@@ -1,0 +1,67 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>d2-web</title>
+<style>body{background:#000;color:#ccc;font:14px monospace;margin:16px}</style>
+<pre id="log"></pre>
+<!-- version-engine.sh rewrites this src into e/<hash>/ alongside the engine. -->
+<script src="streamfs.js"></script>
+<script>
+// M0 smoke page. Boots the engine, mounts the synthetic smoke.mpq through streamfs, reads a
+// file out of it via StormLib in wasm, and publishes the result on window.__d2 for the
+// harness. ?retail=1 also mounts the retail MPQs served at /retail/ (see serve.mjs) into the
+// layered VFS, in retail priority order. Everything real replaces this in M3/M5.
+const RETAIL_ORDER = ['patch_d2.mpq', 'd2exp.mpq', 'd2xmusic.mpq', 'd2xtalk.mpq', 'd2xvideo.mpq', 'd2data.mpq', 'd2char.mpq', 'd2music.mpq', 'd2sfx.mpq', 'd2speech.mpq', 'd2video.mpq'];
+const log = (s) => { document.getElementById('log').textContent += s + '\n'; console.log(s); };
+window.__d2 = { ready: false, smoke: null, error: null };
+// Stamped by version-engine.sh; untouched placeholder = local dev, engine next to this page.
+const VER = '__ENGINE_VERSION__';
+const ENGINE_DIR = VER.startsWith('__') ? '' : 'e/' + VER + '/';
+(async () => {
+  try {
+    if (!crossOriginIsolated) throw new Error('not crossOriginIsolated: COOP/COEP headers missing');
+    const head = await fetch('smoke.mpq', { method: 'HEAD' });
+    if (!head.ok) throw new Error('smoke.mpq: HTTP ' + head.status);
+    const size = Number(head.headers.get('content-length'));
+    // init + wait for the worker BEFORE the engine exists: the first sync read must not race
+    // the worker's own startup (see streamfs.js, 'd2-web divergence').
+    StreamFS.init();
+    await StreamFS.ready();
+    // Retail MPQs: HEAD each for its size, mount only the ones the server has (build.sh links
+    // retail/D2/*.mpq plus the 1.13c core's Patch_D2.mpq into one dir for serve.mjs).
+    const wantRetail = /[?&]retail=1/.test(location.search);
+    const retail = [];
+    if (wantRetail) for (const f of RETAIL_ORDER) {
+      const h = await fetch('retail/' + f, { method: 'HEAD' });
+      if (h.ok) retail.push({ f, size: Number(h.headers.get('content-length')) });
+    }
+    window.Module = {
+      locateFile: (p) => ENGINE_DIR + p,
+      print: log, printErr: log,
+      preRun: [() => {
+        StreamFS.mount('/smoke.mpq', 'smoke.mpq', size);
+        log('streamfs: mounted /smoke.mpq (' + size + ' bytes)');
+        if (retail.length) FS.mkdir('/retail');   // makeNode needs the parent dir to exist
+        for (const r of retail) StreamFS.mount('/retail/' + r.f, 'retail/' + r.f, r.size);
+        if (retail.length) log('streamfs: mounted ' + retail.length + ' retail MPQs');
+      }],
+      onRuntimeInitialized() {
+        const r = Module.ccall('d2_smoke_mpq', 'string', ['string', 'string'], ['/smoke.mpq', 'smoke.txt']);
+        const i32 = Module.ccall('d2_smoke_i32', 'number', [], []);
+        let vfs = 0;
+        for (const m of retail) vfs += Module.ccall('d2_vfs_mount', 'number', ['string'], ['/retail/' + m.f]);
+        window.__d2 = { ready: true, smoke: r, i32, streamfs: StreamFS.stats(), retail: vfs, error: null };
+        // Retail-gated probes for the test runner.
+        window.__d2.txt = (name) => Module.ccall('d2_txt_probe', 'string', ['string'], [name]);
+        // Vector replay for the test runner: run one prng record, return {low, high, hash}.
+        window.__d2.prng = (low, high, nMax, count) => {
+          const out = Module._malloc(12);
+          Module.ccall('d2_prng_check', null, ['number', 'number', 'number', 'number', 'number'], [low >>> 0, high >>> 0, nMax >>> 0, count >>> 0, out]);
+          const r = Array.from(Module.HEAPU32.subarray(out >> 2, (out >> 2) + 3)); Module._free(out); return r;
+        };
+        log('smoke: ' + r + '  i32: ' + i32);
+      },
+    };
+    const s = document.createElement('script'); s.src = ENGINE_DIR + 'd2.js'; document.head.appendChild(s);
+  } catch (e) { window.__d2 = { ready: true, smoke: null, error: String(e) }; log('ERROR ' + e); }
+})();
+</script>

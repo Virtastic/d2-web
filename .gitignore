@@ -1,0 +1,33 @@
+# Game content is never committed: bring your own install.
+*.iso
+*.mpq
+*.dll
+*.exe
+*.cab
+retail/
+
+# Build output
+build-wasm/
+*.wasm
+*.data
+*.br
+play/d2.js
+play/smoke.json
+play/.engine-key
+.git-artifacts.lock
+.widebg/
+
+# Credentials
+*.pem
+*.key
+*.crt
+.env
+.env.*
+!.env.example
+
+# Cruft
+*.tar
+*.7z
+*.zip
+*.bak
+.DS_Store
