@@ -79,6 +79,20 @@
       const handles = new Map();   // id -> FileSystemFileHandle
       const files = new Map();     // id -> File (cached getFile() result)
       let prefetch = null;         // {ckey, done}: the one outstanding sequential prefetch (backlog 389)
+      // d2-web divergence: Chrome can reject a local range fetch transiently. Retry only
+      // transport errors, with a bound; missing files and exhausted reads must still fail.
+      async function readRange(url, start, end) {
+        for (let attempt = 0; ; ++attempt) {
+          try {
+            const r = await fetch(url, { headers: { Range: 'bytes=' + start + '-' + (end - 1) } });
+            if (!r.ok && r.status !== 206) throw new Error('HTTP ' + r.status);
+            return new Uint8Array(await r.arrayBuffer());
+          } catch (err) {
+            if (!(err instanceof TypeError) || attempt === 2) throw err;
+            await new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1)));
+          }
+        }
+      }
       onmessage = async (e) => {
         const m = e.data;
         if (m.init) { ctrl = new Int32Array(m.ctrl); data = new Uint8Array(m.data); postMessage({ ready: 1 }); return; }
@@ -110,9 +124,7 @@
               } catch (e) { /* Cache API unavailable: fall through to the network */ }
             }
             if (!buf) {
-              const r = await fetch(m.url, { headers: { Range: 'bytes=' + m.start + '-' + (m.end - 1) } });
-              if (!r.ok && r.status !== 206) throw new Error('HTTP ' + r.status);
-              buf = new Uint8Array(await r.arrayBuffer());
+              buf = await readRange(m.url, m.start, m.end);
               if (ckey) {
                 // Not awaited: the copy into the shared buffer below reads buf, the put keeps
                 // its own reference, and nothing mutates buf afterwards.
@@ -144,6 +156,8 @@
             })() };
           }
         } catch (err) {
+          // d2-web: preserve the worker's cause when a synchronous engine read fails.
+          console.error('streamfs worker read failed:', String(err));
           ctrl[1] = -1;
           Atomics.store(ctrl, 0, m.gen);
           Atomics.notify(ctrl, 0);

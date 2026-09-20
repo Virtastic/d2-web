@@ -170,6 +170,27 @@ struct D2LvlPrestTxt
 	uint32_t dwDt1Mask;						//0x1AC
 };
 
+// Exact serialized/in-memory retail x86 record. Native wasm64 execution uses
+// D2LvlSubTxt below and expands the embedded pointers/grids explicitly.
+struct D2DrlgGridRetail32Strc
+{
+	uint32_t pCellsFlags;
+	uint32_t pCellsRowOffsets;
+	int32_t nWidth;
+	int32_t nHeight;
+	int32_t unk0x10;
+};
+
+struct D2LvlSubTxtRetail32
+{
+	uint32_t dwType; char szFile[60]; uint32_t dwCheckAll, dwBordType, dwDt1Mask, dwGridSize;
+	uint32_t pDrlgFile;
+	D2DrlgGridRetail32Strc pTileTypeGrid[4], pWallGrid[4], pFloorGrid, pShadowGrid;
+	uint32_t nProb[5]; int32_t nTrials[5], nMax[5]; uint32_t dwExpansion;
+};
+static_assert(sizeof(D2DrlgGridRetail32Strc) == 20);
+static_assert(sizeof(D2LvlSubTxtRetail32) == 348);
+
 struct D2LvlSubTxt
 {
 	uint32_t dwType;						//0x00 D2C_LevelSubstitutionType. Referenced as SubType in Levels.txt

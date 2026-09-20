@@ -31,10 +31,24 @@ bool drlgLoadTables(MpqVfs& vfs, const LangTables&) {
 // hand-ported fixups.
 #include <emscripten.h>
 #include <string>
+#include <vector>
 extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_datatbl(const char* name) {
     static std::string out; std::string n(name);
     const void* p = nullptr; int c = 0;
     D2DataTablesStrc* t = sgptDataTables;
+    static std::vector<D2LvlSubTxtRetail32> lvlSubRetail;
+    if (n == "lvlsub" && t->pLvlSubTxt) {
+        lvlSubRetail.assign(t->nLvlSubTxtRecordCount, {});
+        for (int i = 0; i < t->nLvlSubTxtRecordCount; ++i) {
+            const D2LvlSubTxt& src = t->pLvlSubTxt[i]; D2LvlSubTxtRetail32& dst = lvlSubRetail[i];
+            dst.dwType = src.dwType; memcpy(dst.szFile, src.szFile, sizeof(dst.szFile));
+            dst.dwCheckAll = src.dwCheckAll; dst.dwBordType = src.dwBordType;
+            dst.dwDt1Mask = src.dwDt1Mask; dst.dwGridSize = src.dwGridSize;
+            memcpy(dst.nProb, src.nProb, sizeof(dst.nProb)); memcpy(dst.nTrials, src.nTrials, sizeof(dst.nTrials));
+            memcpy(dst.nMax, src.nMax, sizeof(dst.nMax)); dst.dwExpansion = src.dwExpansion;
+        }
+        p = lvlSubRetail.data(); c = static_cast<int>(lvlSubRetail.size());
+    }
 #define T(nm, ptr, cnt) if (n == nm) { p = t->ptr; c = t->cnt; }
     T("missiles", pMissilesTxt, nMissilesTxtRecordCount) T("skills", pSkillsTxt, nSkillsTxtRecordCount)
     T("monstats", pMonStatsTxt, nMonStatsTxtRecordCount) T("charstats", pCharStatsTxt, nCharStatsTxtRecordCount)
@@ -43,7 +57,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_datatbl(const char* name) {
     T("shrines", pShrinesTxt, nShrinesTxtRecordCount) T("objects", pObjectsTxt, nObjectsTxtRecordCount)
     T("objgroup", pObjGroupTxt, nObjGroupTxtRecordCount) T("lvltypes", pLvlTypesTxt, nLvlTypesTxtRecordCount)
     T("lvlwarp", pLvlWarpTxt, nLvlWarpTxtRecordCount) T("lvlmaze", pLvlMazeTxt, nLvlMazeTxtRecordCount)
-    T("lvlsub", pLvlSubTxt, nLvlSubTxtRecordCount) T("cubemain", pCubeMainTxt, nCubeMainTxtRecordCount)
+    T("cubemain", pCubeMainTxt, nCubeMainTxtRecordCount)
 #undef T
     out = p ? std::to_string((uintptr_t)p) + ":" + std::to_string(c) : "";
     return out.c_str();

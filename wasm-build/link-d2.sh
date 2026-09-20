@@ -1,6 +1,6 @@
 #!/bin/bash
-# Canonical d2-web -> wasm build + link. Runs INSIDE d2-builder32 (Dockerfile.builder32):
-#   docker run --rm -v "$PWD:/build" d2-builder32:1 bash wasm-build/link-d2.sh
+# Canonical d2-web -> wasm build + link. Runs INSIDE d2-builder64 (Dockerfile.builder64):
+#   docker run --rm -v "$PWD:/build" d2-builder64:1 bash wasm-build/link-d2.sh
 # Produces build-wasm/d2.{js,wasm} and copies them into play/ (+ .br siblings). Stage into
 # play/e/<hash>/ with version-engine.sh afterwards; ci/build.sh does all three.
 #
@@ -12,9 +12,22 @@ set -euo pipefail
 ROOT="${ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 BUILD="$ROOT/build-wasm"
 STORM_SRC="$ROOT/third_party/StormLib"
-STORM_BUILD="$BUILD/stormlib"
+STORM_BUILD="$BUILD/stormlib-wasm64"
 mkdir -p "$BUILD"
 cd "$ROOT"
+
+# ci/build.sh runs the container as root so mixed Git-Bash/WSL ownership cannot block CMake.
+# Restore only generated outputs to the invoking user even when compilation exits early.
+restore_output_owner() {
+  [ -n "${D2_OUTPUT_OWNER:-}" ] || return 0
+  targets=("$STORM_BUILD")
+  [ -n "${OBJDIR:-}" ] && targets+=("$OBJDIR")
+  for f in "$BUILD/d2.js" "$BUILD/d2.wasm" "$ROOT/play/d2.js" "$ROOT/play/d2.wasm"; do
+    [ -e "$f" ] && targets+=("$f")
+  done
+  chown -R "$D2_OUTPUT_OWNER" "${targets[@]}" 2>/dev/null || true
+}
+trap restore_output_owner EXIT
 
 [ -f "$STORM_SRC/CMakeLists.txt" ] || { echo "FATAL: third_party/StormLib is empty -- git submodule update --init" >&2; exit 1; }
 
@@ -22,13 +35,16 @@ cd "$ROOT"
 # Bundled zlib/bzip2/lzma so the link line does not depend on which emscripten ports exist in
 # the sysroot. Static, -pthread to match everything else (an archive compiled without -pthread
 # links fine and then faults at runtime on the first atomic -- the bad failure mode).
-storm_rev=$(git -C "$STORM_SRC" rev-parse HEAD 2>/dev/null || echo unknown)
+storm_rev=$(git -c safe.directory="$STORM_SRC" -C "$STORM_SRC" rev-parse HEAD 2>/dev/null || echo unknown)
 if [ ! -f "$STORM_BUILD/libstorm.a" ] || [ "$(cat "$STORM_BUILD/.rev" 2>/dev/null)" != "$storm_rev" ]; then
   echo "==> StormLib @ $storm_rev"
-  rm -rf "$STORM_BUILD"; mkdir -p "$STORM_BUILD"
+  # Clear the contents, not the directory itself. On Windows/WSL Docker bind mounts the output
+  # directory can be writable even when its parent retains a different SID-derived owner.
+  mkdir -p "$STORM_BUILD"
+  find "$STORM_BUILD" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
   emcmake cmake -S "$STORM_SRC" -B "$STORM_BUILD" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release -DSTORM_USE_BUNDLED_LIBRARIES=ON -DSTORM_SKIP_INSTALL=ON \
-    -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS="-pthread -O2" -DCMAKE_CXX_FLAGS="-pthread -O2" >/dev/null
+    -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS="-m64 -pthread -O2" -DCMAKE_CXX_FLAGS="-m64 -pthread -O2" >/dev/null
   ninja -C "$STORM_BUILD" storm
   echo "$storm_rev" > "$STORM_BUILD/.rev"
 fi
@@ -37,21 +53,51 @@ fi
 # --- the engine ---------------------------------------------------------------------------
 # -fno-strict-aliasing: recovered code punning structs is the norm, not the exception.
 # -fwrapv: signed overflow wraps, like the x86-32 MSVC build the logic came from.
-# No -flto (openmw-web: wasm-ld miscompiles under it). No MEMORY64, ever, in this repo.
+# No -flto (openmw-web: wasm-ld miscompiles under it). `-m64` selects full end-to-end Memory64.
 SRCS=$(find src -name '*.cpp' | sort)
 # tools/vectorfmt is shared with the Win32 capture tool: same header, same hash, no drift.
 echo "==> em++ $(echo $SRCS | wc -w) sources"
 # src/core/d2moo is vendored D2MOO (MIT, 1.10f prose map) compiled as 1.13c through the
 # shims in src/core/d2moo/compat; its Windows-isms are silenced, not fixed.
 # D2_CXXFLAGS="-g -O1 -sASSERTIONS=2 -sSAFE_HEAP=1" turns a "memory access out of bounds" into a stack.
-em++ -std=c++20 -O2 -pthread -fno-strict-aliasing -fwrapv ${D2_CXXFLAGS:-} \
+CXXFLAGS="-m64 -std=c++20 -O2 -pthread -fno-strict-aliasing -fwrapv ${D2_CXXFLAGS:-} \
   -Wno-unknown-pragmas -Wno-microsoft -Wno-unused-value \
+  -Wno-invalid-offsetof -Wno-deprecated-volatile -Wno-writable-strings \
   -DD2_VERSION_MAJOR=1 -DD2_VERSION_MINOR=13 -DD2_VERSION_PATCH=67 \
-  -I"$STORM_SRC/src" -Isrc -Isrc/core/d2moo/compat -Isrc/core/d2moo/include $SRCS "$STORM_BUILD/libstorm.a" \
+  -I$STORM_SRC/src -Isrc -Isrc/core/d2moo/compat -Isrc/core/d2moo/include -Isrc/core/d2moo/include/D2Game -Isrc/core/d2moo/squall"
+# Objects are cached per source under build-wasm/obj/<flags-hash>/ (the vendored tree is ~200k
+# lines; a full rebuild is minutes, a one-file change is seconds). Each compile emits a depfile
+# and a content digest for the complete user-header closure. Content, rather than mtimes, matters:
+# GitHub checkout gives every source a fresh timestamp when restoring older cached objects.
+OBJDIR="$BUILD/obj/$(echo "$CXXFLAGS" | md5sum | cut -c1-12)"; mkdir -p "$OBJDIR"
+dependency_digest() {
+  # Read only the depfile's first rule; -MP appends header-only phony rules afterwards.
+  awk 'NR == 1 { sub(/^[^:]*:/, "") }
+       { more = ($0 ~ /\\$/); sub(/\\$/, ""); print; if (!more) exit }' "$1" |
+    tr '\n' ' ' | xargs sha256sum | sha256sum | cut -d' ' -f1
+}
+OBJS=""
+for f in $SRCS; do
+  o="$OBJDIR/$(echo "$f" | tr '/' '_' | sed 's/\.cpp$/.o/')"
+  d="$o.d"
+  digest="$o.inputs"
+  current=""
+  if [ -f "$o" ] && [ -f "$d" ] && [ -f "$digest" ]; then
+    # Paths in this project contain no whitespace. Strip Make continuations and the target,
+    # then hash the contents of every dependency. A missing dependency also forces a rebuild.
+    current=$(dependency_digest "$d" 2>/dev/null || true)
+  fi
+  if [ -z "$current" ] || [ "$current" != "$(cat "$digest" 2>/dev/null)" ]; then
+    em++ $CXXFLAGS -MMD -MP -MF "$d" -MT "$o" -c "$f" -o "$o" || exit 1
+    dependency_digest "$d" > "$digest"
+  fi
+  OBJS="$OBJS $o"
+done
+em++ -m64 -O2 -pthread ${D2_CXXFLAGS:-} $OBJS "$STORM_BUILD/libstorm.a" \
   -sPTHREAD_POOL_SIZE=2 -sALLOW_MEMORY_GROWTH=1 -sMAXIMUM_MEMORY=4294967296 \
   -sEXPORTED_RUNTIME_METHODS=FS,ccall,cwrap,UTF8ToString,HEAPU32,HEAPU8,HEAPU16,HEAP32 \
-  -sEXPORTED_FUNCTIONS=_main,_d2_smoke_mpq,_d2_smoke_i32,_d2_prng_check,_d2_vfs_mount,_d2_txt_probe,_d2_table_bin_load,_d2_table_bin_ptr,_d2_table_bin_len,_d2_lang_probe,_d2_drlg_init,_d2_drlg_act_begin,_d2_drlg_act_end,_d2_drlg_level,_d2_drlg_out,_d2_drlg_grid,_d2_drlg_err,_d2_datatbl,_malloc,_free \
-  -sENVIRONMENT=web,worker -sNO_EXIT_RUNTIME=1 \
+  -sEXPORTED_FUNCTIONS=_main,_d2_smoke_mpq,_d2_smoke_i32,_d2_prng_check,_d2_vfs_mount,_d2_asset_read,_d2_asset_ptr,_d2_asset_len,_d2_asset_error,_d2_txt_probe,_d2_table_bin_load,_d2_table_bin_ptr,_d2_table_bin_len,_d2_lang_probe,_d2_drlg_init,_d2_drlg_act_begin,_d2_drlg_act_end,_d2_drlg_level,_d2_drlg_out,_d2_drlg_grid,_d2_drlg_err,_d2_datatbl,_d2_itemgen_init,_d2_itemgen_run,_d2_itemgen_out,_d2_itemgen_err,_d2_monspawn_init,_d2_monspawn_level,_d2_monspawn_out,_d2_monspawn_units,_d2_monspawn_err,_d2_monspawn_trace,_d2_aispawn_out,_d2_aispawn_units,_d2_aitarget_attach,_d2_aitarget_out,_d2_aitarget_units,_d2_combat_events,_d2_combat_result,_d2_damagecalc_run,_d2_session_create,_d2_session_command_move,_d2_session_command_warp,_d2_session_command_nearest_warp,_d2_session_command_object,_d2_session_command_npc,_d2_session_command_nearest_npc,_d2_session_command_npc_response,_d2_session_command_end_npc,_d2_session_command_npc_vendor,_d2_session_command_vendor_sell,_d2_session_command_vendor_buy,_d2_session_command_vendor_gamble,_d2_session_command_vendor_repair,_d2_session_vendor_repair,_d2_session_command_primary_attack,_d2_session_command_throw,_d2_session_command_kick,_d2_session_equipped_quantity,_d2_session_command_pickup,_d2_session_command_drop,_d2_session_command_use_belt,_d2_session_fixture_experience,_d2_session_command_add_stat,_d2_session_command_add_skill,_d2_session_advancement,_d2_session_command_stow_body,_d2_session_command_respawn,_d2_session_command_recover_corpse,_d2_session_item_save_roundtrip,_d2_session_item_save_bytes,_d2_session_item_save_length,_d2_session_stats_save_roundtrip,_d2_session_stats_save_bytes,_d2_session_stats_save_length,_d2_session_campaign_save_roundtrip,_d2_session_skill_save_bytes,_d2_session_skill_save_length,_d2_session_waypoint_save_bytes,_d2_session_waypoint_save_length,_d2_session_quest_intro_save_roundtrip,_d2_session_quest_save_bytes,_d2_session_quest_save_length,_d2_session_intro_save_bytes,_d2_session_intro_save_length,_d2_session_corpse_save_roundtrip,_d2_session_corpse_save_bytes,_d2_session_corpse_save_length,_d2_session_tick,_d2_session_attack,_d2_session_progress,_d2_session_item_state,_d2_session_npc_interaction,_d2_session_npc_dialog,_d2_session_npc_response,_d2_session_vendor,_d2_session_vendor_items,_d2_session_vendor_item_count,_d2_session_vendor_transaction,_d2_session_act1q1,_d2_session_snapshot,_d2_session_resources,_d2_session_motion,_d2_session_rooms,_d2_session_room_count,_d2_session_units,_d2_session_unit_count,_d2_session_monster_animations,_d2_session_monster_animation_count,_d2_session_object_presentations,_d2_session_object_presentation_count,_d2_session_item_presentations,_d2_session_item_presentation_count,_d2_session_world_hash,_d2_session_tiles,_d2_session_tile_count,_d2_session_terrain_hash,_d2_session_warps,_d2_session_warp_count,_d2_session_navigation_hash,_d2_session_destroy,_malloc,_free \
+  -sENVIRONMENT=web,worker -sNO_EXIT_RUNTIME=1 -Wl,--error-limit=0 \
   -o "$BUILD/d2.js"
 
 mkdir -p play

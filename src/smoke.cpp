@@ -36,14 +36,14 @@ const char* d2_smoke_mpq(const char* mpq, const char* name) {
     return out.c_str();
 }
 
-// wasm32 i32 semantics are the reason for the pointer-model decision; assert them at runtime
-// so a toolchain change that broke wrapping would fail s00 rather than M0b.
+// Assert retail-style uint32_t wrapping and the native wasm64 pointer width at runtime;
+// a toolchain change that breaks either contract must fail s00 before the parity scenarios.
 EMSCRIPTEN_KEEPALIVE
 uint32_t d2_smoke_i32(void) {
     volatile uint32_t a = 0xFFFFFFFFu; a += 2;      // wraps to 1
     volatile int32_t b = 0x7FFFFFFF;                // signed overflow via unsigned path
     uint32_t c = (uint32_t)b + 1u;                  // 0x80000000
-    return a + (c >> 31) + (uint32_t)sizeof(void*); // 1 + 1 + 4 = 6
+    return a + (c >> 31) + (uint32_t)sizeof(void*); // 1 + 1 + 8 = 10
 }
 
 } // extern "C"

@@ -65,5 +65,8 @@ inline uint32_t __fastcall SEED_RollLimitedRandomNumber(D2SeedStrc* pSeed, int n
 
 inline uint32_t SEED_RollPercentage(D2SeedStrc* pSeed)
 {
-	return (SEED_RollRandomNumber(pSeed) % 100);
+	// Retail's x86 callers take the random value through EAX before the remainder.
+	// Keeping the full 64-bit state here changes decisions on wasm64 even though the
+	// resulting seed state remains byte-identical.
+	return static_cast<uint32_t>(SEED_RollRandomNumber(pSeed)) % 100;
 }

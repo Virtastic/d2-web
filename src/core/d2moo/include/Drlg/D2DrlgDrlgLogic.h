@@ -31,6 +31,9 @@ struct D2DrlgLogicalRoomInfoStrc // aka D2DrlgCoordListStrc
 	D2DrlgGridStrc pIndexX;					//0x08
 	D2DrlgGridStrc pIndexY;					//0x1C
 	D2RoomCoordListStrc* pCoordList;		//0x30
+	// wasm64 sidecar for the retail grid that stored 32-bit process pointers.
+	// This is engine state, not part of a serialized retail layout.
+	D2RoomCoordListStrc** ppCoordListByCell;
 };
 
 #pragma pack()

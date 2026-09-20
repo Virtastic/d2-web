@@ -201,6 +201,8 @@ nApplyType was unused
 //}
 
 
+// d2-web: initialisers below name the pad explicitly ({ x, {}, type }); with brace elision the type
+// landed in pad0x01[0] and nItemType stayed 0, so no item ever qualified as superior.
 struct D2ItemTypeCheckStrc
 {
 	uint8_t bItemType;				//0x00
@@ -2467,9 +2469,11 @@ void __stdcall ITEMMODS_AssignProperty(int nType, D2UnitStrc* a2, D2UnitStrc* pI
 
 		case PROPMODE_GRADE:
 		{
-#define MAX_UNIQUE_ITEM_PROPERTIES 12
-			D2_ASSERT(nMod < MAX_UNIQUE_ITEM_PROPERTIES && nMod >= 0);
-			return;
+			// d2-web: the upstream decompile returned here, so superior items never got their
+			// QualityItems.txt mods; retail 1.13c applies the record's two properties (s04 corpus).
+			D2_ASSERT(pMods);
+			pProperty = &((D2QualityItemsTxt*)pMods)->pProperties[nMod];
+			break;
 		}
 
 		case PROPMODE_GEM:
@@ -2662,10 +2666,26 @@ BOOL __stdcall ITEMMODS_CanItemHaveMagicAffix(D2UnitStrc* pItem, const D2MagicAf
 
 	if (ITEMS_GetItemFormat(pItem) >= 100 || !ITEMS_CheckIfStackable(pItem) && !ITEMS_CheckIfThrowable(pItem))
 	{
-		if (ITEMS_CheckIfSocketable(pItem) && ITEMS_GetMaxSockets(pItem) || pMagicAffixTxtRecord->pProperties[0].nProperty < 0 || pMagicAffixTxtRecord->pProperties[0].nProperty < sgptDataTables->nPropertiesTxtRecordCount)
+		// d2-web: D2Common 1.13c #10461 (0x6FD95E50). A socketable item with max sockets > 0 skips
+		// the property check entirely (socket affixes allowed); otherwise an affix whose first
+		// property's stat is numsockets is rejected. The upstream decompile folded the socketable
+		// test into the same condition and rejected socket affixes for every item.
+		bool bTypeCheck = false;
+		if (pItem->dwUnitType == UNIT_ITEM && ITEMS_CheckIfSocketable(pItem) && ITEMS_GetMaxSockets(pItem) > 0)
+		{
+			bTypeCheck = true;
+		}
+		else if (pMagicAffixTxtRecord->pProperties[0].nProperty < 0)
+		{
+			bTypeCheck = true;
+		}
+		else if (pMagicAffixTxtRecord->pProperties[0].nProperty < sgptDataTables->nPropertiesTxtRecordCount)
 		{
 			pPropertiesTxtRecord = &sgptDataTables->pPropertiesTxt[pMagicAffixTxtRecord->pProperties[0].nProperty];
-			if (pPropertiesTxtRecord && pPropertiesTxtRecord->wStat[0] != STAT_ITEM_NUMSOCKETS)
+			bTypeCheck = pPropertiesTxtRecord && pPropertiesTxtRecord->wStat[0] != STAT_ITEM_NUMSOCKETS;
+		}
+		{
+			if (bTypeCheck)
 			{
 				for (int i = 0; i < ARRAY_SIZE(pMagicAffixTxtRecord->wEType); ++i)
 				{
@@ -2739,15 +2759,15 @@ BOOL __stdcall ITEMMODS_CanItemBeHighQuality(D2UnitStrc* pItem, D2QualityItemsTx
 {
 	D2ItemTypeCheckStrc pItemTypeCheck[9] =
 	{
-		{ pQualityItemsTxtRecord->nShield, ITEMTYPE_SHIELD },
-		{ pQualityItemsTxtRecord->nScepter, ITEMTYPE_SCEPTER },
-		{ pQualityItemsTxtRecord->nWand, ITEMTYPE_WAND },
-		{ pQualityItemsTxtRecord->nStaff, ITEMTYPE_STAFF },
-		{ pQualityItemsTxtRecord->nBow, ITEMTYPE_BOW },
-		{ pQualityItemsTxtRecord->nBow, ITEMTYPE_CROSSBOW },
-		{ pQualityItemsTxtRecord->nBoots, ITEMTYPE_BOOTS },
-		{ pQualityItemsTxtRecord->nGloves, ITEMTYPE_GLOVES },
-		{ pQualityItemsTxtRecord->nBelt, ITEMTYPE_BELT },
+		{ pQualityItemsTxtRecord->nShield, {}, ITEMTYPE_SHIELD },
+		{ pQualityItemsTxtRecord->nScepter, {}, ITEMTYPE_SCEPTER },
+		{ pQualityItemsTxtRecord->nWand, {}, ITEMTYPE_WAND },
+		{ pQualityItemsTxtRecord->nStaff, {}, ITEMTYPE_STAFF },
+		{ pQualityItemsTxtRecord->nBow, {}, ITEMTYPE_BOW },
+		{ pQualityItemsTxtRecord->nBow, {}, ITEMTYPE_CROSSBOW },
+		{ pQualityItemsTxtRecord->nBoots, {}, ITEMTYPE_BOOTS },
+		{ pQualityItemsTxtRecord->nGloves, {}, ITEMTYPE_GLOVES },
+		{ pQualityItemsTxtRecord->nBelt, {}, ITEMTYPE_BELT },
 	};
 	
 	int nItemType = ITEMS_GetItemType(pItem);
@@ -3593,7 +3613,7 @@ int __fastcall ITEMMODS_PropertyFunc10(int nType, D2UnitStrc* pUnit, D2UnitStrc*
 
 	if (nValue)
 	{
-		return ITEMMODS_AddPropertyToItemStatList(nType, pUnit, pItem, pProperty, nSet, nStatId, pProperty->nLayer % 3 + 8 * pProperty->nLayer / 3, nValue, nState, fStatList, a11);
+		return ITEMMODS_AddPropertyToItemStatList(nType, pUnit, pItem, pProperty, nSet, nStatId, pProperty->nLayer % 3 + 8 * (pProperty->nLayer / 3) /* d2-web: tab = class*8 + tab-in-class; upstream divided the product */, nValue, nState, fStatList, a11);
 	}
 
 	nMin = pProperty->nMin;
@@ -3630,7 +3650,7 @@ int __fastcall ITEMMODS_PropertyFunc10(int nType, D2UnitStrc* pUnit, D2UnitStrc*
 		return 0;
 	}
 
-	return ITEMMODS_AddPropertyToItemStatList(nType, pUnit, pItem, pProperty, nSet, nStatId, pProperty->nLayer % 3 + 8 * pProperty->nLayer / 3, nMin, nState, fStatList, a11);
+	return ITEMMODS_AddPropertyToItemStatList(nType, pUnit, pItem, pProperty, nSet, nStatId, pProperty->nLayer % 3 + 8 * (pProperty->nLayer / 3) /* d2-web: tab = class*8 + tab-in-class; upstream divided the product */, nMin, nState, fStatList, a11);
 }
 
 //D2Common.0x6FD972E0

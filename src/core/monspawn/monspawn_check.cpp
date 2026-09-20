@@ -1,0 +1,2130 @@
+// Retail-gated monster-spawn check (s05-monspawn): for each (seed, difficulty, level) of
+// the retail captures, make the game the headless 1.13c D2Game made,
+// load the act, initialise the level, activate every room in Room2-list order the way D2Game's
+// room-activation routine does (region tick, preset units, objects, random monsters) and hash the
+// units that hang off the rooms exactly as the retail capture tool does (D2VecMonUnit from `room` on).
+#include <emscripten.h>
+#include <algorithm>
+#include <string>
+#include <vector>
+#include <D2Common.h>
+#include <D2CMP.h>
+#include <D2DataTbls.h>
+#include <D2Dungeon.h>
+#include <D2Collision.h>
+#include <D2Skills.h>
+#include <DataTbls/SkillsIds.h>
+#include <DataTbls/MonsterIds.h>
+#include <Drlg/D2DrlgDrlgLogic.h>
+#include <Drlg/D2DrlgPreset.h>
+#include <D2Seed.h>
+#include <D2StatList.h>
+#include <D2States.h>
+#include <D2Items.h>
+#include <D2QuestRecord.h>
+#include <D2Inventory.h>
+#include <D2PacketDef.h>
+#include <DataTbls/ItemsTbls.h>
+#include <Units/Units.h>
+#include <Units/Monster.h>
+#include <Path/Path.h>
+#include <Path/PathMisc.h>
+#include <Path/Step.h>
+#include <GAME/Game.h>
+#include <GAME/Event.h>
+#include <GAME/Arena.h>
+#include <GAME/Level.h>
+#include <GAME/Clients.h>
+#include <AI/AiGeneral.h>
+#include <UNIT/SUnit.h>
+#include <UNIT/SUnitDmg.h>
+#include <UNIT/SUnitInactive.h>
+#include <UNIT/SUnitProxy.h>
+#include <SKILLS/Skills.h>
+#include <PLAYER/PlrModes.h>
+#include <PLAYER/PlrMsg.h>
+#include <PLAYER/PlrIntro.h>
+#include <PLAYER/Player.h>
+#include <PLAYER/PlrSave.h>
+#include <PLAYER/PlrSave2.h>
+#include <ITEMS/ItemMode.h>
+#include <UNIT/Party.h>
+#include <MONSTER/MonsterRegion.h>
+#include <MONSTER/Monster.h>
+#include <MONSTER/MonsterAI.h>
+#include <MONSTER/MonsterMode.h>
+#include <OBJECTS/ObjRgn.h>
+#include <OBJECTS/Objects.h>
+#include <OBJECTS/ObjMode.h>
+#include <QUESTS/Quests.h>
+#include <QUESTS/ACT1/A1Q1.h>
+#include "../d2moo/compat/datatbls_bridge.h"
+#include "../tables/shared.h"
+#include "../../../tools/vectorfmt/vectorfmt.h"
+
+static std::string g_err;
+static D2GameStrc* g_game;
+static uint32_t g_gameSeed = ~0u; static int g_gameDiff = -1;
+static std::vector<D2VecMonUnit> g_units;   // the last level's units (D2_MONS_DUMP reads them)
+static D2VecMonLevel g_out;
+static std::vector<D2VecAiUnit> g_aiUnits;
+static D2VecAiLevel g_aiOut;
+static D2DrlgLevelStrc* g_lastLevel;
+static D2UnitStrc* g_targetPlayer;
+static D2UnitStrc* g_targetMonster;
+static D2ActiveRoomStrc* g_targetRoom;
+static D2ClientStrc* g_targetClient;
+static std::vector<D2VecAiTargetUnit> g_targetUnits;
+static D2VecAiLevel g_targetOut;
+static std::vector<D2VecCombat> g_combatEvents;
+static D2VecCombatResult g_combatResult;
+static int g_currentAct = -1, g_currentLevel = -1;
+
+// Pointer-free state handed to the browser.  Keep this as an explicit wire layout: none of the
+// native wasm64 pointers in D2Game/D2Unit are allowed to escape the engine boundary.
+#pragma pack(push, 1)
+struct D2SessionSnapshot {
+    uint32_t version, size, seed, frame;
+    uint16_t level;
+    uint8_t difficulty, act;
+    uint32_t playerClass, playerId;
+    int32_t x, y, targetX, targetY, hp, maxHp;
+    uint32_t mode, flags, monsters, hash;
+};
+struct D2SessionRoom {
+    uint32_t ordinal, level;
+    int32_t x, y, width, height;
+    uint32_t flags, firstUnit, unitCount;
+};
+struct D2SessionUnit {
+    uint32_t id, type;
+    int32_t classId;
+    uint32_t mode;
+    int32_t x, y;
+    uint32_t flags, flagsEx;
+    int32_t hp, maxHp;
+    uint32_t room;
+};
+struct D2SessionMonsterAnimation {
+    uint32_t id, classId, code, mode, framePrecise, frameCountPrecise;
+    uint32_t componentCodes[16];
+    uint16_t animSpeed;
+    uint8_t direction, reserved;
+};
+struct D2SessionObjectPresentation {
+    uint32_t id, classId, token, mode;
+    int32_t x, y;
+    uint32_t framePrecise, frameCountPrecise, componentMask;
+    uint16_t animSpeed;
+    uint8_t direction, reserved;
+};
+struct D2SessionItemPresentation {
+    uint32_t id, classId, code, mode;
+    int32_t x, y;
+    uint32_t quality, itemFlags, framePrecise, frameCountPrecise;
+    char flippyFile[32];
+    char invFile[32];
+    int16_t gridX, gridY;
+    uint8_t invPage, bodyLoc;
+    uint16_t reserved;
+};
+struct D2SessionItemState {
+    uint32_t version, size, commandTarget, result;
+    uint32_t groundCount, inventoryCount, cursorItemId, inventoryHash;
+    uint32_t flags, hash;
+};
+struct D2SessionResources { uint32_t version, size; int32_t hp, maxHp, mana, maxMana; };
+// One selected DT1 entry as used by an active DRLG room.  Library slots and entry ordinals
+// replace native pointers at the browser boundary.  main/sub mirror the DT1 style/sequence
+// names; frameIndex is the selected rarity/animation-frame field in the DT1 header.
+struct D2SessionTile {
+    uint32_t room, layer, ordinal;
+    int32_t orientation, mainIndex, subIndex, frameIndex;
+    uint32_t material;
+    int32_t tileX, tileY, worldX, worldY, screenX, screenY, width, height;
+    uint32_t flags, librarySlot, libraryIndex;
+};
+struct D2SessionMotion {
+    uint32_t version, size, gameFrame, mode;
+    int32_t x, y, targetX, targetY;
+    uint32_t pathPoints, currentPoint, framePrecise, frameCountPrecise;
+    uint16_t animSpeed;
+    uint8_t direction, moving;
+};
+struct D2SessionAttack {
+    uint32_t version, size, gameFrame, state;
+    uint32_t attackerId, targetId, skillId, mode;
+    int32_t targetHpBefore, targetHpAfter;
+    uint32_t eventFrame, resultFlags, physicalDamage, totalDamage, attacks, hash;
+};
+struct D2SessionProgress {
+    uint32_t version, size, gameFrame, targetId;
+    int32_t targetHp;
+    uint32_t targetMode;
+    int32_t playerExperience, experienceDelta;
+    uint32_t itemCount, itemHash, kills, flags;
+};
+struct D2SessionAdvancement {
+    uint32_t version, size, gameFrame, level;
+    int32_t experience, lastExperience, nextExperience;
+    int32_t statPoints, skillPoints, strength, energy, dexterity, vitality;
+    uint32_t skillId, skillBaseLevel, skillTotalLevel, hash;
+};
+struct D2SessionNpcInteraction {
+    uint32_t version, size, commandTarget, result;
+    uint32_t npcId, npcClass;
+    int32_t distance, interactType, interactGuid;
+    uint32_t npcInteractCount, npcHasPlayer, flags, hash;
+};
+struct D2SessionNpcDialog {
+    uint32_t version, size, commandTarget, result, npcId;
+    uint32_t packetHeader, packetUnitType, packetGuid, messageCount;
+    uint16_t stringIds[8];
+    uint8_t menus[8];
+    uint32_t flags, hash;
+};
+struct D2SessionNpcResponse {
+    uint32_t version, size, packetHeader, packetSize, npcId, messageId, result;
+    uint32_t introBefore, introAfter;
+    int32_t interactType, interactGuid;
+    uint32_t flags, hash;
+};
+struct D2SessionVendor {
+    uint32_t version, size, packetHeader, packetSize, action, npcId, result;
+    uint32_t trading, vendorInit, itemCount, itemHash, firstClass, firstCode, firstQuality, hash;
+};
+struct D2SessionVendorItem {
+    uint32_t id, classId, code, mode, quality, cost, flags, hash;
+};
+struct D2SessionVendorTransaction {
+    uint32_t version, size, packetHeader, packetSize, npcId, itemId;
+    uint32_t itemClass, itemCode, itemQuality, itemMode, transactionType;
+    int32_t packetCost, handlerResult, goldBefore, goldAfter;
+    uint32_t playerItemsBefore, playerItemsAfter, vendorItemsBefore, vendorItemsAfter;
+    uint32_t ownedBefore, ownedAfter, resultItemId, flags, hash;
+};
+struct D2SessionRepair {
+    uint32_t version, size, packetHeader, packetSize, npcId, itemId, itemClass;
+    int32_t goldBefore, goldAfter, cost, durabilityBefore, durabilityAfter;
+    int32_t maxDurability, quantityBefore, quantityAfter, maxQuantity;
+    uint32_t ownedBefore, ownedAfter, handlerResult, flags, hash;
+};
+struct D2SessionAct1Quest1 {
+    uint32_t version, size, level, questState, lastState, questFlags;
+    uint32_t playerFlags, globalPrimaryGoal, skillPoints;
+    int32_t monstersLeft;
+    uint32_t enteredDen, akaraActivated, finished, timerActive, hash;
+};
+struct D2SessionItemSaveRoundTrip {
+    uint32_t version, size, result, saveVersion;
+    uint32_t bytesWritten, bytesConsumed, replayBytes, itemCount;
+    uint32_t beforeInventoryCount, afterInventoryCount;
+    uint32_t sectionHash, replayHash, flags, hash;
+};
+struct D2SessionStatsSaveRoundTrip {
+    uint32_t version, size, result, saveVersion;
+    uint32_t bytesWritten, bytesConsumed, replayBytes, statEntries;
+    uint32_t sectionHash, replayHash, flags, beforeStatsHash, afterStatsHash;
+    int32_t hpBefore, hpAfter, manaBefore, manaAfter;
+    uint32_t hash;
+};
+struct D2SessionCampaignSaveRoundTrip {
+    uint32_t version, size, result, saveVersion;
+    uint32_t skillBytes, skillConsumed, skillCount, skillHash, skillReplayHash;
+    uint32_t skillSemanticBefore, skillSemanticAfter;
+    uint32_t waypointBytes, waypointConsumed, waypointHash, waypointReplayHash;
+    uint32_t flags, hash, reserved;
+};
+struct D2SessionQuestIntroSaveRoundTrip {
+    uint32_t version, size, result, saveVersion;
+    uint32_t questBytes, questConsumed, questHash, questReplayHash;
+    uint32_t introBytes, introConsumed, introHash, introReplayHash;
+    uint32_t flags, questSemanticBefore, questSemanticAfter;
+    uint32_t introSemanticBefore, introSemanticAfter, gheedBefore, gheedAfter, hash;
+};
+struct D2SessionCorpseSaveRoundTrip {
+    uint32_t version, size, result, saveVersion;
+    uint32_t bytesWritten, bytesConsumed, replayBytes, sectionCount;
+    uint32_t corpseCountBefore, corpseCountAfter, sectionHash, replayHash;
+    uint32_t flags, readerDetail, reserved, hash;
+};
+// One generated level exit. The active DRLG's Vis/Warp slot becomes source/destination IDs;
+// the remaining fields are the loaded LvlWarp.txt selection/walk contract.
+struct D2SessionWarp {
+    uint32_t slot, room, sourceLevel, destinationLevel, warpId, enabled, direction;
+    int32_t exitX, exitY;
+    int32_t selectX, selectY, selectDX, selectDY, exitWalkX, exitWalkY, offsetX, offsetY;
+};
+#pragma pack(pop)
+static_assert(sizeof(D2SessionSnapshot) == 68);
+static_assert(sizeof(D2SessionRoom) == 36);
+static_assert(sizeof(D2SessionUnit) == 44);
+static_assert(sizeof(D2SessionMonsterAnimation) == 92);
+static_assert(sizeof(D2SessionObjectPresentation) == 40);
+static_assert(sizeof(D2SessionItemPresentation) == 112);
+static_assert(sizeof(D2SessionItemState) == 40);
+static_assert(sizeof(D2SessionResources) == 24);
+static_assert(sizeof(D2SessionTile) == 76);
+static_assert(sizeof(D2SessionMotion) == 52);
+static_assert(sizeof(D2SessionAttack) == 64);
+static_assert(sizeof(D2SessionProgress) == 48);
+static_assert(sizeof(D2SessionAdvancement) == 68);
+static_assert(sizeof(D2SessionNpcInteraction) == 52);
+static_assert(sizeof(D2SessionNpcDialog) == 68);
+static_assert(sizeof(D2SessionNpcResponse) == 52);
+static_assert(sizeof(D2SessionVendor) == 60);
+static_assert(sizeof(D2SessionVendorItem) == 32);
+static_assert(sizeof(D2SessionVendorTransaction) == 96);
+static_assert(sizeof(D2SessionRepair) == 84);
+static_assert(sizeof(D2SessionAct1Quest1) == 60);
+static_assert(sizeof(D2SessionItemSaveRoundTrip) == 56);
+static_assert(sizeof(D2SessionStatsSaveRoundTrip) == 72);
+static_assert(sizeof(D2SessionCampaignSaveRoundTrip) == 72);
+static_assert(sizeof(D2SessionQuestIntroSaveRoundTrip) == 80);
+static_assert(sizeof(D2SessionCorpseSaveRoundTrip) == 64);
+static_assert(sizeof(D2SessionWarp) == 68);
+static D2SessionSnapshot g_sessionSnapshot;
+static D2SessionResources g_sessionResources;
+static D2SessionMotion g_sessionMotion;
+static D2SessionAttack g_sessionAttack;
+static D2SessionProgress g_sessionProgress;
+static D2SessionAdvancement g_sessionAdvancement;
+static uint32_t g_sessionAdvancementSkillId = SKILL_MAGICARROW;
+static D2SessionNpcInteraction g_sessionNpcInteraction;
+static D2SessionNpcDialog g_sessionNpcDialog;
+static D2SessionNpcResponse g_sessionNpcResponse;
+static D2SessionVendor g_sessionVendor;
+static std::vector<D2SessionVendorItem> g_sessionVendorItems;
+static D2SessionVendorTransaction g_sessionVendorTransaction;
+static D2SessionRepair g_sessionRepair;
+static D2SessionAct1Quest1 g_sessionAct1Quest1;
+static D2SessionItemSaveRoundTrip g_sessionItemSaveRoundTrip;
+static std::vector<uint8_t> g_sessionItemSaveBytes;
+static D2SessionStatsSaveRoundTrip g_sessionStatsSaveRoundTrip;
+static std::vector<uint8_t> g_sessionStatsSaveBytes;
+static D2SessionCampaignSaveRoundTrip g_sessionCampaignSaveRoundTrip;
+static std::vector<uint8_t> g_sessionSkillSaveBytes;
+static std::vector<uint8_t> g_sessionWaypointSaveBytes;
+static D2SessionQuestIntroSaveRoundTrip g_sessionQuestIntroSaveRoundTrip;
+static std::vector<uint8_t> g_sessionQuestSaveBytes;
+static std::vector<uint8_t> g_sessionIntroSaveBytes;
+static D2SessionCorpseSaveRoundTrip g_sessionCorpseSaveRoundTrip;
+static std::vector<uint8_t> g_sessionCorpseSaveBytes;
+static D2UnitStrc* g_sessionAttackTarget;
+static D2SkillStrc* g_sessionAttackSkill;
+static uint32_t g_sessionAttackCount;
+static uint32_t g_sessionAttackEndFrame;
+static bool g_sessionAttackResolved;
+static bool g_sessionTargetKillCounted;
+static int32_t g_sessionInitialExperience;
+static uint32_t g_sessionKills;
+static std::vector<D2SessionRoom> g_sessionRooms;
+static std::vector<D2SessionUnit> g_sessionUnits;
+static std::vector<D2SessionMonsterAnimation> g_sessionMonsterAnimations;
+static std::vector<D2SessionObjectPresentation> g_sessionObjectPresentations;
+static std::vector<D2SessionItemPresentation> g_sessionItemPresentations;
+static D2SessionItemState g_sessionItemState;
+static std::vector<D2SessionTile> g_sessionTiles;
+static std::vector<D2SessionWarp> g_sessionWarps;
+struct D2SessionWarpPreset { uint32_t room; int32_t destination, x, y; };
+static std::vector<D2SessionWarpPreset> g_sessionWarpPresets;
+static uint32_t g_sessionWorldHash;
+static uint32_t g_sessionTerrainHash;
+static uint32_t g_sessionNavigationHash;
+static int32_t g_sessionTargetX, g_sessionTargetY;
+static bool g_sessionLive, g_sessionMovePending;
+
+extern "C" void D2WEB_ResetLastDialogPacket();
+extern "C" int D2WEB_CopyLastDialogPacket(D2GSPacketSrv27* pPacket);
+
+static uint32_t sessionHashBytes(uint32_t hash, const void* data, size_t size) {
+    const uint8_t* bytes = static_cast<const uint8_t*>(data);
+    for (size_t i = 0; i < size; ++i) { hash ^= bytes[i]; hash *= 16777619u; }
+    return hash;
+}
+
+// d2cmp_tilelib.cpp owns these nodes.  They are deliberately native helper objects rather than
+// retail packed structs, so repeat the private layout here instead of using D2CMP.h's packed
+// 32-bit DLL declarations (whose node pointer begins four bytes earlier under wasm64).
+struct D2SessionTileRef { D2TileLibraryEntryStrc* tile; D2SessionTileRef* next; };
+struct D2SessionTileNode {
+    int32_t style, sequence, type;
+    D2SessionTileRef* refs;
+    D2SessionTileNode* next;
+};
+struct D2SessionTileHash { D2SessionTileNode* nodes[128]; };
+
+static void sessionTileLibraryIdentity(const D2DrlgRoomStrc* roomEx, const D2TileLibraryEntryStrc* tile,
+        uint32_t& slotOut, uint32_t& indexOut) {
+    slotOut = UINT32_MAX; indexOut = UINT32_MAX;
+    if (!roomEx || !tile) return;
+    const uint32_t bucket = (uint32_t)(2 * (uint8_t)tile->nType - (uint8_t)tile->nSequence + (uint8_t)tile->nStyle) & 0x7Fu;
+    for (uint32_t slot = 0; slot < 32 && roomEx->pTiles[slot]; ++slot) {
+        D2SessionTileHash* hash = reinterpret_cast<D2SessionTileHash*>(roomEx->pTiles[slot]);
+        for (D2SessionTileNode* node = hash->nodes[bucket]; node; node = node->next) {
+            if (node->type != tile->nType || node->style != tile->nStyle || node->sequence != tile->nSequence) continue;
+            uint32_t index = 0;
+            for (D2SessionTileRef* ref = node->refs; ref; ref = ref->next, ++index) {
+                if (ref->tile == tile) { slotOut = slot; indexOut = index; return; }
+            }
+        }
+    }
+}
+
+static void appendSessionTiles(const D2DrlgRoomStrc* roomEx, uint32_t roomOrdinal, uint32_t layer,
+        const D2DrlgTileDataStrc* tiles, int count) {
+    if (!tiles || count <= 0) return;
+    for (int i = 0; i < count; ++i) {
+        const D2DrlgTileDataStrc& tileData = tiles[i];
+        if (!tileData.pTile) continue;
+        const D2TileLibraryEntryStrc& tile = *tileData.pTile;
+        D2SessionTile out = {};
+        out.room = roomOrdinal; out.layer = layer; out.ordinal = (uint32_t)i;
+        out.orientation = tile.nType; out.mainIndex = tile.nStyle; out.subIndex = tile.nSequence;
+        out.frameIndex = tile.nRarity_Frame; out.material = tile.nFlags;
+        out.tileX = tileData.nPosX; out.tileY = tileData.nPosY;
+        out.worldX = roomEx->nTileXPos + tileData.nPosX;
+        out.worldY = roomEx->nTileYPos + tileData.nPosY;
+        out.screenX = tileData.nWidth; out.screenY = tileData.nHeight;
+        out.width = tile.nWidth; out.height = tile.nTotalHeight;
+        out.flags = tileData.dwFlags;
+        sessionTileLibraryIdentity(roomEx, tileData.pTile, out.librarySlot, out.libraryIndex);
+        g_sessionTiles.push_back(out);
+    }
+}
+
+static void appendSessionItemPresentation(D2UnitStrc* item) {
+    if (!item || item->dwUnitType != UNIT_ITEM) return;
+    D2SessionItemPresentation out = {};
+    out.id = item->dwUnitId; out.classId = item->dwClassId; out.mode = item->dwAnimMode;
+    out.quality = ITEMS_GetItemQuality(item); out.itemFlags = ITEMS_GetItemFlags(item);
+    out.framePrecise = item->nSeqCurrentFramePrecise; out.frameCountPrecise = item->dwFrameCountPrecise;
+    if (item->pStaticPath) {
+        out.x = item->pStaticPath->tGameCoords.nX; out.y = item->pStaticPath->tGameCoords.nY;
+        out.gridX = (int16_t)item->pStaticPath->tGameCoords.nX;
+        out.gridY = (int16_t)item->pStaticPath->tGameCoords.nY;
+    }
+    out.invPage = ITEMS_GetInvPage(item); out.bodyLoc = ITEMS_GetBodyLocation(item);
+    if (D2ItemsTxt* txt = DATATBLS_GetItemsTxtRecord(item->dwClassId)) {
+        out.code = txt->dwCode;
+        memcpy(out.flippyFile, txt->szFlippyFile, sizeof out.flippyFile);
+        memcpy(out.invFile, txt->szInvFile, sizeof out.invFile);
+    }
+    g_sessionItemPresentations.push_back(out);
+}
+
+static void syncSessionLevelFromPlayer() {
+    if (!g_targetPlayer) return;
+    D2ActiveRoomStrc* room = UNITS_GetRoom(g_targetPlayer);
+    if (!room || !room->pDrlgRoom || !room->pDrlgRoom->pLevel) return;
+    const int level = DUNGEON_GetLevelIdFromRoom(room);
+    if (level <= 0) return;
+    g_currentLevel = level;
+    g_currentAct = DRLG_GetActNoFromLevelId(level);
+    g_lastLevel = room->pDrlgRoom->pLevel;
+    g_targetRoom = room;
+}
+
+// LEVEL_WarpUnit transfers the player to its destination room, but the normal server
+// transition has already made that level's rooms visible and run their activation path.
+// The headless session owns that second half explicitly so destination monster regions,
+// presets, and quest counters are created by the recovered D2Game routine as well.
+static void activateSessionLevelRooms(D2DrlgActStrc* act, D2DrlgLevelStrc* level, int levelId) {
+    if (!act || !level) return;
+    for (D2DrlgRoomStrc* roomEx = level->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
+        if (!roomEx->pRoom) DUNGEON_SetClientIsInSight(act, levelId, roomEx->nTileXPos, roomEx->nTileYPos, nullptr);
+        if (roomEx->pRoom) sub_6FC385A0(g_game, roomEx->pRoom);
+    }
+}
+
+static void updateSessionWorld() {
+    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionTiles.clear(); g_sessionWarps.clear();
+    g_sessionWorldHash = D2VEC_FNV_INIT; g_sessionTerrainHash = D2VEC_FNV_INIT;
+    g_sessionNavigationHash = D2VEC_FNV_INIT;
+    if (!g_sessionLive || !g_lastLevel) return;
+    uint32_t roomOrdinal = 0;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext, ++roomOrdinal) {
+        D2ActiveRoomStrc* room = roomEx->pRoom;
+        if (!room) continue;
+        D2SessionRoom out = {};
+        out.ordinal = roomOrdinal; out.level = (uint32_t)g_currentLevel;
+        out.x = room->tCoords.nSubtileX; out.y = room->tCoords.nSubtileY;
+        out.width = room->tCoords.nSubtileWidth; out.height = room->tCoords.nSubtileHeight;
+        out.flags = room->dwFlags; out.firstUnit = (uint32_t)g_sessionUnits.size();
+        if (room->pRoomTiles) {
+            appendSessionTiles(roomEx, roomOrdinal, 0, room->pRoomTiles->pFloorTiles, room->pRoomTiles->nFloors);
+            appendSessionTiles(roomEx, roomOrdinal, 1, room->pRoomTiles->pWallTiles, room->pRoomTiles->nWalls);
+            appendSessionTiles(roomEx, roomOrdinal, 2, room->pRoomTiles->pRoofTiles, room->pRoomTiles->nRoofs);
+        }
+        for (D2UnitStrc* unit = room->pUnitFirst; unit; unit = unit->pRoomNext) {
+            if (unit->dwUnitType == UNIT_OBJECT && unit->pObjectData && unit->pObjectData->pObjectTxt) {
+                D2SessionObjectPresentation object = {};
+                const D2ObjectsTxt* txt = unit->pObjectData->pObjectTxt;
+                object.id = unit->dwUnitId; object.classId = unit->dwClassId;
+                memcpy(&object.token, txt->szToken, 3); object.mode = unit->dwAnimMode;
+                if (unit->pStaticPath) { object.x = unit->pStaticPath->tGameCoords.nX; object.y = unit->pStaticPath->tGameCoords.nY; }
+                object.framePrecise = unit->nSeqCurrentFramePrecise; object.frameCountPrecise = unit->dwFrameCountPrecise;
+                object.animSpeed = unit->wAnimSpeed; object.direction = txt->nOrientation;
+                const uint8_t* pieces = &txt->nHD;
+                for (uint32_t component = 0; component < 16; ++component) if (pieces[component]) object.componentMask |= 1u << component;
+                g_sessionObjectPresentations.push_back(object);
+            }
+            if (unit->dwUnitType != UNIT_PLAYER && unit->dwUnitType != UNIT_MONSTER && unit->dwUnitType != UNIT_ITEM && unit->dwUnitType != UNIT_MISSILE) continue;
+            D2SessionUnit actor = {};
+            actor.id = (uint32_t)unit->dwUnitId; actor.type = unit->dwUnitType;
+            actor.classId = unit->dwClassId; actor.mode = unit->dwAnimMode;
+            if ((unit->dwUnitType == UNIT_PLAYER || unit->dwUnitType == UNIT_MONSTER || unit->dwUnitType == UNIT_MISSILE) && unit->pDynamicPath) {
+                actor.x = unit->pDynamicPath->tGameCoords.wPosX;
+                actor.y = unit->pDynamicPath->tGameCoords.wPosY;
+            } else if (unit->pStaticPath) {
+                actor.x = unit->pStaticPath->tGameCoords.nX;
+                actor.y = unit->pStaticPath->tGameCoords.nY;
+            }
+            actor.flags = unit->dwFlags; actor.flagsEx = unit->dwFlagEx;
+            actor.hp = STATLIST_UnitGetStatValue(unit, STAT_HITPOINTS, 0);
+            actor.maxHp = STATLIST_UnitGetStatValue(unit, STAT_MAXHP, 0);
+            actor.room = roomOrdinal; g_sessionUnits.push_back(actor); ++out.unitCount;
+            if (unit->dwUnitType == UNIT_ITEM) appendSessionItemPresentation(unit);
+            if (unit->dwUnitType == UNIT_MONSTER && unit->pMonsterData) {
+                D2SessionMonsterAnimation animation = {};
+                animation.id = unit->dwUnitId; animation.classId = unit->dwClassId;
+                animation.code = unit->pMonsterData->pMonstatsTxt ? unit->pMonsterData->pMonstatsTxt->dwCode : 0;
+                animation.mode = unit->dwAnimMode; animation.framePrecise = unit->nSeqCurrentFramePrecise;
+                animation.frameCountPrecise = unit->dwFrameCountPrecise; animation.animSpeed = unit->wAnimSpeed;
+                animation.direction = unit->pDynamicPath ? unit->pDynamicPath->nDirection : 0;
+                for (uint32_t component = 0; component < 16; ++component)
+                    animation.componentCodes[component] = D2Common_11069(unit, component, unit->pMonsterData->nComponent[component]);
+                g_sessionMonsterAnimations.push_back(animation);
+            }
+        }
+        g_sessionRooms.push_back(out);
+    }
+    if (g_targetPlayer && g_targetPlayer->pInventory) {
+        for (D2UnitStrc* item = INVENTORY_GetFirstItem(g_targetPlayer->pInventory); item; item = INVENTORY_GetNextItem(item)) {
+            if (INVENTORY_UnitIsItem(item)) appendSessionItemPresentation(item);
+        }
+    }
+    D2DrlgWarpStrc* dynamicWarps = DRLG_GetDrlgWarpFromLevelId(g_lastLevel->pDrlg, g_currentLevel);
+    const D2LevelDefBin* levelDef = DATATBLS_GetLevelDefRecord(g_currentLevel);
+    for (uint32_t slot = 0; slot < 8; ++slot) {
+        const int32_t destination = dynamicWarps ? dynamicWarps->nVis[slot] : levelDef->dwVis[slot];
+        const int32_t warpId = dynamicWarps ? dynamicWarps->nWarp[slot] : (int32_t)levelDef->dwWarp[slot];
+        if (destination <= 0 || warpId < 0) continue;
+        D2LvlWarpTxt* warp = DATATBLS_GetLvlWarpTxtRecordFromLevelIdAndDirection(warpId, 'b');
+        if (!warp) continue;
+        D2SessionWarp out = {};
+        out.slot = slot; out.room = UINT32_MAX;
+        out.sourceLevel = (uint32_t)g_currentLevel; out.destinationLevel = (uint32_t)destination;
+        out.warpId = (uint32_t)warpId; out.enabled = 1; out.direction = (uint8_t)warp->szDirection[0];
+        uint32_t ordinal = 0;
+        for (const D2SessionWarpPreset& preset : g_sessionWarpPresets) {
+            if (preset.destination != destination) continue;
+            out.room = preset.room; out.exitX = preset.x; out.exitY = preset.y; break;
+        }
+        for (D2DrlgRoomStrc* room = g_lastLevel->pFirstRoomEx; room; room = room->pDrlgRoomNext, ++ordinal) {
+            if (out.room != UINT32_MAX) break;
+            for (D2RoomTileStrc* tile = room->pRoomTiles; tile; tile = tile->pNext) {
+                if (!tile->bEnabled || !tile->pDrlgRoom || !tile->pDrlgRoom->pLevel || tile->pDrlgRoom->pLevel->nLevelId != destination) continue;
+                D2DrlgTileDataStrc* data = tile->unk0x0C ? tile->unk0x0C : tile->unk0x10;
+                out.room = ordinal;
+                if (data && tile->pLvlWarpTxtRecord) {
+                    out.exitX = 5 * (room->nTileXPos + data->nPosX) + (int32_t)tile->pLvlWarpTxtRecord->dwOffsetX;
+                    out.exitY = 5 * (room->nTileYPos + data->nPosY) + (int32_t)tile->pLvlWarpTxtRecord->dwOffsetY;
+                } else {
+                    const D2DrlgRoomStrc* linked = tile->pDrlgRoom;
+                    const int32_t roomCenterX = room->nTileXPos + room->nTileWidth / 2;
+                    const int32_t roomCenterY = room->nTileYPos + room->nTileHeight / 2;
+                    const int32_t linkedCenterX = linked->nTileXPos + linked->nTileWidth / 2;
+                    const int32_t linkedCenterY = linked->nTileYPos + linked->nTileHeight / 2;
+                    out.exitX = 5 * (linkedCenterX < roomCenterX ? room->nTileXPos :
+                        linkedCenterX > roomCenterX ? room->nTileXPos + room->nTileWidth - 1 : roomCenterX) + 2;
+                    out.exitY = 5 * (linkedCenterY < roomCenterY ? room->nTileYPos :
+                        linkedCenterY > roomCenterY ? room->nTileYPos + room->nTileHeight - 1 : roomCenterY) + 2;
+                }
+                if (room->pRoom) {
+                    D2CoordStrc interaction = { out.exitX, out.exitY };
+                    if (COLLISION_GetFreeCoordinatesWithMaxDistance(room->pRoom, &interaction, 2,
+                        COLLIDE_MASK_PLAYER_PATH, TRUE, 6)) {
+                        out.exitX = interaction.nX; out.exitY = interaction.nY;
+                    }
+                }
+                break;
+            }
+            if (out.room != UINT32_MAX) break;
+        }
+        out.selectX = (int32_t)warp->dwSelectX; out.selectY = (int32_t)warp->dwSelectY;
+        out.selectDX = (int32_t)warp->dwSelectDX; out.selectDY = (int32_t)warp->dwSelectDY;
+        out.exitWalkX = (int32_t)warp->dwExitWalkX; out.exitWalkY = (int32_t)warp->dwExitWalkY;
+        out.offsetX = (int32_t)warp->dwOffsetX; out.offsetY = (int32_t)warp->dwOffsetY;
+        g_sessionWarps.push_back(out);
+    }
+    auto hashBytes = [](uint32_t hash, const void* data, size_t size) {
+        const uint8_t* bytes = static_cast<const uint8_t*>(data);
+        for (size_t i = 0; i < size; ++i) { hash ^= bytes[i]; hash *= 16777619u; }
+        return hash;
+    };
+    if (!g_sessionRooms.empty()) g_sessionWorldHash = hashBytes(g_sessionWorldHash, g_sessionRooms.data(), g_sessionRooms.size() * sizeof(D2SessionRoom));
+    if (!g_sessionUnits.empty()) g_sessionWorldHash = hashBytes(g_sessionWorldHash, g_sessionUnits.data(), g_sessionUnits.size() * sizeof(D2SessionUnit));
+    if (!g_sessionTiles.empty()) g_sessionTerrainHash = hashBytes(g_sessionTerrainHash, g_sessionTiles.data(), g_sessionTiles.size() * sizeof(D2SessionTile));
+    if (!g_sessionWarps.empty()) g_sessionNavigationHash = hashBytes(g_sessionNavigationHash, g_sessionWarps.data(), g_sessionWarps.size() * sizeof(D2SessionWarp));
+}
+
+static void captureCombat(D2UnitStrc* attacker, D2UnitStrc* defender, const D2DamageStrc* damage) {
+    if (!g_targetPlayer || !attacker || !defender || !damage) return;
+    D2VecCombat v = {};
+    v.seed = g_gameSeed; v.difficulty = (uint8_t)g_gameDiff; v.act = (uint8_t)g_currentAct; v.level = (uint16_t)g_currentLevel;
+    v.frame = g_game ? g_game->dwGameFrame : 0;
+    v.attackerType = attacker->dwUnitType; v.attackerClass = attacker->dwClassId; v.attackerId = attacker->dwUnitId;
+    v.defenderType = defender->dwUnitType; v.defenderClass = defender->dwClassId; v.defenderId = defender->dwUnitId;
+    v.seedLo = attacker->pSeed.nLowSeed; v.seedHi = attacker->pSeed.nHighSeed;
+    static_assert(sizeof(*damage) == sizeof(v.damage));
+    memcpy(v.damage, damage, sizeof(v.damage));
+    g_combatEvents.push_back(v);
+    if (attacker == g_targetPlayer && defender == g_sessionAttackTarget && g_sessionAttack.state == 1) {
+        g_sessionAttack.resultFlags = damage->wResultFlags;
+        g_sessionAttack.physicalDamage = (uint32_t)damage->dwPhysDamage;
+        g_sessionAttack.totalDamage = (uint32_t)damage->dwDmgTotal;
+    }
+}
+
+static D2VecAiUnit captureAi(const D2UnitStrc* u, uint16_t room, uint16_t ordinal) {
+    D2VecAiUnit a = {};
+    a.room = room; a.ordinal = ordinal; a.classId = u->dwClassId; a.unitId = u->dwUnitId;
+    if (u->pDynamicPath) { a.x = u->pDynamicPath->tGameCoords.wPosX; a.y = u->pDynamicPath->tGameCoords.wPosY; }
+    const D2AiControlStrc* ai = u->pMonsterData ? u->pMonsterData->pAiControl : nullptr;
+    if (ai) {
+        a.specialState = ai->nAiSpecialState; a.flags = ai->nAiFlags;
+        a.ownerGuid = ai->dwOwnerGUID; a.ownerType = ai->dwOwnerType;
+        memcpy(a.params, ai->dwAiParam, sizeof(a.params));
+        if (ai->pCurrentCmd) { a.hasCurrentCmd = 1; memcpy(a.currentCmdParams, ai->pCurrentCmd->nCmdParam, sizeof(a.currentCmdParams)); }
+        for (const D2MinionListStrc* m = ai->pMinionList; m; m = m->pNext) {
+            a.minionCount++; a.minionHash = d2vec_fnv1a_step(a.minionHash ? a.minionHash : D2VEC_FNV_INIT, (uint32_t)m->dwMinionGUID);
+        }
+    }
+    a.thinkFrame = -1;
+    for (const D2EventTimerStrc* t = u->pTimer; t; t = t->pNext) if (t->nEventType == EVENTTYPE_AITHINK) { a.thinkFrame = t->nExpireFrame; break; }
+    return a;
+}
+
+static D2VecAiTargetUnit captureAiTarget(const D2UnitStrc* u, uint16_t room, uint16_t ordinal) {
+    D2VecAiTargetUnit a = {};
+    a.ai = captureAi(u, room, ordinal);
+    a.mode = u->dwAnimMode; a.seedLo = u->pSeed.nLowSeed; a.seedHi = u->pSeed.nHighSeed;
+    a.hp = STATLIST_UnitGetStatValue((D2UnitStrc*)u, STAT_HITPOINTS, 0);
+    a.maxHp = STATLIST_UnitGetStatValue((D2UnitStrc*)u, STAT_MAXHP, 0);
+    if (u->pDynamicPath) {
+        D2UnitStrc* target = u->pDynamicPath->pTargetUnit;
+        a.targetType = target ? target->dwUnitType : u->pDynamicPath->dwTargetType;
+        a.targetId = target ? target->dwUnitId : u->pDynamicPath->dwTargetId;
+        a.targetX = u->pDynamicPath->tTargetCoord.X; a.targetY = u->pDynamicPath->tTargetCoord.Y;
+    }
+    a.usedSkillId = -1;
+    if (u->pSkills && u->pSkills->pUsedSkill && u->pSkills->pUsedSkill->pSkillsTxt)
+        a.usedSkillId = u->pSkills->pUsedSkill->pSkillsTxt->nSkillId;
+    a.modeEventFrame = -1;
+    for (const D2EventTimerStrc* t = u->pTimer; t; t = t->pNext)
+        if (t->nEventType == EVENTTYPE_MODECHANGE) { a.modeEventFrame = t->nExpireFrame; break; }
+    a.framePrecise = u->nSeqCurrentFramePrecise; a.frameCountPrecise = u->dwFrameCountPrecise;
+    a.animSpeed = u->wAnimSpeed; a.actionFrame = u->nActionFrame;
+    return a;
+}
+
+static void detachTargetFixture() {
+    if (g_targetRoom) { g_targetRoom->ppClients = nullptr; g_targetRoom->nNumClients = 0; g_targetRoom->nMaxClients = 0; }
+    free(g_targetClient); g_targetClient = nullptr; g_targetRoom = nullptr; g_targetPlayer = nullptr; g_targetMonster = nullptr;
+}
+
+// GAME_CreateGame minus the server (game slots, clients, tasks, critical sections): the fields the
+// item/monster/object code reads, in the order retail fills them.
+static D2GameStrc* makeGame(uint32_t seed, int difficulty) {
+    D2GameStrc* g = (D2GameStrc*)calloc(1, sizeof(D2GameStrc));
+    g->bExpansion = TRUE;
+    g->wItemFormat = 101;
+    g->dwGameType = 0;
+    g->nDifficulty = (uint8_t)difficulty;
+    g->nMaxPlayers = 8;
+    g->InitSeed = 1;
+    g->dwInitSeed = seed;
+    SEED_InitSeed(&g->pGameSeed);
+    SEED_InitLowSeed(&g->pGameSeed, seed);
+    EVENT_AllocEventQueue(g);
+    ARENA_AllocArena(g, 0, ((uint32_t)difficulty << 12) | 0x04 | 0x100000, 0);
+    PARTY_AllocPartyControl(g);
+    sub_6FC68110(g);                                  // monster regions from the game seed
+    g->dwObjSeed = OBJRGN_AllocObjectControl(g);
+    SUNITPROXY_InitializeNpcControl(g);
+    QUESTS_QuestInit(g);
+    if (g->pQuestControl) g->pQuestControl->bPickedSet = 1;   // what the first player's entry does; the capture sets the same
+    return g;
+}
+
+extern "C" {
+
+
+EMSCRIPTEN_KEEPALIVE int d2_monspawn_init() {
+    if (!d2::drlgLoadTables(d2::sharedVfs(), d2::sharedLang())) { g_err = "tables"; return 0; }
+    SUNITPROXY_FillGlobalItemCache();
+    gpCombatTraceCallback = captureCombat;
+    return 1;
+}
+EMSCRIPTEN_KEEPALIVE void d2_monspawn_reset() {
+    // Force the next level call through makeGame even when seed/difficulty are unchanged.
+    // The differential fixtures use one fresh retail process per record.
+    detachTargetFixture(); g_gameSeed = ~0u; g_gameDiff = -1; g_lastLevel = nullptr;
+    g_currentAct = g_currentLevel = -1; g_combatEvents.clear();
+    memset(&g_combatResult, 0, sizeof g_combatResult);
+}
+
+// Loads (seed, difficulty) once; returns the game's act for `act` (0-based), loading it like
+// LEVEL_LoadAct. Acts stay loaded for the game's lifetime; a new (seed, difficulty) frees the old game.
+static D2DrlgActStrc* gameAct(uint32_t seed, int difficulty, int act) {
+    if (!g_game || g_gameSeed != seed || g_gameDiff != difficulty) {
+        if (g_game) { for (int a = 0; a < 5; a++) if (g_game->pAct[a]) { DUNGEON_FreeAct(g_game->pAct[a]); g_game->pAct[a] = nullptr; } }
+        g_game = makeGame(seed, difficulty); g_gameSeed = seed; g_gameDiff = difficulty;
+    }
+    if (!g_game->pAct[act]) LEVEL_LoadAct(g_game, (uint8_t)act);
+    return g_game->pAct[act];
+}
+
+// One level: returns 1 and fills d2_monspawn_out() (units, monsters, hash); 0 on failure.
+int d2_trace_level = -1;   // D2_MONS_TRACE builds print for this level id (scenario sets it from D2_MONS_TRACE_LEVEL)
+EMSCRIPTEN_KEEPALIVE void d2_monspawn_trace(int levelId) { d2_trace_level = levelId; }
+EMSCRIPTEN_KEEPALIVE int d2_monspawn_level(uint32_t seed, int difficulty, int act, int levelId) {
+    memset(&g_out, 0, sizeof g_out); g_units.clear(); g_aiUnits.clear();
+    g_out.seed = seed; g_out.difficulty = (uint8_t)difficulty; g_out.act = (uint8_t)act; g_out.level = (uint16_t)levelId; g_out.hash = D2VEC_FNV_INIT;
+    g_aiOut = { seed, (uint8_t)difficulty, (uint8_t)act, (uint16_t)levelId, 0, D2VEC_FNV_INIT, 0 };
+    g_currentAct = act; g_currentLevel = levelId; g_combatEvents.clear(); g_sessionWarpPresets.clear();
+    D2DrlgActStrc* pAct = gameAct(seed, difficulty, act);
+    if (!pAct) { g_err = "act"; return 0; }
+    D2DrlgLevelStrc* pLevel = DRLG_GetLevel(pAct->pDrlg, levelId);
+    if (!pLevel) { g_err = "level"; return 0; }
+    if (!pLevel->pFirstRoomEx) DRLG_InitLevel(pLevel);
+    g_lastLevel = pLevel;
+    uint16_t roomIdx = 0;
+    for (D2DrlgRoomStrc* pRoomEx = pLevel->pFirstRoomEx; pRoomEx; pRoomEx = pRoomEx->pDrlgRoomNext, roomIdx++) {
+        for (D2PresetUnitStrc* preset = pRoomEx->pPresetUnits; preset; preset = preset->pNext) if (preset->nUnitType == UNIT_TILE) {
+            g_sessionWarpPresets.push_back({ roomIdx, preset->nIndex,
+                pRoomEx->nTileXPos * 5 + preset->nXpos, pRoomEx->nTileYPos * 5 + preset->nYpos });
+        }
+        if (!pRoomEx->pRoom) DUNGEON_SetClientIsInSight(pAct, levelId, pRoomEx->nTileXPos, pRoomEx->nTileYPos, nullptr);
+        D2ActiveRoomStrc* pRoom = pRoomEx->pRoom;
+        if (!pRoom) continue;
+        for (D2UnitStrc* tile = pRoom->pUnitFirst; tile; tile = tile->pRoomNext) if (tile->dwUnitType == UNIT_TILE && tile->pStaticPath) {
+            g_sessionWarpPresets.push_back({ roomIdx, tile->dwClassId,
+                tile->pStaticPath->tGameCoords.nX, tile->pStaticPath->tGameCoords.nY });
+        }
+#ifdef D2_MONS_TRACE
+        if (levelId == d2_trace_level) fprintf(stderr, "room %u type %d flags %x logical %p lists %d/%x\n", roomIdx, pRoomEx->nType, pRoomEx->dwFlags, (void*)pRoomEx->pLogicalRoomInfo, pRoomEx->pLogicalRoomInfo ? pRoomEx->pLogicalRoomInfo->nLists : -1, pRoomEx->pLogicalRoomInfo ? pRoomEx->pLogicalRoomInfo->dwFlags : 0);
+#endif
+        { D2VecMonUnit m = {}; m.seed = seed; m.difficulty = (uint8_t)difficulty; m.act = (uint8_t)act; m.level = (uint16_t)levelId; m.room = roomIdx; m.unitType = 254; m.seedLo = pRoom->pSeed.nLowSeed; m.seedHi = pRoom->pSeed.nHighSeed; g_units.push_back(m); }
+#ifdef D2_MONS_TRACE
+        if (levelId == d2_trace_level) fprintf(stderr, "[room] %u [%d,%d] gameseed %u/%u objseed %u/%u roomseed %u\n", roomIdx, pRoom->tCoords.nSubtileX, pRoom->tCoords.nSubtileY, g_game->pGameSeed.nLowSeed, g_game->pGameSeed.nHighSeed, g_game->pObjectControl->pSeed.nLowSeed, g_game->pObjectControl->pSeed.nHighSeed, pRoom->pSeed.nLowSeed);
+#endif
+        sub_6FC385A0(g_game, pRoom);   // D2Game 1.13c 0x6FC4CB80 room activation (compat/game_glue.cpp)
+        { D2VecMonUnit m = {}; m.seed = seed; m.difficulty = (uint8_t)difficulty; m.act = (uint8_t)act; m.level = (uint16_t)levelId; m.room = roomIdx; m.unitType = 255;   // diagnosis: room seed after activation, not hashed
+          m.seedLo = pRoom->pSeed.nLowSeed; m.seedHi = pRoom->pSeed.nHighSeed; m.x = (uint16_t)pRoom->tCoords.nSubtileX; m.y = (uint16_t)pRoom->tCoords.nSubtileY; g_units.push_back(m); }
+        uint16_t monOrdinal = 0;
+        for (D2UnitStrc* u = pRoom->pUnitFirst; u; u = u->pRoomNext) {
+            D2VecMonUnit m = {};
+            m.seed = seed; m.difficulty = (uint8_t)difficulty; m.act = (uint8_t)act; m.level = (uint16_t)levelId; m.room = roomIdx;
+            m.unitType = (uint8_t)u->dwUnitType; m.classId = u->dwClassId; m.mode = (uint8_t)u->dwAnimMode;
+            m.seedLo = u->pSeed.nLowSeed; m.seedHi = u->pSeed.nHighSeed;
+            if (u->dwUnitType == UNIT_MONSTER || u->dwUnitType == UNIT_PLAYER || u->dwUnitType == UNIT_MISSILE) { m.x = (uint16_t)u->pDynamicPath->tGameCoords.wPosX; m.y = (uint16_t)u->pDynamicPath->tGameCoords.wPosY; }
+            else if (u->pStaticPath) { m.x = (uint16_t)u->pStaticPath->dwClientCoordX; m.y = (uint16_t)u->pStaticPath->dwClientCoordY; }   // capture reads +0x04/+0x08
+            if (u->dwUnitType == UNIT_MONSTER && u->pMonsterData) {
+                // Native wasm64 pointers shift the runtime fields past their retail x86
+                // offsets. Serialize the named fields into the fixed-width vector record.
+                const D2MonsterDataStrc* md = u->pMonsterData;
+                m.monFlags = md->nTypeFlag;
+                memcpy(m.enchants, md->nMonUmod, sizeof(m.enchants));
+                m.uniqueNo = md->wBossHcIdx;
+                m.hp = (uint32_t)STATLIST_UnitGetStatValue(u, STAT_HITPOINTS, 0); m.maxHp = (uint32_t)STATLIST_UnitGetStatValue(u, STAT_MAXHP, 0); m.lvl = (uint32_t)STATLIST_UnitGetStatValue(u, STAT_LEVEL, 0);
+            }
+            g_out.hash = d2vec_mon_hash(g_out.hash, &m);
+            g_out.units++; if (m.unitType == UNIT_MONSTER) g_out.monsters++;
+            g_units.push_back(m);
+            if (u->dwUnitType == UNIT_MONSTER) {
+                D2VecAiUnit a = captureAi(u, roomIdx, monOrdinal++);
+                g_aiOut.hash = d2vec_ai_hash(g_aiOut.hash, &a); g_aiOut.monsters++; g_aiUnits.push_back(a);
+            }
+        }
+    }
+    return 1;
+}
+EMSCRIPTEN_KEEPALIVE const D2VecMonLevel* d2_monspawn_out() { return &g_out; }
+EMSCRIPTEN_KEEPALIVE const D2VecMonUnit* d2_monspawn_units(int* count) { *count = (int)g_units.size(); return g_units.data(); }
+EMSCRIPTEN_KEEPALIVE const char* d2_monspawn_err() { return g_err.c_str(); }
+EMSCRIPTEN_KEEPALIVE const D2VecAiLevel* d2_aispawn_out() { return &g_aiOut; }
+EMSCRIPTEN_KEEPALIVE const D2VecAiUnit* d2_aispawn_units(int* count) { *count = (int)g_aiUnits.size(); return g_aiUnits.data(); }
+EMSCRIPTEN_KEEPALIVE int d2_aitarget_attach() {
+    if (!g_game || !g_lastLevel || g_targetPlayer) return 0;
+    uint16_t roomIdx = 0;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext, roomIdx++) {
+        D2ActiveRoomStrc* room = roomEx->pRoom; if (!room || room->nNumClients || room->ppClients) continue;
+        D2UnitStrc* anchor = nullptr;
+        for (D2UnitStrc* u = room->pUnitFirst; u; u = u->pRoomNext) if (u->dwUnitType == UNIT_MONSTER) { anchor = u; break; }
+        if (!anchor || !anchor->pDynamicPath) continue;
+        const int ax = anchor->pDynamicPath->tGameCoords.wPosX, ay = anchor->pDynamicPath->tGameCoords.wPosY;
+        for (int radius = 2; radius <= 12; radius++) for (int dy = -radius; dy <= radius; dy++) for (int dx = -radius; dx <= radius; dx++) {
+            if (abs(dx) != radius && abs(dy) != radius) continue;
+            const int x = ax + dx, y = ay + dy;
+            if (x < room->tCoords.nSubtileX + 2 || x >= room->tCoords.nSubtileX + room->tCoords.nSubtileWidth - 2 ||
+                y < room->tCoords.nSubtileY + 2 || y >= room->tCoords.nSubtileY + room->tCoords.nSubtileHeight - 2) continue;
+            if (COLLISION_CheckMaskWithSize(room, x, y, 2, 0xFFFF)) continue;
+            D2UnitStrc* player = SUNIT_AllocUnitData(UNIT_PLAYER, 0, x, y, g_game, room, 1, PLRMODE_NEUTRAL, 0);
+            if (!player) continue;
+            STATLIST_SetUnitStat(player, STAT_HITPOINTS, 50 << 8, 0); STATLIST_SetUnitStat(player, STAT_MAXHP, 50 << 8, 0);
+            STATLIST_SetUnitStat(player, STAT_LEVEL, 1, 0); STATLIST_SetUnitStat(player, STAT_ATTACKRATE, 100, 0);
+            STATLIST_SetUnitStat(player, STAT_VELOCITYPERCENT, 100, 0); STATLIST_SetUnitStat(player, STAT_OTHER_ANIMRATE, 100, 0);
+            g_targetClient = (D2ClientStrc*)calloc(1, sizeof(D2ClientStrc));
+            g_targetClient->pGame = g_game; g_targetClient->pPlayer = player;
+            g_targetClient->nAct = (uint8_t)g_currentAct;
+            UNITS_GetPlayerData(player)->pClient = g_targetClient;
+            sub_6FC33020(g_targetClient, room);
+            for (D2UnitStrc* u = room->pUnitFirst; u; u = u->pRoomNext)
+                if (u->dwUnitType == UNIT_MONSTER) MONSTER_UpdateAiCallbackEvent(g_game, u);
+            g_targetPlayer = player; g_targetMonster = anchor; g_targetRoom = room; return 1;
+        }
+    }
+    return 0;
+}
+EMSCRIPTEN_KEEPALIVE const D2VecAiLevel* d2_aitarget_out() { return &g_targetOut; }
+EMSCRIPTEN_KEEPALIVE const D2VecAiTargetUnit* d2_aitarget_units(int* count) { *count = (int)g_targetUnits.size(); return g_targetUnits.data(); }
+EMSCRIPTEN_KEEPALIVE const D2VecCombat* d2_combat_events(int* count) { *count = (int)g_combatEvents.size(); return g_combatEvents.data(); }
+EMSCRIPTEN_KEEPALIVE const D2VecCombatResult* d2_combat_result() {
+    memset(&g_combatResult, 0, sizeof g_combatResult);
+    if (!g_targetPlayer) return &g_combatResult;
+    D2UnitStrc* u = g_targetPlayer;
+    g_combatResult.seed = g_gameSeed; g_combatResult.difficulty = (uint8_t)g_gameDiff;
+    g_combatResult.act = (uint8_t)g_currentAct; g_combatResult.level = (uint16_t)g_currentLevel;
+    g_combatResult.frame = g_game ? g_game->dwGameFrame : 0;
+    g_combatResult.unitType = u->dwUnitType; g_combatResult.unitClass = u->dwClassId;
+    g_combatResult.unitId = u->dwUnitId; g_combatResult.mode = u->dwAnimMode;
+    g_combatResult.seedLo = u->pSeed.nLowSeed; g_combatResult.seedHi = u->pSeed.nHighSeed;
+    g_combatResult.hp = STATLIST_UnitGetStatValue(u, STAT_HITPOINTS, 0);
+    g_combatResult.maxHp = STATLIST_UnitGetStatValue(u, STAT_MAXHP, 0);
+    g_combatResult.mana = STATLIST_UnitGetStatValue(u, STAT_MANA, 0);
+    g_combatResult.maxMana = STATLIST_UnitGetStatValue(u, STAT_MAXMANA, 0);
+    g_combatResult.stamina = STATLIST_UnitGetStatValue(u, STAT_STAMINA, 0);
+    g_combatResult.maxStamina = STATLIST_UnitGetStatValue(u, STAT_MAXSTAMINA, 0);
+    g_combatResult.lastHitClass = u->dwLastHitClass; g_combatResult.flags = u->dwFlags; g_combatResult.flagsEx = u->dwFlagEx;
+    return &g_combatResult;
+}
+EMSCRIPTEN_KEEPALIVE int d2_damagecalc_run(D2VecDamageCalc* v) {
+    if (!v || !g_game || !g_targetPlayer || !g_targetMonster) return 0;
+    const int statIds[8] = { STAT_NORMAL_DAMAGE_REDUCTION, STAT_MAGIC_DAMAGE_REDUCTION, STAT_DAMAGERESIST,
+        STAT_MAGICRESIST, STAT_FIRERESIST, STAT_LIGHTRESIST, STAT_COLDRESIST, STAT_POISONRESIST };
+    for (int i = 0; i < 8; ++i) STATLIST_SetUnitStat(g_targetPlayer, statIds[i], v->defenderStats[i], 0);
+    g_targetMonster->pSeed.nLowSeed = v->seedLoIn; g_targetMonster->pSeed.nHighSeed = v->seedHiIn;
+    D2DamageStrc damage; static_assert(sizeof damage == sizeof v->damageIn); memcpy(&damage, v->damageIn, sizeof damage);
+    SUNITDMG_CalculateTotalDamage(g_game, g_targetMonster, g_targetPlayer, &damage);
+    v->seedLoOut = g_targetMonster->pSeed.nLowSeed; v->seedHiOut = g_targetMonster->pSeed.nHighSeed;
+    memcpy(v->damageOut, &damage, sizeof damage); return 1;
+}
+EMSCRIPTEN_KEEPALIVE int d2_aiframe_advance(int frames) {
+    if (!g_game || !g_lastLevel || frames < 0) return 0;
+    for (int i = 0; i < frames; i++) {
+        ++g_game->dwGameFrame;
+        EVENT_IterateEvents(g_game);
+    }
+    g_aiUnits.clear();
+    g_aiOut.monsters = 0; g_aiOut.hash = D2VEC_FNV_INIT; g_aiOut.reserved = (uint32_t)frames;
+    uint16_t roomIdx = 0;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext, roomIdx++) {
+        if (!roomEx->pRoom) continue;
+        uint16_t monOrdinal = 0;
+        for (D2UnitStrc* u = roomEx->pRoom->pUnitFirst; u; u = u->pRoomNext) {
+            if (u->dwUnitType != UNIT_MONSTER) continue;
+            D2VecAiUnit a = captureAi(u, roomIdx, monOrdinal++);
+            g_aiOut.hash = d2vec_ai_hash(g_aiOut.hash, &a); g_aiOut.monsters++; g_aiUnits.push_back(a);
+        }
+    }
+    if (g_targetPlayer) {
+        g_targetUnits.clear(); g_targetOut = g_aiOut; g_targetOut.hash = D2VEC_FNV_INIT;
+        roomIdx = 0;
+        for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext, roomIdx++) {
+            if (!roomEx->pRoom) continue; uint16_t monOrdinal = 0;
+            for (D2UnitStrc* u = roomEx->pRoom->pUnitFirst; u; u = u->pRoomNext) {
+                if (u->dwUnitType != UNIT_MONSTER) continue;
+                D2VecAiTargetUnit a = captureAiTarget(u, roomIdx, monOrdinal++);
+                g_targetOut.hash = d2vec_aitarget_hash(g_targetOut.hash, &a); g_targetUnits.push_back(a);
+            }
+        }
+    }
+    return 1;
+}
+
+static void updateSessionSnapshot() {
+    memset(&g_sessionSnapshot, 0, sizeof g_sessionSnapshot);
+    g_sessionSnapshot.version = 1; g_sessionSnapshot.size = sizeof g_sessionSnapshot;
+    updateSessionWorld();
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return;
+    const D2DynamicPathStrc* path = g_targetPlayer->pDynamicPath;
+    g_sessionSnapshot.seed = g_gameSeed; g_sessionSnapshot.frame = g_game->dwGameFrame;
+    g_sessionSnapshot.level = (uint16_t)g_currentLevel; g_sessionSnapshot.difficulty = (uint8_t)g_gameDiff;
+    g_sessionSnapshot.act = (uint8_t)g_currentAct; g_sessionSnapshot.playerClass = g_targetPlayer->dwClassId;
+    g_sessionSnapshot.playerId = g_targetPlayer->dwUnitId;
+    g_sessionSnapshot.x = path->tGameCoords.wPosX; g_sessionSnapshot.y = path->tGameCoords.wPosY;
+    g_sessionSnapshot.targetX = g_sessionMovePending ? g_sessionTargetX : g_sessionSnapshot.x;
+    g_sessionSnapshot.targetY = g_sessionMovePending ? g_sessionTargetY : g_sessionSnapshot.y;
+    g_sessionSnapshot.hp = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_HITPOINTS, 0);
+    g_sessionSnapshot.maxHp = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_MAXHP, 0);
+    g_sessionSnapshot.mode = g_targetPlayer->dwAnimMode; g_sessionSnapshot.flags = g_targetPlayer->dwFlags;
+    g_sessionSnapshot.monsters = 0;
+    for (const D2SessionUnit& unit : g_sessionUnits) if (unit.type == UNIT_MONSTER) ++g_sessionSnapshot.monsters;
+    uint32_t h = D2VEC_FNV_INIT;
+    const uint8_t* bytes = reinterpret_cast<const uint8_t*>(&g_sessionSnapshot);
+    for (size_t i = 0; i < offsetof(D2SessionSnapshot, hash); ++i) { h ^= bytes[i]; h *= 16777619u; }
+    g_sessionSnapshot.hash = h;
+}
+
+// First browser-facing lifetime API.  It deliberately builds on the same game, level and player
+// fixture used by the retail-diff scenarios, but keeps them alive across commands and ticks.
+EMSCRIPTEN_KEEPALIVE int d2_session_create(uint32_t seed, int difficulty, int act, int levelId) {
+    if (difficulty < 0 || difficulty > 2 || act < 0 || act > 4 || levelId < 0) return 0;
+    d2_monspawn_reset(); g_sessionLive = false; g_sessionMovePending = false;
+    memset(&g_sessionAttack, 0, sizeof g_sessionAttack); memset(&g_sessionProgress, 0, sizeof g_sessionProgress);
+    memset(&g_sessionAdvancement, 0, sizeof g_sessionAdvancement); g_sessionAdvancementSkillId = SKILL_MAGICARROW;
+    memset(&g_sessionItemState, 0, sizeof g_sessionItemState);
+    memset(&g_sessionNpcInteraction, 0, sizeof g_sessionNpcInteraction);
+    memset(&g_sessionNpcDialog, 0, sizeof g_sessionNpcDialog); D2WEB_ResetLastDialogPacket();
+    memset(&g_sessionNpcResponse, 0, sizeof g_sessionNpcResponse);
+    memset(&g_sessionVendor, 0, sizeof g_sessionVendor);
+    g_sessionVendorItems.clear(); memset(&g_sessionVendorTransaction, 0, sizeof g_sessionVendorTransaction);
+    memset(&g_sessionRepair, 0, sizeof g_sessionRepair);
+    memset(&g_sessionItemSaveRoundTrip, 0, sizeof g_sessionItemSaveRoundTrip);
+    g_sessionItemSaveBytes.clear();
+    memset(&g_sessionStatsSaveRoundTrip, 0, sizeof g_sessionStatsSaveRoundTrip);
+    g_sessionStatsSaveBytes.clear();
+    memset(&g_sessionCampaignSaveRoundTrip, 0, sizeof g_sessionCampaignSaveRoundTrip);
+    g_sessionSkillSaveBytes.clear(); g_sessionWaypointSaveBytes.clear();
+    memset(&g_sessionQuestIntroSaveRoundTrip, 0, sizeof g_sessionQuestIntroSaveRoundTrip);
+    g_sessionQuestSaveBytes.clear(); g_sessionIntroSaveBytes.clear();
+    g_sessionAttackTarget = nullptr;
+    g_sessionAttackSkill = nullptr; g_sessionAttackCount = 0; g_sessionAttackEndFrame = 0;
+    g_sessionAttackResolved = false; g_sessionTargetKillCounted = false; g_sessionKills = 0;
+    if (!d2_monspawn_init() || !d2_monspawn_level(seed, difficulty, act, levelId) || !d2_aitarget_attach()) {
+        updateSessionSnapshot(); return 0;
+    }
+    if (D2CharStatsTxt* stats = UNITS_GetCharStatsTxtRecord(g_targetPlayer->dwClassId)) {
+        STATLIST_SetUnitStat(g_targetPlayer, STAT_STRENGTH, stats->nStr, 0);
+        STATLIST_SetUnitStat(g_targetPlayer, STAT_ENERGY, stats->nInt, 0);
+        STATLIST_SetUnitStat(g_targetPlayer, STAT_DEXTERITY, stats->nDex, 0);
+        STATLIST_SetUnitStat(g_targetPlayer, STAT_VITALITY, stats->nVit, 0);
+        STATLIST_SetUnitStat(g_targetPlayer, STAT_TOHIT, 0, 0);
+        STATLIST_SetUnitStat(g_targetPlayer, STAT_TOBLOCK, 0, 0);
+        STATLIST_SetUnitStat(g_targetPlayer, STAT_HITPOINTS, (stats->nVit + stats->nLifeAdd) << 8, 0);
+        STATLIST_SetUnitStat(g_targetPlayer, STAT_MAXHP, (stats->nVit + stats->nLifeAdd) << 8, 0);
+    }
+    // The headless save callback creates a bare unit. Retail new-character creation immediately
+    // follows it with the CharStats start-item callback (javelin/shield/potions/scrolls for Amazon).
+    PLAYER_CreateStartItemsFromCharStatsTxt(g_targetPlayer, g_game, nullptr);
+    g_sessionInitialExperience = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_EXPERIENCE, 0);
+    g_sessionLive = true; updateSessionSnapshot(); return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_command_move(int targetX, int targetY) {
+    if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return 0;
+    const D2DynamicPathStrc* path = g_targetPlayer->pDynamicPath;
+    // PlrMsg's retail 0x01 validator accepts each coordinate within 50 subtiles.
+    if (abs(targetX - (int)path->tGameCoords.wPosX) > 50 || abs(targetY - (int)path->tGameCoords.wPosY) > 50) return 0;
+    D2ActiveRoomStrc* targetRoom = COLLISION_GetRoomBySubTileCoordinates(path->pRoom, targetX, targetY);
+    if (!targetRoom) return 0;
+    g_sessionTargetX = targetX; g_sessionTargetY = targetY;
+    uint8_t packet[5] = { 0x01, 0, 0, 0, 0 };
+    const uint16_t x = (uint16_t)targetX, y = (uint16_t)targetY;
+    memcpy(packet + 1, &x, sizeof x); memcpy(packet + 3, &y, sizeof y);
+    if (D2GAME_PACKETCALLBACK_Rcv0x01_Walk_6FC82CB0(g_game, g_targetPlayer, packet, sizeof packet)) return 0;
+    g_sessionMovePending = path->dwPathPoints > 0;
+    updateSessionSnapshot(); return g_sessionMovePending ? 1 : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_command_warp(uint32_t destinationLevel, uint32_t warpId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetClient) return 0;
+    updateSessionSnapshot();
+    bool generatedExit = false;
+    for (const D2SessionWarp& warp : g_sessionWarps) {
+        if (warp.destinationLevel == destinationLevel && warp.warpId == warpId && warp.enabled) {
+            generatedExit = true; break;
+        }
+    }
+    if (!generatedExit) return 0;
+    const int32_t oldLevel = DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(g_targetPlayer));
+    LEVEL_WarpUnit(g_game, g_targetPlayer, (int32_t)destinationLevel, (int32_t)warpId);
+    D2ActiveRoomStrc* room = UNITS_GetRoom(g_targetPlayer);
+    if (!room || DUNGEON_GetLevelIdFromRoom(room) != (int32_t)destinationLevel || !room->pDrlgRoom || !room->pDrlgRoom->pLevel) return 0;
+    g_currentAct = DRLG_GetActNoFromLevelId((int32_t)destinationLevel);
+    g_currentLevel = (int32_t)destinationLevel; g_lastLevel = room->pDrlgRoom->pLevel;
+    // Retail exit operation invokes the quest level-change dispatcher after its successful
+    // room transfer. LEVEL_WarpUnit only moves the unit, so preserve that recovered second half.
+    QUESTS_ChangeLevel(g_game, oldLevel, (int32_t)destinationLevel, g_targetPlayer);
+    activateSessionLevelRooms(g_game->pAct[g_currentAct], g_lastLevel, (int32_t)destinationLevel);
+    g_targetRoom = room; g_targetMonster = nullptr; g_sessionMovePending = false;
+    g_sessionAttackTarget = nullptr; g_sessionAttackSkill = nullptr; memset(&g_sessionAttack, 0, sizeof g_sessionAttack);
+    updateSessionSnapshot(); return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_command_nearest_warp(int radius) {
+    if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pDynamicPath || radius < 0 || radius > 6) return 0;
+    updateSessionSnapshot();
+    const int x = g_targetPlayer->pDynamicPath->tGameCoords.wPosX;
+    const int y = g_targetPlayer->pDynamicPath->tGameCoords.wPosY;
+    const D2SessionWarp* best = nullptr; int bestDistance = radius + 1;
+    for (const D2SessionWarp& warp : g_sessionWarps) {
+        if (!warp.enabled || warp.room == UINT32_MAX) continue;
+        const int distance = std::max(abs(warp.exitX - x), abs(warp.exitY - y));
+        if (distance < bestDistance || (distance == bestDistance && best && warp.slot < best->slot)) {
+            best = &warp; bestDistance = distance;
+        }
+    }
+    if (!best || bestDistance > radius) return 0;
+    const uint32_t destination = best->destinationLevel, warpId = best->warpId;
+    return d2_session_command_warp(destination, warpId);
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_command_object(uint32_t objectId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return 0;
+    D2UnitStrc* object = SUNIT_GetServerUnit(g_game, UNIT_OBJECT, (int32_t)objectId);
+    if (!object || !object->pObjectData || !object->pObjectData->pObjectTxt ||
+        !object->pObjectData->pObjectTxt->nOperateFn || !UNITS_IsObjectInInteractRange(g_targetPlayer, object)) return 0;
+    const uint32_t before = object->dwAnimMode;
+    int32_t result = 0;
+    if (!OBJECTS_OperateHandler(g_game, g_targetPlayer, UNIT_OBJECT, (int32_t)objectId, &result)) return 0;
+    updateSessionSnapshot();
+    return object->dwAnimMode != before ? 1 : 0;
+}
+
+static void updateSessionNpcInteraction(uint32_t npcId) {
+    const uint32_t commandTarget = g_sessionNpcInteraction.commandTarget;
+    const uint32_t result = g_sessionNpcInteraction.result;
+    memset(&g_sessionNpcInteraction, 0, sizeof g_sessionNpcInteraction);
+    g_sessionNpcInteraction.version = 1; g_sessionNpcInteraction.size = sizeof g_sessionNpcInteraction;
+    g_sessionNpcInteraction.commandTarget = commandTarget; g_sessionNpcInteraction.result = result;
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return;
+    int32_t interactType = -1, interactGuid = -1;
+    if (SUNIT_GetInteractInfo(g_targetPlayer, &interactType, &interactGuid)) {
+        g_sessionNpcInteraction.interactType = interactType;
+        g_sessionNpcInteraction.interactGuid = interactGuid;
+        g_sessionNpcInteraction.flags |= 4;
+    } else {
+        g_sessionNpcInteraction.interactType = -1;
+        g_sessionNpcInteraction.interactGuid = -1;
+    }
+    D2UnitStrc* npc = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)npcId);
+    if (npc) {
+        g_sessionNpcInteraction.npcId = npc->dwUnitId;
+        g_sessionNpcInteraction.npcClass = npc->dwClassId;
+        g_sessionNpcInteraction.distance = D2Common_10399(g_targetPlayer, npc);
+        D2MonsterInteractStrc* monInteract = npc->pMonsterData ? npc->pMonsterData->pMonInteract : nullptr;
+        if (monInteract) {
+            g_sessionNpcInteraction.flags |= 1;
+            g_sessionNpcInteraction.npcInteractCount = MONSTERAI_GetInteractUnitCount(monInteract);
+            g_sessionNpcInteraction.npcHasPlayer = MONSTERAI_IsInteractingWith(monInteract, g_targetPlayer);
+        }
+    }
+    if (PLAYER_IsBusy(g_targetPlayer)) g_sessionNpcInteraction.flags |= 2;
+    g_sessionNpcInteraction.hash = sessionHashBytes(D2VEC_FNV_INIT, &g_sessionNpcInteraction,
+        offsetof(D2SessionNpcInteraction, hash));
+}
+
+// Recovered UNIT_MONSTER branch of PlrMsg's interaction dispatcher: the click is accepted at
+// six subtiles, then D2Game owns the player/NPC interaction records and quest speech activation.
+EMSCRIPTEN_KEEPALIVE int d2_session_command_npc(uint32_t npcId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return 0;
+    g_sessionNpcInteraction.commandTarget = npcId; g_sessionNpcInteraction.result = 0;
+    D2WEB_ResetLastDialogPacket();
+    memset(&g_sessionNpcDialog, 0, sizeof g_sessionNpcDialog);
+    g_sessionNpcDialog.version = 1; g_sessionNpcDialog.size = sizeof g_sessionNpcDialog;
+    g_sessionNpcDialog.commandTarget = npcId;
+    D2UnitStrc* npc = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)npcId);
+    if (!npc || !npc->pMonsterData || !npc->pMonsterData->pMonInteract ||
+        D2Common_10399(g_targetPlayer, npc) > 6 || PLAYER_IsBusy(g_targetPlayer)) {
+        updateSessionNpcInteraction(npcId); return 0;
+    }
+    if (PLRINTRO_GetQuestIntroFlag(g_targetPlayer, g_game, npc->dwClassId)) g_sessionNpcDialog.flags |= 2;
+    if (g_game->pQuestControl) {
+        for (D2QuestDataStrc* quest = g_game->pQuestControl->pLastQuest; quest; quest = quest->pPrev) {
+            if (quest->nActNo == ACT_I && quest->pfCallback[QUESTEVENT_NPCACTIVATE]) g_sessionNpcDialog.flags |= 4;
+            if (quest->nQuestNo == 37 && quest->pfCallback[QUESTEVENT_NPCACTIVATE]) g_sessionNpcDialog.flags |= 8;
+        }
+    }
+    D2Common_10153(g_targetPlayer->pDynamicPath);
+    sub_6FC61C70(g_game, g_targetPlayer, npc, npc->pMonsterData->pMonInteract, 0);
+    int32_t type = -1, guid = -1;
+    const int accepted = SUNIT_GetInteractInfo(g_targetPlayer, &type, &guid) &&
+        type == UNIT_MONSTER && guid == (int32_t)npcId &&
+        MONSTERAI_IsInteractingWith(npc->pMonsterData->pMonInteract, g_targetPlayer);
+    g_sessionNpcInteraction.result = accepted ? 1u : 0u;
+    D2GSPacketSrv27 packet = {};
+    g_sessionNpcDialog.result = accepted ? 1u : 0u; g_sessionNpcDialog.npcId = npcId;
+    if (D2WEB_CopyLastDialogPacket(&packet)) {
+        g_sessionNpcDialog.packetHeader = packet.nHeader;
+        g_sessionNpcDialog.packetUnitType = packet.nUnitType;
+        g_sessionNpcDialog.packetGuid = packet.dwUnitGUID;
+        g_sessionNpcDialog.messageCount = std::min<uint32_t>(packet.pMessageList.nCount, 8);
+        for (uint32_t i = 0; i < g_sessionNpcDialog.messageCount; ++i) {
+            g_sessionNpcDialog.stringIds[i] = packet.pMessageList.pMessages[i].nStringId;
+            g_sessionNpcDialog.menus[i] = packet.pMessageList.pMessages[i].nMenu;
+        }
+        g_sessionNpcDialog.flags |= 1;
+    }
+    g_sessionNpcDialog.hash = sessionHashBytes(D2VEC_FNV_INIT, &g_sessionNpcDialog,
+        offsetof(D2SessionNpcDialog, hash));
+    updateSessionNpcInteraction(npcId);
+    return accepted;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_command_nearest_npc(int radius) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || radius < 0 || radius > 6) return 0;
+    updateSessionSnapshot();
+    const D2SessionUnit* best = nullptr; int bestDistance = radius + 1;
+    for (const D2SessionUnit& unit : g_sessionUnits) {
+        if (unit.type != UNIT_MONSTER) continue;
+        D2UnitStrc* npc = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)unit.id);
+        if (!npc || !npc->pMonsterData || !npc->pMonsterData->pMonInteract) continue;
+        D2MonStatsTxt* stats = MONSTERMODE_GetMonStatsTxtRecord(npc->dwClassId);
+        if (!stats || !(stats->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_INTERACT])) continue;
+        const int distance = D2Common_10399(g_targetPlayer, npc);
+        if (distance < bestDistance || (distance == bestDistance && best && unit.id < best->id)) {
+            best = &unit; bestDistance = distance;
+        }
+    }
+    return best && bestDistance <= radius ? d2_session_command_npc(best->id) : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE const D2SessionNpcInteraction* d2_session_npc_interaction() {
+    updateSessionNpcInteraction(g_sessionNpcInteraction.commandTarget);
+    return &g_sessionNpcInteraction;
+}
+EMSCRIPTEN_KEEPALIVE const D2SessionNpcDialog* d2_session_npc_dialog() {
+    return &g_sessionNpcDialog;
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_command_npc_response(uint32_t npcId, uint32_t messageId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || messageId > UINT16_MAX) return 0;
+    memset(&g_sessionNpcResponse, 0, sizeof g_sessionNpcResponse);
+    g_sessionNpcResponse.version = 1; g_sessionNpcResponse.size = sizeof g_sessionNpcResponse;
+    g_sessionNpcResponse.packetHeader = 0x31; g_sessionNpcResponse.packetSize = 9;
+    g_sessionNpcResponse.npcId = npcId; g_sessionNpcResponse.messageId = messageId;
+    D2UnitStrc* npc = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)npcId);
+    int32_t interactType = -1, interactGuid = -1;
+    const bool active = npc && SUNIT_GetInteractInfo(g_targetPlayer, &interactType, &interactGuid) &&
+        interactType == UNIT_MONSTER && interactGuid == (int32_t)npcId;
+    bool offered = false;
+    for (uint32_t i = 0; i < g_sessionNpcDialog.messageCount && i < 8; ++i)
+        if (g_sessionNpcDialog.stringIds[i] == messageId) offered = true;
+    if (!active || !offered) return 0;
+    g_sessionNpcResponse.introBefore = PLRINTRO_GetQuestIntroFlag(g_targetPlayer, g_game, npc->dwClassId);
+    uint8_t packet[9] = { 0x31 };
+    const int32_t guid = (int32_t)npcId; const uint16_t message = (uint16_t)messageId;
+    memcpy(packet + 1, &guid, sizeof guid); memcpy(packet + 5, &message, sizeof message);
+    const int32_t handler = D2GAME_PACKETCALLBACK_Rcv0x31_QuestMessage_6FC86AB0(g_game, g_targetPlayer, packet, sizeof packet);
+    g_sessionNpcResponse.introAfter = PLRINTRO_GetQuestIntroFlag(g_targetPlayer, g_game, npc->dwClassId);
+    SUNIT_GetInteractInfo(g_targetPlayer, &g_sessionNpcResponse.interactType, &g_sessionNpcResponse.interactGuid);
+    g_sessionNpcResponse.result = handler == 0 ? 1u : 0u;
+    if (active) g_sessionNpcResponse.flags |= 1;
+    if (offered) g_sessionNpcResponse.flags |= 2;
+    if (!g_sessionNpcResponse.introBefore && g_sessionNpcResponse.introAfter) g_sessionNpcResponse.flags |= 4;
+    g_sessionNpcResponse.hash = sessionHashBytes(D2VEC_FNV_INIT, &g_sessionNpcResponse,
+        offsetof(D2SessionNpcResponse, hash));
+    return g_sessionNpcResponse.result;
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_command_end_npc(uint32_t npcId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return 0;
+    int32_t type = -1, guid = -1;
+    if (!SUNIT_GetInteractInfo(g_targetPlayer, &type, &guid) || type != UNIT_MONSTER || guid != (int32_t)npcId) return 0;
+    uint8_t packet[9] = { 0x30 };
+    const int32_t npcGuid = (int32_t)npcId; memcpy(packet + 5, &npcGuid, sizeof npcGuid);
+    return D2GAME_PACKETCALLBACK_Rcv0x30_TerminateEntityChat_6FC869F0(g_game, g_targetPlayer, packet, sizeof packet) == 0;
+}
+EMSCRIPTEN_KEEPALIVE const D2SessionNpcResponse* d2_session_npc_response() {
+    return &g_sessionNpcResponse;
+}
+static uint32_t sessionInventoryItemCount(D2InventoryStrc* inventory) {
+    uint32_t count = 0;
+    if (inventory) for (D2UnitStrc* item = INVENTORY_GetFirstItem(inventory); item; item = INVENTORY_GetNextItem(item))
+        if (INVENTORY_UnitIsItem(item)) ++count;
+    return count;
+}
+static void updateSessionVendorItems(D2UnitStrc* npc) {
+    g_sessionVendorItems.clear();
+    if (!npc || !g_targetPlayer || !g_game) return;
+    D2InventoryStrc* inventory = g_sessionVendor.action == 2
+        ? SUNITPROXY_GetGambleInventory(g_game, g_targetPlayer, npc) : npc->pInventory;
+    if (!inventory) return;
+    for (D2UnitStrc* item = INVENTORY_GetFirstItem(inventory); item; item = INVENTORY_GetNextItem(item)) {
+        if (!INVENTORY_UnitIsItem(item)) continue;
+        D2SessionVendorItem out = {};
+        out.id = item->dwUnitId; out.classId = item->dwClassId; out.mode = item->dwAnimMode;
+        out.quality = ITEMS_GetItemQuality(item); out.flags = item->dwFlags;
+        if (D2ItemsTxt* txt = DATATBLS_GetItemsTxtRecord(item->dwClassId)) out.code = txt->dwCode;
+        out.cost = ITEMS_GetTransactionCost(g_targetPlayer, item, (D2C_Difficulties)g_game->nDifficulty,
+            UNITS_GetPlayerData(g_targetPlayer)->pQuestData[g_game->nDifficulty], npc->dwClassId,
+            g_sessionVendor.action == 2 ? D2C_TransactionTypes::TRANSACTIONTYPE_GAMBLE
+                                        : D2C_TransactionTypes::TRANSACTIONTYPE_BUY);
+        out.hash = sessionHashBytes(D2VEC_FNV_INIT, &out, offsetof(D2SessionVendorItem, hash));
+        g_sessionVendorItems.push_back(out);
+    }
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_command_npc_vendor(uint32_t npcId, uint32_t action) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || (action != 1 && action != 2)) return 0;
+    memset(&g_sessionVendor, 0, sizeof g_sessionVendor);
+    g_sessionVendor.version = 1; g_sessionVendor.size = sizeof g_sessionVendor;
+    g_sessionVendor.packetHeader = 0x38; g_sessionVendor.packetSize = sizeof(D2GSPacketClt38);
+    g_sessionVendor.action = action; g_sessionVendor.npcId = npcId;
+    int32_t type = -1, guid = -1;
+    if (!SUNIT_GetInteractInfo(g_targetPlayer, &type, &guid) || type != UNIT_MONSTER || guid != (int32_t)npcId) return 0;
+    D2GSPacketClt38 packet = {};
+    packet.nHeader = 0x38; packet.nAction = action; packet.nNpcGUID = (int32_t)npcId; packet.nItemGUID = -1;
+    const int32_t handler = D2GAME_PACKETCALLBACK_Rcv0x38_EntityAction_6FC86CB0(g_game, g_targetPlayer, &packet, sizeof packet);
+    D2UnitStrc* npc = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)npcId);
+    updateSessionVendorItems(npc);
+    int32_t unused = 0; D2NpcRecordStrc* record = npc ? SUNITPROXY_GetNpcRecordFromUnit(g_game, npc, &unused) : nullptr;
+    if (record) { g_sessionVendor.trading = record->bTrading; g_sessionVendor.vendorInit = record->npcTrade.bVendorInit; }
+    uint32_t hash = D2VEC_FNV_INIT;
+    if (npc && npc->pInventory) for (D2UnitStrc* item = INVENTORY_GetFirstItem(npc->pInventory); item; item = INVENTORY_GetNextItem(item)) {
+        if (!INVENTORY_UnitIsItem(item)) continue;
+        const uint32_t fields[] = { (uint32_t)item->dwClassId, (uint32_t)item->dwAnimMode,
+            (uint32_t)ITEMS_GetItemQuality(item), item->dwFlags, item->dwFlagEx };
+        hash = sessionHashBytes(hash, fields, sizeof fields); ++g_sessionVendor.itemCount;
+        if (g_sessionVendor.itemCount == 1) {
+            g_sessionVendor.firstClass = item->dwClassId; g_sessionVendor.firstQuality = ITEMS_GetItemQuality(item);
+            if (D2ItemsTxt* txt = DATATBLS_GetItemsTxtRecord(item->dwClassId)) g_sessionVendor.firstCode = txt->dwCode;
+        }
+    }
+    g_sessionVendor.itemHash = hash; g_sessionVendor.result = handler == 0 && record && record->bTrading ? 1u : 0u;
+    g_sessionVendor.hash = sessionHashBytes(D2VEC_FNV_INIT, &g_sessionVendor, offsetof(D2SessionVendor, hash));
+    return g_sessionVendor.result;
+}
+EMSCRIPTEN_KEEPALIVE const D2SessionVendor* d2_session_vendor() { return &g_sessionVendor; }
+EMSCRIPTEN_KEEPALIVE const D2SessionVendorItem* d2_session_vendor_items() { return g_sessionVendorItems.data(); }
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_vendor_item_count() { return (uint32_t)g_sessionVendorItems.size(); }
+
+static int sessionVendorTransaction(uint32_t npcId, uint32_t itemId, bool buy) {
+    memset(&g_sessionVendorTransaction, 0, sizeof g_sessionVendorTransaction);
+    D2SessionVendorTransaction& out = g_sessionVendorTransaction;
+    out.version = 1; out.size = sizeof out; out.packetHeader = buy ? 0x32 : 0x33; out.packetSize = 17;
+    out.npcId = npcId; out.itemId = itemId; out.transactionType = buy ? 0 : 1;
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return 0;
+    D2UnitStrc* npc = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)npcId);
+    D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId);
+    int32_t interactType = -1, interactGuid = -1;
+    if (!npc || !item || !SUNIT_GetInteractInfo(g_targetPlayer, &interactType, &interactGuid) ||
+        interactType != UNIT_MONSTER || interactGuid != (int32_t)npcId) return 0;
+    out.itemClass = item->dwClassId; out.itemMode = item->dwAnimMode; out.itemQuality = ITEMS_GetItemQuality(item);
+    if (D2ItemsTxt* txt = DATATBLS_GetItemsTxtRecord(item->dwClassId)) out.itemCode = txt->dwCode;
+    out.packetCost = ITEMS_GetTransactionCost(g_targetPlayer, item, (D2C_Difficulties)g_game->nDifficulty,
+        UNITS_GetPlayerData(g_targetPlayer)->pQuestData[g_game->nDifficulty], npc->dwClassId,
+        buy ? D2C_TransactionTypes::TRANSACTIONTYPE_BUY : D2C_TransactionTypes::TRANSACTIONTYPE_SELL);
+    out.goldBefore = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_GOLD, 0);
+    out.playerItemsBefore = sessionInventoryItemCount(g_targetPlayer->pInventory);
+    out.vendorItemsBefore = sessionInventoryItemCount(npc->pInventory);
+    out.ownedBefore = ITEMS_IsInPlayersInventory(g_targetPlayer, item, 0) == 1;
+    if (buy) {
+        D2GSPacketClt32 packet = {};
+        packet.nHeader = 0x32; packet.dwNpcGUID = (int32_t)npcId; packet.dwItemGUID = (int32_t)itemId;
+        packet.nTransactionType = D2C_TransactionTypes::TRANSACTIONTYPE_BUY;
+        packet.nItemMode = item->dwAnimMode; packet.bMultibuy = 0; packet.dwCost = out.packetCost;
+        out.handlerResult = D2GAME_PACKETCALLBACK_Rcv0x32_BuyItemFromNpcBuffer_6FC86AE0(g_game, g_targetPlayer, &packet, sizeof packet);
+    } else {
+        D2GSPacketClt33 packet = {};
+        packet.nHeader = 0x33; packet.dwMonGUID = npcId; packet.dwItemGUID = itemId;
+        packet.nTab = item->dwAnimMode; packet.dwGold = out.packetCost;
+        out.handlerResult = D2GAME_PACKETCALLBACK_Rcv0x33_SellItemToNpcBuffer_6FC86B30(g_game, g_targetPlayer, &packet, sizeof packet);
+    }
+    if (buy) out.resultItemId = UNITS_GetPlayerData(g_targetPlayer)->dwBoughtItemId;
+    D2UnitStrc* after = SUNIT_GetServerUnit(g_game, UNIT_ITEM, buy ? (int32_t)out.resultItemId : (int32_t)itemId);
+    out.goldAfter = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_GOLD, 0);
+    out.playerItemsAfter = sessionInventoryItemCount(g_targetPlayer->pInventory);
+    out.vendorItemsAfter = sessionInventoryItemCount(npc->pInventory);
+    out.ownedAfter = after && ITEMS_IsInPlayersInventory(g_targetPlayer, after, 0) == 1;
+    if (out.handlerResult == 0) out.flags |= 1;
+    if (buy ? (out.goldAfter == out.goldBefore - out.packetCost) : (out.goldAfter == out.goldBefore + out.packetCost)) out.flags |= 2;
+    if (buy ? (out.playerItemsAfter > out.playerItemsBefore) : (out.playerItemsAfter < out.playerItemsBefore)) out.flags |= 4;
+    if (out.ownedBefore) out.flags |= 8;
+    if (out.ownedAfter) out.flags |= 16;
+    out.hash = sessionHashBytes(D2VEC_FNV_INIT, &out, offsetof(D2SessionVendorTransaction, hash));
+    updateSessionVendorItems(npc);
+    return (out.flags & 7) == 7;
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_command_vendor_gamble(uint32_t npcId, uint32_t itemId) {
+    memset(&g_sessionVendorTransaction, 0, sizeof g_sessionVendorTransaction);
+    D2SessionVendorTransaction& out = g_sessionVendorTransaction;
+    out.version = 1; out.size = sizeof out; out.packetHeader = 0x32; out.packetSize = 17;
+    out.npcId = npcId; out.itemId = itemId; out.transactionType = D2C_TransactionTypes::TRANSACTIONTYPE_GAMBLE;
+    if (!g_sessionLive || !g_game || !g_targetPlayer || g_sessionVendor.action != 2) return 0;
+    D2UnitStrc* npc = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)npcId);
+    D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId);
+    D2InventoryStrc* gamble = npc ? SUNITPROXY_GetGambleInventory(g_game, g_targetPlayer, npc) : nullptr;
+    int32_t interactType = -1, interactGuid = -1; bool listed = false;
+    if (gamble && item) for (D2UnitStrc* it = INVENTORY_GetFirstItem(gamble); it; it = INVENTORY_GetNextItem(it))
+        if (it == item) { listed = true; break; }
+    if (!npc || !item || !listed || !SUNIT_GetInteractInfo(g_targetPlayer, &interactType, &interactGuid) ||
+        interactType != UNIT_MONSTER || interactGuid != (int32_t)npcId) return 0;
+    out.itemClass = item->dwClassId; out.itemMode = item->dwAnimMode; out.itemQuality = ITEMS_GetItemQuality(item);
+    if (D2ItemsTxt* txt = DATATBLS_GetItemsTxtRecord(item->dwClassId)) out.itemCode = txt->dwCode;
+    out.packetCost = ITEMS_GetTransactionCost(g_targetPlayer, item, (D2C_Difficulties)g_game->nDifficulty,
+        UNITS_GetPlayerData(g_targetPlayer)->pQuestData[g_game->nDifficulty], npc->dwClassId,
+        D2C_TransactionTypes::TRANSACTIONTYPE_GAMBLE);
+    out.goldBefore = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_GOLD, 0);
+    out.playerItemsBefore = sessionInventoryItemCount(g_targetPlayer->pInventory);
+    out.vendorItemsBefore = sessionInventoryItemCount(gamble);
+    D2GSPacketClt32 packet = {};
+    packet.nHeader = 0x32; packet.dwNpcGUID = (int32_t)npcId; packet.dwItemGUID = (int32_t)itemId;
+    packet.nTransactionType = D2C_TransactionTypes::TRANSACTIONTYPE_GAMBLE;
+    packet.nItemMode = item->dwAnimMode; packet.dwCost = out.packetCost;
+    out.handlerResult = D2GAME_PACKETCALLBACK_Rcv0x32_BuyItemFromNpcBuffer_6FC86AE0(g_game, g_targetPlayer, &packet, sizeof packet);
+    out.resultItemId = UNITS_GetPlayerData(g_targetPlayer)->dwBoughtItemId;
+    D2UnitStrc* after = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)out.resultItemId);
+    out.goldAfter = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_GOLD, 0);
+    out.playerItemsAfter = sessionInventoryItemCount(g_targetPlayer->pInventory);
+    out.vendorItemsAfter = sessionInventoryItemCount(gamble);
+    out.ownedAfter = after && ITEMS_IsInPlayersInventory(g_targetPlayer, after, 0) == 1;
+    if (out.handlerResult == 0) out.flags |= 1;
+    if (out.goldAfter == out.goldBefore - out.packetCost) out.flags |= 2;
+    if (out.playerItemsAfter > out.playerItemsBefore) out.flags |= 4;
+    if (out.ownedAfter) out.flags |= 16;
+    out.hash = sessionHashBytes(D2VEC_FNV_INIT, &out, offsetof(D2SessionVendorTransaction, hash));
+    updateSessionVendorItems(npc);
+    return (out.flags & 23) == 23;
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_command_vendor_repair(uint32_t npcId, uint32_t itemId) {
+    memset(&g_sessionRepair, 0, sizeof g_sessionRepair);
+    D2SessionRepair& out = g_sessionRepair;
+    out.version = 1; out.size = sizeof out; out.packetHeader = 0x35; out.packetSize = 17;
+    out.npcId = npcId; out.itemId = itemId;
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return 0;
+    D2UnitStrc* npc = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)npcId);
+    D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId);
+    int32_t interactType = -1, interactGuid = -1;
+    if (!npc || !item || !SUNIT_GetInteractInfo(g_targetPlayer, &interactType, &interactGuid) ||
+        interactType != UNIT_MONSTER || interactGuid != (int32_t)npcId) return 0;
+    out.itemClass = item->dwClassId;
+    out.goldBefore = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_GOLD, 0);
+    out.cost = ITEMS_GetTransactionCost(g_targetPlayer, item, (D2C_Difficulties)g_game->nDifficulty,
+        UNITS_GetPlayerData(g_targetPlayer)->pQuestData[g_game->nDifficulty], npc->dwClassId,
+        D2C_TransactionTypes::TRANSACTIONTYPE_REPAIR);
+    out.durabilityBefore = STATLIST_UnitGetStatValue(item, STAT_DURABILITY, 0);
+    out.maxDurability = STATLIST_GetMaxDurabilityFromUnit(item);
+    out.quantityBefore = STATLIST_UnitGetStatValue(item, STAT_QUANTITY, 0);
+    out.maxQuantity = ITEMS_GetTotalMaxStack(item);
+    out.ownedBefore = ITEMS_IsInPlayersInventory(g_targetPlayer, item, 0) == 1;
+    uint8_t packet[17] = { 0x35 };
+    const int32_t npcGuid = (int32_t)npcId, itemGuid = (int32_t)itemId, individual = 0;
+    memcpy(packet + 1, &npcGuid, sizeof npcGuid); memcpy(packet + 5, &itemGuid, sizeof itemGuid);
+    memcpy(packet + 13, &individual, sizeof individual);
+    out.handlerResult = D2GAME_PACKETCALLBACK_Rcv0x35_Repair_6FC86B70(g_game, g_targetPlayer, packet, sizeof packet);
+    out.goldAfter = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_GOLD, 0);
+    out.durabilityAfter = STATLIST_UnitGetStatValue(item, STAT_DURABILITY, 0);
+    out.quantityAfter = STATLIST_UnitGetStatValue(item, STAT_QUANTITY, 0);
+    out.ownedAfter = ITEMS_IsInPlayersInventory(g_targetPlayer, item, 0) == 1;
+    if (out.handlerResult == 0) out.flags |= 1;
+    if (out.goldAfter == out.goldBefore - out.cost) out.flags |= 2;
+    if ((out.maxDurability && out.durabilityAfter == out.maxDurability) ||
+        (out.maxQuantity && out.quantityAfter == out.maxQuantity)) out.flags |= 4;
+    if (out.ownedBefore && out.ownedAfter) out.flags |= 8;
+    out.hash = sessionHashBytes(D2VEC_FNV_INIT, &out, offsetof(D2SessionRepair, hash));
+    return (out.flags & 15) == 15;
+}
+EMSCRIPTEN_KEEPALIVE const D2SessionRepair* d2_session_vendor_repair() { return &g_sessionRepair; }
+EMSCRIPTEN_KEEPALIVE int d2_session_command_vendor_sell(uint32_t npcId, uint32_t itemId) {
+    return sessionVendorTransaction(npcId, itemId, false);
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_command_vendor_buy(uint32_t npcId, uint32_t itemId) {
+    return sessionVendorTransaction(npcId, itemId, true);
+}
+EMSCRIPTEN_KEEPALIVE const D2SessionVendorTransaction* d2_session_vendor_transaction() {
+    return &g_sessionVendorTransaction;
+}
+EMSCRIPTEN_KEEPALIVE const D2SessionAct1Quest1* d2_session_act1q1() {
+    memset(&g_sessionAct1Quest1, 0, sizeof g_sessionAct1Quest1);
+    D2SessionAct1Quest1& out = g_sessionAct1Quest1;
+    out.version = 1; out.size = sizeof out; out.level = g_currentLevel;
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return &out;
+    D2QuestDataStrc* quest = QUESTS_GetQuestData(g_game, QUEST_A1Q1_DENOFEVIL);
+    D2BitBufferStrc* flags = UNITS_GetPlayerData(g_targetPlayer)->pQuestData[g_game->nDifficulty];
+    if (quest) {
+        out.questState = quest->fState; out.lastState = quest->fLastState; out.questFlags = quest->dwFlags;
+        if (D2Act1Quest1Strc* ex = static_cast<D2Act1Quest1Strc*>(quest->pQuestDataEx)) {
+            out.monstersLeft = ex->nMonstersLeft; out.enteredDen = ex->bEnteredDen;
+            out.akaraActivated = ex->bAkaraActivated; out.finished = ex->bFinished; out.timerActive = ex->bTimerActive;
+        }
+    }
+    for (uint32_t bit = 0; bit < 16; ++bit)
+        if (QUESTRECORD_GetQuestState(flags, QUESTSTATEFLAG_A1Q1, bit)) out.playerFlags |= 1u << bit;
+    out.globalPrimaryGoal = QUESTS_GetGlobalState(g_game, QUESTSTATEFLAG_A1Q1, QFLAG_PRIMARYGOALDONE);
+    out.skillPoints = STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_SKILLPTS, 0);
+    out.hash = sessionHashBytes(D2VEC_FNV_INIT, &out, offsetof(D2SessionAct1Quest1, hash));
+    return &out;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath || frames < 0) return 0;
+    for (int i = 0; i < frames; ++i) {
+        const bool wasMoving = g_sessionMovePending;
+        if (g_sessionAttack.state == 2) {
+            D2ActiveRoomStrc* room = g_targetPlayer->pDynamicPath->pRoom;
+            SUNIT_SetCombatMode(g_game, g_targetPlayer,
+                room && DUNGEON_IsRoomInTown(room) ? PLRMODE_TOWNNEUTRAL : PLRMODE_NEUTRAL);
+            D2GAME_DeletePlayerPerFrameEvents_6FCBCE50(g_game, g_targetPlayer);
+            UNITS_SetUsedSkill(g_targetPlayer, nullptr); UNITS_SetTargetUnitForDynamicUnit(g_targetPlayer, nullptr);
+            g_sessionAttack.state = 3;
+        }
+        // Deferred item interaction still relies on the headless session's legacy pre-event path
+        // step. Keep it until the missing retail interaction-completion callback is recovered.
+        if (g_sessionMovePending && !D2Common_10226(g_targetPlayer, 1024)) {
+            D2ActiveRoomStrc* room = g_targetPlayer->pDynamicPath->pRoom;
+            SUNIT_SetCombatMode(g_game, g_targetPlayer,
+                room && DUNGEON_IsRoomInTown(room) ? PLRMODE_TOWNNEUTRAL : PLRMODE_NEUTRAL);
+        }
+        if (!d2_aiframe_advance(1)) return 0;
+        sub_6FC33670(g_game, g_targetClient);
+        if (g_sessionAttack.state == 1 && !g_sessionAttackResolved && g_sessionAttack.eventFrame &&
+            g_game->dwGameFrame >= g_sessionAttack.eventFrame) {
+            g_sessionAttackResolved = true;
+        }
+        if (g_sessionAttack.state == 1 && g_sessionAttackEndFrame &&
+            g_game->dwGameFrame >= g_sessionAttackEndFrame) g_sessionAttack.state = 2;
+        if (g_sessionAttackTarget && !g_sessionTargetKillCounted &&
+            STATLIST_UnitGetStatValue(g_sessionAttackTarget, STAT_HITPOINTS, 0) <= 0) {
+            g_sessionTargetKillCounted = true; ++g_sessionKills;
+        }
+        D2DynamicPathStrc* path = g_targetPlayer->pDynamicPath;
+        g_sessionMovePending = path->dwPathPoints > 0 && path->dwCurrentPointIdx < path->dwPathPoints;
+        if (wasMoving) syncSessionLevelFromPlayer();
+    }
+    updateSessionSnapshot(); return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_command_primary_attack(uint32_t targetUnitId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath ||
+        !g_targetPlayer->pDynamicPath->pRoom || g_targetPlayer->dwAnimMode == PLRMODE_DEAD ||
+        g_sessionAttack.state == 1 || g_sessionAttack.state == 2) return 0;
+    D2UnitStrc* target = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, targetUnitId);
+    if (!target || !target->pDynamicPath ||
+        target->pDynamicPath->pRoom != g_targetPlayer->pDynamicPath->pRoom ||
+        target->dwAnimMode == MONMODE_DEAD || STATLIST_UnitGetStatValue(target, STAT_HITPOINTS, 0) <= 0 ||
+        !(target->dwFlags & UNITFLAG_TARGETABLE)) return 0;
+    if (!UNITS_IsInMeleeRange(g_targetPlayer, target, 1)) {
+        PLRMODE_StartID_WalkRunKnockback(g_game, g_targetPlayer, PLRMODE_WALK, target);
+        const D2DynamicPathStrc* path = g_targetPlayer->pDynamicPath;
+        g_sessionMovePending = path->dwPathPoints > 0;
+        g_sessionTargetX = target->pDynamicPath->tGameCoords.wPosX;
+        g_sessionTargetY = target->pDynamicPath->tGameCoords.wPosY;
+        updateSessionSnapshot(); return g_sessionMovePending ? 2 : 0;
+    }
+    D2SkillStrc* skill = SKILLS_GetHighestLevelSkillFromUnitAndId(g_targetPlayer, SKILL_ATTACK);
+    if (!skill) return 0;
+    memset(&g_sessionAttack, 0, sizeof g_sessionAttack); g_sessionAttack.version = 1;
+    g_sessionAttack.size = sizeof g_sessionAttack; g_sessionAttack.gameFrame = g_game->dwGameFrame;
+    g_sessionAttack.state = 1; g_sessionAttack.attackerId = g_targetPlayer->dwUnitId;
+    g_sessionAttack.targetId = target->dwUnitId; g_sessionAttack.skillId = SKILL_ATTACK;
+    g_sessionAttack.targetHpBefore = STATLIST_UnitGetStatValue(target, STAT_HITPOINTS, 0);
+    g_sessionAttack.targetHpAfter = g_sessionAttack.targetHpBefore; g_sessionAttack.attacks = ++g_sessionAttackCount;
+    g_sessionAttackTarget = target; g_sessionAttackSkill = skill;
+    g_sessionAttackResolved = false; g_sessionTargetKillCounted = false;
+    UNITS_SetUsedSkill(g_targetPlayer, skill); UNITS_SetTargetUnitForDynamicUnit(g_targetPlayer, target);
+    SUNIT_SetCombatMode(g_game, g_targetPlayer, PLRMODE_ATTACK1);
+    g_targetPlayer->dwFlags &= ~UNITFLAG_SKSRVDOFUNC;
+    SKILLS_SrvSt01_Attack_LeftHandSwing(g_game, g_targetPlayer, SKILL_ATTACK,
+        SKILLS_GetSkillLevel(g_targetPlayer, skill, TRUE));
+    sub_6FCBCE70(g_game, g_targetPlayer);
+    g_sessionAttack.eventFrame = EVENT_GetEventFrame(g_game, g_targetPlayer, EVENTTYPE_MODECHANGE);
+    g_sessionAttackEndFrame = EVENT_GetEventFrame(g_game, g_targetPlayer, EVENTTYPE_ENDANIM);
+    g_sessionAttack.mode = g_targetPlayer->dwAnimMode;
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_command_throw(uint32_t targetUnitId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath ||
+        g_targetPlayer->dwAnimMode == PLRMODE_DEAD || g_sessionAttack.state == 1 || g_sessionAttack.state == 2) return 0;
+    D2UnitStrc* target = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)targetUnitId);
+    D2SkillStrc* skill = SKILLS_GetHighestLevelSkillFromUnitAndId(g_targetPlayer, SKILL_THROW);
+    if (!target || !target->pDynamicPath || !skill || SKILLS_GetUseState(g_targetPlayer, skill) != SKILLUSTATE_USABLE ||
+        target->dwAnimMode == MONMODE_DEAD || !(target->dwFlags & UNITFLAG_TARGETABLE)) return 0;
+    memset(&g_sessionAttack, 0, sizeof g_sessionAttack); g_sessionAttack.version = 1;
+    g_sessionAttack.size = sizeof g_sessionAttack; g_sessionAttack.gameFrame = g_game->dwGameFrame;
+    g_sessionAttack.state = 1; g_sessionAttack.attackerId = g_targetPlayer->dwUnitId;
+    g_sessionAttack.targetId = target->dwUnitId; g_sessionAttack.skillId = SKILL_THROW;
+    g_sessionAttack.targetHpBefore = STATLIST_UnitGetStatValue(target, STAT_HITPOINTS, 0);
+    g_sessionAttack.targetHpAfter = g_sessionAttack.targetHpBefore; g_sessionAttack.attacks = ++g_sessionAttackCount;
+    g_sessionAttackTarget = target; g_sessionAttackSkill = skill; g_sessionAttackResolved = false;
+    const int32_t result = sub_6FC836D0(g_game, g_targetPlayer, skill, UNIT_MONSTER, (int32_t)targetUnitId, 1);
+    if (result != 0) { g_sessionAttack.state = 0; return 0; }
+    g_sessionAttack.eventFrame = EVENT_GetEventFrame(g_game, g_targetPlayer, EVENTTYPE_MODECHANGE);
+    g_sessionAttackEndFrame = EVENT_GetEventFrame(g_game, g_targetPlayer, EVENTTYPE_ENDANIM);
+    g_sessionAttack.mode = g_targetPlayer->dwAnimMode;
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_command_kick(uint32_t targetUnitId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath ||
+        g_targetPlayer->dwAnimMode == PLRMODE_DEAD || g_sessionAttack.state == 1 || g_sessionAttack.state == 2) return 0;
+    D2UnitStrc* target = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)targetUnitId);
+    D2SkillStrc* skill = SKILLS_GetHighestLevelSkillFromUnitAndId(g_targetPlayer, SKILL_KICK);
+    if (!target || !target->pDynamicPath || !skill || SKILLS_GetUseState(g_targetPlayer, skill) != SKILLUSTATE_USABLE ||
+        target->dwAnimMode == MONMODE_DEAD || !(target->dwFlags & UNITFLAG_TARGETABLE)) return 0;
+    memset(&g_sessionAttack, 0, sizeof g_sessionAttack); g_sessionAttack.version = 1;
+    g_sessionAttack.size = sizeof g_sessionAttack; g_sessionAttack.gameFrame = g_game->dwGameFrame;
+    g_sessionAttack.state = 1; g_sessionAttack.attackerId = g_targetPlayer->dwUnitId;
+    g_sessionAttack.targetId = target->dwUnitId; g_sessionAttack.skillId = SKILL_KICK;
+    g_sessionAttack.targetHpBefore = STATLIST_UnitGetStatValue(target, STAT_HITPOINTS, 0);
+    g_sessionAttack.targetHpAfter = g_sessionAttack.targetHpBefore; g_sessionAttack.attacks = ++g_sessionAttackCount;
+    g_sessionAttackTarget = target; g_sessionAttackSkill = skill; g_sessionAttackResolved = false;
+    const int32_t result = sub_6FC836D0(g_game, g_targetPlayer, skill, UNIT_MONSTER, (int32_t)targetUnitId, 1);
+    if (result != 0) { g_sessionAttack.state = 0; return 0; }
+    g_sessionAttack.eventFrame = EVENT_GetEventFrame(g_game, g_targetPlayer, EVENTTYPE_MODECHANGE);
+    g_sessionAttackEndFrame = EVENT_GetEventFrame(g_game, g_targetPlayer, EVENTTYPE_ENDANIM);
+    g_sessionAttack.mode = g_targetPlayer->dwAnimMode;
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_equipped_quantity() {
+    if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pInventory) return -1;
+    D2UnitStrc* item = INVENTORY_GetItemFromBodyLoc(g_targetPlayer->pInventory, BODYLOC_RARM);
+    return item ? STATLIST_UnitGetStatValue(item, STAT_QUANTITY, 0) : -1;
+}
+
+// Deterministic progression fixture: initialize experience through the recovered stat list,
+// then let the normal kill/experience path decide whether a level is earned. This never writes
+// level or award points and is accepted only on an otherwise fresh level-1 player.
+EMSCRIPTEN_KEEPALIVE int d2_session_fixture_experience(uint32_t experience) {
+    if (!g_sessionLive || !g_targetPlayer ||
+        STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_LEVEL, 0) != 1 ||
+        STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_EXPERIENCE, 0) != 0 ||
+        STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_STATPTS, 0) != 0 ||
+        STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_SKILLPTS, 0) != 0) return 0;
+    const uint32_t threshold = DATATBLS_GetLevelThreshold(g_targetPlayer->dwClassId, 1);
+    if (experience >= threshold) return 0;
+    STATLIST_SetUnitStat(g_targetPlayer, STAT_EXPERIENCE, (int32_t)experience, 0);
+    STATLIST_SetUnitStat(g_targetPlayer, STAT_LASTEXP, 0, 0);
+    g_sessionInitialExperience = (int32_t)experience;
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_command_add_stat(uint32_t statId, uint32_t count) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || statId > 15 || count < 1 || count > 100) return 3;
+    uint8_t packet[3] = { 0x3A, 0, 0 };
+    const uint16_t encoded = (uint16_t)(statId | ((count - 1) << 8));
+    memcpy(packet + 1, &encoded, sizeof encoded);
+    return D2GAME_PACKETCALLBACK_Rcv0x3A_AddStatPoint_6FC86E80(g_game, g_targetPlayer, packet, sizeof packet);
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_command_add_skill(uint32_t skillId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || skillId > UINT16_MAX) return 3;
+    uint8_t packet[3] = { 0x3B, 0, 0 };
+    const uint16_t encoded = (uint16_t)skillId;
+    memcpy(packet + 1, &encoded, sizeof encoded);
+    const int result = D2GAME_PACKETCALLBACK_Rcv0x3B_AddSkillPoint_6FC86EF0(g_game, g_targetPlayer, packet, sizeof packet);
+    if (result == 0) g_sessionAdvancementSkillId = skillId;
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_command_pickup(uint32_t itemUnitId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pInventory) return 0;
+    D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemUnitId);
+    if (!item || item->dwAnimMode != IMODE_ONGROUND || !UNITS_GetRoom(item)) return 0;
+    g_sessionItemState.commandTarget = itemUnitId;
+    sub_6FC828D0(g_targetPlayer, UNIT_ITEM, (int32_t)itemUnitId, 0, g_game);
+    if (INVENTORY_IsItemInInventory(g_targetPlayer->pInventory, item)) {
+        g_sessionItemState.result = 1;
+        return 1;
+    }
+    if (item->dwAnimMode == IMODE_ONGROUND && UNITS_GetRoom(item)) {
+        g_sessionItemState.result = 2;
+        return 2;
+    }
+    g_sessionItemState.result = 0;
+    return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_command_drop(uint32_t itemUnitId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pInventory) return 0;
+    D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemUnitId);
+    if (!item || item->dwAnimMode != IMODE_STORED || ITEMS_GetInvPage(item) != INVPAGE_INVENTORY ||
+        !INVENTORY_CompareWithItemsParentInventory(g_targetPlayer->pInventory, item)) return 0;
+    int32_t removeError = 0;
+    if (!sub_6FC446B0(g_game, g_targetPlayer, (int32_t)itemUnitId, &removeError, 1, 0, nullptr, 0)) return 0;
+    if (INVENTORY_GetCursorItem(g_targetPlayer->pInventory) != item) return 0;
+    sub_6FC44030(g_game, g_targetPlayer, (int32_t)itemUnitId);
+    updateSessionSnapshot();
+    return item->dwAnimMode == IMODE_ONGROUND && UNITS_GetRoom(item) ? 1 : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_command_use_belt(uint32_t slot) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pInventory || slot >= 16) return 0;
+    D2UnitStrc* item = INVENTORY_GetItemFromBeltSlot(g_targetPlayer->pInventory, (int32_t)slot);
+    if (!item || item->dwAnimMode != IMODE_INBELT ||
+        !INVENTORY_CompareWithItemsParentInventory(g_targetPlayer->pInventory, item)) return 0;
+    int32_t error = 0;
+    const int32_t id = item->dwUnitId;
+    if (!sub_6FC49220(g_game, g_targetPlayer, id, CLIENTS_GetUnitX(g_targetPlayer), CLIENTS_GetUnitY(g_targetPlayer), &error, 0)) return 0;
+    updateSessionSnapshot();
+    return SUNIT_GetServerUnit(g_game, UNIT_ITEM, id) ? 0 : 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_command_stow_body(uint32_t bodyLoc) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pInventory || bodyLoc >= 13) return 0;
+    int32_t result = 0;
+    if (!sub_6FC45B30(g_game, g_targetPlayer, (uint8_t)bodyLoc, 0, &result)) return 0;
+    D2UnitStrc* cursor = INVENTORY_GetCursorItem(g_targetPlayer->pInventory);
+    if (!cursor || !sub_6FC43E60(g_game, g_targetPlayer, cursor, 1, 0, __FILE__, __LINE__)) return 0;
+    updateSessionSnapshot();
+    return INVENTORY_GetItemFromBodyLoc(g_targetPlayer->pInventory, (int32_t)bodyLoc) ? 0 : 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_command_respawn() {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || g_targetPlayer->dwAnimMode != PLRMODE_DEAD) return 0;
+    uint8_t packet = 0x41;
+    const int32_t result = D2GAME_PACKETCALLBACK_Rcv0x41_Resurrect_6FC87480(g_game, g_targetPlayer, &packet, 1);
+    updateSessionSnapshot();
+    return result == 0 && g_targetPlayer->dwAnimMode != PLRMODE_DEAD ? 1 : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_command_recover_corpse(uint32_t corpseId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pInventory) return 0;
+    D2UnitStrc* corpse = SUNIT_GetServerUnit(g_game, UNIT_PLAYER, (int32_t)corpseId);
+    if (!corpse || corpse == g_targetPlayer || corpse->dwAnimMode != PLRMODE_DEAD ||
+        !STATES_CheckState(corpse, STATE_PLAYERBODY) || INVENTORY_GetOwnerId(corpse->pInventory) != g_targetPlayer->dwUnitId) return 0;
+    sub_6FC80440(g_game, g_targetPlayer, corpse);
+    updateSessionSnapshot();
+    return SUNIT_GetServerUnit(g_game, UNIT_PLAYER, (int32_t)corpseId) ? 0 : 1;
+}
+
+static uint32_t sessionInventoryItemCount(const D2InventoryStrc* inventory) {
+    if (!inventory) return 0;
+    uint32_t count = INVENTORY_GetCursorItem(const_cast<D2InventoryStrc*>(inventory)) ? 1u : 0u;
+    for (D2UnitStrc* item = INVENTORY_GetFirstItem(const_cast<D2InventoryStrc*>(inventory));
+         item; item = INVENTORY_GetNextItem(item)) {
+        if (INVENTORY_UnitIsItem(item)) ++count;
+    }
+    return count;
+}
+
+// Executes the recovered retail MJ item-section writer and current-version reader against the
+// live player.  The returned record and byte buffer contain no wasm pointers.
+EMSCRIPTEN_KEEPALIVE const D2SessionItemSaveRoundTrip* d2_session_item_save_roundtrip() {
+    memset(&g_sessionItemSaveRoundTrip, 0, sizeof g_sessionItemSaveRoundTrip);
+    g_sessionItemSaveRoundTrip.version = 1;
+    g_sessionItemSaveRoundTrip.size = sizeof g_sessionItemSaveRoundTrip;
+    g_sessionItemSaveRoundTrip.saveVersion = 96;
+    g_sessionItemSaveBytes.clear();
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pInventory) {
+        g_sessionItemSaveRoundTrip.result = 1;
+        return &g_sessionItemSaveRoundTrip;
+    }
+
+    constexpr uint32_t kCapacity = 64u * 1024u;
+    g_sessionItemSaveBytes.resize(kCapacity);
+    g_sessionItemSaveRoundTrip.beforeInventoryCount = sessionInventoryItemCount(g_targetPlayer->pInventory);
+    const int32_t written = PLRSAVE_WriteItems_6FC89B50(g_targetPlayer->pInventory,
+        g_sessionItemSaveBytes.data(), kCapacity, 0, 0);
+    if (written < 4 || (uint32_t)written > kCapacity) {
+        g_sessionItemSaveBytes.clear();
+        g_sessionItemSaveRoundTrip.result = 2;
+        return &g_sessionItemSaveRoundTrip;
+    }
+    g_sessionItemSaveBytes.resize((size_t)written);
+    g_sessionItemSaveRoundTrip.bytesWritten = (uint32_t)written;
+    g_sessionItemSaveRoundTrip.itemCount = (uint32_t)g_sessionItemSaveBytes[2] |
+        ((uint32_t)g_sessionItemSaveBytes[3] << 8);
+    g_sessionItemSaveRoundTrip.sectionHash = sessionHashBytes(D2VEC_FNV_INIT,
+        g_sessionItemSaveBytes.data(), g_sessionItemSaveBytes.size());
+    if (g_sessionItemSaveBytes[0] == 'J' && g_sessionItemSaveBytes[1] == 'M')
+        g_sessionItemSaveRoundTrip.flags |= 1u;
+    if (g_sessionItemSaveRoundTrip.itemCount == g_sessionItemSaveRoundTrip.beforeInventoryCount)
+        g_sessionItemSaveRoundTrip.flags |= 2u;
+
+    SUNIT_RemoveAllItemsFromInventory(g_game, g_targetPlayer);
+    int32_t consumed = 0;
+    const int32_t readResult = PLRSAVE_ReadItems_6FC8B8A0(g_game, g_targetPlayer,
+        g_sessionItemSaveBytes.data(), 96, written, 0, &consumed);
+    g_sessionItemSaveRoundTrip.bytesConsumed = consumed > 0 ? (uint32_t)consumed : 0;
+    if (readResult != 0) {
+        g_sessionItemSaveRoundTrip.result = 0x100u + (uint32_t)readResult;
+        return &g_sessionItemSaveRoundTrip;
+    }
+    if (consumed == written) g_sessionItemSaveRoundTrip.flags |= 4u;
+    g_sessionItemSaveRoundTrip.afterInventoryCount = sessionInventoryItemCount(g_targetPlayer->pInventory);
+    if (g_sessionItemSaveRoundTrip.afterInventoryCount == g_sessionItemSaveRoundTrip.beforeInventoryCount)
+        g_sessionItemSaveRoundTrip.flags |= 8u;
+
+    std::vector<uint8_t> replay(kCapacity);
+    const int32_t replayWritten = PLRSAVE_WriteItems_6FC89B50(g_targetPlayer->pInventory,
+        replay.data(), kCapacity, 0, 0);
+    if (replayWritten > 0 && (uint32_t)replayWritten <= kCapacity) {
+        g_sessionItemSaveRoundTrip.replayBytes = (uint32_t)replayWritten;
+        g_sessionItemSaveRoundTrip.replayHash = sessionHashBytes(D2VEC_FNV_INIT, replay.data(), (size_t)replayWritten);
+        if (replayWritten == written && !memcmp(replay.data(), g_sessionItemSaveBytes.data(), (size_t)written))
+            g_sessionItemSaveRoundTrip.flags |= 16u;
+    }
+    g_sessionItemSaveRoundTrip.result = (g_sessionItemSaveRoundTrip.flags & 15u) == 15u ? 0u : 3u;
+    updateSessionSnapshot();
+    g_sessionItemSaveRoundTrip.hash = sessionHashBytes(D2VEC_FNV_INIT, &g_sessionItemSaveRoundTrip,
+        offsetof(D2SessionItemSaveRoundTrip, hash));
+    return &g_sessionItemSaveRoundTrip;
+}
+
+EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_item_save_bytes() {
+    return g_sessionItemSaveBytes.data();
+}
+
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_save_length() {
+    return (uint32_t)g_sessionItemSaveBytes.size();
+}
+
+static uint32_t sessionBaseStatsHash(D2UnitStrc* player, uint32_t* countOut) {
+    D2StatStrc stats[512] = {};
+    const int count = player && player->pStatListEx
+        ? STATLIST_GetBaseStatsData((D2StatListStrc*)player->pStatListEx, stats, 512) : 0;
+    std::sort(stats, stats + count, [](const D2StatStrc& a, const D2StatStrc& b) {
+        return a.nStat != b.nStat ? a.nStat < b.nStat : a.nLayer < b.nLayer;
+    });
+    uint32_t hash = D2VEC_FNV_INIT;
+    for (int i = 0; i < count; ++i) {
+        hash = sessionHashBytes(hash, &stats[i].nStat, sizeof stats[i].nStat);
+        hash = sessionHashBytes(hash, &stats[i].nLayer, sizeof stats[i].nLayer);
+        hash = sessionHashBytes(hash, &stats[i].nValue, sizeof stats[i].nValue);
+    }
+    if (countOut) *countOut = (uint32_t)count;
+    return hash;
+}
+
+// Current-version retail `gf` base-stat section. The recovered reader is applied to the exact
+// writer output, then the live base-stat list is serialized again for an exact round-trip gate.
+EMSCRIPTEN_KEEPALIVE const D2SessionStatsSaveRoundTrip* d2_session_stats_save_roundtrip() {
+    memset(&g_sessionStatsSaveRoundTrip, 0, sizeof g_sessionStatsSaveRoundTrip);
+    g_sessionStatsSaveRoundTrip.version = 1;
+    g_sessionStatsSaveRoundTrip.size = sizeof g_sessionStatsSaveRoundTrip;
+    g_sessionStatsSaveRoundTrip.saveVersion = 96;
+    g_sessionStatsSaveBytes.clear();
+    if (!g_sessionLive || !g_game || !g_targetPlayer) {
+        g_sessionStatsSaveRoundTrip.result = 1;
+        return &g_sessionStatsSaveRoundTrip;
+    }
+    constexpr size_t kCapacity = 4096;
+    g_sessionStatsSaveBytes.resize(kCapacity);
+    uint8_t* writeEnd = g_sessionStatsSaveBytes.data();
+    g_sessionStatsSaveRoundTrip.beforeStatsHash = sessionBaseStatsHash(
+        g_targetPlayer, &g_sessionStatsSaveRoundTrip.statEntries);
+    g_sessionStatsSaveRoundTrip.hpBefore = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_HITPOINTS, 0);
+    g_sessionStatsSaveRoundTrip.manaBefore = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_MANA, 0);
+    const int32_t writeResult = PLRSAVE2_WritePlayerStats(g_game, g_targetPlayer, &writeEnd,
+        g_sessionStatsSaveBytes.data() + kCapacity);
+    if (writeResult || writeEnd <= g_sessionStatsSaveBytes.data() || writeEnd > g_sessionStatsSaveBytes.data() + kCapacity) {
+        g_sessionStatsSaveRoundTrip.result = 2u + (uint32_t)writeResult;
+        g_sessionStatsSaveBytes.clear();
+        return &g_sessionStatsSaveRoundTrip;
+    }
+    g_sessionStatsSaveRoundTrip.bytesWritten = (uint32_t)(writeEnd - g_sessionStatsSaveBytes.data());
+    g_sessionStatsSaveBytes.resize(g_sessionStatsSaveRoundTrip.bytesWritten);
+    g_sessionStatsSaveRoundTrip.sectionHash = sessionHashBytes(D2VEC_FNV_INIT,
+        g_sessionStatsSaveBytes.data(), g_sessionStatsSaveBytes.size());
+    if (g_sessionStatsSaveBytes.size() >= 2 && g_sessionStatsSaveBytes[0] == 'g' && g_sessionStatsSaveBytes[1] == 'f')
+        g_sessionStatsSaveRoundTrip.flags |= 1u;
+
+    uint8_t* readEnd = g_sessionStatsSaveBytes.data();
+    const int32_t readResult = PLRSAVE2_ReadStatsEx(g_game, g_targetPlayer, &readEnd,
+        g_sessionStatsSaveBytes.data() + g_sessionStatsSaveBytes.size(), 96);
+    g_sessionStatsSaveRoundTrip.bytesConsumed = (uint32_t)(readEnd - g_sessionStatsSaveBytes.data());
+    if (readResult) {
+        g_sessionStatsSaveRoundTrip.result = 0x100u + (uint32_t)readResult;
+        return &g_sessionStatsSaveRoundTrip;
+    }
+    if (g_sessionStatsSaveRoundTrip.bytesConsumed == g_sessionStatsSaveRoundTrip.bytesWritten)
+        g_sessionStatsSaveRoundTrip.flags |= 2u;
+    g_sessionStatsSaveRoundTrip.afterStatsHash = sessionBaseStatsHash(g_targetPlayer, nullptr);
+    g_sessionStatsSaveRoundTrip.hpAfter = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_HITPOINTS, 0);
+    g_sessionStatsSaveRoundTrip.manaAfter = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_MANA, 0);
+    if (g_sessionStatsSaveRoundTrip.afterStatsHash == g_sessionStatsSaveRoundTrip.beforeStatsHash &&
+        g_sessionStatsSaveRoundTrip.hpAfter == g_sessionStatsSaveRoundTrip.hpBefore &&
+        g_sessionStatsSaveRoundTrip.manaAfter == g_sessionStatsSaveRoundTrip.manaBefore)
+        g_sessionStatsSaveRoundTrip.flags |= 4u;
+
+    std::vector<uint8_t> replay(kCapacity);
+    uint8_t* replayEnd = replay.data();
+    const int32_t replayResult = PLRSAVE2_WritePlayerStats(g_game, g_targetPlayer, &replayEnd, replay.data() + replay.size());
+    if (!replayResult) {
+        g_sessionStatsSaveRoundTrip.replayBytes = (uint32_t)(replayEnd - replay.data());
+        g_sessionStatsSaveRoundTrip.replayHash = sessionHashBytes(D2VEC_FNV_INIT, replay.data(), g_sessionStatsSaveRoundTrip.replayBytes);
+        if (g_sessionStatsSaveRoundTrip.replayBytes == g_sessionStatsSaveRoundTrip.bytesWritten &&
+            !memcmp(replay.data(), g_sessionStatsSaveBytes.data(), g_sessionStatsSaveRoundTrip.bytesWritten))
+            g_sessionStatsSaveRoundTrip.flags |= 8u;
+    }
+    g_sessionStatsSaveRoundTrip.result = g_sessionStatsSaveRoundTrip.flags == 15u ? 0u : 3u;
+    g_sessionStatsSaveRoundTrip.hash = sessionHashBytes(D2VEC_FNV_INIT, &g_sessionStatsSaveRoundTrip,
+        offsetof(D2SessionStatsSaveRoundTrip, hash));
+    return &g_sessionStatsSaveRoundTrip;
+}
+
+EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_stats_save_bytes() { return g_sessionStatsSaveBytes.data(); }
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_stats_save_length() { return (uint32_t)g_sessionStatsSaveBytes.size(); }
+
+static uint32_t sessionSkillSemanticHash(D2UnitStrc* player, int32_t classId, int32_t skillCount) {
+    uint32_t hash = D2VEC_FNV_INIT;
+    for (int32_t i = 0; i < skillCount; ++i) {
+        const int32_t skillId = SKILLS_GetClassSkillId(classId, i);
+        const int32_t level = SKILLS_GetSkillLevel(player, SKILLS_GetSkillById(player, skillId, -1u), 0);
+        hash = sessionHashBytes(hash, &skillId, sizeof skillId);
+        hash = sessionHashBytes(hash, &level, sizeof level);
+    }
+    return hash;
+}
+
+// Two independent recovered sections in their native forms: `if` player skills and `WS`
+// waypoints. They intentionally remain separate byte buffers rather than an invented container.
+EMSCRIPTEN_KEEPALIVE const D2SessionCampaignSaveRoundTrip* d2_session_campaign_save_roundtrip() {
+    memset(&g_sessionCampaignSaveRoundTrip, 0, sizeof g_sessionCampaignSaveRoundTrip);
+    g_sessionCampaignSaveRoundTrip.version = 1;
+    g_sessionCampaignSaveRoundTrip.size = sizeof g_sessionCampaignSaveRoundTrip;
+    g_sessionCampaignSaveRoundTrip.saveVersion = 96;
+    g_sessionSkillSaveBytes.clear(); g_sessionWaypointSaveBytes.clear();
+    if (!g_sessionLive || !g_game || !g_targetPlayer) {
+        g_sessionCampaignSaveRoundTrip.result = 1; return &g_sessionCampaignSaveRoundTrip;
+    }
+    D2ClientStrc* client = SUNIT_GetClientFromPlayer(g_targetPlayer, __FILE__, __LINE__);
+    if (!client) { g_sessionCampaignSaveRoundTrip.result = 2; return &g_sessionCampaignSaveRoundTrip; }
+    const int32_t classId = client->nClassId;
+    const int32_t skillCount = SKILLS_GetPlayerSkillCount(classId);
+    if (classId < 0 || classId >= 7 || skillCount < 0 || skillCount > 255) {
+        g_sessionCampaignSaveRoundTrip.result = 3; return &g_sessionCampaignSaveRoundTrip;
+    }
+    g_sessionCampaignSaveRoundTrip.skillCount = (uint32_t)skillCount;
+    g_sessionCampaignSaveRoundTrip.skillSemanticBefore = sessionSkillSemanticHash(g_targetPlayer, classId, skillCount);
+    g_sessionSkillSaveBytes.assign((size_t)skillCount + 2, 0);
+    g_sessionSkillSaveBytes[0] = 'i'; g_sessionSkillSaveBytes[1] = 'f';
+    for (int32_t i = 0; i < skillCount; ++i) {
+        const int32_t skillId = SKILLS_GetClassSkillId(classId, i);
+        g_sessionSkillSaveBytes[(size_t)i + 2] = (uint8_t)SKILLS_GetSkillLevel(
+            g_targetPlayer, SKILLS_GetSkillById(g_targetPlayer, skillId, -1u), 0);
+    }
+    g_sessionCampaignSaveRoundTrip.skillBytes = (uint32_t)g_sessionSkillSaveBytes.size();
+    g_sessionCampaignSaveRoundTrip.skillHash = sessionHashBytes(D2VEC_FNV_INIT,
+        g_sessionSkillSaveBytes.data(), g_sessionSkillSaveBytes.size());
+    if (g_sessionSkillSaveBytes[0] == 'i' && g_sessionSkillSaveBytes[1] == 'f')
+        g_sessionCampaignSaveRoundTrip.flags |= 1u;
+    uint8_t* skillRead = g_sessionSkillSaveBytes.data();
+    const int32_t skillReadResult = PLRSAVE2_ReadSkills(g_game, g_targetPlayer, &skillRead,
+        g_sessionSkillSaveBytes.data() + g_sessionSkillSaveBytes.size(), 96, skillCount);
+    g_sessionCampaignSaveRoundTrip.skillConsumed = (uint32_t)(skillRead - g_sessionSkillSaveBytes.data());
+    if (skillReadResult) { g_sessionCampaignSaveRoundTrip.result = 0x100u + (uint32_t)skillReadResult; return &g_sessionCampaignSaveRoundTrip; }
+    if (g_sessionCampaignSaveRoundTrip.skillConsumed == g_sessionCampaignSaveRoundTrip.skillBytes)
+        g_sessionCampaignSaveRoundTrip.flags |= 2u;
+    g_sessionCampaignSaveRoundTrip.skillSemanticAfter = sessionSkillSemanticHash(g_targetPlayer, classId, skillCount);
+    if (g_sessionCampaignSaveRoundTrip.skillSemanticAfter == g_sessionCampaignSaveRoundTrip.skillSemanticBefore)
+        g_sessionCampaignSaveRoundTrip.flags |= 4u;
+    std::vector<uint8_t> skillReplay((size_t)skillCount + 2, 0);
+    skillReplay[0] = 'i'; skillReplay[1] = 'f';
+    for (int32_t i = 0; i < skillCount; ++i) {
+        const int32_t skillId = SKILLS_GetClassSkillId(classId, i);
+        skillReplay[(size_t)i + 2] = (uint8_t)SKILLS_GetSkillLevel(
+            g_targetPlayer, SKILLS_GetSkillById(g_targetPlayer, skillId, -1u), 0);
+    }
+    g_sessionCampaignSaveRoundTrip.skillReplayHash = sessionHashBytes(D2VEC_FNV_INIT, skillReplay.data(), skillReplay.size());
+    if (skillReplay == g_sessionSkillSaveBytes) g_sessionCampaignSaveRoundTrip.flags |= 8u;
+
+    g_sessionWaypointSaveBytes.assign(256, 0);
+    uint8_t* waypointWrite = g_sessionWaypointSaveBytes.data();
+    const int32_t waypointWriteResult = PLRSAVE2_WriteWaypointData(g_game, g_targetPlayer, &waypointWrite,
+        g_sessionWaypointSaveBytes.data() + g_sessionWaypointSaveBytes.size());
+    if (waypointWriteResult) { g_sessionCampaignSaveRoundTrip.result = 0x200u + (uint32_t)waypointWriteResult; return &g_sessionCampaignSaveRoundTrip; }
+    g_sessionWaypointSaveBytes.resize((size_t)(waypointWrite - g_sessionWaypointSaveBytes.data()));
+    g_sessionCampaignSaveRoundTrip.waypointBytes = (uint32_t)g_sessionWaypointSaveBytes.size();
+    g_sessionCampaignSaveRoundTrip.waypointHash = sessionHashBytes(D2VEC_FNV_INIT,
+        g_sessionWaypointSaveBytes.data(), g_sessionWaypointSaveBytes.size());
+    if (g_sessionWaypointSaveBytes.size() >= 2 && g_sessionWaypointSaveBytes[0] == 'S' && g_sessionWaypointSaveBytes[1] == 'W')
+        g_sessionCampaignSaveRoundTrip.flags |= 16u;
+    uint8_t* waypointRead = g_sessionWaypointSaveBytes.data();
+    const int32_t waypointReadResult = PLRSAVE2_ReadWaypointData(g_game, g_targetPlayer, &waypointRead,
+        g_sessionWaypointSaveBytes.data() + g_sessionWaypointSaveBytes.size(), 96);
+    g_sessionCampaignSaveRoundTrip.waypointConsumed = (uint32_t)(waypointRead - g_sessionWaypointSaveBytes.data());
+    if (waypointReadResult) { g_sessionCampaignSaveRoundTrip.result = 0x300u + (uint32_t)waypointReadResult; return &g_sessionCampaignSaveRoundTrip; }
+    if (g_sessionCampaignSaveRoundTrip.waypointConsumed == g_sessionCampaignSaveRoundTrip.waypointBytes)
+        g_sessionCampaignSaveRoundTrip.flags |= 32u;
+    std::vector<uint8_t> waypointReplay(256, 0); uint8_t* waypointReplayEnd = waypointReplay.data();
+    const int32_t waypointReplayResult = PLRSAVE2_WriteWaypointData(g_game, g_targetPlayer, &waypointReplayEnd,
+        waypointReplay.data() + waypointReplay.size());
+    waypointReplay.resize((size_t)(waypointReplayEnd - waypointReplay.data()));
+    g_sessionCampaignSaveRoundTrip.waypointReplayHash = sessionHashBytes(D2VEC_FNV_INIT, waypointReplay.data(), waypointReplay.size());
+    if (!waypointReplayResult && waypointReplay == g_sessionWaypointSaveBytes) g_sessionCampaignSaveRoundTrip.flags |= 64u;
+    g_sessionCampaignSaveRoundTrip.result = g_sessionCampaignSaveRoundTrip.flags == 127u ? 0u : 4u;
+    g_sessionCampaignSaveRoundTrip.hash = sessionHashBytes(D2VEC_FNV_INIT, &g_sessionCampaignSaveRoundTrip,
+        offsetof(D2SessionCampaignSaveRoundTrip, hash));
+    return &g_sessionCampaignSaveRoundTrip;
+}
+
+EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_skill_save_bytes() { return g_sessionSkillSaveBytes.data(); }
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_skill_save_length() { return (uint32_t)g_sessionSkillSaveBytes.size(); }
+EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_waypoint_save_bytes() { return g_sessionWaypointSaveBytes.data(); }
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_waypoint_save_length() { return (uint32_t)g_sessionWaypointSaveBytes.size(); }
+
+EMSCRIPTEN_KEEPALIVE const D2SessionQuestIntroSaveRoundTrip* d2_session_quest_intro_save_roundtrip() {
+    memset(&g_sessionQuestIntroSaveRoundTrip, 0, sizeof g_sessionQuestIntroSaveRoundTrip);
+    g_sessionQuestIntroSaveRoundTrip.version = 1; g_sessionQuestIntroSaveRoundTrip.size = sizeof g_sessionQuestIntroSaveRoundTrip;
+    g_sessionQuestIntroSaveRoundTrip.saveVersion = 96; g_sessionQuestSaveBytes.clear(); g_sessionIntroSaveBytes.clear();
+    memset(&g_sessionCorpseSaveRoundTrip, 0, sizeof g_sessionCorpseSaveRoundTrip); g_sessionCorpseSaveBytes.clear();
+    if (!g_sessionLive || !g_game || !g_targetPlayer) { g_sessionQuestIntroSaveRoundTrip.result = 1; return &g_sessionQuestIntroSaveRoundTrip; }
+    g_sessionQuestIntroSaveRoundTrip.gheedBefore = PLRINTRO_GetQuestIntroFlag(g_targetPlayer, g_game, MONSTER_GHEED);
+    g_sessionQuestSaveBytes.assign(298, 0); uint8_t* qw = g_sessionQuestSaveBytes.data();
+    int rc = D2WEB_PLRSAVE2_WriteQuestSection(g_targetPlayer, &qw, g_sessionQuestSaveBytes.data() + g_sessionQuestSaveBytes.size());
+    if (rc) { g_sessionQuestIntroSaveRoundTrip.result = 0x100u + rc; return &g_sessionQuestIntroSaveRoundTrip; }
+    g_sessionQuestIntroSaveRoundTrip.questBytes = (uint32_t)(qw - g_sessionQuestSaveBytes.data());
+    g_sessionQuestIntroSaveRoundTrip.questHash = sessionHashBytes(D2VEC_FNV_INIT, g_sessionQuestSaveBytes.data(), g_sessionQuestSaveBytes.size());
+    g_sessionQuestIntroSaveRoundTrip.questSemanticBefore = g_sessionQuestIntroSaveRoundTrip.questHash;
+    if (g_sessionQuestSaveBytes[0] == 'W' && g_sessionQuestSaveBytes[1] == 'o' && g_sessionQuestSaveBytes[2] == 'o' && g_sessionQuestSaveBytes[3] == '!') g_sessionQuestIntroSaveRoundTrip.flags |= 1u;
+    uint8_t* qr = g_sessionQuestSaveBytes.data(); rc = D2WEB_PLRSAVE2_ReadQuestSection(g_targetPlayer, &qr, g_sessionQuestSaveBytes.data() + g_sessionQuestSaveBytes.size());
+    g_sessionQuestIntroSaveRoundTrip.questConsumed = (uint32_t)(qr - g_sessionQuestSaveBytes.data());
+    if (rc) { g_sessionQuestIntroSaveRoundTrip.result = 0x200u + rc; return &g_sessionQuestIntroSaveRoundTrip; }
+    if (g_sessionQuestIntroSaveRoundTrip.questConsumed == 298) g_sessionQuestIntroSaveRoundTrip.flags |= 2u;
+    std::vector<uint8_t> qrep(298); uint8_t* qre = qrep.data(); rc = D2WEB_PLRSAVE2_WriteQuestSection(g_targetPlayer, &qre, qrep.data() + qrep.size());
+    g_sessionQuestIntroSaveRoundTrip.questReplayHash = sessionHashBytes(D2VEC_FNV_INIT, qrep.data(), qrep.size());
+    g_sessionQuestIntroSaveRoundTrip.questSemanticAfter = g_sessionQuestIntroSaveRoundTrip.questReplayHash;
+    if (!rc && qrep == g_sessionQuestSaveBytes) g_sessionQuestIntroSaveRoundTrip.flags |= 4u;
+
+    g_sessionIntroSaveBytes.assign(52, 0); uint8_t* iw = g_sessionIntroSaveBytes.data();
+    rc = PLRSAVE2_WritePlrIntroSection(g_game, g_targetPlayer, &iw, g_sessionIntroSaveBytes.data() + g_sessionIntroSaveBytes.size());
+    if (rc) { g_sessionQuestIntroSaveRoundTrip.result = 0x300u + rc; return &g_sessionQuestIntroSaveRoundTrip; }
+    g_sessionQuestIntroSaveRoundTrip.introBytes = (uint32_t)(iw - g_sessionIntroSaveBytes.data());
+    g_sessionQuestIntroSaveRoundTrip.introHash = sessionHashBytes(D2VEC_FNV_INIT, g_sessionIntroSaveBytes.data(), g_sessionIntroSaveBytes.size());
+    g_sessionQuestIntroSaveRoundTrip.introSemanticBefore = g_sessionQuestIntroSaveRoundTrip.introHash;
+    if (g_sessionIntroSaveBytes[0] == 1 && g_sessionIntroSaveBytes[1] == 0x77) g_sessionQuestIntroSaveRoundTrip.flags |= 8u;
+    uint8_t* ir = g_sessionIntroSaveBytes.data(); rc = D2WEB_PLRSAVE2_ReadPlrIntroSection(g_targetPlayer, &ir, g_sessionIntroSaveBytes.data() + g_sessionIntroSaveBytes.size());
+    g_sessionQuestIntroSaveRoundTrip.introConsumed = (uint32_t)(ir - g_sessionIntroSaveBytes.data());
+    if (rc) { g_sessionQuestIntroSaveRoundTrip.result = 0x400u + rc; return &g_sessionQuestIntroSaveRoundTrip; }
+    if (g_sessionQuestIntroSaveRoundTrip.introConsumed == 52) g_sessionQuestIntroSaveRoundTrip.flags |= 16u;
+    std::vector<uint8_t> irep(52); uint8_t* ire = irep.data(); rc = PLRSAVE2_WritePlrIntroSection(g_game, g_targetPlayer, &ire, irep.data() + irep.size());
+    g_sessionQuestIntroSaveRoundTrip.introReplayHash = sessionHashBytes(D2VEC_FNV_INIT, irep.data(), irep.size());
+    g_sessionQuestIntroSaveRoundTrip.introSemanticAfter = g_sessionQuestIntroSaveRoundTrip.introReplayHash;
+    if (!rc && irep == g_sessionIntroSaveBytes) g_sessionQuestIntroSaveRoundTrip.flags |= 32u;
+    g_sessionQuestIntroSaveRoundTrip.gheedAfter = PLRINTRO_GetQuestIntroFlag(g_targetPlayer, g_game, MONSTER_GHEED);
+    if (g_sessionQuestIntroSaveRoundTrip.gheedAfter == g_sessionQuestIntroSaveRoundTrip.gheedBefore) g_sessionQuestIntroSaveRoundTrip.flags |= 64u;
+    g_sessionQuestIntroSaveRoundTrip.result = g_sessionQuestIntroSaveRoundTrip.flags == 127u ? 0u : 2u;
+    g_sessionQuestIntroSaveRoundTrip.hash = sessionHashBytes(D2VEC_FNV_INIT, &g_sessionQuestIntroSaveRoundTrip, offsetof(D2SessionQuestIntroSaveRoundTrip, hash));
+    return &g_sessionQuestIntroSaveRoundTrip;
+}
+EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_quest_save_bytes() { return g_sessionQuestSaveBytes.data(); }
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_quest_save_length() { return (uint32_t)g_sessionQuestSaveBytes.size(); }
+EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_intro_save_bytes() { return g_sessionIntroSaveBytes.data(); }
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_intro_save_length() { return (uint32_t)g_sessionIntroSaveBytes.size(); }
+
+static uint32_t sessionCorpseCount(D2InventoryStrc* inventory) {
+    uint32_t count = 0;
+    if (inventory) for (D2CorpseStrc* corpse = INVENTORY_GetFirstCorpse(inventory); corpse; corpse = INVENTORY_GetNextCorpse(corpse)) ++count;
+    return count;
+}
+EMSCRIPTEN_KEEPALIVE const D2SessionCorpseSaveRoundTrip* d2_session_corpse_save_roundtrip() {
+    memset(&g_sessionCorpseSaveRoundTrip, 0, sizeof g_sessionCorpseSaveRoundTrip);
+    g_sessionCorpseSaveRoundTrip.version=1; g_sessionCorpseSaveRoundTrip.size=sizeof g_sessionCorpseSaveRoundTrip; g_sessionCorpseSaveRoundTrip.saveVersion=96;
+    g_sessionCorpseSaveBytes.clear();
+    if(!g_sessionLive||!g_game||!g_targetPlayer||!g_targetPlayer->pInventory){g_sessionCorpseSaveRoundTrip.result=1;return &g_sessionCorpseSaveRoundTrip;}
+    g_sessionCorpseSaveRoundTrip.corpseCountBefore=sessionCorpseCount(g_targetPlayer->pInventory);
+    g_sessionCorpseSaveBytes.assign(65536,0); uint8_t* w=g_sessionCorpseSaveBytes.data();
+    int rc=PLRSAVE2_WriteCorpsesSection(g_game,g_targetPlayer,&w,g_sessionCorpseSaveBytes.data()+g_sessionCorpseSaveBytes.size(),0);
+    if(rc){g_sessionCorpseSaveRoundTrip.result=0x100u+rc;return &g_sessionCorpseSaveRoundTrip;}
+    g_sessionCorpseSaveRoundTrip.bytesWritten=(uint32_t)(w-g_sessionCorpseSaveBytes.data());g_sessionCorpseSaveBytes.resize(g_sessionCorpseSaveRoundTrip.bytesWritten);
+    if(g_sessionCorpseSaveBytes.size()>=4){g_sessionCorpseSaveRoundTrip.sectionCount=(uint32_t)g_sessionCorpseSaveBytes[2]|((uint32_t)g_sessionCorpseSaveBytes[3]<<8);if(g_sessionCorpseSaveBytes[0]=='J'&&g_sessionCorpseSaveBytes[1]=='M')g_sessionCorpseSaveRoundTrip.flags|=1u;}
+    g_sessionCorpseSaveRoundTrip.sectionHash=sessionHashBytes(D2VEC_FNV_INIT,g_sessionCorpseSaveBytes.data(),g_sessionCorpseSaveBytes.size());
+    uint8_t* r=g_sessionCorpseSaveBytes.data();int32_t detail=0;rc=PLRSAVE2_ReadCorpses(g_game,g_targetPlayer,&r,g_sessionCorpseSaveBytes.data()+g_sessionCorpseSaveBytes.size(),96,&detail);
+    g_sessionCorpseSaveRoundTrip.readerDetail=(uint32_t)detail;g_sessionCorpseSaveRoundTrip.bytesConsumed=(uint32_t)(r-g_sessionCorpseSaveBytes.data());
+    if(rc){g_sessionCorpseSaveRoundTrip.result=0x200u+rc;return &g_sessionCorpseSaveRoundTrip;}if(g_sessionCorpseSaveRoundTrip.bytesConsumed==g_sessionCorpseSaveRoundTrip.bytesWritten)g_sessionCorpseSaveRoundTrip.flags|=2u;
+    g_sessionCorpseSaveRoundTrip.corpseCountAfter=sessionCorpseCount(g_targetPlayer->pInventory);if(g_sessionCorpseSaveRoundTrip.corpseCountAfter==g_sessionCorpseSaveRoundTrip.corpseCountBefore+g_sessionCorpseSaveRoundTrip.sectionCount)g_sessionCorpseSaveRoundTrip.flags|=4u;
+    std::vector<uint8_t> rep(65536,0);uint8_t* re=rep.data();rc=PLRSAVE2_WriteCorpsesSection(g_game,g_targetPlayer,&re,rep.data()+rep.size(),0);rep.resize((size_t)(re-rep.data()));
+    g_sessionCorpseSaveRoundTrip.replayBytes=(uint32_t)rep.size();g_sessionCorpseSaveRoundTrip.replayHash=sessionHashBytes(D2VEC_FNV_INIT,rep.data(),rep.size());if(!rc&&rep==g_sessionCorpseSaveBytes)g_sessionCorpseSaveRoundTrip.flags|=8u;
+    g_sessionCorpseSaveRoundTrip.result=g_sessionCorpseSaveRoundTrip.flags==15u?0u:2u;g_sessionCorpseSaveRoundTrip.hash=sessionHashBytes(D2VEC_FNV_INIT,&g_sessionCorpseSaveRoundTrip,offsetof(D2SessionCorpseSaveRoundTrip,hash));return &g_sessionCorpseSaveRoundTrip;
+}
+EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_corpse_save_bytes(){return g_sessionCorpseSaveBytes.data();}
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_corpse_save_length(){return(uint32_t)g_sessionCorpseSaveBytes.size();}
+
+EMSCRIPTEN_KEEPALIVE const D2SessionAttack* d2_session_attack() {
+    g_sessionAttack.version = 1; g_sessionAttack.size = sizeof g_sessionAttack;
+    if (g_sessionLive && g_game) g_sessionAttack.gameFrame = g_game->dwGameFrame;
+    if (g_targetPlayer) g_sessionAttack.mode = g_targetPlayer->dwAnimMode;
+    if (g_sessionAttackTarget) g_sessionAttack.targetHpAfter =
+        STATLIST_UnitGetStatValue(g_sessionAttackTarget, STAT_HITPOINTS, 0);
+    uint32_t hash = D2VEC_FNV_INIT; const uint8_t* bytes = (const uint8_t*)&g_sessionAttack;
+    for (size_t i = 0; i < offsetof(D2SessionAttack, hash); ++i) { hash ^= bytes[i]; hash *= 16777619u; }
+    g_sessionAttack.hash = hash; return &g_sessionAttack;
+}
+
+EMSCRIPTEN_KEEPALIVE const D2SessionProgress* d2_session_progress() {
+    memset(&g_sessionProgress, 0, sizeof g_sessionProgress);
+    g_sessionProgress.version = 1; g_sessionProgress.size = sizeof g_sessionProgress;
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return &g_sessionProgress;
+    g_sessionProgress.gameFrame = g_game->dwGameFrame; g_sessionProgress.kills = g_sessionKills;
+    if (g_sessionAttackTarget) {
+        g_sessionProgress.targetId = g_sessionAttackTarget->dwUnitId;
+        g_sessionProgress.targetHp = STATLIST_UnitGetStatValue(g_sessionAttackTarget, STAT_HITPOINTS, 0);
+        g_sessionProgress.targetMode = g_sessionAttackTarget->dwAnimMode;
+        if (g_sessionProgress.targetHp <= 0) g_sessionProgress.flags |= 1;
+    }
+    g_sessionProgress.playerExperience = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_EXPERIENCE, 0);
+    g_sessionProgress.experienceDelta = g_sessionProgress.playerExperience - g_sessionInitialExperience;
+    updateSessionSnapshot();
+    uint32_t hash = D2VEC_FNV_INIT;
+    for (const D2SessionUnit& unit : g_sessionUnits) if (unit.type == UNIT_ITEM) {
+        ++g_sessionProgress.itemCount;
+        const uint8_t* bytes = reinterpret_cast<const uint8_t*>(&unit);
+        // Unit ids come from a process-global allocator and drop scatter can choose either
+        // adjacent free subtile after game teardown.  Hash the generated item identity/state,
+        // excluding allocator identity and presentation position, for stable session replay.
+        for (size_t i = offsetof(D2SessionUnit, type); i < offsetof(D2SessionUnit, x); ++i) {
+            hash ^= bytes[i]; hash *= 16777619u;
+        }
+        for (size_t i = offsetof(D2SessionUnit, flags); i < sizeof unit; ++i) {
+            hash ^= bytes[i]; hash *= 16777619u;
+        }
+    }
+    g_sessionProgress.itemHash = hash;
+    return &g_sessionProgress;
+}
+
+EMSCRIPTEN_KEEPALIVE const D2SessionAdvancement* d2_session_advancement() {
+    memset(&g_sessionAdvancement, 0, sizeof g_sessionAdvancement);
+    g_sessionAdvancement.version = 1; g_sessionAdvancement.size = sizeof g_sessionAdvancement;
+    g_sessionAdvancement.skillId = g_sessionAdvancementSkillId;
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return &g_sessionAdvancement;
+    g_sessionAdvancement.gameFrame = g_game->dwGameFrame;
+    g_sessionAdvancement.level = STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_LEVEL, 0);
+    g_sessionAdvancement.experience = STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_EXPERIENCE, 0);
+    g_sessionAdvancement.lastExperience = STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_LASTEXP, 0);
+    g_sessionAdvancement.nextExperience = STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_NEXTEXP, 0);
+    g_sessionAdvancement.statPoints = STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_STATPTS, 0);
+    g_sessionAdvancement.skillPoints = STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_SKILLPTS, 0);
+    g_sessionAdvancement.strength = STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_STRENGTH, 0);
+    g_sessionAdvancement.energy = STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_ENERGY, 0);
+    g_sessionAdvancement.dexterity = STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_DEXTERITY, 0);
+    g_sessionAdvancement.vitality = STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_VITALITY, 0);
+    if (D2SkillStrc* skill = SKILLS_GetSkillById(g_targetPlayer, (int32_t)g_sessionAdvancementSkillId, -1)) {
+        g_sessionAdvancement.skillBaseLevel = SKILLS_GetSkillLevel(g_targetPlayer, skill, 0);
+        g_sessionAdvancement.skillTotalLevel = SKILLS_GetSkillLevel(g_targetPlayer, skill, 1);
+    }
+    g_sessionAdvancement.hash = sessionHashBytes(D2VEC_FNV_INIT, &g_sessionAdvancement,
+        offsetof(D2SessionAdvancement, hash));
+    return &g_sessionAdvancement;
+}
+
+EMSCRIPTEN_KEEPALIVE const D2SessionItemState* d2_session_item_state() {
+    const uint32_t commandTarget = g_sessionItemState.commandTarget;
+    const uint32_t result = g_sessionItemState.result;
+    memset(&g_sessionItemState, 0, sizeof g_sessionItemState);
+    g_sessionItemState.version = 1; g_sessionItemState.size = sizeof g_sessionItemState;
+    g_sessionItemState.commandTarget = commandTarget; g_sessionItemState.result = result;
+    if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pInventory) return &g_sessionItemState;
+    updateSessionSnapshot();
+    for (const D2SessionUnit& unit : g_sessionUnits) if (unit.type == UNIT_ITEM) ++g_sessionItemState.groundCount;
+    uint32_t hash = D2VEC_FNV_INIT;
+    for (D2UnitStrc* item = INVENTORY_GetFirstItem(g_targetPlayer->pInventory); item; item = INVENTORY_GetNextItem(item)) {
+        if (!INVENTORY_UnitIsItem(item)) continue;
+        ++g_sessionItemState.inventoryCount;
+        const uint32_t fields[] = { (uint32_t)item->dwClassId, (uint32_t)item->dwAnimMode,
+            (uint32_t)ITEMS_GetItemQuality(item), ITEMS_GetItemFlags(item), ITEMS_GetInvPage(item), ITEMS_GetBodyLocation(item) };
+        hash = sessionHashBytes(hash, fields, sizeof fields);
+    }
+    if (D2UnitStrc* cursor = INVENTORY_GetCursorItem(g_targetPlayer->pInventory)) {
+        g_sessionItemState.cursorItemId = cursor->dwUnitId; g_sessionItemState.flags |= 1;
+    }
+    g_sessionItemState.inventoryHash = hash;
+    const uint8_t* bytes = reinterpret_cast<const uint8_t*>(&g_sessionItemState);
+    g_sessionItemState.hash = sessionHashBytes(D2VEC_FNV_INIT, bytes, offsetof(D2SessionItemState, hash));
+    return &g_sessionItemState;
+}
+
+EMSCRIPTEN_KEEPALIVE const D2SessionMotion* d2_session_motion() {
+    memset(&g_sessionMotion, 0, sizeof g_sessionMotion);
+    g_sessionMotion.version = 1; g_sessionMotion.size = sizeof g_sessionMotion;
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return &g_sessionMotion;
+    const D2DynamicPathStrc* path = g_targetPlayer->pDynamicPath;
+    g_sessionMotion.gameFrame = g_game->dwGameFrame; g_sessionMotion.mode = g_targetPlayer->dwAnimMode;
+    g_sessionMotion.x = path->tGameCoords.wPosX; g_sessionMotion.y = path->tGameCoords.wPosY;
+    g_sessionMotion.targetX = g_sessionMovePending ? g_sessionTargetX : g_sessionMotion.x;
+    g_sessionMotion.targetY = g_sessionMovePending ? g_sessionTargetY : g_sessionMotion.y;
+    g_sessionMotion.pathPoints = path->dwPathPoints; g_sessionMotion.currentPoint = path->dwCurrentPointIdx;
+    g_sessionMotion.framePrecise = g_targetPlayer->nSeqCurrentFramePrecise;
+    g_sessionMotion.frameCountPrecise = g_targetPlayer->dwFrameCountPrecise;
+    g_sessionMotion.animSpeed = g_targetPlayer->wAnimSpeed; g_sessionMotion.direction = path->nDirection;
+    g_sessionMotion.moving = g_sessionMovePending;
+    return &g_sessionMotion;
+}
+
+EMSCRIPTEN_KEEPALIVE const D2SessionSnapshot* d2_session_snapshot() {
+    updateSessionSnapshot(); return &g_sessionSnapshot;
+}
+EMSCRIPTEN_KEEPALIVE const D2SessionResources* d2_session_resources() {
+    memset(&g_sessionResources, 0, sizeof g_sessionResources);
+    g_sessionResources.version = 1; g_sessionResources.size = sizeof g_sessionResources;
+    if (g_targetPlayer) {
+        g_sessionResources.hp = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_HITPOINTS, 0);
+        g_sessionResources.maxHp = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_MAXHP, 0);
+        g_sessionResources.mana = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_MANA, 0);
+        g_sessionResources.maxMana = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_MAXMANA, 0);
+    }
+    return &g_sessionResources;
+}
+
+EMSCRIPTEN_KEEPALIVE const D2SessionRoom* d2_session_rooms() {
+    updateSessionSnapshot(); return g_sessionRooms.data();
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_room_count() {
+    updateSessionSnapshot(); return (int)g_sessionRooms.size();
+}
+EMSCRIPTEN_KEEPALIVE const D2SessionUnit* d2_session_units() {
+    updateSessionSnapshot(); return g_sessionUnits.data();
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_unit_count() {
+    updateSessionSnapshot(); return (int)g_sessionUnits.size();
+}
+EMSCRIPTEN_KEEPALIVE const D2SessionMonsterAnimation* d2_session_monster_animations() {
+    updateSessionSnapshot(); return g_sessionMonsterAnimations.data();
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_monster_animation_count() {
+    updateSessionSnapshot(); return (int)g_sessionMonsterAnimations.size();
+}
+EMSCRIPTEN_KEEPALIVE const D2SessionObjectPresentation* d2_session_object_presentations() {
+    updateSessionSnapshot(); return g_sessionObjectPresentations.data();
+}
+EMSCRIPTEN_KEEPALIVE const D2SessionItemPresentation* d2_session_item_presentations() {
+    updateSessionSnapshot(); return g_sessionItemPresentations.data();
+}
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_presentation_count() {
+    updateSessionSnapshot(); return (uint32_t)g_sessionItemPresentations.size();
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_object_presentation_count() {
+    updateSessionSnapshot(); return (int)g_sessionObjectPresentations.size();
+}
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_world_hash() {
+    updateSessionSnapshot(); return g_sessionWorldHash;
+}
+EMSCRIPTEN_KEEPALIVE const D2SessionTile* d2_session_tiles() {
+    updateSessionSnapshot(); return g_sessionTiles.data();
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_tile_count() {
+    updateSessionSnapshot(); return (int)g_sessionTiles.size();
+}
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_terrain_hash() {
+    updateSessionSnapshot(); return g_sessionTerrainHash;
+}
+EMSCRIPTEN_KEEPALIVE const D2SessionWarp* d2_session_warps() {
+    updateSessionSnapshot(); return g_sessionWarps.data();
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_warp_count() {
+    updateSessionSnapshot(); return (int)g_sessionWarps.size();
+}
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_navigation_hash() {
+    updateSessionSnapshot(); return g_sessionNavigationHash;
+}
+
+EMSCRIPTEN_KEEPALIVE void d2_session_destroy() {
+    d2_monspawn_reset(); g_sessionLive = false; g_sessionMovePending = false;
+    g_sessionAttackTarget = nullptr; g_sessionAttackSkill = nullptr;
+    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionTiles.clear(); g_sessionWarps.clear();
+    memset(&g_sessionItemState, 0, sizeof g_sessionItemState);
+    memset(&g_sessionNpcInteraction, 0, sizeof g_sessionNpcInteraction);
+    memset(&g_sessionNpcDialog, 0, sizeof g_sessionNpcDialog); D2WEB_ResetLastDialogPacket();
+    memset(&g_sessionNpcResponse, 0, sizeof g_sessionNpcResponse);
+    memset(&g_sessionVendor, 0, sizeof g_sessionVendor);
+    g_sessionVendorItems.clear(); memset(&g_sessionVendorTransaction, 0, sizeof g_sessionVendorTransaction);
+    g_sessionWorldHash = D2VEC_FNV_INIT; g_sessionTerrainHash = D2VEC_FNV_INIT;
+    g_sessionNavigationHash = D2VEC_FNV_INIT;
+    updateSessionSnapshot();
+}
+
+} // extern "C"

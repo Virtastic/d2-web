@@ -2,6 +2,7 @@
 
 #include "Drlg/D2DrlgDrlg.h"
 #include "Drlg/D2DrlgDrlgLogic.h"
+#include <cstdio>
 #include "Drlg/D2DrlgDrlgAnim.h"
 #include "Drlg/D2DrlgDrlgGrid.h"
 #include "Drlg/D2DrlgDrlgRoom.h"
@@ -18,6 +19,7 @@ void __fastcall DRLGLOGIC_FreeDrlgCoordList(D2DrlgRoomStrc* pDrlgRoom)
 		{
 			DRLGGRID_FreeGrid(pDrlgRoom->pLevel->pDrlg->pMempool, &pDrlgRoom->pLogicalRoomInfo->pIndexX);
 			DRLGGRID_FreeGrid(pDrlgRoom->pLevel->pDrlg->pMempool, &pDrlgRoom->pLogicalRoomInfo->pIndexY);
+			D2_FREE_POOL(pDrlgRoom->pLevel->pDrlg->pMempool, pDrlgRoom->pLogicalRoomInfo->ppCoordListByCell);
 		}
 
 		D2RoomCoordListStrc* pRoomCoordList = pRoomCoordList = pDrlgRoom->pLogicalRoomInfo->pCoordList;
@@ -71,7 +73,7 @@ void __fastcall DRLGLOGIC_InitializeDrlgCoordList(D2DrlgRoomStrc* pDrlgRoom, D2D
 	for (int i = 0; i < pDrlgRoomTiles->nWalls; ++i)
 	{
 		D2DrlgTileDataStrc* pWallTileData = &pDrlgRoomTiles->pWallTiles[i];
-		if (GetMapTileLayer(pWallTileData->dwFlags) == 1 && pWallTileData->nTileType != TILETYPE_ROOF && !(pWallTileData->dwFlags &MAPTILE_OBJECT_WALL))
+		if ((pWallTileData->dwFlags & MAPTILE_WALL_LAYER_MASK) == (1u << MAPTILE_WALL_LAYER_BIT) /* d2-web: 1.13c compares the raw field with 0x4000 = the FIRST wall layer; GetMapTileLayer() == 1 was the second */ && pWallTileData->nTileType != TILETYPE_ROOF && !(pWallTileData->dwFlags &MAPTILE_OBJECT_WALL))
 		{
 			DRLGGRID_AlterGridFlag(&pDrlgGrid, pWallTileData->nPosX, pWallTileData->nPosY, 1, FLAG_OPERATION_OR);
 		}
@@ -103,6 +105,9 @@ void __fastcall DRLGLOGIC_InitializeDrlgCoordList(D2DrlgRoomStrc* pDrlgRoom, D2D
 		}
 	}
 
+#ifdef D2_MONS_TRACE
+	if (pDrlgRoom->nTileXPos == 1080 && pDrlgRoom->nTileYPos == 1136) { fprintf(stderr, "init coordlist: nWalls %d nFloors %d near %d\n", pDrlgRoomTiles->nWalls, pDrlgRoomTiles->nFloors, pDrlgRoom->nRoomsNear); for (int i = 0; i < pDrlgRoomTiles->nWalls && i < 40; i++) { D2DrlgTileDataStrc* t = &pDrlgRoomTiles->pWallTiles[i]; fprintf(stderr, "  wall %d: pos %d,%d flags %08x layer %d type %d\n", i, t->nPosX, t->nPosY, t->dwFlags, GetMapTileLayer(t->dwFlags), t->nTileType); } for (int y = 0; y <= pDrlgRoom->nTileHeight; y++) { for (int x = 0; x <= pDrlgRoom->nTileWidth; x++) fprintf(stderr, " %d", DRLGGRID_GetGridEntry(&pDrlgGrid, x, y)); fprintf(stderr, "\n"); } }
+#endif
 	D2UnkDrlgLogicStrc tDRLGLogicUnkStrc = {};
 	memset(&tDRLGLogicUnkStrc, 0x00, sizeof(tDRLGLogicUnkStrc));
 	tDRLGLogicUnkStrc.field_4 = &pDrlgCoordList->pIndexX;
@@ -123,7 +128,9 @@ void __fastcall DRLGLOGIC_InitializeDrlgCoordList(D2DrlgRoomStrc* pDrlgRoom, D2D
 				tDRLGLogicUnkStrc.nFlags = (tDRLGLogicUnkStrc.field_18 & 0xFFFFFFF) | 0x10000000;
 
 				D2C_PackedTileInformation nFloorPackedInfo = { (uint32_t)DRLGGRID_GetGridEntry(tDRLGLogicUnkStrc.pFloorGrid, i, j) };
-				if((nFloorPackedInfo.nTileStyle == 30 && nFloorPackedInfo.nWallLayer == 0) || nFloorPackedInfo.bHidden)
+				// d2-web: 1.13c 0x6FDD1C1C tests (packed & 0x1E0FF00) == 0x1E00000 -- style bits 21..24 set and
+				// tile sequence 0 (bit 20 and the wall layer are not looked at) -- or the hidden bit
+				if ((nFloorPackedInfo.nPackedValue & 0x1E0FF00) == 0x1E00000 || nFloorPackedInfo.bHidden)
 				{
 					tDRLGLogicUnkStrc.nFlags |= 0x20000000;
 				}
@@ -194,7 +201,11 @@ void __fastcall DRLGLOGIC_SetTileGridFlags(D2UnkDrlgLogicStrc* a1, int nX, int n
 			nIndex = DRLGGRID_GetGridEntry(a1->pTileTypeGrid, nPosX, nPosY);
 		}
 
-		const int nFlags = dword_6FDCE5EC[a4 + 5 * dword_6FDCE650[nIndex] + 1];
+		// d2-web: tile types whose row is -1 (type 0, 13) index BEFORE the table; in the 1.13c
+		// binary (0x6FDDA7A8) that lands in the zero tail of dword_6FDCE650 (0x6FDDA758), so the
+		// flags are 0. Here the arrays are not adjacent, so say so explicitly.
+		const int nRow = dword_6FDCE650[nIndex];
+		const int nFlags = nRow < 0 ? 0 : dword_6FDCE5EC[a4 + 5 * nRow + 1];
 		if (nFlags & 1)
 		{
 			DRLGGRID_AlterGridFlag(a1->field_4, nPosX, nPosY, a1->nFlags, FLAG_OPERATION_OR);
@@ -320,7 +331,7 @@ void __fastcall sub_6FD76B90(D2DrlgRoomStrc* pDrlgRoom, int nIndex1, int nIndex2
 //D2Common.0x6FD76C20
 BOOL __fastcall DRLG_CheckLayer1ButNotWallObject(D2DrlgTileDataStrc* pTileData)
 {
-	if (GetMapTileLayer(pTileData->dwFlags) == 1)
+	if ((pTileData->dwFlags & MAPTILE_WALL_LAYER_MASK) == (1u << MAPTILE_WALL_LAYER_BIT) /* d2-web: first wall layer (0x4000), see DRLGLOGIC_InitializeDrlgCoordList */)
 	{
 		if (pTileData->nTileType != TILETYPE_ROOF)
 		{
@@ -356,6 +367,11 @@ void __fastcall DRLGLOGIC_AssignCoordListsForGrids(D2DrlgRoomStrc* pDrlgRoom, D2
 	DRLGGRID_InitializeGridCells(pDrlgRoom->pLevel->pDrlg->pMempool, &pDrlgCoordList->pIndexY, pDrlgRoom->nTileWidth + 1, pDrlgRoom->nTileHeight + 1);
 	const int nWidth = pDrlgRoom->nTileWidth + 1;
 	const int nHeight = pDrlgRoom->nTileHeight + 1;
+	pDrlgCoordList->ppCoordListByCell = static_cast<D2RoomCoordListStrc**>(
+		FOG_AllocPool(pDrlgRoom->pLevel->pDrlg->pMempool, sizeof(D2RoomCoordListStrc*) * nWidth * nHeight, __FILE__, __LINE__, 0));
+#ifdef D2_MONS_TRACE
+	if (pDrlgRoom->nTileXPos == 1080 && pDrlgRoom->nTileYPos == 1136) { fprintf(stderr, "logic grid room 1080,1136 (%dx%d) nLists %d:\n", nWidth, nHeight, nLists); for (int y = 0; y < nHeight; y++) { for (int x = 0; x < nWidth; x++) fprintf(stderr, " %08x", DRLGGRID_GetGridEntry(&pDrlgCoordList->pIndexX, x, y)); fprintf(stderr, "\n"); } }
+#endif
 
 	for (int nY = 0; nY < nHeight; ++nY)
 	{
@@ -415,7 +431,10 @@ void __fastcall DRLGLOGIC_AssignCoordListsForGrids(D2DrlgRoomStrc* pDrlgRoom, D2
 				{
 					for (int i = pRoomCoordList->pBox[0].nPosX; i < pRoomCoordList->pBox[0].nWidth; ++i)
 					{
-						DRLGGRID_AlterGridFlag(&pDrlgCoordList->pIndexY, i, j, (int)pRoomCoordList, FLAG_OPERATION_OVERWRITE);
+						// Retail used the 32-bit grid cell itself as pointer storage. Keep the
+						// occupancy bit in that grid and the native pointer in a wasm64 sidecar.
+						DRLGGRID_AlterGridFlag(&pDrlgCoordList->pIndexY, i, j, 1, FLAG_OPERATION_OVERWRITE);
+						pDrlgCoordList->ppCoordListByCell[j * nWidth + i] = pRoomCoordList;
 					}
 				}
 
@@ -500,7 +519,13 @@ D2RoomCoordListStrc* __fastcall sub_6FD77110(D2DrlgRoomStrc* pDrlgRoom, int nX, 
 	}
 	else
 	{
-		return (D2RoomCoordListStrc*)DRLGGRID_GetGridEntry(&pDrlgRoom->pLogicalRoomInfo->pIndexY, nX / 5 - pDrlgRoom->nTileXPos, nY / 5 - pDrlgRoom->nTileYPos);
+		const int nGridX = nX / 5 - pDrlgRoom->nTileXPos;
+		const int nGridY = nY / 5 - pDrlgRoom->nTileYPos;
+		if (nGridX < 0 || nGridY < 0 || nGridX >= pDrlgRoom->pLogicalRoomInfo->pIndexY.nWidth || nGridY >= pDrlgRoom->pLogicalRoomInfo->pIndexY.nHeight)
+		{
+			return nullptr;
+		}
+		return pDrlgRoom->pLogicalRoomInfo->ppCoordListByCell[nGridY * pDrlgRoom->pLogicalRoomInfo->pIndexY.nWidth + nGridX];
 	}
 }
 

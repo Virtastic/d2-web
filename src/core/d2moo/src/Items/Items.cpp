@@ -6330,7 +6330,7 @@ void __fastcall ITEMS_SerializeItemCompact(D2UnitStrc* pItem, D2BitBufferStrc* p
 		}
 		ITEMS_WriteBitsToBitstream(pBuffer, nY, 4);
 
-		ITEMS_WriteBitsToBitstream(pBuffer, (ITEMS_GetInvPage(pItem) + 1), 3);
+		ITEMS_WriteBitsToBitstream(pBuffer, (uint8_t)(ITEMS_GetInvPage(pItem) + 1), 3);   // d2-web: byte arithmetic -- INVPAGE_NULL (255) serialises as 0, as retail 1.13c does (s04 corpus); the int form clamped to 7
 	}
 
 	if (ITEMS_GetItemFlags(pItem) & IFLAG_ISEAR)
@@ -6762,8 +6762,8 @@ void __fastcall ITEMS_SerializeItemComplete(D2UnitStrc* pItem, D2BitBufferStrc* 
 	}
 
 	pMagicAffixInfo = DATATBLS_GetMagicAffixDataTables();
-	nMagicPrefixOffset = ((int)pMagicAffixInfo->pMagicPrefix - (int)pMagicAffixInfo->pMagicAffixTxt) / sizeof(D2MagicAffixTxt);
-	nAutoMagicOffset = ((int)pMagicAffixInfo->pAutoMagic - (int)pMagicAffixInfo->pMagicAffixTxt) / sizeof(D2MagicAffixTxt);
+	nMagicPrefixOffset = static_cast<int>(pMagicAffixInfo->pMagicPrefix - pMagicAffixInfo->pMagicAffixTxt);
+	nAutoMagicOffset = static_cast<int>(pMagicAffixInfo->pAutoMagic - pMagicAffixInfo->pMagicAffixTxt);
 
 	nAutoAffix = pItemData->wAutoAffix;
 	if (nAutoAffix > nAutoMagicOffset)

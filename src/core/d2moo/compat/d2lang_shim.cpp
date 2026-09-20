@@ -48,3 +48,7 @@ const Unicode* D2LANG_GetStringByReferenceString(char* szReference) {
     if (it == fallbacks.end()) it = fallbacks.emplace(key, key.empty() ? std::u16string() : d2::utf8ToU16(key) + u" -not xlated call ken ").first;
     return (const Unicode*)it->second.c_str();
 }
+
+// D2Lang #10009 (1.13c): the string table language. English tables only.
+#include <D2StrTable.h>
+D2C_Language STRTABLE_GetLanguage() { return LANGUAGE_ENGLISH; }

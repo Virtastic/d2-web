@@ -2684,7 +2684,6 @@ void __fastcall DATATBLS_LoadSomeMonsterTxts(HD2ARCHIVE hArchive)
 	static const char* szTreasureClassVariants[] = { "A", "B", "C" };
 	static const char* szDifficulties[] = { "", " (N)", " (H)" };
 
-	D2TCExShortStrc** ppTCEx = NULL;
 	int nTxtRow = 0;
 
 	char szChest[256] = {};
@@ -2707,27 +2706,25 @@ void __fastcall DATATBLS_LoadSomeMonsterTxts(HD2ARCHIVE hArchive)
 	DATATBLS_CreateItemTypeTreasureClasses();
 	DATATBLS_LoadTreasureClassExTxt(hArchive);
 
-	ppTCEx = sgptDataTables->pChestTreasureClasses;
 	for (int i = 0; i < 3; ++i)
 	{
 		for (int j = 0; j < 5; ++j)
 		{
 			for (int k = 0; k < 3; ++k)
 			{
+				const int nChestIndex = k + 3 * (j + 5 * i);
 				// Note: Game actually uses Storm.dll SStrVPrintf
 				wsprintfA(szChest, "Act %d%s Chest %s", j + 1, szDifficulties[i], szTreasureClassVariants[k]);
 
 				nTxtRow = FOG_GetRowFromTxt(sgptDataTables->pTreasureClassExLinker, szChest, 0);
 				if (nTxtRow >= 0)
 				{
-					*ppTCEx = &sgptDataTables->pTreasureClassEx[nTxtRow];
+					sgptDataTables->pChestTreasureClasses[nChestIndex] = &sgptDataTables->pTreasureClassEx[nTxtRow];
 				}
 				else
 				{
-					*ppTCEx = 0;
+					sgptDataTables->pChestTreasureClasses[nChestIndex] = nullptr;
 				}
-
-				++ppTCEx;
 			}
 		}
 	}

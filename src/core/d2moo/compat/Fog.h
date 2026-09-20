@@ -21,7 +21,7 @@ enum D2C_TxtFieldTypes : uint32_t {
     TXTFIELD_CUSTOMLINK, TXTFIELD_UNKNOWN7, TXTFIELD_CALCTODWORD, TXTFIELD_BIT
 };
 // pLinkField is initialised with function pointers of several shapes (MSVC's fn -> void*).
-struct D2LinkFieldPtr { void* p; D2LinkFieldPtr(decltype(nullptr) = nullptr) : p(nullptr) {} D2LinkFieldPtr(int) : p(nullptr) {} template <class T> D2LinkFieldPtr(T* f) : p((void*)f) {} operator void*() const { return p; } };
+struct D2LinkFieldPtr { void* p; D2LinkFieldPtr(decltype(nullptr) = nullptr) : p(nullptr) {} D2LinkFieldPtr(int) : p(nullptr) {} D2LinkFieldPtr(long) : p(nullptr) {} template <class T> D2LinkFieldPtr(T* f) : p((void*)f) {} operator void*() const { return p; } };
 struct D2BinFieldStrc { const char* szFieldName; D2C_TxtFieldTypes nFieldType; int32_t nFieldLength; int32_t nFieldOffset; D2LinkFieldPtr pLinkField; };
 #pragma pack()
 
@@ -29,6 +29,7 @@ void        FOG_DisplayWarning(const char* szMsg, const char* szFile, int nLine)
 void        FOG_DisplayAssert(const char* szMsg, const char* szFile, int nLine);
 void        FOG_DisplayHalt(const char* szMsg, const char* szFile, int nLine);
 void        FOG_Trace(const char* szFormat, ...);
+void        FOG_TraceF(const char* szPrefix, const char* szFormat, ...);
 const char* FOG_csprintf(char* szDest, const char* szFormat, ...);
 inline void FOG_10050_EnterCriticalSection(void*, int) {}
 inline int  FOG_IsExpansion() { return 1; }
@@ -78,3 +79,11 @@ inline void  FOG_Free(void* p, const char*, int, int) { free(p); }
 #define D2_VERIFYM(expr,msg) ((!!(expr)) || (D2_DISPLAY_ASSERT_THEN_BREAK(msg), false))
 #define D2_UNREACHABLE D2_ASSERT(false)
 #define D2_LOCK(pCriticalSection) D2_ASSERT(pCriticalSection); FOG_10050_EnterCriticalSection(pCriticalSection, __LINE__);
+extern "C" int d2_trace_level;   // d2-web: level id that D2_MONS_TRACE prints for (set by the monspawn driver)
+#define D2_UNLOCK(pCriticalSection) D2_ASSERT(pCriticalSection); (void)0;
+inline uint32_t FOG_LeadingZeroesCount(uint32_t v) { return v ? 31u - (uint32_t)__builtin_clz(v) : (uint32_t)-1; }   // Fog #10252: bsr -- index of the highest set bit, -1 for 0 (callers loop while >= 0)
+float FOG_10083_Cos_LUT(int16_t i);   // Fog #10083/#10084: 512-entry unit-circle tables (stubs.cpp; TODO extract the exact floats from Fog.dll)
+float FOG_10084_Sin_LUT(int16_t i);
+inline int32_t FOG_10055_GetSyncTime() { return 0; }   // Fog #10055: server sync timer, no clock here
+uint16_t FOG_ComputeStringCRC16(const char* s);            // Fog #10137, stubs.cpp
+void FOG_Encode14BitsToString(uint16_t* p2, uint32_t v);   // Fog #10086, stubs.cpp

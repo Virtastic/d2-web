@@ -123,7 +123,8 @@ struct D2SkillListStrc
 	D2SkillStrc* pLeftSkill;				//0x08
 	D2SkillStrc* pRightSkill;				//0x0C
 	D2SkillStrc* pUsedSkill;				//0x10
-	uint32_t unk014;						//0x14
+	// Opaque pointer in retail (four bytes on x86); native-width in the wasm64 engine.
+	uintptr_t unk014;					// retail 0x14
 };
 
 struct D2SkillTreeChartStrc

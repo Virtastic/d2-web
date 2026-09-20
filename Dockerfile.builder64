@@ -1,0 +1,29 @@
+# d2-builder64 — pinned emscripten toolchain with a pre-warmed wasm64 sysroot.
+#
+# Ported from openmw-web/Dockerfile.builder64, same reason it exists: the emscripten sysroot
+# cache lives INSIDE the image. The -pthread system libs only materialise when something links
+# them, so without this layer each build would rebuild them all. (StormLib bundles its own
+# zlib/bzip2; the GL port joins in M3.) wasm64 is the engine target. Retail x86-32
+# arithmetic and layouts remain explicit fixed-width values --
+#
+# Build:  docker build -t d2-builder64:1 -f Dockerfile.builder64 .
+# Use:    docker run --rm -v "$PWD:/build" d2-builder64:1 bash wasm-build/link-d2.sh
+# TODO if the toolchain changes: repin the emsdk tag and re-run the assertions below.
+FROM emscripten/emsdk:6.0.5
+RUN apt-get update && apt-get install -y --no-install-recommends ninja-build brotli git \
+ && rm -rf /var/lib/apt/lists/*
+ENV ROOT=/build EMSDK_BIN=/emsdk/upstream/emscripten
+WORKDIR /build
+
+# Pre-warm. A real link step, not embuilder: a lib only builds when linked. The `ls` line is an
+# ASSERTION -- a lib that silently failed here would otherwise surface much later as a bare
+# "file not found" in the middle of the engine link.
+RUN printf 'int main(){return 0;}\n' > /tmp/p.c \
+ && emcc -m64 -pthread -O2 /tmp/p.c -o /tmp/mt.js \
+ && SR=/emsdk/upstream/emscripten/cache/sysroot/lib/wasm64-emscripten \
+ && ls "$SR"/libc-mt.a >/dev/null \
+ && echo "wasm64 sysroot pre-warmed OK"
+
+# build.sh runs the container as the CALLING uid (so build output is not root-owned on a
+# self-hosted runner), and emscripten still writes lock/symbol files into its cache at link time.
+RUN chmod -R a+rwX /emsdk/upstream/emscripten/cache

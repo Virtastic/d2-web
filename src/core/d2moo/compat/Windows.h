@@ -1,5 +1,6 @@
 // Compat shim for the vendored D2MOO DRLG (src/core/d2moo): just enough <Windows.h>
-// to compile under emscripten/clang. Calling conventions are no-ops on wasm32.
+// to compile under emscripten/clang. Calling conventions are no-ops on WebAssembly; the engine
+// target is wasm64.
 #pragma once
 #include <stdint.h>
 #include <stddef.h>
@@ -16,8 +17,24 @@
 #define __int8 char
 #define __int16 short
 #define __int32 int
+#define __int64 long long
 #define __declspec(x)
 #define _Analysis_assume_(x)
+// MSVC SAL lock annotations
+#define _Requires_lock_held_(x)
+#define _Releases_lock_(x)
+#define _Acquires_lock_(x)
+#define _Requires_lock_not_held_(x)
+#define _Guarded_by_(x)
+#define _Post_satisfies_(x)
+#define _In_
+#define _Out_
+#define _Inout_
+#define _In_opt_
+#define _Out_opt_
+#define _Ret_maybenull_
+#define _Ret_notnull_
+#define _Check_return_
 #define __debugbreak() abort()
 
 // D2MOO export decorations: nothing is a DLL here. Defined this early because every vendored
@@ -46,6 +63,7 @@ typedef void*    LPVOID;
 #define MAX_PATH 260
 
 struct RECT  { LONG left, top, right, bottom; };
+struct FILETIME { DWORD dwLowDateTime, dwHighDateTime; };
 struct POINT { LONG x, y; };
 struct PALETTEENTRY { BYTE peRed, peGreen, peBlue, peFlags; };
 struct CRITICAL_SECTION { int32_t unused; };
@@ -74,7 +92,6 @@ template <size_t N> inline int sprintf_s(char (&d)[N], const char* f, ...) { va_
 inline int sprintf_s(char* d, size_t n, const char* f, ...) { va_list a; va_start(a, f); int r = vsnprintf(d, n, f, a); va_end(a); return r; }
 #define wsprintfA sprintf
 #define _strcmpi strcasecmp
-#define SStrCmpI(a, b, n) strncasecmp((a), (b), (n))
 inline void InitializeCriticalSection(LPCRITICAL_SECTION) {}
 inline void DeleteCriticalSection(LPCRITICAL_SECTION) {}
 inline int IsBadCodePtr(FARPROC p) { return p == nullptr; }

@@ -838,7 +838,26 @@ void __fastcall DATATBLS_LoadLvlSubTxt(HD2ARCHIVE hArchive, int a2, int a3)
 		{ "end", TXTFIELD_NONE, 0, 0, NULL },
 	};
 
-	sgptDataTables->pLvlSubTxt = (D2LvlSubTxt*)DATATBLS_CompileTxt(hArchive, "lvlsub", pTbl, &sgptDataTables->nLvlSubTxtRecordCount, sizeof(D2LvlSubTxt));
+	// LvlSub.bin embeds x86 pointers and D2DrlgGridStrc values in its 348-byte
+	// retail records.  A direct overlay only works when native pointers are four
+	// bytes.  Expand those records explicitly for the wasm64 engine while
+	// preserving every serialized scalar at its retail offset.
+	D2LvlSubTxtRetail32* pRetail = static_cast<D2LvlSubTxtRetail32*>(DATATBLS_CompileTxt(
+		hArchive, "lvlsub", pTbl, &sgptDataTables->nLvlSubTxtRecordCount, sizeof(D2LvlSubTxtRetail32)));
+	const size_t nNativeBytes = sizeof(D2LvlSubTxt) * sgptDataTables->nLvlSubTxtRecordCount;
+	uint8_t* pNativeBin = static_cast<uint8_t*>(D2_CALLOC_POOL(nullptr, 4 + nNativeBytes));
+	memcpy(pNativeBin, &sgptDataTables->nLvlSubTxtRecordCount, 4);
+	sgptDataTables->pLvlSubTxt = reinterpret_cast<D2LvlSubTxt*>(pNativeBin + 4);
+	for (int i = 0; i < sgptDataTables->nLvlSubTxtRecordCount; ++i)
+	{
+		D2LvlSubTxt& dst = sgptDataTables->pLvlSubTxt[i]; const D2LvlSubTxtRetail32& src = pRetail[i];
+		dst.dwType = src.dwType; memcpy(dst.szFile, src.szFile, sizeof(dst.szFile));
+		dst.dwCheckAll = src.dwCheckAll; dst.dwBordType = src.dwBordType;
+		dst.dwDt1Mask = src.dwDt1Mask; dst.dwGridSize = src.dwGridSize;
+		memcpy(dst.nProb, src.nProb, sizeof(dst.nProb)); memcpy(dst.nTrials, src.nTrials, sizeof(dst.nTrials));
+		memcpy(dst.nMax, src.nMax, sizeof(dst.nMax)); dst.dwExpansion = src.dwExpansion;
+	}
+	DATATBLS_UnloadBin(pRetail);
 
 	if (sgptDataTables->nLvlSubTxtRecordCount > 0)
 	{

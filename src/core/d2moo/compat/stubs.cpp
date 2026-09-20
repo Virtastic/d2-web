@@ -21,7 +21,8 @@
 void FOG_DisplayWarning(const char* m, const char* f, int l) { fprintf(stderr, "d2moo warning: %s (%s:%d)\n", m, f, l); }
 void FOG_DisplayAssert(const char* m, const char* f, int l)  { fprintf(stderr, "d2moo ASSERT: %s (%s:%d)\n", m, f, l); }
 void FOG_DisplayHalt(const char* m, const char* f, int l)    { fprintf(stderr, "d2moo HALT: %s (%s:%d)\n", m, f, l); abort(); }
-void FOG_Trace(const char* fmt, ...) { va_list a; va_start(a, fmt); vfprintf(stderr, fmt, a); va_end(a); }
+void FOG_Trace(const char* fmt, ...) { va_list a; va_start(a, fmt); vfprintf(stderr, fmt, a); va_end(a); fputc('\n', stderr); }
+void FOG_TraceF(const char*, const char* fmt, ...) { va_list a; va_start(a, fmt); vfprintf(stderr, fmt, a); va_end(a); fputc('\n', stderr); }
 const char* FOG_csprintf(char* dst, const char* fmt, ...) { va_list a; va_start(a, fmt); vsprintf(dst, fmt, a); va_end(a); return dst; }
 
 // --- Archive: DS1 reads go through our layered MPQ VFS ----------------------------------------
@@ -46,38 +47,32 @@ void* ARCHIVE_AllocateBufferAndReadFile(HD2ARCHIVE, const char* szFilePath, size
 
 
 // --- Environment / units / paths: not modelled ---------------------------------------------------
-D2DrlgEnvironmentStrc* ENVIRONMENT_AllocDrlgEnvironment(void*) { return (D2DrlgEnvironmentStrc*)calloc(1, sizeof(D2DrlgEnvironmentStrc)); }
-void ENVIRONMENT_FreeDrlgEnvironment(void*, D2DrlgEnvironmentStrc* p) { free(p); }
-int  MONSTERS_ValidateMonsterId(int nMonsterId) { return (nMonsterId >= 0 && nMonsterId < sgptDataTables->nMonStatsTxtRecordCount) ? nMonsterId : -1; }
 
 // --- Path direction lookup (D2Common 0x6FDAB750 1.10f / 0x6FDDC320 table 1.13c) -----------------
-// Used by the wilderness road placer. Copied from D2MOO Path/PathMisc.cpp.
-static int pathDirIndex(int nX1, int nY1, int nX2, int nY2) {
-    int nDiffX = nX2 - nX1, nDiffY = nY2 - nY1;
-    int nAbsDiffX = nDiffX < 0 ? -nDiffX : nDiffX, nAbsDiffY = nDiffY < 0 ? -nDiffY : nDiffY;
-    if (nAbsDiffX < 2 * nAbsDiffY) {
-        if (nAbsDiffY >= 2 * nAbsDiffX) {
-            if (nDiffX < 0) {
-                if (nDiffY < -1) return 5;
-                else if (nDiffY > 1) nDiffY = 2;
-                return nDiffY + 7;
-            }
-            nDiffX &= 1;
-        }
-    } else {
-        if (nDiffY >= 0) nDiffY &= 1; else nDiffY = -1;
-    }
-    if (nDiffX < -1) nDiffX = -2; else if (nDiffX > 1) nDiffX = 2;
-    if (nDiffY < -1) return 5 * nDiffX + 10;
-    else if (nDiffY > 1) nDiffY = 2;
-    return nDiffY + 5 * nDiffX + 12;
-}
-int sub_6FDAB750(int nX1, int nY1, int nX2, int nY2) {
-    static const int8_t k[25] = { 5,4,4,4,3, 6,5,4,3,2, 6,6,6,2,2, 6,7,0,1,2, 7,0,0,0,1 };
-    return k[pathDirIndex(nX1, nY1, nX2, nY2)];
-}
+// (path direction table sub_6FDAB750 now comes from the vendored Path/Step.cpp)
 
 // --- Path (D2Common Path/Path.cpp #10166/#10167): the room a unit's dynamic path is in ---------
 #include <Path/Path.h>
-D2ActiveRoomStrc* PATH_GetRoom(D2DynamicPathStrc* p) { return p->pRoom; }
-void PATH_SetRoom(D2DynamicPathStrc* p, D2ActiveRoomStrc* pRoom) { p->pRoom = pRoom; }
+
+// --- Storm string helpers (squall's storm/String.hpp declares them) ------------------------------
+#include <Storm.h>
+int32_t SStrCmpI(const char* a, const char* b, size_t n) { return strncasecmp(a, b, n); }
+int32_t SStrCmp(const char* a, const char* b, size_t n) { return strncmp(a, b, n); }
+size_t  SStrCopy(char* dest, const char* src, size_t destsize) { if (!destsize) return 0; size_t n = strlen(src); if (n >= destsize) n = destsize - 1; memcpy(dest, src, n); dest[n] = 0; return n; }
+size_t  SStrLen(const char* s) { return strlen(s); }
+int     SStrVPrintf(char* dst, size_t max, char* fmt, va_list args) { return vsnprintf(dst, max, fmt, args); }
+
+// Fog #10137 / #10086: the CRC-16 over a name and the 14-bit-to-2-chars encoding the client
+// preview uses. Nothing in the spawn path hashes; kept minimal until a scenario reads them.
+uint16_t FOG_ComputeStringCRC16(const char* s) {
+    uint16_t crc = 0;
+    for (; s && *s; s++) { crc ^= (uint8_t)*s; for (int i = 0; i < 8; i++) crc = (crc & 1) ? (uint16_t)((crc >> 1) ^ 0xA001) : (uint16_t)(crc >> 1); }
+    return crc;
+}
+void FOG_Encode14BitsToString(uint16_t* p2, uint32_t v) { p2[0] = (uint16_t)(0x20 + (v & 0x7F)); p2[1] = (uint16_t)(0x20 + ((v >> 7) & 0x7F)); }
+
+// Fog #10083/#10084: 512-step unit circle. Fog ships these as float tables; until they are pulled
+// out of the 1.13c DLL this computes them (identical for the integer-heavy callers seen so far).
+#include <math.h>
+float FOG_10083_Cos_LUT(int16_t i) { return (float)cos((double)(i & 511) * 6.283185307179586 / 512.0); }
+float FOG_10084_Sin_LUT(int16_t i) { return (float)sin((double)(i & 511) * 6.283185307179586 / 512.0); }

@@ -892,8 +892,8 @@ void* __stdcall D2Common_10958(D2UnitStrc* pUnit, void* a2)
 
 	if (pUnit && pUnit->pSkills)
 	{
-		pResult = (void*)pUnit->pSkills->unk014;
-		pUnit->pSkills->unk014 = (int)a2;
+		pResult = reinterpret_cast<void*>(pUnit->pSkills->unk014);
+		pUnit->pSkills->unk014 = reinterpret_cast<uintptr_t>(a2);
 	}
 
 	return pResult;
@@ -904,7 +904,7 @@ void* __stdcall D2Common_10959(D2UnitStrc* pUnit)
 {
 	if (pUnit && pUnit->pSkills)
 	{
-		return (void*)pUnit->pSkills->unk014;
+		return reinterpret_cast<void*>(pUnit->pSkills->unk014);
 	}
 
 	return NULL;

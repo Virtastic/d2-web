@@ -27,8 +27,11 @@ BOOL __fastcall DATATBLS_LoadExpFieldD2(HD2ARCHIVE hArchive)
 //D2Common.0x6FD52010 (#11089)
 BOOL __stdcall DATATBLS_InitializeCollisionFieldTable(char* pExpField, int nSize)
 {
-	uint32_t v2 = *(uint32_t*)(pExpField + 2);
-	uint32_t v3 = *(uint32_t*)(pExpField + 6);
+	// expfield.d2 stores these little-endian dwords at deliberately unaligned
+	// offsets. Retail x86 permits that; memcpy expresses the same load in Wasm.
+	uint32_t v2 = 0, v3 = 0;
+	memcpy(&v2, pExpField + 2, sizeof(v2));
+	memcpy(&v3, pExpField + 6, sizeof(v3));
 
 	sgptDataTables->pFieldData = (uint8_t*)D2_ALLOC_POOL(nullptr, v2 * v3);
 	D2_ASSERT(sgptDataTables->pFieldData);
