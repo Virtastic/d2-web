@@ -822,7 +822,9 @@ int32_t __fastcall D2GAME_STORES_SellItem_6FCC7680(D2GameStrc* pGame, D2UnitStrc
                             nUnitType = pPlayer->dwUnitType;
                         }
 
-                        D2GAME_PACKETS_SendPacket0x22_6FC3DBE0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), nUnitType, nUnitGUID, pBooksTxtRecord->dwScrollSkillId, nSkillQuantity);
+                        // d2-web: selling a tome reports the book skill (220 for Town Portal on the
+                        // wire, kind 22), the skill whose quantity was just changed; upstream sent the scroll's.
+                        D2GAME_PACKETS_SendPacket0x22_6FC3DBE0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), nUnitType, nUnitGUID, pBooksTxtRecord->dwBookSkillId, nSkillQuantity);
                     }
                 }
             }
@@ -1219,14 +1221,28 @@ int32_t __fastcall sub_6FCC88B0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitSt
     // the path used by generated weapon/armour stock and packet 0x32 with multibuy=0.
     D2_ASSERT(pGame);
     D2UnitStrc* pItem = SUNIT_GetServerUnit(pGame, UNIT_ITEM, nItemGUID);
-    if (!pItem || nTransactionType != TRANSACTIONTYPE_BUY || bMultibuy)
+    if (!pItem || (nTransactionType != TRANSACTIONTYPE_BUY && nTransactionType != TRANSACTIONTYPE_GAMBLE) || bMultibuy)
     {
         D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 7,
             STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), nItemGUID, 0);
         return 1;
     }
 
-    if (!ITEMS_IsInPlayersInventory(pNpc, pItem, 0) || pItem->dwAnimMode != nItemMode)
+    // d2-web: the gamble branch of the original (its decompiler notes below): the item must sit
+    // in this player's gamble inventory with the NPC, and the price is the gamble price.
+    // Kind 21 phase-2 vectors (s84) measure it.
+    D2InventoryStrc* pSourceInventory = nullptr;
+    if (nTransactionType == TRANSACTIONTYPE_GAMBLE)
+    {
+        pSourceInventory = SUNITPROXY_GetGambleInventory(pGame, pPlayer, pNpc);
+        if (!pSourceInventory || ITEMS_IsInPlayersInventory(pNpc, pItem, pSourceInventory) != 1)
+        {
+            D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 7,
+                STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), nItemGUID, 0);
+            return 1;
+        }
+    }
+    else if (!ITEMS_IsInPlayersInventory(pNpc, pItem, 0) || pItem->dwAnimMode != nItemMode)
     {
         D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 7,
             STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), nItemGUID, 0);
@@ -1235,7 +1251,7 @@ int32_t __fastcall sub_6FCC88B0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitSt
 
     const int32_t nVendorId = pNpc ? pNpc->dwClassId : -1;
     const int32_t nServerCost = ITEMS_GetTransactionCost(pPlayer, pItem, (D2C_Difficulties)pGame->nDifficulty,
-        UNITS_GetPlayerData(pPlayer)->pQuestData[pGame->nDifficulty], nVendorId, TRANSACTIONTYPE_BUY);
+        UNITS_GetPlayerData(pPlayer)->pQuestData[pGame->nDifficulty], nVendorId, (D2C_TransactionTypes)nTransactionType);
     const int32_t nGold = STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0);
     const int32_t nBank = STATLIST_UnitGetStatValue(pPlayer, STAT_GOLDBANK, 0);
     if (nServerCost > nGold + nBank)
@@ -1276,8 +1292,11 @@ int32_t __fastcall sub_6FCC88B0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitSt
         return 0;
     }
     sub_6FCC7E20(pGame, pNpc, pItem, pPlayer, nTransactionType);
+    // d2-web: 1.13c (D2Game 0x6FCDEC84) marks the bought item IFLAG_TARGET and answers with
+    // transaction type 4, where 1.10f sent 1 and left the flag clear; captured with kind 21.
+    ITEMS_SetItemFlag(pBoughtItem, IFLAG_TARGET, 1);
     D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 0,
-        STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), pBoughtItem->dwUnitId, 1);
+        STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), pBoughtItem->dwUnitId, 4);
     return 0;
 
 //    D2GameStrc* v8; // ebx@1
@@ -2576,7 +2595,10 @@ void __fastcall D2GAME_STORES_FillGamble_6FCCA9F0(D2GameStrc* pGame, D2UnitStrc*
                 D2ItemsTxt* pUberItemsTxtRecord = DATATBLS_GetItemRecordFromItemCode(pItemsTxtRecord->dwUberCode, &nUberItemId);
                 if (pUberItemsTxtRecord)
                 {
-                    const uint32_t nUberItemChance = pDifficultyLevelsTxtRecord->dwGambleUber * (nItemLevel - pUberItemsTxtRecord->nLevel) + 1;
+                    // d2-web: 1.13c (D2Game 0x6FCDD040) keeps the exceptional/elite chance signed, so an
+                    // item level below the upgrade's level yields no roll; upstream's unsigned compare
+                    // upgraded everything a low-level character gambled (kind 20 phase 2 vectors).
+                    const int32_t nUberItemChance = (int32_t)pDifficultyLevelsTxtRecord->dwGambleUber * (nItemLevel - pUberItemsTxtRecord->nLevel) + 1;
                     if (nUberItemChance > 0)
                     {
                         if (ITEMS_RollLimitedRandomNumber(pSeed, 10000) < nUberItemChance)
@@ -2591,8 +2613,8 @@ void __fastcall D2GAME_STORES_FillGamble_6FCCA9F0(D2GameStrc* pGame, D2UnitStrc*
                                 D2ItemsTxt* pUltraItemsTxtRecord = DATATBLS_GetItemRecordFromItemCode(pItemsTxtRecord->dwUltraCode, &nUltraItemId);
                                 if (pUltraItemsTxtRecord)
                                 {
-                                    const uint32_t nUltraItemChance = pDifficultyLevelsTxtRecord->dwGambleUltra * (nItemLevel - pUltraItemsTxtRecord->nLevel) + 1;
-                                    if (nUltraItemChance > 0 && (ITEMS_RollRandomNumber(pSeed) % 10000) < nUltraItemChance)
+                                    const int32_t nUltraItemChance = (int32_t)pDifficultyLevelsTxtRecord->dwGambleUltra * (nItemLevel - pUltraItemsTxtRecord->nLevel) + 1;   // d2-web: signed, as above
+                                    if (nUltraItemChance > 0 && (int32_t)(ITEMS_RollRandomNumber(pSeed) % 10000) < nUltraItemChance)
                                     {
                                         nItemId = nUltraItemId;
                                     }

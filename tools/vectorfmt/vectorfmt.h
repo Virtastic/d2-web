@@ -178,6 +178,217 @@ struct D2VecCombatResult {
 #pragma pack(pop)
 static_assert(sizeof(D2VecCombatResult) == 72, "D2VecCombatResult layout");
 
+// A1Q6: the game-global transition after retail's live Andariel killed callback.  This first
+// slice deliberately has no player reward flags: it proves the boss/timer state machine before
+// the separate player-record attachment path is added.
+#pragma pack(push, 1)
+struct D2VecA1Q6 {
+    uint32_t seed;
+    uint8_t difficulty, phase;
+    uint16_t level;
+    uint32_t andarielId;
+    int32_t andarielGuid;
+    uint16_t timerInvocations;
+    uint8_t andarielKilled, state;
+    uint8_t monsterKilledCallback, timerPresent;
+    uint32_t hash;
+};
+#pragma pack(pop)
+static_assert(sizeof(D2VecA1Q6) == 26, "D2VecA1Q6 layout");
+
+// A1Q6 player slice: post-kill player quest-record state through the live retail callback.
+#pragma pack(push, 1)
+struct D2VecA1Q6Player {
+    uint32_t seed;
+    uint8_t difficulty, phase;
+    uint16_t level;
+    uint32_t playerId, playerFlags;
+    uint8_t primaryGoalDone, rewardPending, rewardGranted, completedNow;
+    uint32_t hash;
+};
+#pragma pack(pop)
+static_assert(sizeof(D2VecA1Q6Player) == 24, "D2VecA1Q6Player layout");
+
+// A1Q6 timer slice: the scheduled retail callback after Andariel's kill transition.  The
+// callback is replayed through invocation 10, where it opens the return portal in Catacombs 4.
+#pragma pack(push, 1)
+struct D2VecA1Q6Timer {
+    uint32_t seed;
+    uint8_t difficulty, phase;
+    uint16_t level;
+    uint32_t andarielId;
+    uint16_t timerInvocations;
+    uint8_t timerStillScheduled, portalCount;
+    uint32_t portalId, portalClass, hash;
+};
+#pragma pack(pop)
+static_assert(sizeof(D2VecA1Q6Timer) == 28, "D2VecA1Q6Timer layout");
+
+// A1Q6 completion slice: the same scheduled callback taken through invocation 12, where retail
+// closes the status cycle (lastState 3, flag byte cleared, timer released) and composes the
+// per-player quest-status packet 0x5D from QUESTS_RefreshStatus.  The packet bytes are read
+// back from the client's queued packet-data tail, exactly as retail composed them.
+#pragma pack(push, 1)
+struct D2VecA1Q6Complete {
+    uint32_t seed;
+    uint8_t difficulty, phase;
+    uint16_t level;
+    uint16_t timerInvocations;
+    uint8_t timerReleased, lastState;
+    uint8_t state, questFlagsLow;
+    uint16_t playerFlags;
+    uint8_t packetHeader, packetQuestId, packetFlags, packetState;
+    uint16_t packetField4, packetBytes;
+    uint32_t hash;
+};
+#pragma pack(pop)
+static_assert(sizeof(D2VecA1Q6Complete) == 28, "D2VecA1Q6Complete layout");
+
+// A1Q6 quest-drop slice: the player-attached kill callback rolls two chipped gems and one
+// normal gem off the global quest seed and drops them at Andariel through
+// D2GAME_DropItemAtUnit.  One record per item unit found in the level afterwards, in Room2-list
+// then unit-list order; the ITEMS_Serialize bitstream is the whole item (kind 3's standard).
+#pragma pack(push, 1)
+struct D2VecA1Q6Drop {
+    uint32_t seed;
+    uint8_t difficulty, phase;
+    uint16_t level;
+    uint32_t itemId, classId, quality, ilvl;
+    uint16_t x, y, index, count;
+    uint32_t seedLo, seedHi, bitBytes;
+    uint8_t bits[32];
+    uint32_t hash;
+};
+#pragma pack(pop)
+static_assert(sizeof(D2VecA1Q6Drop) == 80, "D2VecA1Q6Drop layout");
+
+// A1Q6 act travel: with the reward granted, client packet 0x38 to Warriv (class 155) takes
+// retail's NPC_HandleDialogMessage -> PlayerChangeAct -> LEVEL_WarpUnit -> LEVEL_ChangeAct into
+// Act II.  Recorded after the handler returns: where the player stands, which act the client
+// and unit are in, the loaded-act mask, and what was queued to the client.
+#pragma pack(push, 1)
+struct D2VecA1Q6Travel {
+    uint32_t seed;
+    uint8_t difficulty, phase;
+    uint16_t level;                       // level the player was placed in before the packet
+    uint32_t warrivId, playerId;
+    uint8_t action, handlerResult, clientAct, unitAct;
+    uint16_t destLevel, x, y, roomsLoaded;   // destLevel: level of the player's room afterwards
+    uint8_t actsLoaded, packetsFirst;         // pAct[] mask; first packet header appended
+    uint16_t packetBytes;
+    uint32_t hash;
+};
+#pragma pack(pop)
+static_assert(sizeof(D2VecA1Q6Travel) == 36, "D2VecA1Q6Travel layout");
+
+// NPC dialogue: client packet 0x13 (interact with entity) from a player standing within 6
+// subtiles of a town NPC takes retail's immediate activation path (0x6FC828D0 -> 0x6FC61C70 in
+// D2MOO's map): QUESTS_NPCActivate composes the message list and the 40-byte 0x27 packet,
+// then the global quest flags (0x29, 97 bytes) and the player's quest record (0x28, 103 bytes)
+// are queued to the client.  One record per (game, NPC): every byte the handler queued, in
+// order, as retail composed it.
+#pragma pack(push, 1)
+struct D2VecNpcDialog {
+    uint32_t seed;
+    uint8_t difficulty, phase;
+    uint16_t level;
+    uint32_t npcId, npcClass;
+    uint16_t playerX, playerY;
+    uint8_t handlerResult, packetCount;   // packetCount: whole packets of known size in the stream
+    uint16_t packetBytes;                 // bytes the handler appended to the client queue
+    uint8_t stream[512];                  // the appended bytes (one retail packet-data block)
+    uint32_t hash;
+};
+#pragma pack(pop)
+static_assert(sizeof(D2VecNpcDialog) == 540, "D2VecNpcDialog layout");
+
+// NPC response: after the 0x13 activation, client packet 0x31 {npcGUID, messageId} for one of
+// the message ids the 0x27 list offered (Rcv0x31 -> QUESTS_NPCMessage -> the quest callbacks).
+// One record per (game, NPC, message): the game's global quest record before the message (an
+// input -- earlier responses in the same game set global bits, e.g. Jerhyn's 253 marks A2Q0's
+// primary goal, and packet 0x29 echoes them), everything the handler queued, and the player's
+// whole quest record afterwards (the 96 bytes packet 0x28 carries).
+#pragma pack(push, 1)
+struct D2VecNpcResponse {
+    uint32_t seed;
+    uint8_t difficulty, phase;
+    uint16_t level;
+    uint32_t npcId, npcClass;
+    uint16_t messageId;
+    uint8_t handlerResult, packetCount;
+    uint16_t packetBytes;
+    uint8_t globalRecordBefore[96];
+    uint8_t stream[512];
+    uint8_t questRecord[96];
+    uint32_t hash;
+};
+#pragma pack(pop)
+static_assert(sizeof(D2VecNpcResponse) == 730, "D2VecNpcResponse layout");
+
+// Vendor stock: after the 0x13 activation, client packet 0x38 {1, npcGUID, -1} (trade) makes
+// retail build the NPC's vendor cache (D2GAME_STORES_CreateVendorCache -> FillStoreInventory).
+// One record per item in the NPC's inventory afterwards, in list order, with the item's
+// ITEMS_Serialize bitstream (kind 3's standard, first 80 bytes).  `phase` is the 0x38 action.
+#pragma pack(push, 1)
+struct D2VecVendorItem {
+    uint32_t seed;
+    uint8_t difficulty, phase;
+    uint16_t level;
+    uint32_t npcId, npcClass;
+    uint16_t index, count;
+    uint32_t itemId, classId, quality, ilvl;
+    uint32_t seedLo, seedHi, bitBytes;
+    uint8_t bits[80];
+    uint32_t hash;
+};
+#pragma pack(pop)
+static_assert(sizeof(D2VecVendorItem) == 132, "D2VecVendorItem layout");
+
+// Vendor purchase: with the trade open and the fixture given `goldBefore`, client packet 0x32
+// {npcGUID, itemGUID, type 0, itemMode, cost} for the vendor's first item, `cost` being what
+// ITEMS_GetTransactionCost (D2Common #10107 on 1.13c) returns for it.  Records the handler
+// result, the gold afterwards, the bought item (the first item of the player's inventory) with
+// its bitstream and inventory position, the vendor's remaining stock count, and the stream.
+#pragma pack(push, 1)
+struct D2VecVendorBuy {
+    uint32_t seed;
+    uint8_t difficulty, phase;
+    uint16_t level;
+    uint32_t npcId, npcClass, itemId;
+    int32_t cost, goldBefore, goldAfter;
+    uint8_t handlerResult, playerItems;
+    uint16_t vendorItemsAfter;
+    uint32_t boughtId, boughtClass, boughtSeedLo, boughtSeedHi, boughtBits;
+    uint8_t bits[80];
+    uint16_t packetBytes, packetCount;
+    uint8_t stream[512];
+    uint32_t hash;
+};
+#pragma pack(pop)
+static_assert(sizeof(D2VecVendorBuy) == 656, "D2VecVendorBuy layout");
+
+// Vendor sale: right after the purchase, client packet 0x33 {npcGUID, boughtGUID, itemMode,
+// 0, price} sells the bought item back at ITEMS_GetTransactionCost's sell price.  Records the
+// result, gold before/after, the player's remaining item count, the vendor's stock afterwards
+// and its last item (the duplicate the sale placed with it), and the queued reply.
+#pragma pack(push, 1)
+struct D2VecVendorSell {
+    uint32_t seed;
+    uint8_t difficulty, phase;
+    uint16_t level;
+    uint32_t npcId, npcClass, itemId;
+    int32_t price, goldBefore, goldAfter;
+    uint8_t handlerResult, playerItems;
+    uint16_t vendorItemsAfter;
+    uint32_t dupeId, dupeClass, dupeSeedLo, dupeSeedHi, dupeBits;
+    uint8_t bits[80];
+    uint16_t packetBytes, packetCount;
+    uint8_t stream[512];
+    uint32_t hash;
+};
+#pragma pack(pop)
+static_assert(sizeof(D2VecVendorSell) == 656, "D2VecVendorSell layout");
+
 // DAMAGECALC: a direct retail/wasm replay of SUNITDMG_CalculateTotalDamage. The defender's
 // relevant reduction/resistance stats and the complete before/after damage structures are
 // explicit, allowing elemental, poison, conversion, pierce and absorb cases to grow in-place.
@@ -202,7 +413,7 @@ static_assert(sizeof(D2VecPrng) == 28, "prng record is 28 bytes on every platfor
 // `count` records of `recordSize` bytes copied verbatim from sgptDataTables. One file per table
 //; recordSize is sizeof the retail record struct, so a layout
 // mismatch is refused by d2vec_read_header rather than compared byte-by-byte as garbage.
-enum D2VecKind : uint32_t { D2VEC_PRNG = 1, D2VEC_DRLG = 2, D2VEC_ITEMGEN = 3, D2VEC_MONSPAWN = 4, D2VEC_TABLE = 5, D2VEC_COMBAT = 6, D2VEC_AISPAWN = 7, D2VEC_AIFRAME = 8, D2VEC_AITARGET = 9, D2VEC_COMBATRESULT = 10, D2VEC_DAMAGECALC = 11 };
+enum D2VecKind : uint32_t { D2VEC_PRNG = 1, D2VEC_DRLG = 2, D2VEC_ITEMGEN = 3, D2VEC_MONSPAWN = 4, D2VEC_TABLE = 5, D2VEC_COMBAT = 6, D2VEC_AISPAWN = 7, D2VEC_AIFRAME = 8, D2VEC_AITARGET = 9, D2VEC_COMBATRESULT = 10, D2VEC_DAMAGECALC = 11, D2VEC_A1Q6 = 12, D2VEC_A1Q6PLAYER = 13, D2VEC_A1Q6TIMER = 14, D2VEC_A1Q6COMPLETE = 15, D2VEC_A1Q6DROP = 16, D2VEC_A1Q6TRAVEL = 17, D2VEC_NPCDIALOG = 18, D2VEC_NPCRESPONSE = 19, D2VEC_VENDORITEM = 20, D2VEC_VENDORBUY = 21, D2VEC_VENDORSELL = 22 };
 
 static inline uint32_t d2vec_fnv1a_step(uint32_t h, uint32_t v) {
     for (int i = 0; i < 4; i++) { h ^= (v >> (8 * i)) & 0xFF; h *= 16777619u; }

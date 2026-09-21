@@ -58,6 +58,7 @@
 #include <OBJECTS/ObjMode.h>
 #include <QUESTS/Quests.h>
 #include <QUESTS/ACT1/A1Q1.h>
+#include <QUESTS/ACT1/A1Q6.h>
 #include "../d2moo/compat/datatbls_bridge.h"
 #include "../tables/shared.h"
 #include "../../../tools/vectorfmt/vectorfmt.h"
@@ -79,6 +80,9 @@ static D2VecAiLevel g_targetOut;
 static std::vector<D2VecCombat> g_combatEvents;
 static D2VecCombatResult g_combatResult;
 static int g_currentAct = -1, g_currentLevel = -1;
+// Session construction is class-selectable.  The older vector/AI attachment surface retains
+// Amazon (0) unless a browser session explicitly supplies one of the seven CharStats classes.
+static int g_sessionPlayerClass = 0;
 
 // Pointer-free state handed to the browser.  Keep this as an explicit wire layout: none of the
 // native wasm64 pointers in D2Game/D2Unit are allowed to escape the engine boundary.
@@ -215,6 +219,31 @@ struct D2SessionAct1Quest1 {
     int32_t monstersLeft;
     uint32_t enteredDen, akaraActivated, finished, timerActive, hash;
 };
+// A1Q6 is deliberately an observation record. Its fields come from the live quest controller
+// and player bit buffer; it contains no browser-side completion state.
+struct D2SessionAct1Quest6 {
+    uint32_t version, size, level, questState, lastState, questFlags;
+    uint32_t playerFlags, globalPrimaryGoal;
+    int32_t andarielGuid;
+    uint32_t timerInvocations, andarielKilled, killCallbackActive;
+    uint32_t primaryGoalDone, rewardPending, rewardGranted, completedNow, hash;
+};
+struct D2SessionAct1Quest6Timer {
+    uint32_t version, size, level, andarielId;
+    uint32_t timerInvocations, timerStillScheduled, portalCount, portalId, portalClass, hash;
+};
+struct D2SessionAct1Quest6Complete {
+    uint32_t version, size, level, timerInvocations;
+    uint32_t timerReleased, lastState, state, questFlagsLow, playerFlags;
+    uint32_t packetHeader, packetQuestId, packetFlags, packetState, packetField4, packetBytes, hash;
+};
+// One quest-drop item, the kind-16 vector's fields widened to u32 for the browser reader.
+struct D2SessionAct1Quest6Drop {
+    uint32_t itemId, classId, quality, ilvl, x, y, index, count;
+    uint32_t seedLo, seedHi, bitBytes;
+    uint8_t bits[32];
+    uint32_t hash;
+};
 struct D2SessionItemSaveRoundTrip {
     uint32_t version, size, result, saveVersion;
     uint32_t bytesWritten, bytesConsumed, replayBytes, itemCount;
@@ -277,6 +306,10 @@ static_assert(sizeof(D2SessionVendorItem) == 32);
 static_assert(sizeof(D2SessionVendorTransaction) == 96);
 static_assert(sizeof(D2SessionRepair) == 84);
 static_assert(sizeof(D2SessionAct1Quest1) == 60);
+static_assert(sizeof(D2SessionAct1Quest6) == 68);
+static_assert(sizeof(D2SessionAct1Quest6Timer) == 40);
+static_assert(sizeof(D2SessionAct1Quest6Complete) == 64);
+static_assert(sizeof(D2SessionAct1Quest6Drop) == 80);
 static_assert(sizeof(D2SessionItemSaveRoundTrip) == 56);
 static_assert(sizeof(D2SessionStatsSaveRoundTrip) == 72);
 static_assert(sizeof(D2SessionCampaignSaveRoundTrip) == 72);
@@ -298,6 +331,11 @@ static std::vector<D2SessionVendorItem> g_sessionVendorItems;
 static D2SessionVendorTransaction g_sessionVendorTransaction;
 static D2SessionRepair g_sessionRepair;
 static D2SessionAct1Quest1 g_sessionAct1Quest1;
+static D2SessionAct1Quest6 g_sessionAct1Quest6;
+static D2SessionAct1Quest6Timer g_sessionAct1Quest6Timer;
+static D2SessionAct1Quest6Complete g_sessionAct1Quest6Complete;
+static std::vector<uint32_t> g_sessionAct1Quest6ItemsBefore;
+static std::vector<D2SessionAct1Quest6Drop> g_sessionAct1Quest6Drops;
 static D2SessionItemSaveRoundTrip g_sessionItemSaveRoundTrip;
 static std::vector<uint8_t> g_sessionItemSaveBytes;
 static D2SessionStatsSaveRoundTrip g_sessionStatsSaveRoundTrip;
@@ -336,6 +374,8 @@ static bool g_sessionLive, g_sessionMovePending;
 
 extern "C" void D2WEB_ResetLastDialogPacket();
 extern "C" int D2WEB_CopyLastDialogPacket(D2GSPacketSrv27* pPacket);
+extern "C" void D2WEB_ResetLastQuestStatusPacket();
+extern "C" int D2WEB_CopyLastQuestStatusPacket(D2GSPacketSrv5D* pPacket);
 
 static uint32_t sessionHashBytes(uint32_t hash, const void* data, size_t size) {
     const uint8_t* bytes = static_cast<const uint8_t*>(data);
@@ -756,13 +796,18 @@ EMSCRIPTEN_KEEPALIVE const D2VecMonUnit* d2_monspawn_units(int* count) { *count 
 EMSCRIPTEN_KEEPALIVE const char* d2_monspawn_err() { return g_err.c_str(); }
 EMSCRIPTEN_KEEPALIVE const D2VecAiLevel* d2_aispawn_out() { return &g_aiOut; }
 EMSCRIPTEN_KEEPALIVE const D2VecAiUnit* d2_aispawn_units(int* count) { *count = (int)g_aiUnits.size(); return g_aiUnits.data(); }
+// Anchor class for the player fixture: any monster (0xFFFFFFFF) or a specific class, so a
+// session can be created beside one town NPC the way the retail capture's fixture is.
+static uint32_t g_sessionAnchorClass = 0xFFFFFFFF;
 EMSCRIPTEN_KEEPALIVE int d2_aitarget_attach() {
     if (!g_game || !g_lastLevel || g_targetPlayer) return 0;
     uint16_t roomIdx = 0;
     for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext, roomIdx++) {
-        D2ActiveRoomStrc* room = roomEx->pRoom; if (!room || room->nNumClients || room->ppClients) continue;
+        // A room a previous fixture left keeps its (empty) client array; only a live client counts.
+        D2ActiveRoomStrc* room = roomEx->pRoom; if (!room || room->nNumClients) continue;
         D2UnitStrc* anchor = nullptr;
-        for (D2UnitStrc* u = room->pUnitFirst; u; u = u->pRoomNext) if (u->dwUnitType == UNIT_MONSTER) { anchor = u; break; }
+        for (D2UnitStrc* u = room->pUnitFirst; u; u = u->pRoomNext)
+            if (u->dwUnitType == UNIT_MONSTER && (g_sessionAnchorClass == 0xFFFFFFFF || (uint32_t)u->dwClassId == g_sessionAnchorClass)) { anchor = u; break; }
         if (!anchor || !anchor->pDynamicPath) continue;
         const int ax = anchor->pDynamicPath->tGameCoords.wPosX, ay = anchor->pDynamicPath->tGameCoords.wPosY;
         for (int radius = 2; radius <= 12; radius++) for (int dy = -radius; dy <= radius; dy++) for (int dx = -radius; dx <= radius; dx++) {
@@ -771,7 +816,7 @@ EMSCRIPTEN_KEEPALIVE int d2_aitarget_attach() {
             if (x < room->tCoords.nSubtileX + 2 || x >= room->tCoords.nSubtileX + room->tCoords.nSubtileWidth - 2 ||
                 y < room->tCoords.nSubtileY + 2 || y >= room->tCoords.nSubtileY + room->tCoords.nSubtileHeight - 2) continue;
             if (COLLISION_CheckMaskWithSize(room, x, y, 2, 0xFFFF)) continue;
-            D2UnitStrc* player = SUNIT_AllocUnitData(UNIT_PLAYER, 0, x, y, g_game, room, 1, PLRMODE_NEUTRAL, 0);
+            D2UnitStrc* player = SUNIT_AllocUnitData(UNIT_PLAYER, g_sessionPlayerClass, x, y, g_game, room, 1, PLRMODE_NEUTRAL, 0);
             if (!player) continue;
             STATLIST_SetUnitStat(player, STAT_HITPOINTS, 50 << 8, 0); STATLIST_SetUnitStat(player, STAT_MAXHP, 50 << 8, 0);
             STATLIST_SetUnitStat(player, STAT_LEVEL, 1, 0); STATLIST_SetUnitStat(player, STAT_ATTACKRATE, 100, 0);
@@ -880,8 +925,9 @@ static void updateSessionSnapshot() {
 
 // First browser-facing lifetime API.  It deliberately builds on the same game, level and player
 // fixture used by the retail-diff scenarios, but keeps them alive across commands and ticks.
-EMSCRIPTEN_KEEPALIVE int d2_session_create(uint32_t seed, int difficulty, int act, int levelId) {
-    if (difficulty < 0 || difficulty > 2 || act < 0 || act > 4 || levelId < 0) return 0;
+static int d2_session_create_for_class(uint32_t seed, int difficulty, int act, int levelId, int playerClass, bool startItems = true) {
+    if (difficulty < 0 || difficulty > 2 || act < 0 || act > 4 || levelId < 0 || playerClass < 0 || playerClass >= 7) return 0;
+    g_sessionPlayerClass = playerClass;
     d2_monspawn_reset(); g_sessionLive = false; g_sessionMovePending = false;
     memset(&g_sessionAttack, 0, sizeof g_sessionAttack); memset(&g_sessionProgress, 0, sizeof g_sessionProgress);
     memset(&g_sessionAdvancement, 0, sizeof g_sessionAdvancement); g_sessionAdvancementSkillId = SKILL_MAGICARROW;
@@ -918,9 +964,30 @@ EMSCRIPTEN_KEEPALIVE int d2_session_create(uint32_t seed, int difficulty, int ac
     }
     // The headless save callback creates a bare unit. Retail new-character creation immediately
     // follows it with the CharStats start-item callback (javelin/shield/potions/scrolls for Amazon).
-    PLAYER_CreateStartItemsFromCharStatsTxt(g_targetPlayer, g_game, nullptr);
+    if (startItems) PLAYER_CreateStartItemsFromCharStatsTxt(g_targetPlayer, g_game, nullptr);
     g_sessionInitialExperience = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_EXPERIENCE, 0);
     g_sessionLive = true; updateSessionSnapshot(); return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_create(uint32_t seed, int difficulty, int act, int levelId) {
+    return d2_session_create_for_class(seed, difficulty, act, levelId, 0);
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_session_create_class(uint32_t seed, int difficulty, int act, int levelId, int playerClass) {
+    return d2_session_create_for_class(seed, difficulty, act, levelId, playerClass);
+}
+
+// The retail capture's player fixture is a bare allocated unit with no starting kit; unit GUIDs
+// and the game item seed the quest-drop oracle records depend on that. Mirror it exactly.
+EMSCRIPTEN_KEEPALIVE int d2_session_create_raw(uint32_t seed, int difficulty, int act, int levelId) {
+    return d2_session_create_for_class(seed, difficulty, act, levelId, 0, false);
+}
+// The same bare fixture placed beside the first monster of the given class (a town NPC).
+EMSCRIPTEN_KEEPALIVE int d2_session_create_raw_near(uint32_t seed, int difficulty, int act, int levelId, uint32_t anchorClass) {
+    g_sessionAnchorClass = anchorClass;
+    const int ok = d2_session_create_for_class(seed, difficulty, act, levelId, 0, false);
+    g_sessionAnchorClass = 0xFFFFFFFF;
+    return ok;
 }
 
 EMSCRIPTEN_KEEPALIVE int d2_session_command_move(int targetX, int targetY) {
@@ -1029,6 +1096,167 @@ static void updateSessionNpcInteraction(uint32_t npcId) {
 
 // Recovered UNIT_MONSTER branch of PlrMsg's interaction dispatcher: the click is accepted at
 // six subtiles, then D2Game owns the player/NPC interaction records and quest speech activation.
+extern "C" void D2WEB_ResetPacketStream();
+extern "C" const uint8_t* D2WEB_PacketStream(uint32_t* pLength, uint32_t* pPackets);
+static uint32_t g_sessionPacketStreamLength, g_sessionPacketStreamPackets;
+// Client packet 0x13 (interact with entity) through the recovered handler, exactly as a client
+// sends it: within 6 subtiles the NPC activates immediately and its reply is queued.
+EMSCRIPTEN_KEEPALIVE int d2_session_command_npc_packet(uint32_t npcId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return -1;
+    D2WEB_ResetPacketStream();
+    uint8_t packet[9] = { 0x13 };
+    const uint32_t type = UNIT_MONSTER; memcpy(packet + 1, &type, 4); memcpy(packet + 5, &npcId, 4);
+    const int32_t result = D2GAME_PACKETCALLBACK_Rcv0x13_InteractWithEntity_6FC84D70(g_game, g_targetPlayer, packet, sizeof packet);
+    D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets);
+    updateSessionSnapshot();
+    return result;
+}
+// Client packet 0x31 {npcGUID, messageId} through the recovered handler: the player picked one
+// of the dialogue's messages (quest starts, intro acknowledgements).
+EMSCRIPTEN_KEEPALIVE int d2_session_command_npc_response_packet(uint32_t npcId, uint32_t messageId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || messageId > UINT16_MAX) return -1;
+    D2WEB_ResetPacketStream();
+    uint8_t packet[9] = { 0x31 };
+    const uint16_t message = (uint16_t)messageId;
+    memcpy(packet + 1, &npcId, 4); memcpy(packet + 5, &message, 2);
+    const int32_t result = D2GAME_PACKETCALLBACK_Rcv0x31_QuestMessage_6FC86AB0(g_game, g_targetPlayer, packet, sizeof packet);
+    D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets);
+    updateSessionSnapshot();
+    return result;
+}
+// The retail capture visits a town's NPCs with one bare fixture per monster class, in room
+// order, leaving each previous player unit in the world: unit GUIDs and the game item seed the
+// vendor stock depends on follow that sequence.  Replay it: detach the current fixture (room
+// client list cleared, unit left behind) and allocate the next one beside the given class.
+EMSCRIPTEN_KEEPALIVE int d2_session_reattach_near(uint32_t anchorClass) {
+    if (!g_sessionLive || !g_game) return 0;
+    // The fixture joined its room and the adjacent ones through the recovered client-room path;
+    // leave them the same way so the next room scan sees them client-free.
+    if (g_targetClient) sub_6FC33020(g_targetClient, nullptr);
+    detachTargetFixture();
+    g_sessionAnchorClass = anchorClass;
+    const int ok = d2_aitarget_attach();
+    g_sessionAnchorClass = 0xFFFFFFFF;
+    updateSessionSnapshot();
+    return ok;
+}
+// Distinct monster classes of the session level in room order -- the capture's probe order.
+static std::vector<uint32_t> g_sessionTownClasses;
+EMSCRIPTEN_KEEPALIVE const uint32_t* d2_session_town_classes(uint32_t* count) {
+    g_sessionTownClasses.clear();
+    if (g_sessionLive && g_lastLevel)
+        for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
+            if (!roomEx->pRoom) continue;
+            for (D2UnitStrc* u = roomEx->pRoom->pUnitFirst; u; u = u->pRoomNext)
+                if (u->dwUnitType == UNIT_MONSTER && std::find(g_sessionTownClasses.begin(), g_sessionTownClasses.end(), (uint32_t)u->dwClassId) == g_sessionTownClasses.end())
+                    g_sessionTownClasses.push_back((uint32_t)u->dwClassId);
+        }
+    if (count) *count = (uint32_t)g_sessionTownClasses.size();
+    return g_sessionTownClasses.data();
+}
+// Client packet 0x38 {action, npcGUID, -1} through the recovered handler (trade/gamble/hire).
+EMSCRIPTEN_KEEPALIVE int d2_session_command_npc_action_packet(uint32_t npcId, uint32_t action) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return -1;
+    D2WEB_ResetPacketStream();
+    D2GSPacketClt38 packet = {};
+    packet.nHeader = 0x38; packet.nAction = action; packet.nNpcGUID = (int32_t)npcId; packet.nItemGUID = -1;
+    const int32_t result = D2GAME_PACKETCALLBACK_Rcv0x38_EntityAction_6FC86CB0(g_game, g_targetPlayer, &packet, sizeof packet);
+    g_sessionVendor.action = action; g_sessionVendor.npcId = npcId;   // the transaction commands key on the open action
+    D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets);
+    updateSessionSnapshot();
+    return result;
+}
+// A unit's inventory items in list order with their ITEMS_Serialize bitstreams (vendor stock).
+struct D2SessionInventoryItem {
+    uint32_t itemId, classId, quality, ilvl, seedLo, seedHi, bitBytes;
+    uint8_t bits[80];
+};
+static_assert(sizeof(D2SessionInventoryItem) == 108);
+static std::vector<D2SessionInventoryItem> g_sessionInventoryItems;
+EMSCRIPTEN_KEEPALIVE const D2SessionInventoryItem* d2_session_inventory_items(uint32_t unitType, uint32_t unitId, uint32_t* count) {
+    g_sessionInventoryItems.clear();
+    D2UnitStrc* unit = (g_sessionLive && g_game) ? SUNIT_GetServerUnit(g_game, (int32_t)unitType, (int32_t)unitId) : nullptr;
+    if (unit && unit->pInventory)
+        for (D2UnitStrc* item = INVENTORY_GetFirstItem(unit->pInventory); item; item = INVENTORY_GetNextItem(item)) {
+            if (!INVENTORY_UnitIsItem(item)) continue;
+            D2SessionInventoryItem out = {};
+            out.itemId = item->dwUnitId; out.classId = item->dwClassId;
+            out.quality = (uint32_t)ITEMS_GetItemQuality(item); out.ilvl = (uint32_t)ITEMS_GetItemLevel(item);
+            out.seedLo = item->pSeed.nLowSeed; out.seedHi = item->pSeed.nHighSeed;
+            uint8_t bits[512] = {};
+            out.bitBytes = (uint32_t)ITEMS_SerializeItemToBitstream(item, bits, sizeof bits, 1, 1, 0);
+            memcpy(out.bits, bits, out.bitBytes < sizeof out.bits ? out.bitBytes : sizeof out.bits);
+            g_sessionInventoryItems.push_back(out);
+        }
+    if (count) *count = (uint32_t)g_sessionInventoryItems.size();
+    return g_sessionInventoryItems.data();
+}
+// Every item unit of the game with a GUID above minId, in GUID order (the capture walks
+// pUnitList[3] the same way): what a gamble request generated.  Also reports the highest GUID.
+EMSCRIPTEN_KEEPALIVE const D2SessionInventoryItem* d2_session_item_units_above(uint32_t minId, uint32_t* count, uint32_t* maxId) {
+    g_sessionInventoryItems.clear();
+    std::vector<D2UnitStrc*> units; uint32_t highest = 0;
+    if (g_sessionLive && g_game)
+        for (int b = 0; b < 128; ++b)
+            for (D2UnitStrc* u = g_game->pUnitList[GAME_RemapUnitTypeToListIndex(UNIT_ITEM)][b]; u; u = u->pListNext) {
+                if ((uint32_t)u->dwUnitId > highest) highest = (uint32_t)u->dwUnitId;
+                if ((uint32_t)u->dwUnitId > minId) units.push_back(u);
+            }
+    std::sort(units.begin(), units.end(), [](D2UnitStrc* a, D2UnitStrc* b) { return (uint32_t)a->dwUnitId < (uint32_t)b->dwUnitId; });
+    for (D2UnitStrc* item : units) {
+        D2SessionInventoryItem out = {};
+        out.itemId = item->dwUnitId; out.classId = item->dwClassId;
+        out.quality = (uint32_t)ITEMS_GetItemQuality(item); out.ilvl = (uint32_t)ITEMS_GetItemLevel(item);
+        out.seedLo = item->pSeed.nLowSeed; out.seedHi = item->pSeed.nHighSeed;
+        uint8_t bits[512] = {};
+        out.bitBytes = (uint32_t)ITEMS_SerializeItemToBitstream(item, bits, sizeof bits, 1, 1, 0);
+        memcpy(out.bits, bits, out.bitBytes < sizeof out.bits ? out.bitBytes : sizeof out.bits);
+        g_sessionInventoryItems.push_back(out);
+    }
+    if (count) *count = (uint32_t)g_sessionInventoryItems.size();
+    if (maxId) *maxId = highest;
+    return g_sessionInventoryItems.data();
+}
+// The gamble selection table as loaded: count, then the selection ids, then the 100 limits.
+static std::vector<uint32_t> g_gambleTableDump;
+EMSCRIPTEN_KEEPALIVE const uint32_t* d2_gamble_table(uint32_t* count) {
+    g_gambleTableDump.clear();
+    D2GambleDataTbl* t = DATATBLS_GetGambleDataTables();
+    if (t) {
+        g_gambleTableDump.push_back((uint32_t)t->nGambleTxtRecordCount);
+        for (int i = 0; i < t->nGambleTxtRecordCount; ++i) g_gambleTableDump.push_back(t->pGambleSelection[i]);
+        for (int i = 0; i < 100; ++i) g_gambleTableDump.push_back((uint32_t)t->pGambleChooseLimit[i]);
+    }
+    if (count) *count = (uint32_t)g_gambleTableDump.size();
+    return g_gambleTableDump.data();
+}
+// Fixture stat (the capture gives its bare player gold the same way).
+EMSCRIPTEN_KEEPALIVE int d2_session_set_stat(uint32_t statId, int32_t value) {
+    if (!g_sessionLive || !g_targetPlayer) return 0;
+    STATLIST_SetUnitStat(g_targetPlayer, (int32_t)statId, value, 0);
+    return 1;
+}
+// Load the game's global quest record (the state earlier play left; packet 0x29 echoes it).
+EMSCRIPTEN_KEEPALIVE int d2_session_set_global_quest_record(const uint8_t* bytes) {
+    if (!g_sessionLive || !g_game || !g_game->pQuestControl || !g_game->pQuestControl->pQuestFlags || !bytes) return 0;
+    QUESTRECORD_CopyBufferToRecord(g_game->pQuestControl->pQuestFlags, const_cast<uint8_t*>(bytes), 96, 0);
+    return 1;
+}
+// The player's quest record of the game's difficulty, as packet 0x28 carries it.
+static uint8_t g_sessionQuestRecord[96];
+EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_quest_record() {
+    memset(g_sessionQuestRecord, 0, sizeof g_sessionQuestRecord);
+    if (g_sessionLive && g_game && g_targetPlayer)
+        QUESTRECORD_CopyRecordToBuffer(UNITS_GetPlayerData(g_targetPlayer)->pQuestData[g_game->nDifficulty], g_sessionQuestRecord, sizeof g_sessionQuestRecord, 0);
+    return g_sessionQuestRecord;
+}
+EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_packet_stream() { return D2WEB_PacketStream(nullptr, nullptr); }
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_packet_stream_length() { return g_sessionPacketStreamLength; }
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_packet_stream_packets() { return g_sessionPacketStreamPackets; }
+EMSCRIPTEN_KEEPALIVE int d2_session_player_x() { return g_targetPlayer && g_targetPlayer->pDynamicPath ? g_targetPlayer->pDynamicPath->tGameCoords.wPosX : -1; }
+EMSCRIPTEN_KEEPALIVE int d2_session_player_y() { return g_targetPlayer && g_targetPlayer->pDynamicPath ? g_targetPlayer->pDynamicPath->tGameCoords.wPosY : -1; }
+EMSCRIPTEN_KEEPALIVE int d2_session_player_id() { return g_targetPlayer ? (int)g_targetPlayer->dwUnitId : -1; }
+
 EMSCRIPTEN_KEEPALIVE int d2_session_command_npc(uint32_t npcId) {
     if (!g_sessionLive || !g_game || !g_targetPlayer) return 0;
     g_sessionNpcInteraction.commandTarget = npcId; g_sessionNpcInteraction.result = 0;
@@ -1219,6 +1447,7 @@ static int sessionVendorTransaction(uint32_t npcId, uint32_t itemId, bool buy) {
     out.playerItemsBefore = sessionInventoryItemCount(g_targetPlayer->pInventory);
     out.vendorItemsBefore = sessionInventoryItemCount(npc->pInventory);
     out.ownedBefore = ITEMS_IsInPlayersInventory(g_targetPlayer, item, 0) == 1;
+    D2WEB_ResetPacketStream();
     if (buy) {
         D2GSPacketClt32 packet = {};
         packet.nHeader = 0x32; packet.dwNpcGUID = (int32_t)npcId; packet.dwItemGUID = (int32_t)itemId;
@@ -1242,6 +1471,7 @@ static int sessionVendorTransaction(uint32_t npcId, uint32_t itemId, bool buy) {
     if (buy ? (out.playerItemsAfter > out.playerItemsBefore) : (out.playerItemsAfter < out.playerItemsBefore)) out.flags |= 4;
     if (out.ownedBefore) out.flags |= 8;
     if (out.ownedAfter) out.flags |= 16;
+    D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets);
     out.hash = sessionHashBytes(D2VEC_FNV_INIT, &out, offsetof(D2SessionVendorTransaction, hash));
     updateSessionVendorItems(npc);
     return (out.flags & 7) == 7;
@@ -1268,6 +1498,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_vendor_gamble(uint32_t npcId, uint32
     out.goldBefore = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_GOLD, 0);
     out.playerItemsBefore = sessionInventoryItemCount(g_targetPlayer->pInventory);
     out.vendorItemsBefore = sessionInventoryItemCount(gamble);
+    D2WEB_ResetPacketStream();
     D2GSPacketClt32 packet = {};
     packet.nHeader = 0x32; packet.dwNpcGUID = (int32_t)npcId; packet.dwItemGUID = (int32_t)itemId;
     packet.nTransactionType = D2C_TransactionTypes::TRANSACTIONTYPE_GAMBLE;
@@ -1283,6 +1514,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_vendor_gamble(uint32_t npcId, uint32
     if (out.goldAfter == out.goldBefore - out.packetCost) out.flags |= 2;
     if (out.playerItemsAfter > out.playerItemsBefore) out.flags |= 4;
     if (out.ownedAfter) out.flags |= 16;
+    D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets);
     out.hash = sessionHashBytes(D2VEC_FNV_INIT, &out, offsetof(D2SessionVendorTransaction, hash));
     updateSessionVendorItems(npc);
     return (out.flags & 23) == 23;
@@ -1356,6 +1588,173 @@ EMSCRIPTEN_KEEPALIVE const D2SessionAct1Quest1* d2_session_act1q1() {
     out.hash = sessionHashBytes(D2VEC_FNV_INIT, &out, offsetof(D2SessionAct1Quest1, hash));
     return &out;
 }
+
+EMSCRIPTEN_KEEPALIVE const D2SessionAct1Quest6* d2_session_act1q6() {
+    memset(&g_sessionAct1Quest6, 0, sizeof g_sessionAct1Quest6);
+    D2SessionAct1Quest6& out = g_sessionAct1Quest6;
+    out.version = 1; out.size = sizeof out; out.level = g_currentLevel; out.andarielGuid = -1;
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return &out;
+    D2QuestDataStrc* quest = QUESTS_GetQuestData(g_game, QUEST_A1Q6_ANDARIEL);
+    D2BitBufferStrc* flags = UNITS_GetPlayerData(g_targetPlayer)->pQuestData[g_game->nDifficulty];
+    if (quest) {
+        out.questState = quest->fState; out.lastState = quest->fLastState; out.questFlags = quest->dwFlags;
+        out.killCallbackActive = quest->pfCallback[QUESTEVENT_MONSTERKILLED] != nullptr;
+        if (D2Act1Quest6Strc* ex = static_cast<D2Act1Quest6Strc*>(quest->pQuestDataEx)) {
+            out.andarielGuid = ex->nAndarielGUID; out.timerInvocations = ex->nTimerInvocations;
+            out.andarielKilled = ex->bAndarielKilled;
+        }
+    }
+    for (uint32_t bit = 0; bit < 16; ++bit)
+        if (QUESTRECORD_GetQuestState(flags, QUESTSTATEFLAG_A1Q6, bit)) out.playerFlags |= 1u << bit;
+    out.globalPrimaryGoal = QUESTS_GetGlobalState(g_game, QUESTSTATEFLAG_A1Q6, QFLAG_PRIMARYGOALDONE);
+    out.primaryGoalDone = QUESTRECORD_GetQuestState(flags, QUESTSTATEFLAG_A1Q6, QFLAG_PRIMARYGOALDONE);
+    out.rewardPending = QUESTRECORD_GetQuestState(flags, QUESTSTATEFLAG_A1Q6, QFLAG_REWARDPENDING);
+    out.rewardGranted = QUESTRECORD_GetQuestState(flags, QUESTSTATEFLAG_A1Q6, QFLAG_REWARDGRANTED);
+    out.completedNow = QUESTRECORD_GetQuestState(flags, QUESTSTATEFLAG_A1Q6, QFLAG_COMPLETEDNOW);
+    out.hash = sessionHashBytes(D2VEC_FNV_INIT, &out, offsetof(D2SessionAct1Quest6, hash));
+    return &out;
+}
+
+// The retail A1Q6 oracle's first slice observes the callback with no player argument.  Keep
+// that exact surface here: progression/reward flags remain a subsequent player-record vector.
+EMSCRIPTEN_KEEPALIVE int d2_session_fixture_kill_andariel() {
+    if (!g_sessionLive || !g_game) return 0;
+    D2UnitStrc* andariel = nullptr;
+    for (const D2SessionUnit& unit : g_sessionUnits) {
+        if (unit.type == UNIT_MONSTER && unit.classId == 156) {
+            andariel = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)unit.id);
+            break;
+        }
+    }
+    D2QuestDataStrc* quest = QUESTS_GetQuestData(g_game, QUEST_A1Q6_ANDARIEL);
+    if (!andariel || !quest || !quest->pfCallback[QUESTEVENT_MONSTERKILLED]) return 0;
+    D2QuestArgStrc args = {}; args.pGame = g_game; args.nEvent = QUESTEVENT_MONSTERKILLED; args.pTarget = andariel;
+    quest->pfCallback[QUESTEVENT_MONSTERKILLED](quest, &args);
+    updateSessionSnapshot();
+    return 1;
+}
+
+// Retail's player-attached kill path sets A1Q6's reward-pending and primary-goal bits before
+// scheduling its timer. Keep it separately callable so the no-player global-state vector stays
+// an exact, independent oracle.
+EMSCRIPTEN_KEEPALIVE int d2_session_fixture_kill_andariel_for_player() {
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return 0;
+    D2UnitStrc* andariel = nullptr;
+    for (const D2SessionUnit& unit : g_sessionUnits) {
+        if (unit.type == UNIT_MONSTER && unit.classId == 156) {
+            andariel = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)unit.id);
+            break;
+        }
+    }
+    D2QuestDataStrc* quest = QUESTS_GetQuestData(g_game, QUEST_A1Q6_ANDARIEL);
+    if (!andariel || !quest || !quest->pfCallback[QUESTEVENT_MONSTERKILLED]) return 0;
+    D2QuestArgStrc args = {}; args.pGame = g_game; args.nEvent = QUESTEVENT_MONSTERKILLED;
+    args.pTarget = andariel; args.pPlayer = g_targetPlayer;
+    // Level population already leaves items in Catacombs 4; the quest drop is what the kill adds.
+    g_sessionAct1Quest6ItemsBefore.clear();
+    for (const D2SessionUnit& unit : g_sessionUnits) if (unit.type == UNIT_ITEM) g_sessionAct1Quest6ItemsBefore.push_back(unit.id);
+    quest->pfCallback[QUESTEVENT_MONSTERKILLED](quest, &args);
+    updateSessionSnapshot();
+    return 1;
+}
+
+// The player-attached kill rolls two chipped gems and one normal gem off the global quest seed
+// and drops them at Andariel.  Report every item the kill added, in the same room/unit order
+// and with the same ITEMS_Serialize bitstream the retail capture recorded.
+EMSCRIPTEN_KEEPALIVE const D2SessionAct1Quest6Drop* d2_session_a1q6_drops() {
+    g_sessionAct1Quest6Drops.clear();
+    if (!g_sessionLive || !g_game || !g_lastLevel) return nullptr;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
+        if (!roomEx->pRoom) continue;
+        for (D2UnitStrc* item = roomEx->pRoom->pUnitFirst; item; item = item->pRoomNext) {
+            if (item->dwUnitType != UNIT_ITEM) continue;
+            if (std::find(g_sessionAct1Quest6ItemsBefore.begin(), g_sessionAct1Quest6ItemsBefore.end(), (uint32_t)item->dwUnitId) != g_sessionAct1Quest6ItemsBefore.end()) continue;
+            D2SessionAct1Quest6Drop out = {};
+            out.itemId = item->dwUnitId; out.classId = item->dwClassId;
+            out.quality = (uint32_t)ITEMS_GetItemQuality(item); out.ilvl = (uint32_t)ITEMS_GetItemLevel(item);
+            if (item->pStaticPath) { out.x = (uint16_t)item->pStaticPath->tGameCoords.nX; out.y = (uint16_t)item->pStaticPath->tGameCoords.nY; }
+            out.seedLo = item->pSeed.nLowSeed; out.seedHi = item->pSeed.nHighSeed;
+            uint8_t bits[512] = {};
+            out.bitBytes = (uint32_t)ITEMS_SerializeItemToBitstream(item, bits, sizeof bits, 1, 1, 0);
+            memcpy(out.bits, bits, out.bitBytes < sizeof out.bits ? out.bitBytes : sizeof out.bits);
+            g_sessionAct1Quest6Drops.push_back(out);
+        }
+    }
+    for (size_t i = 0; i < g_sessionAct1Quest6Drops.size(); ++i) {
+        D2SessionAct1Quest6Drop& out = g_sessionAct1Quest6Drops[i];
+        out.index = (uint32_t)i; out.count = (uint32_t)g_sessionAct1Quest6Drops.size();
+        // The retail record's hash covers its packed 76-byte prefix; recompute it over that layout.
+        uint8_t packed[76] = {};
+        uint32_t seed = g_game->dwInitSeed; uint16_t level = (uint16_t)g_currentLevel;
+        uint8_t difficulty = g_game->nDifficulty;
+        memcpy(packed + 0, &seed, 4); packed[4] = difficulty; packed[5] = 0; memcpy(packed + 6, &level, 2);
+        memcpy(packed + 8, &out.itemId, 4); memcpy(packed + 12, &out.classId, 4); memcpy(packed + 16, &out.quality, 4); memcpy(packed + 20, &out.ilvl, 4);
+        uint16_t x = (uint16_t)out.x, y = (uint16_t)out.y, index = (uint16_t)out.index, count = (uint16_t)out.count;
+        memcpy(packed + 24, &x, 2); memcpy(packed + 26, &y, 2); memcpy(packed + 28, &index, 2); memcpy(packed + 30, &count, 2);
+        memcpy(packed + 32, &out.seedLo, 4); memcpy(packed + 36, &out.seedHi, 4); memcpy(packed + 40, &out.bitBytes, 4);
+        memcpy(packed + 44, out.bits, 32);
+        out.hash = sessionHashBytes(D2VEC_FNV_INIT, packed, sizeof packed);
+    }
+    return g_sessionAct1Quest6Drops.data();
+}
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_a1q6_drop_count() { return (uint32_t)g_sessionAct1Quest6Drops.size(); }
+
+// Replay the live scheduled A1Q6 timer, rather than a browser-owned countdown. At invocation
+// 10 its recovered callback opens the normal class-59 Catacombs return portal for the player.
+EMSCRIPTEN_KEEPALIVE int d2_session_fixture_a1q6_timer_to_portal() {
+    memset(&g_sessionAct1Quest6Timer, 0, sizeof g_sessionAct1Quest6Timer);
+    D2SessionAct1Quest6Timer& out = g_sessionAct1Quest6Timer;
+    out.version = 1; out.size = sizeof out; out.level = g_currentLevel;
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_game->pQuestControl) return 0;
+    D2QuestTimerStrc* timer = g_game->pQuestControl->pTimer;
+    D2QuestDataStrc* quest = QUESTS_GetQuestData(g_game, QUEST_A1Q6_ANDARIEL);
+    if (!timer || !quest || timer->pQuest != quest || !timer->pfUpdate) return 0;
+    D2Act1Quest6Strc* ex = static_cast<D2Act1Quest6Strc*>(quest->pQuestDataEx);
+    if (!ex || ex->nTimerInvocations != 1) return 0;
+    for (int i = 0; i < 9; ++i) timer->pfUpdate(g_game, quest);
+    out.andarielId = (uint32_t)ex->nAndarielGUID;
+    out.timerInvocations = ex->nTimerInvocations;
+    out.timerStillScheduled = g_game->pQuestControl->pTimer != nullptr;
+    updateSessionWorld();
+    for (const D2SessionObjectPresentation& object : g_sessionObjectPresentations) {
+        if (object.classId != 59) continue;
+        ++out.portalCount; out.portalId = object.id; out.portalClass = object.classId;
+    }
+    out.hash = sessionHashBytes(D2VEC_FNV_INIT, &out, offsetof(D2SessionAct1Quest6Timer, hash));
+    return out.timerInvocations == 10 && out.portalCount == 1;
+}
+EMSCRIPTEN_KEEPALIVE const D2SessionAct1Quest6Timer* d2_session_act1q6_timer() { return &g_sessionAct1Quest6Timer; }
+
+// Invocations 11-12 of the same live timer: retail's status cycle sets lastState 3, clears the
+// quest flag byte, composes the player's 0x5D status packet, and releases the timer (return 1).
+// The callback is driven directly, as the capture does, so the return value is the release.
+EMSCRIPTEN_KEEPALIVE int d2_session_fixture_a1q6_timer_to_completion() {
+    memset(&g_sessionAct1Quest6Complete, 0, sizeof g_sessionAct1Quest6Complete);
+    D2SessionAct1Quest6Complete& out = g_sessionAct1Quest6Complete;
+    out.version = 1; out.size = sizeof out; out.level = g_currentLevel;
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_game->pQuestControl) return 0;
+    D2QuestTimerStrc* timer = g_game->pQuestControl->pTimer;
+    D2QuestDataStrc* quest = QUESTS_GetQuestData(g_game, QUEST_A1Q6_ANDARIEL);
+    if (!timer || !quest || timer->pQuest != quest || !timer->pfUpdate) return 0;
+    D2Act1Quest6Strc* ex = static_cast<D2Act1Quest6Strc*>(quest->pQuestDataEx);
+    if (!ex || ex->nTimerInvocations != 10) return 0;
+    D2WEB_ResetLastQuestStatusPacket();
+    timer->pfUpdate(g_game, quest);
+    out.timerReleased = timer->pfUpdate(g_game, quest);
+    out.timerInvocations = ex->nTimerInvocations;
+    out.lastState = quest->fLastState; out.state = quest->fState; out.questFlagsLow = quest->dwFlags & 0xFF;
+    D2BitBufferStrc* flags = UNITS_GetPlayerData(g_targetPlayer)->pQuestData[g_game->nDifficulty];
+    for (uint32_t bit = 0; bit < 16; ++bit)
+        if (QUESTRECORD_GetQuestState(flags, QUESTSTATEFLAG_A1Q6, bit)) out.playerFlags |= 1u << bit;
+    D2GSPacketSrv5D packet = {};
+    if (const int count = D2WEB_CopyLastQuestStatusPacket(&packet)) {
+        out.packetHeader = packet.nHeader; out.packetQuestId = packet.nQuestId; out.packetFlags = packet.nFlags;
+        out.packetState = packet.nState; out.packetField4 = packet.field_4; out.packetBytes = count * sizeof packet;
+    }
+    out.hash = sessionHashBytes(D2VEC_FNV_INIT, &out, offsetof(D2SessionAct1Quest6Complete, hash));
+    return out.timerInvocations == 12 && out.packetHeader == 0x5D;
+}
+EMSCRIPTEN_KEEPALIVE const D2SessionAct1Quest6Complete* d2_session_act1q6_complete() { return &g_sessionAct1Quest6Complete; }
 
 EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath || frames < 0) return 0;

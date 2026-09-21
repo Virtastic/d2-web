@@ -7,6 +7,8 @@
 #include <D2StatList.h>
 #include <Calc.h>
 #include <Storm.h>
+#include <cstddef>
+extern "C" void d2web_msvc_qsort(void* base, size_t num, size_t width, int (*cmp)(const void*, const void*));   // d2-web: compat/msvc_qsort.cpp
 
 //D2Common.0x6FD550E0
 int __fastcall DATATBLS_MapItemsTxtKeywordToNumber(char* szKey)
@@ -1591,7 +1593,7 @@ void __fastcall DATATBLS_LoadItemStatCostTxt(HD2ARCHIVE hArchive)
 	}
 	sgptDataTables->nStatsWithDescFunc = nStatsWithDescFunc;
 
-	qsort(pStatsWithDescFunc, nStatsWithDescFunc, sizeof(D2ItemStatCostDescStrc), DATATBLS_CompareItemStatCostDescs);
+	d2web_msvc_qsort(pStatsWithDescFunc, nStatsWithDescFunc, sizeof(D2ItemStatCostDescStrc), DATATBLS_CompareItemStatCostDescs);   // d2-web: retail's CRT sort order for equal keys
 
 	sgptDataTables->pStatsWithDescFunc = (uint16_t*)D2_ALLOC_POOL(nullptr, sizeof(uint16_t) * sgptDataTables->nStatsWithDescFunc);
 	for (int i = 0; i < sgptDataTables->nStatsWithDescFunc; ++i)
@@ -1696,7 +1698,7 @@ void __fastcall DATATBLS_LoadGambleTxt(HD2ARCHIVE hArchive)
 			pGambleTxt[i].nItemId = nItemId;
 			pGambleTxt[i].nLevel = sgptDataTables->pItemDataTables.pItemsTxt[nItemId].nLevel;
 		}
-		qsort(pGambleTxt, sgptDataTables->pGambleDataTables.nGambleTxtRecordCount, sizeof(D2GambleTxt), DATATBLS_CompareGambleTxtRecords);
+		d2web_msvc_qsort(pGambleTxt, sgptDataTables->pGambleDataTables.nGambleTxtRecordCount, sizeof(D2GambleTxt), DATATBLS_CompareGambleTxtRecords);   // d2-web: retail's CRT sort order for equal keys (kind 20 gamble vectors)
 	}
 	else
 	{

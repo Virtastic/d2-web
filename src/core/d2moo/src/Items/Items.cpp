@@ -2531,7 +2531,7 @@ int __fastcall ITEMS_CalculateTransactionCost(D2UnitStrc* pPlayer, D2UnitStrc* p
 			{
 				nStack = pItemsTxtRecord->dwMinStack + pItemsTxtRecord->dwMaxStack;
 
-				v27 = ((signed int)nStack - HIDWORD(nStack)) >> 1;
+				v27 = (int)nStack / 2;   // d2-web: the decompiler HIDWORD/BYTE4 forms are x86 signed-division idioms (cdq; sub; sar); kind 21 phase-2 vectors (s84) price gambles against retail
 				if (v27 < 1)
 				{
 					v27 = 1;
@@ -2543,7 +2543,7 @@ int __fastcall ITEMS_CalculateTransactionCost(D2UnitStrc* pPlayer, D2UnitStrc* p
 					if (pUberItemsTxtRecord)
 					{
 						v30 = 100 * (nLevel - pUberItemsTxtRecord->nLevel);
-						v23 = (((signed int)v30 - HIDWORD(v30)) >> 1) + 1;
+						v23 = (int)v30 / 2 + 1;   // d2-web: signed division (see v27)
 						if (v23 < 0)
 						{
 							v23 = 0;
@@ -2558,7 +2558,7 @@ int __fastcall ITEMS_CalculateTransactionCost(D2UnitStrc* pPlayer, D2UnitStrc* p
 					if (pUltraItemsTxtRecord)
 					{
 						v30 = 100 * (nLevel - pUltraItemsTxtRecord->nLevel);
-						v22 = (((BYTE4(v30) & 3) + (signed int)v30) >> 2) + 1;
+						v22 = (int)v30 / 4 + 1;   // d2-web: signed division (see v27)
 						if (v22 < 0)
 						{
 							v22 = 0;

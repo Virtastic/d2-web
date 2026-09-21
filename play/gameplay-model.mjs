@@ -77,6 +77,7 @@ export function normalizeSnapshot(value) {
     difficulty: Math.max(0, Math.trunc(finite(s.difficulty))),
     mode: Math.max(0, Math.trunc(finite(s.mode))),
     flags: Math.max(0, Math.trunc(finite(s.flags))) >>> 0,
+    playerClass: Math.min(6, Math.max(0, Math.trunc(finite(s.playerClass)))),
     monsterCount: Math.max(0, Math.trunc(finite(s.monsterCount))),
     hash: Math.max(0, Math.trunc(finite(s.hash))) >>> 0,
     area: String(s.area ?? (s.level ? `Level ${s.level}` : 'session unavailable')),
@@ -126,18 +127,21 @@ export function parseMonspawnFixtures(buffer) {
 
 export function parseMonspawnFixture(buffer) { return parseMonspawnFixtures(buffer)[0]; }
 
-// First playable row per act from the retail captures (retail 1.13c corpus).
+// One interactive retail LvlWarp fixture per act. These are the all-act exit corpus from s23,
+// so the browser defaults expose a real progression boundary rather than a random populated room.
 export const DEFAULT_SESSION_FIXTURES = Object.freeze([
   { seed: 1, difficulty: 0, act0: 0, level: 1 }, { seed: 1, difficulty: 0, act0: 1, level: 40 },
-  { seed: 1, difficulty: 0, act0: 2, level: 75 }, { seed: 1, difficulty: 0, act0: 3, level: 103 },
-  { seed: 1, difficulty: 0, act0: 4, level: 109 },
+  { seed: 1, difficulty: 0, act0: 2, level: 76 }, { seed: 1, difficulty: 0, act0: 3, level: 106 },
+  { seed: 1, difficulty: 0, act0: 4, level: 112 },
+  // Retail level 37's generated room corpus includes the Andariel quest boss (class 156).
+  { seed: 1, difficulty: 0, act0: 0, level: 37, label: "Act I · Andariel's Lair" },
 ].map(Object.freeze));
 
 export function parseSessionSnapshot(bytes) {
   const view = bytes instanceof DataView ? bytes : new DataView(bytes.buffer, bytes.byteOffset || 0, bytes.byteLength);
   if (view.byteLength < 68 || view.getUint32(0, true) !== 1 || view.getUint32(4, true) !== 68) throw new Error('unsupported session snapshot');
   return normalizeSnapshot({
-    seed: view.getUint32(8, true), tick: view.getUint32(12, true), level: view.getUint16(16, true),
+    seed: view.getUint32(8, true), tick: view.getUint32(12, true), level: view.getUint16(16, true), playerClass: view.getUint32(20, true),
     difficulty: view.getUint8(18), act: view.getUint8(19) + 1,
     player: { x: view.getInt32(28, true), y: view.getInt32(32, true), hp: view.getInt32(44, true), hpMax: view.getInt32(48, true) },
     mode: view.getUint32(52, true), flags: view.getUint32(56, true), monsterCount: view.getUint32(60, true), hash: view.getUint32(64, true),

@@ -2,13 +2,26 @@ import { decodeDatPalette } from './d2-formats.mjs';
 import { composeCofFrame, decodeCof, decodeDcc } from './unit-formats.mjs';
 
 const COMPONENT = ['HD', 'TR', 'LG', 'RA', 'LA', 'RH', 'LH', 'SH', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8'];
-const AMAZON_BASE = Object.freeze({ 0: 'BHM', 1: 'LIT', 2: 'LIT', 3: 'LIT', 4: 'LIT', 8: 'LIT', 9: 'LIT' });
+// CharStats.txt's fixed seven-row order.  The starting HTH appearance uses the
+// same unarmoured component codes for each player token; equipment composition
+// will replace these bases as the inventory surface becomes authoritative.
+const PLAYER_CLASS = Object.freeze([
+  { token: 'AM', name: 'Amazon' }, { token: 'SO', name: 'Sorceress' },
+  { token: 'NE', name: 'Necromancer' }, { token: 'PA', name: 'Paladin' },
+  { token: 'BA', name: 'Barbarian' }, { token: 'DZ', name: 'Druid' },
+  { token: 'AI', name: 'Assassin' },
+]);
+const START_BASE = Object.freeze({ 0: 'BHM', 1: 'LIT', 2: 'LIT', 3: 'LIT', 4: 'LIT', 8: 'LIT', 9: 'LIT' });
 const MODE = Object.freeze(['DT', 'NU', 'WL', 'RN', 'GH', 'TN', 'TW', 'A1', 'A2', 'BL', 'SC', 'TH', 'KK', 'S1', 'S2', 'S3', 'S4', 'DD']);
 const PALETTE = ['ACT1', 'ACT2', 'ACT3', 'ACT4', 'ACT5'];
 const DIR8 = [4,4,4,4,0,0,0,0,0,0,0,0,5,5,5,5,5,5,5,5,1,1,1,1,1,1,1,1,6,6,6,6,6,6,6,6,2,2,2,2,2,2,2,2,7,7,7,7,7,7,7,7,3,3,3,3,3,3,3,3,4,4,4,4];
 const DIR16 = [4,4,8,8,8,8,0,0,0,0,9,9,9,9,5,5,5,5,10,10,10,10,1,1,1,1,11,11,11,11,6,6,6,6,12,12,12,12,2,2,2,2,13,13,13,13,7,7,7,7,14,14,14,14,3,3,3,3,15,15,15,15,4,4];
 
 export function playerModeToken(mode) { return MODE[Number(mode)] || 'NU'; }
+
+export function playerClassInfo(playerClass) {
+  return PLAYER_CLASS[Math.min(PLAYER_CLASS.length - 1, Math.max(0, Math.trunc(Number(playerClass) || 0)))];
+}
 
 export function dccDirection(direction64, directions) {
   const direction = ((Math.trunc(Number(direction64) || 0) % 64) + 64) % 64;
@@ -39,20 +52,23 @@ export function indexedToRgba(indexed, opaque, palette) {
   return rgba;
 }
 
-export function loadAmazonAnimation(read, mode, { headOnly = false, direction = null } = {}) {
+export function loadPlayerAnimation(read, playerClass, mode, { headOnly = false, direction = null } = {}) {
+  const player = playerClassInfo(playerClass);
   const token = playerModeToken(mode);
-  const cof = decodeCof(read(`data\\global\\CHARS\\AM\\COF\\AM${token}HTH.COF`));
+  const cof = decodeCof(read(`data\\global\\CHARS\\${player.token}\\COF\\${player.token}${token}HTH.COF`));
   const components = new Map();
   for (const layer of cof.layerRecords) {
     if (headOnly && layer.component !== 0) continue;
-    const component = COMPONENT[layer.component], base = AMAZON_BASE[layer.component];
+    const component = COMPONENT[layer.component], base = START_BASE[layer.component];
     if (!component || !base) continue;
-    const path = `data\\global\\CHARS\\AM\\${component}\\AM${component}${base}${token}${layer.weaponClass.toUpperCase()}.DCC`;
+    const path = `data\\global\\CHARS\\${player.token}\\${component}\\${player.token}${component}${base}${token}${layer.weaponClass.toUpperCase()}.DCC`;
     components.set(layer.component, decodeDcc(read(path), direction == null ? {} : { directions: [direction] }));
   }
-  if (!components.has(0)) throw new Error(`Amazon ${token}/HTH animation omitted its retail head component`);
-  return { token, cof, components };
+  if (!components.has(0)) throw new Error(`${player.name} ${token}/HTH animation omitted its retail head component`);
+  return { playerClass: PLAYER_CLASS.indexOf(player), classToken: player.token, token, cof, components };
 }
+
+export function loadAmazonAnimation(read, mode, options = {}) { return loadPlayerAnimation(read, 0, mode, options); }
 
 export function selectAmazonFrame(animation, state = {}) {
   const direction = dccDirection(state.direction, animation.cof.directions);
@@ -60,13 +76,15 @@ export function selectAmazonFrame(animation, state = {}) {
   return { direction, frame, composed: composeCofFrame(animation.cof, direction, frame, animation.components) };
 }
 
+export const selectPlayerFrame = selectAmazonFrame;
+
 /** Synchronous retail player sprite provider; decoded modes and rasterized frames are cached. */
-export function createAmazonPlayerRenderer(read, documentObject = globalThis.document) {
+export function createPlayerRenderer(read, documentObject = globalThis.document) {
   const animations = new Map(), palettes = new Map(), rasters = new Map();
   let lastEvidence = null;
-  function animation(mode, direction64) {
-    const token = playerModeToken(mode), direction = dccDirection(direction64, 16), key = `${token}:${direction}`;
-    let value = animations.get(key); if (!value) { value = loadAmazonAnimation(read, mode, { direction }); animations.set(key, value); }
+  function animation(playerClass, mode, direction64) {
+    const player = playerClassInfo(playerClass), token = playerModeToken(mode), direction = dccDirection(direction64, 16), key = `${player.token}:${token}:${direction}`;
+    let value = animations.get(key); if (!value) { value = loadPlayerAnimation(read, playerClass, mode, { direction }); animations.set(key, value); }
     return value;
   }
   function palette(act) {
@@ -77,9 +95,9 @@ export function createAmazonPlayerRenderer(read, documentObject = globalThis.doc
   }
   return {
     draw(ctx, x, y, state = {}) {
-      const activeAnimation = animation(state.mode, state.direction);
+      const activeAnimation = animation(state.playerClass, state.mode, state.direction);
       const selected = selectAmazonFrame(activeAnimation, state), pal = palette(state.act);
-      const key = `${playerModeToken(state.mode)}:${selected.direction}:${selected.frame}:${pal.act0}`;
+      const key = `${activeAnimation.classToken}:${playerModeToken(state.mode)}:${selected.direction}:${selected.frame}:${pal.act0}`;
       let canvas = rasters.get(key);
       if (!canvas) {
         const { composed } = selected;
@@ -92,7 +110,7 @@ export function createAmazonPlayerRenderer(read, documentObject = globalThis.doc
       }
       const { composed } = selected;
       if (canvas.width && canvas.height) ctx.drawImage(canvas, Math.round(x + composed.xOffset), Math.round(y + composed.yOffset));
-      lastEvidence = { token: playerModeToken(state.mode), direction: selected.direction, frame: selected.frame,
+      lastEvidence = { playerClass: activeAnimation.playerClass, classToken: activeAnimation.classToken, token: playerModeToken(state.mode), direction: selected.direction, frame: selected.frame,
         width: composed.width, height: composed.height, opaque: composed.opaque.reduce((a, value) => a + value, 0),
         components: activeAnimation.components.size };
       return lastEvidence;
@@ -102,3 +120,6 @@ export function createAmazonPlayerRenderer(read, documentObject = globalThis.doc
     get lastEvidence() { return lastEvidence && { ...lastEvidence }; },
   };
 }
+
+/** Compatibility entry point for existing Amazon-only callers and evidence. */
+export function createAmazonPlayerRenderer(read, documentObject = globalThis.document) { return createPlayerRenderer(read, documentObject); }

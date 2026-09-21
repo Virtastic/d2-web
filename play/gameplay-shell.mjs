@@ -2,18 +2,20 @@ import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, hudLines, normalizeSna
 import { createMpqAssetReader } from './assets/mpq-assets.mjs';
 import { createActTileAtlas, decodeActTileAssets } from './assets/retail-tile-view.mjs';
 import { createDs1Canvas, loadActPresetComposition } from './assets/ds1-compositor.mjs';
-import { createAmazonPlayerRenderer } from './assets/unit-renderer.mjs';
+import { createPlayerRenderer, playerClassInfo } from './assets/unit-renderer.mjs';
 import { createMonsterRenderer, parseMonsterAnimations } from './assets/monster-renderer.mjs';
 import { createObjectRenderer, parseObjectPresentations } from './assets/object-renderer.mjs';
 import { createItemRenderer, parseItemPresentations } from './assets/item-renderer.mjs';
 import { createControlPanelRenderer } from './assets/control-panel.mjs';
 import { createInventoryPanelRenderer } from './assets/inventory-panel.mjs';
 import { createBeltRenderer } from './assets/belt-renderer.mjs';
+import { createActMusicPlayer } from './assets/act-music.mjs';
 
 const canvas = document.querySelector('#game');
 const hud = document.querySelector('#hud');
 const status = document.querySelector('#session-status');
 const actSelect = document.querySelector('#act-select');
+const classSelect = document.querySelector('#class-select');
 const ctx = canvas.getContext('2d', { alpha: false });
 const input = new CommandInput();
 let snapshot = normalizeSnapshot(null);
@@ -30,6 +32,7 @@ let itemRenderer = null;
 let inventoryPanelRenderer = null, inventoryPanelEvidence = null;
 let beltRenderer = null, beltEvidence = null;
 let controlPanelRenderer = null, controlPanelEvidence = null;
+let actMusic = null, musicError = '';
 let selectedSkill = 0, lastSkillCommand = null;
 const PLAY_MODE = new URLSearchParams(location.search).get('play') === '1';
 const TERRAIN_ENABLED = new URLSearchParams(location.search).get('terrain') !== '0';
@@ -61,7 +64,7 @@ async function loadActTileView(act0) {
 function sessionAdapter() {
   if (window.Module?._d2_session_create && window.Module?._d2_session_snapshot) {
     return {
-      create(f) { return Module.ccall('d2_session_create', 'number', ['number', 'number', 'number', 'number'], [f.seed, f.difficulty, f.act0, f.level]); },
+      create(f, playerClass = 0) { return Module.ccall('d2_session_create_class', 'number', ['number', 'number', 'number', 'number', 'number'], [f.seed, f.difficulty, f.act0, f.level, playerClass]); },
       move(x, y) { return Module.ccall('d2_session_command_move', 'number', ['number', 'number'], [x, y]); },
       attack(targetId) { return Module.ccall('d2_session_command_primary_attack', 'number', ['number'], [targetId]); },
       throwSkill(targetId) { return Module.ccall('d2_session_command_throw', 'number', ['number'], [targetId]); },
@@ -141,22 +144,28 @@ async function bootstrapSession() {
   try {
     fixtures = DEFAULT_SESSION_FIXTURES;
     if (!fixtures.length) throw new Error('monspawn vectors contain no playable fixtures');
-    actSelect.replaceChildren(...fixtures.map((fixture) => Object.assign(document.createElement('option'), {
-      value: String(fixture.act0), textContent: `Act ${fixture.act0 + 1} · Level ${fixture.level}`,
+    actSelect.replaceChildren(...fixtures.map((fixture, index) => Object.assign(document.createElement('option'), {
+      value: String(index), textContent: fixture.label || `Act ${fixture.act0 + 1} · Level ${fixture.level}`,
     })));
     actSelect.disabled = false;
+    classSelect.replaceChildren(...Array.from({ length: 7 }, (_, playerClass) => Object.assign(document.createElement('option'), {
+      value: String(playerClass), textContent: playerClassInfo(playerClass).name,
+    })));
+    classSelect.disabled = false;
     const fixture = fixtures[0];
     const api = sessionAdapter();
-    if (!api?.create(fixture)) throw new Error('d2_session_create failed');
+    if (!api?.create(fixture, Number(classSelect.value))) throw new Error('d2_session_create failed');
     session = api; snapshot = api.snapshot();
     motion = api.motion();
-    playerRenderer = createAmazonPlayerRenderer(createMpqAssetReader(Module)); playerRenderError = '';
+    const assetReader = createMpqAssetReader(Module);
+    playerRenderer = createPlayerRenderer(assetReader); playerRenderError = '';
     monsterRenderer = createMonsterRenderer(createMpqAssetReader(Module));
     objectRenderer = createObjectRenderer(createMpqAssetReader(Module));
     itemRenderer = createItemRenderer(createMpqAssetReader(Module));
     inventoryPanelRenderer = createInventoryPanelRenderer(createMpqAssetReader(Module));
     beltRenderer = createBeltRenderer(createMpqAssetReader(Module));
-    controlPanelRenderer = createControlPanelRenderer(createMpqAssetReader(Module));
+    controlPanelRenderer = createControlPanelRenderer(assetReader);
+    try { actMusic = createActMusicPlayer(assetReader); await actMusic.prepare(fixture.act0); musicError = ''; } catch (error) { musicError = String(error); }
 
     if (TERRAIN_ENABLED) loadActTileView(fixture.act0);
     window.__d2.session = { fixture, snapshot: () => session.snapshot(), move: (x, y) => session.move(x, y), attack: (targetId) => session.attack(targetId), throwSkill: (targetId) => session.throwSkill(targetId), kick: (targetId) => session.kick(targetId), pickup: (itemId) => session.pickup(itemId), drop: (itemId) => session.drop(itemId), useBelt: (slot) => session.useBelt(slot), operate: (objectId) => session.operate(objectId), talk: (npcId) => session.talk(npcId), respawn: () => session.respawn(),
@@ -167,13 +176,23 @@ async function bootstrapSession() {
 
 actSelect.addEventListener('change', () => {
   if (!session) return;
-  const fixture = fixtures.find((entry) => entry.act0 === Number(actSelect.value));
+  const fixture = fixtures[Number(actSelect.value)];
   if (!fixture) return;
   session.destroy();
-  if (!session.create(fixture)) { sessionError = `unable to create Act ${fixture.act0 + 1} session`; session = null; return; }
+  if (!session.create(fixture, Number(classSelect.value))) { sessionError = `unable to create Act ${fixture.act0 + 1} session`; session = null; return; }
   snapshot = session.snapshot();
   motion = session.motion();
+  actMusic?.prepare(fixture.act0).catch((error) => { musicError = String(error); });
   if (TERRAIN_ENABLED) loadActTileView(fixture.act0);
+});
+
+classSelect.addEventListener('change', () => {
+  if (!session) return;
+  const fixture = fixtures[Number(actSelect.value)];
+  if (!fixture) return;
+  session.destroy();
+  if (!session.create(fixture, Number(classSelect.value))) { sessionError = 'unable to create character session'; session = null; return; }
+  snapshot = session.snapshot(); motion = session.motion(); playerRenderError = '';
 });
 
 function update() {
@@ -219,9 +238,9 @@ function update() {
     try { session.tick(1); snapshot = session.snapshot(); motion = session.motion(); }
     catch (error) { sessionError = String(error); session = null; }
   }
-  status.title = tileViewError;
+  status.title = [tileViewError, musicError].filter(Boolean).join('\n');
   status.textContent = session
-    ? `retail-backed simulation connected · ${tileView ? `retail tiles: Act ${tileView.act0 + 1}` : tileViewError ? 'retail tile fallback' : 'loading retail tiles…'}`
+    ? `retail-backed simulation connected · ${tileView ? `retail tiles: Act ${tileView.act0 + 1}` : tileViewError ? 'retail tile fallback' : 'loading retail tiles…'} · ${musicError ? 'audio unavailable' : 'retail music ready'}`
     : sessionError || (PLAY_MODE ? 'engine loaded; creating simulation…' : 'open ?retail=1&play=1 to create a gameplay session');
 }
 
@@ -278,7 +297,7 @@ function render() {
   for (const object of snapshot.objects) objectRenderer?.draw(ctx, ox + object.x * grid, oy + object.y * grid, object, snapshot.act);
   for (const item of snapshot.items) if (item.mode === 3 && item.invPage === 255) itemRenderer?.draw(ctx, ox + item.x * grid, oy + item.y * grid, item);
   if (playerRenderer) {
-    try { playerRenderer.draw(ctx, w / 2, h / 2, { ...motion, mode: snapshot.mode, tick: snapshot.tick, act: snapshot.act }); playerRenderError = ''; }
+    try { playerRenderer.draw(ctx, w / 2, h / 2, { ...motion, playerClass: snapshot.playerClass, mode: snapshot.mode, tick: snapshot.tick, act: snapshot.act }); playerRenderError = ''; }
     catch (error) { playerRenderError = String(error); playerRenderer = null; }
   }
   if (!playerRenderer) {
@@ -317,11 +336,12 @@ function canvasPoint(event) {
   const r = canvas.getBoundingClientRect();
   return [(event.clientX - r.left) * canvas.width / r.width, (event.clientY - r.top) * canvas.height / r.height];
 }
-addEventListener('keydown', (e) => { if (e.code === 'KeyI' && !e.repeat) { inventoryVisible = !inventoryVisible; e.preventDefault(); return; }
+addEventListener('keydown', (e) => { actMusic?.play(snapshot.act - 1).catch((error) => { musicError = String(error); }); if (e.code === 'KeyI' && !e.repeat) { inventoryVisible = !inventoryVisible; e.preventDefault(); return; }
   if (input.key(e.code, true, e.repeat)) e.preventDefault(); });
 addEventListener('keyup', (e) => { if (input.key(e.code, false)) e.preventDefault(); });
 addEventListener('blur', () => { input.keys.clear(); });
 canvas.addEventListener('pointerdown', (e) => { const [x, y] = canvasPoint(e);
+  actMusic?.play(snapshot.act - 1).catch((error) => { musicError = String(error); });
   const beltItem = beltRenderer?.itemAt(x, y, snapshot.items); if (beltItem && session?.useBelt(beltItem.gridX)) { snapshot = session.snapshot(); canvas.focus(); e.preventDefault(); return; }
   if (!(inventoryVisible && inventoryPanelRenderer?.itemAt(x, y, canvas.width, canvas.height, snapshot))) input.pointer(x, y, e.button);
   canvas.focus(); e.preventDefault(); });
@@ -339,5 +359,6 @@ window.__d2Shell = { input, get snapshot() { return snapshot; }, get tileView() 
   get controlPanelEvidence() { return controlPanelEvidence && { ...controlPanelEvidence }; },
   get selectedSkill() { return selectedSkill; }, get lastSkillCommand() { return lastSkillCommand && { ...lastSkillCommand }; },
   get playerRenderError() { return playerRenderError; }, get sessionError() { return sessionError; }, normalizeSnapshot };
-addEventListener('beforeunload', () => session?.destroy());
+Object.defineProperty(window.__d2Shell, 'music', { get: () => actMusic?.evidence || null });
+addEventListener('beforeunload', () => { session?.destroy(); actMusic?.close(); });
 requestAnimationFrame(frame);

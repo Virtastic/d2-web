@@ -21,7 +21,25 @@
 #include <D2Dungeon.h>
 #include <Units/UnitRoom.h>
 #include <QUESTS/Quests.h>
+#include <D2QuestRecord.h>
+#include <D2States.h>
+#include <D2Items.h>
+#include <D2Inventory.h>
+#include <Units/Units.h>
 #include <cstring>
+
+// Every packet the headless server queues for the session client, in order, so a retail
+// capture's client packet-data block (the retail capture tool reads it back from D2ClientStrc+0x1BC)
+// can be compared byte for byte.  Bounded like retail's 512-byte block.
+static uint8_t g_d2webPacketStream[512];
+static uint32_t g_d2webPacketStreamLength = 0;
+static uint32_t g_d2webPacketStreamPackets = 0;
+extern "C" void D2WEB_ResetPacketStream() { g_d2webPacketStreamLength = 0; g_d2webPacketStreamPackets = 0; }
+extern "C" const uint8_t* D2WEB_PacketStream(uint32_t* pLength, uint32_t* pPackets) {
+    if (pLength) *pLength = g_d2webPacketStreamLength;
+    if (pPackets) *pPackets = g_d2webPacketStreamPackets;
+    return g_d2webPacketStream;
+}
 
 static D2GSPacketSrv27 g_d2webLastDialogPacket = {};
 static bool g_d2webHasDialogPacket = false;
@@ -34,6 +52,19 @@ extern "C" int D2WEB_CopyLastDialogPacket(D2GSPacketSrv27* pPacket) {
     if (!pPacket || !g_d2webHasDialogPacket) return 0;
     *pPacket = g_d2webLastDialogPacket;
     return 1;
+}
+// Packet 0x5D is the per-player quest status the timer status cycle composes from
+// QUESTS_RefreshStatus; the A1Q6 completion oracle compares its exact bytes.
+static D2GSPacketSrv5D g_d2webLastQuestStatusPacket = {};
+static int g_d2webQuestStatusPackets = 0;
+extern "C" void D2WEB_ResetLastQuestStatusPacket() {
+    std::memset(&g_d2webLastQuestStatusPacket, 0, sizeof g_d2webLastQuestStatusPacket);
+    g_d2webQuestStatusPackets = 0;
+}
+extern "C" int D2WEB_CopyLastQuestStatusPacket(D2GSPacketSrv5D* pPacket) {
+    if (!pPacket || !g_d2webQuestStatusPackets) return 0;
+    *pPacket = g_d2webLastQuestStatusPacket;
+    return g_d2webQuestStatusPackets;
 }
 
 uint8_t CLIENTS_GetActNo(D2ClientStrc* pClient) { return pClient ? pClient->nAct : 0; }
@@ -99,7 +130,9 @@ void __fastcall sub_6FC33670(D2GameStrc* pGame, D2ClientStrc* pClient) {
 }
 void CLIENTS_ToggleFlag(D2ClientStrc* pClient, uint16_t nFlag, int32_t bSet) {}
 void CLIENTS_UpdateCharacterProgression(D2ClientStrc* pClient, uint16_t nAct, uint16_t nDifficulty) {}
-void D2GAME_PACKETS_SendHeaderOnlyPacket(D2ClientStrc* pClient, uint8_t nHeader) {}
+void D2GAME_PACKETS_SendHeaderOnlyPacket(D2ClientStrc* pClient, uint8_t nHeader) {
+    if (pClient) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &nHeader, 1);
+}
 void __fastcall D2GAME_PACKETS_SendPacket0x15_6FC3D0D0(D2ClientStrc*, char, char, int32_t, int16_t, int16_t, char) {}
 void D2GAME_PACKETS_SendPacket0x03_6FC3C810(D2ClientStrc* pClient, char nHeader, char nAct, int32_t nInitSeed, int32_t nObjectSeed, int16_t nTownId) {}
 void D2GAME_PACKETS_SendPacket0x07_6FC3D120(D2ClientStrc* pClient, uint8_t nAreaId, uint16_t nTileX, uint16_t nTileY) {}
@@ -110,13 +143,25 @@ void D2GAME_PACKETS_SendPacket0x0F_6FC3CA00(D2ClientStrc* pClient, char nHeader,
 void D2GAME_PACKETS_SendPacket0x10_6FC3C9A0(D2ClientStrc* pClient, char nHeader, char a3, int32_t a4, char a5, char a6, int32_t a7, int16_t a8, int16_t a9) {}
 void D2GAME_PACKETS_SendPacket0x1D_E_F_6FC3D480(D2ClientStrc* pClient, uint16_t nStatId, uint32_t nValue) {}
 void D2GAME_PACKETS_SendPacket0x21_UpdateSkills_6FC3DB50(D2ClientStrc* pClient, D2UnitStrc* pUnit, WORD nSkillId, BYTE nSkillLevel, BYTE a4) {}
-void D2GAME_PACKETS_SendPacket0x22_6FC3DBE0(D2ClientStrc* pClient, BYTE nUnitType, int32_t nUnitGUID, int16_t nSkillId, char a5) {}
+// D2Game.0x6FC3DBE0 (1.13c 0x6FCAD570): item skill quantity update; bytes 2 and 0xA are never
+// written by retail's composer (stack residue on the wire), zero here.  Byte 0xB is 1 only when
+// the unit exists and has STATE_PLAYERBODY (1.13c disassembly; D2MOO's 1.10f reading inverts it).
+void __fastcall D2GAME_PACKETS_SendPacket0x22_6FC3DBE0(D2ClientStrc* pClient, BYTE nUnitType, int32_t nUnitGUID, int16_t nSkillId, char a5) {
+    D2UnitStrc* pUnit = SUNIT_GetServerUnit(CLIENTS_GetGame(pClient), nUnitType, nUnitGUID);
+    D2GSPacketSrv22 packet = {};
+    packet.nHeader = 0x22; packet.nUnitType = nUnitType; packet.nUnitGUID = nUnitGUID;
+    packet.nSkillId = nSkillId; packet.nQuantity = a5;
+    packet.bIsCorpse = pUnit && STATES_CheckState(pUnit, STATE_PLAYERBODY);
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+}
 void D2GAME_PACKETS_SendPacket0x23_6FC3DC60(D2ClientStrc* pClient, BYTE nUnitType, int32_t nUnitGUID, BYTE a4, WORD a5, int32_t a6) {}
 void D2GAME_PACKETS_SendPacket0x26_ServerMessage_6FC3DDF0(D2ClientStrc* pClient, D2GSPacketSrv26* pMsg) {}
 void __fastcall D2GAME_PACKETS_SendPacket0x27_6FC3DF20(D2ClientStrc* pClient, D2GSPacketSrv27* pPacket) {
     if (pClient && pPacket) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof(*pPacket));
 }
-void D2GAME_PACKETS_SendPacket0x29_6FC3F370(D2ClientStrc* pClient, D2GSPacketSrv29* pPacket) {}
+void __fastcall D2GAME_PACKETS_SendPacket0x29_6FC3F370(D2ClientStrc* pClient, D2GSPacketSrv29* pPacket) {
+    if (pClient && pPacket) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof(*pPacket));
+}
 void __fastcall D2GAME_SendPacket0x2A_6FC3F3B0(D2ClientStrc* pClient, char nHeader, char result,
     int32_t gold, int32_t itemId, char action) {
     D2GSPacketSrv2A packet = {};
@@ -162,17 +207,25 @@ void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, in
         g_d2webLastDialogPacket = *static_cast<D2GSPacketSrv27*>(pPacket);
         g_d2webHasDialogPacket = true;
     }
+    if (pClient && pPacket && nPacketSize == (int32_t)sizeof(D2GSPacketSrv5D) &&
+        static_cast<D2GSPacketSrv5D*>(pPacket)->nHeader == 0x5D) {
+        g_d2webLastQuestStatusPacket = *static_cast<D2GSPacketSrv5D*>(pPacket);
+        ++g_d2webQuestStatusPackets;
+    }
+    if (pClient && pPacket && nPacketSize > 0 && g_d2webPacketStreamLength + (uint32_t)nPacketSize <= sizeof g_d2webPacketStream) {
+        std::memcpy(g_d2webPacketStream + g_d2webPacketStreamLength, pPacket, (size_t)nPacketSize);
+        g_d2webPacketStreamLength += (uint32_t)nPacketSize; ++g_d2webPacketStreamPackets;
+    }
 }
 int32_t D2GAME_PLRTRADE_IsInteractingWithPlayer(D2GameStrc* pGame, D2UnitStrc* pUnit) { return {}; }
 int32_t D2GAME_SAVE_WriteFile_6FC8A500(D2GameStrc* pGame, D2UnitStrc* pPlayer, const char* szName, DWORD dwArg) { return {}; }
-void D2GAME_SendP0x9C_ItemAction_AddToGround_6FC3E850(D2ClientStrc* pClient, D2UnitStrc* pItem, DWORD dwFlag) {}
-void D2GAME_SendP0x9C_ItemAction_DropToGround_6FC3E8E0(D2ClientStrc* pClient, D2UnitStrc* pPlayer, D2UnitStrc* pItem, DWORD a4) {}
-void D2GAME_SendP0x9C_ItemAction_OnGround_6FC3E930(D2ClientStrc* pClient, D2UnitStrc* pPlayer, D2UnitStrc* pItem, DWORD a4) {}
-void D2GAME_SendP0x9C_ItemAction_PutInBelt_6FC3EB90(D2ClientStrc* pClient, D2UnitStrc* pPlayer, D2UnitStrc* pItem, DWORD a4) {}
-void D2GAME_SendP0x9C_ItemAction_PutInContainer_6FC3E980(D2ClientStrc* pClient, D2UnitStrc* pPlayer, D2UnitStrc* pItem, DWORD a4) {}
-void D2GAME_SendP0x9C_ItemAction_RemoveFromBelt_6FC3EBE0(D2ClientStrc* pClient, D2UnitStrc* pUnit, D2UnitStrc* pItem, DWORD dwFlag) {}
-void D2GAME_SendP0x9D_ItemAction_Equip_6FC3EA50(D2ClientStrc* pClient, D2UnitStrc* pUnit, D2UnitStrc* pItem, DWORD dwFlags) {}
-void D2GAME_SendPacket0x28_6FC3F2F0(D2ClientStrc* pClient, BYTE nHeader, BYTE a3, int32_t a4, D2BitBufferStrc* a5, BYTE a6) {}
+// D2Game.0x6FC3F2F0: the player's quest record (96 bytes) behind a unit reference.
+void __fastcall D2GAME_SendPacket0x28_6FC3F2F0(D2ClientStrc* pClient, BYTE nHeader, BYTE a3, int32_t a4, D2BitBufferStrc* a5, BYTE a6) {
+    D2GSPacketSrv28 packet = {};
+    packet.nHeader = nHeader; packet.unk0x01 = a3; packet.unk0x02 = a4; packet.unk0x06 = a6;
+    QUESTRECORD_CopyRecordToBuffer(a5, packet.pData, sizeof packet.pData, 0);
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+}
 void D2GAME_SendPacket0x48_6FC3EF40(D2ClientStrc* pClient, D2UnitStrc* pUnit, BYTE a3) {}
 void D2GAME_SendPacket0x50_6FC3F440(D2ClientStrc* pClient, D2GSPacketSrv50* pPacket) {}
 void __fastcall D2GAME_SendPacket0x4E_6FC3F410(D2ClientStrc* pClient, D2GSPacketSrv4E* pPacket) {
@@ -184,10 +237,83 @@ void __fastcall D2GAME_SendPacket0x58_6FC3F520(D2ClientStrc* pClient, D2GSPacket
 }
 void D2GAME_SendPacket0x8E_CorpseAssign_ToAllPlayers_6FC3F9B0(D2GameStrc* pGame, int32_t nUnitId, int32_t nCorpseId, BYTE bAssign) {}
 void D2GAME_SetClientDead_6FC33830(D2ClientStrc* pClient, void* pAlwaysNull) {}
+// Item action packets (D2Game 0x6FC3E570 / 0x6FC3E6F0 and their wrappers, ported from D2MOO's
+// SCmd.cpp): the item's wire bitstream behind an action code, 0x9C for items on the ground or
+// the player's own, 0x9D with the owning unit.  Socketed children follow as ITEMINSOCKET.
+void __fastcall D2GAME_SendPacket0x9C_6FC3E570(D2ClientStrc* pClient, D2UnitStrc* pItem, char nAction, DWORD dwFlag, int32_t bGamble) {
+    D2UnitStrc* pPlayer = CLIENTS_GetPlayerFromClient(pClient, 0);
+    if (!pPlayer || !pItem) return;
+    D2GSPacketSrv9C packet = {};
+    packet.nHeader = 0x9C; packet.nAction = nAction; packet.nItemId = pItem->dwUnitId;
+    packet.nComponent = UNITS_GetItemComponentId(pPlayer, pItem);
+    const uint32_t nOldItemFlags = ITEMS_GetItemFlags(pItem);
+    ITEMS_SetItemFlag(pItem, dwFlag, 1);
+    const uint32_t nLength = (uint32_t)ITEMS_SerializeItemToBitstream(pItem, packet.pBitstream, 0xF4u, 0, 0, bGamble) + 8;
+    packet.nPacketSize = (uint8_t)nLength;
+    ITEMS_SetItemFlag(pItem, 0xFFFFFFFFu, 0);
+    ITEMS_SetItemFlag(pItem, nOldItemFlags, 1);
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, (int32_t)nLength);
+    int32_t nFlags = (int32_t)dwFlag;
+    if (ITEMS_CheckIfSocketable(pItem) && !ITEMS_CheckIfFlagIsSet(nFlags, IFLAG_QUANTITY) && pItem->pInventory)
+        for (D2UnitStrc* i = INVENTORY_GetFirstItem(pItem->pInventory); i; i = INVENTORY_GetNextItem(i)) {
+            ITEMS_SetOrRemoveFlag(&nFlags, IFLAG_DELETED, 1);
+            D2GAME_SendPacket0x9D_6FC3E6F0(pClient, pItem, INVENTORY_UnitIsItem(i), ITEMACTION_ITEMINSOCKET, (DWORD)nFlags, 0);
+        }
+}
+void __fastcall D2GAME_SendPacket0x9D_6FC3E6F0(D2ClientStrc* pClient, D2UnitStrc* pUnit, D2UnitStrc* pItem, char nAction, DWORD dwFlag, int32_t bGamble) {
+    if (!pItem) return;
+    D2GSPacketSrv9D packet = {};
+    packet.nHeader = 0x9D; packet.nAction = nAction;
+    packet.nComponent = UNITS_GetItemComponentId(pUnit, pItem);
+    packet.nItemId = pItem->dwUnitId;
+    if (pUnit) { packet.nUnitType = (uint8_t)pUnit->dwUnitType; packet.nUnitId = pUnit->dwUnitId; }
+    else { packet.nUnitType = 6; packet.nUnitId = -1; }
+    const uint32_t nOldItemFlags = ITEMS_GetItemFlags(pItem);
+    ITEMS_SetItemFlag(pItem, dwFlag, 1);
+    const uint32_t nLength = (uint32_t)ITEMS_SerializeItemToBitstream(pItem, packet.pBitstream, 0xF4u, 0, 0, bGamble) + 13;
+    ITEMS_SetItemFlag(pItem, 0xFFFFFFFFu, 0);
+    ITEMS_SetItemFlag(pItem, nOldItemFlags, 1);
+    packet.nPacketSize = (uint8_t)nLength;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, (int32_t)nLength);
+    int32_t nFlags = (int32_t)dwFlag;
+    if (ITEMS_CheckIfSocketable(pItem) && !ITEMS_CheckIfFlagIsSet(nFlags, IFLAG_QUANTITY) && pItem->pInventory)
+        for (D2UnitStrc* i = INVENTORY_GetFirstItem(pItem->pInventory); i; i = INVENTORY_GetNextItem(i)) {
+            ITEMS_SetOrRemoveFlag(&nFlags, IFLAG_DELETED, 1);
+            D2GAME_SendPacket0x9D_6FC3E6F0(pClient, pItem, INVENTORY_UnitIsItem(i), ITEMACTION_ITEMINSOCKET, (DWORD)nFlags, 0);
+        }
+}
+void __fastcall D2GAME_SendP0x9C_ItemAction_AddToGround_6FC3E850(D2ClientStrc* pClient, D2UnitStrc* pItem, DWORD dwFlag) {
+    D2GAME_SendPacket0x9C_6FC3E570(pClient, pItem, ITEMACTION_ADDTOGROUND, dwFlag, 0);
+}
+void __fastcall D2GAME_SendP0x9C_ItemAction_DropToGround_6FC3E8E0(D2ClientStrc* pClient, D2UnitStrc* pPlayer, D2UnitStrc* pItem, DWORD a4) {
+    D2GAME_SendPacket0x9C_6FC3E570(pClient, pItem, ITEMACTION_DROPTOGROUND, a4, 0);
+}
+void __fastcall D2GAME_SendP0x9C_ItemAction_OnGround_6FC3E930(D2ClientStrc* pClient, D2UnitStrc* pPlayer, D2UnitStrc* pItem, DWORD a4) {
+    D2GAME_SendPacket0x9C_6FC3E570(pClient, pItem, ITEMACTION_ONGROUND, a4, 0);
+}
+void __fastcall D2GAME_SendP0x9C_ItemAction_PutInBelt_6FC3EB90(D2ClientStrc* pClient, D2UnitStrc* pPlayer, D2UnitStrc* pItem, DWORD a4) {
+    D2GAME_SendPacket0x9C_6FC3E570(pClient, pItem, ITEMACTION_PUTINBELT, a4, 0);
+}
+void __fastcall D2GAME_SendP0x9C_ItemAction_PutInContainer_6FC3E980(D2ClientStrc* pClient, D2UnitStrc* pPlayer, D2UnitStrc* pItem, DWORD a4) {
+    D2GAME_SendPacket0x9C_6FC3E570(pClient, pItem, ITEMACTION_PUTINCONTAINER, a4, 0);
+}
+void __fastcall D2GAME_SendP0x9C_ItemAction_RemoveFromBelt_6FC3EBE0(D2ClientStrc* pClient, D2UnitStrc* pUnit, D2UnitStrc* pItem, DWORD dwFlag) {
+    D2GAME_SendPacket0x9C_6FC3E570(pClient, pItem, ITEMACTION_REMOVEFROMBELT, dwFlag, 0);
+}
+void __fastcall D2GAME_SendP0x9D_ItemAction_Equip_6FC3EA50(D2ClientStrc* pClient, D2UnitStrc* pUnit, D2UnitStrc* pItem, DWORD dwFlags) {
+    D2GAME_SendPacket0x9D_6FC3E6F0(pClient, pUnit, pItem, ITEMACTION_EQUIP, dwFlags, 0);
+}
+// D2Game.0x6FC3E9D0: an item leaving the player's container, reported with its cell as the page.
+void __fastcall D2GAME_UpdateClientItem_6FC3E9D0(D2ClientStrc* pClient, D2UnitStrc* pPlayer, D2UnitStrc* pItem, DWORD dwCmdFlag) {
+    if (!pItem) return;
+    const uint8_t nPage = ITEMS_GetInvPage(pItem);
+    ITEMS_SetInvPage(pItem, ITEMS_GetItemCell(pItem));
+    D2GAME_SendPacket0x9D_6FC3E6F0(pClient, pPlayer, pItem, ITEMACTION_REMOVEFROMCONTAINER, dwCmdFlag, 0);
+    ITEMS_SetInvPage(pItem, nPage);
+}
 // The session client is always softcore, so the resurrect handler's hardcore disconnect branch
 // is unreachable. There is no socket-backed peer to remove in the headless game.
 void __fastcall GAME_DisconnectClient(D2GameStrc*, D2ClientStrc*, D2C_SRV2CLT5A_TYPES) {}
-void D2GAME_UpdateClientItem_6FC3E9D0(D2ClientStrc* pClient, D2UnitStrc* pPlayer, D2UnitStrc* pItem, DWORD dwCmdFlag) {}
 void D2Game_10034_Return(int a1) {}
 void GAME_ForEachIngameClient(D2GameStrc* pGame, GAME_ForEachIngameClientCallbackPtr pFn, void* pContext) {}
 int32_t OBJECTS_OperateFunction32_Bank(D2ObjOperateFnStrc* pOp, int32_t nOperate) { return {}; }
