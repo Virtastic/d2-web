@@ -75,4 +75,61 @@ EMSCRIPTEN_KEEPALIVE const char* d2_lang_probe(const char* key) {
 }
 EMSCRIPTEN_KEEPALIVE int d2_table_bin_len() { return (int)g_bin.size(); }
 
+// Retail UI text for the client. d2_lang_probe above is shaped for the test runner -- it prefixes the
+// table count and flattens anything non-ASCII to '?' -- which is fine for a diff and useless for
+// drawing. These return real UTF-8, so a name with an accent survives the trip.
+static std::string u16ToUtf8(const std::u16string& in) {
+    std::string out;
+    for (size_t i = 0; i < in.size(); ++i) {
+        char32_t c = in[i];
+        // Surrogate pair, so characters outside the BMP are not silently cut in half.
+        if (c >= 0xD800 && c <= 0xDBFF && i + 1 < in.size() && in[i + 1] >= 0xDC00 && in[i + 1] <= 0xDFFF) {
+            c = 0x10000 + ((c - 0xD800) << 10) + (in[++i] - 0xDC00);
+        }
+        if (c < 0x80) { out.push_back((char)c); }
+        else if (c < 0x800) {
+            out.push_back((char)(0xC0 | (c >> 6)));
+            out.push_back((char)(0x80 | (c & 0x3F)));
+        } else if (c < 0x10000) {
+            out.push_back((char)(0xE0 | (c >> 12)));
+            out.push_back((char)(0x80 | ((c >> 6) & 0x3F)));
+            out.push_back((char)(0x80 | (c & 0x3F)));
+        } else {
+            out.push_back((char)(0xF0 | (c >> 18)));
+            out.push_back((char)(0x80 | ((c >> 12) & 0x3F)));
+            out.push_back((char)(0x80 | ((c >> 6) & 0x3F)));
+            out.push_back((char)(0x80 | (c & 0x3F)));
+        }
+    }
+    return out;
+}
+
+// By reference key, the way D2LANG_GetStringByReferenceString resolves it (patch, then expansion,
+// then classic). Empty string when the key is absent -- retail would render the key in angle
+// brackets, which is a presentation choice the caller can make.
+EMSCRIPTEN_KEEPALIVE const char* d2_lang_string(const char* key) {
+    static std::string out; out.clear();
+    if (!key) return out.c_str();
+    loadLang();
+    if (const std::u16string* v = g_lang.find(key)) out = u16ToUtf8(*v);
+    return out.c_str();
+}
+
+// By .tbl index, which is what carries dialogue and most UI text in packets and table records
+// (D2LANG_GetStringFromTblIndex: 10000+ patch, 20000+ expansion, otherwise classic).
+EMSCRIPTEN_KEEPALIVE const char* d2_lang_string_by_index(int index) {
+    static std::string out; out.clear();
+    if (index < 0 || index > 0xFFFF) return out.c_str();
+    loadLang();
+    if (const std::u16string* v = g_lang.byTblIndex((uint16_t)index)) out = u16ToUtf8(*v);
+    return out.c_str();
+}
+
+// The .tbl index for a key, so a caller can go key -> index -> string the way retail's tables do.
+EMSCRIPTEN_KEEPALIVE int d2_lang_index(const char* key) {
+    if (!key) return 0;
+    loadLang();
+    return (int)g_lang.tblIndex(key);
+}
+
 } // extern "C"

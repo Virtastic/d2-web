@@ -677,7 +677,14 @@ int32_t __fastcall PLRSAVE2_WriteWaypointData(D2GameStrc* pGame, D2UnitStrc* pUn
     }
 
     D2WaypointSaveDataStrc waypointSaveData = {};
-    waypointSaveData.nHeader = 0x5753; // retail 'SW' value, bytes "WS" on little endian
+    // The marker is the two bytes 'W','S', so the little-endian u16 is 0x5357 -- NOT D2SMAGIC_WPINFO
+    // (0x5753), which is the char-order number and emits "SW" when stored directly. D2MOO's own
+    // source is inconsistent here: its constants table says 0x5753 while its writer uses the
+    // literal 'SW' (= 0x5357 to a C compiler, which is the correct one). Confirmed against two
+    // independent readers of real save files: d2s-format ("starts with 2 chars \"WS\"") and d2s-ts
+    // ("waypoint header identifier = 0x57, 0x53"). The quest section has the same trap and is
+    // already written byte-reversed (0x216F6F57) for the same reason.
+    waypointSaveData.nHeader = 0x5357;
     waypointSaveData.unk0x02 = 1;
     waypointSaveData.nRecordSize = sizeof(D2WaypointSaveDataStrc);
 
@@ -701,7 +708,7 @@ int32_t __fastcall PLRSAVE2_ReadWaypointData(D2GameStrc* pGame, D2UnitStrc* pUni
     }
 
     D2WaypointSaveDataStrc* pWaypointSaveData = (D2WaypointSaveDataStrc*)*ppSection;
-    if (pWaypointSaveData->nHeader != 0x5753)
+    if (pWaypointSaveData->nHeader != 0x5357)
     {
         return PLRSAVE2ERROR_BAD_WAYPOINT;
     }

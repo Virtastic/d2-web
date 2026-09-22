@@ -95,8 +95,12 @@ decltype(T::pStat) __fastcall StatArray_InsertStat(void* pMemPool, T* pStatsArra
 
 	if (insertionIdx < pStatsArray->nStatCount)
 	{
-		// Move memory by 1 slot so that we can insert our stat
-		memmove(&pStatsArray->pStat[insertionIdx + 1], &pStatsArray->pStat[insertionIdx], (pStatsArray->nStatCount - insertionIdx) * sizeof(D2StatStrc));
+		// Move memory by 1 slot so that we can insert our stat. The element size is the array's
+		// own (D2ModStatsArrayStrc holds 4-byte layer/stat ids, not 8-byte D2StatStrc): D2MOO's
+		// sizeof(D2StatStrc) here moved twice the bytes and wrote past the end of the mod-stat
+		// array whenever a saved stat was inserted before existing ones (heap corruption seen as
+		// a realloc abort in PLAYERSTATS_LevelUp).
+		memmove(&pStatsArray->pStat[insertionIdx + 1], &pStatsArray->pStat[insertionIdx], (pStatsArray->nStatCount - insertionIdx) * sizeof(*pStatsArray->pStat));
 	}
 
 	pStatsArray->pStat[insertionIdx] = {}; // Default init to 0

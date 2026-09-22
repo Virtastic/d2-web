@@ -49,6 +49,20 @@ const Unicode* D2LANG_GetStringByReferenceString(char* szReference) {
     return (const Unicode*)it->second.c_str();
 }
 
+// D2Lang #10004: the string a table index names (the inverse of D2LANG_GetTblIndex); "" when absent.
+const Unicode* D2LANG_GetStringFromTblIndex(short index) {
+    static const std::u16string empty;
+    const std::u16string* v = d2::sharedLang().byTblIndex((uint16_t)index);
+    return (const Unicode*)(v ? v : &empty)->c_str();
+}
+// D2Lang #10055: UCS-2 to the Windows code page; ASCII range only here (names in log lines).
+char* Unicode::unicode2Win(char* dest, const Unicode* src, int count) {
+    int i = 0;
+    for (; i < count - 1 && src[i].ch; i++) dest[i] = src[i].ch < 0x80 ? (char)src[i].ch : '?';
+    dest[i] = 0;
+    return dest;
+}
+
 // D2Lang #10009 (1.13c): the string table language. English tables only.
 #include <D2StrTable.h>
 D2C_Language STRTABLE_GetLanguage() { return LANGUAGE_ENGLISH; }

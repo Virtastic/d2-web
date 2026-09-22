@@ -67,9 +67,46 @@ extern "C" int D2WEB_CopyLastQuestStatusPacket(D2GSPacketSrv5D* pPacket) {
     return g_d2webQuestStatusPackets;
 }
 
+static DWORD g_d2webTickCount = 60000;
+extern "C" DWORD d2web_GetTickCount() { return g_d2webTickCount; }
+extern "C" void d2web_AdvanceTickCount(DWORD ms) { g_d2webTickCount += ms; }
+
 uint8_t CLIENTS_GetActNo(D2ClientStrc* pClient) { return pClient ? pClient->nAct : 0; }
 int32_t CLIENTS_GetExperienceLoss(D2ClientStrc* pClient) { return {}; }
-char* CLIENTS_GetName(D2ClientStrc* pClient) { return nullptr; }
+// Backed by the real struct rather than stubbed: the save header refuses to write without a name,
+// so a nullptr here meant no .d2s could exist. The session fills szName/nClassId/nCreateTime when
+// it creates a character (see d2_session_set_character).
+char* CLIENTS_GetName(D2ClientStrc* pClient) { return pClient ? pClient->szName : nullptr; }
+uint8_t __fastcall CLIENTS_GetWeaponSwitch(D2ClientStrc* pClient) { return pClient ? pClient->bSwitchWeapon : 0; }
+// D2CMP is the graphics/palette DLL; the headless session loads no palettes, so the colour
+// transform a caller would apply to an item's inventory image has nothing to resolve against.
+// Returning null is the honest answer here -- it is a rendering concern, not a save-data one.
+uint8_t* __stdcall D2CMP_MixPalette(uint8_t nTrans, int nColor) { return nullptr; }
+int32_t __fastcall CLIENTS_GetClassId(D2ClientStrc* pClient) { return pClient ? pClient->nClassId : 0; }
+int32_t __fastcall CLIENTS_GetFlags(D2ClientStrc* pClient) {
+    if (!pClient) return 0;
+    uint32_t flags = 0;
+    memcpy(&flags, &pClient->tSaveFlags, sizeof pClient->tSaveFlags);
+    return (int32_t)flags;
+}
+int32_t __fastcall CLIENTS_GetCreateTime(D2ClientStrc* pClient) { return pClient ? (int32_t)pClient->nCreateTime : 0; }
+void __fastcall CLIENTS_GetSkillHotKey(D2ClientStrc* pClient, int32_t nId, int32_t* pSkillId, int32_t* nHand, int32_t* nItemGUID) {
+    if (pSkillId) *pSkillId = 0;
+    if (nHand) *nHand = 0;
+    if (nItemGUID) *nItemGUID = -1;
+    if (!pClient || nId < 0 || nId >= 16) return;
+    const D2ClientKeySkillStrc& key = pClient->HotkeySkills[nId];
+    if (pSkillId) *pSkillId = key.nSkill;
+    if (nHand) *nHand = key.nHand;
+    if (nItemGUID) *nItemGUID = (int32_t)key.nItemGUID;
+}
+// No guild support in the headless session; retail writes the emblem fields as zero for a
+// guildless character, which is what an unset D2ClientStrc already carries.
+void __fastcall CLIENTS_GetGuildEmblem(D2ClientStrc* pClient, uint8_t* pBackgroundColor, uint8_t* pForegroundColor, uint8_t* pEmblemType) {
+    if (pBackgroundColor) *pBackgroundColor = 0;
+    if (pForegroundColor) *pForegroundColor = 0;
+    if (pEmblemType) *pEmblemType = 0;
+}
 D2UnitStrc* CLIENTS_GetPlayerFromClient(D2ClientStrc* pClient, BOOL bIgnoreDeath) {
     // The headless sim has no socket clients, but targeted-AI fixtures attach a minimal client
     // carrying the player unit. This is the retail fast path when the client owns a live player.
@@ -187,7 +224,13 @@ void D2GAME_PACKETS_SendPacket0x6D_6FC3D080(D2ClientStrc* pClient, DWORD dwUnitI
 void D2GAME_PACKETS_SendPacket0x74_6FC3F640(D2ClientStrc* pClient, D2UnitStrc* a2, D2UnitStrc* a3, BYTE bAssign) {}
 void D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(D2ClientStrc* pClient, BYTE nUiNo) {}
 void D2GAME_PACKETS_SendPacket0x7A_6FC3E100(D2ClientStrc* pClient, char a2, char a3, int32_t a4, int32_t a5, int16_t a6) {}
-void D2GAME_PACKETS_SendPacket0x81_6FC3E160(D2ClientStrc* pClient, char a2, int32_t a3, int32_t a4, int16_t a5, int32_t a6, int32_t a7, int32_t a8) {}
+// D2Game.0x6FC3E160: pet/hireling assignment {type, class, owner, pet GUID, seed, name}.
+void __fastcall D2GAME_PACKETS_SendPacket0x81_6FC3E160(D2ClientStrc* pClient, char a2, int32_t a3, int32_t a4, int16_t a5, int32_t a6, int32_t a7, int32_t a8) {
+    D2GSPacketSrv81 packet = {};
+    packet.nHeader = 0x81; packet.unk0x01 = (uint8_t)a3; packet.unk0x02 = (uint16_t)a6; packet.unk0x04 = (uint32_t)a5;
+    packet.unk0x08 = (uint32_t)a4; packet.unk0x0C = (uint32_t)a7; packet.unk0x10 = (uint32_t)a8;
+    if (pClient) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+}
 void D2GAME_PACKETS_SendPacket0x82_6FC3F790(D2GameStrc* pGame, D2ClientStrc* pClient, int32_t nPortalGUID, int32_t nPortalOwnerGUID) {}
 void D2GAME_PACKETS_SendPacket0x8D_6FC3F960(D2UnitStrc* pUnit, D2UnitStrc* a2) {}
 void D2GAME_PACKETS_SendPacket0x9B_6FC3FB30(D2ClientStrc* pClient, int16_t a2, int32_t a3) {}
@@ -339,6 +382,21 @@ void sub_6FC3F550(D2ClientStrc* pClient, D2UnitStrc* pUnit) {}
 void sub_6FC3F610(D2ClientStrc* pClient, D2GSPacketSrv73* pPacket) {}
 void sub_6FC3FAF0(D2ClientStrc* pClient, uint32_t a2, uint16_t a3) {}
 void sub_6FC3FC80(D2ClientStrc* pClient, D2UnitStrc* pUnit) {}
+// D2Game's game log (GAME_LogMessage writes the server's text log); nothing to write to here.
+void GAME_LogMessage(int32_t, const char*, ...) {}
+// D2Game.0x6FC93430 (PlrTrade): may the player move this item? Without a player interaction
+// (or with a non-player one) retail answers from the trade state alone: allowed while the
+// trade state is at most 4. There is no second player to trade with in the headless session,
+// so only those two branches exist here.
+int32_t __fastcall sub_6FC93430(D2GameStrc*, D2UnitStrc* pPlayer, D2UnitStrc*) {
+    int32_t nUnitType = 0, nUnitGUID = 0;
+    if (SUNIT_GetInteractInfo(pPlayer, &nUnitType, &nUnitGUID) && nUnitType != UNIT_PLAYER) return 1;
+    return UNITS_GetPlayerData(pPlayer)->dwTradeState <= 4;
+}
+// Trade-screen button handler (PlrTrade); no second player in the headless session.
+int32_t __fastcall sub_6FC91250(D2GameStrc*, D2UnitStrc*, uint16_t, int32_t) { return 0; }
+// Classic end-of-game after Diablo's death (A4Q2 timer); the session never ends a game this way.
+void __fastcall sub_6FC37FB0(D2GameStrc*, D2ClientStrc*) {}
 void sub_6FC92EE0(D2GameStrc* pGame, D2UnitStrc* pUnit) {}
 void sub_6FC92EF0(D2GameStrc* pGame, D2UnitStrc* pUnit) {}
 void sub_6FC92F10(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pItem) {}

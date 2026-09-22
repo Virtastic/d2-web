@@ -62,6 +62,15 @@ const StrTable::Entry* StrTable::lookup(const std::string& key) const {
 }
 const std::u16string* StrTable::find(const std::string& key) const { const Entry* e = lookup(key); return e ? &e->value : nullptr; }
 int StrTable::findIndex(const std::string& key) const { const Entry* e = lookup(key); return e ? (int)e->index : -1; }
+const std::u16string* StrTable::findByIndex(uint16_t index) const {
+    for (const Entry& e : entries_) if (e.active && e.index == index) return &e.value;
+    return nullptr;
+}
+const std::u16string* LangTables::byTblIndex(uint16_t index) const {
+    if (index >= 20000) return expansion.findByIndex((uint16_t)(index - 20000));
+    if (index >= 10000) return patch.findByIndex((uint16_t)(index - 10000));
+    return classic.findByIndex(index);
+}
 
 const std::u16string* LangTables::find(const std::string& key) const {
     if (auto* v = patch.find(key)) return v;

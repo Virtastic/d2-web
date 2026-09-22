@@ -5,6 +5,7 @@ export const COMMAND = Object.freeze({
   CANCEL: 4,
   INTERACT: 5,
   RESPAWN: 6,
+  TRAVEL: 7,
 });
 
 const KEY_DIRECTIONS = Object.freeze({
@@ -31,6 +32,7 @@ export class CommandInput {
     if (code === 'Space') this.queue.push({ type: COMMAND.PRIMARY });
     else if (code === 'KeyE') this.queue.push({ type: COMMAND.INTERACT });
     else if (code === 'KeyR') this.queue.push({ type: COMMAND.RESPAWN });
+    else if (code === 'KeyT') this.queue.push({ type: COMMAND.TRAVEL });
     else if (/^Digit[1-4]$/.test(code)) this.queue.push({ type: COMMAND.SKILL, slot: Number(code.slice(5)) });
     else if (code === 'Escape') this.queue.push({ type: COMMAND.CANCEL });
     else return false;

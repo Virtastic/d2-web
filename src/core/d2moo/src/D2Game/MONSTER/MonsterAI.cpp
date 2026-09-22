@@ -229,23 +229,27 @@ void __fastcall MONSTERAI_UpdateMercStatsAndSkills(D2GameStrc* pGame, D2UnitStrc
         STATLIST_SetUnitStat(pHireling, STAT_EXPERIENCE, nExperience, 0);
     }
 
-    const int32_t nStrength = std::max(pHirelingTxtRecord->nStr + nLevelUps * pHirelingTxtRecord->nStrPerLvl / 8, 10);
+    // d2-web: level-ups are negative when a 1.13c hireling is hired below its record's base
+    // level (Nightmare/Hell records vs a level-20 hirer); retail computes these as signed
+    // values (truncating divisions) and clamps them signed. Upstream's unsigned table fields and
+    // `/ 8` made a negative life (kind 23 vectors, s85).
+    const int32_t nStrength = std::max((int32_t)pHirelingTxtRecord->nStr + (nLevelUps * (int32_t)pHirelingTxtRecord->nStrPerLvl) / 8, 10);
     STATLIST_SetUnitStat(pHireling, STAT_STRENGTH, nStrength, 0);
 
-    const int32_t nDexterity = std::max(pHirelingTxtRecord->nDex + nLevelUps * pHirelingTxtRecord->nDexPerLvl / 8, 10);
+    const int32_t nDexterity = std::max((int32_t)pHirelingTxtRecord->nDex + (nLevelUps * (int32_t)pHirelingTxtRecord->nDexPerLvl) / 8, 10);
     STATLIST_SetUnitStat(pHireling, STAT_DEXTERITY, nDexterity, 0);
 
-    const int32_t nHitpoints = std::max((pHirelingTxtRecord->dwHitpoints << 8) + nLevelUps * (pHirelingTxtRecord->dwHitpointsPerLvl << 8), (40u << 8));
+    const int32_t nHitpoints = std::max((int32_t)pHirelingTxtRecord->dwHitpoints + nLevelUps * (int32_t)pHirelingTxtRecord->dwHitpointsPerLvl, 40) << 8;
     STATLIST_SetUnitStat(pHireling, STAT_MAXHP, nHitpoints, 0);
     STATLIST_SetUnitStat(pHireling, STAT_HITPOINTS, nHitpoints, 0);
 
-    const int32_t nDefense = std::max(pHirelingTxtRecord->dwDefense + nLevelUps * pHirelingTxtRecord->dwDefensePerLvl, 0);
+    const int32_t nDefense = std::max((int32_t)pHirelingTxtRecord->dwDefense + nLevelUps * (int32_t)pHirelingTxtRecord->dwDefensePerLvl, 0);
     STATLIST_SetUnitStat(pHireling, STAT_ARMORCLASS, nDefense, 0);
 
-    const int32_t nMinDamage = std::max(pHirelingTxtRecord->nDmgMin + nLevelUps * pHirelingTxtRecord->nDmgPerLvl / 8, 0);
+    const int32_t nMinDamage = std::max((int32_t)pHirelingTxtRecord->nDmgMin + (nLevelUps * (int32_t)pHirelingTxtRecord->nDmgPerLvl) / 8, 0);
     STATLIST_SetUnitStat(pHireling, STAT_SECONDARY_MINDAMAGE, nMinDamage, 0);
 
-    const int32_t nMaxDamage = std::max(pHirelingTxtRecord->nDmgMax + nLevelUps * pHirelingTxtRecord->nDmgPerLvl / 8, 1);
+    const int32_t nMaxDamage = std::max((int32_t)pHirelingTxtRecord->nDmgMax + (nLevelUps * (int32_t)pHirelingTxtRecord->nDmgPerLvl) / 8, 1);
     STATLIST_SetUnitStat(pHireling, STAT_SECONDARY_MAXDAMAGE, nMaxDamage, 0);
 
     const int32_t nAttackRate = std::max(pHirelingTxtRecord->dwAttackRate + nLevelUps * pHirelingTxtRecord->dwAttackRatePerLvl, 0);

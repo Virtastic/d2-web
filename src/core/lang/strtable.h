@@ -20,6 +20,8 @@ public:
     // The entry's own index (the .tbl's u16 at entry+1), or -1: what D2LANG_GetTblIndex returns
     // before the per-table offset (string 0+, patch 10000+, expansion 20000+).
     int findIndex(const std::string& key) const;
+    // The entry carrying a given .tbl index (D2LANG_GetStringFromTblIndex's per-table half).
+    const std::u16string* findByIndex(uint16_t index) const;
     size_t size() const { return entries_.size(); }
 private:
     struct Entry { bool active; uint16_t index; std::string key; std::u16string value; };
@@ -36,6 +38,8 @@ public:
     const std::u16string* find(const std::string& key) const;
     // D2LANG_GetTblIndex: patch (10000+) > expansion (20000+) > string (0+); 0 when absent.
     uint16_t tblIndex(const std::string& key, const std::u16string** value = nullptr) const;
+    // D2LANG_GetStringFromTblIndex: the inverse of tblIndex (10000+ patch, 20000+ expansion).
+    const std::u16string* byTblIndex(uint16_t index) const;
 };
 
 // UTF-8 -> UTF-16 the way D2Lang's Unicode::utf8ToUnicode does for the 1-3 byte forms.

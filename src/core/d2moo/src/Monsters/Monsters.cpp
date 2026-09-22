@@ -96,16 +96,18 @@ int __fastcall MONSTERS_HirelingInit(BOOL bExpansion, D2UnitStrc* pMonster, int 
 
 		pHirelingInit->nId = pHirelingTxtRecord->nId;
 
+		// d2-web: 1.13c (D2Common #10458, 0x6FD7CCC0) hires at the player's level: the hireling
+		// level is max(2, playerLevel - 5 + roll % 5) and the level-ups are measured from the
+		// record's base level (they can be negative); 1.10f capped the level-ups at roll % 5.
+		// Kind 23 vectors (s85): a level-20 hirer gets a 16 Rogue, a 17 desert mercenary, a 15 Iron Wolf.
 		nLevel = STATLIST_UnitGetStatValue(pMonster, STAT_LEVEL, 0);
-		nRand = (int)SEED_RollRandomNumber(&pSeed) % 5;
-		if (nRand >= nLevel - pHirelingTxtRecord->nHirelingLevel)
+		nRand = (int)((uint32_t)SEED_RollRandomNumber(&pSeed) % 5);   // d2-web: an unsigned roll, as retail (upstream's signed cast went negative)
+		nLevel = nLevel - 5 + nRand;
+		if (nLevel < 2)
 		{
-			nLevelUps = nLevel - pHirelingTxtRecord->nHirelingLevel;
+			nLevel = 2;
 		}
-		else
-		{
-			nLevelUps = nRand;
-		}
+		nLevelUps = nLevel - pHirelingTxtRecord->nHirelingLevel;
 		pHirelingInit->nLevel = pHirelingTxtRecord->nHirelingLevel + nLevelUps;
 
 		pHirelingInit->nHitpoints = nLevelUps * pHirelingTxtRecord->dwHitpointsPerLvl + pHirelingTxtRecord->dwHitpoints;

@@ -166,3 +166,6 @@ D2CharStatsTxt* __fastcall PLRSAVE2_GetCharStatsTxtRecord(int32_t nClass);
 int32_t __fastcall D2WEB_PLRSAVE2_WriteQuestSection(D2UnitStrc* pPlayer, uint8_t** ppSection, const uint8_t* pEnd);
 int32_t __fastcall D2WEB_PLRSAVE2_ReadQuestSection(D2UnitStrc* pPlayer, uint8_t** ppSection, const uint8_t* pEnd);
 int32_t __fastcall D2WEB_PLRSAVE2_ReadPlrIntroSection(D2UnitStrc* pPlayer, uint8_t** ppSection, const uint8_t* pEnd);
+// Load a complete .d2s into an EXISTING player: the second half of PLRSAVE2_ProcessSaveFile, which
+// also creates the unit. See PlrSaveFile.cpp.
+int32_t __fastcall D2WEB_PLRSAVE2_LoadIntoPlayer(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint8_t* pSaveFile, uint32_t nSize);

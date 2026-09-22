@@ -389,6 +389,52 @@ struct D2VecVendorSell {
 #pragma pack(pop)
 static_assert(sizeof(D2VecVendorSell) == 656, "D2VecVendorSell layout");
 
+// Vendor multibuy: like the buy, but the client packet 0x32 carries the multibuy flag (bit 15 of
+// nItemMode, i.e. `mode | 0x8000`) on a STACKABLE stock item (a tome, key or quiver -- selected
+// as the first stock item ITEMS_CheckIfStackable accepts).  Retail's multibuy branch fills the
+// bought stack to its max (or as far as gold allows), so this additionally records the bought
+// item's STAT_QUANTITY afterwards -- the observable the stubbed 1.10f path never produced.
+#pragma pack(push, 1)
+struct D2VecVendorMultibuy {
+    uint32_t seed;
+    uint8_t difficulty, phase;
+    uint16_t level;
+    uint32_t npcId, npcClass, itemId;
+    int32_t cost, goldBefore, goldAfter;
+    uint8_t handlerResult, playerItems;
+    uint16_t vendorItemsAfter;
+    uint32_t boughtId, boughtClass, boughtSeedLo, boughtSeedHi, boughtBits;
+    uint8_t bits[80];
+    uint16_t packetBytes, packetCount;
+    uint8_t stream[512];
+    uint32_t boughtQuantity;
+    uint32_t hash;
+};
+#pragma pack(pop)
+static_assert(sizeof(D2VecVendorMultibuy) == 660, "D2VecVendorMultibuy layout");
+
+// Hiring: after 0x13 and 0x38 {3, hire}, client packet 0x36 {npcGUID, mercName} for the first
+// hireling the 0x4F/0x4E list offered, from a fixture at level 20 with 10,000 gold.  Records
+// the result, gold, the hireling unit the hire spawned (first new monster unit: GUID, class,
+// seeds, level/life/strength/dexterity stats) and the queued reply.
+#pragma pack(push, 1)
+struct D2VecHire {
+    uint32_t seed;
+    uint8_t difficulty, phase;
+    uint16_t level;
+    uint32_t npcId, npcClass;
+    uint16_t mercName, playerLevel;
+    int32_t goldBefore, goldAfter;
+    uint8_t handlerResult, newMonsters;
+    uint16_t packetBytes;
+    uint32_t mercId, mercClass, mercSeedLo, mercSeedHi;
+    int32_t mercLevel, mercLife, mercMaxLife, mercStr, mercDex, mercExp;
+    uint8_t stream[512];
+    uint32_t hash;
+};
+#pragma pack(pop)
+static_assert(sizeof(D2VecHire) == 588, "D2VecHire layout");
+
 // DAMAGECALC: a direct retail/wasm replay of SUNITDMG_CalculateTotalDamage. The defender's
 // relevant reduction/resistance stats and the complete before/after damage structures are
 // explicit, allowing elemental, poison, conversion, pierce and absorb cases to grow in-place.
@@ -413,7 +459,7 @@ static_assert(sizeof(D2VecPrng) == 28, "prng record is 28 bytes on every platfor
 // `count` records of `recordSize` bytes copied verbatim from sgptDataTables. One file per table
 //; recordSize is sizeof the retail record struct, so a layout
 // mismatch is refused by d2vec_read_header rather than compared byte-by-byte as garbage.
-enum D2VecKind : uint32_t { D2VEC_PRNG = 1, D2VEC_DRLG = 2, D2VEC_ITEMGEN = 3, D2VEC_MONSPAWN = 4, D2VEC_TABLE = 5, D2VEC_COMBAT = 6, D2VEC_AISPAWN = 7, D2VEC_AIFRAME = 8, D2VEC_AITARGET = 9, D2VEC_COMBATRESULT = 10, D2VEC_DAMAGECALC = 11, D2VEC_A1Q6 = 12, D2VEC_A1Q6PLAYER = 13, D2VEC_A1Q6TIMER = 14, D2VEC_A1Q6COMPLETE = 15, D2VEC_A1Q6DROP = 16, D2VEC_A1Q6TRAVEL = 17, D2VEC_NPCDIALOG = 18, D2VEC_NPCRESPONSE = 19, D2VEC_VENDORITEM = 20, D2VEC_VENDORBUY = 21, D2VEC_VENDORSELL = 22 };
+enum D2VecKind : uint32_t { D2VEC_PRNG = 1, D2VEC_DRLG = 2, D2VEC_ITEMGEN = 3, D2VEC_MONSPAWN = 4, D2VEC_TABLE = 5, D2VEC_COMBAT = 6, D2VEC_AISPAWN = 7, D2VEC_AIFRAME = 8, D2VEC_AITARGET = 9, D2VEC_COMBATRESULT = 10, D2VEC_DAMAGECALC = 11, D2VEC_A1Q6 = 12, D2VEC_A1Q6PLAYER = 13, D2VEC_A1Q6TIMER = 14, D2VEC_A1Q6COMPLETE = 15, D2VEC_A1Q6DROP = 16, D2VEC_A1Q6TRAVEL = 17, D2VEC_NPCDIALOG = 18, D2VEC_NPCRESPONSE = 19, D2VEC_VENDORITEM = 20, D2VEC_VENDORBUY = 21, D2VEC_VENDORSELL = 22, D2VEC_HIRE = 23, D2VEC_VENDORMULTIBUY = 24 };
 
 static inline uint32_t d2vec_fnv1a_step(uint32_t h, uint32_t v) {
     for (int i = 0; i < 4; i++) { h ^= (v >> (8 * i)) & 0xFF; h *= 16777619u; }

@@ -74,7 +74,12 @@ inline void LeaveCriticalSection(LPCRITICAL_SECTION) {}
 typedef void (*FARPROC)();
 inline long InterlockedIncrement(long volatile* p) { return *p = *p + 1; }
 inline long InterlockedDecrement(long volatile* p) { return *p = *p - 1; }
-inline DWORD GetTickCount() { return 0; }
+// Retail reads the wall clock; the engine keeps a deterministic frame clock instead
+// (40 ms per game frame, advanced by the session, starting from a retail-like uptime so
+// "last tick + delay" checks on fresh units behave as on a warmed-up server).
+extern "C" DWORD d2web_GetTickCount();
+extern "C" void d2web_AdvanceTickCount(DWORD ms);
+inline DWORD GetTickCount() { return d2web_GetTickCount(); }
 inline void OutputDebugStringA(const char*) {}
 
 #define stricmp  strcasecmp

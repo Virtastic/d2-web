@@ -3732,7 +3732,9 @@ void __fastcall sub_6FD149B0(D2GameStrc* pGame, D2EffectStrc* pEffect)
 
         for (int32_t i = 0; i < unitFindData.nIndex; ++i)
         {
-            ((void(__fastcall*)(D2GameStrc*, D2UnitStrc*, D2UnitStrc*, int32_t, int32_t))pEffect->pfAreaEffect)(pGame, pEffect->pUnit, unitFindData.pUnitsArray[i], pEffect->nSkillLevel, pEffect->unk0x1C);
+            // Every area-effect callback (Baal's corpse explosion, Radament's death) returns
+            // int32_t; wasm checks the indirect call's signature, so the cast must say so.
+            ((int32_t(__fastcall*)(D2GameStrc*, D2UnitStrc*, D2UnitStrc*, int32_t, int32_t))pEffect->pfAreaEffect)(pGame, pEffect->pUnit, unitFindData.pUnitsArray[i], pEffect->nSkillLevel, pEffect->unk0x1C);
         }
 
         UNITFINDS_FreeUnitFindData(&unitFindData);

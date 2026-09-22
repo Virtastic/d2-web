@@ -1214,35 +1214,40 @@ D2UnitStrc* __fastcall sub_6FCC87C0(D2GameStrc* pPlayer, D2UnitStrc* pUnit, D2Un
 }
 
 //D2Game.0x6FCC88B0) --------------------------------------------------------
+extern int32_t dword_6FD4DD80;   // SUnitProxy: item code ' vqc' (weapon-swap auto-equip class)
+extern int32_t dword_6FD4DD84;   // SUnitProxy: item code ' vqa'
 int32_t __fastcall sub_6FCC88B0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pNpc, int32_t nItemGUID, int32_t nItemMode, uint16_t nTransactionType, int32_t nCost, int32_t bMultibuy)
 {
-    // The original recovery below still carries the full stackable/autobelt path as
-    // decompiler notes.  Restore its ordinary, single-item store path first: this is
-    // the path used by generated weapon/armour stock and packet 0x32 with multibuy=0.
+    // Faithful 1.13c port of the store purchase handler, multibuy branch included.  D2MOO left the
+    // whole function `return 0;` (upstream never recovered it); this restores it from the decompiler
+    // notes with the two 1.13c divergences the single-item path already carried: the bought item is
+    // marked IFLAG_TARGET and the success 0x2A carries transaction type 4 (1.10f sent type 1 and the
+    // literal item id 2), verified byte-for-byte against the kind-21 buy and kind-24 multibuy vectors.
+    // The label structure (L111/L113/L115/L117) mirrors the decompiler to keep the port 1:1.
     D2_ASSERT(pGame);
     D2UnitStrc* pItem = SUNIT_GetServerUnit(pGame, UNIT_ITEM, nItemGUID);
-    if (!pItem || (nTransactionType != TRANSACTIONTYPE_BUY && nTransactionType != TRANSACTIONTYPE_GAMBLE) || bMultibuy)
+    if (!pItem)
     {
         D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 7,
             STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), nItemGUID, 0);
         return 1;
     }
 
-    // d2-web: the gamble branch of the original (its decompiler notes below): the item must sit
-    // in this player's gamble inventory with the NPC, and the price is the gamble price.
-    // Kind 21 phase-2 vectors (s84) measure it.
-    D2InventoryStrc* pSourceInventory = nullptr;
-    if (nTransactionType == TRANSACTIONTYPE_GAMBLE)
+    const int32_t nTab = nTransactionType;
+    if (nTab)
     {
-        pSourceInventory = SUNITPROXY_GetGambleInventory(pGame, pPlayer, pNpc);
-        if (!pSourceInventory || ITEMS_IsInPlayersInventory(pNpc, pItem, pSourceInventory) != 1)
+        if (nTab == 2)   // gamble: the item must sit in this player's gamble inventory with the NPC
         {
-            D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 7,
-                STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), nItemGUID, 0);
-            return 1;
+            D2InventoryStrc* pGambleInventory = SUNITPROXY_GetGambleInventory(pGame, pPlayer, pNpc);
+            if (!pGambleInventory || ITEMS_IsInPlayersInventory(pNpc, pItem, pGambleInventory) != 1)
+            {
+                D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 7,
+                    STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), nItemGUID, 0);
+                return 1;
+            }
         }
     }
-    else if (!ITEMS_IsInPlayersInventory(pNpc, pItem, 0) || pItem->dwAnimMode != nItemMode)
+    else if (!ITEMS_IsInPlayersInventory(pNpc, pItem, 0) || pItem->dwAnimMode != (uint32_t)nItemMode)   // 1.13c: also gate on the item mode
     {
         D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 7,
             STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), nItemGUID, 0);
@@ -1250,487 +1255,250 @@ int32_t __fastcall sub_6FCC88B0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitSt
     }
 
     const int32_t nVendorId = pNpc ? pNpc->dwClassId : -1;
-    const int32_t nServerCost = ITEMS_GetTransactionCost(pPlayer, pItem, (D2C_Difficulties)pGame->nDifficulty,
-        UNITS_GetPlayerData(pPlayer)->pQuestData[pGame->nDifficulty], nVendorId, (D2C_TransactionTypes)nTransactionType);
-    const int32_t nGold = STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0);
-    const int32_t nBank = STATLIST_UnitGetStatValue(pPlayer, STAT_GOLDBANK, 0);
-    if (nServerCost > nGold + nBank)
+    const int32_t nDifficulty = pGame->nDifficulty;
+    int32_t nServerCost = ITEMS_GetTransactionCost(pPlayer, pItem, (D2C_Difficulties)nDifficulty,
+        UNITS_GetPlayerData(pPlayer)->pQuestData[nDifficulty], nVendorId, (D2C_TransactionTypes)nTab);
+    const int32_t nMoney = STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0) + STATLIST_UnitGetStatValue(pPlayer, STAT_GOLDBANK, 0);
+    if (nServerCost > nMoney)
     {
-        D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 12, nGold, -1, 0);
-        return 0;
-    }
-    if (INVENTORY_GetCursorItem(pPlayer->pInventory))
-    {
-        D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 7, nGold, -1, 0);
-        return 1;
-    }
-
-    D2UnitStrc* pBoughtItem = ITEMS_Duplicate(pGame, pItem, pNpc, 1);
-    if (!pBoughtItem)
-    {
-        D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 9, nGold, -1, 0);
-        return 1;
-    }
-    if (nCost > nGold)
-    {
-        PLRTRADE_AddGold(pPlayer, STAT_GOLD, -nGold);
-        PLRTRADE_AddGold(pPlayer, STAT_GOLDBANK, nGold - nCost);
-    }
-    else
-    {
-        PLRTRADE_AddGold(pPlayer, STAT_GOLD, -nCost);
-    }
-    UNITS_GetPlayerData(pPlayer)->dwBoughtItemId = pBoughtItem->dwUnitId;
-    UNITS_ChangeAnimMode(pBoughtItem, IMODE_ONCURSOR);
-    ITEMS_SetInvPage(pBoughtItem, 0);
-    if (!D2GAME_PlaceItem_6FC44410(__FILE__, __LINE__, pGame, pPlayer, pBoughtItem->dwUnitId, 0, 0, 1, 1, 0))
-    {
-        PLRTRADE_AddGold(pPlayer, STAT_GOLD, nCost);
-        ITEMS_RemoveFromAllPlayers(pGame, pBoughtItem);
-        D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 10,
+        D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 12,
             STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), -1, 0);
         return 0;
     }
-    sub_6FCC7E20(pGame, pNpc, pItem, pPlayer, nTransactionType);
-    // d2-web: 1.13c (D2Game 0x6FCDEC84) marks the bought item IFLAG_TARGET and answers with
-    // transaction type 4, where 1.10f sent 1 and left the flag clear; captured with kind 21.
-    ITEMS_SetItemFlag(pBoughtItem, IFLAG_TARGET, 1);
-    D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 0,
-        STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), pBoughtItem->dwUnitId, 4);
-    return 0;
 
-//    D2GameStrc* v8; // ebx@1
-//    D2UnitStrc* v9; // esi@1
-//    D2UnitStrc* v10; // ebp@4
-//    D2InventoryStrc* v11; // eax@9
-//    int32_t v12; // edi@16
-//    D2PlayerDataStrc* v13; // eax@16
-//    int32_t v14; // edi@16
-//    D2NpcRecordStrc* v15; // edi@20
-//    int32_t v16; // eax@26
-//    int32_t v17; // ecx@26
-//    uint32_t* v18; // edx@27
-//    int32_t v19; // edi@36
-//    int32_t v20; // ebx@36
-//    int32_t v21; // edi@38
-//    int32_t v22; // ebx@38
-//    int32_t v23; // edi@49
-//    int32_t v24; // ebx@51
-//    D2PlayerDataStrc* v25; // eax@51
-//    int32_t v26; // eax@51
-//    uint32_t v27; // edi@51
-//    D2UnitStrc* v28; // ebx@51
-//    int32_t v29; // eax@51
-//    int32_t v30; // ecx@51
-//    int32_t v31; // edi@58
-//    int32_t v32; // edi@60
-//    int32_t v33; // ST158_4@67
-//    D2ClientStrc* v34; // eax@67
-//    uint32_t v35; // ST15C_4@67
-//    D2UnitStrc* v36; // edi@75
-//    int32_t v37; // ebp@80
-//    int32_t v38; // edx@80
-//    int32_t v39; // eax@80
-//    int32_t v40; // ebp@82
-//    int32_t v41; // eax@91
-//    D2InventoryStrc* v42; // ebx@95
-//    int32_t v43; // eax@96
-//    D2UnitStrc* v44; // ebx@100
-//    int32_t v45; // eax@100
-//    int32_t v46; // ST158_4@117
-//    D2ClientStrc* v47; // eax@117
-//    int32_t v48; // eax@120
-//    int32_t v49; // ebx@121
-//    int32_t v50; // eax@127
-//    int32_t v51; // ebx@128
-//    D2ClientStrc* v52; // eax@136
-//    D2ClientStrc* v54; // eax@139
-//    int32_t v55; // [sp+150h] [bp-4Ch]@7
-//    int32_t v56; // [sp+150h] [bp-4Ch]@17
-//    int32_t v57; // [sp+154h] [bp-48h]@7
-//    int32_t v58; // [sp+154h] [bp-48h]@17
-//    int32_t v59; // [sp+158h] [bp-44h]@7
-//    int32_t v60; // [sp+158h] [bp-44h]@17
-//    int32_t v61; // [sp+15Ch] [bp-40h]@7
-//    int32_t v62; // [sp+15Ch] [bp-40h]@17
-//    int32_t v63; // [sp+160h] [bp-3Ch]@7
-//    int32_t v64; // [sp+160h] [bp-3Ch]@17
-//    D2GameStrc* v65; // [sp+174h] [bp-28h]@1
-//    D2UnitStrc* v66; // [sp+178h] [bp-24h]@32
-//    int32_t v67; // [sp+178h] [bp-24h]@46
-//    int32_t v68; // [sp+17Ch] [bp-20h]@32
-//    int32_t v69; // [sp+180h] [bp-1Ch]@5
-//    int32_t v70; // [sp+184h] [bp-18h]@16
-//    D2InventoryStrc* v71; // [sp+188h] [bp-14h]@18
-//    D2UnitStrc* v72; // [sp+18Ch] [bp-10h]@4
-//    int32_t v73; // [sp+190h] [bp-Ch]@75
-//    int32_t v74; // [sp+194h] [bp-8h]@20
-//    int32_t v75; // [sp+198h] [bp-4h]@96
-//    int32_t v76; // [sp+1A0h] [bp+4h]@121
-//    int32_t v77; // [sp+1A0h] [bp+4h]@128
-//    int32_t v78; // [sp+1A4h] [bp+8h]@14
-//    int32_t v79; // [sp+1A4h] [bp+8h]@21
-//    int32_t v80; // [sp+1A4h] [bp+8h]@33
-//    int32_t v81; // [sp+1A4h] [bp+8h]@48
-//    int32_t v82; // [sp+1A4h] [bp+8h]@51
-//    int32_t v83; // [sp+1A4h] [bp+8h]@56
-//    int32_t v84; // [sp+1A4h] [bp+8h]@71
-//    char v85; // [sp+1A4h] [bp+8h]@100
-//    int32_t v86; // [sp+1ACh] [bp+10h]@16
-//    int32_t v87; // [sp+1ACh] [bp+10h]@51
-//    int32_t v88; // [sp+1B4h] [bp+18h]@58
-//    int32_t v89; // [sp+1B4h] [bp+18h]@60
-//
-//    v8 = pGame;
-//    v9 = pPlayer;
-//    v65 = pGame;
-//    
-//    D2_ASSERT(pGame);
-//
-//    v10 = SUNIT_GetServerUnit(pGame, 4, nItemGUID);
-//    v72 = v10;
-//    if (!v10)
-//    {
-//        D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(v9, __FILE__, __LINE__), 0x2Au, 7, STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0), nItemGUID, 0);
-//        return 1;
-//    }
-//
-//    v69 = nTab;
-//    if (nTab)
-//    {
-//        if (nTab == 2)
-//        {
-//            v11 = SUNITPROXY_GetGambleInventory(v8, v9, pNpc);
-//            if (!v11)
-//            {
-//                D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(v9, __FILE__, __LINE__), 0x2Au, 7, STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0), nItemGUID, 0);
-//                return 1;
-//            }
-//
-//            if (ITEMS_IsInPlayersInventory(pNpc, v10, v11) != 1)
-//            {
-//                D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(v9, __FILE__, __LINE__), 0x2Au, 7, STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0), nItemGUID, 0);
-//                return 1;
-//            }
-//        }
-//    }
-//    else
-//    {
-//        if (!ITEMS_IsInPlayersInventory(pNpc, v10, 0))
-//        {
-//            D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(v9, __FILE__, __LINE__), 0x2Au, 7, STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0), nItemGUID, 0);
-//            return 1;
-//        }
-//    }
-//
-//    if (pNpc)
-//        v78 = pNpc->dwClassId;
-//    else
-//        v78 = -1;
-//
-//    v12 = v8->nDifficulty;
-//    v13 = UNITS_GetPlayerData(v9);
-//    v86 = ITEMS_GetTransactionCost(v9, v10, v12, v13->pQuestData[v12], v78, v69);
-//    v14 = STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0);
-//    v70 = v14 + STATLIST_UnitGetStatValue(v9, STAT_GOLDBANK, 0);
-//    if (v86 > v70)
-//    {
-//        D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(v9, __FILE__, __LINE__), 0x2Au, 12, STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0), -1, 0);
-//        return 0;
-//    }
-//
-//    v71 = v9->pInventory;
-//    if (INVENTORY_GetCursorItem(v71))
-//    {
-//        D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(v9, __FILE__, __LINE__), 0x2Au, 7, STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0), -1, 0);
-//        return 1;
-//    }
-//
-//    v15 = UNITPROXY_GetNpcRecordFromUnit(v8, pNpc, &v74);
-//    if (!v15)
-//        goto LABEL_30;
-//
-//    v79 = ITEMS_GetBaseCode(v10);
-//    if (v8->nDifficulty && (v79 == ' 4ph' || v79 == ' 5ph' || v79 == ' 4pm' || v79 == ' 5pm'))
-//        goto LABEL_31;
-//
-//    v16 = v15->npcTrade.pProxy.nPerms;
-//    v17 = 0;
-//    if (v16 <= 0)
-//    {
-//LABEL_30:
-//        a8 = 0;
-//        goto LABEL_31;
-//    }
-//
-//    v18 = v15->npcTrade.pProxy.pPermCache;
-//    while (v79 != *v18)
-//    {
-//        ++v17;
-//        ++v18;
-//        if (v17 >= v16)
-//            goto LABEL_30;
-//    }
-//
-//LABEL_31:
-//    if (ITEMS_CheckItemTypeId(v10, 22))
-//    {
-//        v66 = sub_6FC4B430(v8, v9, v10, &v68);
-//        if (v66)
-//        {
-//            v80 = 1;
-//            if (a8)
-//            {
-//                v80 = v70 / (uint32_t)v86;
-//                if ((int32_t)(v70 / (uint32_t)v86) > v68)
-//                    v80 = v68;
-//            }
-//
-//            v19 = v86 * v80;
-//            v20 = STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0);
-//            if (v20 + STATLIST_UnitGetStatValue(v9, STAT_GOLDBANK, 0) < v86 * v80)
-//            {
-//                D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(v9, __FILE__, __LINE__), 0x2Au, 12, STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0), -1, 0);
-//                return 0;
-//            }
-//            else
-//            {
-//                if (v19 > v20)
-//                {
-//                    PLRTRADE_AddGold(v9, STAT_GOLD, -v20);
-//                    PLRTRADE_AddGold(v9, STAT_GOLDBANK, v20 - v19);
-//                }
-//                else
-//                {
-//                    PLRTRADE_AddGold(v9, STAT_GOLD, -v19);
-//                }
-//
-//                sub_6FC4B520(v65, v9, v66, v80);
-//                sub_6FCC7E20(v65, pNpc, v10, v9, v69);
-//                D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(v9, __FILE__, __LINE__), 0x2Au, 0, STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0), v66->dwUnitId, 5);
-//                return 0;
-//            }
-//        }
-//    }
-//
-//    v67 = STATLIST_UnitGetStatValue(v10, STAT_QUANTITY, 0);
-//    if (!a8 || !ITEMS_GetAutoStack(v10))
-//        goto LABEL_71;
-//
-//    v81 = STATLIST_UnitGetStatValue(v10, STAT_QUANTITY, 0);
-//    STATLIST_SetUnitStat(v10, STAT_QUANTITY, 1, 0);
-//    if (pNpc)
-//        v23 = pNpc->dwClassId;
-//    else
-//        v23 = -1;
-//
-//    v24 = v65->nDifficulty;
-//    v25 = UNITS_GetPlayerData(v9);
-//    v26 = ITEMS_GetTransactionCost(v9, v10, v24, v25->pQuestData[v24], v23, 0);
-//    v27 = v26;
-//    v87 = v26;
-//    STATLIST_SetUnitStat(v10, STAT_QUANTITY, v81, 0);
-//    v82 = v70 / v27;
-//    v28 = sub_6FCC87C0(v65, v9, v10, &v70);
-//    v29 = v70;
-//    v30 = v70;
-//    if (v70 >= v82)
-//        v30 = v82;
-//
-//    if (!v28)
-//    {
-//        v67 = v30;
-//        if (v30 <= 1)
-//            v67 = 1;
-//
-//        v8 = v65;
-//        v86 = v27 * v67;
-//LABEL_71:
-//        v84 = 0;
-//        v70 = 0;
-//        if (!ITEMS_CheckIfAutoBeltable(v71, v10))
-//            a8 = 0;
-//
-//        while (1)
-//        {
-//            if (v70 && !a8)
-//                return 0;
-//
-//            v73 = STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0);
-//            v74 = STATLIST_UnitGetStatValue(v9, STAT_GOLDBANK, 0);
-//            v36 = ITEMS_Duplicate(v8, v10, pNpc, 1);
-//            if (!v36)
-//            {
-//                D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(v9, __FILE__, __LINE__), 0x2Au, 9, STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0), -1, 0);
-//                return 1;
-//            }
-//
-//            if (a8 && ITEMS_CheckIfStackable(v36) && v67)
-//                STATLIST_SetUnitStat(v36, STAT_QUANTITY, v67, 0);
-//
-//            v37 = STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0);
-//            v38 = STATLIST_UnitGetStatValue(v9, STAT_GOLDBANK, 0);
-//            v39 = nCost;
-//            if (v37 + v38 < nCost)
-//            {
-//                D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(v9, __FILE__, __LINE__), 0x2Au, 12, STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0), -1, 0);
-//                return 0;
-//            }
-//
-//            if (nCost > v37)
-//            {
-//                PLRTRADE_AddGold(v9, STAT_GOLD, -v37);
-//                PLRTRADE_AddGold(v9, STAT_GOLDBANK, v37 - v86);
-//            }
-//            else
-//            {
-//                PLRTRADE_AddGold(v9, STAT_GOLD, -nCost);
-//            }
-//
-//            UNITS_GetPlayerData(v9)->dwBoughtItemId = v36->dwUnitId;
-//            UNITS_ChangeAnimMode(v36, 4);
-//            v42 = v71;
-//            v68 = v36->dwClassId;
-//            if (ITEMS_CheckIfAutoBeltable(v71, v36))
-//            {
-//                v43 = sub_6FC48940(v65, v9, v36->dwUnitId, 0, 1, &v75);
-//                v84 = v43;
-//                if (v43)
-//                    goto LABEL_117;
-//
-//                a8 = 0;
-//            }
-//            else
-//            {
-//                v43 = v84;
-//            }
-//
-//            if (!v43)
-//                break;
-//
-//LABEL_117:
-//            sub_6FCC7E20(v65, pNpc, v72, v9, v69);
-//            ITEMS_SetItemFlag(v36, IFLAG_TARGET, 1);
-//            D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(v9, __FILE__, __LINE__), 0x2Au, 0, STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0), 2, 1);
-//            v10 = v72;
-//            v8 = v65;
-//            v70 = 1;
-//        }
-//
-//        v85 = 1;
-//        v44 = INVENTORY_GetLeftHandWeapon(v42);
-//        v45 = UNITS_GetWeaponClass(v9);
-//        if (v68 == dword_6FD4DD80 && v44 && v45 != 7)
-//            v85 = 0;
-//
-//        if (v68 == dword_6FD4DD84)
-//        {
-//            if (!v44)
-//                goto LABEL_111;
-//
-//            if (v45 != 1)
-//                v85 = 0;
-//        }
-//
-//        if (v44)
-//        {
-//            if (!ITEMS_CheckItemTypeId(v36, 45))
-//                goto LABEL_113;
-//
-//            goto LABEL_115;
-//        }
-//
-//LABEL_111:
-//        if (v68 != dword_6FD4DD80 && v68 != dword_6FD4DD84)
-//        {
-//LABEL_113:
-//            if (v85)
-//            {
-//                v84 = sub_6FC4A9B0(v65, v9, v36, 0);
-//                if (v84)
-//                    goto LABEL_117;
-//            }
-//        }
-//
-//LABEL_115:
-//        if (v70 || (ITEMS_SetInvPage(v36, 0), (v84 = D2GAME_PlaceItem_6FC44410(__FILE__, __LINE__, v65, v9, v36->dwUnitId, 0, 0, 1, 1, 0)) == 0))
-//        {
-//            v48 = STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0);
-//            if (v73 != v48)
-//            {
-//                v76 = v73 - STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0);
-//                PLRTRADE_AddGold(v9, STAT_GOLD, v76);
-//            }
-//
-//            v50 = STATLIST_UnitGetStatValue(v9, STAT_GOLDBANK, 0);
-//            if (v74 != v50)
-//            {
-//                v77 = v74 - STATLIST_UnitGetStatValue(v9, STAT_GOLDBANK, 0);
-//                PLRTRADE_AddGold(v9, STAT_GOLDBANK, v77);
-//            }
-//
-//            ITEMS_RemoveFromAllPlayers(v65, v36);
-//            if (!v70)
-//            {
-//                D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(v9, __FILE__, __LINE__), 0x2Au, 10, STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0), -1, 0);
-//                return 0;
-//            }
-//
-//            return 0;
-//        }
-//        goto LABEL_117;
-//    }
-//
-//    if (v70 >= v82)
-//        v29 = v82;
-//
-//    v83 = v29;
-//    v64 = 0;
-//    if (v29 > 0)
-//    {
-//        v31 = v87 * v29;
-//        v88 = STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0);
-//        if (v88 + STATLIST_UnitGetStatValue(v9, STAT_GOLDBANK, 0) < v87 * v83)
-//        {
-//            v64 = 0;
-//            v62 = -1;
-//            v60 = STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0);
-//            v58 = 12;
-//            v56 = 2076;
-//        }
-//        else
-//        {
-//            if (v31 > v88)
-//            {
-//                PLRTRADE_AddGold(v9, STAT_GOLD, -v88);
-//                PLRTRADE_AddGold(v9, STAT_GOLDBANK, v88 - v31);
-//            }
-//            else
-//            {
-//                PLRTRADE_AddGold(v9, STAT_GOLD, -v31);
-//            }
-//
-//            sub_6FCC7E20(v65, pNpc, v10, v9, v69);
-//            STATLIST_AddUnitStat(v28, STAT_QUANTITY, v83, 0);
-//            v33 = STATLIST_UnitGetStatValue(v28, STAT_QUANTITY, 0);
-//            v34 = SUNIT_GetClientFromPlayer(v9, __FILE__, __LINE__);
-//            D2GAME_PACKETS_SendPacket0x3E_6FC3EC20(v34, v28, 1, STAT_QUANTITY, v33, v35, v64);
-//            v62 = 5;
-//            v60 = STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0);
-//            v58 = 0;
-//            v56 = 2085;
-//        }
-//    }
-//    else
-//    {
-//        v62 = -1;
-//        v60 = STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0);
-//        v58 = 12;
-//        v56 = 2071;
-//    }
-//
-//    D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(v9, __FILE__, __LINE__v56), 0x2Au, v58, STATLIST_UnitGetStatValue(v9, STAT_GOLD, 0), v62, v64);
-//    return 0;
+    D2InventoryStrc* pInventory = pPlayer->pInventory;
+    if (INVENTORY_GetCursorItem(pInventory))
+    {
+        D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 7,
+            STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), -1, 0);
+        return 1;
+    }
+
+    // Multibuy is only honoured for items in the vendor's permanent restock cache (kept, in higher
+    // difficulty, for the four hi-rune codes without the cache scan); otherwise a single purchase.
+    int32_t nRecordIndex = 0;
+    D2NpcRecordStrc* pNpcRecord = SUNITPROXY_GetNpcRecordFromUnit(pGame, pNpc, &nRecordIndex);
+    if (!pNpcRecord)
+    {
+        bMultibuy = 0;
+    }
+    else
+    {
+        const uint32_t nBaseCode = ITEMS_GetBaseCode(pItem);
+        const bool bHiRune = nDifficulty && (nBaseCode == ' 4ph' || nBaseCode == ' 5ph' || nBaseCode == ' 4pm' || nBaseCode == ' 5pm');
+        if (!bHiRune)
+        {
+            const int32_t nPerms = pNpcRecord->npcTrade.pProxy.nPerms;
+            const uint32_t* pPermCache = pNpcRecord->npcTrade.pProxy.pPermCache;
+            if (nPerms <= 0)
+            {
+                bMultibuy = 0;
+            }
+            else
+            {
+                int32_t i = 0;
+                while (nBaseCode != pPermCache[i])
+                {
+                    if (++i >= nPerms) { bMultibuy = 0; break; }
+                }
+            }
+        }
+    }
+
+    // Item type 22 (charges topped up on a matching item already carried).
+    if (ITEMS_CheckItemTypeId(pItem, 22))
+    {
+        int32_t nCapacity = 0;
+        D2UnitStrc* pCharged = sub_6FC4B430(pGame, pPlayer, pItem, &nCapacity);
+        if (pCharged)
+        {
+            int32_t nCount = 1;
+            if (bMultibuy)
+            {
+                nCount = (int32_t)((uint32_t)nMoney / (uint32_t)nServerCost);
+                if (nCount > nCapacity) nCount = nCapacity;
+            }
+            const int32_t nTotal = nServerCost * nCount;
+            const int32_t nGold = STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0);
+            if (nGold + STATLIST_UnitGetStatValue(pPlayer, STAT_GOLDBANK, 0) < nServerCost * nCount)
+            {
+                D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 12,
+                    STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), -1, 0);
+                return 0;
+            }
+            if (nTotal > nGold)
+            {
+                PLRTRADE_AddGold(pPlayer, STAT_GOLD, -nGold);
+                PLRTRADE_AddGold(pPlayer, STAT_GOLDBANK, nGold - nTotal);
+            }
+            else
+            {
+                PLRTRADE_AddGold(pPlayer, STAT_GOLD, -nTotal);
+            }
+            sub_6FC4B520(pGame, pPlayer, pCharged, nCount);
+            sub_6FCC7E20(pGame, pNpc, pItem, pPlayer, nTab);
+            D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 0,
+                STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), pCharged->dwUnitId, 5);
+            return 0;
+        }
+    }
+
+    int32_t nStackQuantity = STATLIST_UnitGetStatValue(pItem, STAT_QUANTITY, 0);   // v67
+    D2UnitStrc* pMergeStack = nullptr;   // v28
+    int32_t nUnitCost = nServerCost;     // v87
+    int32_t nMerge = 0;                  // v29 basis (fill from helper)
+    int32_t nAfford = 0;                 // v82
+    bool bNewStack = true;
+    if (bMultibuy && ITEMS_GetAutoStack(pItem))
+    {
+        const int32_t nSaved = STATLIST_UnitGetStatValue(pItem, STAT_QUANTITY, 0);
+        STATLIST_SetUnitStat(pItem, STAT_QUANTITY, 1, 0);
+        const int32_t nVendorId2 = pNpc ? pNpc->dwClassId : -1;
+        nUnitCost = ITEMS_GetTransactionCost(pPlayer, pItem, (D2C_Difficulties)pGame->nDifficulty,
+            UNITS_GetPlayerData(pPlayer)->pQuestData[pGame->nDifficulty], nVendorId2, (D2C_TransactionTypes)0);
+        STATLIST_SetUnitStat(pItem, STAT_QUANTITY, nSaved, 0);
+        nAfford = (int32_t)((uint32_t)nMoney / (uint32_t)nUnitCost);
+        int32_t nFill = 0;
+        pMergeStack = sub_6FCC87C0(pGame, pPlayer, pItem, &nFill);
+        nMerge = nFill;
+        int32_t nClamped = nFill;
+        if (nFill >= nAfford) nClamped = nAfford;
+        if (!pMergeStack)
+        {
+            nStackQuantity = nClamped <= 1 ? 1 : nClamped;
+            nServerCost = nUnitCost * nStackQuantity;
+            bNewStack = true;
+        }
+        else
+        {
+            bNewStack = false;
+        }
+    }
+
+    if (bNewStack)
+    {
+        int32_t nEquipResult = 0;   // v84
+        int32_t nBought = 0;        // v70
+        int32_t nDupeClass = 0;     // v68
+        int32_t nGoldSaved = 0, nBankSaved = 0;   // v73, v74
+        D2UnitStrc* pDupe = nullptr;   // v36
+        if (!ITEMS_CheckIfAutoBeltable(pInventory, pItem)) bMultibuy = 0;
+        while (true)
+        {
+            if (nBought && !bMultibuy) return 0;
+            nGoldSaved = STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0);
+            nBankSaved = STATLIST_UnitGetStatValue(pPlayer, STAT_GOLDBANK, 0);
+            pDupe = ITEMS_Duplicate(pGame, pItem, pNpc, 1);
+            if (!pDupe)
+            {
+                D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 9,
+                    STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), -1, 0);
+                return 1;
+            }
+            if (bMultibuy && ITEMS_CheckIfStackable(pDupe) && nStackQuantity)
+                STATLIST_SetUnitStat(pDupe, STAT_QUANTITY, nStackQuantity, 0);
+            {
+                // The server charges its own recomputed price (nServerCost == v86 == unit * fill),
+                // not the client's nCost: for a non-autostack item the two are equal, but a filled
+                // stack multibuy costs unit*quantity, which the autostack cases (kind 24) measure.
+                const int32_t nGold = STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0);
+                const int32_t nBank = STATLIST_UnitGetStatValue(pPlayer, STAT_GOLDBANK, 0);
+                if (nGold + nBank < nServerCost)
+                {
+                    D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 12,
+                        STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), -1, 0);
+                    return 0;
+                }
+                if (nServerCost > nGold)
+                {
+                    PLRTRADE_AddGold(pPlayer, STAT_GOLD, -nGold);
+                    PLRTRADE_AddGold(pPlayer, STAT_GOLDBANK, nGold - nServerCost);
+                }
+                else
+                {
+                    PLRTRADE_AddGold(pPlayer, STAT_GOLD, -nServerCost);
+                }
+            }
+            UNITS_GetPlayerData(pPlayer)->dwBoughtItemId = pDupe->dwUnitId;
+            UNITS_ChangeAnimMode(pDupe, IMODE_ONCURSOR);
+            nDupeClass = pDupe->dwClassId;
+            if (ITEMS_CheckIfAutoBeltable(pInventory, pDupe))
+            {
+                int32_t nSlot = 0;
+                nEquipResult = sub_6FC48940(pGame, pPlayer, pDupe->dwUnitId, 0, 1, &nSlot);
+                if (nEquipResult) goto L117_loop;
+                bMultibuy = 0;
+            }
+            if (!nEquipResult) break;
+        L117_loop:
+            sub_6FCC7E20(pGame, pNpc, pItem, pPlayer, nTab);
+            ITEMS_SetItemFlag(pDupe, IFLAG_TARGET, 1);   // 1.13c
+            D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 0,
+                STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), pDupe->dwUnitId, 4);   // 1.13c: type 4, real id
+            nBought = 1;
+        }
+
+        // 1.13c places the final (non-belt) item straight into the inventory grid: unlike the 1.10f
+        // decompiler notes it does not attempt the weapon-swap auto-equip (sub_6FC4A9B0), which the
+        // validated single-item buy path (s82) also omits -- the store never equips a purchase.
+        (void)nDupeClass;
+        if (nBought || (ITEMS_SetInvPage(pDupe, 0),
+            D2GAME_PlaceItem_6FC44410(__FILE__, __LINE__, pGame, pPlayer, pDupe->dwUnitId, 0, 0, 1, 1, 0) == 0))
+        {
+            const int32_t nGoldNow = STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0);
+            if (nGoldSaved != nGoldNow) PLRTRADE_AddGold(pPlayer, STAT_GOLD, nGoldSaved - nGoldNow);
+            const int32_t nBankNow = STATLIST_UnitGetStatValue(pPlayer, STAT_GOLDBANK, 0);
+            if (nBankSaved != nBankNow) PLRTRADE_AddGold(pPlayer, STAT_GOLDBANK, nBankSaved - nBankNow);
+            ITEMS_RemoveFromAllPlayers(pGame, pDupe);
+            if (!nBought)
+            {
+                D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 10,
+                    STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), -1, 0);
+                return 0;
+            }
+            return 0;
+        }
+        sub_6FCC7E20(pGame, pNpc, pItem, pPlayer, nTab);
+        ITEMS_SetItemFlag(pDupe, IFLAG_TARGET, 1);   // 1.13c
+        D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 0,
+            STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), pDupe->dwUnitId, 4);   // 1.13c: type 4, real id
+        return 0;
+    }
+
+    // Existing-stack merge: top up pMergeStack in place.
+    int32_t nMergeQty = nMerge;   // v83
+    if (nMerge >= nAfford) nMergeQty = nAfford;
+    if (nMergeQty > 0)
+    {
+        const int32_t nTotal = nUnitCost * nMergeQty;
+        const int32_t nGold = STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0);
+        if (nGold + STATLIST_UnitGetStatValue(pPlayer, STAT_GOLDBANK, 0) < nUnitCost * nMergeQty)
+        {
+            D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 12,
+                STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), -1, 0);
+            return 0;
+        }
+        if (nTotal > nGold)
+        {
+            PLRTRADE_AddGold(pPlayer, STAT_GOLD, -nGold);
+            PLRTRADE_AddGold(pPlayer, STAT_GOLDBANK, nGold - nTotal);
+        }
+        else
+        {
+            PLRTRADE_AddGold(pPlayer, STAT_GOLD, -nTotal);
+        }
+        sub_6FCC7E20(pGame, pNpc, pItem, pPlayer, nTab);
+        STATLIST_AddUnitStat(pMergeStack, STAT_QUANTITY, nMergeQty, 0);
+        const int32_t nNewQty = STATLIST_UnitGetStatValue(pMergeStack, STAT_QUANTITY, 0);
+        D2GAME_PACKETS_SendPacket0x3E_6FC3EC20(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__),
+            pMergeStack, 1, STAT_QUANTITY, nNewQty, 0);
+        D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 0,
+            STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), pMergeStack->dwUnitId, 5);
+        return 0;
+    }
+    D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 12,
+        STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), -1, 0);
+    return 0;
 }
 
 //D2Game.0x6FCC92A0
