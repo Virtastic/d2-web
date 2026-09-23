@@ -459,7 +459,45 @@ static_assert(sizeof(D2VecPrng) == 28, "prng record is 28 bytes on every platfor
 // `count` records of `recordSize` bytes copied verbatim from sgptDataTables. One file per table
 //; recordSize is sizeof the retail record struct, so a layout
 // mismatch is refused by d2vec_read_header rather than compared byte-by-byte as garbage.
-enum D2VecKind : uint32_t { D2VEC_PRNG = 1, D2VEC_DRLG = 2, D2VEC_ITEMGEN = 3, D2VEC_MONSPAWN = 4, D2VEC_TABLE = 5, D2VEC_COMBAT = 6, D2VEC_AISPAWN = 7, D2VEC_AIFRAME = 8, D2VEC_AITARGET = 9, D2VEC_COMBATRESULT = 10, D2VEC_DAMAGECALC = 11, D2VEC_A1Q6 = 12, D2VEC_A1Q6PLAYER = 13, D2VEC_A1Q6TIMER = 14, D2VEC_A1Q6COMPLETE = 15, D2VEC_A1Q6DROP = 16, D2VEC_A1Q6TRAVEL = 17, D2VEC_NPCDIALOG = 18, D2VEC_NPCRESPONSE = 19, D2VEC_VENDORITEM = 20, D2VEC_VENDORBUY = 21, D2VEC_VENDORSELL = 22, D2VEC_HIRE = 23, D2VEC_VENDORMULTIBUY = 24 };
+// TILE: one record = one tile the 1.13c DRLG placed in a room, read out of retail's own memory
+// after AddRoomData. This is the terrain oracle: the browser engine builds its draw list from the
+// same DRLG, so a record-for-record diff turns rendering from an assertion ("tiles resolved", "the
+// canvas is painted") into a comparison with retail -- the standard every other subsystem is held
+// to and the one rendering was missing when every floor tile in the game drew the wrong art.
+//
+// 1.13c offsets, derived by scanning under Wine (D2CAPTURE_SCANROOM) because D2MOO's headers are
+// the 1.10f decompile and differ here: Room1 records are 0x80 bytes; Room1+0x08 -> tile struct;
+// that struct holds (array pointer, count) at +0x08/+0x0C; records are 0x30 bytes and BEGIN with
+// screen X and Y -- not with a pointer to the D2CMP entry, which is the 1.10f shape.
+// Identified by the first record reading (-720, 93840), the exact screen position the browser
+// engine independently computes for the town's first floor tile.
+struct D2VecTile {
+    uint32_t seed;
+    uint8_t  difficulty, act;
+    uint16_t level;
+    uint32_t roomOrdinal, tileIndex;
+    int32_t  screenX, screenY;
+    uint8_t  layer;              // which (array,count) pair in the tile struct: 0 @+0x00, 1 @+0x08, 2 @+0x10
+    uint8_t  pad[3];
+    int32_t  tileX, tileY;       // record +0x08 / +0x0C
+    // The art identity is not in the 0x30 record: record +0x18 points at the D2CMP library entry,
+    // whose layout is the DT1 block header. These offsets are into that entry, located by s141.
+    int32_t  orientation;        // entry +0x14
+    int32_t  mainIndex;          // entry +0x18
+    int32_t  subIndex;           // entry +0x1C
+    int32_t  frameIndex;         // entry +0x20 (the rarity/animation-frame selector)
+    uint16_t material;           // entry +0x06
+    uint16_t pad2;
+    int32_t  width;              // entry +0x0C
+    int32_t  height;             // entry +0x08 (negative: tiles hang above their anchor)
+    // The tile RECORD's own words at +0x10 and +0x14. +0x14 reads like flags (0x00046001 on the
+    // first town floor). Needed to settle whether retail's ninth-row copy is flagged differently
+    // from the neighbour's interior copy -- adding that record contributes MAPTILE_UNWALKABLE and
+    // MAPTILE_FILL_LOS in our engine and moved monster spawn.
+    uint32_t word10, flags14;
+};
+
+enum D2VecKind : uint32_t { D2VEC_PRNG = 1, D2VEC_DRLG = 2, D2VEC_ITEMGEN = 3, D2VEC_MONSPAWN = 4, D2VEC_TABLE = 5, D2VEC_COMBAT = 6, D2VEC_AISPAWN = 7, D2VEC_AIFRAME = 8, D2VEC_AITARGET = 9, D2VEC_COMBATRESULT = 10, D2VEC_DAMAGECALC = 11, D2VEC_A1Q6 = 12, D2VEC_A1Q6PLAYER = 13, D2VEC_A1Q6TIMER = 14, D2VEC_A1Q6COMPLETE = 15, D2VEC_A1Q6DROP = 16, D2VEC_A1Q6TRAVEL = 17, D2VEC_NPCDIALOG = 18, D2VEC_NPCRESPONSE = 19, D2VEC_VENDORITEM = 20, D2VEC_VENDORBUY = 21, D2VEC_VENDORSELL = 22, D2VEC_HIRE = 23, D2VEC_VENDORMULTIBUY = 24, D2VEC_TILE = 25 };
 
 static inline uint32_t d2vec_fnv1a_step(uint32_t h, uint32_t v) {
     for (int i = 0; i < 4; i++) { h ^= (v >> (8 * i)) & 0xFF; h *= 16777619u; }

@@ -7,17 +7,24 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <D2Common.h>
 #include <D2CMP.h>
 #include <D2DataTbls.h>
 #include <D2Dungeon.h>
 #include <D2Collision.h>
 #include <D2Skills.h>
+#include <DataTbls/SkillsTbls.h>
+#include <DataTbls/BeltsTbls.h>
+#include <DataTbls/InvTbls.h>
 #include <DataTbls/SkillsIds.h>
 #include <DataTbls/MonsterIds.h>
 #include <Drlg/D2DrlgDrlgLogic.h>
 #include <Drlg/D2DrlgPreset.h>
+#include <Drlg/D2DrlgOutRoom.h>
+#include <Drlg/D2DrlgDrlgGrid.h>
 #include <D2Seed.h>
+#include <D2Waypoints.h>
 #include <D2StatList.h>
 #include <D2States.h>
 #include <D2Items.h>
@@ -367,8 +374,26 @@ static std::vector<D2SessionUnit> g_sessionUnits;
 static std::vector<D2SessionMonsterAnimation> g_sessionMonsterAnimations;
 static std::vector<D2SessionObjectPresentation> g_sessionObjectPresentations;
 static std::vector<D2SessionItemPresentation> g_sessionItemPresentations;
+// The shop's stock as PRESENTATION records, parallel to the existing vendor list rather than bolted
+// onto it. D2SessionVendorItem is 32 bytes with a hash over its own fields, and proven rows read it
+// at that stride (s50, s54) -- widening it would move their hashes for no reason. Retail's trade
+// window is a 10x4 grid of item icons (Inventory.txt row 7), so the client needs each item's
+// invFile and grid cell, which is exactly what D2SessionItemPresentation already carries.
+static std::vector<D2SessionItemPresentation> g_sessionVendorPresentations;
 static D2SessionItemState g_sessionItemState;
 static std::vector<D2SessionTile> g_sessionTiles;
+// Roll-order trace (DrlgRoomTile.cpp): per session tile, in d2_session_tiles order,
+// { room-local GetTileCache ordinal, entries it chose among, index chosen }; ordinal UINT32_MAX
+// when the record was initialised without a roll. Empty unless d2_session_trace_rolls(1) was set
+// BEFORE the session was created -- the rolls happen at room activation, not at snapshot time.
+struct D2WebRollTrace { uint32_t nOrdinal, nEntries, nChosen, nFramePrev, nFrameNext1, nFrameNext2; };
+extern bool g_d2webRollTraceEnabled;
+extern uint32_t g_d2webRollOrphans;
+extern std::unordered_map<const D2DrlgTileDataStrc*, D2WebRollTrace> g_d2webRollTrace;
+void D2WEB_ResetRollTrace();
+struct D2WebCrossRoll { const D2DrlgRoomStrc* pRoom; uint32_t nOrdinal; const D2DrlgRoomStrc* pCause; };
+extern std::vector<D2WebCrossRoll> g_d2webCrossRolls;
+static std::vector<D2WebRollTrace> g_sessionTileRolls;
 static std::vector<D2SessionWarp> g_sessionWarps;
 struct D2SessionWarpPreset { uint32_t room; int32_t destination, x, y; };
 static std::vector<D2SessionWarpPreset> g_sessionWarpPresets;
@@ -400,6 +425,23 @@ struct D2SessionTileNode {
 };
 struct D2SessionTileHash { D2SessionTileNode* nodes[128]; };
 
+// The DT1 files the CURRENT level's rooms actually loaded, in first-seen order. A tile's
+// `librarySlot` indexes THIS, not LvlTypes: the engine's own slot number is per-room (it indexes
+// that room's pTiles[], holding only what that room loaded, in its own order), so it cannot name a
+// file on its own. Preset rooms pull DT1s through their DS1 that LvlTypes never lists, which is why
+// mapping through the level's table left those levels with no floor.
+extern "C" const char* D2WEB_TileLibraryNameFromHash(const D2TileLibraryHashStrc* pHash);
+static std::vector<std::string> g_sessionTileLibraries;
+
+static uint32_t sessionTileLibraryFile(const D2TileLibraryHashStrc* pHash) {
+    const char* name = pHash ? D2WEB_TileLibraryNameFromHash(pHash) : nullptr;
+    if (!name) return UINT32_MAX;
+    for (size_t i = 0; i < g_sessionTileLibraries.size(); ++i)
+        if (g_sessionTileLibraries[i] == name) return (uint32_t)i;
+    g_sessionTileLibraries.emplace_back(name);
+    return (uint32_t)(g_sessionTileLibraries.size() - 1);
+}
+
 static void sessionTileLibraryIdentity(const D2DrlgRoomStrc* roomEx, const D2TileLibraryEntryStrc* tile,
         uint32_t& slotOut, uint32_t& indexOut) {
     slotOut = UINT32_MAX; indexOut = UINT32_MAX;
@@ -411,18 +453,21 @@ static void sessionTileLibraryIdentity(const D2DrlgRoomStrc* roomEx, const D2Til
             if (node->type != tile->nType || node->style != tile->nStyle || node->sequence != tile->nSequence) continue;
             uint32_t index = 0;
             for (D2SessionTileRef* ref = node->refs; ref; ref = ref->next, ++index) {
-                if (ref->tile == tile) { slotOut = slot; indexOut = index; return; }
+                // Report WHICH FILE, not which of this room's slots.
+                if (ref->tile == tile) { slotOut = sessionTileLibraryFile(roomEx->pTiles[slot]); indexOut = index; return; }
             }
         }
     }
 }
+
+static uint32_t g_sessionTilesSkipped = 0;
 
 static void appendSessionTiles(const D2DrlgRoomStrc* roomEx, uint32_t roomOrdinal, uint32_t layer,
         const D2DrlgTileDataStrc* tiles, int count) {
     if (!tiles || count <= 0) return;
     for (int i = 0; i < count; ++i) {
         const D2DrlgTileDataStrc& tileData = tiles[i];
-        if (!tileData.pTile) continue;
+        if (!tileData.pTile) { ++g_sessionTilesSkipped; continue; }
         const D2TileLibraryEntryStrc& tile = *tileData.pTile;
         D2SessionTile out = {};
         out.room = roomOrdinal; out.layer = layer; out.ordinal = (uint32_t)i;
@@ -436,6 +481,10 @@ static void appendSessionTiles(const D2DrlgRoomStrc* roomEx, uint32_t roomOrdina
         out.flags = tileData.dwFlags;
         sessionTileLibraryIdentity(roomEx, tileData.pTile, out.librarySlot, out.libraryIndex);
         g_sessionTiles.push_back(out);
+        if (g_d2webRollTraceEnabled) {
+            auto it = g_d2webRollTrace.find(&tileData);
+            g_sessionTileRolls.push_back(it != g_d2webRollTrace.end() ? it->second : D2WebRollTrace{ UINT32_MAX - 1, 0, 0, 0, 0, 0 });
+        }
     }
 }
 
@@ -484,7 +533,7 @@ static void activateSessionLevelRooms(D2DrlgActStrc* act, D2DrlgLevelStrc* level
 }
 
 static void updateSessionWorld() {
-    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionTiles.clear(); g_sessionWarps.clear();
+    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionTiles.clear(); g_sessionTileRolls.clear(); g_sessionTileLibraries.clear(); g_sessionWarps.clear();
     g_sessionWorldHash = D2VEC_FNV_INIT; g_sessionTerrainHash = D2VEC_FNV_INIT;
     g_sessionNavigationHash = D2VEC_FNV_INIT;
     if (!g_sessionLive || !g_lastLevel) return;
@@ -808,6 +857,34 @@ EMSCRIPTEN_KEEPALIVE const D2VecAiUnit* d2_aispawn_units(int* count) { *count = 
 // Anchor class for the player fixture: any monster (0xFFFFFFFF) or a specific class, so a
 // session can be created beside one town NPC the way the retail capture's fixture is.
 static uint32_t g_sessionAnchorClass = 0xFFFFFFFF;
+// Place the session player at a standable subtile of `room` and wire up its client. Split out of
+// d2_aitarget_attach so a level with no monster at all can still be entered: the anchor search
+// below is what the AI oracle rows need, not what a player needs.
+static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStrc* anchor) {
+    D2UnitStrc* player = SUNIT_AllocUnitData(UNIT_PLAYER, g_sessionPlayerClass, x, y, g_game, room, 1, PLRMODE_NEUTRAL, 0);
+    if (!player) return 0;
+    STATLIST_SetUnitStat(player, STAT_HITPOINTS, 50 << 8, 0); STATLIST_SetUnitStat(player, STAT_MAXHP, 50 << 8, 0);
+    STATLIST_SetUnitStat(player, STAT_LEVEL, 1, 0); STATLIST_SetUnitStat(player, STAT_ATTACKRATE, 100, 0);
+    STATLIST_SetUnitStat(player, STAT_VELOCITYPERCENT, 100, 0); STATLIST_SetUnitStat(player, STAT_OTHER_ANIMRATE, 100, 0);
+    g_targetClient = (D2ClientStrc*)calloc(1, sizeof(D2ClientStrc));
+    g_targetClient->pGame = g_game; g_targetClient->pPlayer = player;
+    g_targetClient->nAct = (uint8_t)g_currentAct;
+    // The save header reads the character's identity from the client, not the unit: without
+    // a name it refuses to write at all, and the class it stores is this field.
+    g_targetClient->nClassId = (uint8_t)g_sessionPlayerClass;
+    memset(g_targetClient->szName, 0, sizeof g_targetClient->szName);
+    memcpy(g_targetClient->szName, g_sessionCharName, sizeof g_targetClient->szName - 1);
+    // Deterministic by design: a wall-clock creation stamp would make every saved file
+    // differ from the last and defeat byte comparison in a scenario.
+    g_targetClient->nCreateTime = 0;
+    for (int hk = 0; hk < 16; hk++) g_targetClient->HotkeySkills[hk].nItemGUID = (uint32_t)-1;
+    UNITS_GetPlayerData(player)->pClient = g_targetClient;
+    sub_6FC33020(g_targetClient, room);
+    for (D2UnitStrc* u = room->pUnitFirst; u; u = u->pRoomNext)
+        if (u->dwUnitType == UNIT_MONSTER) MONSTER_UpdateAiCallbackEvent(g_game, u);
+    g_targetPlayer = player; g_targetMonster = anchor; g_targetRoom = room; return 1;
+}
+
 EMSCRIPTEN_KEEPALIVE int d2_aitarget_attach() {
     if (!g_game || !g_lastLevel || g_targetPlayer) return 0;
     uint16_t roomIdx = 0;
@@ -825,28 +902,34 @@ EMSCRIPTEN_KEEPALIVE int d2_aitarget_attach() {
             if (x < room->tCoords.nSubtileX + 2 || x >= room->tCoords.nSubtileX + room->tCoords.nSubtileWidth - 2 ||
                 y < room->tCoords.nSubtileY + 2 || y >= room->tCoords.nSubtileY + room->tCoords.nSubtileHeight - 2) continue;
             if (COLLISION_CheckMaskWithSize(room, x, y, 2, 0xFFFF)) continue;
-            D2UnitStrc* player = SUNIT_AllocUnitData(UNIT_PLAYER, g_sessionPlayerClass, x, y, g_game, room, 1, PLRMODE_NEUTRAL, 0);
-            if (!player) continue;
-            STATLIST_SetUnitStat(player, STAT_HITPOINTS, 50 << 8, 0); STATLIST_SetUnitStat(player, STAT_MAXHP, 50 << 8, 0);
-            STATLIST_SetUnitStat(player, STAT_LEVEL, 1, 0); STATLIST_SetUnitStat(player, STAT_ATTACKRATE, 100, 0);
-            STATLIST_SetUnitStat(player, STAT_VELOCITYPERCENT, 100, 0); STATLIST_SetUnitStat(player, STAT_OTHER_ANIMRATE, 100, 0);
-            g_targetClient = (D2ClientStrc*)calloc(1, sizeof(D2ClientStrc));
-            g_targetClient->pGame = g_game; g_targetClient->pPlayer = player;
-            g_targetClient->nAct = (uint8_t)g_currentAct;
-            // The save header reads the character's identity from the client, not the unit: without
-            // a name it refuses to write at all, and the class it stores is this field.
-            g_targetClient->nClassId = (uint8_t)g_sessionPlayerClass;
-            memset(g_targetClient->szName, 0, sizeof g_targetClient->szName);
-            memcpy(g_targetClient->szName, g_sessionCharName, sizeof g_targetClient->szName - 1);
-            // Deterministic by design: a wall-clock creation stamp would make every saved file
-            // differ from the last and defeat byte comparison in a scenario.
-            g_targetClient->nCreateTime = 0;
-            for (int hk = 0; hk < 16; hk++) g_targetClient->HotkeySkills[hk].nItemGUID = (uint32_t)-1;
-            UNITS_GetPlayerData(player)->pClient = g_targetClient;
-            sub_6FC33020(g_targetClient, room);
-            for (D2UnitStrc* u = room->pUnitFirst; u; u = u->pRoomNext)
-                if (u->dwUnitType == UNIT_MONSTER) MONSTER_UpdateAiCallbackEvent(g_game, u);
-            g_targetPlayer = player; g_targetMonster = anchor; g_targetRoom = room; return 1;
+            if (attachSessionPlayerAt(room, x, y, anchor)) return 1;
+        }
+    }
+
+    // No room held a monster to anchor to. For the AI and spawn oracles that is the answer -- and
+    // for a fixture that asked for a specific anchor class it still is -- but a LEVEL WITH NO
+    // MONSTERS IS STILL A LEVEL A PLAYER WALKS INTO. Act 1 level 20, the Forgotten Tower, is one:
+    // it generated fine and every caller of d2_session_create was refused, so the level could not
+    // be entered, drawn, or compared against retail at all.
+    //
+    // Levels that do have monsters never reach here, so no existing row's placement or roll
+    // sequence moves.
+    if (g_sessionAnchorClass != 0xFFFFFFFF) return 0;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
+        D2ActiveRoomStrc* room = roomEx->pRoom;
+        if (!room || room->nNumClients) continue;
+        // Scan outward from the room's middle, so the player lands in open floor rather than
+        // against the first wall the iteration order happens to reach.
+        const int cx = room->tCoords.nSubtileX + room->tCoords.nSubtileWidth / 2;
+        const int cy = room->tCoords.nSubtileY + room->tCoords.nSubtileHeight / 2;
+        const int span = (room->tCoords.nSubtileWidth + room->tCoords.nSubtileHeight) / 2;
+        for (int radius = 0; radius <= span; radius++) for (int dy = -radius; dy <= radius; dy++) for (int dx = -radius; dx <= radius; dx++) {
+            if (radius && abs(dx) != radius && abs(dy) != radius) continue;
+            const int x = cx + dx, y = cy + dy;
+            if (x < room->tCoords.nSubtileX + 2 || x >= room->tCoords.nSubtileX + room->tCoords.nSubtileWidth - 2 ||
+                y < room->tCoords.nSubtileY + 2 || y >= room->tCoords.nSubtileY + room->tCoords.nSubtileHeight - 2) continue;
+            if (COLLISION_CheckMaskWithSize(room, x, y, 2, 0xFFFF)) continue;
+            if (attachSessionPlayerAt(room, x, y, nullptr)) return 1;
         }
     }
     return 0;
@@ -1687,13 +1770,76 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_npc_response(uint32_t npcId, uint32_
         offsetof(D2SessionNpcResponse, hash));
     return g_sessionNpcResponse.result;
 }
+extern "C" uint32_t D2WEB_TakeUiEvents(uint8_t* out, uint32_t cap);
+extern "C" int D2WEB_TakeWaypointMenu(D2GSPacketSrv63* pPacket);
+// The waypoint menu packet (0x63) the server sent since the last call: 1 and the waypoint unit id
+// in *pWaypointId when one arrived, else 0. The ACTIVATED set is read below from the player's own
+// waypoint data, which is what the packet carries.
+EMSCRIPTEN_KEEPALIVE int d2_session_take_waypoint_menu(uint32_t* pWaypointId) {
+    D2GSPacketSrv63 packet = {};
+    if (!D2WEB_TakeWaypointMenu(&packet)) return 0;
+    if (pWaypointId) *pWaypointId = packet.dwUnitId;
+    return 1;
+}
+// Every waypoint retail knows, in waypoint-number order, as {waypointNo, levelId, act, activated}
+// int32 quads, activation from the player's waypoint data for the current difficulty. Returns the
+// number of quads.
+EMSCRIPTEN_KEEPALIVE int d2_session_waypoints(int32_t* out, int cap) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !out) return 0;
+    D2PlayerDataStrc* data = UNITS_GetPlayerData(g_targetPlayer);
+    D2WaypointDataStrc* flags = data ? data->pWaypointData[g_game->nDifficulty] : nullptr;
+    int n = 0;
+    for (int wp = 0; wp < 64 && n + 4 <= cap; ++wp) {
+        int levelId = 0;
+        if (!WAYPOINTS_GetLevelIdFromWaypointNo((short)wp, &levelId) || levelId <= 0) continue;
+        out[n++] = wp; out[n++] = levelId; out[n++] = DRLG_GetActNoFromLevelId(levelId);
+        out[n++] = flags ? (WAYPOINTS_IsActivated(flags, (uint16_t)wp) ? 1 : 0) : 0;
+    }
+    return n / 4;
+}
+// Levels.txt's LevelName for a level: the string-table KEY, resolved by the client like any other.
+EMSCRIPTEN_KEEPALIVE const char* d2_level_name(int levelId) {
+    D2LevelsTxt* rec = DATATBLS_GetLevelsTxtRecord(levelId);
+    return rec ? rec->szLevelName : "";
+}
+// Retail's 0x49 TakeOrCloseWp: travel to levelId through that waypoint, or close the menu with 0.
+EMSCRIPTEN_KEEPALIVE int d2_session_command_waypoint(uint32_t waypointId, int32_t levelId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return 0;
+    uint8_t packet[9] = { 0x49 };
+    const int32_t guid = (int32_t)waypointId; memcpy(packet + 1, &guid, 4); memcpy(packet + 5, &levelId, 4);
+    const int32_t oldLevel = DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(g_targetPlayer));
+    const int32_t rc = D2GAME_PACKETCALLBACK_Rcv0x49_TakeOrCloseWp_6FC87E60(g_game, g_targetPlayer, packet, sizeof packet);
+    const int32_t newLevel = DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(g_targetPlayer));
+    if (newLevel != oldLevel) return adoptSessionLevelChange(oldLevel, newLevel);
+    return rc == 0;
+}
+// The 0x77 UpdateUi codes the server has sent since the last call, in order, then cleared.
+// 16 = UPDATEUI_OPENSTASH, 17 = UPDATEUI_CLOSESTASH (D2Constants.h).
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_take_ui_events(uint8_t* out, uint32_t cap) {
+    return D2WEB_TakeUiEvents(out, cap);
+}
+// Retail's 0x4F ClickButton, e.g. TRADEBTN_CLOSESTASH (18) when the player closes the stash, or
+// withdraw/deposit (19/20) with a gold amount. Through retail's own handler.
+EMSCRIPTEN_KEEPALIVE int d2_session_command_button(uint32_t button, int32_t gold) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || button > 0xFFFF) return 0;
+    uint8_t packet[7] = { 0x4F };
+    const uint16_t b = (uint16_t)button, hi = (uint16_t)((uint32_t)gold >> 16), lo = (uint16_t)gold;
+    memcpy(packet + 1, &b, 2); memcpy(packet + 3, &hi, 2); memcpy(packet + 5, &lo, 2);
+    return D2GAME_PACKETCALLBACK_Rcv0x4F_ClickButton_6FC881D0(g_game, g_targetPlayer, packet, sizeof packet) == 0;
+}
 EMSCRIPTEN_KEEPALIVE int d2_session_command_end_npc(uint32_t npcId) {
     if (!g_sessionLive || !g_game || !g_targetPlayer) return 0;
     int32_t type = -1, guid = -1;
     if (!SUNIT_GetInteractInfo(g_targetPlayer, &type, &guid) || type != UNIT_MONSTER || guid != (int32_t)npcId) return 0;
     uint8_t packet[9] = { 0x30 };
     const int32_t npcGuid = (int32_t)npcId; memcpy(packet + 5, &npcGuid, sizeof npcGuid);
-    return D2GAME_PACKETCALLBACK_Rcv0x30_TerminateEntityChat_6FC869F0(g_game, g_targetPlayer, packet, sizeof packet) == 0;
+    const bool ended = D2GAME_PACKETCALLBACK_Rcv0x30_TerminateEntityChat_6FC869F0(g_game, g_targetPlayer, packet, sizeof packet) == 0;
+    // g_sessionNpcDialog records the conversation the player OPENED; once retail's own 0x30 handler
+    // has ended it, that record no longer describes anything, and a client reading it would keep the
+    // window up forever (s000 step "Esc closes the NPC window"). Clear it only on success, so a
+    // refused end still shows the conversation retail kept open.
+    if (ended) memset(&g_sessionNpcDialog, 0, sizeof g_sessionNpcDialog);
+    return ended;
 }
 EMSCRIPTEN_KEEPALIVE const D2SessionNpcResponse* d2_session_npc_response() {
     return &g_sessionNpcResponse;
@@ -1704,8 +1850,30 @@ static uint32_t sessionInventoryItemCount(D2InventoryStrc* inventory) {
         if (INVENTORY_UnitIsItem(item)) ++count;
     return count;
 }
+// Fill a presentation record for one item, without touching the player's own list.
+static void appendVendorPresentation(D2UnitStrc* item) {
+    if (!item || item->dwUnitType != UNIT_ITEM) return;
+    D2SessionItemPresentation out = {};
+    out.id = item->dwUnitId; out.classId = item->dwClassId; out.mode = item->dwAnimMode;
+    out.quality = ITEMS_GetItemQuality(item); out.itemFlags = ITEMS_GetItemFlags(item);
+    out.framePrecise = item->nSeqCurrentFramePrecise; out.frameCountPrecise = item->dwFrameCountPrecise;
+    if (item->pStaticPath) {
+        out.x = item->pStaticPath->tGameCoords.nX; out.y = item->pStaticPath->tGameCoords.nY;
+        out.gridX = (int16_t)item->pStaticPath->tGameCoords.nX;
+        out.gridY = (int16_t)item->pStaticPath->tGameCoords.nY;
+    }
+    out.invPage = ITEMS_GetInvPage(item); out.bodyLoc = ITEMS_GetBodyLocation(item);
+    if (D2ItemsTxt* txt = DATATBLS_GetItemsTxtRecord(item->dwClassId)) {
+        out.code = txt->dwCode;
+        memcpy(out.flippyFile, txt->szFlippyFile, sizeof out.flippyFile);
+        memcpy(out.invFile, txt->szInvFile, sizeof out.invFile);
+    }
+    g_sessionVendorPresentations.push_back(out);
+}
+
 static void updateSessionVendorItems(D2UnitStrc* npc) {
     g_sessionVendorItems.clear();
+    g_sessionVendorPresentations.clear();
     if (!npc || !g_targetPlayer || !g_game) return;
     D2InventoryStrc* inventory = g_sessionVendor.action == 2
         ? SUNITPROXY_GetGambleInventory(g_game, g_targetPlayer, npc) : npc->pInventory;
@@ -1722,6 +1890,7 @@ static void updateSessionVendorItems(D2UnitStrc* npc) {
                                         : D2C_TransactionTypes::TRANSACTIONTYPE_BUY);
         out.hash = sessionHashBytes(D2VEC_FNV_INIT, &out, offsetof(D2SessionVendorItem, hash));
         g_sessionVendorItems.push_back(out);
+        appendVendorPresentation(item);
     }
 }
 // Fixture: set a stat on a specific item unit (to damage it before a repair). Mirrors the
@@ -2254,9 +2423,26 @@ EMSCRIPTEN_KEEPALIVE int d2_session_fixture_a1q6_timer_to_completion() {
 }
 EMSCRIPTEN_KEEPALIVE const D2SessionAct1Quest6Complete* d2_session_act1q6_complete() { return &g_sessionAct1Quest6Complete; }
 
+// GAME_UpdateProgress's pending-rooms step (D2Game, D2MOO GAME/Game.cpp), run where retail runs it:
+// at the start of a frame, before events and the client update. The client-room change
+// (sub_6FC33670, below) is retail's activation wave -- it creates active rooms around the player
+// and the DRLG raises the act's bHasPendingRoomsUpdates -- and THIS is what populates them:
+// sub_6FC385A0 spawns a new room's presets, objects and monsters, or restores an old one's.
+// Without it, rooms reached by walking stayed empty (s000: the Blood Moor held only the player).
+static void updateSessionPendingRooms() {
+    for (int act = 0; act < 5; ++act) {
+        D2DrlgActStrc* pAct = g_game->pAct[act];
+        if (!pAct || !pAct->bHasPendingRoomsUpdates) continue;
+        for (D2ActiveRoomStrc* room = DUNGEON_GetRoomFromAct(pAct); room; room = room->pRoomNext)
+            sub_6FC385A0(g_game, room);
+        pAct->bHasPendingRoomsUpdates = 0;
+    }
+}
+
 EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath || frames < 0) return 0;
     for (int i = 0; i < frames; ++i) {
+        updateSessionPendingRooms();
         const bool wasMoving = g_sessionMovePending;
         if (g_sessionAttack.state == 2) {
             D2ActiveRoomStrc* room = g_targetPlayer->pDynamicPath->pRoom;
@@ -2292,25 +2478,49 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
     updateSessionSnapshot(); return 1;
 }
 
+// Why the last primary attack was refused (0 = not refused), so a refusal is never guessed at.
+static int g_sessionAttackReason = 0;
+enum { ATTACK_OK = 0, ATTACK_NO_SESSION = 1, ATTACK_BUSY = 2, ATTACK_NO_TARGET = 3, ATTACK_NOT_NEAR = 4,
+       ATTACK_TARGET_DEAD = 5, ATTACK_UNTARGETABLE = 6, ATTACK_NO_SKILL = 7, ATTACK_NO_PATH = 8 };
+EMSCRIPTEN_KEEPALIVE int d2_session_attack_reason() { return g_sessionAttackReason; }
+// A target is reachable from the player's room or any room adjacent to it. The session used to
+// require the SAME room, which retail does not: a monster standing across a room seam could not be
+// fought at all (s000, Blood Moor). Distance is still decided by melee range and the walk below.
+static bool sessionRoomIsNear(D2ActiveRoomStrc* from, D2ActiveRoomStrc* room) {
+    if (!from || !room) return false;
+    if (from == room) return true;
+    D2ActiveRoomStrc** near = nullptr; int32_t count = 0;
+    DUNGEON_GetAdjacentRoomsListFromRoom(from, &near, &count);
+    for (int32_t i = 0; i < count; ++i) if (near[i] == room) return true;
+    return false;
+}
 EMSCRIPTEN_KEEPALIVE int d2_session_command_primary_attack(uint32_t targetUnitId) {
+    g_sessionAttackReason = ATTACK_NO_SESSION;
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath ||
-        !g_targetPlayer->pDynamicPath->pRoom || g_targetPlayer->dwAnimMode == PLRMODE_DEAD ||
-        g_sessionAttack.state == 1 || g_sessionAttack.state == 2) return 0;
+        !g_targetPlayer->pDynamicPath->pRoom || g_targetPlayer->dwAnimMode == PLRMODE_DEAD) return 0;
+    g_sessionAttackReason = ATTACK_BUSY;
+    if (g_sessionAttack.state == 1 || g_sessionAttack.state == 2) return 0;
     D2UnitStrc* target = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, targetUnitId);
-    if (!target || !target->pDynamicPath ||
-        target->pDynamicPath->pRoom != g_targetPlayer->pDynamicPath->pRoom ||
-        target->dwAnimMode == MONMODE_DEAD || STATLIST_UnitGetStatValue(target, STAT_HITPOINTS, 0) <= 0 ||
-        !(target->dwFlags & UNITFLAG_TARGETABLE)) return 0;
+    g_sessionAttackReason = ATTACK_NO_TARGET;
+    if (!target || !target->pDynamicPath) return 0;
+    g_sessionAttackReason = ATTACK_NOT_NEAR;
+    if (!sessionRoomIsNear(g_targetPlayer->pDynamicPath->pRoom, target->pDynamicPath->pRoom)) return 0;
+    g_sessionAttackReason = ATTACK_TARGET_DEAD;
+    if (target->dwAnimMode == MONMODE_DEAD || STATLIST_UnitGetStatValue(target, STAT_HITPOINTS, 0) <= 0) return 0;
+    g_sessionAttackReason = ATTACK_UNTARGETABLE;
+    if (!(target->dwFlags & UNITFLAG_TARGETABLE)) return 0;
+    g_sessionAttackReason = ATTACK_OK;
     if (!UNITS_IsInMeleeRange(g_targetPlayer, target, 1)) {
         PLRMODE_StartID_WalkRunKnockback(g_game, g_targetPlayer, PLRMODE_WALK, target);
         const D2DynamicPathStrc* path = g_targetPlayer->pDynamicPath;
         g_sessionMovePending = path->dwPathPoints > 0;
         g_sessionTargetX = target->pDynamicPath->tGameCoords.wPosX;
         g_sessionTargetY = target->pDynamicPath->tGameCoords.wPosY;
+        if (!g_sessionMovePending) g_sessionAttackReason = ATTACK_NO_PATH;
         updateSessionSnapshot(); return g_sessionMovePending ? 2 : 0;
     }
     D2SkillStrc* skill = SKILLS_GetHighestLevelSkillFromUnitAndId(g_targetPlayer, SKILL_ATTACK);
-    if (!skill) return 0;
+    if (!skill) { g_sessionAttackReason = ATTACK_NO_SKILL; return 0; }
     memset(&g_sessionAttack, 0, sizeof g_sessionAttack); g_sessionAttack.version = 1;
     g_sessionAttack.size = sizeof g_sessionAttack; g_sessionAttack.gameFrame = g_game->dwGameFrame;
     g_sessionAttack.state = 1; g_sessionAttack.attackerId = g_targetPlayer->dwUnitId;
@@ -2418,6 +2628,41 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_add_stat(uint32_t statId, uint32_t c
     const uint16_t encoded = (uint16_t)(statId | ((count - 1) << 8));
     memcpy(packet + 1, &encoded, sizeof encoded);
     return D2GAME_PACKETCALLBACK_Rcv0x3A_AddStatPoint_6FC86E80(g_game, g_targetPlayer, packet, sizeof packet);
+}
+
+// The player's class skill tree, straight out of Skills.txt and SkillDesc.txt.
+//
+// The client cannot invent this: which skills a class has, which of the three tabs each sits on and
+// at which row and column are retail table data, and so is the level a skill needs. Without it a
+// skill tree would be a hand-drawn picture of one. The CURRENT level of
+// each skill comes from the player's own skill list, so the panel shows what the character has, not
+// what the table allows.
+//
+// One record per skill of the player's class, in skill-id order:
+//   id, page (1..3), row, column, requiredLevel, baseLevel, iconCel, nameStr
+// iconCel indexes SkillIcon.dc6, so the panel draws retail's icon for the skill rather than one
+// picked by position; nameStr is the .tbl index of the skill's name, for d2_lang_string_by_index.
+struct D2SessionSkill { uint16_t id, page, row, column, requiredLevel, baseLevel, iconCel, nameStr; };
+
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_class_skills(D2SessionSkill* out, uint32_t cap) {
+    if (!g_sessionLive || !g_targetPlayer || !sgptDataTables || !out) return 0;
+    const int charClass = (int)g_targetPlayer->dwClassId;
+    uint32_t n = 0;
+    for (int id = 0; id < sgptDataTables->nSkillsTxtRecordCount && n < cap; ++id) {
+        D2SkillsTxt* skill = DATATBLS_GetSkillsTxtRecord(id);
+        if (!skill || skill->nCharClass != charClass) continue;
+        D2SkillDescTxt* desc = DATATBLS_GetSkillDescTxtRecord(skill->wSkillDesc);
+        // A skill with no description record has no place on the tree to draw it at.
+        if (!desc || !desc->nSkillPage) continue;
+        D2SessionSkill& row = out[n++];
+        row.id = (uint16_t)id;
+        row.page = desc->nSkillPage; row.row = desc->nSkillRow; row.column = desc->nSkillColumn;
+        row.requiredLevel = skill->wReqLevel;
+        row.iconCel = desc->nIconCel; row.nameStr = desc->wStrName;
+        D2SkillStrc* known = SKILLS_GetHighestLevelSkillFromUnitAndId(g_targetPlayer, id);
+        row.baseLevel = (uint16_t)(known ? SKILLS_GetSkillLevel(g_targetPlayer, known, FALSE) : 0);
+    }
+    return n;
 }
 
 EMSCRIPTEN_KEEPALIVE int d2_session_command_add_skill(uint32_t skillId) {
@@ -3008,6 +3253,212 @@ EMSCRIPTEN_KEEPALIVE int d2_session_object_presentation_count() {
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_world_hash() {
     updateSessionSnapshot(); return g_sessionWorldHash;
 }
+// How many tiles the room arrays held that never reached the draw list because their library
+// entry was unresolved. Retail draws those tiles, so a non-zero count here is a defect, not a
+// statistic -- s140 measures it against retail's own record count.
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_tiles_skipped() { return g_sessionTilesSkipped; }
+
+// Probe for the missing ninth row/column. Retail's room tile lists carry
+// floor records at tile offset 8 -- the row and column past the room's own 8x8 -- and ours do not.
+// The fill only emits a floor where the grid cell has bIsFloor, so this reports, per room, how many
+// of those edge cells carry bIsFloor and how many carry bLOS. Read-only: it walks the same grids
+// the generator already built and changes nothing.
+//   out[0] grid width, out[1] grid height, out[2] edge cells with bIsFloor, out[3] edge with bLOS,
+//   out[4] interior cells with bIsFloor.
+// A PRESET room's edge decision, so the remaining missing tiles can be correlated with it rather
+// than guessed at (T4: 5,285 ninth-row cells still missing, all in levels
+// whose rooms have no outdoor grid).
+//
+// DRLGPRESET_LoadRoomTiles kills an edge only when the preset's LvlPrest KillEdge column is set AND
+// the room's far edge coincides with the maze's. A killed edge is never visited by the fill, so it
+// cannot produce tiles; an unkilled one can, and if retail has tiles there and we do not, the fault
+// is downstream.
+//   out[0] killEdgeColumn, out[1] bKillEdgeX, out[2] bKillEdgeY,
+//   out[3] emitted floors, out[4] emitted walls, out[5] tileWidth, out[6] tileHeight,
+//   out[7] fillBlanks column, out[8] floor layers
+extern int32_t g_d2webPresetEdgeMerged;
+extern int32_t g_d2webPresetEdgeAdded;
+extern int32_t g_d2webPresetEdgeSameMap;
+extern int32_t g_d2webPresetEdgeOtherMap;
+// How a preset room's own ninth row/column was resolved during the last level build: merged into a
+// neighbour, or added here. Diagnostic for the last remaining candidate.
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_preset_edge_counts(int32_t* out, uint32_t cap) {
+    if (!out || cap < 4) return 0;
+    out[0] = g_d2webPresetEdgeMerged; out[1] = g_d2webPresetEdgeAdded;
+    out[2] = g_d2webPresetEdgeSameMap; out[3] = g_d2webPresetEdgeOtherMap;
+    g_d2webPresetEdgeMerged = 0; g_d2webPresetEdgeAdded = 0;
+    g_d2webPresetEdgeSameMap = 0; g_d2webPresetEdgeOtherMap = 0;
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_preset_edge(uint32_t roomOrdinal, int32_t* out, uint32_t cap) {
+    if (!g_sessionLive || !g_lastLevel || !out || cap < 9) return 0;
+    uint32_t ordinal = 0;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext, ++ordinal) {
+        if (ordinal != roomOrdinal) continue;
+        if (roomEx->nType != DRLGTYPE_PRESET || !roomEx->pMaze || !roomEx->pMaze->pMap) return 0;
+        D2DrlgMapStrc* map = roomEx->pMaze->pMap;
+        if (!map->pLvlPrestTxtRecord) return 0;
+        const int kill = (int)map->pLvlPrestTxtRecord->dwKillEdge;
+        out[0] = kill;
+        out[1] = kill && (roomEx->nTileXPos + roomEx->nTileWidth == map->pDrlgCoord.nPosX + map->pDrlgCoord.nWidth);
+        out[2] = kill && (roomEx->nTileYPos + roomEx->nTileHeight == map->pDrlgCoord.nPosY + map->pDrlgCoord.nHeight);
+        out[3] = roomEx->pRoom && roomEx->pRoom->pRoomTiles ? roomEx->pRoom->pRoomTiles->nFloors : -1;
+        out[4] = roomEx->pRoom && roomEx->pRoom->pRoomTiles ? roomEx->pRoom->pRoomTiles->nWalls : -1;
+        out[5] = roomEx->nTileWidth; out[6] = roomEx->nTileHeight;
+        // dwFillBlanks drives bCheckCoordinatesValidity on floor layer 0, which makes every cell
+        // INSIDE the room's coordinates count as floor whether or not it carries bIsFloor. An edge
+        // cell is by definition outside those coordinates, so a FillBlanks level and a plain one
+        // may well treat the ninth row differently -- the caves are the short ones and the town is
+        // not, so this is the column to check.
+        out[7] = (int32_t)map->pLvlPrestTxtRecord->dwFillBlanks;
+        out[8] = map->pFile ? map->pFile->nFloorLayers : -1;
+        return 1;
+    }
+    return 0;
+}
+
+// For a preset room: how many of its NEAR rooms share its preset map, and how many do not.
+//
+// s163 showed every short preset room is downstream of the fill, not a killed edge -- the same
+// merge that caused the outdoor case. But the outdoor rule applied wholesale to presets produced
+// 498 extra floors in a town that is only 3 rooms short, so the preset rule is narrower. The
+// candidate: within ONE preset map an edge cell is shared and recorded once, across maps both
+// rooms record it. This reports the adjacency so that can be checked against the short rooms.
+//   out[0] near rooms, out[1] near rooms sharing this room's pMap, out[2] near rooms on another map,
+//   out[3] near rooms that are not preset rooms at all
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_preset_neighbours(uint32_t roomOrdinal, int32_t* out, uint32_t cap) {
+    if (!g_sessionLive || !g_lastLevel || !out || cap < 4) return 0;
+    uint32_t ordinal = 0;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext, ++ordinal) {
+        if (ordinal != roomOrdinal) continue;
+        if (roomEx->nType != DRLGTYPE_PRESET || !roomEx->pMaze) return 0;
+        const D2DrlgMapStrc* mine = roomEx->pMaze->pMap;
+        out[0] = roomEx->nRoomsNear; out[1] = out[2] = out[3] = 0;
+        for (int i = 0; i < roomEx->nRoomsNear; ++i) {
+            D2DrlgRoomStrc* near = roomEx->ppRoomsNear[i];
+            if (!near || near == roomEx) continue;
+            if (near->nType != DRLGTYPE_PRESET || !near->pMaze) { ++out[3]; continue; }
+            if (near->pMaze->pMap == mine) ++out[1]; else ++out[2];
+        }
+        return 1;
+    }
+    return 0;
+}
+
+// An Inventory.txt row's panel rectangle and item grid, from retail's own accessors
+// (DATATBLS_GetInventoryRect #10635, DATATBLS_GetInventoryGridInfo #10636), at the requested
+// resolution. The rows cover the character panels AND the trade/stash/cube screens, so this is the
+// source for any panel that shows an item grid -- the vendor window included, which currently
+// draws a text list at coordinates that were tuned by trial.
+//
+// out: panelLeft, panelRight, panelTop, panelBottom, gridX, gridY, gridLeft, gridRight, gridTop,
+//      gridBottom, boxWidth, boxHeight  (12 int32)
+// The shop's stock, in the same 112-byte presentation format as the player's items, so the client
+// parses both with one reader. Needed for the vendor ICON GRID.
+EMSCRIPTEN_KEEPALIVE const D2SessionItemPresentation* d2_session_vendor_presentations() {
+    return g_sessionVendorPresentations.data();
+}
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_vendor_presentation_count() {
+    return (uint32_t)g_sessionVendorPresentations.size();
+}
+
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_inventory_layout(int rowId, int higherRes, int32_t* out, uint32_t cap) {
+    // Inventory.txt is indexed nIndex = rowId + 16 * higherRes and the accessors D2_ASSERT on it,
+    // so an out-of-range id does not return an error -- it aborts the whole engine. Refuse here.
+    if (!out || cap < 12 || rowId < 0 || rowId >= 16 || higherRes < 0 || higherRes > 1) return 0;
+    if (!sgptDataTables || !sgptDataTables->pInventoryTxt) return 0;
+    if (rowId + 16 * higherRes >= sgptDataTables->nInventoryTxtRecordCount) return 0;
+    D2InvRectStrc rect = {};
+    D2InventoryGridInfoStrc grid = {};
+    DATATBLS_GetInventoryRect(rowId, higherRes, &rect);
+    DATATBLS_GetInventoryGridInfo(rowId, higherRes, &grid);
+    out[0] = rect.nLeft; out[1] = rect.nRight; out[2] = rect.nTop; out[3] = rect.nBottom;
+    out[4] = grid.nGridX; out[5] = grid.nGridY;
+    out[6] = grid.nGridLeft; out[7] = grid.nGridRight; out[8] = grid.nGridTop; out[9] = grid.nGridBottom;
+    out[10] = grid.nGridBoxWidth; out[11] = grid.nGridBoxHeight;
+    // A row that exists has a panel with area; an id past the end of the table reads back zeros.
+    return (rect.nRight > rect.nLeft && rect.nBottom > rect.nTop) ? 1 : 0;
+}
+
+// The belt's box rectangles, from retail's own Belts.txt accessor.
+//
+// The client had these hardcoded as {x: 342, y: 561, cell: 31}, invented and undeclared
+//. They are table data: DATATBLS_GetInvRectFromBeltsTxt is D2Common #10638
+// and takes the 800x600 flag, so retail computes the layout and the client only draws it.
+//
+// out[0] = number of boxes; then 4 int32 per box (left, right, top, bottom).
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_belt_boxes(int beltIndex, int higherRes, int32_t* out, uint32_t cap) {
+    if (!out || cap < 1) return 0;
+    D2BeltsTxt record = {};
+    DATATBLS_GetBeltsTxtRecord(beltIndex, higherRes, &record);
+    const int boxes = record.nBoxes;
+    if (boxes <= 0 || boxes > 16) return 0;
+    if (cap < (uint32_t)(1 + boxes * 4)) return 0;
+    out[0] = boxes;
+    for (int i = 0; i < boxes; ++i) {
+        D2InvRectStrc rect = {};
+        DATATBLS_GetInvRectFromBeltsTxt(beltIndex, higherRes, &rect, i);
+        out[1 + i * 4 + 0] = rect.nLeft;
+        out[1 + i * 4 + 1] = rect.nRight;
+        out[1 + i * 4 + 2] = rect.nTop;
+        out[1 + i * 4 + 3] = rect.nBottom;
+    }
+    return (uint32_t)boxes;
+}
+
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_room_edge_flags(uint32_t roomOrdinal, uint32_t* out, uint32_t cap) {
+    if (!g_sessionLive || !g_lastLevel || cap < 5) return 0;
+    uint32_t ordinal = 0;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext, ++ordinal) {
+        if (ordinal != roomOrdinal) continue;
+        if (!roomEx->pOutdoor) return 0;          // preset rooms keep their grids elsewhere
+        D2DrlgGridStrc* grid = &roomEx->pOutdoor->pFloorGrid;
+        // A room may carry an outdoor struct whose grid was never built (preset rooms reuse the
+        // slot). Walking it on the strength of a non-null pOutdoor reads out of bounds.
+        if (!grid->pCellsFlags || !grid->pCellsRowOffsets) return 0;
+        if (grid->nWidth <= 0 || grid->nHeight <= 0 || grid->nWidth > 64 || grid->nHeight > 64) return 0;
+        out[0] = (uint32_t)grid->nWidth; out[1] = (uint32_t)grid->nHeight;
+        out[2] = out[3] = out[4] = 0;
+        for (int y = 0; y < grid->nHeight; ++y) {
+            for (int x = 0; x < grid->nWidth; ++x) {
+                const uint32_t flags = (uint32_t)DRLGGRID_GetGridEntry(grid, x, y);
+                const bool edge = (x == roomEx->nTileWidth) || (y == roomEx->nTileHeight);
+                if (edge) { if (flags & 0x2) ++out[2]; if (flags & 0x4) ++out[3]; }
+                else if (flags & 0x2) ++out[4];
+            }
+        }
+        return 1;
+    }
+    return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE void d2_session_trace_rolls(int enable) {
+    g_d2webRollTraceEnabled = enable != 0; D2WEB_ResetRollTrace();
+}
+EMSCRIPTEN_KEEPALIVE const D2WebRollTrace* d2_session_tile_rolls() {
+    updateSessionSnapshot(); return g_sessionTileRolls.data();
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_tile_roll_count() {
+    updateSessionSnapshot(); return (int)g_sessionTileRolls.size();
+}
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_roll_orphans() { return g_d2webRollOrphans; }
+// Cross-room rolls as (room ordinal, that room's roll ordinal, causing room ordinal) triples,
+// room ordinals in d2_session_rooms order; UINT32_MAX for a room outside the current level.
+EMSCRIPTEN_KEEPALIVE int d2_session_cross_rolls(uint32_t* out, int cap) {
+    if (!g_sessionLive || !g_lastLevel || !out) return 0;
+    auto ordinalOf = [](const D2DrlgRoomStrc* p) {
+        uint32_t n = 0;
+        for (D2DrlgRoomStrc* r = g_lastLevel->pFirstRoomEx; r; r = r->pDrlgRoomNext, ++n) if (r == p) return n;
+        return UINT32_MAX;
+    };
+    int written = 0;
+    for (const D2WebCrossRoll& c : g_d2webCrossRolls) {
+        if (written + 3 > cap) break;
+        out[written++] = ordinalOf(c.pRoom); out[written++] = c.nOrdinal; out[written++] = ordinalOf(c.pCause);
+    }
+    return written / 3;
+}
 EMSCRIPTEN_KEEPALIVE const D2SessionTile* d2_session_tiles() {
     updateSessionSnapshot(); return g_sessionTiles.data();
 }
@@ -3018,42 +3469,70 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_terrain_hash() {
     updateSessionSnapshot(); return g_sessionTerrainHash;
 }
 
-// The DT1 tile libraries the CURRENT level's type uses (LvlTypes.txt, up to 32 slots).
+// The DT1 tile libraries the current level's rooms actually loaded.
 //
-// This is what a client needs to draw the real map. `d2_session_tiles` already returns a per-tile
-// draw list straight out of the DRLG -- orientation, mainIndex/subIndex/frameIndex and screen
-// coordinates -- and each tile's `librarySlot` indexes THIS list. Without it a client cannot resolve
-// a tile to pixels and can only paint act-typical tiles, which is what play/ did: the same mocked
-// ground for every level in an act.
+// This is what a client needs to draw the real map: `d2_session_tiles` gives a per-tile draw list
+// straight out of the DRLG -- orientation, mainIndex/subIndex/frameIndex and screen coordinates --
+// and each tile's `librarySlot` indexes THIS list.
 //
-// All 32 slots are emitted in order, including the unused ones -- LvlTypes.txt stores those as the
-// literal string "0", and that is what comes back, unfiltered. The caller must COMPACT the list
-// (drop the "0" entries, keep the order) before indexing it: retail loads only the populated files,
-// so a tile's `librarySlot` indexes that dense array, not the 32-entry table. Act 1 Town leaves
-// slot 6 unused, which is enough to shift every later library by one. The raw table is emitted
-// rather than the dense list so the caller can also see WHICH table slots a level type uses.
-// Paths are written back to back as NUL-terminated strings; returns the number of slots written.
-EMSCRIPTEN_KEEPALIVE int d2_session_level_tile_files(char* out, int cap) {
+// It deliberately does NOT walk LvlTypes.txt. That table lists the level TYPE's files, while rooms
+// load what they need: a preset room pulls DT1s in through its DS1 that LvlTypes never mentions
+// (Andariel's Lair loads Act1\Outdoors\Blank.dt1, absent from the Catacombs entry). Resolving
+// through the type's table therefore pointed tiles at the wrong file or at none, and whole dungeon
+// floors went undrawn. Paths are written back to back as NUL-terminated strings; returns the count.
+// What ONE room loaded, for the dwDT1Mask question.
+//
+// d2_session_level_tile_files lists only libraries a placed tile came from, which cannot show a
+// library that SHOULD have been loaded and was not -- the exact shape of the 43 fallbacks. This
+// reports the room's own view instead, as newline-separated text:
+//   mask <hex> type <levelType>
+//   slot <i> <file>          -- pTiles[] in slot order, i.e. GetTiles' concatenation order
+//   lvltype <bit> <file>     -- every non-empty LvlTypes.txt szFile the mask indexes
+// Diagnostic only; nothing in the client reads it.
+EMSCRIPTEN_KEEPALIVE int d2_session_room_libraries(uint32_t roomOrdinal, char* out, int cap) {
     if (!g_sessionLive || !g_lastLevel || !out || cap <= 0) return 0;
-    int slots = 0, used = 0;
-    for (int file = 0; file < 32; file++) {
-        char path[64];
-        path[0] = 0;
-        DATATBLS_GetFileNameFromLevelTypeAndFileId(g_lastLevel->nLevelType, file, path);
-        path[sizeof path - 1] = 0;
-        const int n = (int)strlen(path) + 1;
-        if (used + n > cap) break;
-        memcpy(out + used, path, (size_t)n);
-        used += n;
-        slots++;
+    uint32_t ordinal = 0;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext, ++ordinal) {
+        if (ordinal != roomOrdinal) continue;
+        std::string text;
+        char line[160];
+        snprintf(line, sizeof line, "mask %08x type %d\n", roomEx->dwDT1Mask, (int)g_lastLevel->nLevelType);
+        text += line;
+        for (int slot = 0; slot < 32 && roomEx->pTiles[slot]; ++slot) {
+            const char* name = D2WEB_TileLibraryNameFromHash(roomEx->pTiles[slot]);
+            snprintf(line, sizeof line, "slot %d %s\n", slot, name ? name : "?");
+            text += line;
+        }
+        if (D2LvlTypesTxt* types = DATATBLS_GetLevelTypesTxtRecord(g_lastLevel->nLevelType)) {
+            for (int bit = 0; bit < 32; ++bit) {
+                if (!types->szFile[bit][0]) continue;
+                snprintf(line, sizeof line, "lvltype %d %.60s\n", bit, types->szFile[bit]);
+                text += line;
+            }
+        }
+        const int n = (int)std::min<size_t>(text.size(), (size_t)cap - 1);
+        memcpy(out, text.data(), (size_t)n); out[n] = 0;
+        return n;
     }
-    return slots;
+    return 0;
 }
 
-// The level type index behind those files (Levels.txt -> LvlTypes.txt), for diagnostics.
-// The character's name. Set before creating the session; retail's 16-byte limit (terminator
-// included) is enforced here rather than silently truncating, because the header writer refuses a
-// 16-character name outright and a silent truncation would turn that refusal into a wrong name.
+EMSCRIPTEN_KEEPALIVE int d2_session_level_tile_files(char* out, int cap) {
+    if (!g_sessionLive || !out || cap <= 0) return 0;
+    // The libraries the level's rooms ACTUALLY loaded, in the order a tile's librarySlot indexes.
+    // This used to walk LvlTypes.txt instead; that table is the level TYPE's list and does not
+    // include DT1s a preset room pulls in through its DS1, so tiles from those libraries resolved
+    // against the wrong file or none at all and whole dungeon floors went undrawn.
+    int written = 0, used = 0;
+    for (const std::string& name : g_sessionTileLibraries) {
+        const int n = (int)name.size() + 1;
+        if (used + n > cap) break;
+        memcpy(out + used, name.c_str(), (size_t)n);
+        used += n; written++;
+    }
+    return written;
+}
+
 EMSCRIPTEN_KEEPALIVE int d2_session_set_character_name(const char* name) {
     if (!name) return 0;
     const size_t n = strlen(name);
@@ -3113,7 +3592,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_navigation_hash() {
 EMSCRIPTEN_KEEPALIVE void d2_session_destroy() {
     d2_monspawn_reset(); g_sessionLive = false; g_sessionMovePending = false;
     g_sessionAttackTarget = nullptr; g_sessionAttackSkill = nullptr;
-    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionTiles.clear(); g_sessionWarps.clear();
+    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionTiles.clear(); g_sessionTileRolls.clear(); g_sessionTileLibraries.clear(); g_sessionWarps.clear();
     memset(&g_sessionItemState, 0, sizeof g_sessionItemState);
     memset(&g_sessionNpcInteraction, 0, sizeof g_sessionNpcInteraction);
     memset(&g_sessionNpcDialog, 0, sizeof g_sessionNpcDialog); D2WEB_ResetLastDialogPacket();

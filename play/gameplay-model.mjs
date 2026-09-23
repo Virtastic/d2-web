@@ -6,6 +6,7 @@ export const COMMAND = Object.freeze({
   INTERACT: 5,
   RESPAWN: 6,
   TRAVEL: 7,
+  BELT: 8,
 });
 
 const KEY_DIRECTIONS = Object.freeze({
@@ -33,7 +34,10 @@ export class CommandInput {
     else if (code === 'KeyE') this.queue.push({ type: COMMAND.INTERACT });
     else if (code === 'KeyR') this.queue.push({ type: COMMAND.RESPAWN });
     else if (code === 'KeyT') this.queue.push({ type: COMMAND.TRAVEL });
-    else if (/^Digit[1-4]$/.test(code)) this.queue.push({ type: COMMAND.SKILL, slot: Number(code.slice(5)) });
+    // Retail: 1-4 use the belt's columns; skills are selected on the F-keys (retail's skill hotkeys --
+    // which skill sits on which F-key is this shell's default, declared in F3).
+    else if (/^Digit[1-4]$/.test(code)) this.queue.push({ type: COMMAND.BELT, slot: Number(code.slice(5)) - 1 });
+    else if (/^F[1-3]$/.test(code)) this.queue.push({ type: COMMAND.SKILL, slot: Number(code.slice(1)) });
     else if (code === 'Escape') this.queue.push({ type: COMMAND.CANCEL });
     else return false;
     return true;

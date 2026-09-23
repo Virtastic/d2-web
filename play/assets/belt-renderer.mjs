@@ -1,16 +1,52 @@
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 
-export const BELT_LAYOUT = Object.freeze({ x: 342, y: 561, cells: 4, cell: 31 });
+// The belt's boxes are TABLE DATA, not a layout this file gets to choose. Retail computes them in
+// DATATBLS_GetInvRectFromBeltsTxt (D2Common #10638) from Belts.txt, at the requested resolution,
+// and the engine hands them over through `d2_session_belt_boxes`.
+//
+// This used to be `{ x: 342, y: 561, cells: 4, cell: 31 }` -- typed in, uncited, and wrong: retail's
+// 800x600 belt is 29x29 boxes with its first column at x=423, so the belt was drawn 81px left of
+// where the game puts it. 
+//
+// Kept only as the fallback for when the engine is not up (the panel still has to draw something
+// during boot), and marked as such rather than presented as the layout.
+export const BELT_FALLBACK = Object.freeze({ x: 423, y: 562, cells: 4, cell: 29 });
 
 function raster(frame, palette, documentObject) { const c = documentObject.createElement('canvas'); c.width = frame.width; c.height = frame.height;
   c.getContext('2d').putImageData(new ImageData(dc6FrameToRgba(frame, palette), frame.width, frame.height), 0, 0); return c; }
 
+/**
+ * `boxes` is the engine's Belts.txt rectangles: [{ left, right, top, bottom }, ...] in the belt's
+ * own order, which is bottom row first. A belt with no record falls back to the four-box row.
+ */
+export function beltBoxes(boxes) {
+  if (Array.isArray(boxes) && boxes.length) return boxes;
+  const { x, y, cells, cell } = BELT_FALLBACK;
+  return Array.from({ length: cells }, (_, i) =>
+    ({ left: x + i * cell, right: x + i * cell + cell, top: y, bottom: y + cell }));
+}
+
 export function createBeltRenderer(read, documentObject = globalThis.document) {
   const palette = decodeDatPalette(read('data\\global\\palette\\SKY\\pal.dat')), cache = new Map();
   const icon = name => { let c = cache.get(name); if (!c) { const d = decodeDc6(read(`data\\global\\items\\${name}.dc6`)); c = raster(d.frames[0], palette, documentObject); cache.set(name, c); } return c; };
-  return { itemAt(x, y, items) { const slot = Math.floor((x - BELT_LAYOUT.x) / BELT_LAYOUT.cell); if (slot < 0 || slot >= 4 || y < BELT_LAYOUT.y || y >= BELT_LAYOUT.y + 31) return null;
-      return (items || []).find(item => item.mode === 2 && item.gridX === slot) || null; },
-    draw(ctx, items) { let count = 0, pixels = 0; for (const item of items || []) { if (item.mode !== 2 || item.gridX < 0 || item.gridX >= 4 || !item.invFile) continue;
-        const c = icon(item.invFile); ctx.drawImage(c, BELT_LAYOUT.x + item.gridX * 31 + Math.floor((31 - c.width) / 2), BELT_LAYOUT.y + Math.floor((31 - c.height) / 2)); count++; pixels += c.width * c.height; }
-      return { count, pixels }; } };
+  return {
+    itemAt(x, y, items, boxes) {
+      const rects = beltBoxes(boxes);
+      const slot = rects.findIndex((b) => x >= b.left && x < b.right && y >= b.top && y < b.bottom);
+      if (slot < 0) return null;
+      return (items || []).find(item => item.mode === 2 && item.gridX === slot) || null;
+    },
+    draw(ctx, items, boxes) {
+      const rects = beltBoxes(boxes);
+      let count = 0, pixels = 0;
+      for (const item of items || []) {
+        if (item.mode !== 2 || item.gridX < 0 || item.gridX >= rects.length || !item.invFile) continue;
+        const b = rects[item.gridX], c = icon(item.invFile);
+        const w = b.right - b.left, h = b.bottom - b.top;
+        ctx.drawImage(c, b.left + Math.floor((w - c.width) / 2), b.top + Math.floor((h - c.height) / 2));
+        count++; pixels += c.width * c.height;
+      }
+      return { count, pixels, boxes: rects.length, cell: rects.length ? rects[0].right - rects[0].left : 0 };
+    },
+  };
 }

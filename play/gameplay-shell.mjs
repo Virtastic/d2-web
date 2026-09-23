@@ -8,14 +8,18 @@ import { createPlayerRenderer, playerClassInfo } from './assets/unit-renderer.mj
 import { createMonsterRenderer, parseMonsterAnimations } from './assets/monster-renderer.mjs';
 import { createObjectRenderer, parseObjectPresentations } from './assets/object-renderer.mjs';
 import { createItemRenderer, parseItemPresentations } from './assets/item-renderer.mjs';
+import { createStashPanelRenderer, stashGeometry, BIG_BANK_PAGE_1 } from './assets/stash-panel.mjs';
+import { createWaypointPanelRenderer } from './assets/waypoint-panel.mjs';
 import { createControlPanelRenderer } from './assets/control-panel.mjs';
 import { createInventoryPanelRenderer } from './assets/inventory-panel.mjs';
+import { createCharacterPanelRenderer } from './assets/character-panel.mjs';
+import { createSkillPanelRenderer, parseClassSkills, SESSION_SKILL_BYTES } from './assets/skill-panel.mjs';
 import { createBeltRenderer } from './assets/belt-renderer.mjs';
 import { createActMusicPlayer } from './assets/act-music.mjs';
 import { createTitleScreen } from './assets/frontend.mjs';
 import { createCharacterCreate } from './assets/charcreate.mjs';
 import { createCharacterSelect } from './assets/charselect.mjs';
-import { createSaveStore } from './assets/save-store.mjs';
+import { createSaveStore, CLASS_NAMES } from './assets/save-store.mjs';
 import { createNpcPanel } from './assets/npc-panel.mjs';
 import { decodeDc6 } from './assets/d2-formats.mjs';
 
@@ -43,12 +47,78 @@ let npcCount = 0;
 let npcPanel = null, npcPanelError = '', npcState = null, npcPanelEvidence = null;
 // A long walk in progress: where we are going, what to do on arrival, and how it is going.
 let walkGoal = null, walkIdle = 0, walkLast = null, walkEvidence = { active: false, hops: 0, reason: 0 };
-let lastPurchase = null;
+let lastPurchase = null, lastSale = null;
 let monsterRenderer = null;
 let objectRenderer = null;
 let itemRenderer = null;
+// The engine's own advancement record (D2SessionAdvancement). Cached per frame and dropped
+// whenever something might have moved it, so the panel never draws a number the engine has already
+// changed -- and never a number this file worked out for itself.
+const ADVANCEMENT = Object.freeze({ level: 12, experience: 16, nextExperience: 24,
+  statPoints: 28, skillPoints: 32, strength: 36, energy: 40, dexterity: 44, vitality: 48 });
+// The player's class skill tree, from the engine's tables. Re-read whenever a point is spent so a
+// skill's level is the engine's, never a local increment.
+const SKILL_CAP = 128;
+function readClassSkills() {
+  if (classSkills) return classSkills;
+  if (!session || typeof Module === 'undefined') return null;
+  // wasm64: a pointer ARGUMENT is BigInt at the ccall boundary, even though a pointer RETURN reads
+  // back fine as a number. Passing it as a number throws "Cannot convert N to a BigInt".
+  const buf = Number(Module.ccall('malloc', 'bigint', ['number'], [SKILL_CAP * SESSION_SKILL_BYTES]));
+  if (!buf) return null;
+  try {
+    const n = Module.ccall('d2_session_class_skills', 'number', ['bigint', 'number'], [BigInt(buf), SKILL_CAP]);
+    return (classSkills = parseClassSkills(
+      Module.HEAPU8.subarray(buf, buf + n * SESSION_SKILL_BYTES), n));
+  } finally { Module.ccall('free', null, ['bigint'], [BigInt(buf)]); }
+}
+
+// The belt's box rectangles, from Belts.txt through retail's own accessor. Read once per session:
+// the table does not change, and the record is chosen by the belt the player is wearing (index 2 is
+// the four-box row a character has with no belt equipped -- selecting by equipped belt is still to
+// do).
+const BELT_RECORD_NO_BELT = 2;
+function readBeltBoxes() {
+  if (beltBoxCache) return beltBoxCache;
+  if (!session || typeof Module === 'undefined') return null;
+  const cap = 1 + 16 * 4;
+  const buf = Number(Module.ccall('malloc', 'bigint', ['number'], [cap * 4]));
+  if (!buf) return null;
+  try {
+    const n = Module.ccall('d2_session_belt_boxes', 'number', ['number', 'number', 'bigint', 'number'],
+      [BELT_RECORD_NO_BELT, 1, BigInt(buf), cap]);
+    if (!n) return null;
+    const v = new DataView(Module.HEAPU8.buffer, 0, Module.HEAPU8.byteLength);
+    const boxes = [];
+    for (let i = 0; i < n; i++) {
+      const b = buf + 4 + i * 16;
+      boxes.push({ left: v.getInt32(b, true), right: v.getInt32(b + 4, true),
+        top: v.getInt32(b + 8, true), bottom: v.getInt32(b + 12, true) });
+    }
+    return (beltBoxCache = boxes);
+  } finally { Module.ccall('free', null, ['bigint'], [BigInt(buf)]); }
+}
+
+function readAdvancement() {
+  if (advancement) return advancement;
+  if (!session || typeof Module === 'undefined') return null;
+  const ptr = Number(Module.ccall('d2_session_advancement', 'number', [], []));
+  if (!ptr) return null;
+  const v = new DataView(Module.HEAPU8.buffer, 0, Module.HEAPU8.byteLength);
+  const out = {};
+  for (const [key, offset] of Object.entries(ADVANCEMENT)) out[key] = v.getInt32(ptr + offset, true);
+  return (advancement = out);
+}
+
 let inventoryPanelRenderer = null, inventoryPanelEvidence = null;
-let beltRenderer = null, beltEvidence = null;
+let characterPanelRenderer = null, characterPanelEvidence = null, advancement = null;
+let skillPanelRenderer = null, skillPanelEvidence = null, classSkills = null;
+// The stash is open because the engine sent 0x77 UPDATEUI_OPENSTASH, and closed when retail's
+// TRADEBTN_CLOSESTASH was accepted -- never because of a click alone.
+let stashPanelRenderer = null, stashPanelError = '', stashEvidence = null, stashOpen = false, stashLayout = null;
+// The waypoint menu is open because the engine sent 0x63; waypointMenu holds that waypoint's unit id.
+let waypointPanelRenderer = null, waypointPanelError = '', waypointEvidence = null, waypointMenu = null, lastWaypointTravel = null;
+let beltRenderer = null, beltEvidence = null, beltBoxCache = null;
 let controlPanelRenderer = null, controlPanelEvidence = null;
 let actMusic = null, musicError = '';
 let selectedSkill = 0, lastSkillCommand = null;
@@ -80,6 +150,8 @@ const saveStore = createSaveStore();
 let chosenClass = null, chosenName = '';
 const TERRAIN_ENABLED = new URLSearchParams(location.search).get('terrain') !== '0';
 let inventoryVisible = new URLSearchParams(location.search).get('inventory') === '1';
+let characterVisible = new URLSearchParams(location.search).get('character') === '1';
+let skillsVisible = new URLSearchParams(location.search).get('skills') === '1';
 
 // Build terrain for the CURRENT level from the engine's own tile list. Keyed by level, not act:
 // that distinction is the whole bug -- every level in an act used to draw the same mocked ground.
@@ -227,6 +299,10 @@ async function bootstrapSession() {
     objectRenderer = createObjectRenderer(createMpqAssetReader(Module));
     itemRenderer = createItemRenderer(createMpqAssetReader(Module));
     inventoryPanelRenderer = createInventoryPanelRenderer(createMpqAssetReader(Module));
+    characterPanelRenderer = createCharacterPanelRenderer(createMpqAssetReader(Module));
+    skillPanelRenderer = createSkillPanelRenderer(createMpqAssetReader(Module));
+    try { stashPanelRenderer = createStashPanelRenderer(createMpqAssetReader(Module)); } catch (error) { stashPanelError = String(error); }
+    try { waypointPanelRenderer = createWaypointPanelRenderer(createMpqAssetReader(Module)); } catch (error) { waypointPanelError = String(error); }
     beltRenderer = createBeltRenderer(createMpqAssetReader(Module));
     controlPanelRenderer = createControlPanelRenderer(assetReader);
     try { actMusic = createActMusicPlayer(assetReader); await actMusic.prepare(fixture.act0); musicError = ''; } catch (error) { musicError = String(error); }
@@ -394,12 +470,34 @@ function readNpcState() {
     const count = Module.ccall('d2_session_vendor_item_count', 'number', [], []);
     if (count > 0) {
       const base = Number(Module.ccall('d2_session_vendor_items', 'number', [], []));
+      // The stock's PRESENTATION records carry each item's retail inventory sprite, keyed by id.
+      // Same 112-byte format as the player's own items, so one reader serves both.
+      const sprites = new Map();
+      const pCount = Module.ccall('d2_session_vendor_presentation_count', 'number', [], []);
+      if (pCount > 0) {
+        const pBase = Number(Module.ccall('d2_session_vendor_presentations', 'number', [], []));
+        for (let i = 0; i < pCount; i++) {
+          const o = pBase + i * 112, pv = new DataView(Module.HEAPU8.buffer, o, 112);
+          let invFile = '';
+          for (let k = 0; k < 32; k++) {
+            const ch = Module.HEAPU8[o + 72 + k];
+            if (!ch) break;
+            invFile += String.fromCharCode(ch);
+          }
+          sprites.set(pv.getUint32(0, true), { invFile,
+            gridX: pv.getInt16(104, true), gridY: pv.getInt16(106, true), invPage: Module.HEAPU8[o + 108] });
+        }
+      }
       for (let i = 0; i < count; i++) {
         const b = base + i * 32, row = new DataView(Module.HEAPU8.buffer, b, 32);
         const code = row.getUint32(8, true);
         const codeText = String.fromCharCode(code & 255, (code >> 8) & 255, (code >> 16) & 255, (code >> 24) & 255)
           .replace(/\0/g, '').trim();
-        items.push({ id: row.getUint32(0, true), code: codeText, cost: row.getUint32(20, true),
+        const id = row.getUint32(0, true);
+        const art = sprites.get(id) || {};
+        items.push({ id, code: codeText, cost: row.getUint32(20, true),
+          invFile: art.invFile || '', gridX: art.gridX ?? -1, gridY: art.gridY ?? -1,
+          invPage: art.invPage ?? 255,
           name: Module.ccall('d2_lang_string', 'string', ['string'], [codeText]) || codeText });
       }
     }
@@ -422,6 +520,35 @@ function buyFromVendor(itemId) {
     snapshot = session.snapshot();
     return Boolean(ok);
   } catch (error) { lastPurchase = { itemId, ok: false, error: String(error) }; return false; }
+}
+
+// Sell an item to the open vendor. Same division as buying: the engine prices it, moves the gold
+// and takes the item; this only names what was clicked.
+function sellToVendor(itemId) {
+  if (!npcState) return false;
+  try {
+    const ok = Module.ccall('d2_session_command_vendor_sell', 'number', ['number', 'number'],
+      [npcState.npcId, itemId]);
+    lastSale = { itemId, ok: Boolean(ok), goldBefore: npcState.gold };
+    npcState = readNpcState();
+    lastSale.goldAfter = npcState ? npcState.gold : -1;
+    snapshot = session.snapshot();
+    return Boolean(ok);
+  } catch (error) { lastSale = { itemId, ok: false, error: String(error) }; return false; }
+}
+
+// Repair ONE item. d2_session_command_vendor_repair resolves the id to a real item unit and refuses
+// anything it cannot find, so there is no repair-all sentinel to pass -- an earlier version of this
+// defaulted the argument to -1 with a comment claiming retail did that, which was unfounded.
+function repairAtVendor(itemId) {
+  if (!npcState || !(itemId >= 0)) return false;
+  try {
+    const ok = Module.ccall('d2_session_command_vendor_repair', 'number', ['number', 'number'],
+      [npcState.npcId, itemId >>> 0]);
+    npcState = readNpcState();
+    snapshot = session.snapshot();
+    return Boolean(ok);
+  } catch { return false; }
 }
 
 function ensureNpcPanel() {
@@ -488,6 +615,8 @@ function readUnitKinds(count) {
 }
 
 function update() {
+  // The engine advances every tick, so last tick's advancement record is stale by definition.
+  advancement = null; classSkills = null;
   if (screen === SCREEN.TITLE) { ensureTitleScreen(); titleTick++; return; }
   if (screen === SCREEN.SELECT) { ensureCharSelect(); return; }
   if (screen === SCREEN.CREATE) { ensureCharCreate(); charCreate?.step(); return; }
@@ -497,7 +626,37 @@ function update() {
     for (const command of commands) {
       if (command.type === COMMAND.MOVE) {
         if (command.directional) session.move(snapshot.player.x + command.x, snapshot.player.y + command.y);
-        else { const d = screenDeltaToWorld(command.x - canvas.width / 2, command.y - canvas.height / 2); session.move(Math.round(snapshot.player.x + d.x), Math.round(snapshot.player.y + d.y)); }
+        else {
+          // A ground click. A new click replaces any walk in progress, as in retail. Retail's walk
+          // command only routes a short leg (MOVE_NO_PATH beyond it -- s000 stalled in town on
+          // exactly that); a far click is routed in legs by the client, so a refused click hands
+          // the SAME goal to the hop walker the NPC walk already uses.
+          const d = screenDeltaToWorld(command.x - canvas.width / 2, command.y - canvas.height / 2);
+          const tx = Math.round(snapshot.player.x + d.x), ty = Math.round(snapshot.player.y + d.y);
+          walkGoal = null;
+          // Retail's LEFT click acts on what is under the cursor before it walks: an item is picked
+          // up, a hostile is attacked with the left-hand skill (normal attack). Only bare ground
+          // walks. (This shell sent every left click as a walk, so a monster could only be fought
+          // with the right button -- s000 clicked one 400 times and never swung.)
+          const underItem = snapshot.items.filter((item) => item.mode === 3 && item.invPage === 255)
+            .map((item) => ({ item, d: (item.x - tx) ** 2 + (item.y - ty) ** 2 })).filter((entry) => entry.d <= 4)
+            .sort((a, b) => a.d - b.d || a.item.id - b.item.id)[0]?.item;
+          if (underItem) { session.pickup(underItem.id); continue; }
+          const underTarget = selectPrimaryTarget(snapshot, { x: tx, y: ty }, 2);
+          if (underTarget) {
+            const result = session.attack(underTarget);
+            lastSkillCommand = { skill: 0, targetId: underTarget, result };
+            // A monster out of reach (rooms away, or no path for the walk-into-range leg): retail
+            // walks the player toward it and attacks on arrival, as clicking an NPC walks and talks.
+            if (!result) {
+              const m = snapshot.entities.find((e) => e.id === underTarget);
+              if (m) { walkEvidence = { active: true, hops: 0, reason: 0 };
+                walkGoal = { x: m.x, y: m.y, within: 2, onArrive: () => { lastSkillCommand = { skill: 0, targetId: underTarget, result: session.attack(underTarget) }; } }; }
+            }
+            continue;
+          }
+          if (!session.move(tx, ty)) { walkEvidence = { active: true, hops: 0, reason: 0 }; walkGoal = { x: tx, y: ty, within: 2 }; }
+        }
       } else if (command.type === COMMAND.PRIMARY) {
         const point = command.x == null ? snapshot.player : (() => { const d = screenDeltaToWorld(command.x - canvas.width / 2, command.y - canvas.height / 2); return { x: Math.round(snapshot.player.x + d.x), y: Math.round(snapshot.player.y + d.y) }; })();
         const ground = command.x == null ? null : snapshot.items.filter((item) => item.mode === 3 && item.invPage === 255)
@@ -508,6 +667,9 @@ function update() {
         const skill = command.secondary ? selectedSkill : 0;
         const result = targetId ? (skill === 2 ? session.throwSkill(targetId) : skill === 1 ? session.kick(targetId) : session.attack(targetId)) : 0;
         lastSkillCommand = { skill, targetId, result };
+      } else if (command.type === COMMAND.BELT) {
+        // Retail's belt keys: 1-4 drink/use the bottom item of that belt column, through the engine.
+        if (session.useBelt(command.slot)) snapshot = session.snapshot();
       } else if (command.type === COMMAND.SKILL) {
         const skills = [0, 2, 1]; if (command.slot >= 1 && command.slot <= skills.length) selectedSkill = skills[command.slot - 1];
       } else if (command.type === COMMAND.CANCEL) {
@@ -719,12 +881,43 @@ function render() {
   }
   // An open conversation draws over the world, the way retail's NPC window does.
   if (npcState && ensureNpcPanel()) {
-    try { npcPanelEvidence = npcPanel.draw(ctx, w, h, npcState); npcPanelError = ''; }
+    try { npcPanelEvidence = npcPanel.draw(ctx, w, h, { ...npcState, playerItems: snapshot.items }); npcPanelError = ''; }
     catch (error) { npcPanelError = String(error); npcPanelEvidence = null; }
   } else npcPanelEvidence = null;
   if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, snapshot, inventoryVisible);
+  pollUiEvents();
+  if (stashPanelRenderer) {
+    try { stashEvidence = stashPanelRenderer.draw(ctx, w, h, stashOpen ? readStashLayout() : null, snapshot.items, stashOpen, snapshot.act); stashPanelError = ''; }
+    catch (error) { stashPanelError = String(error); stashEvidence = null; }
+  }
+  if (waypointPanelRenderer) {
+    try { waypointEvidence = waypointPanelRenderer.draw(ctx, w, h, waypointMenu ? readWaypointRows(snapshot.act) : [], snapshot.act, Boolean(waypointMenu)); waypointPanelError = ''; }
+    catch (error) { waypointPanelError = String(error); waypointEvidence = null; }
+  }
+  if (characterPanelRenderer) {
+    const adv = readAdvancement();
+    // Life and mana are the snapshot's, not the advancement record's: the panel shows what the
+    // player has right now, and the engine is the only thing that decides that.
+    characterPanelEvidence = characterPanelRenderer.draw(ctx, w, h, adv && {
+      ...adv, name: chosenName || '', className: CLASS_NAMES[snapshot.player?.playerClass] || '',
+      // Retail stores life and mana as 8.8 fixed point (50 life is 12800) and displays the whole
+      // part. Drawing the raw stat put "14848" in the Life slot.
+      life: (snapshot.player?.hpMax ?? 0) >> 8, mana: (snapshot.player?.manaMax ?? 0) >> 8,
+      string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]),
+    }, characterVisible);
+  }
+  if (skillPanelRenderer) {
+    const adv = readAdvancement();
+    skillPanelEvidence = skillPanelRenderer.draw(ctx, w, h, skillsVisible ? {
+      playerClass: snapshot.player?.playerClass ?? 0, level: adv?.level ?? 1,
+      skillPoints: adv?.skillPoints ?? 0, skills: readClassSkills() || [],
+      // SkillDesc's wStrName is a .tbl index, so the name is retail's own string, not a table
+      // this client keeps.
+      name: (skill) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [skill.nameStr]),
+    } : null, skillsVisible);
+  }
   if (controlPanelRenderer) controlPanelEvidence = controlPanelRenderer.draw(ctx, w, h, snapshot);
-  if (beltRenderer) beltEvidence = beltRenderer.draw(ctx, snapshot.items);
+  if (beltRenderer) beltEvidence = beltRenderer.draw(ctx, snapshot.items, readBeltBoxes());
   hud.textContent = hudLines(snapshot, Boolean(session), fps).join('\n');
 }
 
@@ -762,6 +955,83 @@ function frame(now) {
 }
 
 // The talkable NPC under a canvas point, if any. Uses the same projection the world is drawn with.
+// Retail's 0x77 UpdateUi codes the engine has sent since the last read (16 opens the stash).
+function pollUiEvents() {
+  if (!session) return;
+  const p = Module._malloc(64);
+  try {
+    const n = Module.ccall('d2_session_take_ui_events', 'number', ['bigint', 'number'], [BigInt(p), 64]);
+    for (const code of Module.HEAPU8.slice(p, p + n)) { if (code === 16) stashOpen = true; else if (code === 17) stashOpen = false; }
+    if (Module.ccall('d2_session_take_waypoint_menu', 'number', ['bigint'], [BigInt(p)])) waypointMenu = { id: Module.HEAPU32[p / 4] };
+  } finally { Module._free(p); }
+}
+// The act's waypoints as the engine reports them, named through retail's own strings.
+function readWaypointRows(act) {
+  const p = Module._malloc(64 * 16);
+  try {
+    const n = Module.ccall('d2_session_waypoints', 'number', ['bigint', 'number'], [BigInt(p), 256]);
+    const a = new Int32Array(Module.HEAPU8.buffer.slice(p, p + n * 16)), rows = [];
+    for (let i = 0; i < n; i++) {
+      if (a[i * 4 + 2] !== act - 1) continue;
+      const key = Module.ccall('d2_level_name', 'string', ['number'], [a[i * 4 + 1]]);
+      rows.push({ waypointNo: a[i * 4], levelId: a[i * 4 + 1], active: a[i * 4 + 3] === 1,
+        name: Module.ccall('d2_lang_string', 'string', ['string'], [key]) || key });
+    }
+    return rows;
+  } finally { Module._free(p); }
+}
+// Retail's 0x49: travel to levelId through the open waypoint, or close the menu with 0.
+function takeWaypoint(levelId) {
+  if (!waypointMenu) return 0;
+  const previousAct = snapshot.act;
+  const result = Module.ccall('d2_session_command_waypoint', 'number', ['number', 'number'], [waypointMenu.id, levelId]);
+  if (result) {
+    waypointMenu = null;
+    snapshot = session.snapshot(); motion = session.motion();
+    if (TERRAIN_ENABLED && snapshot.act !== previousAct) { loadSessionTerrain(snapshot.act - 1); loadActTileView(snapshot.act - 1); }
+  }
+  if (levelId) lastWaypointTravel = { levelId, result };
+  return result;
+}
+// The stash grid is retail's own Inventory.txt record for a LoD character, via the engine.
+function readStashLayout() {
+  if (stashLayout) return stashLayout;
+  const p = Module._malloc(48);
+  try {
+    const ok = Module.ccall('d2_session_inventory_layout', 'number', ['number', 'number', 'bigint', 'number'], [BIG_BANK_PAGE_1, 1, BigInt(p), 12]);
+    stashLayout = ok ? stashGeometry(Array.from(new Int32Array(Module.HEAPU8.buffer.slice(p, p + 48)))) : null;
+  } finally { Module._free(p); }
+  return stashLayout;
+}
+// The level exit under the pointer: an enabled warp whose interaction point (the engine's exitX/Y --
+// the spot retail's nearest-warp test measures from) is within 3 subtiles of the clicked ground.
+// DECLARED approximation: retail hit-tests the warp's LvlWarp selection box in screen space.
+function warpUnderPointer(px, py) {
+  if (!session) return null;
+  const d = screenDeltaToWorld(px - canvas.width / 2, py - canvas.height / 2);
+  const wx = snapshot.player.x + d.x, wy = snapshot.player.y + d.y;
+  let best = null, bestDistance = 3.5;
+  for (const warp of snapshot.warps || []) {
+    if (!warp.enabled || warp.destinationLevel === snapshot.level) continue;
+    const dist = Math.max(Math.abs(warp.x - wx), Math.abs(warp.y - wy));
+    if (dist < bestDistance) { best = warp; bestDistance = dist; }
+  }
+  return best;
+}
+let lastWarpTaken = null;
+// The object under the pointer, the same way npcUnderPointer finds a person.
+function objectUnderPointer(px, py) {
+  if (!session) return null;
+  const camera = worldToScreen(snapshot.player.x, snapshot.player.y);
+  const w = canvas.width, h = canvas.height;
+  let best = null, bestDistance = 36;
+  for (const object of snapshot.objects || []) {
+    const point = worldToScreen(object.x, object.y);
+    const d = Math.hypot(point.x - camera.x + w / 2 - px, point.y - camera.y + h / 2 - py);
+    if (d < bestDistance) { best = object; bestDistance = d; }
+  }
+  return best;
+}
 function npcUnderPointer(px, py) {
   if (!session) return null;
   const camera = worldToScreen(snapshot.player.x, snapshot.player.y);
@@ -794,11 +1064,33 @@ function canvasPoint(event) {
 addEventListener('keydown', (e) => {
   if (screen === SCREEN.CREATE) { if (charCreate?.typeKey(e.code, e.key)) e.preventDefault(); return; }
   actMusic?.play(snapshot.act - 1).catch((error) => { musicError = String(error); }); if (e.code === 'KeyI' && !e.repeat) { inventoryVisible = !inventoryVisible; e.preventDefault(); return; }
+  if (e.code === 'KeyC' && !e.repeat) { characterVisible = !characterVisible; e.preventDefault(); return; }
+  // Esc, as retail: it closes what is open before it does anything else. An open conversation is
+  // ended through retail's own 0x30 TerminateEntityChat handler, and the window reflects what the
+  // ENGINE then reports rather than being hidden locally; then the open panels. With nothing open
+  // it falls through to the command path (which cancels the selected skill, s46).
+  if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && (waypointMenu || stashOpen || npcState || inventoryVisible || characterVisible || skillsVisible)) {
+    if (waypointMenu) {
+      // Retail closes the waypoint menu with 0x49 and level 0.
+      takeWaypoint(0);
+    } else if (stashOpen) {
+      // Retail's client closes the stash and tells the server with 0x4F TRADEBTN_CLOSESTASH (18);
+      // the window closes when the engine accepts it.
+      if (Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [18, 0])) stashOpen = false;
+    } else if (npcState) {
+      Module.ccall('d2_session_command_end_npc', 'number', ['number'], [npcState.npcId]);
+      npcState = readNpcState();
+    } else { inventoryVisible = false; characterVisible = false; skillsVisible = false; }
+    e.preventDefault(); return;
+  }
+  if (e.code === 'KeyT' && !e.repeat) { skillsVisible = !skillsVisible; e.preventDefault(); return; }
   if (input.key(e.code, true, e.repeat)) e.preventDefault(); });
 addEventListener('keyup', (e) => { if (input.key(e.code, false)) e.preventDefault(); });
 addEventListener('blur', () => { input.keys.clear(); });
 canvas.addEventListener('pointermove', (e) => {
   const [x, y] = canvasPoint(e);
+  if (skillsVisible && skillPanelRenderer && session)
+    skillPanelRenderer.hover(x, y, canvas.width, canvas.height, { skills: readClassSkills() || [] });
   if (screen === SCREEN.TITLE) titleScreen?.hover(x, y, canvas.width, canvas.height);
   else if (screen === SCREEN.CREATE) charCreate?.hover(x, y, canvas.width, canvas.height);
 });
@@ -812,19 +1104,73 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   const [x, y] = canvasPoint(e);
   actMusic?.play(snapshot.act - 1).catch((error) => { musicError = String(error); });
-  const beltItem = beltRenderer?.itemAt(x, y, snapshot.items); if (beltItem && session?.useBelt(beltItem.gridX)) { snapshot = session.snapshot(); canvas.focus(); e.preventDefault(); return; }
+  const beltItem = beltRenderer?.itemAt(x, y, snapshot.items, readBeltBoxes()); if (beltItem && session?.useBelt(beltItem.gridX)) { snapshot = session.snapshot(); canvas.focus(); e.preventDefault(); return; }
+  // An open waypoint menu takes the click: an active row travels there, anything else is swallowed.
+  if (waypointMenu && waypointPanelRenderer) {
+    const row = waypointPanelRenderer.rowAt(x, y, canvas.width, canvas.height, readWaypointRows(snapshot.act));
+    if (row?.active) takeWaypoint(row.levelId);
+    canvas.focus(); e.preventDefault(); return;
+  }
   // An open NPC window takes the click before the world does, so buying does not also walk.
   if (npcState && npcPanel) {
-    const item = npcPanel.itemAt(x, y, canvas.width, canvas.height, npcState);
+    const item = npcPanel.itemAt(x, y, canvas.width, canvas.height,
+      { ...npcState, playerItems: snapshot.items });
+    // The trade screen has two grids: the shop's stock above, the player's items below. A click on
+    // your own item is a SALE, not a purchase -- the panel says which side was hit.
+    if (item?.mine) { sellToVendor(item.id); canvas.focus(); e.preventDefault(); return; }
     if (item) { buyFromVendor(item.id); canvas.focus(); e.preventDefault(); return; }
   }
   // Left-clicking a talkable NPC walks over and starts the conversation, which is what a player
   // expects; anything else falls through to the normal command path.
   const npcHit = e.button === 0 && session ? npcUnderPointer(x, y) : null;
-  if (npcHit) {
+  // Left-clicking an OBJECT walks to it and operates it, as retail does. What happens next is the
+  // engine's: the stash, for one, answers with 0x77 UPDATEUI_OPENSTASH (pollUiEvents).
+  const objectHit = !npcHit && e.button === 0 && session && !stashOpen ? objectUnderPointer(x, y) : null;
+  // Left-clicking a level exit walks to it and takes it, through the engine's warp command (which
+  // only accepts a real generated exit of this level).
+  const warpHit = !npcHit && !objectHit && e.button === 0 && session ? warpUnderPointer(x, y) : null;
+  if (warpHit) {
+    walkEvidence = { active: true, hops: 0, reason: 0 };
+    walkGoal = { x: warpHit.x, y: warpHit.y, within: 2, onArrive: () => {
+      const previousAct = snapshot.act;
+      const result = Module.ccall('d2_session_command_warp', 'number', ['number', 'number'], [warpHit.destinationLevel, warpHit.warpId]);
+      lastWarpTaken = { destinationLevel: warpHit.destinationLevel, warpId: warpHit.warpId, result };
+      if (result) { snapshot = session.snapshot(); motion = session.motion();
+        if (TERRAIN_ENABLED && snapshot.act !== previousAct) { loadSessionTerrain(snapshot.act - 1); loadActTileView(snapshot.act - 1); } }
+    } };
+  } else if (npcHit) {
     walkEvidence = { active: true, hops: 0, reason: 0 };
     walkGoal = { x: npcHit.x, y: npcHit.y, within: 4, onArrive: () => talkToNpc(npcHit.id) };
-  } else if (!(inventoryVisible && inventoryPanelRenderer?.itemAt(x, y, canvas.width, canvas.height, snapshot))) input.pointer(x, y, e.button);
+  } else if (objectHit) {
+    walkEvidence = { active: true, hops: 0, reason: 0 };
+    walkGoal = { x: objectHit.x, y: objectHit.y, within: 2, onArrive: () => { session.operate(objectHit.id); snapshot = session.snapshot(); pollUiEvents(); } };
+  } else {
+    // A "+" on the character screen spends a point through retail's 0x3A handler. Re-read rather
+    // than adjust a local copy: the engine decides what a point did, including refusing it.
+    // The skill tree takes the click before the world does, so learning a skill does not also walk.
+    const skillHit = skillsVisible && skillPanelRenderer && session
+      ? skillPanelRenderer.skillAt(x, y, canvas.width, canvas.height,
+          { skills: readClassSkills() || [] }) : null;
+    if (skillHit?.tab) { skillPanelRenderer.tab = skillHit.tab; canvas.focus(); e.preventDefault(); return; }
+    if (skillHit?.skill) {
+      Module.ccall('d2_session_command_add_skill', 'number', ['number'], [skillHit.skill.id]);
+      classSkills = null; advancement = null;
+      canvas.focus(); e.preventDefault(); return;
+    }
+    const statHit = characterVisible && characterPanelRenderer && session
+      ? characterPanelRenderer.buttonAt(x, y, canvas.width, canvas.height, readAdvancement()) : null;
+    if (statHit !== null && statHit !== undefined) {
+      Module.ccall('d2_session_command_add_stat', 'number', ['number', 'number'], [statHit, 1]);
+      advancement = null;
+      canvas.focus(); e.preventDefault(); return;
+    }
+    const carried = inventoryVisible && inventoryPanelRenderer
+      ? inventoryPanelRenderer.itemAt(x, y, canvas.width, canvas.height, snapshot) : null;
+    // With a shop open, clicking something you are carrying sells it; otherwise the inventory
+    // click is swallowed as before and anything else goes to the world.
+    if (carried && npcState) sellToVendor(carried.id);
+    else if (!carried) input.pointer(x, y, e.button);
+  }
   canvas.focus(); e.preventDefault(); });
 canvas.addEventListener('contextmenu', (e) => { if (session && inventoryVisible && inventoryPanelRenderer) {
     const [x, y] = canvasPoint(e), item = inventoryPanelRenderer.itemAt(x, y, canvas.width, canvas.height, snapshot);
@@ -847,6 +1193,30 @@ window.__d2Shell = { input, get snapshot() { return snapshot; }, get tileView() 
   get objectRenderer() { return objectRenderer; },
   get itemRenderer() { return itemRenderer; },
   get inventoryPanelEvidence() { return inventoryPanelEvidence && { ...inventoryPanelEvidence }; },
+  get characterPanelEvidence() { return characterPanelEvidence && { ...characterPanelEvidence }; },
+  get skillPanelEvidence() { return skillPanelEvidence && { ...skillPanelEvidence }; },
+  get warpEvidence() { return { lastWarpTaken, warps: (snapshot.warps || []).map((w) => ({ destinationLevel: w.destinationLevel, warpId: w.warpId, enabled: w.enabled, x: w.x, y: w.y })) }; },
+  get waypointEvidence() { return { open: Boolean(waypointMenu), waypointId: waypointMenu?.id ?? 0, error: waypointPanelError,
+    drawn: waypointEvidence && JSON.parse(JSON.stringify(waypointEvidence)), art: waypointPanelRenderer?.evidence ?? null,
+    lastTravel: lastWaypointTravel }; },
+  get stashEvidence() { return { open: stashOpen, error: stashPanelError, drawn: stashEvidence && JSON.parse(JSON.stringify(stashEvidence)),
+    art: stashPanelRenderer?.evidence ?? null }; },
+  get skillsVisible() { return skillsVisible; },
+  set skillsVisible(v) { skillsVisible = Boolean(v); },
+  get classSkills() { return readClassSkills(); },
+  skillPanelHitTest(x, y) {
+    return skillPanelRenderer && skillsVisible
+      ? skillPanelRenderer.skillAt(x, y, canvas.width, canvas.height, { skills: readClassSkills() || [] }) : null;
+  },
+  // The SAME hit test the click path uses, so a caller aiming at a "+" cannot be testing
+  // coordinates it invented while the real button sits elsewhere.
+  characterPanelHitTest(x, y) {
+    return characterPanelRenderer && characterVisible
+      ? characterPanelRenderer.buttonAt(x, y, canvas.width, canvas.height, readAdvancement()) : null;
+  },
+  get characterVisible() { return characterVisible; },
+  set characterVisible(v) { characterVisible = Boolean(v); },
+  get advancement() { return readAdvancement(); },
   get beltEvidence() { return beltEvidence && { ...beltEvidence }; },
   get controlPanelEvidence() { return controlPanelEvidence && { ...controlPanelEvidence }; },
   get selectedSkill() { return selectedSkill; }, get lastSkillCommand() { return lastSkillCommand && { ...lastSkillCommand }; },
@@ -854,6 +1224,43 @@ window.__d2Shell = { input, get snapshot() { return snapshot; }, get tileView() 
   get frameError() { return frameError; }, get frameErrors() { return frameErrors; },
   get charSelectEvidence() { return charSelect ? { ...charSelect.evidence, error: charSelectError } : { error: charSelectError || 'not built' }; },
   buyVendorItem(itemId) { return buyFromVendor(itemId); },
+  sellVendorItem(itemId) { return sellToVendor(itemId); },
+  repairAtVendor(itemId) { return repairAtVendor(itemId); },
+  // Gambling is a different counter, not a different button: the vendor must be opened with
+  // action 2, and the stock then read is the NPC's GAMBLE inventory rather than its trade stock.
+  openGambleWindow(npcId) {
+    try {
+      const ok = Module.ccall('d2_session_command_npc_vendor', 'number', ['number', 'number'],
+        [npcId ?? npcState?.npcId ?? 0, 2]);
+      npcState = readNpcState();
+      return Boolean(ok);
+    } catch { return false; }
+  },
+  gambleForItem(itemId) {
+    if (!npcState) return false;
+    try {
+      const ok = Module.ccall('d2_session_command_vendor_gamble', 'number', ['number', 'number'],
+        [npcState.npcId, itemId]);
+      npcState = readNpcState();
+      snapshot = session.snapshot();
+      return Boolean(ok);
+    } catch { return false; }
+  },
+  get saleEvidence() { return lastSale ? { ...lastSale } : null; },
+  // What the player is carrying that a vendor would take: inventory pages, not the ground.
+  // The code is decoded to its four-character form so this list and the vendor's speak the same
+  // language -- the raw u32 is the same value, just unreadable, and it is what the string tables
+  // are keyed by.
+  get carriedItems() {
+    return snapshot.items.filter((i) => i.invPage !== 255).map((i) => {
+      const code = typeof i.code === 'number'
+        ? String.fromCharCode(i.code & 255, (i.code >> 8) & 255, (i.code >> 16) & 255, (i.code >> 24) & 255)
+            .replace(/\0/g, '').trim()
+        : i.code;
+      return { id: i.id, code, invPage: i.invPage, bodyLoc: i.bodyLoc,
+        name: Module.ccall('d2_lang_string', 'string', ['string'], [code]) || code };
+    });
+  },
   get purchaseEvidence() { return lastPurchase ? { ...lastPurchase } : null; },
   get walkEvidence() { return { ...walkEvidence, goal: walkGoal ? { x: walkGoal.x, y: walkGoal.y } : null }; },
   walkTo(x, y, within = 4) { walkEvidence = { active: true, hops: 0, reason: 0 }; walkGoal = { x, y, within }; },
@@ -876,7 +1283,7 @@ window.__d2Shell = { input, get snapshot() { return snapshot; }, get tileView() 
       npcId: npcState?.npcId ?? 0, greeting: npcState?.greeting ?? '',
       items: npcState?.items?.length ?? 0,
       gold: npcState?.gold ?? -1,
-      firstItems: (npcState?.items ?? []).slice(0, 6).map((i) => ({ id: i.id, code: i.code, name: i.name, cost: i.cost })),
+      firstItems: (npcState?.items ?? []).slice(0, 6).map((i) => ({ id: i.id, code: i.code, name: i.name, cost: i.cost, invFile: i.invFile })),
       drawn: npcPanelEvidence, panel: npcPanel?.evidence ?? null };
   },
   get npcEvidence() {
@@ -919,6 +1326,26 @@ window.__d2Shell = { input, get snapshot() { return snapshot; }, get tileView() 
     } finally { Module._free(p); }
   },
   get titleEvidence() { return titleScreen ? { ...titleScreen.evidence, error: titleError } : { error: titleError || 'not built' }; },
+  /**
+   * Canvas-pixel click targets for the front-end screens, from the same hit tests their clicks use.
+   * s000 aims real pointer events with these, the way world clicks are aimed with project().
+   */
+  uiTargets() {
+    const w = canvas.width, h = canvas.height, out = { screen };
+    if (screen === SCREEN.TITLE && titleScreen) {
+      out.title = {};
+      for (let y = 0; y < h; y++) {
+        const i = titleScreen.hitTest(w / 2, y, w, h);
+        const label = i >= 0 ? titleScreen.labelAt(i) : null;
+        if (label && !(label in out.title)) {
+          let y2 = y; while (y2 < h && titleScreen.hitTest(w / 2, y2, w, h) === i) y2++;
+          out.title[label] = [Math.round(w / 2), Math.round((y + y2 - 1) / 2)];
+        }
+      }
+    }
+    if (screen === SCREEN.CREATE && charCreate?.targets) out.create = charCreate.targets(w, h);
+    return out;
+  },
   titleClick(label) {
     if (!titleScreen) return -1;
     // Click a menu entry by name, so a scenario does not hardcode button pixel positions.

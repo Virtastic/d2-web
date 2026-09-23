@@ -5,6 +5,16 @@ export function resourceRatio(value, maximum) {
   return Number.isFinite(max) && max > 0 && Number.isFinite(current) ? Math.min(1, Math.max(0, current / max)) : 0;
 }
 
+// The console is CENTRED between the orbs, and the world shows either side of it. That is what
+// retail looks like -- the panel is two orbs plus a centre console, not a solid band across the
+// screen. The arithmetic confirms the offsets are exact rather than hand-placed: the orbs are 117
+// wide so the space between them is 566, the console's four pieces are 128+128+128+86 = 470, and
+// (566 - 470) / 2 = 48, which is centerX 117 + 48 = 165 and the console ending at 635, 48 short of
+// the mana orb at 683.
+//
+// Cycle 110 mistook those two 48px margins for seams and "closed" them by drawing frame 6 in the
+// console. Frame 6 is only 39% opaque, so that put real holes in the bar -- 22 of 55 rows at
+// column 572 -- in place of margins that were correct. Reverted; see V23.
 export const CONTROL_LAYOUT = Object.freeze({ healthX: 0, centerX: 165, manaX: 683, orbY: 0, height: 104 });
 
 function frameCanvas(frame, palette, documentObject) {

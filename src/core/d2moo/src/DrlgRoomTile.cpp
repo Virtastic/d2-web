@@ -42,6 +42,67 @@ struct D2UnkDrlgRoomTileStrc2
 
 //1.10f:D2Common.0x6FD88860
 //1.11: D2Common.0x6FD8D3D0
+// d2-web diagnostic, OFF unless g_d2webRollTraceEnabled: the room-local order in which cells take
+// their GetTileCache roll. Spawn parity proves the NUMBER of rolls a
+// room takes; this records the ORDER, which is the remaining suspect for s141's wrong frames.
+// Side tables only -- nothing here touches the seed or any retail structure.
+#include <unordered_map>
+#include <vector>
+// nFramePrev/nFrameNext1/nFrameNext2: the +0x20 value this cell WOULD have drawn had it taken the
+// previous roll of the room seed, or the next one or two -- the shift-direction test (s172).
+struct D2WebRollTrace { uint32_t nOrdinal, nEntries, nChosen, nFramePrev, nFrameNext1, nFrameNext2; };
+bool g_d2webRollTraceEnabled = false;
+uint32_t g_d2webRollOrphans = 0;
+std::unordered_map<const D2DrlgTileDataStrc*, D2WebRollTrace> g_d2webRollTrace;
+static std::unordered_map<const D2DrlgRoomStrc*, uint32_t> s_d2webRollCounter;
+static bool s_d2webRollPending = false;
+// Rolls LinkedTileDataManager takes on the NEIGHBOUR's seed when it replaces a blank-fill tile:
+// { room whose seed advanced, that room's roll ordinal, room whose pass caused it }.
+struct D2WebCrossRoll { const D2DrlgRoomStrc* pRoom; uint32_t nOrdinal; const D2DrlgRoomStrc* pCause; };
+std::vector<D2WebCrossRoll> g_d2webCrossRolls;
+static const D2DrlgRoomStrc* s_d2webCrossCause = nullptr;
+static D2WebRollTrace s_d2webRollLast = {};
+void D2WEB_ResetRollTrace() { g_d2webCrossRolls.clear(); g_d2webRollTrace.clear(); s_d2webRollCounter.clear(); s_d2webRollPending = false; g_d2webRollOrphans = 0; }
+// The ladder walk of GetTileCache, re-run on an arbitrary seed low word. Returns the chosen
+// entry's +0x20 value. Pure: it never touches a seed.
+static uint32_t D2WEB_PickWithLow(D2TileLibraryEntryStrc** ppEntries, int nEntries, int nMax, uint32_t nLow)
+{
+	if (nEntries <= 0) return UINT32_MAX;
+	int nId = 0;
+	if (nMax > 0)
+	{
+		int32_t nRand = (int32_t)(((nMax - 1) & nMax) ? nLow % (uint32_t)nMax : nLow & (uint32_t)(nMax - 1)) + 1;
+		while (nEntries > 1 && nRand > 0 && nId < nEntries) { nRand -= D2CMP_10081_GetTileRarity(ppEntries[nId]); ++nId; }
+		if (nId) --nId;
+	}
+	return (uint32_t)D2CMP_10081_GetTileRarity(ppEntries[nId]);
+}
+static uint32_t D2WEB_StepLow(D2SeedStrc& seed)
+{
+	seed.lSeed = seed.nHighSeed + 0x6AC690C5ull * seed.nLowSeed;
+	return seed.nLowSeed;
+}
+static void D2WEB_NoteRoll(const D2DrlgRoomStrc* pDrlgRoom, uint32_t nEntries, uint32_t nChosen,
+	D2TileLibraryEntryStrc** ppEntries, int nMax, uint32_t nPrevLow)
+{
+	if (!g_d2webRollTraceEnabled) return;
+	if (s_d2webRollPending) ++g_d2webRollOrphans;
+	D2SeedStrc ahead = pDrlgRoom->pSeed;
+	const uint32_t nNext1 = D2WEB_StepLow(ahead), nNext2 = D2WEB_StepLow(ahead);
+	if (s_d2webCrossCause) { g_d2webCrossRolls.push_back({ pDrlgRoom, s_d2webRollCounter[pDrlgRoom], s_d2webCrossCause }); s_d2webCrossCause = nullptr; }
+	s_d2webRollLast = { s_d2webRollCounter[pDrlgRoom]++, nEntries, nChosen,
+		D2WEB_PickWithLow(ppEntries, (int)nEntries, nMax, nPrevLow),
+		D2WEB_PickWithLow(ppEntries, (int)nEntries, nMax, nNext1),
+		D2WEB_PickWithLow(ppEntries, (int)nEntries, nMax, nNext2) };
+	s_d2webRollPending = true;
+}
+static void D2WEB_StampRoll(const D2DrlgTileDataStrc* pTileData)
+{
+	if (!g_d2webRollTraceEnabled || !pTileData) return;
+	g_d2webRollTrace[pTileData] = s_d2webRollPending ? s_d2webRollLast : D2WebRollTrace{ UINT32_MAX, 0, 0, 0, 0, 0 };
+	s_d2webRollPending = false;
+}
+
 D2TileLibraryEntryStrc* __fastcall DRLGROOMTILE_GetTileCache(D2DrlgRoomStrc* pDrlgRoom, int nType, uint32_t nPackedTileInformation)
 {
 	D2TileLibraryEntryStrc* ppTileLibraryEntries[40] = {};
@@ -64,6 +125,7 @@ D2TileLibraryEntryStrc* __fastcall DRLGROOMTILE_GetTileCache(D2DrlgRoomStrc* pDr
 		}
 
 		int nId = 0;
+		const uint32_t nD2webPrevLow = pDrlgRoom->pSeed.nLowSeed;
 		int32_t nRand = SEED_RollLimitedRandomNumber(&pDrlgRoom->pSeed, nMax) + 1;
 		if (nMax)
 		{
@@ -79,6 +141,7 @@ D2TileLibraryEntryStrc* __fastcall DRLGROOMTILE_GetTileCache(D2DrlgRoomStrc* pDr
 			}
 		}
 
+		D2WEB_NoteRoll(pDrlgRoom, (uint32_t)nEntries, (uint32_t)nId, ppTileLibraryEntries, nMax, nD2webPrevLow);
 		return ppTileLibraryEntries[nId];
 	}
 	else
@@ -95,6 +158,7 @@ D2TileLibraryEntryStrc* __fastcall DRLGROOMTILE_GetTileCache(D2DrlgRoomStrc* pDr
 // Helper function
 static void DRLGROOMTILE_InitTileDataDefaults(D2DrlgRoomStrc* pDrlgRoom, D2DrlgTileDataStrc* pTileData, int nX, int nY, uint32_t nPackedTileInformation, int nTileType, D2TileLibraryEntryStrc* pTileLibraryEntry)
 {
+	D2WEB_StampRoll(pTileData);
 	pTileData->pTile = pTileLibraryEntry;
 	pTileData->nTileType = nTileType;
 	pTileData->dwFlags = MAPTILE_FLAGS_NONE;
@@ -442,6 +506,40 @@ void __fastcall DRLGROOMTILE_InitTileShadow(D2DrlgRoomStrc* pDrlgRoom, int nX, i
 //1.10f:D2Common.0x6FD89000
 //1.11: D2Common.0x6FD8E0B0
 //1.14d: 0x0066E9B0
+// Record a floor tile in this room reusing an ALREADY-CHOSEN library entry. This is the RNG-safe
+// half of the ninth-row/column fix: DRLGROOMTILE_AddLinkedTileData would call GetTileCache, whose
+// rarity roll shifts the room seed and moved monster spawns off retail by two units per level
+// (s05-s08). Retail's shared edge tile carries the neighbour's entry, so no roll is owed.
+// Diagnostic counters for the preset ninth-row question.
+int32_t g_d2webPresetEdgeMerged = 0;
+int32_t g_d2webPresetEdgeAdded = 0;
+int32_t g_d2webPresetEdgeSameMap = 0;
+int32_t g_d2webPresetEdgeOtherMap = 0;
+
+static void D2WEB_AddSharedEdgeFloorTile(void* pMemPool, D2DrlgRoomStrc* pDrlgRoom,
+	D2TileLibraryEntryStrc* pTileCache, uint32_t nPackedTileInformation, int nX, int nY)
+{
+	D2DrlgTileLinkStrc* pCurLink = nullptr;
+	for (pCurLink = pDrlgRoom->pTileGrid->pMapLinks; pCurLink; pCurLink = pCurLink->pNext)
+	{
+		if (pCurLink->bFloor)
+		{
+			break;
+		}
+	}
+	if (pCurLink == nullptr)
+	{
+		D2DrlgTileLinkStrc* pTileLink = D2_ALLOC_STRC_POOL(pMemPool, D2DrlgTileLinkStrc);
+		pTileLink->bFloor = TRUE;
+		pTileLink->pMapTile = nullptr;
+		pTileLink->pNext = pDrlgRoom->pTileGrid->pMapLinks;
+		pDrlgRoom->pTileGrid->pMapLinks = pTileLink;
+		pCurLink = pTileLink;
+	}
+
+	DRLGROOMTILE_InitFloorTileData(pDrlgRoom, &pCurLink->pMapTile, nX, nY, nPackedTileInformation, pTileCache);
+}
+
 void __fastcall DRLGROOMTILE_LoadInitRoomTiles(D2DrlgRoomStrc* pDrlgRoom, D2DrlgGridStrc* pTilePackedInfoGrid, D2DrlgGridStrc* pTileTypeGrid, BOOL bFillBlanks, BOOL bKillEdgeX, BOOL bKillEdgeY)
 {
 	void* pMemPool = pDrlgRoom->pLevel->pDrlg->pMempool;
@@ -451,6 +549,30 @@ void __fastcall DRLGROOMTILE_LoadInitRoomTiles(D2DrlgRoomStrc* pDrlgRoom, D2Drlg
 
 	const int nRoomX = pDrlgRoom->nTileXPos;
 	const int nRoomY = pDrlgRoom->nTileYPos;
+
+	// This routine serves both generators. Only the outdoor floor pass -- the one driven by the
+	// room's own 9x9 pOutdoor->pFloorGrid -- records the ninth row/column in this room; the preset
+	// path shares those cells with the neighbour and merges them.
+	//
+	// The pass is identified by the GRID it was handed, and by nothing else.
+	//
+	// Not by "the room has a pOutdoor": pMaze and pOutdoor are a union at +0x20, so pOutdoor is
+	// non-null for a preset room too, and gating on it put 498 duplicate floors in the town.
+	//
+	// Not by pDrlgRoom->nType either, which looks like the honest discriminator and measures worse:
+	// DRLGTYPE_OUTDOOR took s140 from 7,332 missing to 7,493 across 37 levels instead of 34. The
+	// reason is that DRLGTYPE_MAZE rooms are ALSO backed by the outdoor struct -- DRLGROOM_Free
+	// sends them to DRLGOUTROOM_FreeDrlgOutdoorRoom, and only DRLGTYPE_PRESET uses the preset
+	// struct, despite the union member at +0x20 being spelled pMaze. Testing for DRLGTYPE_OUTDOOR
+	// therefore drops every maze room, which runs this pass on an outdoor floor grid like any other.
+	//
+	// The pointer comparison cannot misfire on a preset room: D2DrlgPresetRoomStrc puts its grids at
+	// 0x10/0x24/0x38/0x4C (walls), 0xB0/0xC4 (floors) and 0xD8 (cells), and none of those is the
+	// 0x28 that D2DrlgOutdoorRoomStrc puts pFloorGrid at.
+	const bool bOutdoorFloorPass = pDrlgRoom->pOutdoor
+		&& pTilePackedInfoGrid == &pDrlgRoom->pOutdoor->pFloorGrid
+		&& pDrlgRoom->pOutdoor->pFloorGrid.pCellsFlags != nullptr;
+
 
 	for (int nTileOffsetY = 0; nTileOffsetY < nTileCountY; ++nTileOffsetY)
 	{
@@ -528,10 +650,51 @@ void __fastcall DRLGROOMTILE_LoadInitRoomTiles(D2DrlgRoomStrc* pDrlgRoom, D2Drlg
 					}
 
 
+					// 1.13c divergence: retail records a floor tile in THIS
+					// room for every grid cell carrying bIsFloor, including the ninth row and column
+					// that overlap the neighbouring room. LinkedTileDataManager only mutates the
+					// neighbour's existing tile and adds nothing here, which lost 12,241 floor tiles
+					// across act 1 -- every one of them at tile offset 8. The merge still runs, for
+					// its effect on the neighbour's flags, and the record is added too -- but only on the
+					// outdoor floor pass, for that room's own ninth row/column. Both halves are measured: for outdoor rooms
+					// retail's floor count is our grid's interior+edge bIsFloor count, 96 rooms out of
+					// 96 (s143); for the preset town retail matches the merge-only behaviour exactly,
+					// and adding there puts 498 duplicate floors on the screen.
+					// On the outdoor floor pass, a cell on this room's own ninth row/column records a
+					// tile HERE instead of merging into the neighbour's. Doing both instead rolls
+					// DRLGROOMTILE_GetTileCache twice for one cell, and that extra draw shifts the
+					// shared room seed -- it took monster spawn and AI (s05-s08) down with it.
+					const bool bOwnEdge = bOutdoorFloorPass
+						&& (nTileOffsetX == pDrlgRoom->nTileWidth || nTileOffsetY == pDrlgRoom->nTileHeight);
+					// Counting only, to answer one question: at a PRESET room's own ninth row or
+					// column, with a floor in the grid, does the fill merge into a neighbour or add
+					// here? Every other explanation is eliminated, so this is where the missing
+					// tiles must be going. Removed once it has answered.
+					if (pDrlgRoom->nType == DRLGTYPE_PRESET
+						&& (nTileOffsetX == pDrlgRoom->nTileWidth || nTileOffsetY == pDrlgRoom->nTileHeight))
+					{
+						D2DrlgRoomStrc* pProbeRoom = nullptr;
+						if (DRLGROOMTILE_GetLinkedTileData(pDrlgRoom, TRUE, nTileInformation.nPackedValue, nTilePosX, nTilePosY, &pProbeRoom))
+						{
+							++g_d2webPresetEdgeMerged;
+							// Whose map does the tile we merge into belong to? s164 asked this per
+							// ROOM and was misled; the decision is per CELL.
+							const bool bSameMap = pProbeRoom && pProbeRoom->nType == DRLGTYPE_PRESET
+								&& pProbeRoom->pMaze && pDrlgRoom->pMaze
+								&& pProbeRoom->pMaze->pMap == pDrlgRoom->pMaze->pMap;
+							if (bSameMap) ++g_d2webPresetEdgeSameMap; else ++g_d2webPresetEdgeOtherMap;
+						}
+						else
+							++g_d2webPresetEdgeAdded;
+					}
 					D2DrlgRoomStrc* pLinkedRoom = nullptr;
 					if (D2DrlgTileDataStrc* pLinkedTileData = DRLGROOMTILE_GetLinkedTileData(pDrlgRoom, TRUE, nTileInformation.nPackedValue, nTilePosX, nTilePosY, &pLinkedRoom))
 					{
 						DRLGROOMTILE_LinkedTileDataManager(pMemPool, pDrlgRoom, pLinkedRoom, pLinkedTileData, TILETYPE_FLOOR, nTileInformation.nPackedValue, nTilePosX, nTilePosY);
+						if (bOwnEdge)
+						{
+							D2WEB_AddSharedEdgeFloorTile(pMemPool, pDrlgRoom, pLinkedTileData->pTile, nTileInformation.nPackedValue, nTilePosX, nTilePosY);
+						}
 					}
 					else
 					{
@@ -934,6 +1097,7 @@ void __fastcall DRLGROOMTILE_LinkedTileDataManager(void* pMemPool, D2DrlgRoomStr
 	if (nTileType != pTileData->nTileType || 
 		pTileData->nTileType == TILETYPE_FLOOR && D2CMP_10078_GetTileStyle(pTileData->pTile) == 30 && D2CMP_10082_GetTileSequence(pTileData->pTile) == 0)
 	{
+		if (g_d2webRollTraceEnabled) s_d2webCrossCause = pDrlgRoom1;
 		D2TileLibraryEntryStrc* pTileCache = DRLGROOMTILE_GetTileCache(pDrlgRoom2, nTileType, nPackedTileInformation);
 		pTileData->nTileType = nTileType;
 

@@ -41,6 +41,14 @@ extern "C" const uint8_t* D2WEB_PacketStream(uint32_t* pLength, uint32_t* pPacke
     return g_d2webPacketStream;
 }
 
+static D2GSPacketSrv63 g_d2webLastWaypointMenu = {};
+static bool g_d2webHasWaypointMenu = false;
+// The waypoint menu the server last sent, once: copied out and cleared. Returns its size or 0.
+extern "C" int D2WEB_TakeWaypointMenu(D2GSPacketSrv63* pPacket) {
+    if (!pPacket || !g_d2webHasWaypointMenu) return 0;
+    *pPacket = g_d2webLastWaypointMenu; g_d2webHasWaypointMenu = false;
+    return (int)sizeof(D2GSPacketSrv63);
+}
 static D2GSPacketSrv27 g_d2webLastDialogPacket = {};
 static bool g_d2webHasDialogPacket = false;
 
@@ -222,7 +230,28 @@ void D2GAME_PACKETS_SendPacket0x6B_6FC3D000(D2ClientStrc* pClient, char a2, int3
 void D2GAME_PACKETS_SendPacket0x6C_6FC3CF90(D2ClientStrc* pClient, char a2, int32_t a3, char a4, char a5, int32_t a6, char a7, int16_t a8, int16_t a9) {}
 void D2GAME_PACKETS_SendPacket0x6D_6FC3D080(D2ClientStrc* pClient, DWORD dwUnitId, WORD nX, WORD nY, BYTE nUnitLife) {}
 void D2GAME_PACKETS_SendPacket0x74_6FC3F640(D2ClientStrc* pClient, D2UnitStrc* a2, D2UnitStrc* a3, BYTE bAssign) {}
-void D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(D2ClientStrc* pClient, BYTE nUiNo) {}
+// 0x77 UpdateUi is how the server tells the client to open or close a window (the stash:
+// UPDATEUI_OPENSTASH 16 / UPDATEUI_CLOSESTASH 17 from the vendored PlrTrade). The headless session
+// has no client to send it to, so it records the codes in order and the session exports them --
+// the browser opens the stash because the ENGINE said so, not because it was clicked.
+static uint8_t g_d2webUiEvents[64];
+static uint32_t g_d2webUiEventCount = 0;
+void D2GAME_PACKETS_SendPacket0x77_Ui_6FC3E0B0(D2ClientStrc* pClient, BYTE nUiNo) {
+    if (g_d2webUiEventCount < sizeof g_d2webUiEvents) g_d2webUiEvents[g_d2webUiEventCount++] = nUiNo;
+}
+// Copies the recorded UI codes out and clears them. Returns how many.
+extern "C" uint32_t D2WEB_TakeUiEvents(uint8_t* out, uint32_t cap) {
+    const uint32_t n = g_d2webUiEventCount < cap ? g_d2webUiEventCount : cap;
+    if (out && n) std::memcpy(out, g_d2webUiEvents, n);
+    g_d2webUiEventCount = 0;
+    return n;
+}
+// Trade (0x78), gold-in-trade/stash (0x79) and the drop-a-client routine the vendored PlrTrade
+// calls: there is no network client in the headless session to send to or drop, and the gold they
+// report is read from the player's stats by the browser directly.
+void __fastcall sub_6FC3E0D0(D2ClientStrc*, D2GSPacketSrv78*) {}
+void __fastcall D2GAME_PACKETS_SendPacket0x79_6FC3E1D0(D2ClientStrc*, int32_t, char) {}
+void __fastcall sub_6FC36C20(D2GameStrc*, int32_t, const char*, int32_t) {}
 void D2GAME_PACKETS_SendPacket0x7A_6FC3E100(D2ClientStrc* pClient, char a2, char a3, int32_t a4, int32_t a5, int16_t a6) {}
 // D2Game.0x6FC3E160: pet/hireling assignment {type, class, owner, pet GUID, seed, name}.
 void __fastcall D2GAME_PACKETS_SendPacket0x81_6FC3E160(D2ClientStrc* pClient, char a2, int32_t a3, int32_t a4, int16_t a5, int32_t a6, int32_t a7, int32_t a8) {
@@ -255,12 +284,19 @@ void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, in
         g_d2webLastQuestStatusPacket = *static_cast<D2GSPacketSrv5D*>(pPacket);
         ++g_d2webQuestStatusPackets;
     }
+    // 0x63 is the waypoint menu (OBJECTS_OperateFunction23_Waypoint): the server opens it on the
+    // client with the player's activated waypoints. Kept whole, like 0x27, so the browser opens the
+    // menu because the engine sent it.
+    if (pClient && pPacket && nPacketSize == (int32_t)sizeof(D2GSPacketSrv63) &&
+        static_cast<D2GSPacketSrv63*>(pPacket)->nHeader == 0x63) {
+        g_d2webLastWaypointMenu = *static_cast<D2GSPacketSrv63*>(pPacket);
+        g_d2webHasWaypointMenu = true;
+    }
     if (pClient && pPacket && nPacketSize > 0 && g_d2webPacketStreamLength + (uint32_t)nPacketSize <= sizeof g_d2webPacketStream) {
         std::memcpy(g_d2webPacketStream + g_d2webPacketStreamLength, pPacket, (size_t)nPacketSize);
         g_d2webPacketStreamLength += (uint32_t)nPacketSize; ++g_d2webPacketStreamPackets;
     }
 }
-int32_t D2GAME_PLRTRADE_IsInteractingWithPlayer(D2GameStrc* pGame, D2UnitStrc* pUnit) { return {}; }
 int32_t D2GAME_SAVE_WriteFile_6FC8A500(D2GameStrc* pGame, D2UnitStrc* pPlayer, const char* szName, DWORD dwArg) { return {}; }
 // D2Game.0x6FC3F2F0: the player's quest record (96 bytes) behind a unit reference.
 void __fastcall D2GAME_SendPacket0x28_6FC3F2F0(D2ClientStrc* pClient, BYTE nHeader, BYTE a3, int32_t a4, D2BitBufferStrc* a5, BYTE a6) {
@@ -359,16 +395,7 @@ void __fastcall D2GAME_UpdateClientItem_6FC3E9D0(D2ClientStrc* pClient, D2UnitSt
 void __fastcall GAME_DisconnectClient(D2GameStrc*, D2ClientStrc*, D2C_SRV2CLT5A_TYPES) {}
 void D2Game_10034_Return(int a1) {}
 void GAME_ForEachIngameClient(D2GameStrc* pGame, GAME_ForEachIngameClientCallbackPtr pFn, void* pContext) {}
-int32_t OBJECTS_OperateFunction32_Bank(D2ObjOperateFnStrc* pOp, int32_t nOperate) { return {}; }
 D2CharStatsTxt* PLRSAVE2_GetCharStatsTxtRecord(int32_t nClass) { return UNITS_GetCharStatsTxtRecord(nClass); }
-void PLRTRADE_AddGold(D2UnitStrc* pUnit, int32_t nStat, int32_t nValue) {
-    if (!pUnit) return;
-    const int32_t next = STATLIST_UnitGetStatValue(pUnit, nStat, 0) + nValue;
-    if (next < 0) STATLIST_SetUnitStat(pUnit, nStat, 0, 0);
-    else STATLIST_AddUnitStat(pUnit, nStat, nValue, 0);
-}
-void __fastcall PLRTRADE_TryToTrade(D2GameStrc*, D2UnitStrc*, D2UnitStrc*) {}
-void __fastcall D2GAME_PLRTRADE_Last_6FC937F0(D2GameStrc*, D2UnitStrc*, int32_t, int32_t) {}
 void SCMD_Send0x75_PartyRosterUpdate(D2UnitStrc* pLocalPlayer, D2UnitStrc* pOtherPlayer) {}
 void sub_6FC37B10(D2GameStrc* pGame) {}
 void sub_6FC3D1F0(D2ClientStrc* pClient, int32_t nUnitGUID, uint8_t nClassId, const char* szName, int16_t nX, int16_t nY) {}
@@ -384,22 +411,5 @@ void sub_6FC3FAF0(D2ClientStrc* pClient, uint32_t a2, uint16_t a3) {}
 void sub_6FC3FC80(D2ClientStrc* pClient, D2UnitStrc* pUnit) {}
 // D2Game's game log (GAME_LogMessage writes the server's text log); nothing to write to here.
 void GAME_LogMessage(int32_t, const char*, ...) {}
-// D2Game.0x6FC93430 (PlrTrade): may the player move this item? Without a player interaction
-// (or with a non-player one) retail answers from the trade state alone: allowed while the
-// trade state is at most 4. There is no second player to trade with in the headless session,
-// so only those two branches exist here.
-int32_t __fastcall sub_6FC93430(D2GameStrc*, D2UnitStrc* pPlayer, D2UnitStrc*) {
-    int32_t nUnitType = 0, nUnitGUID = 0;
-    if (SUNIT_GetInteractInfo(pPlayer, &nUnitType, &nUnitGUID) && nUnitType != UNIT_PLAYER) return 1;
-    return UNITS_GetPlayerData(pPlayer)->dwTradeState <= 4;
-}
-// Trade-screen button handler (PlrTrade); no second player in the headless session.
-int32_t __fastcall sub_6FC91250(D2GameStrc*, D2UnitStrc*, uint16_t, int32_t) { return 0; }
 // Classic end-of-game after Diablo's death (A4Q2 timer); the session never ends a game this way.
 void __fastcall sub_6FC37FB0(D2GameStrc*, D2ClientStrc*) {}
-void sub_6FC92EE0(D2GameStrc* pGame, D2UnitStrc* pUnit) {}
-void sub_6FC92EF0(D2GameStrc* pGame, D2UnitStrc* pUnit) {}
-void sub_6FC92F10(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pItem) {}
-// Retail updates the peer's mirrored item during an active player trade.  The headless session
-// has no second player/trade state, so there is no peer inventory to synchronize.
-void __fastcall sub_6FC931D0(D2GameStrc*, D2UnitStrc*, D2UnitStrc*) {}

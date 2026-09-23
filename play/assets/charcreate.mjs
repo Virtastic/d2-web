@@ -206,6 +206,15 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
       hovered = heroes.findIndex((h) => inBox(p, h.hit));
       return hovered;
     },
+    /**
+     * Where to click, in canvas pixels, computed from the SAME boxes click() tests -- so a scenario
+     * can deliver a real pointer event at a class or at OK without hardcoding positions.
+     */
+    targets(width, height) {
+      const v = view(width, height);
+      const centre = (b) => [Math.round(v.ox + (b.x + b.w / 2) * v.scale), Math.round(v.oy + (b.y + b.h / 2) * v.scale)];
+      return { classes: Object.fromEntries(heroes.map((h) => [h.key, centre(h.hit)])), ok: centre(okBox()), exit: centre(exitBox()) };
+    },
     click(x, y, width, height) {
       const p = toScreen(x, y, width, height);
       if (inBox(p, okBox())) { this.submit(); return 'ok'; }

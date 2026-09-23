@@ -1,0 +1,115 @@
+// The stash: retail's personal storage in town, opened by clicking the stash object.
+//
+// Nothing here decides anything. The window is open because the ENGINE sent retail's 0x77
+// UPDATEUI_OPENSTASH (D2MOO's OBJECTS_OperateFunction32_Bank, vendored), it closes because the
+// engine answered TRADEBTN_CLOSESTASH, and the grid is the Inventory.txt record retail itself uses
+// for a Lord of Destruction character -- INVENTORYRECORD_BIG_BANK_PAGE_1 (Units.cpp: bLoD ? BIG_BANK
+// : BANK), read through the engine's own accessor (d2_session_inventory_layout). One position is
+// NOT from retail data -- the art's top edge, LEFT_PANEL_TOP below -- and it is declared as such.
+//
+// The art is data\global\ui\PANEL\TradeStash.dc6. OpenDiablo2 stalled before stashes, so there is
+// no layout prior art; its frames are composed the way the other retail panels' are (a 2x2 set
+// when it carries four), and the composition is REPORTED so a scenario can check it rather than
+// trust it.
+
+import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
+import { inventoryItemAsset } from './inventory-panel.mjs';
+
+export const STASH_ART = 'data\\global\\ui\\PANEL\\TradeStash.dc6';
+export const INVPAGE_STASH = 4;
+// Inventory.txt row for a Lord of Destruction stash, and the 800x600 flag (row + 16 * higherRes).
+export const BIG_BANK_PAGE_1 = 12;
+
+function frameCanvas(frame, palette, documentObject) {
+  const canvas = documentObject.createElement('canvas');
+  canvas.width = Math.max(1, frame.width); canvas.height = Math.max(1, frame.height);
+  if (frame.width && frame.height)
+    canvas.getContext('2d').putImageData(new ImageData(dc6FrameToRgba(frame, palette), frame.width, frame.height), 0, 0);
+  return canvas;
+}
+
+// Where the ART is anchored. The record's grid is exact, but its panel rectangle is not the art's:
+// BIG_BANK_PAGE_1 reports a panel top of 280 -- the same rectangle as the trade screen's lower
+// half -- while its own grid starts at y 142, so 280 cannot be where the stash art begins. The art
+// is placed at the left-panel origin the trade screen uses (x = the record's left, y = 60), and the
+// frame is LOOKED AT to confirm the grid falls on the art's cells (s000 captures it). Declared in
+// until a retail draw list (OBJECTIVE v5 E) gives the number directly.
+export const LEFT_PANEL_TOP = 60;
+
+/**
+ * `layout` is d2_session_inventory_layout's twelve numbers for BIG_BANK_PAGE_1 at 800x600:
+ * [left, right, top, bottom, columns, rows, gridLeft, gridRight, gridTop, gridBottom, boxW, boxH].
+ */
+export function stashGeometry(layout) {
+  if (!Array.isArray(layout) || layout.length < 12) return null;
+  const [left, right, top, bottom, columns, rows, gridLeft, , gridTop, , boxW, boxH] = layout;
+  if (!(right > left && bottom > top && columns > 0 && rows > 0 && boxW > 0 && boxH > 0)) return null;
+  return { left, top: LEFT_PANEL_TOP, recordTop: top, columns, rows, gridLeft, gridTop, boxW, boxH };
+}
+
+// In-game panels are drawn with the ACT's palette.
+const actPalette = (act) => `data\\global\\palette\\ACT${Math.min(5, Math.max(1, act | 0))}\\pal.dat`;
+
+export function createStashPanelRenderer(read, documentObject = globalThis.document) {
+  const dc6 = decodeDc6(read(STASH_ART));
+  const perAct = new Map();
+  const forAct = (act) => {
+    let a = perAct.get(act);
+    if (!a) {
+      const palette = decodeDatPalette(read(actPalette(act)));
+      a = { palette, frames: dc6.frames.map((f) => frameCanvas(f, palette, documentObject)), icons: new Map() };
+      perAct.set(act, a);
+    }
+    return a;
+  };
+  const icon = (a, invFile) => {
+    let c = a.icons.get(invFile);
+    if (!c) { c = frameCanvas(decodeDc6(read(inventoryItemAsset(invFile))).frames[0], a.palette, documentObject); a.icons.set(invFile, c); }
+    return c;
+  };
+  const origin = (width, height) => {
+    const scale = Math.min(1, width / 800, height / 600);
+    return { scale, x: (width - 800 * scale) / 2, y: (height - 600 * scale) / 2 };
+  };
+
+  return {
+    evidence: { frames: dc6.frames.length, sizes: dc6.frames.map((f) => [f.width, f.height]) },
+    /** Which stashed item is under a canvas point, or null. Shares the cell maths with draw(). */
+    itemAt(px, py, width, height, geometry, items) {
+      if (!geometry) return null;
+      const o = origin(width, height), x = (px - o.x) / o.scale, y = (py - o.y) / o.scale;
+      const col = Math.floor((x - geometry.gridLeft) / geometry.boxW), row = Math.floor((y - geometry.gridTop) / geometry.boxH);
+      return (items || []).find((i) => i.invPage === INVPAGE_STASH && col === i.gridX && row === i.gridY) || null;
+    },
+    draw(ctx, width, height, geometry, items, open, act = 1) {
+      if (!open || !geometry) return null;
+      const a = forAct(act), frames = a.frames, o = origin(width, height);
+      ctx.save(); ctx.translate(o.x, o.y); ctx.scale(o.scale, o.scale);
+      // Panel art at the left-panel origin (see LEFT_PANEL_TOP).
+      let composed = { width: 0, height: 0 };
+      if (frames.length === 4) {
+        const [tl, tr, bl, br] = frames;
+        ctx.drawImage(tl, geometry.left, geometry.top);
+        ctx.drawImage(tr, geometry.left + tl.width, geometry.top);
+        ctx.drawImage(bl, geometry.left, geometry.top + tl.height);
+        ctx.drawImage(br, geometry.left + tl.width, geometry.top + tl.height);
+        composed = { width: tl.width + tr.width, height: tl.height + bl.height };
+      } else if (frames.length) {
+        ctx.drawImage(frames[0], geometry.left, geometry.top);
+        composed = { width: frames[0].width, height: frames[0].height };
+      }
+      // Items the engine says are on the stash page, at the grid cell the engine reports.
+      const drawn = [];
+      for (const item of items || []) {
+        if (item.invPage !== INVPAGE_STASH || !item.invFile) continue;
+        const c = icon(a, item.invFile);
+        const x = geometry.gridLeft + item.gridX * geometry.boxW, y = geometry.gridTop + item.gridY * geometry.boxH;
+        ctx.drawImage(c, x, y);
+        drawn.push({ id: item.id, invFile: item.invFile, cell: [item.gridX, item.gridY], at: [x, y] });
+      }
+      ctx.restore();
+      return { anchor: [geometry.left, geometry.top], recordTop: geometry.recordTop, palette: actPalette(act), open: true, composed, frames: frames.length, grid: { columns: geometry.columns, rows: geometry.rows,
+        left: geometry.gridLeft, top: geometry.gridTop, box: [geometry.boxW, geometry.boxH] }, drawn };
+    },
+  };
+}

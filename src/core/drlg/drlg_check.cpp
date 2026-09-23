@@ -9,6 +9,7 @@
 #include <D2Common.h>
 #include <D2Dungeon.h>
 #include <D2Collision.h>
+#include <D2CMP.h>
 #include <Drlg/D2DrlgDrlg.h>
 #include "../d2moo/compat/datatbls_bridge.h"
 #include "../tables/shared.h"
@@ -18,6 +19,23 @@ static D2DrlgActStrc* g_act = nullptr;
 static uint8_t g_actNo = 0;
 static std::vector<uint16_t> g_grid;
 static std::string g_err;
+// Tile identity under the CAPTURE's activation protocol (s173). the retail capture tool reads a room's tiles
+// immediately after AddRoomData and before RemoveRoomData, one room at a time, so when it reads a
+// room fewer of its neighbours are alive than in a session that activates every room and keeps
+// them. Whether a shared edge cell's neighbour exists at tile time decides merge-vs-add and hence
+// whether the room takes a roll, so the corpus can only be matched by the same protocol.
+// Record: room ordinal, layer (0 floor, 1 wall, 2 roof), key x, key y, orientation, main, sub, frame.
+struct D2DrlgTileRec { int32_t room, layer, x, y, orientation, main, sub, frame; };
+static bool g_collectTiles = false;
+static std::vector<D2DrlgTileRec> g_tiles;
+static void collectTiles(int32_t room, int32_t layer, const D2DrlgTileDataStrc* tiles, int count) {
+    if (!tiles) return;
+    for (int i = 0; i < count; ++i) {
+        const D2DrlgTileDataStrc& t = tiles[i];
+        if (!t.pTile) continue;
+        g_tiles.push_back({ room, layer, t.nWidth, t.nHeight, t.pTile->nType, t.pTile->nStyle, t.pTile->nSequence, t.pTile->nRarity_Frame });
+    }
+}
 // Result of the last d2_drlg_level: originX, originY, width, height, hash, tombArea
 static int32_t g_out[6];
 
@@ -57,11 +75,19 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_level(int level) {
     const int32_t ox = pLevel->nPosX * 5, oy = pLevel->nPosY * 5;
     const uint32_t w = (uint32_t)pLevel->nWidth * 5, h = (uint32_t)pLevel->nHeight * 5;
     g_grid.assign((size_t)w * h, 0xFFFF);
+    g_tiles.clear();
+    int32_t roomOrdinal = -1;
     for (D2DrlgRoomStrc* r2 = pLevel->pFirstRoomEx; r2; r2 = r2->pDrlgRoomNext) {
+        ++roomOrdinal;
         const int rx = r2->nTileXPos, ry = r2->nTileYPos;
         bool added = false;
         if (!r2->pRoom) { DUNGEON_SetClientIsInSight(g_act, level, rx, ry, nullptr); added = true; }
         D2ActiveRoomStrc* r1 = r2->pRoom;
+        if (g_collectTiles && r1 && r1->pRoomTiles) {
+            collectTiles(roomOrdinal, 0, r1->pRoomTiles->pFloorTiles, r1->pRoomTiles->nFloors);
+            collectTiles(roomOrdinal, 1, r1->pRoomTiles->pWallTiles, r1->pRoomTiles->nWalls);
+            collectTiles(roomOrdinal, 2, r1->pRoomTiles->pRoofTiles, r1->pRoomTiles->nRoofs);
+        }
         D2RoomCollisionGridStrc* coll = r1 ? r1->pCollisionGrid : nullptr;
         if (coll) {
             const int64_t x = (int64_t)coll->pRoomCoords.nSubtileX - ox, y = (int64_t)coll->pRoomCoords.nSubtileY - oy;
@@ -82,6 +108,9 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_level(int level) {
 }
 
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_drlg_out() { return g_out; }
+EMSCRIPTEN_KEEPALIVE void d2_drlg_collect_tiles(int enable) { g_collectTiles = enable != 0; g_tiles.clear(); }
+EMSCRIPTEN_KEEPALIVE const D2DrlgTileRec* d2_drlg_tiles() { return g_tiles.data(); }
+EMSCRIPTEN_KEEPALIVE int d2_drlg_tile_count() { return (int)g_tiles.size(); }
 EMSCRIPTEN_KEEPALIVE const uint16_t* d2_drlg_grid() { return g_grid.data(); }
 EMSCRIPTEN_KEEPALIVE const char* d2_drlg_err() { return g_err.c_str(); }
 

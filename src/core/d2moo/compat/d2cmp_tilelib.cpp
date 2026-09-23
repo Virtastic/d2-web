@@ -73,6 +73,18 @@ void D2CMP_10087_LoadTileLibrarySlot(D2TileLibraryHashStrc** ppSlots, const char
     ppSlots[i] = (D2TileLibraryHashStrc*)loadLibrary(szFileName);
 }
 
+// The DT1 a loaded library came from.
+//
+// Not a retail export: retail has no need to name a library once it is loaded, but the browser
+// client does. A tile's slot index is per-ROOM (it indexes that room's pTiles[], holding only what
+// that room loaded, in its own order), so the client cannot map a slot to a file through the
+// level's LvlTypes list -- doing so left preset-room levels with no floor. Resolving the hash
+// pointer back to its filename gives an exact mapping instead of a guess.
+extern "C" const char* D2WEB_TileLibraryNameFromHash(const D2TileLibraryHashStrc* pHash) {
+    for (Record* r : g_records) if ((const D2TileLibraryHashStrc*)r->hash == pHash) return r->name.c_str();
+    return nullptr;
+}
+
 // #10059 (1.13c) / #10088 (1.10f): 0x6fe253a0 over the slots, 0x6fe22e60 per library
 int D2CMP_10088_GetTiles(D2TileLibraryHashStrc** ppSlots, int nType, int nStyle, int nSequence, D2TileLibraryEntryStrc** pTileList, int nTileListSize) {
     D2_ASSERT(ppSlots);

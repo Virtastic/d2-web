@@ -81,6 +81,20 @@ extern "C" DWORD d2web_GetTickCount();
 extern "C" void d2web_AdvanceTickCount(DWORD ms);
 inline DWORD GetTickCount() { return d2web_GetTickCount(); }
 inline void OutputDebugStringA(const char*) {}
+// Win32 SYSTEMTIME, for the Horadric Cube's date-dependent recipes (PlrTrade.cpp reads the day
+// and day of week). Retail reads the local wall clock here, and so does this -- it is the one
+// piece of retail that is SUPPOSED to vary with the date, not the deterministic frame clock above.
+#include <time.h>
+typedef struct _SYSTEMTIME {
+    uint16_t wYear, wMonth, wDayOfWeek, wDay, wHour, wMinute, wSecond, wMilliseconds;
+} SYSTEMTIME, *LPSYSTEMTIME;
+inline void GetLocalTime(LPSYSTEMTIME t) {
+    const time_t now = time(nullptr); struct tm lt; localtime_r(&now, &lt);
+    t->wYear = (uint16_t)(lt.tm_year + 1900); t->wMonth = (uint16_t)(lt.tm_mon + 1);
+    t->wDayOfWeek = (uint16_t)lt.tm_wday; t->wDay = (uint16_t)lt.tm_mday;
+    t->wHour = (uint16_t)lt.tm_hour; t->wMinute = (uint16_t)lt.tm_min; t->wSecond = (uint16_t)lt.tm_sec;
+    t->wMilliseconds = 0;
+}
 
 #define stricmp  strcasecmp
 #define strnicmp strncasecmp

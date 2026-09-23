@@ -105,9 +105,13 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       try {
         const dt1 = decodeDt1(read(path));
         entry.byIndex = dt1.tiles;
-        for (let i = 0; i < dt1.tiles.length; i++) {
-          const t = dt1.tiles[i];
-          entry.byKey.set(`${t.orientation}:${t.mainIndex}:${t.subIndex}`, t);
+        // Group by identity, keeping FILE ORDER within each group: a tile's `libraryIndex` counts
+        // variants that share an identity, so the n-th tile with this (orientation, main, sub) is
+        // what the DRLG asked for.
+        for (const t of dt1.tiles) {
+          const key = `${t.orientation}:${t.mainIndex}:${t.subIndex}`;
+          const bucket = entry.byKey.get(key);
+          if (bucket) bucket.push(t); else entry.byKey.set(key, [t]);
         }
       } catch (error) { entry.error = String(error); errors.push(`${path}: ${error}`); }
     }
@@ -163,36 +167,77 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       // Record what failed to resolve, not just how many: a hole in the floor is only diagnosable
       // if you know which (slot, orientation, main, sub, index) the lookup missed.
       const missingSample = [];
+      let searched = 0, ambiguous = 0;
       // Resolve every tile to a bitmap and an on-screen box once, then split by layer.
       const floors = [], walls = [];
       for (const tile of tiles) {
+        // An empty/failed slot is not fatal any more: the identity search below can still find
+        // the tile in another library, which is the normal case now that librarySlot is per-room.
         const lib = library(tile.librarySlot, files);
-        if (lib.error && !lib.byIndex.length) {
-          missing++;
-          if (missingSample.length < 8) missingSample.push({ slot: tile.librarySlot, libraryError: lib.error });
-          continue;
+        // Resolve by IDENTITY across the level's libraries, then by variant.
+        //
+        // `librarySlot` cannot be used to pick the file: it indexes the ROOM's own pTiles[] array,
+        // which holds only the libraries that room loaded, in its own order -- not the level's
+        // LvlTypes list. In Andariel's Lair slot 2 pointed at a stairway library while the tiles
+        // there wanted a floor identity, leaving 715 floors undrawn and the dungeon floorless.
+        //
+        // So the identity is the key and the libraries are searched. That is only safe if an
+        // identity lives in ONE library; `ambiguous` counts violations and s126 asserts it is zero,
+        // so if a level ever breaks that assumption it is reported rather than silently mispicked.
+        //
+        // `libraryIndex` is NOT an offset into the DT1's tile array. The engine derives it by
+        // walking the room's tile hash for this (type, style, sequence) -- orientation, mainIndex,
+        // subIndex -- and counting position within that bucket's ref list. Indexing the file array
+        // with it returns an unrelated tile, and because that lookup always succeeds the old
+        // `?? byKey` fallback never fired: every floor tile on screen was the wrong art, while the
+        // "0 unresolved tiles" check passed happily because something was always found.
+        const key = `${tile.orientation}:${tile.mainIndex}:${tile.subIndex}`;
+        let variants = lib.byKey.get(key), foundSlot = tile.librarySlot, matches = variants ? 1 : 0;
+        if (!variants) {
+          for (let slot = 0; slot < files.length; slot++) {
+            if (slot === tile.librarySlot) continue;
+            const other = library(slot, files);
+            const candidate = other.byKey.get(key);
+            if (!candidate) continue;
+            matches++;
+            if (!variants) { variants = candidate; foundSlot = slot; }
+          }
+          if (variants) searched++;
         }
-        const dt1Tile = lib.byIndex[tile.libraryIndex]
-          ?? lib.byKey.get(`${tile.orientation}:${tile.mainIndex}:${tile.subIndex}`);
-        const bitmap = dt1Tile && bitmapFor(tile.librarySlot, dt1Tile, tile.libraryIndex);
+        if (matches > 1) ambiguous++;
+        const dt1Tile = variants ? (variants[tile.libraryIndex] ?? variants[0]) : undefined;
+        const bitmap = dt1Tile && bitmapFor(foundSlot, dt1Tile,
+          `${tile.orientation}:${tile.mainIndex}:${tile.subIndex}:${tile.libraryIndex}`);
         if (!bitmap) {
           missing++;
           if (missingSample.length < 8) missingSample.push({ slot: tile.librarySlot, orientation: tile.orientation,
             mainIndex: tile.mainIndex, subIndex: tile.subIndex, libraryIndex: tile.libraryIndex,
-            inLibrary: lib.byIndex.length, resolved: Boolean(dt1Tile) });
+            inLibrary: lib.byIndex.length, variants: variants ? variants.length : 0,
+            reason: variants ? 'no variant' : 'identity not in this library' });
           continue;
         }
         const x = tile.screenX + offsetX;
         const y = tile.screenY + offsetY;
-        if (x + bitmap.width < 0 || y + bitmap.height < 0 || x > width || y > height) continue;
-        // DT1 floor records carry a negative height; the art hangs UP from the anchor row.
-        const entry = { bitmap, x: Math.round(x), y: Math.round(y + Math.min(0, tile.height)), depth: y, ordinal: tile.ordinal };
+        // DT1 records carry a negative height, so the art hangs UP from the anchor: a tile anchored
+        // just BELOW the viewport still paints into it, by as much as |height| pixels. Culling on
+        // the anchor row dropped exactly those, leaving a sawtooth band of bare canvas above the
+        // control panel where retail draws ground -- the world stopped 14 rows short of the panel.
+        // Cull against the rectangle actually painted, never the anchor.
+        const drawY = y + Math.min(0, tile.height);
+        if (x + bitmap.width < 0 || x > width || drawY + bitmap.height < 0 || drawY > height) continue;
+        // Carry the identity asked for AND the identity drawn, so a scenario can prove they match.
+        // Every floor tile once drew unrelated art while "0 unresolved" passed; only comparing these
+        // two would have caught it.
+        const entry = { bitmap, x: Math.round(x), y: Math.round(drawY), depth: y, ordinal: tile.ordinal,
+          want: `${tile.orientation}:${tile.mainIndex}:${tile.subIndex}`,
+          got: `${dt1Tile.orientation}:${dt1Tile.mainIndex}:${dt1Tile.subIndex}` };
         (tile.layer === 0 ? floors : walls).push(entry);
       }
 
       floors.sort((a, b) => a.ordinal - b.ordinal);
       // A few real blits, so "the floor has holes" can be checked against pixels instead of guessed.
-      const drawnSample = floors.slice(0, 6).map((f) => ({ x: f.x, y: f.y, w: f.bitmap.width, h: f.bitmap.height }));
+      const drawnSample = floors.slice(0, 6).map((f) => ({ x: f.x, y: f.y, w: f.bitmap.width, h: f.bitmap.height,
+        want: f.want, got: f.got }));
       for (const f of floors) { ctx.drawImage(f.bitmap, f.x, f.y); drawn++; }
 
       // Walls and sprites share one depth-sorted pass: a sprite at a smaller screen Y is further
@@ -203,7 +248,9 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         if (o.sprite) { o.sprite.draw(ctx); continue; }
         ctx.drawImage(o.bitmap, o.x, o.y); drawn++;
       }
-      return { drawn, missing, missingSample, drawnSample, floors: floors.length, walls: walls.length, sprites: sprites.length };
+      const wrongIdentity = floors.concat(walls).filter((e) => e.want !== e.got).length;
+      return { drawn, missing, missingSample, drawnSample, wrongIdentity, searched, ambiguous,
+        floors: floors.length, walls: walls.length, sprites: sprites.length };
     },
   };
 }
