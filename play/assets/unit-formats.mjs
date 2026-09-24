@@ -127,10 +127,12 @@ function decodeDccPixels(bytes, direction, directionEnd, index) {
         if (value === last) break;
         stack.push(value); last = value;
       }
-      const values = old ? old.values.slice() : [0, 0, 0, 0];
+      // A kept cell carries its palette-map INDICES, mapped once below (OpenDiablo2 dcc_direction.go
+      // 395/407-409); carrying the mapped colours mapped them twice and scrambled attack frames (F15).
+      const values = old ? old.raw.slice() : [0, 0, 0, 0];
       let stackAt = stack.length - 1;
       for (let n = 0; n < 4; n++) if (mask & (1 << n)) values[n] = stackAt >= 0 ? stack[stackAt--] : 0;
-      const entry = { values: values.map((v) => direction.paletteEntries[v]), frameIndex, frameCellIndex };
+      const entry = { raw: values, values: values.map((v) => direction.paletteEntries[v] ?? 0), frameIndex, frameCellIndex };
       entries.push(entry); state[stateIndex] = entry;
     });
   });

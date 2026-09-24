@@ -75,7 +75,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
   const fontPalette = decodeDatPalette(read(FRONTEND.palette));
   const background = composeTiled(decodeDc6(read(SELECT_ASSETS.background)), palette, TITLE_COLUMNS, documentObject);
   const font = createFont({
-    dc6: decodeDc6(read(FRONTEND.font)), tbl: decodeFontTbl(read(FRONTEND.fontTbl)),
+    dc6: decodeDc6(read(FRONTEND.headingFont)), tbl: decodeFontTbl(read(FRONTEND.headingFontTbl)),
     palette: fontPalette, documentObject,
   });
   const rowFont = createFont({

@@ -11,6 +11,9 @@
 #include <D2Collision.h>
 #include <D2CMP.h>
 #include <Drlg/D2DrlgDrlg.h>
+#include <Drlg/D2DrlgOutdoors.h>
+#include <Drlg/D2DrlgDrlgVer.h>
+#include <Drlg/D2DrlgOutRoom.h>
 #include "../d2moo/compat/datatbls_bridge.h"
 #include "../tables/shared.h"
 #include "../../../tools/vectorfmt/vectorfmt.h"
@@ -36,6 +39,27 @@ static void collectTiles(int32_t room, int32_t layer, const D2DrlgTileDataStrc* 
         g_tiles.push_back({ room, layer, t.nWidth, t.nHeight, t.pTile->nType, t.pTile->nStyle, t.pTile->nSequence, t.pTile->nRarity_Frame });
     }
 }
+// The tile pick stream under the same protocol (s175, vector kind 26): one record per GetTiles call,
+// with the GetTileRarity calls after it split into the weight sum and the ladder, labelled with the
+// room whose AddRoomData is in progress -- exactly as the retail capture tool labels retail's.
+extern void (*g_d2webOnGetTiles)(int, int, int, int, int);
+extern void (*g_d2webOnTileRarity)(int);
+static std::vector<D2VecTilePick> g_picks;
+static int32_t g_pickRoom = -1; static uint32_t g_pickCall = 0; static int g_pickSumLeft = 0;
+static uint32_t g_pickSeed = 0; static uint8_t g_pickDiff = 0; static uint16_t g_pickLevel = 0;
+static void onGetTiles(int type, int style, int seq, int n, int firstFrame) {
+    D2VecTilePick r = {};
+    r.seed = g_pickSeed; r.difficulty = g_pickDiff; r.act = g_actNo; r.level = g_pickLevel;
+    r.room = g_pickRoom; r.call = g_pickCall++; r.type = type; r.style = style; r.sequence = seq;
+    r.entries = n; r.chosenFrame = firstFrame;
+    g_picks.push_back(r); g_pickSumLeft = n;
+}
+static void onTileRarity(int w) {
+    if (g_picks.empty()) return;
+    D2VecTilePick& r = g_picks.back();
+    if (g_pickSumLeft > 0) { r.weightSum += w; --g_pickSumLeft; } else { ++r.ladder; r.chosenFrame = w; }
+}
+
 // Result of the last d2_drlg_level: originX, originY, width, height, hash, tombArea
 static int32_t g_out[6];
 
@@ -49,13 +73,21 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_init() {
     return done > 0;
 }
 
+// The capture hands LoadAct D2Client's automap callbacks. DRLGPRESET_GenerateLevel branches on
+// their PRESENCE: for an AutoMap preset it InitLevels the vis-linked levels and builds every room
+// up front, which changes which neighbours are alive when the next rooms are built. The callbacks'
+// own work (the client automap) is not modelled; s173 measures whether presence alone matches.
+static void __stdcall noAutomap(D2ActiveRoomStrc*) {}
+static void __stdcall noTownAutomap(int32_t, int32_t, int32_t, int32_t) {}
+
 // act is 1-based like the vectors; town level = first level of the act.
 EMSCRIPTEN_KEEPALIVE int d2_drlg_act_begin(uint32_t seed, int difficulty, int act) {
     static const int kActFirstLevel[6] = { 1, 40, 75, 103, 109, 137 };
     if (g_act) { DUNGEON_FreeAct(g_act); g_act = nullptr; }
     if (act < 1 || act > 5) return 0;
     g_actNo = (uint8_t)(act - 1);
-    g_act = DUNGEON_AllocAct(g_actNo, seed, TRUE, nullptr, (uint8_t)difficulty, nullptr, kActFirstLevel[act - 1], nullptr, nullptr);
+    g_pickSeed = seed; g_pickDiff = (uint8_t)difficulty; g_pickLevel = 0; g_pickCall = 0; g_pickRoom = -1;   // LoadAct's own lookups: level 0
+    g_act = DUNGEON_AllocAct(g_actNo, seed, TRUE, nullptr, (uint8_t)difficulty, nullptr, kActFirstLevel[act - 1], noAutomap, noTownAutomap);
     return g_act != nullptr;
 }
 
@@ -68,6 +100,7 @@ EMSCRIPTEN_KEEPALIVE void d2_drlg_act_end() {
 EMSCRIPTEN_KEEPALIVE int d2_drlg_level(int level) {
     if (!g_act) { g_err = "no act"; return 0; }
     D2DrlgStrc* pDrlg = g_act->pDrlg;
+    g_pickLevel = (uint16_t)level; g_pickCall = 0;
     D2DrlgLevelStrc* pLevel = DRLG_GetLevel(pDrlg, level);
     if (!pLevel) { g_err = "GetLevel null"; return 0; }
     if (!pLevel->pFirstRoomEx) DRLG_InitLevel(pLevel);
@@ -81,6 +114,7 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_level(int level) {
         ++roomOrdinal;
         const int rx = r2->nTileXPos, ry = r2->nTileYPos;
         bool added = false;
+        g_pickRoom = roomOrdinal;
         if (!r2->pRoom) { DUNGEON_SetClientIsInSight(g_act, level, rx, ry, nullptr); added = true; }
         D2ActiveRoomStrc* r1 = r2->pRoom;
         if (g_collectTiles && r1 && r1->pRoomTiles) {
@@ -99,6 +133,7 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_level(int level) {
             }
         }
         if (added) DUNGEON_UnsetClientIsInSight(g_act, level, rx, ry, nullptr);
+        g_pickRoom = -1;
     }
     uint32_t hsh = D2VEC_FNV_INIT;
     for (uint16_t v : g_grid) { hsh ^= v & 0xFF; hsh *= 16777619u; hsh ^= v >> 8; hsh *= 16777619u; }
@@ -108,6 +143,58 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_level(int level) {
 }
 
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_drlg_out() { return g_out; }
+// The rasterised dirt-path grid of every outdoor room tiled while collecting (s178), in
+// the retail capture tool's dirtgrid.txt form after its "seed diff level room" prefix:
+// "room <ordinal> at <tx>,<ty> <w>x<h> path <W>x<H> <row> <row> ..." with each row "v,v,...,".
+extern void (*g_d2webOnDirtPathGrid)(D2DrlgLevelStrc*, D2DrlgRoomStrc*, D2DrlgGridStrc*);
+static std::string g_dirtGrids;
+static void onDirtPathGrid(D2DrlgLevelStrc* pLevel, D2DrlgRoomStrc* pRoom, D2DrlgGridStrc* g) {
+    char head[160];
+    (void)pLevel;   // keyed like the capture: the level being walked, not the room's own
+    snprintf(head, sizeof head, "%d %d room %d at %d,%d %dx%d path %dx%d", (int)g_pickLevel, g_pickRoom, g_pickRoom,
+             pRoom->nTileXPos, pRoom->nTileYPos, pRoom->nTileWidth, pRoom->nTileHeight, g->nWidth, g->nHeight);
+    g_dirtGrids += head;
+    auto rows = [](const D2DrlgGridStrc* g) {
+        for (int y = 0; y < g->nHeight; y++) {
+            g_dirtGrids += ' ';
+            for (int x = 0; x < g->nWidth; x++) { char v[16]; snprintf(v, sizeof v, "%x,", g->pCellsFlags[g->pCellsRowOffsets[y] + x]); g_dirtGrids += v; }
+        }
+    };
+    rows(g);
+    const D2DrlgGridStrc* floor = &pRoom->pOutdoor->pFloorGrid;
+    snprintf(head, sizeof head, " floor %dx%d", floor->nWidth, floor->nHeight); g_dirtGrids += head;
+    rows(floor);
+    g_dirtGrids += '\n';
+}
+EMSCRIPTEN_KEEPALIVE void d2_drlg_collect_dirtgrids(int enable) { g_d2webOnDirtPathGrid = enable ? onDirtPathGrid : nullptr; g_dirtGrids.clear(); }
+EMSCRIPTEN_KEEPALIVE const char* d2_drlg_dirtgrids() { return g_dirtGrids.c_str(); }
+
+// Act I wilderness dirt paths of `level` in the current act (s178), in the retail capture tool's text form
+// after its "seed diff level" prefix: "paths <n> | x,y x,y ... | ...". Read after d2_drlg_level,
+// the point at which the capture reads retail's.
+static std::string g_dirt;
+EMSCRIPTEN_KEEPALIVE const char* d2_drlg_dirt_paths(int level) {
+    g_dirt.clear();
+    D2DrlgLevelStrc* pLevel = g_act ? DRLG_GetLevel(g_act->pDrlg, level) : nullptr;
+    if (!pLevel || !pLevel->pOutdoors) { g_dirt = "no-outdoors"; return g_dirt.c_str(); }
+    D2DrlgOutdoorInfoStrc* o = pLevel->pOutdoors;
+    g_dirt = "paths " + std::to_string(o->nVertices);
+    for (int i = 0; i < o->nVertices && i < 6; i++) {
+        g_dirt += " |";
+        int guard = 0;
+        for (D2DrlgVertexStrc* v = o->pPathStarts[i]; v && guard < 64; v = v->pNext, guard++)
+            g_dirt += " " + std::to_string(v->nPosX) + "," + std::to_string(v->nPosY);
+    }
+    return g_dirt.c_str();
+}
+// Collect the tile pick stream (vectorfmt.h D2VecTilePick) from the next d2_drlg_act_begin on.
+EMSCRIPTEN_KEEPALIVE void d2_drlg_collect_picks(int enable) {
+    g_picks.clear();
+    g_d2webOnGetTiles = enable ? onGetTiles : nullptr;
+    g_d2webOnTileRarity = enable ? onTileRarity : nullptr;
+}
+EMSCRIPTEN_KEEPALIVE const D2VecTilePick* d2_drlg_picks() { return g_picks.data(); }
+EMSCRIPTEN_KEEPALIVE int d2_drlg_pick_count() { return (int)g_picks.size(); }
 EMSCRIPTEN_KEEPALIVE void d2_drlg_collect_tiles(int enable) { g_collectTiles = enable != 0; g_tiles.clear(); }
 EMSCRIPTEN_KEEPALIVE const D2DrlgTileRec* d2_drlg_tiles() { return g_tiles.data(); }
 EMSCRIPTEN_KEEPALIVE int d2_drlg_tile_count() { return (int)g_tiles.size(); }

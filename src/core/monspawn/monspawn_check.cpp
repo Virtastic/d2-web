@@ -532,7 +532,14 @@ static void activateSessionLevelRooms(D2DrlgActStrc* act, D2DrlgLevelStrc* level
     }
 }
 
+// While the client holds the world (d2_session_hold_world), the first read rebuilds these lists and
+// the rest reuse them: every read export rebuilds otherwise, and the shell's one snapshot is a dozen
+// reads -- ten times the cost of the game tick itself (s000a's budget). Only read-only stretches
+// hold; a command between two reads needs a release first.
+static int g_worldHold = 0; static bool g_worldHoldBuilt = false;
 static void updateSessionWorld() {
+    if (g_worldHold && g_worldHoldBuilt) return;
+    if (g_worldHold) g_worldHoldBuilt = true;
     g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionTiles.clear(); g_sessionTileRolls.clear(); g_sessionTileLibraries.clear(); g_sessionWarps.clear();
     g_sessionWorldHash = D2VEC_FNV_INIT; g_sessionTerrainHash = D2VEC_FNV_INIT;
     g_sessionNavigationHash = D2VEC_FNV_INIT;
@@ -1208,6 +1215,77 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_level_links() {
     return g_sessionLevelLinks;
 }
 
+// Why an object operate may be refused (OBJECTS_OperateHandler's own guard): {interact unit type
+// (-1 none), its GUID, bBusy, cursor item GUID (0 none)}. Read-only.
+static int32_t g_sessionPlayerBusy[4];
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_player_busy() {
+    g_sessionPlayerBusy[0] = -1; g_sessionPlayerBusy[1] = -1; g_sessionPlayerBusy[2] = 0; g_sessionPlayerBusy[3] = 0;
+    if (!g_sessionLive || !g_targetPlayer) return g_sessionPlayerBusy;
+    int32_t type = -1, guid = -1;
+    if (SUNIT_GetInteractInfo(g_targetPlayer, &type, &guid)) { g_sessionPlayerBusy[0] = type; g_sessionPlayerBusy[1] = guid; }
+    g_sessionPlayerBusy[2] = g_targetPlayer->pPlayerData ? g_targetPlayer->pPlayerData->bBusy : 0;
+    D2UnitStrc* cursor = g_targetPlayer->pInventory ? INVENTORY_GetCursorItem(g_targetPlayer->pInventory) : nullptr;
+    g_sessionPlayerBusy[3] = cursor ? (int32_t)cursor->dwUnitId : 0;
+    return g_sessionPlayerBusy;
+}
+
+// 1 if an ACTIVE room (one with a collision grid) covers this subtile, else 0. d2_session_walkable
+// cannot tell a wall from ground whose room is not active yet; a player exploring can -- the
+// automap shows where they have not been. Read-only.
+EMSCRIPTEN_KEEPALIVE int d2_session_room_active_at(int x, int y) {
+    if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return 0;
+    return COLLISION_GetRoomBySubTileCoordinates(g_targetPlayer->pDynamicPath->pRoom, x, y) ? 1 : 0;
+}
+
+// A level's rectangle in subtiles as the act's DRLG placed it -- what the automap shows a player
+// of where the next area lies. Read-only; {x, y, width, height}, zeros if the level is not in the
+// current act.
+static int32_t g_sessionLevelRect[4];
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_level_rect(int32_t levelId) {
+    memset(g_sessionLevelRect, 0, sizeof g_sessionLevelRect);
+    if (!g_sessionLive || !g_lastLevel || !g_lastLevel->pDrlg) return g_sessionLevelRect;
+    D2DrlgLevelStrc* level = DRLG_GetLevel(g_lastLevel->pDrlg, levelId);
+    if (!level) return g_sessionLevelRect;
+    g_sessionLevelRect[0] = level->nPosX * 5; g_sessionLevelRect[1] = level->nPosY * 5;
+    g_sessionLevelRect[2] = level->nWidth * 5; g_sessionLevelRect[3] = level->nHeight * 5;
+    return g_sessionLevelRect;
+}
+
+// Where this level's rooms share an edge with rooms of `destinationLevel` (a seam), as up to 32
+// segments {x0, y0, x1, y1} in subtiles -- the DRLG's own room adjacency, what the automap shows.
+// Read-only: unlike d2_session_command_seam it activates nothing. Returns the segment count.
+static int32_t g_sessionSeamEdges[32 * 4];
+EMSCRIPTEN_KEEPALIVE int d2_session_seam_edges(uint32_t destinationLevel) {
+    int count = 0;
+    if (!g_sessionLive || !g_targetPlayer) return 0;
+    // The level the player is standing in -- a walk across a seam does not refresh g_lastLevel.
+    D2ActiveRoomStrc* here = UNITS_GetRoom(g_targetPlayer);
+    D2DrlgLevelStrc* level = here && here->pDrlgRoom ? here->pDrlgRoom->pLevel : g_lastLevel;
+    if (!level) return 0;
+    for (D2DrlgRoomStrc* roomEx = level->pFirstRoomEx; roomEx && count < 32; roomEx = roomEx->pDrlgRoomNext) {
+        for (int32_t n = 0; n < roomEx->nRoomsNear && count < 32; ++n) {
+            D2DrlgRoomStrc* near = roomEx->ppRoomsNear[n];
+            if (!near || !near->pLevel || near->pLevel->nLevelId != (int32_t)destinationLevel) continue;
+            int32_t dx = 0, dy = 0;
+            if (near->nTileXPos == roomEx->nTileXPos + roomEx->nTileWidth) dx = 1;
+            else if (near->nTileXPos + near->nTileWidth == roomEx->nTileXPos) dx = -1;
+            else if (near->nTileYPos == roomEx->nTileYPos + roomEx->nTileHeight) dy = 1;
+            else if (near->nTileYPos + near->nTileHeight == roomEx->nTileYPos) dy = -1;
+            else continue;
+            const int32_t lo = dx ? std::max(roomEx->nTileYPos, near->nTileYPos) : std::max(roomEx->nTileXPos, near->nTileXPos);
+            const int32_t hi = dx ? std::min(roomEx->nTileYPos + roomEx->nTileHeight, near->nTileYPos + near->nTileHeight)
+                                  : std::min(roomEx->nTileXPos + roomEx->nTileWidth, near->nTileXPos + near->nTileWidth);
+            if (lo >= hi) continue;
+            const int32_t line = dx > 0 ? 5 * (roomEx->nTileXPos + roomEx->nTileWidth) : dx < 0 ? 5 * roomEx->nTileXPos :
+                                 dy > 0 ? 5 * (roomEx->nTileYPos + roomEx->nTileHeight) : 5 * roomEx->nTileYPos;
+            int32_t* e = &g_sessionSeamEdges[4 * count++];
+            e[0] = dx ? line : 5 * lo; e[1] = dx ? 5 * lo : line; e[2] = dx ? line : 5 * hi; e[3] = dx ? 5 * hi : line;
+        }
+    }
+    return count;
+}
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_seam_edge_data() { return g_sessionSeamEdges; }
+
 // Levels.txt links with Warp -1 are seams: the two levels are continuous generated terrain and
 // the player simply walks across (s60). The route driver needs that crossing for any adjacent
 // pair, so this command finds the first passable subtile pair across the shared edge of two
@@ -1798,6 +1876,11 @@ EMSCRIPTEN_KEEPALIVE int d2_session_waypoints(int32_t* out, int cap) {
     return n / 4;
 }
 // Levels.txt's LevelName for a level: the string-table KEY, resolved by the client like any other.
+// MonStats NameStr of a monster class: the string index the client names an NPC by (its menu header).
+EMSCRIPTEN_KEEPALIVE int d2_monster_name_str(int classId) {
+    D2MonStatsTxt* rec = DATATBLS_GetMonStatsTxtRecord(classId);
+    return rec ? rec->wNameStr : -1;
+}
 EMSCRIPTEN_KEEPALIVE const char* d2_level_name(int levelId) {
     D2LevelsTxt* rec = DATATBLS_GetLevelsTxtRecord(levelId);
     return rec ? rec->szLevelName : "";
@@ -2718,6 +2801,19 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_use_belt(uint32_t slot) {
     return SUNIT_GetServerUnit(g_game, UNIT_ITEM, id) ? 0 : 1;
 }
 
+// Right-clicking an item in the inventory: retail's 0x20 UseGridItem, through its own handler (a
+// Town Portal scroll opens a portal, a potion is drunk, a tome is read). 1 if the handler accepted.
+EMSCRIPTEN_KEEPALIVE int d2_session_command_use_item(uint32_t itemUnitId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return 0;
+    uint8_t packet[13] = { 0x20 };
+    const int32_t id = (int32_t)itemUnitId;
+    const int32_t x = g_targetPlayer->pDynamicPath->tGameCoords.wPosX, y = g_targetPlayer->pDynamicPath->tGameCoords.wPosY;
+    memcpy(packet + 1, &id, 4); memcpy(packet + 5, &x, 4); memcpy(packet + 9, &y, 4);
+    const int32_t result = D2GAME_PACKETCALLBACK_Rcv0x20_UseGridItem_6FC85990(g_game, g_targetPlayer, packet, sizeof packet);
+    updateSessionSnapshot();
+    return result == 0 ? 1 : 0;
+}
+
 EMSCRIPTEN_KEEPALIVE int d2_session_command_stow_body(uint32_t bodyLoc) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pInventory || bodyLoc >= 13) return 0;
     int32_t result = 0;
@@ -2731,7 +2827,12 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_stow_body(uint32_t bodyLoc) {
 EMSCRIPTEN_KEEPALIVE int d2_session_command_respawn() {
     if (!g_sessionLive || !g_game || !g_targetPlayer || g_targetPlayer->dwAnimMode != PLRMODE_DEAD) return 0;
     uint8_t packet = 0x41;
+    const int32_t oldLevel = DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(g_targetPlayer));
     const int32_t result = D2GAME_PACKETCALLBACK_Rcv0x41_Resurrect_6FC87480(g_game, g_targetPlayer, &packet, 1);
+    // Resurrect moves the player to town (D2GAME_PlayerChangeAct): the session adopts the new level
+    // as it does after an exit, a portal or a caravan, or it keeps the level the body lies in.
+    D2ActiveRoomStrc* room = UNITS_GetRoom(g_targetPlayer);
+    if (result == 0 && room && DUNGEON_GetLevelIdFromRoom(room) != oldLevel) adoptSessionLevelChange(oldLevel, DUNGEON_GetLevelIdFromRoom(room));
     updateSessionSnapshot();
     return result == 0 && g_targetPlayer->dwAnimMode != PLRMODE_DEAD ? 1 : 0;
 }
@@ -3205,6 +3306,7 @@ EMSCRIPTEN_KEEPALIVE const D2SessionMotion* d2_session_motion() {
     return &g_sessionMotion;
 }
 
+EMSCRIPTEN_KEEPALIVE void d2_session_hold_world(int hold) { g_worldHold = hold != 0; g_worldHoldBuilt = false; }
 EMSCRIPTEN_KEEPALIVE const D2SessionSnapshot* d2_session_snapshot() {
     updateSessionSnapshot(); return &g_sessionSnapshot;
 }

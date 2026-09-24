@@ -497,7 +497,27 @@ struct D2VecTile {
     uint32_t word10, flags14;
 };
 
-enum D2VecKind : uint32_t { D2VEC_PRNG = 1, D2VEC_DRLG = 2, D2VEC_ITEMGEN = 3, D2VEC_MONSPAWN = 4, D2VEC_TABLE = 5, D2VEC_COMBAT = 6, D2VEC_AISPAWN = 7, D2VEC_AIFRAME = 8, D2VEC_AITARGET = 9, D2VEC_COMBATRESULT = 10, D2VEC_DAMAGECALC = 11, D2VEC_A1Q6 = 12, D2VEC_A1Q6PLAYER = 13, D2VEC_A1Q6TIMER = 14, D2VEC_A1Q6COMPLETE = 15, D2VEC_A1Q6DROP = 16, D2VEC_A1Q6TRAVEL = 17, D2VEC_NPCDIALOG = 18, D2VEC_NPCRESPONSE = 19, D2VEC_VENDORITEM = 20, D2VEC_VENDORBUY = 21, D2VEC_VENDORSELL = 22, D2VEC_HIRE = 23, D2VEC_VENDORMULTIBUY = 24, D2VEC_TILE = 25 };
+// Kind 26 (s175): the per-lookup tile pick stream (OBJECTIVE v5 B; libd2's probe_seq is the prior
+// art). One record per D2CMP GetTiles call D2Common makes (#10059 in 1.13c, #10088 in 1.10f/D2MOO) --
+// GetTileCache's candidate set -- with what the GetTileRarity calls (#10027; 1.10f #10081) that follow it reveal: the first `entries` calls sum the
+// weights, the rest are the rarity ladder, and the pick is the last entry the ladder consulted
+// (entry 0 when there is no ladder). The seed roll itself is inline in D2Common, so the ladder
+// length is how it shows. `room` is the room ordinal of the AddRoomData in progress, -1 outside one.
+struct D2VecTilePick {
+    uint32_t seed;
+    uint8_t  difficulty, act;
+    uint16_t level;
+    int32_t  room;
+    uint32_t call;               // index within (seed, difficulty, act, level)
+    int32_t  type, style, sequence;
+    int32_t  entries;            // GetTiles' return value
+    int32_t  weightSum;          // sum of the first `entries` GetTileRarity results
+    int32_t  ladder;             // GetTileRarity calls after the sum
+    int32_t  chosenFrame;        // +0x20 of the entry picked; -1 if GetTiles returned none
+};
+static_assert(sizeof(D2VecTilePick) == 44, "tile pick record");
+
+enum D2VecKind : uint32_t { D2VEC_PRNG = 1, D2VEC_DRLG = 2, D2VEC_ITEMGEN = 3, D2VEC_MONSPAWN = 4, D2VEC_TABLE = 5, D2VEC_COMBAT = 6, D2VEC_AISPAWN = 7, D2VEC_AIFRAME = 8, D2VEC_AITARGET = 9, D2VEC_COMBATRESULT = 10, D2VEC_DAMAGECALC = 11, D2VEC_A1Q6 = 12, D2VEC_A1Q6PLAYER = 13, D2VEC_A1Q6TIMER = 14, D2VEC_A1Q6COMPLETE = 15, D2VEC_A1Q6DROP = 16, D2VEC_A1Q6TRAVEL = 17, D2VEC_NPCDIALOG = 18, D2VEC_NPCRESPONSE = 19, D2VEC_VENDORITEM = 20, D2VEC_VENDORBUY = 21, D2VEC_VENDORSELL = 22, D2VEC_HIRE = 23, D2VEC_VENDORMULTIBUY = 24, D2VEC_TILE = 25, D2VEC_TILEPICK = 26 };
 
 static inline uint32_t d2vec_fnv1a_step(uint32_t h, uint32_t v) {
     for (int i = 0; i < 4; i++) { h ^= (v >> (8 * i)) & 0xFF; h *= 16777619u; }

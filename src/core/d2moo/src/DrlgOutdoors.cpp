@@ -907,6 +907,9 @@ static const uint8_t byte_6FDCF958[] =
 	0x18, 0x18, 0x19, 0x20, 0x18, 0x18, 0x1E, 0x01		
 };
 
+// D2WEB: observer for the rasterised dirt-path grid (set by src/core/drlg/drlg_check.cpp).
+void (*g_d2webOnDirtPathGrid)(D2DrlgLevelStrc*, D2DrlgRoomStrc*, D2DrlgGridStrc*) = nullptr;
+
 //D2Common.0x6FD7EFE0
 void __fastcall DRLG_OUTDOORS_GenerateDirtPath(D2DrlgLevelStrc* pLevel, D2DrlgRoomStrc* pDrlgRoom)
 {
@@ -992,7 +995,10 @@ void __fastcall DRLG_OUTDOORS_GenerateDirtPath(D2DrlgLevelStrc* pLevel, D2DrlgRo
 			// Update flags for next Y (move everything in direction of negative y, then sample the new values
 			if (nY >= 2)
 			{
-				memcpy(aFlags, &aFlags[1], sizeof(aFlags) - sizeof(aFlags[0]));
+				// D2WEB: memmove, not D2MOO's memcpy -- the ranges overlap, which is undefined for memcpy,
+				// and wasm's copies them out of order: the window kept phantom west neighbours and 988
+				// Act I dirt-path edge tiles took the wrong sequence (s173/s175/s178).
+				memmove(aFlags, &aFlags[1], sizeof(aFlags) - sizeof(aFlags[0]));
 
 				aFlags[MapOffsetToBoxIndex(-1, -1)] = DRLGGRID_GetGridEntry(pDirtPathGrid, nX - 1, nY - 2);
 				aFlags[MapOffsetToBoxIndex( 0, -1)] = DRLGGRID_GetGridEntry(pDirtPathGrid, nX + 0, nY - 2);
@@ -1000,6 +1006,9 @@ void __fastcall DRLG_OUTDOORS_GenerateDirtPath(D2DrlgLevelStrc* pLevel, D2DrlgRo
 			}
 		}
 	}
+	// D2WEB: the rasterised path grid and the floor grid this pass wrote (s178 compares both with what
+	// 1.13c's capture dumps around the same pass).
+	if (g_d2webOnDirtPathGrid) g_d2webOnDirtPathGrid(pLevel, pDrlgRoom, pDirtPathGrid);
 }
 
 //D2Common.0x6FD7F250

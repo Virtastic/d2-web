@@ -32,7 +32,6 @@ export class CommandInput {
     if (!down || repeat) return false;
     if (code === 'Space') this.queue.push({ type: COMMAND.PRIMARY });
     else if (code === 'KeyE') this.queue.push({ type: COMMAND.INTERACT });
-    else if (code === 'KeyR') this.queue.push({ type: COMMAND.RESPAWN });
     else if (code === 'KeyT') this.queue.push({ type: COMMAND.TRAVEL });
     // Retail: 1-4 use the belt's columns; skills are selected on the F-keys (retail's skill hotkeys --
     // which skill sits on which F-key is this shell's default, declared in F3).
@@ -84,6 +83,7 @@ export function normalizeSnapshot(value) {
     mode: Math.max(0, Math.trunc(finite(s.mode))),
     flags: Math.max(0, Math.trunc(finite(s.flags))) >>> 0,
     playerClass: Math.min(6, Math.max(0, Math.trunc(finite(s.playerClass)))),
+    playerId: Math.max(0, Math.trunc(finite(s.playerId))) >>> 0,
     monsterCount: Math.max(0, Math.trunc(finite(s.monsterCount))),
     hash: Math.max(0, Math.trunc(finite(s.hash))) >>> 0,
     area: String(s.area ?? (s.level ? `Level ${s.level}` : 'session unavailable')),
@@ -147,7 +147,7 @@ export function parseSessionSnapshot(bytes) {
   const view = bytes instanceof DataView ? bytes : new DataView(bytes.buffer, bytes.byteOffset || 0, bytes.byteLength);
   if (view.byteLength < 68 || view.getUint32(0, true) !== 1 || view.getUint32(4, true) !== 68) throw new Error('unsupported session snapshot');
   return normalizeSnapshot({
-    seed: view.getUint32(8, true), tick: view.getUint32(12, true), level: view.getUint16(16, true), playerClass: view.getUint32(20, true),
+    seed: view.getUint32(8, true), tick: view.getUint32(12, true), level: view.getUint16(16, true), playerClass: view.getUint32(20, true), playerId: view.getUint32(24, true),
     difficulty: view.getUint8(18), act: view.getUint8(19) + 1,
     player: { x: view.getInt32(28, true), y: view.getInt32(32, true), hp: view.getInt32(44, true), hpMax: view.getInt32(48, true) },
     mode: view.getUint32(52, true), flags: view.getUint32(56, true), monsterCount: view.getUint32(60, true), hash: view.getUint32(64, true),

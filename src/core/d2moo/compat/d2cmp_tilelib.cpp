@@ -85,6 +85,11 @@ extern "C" const char* D2WEB_TileLibraryNameFromHash(const D2TileLibraryHashStrc
     return nullptr;
 }
 
+// The tile pick stream (s175, vector kind 26) observes these two calls the way the retail capture tool observes
+// retail's through D2Common's import table. Null unless drlg_check is collecting; they only watch.
+void (*g_d2webOnGetTiles)(int nType, int nStyle, int nSequence, int nEntries, int nFirstFrame) = nullptr;
+void (*g_d2webOnTileRarity)(int nRarity) = nullptr;
+
 // #10059 (1.13c) / #10088 (1.10f): 0x6fe253a0 over the slots, 0x6fe22e60 per library
 int D2CMP_10088_GetTiles(D2TileLibraryHashStrc** ppSlots, int nType, int nStyle, int nSequence, D2TileLibraryEntryStrc** pTileList, int nTileListSize) {
     D2_ASSERT(ppSlots);
@@ -98,11 +103,12 @@ int D2CMP_10088_GetTiles(D2TileLibraryHashStrc** ppSlots, int nType, int nStyle,
         for (Ref* r = n->pRef; r && got < nTileListSize; r = r->pNext) pTileList[total + got++] = (D2TileLibraryEntryStrc*)r->pTile;
         total += got; nTileListSize -= got;
     }
+    if (g_d2webOnGetTiles) g_d2webOnGetTiles(nType, nStyle, nSequence, total, total > 0 ? tileRarity((const uint8_t*)pTileList[0]) : -1);
     return total;
 }
 
 int D2CMP_10078_GetTileStyle(D2TileLibraryEntryStrc* e)    { D2_ASSERT(e); return tileStyle((const uint8_t*)e); }
 int D2CMP_10079_GetTileFlags(D2TileLibraryEntryStrc* e)    { D2_ASSERT(e); uint16_t v; memcpy(&v, (const uint8_t*)e + 6, 2); return v; }
-int D2CMP_10081_GetTileRarity(D2TileLibraryEntryStrc* e)   { D2_ASSERT(e); return tileRarity((const uint8_t*)e); }
+int D2CMP_10081_GetTileRarity(D2TileLibraryEntryStrc* e)   { D2_ASSERT(e); const int v = tileRarity((const uint8_t*)e); if (g_d2webOnTileRarity) g_d2webOnTileRarity(v); return v; }
 int D2CMP_10082_GetTileSequence(D2TileLibraryEntryStrc* e) { D2_ASSERT(e); return tileSeq((const uint8_t*)e); }
 uint8_t* D2CMP_10085_GetTileFlagArray(D2TileLibraryEntryStrc* e) { D2_ASSERT(e); return (uint8_t*)e + 0x28; }
