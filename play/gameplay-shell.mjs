@@ -1,5 +1,5 @@
-import { createSessionTerrain, parseSessionTiles, readLevelTileFiles, worldToScreen, screenDeltaToWorld } from './assets/session-terrain.mjs';
-import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, selectPrimaryTarget, viewportToWorld } from './gameplay-model.mjs';
+import { createSessionTerrain, parseSessionTiles, readLevelTileFiles, readSessionTerrain, readSessionLightmap, worldToScreen, screenDeltaToWorld, UNIT_CENTRE_Y } from './assets/session-terrain.mjs';
+import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, hudLines, savedCharacterFixture, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, selectPrimaryTarget, viewportToWorld } from './gameplay-model.mjs';
 import { createMpqAssetReader } from './assets/mpq-assets.mjs';
 import { ACT_TILE_ASSETS, createActTileAtlas, decodeActTileAssets } from './assets/retail-tile-view.mjs';
 import { decodeDatPalette, decodeDt1 } from './assets/d2-formats.mjs';
@@ -11,9 +11,10 @@ import { createItemRenderer, parseItemPresentations } from './assets/item-render
 import { createStashPanelRenderer, stashGeometry, BIG_BANK_PAGE_1 } from './assets/stash-panel.mjs';
 import { createWaypointPanelRenderer } from './assets/waypoint-panel.mjs';
 import { createControlPanelRenderer } from './assets/control-panel.mjs';
-import { createInventoryPanelRenderer } from './assets/inventory-panel.mjs';
+import { createInventoryPanelRenderer, inventoryLayoutFromEngine } from './assets/inventory-panel.mjs';
 import { createCharacterPanelRenderer } from './assets/character-panel.mjs';
 import { createSkillPanelRenderer, parseClassSkills, SESSION_SKILL_BYTES } from './assets/skill-panel.mjs';
+import { createSkillSelectRenderer, parseSkillChoices, SESSION_SKILL_CHOICE_BYTES } from './assets/skill-select.mjs';
 import { createBeltRenderer } from './assets/belt-renderer.mjs';
 import { createActMusicPlayer } from './assets/act-music.mjs';
 import { createTitleScreen } from './assets/frontend.mjs';
@@ -24,6 +25,8 @@ import { createNpcPanel } from './assets/npc-panel.mjs';
 import { createGameMenu } from './assets/game-menu.mjs';
 import { createDeathScreen } from './assets/death-screen.mjs';
 import { createNpcMenu, npcMenuEntries } from './assets/npc-menu.mjs';
+import { createMissileRenderer } from './assets/missile-renderer.mjs';
+import { createVendorPanel } from './assets/vendor-panel.mjs';
 import { decodeDc6 } from './assets/d2-formats.mjs';
 
 const canvas = document.querySelector('#game');
@@ -36,8 +39,13 @@ const input = new CommandInput();
 let snapshot = normalizeSnapshot(null);
 let last = performance.now(), accumulator = 0, frames = 0, fps = 0, fpsAt = last;
 const STEP = 1000 / 60;
-let session = null, bootstrapStarted = false, sessionError = '';
+let session = null, bootstrapStarted = false, sessionError = '', inventoryLayoutKey = '';
 let fixtures = [];
+// A picked save starts in the town of the act its header says it is in (save-store nTown); retail's
+// town level per act is DUNGEON_GetTownLevelIdFromActNo: Rogue Encampment, Lut Gholein, Kurast
+// Docks, the Pandemonium Fortress, Harrogath. TODO(client-parity C3k): the game seed is fixture 1,
+// not the header dwMapSeed.
+let loadDifficulty = 0;   // the picked save's difficulty: which of the header's nTown bytes applies
 // Debug overlays (grid, room rectangles, warp diamonds) are exactly what made this read as a test
 // harness rather than a game. They are opt-in now: ?debug=1.
 const DEBUG_OVERLAY = new URLSearchParams(location.search).get('debug') === '1';
@@ -45,7 +53,7 @@ let terrain = null, terrainFiles = null, terrainStats = null, terrainError = '',
 const tileViews = new Map();
 let tileView = null, tileViewLoading = 0, tileViewError = '';
 let playerRenderer = null, playerRenderError = '', motion = {};
-let corpseRenderer = null, corpseEvidence = null, lastCorpseRecovery = null;
+let corpseRenderer = null, corpseEvidence = null, lastCorpseRecovery = null, missileRenderer = null;
 let frameError = '', frameErrors = 0;
 let npcCount = 0;
 let npcPanel = null, npcPanelError = '', npcState = null, npcPanelEvidence = null;
@@ -124,8 +132,32 @@ let stashPanelRenderer = null, stashPanelError = '', stashEvidence = null, stash
 let waypointPanelRenderer = null, waypointPanelError = '', waypointEvidence = null, waypointMenu = null, lastWaypointTravel = null;
 let beltRenderer = null, beltEvidence = null, beltBoxCache = null;
 let controlPanelRenderer = null, controlPanelEvidence = null;
+// The skill buttons beside the belt and their popup (skill-select.mjs); the engine owns the choice.
+let skillSelectRenderer = null, skillSelectEvidence = null, skillSelectError = '';
+function readSkillChoices() {
+  if (!session || typeof Module === 'undefined' || !Module._d2_session_skill_choices) return [];
+  const cap = 128, buf = Number(Module.ccall('malloc', 'bigint', ['number'], [cap * SESSION_SKILL_CHOICE_BYTES]));
+  if (!buf) return [];
+  try {
+    const n = Module.ccall('d2_session_skill_choices', 'number', ['bigint', 'number'], [BigInt(buf), cap]);
+    return parseSkillChoices(Module.HEAPU8.slice(buf, buf + n * SESSION_SKILL_CHOICE_BYTES), n);
+  } finally { Module.ccall('free', null, ['bigint'], [BigInt(buf)]); }
+}
+function readSelectedSkills() {
+  if (!session || typeof Module === 'undefined' || !Module._d2_session_selected_skills) return { left: -1, right: -1 };
+  const p = Number(Module.ccall('d2_session_selected_skills', 'number', [], []));
+  const v = new DataView(Module.HEAPU8.buffer, p, 8);
+  return { left: v.getInt32(0, true), right: v.getInt32(4, true) };
+}
+// Retail's 0x3C through the engine; the right hand's choice is also what a right click casts.
+function selectSkill(id, side) {
+  const rc = Module.ccall('d2_session_command_select_skill', 'number', ['number', 'number'], [id, side === 'left' ? 1 : 0]);
+  return rc;
+}
 let actMusic = null, musicError = '';
-let selectedSkill = 0, lastSkillCommand = null;
+// The selected skills are the ENGINE's (the unit's left/right skill, d2_session_selected_skills): a
+// loaded character keeps the hands its save held, and there is no second copy here to disagree.
+let lastSkillCommand = null;
 const PLAY_MODE = new URLSearchParams(location.search).get('play') === '1';
 // Retail opens on a title screen, so that is what a plain visit gets. `play=1` keeps booting
 // straight into a session: every browser scenario drives the game directly and must not have to
@@ -223,7 +255,8 @@ async function loadActTileView(act0) {
 function sessionAdapter() {
   if (window.Module?._d2_session_create && window.Module?._d2_session_snapshot) {
     return {
-      create(f, playerClass = 0) { return Module.ccall('d2_session_create_class', 'number', ['number', 'number', 'number', 'number', 'number'], [f.seed, f.difficulty, f.act0, f.level, playerClass]); },
+      // bare: no start kit, for a player a saved file is about to be applied to.
+      create(f, playerClass = 0, bare = false) { return Module.ccall(bare && Module._d2_session_create_class_bare ? 'd2_session_create_class_bare' : 'd2_session_create_class', 'number', ['number', 'number', 'number', 'number', 'number'], [f.seed, f.difficulty, f.act0, f.level, playerClass]); },
       move(x, y) { return Module.ccall('d2_session_command_move', 'number', ['number', 'number'], [x, y]); },
       attack(targetId) { return Module.ccall('d2_session_command_primary_attack', 'number', ['number'], [targetId]); },
       throwSkill(targetId) { return Module.ccall('d2_session_command_throw', 'number', ['number'], [targetId]); },
@@ -325,13 +358,15 @@ async function bootstrapSession() {
     // The name has to reach the engine BEFORE the session is created: the save header reads the
     // character's identity from the client record, which is built during create.
     if (chosenName) Module.ccall('d2_session_set_character_name', 'number', ['string'], [chosenName]);
-    const fixture = fixtures[0];
+    // A picked character resumes in the town of the act it was saved in (retail's header act).
+    const fixture = pendingLoad ? savedCharacterFixture(pendingLoad, loadDifficulty) : fixtures[0];
     const api = sessionAdapter();
-    if (!api?.create(fixture, Number(classSelect.value))) throw new Error('d2_session_create failed');
+    if (!api?.create(fixture, Number(classSelect.value), Boolean(pendingLoad))) throw new Error('d2_session_create failed');
     session = api; snapshot = api.snapshot();
     motion = api.motion();
     const assetReader = createMpqAssetReader(Module);
     playerRenderer = createPlayerRenderer(assetReader); playerRenderError = '';
+    missileRenderer = createMissileRenderer(assetReader, document, (cls) => Module._d2_missile_celfile ? Module.ccall('d2_missile_celfile', 'string', ['number'], [cls]) : '');
     corpseRenderer = createPlayerRenderer(assetReader);   // its own instance: the player's draw evidence stays the player's
     monsterRenderer = createMonsterRenderer(createMpqAssetReader(Module));
     objectRenderer = createObjectRenderer(createMpqAssetReader(Module));
@@ -339,10 +374,12 @@ async function bootstrapSession() {
     inventoryPanelRenderer = createInventoryPanelRenderer(createMpqAssetReader(Module));
     characterPanelRenderer = createCharacterPanelRenderer(createMpqAssetReader(Module));
     skillPanelRenderer = createSkillPanelRenderer(createMpqAssetReader(Module));
-    try { stashPanelRenderer = createStashPanelRenderer(createMpqAssetReader(Module)); } catch (error) { stashPanelError = String(error); }
-    try { waypointPanelRenderer = createWaypointPanelRenderer(createMpqAssetReader(Module)); } catch (error) { waypointPanelError = String(error); }
+    try { stashPanelRenderer = createStashPanelRenderer(createMpqAssetReader(Module), document, { string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]),
+      stashGold: (limit) => Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [limit]) : 0 }); } catch (error) { stashPanelError = String(error); }
+    try { waypointPanelRenderer = createWaypointPanelRenderer(createMpqAssetReader(Module), document, { string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) }); } catch (error) { waypointPanelError = String(error); }
     beltRenderer = createBeltRenderer(createMpqAssetReader(Module));
     controlPanelRenderer = createControlPanelRenderer(assetReader);
+    try { skillSelectRenderer = createSkillSelectRenderer(createMpqAssetReader(Module)); } catch (error) { skillSelectError = String(error); }
     try { actMusic = createActMusicPlayer(assetReader); await actMusic.prepare(fixture.act0); musicError = ''; } catch (error) { musicError = String(error); }
 
     if (TERRAIN_ENABLED) { loadSessionTerrain(fixture.act0); loadActTileView(fixture.act0); }
@@ -463,6 +500,7 @@ async function playSavedCharacter(name) {
   if (!bytes) { charSelectError = `no saved character named ${name}`; return; }
   const header = savedCharacters.find((ch) => ch.name === name);
   chosenClass = header ? header.playerClass : 0;
+  loadDifficulty = header?.difficulty ?? 0;
   chosenName = name;
   pendingLoad = bytes;
   lastLoad = { attempted: false, pending: true, rc: null, bytes: bytes.length };
@@ -565,6 +603,23 @@ function buyFromVendor(itemId) {
 
 // Sell an item to the open vendor. Same division as buying: the engine prices it, moves the gold
 // and takes the item; this only names what was clicked.
+let lastGridToBelt = null;
+function gridToBelt(itemId) {
+  const p = Module._malloc(5), v = new DataView(Module.HEAPU8.buffer, Number(p), 5);
+  v.setUint8(0, 0x63); v.setUint32(1, itemId >>> 0, true);
+  try { return Module.ccall('d2_session_client_packet', 'number', ['bigint', 'number'], [BigInt(p), 5]); } finally { Module._free(p); }
+}
+
+// A shop opening brings retail's inventory up beside it; leaving the shop closes what it opened.
+// Run from the draw AND from input: a click that arrives before the next frame is drawn (headless, or
+// a fast player) found the inventory still hidden, fell through to the world, and the world click
+// closed the trade -- every death shop in s000c sold nothing and bought nothing.
+function syncShopInventory() {
+  if (shopOpen() && !shopWasOpen && ensureVendorPanel()) { vendorPanel.reset(npcState.items); inventoryVisible = true; }
+  if (!shopOpen() && shopWasOpen) inventoryVisible = false;
+  shopWasOpen = shopOpen();
+}
+
 function sellToVendor(itemId) {
   if (!npcState) return false;
   try {
@@ -592,6 +647,16 @@ function repairAtVendor(itemId) {
   } catch { return false; }
 }
 
+// An open shop is retail's vendor window (play/assets/vendor-panel.mjs), not the trade panel.
+let vendorPanel = null, vendorPanelError = '', shopWasOpen = false;
+function ensureVendorPanel() {
+  if (vendorPanel || vendorPanelError) return vendorPanel;
+  try { vendorPanel = createVendorPanel({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette,
+    string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]) }); }
+  catch (error) { vendorPanelError = String(error); }
+  return vendorPanel;
+}
+const shopOpen = () => Boolean(npcState?.items?.length);
 function ensureNpcPanel() {
   if (npcPanel || npcPanelError) return npcPanel;
   try { npcPanel = createNpcPanel({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette }); }
@@ -643,7 +708,10 @@ function walkStep() {
   }
   // Nothing reachable makes progress: stop rather than spin.
   walkEvidence = { active: false, hops: walkEvidence.hops, reason: Module.ccall('d2_session_move_reason', 'number', [], []) };
-  walkGoal = null;
+  // A goal whose own footprint keeps the player out of `within` (Harrogath's 1x7 main gate) still
+  // gets its interaction: the engine's range test (UNITS_IsObjectInInteractRange) decides, as the
+  // server does for retail's client.
+  const stuck = walkGoal.onStuck; walkGoal = null; stuck?.();
 }
 
 function readUnitKinds(count) {
@@ -673,18 +741,22 @@ function update() {
           // command only routes a short leg (MOVE_NO_PATH beyond it -- s000 stalled in town on
           // exactly that); a far click is routed in legs by the client, so a refused click hands
           // the SAME goal to the hop walker the NPC walk already uses.
-          const d = screenDeltaToWorld(command.x - canvas.width / 2, command.y - canvas.height / 2);
-          const tx = Math.round(snapshot.player.x + d.x), ty = Math.round(snapshot.player.y + d.y);
+          const d = screenDeltaToWorld(command.x - canvas.width / 2, command.y - (canvas.height / 2 + UNIT_CENTRE_Y));
+          const tx = Math.round(snapshot.player.x + 0.5 + d.x), ty = Math.round(snapshot.player.y + 0.5 + d.y);   // the ground: static grid, camera at the half subtile
           walkGoal = null;
           // Retail's LEFT click acts on what is under the cursor before it walks: an item is picked
           // up, a hostile is attacked with the left-hand skill (normal attack). Only bare ground
           // walks. (This shell sent every left click as a walk, so a monster could only be fought
           // with the right button -- s000 clicked one 400 times and never swung.)
-          const underItem = snapshot.items.filter((item) => item.mode === 3 && item.invPage === 255)
+          // A live monster under the pointer comes before a ground item at its feet: a fight drops
+          // loot where the pack stands, and every click on the next monster picked up (or walked to)
+          // the drop instead -- s000d logged 400 'busy' rounds on a monster no click ever attacked.
+          // (F14: retail's hover order is not recovered; units before items is observed behaviour.)
+          const underTarget = selectPrimaryTarget(snapshot, { x: tx, y: ty }, 2);
+          const underItem = underTarget ? null : snapshot.items.filter((item) => item.mode === 3 && item.invPage === 255)
             .map((item) => ({ item, d: (item.x - tx) ** 2 + (item.y - ty) ** 2 })).filter((entry) => entry.d <= 4)
             .sort((a, b) => a.d - b.d || a.item.id - b.item.id)[0]?.item;
           if (underItem) { session.pickup(underItem.id); continue; }
-          const underTarget = selectPrimaryTarget(snapshot, { x: tx, y: ty }, 2);
           if (underTarget) {
             const result = session.attack(underTarget);
             lastSkillCommand = { skill: 0, targetId: underTarget, result };
@@ -700,22 +772,25 @@ function update() {
           if (!session.move(tx, ty)) { walkEvidence = { active: true, hops: 0, reason: 0 }; walkGoal = { x: tx, y: ty, within: 2 }; }
         }
       } else if (command.type === COMMAND.PRIMARY) {
-        const point = command.x == null ? snapshot.player : (() => { const d = screenDeltaToWorld(command.x - canvas.width / 2, command.y - canvas.height / 2); return { x: Math.round(snapshot.player.x + d.x), y: Math.round(snapshot.player.y + d.y) }; })();
-        const ground = command.x == null ? null : snapshot.items.filter((item) => item.mode === 3 && item.invPage === 255)
+        const point = command.x == null ? snapshot.player : (() => { const d = screenDeltaToWorld(command.x - canvas.width / 2, command.y - (canvas.height / 2 + UNIT_CENTRE_Y)); return { x: Math.round(snapshot.player.x + d.x), y: Math.round(snapshot.player.y + d.y) }; })();
+        const targetId = selectPrimaryTarget(snapshot, point, command.x == null ? Infinity : 2);
+        const ground = command.x == null || targetId ? null : snapshot.items.filter((item) => item.mode === 3 && item.invPage === 255)
           .map((item) => ({ item, d: (item.x - point.x) ** 2 + (item.y - point.y) ** 2 })).filter((entry) => entry.d <= 4)
           .sort((a, b) => a.d - b.d || a.item.id - b.item.id)[0]?.item;
         if (ground) { session.pickup(ground.id); continue; }
-        const targetId = selectPrimaryTarget(snapshot, point, command.x == null ? Infinity : 2);
-        const skill = command.secondary ? selectedSkill : 0;
-        const result = targetId ? (skill === 2 ? session.throwSkill(targetId) : skill === 1 ? session.kick(targetId) : session.attack(targetId)) : 0;
+        const skill = command.secondary ? Math.max(0, readSelectedSkills().right) : 0;
+        // Any other right-hand skill (Bash, Double Swing, ...) is the engine's selected right skill.
+        const result = targetId ? (skill === 2 ? session.throwSkill(targetId) : skill === 1 ? session.kick(targetId) : skill === 0 ? session.attack(targetId)
+          : Module.ccall('d2_session_command_right_skill', 'number', ['number'], [targetId])) : 0;
         lastSkillCommand = { skill, targetId, result };
       } else if (command.type === COMMAND.BELT) {
         // Retail's belt keys: 1-4 drink/use the bottom item of that belt column, through the engine.
         if (session.useBelt(command.slot)) snapshot = session.snapshot();
       } else if (command.type === COMMAND.SKILL) {
-        const skills = [0, 2, 1]; if (command.slot >= 1 && command.slot <= skills.length) selectedSkill = skills[command.slot - 1];
+        // F1-F3: Attack, Throw, Kick into the right hand (retail's 0x3C, through the engine).
+        const skills = [0, 2, 1]; if (command.slot >= 1 && command.slot <= skills.length) selectSkill(skills[command.slot - 1], 'right');
       } else if (command.type === COMMAND.CANCEL) {
-        selectedSkill = 0;
+        // Retail's Esc does not touch the selected skills.
       } else if (command.type === COMMAND.INTERACT) {
         const previousAct = snapshot.act;
         let accepted = session.talkNearest();
@@ -743,16 +818,20 @@ function update() {
       }
     }
     try {
-      session.tick(1); snapshot = session.snapshot(); motion = session.motion();
-      // Hostility is the monster's alignment, not "is a monster"; talkable is its INTERACT flag.
-      walkStep();
-      // Read-only from here to the end of the tick: one world rebuild serves all of it.
-      if (Module._d2_session_hold_world) Module.ccall('d2_session_hold_world', null, ['number'], [1]);
+      session.tick(1);
+      // One world rebuild per frame, not two: the snapshot and the npc/kind reads share one hold
+      // (a rebuild costs ~1 ms, as much as the tick). walkStep can issue a command, so a frame with a
+      // walk in progress releases the hold around it and rebuilds after it, as before.
+      const hold = Boolean(Module._d2_session_hold_world), holdWorld = (on) => { if (hold) Module.ccall('d2_session_hold_world', null, ['number'], [on ? 1 : 0]); };
+      holdWorld(true);
       let kinds;
       try {
+        snapshot = session.readSnapshot(); motion = session.motion();
+        // Hostility is the monster's alignment, not "is a monster"; talkable is its INTERACT flag.
+        if (walkGoal) { holdWorld(false); walkStep(); holdWorld(true); }
         npcState = npcMenu?.open ? null : readNpcState();   // the menu comes first; the window opens on its entry
         kinds = readUnitKinds(snapshot.entities.length);
-      } finally { if (Module._d2_session_hold_world) Module.ccall('d2_session_hold_world', null, ['number'], [0]); }
+      } finally { holdWorld(false); }
       npcCount = 0;
       if (kinds) for (let i = 0; i < snapshot.entities.length && i < kinds.length; i++) {
         const entity = snapshot.entities[i], kind = kinds[i];
@@ -785,11 +864,12 @@ function update() {
 function drawPlayer(c) {
   const w = canvas.width, h = canvas.height;
   if (playerRenderer) {
-    try { playerRenderer.draw(c, w / 2, h / 2, { ...motion, playerClass: snapshot.playerClass, mode: snapshot.mode, tick: snapshot.tick, act: snapshot.act }); playerRenderError = ''; }
-    catch (error) { playerRenderError = String(error); playerRenderer = null; }
+    try { playerRenderer.draw(c, w / 2, (h / 2 + UNIT_CENTRE_Y), { ...motion, playerClass: snapshot.playerClass, mode: snapshot.mode, tick: snapshot.tick, act: snapshot.act }); playerRenderError = ''; }
+    // One animation that fails to draw is reported, not fatal: the next mode may draw fine.
+    catch (error) { playerRenderError = String(error); }
   }
   if (!playerRenderer) {
-    c.fillStyle = '#d9b85c'; c.beginPath(); c.arc(w / 2, h / 2, 7, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#d9b85c'; c.beginPath(); c.arc(w / 2, (h / 2 + UNIT_CENTRE_Y), 7, 0, Math.PI * 2); c.fill();
   }
 }
 
@@ -826,6 +906,9 @@ function render() {
 
 function drawFrame() {
   const w = canvas.width, h = canvas.height;
+  // The title draws retail's own pointer sprite (ohand.dc6); the system arrow would be a second one.
+  const cursorStyle = screen === SCREEN.TITLE ? 'none' : '';
+  if (canvas.style.cursor !== cursorStyle) canvas.style.cursor = cursorStyle;
   if (screen === SCREEN.TITLE) {
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
     if (titleScreen) titleScreen.draw(ctx, w, h, titleTick);
@@ -864,7 +947,9 @@ function drawFrame() {
   // engine used for its tiles, so sprites land on the ground they are standing on rather than on a
   // parallel flat grid.
   const camera = worldToScreen(snapshot.player.x, snapshot.player.y);
-  const proj = (wx, wy) => { const p = worldToScreen(wx, wy); return [p.x - camera.x + w / 2, p.y - camera.y + h / 2]; };
+  const proj = (wx, wy) => { const p = worldToScreen(wx, wy); return [p.x - camera.x + w / 2, p.y - camera.y + (h / 2 + UNIT_CENTRE_Y)]; };
+  // Objects and ground items are static: on the integer grid under the half-subtile camera (8 px higher).
+  const projStatic = (wx, wy) => proj(wx - 0.5, wy - 0.5);
 
   // Sprites are handed to the terrain pass rather than painted after it, so a wall in front of a
   // monster covers the monster. `depth` is the projected screen Y -- the same key the walls sort on.
@@ -876,14 +961,22 @@ function drawFrame() {
     const [sx, sy] = proj(entity.x, entity.y);
     // Another player unit in the dead mode is the player's corpse, drawn in its death pose
     // (TODO(client-parity F19): the corpse's facing is not on the unit record; direction 0).
+    // A missile draws from its Missiles.txt CelFile (F20 keeps the dot for one that has none).
+    if (entity.kind === 'missile') {
+      sprites.push({ depth: sy, wx: entity.x, wy: entity.y, draw(c) {
+        let drawn = null; try { drawn = missileRenderer?.draw(c, sx, sy, entity, 0, snapshot.tick); } catch { drawn = null; }
+        if (!drawn) { c.fillStyle = '#958968'; c.beginPath(); c.arc(sx, sy, 5, 0, Math.PI * 2); c.fill(); }
+      } });
+      continue;
+    }
     if (entity.kind === 'player') {
-      sprites.push({ depth: sy, draw(c) {
+      sprites.push({ depth: sy, wx: entity.x, wy: entity.y, draw(c) {
         try { corpseEvidence = { id: entity.id, x: entity.x, y: entity.y, ...(corpseRenderer?.draw(c, sx, sy, { playerClass: entity.classId, mode: entity.mode, direction: 0, tick: snapshot.tick, act: snapshot.act }) || {}) }; }
         catch (error) { corpseEvidence = { id: entity.id, error: String(error) }; }
       } });
       continue;
     }
-    sprites.push({ depth: sy, draw(c) {
+    sprites.push({ depth: sy, wx: entity.x, wy: entity.y, draw(c) {
       // Draw the retail sprite for ANY unit that has an animation. This used to require
       // entity.hostile, which tied "has a body" to "is an enemy" -- so once town NPCs were
       // correctly marked non-hostile they stopped being drawn and Charsi became a dot.
@@ -893,23 +986,31 @@ function drawFrame() {
     } });
   }
   for (const object of snapshot.objects) {
-    const [sx, sy] = proj(object.x, object.y);
-    sprites.push({ depth: sy, draw(c) { objectRenderer?.draw(c, sx, sy, object, snapshot.act); } });
+    const [sx, sy] = projStatic(object.x, object.y);
+    sprites.push({ depth: sy, wx: object.x, wy: object.y, draw(c) { objectRenderer?.draw(c, sx, sy, object, snapshot.act); } });
   }
   for (const item of snapshot.items) if (item.mode === 3 && item.invPage === 255) {
-    const [sx, sy] = proj(item.x, item.y);
-    sprites.push({ depth: sy, draw(c) { itemRenderer?.draw(c, sx, sy, item); } });
+    const [sx, sy] = projStatic(item.x, item.y);
+    sprites.push({ depth: sy, wx: item.x, wy: item.y, draw(c) { itemRenderer?.draw(c, sx, sy, item); } });
   }
-  sprites.push({ depth: h / 2, draw: drawPlayer });
+  sprites.push({ depth: (h / 2 + UNIT_CENTRE_Y), wx: snapshot.player.x, wy: snapshot.player.y, draw: drawPlayer });
 
   terrainStats = null;
   if (terrain && session) {
     try {
-      const count = Module.ccall('d2_session_tile_count', 'number', [], []);
-      const ptr = Number(Module.ccall('d2_session_tiles', 'number', [], []));
-      if (count > 0 && ptr > 0) {
-        const tiles = parseSessionTiles(Module.HEAPU8, ptr, count);
-        terrainStats = terrain.draw(ctx, tiles, terrainFiles, snapshot.player, w, h, sprites);
+      // The engine's library list is rebuilt with the world (rooms of a neighbouring level bring
+      // their own): read it with the tiles that index it, never from an earlier frame. The tiles of
+      // the neighbouring levels' active rooms come with it (across a seam retail draws them, F24).
+      const { tiles, files } = readSessionTerrain(Module);
+      if (tiles.length) {
+        terrainFiles = files;
+        // Floors are lit from the engine's light map, as D2Client lights them.
+        const lightmap = readSessionLightmap(Module);
+        terrain.setLightGrid(lightmap ? (a, b) => lightmap.grid(a, b) : null);
+        // Retail's camera is the player's PRECISE position, a subtile's centre (x + 0.5, y + 0.5): the
+        // static world (floors, walls, objects, ground items) sits on the integer grid under it, while
+        // units stand at their centres too.
+        terrainStats = terrain.draw(ctx, tiles, terrainFiles, { ...snapshot.player, x: snapshot.player.x + 0.5, y: snapshot.player.y + 0.5 }, w, h, sprites);
       }
     } catch (error) { terrainError = String(error); terrain = null; }
   }
@@ -958,22 +1059,32 @@ function drawFrame() {
   if (npcMenu?.open) {
     const npc = snapshot.entities.find((u) => u.id === npcMenu.state.npcId && u.type === 1);
     if (npc) { const cam = worldToScreen(snapshot.player.x, snapshot.player.y), pt = worldToScreen(npc.x, npc.y);
-      npcMenuEvidence = npcMenu.draw(ctx, pt.x - cam.x + w / 2, pt.y - cam.y + h / 2, snapshot.act); }
+      npcMenuEvidence = npcMenu.draw(ctx, pt.x - cam.x + w / 2, pt.y - cam.y + (h / 2 + UNIT_CENTRE_Y), snapshot.act); }
     else npcMenu.close();
   }
   // An open conversation draws over the world, the way retail's NPC window does.
-  if (npcState && ensureNpcPanel()) {
+  // A shop opening brings retail's inventory up beside it, on its opening tab.
+  syncShopInventory();
+  if (shopOpen() && ensureVendorPanel()) {
+    try { npcPanelEvidence = vendorPanel.draw(ctx, w, h, { ...npcState, stashGold: Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [0]) : -1 }); npcPanelError = ''; }
+    catch (error) { npcPanelError = String(error); npcPanelEvidence = null; }
+  } else if (npcState && ensureNpcPanel()) {
     try { npcPanelEvidence = npcPanel.draw(ctx, w, h, { ...npcState, playerItems: snapshot.items }); npcPanelError = ''; }
     catch (error) { npcPanelError = String(error); npcPanelEvidence = null; }
   } else npcPanelEvidence = null;
-  if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, snapshot, inventoryVisible);
+  // Inventory.txt's record is per class: re-read whenever the session's character changes (a new
+  // session, a loaded save, another class), not only when none is cached.
+  const layoutKey = session ? `${snapshot.playerClass}/${snapshot.playerId}/${snapshot.seed}` : '';
+  if (inventoryPanelRenderer && session && (!inventoryPanelRenderer.layout || inventoryLayoutKey !== layoutKey)) {
+    inventoryPanelRenderer.setLayout(readInventoryLayout()); inventoryLayoutKey = layoutKey; }
+  if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && session ? { ...snapshot, gold: Module.ccall('d2_session_player_gold', 'number', [], []) } : snapshot, inventoryVisible);
   pollUiEvents();
   if (stashPanelRenderer) {
     try { stashEvidence = stashPanelRenderer.draw(ctx, w, h, stashOpen ? readStashLayout() : null, snapshot.items, stashOpen, snapshot.act); stashPanelError = ''; }
     catch (error) { stashPanelError = String(error); stashEvidence = null; }
   }
   if (waypointPanelRenderer) {
-    try { waypointEvidence = waypointPanelRenderer.draw(ctx, w, h, waypointMenu ? readWaypointRows(snapshot.act) : [], snapshot.act, Boolean(waypointMenu)); waypointPanelError = ''; }
+    try { waypointEvidence = waypointPanelRenderer.draw(ctx, w, h, waypointMenu ? readWaypointRows(snapshot.act) : [], snapshot.act, Boolean(waypointMenu), snapshot.level); waypointPanelError = ''; }
     catch (error) { waypointPanelError = String(error); waypointEvidence = null; }
   }
   if (characterPanelRenderer) {
@@ -1000,6 +1111,14 @@ function drawFrame() {
   }
   if (controlPanelRenderer) controlPanelEvidence = controlPanelRenderer.draw(ctx, w, h, snapshot);
   if (beltRenderer) beltEvidence = beltRenderer.draw(ctx, snapshot.items, readBeltBoxes());
+  // The item on the cursor, over everything, where the pointer is (retail holds it there).
+  cursorItemEvidence = null;
+  if (session && inventoryPanelRenderer && Module._d2_session_cursor_item) {
+    const id = Module.ccall('d2_session_cursor_item', 'number', [], []);
+    const item = id ? snapshot.items.find((i) => i.id === id && i.mode === 4) || snapshot.items.find((i) => i.id === id) : null;
+    if (id) cursorItemEvidence = { engineId: id, drawn: item ? inventoryPanelRenderer.drawCursorItem(ctx, w, h, item, pointer.x, pointer.y) : null };
+  }
+  if (skillSelectRenderer && session) { try { skillSelectEvidence = skillSelectRenderer.draw(ctx, w, h, readSkillChoices(), readSelectedSkills()); } catch (error) { skillSelectError = String(error); } }
   hud.textContent = hudLines(snapshot, Boolean(session), fps).join('\n');
 }
 
@@ -1046,7 +1165,8 @@ function pollUiEvents() {
   const p = Module._malloc(64);
   try {
     const n = Module.ccall('d2_session_take_ui_events', 'number', ['bigint', 'number'], [BigInt(p), 64]);
-    for (const code of Module.HEAPU8.slice(p, p + n)) { if (code === 16) stashOpen = true; else if (code === 17) stashOpen = false; }
+    // Retail opens the inventory beside the stash and closes both together (frame buffer, s197).
+    for (const code of Module.HEAPU8.slice(p, p + n)) { if (code === 16) { stashOpen = true; inventoryVisible = true; } else if (code === 17) { stashOpen = false; inventoryVisible = false; } }
     if (Module.ccall('d2_session_take_waypoint_menu', 'number', ['bigint'], [BigInt(p)])) waypointMenu = { id: Module.HEAPU32[p / 4] };
   } finally { Module._free(p); }
 }
@@ -1079,6 +1199,40 @@ function takeWaypoint(levelId) {
   return result;
 }
 // The stash grid is retail's own Inventory.txt record for a LoD character, via the engine.
+// The player's own inventory panel from Inventory.txt through the engine: the class's row
+// (UNITS_GetInventoryRecordId), 800x600, its grid and its ten equipment slots.
+let cursorItemEvidence = null, lastItemCommand = null;
+const pointer = { x: 0, y: 0 };
+function readInventoryLayout() {
+  if (!Module._d2_session_inventory_components) return null;
+  const row = Module.ccall('d2_session_player_inventory_record', 'number', [], []);
+  if (row < 0) return null;
+  const p = Module._malloc(64 * 4);
+  try {
+    if (!Module.ccall('d2_session_inventory_layout', 'number', ['number', 'number', 'bigint', 'number'], [row, 1, BigInt(p), 12])) return null;
+    const grid = Array.from(new Int32Array(Module.HEAPU8.buffer.slice(p, p + 48)));
+    if (!Module.ccall('d2_session_inventory_components', 'number', ['number', 'number', 'bigint', 'number'], [row, 1, BigInt(p), 60])) return null;
+    const comps = Array.from(new Int32Array(Module.HEAPU8.buffer.slice(p, p + 240)));
+    return { ...inventoryLayoutFromEngine(grid, comps), row };
+  } finally { Module._free(p); }
+}
+// Retail's item-cursor packets, through the engine's recovered handlers. Each returns the handler's
+// result and is recorded in lastItemCommand.
+function itemCommand(name, ...args) {
+  let result;
+  if (name === 'lift') result = Module.ccall('d2_session_command_item_to_cursor_packet', 'number', ['number'], [args[0]]);             // 0x19
+  else if (name === 'put') result = Module.ccall('d2_session_command_insert_item_packet', 'number', ['number', 'number', 'number', 'number'], [args[0], args[1], args[2], 0]);   // 0x18
+  else if (name === 'equip') result = Module.ccall('d2_session_command_equip_packet', 'number', ['number', 'number'], [args[0], args[1]]);   // 0x1A
+  else if (name === 'swap') result = Module.ccall('d2_session_command_cursor_item_packet', 'number', ['number', 'number', 'number'], [0x1D, args[0], args[1]]);   // 0x1D
+  else if (name === 'drop') result = Module.ccall('d2_session_command_cursor_item_packet', 'number', ['number', 'number', 'number'], [0x17, args[0], 0]);   // 0x17
+  else if (name === 'unequip') {   // 0x1C {bodyLoc:u16}
+    const p = Module._malloc(3); Module.HEAPU8.set([0x1C, args[0] & 255, args[0] >> 8], Number(p));
+    try { result = Module.ccall('d2_session_client_packet', 'number', ['bigint', 'number'], [BigInt(p), 3]); } finally { Module._free(p); }
+  }
+  lastItemCommand = { name, args, result, cursor: Module.ccall('d2_session_cursor_item', 'number', [], []) };
+  snapshot = session.snapshot();
+  return result;
+}
 function readStashLayout() {
   if (stashLayout) return stashLayout;
   const p = Module._malloc(48);
@@ -1093,11 +1247,11 @@ function readStashLayout() {
 // DECLARED approximation: retail hit-tests the warp's LvlWarp selection box in screen space.
 function warpUnderPointer(px, py) {
   if (!session) return null;
-  const d = screenDeltaToWorld(px - canvas.width / 2, py - canvas.height / 2);
-  const wx = snapshot.player.x + d.x, wy = snapshot.player.y + d.y;
+  const d = screenDeltaToWorld(px - canvas.width / 2, py - (canvas.height / 2 + UNIT_CENTRE_Y));
+  const wx = snapshot.player.x + 0.5 + d.x, wy = snapshot.player.y + 0.5 + d.y;
   let best = null, bestDistance = 3.5;
   for (const warp of snapshot.warps || []) {
-    if (!warp.enabled || warp.destinationLevel === snapshot.level) continue;
+    if (!warp.enabled || warp.located === false || warp.destinationLevel === snapshot.level) continue;
     const dist = Math.max(Math.abs(warp.x - wx), Math.abs(warp.y - wy));
     if (dist < bestDistance) { best = warp; bestDistance = dist; }
   }
@@ -1107,12 +1261,16 @@ let lastWarpTaken = null;
 // The object under the pointer, the same way npcUnderPointer finds a person.
 function objectUnderPointer(px, py) {
   if (!session) return null;
-  const camera = worldToScreen(snapshot.player.x, snapshot.player.y);
+  const camera = worldToScreen(snapshot.player.x + 0.5, snapshot.player.y + 0.5);   // static grid (projStatic)
   const w = canvas.width, h = canvas.height;
   let best = null, bestDistance = 36;
+  // Retail's hover skips an object its mode makes unselectable (Objects.txt Selectable<mode>): an
+  // opened chest is not clicked again -- s000a re-operated one every 6 frames while picking up its
+  // drop, and each operate re-armed its trap (96 trap-firebolt monsters from one chest).
   for (const object of snapshot.objects || []) {
+    if (object.selectable === false) continue;
     const point = worldToScreen(object.x, object.y);
-    const d = Math.hypot(point.x - camera.x + w / 2 - px, point.y - camera.y + h / 2 - py);
+    const d = Math.hypot(point.x - camera.x + w / 2 - px, point.y - camera.y + (h / 2 + UNIT_CENTRE_Y) - py);
     if (d < bestDistance) { best = object; bestDistance = d; }
   }
   return best;
@@ -1125,7 +1283,7 @@ function npcUnderPointer(px, py) {
   for (const entity of snapshot.entities) {
     if (!entity.npc) continue;
     const point = worldToScreen(entity.x, entity.y);
-    const ex = point.x - camera.x + w / 2, ey = point.y - camera.y + h / 2;
+    const ex = point.x - camera.x + w / 2, ey = point.y - camera.y + (h / 2 + UNIT_CENTRE_Y);
     const distance = Math.hypot(ex - px, ey - py);
     if (distance < bestDistance) { best = entity; bestDistance = distance; }
   }
@@ -1211,7 +1369,7 @@ addEventListener('keydown', (e) => {
     } else if (stashOpen) {
       // Retail's client closes the stash and tells the server with 0x4F TRADEBTN_CLOSESTASH (18);
       // the window closes when the engine accepts it.
-      if (Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [18, 0])) stashOpen = false;
+      if (Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [18, 0])) { stashOpen = false; inventoryVisible = false; }
     } else if (npcState) {
       // Dismissing the speech tells the server it was heard -- retail's 0x31 with the message id --
       // which is where a quest message does its work (Akara's A1Q1 reward is granted on message 76).
@@ -1234,13 +1392,16 @@ addEventListener('keyup', (e) => { if (input.key(e.code, false)) e.preventDefaul
 addEventListener('blur', () => { input.keys.clear(); });
 canvas.addEventListener('pointermove', (e) => {
   const [x, y] = canvasPoint(e);
+  pointer.x = x; pointer.y = y;
   if (screen === SCREEN.GAME && gameMenu?.open) { gameMenu.hover(x, y, canvas.width, canvas.height); return; }
   if (skillsVisible && skillPanelRenderer && session)
     skillPanelRenderer.hover(x, y, canvas.width, canvas.height, { skills: readClassSkills() || [] });
+  if (screen === SCREEN.GAME && npcMenu?.open) npcMenu.hover(x, y);
   if (screen === SCREEN.TITLE) titleScreen?.hover(x, y, canvas.width, canvas.height);
   else if (screen === SCREEN.CREATE) charCreate?.hover(x, y, canvas.width, canvas.height);
 });
 canvas.addEventListener('pointerdown', (e) => {
+  syncShopInventory();
   if (screen === SCREEN.GAME && gameMenu?.open) { const [mx, my] = canvasPoint(e); gameMenu.click(mx, my, canvas.width, canvas.height); canvas.focus(); e.preventDefault(); return; }
   if (screen === SCREEN.TITLE || screen === SCREEN.CREATE || screen === SCREEN.SELECT) {
     const [tx, ty] = canvasPoint(e);
@@ -1251,6 +1412,14 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   const [x, y] = canvasPoint(e);
   actMusic?.play(snapshot.act - 1).catch((error) => { musicError = String(error); });
+  // The skill buttons and their popup take the click first: a button opens (or closes) its hand's
+  // popup, an icon in the popup selects that skill (0x3C), anywhere else closes the popup.
+  if (skillSelectRenderer && session && e.button === 0) {
+    const hit = skillSelectRenderer.hitTest(x, y, canvas.width, canvas.height, readSkillChoices());
+    if (hit?.button) { skillSelectRenderer.open = skillSelectRenderer.open === hit.button ? null : hit.button; canvas.focus(); e.preventDefault(); return; }
+    if (hit?.skill) { selectSkill(hit.skill.id, hit.side); skillSelectRenderer.open = null; canvas.focus(); e.preventDefault(); return; }
+    if (skillSelectRenderer.open) { skillSelectRenderer.open = null; canvas.focus(); e.preventDefault(); return; }
+  }
   const beltItem = beltRenderer?.itemAt(x, y, snapshot.items, readBeltBoxes()); if (beltItem && session?.useBelt(beltItem.gridX)) { snapshot = session.snapshot(); canvas.focus(); e.preventDefault(); return; }
   // An open waypoint menu takes the click: an active row travels there, anything else is swallowed.
   if (waypointMenu && waypointPanelRenderer) {
@@ -1264,8 +1433,50 @@ canvas.addEventListener('pointerdown', (e) => {
     chooseNpcMenu(entry || { action: 'cancel' });
     canvas.focus(); e.preventDefault(); return;
   }
+  // An open shop: a tab switches the stock shown, an item in the grid is bought, and an item in the
+  // player's own inventory (retail's inventory panel beside the shop) is sold.
+  if (shopOpen() && vendorPanel && e.button === 0) {
+    const t = vendorPanel.tabAt(x, y, canvas.width, canvas.height);
+    if (t !== null) { vendorPanel.setTab(t); canvas.focus(); e.preventDefault(); return; }
+    const item = vendorPanel.itemAt(x, y, canvas.width, canvas.height, npcState);
+    if (item) { buyFromVendor(item.id); canvas.focus(); e.preventDefault(); return; }
+    const mine = inventoryVisible && inventoryPanelRenderer ? inventoryPanelRenderer.itemAt(x, y, canvas.width, canvas.height, snapshot) : null;
+    if (mine) { sellToVendor(mine.id); canvas.focus(); e.preventDefault(); return; }
+  }
+  // The item cursor (retail's inventory handling, the engine's packet handlers deciding): over the
+  // open inventory, a click lifts a carried item (0x19) or a worn one (0x1C) onto the cursor, and
+  // with an item held puts it in the grid at the cell under it (0x18) or on a body slot (0x1A, or
+  // 0x1D to swap with what is worn there); shift+click sends a carried potion to the belt (0x63).
+  // Anywhere else in the world, a held item is dropped (0x17). The panel swallows its own clicks.
+  if (session && e.button === 0 && !shopOpen() && inventoryPanelRenderer && Module._d2_session_cursor_item) {
+    pointer.x = x; pointer.y = y;
+    const cursorId = Module.ccall('d2_session_cursor_item', 'number', [], []);
+    if (inventoryVisible && inventoryPanelRenderer.contains(x, y, canvas.width, canvas.height)) {
+      const W = canvas.width, H = canvas.height, slot = inventoryPanelRenderer.slotAt(x, y, W, H, snapshot);
+      if (!cursorId) {
+        const item = inventoryPanelRenderer.itemAt(x, y, W, H, snapshot);
+        if (item && e.shiftKey && !npcState) lastGridToBelt = { itemId: item.id, result: gridToBelt(item.id) };
+        else if (item) itemCommand('lift', item.id);
+        else if (slot?.item) itemCommand('unequip', slot.bodyLoc);
+      } else {
+        const held = snapshot.items.find((i) => i.id === cursorId) || { id: cursorId };
+        const cell = inventoryPanelRenderer.cellAt(x, y, W, H, held);
+        if (slot) itemCommand(slot.item ? 'swap' : 'equip', cursorId, slot.bodyLoc);
+        else if (cell) itemCommand('put', cursorId, cell.x, cell.y);
+      }
+      snapshot = session.snapshot(); canvas.focus(); e.preventDefault(); return;
+    }
+    // Retail drops a held item only on a click in the world: an open panel (character, skills,
+    // stash, an NPC window -- each 320x432 at the screen's left or right) takes its own clicks first
+    // and the item stays on the cursor.
+    const onPanel = (() => { const sc = Math.min(1, canvas.width / 800, canvas.height / 600);
+      const px = (x - (canvas.width - 800 * sc) / 2) / sc, py = (y - (canvas.height - 600 * sc) / 2) / sc;
+      if (py < 0 || py >= 432) return false;
+      return (px < 320 && (characterVisible || stashOpen || Boolean(npcState))) || (px >= 480 && (skillsVisible || inventoryVisible)); })();
+    if (cursorId && !onPanel) { itemCommand('drop', cursorId); canvas.focus(); e.preventDefault(); return; }
+  }
   // An open NPC window takes the click before the world does, so buying does not also walk.
-  if (npcState && npcPanel) {
+  if (npcState && npcPanel && !shopOpen()) {
     const item = npcPanel.itemAt(x, y, canvas.width, canvas.height,
       { ...npcState, playerItems: snapshot.items });
     // The trade screen has two grids: the shop's stock above, the player's items below. A click on
@@ -1291,7 +1502,7 @@ canvas.addEventListener('pointerdown', (e) => {
   // tile. TODO(client-parity F14): the exact hover order between overlapping units (D2Client's
   // hover selection) is not recovered; monsters-first is the observed behaviour, not the code.
   const hostileHit = e.button === 0 && session ? (() => {
-    const d = screenDeltaToWorld(x - canvas.width / 2, y - canvas.height / 2);
+    const d = screenDeltaToWorld(x - canvas.width / 2, y - (canvas.height / 2 + UNIT_CENTRE_Y));
     return selectPrimaryTarget(snapshot, { x: Math.round(snapshot.player.x + d.x), y: Math.round(snapshot.player.y + d.y) }, 2);
   })() : null;
   // The player's own corpse: clicking it walks over and takes the gear back (retail's interact with
@@ -1299,14 +1510,21 @@ canvas.addEventListener('pointerdown', (e) => {
   const corpseHit = !hostileHit && e.button === 0 && session ? (() => {
     const cam = worldToScreen(snapshot.player.x, snapshot.player.y); let best = null, bestD = 36;
     for (const u of snapshot.entities) if (u.kind === 'player' && u.id !== snapshot.playerId && u.mode === 17) {
-      const pt = worldToScreen(u.x, u.y), d = Math.hypot(pt.x - cam.x + canvas.width / 2 - x, pt.y - cam.y + canvas.height / 2 - y);
+      const pt = worldToScreen(u.x, u.y), d = Math.hypot(pt.x - cam.x + canvas.width / 2 - x, pt.y - cam.y + (canvas.height / 2 + UNIT_CENTRE_Y) - y);
       if (d < bestD) { best = u; bestD = d; } }
     return best; })() : null;
   if (corpseHit) {
     walkEvidence = { active: true, hops: 0, reason: 0 };
-    walkGoal = { x: corpseHit.x, y: corpseHit.y, within: 2, onArrive: () => {
-      lastCorpseRecovery = { id: corpseHit.id, result: Module.ccall('d2_session_command_recover_corpse', 'number', ['number'], [corpseHit.id]) };
-      snapshot = session.snapshot(); } };
+    const recover = (stuck) => {
+      lastCorpseRecovery = { id: corpseHit.id, result: Module.ccall('d2_session_command_recover_corpse', 'number', ['number'], [corpseHit.id]), stuck };
+      snapshot = session.snapshot(); };
+    // A walk that stalls short of the body (a monster or the body's own footprint in the way) still
+    // asks: the engine's recovery decides, as it does for objects and exits.
+    // Already beside it (the body's own cell and the monsters' blocking can keep a walk from ever
+    // arriving or stalling -- s000a stood 3 subtiles from its second body, clicking): take it now.
+    const p0 = snapshot.player;
+    if (Math.max(Math.abs(corpseHit.x - p0.x), Math.abs(corpseHit.y - p0.y)) <= 4) { recover(false); canvas.focus(); e.preventDefault(); return; }
+    walkGoal = { x: corpseHit.x, y: corpseHit.y, within: 2, onArrive: () => recover(false), onStuck: () => recover(true) };
     canvas.focus(); e.preventDefault(); return;
   }
   const npcHit = !hostileHit && e.button === 0 && session ? npcUnderPointer(x, y) : null;
@@ -1318,13 +1536,16 @@ canvas.addEventListener('pointerdown', (e) => {
   const warpHit = !hostileHit && !npcHit && !objectHit && e.button === 0 && session ? warpUnderPointer(x, y) : null;
   if (warpHit) {
     walkEvidence = { active: true, hops: 0, reason: 0 };
-    walkGoal = { x: warpHit.x, y: warpHit.y, within: 2, onArrive: () => {
+    const takeWarp = (stuck) => {
       const previousAct = snapshot.act;
       const result = Module.ccall('d2_session_command_warp', 'number', ['number', 'number'], [warpHit.destinationLevel, warpHit.warpId]);
-      lastWarpTaken = { destinationLevel: warpHit.destinationLevel, warpId: warpHit.warpId, result };
+      lastWarpTaken = { destinationLevel: warpHit.destinationLevel, warpId: warpHit.warpId, result, stuck };
       if (result) { snapshot = session.snapshot(); motion = session.motion();
         if (TERRAIN_ENABLED && snapshot.act !== previousAct) { loadSessionTerrain(snapshot.act - 1); loadActTileView(snapshot.act - 1); } }
-    } };
+    };
+    // A walk that stalls short of the exit (the Den's mouth, approached over its rocks) still asks:
+    // the engine's warp command decides whether the player is close enough, as the server does.
+    walkGoal = { x: warpHit.x, y: warpHit.y, within: 2, onArrive: () => takeWarp(false), onStuck: () => takeWarp(true) };
   } else if (npcHit) {
     walkEvidence = { active: true, hops: 0, reason: 0 };
     walkGoal = { x: npcHit.x, y: npcHit.y, within: 4, onArrive: () => talkToNpc(npcHit.id) };
@@ -1348,7 +1569,7 @@ canvas.addEventListener('pointerdown', (e) => {
         }
         if (spot) { walkEvidence = { active: true, hops: 0, reason: 0 }; walkGoal = { x: spot.x, y: spot.y, within: 0, onArrive: () => operateObject(true) }; }
       } };
-    walkGoal = { x: objectHit.x, y: objectHit.y, within: 2, onArrive: () => operateObject(false) };
+    walkGoal = { x: objectHit.x, y: objectHit.y, within: 2, onArrive: () => operateObject(false), onStuck: () => operateObject(true) };
   } else {
     // A "+" on the character screen spends a point through retail's 0x3A handler. Re-read rather
     // than adjust a local copy: the engine decides what a point did, including refusing it.
@@ -1373,6 +1594,8 @@ canvas.addEventListener('pointerdown', (e) => {
       ? inventoryPanelRenderer.itemAt(x, y, canvas.width, canvas.height, snapshot) : null;
     // With a shop open, clicking something you are carrying sells it; otherwise the inventory
     // click is swallowed as before and anything else goes to the world.
+    // Shift+left-click on a carried item puts it in the belt (retail's client packet 0x63, sGridToBelt:
+    // the engine decides whether it fits and which box).
     if (carried && npcState) sellToVendor(carried.id);
     else if (!carried) input.pointer(x, y, e.button);
   }
@@ -1385,16 +1608,32 @@ canvas.addEventListener('contextmenu', (e) => { if (session && inventoryVisible 
   } e.preventDefault(); });
 window.__d2Shell = { input, get snapshot() { return snapshot; }, get tileView() { return tileView; }, get tileViewError() { return tileViewError; },
   step() { update(); },
+  // n frames with one shell update at the end: the engine ticks the others directly (the shell's
+  // per-frame world read is ~2.5 ms of a 3.6 ms step). Any frame that needs the shell's own per-frame
+  // logic -- a click-walk in progress, the paused game menu, a screen other than the game -- runs the
+  // full update instead, so this only skips re-reading a world nothing is waiting on.
+  stepN(n) {
+    for (let i = 0; i < n - 1; i++) {
+      if (screen === SCREEN.GAME && session && !walkGoal && !gameMenu?.open && Module._d2_session_tick) Module.ccall('d2_session_tick', 'number', ['number'], [1]);
+      else update();
+    }
+    if (n > 0) update();
+  },
   // Force one frame. requestAnimationFrame is throttled hard in a headless/background tab, so a
   // caller that drives the shell with step() and then reads PIXELS can otherwise be looking at a
   // frame from before its own input -- which reads exactly like "the screen never changed".
   renderNow() { render(); },
+  // The title's animation clock (60 Hz updates; logo frame = floor(tick * 25 / 60) mod 29). A draw-list row pins it to the
+  // phase retail's captured frame shows (s180), so the comparison is of one scene, not two phases.
+  get titleTick() { return titleTick; }, set titleTick(v) { titleTick = v; },
+  // The creation screen's clock (60 Hz updates; charcreate.mjs maps it to retail's 25 Hz loops).
+  get createTick() { return charCreate ? charCreate.tick : 0; }, set createTick(v) { if (charCreate) charCreate.tick = v; },
   // World (subtile) -> canvas pixel, through the SAME isometric transform render() and the pointer
   // path use. Exposed so a caller aiming at a unit does not re-derive the projection and quietly
   // drift from it; input.pointer(...project(u.x, u.y)) round-trips back to that unit.
   project(wx, wy) {
-    const c = worldToScreen(snapshot.player.x, snapshot.player.y), p = worldToScreen(wx, wy);
-    return [p.x - c.x + canvas.width / 2, p.y - c.y + canvas.height / 2];
+    const c = worldToScreen(snapshot.player.x + 0.5, snapshot.player.y + 0.5), p = worldToScreen(wx, wy);   // the static grid
+    return [p.x - c.x + canvas.width / 2, p.y - c.y + (canvas.height / 2 + UNIT_CENTRE_Y)];
   },
   get playerRenderer() { return playerRenderer; }, get monsterRenderer() { return monsterRenderer; },
   get objectRenderer() { return objectRenderer; },
@@ -1425,8 +1664,13 @@ window.__d2Shell = { input, get snapshot() { return snapshot; }, get tileView() 
   set characterVisible(v) { characterVisible = Boolean(v); },
   get advancement() { return readAdvancement(); },
   get beltEvidence() { return beltEvidence && { ...beltEvidence }; },
+  get lastGridToBelt() { return lastGridToBelt; },
+  get cursorItemEvidence() { return cursorItemEvidence && JSON.parse(JSON.stringify(cursorItemEvidence)); },
+  get lastItemCommand() { return lastItemCommand && { ...lastItemCommand }; },
+  get inventoryLayout() { return inventoryPanelRenderer?.layout ? JSON.parse(JSON.stringify(inventoryPanelRenderer.layout)) : null; },
   get controlPanelEvidence() { return controlPanelEvidence && { ...controlPanelEvidence }; },
-  get selectedSkill() { return selectedSkill; }, get lastSkillCommand() { return lastSkillCommand && { ...lastSkillCommand }; },
+  get skillSelectEvidence() { return skillSelectEvidence && JSON.parse(JSON.stringify({ ...skillSelectEvidence, error: skillSelectError })); },
+  get selectedSkill() { return Math.max(0, readSelectedSkills().right); }, get lastSkillCommand() { return lastSkillCommand && { ...lastSkillCommand }; },
   get screen() { return screen; },
   get frameError() { return frameError; }, get frameErrors() { return frameErrors; },
   get charSelectEvidence() { return charSelect ? { ...charSelect.evidence, error: charSelectError } : { error: charSelectError || 'not built' }; },
@@ -1491,7 +1735,7 @@ window.__d2Shell = { input, get snapshot() { return snapshot; }, get tileView() 
       items: npcState?.items?.length ?? 0,
       gold: npcState?.gold ?? -1,
       firstItems: (npcState?.items ?? []).slice(0, 6).map((i) => ({ id: i.id, code: i.code, name: i.name, cost: i.cost, invFile: i.invFile })),
-      drawn: npcPanelEvidence, panel: npcPanel?.evidence ?? null };
+      drawn: npcPanelEvidence, panel: (shopOpen() ? vendorPanel?.evidence : npcPanel?.evidence) ?? null };
   },
   get npcEvidence() {
     const ents = snapshot.entities;
@@ -1536,6 +1780,16 @@ window.__d2Shell = { input, get snapshot() { return snapshot; }, get tileView() 
   get npcMenuEvidence() { return npcMenuEvidence ? { ...npcMenuEvidence, error: npcMenuError } : { error: npcMenuError }; },
   get deathScreenEvidence() { return deathScreenEvidence ? { ...deathScreenEvidence, error: deathScreenError } : { error: deathScreenError }; },
   get gameMenuEvidence() { return gameMenu ? { ...gameMenu.evidence, error: gameMenuError } : { open: false, error: gameMenuError }; },
+  // Hostile monsters near the player with what they are (d2_session_unit_info 8..11): MonsterData
+  // type flags (0x04 champion, 0x08 unique, 0x10 minion, 0x02 superunique), monster level, damage%.
+  get monsterTypes() {
+    const s = this.snapshot, p = s?.player;
+    if (!p || !window.Module?._d2_session_unit_info) return [];
+    return s.entities.filter((e) => e.type === 1 && e.hostile && e.hp > 0 && Math.hypot(e.x - p.x, e.y - p.y) < 30).map((e) => {
+      const v = new Int32Array(Module.HEAPU8.buffer, Number(Module.ccall('d2_session_unit_info', 'number', ['number', 'number'], [1, e.id])), 12);
+      return { id: e.id, classId: e.classId, typeFlag: v[8], level: v[9], damagePercent: v[10], umod: v[11] };
+    });
+  },
   get titleEvidence() { return titleScreen ? { ...titleScreen.evidence, error: titleError } : { error: titleError || 'not built' }; },
   /**
    * Canvas-pixel click targets for the front-end screens, from the same hit tests their clicks use.
@@ -1555,12 +1809,24 @@ window.__d2Shell = { input, get snapshot() { return snapshot; }, get tileView() 
       }
     }
     if (screen === SCREEN.CREATE && charCreate?.targets) out.create = charCreate.targets(w, h);
+    if (screen === SCREEN.SELECT && charSelect?.targets) out.select = charSelect.targets(w, h);
     if (screen === SCREEN.GAME && gameMenu?.open) out.gameMenu = gameMenu.targets(w, h);
     if (screen === SCREEN.GAME && npcMenu?.open) out.npcMenu = npcMenu.targets();
+    // The shop's stock under the pointer, found through the same itemAt the click handler uses:
+    // item id -> { at, code, cost } for the vendor's side of the trade screen.
+    if (screen === SCREEN.GAME && shopOpen() && vendorPanel) {
+      out.shop = {};
+      for (let y = 2; y < h; y += 4) for (let x = 2; x < w; x += 4) {
+        const it = vendorPanel.itemAt(x, y, w, h, npcState);
+        if (it && !(it.id in out.shop)) out.shop[it.id] = { at: [x + 6, y + 6], code: it.code, cost: it.cost };
+      }
+      out.shopTabs = vendorPanel.tabTargets(w, h);
+    }
     // The character screen's "+" buttons and the skill tree's cells, found by probing the SAME
     // hit-tests the click handler uses, so an aimed click cannot land somewhere else.
     const probe = (hit) => { const found = {}; for (let y = 2; y < h; y += 4) for (let x = 2; x < w; x += 4) { const k = hit(x, y); if (k !== null && k !== undefined && !(k in found)) found[k] = [[x, y]]; else if (k !== null && k !== undefined) found[k].push([x, y]); }
       return Object.fromEntries(Object.entries(found).map(([k, pts]) => [k, [Math.round(pts.reduce((a, p) => a + p[0], 0) / pts.length), Math.round(pts.reduce((a, p) => a + p[1], 0) / pts.length)]])); };
+    if (screen === SCREEN.GAME && skillSelectRenderer && session) out.skillSelect = skillSelectRenderer.targets(w, h, readSkillChoices());
     if (screen === SCREEN.GAME && characterVisible && characterPanelRenderer && session)
       out.character = probe((x, y) => characterPanelRenderer.buttonAt(x, y, w, h, readAdvancement()));
     if (screen === SCREEN.GAME && skillsVisible && skillPanelRenderer && session) {

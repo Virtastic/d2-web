@@ -2601,7 +2601,10 @@ void __fastcall sub_6FC45930(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* p
             D2UnitStrc* pRemove = INVENTORY_RemoveItemFromInventory(pUnit->pInventory, pBeltItem);
             D2_ASSERT(pRemove);
 
-            D2_ASSERT(pItem == pRemove);
+            // D2WEB: the item removed is the belt slot's (pBeltItem); D2MOO compared it with pItem, the
+            // BELT whose box count changed, which never matches -- a death with a picked-up belt worn
+            // (the belt goes to the body, the boxes shrink) aborted the engine (s000a).
+            D2_ASSERT(pBeltItem == pRemove);
 
             UNITS_ChangeAnimMode(pRemove, IMODE_ONCURSOR);
 
@@ -4401,18 +4404,22 @@ void __fastcall sub_6FC49090(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* p
 }
 
 //D2Game.0x6FC49140
+// d2-web: the belt drops the used item's COLUMN down. D2MOO walked slots 4*i for i = column..3
+// (column 0's rows, from the used column's row index), so a drink from any column but the first
+// never refilled it and column 0 was reshuffled instead. 1.13c (D2Game 0x6FCF2540) walks the four
+// rows of the used column -- slot column + 4*row -- and packs them down from row 0.
 void __fastcall sub_6FC49140(D2GameStrc* pGame, D2UnitStrc* pUnit, int8_t nX)
 {
     const int32_t nPosition = D2Clamp(nX & 3, 0, 3);
-    int32_t j = nPosition;
-    for (int32_t i = nPosition; i < 4; ++i)
+    int32_t j = 0;
+    for (int32_t i = 0; i < 4; ++i)
     {
-        D2UnitStrc* pBeltItem = INVENTORY_GetItemFromBeltSlot(pUnit->pInventory, 4 * i);
+        D2UnitStrc* pBeltItem = INVENTORY_GetItemFromBeltSlot(pUnit->pInventory, nPosition + 4 * i);
         if (pBeltItem)
         {
             if (j != i)
             {
-                INVENTORY_PlaceItemInBeltSlot(pUnit->pInventory, pBeltItem, 4 * j);
+                INVENTORY_PlaceItemInBeltSlot(pUnit->pInventory, pBeltItem, nPosition + 4 * j);
                 ITEMS_SetItemFlag(pBeltItem, IFLAG_UNK1, 1);
                 ITEMS_SetItemFlag(pBeltItem, IFLAG_NEWITEM, 1);
 
@@ -5171,11 +5178,16 @@ int32_t __fastcall D2GAME_Transmogrify_6FC4A660(D2GameStrc* pGame, D2UnitStrc* p
 //D2Game.0x6FC4A9B0
 int32_t __fastcall sub_6FC4A9B0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pItem, uint8_t nBodyLoc)
 {
+    // D2WEB: the 4th argument is sub_6FC42F20's bSkipRequirementCheck (both callers pass 0), and the
+    // item goes where THAT check puts it (a3). D2MOO named the flag nBodyLoc and placed the item at it
+    // -- body location 0, which always fails, so a ground pickup that retail auto-equips hit
+    // FOG_DisplayAssert + exit(-1) (s000a, the Underground Passage).
     int32_t a3 = 0;
     if (!sub_6FC42F20(pUnit, pItem, &a3, nBodyLoc))
     {
         return 0;
     }
+    nBodyLoc = (uint8_t)a3;
 
     if (!INVENTORY_PlaceItemInBodyLoc(pUnit->pInventory, pItem, nBodyLoc))
     {

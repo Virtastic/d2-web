@@ -143,6 +143,24 @@ export const DEFAULT_SESSION_FIXTURES = Object.freeze([
   { seed: 1, difficulty: 0, act0: 0, level: 37, label: "Act I · Andariel's Lair" },
 ].map(Object.freeze));
 
+// A saved character enters the game in the town of the act its header records for the game's
+// difficulty: nTown[difficulty] at 0xA8, low bits the act, an act >= 5 read as Act I (D2Game
+// PLRSAVE2_ReadSaveHeader -> CLIENTS_SetActNo). The towns are D2Common's own table
+// (DUNGEON_GetTownLevelIdFromActNo, #10085): Rogue Encampment, Lut Gholein, Kurast Docks,
+// Pandemonium Fortress, Harrogath. The map is the one the character was saved in: when the
+// difficulty was reached (bit 7), ReadSaveHeader seeds the game from the header's dwMapSeed (0xAB),
+// which PLRSAVE2_WriteSaveHeader wrote from pGame->dwInitSeed. Otherwise the fixture seed (1)
+// stands in for retail's fresh random seed.
+export const ACT_TOWN_LEVELS = Object.freeze([1, 40, 75, 103, 109]);
+export function savedCharacterFixture(bytes, difficulty = 0) {
+  const header = bytes && bytes.length >= 0xAF;
+  const town = header ? bytes[0xA8 + difficulty] : 0;
+  let act0 = town & 0x7F;
+  if (act0 >= ACT_TOWN_LEVELS.length) act0 = 0;
+  const mapSeed = header ? (bytes[0xAB] | bytes[0xAC] << 8 | bytes[0xAD] << 16 | bytes[0xAE] << 24) >>> 0 : 0;
+  return Object.freeze({ seed: town & 0x80 && mapSeed ? mapSeed : 1, difficulty, act0, level: ACT_TOWN_LEVELS[act0] });
+}
+
 export function parseSessionSnapshot(bytes) {
   const view = bytes instanceof DataView ? bytes : new DataView(bytes.buffer, bytes.byteOffset || 0, bytes.byteLength);
   if (view.byteLength < 68 || view.getUint32(0, true) !== 1 || view.getUint32(4, true) !== 68) throw new Error('unsupported session snapshot');
@@ -183,6 +201,9 @@ export function parseSessionWarps(bytes, count) {
     slot: view.getUint32(o, true), room: view.getUint32(o + 4, true), sourceLevel: view.getUint32(o + 8, true),
     destinationLevel: view.getUint32(o + 12, true), warpId: view.getUint32(o + 16, true), enabled: view.getUint32(o + 20, true) !== 0,
     direction: view.getInt32(o + 24, true), x: view.getInt32(o + 28, true), y: view.getInt32(o + 32, true),
+    // room is UINT32_MAX while no room tile to the destination is generated: the exit is listed (and
+    // the warp command can still take it) but its point is not known -- x,y read (0,0).
+    located: view.getUint32(o + 4, true) !== 0xFFFFFFFF,
   }; });
 }
 
@@ -200,6 +221,9 @@ export function selectPrimaryTarget(snapshot, point = snapshot?.player, maxDista
   let selected = null, distance2 = limit2;
   for (const entity of s.entities) {
     if (!entity.hostile || entity.hp <= 0) continue;
+    // A monster in MONMODE_DEATH (0) or DEAD (12) is a corpse even when its life reads above 0
+    // (s000d: a Burning Soul at 2108 life in mode 12); retail refuses to attack it (reason 5).
+    if (entity.type === 1 && (entity.mode === 0 || entity.mode === 12)) continue;
     const dx = entity.x - x, dy = entity.y - y, candidate = dx * dx + dy * dy;
     if (candidate < distance2 || (candidate === distance2 && (!selected || entity.id < selected.id))) {
       selected = entity; distance2 = candidate;

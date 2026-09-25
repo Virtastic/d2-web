@@ -118,6 +118,15 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       return i;
     },
     play() { if (selected >= 0) onPlay?.(list[selected].name); },
+    /** Canvas-pixel centres of the SAME boxes click() tests: each listed character, and the buttons. */
+    targets(width, height) {
+      const v = view(width, height);
+      const centre = (b) => [Math.round(v.ox + (b.x + b.w / 2) * v.scale), Math.round(v.oy + (b.y + b.h / 2) * v.scale)];
+      const characters = Object.fromEntries(list.map((ch, i) => [ch.name, centre(rowBox(i))]));
+      const play = centre(playBox()), create = centre(createBox()), exit = centre(exitBox());
+      // `rows`, OK, 'CREATE NEW CHARACTER', EXIT: the names s000b/s000d aim by (same points).
+      return { characters, rows: characters, play, create, exit, OK: play, 'CREATE NEW CHARACTER': create, EXIT: exit };
+    },
     click(x, y, width, height) {
       const p = toScreen(x, y, width, height);
       if (inBox(p, playBox())) { this.play(); return 'play'; }

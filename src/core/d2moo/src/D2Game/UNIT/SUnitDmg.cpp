@@ -44,6 +44,7 @@
 #include "UNIT/SUnitEvent.h"
 #include "UNIT/SUnit.h"
 
+extern const char* g_d2webRegenSite;
 D2CombatTraceCallback gpCombatTraceCallback = nullptr;
 
 
@@ -1117,6 +1118,11 @@ void __fastcall SUNITDMG_ExecuteEvents(D2GameStrc* pGame, D2UnitStrc* pAttacker,
 	if (bMissile)
 	{
 		SUNITDMG_CalculateTotalDamage(pGame, pAttacker, pDefender, pDamage);
+		// d2-web: the combat trace sees missile hits too, at retail's 0x6FCFE1A5 (after this call).
+		if (gpCombatTraceCallback)
+		{
+			gpCombatTraceCallback(pAttacker, pDefender, pDamage);
+		}
 	}
 
 	if (!(pDamage->wResultFlags & DAMAGERESULTFLAG_32) && pDamage->wResultFlags & DAMAGERESULTFLAG_SUCCESSFULHIT)
@@ -1381,6 +1387,7 @@ void __fastcall SUNITDMG_ExecuteEvents(D2GameStrc* pGame, D2UnitStrc* pAttacker,
 			if (STATLIST_UnitGetStatValue(pDefender, STAT_HPREGEN, 0))
 			{
 				D2GAME_EVENTS_Delete_6FC34840(pGame, pDefender, EVENTTYPE_STATREGEN, 0);
+				g_d2webRegenSite = "SUNITDMG_ExecuteEvents";
 				EVENT_SetEvent(pGame, pDefender, EVENTTYPE_STATREGEN, pGame->dwGameFrame + 1, 0, 0);
 			}
 			sub_6FCF8DD0(pDefender);
@@ -1460,6 +1467,7 @@ void __fastcall SUNITDMG_ApplyPoisonDamage(D2UnitStrc* pAttacker, D2UnitStrc* pD
 	if (pDefender && pDefender->dwUnitType == UNIT_MONSTER)
 	{
 		D2GAME_EVENTS_Delete_6FC34840(pGame, pDefender, EVENTTYPE_STATREGEN, 0);
+		g_d2webRegenSite = "SUNITDMG_ApplyPoisonDamage";
 		EVENT_SetEvent(pGame, pDefender, EVENTTYPE_STATREGEN, pGame->dwGameFrame + 1, 0, 0);
 	}
 
@@ -1507,6 +1515,7 @@ void __fastcall SUNITDMG_ApplyBurnDamage(D2UnitStrc* pAttacker, D2UnitStrc* pDef
 	if (pDefender && pDefender->dwUnitType == UNIT_MONSTER)
 	{
 		D2GAME_EVENTS_Delete_6FC34840(pGame, pDefender, EVENTTYPE_STATREGEN, 0);
+		g_d2webRegenSite = "SUNITDMG_ApplyBurnDamage";
 		EVENT_SetEvent(pGame, pDefender, EVENTTYPE_STATREGEN, pGame->dwGameFrame + 1, 0, 0);
 	}
 

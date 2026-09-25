@@ -2064,10 +2064,14 @@ D2ItemTypesTxt* __fastcall ITEMS_GetItemTypesTxtRecord(int32_t nItemType)
     return nullptr;
 }
 
+// d2-web: observer for the kind-29 monster-drop oracle (d2_mondrop_run): the walk's inputs.
+void (*g_d2webOnDropTC)(D2UnitStrc* pMonster, D2TCExShortStrc* pTC, int32_t nQuality, int32_t nLvl) = nullptr;
+
 //D2Game.0x6FC51360
 void __fastcall D2GAME_DropTC_6FC51360(D2GameStrc* pGame, D2UnitStrc* pMonster, D2UnitStrc* pPlayer, D2TCExShortStrc* pTCTxtRecord, int32_t nQuality, int32_t nLvl, int32_t a7, D2UnitStrc** ppItems, int32_t* pnItemsDropped, int32_t nMaxItems)
 {
     D2_ASSERT(pTCTxtRecord);
+    if (g_d2webOnDropTC) g_d2webOnDropTC(pMonster, pTCTxtRecord, nQuality, nLvl);
 
     int32_t nItemsDropped = 0;
     if (!pnItemsDropped)
@@ -2226,7 +2230,12 @@ void __fastcall D2GAME_DropTC_6FC51360(D2GameStrc* pGame, D2UnitStrc* pMonster, 
                     }
                 }
 
-                nIndex = std::max(nLowerBound - 1, 0);
+                // d2-web: an exact hit keeps nIndex (D2Game 1.13c 0x6FC326CA); only a search that
+                // ran out takes the entry below nLowerBound. Upstream overwrote the hit with its predecessor.
+                if (nLowerBound >= nUpperBound)
+                {
+                    nIndex = std::max(nLowerBound - 1, 0);
+                }
             }
 
             if (nIndex < pTC->nTypes)
@@ -2264,6 +2273,11 @@ void __fastcall D2GAME_DropTC_6FC51360(D2GameStrc* pGame, D2UnitStrc* pMonster, 
                         ++pOld;
                         ++pCurrent;
                     }
+
+                    // d2-web: a sub-TC pick only pushes the TC (D2Game 1.13c 0x6FC327DC jumps back to the
+                    // walk). Upstream fell through and created an item whose id was the TC's ROW, so every
+                    // "Act 1 Equip A" pick in the Blood Moor also dropped an elite/exceptional weapon.
+                    continue;
                 }
 
                 const int16_t nItemId = pTCExInfo->nItemId;

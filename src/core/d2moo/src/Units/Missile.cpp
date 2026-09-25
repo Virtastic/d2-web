@@ -795,6 +795,10 @@ void __stdcall MISSILE_CalculateDamageData(D2MissileDamageDataStrc* pMissileDama
 }
 
 //D2Common.0x6FDBADF0
+// d2-web: the three chance rolls are UNSIGNED (roll % 100 on the low dword), as retail 1.13c. D2MOO's
+// (int) cast made every roll with the high bit set negative, so `< 0` critical strike fired for monsters
+// with none: half of all monster arrows did double damage (s200: skeleton archers 44/43 in Sewers 1,
+// retail's missile-path damage record 1194/1314 vs ours 2388/2628).
 BOOL __fastcall MISSILE_HasBonusStats(D2UnitStrc* pUnit, D2UnitStrc* pItem)
 {
 	int nPassiveMastery = 0;
@@ -803,11 +807,11 @@ BOOL __fastcall MISSILE_HasBonusStats(D2UnitStrc* pUnit, D2UnitStrc* pItem)
 
 	nCriticalStrike = STATLIST_UnitGetStatValue(pUnit, STAT_PASSIVE_CRITICAL_STRIKE, 0);
 
-	if (((int)SEED_RollRandomNumber(&pUnit->pSeed) % 100) >= nCriticalStrike)
+	if (((uint32_t)SEED_RollRandomNumber(&pUnit->pSeed) % 100) >= nCriticalStrike)
 	{
 		nDeadlyStrike = STATLIST_UnitGetItemStatOrSkillStatValue(pUnit, STAT_ITEM_DEADLYSTRIKE, 0);
 
-		if (!nDeadlyStrike || ((int)SEED_RollRandomNumber(&pUnit->pSeed) % 100) >= nDeadlyStrike)
+		if (!nDeadlyStrike || ((uint32_t)SEED_RollRandomNumber(&pUnit->pSeed) % 100) >= nDeadlyStrike)
 		{
 			if (!pItem)
 			{
@@ -815,7 +819,7 @@ BOOL __fastcall MISSILE_HasBonusStats(D2UnitStrc* pUnit, D2UnitStrc* pItem)
 			}
 
 			nPassiveMastery = SKILLS_GetWeaponMasteryBonus(pUnit, pItem, NULL, 2);
-			if (!nPassiveMastery || ((int)SEED_RollRandomNumber(&pUnit->pSeed) % 100) >= nPassiveMastery)
+			if (!nPassiveMastery || ((uint32_t)SEED_RollRandomNumber(&pUnit->pSeed) % 100) >= nPassiveMastery)
 			{
 				return FALSE;
 			}

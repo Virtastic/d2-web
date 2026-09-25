@@ -136,6 +136,7 @@ constexpr D2MonModeCallbackTableStrc gShadowMasterWarrior_Skill4_Callbacks =
 };
 
 
+extern const char* g_d2webRegenSite;
 //D2Game.0x6FC62770
 int32_t __fastcall D2GAME_IsMonster_6FC62770(D2UnitStrc* pUnit)
 {
@@ -586,7 +587,7 @@ void __fastcall D2GAME_MONSTER_ApplyStatRegen_6FC63440(D2GameStrc* pGame, D2Unit
 
     if (!STATES_CheckState(pUnit, STATE_PREVENTHEAL) || nHpRegen < 0)
     {
-        EVENT_SetEvent(pGame, pUnit, EVENTTYPE_STATREGEN, pGame->dwGameFrame + 1, 0, 0);
+        g_d2webRegenSite = "MONSTER_ApplyStatRegen"; EVENT_SetEvent(pGame, pUnit, EVENTTYPE_STATREGEN, pGame->dwGameFrame + 1, 0, 0);
 
         if (nHpRegen)
         {

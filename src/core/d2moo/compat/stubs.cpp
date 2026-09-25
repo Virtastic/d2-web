@@ -19,7 +19,14 @@
 
 // --- Fog ------------------------------------------------------------------------------------
 void FOG_DisplayWarning(const char* m, const char* f, int l) { fprintf(stderr, "d2moo warning: %s (%s:%d)\n", m, f, l); }
-void FOG_DisplayAssert(const char* m, const char* f, int l)  { fprintf(stderr, "d2moo ASSERT: %s (%s:%d)\n", m, f, l); }
+// The last retail assert, kept so a caller can say WHICH one ended the engine: most are followed by
+// exit(-1) (147 sites in D2Game alone), and stderr alone did not reach the test runner log.
+static char g_lastAssert[512];
+extern "C" __attribute__((used)) const char* d2_last_assert() { return g_lastAssert; }
+void FOG_DisplayAssert(const char* m, const char* f, int l)  {
+    snprintf(g_lastAssert, sizeof g_lastAssert, "%s (%s:%d)", m, f, l);
+    fprintf(stderr, "d2moo ASSERT: %s\n", g_lastAssert); printf("d2moo ASSERT: %s\n", g_lastAssert); fflush(stdout);
+}
 void FOG_DisplayHalt(const char* m, const char* f, int l)    { fprintf(stderr, "d2moo HALT: %s (%s:%d)\n", m, f, l); abort(); }
 void FOG_Trace(const char* fmt, ...) { va_list a; va_start(a, fmt); vfprintf(stderr, fmt, a); va_end(a); fputc('\n', stderr); }
 void FOG_TraceF(const char*, const char* fmt, ...) { va_list a; va_start(a, fmt); vfprintf(stderr, fmt, a); va_end(a); fputc('\n', stderr); }

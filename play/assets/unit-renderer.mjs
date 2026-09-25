@@ -64,7 +64,9 @@ export function loadPlayerAnimation(read, playerClass, mode, { headOnly = false,
     const path = `data\\global\\CHARS\\${player.token}\\${component}\\${player.token}${component}${base}${token}${layer.weaponClass.toUpperCase()}.DCC`;
     components.set(layer.component, decodeDcc(read(path), direction == null ? {} : { directions: [direction] }));
   }
-  if (!components.has(0)) throw new Error(`${player.name} ${token}/HTH animation omitted its retail head component`);
+  // Every component the COF names must load; which ones those are is the COF's business -- the
+  // dead pose (DD) is a single torso layer, the whole body one sprite, with no head at all.
+  if (!components.size || (headOnly && !components.has(0))) throw new Error(`${player.name} ${token}/HTH animation loaded none of its retail components`);
   return { playerClass: PLAYER_CLASS.indexOf(player), classToken: player.token, token, cof, components };
 }
 

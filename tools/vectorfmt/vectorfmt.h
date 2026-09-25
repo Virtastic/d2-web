@@ -138,6 +138,37 @@ struct D2VecAiTargetUnit {
 };
 #pragma pack(pop)
 static_assert(sizeof(D2VecAiTargetUnit) == 132, "D2VecAiTargetUnit layout");
+// AITRACE (kind 27): one aitarget unit record per monster per snapshot, prefixed by the frame offset
+// the snapshot was taken at (every D2CAPTURE_AI_EVERY frames); the player's state per snapshot is a
+// D2VecCombatResult (its `frame` = the same offset) in aitrace-player.bin.
+#pragma pack(push, 1)
+struct D2VecAiTrace { uint32_t frame; D2VecAiTargetUnit unit; };
+#pragma pack(pop)
+static_assert(sizeof(D2VecAiTrace) == 136, "D2VecAiTrace layout");
+// AIPATH (kind 28, aitrace-path.bin beside kind 27): each traced monster's D2DynamicPathStrc per
+// snapshot, pointer fields dropped, every scalar at its 1.13c offset (named in the comments), the first
+// 16 path points and the saved steps. Retail reads the offsets; the engine copies the fields.
+#pragma pack(push, 1)
+struct D2VecAiPath {
+    uint32_t frame, unitId;
+    uint32_t precX, precY;              // 0x00, 0x04 (16.16 subtiles)
+    int32_t  clientX, clientY;          // 0x08, 0x0C
+    uint32_t target, prevTarget, finalTarget; // 0x10, 0x14, 0x18 (x | y << 16)
+    int32_t  curIdx, points;            // 0x24, 0x28
+    uint32_t flags, unk38, pathType, prevPathType, unitSize, collisionPattern, footprintMask, moveTestMask; // 0x34..0x50
+    uint16_t collidedWith, pad56;       // 0x54
+    uint32_t targetType, targetId;      // 0x5C, 0x60
+    uint8_t  direction, newDirection, diffDirection, unk67, speed, unk69; // 0x64..0x69
+    int32_t  dirVecX, dirVecY, velVecX, velVecY; // 0x6A, 0x72 (unaligned in retail)
+    int32_t  velocity, prevVelocity, maxVelocity, acceleration, accelCounter; // 0x7C..0x8C
+    uint8_t  dist, distMax, idaF, stepNum, distance, pad95[3]; // 0x90..0x97
+    int32_t  dirOffset;                 // 0x98
+    uint32_t pathPoints[16];            // 0x9C
+    int32_t  savedSteps;                // 0x1D4
+    uint32_t saved[10];                 // 0x1D8
+};
+#pragma pack(pop)
+static_assert(sizeof(D2VecAiPath) == 250, "D2VecAiPath layout");
 static inline uint32_t d2vec_aitarget_hash(uint32_t h, const D2VecAiTargetUnit* u) {
     const uint8_t* p = (const uint8_t*)u;
     for (size_t i = 0; i < sizeof(*u); i++) { h ^= p[i]; h *= 16777619u; }
@@ -280,6 +311,42 @@ struct D2VecA1Q6Travel {
 };
 #pragma pack(pop)
 static_assert(sizeof(D2VecA1Q6Travel) == 36, "D2VecA1Q6Travel layout");
+
+// Monster drop (kind 29): on a fresh level with the player fixture attached, every monster in
+// Room2-list then unit-list order is handed to D2Game's monster-death drop routine (1.13c
+// 0x6FC95680, D2MOO sub_6FC631B0: TC column by monster type, quest TC, item level) with the
+// player as the mode change's target. One D2VecMonDrop per monster: the inputs the routine gave
+// the treasure-class walk (D2Game 0x6FC32380 / D2MOO D2GAME_DropTC_6FC51360: TC row, quality and
+// level arguments, number of walks) and the monster seed before and after it; one
+// D2VecMonDropItem per item unit the call added to the level (Room2-list then unit-list order).
+#pragma pack(push, 1)
+struct D2VecMonDrop {
+    uint32_t seed;
+    uint8_t difficulty, act;
+    uint16_t level;
+    uint16_t room, ordinal;
+    uint32_t monClass;
+    uint32_t seedLo, seedHi;              // monster seed before the drop
+    uint32_t tcId;                        // pTreasureClassEx row handed to the walk (0xFFFFFFFF: none)
+    uint32_t walks;                       // DropTC calls the routine made
+    int32_t quality, itemLevel;           // the walk's nQuality / nLvl arguments
+    uint32_t seedLoAfter, seedHiAfter;
+    uint32_t items, itemHash;             // FNV-1a over the D2VecMonDropItem records from classId on
+};
+#pragma pack(pop)
+static_assert(sizeof(D2VecMonDrop) == 56, "D2VecMonDrop layout");
+#pragma pack(push, 1)
+struct D2VecMonDropItem {
+    uint16_t monster, index;              // monster record index within the level, item index within its drop
+    uint32_t classId, quality, ilvl, seedLo, seedHi;
+    uint16_t x, y;
+};
+#pragma pack(pop)
+static_assert(sizeof(D2VecMonDropItem) == 28, "D2VecMonDropItem layout");
+static inline uint32_t d2vec_mondrop_item_hash(uint32_t h, const D2VecMonDropItem* it) {
+    for (const uint8_t* p = (const uint8_t*)&it->classId; p < (const uint8_t*)(it + 1); ++p) { h ^= *p; h *= 16777619u; }
+    return h;
+}
 
 // NPC dialogue: client packet 0x13 (interact with entity) from a player standing within 6
 // subtiles of a town NPC takes retail's immediate activation path (0x6FC828D0 -> 0x6FC61C70 in
@@ -517,7 +584,7 @@ struct D2VecTilePick {
 };
 static_assert(sizeof(D2VecTilePick) == 44, "tile pick record");
 
-enum D2VecKind : uint32_t { D2VEC_PRNG = 1, D2VEC_DRLG = 2, D2VEC_ITEMGEN = 3, D2VEC_MONSPAWN = 4, D2VEC_TABLE = 5, D2VEC_COMBAT = 6, D2VEC_AISPAWN = 7, D2VEC_AIFRAME = 8, D2VEC_AITARGET = 9, D2VEC_COMBATRESULT = 10, D2VEC_DAMAGECALC = 11, D2VEC_A1Q6 = 12, D2VEC_A1Q6PLAYER = 13, D2VEC_A1Q6TIMER = 14, D2VEC_A1Q6COMPLETE = 15, D2VEC_A1Q6DROP = 16, D2VEC_A1Q6TRAVEL = 17, D2VEC_NPCDIALOG = 18, D2VEC_NPCRESPONSE = 19, D2VEC_VENDORITEM = 20, D2VEC_VENDORBUY = 21, D2VEC_VENDORSELL = 22, D2VEC_HIRE = 23, D2VEC_VENDORMULTIBUY = 24, D2VEC_TILE = 25, D2VEC_TILEPICK = 26 };
+enum D2VecKind : uint32_t { D2VEC_PRNG = 1, D2VEC_DRLG = 2, D2VEC_ITEMGEN = 3, D2VEC_MONSPAWN = 4, D2VEC_TABLE = 5, D2VEC_COMBAT = 6, D2VEC_AISPAWN = 7, D2VEC_AIFRAME = 8, D2VEC_AITARGET = 9, D2VEC_COMBATRESULT = 10, D2VEC_DAMAGECALC = 11, D2VEC_A1Q6 = 12, D2VEC_A1Q6PLAYER = 13, D2VEC_A1Q6TIMER = 14, D2VEC_A1Q6COMPLETE = 15, D2VEC_A1Q6DROP = 16, D2VEC_A1Q6TRAVEL = 17, D2VEC_NPCDIALOG = 18, D2VEC_NPCRESPONSE = 19, D2VEC_VENDORITEM = 20, D2VEC_VENDORBUY = 21, D2VEC_VENDORSELL = 22, D2VEC_HIRE = 23, D2VEC_VENDORMULTIBUY = 24, D2VEC_TILE = 25, D2VEC_TILEPICK = 26, D2VEC_AITRACE = 27, D2VEC_AIPATH = 28, D2VEC_MONDROP = 29 };
 
 static inline uint32_t d2vec_fnv1a_step(uint32_t h, uint32_t v) {
     for (int i = 0; i < 4; i++) { h ^= (v >> (8 * i)) & 0xFF; h *= 16777619u; }

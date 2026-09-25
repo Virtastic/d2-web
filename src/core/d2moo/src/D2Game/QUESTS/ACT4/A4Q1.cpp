@@ -161,7 +161,9 @@ bool __fastcall ACT4Q1_SeqCallback(D2QuestDataStrc* pQuestData)
 		exit(-1);
 	}
 
-	return pQuestData->pfSeqFilter(pQuest);
+	// d2-web: the NEXT quest's sequence filter (the assert above names it); upstream called Izual's own,
+	// which returned without ever opening the Hellforge (see README).
+	return pQuest->pfSeqFilter(pQuest);
 }
 
 //D2Game.0x6FCADA70

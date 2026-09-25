@@ -14,7 +14,7 @@ export function parseObjectPresentations(bytes, count) {
     id: view.getUint32(at, true), classId: view.getUint32(at + 4, true), token: fourcc(view.getUint32(at + 8, true)),
     mode: view.getUint32(at + 12, true), x: view.getInt32(at + 16, true), y: view.getInt32(at + 20, true),
     framePrecise: view.getUint32(at + 24, true), frameCountPrecise: view.getUint32(at + 28, true),
-    componentMask: view.getUint32(at + 32, true), animSpeed: view.getUint16(at + 36, true), direction: view.getUint8(at + 38),
+    componentMask: view.getUint32(at + 32, true), animSpeed: view.getUint16(at + 36, true), direction: view.getUint8(at + 38), selectable: view.getUint8(at + 39) !== 0,
   }; });
 }
 

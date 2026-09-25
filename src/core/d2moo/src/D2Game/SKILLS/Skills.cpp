@@ -1081,11 +1081,11 @@ int32_t __fastcall D2GAME_SKILLMANA_Consume_6FD10A50(D2GameStrc* pGame, D2UnitSt
             return 0;
         }
 
-        int32_t nManaCost = 0;
-        if (nSkillLevel > 1)
-        {
-            nManaCost = (pSkillsTxtRecord->wMana + (nSkillLevel - 1) * pSkillsTxtRecord->wLevelMana) << pSkillsTxtRecord->nManaShift;
-        }
+        // d2-web: the cost at level 1 is Skills.txt `mana` (retail 1.13c: a level-1 Bash, mana 2, spends 2
+        // -- s210's player mana track). Upstream computed it only above level 1, so every level-1 skill cost
+        // `minmana` instead (Bash 1).
+        const int32_t nManaCost0 = (pSkillsTxtRecord->wMana + (nSkillLevel - 1) * pSkillsTxtRecord->wLevelMana) << pSkillsTxtRecord->nManaShift;
+        int32_t nManaCost = nSkillLevel >= 1 ? nManaCost0 : 0;
 
         const int32_t nMinManaCost = pSkillsTxtRecord->wMinMana << 8;
         if (nManaCost < nMinManaCost)
@@ -2690,7 +2690,10 @@ int32_t __fastcall SKILL_ComputePeriodicRate(D2GameStrc* pGame, D2UnitStrc* pUni
         nDelay = 5;
     }
 
-    return nDelay * (pGame->dwGameFrame + nDelay - 1) / nDelay + 1;
+    // d2-web: the next multiple of nDelay, plus one. Upstream's `nDelay * (f + nDelay - 1) / nDelay`
+    // multiplies first and cancels the rounding (1.13c: a periodic aura set at frame 0 with delay 50
+    // first fires at frame 1, not 50 -- capture, s184 Vile Mother #21).
+    return nDelay * ((pGame->dwGameFrame + nDelay - 1) / nDelay) + 1;
 }
 
 //D2Game.0x6FD13260

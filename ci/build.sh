@@ -23,6 +23,23 @@ if [ "$want" != "$have" ]; then
   docker build --label "d2.dockerfile=$want" -t "$IMAGE" -f Dockerfile.builder64 .
 fi
 
+# Engine builds are rationed on this box: every worktree
+# queues on the same lock in the main checkout. Staging (ci/stage.sh) stays outside it.
+LOCK_DIR="$(cd "$(git rev-parse --git-common-dir 2>/dev/null || echo .git)/.." && pwd)/build-wasm"
+mkdir -p "$LOCK_DIR"
+# D2_BUILD_SLOTS parallel builds share this checkout (default 8).
+SLOTS="${D2_BUILD_SLOTS:-3}"; got=""; T0=$(date +%s)
+while [ -z "$got" ]; do
+  for i in $(seq 0 $((SLOTS - 1))); do
+    exec 9>"$LOCK_DIR/.build.lock.$i"
+    if flock -n 9; then got=$i; break; fi
+    exec 9>&-
+  done
+  [ -n "$got" ] || { [ -n "${waited:-}" ] || echo "==> waiting for a build slot ($SLOTS busy, $LOCK_DIR/.build.lock.*)"; waited=1; sleep 5; }
+done
+echo "==> build slot $got of $SLOTS"
+WAIT=$(( $(date +%s) - T0 ))
+
 echo "==> link (in $IMAGE)"
 # Create the output parent as the invoking user; otherwise the root container creates it
 # and a fresh Linux checkout cannot stage build-wasm/site after compilation.
@@ -48,23 +65,10 @@ MSYS_NO_PATHCONV=1 docker run --rm \
   -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" -v "$MOUNT:/build" "$IMAGE" \
   bash -c 'bash wasm-build/make_br.sh && chown "$D2_OUTPUT_OWNER" play/d2.js.br play/d2.wasm.br'
 
-echo "==> stage build-wasm/site"
-mkdir -p build-wasm/site
-find build-wasm/site -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-cp play/index.html play/streamfs.js play/gameplay-model.mjs play/gameplay-shell.mjs play/serve.mjs play/smoke.mpq play/smoke.json play/d2.js play/d2.wasm play/d2.js.br play/d2.wasm.br build-wasm/site/
-cp -r play/assets build-wasm/site/assets
-# Committed ground truth, served so scenarios can fetch it into the page.
-cp -r vectors build-wasm/site/vectors
-[ -d build-wasm/diag ] && cp -r build-wasm/diag build-wasm/site/diag   # diagnosis captures (D2_ITEMGEN_FILE=diag/...), never committed
+flock -u 9; exec 9>&-
 
-# Retail MPQs for the retail-gated scenarios, when this box has them (never in CI): one dir
-# with the disc MPQs and the 1.13c core's patch. Symlinks, not copies (2.3 GB).
-if [ -f retail/D2/d2data.mpq ]; then
-  mkdir -p build-wasm/retail
-  find build-wasm/retail -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-  for f in retail/D2/*.mpq; do ln -s "$(pwd)/$f" "build-wasm/retail/$(basename "$f")"; done
-  # retail/D2/patch_d2.mpq (the same core patch, copied there for the retail capture tool) already links it
-  [ -e build-wasm/retail/patch_d2.mpq ] || ln -s "$(pwd)/retail/D2/D2SE/CORES/1.13c/Patch_D2.mpq" build-wasm/retail/patch_d2.mpq
-  echo "==> retail: $(ls build-wasm/retail | wc -l) MPQs linked for the test runner"
-fi
-PLAY=build-wasm/site sh wasm-build/version-engine.sh
+bash ci/stage.sh
+# One line per build in the main checkout's timing.log.
+mkdir -p "$(dirname "$LOCK_DIR")/wasm-build/harness-out"
+printf '%s\tbuild\t%s\twait=%s\tdur=%s\n' "$(date -Is)" "$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')" "$WAIT" "$(( $(date +%s) - T0 - WAIT ))" \
+  >>"$(dirname "$LOCK_DIR")/wasm-build/harness-out/timing.log" 2>/dev/null || true

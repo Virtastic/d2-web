@@ -201,6 +201,9 @@ void __stdcall PATH_AddCollisionFootprintForUnit(D2UnitStrc* pUnit)
 
 	switch (pUnit->dwUnitType)
 	{
+	// d2-web: players take the pattern too (1.13c: a freshly allocated player's subtile reads 0x1080,
+	// COLLIDE_PLAYER | COLLIDE_NO_PATH; the size branch leaves 0x0080), matching the removal below.
+	case UNIT_PLAYER:
 	case UNIT_MONSTER:
 		COLLISION_SetMaskWithPattern(UNITS_GetRoom(pUnit), pCoords.nX, pCoords.nY, pUnit->pDynamicPath->dwCollisionPattern, UNITS_GetCollisionMask(pUnit));
 		break;

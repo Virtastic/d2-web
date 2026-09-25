@@ -92,6 +92,9 @@ function decodeDc6Frame(bytes, view, offset, frameIndex) {
   return {
     flipped: u32(0), width, height, offsetX: i32(12), offsetY: i32(16),
     unknown: u32(20), nextBlock: u32(24), indices, opaque,
+    // The encoded bytes as stored: what retail keeps in memory for this frame, so a draw list can
+    // name the exact frame drawn (play/assets/drawlist.mjs hashes them).
+    encoded: bytes.subarray(dataOffset, end),
   };
 }
 

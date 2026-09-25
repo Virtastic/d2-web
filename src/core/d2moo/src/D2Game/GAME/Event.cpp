@@ -328,8 +328,16 @@ int32_t __fastcall EVENT_GetEventFrame(D2GameStrc* pGame, D2UnitStrc* pUnit, int
 }
 
 //D2Game.0x6FC351B0
+// d2-web diagnostic (no behaviour change): a regen timer armed on a monster already in its death or
+// dead mode is reported with the call site that armed it (g_d2webRegenSite, set just before the call).
+const char* g_d2webRegenSite = "";
+void (*g_d2webOnDeadRegen)(D2UnitStrc* pUnit, const char* szSite) = nullptr;
 void __fastcall EVENT_SetEvent(D2GameStrc* pGame, D2UnitStrc* pUnit, D2C_EventTypes nEventType, int32_t nExpireFrame, int32_t dwEventCustomId, int32_t dwEventCustomParam)
 {
+    if (nEventType == EVENTTYPE_STATREGEN && pUnit && pUnit->dwUnitType == UNIT_MONSTER && g_d2webOnDeadRegen &&
+        (pUnit->dwAnimMode == MONMODE_DEATH || pUnit->dwAnimMode == MONMODE_DEAD))
+        g_d2webOnDeadRegen(pUnit, g_d2webRegenSite);
+    g_d2webRegenSite = "";
     D2GAME_InitTimer_6FC351D0(pGame, pUnit, nEventType, nExpireFrame, nullptr, dwEventCustomId, dwEventCustomParam);
 }
 

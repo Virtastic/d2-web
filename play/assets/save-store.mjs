@@ -13,7 +13,7 @@ const DB_VERSION = 1;
 const STORE = 'characters';
 
 // Fixed header offsets
-const OFF_MAGIC = 0, OFF_VERSION = 4, OFF_SIZE = 8, OFF_NAME = 20, OFF_CLASS = 40, OFF_LEVEL = 43;
+const OFF_MAGIC = 0, OFF_VERSION = 4, OFF_SIZE = 8, OFF_NAME = 20, OFF_CLASS = 40, OFF_LEVEL = 43, OFF_TOWN = 0xA8;
 export const D2S_MAGIC = 0xaa55aa55;
 
 // CharStats.txt's seven-row order, which is also the engine's class index.
@@ -29,6 +29,11 @@ export function readSaveHeader(bytes) {
   if (view.getUint32(OFF_MAGIC, true) >>> 0 !== D2S_MAGIC) return null;
   let name = '';
   for (let i = 0; i < 16 && bytes[OFF_NAME + i]; i++) name += String.fromCharCode(bytes[OFF_NAME + i]);
+  // nTown[3] (D2SaveHeaderStrc 0xA8): per difficulty, bit 7 = entered, bits 0-2 = the act the
+  // character is in -- PLRSAVE2_WriteSaveHeader stores CLIENTS_GetActNo | 0x80 for the game's
+  // difficulty (d2s-format "Difficulty"). The highest entered difficulty is the one it plays.
+  let difficulty = 0, act0 = 0;
+  for (let d = 0; d < 3 && bytes.length > OFF_TOWN + d; d++) if (bytes[OFF_TOWN + d] & 0x80) { difficulty = d; act0 = bytes[OFF_TOWN + d] & 7; }
   return {
     name,
     version: view.getUint32(OFF_VERSION, true),
@@ -36,6 +41,7 @@ export function readSaveHeader(bytes) {
     playerClass: bytes[OFF_CLASS],
     className: CLASS_NAMES[bytes[OFF_CLASS]] ?? `class ${bytes[OFF_CLASS]}`,
     level: bytes[OFF_LEVEL],
+    difficulty, act0: Math.min(act0, 4),
     bytes: bytes.length,
   };
 }

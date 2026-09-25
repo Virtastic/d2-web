@@ -1,6 +1,7 @@
 import { decodeDatPalette } from './d2-formats.mjs';
 import { composeCofFrame, decodeCof, decodeDcc } from './unit-formats.mjs';
 import { dccDirection, indexedToRgba } from './unit-renderer.mjs';
+import { createBlender } from './frontend.mjs';
 
 const COMPONENT = ['HD','TR','LG','RA','LA','RH','LH','SH','S1','S2','S3','S4','S5','S6','S7','S8'];
 const MODE = ['DT','NU','WL','GH','A1','A2','BL','SC','S1','S2','S3','S4','DD','KB','SQ','RN'];
@@ -47,7 +48,8 @@ export function loadMonsterAnimation(read, actor) {
 }
 
 export function createMonsterRenderer(read, documentObject = globalThis.document) {
-  const animations = new Map(), failures = new Set(), palettes = new Map(), rasters = new Map();
+  const animations = new Map(), failures = new Set(), palettes = new Map(), rasters = new Map(), blenders = new Map();
+  const blenderFor = (act0) => { if (!blenders.has(act0)) { let b = null; try { b = createBlender(read(`data\\global\\palette\\${PALETTE[act0]}\\pal.pl2`), palettes.get(act0)); } catch {} blenders.set(act0, b); } return blenders.get(act0); };
   let lastEvidence = null;
   const palette = (act) => {
     const act0 = Math.min(4, Math.max(0, Math.trunc(Number(act) || 1) - 1));
@@ -60,7 +62,11 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
       if (failures.has(baseKey)) return null;
       let animation = animations.get(baseKey);
       if (!animation) { try { animation = loadMonsterAnimation(read, actor); animations.set(baseKey, animation); } catch { failures.add(baseKey); return null; } }
-      const frame = ((actor.framePrecise >>> 8) % animation.cof.framesPerDirection) >>> 0;
+      // The engine wraps a looping mode's frame counter; one past the end means a one-shot sequence has
+      // finished (Izual's ghost reports S1 at 40,860 frames of a 20-frame rise, whose frame 0 is empty --
+      // the modulo drew nothing), so it holds its last frame.
+      const whole = actor.framePrecise >>> 8, count = animation.cof.framesPerDirection;
+      const frame = (whole >= count && actor.frameCountPrecise && actor.framePrecise >= actor.frameCountPrecise ? count - 1 : whole % count) >>> 0;
       const composed = composeCofFrame(animation.cof, animation.direction, frame, animation.components);
       const [act0, pal] = palette(act), key = `${baseKey}:${frame}:${act0}`;
       let canvas = rasters.get(key);
@@ -70,7 +76,32 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
           new ImageData(indexedToRgba(composed.indexed, composed.opaque, pal), canvas.width, canvas.height), 0, 0);
         rasters.set(key, canvas);
       }
-      if (canvas.width && canvas.height) ctx.drawImage(canvas, Math.round(x + composed.xOffset), Math.round(y + composed.yOffset));
+      // A COF layer marked transparent draws through its draw effect (Izual's ghost: both layers, effect 3
+      // = PL2 AdditiveBlend, the draw mode retail's own frame buffers pin for mode 3). Such a unit is
+      // drawn layer by layer in the COF's priority order; effects other than 3/4 stay opaque (declared).
+      const blended = animation.cof.layerRecords.some((l) => l.transparent && (l.drawEffect === 3 || l.drawEffect === 4));
+      if (blended) {
+        const blend = blenderFor(act0);
+        for (const component of animation.cof.priority[animation.direction][frame]) {
+          const dcc = animation.components.get(component); if (!dcc) continue;
+          const layer = animation.cof.layerRecords.find((l) => l.component === component);
+          const one = composeCofFrame(animation.cof, animation.direction, frame, new Map([[component, dcc]]));
+          if (!one.width || !one.height) continue;
+          const left = Math.round(x + one.xOffset), top = Math.round(y + one.yOffset);
+          if (layer && layer.transparent && (layer.drawEffect === 3 || layer.drawEffect === 4) && blend)
+            blend(ctx, { width: one.width, height: one.height, indices: one.indexed, opaque: one.opaque }, left, top, layer.drawEffect);
+          else { const cv = documentObject.createElement('canvas'); cv.width = one.width; cv.height = one.height;
+            cv.getContext('2d').putImageData(new ImageData(indexedToRgba(one.indexed, one.opaque, pal), one.width, one.height), 0, 0); ctx.drawImage(cv, left, top); }
+        }
+      } else if (canvas.width && canvas.height) ctx.drawImage(canvas, Math.round(x + composed.xOffset), Math.round(y + composed.yOffset));
+      // Draw-list records (drawlist.mjs conventions): one per COF layer drawn, named as retail's cel
+      // records name a DCC (monsters\\<code>\\<comp>\\<code><comp><variant><mode><class>), at the unit's anchor.
+      if (Array.isArray(globalThis.__d2DrawList)) for (const layer of animation.cof.layerRecords) {
+        const comp = COMPONENT[layer.component], variant = actor.components[layer.component];
+        if (!comp || !variant || !animation.components.has(layer.component)) continue;
+        globalThis.__d2DrawList.push({ op: 'unit', path: `monsters\\${actor.code}\\${comp}\\${actor.code}${comp}${variant}${animation.token}${layer.weaponClass}`.toLowerCase(),
+          frame, x: Math.round(x), y: Math.round(y), mode: 5 });
+      }
       let pixelHash = 0x811c9dc5; for (const value of composed.indexed) { pixelHash ^= value; pixelHash = Math.imul(pixelHash, 0x01000193); }
       lastEvidence = { id: actor.id, classId: actor.classId, code: actor.code, token: animation.token,
         direction: animation.direction, frame, components: animation.components.size, width: composed.width,

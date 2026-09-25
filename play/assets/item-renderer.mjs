@@ -18,6 +18,8 @@ export function parseItemPresentations(bytes, count) {
     framePrecise: view.getUint32(at + 32, true), frameCountPrecise: view.getUint32(at + 36, true),
     flippyFile: cstring(raw, at + 40, 32), invFile: cstring(raw, at + 72, 32),
     gridX: view.getInt16(at + 104, true), gridY: view.getInt16(at + 106, true), invPage: view.getUint8(at + 108), bodyLoc: view.getUint8(at + 109),
+    // ItemsTxt nInvWidth/nInvHeight (the engine fills the record's last two bytes): cells covered.
+    invWidth: view.getUint8(at + 110) || 1, invHeight: view.getUint8(at + 111) || 1,
   }; });
 }
 

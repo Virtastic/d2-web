@@ -3471,6 +3471,12 @@ D2UnitGUID __stdcall UNITS_GetWeaponGUID(D2UnitStrc* pUnit)
 //D2Common.0x6FDC2630 (#10339)
 unsigned int __stdcall UNITS_GetStashGoldLimit(D2UnitStrc* pUnit)
 {
+#if D2_VERSION_MINOR >= 13
+	// 1.13 made the stash limit a constant: retail 1.13c's stash panel reads "Gold Max: 2500000" for a
+	// level-1 Barbarian, where 1.10's rule gives 50000.
+	(void)pUnit;
+	return 2500000;
+#endif
 	int nMultiplier = 0;
 	int nLevel = 0;
 

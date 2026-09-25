@@ -8,16 +8,19 @@
 //   behind 3334 Trade/Repair), 0x6FAFABE0 gamble, 0x6FAF9440 hire, 0x6FAF8750 Cain's identify,
 //   0x6FAF87B0 Anya's (3385), 0x6FAF6AF0 the act 5 entry 4020.
 //
-// Layout and colours MEASURED from retail's own frame (retail/frames/s4.png: Warriv's menu, 1.13c
-// under Wine, the retail capture tool/frame-ingame-linux.sh): a translucent box with a 1px gold border, box
-// width = widest line's advance + 20, 64px tall for three lines, bottom 120px above the NPC's feet, centred on
-// them; lines in font16 (retail's ink widths: talk 33, cancel 48 -- font16's exactly) with ink bottoms at box top + 19, then every 15.5px (floored): the name
-// in gold, the first entry in blue, the rest white. TODO(client-parity F18): one frame, one NPC --
-// the blue entry is the first one with the pointer elsewhere; whether it follows the pointer, and the
-// gold/blue/white translations (these are OpenDiablo2's colour tokens), are not verified. The border
-// is retail's (154,136,80) taken back through the display ramp; the fill halves the world under it
-// (retail's is a palette blend table, so ours differs by a shade where the table rounds).
+// Layout from retail's own DRAW LIST (the retail captures: Warriv's
+// menu, his unit anchored at (304, 292)). Retail draws, in order:
+//   1. a box (D2GFX DrawBox, colour 0, DrawMode 1 = 50%) over rect (x1,y1)-(x2,y2): x2 - x1 = widest
+//      line's width (.tbl advances) + 20, centred on the NPC's x; y2 = NPC y - 118; y1 = y2 - (15 * lines + 21);
+//   2. 22 cels of ui\menu\boxpieces.dc6 around it (menuFramePieces below);
+//   3. the lines through D2Win's text draw in font16, anchored (bottom row) at y1 + 21, then every
+//      15px, each from the NPC's x - width / 2 + 1: the name colour 4 (gold), the entries colour 0 (white).
+// The blue entry is the SELECTED one: the first on opening (retail/frames/s3-s4), then whichever the
+// pointer is over, none when it is elsewhere (the draw list, pointer parked at 799,300).
+// TODO(client-parity F18): one NPC, one box size -- the piece rules are exact for it; a second
+// capture (a 4- and a 5-line menu) should confirm how edges repeat on a larger box.
 import { createFont, decodeFontTbl, FRONTEND } from './frontend.mjs';
+import { recordDc6, recordPrim } from './drawlist.mjs';
 
 const TALK = 'talk', TRADE = 'trade', GAMBLE = 'gamble', HIRE = 'hire', IDENTIFY = 'identify', OTHER = 'other';
 const S_TALK = 3381, S_TRADE = 3396, S_TRADE_REPAIR = 3334, S_GAMBLE = 3398, S_HIRE = 3397, S_IDENTIFY = 3383, S_CANCEL = 3400;
@@ -46,21 +49,62 @@ export function npcMenuEntries(classId) {
   return [...row[1].map((stringId) => ({ stringId, action: ACTION[stringId] ?? OTHER })), { stringId: S_CANCEL, action: 'cancel' }];
 }
 
-export const NPC_MENU_ASSETS = { palette: FRONTEND.palette, font: 'data\\local\\font\\latin\\font16.dc6', fontTbl: 'data\\local\\font\\latin\\font16.tbl' };
-export const NPC_MENU_LAYOUT = Object.freeze({ padX: 10, firstInkBottom: 19, pitch: 15.5, bottomPad: 14, aboveFeet: 120 });
+export const NPC_MENU_ASSETS = { palette: FRONTEND.palette, font: 'data\\local\\font\\latin\\font16.dc6', fontTbl: 'data\\local\\font\\latin\\font16.tbl',
+  pieces: 'data\\global\\ui\\menu\\boxpieces.dc6' };
+export const NPC_MENU_LAYOUT = Object.freeze({ padX: 20, firstLine: 21, pitch: 15, aboveFeet: 118 });
+
+/**
+ * The boxpieces cels retail draws around a menu rect, in its order: [frame, anchor x, anchor y]
+ * (anchor = bottom row, inclusive). From the draw list for the rect (265,108)-(343,174): top edge
+ * frames 3.. every 12px from x1+12 at y1+12, bottom edge 16.. from x1+13 at y2+10, left edge frames
+ * 12,10,11 repeating from y1+22 at x1-4, right edge 13,14,15 from y1+24 at x2-7, each while it
+ * starts inside the rect, then the corners 0 (x1, y1+12), 1 (x2-12, y1+12), 8 (x1, y2+1), 9 (x2-12, y2+1).
+ */
+export function menuFramePieces(x1, y1, x2, y2) {
+  const out = [];
+  for (let i = 0, x = x1 + 12; x < x2 - 12; i++, x += 12) out.push([3 + (i % 5), x, y1 + 12]);
+  for (let i = 0, x = x1 + 13; x < x2 - 12; i++, x += 12) out.push([16 + (i % 5), x, y2 + 10]);
+  for (let i = 0, y = y1 + 22; y < y2; i++, y += 12) out.push([10 + ((i + 2) % 3), x1 - 4, y]);
+  for (let i = 0, y = y1 + 24; y < y2; i++, y += 12) out.push([13 + (i % 3), x2 - 7, y]);
+  out.push([0, x1, y1 + 12], [1, x2 - 12, y1 + 12], [8, x1, y2 + 1], [9, x2 - 12, y2 + 1]);
+  return out;
+}
 const GOLD = [0xc7, 0xb3, 0x77], BLUE = [0x69, 0x69, 0xff];
 
 export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, documentObject = globalThis.document }) {
   const palette = decodeDatPalette(read(NPC_MENU_ASSETS.palette));
   const dc6 = decodeDc6(read(NPC_MENU_ASSETS.font)), tbl = decodeFontTbl(read(NPC_MENU_ASSETS.fontTbl));
   const tint = (rgb) => palette.map((v, i) => (i % 4 === 3 ? v : Math.round(v * rgb[i % 4] / 0xff)));
-  const white = createFont({ dc6, tbl, palette, documentObject });
-  const gold = createFont({ dc6, tbl, palette: tint(GOLD), documentObject });
-  const blue = createFont({ dc6, tbl, palette: tint(BLUE), documentObject });
-  // Where a capital's ink ends inside the glyph cell, so a line is placed by its ink bottom.
-  const capital = dc6.frames[tbl.chars.get(65)?.imageIndex ?? 65];
-  let inkBottom = capital ? capital.height - 1 : 0;
-  while (capital && inkBottom > 0 && !capital.opaque.subarray(inkBottom * capital.width, (inkBottom + 1) * capital.width).some(Boolean)) inkBottom--;
+  const fontPath = NPC_MENU_ASSETS.font, glyphs = { op: 'celcolor', mode: 5 };
+  const white = createFont({ dc6, tbl, palette, documentObject, path: fontPath, drawAs: glyphs });
+  // A coloured line is its glyphs' indices through the act PL2's TextColorShifts[colour] (retail's own
+  // 8-bit frame of this menu: Warriv's name, colour 4, 191 of 191 glyph pixels; an earlier change). Offsets per
+  // OpenDiablo2's d2pl2 layout; gold is colour 4, blue colour 3.
+  const TEXT_SHIFTS = 1024 + 8192 + 4096 + 256 + 5 * 65536 + 111 * 256 + 768 + 14 * 256 + 65536 + 256 + 39;
+  const shifted = (colour, fallback, act = 1) => {
+    try { const pl2 = read(`data\\global\\palette\\ACT${Math.min(5, Math.max(1, act | 0))}\\pal.pl2`), out = palette.slice();
+      for (let k = 0; k < 256; k++) { const j = pl2[TEXT_SHIFTS + colour * 256 + k]; out.set(palette.subarray(j * 4, j * 4 + 3), k * 4); }
+      return out; } catch { return tint(fallback); } };
+  // Coloured fonts per act: the shift table is the CURRENT act's PL2 (Codex review: Act I's was read in
+  // every act, so Lut Gholein's and Harrogath's menus shifted through the wrong table).
+  const coloured = new Map();
+  const fontsFor = (act) => { if (!coloured.has(act)) coloured.set(act, {
+    gold: createFont({ dc6, tbl, palette: shifted(4, GOLD, act), documentObject, path: fontPath, drawAs: glyphs }),
+    blue: createFont({ dc6, tbl, palette: shifted(3, BLUE, act), documentObject, path: fontPath, drawAs: glyphs }) });
+    return coloured.get(act); };
+  const pieces = decodeDc6(read(NPC_MENU_ASSETS.pieces));
+  const pieceCanvas = new Map();
+  const piece = (i) => {
+    if (!pieceCanvas.has(i)) {
+      const f = pieces.frames[i], c = documentObject.createElement('canvas');
+      c.width = f.width; c.height = f.height;
+      const rgba = new Uint8ClampedArray(f.width * f.height * 4);
+      for (let k = 0; k < f.indices.length; k++) if (f.opaque[k]) rgba.set(palette.subarray(f.indices[k] * 4, f.indices[k] * 4 + 4), k * 4);
+      c.getContext('2d').putImageData(new ImageData(rgba, f.width, f.height), 0, 0);
+      pieceCanvas.set(i, c);
+    }
+    return pieceCanvas.get(i);
+  };
   const L = NPC_MENU_LAYOUT;
   // The box darkens the world through the act palette's 50% blend table, as retail does: PL2
   // AlphaBlend[1] (reference/OpenDiablo2 d2pl2), transform of the world pixel's palette index, entry 0
@@ -94,33 +138,43 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
     }
     ctx.putImageData(img, b.x, b.y);
   };
-  let state = null, rows = [], box = null;
+  let state = null, rows = [], box = null, selected = 0;
   const layout = (feetX, feetY) => {
     const labels = [state.name, ...state.entries.map((e) => string(e.stringId) || String(e.stringId))];
-    const w = Math.max(...labels.map((l) => white.measure(l))) + L.padX * 2;
-    const h = L.firstInkBottom + Math.floor((labels.length - 1) * L.pitch) + L.bottomPad;
-    const x = Math.round(feetX - w / 2), y = Math.round(feetY - L.aboveFeet - h);
-    const bottoms = labels.map((_, i) => y + L.firstInkBottom + Math.floor(i * L.pitch));
-    rows = state.entries.map((e, i) => ({ ...e, label: labels[i + 1], x, y: bottoms[i + 1] - 12, w, h: 15, inkBottom: bottoms[i + 1] }));
-    box = { x, y, w, h };
-    return { labels, bottoms };
+    const cx = Math.trunc(feetX);
+    const w = Math.max(...labels.map((l) => white.measure(l))) + L.padX;
+    const x1 = cx - Math.trunc(w / 2), x2 = x1 + w;
+    const y2 = Math.trunc(feetY) - L.aboveFeet, y1 = y2 - (L.pitch * labels.length + L.firstLine);
+    const bottoms = labels.map((_, i) => y1 + L.firstLine + i * L.pitch);
+    rows = state.entries.map((e, i) => ({ ...e, label: labels[i + 1], x: x1, y: bottoms[i + 1] - 12, w, h: 15, inkBottom: bottoms[i + 1] }));
+    box = { x: x1, y: y1, w, h: y2 - y1, x1, y1, x2, y2 };
+    return { labels, bottoms, cx };
   };
   return {
     get open() { return Boolean(state); },
     get state() { return state; },
     /** `entries` from npcMenuEntries; the menu hangs over the NPC (its feet at the anchor). */
-    show(npcId, classId, name, entries) { state = { npcId, classId, name, entries }; rows = []; box = null; },
+    show(npcId, classId, name, entries) { state = { npcId, classId, name, entries }; rows = []; box = null; selected = 0; },
+    /** The pointer moved: the entry under it is selected, none when it is elsewhere (retail). */
+    hover(x, y) { if (state && rows.length) selected = rows.findIndex((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h); return selected; },
     close() { state = null; rows = []; box = null; },
     draw(ctx, feetX, feetY, act = 1) {
       if (!state) return null;
-      const { labels, bottoms } = layout(feetX, feetY);
+      const { labels, bottoms, cx } = layout(feetX, feetY);
       ctx.save();
       darken(ctx, box, act);
-      ctx.strokeStyle = 'rgb(99,88,52)'; ctx.lineWidth = 1; ctx.strokeRect(box.x + 0.5, box.y + 0.5, box.w - 1, box.h - 1);
+      recordPrim('box', box.x1, box.y1, box.x2, box.y2, 0, 1);
+      for (const [i, ax, ay] of menuFramePieces(box.x1, box.y1, box.x2, box.y2)) {
+        const f = pieces.frames[i], left = ax + f.offsetX, top = ay + f.offsetY - f.height + 1;
+        ctx.drawImage(piece(i), left, top);
+        recordDc6(NPC_MENU_ASSETS.pieces, i, f, left, top);
+      }
       ctx.restore();
-      const line = (font, text, bottom) => font.draw(ctx, text, Math.round(box.x + (box.w - font.measure(text)) / 2), bottom - inkBottom);
+      // Each line starts at cx - width / 2 + 1 (retail: Warriv 276, talk 288, cancel 281 about 304).
+      const line = (font, text, bottom) => font.drawAnchored(ctx, text, cx - Math.trunc(font.measure(text) / 2) + 1, bottom);
+      const { gold, blue } = fontsFor(act);
       line(gold, labels[0], bottoms[0]);
-      rows.forEach((r, i) => line(i === 0 ? blue : white, r.label, r.inkBottom));
+      rows.forEach((r, i) => line(i === selected ? blue : white, r.label, r.inkBottom));
       return { npcId: state.npcId, classId: state.classId, name: state.name, box: { ...box },
         entries: rows.map((r) => ({ stringId: r.stringId, action: r.action, label: r.label, inkBottom: r.inkBottom })) };
     },

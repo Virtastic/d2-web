@@ -21,6 +21,7 @@
 #include <Units/Units.h>
 #include <GAME/Game.h>
 #include <GAME/Clients.h>
+#include "SKILLS/Skills.h"
 #include <PLAYER/PlrSave.h>
 #include <PLAYER/PlrSave2.h>
 #include <PLAYER/Player.h>
@@ -402,6 +403,22 @@ int32_t __fastcall D2WEB_PLRSAVE2_LoadIntoPlayer(D2GameStrc* pGame, D2UnitStrc* 
 
     nErrorCode = PLRSAVE2_ReadCorpses(pGame, pPlayer, &pSection, pSaveFileEnd, nVersion, &nSectionSize);
     if (nErrorCode) return nErrorCode;
+
+    // d2-web: the hands the file holds (header nLeftSkillId 0x78 / nRightSkillId 0x7C, written by the
+    // save above from UNITS_GetLeft/RightSkill), assigned as retail's SelectSkill handler (0x3C) does:
+    // D2GAME_AssignSkill + UNITS_InitLeft/RightSkill, for a skill the player has at level > 0. An
+    // item-granted hand (item index != 0, 1-based) is left to the default until item skills are covered.
+    // Retail's own load-time restore is not located yet; s189 asserts the reloaded hand.
+    for (int32_t bLeft = 0; bLeft < 2; ++bLeft)
+    {
+        const int32_t nSkillId = bLeft ? pSaveHeader->nLeftSkillId : pSaveHeader->nRightSkillId;
+        const int32_t nItemIndex = bLeft ? pSaveHeader->nLeftSkillItemIndex : pSaveHeader->nRightSkillItemIndex;
+        if (nSkillId < 0 || nSkillId >= sgptDataTables->nSkillsTxtRecordCount || nItemIndex != 0) continue;   // 0 = no item (PLRSAVE2_GetItemIndex)
+        D2SkillStrc* pSkill = SKILLS_GetSkillById(pPlayer, nSkillId, -1);
+        if (!pSkill || !SKILLS_GetSkillLevel(pPlayer, pSkill, 1)) continue;
+        D2GAME_AssignSkill_6FD13800(pPlayer, bLeft, nSkillId, -1);
+        if (bLeft) UNITS_InitLeftSkill(pPlayer); else UNITS_InitRightSkill(pPlayer);
+    }
 
     // The expansion tail (mercenary 'j f', iron golem 'k f') is written as empty markers by
     // CreateSaveFile above and is not read back; see C3d.

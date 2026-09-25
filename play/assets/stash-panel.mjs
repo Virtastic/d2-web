@@ -14,6 +14,7 @@
 
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { inventoryItemAsset } from './inventory-panel.mjs';
+import { BORDER_LEFT, BORDER_RIGHT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
 
 export const STASH_ART = 'data\\global\\ui\\PANEL\\TradeStash.dc6';
 export const INVPAGE_STASH = 4;
@@ -34,7 +35,9 @@ function frameCanvas(frame, palette, documentObject) {
 // is placed at the left-panel origin the trade screen uses (x = the record's left, y = 60), and the
 // frame is LOOKED AT to confirm the grid falls on the art's cells (s000 captures it). Declared in
 // until a retail draw list (OBJECTIVE v5 E) gives the number directly.
-export const LEFT_PANEL_TOP = 60;
+// Retail's draw list: TradeStash frames anchored (80,316), (336,316),
+// (80,492), (336,492) -- the art's top is y 61.
+export const LEFT_PANEL_TOP = 61;
 
 /**
  * `layout` is d2_session_inventory_layout's twelve numbers for BIG_BANK_PAGE_1 at 800x600:
@@ -50,7 +53,8 @@ export function stashGeometry(layout) {
 // In-game panels are drawn with the ACT's palette.
 const actPalette = (act) => `data\\global\\palette\\ACT${Math.min(5, Math.max(1, act | 0))}\\pal.dat`;
 
-export function createStashPanelRenderer(read, documentObject = globalThis.document) {
+export function createStashPanelRenderer(read, documentObject = globalThis.document, { string = null, stashGold = null } = {}) {
+  const chrome = createPanelChrome(read, documentObject);
   const dc6 = decodeDc6(read(STASH_ART));
   const perAct = new Map();
   const forAct = (act) => {
@@ -107,6 +111,17 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
         ctx.drawImage(c, x, y);
         drawn.push({ id: item.id, invFile: item.invFile, cell: [item.gridX, item.gridY], at: [x, y] });
       }
+      // Gold in the stash beside the coin button, the limit below it (string 4051 "Gold Max: %d"), the close
+      // button, and the left border -- retail's anchors.
+      if (stashGold) {
+        const inStash = String(stashGold(0)), cx = 245;   // one glyph captured: left or right alignment not yet known
+        chrome.cel(ctx, act, CHROME_ART.gold, 0, 155, 100);
+        chrome.text(ctx, act, inStash, cx, 100);
+        if (string) chrome.text(ctx, act, string(4051).replace('%d', String(stashGold(1))), 158, 125);
+      }
+      chrome.cel(ctx, act, CHROME_ART.close, 10, 352, 476);
+      // The stash opens with the inventory; retail frames both after both panels, left then right.
+      chrome.border(ctx, act, BORDER_LEFT); chrome.border(ctx, act, BORDER_RIGHT);
       ctx.restore();
       return { anchor: [geometry.left, geometry.top], recordTop: geometry.recordTop, palette: actPalette(act), open: true, composed, frames: frames.length, grid: { columns: geometry.columns, rows: geometry.rows,
         left: geometry.gridLeft, top: geometry.gridTop, box: [geometry.boxW, geometry.boxH] }, drawn };
