@@ -103,8 +103,11 @@ static void D2WEB_StampRoll(const D2DrlgTileDataStrc* pTileData)
 	s_d2webRollPending = false;
 }
 
+// d2-web diagnostic: the room whose GetTileCache is running, for the tile-pick stream (d2_drlg_pick_rooms).
+const D2DrlgRoomStrc* g_d2webTileCacheRoom = nullptr;
 D2TileLibraryEntryStrc* __fastcall DRLGROOMTILE_GetTileCache(D2DrlgRoomStrc* pDrlgRoom, int nType, uint32_t nPackedTileInformation)
 {
+	g_d2webTileCacheRoom = pDrlgRoom;
 	D2TileLibraryEntryStrc* ppTileLibraryEntries[40] = {};
 
 	D2C_PackedTileInformation nTileInformation{ nPackedTileInformation };
@@ -1003,12 +1006,21 @@ void __fastcall DRLGROOMTILE_AddLinkedTileData(void* pMemPool, D2DrlgRoomStrc* p
 //1.11: D2Common.0x6FD8DE40
 void __fastcall DRLGROOMTILE_LinkedTileDataManager(void* pMemPool, D2DrlgRoomStrc* pDrlgRoom1, D2DrlgRoomStrc* pDrlgRoom2, D2DrlgTileDataStrc* pTileData, int nTileType, uint32_t nPackedTileInformation, int nX, int nY)
 {
-	//D2Common.0x6FDD1340
+	// 1.13c D2Common.dll VA 0x6FDE0080 (not 0x6FDD1340 -- that address does not land on this
+	// function in the 1.13c build; found by searching the DLL for these 19 ints' byte pattern,
+	// see ). D2MOO's source carries the same 19-entry table and the same
+	// index-19 overread for nTileType==TILETYPE_FRONT_WALL_DOWN (19); retail's function at VA
+	// 0x6FDB95D0 (DRLGROOMTILE_LinkedTileDataManager, read in Ghidra) loads the entry for the
+	// tile type straight from the table at 0x6FDE0080 with no bounds test before the read, so
+	// retail performs the identical out-of-bounds read. The 4 bytes retail lands on (file offset
+	// 590028, VA 0x6FDE00CC, right after the table) are 0xFFFFFFFF -- retail's neighbouring
+	// .rdata for index 19 is -1, confirmed from the DLL bytes, not assumed from the table's
+	// trailing pattern of -1s.
 	// -1 Means stop and do nothing
 	// -2 Means ignore remapping but still init tile data
 	static const int nRemapIndices[] =
 	{
-		-1, 
+		-1,
 		0, // [TILETYPE_WALL_LEFT            ]
 		1, // [TILETYPE_WALL_RIGHT           ]
 		2, // [TILETYPE_WALL_TOP_CORNER_RIGHT]
@@ -1016,7 +1028,8 @@ void __fastcall DRLGROOMTILE_LinkedTileDataManager(void* pMemPool, D2DrlgRoomStr
 		3, // [TILETYPE_WALL_TOP_RIGHT       ]
 		4, // [TILETYPE_WALL_BOTTOM_LEFT     ]
 		5, // [TILETYPE_WALL_BOTTOM_RIGHT    ]
-		-2, -2, -1, -1, -1, -2, -1, -1, -1, -1, -1
+		-2, -2, -1, -1, -1, -2, -1, -1, -1, -1, -1,
+		-1, // [TILETYPE_FRONT_WALL_DOWN      ] retail's index-19 read: VA 0x6FDE00CC = -1
 	};
 	//D2Common.0x6FDD1390
 	static const int nWallTileTypeRemap[6][7] =

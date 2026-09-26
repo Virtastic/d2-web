@@ -252,6 +252,33 @@ BOOL __stdcall PATH_RemoveCollisionFootprintForUnit(D2UnitStrc* pUnit, BOOL bFor
 	return FALSE;
 }
 
+
+// d2-web diagnostic: each path the target-room test refuses, kept in a ring of 64 records --
+// [unit type, class, id, from x, from y, to x, to y, start room's level, an active room of the act holds
+// the target (and its level), a level rectangle holds the target (its level), frame]. Read by
+// d2_path_refusals(); it never changes the answer (FALSE: the path is refused, as retail's is).
+int32_t g_d2webPathRefusals[64][12]; uint32_t g_d2webPathRefusalCount = 0;
+static BOOL D2WEB_PATH_LogRefusal(D2UnitStrc* pUnit, D2PathInfoStrc* pInfo)
+{
+	int32_t* r = g_d2webPathRefusals[g_d2webPathRefusalCount++ & 63];
+	memset(r, 0, sizeof(int32_t) * 12);
+	r[0] = pUnit ? (int32_t)pUnit->dwUnitType : -1; r[1] = pUnit ? (int32_t)pUnit->dwClassId : -1; r[2] = pUnit ? (int32_t)pUnit->dwUnitId : -1;
+	r[3] = pInfo->tStartCoord.X; r[4] = pInfo->tStartCoord.Y; r[5] = pInfo->tTargetCoord.X; r[6] = pInfo->tTargetCoord.Y;
+	D2ActiveRoomStrc* pStart = pInfo->pStartRoom;
+	r[7] = (pStart && pStart->pDrlgRoom && pStart->pDrlgRoom->pLevel) ? pStart->pDrlgRoom->pLevel->nLevelId : -1;
+	r[8] = r[9] = r[10] = -1;
+	if (pStart && pStart->pDrlgRoom && pStart->pDrlgRoom->pLevel)
+		for (D2DrlgLevelStrc* pLevel = pStart->pDrlgRoom->pLevel->pDrlg->pLevel; pLevel; pLevel = pLevel->pNextLevel) {
+			const int nX = pInfo->tTargetCoord.X, nY = pInfo->tTargetCoord.Y;
+			if (r[9] < 0 && nX >= pLevel->nPosX * 5 && nX < (pLevel->nPosX + pLevel->nWidth) * 5 && nY >= pLevel->nPosY * 5 && nY < (pLevel->nPosY + pLevel->nHeight) * 5) r[9] = pLevel->nLevelId;
+			for (D2DrlgRoomStrc* pDrlgRoom = pLevel->pFirstRoomEx; pDrlgRoom; pDrlgRoom = pDrlgRoom->pDrlgRoomNext) {
+				const int x0 = pDrlgRoom->nTileXPos * 5, y0 = pDrlgRoom->nTileYPos * 5, x1 = x0 + pDrlgRoom->nTileWidth * 5, y1 = y0 + pDrlgRoom->nTileHeight * 5;
+				if (nX >= x0 && nX < x1 && nY >= y0 && nY < y1) { r[8] = pDrlgRoom->pRoom ? 1 : 0; r[10] = pLevel->nLevelId; }
+			}
+		}
+	r[11] = (int32_t)g_d2webPathRefusalCount;
+	return FALSE;
+}
 //1.10f: Inlined
 //1.13C: D2Common.0x6FD85780
 BOOL __fastcall PATH_IsTargetDestinationAllowed(D2PathInfoStrc* pPathInfo, D2UnitStrc* pUnit)
@@ -403,10 +430,12 @@ int __stdcall D2Common_10142(D2DynamicPathStrc* pPath, D2UnitStrc* pUnit, int bA
 				tPathInfo.pStartRoom = pPath->pRoom;
 				tPathInfo.pTargetRoom = COLLISION_GetRoomBySubTileCoordinates(tPathInfo.pStartRoom, tPathInfo.tTargetCoord.X, tPathInfo.tTargetCoord.Y);
 
-				if (tPathInfo.pStartRoom && 
-#ifdef D2_VERSION_113C
-					tPathInfo.pTargetRoom && // Optimization done in 1.13f
-#endif
+				// d2-web: retail 1.13c D2Common 0x6FD86396..0x6FD863AD tests the start room AND the target room
+				// (`test ecx,ecx; je fail; test eax,eax; je fail`): a path to a subtile no room holds fails.
+				// Upstream compiled that only under D2_VERSION_113C, never defined here (s232, act5barb1 #28 at
+				// frame 323 walked toward (4892,5244), south of the Bloody Foothills, where retail refused it).
+				if (tPathInfo.pStartRoom &&
+					(tPathInfo.pTargetRoom || D2WEB_PATH_LogRefusal(pUnit, &tPathInfo)) &&
 					(PATH_IsTargetDestinationAllowed(&tPathInfo, pUnit) || bAllowInTown))
 				{
 					tPathInfo.nPathType = pPath->dwPathType;

@@ -15,7 +15,11 @@ export function resourceRatio(value, maximum) {
 // Cycle 110 mistook those two 48px margins for seams and "closed" them by drawing frame 6 in the
 // console. Frame 6 is only 39% opaque, so that put real holes in the bar -- 22 of 55 rows at
 // column 572 -- in place of margins that were correct. Reverted; see V23.
-export const CONTROL_LAYOUT = Object.freeze({ healthX: 0, centerX: 165, manaX: 683, orbY: 0, height: 104 });
+// OpenDiablo2's HUD uses the 800x600 retail coordinates (256,561), a 120x2 white
+// fill.  This renderer is local to the 104px-high panel, hence y = 561 - 496 = 65.
+// `d2_session_advancement` owns both values; this module only projects their ratio.
+export const CONTROL_LAYOUT = Object.freeze({ healthX: 0, centerX: 165, manaX: 683, orbY: 0, height: 104,
+  experienceX: 256, experienceY: 65, experienceWidth: 120, experienceHeight: 2 });
 
 function frameCanvas(frame, palette, documentObject) {
   const canvas = documentObject.createElement('canvas'); canvas.width = frame.width; canvas.height = frame.height;
@@ -32,7 +36,7 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
   const p = panel.frames.map((f) => frameCanvas(f, palette, documentObject));
   const fluid = fluids.frames.slice(0, 2).map((f) => frameCanvas(f, palette, documentObject));
   const overlap = overlaps.frames.slice(0, 2).map((f) => frameCanvas(f, palette, documentObject));
-  return { draw(ctx, width, height, snapshot) {
+  return { draw(ctx, width, height, snapshot, advancement) {
     const scale = Math.min(1, width / 800), panelWidth = 800 * scale, x0 = (width - panelWidth) / 2, y0 = height - CONTROL_LAYOUT.height * scale;
     ctx.save(); ctx.translate(x0, y0); ctx.scale(scale, scale);
     ctx.drawImage(p[0], CONTROL_LAYOUT.healthX, 0);
@@ -44,8 +48,22 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
       if (shown > 0) ctx.drawImage(image, 0, top, image.width, shown, x, y + top, image.width, shown); };
     drawFluid(fluid[0], 30, 14, life); drawFluid(fluid[1], 691, 14, mana);
     ctx.drawImage(overlap[0], 28, 6); ctx.drawImage(overlap[1], 691, 10);
+    const experience = Number(advancement?.experience);
+    const nextExperience = Number(advancement?.nextExperience);
+    const experienceRatio = resourceRatio(experience, nextExperience);
+    // D2's renderer truncates the float width to an integer before its DrawRect call.
+    const experiencePixels = Math.floor(experienceRatio * CONTROL_LAYOUT.experienceWidth);
+    if (experiencePixels > 0) {
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(CONTROL_LAYOUT.experienceX, CONTROL_LAYOUT.experienceY,
+        experiencePixels, CONTROL_LAYOUT.experienceHeight);
+    }
     ctx.restore();
     return { x: x0, y: y0, scale, life, mana, panelFrames: panel.frames.length,
-      panelBytes: panel.frames.reduce((sum, frame) => sum + frame.width * frame.height, 0) };
+      panelBytes: panel.frames.reduce((sum, frame) => sum + frame.width * frame.height, 0),
+      experience: { requested: experience, next: nextExperience, ratio: experienceRatio,
+        pixels: experiencePixels, x: x0 + CONTROL_LAYOUT.experienceX * scale,
+        y: y0 + CONTROL_LAYOUT.experienceY * scale, width: CONTROL_LAYOUT.experienceWidth * scale,
+        height: CONTROL_LAYOUT.experienceHeight * scale } };
   } };
 }

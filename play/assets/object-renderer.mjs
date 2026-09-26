@@ -2,6 +2,7 @@ import { decodeDatPalette } from './d2-formats.mjs';
 import { composeCofFrame, decodeCof, decodeDcc } from './unit-formats.mjs';
 import { dccDirection, indexedToRgba } from './unit-renderer.mjs';
 import { fourcc } from './monster-renderer.mjs';
+import { createBlender } from './frontend.mjs';
 
 const COMPONENT = ['HD','TR','LG','RA','LA','RH','LH','SH','S1','S2','S3','S4','S5','S6','S7','S8'];
 const MODE = ['NU','OP','ON','S1','S2','S3','S4','S5'];
@@ -19,9 +20,16 @@ export function parseObjectPresentations(bytes, count) {
 }
 
 export function createObjectRenderer(read, documentObject = globalThis.document) {
-  const animations = new Map(), failures = new Set(), rasters = new Map(), palettes = new Map(); let lastEvidence = null;
+  const animations = new Map(), failures = new Set(), rasters = new Map(), palettes = new Map(), blenders = new Map(); let lastEvidence = null;
   const palette = (act) => { const a = Math.min(4, Math.max(0, (act | 0) - 1));
     if (!palettes.has(a)) palettes.set(a, decodeDatPalette(read(`data\\global\\palette\\${PALETTE[a]}\\pal.dat`))); return [a, palettes.get(a)]; };
+  const blender = (act0, pal) => {
+    if (!blenders.has(act0)) { let value = null;
+      try { value = createBlender(read(`data\\global\\palette\\${PALETTE[act0]}\\pal.pl2`), pal); } catch {}
+      blenders.set(act0, value);
+    }
+    return blenders.get(act0);
+  };
   return { draw(ctx, x, y, object, act) {
     const mode = MODE[object.mode] || 'NU', base = `${object.token}:${mode}:${object.direction}:${object.componentMask}`;
     if (!object.token || failures.has(base)) return null;
@@ -42,10 +50,45 @@ export function createObjectRenderer(read, documentObject = globalThis.document)
     const key = `${base}:${frame}:${act0}`; let canvas = rasters.get(key);
     if (!canvas) { canvas = documentObject.createElement('canvas'); canvas.width = composed.width; canvas.height = composed.height;
       if (canvas.width && canvas.height) canvas.getContext('2d').putImageData(new ImageData(indexedToRgba(composed.indexed, composed.opaque, pal), canvas.width, canvas.height), 0, 0); rasters.set(key, canvas); }
-    if (canvas.width && canvas.height) ctx.drawImage(canvas, Math.round(x + composed.xOffset), Math.round(y + composed.yOffset));
+    // COF effects apply to individual layers.  Flattening the object first lost the additive
+    // flames/glows/smoke and rendered their source indices as opaque black or grey (F28/F41).
+    const layerEvidence = [];
+    const hasBlend = animation.cof.layerRecords.some((layer) => layer.transparent && (layer.drawEffect === 3 || layer.drawEffect === 4));
+    if (hasBlend) {
+      const blend = blender(act0, pal);
+      for (const componentId of animation.cof.priority[animation.direction][frame]) {
+        const dcc = animation.components.get(componentId); if (!dcc) continue;
+        const layer = animation.cof.layerRecords.find((value) => value.component === componentId);
+        const one = composeCofFrame(animation.cof, animation.direction, frame, new Map([[componentId, dcc]]));
+        if (!one.width || !one.height) continue;
+        const left = Math.round(x + one.xOffset), top = Math.round(y + one.yOffset);
+        const requestedMode = layer?.transparent && (layer.drawEffect === 3 || layer.drawEffect === 4) ? layer.drawEffect : 5;
+        // Evidence states what reached the canvas. A missing PL2 must never be reported as a blend.
+        const mode = requestedMode !== 5 && blend ? requestedMode : 5;
+        if (mode !== 5 && blend) blend(ctx, { width: one.width, height: one.height, indices: one.indexed, opaque: one.opaque }, left, top, mode);
+        else {
+          const oneCanvas = documentObject.createElement('canvas'); oneCanvas.width = one.width; oneCanvas.height = one.height;
+          oneCanvas.getContext('2d').putImageData(new ImageData(indexedToRgba(one.indexed, one.opaque, pal), one.width, one.height), 0, 0);
+          ctx.drawImage(oneCanvas, left, top);
+        }
+        const component = COMPONENT[componentId];
+        const path = component && layer ? `objects\\${object.token}\\${component}\\${object.token}${component}lit${animation.mode}${layer.weaponClass}`.toLowerCase() : null;
+        layerEvidence.push({ component, path, mode, transparent: Boolean(layer?.transparent), drawEffect: layer?.drawEffect ?? 0 });
+        if (Array.isArray(globalThis.__d2DrawList) && path) globalThis.__d2DrawList.push({ op: 'dcc', path, frame, x: Math.round(x), y: Math.round(y), mode });
+      }
+    } else if (canvas.width && canvas.height) {
+      ctx.drawImage(canvas, Math.round(x + composed.xOffset), Math.round(y + composed.yOffset));
+      for (const componentId of animation.cof.priority[animation.direction][frame]) {
+        const layer = animation.cof.layerRecords.find((value) => value.component === componentId), component = COMPONENT[componentId];
+        if (!layer || !component || !animation.components.has(componentId)) continue;
+        const path = `objects\\${object.token}\\${component}\\${object.token}${component}lit${animation.mode}${layer.weaponClass}`.toLowerCase();
+        layerEvidence.push({ component, path, mode: 5, transparent: Boolean(layer.transparent), drawEffect: layer.drawEffect });
+        if (Array.isArray(globalThis.__d2DrawList)) globalThis.__d2DrawList.push({ op: 'dcc', path, frame, x: Math.round(x), y: Math.round(y), mode: 5 });
+      }
+    }
     let pixelHash = 0x811c9dc5; for (const value of composed.indexed) { pixelHash ^= value; pixelHash = Math.imul(pixelHash, 0x01000193); }
     lastEvidence = { id: object.id, classId: object.classId, token: object.token, mode: animation.mode, direction: animation.direction,
       frame, components: animation.components.size, width: composed.width, height: composed.height,
-      opaque: composed.opaque.reduce((a,v)=>a+v,0), pixelHash: pixelHash >>> 0 }; return lastEvidence;
+      opaque: composed.opaque.reduce((a,v)=>a+v,0), pixelHash: pixelHash >>> 0, layers: layerEvidence }; return lastEvidence;
   }, get lastEvidence(){return lastEvidence&&{...lastEvidence};}, get decoded(){return animations.size;}, get failures(){return failures.size;} };
 }

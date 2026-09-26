@@ -9,7 +9,7 @@ cd "$SRC"
 echo "==> stage build-wasm/site"
 mkdir -p build-wasm/site
 find build-wasm/site -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-cp play/index.html play/streamfs.js play/gameplay-model.mjs play/gameplay-shell.mjs play/serve.mjs play/smoke.mpq play/smoke.json play/d2.js play/d2.wasm play/d2.js.br play/d2.wasm.br build-wasm/site/
+cp play/index.html play/manifest.webmanifest play/streamfs.js play/gameplay-model.mjs play/gameplay-shell.mjs play/serve.mjs play/smoke.mpq play/smoke.json play/d2.js play/d2.wasm play/d2.js.br play/d2.wasm.br build-wasm/site/
 cp -r play/assets build-wasm/site/assets
 # Committed ground truth, served so scenarios can fetch it into the page.
 cp -r vectors build-wasm/site/vectors

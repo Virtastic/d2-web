@@ -505,6 +505,8 @@ D2UnitStrc* __fastcall D2GAME_SpawnNormalMonster_6FC68E30(D2UnkMonCreateStrc* pM
     }
 
     D2UnitStrc* pMonster = SUNIT_AllocUnitData(UNIT_MONSTER, nMonsterId, nX, nY, pMonCreate->pGame, pRoom, (nFlags & 0x20) ? 3 : 1, pMonCreate->nAnimMode, pMonCreate->nUnitGUID);
+    // d2-web diagnosis (not retail): every monster made, with the path that made it (d2_session_spawn_log).
+    if (pMonster) { extern void d2_note_monster_spawn(D2GameStrc*, D2UnitStrc*, int32_t, int32_t, int32_t); d2_note_monster_spawn(pMonCreate->pGame, pMonster, nMonsterId, nX, nY); }
     if (!pMonster)
     {
         return nullptr;

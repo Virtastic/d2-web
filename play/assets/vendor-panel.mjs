@@ -31,9 +31,14 @@ export const VENDOR_ASSETS = {
 // Inventory.txt "Monster" at 800x600 (read through the engine by the shell; these are its values,
 // kept here so the panel can draw before the first read and so a mismatch is visible in review).
 export const VENDOR_LAYOUT = Object.freeze({ left: 80, top: 60, gridLeft: 96, gridTop: 123, columns: 10, rows: 10, cell: 29,
-  tabStep: 80, buttonX: [116, 168, 220, 272], buttonFromBottom: 15 });
+  tabStep: 80, buttonX: [195, 248, 300, 352], buttonFromBottom: 15 });   // buttonX: retail's draw list (vendor-akara), riiablo's 116..272 were off
 const TAB_NAMES = ['strBSArmor', 'strBSWeapons', 'strBSWeapons', 'strBSMisc'];
-const BUTTON_FRAMES = { buy: 2, sell: 4, repair: 6, exit: 10 };
+const BUTTON_FRAMES = { blank: 0, buy: 2, sell: 4, repair: 6, exit: 10, repairAll: 18 };
+// The smiths (MonStats: Charsi, Fara, Hratli, Halbu, Larzuk) are the vendors D2GAME_NPC_Repair accepts;
+// their row is Buy / Sell / Repair / Repair All, every other vendor's Buy / Sell / (blank) / Exit
+// (riiablo's VendorPanel SMITHY and TRADER masks over the same four slots).
+export const SMITH_CLASSES = new Set([154, 178, 253, 257, 511]);
+export const vendorButtons = (npcClass) => (SMITH_CLASSES.has(npcClass) ? ['buy', 'sell', 'repair', 'repairAll'] : ['buy', 'sell', 'blank', 'exit']);
 
 function frameCanvas(frame, palette, documentObject) {
   const canvas = documentObject.createElement('canvas');
@@ -46,39 +51,51 @@ function frameCanvas(frame, palette, documentObject) {
 }
 
 export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, layout = VENDOR_LAYOUT, documentObject = globalThis.document }) {
-  const palette = decodeDatPalette(read(VENDOR_ASSETS.palette));
-  // buysell.dc6: 256+64 wide over 256+176 tall, four frames in two rows.
+  // Everything drawn through a palette is built per act (the session's act, as the skill tree and
+  // npc-menu.mjs fontsFor(act)): pal.dat for the art, pal.pl2 for the gold text and the item box blend.
+  const actPath = (act, f) => `data\\global\\palette\\ACT${Math.min(5, Math.max(1, act | 0))}\\${f}`;
   const panelDc6 = decodeDc6(read(VENDOR_ASSETS.panel));
-  const panel = documentObject.createElement('canvas');
-  panel.width = panelDc6.frames[0].width + panelDc6.frames[1].width; panel.height = panelDc6.frames[0].height + panelDc6.frames[2].height;
-  { const g = panel.getContext('2d'); let y = 0;
-    for (let r = 0; r < 2; r++) { let x = 0; for (let c = 0; c < 2; c++) { const f = panelDc6.frames[r * 2 + c]; g.drawImage(frameCanvas(f, palette, documentObject), x, y); x += f.width; } y += panelDc6.frames[r * 2].height; } }
-  const tabFrames = decodeDc6(read(VENDOR_ASSETS.tabs)).frames.map((f) => frameCanvas(f, palette, documentObject));
-  const buttonFrames = decodeDc6(read(VENDOR_ASSETS.buttons)).frames.map((f) => frameCanvas(f, palette, documentObject));
+  const tabDc6 = decodeDc6(read(VENDOR_ASSETS.tabs)), buttonDc6 = decodeDc6(read(VENDOR_ASSETS.buttons));
   const fontDc6 = decodeDc6(read(VENDOR_ASSETS.font)), fontTbl = decodeFontTbl(read(VENDOR_ASSETS.fontTbl));
-  const font = createFont({ dc6: fontDc6, tbl: fontTbl, palette, documentObject });
-  let gold = font;
-  try { gold = createFont({ dc6: fontDc6, tbl: fontTbl, palette: textColourPalette(read(VENDOR_ASSETS.palette.replace(/pal\.dat$/i, 'pal.pl2')), palette, 4), documentObject }); } catch {}
+  const perAct = new Map();
+  const forAct = (act) => {
+    let a = perAct.get(act);
+    if (a) return a;
+    const palette = decodeDatPalette(read(actPath(act, 'pal.dat'))), pl2 = read(actPath(act, 'pal.pl2'));
+    // buysell.dc6: 256+64 wide over 256+176 tall, four frames in two rows.
+    const panel = documentObject.createElement('canvas');
+    panel.width = panelDc6.frames[0].width + panelDc6.frames[1].width; panel.height = panelDc6.frames[0].height + panelDc6.frames[2].height;
+    { const g = panel.getContext('2d'); let y = 0;
+      for (let r = 0; r < 2; r++) { let x = 0; for (let c = 0; c < 2; c++) { const f = panelDc6.frames[r * 2 + c]; g.drawImage(frameCanvas(f, palette, documentObject), x, y); x += f.width; } y += panelDc6.frames[r * 2].height; } }
+    const font = createFont({ dc6: fontDc6, tbl: fontTbl, palette, documentObject });
+    const index = new Map();
+    for (let k = 255; k >= 0; k--) index.set((palette[k * 4] << 16) | (palette[k * 4 + 1] << 8) | palette[k * 4 + 2], k);
+    a = { palette, pl2, index, panel, font, icons: new Map(),
+      gold: createFont({ dc6: fontDc6, tbl: fontTbl, palette: textColourPalette(pl2, palette, 4), documentObject }),
+      tabFrames: tabDc6.frames.map((f) => frameCanvas(f, palette, documentObject)),
+      buttonFrames: buttonDc6.frames.map((f) => frameCanvas(f, palette, documentObject)) };
+    perAct.set(act, a);
+    return a;
+  };
+  let cur = forAct(1);
   const chrome = createPanelChrome(read, documentObject);
   // A stock item sits on retail's box, colour 234 in draw mode 0 (AlphaBlend[2][under][234]), as in the
   // inventory (s197/s250), read back from the canvas as palette indices.
-  let blendT = null;
   const itemBackground = (ctx, x, y, w, h) => {
-    if (!blendT) { const pl2 = read(VENDOR_ASSETS.palette.replace(/pal\.dat$/i, 'pal.pl2')), index = new Map();
-      for (let k = 255; k >= 0; k--) index.set((palette[k * 4] << 16) | (palette[k * 4 + 1] << 8) | palette[k * 4 + 2], k); blendT = { pl2, index }; }
+    const { pl2, index, palette } = cur;
     const X = Math.round(x), Y = Math.round(y), W = Math.round(w), H = Math.round(h);
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
     const img = ctx.getImageData(X, Y, W, H), d = img.data, base = 13568 + 2 * 65536;
-    for (let i = 0; i < d.length; i += 4) { const u = blendT.index.get((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]); if (u === undefined) continue;
-      const c = blendT.pl2[base + u * 256 + 234]; d[i] = palette[c * 4]; d[i + 1] = palette[c * 4 + 1]; d[i + 2] = palette[c * 4 + 2]; }
+    for (let i = 0; i < d.length; i += 4) { const u = index.get((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]); if (u === undefined) continue;
+      const c = pl2[base + u * 256 + 234]; d[i] = palette[c * 4]; d[i + 1] = palette[c * 4 + 1]; d[i + 2] = palette[c * 4 + 2]; }
     ctx.putImageData(img, X, Y); ctx.restore();
   };
-  const icons = new Map();
   const icon = (invFile) => {
     if (!invFile) return null;
+    const icons = cur.icons;
     if (icons.has(invFile)) return icons.get(invFile);
     let image = null;
-    try { const d = decodeDc6(read(inventoryItemAsset(invFile))); if (d.frames.length) image = frameCanvas(d.frames[0], palette, documentObject); } catch { image = null; }
+    try { const d = decodeDc6(read(inventoryItemAsset(invFile))); if (d.frames.length) image = frameCanvas(d.frames[0], cur.palette, documentObject); } catch { image = null; }
     icons.set(invFile, image); return image;
   };
   const L = layout;
@@ -87,10 +104,12 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
   const toScreen = (width, height, px, py) => { const v = view(width, height); return [(px - v.ox) / v.scale, (py - v.oy) / v.scale]; };
   const tabsWithStock = (items) => [0, 1, 2, 3].filter((t) => items.some((it) => it.invPage === t));
   // Retail's anchors: the panel's top row is y 61, a tab's too.
-  const tabRect = (t) => ({ x: L.left + t * L.tabStep, y: L.top + 1, w: tabFrames[t].width, h: tabFrames[t].height });
+  const tabRect = (t) => ({ x: L.left + t * L.tabStep, y: L.top + 1, w: cur.tabFrames[t].width, h: cur.tabFrames[t].height });
+  const buttonTop = () => 446;   // retail: bottom row 477, 32 tall (vendor-akara)
+  const buttonRect = (i, name) => { const f = cur.buttonFrames[BUTTON_FRAMES[name]]; return { x: L.buttonX[i], y: buttonTop(), w: f ? f.width : 32, h: f ? f.height : 32 }; };
   return {
     get tab() { return tab; },
-    get evidence() { return { background: { width: panel.width, height: panel.height }, art: VENDOR_ASSETS.panel, layout: { ...L } }; },
+    get evidence() { return { background: { width: cur.panel.width, height: cur.panel.height }, art: VENDOR_ASSETS.panel, layout: { ...L } }; },
     /** Show the tab retail opens a shop on, or the first one with stock. */
     reset(items = []) { const t = tabsWithStock(items); tab = t.includes(3) ? 3 : (t[0] ?? 3); },
     setTab(t) { tab = t; },
@@ -106,6 +125,19 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
       return (state?.items || []).find((it) => it.invPage === tab && gx >= it.gridX && gx < it.gridX + (it.width || 1) && gy >= it.gridY && gy < it.gridY + (it.height || 1))
         ?? (state?.items || []).find((it) => it.invPage === tab && it.gridX === gx && it.gridY === gy) ?? null;
     },
+    /** The button under a canvas point (not 'blank'), for the vendor of MonStats class npcClass. */
+    buttonAt(px, py, width, height, npcClass) {
+      const [x, y] = toScreen(width, height, px, py);
+      const names = vendorButtons(npcClass);
+      const i = names.findIndex((n, k) => { const r = buttonRect(k, n); return n !== 'blank' && x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h; });
+      return i < 0 ? null : names[i];
+    },
+    /** Canvas pixel centre of each of the vendor's buttons, keyed by name. */
+    buttonTargets(width, height, npcClass) {
+      const v = view(width, height);
+      return Object.fromEntries(vendorButtons(npcClass).filter((n) => n !== 'blank').map((n) => { const r = buttonRect(vendorButtons(npcClass).indexOf(n), n);
+        return [n, [Math.round(v.ox + (r.x + r.w / 2) * v.scale), Math.round(v.oy + (r.y + r.h / 2) * v.scale)]]; }));
+    },
     /** Canvas pixel centre of each visible tab, keyed by tab index. */
     tabTargets(width, height) {
       const v = view(width, height);
@@ -113,6 +145,8 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
     },
     draw(ctx, width, height, state) {
       const items = Array.isArray(state?.items) ? state.items : [];
+      cur = forAct(state?.act || 1);
+      const { panel, tabFrames, buttonFrames, font, gold } = cur;
       const v = view(width, height);
       ctx.save(); ctx.translate(v.ox, v.oy); ctx.scale(v.scale, v.scale);
       ctx.drawImage(panel, L.left, L.top + 1);
@@ -137,19 +171,19 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
           ctx.drawImage(img, x, y + 1); drawnIcons++;
         }
       }
-      // Retail's button row for Akara: buysellbtn 2 (buy), 4 (sell), 0, 10 (close) at x 195/248/300/352,
-      // bottom row 477. (Frame 0 in the third place is what retail drew for her; a repairing vendor's
-      // third button is not captured yet.)
-      [[2, 195], [4, 248], [0, 300], [10, 352]].forEach(([f, x]) => { const c = buttonFrames[f]; if (c) ctx.drawImage(c, x, 477 - c.height + 1); });
+      // Retail's button row (vendor-akara: buysellbtn 2 / 4 / 0 / 10 at x 195/248/300/352, bottom row 477);
+      // a smith's row is main's Buy / Sell / Repair / Repair All (not captured yet).
+      const buttons = vendorButtons(state?.classId);
+      buttons.forEach((b, i) => { const c = buttonFrames[BUTTON_FRAMES[b]]; if (c) ctx.drawImage(c, L.buttonX[i], 477 - c.height + 1); });
       // The stash line (1.13 vendors take stash gold): string "stash" at (101, 434), the stash's gold at (266, 434).
       font.drawAnchored(ctx, string('stash'), 101, 434);
       if (state?.stashGold >= 0) font.drawAnchored(ctx, String(state.stashGold), 266, 434);
       ctx.restore();
       ctx.save(); ctx.translate(v.ox, v.oy); ctx.scale(v.scale, v.scale);
-      chrome.border(ctx, 1, BORDER_LEFT); chrome.border(ctx, 1, BORDER_RIGHT);
+      chrome.border(ctx, state?.act || 1, BORDER_LEFT); chrome.border(ctx, state?.act || 1, BORDER_RIGHT);
       ctx.restore();
       return { box: { x: L.left, y: L.top, width: panel.width, height: panel.height }, tab, tabs: [...lastTabs], shown, total: items.length,
-        drawnIcons, scroll: 0, gold: state?.gold ?? -1 };
+        drawnIcons, scroll: 0, gold: state?.gold ?? -1, buttons };
     },
   };
 }

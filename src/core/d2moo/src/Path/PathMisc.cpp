@@ -21,11 +21,17 @@ struct D2UnkPathStrc
 	int unk0x08;
 };
 
+// 1.13c (D2Common.0x6fd85e9d/0x6fd85ea5/0x6fd85ead and the 5 other call sites) reads these three
+// bytes with `movzx` -- zero-extend -- never `movsx`. The table's "-1" entries (no third direction)
+// therefore load as 255 in retail, which is exactly PATH_DIR_NULL, so `pTestDir[2] != PATH_DIR_NULL`
+// (PathMisc.cpp:179,214) correctly skips them. int8_t sign-extends the same -1 byte to int -1, which
+// never equals PATH_DIR_NULL(255): the guard passes and gatDirectionToOffset[8] is read at index -1
+//. uint8_t reproduces retail's zero-extend.
 struct D2UnkPathStrc2
 {
-	int8_t unk0x00;
-	int8_t unk0x01;
-	int8_t unk0x02;
+	uint8_t unk0x00;
+	uint8_t unk0x01;
+	uint8_t unk0x02;
 };
 
 //1.10f: D2Common.0x6FDD2158
@@ -63,31 +69,31 @@ static const D2UnkPathStrc stru_6FDD2158[25] =
 //1.13c: D2Common.0x6FDDC450
 static const D2UnkPathStrc2 byte_6FDD2288[25] =
 {
-	{ 4, 6, -1 },
-	{ 4, 6, -1 },
+	{ 4, 6, 0xFF },
+	{ 4, 6, 0xFF },
 	{ 4, 2, 6 },
-	{ 4, 2, -1 },
-	{ 4, 2, -1 },
-	{ 6, 4, -1 },
-	{ 4, 6, -1 },
+	{ 4, 2, 0xFF },
+	{ 4, 2, 0xFF },
+	{ 6, 4, 0xFF },
+	{ 4, 6, 0xFF },
 	{ 4, 2, 6 },
-	{ 4, 2, -1 },
-	{ 2, 4, -1 },
+	{ 4, 2, 0xFF },
+	{ 2, 4, 0xFF },
 	{ 6, 0, 4 },
 	{ 6, 0, 4 },
 	{ 6, 0, 4 },
 	{ 2, 0, 4 },
 	{ 2, 0, 4 },
-	{ 6, 0, -1 },
-	{ 0, 6, -1 },
+	{ 6, 0, 0xFF },
+	{ 0, 6, 0xFF },
 	{ 0, 2, 6 },
-	{ 2, 0, -1 },
-	{ 2, 0, -1 },
-	{ 0, 6, -1 },
-	{ 0, 6, -1 },
+	{ 2, 0, 0xFF },
+	{ 2, 0, 0xFF },
+	{ 0, 6, 0xFF },
+	{ 0, 6, 0xFF },
 	{ 0, 2, 6 },
-	{ 0, 2, -1 },
-	{ 0, 2, -1 },
+	{ 0, 2, 0xFF },
+	{ 0, 2, 0xFF },
 };
 
 // 1.10f: D2Common.0x6FDD1DA0

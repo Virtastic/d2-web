@@ -11,14 +11,16 @@
 // Layout from retail's own DRAW LIST (the retail captures: Warriv's
 // menu, his unit anchored at (304, 292)). Retail draws, in order:
 //   1. a box (D2GFX DrawBox, colour 0, DrawMode 1 = 50%) over rect (x1,y1)-(x2,y2): x2 - x1 = widest
-//      line's width (.tbl advances) + 20, centred on the NPC's x; y2 = NPC y - 118; y1 = y2 - (15 * lines + 21);
-//   2. 22 cels of ui\menu\boxpieces.dc6 around it (menuFramePieces below);
+//      line's width (.tbl advances) + 20, centred on the NPC's x; y2 = NPC y - 148 + 10 * lines;
+//      y1 = y2 - (15 * lines + 21);
+//   2. ui\menu\boxpieces.dc6 around it (menuFramePieces below); the count grows with the box.
 //   3. the lines through D2Win's text draw in font16, anchored (bottom row) at y1 + 21, then every
 //      15px, each from the NPC's x - width / 2 + 1: the name colour 4 (gold), the entries colour 0 (white).
 // The blue entry is the SELECTED one: the first on opening (retail/frames/s3-s4), then whichever the
 // pointer is over, none when it is elsewhere (the draw list, pointer parked at 799,300).
-// TODO(client-parity F18): one NPC, one box size -- the piece rules are exact for it; a second
-// capture (a 4- and a 5-line menu) should confirm how edges repeat on a larger box.
+// TODO(client-parity F18): Warriv's 3-line and Hratli's 4-line retail lists establish this rule.
+// Jerhyn's committed 2-line retail list is awaiting its Act II branch's merge onto main, when s221
+// will take it as the third size rather than extrapolating from two examples.
 import { createFont, decodeFontTbl, FRONTEND } from './frontend.mjs';
 import { recordDc6, recordPrim } from './drawlist.mjs';
 
@@ -51,21 +53,24 @@ export function npcMenuEntries(classId) {
 
 export const NPC_MENU_ASSETS = { palette: FRONTEND.palette, font: 'data\\local\\font\\latin\\font16.dc6', fontTbl: 'data\\local\\font\\latin\\font16.tbl',
   pieces: 'data\\global\\ui\\menu\\boxpieces.dc6' };
-export const NPC_MENU_LAYOUT = Object.freeze({ padX: 20, firstLine: 21, pitch: 15, aboveFeet: 118 });
+export const NPC_MENU_LAYOUT = Object.freeze({ padX: 20, firstLine: 21, pitch: 15, bottomBaseAboveFeet: 148, bottomPerLine: 10 });
 
 /**
  * The boxpieces cels retail draws around a menu rect, in its order: [frame, anchor x, anchor y]
- * (anchor = bottom row, inclusive). From the draw list for the rect (265,108)-(343,174): top edge
- * frames 3.. every 12px from x1+12 at y1+12, bottom edge 16.. from x1+13 at y2+10, left edge frames
- * 12,10,11 repeating from y1+22 at x1-4, right edge 13,14,15 from y1+24 at x2-7, each while it
- * starts inside the rect, then the corners 0 (x1, y1+12), 1 (x2-12, y1+12), 8 (x1, y2+1), 9 (x2-12, y2+1).
+ * (anchor = bottom row, inclusive). Retail lists establish these cycles for the 3-line Warriv and
+ * 4-line Hratli boxes: top frames 2..7 begin at 3; bottom frames 16..21 begin after the top's
+ * extra pieces; left frames 12,10,11 repeat; right frames 13..15 advance for each extra left piece.
+ * Each edge starts inside the rect, followed by corners 0,1,8,9.
  */
 export function menuFramePieces(x1, y1, x2, y2) {
   const out = [];
-  for (let i = 0, x = x1 + 12; x < x2 - 12; i++, x += 12) out.push([3 + (i % 5), x, y1 + 12]);
-  for (let i = 0, x = x1 + 13; x < x2 - 12; i++, x += 12) out.push([16 + (i % 5), x, y2 + 10]);
-  for (let i = 0, y = y1 + 22; y < y2; i++, y += 12) out.push([10 + ((i + 2) % 3), x1 - 4, y]);
-  for (let i = 0, y = y1 + 24; y < y2; i++, y += 12) out.push([13 + (i % 3), x2 - 7, y]);
+  const top = [];
+  for (let i = 0, x = x1 + 12; x < x2 - 12; i++, x += 12) top.push([2 + ((i + 1) % 6), x, y1 + 12]);
+  out.push(...top);
+  for (let i = 0, x = x1 + 13; x < x2 - 12; i++, x += 12) out.push([16 + ((i + top.length - 5) % 6), x, y2 + 10]);
+  let leftCount = 0;
+  for (let i = 0, y = y1 + 22; y < y2; i++, y += 12) { out.push([10 + ((i + 2) % 3), x1 - 4, y]); leftCount++; }
+  for (let i = 0, y = y1 + 24; y < y2; i++, y += 12) out.push([13 + ((i + leftCount - 4) % 3), x2 - 7, y]);
   out.push([0, x1, y1 + 12], [1, x2 - 12, y1 + 12], [8, x1, y2 + 1], [9, x2 - 12, y2 + 1]);
   return out;
 }
@@ -144,7 +149,8 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
     const cx = Math.trunc(feetX);
     const w = Math.max(...labels.map((l) => white.measure(l))) + L.padX;
     const x1 = cx - Math.trunc(w / 2), x2 = x1 + w;
-    const y2 = Math.trunc(feetY) - L.aboveFeet, y1 = y2 - (L.pitch * labels.length + L.firstLine);
+    const y2 = Math.trunc(feetY) - L.bottomBaseAboveFeet + L.bottomPerLine * labels.length,
+      y1 = y2 - (L.pitch * labels.length + L.firstLine);
     const bottoms = labels.map((_, i) => y1 + L.firstLine + i * L.pitch);
     rows = state.entries.map((e, i) => ({ ...e, label: labels[i + 1], x: x1, y: bottoms[i + 1] - 12, w, h: 15, inkBottom: bottoms[i + 1] }));
     box = { x: x1, y: y1, w, h: y2 - y1, x1, y1, x2, y2 };

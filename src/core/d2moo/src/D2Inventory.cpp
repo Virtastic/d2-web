@@ -3416,3 +3416,21 @@ int __fastcall UNITS_GetYPosition(D2UnitStrc* pUnit)
 		return 0;
 	}
 }
+
+// d2-web: the character-menu appearance bytes (d2s 0x88, written by INVENTORY_GetItemSaveGfxInfo) name a
+// component token by its index in gTxtComponentItemTypeMap. Character select draws the portrait from
+// them without a player unit: the token (the item's alternate gfx, else its code) and the weapon class
+// of the first Items.txt row carrying it. Returns 0 for an index with no token.
+extern "C" int D2WEB_ComponentToken(int nIndex, uint32_t* pCode, uint32_t* pWeaponClass)
+{
+	INVENTORY_InitializeComponentArray();
+	if (nIndex <= 0 || nIndex >= ARRAY_SIZE(gTxtComponentItemTypeMap) || !gTxtComponentItemTypeMap[nIndex].dwCode) return 0;
+	*pCode = (uint32_t)gTxtComponentItemTypeMap[nIndex].dwCode; *pWeaponClass = 0;
+	D2ItemDataTbl* pItemDataTbl = DATATBLS_GetItemDataTables();
+	for (int i = 0; i < pItemDataTbl->nItemsTxtRecordCount; ++i)
+	{
+		D2ItemsTxt* p = &pItemDataTbl->pItemsTxt[i];
+		if ((uint32_t)(p->dwAlternateGfx ? p->dwAlternateGfx : p->dwCode) == *pCode) { *pWeaponClass = p->dwWeapClass; break; }
+	}
+	return 1;
+}

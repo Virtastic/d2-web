@@ -16018,7 +16018,10 @@ void __fastcall AITHINK_Fn126_CatapultSpotter(D2GameStrc* pGame, D2UnitStrc* pUn
 {
 	constexpr int32_t nCatapultSkillIds[5] = { SKILL_CATAPULTCHARGEDBALL, SKILL_CATAPULTSPIKEBALL, SKILL_CATAPULTBLIZZARD, SKILL_CATAPULTPLAGUE, SKILL_CATAPULTMETEOR };
 
-	if (!pAiTickParam->pAiControl->dwAiParam[2] && AI_RollPercentage(pUnit) < 3)
+	// d2-web: retail 1.13c D2Game 0x6FCC4FE8: `mov ecx,[eax+1C]; test ecx,ecx; je 0x6FCC5026` skips the roll
+	// when dwAiParam[2] is 0 and runs the room check; otherwise it rolls (seed * 0x6AC690C5, % 100) and goes on
+	// only below 3. Upstream had && (roll only on the first think, check only then): s232 frame 15.
+	if (!pAiTickParam->pAiControl->dwAiParam[2] || AI_RollPercentage(pUnit) < 3)
 	{
 		D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
 		D2_ASSERT(pRoom);

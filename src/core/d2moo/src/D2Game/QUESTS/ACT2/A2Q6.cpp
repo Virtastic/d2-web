@@ -635,12 +635,12 @@ void __fastcall ACT2Q6_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 			pQuestData->pfCallback[QUESTEVENT_NPCDEACTIVATE] = ACT2Q6_Callback02_NpcDeactivate;
 			if (pQuest)
 			{
-				if (IsBadCodePtr((FARPROC)pQuestData->pfSeqFilter))
+				if (IsBadCodePtr((FARPROC)pQuest->pfSeqFilter))
 				{
 					FOG_DisplayAssert("pQuestInfo->pSequence", __FILE__, __LINE__);
 					exit(-1);
 				}
-				pQuestData->pfSeqFilter(pQuest);
+				pQuest->pfSeqFilter(pQuest);
 			}
 		}
 		else
@@ -1042,12 +1042,12 @@ bool __fastcall ACT2Q6_SeqCallback(D2QuestDataStrc* pQuestData)
 		return true;
 	}
 
-	if (IsBadCodePtr((FARPROC)pQuestData->pfSeqFilter))
+	if (IsBadCodePtr((FARPROC)pQuest->pfSeqFilter))
 	{
 		FOG_DisplayAssert("pQuestInfo->pSequence", __FILE__, __LINE__);
 		exit(-1);
 	}
-	return pQuestData->pfSeqFilter(pQuest);
+	return pQuest->pfSeqFilter(pQuest);
 }
 
 //D2Game.0x6FCA5900

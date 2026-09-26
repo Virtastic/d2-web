@@ -651,12 +651,14 @@ bool __fastcall ACT3Q5_SeqCallback(D2QuestDataStrc* pQuestData)
 		return false;
 	}
 
-	if (IsBadCodePtr((FARPROC)pQuestData->pfSeqFilter))
+	// d2-web: the next quest's own filter on its own data (retail 1.13c D2Game: every call through
+	// quest data +0xF0 is "mov ecx, R; call [R+0xF0]"; upstream ran this quest's filter on the next's data).
+	if (IsBadCodePtr((FARPROC)pQuest->pfSeqFilter))
 	{
 		FOG_DisplayAssert("pQuestInfo->pSequence", __FILE__, __LINE__);
 		exit(-1);
 	}
-	return pQuestData->pfSeqFilter(pQuest);
+	return pQuest->pfSeqFilter(pQuest);
 }
 
 //D2Game.0x6FCABBC0

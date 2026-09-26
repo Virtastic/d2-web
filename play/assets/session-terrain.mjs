@@ -35,6 +35,29 @@ export function screenDeltaToWorld(dx, dy) {
   };
 }
 
+/**
+ * The light map cell (subtile) each of a wall's SIX light entries reads, for a wall tile whose corner is
+ * (A, B) = the client's tile corner (worldX/Y * 5), by orientation. D2DDraw+0x7320 (read)
+ * lights a wall block at DT1 x from entry (x >> 5) to entry (x >> 5) + 1 of a six-entry array (blocks
+ * reach x 128, so entries 0..5 are all used); the hook recorded only the first four until an earlier change.
+ * Fitted on retail's records against the same frame's 48x48 light map: 21 Rogue Encampment captures
+ * (4 entries each) + 13 more with the player's light moving across walls, tree groups and 3/4 wall ends
+ * (all 6 entries) -- s257 checks every record.
+ *   2 (right wall)            (A - 5 + 2j, B + 2)
+ *   1 (left wall)             (A + 2, B + 5 - 2j)
+ *   3, 4, 12, 14 (the rest)   (A + 2, B + 5), (A + 2, B + 3), (A + 2, B + 2), (A + 2, B + 2), (A + 3, B + 2), (A + 5, B + 2)
+ *   7 (corner)                the right wall's line for j < 3, then the left wall's: (A + 2, B + 5 - 2j)
+ * Orientations not in the captures take the right wall's line (client-parity F42).
+ */
+export function wallLightCells(o, A, B, j) {
+  switch (o) {
+    case 1: return [A + 2, B + 5 - 2 * j];
+    case 3: case 4: case 12: case 14: return [[A + 2, B + 5], [A + 2, B + 3], [A + 2, B + 2], [A + 2, B + 2], [A + 3, B + 2], [A + 5, B + 2]][j];
+    case 7: return j < 3 ? [A - 5 + 2 * j, B + 2] : [A + 2, B + 5 - 2 * j];
+    default: return [A - 5 + 2 * j, B + 2];
+  }
+}
+
 export const SESSION_TILE_BYTES = 76;
 // Where the camera puts things, in retail's numbers:
 // the player -- and so every unit, projected relative to him -- is drawn 8 px ABOVE the canvas
@@ -127,7 +150,7 @@ export function readSessionLightmap(Module, ambientOverride = -1, occludeUnits =
   const at = (x, y) => cells[Math.max(0, Math.min(47, y - oy)) * 48 + Math.max(0, Math.min(47, x - ox))];
   const sv = new DataView(Module.HEAPU8.buffer, p + 16 + 48 * 48 * 2, 64 * 20), list = [];
   for (let i = 0; i < Math.min(64, v.getInt32(12, true)); i++) list.push([0, 4, 8, 12, 16].map((o) => sv.getInt32(i * 20 + o, true)));
-  return { origin: [ox, oy], ambient: v.getInt32(8, true), sources: v.getInt32(12, true), list, cells, blocked,
+  return { origin: [ox, oy], ambient: v.getInt32(8, true), sources: v.getInt32(12, true), list, cells, blocked, at,
     grid: (a, b) => { const g = new Array(64); for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) g[j * 8 + i] = at(a - 1 + i, b - 1 + j); return g; } };
 }
 
@@ -166,7 +189,8 @@ function recordTile(entry, files) {
   const t = entry.tile, px = entry.dt1Tile.pixels, floor = t.orientation === 0 || t.orientation === 15;
   const file = String(files[entry.slot] ?? '?').toLowerCase().replace(/\//g, '\\');
   list.push({ op: floor ? 'floor' : t.orientation === 13 ? 'shadowtile' : 'wall', path: `${file} ${t.orientation} ${t.mainIndex} ${t.subIndex}`, frame: entry.dt1Tile.rarity,   // the DRAWN art's rarity
-    x: entry.x - px.originX + (floor ? 80 : 0), y: entry.y - px.originY, mode: 0, hash: 0, a: t.worldX * 5, b: t.worldY * 5 });
+    x: entry.x - px.originX + (floor ? 80 : 0), y: entry.y - px.originY, mode: 0, hash: 0, a: t.worldX * 5, b: t.worldY * 5,
+    rect: [entry.x, entry.y, entry.bitmap.width, entry.bitmap.height] });   // the painted rectangle: a cull check reads it
 }
 
 /**
@@ -300,6 +324,41 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     if (litCache.size > 1500) litCache.clear();   // the light moves with the player: keep the cache bounded
     litCache.set(key, canvas); return canvas;
   }
+  // Wall lighting: a wall reaches D2DDraw slot 39 with four light
+  // entries, and D2DDraw+0x7320 lights each 32-px block from entry (blockX >> 5) to the next (corners
+  // left, right, right, left). The entries are light map cells, wallLightCells (fitted per orientation).
+  const wallCells = wallLightCells;
+  function litWall(path, dt1Tile, index, E) {
+    const key = `w${path}:${index}:${E.join(',')}`;
+    if (litCache.has(key)) return litCache.get(key);
+    const t = blendPl2(), px = dt1Tile.pixels;
+    if (!t || !px || !px.width) { litCache.set(key, null); return null; }
+    const idx = new Uint8Array(px.indices), opq = px.opaque;
+    for (const b of dt1Tile.blocks) {
+      const k = Math.min(4, Math.max(0, b.x >> 5)), Lv = E[k], Rv = E[k + 1];
+      const flat = 3 * Math.abs(Rv - Lv) < 10, L = Lv >> 3, R = Rv >> 3;
+      const iso = b.format === 1, rows = iso ? 15 : 32;
+      for (let r = 0; r < rows; r++) {
+        const skip = iso ? ISO_SKIP[r] : 0, run = iso ? ISO_RUN[r] : 32;
+        for (let col = 0; col < run; col++) {
+          const x = skip + col, yy = b.y + r - px.originY, xx = b.x + x - px.originX;
+          if (yy < 0 || yy >= px.height || xx < 0 || xx >= px.width) continue;
+          const q = yy * px.width + xx;
+          if (!opq[q]) continue;
+          const lvl = flat ? L : L + Math.floor((R - L) * x / 32);
+          idx[q] = t[1024 + lvl * 256 + px.indices[q]];
+        }
+      }
+    }
+    const rgba = new Uint8ClampedArray(idx.length * 4);
+    for (let q = 0; q < idx.length; q++) { if (!opq[q]) continue; rgba[q * 4] = t[idx[q] * 4]; rgba[q * 4 + 1] = t[idx[q] * 4 + 1]; rgba[q * 4 + 2] = t[idx[q] * 4 + 2]; rgba[q * 4 + 3] = 255; }
+    const canvas = documentObject.createElement('canvas'); canvas.width = px.width; canvas.height = px.height;
+    canvas.getContext('2d').putImageData(new ImageData(rgba, px.width, px.height), 0, 0);
+    if (litCache.size > 1500) litCache.clear();
+    litCache.set(key, canvas); return canvas;
+  }
+  let lightAmbient = null;   // the light map's ambient: roofs are lit flat at it
+  let lightCell = null;   // (subtileX, subtileY) -> the light map cell, for walls
   let lightGrid = null;   // (worldSubtileX, worldSubtileY) -> 36 corner intensities, or null (unlit)
 
   function bitmapFor(path, tile, index) {
@@ -327,7 +386,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   return {
     errors,
     /** Light floors from a grid source: fn(a, b) -> 36 intensities or null. */
-    setLightGrid(fn) { lightGrid = fn; },
+    setLightGrid(fn, cell = null, ambient = null) { lightGrid = fn; lightCell = fn ? cell : null; lightAmbient = fn ? ambient : null; },
     /**
      * Draw the level. `tiles` is parseSessionTiles output, `files` readLevelTileFiles output,
      * `player` the snapshot player (subtile coords). Floors (layer 0) draw before walls (layer 1)
@@ -361,7 +420,9 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         // animated floor but the current one by toggling it, and hidden walls (Inv_Wall.dt1 and the
         // like) carry it from their DS1/DRLG placement. Drawing them put every animation frame and
         // the editor-coloured invisible walls on screen.
-        if (tile.flags & 0x8) { hidden++; continue; }
+        // Not a shadow tile, though: retail draws Harrogath's main-gate shadows (maingate.dt1 13:1:2/7/8)
+        // with the bit set (s231 against retail's frame inside the gate, F34).
+        if ((tile.flags & 0x8) && tile.orientation !== 13) { hidden++; continue; }
         // An empty/failed slot is not fatal any more: the identity search below can still find
         // the tile in another library, which is the normal case now that librarySlot is per-room.
         const lib = library(tile.librarySlot, files);
@@ -414,7 +475,19 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
           `${tile.orientation}:${tile.mainIndex}:${tile.subIndex}:v${variantNo}`);
         // A tile the DT1 holds with no blocks at all (some shadow entries: Trees.dt1 13/1/n) is
         // empty in retail too -- drawn as nothing, not missing.
-        if (!bitmap && dt1Tile && dt1Tile.blocks && dt1Tile.blocks.length === 0) { empty++; continue; }
+        // Retail still SUBMITS it (s271: Trees.dt1 13/1/5 and 13/1/6 in the Black Marsh's draw list,
+        // anchored on screen): the draw list records it, nothing is painted.
+        if (!bitmap && dt1Tile && dt1Tile.blocks && dt1Tile.blocks.length === 0) {
+          empty++;
+          const list = globalThis.__d2DrawList;
+          if (Array.isArray(list) && tile.orientation !== 0 && tile.orientation !== 15) {
+            const ax = tile.screenX + offsetX + FLOOR_DX, ay = tile.screenY + offsetY + FLOOR_DY + 80;
+            if (ax >= 0 && ax < width && ay >= 0 && ay < height)
+              list.push({ op: tile.orientation === 13 ? 'shadowtile' : 'wall', path: `${String(files[foundSlot] ?? '?').toLowerCase().replace(/\//g, '\\')} ${tile.orientation} ${tile.mainIndex} ${tile.subIndex}`,
+                frame: dt1Tile.rarity, x: ax, y: ay, mode: 0, hash: 0, a: tile.worldX * 5, b: tile.worldY * 5, rect: [ax, ay, 0, 0] });
+          }
+          continue;
+        }
         if (!bitmap) {
           missing++;
           if (missingSample.length < 8) missingSample.push({ slot: tile.librarySlot, orientation: tile.orientation,
@@ -432,7 +505,10 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         // drawn through the floor entry with orientation 15 80 px higher. FLOOR_DY is this client's
         // camera constants (FLOOR_DX/FLOOR_DY, UNIT_CENTRE_Y) place the floors against the units.
         const px = dt1Tile.pixels;
-        const kindDy = tile.orientation === 0 ? 0 : tile.orientation === 15 ? -80 : 80;
+        // A roof (orientation 15) rises by its own DT1 roofHeight, not a fixed 80: every roof in retail's
+        // frames sits exactly roofHeight above the floor anchor (Act I Objects 15:0 and Harrogath's
+        // blacksmith 15:13 at 80; Buildingses 15:14 subs 10-30 at 160 by the main gate: s231, F34).
+        const kindDy = tile.orientation === 0 ? 0 : tile.orientation === 15 ? -(dt1Tile.roofHeight || 80) : 80;
         const drawX = x + FLOOR_DX + px.originX;
         const drawY = y + FLOOR_DY + px.originY + kindDy;
         // Culling, as retail's frames do it. A tile drawn
@@ -450,7 +526,8 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         // two would have caught it.
         const entry = { variantNo, bitmap, x: Math.round(drawX), y: Math.round(drawY), depth: y, ordinal: tile.ordinal, tile, dt1Tile, slot: foundSlot,
           want: `${tile.orientation}:${tile.mainIndex}:${tile.subIndex}`,
-          got: `${dt1Tile.orientation}:${dt1Tile.mainIndex}:${dt1Tile.subIndex}` };
+          got: `${dt1Tile.orientation}:${dt1Tile.mainIndex}:${dt1Tile.subIndex}`, file: files[foundSlot] ?? "", variant: tile.libraryIndex, wall: tile.layer !== 0,
+          seam: Boolean(tile.seam) };
         (tile.layer === 0 ? floors : walls).push(entry);
       }
 
@@ -458,6 +535,13 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       // A few real blits, so "the floor has holes" can be checked against pixels instead of guessed.
       const drawnSample = floors.slice(0, 6).map((f) => ({ x: f.x, y: f.y, w: f.bitmap.width, h: f.bitmap.height,
         want: f.want, got: f.got }));
+      // LOWER walls (orientation 16-19: cliff faces that hang DOWN from their anchor) go under the
+      // floor, before it, as OpenDiablo2's renderer does (renderTilePass1: lower walls, then floors,
+      // then shadows). Their 800-px art runs beneath the neighbouring ground, which covers it; drawn
+      // in the wall pass instead, their pale foot painted a vertical band over the Bloody Foothills'
+      // ground (client-parity F31).
+      const isLower = (e) => { const o = Number(e.want.split(':')[0]); return o >= 16 && o <= 19; };
+      for (const l of walls.filter(isLower).sort((a, b) => (a.depth - b.depth) || (a.ordinal - b.ordinal))) { ctx.drawImage(l.bitmap, l.x, l.y); drawn++; recordTile(l, files); }
       for (const f of floors) {
         const grid = lightGrid && lightGrid(f.tile.worldX * 5, f.tile.worldY * 5);
         const lit = grid && litFloor(files[f.slot], f.dt1Tile, f.want + ':v' + f.variantNo, grid);
@@ -470,10 +554,17 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       const key = (o) => o.sprite
         ? (o.sprite.wx === undefined ? [1e9, 0, 0, o.depth] : [Math.floor(o.sprite.wy / 5), Math.floor(o.sprite.wx / 5), 0, o.depth])
         : [o.tile.worldY, o.tile.worldX, 1, o.ordinal];
-      const overlay = walls.concat(sprites.map((s) => ({ sprite: s, depth: s.depth, ordinal: -1 })));
+      // Roofs (orientation 15) are retail's LAST terrain pass: every roof draw in arrival, the Den and the
+      // Cold Plains captures follows every wall and unit (arrival.txt: the six tent roofs at the end,
+      // rows then columns). Drawn in the overlay they sat under the tent's own walls.
+      const isRoof = (e) => e.tile.orientation === 15;
+      const overlay = walls.filter((e) => !isLower(e) && !isRoof(e)).concat(sprites.map((s) => ({ sprite: s, depth: s.depth, ordinal: -1 })));
+      const roofs = walls.filter((e) => !isLower(e) && isRoof(e));
+      for (const o of roofs) o.k = [o.tile.worldY, o.tile.worldX, 1, o.ordinal];
+      roofs.sort((a, b) => (a.k[0] - b.k[0]) || (a.k[1] - b.k[1]) || (a.k[3] - b.k[3]));
       for (const o of overlay) o.k = key(o);
       overlay.sort((a, b) => (a.k[0] - b.k[0]) || (a.k[1] - b.k[1]) || (a.k[2] - b.k[2]) || (a.k[3] - b.k[3]));
-      for (const o of overlay) {
+      for (const o of overlay.concat(roofs)) {
         if (o.sprite) { o.sprite.draw(ctx); continue; }
         if (o.tile.orientation === 13) {
           // A shadow tile blends into what is under it through PL2 AlphaBlend[0] (drawShadow; T8).
@@ -482,11 +573,24 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
             const prev = ctx.globalAlpha; ctx.globalAlpha = 1 - SHADOW_KEEP;
             ctx.drawImage(silhouette(o.bitmap), o.x, o.y); ctx.globalAlpha = prev;
           }
-        } else ctx.drawImage(o.bitmap, o.x, o.y);
+        } else {
+          const at = lightCell, A = o.tile.worldX * 5, B = o.tile.worldY * 5;
+          // A roof (orientation 15) goes through retail's FLOOR entry (op 31) with a floor light grid
+          // (768 bytes = 8x8 x 12) that is UNIFORM at the light map's ambient: every roof in arrival3 and
+          // lit0..1 (133, 144, 146 -- each capture's map minimum), whatever light is under it.
+          const roofGrid = o.tile.orientation === 15 && lightAmbient != null && new Array(64).fill(lightAmbient);
+          const lit = roofGrid ? litFloor(files[o.slot], o.dt1Tile, o.want + ':v' + o.variantNo, roofGrid) : at && litWall(files[o.slot], o.dt1Tile, o.want + ':v' + o.variantNo,
+            [0, 1, 2, 3, 4, 5].map((j) => { const [a, b] = wallCells(o.tile.orientation, A, B, j); return at(a, b); }));
+          ctx.drawImage(lit || o.bitmap, o.x, o.y);
+        }
         drawn++; recordTile(o, files);
       }
       const wrongIdentity = floors.concat(walls).filter((e) => e.want !== e.got).length;
-      return { drawn, missing, empty, hidden, rarityAmbiguous, missingSample, drawnSample, wrongIdentity, searched, ambiguous,
+      // Identity of every blit (level 2 evidence): which file, which (orientation:main:sub) was asked
+      // for and drawn, and the screen box it covers -- so a wrong patch on screen names its tiles.
+      const blits = floors.concat(walls).map((e) => ({ file: e.file, want: e.want, got: e.got, variant: e.variant,
+        x: e.x, y: e.y, w: e.bitmap.width, h: e.bitmap.height, wall: e.wall, seam: e.seam }));
+      return { drawn, missing, empty, hidden, rarityAmbiguous, blits, seam: floors.concat(walls).filter((e) => e.seam).length, missingSample, drawnSample, wrongIdentity, searched, ambiguous,
         floors: floors.length, walls: walls.length, sprites: sprites.length };
     },
   };

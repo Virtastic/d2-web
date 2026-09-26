@@ -53,14 +53,29 @@ export function createBlender(pl2, palette) {
   const index = new Map();
   for (let j = 255; j >= 0; j--) index.set((palette[j * 4] << 16) | (palette[j * 4 + 1] << 8) | palette[j * 4 + 2], j);
   const tables = { 3: pl2.subarray(PL2_ADDITIVE, PL2_ADDITIVE + 65536), 4: pl2.subarray(PL2_MULTIPLICATIVE, PL2_MULTIPLICATIVE + 65536) };
+  // World art normally reaches this compositor as an exact palette colour. UI scaling and an
+  // earlier blend do not, though. Source-index fallback makes an effect-3 cel opaque in that
+  // case; choose the nearest palette entry, as the other PL2 consumer (the NPC menu box) does.
+  const paletteIndex = (r, g, b) => {
+    const key = (r << 16) | (g << 8) | b;
+    let value = index.get(key);
+    if (value !== undefined) return value;
+    let best = 0, bestDistance = Infinity;
+    for (let j = 0; j < 256; j++) {
+      const dr = palette[j * 4] - r, dg = palette[j * 4 + 1] - g, db = palette[j * 4 + 2] - b;
+      const distance = dr * dr + dg * dg + db * db;
+      if (distance < bestDistance) { best = j; bestDistance = distance; }
+    }
+    index.set(key, best); return best;
+  };
   return (ctx, frame, left, top, mode) => {
     const table = tables[mode];
     if (!frame.width || !frame.height) return;
     const img = ctx.getImageData(left, top, frame.width, frame.height), d = img.data;
     for (let k = 0; k < frame.indices.length; k++) {
       if (!frame.opaque[k]) continue;
-      const under = index.get((d[k * 4] << 16) | (d[k * 4 + 1] << 8) | d[k * 4 + 2]);
-      const c = under === undefined ? frame.indices[k] : table[under * 256 + frame.indices[k]];
+      const under = paletteIndex(d[k * 4], d[k * 4 + 1], d[k * 4 + 2]);
+      const c = table[under * 256 + frame.indices[k]];
       d[k * 4] = palette[c * 4]; d[k * 4 + 1] = palette[c * 4 + 1]; d[k * 4 + 2] = palette[c * 4 + 2]; d[k * 4 + 3] = 255;
     }
     ctx.putImageData(img, left, top);

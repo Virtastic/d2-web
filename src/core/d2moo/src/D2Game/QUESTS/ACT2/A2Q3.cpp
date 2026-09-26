@@ -434,12 +434,12 @@ bool __fastcall ACT2Q3_SeqCallback(D2QuestDataStrc* pQuestData)
 		return false;
 	}
 
-	if (IsBadCodePtr((FARPROC)pQuestData->pfSeqFilter))
+	if (IsBadCodePtr((FARPROC)pQuest->pfSeqFilter))
 	{
 		FOG_DisplayAssert("pQuestInfo->pSequence", __FILE__, __LINE__);
 		exit(-1);
 	}
-	return pQuestData->pfSeqFilter(pQuest);
+	return pQuest->pfSeqFilter(pQuest);
 }
 
 //D2Game.0x6FCA1D10

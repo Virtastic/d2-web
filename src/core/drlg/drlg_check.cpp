@@ -4,6 +4,7 @@
 // The call sequence mirrors the capture exactly: LoadAct -> GetLevel -> InitLevel -> for each
 // RoomEx without an active room: AddRoomData / read collision grid / RemoveRoomData.
 #include <emscripten.h>
+#include <algorithm>
 #include <string>
 #include <vector>
 #include <D2Common.h>
@@ -47,7 +48,20 @@ extern void (*g_d2webOnTileRarity)(int);
 static std::vector<D2VecTilePick> g_picks;
 static int32_t g_pickRoom = -1; static uint32_t g_pickCall = 0; static int g_pickSumLeft = 0;
 static uint32_t g_pickSeed = 0; static uint8_t g_pickDiff = 0; static uint16_t g_pickLevel = 0;
+extern const D2DrlgRoomStrc* g_d2webTileCacheRoom;
+// Parallel to g_picks: the room's tile rectangle (x, y, w, h) and its seed low word at the lookup.
+static std::vector<int32_t> g_pickRooms;
+static std::string g_pickNear;
 static void onGetTiles(int type, int style, int seq, int n, int firstFrame) {
+    { const D2DrlgRoomStrc* q = g_d2webTileCacheRoom;
+      g_pickRooms.insert(g_pickRooms.end(), { q ? q->nTileXPos : -1, q ? q->nTileYPos : -1, q ? q->nTileWidth : 0, q ? q->nTileHeight : 0, q ? (int32_t)q->pSeed.nLowSeed : 0 }); }
+    // First sighting of a room: its near-room list in list order (drawhook logs retail's the same way).
+    { const D2DrlgRoomStrc* q = g_d2webTileCacheRoom; static std::vector<const D2DrlgRoomStrc*> seen;
+      if (g_picks.empty()) seen.clear();
+      if (q && std::find(seen.begin(), seen.end(), q) == seen.end()) { seen.push_back(q);
+        g_pickNear += "near room " + std::to_string(q->nTileXPos) + "," + std::to_string(q->nTileYPos) + " n=" + std::to_string(q->nRoomsNear) + ":";
+        for (int i = 0; i < q->nRoomsNear; i++) g_pickNear += " " + std::to_string(q->ppRoomsNear[i]->nTileXPos) + "," + std::to_string(q->ppRoomsNear[i]->nTileYPos);
+        g_pickNear += "\n"; } }
     D2VecTilePick r = {};
     r.seed = g_pickSeed; r.difficulty = g_pickDiff; r.act = g_actNo; r.level = g_pickLevel;
     r.room = g_pickRoom; r.call = g_pickCall++; r.type = type; r.style = style; r.sequence = seq;
@@ -189,16 +203,30 @@ EMSCRIPTEN_KEEPALIVE const char* d2_drlg_dirt_paths(int level) {
 }
 // Collect the tile pick stream (vectorfmt.h D2VecTilePick) from the next d2_drlg_act_begin on.
 EMSCRIPTEN_KEEPALIVE void d2_drlg_collect_picks(int enable) {
-    g_picks.clear();
+    g_picks.clear(); g_pickRooms.clear(); g_pickNear.clear();
     g_d2webOnGetTiles = enable ? onGetTiles : nullptr;
     g_d2webOnTileRarity = enable ? onTileRarity : nullptr;
 }
 EMSCRIPTEN_KEEPALIVE const D2VecTilePick* d2_drlg_picks() { return g_picks.data(); }
 EMSCRIPTEN_KEEPALIVE int d2_drlg_pick_count() { return (int)g_picks.size(); }
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_drlg_pick_rooms() { return g_pickRooms.data(); }
+EMSCRIPTEN_KEEPALIVE const char* d2_drlg_pick_near() { return g_pickNear.c_str(); }   // near lists, first sighting per room   // 5 per pick: room x, y, w, h (tiles), seed low
 EMSCRIPTEN_KEEPALIVE void d2_drlg_collect_tiles(int enable) { g_collectTiles = enable != 0; g_tiles.clear(); }
 EMSCRIPTEN_KEEPALIVE const D2DrlgTileRec* d2_drlg_tiles() { return g_tiles.data(); }
 EMSCRIPTEN_KEEPALIVE int d2_drlg_tile_count() { return (int)g_tiles.size(); }
 EMSCRIPTEN_KEEPALIVE const uint16_t* d2_drlg_grid() { return g_grid.data(); }
+int D2WEB_ComponentToken(int nIndex, uint32_t* pCode, uint32_t* pWeaponClass);
+// Character select's portrait: appearance index -> "tok wcl" (4-char token, 3-char weapon class; the
+// codes' trailing spaces trimmed), "" when the index names none. Needs the data tables (d2_drlg_init).
+static std::string g_componentToken;
+EMSCRIPTEN_KEEPALIVE const char* d2_component_token(int index) {
+    uint32_t code = 0, wclass = 0; g_componentToken.clear();
+    if (!D2WEB_ComponentToken(index, &code, &wclass)) return g_componentToken.c_str();
+    for (int i = 0; i < 4; i++) { char ch = (char)((code >> (8 * i)) & 0xFF); if (ch && ch != ' ') g_componentToken += ch; }
+    g_componentToken += ' ';
+    for (int i = 0; i < 4; i++) { char ch = (char)((wclass >> (8 * i)) & 0xFF); if (ch && ch != ' ') g_componentToken += ch; }
+    return g_componentToken.c_str();
+}
 EMSCRIPTEN_KEEPALIVE const char* d2_drlg_err() { return g_err.c_str(); }
 
 } // extern "C"

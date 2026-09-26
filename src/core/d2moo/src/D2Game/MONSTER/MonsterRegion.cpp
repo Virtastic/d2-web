@@ -645,6 +645,8 @@ void __fastcall D2GAME_PopulateRoom_6FC67190(D2GameStrc* pGame, D2ActiveRoomStrc
     if (pMonsterRegion->unk0x0C < 0)
     {
         pMonsterRegion->unk0x0C = DUNGEON_GetNumberOfPopulatedRoomsInLevel(pGame->pAct[pMonsterRegion->nAct], nLevelId);
+        // d2-web diagnosis (not retail): which of the level's rooms read as unpopulated when the count was taken.
+        { extern void d2_note_popzero(D2DrlgActStrc*, int32_t); d2_note_popzero(pGame->pAct[pMonsterRegion->nAct], nLevelId); }
     }
 
 #ifdef D2_MONS_TRACE

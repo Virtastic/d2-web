@@ -271,12 +271,12 @@ void __fastcall ACT2Q1_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 				D2QuestDataStrc* pQuest = QUESTS_GetQuestData(pQuestData->pGame, pQuestData->nSeqId);
 				if (pQuest)
 				{
-					if (IsBadCodePtr((FARPROC)pQuestData->pfSeqFilter))
+					if (IsBadCodePtr((FARPROC)pQuest->pfSeqFilter))
 					{
 						FOG_DisplayAssert("pQuestInfo->pSequence", __FILE__, __LINE__);
 						exit(-1);
 					}
-					pQuestData->pfSeqFilter(pQuest);
+					pQuest->pfSeqFilter(pQuest);
 				}
 			}
 		}
@@ -546,12 +546,12 @@ bool __fastcall ACT2Q1_SeqCallback(D2QuestDataStrc* pQuestData)
 		return false;
 	}
 
-	if (IsBadCodePtr((FARPROC)pQuestData->pfSeqFilter))
+	if (IsBadCodePtr((FARPROC)pQuest->pfSeqFilter))
 	{
 		FOG_DisplayAssert("pQuestInfo->pSequence", __FILE__, __LINE__);
 		exit(-1);
 	}
-	return pQuestData->pfSeqFilter(pQuest);
+	return pQuest->pfSeqFilter(pQuest);
 }
 
 //D2Game.0x6FCA0010

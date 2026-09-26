@@ -2,10 +2,23 @@ import { decodeWav } from './wav.mjs';
 
 export const ACT_MUSIC = Object.freeze(['Act1\\town1.wav', 'Act2\\town2.wav', 'Act3\\town3.wav', 'Act4\\town4.wav', 'Act5\\xtown.wav']);
 
-export function createActMusicPlayer(read, AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext) {
+// Every browser starts a fresh AudioContext 'suspended' until a user gesture (
+// "Support matrix": iOS always; Chrome/Firefox once autoplay heuristics decide there was none). This
+// resumes it on the FIRST pointer, key, touch or gamepad activity anywhere on the page, rather than waiting for whatever later UI click happens to call `play()` --
+// so town music can start the instant a level loads, not on some second, unrelated click.
+function unlockOnGesture(context, target = globalThis.window) {
+  if (typeof target?.addEventListener !== 'function' || context.state !== 'suspended') return;
+  const controller = new AbortController();
+  const unlock = () => { context.resume().catch(() => {}); controller.abort(); };
+  const opts = { signal: controller.signal, passive: true };
+  for (const type of ['pointerdown', 'keydown', 'touchstart', 'gamepadconnected']) target.addEventListener(type, unlock, opts);
+}
+
+export function createActMusicPlayer(read, AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext, gestureTarget = globalThis.window) {
   if (typeof read !== 'function') throw new TypeError('retail asset reader is required');
   if (!AudioContextClass) throw new Error('Web Audio is unavailable');
   const context = new AudioContextClass(), buffers = new Map();
+  unlockOnGesture(context, gestureTarget);
   let source = null, activeAct = -1;
   async function prepare(act0) {
     const act = Math.min(4, Math.max(0, Math.trunc(Number(act0) || 0)));

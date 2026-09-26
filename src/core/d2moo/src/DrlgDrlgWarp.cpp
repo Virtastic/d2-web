@@ -95,6 +95,18 @@ void __fastcall DRLGWARP_UpdateWarpRoomDeselect(D2DrlgRoomStrc* pDrlgRoom, int n
 //TODO: Name
 D2ActiveRoomStrc* __fastcall sub_6FD788D0(D2DrlgStrc* pDrlg, int nLevelId, int nTileIndex, int* pX, int* pY)
 {
+	// Sanitizer-flagged: nTileIndex (this function's
+	// parameter) and pLevel->pTileInfo[i].nTileIndex both index this table with no bounds check in
+	// retail (confirmed in Ghidra: D2Common.dll 1.13c's function at VA 0x6FD69B60 reads the table
+	// at 0x6FDE4F48 by index, 8 bytes an entry, with no guard) -- and the sweep caught index 32, past the 14
+	// entries this table's own initializer names. Retail's read at index 32 lands in its own
+	// neighbouring .rdata: the C-string literals that follow this table in D2Common.dll ("armtype",
+	// "composit(e)", "objmode", "objtype", the "xx_Dir" tile-type name list). That is retail's
+	// answer, byte for byte, not meaningful D2CoordStrc data -- so entries 14-32 below are those
+	// same bytes (found by byte-pattern match at D2Common.dll 1.13c file offset 0x94f48, VA
+	// 0x6fde4f48, image base 0x6fd50000; ~/d2-retail/D2Common.dll, byte-identical to
+	// retail/D2/D2SE/CORES/1.13c/D2Common.dll here), so an in-bounds read of THIS array gives
+	// retail's exact undefined-behaviour result instead of whatever wasm happens to keep at +256.
 	static const D2CoordStrc stru_6FDCE6A0[] =
 	{
 		{ 1, 0 },
@@ -110,7 +122,27 @@ D2ActiveRoomStrc* __fastcall sub_6FD788D0(D2DrlgStrc* pDrlg, int nLevelId, int n
 		{ 0, 2 },
 		{ 0, 3 },
 		{ 0, 4 },
-		{ 0, 5 }
+		{ 0, 5 },
+		// -- retail's own neighbouring .rdata past this point, not real coordinates; see above --
+		{ 1953329761, 6647929 },
+		{ 1886220131, 1953067887 },
+		{ 0, 1835688559 },
+		{ 6644847, 1953129071 },
+		{ 6647929, 1147096658 },
+		{ 29289, 1147097427 },
+		{ 29289, 1147093579 },
+		{ 29289, 1147094084 },
+		{ 29289, 1147090003 },
+		{ 29289, 1147089747 },
+		{ 29289, 1147089491 },
+		{ 29289, 1147089235 },
+		{ 29289, 1147093843 },
+		{ 29289, 1147096130 },
+		{ 29289, 1147089473 },
+		{ 29289, 1147089217 },
+		{ 29289, 1147095111 },
+		{ 29289, 1147096151 },
+		{ 29289, 1147098446 },
 	};
 
 	D2LevelDefBin* pLevelDefBinRecord = NULL;

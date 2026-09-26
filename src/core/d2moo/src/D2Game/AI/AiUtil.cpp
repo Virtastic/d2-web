@@ -47,8 +47,11 @@ struct D2UnkAiTableStrc
 //Inlined in D2Game.0x6FCF1210 and D2Game.0x6FCF1310
 int32_t __fastcall AIUTIL_GetDistanceToCoordinatesWithSize(D2UnitStrc* pUnit, int32_t nX, int32_t nY, int32_t nSize)
 {
-	const int32_t nXFinal = std::abs(std::abs(CLIENTS_GetUnitX(pUnit) - nX) - nSize);
-	const int32_t nYFinal = std::abs(std::abs(CLIENTS_GetUnitY(pUnit) - nY) - nSize);
+	// d2-web: retail 1.13c D2Game 0x6FCD0AED..0AFB (the full-size distance the target scan uses): each axis is
+	// |d| - size, CLAMPED at 0 (`sub; test; jge; xor`), not |(|d| - size)|. Upstream's abs made a unit whose
+	// footprint overlaps read farther than one exactly at arm's length (s233, act5barb1 #99 at frame 298).
+	const int32_t nXFinal = std::max(std::abs(CLIENTS_GetUnitX(pUnit) - nX) - nSize, 0);
+	const int32_t nYFinal = std::max(std::abs(CLIENTS_GetUnitY(pUnit) - nY) - nSize, 0);
 
 	if (nXFinal <= nYFinal)
 	{
@@ -721,7 +724,11 @@ D2UnitStrc* __fastcall sub_6FCF2110(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiCo
 			arg.pAlternativeTarget = nullptr;
 			arg.nAlternativeDistance = INT_MAX;
 
-			if (sub_6FCF1E80(pGame, pUnit, &arg, nullptr, 5) && arg.pAlternativeTarget && sub_6FCF27B0(pUnit, &arg.pTarget, &arg.nDistance, arg.pAlternativeTarget, arg.nAlternativeDistance))
+			// d2-web: retail 1.13c D2Game 0x6FCD2075 calls the scan, THEN tests the alternative (0x6FCD207A:
+			// mov eax,[esp+4C]; test eax,eax; je; ... call 0x6FCD1AB0): the scan's result is not a condition
+			// (its callback always returns null, so upstream's `scan && ...` never took the alternative).
+			sub_6FCF1E80(pGame, pUnit, &arg, nullptr, 5);
+			if (arg.pAlternativeTarget && sub_6FCF27B0(pUnit, &arg.pTarget, &arg.nDistance, arg.pAlternativeTarget, arg.nAlternativeDistance))
 			{
 				pTargetUnit = arg.pAlternativeTarget;
 				nDistanceToTarget = arg.nAlternativeDistance;
@@ -796,6 +803,10 @@ D2UnitStrc* __fastcall sub_6FCF2110(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiCo
 				}
 			}
 
+			// d2-web: the good-aligned monsters' list (node 8: NpcBarb and the monster-region spawns register there,
+			// sub_6FC40280(.., 8)). The loop above leaves pTargetNode at player slot 7, so this walk never reached it:
+			// Harrogath's minions never targeted act5barb1 (s232 frame 15; retail's minion #13 targets barb #11).
+			pTargetNode = pGame->pTargetNodes[8];
 			while (pTargetNode)
 			{
 				if (pUnit->nAct == pTargetNode->pUnit->nAct)

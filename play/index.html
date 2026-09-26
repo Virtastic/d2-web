@@ -1,26 +1,71 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>d2-web</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050505">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<!-- iOS has no manifest support: Add to Home Screen reads these instead. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="D2 Web">
+<link rel="apple-touch-icon" href="assets/icon.svg">
+<script>
+// Test-only viewport override for wasm-build/scenarios/s320: the
+// harness launches one fixed-size Chrome window (no CDP resize yet, "Proving it"),
+// so this lets a scenario ask the SAME CSS the real 100dvw/100dvh path uses to letterbox the canvas
+// at a second, different size. Absent (and inert) on every real visit.
+(() => {
+  const m = /[?&]viewport=(\d+)x(\d+)/.exec(location.search);
+  if (!m) return;
+  document.documentElement.style.setProperty('--d2-vw', m[1] + 'px');
+  document.documentElement.style.setProperty('--d2-vh', m[2] + 'px');
+})();
+</script>
 <style>
-  :root{color-scheme:dark} *{box-sizing:border-box}
-  body{background:#050505;color:#ccc;font:14px monospace;margin:0;min-height:100vh;display:grid;place-items:center}
-  main{width:min(100vw,1000px);padding:16px}
-  h1{font:26px Georgia,serif;color:#c9ad68;margin:0 0 10px;letter-spacing:.08em}
-  #viewport{position:relative;border:1px solid #493d27;background:#080a08;box-shadow:0 8px 40px #000}
-  canvas{display:block;width:100%;aspect-ratio:4/3;outline:none;image-rendering:pixelated}
+  :root{color-scheme:dark;--d2-vw:100dvw;--d2-vh:100dvh} *{box-sizing:border-box}
+  body{background:#050505;color:#ccc;font:14px monospace;margin:0;min-height:100dvh;display:grid;place-items:center}
+  main{width:min(var(--d2-vw),1000px);padding:16px}
+  h1{font:26px/30px Georgia,serif;height:30px;color:#c9ad68;margin:0 0 10px;letter-spacing:.08em}
+  /* the largest 4:3 box that fits BOTH main's own width budget (unchanged) and the viewport's
+     height (new) -- width is the min of the two so aspect-ratio (definite width -> derived height)
+     never needs to guess; margin:auto centres it when the height term wins. The -60px is what sits
+     above it in the window: main's 16px padding, the 30px heading and its 10px margin, #viewport's border. */
+  #viewport{position:relative;border:1px solid #493d27;background:#080a08;box-shadow:0 8px 40px #000;
+    width:min(100%, (var(--d2-vh) - 60px) * 4 / 3);aspect-ratio:4/3;margin:0 auto}
+  canvas{display:block;width:100%;height:100%;outline:none;image-rendering:pixelated}
   #hud{position:absolute;left:12px;top:10px;margin:0;color:#ddd;text-shadow:1px 1px #000;pointer-events:none;line-height:1.45}
   #session-bar{display:flex;align-items:center;gap:12px;margin:.55rem 0}.controls{color:#756c5a;font-size:12px}
   #session-status{color:#958968;flex:1}select{background:#100f0c;color:#c9ad68;border:1px solid #493d27;padding:4px 8px}
   #log{max-height:8rem;overflow:auto;color:#777;font-size:11px;white-space:pre-wrap}
+  /* the game is the page. The heading, session bar, key list and debug log are a
+     desktop developer's chrome -- on a phone held sideways they made the page taller than the screen --
+     so a coarse pointer drops them and the 4:3 box takes the largest size the whole screen allows. */
+  @media (pointer: coarse){
+    main{width:var(--d2-vw);padding:0}
+    h1,#session-bar,.controls,#log,#hud{display:none}
+    #viewport{border:0;box-shadow:none;width:min(100%, var(--d2-vh) * 4 / 3)}
+  }
+  #unsupported{display:none;max-width:560px;padding:20px 24px;margin-top:8px;border:1px solid #493d27;background:#0b0c09;line-height:1.6}
+  #unsupported h2{color:#c9ad68;margin:0 0 10px;font:20px Georgia,serif}
+  body.unsupported #viewport,body.unsupported #session-bar,body.unsupported .controls,body.unsupported #log{display:none}
+  body.unsupported #unsupported{display:block}
 </style>
 <main>
   <h1>DIABLO II · WEB</h1>
-  <div id="viewport"><canvas id="game" width="800" height="600" tabindex="0" aria-label="Diablo II game viewport"></canvas><pre id="hud"></pre></div>
+  <div id="unsupported" role="alert">
+    <h2>Can't run here</h2>
+    <p><strong data-field="browser"></strong> cannot run d2-web: missing <span data-field="missing"></span>.</p>
+    <p>Runs today on <span data-field="supported"></span>.</p>
+  </div>
+  <div id="viewport"><canvas id="game" width="800" height="600" tabindex="0" aria-label="Diablo II game viewport"></canvas><pre id="hud"></pre><div id="touch-overlay"></div></div>
   <div id="session-bar"><div id="session-status">starting engine…</div><label>Class <select id="class-select" disabled></select></label><label>World <select id="act-select" disabled></select></label></div>
   <div class="controls">Move: WASD / arrows / left click · Attack: Space · Right skill: 1 Attack, 2 Throw, 3 Kick · Use: right click · Interact / exit: E · Travel (caravan): T · Inventory: I · Respawn: R · Cancel: Esc</div>
   <pre id="log"></pre>
 </main>
 <script type="module" src="gameplay-shell.mjs"></script>
+<script type="module" src="assets/input-controller.mjs"></script>
+<script type="module" src="assets/input-touch.mjs"></script>
 <!-- version-engine.sh rewrites this src into e/<hash>/ alongside the engine. -->
 <script src="streamfs.js"></script>
 <script>
@@ -34,9 +79,32 @@ window.__d2 = { ready: false, smoke: null, error: null };
 // Stamped by version-engine.sh; untouched placeholder = local dev, engine next to this page.
 const VER = '__ENGINE_VERSION__';
 const ENGINE_DIR = VER.startsWith('__') ? '' : 'e/' + VER + '/';
+function showUnsupported(info) {
+  document.querySelector('#unsupported [data-field=browser]').textContent = info.browser;
+  document.querySelector('#unsupported [data-field=missing]').textContent = info.missing.join(' and ');
+  document.querySelector('#unsupported [data-field=supported]').textContent = info.supportedBrowsers;
+  document.body.classList.add('unsupported');
+}
 (async () => {
   try {
-    if (!crossOriginIsolated) throw new Error('not crossOriginIsolated: COOP/COEP headers missing');
+    // Capability probe, run before anything else touches the engine:
+    // crossOriginIsolated (COOP/COEP -> SharedArrayBuffer -> streamfs) and Memory64 (the engine's
+    // build,. Missing either gets a readable screen naming the
+    // browser and what runs the game -- never an exception in the debug log below.
+    // ?unsupported=1 is a test-only switch (wasm-build/scenarios/s321): it forces this branch in a
+    // browser that actually does support both, so the screen itself can be asserted anywhere.
+    const { probeCapabilities, unsupportedMessage } = await import('./assets/platform-probe.mjs');
+    const forceUnsupported = /[?&]unsupported=1/.test(location.search);
+    const caps = forceUnsupported ? { crossOriginIsolated: false, memory64: false, supported: false } : probeCapabilities();
+    if (!caps.supported) {
+      const info = unsupportedMessage(caps);
+      window.__d2Platform = { ...caps, ...info };
+      showUnsupported(info);
+      window.__d2 = { ready: true, smoke: null, error: null };
+      log('unsupported: ' + info.text);
+      return;
+    }
+    window.__d2Platform = caps;
     const head = await fetch('smoke.mpq', { method: 'HEAD' });
     if (!head.ok) throw new Error('smoke.mpq: HTTP ' + head.status);
     const size = Number(head.headers.get('content-length'));

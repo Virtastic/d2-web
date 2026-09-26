@@ -572,18 +572,20 @@ bool __fastcall ACT3Q4_SeqCallback(D2QuestDataStrc* pQuestData)
 	D2QuestDataStrc* pQuest = QUESTS_GetQuestData(pQuestData->pGame, pQuestData->nSeqId);
 	if (pQuest)
 	{
-		if (IsBadCodePtr((FARPROC)pQuestData->pfSeqFilter))
+		// d2-web: the next quest's own filter on its own data (see A3Q1).
+		if (IsBadCodePtr((FARPROC)pQuest->pfSeqFilter))
 		{
 			FOG_DisplayAssert("pQuestInfo->pSequence", __FILE__, __LINE__);
 			exit(-1);
 		}
-		bResult = pQuestData->pfSeqFilter(pQuest);
+		bResult = pQuest->pfSeqFilter(pQuest);
 	}
 
 	D2QuestDataStrc* pQuestData17 = QUESTS_GetQuestData(pQuestData->pGame, QUEST_A3Q3_GIDBINN);
 	if (pQuestData17)
 	{
-		if (IsBadCodePtr((FARPROC)pQuestData->pfSeqFilter))
+		// d2-web: the pointer tested is the one called (retail tests [R+0xF0] and calls [R+0xF0], same R).
+		if (IsBadCodePtr((FARPROC)pQuestData17->pfSeqFilter))
 		{
 			FOG_DisplayAssert("pQuestInfo->pSequence", __FILE__, __LINE__);
 			exit(-1);

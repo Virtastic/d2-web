@@ -663,12 +663,12 @@ bool __fastcall ACT2Q4_SeqCallback(D2QuestDataStrc* pQuestData)
 		return true;
 	}
 
-	if (IsBadCodePtr((FARPROC)pQuestData->pfSeqFilter))
+	if (IsBadCodePtr((FARPROC)pQuest->pfSeqFilter))
 	{
 		FOG_DisplayAssert("pQuestInfo->pSequence", __FILE__, __LINE__);
 		exit(-1);
 	}
-	pQuestData->pfSeqFilter(pQuest);
+	pQuest->pfSeqFilter(pQuest);
 	return true;
 }
 

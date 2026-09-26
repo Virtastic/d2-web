@@ -43,6 +43,10 @@ export function readSaveHeader(bytes) {
     level: bytes[OFF_LEVEL],
     difficulty, act0: Math.min(act0, 4),
     bytes: bytes.length,
+    // The character-menu appearance (D2SaveHeaderStrc 0x88: 16 component indices, 0x98: 16 colours),
+    // written by INVENTORY_GetItemSaveGfxInfo; character select draws the portrait from it.
+    appearance: bytes.length >= 0xA8 ? Array.from(bytes.subarray(0x88, 0x98)) : null,
+    appearanceColours: bytes.length >= 0xA8 ? Array.from(bytes.subarray(0x98, 0xA8)) : null,
   };
 }
 
@@ -72,22 +76,35 @@ function run(db, mode, fn) {
 /**
  * The character store. Every method rejects rather than swallowing: a save that silently did not
  * happen is the worst outcome here, because the player only finds out when the character is gone.
+ *
+ * `navigator.storage.persist()` is requested once, at the first `put()`:
+ * Safari evicts a site's storage after 7 days with no interaction ("Support
+ * matrix"), and a save is the one thing here that must survive that. Best-effort and never awaited
+ * into the save path -- a browser that refuses or lacks the API still gets the save; it just keeps
+ * the eviction risk the support matrix already documents.
  */
-export function createSaveStore({ indexedDBObject = globalThis.indexedDB } = {}) {
-  let dbPromise = null;
+export function createSaveStore({ indexedDBObject = globalThis.indexedDB, storageManager = globalThis.navigator?.storage } = {}) {
+  let dbPromise = null, persistRequested = false;
   const db = () => (dbPromise ??= open(indexedDBObject));
+  function requestPersistOnce() {
+    if (persistRequested) return;
+    persistRequested = true;
+    try { storageManager?.persist?.().catch(() => {}); } catch {}
+  }
 
   return {
     async put(bytes) {
       const header = readSaveHeader(bytes);
       if (!header) throw new Error('refusing to store bytes that are not a .d2s');
       if (!header.name) throw new Error('refusing to store a character with no name');
+      requestPersistOnce();
       // Stored as a plain copy: a view onto wasm memory would be invalidated by the next growth.
       const record = { name: header.name, playerClass: header.playerClass, level: header.level,
         saved: Date.now(), data: Uint8Array.from(bytes) };
       await run(await db(), 'readwrite', (store) => store.put(record));
       return header;
     },
+    get persistRequested() { return persistRequested; },
     async get(name) {
       const record = await run(await db(), 'readonly', (store) => store.get(name));
       return record ? Uint8Array.from(record.data) : null;

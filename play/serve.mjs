@@ -17,7 +17,8 @@ const ROOT = process.argv[3] ? resolve(process.argv[3]) + sep : fileURLToPath(ne
 const PORT = Number(process.argv[2] || process.env.PORT || 8920);
 const RETAIL = process.env.D2_RETAIL_DIR ? resolve(process.env.D2_RETAIL_DIR) + sep : null;
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.wasm': 'application/wasm',
-  '.json': 'application/json', '.mpq': 'application/octet-stream', '.txt': 'text/plain' };
+  '.json': 'application/json', '.mpq': 'application/octet-stream', '.txt': 'text/plain',
+  '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png' };
 
 createServer((req, res) => {
   const url = new URL(req.url, 'http://x');

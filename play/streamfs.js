@@ -68,6 +68,43 @@
   // so eviction pops the first (oldest) key. No separate order array → O(1) hit path, no linear scan.
   const S = { worker: null, ctrl: null, data: null, cache: new Map(), nextId: 1, urlSrcs: new Map() };
 
+  // d2-web divergence: MEASURED 2026-09-25 -- in Firefox 156 the worker+Atomics round trip below
+  // never completes. The Range fetch's own headers resolve in milliseconds (confirmed by a
+  // Firefox-side timestamp taken right after `await fetch`), but `await r.arrayBuffer()` inside the
+  // worker then stalls for the full 30s timeout, and the body is delivered the instant the spinning
+  // main-thread loop stops (the `dbgStore` completion message and the timeout's throw land within a
+  // few ms of each other every time). A worker's own thread is independent of the main thread's JS,
+  // but its fetch body still has to cross back through the content process's networking/IPC path,
+  // and that path only advances when the main thread returns to the event loop -- which the
+  // Atomics-poll loop below never does. Chrome's network stack is fully out-of-process and does not
+  // have this dependency, so the same code boots there in milliseconds; a synthetic repro (a bare
+  // Range fetch from a Worker, no main-thread spin) also returns instantly in Firefox, isolating the
+  // main-thread spin as the cause, not the server or the Range request itself.
+  //
+  // Firefox (unlike Chrome, matching this file's own "modern Chrome forbids synchronous binary XHR"
+  // note above) still runs a synchronous XMLHttpRequest to completion on the main thread when its
+  // responseType is left at the default ('text' -- setting 'arraybuffer' throws for a sync request in
+  // BOTH browsers, that part of the comment above was never Chrome-specific). Reading the bytes back
+  // through the classic `overrideMimeType('text/plain; charset=x-user-defined')` trick (each char
+  // code is one raw byte, 0-255) sidesteps the worker/Atomics path -- and therefore this stall --
+  // entirely. Used only for URL-sourced (server-hosted) reads on Firefox: it needs no worker round
+  // trip at all, so it also skips the persistent Cache-API chunk store the worker keeps for the other
+  // browsers (a speed loss noted here, not a correctness one -- ).
+  const IS_FIREFOX = typeof navigator !== 'undefined' && /Firefox\//.test(navigator.userAgent || '');
+  function fetchRangeSyncXHR(url, start, end) {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', url, false);
+    xhr.overrideMimeType('text/plain; charset=x-user-defined');
+    xhr.setRequestHeader('Range', 'bytes=' + start + '-' + (end - 1));
+    xhr.send(null);
+    if (xhr.status !== 206 && xhr.status !== 200) throw new Error('streamfs: HTTP ' + xhr.status + ' ' + url);
+    // A 200 is a server that ignored Range and sent the whole file: take this chunk's slice of it.
+    const text = xhr.status === 200 ? xhr.responseText.slice(start, end) : xhr.responseText;
+    const chunk = new Uint8Array(text.length);
+    for (let i = 0; i < text.length; ++i) chunk[i] = text.charCodeAt(i) & 0xff;
+    return chunk;
+  }
+
   // Streaming cost counters, exposed as window.__streamfsStats. Chunk misses block the main thread
   // (see fetchChunkSync), so this is the only place the stall is observable. Two adds per read —
   // cheap enough to leave always-on, unlike the flag-gated ?glcount/?perfstats probes.
@@ -174,6 +211,16 @@
       S.cache.delete(cacheKey); S.cache.set(cacheKey, hit); // move-to-end (most-recently-used)
       ST.hits++;
       return hit;
+    }
+    // d2-web divergence: Firefox's worker+Atomics round trip stalls (see IS_FIREFOX above) --
+    // read URL sources with a direct synchronous XHR instead, no worker or spin needed.
+    if (IS_FIREFOX && src.url) {
+      const t0f = performance.now();
+      const chunk = fetchRangeSyncXHR(src.url, start, end);
+      ST.misses++; ST.stallMs += performance.now() - t0f; ST.bytes += chunk.length;
+      S.cache.set(cacheKey, chunk);
+      if (S.cache.size > LRU_MAX) { S.cache.delete(S.cache.keys().next().value); ST.evictions++; }
+      return chunk;
     }
     const gen = ++generation;
     // Backlog 389: a miss right after the previous chunk of the same file is a sequential

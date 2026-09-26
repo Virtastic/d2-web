@@ -536,7 +536,10 @@ void __fastcall DRLG_CreateRoomForRoomEx(D2DrlgStrc* pDrlg, D2DrlgRoomStrc* pDrl
 			dwFlags = 0;
 		}
 
-		pDrlgRoom->pRoom = DUNGEON_AllocRoom(pDrlg->pAct, pDrlgRoom, &pDrlgCoords, &pDrlgRoom->pTileGrid->pTiles, (int)SEED_RollRandomNumber(&pDrlgRoom->pSeed), dwFlags);
+		const int nD2webRoomSeed = (int)SEED_RollRandomNumber(&pDrlgRoom->pSeed);
+		// d2-web diagnosis (not retail): the order rooms are created in, and the seed each active room gets.
+		{ extern void d2_note_room_create(int, int, int, int); d2_note_room_create(pDrlgRoom->pLevel ? pDrlgRoom->pLevel->nLevelId : -1, pDrlgRoom->nTileXPos * 5, pDrlgRoom->nTileYPos * 5, nD2webRoomSeed); }
+		pDrlgRoom->pRoom = DUNGEON_AllocRoom(pDrlg->pAct, pDrlgRoom, &pDrlgCoords, &pDrlgRoom->pTileGrid->pTiles, nD2webRoomSeed, dwFlags);
 	}
 }
 

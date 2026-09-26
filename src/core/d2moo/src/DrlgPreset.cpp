@@ -1,6 +1,7 @@
 #include "Drlg/D2DrlgPreset.h"
 
 #include <algorithm>
+#include <cstring>
 
 #include <Archive.h>
 #include <D2CMP.h>
@@ -118,9 +119,18 @@ struct D2DS1FileStrc
 	int32_t pData[1];
 };
 
+// A DS1's string section (nVersion >= 3) is skipped byte-for-byte (strlen + 1), which can leave
+// pData on a non-4-byte boundary for the rest of the file: every int32 after it, and every layer
+// pointer derived from it, is then read at an address a plain `*(int32_t*)p` may fault on under
+// wasm64 Safe Heap (the same class as MonsterRegion.cpp's packed array). Retail's x86
+// code reads it unaligned without issue, so the fix is memcpy, never re-deriving the offset: any
+// padding here would parse a different byte, changing every roll drawn from the file downstream.
 static int32_t ReadInt32(int32_t*& pData)
 {
-	return *(pData++);
+	int32_t v;
+	memcpy(&v, pData, sizeof(v));
+	++pData;
+	return v;
 }
 
 static void SkipInt32s(int32_t*& pData, uint32_t nbToSkip)
@@ -220,7 +230,10 @@ void __fastcall DRLGPRESET_ParseDS1File(D2DrlgFileStrc* pDrlgFile, HD2ARCHIVE hA
 			int* pTileTypeLayer = (int*)pDrlgFile->pTileTypeLayer[j];
 			for (int i = 0; i < nArea; ++i)
 			{
-				pTileTypeLayer[i] = DRLGPRESET_MapTileType(pTileTypeLayer[i]);
+				int32_t v;
+				memcpy(&v, &pTileTypeLayer[i], sizeof(v));
+				v = DRLGPRESET_MapTileType(v);
+				memcpy(&pTileTypeLayer[i], &v, sizeof(v));
 			}
 		}
 	}

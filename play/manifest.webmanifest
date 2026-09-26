@@ -1,0 +1,13 @@
+{
+  "name": "Diablo II: Web",
+  "short_name": "D2 Web",
+  "description": "A decompile-derived, 1:1 wasm64 reimplementation of Diablo II: Lord of Destruction 1.13c.",
+  "start_url": "./index.html?retail=1",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#050505",
+  "theme_color": "#050505",
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

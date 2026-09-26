@@ -280,12 +280,12 @@ bool __fastcall ACT5Q4_SeqCallback(D2QuestDataStrc* pQuestData)
 		return false;
 	}
 
-	if (IsBadCodePtr((FARPROC)pQuestData->pfSeqFilter))
+	if (IsBadCodePtr((FARPROC)pQuest->pfSeqFilter))
 	{
 		FOG_DisplayAssert("pQuestInfo->pSequence", __FILE__, __LINE__);
 		exit(-1);
 	}
-	return pQuestData->pfSeqFilter(pQuest);
+	return pQuest->pfSeqFilter(pQuest);
 }
 
 //D2Game.0x6FCB5F70
@@ -341,12 +341,12 @@ void __fastcall ACT5Q4_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 			return;
 		}
 
-		if (IsBadCodePtr((FARPROC)pQuestData->pfSeqFilter))
+		if (IsBadCodePtr((FARPROC)pQuest->pfSeqFilter))
 		{
 			FOG_DisplayAssert("pQuestInfo->pSequence", __FILE__, __LINE__);
 			exit(-1);
 		}
-		pQuestData->pfSeqFilter(pQuest);
+		pQuest->pfSeqFilter(pQuest);
 	}
 }
 

@@ -1526,12 +1526,14 @@ __forceinline void __fastcall UNITS_UpdateCastAnimRateAndVelocity(D2UnitStrc* pU
 //1.13c: D2Common.0x6FD7EFC0
 BOOL UNITS_IsAnimModeGetHit(int nUnitType, int nAnimMode)
 {
+	// d2-web: D2MOO tested the BLOCK modes here (a copy of UNITS_IsAnimModeBlocking), so a get-hit ran
+	// at the full base rate instead of base * (FHR + 50) / 100; s212 captured retail's 128 against our 256.
 	switch (nUnitType)
 	{
 	case UNIT_PLAYER:
-		return nAnimMode == PLRMODE_BLOCK;
+		return nAnimMode == PLRMODE_GETHIT;
 	case UNIT_MONSTER:
-		return nAnimMode == MONMODE_BLOCK;
+		return nAnimMode == MONMODE_GETHIT;
 	default:
 		return FALSE;
 

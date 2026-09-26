@@ -9,6 +9,7 @@ import { createMonsterRenderer, parseMonsterAnimations } from './assets/monster-
 import { createObjectRenderer, parseObjectPresentations } from './assets/object-renderer.mjs';
 import { createItemRenderer, parseItemPresentations } from './assets/item-renderer.mjs';
 import { createStashPanelRenderer, stashGeometry, BIG_BANK_PAGE_1 } from './assets/stash-panel.mjs';
+import { createStashGoldRenderer, STASH_GOLD } from './assets/stash-gold-dialog.mjs';
 import { createWaypointPanelRenderer } from './assets/waypoint-panel.mjs';
 import { createControlPanelRenderer } from './assets/control-panel.mjs';
 import { createInventoryPanelRenderer, inventoryLayoutFromEngine } from './assets/inventory-panel.mjs';
@@ -61,6 +62,7 @@ let npcPanel = null, npcPanelError = '', npcState = null, npcPanelEvidence = nul
 let walkGoal = null, walkIdle = 0, walkLast = null, walkEvidence = { active: false, hops: 0, reason: 0 };
 let lastPurchase = null, lastSale = null;
 let monsterRenderer = null;
+let unitDrawEvidence = [];
 let objectRenderer = null;
 let itemRenderer = null;
 // The engine's own advancement record (D2SessionAdvancement). Cached per frame and dropped
@@ -128,6 +130,7 @@ let skillPanelRenderer = null, skillPanelEvidence = null, classSkills = null;
 // The stash is open because the engine sent 0x77 UPDATEUI_OPENSTASH, and closed when retail's
 // TRADEBTN_CLOSESTASH was accepted -- never because of a click alone.
 let stashPanelRenderer = null, stashPanelError = '', stashEvidence = null, stashOpen = false, stashLayout = null;
+let stashGoldRenderer = null, stashGoldEvidence = null, stashGoldError = '', stashGoldDialog = null;
 // The waypoint menu is open because the engine sent 0x63; waypointMenu holds that waypoint's unit id.
 let waypointPanelRenderer = null, waypointPanelError = '', waypointEvidence = null, waypointMenu = null, lastWaypointTravel = null;
 let beltRenderer = null, beltEvidence = null, beltBoxCache = null;
@@ -166,7 +169,7 @@ const SCREEN = { TITLE: 'title', SELECT: 'select', CREATE: 'create', GAME: 'game
 let screen = PLAY_MODE ? SCREEN.GAME : SCREEN.TITLE;
 let titleScreen = null, titleError = '', titleTick = 0;
 let charCreate = null, charCreateError = '';
-let charSelect = null, charSelectError = '', savedCharacters = [];
+let charSelect = null, charSelectError = '', savedCharacters = [], componentTablesReady = false;
 // Esc's in-game menu (retail: OPTIONS / SAVE AND EXIT GAME / RETURN TO GAME). Single player pauses
 // while it is up, as retail does.
 let gameMenu = null, gameMenuError = '';
@@ -376,6 +379,7 @@ async function bootstrapSession() {
     skillPanelRenderer = createSkillPanelRenderer(createMpqAssetReader(Module));
     try { stashPanelRenderer = createStashPanelRenderer(createMpqAssetReader(Module), document, { string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]),
       stashGold: (limit) => Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [limit]) : 0 }); } catch (error) { stashPanelError = String(error); }
+    try { stashGoldRenderer = createStashGoldRenderer(createMpqAssetReader(Module), document, { string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]) }); } catch (error) { stashGoldError = String(error); }
     try { waypointPanelRenderer = createWaypointPanelRenderer(createMpqAssetReader(Module), document, { string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) }); } catch (error) { waypointPanelError = String(error); }
     beltRenderer = createBeltRenderer(createMpqAssetReader(Module));
     controlPanelRenderer = createControlPanelRenderer(assetReader);
@@ -471,6 +475,8 @@ function ensureCharSelect() {
       onPlay: (name) => { playSavedCharacter(name); },
       onCreate: () => { screen = SCREEN.CREATE; ensureCharCreate(); },
       onCancel: () => { screen = SCREEN.TITLE; },
+      // The portrait's item components: the engine's own component table (needs the data tables).
+      componentToken: (i) => { if (!componentTablesReady) componentTablesReady = Boolean(Module.ccall('d2_drlg_init', 'number', [], [])); return Module._d2_component_token ? Module.ccall('d2_component_token', 'string', ['number'], [i]) : ''; },
     });
   } catch (error) { charSelectError = String(error); }
 }
@@ -581,7 +587,9 @@ function readNpcState() {
     }
     const gold = Module.ccall('d2_session_player_gold', 'number', [], []);
     const spoken = messageCount ? view.getUint16(36, true) : 0;   // the message the NPC is speaking
-    return { npcId, greeting, spoken, items, gold };
+    // The vendor's MonStats class decides its button row (a smith repairs).
+    const classId = snapshot?.entities?.find((e) => e.id === npcId && e.type === 1)?.classId ?? -1;
+    return { npcId, classId, greeting, spoken, items, gold };
   } catch { return null; }
 }
 
@@ -647,6 +655,18 @@ function repairAtVendor(itemId) {
   } catch { return false; }
 }
 
+// The smith's Repair All button (retail's 0x35 with the repair-all flag): every carried item mended,
+// paid from the inventory's gold and then the stash's.
+let lastRepairAll = null;
+function repairAllAtVendor() {
+  if (!npcState || !Module._d2_session_command_vendor_repair_all) return false;
+  const before = Module.ccall('d2_session_player_gold', 'number', [], []);
+  const ok = Boolean(Module.ccall('d2_session_command_vendor_repair_all', 'number', ['number'], [npcState.npcId]));
+  npcState = readNpcState(); snapshot = session.snapshot();
+  lastRepairAll = { npcId: npcState?.npcId ?? -1, ok, goldBefore: before, goldAfter: Module.ccall('d2_session_player_gold', 'number', [], []) };
+  return ok;
+}
+
 // An open shop is retail's vendor window (play/assets/vendor-panel.mjs), not the trade panel.
 let vendorPanel = null, vendorPanelError = '', shopWasOpen = false;
 function ensureVendorPanel() {
@@ -687,6 +707,13 @@ function walkStep() {
   walkLast = { x: p.x, y: p.y };
   if (walkIdle < 2 && walkEvidence.hops) return;
 
+  // Hops accepted but the distance not closing (a pocket whose fan legs all end against its walls,
+  // s000a's Den mouth after an earlier change's retail get-hit timing): ask the engine's own path to the goal.
+  if (walkEvidence.hops && dist >= (walkGoal.best ?? Infinity)) walkGoal.stall = (walkGoal.stall || 0) + 1; else walkGoal.stall = 0;
+  walkGoal.best = Math.min(walkGoal.best ?? Infinity, dist);
+  if (walkGoal.stall >= 4 && walkGoal.stall % 4 === 0 && session.move(walkGoal.x, walkGoal.y)) {
+    walkEvidence = { active: true, hops: walkEvidence.hops + 1, reason: 0 }; walkIdle = 0; return;
+  }
   const candidates = [];
   for (let a = 0; a < WALK_FAN; a++) {
     const angle = (a / WALK_FAN) * Math.PI * 2;
@@ -954,7 +981,7 @@ function drawFrame() {
   // Sprites are handed to the terrain pass rather than painted after it, so a wall in front of a
   // monster covers the monster. `depth` is the projected screen Y -- the same key the walls sort on.
   const sprites = [];
-  corpseEvidence = null;
+  corpseEvidence = null; unitDrawEvidence = [];
   for (const entity of snapshot.entities) {
     // The player is drawn by drawPlayer and ground items by the item pass; neither is a dot here.
     if (entity.kind === 'item' || (entity.kind === 'player' && entity.id === snapshot.playerId)) continue;
@@ -980,7 +1007,10 @@ function drawFrame() {
       // Draw the retail sprite for ANY unit that has an animation. This used to require
       // entity.hostile, which tied "has a body" to "is an enemy" -- so once town NPCs were
       // correctly marked non-hostile they stopped being drawn and Charsi became a dot.
-      if (entity.animation && monsterRenderer?.draw(c, sx, sy, entity.animation, snapshot.act)) return;
+      const drawn = Boolean(entity.animation && monsterRenderer?.draw(c, sx, sy, entity.animation, snapshot.act));
+      // Per unit, what was drawn and where (s000e asserts Harrogath's townsfolk against retail's draw list).
+      unitDrawEvidence.push({ id: entity.id, classId: entity.classId, code: entity.animation?.code ?? null, mode: entity.animation?.mode ?? null, drawn, x: Math.round(sx), y: Math.round(sy) });
+      if (drawn) return;
       c.fillStyle = entity.hostile ? '#b33b2e' : '#958968';
       c.beginPath(); c.arc(sx, sy, 5, 0, Math.PI * 2); c.fill();
     } });
@@ -1006,7 +1036,7 @@ function drawFrame() {
         terrainFiles = files;
         // Floors are lit from the engine's light map, as D2Client lights them.
         const lightmap = readSessionLightmap(Module);
-        terrain.setLightGrid(lightmap ? (a, b) => lightmap.grid(a, b) : null);
+        terrain.setLightGrid(lightmap ? (a, b) => lightmap.grid(a, b) : null, lightmap?.at, lightmap?.ambient);
         // Retail's camera is the player's PRECISE position, a subtile's centre (x + 0.5, y + 0.5): the
         // static world (floors, walls, objects, ground items) sits on the integer grid under it, while
         // units stand at their centres too.
@@ -1065,8 +1095,9 @@ function drawFrame() {
   // An open conversation draws over the world, the way retail's NPC window does.
   // A shop opening brings retail's inventory up beside it, on its opening tab.
   syncShopInventory();
-  if (shopOpen() && ensureVendorPanel()) {
-    try { npcPanelEvidence = vendorPanel.draw(ctx, w, h, { ...npcState, stashGold: Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [0]) : -1 }); npcPanelError = ''; }
+  // __d2HideShop: a panel row's no-panel render (lib/panel-frame.mjs toggle), never set by play.
+  if (shopOpen() && !globalThis.__d2HideShop && ensureVendorPanel()) {
+    try { npcPanelEvidence = vendorPanel.draw(ctx, w, h, { ...npcState, act: snapshot?.act, stashGold: Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [0]) : -1 }); npcPanelError = ''; }
     catch (error) { npcPanelError = String(error); npcPanelEvidence = null; }
   } else if (npcState && ensureNpcPanel()) {
     try { npcPanelEvidence = npcPanel.draw(ctx, w, h, { ...npcState, playerItems: snapshot.items }); npcPanelError = ''; }
@@ -1083,6 +1114,11 @@ function drawFrame() {
     try { stashEvidence = stashPanelRenderer.draw(ctx, w, h, stashOpen ? readStashLayout() : null, snapshot.items, stashOpen, snapshot.act); stashPanelError = ''; }
     catch (error) { stashPanelError = String(error); stashEvidence = null; }
   }
+  if (stashGoldRenderer) {
+    try { stashGoldEvidence = stashGoldRenderer.draw(ctx, w, h, stashOpen ? readStashLayout() : null, stashOpen,
+      { ...(stashGoldDialog || {}), bank: stashGoldStat(STASH_GOLD.bank) }); stashGoldError = ''; }
+    catch (error) { stashGoldError = String(error); stashGoldEvidence = null; }
+  }
   if (waypointPanelRenderer) {
     try { waypointEvidence = waypointPanelRenderer.draw(ctx, w, h, waypointMenu ? readWaypointRows(snapshot.act) : [], snapshot.act, Boolean(waypointMenu), snapshot.level); waypointPanelError = ''; }
     catch (error) { waypointPanelError = String(error); waypointEvidence = null; }
@@ -1092,24 +1128,30 @@ function drawFrame() {
     // Life and mana are the snapshot's, not the advancement record's: the panel shows what the
     // player has right now, and the engine is the only thing that decides that.
     characterPanelEvidence = characterPanelRenderer.draw(ctx, w, h, adv && {
-      ...adv, name: chosenName || '', className: CLASS_NAMES[snapshot.player?.playerClass] || '',
+      ...adv, name: chosenName || '', className: Module.ccall('d2_lang_string', 'string', ['string'], [CLASS_NAMES[snapshot.playerClass] || '']) || CLASS_NAMES[snapshot.playerClass] || '',
       // Retail stores life and mana as 8.8 fixed point (50 life is 12800) and displays the whole
       // part. Drawing the raw stat put "14848" in the Life slot.
-      life: (snapshot.player?.hpMax ?? 0) >> 8, mana: (snapshot.player?.manaMax ?? 0) >> 8,
+      life: (snapshot.player?.hp ?? 0) >> 8, lifeMax: (snapshot.player?.hpMax ?? 0) >> 8,
+      mana: (snapshot.player?.mana ?? 0) >> 8, manaMax: (snapshot.player?.manaMax ?? 0) >> 8, act: snapshot.act,
+      screen: characterVisible ? readCharacterScreen() : null,
       string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]),
     }, characterVisible);
   }
   if (skillPanelRenderer) {
     const adv = readAdvancement();
     skillPanelEvidence = skillPanelRenderer.draw(ctx, w, h, skillsVisible ? {
-      playerClass: snapshot.player?.playerClass ?? 0, level: adv?.level ?? 1,
+      // The class is the snapshot's top-level field (player.playerClass does not exist: the tree was the Amazon's for everyone).
+      playerClass: snapshot.playerClass ?? 0, level: adv?.level ?? 1, act: snapshot.act,
+      string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]),
       skillPoints: adv?.skillPoints ?? 0, skills: readClassSkills() || [],
       // SkillDesc's wStrName is a .tbl index, so the name is retail's own string, not a table
       // this client keeps.
       name: (skill) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [skill.nameStr]),
     } : null, skillsVisible);
   }
-  if (controlPanelRenderer) controlPanelEvidence = controlPanelRenderer.draw(ctx, w, h, snapshot);
+  // The bar receives the engine's advancement record directly. It does not keep a client-side XP
+  // counter: a kill, quest reward, or level-up can change both fields at any engine tick.
+  if (controlPanelRenderer) controlPanelEvidence = controlPanelRenderer.draw(ctx, w, h, snapshot, readAdvancement());
   if (beltRenderer) beltEvidence = beltRenderer.draw(ctx, snapshot.items, readBeltBoxes());
   // The item on the cursor, over everything, where the pointer is (retail holds it there).
   cursorItemEvidence = null;
@@ -1165,8 +1207,16 @@ function pollUiEvents() {
   const p = Module._malloc(64);
   try {
     const n = Module.ccall('d2_session_take_ui_events', 'number', ['bigint', 'number'], [BigInt(p), 64]);
-    // Retail opens the inventory beside the stash and closes both together (frame buffer, s197).
-    for (const code of Module.HEAPU8.slice(p, p + n)) { if (code === 16) { stashOpen = true; inventoryVisible = true; } else if (code === 17) { stashOpen = false; inventoryVisible = false; } }
+    for (const code of Module.HEAPU8.slice(p, p + n)) {
+      // Retail opens the inventory beside the stash (s197). A close invalidates
+      // any modal amount before another key can turn it into a stale transfer.
+      if (code === 16) { stashOpen = true; inventoryVisible = true; }
+      else if (code === 17) {
+        stashOpen = false;
+        inventoryVisible = false;
+        closeStashGold();
+      }
+    }
     if (Module.ccall('d2_session_take_waypoint_menu', 'number', ['bigint'], [BigInt(p)])) waypointMenu = { id: Module.HEAPU32[p / 4] };
   } finally { Module._free(p); }
 }
@@ -1242,6 +1292,32 @@ function readStashLayout() {
   } finally { Module._free(p); }
   return stashLayout;
 }
+// Both figures are read from retail's stat list on every use. The dialog owns
+// no balance and never predicts a capped transfer; button 19/20 decides that.
+function stashGoldStat(which) {
+  return session ? Module.ccall('d2_session_player_stat', 'number', ['number', 'number'], [which, 0]) : 0;
+}
+function openStashGold(mode) {
+  const available = stashGoldStat(mode === 'withdraw' ? STASH_GOLD.bank : STASH_GOLD.carried);
+  stashGoldDialog = { open: true, mode, available, amount: available };
+}
+function closeStashGold() { stashGoldDialog = null; }
+function changeStashGoldAmount(delta) {
+  if (!stashGoldDialog) return;
+  stashGoldDialog.amount = Math.max(0, Math.min(stashGoldDialog.available, stashGoldDialog.amount + delta));
+}
+function submitStashGold() {
+  // The engine may have closed the stash since the dialog was drawn. Do not
+  // turn a stale amount into a retail button command after that event.
+  if (!stashOpen || !stashGoldDialog) return 0;
+  const button = stashGoldDialog.mode === 'withdraw' ? STASH_GOLD.withdraw : STASH_GOLD.deposit;
+  const amount = Math.max(0, Math.min(stashGoldDialog.available, stashGoldDialog.amount | 0));
+  const result = Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [button, amount]);
+  // Retail owns every consequence (including capacity refusal); reread it and
+  // close this client dialog rather than locally adjusting either balance.
+  snapshot = session.snapshot(); closeStashGold();
+  return result;
+}
 // The level exit under the pointer: an enabled warp whose interaction point (the engine's exitX/Y --
 // the spot retail's nearest-warp test measures from) is within 3 subtiles of the clicked ground.
 // DECLARED approximation: retail hit-tests the warp's LvlWarp selection box in screen space.
@@ -1259,6 +1335,14 @@ function warpUnderPointer(px, py) {
 }
 let lastWarpTaken = null;
 // The object under the pointer, the same way npcUnderPointer finds a person.
+// The character screen's computed numbers (d2_session_character_screen): defense, attack rating,
+// damage, stamina, resistances.
+function readCharacterScreen() {
+  if (!session || !Module._d2_session_character_screen) return null;
+  const p = Module._malloc(64);
+  try { if (!Module.ccall('d2_session_character_screen', 'number', ['bigint'], [BigInt(p)])) return null; return Array.from(new Int32Array(Module.HEAPU8.buffer.slice(Number(p), Number(p) + 64))); }
+  finally { Module._free(p); }
+}
 function objectUnderPointer(px, py) {
   if (!session) return null;
   const camera = worldToScreen(snapshot.player.x + 0.5, snapshot.player.y + 0.5);   // static grid (projStatic)
@@ -1345,6 +1429,16 @@ function canvasPoint(event) {
 }
 addEventListener('keydown', (e) => {
   if (screen === SCREEN.CREATE) { if (charCreate?.typeKey(e.code, e.key)) e.preventDefault(); return; }
+  // The amount box is modal. It gets Esc/Enter and numeric typing before the
+  // global bindings, so Esc does not accidentally close the stash behind it.
+  if (screen === SCREEN.GAME && stashGoldDialog?.open) {
+    if (e.code === 'Escape') closeStashGold();
+    else if (e.code === 'Enter') submitStashGold();
+    else if (e.code === 'Backspace') stashGoldDialog.amount = Math.floor(stashGoldDialog.amount / 10);
+    else if (/^[0-9]$/.test(e.key)) stashGoldDialog.amount = Math.min(stashGoldDialog.available, stashGoldDialog.amount * 10 + Number(e.key));
+    else return;
+    e.preventDefault(); return;
+  }
   actMusic?.play(snapshot.act - 1).catch((error) => { musicError = String(error); }); if (e.code === 'KeyI' && !e.repeat) { inventoryVisible = !inventoryVisible; e.preventDefault(); return; }
   if (e.code === 'KeyC' && !e.repeat) { characterVisible = !characterVisible; e.preventDefault(); return; }
   // Esc, as retail: it closes what is open before it does anything else. An open conversation is
@@ -1369,7 +1463,7 @@ addEventListener('keydown', (e) => {
     } else if (stashOpen) {
       // Retail's client closes the stash and tells the server with 0x4F TRADEBTN_CLOSESTASH (18);
       // the window closes when the engine accepts it.
-      if (Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [18, 0])) { stashOpen = false; inventoryVisible = false; }
+      if (Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [18, 0])) { stashOpen = false; inventoryVisible = false; closeStashGold(); }
     } else if (npcState) {
       // Dismissing the speech tells the server it was heard -- retail's 0x31 with the message id --
       // which is where a quest message does its work (Akara's A1Q1 reward is granted on message 76).
@@ -1420,6 +1514,20 @@ canvas.addEventListener('pointerdown', (e) => {
     if (hit?.skill) { selectSkill(hit.skill.id, hit.side); skillSelectRenderer.open = null; canvas.focus(); e.preventDefault(); return; }
     if (skillSelectRenderer.open) { skillSelectRenderer.open = null; canvas.focus(); e.preventDefault(); return; }
   }
+  // The stash's coin button opens the retail amount dialog. Left deposits the
+  // gold carried by the player; right withdraws banked gold. Both submit the
+  // exact amount through retail 0x4F button 20/19, respectively.
+  if (stashOpen && stashGoldRenderer && session) {
+    const hit = stashGoldRenderer.hitAt(x, y, canvas.width, canvas.height, readStashLayout(), Boolean(stashGoldDialog));
+    if (hit) {
+      if (hit.action === 'open') openStashGold(e.button === 2 ? 'withdraw' : 'deposit');
+      else if (hit.action === 'submit') submitStashGold();
+      else if (hit.action === 'close') closeStashGold();
+      else if (hit.action === 'increase') changeStashGoldAmount(1);
+      else if (hit.action === 'decrease') changeStashGoldAmount(-1);
+      canvas.focus(); e.preventDefault(); return;
+    }
+  }
   const beltItem = beltRenderer?.itemAt(x, y, snapshot.items, readBeltBoxes()); if (beltItem && session?.useBelt(beltItem.gridX)) { snapshot = session.snapshot(); canvas.focus(); e.preventDefault(); return; }
   // An open waypoint menu takes the click: an active row travels there, anything else is swallowed.
   if (waypointMenu && waypointPanelRenderer) {
@@ -1438,6 +1546,10 @@ canvas.addEventListener('pointerdown', (e) => {
   if (shopOpen() && vendorPanel && e.button === 0) {
     const t = vendorPanel.tabAt(x, y, canvas.width, canvas.height);
     if (t !== null) { vendorPanel.setTab(t); canvas.focus(); e.preventDefault(); return; }
+    const button = vendorPanel.buttonAt(x, y, canvas.width, canvas.height, npcState.classId);
+    if (button === 'repairAll') { repairAllAtVendor(); canvas.focus(); e.preventDefault(); return; }
+    if (button === 'exit') { Module.ccall('d2_session_command_end_npc', 'number', ['number'], [npcState.npcId]); npcState = readNpcState(); canvas.focus(); e.preventDefault(); return; }
+    if (button) { canvas.focus(); e.preventDefault(); return; }   // Buy / Sell / Repair: modes not modelled yet (a click buys or sells directly)
     const item = vendorPanel.itemAt(x, y, canvas.width, canvas.height, npcState);
     if (item) { buyFromVendor(item.id); canvas.focus(); e.preventDefault(); return; }
     const mine = inventoryVisible && inventoryPanelRenderer ? inventoryPanelRenderer.itemAt(x, y, canvas.width, canvas.height, snapshot) : null;
@@ -1646,7 +1758,8 @@ window.__d2Shell = { input, get snapshot() { return snapshot; }, get tileView() 
     drawn: waypointEvidence && JSON.parse(JSON.stringify(waypointEvidence)), art: waypointPanelRenderer?.evidence ?? null,
     lastTravel: lastWaypointTravel }; },
   get stashEvidence() { return { open: stashOpen, error: stashPanelError, drawn: stashEvidence && JSON.parse(JSON.stringify(stashEvidence)),
-    art: stashPanelRenderer?.evidence ?? null }; },
+    art: stashPanelRenderer?.evidence ?? null, gold: { error: stashGoldError, drawn: stashGoldEvidence && JSON.parse(JSON.stringify(stashGoldEvidence)),
+      art: stashGoldRenderer?.evidence ?? null } }; },
   get skillsVisible() { return skillsVisible; },
   set skillsVisible(v) { skillsVisible = Boolean(v); },
   get classSkills() { return readClassSkills(); },
@@ -1713,6 +1826,7 @@ window.__d2Shell = { input, get snapshot() { return snapshot; }, get tileView() 
     });
   },
   get purchaseEvidence() { return lastPurchase ? { ...lastPurchase } : null; },
+  get repairAllEvidence() { return lastRepairAll ? { ...lastRepairAll } : null; },
   get walkEvidence() { return { ...walkEvidence, goal: walkGoal ? { x: walkGoal.x, y: walkGoal.y } : null }; },
   walkTo(x, y, within = 4) { walkEvidence = { active: true, hops: 0, reason: 0 }; walkGoal = { x, y, within }; },
   talkToNearestNpc() {
@@ -1737,6 +1851,7 @@ window.__d2Shell = { input, get snapshot() { return snapshot; }, get tileView() 
       firstItems: (npcState?.items ?? []).slice(0, 6).map((i) => ({ id: i.id, code: i.code, name: i.name, cost: i.cost, invFile: i.invFile })),
       drawn: npcPanelEvidence, panel: (shopOpen() ? vendorPanel?.evidence : npcPanel?.evidence) ?? null };
   },
+  get unitDrawEvidence() { return unitDrawEvidence.map((u) => ({ ...u })); },
   get npcEvidence() {
     const ents = snapshot.entities;
     return { npcs: npcCount, hostile: ents.filter((e) => e.hostile).length,
@@ -1786,7 +1901,9 @@ window.__d2Shell = { input, get snapshot() { return snapshot; }, get tileView() 
     const s = this.snapshot, p = s?.player;
     if (!p || !window.Module?._d2_session_unit_info) return [];
     return s.entities.filter((e) => e.type === 1 && e.hostile && e.hp > 0 && Math.hypot(e.x - p.x, e.y - p.y) < 30).map((e) => {
-      const v = new Int32Array(Module.HEAPU8.buffer, Number(Module.ccall('d2_session_unit_info', 'number', ['number', 'number'], [1, e.id])), 12);
+      // The call first, then the heap: a call that grows the heap leaves an earlier HEAPU8 read stale (traps.md).
+      const at = Number(Module.ccall('d2_session_unit_info', 'number', ['number', 'number'], [1, e.id]));
+      const v = new Int32Array(Module.HEAPU8.buffer, at, 12);
       return { id: e.id, classId: e.classId, typeFlag: v[8], level: v[9], damagePercent: v[10], umod: v[11] };
     });
   },
@@ -1821,6 +1938,7 @@ window.__d2Shell = { input, get snapshot() { return snapshot; }, get tileView() 
         if (it && !(it.id in out.shop)) out.shop[it.id] = { at: [x + 6, y + 6], code: it.code, cost: it.cost };
       }
       out.shopTabs = vendorPanel.tabTargets(w, h);
+      out.shopButtons = vendorPanel.buttonTargets(w, h, npcState.classId);
     }
     // The character screen's "+" buttons and the skill tree's cells, found by probing the SAME
     // hit-tests the click handler uses, so an aimed click cannot land somewhere else.

@@ -325,7 +325,7 @@ bool __fastcall ACT4Q3_SeqCallback(D2QuestDataStrc* pQuestData)
 		FOG_DisplayAssert("pQuest->pSequence", __FILE__, __LINE__);
 		exit(-1);
 	}
-	return pQuestData->pfSeqFilter(pQuest);
+	return pQuest->pfSeqFilter(pQuest);   // d2-web: the next quest's filter (retail 1.13c D2Game 0x6FCDA30F: call [esi+0xF0], esi = next quest)
 }
 
 //D2Game.0x6FCB0650
