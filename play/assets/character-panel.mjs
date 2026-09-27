@@ -47,6 +47,41 @@ export const CHARACTER_SLOTS = Object.freeze({
   life:       { x: 160, y: 168, w: 151, h: 20 },
   mana:       { x: 160, y: 192, w: 151, h: 20 },
 });
+// The point-spending "+" beside an attribute, as RETAIL'S OWN ART rather than a drawn rectangle.
+//
+// The art and its frames are prior art: OpenDiablo2's button
+// table defines the attribute button as `ButtonTypeAddSkill` with `ResourceName =
+// d2resource.AddSkillButton` = `PANEL/level.DC6` and `DisabledFrame = 2` (d2core/d2ui/button.go,
+// d2common/d2resource/resource_paths.go), and the socket it is drawn into is `HeroStatsPanelSocket`
+// = `PANEL/levelsocket.dc6` (`hero_stats_panel.go`, `addStatSocketOffset = -3, 34`).
+//
+// The two are drawn as a PAIR by retail itself, and the offset between them is measured, not taken
+// from OpenDiablo2: `the retail captures` draws `Levelsocket.dc6` frame 0 (35x36) at
+// (440,495) and then `Level.DC6` frame 0 (30x30) at (443,491) -- socket 3 px left and 2 px above the
+// button, the same pair and offset at (725,440)/(728,436) in `vendor-akara.txt` and `den-outside.txt`.
+export const STAT_PLUS_ART = 'data\\global\\ui\\PANEL\\level.DC6';
+export const STAT_PLUS_SOCKET_ART = 'data\\global\\ui\\PANEL\\levelsocket.dc6';
+export const STAT_PLUS_FRAME = 0;              // retail's enabled frame: a point is waiting
+export const STAT_PLUS_DISABLED_FRAME = 2;     // OpenDiablo2's DisabledFrame, recorded for the day a
+                                               // capture shows retail drawing the unlit state
+export const STAT_PLUS_SOCKET_OFFSET = Object.freeze({ x: -3, y: -2 });
+
+// Where the button goes, from the panel's own two independent readings: the attribute frames are the
+// panel ART's (CHARACTER_SLOTS, s154, and s251 pins the panel at 0 px), and OpenDiablo2's own button
+// list is the cross-check -- its four buttons at screen (205, 140/201/286/347) against the art's
+// "frame right edge + 4" = 205 exactly, and level with each frame's top row. OpenDiablo2's absolute y
+// is 7 px off retail's (its labels are), so the RELATION is what is taken from it, never the number.
+const STAT_BUTTON_GAP = 4;
+// InvChar6 frames 0..3 anchored as retail anchors them (draw() below); frame 0's top-left is the
+// panel's origin, which is what the slots are relative to.
+const PANEL_ORIGIN = Object.freeze({ x: 80, y: 61 });
+export const STAT_BUTTON_RECTS = Object.freeze(Object.fromEntries(
+  ['strength', 'dexterity', 'vitality', 'energy'].map((key) => {
+    const slot = CHARACTER_SLOTS[key];
+    return [slot.stat, { x: PANEL_ORIGIN.x + slot.x + slot.w + STAT_BUTTON_GAP, y: PANEL_ORIGIN.y + slot.y,
+      w: 30, h: 30, slot: key }];
+  })));
+
 // Which slot holds which field: the four attributes are certain (four left frames, retail's own
 // Strength/Dexterity/Vitality/Energy order) and so is the name. The right column assignment is
 // INFERRED from retail's field order and is not verified -- the remaining slots at y 230/254/292
@@ -124,16 +159,13 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
   ].map(([key, f, sample, x, y]) => ({ key, size: f, centre: x + F[f].measure(sample) / 2, y }));
   const chrome = createPanelChrome(read, documentObject);
   const view = (width, height) => { const scale = Math.min(1, width / 800, height / 600); return { scale, ox: (width - 800 * scale) / 2, oy: (height - 600 * scale) / 2 }; };
-  // The "+" beside an attribute when points remain: the art's arrow slot right of the value box.
-  // DECLARED: retail's level-up button was not on screen in the capture (no points to spend).
-  const STAT_ROWS = { [STAT.STRENGTH]: 159, [STAT.DEXTERITY]: 221, [STAT.VITALITY]: 307, [STAT.ENERGY]: 368 };
-  const buttonRect = (stat) => ({ x: 196, y: STAT_ROWS[stat] - 15, w: 16, h: 16 });
+  const buttonRect = (stat) => STAT_BUTTON_RECTS[stat];
   return {
     get layout() { return CHARACTER_LAYOUT; },
     buttonAt(px, py, width, height, state) {
       if (!(state?.statPoints > 0)) return null;
       const v = view(width, height), x = (px - v.ox) / v.scale, y = (py - v.oy) / v.scale;
-      for (const stat of Object.keys(STAT_ROWS).map(Number)) { const r = buttonRect(stat); if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) return stat; }
+      for (const stat of Object.keys(STAT_BUTTON_RECTS).map(Number)) { const r = buttonRect(stat); if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) return stat; }
       return null;
     },
     /** `state`: a d2_session_advancement read plus { name, className, life, lifeMax, mana, manaMax, screen: d2_session_character_screen's ten numbers, string(key) }. */
@@ -163,9 +195,15 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
       for (const f of FIELDS) { const t = text[f.key]; if (t === undefined || t === null || t === '') continue;
         const str = String(t), font = face[f.size]; font.drawAnchored(ctx, str, Math.floor(f.centre - font.measure(str) / 2), f.y); }
       chrome.cel(ctx, state?.act || 1, CHROME_ART.close, 10, 208, 480);
+      // The "+" is retail art, blitted as retail blits the pair (socket first, then the button on
+      // top), and every blit is carried out to the evidence by the cel's own requested/drawn record.
       const buttons = [];
-      if (state?.statPoints > 0) for (const stat of Object.keys(STAT_ROWS).map(Number)) { const r = buttonRect(stat);
-        ctx.save(); ctx.fillStyle = 'rgba(150,120,50,.55)'; ctx.fillRect(r.x, r.y, r.w, r.h); ctx.restore(); font16.draw(ctx, '+', r.x + 5, r.y + 1); buttons.push(stat); }
+      const act = state?.act || 1;
+      if (state?.statPoints > 0) for (const stat of Object.keys(STAT_BUTTON_RECTS).map(Number)) { const r = buttonRect(stat);
+        const socket = chrome.cel(ctx, act, STAT_PLUS_SOCKET_ART, STAT_PLUS_FRAME,
+          r.x + STAT_PLUS_SOCKET_OFFSET.x, r.y + STAT_PLUS_SOCKET_OFFSET.y + 36 - 1);
+        const plus = chrome.cel(ctx, act, STAT_PLUS_ART, STAT_PLUS_FRAME, r.x, r.y + 30 - 1);
+        buttons.push({ stat, slot: STAT_BUTTON_RECTS[stat].slot, rect: { ...r }, socket, plus }); }
       if (state?.statPoints > 0) font16.drawAnchored(ctx, `${S('strchrstat')} ${state.statPoints}`, 96, 420);
       chrome.border(ctx, state?.act || 1, BORDER_LEFT);
       ctx.restore();

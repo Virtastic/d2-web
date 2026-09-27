@@ -98,6 +98,10 @@ export function normalizeSnapshot(value) {
       hp: Math.max(0, finite(e?.hp)), hpMax: Math.max(0, finite(e?.hpMax)),
       kind: String(e?.kind ?? 'entity'), hostile: Boolean(e?.hostile), roomOrdinal: Math.trunc(finite(e?.roomOrdinal)),
       animation: e?.animation && typeof e.animation === 'object' ? e.animation : null,
+      // The engine's 16.16 position where the session has one (see gameplay-shell's unitAnchor):
+      // null on an engine without d2_session_unit_coords, which falls back to the whole subtile.
+      preciseX: Number.isFinite(Number(e?.preciseX)) ? Number(e.preciseX) : null,
+      preciseY: Number.isFinite(Number(e?.preciseY)) ? Number(e.preciseY) : null,
     })),
     rooms: rooms.slice(0, 2048).map((room) => ({
       ordinal: Math.trunc(finite(room?.ordinal)), level: Math.trunc(finite(room?.level)),
@@ -143,23 +147,13 @@ export const DEFAULT_SESSION_FIXTURES = Object.freeze([
   { seed: 1, difficulty: 0, act0: 0, level: 37, label: "Act I · Andariel's Lair" },
 ].map(Object.freeze));
 
-// A saved character enters the game in the town of the act its header records for the game's
-// difficulty: nTown[difficulty] at 0xA8, low bits the act, an act >= 5 read as Act I (D2Game
-// PLRSAVE2_ReadSaveHeader -> CLIENTS_SetActNo). The towns are D2Common's own table
-// (DUNGEON_GetTownLevelIdFromActNo, #10085): Rogue Encampment, Lut Gholein, Kurast Docks,
-// Pandemonium Fortress, Harrogath. The map is the one the character was saved in: when the
-// difficulty was reached (bit 7), ReadSaveHeader seeds the game from the header's dwMapSeed (0xAB),
-// which PLRSAVE2_WriteSaveHeader wrote from pGame->dwInitSeed. Otherwise the fixture seed (1)
-// stands in for retail's fresh random seed.
-export const ACT_TOWN_LEVELS = Object.freeze([1, 40, 75, 103, 109]);
-export function savedCharacterFixture(bytes, difficulty = 0) {
-  const header = bytes && bytes.length >= 0xAF;
-  const town = header ? bytes[0xA8 + difficulty] : 0;
-  let act0 = town & 0x7F;
-  if (act0 >= ACT_TOWN_LEVELS.length) act0 = 0;
-  const mapSeed = header ? (bytes[0xAB] | bytes[0xAC] << 8 | bytes[0xAD] << 16 | bytes[0xAE] << 24) >>> 0 : 0;
-  return Object.freeze({ seed: town & 0x80 && mapSeed ? mapSeed : 1, difficulty, act0, level: ACT_TOWN_LEVELS[act0] });
-}
+// Where a saved character resumes is NOT decided here. The act it was in, the town level of that
+// act, the map seed its game is generated from and the class of its unit are the header's, and the
+// engine reads them: `d2_session_create_from_save` is PLRSAVE2_ReadSaveHeader (D2Game), which is
+// the only thing that should ever decode a retail .d2s header into game state. This module used to
+// carry a `savedCharacterFixture(bytes)` that re-derived those four fields in JavaScript; it was a
+// second source of truth for the format and it is gone. `s670-create-from-save-header` asserts the
+// engine's answer against the file's own bytes.
 
 export function parseSessionSnapshot(bytes) {
   const view = bytes instanceof DataView ? bytes : new DataView(bytes.buffer, bytes.byteOffset || 0, bytes.byteLength);

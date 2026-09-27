@@ -36,7 +36,13 @@ void __stdcall sub_6FC62020(D2SeedStrc* pSeed, D2MonRegDataStrc* pMonRegData, in
         return;
     }
 
-    int32_t nMax = (1 << pMonStats2TxtRecord->unk0x25) - pMonRegData->nComponentVariantsMax;
+    // Sanitizer-flagged: unk0x25 is a uint8_t straight from
+    // monstats2.txt and can exceed 31, making `1 << unk0x25` a shift-exponent overflow on a 32-bit
+    // int -- undefined in C++ even though x86's SHL reg32, cl masks the count to 5 bits (mod 32) and
+    // wasm's shift instructions do the same, so both platforms compute the identical `1 << (unk0x25 &
+    // 31)` today. The mask is made explicit so the result stays retail's exact value under any
+    // compiler, not just the ones that happen to keep x86's masking under -O2/-O3.
+    int32_t nMax = (1 << (pMonStats2TxtRecord->unk0x25 & 31)) - pMonRegData->nComponentVariantsMax;
     
     if (nCount > nMax)
     {

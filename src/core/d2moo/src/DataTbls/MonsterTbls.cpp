@@ -1671,10 +1671,9 @@ void __fastcall DATATBLS_LoadHirelingTxt(HD2ARCHIVE hArchive)
 
 	sgptDataTables->pHirelingTxt = (D2HirelingTxt*)DATATBLS_CompileTxt(hArchive, "hireling", pTbl, &sgptDataTables->nHirelingTxtRecordCount, sizeof(D2HirelingTxt));
 
-	for (int i = 0; i < 256; ++i)
+	for (int i = 0; i < 512; ++i)
 	{
-		sgptDataTables->nClassicHirelingStartRecordIds[i] = -1;
-		sgptDataTables->nExpansionHirelingStartRecordIds[i] = -1;
+		sgptDataTables->nHirelingStartRecordIds[i] = -1;
 	}
 
 	for (int i = 0; i < sgptDataTables->nHirelingTxtRecordCount; ++i)
@@ -1694,9 +1693,9 @@ void __fastcall DATATBLS_LoadHirelingTxt(HD2ARCHIVE hArchive)
 		if (sgptDataTables->pHirelingTxt[i].nId < 256)
 		{
 			nId = sgptDataTables->pHirelingTxt[i].nId + ((sgptDataTables->pHirelingTxt[i].wVersion >= 100) << 8);
-			if (sgptDataTables->nClassicHirelingStartRecordIds[nId] < 0)
+			if (sgptDataTables->nHirelingStartRecordIds[nId] < 0)
 			{
-				sgptDataTables->nClassicHirelingStartRecordIds[nId] = i;
+				sgptDataTables->nHirelingStartRecordIds[nId] = i;
 			}
 		}
 	}
@@ -1723,7 +1722,7 @@ D2HirelingTxt* __stdcall DATATBLS_GetHirelingTxtRecordFromIdAndLevel(BOOL bExpan
 
 	const int nVersion = bExpansion != 0 ? 100 : 0;
 
-	int nStartRecordId = sgptDataTables->nClassicHirelingStartRecordIds[nId + (bExpansion != FALSE) * 256];
+	int nStartRecordId = sgptDataTables->nHirelingStartRecordIds[nId + (bExpansion != FALSE) * 256];
 	if (nStartRecordId < 0)
 	{
 		return nullptr;
@@ -2860,10 +2859,9 @@ void __fastcall DATATBLS_UnloadSomeMonsterTxts()
 
 	DATATBLS_UnloadBin(sgptDataTables->pHirelingTxt);
 	sgptDataTables->nHirelingTxtRecordCount = 0;
-	for (int i = 0; i < 256; ++i)
+	for (int i = 0; i < 512; ++i)
 	{
-		sgptDataTables->nClassicHirelingStartRecordIds[i] = -1;
-		sgptDataTables->nExpansionHirelingStartRecordIds[i] = -1;
+		sgptDataTables->nHirelingStartRecordIds[i] = -1;
 	}
 
 	if (sgptDataTables->pMonPresetTxt)

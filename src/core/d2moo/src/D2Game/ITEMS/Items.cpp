@@ -2838,7 +2838,7 @@ void __fastcall sub_6FC52650(D2UnitStrc* pUnit, int32_t nItemLvl, int32_t nClass
             nSkillId = nBaseLayer + ITEMS_RollRandomNumber(ITEMS_GetItemSeed(pUnit)) % 5;
 
             D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
-            if (!pSkillsTxtRecord || pSkillsTxtRecord->nITypeA[0] <= 0 || ITEMS_CheckItemTypeId(pUnit, pSkillsTxtRecord->nITypeA[0]))
+            if (!pSkillsTxtRecord || pSkillsTxtRecord->nItemTypeAB[0][0] <= 0 || ITEMS_CheckItemTypeId(pUnit, pSkillsTxtRecord->nItemTypeAB[0][0]))
             {
                 if (nSkillId != skillIds[0] && nSkillId != skillIds[1] && nSkillId != skillIds[2])
                 {

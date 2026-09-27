@@ -95,18 +95,27 @@ void __fastcall DRLGWARP_UpdateWarpRoomDeselect(D2DrlgRoomStrc* pDrlgRoom, int n
 //TODO: Name
 D2ActiveRoomStrc* __fastcall sub_6FD788D0(D2DrlgStrc* pDrlg, int nLevelId, int nTileIndex, int* pX, int* pY)
 {
-	// Sanitizer-flagged: nTileIndex (this function's
-	// parameter) and pLevel->pTileInfo[i].nTileIndex both index this table with no bounds check in
-	// retail (confirmed in Ghidra: D2Common.dll 1.13c's function at VA 0x6FD69B60 reads the table
-	// at 0x6FDE4F48 by index, 8 bytes an entry, with no guard) -- and the sweep caught index 32, past the 14
-	// entries this table's own initializer names. Retail's read at index 32 lands in its own
-	// neighbouring .rdata: the C-string literals that follow this table in D2Common.dll ("armtype",
-	// "composit(e)", "objmode", "objtype", the "xx_Dir" tile-type name list). That is retail's
-	// answer, byte for byte, not meaningful D2CoordStrc data -- so entries 14-32 below are those
-	// same bytes (found by byte-pattern match at D2Common.dll 1.13c file offset 0x94f48, VA
-	// 0x6fde4f48, image base 0x6fd50000; ~/d2-retail/D2Common.dll, byte-identical to
-	// retail/D2/D2SE/CORES/1.13c/D2Common.dll here), so an in-bounds read of THIS array gives
-	// retail's exact undefined-behaviour result instead of whatever wasm happens to keep at +256.
+	// Sanitizer-flagged: nTileIndex
+	// (this function's parameter) and pLevel->pTileInfo[i].nTileIndex both index this table with no
+	// bounds check in retail (confirmed in Ghidra: D2Common.dll 1.13c's function at VA 0x6FD69B60
+	// reads the table at 0x6FDE4F48 by index, 8 bytes an entry, with no guard). pLevel->pTileInfo[]'s
+	// own nTileIndex stays small (DrlgPreset.cpp assigns it 0-12), so every larger index seen here is
+	// the nTileIndex PARAMETER: retail's own Levels.txt "WarpN" columns are passed straight through
+	// (DUNGEON_FindActSpawnLocationEx -> LEVEL_WarpUnit/LEVEL_ChangeAct) with no reshaping, and that
+	// table's own values reach 32 (Warp0 for the Arcane Sanctuary and the Pandemonium Fortress) up to
+	// 67 (Act 3 Mephisto levels' Warp0) and 82 (Act 5's Baal Temple/Throne Room levels' Warp1, the
+	// table's overall maximum) -- so this is retail's own data driving retail's own unchecked read,
+	// not a computation this port got wrong. Retail's reads past index 13 land in its own neighbouring
+	// .rdata: the C-string literals that follow this table in D2Common.dll ("armtype", "composit(e)",
+	// "objmode", "objtype", the "xx_Dir" tile-type name list) through roughly index 40, then bytes that
+	// read as a plausible small coordinate table -- likely an unrelated static array the linker placed
+	// right after this one -- through index 77, then more string-shaped data to 82. Whatever it
+	// actually is, it is retail's literal answer, byte for byte, not meaningful D2CoordStrc data -- so
+	// entries 14-82 below are those same bytes (found by byte-pattern match at D2Common.dll 1.13c file
+	// offset 0x94f48, VA 0x6fde4f48, image base 0x6fd50000; ~/d2-retail/D2Common.dll, byte-identical to
+	// retail/D2/D2SE/CORES/1.13c/D2Common.dll here; 82 is Levels.txt's own highest WarpN value across
+	// every level, so no further entries are needed), so an in-bounds read of THIS array gives
+	// retail's exact undefined-behaviour result instead of whatever wasm happens to keep at +664.
 	static const D2CoordStrc stru_6FDCE6A0[] =
 	{
 		{ 1, 0 },
@@ -143,6 +152,56 @@ D2ActiveRoomStrc* __fastcall sub_6FD788D0(D2DrlgStrc* pDrlg, int nLevelId, int n
 		{ 29289, 1147095111 },
 		{ 29289, 1147096151 },
 		{ 29289, 1147098446 },
+		{ 29289, 1147098180 },
+		{ 29289, 1398550062 },
+		{ 1668445551, 843340901 },
+		{ 1835888451, 1146908271 },
+		{ 1413567553, 1548962882 },
+		{ 1416326996, 779316322 },
+		{ 7368803, 1953655920 },
+		{ 6647929, 1701539700 },
+		{ 110, 0 },
+		{ 6, 0 },
+		{ 0, 2 },
+		{ 2, 4 },
+		{ 4, 6 },
+		{ 6, 0 },
+		{ 0, 2 },
+		{ 2, 4 },
+		{ 4, 6 },
+		{ 2, 2 },
+		{ 4, 4 },
+		{ 6, 6 },
+		{ 0, 0 },
+		{ 2, 2 },
+		{ 4, 4 },
+		{ 6, 6 },
+		{ 0, 0 },
+		{ 2, 2 },
+		{ 4, 4 },
+		{ 6, 6 },
+		{ 0, 0 },
+		{ 2, 2 },
+		{ 4, 4 },
+		{ 6, 6 },
+		{ 0, 0 },
+		{ 6, 6 },
+		{ 0, 0 },
+		{ 2, 2 },
+		{ 4, 4 },
+		{ 6, 6 },
+		{ 0, 0 },
+		{ 2, 2 },
+		{ 4, 4 },
+		{ 7, 0 },
+		{ 1, 6 },
+		{ -1, 2 },
+		{ 5, 4 },
+		{ 3, 1398550062 },
+		{ 1668445551, 843340901 },
+		{ 1835888451, 1130131055 },
+		{ 1551130984, 1952540739 },
+		{ 1886413614, 0 },
 	};
 
 	D2LevelDefBin* pLevelDefBinRecord = NULL;

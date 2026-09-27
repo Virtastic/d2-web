@@ -46,10 +46,17 @@ export const TRADE_LAYOUT = Object.freeze({
   // trade.dc6's lower cell bands run y 255..368.
   playerGridY: 255,
 });
-const GREETING_LINES = 3;
-// Text that is not part of the grid: the NPC's name, greeting and the player's gold. These are
-// panel-relative offsets and are NOT retail-derived -- declared in .
-const TEXT = Object.freeze({ x: 18, nameY: 26, greetingY: 50, lineHeight: 17, width: 284 });
+// There is no name slot and no greeting line in retail's trade window, and no gold line of our own:
+// this panel used to draw an NPC name at (18,26), a wrapped greeting at (18,50) and "GOLD n" against
+// its right edge, all hand-picked. Retail's own draw list of Akara's open
+// shop carries exactly two pieces of text on this panel -- the
+// STASH label at screen (101,434) and the player's gold at (266,434), both Font16 -- plus the tab
+// labels, and retail/frames/ + drawlists/vendor-akara.png show the same window: no name, no greeting.
+// The greeting is the SPEECH BOX's (speech-box.mjs), which is the panel retail shows it in. So the
+// only text this fallback draws is the gold, at the anchor retail draws it at.
+// (npc-panel.mjs is the superseded trade window -- vendor-panel.mjs draws the live one and s250 pins
+// it against retail's frame; this path is reached only when the vendor panel cannot be built.)
+const GOLD_ANCHOR = Object.freeze({ x: 186, y: 374 });   // screen (266,434) - the panel's (80,60)
 function frameCanvas(frame, palette, documentObject) {
   const canvas = documentObject.createElement('canvas');
   canvas.width = Math.max(1, frame.width);
@@ -122,11 +129,6 @@ export function createNpcPanel({ read, decodeDc6, decodeDatPalette, documentObje
 
   let scroll = 0;
 
-  // Retail's dialogue values carry a leading numeric token and a newline before the spoken text --
-  // Charsi's greeting is stored as "47\nHi there. I'm Charsi...". Retail does not show that token,
-  // so it is stripped for display rather than printed as part of the line.
-  const spokenText = (raw) => String(raw || '').replace(/^\s*\d+\s*\n/, '');
-
   // Retail anchors the trade window at screen (80, 60) on an 800x600 screen, scaled with the view.
   const panelBox = (width, height) => {
     const scale = Math.min(1, width / 800, height / 600);
@@ -177,30 +179,6 @@ export function createNpcPanel({ read, decodeDc6, decodeDatPalette, documentObje
       const w = box.width, h = box.height, x = box.x, y = box.y;
       ctx.drawImage(background.canvas, x, y);
 
-      const line = (text, lx, ly, limit) => {
-        let s = String(text ?? '');
-        if (limit) while (s.length && font.measure(s) > limit) s = s.slice(0, -1);
-        font.draw(ctx, s, lx, ly);
-      };
-
-      if (state.name) line(state.name, x + TEXT.x, y + TEXT.nameY, w - 40);
-      // The greeting, wrapped to the panel rather than running off it.
-      const greeting = spokenText(state.greeting);
-      if (greeting) {
-        const words = greeting.replace(/\n+/g, ' ').split(/\s+/).filter(Boolean);
-        const lines = [];
-        let row = '';
-        for (const word of words) {
-          const next = row ? `${row} ${word}` : word;
-          if (font.measure(next) > TEXT.width && row) {
-            lines.push(row); row = word;
-            if (lines.length >= GREETING_LINES) break;
-          } else row = next;
-        }
-        if (row && lines.length < GREETING_LINES) lines.push(row);
-        for (let i = 0; i < lines.length; i++)
-          line(lines[i], x + TEXT.x, y + TEXT.greetingY + i * TEXT.lineHeight);
-      }
 
       const items = Array.isArray(state.items) ? state.items : [];
       // A stock page is taller than the four visible rows (Charsi's tabs reach 10x8), so `scroll`
@@ -226,10 +204,7 @@ export function createNpcPanel({ read, decodeDc6, decodeDatPalette, documentObje
         }
         ctx.globalAlpha = 1;
       }
-      if (state.gold >= 0) {
-        const gold = `GOLD ${state.gold}`;
-        font.draw(ctx, gold, x + TEXT.x + TEXT.width - font.measure(gold), y + h - 30);
-      }
+      if (state.gold >= 0) font.draw(ctx, String(state.gold), x + GOLD_ANCHOR.x, y + GOLD_ANCHOR.y);
       // The player's own items, in the lower grid. Selling is a click on one of these, so drawing
       // them is what makes the trade screen a trade screen rather than a shop window.
       let playerDrawn = 0;
@@ -246,7 +221,7 @@ export function createNpcPanel({ read, decodeDc6, decodeDatPalette, documentObje
       // How much of the page is on screen, since a stock page is taller than the grid.
       if (items.length > placed) {
         const more = `${placed}/${items.length}`;
-        font.draw(ctx, more, x + TEXT.x, y + h - 52);
+        font.draw(ctx, more, x + GOLD_ANCHOR.x, y + h - 52);
       }
       return { box: { x, y, width: w, height: h }, shown: placed, total: items.length,
         gold: state.gold ?? -1, drawnIcons, scroll, playerDrawn };

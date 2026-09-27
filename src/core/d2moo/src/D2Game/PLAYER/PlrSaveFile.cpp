@@ -12,21 +12,33 @@
 // 335 (header) + 298 (quests) + 81 (waypoints) + 51 (NPC intro) = 765 -- which is two independent
 // descriptions of the same layout landing on the same number.
 #include <D2Common.h>
+#include <D2Constants.h>
 #include <D2DataTbls.h>
 #include <D2StatList.h>
 #include <D2Inventory.h>
 #include <D2Skills.h>
+#include <D2Items.h>               // IMODE_ONGROUND, the mode the golem's restored item is placed in
+#include <DataTbls/MonsterIds.h>   // MONSTER_IRONGOLEM, the iron golem section's own class
+#include <DataTbls/SkillsIds.h>    // SKILL_IRONGOLEM, the skill the golem's item is carried under
 #include <D2Waypoints.h>
 #include <D2QuestRecord.h>
 #include <Units/Units.h>
 #include <GAME/Game.h>
+#include <GAME/Arena.h>
 #include <GAME/Clients.h>
 #include "SKILLS/Skills.h"
+#include <D2Monsters.h>            // MONSTERS_GetHirelingExpForNextLevel
 #include <PLAYER/PlrSave.h>
 #include <PLAYER/PlrSave2.h>
 #include <PLAYER/Player.h>
 #include <PLAYER/PlayerPets.h>
+#include <ITEMS/Items.h>           // sub_6FC4EC10, one item out of a section
+#include <ITEMS/ItemMode.h>        // D2GAME_ITEMS_UpdateInventoryItems_6FC45050
+#include <MONSTER/Monster.h>       // MONSTER_DeleteEvents
+#include <MONSTER/MonsterAI.h>     // MONSTERAI_UpdateMercStatsAndSkills
 #include <UNIT/SUnit.h>
+#include <UNIT/SUnitMsg.h>         // D2GAME_MERCS_SendStat_6FCC61D0
+#include <UNIT/SUnitNpc.h>         // D2GAME_MERCS_Create_6FCC8630
 #include <cstring>
 #include <ctime>
 #include <climits>
@@ -314,8 +326,9 @@ int32_t __fastcall PLRSAVE2_CreateSaveFile(D2GameStrc* pGame, D2UnitStrc* pPlaye
         return nResult;
     }
 
-    // Expansion tail: the mercenary's item block, then the iron golem's. Both are present in every
-    // expansion save even when empty, which is why they are written unconditionally here.
+    // Expansion tail: the mercenary's item block, then the iron golem's. Both markers are present in
+    // every expansion save even when their block is empty, which is why they are written
+    // unconditionally here.
     if (pGame->bExpansion)
     {
         if (ppSection + 3 > pEnd)
@@ -325,12 +338,59 @@ int32_t __fastcall PLRSAVE2_CreateSaveFile(D2GameStrc* pGame, D2UnitStrc* pPlaye
         ppSection[0] = 'j';
         ppSection[1] = 'f';
         ppSection += 2;
-        // TODO(client-parity): a hired mercenary's items are not serialised yet -- the marker and an
-        // empty block are written so the file's section chain stays well formed and loadable.
+
+        // The hireling's items are written by the SAME writer the player's own section uses
+        // (PLRSAVE_WriteItems, retail's sub_6FC8A0F0: a 'JM' marker, a 16-bit count, then one
+        // byte-aligned serialized item each), applied to the pet's inventory. A pet that does not
+        // exist gets no block -- the marker then stands alone and 'k f' follows it directly, which
+        // is what every save we hold does. Writing the marker with nothing behind it unconditionally
+        // (which is what this did) dropped every hired mercenary's gear (client-parity C3d).
+        D2UnitStrc* pPet = sub_6FC7E8B0(pGame, pPlayer, PETTYPE_HIREABLE, 1);
+        if (pPet)
+        {
+            const int32_t nPetSectionSize = sub_6FC8A0F0(pGame, pPet, ppSection, (int32_t)(pEnd - ppSection), 0, a7);
+            if (nPetSectionSize < 0)
+            {
+                return PLRSAVE2ERROR_BAD_PET;
+            }
+            ppSection += nPetSectionSize;
+        }
+
+        // PLRSAVE2_WriteIronGolemSection (D2Game.0x6FC8D880): the marker, a present flag, and the
+        // golem's own item when there is one. The engine summons no iron golem on any path a row
+        // drives, so this arm is unasserted -- but the flag is now the golem's state rather than the
+        // constant 0 the marker used to carry.
         ppSection[0] = 'k';
         ppSection[1] = 'f';
-        ppSection[2] = 0;   // iron golem present flag
+        uint8_t bHasIronGolem = 0;
+        D2UnitStrc* pIronGolemItem = nullptr;
+        D2UnitStrc* pIronGolem = sub_6FC7E8B0(pGame, pPlayer, PETTYPE_GOLEM, 1);
+        if (pIronGolem && pIronGolem->dwClassId == MONSTER_IRONGOLEM &&
+            SKILLS_GetSkillById(pPlayer, SKILL_IRONGOLEM, (D2UnitGUID)-1) && pIronGolem->pInventory)
+        {
+            pIronGolemItem = INVENTORY_UnitIsItem(INVENTORY_GetFirstItem(pIronGolem->pInventory));
+            if (pIronGolemItem)
+            {
+                bHasIronGolem = 1;
+            }
+        }
+        ppSection[2] = bHasIronGolem;
         ppSection += 3;
+        if (bHasIronGolem)
+        {
+            const int32_t nGolemItemSize = D2GAME_SAVE_SerializeItem_6FC89AD0(pIronGolemItem, ppSection,
+                (uint32_t)(pEnd - ppSection), 0, a7);
+            // Retail clears the present flag rather than advancing by a failed length; a serializer
+            // that wrote nothing leaves the section at its three bytes.
+            if (nGolemItemSize <= 0)
+            {
+                ppSection[-1] = 0;
+            }
+            else
+            {
+                ppSection += nGolemItemSize;
+            }
+        }
     }
 
     const uint32_t nFileSize = (uint32_t)(ppSection - pStart);
@@ -341,6 +401,250 @@ int32_t __fastcall PLRSAVE2_CreateSaveFile(D2GameStrc* pGame, D2UnitStrc* pPlaye
 
     *pSize = nFileSize;
     return PLRSAVE2ERROR_SUCCESS;
+}
+
+// PLRSAVE2_ReadMercData (D2Game.0x6FC8E730): the header's MercSaveData record, turned back into a
+// live hireling. PLRSAVE2_WriteMercData is its mirror, and the pair is what makes a saved
+// mercenary survive a save->load->save round trip rather than only the write half.
+//
+// The record stores the name as an OFFSET into the hireling's name range (the writer subtracts
+// wNameFirst), so the reader adds it back and clamps into the range. A record with no seed, no
+// experience and no name is "no mercenary" and creates nothing -- which is what every save we hold
+// carries, so a character without a hireling is unaffected by the sections below.
+D2UnitStrc* __fastcall D2WEB_PLRSAVE2_ReadMercData(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2MercSaveDataStrc* pData, uint32_t dwVersion)
+{
+    if (!pData->nExperience && !pData->nSeed && !pData->wName)
+    {
+        return nullptr;
+    }
+
+    D2MercSaveDataStrc hirelingData = {};
+    memcpy(&hirelingData, pData, sizeof(hirelingData));
+
+    D2HirelingTxt* pHirelingTxtRecord = DATATBLS_GetHirelingTxtRecordFromIdAndLevel(pGame->bExpansion, hirelingData.nHirelingId, 1);
+    if (!pHirelingTxtRecord)
+    {
+        return nullptr;
+    }
+
+    hirelingData.wName += pHirelingTxtRecord->wNameFirst;
+    if (hirelingData.wName > pHirelingTxtRecord->wNameLast)
+    {
+        hirelingData.wName = pHirelingTxtRecord->wNameFirst;
+    }
+
+    D2UnitStrc* pMerc = D2GAME_MERCS_Create_6FCC8630(pGame, pPlayer, hirelingData.wName, hirelingData.nSeed,
+        hirelingData.nHirelingId, pHirelingTxtRecord->dwClass, hirelingData.nFlags & UNITFLAG_ISDEAD);
+    if (!pMerc)
+    {
+        return nullptr;
+    }
+
+    D2PetInfoStrc petInfo = {};
+    petInfo.nSeed = hirelingData.nSeed;
+    petInfo.wName = hirelingData.wName;
+    petInfo.nHirelingId = hirelingData.nHirelingId;
+    PLAYERPETS_UpdatePetInfo(pPlayer, PETTYPE_HIREABLE, pMerc->dwUnitId, &petInfo);
+
+    int32_t nLevel = 1;
+    const int32_t nMaxLevel = DATATBLS_GetMaxLevel(0);
+
+    if (STATLIST_UnitGetStatValue(pMerc, STAT_EXPERIENCE, 0) < hirelingData.nExperience)
+    {
+        STATLIST_SetUnitStat(pMerc, STAT_EXPERIENCE, (int32_t)hirelingData.nExperience, 0);
+    }
+
+    D2GAME_MERCS_SendStat_6FCC61D0(pMerc, STAT_EXPERIENCE, hirelingData.nExperience);
+
+    do
+    {
+        pHirelingTxtRecord = DATATBLS_GetHirelingTxtRecordFromIdAndLevel(pGame->bExpansion, hirelingData.nHirelingId, nLevel);
+        if (!pHirelingTxtRecord)
+        {
+            SUNIT_RemoveUnit(pGame, pMerc);
+            return nullptr;
+        }
+
+        ++nLevel;
+    }
+    while (nLevel <= nMaxLevel && hirelingData.nExperience >= MONSTERS_GetHirelingExpForNextLevel(nLevel, pHirelingTxtRecord->dwExpPerLvl));
+
+    MONSTERAI_UpdateMercStatsAndSkills(pGame, pPlayer, pMerc, nLevel);
+
+    if (hirelingData.nFlags & UNITFLAG_ISDEAD)
+    {
+        sub_6FC7D470(pGame, pPlayer, pMerc);
+        pMerc->dwFlags |= UNITFLAG_ISDEAD;
+        SUNIT_SetCombatMode(pGame, pMerc, MONMODE_DEAD);
+        MONSTER_DeleteEvents(pGame, pMerc);
+    }
+
+    // A hireling's inventory is allocated on demand (there is none on the unit this creates), and
+    // the item section that follows needs one.
+    if (!pMerc->pInventory)
+    {
+        INVENTORY_AllocInventory(nullptr, pMerc);
+    }
+
+    return pMerc;
+}
+
+// PLRSAVE2_ReadPetSection (D2Game.0x6FC8E850): the 'j f' block, applied to the hireling. The block
+// is the same item format as the player's own ('JM', a count, byte-aligned items), read by the
+// same reader (sub_6FC8BC70), against the mercenary's inventory instead of the player's.
+int32_t __fastcall D2WEB_PLRSAVE2_ReadPetSection(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pMerc,
+    uint8_t** ppSection, uint8_t* pEnd, uint32_t dwVersion, int32_t* pSectionSize)
+{
+    if (!pGame->bExpansion)
+    {
+        return 0;
+    }
+
+    uint8_t* pData = *ppSection + 2;
+    if (pData > pEnd)
+    {
+        return 0;
+    }
+
+    if (*(uint16_t*)*ppSection != 0x666A)   // 'j f'
+    {
+        if (pSectionSize) *pSectionSize = 101;
+        return PLRSAVE2ERROR_BAD_PET;
+    }
+
+    // No hireling: the marker stands alone and the iron golem section follows it directly.
+    if (!pMerc)
+    {
+        *ppSection = pData;
+        return 0;
+    }
+
+    int32_t nLength = 0;
+    const int32_t nResult = sub_6FC8BC70(pGame, pMerc, pData, dwVersion, (int32_t)(pEnd - pData), 0, &nLength);
+    if (nResult)
+    {
+        if (pSectionSize) *pSectionSize = nResult;
+        return PLRSAVE2ERROR_BAD_PET;
+    }
+
+    D2GAME_ITEMS_UpdateInventoryItems_6FC45050(pGame, pMerc, 0, 0);
+    if (!SUNIT_IsDead(pMerc))
+    {
+        STATLIST_SetUnitStat(pMerc, STAT_HITPOINTS, STATLIST_GetMaxLifeFromUnit(pMerc), 0);
+    }
+
+    *ppSection = &pData[nLength];
+    return 0;
+}
+
+// PLRSAVE2_CreateItem (D2Game.0x6FC8E920): one serialized item out of a section, socketed children
+// included. Read by the iron golem section below to restore the golem's item; the player's and the
+// mercenary's own item sections use the bulk reader (PLRSAVE_ReadItems), which is a different
+// function. Nothing in this engine summons an iron golem, so this is ported for the section chain's
+// sake and is unasserted -- see C3d.
+int32_t __fastcall D2WEB_PLRSAVE2_CreateItem(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc** ppItem,
+    uint8_t** ppSection, uint8_t* pEnd, uint32_t dwVersion)
+{
+    *ppItem = nullptr;
+
+    uint8_t* pSection = *ppSection;
+    uint32_t nSize = (uint32_t)(pEnd - pSection);
+
+    D2ItemSaveStrc pItemSave = {};
+    ITEMS_GetCompactItemDataFromBitstream(pSection, nSize, 1, &pItemSave);
+    if (pItemSave.nClassId == -1)
+    {
+        return 0;
+    }
+
+    D2UnitStrc* pItem = sub_6FC4EC10(pGame, 0, pSection, nSize, 1, &pItemSave, &nSize, dwVersion);
+    if (!pItem)
+    {
+        return 0;
+    }
+
+    uint8_t* pNext = &pSection[nSize];
+
+    for (int32_t i = 0; i < pItemSave.nItemFileIndex; ++i)
+    {
+        nSize = (uint32_t)(pEnd - pNext);
+        ITEMS_GetCompactItemDataFromBitstream(pNext, nSize, 1, &pItemSave);
+
+        D2UnitStrc* pSocketable = sub_6FC4EC10(pGame, 0, pNext, nSize, 1, &pItemSave, &nSize, dwVersion);
+        if (!pSocketable)
+        {
+            SUNIT_RemoveUnit(pGame, pItem);
+            return 0;
+        }
+
+        pNext += nSize;
+        UNITS_ChangeAnimMode(pSocketable, IMODE_ONCURSOR);
+
+        int32_t bPlaced = 0;
+        if (!D2GAME_ITEMSOCKET_PlaceItem_6FC497E0(pGame, pPlayer, pSocketable->dwUnitId,
+                pItem ? pItem->dwUnitId : -1, &bPlaced, 0, 1, 0))
+        {
+            SUNIT_RemoveUnit(pGame, pItem);
+            return 0;
+        }
+    }
+
+    if ((ITEMS_GetItemFlags(pItem) & IFLAG_RUNEWORD) && !ITEMS_GetRunesTxtRecordFromItem(pItem))
+    {
+        D2GAME_ITEMMODE_Unk_6FC4BC10(pGame, pPlayer, pItem);
+        pItem = nullptr;
+    }
+
+    *ppSection = pNext;
+    *ppItem = pItem;
+    return 1;
+}
+
+// PLRSAVE2_ReadIronGolemSection (D2Game.0x6FC8EAB0): the 'k f' marker, a present flag, and the
+// golem's own item when the flag is set. The flag is 0 in every save we hold, so the section is the
+// three bytes the writer emits; the item arm is ported for the chain's sake and is unasserted.
+int32_t __fastcall D2WEB_PLRSAVE2_ReadIronGolemSection(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint8_t** ppSection,
+    uint8_t* pEnd, uint32_t dwVersion)
+{
+    if (!pGame->bExpansion)
+    {
+        return 0;
+    }
+
+    uint8_t* pData = *ppSection + 2;
+    if (pData > pEnd)
+    {
+        return 0;
+    }
+
+    if (*(uint16_t*)*ppSection != 0x666B)   // 'k f'
+    {
+        return PLRSAVE2ERROR_BAD_IRONGOLEM;
+    }
+
+    uint8_t* pSectionEnd = pData + 1;
+    if (*pData)
+    {
+        D2SkillStrc* pSkill = SKILLS_GetHighestLevelSkillFromUnitAndId(pPlayer, SKILL_IRONGOLEM);
+        if (!pSkill)
+        {
+            return PLRSAVE2ERROR_BAD_IRONGOLEM;
+        }
+
+        UNITS_SetUsedSkill(pPlayer, pSkill);
+
+        D2UnitStrc* pItem = nullptr;
+        if (!D2WEB_PLRSAVE2_CreateItem(pGame, pPlayer, &pItem, &pSectionEnd, pEnd, dwVersion))
+        {
+            return PLRSAVE2ERROR_BAD_IRONGOLEM;
+        }
+
+        UNITS_ChangeAnimMode(pItem, IMODE_ONGROUND);
+        CLIENTS_SetIronGolemItemGUID(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), pItem ? (int32_t)pItem->dwUnitId : -1);
+    }
+
+    *ppSection = pSectionEnd;
+    return 0;
 }
 
 // Load a .d2s back INTO AN EXISTING player, the mirror of PLRSAVE2_CreateSaveFile above.
@@ -404,6 +708,21 @@ int32_t __fastcall D2WEB_PLRSAVE2_LoadIntoPlayer(D2GameStrc* pGame, D2UnitStrc* 
     nErrorCode = PLRSAVE2_ReadCorpses(pGame, pPlayer, &pSection, pSaveFileEnd, nVersion, &nSectionSize);
     if (nErrorCode) return nErrorCode;
 
+    // The expansion tail, in retail's own order (PLRSAVE2_ProcessSaveFile): the header's mercenary
+    // record first, which CREATES the hireling, then the 'j f' item block applied to it, then the
+    // 'k f' iron golem section. Each function answers 0 in a classic game. Skipping the tail (which
+    // is what this did) dropped a mercenary and its gear on load, so a file this engine wrote could
+    // not be read back as the character that wrote it (client-parity C3d).
+    D2UnitStrc* pMerc = D2WEB_PLRSAVE2_ReadMercData(pGame, pPlayer, &pSaveHeader->MercSaveData, nVersion);
+    nErrorCode = D2WEB_PLRSAVE2_ReadPetSection(pGame, pPlayer, pMerc, &pSection, pSaveFileEnd, nVersion, &nSectionSize);
+    if (nErrorCode) return nErrorCode;
+    if (pMerc)
+    {
+        MONSTERAI_SendMercStats(pGame, pPlayer, 1);
+    }
+    nErrorCode = D2WEB_PLRSAVE2_ReadIronGolemSection(pGame, pPlayer, &pSection, pSaveFileEnd, nVersion);
+    if (nErrorCode) return nErrorCode;
+
     // d2-web: the hands the file holds (header nLeftSkillId 0x78 / nRightSkillId 0x7C, written by the
     // save above from UNITS_GetLeft/RightSkill), assigned as retail's SelectSkill handler (0x3C) does:
     // D2GAME_AssignSkill + UNITS_InitLeft/RightSkill, for a skill the player has at level > 0. An
@@ -420,7 +739,203 @@ int32_t __fastcall D2WEB_PLRSAVE2_LoadIntoPlayer(D2GameStrc* pGame, D2UnitStrc* 
         if (bLeft) UNITS_InitLeftSkill(pPlayer); else UNITS_InitRightSkill(pPlayer);
     }
 
-    // The expansion tail (mercenary 'j f', iron golem 'k f') is written as empty markers by
-    // CreateSaveFile above and is not read back; see C3d.
+    return PLRSAVE2ERROR_SUCCESS;
+}
+
+// 1.12f/1.13c PLRSAVE2_CheckPlayerFlags (1.13c D2Game.0x6FD0BAF0). The file's own save flags must
+// agree with the game it is joining: expansion/classic, ladder/non-ladder, hardcore/softcore, and
+// the difficulty gate against the acts the file records as completed.
+int32_t __fastcall PLRSAVE2_CheckPlayerFlags(D2GameStrc* pGame, uint32_t dwFlags)
+{
+    if (dwFlags & CLIENTSAVEFLAG_EXPANSION)
+    {
+        if (!pGame->bExpansion) return PLRSAVE2ERROR_NOTEXPANSIONGAME;
+    }
+    else
+    {
+        if (pGame->bExpansion) return PLRSAVE2ERROR_EXPANSIONGAME;
+    }
+
+    // 1.13c also compares the file's creation stamp with the current ladder start. We run no ladder
+    // server, so the constant arm D2MOO compiles for 1.13c ("the stamp is current") is the one that
+    // applies: the file's ladder bit is checked, the timestamp is not.
+    if (dwFlags & CLIENTSAVEFLAG_LADDER)
+    {
+        if (!pGame->dwGameType) return PLRSAVE2ERROR_NOTLADDERGAME;
+    }
+    else
+    {
+        if (pGame->dwGameType) return PLRSAVE2ERROR_LADDERGAME;
+    }
+
+    if (dwFlags & CLIENTSAVEFLAG_HARDCORE)
+    {
+        if (dwFlags & CLIENTSAVEFLAG_DEAD) return PLRSAVE2ERROR_DEADHARDCORE;
+        if (!(ARENA_GetFlags(pGame) & GAMEFLAG_ARENA_HARDCORE)) return PLRSAVE2ERROR_HARDCOREJOINSOFTCORE;
+    }
+    else
+    {
+        if (ARENA_GetFlags(pGame) & GAMEFLAG_ARENA_HARDCORE) return PLRSAVE2ERROR_SOFTCOREJOINHARDCORE;
+    }
+
+    const uint8_t nProgression = (dwFlags & CLIENTSAVEFLAG_CHARACTER_PROGRESSION_MASK) >> CLIENTSAVEFLAG_CHARACTER_PROGRESSION_BIT;
+    switch (pGame->nDifficulty)
+    {
+    case DIFFMODE_NORMAL:
+        break;
+    case DIFFMODE_NIGHTMARE:
+        if (((dwFlags & CLIENTSAVEFLAG_EXPANSION) && nProgression < 5) || nProgression < 4)
+        {
+            return PLRSAVE2ERROR_NIGHTMARE_NOT_UNLOCKED;
+        }
+        break;
+    case DIFFMODE_HELL:
+        if (((dwFlags & CLIENTSAVEFLAG_EXPANSION) && nProgression < 10) || nProgression < 8)
+        {
+            return PLRSAVE2ERROR_HELL_NOT_UNLOCKED;
+        }
+        break;
+    default:
+        break;
+    }
+
+    return 0;
+}
+
+// PLRSAVE2_ReadSaveHeader (1.13c D2Game.0x6FD0D250), the half that must run before any character
+// exists: validate the file and derive who it is. Retail does this after the game exists -- a realm
+// creates the game and the character joins it -- and allocates the unit in the same call. Here the
+// header is what decides the game: the act it records is the act the level must be, so the session
+// reads it first and creates from it. The unit's class comes out of here, not from the caller.
+//
+// Two things retail's own function does that are deliberately not here, both because they need a
+// live client record and a tuned game rather than a byte buffer:
+//   - the `_strcmpi(CLIENTS_GetName(pClient), szName)` check, which the session performs on the
+//     client it built (see d2_session_create_from_save);
+//   - PLRSAVE2_CheckPlayerFlags, which the session calls once the game it created exists.
+// Everything that is a property of the FILE is here, in retail's order: signature, checksum, size,
+// version, the name terminator, the class bound, the newbie-save refusal, and the acts and map seed.
+int32_t __fastcall D2WEB_PLRSAVE2_ReadSaveHeader(uint8_t* pSaveFile, uint32_t nSize, int32_t nDifficulty, D2SaveHeaderReadStrc* pOut)
+{
+    if (pOut) { pOut->pHeader = nullptr; pOut->dwMapSeed = 0; pOut->nAct = ACT_I; pOut->nClass = 0; }
+    if (!pSaveFile || !pOut) return PLRSAVE2ERROR_CLIENT_ERROR;
+    if (nDifficulty < 0 || nDifficulty >= NUM_DIFFICULTIES) return PLRSAVE2ERROR_CLIENT_ERROR;
+    if (nSize < sizeof(D2SaveHeaderStrc)) return PLRSAVE2ERROR_CLIENT_ERROR;
+
+    D2SaveHeaderStrc* pSaveHeader = (D2SaveHeaderStrc*)pSaveFile;
+
+    // The file signature is not read inside retail's ReadSaveHeader -- its caller has already
+    // refused a file that is not a save -- but the same check stands in D2WEB_PLRSAVE2_LoadIntoPlayer,
+    // and keeping it here is what makes both halves answer NOT_COMPATIBLE for the same input.
+    if (pSaveHeader->dwHeaderMagic != D2SMAGIC_HEADER) return PLRSAVE2ERROR_NOT_COMPATIBLE;
+
+    // Retail zeroes the checksum field and sums the WHOLE remaining buffer, which at the file's
+    // start is the whole file. The checksum routine restores the field itself.
+    const uint32_t nCheckSum = pSaveHeader->dwChecksum;
+    if ((uint32_t)D2GAME_SAVE_CalculateChecksum_6FC8A140(pSaveHeader, (int32_t)nSize) != nCheckSum)
+    {
+        return PLRSAVE2ERROR_INVALID_CHECKSUM;
+    }
+
+    if (nSize != pSaveHeader->dwSize) return PLRSAVE2ERROR_INVALID_SIZE;
+
+    const uint32_t nVersion = pSaveHeader->dwVersion;
+    if (nVersion <= 91 || nVersion > 96) return PLRSAVE2ERROR_NOT_COMPATIBLE;
+
+    pSaveHeader->szName[15] = '\0';
+
+    const uint8_t nClass = pSaveHeader->nClass;
+    if (nClass > NUMBER_OF_PLAYERCLASSES) return PLRSAVE2ERROR_CLIENT_ERROR;
+
+    // A newbie save carries the character-creation flag instead of a played character: retail
+    // returns here, BEFORE it allocates the unit, and the client is asked to create a fresh
+    // character of that class rather than load one. Nothing to load, so nothing is created.
+    if (pSaveHeader->tPackedSaveFlags.bInit)
+    {
+        pOut->nClass = nClass;
+        return PLRSAVE2ERROR_NEWBIE_SAVE;
+    }
+
+    // nTown[difficulty] holds the act the character was last in for that difficulty, with the top
+    // bit marking that the difficulty was entered at all. An act outside the real range is read as
+    // Act I, which is retail's own clamp.
+    const uint8_t nCurrentTown = pSaveHeader->nTown[nDifficulty];
+    uint8_t nAct = nCurrentTown & 0x7F;
+    if (nAct >= NUM_ACTS) nAct = ACT_I;
+
+    // Retail writes the file's map seed into the game when the difficulty was entered, so a resumed
+    // character walks the map it was saved on (pGame->nGameType == 3 is the single-player game this
+    // is: dwInitSeed is only overwritten for a game that has not been seeded yet).
+    pOut->dwMapSeed = (nCurrentTown & 0x80) ? pSaveHeader->dwMapSeed : 0;
+    pOut->pHeader = pSaveHeader;
+    pOut->nAct = nAct;
+    pOut->nClass = nClass;
+    return PLRSAVE2ERROR_SUCCESS;
+}
+
+// The unit half of PLRSAVE2_ReadSaveHeader: what the header says about the character, applied to
+// the client and the player unit the session allocated with the class the reader read. Retail does
+// these inline in ReadSaveHeader between the unit allocation and the return; the seam is the
+// allocation itself, which in this session belongs to the attach that stands the unit in a room.
+int32_t __fastcall D2WEB_PLRSAVE2_ApplySaveHeader(D2ClientStrc* pClient, D2UnitStrc* pPlayer, const D2SaveHeaderStrc* pHeader, int32_t nAct)
+{
+    if (!pClient || !pPlayer || !pHeader) return PLRSAVE2ERROR_BAD_CLIENT;
+
+    D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
+    if (!pPlayerData) return PLRSAVE2ERROR_CLIENT_ERROR;
+
+    // A freshly loaded character is in no trade.
+    pPlayerData->pTrade = nullptr;
+    pPlayerData->dwTradeState = 0;
+    pPlayerData->dwAcceptTradeTick = 0;
+    pPlayerData->unk0x54 = 0;
+
+    CLIENTS_SetWeaponSwitch(pClient, pHeader->dwWeaponSwitch & 1);
+    CLIENTS_SetFlags(pClient, pHeader->dwSaveFlags);
+    CLIENTS_SetCreateTime(pClient, pHeader->dwCreateTime);
+    CLIENTS_SetActNo(pClient, (uint8_t)nAct);
+
+    for (int32_t i = 0; i < 16; ++i)
+    {
+        if (pHeader->SkillKeys[i].nSkill == uint16_t(-1))
+        {
+            CLIENTS_SetSkillHotKey(pClient, i, -1, 0, -1);
+            continue;
+        }
+
+        const int16_t nSkillData = pHeader->SkillKeys[i].nSkill;
+        const int16_t nSkillId = nSkillData & 0x0FFF;
+        const uint8_t nHand = (uint8_t)(nSkillData >> 15);
+
+        int16_t nFlags = pHeader->SkillKeys[i].nItemSlot;
+        if (!nFlags) nFlags = -1;
+
+        CLIENTS_SetSkillHotKey(pClient, i, nSkillId, nHand, nFlags);
+    }
+
+    // The hands. -1 is "no skill"; otherwise the low 12 bits are the skill and the item index is a
+    // 1-based inventory index, where 0 means "not an item-granted hand" and stores as -1.
+    struct { int16_t nSkill; int16_t nItemIndex; int32_t* pId; int32_t* pFlags; } hands[4] = {
+        { pHeader->nLeftSkillId, pHeader->nLeftSkillItemIndex, &pPlayerData->nLeftSkillId, &pPlayerData->nLeftSkillFlags },
+        { pHeader->nRightSkillId, pHeader->nRightSkillItemIndex, &pPlayerData->nRightSkillId, &pPlayerData->nRightSkillFlags },
+        { pHeader->nSwitchLeftSkillId, pHeader->nSwitchLeftSkillItemIndex, &pPlayerData->nSwitchLeftSkillId, &pPlayerData->nSwitchLeftSkillFlags },
+        { pHeader->nSwitchRightSkillId, pHeader->nSwitchRightSkillItemIndex, &pPlayerData->nSwitchRightSkillId, &pPlayerData->nSwitchRightSkillFlags },
+    };
+
+    for (int32_t i = 0; i < 4; ++i)
+    {
+        if (hands[i].nSkill == -1)
+        {
+            *hands[i].pId = -1;
+            *hands[i].pFlags = -1;
+            continue;
+        }
+
+        *hands[i].pId = hands[i].nSkill & 0x0FFF;
+        *hands[i].pFlags = hands[i].nItemIndex;
+        if (!*hands[i].pFlags) *hands[i].pFlags = -1;
+    }
+
+    CLIENTS_SetGuildEmblem(pClient, pHeader->nGuildEmblemBgColor, 0, 0);
     return PLRSAVE2ERROR_SUCCESS;
 }

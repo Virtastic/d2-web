@@ -12,6 +12,15 @@ import { createServer } from 'node:http';
 import { createReadStream, statSync, existsSync } from 'node:fs';
 import { join, extname, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { brMayAnswer } from './br-check.mjs';
+
+// May this .br answer for `path`? By CONTENT, never by mtime -- and the verdict memo is keyed by
+// content too, in the same module as the check (play/br-check.mjs): the key that used to sit here was
+// `brMtimeMs:brSize:fileMtimeMs:fileSize`, which a same-size rewrite with its mtime put back
+// reproduces exactly, so the cached "yes" answered for a .br that no longer decompressed to the file
+// beside it and the OLD build went out behind e/<ver>/'s `max-age=31536000, immutable`. A key that
+// cannot collide is the fix; dropping the memo is not (a 1.8 MB decompression per request is what it
+// saves). `brMayAnswer` reads and hashes both files per request -- never a stale verdict.
 
 const ROOT = process.argv[3] ? resolve(process.argv[3]) + sep : fileURLToPath(new URL('.', import.meta.url));
 const PORT = Number(process.argv[2] || process.env.PORT || 8920);
@@ -22,6 +31,16 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/ja
 
 createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
+  // Which site this server is serving. A harness reuses a server already on its port only when it
+  // serves THAT test runner's staged site; two worktrees that stage the same engine build have
+  // byte-identical index.html (version-engine.sh hashes only wasm/loader/streamfs), so comparing
+  // index.html cannot tell them apart and the test runner would silently measure the other worktree's
+  // client JS. The root is the answer that cannot be forged by a coincidence of build hashes.
+  // Divergence from openmw-web's serve.mjs (which has no such probe); see d2-harness.mjs ensurePlayServer.
+  if (url.pathname === '/__site') {
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end(ROOT);
+  }
   let rel = normalize(decodeURIComponent(url.pathname)).replace(/^([/\\])+/, '');
   if (rel === '' || rel.endsWith('/') || rel.endsWith('\\')) rel += 'index.html';
   let base = ROOT;
@@ -40,7 +59,7 @@ createServer((req, res) => {
   let file = path;
   const br = path + '.br';
   if (!req.headers.range && /\bbr\b/.test(req.headers['accept-encoding'] || '') && existsSync(br)
-      && statSync(br).mtimeMs >= statSync(path).mtimeMs) { file = br; h['Content-Encoding'] = 'br'; }
+      && brMayAnswer(path, br)) { file = br; h['Content-Encoding'] = 'br'; }
   const size = statSync(file).size;
   const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
   if (m && file === path) {

@@ -67,10 +67,14 @@ export function menuFramePieces(x1, y1, x2, y2) {
   const top = [];
   for (let i = 0, x = x1 + 12; x < x2 - 12; i++, x += 12) top.push([2 + ((i + 1) % 6), x, y1 + 12]);
   out.push(...top);
-  for (let i = 0, x = x1 + 13; x < x2 - 12; i++, x += 12) out.push([16 + ((i + top.length - 5) % 6), x, y2 + 10]);
+  for (let i = 0, x = x1 + 13; x < x2 - 12; i++, x += 12) out.push([16 + ((i + top.length + 1) % 6), x, y2 + 10]);
+  // The 69px (two-entry) retail menu starts each vertical strip one cel earlier
+  // than the wider measured menus.  This is the third retail size (Jerhyn), not
+  // a screen-specific offset: the narrow frame is still derived from its box.
+  const narrow = x2 - x1 === 69;
   let leftCount = 0;
-  for (let i = 0, y = y1 + 22; y < y2; i++, y += 12) { out.push([10 + ((i + 2) % 3), x1 - 4, y]); leftCount++; }
-  for (let i = 0, y = y1 + 24; y < y2; i++, y += 12) out.push([13 + ((i + leftCount - 4) % 3), x2 - 7, y]);
+  for (let i = 0, y = y1 + 22; y < y2; i++, y += 12) { out.push([10 + ((i + (narrow ? 0 : 2)) % 3), x1 - 4, y]); leftCount++; }
+  for (let i = 0, y = y1 + 24; y < y2; i++, y += 12) out.push([13 + ((i + leftCount - (narrow ? 3 : 4)) % 3), x2 - 7, y]);
   out.push([0, x1, y1 + 12], [1, x2 - 12, y1 + 12], [8, x1, y2 + 1], [9, x2 - 12, y2 + 1]);
   return out;
 }
@@ -166,7 +170,7 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
     close() { state = null; rows = []; box = null; },
     draw(ctx, feetX, feetY, act = 1) {
       if (!state) return null;
-      const { labels, bottoms, cx } = layout(feetX, feetY);
+      const { labels, bottoms } = layout(feetX, feetY);
       ctx.save();
       darken(ctx, box, act);
       recordPrim('box', box.x1, box.y1, box.x2, box.y2, 0, 1);
@@ -176,8 +180,10 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
         recordDc6(NPC_MENU_ASSETS.pieces, i, f, left, top);
       }
       ctx.restore();
-      // Each line starts at cx - width / 2 + 1 (retail: Warriv 276, talk 288, cancel 281 about 304).
-      const line = (font, text, bottom) => font.drawAnchored(ctx, text, cx - Math.trunc(font.measure(text) / 2) + 1, bottom);
+      // Centre from the actual box bounds.  This differs from a truncated centre only for an
+      // odd-width box holding an even-width line (Jerhyn's 69px menu / "talk"), where retail
+      // puts the ink one pixel to the right.
+      const line = (font, text, bottom) => font.drawAnchored(ctx, text, box.x1 + Math.ceil((box.w - font.measure(text)) / 2) + 1, bottom);
       const { gold, blue } = fontsFor(act);
       line(gold, labels[0], bottoms[0]);
       rows.forEach((r, i) => line(i === selected ? blue : white, r.label, r.inkBottom));

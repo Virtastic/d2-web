@@ -1331,7 +1331,22 @@ BOOL UNITS_CanAnimModeUseAttackRate(int nUnitType, int nAnimMode, D2UnitStrc* pU
 
 	if (pAnimModeModulators->bCanUseSkillAttackRate)
 	{
-		D2SkillsTxt* pSkillsRecord = DATATBLS_GetSkillsTxtRecord(UNITS_GetUsedSkill(pUnit)->pSkillsTxt->nSkillId);
+		// Sanitizer-flagged: upstream dereferenced
+		// UNITS_GetUsedSkill(pUnit)->pSkillsTxt unconditionally -- a unit changing into such a mode
+		// with no used skill (a town NPC via AITHINK_Fn032_Npc; s000c walking into the Great Marsh
+		// trapped this) read through a null D2SkillStrc. Retail 1.13c D2Common 0x6FD80BD0 (Ghidra):
+		// `call 0x6FD803A0 [UNITS_GetUsedSkill]; test eax,eax; jne <continue>` else `xor eax,eax;
+		// ret 8` -- retail guards the skill pointer and returns FALSE for "no used skill", it does
+		// not fault. D2SkillStrc::pSkillsTxt is only ever set from a looked-up D2SkillsTxt record
+		// (D2Skills.cpp), so a null pSkillsTxt on an existing skill is the same "not a real skill"
+		// case and gets the same guard.
+		D2SkillStrc* pUsedSkill = UNITS_GetUsedSkill(pUnit);
+		if (!pUsedSkill || !pUsedSkill->pSkillsTxt)
+		{
+			return FALSE;
+		}
+
+		D2SkillsTxt* pSkillsRecord = DATATBLS_GetSkillsTxtRecord(pUsedSkill->pSkillsTxt->nSkillId);
 		return (pSkillsRecord->dwFlags[0] & SKILLSFLAG_USEATTACKRATE) != 0;
 	}
 

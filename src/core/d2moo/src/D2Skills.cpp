@@ -1537,7 +1537,7 @@ int __stdcall SKILLS_GetUseState(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 		}
 	}
 
-	if (pSkill->pSkillsTxt->nETypeA[0] > 0 || pSkill->pSkillsTxt->nITypeA[0] > 0)
+	if (pSkill->pSkillsTxt->nElemTypeAB[0][0] > 0 || pSkill->pSkillsTxt->nItemTypeAB[0][0] > 0)
 	{
 		if (!pUnit->pInventory)
 		{
@@ -1710,22 +1710,26 @@ BOOL __fastcall sub_6FDB1070(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 }
 
 //D2Common.0x6FDB1130
+// Sanitizer-flagged: nType selects retail's "A" row (melee,
+// nType==0) or "B" row (nType==1) of skills.txt's itype/etype columns; D2SkillsTxt now holds them as
+// nItemTypeAB[2][3]/nElemTypeAB[2][2] (see DataTbls/SkillsTbls.h) instead of four separately-bounded same-width
+// arrays, so `nType`'s row selection stays a plain row index instead of overrunning the "A" array.
 BOOL __fastcall sub_6FDB1130(D2UnitStrc* pItem, D2UnitStrc* pUnit, D2SkillsTxt* pSkillsTxtRecord, int nType)
 {
 
 	if (!pItem)
 	{
-		if (pSkillsTxtRecord->nETypeA[2 * nType] <= 0 && pSkillsTxtRecord->nITypeA[3 * nType] <= 0)
+		if (pSkillsTxtRecord->nElemTypeAB[nType][0] <= 0 && pSkillsTxtRecord->nItemTypeAB[nType][0] <= 0)
 		{
 			return TRUE;
 		}
 
-		if ((pSkillsTxtRecord->nITypeA[0] == ITEMTYPE_WEAPON || pSkillsTxtRecord->nITypeA[0] == ITEMTYPE_MELEE_WEAPON || pSkillsTxtRecord->nITypeA[0] == ITEMTYPE_HAND_TO_HAND) && pSkillsTxtRecord->nITypeB[0] <= 0 && !ITEMS_CheckItemTypeId(NULL, ITEMTYPE_WEAPON) && !ITEMS_CheckItemTypeId(pUnit, ITEMTYPE_WEAPON))
+		if ((pSkillsTxtRecord->nItemTypeAB[0][0] == ITEMTYPE_WEAPON || pSkillsTxtRecord->nItemTypeAB[0][0] == ITEMTYPE_MELEE_WEAPON || pSkillsTxtRecord->nItemTypeAB[0][0] == ITEMTYPE_HAND_TO_HAND) && pSkillsTxtRecord->nItemTypeAB[1][0] <= 0 && !ITEMS_CheckItemTypeId(NULL, ITEMTYPE_WEAPON) && !ITEMS_CheckItemTypeId(pUnit, ITEMTYPE_WEAPON))
 		{
 			return TRUE;
 		}
 
-		if (pSkillsTxtRecord->nITypeA[0] == ITEMTYPE_HAND_TO_HAND && pSkillsTxtRecord->nITypeB[0] <= 0 && !ITEMS_CheckItemTypeId(NULL, ITEMTYPE_WEAPON) && !ITEMS_CheckItemTypeId(pUnit, ITEMTYPE_WEAPON))
+		if (pSkillsTxtRecord->nItemTypeAB[0][0] == ITEMTYPE_HAND_TO_HAND && pSkillsTxtRecord->nItemTypeAB[1][0] <= 0 && !ITEMS_CheckItemTypeId(NULL, ITEMTYPE_WEAPON) && !ITEMS_CheckItemTypeId(pUnit, ITEMTYPE_WEAPON))
 		{
 			return TRUE;
 		}
@@ -1733,7 +1737,7 @@ BOOL __fastcall sub_6FDB1130(D2UnitStrc* pItem, D2UnitStrc* pUnit, D2SkillsTxt* 
 		return FALSE;
 	}
 
-	short* pEType = &pSkillsTxtRecord->nETypeA[2 * nType];
+	short* pEType = &pSkillsTxtRecord->nElemTypeAB[nType][0];
 	for (int i = 0; i < 2; ++i)
 	{
 		if (*pEType <= 0)
@@ -1750,7 +1754,7 @@ BOOL __fastcall sub_6FDB1130(D2UnitStrc* pItem, D2UnitStrc* pUnit, D2SkillsTxt* 
 	}
 
 	int i = 0;
-	short* pIType = &pSkillsTxtRecord->nITypeA[3 * nType];
+	short* pIType = &pSkillsTxtRecord->nItemTypeAB[nType][0];
 	while (1)
 	{
 		if (*pIType <= 0)
@@ -3032,8 +3036,8 @@ int __stdcall D2Common_11024(D2UnitStrc* pUnit, D2UnitStrc* pItem, D2SkillStrc* 
 		}
 	}
 	
-	if(!ITEMS_CheckIfThrowable(pItem) || !pSkill->pSkillsTxt || pSkill->pSkillsTxt->nITypeA[0] <= 0
-	   || !ITEMS_CheckType(pSkill->pSkillsTxt->nITypeA[0], ITEMTYPE_THROWN_WEAPON) || pSkill->pSkillsTxt->nRange != 2)
+	if(!ITEMS_CheckIfThrowable(pItem) || !pSkill->pSkillsTxt || pSkill->pSkillsTxt->nItemTypeAB[0][0] <= 0
+	   || !ITEMS_CheckType(pSkill->pSkillsTxt->nItemTypeAB[0][0], ITEMTYPE_THROWN_WEAPON) || pSkill->pSkillsTxt->nRange != 2)
 	{
 		return 0;
 	}

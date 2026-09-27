@@ -164,10 +164,16 @@ struct D2SkillsTxt
 	uint8_t nSelectProc;					//0x15
 	uint8_t nSeqInput;						//0x16
 	uint8_t pad0x17;						//0x17
-	int16_t nITypeA[3];						//0x18
-	int16_t nITypeB[3];						//0x1E
-	int16_t nETypeA[2];						//0x24
-	int16_t nETypeB[2];						//0x28
+	// Sanitizer-flagged: sub_6FDB1130 (1.13c D2Common.dll)
+	// selects the "A" row for melee (nType==0) or the "B" row for throwing/other (nType==1) with
+	// `nITypeA[3 * nType]` and `nETypeA[2 * nType]` -- a flattened row index into a 2-row table, not a
+	// single-row array indexed out of range. Splitting the table into four separately-bounded
+	// same-width arrays (ITypeA/ITypeB, ETypeA/ETypeB), laid out back to back with no padding
+	// (0x18/0x1E/0x24/0x28), reproduced retail's bytes but made nType==1 index past the "A" array's
+	// declared bound. One `[2][N]` array per width keeps the same bytes at the same offsets and every
+	// index in bounds.
+	int16_t nItemTypeAB[2][3];					//0x18 (retail's nITypeA is row 0, nITypeB row 1)
+	int16_t nElemTypeAB[2][2];					//0x24 (retail's nETypeA is row 0, nETypeB row 1)
 	int16_t wSrvStartFunc;					//0x2C
 	uint16_t wSrvDoFunc;					//0x2E
 	uint16_t wSrvPrgFunc[3];				//0x30

@@ -3,6 +3,7 @@ import { composeCofFrame, decodeCof, decodeDcc } from './unit-formats.mjs';
 import { dccDirection, indexedToRgba } from './unit-renderer.mjs';
 import { fourcc } from './monster-renderer.mjs';
 import { createBlender } from './frontend.mjs';
+import { createUnitShadowRenderer } from './unit-shadow-renderer.mjs';
 
 const COMPONENT = ['HD','TR','LG','RA','LA','RH','LH','SH','S1','S2','S3','S4','S5','S6','S7','S8'];
 const MODE = ['NU','OP','ON','S1','S2','S3','S4','S5'];
@@ -19,8 +20,18 @@ export function parseObjectPresentations(bytes, count) {
   }; });
 }
 
-export function createObjectRenderer(read, documentObject = globalThis.document) {
-  const animations = new Map(), failures = new Set(), rasters = new Map(), palettes = new Map(), blenders = new Map(); let lastEvidence = null;
+/**
+ * `shadow: true` draws each of the object's shadow-carrying COF layers under its sprite first, the way
+ * retail orders it: a `shadow dcc:` immediately before the matching `cel dcc:` of the same path, frame
+ * and anchor.
+ * Retail shadows these objects through that draw: the torches, banners, rocks, the waypoint, the
+ * rogue's campfire. The gate is the layer's own COF Shadow byte and not its transparency byte; the
+ * counts and the negative control are
+ */
+export function createObjectRenderer(read, documentObject = globalThis.document, { shadow = false } = {}) {
+  const animations = new Map(), failures = new Set(), rasters = new Map(), palettes = new Map(), blenders = new Map();
+  const shadows = shadow ? createUnitShadowRenderer(read) : null;
+  let lastEvidence = null, measuring = false;
   const palette = (act) => { const a = Math.min(4, Math.max(0, (act | 0) - 1));
     if (!palettes.has(a)) palettes.set(a, decodeDatPalette(read(`data\\global\\palette\\${PALETTE[a]}\\pal.dat`))); return [a, palettes.get(a)]; };
   const blender = (act0, pal) => {
@@ -30,7 +41,11 @@ export function createObjectRenderer(read, documentObject = globalThis.document)
     }
     return blenders.get(act0);
   };
-  return { draw(ctx, x, y, object, act) {
+  // Where a hit test paints when it needs the sprite's own box: a 1x1 scratch canvas, drawn once
+  // and never read, so measuring an object never paints the frame the player sees.
+  let scratch = null;
+  const scratchContext = () => { if (!scratch) { scratch = documentObject.createElement('canvas'); scratch.width = 1; scratch.height = 1; } return scratch.getContext('2d'); };
+  const renderer = { draw(ctx, x, y, object, act) {
     const mode = MODE[object.mode] || 'NU', base = `${object.token}:${mode}:${object.direction}:${object.componentMask}`;
     if (!object.token || failures.has(base)) return null;
     let animation = animations.get(base);
@@ -46,6 +61,11 @@ export function createObjectRenderer(read, documentObject = globalThis.document)
       animation = { cof, direction, components, mode }; animations.set(base, animation);
     } catch { failures.add(base); return null; }
     const frame = (object.framePrecise >>> 8) % animation.cof.framesPerDirection;
+    // The shadow goes under the sprite, at the object's own anchor, one blit per COF layer whose Shadow
+    // byte is set -- retail's own order (shadow records precede every cel of the same frame).
+    const shadowBlit = shadows && !measuring ? shadows.draw(ctx, Math.round(x), Math.round(y),
+      { cof: animation.cof, components: animation.components, direction: animation.direction, frame },
+      { kind: 'object', id: object.id, classId: object.classId, token: object.token, direction: animation.direction, frame, act }) : null;
     const composed = composeCofFrame(animation.cof, animation.direction, frame, animation.components), [act0, pal] = palette(act);
     const key = `${base}:${frame}:${act0}`; let canvas = rasters.get(key);
     if (!canvas) { canvas = documentObject.createElement('canvas'); canvas.width = composed.width; canvas.height = composed.height;
@@ -73,7 +93,7 @@ export function createObjectRenderer(read, documentObject = globalThis.document)
         }
         const component = COMPONENT[componentId];
         const path = component && layer ? `objects\\${object.token}\\${component}\\${object.token}${component}lit${animation.mode}${layer.weaponClass}`.toLowerCase() : null;
-        layerEvidence.push({ component, path, mode, transparent: Boolean(layer?.transparent), drawEffect: layer?.drawEffect ?? 0 });
+        layerEvidence.push({ component, path, mode, transparent: Boolean(layer?.transparent), drawEffect: layer?.drawEffect ?? 0, shadow: Boolean(layer?.shadow) });
         if (Array.isArray(globalThis.__d2DrawList) && path) globalThis.__d2DrawList.push({ op: 'dcc', path, frame, x: Math.round(x), y: Math.round(y), mode });
       }
     } else if (canvas.width && canvas.height) {
@@ -82,13 +102,33 @@ export function createObjectRenderer(read, documentObject = globalThis.document)
         const layer = animation.cof.layerRecords.find((value) => value.component === componentId), component = COMPONENT[componentId];
         if (!layer || !component || !animation.components.has(componentId)) continue;
         const path = `objects\\${object.token}\\${component}\\${object.token}${component}lit${animation.mode}${layer.weaponClass}`.toLowerCase();
-        layerEvidence.push({ component, path, mode: 5, transparent: Boolean(layer.transparent), drawEffect: layer.drawEffect });
+        layerEvidence.push({ component, path, mode: 5, transparent: Boolean(layer.transparent), drawEffect: layer.drawEffect, shadow: Boolean(layer.shadow) });
         if (Array.isArray(globalThis.__d2DrawList)) globalThis.__d2DrawList.push({ op: 'dcc', path, frame, x: Math.round(x), y: Math.round(y), mode: 5 });
       }
     }
     let pixelHash = 0x811c9dc5; for (const value of composed.indexed) { pixelHash ^= value; pixelHash = Math.imul(pixelHash, 0x01000193); }
     lastEvidence = { id: object.id, classId: object.classId, token: object.token, mode: animation.mode, direction: animation.direction,
       frame, components: animation.components.size, width: composed.width, height: composed.height,
-      opaque: composed.opaque.reduce((a,v)=>a+v,0), pixelHash: pixelHash >>> 0, layers: layerEvidence }; return lastEvidence;
-  }, get lastEvidence(){return lastEvidence&&{...lastEvidence};}, get decoded(){return animations.size;}, get failures(){return failures.size;} };
+      xOffset: composed.xOffset, yOffset: composed.yOffset,
+      opaque: composed.opaque.reduce((a,v)=>a+v,0), pixelHash: pixelHash >>> 0, layers: layerEvidence,
+      // The shadow blit this draw made (or null).  `layers[].shadow` is the COF byte as retail shipped
+      // it; `shadow.layers`/`shadow.components` is what the pass decided to draw -- so a row can assert
+      // both a blit for a Shadow-set layer and none for a layer whose bytes say otherwise.
+      shadow: shadowBlit, shadowLayers: shadowBlit ? shadowBlit.layers : 0 }; return lastEvidence;
+  },
+  // The box this object's sprite occupies when drawn at (x, y), or null when nothing would be drawn
+  // (no token, a COF/DCC that will not decode). Retail's hover is the drawn sprite, not a radius
+  // around the object's origin, so the hit test asks the SAME draw that paints the frame -- into the
+  // scratch canvas, with the draw list and the last evidence left exactly as the frame left them.
+  measure(object, act) {
+    if (!object?.token) return null;
+    const keepEvidence = lastEvidence, keepList = globalThis.__d2DrawList;
+    globalThis.__d2DrawList = null; measuring = true;   // the scratch canvas is 1x1: a shadow there is all clip
+    try { const drawn = renderer.draw(scratchContext(), 0, 0, object, act);
+      return drawn ? { width: drawn.width, height: drawn.height, xOffset: drawn.xOffset, yOffset: drawn.yOffset } : null; }
+    catch { return null; }
+    finally { lastEvidence = keepEvidence; globalThis.__d2DrawList = keepList; measuring = false; }
+  },
+  get lastEvidence(){return lastEvidence&&{...lastEvidence};}, get decoded(){return animations.size;}, get failures(){return failures.size;} };
+  return renderer;
 }

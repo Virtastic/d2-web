@@ -108,12 +108,21 @@ void __fastcall CLIENTS_GetSkillHotKey(D2ClientStrc* pClient, int32_t nId, int32
     if (nHand) *nHand = key.nHand;
     if (nItemGUID) *nItemGUID = (int32_t)key.nItemGUID;
 }
-// No guild support in the headless session; retail writes the emblem fields as zero for a
-// guildless character, which is what an unset D2ClientStrc already carries.
+// No guild SERVER in the headless session, but the emblem is a field of the character: the save
+// header carries it (0xCF) and a load restores it, so these read and write D2ClientStrc's own
+// tGuildInfo rather than answering a constant. A guildless character's struct is zero, which is
+// the same value the constant used to return -- but a character whose file carried an emblem now
+// keeps it, and the save header's write->read->write round trip is real rather than self-cancelling.
 void __fastcall CLIENTS_GetGuildEmblem(D2ClientStrc* pClient, uint8_t* pBackgroundColor, uint8_t* pForegroundColor, uint8_t* pEmblemType) {
-    if (pBackgroundColor) *pBackgroundColor = 0;
-    if (pForegroundColor) *pForegroundColor = 0;
-    if (pEmblemType) *pEmblemType = 0;
+    if (pBackgroundColor) *pBackgroundColor = pClient ? pClient->tGuildInfo.nBackgroundColor : 0;
+    if (pForegroundColor) *pForegroundColor = pClient ? pClient->tGuildInfo.nForegroundColor : 0;
+    if (pEmblemType) *pEmblemType = pClient ? pClient->tGuildInfo.nEmblemType : 0;
+}
+void __fastcall CLIENTS_SetGuildEmblem(D2ClientStrc* pClient, uint8_t nBackgroundColor, uint8_t nForegroundColor, uint8_t nEmblemType) {
+    if (!pClient) return;
+    pClient->tGuildInfo.nBackgroundColor = nBackgroundColor;
+    pClient->tGuildInfo.nForegroundColor = nForegroundColor;
+    pClient->tGuildInfo.nEmblemType = nEmblemType;
 }
 D2UnitStrc* CLIENTS_GetPlayerFromClient(D2ClientStrc* pClient, BOOL bIgnoreDeath) {
     // The headless sim has no socket clients, but targeted-AI fixtures attach a minimal client
@@ -154,6 +163,29 @@ void CLIENTS_SetRoomInClient(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
     pClient->pRoom = pRoom;
 }
 
+// The client setters the save-header reader needs, missing from the vendored tree (they were
+// declared in D2Game's header with no definition). Backed by the real struct, like the getters
+// above -- the reader writes the character's identity onto the client exactly as retail's
+// PLRSAVE2_ReadSaveHeader does.
+void __fastcall CLIENTS_SetClassId(D2ClientStrc* pClient, int32_t nClass) { if (pClient) pClient->nClassId = (uint8_t)nClass; }
+void __fastcall CLIENTS_SetWeaponSwitch(D2ClientStrc* pClient, uint8_t bSwitchWeapon) { if (pClient) pClient->bSwitchWeapon = bSwitchWeapon; }
+void __fastcall CLIENTS_SetFlags(D2ClientStrc* pClient, int32_t nFlags) {
+    if (!pClient) return;
+    const uint16_t packed = (uint16_t)nFlags;
+    memcpy(&pClient->tSaveFlags, &packed, sizeof packed);
+}
+void __fastcall CLIENTS_SetCreateTime(D2ClientStrc* pClient, DWORD dwCreateTime) { if (pClient) pClient->nCreateTime = dwCreateTime; }
+// Declared in D2Game's Clients.h with no definition in the vendored tree (like the setters above).
+// The iron golem restore needs it; nothing in this engine summons a golem, so it is never reached.
+void __fastcall CLIENTS_SetIronGolemItemGUID(D2ClientStrc* pClient, int32_t nIronGolemItemGUID) { if (pClient) pClient->nIronGolemItemGUID = nIronGolemItemGUID; }
+void __fastcall CLIENTS_SetPlayerInClient(D2ClientStrc* pClient, D2UnitStrc* pUnit) { if (pClient) pClient->pPlayer = pUnit; }
+void __fastcall CLIENTS_SetSkillHotKey(D2ClientStrc* pClient, int32_t nHotkeyId, int16_t nSkillId, uint8_t nHand, int32_t nItemGUID) {
+    if (!pClient || nHotkeyId < 0 || nHotkeyId >= 16) return;
+    pClient->HotkeySkills[nHotkeyId].nSkill = nSkillId;
+    pClient->HotkeySkills[nHotkeyId].nHand = nHand;
+    pClient->HotkeySkills[nHotkeyId].nItemGUID = (uint32_t)nItemGUID;
+}
+
 // Recovered structural path from D2Game.0x6FC33670, normally called once per active client/frame.
 void __fastcall sub_6FC33670(D2GameStrc* pGame, D2ClientStrc* pClient) {
     if (!pGame || !pClient) return;
@@ -174,11 +206,32 @@ void __fastcall sub_6FC33670(D2GameStrc* pGame, D2ClientStrc* pClient) {
     if (UNITS_GetRoom(player)) UNITROOM_RefreshUnit(player);
 }
 void CLIENTS_ToggleFlag(D2ClientStrc* pClient, uint16_t nFlag, int32_t bSet) {}
-void CLIENTS_UpdateCharacterProgression(D2ClientStrc* pClient, uint16_t nAct, uint16_t nDifficulty) {}
+// 1.13c D2Game.0x6FC33xxx (D2MOO Clients.cpp CLIENTS_UpdateCharacterProgression). Retail's own
+// progression update, called by each act-boss quest the moment its boss dies (A1Q6 passes 1 ...
+// A5Q6 passes 5): the count is the HIGH-WATER mark of act + difficulty * actsPerDifficulty, where
+// actsPerDifficulty is 5 in an expansion game and 4 in classic. Those are exactly the values
+// PLRSAVE2_CheckPlayerFlags gates Nightmare (>= 5 expansion / 4 classic) and Hell (>= 10 / 8) on.
+// This was a no-op, so every file this engine wrote recorded progression 0 and could only ever be
+// loaded back at Normal (client-parity C3p).
+void CLIENTS_UpdateCharacterProgression(D2ClientStrc* pClient, uint16_t nAct, uint16_t nDifficulty)
+{
+    if (!pClient) return;
+    const int32_t nActsPerDifficulty = pClient->tSaveFlags.bExpansion ? NUM_ACTS : (NUM_ACTS - 1);
+    const int32_t nNewActDifficulty = (int32_t)nAct + (int32_t)nDifficulty * nActsPerDifficulty;
+    if (nNewActDifficulty >= (int32_t)pClient->tSaveFlags.nProgression)
+    {
+        pClient->tSaveFlags.nProgression = (uint16_t)nNewActDifficulty;
+    }
+}
 void D2GAME_PACKETS_SendHeaderOnlyPacket(D2ClientStrc* pClient, uint8_t nHeader) {
     if (pClient) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &nHeader, 1);
 }
 void __fastcall D2GAME_PACKETS_SendPacket0x15_6FC3D0D0(D2ClientStrc*, char, char, int32_t, int16_t, int16_t, char) {}
+// 0x97 is the "your weapons swapped" item update, sent to the client that asked. The browser client
+// reads the engine's own state instead of a D2 packet stream, so there is nothing to send -- but the
+// symbol has to exist now that the swap itself is reachable (d2_session_command_swap_weapons, F3):
+// wasm-ld drops an unreferenced function's calls, so sub_6FC46840 linked without this until then.
+void __fastcall D2GAME_PACKETS_SendPacket0x97_6FC3FB60(D2ClientStrc* pClient) {}
 void D2GAME_PACKETS_SendPacket0x03_6FC3C810(D2ClientStrc* pClient, char nHeader, char nAct, int32_t nInitSeed, int32_t nObjectSeed, int16_t nTownId) {}
 void D2GAME_PACKETS_SendPacket0x07_6FC3D120(D2ClientStrc* pClient, uint8_t nAreaId, uint16_t nTileX, uint16_t nTileY) {}
 void D2GAME_PACKETS_SendPacket0x09_6FC3D1A0(D2ClientStrc* pClient, BYTE a2, BYTE a3, DWORD a4, BYTE a5, WORD a6, WORD a7) {}

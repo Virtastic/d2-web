@@ -311,8 +311,25 @@ D2InventoryComponentItemTypeStrc gComponentItemTypeMap[]
 	{ ' 2fq', ITEMTYPE_MACE },
 };
 
-//D2Common.0x6FDEA708
-D2InventoryComponentItemTypeStrc gTxtComponentItemTypeMap[255] = {};
+// Sanitizer-flagged: INVENTORY_InitializeComponentArray's
+// free-slot search (below, "gTxtComponentItemTypeMap[nIndex].dwCode") increments nIndex with no bound
+// check while it runs and only clamps it back to nCurrentTableEntries afterwards, so a game whose
+// Items.txt fills every one of this table's slots reads one past the end before the clamp fires.
+// Retail's own compiled 1.13c D2Common.dll has the identical shape (Ghidra decompile of VA
+// 0x6FD6E920, confirmed against ~/d2-retail/D2Common.dll: the same unguarded "look for an empty slot"
+// loop, the same `if (local_18 > 0xFE) local_18 = local_10;` clamp applied only once the loop exits),
+// and D2MOO's 1.10f decompile (reference/D2MOO/source/D2Common/src/D2Inventory.cpp) carries the same
+// unguarded loop unchanged -- this is retail's own long-standing read, not a defect this port
+// introduced. The one slot retail reads past the array (VA 0x6FDF0BA8 + 255*8 = 0x6FDF13A0) is not
+// part of this table at all: it is `gnComponentArrayRecordCount`'s own storage, the very next global
+// the retail linker placed after this array (matching this file's separately-declared
+// gnComponentArrayRecordCount below), and INVENTORY_InitializeComponentArray is its only writer,
+// assigning it 255 once, after this same scan loop finishes. So both on the one call that runs the
+// scan and on every later read, retail's one-past value is that variable's own pristine
+// never-yet-assigned zero. A trailing zero entry reproduces that value in-bounds; the logical size
+// every bound check below compares against stays 255, matching retail's own clamp.
+static constexpr int kComponentArrayLogicalSize = 255;
+D2InventoryComponentItemTypeStrc gTxtComponentItemTypeMap[kComponentArrayLogicalSize + 1] = {};
 
 //D2Common.0x6FDEAF00
 int gnComponentArrayRecordCount;
@@ -2623,7 +2640,7 @@ int __stdcall D2Common_10315(D2CorpseStrc* pCorpse)
 // Helper function
 inline int INVENTORY_GetComponentArrayIndexFromItemsTxtRecord(D2ItemsTxt* pItemsTxtRecord)
 {
-	for (int nCounter = 1; nCounter < ARRAY_SIZE(gTxtComponentItemTypeMap); ++nCounter)
+	for (int nCounter = 1; nCounter < kComponentArrayLogicalSize; ++nCounter)
 	{
 		if (gTxtComponentItemTypeMap[nCounter].dwCode == pItemsTxtRecord->dwAlternateGfx || gTxtComponentItemTypeMap[nCounter].dwCode == pItemsTxtRecord->dwCode)
 		{
@@ -2631,13 +2648,13 @@ inline int INVENTORY_GetComponentArrayIndexFromItemsTxtRecord(D2ItemsTxt* pItems
 		}
 	}
 
-	return ARRAY_SIZE(gTxtComponentItemTypeMap);
+	return kComponentArrayLogicalSize;
 }
 
 // Helper function
 inline int INVENTORY_GetComponentArrayIndexFromArmTypeTxtRecord(D2ArmTypeTxt* pArmTypeTxtRecord)
 {
-	for (int nCounter = 1; nCounter < ARRAY_SIZE(gTxtComponentItemTypeMap); ++nCounter)
+	for (int nCounter = 1; nCounter < kComponentArrayLogicalSize; ++nCounter)
 	{
 		if (gTxtComponentItemTypeMap[nCounter].dwCode == *(uint32_t*)&pArmTypeTxtRecord->szToken[0])
 		{
@@ -2645,7 +2662,7 @@ inline int INVENTORY_GetComponentArrayIndexFromArmTypeTxtRecord(D2ArmTypeTxt* pA
 		}
 	}
 
-	return ARRAY_SIZE(gTxtComponentItemTypeMap);
+	return kComponentArrayLogicalSize;
 }
 
 //D2Common.0x6FD912F0 (#10298)
@@ -2672,7 +2689,7 @@ void __stdcall INVENTORY_GetItemSaveGfxInfo(D2UnitStrc* pPlayer, uint8_t* pCompo
 
 					const int nIndex = INVENTORY_GetComponentArrayIndexFromItemsTxtRecord(pItemsTxtRecord);
 
-					if (nIndex >= ARRAY_SIZE(gTxtComponentItemTypeMap))
+					if (nIndex >= kComponentArrayLogicalSize)
 					{
 						if (nComponent < NUM_COMPONENTS)
 						{
@@ -2728,7 +2745,7 @@ void __stdcall INVENTORY_GetItemSaveGfxInfo(D2UnitStrc* pPlayer, uint8_t* pCompo
 
 							const int nIndex = INVENTORY_GetComponentArrayIndexFromArmTypeTxtRecord(pArmTypeTxtRecord);
 
-							if (nIndex < ARRAY_SIZE(gTxtComponentItemTypeMap))
+							if (nIndex < kComponentArrayLogicalSize)
 							{
 								pComponents[i] = nIndex;
 
@@ -2825,7 +2842,7 @@ void __fastcall INVENTORY_InitializeComponentArray()
 					++nIndex;
 				}
 
-				if (nIndex >= ARRAY_SIZE(gTxtComponentItemTypeMap))
+				if (nIndex >= kComponentArrayLogicalSize)
 				{
 					nIndex = nCurrentTableEntries;
 				}
@@ -2840,7 +2857,7 @@ void __fastcall INVENTORY_InitializeComponentArray()
 			}
 		}
 
-		gnComponentArrayRecordCount = ARRAY_SIZE(gTxtComponentItemTypeMap);
+		gnComponentArrayRecordCount = kComponentArrayLogicalSize;
 	}
 }
 
@@ -2872,7 +2889,7 @@ void __fastcall sub_6FD917B0(D2UnitStrc* pUnit, uint8_t* a2, uint8_t* pColor, D2
 
 					const int nIndex = INVENTORY_GetComponentArrayIndexFromItemsTxtRecord(pItemsTxtRecord);
 
-					if (nIndex >= ARRAY_SIZE(gTxtComponentItemTypeMap))
+					if (nIndex >= kComponentArrayLogicalSize)
 					{
 						a2[COMPOSIT_LEFTHAND] = -1;
 						pColor[COMPOSIT_LEFTHAND] = -1;
@@ -2896,7 +2913,7 @@ void __fastcall sub_6FD917B0(D2UnitStrc* pUnit, uint8_t* a2, uint8_t* pColor, D2
 
 					const int nIndex = INVENTORY_GetComponentArrayIndexFromItemsTxtRecord(pItemsTxtRecord);
 
-					if (nIndex >= ARRAY_SIZE(gTxtComponentItemTypeMap))
+					if (nIndex >= kComponentArrayLogicalSize)
 					{
 						a2[COMPOSIT_RIGHTHAND] = -1;
 						pColor[COMPOSIT_RIGHTHAND] = -1;
@@ -3424,7 +3441,7 @@ int __fastcall UNITS_GetYPosition(D2UnitStrc* pUnit)
 extern "C" int D2WEB_ComponentToken(int nIndex, uint32_t* pCode, uint32_t* pWeaponClass)
 {
 	INVENTORY_InitializeComponentArray();
-	if (nIndex <= 0 || nIndex >= ARRAY_SIZE(gTxtComponentItemTypeMap) || !gTxtComponentItemTypeMap[nIndex].dwCode) return 0;
+	if (nIndex <= 0 || nIndex >= kComponentArrayLogicalSize || !gTxtComponentItemTypeMap[nIndex].dwCode) return 0;
 	*pCode = (uint32_t)gTxtComponentItemTypeMap[nIndex].dwCode; *pWeaponClass = 0;
 	D2ItemDataTbl* pItemDataTbl = DATATBLS_GetItemDataTables();
 	for (int i = 0; i < pItemDataTbl->nItemsTxtRecordCount; ++i)

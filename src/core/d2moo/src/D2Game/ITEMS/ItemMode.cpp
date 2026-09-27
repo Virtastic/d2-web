@@ -2337,7 +2337,7 @@ int32_t __fastcall ITEMMODE_SkillNeedsToBeInitialized(D2UnitStrc* pUnit, D2Skill
     }
     
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecordFromSkill(pSkill);
-    if (!pSkillsTxtRecord || pSkillsTxtRecord->nITypeA[0] <= 0 || !ITEMS_CheckType(pSkillsTxtRecord->nITypeA[0], ITEMTYPE_THROWN_WEAPON) || pSkillsTxtRecord->nRange != 2)
+    if (!pSkillsTxtRecord || pSkillsTxtRecord->nItemTypeAB[0][0] <= 0 || !ITEMS_CheckType(pSkillsTxtRecord->nItemTypeAB[0][0], ITEMTYPE_THROWN_WEAPON) || pSkillsTxtRecord->nRange != 2)
     {
         return 1;
     }

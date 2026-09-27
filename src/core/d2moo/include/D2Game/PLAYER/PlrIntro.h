@@ -12,6 +12,11 @@ int32_t __fastcall PLRINTRO_GetQuestIntroFlag(D2UnitStrc* pUnit, D2GameStrc* pGa
 void __fastcall PLRINTRO_SetNpcIntroFlag(D2PlrIntroStrc* pPlayerIntro, int32_t nNpcId);
 //D2Game.0x6FC7F100
 int32_t __fastcall PLRINTRO_GetNpcIntroFlag(D2PlrIntroStrc* pPlayerIntro, int32_t nNpcId);
+// d2-web: is this NPC class one the intro table names at all? PLRINTRO_GetNpcIntroFlag answers bit 0
+// -- the shared "any intro heard" bit -- for a class outside the table, so a caller reading "does
+// this NPC have an intro still to hear" has to ask this first. No retail ordinal: retail inlines the
+// same table walk at both call sites.
+bool PLRINTRO_HasNpcIntro(int32_t nNpcId);
 //D2Game.0x6FC7F140
 void __fastcall PLRINTRO_MaskNpcIntroFlag(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nNpcId);
 //D2Game.0x6FC7F1A0

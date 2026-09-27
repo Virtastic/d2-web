@@ -91,12 +91,45 @@
   // trip at all, so it also skips the persistent Cache-API chunk store the worker keeps for the other
   // browsers (a speed loss noted here, not a correctness one -- ).
   const IS_FIREFOX = typeof navigator !== 'undefined' && /Firefox\//.test(navigator.userAgent || '');
-  function fetchRangeSyncXHR(url, start, end) {
+  // d2-web divergence: this read has NO deadline of its own, and none can be given to
+  // it. A window-context synchronous XHR may not set `xhr.timeout` (the spec throws
+  // InvalidAccessError -- the whole reason the request is synchronous is that a caller needs the bytes
+  // in this tick), so a host that accepts the Range request and then never answers blocks the tab for
+  // as long as the browser's own network stack allows. MEASURED 2026-09-26, Firefox 156, against such
+  // a host: the page was unresponsive for 37.6 s and then threw NetworkError (the whole probe run took
+  // 44 s, browser teardown included). The two bounded-looking alternatives were measured too, and
+  // BOTH fail on Firefox, so neither is available: (a) a worker's own sync XHR -- `xhr.timeout` IS
+  // legal inside a worker -- never completes while this thread spins (8 s cap, no completion, the same
+  // deadlock as the fetch path above: a worker's read needs the content process's main thread and the
+  // spin never yields it); (b) pumping the loop with a sync XHR to a healthy URL does not deliver a
+  // worker's fetch either (1913 pumps in 5 s, body never arrived). Chrome is unaffected: its reads go
+  // through the worker path, whose spin below carries its own 30 s deadline.
+  //
+  // What is left is to report the wait instead of hiding it. A failed read used to surface as a bare
+  // NetworkError with nothing to say how long it took or which host; the tab's own stall counters did
+  // not move either, because the miss is only counted after the read returns. Both now carry the read's
+  // real cost, and the error names the host, the wait, and where to read about it
+  //. `play/index.html` keeps this path from being reached for the common
+  // case -- a host that never answers -- by bounding the boot's own requests.
+  function fetchRangeSyncXHR(src, url, start, end) {
     const xhr = new XMLHttpRequest();
     xhr.open('GET', url, false);
     xhr.overrideMimeType('text/plain; charset=x-user-defined');
     xhr.setRequestHeader('Range', 'bytes=' + start + '-' + (end - 1));
-    xhr.send(null);
+    const t0 = performance.now();
+    try {
+      xhr.send(null);
+    } catch (err) {
+      // A read that never lands is the most expensive miss there is: count it as one, with its cost,
+      // before re-throwing -- window.__streamfsStats is where a stall is supposed to be visible.
+      const ms = Math.round(performance.now() - t0);
+      ST.misses++; ST.stallMs += ms; ST.lastReadMs = ms; ST.lastReadUrl = url;
+      throw new Error('streamfs: ' + url + ' did not answer within ' + ms + 'ms -- the host accepted ' +
+        'the request and then stalled. Firefox reads URL sources synchronously, and a synchronous XHR ' +
+        'cannot take a timeout, so the browser\'s own network timeout is the only bound ' +
+        '', { cause: err });
+    }
+    ST.lastReadMs = Math.round(performance.now() - t0); ST.lastReadUrl = url;
     if (xhr.status !== 206 && xhr.status !== 200) throw new Error('streamfs: HTTP ' + xhr.status + ' ' + url);
     // A 200 is a server that ignored Range and sent the whole file: take this chunk's slice of it.
     const text = xhr.status === 200 ? xhr.responseText.slice(start, end) : xhr.responseText;
@@ -108,7 +141,10 @@
   // Streaming cost counters, exposed as window.__streamfsStats. Chunk misses block the main thread
   // (see fetchChunkSync), so this is the only place the stall is observable. Two adds per read —
   // cheap enough to leave always-on, unlike the flag-gated ?glcount/?perfstats probes.
-  const ST = { hits: 0, misses: 0, stallMs: 0, evictions: 0, bytes: 0 };
+  // lastReadMs/lastReadUrl: the most recent Firefox synchronous read and what it cost. A read
+  // that stalls is the one fact a report of a frozen tab needs, and it is gone by the time the error
+  // is caught unless it is kept here.
+  const ST = { hits: 0, misses: 0, stallMs: 0, evictions: 0, bytes: 0, lastReadMs: 0, lastReadUrl: '' };
 
   function workerSource() {
     return `
@@ -216,7 +252,7 @@
     // read URL sources with a direct synchronous XHR instead, no worker or spin needed.
     if (IS_FIREFOX && src.url) {
       const t0f = performance.now();
-      const chunk = fetchRangeSyncXHR(src.url, start, end);
+      const chunk = fetchRangeSyncXHR(src, src.url, start, end);
       ST.misses++; ST.stallMs += performance.now() - t0f; ST.bytes += chunk.length;
       S.cache.set(cacheKey, chunk);
       if (S.cache.size > LRU_MAX) { S.cache.delete(S.cache.keys().next().value); ST.evictions++; }

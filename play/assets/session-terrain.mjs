@@ -182,13 +182,21 @@ export function readSessionTerrain(Module) {
  * from where this renderer actually put the pixels. Measured on retail's own town frame against its
  * draw list: a wall's DT1 block (bx, by) lands at anchor + (bx, by); a tile
  * drawn through the floor entry (orientation 0 and 15) at anchor + (bx - 80, by).
+ *
+ * The op is the RENDERER ENTRY retail submits the tile through, and the layer says which of the room's
+ * three tile lists the engine put it in (0 floors, 1 walls, 2 roofs). Retail takes pRoofTiles through
+ * its roof (transparent) entry -- the pass after the units -- so a layer-2 tile recorded as `wall`
+ * would be compared against an entry the parser does not even read (the Outer Cloister's and the
+ * Catacombs Level 2's "five/16 extra walls", F65). Orientation 13 still wins over the layer: retail
+ * draws those through the shadow-tile entry whichever list holds them.
  */
 function recordTile(entry, files) {
   const list = globalThis.__d2DrawList;
   if (!Array.isArray(list)) return;
   const t = entry.tile, px = entry.dt1Tile.pixels, floor = t.orientation === 0 || t.orientation === 15;
   const file = String(files[entry.slot] ?? '?').toLowerCase().replace(/\//g, '\\');
-  list.push({ op: floor ? 'floor' : t.orientation === 13 ? 'shadowtile' : 'wall', path: `${file} ${t.orientation} ${t.mainIndex} ${t.subIndex}`, frame: entry.dt1Tile.rarity,   // the DRAWN art's rarity
+  const op = floor ? 'floor' : t.orientation === 13 ? 'shadowtile' : t.layer === 2 ? 'roof' : 'wall';
+  list.push({ op, path: `${file} ${t.orientation} ${t.mainIndex} ${t.subIndex}`, frame: entry.dt1Tile.rarity,   // the DRAWN art's rarity
     x: entry.x - px.originX + (floor ? 80 : 0), y: entry.y - px.originY, mode: 0, hash: 0, a: t.worldX * 5, b: t.worldY * 5,
     rect: [entry.x, entry.y, entry.bitmap.width, entry.bitmap.height] });   // the painted rectangle: a cull check reads it
 }
@@ -402,12 +410,23 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
      * by the DRLG's own ordinal, so tile order stays stable). Retail instead walks rooms and then
      * cells within a room, which can differ at room seams and for tall multi-cell walls. This is an
      * approximation of that walk, not a port of it -- the room/cell draw order is not recovered yet.
+     *
+     * `afterFloors` runs between the floor pass and the wall pass, which is where retail draws its
+     * weather: in the retail captures the frame's 96 floor draws are followed by the whole
+     * rain block and only then by the shadows and the walls, so a wall or a roof covers the rain
+     * behind it (client-parity F11b).
      */
-    draw(ctx, tiles, files, player, width, height, sprites = []) {
+    draw(ctx, tiles, files, player, width, height, sprites = [], afterFloors = null) {
       const origin = worldToScreen(player.x, player.y);
       const offsetX = width / 2 - origin.x;
       const offsetY = height / 2 + UNIT_CENTRE_Y - origin.y;
-      let drawn = 0, missing = 0, empty = 0;
+      // Count resolution before viewport culling: an off-screen wrong lookup is still wrong art,
+      // and must not disappear from level-2 requested-versus-drawn identity evidence.
+      let drawn = 0, missing = 0, empty = 0, requested = 0, resolved = 0, wrongIdentity = 0, noEntry = 0;
+      // `resolved` counts every tile whose identity was FOUND (including the art-less entries `empty`
+      // counts), so the exact accounting of the requests is `requested === resolved + noEntry`: a tile is
+      // either found in a library or it is not. Exported so a row can assert no tile was dropped without
+      // being counted (T10).
       // Record what failed to resolve, not just how many: a hole in the floor is only diagnosable
       // if you know which (slot, orientation, main, sub, index) the lookup missed.
       const missingSample = [];
@@ -423,6 +442,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         // Not a shadow tile, though: retail draws Harrogath's main-gate shadows (maingate.dt1 13:1:2/7/8)
         // with the bit set (s231 against retail's frame inside the gate, F34).
         if ((tile.flags & 0x8) && tile.orientation !== 13) { hidden++; continue; }
+        requested++;
         // An empty/failed slot is not fatal any more: the identity search below can still find
         // the tile in another library, which is the normal case now that librarySlot is per-room.
         const lib = library(tile.librarySlot, files);
@@ -469,6 +489,17 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         const vi = variants ? variants.length - 1 - tile.libraryIndex : 0;
         const dt1Tile = variants ? (sameRarity.length === 1 ? sameRarity[0] : (variants[vi] ?? variants[0])) : undefined;
         if (variants && sameRarity.length !== 1) rarityAmbiguous++;
+        if (dt1Tile) {
+          resolved++;
+          // Structurally 0, and recorded here so no row quotes it as evidence (T10): `dt1Tile`
+          // comes out of `variants`, the byKey bucket the wanted identity was READ OUT OF, so the drawn
+          // identity cannot differ from the asked one -- the entry IS the key. It catches nothing, by
+          // construction. What catches a wrong lookup is the blob compared against RETAIL, not itself:
+          // `missing` (no entry at all) and the draw-list rows (s182/s183/s243/s330) that compare the
+          // variant drawn with the one retail drew. Kept because the shape is what a future non-search
+          // resolver would be checked with, and s126/s364/s370 still read it.
+          if (`${tile.orientation}:${tile.mainIndex}:${tile.subIndex}` !== `${dt1Tile.orientation}:${dt1Tile.mainIndex}:${dt1Tile.subIndex}`) wrongIdentity++;
+        }
         // Keyed by the DRAWN variant (its position among the identity's variants), never the asked index.
         const variantNo = variants ? variants.indexOf(dt1Tile) : -1;
         const bitmap = dt1Tile && bitmapFor(files[foundSlot], dt1Tile,
@@ -490,6 +521,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         }
         if (!bitmap) {
           missing++;
+          if (!variants) noEntry++;
           if (missingSample.length < 8) missingSample.push({ slot: tile.librarySlot, orientation: tile.orientation,
             mainIndex: tile.mainIndex, subIndex: tile.subIndex, libraryIndex: tile.libraryIndex,
             inLibrary: lib.byIndex.length, variants: variants ? variants.length : 0,
@@ -545,8 +577,13 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       for (const f of floors) {
         const grid = lightGrid && lightGrid(f.tile.worldX * 5, f.tile.worldY * 5);
         const lit = grid && litFloor(files[f.slot], f.dt1Tile, f.want + ':v' + f.variantNo, grid);
+        // Off unless globalThis.__d2TraceBlits is an array: then each drawn floor carries the dt1 art
+        // and the 8x8 light grid it was lit from, so a row can recompute the LEVEL litFloor gave a
+        // pixel (F96: our floor level is 1-2 above retail's on the frame's left edge). s448 reads it.
+        if (globalThis.__d2TraceBlits) globalThis.__d2TraceBlits.push({ x: f.x, y: f.y, path: files[f.slot], want: f.want, variantNo: f.variantNo, dt1Tile: f.dt1Tile, grid, a: f.tile.worldX * 5, b: f.tile.worldY * 5 });
         ctx.drawImage(lit || f.bitmap, f.x, f.y); drawn++; recordTile(f, files);
       }
+      if (afterFloors) afterFloors(ctx);
 
       // Walls and sprites in retail's order: tile by tile, rows (world Y) then columns (world X); a unit belongs to the
       // tile its subtile is in and is drawn BEFORE that tile's walls. A sprite with no world position
@@ -585,12 +622,11 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         }
         drawn++; recordTile(o, files);
       }
-      const wrongIdentity = floors.concat(walls).filter((e) => e.want !== e.got).length;
       // Identity of every blit (level 2 evidence): which file, which (orientation:main:sub) was asked
       // for and drawn, and the screen box it covers -- so a wrong patch on screen names its tiles.
       const blits = floors.concat(walls).map((e) => ({ file: e.file, want: e.want, got: e.got, variant: e.variant,
         x: e.x, y: e.y, w: e.bitmap.width, h: e.bitmap.height, wall: e.wall, seam: e.seam }));
-      return { drawn, missing, empty, hidden, rarityAmbiguous, blits, seam: floors.concat(walls).filter((e) => e.seam).length, missingSample, drawnSample, wrongIdentity, searched, ambiguous,
+      return { drawn, missing, empty, hidden, requested, resolved, noEntry, rarityAmbiguous, blits, seam: floors.concat(walls).filter((e) => e.seam).length, missingSample, drawnSample, wrongIdentity, searched, ambiguous,
         floors: floors.length, walls: walls.length, sprites: sprites.length };
     },
   };

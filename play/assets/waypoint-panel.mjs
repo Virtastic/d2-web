@@ -8,9 +8,18 @@
 // the retail string tables. Travel and close are retail's 0x49 TakeOrCloseWp.
 //
 // Layout: retail's own draw list for this menu: every
-// cel's file, frame and anchor below is what retail 1.13c draws for the Rogue Encampment menu. Not
-// yet seen in a capture, declared in P6: the other acts' tab frames (only Act
-// I's tab, frame 0, was on screen) and the click rectangles (retail's hit test is not recovered).
+// cel's file, frame and anchor below is what retail 1.13c draws for the Rogue Encampment menu.
+//
+// The tab strip was the one thing P6 declared unverified, and two captures settle it (s492, which
+// compares the whole menu against retail's Act II frame buffer, and retail/drawlists/act4-wpmenu):
+//   - retail draws a tab for EVERY act the player can travel in, not only the shown one -- one in
+//     the Rogue Encampment, two in Lut Gholein (acts I, II), four in the Pandemonium Fortress (I-IV);
+//   - the shown act's tab is expwaygatetabs frame 2*(act-1), every other act's is 2*(act-1)+1;
+//   - the tabs stand 62 px apart, not 63: measured anchors 85, 147, 209, 271 for acts I..IV, i.e.
+//     tabX + tabPitch*(act-1) (a 63 px pitch would put act II at 148);
+//   - they are drawn in ACT ORDER, which is not cosmetic: consecutive cels overlap by the one column
+//     (the cel is 63 wide on a 62 px pitch), so the later act's cel owns it.
+// The click rectangles are still retail's not-recovered hit test and stay declared in P6.
 
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
@@ -26,13 +35,18 @@ export const WAYGATE_ART = {
 // The left panel's ornate border, drawn after the menu: 800borderframe frames 0..4 at these anchors.
 const BORDER = [[0, 253], [256, 63], [0, 484], [0, 553], [256, 553]];
 // Retail's draw list (anchors are cel anchors: left edge, BOTTOM row). The panel's four background
-// cels have their top-left at (80, 61); the act tab frame 2*(act-1) at (85 + 63*(act-1), 94); the
+// cels have their top-left at (80, 61); the act tab frame 2*(act-1) at (85 + 62*(act-1), 94); the
 // close button (buysellbtn frame 10) at (353, 477); per row an icon at (97, 149 + 36i) -- frame 0 for
 // the waypoint the player stands at, 3 for another active one, none for an inactive one -- and its
 // name in font16 anchored at (160, 144 + 35i) (blue here, white active, grey inactive); last the
-// title at (145, 108), then the left panel border (BORDER).
-export const WAYPOINT_LAYOUT = Object.freeze({ left: 80, top: 61, tabX: 85, tabY: 94, tabWidth: 63, closeX: 353, closeY: 477,
+// title at (145, 108), then the left panel border (BORDER). `tabWidth` is the CEL's width; the
+// PITCH between tabs is `tabPitch` (retail's measured 62), so a band is 62 px and the cels overlap.
+export const WAYPOINT_LAYOUT = Object.freeze({ left: 80, top: 61, tabX: 85, tabY: 94, tabWidth: 63, tabPitch: 62, closeX: 353, closeY: 477,
   iconX: 97, iconY: 149, iconPitch: 36, textX: 160, textY: 144, rowHeight: 35, titleX: 145, titleY: 108 });
+// The acts whose tab retail draws: the ones the engine reports at least one ACTIVE waypoint in (its
+// captures draw one, two and four). Read by the caller from d2_session_waypoints and handed to draw()
+// as `tabActs`, so the panel keeps no second source of truth about which waypoints exist.
+export const tabActsOf = (rowsByAct) => [...rowsByAct.keys()].filter((act) => (rowsByAct.get(act) || []).some((row) => row.active)).sort((a, b) => a - b);
 // The title is retail's string 3990 (waypointsheader, "Choose your destination").
 export const TITLE_STRING_INDEX = 3990;
 // ...and 3991 (nowaypoints, "No Other Waypoints Activated") when no waypoint but the one the player
@@ -55,9 +69,9 @@ export function createWaypointPanelRenderer(read, documentObject = globalThis.do
   const palette = decodeDatPalette(read('data\\global\\palette\\units\\pal.dat'));
   const tint = (rgb) => palette.map((v, i) => (i % 4 === 3 ? v : Math.round(v * rgb[i % 4] / 0xff)));
   const fontOf = (pal) => createFont({ dc6: fontDc6, tbl, palette: pal, documentObject, path: 'data\\local\\font\\latin\\font16.dc6', drawAs: { op: 'celcolor', mode: 5 } });
-  // D2Win text colours 0 white, 3 blue, 5 grey.
-  // D2Win colours 0 white, 3 blue, 5 grey: the glyph indices through the act PL2's TextColorShifts, shown
-  // through the act palette (retail's frame buffer, s196).
+  // D2Win text colours 0 white, 3 blue, 5 grey.  These glyph indices go through the
+  // player's current act PL2; switching a shown waypoint tab has no captured proof that
+  // retail changes this palette too (P6), so it deliberately is a separate draw input.
   const fontsByAct = new Map();
   const fontsFor = (act) => { let f = fontsByAct.get(act); if (!f) {
     const pal = decodeDatPalette(read(actPalette(act)));
@@ -80,11 +94,13 @@ export function createWaypointPanelRenderer(read, documentObject = globalThis.do
     return { scale, x: (width - 800 * scale) / 2, y: (height - 600 * scale) / 2 };
   };
   const L = WAYPOINT_LAYOUT;
-  // A cel drawn as retail anchors it (left, bottom row), and recorded for the draw-list rows.
+  // A cel drawn as retail anchors it (left, bottom row), and recorded for the draw-list rows. The
+  // record is returned so a caller can report what it BLITTED: this used to return nothing, and the
+  // one caller that built evidence out of it (the selected tab below) then reported a plan instead.
   const cel = (ctx, key, canvases, i, x, anchorY) => {
-    const f = dc6[key].frames[i], c = canvases[i]; if (!f || !c) return;
+    const f = dc6[key].frames[i], c = canvases[i]; if (!f || !c) return null;
     const top = anchorY + f.offsetY - f.height + 1;
-    ctx.drawImage(c, x + f.offsetX, top); recordDc6(WAYGATE_ART[key], i, f, x + f.offsetX, top);
+    ctx.drawImage(c, x + f.offsetX, top); return recordDc6(WAYGATE_ART[key], i, f, x + f.offsetX, top);
   };
   // The click band of row i: the text line's 35 px pitch (retail's hit test not yet recovered).
   const rowRect = (i) => ({ x: L.iconX, y: L.textY - L.rowHeight + 6 + i * L.rowHeight, w: 280, h: L.rowHeight });
@@ -100,10 +116,12 @@ export function createWaypointPanelRenderer(read, documentObject = globalThis.do
       }
       return null;
     },
-    /** `rows` are the engine's waypoints for the shown act: [{ levelId, name, active }]; `hereLevelId` the waypoint's own level. */
-    draw(ctx, width, height, rows, act, open, hereLevelId = null) {
+    /** `rows` are the engine's waypoints for `shownAct`; `paletteAct` is the player's current act;
+     *  `tabActs` are the acts retail draws a tab for (the caller reads them from the engine's own
+     *  table -- tabActsOf). Absent, only the shown act's tab is drawn, which is a one-act menu. */
+    draw(ctx, width, height, rows, shownAct, open, hereLevelId = null, paletteAct = shownAct, tabActs = null) {
       if (!open) return null;
-      const a = art(act), o = origin(width, height), fonts = fontsFor(act);
+      const a = art(paletteAct), o = origin(width, height), fonts = fontsFor(paletteAct);
       ctx.save(); ctx.translate(o.x, o.y); ctx.scale(o.scale, o.scale);
       const bg = dc6.background.frames;
       let composed = { width: 0, height: 0 };
@@ -113,8 +131,21 @@ export function createWaypointPanelRenderer(read, documentObject = globalThis.do
         cel(ctx, 'background', a.background, 2, L.left, bottom1); cel(ctx, 'background', a.background, 3, L.left + bg[0].width, bottom1);
         composed = { width: bg[0].width + bg[1].width, height: bg[0].height + bg[2].height };
       }
-      const tabs = [{ act, selected: true }];
-      cel(ctx, 'tabs', a.tabs, 2 * (act - 1), L.tabX + L.tabWidth * (act - 1), L.tabY);
+      // Every tab is evidence only if its cel reached the canvas, so each is reported from the blit's
+      // own record: `frame` is the index the layout asked for and `drawn` says whether expwaygatetabs
+      // carried it -- a tab reported from a plan built before the draw would claim a tab nobody drew.
+      // Drawn in ACT ORDER because consecutive cels overlap by one column (63-wide cel, 62 px pitch)
+      // and retail's later act owns it; reported with the shown act first, which is the order s298
+      // reads.
+      const acts = (Array.isArray(tabActs) && tabActs.length ? [...tabActs] : [shownAct]).sort((x, y) => x - y);
+      if (!acts.includes(shownAct)) acts.push(shownAct), acts.sort((x, y) => x - y);
+      const tabs = [];
+      for (const act of acts) {
+        const frame = 2 * (act - 1) + (act === shownAct ? 0 : 1);
+        const cel_ = cel(ctx, 'tabs', a.tabs, frame, L.tabX + L.tabPitch * (act - 1), L.tabY);
+        tabs.push({ act, selected: act === shownAct, frame, drawn: Boolean(cel_), cel: cel_ });
+      }
+      tabs.sort((x, y) => Number(y.selected) - Number(x.selected));
       cel(ctx, 'close', a.close, 10, L.closeX, L.closeY);
       const drawn = [];
       (rows || []).forEach((row, i) => {
@@ -132,7 +163,7 @@ export function createWaypointPanelRenderer(read, documentObject = globalThis.do
       }
       BORDER.forEach(([x, y], i) => cel(ctx, 'border', a.border, i, x, y));
       ctx.restore();
-      return { open: true, act, composed, tabs, drawn, layout: { rowY: rowRect(0).y, rowHeight: L.rowHeight } };
+      return { open: true, act: shownAct, paletteAct, composed, tabs, drawn, layout: { rowY: rowRect(0).y, rowHeight: L.rowHeight } };
     },
   };
 }

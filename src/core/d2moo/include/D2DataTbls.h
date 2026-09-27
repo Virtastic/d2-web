@@ -247,12 +247,26 @@ struct D2StatesTxt
 	uint16_t wCastOverlay;					//0x0A
 	uint16_t wRemoveOverlay;				//0x0C
 	uint16_t wPrgOverlay;					//0x0E
+	// Sanitizer-flagged: DATATBLS_LoadStatesTxt builds
+	// `fStateMasks[40]` (one mask per state-FLAG bit, ARRAY_SIZE 40) by reading
+	// `pStatesTxt[j].nStateFlags[i >> 3]` for i up to 39, i.e. byte index up to 4 -- one past a
+	// `uint8_t[4]`. states.txt's own bit-field columns (this file, the "states" TXTFIELD_BIT rows)
+	// go up to bit 39 at byte offset 0x10, so retail's real flag region is 40 bits (5 bytes) wide,
+	// running from `dwStateFlags` straight into the first byte of the next field, `dwStateFlagsEx`,
+	// with no gap between them (0x10 and 0x14, no padding) -- retail's own layout, not neighbouring
+	// unrelated data. `dwStateFlagsEx` is otherwise never read in this port (states.txt has no column
+	// past bit 39), so folding it into the same union as `nStateFlags`/`dwStateFlags` keeps every
+	// offset identical and makes the byte this code already receives from retail's memory a legal
+	// read instead of one past the array.
 	union
 	{
-		uint8_t nStateFlags[4];				//0x10
-		uint32_t dwStateFlags;				//0x10
+		uint8_t nStateFlags[8];				//0x10 (bits 32-39 continue into dwStateFlagsEx, contiguous in retail)
+		struct
+		{
+			uint32_t dwStateFlags;			//0x10
+			uint32_t dwStateFlagsEx;		//0x14
+		};
 	};
-	uint32_t dwStateFlagsEx;				//0x14
 	uint16_t wStat;							//0x18
 	uint16_t wSetFunc;						//0x1A
 	uint16_t wRemFunc;						//0x1C
@@ -347,8 +361,16 @@ struct D2DataTablesStrc
 	int nSoundsTxtCodes;								//0x19C
 	D2HirelingTxt* pHirelingTxt;						//0x1A0
 	int nHirelingTxtRecordCount;						//0x1A4
-	int nClassicHirelingStartRecordIds[256];			//0x1A8
-	int nExpansionHirelingStartRecordIds[256];			//0x5A8
+	// Sanitizer-flagged: retail's compiled
+	// D2DataTbls struct lays these two 256-int fields back to back with no padding (0x1A8 and 0x5A8,
+	// exactly 0x400 = 256*sizeof(int) apart), and DATATBLS_GetHirelingTxtRecordFromIdAndLevel (1.13c
+	// D2Common.dll, read in Ghidra) indexes across that boundary with nId + (bExpansion)*256 into ONE
+	// table -- it never reaches the second half through a name of its own, which is only ever
+	// zero/-1-initialized directly. That is retail's own memory shape doing exactly what it looks
+	// like: one contiguous 512-entry table, split here into two separately-declared, separately-
+	// bounded C++ arrays. The two-array split, not retail's read, is this port's own bug. One 512-int
+	// array reproduces retail's real layout and keeps every index in bounds.
+	int nHirelingStartRecordIds[512];					//0x1A8 (retail: nClassicHirelingStartRecordIds[256] then nExpansionHirelingStartRecordIds[256], contiguous)
 	D2NpcTxt* pNpcTxt;									//0x9A8
 	int nNpcTxtRecordCount;								//0x9AC
 	D2ColorsTxt* pColorsTxt;							//0x9B0

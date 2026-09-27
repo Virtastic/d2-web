@@ -78,12 +78,48 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
 
   return {
     evidence: { frames: dc6.frames.length, sizes: dc6.frames.map((f) => [f.width, f.height]) },
-    /** Which stashed item is under a canvas point, or null. Shares the cell maths with draw(). */
+    /**
+     * The panel's own rectangle on the 800x600 screen -- the art's composed size at its anchor
+     * (LEFT_PANEL_TOP). A click inside it belongs to the stash and never falls through to the world.
+     */
+    panelRect(geometry) {
+      if (!geometry) return null;
+      const w = dc6.frames.length === 4 ? dc6.frames[0].width + dc6.frames[1].width : (dc6.frames[0]?.width || 0);
+      const h = dc6.frames.length === 4 ? dc6.frames[0].height + dc6.frames[2].height : (dc6.frames[0]?.height || 0);
+      return { left: geometry.left, top: geometry.top, width: w, height: h };
+    },
+    /** Whether the pointer is over the stash panel at all. */
+    contains(px, py, width, height, geometry) {
+      const r = this.panelRect(geometry);
+      if (!r) return false;
+      const o = origin(width, height), x = (px - o.x) / o.scale, y = (py - o.y) / o.scale;
+      return x >= r.left && x < r.left + r.width && y >= r.top && y < r.top + r.height;
+    },
+    /**
+     * Which stashed item is under a canvas point, or null. An item is covered by its WHOLE footprint
+     * (ItemsTxt nInvWidth/nInvHeight), the same rule the vendor grid got in an earlier change: matching only
+     * the top-left cell makes a large item's body dead to the pointer.
+     */
     itemAt(px, py, width, height, geometry, items) {
       if (!geometry) return null;
       const o = origin(width, height), x = (px - o.x) / o.scale, y = (py - o.y) / o.scale;
-      const col = Math.floor((x - geometry.gridLeft) / geometry.boxW), row = Math.floor((y - geometry.gridTop) / geometry.boxH);
-      return (items || []).find((i) => i.invPage === INVPAGE_STASH && col === i.gridX && row === i.gridY) || null;
+      const g = geometry;
+      return [...(items || [])].reverse().find((i) => i.invPage === INVPAGE_STASH && i.invFile &&
+        x >= g.gridLeft + i.gridX * g.boxW && x < g.gridLeft + (i.gridX + (i.invWidth || 1)) * g.boxW &&
+        y >= g.gridTop + i.gridY * g.boxH && y < g.gridTop + (i.gridY + (i.invHeight || 1)) * g.boxH) || null;
+    },
+    /**
+     * The stash cell a cursor item would be put down at, the item centred on the pointer as retail
+     * holds it; null off the grid. The inverse of itemAt, so a click cannot land on a cell other than
+     * the one the player sees the item over.
+     */
+    cellAt(px, py, width, height, geometry, item) {
+      if (!geometry) return null;
+      const o = origin(width, height), x = (px - o.x) / o.scale, y = (py - o.y) / o.scale;
+      const g = geometry, w = item?.invWidth || 1, h = item?.invHeight || 1;
+      if (x < g.gridLeft || y < g.gridTop || x >= g.gridLeft + g.columns * g.boxW || y >= g.gridTop + g.rows * g.boxH) return null;
+      const cx = Math.round((x - g.gridLeft) / g.boxW - w / 2), cy = Math.round((y - g.gridTop) / g.boxH - h / 2);
+      return { x: Math.max(0, Math.min(g.columns - w, cx)), y: Math.max(0, Math.min(g.rows - h, cy)) };
     },
     draw(ctx, width, height, geometry, items, open, act = 1) {
       if (!open || !geometry) return null;

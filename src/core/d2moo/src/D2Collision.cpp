@@ -1299,7 +1299,17 @@ BOOL __stdcall COLLISION_RayTrace(D2ActiveRoomStrc* pRoom, D2CoordStrc* pBeginCo
 	if (nDeltaX == 0 && nDeltaY == 0) // coords Begin == End
 	{
 		D2RoomCollisionGridStrc* pCollisionGrid = DUNGEON_GetCollisionGridFromRoom(pRoom);
-		const size_t nMaskIdx = (tCurrentCoord.nX - pRoom->tCoords.nSubtileX) + (tCurrentCoord.nY - pRoom->tCoords.nSubtileY) * pCollisionGrid->pRoomCoords.nSubtileWidth;
+		// Sanitizer-flagged: this file's `nMaskIdx` was a
+		// `size_t` even though the vertical/horizontal branches below add a signed, direction-scaled
+		// step to it to find the far end of a run of collision cells; when that step is negative,
+		// promoting it to `size_t` before the add wraps the whole computation through 2^64 before it
+		// lands back on the small in-bounds value retail's plain x86 pointer arithmetic reaches
+		// directly (address math, no signedness). The wrap is well-defined arithmetic in itself, but
+		// building `&array[wrapped_offset]` -- a pointer whose intermediate value has left the
+		// array's bounds -- is undefined in C++ regardless. `ptrdiff_t` keeps the same additions
+		// signed throughout so the final index is computed, and used, without ever going through
+		// that out-of-bounds intermediate, for the identical in-bounds result.
+		const ptrdiff_t nMaskIdx = (tCurrentCoord.nX - pRoom->tCoords.nSubtileX) + (tCurrentCoord.nY - pRoom->tCoords.nSubtileY) * pCollisionGrid->pRoomCoords.nSubtileWidth;
 		if ((nCollisionMask & pCollisionGrid->pCollisionMask[nMaskIdx]) != 0)
 		{
 			*pEndCoord = tCurrentCoord;
@@ -1341,7 +1351,9 @@ BOOL __stdcall COLLISION_RayTrace(D2ActiveRoomStrc* pRoom, D2CoordStrc* pBeginCo
 			}
 
 			D2RoomCollisionGridStrc* pCollisionGrid = DUNGEON_GetCollisionGridFromRoom(pRoom);
-			const size_t nMaskIdx = (tCurrentCoord.nX - pRoom->tCoords.nSubtileX) + (tCurrentCoord.nY - pRoom->tCoords.nSubtileY) * pCollisionGrid->pRoomCoords.nSubtileWidth;
+			// Same fix as the size_t -> ptrdiff_t change above: nYDirection can be -1, so this
+			// end-of-run offset is signed by construction.
+			const ptrdiff_t nMaskIdx = (tCurrentCoord.nX - pRoom->tCoords.nSubtileX) + (tCurrentCoord.nY - pRoom->tCoords.nSubtileY) * pCollisionGrid->pRoomCoords.nSubtileWidth;
 			const uint16_t* pMaskIt = &pCollisionGrid->pCollisionMask[nMaskIdx];
 			const uint16_t* pMaskEnd = &pCollisionGrid->pCollisionMask[nMaskIdx + nRemainingStepsInRoomY * nYDirection * pRoom->tCoords.nSubtileWidth];
 
@@ -1405,7 +1417,9 @@ BOOL __stdcall COLLISION_RayTrace(D2ActiveRoomStrc* pRoom, D2CoordStrc* pBeginCo
 			}
 
 			D2RoomCollisionGridStrc* pCollisionGrid = DUNGEON_GetCollisionGridFromRoom(pRoom);
-			const size_t nMaskIdx = (tCurrentCoord.nX - pRoom->tCoords.nSubtileX) + (tCurrentCoord.nY - pRoom->tCoords.nSubtileY) * pCollisionGrid->pRoomCoords.nSubtileWidth;
+			// Same fix as the vertical branch above: nXDirection can be -1, so this end-of-run
+			// offset is signed by construction (identical shape, not itself a separately-hit site).
+			const ptrdiff_t nMaskIdx = (tCurrentCoord.nX - pRoom->tCoords.nSubtileX) + (tCurrentCoord.nY - pRoom->tCoords.nSubtileY) * pCollisionGrid->pRoomCoords.nSubtileWidth;
 			const uint16_t* pMaskIt = &pCollisionGrid->pCollisionMask[nMaskIdx];
 			const uint16_t* pMaskEnd = &pCollisionGrid->pCollisionMask[nMaskIdx + nRemainingStepsInRoomX * nXDirection];
 
@@ -1451,9 +1465,12 @@ BOOL __stdcall COLLISION_RayTrace(D2ActiveRoomStrc* pRoom, D2CoordStrc* pBeginCo
 			}
 
 			D2RoomCollisionGridStrc* pCollisionGrid = DUNGEON_GetCollisionGridFromRoom(pRoom);
-			const size_t nMaskIdx = (tCurrentCoord.nX - pRoom->tCoords.nSubtileX) + (tCurrentCoord.nY - pRoom->tCoords.nSubtileY) * pCollisionGrid->pRoomCoords.nSubtileWidth;
+			// Consistent with the size_t -> ptrdiff_t fix above; this branch never adds a negative
+			// delta to nMaskIdx itself (pMaskIt is walked in-loop instead), kept the same type for
+			// uniformity across the function.
+			const ptrdiff_t nMaskIdx = (tCurrentCoord.nX - pRoom->tCoords.nSubtileX) + (tCurrentCoord.nY - pRoom->tCoords.nSubtileY) * pCollisionGrid->pRoomCoords.nSubtileWidth;
 			const uint16_t* pMaskIt = &pCollisionGrid->pCollisionMask[nMaskIdx];
-			
+
 			while (1)
 			{
 				if ((*pMaskIt & nCollisionMask) != 0)
@@ -1505,7 +1522,8 @@ BOOL __stdcall COLLISION_RayTrace(D2ActiveRoomStrc* pRoom, D2CoordStrc* pBeginCo
 			}
 
 			D2RoomCollisionGridStrc* pCollisionGrid = DUNGEON_GetCollisionGridFromRoom(pRoom);
-			const size_t nMaskIdx =  (tCurrentCoord.nX - pRoom->tCoords.nSubtileX) + (tCurrentCoord.nY - pRoom->tCoords.nSubtileY) * pCollisionGrid->pRoomCoords.nSubtileWidth;
+			// Consistent with the size_t -> ptrdiff_t fix above (same reasoning as the other branch).
+			const ptrdiff_t nMaskIdx = (tCurrentCoord.nX - pRoom->tCoords.nSubtileX) + (tCurrentCoord.nY - pRoom->tCoords.nSubtileY) * pCollisionGrid->pRoomCoords.nSubtileWidth;
 			const uint16_t* pMaskIt = &pCollisionGrid->pCollisionMask[nMaskIdx];
 
 			while (1)

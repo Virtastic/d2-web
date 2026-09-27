@@ -48,18 +48,24 @@
   }
   #unsupported{display:none;max-width:560px;padding:20px 24px;margin-top:8px;border:1px solid #493d27;background:#0b0c09;line-height:1.6}
   #unsupported h2{color:#c9ad68;margin:0 0 10px;font:20px Georgia,serif}
+  #unsupported .detail{color:#8a8069;font-size:12px;margin:.4em 0 0}
   body.unsupported #viewport,body.unsupported #session-bar,body.unsupported .controls,body.unsupported #log{display:none}
   body.unsupported #unsupported{display:block}
 </style>
 <main>
   <h1>DIABLO II · WEB</h1>
+  <!-- The screen is written from the probe's answer (unsupportedMessage), not from the markup: the
+       cause is not always the browser. A capable browser served without COOP/COEP gets a sentence
+       that says so, instead of being told it cannot run the game. -->
   <div id="unsupported" role="alert">
     <h2>Can't run here</h2>
-    <p><strong data-field="browser"></strong> cannot run d2-web: missing <span data-field="missing"></span>.</p>
-    <p>Runs today on <span data-field="supported"></span>.</p>
+    <p><strong data-field="summary"></strong></p>
+    <p><span data-field="advice"></span></p>
+    <p class="detail"><span data-field="browser"></span> · missing <span data-field="missing"></span></p>
+    <p class="detail" data-field="runs-today">Runs today on <span data-field="supported"></span>.</p>
   </div>
   <div id="viewport"><canvas id="game" width="800" height="600" tabindex="0" aria-label="Diablo II game viewport"></canvas><pre id="hud"></pre><div id="touch-overlay"></div></div>
-  <div id="session-bar"><div id="session-status">starting engine…</div><label>Class <select id="class-select" disabled></select></label><label>World <select id="act-select" disabled></select></label></div>
+  <div id="session-bar"><div id="session-status">starting engine…</div><label>Class <select id="class-select" disabled></select></label></div>
   <div class="controls">Move: WASD / arrows / left click · Attack: Space · Right skill: 1 Attack, 2 Throw, 3 Kick · Use: right click · Interact / exit: E · Travel (caravan): T · Inventory: I · Respawn: R · Cancel: Esc</div>
   <pre id="log"></pre>
 </main>
@@ -80,9 +86,34 @@ window.__d2 = { ready: false, smoke: null, error: null };
 const VER = '__ENGINE_VERSION__';
 const ENGINE_DIR = VER.startsWith('__') ? '' : 'e/' + VER + '/';
 function showUnsupported(info) {
-  document.querySelector('#unsupported [data-field=browser]').textContent = info.browser;
-  document.querySelector('#unsupported [data-field=missing]').textContent = info.missing.join(' and ');
-  document.querySelector('#unsupported [data-field=supported]').textContent = info.supportedBrowsers;
+  const set = (f, v) => { document.querySelector(`#unsupported [data-field=${f}]`).textContent = v; };
+  set('summary', info.summary);
+  set('advice', info.advice);
+  set('browser', info.browser);
+  set('missing', info.missing.join(' and '));
+  set('supported', info.supportedBrowsers);
+  // The browser list is an answer to "which browsers run this"; when the browser is fine and the
+  // DELIVERY is what is wrong, listing browsers is noise that reads as "yours is not one of them".
+  document.querySelector('#unsupported [data-field=runs-today]').style.display = info.supportedBrowsers ? '' : 'none';
+  document.body.classList.add('unsupported');
+}
+// A boot that does not complete says so ON THE SCREEN (issue 3: "never a crash or
+// a blank page"). Two measured ways a player met a page that never finished instead:
+//   * a host that never answers: the boot's own deadline fires and `window.__d2.error` names the host
+//     and the wait, but nothing was ever shown -- the page read "starting engine…" for ever;
+//   * the engine starting and then stalling: measured in a real WebKit (Playwright's build, Safari
+//     26.6 UA, 2026-09-26) the first streamfs read times out in its worker and rejects a promise
+//     nothing awaits -- the console says "streamfs: read timeout <url>" while the player sits on
+//     "loading…" with no error anywhere on the page.
+// This reuses the unsupported panel (one screen, one stylesheet): the capability lines do not apply to
+// a boot failure, so they are hidden rather than left blank.
+function showBootFailure(why) {
+  if (document.body.classList.contains('unsupported')) return;   // a real capability screen already spoke
+  const set = (f, v) => { const el = document.querySelector(`#unsupported [data-field=${f}]`); if (el) el.textContent = v; };
+  document.querySelector('#unsupported h2').textContent = "Can't start here";
+  set('summary', 'The game did not start.');
+  set('advice', why);
+  for (const el of document.querySelectorAll('#unsupported .detail')) el.style.display = 'none';
   document.body.classList.add('unsupported');
 }
 (async () => {
@@ -91,11 +122,41 @@ function showUnsupported(info) {
     // crossOriginIsolated (COOP/COEP -> SharedArrayBuffer -> streamfs) and Memory64 (the engine's
     // build,. Missing either gets a readable screen naming the
     // browser and what runs the game -- never an exception in the debug log below.
-    // ?unsupported=1 is a test-only switch (wasm-build/scenarios/s321): it forces this branch in a
-    // browser that actually does support both, so the screen itself can be asserted anywhere.
+    // Test-only switches (wasm-build/scenarios/s321, s328), for asserting the screen in a browser
+    // that actually supports the engine. Each forces missing only the capability named, and keeps the
+    // REAL answer for the other -- so the screen the row reads is the one a person in that state sees,
+    // not a state invented for the test:
+    //   `?unsupported=1`          both missing (the generic browser-fault screen, s321)
+    //   `?unsupported=isolated`   cross-origin isolation only: a capable browser served without
+    //                             COOP/COEP (the host-fault screen, s328)
+    //   `?unsupported=memory64`   Memory64 only: the state an Apple browser is in when the page IS
+    //                             served right (Safari has COOP/COEP and no Memory64) -- row issue 2's
+    //                             screen. No browser on this box reaches it unaided, and that is a
+    //                             measurement, not an assumption: the only WebKit here is Playwright's
+    //                             own build (`~/.cache/ms-playwright/webkit-2359`), and it answers
+    //                             probeMemory64 TRUE -- its `WebAssembly.validate` of this repo's probe
+    //                             bytes is true, and a module that really declares and uses an i64
+    //                             memory (`memory.size` -> i64) compiles, instantiates and returns the
+    //                             right size (measured 2026-09-26; V8 24.19 answers identically, and
+    //                             this V8 has no flag that removes Memory64 -- `node --v8-options`
+    //                             lists none). Playwright's WebKit is a Linux port of the engine, not
+    //                             shipping Safari, so it is NOT the Apple state 
+    //                             records (caniuse: no Safari ships Memory64) and cannot stand in for
+    //                             it; Apple's real position is re-opened only by a measurement on a
+    //                             shipping Apple browser. What that WebKit DID show is the other
+    //                             honest path: it started the engine and then stalled on its first
+    //                             streamfs read (the issue 9 Firefox mechanism -- a worker's fetch needs a
+    //                             main thread this page never yields), which is what showBootFailure
+    //                             below was written for.
     const { probeCapabilities, unsupportedMessage } = await import('./assets/platform-probe.mjs');
-    const forceUnsupported = /[?&]unsupported=1/.test(location.search);
-    const caps = forceUnsupported ? { crossOriginIsolated: false, memory64: false, supported: false } : probeCapabilities();
+    const force = /[?&]unsupported=([\w,]+)/.exec(location.search);
+    const forced = force ? (force[1] === '1' ? ['isolated', 'memory64'] : force[1].split(',')) : [];
+    const real = force ? probeCapabilities() : null;
+    const caps = force
+      ? { crossOriginIsolated: forced.includes('isolated') ? false : real.crossOriginIsolated,
+          memory64: forced.includes('memory64') ? false : real.memory64,
+          supported: false }
+      : probeCapabilities();
     if (!caps.supported) {
       const info = unsupportedMessage(caps);
       window.__d2Platform = { ...caps, ...info };
@@ -105,8 +166,47 @@ function showUnsupported(info) {
       return;
     }
     window.__d2Platform = caps;
-    const head = await fetch('smoke.mpq', { method: 'HEAD' });
-    if (!head.ok) throw new Error('smoke.mpq: HTTP ' + head.status);
+    // A failure that lands before the engine is up IS the boot failing, whether anything awaited it or
+    // not -- and it arrives two ways, so both are listened for: as an unhandled rejection (measured in
+    // a real WebKit) and as an uncaught error thrown out of the engine's own synchronous read, which is
+    // what a stalled read does in Chrome and Firefox (measured 2026-09-26: `streamfs: read timeout
+    // <url>` out of fetchChunkSync, with the engine never reaching `ready`). Either way the player used
+    // to keep reading "loading…" with nothing anywhere on the page.
+    const bootFailed = (why) => {
+      if (window.__d2?.ready) return;   // the engine came up; a later failure is not a boot failure
+      const msg = String(why);
+      log('ERROR ' + msg);
+      window.__d2 = { ready: true, smoke: null, error: msg, streamfs: window.__streamfsStats };
+      showBootFailure(msg);
+    };
+    addEventListener('unhandledrejection', (ev) => bootFailed((ev.reason && (ev.reason.message || ev.reason)) || ev.reason));
+    addEventListener('error', (ev) => bootFailed(ev.message || (ev.error && ev.error.message) || ev.type || ev));
+    // Every request this page makes before the engine exists carries a deadline (
+    // issue 11). A host that accepts a connection and then never answers used to hang the boot here with
+    // nothing in the log at all: the page never finished loading, nothing was thrown, and on Firefox --
+    // where the engine's own reads are synchronous, with the browser's network timeout as their only
+    // bound (play/streamfs.js) -- the first read that followed froze the tab for the better part of a
+    // minute. Failing at the deadline turns that into a named error, at the moment it is known, before
+    // the engine can start. `?bootDeadline=<ms>` shortens it and `?bootUrl=<url>` points the first
+    // request at another host, both test switches for wasm-build/scenarios/s329-browser-stalled-host.
+    const bootDeadlineParam = /[?&]bootDeadline=(\d+)/.exec(location.search);
+    const BOOT_DEADLINE_MS = Math.max(1, bootDeadlineParam ? Number(bootDeadlineParam[1]) : 15000);
+    const bootUrlParam = /[?&]bootUrl=([^&]+)/.exec(location.search);
+    const SMOKE_URL = bootUrlParam ? decodeURIComponent(bootUrlParam[1]) : 'smoke.mpq';
+    async function fetchBounded(url, init, what) {
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), BOOT_DEADLINE_MS);
+      try {
+        return await fetch(url, Object.assign({ signal: ac.signal }, init));
+      } catch (err) {
+        if (err && err.name === 'AbortError')
+          throw new Error(`${what} did not answer within ${BOOT_DEADLINE_MS}ms -- the host accepted the ` +
+            `request and then stalled`);
+        throw err;
+      } finally { clearTimeout(timer); }
+    }
+    const head = await fetchBounded(SMOKE_URL, { method: 'HEAD' }, SMOKE_URL);
+    if (!head.ok) throw new Error(SMOKE_URL + ': HTTP ' + head.status);
     const size = Number(head.headers.get('content-length'));
     // init + wait for the worker BEFORE the engine exists: the first sync read must not race
     // the worker's own startup (see streamfs.js, 'd2-web divergence').
@@ -117,14 +217,14 @@ function showUnsupported(info) {
     const wantRetail = /[?&]retail=1/.test(location.search);
     const retail = [];
     if (wantRetail) for (const f of RETAIL_ORDER) {
-      const h = await fetch('retail/' + f, { method: 'HEAD' });
+      const h = await fetchBounded('retail/' + f, { method: 'HEAD' }, 'retail/' + f);
       if (h.ok) retail.push({ f, size: Number(h.headers.get('content-length')) });
     }
     window.Module = {
       locateFile: (p) => ENGINE_DIR + p,
       print: log, printErr: log,
       preRun: [() => {
-        StreamFS.mount('/smoke.mpq', 'smoke.mpq', size);
+        StreamFS.mount('/smoke.mpq', SMOKE_URL, size);
         log('streamfs: mounted /smoke.mpq (' + size + ' bytes)');
         if (retail.length) FS.mkdir('/retail');   // makeNode needs the parent dir to exist
         for (const r of retail) StreamFS.mount('/retail/' + r.f, 'retail/' + r.f, r.size);
@@ -148,6 +248,6 @@ function showUnsupported(info) {
       },
     };
     const s = document.createElement('script'); s.src = ENGINE_DIR + 'd2.js'; document.head.appendChild(s);
-  } catch (e) { window.__d2 = { ready: true, smoke: null, error: String(e) }; log('ERROR ' + e); }
+  } catch (e) { window.__d2 = { ready: true, smoke: null, error: String(e) }; log('ERROR ' + e); showBootFailure(String(e)); }
 })();
 </script>

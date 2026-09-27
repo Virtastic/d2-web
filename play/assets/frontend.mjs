@@ -35,12 +35,19 @@ export function decodeFontTbl(bytes) {
 /**
  * Retail's blended cel draw modes, index-exact (retail's own 8-bit title frame): mode 3
  * writes PL2 AdditiveBlend[under][src], mode 4 (the button labels) MultiplicativeBlend[under][src],
- * the tables of the screen's palette (Sky on the title: 99.96% and 100% of retail's pixels). `under`
+ * mode 1 AlphaBlend[under][src] (a control drawn dimmed), the tables of the screen's palette (Sky on
+ * the title: 99.96% and 100% of retail's pixels). `under`
  * is read back from the canvas as a palette index, so the canvas must be unscaled 800x600 and hold
  * raw palette colours. Offsets per OpenDiablo2's d2pl2 layout.
  */
 export const PL2_ADDITIVE = 1024 + 32 * 256 + 16 * 256 + 256 + 3 * 65536;
 export const PL2_MULTIPLICATIVE = PL2_ADDITIVE + 65536;
+/** Offset of PL2 AlphaBlend (retail's DrawMode 1, the disabled/dimmed control): index 1 of the four
+ *  tables, two 65536-byte steps below the additive one. Retail's own draw list draws character
+ *  creation's OK button through it while the name is under two characters
+ *  (`cel MediumSelButtonBlank.dc6 frame=0 x=627 y=572 mode=1`, the retail captures),
+ *  and character select's disabled CONVERT TO EXPANSION the same way. */
+export const PL2_ALPHA = PL2_ADDITIVE - 2 * 65536;
 /** Offset of PL2 TextColorShifts (13 x 256; OpenDiablo2 d2pl2 layout). */
 export const PL2_TEXT_SHIFTS = 1024 + 8192 + 4096 + 256 + 5 * 65536 + 111 * 256 + 768 + 14 * 256 + 65536 + 256 + 39;
 /** A palette whose entry k is palette[TextColorShifts[colour][k]]: a glyph drawn in D2Win colour `colour`. */
@@ -52,7 +59,7 @@ export function textColourPalette(pl2, palette, colour) {
 export function createBlender(pl2, palette) {
   const index = new Map();
   for (let j = 255; j >= 0; j--) index.set((palette[j * 4] << 16) | (palette[j * 4 + 1] << 8) | palette[j * 4 + 2], j);
-  const tables = { 3: pl2.subarray(PL2_ADDITIVE, PL2_ADDITIVE + 65536), 4: pl2.subarray(PL2_MULTIPLICATIVE, PL2_MULTIPLICATIVE + 65536) };
+  const tables = { 1: pl2.subarray(PL2_ALPHA, PL2_ALPHA + 65536), 3: pl2.subarray(PL2_ADDITIVE, PL2_ADDITIVE + 65536), 4: pl2.subarray(PL2_MULTIPLICATIVE, PL2_MULTIPLICATIVE + 65536) };
   // World art normally reaches this compositor as an exact palette colour. UI scaling and an
   // earlier blend do not, though. Source-index fallback makes an effect-3 cel opaque in that
   // case; choose the nearest palette entry, as the other PL2 consumer (the NPC menu box) does.
@@ -102,7 +109,9 @@ function frameCanvas(frame, palette, documentObject) {
  * A retail bitmap font: the DC6 supplies the glyph images, the .tbl the advance widths and the
  * code-point -> frame mapping.
  */
-export function createFont({ dc6, tbl, palette, documentObject = globalThis.document, path = null, drawAs = { op: 'celcolor', mode: 5 } }) {
+// `onGlyph` is bound as onFontGlyph: it is the FONT-level option, and `draw` also takes a per-call
+// callback. The two are handed different payloads (see draw), so they cannot share a name.
+export function createFont({ dc6, tbl, palette, documentObject = globalThis.document, path = null, drawAs = { op: 'celcolor', mode: 5 }, onGlyph: onFontGlyph = null }) {
   const glyphs = new Map();
   const glyphFor = (code) => {
     if (glyphs.has(code)) return glyphs.get(code);
@@ -117,6 +126,8 @@ export function createFont({ dc6, tbl, palette, documentObject = globalThis.docu
     // Every glyph frame is the same fixed cell; retail centres THAT box in a button, not the .tbl
     // line height (the retail title frame puts exocet10's ink 3px higher than line-height centring).
     cellHeight: Math.max(...dc6.frames.map((f) => f.height)),
+    /** The glyph a code point resolves to (null when the font has none) -- identity evidence. */
+    glyph(code) { return glyphFor(code); },
     measure(text) {
       let w = 0;
       for (const ch of String(text)) w += glyphFor(ch.codePointAt(0))?.advance ?? 0;
@@ -135,22 +146,32 @@ export function createFont({ dc6, tbl, palette, documentObject = globalThis.docu
           const top = anchorY + g.frame.offsetY - g.frame.height + 1;
           if (drawAs.blend) drawAs.blend(ctx, g.frame, cursor + g.frame.offsetX, top, drawAs.mode);
           else ctx.drawImage(g.canvas, cursor + g.frame.offsetX, top);
-          if (path) recordDc6(path, g.index, g.frame, cursor + g.frame.offsetX, top, drawAs);
+          const blit = path && recordDc6(path, g.index, g.frame, cursor + g.frame.offsetX, top, drawAs);
+          if (blit && onFontGlyph) onFontGlyph({ char: ch, ...blit });
         }
         cursor += g.advance;
       }
       return cursor - x;
     },
     /** Draw `text` with its LEFT edge at x and its TOP at y. */
-    draw(ctx, text, x, y) {
+    draw(ctx, text, x, y, onGlyph = null) {
       let cursor = x;
       for (const ch of String(text)) {
         const g = glyphFor(ch.codePointAt(0));
         if (!g) continue;
         if (g.canvas.width && g.canvas.height) {
-          ctx.drawImage(g.canvas, Math.round(cursor), Math.round(y));
+          const left = Math.round(cursor), top = Math.round(y);
+          ctx.drawImage(g.canvas, left, top);
           // A glyph is a cel draw of the font's DC6 frame (drawlist.mjs); `path` names the font.
-          if (path) recordDc6(path, g.index, g.frame, Math.round(cursor), Math.round(y), drawAs);
+          const blit = path && recordDc6(path, g.index, g.frame, left, top, drawAs);
+          // Two consumers want identity evidence and they cannot share one `path`. The per-call
+          // callback (gameplay-shell's hover labels) is handed the FONT path, which its row compares
+          // against the requested font identity. The font-level option (charcreate's description
+          // lines) is handed the RECORDED cel row, whose `path` is the DC6 draw path the draw list
+          // uses. Both fire only for a glyph that was really blitted, so requested text stays
+          // distinct from painted identity in either shape.
+          onGlyph?.({ character: ch, index: g.index, path, x: left, y: top });
+          if (blit && onFontGlyph) onFontGlyph({ char: ch, ...blit });
         }
         cursor += g.advance;
       }
@@ -166,6 +187,12 @@ export const FRONTEND = {
   palette: 'data\\global\\palette\\Units\\pal.dat',
   backgroundPalette: 'data\\global\\palette\\Sky\\pal.dat',
   background: 'data\\global\\ui\\FrontEnd\\gameselectscreenEXP.dc6',
+  // The phase BEFORE the menu, which 1.13c boots into (retail's own draw list,
+  // the retail captures): its own background art, the same four logo DC6s, and the two
+  // copyright lines -- no buttons, no version label, no pointer.
+  trademark: 'data\\global\\ui\\FrontEnd\\trademarkscreenEXP.dc6',
+  trademarkFont: 'data\\local\\font\\latin\\fontformal12.dc6',
+  trademarkFontTbl: 'data\\local\\font\\latin\\fontformal12.tbl',
   logoFire: ['data\\global\\ui\\FrontEnd\\D2logoFireLeft.DC6', 'data\\global\\ui\\FrontEnd\\D2logoFireRight.DC6'],
   logoBlack: ['data\\global\\ui\\FrontEnd\\D2logoBlackLeft.DC6', 'data\\global\\ui\\FrontEnd\\D2logoBlackRight.DC6'],
   button: 'data\\global\\ui\\FrontEnd\\WideButtonBlank.dc6',
@@ -204,6 +231,33 @@ export const TITLE_VERSION = { text: 'v 1.13', x: 79, y: 569 };
 // d2ui/button.go LabelColor greyAlpha100: button labels are the font's glyphs modulated by 0x64.
 const LABEL_TINT = 0x64 / 0xff;
 
+/**
+ * The trademark screen: the copyright notice retail shows for ten seconds before the menu (its own
+ * pre-menu phase), on the trademark art.
+ *
+ * Where everything comes from: retail's premenu draw list (`the retail captures`) gives the
+ * font (FontFormal12), the two bottom-row anchors (520 and 544), the draw mode (celcolor, mode 5),
+ * the colour shift (extra 4 -- gold; OpenD2 `Modcode/Client/UI/Menus/Trademark.cpp`) and the text
+ * itself -- a font's DC6 frame index is its code point, so the 59 glyph records decode to
+ * "© Copyright 2001 Blizzard Entertainment" and "All Rights Reserved.". The x is D2Win's centre
+ * alignment in the 800-wide screen: `trunc((800 - width) / 2)` puts the glyph cursors at retail's own
+ * 222 and 314 exactly (advances 356 and 172 in fontformal12.tbl).
+ *
+ * The indices are measured, not taken from OpenD2: 5104 is the CLASSIC line
+ * ("(c) 2000 Blizzard Entertainment") and drawing it would not be the LoD screen; 1.13c's
+ * ExpansionString.tbl carries the 2001 line at 21882 (scanned with the engine's own
+ * d2_lang_string_by_index, not read off a table file) and the classic table's "All Rights Reserved."
+ * at 5105 -- the
+ * expansion table has no second line of its own. D2MOO's StringIds.h names the same two classic
+ * indices and leaves 21882 unnamed, i.e. the same layout on 1.10f.
+ */
+export const TRADEMARK_LAYOUT = {
+  screenWidth: 800,
+  colour: 4,                                        // D2Win TextColorShifts index (gold)
+  lines: [{ string: 21882, y: 520 },                // ExpansionString.tbl "© Copyright 2001 Blizzard Entertainment"
+           { string: 5105, y: 544 }],               // string.tbl "All Rights Reserved."
+};
+
 // The title screen is a 800x600 image cut into a grid of DC6 frames: 4 columns
 // (256 + 256 + 256 + 32) by 3 rows (256 + 256 + 88), stored row-major.
 export const TITLE_COLUMNS = 4;
@@ -237,23 +291,31 @@ export function composeTiled(dc6, palette, columns, documentObject) {
 }
 
 /** Draw-list records for a composed background drawn at (ox, oy). */
-function recordTiled(path, tiled, ox, oy) {
+export function recordTiled(path, tiled, ox, oy) {
   for (const p of tiled.placements) recordDc6(path, p.i, p.frame, ox + p.left, oy + p.top);
 }
 
 /**
  * Build the title screen. `items` are the menu entries, each `{ label, action }`.
  *
+ * Two phases, in retail's order: `trademark` (the copyright notice on the trademark art, no buttons)
+ * and `menu`. `string` is the engine's string-table lookup by index (`d2_lang_string_by_index`), which
+ * is where the copyright text comes from -- the glyph frames retail draws are the text, so a wrong or
+ * missing string shows up as a wrong draw list rather than as a blank line nobody notices.
+ *
  * The flaming logo is two DC6s (left and right halves), each 30 frames, positioned by their own
- * frame offsets -- retail animates them over the static black logo underneath.
+ * frame offsets -- retail animates them over the static black logo underneath, in both phases.
  */
-export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, documentObject = globalThis.document }) {
+export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, string = null, documentObject = globalThis.document }) {
   const palette = decodeDatPalette(read(FRONTEND.palette));
   // The whole title is ONE 8-bit frame shown through Sky (retail's frame buffer, s194), the buttons
-  // too: Units differs from Sky in a few entries, the button gems among them.
+  // too: Units differs from Sky in a few entries, the button gems among them. The trademark phase is
+  // the same screen with earlier art, so it is the same palette.
   const skyPalette = decodeDatPalette(read(FRONTEND.backgroundPalette));
-  const background = composeTiled(decodeDc6(read(FRONTEND.background)), skyPalette,
-    TITLE_COLUMNS, documentObject);
+  const background = { ...composeTiled(decodeDc6(read(FRONTEND.background)), skyPalette,
+    TITLE_COLUMNS, documentObject), path: FRONTEND.background };
+  const trademarkBackground = { ...composeTiled(decodeDc6(read(FRONTEND.trademark)), skyPalette,
+    TITLE_COLUMNS, documentObject), path: FRONTEND.trademark };
   // Retail's order: black left, fire left, black right, fire right (title draw list).
   const logos = [FRONTEND.logoBlack[0], FRONTEND.logoFire[0], FRONTEND.logoBlack[1], FRONTEND.logoFire[1]].map((path) => {
     const dc6 = decodeDc6(read(path));
@@ -291,6 +353,28 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, do
   const font = createFont({ dc6: decodeDc6(read(FRONTEND.font)), tbl: decodeFontTbl(read(FRONTEND.fontTbl)), palette: labelPalette, documentObject, path: FRONTEND.font, drawAs: labelDraw });
   const smallFont = createFont({ dc6: decodeDc6(read(FRONTEND.smallFont)), tbl: decodeFontTbl(read(FRONTEND.smallFontTbl)), palette: labelPalette, documentObject, path: FRONTEND.smallFont, drawAs: labelDraw });
   const versionFont = createFont({ dc6: decodeDc6(read(FRONTEND.versionFont)), tbl: decodeFontTbl(read(FRONTEND.versionFontTbl)), palette, documentObject, path: FRONTEND.versionFont, drawAs: { op: 'celcolor', mode: 5 } });
+  // The copyright lines, in the font's own colour 4 (gold) through Sky's shift table -- the palette
+  // entry each glyph pixel is remapped to before the palette lookup (textColourPalette), which is
+  // what retail's celcolour draw with extra=4 does.
+  const skyPl2 = read('data\\global\\palette\\Sky\\pal.pl2');
+  const goldPalette = textColourPalette(skyPl2, skyPalette, TRADEMARK_LAYOUT.colour);
+  const trademarkFont = createFont({ dc6: decodeDc6(read(FRONTEND.trademarkFont)),
+    tbl: decodeFontTbl(read(FRONTEND.trademarkFontTbl)), palette: goldPalette, documentObject,
+    path: FRONTEND.trademarkFont, drawAs: { op: 'celcolor', mode: 5, extra: TRADEMARK_LAYOUT.colour } });
+  // Resolved on first use, not at construction: the string tables are the engine's, and a failure
+  // here must be visible in the evidence rather than silently drawing nothing.
+  let trademarkError = '';
+  const trademarkLines = TRADEMARK_LAYOUT.lines.map((line) => ({ ...line, text: null, x: null }));
+  const resolveTrademark = () => {
+    for (const line of trademarkLines) {
+      if (line.text !== null) return;
+      try { line.text = String(string ? string(line.string) : ''); }
+      catch (error) { trademarkError = String(error); line.text = ''; }
+      line.x = Math.trunc((TRADEMARK_LAYOUT.screenWidth - trademarkFont.measure(line.text)) / 2);
+    }
+  };
+  // `glyph` takes a code point (the .tbl's key); a line of text counts its characters' code points.
+  const glyphCount = (text) => [...String(text)].filter((ch) => trademarkFont.glyph(ch.codePointAt(0))).length;
   const cursorDc6 = decodeDc6(read(FRONTEND.cursor));
   const cursorCanvas = frameCanvas(cursorDc6.frames[0], palette, documentObject);
 
@@ -313,23 +397,54 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, do
   // D2Win's button label (D2MOO D2WinButton.cpp BUTTON_Draw): exocet10 on buttons 35+ tall, else
   // fontridiculous; x = left + max((w - textWidth) / 2, 0), anchor y = bottom + offY - (h - font
   // line height) / 2 with offY 4 (h >= 35) / 3 (h == 32) / 2 (h > 20) / 1, integer division.
-  const drawLabel = (ctx, text, x, y, w, h) => {
+  // `dx`/`dy` carry retail's pressedButtonOffset: a button held down draws its label 2 px left and
+  // 2 px down, the same displacement its own cel moves. Retail's title frame with SINGLE PLAYER held
+  // is the evidence: the glyphs move, the cels do not.
+  const drawLabel = (ctx, text, x, y, w, h, dx = 0, dy = 0) => {
     const f = h >= 35 ? font : smallFont;
     const offY = h >= 35 ? 4 : h === 32 ? 3 : h > 20 ? 2 : 1;
     const bottom = y + h - 1;
-    f.drawAnchored(ctx, text, x + Math.max(Math.trunc((w - f.measure(text)) / 2), 0), bottom + offY - Math.trunc((h - f.lineHeight) / 2));
+    f.drawAnchored(ctx, text, x + dx + Math.max(Math.trunc((w - f.measure(text)) / 2), 0), bottom + dy + offY - Math.trunc((h - f.lineHeight) / 2));
   };
   const drawOrder = [...boxes].sort((a, b) => TITLE_LAYOUT[a.item.label].order - TITLE_LAYOUT[b.item.label].order);
 
-  let hot = -1, pointer = null;
+  let hot = -1, pressed = -1, pointer = null;
+  // Retail's logo animation, both phases: black left, fire left, black right, fire right, one frame a
+  // tick at 25 Hz, the DC6's last frame never shown (title draw list: frames 8, 9, 10, 11 on four
+  // consecutive frames; the creation loops' rule). A frame's anchor is its bottom row.
+  const drawLogos = (ctx, tick) => {
+    for (const logo of logos) {
+      const n = logo.canvases.length;
+      const frameIndex = Math.floor(tick * 25 / 60) % (n - 1);
+      const frame = logo.dc6.frames[frameIndex];
+      const canvas = logo.canvases[frameIndex];
+      if (!frame || !canvas.width) continue;
+      const fire = logo.path.toLowerCase().includes('fire');
+      const left = 400 + frame.offsetX, top = 120 + frame.offsetY - frame.height + 1;
+      if (fire) blend(ctx, frame, left, top, 3);
+      else ctx.drawImage(canvas, left, top);
+      recordDc6(logo.path, frameIndex, frame, left, top, { op: 'cel', mode: fire ? 3 : 5 });
+    }
+  };
   return {
-    evidence: {
-      background: { width: background.width, height: background.height, rows: background.rows, columns: background.columns },
-      logoFrames: logos.map((l) => l.dc6.frames.length),
-      button: { width: buttons.wide[0].width, height: buttons.wide[0].height, states: buttons.wide.length },
-      boxes: boxes.map((b) => ({ label: b.item.label, kind: b.kind, x: b.x, y: b.y, w: b.w, h: b.h })),
-      fontGlyphs: font.measure('SINGLE PLAYER'),
-      lineHeight: font.lineHeight,
+    get evidence() {
+      resolveTrademark();
+      return {
+        background: { width: background.width, height: background.height, rows: background.rows, columns: background.columns },
+        logoFrames: logos.map((l) => l.dc6.frames.length),
+        button: { width: buttons.wide[0].width, height: buttons.wide[0].height, states: buttons.wide.length },
+        boxes: boxes.map((b) => ({ label: b.item.label, kind: b.kind, x: b.x, y: b.y, w: b.w, h: b.h })),
+        fontGlyphs: font.measure('SINGLE PLAYER'),
+        lineHeight: font.lineHeight,
+        pointer: { hot: hot >= 0 ? items[hot]?.label ?? null : null, pressed: pressed >= 0 ? items[pressed]?.label ?? null : null },
+        trademark: {
+          background: { width: trademarkBackground.width, height: trademarkBackground.height,
+            rows: trademarkBackground.rows, columns: trademarkBackground.columns, path: FRONTEND.trademark },
+          font: FRONTEND.trademarkFont, colour: TRADEMARK_LAYOUT.colour, error: trademarkError,
+          lines: trademarkLines.map((l) => ({ string: l.string, text: l.text, x: l.x, y: l.y,
+            glyphs: glyphCount(l.text) })),
+        },
+      };
     },
     hitTest(x, y, width, height) {
       const v = view(width, height);
@@ -338,6 +453,13 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, do
       return i < 0 ? -1 : items.indexOf(boxes[i].item);
     },
     labelAt(index) { return items[index]?.label ?? null; },
+    /** Canvas-pixel centres of the SAME boxes hitTest() and click() use. */
+    targets(width, height) {
+      const v = view(width, height);
+      return Object.fromEntries(boxes.map((b) => [b.item.label, [
+        Math.round(v.ox + (b.x + b.w / 2) * v.scale), Math.round(v.oy + (b.y + b.h / 2) * v.scale),
+      ]]));
+    },
     hover(x, y, width, height) {
       const v = view(width, height);
       pointer = [Math.trunc((x - v.ox) / v.scale), Math.trunc((y - v.oy) / v.scale)];
@@ -348,28 +470,39 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, do
       if (i >= 0) items[i].action?.();
       return i;
     },
-    draw(outCtx, width, height, tick) {
+    // Press arms the button under the pointer and shows its down cel; the release fires only when
+    // it is still over the same button. Hover alone never draws the down cel (retail's mouse-up).
+    press(x, y, width, height) { pressed = this.hitTest(x, y, width, height); return pressed >= 0 ? pressed : null; },
+    release(token, x, y, width, height) {
+      const i = this.hitTest(x, y, width, height); pressed = -1;
+      if (i >= 0 && i === token) items[i].action?.();
+      return i >= 0 && i === token ? i : -1;
+    },
+    /** A cancelled gesture drops the down cel without activating the button. */
+    cancel() { pressed = -1; },
+    draw(outCtx, width, height, tick, phase = 'menu') {
       outCtx.fillStyle = '#000'; outCtx.fillRect(0, 0, width, height);
       const v = view(width, height);
       const ctx = sceneCtx;
       ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 800, 600);
-      ctx.drawImage(background.canvas, 0, 0);
-      recordTiled(FRONTEND.background, background, 0, 0);
-      // Logo: retail animates the black halves in step with the fire (same frame index), the fire in
-      // DrawMode 3 -- PL2 AdditiveBlend over what is below (createBlender). A frame's anchor is its bottom row.
-      for (const logo of logos) {
-        const n = logo.canvases.length;
-        // Retail's 25 Hz front-end clock, one logo frame a tick, the DC6's last frame never shown
-        // (title draw list: frames 8, 9, 10, 11 on four consecutive frames; the creation loops' rule).
-        const frameIndex = Math.floor(tick * 25 / 60) % (n - 1);
-        const frame = logo.dc6.frames[frameIndex];
-        const canvas = logo.canvases[frameIndex];
-        if (!frame || !canvas.width) continue;
-        const fire = logo.path.toLowerCase().includes('fire');
-        const left = 400 + frame.offsetX, top = 120 + frame.offsetY - frame.height + 1;
-        if (fire) blend(ctx, frame, left, top, 3);
-        else ctx.drawImage(canvas, left, top);
-        recordDc6(logo.path, frameIndex, frame, left, top, { op: 'cel', mode: fire ? 3 : 5 });
+      const art = phase === 'trademark' ? trademarkBackground : background;
+      ctx.drawImage(art.canvas, 0, 0);
+      recordTiled(art.path, art, 0, 0);
+      drawLogos(ctx, tick);
+      if (phase === 'trademark') {
+        // Retail's pre-menu frame is the art, the logo and the two copyright lines -- nothing else:
+        // no buttons, no `v 1.13`, and no pointer cel.
+        resolveTrademark();
+        let glyphs = 0;
+        for (const line of trademarkLines) {
+          if (!line.text) continue;
+          trademarkFont.drawAnchored(ctx, line.text, line.x, line.y);
+          glyphs += glyphCount(line.text);
+        }
+        outCtx.save(); outCtx.imageSmoothingEnabled = false;
+        outCtx.drawImage(scene, v.ox, v.oy, 800 * v.scale, 600 * v.scale);
+        outCtx.restore();
+        return { phase, buttons: 0, glyphs, hot: -1 };
       }
       for (const b of drawOrder) {
         if (b.gateway) {
@@ -378,10 +511,12 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, do
           recordButton(g, b.gateway.x, b.gateway.y);
           drawLabel(ctx, b.gateway.label, b.gateway.x, b.gateway.y, g.width, g.height);
         }
-        const state = items.indexOf(b.item) === hot ? 1 : 0;
+        // Hover keeps retail's up cel; only a held pointer gets the down cel.
+        const down = items.indexOf(b.item) === pressed;
+        const state = down ? 1 : 0;
         ctx.drawImage(buttons[b.kind][state].canvas, b.x, b.y);
         recordButton(buttons[b.kind][state], b.x, b.y);
-        drawLabel(ctx, b.item.label, b.x, b.y, b.w, b.h);
+        drawLabel(ctx, b.item.label, b.x, b.y, b.w, b.h, down ? -2 : 0, down ? 2 : 0);
       }
       versionFont.drawAnchored(ctx, TITLE_VERSION.text, TITLE_VERSION.x, TITLE_VERSION.y);
       // D2Win draws the pointer last, as a cel at (mouse x, mouse y - 1) (D2MOO D2WinMain.cpp).
@@ -394,7 +529,7 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, do
       outCtx.save(); outCtx.imageSmoothingEnabled = false;
       outCtx.drawImage(scene, v.ox, v.oy, 800 * v.scale, 600 * v.scale);
       outCtx.restore();
-      return { buttons: boxes.length, hot };
+      return { phase, buttons: boxes.length, hot };
     },
   };
 }

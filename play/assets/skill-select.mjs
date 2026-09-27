@@ -16,6 +16,7 @@
 // omits skills without Skills.txt `leftskill`, both omit passives and ListRow -1. Left rows are
 // ordered by skill id ascending, right rows descending.
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
+import { recordDc6 } from './drawlist.mjs';
 
 export const SESSION_SKILL_CHOICE_BYTES = 8;   // D2SessionSkillChoice
 export const SKILL_SELECT_LAYOUT = Object.freeze({
@@ -66,8 +67,11 @@ export function createSkillSelectRenderer(read, documentObject = globalThis.docu
   const sheets = new Map();
   const sheet = (charClass) => {
     const key = skillSheetAsset(charClass);
-    if (!sheets.has(key)) sheets.set(key, decodeDc6(read(key)).frames.map((f) => frameCanvas(f, palette, documentObject)));
-    return { key, frames: sheets.get(key) };
+    if (!sheets.has(key)) {
+      const frames = decodeDc6(read(key)).frames;   // the raw frames: the draw list hashes their bytes
+      sheets.set(key, { key, frames, canvases: frames.map((f) => frameCanvas(f, palette, documentObject)) });
+    }
+    return sheets.get(key);
   };
   const origin = (width, height) => { const scale = Math.min(1, width / 800, height / 600); return { scale, x: (width - 800 * scale) / 2, y: (height - 600 * scale) / 2 }; };
   const toScreen = (x, y, width, height) => { const o = origin(width, height); return [(x - o.x) / o.scale, (y - o.y) / o.scale]; };
@@ -92,10 +96,14 @@ export function createSkillSelectRenderer(read, documentObject = globalThis.docu
     draw(ctx, width, height, choices, selected) {
       const o = origin(width, height), L = SKILL_SELECT_LAYOUT, drawn = [];
       ctx.save(); ctx.translate(o.x, o.y); ctx.scale(o.scale, o.scale);
+      // The blit is recorded, not just counted: retail's own draw lists carry this cel (the socket
+      // icon as `Skillicon.dc6` frame 2 at the anchor (117|635, 600)), and a record is what lets a
+      // row compare OUR anchor against RETAIL's instead of trusting the layout constant below.
       const icon = (s, x, y, where) => {
-        const sh = sheet(s.charClass), f = sh.frames[s.iconCel];
-        if (!f) { drawn.push({ where, id: s.id, sheet: sh.key, cel: s.iconCel, missing: true }); return; }
-        ctx.drawImage(f, x, y); drawn.push({ where, id: s.id, sheet: sh.key, cel: s.iconCel });
+        const sh = sheet(s.charClass), f = sh.frames[s.iconCel], c = sh.canvases[s.iconCel];
+        if (!f || !c) { drawn.push({ where, id: s.id, sheet: sh.key, cel: s.iconCel, missing: true }); return; }
+        ctx.drawImage(c, x, y);
+        drawn.push({ where, id: s.id, sheet: sh.key, cel: s.iconCel, blit: recordDc6(sh.key, s.iconCel, f, x, y) });
       };
       for (const side of ['left', 'right']) {
         const s = choices.find((c) => c.id === selected?.[side]);

@@ -169,3 +169,26 @@ int32_t __fastcall D2WEB_PLRSAVE2_ReadPlrIntroSection(D2UnitStrc* pPlayer, uint8
 // Load a complete .d2s into an EXISTING player: the second half of PLRSAVE2_ProcessSaveFile, which
 // also creates the unit. See PlrSaveFile.cpp.
 int32_t __fastcall D2WEB_PLRSAVE2_LoadIntoPlayer(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint8_t* pSaveFile, uint32_t nSize);
+
+// What PLRSAVE2_ReadSaveHeader derives from a file before a character can exist: the class its unit
+// must be allocated as, the act its game must be created in, and the seed that game is generated
+// from when the file's difficulty was already entered. Retail writes these straight onto the game
+// and the client and allocates the unit in the same call; d2-web's session must know the act BEFORE
+// it builds a level (the level IS the act), so the reader answers them here and the session creates
+// from them. pHeader points into the caller's own buffer.
+struct D2SaveHeaderReadStrc
+{
+	const D2SaveHeaderStrc* pHeader;	//0x00 the validated header, in the caller's buffer
+	uint32_t dwMapSeed;					//0x08 the file's seed, when its difficulty was entered (nTown & 0x80); else 0
+	int32_t nAct;						//0x0C nTown[difficulty] & 0x7F, an act >= NUM_ACTS read as ACT_I
+	uint8_t nClass;						//0x10 the character's class, the unit's dwClassId
+};
+
+// The first half of PLRSAVE2_ReadSaveHeader: validate the file (signature, size field, version,
+// checksum) and derive the character's identity, including the class check and the newbie-save
+// refusal. Returns a PLRSAVE2 error code; PLRSAVE2ERROR_SUCCESS fills pOut.
+int32_t __fastcall D2WEB_PLRSAVE2_ReadSaveHeader(uint8_t* pSaveFile, uint32_t nSize, int32_t nDifficulty, D2SaveHeaderReadStrc* pOut);
+// The unit half of PLRSAVE2_ReadSaveHeader, applied to the unit the session allocated with nClass:
+// the client's weapon switch / save flags / create time / act, the sixteen skill hotkeys the header
+// stores, the four skill hands, and the guild emblem. nAct is pOut.nAct (already clamped).
+int32_t __fastcall D2WEB_PLRSAVE2_ApplySaveHeader(D2ClientStrc* pClient, D2UnitStrc* pPlayer, const D2SaveHeaderStrc* pHeader, int32_t nAct);

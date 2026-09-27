@@ -26,9 +26,10 @@ export function dc6FrameHash(frame) {
   return h;
 }
 
-/** Normalise a retail path the way the vector writes it: lower case, no `data\`, no extension. */
+/** Normalise a retail path the way the vector writes it: lower case, no `data\`, no extension.
+ *  Retail's hook logs a DCC cel (a character composite layer) with no extension either. */
 export function drawPath(path) {
-  return String(path).replace(/\//g, '\\').toLowerCase().replace(/^data\\/, '').replace(/\.dc6$/, '');
+  return String(path).replace(/\//g, '\\').toLowerCase().replace(/^data\\/, '').replace(/\.(dc6|dcc)$/, '');
 }
 
 export function drawListActive() { return Array.isArray(globalThis.__d2DrawList); }
@@ -36,15 +37,45 @@ export function drawListActive() { return Array.isArray(globalThis.__d2DrawList)
 /**
  * Record that `frame` (frame `index` of the DC6 at `path`) was just drawn with its top-left corner
  * at (left, top) on the 800x600 screen.
+ *
+ * `extra` is retail's own per-draw argument (the decompile: the colour shift a
+ * pfCelDrawColor carries -- 4 on the trademark screen's gold copyright, 0 on the menu's labels).
+ * diffDrawLists does NOT compare it: it is recorded so a row can assert the colour shift for a
+ * draw whose identity is otherwise identical (s198).
  */
-export function recordDc6(path, index, frame, left, top, { op = 'cel', mode = 5 } = {}) {
+export function recordDc6(path, index, frame, left, top, { op = 'cel', mode = 5, extra = 0 } = {}) {
   const list = globalThis.__d2DrawList;
-  if (!Array.isArray(list) || !frame) return;
-  list.push({
+  if (!frame) return null;
+  const record = {
     op, path: drawPath(path), frame: index,
     x: Math.round(left - frame.offsetX), y: Math.round(top + frame.height - 1 - frame.offsetY),
-    mode, w: frame.width, h: frame.height, hash: dc6FrameHash(frame),
-  });
+    mode, extra, w: frame.width, h: frame.height, hash: dc6FrameHash(frame),
+  };
+  if (Array.isArray(list)) list.push(record);
+  return record;
+}
+
+/**
+ * Record a DCC cel draw (a character composite layer, the only DCC path the front end draws). Retail
+ * takes the same (x, y) anchor for it as for a DC6 cel -- x + frame.xOffset is the first column,
+ * y + frame.yOffset + 1 - frame.height the first row -- but the hook cannot hash a frame decoded from
+ * a DCC bitstream, so retail's own records carry `hash=0`. The anchor is passed in rather than
+ * re-derived from the frame: a DCC frame has no `offsetX`/`offsetY` and its `bottomUp` orientation
+ * changes which of its own fields is the anchor.
+ */
+export function recordDcc(path, index, anchorX, anchorY, { op = 'cel', mode = 5 } = {}) {
+  const list = globalThis.__d2DrawList;
+  if (!Array.isArray(list)) return;
+  list.push({ op, path: drawDccPath(path), frame: index, x: Math.round(anchorX), y: Math.round(anchorY), mode, hash: 0 });
+}
+
+/** A DCC cel's path the way the hook writes it (tools/drawlist.py `line()`): retail has no cell file
+ *  for one, so its identity is the unit's own tokens -- `dcc:{kind}\{class}\{type}{class}{armour}
+ *  {mode}{hitclass}` under the game's data root, e.g. `dcc:chars\BA\LG\BALGlitTNhth`. Our own path
+ *  spells the same thing as `data\global\chars\BA\LG\BALGlitTNhth.dcc`, so the two differences are the
+ *  `data\global\` root and the extension. */
+export function drawDccPath(path) {
+  return 'dcc:' + drawPath(path).replace(/^global\\/, '');
 }
 
 /** Record a renderer primitive (retail's box / line / rect records): op, corners, colour, mode. */
@@ -70,7 +101,7 @@ export function parseDrawListVector(text) {
     }
     if (op !== 'cel' && op !== 'celcolor') { out.push({ op, raw: line }); continue; }
     out.push({ op, path: drawPath(path), frame: Number(f.frame), x: Number(f.x), y: Number(f.y), mode: Number(f.mode),
-      w: Number(f.w), h: Number(f.h), hash: parseInt(f.hash, 16) >>> 0 });
+      extra: Number(f.extra ?? 0), w: Number(f.w), h: Number(f.h), hash: parseInt(f.hash, 16) >>> 0 });
   }
   return out;
 }

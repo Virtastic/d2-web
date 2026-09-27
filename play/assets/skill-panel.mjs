@@ -13,8 +13,9 @@ import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { textColourPalette } from './frontend.mjs';
 import { BORDER_RIGHT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
 import { createFont, decodeFontTbl } from './frontend.mjs';
+import { PANEL_CLOSE_ART, panelCloseLayout } from './panel-close.mjs';
 
-export const SESSION_SKILL_BYTES = 16;   // D2SessionSkill: eight uint16
+export const SESSION_SKILL_BYTES = 26;   // D2SessionSkill: thirteen uint16 (manaLine/manaCost are V19's)
 
 // Retail names the tree background per class: skltree_<letter>_back.dc6. The letters follow
 // CharStats.txt's class order, which is also the engine's class index. All seven are distinct
@@ -63,6 +64,27 @@ const TAB_KEYS = {
   5: [['StrSklTree26'], ['StrSklTree27', 'StrSklTree28'], ['StrSklTree29']],
 };
 const TAB_MID = { 1: 436, 2: 330, 3: 222 };
+// The hover plate: its BOX is ours (padding, fill, placement) -- retail's tooltip frame exists since
+// 2026-09-27 (`retail/drawlists/skilltree-hover.bin`, a captured pointer parked on Bash's icon) but
+// our plate is not drawn from it. Its padding is this client's and is named here so the row can say
+// which part is retail's text and which part is our box around it.
+const PLATE_PAD = 5;
+
+/**
+ * Retail's own mana line text for a skill's cost, in the engine's 1/256 units (V19).
+ *
+ * Measured, not derived: retail 1.13c's frame of an unlearned Bash's tooltip reads "Mana Cost: 2"
+ * (engine 512) and of Whirlwind's "Mana Cost: 12.5" (engine 3200), so a cost with a fraction is
+ * printed with its TRUNCATED tenth. Retail's screen carries no more precision than that: its frame
+ * of Whirlwind's line shows "12.5" for 3200/256, and the community's transcription of the same
+ * display -- the Arreat Summit's per-level Prayer table, 1.1/1.3/1.5/1.7 at levels 2..5 -- is the
+ * truncation of 1.1875/1.375/1.5625/1.75. Whole costs print without a decimal, as retail's "Mana
+ * Cost: 2" does.
+ */
+export function formatManaCost(cost) {
+  const whole = Math.floor(cost / 256), fraction = cost % 256;
+  return fraction ? `${whole}.${Math.trunc(fraction * 10 / 256)}` : String(whole);
+}
 
 export function parseClassSkills(bytes, count) {
   const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
@@ -74,7 +96,9 @@ export function parseClassSkills(bytes, count) {
     out.push({ id: v.getUint16(o, true), page: v.getUint16(o + 2, true), row: v.getUint16(o + 4, true),
       column: v.getUint16(o + 6, true), requiredLevel: v.getUint16(o + 8, true),
       baseLevel: v.getUint16(o + 10, true), iconCel: v.getUint16(o + 12, true),
-      nameStr: v.getUint16(o + 14, true) });
+      nameStr: v.getUint16(o + 14, true), descStr: v.getUint16(o + 16, true),
+      manaStr: v.getUint16(o + 18, true), canLearn: v.getUint16(o + 20, true) !== 0,
+      manaLine: v.getUint16(o + 22, true) !== 0, manaCost: v.getUint16(o + 24, true) });
   }
   return out;
 }
@@ -87,7 +111,8 @@ function frameCanvas(frame, palette, documentObject) {
   return canvas;
 }
 
-export function createSkillPanelRenderer(read, documentObject = globalThis.document) {
+export function createSkillPanelRenderer(read, documentObject = globalThis.document, skillPointOverlay) {
+  if (!skillPointOverlay) throw new Error('skill panel needs its skill-point overlay');
   // Everything drawn through the ACT's palette (the panel is shown in whatever act the player is in):
   // per act, its pal.dat, the Font16 face, the colour-5 grey (the act PL2's TextColorShifts[5]) and the
   // icon sheets. The layer order and anchors do not depend on the act.
@@ -126,10 +151,11 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
   };
 
   let tab = 1;
-  // The skill under the pointer, so the panel can name it. Retail shows the name, description and
-  // mana cost on hover; the NAME is exact -- SkillDesc's wStrName is a .tbl index the engine
-  // already hands us -- so it lands now and the rest stays open (V19).
+  // The skill under the pointer, so the panel can name it. Retail shows the name, the description
+  // and the mana line on hover, each a .tbl index SkillDesc carries, so all three land from the
+  // engine's record (V19).
   let hovered = null;
+  let plate = null;
 
   const origin = (width, height) => {
     const scale = Math.min(1, width / 800, height / 600);
@@ -186,8 +212,12 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
       // Retail: the backdrop set (frames 0-3) then the open page's set (4*page .. +3), each at
       // (400|656, 316|492), bottom rows (skilltree.txt).
       const bg = bgFor(state.playerClass ?? 0), path = skillTreeAsset(state.playerClass ?? 0);
+      // Every panel cel this frame blitted, with the cel it actually drew -- the record a draw-list
+      // comparison reads, so "the backdrop is at retail's anchor" is checked, not asserted.
+      const cels = [];
       for (const set of [0, tab]) for (const [k, x, y] of [[0, 400, 316], [1, 656, 316], [2, 400, 492], [3, 656, 492]])
-        if (bg[set * TAB_FRAMES + k]) chrome.cel(ctx, act, path, set * TAB_FRAMES + k, x, y);
+        if (bg[set * TAB_FRAMES + k]) { const f = set * TAB_FRAMES + k;
+          cels.push({ path, frame: f, anchor: { x, y }, drawn: chrome.cel(ctx, act, path, f, x, y)?.drawn ?? null }); }
       // "Skill / Choices / Remaining" and the count, each line centred on x 677 (retail: 659/649/639,
       // rows 85/97/109; the count at 669,140).
       const S = (k) => (state.string?.(k) || '');
@@ -199,45 +229,104 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
       for (const t of [1, 2, 3]) { const lines = keys[t - 1].map(S), top = TAB_MID[t] - 6 * (lines.length - 1);
         lines.forEach((l, i) => centred(l, cx, top + 12 * i)); }
 
-      const drawn = [], missingIcons = [];
+      const drawn = [], missingIcons = [], plus = [];
+      const iconPath = skillIconAsset(state.playerClass ?? 0);
       for (const skill of state.skills || []) {
         if (skill.page !== tab) continue;
         const r = cellRect(skill);
         const sheet = skill.baseLevel > 0 ? icons : greyFor(state.playerClass ?? 0, act);
         const icon = sheet[skill.iconCel];
-        const available = (state.level ?? 1) >= skill.requiredLevel;
+        const available = skillPointOverlay.isCandidate(skill);
         if (icon) ctx.drawImage(icon, r.x, r.y);
         else missingIcons.push({ id: skill.id, iconCel: skill.iconCel });
+        if (available) {
+          const blit = skillPointOverlay.draw(chrome, ctx, act, r);
+          if (blit) plus.push({ id: skill.id, icon: { x: r.x, y: r.y, w: r.w, h: r.h }, ...blit });
+        }
         // The skill's level in Font16 anchored at the icon's right edge, 12 rows below its bottom
         // (retail's act-V tree, skilltree-act5: '2' at 532,134 for the icon at 484..531 x 75..122).
         if (skill.baseLevel > 0) font.drawAnchored(ctx, String(skill.baseLevel), r.x + r.w, r.y + r.h - 1 + 12);
-        drawn.push({ id: skill.id, x: r.x, y: r.y, baseLevel: skill.baseLevel, available });
+        // Identity, not coverage: the cel DRAWN is named (its sheet and its SkillDesc iconCel), so a
+        // row can compare the blit against retail's own draw list rather than counting icons.
+        drawn.push({ id: skill.id, x: r.x, y: r.y, baseLevel: skill.baseLevel, available,
+          iconCel: skill.iconCel, sheet: iconPath, frame: skill.iconCel, w: r.w, h: r.h, grey: !(skill.baseLevel > 0) });
       }
-      chrome.cel(ctx, act, CHROME_ART.close, 10, 571, 477);
+      // skilltree.go assigns a close x per class and open tab; do not flatten it
+      // to the right-hand button merely because that happens to fit one page.
+      const close = panelCloseLayout('skills', { playerClass: state.playerClass, tab });
+      const closeBlit = chrome.cel(ctx, act, PANEL_CLOSE_ART.path, PANEL_CLOSE_ART.frame, close.x - 1, close.y + 28);
       chrome.border(ctx, act, BORDER_RIGHT);
 
-      // The hovered skill's real name, from the retail string table. Drawn last so it sits over
-      // the icons, and clamped to the panel so a long name cannot run off the edge.
+      // The hovered skill's own retail text: SkillDesc's wStrName and wStrLong are .tbl indices the
+      // ENGINE carries (d2_session_class_skills), so the name and the description lines are retail's
+      // strings and not a sentence this client wrote (V19). The PLATE is ours -- retail's skill
+      // tooltip has no frame capture yet, which is V19's remaining gap -- so its art is not claimed
+      // here. A line whose index resolves to nothing is left out and reported (missing), never
+      // filled with invented text.
+      //
+      // The description's lines are drawn in REVERSE order of the string, which is how retail shows
+      // them: SkillDesc stores `str long` bottom-up, so Amazon skill 22 reads "enhances your arrows
+      // and bolts / to track your target / or seek one of its own / always hits" where the table has
+      // those four lines the other way round (checked on all 30 of a class's descriptions: every one
+      // is reversed, and the community's own text -- "Creates a magical arrow or bolt that does extra
+      // damage" for skill 6, whose table order is the opposite -- is the display order). The lines are
+      // drawn verbatim, not re-wrapped: retail's data already wrapped them.
+      //
+      // The mana line IS drawn, from the engine and from a RETAIL measurement. The
+      // engine decides both halves -- manaLine (SkillDesc's own line table carries a 1 somewhere:
+      // descline1..6 / dsc2line1..4 / dsc3line1..7, which is where retail draws "Mana Cost: ") and
+      // manaCost (SKILLS_GetManaCosts, the number the game spends, at the level the tooltip
+      // describes) -- and this file only formats it. The format is measured, not guessed: retail
+      // 1.13c's own tooltip frame (`retail/drawlists/skilltree-hover.bin`, decoded from its glyph
+      // draws) reads "Mana Cost: 2" for Bash and "Mana Cost: 12.5" for Whirlwind, both unlearned, so
+      // the 1/256-unit cost is printed with its truncated tenth. Those two cases are whole-or-half
+      // and exact; a LEARNED skill at level 2 or more reaches fractions a tenth cannot express
+      // (Prayer level 2 is 1.1875) and there the tenth is retail's display as the community
+      // transcribed it -- the Arreat Summit's per-level Prayer table reads 1.1 / 1.3 / 1.5 for
+      // 1.1875 / 1.375 / 1.5625 -- which is a cross-check, not a measurement (
+      // V19 names the frame that would settle it).
+      // The line goes LAST, after the description: retail draws the block in reverse table order and
+      // its mana line is descline1 in 162 of the 163 skills that have one (Fire Bolt's is dsc2line1,
+      // the one case where retail's order differs -- named in V19).
+      const plateLines = [];
+      const line = state.line || (() => '');
       let namePlate = null;
-      if (hovered && state.name) {
-        const label = state.name(hovered) || '';
-        if (label) {
-          const r = cellRect(hovered);
-          const w = font.measure(label) + 10;
-          const nx = Math.max(2, Math.min(SKILL_LAYOUT.width - w - 2, r.x + r.w / 2 - w / 2));
-          const ny = Math.max(2, r.y - font.lineHeight - 6);
-          ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.78)';
-          ctx.fillRect(nx, ny, w, font.lineHeight + 4); ctx.restore();
-          font.draw(ctx, label, nx + 5, ny + 2);
-          namePlate = { id: hovered.id, label, x: nx, y: ny };
+      if (hovered) {
+        const name = hovered.nameStr ? line(hovered.nameStr) : '';
+        if (name) plateLines.push({ kind: 'name', index: hovered.nameStr, text: name });
+        const desc = hovered.descStr ? String(line(hovered.descStr) || '') : '';
+        for (const l of desc.split('\n').filter((t) => t.length).reverse())
+          plateLines.push({ kind: 'desc', index: hovered.descStr, text: l });
+        // The mana line: SkillDesc's `str mana` template (the SAME index for passives and attacks --
+        // the table decides who gets a line, not this file) and the cost the engine hands over. A
+        // template that resolves to nothing leaves the line out, as every other unresolvable index is.
+        if (hovered.manaLine) {
+          const template = hovered.manaStr ? line(hovered.manaStr) : '';
+          if (template) plateLines.push({ kind: 'mana', index: hovered.manaStr, text: template + formatManaCost(hovered.manaCost), cost: hovered.manaCost });
         }
-      }
+        const shown = plateLines;
+        if (shown.length) {
+          const r = cellRect(hovered);
+          const w = Math.max(...shown.map((l) => font.measure(l.text))) + PLATE_PAD * 2;
+          const h = shown.length * font.lineHeight + PLATE_PAD * 2;
+          const nx = Math.max(2, Math.min(SKILL_LAYOUT.width - w - 2, r.x + r.w / 2 - w / 2));
+          const ny = Math.max(2, Math.min(SKILL_LAYOUT.height - h - 2, r.y - h - 6));
+          ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.78)';
+          ctx.fillRect(nx, ny, w, h); ctx.restore();
+          shown.forEach((l, i) => font.draw(ctx, l.text, nx + PLATE_PAD, ny + PLATE_PAD + i * font.lineHeight));
+          namePlate = { id: hovered.id, label: shown[0].text, x: nx, y: ny };
+          plate = { id: hovered.id, x: nx, y: ny, w, h, lines: shown,
+            manaStr: hovered.manaStr, manaTemplate: hovered.manaStr ? line(hovered.manaStr) : '',
+            manaLine: Boolean(hovered.manaLine), manaCost: hovered.manaCost };
+        } else plate = null;
+      } else plate = null;
       ctx.restore();
 
       // missingIcons is reported, not swallowed: an iconCel with no frame behind it is the exact
       // shape of the defect that drew a green block, and a count of drawn icons cannot see it.
-      return { x: o.x, y: o.y, scale: o.scale, tab, drawn, missingIcons, namePlate,
-        icons: icons.length, skillPoints: state.skillPoints ?? 0, total: (state.skills || []).length };
+      return { x: o.x, y: o.y, scale: o.scale, tab, drawn, plus, missingIcons, namePlate, plate, cels,
+        icons: icons.length, skillPoints: state.skillPoints ?? 0, total: (state.skills || []).length,
+        close: { ...close, path: PANEL_CLOSE_ART.path, frame: PANEL_CLOSE_ART.frame, blit: closeBlit } };
     },
   };
 }

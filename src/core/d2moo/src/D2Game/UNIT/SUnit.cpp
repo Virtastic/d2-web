@@ -12,6 +12,7 @@
 #include <D2States.h>
 #include <D2Monsters.h>
 #include <D2Items.h>
+#include <DataTbls/MissilesTbls.h>   // the missile's own sequence record (SUNIT_AllocUnitData, UNIT_MISSILE)
 #include <DataTbls/MonsterIds.h>
 #include <DataTbls/ObjectsIds.h>
 #include <DataTbls/LevelsIds.h>
@@ -550,6 +551,30 @@ D2UnitStrc* __fastcall SUNIT_AllocUnitData(int32_t nUnitType, int32_t nClassId, 
         pUnit->pObjectData = D2_CALLOC_STRC_POOL(pGame->pMemoryPool, D2ObjectDataStrc);
         pUnit->pObjectData->pObjectTxt = DATATBLS_GetObjectsTxtRecord(nClassId);
         pUnit->dwAnimMode = nMode;
+        // The object's sequence record -- its own Objects.txt FrameCnt/FrameDelta/Start for the mode
+        // it is in -- is derived here, the same three fields `UNITS_SetAnimStartFrame` (#10349) writes
+        // on a mode change. Without it an object that spawns in a mode nothing ever changes (a town
+        // bonfire `RB`, a dummy `N2`, a bank `b6`) carries `dwFrameCountPrecise` 0 and `wAnimSpeed` 0,
+        // so no per-frame pass can move its clock at all. Retail's own four consecutive town frames
+        // advance exactly those objects at exactly their own FrameDelta (`RB` 7,8,8,9 and `N2`
+        // 2,3,3,4 at 128, `b6` 0,0,0,0 at 256 with a one-frame sequence;
+        // the retail captures) and hold the one whose FrameDelta is 0 (`ss`), which is what
+        // `s351-object-animation` measures against.
+        //
+        // Deliberately NOT the whole of #10349: an object whose row has Sync 0 gets a jittered
+        // `wAnimSpeed` there, from `SEED_RollLimitedRandomNumber(&pUnit->pSeed, wFrameDelta / 8)`. That
+        // would consume a draw from the unit's own spawn seed, which other code then uses -- the
+        // desert shrine's id is the NEXT roll in `OBJECTS_SpawnShrine`, and a shrine's operate function
+        // rolls its own seed for its item count (`ObjMode.cpp` 1999/2072) -- so taking it here would
+        // move game state this band has no oracle for. The rate it gives up is at most
+        // `FrameDelta / 16 + FrameDelta / 8` of 256, a phase difference inside the band `s351` checks.
+        // What would settle it: a capture of an object's drawn rate at spawn against its FrameDelta.
+        if (pUnit->dwAnimMode < 8 && pUnit->pObjectData->pObjectTxt) {
+            const D2ObjectsTxt* pObjectsTxtRecord = pUnit->pObjectData->pObjectTxt;
+            pUnit->dwFrameCountPrecise = pObjectsTxtRecord->dwFrameCnt[pUnit->dwAnimMode];
+            pUnit->nSeqCurrentFramePrecise = (uint16_t)pObjectsTxtRecord->nStart[pUnit->dwAnimMode] << 8;
+            pUnit->wAnimSpeed = pObjectsTxtRecord->wFrameDelta[pUnit->dwAnimMode];
+        }
         UNITS_AllocStaticPath(pUnit);
         OBJECTS_InitHandler(pGame, pUnit, nUnitGUID, pRoom, nX, nY);
         break;
@@ -564,6 +589,24 @@ D2UnitStrc* __fastcall SUNIT_AllocUnitData(int32_t nUnitType, int32_t nClassId, 
     case UNIT_MISSILE:
     {
         pUnit->dwAnimMode = nMode;
+        // The missile's sequence record -- Missiles.txt's `wAnimRate` and `nAnimLen` for the mode it
+        // is in -- derived here, the same two fields `UNITS_SetAnimStartFrame` (#10349) writes for a
+        // missile on a mode change.  Without it a missile carries `dwFrameCountPrecise` 0 and
+        // `wAnimSpeed` 0, so the per-frame unit animation pass skips it (`dwFrameCountPrecise <= 0`)
+        // and its cel never advances: the client drew the first frame for the whole flight, or worse,
+        // a frame off its own shell tick.  Same defect, same function, one unit type over from the
+        // UNIT_OBJECT branch above, which the animation band fixed for objects (s351).
+        //
+        // Not `UNITS_SetAnimStartFrame` itself, deliberately: that function also rewrites
+        // `nSeqCurrentFramePrecise` from `UNITS_GetFrameBonus`, and a missile's clock is set from the
+        // spawn parameters under `missileParams->dwFlags & 0x200` (`MISSILES_Initialize`, called just
+        // below) -- taking the frame bonus here would overwrite that.  The two fields written are the
+        // ones #10349's own UNIT_MISSILE case writes, at the same rate.
+        if (const D2MissilesTxt* pMissilesTxtRecord = DATATBLS_GetMissilesTxtRecord(nClassId))
+        {
+            pUnit->wAnimSpeed = ((int16_t)pMissilesTxtRecord->wAnimRate << 8) / 1024;
+            pUnit->dwFrameCountPrecise = pMissilesTxtRecord->nAnimLen << 8;
+        }
         MISSILES_Initialize(pGame, pUnit, nUnitGUID);
         break;
     }

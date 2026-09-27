@@ -104,6 +104,21 @@ void __fastcall PLRINTRO_SetNpcIntroFlag(D2PlrIntroStrc* pPlayerIntro, int32_t n
     BITMANIP_SetBitState(pPlayerIntro->pNpcIntroFlags->pBuffer, 0);
 }
 
+// d2-web: the npcIndexMap walk both PLRINTRO_Get/SetNpcIntroFlag do before they fall back to bit 0.
+// Index 0 is the table's own {-1, 0} entry, so nIndex == 0 means "not an intro NPC".
+bool PLRINTRO_HasNpcIntro(int32_t nNpcId)
+{
+    for (int32_t i = 0; i < std::size(npcIndexMap); ++i)
+    {
+        if (npcIndexMap[i].nNpcClassId == nNpcId)
+        {
+            return npcIndexMap[i].nIndex != 0;
+        }
+    }
+
+    return false;
+}
+
 //D2Game.0x6FC7F100
 int32_t __fastcall PLRINTRO_GetNpcIntroFlag(D2PlrIntroStrc* pPlayerIntro, int32_t nNpcId)
 {

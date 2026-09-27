@@ -5,8 +5,10 @@
 // units that hang off the rooms exactly as the retail capture tool does (D2VecMonUnit from `room` on).
 #include <emscripten.h>
 #include <algorithm>
+#include <Drlg/D2DrlgActivate.h>
 #include <Drlg/D2DrlgDrlgRoom.h>
 #include <string>
+#include <strings.h>
 #include <vector>
 #include <unordered_map>
 #include <D2Common.h>
@@ -22,6 +24,8 @@
 #include <DataTbls/MonsterIds.h>
 #include <Drlg/D2DrlgDrlgLogic.h>
 #include <Drlg/D2DrlgPreset.h>
+#include <Drlg/D2DrlgRoomTile.h>
+#include <Drlg/D2DrlgDrlgWarp.h>
 #include <Drlg/D2DrlgOutRoom.h>
 #include <Drlg/D2DrlgDrlgGrid.h>
 #include <D2Seed.h>
@@ -49,6 +53,7 @@
 #include <AI/AiGeneral.h>
 #include <MONSTER/MonsterUnique.h>
 #include <UNIT/SUnit.h>
+#include <UNIT/SUnitMsg.h>
 #include <AI/AiUtil.h>
 #include <MONSTER/MonsterMode.h>
 #include <UNIT/SUnitDmg.h>
@@ -96,6 +101,12 @@ static D2ClientStrc* g_targetClient;
 // The character's name, as chosen on the creation screen. Retail's header refuses a name that does
 // not fit in 16 bytes including its terminator, so this buffer matches that limit exactly.
 static char g_sessionCharName[16] = "PLAYER";
+// The retail client save flags (D2ClientSaveFlags) the session is created with -- the character
+// creation screen's Expansion and Hardcore checkboxes. Retail's PLRSAVE2_WriteSaveHeader stores them
+// in the file's header word at 0x24 and PLRSAVE2_CheckPlayerFlags compares them against the game the
+// character joins, so the game's own mode has to agree with them or the file it writes cannot be
+// loaded back. Default: retail's own creation defaults, Expansion checked and Hardcore clear.
+static uint32_t g_sessionClientSaveFlags = CLIENTSAVEFLAG_EXPANSION;
 static std::vector<D2VecAiTargetUnit> g_targetUnits;
 static D2VecAiLevel g_targetOut;
 static std::vector<D2VecCombat> g_combatEvents;
@@ -144,6 +155,18 @@ struct D2SessionMonsterAnimation {
     uint16_t animSpeed;
     uint8_t direction, reserved;
 };
+// A missile's own presentation record: what the client needs to draw the Missiles.txt CelFile at the
+// frame and facing the ENGINE has it in, instead of a frame guessed from the shell's tick.  Retail's
+// client draws a missile from the same unit fields a monster's is drawn from -- nSeqCurrentFramePrecise
+// (advanced per game frame for every unit, see the tick below), dwFrameCountPrecise and
+// pDynamicPath->nDirection -- plus Missiles.txt's own CelFile and nTrans.
+struct D2SessionMissileAnimation {
+    uint32_t id, classId, mode, framePrecise, frameCountPrecise;
+    uint16_t animSpeed;
+    uint8_t direction;   // pDynamicPath->nDirection, 0..63 (the client resolves it to the DCC index)
+    uint8_t trans;       // Missiles.txt nTrans.  Reported, NOT applied: the client draws it opaque
+                         // until retail's mapping to a draw mode is captured (client-parity F20).
+};
 struct D2SessionObjectPresentation {
     uint32_t id, classId, token, mode;
     int32_t x, y;
@@ -183,6 +206,29 @@ struct D2SessionMotion {
     uint32_t pathPoints, currentPoint, framePrecise, frameCountPrecise;
     uint16_t animSpeed;
     uint8_t direction, moving;
+};
+// The player's position at the engine's own precision, for the one thing that must draw with it.
+// Retail stores a dynamic path's position as 16.16 subtiles (`D2FP32_16 tGameCoords`: wOffsetX is
+// the fraction, wPosX the whole subtile) and its client draws units with the same value, shifted
+// into screen pixels (`PATH_UpdateClientCoords`: dwClientCoordX = dwPrecisionX >> 11). The session's
+// other position fields -- x/y in D2SessionSnapshot, D2SessionMotion and D2SessionUnit, and
+// d2_session_player_x/y -- publish only `wPosX`, and the shell drew its camera from those, so every
+// drawn frame landed on a whole subtile: 16 px in x / 8 px in y at a time, and on a diagonal walk
+// the drawn screen x REVERSED between neighbouring cells (s490 measured 3 reversals in 18 frames of
+// a straight diagonal walk; retail's own captured path moves 5235.48292 -> 5238.45734 across
+// frames). Read-only: nothing in the engine moves differently because these are published.
+struct D2SessionCoords {
+    uint32_t version, size;
+    uint32_t preciseX, preciseY;   // tGameCoords.dwPrecisionX/Y, 16.16 subtiles
+};
+// The same 16.16 position for EVERY unit, one record per D2SessionUnit in the same order (carrying
+// the id, so a misalignment is a named failure and not a wrong sprite). Only a unit with a dynamic
+// path has one; (0,0) means "no precise position", which no real subtile is. See D2SessionCoords for
+// why: drawn from `wPosX` alone, a walking monster holds still for several frames and then jumps a
+// whole subtile -- 16 px in x / 8 px in y, and on a diagonal an x-step and a y-step alternately,
+// which swings it +16 px and -16 px in screen x (s491).
+struct D2SessionUnitCoord {
+    uint32_t id, preciseX, preciseY;
 };
 struct D2SessionAttack {
     uint32_t version, size, gameFrame, state;
@@ -318,6 +364,7 @@ static_assert(sizeof(D2SessionSnapshot) == 68);
 static_assert(sizeof(D2SessionRoom) == 36);
 static_assert(sizeof(D2SessionUnit) == 44);
 static_assert(sizeof(D2SessionMonsterAnimation) == 92);
+static_assert(sizeof(D2SessionMissileAnimation) == 24);
 static_assert(sizeof(D2SessionObjectPresentation) == 40);
 static_assert(sizeof(D2SessionItemPresentation) == 112);
 static_assert(sizeof(D2SessionItemState) == 40);
@@ -348,6 +395,8 @@ static_assert(sizeof(D2SessionWarp) == 68);
 static D2SessionSnapshot g_sessionSnapshot;
 static D2SessionResources g_sessionResources;
 static D2SessionMotion g_sessionMotion;
+static D2SessionCoords g_sessionCoords;
+static std::vector<D2SessionUnitCoord> g_sessionUnitCoords;
 static D2SessionAttack g_sessionAttack;
 static D2SessionProgress g_sessionProgress;
 static D2SessionAdvancement g_sessionAdvancement;
@@ -388,6 +437,7 @@ static uint32_t g_sessionKills;
 static std::vector<D2SessionRoom> g_sessionRooms;
 static std::vector<D2SessionUnit> g_sessionUnits;
 static std::vector<D2SessionMonsterAnimation> g_sessionMonsterAnimations;
+static std::vector<D2SessionMissileAnimation> g_sessionMissileAnimations;
 static std::vector<D2SessionObjectPresentation> g_sessionObjectPresentations;
 static std::vector<D2SessionItemPresentation> g_sessionItemPresentations;
 // The shop's stock as PRESENTATION records, parallel to the existing vendor list rather than bolted
@@ -422,12 +472,74 @@ static int32_t sessionWarpTileDestination(const D2DrlgRoomStrc* room, int32_t wa
             return t->pDrlgRoom->pLevel->nLevelId;
     return -1;
 }
+// F52. An exit's POSITION is generation-time DRLG data -- the room's own DS1 -- not activation output:
+// the built path below reads it out of the room's tile data (tile->unk0x0C/unk0x10, filled by
+// DRLGROOMTILE_LoadWallWarpTiles while the room's tiles are laid out), so a room the activation wave
+// has not built yet had no answer and the slot fell through to ANOTHER room's exit to the same level
+// (Harem Level 1's warp to 51 read its sibling's (10042,5082) instead of its own (10041,5017)).
+//
+// This walks the room's own DS1 the way the wall pass of DRLGROOMTILE_LoadInitRoomTiles does -- the
+// same window (nTileWidth/nTileHeight plus the unnarrowed edge, unless dwKillEdge kills it), the same
+// cells (`pWallLayer`/`pTileTypeLayer` at the room's offset inside the map, row stride mapWidth+1, the
+// exact array DRLGGRID_FillNewCellFlags exposes), the same test (a WALL_LEFT/RIGHT_EXIT that is
+// bHidden with nTileStyle < 8) and the same LvlWarp record lookup by direction -- and returns the
+// point DRLGROOMTILE_AddWarp records as that warp's UNIT_TILE preset: the cell times five, plus the
+// record's own offsets.
+//
+// The caller asks it ONLY for a link node that carries no tile data (F54). Whether or not the room is
+// built says nothing about that: every exit of Lut Gholein is a blank node in a fully built town (6 of
+// 6 rooms built, node dataKind 0, `s421`), where the room-centre fallback below used to answer and read
+// 11, 19 and 27 subtiles from the position DRLGROOMTILE_AddWarp recorded for the same warp on the same
+// room. A node that DOES carry data keeps the reading above it -- that node and its data are the wall
+// pass's own output, the same record this derivation reproduces from the room's DS1.
+static bool sessionWarpPointFromDs1(const D2DrlgRoomStrc* room, int32_t warpId, int32_t* outX, int32_t* outY) {
+    if (!room || room->nType != DRLGTYPE_PRESET || !room->pMaze || !room->pMaze->pMap || !room->pLevel) return false;
+    const D2DrlgMapStrc* map = room->pMaze->pMap;
+    const D2DrlgFileStrc* file = map->pFile;
+    if (!file || !file->pWallLayer[0] || !file->pTileTypeLayer[0]) return false;
+    bool killEdgeX = false, killEdgeY = false;
+    if (map->pLvlPrestTxtRecord && map->pLvlPrestTxtRecord->dwKillEdge) {
+        killEdgeX = room->nTileXPos + room->nTileWidth == map->pDrlgCoord.nPosX + map->pDrlgCoord.nWidth;
+        killEdgeY = room->nTileYPos + room->nTileHeight == map->pDrlgCoord.nPosY + map->pDrlgCoord.nHeight;
+    }
+    const int countX = room->nTileWidth + (killEdgeX ? 0 : 1);
+    const int countY = room->nTileHeight + (killEdgeY ? 0 : 1);
+    const int stride = map->pDrlgCoord.nWidth + 1;
+    const int baseX = room->nTileXPos - map->pDrlgCoord.nPosX;
+    const int baseY = room->nTileYPos - map->pDrlgCoord.nPosY;
+    for (int layer = 0; layer < file->nWallLayers; ++layer) {
+        const int* wall = (const int*)file->pWallLayer[layer];
+        const int* type = (const int*)file->pTileTypeLayer[layer];
+        if (!wall || !type) continue;
+        for (int oy = 0; oy < countY; ++oy) for (int ox = 0; ox < countX; ++ox) {
+            const int cell = (baseY + oy) * stride + baseX + ox;
+            const int nTileType = type[cell];
+            if (nTileType != TILETYPE_WALL_LEFT_EXIT && nTileType != TILETYPE_WALL_RIGHT_EXIT) continue;
+            const D2C_PackedTileInformation info{ (uint32_t)wall[cell] };
+            if (!info.bHidden || info.nTileStyle >= 8) continue;
+            if (DRLGWARP_GetWarpDestinationFromArray(room->pLevel, (uint8_t)info.nTileStyle) != warpId) continue;
+            const D2LvlWarpTxt* rec = DRLGWARP_GetLvlWarpTxtRecordFromWarpIdAndDirection(room->pLevel, (uint8_t)info.nTileStyle,
+                nTileType == TILETYPE_WALL_RIGHT_EXIT ? 'r' : 'l');
+            if (!rec) continue;
+            int px = ox, py = oy;
+            DUNGEON_GameTileToSubtileCoords(&px, &py);
+            *outX = 5 * room->nTileXPos + px + (int32_t)rec->dwOffsetX;
+            *outY = 5 * room->nTileYPos + py + (int32_t)rec->dwOffsetY;
+            return true;
+        }
+    }
+    return false;
+}
 static std::vector<D2SessionWarpPreset> g_sessionWarpPresets;
 static uint32_t g_sessionWorldHash;
 static uint32_t g_sessionTerrainHash;
 static uint32_t g_sessionNavigationHash;
 static int32_t g_sessionTargetX, g_sessionTargetY;
 static bool g_sessionLive, g_sessionMovePending;
+// D2Client's run/walk toggle (see the exports near d2_session_command_move for why it lives here and
+// not on the unit): the client owns it, and it is what decides which of retail's two move packets a
+// command sends. Off is retail's default for a new game.
+static bool g_sessionRunToggle = false;
 
 extern "C" void D2WEB_ResetLastDialogPacket();
 extern "C" int D2WEB_CopyLastDialogPacket(D2GSPacketSrv27* pPacket);
@@ -589,8 +701,89 @@ static void syncSessionLevelFromPlayer() {
 // d2_session_retail_level_change(0) restores the list order for a before/after run.
 static int g_sessionRetailLevelChange = 1;
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_session_retail_level_change(int on) { g_sessionRetailLevelChange = on; }
+// retail's client activates a level FROM THE PLAYER'S ROOM and follows the player
+// -- DUNGEON_SetClientIsInSight / DUNGEON_ChangeClientRoom propagate DRLGACTIVATE status outward
+// (the room the player is in CLIENT_IN_ROOM, its near ring CLIENT_IN_SIGHT and built at once, the
+// ring beyond it CLIENT_OUT_OF_SIGHT and built one at a time by DRLGACTIVATE_Update), and rooms left
+// behind lose their status and are freed. The session built EVERY room of a new level up front, which
+// retail never does: a room's shared-edge cells merge into a live neighbour and its InitRoomGrids
+// reseed reads dwInitSeed, so a level built whole is the right tiles for a history no player has.
+// `d2_session_activation_wave(1)` turns that on (and 0 restores the eager build), so a run measures
+// the two against each other; the census is d2_session_room_stats and s59 does the A/B.
+//
+// It was 0 until it was fixed because a level entered by the wave read its exits' coordinates WRONG
+// -- the warp list took them from a room's activated tile data, so an unbuilt exit room answered with
+// another room's exit to the same level (on Harem Level 1 the warp to 51 read (10042,5082) instead of
+// (10041,5017)) and s000b's walk to the Sewers stairs stalled 300 rounds, its first failing step
+// moving 19 -> 12. F52 fixed that (an exit's position is generation-time DRLG data:
+// sessionWarpPointFromDs1, and the level's room links built up front).
+//
+// DEFAULT 1. The flip waited on s88-session-act-routes, which the wave broke on act I's
+// route at "27 -> 28 via seam" (command_seam(28) returned 0, the player left at (15002,4941) still in
+// level 27). The gap was in that command's own walk, not in the wave: `d2_session_command_seam`
+// builds the two rooms a crossing needs, and a room built that way has its TILES and nothing else --
+// its preset units (the door at the seam among them) and the objects it holds spawn on the frame
+// that follows, which is also how the wave builds a room (DRLGACTIVATE_RoomEx_EnsureHasRoom, then the
+// pending-rooms pass on the next frame). The search read the room before that frame, saw no door,
+// stood ON the seam column, and its walk across was refused with no path (MOVE_NO_PATH), candidate
+// after candidate. The eager build had every room populated long before, so it stood two subtiles
+// back, opened the door as a player does and crossed. The command now runs that one frame for a room
+// it built (`if (builtHere || builtDest) d2_session_tick(1)`), and s420-probe-seam-seamwalk measures
+// the result on ONE engine: with the wave on, act I's route to level 27 and the seam walk into 28
+// both cross, at the same subtile as the eager build, with level 27 at 8 of its 35 rooms built where
+// the eager build has 35 -- and s88-session-act-routes passes all six acts' routes with the switch
+// compiled at 1. `d2_session_activation_wave(0)` still restores the eager build for an A/B, which is
+// what s59, s997 and s420 do.
+static int g_sessionActivationWave = 1;
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_session_activation_wave(int on) { g_sessionActivationWave = on ? 1 : 0; }
+// Anchor class for the player fixture: any monster (0xFFFFFFFF) or a specific class, so a
+// session can be created beside one town NPC the way the retail capture's fixture is.
+static uint32_t g_sessionAnchorClass = 0xFFFFFFFF;
+// F64: `d2_monspawn_level` is BOTH the retail-vector fixture and the path a session is created
+// through (`d2_session_create_for_class`), and the two want opposite things from it.
+//
+// A fixture that REPLAYS retail's own client sight stream (`d2_session_sight_point`) must not have
+// the level built for it: the replay IS the comparison, and a create that walks the level's room
+// list marks rooms retail had not reached yet, so the replay's calls land on rooms that already
+// exist and measure nothing (s247). d2_session_create_stream(1) is that fixture's switch, and it is
+// OPT-IN.
+//
+// Every other fixture reads the level it was created IN, right after the create and without walking
+// it: an object's presentation (the five seals, the Compelling Orb, an orifice, a journal, a
+// portal), a room's tiles in the draw list, the room-seed roll behind an item, the world hash of an
+// act. `d2_session_create` is a fixture, not a retail path -- retail's client reaches a wilderness
+// level through the WARP path, which F53 has driven by the activation wave since then -- so
+// the eager build stays the default and the streaming create is the exception. Measured on the
+// merged branch (an earlier change, D2_WORKERS=1, the create's own room count against the level's built
+// whole): Cold Plains 16, Andariel's Lair 4, the Chaos Sanctuary 28 of 225, Travincal 9 of 64. With
+// that cutoff the merge's sweep had 35 rows red besides this branch's own s247, every one a row
+// that reads the level it was created in; the per-frame wave replaces the missing rooms at about a
+// room every five frames, far slower than the 8 ticks a draw-list row runs.
+//
+// Set only by `d2_session_create_stream`, so s240-s242 and s05-s08 call `d2_monspawn_level`
+// directly and build exactly what they always did.
+static int g_monspawnSessionCreate = 0;
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_session_create_stream(int on) { g_monspawnSessionCreate = on ? 1 : 0; }
 static void activateSessionLevelRooms(D2DrlgActStrc* act, D2DrlgLevelStrc* level, int levelId) {
     if (!act || !level) return;
+    if (g_sessionActivationWave && g_targetPlayer && g_targetPlayer->pDynamicPath) {
+        // F52: a room's warp LINKS are generation-time DRLG data. sub_6FD77BB0 builds them from room
+        // geometry, the level's own Vis/Warp arrays and the destination rooms' flags -- no tile grid is
+        // read -- and retail has them for the whole level as soon as it is generated. The wave used to
+        // leave them to DRLGACTIVATE, so a room the player had not reached had no links, its exits were
+        // invisible to the session's warp list, and a slot fell through to another room's exit to the
+        // same level. Build them here, before the wave starts, so entering by the wave reads the same
+        // exits as entering eagerly; the wave still decides which rooms get their TILES (the guard
+        // keeps a later DRLGACTIVATE from rebuilding a list and duplicating its link nodes).
+        for (D2DrlgRoomStrc* roomEx = level->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext)
+            if (!roomEx->nRoomsNear) sub_6FD77BB0(level->pDrlg->pMempool, roomEx);
+        // The one activation retail's client makes for a landing: the player's own room, whose status
+        // propagation builds the near ring and marks the rest. Everything further waits for the wave.
+        const D2DynamicPathStrc* path = g_targetPlayer->pDynamicPath;
+        D2ActiveRoomStrc* here = UNITS_GetRoom(g_targetPlayer);
+        DUNGEON_SetClientIsInSight(act, levelId, path->tGameCoords.wPosX / 5, path->tGameCoords.wPosY / 5, here);
+        return;
+    }
     std::vector<D2DrlgRoomStrc*> order;
     D2ActiveRoomStrc* here = g_targetPlayer ? UNITS_GetRoom(g_targetPlayer) : nullptr;
     if (g_sessionRetailLevelChange && here && here->pDrlgRoom && here->pDrlgRoom->pLevel == level) {
@@ -620,7 +813,7 @@ static int g_worldHold = 0; static bool g_worldHoldBuilt = false;
 static void updateSessionWorld() {
     if (g_worldHold && g_worldHoldBuilt) return;
     if (g_worldHold) g_worldHoldBuilt = true;
-    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionWarps.clear();
+    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionWarps.clear(); g_sessionMissileAnimations.clear();
     g_sessionWorldHash = D2VEC_FNV_INIT;
     g_sessionNavigationHash = D2VEC_FNV_INIT;
     // The tile lists are built from this world only when a tile export asks (ensureSessionTiles):
@@ -666,7 +859,24 @@ static void updateSessionWorld() {
             actor.hp = STATLIST_UnitGetStatValue(unit, STAT_HITPOINTS, 0);
             actor.maxHp = STATLIST_UnitGetStatValue(unit, STAT_MAXHP, 0);
             actor.room = roomOrdinal; g_sessionUnits.push_back(actor); ++out.unitCount;
+            {   // The 16.16 position of the same unit, in the same order (0,0 with no dynamic path).
+                D2SessionUnitCoord coord = {};
+                coord.id = (uint32_t)unit->dwUnitId;
+                const bool dynamic = (unit->dwUnitType == UNIT_PLAYER || unit->dwUnitType == UNIT_MONSTER || unit->dwUnitType == UNIT_MISSILE) && unit->pDynamicPath;
+                if (dynamic) { coord.preciseX = unit->pDynamicPath->tGameCoords.dwPrecisionX; coord.preciseY = unit->pDynamicPath->tGameCoords.dwPrecisionY; }
+                g_sessionUnitCoords.push_back(coord);
+            }
             if (unit->dwUnitType == UNIT_ITEM) appendSessionItemPresentation(unit);
+            if (unit->dwUnitType == UNIT_MISSILE) {
+                D2SessionMissileAnimation missile = {};
+                missile.id = (uint32_t)unit->dwUnitId; missile.classId = unit->dwClassId; missile.mode = unit->dwAnimMode;
+                missile.framePrecise = unit->nSeqCurrentFramePrecise; missile.frameCountPrecise = unit->dwFrameCountPrecise;
+                missile.animSpeed = unit->wAnimSpeed;
+                missile.direction = unit->pDynamicPath ? unit->pDynamicPath->nDirection : 0;
+                const D2MissilesTxt* txt = DATATBLS_GetMissilesTxtRecord(unit->dwClassId);
+                missile.trans = txt ? txt->nTrans : 0;
+                g_sessionMissileAnimations.push_back(missile);
+            }
             if (unit->dwUnitType == UNIT_MONSTER && unit->pMonsterData) {
                 D2SessionMonsterAnimation animation = {};
                 animation.id = unit->dwUnitId; animation.classId = unit->dwClassId;
@@ -725,6 +935,13 @@ static void updateSessionWorld() {
                 if (data && tile->pLvlWarpTxtRecord) {
                     out.exitX = 5 * (room->nTileXPos + data->nPosX) + (int32_t)tile->pLvlWarpTxtRecord->dwOffsetX;
                     out.exitY = 5 * (room->nTileYPos + data->nPosY) + (int32_t)tile->pLvlWarpTxtRecord->dwOffsetY;
+                } else if (sessionWarpPointFromDs1(room, warpId, &out.exitX, &out.exitY)) {
+                    // F54: the node carries no tile data, so the point is the room's own DS1 geometry
+                    // (F52's derivation), whether or not the room is built -- a built room with a blank
+                    // link is not a room with an answer. Lut Gholein's three exits all read here, 11, 19
+                    // and 27 subtiles from the position DRLGROOMTILE_AddWarp recorded (s421), which is
+                    // what the room-centre fallback below was guessing at. The collision nudge at the end
+                    // of this block still needs a room and applies whenever there is one.
                 } else {
                     const D2DrlgRoomStrc* linked = tile->pDrlgRoom;
                     const int32_t roomCenterX = room->nTileXPos + room->nTileWidth / 2;
@@ -894,8 +1111,13 @@ static void detachTargetFixture() {
 // GAME_CreateGame minus the server (game slots, clients, tasks, critical sections): the fields the
 // item/monster/object code reads, in the order retail fills them.
 static D2GameStrc* makeGame(uint32_t seed, int difficulty) {
+    // The game's mode is the character's: a classic character plays in a classic game. Retail's own
+    // PLRSAVE2_CheckPlayerFlags refuses a mismatch in either direction, so the header this session
+    // writes (dwSaveFlags) and the game the character is in have to be the same answer.
+    const bool bExpansion = (g_sessionClientSaveFlags & CLIENTSAVEFLAG_EXPANSION) != 0;
+    const bool bHardcore = (g_sessionClientSaveFlags & CLIENTSAVEFLAG_HARDCORE) != 0;
     D2GameStrc* g = (D2GameStrc*)calloc(1, sizeof(D2GameStrc));
-    g->bExpansion = TRUE;
+    g->bExpansion = bExpansion ? TRUE : FALSE;
     g->wItemFormat = 101;
     g->dwGameType = 0;
     g->nDifficulty = (uint8_t)difficulty;
@@ -905,7 +1127,8 @@ static D2GameStrc* makeGame(uint32_t seed, int difficulty) {
     SEED_InitSeed(&g->pGameSeed);
     SEED_InitLowSeed(&g->pGameSeed, seed);
     EVENT_AllocEventQueue(g);
-    ARENA_AllocArena(g, 0, ((uint32_t)difficulty << 12) | 0x04 | 0x100000, 0);
+    ARENA_AllocArena(g, 0, ((uint32_t)difficulty << 12) | 0x04
+        | (bExpansion ? GAMEFLAG_ARENA_EXPANSION : 0u) | (bHardcore ? GAMEFLAG_ARENA_HARDCORE : 0u), 0);
     PARTY_AllocPartyControl(g);
     sub_6FC68110(g);                                  // monster regions from the game seed
     g->dwObjSeed = OBJRGN_AllocObjectControl(g);
@@ -931,6 +1154,14 @@ EMSCRIPTEN_KEEPALIVE void d2_monspawn_reset() {
     detachTargetFixture(); g_gameSeed = ~0u; g_gameDiff = -1; g_lastLevel = nullptr;
     g_currentAct = g_currentLevel = -1; g_combatEvents.clear();
     memset(&g_combatResult, 0, sizeof g_combatResult);
+    // The creation and population logs are "what happened in THIS session", not "what has happened on
+    // this page": `d2_session_room_create_log` is documented as every room created, and a scenario that
+    // creates several levels in a row was reading the sum of all of them. s247 measured 12 / 24 / 85 /
+    // 96 rooms for the SAME level across its four fixtures, each asking the engine for the identical
+    // thing, and called that "our session creates every room of the level up front" -- the number was
+    // four fixtures' rooms, and the level's whole grid is 48. d2_session_destroy calls this too, so a
+    // released session's log is empty and a new one starts at zero.
+    { extern int32_t g_d2CreateCount; extern int32_t g_d2SeqCount; g_d2CreateCount = 0; g_d2SeqCount = 0; }
 }
 
 // Loads (seed, difficulty) once; returns the game's act for `act` (0-based), loading it like
@@ -1002,13 +1233,36 @@ EMSCRIPTEN_KEEPALIVE int d2_monspawn_level(uint32_t seed, int difficulty, int ac
                 if (it->first->nTileXPos * 5 == g_monsSeq[k + 2] && it->first->nTileYPos * 5 == g_monsSeq[k + 3]) { first.push_back(*it); order.erase(it); break; }
         first.insert(first.end(), order.begin(), order.end()); order.swap(first);
     }
+    // F64: a SESSION's create stops here. Retail's client activates a room when the player's sight
+    // wave reaches it and the per-frame DRLGACTIVATE_Update builds the rest (F53), so a create that
+    // walks the level's own room list and calls `DUNGEON_SetClientIsInSight` on every room of it
+    // builds the level in an order no player ever had. What a create still builds is the fixture's
+    // LANDING -- the rooms from the room-list head down to the first one holding a monster the
+    // anchor search can stand the player beside, which is where `d2_aitarget_attach` puts it either
+    // way -- and nothing after that; the wave owns the rest. The retail-vector fixtures never set
+    // `g_monspawnSessionCreate`, and `d2_session_activation_wave(0)` restores the eager build.
+    //
+    // A TOWN is the one level retail builds whole: the capture's own draw-hook frames show all of
+    // the Kurast Docks up before the walk moved, where the Spider Forest's rooms stream in five rows
+    // as the wave reaches them. A town is also where a session's NPCs,
+    // exits and vendors live, and every fixture that reads one right after the create does so; so
+    // the wave owns the wilderness and the town is built as it always was.
+    const bool town = (int)levelId == DUNGEON_GetTownLevelIdFromActNo(act);
+    const bool sessionWave = g_monspawnSessionCreate && g_sessionActivationWave && !town;
+    bool sessionLanding = !sessionWave;
     for (auto [pRoomEx, roomIdx] : order) {
         if (!g_monsSeq.empty()) runCreatesUntil(pRoomEx);
+        // The warp list is collected for EVERY room of the level, built or not: an exit's point is
+        // generation-time DRLG data (F52, `sessionWarpPointFromDs1`), not something the room's tile
+        // grid answers, and a room the wave has not reached still has to be a destination. Skipping
+        // this for the rooms past the landing left the session with NO exits at all (s88's act III
+        // route read an empty warp list and could not cross the seam).
         for (D2PresetUnitStrc* preset = pRoomEx->pPresetUnits; preset; preset = preset->pNext) if (preset->nUnitType == UNIT_TILE) {
             g_sessionWarpPresets.push_back({ roomIdx, preset->nIndex,
                 pRoomEx->nTileXPos * 5 + preset->nXpos, pRoomEx->nTileYPos * 5 + preset->nYpos, sessionWarpTileDestination(pRoomEx, preset->nIndex) });
         }
-        if (!pRoomEx->pRoom) DUNGEON_SetClientIsInSight(pAct, levelId, pRoomEx->nTileXPos, pRoomEx->nTileYPos, nullptr);
+        if (!pRoomEx->pRoom && !(sessionWave && sessionLanding))
+            DUNGEON_SetClientIsInSight(pAct, levelId, pRoomEx->nTileXPos, pRoomEx->nTileYPos, nullptr);
         D2ActiveRoomStrc* pRoom = pRoomEx->pRoom;
         if (!pRoom) continue;
         for (D2UnitStrc* tile = pRoom->pUnitFirst; tile; tile = tile->pRoomNext) if (tile->dwUnitType == UNIT_TILE && tile->pStaticPath) {
@@ -1023,6 +1277,18 @@ EMSCRIPTEN_KEEPALIVE int d2_monspawn_level(uint32_t seed, int difficulty, int ac
         if (levelId == d2_trace_level) fprintf(stderr, "[room] %u [%d,%d] gameseed %u/%u objseed %u/%u roomseed %u\n", roomIdx, pRoom->tCoords.nSubtileX, pRoom->tCoords.nSubtileY, g_game->pGameSeed.nLowSeed, g_game->pGameSeed.nHighSeed, g_game->pObjectControl->pSeed.nLowSeed, g_game->pObjectControl->pSeed.nHighSeed, pRoom->pSeed.nLowSeed);
 #endif
         sub_6FC385A0(g_game, pRoom);   // D2Game 1.13c 0x6FC4CB80 room activation (compat/game_glue.cpp)
+        // The landing: the first room of the room-list order whose population put a monster in it
+        // is the one `d2_aitarget_attach` will stand the fixture's player in. This is the room
+        // reach of a create; every later room is the activation wave's to build (F64).
+        //
+        // The predicate has to be the SEARCH's own condition, not "a monster of any class": the
+        // attach walks the same list for a room no client holds and a monster it accepts
+        // (`g_sessionAnchorClass`, set by `d2_session_create_raw_near`), so a landing that stopped
+        // one room early on a class the caller did not ask for cuts the level before the room the
+        // anchor is in and the attach then finds nothing at all (Codex review).
+        if (sessionWave && !sessionLanding && !pRoom->nNumClients)
+            for (D2UnitStrc* u = pRoom->pUnitFirst; u; u = u->pRoomNext)
+                if (u->dwUnitType == UNIT_MONSTER && (g_sessionAnchorClass == 0xFFFFFFFF || (uint32_t)u->dwClassId == g_sessionAnchorClass)) { sessionLanding = true; break; }
         { D2VecMonUnit m = {}; m.seed = seed; m.difficulty = (uint8_t)difficulty; m.act = (uint8_t)act; m.level = (uint16_t)levelId; m.room = roomIdx; m.unitType = 255;   // diagnosis: room seed after activation, not hashed
           m.seedLo = pRoom->pSeed.nLowSeed; m.seedHi = pRoom->pSeed.nHighSeed; m.x = (uint16_t)pRoom->tCoords.nSubtileX; m.y = (uint16_t)pRoom->tCoords.nSubtileY; g_units.push_back(m); }
         uint16_t monOrdinal = 0;
@@ -1058,9 +1324,6 @@ EMSCRIPTEN_KEEPALIVE const D2VecMonUnit* d2_monspawn_units(int* count) { *count 
 EMSCRIPTEN_KEEPALIVE const char* d2_monspawn_err() { return g_err.c_str(); }
 EMSCRIPTEN_KEEPALIVE const D2VecAiLevel* d2_aispawn_out() { return &g_aiOut; }
 EMSCRIPTEN_KEEPALIVE const D2VecAiUnit* d2_aispawn_units(int* count) { *count = (int)g_aiUnits.size(); return g_aiUnits.data(); }
-// Anchor class for the player fixture: any monster (0xFFFFFFFF) or a specific class, so a
-// session can be created beside one town NPC the way the retail capture's fixture is.
-static uint32_t g_sessionAnchorClass = 0xFFFFFFFF;
 // Place the session player at a standable subtile of `room` and wire up its client. Split out of
 // d2_aitarget_attach so a level with no monster at all can still be entered: the anchor search
 // below is what the AI oracle rows need, not what a player needs.
@@ -1078,6 +1341,16 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
     // The save header reads the character's identity from the client, not the unit: without
     // a name it refuses to write at all, and the class it stores is this field.
     g_targetClient->nClassId = (uint8_t)g_sessionPlayerClass;
+    // The save flags are the CLIENT's, not the game's: PLRSAVE2_WriteSaveHeader writes
+    // CLIENTS_GetFlags(pClient) into the header word at 0x24, which is where the creation screen's
+    // Expansion/Hardcore checkboxes end up in the .d2s.
+    //
+    // This also carries the correction C3p needed, and it is why the bit must not be left zero: the
+    // game is created FROM these flags, so `g_game->bExpansion` is derived from them and the two
+    // cannot disagree -- but an expansion character counted classic acts per difficulty (4, not 5)
+    // while the flags were zero, so a Baal kill one difficulty up saved progression 9 instead of 10
+    // and refused the character its own Hell game.
+    CLIENTS_SetFlags(g_targetClient, (int32_t)g_sessionClientSaveFlags);
     memset(g_targetClient->szName, 0, sizeof g_targetClient->szName);
     memcpy(g_targetClient->szName, g_sessionCharName, sizeof g_targetClient->szName - 1);
     // Deterministic by design: a wall-clock creation stamp would make every saved file
@@ -1560,6 +1833,8 @@ static int d2_session_create_for_class(uint32_t seed, int difficulty, int act, i
     if (difficulty < 0 || difficulty > 2 || act < 0 || act > 4 || levelId < 0 || playerClass < 0 || playerClass >= 7) return 0;
     g_sessionPlayerClass = playerClass;
     d2_monspawn_reset(); g_sessionLive = false; g_sessionMovePending = false;
+    // A new game's client starts with the run toggle off (retail's own default).
+    g_sessionRunToggle = false;
     memset(&g_sessionAttack, 0, sizeof g_sessionAttack); memset(&g_sessionProgress, 0, sizeof g_sessionProgress);
     memset(&g_sessionAdvancement, 0, sizeof g_sessionAdvancement); g_sessionAdvancementSkillId = SKILL_MAGICARROW;
     memset(&g_sessionItemState, 0, sizeof g_sessionItemState);
@@ -1581,7 +1856,11 @@ static int d2_session_create_for_class(uint32_t seed, int difficulty, int act, i
     g_sessionAttackSkill = nullptr; g_sessionAttackCount = 0; g_sessionAttackEndFrame = 0;
     g_sessionAttackResolved = false; g_sessionTargetKillCounted = false; g_sessionKills = 0;
     g_deadRegenCount = 0; g_deadRegenLog.clear(); g_busyStreak = g_busyStartFrame = g_busyLongest = 0; g_busyLog.clear();
-    if (!d2_monspawn_init() || !d2_monspawn_level(seed, difficulty, act, levelId) || !d2_aitarget_attach()) {
+    // F64: with `d2_session_create_stream(1)` the level is not built whole -- `d2_monspawn_level`
+    // stops at the landing room and the activation wave builds the rest (F53); without it the create
+    // builds the level the fixture is about to read. See `g_monspawnSessionCreate` above.
+    const int levelOk = d2_monspawn_init() && d2_monspawn_level(seed, difficulty, act, levelId);
+    if (!levelOk || !d2_aitarget_attach()) {
         updateSessionSnapshot(); return 0;
     }
     // Retail's new character takes its starting stats from D2Game's own routine (0x6FC7EA50,
@@ -1600,29 +1879,46 @@ EMSCRIPTEN_KEEPALIVE int d2_session_create(uint32_t seed, int difficulty, int ac
     return d2_session_create_for_class(seed, difficulty, act, levelId, 0);
 }
 
+// Where a player stands on entering its own act's town. Retail has ONE rule for this: D2Game
+// sub_6FC31EF0 (D2MOO Clients.cpp) places a joining player at DUNGEON_FindActSpawnLocationEx(act, the
+// act's town, tile 0), whether the character is brand new or loaded from a save. Our session create
+// is a fixture and placed the player "beside the first monster" of the landing room instead.
+//
+// Measured against retail's own draw lists for every act whose town has one (the vector's floor
+// anchors give the camera, and the camera IS the player's precise position, a subtile's centre --
+// "Units"): Rogue Encampment (4393,4548) for retail's (4393.5,4548.5), Lut Gholein
+// (5153,5203) for (5153.5,5203.5), Kurast Docks (5118,5168) for (5118.5,5168.5), Harrogath (5098,5023)
+// for (5098.5,5023.5). Before this, the saved-character path was exact and the new-character path was
+// 101, 27, 18 and 105 subtiles off respectively -- and Harrogath's was exactly the (5073,5125) beside
+// Nihlathak that client-parity F29 recorded. s580 asserts all four, both paths.
+//
+// Narrow on purpose: only the act's OWN TOWN level. A fixture created in a wilderness level keeps the
+// capture's placement, which the vector rows (s05-s08, s420-s429, s997 and the monspawn hashes) replay.
+EMSCRIPTEN_KEEPALIVE int d2_session_fixture_place_player(int32_t x, int32_t y);
+static void placeSessionPlayerAtTownSpawn(int act, int levelId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return;
+    if (act < 0 || act >= 5 || !g_game->pAct[act]) return;
+    if (levelId != DUNGEON_GetTownLevelIdFromActNo(act)) return;
+    int x = 0, y = 0;
+    if (DUNGEON_FindActSpawnLocationEx(g_game->pAct[act], levelId, 0, &x, &y, UNITS_GetUnitSizeX(g_targetPlayer)))
+        d2_session_fixture_place_player(x, y);
+}
+
 EMSCRIPTEN_KEEPALIVE int d2_session_create_class(uint32_t seed, int difficulty, int act, int levelId, int playerClass) {
     g_sessionSeedPlayer = true;
     const int ok = d2_session_create_for_class(seed, difficulty, act, levelId, playerClass);
     g_sessionSeedPlayer = false;
+    if (ok) placeSessionPlayerAtTownSpawn(act, levelId);   // a NEW character enters its town at retail's spot too
     return ok;
 }
 // The player a saved file is applied to: no CharStats start kit. Retail creates start items only
 // for a newbie save (PLRSAVE2_ReadSaveHeader -> PLRSAVE2ERROR_NEWBIE_SAVE); a saved character
 // brings its own items, and a kit created first would sit on top of them (belt slots, body slots).
-EMSCRIPTEN_KEEPALIVE int d2_session_fixture_place_player(int32_t x, int32_t y);
 EMSCRIPTEN_KEEPALIVE int d2_session_create_class_bare(uint32_t seed, int difficulty, int act, int levelId, int playerClass) {
     g_sessionSeedPlayer = true;
     const int ok = d2_session_create_for_class(seed, difficulty, act, levelId, playerClass, false);
     g_sessionSeedPlayer = false;
-    // A saved character entering its town stands where retail puts a joining player: D2Game
-    // sub_6FC31EF0 (D2MOO Clients.cpp) asks DUNGEON_FindActSpawnLocationEx(act, the act's town, tile 0)
-    // for the spot, not the capture fixture's "beside the first monster" (client-parity F32: retail
-    // 1.13c put ELDRA at (5098.5,5023.5) in Harrogath, ours stood by Nihlathak at (5073,5125)).
-    if (ok && g_game && act >= 0 && act < 5 && g_game->pAct[act] && levelId == DUNGEON_GetTownLevelIdFromActNo(act)) {
-        int x = 0, y = 0;
-        if (DUNGEON_FindActSpawnLocationEx(g_game->pAct[act], levelId, 0, &x, &y, UNITS_GetUnitSizeX(g_targetPlayer)))
-            d2_session_fixture_place_player(x, y);
-    }
+    if (ok) placeSessionPlayerAtTownSpawn(act, levelId);
     return ok;
 }
 
@@ -1676,6 +1972,14 @@ static int g_sessionMoveReason = 0;
 enum {
     MOVE_OK = 0, MOVE_NO_SESSION = 1, MOVE_OUT_OF_RANGE = 2, MOVE_NO_ROOM = 3,
     MOVE_HANDLER_REFUSED = 4, MOVE_NO_PATH = 5,
+    // A refused walk has TWO possible subjects and they must never be confused: the GROUND (3, 5 --
+    // this subtile has no active room, or no route from here reaches it) and the PLAYER (6 -- the
+    // ground is fine, this player may not walk right now). Retail's dispatcher refuses a walk packet
+    // from a dying, dead or uninterruptable player before any terrain is consulted, so both answers
+    // are correct at once; reporting the player's refusal as MOVE_HANDLER_REFUSED made the client's
+    // aim loop read "the world will not take this subtile" when the world was fine, and it re-sent an
+    // identical refused aim until its budget expired (client-parity F19's pocket).
+    MOVE_DISPATCH_REFUSED = 6,
 };
 EMSCRIPTEN_KEEPALIVE int d2_session_move_reason() { return g_sessionMoveReason; }
 
@@ -1694,6 +1998,63 @@ static bool sessionDispatchGate(uint8_t header) {
     return false;
 }
 EMSCRIPTEN_KEEPALIVE int32_t d2_session_dispatch_refused() { return g_sessionDispatchRefused; }
+
+// D2Client's run/walk toggle, and the only place retail keeps one. Retail has NO server-side run
+// flag: the CLIENT owns the toggle and chooses which of the two move packets to send -- 0x01 Walk
+// or 0x03 Run (D2Game's own handlers, PlrMsg.cpp D2GAME_PACKETCALLBACK_Rcv0x01_Walk_6FC82CB0 and
+// D2GAME_PACKETCALLBACK_Rcv0x03_Run_6FC83090, each calling sub_6FC817D0 with PLRMODE_WALK or
+// PLRMODE_RUN) -- and the mode the hero then plays, and the stamina drain that follows it
+// (sub_6FC7F780 drains only while dwAnimMode == PLRMODE_RUN and the room is not a town), are both
+// downstream of that choice. This session IS the client here: d2_session_command_move builds the
+// packet itself and calls the handler directly, so the toggle lives with it.
+// Default OFF, which is retail's: a new game walks, and every captured scene draws the button in
+// its untoggled frame. Off is also what every pre-existing row expects,
+// so the packet this sends is unchanged for them.
+EMSCRIPTEN_KEEPALIVE int d2_session_toggle_run(int on) {
+    g_sessionRunToggle = on != 0;
+    return g_sessionRunToggle ? 1 : 0;
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_run_state() { return g_sessionRunToggle ? 1 : 0; }
+
+// The run drain's own inputs, and its effect, in one record -- so a stamina stall is never guessed
+// at again. Retail drains in sub_6FC7F780 (PlrModes.cpp), reached once a game frame from the player's
+// infinite EVENTTYPE_MODECHANGE timer through the mode-handler table; every condition on the way in
+// and the result of the drain itself are here:
+//   [0] game frame, [1] STAT_STAMINA before, [2] dwAnimMode,
+//   [3] DUNGEON_IsRoomInTown(UNITS_GetRoom(hero)) -- the drain's own town exclusion,
+//   [4] DUNGEON_IsRoomInTown(path->pRoom) -- what the neutral-mode setters read,
+//   [5] CharStats nRunDrain (the drain is 2x this, min 1),
+//   [6] STAT_MAXSTAMINA (EVENTS_StaminaRegen regens only below it),
+//   [7] the EVENTTYPE_MODECHANGE timer's expire frame (-2 when the hero has none),
+//   [8] STAT_STAMINA after retail's sub_6FC7F780 has run once (drain != 0), so a zero at [0..7] that
+//       still moves [8] is an event-path defect and not an arithmetic one,
+//   [9] dwAnimMode after that call, [10] DRLGROOM_GetLevelId(room) -- the level id [3] is derived
+//       from, so "in town" is never read off the session's own idea of where the hero is.
+// Read-only with drain == 0: a caller may ask this every leg of a walk without moving a stat.
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_run_probe(int32_t drain) {
+    static int32_t probe[12];
+    memset(probe, 0, sizeof probe);
+    if (!g_sessionLive || !g_game || !g_targetPlayer) { probe[0] = -1; return probe; }
+    D2UnitStrc* p = g_targetPlayer;
+    probe[0] = (int32_t)g_game->dwGameFrame;
+    probe[1] = STATLIST_UnitGetStatValue(p, STAT_STAMINA, 0);
+    probe[2] = (int32_t)p->dwAnimMode;
+    D2ActiveRoomStrc* room = UNITS_GetRoom(p);
+    probe[3] = DUNGEON_IsRoomInTown(room) ? 1 : 0;
+    probe[4] = (p->pDynamicPath && DUNGEON_IsRoomInTown(p->pDynamicPath->pRoom)) ? 1 : 0;
+    D2CharStatsTxt* cs = PLRSAVE2_GetCharStatsTxtRecord(p->dwClassId);
+    probe[5] = cs ? (int32_t)cs->nRunDrain : -1;
+    probe[6] = STATLIST_UnitGetStatValue(p, STAT_MAXSTAMINA, 0);
+    probe[7] = -2;
+    for (D2EventTimerStrc* t = SUNIT_GetTimerFromUnit(p); t; t = t->pNext)
+        if (t->nEventType == EVENTTYPE_MODECHANGE) { probe[7] = t->nExpireFrame; break; }
+    if (drain) sub_6FC7F780(g_game, p, 0, 0);
+    probe[8] = STATLIST_UnitGetStatValue(p, STAT_STAMINA, 0);
+    probe[9] = (int32_t)p->dwAnimMode;
+    probe[10] = (room && room->pDrlgRoom) ? DRLGROOM_GetLevelId(room->pDrlgRoom) : -1;
+    return probe;
+}
+
 EMSCRIPTEN_KEEPALIVE int d2_session_command_move(int targetX, int targetY) {
     g_sessionMoveReason = MOVE_NO_SESSION;
     if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return 0;
@@ -1705,12 +2066,23 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_move(int targetX, int targetY) {
     D2ActiveRoomStrc* targetRoom = COLLISION_GetRoomBySubTileCoordinates(path->pRoom, targetX, targetY);
     if (!targetRoom) return 0;
     g_sessionTargetX = targetX; g_sessionTargetY = targetY;
-    uint8_t packet[5] = { 0x01, 0, 0, 0, 0 };
+    // The run/walk toggle picks the packet, exactly as retail's client does (g_sessionRunToggle).
+    // Both handlers share the same body shape -- validate, then sub_6FC817D0 with their own mode --
+    // so the only difference downstream is the mode the hero plays.
+    const uint8_t header = g_sessionRunToggle ? 0x03 : 0x01;
+    uint8_t packet[5] = { header, 0, 0, 0, 0 };
     const uint16_t x = (uint16_t)targetX, y = (uint16_t)targetY;
     memcpy(packet + 1, &x, sizeof x); memcpy(packet + 3, &y, sizeof y);
+    // The dispatch gate is a PLAYER test -- dying (mode 0), dead (mode 17) or STATE_UNINTERRUPTABLE --
+    // and says nothing about the ground, which is why it gets its own reason. Note the handler's own
+    // refusal below can no longer be the subtile's distance: sub_6FC82D10 measures with
+    // CLIENTS_GetUnitX, which returns this same path->tGameCoords the range check above just used.
+    if (!sessionDispatchGate(header)) { g_sessionMoveReason = MOVE_DISPATCH_REFUSED; return 0; }
     g_sessionMoveReason = MOVE_HANDLER_REFUSED;
-    if (!sessionDispatchGate(0x01)) { g_sessionMoveReason = MOVE_HANDLER_REFUSED; return 0; }
-    if (D2GAME_PACKETCALLBACK_Rcv0x01_Walk_6FC82CB0(g_game, g_targetPlayer, packet, sizeof packet)) return 0;
+    const int32_t refused = g_sessionRunToggle
+        ? D2GAME_PACKETCALLBACK_Rcv0x03_Run_6FC83090(g_game, g_targetPlayer, packet, sizeof packet)
+        : D2GAME_PACKETCALLBACK_Rcv0x01_Walk_6FC82CB0(g_game, g_targetPlayer, packet, sizeof packet);
+    if (refused) return 0;
     g_sessionMovePending = path->dwPathPoints > 0;
     // The handler accepted the packet but produced no path: the destination is unreachable from
     // here, which is a different failure from "the packet was invalid".
@@ -1734,17 +2106,183 @@ static int adoptSessionLevelChange(int32_t oldLevel, int32_t destinationLevel) {
     updateSessionSnapshot(); return 1;
 }
 
+// F56: the source-side tile a warp click stands for. Retail's caller for a click on a level exit is
+// the client's 0x13 interact with the UNIT_TILE under it (D2GAME_PACKETCALLBACK_Rcv0x13_
+// InteractWithEntity_6FC84D70 -> sub_6FC828D0's UNIT_TILE case, PlrMsg.cpp): within 4 subtiles of the
+// tile it calls SUNIT_WarpPlayer, which places the player at the tile the warp PAIRS with
+// (DUNGEON_GetWarpTileFromRoomAndSourceLevelId -> COLLISION_GetFreeCoordinates(..., 0x1C09u, 1)) --
+// the `DRLGROOMTILE_AddWarp` record, one per exit. LEVEL_WarpUnit answers instead with a point of the
+// destination LEVEL (DUNGEON_FindActSpawnLocationEx -> sub_6FD788D0, whose nTileCalc match is written
+// for the classic WarpN values 0-13 and sees an LoD level's LvlWarp id match nothing), which is how
+// Lut Gholein's two sewer doorways came to arrive on one subtile.
+//
+// The tile the warp LEADS TO from a source tile -- `SUNIT_WarpPlayer`'s own lookup, exposed so the
+// command can ask whether a candidate tile is the one whose room carries the link. A warp tile unit's
+// room holds that link in its DRLG room-tile array (`DRLGWARP_GetDestinationRoom` matches the array's
+// LvlWarp record), and a tile whose room does not is not the clicked exit: `SUNIT_WarpPlayer` answers
+// with nothing at all for it (its `if (!pWarpTile) return;`), which is how a wrong candidate reads as
+// "the warp did not happen" instead of a wrong arrival.
+static D2UnitStrc* sessionWarpPairedTile(D2UnitStrc* tile, D2LvlWarpTxt** txt) {
+    D2ActiveRoomStrc* room = tile ? UNITS_GetRoom(tile) : nullptr;
+    if (!room || !room->pDrlgRoom) return nullptr;
+    return DUNGEON_GetWarpTileFromRoomAndSourceLevelId(room, (int)tile->dwClassId, txt);
+}
+
+// Whether the lookup above CAN answer for this tile -- `DRLGWARP_GetDestinationRoom`'s own two
+// conditions, asked first because the vendored function asserts on a destination room it cannot
+// resolve (`D2_ASSERT(pDestRoom)`, D2Dungeon.cpp, and D2_ASSERT aborts: s25 and s88 died there the
+// first time this path was driven). A tile whose room carries no link node of its id, or whose link
+// leads to a room that does not link back, is simply not this exit's tile; the command falls through
+// to LEVEL_WarpUnit for it, exactly as it did before the tile path existed.
+static bool sessionWarpLinkResolves(D2UnitStrc* tile) {
+    D2ActiveRoomStrc* room = tile ? UNITS_GetRoom(tile) : nullptr;
+    D2DrlgRoomStrc* drlgRoom = room ? room->pDrlgRoom : nullptr;
+    if (!drlgRoom) return false;
+    for (const D2RoomTileStrc* node = drlgRoom->pRoomTiles; node; node = node->pNext) {
+        if (!node->pLvlWarpTxtRecord || (uint32_t)node->pLvlWarpTxtRecord->dwLevelId != tile->dwClassId) continue;
+        D2DrlgRoomStrc* destination = node->pDrlgRoom;
+        if (!destination) return false;
+        for (const D2RoomTileStrc* back = destination->pRoomTiles; back; back = back->pNext)
+            if (back->pDrlgRoom == drlgRoom) return true;
+        return false;
+    }
+    return false;
+}
+
+// The tile a click on this exit stands for: a warp tile unit's dwClassId is its LvlWarp id -- the
+// same column `g_sessionWarpPresets` collects -- so the candidates are the level's built tiles of that
+// id, and the answer is the nearest one whose own room resolves the pair. The lookup itself builds the
+// DESTINATION room as a side effect (`DRLGWARP_GetDestinationRoom` -> DRLGACTIVATE_InitializeRoomEx)
+// and a room built that way has its tiles and nothing else: its preset units -- the paired warp TILE
+// among them, which is the very unit this lookup returns -- appear on the pending-rooms pass, exactly
+// the rule `d2_session_command_seam` follows for the room it builds. So the search runs that pass and
+// asks once more; measured (s423): before it the pair lookup answers nothing for both of
+// Lut Gholein's sewer doorways, and after it the two answer their OWN tiles, class 22 at (7520,5008)
+// and class 21 at (7845,5278), which is Levels.txt's pairing 19<->22, 20<->21.
+static void updateSessionPendingRooms();
+
+static D2UnitStrc* sessionWarpClickTile(uint32_t warpId, int32_t x, int32_t y) {
+    if (!g_lastLevel) return nullptr;
+    std::vector<std::pair<int, D2UnitStrc*>> candidates;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
+        D2ActiveRoomStrc* room = roomEx->pRoom;
+        if (!room) continue;
+        for (D2UnitStrc* tile = room->pUnitFirst; tile; tile = tile->pRoomNext) {
+            if (tile->dwUnitType != UNIT_TILE || !tile->pStaticPath || tile->dwClassId != warpId) continue;
+            const int distance = std::max(abs(tile->pStaticPath->tGameCoords.nX - x), abs(tile->pStaticPath->tGameCoords.nY - y));
+            candidates.push_back({ distance, tile });
+        }
+    }
+    std::stable_sort(candidates.begin(), candidates.end(),
+        [](const std::pair<int, D2UnitStrc*>& a, const std::pair<int, D2UnitStrc*>& b) { return a.first < b.first; });
+    for (int pass = 0; pass < 2; ++pass) {
+        for (const std::pair<int, D2UnitStrc*>& candidate : candidates)
+            if (sessionWarpLinkResolves(candidate.second) && sessionWarpPairedTile(candidate.second, nullptr)) return candidate.second;
+        if (pass == 0) updateSessionPendingRooms();
+    }
+    return nullptr;
+}
+
+// PROBE (F56, lands with the arrival measurement it justifies): the click path's own census, because
+// "the warp did not happen" has three different causes here and they are told apart by counting. Read
+// out: {candidates of this id, of those with a static path, the nearest one's class/x/y, the room's
+// DRLG room-tile nodes / of those with a record / of those whose record matches the tile's id, the
+// room's level, then the pair lookup: found, dest class, dest x, dest y, dest level, dest room's
+// UNIT_TILE count, dest record}, and last the tile the exit OBJECT's own operate path passes to
+// `SUNIT_WarpPlayer` (its room's FIRST UNIT_TILE, whatever its class) with whether THAT pair resolves:
+// the two callers are one placement in retail, so if one of them resolves and the other does not, the
+// difference is the tile and not the function. Read-only; -1 everywhere when absent.
+static int32_t g_sessionWarpTileProbe[18];
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_warp_tile_probe(uint32_t destinationLevel, uint32_t warpId, int32_t* count) {
+    for (int i = 0; i < 18; ++i) g_sessionWarpTileProbe[i] = -1;
+    if (count) *count = 18;
+    if (!g_sessionLive || !g_lastLevel) return g_sessionWarpTileProbe;
+    const D2SessionWarp* exit = nullptr;
+    for (const D2SessionWarp& warp : g_sessionWarps)
+        if (warp.destinationLevel == destinationLevel && warp.warpId == warpId && warp.enabled) { exit = &warp; break; }
+    if (!exit) return g_sessionWarpTileProbe;
+    int candidates = 0, withPath = 0, bestDistance = INT32_MAX; D2UnitStrc* best = nullptr;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
+        if (!roomEx->pRoom) continue;
+        for (D2UnitStrc* tile = roomEx->pRoom->pUnitFirst; tile; tile = tile->pRoomNext) {
+            if (tile->dwUnitType != UNIT_TILE || tile->dwClassId != warpId) continue;
+            ++candidates;
+            if (!tile->pStaticPath) continue;
+            ++withPath;
+            const int distance = std::max(abs(tile->pStaticPath->tGameCoords.nX - exit->exitX),
+                                          abs(tile->pStaticPath->tGameCoords.nY - exit->exitY));
+            if (distance < bestDistance) { best = tile; bestDistance = distance; }
+        }
+    }
+    g_sessionWarpTileProbe[0] = candidates; g_sessionWarpTileProbe[1] = withPath;
+    if (!best) return g_sessionWarpTileProbe;
+    g_sessionWarpTileProbe[2] = (int32_t)best->dwClassId;
+    g_sessionWarpTileProbe[3] = best->pStaticPath->tGameCoords.nX;
+    g_sessionWarpTileProbe[4] = best->pStaticPath->tGameCoords.nY;
+    D2ActiveRoomStrc* room = UNITS_GetRoom(best);
+    D2DrlgRoomStrc* drlgRoom = room ? room->pDrlgRoom : nullptr;
+    int nodes = 0, withRecord = 0, matching = 0;
+    if (drlgRoom) for (const D2RoomTileStrc* node = drlgRoom->pRoomTiles; node; node = node->pNext) {
+        ++nodes;
+        if (!node->pLvlWarpTxtRecord) continue;
+        ++withRecord;
+        if ((uint32_t)node->pLvlWarpTxtRecord->dwLevelId == best->dwClassId) ++matching;
+    }
+    g_sessionWarpTileProbe[5] = nodes; g_sessionWarpTileProbe[6] = withRecord; g_sessionWarpTileProbe[7] = matching;
+    g_sessionWarpTileProbe[8] = room ? DUNGEON_GetLevelIdFromRoom(room) : -1;
+    D2LvlWarpTxt* txt = nullptr;
+    D2UnitStrc* paired = sessionWarpPairedTile(best, &txt);
+    g_sessionWarpTileProbe[9] = paired ? 1 : 0;
+    if (paired) {
+        D2ActiveRoomStrc* pairedRoom = UNITS_GetRoom(paired);
+        int destTiles = 0;
+        if (pairedRoom) for (D2UnitStrc* t = pairedRoom->pUnitFirst; t; t = t->pRoomNext) if (t->dwUnitType == UNIT_TILE) ++destTiles;
+        g_sessionWarpTileProbe[10] = (int32_t)paired->dwClassId;
+        g_sessionWarpTileProbe[11] = CLIENTS_GetUnitX(paired);
+        g_sessionWarpTileProbe[12] = CLIENTS_GetUnitY(paired);
+        g_sessionWarpTileProbe[13] = pairedRoom ? DUNGEON_GetLevelIdFromRoom(pairedRoom) : -1;
+        g_sessionWarpTileProbe[14] = destTiles;
+        g_sessionWarpTileProbe[15] = txt ? (int32_t)txt->dwLevelId : -1;
+    }
+    // What the exit OBJECT's operate passes: OperateFn 16 walks its own room's unit list to the first
+    // UNIT_TILE of ANY class (`OBJECTS_OperateFunction16_TrapDoor`, ObjMode.cpp) and calls the same
+    // SUNIT_WarpPlayer. Reported with its own pair lookup, so "one placement, two callers" is a count.
+    if (room) for (D2UnitStrc* tile = room->pUnitFirst; tile; tile = tile->pRoomNext) {
+        if (tile->dwUnitType != UNIT_TILE) continue;
+        g_sessionWarpTileProbe[16] = (int32_t)tile->dwClassId;
+        g_sessionWarpTileProbe[17] = sessionWarpPairedTile(tile, nullptr) ? 1 : 0;
+        break;
+    }
+    return g_sessionWarpTileProbe;
+}
+
 EMSCRIPTEN_KEEPALIVE int d2_session_command_warp(uint32_t destinationLevel, uint32_t warpId) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetClient) return 0;
     updateSessionSnapshot();
-    bool generatedExit = false;
+    const D2SessionWarp* exit = nullptr;
     for (const D2SessionWarp& warp : g_sessionWarps) {
         if (warp.destinationLevel == destinationLevel && warp.warpId == warpId && warp.enabled) {
-            generatedExit = true; break;
+            exit = &warp; break;
         }
     }
-    if (!generatedExit) return 0;
+    if (!exit) return 0;
     const int32_t oldLevel = DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(g_targetPlayer));
+    // Retail's own placement for a warp click (F56): the client's 0x13 interact with the UNIT_TILE
+    // under it calls SUNIT_WarpPlayer with that tile, which places the player at the tile the warp
+    // PAIRS with -- one arrival per exit, not one point of the destination level. SUNIT_WarpPlayer
+    // moves the player between rooms of one act and nothing else, so an exit into another act stays
+    // LEVEL_WarpUnit's (the act change, SUNITPROXY_UpdateNpcsOnActChange and LEVEL_ChangeAct, is its
+    // path in retail too); so does an exit whose tile the click path cannot resolve.
+    D2UnitStrc* tile = DRLG_GetActNoFromLevelId((int32_t)destinationLevel) == g_currentAct
+        ? sessionWarpClickTile(warpId, exit->exitX, exit->exitY) : nullptr;
+    if (tile) {
+        SUNIT_WarpPlayer(g_game, g_targetPlayer, tile);
+        // SUNIT_WarpPlayer answers with nothing when its own COLLISION_GetFreeCoordinates or room
+        // transfer refuses, and a warp that places nobody is worse than the level search's answer:
+        // s25's act III transition is one (measured). Only a placement that moved the
+        // player ends here; otherwise the exit keeps the answer it had before the tile path existed.
+        if (adoptSessionLevelChange(oldLevel, (int32_t)destinationLevel)) return 1;
+    }
     LEVEL_WarpUnit(g_game, g_targetPlayer, (int32_t)destinationLevel, (int32_t)warpId);
     return adoptSessionLevelChange(oldLevel, (int32_t)destinationLevel);
 }
@@ -1803,6 +2341,162 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_player_busy() {
 EMSCRIPTEN_KEEPALIVE int d2_session_room_active_at(int x, int y) {
     if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return 0;
     return COLLISION_GetRoomBySubTileCoordinates(g_targetPlayer->pDynamicPath->pRoom, x, y) ? 1 : 0;
+}
+
+// d2_session_room_active_at's question asked of the level's own room list instead of the player's
+// room: is some built room covering this subtile? COLLISION_GetRoomBySubTileCoordinates starts at a
+// room and tests it plus its DRLG neighbours -- retail's own one-hop resolver -- so d2_session_walkable
+// and d2_session_room_active_at both answer 0 for any subtile two rooms away whatever is built there.
+// That is right for the path code, and useless for telling "a wall" from "not built" from "out of the
+// resolver's reach", which is the distinction every walk diagnosis turns on. Read-only.
+EMSCRIPTEN_KEEPALIVE int d2_session_room_active_level(int x, int y) {
+    if (!g_sessionLive || !g_lastLevel) return 0;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext)
+        if (roomEx->pRoom && DungeonTestRoomGame(roomEx->pRoom, x, y)) return 1;
+    return 0;
+}
+// The act's own collision answer for a subtile: the same test as d2_session_walkable, but the room is
+// found in the act's room lists instead of by walking one hop from the player's room. This is the map
+// the retail CLIENT paths on -- it holds every loaded room's collision grid and picks the target's own
+// room -- where COLLISION_GetRoomBySubTileCoordinates is the one-hop predicate a single walk command's
+// path search runs. A planner that only had the latter could never see past the current room.
+EMSCRIPTEN_KEEPALIVE int d2_session_walkable_level(int x, int y) {
+    if (!g_sessionLive || !g_targetPlayer || !g_game || g_currentAct < 0 || g_currentAct >= 5) return 0;
+    D2DrlgActStrc* act = g_game->pAct[g_currentAct];
+    if (!act || !act->pDrlg) return 0;
+    for (D2DrlgLevelStrc* lv = act->pDrlg->pLevel; lv; lv = lv->pNextLevel) {
+        for (D2DrlgRoomStrc* roomEx = lv->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
+            D2ActiveRoomStrc* room = roomEx->pRoom;
+            if (!room || !DungeonTestRoomGame(room, x, y)) continue;
+            return COLLISION_CheckMaskWithSize(room, x, y, UNITS_GetUnitSizeX(g_targetPlayer), COLLIDE_MASK_PLAYER_PATH) ? 0 : 1;
+        }
+    }
+    return 0;
+}
+// The raw collision word at a subtile in the act's own room lists (every mask), -1 when no built room
+// covers it -- d2_session_collision's act-wide twin, so a probe can name what blocks a subtile
+// (COLLIDE_WALL / COLLIDE_DOOR / a unit footprint) instead of only that something does. Read-only.
+EMSCRIPTEN_KEEPALIVE int d2_session_collision_level(int x, int y) {
+    if (!g_sessionLive || !g_game || g_currentAct < 0 || g_currentAct >= 5) return -1;
+    D2DrlgActStrc* act = g_game->pAct[g_currentAct];
+    if (!act || !act->pDrlg) return -1;
+    for (D2DrlgLevelStrc* lv = act->pDrlg->pLevel; lv; lv = lv->pNextLevel)
+        for (D2DrlgRoomStrc* roomEx = lv->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
+            D2ActiveRoomStrc* room = roomEx->pRoom;
+            if (!room || !DungeonTestRoomGame(room, x, y)) continue;
+            return (int)COLLISION_CheckMask(room, x, y, COLLIDE_ALL_MASK);
+        }
+    return -1;
+}
+// The level-list ordinal (the same index updateSessionWorld and the snapshots use) of the room
+// covering a subtile, or -1 when no built room covers it. Read-only.
+EMSCRIPTEN_KEEPALIVE int d2_session_room_ordinal_at(int x, int y) {
+    if (!g_sessionLive || !g_lastLevel) return -1;
+    uint32_t ordinal = 0;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext, ++ordinal)
+        if (roomEx->pRoom && DungeonTestRoomGame(roomEx->pRoom, x, y)) return (int)ordinal;
+    return -1;
+}
+// The current level's DRLGACTIVATE room-status census -- what retail's activation wave has done, as
+// D2Common holds it: {roomEx on the level's list, of those with a collision room built, then how many
+// carry status 0 CLIENT_IN_ROOM / 1 CLIENT_IN_SIGHT / 2 CLIENT_OUT_OF_SIGHT / 3 UNTILE, then the
+// act's nRoomsInitTimeout and nRoomsInitSinceLastUpdate}. The wave is owed to the player's room, so a
+// census with everything at CLIENT_IN_SIGHT means the level was built up front and nothing follows the
+// player. Read-only.
+static int32_t g_sessionRoomStats[8];
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_room_stats() {
+    memset(g_sessionRoomStats, 0, sizeof g_sessionRoomStats);
+    if (!g_sessionLive || !g_lastLevel || !g_lastLevel->pDrlg) return g_sessionRoomStats;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
+        ++g_sessionRoomStats[0];
+        if (roomEx->pRoom) ++g_sessionRoomStats[1];
+        if (roomEx->fRoomStatus < ROOMSTATUS_COUNT) ++g_sessionRoomStats[2 + roomEx->fRoomStatus];
+    }
+    g_sessionRoomStats[6] = g_lastLevel->pDrlg->nRoomsInitTimeout;
+    g_sessionRoomStats[7] = g_lastLevel->pDrlg->nRoomsInitSinceLastUpdate;
+    return g_sessionRoomStats;
+}
+
+// PROBE (F52, lands with the measurement it justifies): where a level's exit data actually lives,
+// room by room, in one dump -- the generation-time sources (the map's own DS1 preset-unit list, the
+// DS1's wall/type layers) beside the activation-time ones (the room's preset units and its
+// pRoomTiles warp links). Flat int32, self-describing so the probe reads it sequentially:
+//   {levelId, nRooms} then per room
+//   {ordinal, nType, tileX, tileY, tileW, tileH, built, nRoomsNear, nTileNodes, nRoomTiles,
+//    nMapPresets, hasMap} then
+//   nTileNodes * {destLevel, warpTxtLevelId, bEnabled, dataKind, dataPosX, dataPosY, offX, offY}
+//   nRoomTiles * {nIndex, nXpos, nYpos}                      -- the room's UNIT_TILE preset units
+//   nMapPresets * {nUnitType, nIndex, nXpos, nYpos}          -- the DS1 map's shared preset units
+// dataKind: 0 none, 1 from unk0x0C, 2 from unk0x10. Read-only.
+static std::vector<int32_t> g_sessionExitProbe;
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_exit_probe(int32_t levelId, int32_t* count) {
+    g_sessionExitProbe.clear();
+    if (count) *count = 0;
+    if (!g_sessionLive || !g_lastLevel || !g_lastLevel->pDrlg) return g_sessionExitProbe.data();
+    D2DrlgLevelStrc* level = levelId < 0 ? g_lastLevel : DRLG_GetLevel(g_lastLevel->pDrlg, levelId);
+    if (!level) return g_sessionExitProbe.data();
+    g_sessionExitProbe.push_back(level->nLevelId);
+    g_sessionExitProbe.push_back(0);
+    int32_t nRooms = 0;
+    for (D2DrlgRoomStrc* roomEx = level->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext, ++nRooms) {
+        D2DrlgMapStrc* map = (roomEx->nType == DRLGTYPE_PRESET && roomEx->pMaze) ? roomEx->pMaze->pMap : nullptr;
+        int32_t nNodes = 0, nRoomTiles = 0, nMapPresets = 0;
+        for (const D2RoomTileStrc* t = roomEx->pRoomTiles; t; t = t->pNext) ++nNodes;
+        for (const D2PresetUnitStrc* p = roomEx->pPresetUnits; p; p = p->pNext) if (p->nUnitType == UNIT_TILE) ++nRoomTiles;
+        if (map) for (const D2PresetUnitStrc* p = map->pPresetUnit; p; p = p->pNext) ++nMapPresets;
+        const int32_t head[] = { nRooms, roomEx->nType, roomEx->nTileXPos, roomEx->nTileYPos,
+            roomEx->nTileWidth, roomEx->nTileHeight, roomEx->pRoom ? 1 : 0, roomEx->nRoomsNear,
+            nNodes, nRoomTiles, nMapPresets, map ? 1 : 0 };
+        g_sessionExitProbe.insert(g_sessionExitProbe.end(), head, head + 12);
+        for (const D2RoomTileStrc* t = roomEx->pRoomTiles; t; t = t->pNext) {
+            const D2DrlgTileDataStrc* d = t->unk0x0C ? t->unk0x0C : t->unk0x10;
+            const int32_t node[] = {
+                (t->pDrlgRoom && t->pDrlgRoom->pLevel) ? t->pDrlgRoom->pLevel->nLevelId : -1,
+                t->pLvlWarpTxtRecord ? (int32_t)t->pLvlWarpTxtRecord->dwLevelId : -1,
+                t->bEnabled, t->unk0x0C ? 1 : (t->unk0x10 ? 2 : 0),
+                d ? d->nPosX : -1, d ? d->nPosY : -1,
+                t->pLvlWarpTxtRecord ? (int32_t)t->pLvlWarpTxtRecord->dwOffsetX : -1,
+                t->pLvlWarpTxtRecord ? (int32_t)t->pLvlWarpTxtRecord->dwOffsetY : -1 };
+            g_sessionExitProbe.insert(g_sessionExitProbe.end(), node, node + 8);
+        }
+        for (const D2PresetUnitStrc* p = roomEx->pPresetUnits; p; p = p->pNext) if (p->nUnitType == UNIT_TILE) {
+            const int32_t rec[] = { p->nIndex, p->nXpos, p->nYpos };
+            g_sessionExitProbe.insert(g_sessionExitProbe.end(), rec, rec + 3);
+        }
+        if (map) for (const D2PresetUnitStrc* p = map->pPresetUnit; p; p = p->pNext) {
+            const int32_t rec[] = { p->nUnitType, p->nIndex, p->nXpos, p->nYpos };
+            g_sessionExitProbe.insert(g_sessionExitProbe.end(), rec, rec + 4);
+        }
+    }
+    g_sessionExitProbe[1] = nRooms;
+    if (count) *count = (int32_t)g_sessionExitProbe.size();
+    return g_sessionExitProbe.data();
+}
+
+// PROBE (lands with the arrival measurement it justifies): WHERE LEVEL_WarpUnit's placement comes
+// from. DUNGEON_FindActSpawnLocationEx -> sub_6FD788D0 picks one of the destination LEVEL's own
+// pTileInfo[] entries -- the level's own entrance tiles, nTileIndex = the LvlWarp id its DS1 recorded
+// on that tile -- by matching the caller's nTileCalc (Levels.txt's WarpN value, which for an LoD
+// level is a LvlWarp id, not the 0-13 the search's own coordinate table was written for) and falls
+// back to the FIRST entry when nothing matches. This reports the entries so a probe can name the one
+// an arrival came from: {levelId, nTileInfo} then per entry {nTileIndex, nPosX, nPosY} in game tiles.
+// Read-only apart from DRLG_InitLevel, which the search itself runs for a level not yet generated.
+static std::vector<int32_t> g_sessionLevelTileInfo;
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_level_tile_info(int32_t levelId, int32_t* count) {
+    g_sessionLevelTileInfo.clear();
+    if (count) *count = 0;
+    if (!g_lastLevel || !g_lastLevel->pDrlg) return g_sessionLevelTileInfo.data();
+    D2DrlgLevelStrc* level = DRLG_GetLevel(g_lastLevel->pDrlg, levelId);
+    if (!level) return g_sessionLevelTileInfo.data();
+    if (!level->pFirstRoomEx) DRLG_InitLevel(level);
+    g_sessionLevelTileInfo.push_back(level->nLevelId);
+    g_sessionLevelTileInfo.push_back(level->nTileInfo);
+    for (int32_t i = 0; i < level->nTileInfo && i < 32; ++i) {
+        const int32_t rec[] = { level->pTileInfo[i].nTileIndex, level->pTileInfo[i].nPosX, level->pTileInfo[i].nPosY };
+        g_sessionLevelTileInfo.insert(g_sessionLevelTileInfo.end(), rec, rec + 3);
+    }
+    if (count) *count = (int32_t)g_sessionLevelTileInfo.size();
+    return g_sessionLevelTileInfo.data();
 }
 
 // A level's rectangle in subtiles as the act's DRLG placed it -- what the automap shows a player
@@ -1891,8 +2585,21 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_seam(uint32_t destinationLevel) {
             const int32_t hi = dx ? std::min(roomEx->nTileYPos + roomEx->nTileHeight, near->nTileYPos + near->nTileHeight)
                                   : std::min(roomEx->nTileXPos + roomEx->nTileWidth, near->nTileXPos + near->nTileWidth);
             if (lo >= hi) continue;
-            if (!roomEx->pRoom) DUNGEON_SetClientIsInSight(act, oldLevel, roomEx->nTileXPos, roomEx->nTileYPos, nullptr);
-            if (!near->pRoom) DUNGEON_SetClientIsInSight(act, (int32_t)destinationLevel, near->nTileXPos, near->nTileYPos, nullptr);
+            const bool builtHere = !roomEx->pRoom;
+            const bool builtDest = !near->pRoom;
+            if (builtHere) DUNGEON_SetClientIsInSight(act, oldLevel, roomEx->nTileXPos, roomEx->nTileYPos, nullptr);
+            if (builtDest) DUNGEON_SetClientIsInSight(act, (int32_t)destinationLevel, near->nTileXPos, near->nTileYPos, nullptr);
+            if (!roomEx->pRoom || !near->pRoom) continue;
+            // A room built HERE has its tiles and nothing else: its preset units (a door at the seam
+            // among them) and the objects it holds are spawned by the frame that follows, and their
+            // collision is part of what the crossing reads -- the stand-back from a shut door, and
+            // the walk's own path. The activation wave builds a room the same way
+            // (DRLGACTIVATE_RoomEx_EnsureHasRoom, then the next frame's pending-rooms pass), so run
+            // that frame before reading anything out of the room. Measured (s420): without it the
+            // search sees no door, stands ON the seam column and the walk across is refused with no
+            // path, where the eager build stands two subtiles back, opens the door as a player does
+            // and crosses.
+            if (builtHere || builtDest) d2_session_tick(1);
             if (!roomEx->pRoom || !near->pRoom) continue;
             const int32_t srcLine = dx > 0 ? 5 * (roomEx->nTileXPos + roomEx->nTileWidth) - 1 : dx < 0 ? 5 * roomEx->nTileXPos :
                                     dy > 0 ? 5 * (roomEx->nTileYPos + roomEx->nTileHeight) - 1 : 5 * roomEx->nTileYPos;
@@ -1997,6 +2704,24 @@ static void updateSessionNpcInteraction(uint32_t npcId) {
     if (PLAYER_IsBusy(g_targetPlayer)) g_sessionNpcInteraction.flags |= 2;
     g_sessionNpcInteraction.hash = sessionHashBytes(D2VEC_FNV_INIT, &g_sessionNpcInteraction,
         offsetof(D2SessionNpcInteraction, hash));
+}
+
+// Replay of the capture's OWN decision stream (D2VEC kind 30 op 1 / op 0):
+// the D2Common sight call retail's client made, in retail's order, at retail's points. It is the
+// v5-A protocol replay for the room-activation wave -- the CALLER is the half D2Client owns and
+// this tree does not, so feeding the engine retail's own decisions is what makes a comparison
+// against retail's room set a measurement of the STATUS MACHINE rather than of two different walks.
+// A comparison that did not replay them compared a fresh session against a walked one.
+EMSCRIPTEN_KEEPALIVE int d2_session_sight_point(int levelId, int tileX, int tileY, int on) {
+    if (!g_sessionLive || !g_game || g_currentAct < 0 || g_currentAct > 4) return 0;
+    D2DrlgActStrc* act = g_game->pAct[g_currentAct];
+    if (!act) return 0;
+    D2DrlgLevelStrc* level = DRLG_GetLevel(act->pDrlg, levelId);
+    if (!level) return 0;
+    if (!level->pFirstRoomEx) DRLG_InitLevel(level);
+    if (on) DUNGEON_SetClientIsInSight(act, levelId, tileX, tileY, nullptr);
+    else DUNGEON_UnsetClientIsInSight(act, levelId, tileX, tileY, nullptr);
+    return 1;
 }
 
 // Recovered UNIT_MONSTER branch of PlrMsg's interaction dispatcher: the click is accepted at
@@ -2411,6 +3136,49 @@ EMSCRIPTEN_KEEPALIVE int d2_session_unit_kinds(uint8_t* out, int cap) {
     return written;
 }
 
+// Whether each unit carries retail's NPC speech alert (`npcalert`, the gold "!", F22): one byte per
+// unit in d2_session_units order, 1 when the alert is pending, else 0.
+//
+// The state is the engine's own, not a client guess about who has news: the NPC's QUEST intro flag,
+// which every per-act Intro quest callback reads as "this NPC still has an intro speech to deliver"
+// (ACT1Intro_ActiveFilterCallback 0x6FC97770 and its act II/III/V siblings). It is SET when that
+// speech is acknowledged -- PLRINTRO_SetQuestIntroFlag, from the act's Intro scroll-message callback
+// (ACT1Intro_Callback11_ScrollMessage 0x6FC97640), which runs on the player's own message pick
+// (client packet 0x31, the acknowledgement d2_session_command_npc_response drives), and a fresh
+// player's flags are zero, which is retail's own state in the start-of-Act-I capture w0.png.
+//
+// The OTHER intro buffer, pNpcIntroFlags, is NOT this state and was measured out: PLRINTRO_MaskNpcIntroFlag
+// (packet 0x4D PlayNpcMessage) CLEARS a bit that a fresh player has already clear -- the packet
+// returns success and the per-unit alert does not move -- so it cannot be what the balloon clears on.
+//
+// PLRINTRO_HasNpcIntro narrows it to the classes retail's own intro table names, because
+// PLRINTRO_GetQuestIntroFlag answers bit 0 -- the "any intro delivered" bit, set unconditionally for
+// any NPC -- for a class outside the table, which would otherwise clear the alert over every talkable
+// monster the first time any NPC's intro was delivered. The INTERACT flag and pMonInteract are the
+// same talkable-NPC test d2_session_unit_kinds and d2_session_command_nearest_npc already use.
+//
+// Emitted beside D2SessionUnit for the same reason unit_kinds is: that record's 44-byte stride is
+// hardcoded in a dozen scenarios.
+EMSCRIPTEN_KEEPALIVE int d2_session_npc_speech_alerts(uint8_t* out, int cap) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !out || cap <= 0) return 0;
+    updateSessionSnapshot();
+    int written = 0;
+    for (const D2SessionUnit& unit : g_sessionUnits) {
+        if (written >= cap) break;
+        uint8_t pending = 0;
+        if (unit.type == UNIT_MONSTER) {
+            D2UnitStrc* npc = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)unit.id);
+            D2MonStatsTxt* stats = npc ? MONSTERMODE_GetMonStatsTxtRecord(npc->dwClassId) : nullptr;
+            if (stats && npc->pMonsterData && npc->pMonsterData->pMonInteract &&
+                (stats->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_INTERACT]) &&
+                PLRINTRO_HasNpcIntro(npc->dwClassId) &&
+                !PLRINTRO_GetQuestIntroFlag(g_targetPlayer, g_game, npc->dwClassId)) pending = 1;
+        }
+        out[written++] = pending;
+    }
+    return written;
+}
+
 EMSCRIPTEN_KEEPALIVE int d2_session_command_nearest_npc(int radius) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || radius < 0 || radius > 6) return 0;
     updateSessionSnapshot();
@@ -2525,6 +3293,44 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_waypoint(uint32_t waypointId, int32_
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_take_ui_events(uint8_t* out, uint32_t cap) {
     return D2WEB_TakeUiEvents(out, cap);
 }
+// Every SOUND EVENT retail's own server code has attached to a unit since the last call, as int32
+// sextets {unitType, unitId, classId, soundEvent, updateUnitType, updateUnitId}, and the events are
+// CONSUMED (retail's per-client send pass clears the same flag, sub_6FCBC300).
+//
+// The mechanism is already retail's and already runs here: 114 call sites across the vendored D2Game
+// call SUNIT_AttachSound(pUnit, nSoundEvent, pUpdateUnit) -- a monster noticing the player
+// (AI/AiThink 18), an NPC healing (UNIT/SUnitNpc 10), skills, items, quests -- and SUNIT_AttachSound
+// records the event on the unit itself (nUpdateType, pUpdateUnit) and sets UNITFLAG_HASEVENTSOUND
+// (SUnit.cpp). Retail's client is then sent packet 0x2C {nUnitType, dwUnitGUID, nSoundEvent}
+// (D2GAME_UpdateUnit_6FCC6080 -> sub_6FC3F3F0) and plays it; pUpdateUnit is the AUDIENCE filter --
+// null means every client, a unit means only that unit's client (the test 6FCC6080 opens with).
+// The headless session has no client to send to, so the events are drained here instead -- the same
+// boundary d2_session_take_ui_events uses.
+//
+// WHAT REMAINS IS THE CLIENT'S OWN RULE, not an engine event: turning (unitType, classId, soundEvent)
+// into a Sounds.txt handle is D2Client's -- D2CLIENT_PlaySound and the MonSounds/Sounds tables behind
+// it -- and nothing in reference/ carries D2Client (D2MOO stops at D2Gfx/D2Win). See
+// S2; the ids below are what a retail capture or a 1.13c D2Client pass has to
+// be matched against.
+EMSCRIPTEN_KEEPALIVE int d2_session_take_sounds(int32_t* out, int cap) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_lastLevel || !out || cap < 6) return 0;
+    int n = 0;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx && n + 6 <= cap; roomEx = roomEx->pDrlgRoomNext) {
+        D2ActiveRoomStrc* room = roomEx->pRoom;
+        if (!room) continue;
+        for (D2UnitStrc* unit = room->pUnitFirst; unit && n + 6 <= cap; unit = unit->pRoomNext) {
+            if (!(unit->dwFlags & UNITFLAG_HASEVENTSOUND)) continue;
+            out[n++] = (int32_t)unit->dwUnitType;
+            out[n++] = (int32_t)unit->dwUnitId;
+            out[n++] = unit->dwClassId;
+            out[n++] = (int32_t)unit->nUpdateType;
+            out[n++] = unit->pUpdateUnit ? (int32_t)unit->pUpdateUnit->dwUnitType : -1;
+            out[n++] = unit->pUpdateUnit ? (int32_t)unit->pUpdateUnit->dwUnitId : 0;
+            unit->dwFlags &= ~UNITFLAG_HASEVENTSOUND;
+        }
+    }
+    return n / 6;
+}
 // Retail's 0x4F ClickButton, e.g. TRADEBTN_CLOSESTASH (18) when the player closes the stash, or
 // withdraw/deposit (19/20) with a gold amount. Through retail's own handler.
 EMSCRIPTEN_KEEPALIVE int d2_session_command_button(uint32_t button, int32_t gold) {
@@ -2576,6 +3382,10 @@ static void appendVendorPresentation(D2UnitStrc* item) {
         out.code = txt->dwCode;
         memcpy(out.flippyFile, txt->szFlippyFile, sizeof out.flippyFile);
         memcpy(out.invFile, txt->szInvFile, sizeof out.invFile);
+        // Same as the player-side producer below: the cells the item covers come from ItemsTxt, so a
+        // two-handed axe is 2x4 on the vendor grid and a click anywhere on it buys it. Leaving these
+        // zero made every vendor item a 1x1 for the client's hit test.
+        out.invWidth = txt->nInvWidth; out.invHeight = txt->nInvHeight;
     }
     g_sessionVendorPresentations.push_back(out);
 }
@@ -3023,8 +3833,11 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_insert_item_packet(uint32_t itemId, 
 }
 
 // A client packet through its recovered handler, for inputs no dedicated command covers yet:
-// 0x1C unequip to the cursor, 0x58 quest log viewed, 0x63 shift-click to the belt (0x17 is
-// d2_session_command_cursor_item_packet's). Not the whole dispatch (D2GAME_PACKET_Handler_6FC89320): its table reaches party,
+// 0x1C unequip to the cursor, 0x58 quest log viewed, 0x61 hand the CURSOR item to the mercenary,
+// 0x63 shift-click to the belt (0x17 is d2_session_command_cursor_item_packet's). 0x61 is retail's
+// own way a mercenary gets gear -- D2GAME_MERCS_EquipItem allocates the pet's inventory on the
+// first item -- and it is what makes the save's mercenary item block reachable at all.
+// Not the whole dispatch (D2GAME_PACKET_Handler_6FC89320): its table reaches party,
 // player-list and warp code the headless link has no client layer for. -1 for any other header.
 EMSCRIPTEN_KEEPALIVE int d2_session_client_packet(const uint8_t* bytes, int len) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !bytes || len <= 0 || len > 512) return -1;
@@ -3033,6 +3846,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_packet(const uint8_t* bytes, int len)
     switch (packet[0]) {
     case 0x1C: handler = D2GAME_PACKETCALLBACK_Rcv0x1C_RemoveBodyItem_6FC854B0; break;
     case 0x58: handler = D2GAME_PACKETCALLBACK_Rcv0x58_QuestCompleted_6FC883B0; break;
+    case 0x61: if (len != 3) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x61_DropPickupMercItem_6FC88930; break;
     case 0x63: handler = D2GAME_PACKETCALLBACK_Rcv0x63_ShiftLeftClickItemToBelt_6FC88F80; break;
     default: return -1;
     }
@@ -3433,6 +4247,88 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         }
         if (!d2_aiframe_advance(1)) return 0;
         sub_6FC33670(g_game, g_targetClient);
+        // D2Client's per-frame DRLG streaming -- D2Common #10015 (0x6FD73F20) DRLGACTIVATE_Update,
+        // which had no caller anywhere in this tree, so nothing ever built the rooms the wave marked
+        // CLIENT_OUT_OF_SIGHT: one is built per nRoomsInitTimeout frames, and the pending-rooms step
+        // above then populates it. Retail runs it from the client's frame; the session tick IS our
+        // client's frame.
+        if (g_sessionActivationWave) {
+            D2ActiveRoomStrc* here = UNITS_GetRoom(g_targetPlayer);
+            if (here && here->pDrlgRoom && here->pDrlgRoom->pLevel) DRLGACTIVATE_Update(here->pDrlgRoom->pLevel->pDrlg);
+        }
+        // Retail's per-frame unit ANIMATION pass, which this tree has no caller for. It is D2Client's
+        // (like the rest of the draw side, D2Client is not ported): D2Common #10373 `UNITS_StopSequence`
+        // and #10193 `PATH_AdjustDirection` are exported and implemented, but nothing in D2MOO or in
+        // `src/` calls either one for a player -- D2MOO reaches StopSequence only from MonsterMode.cpp,
+        // where a monster's AI gates on its own frame. So the drawn hero's clock never left its
+        // mode-start value and its facing never left 0: every mode played frame 0 for its whole length,
+        // and a walk drawn both ways drew the same direction (s350, `` F47).
+        //
+        // #10373 advances `nSeqCurrentFramePrecise += wAnimSpeed` each game frame and wraps at
+        // `dwFrameCountPrecise`. Retail starts that counter two ways -- a frame index from
+        // `UNITS_SetAnimStartFrame` (#10349, `UNITS_GetFrameBonus(pUnit) << 8`: walk, neutral, NPC-style
+        // modes) or an epoch of game frames from `sub_6FCBCE70` (`pGame->dwGameFrame << 8`: the combat
+        // modes) -- and the wrap loop is a modulo under both readings, so one unconditional advance is
+        // right for both. The epoch's own consumer (`sub_6FCBCFD0`, `SkillPal.cpp`) reads it at mode
+        // start, before the first advance, so it is not disturbed. The ONE guard that is needed is a
+        // zero-length sequence: with `dwFrameCountPrecise` 0 the wrap loop's condition is true forever.
+        //
+        // #10193 walks `nDirection` toward the `nNewDirection` that the path pass above
+        // (`PATH_ComputeVelocityAndDirectionVectorsToNextPoint` -> `sub_6FDA9720`, reached from
+        // `D2Common_10226`) just set, which is what makes a hero who turns around draw a different DCC
+        // direction. It is a no-op when the two already agree.
+        if (g_targetPlayer->dwFrameCountPrecise > 0) UNITS_StopSequence(g_targetPlayer);
+        D2COMMON_10193_PATH_AdjustDirection(g_targetPlayer->pDynamicPath);
+        // Every OTHER unit's sequence advances on the same rendered frame, and for the same reason:
+        // retail's draw list shows a town NPC's or a monster's clock moving one animation frame per
+        // game frame while its mode does not change at all -- Warriv `frame=15,0,0,1` (NU, len 16,
+        // animSpeed 128, so the 0.5-rate step pattern) and the Rogue `frame=6,7,8,9` (NU, len 12,
+        // animSpeed 256) over the SAME four consecutive retail game frames as the hero's own
+        //. The player's call above is D2Common #10373, the
+        // game-logic advance, which also rewrites the mode of a `pAnimSeq` unit; the render-side
+        // advance is #10374 `UNITS_UpdateFrame`, the plain `nSeqCurrentFramePrecise += wAnimSpeed`
+        // with the wrap at `dwFrameCountPrecise` -- also exported, also implemented, and also with no
+        // caller anywhere in this tree or in D2MOO, because the pass that called it is D2Client's.
+        //
+        // It is deliberate that the two are different functions. #10374 touches the clock and nothing
+        // else: mode, `nActionFrame` and `UNITFLAG_SQGFXCHANGE` are left exactly as the game logic set
+        // them, so no AI, combat or spawn vector can move with this call -- and those vectors are
+        // captured from a HEADLESS retail host that never runs D2Client's pass, so they hold the
+        // spawn-time clock and #10373's mode rewrite would break them (s08-aitarget compares
+        // `framePrecise` byte for byte). The single guard is the same zero-length one the player's
+        // call needs: with `dwFrameCountPrecise` 0 the wrap has no period to wrap.
+        if (g_lastLevel) {
+            for (D2DrlgRoomStrc* animRoom = g_lastLevel->pFirstRoomEx; animRoom; animRoom = animRoom->pDrlgRoomNext) {
+                if (!animRoom->pRoom) continue;
+                for (D2UnitStrc* animUnit = animRoom->pRoom->pUnitFirst; animUnit; animUnit = animUnit->pRoomNext) {
+                    if (animUnit == g_targetPlayer) continue;
+                    // The facing, on the same pass and for the same reason as the clock above.
+                    // `sub_6FDA9720` writes `nNewDirection` -- and the per-step `nDiffDirection` that
+                    // reaches it -- whenever a unit's path recomputes its velocity vector, which is
+                    // what a walking monster's own movement does. The value DRAWN is `nDirection`, and
+                    // that one is only ever moved by #10193 `PATH_AdjustDirection`, which walks it
+                    // toward `nNewDirection` a step at a time. Cycle 204 wired #10193 for the player
+                    // alone, so every other unit's `nDirection` stayed at its spawn value for the
+                    // whole game: measured (s278, main's engine b6bb41793228), every monster in the
+                    // Den and on the Blood Moor held ONE facing -- 0, which the client resolves to DCC
+                    // direction 4 of 8 -- across a whole scene, where retail's own den draw list
+                    // records ONE Fallen at dir 23, 60, 3, 56, 51 and 44 (the retail captures
+                    // den-shadow-lit.txt). Gated to the two unit types that OWN a dynamic path, and
+                    // the gate is a whitelist on purpose: `pDynamicPath` shares a union with
+                    // `pStaticPath` (a tile's), so a type NEGATION leaves a tile's static path in the
+                    // field and the call walks a struct it knows nothing about -- measured,
+                    // `s59-client-room-streaming` died of a wasm out-of-bounds trap with a negation
+                    // guard and passes with this one. PLAYER and MONSTER are also exactly the two
+                    // types `sub_6FDA9720` sends through its `default:` branch (OBJECT, ITEM and
+                    // MISSILE write `nDirection` directly and leave `nNewDirection` alone, so
+                    // adjusting one would rotate a parked object toward a stale zero), and the two
+                    // `PATH_CheckCollisionsToNextPosition` asserts on.
+                    if (animUnit->dwUnitType == UNIT_PLAYER || animUnit->dwUnitType == UNIT_MONSTER)
+                        D2COMMON_10193_PATH_AdjustDirection(animUnit->pDynamicPath);
+                    if (animUnit->dwFrameCountPrecise > 0) UNITS_UpdateFrame(animUnit);
+                }
+            }
+        }
         if (g_sessionAttack.state == 1 && !g_sessionAttackResolved && g_sessionAttack.eventFrame &&
             g_game->dwGameFrame >= g_sessionAttack.eventFrame) {
             g_sessionAttackResolved = true;
@@ -3800,10 +4696,50 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_add_stat(uint32_t statId, uint32_t c
 // what the table allows.
 //
 // One record per skill of the player's class, in skill-id order:
-//   id, page (1..3), row, column, requiredLevel, baseLevel, iconCel, nameStr
+//   id, page (1..3), row, column, requiredLevel, baseLevel, iconCel, nameStr, descStr, manaStr, canLearn,
+//   manaLine, manaCost
 // iconCel indexes SkillIcon.dc6, so the panel draws retail's icon for the skill rather than one
-// picked by position; nameStr is the .tbl index of the skill's name, for d2_lang_string_by_index.
-struct D2SessionSkill { uint16_t id, page, row, column, requiredLevel, baseLevel, iconCel, nameStr; };
+// picked by position; nameStr/descStr/manaStr are SkillDesc's wStrName/wStrLong/wStrMana -- .tbl
+// indices for d2_lang_string_by_index -- so the panel's hover text is retail's own string and not a
+// sentence this client made up.
+//
+// canLearn is retail's answer to "may this character put a point here right now", and it is the
+// engine's own predicate, not a client rule: sessionSkillCanLearn() below runs exactly the checks
+// D2GAME_PACKETCALLBACK_Rcv0x3B_AddSkillPoint_6FC86EF0 runs before it spends a point. Before it
+// existed the client offered a "+" on any skill whose table level was met and whose invested level
+// was under 20, which offers a point on a skill retail rejects for its PREREQUISITES
+//.
+//
+// manaLine/manaCost are the tooltip's mana line (V19), and both are the ENGINE's answer, not a
+// client rule: manaLine is SkillDesc's own line table (nDescLine[17] -- descline1..6, dsc2line1..4,
+// dsc3line1..7 in that order) carrying a 1 on some line, which is where retail draws "Mana Cost: "
+// (measured on retail 1.13c's own frame of Bash's tooltip, 2026-09-27: descline1, and NOT on Frenzy's,
+// whose lines are 5/52/52/2/2); manaCost is SKILLS_GetManaCosts -- the same number the game spends,
+// 1/256 units -- at the level the tooltip describes: level 1 for a skill the character has not
+// learned (retail's frame reads "First Level" then "Mana Cost: 2" for Bash and "Mana Cost: 12.5" for
+// Whirlwind, both unlearned), the skill's own level otherwise. A negative cost (Magic Arrow's falls
+// with level) is reported as 0.
+struct D2SessionSkill { uint16_t id, page, row, column, requiredLevel, baseLevel, iconCel, nameStr, descStr, manaStr, canLearn, manaLine, manaCost; };
+static_assert(sizeof(D2SessionSkill) == 26, "D2SessionSkill is 26 bytes");
+
+// D2Game.0x6FC86EF0's precondition, in its own order and out of its own tables: class skill,
+// required skills (prerequisites), required attributes, the skill's maximum level (wMaxLvl, 20 when
+// the table says <= 0, exactly as the handler defaults it) and the skill points the next level costs
+// (dwSkPoints through the engine's own SKILLS_EvaluateSkillFormula -- the handler spends the same
+// number). True means the 0x3B handler would accept the point.
+static bool sessionSkillCanLearn(D2UnitStrc* unit, int32_t id, D2SkillsTxt* txt) {
+    if (!D2GAME_CheckSkillIfUnitsClassSkill_6FD11B50(unit, id)) return false;
+    if (!SKILLS_CheckRequiredSkills(unit, id) || !SKILLS_CheckRequiredAttributes(unit, id)) return false;
+    int32_t maxLvl = txt->wMaxLvl;
+    if (maxLvl <= 0) maxLvl = 20;
+    D2SkillStrc* known = SKILLS_GetSkillById(unit, id, -1u);
+    const int32_t level = known ? SKILLS_GetSkillLevel(unit, known, 0) : 0;
+    if (level >= maxLvl) return false;
+    int32_t cost = 1;
+    if (txt->dwSkPoints != -1)
+        cost = SKILLS_EvaluateSkillFormula(unit, txt->dwSkPoints, id, known ? SKILLS_GetSkillLevel(unit, known, 1) : 0);
+    return STATLIST_GetUnitBaseStat(unit, STAT_SKILLPTS, 0) >= cost;
+}
 
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_class_skills(D2SessionSkill* out, uint32_t cap) {
     if (!g_sessionLive || !g_targetPlayer || !sgptDataTables || !out) return 0;
@@ -3820,8 +4756,19 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_class_skills(D2SessionSkill* out, uint3
         row.page = desc->nSkillPage; row.row = desc->nSkillRow; row.column = desc->nSkillColumn;
         row.requiredLevel = skill->wReqLevel;
         row.iconCel = desc->nIconCel; row.nameStr = desc->wStrName;
+        row.descStr = desc->wStrLong; row.manaStr = desc->wStrMana;
         D2SkillStrc* known = SKILLS_GetHighestLevelSkillFromUnitAndId(g_targetPlayer, id);
-        row.baseLevel = (uint16_t)(known ? SKILLS_GetSkillLevel(g_targetPlayer, known, FALSE) : 0);
+        const int level = known ? SKILLS_GetSkillLevel(g_targetPlayer, known, FALSE) : 0;
+        row.baseLevel = (uint16_t)(level > 0 ? level : 0);
+        // The tooltip's mana line (V19): does SkillDesc's own line table carry a 1 somewhere, and what
+        // does the skill cost at the level the tooltip describes (level 1 when it is not learned)?
+        bool manaLine = false;
+        for (int i = 0; i < 17 && !manaLine; ++i) manaLine = desc->nDescLine[i] == 1;
+        int cost = SKILLS_GetManaCosts(id, level > 0 ? level : 1);
+        if (cost < 0) cost = 0;
+        row.manaLine = manaLine ? 1 : 0;
+        row.manaCost = (uint16_t)(cost > 0xFFFF ? 0xFFFF : cost);
+        row.canLearn = sessionSkillCanLearn(g_targetPlayer, id, skill) ? 1 : 0;
     }
     return n;
 }
@@ -3904,6 +4851,31 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_stow_body(uint32_t bodyLoc) {
     if (!cursor || !sub_6FC43E60(g_game, g_targetPlayer, cursor, 1, 0, __FILE__, __LINE__)) return 0;
     updateSessionSnapshot();
     return INVENTORY_GetItemFromBodyLoc(g_targetPlayer->pInventory, (int32_t)bodyLoc) ? 0 : 1;
+}
+
+// Retail's Swap Weapons, which its own Configure Controls screen binds to `W`. The client only asks: the
+// swap is the engine's own recovered function -- D2GAME_PACKETCALLBACK_Rcv0x60_SwapWeapons_6FC888A0's
+// `sub_6FC46840`, which moves the equipment between the two weapon sets, resets and re-assigns each
+// hand's skill and flips the active set. This does the same two checks that handler does first (the
+// swap only exists in an expansion game, and not while a skill is in use or the player is dead) and
+// then reports whether the engine's ACTIVE SET actually moved, so a refusal and a no-op are the same
+// answer to the caller. Returns 1 when the set switched.
+EMSCRIPTEN_KEEPALIVE int d2_session_command_swap_weapons() {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetClient || !g_targetPlayer->pInventory) return 0;
+    if (!g_game->bExpansion) return 0;
+    if (UNITS_GetUsedSkill(g_targetPlayer) || SUNIT_IsDead(g_targetPlayer)) return 0;
+    const uint8_t nBefore = CLIENTS_GetWeaponSwitch(g_targetClient);
+    int32_t nRefused = 0;
+    sub_6FC46840(g_game, g_targetPlayer, &nRefused);
+    updateSessionSnapshot();
+    return CLIENTS_GetWeaponSwitch(g_targetClient) != nBefore ? 1 : 0;
+}
+
+// Which weapon set is active (0 the primary pair, 1 the alternate), out of the engine's own client
+// record -- the bit retail's save header writes at 0x10. -1 outside a session.
+EMSCRIPTEN_KEEPALIVE int d2_session_weapon_switch() {
+    if (!g_sessionLive || !g_targetClient) return -1;
+    return (int)CLIENTS_GetWeaponSwitch(g_targetClient);
 }
 
 EMSCRIPTEN_KEEPALIVE int d2_session_command_respawn() {
@@ -4394,6 +5366,18 @@ EMSCRIPTEN_KEEPALIVE const D2SessionMotion* d2_session_motion() {
     return &g_sessionMotion;
 }
 
+// The player's path position at the engine's own 16.16 precision (see D2SessionCoords). The shell's
+// camera reads this instead of the whole-subtile x/y, which is what made the world step 16 px at a
+// time instead of gliding the way retail's does.
+EMSCRIPTEN_KEEPALIVE const D2SessionCoords* d2_session_player_coords() {
+    memset(&g_sessionCoords, 0, sizeof g_sessionCoords);
+    g_sessionCoords.version = 1; g_sessionCoords.size = sizeof g_sessionCoords;
+    if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return &g_sessionCoords;
+    const D2DynamicPathStrc* path = g_targetPlayer->pDynamicPath;
+    g_sessionCoords.preciseX = path->tGameCoords.dwPrecisionX;
+    g_sessionCoords.preciseY = path->tGameCoords.dwPrecisionY;
+    return &g_sessionCoords;
+}
 // Whether the player has a state (States.txt id) -- diagnosis for mode changes the engine refuses.
 EMSCRIPTEN_KEEPALIVE int d2_session_player_has_state(int stateId) { return g_targetPlayer && STATES_CheckState(g_targetPlayer, stateId) ? 1 : 0; }
 // Why d2_session_tick would not advance: each of its preconditions, as bits (1 live, 2 game,
@@ -4475,11 +5459,25 @@ EMSCRIPTEN_KEEPALIVE const D2SessionUnit* d2_session_units() {
 EMSCRIPTEN_KEEPALIVE int d2_session_unit_count() {
     updateSessionSnapshot(); return (int)g_sessionUnits.size();
 }
+// One D2SessionUnitCoord per d2_session_units record, in the same order. Separate from D2SessionUnit
+// so that record's stride -- which every scenario parses at fixed offsets -- does not move.
+EMSCRIPTEN_KEEPALIVE const D2SessionUnitCoord* d2_session_unit_coords() {
+    updateSessionSnapshot(); return g_sessionUnitCoords.data();
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_unit_coord_count() {
+    updateSessionSnapshot(); return (int)g_sessionUnitCoords.size();
+}
 EMSCRIPTEN_KEEPALIVE const D2SessionMonsterAnimation* d2_session_monster_animations() {
     updateSessionSnapshot(); return g_sessionMonsterAnimations.data();
 }
 EMSCRIPTEN_KEEPALIVE int d2_session_monster_animation_count() {
     updateSessionSnapshot(); return (int)g_sessionMonsterAnimations.size();
+}
+EMSCRIPTEN_KEEPALIVE const D2SessionMissileAnimation* d2_session_missile_animations() {
+    updateSessionSnapshot(); return g_sessionMissileAnimations.data();
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_missile_animation_count() {
+    updateSessionSnapshot(); return (int)g_sessionMissileAnimations.size();
 }
 EMSCRIPTEN_KEEPALIVE const D2SessionObjectPresentation* d2_session_object_presentations() {
     updateSessionSnapshot(); return g_sessionObjectPresentations.data();
@@ -4651,6 +5649,20 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_session_player_inventory_record() {
 //. They are table data: DATATBLS_GetInvRectFromBeltsTxt is D2Common #10638
 // and takes the 800x600 flag, so retail computes the layout and the client only draws it.
 //
+// Which Belts.txt row the player's belt is, for d2_session_belt_boxes below. UNITS_GetBeltType is
+// retail's own accessor (D2Common #10367: ItemsTxt's nBelt column of the WORN belt item), and 2 is
+// retail's fallback with no belt -- INVENTORY_GetFreeBeltSlot's own `int nBeltType = 2; if (pBelt)
+// nBeltType = UNITS_GetBeltType(pBelt);`. The caller had this row hardcoded to 2, so a worn Sash,
+// Belt, Heavy Belt, Girdle or Plated Belt still drew the four-box default row: every potion above
+// the first row landed on the first row, and one in a slot past 3 was not drawn at all
+//. Belts.txt gives the worn row 8/12/16 boxes at 800x600.
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_belt_index() {
+    if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pInventory) return 2;
+    D2UnitStrc* worn = INVENTORY_GetItemFromBodyLoc(g_targetPlayer->pInventory, BODYLOC_BELT);
+    if (!worn || worn->dwUnitType != UNIT_ITEM) return 2;
+    return (uint32_t)UNITS_GetBeltType(worn);
+}
+
 // out[0] = number of boxes; then 4 int32 per box (left, right, top, bottom).
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_belt_boxes(int beltIndex, int higherRes, int32_t* out, uint32_t cap) {
     if (!out || cap < 1) return 0;
@@ -4734,7 +5746,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tile_count() {
 // blocked; each light source adds ((r - d) * ((intensity << 16) / r)) >> 16 to the cells of its square,
 // d the octagonal distance ((max*0x3D7 + min*0x197) >> 10) in 1/8 subtiles from its position to the
 // cell's corner, the cell clamped to 255. Sources, as D2Client creates them (+0xFB58C20: radius =
-// min(r, 18) * 8, position (precise >> 13) + 4): the player (radius 13), objects with a light diameter
+// min(r, 18) * 8, position (precise >> 13) + 4): the player (13 + STAT_ITEM_LIGHTRADIUS, so 13 for an
+// ungeared character and 18 -- the clamp -- for a geared one), objects with a light diameter
 // for their mode (Objects.txt Lit, halved), monsters with one (MonStats2 Light). Not yet ported: the per-room
 // ambient override and the torch flicker. (The +0x149xxx addresses of an earlier change were wrong: the
 // light code is at D2Client+0xA8000..0xAA000.)
@@ -4807,14 +5820,37 @@ EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_session_lightmap(int ambientOve
     if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pDynamicPath || !g_lastLevel) return &m;
     const D2DynamicPathStrc* path = g_targetPlayer->pDynamicPath;
     m.originX = (int)path->tGameCoords.wPosX - 24; m.originY = (int)path->tGameCoords.wPosY - 24;
-    m.ambient = ambientOverride >= 0 ? ambientOverride : ENVIRONMENT_GetIntensityFromAct(g_game->pAct[g_currentAct]);
+    // The map's base is the LEVEL's own Levels.txt Intensity where the level defines one, and the act's
+    // day/night environment only where it defines none (0). Retail's captured maps read exactly the
+    // level's value: Act IV Town 140, Mesa 3 (the City of the Damned) 40 and Lava 1 (the River of Flame)
+    // 120, each dumped from the running game over the capture of that scene (retail/drawlists/act4-*.bin
+    // via tools/drawlist-light.py); every Act I..III outdoor level defines 0 and its capture reads the
+    // environment's time of day instead (Act II town 141, Act III docks 153). Nothing in this build
+    // drives ENVIRONMENT_* (UpdateTicks/UpdatePeriodOfDay/InitializeEnvironment have no caller), so the
+    // environment holds its creation-time default and using it lit every level of every act alike --
+    // which is what made Act IV brighter than retail's own frames of it (client-parity F11/V2).
+    const int levelId = path->pRoom ? DUNGEON_GetLevelIdFromRoom(path->pRoom) : 0;
+    const D2LevelDefBin* levelDef = levelId ? DATATBLS_GetLevelDefRecord(levelId) : nullptr;
+    const int levelIntensity = levelDef ? (int)levelDef->nIntensity : 0;
+    m.ambient = ambientOverride >= 0 ? ambientOverride
+        : (levelIntensity ? levelIntensity : ENVIRONMENT_GetIntensityFromAct(g_game->pAct[g_currentAct]));
     memset(m.intensity, m.ambient > 255 ? 255 : m.ambient, sizeof m.intensity);
     for (int gy = 0; gy < 48; gy++) for (int gx = 0; gx < 48; gx++) {
         D2ActiveRoomStrc* room = COLLISION_GetRoomBySubTileCoordinates(path->pRoom, m.originX + gx, m.originY + gy);
         m.blocked[gy * 48 + gx] = room && COLLISION_CheckMask(room, m.originX + gx, m.originY + gy, COLLIDE_VISIBLE | COLLIDE_BLANK) ? 1 : 0;
     }
     const int px = (int)(path->tGameCoords.dwPrecisionX >> 13) + 4, py = (int)(path->tGameCoords.dwPrecisionY >> 13) + 4;
-    lightAddSource(px, py, 13 * 8, 255, occludeUnits != 0, true); m.source[0] = { 0, (int32_t)g_targetPlayer->dwClassId, px, py, 13 * 8 }; m.sources = 1;
+    // A player's light radius is a STAT, not the constant 13: D2Client recomputes a unit's light source
+    // whenever STAT_ITEM_LIGHTRADIUS changes, giving a player unit 13 plus the stat's value (a monster
+    // gets max(its own item light, MonStats2 Light)), and the source's radius is min(r, 18) * 8. Both
+    // capture characters land on it exactly: the ungeared Oracle Barbarian reads 104 (13, stat 0) in
+    // every Act I-III/V scene, and the level-27 bootstrap character reads 144 (18, the clamp, stat 7).
+    // The act is not a variable in it (s880 reads each character's own stat). 
+    const int playerLight = 13 + STATLIST_UnitGetStatValue(g_targetPlayer, STAT_ITEM_LIGHTRADIUS, 0);
+    // Retail clamps a non-positive radius to 0 before the setter; a light penalty deep enough to reach
+    // it would otherwise put a negative radius in the source list this dump exposes.
+    const int playerRadius = (playerLight > 18 ? 18 : (playerLight < 0 ? 0 : playerLight)) * 8;
+    lightAddSource(px, py, playerRadius, 255, occludeUnits != 0, true); m.source[0] = { 0, (int32_t)g_targetPlayer->dwClassId, px, py, playerRadius }; m.sources = 1;
     for (D2DrlgLevelStrc* level = g_lastLevel->pDrlg ? g_lastLevel->pDrlg->pLevel : nullptr; level; level = level->pNextLevel)
         for (D2DrlgRoomStrc* roomEx = level->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
             if (!roomEx->pRoom) continue;
@@ -4947,6 +5983,24 @@ EMSCRIPTEN_KEEPALIVE int d2_session_set_character_name(const char* name) {
     return 1;
 }
 
+// The creation screen's two checkboxes, as the retail client save flags they are: Expansion
+// (CLIENTSAVEFLAG_EXPANSION) and Hardcore (CLIENTSAVEFLAG_HARDCORE). Called BEFORE the session is
+// created, like d2_session_set_character_name, because both the game's mode (makeGame) and the
+// client record the save header reads are built during create -- a live session's game mode is
+// already fixed, so a late call is refused rather than writing a file that disagrees with the game
+// it was played in. Returns 1 when recorded.
+EMSCRIPTEN_KEEPALIVE int d2_session_set_client_flags(int expansion, int hardcore) {
+    if (g_sessionLive) return 0;
+    uint32_t flags = 0;
+    if (expansion) flags |= CLIENTSAVEFLAG_EXPANSION;
+    if (hardcore) flags |= CLIENTSAVEFLAG_HARDCORE;
+    g_sessionClientSaveFlags = flags;
+    return 1;
+}
+
+// The flags the session would carry: what the .d2s header word at 0x24 will hold.
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_client_flags() { return g_sessionClientSaveFlags; }
+
 // The complete .d2s for the live character. Returns the byte count written, 0 on failure; the
 // PLRSAVE2 error code is available from d2_session_save_d2s_error().
 static std::vector<uint8_t> g_sessionSaveFile;
@@ -4977,8 +6031,76 @@ EMSCRIPTEN_KEEPALIVE int d2_session_load_d2s(const uint8_t* data, int len) {
     return D2WEB_PLRSAVE2_LoadIntoPlayer(g_game, g_targetPlayer, copy.data(), (uint32_t)copy.size());
 }
 
+EMSCRIPTEN_KEEPALIVE void d2_session_destroy();
+
+// Create a character FROM a file -- the other half of PLRSAVE2_ProcessSaveFile, and what a
+// character-select pick runs. Nothing here comes from the caller except the difficulty being
+// played: the class of the unit the session allocates, the act it is in, the town level and the
+// seed its map is generated from are all the FILE's (D2WEB_PLRSAVE2_ReadSaveHeader), which is the
+// difference between this and d2_session_load_d2s above -- that one needs a live player of a class
+// somebody else chose and only applies the sections to it.
+//
+// The name is retail's own check: a character joins a game as the name it logged in with, so the
+// caller names the character it picked (d2_session_set_character_name) and the file must agree.
+//
+// Returns 0 on success, otherwise the PLRSAVE2 error code.
+EMSCRIPTEN_KEEPALIVE int d2_session_create_from_save(const uint8_t* data, int len, int difficulty) {
+    if (!data || len <= 0 || difficulty < 0 || difficulty >= NUM_DIFFICULTIES) return PLRSAVE2ERROR_INVALID_SIZE;
+    // The reader (and the checksum) work on the buffer, so the caller's bytes are not touched.
+    std::vector<uint8_t> copy(data, data + len);
+
+    D2SaveHeaderReadStrc read = {};
+    const int32_t nHeaderError = D2WEB_PLRSAVE2_ReadSaveHeader(copy.data(), (uint32_t)copy.size(), difficulty, &read);
+    if (nHeaderError != PLRSAVE2ERROR_SUCCESS) return nHeaderError;
+
+    const D2SaveHeaderStrc* pHeader = read.pHeader;
+
+    // Retail's own name check (PLRSAVE2_ReadSaveHeader, _strcmpi): a character joins a game as the
+    // name it logged in with, so the caller's name must be the file's -- case-insensitively.
+    if (strcasecmp(g_sessionCharName, pHeader->szName) != 0) return PLRSAVE2ERROR_NOT_COMPATIBLE;
+
+    // A map seed of 0 is "this difficulty was never entered": retail rolls a fresh map there and so
+    // does the session's own fixture. Otherwise the character walks the map it was saved on.
+    const uint32_t nSeed = read.dwMapSeed ? read.dwMapSeed : 1;
+    const int nAct = read.nAct;
+    const int nLevel = (int)DUNGEON_GetTownLevelIdFromActNo(nAct);
+
+    // The class is the header's, and a bare player (no CharStats start kit) is what a saved
+    // character needs -- the kit would sit on top of the file's own items (client-parity C3m).
+    if (!d2_session_create_class_bare(nSeed, difficulty, nAct, nLevel, read.nClass)) return PLRSAVE2ERROR_UNKNOWN;
+
+    // Everything below can only be asked once the game the character is joining exists.
+    const int32_t nFlagsError = PLRSAVE2_CheckPlayerFlags(g_game, pHeader->dwSaveFlags);
+    if (nFlagsError != PLRSAVE2ERROR_SUCCESS) { d2_session_destroy(); return nFlagsError; }
+
+    CLIENTS_SetClassId(g_targetClient, read.nClass);
+    CLIENTS_SetPlayerInClient(g_targetClient, g_targetPlayer);
+    SUNIT_InitClientInPlayerData(g_targetPlayer, g_targetClient);
+    UNITS_SetNameInPlayerData(g_targetPlayer, CLIENTS_GetName(g_targetClient));
+
+    const int32_t nApplyError = D2WEB_PLRSAVE2_ApplySaveHeader(g_targetClient, g_targetPlayer, pHeader, nAct);
+    if (nApplyError != PLRSAVE2ERROR_SUCCESS) { d2_session_destroy(); return nApplyError; }
+
+    D2GAME_SUNITMSG_FirstFn_6FCC5520(g_game, g_targetPlayer, g_targetClient);
+
+    const int32_t nLoadError = D2WEB_PLRSAVE2_LoadIntoPlayer(g_game, g_targetPlayer, copy.data(), (uint32_t)copy.size());
+    if (nLoadError != PLRSAVE2ERROR_SUCCESS) { d2_session_destroy(); return nLoadError; }
+
+    updateSessionSnapshot();
+    return PLRSAVE2ERROR_SUCCESS;
+}
+
 EMSCRIPTEN_KEEPALIVE int d2_session_level_type() {
     return (g_sessionLive && g_lastLevel) ? g_lastLevel->nLevelType : -1;
+}
+// Retail's Levels.txt `Rain` column for the level the player stands in -- the flag D2Client's weather
+// pass starts from (client-parity F11b; 1 in the Rogue Encampment and Kurast Docktown and their
+// outdoor wilderness, 0 in every Act II level and every interior). -1 outside a session.
+EMSCRIPTEN_KEEPALIVE int d2_session_level_rain() {
+    if (!g_sessionLive || !g_targetPlayer) return -1;
+    D2ActiveRoomStrc* room = UNITS_GetRoom(g_targetPlayer);
+    const int levelId = room ? DUNGEON_GetLevelIdFromRoom(room) : -1;
+    return levelId < 0 ? -1 : (int)DATATBLS_GetRainFromLevelsTxt(levelId);
 }
 EMSCRIPTEN_KEEPALIVE const D2SessionWarp* d2_session_warps() {
     updateSessionSnapshot(); return g_sessionWarps.data();
@@ -4993,7 +6115,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_navigation_hash() {
 EMSCRIPTEN_KEEPALIVE void d2_session_destroy() {
     d2_monspawn_reset(); g_sessionLive = false; g_sessionMovePending = false;
     g_sessionAttackTarget = nullptr; g_sessionAttackSkill = nullptr;
-    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionTiles.clear(); g_sessionSeamTiles.clear(); g_sessionTileRolls.clear(); g_sessionTileLibraries.clear(); g_sessionWarps.clear();
+    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionTiles.clear(); g_sessionSeamTiles.clear(); g_sessionTileRolls.clear(); g_sessionTileLibraries.clear(); g_sessionWarps.clear(); g_sessionMissileAnimations.clear();
     memset(&g_sessionItemState, 0, sizeof g_sessionItemState);
     memset(&g_sessionNpcInteraction, 0, sizeof g_sessionNpcInteraction);
     memset(&g_sessionNpcDialog, 0, sizeof g_sessionNpcDialog); D2WEB_ResetLastDialogPacket();
@@ -5002,6 +6124,8 @@ EMSCRIPTEN_KEEPALIVE void d2_session_destroy() {
     g_sessionVendorItems.clear(); memset(&g_sessionVendorTransaction, 0, sizeof g_sessionVendorTransaction);
     g_sessionWorldHash = D2VEC_FNV_INIT; g_sessionTerrainHash = D2VEC_FNV_INIT;
     g_sessionNavigationHash = D2VEC_FNV_INIT;
+    // ... and back to the creation screen's defaults, so the next character's flags are its own.
+    g_sessionClientSaveFlags = CLIENTSAVEFLAG_EXPANSION;
     updateSessionSnapshot();
 }
 

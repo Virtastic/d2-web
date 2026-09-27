@@ -62,27 +62,77 @@ export function probeCapabilities(g = globalThis) {
 /** Best-effort browser name for the unsupported screen -- informational only, never the gate. */
 export function describeBrowser(ua) {
   ua = String(ua || '');
-  if (/iPad|iPhone|iPod/.test(ua)) return 'Safari';               // every iOS browser is WebKit
+  // The iOS browsers that are NOT Safari come first, by their engine-identifying token. The generic
+  // /iPad|iPhone|iPod/ test below matches every iOS UA, so running it first (as this did) made the
+  // CriOS/FxiOS branches dead code and told a person holding Chrome on an iPhone that "Safari cannot
+  // run d2-web" -- the wrong browser named, on the one screen whose whole job is to be honest
+  //. Every iOS browser is still WebKit, and the
+  // name still says so.
+  if (/CriOS\//.test(ua)) return 'Chrome for iOS (WebKit)';
+  if (/FxiOS\//.test(ua)) return 'Firefox for iOS (WebKit)';
+  if (/EdgiOS\//.test(ua)) return 'Edge for iOS (WebKit)';
+  if (/OPiOS\//.test(ua)) return 'Opera for iOS (WebKit)';
+  if (/iPad|iPhone|iPod/.test(ua)) return 'Safari';               // every other iOS browser is Safari
   if (/EdgA?\//.test(ua)) return 'Edge';
   if (/OPR\//.test(ua)) return 'Opera';
   if (/SamsungBrowser\//.test(ua)) return 'Samsung Internet';
-  if (/CriOS\//.test(ua)) return 'Chrome for iOS (WebKit)';
-  if (/FxiOS\//.test(ua)) return 'Firefox for iOS (WebKit)';
   if (/Firefox\//.test(ua)) return 'Firefox';
   if (/Chrome\//.test(ua)) return 'Chrome';
   if (/Version\/.*Safari\//.test(ua)) return 'Safari';
   return 'This browser';
 }
 
-/** The text of the unsupported screen: names the browser, what is missing, what runs the game. */
+/**
+ * The text of the unsupported screen: names the browser, what is missing, what runs the game -- and
+ * says WHICH of the two is at fault.
+ *
+ * `crossOriginIsolated` is not a browser capability; it is a fact about how the page was served.
+ * Reporting it as a missing browser feature made this screen lie twice over on a fully capable
+ * browser: "Chrome cannot run d2-web: missing cross-origin isolation (COOP/COEP). Runs today on
+ * Chrome or Edge 133+" -- the same sentence blaming Chrome and naming Chrome as a browser that runs
+ * it (measured live: Chrome 153 on a plain host without the headers, memory64 true).
+ *
+ * Memory64 IS a browser capability, and it is the discriminator: an engine that has it (Chrome/Edge
+ * 133+, Firefox 134+) is years newer than COOP/COEP (Chrome 92, Firefox 79), so a browser with
+ * Memory64 that is not cross-origin isolated was served the page wrong. Both engines can be wrong in
+ * principle (an extension or an enterprise policy that strips the headers); the advice names the
+ * likely cause and what to do about it either way.
+ *
+ * Returns `summary` (the headline), `advice` (why the engine needs what is missing, in the browser's
+ * or host's own terms) and `supportedBrowsers` (the list, empty when the browser is not the problem),
+ * which is what the page renders on three lines, plus `browser`/`missing`/`cause` for the test runner and
+ * `text` as those three lines joined -- exactly what the player reads.
+ */
 export function unsupportedMessage(caps, ua = (typeof navigator !== 'undefined' ? navigator.userAgent : '')) {
   const browser = describeBrowser(ua);
   const missing = [];
   if (!caps.crossOriginIsolated) missing.push('cross-origin isolation (COOP/COEP)');
   if (!caps.memory64) missing.push('WebAssembly Memory64');
+  const cause = caps.memory64 && !caps.crossOriginIsolated ? 'host' : 'browser';
+
+  if (cause === 'host') {
+    const summary = `This page is not cross-origin isolated, so the game cannot start.`;
+    const advice = `${browser} supports what the game needs -- the page was served without the `
+      + `COOP/COEP headers the engine requires for SharedArrayBuffer. Open it from a server that `
+      + `sends them (COOP: same-origin, COEP: require-corp, on any HTTPS or localhost host; this `
+      + `repo's play/serve.mjs does) and reload.`;
+    return { browser, missing, cause, supportedBrowsers: '', summary, advice, text: `${summary} ${advice}` };
+  }
+
+  // The browser IS at fault -- but the list of browsers that run the game is not the advice, it is
+  // the answer to "which browsers run this": it renders once, on its own line (index.html's
+  // `runs-today`), and a copy of it here printed the same sentence twice on every browser-fault
+  // screen. Seen, not inferred: the frame is in harness-out/s328-browser-unsupported-honest/
+  //. So this line says WHY the engine needs what is
+  // missing, in the browser's own terms, and `text` below is the three lines the page renders.
+  const summary = `${browser} cannot run d2-web: missing ${missing.join(' and ')}.`;
+  const advice = [
+    !caps.memory64 ? `The engine is built on 64-bit WebAssembly memory (wasm64), which this browser does not implement yet.` : '',
+    !caps.crossOriginIsolated ? `It also needs a cross-origin isolated page (COOP/COEP), which this host did not send.` : '',
+  ].filter(Boolean).join(' ');
+  const listLine = SUPPORTED_BROWSERS ? `Runs today on ${SUPPORTED_BROWSERS}.` : '';
   return {
-    browser, missing, supportedBrowsers: SUPPORTED_BROWSERS,
-    text: `${browser} cannot run d2-web: missing ${missing.join(' and ')}. `
-      + `Runs today on ${SUPPORTED_BROWSERS}.`,
+    browser, missing, cause, supportedBrowsers: SUPPORTED_BROWSERS, summary, advice,
+    text: [summary, advice, listLine].filter(Boolean).join(' '),
   };
 }

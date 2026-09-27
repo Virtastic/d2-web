@@ -4,6 +4,7 @@
 // it: left edge x, BOTTOM row y (drawlist.mjs), through the act palette.
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { createFont, decodeFontTbl } from './frontend.mjs';
+import { recordDc6 } from './drawlist.mjs';
 
 export const CHROME_ART = {
   border: 'data\\global\\ui\\PANEL\\800BorderFrame.dc6',
@@ -45,7 +46,21 @@ export function createPanelChrome(read, documentObject = globalThis.document) {
     /** Draw frame i of `path` anchored as retail does (left x, bottom row y). */
     cel(ctx, act, path, i, x, y) {
       const f = dc6(path).frames[i]; if (!f) return;
-      ctx.drawImage(canvasOf(forAct(act), path, i), x + f.offsetX, y + f.offsetY - f.height + 1);
+      const left = x + f.offsetX, top = y + f.offsetY - f.height + 1;
+      ctx.drawImage(canvasOf(forAct(act), path, i), left, top);
+      // Two callers want two different things from one blit, and both are right.
+      // `s367` compares the DRAW-LIST RECORD and requires it to be the very object that went into
+      // the list (`records.some(r => r === close.blit)`), so this must return `recordDc6`'s record
+      // itself. `s369` (skill-plus) reads `requested`/`drawn` off the same return to compare the cel
+      // it asked for against the cel that reached the canvas. Returning the record with the
+      // completed identity attached satisfies both without a second blit path; the extra two fields
+      // are additive and no draw-list comparison reads them.
+      const record = recordDc6(path, i, f, left, top);
+      if (record) {
+        record.requested = { path, frame: i, anchor: { x, y } };
+        record.drawn = { path, frame: i, x: left, y: top, w: f.width, h: f.height };
+      }
+      return record;
     },
     /** Font16 white text anchored at its bottom row. */
     text(ctx, act, s, x, y) { forAct(act).font.drawAnchored(ctx, s, x, y); },

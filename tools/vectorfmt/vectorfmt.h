@@ -584,7 +584,25 @@ struct D2VecTilePick {
 };
 static_assert(sizeof(D2VecTilePick) == 44, "tile pick record");
 
-enum D2VecKind : uint32_t { D2VEC_PRNG = 1, D2VEC_DRLG = 2, D2VEC_ITEMGEN = 3, D2VEC_MONSPAWN = 4, D2VEC_TABLE = 5, D2VEC_COMBAT = 6, D2VEC_AISPAWN = 7, D2VEC_AIFRAME = 8, D2VEC_AITARGET = 9, D2VEC_COMBATRESULT = 10, D2VEC_DAMAGECALC = 11, D2VEC_A1Q6 = 12, D2VEC_A1Q6PLAYER = 13, D2VEC_A1Q6TIMER = 14, D2VEC_A1Q6COMPLETE = 15, D2VEC_A1Q6DROP = 16, D2VEC_A1Q6TRAVEL = 17, D2VEC_NPCDIALOG = 18, D2VEC_NPCRESPONSE = 19, D2VEC_VENDORITEM = 20, D2VEC_VENDORBUY = 21, D2VEC_VENDORSELL = 22, D2VEC_HIRE = 23, D2VEC_VENDORMULTIBUY = 24, D2VEC_TILE = 25, D2VEC_TILEPICK = 26, D2VEC_AITRACE = 27, D2VEC_AIPATH = 28, D2VEC_MONDROP = 29 };
+// ROOMSIGHT: what the retail CLIENT does to the world as the player walks.
+// One record per event, in the order retail made it:
+//   op 1  DUNGEON_SetClientIsInSight      (level, x, y) = the point the client marked in sight
+//   op 0  DUNGEON_UnsetClientIsInSight    (level, x, y) = the point it released
+//   op 2  a capture MARK                  level = the mark's 1-based ordinal, x = y = 0
+//   op 4  a room lost its Room1           (level, x, y) = the room's subtile origin, FREED
+//   op 3  a room gained its Room1         (level, x, y) = the room's subtile origin, ALLOCATED
+// x and y are SUBTILES for every op, the units D2DrlgRoomStrc.nTileXPos * 5 and the units our
+// d2_session_room_create_log stores, so an op-3 stream and that log are the same shape and compare
+// directly. `tick` is GetTickCount() at the event.
+struct D2VecRoomSight {
+    uint32_t tick;
+    uint32_t op;
+    int32_t  level;      // op 3/4: the level id; op 1/0: the level the sight point is in; op 2: mark ordinal
+    int32_t  x, y;       // subtiles
+};
+static_assert(sizeof(D2VecRoomSight) == 20, "room sight record");
+
+enum D2VecKind : uint32_t { D2VEC_PRNG = 1, D2VEC_DRLG = 2, D2VEC_ITEMGEN = 3, D2VEC_MONSPAWN = 4, D2VEC_TABLE = 5, D2VEC_COMBAT = 6, D2VEC_AISPAWN = 7, D2VEC_AIFRAME = 8, D2VEC_AITARGET = 9, D2VEC_COMBATRESULT = 10, D2VEC_DAMAGECALC = 11, D2VEC_A1Q6 = 12, D2VEC_A1Q6PLAYER = 13, D2VEC_A1Q6TIMER = 14, D2VEC_A1Q6COMPLETE = 15, D2VEC_A1Q6DROP = 16, D2VEC_A1Q6TRAVEL = 17, D2VEC_NPCDIALOG = 18, D2VEC_NPCRESPONSE = 19, D2VEC_VENDORITEM = 20, D2VEC_VENDORBUY = 21, D2VEC_VENDORSELL = 22, D2VEC_HIRE = 23, D2VEC_VENDORMULTIBUY = 24, D2VEC_TILE = 25, D2VEC_TILEPICK = 26, D2VEC_AITRACE = 27, D2VEC_AIPATH = 28, D2VEC_MONDROP = 29, D2VEC_ROOMSIGHT = 30 };
 
 static inline uint32_t d2vec_fnv1a_step(uint32_t h, uint32_t v) {
     for (int i = 0; i < 4; i++) { h ^= (v >> (8 * i)) & 0xFF; h *= 16777619u; }

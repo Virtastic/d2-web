@@ -1,5 +1,7 @@
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { BORDER_RIGHT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
+import { paperdollIdentity } from './paperdoll-identity.mjs';
+import { PANEL_CLOSE_ART, panelCloseLayout } from './panel-close.mjs';
 
 // Inventory.txt Amazon2, normalized from its 800x600 screen coordinates to the
 // invchar6 panel origin. Retail leaves the final 80 pixels for the screen edge.
@@ -216,19 +218,23 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
         const left = slot.left + Math.floor((slot.width - bw) / 2), top = slot.top + Math.floor((slot.height - bh) / 2) + 1;
         ctx.drawImage(image, left - sx, top - sy);
         equippedItemPixels += image.width * image.height; equippedItemCount++;
-        drawn.push({ id: item.id, where: 'body', bodyLoc: item.bodyLoc, left, top, slot }); }
+        drawn.push(paperdollIdentity(item, decodeDc6(read(inventoryItemAsset(item.invFile))).frames[0], left, top, slot)); }
     }
     ctx.restore();
     // Gold, the gold button, the close button and the right-hand border (retail's anchors, s197).
     ctx.save(); ctx.translate(ox, oy); ctx.scale(scale, scale);
     chrome.text(ctx, act, String(state?.gold ?? 0), 508, 468);
     chrome.cel(ctx, act, CHROME_ART.gold, 0, 484, 469);
-    chrome.cel(ctx, act, CHROME_ART.close, 10, 418, 476);
+    // OpenDiablo2 inventory.go: the widget is at 419,449.  The DC6 is anchored
+    // at its retail draw origin, while evidence retains that logical hit rect.
+    const close = panelCloseLayout('inventory');
+    const closeBlit = chrome.cel(ctx, act, PANEL_CLOSE_ART.path, PANEL_CLOSE_ART.frame, 418, 476);
     chrome.border(ctx, act, BORDER_RIGHT);
     ctx.restore();
     return { x: baseX, y: baseY, scale, panelFrames: 4,
       panelPixels: [4, 5, 6, 7].reduce((sum, i) => sum + dc6.frames[i].width * dc6.frames[i].height, 0),
       itemCount: (state?.items || []).filter((item) => item.invPage === 0).length, itemPixels,
-      equippedItemCount, equippedItemPixels, drawn, layout: layout ? 'engine' : 'amazon2' };
+      equippedItemCount, equippedItemPixels, drawn, layout: layout ? 'engine' : 'amazon2',
+      close: { ...close, path: PANEL_CLOSE_ART.path, frame: PANEL_CLOSE_ART.frame, blit: closeBlit } };
   } };
 }

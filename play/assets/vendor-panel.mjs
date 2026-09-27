@@ -50,6 +50,23 @@ function frameCanvas(frame, palette, documentObject) {
   return canvas;
 }
 
+// `drawImage` has no result value.  For evidence, compare the destination rectangle immediately
+// before and after the blit; an asset which decodes but paints no pixels is not a drawn item.
+function changedOutputPixels(ctx, transform, x, y, width, height, draw) {
+  const x0 = Math.max(0, Math.floor(transform.e + x * transform.a));
+  const y0 = Math.max(0, Math.floor(transform.f + y * transform.d));
+  const x1 = Math.min(ctx.canvas.width, Math.ceil(transform.e + (x + width) * transform.a));
+  const y1 = Math.min(ctx.canvas.height, Math.ceil(transform.f + (y + height) * transform.d));
+  if (x1 <= x0 || y1 <= y0) { draw(); return 0; }
+  const before = ctx.getImageData(x0, y0, x1 - x0, y1 - y0).data;
+  draw();
+  const after = ctx.getImageData(x0, y0, x1 - x0, y1 - y0).data;
+  let changed = 0;
+  for (let i = 0; i < after.length; i += 4)
+    if (before[i] !== after[i] || before[i + 1] !== after[i + 1] || before[i + 2] !== after[i + 2] || before[i + 3] !== after[i + 3]) changed++;
+  return changed;
+}
+
 export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, layout = VENDOR_LAYOUT, documentObject = globalThis.document }) {
   // Everything drawn through a palette is built per act (the session's act, as the skill tree and
   // npc-menu.mjs fontsFor(act)): pal.dat for the art, pal.pl2 for the gold text and the item box blend.
@@ -79,6 +96,9 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
   };
   let cur = forAct(1);
   const chrome = createPanelChrome(read, documentObject);
+  // A decoded icon's first successful blit is sufficient evidence for its asset.  Retain that
+  // readback result so opening or redrawing a shop does not turn the renderer into a readback loop.
+  const visibleBlits = new WeakMap();
   // A stock item sits on retail's box, colour 234 in draw mode 0 (AlphaBlend[2][under][234]), as in the
   // inventory (s197/s250), read back from the canvas as palette indices.
   const itemBackground = (ctx, x, y, w, h) => {
@@ -102,7 +122,13 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
   let tab = 3, lastTabs = [];
   const view = (width, height) => { const scale = Math.min(width / 800, height / 600); return { scale, ox: (width - 800 * scale) / 2, oy: (height - 600 * scale) / 2 }; };
   const toScreen = (width, height, px, py) => { const v = view(width, height); return [(px - v.ox) / v.scale, (py - v.oy) / v.scale]; };
-  const tabsWithStock = (items) => [0, 1, 2, 3].filter((t) => items.some((it) => it.invPage === t));
+  // Inventory.txt has two weapon store pages (1 and 2), but the retail strip has
+  // one Weapons tab: vendor-malah-act5 draws frame 5 at x=160 once, never a second
+  // tab at x=240.  Page 2 is therefore not a second label/control.
+  const tabsWithStock = (items) => [0, 1, 3].filter((t) => items.some((it) => it.invPage === t || (t === 1 && it.invPage === 2)));
+  // This predicate deliberately serves both rendering and pointer selection.  Splitting page 2
+  // from page 1 here would make items the Weapons tab says it contains invisible or unclickable.
+  const belongsToTab = (it, t) => it.invPage === t || (t === 1 && it.invPage === 2);
   // Retail's anchors: the panel's top row is y 61, a tab's too.
   const tabRect = (t) => ({ x: L.left + t * L.tabStep, y: L.top + 1, w: cur.tabFrames[t].width, h: cur.tabFrames[t].height });
   const buttonTop = () => 446;   // retail: bottom row 477, 32 tall (vendor-akara)
@@ -121,9 +147,12 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
       const [x, y] = toScreen(width, height, px, py);
       const gx = Math.floor((x - L.gridLeft) / L.cell), gy = Math.floor((y - L.gridTop) / L.cell);
       if (gx < 0 || gx >= L.columns || gy < 0 || gy >= L.rows) return null;
-      // An item covers its whole footprint; a click anywhere on it buys it.
-      return (state?.items || []).find((it) => it.invPage === tab && gx >= it.gridX && gx < it.gridX + (it.width || 1) && gy >= it.gridY && gy < it.gridY + (it.height || 1))
-        ?? (state?.items || []).find((it) => it.invPage === tab && it.gridX === gx && it.gridY === gy) ?? null;
+      // An item covers its whole footprint -- the engine's own ItemsTxt nInvWidth/nInvHeight when the
+      // vendor presentation carries them -- and a click anywhere on it buys it.  Draw order is input
+      // order, so the final matching cel is visually on top: a grouped Weapons page can share a cell
+      // across pages 1/2, and selecting the top cel makes the hit test name the item the player sees.
+      return (state?.items || []).findLast((it) => belongsToTab(it, tab) && gx >= it.gridX && gx < it.gridX + (it.invWidth || it.width || 1) && gy >= it.gridY && gy < it.gridY + (it.invHeight || it.height || 1))
+        ?? (state?.items || []).findLast((it) => belongsToTab(it, tab) && it.gridX === gx && it.gridY === gy) ?? null;
     },
     /** The button under a canvas point (not 'blank'), for the vendor of MonStats class npcClass. */
     buttonAt(px, py, width, height, npcClass) {
@@ -160,16 +189,30 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
         face.drawAnchored(ctx, label, r.x + Math.floor((r.w + 4 - face.measure(label)) / 2), 80);
       }
       let shown = 0, drawnIcons = 0;
+      // The exact engine presentation identity carried into the visible panel. This makes the
+      // top-left cell and its whole ItemsTxt footprint observable to browser rows.
+      const drawnItems = [], undrawnItems = [];
       for (const it of items) {
-        if (it.invPage !== tab || it.gridX < 0 || it.gridY < 0) continue;
+        if (!belongsToTab(it, tab) || it.gridX < 0 || it.gridY < 0) continue;
         shown++;
         const img = icon(it.invFile);
         const x = L.gridLeft + it.gridX * L.cell, y = L.gridTop + it.gridY * L.cell;
         if (img) {
           const t = ctx.getTransform();
           itemBackground(ctx, t.e + x * t.a, t.f + y * t.d, Math.ceil(img.width / L.cell) * L.cell * t.a, Math.ceil(img.height / L.cell) * L.cell * t.d);
-          ctx.drawImage(img, x, y + 1); drawnIcons++;
-        }
+          let visiblePixels = visibleBlits.get(img);
+          if (visiblePixels === undefined) {
+            visiblePixels = changedOutputPixels(ctx, t, x, y + 1, img.width, img.height, () => ctx.drawImage(img, x, y + 1));
+            visibleBlits.set(img, visiblePixels);
+          } else ctx.drawImage(img, x, y + 1);
+          // Identity is evidence of a successful visible blit, never of an intended one.
+          if (visiblePixels > 0) {
+            drawnIcons++;
+            drawnItems.push({ id: it.id, invFile: it.invFile, asset: inventoryItemAsset(it.invFile), visiblePixels,
+              invPage: it.invPage, gridX: it.gridX, gridY: it.gridY,
+              invWidth: it.invWidth || it.width || 1, invHeight: it.invHeight || it.height || 1 });
+          } else undrawnItems.push({ id: it.id, invFile: it.invFile, asset: inventoryItemAsset(it.invFile), reason: 'no-visible-output' });
+        } else undrawnItems.push({ id: it.id, invFile: it.invFile, reason: 'unresolved-asset' });
       }
       // Retail's button row (vendor-akara: buysellbtn 2 / 4 / 0 / 10 at x 195/248/300/352, bottom row 477);
       // a smith's row is main's Buy / Sell / Repair / Repair All (not captured yet).
@@ -183,7 +226,7 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
       chrome.border(ctx, state?.act || 1, BORDER_LEFT); chrome.border(ctx, state?.act || 1, BORDER_RIGHT);
       ctx.restore();
       return { box: { x: L.left, y: L.top, width: panel.width, height: panel.height }, tab, tabs: [...lastTabs], shown, total: items.length,
-        drawnIcons, scroll: 0, gold: state?.gold ?? -1, buttons };
+        drawnIcons, drawnItems, undrawnItems, scroll: 0, gold: state?.gold ?? -1, buttons };
     },
   };
 }
