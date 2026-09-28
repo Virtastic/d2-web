@@ -47,7 +47,7 @@
 // draw from: inventing one would be a stand-in that looks right.  This file draws the peak intensity
 // continuously, which over-rains against retail's own dry captures; s561 counts it and F11b carries it
 // as the open half.
-import { decodeDc6 } from './d2-formats.mjs';
+import { decodeDatPalette, decodeDc6 } from './d2-formats.mjs';
 import { recordDc6 } from './drawlist.mjs';
 
 /** The two layers retail's captured frames draw, with the particle count of the Rogue Encampment's own
@@ -65,10 +65,58 @@ const TICKS_PER_FRAME = 2;  // measured above: 2169 and 2170 are the same animat
 /** The vector writes a cel path lower case with no `data\` and no extension. */
 const MPQ_PATH = (path) => path.toLowerCase();
 
+/**
+ * A decoded palette (RGBA, 256 * 4) -> the additive grey each cel byte contributes. THE RAIN'S RULE,
+ * and the one this file got wrong: the operand is the PALETTE'S VALUE for the byte, never the byte.
+ * `ACT1\pal.dat` maps the rain cels' indices 172..179 to (4,4,4) .. (32,32,32); using the index adds
+ * 172..179 instead, saturates every channel and drew the rain as solid white splats over the whole
+ * town. Exported so test/weather-intensity.test.mjs can pin it against the real palette.
+ */
+export function intensityTable(rgba) {
+  const table = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) table[i] = Math.max(rgba[i * 4], rgba[i * 4 + 1], rgba[i * 4 + 2]);
+  return table;
+}
+
+/**
+ * Every act palette maps the rain cels' indices 172..179 IDENTICALLY, so this renderer does not need
+ * to be told which act it is drawing. MEASURED over reference/riiablo's vendored copies of retail's
+ * own files, `pal.dat` 172..179: ACT1, ACT2, ACT3, ACT4, ACT5 and Sky are all
+ * (4,4,4) (8,8,8) (12,12,12) (16,16,16) (20,20,20) (24,24,24) (24,28,36) (32,32,32), one distinct
+ * mapping across six files. The other palettes in that set (menu, EndGame, Trademark, fechar) differ,
+ * and none of them is an act.
+ *
+ * This is why the palette is read HERE rather than plumbed in from the caller: `belt-renderer.mjs`,
+ * `character-panel.mjs` and `death-screen.mjs` all read their own `pal.dat` the same way, and the
+ * caller-side plumbing this replaced is what the held attempt is suspected of breaking `s126` with.
+ * The `act` argument stays on `setLevel` so a caller that knows the act can select it, but nothing
+ * has to.
+ */
+const ACT_PALETTE = (act) => `data\\global\\palette\\ACT${Math.min(5, Math.max(1, (act | 0) + 1))}\\pal.dat`;
+
 export function createWeatherRenderer({ read, documentObject = globalThis.document }) {
   const layers = [];
   const errors = [];
   let prepared = false, levelRain = 0;
+  let actN = 0, grey = null;
+
+  /**
+   * 256-entry byte -> the additive grey that byte contributes, from the act's own palette. A palette
+   * that will not load is recorded on `errors` (which the row reads) and yields a table of ZEROES, so
+   * the frame draws no rain rather than a false one. Falling back to the raw index here would restore
+   * the exact defect this replaced: 172..179 added to every channel is solid white.
+   */
+  const greyTable = () => {
+    if (grey) return grey;
+    try {
+      // decodeDatPalette returns RGBA (256 * 4), not one byte per entry: index by 4, not 3.
+      grey = intensityTable(decodeDatPalette(read(ACT_PALETTE(actN))));
+    } catch (error) {
+      errors.push(`palette for act ${actN + 1}: ${error}`);
+      grey = new Uint8Array(256);                     // all zero: no false rain to look at
+    }
+    return grey;
+  };
 
   /**
    * The rain's own bytes are the INTENSITY, not a palette index.  Every act palette maps the cels'
@@ -90,7 +138,15 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
         const rgba = new Uint8ClampedArray(frame.indices.length * 4);
         for (let i = 0; i < frame.indices.length; i++) {
           if (!frame.opaque[i]) continue;
-          const value = frame.indices[i];
+          // The intensity is the ACT PALETTE's value for this byte, NOT the byte itself. The cels'
+          // dominant indices are 172..179 and `ACT1\pal.dat` maps them to (4,4,4) .. (32,32,32); retail's
+          // own frame of the same draws (retail/drawlists/town3.png) has the streaks "25 or more brighter
+          // than their neighbours", which is that palette value. Drawing the raw index adds 172..179,
+          // saturates every channel, and is why the rain rendered as solid white splats over the town
+          // (seen on :8950 2026-09-27: 6,395 near-white px on the ground band against retail's 631, 96%
+          // of them moving -- the particle layer). Which D2DDraw path mode 3 takes is not recovered, so
+          // the additive model is still a model; the OPERAND is what the measured delta settles.
+          const value = greyTable()[frame.indices[i]];
           rgba[i * 4] = value; rgba[i * 4 + 1] = value; rgba[i * 4 + 2] = value; rgba[i * 4 + 3] = 255;
         }
         const canvas = documentObject.createElement('canvas');
@@ -122,7 +178,20 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
 
   return {
     /** The level's own Rain byte, straight from the engine's Levels.txt read. */
-    setLevel(rain) { levelRain = Number(rain) > 0 ? 1 : 0; },
+    /**
+     * The level's own Rain byte, straight from the engine's Levels.txt read, and optionally the act
+     * that colours it. A change of act invalidates the palette table AND the per-frame bitmaps built
+     * from it. `act` is optional: every act palette agrees on the rain indices (ACT_PALETTE above), so
+     * a caller that does not know the act still gets the right colours.
+     */
+    setLevel(rain, act) {
+      levelRain = Number(rain) > 0 ? 1 : 0;
+      const next = Number.isFinite(act) ? Math.min(4, Math.max(0, act | 0)) : actN;
+      if (next !== actN) {
+        actN = next; grey = null;
+        for (const layer of layers) layer.bitmaps.clear();
+      }
+    },
 
     active() { return levelRain === 1; },
 

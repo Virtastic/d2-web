@@ -69,6 +69,7 @@
 #include <PLAYER/PlrSave.h>
 #include <PLAYER/PlrSave2.h>
 #include <ITEMS/ItemMode.h>
+#include <INVENTORY/InvMode.h>   // D2GAME_INVMODE_Last_6FC416D0, the save-time delivery-flag reset
 #include <UNIT/Party.h>
 #include <MONSTER/MonsterRegion.h>
 #include <MONSTER/Monster.h>
@@ -3780,6 +3781,17 @@ EMSCRIPTEN_KEEPALIVE int d2_session_item_quality(uint32_t itemId) {
     D2UnitStrc* item = (g_sessionLive && g_game) ? SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId) : nullptr;
     return item && item->pItemData ? (int)item->pItemData->dwQualityNo : -1;
 }
+// What an item IS, by retail's own classifier: ITEMS_CheckItemTypeIdByItemId walks Items.txt's
+// wType[0]/wType[1] through ItemTypes.txt's equivalence LUT, so "is this a weapon" is a column retail
+// owns rather than a list of item codes anybody paraphrases. A client that needs it had none of it:
+// the shared player armed a bare-handed hero by matching a hand-typed 3-letter code regex, which
+// matched exactly 1 of Larzuk's 48 store rows at the act V hero's level (act5-bootstrap, F53), so a
+// full store and a full purse could still come back "nothing affordable". Keyed by CLASS id, which is
+// what d2_session_inventory_items and the item presentations already hand out. itemType is an
+// ITEMTYPE_* code from D2Items.h (ITEMTYPE_WEAPON 45, ITEMTYPE_ARMOR 2, ITEMTYPE_ANY_ARMOR 47).
+EMSCRIPTEN_KEEPALIVE int d2_session_item_class_is_type(uint32_t classId, int32_t itemType) {
+    return ITEMS_CheckItemTypeIdByItemId((int)classId, itemType) ? 1 : 0;
+}
 
 // Client packet 0x19 {itemGUID}: lift a stored inventory item onto the cursor.
 EMSCRIPTEN_KEEPALIVE int d2_session_command_item_to_cursor_packet(uint32_t itemId) {
@@ -4369,7 +4381,13 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
 // Why the last primary attack was refused (0 = not refused), so a refusal is never guessed at.
 static int g_sessionAttackReason = 0;
 enum { ATTACK_OK = 0, ATTACK_NO_SESSION = 1, ATTACK_BUSY = 2, ATTACK_NO_TARGET = 3, ATTACK_NOT_NEAR = 4,
-       ATTACK_TARGET_DEAD = 5, ATTACK_UNTARGETABLE = 6, ATTACK_NO_SKILL = 7, ATTACK_NO_PATH = 8 };
+       ATTACK_TARGET_DEAD = 5, ATTACK_UNTARGETABLE = 6, ATTACK_NO_SKILL = 7, ATTACK_NO_PATH = 8,
+       // The command was accepted and the swing set up, but the skill-do armed no ENDANIM, so nothing
+       // will ever end it and the attack was NOT put in flight (state 0, no lock held, no blow thrown).
+       // It used to leave g_sessionAttackReason at ATTACK_OK, so a caller reading the reason could not
+       // tell that no-op from a swing that did start -- and 133 of 400 rounds of the act V Shenk fight
+       // are exactly this population, against 260 refused BUSY (F53, act5-bootstrap).
+       ATTACK_NO_ENDANIM = 9 };
 EMSCRIPTEN_KEEPALIVE int d2_session_attack_reason() { return g_sessionAttackReason; }
 // A target is reachable from the player's room or any room adjacent to it. The session used to
 // require the SAME room, which retail does not: a monster standing across a room seam could not be
@@ -4491,7 +4509,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_primary_attack(uint32_t targetUnitId
     // No animation started (the skill-do accepted the command but the player never left neutral, e.g.
     // hit mid-click): nothing will end it, so the attack is not in flight. Left at state 1 it refused
     // every later command, across death and respawn, while the pack killed the player (s000b, Sewers).
-    if (!g_sessionAttackEndFrame) { g_sessionAttack.state = 0; return 0; }
+    if (!g_sessionAttackEndFrame) { g_sessionAttack.state = 0; g_sessionAttackReason = ATTACK_NO_ENDANIM; return 0; }
     return 1;
 }
 
@@ -4517,7 +4535,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_throw(uint32_t targetUnitId) {
     // No animation started (the skill-do accepted the command but the player never left neutral, e.g.
     // hit mid-click): nothing will end it, so the attack is not in flight. Left at state 1 it refused
     // every later command, across death and respawn, while the pack killed the player (s000b, Sewers).
-    if (!g_sessionAttackEndFrame) { g_sessionAttack.state = 0; return 0; }
+    if (!g_sessionAttackEndFrame) { g_sessionAttack.state = 0; g_sessionAttackReason = ATTACK_NO_ENDANIM; return 0; }
     return 1;
 }
 
@@ -4543,7 +4561,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_kick(uint32_t targetUnitId) {
     // No animation started (the skill-do accepted the command but the player never left neutral, e.g.
     // hit mid-click): nothing will end it, so the attack is not in flight. Left at state 1 it refused
     // every later command, across death and respawn, while the pack killed the player (s000b, Sewers).
-    if (!g_sessionAttackEndFrame) { g_sessionAttack.state = 0; return 0; }
+    if (!g_sessionAttackEndFrame) { g_sessionAttack.state = 0; g_sessionAttackReason = ATTACK_NO_ENDANIM; return 0; }
     return 1;
 }
 
@@ -6009,6 +6027,18 @@ static int g_sessionSaveError = 0;
 EMSCRIPTEN_KEEPALIVE int d2_session_save_d2s(uint8_t* out, int cap) {
     g_sessionSaveError = 0;
     if (!g_sessionLive || !g_game || !g_targetPlayer || !out || cap <= 0) { g_sessionSaveError = -1; return 0; }
+    // What a character FILE carries is the flags retail's session is left with, and retail clears a
+    // unit's DELIVERY flags on every frame the unit is queued (D2Game 0x6FC3C5B0
+    // `LEVEL_UpdateQueuedUnitsInAllActs` -> `sub_6FCBC300` -> `D2GAME_INVMODE_Last_6FC416D0` over the
+    // unit's inventory). This tree had no caller for that flush anywhere (
+    // C3q), so a start-kit item kept IFLAG_NEWITEM, which the equip path sets, all the way into the
+    // file. Measured against retail 1.13c itself: a fresh Paladin it creates and saves writes
+    // `00a22010` on each of its six potions and `00822010` on its sword and shield -- INSTORE |
+    // STARTITEM | JUSTSAVED (| COMPACTSAVE) and no IFLAG_NEWITEM -- while this engine wrote
+    // `00822011`. The reset is retail's own function applied to the player, at the boundary where
+    // the file is composed: an item flags word that says "the client has not been told about this
+    // item yet" is session bookkeeping, not part of the character.
+    D2GAME_INVMODE_Last_6FC416D0(g_game, g_targetPlayer);
     constexpr uint32_t kCapacity = 0x2000;   // retail's own buffer size in D2GAME_SAVE_WriteFile
     g_sessionSaveFile.assign(kCapacity, 0);
     uint32_t written = 0;

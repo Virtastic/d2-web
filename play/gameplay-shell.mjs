@@ -107,8 +107,6 @@ let corpseRenderer = null, corpseEvidence = null, lastCorpseRecovery = null, mis
 let weatherRenderer = null, weatherEvidence = { rain: -1, blits: [] };
 let frameError = '', frameErrors = 0;
 let npcCount = 0;
-// F22: how many units the ENGINE reports as having a speech pending this frame.
-let speechAlertCount = 0;
 let npcPanel = null, npcPanelError = '', npcState = null, npcPanelEvidence = null;
 // A long walk in progress: where we are going, what to do on arrival, and how it is going.
 let walkGoal = null, walkIdle = 0, walkLast = null, walkEvidence = { active: false, hops: 0, reason: 0 };
@@ -146,9 +144,6 @@ let lastPurchase = null, lastSale = null;
 let monsterRenderer = null;
 let npcSpeechAlertRenderer = null;
 let unitDrawEvidence = [];
-// F22: one identity per NPC speech-alert blit drawn this frame, so a row can read the pixels back
-// from the rectangle the blit actually landed in rather than from a rectangle it re-derived.
-let npcAlertEvidence = [];
 let objectRenderer = null;
 let waypointPadEvidence = [];
 let itemRenderer = null;
@@ -946,10 +941,6 @@ function readNpcState() {
             invFile += String.fromCharCode(ch);
           }
           sprites.set(pv.getUint32(0, true), { invFile,
-            // The presentation's own classId (D2SessionItemPresentation, bytes 4-7): what the offer IS,
-            // for d2_session_item_class_is_type. s000e's armUp armed a bare-handed hero by matching a
-            // hand-typed 3-letter code regex, which matched 1 of Larzuk's 26 weapon rows (F53).
-            classId: pv.getUint32(4, true),
             gridX: pv.getInt16(104, true), gridY: pv.getInt16(106, true), invPage: Module.HEAPU8[o + 108],
             // ItemsTxt nInvWidth/nInvHeight: presentation bytes shared with P3b's item cursor.
             invWidth: Module.HEAPU8[o + 110] || 1, invHeight: Module.HEAPU8[o + 111] || 1 });
@@ -962,7 +953,7 @@ function readNpcState() {
           .replace(/\0/g, '').trim();
         const id = row.getUint32(0, true);
         const art = sprites.get(id) || {};
-        items.push({ id, code: codeText, classId: art.classId ?? -1, cost: row.getUint32(20, true),
+        items.push({ id, code: codeText, cost: row.getUint32(20, true),
           invFile: art.invFile || '', gridX: art.gridX ?? -1, gridY: art.gridY ?? -1,
           invPage: art.invPage ?? 255, invWidth: art.invWidth ?? 1, invHeight: art.invHeight ?? 1,
           name: Module.ccall('d2_lang_string', 'string', ['string'], [codeText]) || codeText });
@@ -1155,19 +1146,6 @@ function readUnitKinds(count) {
   } catch { return null; } finally { Module._free(p); }
 }
 
-// F22: which units carry retail's NPC speech alert, one byte per unit in snapshot.entities order.
-// The engine answers it from its own per-player NPC-intro flags (the buffer it syncs to the client
-// in server packet 0x91 and clears on client packet 0x4D). No answer -> no alert: an engine without
-// the export must not have the client invent one, the same contract the renderer's `pending` has.
-function readNpcSpeechAlerts(count) {
-  if (!count) return null;
-  const p = Module._malloc(count);
-  try {
-    const n = Module.ccall('d2_session_npc_speech_alerts', 'number', ['bigint', 'number'], [BigInt(p), count]);
-    return n > 0 ? Module.HEAPU8.slice(Number(p), Number(p) + n) : null;
-  } catch { return null; } finally { Module._free(p); }
-}
-
 // Advance the engine by one game frame.
 //   forced (a test runner `step()`): exactly ONE game frame, and the wall-clock clock is zeroed, so a
 //     scenario's step count stays deterministic however the browser happened to schedule it.
@@ -1314,7 +1292,7 @@ function update(forceTick = false) {
       // walk in progress releases the hold around it and rebuilds after it, as before.
       const hold = Boolean(Module._d2_session_hold_world), holdWorld = (on) => { if (hold) Module.ccall('d2_session_hold_world', null, ['number'], [on ? 1 : 0]); };
       holdWorld(true);
-      let kinds, alerts;
+      let kinds;
       try {
         snapshot = session.readSnapshot(); motion = session.motion();
         // Hostility is the monster's alignment, not "is a monster"; talkable is its INTERACT flag.
@@ -1327,20 +1305,13 @@ function update(forceTick = false) {
         if (walkGoal && engineAdvanced) { holdWorld(false); walkStep(); holdWorld(true); }
         npcState = npcMenu?.open ? null : readNpcState();   // the menu comes first; the window opens on its entry
         kinds = readUnitKinds(snapshot.entities.length);
-        alerts = readNpcSpeechAlerts(snapshot.entities.length);
       } finally { holdWorld(false); }
-      npcCount = 0; speechAlertCount = 0;
+      npcCount = 0;
       if (kinds) for (let i = 0; i < snapshot.entities.length && i < kinds.length; i++) {
         const entity = snapshot.entities[i], kind = kinds[i];
         entity.npc = (kind & 1) !== 0;
         entity.hostile = (kind & 2) !== 0;
         if (entity.npc) npcCount++;
-      }
-      // F22: the engine's pending-speech bit decides the alert; a unit the engine says nothing about
-      // keeps `undefined`, which the renderer already treats as "do not draw".
-      if (alerts) for (let i = 0; i < snapshot.entities.length && i < alerts.length; i++) {
-        snapshot.entities[i].speechPending = alerts[i] !== 0;
-        if (alerts[i]) speechAlertCount++;
       }
     }
     catch (error) { sessionError = String(error); session = null; }
@@ -1630,7 +1601,7 @@ function drawFrame() {
   // Sprites are handed to the terrain pass rather than painted after it, so a wall in front of a
   // monster covers the monster. `depth` is the projected screen Y -- the same key the walls sort on.
   const sprites = [];
-  corpseEvidence = null; unitDrawEvidence = []; waypointPadEvidence = []; missileEvidence = []; npcAlertEvidence = [];
+  corpseEvidence = null; unitDrawEvidence = []; waypointPadEvidence = []; missileEvidence = [];
   for (const entity of snapshot.entities) {
     // The player is drawn by drawPlayer and ground items by the item pass; neither is a dot here.
     if (entity.kind === 'item' || (entity.kind === 'player' && entity.id === snapshot.playerId)) continue;
@@ -1670,13 +1641,7 @@ function drawFrame() {
       // correctly marked non-hostile they stopped being drawn and Charsi became a dot.
       const being = entity.animation ? monsterRenderer?.draw(c, sx, sy, entity.animation, snapshot.act) : null;
       const drawn = Boolean(being);
-      // F22: the alert's pending state is the ENGINE's per-unit bit (d2_session_npc_speech_alerts,
-      // read into entity.speechPending above), never a client quest guess. The renderer's own record
-      // of what it painted is kept beside the unit so a row can read the canvas back at that
-      // rectangle -- the blit that reached the canvas, not the request that produced it.
-      const alert = npcSpeechAlertRenderer?.draw(c, sx, sy, entity, entity.speechPending, snapshot.tick);
-      if (alert && alert.drawn) npcAlertEvidence.push({ id: entity.id, classId: entity.classId,
-        anchorX: Math.round(sx), anchorY: Math.round(sy), tick: snapshot.tick, ...alert });
+      npcSpeechAlertRenderer?.draw(c, sx, sy, entity, entity.speechPending, snapshot.tick);
       // Per unit, what was drawn and where (s000e asserts Harrogath's townsfolk against retail's draw list).
       // The identity the renderer DREW is carried through beside the mode the shell handed it -- without
       // it a row can only say a unit was drawn, not that it drew the sequence the engine asked for (s278).
@@ -2696,12 +2661,6 @@ window.__d2Shell = { input, get snapshot() { return snapshot; },
   // frame -- the record shape retail's draw lists use, so a row can compare them record for record.
   get weatherEvidence() { return { rain: weatherEvidence.rain, errors: weatherEvidence.errors ? weatherEvidence.errors.slice() : [], blits: weatherEvidence.blits.map((b) => ({ ...b })) }; },
   get npcSpeechAlertRenderer() { return npcSpeechAlertRenderer; },
-  // F22: the units the engine reports as having a speech pending, and one drawn-blit identity per
-  // alert actually painted this frame -- the cel's own rectangle on the canvas and the decoded hash
-  // of the frame rasterised into it, so a row reads the blit back rather than the request.
-  get npcSpeechAlerts() { return { pending: snapshot.entities.filter((e) => e.speechPending === true)
-      .map((e) => ({ id: e.id, classId: e.classId, x: e.x, y: e.y, preciseX: e.preciseX, preciseY: e.preciseY })), count: speechAlertCount }; },
-  get npcAlertEvidence() { return npcAlertEvidence.map((entry) => ({ ...entry })); },
   get objectRenderer() { return objectRenderer; },
   get waypointPadEvidence() { return waypointPadEvidence.map((entry) => JSON.parse(JSON.stringify(entry))); },
   get itemRenderer() { return itemRenderer; },
@@ -3014,7 +2973,7 @@ window.__d2Shell = { input, get snapshot() { return snapshot; },
       out.shop = {};
       for (let y = 2; y < h; y += 4) for (let x = 2; x < w; x += 4) {
         const it = vendorPanel.itemAt(x, y, w, h, npcState);
-        if (it && !(it.id in out.shop)) out.shop[it.id] = { at: [x + 6, y + 6], code: it.code, cost: it.cost, classId: it.classId };
+        if (it && !(it.id in out.shop)) out.shop[it.id] = { at: [x + 6, y + 6], code: it.code, cost: it.cost };
       }
       out.shopTabs = vendorPanel.tabTargets(w, h);
       out.shopButtons = vendorPanel.buttonTargets(w, h, npcState.classId);
