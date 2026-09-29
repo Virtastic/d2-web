@@ -86,10 +86,23 @@ int32_t CLIENTS_GetExperienceLoss(D2ClientStrc* pClient) { return {}; }
 // it creates a character (see d2_session_set_character).
 char* CLIENTS_GetName(D2ClientStrc* pClient) { return pClient ? pClient->szName : nullptr; }
 uint8_t __fastcall CLIENTS_GetWeaponSwitch(D2ClientStrc* pClient) { return pClient ? pClient->bSwitchWeapon : 0; }
-// D2CMP is the graphics/palette DLL; the headless session loads no palettes, so the colour
-// transform a caller would apply to an item's inventory image has nothing to resolve against.
-// Returning null is the honest answer here -- it is a rendering concern, not a save-data one.
-uint8_t* __stdcall D2CMP_MixPalette(uint8_t nTrans, int nColor) { return nullptr; }
+// D2CMP is the graphics/palette DLL; the headless session loads no palette PIXELS, so this cannot
+// return usable image data. It does not need to: every caller (ITEMS_GetColor, Items.cpp) uses the
+// return only as a truthy "does a transform apply" check, and separately writes the actual value it
+// wants recorded -- (colourField & 31) + 32*nTrans -- into its own *pColor out-parameter before
+// returning this call's result. That packed value is a 1-based index into the PL2 MaxComponentBlend
+// bank once the save-writer increments it (client-parity C3o; play/assets/frontend.mjs
+// PL2_MAX_COMPONENT_BLEND names the client-side offset the byte selects).
+// So the one fact this function must get right is validity, matching retail's own gate seen at every
+// call site (nTrans in [1,8], nColor in [0,20]; a bank sized for a component array of NUM_COMPONENTS
+// entries and 21 colourField values gTxtComponentItemTypeMap+D2StatesTxt/D2MagicAffixTxt use). A
+// stable non-null address per (nTrans, nColor) satisfies every caller without palette pixels; nothing
+// dereferences the pointer's pointee.
+uint8_t* __stdcall D2CMP_MixPalette(uint8_t nTrans, int nColor) {
+    if (nTrans < 1 || nTrans > 8 || nColor < 0 || nColor > 20) return nullptr;
+    static uint8_t sentinel[9][21];
+    return &sentinel[nTrans][nColor];
+}
 int32_t __fastcall CLIENTS_GetClassId(D2ClientStrc* pClient) { return pClient ? pClient->nClassId : 0; }
 int32_t __fastcall CLIENTS_GetFlags(D2ClientStrc* pClient) {
     if (!pClient) return 0;
@@ -204,8 +217,30 @@ void __fastcall sub_6FC33670(D2GameStrc* pGame, D2ClientStrc* pClient) {
         sub_6FC33020(pClient, playerRoom);
     }
     if (UNITS_GetRoom(player)) UNITROOM_RefreshUnit(player);
+    // The level's roof POPS, once per client frame from the player's own room and position: D2Common
+    // #10012 DUNGEON_UpdatePops -> DRLGPRESET_UpdatePops, which hides the roof the preset's pop region
+    // names while the player stands inside that region (and reveals it again on the way out). Its only
+    // caller in retail is the client frame, which is this function's role here -- nothing in the tree
+    // called it, so every roof stayed drawn and the Fortress hid the hero under one (client-parity F44).
+    // The coordinates are the session's own subtile position, the unit DUNGEON_UpdatePops' region test
+    // is written in (5 * the map's tile coordinate, DrlgPreset.cpp).
+    if (playerRoom && player->pDynamicPath) {
+        DUNGEON_UpdatePops(playerRoom, player->pDynamicPath->tGameCoords.wPosX, player->pDynamicPath->tGameCoords.wPosY, FALSE);
+    }
 }
-void CLIENTS_ToggleFlag(D2ClientStrc* pClient, uint16_t nFlag, int32_t bSet) {}
+// 1.13c D2Game.0x6FC3xxxx (D2MOO Clients.cpp CLIENTS_ToggleFlag): sets or clears one bit of the
+// client's own save flags (D2ClientStrc::tSaveFlags, the same word PLRSAVE2_WriteSaveHeader writes
+// to the .d2s header at 0x24). This was a no-op, so retail's own death path (PLRMODE_StartID_Death /
+// PLRMODE_StartXY_Dead, PlrModes.cpp) calling CLIENTS_ToggleFlag(pClient, CLIENTSAVEFLAG_DEAD, TRUE)
+// never actually marked a dying client dead: the flags a hardcore player read back after dying, and
+// the .d2s this engine wrote for them, both stayed HARDCORE|EXPANSION with no DEAD bit, so nothing
+// downstream that gates on CLIENTSAVEFLAG_DEAD (the hardcore resurrect refusal, PLRSAVE2's
+// DEADHARDCORE reload check) could ever fire.
+void CLIENTS_ToggleFlag(D2ClientStrc* pClient, uint16_t nFlag, int32_t bSet) {
+    if (!pClient) return;
+    if (bSet) pClient->tSaveFlags.nPackedValue |= nFlag;
+    else pClient->tSaveFlags.nPackedValue &= ~nFlag;
+}
 // 1.13c D2Game.0x6FC33xxx (D2MOO Clients.cpp CLIENTS_UpdateCharacterProgression). Retail's own
 // progression update, called by each act-boss quest the moment its boss dies (A1Q6 passes 1 ...
 // A5Q6 passes 5): the count is the HIGH-WATER mark of act + difficulty * actsPerDifficulty, where

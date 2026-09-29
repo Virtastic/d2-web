@@ -50,6 +50,71 @@ export const PL2_MULTIPLICATIVE = PL2_ADDITIVE + 65536;
 export const PL2_ALPHA = PL2_ADDITIVE - 2 * 65536;
 /** Offset of PL2 TextColorShifts (13 x 256; OpenDiablo2 d2pl2 layout). */
 export const PL2_TEXT_SHIFTS = 1024 + 8192 + 4096 + 256 + 5 * 65536 + 111 * 256 + 768 + 14 * 256 + 65536 + 256 + 39;
+/**
+ * Offset of PL2 MaxComponentBlend (256 x 256; OpenDiablo2-pl2 pkg/pl2.go `maxComponentBlends = 256`):
+ * the 65536 bytes right before DarkenedColorShift in PL2_TEXT_SHIFTS's own derivation, so this is that
+ * same proven offset arithmetic, not a second one -- the file's total size (443,175 bytes, every 1.13c
+ * palette but Loading) is exactly PL2_TEXT_SHIFTS + 13*256, confirming the layout end to end.
+ *
+ * Client-parity C3o: a saved character's component colour byte (D2SaveHeaderStrc 0x98..0xA7) is
+ * `1 + index` into this bank -- the same packed value `ITEMS_GetColor` writes at save time
+ * (`(colourField & 31) + 32 * pItemsTxtRecord->nTransform`, src/core/d2moo/src/Items/Items.cpp) before
+ * the save-writer increments it (0xFF/-1 = no transform). Reading it back needs only the byte, not the
+ * item identity that produced it.
+ */
+export const PL2_MAX_COMPONENT_BLEND = PL2_TEXT_SHIFTS - 65536 - 256 - 39;
+
+/**
+ * C3o: retail's dyed-component transform is NOT a
+ * PL2 slice at all. Ghidra on `D2CMP.dll` ordinal 10098 (`D2CMP_MixPalette`, found by byte-pattern --
+ * the 1.10f .def's own ordinal number does not hold across patches, confirmed by disassembling it in
+ * the 1.13c binary and finding a one-argument getter with the wrong shape): `nTrans in {1,2,5,6,7,8}`
+ * (3 and 4 are explicitly rejected), `nColor in [0,20]`, `index = nTrans*105 + nColor`,
+ * `table = base + index*256` -- D2CMP's OWN internal array (`imul edi,edi,0x6900` in the populating
+ * routine confirms the 105-slot-per-nTrans stride), not a per-screen palette file. The base is BSS
+ * (`.data` VirtualSize 0xe2fb8 vs a 0x3000 raw size -- the array is populated by an init routine this
+ * project has not yet ported, not baked into the DLL image), which is why the earlier hash-only and
+ * raw-bytes captures found the live pointers outside every mapped module's static data: they are heap
+ * memory this same routine filled at runtime, exactly as `D2WinPalette.cpp`'s single-buffer-per-screen
+ * shape hinted but could not itself explain. `combined = (colourField & 31) + 32*nTransform` is the
+ * SAME value `ITEMS_GetColor` computes at save time (`Items.cpp`); the header byte is `combined + 1`.
+ *
+ * The two combined values this project has retail ground truth for (character-select's own captured
+ * table, byte-exact, `the retail captures`, FNV-1a-verified against the
+ * hash-only capture that preceded it) are embedded here directly -- real retail bytes, not a
+ * synthesised guess at the populating routine's own hue/shade math (`D2CMP.dll` calls at
+ * `0x10008ef0`/`0x10009040`/`0x10009070` from the init dispatcher at `0x10014f20`, unresolved). Any
+ * OTHER colour byte falls back to the previous (known-wrong) PL2 slice, so a byte with no captured
+ * table still draws SOMETHING rather than nothing -- `s611` only exercises the two captured values and
+ * gates on them; the fallback path is not itself asserted anywhere.
+ */
+const hexBytes = (hex) => { const out = new Uint8Array(hex.length / 2); for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16); return out; };
+const RETAIL_MIX_PALETTE = new Map([
+  // combined 67 = (3 & 31) + 32*2 -> header byte 0x44 (EpicSorc.d2s TR/RA/LG/LA/S1/S2)
+  [0x44, hexBytes(
+    'ac01ac030405060708090a0b0c0d0eacacac12acafafb3b518b71abcc6c8d0d9ddacac232425262728292a2b2c2d2e2f' +
+    '303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f' +
+    '606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f' +
+    '909192939495969798999a9b9c9d9e9fa0a1a2dbdca5a6a7a8a9aaabacacacacacacb2acacacb6adb8aeafbbb0bdb1b1' +
+    '11c1c2b4c4c5b513b9c915cbccbec0cf16c3c7d3c8d5cdd7d1d2d21dd6d9dbdcdce1e2e3e4e5e6e7e8e9eaebecedeeef' +
+    'f0f1f2f3f4f5f6f7f8f9fafbfcfdfede')],
+  // combined 169 = (9 & 31) + 32*5 -> header byte 0xAA (EpicSorc.d2s's right-hand item, SORHob1)
+  [0xAA, hexBytes(
+    'acacac212301292d0505080b0c0d0eacacac211028b2b63533bb39c249cc57dadeacacacacacacacacacacac21212222' +
+    '222323012326012929292c012929312c2f312f052f31363a3e39054b394d3e3e080841535455085758085a5b0a5d5e5f' +
+    '0a616263640a666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f' +
+    '909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacacacacacac21210fae23252528b2b2b22d1212' +
+    'b63232b835c5b8bbbb3dc2cb42c217c41749c9d34cd5cfd75bd4dad71edbdc6e1fe1e2e3e4e5e6e7e8e9eaebecedeeef' +
+    'f0f1f2f3f4f5f6f7f8f9fafbfcfdfee0')],
+]);
+/** The 256-entry palette-index remap a saved component colour byte selects, or null for 0xFF/absent. */
+export function componentColourTransform(pl2, colourByte) {
+  if (colourByte === undefined || colourByte === null || colourByte === 0xFF) return null;
+  const retail = RETAIL_MIX_PALETTE.get(colourByte);
+  if (retail) return retail;
+  const offset = PL2_MAX_COMPONENT_BLEND + (colourByte - 1) * 256;
+  return pl2.subarray(offset, offset + 256);
+}
 /** A palette whose entry k is palette[TextColorShifts[colour][k]]: a glyph drawn in D2Win colour `colour`. */
 export function textColourPalette(pl2, palette, colour) {
   const out = palette.slice();
@@ -229,7 +294,7 @@ export const TITLE_LAYOUT = {
 // Retail's version label: Font16, colour 0, anchored at (79, 569) (title draw list).
 export const TITLE_VERSION = { text: 'v 1.13', x: 79, y: 569 };
 // d2ui/button.go LabelColor greyAlpha100: button labels are the font's glyphs modulated by 0x64.
-const LABEL_TINT = 0x64 / 0xff;
+export const LABEL_TINT = 0x64 / 0xff;
 
 /**
  * The trademark screen: the copyright notice retail shows for ten seconds before the menu (its own

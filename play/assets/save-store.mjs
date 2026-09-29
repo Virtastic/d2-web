@@ -42,6 +42,10 @@ export function readSaveHeader(bytes) {
     playerClass: bytes[OFF_CLASS],
     className: CLASS_NAMES[bytes[OFF_CLASS]] ?? `class ${bytes[OFF_CLASS]}`,
     level: bytes[OFF_LEVEL],
+    // The client save flags word (0x24): 0x20 Expansion, 0x04 Hardcore (PLRSAVE2_WriteSaveHeader).
+    flags: view.getUint32(0x24, true) >>> 0,
+    expansion: Boolean(view.getUint32(0x24, true) & 0x20),
+    hardcore: Boolean(view.getUint32(0x24, true) & 0x04),
     difficulty, act0: Math.min(act0, 4),
     bytes: bytes.length,
     // The character-menu appearance (D2SaveHeaderStrc 0x88: 16 component indices, 0x98: 16 colours),
@@ -156,6 +160,9 @@ export function createSaveStore({ indexedDBObject = globalThis.indexedDB, storag
       journal.write(record);
       return header;
     },
+    // Side data (PlugY .sss blobs) beside the characters, same store, key '_LOD_<name>.sss'. Never a .d2s.
+    async putAux(key, bytes) { requestPersistOnce(); await run(await db(), 'readwrite', (store) => store.put({ name: key, aux: true, saved: 0, data: Uint8Array.from(bytes) })); },
+    async getAux(key) { const r = await run(await db(), 'readonly', (store) => store.get(key)); return r ? Uint8Array.from(r.data) : null; },
     get persistRequested() { return persistRequested; },
     async get(name) {
       await restoreUnloadJournal();
@@ -170,7 +177,7 @@ export function createSaveStore({ indexedDBObject = globalThis.indexedDB, storag
         .filter((header) => header && header.name)
         .sort((a, b) => b.saved - a.saved);
     },
-    async remove(name) { journal.invalidate(name); await run(await db(), 'readwrite', (store) => store.delete(name)); },
+    async remove(name) { journal.invalidate(name); await run(await db(), 'readwrite', (store) => { store.delete(`_LOD_${name}.sss`); return store.delete(name); }); },
     async clear() { journal.invalidate(); await run(await db(), 'readwrite', (store) => store.clear()); },
   };
 }

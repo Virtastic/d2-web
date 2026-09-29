@@ -3,12 +3,17 @@
 //   1. COOP/COEP so the page is crossOriginIsolated (SharedArrayBuffer -> pthreads, streamfs)
 //   2. HTTP Range so streamfs can fetch chunks
 //   3. a precompressed .br sibling served when the client accepts it
-// node play/serve.mjs [port] [dir]   (default 8920, this dir; 127.0.0.1 only -- no auth)
+// node play/serve.mjs [port] [dir]   (default 8920, this dir; 127.0.0.1 only unless D2_BIND=0.0.0.0 -- no auth)
 // D2_RETAIL_DIR=<dir with the retail *.mpq> additionally serves them under /retail/ so the page
 // can streamfs-mount them (local/harness use; the deployed site never hosts retail data).
 // ci/build.sh stages a versioned copy in build-wasm/site/ and serves THAT, so
 // version-engine.sh never rewrites the tracked play/index.html.
-import { createServer } from 'node:http';
+import { createServer as createHttp } from 'node:http';
+import { createServer as createHttps } from 'node:https';
+import { readFileSync } from 'node:fs';
+// D2_TLS_DIR=<dir with key.pem + cert.pem> serves HTTPS (a secure context, so the game can be cross-origin isolated from a LAN address).
+const TLS = process.env.D2_TLS_DIR ? { key: readFileSync(join(process.env.D2_TLS_DIR, 'key.pem')), cert: readFileSync(join(process.env.D2_TLS_DIR, 'cert.pem')) } : null;
+const createServer = (h) => TLS ? createHttps(TLS, h) : createHttp(h);
 import { createReadStream, statSync, existsSync } from 'node:fs';
 import { join, extname, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,6 +36,10 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/ja
 
 createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
+  // D2_RETAIL_REDIRECT=1: a bare page load gets ?retail=1, else it mounts no retail data and reports a missing .bik.
+  if (RETAIL && process.env.D2_RETAIL_REDIRECT === '1' && (url.pathname === '/' || url.pathname === '/index.html') && ![...url.searchParams.keys()].some(k => k === 'retail' || k === 'play')) {
+    url.searchParams.set('retail', '1'); res.writeHead(302, { Location: '/index.html' + url.search }); res.end(); return;
+  }
   // Which site this server is serving. A harness reuses a server already on its port only when it
   // serves THAT test runner's staged site; two worktrees that stage the same engine build have
   // byte-identical index.html (version-engine.sh hashes only wasm/loader/streamfs), so comparing
@@ -74,4 +83,4 @@ createServer((req, res) => {
   res.writeHead(200, h);
   if (req.method === 'HEAD') return res.end();
   createReadStream(file).pipe(res);
-}).listen(PORT, '127.0.0.1', () => console.log(`play/ on http://127.0.0.1:${PORT}/`));
+}).listen(PORT, process.env.D2_BIND || '127.0.0.1', () => console.log(`play/ on http://${process.env.D2_BIND || '127.0.0.1'}:${PORT}/`));

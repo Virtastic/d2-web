@@ -85,6 +85,7 @@ struct D2SetItemsTxt
 	D2PropertyStrc pProperties[9];			//0x88
 	D2PropertyStrc pPartialBoni[10];		//0x118
 };
+static_assert(sizeof(D2SetItemsTxt) == 440, "D2SetItemsTxt is a .bin record: retail's is 0x1B8 bytes");
 
 struct D2SetsTxt
 {
@@ -99,8 +100,17 @@ struct D2SetsTxt
 	D2PropertyStrc pBoni4[2];				//0x50
 	D2PropertyStrc pBoni5[2];				//0x70
 	D2PropertyStrc pFBoni[8];				//0x90
-	D2SetItemsTxt* pSetItem[6];				//0x110
+	// 0x110: retail's `D2SetItemsTxt* pSetItem[6]` -- six POINTERS, 24 bytes, and the shipped
+	// sets.bin's record is exactly 0x128 = 296 bytes for that reason. On wasm64 the same field
+	// declared as pointers is 48 bytes, so the record becomes 320 and DATATBLS_CompileTxt's
+	// record array -- which is the .bin itself, indexed at `sizeof(D2SetsTxt)` -- is read at a
+	// 24-byte-per-record skew from record 1 on (24 bytes past the end by record 31). The slots
+	// hold setitems ROW INDICES instead; DATATBLS_GetSetItemOfSet() is the deref the pointer
+	// field used to be. Measured: the skew is exactly the `too many items in set N` boot trace
+	//.
+	uint32_t dwSetItemIndex[6];				//0x110
 };
+static_assert(sizeof(D2SetsTxt) == 296, "D2SetsTxt is a .bin record: retail's is 0x128 bytes (32-bit pointer slots)");
 
 enum D2C_UniqueItemsTxtFlagIndices
 {
@@ -643,6 +653,11 @@ void __fastcall DATATBLS_LoadSets_SetItemsTxt(HD2ARCHIVE hArchive);
 void __fastcall DATATBLS_UnloadSets_SetItemsTxt();
 // Inlined
 D2SetItemsTxt* __stdcall DATATBLS_GetSetItemsTxtRecord(int nSetItemId);
+// The i'th set item of a set: retail dereferenced pSetItem[i], which is the same record this
+// resolves (the loader stores the setitems row index in the 4-byte slot the pointer occupied).
+inline D2SetItemsTxt* DATATBLS_GetSetItemOfSet(const D2SetsTxt* pSet, int i) {
+	return (pSet && i >= 0 && i < 6) ? DATATBLS_GetSetItemsTxtRecord((int)pSet->dwSetItemIndex[i]) : nullptr;
+}
 // Inlined
 D2SetsTxt* __stdcall DATATBLS_GetSetsTxtRecord(int nSetId);
 // Inlined

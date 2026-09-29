@@ -90,7 +90,26 @@
   // entirely. Used only for URL-sourced (server-hosted) reads on Firefox: it needs no worker round
   // trip at all, so it also skips the persistent Cache-API chunk store the worker keeps for the other
   // browsers (a speed loss noted here, not a correctness one -- ).
+  //
+  // d2-web divergence: WebKit hits the identical stall, MEASURED 2026-09-28
+  // (`tools/webkit-boot-check.mjs`) -- capability probe passes (`crossOriginIsolated:true,
+  // memory64:true`), the worker mounts every MPQ, and the first read then times out at the same
+  // ~30s worker/Atomics deadline issue 9 diagnosed for Firefox, because WebKit's process model has the
+  // same property: a worker's fetch body delivery depends on the page's main thread returning to
+  // its event loop, which the `fetchChunkSync` spin below never does (Chrome's out-of-process
+  // network stack is the odd one out, not the rule). issue 9's fix -- skip the worker/Atomics path for
+  // URL-sourced reads and use a synchronous XHR on the main thread instead -- is not
+  // Firefox-specific in its reasoning, so it is extended to WebKit rather than re-derived: same
+  // `fetchRangeSyncXHR`, same `overrideMimeType('text/plain; charset=x-user-defined')` byte
+  // trick. UA sniffing is otherwise avoided in this codebase (platform-probe.mjs feature-detects),
+  // but no feature flag distinguishes "does this browser's worker fetch need the main thread free"
+  // -- the same trade issue 9 already made. The desktop-Safari/WebKit signature
+  // (`Version/<n> Safari/<n>` with no `Chrome/` token) is the one platform-probe.mjs's own
+  // `describeBrowser` already uses to name Safari, so it is reused here rather than invented.
   const IS_FIREFOX = typeof navigator !== 'undefined' && /Firefox\//.test(navigator.userAgent || '');
+  const IS_WEBKIT = typeof navigator !== 'undefined' &&
+    /Version\/.*Safari\//.test(navigator.userAgent || '') && !/Chrome\//.test(navigator.userAgent || '');
+  const NEEDS_SYNC_XHR = IS_FIREFOX || IS_WEBKIT;
   // d2-web divergence: this read has NO deadline of its own, and none can be given to
   // it. A window-context synchronous XHR may not set `xhr.timeout` (the spec throws
   // InvalidAccessError -- the whole reason the request is synchronous is that a caller needs the bytes
@@ -125,7 +144,7 @@
       const ms = Math.round(performance.now() - t0);
       ST.misses++; ST.stallMs += ms; ST.lastReadMs = ms; ST.lastReadUrl = url;
       throw new Error('streamfs: ' + url + ' did not answer within ' + ms + 'ms -- the host accepted ' +
-        'the request and then stalled. Firefox reads URL sources synchronously, and a synchronous XHR ' +
+        'the request and then stalled. This browser reads URL sources synchronously, and a synchronous XHR ' +
         'cannot take a timeout, so the browser\'s own network timeout is the only bound ' +
         '', { cause: err });
     }
@@ -248,9 +267,10 @@
       ST.hits++;
       return hit;
     }
-    // d2-web divergence: Firefox's worker+Atomics round trip stalls (see IS_FIREFOX above) --
-    // read URL sources with a direct synchronous XHR instead, no worker or spin needed.
-    if (IS_FIREFOX && src.url) {
+    // d2-web divergence: Firefox's and WebKit's worker+Atomics round trip stalls (see
+    // NEEDS_SYNC_XHR above, issue 9/issue 20) -- read URL sources with a direct synchronous XHR instead, no
+    // worker or spin needed.
+    if (NEEDS_SYNC_XHR && src.url) {
       const t0f = performance.now();
       const chunk = fetchRangeSyncXHR(src, src.url, start, end);
       ST.misses++; ST.stallMs += performance.now() - t0f; ST.bytes += chunk.length;

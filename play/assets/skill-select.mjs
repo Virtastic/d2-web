@@ -9,19 +9,23 @@
 // the engine (`d2_session_selected_skills`, the unit's own left/right skill), and selecting goes
 // through the engine (`d2_session_command_select_skill`). Nothing here decides a skill exists.
 //
-// Layout is prior art, not derived: OpenDiablo2 d2game/d2player/game_controls.go puts the buttons
-// at (117,550) and (635,550), 50x50, and skill_select_panel.go draws the popup's rows 48px tall,
-// the first row's top at y=465 and each further row 48px above it; the left popup starts at x=90,
-// the right one ends at x=720. Rows are SkillDesc ListRow 0..4, empty rows skipped; the left popup
-// omits skills without Skills.txt `leftskill`, both omit passives and ListRow -1. Left rows are
-// ordered by skill id ascending, right rows descending.
+// Layout is prior art, cross-checked against retail's own frame: OpenDiablo2 d2game/d2player/
+// game_controls.go puts the buttons at (117,550) and (635,550), 50x50, and skill_select_panel.go
+// draws the popup's rows 48px tall, the first row's top at y=465 and each further row 48px above it,
+// the right popup ending at x=720. The left popup's start x is retail's OWN measured value, not
+// OpenDiablo2's: `s341-drawlist-skill-popup-layout` reads it off `the retail captures
+// v9b-skill-popup-left.txt` (retail 1.13c, retail-capture 2026-09-28) and found x=80, 10px left of
+// OpenDiablo2's 90 -- icons at 80,128,176. Rows are SkillDesc ListRow 0..4, empty rows skipped; the
+// left popup omits skills without Skills.txt `leftskill`, both omit passives and ListRow -1. Left
+// rows are ordered by skill id ascending, right rows descending.
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { recordDc6 } from './drawlist.mjs';
+import { hudOrigin } from './hud-origin.mjs';
 
 export const SESSION_SKILL_CHOICE_BYTES = 8;   // D2SessionSkillChoice
 export const SKILL_SELECT_LAYOUT = Object.freeze({
   left: { x: 117, y: 550, w: 50, h: 50 }, right: { x: 635, y: 550, w: 50, h: 50 },
-  icon: 48, firstRowTop: 465, leftStartX: 90, rightEndX: 720, rows: 5,
+  icon: 48, firstRowTop: 465, leftStartX: 80, rightEndX: 720, rows: 5,
 });
 const CLASS_TOKEN = ['am', 'so', 'ne', 'pa', 'ba', 'dr', 'as'];
 // The per-class sheet (<token>skillicon.dc6) holds the class's icons; the general skills (Attack,
@@ -73,46 +77,47 @@ export function createSkillSelectRenderer(read, documentObject = globalThis.docu
     }
     return sheets.get(key);
   };
-  const origin = (width, height) => { const scale = Math.min(1, width / 800, height / 600); return { scale, x: (width - 800 * scale) / 2, y: (height - 600 * scale) / 2 }; };
-  const toScreen = (x, y, width, height) => { const o = origin(width, height); return [(x - o.x) / o.scale, (y - o.y) / o.scale]; };
+  // Each hand's button and popup are anchored to their own screen edge and the bottom (hud-origin.mjs).
+  const origin = (width, height, side) => hudOrigin(width, height, side === 'right' ? 'bottom-right' : 'bottom-left');
+  const toScreen = (x, y, width, height, side) => { const o = origin(width, height, side); return [(x - o.x) / o.scale, (y - o.y) / o.scale]; };
   const inRect = (x, y, r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
   const renderer = {
     open: null,
     /** What is under a canvas point: { button: side } or { side, skill } in the open popup. */
     hitTest(cx, cy, width, height, choices) {
-      const [x, y] = toScreen(cx, cy, width, height), L = SKILL_SELECT_LAYOUT;
-      if (this.open) for (const row of skillSelectRows(choices, this.open))
-        for (const s of row.skills) if (inRect(x, y, { x: s.x, y: s.y, w: L.icon, h: L.icon })) return { side: this.open, skill: s };
-      for (const side of ['left', 'right']) if (inRect(x, y, L[side])) return { button: side };
+      const L = SKILL_SELECT_LAYOUT;
+      if (this.open) { const [x, y] = toScreen(cx, cy, width, height, this.open);
+        for (const row of skillSelectRows(choices, this.open))
+          for (const s of row.skills) if (inRect(x, y, { x: s.x, y: s.y, w: L.icon, h: L.icon })) return { side: this.open, skill: s }; }
+      for (const side of ['left', 'right']) { const [x, y] = toScreen(cx, cy, width, height, side); if (inRect(x, y, L[side])) return { button: side }; }
       return null;
     },
     /** Canvas-pixel centres of the buttons and of every icon in the open popup (for aimed clicks). */
     targets(width, height, choices) {
-      const o = origin(width, height), L = SKILL_SELECT_LAYOUT, at = (x, y) => [Math.round(o.x + x * o.scale), Math.round(o.y + y * o.scale)];
-      const out = { left: at(L.left.x + L.left.w / 2, L.left.y + L.left.h / 2), right: at(L.right.x + L.right.w / 2, L.right.y + L.right.h / 2), skills: {} };
-      if (this.open) for (const row of skillSelectRows(choices, this.open)) for (const s of row.skills) out.skills[s.id] = at(s.x + L.icon / 2, s.y + L.icon / 2);
+      const L = SKILL_SELECT_LAYOUT, at = (side, x, y) => { const o = origin(width, height, side); return [Math.round(o.x + x * o.scale), Math.round(o.y + y * o.scale)]; };
+      const out = { left: at('left', L.left.x + L.left.w / 2, L.left.y + L.left.h / 2), right: at('right', L.right.x + L.right.w / 2, L.right.y + L.right.h / 2), skills: {} };
+      if (this.open) for (const row of skillSelectRows(choices, this.open)) for (const s of row.skills) out.skills[s.id] = at(this.open, s.x + L.icon / 2, s.y + L.icon / 2);
       return out;
     },
     draw(ctx, width, height, choices, selected) {
-      const o = origin(width, height), L = SKILL_SELECT_LAYOUT, drawn = [];
-      ctx.save(); ctx.translate(o.x, o.y); ctx.scale(o.scale, o.scale);
+      const L = SKILL_SELECT_LAYOUT, drawn = [];
       // The blit is recorded, not just counted: retail's own draw lists carry this cel (the socket
       // icon as `Skillicon.dc6` frame 2 at the anchor (117|635, 600)), and a record is what lets a
       // row compare OUR anchor against RETAIL's instead of trusting the layout constant below.
-      const icon = (s, x, y, where) => {
+      const icon = (s, x, y, where, side) => {
         const sh = sheet(s.charClass), f = sh.frames[s.iconCel], c = sh.canvases[s.iconCel];
         if (!f || !c) { drawn.push({ where, id: s.id, sheet: sh.key, cel: s.iconCel, missing: true }); return; }
-        ctx.drawImage(c, x, y);
-        drawn.push({ where, id: s.id, sheet: sh.key, cel: s.iconCel, blit: recordDc6(sh.key, s.iconCel, f, x, y) });
+        const o = origin(width, height, side); ctx.save(); ctx.translate(o.x, o.y); ctx.scale(o.scale, o.scale);
+        ctx.drawImage(c, x, y); ctx.restore();
+        drawn.push({ where, id: s.id, sheet: sh.key, cel: s.iconCel, origin: { x: o.x, y: o.y }, blit: recordDc6(sh.key, s.iconCel, f, x, y) });
       };
       for (const side of ['left', 'right']) {
         const s = choices.find((c) => c.id === selected?.[side]);
         // Retail draws the button's icon (SkillIcon, 48x48) anchored at (117|635, 600): top-left (x, 553).
-        if (s) icon(s, L[side].x, L[side].y + 3, side + 'Button');
+        if (s) icon(s, L[side].x, L[side].y + 3, side + 'Button', side);
       }
       const rows = this.open ? skillSelectRows(choices, this.open) : [];
-      for (const row of rows) for (const s of row.skills) icon(s, s.x, s.y, 'popup');
-      ctx.restore();
+      for (const row of rows) for (const s of row.skills) icon(s, s.x, s.y, 'popup', this.open);
       return { open: this.open, selected: { ...selected }, rows: rows.map((r) => ({ listRow: r.listRow, ids: r.skills.map((s) => s.id) })), drawn };
     },
   };

@@ -85,6 +85,18 @@ extern "C" const char* D2WEB_TileLibraryNameFromHash(const D2TileLibraryHashStrc
     return nullptr;
 }
 
+// The index of a library entry in its DT1 file (entries ARE the file's 0x60-byte records): the exact
+// variant the room picked. UINT32_MAX for a pointer no loaded library owns.
+extern "C" uint32_t D2WEB_TileEntryFileIndex(const void* pEntry) {
+    const uint8_t* e = (const uint8_t*)pEntry;
+    for (Record* r : g_records) {
+        int32_t off; memcpy(&off, r->data.data() + 0x110, 4);
+        const uint8_t* base = r->data.data() + off;
+        if (e >= base && e < r->data.data() + r->data.size()) return (uint32_t)((e - base) / 0x60);
+    }
+    return UINT32_MAX;
+}
+
 // The tile pick stream (s175, vector kind 26) observes these two calls the way the retail capture tool observes
 // retail's through D2Common's import table. Null unless drlg_check is collecting; they only watch.
 void (*g_d2webOnGetTiles)(int nType, int nStyle, int nSequence, int nEntries, int nFirstFrame) = nullptr;

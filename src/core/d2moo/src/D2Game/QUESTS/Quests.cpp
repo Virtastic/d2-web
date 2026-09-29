@@ -86,7 +86,7 @@
 #include "UNIT/SUnit.h"
 
 
-uint8_t byte_6FD31270;
+uint8_t byte_6FD31270 = 1; // sequences enabled by default: QUESTS_DisableSequences() is the only writer (sets 0), so retail .data holds 1; zero-init left Q2.. never unlocked after a save reload
 
 
 #define dword_6FD4DC34 1

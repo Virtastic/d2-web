@@ -582,6 +582,8 @@ void __fastcall ACT4Q3_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 void __fastcall ACT4Q3_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	D2Act4Quest3Strc* pQuestDataEx = (D2Act4Quest3Strc*)pQuestData->pQuestDataEx;
+	extern int32_t g_f124Trace[8];
+	++g_f124Trace[0]; g_f124Trace[1] = pQuestData->bNotIntro;
 	if (!pQuestData->bNotIntro)
 	{
 		return;
@@ -589,9 +591,18 @@ void __fastcall ACT4Q3_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2Q
 
 	pQuestArg->pTarget->dwDropItemCode = ' hfh';
 	int32_t nItemLevel = 0;
-	if (D2GAME_DropItemAtUnit_6FC4FEC0(pQuestArg->pGame, pQuestArg->pTarget, ITEMQUAL_UNIQUE, &nItemLevel, 0, -1, 0))
+	++g_f124Trace[2];
+	D2UnitStrc* pDropped = D2GAME_DropItemAtUnit_6FC4FEC0(pQuestArg->pGame, pQuestArg->pTarget, ITEMQUAL_UNIQUE, &nItemLevel, 0, -1, 0);
+	if (pDropped)
 	{
 		++pQuestDataEx->nHellforgeHammersInGame;
+		// F124 diagnosis: the Hellforge Hammer step reads mode 0 / page 0
+		// (stored, general inv) instead of mode 3 / page 255 (ground) the instant after this drop
+		// returns -- read via d2_debug_f124() rather than console (AudioContext spam floods the tail).
+		g_f124Trace[3] = (int32_t)pDropped->dwUnitId; g_f124Trace[4] = (int32_t)pDropped->dwAnimMode;
+		g_f124Trace[5] = (int32_t)ITEMS_GetInvPage(pDropped);
+		g_f124Trace[6] = pDropped->pStaticPath ? pDropped->pStaticPath->tGameCoords.nX : -1;
+		g_f124Trace[7] = pDropped->pStaticPath ? pDropped->pStaticPath->tGameCoords.nY : -1;
 	}
 }
 

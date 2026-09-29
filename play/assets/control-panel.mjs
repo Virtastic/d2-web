@@ -165,7 +165,7 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
    */
   const hitControlBox = (box, x, y, width, height) => {
     if (!box) return false;
-    const scale = Math.min(1, width / 800, height / 600);
+    const scale = Math.min(1, width / 800); // the SAME scale draw() uses, or a short window hits off the drawn box
     const x0 = (width - 800 * scale) / 2, y0 = height - CONTROL_LAYOUT.height * scale;
     const left = x0 + box.left * scale, top = y0 + (box.top - PANEL_SCREEN_TOP) * scale;
     return x >= left && x < left + box.w * scale && y >= top && y < top + box.h * scale;
@@ -173,19 +173,26 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
   const hitMenuButton = (evidence, x, y, width, height) => hitControlBox(evidence?.hud?.menuButton, x, y, width, height);
   // The run/walk toggle, on the box the LAST frame actually placed -- the same rule the arrow and
   // the world's own objectUnderPointer use, so a caller cannot aim at a re-derived constant.
+  // The mini-panel icon under (x, y) on the boxes the LAST frame placed: index into miniButtons.frames, or -1.
+  const hitMiniButton = (evidence, x, y, width, height) => (evidence?.hud?.miniPanel?.buttons || [])
+    .findIndex((b) => hitControlBox(b, x, y, width, height));
   const hitRunButton = (evidence, x, y, width, height) => hitControlBox(evidence?.hud?.runButton, x, y, width, height);
   function draw(ctx, width, height, snapshot, advancement, hud = {}) {
     const scale = Math.min(1, width / 800), panelWidth = 800 * scale, x0 = (width - panelWidth) / 2, y0 = height - CONTROL_LAYOUT.height * scale;
     ctx.save(); ctx.translate(x0, y0); ctx.scale(scale, scale);
-    ctx.drawImage(p[0], CONTROL_LAYOUT.healthX, 0);
+    // SGD2FreeRes: the orbs sit at the screen edges; `edge` is how far each moves out, 0 at 800x600.
+    const edge = x0 / scale;
+    ctx.drawImage(p[0], CONTROL_LAYOUT.healthX - edge, 0);
     let x = CONTROL_LAYOUT.centerX; for (let i = 1; i <= 4; i++) { ctx.drawImage(p[i], x, CONTROL_LAYOUT.height - p[i].height); x += p[i].width; }
-    ctx.drawImage(p[5], CONTROL_LAYOUT.manaX, 0);
+    ctx.drawImage(p[5], CONTROL_LAYOUT.manaX + edge, 0);
     const life = resourceRatio(snapshot?.player?.hp, snapshot?.player?.hpMax);
     const mana = resourceRatio(snapshot?.player?.mana, snapshot?.player?.manaMax);
     const drawFluid = (image, x, y, ratio) => { const top = Math.round(image.height * (1 - ratio)), shown = image.height - top;
       if (shown > 0) ctx.drawImage(image, 0, top, image.width, shown, x, y + top, image.width, shown); };
-    drawFluid(fluid[0], 30, 14, life); drawFluid(fluid[1], 691, 14, mana);
-    ctx.drawImage(overlap[0], 28, 6); ctx.drawImage(overlap[1], 691, 10);
+    drawFluid(fluid[0], 30 - edge, 14, life); drawFluid(fluid[1], 691 + edge, 14, mana);
+    ctx.drawImage(overlap[0], 28 - edge, 6); ctx.drawImage(overlap[1], 691 + edge, 10);
+    // The ornate strips between each skill button and the console (wide views only): hud.strips paints them.
+    if (edge > 0 && hud.strips) hud.strips(ctx);
 
     // --- Retail's HUD, in retail's own draw order (den-entry.txt lines 90-157). The run button, the
     // stamina bar and the open/close arrow are drawn on every screen; the icon row slides with a
@@ -230,8 +237,12 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
         left: spec.x, top: spec.y, w: f.width, h: f.height }; })();
     // The two add-point buttons either side of the belt, at retail's own anchors and in retail's own
     // (disabled) frame -- see HUD_LAYOUT.levelButtons.
-    const levelButtons = HUD_LAYOUT.levelButtons.xs.map((bx) => {
-      const spec = HUD_LAYOUT.levelButtons, index = spec.disabledFrame, f = levelButtonDc6.frames[index];
+    // LIT (frame 0, same anchors) while the engine holds points to spend: retail's charpanel-points /
+    // skilltree-points frames (s192) show both red at 206/563 at level 2; left = stat points, right =
+    // skill points (OpenDiablo2's two add-point buttons; only "both pending" is measured).
+    const levelButtons = HUD_LAYOUT.levelButtons.xs.map((bx, i) => {
+      const spec = HUD_LAYOUT.levelButtons, pending = Number(i ? advancement?.skillPoints : advancement?.statPoints) > 0,
+        index = pending ? spec.litFrame : spec.disabledFrame, f = levelButtonDc6.frames[index];
       ctx.drawImage(frameCanvas(f, palette, documentObject), bx, spec.y - PANEL_SCREEN_TOP);
       return { ...record(spec, index, f, bx, spec.y), left: bx, top: spec.y, w: f.width, h: f.height };
     });
@@ -240,9 +251,9 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
       const spec = HUD_LAYOUT.miniPanel, shift = Math.round(Number(hud.offsetX) || 0);
       ctx.drawImage(miniPanel, spec.x + shift, spec.y - PANEL_SCREEN_TOP);
       const buttons = HUD_LAYOUT.miniButtons.frames.map((index, i) => {
-        const bf = miniButtonDc6.frames[index], bx = HUD_LAYOUT.miniButtons.x + i * HUD_LAYOUT.miniButtons.stride + shift;
+        const bf = miniButtonDc6.frames[index + (hud.miniPressed === i ? 1 : 0)], bx = HUD_LAYOUT.miniButtons.x + i * HUD_LAYOUT.miniButtons.stride + shift;
         ctx.drawImage(frameCanvas(bf, palette, documentObject), bx, HUD_LAYOUT.miniButtons.y - PANEL_SCREEN_TOP);
-        return record(HUD_LAYOUT.miniButtons, index, bf, bx, HUD_LAYOUT.miniButtons.y);
+        return { ...record(HUD_LAYOUT.miniButtons, index + (hud.miniPressed === i ? 1 : 0), bf, bx, HUD_LAYOUT.miniButtons.y), left: bx, top: HUD_LAYOUT.miniButtons.y, w: bf.width, h: bf.height };
       });
       mini = { container: record(spec, spec.frame, miniPanelDc6.frames[spec.frame], spec.x + shift, spec.y), buttons, offsetX: shift };
     }
@@ -258,7 +269,7 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
         experiencePixels, CONTROL_LAYOUT.experienceHeight);
     }
     ctx.restore();
-    return { x: x0, y: y0, scale, life, mana, panelFrames: panel.frames.length,
+    return { x: x0, y: y0, scale, edge, life, mana, panelFrames: panel.frames.length,
       panelBytes: panel.frames.reduce((sum, frame) => sum + frame.width * frame.height, 0),
       hud: { miniPanel: mini, menuButton: menu, runButton: run, stamina: bar, levelButtons,
         iconRow: hud.iconRow !== false },
@@ -268,5 +279,5 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
         height: CONTROL_LAYOUT.experienceHeight * scale } };
   }
 
-  return { draw, hitMenuButton, hitRunButton };
+  return { draw, hitMenuButton, hitRunButton, hitMiniButton };
 }

@@ -200,6 +200,18 @@ struct D2SessionTile {
     uint32_t material;
     int32_t tileX, tileY, worldX, worldY, screenX, screenY, width, height;
     uint32_t flags, librarySlot, libraryIndex;
+    // F66: the per-instance value retail's DRLGLOGIC_SetCoordListForTiles
+    // writes at D2DrlgTileDataStrc+0x10, measured to be the field that separates a wall-list record
+    // retail draws through the wall entry (39) from one it draws through the transparent/roof entry
+    // (40) -- s338 pins it disjoint on two captured scenes. Exported so the client CAN read it; the
+    // general selection rule (what in the room's coord lists makes a run draw transparently) is still
+    // open research, not derived here.
+    int32_t entryHint;
+    // The level's roof-POP state for this tile (F44): 0 not pop-affected, 1 the pop that names this
+    // tile's DT1 style is ACTIVE with the player inside its region (retail draws no such tile), 2 the
+    // pop has been left and the tile is drawn again. Retail's own client keeps it in the tile's
+    // `unk0x24` bit 1 and the direction in its green/blue pair; see sessionTilePop.
+    uint32_t pop;
 };
 struct D2SessionMotion {
     uint32_t version, size, gameFrame, mode;
@@ -370,7 +382,7 @@ static_assert(sizeof(D2SessionObjectPresentation) == 40);
 static_assert(sizeof(D2SessionItemPresentation) == 112);
 static_assert(sizeof(D2SessionItemState) == 40);
 static_assert(sizeof(D2SessionResources) == 24);
-static_assert(sizeof(D2SessionTile) == 76);
+static_assert(sizeof(D2SessionTile) == 84);
 static_assert(sizeof(D2SessionMotion) == 52);
 static_assert(sizeof(D2SessionAttack) == 64);
 static_assert(sizeof(D2SessionProgress) == 48);
@@ -429,6 +441,9 @@ static D2SessionCorpseSaveRoundTrip g_sessionCorpseSaveRoundTrip;
 static std::vector<uint8_t> g_sessionCorpseSaveBytes;
 static D2UnitStrc* g_sessionAttackTarget;
 static D2SkillStrc* g_sessionAttackSkill;
+// Defined beside `d2_session_attack`, near the end of this file; declared here because the per-tick
+// kill count in `d2_session_tick` reads the same target long before that point.
+static D2UnitStrc* sessionAttackTargetLive();
 static uint32_t g_sessionAttackCount;
 static uint32_t g_sessionAttackEndFrame;
 static bool g_sessionAttackResolved;
@@ -449,6 +464,10 @@ static std::vector<D2SessionItemPresentation> g_sessionItemPresentations;
 static std::vector<D2SessionItemPresentation> g_sessionVendorPresentations;
 static D2SessionItemState g_sessionItemState;
 static std::vector<D2SessionTile> g_sessionTiles;
+// Parallel to g_sessionTiles: the index of the tile's entry in its DT1 file (UINT32_MAX: not a library entry).
+// Kept out of D2SessionTile so the terrain hash and every row pinning that stride stay as they were.
+static std::vector<uint32_t> g_sessionTileEntry, g_sessionSeamTileEntry;
+extern "C" uint32_t D2WEB_TileEntryFileIndex(const void* pEntry);
 // Roll-order trace (DrlgRoomTile.cpp): per session tile, in d2_session_tiles order,
 // { room-local GetTileCache ordinal, entries it chose among, index chosen }; ordinal UINT32_MAX
 // when the record was initialised without a roll. Empty unless d2_session_trace_rolls(1) was set
@@ -462,6 +481,7 @@ struct D2WebCrossRoll { const D2DrlgRoomStrc* pRoom; uint32_t nOrdinal; const D2
 extern std::vector<D2WebCrossRoll> g_d2webCrossRolls;
 static std::vector<D2WebRollTrace> g_sessionTileRolls;
 static std::vector<D2SessionWarp> g_sessionWarps;
+static std::vector<int32_t> g_sessionWarpOrigins;   // x,y per warp, same order: the LvlWarp select box's anchor (subtiles)
 // A warp tile of the level: its class is the LvlWarp.txt Id it belongs to (DRLGWARP_GetLvlWarpTxtRecordFromUnit
 // matches pLvlWarpTxtRecord->dwLevelId -- the Id column -- against the tile unit's class), not a level id.
 struct D2SessionWarpPreset { uint32_t room; int32_t warpId, x, y, destination; };
@@ -534,6 +554,17 @@ static bool sessionWarpPointFromDs1(const D2DrlgRoomStrc* room, int32_t warpId, 
 static std::vector<D2SessionWarpPreset> g_sessionWarpPresets;
 static uint32_t g_sessionWorldHash;
 static uint32_t g_sessionTerrainHash;
+// F128: tried generalising the Sewers trapdoor's proximity-sight to EVERY
+// generated exit, driven by LvlWarp.txt's own SelectX/Y/DX/DY (D2LvlWarpTxt). Measured wrong twice:
+// the fields are signed and can be negative (e.g. level 40 warpId 20 -> select=(-25,-95)+(70,130)),
+// so they are NOT the absolute destination-level tile rect the scenario's four retail-captured
+// targets sit in -- they read as an offset from something else entirely (dwExitWalkX/Y did not
+// explain it either). D2Client's own selection logic is out of scope (not RE'd) per the scenario's
+// own comment; deriving it needs a capture, which is more than one cycle. Smaller-
+// change default taken instead: kept the scenario's explicit, retail-verified four-point call
+// (`d2_session_sight_point`, per-scenario) rather than land a wrong "generic" rect read. The helper
+// below is still factored out so a future capture-backed generalisation can reuse it.
+static int sessionSightPointAct(D2DrlgActStrc* act, int levelId, int tileX, int tileY, int on);
 static uint32_t g_sessionNavigationHash;
 static int32_t g_sessionTargetX, g_sessionTargetY;
 static bool g_sessionLive, g_sessionMovePending;
@@ -608,6 +639,20 @@ static bool g_sessionTilesStale = true, g_sessionTilesRollTrace = false, g_sessi
 static std::vector<D2SessionTile> g_sessionSeamTiles;
 static std::vector<std::string> g_sessionSeamLibraries;
 
+// A preset's roof POP, as the engine's own client frame leaves it on the tiles (F44). D2Common's
+// DUNGEON_UpdatePops -> DRLGPRESET_UpdatePops toggles, for every tile of the DT1 STYLE a pop names
+// inside that pop's region, `D2DrlgTileDataStrc::unk0x24` bit 1 -- the "this tile is pop-affected"
+// mark -- and writes the direction it went in the tile's green/blue pair: entering the region (the
+// activate call, nCellFlags 0) sets green 255 / blue 0, leaving it (nCellFlags 1) green 0 / blue 255.
+// A tile the pop has hidden is the one retail does not draw, so the pair is the state and the client
+// drops the tile (session-terrain's `pop === 1`). Retail's own frames pin the direction rather than
+// this reading: act4-tyrael's camera stands the hero INSIDE the Fortress plaza's pop region and has no
+// roof draw at all, while act4-fortress's stands him outside it and draws every roof.
+static uint32_t sessionTilePop(const D2DrlgTileDataStrc& tileData) {
+    if (!(tileData.unk0x24 & 2)) return 0;
+    return tileData.nGreen == 255 ? 1u : 2u;
+}
+
 static void appendSessionTiles(const D2DrlgRoomStrc* roomEx, uint32_t roomOrdinal, uint32_t layer,
         const D2DrlgTileDataStrc* tiles, int count) {
     if (!tiles || count <= 0) return;
@@ -625,8 +670,10 @@ static void appendSessionTiles(const D2DrlgRoomStrc* roomEx, uint32_t roomOrdina
         out.screenX = tileData.nWidth; out.screenY = tileData.nHeight;
         out.width = tile.nWidth; out.height = tile.nTotalHeight;
         out.flags = tileData.dwFlags;
+        out.entryHint = tileData.unk0x10;
+        out.pop = sessionTilePop(tileData);
         sessionTileLibraryIdentity(roomEx, tileData.pTile, out.librarySlot, out.libraryIndex);
-        g_sessionTiles.push_back(out);
+        g_sessionTiles.push_back(out); g_sessionTileEntry.push_back(D2WEB_TileEntryFileIndex(tileData.pTile));
         if (g_d2webRollTraceEnabled) {
             auto it = g_d2webRollTrace.find(&tileData);
             g_sessionTileRolls.push_back(it != g_d2webRollTrace.end() ? it->second : D2WebRollTrace{ UINT32_MAX - 1, 0, 0, 0, 0, 0 });
@@ -761,10 +808,14 @@ static uint32_t g_sessionAnchorClass = 0xFFFFFFFF;
 // that reads the level it was created in; the per-frame wave replaces the missing rooms at about a
 // room every five frames, far slower than the 8 ticks a draw-list row runs.
 //
+// STATUS (F63): lazy is OPT-IN via `g_sessionLazy` (default 0, whole-level build); the default flip is pending
+// s000e s247 s249 s330 s59 s830, still red with lazy on. Fixtures that need the whole level call stream(0).
+//
 // Set only by `d2_session_create_stream`, so s240-s242 and s05-s08 call `d2_monspawn_level`
 // directly and build exactly what they always did.
-static int g_monspawnSessionCreate = 0;
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_session_create_stream(int on) { g_monspawnSessionCreate = on ? 1 : 0; }
+static int g_monspawnSessionCreate = 0;  // set only around a session create; direct d2_monspawn_level callers stay eager
+static int g_sessionLazy = 0;  // F63: lazy session create is OPT-IN (d2_session_create_stream(1)); default flip pending s000e s247 s249 s330 s59 s830
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_session_create_stream(int on) { g_sessionLazy = on ? 1 : 0; }
 static void activateSessionLevelRooms(D2DrlgActStrc* act, D2DrlgLevelStrc* level, int levelId) {
     if (!act || !level) return;
     if (g_sessionActivationWave && g_targetPlayer && g_targetPlayer->pDynamicPath) {
@@ -806,6 +857,53 @@ static void activateSessionLevelRooms(D2DrlgActStrc* act, D2DrlgLevelStrc* level
     }
 }
 
+// F128: three already-committed captures (trapdoor, town->wilderness edge, wilderness-
+// wilderness edge) all show retail setting the TARGET level's sight point in the same poll tick it
+// reaches the SOURCE room that carries the crossing -- before the player's own level changes. Both
+// kinds of crossing are already-populated DRLG data on the source room, so no per-level special case
+// is needed: an outdoor edge is the room's own near-room list crossing a level boundary (geometric
+// adjacency, same read as `d2_session_seam_edges`/`d2_session_command_seam`); an indoor trapdoor is
+// its DS1 warp tiles' `pRoomTiles` list, populated by DRLGROOMTILE_AddWarp with the destination room
+// already linked (`tile->pDrlgRoom`) regardless of the cross-level `ppRoomsNear` link this file's own
+// F128 note ruled out for the Sewers case. A room the wave has already reached (`roomEx->pRoom`)
+// drives whichever kind of exit it holds; this replaces the four retail-verified but Sewers-specific
+// points `s000b-act2.mjs` used to replay by hand with the same rule for every level.
+// First-occurrence log of the target points this rule sets ({level, tileX, tileY, callIndex}), read by the s210
+// replay row against retail's own record. callIndex counts d2_session_tick frames since reset.
+static std::vector<int32_t> g_presightLog; static int32_t g_presightFrame = 0;
+static void presightSet(D2DrlgActStrc* act, D2DrlgRoomStrc* r, D2DrlgRoomStrc* from) {
+    for (size_t i = 0; i + 5 < g_presightLog.size(); i += 6)
+        if (g_presightLog[i] == r->pLevel->nLevelId && g_presightLog[i + 1] == r->nTileXPos && g_presightLog[i + 2] == r->nTileYPos) return; // once per target: a set is a counted reference
+    g_presightLog.insert(g_presightLog.end(), {(int32_t)r->pLevel->nLevelId, (int32_t)r->nTileXPos, (int32_t)r->nTileYPos, g_presightFrame, (int32_t)from->nTileXPos, (int32_t)from->nTileYPos});
+    DUNGEON_SetClientIsInSight(act, r->pLevel->nLevelId, r->nTileXPos, r->nTileYPos, nullptr);
+}
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_session_presight_reset() { g_presightLog.clear(); g_presightFrame = 0; }
+extern "C" EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_presight_log(int* n) { *n = (int)(g_presightLog.size() / 6); return g_presightLog.data(); }
+static int32_t g_presightHere[4];
+extern "C" EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_presight_here() { return g_presightHere; }
+static void sessionPreSightCrossLevelExits(D2DrlgActStrc* act, D2DrlgLevelStrc* level) {
+    ++g_presightFrame;
+    if (!act || !level) return;
+    // Retail's lattice is centred on the hero's own room (s2101: the target row is set only when the hero stands in the
+    // crossing room -- one room earlier, with the crossing room merely in the lattice, retail sets nothing).
+    D2ActiveRoomStrc* here = g_targetPlayer ? UNITS_GetRoom(g_targetPlayer) : nullptr;
+    for (D2DrlgRoomStrc* roomEx = here ? here->pDrlgRoom : nullptr; roomEx; roomEx = nullptr) {
+        g_presightHere[0] = roomEx->nTileXPos; g_presightHere[1] = roomEx->nTileYPos; g_presightHere[2] = roomEx->nRoomsNear; g_presightHere[3] = 0;
+        for (int i = 0; i < roomEx->nRoomsNear; ++i) if (roomEx->ppRoomsNear[i] && roomEx->ppRoomsNear[i]->pLevel != level) g_presightHere[3] += roomEx->ppRoomsNear[i]->pRoom ? 100 : 1;
+        if (!roomEx->pRoom) continue;
+        for (int i = 0; i < roomEx->nRoomsNear; ++i) {
+            D2DrlgRoomStrc* near = roomEx->ppRoomsNear[i];
+            if (near && near->pLevel && near->pLevel != level)
+                presightSet(act, near, roomEx);
+        }
+        for (D2RoomTileStrc* tile = roomEx->pRoomTiles; tile; tile = tile->pNext) {
+            D2DrlgRoomStrc* target = tile->pDrlgRoom;
+            if (tile->bEnabled && target && target->pLevel && target->pLevel != level)
+                presightSet(act, target, roomEx);
+        }
+    }
+}
+
 // While the client holds the world (d2_session_hold_world), the first read rebuilds these lists and
 // the rest reuse them: every read export rebuilds otherwise, and the shell's one snapshot is a dozen
 // reads -- ten times the cost of the game tick itself (s000a's budget). Only read-only stretches
@@ -814,7 +912,7 @@ static int g_worldHold = 0; static bool g_worldHoldBuilt = false;
 static void updateSessionWorld() {
     if (g_worldHold && g_worldHoldBuilt) return;
     if (g_worldHold) g_worldHoldBuilt = true;
-    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionWarps.clear(); g_sessionMissileAnimations.clear();
+    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionWarps.clear(); g_sessionWarpOrigins.clear(); g_sessionMissileAnimations.clear();
     g_sessionWorldHash = D2VEC_FNV_INIT;
     g_sessionNavigationHash = D2VEC_FNV_INIT;
     // The tile lists are built from this world only when a tile export asks (ensureSessionTiles):
@@ -913,6 +1011,7 @@ static void updateSessionWorld() {
         D2LvlWarpTxt* warp = DATATBLS_GetLvlWarpTxtRecordFromLevelIdAndDirection(warpId, 'b');
         if (!warp) continue;
         D2SessionWarp out = {};
+        int32_t originX = INT32_MIN, originY = 0;
         out.slot = slot; out.room = UINT32_MAX;
         out.sourceLevel = (uint32_t)g_currentLevel; out.destinationLevel = (uint32_t)destination;
         out.warpId = (uint32_t)warpId; out.enabled = 1; out.direction = (uint8_t)warp->szDirection[0];
@@ -954,6 +1053,7 @@ static void updateSessionWorld() {
                     out.exitY = 5 * (linkedCenterY < roomCenterY ? room->nTileYPos :
                         linkedCenterY > roomCenterY ? room->nTileYPos + room->nTileHeight - 1 : roomCenterY) + 2;
                 }
+                originX = out.exitX - 2; originY = out.exitY - 2;   // the select box's anchor, before the collision nudge
                 if (room->pRoom) {
                     D2CoordStrc interaction = { out.exitX, out.exitY };
                     if (COLLISION_GetFreeCoordinatesWithMaxDistance(room->pRoom, &interaction, 2,
@@ -966,6 +1066,8 @@ static void updateSessionWorld() {
             if (out.room != UINT32_MAX) break;
         }
         }
+        if (originX == INT32_MIN) { originX = out.exitX - 2; originY = out.exitY - 2; }
+        g_sessionWarpOrigins.push_back(originX); g_sessionWarpOrigins.push_back(originY);
         out.selectX = (int32_t)warp->dwSelectX; out.selectY = (int32_t)warp->dwSelectY;
         out.selectDX = (int32_t)warp->dwSelectDX; out.selectDY = (int32_t)warp->dwSelectDY;
         out.exitWalkX = (int32_t)warp->dwExitWalkX; out.exitWalkY = (int32_t)warp->dwExitWalkY;
@@ -987,7 +1089,7 @@ static void updateSessionWorld() {
 static void ensureSessionTiles() {
     if (!g_sessionTilesStale) return;
     g_sessionTilesStale = false;
-    g_sessionTiles.clear(); g_sessionTileRolls.clear(); g_sessionTileLibraries.clear();
+    g_sessionTiles.clear(); g_sessionTileEntry.clear(); g_sessionTileRolls.clear(); g_sessionTileLibraries.clear();
     g_sessionTerrainHash = D2VEC_FNV_INIT;
     if (!g_sessionLive || !g_lastLevel) return;
     const bool rollTraceNow = g_d2webRollTraceEnabled; g_d2webRollTraceEnabled = g_sessionTilesRollTrace;
@@ -1001,8 +1103,8 @@ static void ensureSessionTiles() {
         appendSessionTiles(roomEx, roomOrdinal, 2, room->pRoomTiles->pRoofTiles, room->pRoomTiles->nRoofs);
     }
     {
-        g_sessionSeamTiles.clear(); g_sessionSeamLibraries.clear();
-        std::swap(g_sessionTiles, g_sessionSeamTiles); std::swap(g_sessionTileLibraries, g_sessionSeamLibraries);
+        g_sessionSeamTiles.clear(); g_sessionSeamTileEntry.clear(); g_sessionSeamLibraries.clear();
+        std::swap(g_sessionTiles, g_sessionSeamTiles); std::swap(g_sessionTileEntry, g_sessionSeamTileEntry); std::swap(g_sessionTileLibraries, g_sessionSeamLibraries);
         const bool rollTrace = g_d2webRollTraceEnabled; g_d2webRollTraceEnabled = false;
         uint32_t seamOrdinal = 0x10000;
         for (D2DrlgLevelStrc* level = g_lastLevel->pDrlg ? g_lastLevel->pDrlg->pLevel : nullptr; level; level = level->pNextLevel) {
@@ -1016,12 +1118,12 @@ static void ensureSessionTiles() {
             }
         }
         g_d2webRollTraceEnabled = rollTrace;
-        std::swap(g_sessionTiles, g_sessionSeamTiles); std::swap(g_sessionTileLibraries, g_sessionSeamLibraries);
+        std::swap(g_sessionTiles, g_sessionSeamTiles); std::swap(g_sessionTileEntry, g_sessionSeamTileEntry); std::swap(g_sessionTileLibraries, g_sessionSeamLibraries);
     }
     g_sessionTilesCounting = true; g_d2webRollTraceEnabled = rollTraceNow;
     for (const D2SessionTile& tile : g_sessionTiles) {
         const uint8_t* bytes = reinterpret_cast<const uint8_t*>(&tile);
-        for (size_t i = 0; i < sizeof tile; ++i) { g_sessionTerrainHash ^= bytes[i]; g_sessionTerrainHash *= 16777619u; }
+        for (size_t i = 0; i < 76 /* pre-F66 bytes: entryHint (+0x4C) is not terrain identity, keeps pinned hashes */; ++i) { g_sessionTerrainHash ^= bytes[i]; g_sessionTerrainHash *= 16777619u; }
     }
 }
 
@@ -1179,6 +1281,14 @@ static D2DrlgActStrc* gameAct(uint32_t seed, int difficulty, int act) {
 // One level: returns 1 and fills d2_monspawn_out() (units, monsters, hash); 0 on failure.
 int d2_trace_level = -1;   // D2_MONS_TRACE builds print for this level id (scenario sets it from D2_MONS_TRACE_LEVEL)
 EMSCRIPTEN_KEEPALIVE void d2_monspawn_trace(int levelId) { d2_trace_level = levelId; }
+static bool d2_debug_trace_c3r = false;  // scratch, C3r's per-tick queued-unit-flush trace (fprintf, live.log)
+EMSCRIPTEN_KEEPALIVE void d2_debug_c3r(int on) { d2_debug_trace_c3r = on != 0; }
+// F124 diagnosis: the Hellforge Hammer's mode/invpage the instant it is
+// created by ACT4Q3_Callback08_MonsterKilled / D2GAME_DropItemAtUnit_6FC4FEC0, read directly (not
+// through console, which the per-frame AudioContext spam pushes out of the 80-line tail). Packed as
+// [callbackCalls, notIntro, dropCalls, createdId, createdMode, createdInvPage, createdX, createdY].
+int32_t g_f124Trace[8] = {0, -1, 0, 0, -1, -1, 0, 0};
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_debug_f124() { return g_f124Trace; }
 // Room population order for d2_monspawn_level: subtile origins {x, y} populated first (empty: list order).
 static std::vector<int32_t> g_monsOrder;
 static std::vector<int32_t> g_monsCreate, g_monsSeq;
@@ -1299,7 +1409,10 @@ EMSCRIPTEN_KEEPALIVE int d2_monspawn_level(uint32_t seed, int difficulty, int ac
             m.unitType = (uint8_t)u->dwUnitType; m.classId = u->dwClassId; m.mode = (uint8_t)u->dwAnimMode;
             m.seedLo = u->pSeed.nLowSeed; m.seedHi = u->pSeed.nHighSeed;
             if (u->dwUnitType == UNIT_MONSTER || u->dwUnitType == UNIT_PLAYER || u->dwUnitType == UNIT_MISSILE) { m.x = (uint16_t)u->pDynamicPath->tGameCoords.wPosX; m.y = (uint16_t)u->pDynamicPath->tGameCoords.wPosY; }
-            else if (u->pStaticPath) { m.x = (uint16_t)u->pStaticPath->dwClientCoordX; m.y = (uint16_t)u->pStaticPath->dwClientCoordY; }   // capture reads +0x04/+0x08
+            // tGameCoords, not dwClientCoordX/Y (a different, client-pixel-scale pair): capture's
+            // safePopulateLevel matched this file's own bug until the town-portal
+            // capture proved +0x0C/+0x10 (tGameCoords) is the game subtile. Both sides now read it.
+            else if (u->pStaticPath) { m.x = (uint16_t)u->pStaticPath->tGameCoords.nX; m.y = (uint16_t)u->pStaticPath->tGameCoords.nY; }
             if (u->dwUnitType == UNIT_MONSTER && u->pMonsterData) {
                 // Native wasm64 pointers shift the runtime fields past their retail x86
                 // offsets. Serialize the named fields into the fixed-width vector record.
@@ -1357,7 +1470,13 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
     // Deterministic by design: a wall-clock creation stamp would make every saved file
     // differ from the last and defeat byte comparison in a scenario.
     g_targetClient->nCreateTime = 0;
-    for (int hk = 0; hk < 16; hk++) g_targetClient->HotkeySkills[hk].nItemGUID = (uint32_t)-1;
+    // Retail marks an unbound hotkey with nSkill == 0xFFFF (PlrSaveFile.cpp reads the same sentinel
+    // back at load); zero-initialized memory left it 0, which the save header wrote as a bound skill 0
+    // (Attack) on every slot instead of "nothing bound here" (found diffing retailc-paladin-fresh.d2s).
+    for (int hk = 0; hk < 16; hk++) {
+        g_targetClient->HotkeySkills[hk].nSkill = (int16_t)-1;
+        g_targetClient->HotkeySkills[hk].nItemGUID = (uint32_t)-1;
+    }
     UNITS_GetPlayerData(player)->pClient = g_targetClient;
     // The capture's fixture (the retail capture tool/main.cpp "player fixture") hangs its client on its OWN room only
     // (ppClients +0x48, nNumClients +0x78 = 1) before any AI event is scheduled, then wakes that room's
@@ -1860,7 +1979,9 @@ static int d2_session_create_for_class(uint32_t seed, int difficulty, int act, i
     // F64: with `d2_session_create_stream(1)` the level is not built whole -- `d2_monspawn_level`
     // stops at the landing room and the activation wave builds the rest (F53); without it the create
     // builds the level the fixture is about to read. See `g_monspawnSessionCreate` above.
+    g_monspawnSessionCreate = g_sessionLazy;
     const int levelOk = d2_monspawn_init() && d2_monspawn_level(seed, difficulty, act, levelId);
+    g_monspawnSessionCreate = 0;
     if (!levelOk || !d2_aitarget_attach()) {
         updateSessionSnapshot(); return 0;
     }
@@ -1872,6 +1993,17 @@ static int d2_session_create_for_class(uint32_t seed, int difficulty, int act, i
     // The headless save callback creates a bare unit. Retail new-character creation immediately
     // follows it with the CharStats start-item callback (javelin/shield/potions/scrolls for Amazon).
     if (startItems) PLAYER_CreateStartItemsFromCharStatsTxt(g_targetPlayer, g_game, nullptr);
+    // The class's CharStats StartSkill (Sorceress Fire Bolt, Necromancer Raise Skeleton) is granted by its starting
+    // item and selected as the RIGHT skill when the game opens -- retail's own save of a fresh character carries it
+    // in the header (0x7C; s1002 against retail's Sorceress and Necromancer files). The selection is what the 0x3C
+    // handler does; whether retail's client or server issues it at join is not located, the resulting state is measured.
+    if (startItems) if (const D2CharStatsTxt* cs = PLRSAVE2_GetCharStatsTxtRecord(g_targetPlayer->dwClassId)) {
+        const int32_t startSkill = cs->wStartSkill;
+        if (startSkill > 0 && startSkill < sgptDataTables->nSkillsTxtRecordCount) {
+            D2SkillStrc* sk = SKILLS_GetSkillById(g_targetPlayer, startSkill, -1);
+            if (sk && SKILLS_GetSkillLevel(g_targetPlayer, sk, 1)) { D2GAME_AssignSkill_6FD13800(g_targetPlayer, 0, startSkill, -1); UNITS_InitRightSkill(g_targetPlayer); }
+        }
+    }
     g_sessionInitialExperience = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_EXPERIENCE, 0);
     g_sessionLive = true; updateSessionSnapshot(); return 1;
 }
@@ -1983,6 +2115,23 @@ enum {
     MOVE_DISPATCH_REFUSED = 6,
 };
 EMSCRIPTEN_KEEPALIVE int d2_session_move_reason() { return g_sessionMoveReason; }
+
+// F55 diagnostic: the path planner's own decisions for the walk command just issued (PATH_Straight_Compute
+// and, if it ran, PATH_AStar_ComputePath) -- read right after d2_session_command_move, before another
+// move overwrites them. [0] Toward's own point count, [1] Toward's early-return fired, [2] the A* distance
+// gate (squared <= 324) let A* run, [3] the squared straight-line distance, [4] A* nodes popped, [5] A*
+// advanced past the start node (has a parent), [6] A*'s 200-node pool (STORAGE_SIZE) was exhausted,
+// [7] A*'s own path point count (-2 = TargetLocationHasEnoughRoom rejected it before the search ran).
+extern int32_t g_d2webStraightTowardPoints, g_d2webStraightTowardEarlyReturn, g_d2webStraightAStarGate, g_d2webStraightSquaredDist;
+extern int32_t g_d2webAStarNodesPopped, g_d2webAStarAdvanced, g_d2webAStarExhausted, g_d2webAStarPathPoints;
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_astar_probe() {
+    static int32_t probe[8];
+    probe[0] = g_d2webStraightTowardPoints; probe[1] = g_d2webStraightTowardEarlyReturn;
+    probe[2] = g_d2webStraightAStarGate; probe[3] = g_d2webStraightSquaredDist;
+    probe[4] = g_d2webAStarNodesPopped; probe[5] = g_d2webAStarAdvanced;
+    probe[6] = g_d2webAStarExhausted; probe[7] = g_d2webAStarPathPoints;
+    return probe;
+}
 
 // Retail's client-packet dispatcher (D2GAME_PACKET_Handler_6FC89320, 1.13c the same) lets a packet
 // through only when D2GAME_PLRMODES_First_6FC7F340 allows it -- not while the player is dying, dead or
@@ -2126,7 +2275,9 @@ static int adoptSessionLevelChange(int32_t oldLevel, int32_t destinationLevel) {
 static D2UnitStrc* sessionWarpPairedTile(D2UnitStrc* tile, D2LvlWarpTxt** txt) {
     D2ActiveRoomStrc* room = tile ? UNITS_GetRoom(tile) : nullptr;
     if (!room || !room->pDrlgRoom) return nullptr;
-    return DUNGEON_GetWarpTileFromRoomAndSourceLevelId(room, (int)tile->dwClassId, txt);
+    // the callee stores through the out-pointer unconditionally (retail's callers always pass one); a null store on wasm hits address 0
+    D2LvlWarpTxt* ignored = nullptr;
+    return DUNGEON_GetWarpTileFromRoomAndSourceLevelId(room, (int)tile->dwClassId, txt ? txt : &ignored);
 }
 
 // Whether the lookup above CAN answer for this tile -- `DRLGWARP_GetDestinationRoom`'s own two
@@ -2423,12 +2574,29 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_room_stats() {
 // DS1's wall/type layers) beside the activation-time ones (the room's preset units and its
 // pRoomTiles warp links). Flat int32, self-describing so the probe reads it sequentially:
 //   {levelId, nRooms} then per room
-//   {ordinal, nType, tileX, tileY, tileW, tileH, built, nRoomsNear, nTileNodes, nRoomTiles,
-//    nMapPresets, hasMap} then
+//   {ordinal, nType, tileX, tileY, tileW, tileH, built, nRoomsNear, nTileNodes, nRoomPresets,
+//    nMapPresets, hasMap, levelPrest, pickedFile, presetFlags} then
 //   nTileNodes * {destLevel, warpTxtLevelId, bEnabled, dataKind, dataPosX, dataPosY, offX, offY}
-//   nRoomTiles * {nIndex, nXpos, nYpos}                      -- the room's UNIT_TILE preset units
+//   nRoomPresets * {nUnitType, nIndex, nXpos, nYpos, bSpawned} -- the room's OWN preset units
+//      (bSpawned is the DS1's own per-unit flag; SUNIT_SpawnPresetUnitsInRoom SKIPS any unit whose
+//      bit 0 is set -- `if (i->nUnitType == UNIT_MONSTER || (i->bSpawned & 1)) continue;`)
 //   nMapPresets * {nUnitType, nIndex, nXpos, nYpos}          -- the DS1 map's shared preset units
 // dataKind: 0 none, 1 from unk0x0C, 2 from unk0x10. Read-only.
+//
+// The two lists are the two halves of a spawn: SUNIT_SpawnPresetUnitsInRoom walks the ROOM's own
+// pPresetUnits (via DRLGROOM_GetPresetUnits, which is a ONE-SHOT -- it sets
+// DRLGROOMFLAG_PRESET_UNITS_SPAWNED and returns NULL on every later call, so a room whose list was
+// still empty when it first activated can never spawn them), while the map's list is the DS1's raw
+// ask. Dumping both with their unit TYPE is what tells "the DS1 never asked" from "the room's list
+// was never filled" from "it was filled and the spawn still produced nothing".
+//
+// The last three name the room's PRESET, not its geometry: a maze level's rooms are picked from the
+// level's own LvlPrest rows and the special ones (a tomb's cube room, Tal Rasha's chamber, the Arcane
+// Sanctuary's summoner room) are placed by replacing or adding a preset AFTER the maze is built. A
+// census that only counts spawned objects cannot tell "the special room was never placed" from "the
+// room is there and its preset units did not spawn" -- these three can, which is why they are here.
+// presetFlags is the raw dwFlags (DRLGPRESETROOMFLAG_HAS_MAP_DS1 is 1<<1, "needs confirmation").
+// They are -1 for a room that is not DRLGTYPE_PRESET (its pMaze is really a pOutdoor).
 static std::vector<int32_t> g_sessionExitProbe;
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_exit_probe(int32_t levelId, int32_t* count) {
     g_sessionExitProbe.clear();
@@ -2440,15 +2608,18 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_exit_probe(int32_t levelId, int32
     g_sessionExitProbe.push_back(0);
     int32_t nRooms = 0;
     for (D2DrlgRoomStrc* roomEx = level->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext, ++nRooms) {
-        D2DrlgMapStrc* map = (roomEx->nType == DRLGTYPE_PRESET && roomEx->pMaze) ? roomEx->pMaze->pMap : nullptr;
-        int32_t nNodes = 0, nRoomTiles = 0, nMapPresets = 0;
+        D2DrlgPresetRoomStrc* preset = (roomEx->nType == DRLGTYPE_PRESET) ? roomEx->pMaze : nullptr;
+        D2DrlgMapStrc* map = preset ? preset->pMap : nullptr;
+        int32_t nNodes = 0, nRoomPresets = 0, nMapPresets = 0;
         for (const D2RoomTileStrc* t = roomEx->pRoomTiles; t; t = t->pNext) ++nNodes;
-        for (const D2PresetUnitStrc* p = roomEx->pPresetUnits; p; p = p->pNext) if (p->nUnitType == UNIT_TILE) ++nRoomTiles;
+        for (const D2PresetUnitStrc* p = roomEx->pPresetUnits; p; p = p->pNext) ++nRoomPresets;
         if (map) for (const D2PresetUnitStrc* p = map->pPresetUnit; p; p = p->pNext) ++nMapPresets;
         const int32_t head[] = { nRooms, roomEx->nType, roomEx->nTileXPos, roomEx->nTileYPos,
             roomEx->nTileWidth, roomEx->nTileHeight, roomEx->pRoom ? 1 : 0, roomEx->nRoomsNear,
-            nNodes, nRoomTiles, nMapPresets, map ? 1 : 0 };
-        g_sessionExitProbe.insert(g_sessionExitProbe.end(), head, head + 12);
+            nNodes, nRoomPresets, nMapPresets, map ? 1 : 0,
+            preset ? preset->nLevelPrest : -1, preset ? preset->nPickedFile : -1,
+            preset ? (int32_t)preset->dwFlags : -1 };
+        g_sessionExitProbe.insert(g_sessionExitProbe.end(), head, head + 15);
         for (const D2RoomTileStrc* t = roomEx->pRoomTiles; t; t = t->pNext) {
             const D2DrlgTileDataStrc* d = t->unk0x0C ? t->unk0x0C : t->unk0x10;
             const int32_t node[] = {
@@ -2460,9 +2631,9 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_exit_probe(int32_t levelId, int32
                 t->pLvlWarpTxtRecord ? (int32_t)t->pLvlWarpTxtRecord->dwOffsetY : -1 };
             g_sessionExitProbe.insert(g_sessionExitProbe.end(), node, node + 8);
         }
-        for (const D2PresetUnitStrc* p = roomEx->pPresetUnits; p; p = p->pNext) if (p->nUnitType == UNIT_TILE) {
-            const int32_t rec[] = { p->nIndex, p->nXpos, p->nYpos };
-            g_sessionExitProbe.insert(g_sessionExitProbe.end(), rec, rec + 3);
+        for (const D2PresetUnitStrc* p = roomEx->pPresetUnits; p; p = p->pNext) {
+            const int32_t rec[] = { p->nUnitType, p->nIndex, p->nXpos, p->nYpos, p->bSpawned };
+            g_sessionExitProbe.insert(g_sessionExitProbe.end(), rec, rec + 5);
         }
         if (map) for (const D2PresetUnitStrc* p = map->pPresetUnit; p; p = p->pNext) {
             const int32_t rec[] = { p->nUnitType, p->nIndex, p->nXpos, p->nYpos };
@@ -2472,6 +2643,89 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_exit_probe(int32_t levelId, int32
     g_sessionExitProbe[1] = nRooms;
     if (count) *count = (int32_t)g_sessionExitProbe.size();
     return g_sessionExitProbe.data();
+}
+
+// PROBE (F106's named instrument): the pending-rooms pass, which is the ONLY keeper that
+// can populate a room nobody walked into. `d2_session_exit_probe` already reads a room's preset lists
+// and `built`; this reads the OTHER half of the fork, so "the room was never populated" splits into
+// its two causes instead of being one sentence:
+//
+//   * `built 0`                      -- DRLG_CreateRoomForRoomEx declined (no walls/floors in the tile
+//                                       grid), so there is no active room to populate. That is
+//                                       retail's own condition, not a defect.
+//   * `built 1, populated 0`         -- DUNGEON_AllocRoom ran (it raises the act's
+//                                       bHasPendingRoomsUpdates), and the pass that consumes that flag
+//                                       never reached this room. The head carries the counters that
+//                                       say whether the pass ran at all, and the live flag says
+//                                       whether the work was still queued when the probe read it.
+//   * `built 1, populated 1`         -- sub_6FC385A0 took its SPAWN branch and the room is empty
+//                                       anyway: the fault is inside population, and `roomPresets` vs
+//                                       `presetsSpawned` vs `objects` names which one.
+//
+// `presetsSpawned` is DRLGROOMFLAG_PRESET_UNITS_SPAWNED, which DRLGROOM_GetPresetUnits sets even when
+// the room's own list is EMPTY and then refuses to hand the list over ever again -- a room whose
+// spawn ran before DRLGPRESET_InitPresetRoomGrids moved the DS1's units in can never spawn from it,
+// however many units the map asked for. A room with that flag set, `roomPresets 0` and the chest in
+// the map's list is exactly that state, and it is invisible from the object census.
+//
+// Head: {levelId, nRooms, pendingFlag, pendingPassRuns, pendingPassRooms, spawnBranch, restoreBranch,
+//        nRoomsInitSinceLastUpdate, nAllocatedRooms, targetRoom, lastLevel, currentLevel, currentAct}.
+//        `targetRoom` is the ordinal of the level's room the PLAYER stands in, or -1. `lastLevel` is
+//        the level the session's own world census (`updateSessionWorld`, and so the shell's
+//        snapshot.rooms/objects) is scoped to -- see the note at the head's own construction.
+// Room: {ordinal, nType, nTileXPos, nTileYPos, built, roomFlags, populated, roomPresets, mapPresets,
+//        presetsSpawned, presetsAdded, tilelibLoaded, objects, monsters, tiles, nNumClients,
+//        nRoomsNear}.
+// F106's counters (game_glue.cpp): which branch of sub_6FC385A0 a room took, and whether the
+// pending-rooms pass that offers rooms to it ran at all. Declared here because this probe is the
+// first reader in the file.
+extern int32_t g_d2PopulateSpawnBranch, g_d2PopulateRestoreBranch, g_d2PendingPassRuns, g_d2PendingPassRooms;
+static std::vector<int32_t> g_sessionPendingProbe;
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_pending_probe(int32_t levelId, int32_t* count) {
+    g_sessionPendingProbe.clear();
+    if (count) *count = 0;
+    if (!g_sessionLive || !g_lastLevel || !g_lastLevel->pDrlg) return g_sessionPendingProbe.data();
+    D2DrlgLevelStrc* level = levelId < 0 ? g_lastLevel : DRLG_GetLevel(g_lastLevel->pDrlg, levelId);
+    if (!level) return g_sessionPendingProbe.data();
+    D2DrlgActStrc* pAct = level->pDrlg ? level->pDrlg->pAct : nullptr;
+    D2ActiveRoomStrc* playerRoom = g_targetPlayer ? UNITS_GetRoom(g_targetPlayer) : nullptr;
+    int32_t nRooms = 0, targetRoom = -1;
+    for (D2DrlgRoomStrc* r = level->pFirstRoomEx; r; r = r->pDrlgRoomNext, ++nRooms) if (r->pRoom && r->pRoom == playerRoom) targetRoom = nRooms;
+    const int32_t head[] = { level->nLevelId, nRooms, pAct ? (pAct->bHasPendingRoomsUpdates ? 1 : 0) : -1,
+        g_d2PendingPassRuns, g_d2PendingPassRooms, g_d2PopulateSpawnBranch, g_d2PopulateRestoreBranch,
+        level->pDrlg ? level->pDrlg->nRoomsInitSinceLastUpdate : -1,
+        level->pDrlg ? level->pDrlg->nAllocatedRooms : -1, targetRoom,
+        // WHICH level the session's own world census is scoped to. `updateSessionWorld` (the source of
+        // the shell's snapshot.rooms/objects) walks `g_lastLevel->pFirstRoomEx` and skips rooms with no
+        // pRoom, while this probe resolves its subject through the ACT's DRLG (`g_lastLevel->pDrlg`),
+        // which answers for a level whether or not it is g_lastLevel. So a census taken here and a
+        // census taken from snapshot.objects can be reading TWO DIFFERENT LEVELS, and `lastLevel` vs
+        // the head's own `level` is what says so: a sweep that builds rooms in level 60 while
+        // `lastLevel` is 40 moves every engine counter and leaves snapshot.objects untouched.
+        g_lastLevel ? g_lastLevel->nLevelId : -1, g_currentLevel, g_currentAct };
+    g_sessionPendingProbe.insert(g_sessionPendingProbe.end(), head, head + 13);
+    int32_t ordinal = 0;
+    for (D2DrlgRoomStrc* r = level->pFirstRoomEx; r; r = r->pDrlgRoomNext, ++ordinal) {
+        D2DrlgPresetRoomStrc* preset = (r->nType == DRLGTYPE_PRESET) ? r->pMaze : nullptr;
+        D2DrlgMapStrc* map = preset ? preset->pMap : nullptr;
+        int32_t roomPresets = 0, mapPresets = 0;
+        for (const D2PresetUnitStrc* p = r->pPresetUnits; p; p = p->pNext) ++roomPresets;
+        if (map) for (const D2PresetUnitStrc* p = map->pPresetUnit; p; p = p->pNext) ++mapPresets;
+        int32_t objects = 0, monsters = 0, tiles = 0;
+        if (r->pRoom) for (D2UnitStrc* u = r->pRoom->pUnitFirst; u; u = u->pRoomNext) {
+            if (u->dwUnitType == UNIT_OBJECT) ++objects;
+            else if (u->dwUnitType == UNIT_MONSTER) ++monsters;
+            else if (u->dwUnitType == UNIT_TILE) ++tiles;
+        }
+        const int32_t rec[] = { ordinal, r->nType, r->nTileXPos, r->nTileYPos, r->pRoom ? 1 : 0, (int32_t)r->dwFlags,
+            (r->pRoom && (r->pRoom->dwFlags & 1)) ? 1 : 0, roomPresets, mapPresets,
+            (r->dwFlags & DRLGROOMFLAG_PRESET_UNITS_SPAWNED) ? 1 : 0, (r->dwFlags & DRLGROOMFLAG_PRESET_UNITS_ADDED) ? 1 : 0,
+            (r->dwFlags & DRLGROOMFLAG_TILELIB_LOADED) ? 1 : 0, objects, monsters, tiles,
+            r->pRoom ? r->pRoom->nNumClients : -1, r->nRoomsNear };
+        g_sessionPendingProbe.insert(g_sessionPendingProbe.end(), rec, rec + 17);
+    }
+    if (count) *count = (int32_t)g_sessionPendingProbe.size();
+    return g_sessionPendingProbe.data();
 }
 
 // PROBE (lands with the arrival measurement it justifies): WHERE LEVEL_WarpUnit's placement comes
@@ -2713,9 +2967,7 @@ static void updateSessionNpcInteraction(uint32_t npcId) {
 // this tree does not, so feeding the engine retail's own decisions is what makes a comparison
 // against retail's room set a measurement of the STATUS MACHINE rather than of two different walks.
 // A comparison that did not replay them compared a fresh session against a walked one.
-EMSCRIPTEN_KEEPALIVE int d2_session_sight_point(int levelId, int tileX, int tileY, int on) {
-    if (!g_sessionLive || !g_game || g_currentAct < 0 || g_currentAct > 4) return 0;
-    D2DrlgActStrc* act = g_game->pAct[g_currentAct];
+static int sessionSightPointAct(D2DrlgActStrc* act, int levelId, int tileX, int tileY, int on) {
     if (!act) return 0;
     D2DrlgLevelStrc* level = DRLG_GetLevel(act->pDrlg, levelId);
     if (!level) return 0;
@@ -2723,6 +2975,10 @@ EMSCRIPTEN_KEEPALIVE int d2_session_sight_point(int levelId, int tileX, int tile
     if (on) DUNGEON_SetClientIsInSight(act, levelId, tileX, tileY, nullptr);
     else DUNGEON_UnsetClientIsInSight(act, levelId, tileX, tileY, nullptr);
     return 1;
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_sight_point(int levelId, int tileX, int tileY, int on) {
+    if (!g_sessionLive || !g_game || g_currentAct < 0 || g_currentAct > 4) return 0;
+    return sessionSightPointAct(g_game->pAct[g_currentAct], levelId, tileX, tileY, on);
 }
 
 // Recovered UNIT_MONSTER branch of PlrMsg's interaction dispatcher: the click is accepted at
@@ -2742,6 +2998,16 @@ EMSCRIPTEN_KEEPALIVE int d2_session_fixture_place_player(int32_t x, int32_t y) {
         if (roomEx->pRoom) { D2ActiveRoomStrc* r = COLLISION_GetRoomBySubTileCoordinates(roomEx->pRoom, x, y); if (r) { dest = r; break; } }
     if (!sub_6FCBDFE0(g_game, g_targetPlayer, dest, x, y, 0, 0)) return 0;
     g_sessionMovePending = false;
+    updateSessionSnapshot();
+    return 1;
+}
+// Same, then the sub-subtile fraction (16.16 low bits, 0..65535): a retail capture's light source sits
+// at a fractional position and the light map is read from dwPrecision (>>13), so whole subtiles are 0..7/8 off.
+EMSCRIPTEN_KEEPALIVE int d2_session_fixture_place_player_frac(int32_t x, int32_t y, int32_t fx, int32_t fy) {
+    if (!d2_session_fixture_place_player(x, y)) return 0;
+    D2DynamicPathStrc* p = g_targetPlayer->pDynamicPath;
+    p->tGameCoords.dwPrecisionX = ((uint32_t)x << 16) | (uint32_t)(fx & 0xFFFF);
+    p->tGameCoords.dwPrecisionY = ((uint32_t)y << 16) | (uint32_t)(fy & 0xFFFF);
     updateSessionSnapshot();
     return 1;
 }
@@ -3277,6 +3543,13 @@ EMSCRIPTEN_KEEPALIVE const char* d2_level_name(int levelId) {
     D2LevelsTxt* rec = DATATBLS_GetLevelsTxtRecord(levelId);
     return rec ? rec->szLevelName : "";
 }
+// Levels.txt's EntryFile for a level: the art retail blits as its level-ENTRY banner, with no
+// directory and no extension (`A3L3` for the Great Marsh). The client resolves it under the level's
+// own act and draws its frames; s693 measured retail 1.13c doing exactly that on a waypoint arrival.
+EMSCRIPTEN_KEEPALIVE const char* d2_level_entry_file(int levelId) {
+    D2LevelsTxt* rec = DATATBLS_GetLevelsTxtRecord(levelId);
+    return rec ? rec->szEntryFile : "";
+}
 // Retail's 0x49 TakeOrCloseWp: travel to levelId through that waypoint, or close the menu with 0.
 EMSCRIPTEN_KEEPALIVE int d2_session_command_waypoint(uint32_t waypointId, int32_t levelId) {
     if (!g_sessionLive || !g_game || !g_targetPlayer) return 0;
@@ -3435,6 +3708,18 @@ EMSCRIPTEN_KEEPALIVE int d2_session_fixture_set_item_stat(uint32_t itemId, uint3
     STATLIST_SetUnitStat(item, (int32_t)statId, value, 0);
     updateSessionSnapshot();
     return STATLIST_UnitGetStatValue(item, (int32_t)statId, 0) == value ? 1 : 0;
+}
+
+// The cursor item handed to an NPC (Larzuk's socket reward, Charsi's imbue): retail's 0x38 with the item
+// GUID, action 0 -- NPC_HandleDialogMessage reads nType only for 1..3 and routes the rest by NPC class.
+EMSCRIPTEN_KEEPALIVE int d2_session_command_npc_item(uint32_t npcId, uint32_t itemId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return -1;
+    D2GSPacketClt38 packet = {};
+    packet.nHeader = 0x38; packet.nAction = 0; packet.nNpcGUID = (int32_t)npcId; packet.nItemGUID = (int32_t)itemId;
+    if (!sessionDispatchGate(0x38)) return -2;
+    const int32_t result = D2GAME_PACKETCALLBACK_Rcv0x38_EntityAction_6FC86CB0(g_game, g_targetPlayer, &packet, sizeof packet);
+    updateSessionSnapshot();
+    return result;
 }
 
 EMSCRIPTEN_KEEPALIVE int d2_session_command_npc_vendor(uint32_t npcId, uint32_t action) {
@@ -3640,6 +3925,14 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_session_item_quantity(uint32_t itemId) {
     D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId);
     return item ? STATLIST_UnitGetStatValue(item, STAT_QUANTITY, 0) : -1;
 }
+// ITEMS_GetItemFlags of a server item unit, live (never composing a save file the way
+// d2_session_save_d2s does) -- so a scenario can read the delivery flags a unit still carries
+// mid-frame, C3r's own evidence that the per-frame flush (not only the save boundary) clears them.
+EMSCRIPTEN_KEEPALIVE int32_t d2_session_item_flags(uint32_t itemId) {
+    if (!g_sessionLive || !g_game) return -1;
+    D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId);
+    return item ? (int32_t)ITEMS_GetItemFlags(item) : -1;
+}
 EMSCRIPTEN_KEEPALIVE const D2SessionVendorTransaction* d2_session_vendor_transaction() {
     return &g_sessionVendorTransaction;
 }
@@ -3748,12 +4041,24 @@ EMSCRIPTEN_KEEPALIVE int d2_session_fixture_stand_near_unit(uint32_t unitType, u
 
 // Fixture: kill a monster through the recovered kill routine (SUNITDMG_KillMonster: death mode,
 // drops, experience, quest MONSTERKILLED events) with the target player as the killer.
+//
+// The last argument is `bPetKill`, and it is 1 here because that is what every real death in the
+// engine passes: SkillDruid, Skills, SUnitDmg's own damage path, AiBaal, MonsterMode, AiThink and
+// SUnit.cpp all call it with 1, and the ONE caller that passes 0 is PlayerPets' dismiss path, which
+// has already done the pet bookkeeping itself. With 0 a killed HIRELING was never marked dead in its
+// pet record (`sub_6FC7D470` -> `pPetData->nFlags |= 1`), which is the state retail's own resurrect
+// reads: `D2GAME_NPC_ResurrectMerc_6FCC9350` -> `sub_6FCC84D0` looks the pet up with
+// `sub_6FC7E8B0(pGame, pPlayer, 7, 0)`, whose `a4 = 0` means "the first pet that is NOT dead" --
+// with the corpse still marked alive that returned the corpse, took the DISMISS branch
+// (`SUNIT_RemoveUnit`) and then went on using the freed unit, which traps the wasm (measured, cycle
+// 534: retail's 0x62 on a hireling killed this way is a memory-access-out-of-bounds). For an
+// ordinary ownerless monster the flag changes nothing, which is why no other row moves.
 EMSCRIPTEN_KEEPALIVE int d2_session_fixture_kill_monster(uint32_t unitId) {
     if (!g_sessionLive || !g_game || !g_targetPlayer) return 0;
     D2UnitStrc* monster = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)unitId);
     if (!monster || monster->dwAnimMode == MONMODE_DEATH || monster->dwAnimMode == MONMODE_DEAD) return 0;
     STATLIST_SetUnitStat(monster, STAT_HITPOINTS, 0, 0);
-    SUNITDMG_KillMonster(g_game, monster, g_targetPlayer, 0);
+    SUNITDMG_KillMonster(g_game, monster, g_targetPlayer, 1);
     updateSessionSnapshot();
     return monster->dwAnimMode == MONMODE_DEATH || monster->dwAnimMode == MONMODE_DEAD ? 1 : 0;
 }
@@ -3806,9 +4111,9 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_item_to_cursor_packet(uint32_t itemI
 
 // Client packets on the cursor item, through the recovered handlers: 0x17 {itemGUID} (drop it on
 // the ground), 0x1D {itemGUID, bodyLoc} (swap it with the equipped one), 0x23 {itemGUID, beltSlot}
-// (put it in the belt).
+// (put it in the belt), 0x1B {itemGUID, bodyLoc} (put a two-hander on, taking the opposite hand's item off).
 EMSCRIPTEN_KEEPALIVE int d2_session_command_cursor_item_packet(uint32_t opcode, uint32_t itemId, uint32_t arg) {
-    if (!g_sessionLive || !g_game || !g_targetPlayer || (opcode != 0x17 && opcode != 0x1D && opcode != 0x23)) return -1;
+    if (!g_sessionLive || !g_game || !g_targetPlayer || (opcode != 0x17 && opcode != 0x1B && opcode != 0x1D && opcode != 0x23)) return -1;
     if (!sessionDispatchGate((uint8_t)opcode)) return -2;
     uint8_t packet[9] = { (uint8_t)opcode };
     memcpy(packet + 1, &itemId, 4); memcpy(packet + 5, &arg, 4);
@@ -3816,6 +4121,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_cursor_item_packet(uint32_t opcode, 
         ? D2GAME_PACKETCALLBACK_Rcv0x17_DropItemOnGround_6FC84E20(g_game, g_targetPlayer, packet, 5)
         : opcode == 0x1D
         ? D2GAME_PACKETCALLBACK_Rcv0x1D_SwapCursorItemWithBody_6FC85550(g_game, g_targetPlayer, packet, sizeof packet)
+        : opcode == 0x1B
+        ? D2GAME_PACKETCALLBACK_Rcv0x1B_Swap2HandedItem_6FC853C0(g_game, g_targetPlayer, packet, sizeof packet)
         : D2GAME_PACKETCALLBACK_Rcv0x23_ItemToBelt_6FC85E70(g_game, g_targetPlayer, packet, sizeof packet);
     updateSessionSnapshot();
     return result;
@@ -3845,8 +4152,10 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_insert_item_packet(uint32_t itemId, 
 }
 
 // A client packet through its recovered handler, for inputs no dedicated command covers yet:
-// 0x1C unequip to the cursor, 0x58 quest log viewed, 0x61 hand the CURSOR item to the mercenary,
-// 0x63 shift-click to the belt (0x17 is d2_session_command_cursor_item_packet's). 0x61 is retail's
+// 0x1C unequip to the cursor, 0x24 lift a belt item to the cursor (the reverse of 0x63 below --
+// M10, gameplay-shell.mjs's shift+click-on-belt already sends this; only the dispatch case was
+// missing), 0x58 quest log viewed, 0x61 hand the CURSOR item to the mercenary, 0x63 shift-click to
+// the belt (0x17 is d2_session_command_cursor_item_packet's). 0x61 is retail's
 // own way a mercenary gets gear -- D2GAME_MERCS_EquipItem allocates the pet's inventory on the
 // first item -- and it is what makes the save's mercenary item block reachable at all.
 // Not the whole dispatch (D2GAME_PACKET_Handler_6FC89320): its table reaches party,
@@ -3857,8 +4166,15 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_packet(const uint8_t* bytes, int len)
     int32_t (__fastcall* handler)(D2GameStrc*, D2UnitStrc*, void*, int32_t) = nullptr;
     switch (packet[0]) {
     case 0x1C: handler = D2GAME_PACKETCALLBACK_Rcv0x1C_RemoveBodyItem_6FC854B0; break;
+    case 0x24: if (len != 5) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x24_ItemFromBelt_6FC85F50; break;
     case 0x58: handler = D2GAME_PACKETCALLBACK_Rcv0x58_QuestCompleted_6FC883B0; break;
     case 0x61: if (len != 3) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x61_DropPickupMercItem_6FC88930; break;
+    // Retail's own resurrect-a-dead-mercenary packet: 0x62 {int32 npcGUID}, five bytes, handled by
+    // D2GAME_PACKETCALLBACK_Rcv0x62_ResurrectMerc_6FC86C00 -> D2GAME_NPC_ResurrectMerc_6FCC9350,
+    // which requires that vendor to be the NPC the player is interacting with. Recovered and vendored
+    // but with no caller anywhere in this tree, exactly as 0x61 was before it was wired (client-parity
+    // P7: "resurrection at the same vendor" was unmeasured with no way to reach the handler at all).
+    case 0x62: if (len != 5) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x62_ResurrectMerc_6FC86C00; break;
     case 0x63: handler = D2GAME_PACKETCALLBACK_Rcv0x63_ShiftLeftClickItemToBelt_6FC88F80; break;
     default: return -1;
     }
@@ -4163,8 +4479,11 @@ static void updateSessionPendingRooms() {
     for (int act = 0; act < 5; ++act) {
         D2DrlgActStrc* pAct = g_game->pAct[act];
         if (!pAct || !pAct->bHasPendingRoomsUpdates) continue;
-        for (D2ActiveRoomStrc* room = DUNGEON_GetRoomFromAct(pAct); room; room = room->pRoomNext)
+        ++g_d2PendingPassRuns;
+        for (D2ActiveRoomStrc* room = DUNGEON_GetRoomFromAct(pAct); room; room = room->pRoomNext) {
+            ++g_d2PendingPassRooms;
             sub_6FC385A0(g_game, room);
+        }
         pAct->bHasPendingRoomsUpdates = 0;
     }
 }
@@ -4259,6 +4578,14 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         }
         if (!d2_aiframe_advance(1)) return 0;
         sub_6FC33670(g_game, g_targetClient);
+        // C3r: retail's own order (Game.cpp:1858-1870 kind 31) runs the queued-unit
+        // flush right after the per-client update, every frame -- the capture found no special handling
+        // around a 0x3B skill-point spend, just the next scheduled flush. Wired here, at the same point.
+        if (d2_debug_trace_c3r) fprintf(stderr, "[c3r] pre-flush frame=%u skillpts=%d flags=%08x\n",
+            g_game->dwGameFrame, STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_SKILLPTS, 0), g_targetPlayer->dwFlags);
+        LEVEL_UpdateQueuedUnitsInAllActs(g_game);
+        if (d2_debug_trace_c3r) fprintf(stderr, "[c3r] post-flush frame=%u skillpts=%d flags=%08x\n",
+            g_game->dwGameFrame, STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_SKILLPTS, 0), g_targetPlayer->dwFlags);
         // D2Client's per-frame DRLG streaming -- D2Common #10015 (0x6FD73F20) DRLGACTIVATE_Update,
         // which had no caller anywhere in this tree, so nothing ever built the rooms the wave marked
         // CLIENT_OUT_OF_SIGHT: one is built per nRoomsInitTimeout frames, and the pending-rooms step
@@ -4266,7 +4593,12 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         // client's frame.
         if (g_sessionActivationWave) {
             D2ActiveRoomStrc* here = UNITS_GetRoom(g_targetPlayer);
-            if (here && here->pDrlgRoom && here->pDrlgRoom->pLevel) DRLGACTIVATE_Update(here->pDrlgRoom->pLevel->pDrlg);
+            if (here && here->pDrlgRoom && here->pDrlgRoom->pLevel) {
+                DRLGACTIVATE_Update(here->pDrlgRoom->pLevel->pDrlg);
+                // F128: sight the far side of any crossing the wave has already reached this level's
+                // rooms for, in the same tick -- before the player's own level changes.
+                sessionPreSightCrossLevelExits(g_game->pAct[g_currentAct], here->pDrlgRoom->pLevel);
+            }
         }
         // Retail's per-frame unit ANIMATION pass, which this tree has no caller for. It is D2Client's
         // (like the rest of the draw side, D2Client is not ported): D2Common #10373 `UNITS_StopSequence`
@@ -4366,7 +4698,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             if (m == PLRMODE_NEUTRAL || m == PLRMODE_TOWNNEUTRAL || m == PLRMODE_WALK || m == PLRMODE_RUN || m == PLRMODE_TOWNWALK)
                 g_sessionAttack.state = 2;
         }
-        if (g_sessionAttackTarget && !g_sessionTargetKillCounted &&
+        if (sessionAttackTargetLive() && !g_sessionTargetKillCounted &&
             STATLIST_UnitGetStatValue(g_sessionAttackTarget, STAT_HITPOINTS, 0) <= 0) {
             g_sessionTargetKillCounted = true; ++g_sessionKills;
         }
@@ -4611,7 +4943,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_skill_choices(D2SessionSkillChoice* out
 // (d2a00c4), 100+result the skill-do refused. Read-only.
 static int g_rightSkillRefusal = 0;
 EMSCRIPTEN_KEEPALIVE int d2_session_right_skill_refusal() { return g_rightSkillRefusal; }
-EMSCRIPTEN_KEEPALIVE int d2_session_command_right_skill(uint32_t targetUnitId) {
+static int sessionCommandHandSkill(uint32_t targetUnitId, bool left) {
     // The same refusal reasons as the left click (d2_session_attack_reason), so a stalled right-hand
     // fight names why instead of showing the last left click's reason.
     g_sessionAttackReason = (g_sessionAttack.state == 1 || g_sessionAttack.state == 2) ? ATTACK_BUSY : ATTACK_NO_SESSION;
@@ -4621,7 +4953,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_right_skill(uint32_t targetUnitId) {
     g_rightSkillRefusal = 2;
     if (g_sessionAttack.state == 1 || g_sessionAttack.state == 2) return 0;
     D2UnitStrc* target = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)targetUnitId);
-    D2SkillStrc* skill = UNITS_GetRightSkill(g_targetPlayer);
+    D2SkillStrc* skill = left ? UNITS_GetLeftSkill(g_targetPlayer) : UNITS_GetRightSkill(g_targetPlayer);
     g_rightSkillRefusal = 3;
     if (!target || !target->pDynamicPath || !skill) return 0;
     g_rightSkillRefusal = 10 + SKILLS_GetUseState(g_targetPlayer, skill);   // 10 + SKILLUSTATE_* (not usable: mana, weapon, ...)
@@ -4658,6 +4990,10 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_right_skill(uint32_t targetUnitId) {
     g_rightSkillRefusal = 0;
     return 1;
 }
+EMSCRIPTEN_KEEPALIVE int d2_session_command_right_skill(uint32_t targetUnitId) { return sessionCommandHandSkill(targetUnitId, false); }
+// The left hand's selected skill (V9b): the same path, UNITS_GetLeftSkill. The client uses it only when the
+// left skill is not the plain Attack, which keeps its own primary-attack path.
+EMSCRIPTEN_KEEPALIVE int d2_session_command_left_skill(uint32_t targetUnitId) { return sessionCommandHandSkill(targetUnitId, true); }
 
 EMSCRIPTEN_KEEPALIVE int d2_session_equipped_quantity() {
     if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pInventory) return -1;
@@ -4797,7 +5133,11 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_add_skill(uint32_t skillId) {
     const uint16_t encoded = (uint16_t)skillId;
     memcpy(packet + 1, &encoded, sizeof encoded);
     if (!sessionDispatchGate(0x3B)) return -2;
+    if (d2_debug_trace_c3r) fprintf(stderr, "[c3r] 0x3B skill=%u frame=%u skillpts-before=%d\n",
+        skillId, g_game->dwGameFrame, STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_SKILLPTS, 0));
     const int result = D2GAME_PACKETCALLBACK_Rcv0x3B_AddSkillPoint_6FC86EF0(g_game, g_targetPlayer, packet, sizeof packet);
+    if (d2_debug_trace_c3r) fprintf(stderr, "[c3r] 0x3B skill=%u result=%d skillpts-after=%d\n",
+        skillId, result, STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_SKILLPTS, 0));
     if (result == 0) g_sessionAdvancementSkillId = skillId;
     return result;
 }
@@ -4916,13 +5256,32 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_recover_corpse(uint32_t corpseId) {
     if (!corpse || corpse == g_targetPlayer || corpse->dwAnimMode != PLRMODE_DEAD ||
         !STATES_CheckState(corpse, STATE_PLAYERBODY) || INVENTORY_GetOwnerId(corpse->pInventory) != g_targetPlayer->dwUnitId) return 0;
     // Recovered = the body's items came back to the player. The body itself is removed later in
-    // the frame (SUNIT_RemoveUnit defers), so "still exists" right after is not a refusal -- s000a
-    // clicked its body, got its gear back, and read failure.
-    const uint32_t before = sessionInventoryItemCount(g_targetPlayer->pInventory);
+    // the frame (SUNIT_RemoveUnit defers), so "still exists" right after is not by itself a refusal
+    // -- s000a clicked its body, got its gear back, and read failure on that alone.
+    //
+    // sub_6FC80440's own gate (sub_6FC4AD80) moves the corpse's items one at a time and is NOT
+    // atomic: a corpse with 10 items and room for only some of them still has `bItemRemoved` fire on
+    // every item that DID fit, so `after > before` (the old check here) reads TRUE on a PARTIAL
+    // recovery -- the exact case retail's own sound 0x17 (refused) is for, and the exact case
+    // sub_6FC80440 leaves the corpse NOT freed, its remaining items still on it. The old check
+    // reported that partial pass as a full recovery (1), and the caller (a click that reads 1 as
+    // "done") never came back for what was left on the corpse -- act IV an earlier change, s000d-act4 step
+    // 20 BOOTSTRAP S000_FROM=19: `lastCorpseRecovery {id:2,result:1}` recorded, and every one of the
+    // ten items the hero wore at death (plt/fhl/tbl/tgl/lbt/amu/rin/rin/wax/kit) still read `nowhere`
+    // -- not worn, not in the pack, not on the ground -- because they were still on body 2, which the
+    // false "1" told the caller was already empty.
+    //
+    // sub_6FC80440 frees and removes the corpse ONLY when sub_6FC4AD80 returns true (full recovery);
+    // on a partial or refused pass the corpse survives with its leftover items still in its OWN
+    // inventory. That is the gate this reads instead: the corpse's own remaining item count, which is
+    // already zeroed inside sub_6FC80440 (INVENTORY_FreeCorpse) on the full-success path even during
+    // the one-frame window before SUNIT_RemoveUnit's deferred removal takes the unit away, so it does
+    // not re-introduce the deferred-removal false-refusal the old check was written to avoid.
     sub_6FC80440(g_game, g_targetPlayer, corpse);
     updateSessionSnapshot();
-    const uint32_t after = sessionInventoryItemCount(g_targetPlayer->pInventory);
-    return after > before || !SUNIT_GetServerUnit(g_game, UNIT_PLAYER, (int32_t)corpseId) ? 1 : 0;
+    D2UnitStrc* stillThere = SUNIT_GetServerUnit(g_game, UNIT_PLAYER, (int32_t)corpseId);
+    const uint32_t corpseLeft = stillThere ? sessionInventoryItemCount(stillThere->pInventory) : 0;
+    return (!stillThere || corpseLeft == 0) ? 1 : 0;
 }
 
 static uint32_t sessionInventoryItemCount(const D2InventoryStrc* inventory) {
@@ -5005,6 +5364,48 @@ EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_item_save_bytes() {
 
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_save_length() {
     return (uint32_t)g_sessionItemSaveBytes.size();
+}
+
+// PY1 (PlugY stash pages): the stash (inventory page 4) as an "JM" item section -- the save path's own
+// ITEMS_SerializeItemToBitstream per item, so the client keeps pages as opaque bytes. Non-destructive.
+// Returns bytes written, 0 on failure.
+EMSCRIPTEN_KEEPALIVE int d2_session_stash_export(uint8_t* out, int cap) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pInventory || !out || cap < 4) return 0;
+    D2GAME_INVMODE_Last_6FC416D0(g_game, g_targetPlayer);   // as d2_session_save_d2s: drop session-only delivery flags
+    uint8_t* w = out + 4; uint16_t n = 0;
+    for (D2UnitStrc* i = INVENTORY_GetFirstItem(g_targetPlayer->pInventory); i; i = INVENTORY_GetNextItem(i)) {
+        D2UnitStrc* item = INVENTORY_UnitIsItem(i);
+        if (!item || item->dwAnimMode != IMODE_STORED || ITEMS_GetInvPage(item) != INVPAGE_STASH) continue;
+        const int32_t len = ITEMS_SerializeItemToBitstream(item, w, (uint32_t)(out + cap - w), 1, 1, 0);
+        if (len <= 0) return 0;
+        w += len; ++n;
+    }
+    out[0] = 'J'; out[1] = 'M'; out[2] = (uint8_t)n; out[3] = (uint8_t)(n >> 8);
+    return (int)(w - out);
+}
+// Delete every stash item (SUNIT_RemoveAllItemsFromInventory's per-item body, page 4 only).
+EMSCRIPTEN_KEEPALIVE int d2_session_stash_clear() {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pInventory) return -1;
+    D2InventoryStrc* inv = g_targetPlayer->pInventory; int removed = 0;
+    for (D2UnitStrc* i = INVENTORY_GetFirstItem(inv), *next; i; i = next) {
+        next = INVENTORY_GetNextItem(i);
+        D2UnitStrc* item = INVENTORY_UnitIsItem(i);
+        if (!item || item->dwAnimMode != IMODE_STORED || ITEMS_GetInvPage(item) != INVPAGE_STASH) continue;
+        D2GAME_ITEMS_UpdateTransferredProperties_6FC424E0(g_game, item, g_targetPlayer, 0, 1);
+        if (!INVENTORY_RemoveItemFromInventory(inv, item)) return -2;
+        SUNIT_RemoveUnit(g_game, item); ++removed;
+    }
+    updateSessionSnapshot();
+    return removed;
+}
+// Parse a "JM" section back through the save loader (item creation + its stored page/x/y placement,
+// so the grid is respected). 0 = ok, else the PLRSAVE error code.
+EMSCRIPTEN_KEEPALIVE int d2_session_stash_insert(const uint8_t* bytes, int len) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !bytes || len < 4) return -1;
+    std::vector<uint8_t> copy(bytes, bytes + len); int32_t consumed = 0;
+    const int r = PLRSAVE_ReadItems_6FC8B8A0(g_game, g_targetPlayer, copy.data(), 96, len, 0, &consumed);
+    updateSessionSnapshot();
+    return r;
 }
 
 static uint32_t sessionBaseStatsHash(D2UnitStrc* player, uint32_t* countOut) {
@@ -5273,12 +5674,33 @@ EMSCRIPTEN_KEEPALIVE const D2SessionCorpseSaveRoundTrip* d2_session_corpse_save_
 EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_corpse_save_bytes(){return g_sessionCorpseSaveBytes.data();}
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_corpse_save_length(){return(uint32_t)g_sessionCorpseSaveBytes.size();}
 
+// The unit the last swing was aimed at, RE-RESOLVED BY ID, or null when the unit is gone.
+//
+// `g_sessionAttackTarget` is the only raw unit pointer this file keeps -- every other unit read in it
+// resolves through `SUNIT_GetServerUnit` -- and it can outlive its unit. A monster that dies is killed
+// and counted, and once `g_sessionTargetKillCounted` is set the per-tick read in `d2_session_tick` stops
+// touching the pointer entirely; the unit is then freed (corpse decay) with nobody clearing it, and the
+// NEXT `d2_session_attack` dereferences a freed unit and traps: `eval: RuntimeError: memory access out of
+// bounds`, wasm frames 2567 <- 2566 <- the ccall, in `STATLIST_UnitGetStatValue` inside
+// `d2_session_attack` (measured, s000d act IV step 18, three consecutive runs, the walk's 311th swing:
+// F110). The id is already carried in `g_sessionAttack.targetId`, set at the same
+// instant as the pointer at every one of the four sites that set it, so the lookup is free of new state.
+// A lookup that does not hand back the same unit means the unit is gone: drop both cached pointers and
+// report null, and the swing's record keeps the values the swing itself wrote.
+static D2UnitStrc* sessionAttackTargetLive() {
+    if (!g_sessionAttackTarget) return nullptr;
+    if (!g_sessionLive || !g_game) return nullptr;
+    D2UnitStrc* unit = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)g_sessionAttack.targetId);
+    if (unit != g_sessionAttackTarget) { g_sessionAttackTarget = nullptr; g_sessionAttackSkill = nullptr; return nullptr; }
+    return unit;
+}
+
 EMSCRIPTEN_KEEPALIVE const D2SessionAttack* d2_session_attack() {
     g_sessionAttack.version = 1; g_sessionAttack.size = sizeof g_sessionAttack;
     if (g_sessionLive && g_game) g_sessionAttack.gameFrame = g_game->dwGameFrame;
     if (g_targetPlayer) g_sessionAttack.mode = g_targetPlayer->dwAnimMode;
-    if (g_sessionAttackTarget) g_sessionAttack.targetHpAfter =
-        STATLIST_UnitGetStatValue(g_sessionAttackTarget, STAT_HITPOINTS, 0);
+    if (D2UnitStrc* target = sessionAttackTargetLive()) g_sessionAttack.targetHpAfter =
+        STATLIST_UnitGetStatValue(target, STAT_HITPOINTS, 0);
     uint32_t hash = D2VEC_FNV_INIT; const uint8_t* bytes = (const uint8_t*)&g_sessionAttack;
     for (size_t i = 0; i < offsetof(D2SessionAttack, hash); ++i) { hash ^= bytes[i]; hash *= 16777619u; }
     g_sessionAttack.hash = hash; return &g_sessionAttack;
@@ -5289,10 +5711,10 @@ EMSCRIPTEN_KEEPALIVE const D2SessionProgress* d2_session_progress() {
     g_sessionProgress.version = 1; g_sessionProgress.size = sizeof g_sessionProgress;
     if (!g_sessionLive || !g_game || !g_targetPlayer) return &g_sessionProgress;
     g_sessionProgress.gameFrame = g_game->dwGameFrame; g_sessionProgress.kills = g_sessionKills;
-    if (g_sessionAttackTarget) {
-        g_sessionProgress.targetId = g_sessionAttackTarget->dwUnitId;
-        g_sessionProgress.targetHp = STATLIST_UnitGetStatValue(g_sessionAttackTarget, STAT_HITPOINTS, 0);
-        g_sessionProgress.targetMode = g_sessionAttackTarget->dwAnimMode;
+    if (D2UnitStrc* target = sessionAttackTargetLive()) {
+        g_sessionProgress.targetId = target->dwUnitId;
+        g_sessionProgress.targetHp = STATLIST_UnitGetStatValue(target, STAT_HITPOINTS, 0);
+        g_sessionProgress.targetMode = target->dwAnimMode;
         if (g_sessionProgress.targetHp <= 0) g_sessionProgress.flags |= 1;
     }
     g_sessionProgress.playerExperience = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_EXPERIENCE, 0);
@@ -5756,8 +6178,63 @@ EMSCRIPTEN_KEEPALIVE int d2_session_cross_rolls(uint32_t* out, int cap) {
 EMSCRIPTEN_KEEPALIVE const D2SessionTile* d2_session_tiles() {
     updateSessionSnapshot(); ensureSessionTiles(); return g_sessionTiles.data();
 }
+EMSCRIPTEN_KEEPALIVE const uint32_t* d2_session_tile_entries() {
+    updateSessionSnapshot(); ensureSessionTiles(); return g_sessionTileEntry.data();
+}
+EMSCRIPTEN_KEEPALIVE const uint32_t* d2_session_seam_tile_entries() {
+    updateSessionSnapshot(); ensureSessionTiles(); return g_sessionSeamTileEntry.data();
+}
 EMSCRIPTEN_KEEPALIVE int d2_session_tile_count() {
     updateSessionSnapshot(); ensureSessionTiles(); return (int)g_sessionTiles.size();
+}
+// F44: the level's roof POP regions and what they have done to the tiles, so a count that did not move
+// can say whether the preset has pops at all, which DT1 style each hides and where its region is. Read
+// live (not from the session's tile snapshot): the pops are the engine's own per-tile state.
+EMSCRIPTEN_KEEPALIVE const char* d2_session_pop_log() {
+    static std::string out; out.clear();
+    if (!g_lastLevel) return out.c_str();
+    char buf[256];
+    // One entry per MAP, not per room: every room the map generated carries its own pops, so a map
+    // listed once per room would print the same region twelve times (it did, the first run).
+    std::vector<const D2DrlgMapStrc*> seen;
+    int presets = 0;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx && out.size() < 1600; roomEx = roomEx->pDrlgRoomNext) {
+        if (roomEx->nType != DRLGTYPE_PRESET || !roomEx->pMaze || !roomEx->pMaze->pMap) continue;
+        const D2DrlgMapStrc* map = roomEx->pMaze->pMap;
+        if (!map->nPops || std::find(seen.begin(), seen.end(), map) != seen.end()) continue;
+        seen.push_back(map);
+        ++presets;
+        for (int i = 0; i < map->nPops && out.size() < 1400; ++i) {
+            snprintf(buf, sizeof buf, "pop %d: index %d hides style %d at level tile %d,%d %dx%d, active since tick %d (room %d,%d); ",
+                i, map->pPopsIndex[i], map->pPopsSubIndex[i],
+                map->pPopsLocation[i].nPosX, map->pPopsLocation[i].nPosY, map->pPopsLocation[i].nWidth, map->pPopsLocation[i].nHeight,
+                map->pPopsOrientation[i], roomEx->nTileXPos, roomEx->nTileYPos);
+            out += buf;
+        }
+    }
+    if (g_sessionLive && g_targetPlayer && g_targetPlayer->pDynamicPath) {
+        const D2DynamicPathStrc* path = g_targetPlayer->pDynamicPath;
+        snprintf(buf, sizeof buf, "player at subtile %d,%d; ", path->tGameCoords.wPosX, path->tGameCoords.wPosY);
+        out += buf;
+    }
+    int affected = 0, hidden = 0, revealed = 0;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
+        if (!roomEx->pRoom || !roomEx->pRoom->pRoomTiles) continue;
+        const D2DrlgRoomTilesStrc* tiles = roomEx->pRoom->pRoomTiles;
+        for (int layer = 0; layer < 2; ++layer) {
+            const D2DrlgTileDataStrc* list = layer ? tiles->pRoofTiles : tiles->pWallTiles;
+            const int count = layer ? tiles->nRoofs : tiles->nWalls;
+            for (int i = 0; i < count; ++i) {
+                const uint32_t pop = sessionTilePop(list[i]);
+                if (!pop) continue;
+                ++affected;
+                if (pop == 1) ++hidden; else ++revealed;
+            }
+        }
+    }
+    snprintf(buf, sizeof buf, "presets with pops %d; pop-affected tiles %d (hidden %d, shown %d)", presets, affected, hidden, revealed);
+    out += buf;
+    return out.c_str();
 }
 // D2Client's light map, which the floor draw samples. 48x48 subtile cells centred on the player; every cell starts
 // at the ambient intensity; cells whose subtile collides with mask 0x22 (VISIBLE|BLANK) are marked
@@ -6016,8 +6493,15 @@ EMSCRIPTEN_KEEPALIVE int d2_session_set_client_flags(int expansion, int hardcore
     return 1;
 }
 
-// The flags the session would carry: what the .d2s header word at 0x24 will hold.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_session_client_flags() { return g_sessionClientSaveFlags; }
+// The flags the session carries: what the .d2s header word at 0x24 will hold. Before a session is
+// live this is the value d2_session_set_client_flags recorded (what create will start with); once
+// the session is live it is the CLIENT's own flags (D2ClientStrc::tSaveFlags), because retail's own
+// death path (PLRMODE_StartID_Death, PlrModes.cpp) toggles CLIENTSAVEFLAG_DEAD directly on the
+// client with CLIENTS_ToggleFlag -- the static mirror this function used to return never saw it, so
+// a hardcore player who had just died still read back HARDCORE|EXPANSION with no DEAD bit.
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_client_flags() {
+    return g_targetClient ? (uint32_t)g_targetClient->tSaveFlags.nPackedValue : g_sessionClientSaveFlags;
+}
 
 // The complete .d2s for the live character. Returns the byte count written, 0 on failure; the
 // PLRSAVE2 error code is available from d2_session_save_d2s_error().
@@ -6095,6 +6579,14 @@ EMSCRIPTEN_KEEPALIVE int d2_session_create_from_save(const uint8_t* data, int le
     const int nAct = read.nAct;
     const int nLevel = (int)DUNGEON_GetTownLevelIdFromActNo(nAct);
 
+    // The game's mode has to be the FILE's, not whatever the creation-screen checkboxes left behind:
+    // makeGame() builds g_game->bExpansion and the arena's GAMEFLAG_ARENA_HARDCORE from
+    // g_sessionClientSaveFlags, and PLRSAVE2_CheckPlayerFlags below refuses a mismatch in either
+    // direction (NOTEXPANSIONGAME/EXPANSIONGAME, HARDCOREJOINSOFTCORE/SOFTCOREJOINHARDCORE). Loading
+    // a hardcore file after the classic-mode checkboxes built the game would always fail that check
+    // before the header's own flags ever got applied to the client (C2c "still open").
+    g_sessionClientSaveFlags = pHeader->dwSaveFlags & (CLIENTSAVEFLAG_EXPANSION | CLIENTSAVEFLAG_HARDCORE);
+
     // The class is the header's, and a bare player (no CharStats start kit) is what a saved
     // character needs -- the kit would sit on top of the file's own items (client-parity C3m).
     if (!d2_session_create_class_bare(nSeed, difficulty, nAct, nLevel, read.nClass)) return PLRSAVE2ERROR_UNKNOWN;
@@ -6116,8 +6608,52 @@ EMSCRIPTEN_KEEPALIVE int d2_session_create_from_save(const uint8_t* data, int le
     const int32_t nLoadError = D2WEB_PLRSAVE2_LoadIntoPlayer(g_game, g_targetPlayer, copy.data(), (uint32_t)copy.size());
     if (nLoadError != PLRSAVE2ERROR_SUCCESS) { d2_session_destroy(); return nLoadError; }
 
+    // A LOADED CHARACTER IS A GAME START, NOT A JOIN, and retail runs the quest game-start pass for
+    // it. Both branches of retail's load (D2Game 0x6FC8CB40, `D2GAME_SAVE_GetUnitDataFromFile_6FC8CB40`
+    // in the D2MOO prior art at `reference/D2MOO/source/D2Game/src/PLAYER/PlrSave.cpp` -- not vendored
+    // here -- single player after D2GAME_SAVE_ReadFile_6FC8C9D0, and a realm client after
+    // PLRSAVE2_ProcessSaveFile) end with `QUESTS_SequenceCycler(pGame, pPlayer, 0)`, AFTER the file's
+    // sections are applied. With bGameEnter 0 that call reaches the block guarded by `bPickedSet`
+    // and runs every quest's QUESTEVENT_PLAYERSTARTEDGAME callback -- the pass that rebuilds each
+    // quest controller's fState/fLastState from the player's own saved quest record
+    // (`ACT5Q1_Callback13_PlayerStartedGame`: QFLAG_STARTED -> fLastState 1, fState 2). The
+    // new-character path is the one that passes bGameEnter 1 there, which is why `makeGame` marking
+    // the flag set picked is faithful for a character with no save behind it.
+    //
+    // Without this the resumed character's every quest reads fState 0 while its record still says
+    // STARTED, so the quest cannot advance on the level change that resumes it: MEASURED, s000e
+    // step 10 "walk out of Harrogath into the Bloody Foothills" on a checkpoint resume, the engine
+    // read `A5Q1 fState 0, word 4` as the hero arrived in level 110 (harness-out/act5-269-from9.log
+    // and its base arm, engine 7162ff435c47) where retail's own ACT5Q1_Callback03_ChangedLevel
+    // takes fState 2 -> 3 and sets ENTERAREA/LEAVETOWN.
+    if (g_game->pQuestControl) g_game->pQuestControl->bPickedSet = 0;
+    QUESTS_SequenceCycler(g_game, g_targetPlayer, 0);
+
     updateSessionSnapshot();
     return PLRSAVE2ERROR_SUCCESS;
+}
+
+// CONVERT TO EXPANSION (character select): retail rewrites a classic character as an expansion one. Here the
+// engine does it: the classic file joins a classic game (create_from_save), the client's save flags gain
+// CLIENTSAVEFLAG_EXPANSION, and PLRSAVE2_CreateSaveFile writes the file with the header word from those flags.
+// The caller names the character first (d2_session_set_character_name). Returns the byte count, or <= 0:
+// -1 a session is already live, -2 the file is not classic, -3 create failed, else the PLRSAVE2 error negated.
+EMSCRIPTEN_KEEPALIVE int d2_session_convert_expansion(const uint8_t* data, int len, int difficulty, uint8_t* out, int cap) {
+    if (g_sessionLive) return -1;
+    // Load a classic file AS an expansion character (header flag set on a copy): the game's expansion
+    // bit decides whether the writer emits retail's expansion-only "jf"/"kf" tail, so flipping the
+    // client flag after a classic load wrote a file without them (s1003).
+    if (len < 0x28 || (data[0x24] & 0x20)) return -2;
+    std::vector<uint8_t> copy(data, data + len);
+    copy[0x24] |= 0x20;
+    { uint32_t sum = 0; for (int i = 0; i < len; i++) { const uint32_t b = (i >= 12 && i < 16) ? 0 : copy[i]; sum = ((sum << 1) | (sum >> 31)) + b; }
+      memcpy(&copy[12], &sum, 4); }  // .d2s checksum over the file with bytes 12..15 zero
+    const int rc = d2_session_create_from_save(copy.data(), len, difficulty);
+    if (rc != 0) return rc > 0 ? -rc : -3;
+    int n = d2_session_save_d2s(out, cap);
+    if (n <= 0) n = -3;
+    d2_session_destroy();
+    return n;
 }
 
 EMSCRIPTEN_KEEPALIVE int d2_session_level_type() {
@@ -6135,6 +6671,9 @@ EMSCRIPTEN_KEEPALIVE int d2_session_level_rain() {
 EMSCRIPTEN_KEEPALIVE const D2SessionWarp* d2_session_warps() {
     updateSessionSnapshot(); return g_sessionWarps.data();
 }
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_warp_origins() {
+    updateSessionSnapshot(); return g_sessionWarpOrigins.data();
+}
 EMSCRIPTEN_KEEPALIVE int d2_session_warp_count() {
     updateSessionSnapshot(); return (int)g_sessionWarps.size();
 }
@@ -6145,7 +6684,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_navigation_hash() {
 EMSCRIPTEN_KEEPALIVE void d2_session_destroy() {
     d2_monspawn_reset(); g_sessionLive = false; g_sessionMovePending = false;
     g_sessionAttackTarget = nullptr; g_sessionAttackSkill = nullptr;
-    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionTiles.clear(); g_sessionSeamTiles.clear(); g_sessionTileRolls.clear(); g_sessionTileLibraries.clear(); g_sessionWarps.clear(); g_sessionMissileAnimations.clear();
+    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionTiles.clear(); g_sessionSeamTiles.clear(); g_sessionTileRolls.clear(); g_sessionTileLibraries.clear(); g_sessionWarps.clear(); g_sessionWarpOrigins.clear(); g_sessionMissileAnimations.clear();
     memset(&g_sessionItemState, 0, sizeof g_sessionItemState);
     memset(&g_sessionNpcInteraction, 0, sizeof g_sessionNpcInteraction);
     memset(&g_sessionNpcDialog, 0, sizeof g_sessionNpcDialog); D2WEB_ResetLastDialogPacket();

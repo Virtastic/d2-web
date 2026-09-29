@@ -170,11 +170,16 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     const cx = Math.round((x - g.left) / g.cellWidth - w / 2), cy = Math.round((y - g.top) / g.cellHeight - h / 2);
     return { x: Math.max(0, Math.min(g.columns - w, cx)), y: Math.max(0, Math.min(g.rows - h, cy)) };
   },
+  // The panel's own rectangle on the 800x600 screen: what `contains` tests and what the shell reports
+  // to an input layer that has to bound a finger's own aim by the panel's chrome (M15, s377) -- so the
+  // band a finger's tap is allowed to land in is read from ONE place rather than re-derived.
+  panelRect() { return { left: AMAZON2_INVENTORY_LAYOUT.screenX, top: AMAZON2_INVENTORY_LAYOUT.screenY,
+    width: AMAZON2_INVENTORY_LAYOUT.width, height: AMAZON2_INVENTORY_LAYOUT.height }; },
   // Whether the pointer is over the panel at all (a click there is never a click on the world).
   contains(screenX, screenY, width, height) {
     const [x, y] = toScreen(width, height, screenX, screenY);
-    return x >= AMAZON2_INVENTORY_LAYOUT.screenX && x < AMAZON2_INVENTORY_LAYOUT.screenX + AMAZON2_INVENTORY_LAYOUT.width &&
-      y >= AMAZON2_INVENTORY_LAYOUT.screenY && y < AMAZON2_INVENTORY_LAYOUT.screenY + AMAZON2_INVENTORY_LAYOUT.height;
+    const r = this.panelRect();
+    return x >= r.left && x < r.left + r.width && y >= r.top && y < r.top + r.height;
   },
   // The item on the cursor, drawn centred on the pointer (retail draws the held item's inventory
   // art there). Returns what was drawn, for identity checks.
@@ -225,10 +230,10 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     ctx.save(); ctx.translate(ox, oy); ctx.scale(scale, scale);
     chrome.text(ctx, act, String(state?.gold ?? 0), 508, 468);
     chrome.cel(ctx, act, CHROME_ART.gold, 0, 484, 469);
-    // OpenDiablo2 inventory.go: the widget is at 419,449.  The DC6 is anchored
-    // at its retail draw origin, while evidence retains that logical hit rect.
+    // panelCloseLayout is the one place this rect lives now (panel-close.mjs) -- the drawn cel and
+    // the click hit-box both come from it, so they cannot drift apart the way 419,449 vs 418,476 did.
     const close = panelCloseLayout('inventory');
-    const closeBlit = chrome.cel(ctx, act, PANEL_CLOSE_ART.path, PANEL_CLOSE_ART.frame, 418, 476);
+    const closeBlit = chrome.cel(ctx, act, PANEL_CLOSE_ART.path, PANEL_CLOSE_ART.frame, close.x, close.y + close.height - 1);
     chrome.border(ctx, act, BORDER_RIGHT);
     ctx.restore();
     return { x: baseX, y: baseY, scale, panelFrames: 4,

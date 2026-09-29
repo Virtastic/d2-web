@@ -15,7 +15,7 @@ cd "$SRC"
 # simply had no such export. Nothing said so; stage printed a normal engine stamp and the sweep ran.
 # Gate on it: if any engine source is NEWER than the wasm about to be staged, the wasm cannot have
 # been built from it. D2_STAGE_ALLOW_STALE=1 overrides for the deliberate case.
-if [ "${D2_STAGE_ALLOW_STALE:-0}" != "1" ]; then
+if [ "${D2_STAGE_ALLOW_STALE:-0}" != "1" ] && [ "$(cat play/.engine-key 2>/dev/null)" != "$(bash tools/engine-key.sh . 2>/dev/null)" ]; then
   newer=$(find src wasm-build -newer play/d2.wasm -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.hpp' -o -name '*.sh' \) -not -path '*/build-*' 2>/dev/null | head -1)
   if [ -n "$newer" ]; then
     echo "FATAL: play/d2.wasm is OLDER than the engine source that would be staged." >&2
@@ -45,6 +45,8 @@ done
 cp -r play/assets build-wasm/site/assets
 # Committed ground truth, served so scenarios can fetch it into the page.
 cp -r vectors build-wasm/site/vectors
+FR="${D2_FREERES_DIR:-third-party/sgd2freeres}"
+[ -d "$FR" ] && mkdir -p build-wasm/site/freeres && cp "$FR"/*.dc6 build-wasm/site/freeres/ || true
 [ -d build-wasm/diag ] && cp -r build-wasm/diag build-wasm/site/diag   # diagnosis captures (D2_ITEMGEN_FILE=diag/...), never committed
 
 # with the disc MPQs and the 1.13c core's patch. Symlinks, not copies (2.3 GB).

@@ -4,6 +4,7 @@ import { dccDirection, indexedToRgba } from './unit-renderer.mjs';
 import { fourcc } from './monster-renderer.mjs';
 import { createBlender } from './frontend.mjs';
 import { createUnitShadowRenderer } from './unit-shadow-renderer.mjs';
+import { createObjectShadowPolicy } from './object-shadow-policy.mjs';
 
 const COMPONENT = ['HD','TR','LG','RA','LA','RH','LH','SH','S1','S2','S3','S4','S5','S6','S7','S8'];
 const MODE = ['NU','OP','ON','S1','S2','S3','S4','S5'];
@@ -31,6 +32,7 @@ export function parseObjectPresentations(bytes, count) {
 export function createObjectRenderer(read, documentObject = globalThis.document, { shadow = false } = {}) {
   const animations = new Map(), failures = new Set(), rasters = new Map(), palettes = new Map(), blenders = new Map();
   const shadows = shadow ? createUnitShadowRenderer(read) : null;
+  const shadowPolicy = shadow ? createObjectShadowPolicy(read) : null;
   let lastEvidence = null, measuring = false;
   const palette = (act) => { const a = Math.min(4, Math.max(0, (act | 0) - 1));
     if (!palettes.has(a)) palettes.set(a, decodeDatPalette(read(`data\\global\\palette\\${PALETTE[a]}\\pal.dat`))); return [a, palettes.get(a)]; };
@@ -63,7 +65,8 @@ export function createObjectRenderer(read, documentObject = globalThis.document,
     const frame = (object.framePrecise >>> 8) % animation.cof.framesPerDirection;
     // The shadow goes under the sprite, at the object's own anchor, one blit per COF layer whose Shadow
     // byte is set -- retail's own order (shadow records precede every cel of the same frame).
-    const shadowBlit = shadows && !measuring ? shadows.draw(ctx, Math.round(x), Math.round(y),
+    const shadowDecision = shadowPolicy ? shadowPolicy.decide(object) : { draw: false, reason: 'shadow-disabled', drawUnder: null };
+    const shadowBlit = shadows && shadowDecision.draw && !measuring ? shadows.draw(ctx, Math.round(x), Math.round(y),
       { cof: animation.cof, components: animation.components, direction: animation.direction, frame },
       { kind: 'object', id: object.id, classId: object.classId, token: object.token, direction: animation.direction, frame, act }) : null;
     const composed = composeCofFrame(animation.cof, animation.direction, frame, animation.components), [act0, pal] = palette(act);
@@ -114,7 +117,7 @@ export function createObjectRenderer(read, documentObject = globalThis.document,
       // The shadow blit this draw made (or null).  `layers[].shadow` is the COF byte as retail shipped
       // it; `shadow.layers`/`shadow.components` is what the pass decided to draw -- so a row can assert
       // both a blit for a Shadow-set layer and none for a layer whose bytes say otherwise.
-      shadow: shadowBlit, shadowLayers: shadowBlit ? shadowBlit.layers : 0 }; return lastEvidence;
+      shadow: shadowBlit, shadowLayers: shadowBlit ? shadowBlit.layers : 0, shadowDecision }; return lastEvidence;
   },
   // The box this object's sprite occupies when drawn at (x, y), or null when nothing would be drawn
   // (no token, a COF/DCC that will not decode). Retail's hover is the drawn sprite, not a radius

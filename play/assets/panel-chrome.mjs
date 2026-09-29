@@ -65,6 +65,7 @@ export function createPanelChrome(read, documentObject = globalThis.document) {
     /** Font16 white text anchored at its bottom row. */
     text(ctx, act, s, x, y) { forAct(act).font.drawAnchored(ctx, s, x, y); },
     measure(act, s) { return forAct(act).font.measure(s); },
-    border(ctx, act, pieces) { for (const [i, x, y] of pieces) this.cel(ctx, act, CHROME_ART.border, i, x, y); },
+    // The wide view draws SGD2FreeRes's own frame instead (assets/wide-hud.mjs sets __d2WideFrame).
+    border(ctx, act, pieces) { if (globalThis.__d2WideFrame) return; for (const [i, x, y] of pieces) this.cel(ctx, act, CHROME_ART.border, i, x, y); },
   };
 }

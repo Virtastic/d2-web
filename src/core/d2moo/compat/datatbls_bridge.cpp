@@ -58,6 +58,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_datatbl(const char* name) {
     T("objgroup", pObjGroupTxt, nObjGroupTxtRecordCount) T("lvltypes", pLvlTypesTxt, nLvlTypesTxtRecordCount)
     T("lvlwarp", pLvlWarpTxt, nLvlWarpTxtRecordCount) T("lvlmaze", pLvlMazeTxt, nLvlMazeTxtRecordCount)
     T("cubemain", pCubeMainTxt, nCubeMainTxtRecordCount)
+    // sets/setitems have no captured vector, so their gate is the shipped .bin itself (the .bin IS
+    // the in-memory record array before fixups): s02-tables compares these bytes against it.
+    T("sets", pSetsTxt, nSetsTxtRecordCount) T("setitems", pSetItemsTxt, nSetItemsTxtRecordCount)
 #undef T
     out = p ? std::to_string((uintptr_t)p) + ":" + std::to_string(c) : "";
     return out.c_str();

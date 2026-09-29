@@ -1,4 +1,5 @@
 // The real map, drawn from the engine's own tile list.
+import { terrainDrawOp } from './terrain-draw-identity.mjs';
 //
 // What this replaces: retail-tile-view.mjs picked ONE hardcoded DT1 per act, took a dozen
 // "representative" tiles out of it, and tiled them as a backdrop. Every level in an act therefore
@@ -51,14 +52,14 @@ export function screenDeltaToWorld(dx, dy) {
  */
 export function wallLightCells(o, A, B, j) {
   switch (o) {
-    case 1: return [A + 2, B + 5 - 2 * j];
+    case 1: case 8: return [A + 2, B + 5 - 2 * j];
     case 3: case 4: case 12: case 14: return [[A + 2, B + 5], [A + 2, B + 3], [A + 2, B + 2], [A + 2, B + 2], [A + 3, B + 2], [A + 5, B + 2]][j];
     case 7: return j < 3 ? [A - 5 + 2 * j, B + 2] : [A + 2, B + 5 - 2 * j];
     default: return [A - 5 + 2 * j, B + 2];
   }
 }
 
-export const SESSION_TILE_BYTES = 76;
+export const SESSION_TILE_BYTES = 84;
 // Where the camera puts things, in retail's numbers:
 // the player -- and so every unit, projected relative to him -- is drawn 8 px ABOVE the canvas
 // centre (retail's town frame: the Barbarian at 400,292 on 800x600), and a tile's DT1 blocks land at
@@ -103,6 +104,11 @@ export function parseSessionTiles(heap, pointer, count) {
       screenX: view.getInt32(b + 48, true), screenY: view.getInt32(b + 52, true),
       width: view.getInt32(b + 56, true), height: view.getInt32(b + 60, true), flags: view.getUint32(b + 64, true),
       librarySlot: view.getUint32(b + 68, true), libraryIndex: view.getUint32(b + 72, true),
+      // F66: retail's per-record D2DrlgTileDataStrc+0x10, the field that picks its transparent (roof,
+      // slot 40) entry over the wall entry (39) on a wall-list record -- s338. The general rule is not
+      // derived yet; this is the raw value, exported for that work.
+      entryHint: view.getInt32(b + 76, true),
+      pop: view.getUint32(b + 80, true),
     };
   }
   return tiles;
@@ -140,8 +146,19 @@ export function readLevelTileFiles(Module, cap = 4096, exportName = 'd2_session_
  * The engine's light map (d2_session_lightmap: D2Client's 48x48 subtile map around the player) as the
  * floor-grid source litFloor wants: a floor at world subtile (a, b) reads the 8x8 padded grid of cells
  * (a - 1 + i, b - 1 + j), clamped into the map, exactly as D2Client+0xA38C0 / +0xA8230 fill it.
+ *
+ * `occludeUnits` defaults ON, which is the CAPTURE's own setting and not a preference: D2Client
+ * occludes a unit's light (a player's or a monster's -- objects always) only above the Light Quality
+ * option, and retail's captures were taken with it on. The two scenes that decided the flag the other
+ * way cannot see it at all -- turning it on changes NO cell there -- while the
+ * Flayer Jungle's waypoint arrival (s697) needs it: with the player's light unoccluded 18 of
+ * the 96 floor tiles retail's own captured map carries are wrong (worst corner 61/255, 66 cells of the
+ * 48x48 grid, every one of them OURS HIGHER), and with it occluded all 96 tiles and all 2304 cells are
+ * retail's exactly. The flag grid is identical to retail's either way (2304 of 2304): the mask is not
+ * the variable, the occlusion is. Setting it is a quality OPTION we do not model, so the measured arm
+ * is the default and a caller that needs the other one passes it.
  */
-export function readSessionLightmap(Module, ambientOverride = -1, occludeUnits = 0) {
+export function readSessionLightmap(Module, ambientOverride = -1, occludeUnits = 1) {
   if (!Module._d2_session_lightmap) return null;
   const p = Number(Module.ccall('d2_session_lightmap', 'number', ['number', 'number'], [ambientOverride, occludeUnits]));
   const v = new DataView(Module.HEAPU8.buffer, p, 16 + 48 * 48 * 2);
@@ -164,6 +181,9 @@ export function readSessionTerrain(Module) {
   const count = Module.ccall('d2_session_tile_count', 'number', [], []);
   const ptr = Number(Module.ccall('d2_session_tiles', 'number', [], []));
   const tiles = count > 0 && ptr > 0 ? parseSessionTiles(Module.HEAPU8, ptr, count) : [];
+  // The engine's own pick: each tile's entry index in its DT1 (parallel array, D2WEB_TileEntryFileIndex).
+  const entries = (ptr, n, into) => { if (!ptr || !Module._d2_session_tile_entries) return; const u = new Uint32Array(Module.HEAPU8.buffer, ptr, n); into.forEach((t, i) => { t.entry = u[i]; }); };
+  entries(count > 0 ? Number(Module.ccall('d2_session_tile_entries', 'number', [], [])) : 0, count, tiles);
   const files = readLevelTileFiles(Module);
   if (Module._d2_session_seam_tiles) {
     const seamCount = Module.ccall('d2_session_seam_tile_count', 'number', [], []);
@@ -171,7 +191,9 @@ export function readSessionTerrain(Module) {
     if (seamCount > 0 && seamPtr > 0) {
       const base = files.length;
       files.push(...readLevelTileFiles(Module, 4096, 'd2_session_seam_tile_files'));
-      for (const t of parseSessionTiles(Module.HEAPU8, seamPtr, seamCount)) tiles.push({ ...t, librarySlot: t.librarySlot + base, seam: true });
+      const seam = parseSessionTiles(Module.HEAPU8, seamPtr, seamCount);
+      entries(Number(Module.ccall('d2_session_seam_tile_entries', 'number', [], [])), seamCount, seam);
+      for (const t of seam) tiles.push({ ...t, librarySlot: t.librarySlot + base, seam: true });
     }
   }
   return { tiles, files };
@@ -195,7 +217,7 @@ function recordTile(entry, files) {
   if (!Array.isArray(list)) return;
   const t = entry.tile, px = entry.dt1Tile.pixels, floor = t.orientation === 0 || t.orientation === 15;
   const file = String(files[entry.slot] ?? '?').toLowerCase().replace(/\//g, '\\');
-  const op = floor ? 'floor' : t.orientation === 13 ? 'shadowtile' : t.layer === 2 ? 'roof' : 'wall';
+  const op = terrainDrawOp(t);
   list.push({ op, path: `${file} ${t.orientation} ${t.mainIndex} ${t.subIndex}`, frame: entry.dt1Tile.rarity,   // the DRAWN art's rarity
     x: entry.x - px.originX + (floor ? 80 : 0), y: entry.y - px.originY, mode: 0, hash: 0, a: t.worldX * 5, b: t.worldY * 5,
     rect: [entry.x, entry.y, entry.bitmap.width, entry.bitmap.height] });   // the painted rectangle: a cull check reads it
@@ -416,9 +438,9 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
      * rain block and only then by the shadows and the walls, so a wall or a roof covers the rain
      * behind it (client-parity F11b).
      */
-    draw(ctx, tiles, files, player, width, height, sprites = [], afterFloors = null) {
+    draw(ctx, tiles, files, player, width, height, sprites = [], afterFloors = null, centreX = width / 2) {
       const origin = worldToScreen(player.x, player.y);
-      const offsetX = width / 2 - origin.x;
+      const offsetX = centreX - origin.x;
       const offsetY = height / 2 + UNIT_CENTRE_Y - origin.y;
       // Count resolution before viewport culling: an off-screen wrong lookup is still wrong art,
       // and must not disappear from level-2 requested-versus-drawn identity evidence.
@@ -433,7 +455,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       let searched = 0, ambiguous = 0;
       // Resolve every tile to a bitmap and an on-screen box once, then split by layer.
       const floors = [], walls = [];
-      let hidden = 0, rarityAmbiguous = 0;
+      let hidden = 0, popHidden = 0, rarityAmbiguous = 0, entryTiles = 0, entryExact = 0, entryDiffers = 0;
       for (const tile of tiles) {
         // MAPTILE_HIDDEN (0x8, D2DrlgDrlg.h) is a DRAW flag: DrlgDrlgAnim hides every frame of an
         // animated floor but the current one by toggling it, and hidden walls (Inv_Wall.dt1 and the
@@ -442,6 +464,12 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         // Not a shadow tile, though: retail draws Harrogath's main-gate shadows (maingate.dt1 13:1:2/7/8)
         // with the bit set (s231 against retail's frame inside the gate, F34).
         if ((tile.flags & 0x8) && tile.orientation !== 13) { hidden++; continue; }
+        // A tile the level's own roof POP hides while the player stands in the pad's region. The engine
+        // decides it (`DRLGPRESET_UpdatePops`: a preset's pop names a DT1 STYLE and, while the player is
+        // inside its rect, every tile of that style in the rect is the hidden roof) and publishes it on
+        // the tile; retail's client draws none of them -- retail's own act4-tyrael frame has no roof over
+        // the hero while this client painted the whole Exterior.dt1 15:2:4..15 plane (client-parity F44).
+        if (tile.pop === 1) { popHidden++; continue; }
         requested++;
         // An empty/failed slot is not fatal any more: the identity search below can still find
         // the tile in another library, which is the normal case now that librarySlot is per-room.
@@ -487,7 +515,13 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         // same-rarity grass variants drew a sibling's art; reversing took town floors 118,824 -> 17,986
         // differing pixels).
         const vi = variants ? variants.length - 1 - tile.libraryIndex : 0;
-        const dt1Tile = variants ? (sameRarity.length === 1 ? sameRarity[0] : (variants[vi] ?? variants[0])) : undefined;
+        // The engine's own entry (file index of the pTile the room picked) beats every heuristic above when
+        // it names a tile of this identity in this room's own library: the exact variant, not a guess.
+        const exact = variants && foundSlot === tile.librarySlot && tile.entry !== undefined ? lib.byIndex[tile.entry] : undefined;
+        const heur = variants ? (sameRarity.length === 1 ? sameRarity[0] : (variants[vi] ?? variants[0])) : undefined;
+        const exactOk = exact && `${exact.orientation}:${exact.mainIndex}:${exact.subIndex}` === key;
+        if (variants) { entryTiles++; if (exactOk) { entryExact++; if (exact !== heur) entryDiffers++; } }
+        const dt1Tile = variants ? (exactOk ? exact : heur) : undefined;
         if (variants && sameRarity.length !== 1) rarityAmbiguous++;
         if (dt1Tile) {
           resolved++;
@@ -580,7 +614,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         // Off unless globalThis.__d2TraceBlits is an array: then each drawn floor carries the dt1 art
         // and the 8x8 light grid it was lit from, so a row can recompute the LEVEL litFloor gave a
         // pixel (F96: our floor level is 1-2 above retail's on the frame's left edge). s448 reads it.
-        if (globalThis.__d2TraceBlits) globalThis.__d2TraceBlits.push({ x: f.x, y: f.y, path: files[f.slot], want: f.want, variantNo: f.variantNo, dt1Tile: f.dt1Tile, grid, a: f.tile.worldX * 5, b: f.tile.worldY * 5 });
+        if (globalThis.__d2TraceBlits) globalThis.__d2TraceBlits.push({ x: f.x, y: f.y, path: files[f.slot], want: f.want, variantNo: f.variantNo, dt1Tile: f.dt1Tile, grid, a: f.tile.worldX * 5, b: f.tile.worldY * 5, seam: Boolean(f.tile.seam) });
         ctx.drawImage(lit || f.bitmap, f.x, f.y); drawn++; recordTile(f, files);
       }
       if (afterFloors) afterFloors(ctx);
@@ -595,15 +629,56 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       // Cold Plains captures follows every wall and unit (arrival.txt: the six tent roofs at the end,
       // rows then columns). Drawn in the overlay they sat under the tent's own walls.
       const isRoof = (e) => e.tile.orientation === 15;
-      const overlay = walls.filter((e) => !isLower(e) && !isRoof(e)).concat(sprites.map((s) => ({ sprite: s, depth: s.depth, ordinal: -1 })));
-      const roofs = walls.filter((e) => !isLower(e) && isRoof(e));
+      const isShadow = (e) => e.tile.orientation === 13;
+      // Shadow tiles (orientation 13) are their OWN pass, entirely before walls and units, not
+      // interleaved by tile position: retail's own capture (a3-flayer-wp.txt, world 4440,3800) draws
+      // every one of its 13 shadowtile records (lines 115-139) before any of its wall records (140+),
+      // whole-list-first -- a per-tile ordinal tie-break put ours the other way round for this tile,
+      // so the tree's own opaque wall (drawn after us) never covered the shadow's blend and it darkened
+      // the tree canopy by 27% (SHADOW_KEEP) instead of nothing (F117, s699: 469 -> 0 of 2,503 traced
+      // pixels of this one wall with only the draw ORDER corrected, litWall's level unchanged).
+      const shadows = walls.filter((e) => !isLower(e) && isShadow(e));
+      const overlay = walls.filter((e) => !isLower(e) && !isRoof(e) && !isShadow(e)).concat(sprites.map((s) => ({ sprite: s, depth: s.depth, ordinal: -1 })));
+      for (const o of shadows) o.k = [o.tile.worldY, o.tile.worldX, 1, o.ordinal];
+      shadows.sort((a, b) => (a.k[0] - b.k[0]) || (a.k[1] - b.k[1]) || (a.k[3] - b.k[3]));
+      // A roof plane is one contiguous building; retail hides the WHOLE plane when the player stands
+      // under its footprint (client-parity F44: five retail captures of the Fortress roof
+      // gave 6/6/24/36/0 orientation-15 draws, and the one 0 is the only capture whose hero position
+      // falls inside the roof's own world bounding box -- 5015-5030 x 5020-5050, hero at
+      // 5020.5,5039.5 -- while the other four hero positions sit outside it). Cluster contiguous roof
+      // tiles (8-neighbour on the DRLG grid) and cull a whole cluster when the player's subtile
+      // position falls inside its tile-grid bounding box; per-tile culling does not reproduce the
+      // measured all-or-nothing counts.
+      const roofsAll = walls.filter((e) => !isLower(e) && isRoof(e));
+      const parent = roofsAll.map((_, i) => i);
+      const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+      const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; };
+      for (let i = 0; i < roofsAll.length; i++) {
+        for (let j = i + 1; j < roofsAll.length; j++) {
+          if (Math.abs(roofsAll[i].tile.worldX - roofsAll[j].tile.worldX) <= 1 &&
+              Math.abs(roofsAll[i].tile.worldY - roofsAll[j].tile.worldY) <= 1) union(i, j);
+        }
+      }
+      const clusters = new Map();
+      roofsAll.forEach((e, i) => { const r = find(i); if (!clusters.has(r)) clusters.set(r, []); clusters.get(r).push(e); });
+      const culledRoof = new Set();
+      for (const members of clusters.values()) {
+        const minX = Math.min(...members.map((e) => e.tile.worldX)), maxX = Math.max(...members.map((e) => e.tile.worldX));
+        const minY = Math.min(...members.map((e) => e.tile.worldY)), maxY = Math.max(...members.map((e) => e.tile.worldY));
+        const inside = player.x >= minX * 5 && player.x < (maxX + 1) * 5 && player.y >= minY * 5 && player.y < (maxY + 1) * 5;
+        if (inside) for (const e of members) culledRoof.add(e);
+      }
+      const roofs = roofsAll.filter((e) => !culledRoof.has(e));
       for (const o of roofs) o.k = [o.tile.worldY, o.tile.worldX, 1, o.ordinal];
       roofs.sort((a, b) => (a.k[0] - b.k[0]) || (a.k[1] - b.k[1]) || (a.k[3] - b.k[3]));
       for (const o of overlay) o.k = key(o);
       overlay.sort((a, b) => (a.k[0] - b.k[0]) || (a.k[1] - b.k[1]) || (a.k[2] - b.k[2]) || (a.k[3] - b.k[3]));
-      for (const o of overlay.concat(roofs)) {
+      for (const o of shadows.concat(overlay).concat(roofs)) {
         if (o.sprite) { o.sprite.draw(ctx); continue; }
         if (o.tile.orientation === 13) {
+          // A shadow tile repaints whatever is under it, so a row attributing a pixel to the terrain
+          // blit that painted it has to see this pass too (same guarded trace, __d2TraceWalls).
+          if (globalThis.__d2TraceWalls) globalThis.__d2TraceWalls.push({ x: o.x, y: o.y, path: files[o.slot], want: o.want, o: 13, dt1Tile: o.dt1Tile, shadow: true });
           // A shadow tile blends into what is under it through PL2 AlphaBlend[0] (drawShadow; T8).
           if (globalThis.__d2ShadowOpaque) ctx.drawImage(o.bitmap, o.x, o.y);   // a row reading the tiles' own pixels (s191)
           else if (!drawShadow(ctx, o)) {   // no PL2: the measured stand-in
@@ -616,8 +691,19 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
           // (768 bytes = 8x8 x 12) that is UNIFORM at the light map's ambient: every roof in arrival3 and
           // lit0..1 (133, 144, 146 -- each capture's map minimum), whatever light is under it.
           const roofGrid = o.tile.orientation === 15 && lightAmbient != null && new Array(64).fill(lightAmbient);
-          const lit = roofGrid ? litFloor(files[o.slot], o.dt1Tile, o.want + ':v' + o.variantNo, roofGrid) : at && litWall(files[o.slot], o.dt1Tile, o.want + ':v' + o.variantNo,
-            [0, 1, 2, 3, 4, 5].map((j) => { const [a, b] = wallCells(o.tile.orientation, A, B, j); return at(a, b); }));
+          // The SIX light entries this wall is drawn with, and the light map cell each came from -- the
+          // same override the floor path below takes, for the wall path (F117: which entry a wall's
+          // 32-px block reads is the question the gate frame asks). Off unless __d2TraceWalls is an
+          // array; never populated otherwise, and it changes no drawing.
+          const wallE = at && !roofGrid ? [0, 1, 2, 3, 4, 5].map((j) => { const [a, b] = wallCells(o.tile.orientation, A, B, j); return at(a, b); }) : null;
+          if (globalThis.__d2TraceWalls) globalThis.__d2TraceWalls.push({ x: o.x, y: o.y, path: files[o.slot], want: o.want, o: o.tile.orientation,
+            dt1Tile: o.dt1Tile, A, B, cells: wallE && [0, 1, 2, 3, 4, 5].map((j) => wallCells(o.tile.orientation, A, B, j)), E: wallE, roof: Boolean(roofGrid) });
+          // Off unless globalThis.__d2TraceBlits is an array: the wall counterpart of the floor trace
+          // above (F117's own routing -- "s448's __d2TraceBlits is the hook") -- each drawn wall carries
+          // its six fitted light entries (wallCells' own E array) and the dt1 art, so a row can recompute
+          // litWall's per-block level and orientation the same way s448 reads litFloor's.
+          if (globalThis.__d2TraceBlits && wallE) globalThis.__d2TraceBlits.push({ x: o.x, y: o.y, path: files[o.slot], want: o.want, variantNo: o.variantNo, dt1Tile: o.dt1Tile, orientation: o.tile.orientation, E: wallE, a: A, b: B, wall: true });
+          const lit = roofGrid ? litFloor(files[o.slot], o.dt1Tile, o.want + ':v' + o.variantNo, roofGrid) : wallE && litWall(files[o.slot], o.dt1Tile, o.want + ':v' + o.variantNo, wallE);
           ctx.drawImage(lit || o.bitmap, o.x, o.y);
         }
         drawn++; recordTile(o, files);
@@ -625,8 +711,8 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       // Identity of every blit (level 2 evidence): which file, which (orientation:main:sub) was asked
       // for and drawn, and the screen box it covers -- so a wrong patch on screen names its tiles.
       const blits = floors.concat(walls).map((e) => ({ file: e.file, want: e.want, got: e.got, variant: e.variant,
-        x: e.x, y: e.y, w: e.bitmap.width, h: e.bitmap.height, wall: e.wall, seam: e.seam }));
-      return { drawn, missing, empty, hidden, requested, resolved, noEntry, rarityAmbiguous, blits, seam: floors.concat(walls).filter((e) => e.seam).length, missingSample, drawnSample, wrongIdentity, searched, ambiguous,
+        x: e.x, y: e.y, w: e.bitmap.width, h: e.bitmap.height, wall: e.wall, seam: e.seam, flag8000: !!(e.tile.flags & 0x8000), tflags: e.tile.flags, o: e.tile.orientation, room: e.tile.room, layer: e.tile.layer }));
+      return { entryTiles, entryExact, entryDiffers, drawn, missing, empty, hidden, popHidden, requested, resolved, noEntry, rarityAmbiguous, blits, seam: floors.concat(walls).filter((e) => e.seam).length, missingSample, drawnSample, wrongIdentity, searched, ambiguous,
         floors: floors.length, walls: walls.length, sprites: sprites.length };
     },
   };

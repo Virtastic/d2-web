@@ -125,12 +125,21 @@ D2PathFoWallNodeStrc* PATH_AStar_PopBestScoreForVisit(D2PathFoWallContextStrc* p
 }
 
 //1.00:  D2Common.0x10056EC0
+// d2-web diagnostic (F55): the A* search's own outcome for the last call, so a MOVE_NO_PATH refusal
+// can be told apart from "the room test rejected it" (TargetLocationHasEnoughRoom, unreachable for a
+// ground click -- no pTargetUnit) versus "the node pool never advanced past the start" versus "it
+// advanced but the pool of 200 (D2PathFoWallContextStrc::STORAGE_SIZE) ran out short of the target".
+// Never changes the answer; read by d2_session_astar_probe().
+int32_t g_d2webAStarNodesPopped = -1, g_d2webAStarAdvanced = -1, g_d2webAStarExhausted = -1, g_d2webAStarPathPoints = -1;
+
 //1.10f: D2Common.0x6FDA69E0
 //1.13c: D2Common.0x6FDCB630
 int __fastcall PATH_AStar_ComputePath(D2PathInfoStrc* pPathInfo)
 {
+	g_d2webAStarNodesPopped = 0; g_d2webAStarAdvanced = 0; g_d2webAStarExhausted = 0; g_d2webAStarPathPoints = -1;
 	if (!PATH_AStar_TargetLocationHasEnoughRoom(pPathInfo))
 	{
+		g_d2webAStarPathPoints = -2; // rejected before the search ran
 		return 0;
 	}
 
@@ -152,6 +161,7 @@ int __fastcall PATH_AStar_ComputePath(D2PathInfoStrc* pPathInfo)
 		pCurNodeToVisit = PATH_AStar_PopBestScoreForVisit(&tContext)
 		)
 	{
+		++g_d2webAStarNodesPopped;
 		if (pBestNode == nullptr
 			|| pCurNodeToVisit->nHeuristicDistanceToTarget < pBestNode->nHeuristicDistanceToTarget
 			|| (pCurNodeToVisit->nHeuristicDistanceToTarget == pBestNode->nHeuristicDistanceToTarget
@@ -167,13 +177,17 @@ int __fastcall PATH_AStar_ComputePath(D2PathInfoStrc* pPathInfo)
 			|| !PATH_AStar_ExploreChildren(pPathInfo, &tContext, pCurNodeToVisit, tTargetCoord)
 			)
 		{
+			if (tContext.nNodesCount == ARRAY_SIZE(tContext.aNodesStorage)) g_d2webAStarExhausted = 1;
 			break; // Then stop here
 		}
 	}
+	g_d2webAStarAdvanced = (pBestNode && pBestNode->pBestParent) ? 1 : 0;
 	if (pBestNode)
 	{
-		return PATH_AStar_FlushNodeToDynamicPath(pBestNode, pPathInfo);
+		g_d2webAStarPathPoints = PATH_AStar_FlushNodeToDynamicPath(pBestNode, pPathInfo);
+		return g_d2webAStarPathPoints;
 	}
+	g_d2webAStarPathPoints = 0;
 	return 0;
 }
 

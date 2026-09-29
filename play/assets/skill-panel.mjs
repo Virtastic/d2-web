@@ -44,6 +44,11 @@ const TAB_FRAMES = 4;
 // This grid was invented at 90x58 for a cycle, which is why the icons never sat on the
 // background's connector arrows -- and it was written off as "needs RE" while the constants sat in
 // reference/OpenDiablo2. See , "UI / HUD panel layouts".
+// Where the panel's own art is anchored. OpenDiablo2 puts the skill tree at (401, 64) and retail's
+// draw list anchors its backdrop frames at (400|656, 316|492) -- the same pair the inventory panel's
+// InvChar6 frames use, in the same sheet geometry -- so the panel is 320 wide at x 400, and its top is
+// the character screen's own PANEL_ORIGIN.y, which s251 pinned against retail's draw list.
+export const SKILL_PANEL_ORIGIN = Object.freeze({ x: 400, y: 61 });
 export const SKILL_LAYOUT = Object.freeze({
   screenX: 0, screenY: 0, width: 800, height: 600,
   // Retail's draw list: icons at x 346 + 69 * SkillColumn, their
@@ -68,7 +73,13 @@ const TAB_MID = { 1: 436, 2: 330, 3: 222 };
 // 2026-09-27 (`retail/drawlists/skilltree-hover.bin`, a captured pointer parked on Bash's icon) but
 // our plate is not drawn from it. Its padding is this client's and is named here so the row can say
 // which part is retail's text and which part is our box around it.
-const PLATE_PAD = 5;
+const PLATE_PAD = 4, PLATE_LINE = 16;
+
+/** The plate's box (see the comment where it is drawn); `cell` is the hovered icon's rect. */
+export function plateBox(cell, textWidth, lines) {
+  const w = textWidth + PLATE_PAD * 2, h = lines * PLATE_LINE;
+  return { x: Math.max(0, Math.min(SKILL_LAYOUT.width - w, cell.x)), y: Math.min(cell.y + cell.h + 4, SKILL_LAYOUT.height - 5 - h), w, h };
+}
 
 /**
  * Retail's own mana line text for a skill's cost, in the engine's 1/256 units (V19).
@@ -175,6 +186,12 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
   return {
     get tab() { return tab; },
     get hovered() { return hovered; },
+    /** The panel's own rectangle on the 800x600 screen. Its backdrop cels are anchored where retail
+     *  anchors them (skilltree.txt: the frames at (400|656, 316|492) below, like InvChar6's), so the
+     *  panel is the same 320x441 as the inventory's, at the same left -- and the tabs (630..718), the
+     *  close box and the icons all sit inside it, which s427 asserts. The click routing's panel test
+     *  reads this rather than a second guess in the shell. */
+    panelRect() { return { left: SKILL_PANEL_ORIGIN.x, top: SKILL_PANEL_ORIGIN.y, width: 320, height: 441 }; },
     /** Track the pointer so draw() can name the skill under it. Returns the skill id, or null. */
     hover(px, py, width, height, state) {
       const hit = this.skillAt(px, py, width, height, state);
@@ -220,8 +237,12 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
           cels.push({ path, frame: f, anchor: { x, y }, drawn: chrome.cel(ctx, act, path, f, x, y)?.drawn ?? null }); }
       // "Skill / Choices / Remaining" and the count, each line centred on x 677 (retail: 659/649/639,
       // rows 85/97/109; the count at 669,140).
+      // Every text draw this frame made, at the (left-x, y) pixel it actually painted at -- the same
+      // convention retail's own draw-list `text` records use -- so a scenario can compare positions
+      // without re-deriving them (client-parity P4b, "not yet checked record-for-record").
+      const labels = [];
       const S = (k) => (state.string?.(k) || '');
-      const centred = (t, cx, y) => font.drawAnchored(ctx, t, Math.floor(cx - font.measure(t) / 2), y);
+      const centred = (t, cx, y) => { const x = Math.floor(cx - font.measure(t) / 2); font.drawAnchored(ctx, t, x, y); labels.push({ text: t, x, y }); };
       const cx = 659 + font.measure(S('StrSklTree1') || 'Skill') / 2;
       [['StrSklTree1', 85], ['StrSklTree2', 97], ['StrSklTree3', 109]].forEach(([k, y]) => centred(S(k), cx, y));
       centred(String(state.skillPoints ?? 0), cx, 140);
@@ -252,9 +273,12 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
           iconCel: skill.iconCel, sheet: iconPath, frame: skill.iconCel, w: r.w, h: r.h, grey: !(skill.baseLevel > 0) });
       }
       // skilltree.go assigns a close x per class and open tab; do not flatten it
-      // to the right-hand button merely because that happens to fit one page.
+      // to the right-hand button merely because that happens to fit one page. panelCloseLayout
+      // (panel-close.mjs) is the one place this rect lives -- the drawn cel and the click hit-box
+      // both come from it now, so they cannot drift the way close.x-1,close.y+28 vs the raw table
+      // entry did.
       const close = panelCloseLayout('skills', { playerClass: state.playerClass, tab });
-      const closeBlit = chrome.cel(ctx, act, PANEL_CLOSE_ART.path, PANEL_CLOSE_ART.frame, close.x - 1, close.y + 28);
+      const closeBlit = chrome.cel(ctx, act, PANEL_CLOSE_ART.path, PANEL_CLOSE_ART.frame, close.x, close.y + close.height - 1);
       chrome.border(ctx, act, BORDER_RIGHT);
 
       // The hovered skill's own retail text: SkillDesc's wStrName and wStrLong are .tbl indices the
@@ -307,13 +331,15 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
         const shown = plateLines;
         if (shown.length) {
           const r = cellRect(hovered);
-          const w = Math.max(...shown.map((l) => font.measure(l.text))) + PLATE_PAD * 2;
-          const h = shown.length * font.lineHeight + PLATE_PAD * 2;
-          const nx = Math.max(2, Math.min(SKILL_LAYOUT.width - w - 2, r.x + r.w / 2 - w / 2));
-          const ny = Math.max(2, Math.min(SKILL_LAYOUT.height - h - 2, r.y - h - 6));
-          ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.78)';
+          // The box is measured from retail's own frames (skilltree-hover, -frenzy, -ww): pad 4 either
+          // side of the widest line, 16 px per line, first glyph row 13 below the top; x = the icon's
+          // left clamped to the screen's right edge, y = 4 under the icon's bottom row clamped so the
+          // bottom stays 5 above the screen's; every line centred on the box.
+          const { x: nx, y: ny, w, h } = plateBox(r, Math.max(...shown.map((l) => font.measure(l.text))), shown.length);
+          ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.5)'; // ponytail: retail's `box color=0 mode=2` blend level unmeasured; .5 stands in
           ctx.fillRect(nx, ny, w, h); ctx.restore();
-          shown.forEach((l, i) => font.draw(ctx, l.text, nx + PLATE_PAD, ny + PLATE_PAD + i * font.lineHeight));
+          shown.forEach((l, i) => { l.x = Math.floor(nx + w / 2 - font.measure(l.text) / 2); l.y = ny + 13 + i * PLATE_LINE;
+            font.drawAnchored(ctx, l.text, l.x, l.y); });
           namePlate = { id: hovered.id, label: shown[0].text, x: nx, y: ny };
           plate = { id: hovered.id, x: nx, y: ny, w, h, lines: shown,
             manaStr: hovered.manaStr, manaTemplate: hovered.manaStr ? line(hovered.manaStr) : '',
@@ -324,7 +350,7 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
 
       // missingIcons is reported, not swallowed: an iconCel with no frame behind it is the exact
       // shape of the defect that drew a green block, and a count of drawn icons cannot see it.
-      return { x: o.x, y: o.y, scale: o.scale, tab, drawn, plus, missingIcons, namePlate, plate, cels,
+      return { x: o.x, y: o.y, scale: o.scale, tab, drawn, plus, missingIcons, namePlate, plate, cels, labels,
         icons: icons.length, skillPoints: state.skillPoints ?? 0, total: (state.skills || []).length,
         close: { ...close, path: PANEL_CLOSE_ART.path, frame: PANEL_CLOSE_ART.frame, blit: closeBlit } };
     },

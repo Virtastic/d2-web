@@ -48,7 +48,8 @@
 // continuously, which over-rains against retail's own dry captures; s561 counts it and F11b carries it
 // as the open half.
 import { decodeDatPalette, decodeDc6 } from './d2-formats.mjs';
-import { recordDc6 } from './drawlist.mjs';
+import { recordDc6, recordPrim } from './drawlist.mjs';
+import { createWeatherCycle } from './weather-cycle.mjs';
 
 /** The two layers retail's captured frames draw, with the particle count of the Rogue Encampment's own
  *  peak episode (walls14: 45 Rain3 + 42 Rain4 -- its tiles are `Act1\Town\Floor`/`Fence`/`Objects`;
@@ -98,7 +99,10 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
   const layers = [];
   const errors = [];
   let prepared = false, levelRain = 0;
-  let actN = 0, grey = null;
+  let actN = 0, grey = null, rgbaPal = null;
+  const cycle = createWeatherCycle(), clock = { tick: null };
+  const parity = new URLSearchParams(globalThis.location?.search ?? '').get('enhanced') !== '1' && new URLSearchParams(globalThis.location?.search ?? '').get('view') !== 'fill';
+  const streaks = { drops: [], w: 0, h: 0, tick: null, camX: null, camY: null, seed: 0x2545f491 };
 
   /**
    * 256-entry byte -> the additive grey that byte contributes, from the act's own palette. A palette
@@ -159,6 +163,47 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
     return bitmap;
   };
 
+
+  // ---- The falling drops: retail's LINE primitives (renderer slot 48, mode 127), ~250 a frame ----------
+  // Measured on the retail captures{town-anim,run-by-click-anim}.txt (4 and 24 consecutive whole frames) --
+  // the drops were never the Rain3/4 cels (those are the ground ripples), they are these lines:
+  //   * drawn AFTER the whole world (floors, walls, units) and before the HUD, in the act palette's grey
+  //     (colour idx 22 25 27 115 185 188 192 198 200 206 231); 1 px wide, ~7 in 10 are 3..10 px streaks
+  //     and ~1 in 4 a 1 px dot that sits ~3 frames;
+  //   * a streak falls in a straight line at its OWN speed, 15..27 px per game frame, with a per-frame
+  //     wind slope dx/dy in about -0.28..+0.41 that every drop shares; its length is fixed until it lands,
+  //     then it shortens to the landing row, shows as a dot for one frame and is gone;
+  //   * drops are WORLD-anchored in x/y: while the camera scrolls (floors shift 6-7 px a frame in
+  //     run-by-click-anim) the drops' chains shift by the same amount, so they are advanced by the
+  //     camera's own screen delta -- and they cover the whole viewport, so a wider window gets more.
+  // NOT recovered: retail's RNG (spawn x, landing rows, speeds) -- seeded stand-ins with the measured
+  // ranges -- and the wind's schedule (a slow sine over the measured range).
+  const LINE_COLOURS = [115, 115, 115, 27, 27, 22, 25, 185, 188, 192, 198, 200, 206, 231];
+  const rnd = (n) => { streaks.seed = (Math.imul(streaks.seed, 1664525) + 1013904223) >>> 0; return (streaks.seed >>> 8) % n; };
+  const spawn = (drop, first) => {
+    const dot = rnd(4) === 0;
+    drop.dot = dot; drop.colour = LINE_COLOURS[rnd(LINE_COLOURS.length)];
+    drop.vy = 15 + rnd(13); drop.len = dot ? 0 : 3 + rnd(8);
+    drop.x = rnd(streaks.w + 200) - 100; drop.land = Math.round(streaks.h * 0.2) + rnd(Math.round(streaks.h * 0.75));
+    drop.y = first ? rnd(drop.land) : -drop.len - rnd(drop.vy);
+    drop.ttl = 3 + rnd(4); drop.state = 0;
+    if (dot) drop.y = drop.land;
+  };
+  const stepDrops = (wind, scrollX, scrollY) => {
+    for (const d of streaks.drops) {
+      d.x -= scrollX; d.y -= scrollY;
+      if (d.dot) { if (--d.ttl < 0) spawn(d, false); continue; }
+      if (d.state === 1) { spawn(d, false); continue; }
+      d.x += wind * d.vy; d.y += d.vy;
+      if (d.y + d.len >= d.land) { d.len = Math.max(0, d.land - d.y); d.state = d.len === 0 ? 1 : 0; if (d.y >= d.land) { d.len = 0; d.state = 1; } }
+      if (d.x < -100 || d.x > streaks.w + 100) spawn(d, false);
+    }
+  };
+  const plot = (ctx, x0, y0, x1, y1) => {
+    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+    for (let i = 0; i <= n; i++) ctx.fillRect(Math.round(x0 + (x1 - x0) * (n ? i / n : 0)), Math.round(y0 + (y1 - y0) * (n ? i / n : 0)), 1, 1);
+  };
+
   const prepare = () => {
     if (prepared) return;
     prepared = true;
@@ -188,10 +233,58 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
       levelRain = Number(rain) > 0 ? 1 : 0;
       const next = Number.isFinite(act) ? Math.min(4, Math.max(0, act | 0)) : actN;
       if (next !== actN) {
-        actN = next; grey = null;
+        actN = next; grey = null; rgbaPal = null;
         for (const layer of layers) layer.bitmaps.clear();
       }
     },
+
+
+    /**
+     * The falling drops, drawn after the world (retail's line records).  `cx, cy` are the camera's screen
+     * position, so the drops follow the scroll; returns the line records drawn ({x0,y0,x1,y1,colour}).
+     */
+    drawStreaks(ctx, width, height, tick, cx, cy) {
+      if (!levelRain) return [];
+      if (!rgbaPal) {
+        try { rgbaPal = decodeDatPalette(read(ACT_PALETTE(actN))); } catch (error) { errors.push(`palette: ${error}`); rgbaPal = new Uint8Array(1024); }
+      }
+      // The retail count IS the cycle's intensity on 800x600; a wider or taller viewport gets the same
+      // DENSITY (?parity=1: exactly retail's count, whatever the viewport).
+      const want = Math.round(cycle.intensity * (parity ? 1 : (width * height) / 480000));
+      if (streaks.w !== width || streaks.h !== height || streaks.drops.length !== want) {
+        streaks.w = width; streaks.h = height;
+        while (streaks.drops.length > want) streaks.drops.pop();
+        while (streaks.drops.length < want) { const d = {}; spawn(d, true); streaks.drops.push(d); }
+      }
+      const t = Math.floor(Number(tick));
+      if (streaks.tick === null) { streaks.tick = t; streaks.camX = cx; streaks.camY = cy; }
+      const steps = Math.min(5, Math.max(0, t - streaks.tick));
+      if (steps) {
+        const wind = 0.33 * Math.sin(t / 1500);
+        for (let i = 0; i < steps; i++) stepDrops(wind, (cx - streaks.camX) / steps, (cy - streaks.camY) / steps);
+        streaks.tick = t; streaks.camX = cx; streaks.camY = cy;
+      } else if (t < streaks.tick) { streaks.tick = t; streaks.camX = cx; streaks.camY = cy; }
+      const wind = 0.33 * Math.sin(t / 1500), out = [];
+      ctx.save();
+      for (const d of streaks.drops) {
+        const x0 = Math.round(d.x), y0 = Math.round(d.y), x1 = Math.round(d.x + wind * d.len), y1 = Math.round(d.y + d.len);
+        const o = d.colour * 4;
+        ctx.fillStyle = `rgb(${rgbaPal[o]},${rgbaPal[o + 1]},${rgbaPal[o + 2]})`;
+        plot(ctx, x0, y0, x1, y1);
+        recordPrim('line', x0, y0, x1, y1, d.colour, 127);
+        out.push({ x0, y0, x1, y1, colour: d.colour });
+      }
+      ctx.restore();
+      return out;
+    },
+
+    /** One weather tick per game frame (retail: one per rendered frame), on every level. */
+    advance(tick) {
+      const t = Math.floor(Number(tick));
+      if (clock.tick !== null && t > clock.tick) cycle.tick(t - clock.tick);
+      clock.tick = t;
+    },
+    get cycle() { return cycle; },
 
     active() { return levelRain === 1; },
 
@@ -205,7 +298,7 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
      * conventions (play/assets/drawlist.mjs), the same record retail's hook writes.
      */
     draw(ctx, width, height, tick) {
-      if (!levelRain) return [];
+      if (!levelRain || cycle.intensity === 0) return [];   // ripples: retail draws none while dry (rain-dry-camp)
       prepare();
       const step = Math.floor(Number(tick) / TICKS_PER_FRAME);
       const blits = [];

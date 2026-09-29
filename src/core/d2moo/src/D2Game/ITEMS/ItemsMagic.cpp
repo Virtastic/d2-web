@@ -947,9 +947,10 @@ int32_t __fastcall sub_6FC544A0(D2UnitStrc* pItem)
         {
             for (int32_t i = 0; i < pSetsTxtRecord->nSetItems; ++i)
             {
-                if (pItemsTxtRecord->dwCode == pSetsTxtRecord->pSetItem[i]->szItemCode)
+                D2SetItemsTxt* pSetItem = DATATBLS_GetSetItemOfSet(pSetsTxtRecord, i);
+                if (pSetItem && pItemsTxtRecord->dwCode == pSetItem->szItemCode)
                 {
-                    nSetItemId = pSetsTxtRecord->pSetItem[i]->wSetItemId;
+                    nSetItemId = pSetItem->wSetItemId;
                     break;
                 }
             }

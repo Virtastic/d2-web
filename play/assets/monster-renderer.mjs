@@ -96,7 +96,9 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
       // the modulo drew nothing), so it holds its last frame.
       const whole = actor.framePrecise >>> 8, count = animation.cof.framesPerDirection;
       const frame = (whole >= count && actor.frameCountPrecise && actor.framePrecise >= actor.frameCountPrecise ? count - 1 : whole % count) >>> 0;
-      const composed = composeCofFrame(animation.cof, animation.direction, frame, animation.components);
+      let composed;
+      try { composed = composeCofFrame(animation.cof, animation.direction, frame, animation.components); }
+      catch (e) { failures.add(baseKey); console.warn(`monster ${actor.code} mode ${actor.mode} dir ${actor.direction} frame ${frame}: ${e.message}`); return null; }   // a COF/DCC frame-count mismatch must not stop the frame loop
       const [act0, pal] = palette(act), key = `${baseKey}:${frame}:${act0}`;
       let canvas = rasters.get(key);
       if (!canvas) {

@@ -18,7 +18,9 @@
 
 import { composeTiled, createBlender, createFont, decodeFontTbl, FRONTEND, recordTiled, TITLE_COLUMNS } from './frontend.mjs';
 import { createCharacterCreateCheckboxes } from './charcreate-checkboxes.mjs';
+import { createCharacterNameRenderer, NAME_FIELD } from './charcreate-name.mjs';
 import { recordDc6 } from './drawlist.mjs';
+import { createHeroStances, HERO_STANCE } from './charcreate-stances.mjs';
 
 /**
  * Per-class layout, from OpenDiablo2's select_hero_class.go.
@@ -43,13 +45,13 @@ import { recordDc6 } from './drawlist.mjs';
  * 0 Amazon, 1 Sorceress, 2 Necromancer, 3 Paladin, 4 Barbarian, 5 Druid, 6 Assassin.
  */
 export const CLASSES = [
-  { key: 'amazon',      label: 'Amazon',      descriptionIndex: 5128,  playerClass: 0, dir: 'amazon',      code: 'AM', anchor: { x: 100, y: 337 }, hit: { x:  70, y: 220, w: 55, h: 200 }, idleEvery: 3, idleMs: 2500, forwardMs: 2200, selectedEvery: 2 },
-  { key: 'assassin',    label: 'Assassin',    descriptionIndex: 22519, playerClass: 6, dir: 'assassin',    code: 'AS', anchor: { x: 232, y: 364 }, hit: { x: 175, y: 235, w: 50, h: 180 }, idleEvery: 3, idleMs: 2500, forwardMs: 3800, selectedEvery: 2 },
-  { key: 'necromancer', label: 'Necromancer', descriptionIndex: 5129,  playerClass: 2, dir: 'necromancer', code: 'NE', anchor: { x: 301, y: 333 }, hit: { x: 265, y: 220, w: 55, h: 175 }, idleEvery: 3, idleMs: 1200, forwardMs: 2000, selectedEvery: 2 },
-  { key: 'barbarian',   label: 'Barbarian',   descriptionIndex: 5130,  playerClass: 4, dir: 'barbarian',   code: 'BA', anchor: { x: 400, y: 330 }, hit: { x: 364, y: 201, w: 90, h: 170 }, idleEvery: 2, idleMs:    0, forwardMs: 2500, selectedEvery: 1 },
-  { key: 'paladin',     label: 'Paladin',     descriptionIndex: 5132,  playerClass: 3, dir: 'paladin',     code: 'PA', anchor: { x: 521, y: 339 }, hit: { x: 490, y: 210, w: 65, h: 180 }, idleEvery: 2, idleMs: 2500, forwardMs: 3400, selectedEvery: 2 },
-  { key: 'sorceress',   label: 'Sorceress',   descriptionIndex: 5131,  playerClass: 1, dir: 'sorceress',   code: 'SO', anchor: { x: 626, y: 353 }, hit: { x: 580, y: 240, w: 65, h: 160 }, idleEvery: 2, idleMs: 2500, forwardMs: 2300, selectedEvery: 1 },
-  { key: 'druid',       label: 'Druid',       descriptionIndex: 22518, playerClass: 5, dir: 'druid',       code: 'DZ', anchor: { x: 720, y: 370 }, hit: { x: 680, y: 220, w: 70, h: 195 }, idleEvery: 2, idleMs: 1500, forwardMs: 4800, selectedEvery: 2 },
+  { key: 'amazon',      label: 'Amazon',      descriptionIndex: 5128,  playerClass: 0, dir: 'amazon',      code: 'AM', anchor: { x: 100, y: 337 }, hit: { x:  70, y: 220, w: 55, h: 200 }, idleEvery: 3, idleMs: 2500, forwardMs: 2200, backMs: 1500, selectedEvery: 2 },
+  { key: 'assassin',    label: 'Assassin',    descriptionIndex: 22519, playerClass: 6, dir: 'assassin',    code: 'AS', anchor: { x: 232, y: 364 }, hit: { x: 175, y: 235, w: 50, h: 180 }, idleEvery: 3, idleMs: 2500, forwardMs: 3800, backMs: 1500, selectedEvery: 2 },
+  { key: 'necromancer', label: 'Necromancer', descriptionIndex: 5129,  playerClass: 2, dir: 'necromancer', code: 'NE', anchor: { x: 301, y: 333 }, hit: { x: 265, y: 220, w: 55, h: 175 }, idleEvery: 3, idleMs: 1200, forwardMs: 2000, backMs: 1500, selectedEvery: 2 },
+  { key: 'barbarian',   label: 'Barbarian',   descriptionIndex: 5130,  playerClass: 4, dir: 'barbarian',   code: 'BA', anchor: { x: 400, y: 330 }, hit: { x: 364, y: 201, w: 90, h: 170 }, idleEvery: 2, idleMs:    0, forwardMs: 2500, backMs: 1000, selectedEvery: 1 },
+  { key: 'paladin',     label: 'Paladin',     descriptionIndex: 5132,  playerClass: 3, dir: 'paladin',     code: 'PA', anchor: { x: 521, y: 339 }, hit: { x: 490, y: 210, w: 65, h: 180 }, idleEvery: 2, idleMs: 2500, forwardMs: 3400, backMs: 1300, selectedEvery: 2 },
+  { key: 'sorceress',   label: 'Sorceress',   descriptionIndex: 5131,  playerClass: 1, dir: 'sorceress',   code: 'SO', anchor: { x: 626, y: 353 }, hit: { x: 580, y: 240, w: 65, h: 160 }, idleEvery: 2, idleMs: 2500, forwardMs: 2300, backMs: 1200, selectedEvery: 1 },
+  { key: 'druid',       label: 'Druid',       descriptionIndex: 22518, playerClass: 5, dir: 'druid',       code: 'DZ', anchor: { x: 720, y: 370 }, hit: { x: 680, y: 220, w: 70, h: 195 }, idleEvery: 2, idleMs: 1500, forwardMs: 4800, backMs: 1500, selectedEvery: 2 },
 ];
 
 /**
@@ -60,7 +62,7 @@ export const CLASSES = [
  *
  * Measured, not guessed. A `create` draw list's cel-load list (tools/drawlist.py over the capture's
  * `cels.bin`) names every front-end hero file 1.13c loads for this screen; the s-suffixed ones are
- * exactly these six, and no others -- Amazon's AMFWs.DC6 exists in the 1.10f table OpenDiablo2 carries
+ * exactly these eight, and no others -- Amazon's AMFWs.DC6 exists in the 1.10f table OpenDiablo2 carries
  * but this build never asks for it, and Amazon, Assassin and Druid load no overlay at all:
  *   SOFWs SONU3s SOBWs   NEFWs NENU3s NEBWs   BAFWs   PAFWs
  *
@@ -71,10 +73,10 @@ export const CLASSES = [
 export const SELECT_OVERLAYS = {
   amazon: {},
   assassin: {},
-  necromancer: { forward: 'FWS', selected: 'NU3s', forwardBlend: true },
+  necromancer: { forward: 'FWS', selected: 'NU3s', back: 'BWs', forwardBlend: true, backBlend: true },
   barbarian: { forward: 'FWS', forwardBlend: false },
   paladin: { forward: 'FWS', forwardBlend: false },
-  sorceress: { forward: 'FWS', selected: 'NU3s', forwardBlend: true },
+  sorceress: { forward: 'FWS', selected: 'NU3s', back: 'BWs', forwardBlend: true, backBlend: true },
   druid: {},
 };
 // Retail's overlay draw mode: `blend` in that load flag is the same table the campfire's cel uses,
@@ -106,7 +108,7 @@ export const LAYOUT = {
   // draw list: 7 celcolor blits, x=326, 336, 344, 355, 364, 369, 379, all y=514, w=35 h=30). Nothing
   // here came from retail before: the name was drawn in Font30 at nameBox.x + 8, centred in the box,
   // which is why it was both too large and sitting outside the field.
-  nameField: { x: 326, anchorY: 514 },
+  nameField: NAME_FIELD,
   exitButton: { x: 33, y: 538 },
   // Retail's draw list puts BOTH buttons' cels at y=572 (bottom row), h=35 -> top 538, and the OK
   // cel's x at 627, not OpenDiablo2's 630: retail's own frame has the button's first lit pixel at
@@ -124,8 +126,6 @@ export const FONT16 = {
 // FontFormal12, the same face the trademark screen's copyright lines use. It is the face the
 // character-creation NAME FIELD types in (retail's own draw list, above) -- one screen, three fonts:
 // Font30 for the heading and the class name, Font16 for the labels, FontFormal12 for the name.
-export const NAME_FONT = { font: FRONTEND.trademarkFont, fontTbl: FRONTEND.trademarkFontTbl };
-
 // The name field's CARET. Retail's own multi-frame draw list of the typed name
 // (the retail captures, 30 consecutive whole frames of the Barbarian chosen
 // with a four-letter name typed) draws one extra FontFormal12 cel after the last glyph: frame=95 at x=366, bottom
@@ -136,9 +136,6 @@ export const NAME_FONT = { font: FRONTEND.trademarkFont, fontTbl: FRONTEND.trade
 // absent in 2-7, 15-20 and 27-29 -- transitions 6.25 frames apart. A whole frame is one 25 Hz
 // front-end tick (the same capture's fire.dc6 advances one frame per whole frame, and the hovered
 // barbarian's banu2 one frame per two), so the caret is 250 ms lit and 250 ms dark.
-export const CARET_GLYPH = '_';
-export const CARET_BLINK_MS = 250;
-
 export const CREATE_ASSETS = {
   background: 'data\\global\\ui\\FrontEnd\\charactercreationscreenEXP.dc6',
   // Retail's draw list draws the NAME FIELD from textbox.dc6, not TextBox2.dc6 (both are in the
@@ -189,7 +186,6 @@ function descriptionLines(text) {
 }
 
 const SCREEN = { width: 800, height: 600 };
-const FRAME_MS = 1000 / 25;   // retail front-end sprites run at 25fps
 
 function frameCanvas(frame, palette, documentObject) {
   const canvas = documentObject.createElement('canvas');
@@ -247,6 +243,7 @@ function selectOverlayAnimations(overlay, cls, base, read, decodeDc6, palette, d
   const out = {};
   if (overlay?.forward) out.forwardOverlay = animation(read, decodeDc6, `${base}${cls.dir}\\${cls.code}${overlay.forward}.DC6`, palette, documentObject);
   if (overlay?.selected) out.idleSelectedOverlay = animation(read, decodeDc6, `${base}${cls.dir}\\${cls.code}${overlay.selected}.DC6`, palette, documentObject);
+  if (overlay?.back) out.backOverlay = animation(read, decodeDc6, `${base}${cls.dir}\\${cls.code}${overlay.back}.DC6`, palette, documentObject);
   return out;
 }
 
@@ -273,15 +270,11 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     // kept beside the blit that made them (s640 compares them with retail's records per glyph).
     onGlyph: (blit) => { if (classNameGlyphs) classNameGlyphs.push(blit); },
   });
-  let descriptionGlyphs = null, nameGlyphs = null, classNameGlyphs = null;
+  let descriptionGlyphs = null, classNameGlyphs = null;
   // The name field's own font, recorded like the description's so a row can assert the FONT, the
   // glyph and the position that were really blitted rather than the text that was requested.
-  const nameFont = createFont({
-    dc6: decodeDc6(read(NAME_FONT.font)),
-    tbl: decodeFontTbl(read(NAME_FONT.fontTbl)),
-    palette: fontPalette, documentObject, path: NAME_FONT.font,
-    onGlyph: (blit) => { if (nameGlyphs) nameGlyphs.push(blit); },
-  });
+  const nameRenderer = createCharacterNameRenderer({ read, decodeDc6, decodeFontTbl, createFont,
+    palette: fontPalette, documentObject });
   const smallFont = createFont({
     dc6: decodeDc6(read(FONT16.font)),
     tbl: decodeFontTbl(read(FONT16.fontTbl)),
@@ -325,6 +318,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     // NU3: retail's CHOSEN art, held after the forward walk -- not the hover art.
     idleSelected: animation(read, decodeDc6, `${base}${c.dir}\\${c.code}NU3.DC6`, palette, documentObject),
     forward: animation(read, decodeDc6, `${base}${c.dir}\\${c.code}FW.DC6`, palette, documentObject),
+    back: animation(read, decodeDc6, `${base}${c.dir}\\${c.code}BW.DC6`, palette, documentObject),
     // The overlay half of each of those two states, for the classes 1.13c has one for. Built only
     // where the file is in retail's own load list, so a class without one cannot open a missing cel.
     ...selectOverlayAnimations(SELECT_OVERLAYS[c.key], c, base, read, decodeDc6, palette, documentObject),
@@ -333,6 +327,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
   // The widgets are menu chrome, not part of the character scene: they index the SAME palette the
   // title screen's buttons do, not fechar. Painting them with fechar gives blue-and-white noise --
   // again a wrong picture, not an error, which is why each of these is pinned deliberately.
+  const stances = createHeroStances(heroes, { retailHz: RETAIL_HZ, updateHz: UPDATE_HZ });
   const textBoxDc6 = decodeDc6(read(CREATE_ASSETS.textBox));
   const textBox = frameCanvas(textBoxDc6.frames[0], fontPalette, documentObject);
   const buttonDc6 = decodeDc6(read(CREATE_ASSETS.button));
@@ -345,7 +340,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     const w = buttons[0].width, h = buttons[0].height;
     labelFont.drawAnchored(ctx, text, at.x + Math.max(Math.trunc((w - labelFont.measure(text)) / 2), 0), at.y + h - 1 + 4 - Math.trunc((h - labelFont.lineHeight) / 2));
   };
-  let hovered = -1, chosen = -1, name = '', chosenAtTick = 0, tick = 0, drawnDescription = null, drawnClassName = null, drawnName = null, pressed = null, drawnHeroes = [], releaseEvidence = null;
+  let hovered = -1, chosen = -1, name = '', tick = 0, drawnDescription = null, drawnClassName = null, drawnName = null, pressed = null, drawnHeroes = [], releaseEvidence = null;
   const clock = () => Math.floor(tick * RETAIL_HZ / UPDATE_HZ);   // retail's 25 Hz front-end tick
   // Retail drives NU1 (idle) and NU3 (selected idle) from the SAME 25 Hz front-end clock, and its
   // loops show frames `floor(t / idleEvery) mod (frames - 1)` -- the last DC6 frame is never shown.
@@ -355,11 +350,11 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
   // The CHOSEN idle walks the same `mod (frames - 1)` rule at its own per-class cadence (the comment
   // on CLASSES has the measurement). Same last-frame rule: the DC6's last frame is never shown.
   const selectedFrame = (hero, anim) => Math.floor(clock() / hero.selectedEvery) % Math.max(1, anim.count - 1);
-  // The caret's half-period is CARET_BLINK_MS of retail's own clock, which is 25 Hz: 250 ms is 6.25
+  // The name renderer's caret half-period is retail's 250 ms on the 25 Hz clock: 6.25
   // ticks, so on the integer tick grid the lit and dark runs come out 7 and 6 ticks long -- the same
   // irregularity the capture shows (lit 0-1, 8-14 of 7, dark 2-7, 15-20 of 6). Its phase is an epoch
   // no single capture fixes, so the row aligns the two sequences and compares them frame for frame.
-  const caretLit = () => Math.floor(clock() * (1000 / RETAIL_HZ) / CARET_BLINK_MS) % 2 === 0;
+  const caretLit = () => nameRenderer.caretLit(clock());
 
   // Everything is authored for 800x600; one transform maps it onto whatever the canvas is.
   const view = (width, height) => {
@@ -391,28 +386,31 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
   };
 
   const canCreate = () => chosen >= 0 && name.trim().length >= 2;
+  // A hover that began mid-walk lands once the walk ends (Codex F99 review).
+  const rehover = () => { if (hovered >= 0) stances.hover(hovered, tick); };
   const sound = (index, trigger) => { if (index >= 0) onSound?.({ key: heroes[index].key, trigger }); };
   const choose = (index) => {
     if (index < 0) return index;
+    if (!stances.choose(index, tick)) return chosen;
     const previous = chosen;
-    if (previous !== index) {
-      if (previous >= 0) sound(previous, 'deselect');
-      chosen = index; chosenAtTick = tick; sound(index, 'select');
-    }
+    if (previous >= 0 && previous !== index) sound(previous, 'deselect');
+    chosen = index; sound(index, 'select');
     return index;
   };
 
   return {
     get evidence() {
+      rehover();
       return {
         background: { width: background.width, height: background.height, rows: background.rows, columns: background.columns },
         fonts: { large: font.lineHeight, small: smallFont.lineHeight },
         classes: heroes.map((h) => ({ key: h.key, playerClass: h.playerClass,
-          idle: h.idle.count, hover: h.hover.count, idleSelected: h.idleSelected.count, forward: h.forward.count,
+          idle: h.idle.count, hover: h.hover.count, idleSelected: h.idleSelected.count, forward: h.forward.count, back: h.back.count,
           // 0 means this class has NO overlay in retail's own load list for this screen, which is a
           // different fact from "the overlay was there and we did not draw it".
           forwardOverlay: h.forwardOverlay ? h.forwardOverlay.count : 0,
           idleSelectedOverlay: h.idleSelectedOverlay ? h.idleSelectedOverlay.count : 0,
+          backOverlay: h.backOverlay ? h.backOverlay.count : 0,
           forwardOverlayMode: h.overlay.forwardBlend ? OVERLAY_MODE : 0,
           idleSelectedOverlayMode: h.idleSelectedOverlay ? OVERLAY_MODE : 0,
           // The cadence the frame was actually driven at, per state, so a row compares the drawn
@@ -443,7 +441,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
         hovered: hovered >= 0 ? heroes[hovered].key : null,
         pressed,
         release: releaseEvidence,
-        clock: clock(), drawnHeroes,
+        clock: clock(), stances: Object.fromEntries(heroes.map((h, i) => [h.key, stances.stance(i, tick)])), drawnHeroes,
         name, canCreate: canCreate(),
       };
     },
@@ -465,6 +463,8 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
       const p = toScreen(x, y, width, height);
       const next = heroes.findIndex((h) => inBox(p, h.hit));
       if (next !== hovered && next >= 0) sound(next, 'hover');
+      if (hovered >= 0 && hovered !== next) stances.unhover(hovered, tick);
+      if (next >= 0) stances.hover(next, tick);
       hovered = next;
       return hovered;
     },
@@ -511,6 +511,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     /** The screen's clock in 60 Hz updates since it opened; a row pins it to a retail capture's tick. */
     get tick() { return tick; }, set tick(v) { tick = v; },
     draw(outCtx, width, height) {
+      rehover();
       outCtx.fillStyle = '#000'; outCtx.fillRect(0, 0, width, height);
       const v = view(width, height);
       const ctx = sceneCtx;
@@ -567,28 +568,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
         // Left-aligned at the position the layout gives, in the small font, so it sits above the box
         // rather than through it (retail's own Font16 record starts at x=321 with its bottom at 490).
         smallFont.draw(ctx, nameLabel, LAYOUT.nameLabel.x, LAYOUT.nameLabel.y);
-        drawnName = { font: NAME_FONT.font, x: LAYOUT.nameField.x, anchorY: LAYOUT.nameField.anchorY, text: name, glyphs: [], caret: null };
-        nameGlyphs = drawnName.glyphs;   // onGlyph pushes the RECORDED cel row: path, frame, x, y
-        const pen = LAYOUT.nameField.x + nameFont.drawAnchored(ctx, name, LAYOUT.nameField.x, LAYOUT.nameField.anchorY);
-        nameGlyphs = null;
-        // The caret. Retail draws it as one more cel of the SAME font at the pen the name just left --
-        // the retail captures: after "Akara" (FontFormal12 cels at x=326, 341,
-        // 346, 356, bottom 514) comes FontFormal12 frame=95 at x=366, bottom 514, the same 35x30 cell.
-        // Frame 95 IS the `_` glyph: in this font a DC6 frame index is the code point's own value (the
-        // name "Akara" is frames 77, 105, 107, 101 and character creation's Font16 label "CHARACTER NAME"
-        // is 67, 104, 97, 114, 97, 99, 116, 101, 114, 32, 78, 97, 109, 101 -- its ASCII).
-        //
-        // It blinks. Over the capture's 30 consecutive whole frames the cel is present in 0-1, absent in
-        // 2-7, present in 8-14, absent in 15-20, present in 21-26 -- transitions every 6.25 frames, and
-        // a whole frame is one 25 Hz front-end tick (the same capture's fire.dc6 steps one frame per
-        // whole frame), so the caret is 250 ms on and 250 ms off. `clock()` is retail's own tick.
-        if (caretLit()) {
-          drawnName.caretAt = pen;
-          nameGlyphs = [];
-          nameFont.drawAnchored(ctx, CARET_GLYPH, pen, LAYOUT.nameField.anchorY);
-          drawnName.caret = nameGlyphs[0] ?? null;
-          nameGlyphs = null;
-        }
+        drawnName = nameRenderer.draw(ctx, name, clock());
         checkboxes.draw(ctx);
         // Retail DRAWS the OK button whether or not it can be used -- what changes is the cel's draw
         // MODE: mode 5 enabled and mode 1 dimmed while
@@ -610,48 +590,51 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
       // `sprite` names which of the hero's retail DC6s was drawn and `path` IS that file, so a row can
       // assert the identity of what was painted rather than that something was. `requestedFrame` and
       // `drawnFrame` are kept apart on purpose: they differ whenever an index wraps.
-      const show = (h, sprite, frame) => drawnHeroes.push({ key: h.key, sprite, path: h[sprite].path, count: h[sprite].count,
+      const show = (h, stance, pass, sprite, frame) => drawnHeroes.push({ key: h.key, stance, pass, sprite, path: h[sprite].path, count: h[sprite].count,
         requestedFrame: frame, drawnFrame: h[sprite].draw(ctx, frame, h.anchor.x, h.anchor.y) });
       // The overlay half of the SAME state, drawn immediately after its base and at the same anchor --
       // retail's call order. It carries its own path/identity into `drawnHeroes`, so a row can tell a
       // drawn overlay from a missing one (the whole defect) rather than counting cels.
-      const showOverlay = (h, sprite, frame, mode) => {
+      const showOverlay = (h, stance, pass, sprite, frame, mode) => {
         const anim = h[sprite];
         if (!anim) return;
         const drawnFrame = ((frame % anim.count) + anim.count) % anim.count;
-        drawnHeroes.push({ key: h.key, sprite, path: anim.path, count: anim.count,
+        drawnHeroes.push({ key: h.key, stance, pass, sprite, path: anim.path, count: anim.count,
           requestedFrame: frame, drawnFrame, mode });
         if (mode) anim.drawBlended(ctx, drawnFrame, h.anchor.x, h.anchor.y, blend, mode);
         else anim.draw(ctx, drawnFrame, h.anchor.x, h.anchor.y);
       };
-      for (const key of DRAW_ORDER) {
-        const i = heroes.findIndex((h) => h.key === key), h = heroes[i];
-        if (i === chosen) {
-          // The chosen class walks forward once, then holds its selected art (NU3). The walk lasts
-          // `forwardMs` of retail's clock, so `since` is converted from the shell's 60 Hz update
-          // counter into retail's 25 Hz ticks before it is compared with a 25 Hz frame count --
-          // counting 60 Hz ticks against 25 Hz frames ran the walk 2.4x fast (the Amazon's 2200 ms
-          // in 55 shell ticks, ~0.9 s, instead of ~132).
-          const forwardFrames = Math.max(1, Math.round(h.forwardMs / FRAME_MS));
-          const since = Math.floor((tick - chosenAtTick) * RETAIL_HZ / UPDATE_HZ);
-          if (since < forwardFrames) {
-            show(h, 'forward', Math.floor(since * h.forward.count / forwardFrames));
-            if (h.forwardOverlay) showOverlay(h, 'forwardOverlay', Math.floor(since * h.forwardOverlay.count / forwardFrames), h.overlay.forwardBlend ? OVERLAY_MODE : 0);
-          } else {
-            // The base and its overlay carry the SAME frame index: retail's own draw list over 15
-            // consecutive frames of the selected Necromancer has `nenu3` and `nenu3s` stepping
-            // 1,1,2,2,3,3,... together, never out of step.
-            const frame = selectedFrame(h, h.idleSelected);
-            show(h, 'idleSelected', frame);
-            if (h.idleSelectedOverlay) showOverlay(h, 'idleSelectedOverlay', frame, OVERLAY_MODE);
-          }
-        } else if (i === hovered) {
-          // The hover draws NU2, not NU3: a hovered class is highlighted, not chosen (see the hero
-          // table above). It loops on the same retail clock as the idle.
-          show(h, 'hover', idleFrame(h, h.hover));
+      const renderHero = (i, pass) => {
+        const h = heroes[i], stance = stances.stance(i, tick);
+        if (stance === HERO_STANCE.APPROACHING) {
+          const since = stances.elapsed(i, tick);
+          const duration = Math.max(1, Math.round(h.forwardMs * RETAIL_HZ / 1000));
+          const frame = Math.floor(since * h.forward.count / duration);
+          show(h, stance, pass, 'forward', frame);
+          if (h.forwardOverlay) showOverlay(h, stance, pass, 'forwardOverlay', frame, h.overlay.forwardBlend ? OVERLAY_MODE : 0);
+        } else if (stance === HERO_STANCE.RETREATING) {
+          const since = stances.elapsed(i, tick);
+          const duration = Math.max(1, Math.round(h.backMs * RETAIL_HZ / 1000));
+          const frame = Math.floor(since * h.back.count / duration);
+          show(h, stance, pass, 'back', frame);
+          if (h.backOverlay) showOverlay(h, stance, pass, 'backOverlay', frame, h.overlay.backBlend ? OVERLAY_MODE : 0);
+        } else if (stance === HERO_STANCE.SELECTED) {
+          const frame = selectedFrame(h, h.idleSelected);
+          show(h, stance, pass, 'idleSelected', frame);
+          if (h.idleSelectedOverlay) showOverlay(h, stance, pass, 'idleSelectedOverlay', frame, OVERLAY_MODE);
+        } else if (stance === HERO_STANCE.IDLE_SELECTED) {
+          show(h, stance, pass, 'hover', idleFrame(h, h.hover));
         } else {
-          show(h, 'idle', idleFrame(h, h.idle));
+          show(h, stance, pass, 'idle', idleFrame(h, h.idle));
         }
+      };
+      // Retail's SelectHeroClass.Render has two passes: all stationary heroes first, then every
+      // walker. A moving hero therefore stays above an idle hero where their cels overlap.
+      for (const pass of ['stationary', 'moving']) for (const key of DRAW_ORDER) {
+        const i = heroes.findIndex((h) => h.key === key);
+        const stance = stances.stance(i, tick);
+        const moving = stance === HERO_STANCE.APPROACHING || stance === HERO_STANCE.SELECTED || stance === HERO_STANCE.RETREATING;
+        if ((pass === 'moving') === moving) renderHero(i, pass);
       }
       campfire.drawBlended(ctx, clock() % (campfire.count - 1), CAMPFIRE.x, CAMPFIRE.y, blend, 3);
       outCtx.save(); outCtx.imageSmoothingEnabled = false;

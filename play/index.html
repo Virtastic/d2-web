@@ -11,15 +11,38 @@
 <meta name="apple-mobile-web-app-title" content="D2 Web">
 <link rel="apple-touch-icon" href="assets/icon.svg">
 <script>
-// Test-only viewport override for wasm-build/scenarios/s320: the
-// harness launches one fixed-size Chrome window (no CDP resize yet, "Proving it"),
-// so this lets a scenario ask the SAME CSS the real 100dvw/100dvh path uses to letterbox the canvas
-// at a second, different size. Absent (and inert) on every real visit.
+// the player's page is the game, and the BARE host is that page.
+// issue 16 made `?retail=1` without the developer shortcut `play=1` the page a player is given, and the developer chrome below the canvas -- session bar, key list, debug log -- made that
+// page taller than the window at EVERY desktop size measured (2026-09-28, headed Chrome 960x700:
+// 846px of content in a 700px window), so it scrolled; and since `100dvw` counts the scrollbar's own
+// gutter, the vertical scrollbar produced a horizontal one as well (scrollWidth 960 vs clientWidth
+// 945). The same rule a touch screen gets, for the same reason. Set before the first paint so the
+// chrome never flashes; the two failure screens below remove it again, because they need the readable
+// desktop layout.
+//
+// issue 18 measured the routing gap issue 16 left: the bare host (`http://<host>:<port>/`, no query) served the
+// M0 smoke / developer page by URL, so a person opening the URL got a black box -- the engine up,
+// no retail MPQs mounted, `#hud` reading `cinematic: data\local\video\New_Bliz640x480.bik: ... asset
+// not found`, and the developer chrome around it. Measured 2026-09-28, headed and headless Chrome and
+// Firefox: 0 ink samples on the canvas at `/`, 2126 at `?retail=1`. So `retail` DEFAULTS to mounted
+// here -- the bare host and `?retail=1` are the same page -- and only an explicit `?retail=0`
+// withholds the game's data, which is the M0 smoke / developer page. `play=1` stays explicit.
+//
+// The decision is made ONCE, in this script, and published on `window.__d2Entry`: index.html's own
+// boot script and gameplay-shell.mjs's session gate both read that rather than re-parsing the query,
+// so there is one answer to "is the game's data mounted" and one to "is this the player's page".
 (() => {
-  const m = /[?&]viewport=(\d+)x(\d+)/.exec(location.search);
-  if (!m) return;
-  document.documentElement.style.setProperty('--d2-vw', m[1] + 'px');
-  document.documentElement.style.setProperty('--d2-vh', m[2] + 'px');
+  const q = new URLSearchParams(location.search);
+  const retail = q.has('retail') ? q.get('retail') === '1' : true;
+  const player = retail && q.get('play') !== '1';
+  // Fill mode (): the player's page renders a game view of the WINDOW's aspect
+  // (gameplay-shell fitView) instead of a letterboxed 800x600; `?view=800` keeps retail's exact view.
+  // DEFAULT = strict retail 1.13c (800x600, PlugY and every enhancement off; ?parity=1 / ?view=800 are aliases). ?enhanced=1 (or ?view=fill) = D2GL widescreen fill; ?plugy=1 = PlugY stash pages.
+  const fill = q.get('view') !== '800' && q.get('parity') !== '1' && (q.get('enhanced') === '1' || q.get('view') === 'fill');
+  const parity = !fill;
+  window.__d2Entry = { retail, player, fill, parity, search: location.search };
+  if (fill) document.documentElement.classList.add('fill');
+  if (player) document.documentElement.classList.add('playing');
 })();
 </script>
 <style>
@@ -46,6 +69,15 @@
     h1,#session-bar,.controls,#log,#hud{display:none}
     #viewport{border:0;box-shadow:none;width:min(100%, var(--d2-vh) * 4 / 3)}
   }
+  /* the same rule for the PLAYER's page (the .playing class above), where the chrome below the
+     canvas was what made a desktop window scroll. `width:100%`, deliberately not `var(--d2-vw)`:
+     `100dvw` counts the scrollbar's gutter, so on any page that does scroll it makes main wider than
+     the window and buys the second scrollbar this row exists to remove. */
+  html.playing main{width:100%;padding:0}
+  html.playing h1,html.playing #session-bar,html.playing .controls,html.playing #log,html.playing #hud{display:none}
+  html.playing #viewport{border:0;box-shadow:none;width:min(100%, var(--d2-vh) * 4 / 3)}
+  html.fill,html.fill body{overflow:hidden;height:100%}
+  html.fill #viewport{position:fixed;inset:0;width:100%;height:100%;aspect-ratio:auto;margin:0}
   #unsupported{display:none;max-width:560px;padding:20px 24px;margin-top:8px;border:1px solid #493d27;background:#0b0c09;line-height:1.6}
   #unsupported h2{color:#c9ad68;margin:0 0 10px;font:20px Georgia,serif}
   #unsupported .detail{color:#8a8069;font-size:12px;margin:.4em 0 0}
@@ -77,8 +109,10 @@
 <script>
 // M0 smoke page. Boots the engine, mounts the synthetic smoke.mpq through streamfs, reads a
 // file out of it via StormLib in wasm, and publishes the result on window.__d2 for the
-// harness. ?retail=1 also mounts the retail MPQs served at /retail/ (see serve.mjs) into the
-// layered VFS, in retail priority order. Everything real replaces this in M3/M5.
+// harness. The retail MPQs served at /retail/ (see serve.mjs) are mounted into the layered VFS,
+// in retail priority order, whenever the URL asks for the game's data -- which is the default
+// since issue 18 (`window.__d2Entry.retail` above; `?retail=0` is this smoke page with no game data).
+// Everything real replaces this in M3/M5.
 const RETAIL_ORDER = ['patch_d2.mpq', 'd2exp.mpq', 'd2xmusic.mpq', 'd2xtalk.mpq', 'd2xvideo.mpq', 'd2data.mpq', 'd2char.mpq', 'd2music.mpq', 'd2sfx.mpq', 'd2speech.mpq', 'd2video.mpq'];
 const log = (s) => { document.getElementById('log').textContent += s + '\n'; console.log(s); };
 window.__d2 = { ready: false, smoke: null, error: null };
@@ -95,6 +129,8 @@ function showUnsupported(info) {
   // The browser list is an answer to "which browsers run this"; when the browser is fine and the
   // DELIVERY is what is wrong, listing browsers is noise that reads as "yours is not one of them".
   document.querySelector('#unsupported [data-field=runs-today]').style.display = info.supportedBrowsers ? '' : 'none';
+  // issue 16's player layout drops the heading and the padding; this screen is prose and needs them.
+  document.documentElement.classList.remove('playing');
   document.body.classList.add('unsupported');
 }
 // A boot that does not complete says so ON THE SCREEN (issue 3: "never a crash or
@@ -114,6 +150,7 @@ function showBootFailure(why) {
   set('summary', 'The game did not start.');
   set('advice', why);
   for (const el of document.querySelectorAll('#unsupported .detail')) el.style.display = 'none';
+  document.documentElement.classList.remove('playing');   // as above: this screen is prose
   document.body.classList.add('unsupported');
 }
 (async () => {
@@ -181,6 +218,41 @@ function showBootFailure(why) {
     };
     addEventListener('unhandledrejection', (ev) => bootFailed((ev.reason && (ev.reason.message || ev.reason)) || ev.reason));
     addEventListener('error', (ev) => bootFailed(ev.message || (ev.error && ev.error.message) || ev.type || ev));
+    // . Both screens above answer a failure that lands BEFORE the engine is
+    // up, and a failure that lands after one had no screen at all -- on the player's page, whose own
+    // layout rule drops `#hud`, the one place the shell says why. Measured 2026-09-28, headed
+    // Chrome and Firefox, the player's URL against play/serve.mjs started with no D2_RETAIL_DIR (the
+    // state a host that serves none of the game's data puts a player in): the canvas was exactly
+    // black -- 0 ink samples at 3, 15, 45 and 60 s -- the shell reported `asset not found or
+    // unreadable: data\global\palette\Units\pal.dat` and the missing boot movie beside it, and
+    // NOTHING on the page said anything for as long as the player waited. "Never a crash or a blank
+    // page" was failing one step later than it was written for.
+    //
+    // The shell already publishes the reason as a STRUCTURED fact, so this reads the field, never the
+    // prose: `cinematicsEvidence.error` is empty while a boot movie opens or plays and non-empty only
+    // when the file could not be opened, and a movie that cannot be opened is what leaves the front
+    // end on that black frame for ever (measured: still there at 60 s, the phase never advancing). So
+    // the page fires only on a real error from the shell, and only after the same error has survived
+    // ERROR_GRACE_MS -- a slow host reports no error at all and is left alone, which matters because
+    // this must never cover a run that is merely early. It stops for good once the game is up: this is
+    // "the game did not start", the failure screen's own words, not "something failed later".
+    // Player's page only: the developer URLs keep their own chrome, where `#hud` is visible anyway.
+    const playerPage = window.__d2Entry.player;   // decided once, in the head script above
+    if (playerPage) {
+      const ERROR_GRACE_MS = 4000;
+      let seenAt = 0;
+      const frontEndWatch = setInterval(() => {
+        const shell = window.__d2Shell;
+        if (!shell || !window.__d2?.ready) return;
+        if (shell.screen === 'game') return clearInterval(frontEndWatch);
+        const err = shell.cinematicsEvidence?.error || '';
+        if (!err) { seenAt = 0; return; }
+        if (!seenAt) { seenAt = performance.now(); return; }
+        if (performance.now() - seenAt < ERROR_GRACE_MS) return;
+        clearInterval(frontEndWatch);
+        showBootFailure(err);
+      }, 500);
+    }
     // Every request this page makes before the engine exists carries a deadline (
     // issue 11). A host that accepts a connection and then never answers used to hang the boot here with
     // nothing in the log at all: the page never finished loading, nothing was thrown, and on Firefox --
@@ -214,9 +286,14 @@ function showBootFailure(why) {
     await StreamFS.ready();
     // Retail MPQs: HEAD each for its size, mount only the ones the server has (build.sh links
     // retail/D2/*.mpq plus the 1.13c core's Patch_D2.mpq into one dir for serve.mjs).
-    const wantRetail = /[?&]retail=1/.test(location.search);
+    const wantRetail = window.__d2Entry.retail;   // `retail` defaults to mounted; `?retail=0` is the developer page
+    // Test switch for wasm-build/scenarios/s940-browser-front-end-failure: `?noRetail=1` mounts none
+    // of the retail MPQs, which is the state a host that serves no game data leaves the page in --
+    // measured for real against `play/serve.mjs` started with no D2_RETAIL_DIR this row also runs
+    // against. It changes nothing else: same host, same engine, same page, one thing missing.
+    const noRetail = /[?&]noRetail=1/.test(location.search);
     const retail = [];
-    if (wantRetail) for (const f of RETAIL_ORDER) {
+    if (wantRetail && !noRetail) for (const f of RETAIL_ORDER) {
       const h = await fetchBounded('retail/' + f, { method: 'HEAD' }, 'retail/' + f);
       if (h.ok) retail.push({ f, size: Number(h.headers.get('content-length')) });
     }

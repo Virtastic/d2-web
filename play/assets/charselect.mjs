@@ -13,7 +13,7 @@
 //
 // Everything about which characters exist comes from the store: real .d2s files the engine wrote.
 
-import { createFont, decodeFontTbl, FRONTEND, TITLE_COLUMNS, composeTiled, createBlender, textColourPalette } from './frontend.mjs';
+import { createFont, decodeFontTbl, FRONTEND, TITLE_COLUMNS, composeTiled, createBlender, textColourPalette, componentColourTransform } from './frontend.mjs';
 import { drawPath, fnv1a, recordDc6, recordDcc } from './drawlist.mjs';
 import { CLASS_NAMES } from './save-store.mjs';
 import { createDeleteConfirmFlow } from './delete-confirm-flow.mjs';
@@ -48,7 +48,7 @@ const CARD = { x: 37, top: 86, w: 272, h: 93, colStep: 272, rowStep: 95, textX: 
 const TITLE = { anchor: 63, centre: 318 };   // centre: retail's 'Oracle' starts at x 253 (one sample)
 const BUTTONS = {
   create: { kind: 'tall', x: 33, top: 469, lines: ['CREATE NEW', 'CHARACTER'] },
-  convert: { kind: 'tall', x: 233, top: 469, lines: ['CONVERT TO', 'EXPANSION'], disabled: true },
+  convert: { kind: 'tall', x: 233, top: 469, lines: ['CONVERT TO', 'EXPANSION'] },
   delete: { kind: 'tall', x: 433, top: 469, lines: ['DELETE', 'CHARACTER'] },
   exit: { kind: 'medium', x: 33, top: 538, lines: ['EXIT'] },
   ok: { kind: 'medium', x: 627, top: 538, lines: ['OK'] },
@@ -75,9 +75,13 @@ function frameCanvas(frame, palette, documentObject) {
 // character? Take note: this will delete all versions of this Character."), and 5166/5167 are the
 // button labels. These were 0 placeholders, so the dialog could only ever draw its fallback text.
 export const DELETE_STRINGS = { confirm: 5163, yes: 5166, no: 5167 };
+// The portrait's card-local anchor (retail's draw list: the composite DCC at the card's (67,165)).
+// Exported so a row can turn a layer's card-local `left`/`top` (charSelectEvidence.drawnPortraits[].
+// layers[]) into the actual scene position: sceneX = layer.left + (portrait.x - PORTRAIT.x).
+export const PORTRAIT = { x: 67, anchor: 165 };
 
 /** `characters` is the store's listing. onPlay(name), onCreate(), onCancel(), onDelete(name). */
-export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, characters, onPlay, onCreate, onCancel, onDelete = null, string = null, componentToken = null, documentObject = globalThis.document }) {
+export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, characters, onPlay, onCreate, onCancel, onDelete = null, onConvert = null, string = null, componentToken = null, documentObject = globalThis.document }) {
   // Keep the requested path separate from the bytes that were actually decoded.  The latter is
   // carried to every confirmation blit: a constant copied into both sides of an assertion cannot
   // make a substituted DC6 or palette look correct.
@@ -112,6 +116,13 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
   const unitsPaletteSource = source('data\\global\\palette\\Units\\pal.dat');
   const popupPalette = decodeDatPalette(popupPaletteSource.bytes);
   const units = decodeDatPalette(unitsPaletteSource.bytes);
+  // The portrait's own colour transform bank (client-parity C3o): retail ships NO
+  // data\global\palette\Units\pal.pl2 at all (`mpq ls` against the retail MPQs -- every OTHER
+  // palette directory, ACT1-5/menu0-4/fechar/loading/Trademark/EndGame/Sky, carries one; Units and
+  // STATIC do not). D2CMP keeps ONE currently-loaded PL2 at a time, and
+  // this screen's own is Sky's (SELECT_ASSETS.pl2, `pl2` above) -- the only transform bank this
+  // screen ever loads -- so that is what a component's dye remaps a DCC's palette INDEX through,
+  // before the (separate) Units palette turns that index into RGB for the portrait's own blit.
   const popupDc6 = decodeDc6(popupSource.bytes);
   const popupParts = popupDc6.frames.slice(0, 2).map((f) => frameCanvas(f, popupPalette, documentObject));
   const okCancelSource = source(SELECT_ASSETS.okCancel);
@@ -170,23 +181,28 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
   // could not be compared draw by draw, and a layer that failed to load would just vanish into it --
   // so each layer keeps its own canvas, its own DCC path and its own record, and a layer that does
   // not load is REPORTED (portraitMissing), never silently dropped.
-  const PORTRAIT = { x: 67, anchor: 165 };
   const COMP = ['HD', 'TR', 'LG', 'RA', 'LA', 'RH', 'LH', 'SH', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8'];
   const portraitError = [];
   const layerError = (ch, path, error) => { portraitError.push(`${ch.name}: ${path}: ${error}`); };
-  const layerCanvas = (frame) => {
+  // `transform`, when given, is the 256-entry palette-index remap the layer's own saved colour byte
+  // selects (componentColourTransform, client-parity C3o): each source DCC palette index is remapped
+  // through it BEFORE the Units lookup, exactly as retail's saved dye applies to one equipped layer.
+  const layerCanvas = (frame, transform = null) => {
     const c = documentObject.createElement('canvas');
     c.width = Math.max(1, frame.width); c.height = Math.max(1, frame.height);
     if (!frame.width || !frame.height) return c;
     const rgba = new Uint8ClampedArray(frame.width * frame.height * 4);
-    for (let k = 0; k < frame.indexed.length; k++) if (frame.opaque[k]) { const s = frame.indexed[k] * 4; rgba[k * 4] = units[s]; rgba[k * 4 + 1] = units[s + 1]; rgba[k * 4 + 2] = units[s + 2]; rgba[k * 4 + 3] = 255; }
+    for (let k = 0; k < frame.indexed.length; k++) if (frame.opaque[k]) {
+      const paletteIndex = transform ? transform[frame.indexed[k]] : frame.indexed[k];
+      const s = paletteIndex * 4; rgba[k * 4] = units[s]; rgba[k * 4 + 1] = units[s + 1]; rgba[k * 4 + 2] = units[s + 2]; rgba[k * 4 + 3] = 255;
+    }
     c.getContext('2d').putImageData(new ImageData(rgba, frame.width, frame.height), 0, 0);
     return c;
   };
   const portrait = (ch) => {
     const empty = { trace: [], drawable: [], missing: [], wclass: null, width: 0, height: 0, identity: null };
     try {
-      const token = playerClassInfo(ch.playerClass).token, app = ch.appearance || [];
+      const token = playerClassInfo(ch.playerClass).token, app = ch.appearance || [], appColours = ch.appearanceColours || [];
       const item = (i) => { const v = app[i]; if (v === undefined || v === 0xFF || v === 0) return null; const t = componentToken?.(v) || ''; const [code, wclass] = t.split(' '); return code ? { code, wclass } : null; };
       const rh = item(5), lh = item(6);
       const wclass = (rh?.wclass || lh?.wclass || 'hth').toUpperCase();
@@ -203,13 +219,18 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       // trace, so a DCC that failed to resolve is reported rather than silently dropped and a partial
       // portrait cannot pass for a complete one (s291 asserts on these traces).
       const required = new Set(cof.priority[cofDirection][frameIndex]);
-      const trace = [], frames = new Map(), missing = [];
+      const trace = [], frames = new Map(), colourTransforms = new Map(), missing = [];
       for (const layer of cof.layerRecords) {
         const comp = COMP[layer.component];
         const v = app[layer.component], it = item(layer.component);
         const base = it ? it.code : (v >= 1 && v <= 3 ? ['lit', 'med', 'hvy'][v - 1] : 'lit');
+        const colourByte = appColours[layer.component];
+        const transform = componentColourTransform(pl2, colourByte);
         const entry = { component: layer.component, appearance: v ?? null, token: base,
           weaponClass: layer.weaponClass.toUpperCase(), required: required.has(layer.component),
+          // C3o: the byte this layer's colour slot carries and whether a transform was applied --
+          // 0xFF/undefined draws the DCC's own palette indices unchanged, matching retail.
+          colourByte: colourByte ?? null, colourTransformed: Boolean(transform),
           drawn: false, resolved: false, path: null, error: null };
         trace.push(entry);
         if (!comp) { entry.error = `COF component ${layer.component} has no DCC directory`; continue; }
@@ -218,6 +239,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
           const dcc = decodeDcc(read(entry.path), { directions: [artDirection] });
           if (artDirection >= dcc.directions || frameIndex >= dcc.framesPerDirection) throw new RangeError(`no direction ${artDirection} frame ${frameIndex}`);
           frames.set(layer.component, dcc.directionRecords[artDirection].frames[frameIndex]);
+          if (transform) colourTransforms.set(layer.component, transform);
           entry.resolved = true;
           entry.drawn = entry.required;
         } catch (error) { entry.error = String(error && error.message || error); missing.push(entry.path); layerError(ch, entry.path, entry.error); }
@@ -232,8 +254,12 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
         if (!frame) continue;
         const left = PORTRAIT.x + frame.xOffset;
         const top = PORTRAIT.anchor + (frame.bottomUp ? frame.yOffset : frame.yOffset - frame.height + 1);
-        drawable.push({ component, frameIndex, frame, canvas: layerCanvas(frame), left, top,
+        drawable.push({ component, frameIndex, frame, canvas: layerCanvas(frame, colourTransforms.get(component) || null), left, top,
           path: trace.find((l) => l.component === component)?.path });
+        // Back onto the trace entry too: the screen anchor (card-relative) a colour-transform row
+        // needs to locate this layer's own drawn pixels in the scene, without re-deriving DCC offsets.
+        const traced = trace.find((l) => l.component === component);
+        if (traced) { traced.left = left; traced.top = top; traced.width = frame.width; traced.height = frame.height; }
         minX = Math.min(minX, left); minY = Math.min(minY, top);
         maxX = Math.max(maxX, left + frame.width); maxY = Math.max(maxY, top + frame.height);
       }
@@ -280,16 +306,19 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
     for (let i = 0; i < list.length; i++) if (inBox(p, cardBox(i))) return `card-${i}`;
     return null;
   };
+  // Retail's rule: CONVERT is live only for a classic character (an expansion one cannot be converted); with no character it is dead too.
+  const convertDisabled = () => selected < 0 || Boolean(list[selected].expansion);
+  const isDisabled = (id) => id === 'convert' ? convertDisabled() : Boolean(BUTTONS[id].disabled);
   const describe = (ch) => `Level ${ch.level} ${CLASS_NAMES[ch.playerClass] ?? ch.className ?? ''}`;
 
   return {
     get evidence() {
       return {
         background: { width: background.width, height: background.height, rows: background.rows, columns: background.columns },
-        characters: list.map((ch) => ({ name: ch.name, className: ch.className, level: ch.level })),
+        characters: list.map((ch) => ({ name: ch.name, className: ch.className, level: ch.level, expansion: Boolean(ch.expansion) })),
         selected: selected >= 0 ? list[selected].name : null,
         pointerState: { pressed },
-        buttons: Object.fromEntries(ORDER.map((id) => [id, { ...buttonBox(id), disabled: Boolean(BUTTONS[id].disabled) }])),
+        buttons: Object.fromEntries(ORDER.map((id) => [id, { ...buttonBox(id), disabled: isDisabled(id) }])),
         // The portrait per character, as the identity the DRAWS carry: the save's own appearance bytes
         // (and colour bytes), the class token, the COF/COF-direction/DCC-direction/frame asked for, and
         // one trace per COF layer -- its own DCC path, whether the COF requires it, and whether it
@@ -329,7 +358,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       // The confirmation's own targets: they exist only while it is open (retail's dialog is modal).
       const dialog = deleteFlow.armed >= 0 ? { DELETE_YES: centre(dialogButtonBox('yes')), DELETE_NO: centre(dialogButtonBox('no')) } : {};
       return { characters, rows: characters, play, create, exit, OK: play, 'CREATE NEW CHARACTER': create, EXIT: exit,
-        'DELETE CHARACTER': centre(buttonBox('delete')), ...dialog };
+        'DELETE CHARACTER': centre(buttonBox('delete')), 'CONVERT TO EXPANSION': centre(buttonBox('convert')), ...dialog };
     },
     click(x, y, width, height) {
       const p = toScreen(x, y, width, height);
@@ -342,6 +371,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       if (inBox(p, buttonBox('ok'))) { this.play(); return 'play'; }
       if (inBox(p, buttonBox('create'))) { onCreate?.(); return 'create'; }
       if (inBox(p, buttonBox('exit'))) { onCancel?.(); return 'exit'; }
+      if (inBox(p, buttonBox('convert'))) { if (convertDisabled()) return null; void onConvert?.(list[selected].name); return 'convert'; }
       if (inBox(p, buttonBox('delete'))) { if (selected >= 0 && deleteFlow.arm(selected)) return 'delete-arm'; return null; }
       for (let i = 0; i < list.length; i++) if (inBox(p, cardBox(i))) { selected = i; return list[i].name; }
       return null;
@@ -373,7 +403,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       // the order is part of the record, not an artefact of the anchors: the anchor each line lands on is
       // retail's either way, only the call order moves. Ours is a comparison of call order, so it counts.
       for (const id of ORDER) {
-        const b = BUTTONS[id], state = pressed === `button-${id}` ? 1 : 0, k = kinds[b.kind].states[state] || kinds[b.kind].states[0], bottom = b.top + k.frame.height - 1;
+        const b = { ...BUTTONS[id], disabled: isDisabled(id) }, state = pressed === `button-${id}` ? 1 : 0, k = kinds[b.kind].states[state] || kinds[b.kind].states[0], bottom = b.top + k.frame.height - 1;
         if (b.disabled) trans50(g, k.frame, b.x, b.top); else g.drawImage(k.canvas, b.x, b.top);
         recordDc6(kinds[b.kind].path, state < kinds[b.kind].states.length ? state : 0, k.frame, b.x, b.top, { op: 'cel', mode: b.disabled ? 1 : 5 });
         // Retail's pressedButtonOffset: a held button's label moves 2 px left and 2 px down with its
@@ -391,7 +421,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       }
       for (let i = 0; i < list.length; i++) {
         const ch = list[i], box = cardBox(i), dx = box.x - CARD.x, dy = box.y - CARD.top;
-        [ch.name, describe(ch), 'EXPANSION CHARACTER'].forEach((text, n) => cardFonts[n].drawAnchored(g, text, CARD.textX + dx, CARD.lines[n] + dy));
+        [ch.name, describe(ch), ...(ch.expansion ? ['EXPANSION CHARACTER'] : [])].forEach((text, n) => cardFonts[n].drawAnchored(g, text, CARD.textX + dx, CARD.lines[n] + dy));
         // The selected card's box, then its portrait on top of it: retail's call order is the three card
         // labels, charselectbox frame 0 and 1, then the nine portrait layers (the retail captures
         // select-oracle.txt records 84..139 that way). Two cels, not one -- frame 0 is 256 wide at x=37,

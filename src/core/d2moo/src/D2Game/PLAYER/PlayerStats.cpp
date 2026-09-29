@@ -45,8 +45,10 @@ void __fastcall PLAYERSTATS_SetStatsForStartingAct(D2GameStrc* pGame, D2UnitStrc
     STATLIST_SetUnitStat(pUnit, STAT_VITALITY, pCharStatsTxtRecord->nVit, 0);
     STATLIST_SetUnitStat(pUnit, STAT_TOHIT, 0, 0);
     STATLIST_SetUnitStat(pUnit, STAT_TOBLOCK, 0, 0);
-    STATLIST_SetUnitStat(pUnit, STAT_HITPOINTS, (pCharStatsTxtRecord->nVit + pCharStatsTxtRecord->nLifeAdd) << 8, 0);
+    // d2-web: MAXHP before HITPOINTS. Setting the current life first clamps it to the max the unit had at that
+    // moment, which left a fresh Sorceress at 32/40 and a Necromancer at 40/45; retail's own saves read 40/40 and 45/45 (s1002).
     STATLIST_SetUnitStat(pUnit, STAT_MAXHP, (pCharStatsTxtRecord->nVit + pCharStatsTxtRecord->nLifeAdd) << 8, 0);
+    STATLIST_SetUnitStat(pUnit, STAT_HITPOINTS, (pCharStatsTxtRecord->nVit + pCharStatsTxtRecord->nLifeAdd) << 8, 0);
     STATLIST_SetUnitStat(pUnit, STAT_MANA, pCharStatsTxtRecord->nInt << 8, 0);
     STATLIST_SetUnitStat(pUnit, STAT_MAXMANA, pCharStatsTxtRecord->nInt << 8, 0);
     STATLIST_SetUnitStat(pUnit, STAT_STAMINA, pCharStatsTxtRecord->nStamina << 8, 0);

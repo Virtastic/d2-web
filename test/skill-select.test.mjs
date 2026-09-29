@@ -18,5 +18,5 @@ test('popup rows follow OpenDiablo2 skill_select_panel.go: bottom-up, empty rows
   assert.deepEqual(right.map((r) => [r.listRow, r.top, r.skills.map((k) => k.id)]), [[0, 465, [2, 0]], [1, 417, [133, 126]], [3, 369, [130]]]);
   assert.equal(right[0].x + right[0].width, SKILL_SELECT_LAYOUT.rightEndX);
   const left = skillSelectRows(choices, 'left');
-  assert.deepEqual(left.map((r) => [r.listRow, r.x, r.skills.map((k) => k.id)]), [[0, 90, [0]], [1, 90, [126, 133]]]);
+  assert.deepEqual(left.map((r) => [r.listRow, r.x, r.skills.map((k) => k.id)]), [[0, 80, [0]], [1, 80, [126, 133]]]);
 });

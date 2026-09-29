@@ -585,25 +585,35 @@ int __fastcall PATH_BackupTurn_Compute(D2PathInfoStrc* pPathInfo)
 	return result + v5;
 }
 
+// d2-web diagnostic (F55): PATH_Straight_Compute's own decisions for the last call -- Toward's own
+// point count, whether Toward's own early-return fired, whether the distance gate let A* run at all.
+// Never changes the answer; read by d2_session_astar_probe() alongside the A* counters above.
+extern int32_t g_d2webAStarNodesPopped, g_d2webAStarAdvanced, g_d2webAStarExhausted, g_d2webAStarPathPoints;
+int32_t g_d2webStraightTowardPoints = -1, g_d2webStraightTowardEarlyReturn = -1, g_d2webStraightAStarGate = -1, g_d2webStraightSquaredDist = -1;
+
 //1.10f: D2Common.0x6FDAB130
 //1.13c: D2Common.0x6FDB7AD0
 int __fastcall PATH_Straight_Compute(D2PathInfoStrc* pPathInfo)
 {
+	g_d2webStraightTowardPoints = -1; g_d2webStraightTowardEarlyReturn = 0; g_d2webStraightAStarGate = 0; g_d2webStraightSquaredDist = -1;
+	g_d2webAStarNodesPopped = -1; g_d2webAStarAdvanced = -1; g_d2webAStarExhausted = -1; g_d2webAStarPathPoints = -1;
 	pPathInfo->pDynamicPath->dwCurrentPointIdx = 0;
 	pPathInfo->pDynamicPath->dwPathPoints = 0;
 
 	int nPathPoints = PATH_Toward_6FDAA9F0(pPathInfo);
+	g_d2webStraightTowardPoints = nPathPoints;
 	if (nPathPoints)
 	{
 		D2PathPointStrc tPathLastPoint = pPathInfo->pDynamicPath->PathPoints[nPathPoints - 1];
 		if (sub_6FDABA50(tPathLastPoint, pPathInfo->tTargetCoord) <= pPathInfo->field_14 // If heuristic distance is too small
 			&& tPathLastPoint != pPathInfo->tStartCoord)								 // and we couldn't reach the target
 		{
+			g_d2webStraightTowardEarlyReturn = 1;
 			return nPathPoints;															 // Then stop here
 		}
 	}
 
-	
+
 	// If distance is short enough, try to go around obstacles.
 	const int nMaxDist = 18;
 	const int nMaxDistSquared = nMaxDist * nMaxDist;
@@ -611,9 +621,11 @@ int __fastcall PATH_Straight_Compute(D2PathInfoStrc* pPathInfo)
 	const int nDiffX = std::abs(pPathInfo->tStartCoord.X - pPathInfo->tTargetCoord.X);
 	const int nDiffY = std::abs(pPathInfo->tStartCoord.Y - pPathInfo->tTargetCoord.Y);
 	const int nSquaredDistance = nDiffX * nDiffX + nDiffY * nDiffY;
+	g_d2webStraightSquaredDist = nSquaredDistance;
 
 	if (nSquaredDistance <= nMaxDistSquared)
 	{
+		g_d2webStraightAStarGate = 1;
 		if (int nAStarPathPoints = PATH_AStar_ComputePath(pPathInfo))
 		{
 			return nAStarPathPoints;

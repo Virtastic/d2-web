@@ -19,16 +19,29 @@
 // draws no armoured HUD over a panel screen was wrong, about this and about the mini-panel: retail
 // draws both with the character screen open, and neither with the skill tree open.
 import { createFont, decodeFontTbl } from './frontend.mjs';
-import { decodeDatPalette, decodeDc6 } from './d2-formats.mjs';
+import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
+import { recordDc6 } from './drawlist.mjs';
 
 export const HUD_HELP_ART = 'data\\local\\font\\latin\\font16.dc6';
 export const HUD_HELP_TBL = 'data\\local\\font\\latin\\font16.tbl';
 export const HUD_HELP_TEXT = 'Help (H)';
 export const HUD_HELP_ANCHOR = Object.freeze({ x: 714, y: 403 });   // screen 800x600, bottom row
 
+// The button under the label: retail draws `Levelsocket.dc6` frame 0 (bottom row 440) then `Level.dc6`
+// frame 0 (bottom row 436, the cross gem) straight after the label's glyphs, in every capture that
+// draws the label and no other (the retail captures: 39+3 of 42 with both; the 7 without it are the
+// controls overlay covering the spot). Not gated on skill points: the fresh-character town-start
+// frame has it. Retail's y is a bottom row, recordDc6 takes the top.
+const BUTTON = [['data\\global\\ui\\PANEL\\levelsocket.dc6', 725, 440], ['data\\global\\ui\\PANEL\\level.dc6', 728, 436]];
+
 export function createHudHelp(read, documentObject = globalThis.document) {
   const dc6 = decodeDc6(read(HUD_HELP_ART)), tbl = decodeFontTbl(read(HUD_HELP_TBL));
   const perAct = new Map();
+  const button = BUTTON.map(([path, x, bottom]) => {
+    const frame = decodeDc6(read(path)).frames[0];
+    return { path, x, top: bottom - frame.height + 1, frame };
+  });
+  let buttonCanvas = null;
   const fontFor = (act) => {
     let f = perAct.get(act);
     if (!f) {
@@ -48,7 +61,16 @@ export function createHudHelp(read, documentObject = globalThis.document) {
     draw(ctx, act = 1) {
       const font = fontFor(act);
       font.drawAnchored(ctx, HUD_HELP_TEXT, HUD_HELP_ANCHOR.x, HUD_HELP_ANCHOR.y);
-      return { text: HUD_HELP_TEXT, art: HUD_HELP_ART, anchor: { ...HUD_HELP_ANCHOR }, act,
+      buttonCanvas ??= (() => {
+        const pal = decodeDatPalette(read('data\\global\\palette\\ACT1\\pal.dat'));
+        return button.map(({ frame }) => { const c = documentObject.createElement('canvas'); c.width = frame.width; c.height = frame.height;
+          c.getContext('2d').putImageData(new ImageData(dc6FrameToRgba(frame, pal), frame.width, frame.height), 0, 0); return c; });
+      })();
+      const buttonRecords = button.map(({ path, x, top, frame }, i) => {
+        ctx.drawImage(buttonCanvas[i], x, top);
+        return recordDc6(path, 0, frame, x, top, { op: 'cel', mode: 5 });
+      });
+      return { button: buttonRecords, text: HUD_HELP_TEXT, art: HUD_HELP_ART, anchor: { ...HUD_HELP_ANCHOR }, act,
         width: font.measure(HUD_HELP_TEXT),
         glyphs: [...HUD_HELP_TEXT].map((ch) => font.glyph(ch.codePointAt(0))?.index ?? -1) };
     },

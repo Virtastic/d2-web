@@ -994,7 +994,9 @@ void __fastcall DATATBLS_LoadSets_SetItemsTxt(HD2ARCHIVE hArchive)
 			{
 				sgptDataTables->pSetItemsTxt[i].wVersion = sgptDataTables->pSetsTxt[nSetId].wVersion;
 				sgptDataTables->pSetItemsTxt[i].nSetItems = sgptDataTables->pSetsTxt[nSetId].nSetItems;
-				sgptDataTables->pSetsTxt[nSetId].pSetItem[sgptDataTables->pSetsTxt[nSetId].nSetItems] = &sgptDataTables->pSetItemsTxt[i];
+				// The row index, not a pointer: retail's 6 slots are 4 bytes each and sets.bin's
+				// record is sized for that (see D2SetsTxt). DATATBLS_GetSetItemOfSet dereferences it.
+				sgptDataTables->pSetsTxt[nSetId].dwSetItemIndex[sgptDataTables->pSetsTxt[nSetId].nSetItems] = (uint32_t)i;
 
 				++sgptDataTables->pSetsTxt[nSetId].nSetItems;//TODO: Increment SetItemsTxt-Counter, too? (Not done in the original code)
 			}

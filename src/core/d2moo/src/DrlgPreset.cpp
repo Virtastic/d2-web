@@ -1310,6 +1310,11 @@ D2DrlgRoomStrc* __fastcall DRLGPRESET_BuildArea(D2DrlgLevelStrc* pLevel, D2DrlgM
 void __fastcall DRLGPRESET_BuildPresetArea(D2DrlgLevelStrc* pLevel, D2DrlgGridStrc* pDrlgGrid, int nFlags, D2DrlgMapStrc* pDrlgMap, BOOL bSingleRoom)
 {
 	int* pVisArray = DRLGROOM_GetVisArrayFromLevelId(pLevel->pDrlg, pLevel->nLevelId);
+#ifdef D2_DRLG_TRACE
+	fprintf(stderr, "build-preset-area: level %d vis [%d %d %d %d %d %d %d %d] nFlags-in %x\n",
+		pLevel->nLevelId, pVisArray[0], pVisArray[1], pVisArray[2], pVisArray[3],
+		pVisArray[4], pVisArray[5], pVisArray[6], pVisArray[7], nFlags);
+#endif
 	for (int i = 0; i < 8; ++i)
 	{
 		if (pVisArray[i] && DRLGWARP_GetWarpDestinationFromArray(pLevel, i) == -1)
@@ -1317,6 +1322,9 @@ void __fastcall DRLGPRESET_BuildPresetArea(D2DrlgLevelStrc* pLevel, D2DrlgGridSt
 			nFlags |= (DRLGROOMFLAG_HAS_WARP_0 << i);
 		}
 	}
+#ifdef D2_DRLG_TRACE
+	fprintf(stderr, "build-preset-area: level %d nFlags-out %x\n", pLevel->nLevelId, nFlags);
+#endif
 
 	DRLGGRID_AlterAllGridFlags(pDrlgGrid, nFlags, FLAG_OPERATION_OR);
 

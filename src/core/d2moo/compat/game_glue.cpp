@@ -43,6 +43,14 @@ void d2_note_monster_spawn(D2GameStrc* pGame, D2UnitStrc* pMonster, int32_t nCla
     e[0] = pGame ? (int32_t)pGame->dwGameFrame : -1; e[1] = (int32_t)pMonster->dwUnitId; e[2] = nClass; e[3] = nX; e[4] = nY; e[5] = g_d2SpawnPath;
 }
 
+// F106 diagnosis (act II, non-retail counters): WHICH keeper populated a room, told apart by counting
+// rather than inferred from an object census. `sub_6FC385A0` takes exactly one of two branches --
+// `dwFlags & 1` set means it has already spawned and is only restoring inactive units -- so the two
+// counts plus the room's own flag say whether the spawn branch ran AT ALL for a room that has no
+// units. `g_d2PendingPassRuns` counts the passes that actually entered the loop (the act's
+// bHasPendingRoomsUpdates was raised), which is the other half: a room can be built and never offered
+// to this function. Read out by d2_session_pending_probe (monspawn_check.cpp).
+int32_t g_d2PopulateSpawnBranch = 0, g_d2PopulateRestoreBranch = 0, g_d2PendingPassRuns = 0, g_d2PendingPassRooms = 0;
 // D2Game.0x6FC385A0 (1.13c 0x6FC4CB80): populate a room the first time it becomes active.
 // Order is the one retail runs and the retail capture tool recorded.
 void __fastcall sub_6FC385A0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom) {
@@ -54,8 +62,10 @@ void __fastcall sub_6FC385A0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom) {
     if (tl == d2_trace_level) fprintf(stderr, "  after tick %u\n", pRoom->pSeed.nLowSeed);
 #endif
     if (pRoom->dwFlags & 1) {
+        ++g_d2PopulateRestoreBranch;
         if (!D2Common_10074(pRoom)) { { const int32_t was = g_d2SpawnPath; g_d2SpawnPath = 3; SUNITINACTIVE_RestoreInactiveUnits(pGame, pRoom); g_d2SpawnPath = was; } D2Common_10075(pRoom, 1); }
     } else {
+        ++g_d2PopulateSpawnBranch;
         g_d2SpawnPath = 1;
         SUNIT_SpawnPresetUnitsInRoom(pGame, pRoom);
 #ifdef D2_MONS_TRACE

@@ -68,6 +68,7 @@ MSYS_NO_PATHCONV=1 docker run --rm \
 flock -u 9; exec 9>&-
 
 bash ci/stage.sh
+bash tools/engine-cache.sh put . || true   # share this build with every worktree (tools/engine-sync.sh)
 # One line per build in the main checkout's timing.log.
 mkdir -p "$(dirname "$LOCK_DIR")/wasm-build/harness-out"
 printf '%s\tbuild\t%s\twait=%s\tdur=%s\n' "$(date -Is)" "$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')" "$WAIT" "$(( $(date +%s) - T0 - WAIT ))" \

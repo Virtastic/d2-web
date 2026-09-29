@@ -1,5 +1,5 @@
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
-import { worldToScreen, TILE_SCREEN_W } from './session-terrain.mjs';
+import { TILE_SCREEN_W, UNIT_CENTRE_Y } from './session-terrain.mjs';
 
 // DATATBLS_LoadAutomapTxt turns these LevelName strings into its automap-type
 // enum.  This is the same 1.13c table order as D2MOO's gszAutomapLevelNames;
@@ -49,6 +49,15 @@ function selectRecord(rows, levelType, tile) {
     (row.startSequence === -1 || (row.startSequence <= tile.subIndex && tile.subIndex <= row.endSequence)));
   return record ? { record, levelName, tileName } : null;
 }
+// One retail marker: the 12 segments of its draw-list records as offsets from the glyph's centre.
+const CROSS = Object.freeze([[0, -2], [4, -4], [8, -2], [4, 0], [8, 2], [4, 4], [0, 2], [-4, 4], [-8, 2], [-4, 0], [-8, -2], [-4, -4], [0, -2]]);
+const AX = 0, AY = -36, AY_CAVE = 1;   // the hero's tile-origin cell's box relative to the hero's screen point (fitted: s953/s954)
+const HERO_COLOUR = 151, NPC_COLOUR = 32;
+function line(ctx, x0, y0, x1, y1) {   // Bresenham, 1 px, no antialiasing
+  const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx + dy;
+  for (;;) { ctx.fillRect(x0, y0, 1, 1); if (x0 === x1 && y0 === y1) break; const e2 = 2 * err; if (e2 >= dy) { err += dy; x0 += sx; } if (e2 <= dx) { err += dx; y0 += sy; } }
+}
 function levelRect(Module, levelId) {
   const pointer = Number(Module.ccall('d2_session_level_rect', 'number', ['number'], [levelId]));
   return pointer ? Array.from(new Int32Array(Module.HEAPU8.buffer, pointer, 4)) : [0, 0, 0, 0];
@@ -61,6 +70,16 @@ function seamEdges(Module, destinationLevel) {
 // One automap CELL, keyed the way retail's layer holds one: by where on the map it sits, not by the
 // room that happens to hold it. A map cell carries three tile lists (floors, walls, roofs) and can
 // hold one of each, so the layer is part of the key.
+// RETAIL'S REVEAL RULE: on entering a NEW hero Room1,
+// RevealAutomapRoom runs for each room of its pRoomsNear (the hero room + existing 3x3 neighbours) on the hero's
+// level; reveals union across room changes; a room adds the cells of its own tiles, unclipped.
+function levelRooms(Module, levelId) {
+  const n = Module.ccall('d2_session_room_count', 'number', [], []), p = Number(Module.ccall('d2_session_rooms', 'number', [], []));
+  const v = new Int32Array(Module.HEAPU8.buffer, p, n * 9), out = [];   // D2SessionRoom: ordinal, level, x, y, w, h (subtiles), ...
+  for (let i = 0; i < n; i++) if (v[i * 9 + 1] === levelId) out.push({ x: v[i * 9 + 2], y: v[i * 9 + 3], w: v[i * 9 + 4], h: v[i * 9 + 5] });
+  return out;
+}
+const inRoom = (r, x, y) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
 const cellKey = (tile) => `${tile.worldX},${tile.worldY},${tile.layer}`;
 
 export function createAutomapOverlay({ read, Module, documentObject = globalThis.document, isGameplay }) {
@@ -75,7 +94,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
   // 20 px per tile -- which spaces the cells 4 px apart, and the sparse floor dithers 8 px apart, so
   // TAB drew a lattice of isolated marks instead of a map (measured: s950/s951).
   const step = Math.max(...map.frames.map((frame) => frame.width));
-  const scale = step / TILE_SCREEN_W;
+  const scale = step / (2 * TILE_SCREEN_W); // TILE_SCREEN_W is a tile diamond HALF-width: the 16 px box is the 160 px tile diamond (retail step 8/4 per tile, f5b-automap-town.txt)
   const layout = Object.freeze({ ...AUTOMAP_LAYOUT, step, scale });
   let visible = false, evidence = { open: false, drawn: [], unresolved: [], layout, error: null };
   // Retail's automap is CLIENT state and it is per level. D2Client keeps a D2AutomapLayerStrc per
@@ -89,6 +108,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
   // matches. Counted rather than dropped, because this is the one part of the map that still needs a
   // retail TAB frame to settle.
   const unrevealed = new Map();
+  const revealed = new Map();   // level id -> { rooms: revealed room keys 'x,y', hero: the hero Room1's key }
   globalThis.addEventListener('keydown', (event) => {
     if (isGameplay() && event.code === 'Tab' && !event.repeat) { visible = !visible; event.preventDefault(); event.stopImmediatePropagation(); }
   });
@@ -97,12 +117,18 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
     // one. The layer is filled on EVERY frame, not only while TAB is up: retail's map fills as the
     // player explores, and a map that only grows while it is being looked at is not a map of where
     // the player has been.
-    draw(ctx, width, height, snapshot, tiles = null) {
+    draw(ctx, width, height, snapshot, tiles = null, view = null) {
       const levelId = snapshot.level;
-      if (!layers.has(levelId)) { layers.set(levelId, new Map()); unrevealed.set(levelId, new Set()); }
+            if (!layers.has(levelId)) { layers.set(levelId, new Map()); unrevealed.set(levelId, new Set()); revealed.set(levelId, { rooms: new Set(), hero: null }); }
       const layer = layers.get(levelId), unnamed = unrevealed.get(levelId), live = new Set();
       if (tiles && tiles.length) {
         const levelType = Module.ccall('d2_session_level_type', 'number', [], []);
+        const rv = revealed.get(levelId), rooms = levelRooms(Module, levelId);
+        const hp = view?.camera || snapshot.player, heroRoom = rooms.find((r) => inRoom(r, Math.floor(hp.x), Math.floor(hp.y)));
+        if (heroRoom && rv.hero !== `${heroRoom.x},${heroRoom.y}`) {
+          rv.hero = `${heroRoom.x},${heroRoom.y}`;
+          for (const r of rooms) if (Math.abs(r.x - heroRoom.x) <= heroRoom.w && Math.abs(r.y - heroRoom.y) <= heroRoom.h) rv.rooms.add(`${r.x},${r.y}`);
+        }
         // WHAT IS REVEALED IS THE ENGINE'S ANSWER, and this frame's own terrain read already carries
         // it: `d2_session_tiles` is built from the rooms that hold an active pRoom, so a tile in this
         // list is a tile of a room the engine has built for the player to be in. It used to be
@@ -118,9 +144,16 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
           // A cell is absorbed once, on the frame its tile first exists: re-selecting it every frame
           // would walk AutoMap.txt per tile per frame for a record the engine's own tile cannot change.
           if (layer.has(key)) continue;
+          const room = rooms.find((r) => inRoom(r, tile.worldX * 5, tile.worldY * 5));
+          if (!room || !rv.rooms.has(`${room.x},${room.y}`)) continue;
           const selected = selectRecord(rows, levelType, tile);
           if (!selected || !frames[selected.record.frames[0]]) { unnamed.add(key); continue; }
-          const frame = selected.record.frames[0];
+          // Retail rolls its private automap seed (gpAutomapSeed, low seed 0) per GetAutomapCellId call, in
+          // the order retail adds cells -- an order this client does not have -- so the pick is a hash of the
+          // cell's own position: uniform over Cel1..4 like retail's draw list (f5b: frames 0-3 ~110 each),
+          // stable across frames and across layers.
+          const cels = selected.record.frames;
+          const frame = cels[Math.abs((tile.worldX * 73856093) ^ (tile.worldY * 19349663) ^ (tile.layer * 83492791)) % cels.length];
           layer.set(key, { frame, requestedFrames: [...selected.record.frames], levelName: selected.levelName,
             tileName: selected.tileName, style: selected.record.style, startSequence: selected.record.startSequence,
             endSequence: selected.record.endSequence, orientation: tile.orientation, mainIndex: tile.mainIndex,
@@ -134,10 +167,15 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
       // placed rectangle gives the panel's extent, while seam segments identify adjacent areas.
       const geometry = { levelRect: levelRect(Module, levelId), seams: (snapshot.warps || []).filter((w) => w.destinationLevel !== levelId)
         .map((warp) => ({ destinationLevel: warp.destinationLevel, rect: levelRect(Module, warp.destinationLevel), edges: seamEdges(Module, warp.destinationLevel) })) };
-      const camera = worldToScreen(snapshot.player.x + .5, snapshot.player.y + .5);
-      // The panel is centred on the PLAYER, at retail's own screen centre for the player.
-      const cx = width * (AUTOMAP_LAYOUT.centreX / AUTOMAP_LAYOUT.width);
-      const cy = height * (AUTOMAP_LAYOUT.centreY / AUTOMAP_LAYOUT.height);
+      // The map is centred on the hero's PRECISE position, at the screen point the world pass puts the hero
+      // (w/2, h/2 + UNIT_CENTRE_Y = retail's 400,292 on 800x600, and the middle of a wide viewport).
+      // THE MAP IS CENTRED ON THE HERO'S PRECISE POSITION at the screen point the world pass puts the hero
+      // (w/2, h/2 + UNIT_CENTRE_Y = retail's 400,292 on 800x600), at a tenth of the world's scale: a tile is a
+      // 16x8 diamond, (8,4) per tile step -- every one of the 890 cells of f5b-automap-town.txt and 826 of
+      // a3-forest-walkin.txt sits on that lattice, offset by the hero's sub-tile position (0 in the town, where
+      // the hero starts on a tile origin; 4,3 in the forest).
+      const cx = Math.round(width / 2), cy = Math.round(height / 2 + UNIT_CENTRE_Y);
+      const hero = view?.camera || { x: snapshot.player.x + .5, y: snapshot.player.y + .5 };
       if (!layer.size) unresolved.push({ reason: 'this level has no revealed cell yet' });
       ctx.save(); ctx.imageSmoothingEnabled = false;
       // RETAIL'S OWN LIST ORDER, not the order the cells happened to be discovered in: a layer holds
@@ -150,24 +188,36 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
         // private Automap RNG stream, so it deterministically uses the row's first valid Cel;
         // evidence retains every permitted Cel rather than claiming the retail random choice.
         const bitmap = frames[cell.frame];
-        const p = worldToScreen(cell.world[0], cell.world[1]);
-        // RETAIL'S DC6 ANCHOR, the one every other renderer here places a frame by (`left = anchorX
-        // + offsetX`, `top = anchorY + offsetY - height + 1`, drawlist.mjs): the frame's box sits
-        // with its BOTTOM at the tile's south vertex. The sheet's own geometry says the same and
-        // says where the box goes -- the cell art fills the bottom of the box and the wall pieces
-        // hang upward from it -- so centring the box put every cell half a footprint below its tile.
-        const x = Math.round(cx + (p.x - camera.x) * scale - bitmap.width / 2);
-        const y = Math.round(cy + (p.y - camera.y) * scale + step / 2 - bitmap.height + 1);
+        const x = Math.round(cx + ((cell.world[0] - cell.world[1]) - (hero.x - hero.y)) * 16 * scale + AX);
+        const y = Math.round(cy + ((cell.world[0] + cell.world[1]) - (hero.x + hero.y)) * 8 * scale + (LEVEL_NAMES[levelType] === '1 Cave' ? AY_CAVE : AY));   // '1 Cave' MEASURED +1 (Den, s960/s961: 81/81 and 82/82 cells at one shift); other dungeon types unmeasured
         ctx.drawImage(bitmap, x, y);
         drawn.push({ source: AUTOMAP_PATH, frame: cell.frame, requestedFrames: [...cell.requestedFrames], levelName: cell.levelName,
           tileName: cell.tileName, style: cell.style, startSequence: cell.startSequence, endSequence: cell.endSequence,
           tile: { orientation: cell.orientation, style: cell.mainIndex, sequence: cell.subIndex, layer: cell.layer, world: cell.world },
           at: [x, y], size: [bitmap.width, bitmap.height], order: drawn.length, remembered: !live.has(key) });
       }
+      // Unit markers, as retail draws them over the map (f5b-automap-town.txt, a3-forest-walkin.txt): a
+      // 12-segment 16x8 glyph centred 8 right / 7 up of the unit's feet, palette index 151 for the hero and
+      // 32 for a town NPC (the draw list's colour is index + 256*k), plus the NPC's name beside it.
+      const markers = [];
+      const cross = (x, y, index) => {
+        const r = palette[index * 4], g = palette[index * 4 + 1], b = palette[index * 4 + 2]; ctx.fillStyle = `rgb(${r},${g},${b})`;
+        for (let i = 0; i < CROSS.length - 1; i++) line(ctx, x + CROSS[i][0], y + CROSS[i][1], x + CROSS[i + 1][0], y + CROSS[i + 1][1]);
+        markers.push({ index, at: [x, y] });
+      };
+      if (view) {
+        for (const n of view.npcs || []) { cross(Math.round(n.sx) + 8, Math.round(n.sy) - 7, NPC_COLOUR); if (n.label && view.font) view.font.draw(ctx, n.label, Math.round(n.sx) - 18 + 8, Math.round(n.sy) - 10 + 2 - 7); }
+        cross(Math.round(cx) + 8, Math.round(cy) - 7, HERO_COLOUR);
+      }
       ctx.restore();
-      return (evidence = { open: true, levelType, levelName: LEVEL_NAMES[levelType] ?? 'None', cells: layer.size,
+      return (evidence = { open: true, markers, levelType, levelName: LEVEL_NAMES[levelType] ?? 'None', cells: layer.size,
         unrevealed: unnamed.size, drawn, unresolved, geometry, layout, error: null });
     },
     get evidence() { return JSON.parse(JSON.stringify(evidence)); },
+    // The overlay's own open state, as a boolean: the frame loop asks this every frame, and
+    // `evidence` is a JSON copy of every drawn cell, which is not a per-frame read (F115 gates the
+    // area-name block on it).
+    get isOpen() { return visible; },
+    toggle() { visible = !visible; },
   };
 }

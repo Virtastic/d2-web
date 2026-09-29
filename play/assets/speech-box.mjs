@@ -37,9 +37,13 @@ export function createSpeechBox({ read, decodeDc6, decodeDatPalette, createFont,
     }
     return pieceCanvas.get(i);
   };
-  const font = createFont({ dc6: decodeDc6(read('data\\local\\font\\latin\\font16.dc6')),
-    tbl: decodeFontTbl(read('data\\local\\font\\latin\\font16.tbl')), palette, documentObject,
-    path: 'data\\local\\font\\latin\\font16.dc6', drawAs: { op: 'celcolor', mode: 5 } });
+  // Retail draws the spoken line in FontFormal11, not Font16 (the retail captures:
+  // `text ... font=8` immediately followed by `celcolor DATA\LOCAL\Font\Latin\FontFormal11.dc6`),
+  // left-aligned at x=253 (box.x1+16), first line anchored at y=33 (box.y1+26), 18px line pitch --
+  // not the centred Font16 draw this used to do (that was the NPC MENU's font, a different box).
+  const font = createFont({ dc6: decodeDc6(read('data\\local\\font\\latin\\fontformal11.dc6')),
+    tbl: decodeFontTbl(read('data\\local\\font\\latin\\fontformal11.tbl')), palette, documentObject,
+    path: 'data\\local\\font\\latin\\fontformal11.dc6', drawAs: { op: 'celcolor', mode: 5 } });
 
   return {
     /** `text` is the NPC's spoken line, already stripped of its leading numeric token. */
@@ -61,17 +65,18 @@ export function createSpeechBox({ read, decodeDc6, decodeDatPalette, createFont,
       // (npc-panel.mjs's spokenText -- Charsi's greeting is "47\nHi there. I'm Charsi...").
       const spoken = String(text || '').replace(/^\s*\d+\s*\n/, '');
       const words = spoken.replace(/\n+/g, ' ').split(/\s+/).filter(Boolean);
-      const maxWidth = (box.x2 - box.x1) - 16, lines = [];
+      const left = box.x1 + 16, maxWidth = (box.x2 - box.x1) - 32, lines = [];
       let row = '';
       for (const word of words) {
         const next = row ? `${row} ${word}` : word;
         if (font.measure(next) > maxWidth && row) { lines.push(row); row = word; } else row = next;
       }
       if (row) lines.push(row);
-      const cx = Math.trunc((box.x1 + box.x2) / 2);
-      let y = box.y1 + 10;
+      // Retail's own pitch: left-aligned at box.x1+16, first
+      // line anchored at box.y1+26, then font.lineHeight per line -- never centred.
+      let y = box.y1 + 26;
       for (const line of lines) {
-        font.drawAnchored(ctx, line, cx - Math.trunc(font.measure(line) / 2), y + font.lineHeight - 4);
+        font.drawAnchored(ctx, line, left, y);
         y += font.lineHeight;
         if (y > box.y2 - 10) break;   // TODO(client-parity F21): retail scrolls the rest; we clip it
       }

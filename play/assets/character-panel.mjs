@@ -72,13 +72,16 @@ export const STAT_PLUS_SOCKET_OFFSET = Object.freeze({ x: -3, y: -2 });
 // "frame right edge + 4" = 205 exactly, and level with each frame's top row. OpenDiablo2's absolute y
 // is 7 px off retail's (its labels are), so the RELATION is what is taken from it, never the number.
 const STAT_BUTTON_GAP = 4;
+// Measured against retail's own frame (retail/frames/charpanel-points.fb.png, s192): retail's button
+// sits 4 px ABOVE its attribute frame's top row -- the "level with the top row" reading was 4 px low.
+const STAT_BUTTON_DY = -4;
 // InvChar6 frames 0..3 anchored as retail anchors them (draw() below); frame 0's top-left is the
 // panel's origin, which is what the slots are relative to.
 const PANEL_ORIGIN = Object.freeze({ x: 80, y: 61 });
 export const STAT_BUTTON_RECTS = Object.freeze(Object.fromEntries(
   ['strength', 'dexterity', 'vitality', 'energy'].map((key) => {
     const slot = CHARACTER_SLOTS[key];
-    return [slot.stat, { x: PANEL_ORIGIN.x + slot.x + slot.w + STAT_BUTTON_GAP, y: PANEL_ORIGIN.y + slot.y,
+    return [slot.stat, { x: PANEL_ORIGIN.x + slot.x + slot.w + STAT_BUTTON_GAP, y: PANEL_ORIGIN.y + slot.y + STAT_BUTTON_DY,
       w: 30, h: 30, slot: key }];
   })));
 
@@ -162,6 +165,12 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
   const buttonRect = (stat) => STAT_BUTTON_RECTS[stat];
   return {
     get layout() { return CHARACTER_LAYOUT; },
+    /** The panel's own rectangle on the 800x600 screen: the art's own extent, anchored where retail
+     *  anchors InvChar6 frame 0 (PANEL_ORIGIN, the origin every slot and every "+" is measured from
+     *  and what s251 pinned against retail's draw list). The click routing's panel test reads it, the
+     *  same way the inventory's and the stash's `panelRect()` are read -- one source for the panel's
+     *  rectangle rather than a second guess in the shell. */
+    panelRect() { return { left: PANEL_ORIGIN.x, top: PANEL_ORIGIN.y, width: CHARACTER_LAYOUT.width, height: CHARACTER_LAYOUT.height }; },
     buttonAt(px, py, width, height, state) {
       if (!(state?.statPoints > 0)) return null;
       const v = view(width, height), x = (px - v.ox) / v.scale, y = (py - v.oy) / v.scale;

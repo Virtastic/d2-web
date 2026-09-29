@@ -5286,9 +5286,10 @@ int __fastcall ITEMS_DecodeItemBitstreamComplete(D2UnitStrc* pItem, D2BitBufferS
 					{
 						for (int i = 0; i < pSetsTxtRecord->nSetItems; ++i)
 						{
-							if (pSetsTxtRecord->pSetItem[i]->szItemCode == dwCode)
+							D2SetItemsTxt* pSetItem = DATATBLS_GetSetItemOfSet(pSetsTxtRecord, i);
+							if (pSetItem && pSetItem->szItemCode == dwCode)
 							{
-								pItemData->dwFileIndex = pSetsTxtRecord->pSetItem[i]->wSetItemId;
+								pItemData->dwFileIndex = pSetItem->wSetItemId;
 								bError = FALSE;
 								break;
 							}

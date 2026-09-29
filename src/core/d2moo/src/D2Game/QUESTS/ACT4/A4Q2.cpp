@@ -604,7 +604,16 @@ void __fastcall ACT4Q2_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2Q
 		{
 			pQuestDataEx->nPlayerCount = 0;
 			QUESTS_UnitIterate(pQuestData, 13, 0, ACT4Q2_UnitIterate_StatusCyclerEx, 1);
-			SUNIT_IterateUnitsOfType(pQuestArg->pGame, 0, pQuestArg->pTarget, ACT4Q2_UnitIterate_UpdateQuestStateFlags);
+			// Retail 1.13c's second iterate here is the room-guarded GRANT, not a state-flag update:
+			// D2Game.dll 0x6FCDC2C0's Diablo branch enters its iterate block at 0x6FCDC400 and calls
+			// through 0x6FCFFCC0 with 0x6FCD99D0, 0x6FCD9F20, 0x6FCDA490, 0x6FCD9BC0, 0x6FCD9B00 in
+			// that order, and 0x6FCD9F20 reads the player's A4Q2 record, takes UNITS_GetRoom, walks
+			// the quest list for id 0x17 (A4Q2), compares the player's room with the death room
+			// (pQuestDataEx+0x3C) and its adjacent list, and only then sets PRIMARYGOALDONE +
+			// REWARDGRANTED. Upstream bound UpdateQuestStateFlags at this one call site, so
+			// REWARDGRANTED was never set by a kill, and Tyrael's string-20000 branch and
+			// OBJECTS_OperateFunction73 (the act V portal) both stayed out of reach (s103).
+			SUNIT_IterateUnitsOfType(pQuestArg->pGame, 0, pQuestArg->pTarget, ACT4Q2_UnitIterate_UpdatePlayerState);
 			SUNIT_IterateUnitsOfType(pQuestArg->pGame, 0, pQuestArg->pTarget, ACT4Q2_UnitIterate_SetPrimaryGoalDoneForPartyMembers);
 			SUNIT_IterateUnitsOfType(pQuestArg->pGame, 0, pQuestArg->pTarget, ACT4Q2_UnitIterate_SetCompletionFlag);
 			SUNIT_IterateUnitsOfType(pQuestArg->pGame, 0, pQuestArg->pTarget, ACT4Q2_UnitIterate_AttachCompletionSound);
