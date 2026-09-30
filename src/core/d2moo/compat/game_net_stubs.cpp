@@ -49,6 +49,17 @@ extern "C" int D2WEB_TakeWaypointMenu(D2GSPacketSrv63* pPacket) {
     *pPacket = g_d2webLastWaypointMenu; g_d2webHasWaypointMenu = false;
     return (int)sizeof(D2GSPacketSrv63);
 }
+// F157: a 0x27 whose unit is an OBJECT (QUESTS_SendScrollMessage: Anya's plea from her ice) is a speech the page draws over
+// the object; kept in its own bounded queue so a later NPC dialog packet cannot overwrite it. Taken once, oldest first.
+static struct { int32_t guid; uint32_t stringId; } g_d2webObjectMessages[8];
+static int g_d2webObjectMessageCount = 0;
+extern "C" int D2WEB_TakeObjectMessage(int32_t* pGuid, uint32_t* pStringId) {
+    if (!g_d2webObjectMessageCount) return 0;
+    *pGuid = g_d2webObjectMessages[0].guid; *pStringId = g_d2webObjectMessages[0].stringId;
+    for (int i = 1; i < g_d2webObjectMessageCount; ++i) g_d2webObjectMessages[i - 1] = g_d2webObjectMessages[i];
+    --g_d2webObjectMessageCount;
+    return 1;
+}
 static D2GSPacketSrv27 g_d2webLastDialogPacket = {};
 static bool g_d2webHasDialogPacket = false;
 
@@ -366,6 +377,10 @@ void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, in
         static_cast<D2GSPacketSrv27*>(pPacket)->nHeader == 0x27) {
         g_d2webLastDialogPacket = *static_cast<D2GSPacketSrv27*>(pPacket);
         g_d2webHasDialogPacket = true;
+        const D2GSPacketSrv27* p27 = static_cast<D2GSPacketSrv27*>(pPacket);
+        if (p27->nUnitType == UNIT_OBJECT && p27->pMessageList.nCount >= 1 && g_d2webObjectMessageCount < 8) {
+            g_d2webObjectMessages[g_d2webObjectMessageCount++] = { (int32_t)p27->dwUnitGUID, p27->pMessageList.pMessages[0].nStringId };
+        }
     }
     if (pClient && pPacket && nPacketSize == (int32_t)sizeof(D2GSPacketSrv5D) &&
         static_cast<D2GSPacketSrv5D*>(pPacket)->nHeader == 0x5D) {

@@ -17,7 +17,10 @@ export function readSss(b, itemSize) {
   const pages = [];
   for (let i = 0; i < n; i++) {
     if (u16(b, o) !== 0x5453) throw new Error('bad ST tag'); o += 2;   // "ST"
-    const flags = u32(b, o); o += 4;
+    // PlugY 10.00 (the build D2SE ships, a real one measured 2026-09-29) writes NO flags field; the 11.x source's
+    // reader tells the two apart the same way: a NUL-terminated name followed by "JM" means flags are absent.
+    let flags = 0, l = o; while (b[l]) l++;
+    if (u16(b, l + 1) !== 0x4d4a) { flags = u32(b, o); o += 4; }
     let e = o; while (b[e]) e++;
     const name = String.fromCharCode(...b.subarray(o, e)); o = e + 1;
     if (u16(b, o) !== 0x4d4a) throw new Error('bad JM tag'); o += 2;   // "JM"
@@ -29,13 +32,13 @@ export function readSss(b, itemSize) {
   return { gold, pages };
 }
 
-export function writeSss({ gold = 0, pages }) {
+export function writeSss({ gold = 0, pages, legacy = false }) {   // legacy: PlugY 10.00 layout, flags-0 pages carry no flags field
   const out = [...asc('SSS\0')];
   const w32 = (v) => out.push(v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255);
   if (gold) { out.push(...asc('02')); w32(gold); } else out.push(...asc('01'));   // PlugY omits gold => v01
   w32(pages.length);
   for (const p of pages) {
-    out.push(...asc('ST')); w32(p.flags);
+    out.push(...asc('ST')); if (!(legacy && !p.flags)) w32(p.flags);
     out.push(...asc(p.name.slice(0, 20)), 0);
     // p.section: the engine's exported "JM"+count+items bytes, already in page layout (PY1 swap).
     if (p.section) out.push(...p.section);

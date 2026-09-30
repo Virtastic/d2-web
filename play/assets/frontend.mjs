@@ -11,6 +11,8 @@
 // comes out monospaced and wrong.
 
 import { recordDc6 } from './drawlist.mjs';
+import RETAIL_MIX_HEX from './retail-mixpalette.mjs';
+import { createGatewaySelector, DEFAULT_GATEWAY_LABEL } from './bnet-servers.mjs';
 
 /** 12-byte header, then one 14-byte record per code point. Layout per riiablo's FontTBL. */
 export function decodeFontTbl(bytes) {
@@ -89,24 +91,8 @@ export const PL2_MAX_COMPONENT_BLEND = PL2_TEXT_SHIFTS - 65536 - 256 - 39;
  * gates on them; the fallback path is not itself asserted anywhere.
  */
 const hexBytes = (hex) => { const out = new Uint8Array(hex.length / 2); for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16); return out; };
-const RETAIL_MIX_PALETTE = new Map([
-  // combined 67 = (3 & 31) + 32*2 -> header byte 0x44 (EpicSorc.d2s TR/RA/LG/LA/S1/S2)
-  [0x44, hexBytes(
-    'ac01ac030405060708090a0b0c0d0eacacac12acafafb3b518b71abcc6c8d0d9ddacac232425262728292a2b2c2d2e2f' +
-    '303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f' +
-    '606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f' +
-    '909192939495969798999a9b9c9d9e9fa0a1a2dbdca5a6a7a8a9aaabacacacacacacb2acacacb6adb8aeafbbb0bdb1b1' +
-    '11c1c2b4c4c5b513b9c915cbccbec0cf16c3c7d3c8d5cdd7d1d2d21dd6d9dbdcdce1e2e3e4e5e6e7e8e9eaebecedeeef' +
-    'f0f1f2f3f4f5f6f7f8f9fafbfcfdfede')],
-  // combined 169 = (9 & 31) + 32*5 -> header byte 0xAA (EpicSorc.d2s's right-hand item, SORHob1)
-  [0xAA, hexBytes(
-    'acacac212301292d0505080b0c0d0eacacac211028b2b63533bb39c249cc57dadeacacacacacacacacacacac21212222' +
-    '222323012326012929292c012929312c2f312f052f31363a3e39054b394d3e3e080841535455085758085a5b0a5d5e5f' +
-    '0a616263640a666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f' +
-    '909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacacacacacac21210fae23252528b2b2b22d1212' +
-    'b63232b835c5b8bbbb3dc2cb42c217c41749c9d34cd5cfd75bd4dad71edbdc6e1fe1e2e3e4e5e6e7e8e9eaebecedeeef' +
-    'f0f1f2f3f4f5f6f7f8f9fafbfcfdfee0')],
-]);
+// All 126 retail tables (tools/gen-mixpalette.mjs from the retail captures).
+const RETAIL_MIX_PALETTE = new Map(Object.entries(RETAIL_MIX_HEX).map(([byte, hex]) => [+byte, hexBytes(hex)]));
 /** The 256-entry palette-index remap a saved component colour byte selects, or null for 0xFF/absent. */
 export function componentColourTransform(pl2, colourByte) {
   if (colourByte === undefined || colourByte === null || colourByte === 0xFF) return null;
@@ -202,7 +188,7 @@ export function createFont({ dc6, tbl, palette, documentObject = globalThis.docu
      * Draw `text` as D2Win does: glyph by glyph from x (whole pixels, the .tbl advances), each glyph
      * a cel drawn with its BOTTOM row at `anchorY` (inclusive).
      */
-    drawAnchored(ctx, text, x, anchorY) {
+    drawAnchored(ctx, text, x, anchorY, onGlyph = null) {
       let cursor = Math.trunc(x);
       for (const ch of String(text)) {
         const g = glyphFor(ch.codePointAt(0));
@@ -213,6 +199,7 @@ export function createFont({ dc6, tbl, palette, documentObject = globalThis.docu
           else ctx.drawImage(g.canvas, cursor + g.frame.offsetX, top);
           const blit = path && recordDc6(path, g.index, g.frame, cursor + g.frame.offsetX, top, drawAs);
           if (blit && onFontGlyph) onFontGlyph({ char: ch, ...blit });
+          onGlyph?.({ character: ch, index: g.index, path, x: cursor, y: anchorY });
         }
         cursor += g.advance;
       }
@@ -285,7 +272,7 @@ export const FRONTEND = {
 // PLAYER, CREDITS, CINEMATICS, EXIT.
 export const TITLE_LAYOUT = {
   'SINGLE PLAYER': { kind: 'wide', x: 264, y: 290, order: 3 },
-  'BATTLE.NET': { kind: 'wide02', x: 264, y: 332, order: 2, gateway: { x: 264, y: 367, label: 'GATEWAY: U.S. EAST' } },
+  'BATTLE.NET': { kind: 'wide02', x: 264, y: 332, order: 2, gateway: { x: 264, y: 367, label: DEFAULT_GATEWAY_LABEL } },
   'OTHER MULTIPLAYER': { kind: 'wide', x: 264, y: 399, order: 2.5 },
   'CREDITS': { kind: 'short', x: 264, y: 504, order: 4 },
   'CINEMATICS': { kind: 'short', x: 402, y: 504, order: 5 },
@@ -371,7 +358,7 @@ export function recordTiled(path, tiled, ox, oy) {
  * The flaming logo is two DC6s (left and right halves), each 30 frames, positioned by their own
  * frame offsets -- retail animates them over the static black logo underneath, in both phases.
  */
-export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, string = null, documentObject = globalThis.document }) {
+export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, string = null, documentObject = globalThis.document, bnet = null }) {
   const palette = decodeDatPalette(read(FRONTEND.palette));
   // The whole title is ONE 8-bit frame shown through Sky (retail's frame buffer, s194), the buttons
   // too: Units differs from Sky in a few entries, the button gems among them. The trademark phase is
@@ -402,8 +389,9 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
       return { canvas, width, height, path, parts: parts.map((f, k) => ({ frame: f, index: state * framesPerState + k })) };
     });
   };
-  // Draw-list records for a composed button drawn with its top-left at (x, y).
-  const recordButton = (b, x, y) => { for (const p of b.parts) { recordDc6(b.path, p.index, p.frame, x, y); x += p.frame.width; } };
+  // Draw-list records for a composed button drawn with its top-left at (x, y). Returns them, so the
+  // Battle.net region list can carry the identity of what it actually painted.
+  const recordButton = (b, x, y) => { const out = []; for (const p of b.parts) { out.push(recordDc6(b.path, p.index, p.frame, x, y)); x += p.frame.width; } return out; };
   const buttons = { wide: buttonKind(FRONTEND.button, 2), wide02: buttonKind(FRONTEND.button02, 2),
     short: buttonKind(FRONTEND.shortButton, 1), narrow: buttonKind(FRONTEND.narrowButton, 2) };
   const tinted = (p) => { const t = p.slice(); for (let i = 0; i < t.length; i += 4) for (let k = 0; k < 3; k++) t[i + k] = Math.round(t[i + k] * LABEL_TINT); return t; };
@@ -465,15 +453,38 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
   // `dx`/`dy` carry retail's pressedButtonOffset: a button held down draws its label 2 px left and
   // 2 px down, the same displacement its own cel moves. Retail's title frame with SINGLE PLAYER held
   // is the evidence: the glyphs move, the cels do not.
-  const drawLabel = (ctx, text, x, y, w, h, dx = 0, dy = 0) => {
+  const drawLabel = (ctx, text, x, y, w, h, dx = 0, dy = 0, onGlyph = null) => {
     const f = h >= 35 ? font : smallFont;
     const offY = h >= 35 ? 4 : h === 32 ? 3 : h > 20 ? 2 : 1;
     const bottom = y + h - 1;
-    f.drawAnchored(ctx, text, x + dx + Math.max(Math.trunc((w - f.measure(text)) / 2), 0), bottom + dy + offY - Math.trunc((h - f.lineHeight) / 2));
+    f.drawAnchored(ctx, text, x + dx + Math.max(Math.trunc((w - f.measure(text)) / 2), 0), bottom + dy + offY - Math.trunc((h - f.lineHeight) / 2), onGlyph);
   };
   const drawOrder = [...boxes].sort((a, b) => TITLE_LAYOUT[a.item.label].order - TITLE_LAYOUT[b.item.label].order);
 
+  // Battle.net is a CONFIG FILE the project owns (`play/assets/bnet-servers.json` through
+  // `bnet-servers.mjs`), not a player setting. This is the whole of it: with the shipped empty file
+  // `enabled` is false, nothing below exists, BATTLE.NET keeps its inert action, the bar keeps
+  // retail's own text and the frame is byte-for-byte retail's. `bnet` is the boot fetch's promise (or
+  // a plain config); it resolves long before a player can reach the menu, and until it does the
+  // evidence says `pending` rather than pretending Battle.net is off.
+  let gatewaySelector = null;
+  let bnetState = { pending: true, enabled: false, serverCount: 0, error: '', url: null, configured: [] };
+  const applyBnet = (cfg) => {
+    bnetState = { pending: false, enabled: Boolean(cfg?.enabled), serverCount: cfg?.servers?.length ?? 0,
+      error: cfg?.error ?? '', url: cfg?.url ?? null, configured: (cfg?.servers ?? []).map((s) => ({ region: s.region, host: s.host })) };
+    if (!bnetState.enabled) return;
+    gatewaySelector = createGatewaySelector({
+      servers: cfg.servers, buttons, recordButton, width: 800, height: 600,
+      drawLabel: (c, text, x, y, w, h, dx, dy, onGlyph) => drawLabel(c, text, x, y, w, h, dx, dy, onGlyph),
+      drawHeading: (c, text, anchorY, onGlyph) => smallFont.drawAnchored(c, text, Math.trunc((800 - smallFont.measure(text)) / 2), anchorY, onGlyph),
+    });
+  };
+  if (bnet) Promise.resolve(bnet).then(applyBnet, (error) => applyBnet({ enabled: false, servers: [], error: String(error) }));
+
   let hot = -1, pressed = -1, pointer = null;
+  // The glyphs the gateway bar ACTUALLY blitted last frame -- identity evidence for the bar text,
+  // which is retail's own until the player picks a configured region.
+  let barDrawn = null;
   // Retail's logo animation, both phases: black left, fire left, black right, fire right, one frame a
   // tick at 25 Hz, the DC6's last frame never shown (title draw list: frames 8, 9, 10, 11 on four
   // consecutive frames; the creation loops' rule). A frame's anchor is its bottom row.
@@ -502,6 +513,11 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
         fontGlyphs: font.measure('SINGLE PLAYER'),
         lineHeight: font.lineHeight,
         pointer: { hot: hot >= 0 ? items[hot]?.label ?? null : null, pressed: pressed >= 0 ? items[pressed]?.label ?? null : null },
+        // The Battle.net config as the page read it, and -- when it listed servers -- the identity of
+        // what the region dialog actually painted. Empty/absent file: `{ enabled: false }`, and the
+        // gateway bar is retail's own text.
+        gateways: { ...bnetState, bar: gatewaySelector ? gatewaySelector.gatewayBar() : DEFAULT_GATEWAY_LABEL,
+          barDrawn, ...(gatewaySelector ? { dialog: gatewaySelector.evidence } : { dialog: null }) },
         trademark: {
           background: { width: trademarkBackground.width, height: trademarkBackground.height,
             rows: trademarkBackground.rows, columns: trademarkBackground.columns, path: FRONTEND.trademark },
@@ -512,6 +528,8 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
       };
     },
     hitTest(x, y, width, height) {
+      // The region dialog is modal over the menu: while it is up, no menu entry is under the pointer.
+      if (gatewaySelector?.open) return -1;
       const v = view(width, height);
       const sx = (x - v.ox) / v.scale, sy = (y - v.oy) / v.scale;
       const i = boxes.findIndex((b) => sx >= b.x && sx < b.x + b.w && sy >= b.y && sy < b.y + b.h);
@@ -525,26 +543,41 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
         Math.round(v.ox + (b.x + b.w / 2) * v.scale), Math.round(v.oy + (b.y + b.h / 2) * v.scale),
       ]]));
     },
+    /** Whether the Battle.net config listed servers, and the region dialog's row centres if so. */
+    gatewaysOpen() { return Boolean(gatewaySelector?.open); },
+    openGateways() { return gatewaySelector ? gatewaySelector.openDialog() : false; },
+    gatewayTargets(width, height) { return gatewaySelector ? gatewaySelector.targets(width, height) : {}; },
     hover(x, y, width, height) {
       const v = view(width, height);
-      pointer = [Math.trunc((x - v.ox) / v.scale), Math.trunc((y - v.oy) / v.scale)];
+      const sx = (x - v.ox) / v.scale, sy = (y - v.oy) / v.scale;
+      if (gatewaySelector?.open) return gatewaySelector.hover(sx, sy);
+      pointer = [Math.trunc(sx), Math.trunc(sy)];
       hot = this.hitTest(x, y, width, height); return hot;
     },
     click(x, y, width, height) {
+      if (gatewaySelector?.open) {
+        const v = view(width, height), sx = (x - v.ox) / v.scale, sy = (y - v.oy) / v.scale;
+        const token = gatewaySelector.press(sx, sy);
+        return token === null ? -1 : gatewaySelector.release(token, sx, sy);
+      }
       const i = this.hitTest(x, y, width, height);
       if (i >= 0) items[i].action?.();
       return i;
     },
     // Press arms the button under the pointer and shows its down cel; the release fires only when
     // it is still over the same button. Hover alone never draws the down cel (retail's mouse-up).
-    press(x, y, width, height) { pressed = this.hitTest(x, y, width, height); return pressed >= 0 ? pressed : null; },
+    press(x, y, width, height) {
+      if (gatewaySelector?.open) { const v = view(width, height); return gatewaySelector.press((x - v.ox) / v.scale, (y - v.oy) / v.scale); }
+      pressed = this.hitTest(x, y, width, height); return pressed >= 0 ? pressed : null;
+    },
     release(token, x, y, width, height) {
+      if (gatewaySelector?.open) { const v = view(width, height); return gatewaySelector.release(token, (x - v.ox) / v.scale, (y - v.oy) / v.scale); }
       const i = this.hitTest(x, y, width, height); pressed = -1;
       if (i >= 0 && i === token) items[i].action?.();
       return i >= 0 && i === token ? i : -1;
     },
     /** A cancelled gesture drops the down cel without activating the button. */
-    cancel() { pressed = -1; },
+    cancel() { if (gatewaySelector?.open) gatewaySelector.cancel(); pressed = -1; },
     draw(outCtx, width, height, tick, phase = 'menu') {
       outCtx.fillStyle = '#000'; outCtx.fillRect(0, 0, width, height);
       const v = view(width, height);
@@ -569,12 +602,21 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
         outCtx.restore();
         return { phase, buttons: 0, glyphs, hot: -1 };
       }
-      for (const b of drawOrder) {
+      // The region dialog is a MODAL SCREEN, not an overlay on the menu: the menu entries are not drawn
+      // at all while it is up, so a player cannot read a region row as a relabelled menu button.
+      if (gatewaySelector?.open) {
+        gatewaySelector.draw(ctx);
+      } else for (const b of drawOrder) {
         if (b.gateway) {
           const g = buttons.narrow[0];
           ctx.drawImage(g.canvas, b.gateway.x, b.gateway.y);
           recordButton(g, b.gateway.x, b.gateway.y);
-          drawLabel(ctx, b.gateway.label, b.gateway.x, b.gateway.y, g.width, g.height);
+          // Retail's own text until the player picks a region (`gatewayBar`); either way the glyphs we
+          // blit are recorded, so a scenario compares the PAINTED bar to the configured region.
+          const glyphs = [];
+          const bar = gatewaySelector ? gatewaySelector.gatewayBar() : b.gateway.label;
+          drawLabel(ctx, bar, b.gateway.x, b.gateway.y, g.width, g.height, 0, 0, (gl) => glyphs.push(gl));
+          barDrawn = { text: glyphs.map((gl) => gl.character).join(''), glyphs: glyphs.map((gl) => ({ character: gl.character, index: gl.index, path: gl.path })) };
         }
         // Hover keeps retail's up cel; only a held pointer gets the down cel.
         const down = items.indexOf(b.item) === pressed;
@@ -583,8 +625,8 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
         recordButton(buttons[b.kind][state], b.x, b.y);
         drawLabel(ctx, b.item.label, b.x, b.y, b.w, b.h, down ? -2 : 0, down ? 2 : 0);
       }
-      versionFont.drawAnchored(ctx, TITLE_VERSION.text, TITLE_VERSION.x, TITLE_VERSION.y);
-      // D2Win draws the pointer last, as a cel at (mouse x, mouse y - 1) (D2MOO D2WinMain.cpp).
+      if (!gatewaySelector?.open) versionFont.drawAnchored(ctx, TITLE_VERSION.text, TITLE_VERSION.x, TITLE_VERSION.y);
+      // Retail draws the pointer last (D2WinMain.cpp), so the region dialog goes under the pointer cel.
       if (pointer) {
         const f = cursorDc6.frames[0];
         const left = pointer[0] + f.offsetX, top = pointer[1] - 1 + f.offsetY - f.height + 1;
@@ -594,7 +636,7 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
       outCtx.save(); outCtx.imageSmoothingEnabled = false;
       outCtx.drawImage(scene, v.ox, v.oy, 800 * v.scale, 600 * v.scale);
       outCtx.restore();
-      return { phase, buttons: boxes.length, hot };
+      return { phase, buttons: gatewaySelector?.open ? 0 : boxes.length, hot };
     },
   };
 }

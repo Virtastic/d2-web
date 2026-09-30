@@ -38,6 +38,12 @@ const BUTTON_FRAMES = { blank: 0, buy: 2, sell: 4, repair: 6, exit: 10, repairAl
 // their row is Buy / Sell / Repair / Repair All, every other vendor's Buy / Sell / (blank) / Exit
 // (riiablo's VendorPanel SMITHY and TRADER masks over the same four slots).
 export const SMITH_CLASSES = new Set([154, 178, 253, 257, 511]);
+// The tooltip's lines and their D2Win colours (top down: Cost, name, then the engine's property lines). P8j: a magic item's
+// Cost and name are blue (shop-magic-*-r21; other qualities unmeasured, white); 'v' = label white, value blue.
+export function tooltipSpec(h) {
+  const qc = h.quality === 4 ? 3 : 0;
+  return { lines: [`${h.costLabel || 'Cost: '}${h.cost}`, h.name || h.code, ...(h.props || [])], colours: [qc, qc, ...(h.propColours || [])] };
+}
 export const vendorButtons = (npcClass) => (SMITH_CLASSES.has(npcClass) ? ['buy', 'sell', 'repair', 'repairAll'] : ['buy', 'sell', 'blank', 'exit']);
 
 function frameCanvas(frame, palette, documentObject) {
@@ -89,6 +95,8 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
     for (let k = 255; k >= 0; k--) index.set((palette[k * 4] << 16) | (palette[k * 4 + 1] << 8) | palette[k * 4 + 2], k);
     a = { palette, pl2, index, panel, font, icons: new Map(),
       gold: createFont({ dc6: fontDc6, tbl: fontTbl, palette: textColourPalette(pl2, palette, 4), documentObject }),
+      // P8j: D2Win text colours the tooltip uses beyond white: 1 red (unmet requirement), 3 blue (magical property).
+      tint: (c) => (a.tints ||= new Map()).get(c) || (a.tints.set(c, createFont({ dc6: fontDc6, tbl: fontTbl, palette: textColourPalette(pl2, palette, c), documentObject })), a.tints.get(c)),
       tabFrames: tabDc6.frames.map((f) => frameCanvas(f, palette, documentObject)),
       buttonFrames: buttonDc6.frames.map((f) => frameCanvas(f, palette, documentObject)) };
     perAct.set(act, a);
@@ -101,13 +109,13 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
   const visibleBlits = new WeakMap();
   // A stock item sits on retail's box, colour 234 in draw mode 0 (AlphaBlend[2][under][234]), as in the
   // inventory (s197/s250), read back from the canvas as palette indices.
-  const itemBackground = (ctx, x, y, w, h) => {
+  const itemBackground = (ctx, x, y, w, h, colour = 234) => {
     const { pl2, index, palette } = cur;
     const X = Math.round(x), Y = Math.round(y), W = Math.round(w), H = Math.round(h);
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
     const img = ctx.getImageData(X, Y, W, H), d = img.data, base = 13568 + 2 * 65536;
     for (let i = 0; i < d.length; i += 4) { const u = index.get((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]); if (u === undefined) continue;
-      const c = pl2[base + u * 256 + 234]; d[i] = palette[c * 4]; d[i + 1] = palette[c * 4 + 1]; d[i + 2] = palette[c * 4 + 2]; }
+      const c = pl2[base + u * 256 + colour]; d[i] = palette[c * 4]; d[i + 1] = palette[c * 4 + 1]; d[i + 2] = palette[c * 4 + 2]; }
     ctx.putImageData(img, X, Y); ctx.restore();
   };
   const icon = (invFile) => {
@@ -122,13 +130,12 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
   let tab = 3, lastTabs = [];
   const view = (width, height) => { const scale = Math.min(width / 800, height / 600); return { scale, ox: (width - 800 * scale) / 2, oy: (height - 600 * scale) / 2 }; };
   const toScreen = (width, height, px, py) => { const v = view(width, height); return [(px - v.ox) / v.scale, (py - v.oy) / v.scale]; };
-  // Inventory.txt has two weapon store pages (1 and 2), but the retail strip has
-  // one Weapons tab: vendor-malah-act5 draws frame 5 at x=160 once, never a second
-  // tab at x=240.  Page 2 is therefore not a second label/control.
-  const tabsWithStock = (items) => [0, 1, 3].filter((t) => items.some((it) => it.invPage === t || (t === 1 && it.invPage === 2)));
-  // This predicate deliberately serves both rendering and pointer selection.  Splitting page 2
-  // from page 1 here would make items the Weapons tab says it contains invisible or unclickable.
-  const belongsToTab = (it, t) => it.invPage === t || (t === 1 && it.invPage === 2);
+  // Retail draws a smith's stock as four tabs, one per store page 0..3 (Armor, Weapons, Weapons, Misc:
+  // p8-smith-shop, p8-ui2-shop-*), but Akara's and Malah's as pages 1 and 3 only (vendor-akara,
+  // vendor-malah-act5).  So only a smith keeps page 2 as its own tab; for anyone else it stays in Weapons.
+  let split = false;   // the vendor being drawn is a smith
+  const tabsWithStock = (items) => [0, 1, 2, 3].filter((t) => items.some((it) => belongsToTab(it, t)));
+  const belongsToTab = (it, t) => split ? it.invPage === t : it.invPage === (t === 2 ? -1 : t) || (t === 1 && it.invPage === 2);
   // Retail's anchors: the panel's top row is y 61, a tab's too.
   const tabRect = (t) => ({ x: L.left + t * L.tabStep, y: L.top + 1, w: cur.tabFrames[t].width, h: cur.tabFrames[t].height });
   const buttonTop = () => 446;   // retail: bottom row 477, 32 tall (vendor-akara)
@@ -137,13 +144,16 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
     get tab() { return tab; },
     get evidence() { return { background: { width: cur.panel.width, height: cur.panel.height }, art: VENDOR_ASSETS.panel, layout: { ...L } }; },
     /** Show the tab retail opens a shop on, or the first one with stock. */
-    reset(items = []) { const t = tabsWithStock(items); tab = t.includes(3) ? 3 : (t[0] ?? 3); },
+    // Retail opens Akara's and Malah's on Misc (frame 3 active) and Charsi's on Weapons (frame 1 active,
+    // p8-smith-shop); a smith is told by `smith`, the rule behind it is not captured beyond those three.
+    reset(items = [], smith = false) { split = smith; const t = tabsWithStock(items); tab = smith && t.includes(1) ? 1 : t.includes(3) ? 3 : (t[0] ?? 3); },
     setTab(t) { tab = t; },
     tabAt(px, py, width, height) {
       const [x, y] = toScreen(width, height, px, py);
       return lastTabs.find((t) => { const r = tabRect(t); return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h; }) ?? null;
     },
     itemAt(px, py, width, height, state) {
+      split = SMITH_CLASSES.has(state?.classId);
       const [x, y] = toScreen(width, height, px, py);
       const gx = Math.floor((x - L.gridLeft) / L.cell), gy = Math.floor((y - L.gridTop) / L.cell);
       if (gx < 0 || gx >= L.columns || gy < 0 || gy >= L.rows) return null;
@@ -174,6 +184,7 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
     },
     draw(ctx, width, height, state) {
       const items = Array.isArray(state?.items) ? state.items : [];
+      split = SMITH_CLASSES.has(state?.classId);
       cur = forAct(state?.act || 1);
       const { panel, tabFrames, buttonFrames, font, gold } = cur;
       const v = view(width, height);
@@ -188,6 +199,11 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
         // x = tab + (w + 4 - text) / 2, fitted on retail's two labels (Weapons 168, Misc 346).
         face.drawAnchored(ctx, label, r.x + Math.floor((r.w + 4 - face.measure(label)) / 2), 80);
       }
+      // Retail's hover: the item under the pointer has its
+      // cells' backing box colour 118 instead of 234, at 5000 gold AND at 0 -- there is NO affordability
+      // mark on the grid (P8d), so the hover is the only variation and it never reads the purse.
+      const p = state?.pointer;
+      const hovered = p ? this.itemAt(p.x, p.y, width, height, state) : null;
       let shown = 0, drawnIcons = 0;
       // The exact engine presentation identity carried into the visible panel. This makes the
       // top-left cell and its whole ItemsTxt footprint observable to browser rows.
@@ -199,7 +215,7 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
         const x = L.gridLeft + it.gridX * L.cell, y = L.gridTop + it.gridY * L.cell;
         if (img) {
           const t = ctx.getTransform();
-          itemBackground(ctx, t.e + x * t.a, t.f + y * t.d, Math.ceil(img.width / L.cell) * L.cell * t.a, Math.ceil(img.height / L.cell) * L.cell * t.d);
+          itemBackground(ctx, t.e + x * t.a, t.f + y * t.d, Math.ceil(img.width / L.cell) * L.cell * t.a, Math.ceil(img.height / L.cell) * L.cell * t.d, hovered && hovered.id === it.id ? 118 : 234);
           let visiblePixels = visibleBlits.get(img);
           if (visiblePixels === undefined) {
             visiblePixels = changedOutputPixels(ctx, t, x, y + 1, img.width, img.height, () => ctx.drawImage(img, x, y + 1));
@@ -221,12 +237,27 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
       // The stash line (1.13 vendors take stash gold): string "stash" at (101, 434), the stash's gold at (266, 434).
       font.drawAnchored(ctx, string('stash'), 101, 434);
       if (state?.stashGold >= 0) font.drawAnchored(ctx, String(state.stashGold), 266, 434);
+      // Retail's tooltip (same captures): a mode-2 black box, 16 px per line, centred on the pointer and
+      // clamped to the screen, its bottom 25 px above the pointer; lines are centred, listed top down as
+      // retail draws them (Cost first, then the name). The property lines come from the engine's
+      // d2_session_item_lines.
+      let tooltip = null;
+      if (hovered) {
+        const { lines, colours } = tooltipSpec(hovered);
+        const w = Math.max(...lines.map((l) => font.measure(l))) + 8, h = lines.length * 16;
+        const bx = Math.max(0, Math.min(800 - w, Math.round(p.x / v.scale - v.ox / v.scale - w / 2))), bottom = Math.round((p.y - v.oy) / v.scale) - 25;
+        ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(bx, bottom - h, w, h);
+        lines.forEach((l, k) => { const x = bx + Math.floor((w - font.measure(l)) / 2), y = bottom - h + 13 + 16 * k, c = colours[k];
+          if (c === 'v') { const cut = l.indexOf(': ') + 2; font.drawAnchored(ctx, l.slice(0, cut), x, y); cur.tint(3).drawAnchored(ctx, l.slice(cut), x + font.measure(l.slice(0, cut)), y); }
+          else (c ? cur.tint(c) : font).drawAnchored(ctx, l, x, y); });
+        tooltip = { box: [bx, bottom - h, bx + w, bottom], lines, colours };
+      }
       ctx.restore();
       ctx.save(); ctx.translate(v.ox, v.oy); ctx.scale(v.scale, v.scale);
       chrome.border(ctx, state?.act || 1, BORDER_LEFT); chrome.border(ctx, state?.act || 1, BORDER_RIGHT);
       ctx.restore();
       return { box: { x: L.left, y: L.top, width: panel.width, height: panel.height }, tab, tabs: [...lastTabs], shown, total: items.length,
-        drawnIcons, drawnItems, undrawnItems, scroll: 0, gold: state?.gold ?? -1, buttons };
+        drawnIcons, drawnItems, undrawnItems, hover: hovered ? { id: hovered.id, colour: 118, gridX: hovered.gridX, gridY: hovered.gridY, invWidth: hovered.invWidth || 1, invHeight: hovered.invHeight || 1 } : null, tooltip, scroll: 0, gold: state?.gold ?? -1, buttons };
     },
   };
 }

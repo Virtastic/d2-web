@@ -1,5 +1,7 @@
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { TILE_SCREEN_W, UNIT_CENTRE_Y } from './session-terrain.mjs';
+import { MA0_K } from './ma0.mjs';
+import { perfT0, perfT, perfSample } from './frame-perf.mjs';
 
 // DATATBLS_LoadAutomapTxt turns these LevelName strings into its automap-type
 // enum.  This is the same 1.13c table order as D2MOO's gszAutomapLevelNames;
@@ -81,6 +83,18 @@ function levelRooms(Module, levelId) {
 }
 const inRoom = (r, x, y) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
 const cellKey = (tile) => `${tile.worldX},${tile.worldY},${tile.layer}`;
+// A cheap, order-independent signature of everything the absorb reads off a tile: its cell key (world
+// position + layer), its `seam` flag, and the inputs AutoMap.txt selection uses (orientation,
+// mainIndex, subIndex -- see selectRecord). One allocation-free pass; it is compared, never stored.
+const tileReadSignature = (tiles) => {
+  let h = tiles.length | 0;
+  for (let i = 0; i < tiles.length; i++) {
+    const t = tiles[i];
+    h = (h + (Math.imul(t.worldX, 73856093) ^ Math.imul(t.worldY, 19349663) ^ Math.imul(t.layer, 83492791) ^
+      Math.imul(t.orientation, 2654435761) ^ Math.imul(t.mainIndex, 40503) ^ Math.imul(t.subIndex, 2246822519) ^ (t.seam ? 1 : 0))) | 0;
+  }
+  return h;
+};
 
 export function createAutomapOverlay({ read, Module, documentObject = globalThis.document, isGameplay }) {
   const rows = rowsFromTxt(read('data\\global\\excel\\automap.txt'));
@@ -104,6 +118,29 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
   // and the layer survives leaving and re-entering its level. This is that layer, per level id:
   // level id -> (cell key -> cell).
   const layers = new Map();
+  // The absorb is a PURE FUNCTION of (the frame's tile read, the level's revealed rooms), and both move
+  // only when the player does something: rooms reveal as the hero enters them, the tile read changes as
+  // rooms activate. Re-running it on a frame where neither changed absorbs nothing -- it re-keys every
+  // tile, re-walks AutoMap.txt for every tile whose room is not yet revealed, and re-tests every cell
+  // already in the layer -- and THAT was the frame: 46.5 ms, over half of it, in the Rogue Encampment
+  // with the map CLOSED (s2310, F238). So it runs when its inputs moved and is
+  // skipped when they did not. `live` is the loop's only other product (the evidence's `remembered`
+  // flag reads it) and an unchanged key means unchanged keys, so it is kept from the frame that built it.
+  let absorbed = { key: null, live: new Set() };
+  // The character's saved automap (parseMa0: layer number -> cells), seeded into a level's layer when it is
+  // created, at retail's own frame -- Levels.txt `Layer` names the layer a level belongs to (1,2,3 -> 0; Den 8 -> 1).
+  let saved = new Map();
+  const levelLayer = new Map();
+  try { const t = decodeText(read('data\\global\\excel\\levels.txt')).replace(/\r/g, '').split('\n'), h = t[0].split('\t'), id = h.indexOf('Id'), ly = h.indexOf('Layer');
+    for (const l of t.slice(1)) { const f = l.split('\t'); if (f[id] !== undefined && f[id] !== '') levelLayer.set(+f[id], +f[ly]); } } catch { /* no levels.txt: no saved layer */ }
+  const seed = (layer, levelId) => {
+    for (const c of saved.get(levelLayer.get(levelId)) || []) {
+      const wsum = (c.y - MA0_K.y) / 0.8, wdif = (c.x - MA0_K.x) / 1.6, wx = (wsum + wdif) / 2, wy = (wsum - wdif) / 2, kind = c.wall ? 1 : 0;
+      if (!frames[c.frame]) continue;
+      layer.set(`${wx / 5},${wy / 5},${kind}`, { frame: c.frame, requestedFrames: [c.frame], levelName: 'saved', tileName: '.ma0', style: -1, startSequence: -1, endSequence: -1,
+        orientation: -1, mainIndex: -1, subIndex: -1, layer: kind, world: [wx, wy] });
+    }
+  };
   // Cells the AutoMap.txt route cannot name, per level: the frame's terrain read offers them, no row
   // matches. Counted rather than dropped, because this is the one part of the map that still needs a
   // retail TAB frame to settle.
@@ -119,15 +156,21 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
     // the player has been.
     draw(ctx, width, height, snapshot, tiles = null, view = null) {
       const levelId = snapshot.level;
-            if (!layers.has(levelId)) { layers.set(levelId, new Map()); unrevealed.set(levelId, new Set()); revealed.set(levelId, { rooms: new Set(), hero: null }); }
-      const layer = layers.get(levelId), unnamed = unrevealed.get(levelId), live = new Set();
+            if (!layers.has(levelId)) { const fresh = new Map(); seed(fresh, levelId); layers.set(levelId, fresh); unrevealed.set(levelId, new Set()); revealed.set(levelId, { rooms: new Set(), hero: null }); }
+      const layer = layers.get(levelId), unnamed = unrevealed.get(levelId);
+      let live = new Set();
       if (tiles && tiles.length) {
+        const pRooms = perfT0();
         const levelType = Module.ccall('d2_session_level_type', 'number', [], []);
         const rv = revealed.get(levelId), rooms = levelRooms(Module, levelId);
         const hp = view?.camera || snapshot.player, heroRoom = rooms.find((r) => inRoom(r, Math.floor(hp.x), Math.floor(hp.y)));
+        perfT('automap-rooms', pRooms);
         if (heroRoom && rv.hero !== `${heroRoom.x},${heroRoom.y}`) {
+          // Layer creation (amap5: 35 RevealAutomapRoom calls, ret 6FB12AD4) reveals every room built at game entry; later Room1 changes reveal the near set.
+          const entry = rv.hero === null && rv.rooms.size === 0;
           rv.hero = `${heroRoom.x},${heroRoom.y}`;
-          for (const r of rooms) if (Math.abs(r.x - heroRoom.x) <= heroRoom.w && Math.abs(r.y - heroRoom.y) <= heroRoom.h) rv.rooms.add(`${r.x},${r.y}`);
+          if (entry && levelId === 1) for (const r of rooms) rv.rooms.add(`${r.x},${r.y}`);
+          else for (const r of rooms) if (Math.abs(r.x - heroRoom.x) <= heroRoom.w && Math.abs(r.y - heroRoom.y) <= heroRoom.h) rv.rooms.add(`${r.x},${r.y}`);
         }
         // WHAT IS REVEALED IS THE ENGINE'S ANSWER, and this frame's own terrain read already carries
         // it: `d2_session_tiles` is built from the rooms that hold an active pRoom, so a tile in this
@@ -138,26 +181,37 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
         // -- and the filter's measured cost in the Rogue Encampment was **233 cells drawn of the
         // level's 2,337** (s590). A seam tile belongs to the neighbouring level and goes into THAT
         // level's layer, when that level is the one being played.
-        for (const tile of tiles) {
-          if (tile.seam) continue;
-          const key = cellKey(tile); live.add(key);
-          // A cell is absorbed once, on the frame its tile first exists: re-selecting it every frame
-          // would walk AutoMap.txt per tile per frame for a record the engine's own tile cannot change.
-          if (layer.has(key)) continue;
-          const room = rooms.find((r) => inRoom(r, tile.worldX * 5, tile.worldY * 5));
-          if (!room || !rv.rooms.has(`${room.x},${room.y}`)) continue;
-          const selected = selectRecord(rows, levelType, tile);
-          if (!selected || !frames[selected.record.frames[0]]) { unnamed.add(key); continue; }
-          // Retail rolls its private automap seed (gpAutomapSeed, low seed 0) per GetAutomapCellId call, in
-          // the order retail adds cells -- an order this client does not have -- so the pick is a hash of the
-          // cell's own position: uniform over Cel1..4 like retail's draw list (f5b: frames 0-3 ~110 each),
-          // stable across frames and across layers.
-          const cels = selected.record.frames;
-          const frame = cels[Math.abs((tile.worldX * 73856093) ^ (tile.worldY * 19349663) ^ (tile.layer * 83492791)) % cels.length];
-          layer.set(key, { frame, requestedFrames: [...selected.record.frames], levelName: selected.levelName,
-            tileName: selected.tileName, style: selected.record.style, startSequence: selected.record.startSequence,
-            endSequence: selected.record.endSequence, orientation: tile.orientation, mainIndex: tile.mainIndex,
-            subIndex: tile.subIndex, layer: tile.layer, world: [tile.worldX * 5, tile.worldY * 5] });
+        // The revealed set only ever GROWS (every rv.rooms.add above), so its size is its whole state:
+        // same size and same tile read means every tile's outcome below is the one already stored.
+        const absorbKey = `${levelId}|${levelType}|${rv.rooms.size}|${tileReadSignature(tiles)}`;
+        if (absorbKey === absorbed.key) {
+          live = absorbed.live;
+        } else {
+          const pAbsorb = perfT0(); perfSample('automap-tiles', tiles.length);
+          live = new Set();
+          for (const tile of tiles) {
+            if (tile.seam) continue;
+            const key = cellKey(tile); live.add(key);
+            // A cell is absorbed once, on the frame its tile first exists: re-selecting it every frame
+            // would walk AutoMap.txt per tile per frame for a record the engine's own tile cannot change.
+            if (layer.has(key)) continue;
+            const room = rooms.find((r) => inRoom(r, tile.worldX * 5, tile.worldY * 5));
+            if (!room || !rv.rooms.has(`${room.x},${room.y}`)) continue;
+            const selected = selectRecord(rows, levelType, tile);
+            if (!selected || !frames[selected.record.frames[0]]) { unnamed.add(key); continue; }
+            // Retail rolls its private automap seed (gpAutomapSeed, low seed 0) per GetAutomapCellId call, in
+            // the order retail adds cells -- an order this client does not have -- so the pick is a hash of the
+            // cell's own position: uniform over Cel1..4 like retail's draw list (f5b: frames 0-3 ~110 each),
+            // stable across frames and across layers.
+            const cels = selected.record.frames;
+            const frame = cels[Math.abs((tile.worldX * 73856093) ^ (tile.worldY * 19349663) ^ (tile.layer * 83492791)) % cels.length];
+            layer.set(key, { frame, requestedFrames: [...selected.record.frames], levelName: selected.levelName,
+              tileName: selected.tileName, style: selected.record.style, startSequence: selected.record.startSequence,
+              endSequence: selected.record.endSequence, orientation: tile.orientation, mainIndex: tile.mainIndex,
+              subIndex: tile.subIndex, layer: tile.layer, world: [tile.worldX * 5, tile.worldY * 5] });
+          }
+          perfT('automap-absorb', pAbsorb);
+          absorbed = { key: absorbKey, live };
         }
       }
       if (!visible) return (evidence = { open: false, drawn: [], unresolved: [], layout, error: null });
@@ -190,6 +244,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
         const bitmap = frames[cell.frame];
         const x = Math.round(cx + ((cell.world[0] - cell.world[1]) - (hero.x - hero.y)) * 16 * scale + AX);
         const y = Math.round(cy + ((cell.world[0] + cell.world[1]) - (hero.x + hero.y)) * 8 * scale + (LEVEL_NAMES[levelType] === '1 Cave' ? AY_CAVE : AY));   // '1 Cave' MEASURED +1 (Den, s960/s961: 81/81 and 82/82 cells at one shift); other dungeon types unmeasured
+        if (x + bitmap.width <= 0 || x >= width || y + bitmap.height <= 0 || y > height - 8) continue;   // retail lists only what is on screen: f5b's lowest cell is y=592 of 600, the next lattice row (596) is culled
         ctx.drawImage(bitmap, x, y);
         drawn.push({ source: AUTOMAP_PATH, frame: cell.frame, requestedFrames: [...cell.requestedFrames], levelName: cell.levelName,
           tileName: cell.tileName, style: cell.style, startSequence: cell.startSequence, endSequence: cell.endSequence,
@@ -219,5 +274,6 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
     // area-name block on it).
     get isOpen() { return visible; },
     toggle() { visible = !visible; },
+    setSaved(map) { saved = map; },
   };
 }

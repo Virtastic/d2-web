@@ -158,3 +158,10 @@ D2COMMON_DLL_DECL int __stdcall DATATBLS_GetShrinesTxtRecordCount();
 //D2Common.0x6FD72080
 void __fastcall DATATBLS_UnloadShrinesTxt();
 
+// ENDANIM delay of an object's mode-1 (OPERATING) sequence, in game ticks. Retail plays FrameCnt cels at
+// FrameDelta/256 cels per tick, i.e. (FrameCnt<<8)/FrameDelta ticks, rounded up to the tick that completes the last cel (waypoint: 15 cels @200 = 19.2 -> 20, F60/s346);
+// FrameDelta 256 gives FrameCnt, the old `>> 8` figure. A zero delta keeps the old figure.
+inline int32_t OBJECTS_GetOperatingTicks(const D2ObjectsTxt* pRec)
+{
+	return pRec->wFrameDelta[1] ? (int32_t)((pRec->dwFrameCnt[1] + pRec->wFrameDelta[1] - 1) / pRec->wFrameDelta[1]) : (int32_t)(pRec->dwFrameCnt[1] >> 8);
+}

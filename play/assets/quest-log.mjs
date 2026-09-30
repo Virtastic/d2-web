@@ -10,7 +10,7 @@ import { createPanelChrome, BORDER_LEFT } from './panel-chrome.mjs';
 const MENU = 'data\\global\\ui\\MENU\\';
 export const QUEST_ART = { bg: MENU + 'questbackground.dc6', tabs: MENU + 'expquesttabs.dc6', sockets: MENU + 'questsockets.dc6',
   desc: MENU + 'questlast.dc6', close: 'data\\global\\ui\\PANEL\\buysellbtn.dc6', icon: (act, q) => `${MENU}a${act}q${q}.dc6` };
-export const FRAME = Object.freeze({ done: 24, progress: 25, locked: 26 });     // a?q?.dc6 static frames (OpenDiablo2; 24 and 26 seen in retail)
+export const FRAME = Object.freeze({ done: 24, progress: 0, locked: 26 });     // a?q?.dc6 static frames (retail's own: 24 done, 26 locked, 0 in progress -- the retail captures)
 // Quests per act, and where each sits on the 3x2 board as [column, row] -- retail's own placement
 // (Act I and III are not in number order: the retail captures, questlog-tab3.txt).
 export const QUESTS_IN_ACT = [6, 6, 6, 3, 6];
@@ -26,6 +26,7 @@ export const questStatus = (words, act, q) => {
   return done || (w & 0x8001) ? 'done' : w ? 'progress' : 'locked';
 };
 const actPalette = (act) => `data\\global\\palette\\ACT${Math.min(5, Math.max(1, act | 0))}\\pal.dat`;
+const POSTED_PAD = 4;   // retail's posted box right edge is 102 for 'Oracle: hello'
 const origin = (width, height) => { const scale = Math.min(1, width / 800, height / 600); return { scale, x: (width - 800 * scale) / 2, y: (height - 600 * scale) / 2 }; };
 
 export function createQuestLogRenderer(read, documentObject = globalThis.document) {
@@ -108,8 +109,24 @@ export function createMessageLogRenderer(read, documentObject = globalThis.docum
     const pal = decodeDatPalette(read(actPalette(act)));
     let pl2 = null; try { pl2 = read(actPalette(act).replace(/pal\.dat$/i, 'pal.pl2')); } catch { /* the plain palette then */ }
     const mk = (p, extra = 0) => createFont({ dc6: fontDc6, tbl, palette: p, documentObject, path: 'data\\local\\font\\latin\\font16.dc6', drawAs: { op: 'celcolor', mode: 5, extra } });
-    const f = { white: mk(pal), gold: mk(pl2 ? textColourPalette(pl2, pal, 4) : pal, 4) }; fonts.set(act, f); return f; })();
+    const f = { white: mk(pal), gold: mk(pl2 ? textColourPalette(pl2, pal, 4) : pal, 4) };
+    // V8c: retail draws a message line in FontInGameChat (msglog-with-message-r22: x=37, y=90, name in colour 4, the rest colour 0).
+    const chatDc6 = decodeDc6(read('data\\local\\font\\latin\\fontingamechat.dc6')), chatTbl = decodeFontTbl(read('data\\local\\font\\latin\\fontingamechat.tbl'));
+    const ck = (p, extra = 0) => createFont({ dc6: chatDc6, tbl: chatTbl, palette: p, documentObject, path: 'data\\local\\font\\latin\\fontingamechat.dc6', drawAs: { op: 'celcolor', mode: 5, extra } });
+    f.chat = { 0: ck(pal), 4: ck(pl2 ? textColourPalette(pl2, pal, 4) : pal, 4) };
+    fonts.set(act, f); return f; })();
+  // 'ÿc4Name' colour codes: 4 gold, anything else white (the only colours retail's chat names use).
+  const drawChat = (ctx, f, line, x, y) => { for (const part of String(line).split(/(?=ÿc\d)/)) { const m = /^ÿc(\d)/.exec(part), font = f.chat[m && m[1] === '4' ? 4 : 0], t = m ? part.slice(3) : part; font.drawAnchored(ctx, t, x, y); x += font.measure(t); } };
   return {
+    /** The open Enter chat bar (F175 capture chatbar-open-rb): alpha box 127,497-672,544 mode 1, Font13 text at 131,512, caret `_` after it. */
+    drawChatBar(ctx, width, height, text, act = 1) { const o = origin(width, height); ctx.save(); ctx.translate(o.x, o.y); ctx.scale(o.scale, o.scale);
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(127, 497, 545, 47); drawChat(ctx, fontFor(act), text + '_', 131, 512); ctx.restore();
+      return { box: [127, 497, 672, 544], text: [131, 512] }; },
+    /** A freshly posted line drawn over the game (posted-rb): alpha box 11,6-(text end+POSTED_PAD),22, line at 15,20. */
+    drawPosted(ctx, width, height, line, act = 1) { const o = origin(width, height), f = fontFor(act); ctx.save(); ctx.translate(o.x, o.y); ctx.scale(o.scale, o.scale);
+      const w = String(line).split(/(?=ÿc\d)/).reduce((n, part) => n + f.chat[0].measure(/^ÿc\d/.test(part) ? part.slice(3) : part), 0), box = [11, 6, 15 + w + POSTED_PAD, 22];
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(box[0], box[1], box[2] - box[0], box[3] - box[1]); drawChat(ctx, f, line, 15, 20); ctx.restore();
+      return { box, text: [15, 20], width: w }; },
     /** The Close label's rectangle (the button retail draws under its cursor is a 32x29 orotate cel). */
     closeRect: { x: 355, y: 462, w: 80, h: 30 },
     hitClose(px, py, width, height) { const o = origin(width, height), x = (px - o.x) / o.scale, y = (py - o.y) / o.scale, r = this.closeRect; return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h; },
@@ -122,7 +139,7 @@ export function createMessageLogRenderer(read, documentObject = globalThis.docum
       const slid = (fr, y) => { const r = chrome.cel(ctx, act, SLID, fr, 767, y); if (r) blits.push(r); };
       slid(9, 81); for (let y = 93; y <= 453; y += 12) slid(13, y); slid(8, 453);
       f.gold.drawAnchored(ctx, s.title, 349, 51); f.white.drawAnchored(ctx, s.close, 376, 486);
-      s.lines.slice(-30).forEach((l, i) => f.white.drawAnchored(ctx, l, 20, 100 + 15 * i));
+      s.lines.slice(-30).forEach((l, i) => drawChat(ctx, f, l, 37, 90 + 15 * i));
       ctx.restore();
       return { title: s.title, lines: s.lines.length, blits };
     },

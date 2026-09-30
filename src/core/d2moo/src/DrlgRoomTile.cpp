@@ -62,7 +62,10 @@ struct D2WebCrossRoll { const D2DrlgRoomStrc* pRoom; uint32_t nOrdinal; const D2
 std::vector<D2WebCrossRoll> g_d2webCrossRolls;
 static const D2DrlgRoomStrc* s_d2webCrossCause = nullptr;
 static D2WebRollTrace s_d2webRollLast = {};
-void D2WEB_ResetRollTrace() { g_d2webCrossRolls.clear(); g_d2webRollTrace.clear(); s_d2webRollCounter.clear(); s_d2webRollPending = false; g_d2webRollOrphans = 0; }
+// Ordered per-call log, the shape of retail's drawhook pick stream (PickRec): room tile x,y, type, style,
+// sequence, entries, weight sum, ladder steps, chosen rarity, seed low before the roll (T12).
+std::vector<int32_t> g_d2webRollCalls;
+void D2WEB_ResetRollTrace() { g_d2webRollCalls.clear(); g_d2webCrossRolls.clear(); g_d2webRollTrace.clear(); s_d2webRollCounter.clear(); s_d2webRollPending = false; g_d2webRollOrphans = 0; }
 // The ladder walk of GetTileCache, re-run on an arbitrary seed low word. Returns the chosen
 // entry's +0x20 value. Pure: it never touches a seed.
 static uint32_t D2WEB_PickWithLow(D2TileLibraryEntryStrc** ppEntries, int nEntries, int nMax, uint32_t nLow)
@@ -129,6 +132,7 @@ D2TileLibraryEntryStrc* __fastcall DRLGROOMTILE_GetTileCache(D2DrlgRoomStrc* pDr
 
 		int nId = 0;
 		const uint32_t nD2webPrevLow = pDrlgRoom->pSeed.nLowSeed;
+		int32_t nD2webLadder = 0;
 		int32_t nRand = SEED_RollLimitedRandomNumber(&pDrlgRoom->pSeed, nMax) + 1;
 		if (nMax)
 		{
@@ -138,12 +142,16 @@ D2TileLibraryEntryStrc* __fastcall DRLGROOMTILE_GetTileCache(D2DrlgRoomStrc* pDr
 				++nId;
 			}
 
+			nD2webLadder = nId;
 			if (nId)
 			{
 				--nId;
 			}
 		}
 
+		if (g_d2webRollTraceEnabled)
+			for (int32_t v : { pDrlgRoom->nTileXPos, pDrlgRoom->nTileYPos, (int32_t)nType, (int32_t)nStyle, (int32_t)nSequence, nEntries, nMax, nD2webLadder, (int32_t)D2CMP_10081_GetTileRarity(ppTileLibraryEntries[nId]), (int32_t)nD2webPrevLow })
+				g_d2webRollCalls.push_back(v);
 		D2WEB_NoteRoll(pDrlgRoom, (uint32_t)nEntries, (uint32_t)nId, ppTileLibraryEntries, nMax, nD2webPrevLow);
 		return ppTileLibraryEntries[nId];
 	}

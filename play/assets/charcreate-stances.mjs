@@ -20,11 +20,13 @@ export function createHeroStances(heroes, { retailHz = 25, updateHz = 60 } = {})
   const elapsedRetailTicks = (now, since) => Math.floor((now - since) * retailHz / updateHz);
   const durationTicks = (milliseconds) => Math.max(1, Math.round(milliseconds * retailHz / 1000));
 
+  // A walk lasts its DC6's frame count in 25 Hz ticks, one frame per tick (F84, retail captures).
+  const forwardTicks = (hero) => hero.forward?.count || durationTicks(hero.forwardMs);
   const settle = (now) => {
     for (let index = 0; index < states.length; index++) {
       const state = states[index], hero = heroes[index];
       if (state.stance === HERO_STANCE.APPROACHING
-        && elapsedRetailTicks(now, state.since) >= durationTicks(hero.forwardMs)) {
+        && elapsedRetailTicks(now, state.since) >= forwardTicks(hero)) {
         state.stance = HERO_STANCE.SELECTED;
       } else if (state.stance === HERO_STANCE.RETREATING
         && elapsedRetailTicks(now, state.since) >= durationTicks(hero.backMs)) {
@@ -48,8 +50,9 @@ export function createHeroStances(heroes, { retailHz = 25, updateHz = 60 } = {})
     choose(index, now) {
       settle(now);
       if (index < 0 || index >= states.length) return false;
-      // Accepted mid-walk: main's behaviour; retail's mid-walk click is UNMEASURED (OD2 says ignore).
-      if ([HERO_STANCE.SELECTED, HERO_STANCE.APPROACHING].includes(states[index].stance)) return false;
+      // Retail ignores every hero click while a forward walk runs (F99b, the retail captures).
+      if (states.some(({ stance }) => stance === HERO_STANCE.APPROACHING)) return false;
+      if (states[index].stance === HERO_STANCE.SELECTED) return false;
       for (const state of states) {
         if (state.stance === HERO_STANCE.SELECTED || state.stance === HERO_STANCE.APPROACHING) {
           state.stance = HERO_STANCE.RETREATING;

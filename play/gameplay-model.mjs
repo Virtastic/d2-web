@@ -36,7 +36,7 @@ export class CommandInput {
     // Retail: 1-4 use the belt's columns; skills are selected on the F-keys (retail's skill hotkeys --
     // which skill sits on which F-key is this shell's default, declared in F3).
     else if (/^Digit[1-4]$/.test(code)) this.queue.push({ type: COMMAND.BELT, slot: Number(code.slice(5)) - 1 });
-    else if (/^F[1-3]$/.test(code)) this.queue.push({ type: COMMAND.SKILL, slot: Number(code.slice(1)) });
+    else if (/^F[1-8]$/.test(code)) this.queue.push({ type: COMMAND.SKILL, slot: Number(code.slice(1)) });
     else if (code === 'Escape') this.queue.push({ type: COMMAND.CANCEL });
     else return false;
     return true;
@@ -148,6 +148,12 @@ export const DEFAULT_SESSION_FIXTURES = Object.freeze([
   { seed: 1, difficulty: 0, act0: 4, level: 112 },
   // Retail level 37's generated room corpus includes the Andariel quest boss (class 156).
   { seed: 1, difficulty: 0, act0: 0, level: 37, label: "Act I · Andariel's Lair" },
+  // The whole object pick-box row (F71/s438, F98c/s380) lives on the Monastery's own levels: the
+  // Barracks carries doors an activation wave has already OPENED (mode 2, one opaque pixel of art)
+  // and the Outer Cloister the shut class-23 door and the class-24 gate whose sprite ends 2 px above
+  // its own anchor. Both are retail areas of the act the fixture list otherwise reaches only at 37.
+  { seed: 1, difficulty: 0, act0: 0, level: 28, label: 'Act I · Barracks' },
+  { seed: 1, difficulty: 0, act0: 0, level: 27, label: 'Act I · Outer Cloister' },
 ].map(Object.freeze));
 
 // Where a saved character resumes is NOT decided here. The act it was in, the town level of that
@@ -203,7 +209,7 @@ export function parseSessionWarps(bytes, count, origins = null) {
     located: view.getUint32(o + 4, true) !== 0xFFFFFFFF,
     // LvlWarp's screen-space select box (px, y down) and its anchor in subtiles (Diablerie Warp.cs).
     select: { x: view.getInt32(o + 36, true), y: view.getInt32(o + 40, true), dx: view.getInt32(o + 44, true), dy: view.getInt32(o + 48, true) },
-    originX: origins ? origins[2 * i] : view.getInt32(o + 28, true) - 2, originY: origins ? origins[2 * i + 1] : view.getInt32(o + 32, true) - 2,
+    originX: origins ? origins[2 * i] : view.getInt32(o + 28, true), originY: origins ? origins[2 * i + 1] : view.getInt32(o + 32, true),
   }; });
 }
 
@@ -214,13 +220,20 @@ export function viewportToWorld(screenX, screenY, width, height, player, pixelsP
   };
 }
 
-export function selectPrimaryTarget(snapshot, point = snapshot?.player, maxDistance = Infinity) {
+// F14, MEASURED retail 1.13c: a unit is hovered/clicked when the
+// pointer is inside a SCREEN-SPACE box about its cel anchor: Warriv x -24..+19, y -78..+15 px (1 px bisection);
+// Akara's wandering hull (x -22..+20, y -69..+11, +-4 px) lies inside it, so ONE box fits both. Not derived
+// per unit from cel extents: only these two units were measured, and the box exceeds their sprites.
+export const UNIT_HOVER_BOX = { x0: -24, x1: 19, y0: -78, y1: 15 };
+export const inUnitHoverBox = (dx, dy) => dx >= UNIT_HOVER_BOX.x0 && dx <= UNIT_HOVER_BOX.x1 && dy >= UNIT_HOVER_BOX.y0 && dy <= UNIT_HOVER_BOX.y1;
+
+export function selectPrimaryTarget(snapshot, point = snapshot?.player, maxDistance = Infinity, accept = null) {
   const s = normalizeSnapshot(snapshot);
   const x = finite(point?.x, s.player.x), y = finite(point?.y, s.player.y);
   const limit2 = Number.isFinite(maxDistance) ? Math.max(0, maxDistance) ** 2 : Infinity;
   let selected = null, distance2 = limit2;
   for (const entity of s.entities) {
-    if (!entity.hostile || entity.hp <= 0) continue;
+    if (!entity.hostile || entity.hp <= 0 || (accept && !accept(entity))) continue;
     // A monster in MONMODE_DEATH (0) or DEAD (12) is a corpse even when its life reads above 0
     // (s000d: a Burning Soul at 2108 life in mode 12); retail refuses to attack it (reason 5).
     if (entity.type === 1 && (entity.mode === 0 || entity.mode === 12)) continue;

@@ -788,7 +788,7 @@ bool __fastcall ACT5Q5_Timer_RespawnAncientStatueObjects(D2GameStrc* pGame, D2Qu
 				UNITS_ChangeAnimMode(pAncientStatue, OBJMODE_OPERATING);
 
 				D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pAncientStatue->dwClassId);
-				EVENT_SetEvent(pGame, pAncientStatue, EVENTTYPE_ENDANIM, pGame->dwGameFrame + (pObjectsTxtRecord->dwFrameCnt[1] >> 8), 0, 0);
+				EVENT_SetEvent(pGame, pAncientStatue, EVENTTYPE_ENDANIM, pGame->dwGameFrame + OBJECTS_GetOperatingTicks(pObjectsTxtRecord), 0, 0);
 
 				pQuestDataEx->bAncienStatueRespawned[i] = 0;
 				pQuestDataEx->nAncientStatueObjectMode[i] = OBJMODE_OPENED;
@@ -1318,7 +1318,7 @@ int32_t __fastcall OBJECTS_OperateFunction66_AncientsDoor(D2ObjOperateFnStrc* pO
 	{
 		UNITS_ChangeAnimMode(pObject, OBJMODE_OPERATING);
 		DUNGEON_ToggleHasPortalFlag(UNITS_GetRoom(pObject), 0);
-		EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, pOp->pGame->dwGameFrame + (pObjectsTxtRecord->dwFrameCnt[1] >> 8), 0, 0);
+		EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, pOp->pGame->dwGameFrame + OBJECTS_GetOperatingTicks(pObjectsTxtRecord), 0, 0);
 	}
 	else if (pObject->dwAnimMode == OBJMODE_OPENED)
 	{

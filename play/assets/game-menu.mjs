@@ -1,90 +1,253 @@
-// The in-game menu Esc opens: OPTIONS / SAVE AND EXIT GAME / RETURN TO GAME in font42, the selected
-// line flanked by the spinning pentagram cursor (data\global\ui\CURSOR\pentspin.DC6).
+// The in-game menu Esc opens (OPTIONS / SAVE AND EXIT GAME / RETURN TO GAME) and the Options page
+// its first line opens. Retail draws every line as ONE pre-baked cel (or cel pair) out of
+// `data\local\ui\eng\` -- NOT as font text -- and flanks the selected line with two
+// `data\global\ui\CURSOR\Pentspin.dc6` frames.
 //
-// Measured from retail's own frame (retail/frames/esc-menu.png, ~/d2-retail 1.13c): the lines are
-// centred on x=400 with their ink starting at y=198, 249 and 299, and their widths are font42's
-// UPPER-case advances (OPTIONS 160px, as retail). TODO(client-parity G1): the TEXT is copied from
-// that frame -- it is in none of the string tables, and where D2Client takes it from is not
-// recovered. OPTIONS has no submenu yet.
-import { createFont, decodeFontTbl, FRONTEND } from './frontend.mjs';
+// Every anchor below is a record of retail's OWN draw list, never derived from a frame
+//:
+//   * escape menu      -- `opt-esc-menu.txt` (+ `-hover-options`, `-hover-saveexit`)
+//   * Options page     -- `opt-options-page.txt` (+ `-hover-sound`, `-sound-on`)
+//   * the pentagrams   -- x=99 and x=649, y = the SELECTED row's anchor + 12 (measured on all four
+//                         hover captures and both idle ones).
+// A cel lands with its left edge at `x + frame.offsetX` and its bottom row at `y + frame.offsetY`
+// (drawlist.mjs), so a spec carries retail's own (x, y) anchor and the frame supplies the box.
+//
+// The palette is the ACT's, the one the world this menu overlays is drawn with: retail renders the
+// whole in-game screen in one palette, and the frame's own colours are what it must match.
+// Declared: SOUND OPTIONS is drawn dimmed (retail's DrawMode 1), because retail's own capture of
+// this page (`retail/frames/options-menu.png`, `opt-options-page.txt`) runs with sound off (`-ns`)
+// and this client has no D2 sound device either. `opt-options-page-sound-on.txt` is the mode-5
+// variant a build with a sound device draws (client-parity F215).
+//
+// F215/F216: the SOUND OPTIONS and VIDEO OPTIONS pages themselves live in `options-pages.mjs`
+// (its own row table and renderer), opened from two of the OPTIONS lines below.
+import { dc6FrameToRgba } from './d2-formats.mjs';
+import { createBlender } from './frontend.mjs';
+import { recordDc6 } from './drawlist.mjs';
+import { createOptionsPages } from './options-pages.mjs';
 
-export const GAME_MENU = {
-  font: 'data\\local\\font\\latin\\font42.dc6',
-  fontTbl: 'data\\local\\font\\latin\\font42.tbl',
-  pentagram: 'data\\global\\ui\\CURSOR\\pentspin.DC6',
-  items: ['OPTIONS', 'SAVE AND EXIT GAME', 'RETURN TO GAME'],
-  inkTops: [198, 249, 299],
-  pentagramOffsetX: 272,   // pentagram centres sit this far either side of x=400 (retail frame)
-};
+const ENG = 'data\\local\\ui\\eng\\';
+const FILE = Object.freeze({
+  options: 'options.dc6', exit: 'exit.dc6', returntogame: 'returntogame.dc6',
+  soundoptions: 'soundoptions.dc6', videooptions: 'videooptions.dc6', automapoptions: 'automapoptions.dc6',
+  cfgoptions: 'cfgoptions.dc6', previous: 'previous.dc6',
+  // F217: the Automap Options sub-page -- the same cel renderer, 26 px rows at a 45 px pitch.
+  automapmode: 'AutoMapMode.dc6', automapfade: 'AutoMapFade.dc6', automapcenter: 'AutoMapCenter.dc6',
+  automapparty: 'AutoMapParty.dc6', automappartynames: 'AutoMapPartyNames.dc6',
+  full: 'Full.dc6', mini: 'Mini.dc6', everything: 'Everything.dc6', smallno: 'SmallNo.dc6', smallyes: 'SmallYes.dc6',
+  sprevious: 'SPrevious.dc6',
+});
+export const PENTAGRAM = 'data\\global\\ui\\CURSOR\\Pentspin.dc6';
+export const PENTAGRAM_X = Object.freeze([99, 649]);
+export const PENTAGRAM_TOP_OFFSET = 12;   // pentagram anchor y = selected row's anchor + 12
+
+/** `[file, frame, x, y]` per cel, retail's own anchors from the draw-list vectors. */
+export const ESC_MENU_ROWS = Object.freeze([
+  { label: 'OPTIONS', anchorY: 224, cels: [['options', 0, 319, 224]] },
+  { label: 'SAVE AND EXIT GAME', anchorY: 274, cels: [['exit', 0, 182, 274], ['exit', 1, 438, 274]] },
+  { label: 'RETURN TO GAME', anchorY: 324, cels: [['returntogame', 0, 221, 324], ['returntogame', 1, 477, 324]] },
+]);
+export const OPTIONS_PAGE_ROWS = Object.freeze([
+  { label: 'SOUND OPTIONS', anchorY: 174, dim: true, cels: [['soundoptions', 0, 245, 174], ['soundoptions', 1, 501, 174]] },
+  { label: 'VIDEO OPTIONS', anchorY: 224, cels: [['videooptions', 0, 252, 224], ['videooptions', 1, 508, 224]] },
+  { label: 'AUTOMAP OPTIONS', anchorY: 274, cels: [['automapoptions', 0, 210, 274], ['automapoptions', 1, 466, 274]] },
+  { label: 'CONFIGURE CONTROLS', anchorY: 324, cels: [['cfgoptions', 0, 188, 324], ['cfgoptions', 1, 444, 324]] },
+  { label: 'PREVIOUS MENU', anchorY: 374, cels: [['previous', 0, 243, 374], ['previous', 1, 499, 374]] },
+]);
+
+// F217: the AUTOMAP OPTIONS sub-page (Esc -> OPTIONS -> AUTOMAP OPTIONS). Same renderer as the two
+// pages above, retail's own anchors from `the retail captures` and its four toggled
+// variants: title `AutoMapOptions.dc6` f0/f1 210,137 / 466,137 (the SAME file as the menu row), five
+// 26 px rows 45 px apart from y 182, `SPrevious.dc6` 284,407. Each row is a label cel plus a VALUE cel
+// chosen by its setting; the pentagram sits at the selected row's anchor + 15 (these rows are 26 px,
+// not the menu's 36). Retail's coupling, measured on `opt-automap-names-toggled.txt`: Show Party = NO
+// draws Show Names dimmed (DrawMode 1) and dead, with the value forced to NO.
+export const AUTOMAP_DEFAULTS = Object.freeze({ mode: 'full', fade: 'off', center: 'yes', party: 'yes', names: 'yes' });
+export const AUTOMAP_PENTAGRAM_OFFSET = 15;
+const AUTOMAP_TITLE = Object.freeze([['automapoptions', 0, 210, 137], ['automapoptions', 1, 466, 137]]);
+const AUTOMAP_ROWS = Object.freeze([
+  { label: 'AUTOMAP MODE', key: 'mode', anchorY: 182, cels: [['automapmode', 0, 170, 182]],
+    values: { full: [['full', 0, 450, 182]], mini: [['mini', 0, 499, 182]] } },
+  { label: 'AUTOMAP FADE', key: 'fade', anchorY: 227, cels: [['automapfade', 0, 170, 227]],
+    values: { off: [['smallno', 0, 590, 227]], on: [['everything', 0, 457, 227]] } },
+  { label: 'AUTOMAP CENTER', key: 'center', anchorY: 272, cels: [['automapcenter', 0, 170, 272], ['automapcenter', 1, 426, 272]],
+    values: { yes: [['smallyes', 0, 579, 272]], no: [['smallno', 0, 590, 272]] } },
+  { label: 'AUTOMAP PARTY', key: 'party', anchorY: 317, cels: [['automapparty', 0, 170, 317]],
+    values: { yes: [['smallyes', 0, 579, 317]], no: [['smallno', 0, 590, 317]] } },
+  { label: 'AUTOMAP PARTY NAMES', key: 'names', anchorY: 362, cels: [['automappartynames', 0, 170, 362]],
+    values: { yes: [['smallyes', 0, 579, 362]], no: [['smallno', 0, 590, 362]] } },
+]);
+const AUTOMAP_PREVIOUS = Object.freeze({ label: 'PREVIOUS', anchorY: 407, cels: [['sprevious', 0, 284, 407]] });
 
 function frameCanvas(frame, palette, documentObject) {
   const canvas = documentObject.createElement('canvas');
   canvas.width = Math.max(1, frame.width); canvas.height = Math.max(1, frame.height);
   if (!frame.width || !frame.height) return canvas;
-  const rgba = new Uint8ClampedArray(frame.width * frame.height * 4);
-  for (let i = 0; i < frame.indices.length; i++) {
-    if (!frame.opaque[i]) continue;
-    rgba.set(palette.subarray(frame.indices[i] * 4, frame.indices[i] * 4 + 4), i * 4);
-  }
-  canvas.getContext('2d').putImageData(new ImageData(rgba, frame.width, frame.height), 0, 0);
+  canvas.getContext('2d').putImageData(new ImageData(dc6FrameToRgba(frame, palette), frame.width, frame.height), 0, 0);
   return canvas;
 }
 
-/** `onChoose(item)` receives one of GAME_MENU.items. */
-export function createGameMenu({ read, decodeDc6, decodeDatPalette, onChoose, documentObject = globalThis.document }) {
-  const palette = decodeDatPalette(read(FRONTEND.palette));
-  const fontDc6 = decodeDc6(read(GAME_MENU.font));
-  const fontTbl = decodeFontTbl(read(GAME_MENU.fontTbl));
-  const font = createFont({ dc6: fontDc6, tbl: fontTbl, palette, documentObject });
-  // Where a capital's ink starts inside font42's fixed glyph cell, so a line can be placed by its ink.
-  const oFrame = fontDc6.frames[fontTbl.chars.get(79)?.imageIndex ?? 79];
-  let inkTop = 0;
-  for (let y = 0; oFrame && y < oFrame.height; y++) { if (oFrame.opaque.subarray(y * oFrame.width, (y + 1) * oFrame.width).some(Boolean)) { inkTop = y; break; } }
-  const pent = decodeDc6(read(GAME_MENU.pentagram));
-  const pentCanvases = pent.frames.map((f) => frameCanvas(f, palette, documentObject));
-  const rows = GAME_MENU.items.map((label, i) => {
-    const w = font.measure(label);
-    return { label, x: 400 - w / 2, y: GAME_MENU.inkTops[i] - inkTop, w, h: font.cellHeight - inkTop };
+/** `onChoose(item)` receives one of the rows' `label`s. */
+export function createGameMenu({ read, decodeDc6, decodeDatPalette, onChoose, palettePath = 'data\\global\\palette\\ACT1\\pal.dat', documentObject = globalThis.document }) {
+  const resolved = () => (typeof palettePath === 'function' ? palettePath() : palettePath);
+  let palette = null, paletteAt = null, blend = null;
+  const sheets = new Map();       // file key -> { path, dc6, canvases }
+  const ensurePalette = () => {
+    const p = resolved();
+    if (p === paletteAt) return false;
+    palette = decodeDatPalette(read(p));
+    blend = createBlender(read(p.replace(/pal\.dat$/i, 'pal.pl2')), palette);
+    paletteAt = p; sheets.clear();
+    return true;
+  };
+  const sheetFor = (key) => {
+    let s = sheets.get(key);
+    if (!s) {
+      const path = ENG + FILE[key];
+      const dc6 = decodeDc6(read(path));
+      s = { path, dc6, canvases: dc6.frames.map((f) => frameCanvas(f, palette, documentObject)) };
+      sheets.set(key, s);
+    }
+    return s;
+  };
+  // Per cel: the drawn box, from retail's anchor and the frame's own offsets/size.
+  const place = ([key, frame, ax, ay]) => {
+    const s = sheetFor(key), f = s.dc6.frames[frame];
+    if (!f) throw new RangeError(`${s.path}: no frame ${frame}`);
+    return { sheet: s, frame, index: frame, f,
+      left: ax + (f.offsetX | 0), top: ay + (f.offsetY | 0) - f.height + 1, width: f.width, height: f.height };
+  };
+  const rowsFrom = (spec) => spec.map((row) => {
+    const cels = row.cels.map(place);
+    const x = Math.min(...cels.map((c) => c.left)), y = Math.min(...cels.map((c) => c.top));
+    const w = Math.max(...cels.map((c) => c.left + c.width)) - x, h = Math.max(...cels.map((c) => c.top + c.height)) - y;
+    return { label: row.label, anchorY: row.anchorY, dim: !!row.dim, cels, x, y, w, h };
   });
+  // F217: the Automap Options page IS state -- its five rows each carry a value cel that a click
+  // cycles. `settings` is that state; the page is rebuilt from it whenever it changes. The coupling
+  // (party = no deadens names) is retail's, measured in opt-automap-names-toggled.txt.
+  const settings = { ...AUTOMAP_DEFAULTS };
+  const automapSpec = () => {
+    const spec = [{ label: null, anchorY: 137, cels: AUTOMAP_TITLE }];
+    for (const r of AUTOMAP_ROWS) {
+      const dead = r.key === 'names' && settings.party === 'no';
+      spec.push({ label: r.label, anchorY: r.anchorY, dim: dead, cels: [...r.cels, ...(r.values[dead ? 'no' : settings[r.key]] || [])] });
+    }
+    spec.push(AUTOMAP_PREVIOUS);
+    return spec;
+  };
+  ensurePalette();
+  const pages = { main: rowsFrom(ESC_MENU_ROWS), options: rowsFrom(OPTIONS_PAGE_ROWS), automap: rowsFrom(automapSpec()) };
+  const pent = decodeDc6(read(PENTAGRAM));
+  const pentCanvases = pent.frames.map((f) => frameCanvas(f, palette, documentObject));
+  let page = 'main', pentOffset = PENTAGRAM_TOP_OFFSET, rows = pages.main;
   let open = false, selected = rows.length - 1, tick = 0;
+  const goto = (name) => { page = name; pentOffset = name === 'automap' ? AUTOMAP_PENTAGRAM_OFFSET : PENTAGRAM_TOP_OFFSET; rows = pages[name]; selected = rows.length - 1; };
+  const cycle = (label) => {
+    const r = AUTOMAP_ROWS.find((x) => x.label === label);
+    if (!r || (r.key === 'names' && settings.party === 'no')) return;   // names is dead while party = no
+    const order = Object.keys(r.values);
+    settings[r.key] = order[(order.indexOf(settings[r.key]) + 1) % order.length];
+    if (r.key === 'party' && settings.party === 'no') settings.names = 'no';
+    if (page === 'automap') { pages.automap = rowsFrom(automapSpec()); rows = pages.automap; selected = rows.findIndex((x) => x.label === label); }
+  };
+  // F215/F216: the SOUND OPTIONS and VIDEO OPTIONS screens behind two of the OPTIONS lines. Built on
+  // first use and never allowed to throw into the escape menu: a page that cannot load leaves the menu
+  // it was opened from intact.
+  let sub = null, subError = '';
+  const subpages = () => {
+    if (!sub && !subError) { try { sub = createOptionsPages({ read, decodeDc6, decodeDatPalette, documentObject }); } catch (error) { subError = String(error); } }
+    return sub;
+  };
+  const choose = (label) => {
+    if (page === 'main' && label === 'OPTIONS') return goto('options');
+    if (page === 'options' && label === 'SOUND OPTIONS') return void subpages()?.open('sound');
+    if (page === 'options' && label === 'VIDEO OPTIONS') return void subpages()?.open('video');
+    if (page === 'options' && label === 'PREVIOUS MENU') return goto('main');
+    if (page === 'options' && label === 'AUTOMAP OPTIONS') return goto('automap');
+    // F218: CONFIGURE CONTROLS is the one Options row this renderer does not own -- the panel is a
+    // screen of its own (assets/configure-controls.mjs), so the page hands the choice to the shell.
+    if (page === 'options' && label === 'CONFIGURE CONTROLS') return onChoose?.(label);
+    if (page === 'automap') { if (label === 'PREVIOUS') return goto('options'); return cycle(label); }
+    if (page === 'main') onChoose?.(label);
+  };
   const view = (width, height) => {
     const scale = Math.min(width / 800, height / 600);
     return { scale, ox: (width - 800 * scale) / 2, oy: (height - 600 * scale) / 2 };
   };
   const rowAt = (x, y, width, height) => {
-    const v = view(width, height), sy = (y - v.oy) / v.scale;
-    return rows.findIndex((r) => sy >= r.y + inkTop - 8 && sy < r.y + inkTop + 34);
+    const v = view(width, height), sx = (x - v.ox) / v.scale, sy = (y - v.oy) / v.scale;
+    return rows.findIndex((r) => r.label !== null && sx >= r.x && sx < r.x + r.w && sy >= r.y && sy < r.y + r.h);
   };
+  // The automap page carries a title row (label null) that is drawn but not selectable.
+  const selectable = () => rows.map((r, i) => (r.label !== null ? i : -1)).filter((i) => i >= 0);
   return {
     get open() { return open; },
-    get evidence() { return { open, selected: rows[selected]?.label ?? null, rows: rows.map((r) => ({ label: r.label, x: Math.round(r.x), y: r.y, w: r.w })) }; },
-    toggle() { open = !open; if (open) selected = rows.length - 1; return open; },
-    close() { open = false; },
+    get page() { return page; },
+    /** F217: the Automap Options page's settings, read by the shell for the automap overlay. */
+    get settings() { return { ...settings }; },
+    get subpage() { return sub?.page ?? null; },
+    get evidence() { return { open, page, subpage: sub?.page ?? null, selected: rows[selected]?.label ?? null, settings: { ...settings },
+      rows: rows.filter((r) => r.label !== null).map((r) => ({ label: r.label, x: r.x, y: r.y, w: r.w, h: r.h, dim: r.dim })),
+      sub: sub?.evidence ?? (subError ? { error: subError } : null) }; },
+    toggle() { open = !open; goto('main'); return open; },
+    close() { sub?.close(); open = false; goto('main'); },
+    /**
+     * Esc. Retail: from a SOUND/VIDEO screen straight back to the ESC MENU -- `opt-sound-after-esc`
+     * draws the menu (Options/Exit/ReturnToGame cels) with RETURN TO GAME flanked -- not the OPTIONS
+     * page, so the sub-page closes AND the menu returns to `main`. From the OPTIONS page or AUTOMAP
+     * back one page; from the escape menu, out.
+     */
+    back() { if (sub?.isOpen) { sub.close(); return goto('main'); } if (page === 'main') open = false; else goto(page === 'automap' ? 'options' : 'main'); },
     key(code) {
       if (!open) return false;
-      if (code === 'ArrowUp') selected = (selected + rows.length - 1) % rows.length;
-      else if (code === 'ArrowDown') selected = (selected + 1) % rows.length;
-      else if (code === 'Enter') onChoose?.(rows[selected].label);
+      if (sub?.isOpen) return true;   // retail's sound/video screens are pointer-driven
+      const idx = selectable(); if (!idx.length) return false;
+      const at = idx.indexOf(selected);
+      if (code === 'ArrowUp') selected = idx[(at - 1 + idx.length) % idx.length];
+      else if (code === 'ArrowDown') selected = idx[(at + 1) % idx.length];
+      else if (code === 'Enter') choose(rows[selected].label);
       else return false;
       return true;
     },
-    hover(x, y, width, height) { const i = rowAt(x, y, width, height); if (i >= 0) selected = i; return i; },
-    click(x, y, width, height) { const i = rowAt(x, y, width, height); if (i >= 0) { selected = i; onChoose?.(rows[i].label); } return i; },
-    /** Canvas pixel centre of each line, from the same rows click() tests. */
+    hover(x, y, width, height) { if (sub?.isOpen) return sub.hover(x, y, width, height); const i = rowAt(x, y, width, height); if (i >= 0) selected = i; return i; },
+    click(x, y, width, height) {
+      if (sub?.isOpen) { if (sub.click(x, y, width, height) === 'previous') sub.close(); return; }
+      const i = rowAt(x, y, width, height); if (i >= 0) { selected = i; choose(rows[i].label); } return i;
+    },
+    /** Canvas pixel centre of each row, from the same rect click() tests. */
     targets(width, height) {
       const v = view(width, height);
-      return Object.fromEntries(rows.map((r) => [r.label, [Math.round(v.ox + (r.x + r.w / 2) * v.scale), Math.round(v.oy + (r.y + inkTop + 12) * v.scale)]]));
+      const base = Object.fromEntries(rows.filter((r) => r.label !== null).map((r) => [r.label, [Math.round(v.ox + (r.x + r.w / 2) * v.scale), Math.round(v.oy + (r.y + r.h / 2) * v.scale)]]));
+      return sub?.isOpen ? { ...base, ...sub.targets(width, height) } : base;
     },
-    step() { tick++; },
+    step() { tick++; sub?.step(); },
     draw(ctx, width, height) {
       if (!open) return;
+      // The act can change under an open menu (a waypoint, a save loaded in another act): the cels are
+      // re-decoded in that act's palette, which is what the world behind them is drawn in.
+      if (ensurePalette()) { pages.main = rowsFrom(ESC_MENU_ROWS); pages.options = rowsFrom(OPTIONS_PAGE_ROWS); pages.automap = rowsFrom(automapSpec()); rows = pages[page]; selected = selectable().includes(selected) ? selected : selectable().at(-1); }
+      // F215/F216: an open SOUND/VIDEO sub-page owns the frame (the escape menu's own cels are not
+      // drawn behind it -- retail's `opt-sound-after-esc` shows the menu only after the sub-page closes).
+      if (sub?.isOpen) { sub.draw(ctx, width, height); return; }
       const v = view(width, height);
       ctx.save(); ctx.translate(v.ox, v.oy); ctx.scale(v.scale, v.scale);
-      for (const r of rows) font.draw(ctx, r.label, r.x, r.y);
-      const r = rows[selected], frame = Math.floor(tick / 2) % pentCanvases.length, pc = pentCanvases[frame];
-      const cy = r.y + inkTop + 11 - pc.height / 2;
-      ctx.drawImage(pc, 400 - GAME_MENU.pentagramOffsetX - pc.width / 2, cy);
-      ctx.drawImage(pc, 400 + GAME_MENU.pentagramOffsetX - pc.width / 2, cy);
+      // At retail's own geometry (800x600, no offset) DrawMode 1 is exactly PL2's alpha table over the
+      // pixels already there; a scaled viewport cannot index those pixels, so it takes the same 50%
+      // wash help-overlay.mjs declares. The record is mode 1 either way -- it is what is being drawn.
+      const exact = v.scale === 1 && v.ox === 0 && v.oy === 0;
+      for (const r of rows) for (const c of r.cels) {
+        if (r.dim && exact) blend(ctx, c.f, c.left, c.top, 1);
+        else if (r.dim) { ctx.globalAlpha = 0.5; ctx.drawImage(c.sheet.canvases[c.index], c.left, c.top); ctx.globalAlpha = 1; }
+        else ctx.drawImage(c.sheet.canvases[c.index], c.left, c.top);
+        recordDc6(c.sheet.path, c.index, c.f, c.left, c.top, { op: 'cel', mode: r.dim ? 1 : 5 });
+      }
+      const r = rows[selected], frame = Math.floor(tick / 2) % pent.frames.length, pf = pent.frames[frame];
+      for (const anchorX of PENTAGRAM_X) {
+        const left = anchorX + (pf.offsetX | 0), top = (r.anchorY + pentOffset) + (pf.offsetY | 0) - pf.height + 1;
+        ctx.drawImage(pentCanvases[frame], left, top);
+        recordDc6(PENTAGRAM, frame, pf, left, top, { op: 'cel', mode: 5 });
+      }
       ctx.restore();
     },
   };

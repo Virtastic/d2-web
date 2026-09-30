@@ -50,6 +50,13 @@ const INV_PANEL = [[4, 400, 316], [5, 656, 316], [6, 400, 492], [7, 656, 492]];
 
 export const ITEM_PRESENTATION_BYTES = 112;
 
+// Where the panel draws the carried-gold coin (F162): goldcoinbtn.dc6 frame 0, anchored x left /
+// y = the cel's BOTTOM row, as retail's own draw list records it -- the retail captures
+// line `goldcoinbtn.dc6 frame=0 x=484 y=469`. It is the coin a player clicks to OPEN the stash's DEPOSIT
+// dialog (the stash panel's own coin at 155,100 opens WITHDRAW). Exported so the stash-gold renderer
+// hit-tests this SAME rectangle rather than deriving a second copy of retail's anchor.
+export const INVENTORY_GOLD_ANCHOR = Object.freeze({ x: 484, bottom: 469 });
+
 function fixedAscii(bytes, offset, length) {
   let end = offset;
   while (end < offset + length && bytes[end]) end++;
@@ -186,9 +193,13 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
   drawCursorItem(ctx, width, height, item, pointerX, pointerY) {
     if (!item?.invFile) return null;
     const image = icon(item.invFile), v = view(width, height);
-    const x = pointerX - image.width * v.scale / 2, y = pointerY - image.height * v.scale / 2;
+    // Retail blits the cursor item at an INTEGER screen position, and a blit at a fractional offset is
+    // not a blit retail can make: the Canvas API resamples it, so the cursor is blurry and its pixels
+    // sit half a pixel away from the rect this returns. At scale 1 that is every pixel of the item,
+    // and s383 measures the canvas against this rect.
+    const x = Math.round(pointerX - image.width * v.scale / 2), y = Math.round(pointerY - image.height * v.scale / 2);
     ctx.save(); ctx.translate(x, y); ctx.scale(v.scale, v.scale); ctx.drawImage(image, 0, 0); ctx.restore();
-    return { id: item.id, invFile: item.invFile, x: Math.round(x), y: Math.round(y), width: image.width, height: image.height };
+    return { id: item.id, invFile: item.invFile, x, y, width: image.width, height: image.height };
   },
   draw(ctx, width, height, state, visible = true) {
     if (!visible) return null;
@@ -229,7 +240,7 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     // Gold, the gold button, the close button and the right-hand border (retail's anchors, s197).
     ctx.save(); ctx.translate(ox, oy); ctx.scale(scale, scale);
     chrome.text(ctx, act, String(state?.gold ?? 0), 508, 468);
-    chrome.cel(ctx, act, CHROME_ART.gold, 0, 484, 469);
+    const goldBlit = chrome.cel(ctx, act, CHROME_ART.gold, 0, INVENTORY_GOLD_ANCHOR.x, INVENTORY_GOLD_ANCHOR.bottom);
     // panelCloseLayout is the one place this rect lives now (panel-close.mjs) -- the drawn cel and
     // the click hit-box both come from it, so they cannot drift apart the way 419,449 vs 418,476 did.
     const close = panelCloseLayout('inventory');
@@ -240,6 +251,7 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
       panelPixels: [4, 5, 6, 7].reduce((sum, i) => sum + dc6.frames[i].width * dc6.frames[i].height, 0),
       itemCount: (state?.items || []).filter((item) => item.invPage === 0).length, itemPixels,
       equippedItemCount, equippedItemPixels, drawn, layout: layout ? 'engine' : 'amazon2',
+      gold: { path: CHROME_ART.gold, frame: 0, blit: goldBlit },
       close: { ...close, path: PANEL_CLOSE_ART.path, frame: PANEL_CLOSE_ART.frame, blit: closeBlit } };
   } };
 }

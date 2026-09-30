@@ -12,6 +12,9 @@ const ACT_PALETTES = Object.freeze([
   'data\\global\\palette\\ACT5\\pal.dat',
 ]);
 
+/** The palette an act's in-game screen is drawn in -- the world's and its panels'. `act` is 1-based. */
+export function actPalettePath(act) { return ACT_PALETTES[Math.min(5, Math.max(1, act | 0)) - 1]; }
+
 export function loadLiveLevelTerrain(Module, act0) {
   try {
     const files = readLevelTileFiles(Module);

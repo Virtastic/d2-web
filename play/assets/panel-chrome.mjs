@@ -3,7 +3,7 @@
 // (buysellbtn frame 10), the gold coin button and Font16 text. Every cel is placed as retail anchors
 // it: left edge x, BOTTOM row y (drawlist.mjs), through the act palette.
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
-import { createFont, decodeFontTbl } from './frontend.mjs';
+import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
 import { recordDc6 } from './drawlist.mjs';
 
 export const CHROME_ART = {
@@ -64,6 +64,13 @@ export function createPanelChrome(read, documentObject = globalThis.document) {
     },
     /** Font16 white text anchored at its bottom row. */
     text(ctx, act, s, x, y) { forAct(act).font.drawAnchored(ctx, s, x, y); },
+    /** Font16 text in text colour `colour` (D2's \xffc<n> palette: 1 red, 4 gold, ...) through the act's pal.pl2. */
+    textIn(ctx, act, s, x, y, colour) {
+      const a = forAct(act); a.tinted ??= new Map();
+      let f = a.tinted.get(colour);
+      if (!f) { f = createFont({ dc6: fontDc6, tbl, palette: textColourPalette(read(actPalette(act).replace(/pal\.dat$/i, 'pal.pl2')), a.palette, colour), documentObject }); a.tinted.set(colour, f); }
+      f.drawAnchored(ctx, s, x, y);
+    },
     measure(act, s) { return forAct(act).font.measure(s); },
     // The wide view draws SGD2FreeRes's own frame instead (assets/wide-hud.mjs sets __d2WideFrame).
     border(ctx, act, pieces) { if (globalThis.__d2WideFrame) return; for (const [i, x, y] of pieces) this.cel(ctx, act, CHROME_ART.border, i, x, y); },

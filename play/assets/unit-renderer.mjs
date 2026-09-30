@@ -13,7 +13,7 @@ const PLAYER_CLASS = Object.freeze([
   { token: 'BA', name: 'Barbarian' }, { token: 'DZ', name: 'Druid' },
   { token: 'AI', name: 'Assassin' },
 ]);
-const START_BASE = Object.freeze({ 0: 'BHM', 1: 'LIT', 2: 'LIT', 3: 'LIT', 4: 'LIT', 8: 'LIT', 9: 'LIT' });
+const START_BASE = Object.freeze({ 0: 'LIT', 1: 'LIT', 2: 'LIT', 3: 'LIT', 4: 'LIT', 8: 'LIT', 9: 'LIT' });
 const MODE = Object.freeze(['DT', 'NU', 'WL', 'RN', 'GH', 'TN', 'TW', 'A1', 'A2', 'BL', 'SC', 'TH', 'KK', 'S1', 'S2', 'S3', 'S4', 'DD']);
 const PALETTE = ['ACT1', 'ACT2', 'ACT3', 'ACT4', 'ACT5'];
 const DIR8 = [4,4,4,4,0,0,0,0,0,0,0,0,5,5,5,5,5,5,5,5,1,1,1,1,1,1,1,1,6,6,6,6,6,6,6,6,2,2,2,2,2,2,2,2,7,7,7,7,7,7,7,7,3,3,3,3,3,3,3,3,4,4,4,4];

@@ -102,6 +102,7 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
   let actN = 0, grey = null, rgbaPal = null;
   const cycle = createWeatherCycle(), clock = { tick: null };
   const parity = new URLSearchParams(globalThis.location?.search ?? '').get('enhanced') !== '1' && new URLSearchParams(globalThis.location?.search ?? '').get('view') !== 'fill';
+  let live = [];
   const streaks = { drops: [], w: 0, h: 0, tick: null, camX: null, camY: null, seed: 0x2545f491 };
 
   /**
@@ -285,6 +286,8 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
       clock.tick = t;
     },
     get cycle() { return cycle; },
+    /** Live ripples of the last draw: world anchor (wx, wy) and screen anchor (sx, sy). */
+    get ripples() { return live.map((r) => ({ ...r })); },
 
     active() { return levelRain === 1; },
 
@@ -297,7 +300,8 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
      * Returns one identity per blit -- `{ path, frame, x, y, w, h, hash }` in the draw list's own
      * conventions (play/assets/drawlist.mjs), the same record retail's hook writes.
      */
-    draw(ctx, width, height, tick) {
+    draw(ctx, width, height, tick, cx = 0, cy = 0) {
+      live = [];
       if (!levelRain || cycle.intensity === 0) return [];   // ripples: retail draws none while dry (rain-dry-camp)
       prepare();
       const step = Math.floor(Number(tick) / TICKS_PER_FRAME);
@@ -309,14 +313,18 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
       for (const layer of layers) {
         for (const particle of layer.particles) {
           const index = ((step + particle.phase) % FRAMES + FRAMES) % FRAMES;
+          // Particles live in WORLD (camera-origin) space: wx/wy = screen position + the camera's screen
+          // position when spawned; drawn at wx - cx, so they scroll with the ground (F11b).
+          if (particle.wx === undefined) { particle.wx = particle.x + cx; particle.wy = particle.y + cy; }
           if (particle.last === undefined) particle.last = index;
           // The animation wrapped (9 -> 0): retail gives the particle a NEW position, and keeps it for
           // the whole of the next pass -- the captured particles that did not wrap kept theirs exactly.
           else if (index < particle.last) {
             const seed = (Math.imul(particle.x * 31 + particle.y * 17 + step, 1664525) + 1013904223) >>> 0;
-            particle.x = (seed >>> 8) % width;
-            particle.y = (seed >>> 20) % height;
+            particle.wx = ((seed >>> 8) % width) + cx;
+            particle.wy = ((seed >>> 20) % height) + cy;
           }
+          particle.x = particle.wx - cx; particle.y = particle.wy - cy;
           particle.last = index;
           const frame = layer.dc6.frames[index];
           const bitmap = bitmapOf(layer, index);
@@ -328,6 +336,7 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
           ctx.drawImage(bitmap, left, top);
           const record = recordDc6(layer.path, index, frame, left, top, { op: 'cel', mode: 3, extra: 0 });
           if (record && record.hash) blits.push(record);
+          live.push({ layer: layer.path, wx: particle.wx, wy: particle.wy, sx: particle.x, sy: particle.y, frame: index });
         }
       }
       ctx.restore();

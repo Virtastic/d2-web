@@ -76,6 +76,14 @@ const TAB_MID = { 1: 436, 2: 330, 3: 222 };
 const PLATE_PAD = 4, PLATE_LINE = 16;
 
 /** The plate's box (see the comment where it is drawn); `cell` is the hovered icon's rect. */
+export function drawPlate(ctx, font, cell, lines) {
+  const box = plateBox(cell, Math.max(...lines.map((l) => font.measure(l.text))), lines.length);
+  ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.75)'; // retail's `box color=0 mode=2`: destination x0.25 (measured on skilltree-hover vs skilltree)
+  ctx.fillRect(box.x, box.y, box.w, box.h); ctx.restore();
+  lines.forEach((l, i) => { l.x = Math.floor(box.x + box.w / 2 - font.measure(l.text) / 2); l.y = box.y + 13 + i * PLATE_LINE;
+    if (l.text) font.drawAnchored(ctx, l.text, l.x, l.y); });
+  return box;
+}
 export function plateBox(cell, textWidth, lines) {
   const w = textWidth + PLATE_PAD * 2, h = lines * PLATE_LINE;
   return { x: Math.max(0, Math.min(SKILL_LAYOUT.width - w, cell.x)), y: Math.min(cell.y + cell.h + 4, SKILL_LAYOUT.height - 5 - h), w, h };
@@ -120,6 +128,81 @@ function frameCanvas(frame, palette, documentObject) {
   if (!frame.width || !frame.height) return canvas;
   canvas.getContext('2d').putImageData(new ImageData(dc6FrameToRgba(frame, palette), frame.width, frame.height), 0, 0);
   return canvas;
+}
+
+/** The hover plate's lines for a skill record (V19; the tree and the skill-select popup share it). `state`: line, string, skillDesc, skillMana. */
+export function buildSkillPlate(hovered, state, compact = false) {
+  const plateLines = [], unmodelled = [];
+  const line = state.line || (() => ''), key = state.string || (() => '');
+  const blank = () => plateLines.push({ kind: 'blank', text: '' });
+  // Retail's layout (skilltree-hover*.txt, 16 px slots): [unlearned + blank], name, description,
+  // Required Level, blank, [SkillDesc's dsc2 lines + blank], the level block, [blank + synergy].
+  if (!hovered.baseLevel) { plateLines.push({ kind: 'unlearned', text: key('StrSkill119') }); blank(); }
+  const name = hovered.nameStr ? line(hovered.nameStr) : '';
+  if (name) plateLines.push({ kind: 'name', index: hovered.nameStr, text: name });
+  // The popup's plate (compact) shows SkillDesc's SHORT text, not the long description (v9b-popup-iconhover-r29: "stuns your target").
+  const shortIdx = compact ? state.skillStrings?.(hovered.id)?.short : 0;
+  const desc = compact ? (shortIdx ? String(line(shortIdx) || '') : '') : (hovered.descStr ? String(line(hovered.descStr) || '') : '');
+  for (const l of (compact ? desc.split('\n').filter((t) => t.length) : desc.split('\n').filter((t) => t.length).reverse()))
+    plateLines.push({ kind: 'desc', index: hovered.descStr, text: l });
+  // Retail's learned-skill plate (skilltree-hover-bash5-r20) has NO Required Level line, only the spacer: drawn for an unlearned skill.
+  if (!hovered.baseLevel) plateLines.push({ kind: 'required', text: key('skilldesc3') + hovered.requiredLevel });
+  blank();
+  const level = hovered.baseLevel || 1;
+  let d = state.skillDesc ? state.skillDesc(hovered.id, level) : [];
+  // SkillDesc's line types this client formats, each measured on a retail frame: 2 = "A +calc B",
+  // 4 = "A +calc", 12 = "A calc seconds", 52 = "A calc B"; a zero value is not drawn (Frenzy's dsc2line2).
+  // Other types are reported in plate.unmodelled, never drawn as a guess.
+  const sign = (n) => (n >= 0 ? '+' : '') + n;
+  const stat = (e) => {
+    const a = e.a ? line(e.a) : '', b = e.b ? line(e.b) : '';
+    if (e.type === 2) return a + sign(e.calcA) + b;
+    if (e.type === 4) return a + sign(e.calcA);
+    if (e.type === 12) return a + e.calcA / 25 + key('StrSkill16');   // frames at 25 per second (Frenzy 150 -> 6)
+    if (e.type === 52 || e.type === 3) return a + e.calcA + b;   // 3: Stun's `Attack: 40 percent` (v9b-popup-iconhover-r29)
+    return null;
+  };
+  const stats = (from, to) => {
+    const out = [];
+    for (let i = to - 1; i >= from; i--) {
+      const e = d[i];
+      if (!e || !e.type || e.type === 1 || e.type === 5) continue;
+      const text = stat(e);
+      if (text === null) unmodelled.push({ index: i, type: e.type }); else if (e.calcA !== 0) out.push({ kind: 'stat', text });
+    }
+    return out;
+  };
+  const dsc2 = stats(6, 10);
+  // The popup plate carries the dsc2 lines inside the level block, straight after its header, with no spacer around them.
+  if (dsc2.length && !compact) { plateLines.push(...dsc2); blank(); }
+  // One level block (header, SkillDesc's stat lines bottom-up, the mana line); a learned skill draws
+  // it twice, "Current Skill Level: N" then retail's "Next Level" at N+1 (skilltree-hover-bash5-r20).
+  const levelBlock = (header, lvl, cost, omitZeroMana) => {
+    const dl = lvl === level ? d : (state.skillDesc ? state.skillDesc(hovered.id, lvl) : []);
+    plateLines.push({ kind: 'header', text: header });
+    if (compact) plateLines.push(...dsc2);
+    const saved = d; d = dl; plateLines.push(...stats(1, 6)); d = saved;
+    if (hovered.manaLine) {
+      // The mana line: SkillDesc's `str mana` template (the SAME index for passives and attacks --
+      // the table decides who gets a line, not this file) and the cost the engine hands over. A
+      // template that resolves to nothing leaves the line out, as every other unresolvable index is.
+      const template = hovered.manaStr ? line(hovered.manaStr) : '';
+      // Type 5 (Frenzy: `usmc/128`) prints its own evaluated calc (3 where SKILLS_GetManaCosts says 1.5); type 1 the engine's cost.
+      const five = dl.slice(0, 6).find((e) => e.type === 5);
+      // Retail's Next Level block draws no mana line when the printed cost is 0 (Double Swing 5 -> 6, skilltree-hover-dswing5-r29).
+      const shown = five ? five.calcA : formatManaCost(cost);
+      if (template && !(omitZeroMana && Number(shown) === 0)) plateLines.push({ kind: 'mana', index: hovered.manaStr, text: template + shown, cost });
+    }
+  };
+  levelBlock(hovered.baseLevel ? key('StrSkill2') + hovered.baseLevel : key('StrSkill17'), level, hovered.manaCost);
+  // The skill-select popup's plate is the Current block only: no Next Level, no synergy (v9b-popup-iconhover-r29, Stun 1).
+  if (hovered.baseLevel && state.skillMana && !compact) { blank(); levelBlock(key('StrSkill1'), level + 1, state.skillMana(hovered.id, level + 1), true); }
+  // The synergy block: type 40 header ("%s Receives Bonuses From:" with the skill's name) and
+  // type 63 lines "Name: +calc% text", in table order.
+  const syn = d.slice(10, 17).filter((e) => e.type === 63).map((e) => ({ kind: 'syn', text: `${line(e.a)}: +${e.calcA}% ${line(e.b)}` }));
+  const head = d.slice(10, 17).find((e) => e.type === 40);
+  if (head && syn.length && !compact) { blank(); plateLines.push({ kind: 'synheader', text: line(head.a).replace('%s', line(head.b)) }, ...syn); }
+  return { lines: plateLines, unmodelled };
 }
 
 export function createSkillPanelRenderer(read, documentObject = globalThis.document, skillPointOverlay) {
@@ -245,32 +328,32 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
       const centred = (t, cx, y) => { const x = Math.floor(cx - font.measure(t) / 2); font.drawAnchored(ctx, t, x, y); labels.push({ text: t, x, y }); };
       const cx = 659 + font.measure(S('StrSklTree1') || 'Skill') / 2;
       [['StrSklTree1', 85], ['StrSklTree2', 97], ['StrSklTree3', 109]].forEach(([k, y]) => centred(S(k), cx, y));
-      centred(String(state.skillPoints ?? 0), cx, 140);
+      // Count: left-anchored, not centred -- retail measured x=668 for '1' and '11', 669 for '0' (skilltree-points/-points11/-spent-r20).
+      { const t = String(state.skillPoints ?? 0), x = t[0] === '0' ? 669 : 668; font.drawAnchored(ctx, t, x, 140); labels.push({ text: t, x, y: 140 }); }
       const keys = TAB_KEYS[state.playerClass ?? 0] || TAB_KEYS[0];
       for (const t of [1, 2, 3]) { const lines = keys[t - 1].map(S), top = TAB_MID[t] - 6 * (lines.length - 1);
         lines.forEach((l, i) => centred(l, cx, top + 12 * i)); }
 
-      const drawn = [], missingIcons = [], plus = [];
+      const drawn = [], missingIcons = [], plus = [], digits = [];
       const iconPath = skillIconAsset(state.playerClass ?? 0);
       for (const skill of state.skills || []) {
         if (skill.page !== tab) continue;
         const r = cellRect(skill);
-        const sheet = skill.baseLevel > 0 ? icons : greyFor(state.playerClass ?? 0, act);
-        const icon = sheet[skill.iconCel];
         const available = skillPointOverlay.isCandidate(skill);
+        // A skill the player can learn now draws coloured, as a learned one does (retail's
+        // skilltree-points capture: only the learnable Bash is extra=0, the rest grey).
+        const sheet = skill.baseLevel > 0 || available ? icons : greyFor(state.playerClass ?? 0, act);
+        const icon = sheet[skill.iconCel];
         if (icon) ctx.drawImage(icon, r.x, r.y);
         else missingIcons.push({ id: skill.id, iconCel: skill.iconCel });
-        if (available) {
-          const blit = skillPointOverlay.draw(chrome, ctx, act, r);
-          if (blit) plus.push({ id: skill.id, icon: { x: r.x, y: r.y, w: r.w, h: r.h }, ...blit });
-        }
+        // No "+" over a learnable icon: retail's skilltree-points frame (one unspent point, Bash learnable) has no level.dc6 over the tree (V20 struck).
         // The skill's level in Font16 anchored at the icon's right edge, 12 rows below its bottom
         // (retail's act-V tree, skilltree-act5: '2' at 532,134 for the icon at 484..531 x 75..122).
-        if (skill.baseLevel > 0) font.drawAnchored(ctx, String(skill.baseLevel), r.x + r.w, r.y + r.h - 1 + 12);
+        if (skill.baseLevel > 0) { const dy = r.y + r.h - 1 + 12; font.drawAnchored(ctx, String(skill.baseLevel), r.x + r.w, dy); digits.push({ text: String(skill.baseLevel), x: r.x + r.w, y: dy, iconCel: skill.iconCel }); }
         // Identity, not coverage: the cel DRAWN is named (its sheet and its SkillDesc iconCel), so a
         // row can compare the blit against retail's own draw list rather than counting icons.
         drawn.push({ id: skill.id, x: r.x, y: r.y, baseLevel: skill.baseLevel, available,
-          iconCel: skill.iconCel, sheet: iconPath, frame: skill.iconCel, w: r.w, h: r.h, grey: !(skill.baseLevel > 0) });
+          iconCel: skill.iconCel, sheet: iconPath, frame: skill.iconCel, w: r.w, h: r.h, grey: !(skill.baseLevel > 0 || available) });
       }
       // skilltree.go assigns a close x per class and open tab; do not flatten it
       // to the right-hand button merely because that happens to fit one page. panelCloseLayout
@@ -312,22 +395,11 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
       // The line goes LAST, after the description: retail draws the block in reverse table order and
       // its mana line is descline1 in 162 of the 163 skills that have one (Fire Bolt's is dsc2line1,
       // the one case where retail's order differs -- named in V19).
-      const plateLines = [];
       const line = state.line || (() => '');
-      let namePlate = null;
+      const key = state.string || (() => '');
+      let namePlate = null, unmodelled = [];
       if (hovered) {
-        const name = hovered.nameStr ? line(hovered.nameStr) : '';
-        if (name) plateLines.push({ kind: 'name', index: hovered.nameStr, text: name });
-        const desc = hovered.descStr ? String(line(hovered.descStr) || '') : '';
-        for (const l of desc.split('\n').filter((t) => t.length).reverse())
-          plateLines.push({ kind: 'desc', index: hovered.descStr, text: l });
-        // The mana line: SkillDesc's `str mana` template (the SAME index for passives and attacks --
-        // the table decides who gets a line, not this file) and the cost the engine hands over. A
-        // template that resolves to nothing leaves the line out, as every other unresolvable index is.
-        if (hovered.manaLine) {
-          const template = hovered.manaStr ? line(hovered.manaStr) : '';
-          if (template) plateLines.push({ kind: 'mana', index: hovered.manaStr, text: template + formatManaCost(hovered.manaCost), cost: hovered.manaCost });
-        }
+        const built = buildSkillPlate(hovered, state); const plateLines = built.lines; unmodelled = built.unmodelled;
         const shown = plateLines;
         if (shown.length) {
           const r = cellRect(hovered);
@@ -335,22 +407,18 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
           // side of the widest line, 16 px per line, first glyph row 13 below the top; x = the icon's
           // left clamped to the screen's right edge, y = 4 under the icon's bottom row clamped so the
           // bottom stays 5 above the screen's; every line centred on the box.
-          const { x: nx, y: ny, w, h } = plateBox(r, Math.max(...shown.map((l) => font.measure(l.text))), shown.length);
-          ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.5)'; // ponytail: retail's `box color=0 mode=2` blend level unmeasured; .5 stands in
-          ctx.fillRect(nx, ny, w, h); ctx.restore();
-          shown.forEach((l, i) => { l.x = Math.floor(nx + w / 2 - font.measure(l.text) / 2); l.y = ny + 13 + i * PLATE_LINE;
-            font.drawAnchored(ctx, l.text, l.x, l.y); });
-          namePlate = { id: hovered.id, label: shown[0].text, x: nx, y: ny };
+          const { x: nx, y: ny, w, h } = drawPlate(ctx, font, r, shown);
+          namePlate = { id: hovered.id, label: shown.find((l) => l.kind === 'name')?.text ?? shown[0].text, x: nx, y: ny };
           plate = { id: hovered.id, x: nx, y: ny, w, h, lines: shown,
             manaStr: hovered.manaStr, manaTemplate: hovered.manaStr ? line(hovered.manaStr) : '',
-            manaLine: Boolean(hovered.manaLine), manaCost: hovered.manaCost };
+            manaLine: Boolean(hovered.manaLine), manaCost: hovered.manaCost, unmodelled };
         } else plate = null;
       } else plate = null;
       ctx.restore();
 
       // missingIcons is reported, not swallowed: an iconCel with no frame behind it is the exact
       // shape of the defect that drew a green block, and a count of drawn icons cannot see it.
-      return { x: o.x, y: o.y, scale: o.scale, tab, drawn, plus, missingIcons, namePlate, plate, cels, labels,
+      return { x: o.x, y: o.y, scale: o.scale, tab, drawn, plus, missingIcons, namePlate, plate, cels, labels, digits,
         icons: icons.length, skillPoints: state.skillPoints ?? 0, total: (state.skills || []).length,
         close: { ...close, path: PANEL_CLOSE_ART.path, frame: PANEL_CLOSE_ART.frame, blit: closeBlit } };
     },

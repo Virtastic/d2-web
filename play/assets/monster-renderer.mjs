@@ -3,6 +3,7 @@ import { composeCofFrame, decodeCof, decodeDcc } from './unit-formats.mjs';
 import { dccDirection, indexedToRgba } from './unit-renderer.mjs';
 import { createBlender } from './frontend.mjs';
 import { createUnitShadowRenderer } from './unit-shadow-renderer.mjs';
+import { highlightMap } from './unit-highlight.mjs';
 
 const COMPONENT = ['HD','TR','LG','RA','LA','RH','LH','SH','S1','S2','S3','S4','S5','S6','S7','S8'];
 const MODE = ['DT','NU','WL','GH','A1','A2','BL','SC','S1','S2','S3','S4','DD','KB','SQ','RN'];
@@ -76,7 +77,7 @@ export function loadMonsterAnimation(read, actor) {
 
 /** `shadow: true` draws the unit's shadow under its sprite first, as retail's draw list orders it. */
 export function createMonsterRenderer(read, documentObject = globalThis.document, { shadow = false } = {}) {
-  const animations = new Map(), failures = new Set(), palettes = new Map(), rasters = new Map(), blenders = new Map();
+  const animations = new Map(), failures = new Set(), palettes = new Map(), rasters = new Map(), blenders = new Map(), highlights = new Map();
   const shadows = shadow ? createUnitShadowRenderer(read) : null;
   const blenderFor = (act0) => { if (!blenders.has(act0)) { let b = null; try { b = createBlender(read(`data\\global\\palette\\${PALETTE[act0]}\\pal.pl2`), palettes.get(act0)); } catch {} blenders.set(act0, b); } return blenders.get(act0); };
   let lastEvidence = null;
@@ -86,7 +87,8 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
     return [act0, palettes.get(act0)];
   };
   return {
-    draw(ctx, x, y, actor, act) {
+    // `highlight`: retail's DrawMode 7, the hovered unit (V5, unit-highlight.mjs) -- the cel's colours through the measured rule.
+    draw(ctx, x, y, actor, act, highlight = false) {
       const baseKey = `${actor.code}:${actor.mode}:${actor.direction}:${actor.components.join(',')}`;
       if (failures.has(baseKey)) return null;
       let animation = animations.get(baseKey);
@@ -99,15 +101,18 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
       let composed;
       try { composed = composeCofFrame(animation.cof, animation.direction, frame, animation.components); }
       catch (e) { failures.add(baseKey); console.warn(`monster ${actor.code} mode ${actor.mode} dir ${actor.direction} frame ${frame}: ${e.message}`); return null; }   // a COF/DCC frame-count mismatch must not stop the frame loop
-      const [act0, pal] = palette(act), key = `${baseKey}:${frame}:${act0}`;
+      const [act0, pal] = palette(act), key = `${baseKey}:${frame}:${act0}${highlight ? ':hl' : ''}`;
+      if (highlight && !highlights.has(act0)) highlights.set(act0, highlightMap(read(`data\\global\\palette\\${PALETTE[act0]}\\pal.dat`)));
+      const hmap = highlight ? highlights.get(act0) : null;
       let canvas = rasters.get(key);
       if (!canvas) {
         canvas = documentObject.createElement('canvas'); canvas.width = composed.width; canvas.height = composed.height;
         if (canvas.width && canvas.height) canvas.getContext('2d').putImageData(
-          new ImageData(indexedToRgba(composed.indexed, composed.opaque, pal), canvas.width, canvas.height), 0, 0);
+          new ImageData(indexedToRgba(hmap ? composed.indexed.map((v) => hmap[v]) : composed.indexed, composed.opaque, pal), canvas.width, canvas.height), 0, 0);
         rasters.set(key, canvas);
       }
-      shadows?.draw(ctx, Math.round(x), Math.round(y),
+      // D2Client sets the unit's no-shadow bit (0x20) for a dead monster; retail's records: 41 DT/DD instances, 0 shadows.
+      if (animation.token !== 'DT' && animation.token !== 'DD') shadows?.draw(ctx, Math.round(x), Math.round(y),
         { cof: animation.cof, components: animation.components, direction: animation.direction, frame },
         { kind: 'monster', id: actor.id, classId: actor.classId, code: actor.code, token: animation.token, direction: animation.direction, frame, act });
       // A COF layer marked transparent draws through its draw effect (Izual's ghost: both layers, effect 3
@@ -142,7 +147,7 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
         if (!comp || !variant || !animation.components.has(layer.component)) continue;
         globalThis.__d2DrawList.push({ op: 'unit', path: `monsters\\${actor.code}\\${comp}\\${actor.code}${comp}${variant}${animation.token}${layer.weaponClass}`.toLowerCase(),
           frame, frames: animation.cof.framesPerDirection, dir: actor.direction, token: animation.token,
-          x: Math.round(x), y: Math.round(y), mode: 5 });
+          x: Math.round(x), y: Math.round(y), mode: highlight ? 7 : 5 });
       }
       let pixelHash = 0x811c9dc5; for (const value of composed.indexed) { pixelHash ^= value; pixelHash = Math.imul(pixelHash, 0x01000193); }
       // `directions` and `frames` are the COF's own lengths, so a caller comparing the drawn identity
@@ -151,7 +156,19 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
       lastEvidence = { id: actor.id, classId: actor.classId, code: actor.code, token: animation.token,
         direction: animation.direction, directions: animation.cof.directions, frame, frames: count,
         components: animation.components.size, width: composed.width,
-        height: composed.height, opaque: composed.opaque.reduce((a, v) => a + v, 0), pixelHash: pixelHash >>> 0 };
+        // F14: the blit's own placement beside its size -- the rectangle this draw actually painted,
+        // in anchor-relative px (`ctx.drawImage(canvas, Math.round(x + xOffset), Math.round(y + yOffset))`
+        // above). A row measuring a unit's hover box needs the rect that was DRAWN, not a re-derivation
+        // of it from the DCC beside the renderer.
+        xOffset: composed.xOffset, yOffset: composed.yOffset,
+        // F14: the ANIMATION's own box for this direction -- the union over the drawn layers' DCC
+        // direction boxes (unit-formats' `direction.box`, the union across that direction's frames),
+        // anchor-relative, the same rectangle Riiablo's HoveredManager hit-tests (`animation.getBox()`).
+        // A single frame's cel is smaller than this whenever the animation moves, so the two must be
+        // told apart by measurement rather than assumed equal.
+        animBox: (() => { let a = null; for (const dcc of animation.components.values()) { const d = dcc.directionRecords[animation.direction]; if (!d || !d.box) continue;
+          const b = d.box; a = a ? { minX: Math.min(a.minX, b.minX), minY: Math.min(a.minY, b.minY), maxX: Math.max(a.maxX, b.maxX), maxY: Math.max(a.maxY, b.maxY) } : { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY }; } return a; })(),
+        height: composed.height, opaque: composed.opaque.reduce((a, v) => a + v, 0), pixelHash: pixelHash >>> 0, mode: highlight ? 7 : 5 };
       return lastEvidence;
     },
     get lastEvidence() { return lastEvidence && { ...lastEvidence }; },

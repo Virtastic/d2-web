@@ -7,5 +7,6 @@ export function terrainDrawOp(tile) {
   // Shadow orientation takes precedence: pRoofTiles is populated by shadow
   // tiles too, but retail dispatches orientation 13 through slot 41.
   if (tile.orientation === 13) return 'shadowtile';
-  return tile.layer === 2 ? 'roof' : 'wall';
+  // F66: a wall-list record the client fades (roof-hide.mjs) goes through retail's transparent entry.
+  return tile.layer === 2 || tile.hidesPlayer ? 'roof' : 'wall';
 }

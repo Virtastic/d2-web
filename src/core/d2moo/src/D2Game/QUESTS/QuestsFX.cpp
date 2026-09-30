@@ -127,7 +127,7 @@ void __fastcall QUESTSFX_SpawnCompellingOrbMissile(D2GameStrc* pGame, D2UnitStrc
     {
         UNITS_ChangeAnimMode(pStairs, OBJMODE_OPERATING);
         D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(386u);
-        EVENT_SetEvent(pGame, pStairs, EVENTTYPE_ENDANIM, pGame->dwGameFrame + (pObjectsTxtRecord->dwFrameCnt[1] >> 8), 0, 0);
+        EVENT_SetEvent(pGame, pStairs, EVENTTYPE_ENDANIM, pGame->dwGameFrame + OBJECTS_GetOperatingTicks(pObjectsTxtRecord), 0, 0);
     }
 }
 

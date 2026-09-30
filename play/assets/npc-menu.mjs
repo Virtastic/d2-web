@@ -23,9 +23,10 @@
 // will take it as the third size rather than extrapolating from two examples.
 import { createFont, decodeFontTbl, FRONTEND } from './frontend.mjs';
 import { recordDc6, recordPrim } from './drawlist.mjs';
+import { questOfMessage } from './npc-topics.mjs';
 
 const TALK = 'talk', TRADE = 'trade', GAMBLE = 'gamble', HIRE = 'hire', IDENTIFY = 'identify', OTHER = 'other';
-const S_TALK = 3381, S_TRADE = 3396, S_TRADE_REPAIR = 3334, S_GAMBLE = 3398, S_HIRE = 3397, S_IDENTIFY = 3383, S_CANCEL = 3400;
+const S_INTRO = 3399, S_GOSSIP = 3395, S_TALK = 3381, S_TRADE = 3396, S_TRADE_REPAIR = 3334, S_GAMBLE = 3398, S_HIRE = 3397, S_IDENTIFY = 4020, S_CANCEL = 3400;
 const ACTION = { [S_TALK]: TALK, [S_TRADE]: TRADE, [S_TRADE_REPAIR]: TRADE, [S_GAMBLE]: GAMBLE, [S_HIRE]: HIRE, [S_IDENTIFY]: IDENTIFY };
 
 // [NPC class, entry string ids] in the table's order (the Cancel each ends with is implied).
@@ -33,18 +34,31 @@ export const NPC_MENU_TABLE = [
   [148, [S_TALK, S_TRADE]], [176, [S_TALK]], [146, [S_TALK]], [154, [S_TALK, S_TRADE_REPAIR]],
   [177, [S_TALK, S_TRADE]], [199, [S_TALK, S_TRADE, S_GAMBLE]], [200, [S_TALK]], [147, [S_TALK, S_TRADE, S_GAMBLE]],
   [198, [S_TALK, S_HIRE]], [201, [S_TALK]], [202, [S_TALK, S_TRADE]], [150, [S_TALK]],
-  [178, [S_TALK, S_TRADE_REPAIR]], [155, [S_TALK]], [175, [S_TALK, S_IDENTIFY]], [210, [S_TALK]],
-  [244, [S_TALK, 4020]], [265, [S_TALK, 4020]], [245, [S_TALK, 4020]], [246, [S_TALK, 4020]],
+  [178, [S_TALK, S_TRADE_REPAIR]], [155, [S_TALK]], [175, [S_TALK, 3383]], [210, [S_TALK]],
+  [244, [S_TALK, S_IDENTIFY]], [265, [S_TALK, S_IDENTIFY]], [245, [S_TALK, S_IDENTIFY]], [246, [S_TALK, S_IDENTIFY]],
   [251, [S_TALK]], [367, [S_TALK]], [257, [S_TRADE_REPAIR]], [405, [S_TRADE, S_GAMBLE]],
   [252, [S_TALK, S_HIRE, S_TRADE]], [253, [S_TALK, S_TRADE_REPAIR]], [254, [S_TALK, S_TRADE, S_GAMBLE]], [255, [S_TALK, S_TRADE]],
   [406, [S_TALK]], [257, [S_TALK]], [264, [S_TALK, 3385]], [297, [S_TALK]],
   [266, [S_TALK]], [331, [S_TALK]], [408, [S_TALK]], [378, [S_TALK]],
-  [377, [S_TALK]], [521, [S_TALK]], [520, [S_TALK, 4020]], [511, [S_TALK, S_TRADE_REPAIR]],
+  [377, [S_TALK]], [521, [S_TALK]], [520, [S_TALK, S_IDENTIFY]], [511, [S_TALK, S_TRADE_REPAIR]],
   [513, [S_TALK, S_TRADE]], [512, [S_TALK, S_TRADE, S_GAMBLE]], [514, [S_TALK, S_GAMBLE]], [515, [S_TALK]],
   [527, [S_TALK]], [537, [S_TALK]], [538, [S_TALK]], [539, [S_TALK]],
 ];
 
 /** The retail entries for an NPC class (first matching record, as D2Client walks the table), or null. */
+// P7b: the Talk box (kashya-talk-r14: talk / introduction / gossip / Den of Evil / cancel). Introduction and Gossip are always there;
+// then one topic per menu-2 message of the engine's 0x27 list (D2Text nMenu 2), labelled with its quest's own name (npc-topics.mjs).
+// `messages` = [{ stringId, menu }] from the engine; `questName(act, n)` = the quest's name string.
+export function talkEntries(messages, questName) {
+  const seen = new Set(), topics = [];
+  for (const m of messages) {
+    if (m.menu !== 2) continue;
+    const q = questOfMessage(m.stringId), label = q ? questName(q.act, q.quest) : '';
+    if (!label || seen.has(label)) continue;
+    seen.add(label); topics.push({ stringId: m.stringId, label, action: 'topic' });
+  }
+  return [{ stringId: S_INTRO, action: 'intro' }, { stringId: S_GOSSIP, action: 'gossip' }, ...topics, { stringId: S_CANCEL, action: 'cancel' }];
+}
 export function npcMenuEntries(classId) {
   const row = NPC_MENU_TABLE.find(([cls]) => cls === classId);
   if (!row) return null;
@@ -64,17 +78,20 @@ export const NPC_MENU_LAYOUT = Object.freeze({ padX: 20, firstLine: 21, pitch: 1
  */
 export function menuFramePieces(x1, y1, x2, y2) {
   const out = [];
-  const top = [];
-  for (let i = 0, x = x1 + 12; x < x2 - 12; i++, x += 12) top.push([2 + ((i + 1) % 6), x, y1 + 12]);
+  // Pieces per horizontal edge: retail's lists give 4 for w 69 (Jerhyn) and 73 (Kashya), 5 for 78 (Warriv),
+  // 8 for 119 (Kashya's Talk box) -- floor((w - 14) / 12); 125 (Cain) gives 9.
+  const n = Math.floor((x2 - x1 - 14) / 12), top = [];
+  for (let i = 0; i < n; i++) top.push([2 + ((i + 1) % 6), x1 + 12 + 12 * i, y1 + 12]);
   out.push(...top);
   for (let i = 0, x = x1 + 13; x < x2 - 12; i++, x += 12) out.push([16 + ((i + top.length + 1) % 6), x, y2 + 10]);
-  // The 69px (two-entry) retail menu starts each vertical strip one cel earlier
-  // than the wider measured menus.  This is the third retail size (Jerhyn), not
-  // a screen-specific offset: the narrow frame is still derived from its box.
-  const narrow = x2 - x1 === 69;
+  // The vertical strips continue the edge cycle: the left strip starts at 10 + (top + bottom count + 1) % 3
+  // and runs 10,11,12 down; the right strip carries on from where the left ended (13..15). Fitted to all
+  // five retail boxes (Warriv, Hratli, Jerhyn's 69px, Cain with and without Identify) -- the earlier
+  // "narrow" special case was this rule's phase for a 4-piece top edge.
+  const leftStart = (2 * top.length + 1) % 3;
   let leftCount = 0;
-  for (let i = 0, y = y1 + 22; y < y2; i++, y += 12) { out.push([10 + ((i + (narrow ? 0 : 2)) % 3), x1 - 4, y]); leftCount++; }
-  for (let i = 0, y = y1 + 24; y < y2; i++, y += 12) out.push([13 + ((i + leftCount - (narrow ? 3 : 4)) % 3), x2 - 7, y]);
+  for (let i = 0, y = y1 + 22; y < y2; i++, y += 12) { out.push([10 + ((i + leftStart) % 3), x1 - 4, y]); leftCount++; }
+  for (let i = 0, y = y1 + 24; y < y2; i++, y += 12) out.push([13 + ((i + leftStart + leftCount) % 3), x2 - 7, y]);
   out.push([0, x1, y1 + 12], [1, x2 - 12, y1 + 12], [8, x1, y2 + 1], [9, x2 - 12, y2 + 1]);
   return out;
 }
@@ -98,10 +115,21 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
   // every act, so Lut Gholein's and Harrogath's menus shifted through the wrong table).
   const coloured = new Map();
   const fontsFor = (act) => { if (!coloured.has(act)) coloured.set(act, {
-    gold: createFont({ dc6, tbl, palette: shifted(4, GOLD, act), documentObject, path: fontPath, drawAs: glyphs }),
-    blue: createFont({ dc6, tbl, palette: shifted(3, BLUE, act), documentObject, path: fontPath, drawAs: glyphs }) });
+    gold: createFont({ dc6, tbl, palette: shifted(4, GOLD, act), documentObject, path: fontPath, drawAs: { ...glyphs, extra: 4 } }),
+    blue: createFont({ dc6, tbl, palette: shifted(3, BLUE, act), documentObject, path: fontPath, drawAs: { ...glyphs, extra: 3 } }) });
     return coloured.get(act); };
   const pieces = decodeDc6(read(NPC_MENU_ASSETS.pieces));
+  const SLIDER = 'data\\global\\ui\\menu\\textslid.dc6';
+  const sliders = decodeDc6(read(SLIDER)), sliderCanvas = new Map();
+  const slid = (i) => {
+    if (!sliderCanvas.has(i)) {
+      const f = sliders.frames[i], c = documentObject.createElement('canvas'); c.width = f.width; c.height = f.height;
+      const rgba = new Uint8ClampedArray(f.width * f.height * 4);
+      for (let k = 0; k < f.indices.length; k++) if (f.opaque[k]) rgba.set(palette.subarray(f.indices[k] * 4, f.indices[k] * 4 + 4), k * 4);
+      c.getContext('2d').putImageData(new ImageData(rgba, f.width, f.height), 0, 0); sliderCanvas.set(i, c);
+    }
+    return sliderCanvas.get(i);
+  };
   const pieceCanvas = new Map();
   const piece = (i) => {
     if (!pieceCanvas.has(i)) {
@@ -148,8 +176,14 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
     ctx.putImageData(img, b.x, b.y);
   };
   let state = null, rows = [], box = null, selected = 0;
+  // P7: the 'Hire which Mercenary?' window: a fixed 490x350
+  // box at (155,85) -- the NPC menu's fill and frame rule -- a text-slider track on the right, a name line and a
+  // skill line per offer (7 rows of 34 px show at once), the hover row in blue, a scroll thumb and the Cancel label.
+  const HW = { x1: 155, y1: 85, x2: 645, y2: 435, rows: 7, textX: 187, firstBottom: 145, pitch: 34, trackX: 627, cancelX: 377, cancelY: 421, headerY: 106 };
+  let hire = null;
+  const hireRow = (i) => ({ x: HW.x1 + 20, y: HW.firstBottom - 12 + i * HW.pitch, w: 440, h: HW.pitch });
   const layout = (feetX, feetY) => {
-    const labels = [state.name, ...state.entries.map((e) => string(e.stringId) || String(e.stringId))];
+    const labels = [state.name, ...state.entries.map((e) => e.label ?? (string(e.stringId) || String(e.stringId)))];
     const cx = Math.trunc(feetX);
     const w = Math.max(...labels.map((l) => white.measure(l))) + L.padX;
     const x1 = cx - Math.trunc(w / 2), x2 = x1 + w;
@@ -168,6 +202,55 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
     /** The pointer moved: the entry under it is selected, none when it is elsewhere (retail). */
     hover(x, y) { if (state && rows.length) selected = rows.findIndex((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h); return selected; },
     close() { state = null; rows = []; box = null; },
+    /** The hire window over offers [{ name, level, life, def, cost, skill, mercName }] and the hirer's gold. */
+    showHire(npcId, offers, gold) { hire = { npcId, offers, gold, top: 0, selected: 0 }; },
+    get hireOpen() { return Boolean(hire); },
+    get hireState() { return hire; },
+    closeHire() { hire = null; },
+    hireHover(x, y) { if (hire) hire.selected = this.hireAt(x, y)?.row ?? -1; },
+    hireScroll(d) { if (hire) hire.top = Math.max(0, Math.min(Math.max(0, hire.offers.length - HW.rows), hire.top + d)); },
+    /** {row: index into offers} | {cancel: true} | null for a canvas point. */
+    hireAt(x, y) {
+      if (!hire) return null;
+      if (x >= HW.cancelX - 20 && x < HW.cancelX + 100 && y >= HW.cancelY - 16 && y < HW.cancelY + 8) return { cancel: true };
+      for (let i = 0; i < Math.min(HW.rows, hire.offers.length - hire.top); i++) { const r = hireRow(i); if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) return { row: hire.top + i }; }
+      return null;
+    },
+    drawHire(ctx, act = 1) {
+      if (!hire) return null;
+      const { gold, blue } = fontsFor(act), n = hire.offers.length, shown = hire.offers.slice(hire.top, hire.top + HW.rows);
+      const b = { x: HW.x1, y: HW.y1, w: HW.x2 - HW.x1, h: HW.y2 - HW.y1 };
+      ctx.save();
+      darken(ctx, b, act);
+      recordPrim('box', HW.x1, HW.y1, HW.x2, HW.y2, 0, 1);
+      const cel = (path, dc, i, ax, ay) => {   // anchor = bottom row for boxpieces, top row for the slider cels
+        const f = dc.frames[i], left = ax + f.offsetX, top = ay + f.offsetY - f.height + 1;
+        ctx.drawImage(sliderOrPiece(path, dc, i), left, top); recordDc6(path, i, f, left, top);
+      };
+      const sliderOrPiece = (path, dc, i) => path === NPC_MENU_ASSETS.pieces ? piece(i) : slid(i);
+      // Two nested frames: the window's own and the inset one around the offers (retail draws both).
+      for (const r of [[HW.x1, HW.y1, HW.x2, HW.y2], [HW.x1, HW.y1 + 35, HW.x2, HW.y2 - 35]])
+        for (const [i, ax, ay] of menuFramePieces(...r)) cel(NPC_MENU_ASSETS.pieces, pieces, i, ax, ay);
+      cel(SLIDER, sliders, 9, HW.trackX, 136);
+      for (let y = 148; y <= 388; y += 12) cel(SLIDER, sliders, 13, HW.trackX, y);
+      cel(SLIDER, sliders, 8, HW.trackX, 388);
+      ctx.restore();
+      shown.forEach((o, i) => {
+        const on = hire.top + i === hire.selected, f = on ? blue : white, y = HW.firstBottom + i * HW.pitch;
+        f.drawAnchored(ctx, `${o.name} - Lvl: ${String(o.level).padStart(2)}  Life: ${String(o.life).padStart(2)}  Def: ${String(o.def).padStart(2)}  Cost: ${o.cost}`, HW.textX, y);
+        f.drawAnchored(ctx, `  ${o.skill}`, HW.textX, y + 14);
+      });
+      const thumb = Math.max(3, Math.floor(21 * Math.min(1, HW.rows / Math.max(1, n))));
+      cel(SLIDER, sliders, 16, HW.trackX - 1, 149);
+      for (let k = 0; k < thumb - 2; k++) cel(SLIDER, sliders, 14, HW.trackX - 1, 161 + 12 * k);
+      cel(SLIDER, sliders, 15, HW.trackX - 1, 161 + 12 * (thumb - 2));
+      const head = `${string(3364).replace('%d', String(hire.gold))}`;
+      const centred = (t) => HW.x1 + Math.ceil((HW.x2 - HW.x1 - white.measure(t)) / 2) + 1;   // the menu's own centring rule
+      gold.drawAnchored(ctx, head, centred(head), HW.headerY);
+      const cancel = string(3400);
+      white.drawAnchored(ctx, cancel, centred(cancel), HW.cancelY);
+      return { offers: shown.map((o) => o.name), rows: shown.length, total: n, selected: hire.selected, thumbCels: thumb };
+    },
     draw(ctx, feetX, feetY, act = 1) {
       if (!state) return null;
       const { labels, bottoms } = layout(feetX, feetY);

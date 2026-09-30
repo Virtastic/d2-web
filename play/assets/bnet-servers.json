@@ -1,0 +1,4 @@
+{
+  "_comment": "The Battle.net server list. WE edit this file; the page reads it at boot (play/assets/bnet-servers.mjs). This client hosts no Battle.net -- each entry is a REGION, and the region IS the server the client points at. An empty list is the shipped default and means Battle.net is OFF: the BATTLE.NET entry stays inert, the gateway bar keeps retail's own text, and no connection is attempted. Add entries as { \"region\": \"U.S. EAST\", \"host\": \"127.0.0.1:6112\" } to list them.",
+  "servers": []
+}

@@ -18,6 +18,17 @@ import { BORDER_LEFT, BORDER_RIGHT, CHROME_ART, createPanelChrome } from './pane
 
 export const STASH_ART = 'data\\global\\ui\\PANEL\\TradeStash.dc6';
 export const INVPAGE_STASH = 4;
+// F162: the stash panel's own gold coin -- goldcoinbtn.dc6 frame 0, x left / y = the cel's BOTTOM row, at
+// retail's own draw-list anchor (the retail captures `goldcoinbtn.dc6 frame=0 x=155
+// y=100`). Exported so the stash-gold hit test uses this exact rect instead of re-deriving it from the
+// panel geometry: geometry.left+74 was 154 while the cel is drawn at 155, so a click on the coin's right
+// column missed the drawn coin.
+export const STASH_GOLD_COIN_ANCHOR = Object.freeze({ x: 155, bottom: 100 });
+// The Horadric Cube's grid is page 3 and Inventory.txt row TRANSMOGRIFY_BOX_PAGE_1 (D2Inventory.h); its window
+// reuses this renderer -- the same TradeStash art (the only 141012-byte trade panel the MPQs carry: no cube-specific
+// DC6 exists under PANEL) with the cube's own grid.
+export const INVPAGE_CUBE = 3;
+export const TRANSMOGRIFY_BOX_PAGE_1 = 9;
 // Inventory.txt row for a Lord of Destruction stash, and the 800x600 flag (row + 16 * higherRes).
 export const BIG_BANK_PAGE_1 = 12;
 
@@ -53,10 +64,11 @@ export function stashGeometry(layout) {
 // In-game panels are drawn with the ACT's palette.
 const actPalette = (act) => `data\\global\\palette\\ACT${Math.min(5, Math.max(1, act | 0))}\\pal.dat`;
 
-export function createStashPanelRenderer(read, documentObject = globalThis.document, { string = null, stashGold = null } = {}) {
+export function createStashPanelRenderer(read, documentObject = globalThis.document, { string = null, stashGold = null, page = INVPAGE_STASH, transmute = null } = {}) {
   const chrome = createPanelChrome(read, documentObject);
-  const dc6 = decodeDc6(read(STASH_ART));
+  let dc6 = decodeDc6(read(STASH_ART));
   const perAct = new Map();
+  const plugy = { on: false, pageName: null };   // PY3: ?plugy=1 swaps the art for PlugY's TradeStash.dc6 and names the page
   const forAct = (act) => {
     let a = perAct.get(act);
     if (!a) {
@@ -76,8 +88,21 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
     return { scale, x: (width - 800 * scale) / 2, y: (height - 600 * scale) / 2 };
   };
 
+  // Level 1 (declared, not retail-measured): the Transmute button sits under the cube's grid, its width.
+  const buttonRect = (g) => ({ x: g.gridLeft, y: g.gridTop + g.rows * g.boxH + 10, w: g.columns * g.boxW, h: 24 });
   return {
-    evidence: { frames: dc6.frames.length, sizes: dc6.frames.map((f) => [f.width, f.height]) },
+    /** Whether a canvas point is on the Transmute button (cube window only). */
+    transmuteAt(px, py, width, height, geometry) {
+      if (!transmute || !geometry) return false;
+      const o = origin(width, height), x = (px - o.x) / o.scale, y = (py - o.y) / o.scale, b = buttonRect(geometry);
+      return x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h;
+    },
+    plugy,
+    /** Font16 helpers for PlugY's hover popups (plugy-stash-ui.mjs). */
+    text: { measure: (act, str) => chrome.measure(act, str), draw: (ctx, act, str, x, y) => chrome.text(ctx, act, str, x, y) },
+    /** PY3: replace the panel art (PlugY's own TradeStash.dc6 bytes). */
+    setArt(bytes) { dc6 = decodeDc6(bytes); perAct.clear(); },
+    get evidence() { return { frames: dc6.frames.length, sizes: dc6.frames.map((f) => [f.width, f.height]) }; },
     /**
      * The panel's own rectangle on the 800x600 screen -- the art's composed size at its anchor
      * (LEFT_PANEL_TOP). A click inside it belongs to the stash and never falls through to the world.
@@ -104,7 +129,7 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
       if (!geometry) return null;
       const o = origin(width, height), x = (px - o.x) / o.scale, y = (py - o.y) / o.scale;
       const g = geometry;
-      return [...(items || [])].reverse().find((i) => i.invPage === INVPAGE_STASH && i.invFile &&
+      return [...(items || [])].reverse().find((i) => i.invPage === page && i.invFile &&
         x >= g.gridLeft + i.gridX * g.boxW && x < g.gridLeft + (i.gridX + (i.invWidth || 1)) * g.boxW &&
         y >= g.gridTop + i.gridY * g.boxH && y < g.gridTop + (i.gridY + (i.invHeight || 1)) * g.boxH) || null;
     },
@@ -141,7 +166,7 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
       // Items the engine says are on the stash page, at the grid cell the engine reports.
       const drawn = [];
       for (const item of items || []) {
-        if (item.invPage !== INVPAGE_STASH || !item.invFile) continue;
+        if (item.invPage !== page || !item.invFile) continue;
         const c = icon(a, item.invFile);
         const x = geometry.gridLeft + item.gridX * geometry.boxW, y = geometry.gridTop + item.gridY * geometry.boxH;
         ctx.drawImage(c, x, y);
@@ -151,15 +176,22 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
       // button, and the left border -- retail's anchors.
       if (stashGold) {
         const inStash = String(stashGold(0)), cx = 245;   // one glyph captured: left or right alignment not yet known
-        chrome.cel(ctx, act, CHROME_ART.gold, 0, 155, 100);
+        chrome.cel(ctx, act, CHROME_ART.gold, 0, STASH_GOLD_COIN_ANCHOR.x, STASH_GOLD_COIN_ANCHOR.bottom);
         chrome.text(ctx, act, inStash, cx, 100);
-        if (string) chrome.text(ctx, act, string(4051).replace('%d', String(stashGold(1))), 158, 125);
+        if (plugy.pageName) { if (plugy.nameColour) chrome.textIn(ctx, act, plugy.pageName, plugy.nameX, plugy.nameY, plugy.nameColour); else chrome.text(ctx, act, plugy.pageName, plugy.nameX, plugy.nameY); }
+        else if (string) chrome.text(ctx, act, string(4051).replace('%d', String(stashGold(1))), 158, 125);
+      }
+      if (transmute) {
+        const b = buttonRect(geometry);
+        ctx.fillStyle = 'rgba(40,30,20,0.85)'; ctx.fillRect(b.x, b.y, b.w, b.h);
+        ctx.strokeStyle = '#8a7a52'; ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
+        chrome.text(ctx, act, transmute, b.x + 8, b.y + 18);
       }
       chrome.cel(ctx, act, CHROME_ART.close, 10, 352, 476);
       // The stash opens with the inventory; retail frames both after both panels, left then right.
       chrome.border(ctx, act, BORDER_LEFT); chrome.border(ctx, act, BORDER_RIGHT);
       ctx.restore();
-      return { anchor: [geometry.left, geometry.top], recordTop: geometry.recordTop, palette: actPalette(act), open: true, composed, frames: frames.length, grid: { columns: geometry.columns, rows: geometry.rows,
+      return { page, anchor: [geometry.left, geometry.top], recordTop: geometry.recordTop, palette: actPalette(act), open: true, composed, frames: frames.length, grid: { columns: geometry.columns, rows: geometry.rows,
         left: geometry.gridLeft, top: geometry.gridTop, box: [geometry.boxW, geometry.boxH] }, drawn };
     },
   };

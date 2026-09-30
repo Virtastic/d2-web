@@ -1,14 +1,16 @@
 import { parseSessionTiles, readSessionTerrain, readSessionLightmap, worldToScreen, screenDeltaToWorld, UNIT_CENTRE_Y } from './assets/session-terrain.mjs';
-import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, selectPrimaryTarget, viewportToWorld } from './gameplay-model.mjs';
+import { perfSync, perfEnabled, perfT0, perfT, perfSample, perfCountFrame, perfReset, perfReport } from './assets/frame-perf.mjs';
+import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, selectPrimaryTarget, viewportToWorld } from './gameplay-model.mjs';
 import { createMpqAssetReader } from './assets/mpq-assets.mjs';
-import { loadLiveLevelTerrain } from './assets/live-level-terrain.mjs';
+import { recordPrim } from './assets/drawlist.mjs';
+import { loadLiveLevelTerrain, actPalettePath } from './assets/live-level-terrain.mjs';
 import { decodeDatPalette } from './assets/d2-formats.mjs';
 import { createPlayerRenderer, playerClassInfo } from './assets/unit-renderer.mjs';
 import { createMonsterRenderer, parseMonsterAnimations } from './assets/monster-renderer.mjs';
 import { createObjectRenderer, parseObjectPresentations } from './assets/object-renderer.mjs';
 import { waypointPadAnchor } from './assets/waypoint-pad-anchor.mjs';
 import { createItemRenderer, parseItemPresentations } from './assets/item-renderer.mjs';
-import { createStashPanelRenderer, stashGeometry, BIG_BANK_PAGE_1, INVPAGE_STASH } from './assets/stash-panel.mjs';
+import { createStashPanelRenderer, stashGeometry, BIG_BANK_PAGE_1, INVPAGE_STASH, INVPAGE_CUBE, TRANSMOGRIFY_BOX_PAGE_1 } from './assets/stash-panel.mjs';
 import { createStashGoldRenderer, STASH_GOLD } from './assets/stash-gold-dialog.mjs';
 import { createWaypointPanelRenderer, tabActsOf } from './assets/waypoint-panel.mjs';
 import { createWaypointMenuInput } from './assets/waypoint-menu-input.mjs';
@@ -26,7 +28,9 @@ import { createFreeResArt, barParts, halfParts, stoneTiles, drawParts } from './
 import { createBeltRenderer } from './assets/belt-renderer.mjs';
 import { createActMusicPlayer } from './assets/act-music.mjs';
 import { createUiClickSoundPlayer } from './assets/ui-click-sound.mjs';
+import { createUnitSoundPlayer } from './assets/unit-sound-player.mjs';
 import { createFont, createTitleScreen, decodeFontTbl, FRONTEND } from './assets/frontend.mjs';
+import { loadBnetServers } from './assets/bnet-servers.mjs';
 import { BOOT_MOVIES, openMovie } from './assets/cinematics.mjs';
 import { createClassSelectSoundPlayer } from './assets/class-create-sounds.mjs';
 import { createCreditsScreen } from './assets/credits-screen.mjs';
@@ -41,22 +45,26 @@ import { createNpcPanel } from './assets/npc-panel.mjs';
 import { createGameMenu } from './assets/game-menu.mjs';
 import { MODAL_POINTER_OWNER, modalPointerOwner } from './assets/modal-pointer-priority.mjs';
 import { createDeathScreen } from './assets/death-screen.mjs';
-import { createNpcMenu, npcMenuEntries } from './assets/npc-menu.mjs';
+import { createNpcMenu, npcMenuEntries, talkEntries } from './assets/npc-menu.mjs';
+import { npcSpeech } from './assets/npc-topics.mjs';
 import { createWeatherRenderer } from './assets/weather-renderer.mjs';
 import { createMissileRenderer, parseMissileAnimations } from './assets/missile-renderer.mjs';
 import { createNpcSpeechAlertRenderer } from './assets/npc-speech-alert.mjs';
 import { createAreaNameBlockRenderer } from './assets/area-name-block.mjs';
 import { createEntryBanner, ENTRY_BANNER } from './assets/level-entry-banner.mjs';
-import { createVendorPanel } from './assets/vendor-panel.mjs';
+import { createVendorPanel, SMITH_CLASSES, tooltipSpec } from './assets/vendor-panel.mjs';
 import { handleVendorRepairClick } from './assets/vendor-repair-control.mjs';
 import { decodeDc6 } from './assets/d2-formats.mjs';
 import { createGameCursor } from './assets/game-cursor.mjs';
+import { createPointerLayer } from './assets/pointer-layer.mjs';
 import { DROPPED_GAMEPLAY_KEYS } from './assets/retail-key-bindings.mjs';
 import { createHelpOverlayRenderer } from './assets/help-overlay.mjs';
+import { createConfigureControls } from './assets/configure-controls.mjs';
 import { createAutomapOverlay } from './assets/automap-overlay.mjs';
+import { parseMa0 } from './assets/ma0.mjs';
 import { panelCloseAt } from './assets/panel-close.mjs';
 import { installScrollSafeCanvasFocus } from './assets/canvas-focus.mjs';
-import { createPlugyStash } from './assets/plugy-stash-ui.mjs';
+import { createPlugyStash, PLUGY_GRID, PLUGY_NAME_AT } from './assets/plugy-stash-ui.mjs';
 import { pagesToSss, sssToPages } from './assets/plugy-stash.mjs';
 import { closeStashFromInventory } from './assets/stash-close.mjs';
 import { createFrontendPointerStates } from './assets/frontend-pointer-states.mjs';
@@ -124,6 +132,9 @@ let loadDifficulty = 0;   // the picked save's difficulty: which of the header's
 // Debug overlays (grid, room rectangles, warp diamonds) are exactly what made this read as a test
 // harness rather than a game. They are opt-in now: ?debug=1.
 const DEBUG_OVERLAY = new URLSearchParams(location.search).get('debug') === '1';
+// ?perf=1 turns the frame-cost instrument on from the URL (assets/frame-perf.mjs), so a real browser
+// or the desktop build can be measured without injecting the flag first. Off otherwise.
+if (new URLSearchParams(location.search).get('perf') === '1') globalThis.__d2Perf = true;
 let terrain = null, terrainFiles = null, terrainStats = null, terrainError = '', terrainLevel = -1;
 let playerRenderer = null, playerRenderError = '', motion = {};
 let corpseRenderer = null, corpseEvidence = null, lastCorpseRecovery = null, missileRenderer = null, missileEvidence = [];
@@ -132,6 +143,8 @@ let corpseRenderer = null, corpseEvidence = null, lastCorpseRecovery = null, mis
 let weatherRenderer = null, weatherEvidence = { rain: -1, blits: [] };
 let frameError = '', frameErrors = 0;
 let npcCount = 0;
+// F22: how many units the ENGINE reports as having a speech pending this frame.
+let speechAlertCount = 0;
 let npcPanel = null, npcPanelError = '', npcState = null, npcPanelEvidence = null;
 // A long walk in progress: where we are going, what to do on arrival, and how it is going.
 let walkGoal = null, walkIdle = 0, walkLast = null, walkEvidence = { active: false, hops: 0, reason: 0 };
@@ -165,9 +178,12 @@ const noteClick = (x, y, button) => {
 const claimClick = (x, y) => { for (let i = clickDispatch.length - 1; i >= 0; i--) {
   const c = clickDispatch[i]; if (c.spent === 'world' && !c.result && c.at[0] === x && c.at[1] === y) return c; }
   return null; };
-let lastPurchase = null, lastSale = null, lastHire = null;
+let lastPurchase = null, lastSale = null, lastHire = null, hireWindowEvidence = null;
 let monsterRenderer = null;
 let npcSpeechAlertRenderer = null;
+// F22: one identity per NPC speech-alert blit drawn this frame, so a row can read the pixels back
+// from the rectangle the blit actually landed in rather than from a rectangle it re-derived.
+let npcAlertEvidence = [];
 let areaNameRenderer = null;
 // F115 (renamed from F109 at the cycle-273 merge): nothing is carried here about the area-name block.
 // The NAME is read from the engine at draw time (d2_level_name), and whether the block is drawn at all
@@ -193,6 +209,8 @@ let hoverFont = null, automapFont = null;
 let hoverGlyphPainting = true;
 // Retail's own in-game pointer cel (V4/F6b). Null until the session's assets are decoded.
 let gameCursor = null, gameCursorEvidence = null;
+// The pointer layer owns the last draw of the frame and the browser arrow with it (assets/pointer-layer.mjs).
+let pointerLayer = null;
 // The engine's own advancement record (D2SessionAdvancement). Cached per frame and dropped
 // whenever something might have moved it, so the panel never draws a number the engine has already
 // changed -- and never a number this file worked out for itself.
@@ -212,6 +230,18 @@ function readClassSkills() {
     const n = Module.ccall('d2_session_class_skills', 'number', ['bigint', 'number'], [BigInt(buf), SKILL_CAP]);
     return (classSkills = parseClassSkills(
       Module.HEAPU8.subarray(buf, buf + n * SESSION_SKILL_BYTES), n));
+  } finally { Module.ccall('free', null, ['bigint'], [BigInt(buf)]); }
+}
+
+// V19: SkillDesc's 17 tooltip lines for a skill at a level, calcs evaluated by the engine (16 bytes each).
+function readSkillDesc(id, level) {
+  if (!session || typeof Module === 'undefined' || !Module._d2_session_skill_desc) return [];
+  const buf = Number(Module.ccall('malloc', 'bigint', ['number'], [17 * 16]));
+  try {
+    if (!Module.ccall('d2_session_skill_desc', 'number', ['number', 'number', 'bigint'], [id, level, BigInt(buf)])) return [];
+    const dv = new DataView(Module.HEAPU8.buffer, buf, 17 * 16);
+    return Array.from({ length: 17 }, (_, i) => ({ type: dv.getUint16(i * 16, true), a: dv.getUint16(i * 16 + 2, true),
+      b: dv.getUint16(i * 16 + 4, true), calcA: dv.getInt32(i * 16 + 8, true), calcB: dv.getInt32(i * 16 + 12, true) }));
   } finally { Module.ccall('free', null, ['bigint'], [BigInt(buf)]); }
 }
 
@@ -281,6 +311,9 @@ let skillPanelRenderer = null, skillPanelEvidence = null, classSkills = null;
 // tab and quest are showing. `messageLines` is the log's feed (nothing wired yet: V8c).
 let questLogRenderer = null, messageLogRenderer = null, questVisible = false, messageVisible = false, questAct = 0, questSelected = 0, questEvidence = null, messageEvidence = null;
 const messageLines = [];
+let chatEvidence = null, postedEvidence = null, postedAt = 0;   // V8c: bar/posted-line geometry evidence; the line shows for POSTED_MS after posting (duration unmeasured)
+const POSTED_MS = 10000;
+let chat = null;   // V8c: the Enter chat bar's text while open (null = closed)
 const readQuestWords = () => { const p = Number(Module.ccall('d2_session_quest_record', 'number', [], [])); return p ? new Uint16Array(Module.HEAPU8.buffer.slice(p, p + 96)) : new Uint16Array(48); };
 const questTabs = (words, act) => { let top = act; for (let a = 1; a <= 5; a++) for (let i = 0; i < 8; i++) if (words[8 * (a - 1) + i] && i) top = Math.max(top, a); return Array.from({ length: Math.min(5, top) }, (_, i) => i + 1); };
 const questFirst = (words, act) => { for (let q = 1; q <= QUESTS_IN_ACT[act - 1]; q++) if (questStatus(words, act, q) !== 'locked') return q; return 0; };
@@ -288,6 +321,9 @@ const toggleQuest = () => { questVisible = !questVisible; if (questVisible) { ch
 const toggleMessage = () => { messageVisible = !messageVisible; };
 // The stash is open because the engine sent 0x77 UPDATEUI_OPENSTASH, and closed when retail's
 // TRADEBTN_CLOSESTASH was accepted -- never because of a click alone.
+// The Horadric Cube window (P3c): a right click on the cube in the pack USES it (0x20) and its spell sends 0x77 UPDATEUI_OPENCUBE (21),
+// its items live on invPage 3 and the Transmute button is TRADEBTN_TRANSMUTE (24).
+let cubePanelRenderer = null, cubeOpen = false, cubeLayout = null, cubeEvidence = null;
 let stashPanelRenderer = null, stashPanelError = '', stashEvidence = null, stashOpen = false, stashLayout = null;
 // PlugY shared-stash page control: OPT-IN (?plugy=1; default is strict retail). Off = nothing here runs, nothing is
 // read from or written to the PlugY side store.
@@ -339,6 +375,22 @@ async function plugyLoad(name) {
 const plugyQuery = new URLSearchParams(location.search);
 const plugyStash = createPlugyStash({ enabled: plugyQuery.get('plugy') === '1', onPage: plugySwap });
 let plugyEvidence = null;
+// PY3: PlugY's own art (StashBtns, SharedGoldBtns, TradeStash), fetched from the dev server's /retail/PlugY/ (never hosted; absent = the plain control and retail's panel stay).
+if (plugyStash.enabled) (async () => {
+  try {
+    const get = async (n) => new Uint8Array(await (await fetch('/retail/PlugY/' + n + '.dc6')).arrayBuffer());
+    const [btns, gold, trade] = [await get('StashBtns'), await get('SharedGoldBtns'), await get('TradeStash')];
+    let pal = null;   // the MPQ mounts after boot: retry until the palette reads
+    for (let t = 0; !pal && t < 600; t++) { try { pal = decodeDatPalette(createMpqAssetReader(Module)('data\\global\\palette\\ACT1\\pal.dat')); } catch { await new Promise((r) => setTimeout(r, 500)); } }
+    const canv = (bytes) => decodeDc6(bytes).frames.map((f) => { const c = document.createElement('canvas'); c.width = Math.max(1, f.width); c.height = Math.max(1, f.height);
+      const rgba = new Uint8ClampedArray(f.width * f.height * 4);
+      for (let i = 0; i < f.indices.length; i++) if (f.opaque[i]) rgba.set(pal.subarray(f.indices[i] * 4, f.indices[i] * 4 + 4), i * 4);
+      c.getContext('2d').putImageData(new ImageData(rgba, f.width, f.height), 0, 0); return c; });
+    for (let t = 0; !stashPanelRenderer && t < 600; t++) await new Promise((r) => setTimeout(r, 500));
+    stashPanelRenderer.setArt(trade); stashPanelRenderer.plugy.on = true; stashPanelRenderer.plugy.nameX = PLUGY_NAME_AT.x; stashPanelRenderer.plugy.nameY = PLUGY_NAME_AT.y;
+    plugyStash.setArt({ stash: canv(btns), gold: canv(gold) });
+  } catch (e) { plugyError = `PlugY art: ${e}`; }
+})();
 let stashGoldRenderer = null, stashGoldEvidence = null, stashGoldError = '', stashGoldDialog = null;
 // The waypoint menu is open because the engine sent 0x63; waypointMenu holds that waypoint's unit id.
 let waypointPanelRenderer = null, waypointPanelError = '', waypointEvidence = null, waypointMenu = null, lastWaypointTravel = null;
@@ -347,6 +399,13 @@ let beltRenderer = null, beltEvidence = null, beltBoxCache = null, beltBoxRecord
 let miniDown = -1;
 let controlPanelRenderer = null, controlPanelEvidence = null, hudIconRow = true, lastRunToggle = null;
 let hudHelp = null, hudHelpEvidence = null, hudHelpError = '';
+// F210: retail's HUD Help button (Levelsocket+Level and its "Help (H)" label) is drawn until the Help screen has been used ONCE.
+// D2Client's `H` handler and the button's click handler both write the Storm registry value "Help Menu" = 1 (section "Diablo II"), and the
+// button's draw (D2Client 6fae7740) reads it back and draws nothing when it is set: per machine, not per character or save, so it never
+// returns. The browser's per-machine store is localStorage; `__d2Shell.resetHelpMenu()` (scenarios) shows it again.
+const HELP_MENU_KEY = 'd2.helpMenu';
+const helpMenuSeen = () => { try { return localStorage.getItem(HELP_MENU_KEY) === '1'; } catch { return false; } };
+const markHelpMenuSeen = () => { try { localStorage.setItem(HELP_MENU_KEY, '1'); } catch { /* private window: the button just stays */ } };
 // Retail's Help screen (`H`, CfgHelp): a full-screen overlay (assets/help-overlay.mjs). It is a
 // SCREEN, not chrome -- ClearScreen does not hide it and it does not hide the HUD behind its border,
 // which is the whole point of the screen: its labels' leader lines point at the HUD controls they
@@ -354,13 +413,8 @@ let hudHelp = null, hudHelpEvidence = null, hudHelpError = '';
 // press inside the overlay's rect) and Esc closes it before anything else (its onEscKey).
 let helpRenderer = null, helpVisible = false, helpEvidence = null, helpError = '';
 let automapOverlay = null;
-// Retail's ClearScreen (CfgClearScreen, `Space`): the interface is hidden so the world fills the
-// screen, and the same key brings it back. It suppresses the always-visible HUD CHROME -- what the
-// client draws on every frame whether or not a panel is open (the orbs, the belt, the mini panel,
-// the skill sockets and their popup, the "Help (H)" label, the hover name plate) -- and the chrome's
-// own hit tests with it, so a control that is not on screen cannot answer a click.
-// Open panels are NOT part of it: they are opened and closed by their own controls, and whether
-// retail hides them under ClearScreen as well is unmeasured.
+// Retail's Space (CfgClearScreen) closes open panels and hides no chrome (F3c, retail's frames), so this flag is never set;
+// the chrome gates below stay as no-ops.
 let clearScreen = false;
 // The skill buttons beside the belt and their popup (skill-select.mjs); the engine owns the choice.
 let skillSelectRenderer = null, skillSelectEvidence = null, skillSelectError = '';
@@ -378,6 +432,17 @@ function readSelectedSkills() {
   const p = Number(Module.ccall('d2_session_selected_skills', 'number', [], []));
   const v = new DataView(Module.HEAPU8.buffer, p, 8);
   return { left: v.getInt32(0, true), right: v.getInt32(4, true) };
+}
+// V9b: a skill's wStrName / wStrShort .tbl indices (any id, general skills included) for the button's hover plate.
+function readSkillStrings(id) {
+  if (!Module._d2_session_skill_strings) return null;
+  const v = Module.ccall('d2_session_skill_strings', 'number', ['number'], [id]) >>> 0;
+  return { name: v & 0xFFFF, short: v >>> 16 };
+}
+// V9b: the popup icon's plate is the tree's (buildSkillPlate) over the class tree's record for that skill.
+function skillPlateState() {
+  return { string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]), line: (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]),
+    skillDesc: readSkillDesc, skillStrings: readSkillStrings, skillMana: (id, level) => Module.ccall("d2_session_skill_mana", "number", ["number", "number"], [id, level]), record: (id) => (readClassSkills() || []).find((k) => k.id === id) || null };
 }
 // Retail's 0x3C through the engine; the right hand's choice is also what a right click casts.
 function selectSkill(id, side) {
@@ -407,6 +472,10 @@ const PLAY_MODE = new URLSearchParams(location.search).get('play') === '1';
 const SCREEN = { TITLE: 'title', CREDITS: 'credits', CINEMATICS: 'cinematics', SELECT: 'select', CREATE: 'create', GAME: 'game' };
 let screen = PLAY_MODE ? SCREEN.GAME : SCREEN.TITLE;
 let titleScreen = null, titleError = '', titleTick = 0;
+// The Battle.net server list, read once from the repo's own config file (`play/assets/bnet-servers.json`,
+// loadBnetServers). Battle.net is OFF by default: the shipped file is empty, which resolves to the same
+// off state as a missing or malformed one, and the title screen then behaves exactly as retail's does.
+let bnetConfigPromise = null;
 let cinematicsScreen = null, cinematicsError = '';
 let creditsScreen = null, creditsError = '', creditsTick = 0, exitEvidence = { count: 0, screen: null };
 // Retail's front end opens on the Blizzard logo movies -- New_Bliz, then BlizNorth -- and only then
@@ -423,10 +492,24 @@ let charSelect = null, charSelectError = '', savedCharacters = [], componentTabl
 // Esc's in-game menu (retail: OPTIONS / SAVE AND EXIT GAME / RETURN TO GAME). Single player pauses
 // while it is up, as retail does.
 let gameMenu = null, gameMenuError = '';
+// F218: retail's CONFIGURE CONTROLS panel, the Options page's fourth line. It is a screen of its own
+// (retail's own draw list: boxpieces + textslid + FontInGameChat, no options-page cel anywhere in it),
+// so it draws instead of the menu's page and owns the pointer and the keys while it is up.
+let controlsPanel = null, controlsPanelError = '';
+function ensureConfigureControls() {
+  if (controlsPanel || controlsPanelError || !window.__d2?.ready) return controlsPanel;
+  try {
+    controlsPanel = createConfigureControls({ read: createMpqAssetReader(Module),
+      palettePath: () => actPalettePath(snapshot?.act ?? 1) });
+  } catch (error) { controlsPanelError = String(error); }
+  return controlsPanel;
+}
 function ensureGameMenu() {
   if (gameMenu || gameMenuError || !window.__d2?.ready) return gameMenu;
   try {
-    gameMenu = createGameMenu({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette, onChoose: (item) => {
+    gameMenu = createGameMenu({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette,
+      palettePath: () => actPalettePath(snapshot?.act ?? 1), onChoose: (item) => {
+      if (item === 'CONFIGURE CONTROLS') { ensureConfigureControls()?.openPanel(); return; }
       if (item === 'RETURN TO GAME') gameMenu.close();
       else if (item === 'SAVE AND EXIT GAME') {
         gameMenu.close();
@@ -479,7 +562,7 @@ function sessionAdapter() {
   if (window.Module?._d2_session_create && window.Module?._d2_session_snapshot) {
     return {
       // bare: no start kit, for a player a saved file is about to be applied to.
-      create(f, playerClass = 0, bare = false) { return Module.ccall(bare && Module._d2_session_create_class_bare ? 'd2_session_create_class_bare' : 'd2_session_create_class', 'number', ['number', 'number', 'number', 'number', 'number'], [f.seed, f.difficulty, f.act0, f.level, playerClass]); },
+      create(f, playerClass = 0, bare = false) { Module.ccall('d2_session_create_stream', 'number', ['number'], [0]); return Module.ccall(bare && Module._d2_session_create_class_bare ? 'd2_session_create_class_bare' : 'd2_session_create_class', 'number', ['number', 'number', 'number', 'number', 'number'], [f.seed, f.difficulty, f.act0, f.level, playerClass]); },
       // Create the character FROM the file: the engine reads the header and everything -- class,
       // act, town level, map seed -- comes out of it (PLRSAVE2_ReadSaveHeader, client-parity C3e).
       // Returns 0, or the PLRSAVE2 error code that refused the file.
@@ -694,6 +777,8 @@ async function bootstrapSession() {
       tbl: decodeFontTbl(assetReader('data\\local\\font\\latin\\font6.tbl')), palette: hoverPalette,
       documentObject: document, path: 'data\\local\\font\\latin\\font6.dc6', drawAs: { op: 'celcolor', mode: 5 } });
     gameCursor = createGameCursor({ read: assetReader, decodeDc6, documentObject: document });
+    pointerLayer = createPointerLayer({ gameCursor,
+      cursorItem: (c, w, h, item, x, y) => inventoryPanelRenderer?.drawCursorItem(c, w, h, item, x, y) });
     // In the world a unit casts its shadow (F8); the corpse renderer below does not, and retail's own
     // draw lists carry no `shadow dcc:` for a DD-mode sprite.
     playerRenderer = createPlayerRenderer(assetReader, document, { shadow: true }); playerRenderError = '';
@@ -716,6 +801,8 @@ async function bootstrapSession() {
     try { questLogRenderer = createQuestLogRenderer(createMpqAssetReader(Module), document); messageLogRenderer = createMessageLogRenderer(createMpqAssetReader(Module), document); } catch (error) { sessionError = String(error); }
     try { stashPanelRenderer = createStashPanelRenderer(createMpqAssetReader(Module), document, { string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]),
       stashGold: (limit) => Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [limit]) : 0 }); } catch (error) { stashPanelError = String(error); }
+    try { cubePanelRenderer = createStashPanelRenderer(createMpqAssetReader(Module), document, { page: INVPAGE_CUBE, string: null,
+      transmute: Module.ccall('d2_lang_string', 'string', ['string'], ['Transmute']) || 'Transmute' }); } catch (error) { stashPanelError += ' cube: ' + error; }
     try { stashGoldRenderer = createStashGoldRenderer(createMpqAssetReader(Module), document, { string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]) }); } catch (error) { stashGoldError = String(error); }
     try { waypointPanelRenderer = createWaypointPanelRenderer(createMpqAssetReader(Module), document, { string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) }); } catch (error) { waypointPanelError = String(error); }
     beltRenderer = createBeltRenderer(createMpqAssetReader(Module));
@@ -726,9 +813,12 @@ async function bootstrapSession() {
     try { helpRenderer = createHelpOverlayRenderer(createMpqAssetReader(Module), (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key])); helpError = ''; }
     catch (error) { helpRenderer = null; helpError = String(error); }
     try { automapOverlay = createAutomapOverlay({ read: assetReader, Module, isGameplay: () => screen === SCREEN.GAME }); } catch (error) { sessionError = String(error); }
+    // ?ma0=<url>: the character's saved automap (F186); the real save path is not wired yet.
+    try { const u = new URLSearchParams(location.search).get('ma0'); if (u && automapOverlay) automapOverlay.setSaved(parseMa0(new Uint8Array(await (await fetch(u)).arrayBuffer()))); } catch (error) { sessionError = String(error); }
     try { skillSelectRenderer = createSkillSelectRenderer(createMpqAssetReader(Module)); } catch (error) { skillSelectError = String(error); }
     try { actMusic = createActMusicPlayer(assetReader); await actMusic.prepare(fixture.act0); musicError = ''; } catch (error) { musicError = String(error); }
     try { createUiClickSoundPlayer(assetReader, canvas); } catch (error) { musicError = String(error); }
+    try { unitSounds = createUnitSoundPlayer(assetReader); canvas.__d2UnitSound = unitSounds; } catch (error) { musicError = String(error); }
 
     if (TERRAIN_ENABLED) loadSessionTerrain(fixture.act0);
     // A picked character is not applied to anything: createFromSave above already made it, sections
@@ -806,11 +896,15 @@ function ensureTitleScreen(entryPhase = null) {
     titleScreen = createTitleScreen({
       read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette,
       string: (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]),
+      // Under the hood, not a player setting: the page reads the repo's server-list file at boot.
+      bnet: (bnetConfigPromise ??= loadBnetServers()),
       items: [
         { label: 'SINGLE PLAYER', action: () => { enterCharacterSelect(); } },
-        // TODO(client-parity C2/C3): BATTLE.NET and OTHER MULTIPLAYER need a network backend;
-        // They deliberately remain inert (F89: no retail capture of the screens behind them).
-        { label: 'BATTLE.NET', action: () => {} },
+        // TODO(client-parity C2/C3): BATTLE.NET and OTHER MULTIPLAYER need a network backend.
+        // With no servers configured BATTLE.NET stays inert, exactly as before. With servers
+        // configured it opens the region dialog and points the client at the picked region; it
+        // still dials nothing itself (F89: no retail capture of the screens behind it).
+        { label: 'BATTLE.NET', action: () => { titleScreen?.openGateways(); } },
         { label: 'OTHER MULTIPLAYER', action: () => {} },
         { label: 'CREDITS', action: () => { creditsTick = 0; screen = SCREEN.CREDITS; ensureCreditsScreen(); } },
         { label: 'CINEMATICS', action: () => { screen = SCREEN.CINEMATICS; ensureCinematicsScreen(); } },
@@ -833,6 +927,30 @@ function ensureCreditsScreen() {
   try { creditsScreen = createCreditsScreen({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette, onExit: exitToTitle,
     string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]) }); }
   catch (error) { creditsError = String(error); }
+}
+
+// P8i: retail's tooltip property lines from the engine (d2_session_item_lines), cached per item id.
+const propCache = new Map();
+function itemProps(id) {
+  if (propCache.has(id)) return propCache.get(id);
+  const buf = (itemProps.buf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [512])));
+  const n = Module.ccall('d2_session_item_lines', 'number', ['number', 'bigint', 'number'], [id, BigInt(buf), 512]);
+  // A line may start "\x01<digit>": its D2Win colour (P8j: 1 red unmet requirement, 3 blue magical property); none = white.
+  // "\x01v" (P8j): the label up to ": " is white and the value blue -- a damage line an affix modifies.
+  const raw = n ? Module.UTF8ToString(buf).split('\n').filter(Boolean) : [];
+  const lines = raw.map((l) => l.replace(/^\x01./, '')), colours = raw.map((l) => (l[0] === '\x01' ? (l[1] === 'v' ? 'v' : +l[1]) : 0));
+  const tb = (itemProps.tbuf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [128])));
+  const title = Module.ccall('d2_session_item_title', 'number', ['number', 'bigint', 'number'], [id, BigInt(tb), 128]) ? Module.UTF8ToString(tb) : '';
+  const r = { lines, colours, title, quality: Module.ccall('d2_session_item_quality', 'number', ['number'], [id]) };
+  if (n) propCache.set(id, r);
+  return r;
+}
+
+// The tooltip fields of an item (shared by the shop grid and __d2Shell.tooltipSpec, the s2160 probe of any item id).
+function tipFields(id, codeText) {
+  const p = itemProps(id);
+  return { name: p.title || Module.ccall('d2_lang_string', 'string', ['string'], [codeText]) || codeText, quality: p.quality, props: p.lines, propColours: p.colours,
+    costLabel: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [3329]) };
 }
 
 // Browser pages cannot close their own tab: rebuild the title screen as retail exit's equivalent.
@@ -1054,16 +1172,29 @@ function ensureCharCreate() {
 // the Rogue guards -- as enemies.
 // Read the live NPC conversation out of the engine: who we are talking to, what they said, and
 // their stock if a trade is open. All of it is engine state; the panel only draws it.
+// Retail plays an NPC's message list in order: each dismissal acks the message and shows the next (npcMsgSkip.n = how many were heard).
+let npcMsgSkip = { npcId: 0, n: 0 };
 function readNpcState() {
   try {
     const dialogPtr = Number(Module.ccall('d2_session_npc_dialog', 'number', [], []));
-    if (!dialogPtr) return null;
+    if (!dialogPtr) { npcMsgSkip = { npcId: 0, n: 0 }; return null; }
     const view = new DataView(Module.HEAPU8.buffer, dialogPtr, 64);
     const npcId = view.getUint32(16, true);
-    if (!npcId) return null;
+    if (!npcId) { npcMsgSkip = { npcId: 0, n: 0 }; return null; }
     const messageCount = view.getUint32(32, true);
-    const greeting = messageCount
-      ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [view.getUint16(36, true)])
+    if (npcMsgSkip.npcId !== npcId) npcMsgSkip = { npcId, n: 0 };
+    // Only a menu-0 message speaks on the click; a menu-2 one is a Talk topic and waits for the Talk box (retail: Kashya's first click
+    // is her introduction, 'Den of Evil' is a topic; s2173).
+    const all = Array.from({ length: Math.min(messageCount, 8) }, (_, i) => i), zero = all.filter((i) => Module.HEAPU8[dialogPtr + 52 + i] === 0);
+    const plain = zero.length ? zero : all;   // a list of topics only is spoken as before (Drognan's ordered messages, s000b step 29)
+    // A string id of 0 is a REAL message, so it cannot double as "nothing to say": retail's own 0x27
+    // for Warriv is count 1, ids [0], menus [0], and
+    // D2's ACT1Q0_Callback11_ScrollMessage acks "0 or 1" by design. With 0 read as silence the client
+    // never spoke the A1Q0 gossip, so the A1Q6 quest message behind it (183, REWARDGRANTED on the ack)
+    // was never reached and Warriv never offered the boat east. F230 / s000a step 48.
+    const msgIdx = npcMsgSkip.n, msgId = msgIdx < plain.length ? view.getUint16(36 + plain[msgIdx] * 2, true) : -1;
+    const greeting = msgId >= 0
+      ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [msgId])
       : '';
     const items = [];
     const count = Module.ccall('d2_session_vendor_item_count', 'number', [], []);
@@ -1099,15 +1230,21 @@ function readNpcState() {
         items.push({ id, code: codeText, cost: row.getUint32(20, true),
           invFile: art.invFile || '', gridX: art.gridX ?? -1, gridY: art.gridY ?? -1,
           invPage: art.invPage ?? 255, invWidth: art.invWidth ?? 1, invHeight: art.invHeight ?? 1,
-          name: Module.ccall('d2_lang_string', 'string', ['string'], [codeText]) || codeText });
+          ...tipFields(id, codeText) });
       }
     }
     const gold = Module.ccall('d2_session_player_gold', 'number', [], []);
-    const spoken = messageCount ? view.getUint16(36, true) : 0;   // the message the NPC is speaking
+    const spoken = msgId >= 0 ? msgId : null;   // the message the NPC is speaking; null once the list is exhausted
     // The vendor's MonStats class decides its button row (a smith repairs).
     const classId = snapshot?.entities?.find((e) => e.id === npcId && e.type === 1)?.classId ?? -1;
-    return { npcId, classId, greeting, spoken, items, gold };
-  } catch { return null; }
+    // WHICH counter the engine has open, from the engine: D2SessionVendor.action is the 0x38 action
+    // the window was opened with -- 1 a vendor's trade stock, 2 a gambler's inventory (the engine's
+    // own updateSessionVendorItems switches on it), 0 when nothing is open. It decides which engine
+    // command a click on an offer is (P8d/P8f); the window itself draws the same either way.
+    const vendorPtr = Number(Module.ccall('d2_session_vendor', 'number', [], []));
+    const action = vendorPtr ? new DataView(Module.HEAPU8.buffer, vendorPtr, 28).getUint32(16, true) : 0;
+    return { npcId, classId, greeting, spoken, items, gold, action };
+  } catch (e) { console.error('npcState', e); return null; }
 }
 
 // Buy a vendor item. The engine owns the transaction: it recomputes the price, moves the gold and
@@ -1124,6 +1261,22 @@ function buyFromVendor(itemId) {
     snapshot = session.snapshot();
     return Boolean(ok);
   } catch (error) { lastPurchase = { itemId, ok: false, error: String(error) }; return false; }
+}
+
+// Spend a gambler's offer. A gamble counter is the SAME window over a different inventory (P8f), so
+// the click that reaches here is a click on a drawn offer, exactly as a buy is -- but the engine
+// command is not the same one: d2_session_command_vendor_gamble reads the NPC's per-player gamble
+// inventory and rolls the result item, while d2_session_command_vendor_buy reads the NPC's trade
+// stock and would refuse an offer it has never listed. `npcState.npcId` is the same either way.
+function gambleAtVendor(itemId) {
+  if (!npcState) return false;
+  try {
+    const ok = Module.ccall('d2_session_command_vendor_gamble', 'number', ['number', 'number'],
+      [npcState.npcId, itemId]);
+    npcState = npcMenu?.open ? null : readNpcState();   // the menu comes first; the window opens on its entry
+    snapshot = session.snapshot();
+    return Boolean(ok);
+  } catch { return false; }
 }
 
 // Sell an item to the open vendor. Same division as buying: the engine prices it, moves the gold
@@ -1153,7 +1306,7 @@ function beltToCursor(itemId) {
 // a fast player) found the inventory still hidden, fell through to the world, and the world click
 // closed the trade -- every death shop in s000c sold nothing and bought nothing.
 function syncShopInventory() {
-  if (shopOpen() && !shopWasOpen && ensureVendorPanel()) { vendorPanel.reset(npcState.items); inventoryVisible = true; }
+  if (shopOpen() && !shopWasOpen && ensureVendorPanel()) { vendorPanel.reset(npcState.items, SMITH_CLASSES.has(npcState.classId)); inventoryVisible = true; }
   if (!shopOpen() && shopWasOpen) inventoryVisible = false;
   shopWasOpen = shopOpen();
 }
@@ -1256,23 +1409,6 @@ function walkStep() {
   if (walkEvidence.hops && dist >= (walkGoal.best ?? Infinity)) walkGoal.stall = (walkGoal.stall || 0) + 1; else walkGoal.stall = 0;
   walkGoal.best = Math.min(walkGoal.best ?? Infinity, dist);
 
-  // Close range (a door's own interact box, 1-3 subtiles wide): the fan below can never propose the
-  // one-subtile step that closes it -- its radius floors at 4 (WALK_RANGES via `max(4, dist)`), and
-  // even a radius-1 candidate would be filtered out by `d2_session_walkable`, which the hero's OWN
-  // footprint (COLLIDE_NO_PATH on every subtile his cross covers, COLLISION_CheckCollisionMaskWithAdjacentCells)
-  // makes read wall on every cell touching him. F119, measured (s552, engine 7162ff435c47): parked one
-  // subtile outside a door's box, `d2_session_command_move` to the very next subtile toward the door
-  // returned MOVE_OK and moved the hero there, while both walkable predicates read 0 for that same
-  // cell. So this step asks the engine directly, filter-free -- session.move() is its own authority.
-  // Bounded to a handful of tries per goal -- a genuine wall (not this park) makes the same refused
-  // call every time, and this step must not become its own unbounded loop alongside WALK_GIVE_UP_LEGS.
-  if (dist <= 6 && walkIdle >= 2 && (walkGoal.closeTries || 0) < 6) {
-    walkGoal.closeTries = (walkGoal.closeTries || 0) + 1;
-    const stepx = p.x + Math.sign(walkGoal.x - p.x), stepy = p.y + Math.sign(walkGoal.y - p.y);
-    if ((stepx !== p.x || stepy !== p.y) && session.move(stepx, stepy)) {
-      walkEvidence = { active: true, hops: walkEvidence.hops + 1, reason: 0 }; walkIdle = 0; return;
-    }
-  }
   // Bounded, and honest: this many legs without ever closing on the goal is a wall, not a detour (a
   // detour that gains anything at all resets the count above). Stopping here is what runs a caller's
   // onStuck -- the walk that never stops is a question the engine is never asked.
@@ -1303,6 +1439,25 @@ function walkStep() {
       return;
     }
   }
+  // F119: NOTHING THE FAN PROPOSED MADE PROGRESS, but the goal may sit one subtile away across a box
+  // the hero's own body hides. The fan can never propose that step -- its radius floors at 4
+  // (`WALK_RANGES` via `max(4, dist)`) and its candidate filter is `d2_session_walkable`, which the
+  // hero's OWN footprint (COLLIDE_NO_PATH on every subtile his cross covers,
+  // COLLISION_CheckCollisionMaskWithAdjacentCells) makes read wall on every cell touching him.
+  // MEASURED (s552, engine 7162ff435c47): parked one subtile outside a door's box, the engine's own
+  // `d2_session_command_move` to the very next subtile toward the door returned MOVE_OK and moved the
+  // hero there, while both walkability predicates read 0 for that same cell. So ask the engine
+  // directly, filter-free -- session.move() is its own authority. Placed HERE, AFTER the fan, so a
+  // walk the fan can serve is untouched: only a fan that produced no accepted move falls through to
+  // it. Bounded to a handful of tries per goal -- a genuine wall (not this park) makes the same
+  // refused call every time, and this must not become its own unbounded loop alongside WALK_GIVE_UP_LEGS.
+  if (dist <= 6 && (walkGoal.closeTries || 0) < 6) {
+    walkGoal.closeTries = (walkGoal.closeTries || 0) + 1;
+    const stepx = p.x + Math.sign(walkGoal.x - p.x), stepy = p.y + Math.sign(walkGoal.y - p.y);
+    if ((stepx !== p.x || stepy !== p.y) && session.move(stepx, stepy)) {
+      walkEvidence = { active: true, hops: walkEvidence.hops + 1, reason: 0 }; walkIdle = 0; return;
+    }
+  }
   // Nothing reachable makes progress: stop rather than spin.
   walkEvidence = { active: false, hops: walkEvidence.hops, reason: Module.ccall('d2_session_move_reason', 'number', [], []) };
   // A goal whose own footprint keeps the player out of `within` (Harrogath's 1x7 main gate) still
@@ -1316,6 +1471,19 @@ function readUnitKinds(count) {
   const p = Module._malloc(count);
   try {
     const n = Module.ccall('d2_session_unit_kinds', 'number', ['bigint', 'number'], [BigInt(p), count]);
+    return n > 0 ? Module.HEAPU8.slice(Number(p), Number(p) + n) : null;
+  } catch { return null; } finally { Module._free(p); }
+}
+
+// F22: which units carry retail's NPC speech alert, one byte per unit in snapshot.entities order.
+// The engine answers it from its own per-player NPC-intro flags (the buffer it syncs to the client
+// in server packet 0x91 and clears on client packet 0x4D). No answer -> no alert: an engine without
+// the export must not have the client invent one, the same contract the renderer's `pending` has.
+function readNpcSpeechAlerts(count) {
+  if (!count) return null;
+  const p = Module._malloc(count);
+  try {
+    const n = Module.ccall('d2_session_npc_speech_alerts', 'number', ['bigint', 'number'], [BigInt(p), count]);
     return n > 0 ? Module.HEAPU8.slice(Number(p), Number(p) + n) : null;
   } catch { return null; } finally { Module._free(p); }
 }
@@ -1346,7 +1514,34 @@ function advanceEngine(forced) {
   return n;
 }
 
+// S2: play what the engine attached to units this tick (d2_session_take_sounds), through the retail resolver.
+// F157: an OBJECT's quest message (packet 0x27 on an object, e.g. Anya's plea from her ice) is drawn as the speech box;
+// dismissing it reports it heard (0x31 {guid, string}), which is what advances the quest.
+let objectSpeech = null, objectMsgBuf = 0;
+function pollObjectSpeech() {
+  if (objectSpeech || !session || screen !== SCREEN.GAME || !Module._d2_session_take_object_message) return;
+  if (!objectMsgBuf) objectMsgBuf = Number(Module.ccall('malloc', 'bigint', ['number'], [8]));
+  if (!Module.ccall('d2_session_take_object_message', 'number', ['bigint'], [BigInt(objectMsgBuf)])) return;
+  const v = new Int32Array(Module.HEAPU8.buffer.slice(objectMsgBuf, objectMsgBuf + 8));
+  objectSpeech = { guid: v[0] >>> 0, stringId: v[1], text: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [v[1]]) };
+}
+function dismissObjectSpeech() {
+  const m = objectSpeech; objectSpeech = null;
+  if (m) Module.ccall('d2_session_command_npc_response_packet', 'number', ['number', 'number'], [m.guid, m.stringId]);
+}
+let unitSounds = null, soundBuf = 0;
+function drainUnitSounds() {
+  pollObjectSpeech();
+  if (!unitSounds || !session || screen !== SCREEN.GAME || !Module._d2_session_take_sounds) return;
+  const cap = 32; if (!soundBuf) soundBuf = Number(Module.ccall('malloc', 'bigint', ['number'], [cap * 24]));
+  const n = Module.ccall('d2_session_take_sounds', 'number', ['bigint', 'number'], [BigInt(soundBuf), cap]);
+  if (!n) return;
+  const v = new Int32Array(Module.HEAPU8.buffer.slice(Number(soundBuf), Number(soundBuf) + n * 24));
+  const local = snapshot?.playerId;
+  for (let i = 0; i < n; i++) unitSounds.play({ unitType: v[i * 6], unitId: v[i * 6 + 1], classId: v[i * 6 + 2], soundEvent: v[i * 6 + 3], updateUnitType: v[i * 6 + 4], updateUnitId: v[i * 6 + 5] }, local);
+}
 function update(forceTick = false) {
+  drainUnitSounds();
   // The engine advances every tick, so last tick's advancement record is stale by definition.
   advancement = null; classSkills = null;
   if (screen === SCREEN.TITLE) {
@@ -1368,7 +1563,7 @@ function update(forceTick = false) {
   // the moment the bare host became the player's page: the page would mount the MPQs and this gate
   // would still refuse the session for a URL that never spelled `retail=1`.
   if (!bootstrapStarted && PLAY_MODE && window.__d2Entry.retail && window.__d2?.ready && !window.__d2.error && sessionAdapter()) bootstrapSession();
-  if (gameMenu?.open) { gameMenu.step(); input.drain(); return; }   // single player pauses under the menu
+  if (gameMenu?.open) { gameMenu.step(); controlsPanel?.step(); input.drain(); return; }   // single player pauses under the menu
   const commands = input.drain();
   if (session) {
     for (const command of commands) {
@@ -1453,8 +1648,15 @@ function update(forceTick = false) {
         if (result) snapshot = session.snapshot();
         lastBeltCommand = { slot: command.slot, result };
       } else if (command.type === COMMAND.SKILL) {
-        // F1-F3: Attack, Throw, Kick into the right hand (retail's 0x3C, through the engine).
-        const skills = [0, 2, 1]; if (command.slot >= 1 && command.slot <= skills.length) selectSkill(skills[command.slot - 1], 'right');
+        // F1-F8 are the engine's hotkey table (V9b). With the skill popup open and the pointer on an icon the key ASSIGNS that
+        // skill (in the popup's hand) to the slot; otherwise it selects the slot's skill into its hand (retail's 0x3C). An
+        // unbound key does nothing (retail has no default F-key skills).
+        const slot = command.slot - 1, over = skillSelectRenderer?.open && skillSelectRenderer.hoverIcon;
+        if (over && Module._d2_session_hotkey_assign) Module.ccall('d2_session_hotkey_assign', 'number', ['number', 'number', 'number'], [slot, over.skill.id, over.side === 'left' ? 1 : 0]);
+        else {
+          const bound = Number(Module.ccall('d2_session_hotkey_skill', 'number', ['number'], [slot]));
+          if (bound >= 0) selectSkill(bound, Module.ccall('d2_session_hotkey_hand', 'number', ['number'], [slot]) ? 'left' : 'right');
+        }
       } else if (command.type === COMMAND.CANCEL) {
         // Retail's Esc does not touch the selected skills.
       } else if (command.type === COMMAND.INTERACT) {
@@ -1490,7 +1692,7 @@ function update(forceTick = false) {
       // walk in progress releases the hold around it and rebuilds after it, as before.
       const hold = Boolean(Module._d2_session_hold_world), holdWorld = (on) => { if (hold) Module.ccall('d2_session_hold_world', null, ['number'], [on ? 1 : 0]); };
       holdWorld(true);
-      let kinds;
+      let kinds, alerts;
       try {
         snapshot = session.readSnapshot(); motion = session.motion();
         // Hostility is the monster's alignment, not "is a monster"; talkable is its INTERACT flag.
@@ -1501,15 +1703,23 @@ function update(forceTick = false) {
         // threshold and REPLACE THE ROUTE before the engine had walked the current leg (Codex review
         // of this branch, measured: a long click-walk stalls or takes different hops).
         if (walkGoal && engineAdvanced) { holdWorld(false); walkStep(); holdWorld(true); }
-        npcState = npcMenu?.open ? null : readNpcState();   // the menu comes first; the window opens on its entry
+        // P7b: a timed Introduction/Gossip speech is ours (its line may not be in the engine's list): the engine's read must not replace it.
+        npcState = npcMenu?.open ? null : npcState?.own ? npcState : readNpcState();   // the menu comes first; the window opens on its entry
         kinds = readUnitKinds(snapshot.entities.length);
+        alerts = readNpcSpeechAlerts(snapshot.entities.length);
       } finally { holdWorld(false); }
-      npcCount = 0;
+      npcCount = 0; speechAlertCount = 0;
       if (kinds) for (let i = 0; i < snapshot.entities.length && i < kinds.length; i++) {
         const entity = snapshot.entities[i], kind = kinds[i];
         entity.npc = (kind & 1) !== 0;
         entity.hostile = (kind & 2) !== 0;
         if (entity.npc) npcCount++;
+      }
+      // F22: the engine's pending-speech bit decides the alert; a unit the engine says nothing about
+      // keeps `undefined`, which the renderer already treats as "do not draw".
+      if (alerts) for (let i = 0; i < snapshot.entities.length && i < alerts.length; i++) {
+        snapshot.entities[i].speechPending = alerts[i] !== 0;
+        if (alerts[i]) speechAlertCount++;
       }
     }
     catch (error) { sessionError = String(error); session = null; }
@@ -1552,7 +1762,7 @@ function cameraCentre() {
 // scenery against the hero.
 // The world's screen centre column: the canvas centre, moved to the middle of the free half while a panel is open
 // on one side (SGD2FreeRes set_screen_shift). Fill mode only: ?parity=1 keeps today's fixed centre.
-function panelSides() { return [characterVisible || stashOpen || Boolean(waypointMenu) || Boolean(npcState), skillsVisible || inventoryVisible]; }
+function panelSides() { return [characterVisible || stashOpen || cubeOpen || Boolean(waypointMenu) || Boolean(npcState), skillsVisible || inventoryVisible]; }
 function viewCX() {
   if (!window.__d2Entry?.fill || screen !== SCREEN.GAME || clearScreen) return canvas.width / 2;
   const [left, right] = panelSides();
@@ -1588,11 +1798,8 @@ function unitAnchor(entity) {
 function drawPlayer(c) {
   const w = canvas.width, h = canvas.height;
   if (playerRenderer) {
-    // F40's equipped composite is presently the measured Act IV Barbarian
-    // presentation.  Keep the established Amazon base-composite fixture
-    // (s24) on its retail TN/1ht identity until that class has equivalent
-    // worn-item evidence; passing every session's inventory here changed it.
-    const items = snapshot.playerClass === 4 ? snapshot.items : undefined;
+    // F195: every class draws its worn items (this was gated to the Barbarian).
+    const items = snapshot.items;
     try { playerRenderer.draw(c, viewCX(), (h / 2 + UNIT_CENTRE_Y), { ...motion, playerClass: snapshot.playerClass, mode: snapshot.mode, tick: snapshot.tick, act: snapshot.act, items }); playerRenderError = ''; }
     // One animation that fails to draw is reported, not fatal: the next mode may draw fine.
     catch (error) { playerRenderError = String(error); }
@@ -1635,7 +1842,9 @@ function pointerWorldAt(x, y) {
 // decides every act's loot click, not only act IV's.
 function resolvePointerTarget(x, y) {
   const at = pointerWorldAt(x, y);
-  const unitId = selectPrimaryTarget(snapshot, at, 2);
+  // F14 measured: the unit test is retail's screen-space box, not a subtile disc. The overlap tie-break
+  // (nearest world point to the pointer, lower id) is UNMEASURED and unchanged.
+  const unitId = selectPrimaryTarget(snapshot, at, Infinity, (entity) => unitBoxHit(entity, x, y));
   const distance2 = (candidate) => (candidate.x - at.x) ** 2 + (candidate.y - at.y) ** 2;
   const ground = (snapshot.items || []).filter((candidate) => candidate.mode === 3 && candidate.invPage === 255)
     .map((candidate) => ({ item: candidate, distance: distance2(candidate) }))
@@ -1686,20 +1895,31 @@ function gameCursorContext() {
 
 function drawHoverLabel(c, target, projectUnit, projectStatic) {
   if (!target || !hoverFont) return null;
+  const glyphs = [], font = 'data\\local\\font\\latin\\font16.dc6';
+  if (target.kind === 'unit') {
+    // Retail: a colour-5 mode-1 box centred on the HUD's top
+    // centre, the name as Font16 glyphs padded by two spaces each side (baseline y=31), then the
+    // MonType line (MonType.txt StrSing, "Demon") as centred Font6 at y=49.
+    const text = `  ${target.label}  `, width = hoverFont.measure(text), cx = Math.round(canvas.width / 2);
+    const left = cx - Math.trunc(width / 2), box = { x: left, y: 18, width: width + 8, height: 16 };
+    c.save(); c.fillStyle = 'rgba(0,0,0,.5)'; c.fillRect(box.x, box.y, box.width, box.height); c.restore();
+    recordPrim('box', box.x, box.y, box.x + box.width, box.y + box.height, 5, 1);
+    if (hoverGlyphPainting) hoverFont.drawAnchored(c, text, left + 4, 31, (glyph) => glyphs.push(glyph));
+    const typeIndex = Module.ccall('d2_monster_type_str', 'number', ['number'], [target.classId]);
+    const typeLine = typeIndex > 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [typeIndex]) : '';
+    if (typeLine && automapFont && !target.npc) automapFont.drawAnchored(c, typeLine + ' ', cx - Math.trunc(automapFont.measure(typeLine + ' ') / 2) + 4, 49);   // +4: retail's Font6 centred-text glyphs start 4px right of the text origin (measured, f7 vector)
+    return { ...target, requested: target.label, font, glyphs, plateText: text, typeLine, x: cx, y: 31, box, placement: 'hud-top-centre' };
+  }
+  // The drop stays world-anchored above its static-grid feet (retail's drop label: s286).
   const label = target.label, width = hoverFont.measure(label);
-  // Retail places a selected monster's name in the HUD at the top centre, over its red life bar;
-  // the drop remains world-anchored above its static-grid feet. OpenDiablo2 HUD provides Font16,
-  // centre alignment and 5px padding; retail capture is still needed for final pixel placement.
   const [worldX, foot] = projectStatic(target.x, target.y);
-  const x = target.kind === 'unit' ? Math.round(canvas.width / 2) : Math.round(worldX);
-  const y = target.kind === 'unit' ? 28 : Math.round(foot - 37);
-  const left = Math.round(x - width / 2 - 5), top = target.kind === 'unit' ? 4 : y - hoverFont.lineHeight - 5;
+  const x = Math.round(worldX), y = Math.round(foot - 37);
+  const left = Math.round(x - width / 2 - 5), top = y - hoverFont.lineHeight - 5;
   c.save(); c.fillStyle = 'rgba(0,0,0,.5)'; c.fillRect(left, top, width + 10, hoverFont.lineHeight + 10); c.restore();
-  const glyphs = [];
   if (hoverGlyphPainting) hoverFont.draw(c, label, Math.round(x - width / 2), y - hoverFont.lineHeight,
     (glyph) => glyphs.push(glyph));
-  return { ...target, requested: label, font: 'data\\local\\font\\latin\\font16.dc6', glyphs,
-    x, y, box: { x: left, y: top, width: width + 10, height: hoverFont.lineHeight + 10 }, placement: target.kind === 'unit' ? 'hud-top-centre' : 'above-ground-drop' };
+  return { ...target, requested: label, font, glyphs,
+    x, y, box: { x: left, y: top, width: width + 10, height: hoverFont.lineHeight + 10 }, placement: 'above-ground-drop' };
 }
 
 // The level's DT1 libraries come from LvlTypes.txt via the level's TYPE, so terrain must be rebuilt
@@ -1759,22 +1979,47 @@ function applyDisplayRamp(w, h) {
 }
 
 function render() {
+  // The frame-cost instrument (assets/frame-perf.mjs) is refreshed per frame and, while off, every
+  // perfT0()/perfT() below is a no-op: the shipped frame draws byte-identically.
+  perfSync();
+  const pRender = perfT0();
+  const pWorld = perfT0();
   drawFrame();
-  if (screen === SCREEN.GAME && gameMenu?.open) gameMenu.draw(ctx, canvas.width, canvas.height);
+  perfT('world', pWorld);
+  if (screen === SCREEN.GAME && gameMenu?.open && !controlsPanel?.open) { const p = perfT0(); gameMenu.draw(ctx, canvas.width, canvas.height); perfT('menu', p); }
+  if (screen === SCREEN.GAME && controlsPanel?.open) { const p = perfT0(); controlsPanel.draw(ctx, canvas.width, canvas.height); perfT('controls', p); }   // F218
+  // THE POINTER IS THE LAST THING DRAWN, over the menu as over everything else: it is what retail's
+  // D2Client paints its own cursor cel as, and the layer takes the browser arrow with it (never
+  // neither). Before the ramp, because retail's cursor cel is a palette frame like every other.
+  if (pointerLayer && screen === SCREEN.GAME) {
+    const p = perfT0();
+    const drawn = pointerLayer.draw(ctx, canvas, { session, items: snapshot.items, pointerX: pointer.x, pointerY: pointer.y,
+      context: gameCursorContext(), tick: snapshot.tick,
+      cursorId: Module._d2_session_cursor_item ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0 });
+    cursorItemEvidence = drawn.item; gameCursorEvidence = drawn.game;
+    perfT('pointer', p);
+  }
   // The display ramp is retail's PALETTE brightening, and a boot movie is not a palette frame: its
   // pixels are blitted straight to the primary surface. Measured -- retail's own capture of a movie
   // frame matches our unramped decode to 0.14% RMSE and the same frame ramped to 2.6% (assets/
   // cinematics.mjs), so the ramp must stay off while a movie is up.
-  if (!(screen === SCREEN.TITLE && bootMovieSpec(titlePhase)) && !(screen === SCREEN.CINEMATICS && cinematicsScreen?.evidence.playing != null)) applyDisplayRamp(canvas.width, canvas.height);
+  if (!(screen === SCREEN.TITLE && bootMovieSpec(titlePhase)) && !(screen === SCREEN.CINEMATICS && cinematicsScreen?.evidence.playing != null)) {
+    const p = perfT0(); applyDisplayRamp(canvas.width, canvas.height); perfT('ramp', p);
+  }
+  perfT('render', pRender);
+  perfCountFrame();
 }
 
 function drawFrame() {
   fitView();   // also per frame: a resize that lands between events must never leave a stale view
   const w = canvas.width, h = canvas.height;
-  // The title and character select draw retail's own pointer sprite (ohand.dc6); the system arrow
-  // would be a second one.
-  const cursorStyle = (screen === SCREEN.TITLE || screen === SCREEN.CINEMATICS || screen === SCREEN.SELECT || screen === SCREEN.GAME) ? 'none' : '';
-  if (canvas.style.cursor !== cursorStyle) canvas.style.cursor = cursorStyle;
+  // The title, character select and the movies draw retail's own pointer sprite (ohand.dc6); the
+  // system arrow would be a second one. IN GAME the pointer layer below owns this style instead: the
+  // arrow has to be hidden exactly while a pointer is actually drawn, which only that layer knows.
+  if (screen !== SCREEN.GAME) {
+    const cursorStyle = (screen === SCREEN.TITLE || screen === SCREEN.CINEMATICS || screen === SCREEN.SELECT) ? 'none' : '';
+    if (canvas.style.cursor !== cursorStyle) canvas.style.cursor = cursorStyle;
+  }
   if (screen === SCREEN.TITLE) {
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
     // A boot movie owns the whole screen while it runs, and the screen is BLACK until it opens --
@@ -1842,7 +2087,7 @@ function drawFrame() {
   // Sprites are handed to the terrain pass rather than painted after it, so a wall in front of a
   // monster covers the monster. `depth` is the projected screen Y -- the same key the walls sort on.
   const sprites = [];
-  corpseEvidence = null; unitDrawEvidence = []; waypointPadEvidence = []; missileEvidence = [];
+  corpseEvidence = null; unitDrawEvidence = []; waypointPadEvidence = []; missileEvidence = []; npcAlertEvidence = [];
   for (const entity of snapshot.entities) {
     // The player is drawn by drawPlayer and ground items by the item pass; neither is a dot here.
     if (entity.kind === 'item' || (entity.kind === 'player' && entity.id === snapshot.playerId)) continue;
@@ -1880,15 +2125,26 @@ function drawFrame() {
       // Draw the retail sprite for ANY unit that has an animation. This used to require
       // entity.hostile, which tied "has a body" to "is an enemy" -- so once town NPCs were
       // correctly marked non-hostile they stopped being drawn and Charsi became a dot.
-      const being = entity.animation ? monsterRenderer?.draw(c, sx, sy, entity.animation, snapshot.act) : null;
+      const being = entity.animation ? monsterRenderer?.draw(c, sx, sy, entity.animation, snapshot.act, hovered?.kind === 'unit' && hovered.id === entity.id) : null;
       const drawn = Boolean(being);
-      npcSpeechAlertRenderer?.draw(c, sx, sy, entity, entity.speechPending, snapshot.tick);
+      // F22: the alert's pending state is the ENGINE's per-unit bit (d2_session_npc_speech_alerts,
+      // read into entity.speechPending above), never a client quest guess. The renderer's own record
+      // of what it painted is kept beside the unit so a row can read the canvas back at that
+      // rectangle -- the blit that reached the canvas, not the request that produced it.
+      const alert = npcSpeechAlertRenderer?.draw(c, sx, sy, entity, entity.speechPending, snapshot.tick);
+      if (alert && alert.drawn) npcAlertEvidence.push({ id: entity.id, classId: entity.classId,
+        anchorX: Math.round(sx), anchorY: Math.round(sy), tick: snapshot.tick, ...alert });
       // Per unit, what was drawn and where (s000e asserts Harrogath's townsfolk against retail's draw list).
       // The identity the renderer DREW is carried through beside the mode the shell handed it -- without
       // it a row can only say a unit was drawn, not that it drew the sequence the engine asked for (s278).
       unitDrawEvidence.push({ id: entity.id, classId: entity.classId, code: entity.animation?.code ?? null, mode: entity.animation?.mode ?? null,
-        token: being?.token ?? null, frame: being?.frame ?? null, frames: being?.frames ?? null, direction: being?.direction ?? null,
-        directions: being?.directions ?? null, drawn, x: Math.round(sx), y: Math.round(sy) });
+        token: being?.token ?? null, drawMode: being?.mode ?? null, frame: being?.frame ?? null, frames: being?.frames ?? null, direction: being?.direction ?? null,
+        directions: being?.directions ?? null,
+        // F14: the cel rectangle this blit painted, anchor-relative -- the rectangle a hover-box rule can
+        // be asked about per unit (`x`/`y` here are the same rounded anchor `unitBoxHit` tests against).
+        celWidth: being?.width ?? null, celHeight: being?.height ?? null, celXOffset: being?.xOffset ?? null, celYOffset: being?.yOffset ?? null,
+        animBox: being?.animBox ?? null,
+        drawn, x: Math.round(sx), y: Math.round(sy) });
       if (drawn) return;
       c.fillStyle = entity.hostile ? '#b33b2e' : '#958968';
       c.beginPath(); c.arc(sx, sy, 5, 0, Math.PI * 2); c.fill();
@@ -1914,6 +2170,7 @@ function drawFrame() {
       // The engine's library list is rebuilt with the world (rooms of a neighbouring level bring
       // their own): read it with the tiles that index it, never from an earlier frame. The tiles of
       // the neighbouring levels' active rooms come with it (across a seam retail draws them, F24).
+      const pRead = perfT0();
       const { tiles, files } = readSessionTerrain(Module);
       terrainTiles = tiles;
       if (tiles.length) {
@@ -1930,32 +2187,45 @@ function drawFrame() {
         // Retail's camera is the player's PRECISE position, a subtile's centre (x + 0.5, y + 0.5): the
         // static world (floors, walls, objects, ground items) sits on the integer grid under it, while
         // units stand at their centres too.
+        const wcam = worldToScreen(cameraGrid().x, cameraGrid().y);
+        perfT('worldRead', pRead);
+        const pTerrain = perfT0();
         terrainStats = terrain.draw(ctx, tiles, terrainFiles, { ...snapshot.player, ...cameraCentre() }, w, h, sprites,
           // A broken weather must not take the world down with it: the terrain pass catches nothing, and
           // the error is reported on the evidence a row reads rather than swallowed.
           weatherRenderer ? (c) => {
-            try { weatherEvidence = { rain, blits: weatherRenderer.draw(c, w, h, engineTicks), errors: weatherRenderer.errors }; }
+            try { weatherEvidence = { rain, blits: weatherRenderer.draw(c, w, h, engineTicks, wcam.x, wcam.y), errors: weatherRenderer.errors }; }
             catch (error) { weatherEvidence = { rain, blits: [], errors: weatherRenderer.errors, error: String(error) }; }
           } : null, viewCX());
-      }
+        perfT('terrain', pTerrain);
+      } else perfT('worldRead', pRead);
     } catch (error) { terrainError = String(error); terrain = null; }
   }
   // Without terrain there is no wall pass to interleave into, so the sprites still need painting.
   if (!terrainStats?.drawn) for (const sprite of sprites) sprite.draw(ctx);
   // Retail's falling rain drops are line primitives drawn after the whole world, before the HUD (F11b).
   if (weatherRenderer && terrain && weatherEvidence.rain > 0) {
+    const pWeather = perfT0();
     try { const cam = worldToScreen(cameraGrid().x, cameraGrid().y); weatherEvidence.lines = weatherRenderer.drawStreaks(ctx, w, h, engineTicks, cam.x, cam.y); weatherEvidence.cycle = { ...weatherRenderer.cycle.state, intensity: weatherRenderer.cycle.intensity }; }
     catch (error) { weatherEvidence.streakError = String(error); }
+    perfT('weather', pWeather);
   }
   // Draw after the world passes so the name plate remains legible over foreground terrain, like
   // the HUD's foreground label.  Its subject was resolved before any drawing from F14's target.
   // The name plate is chrome, like the rest of the HUD: ClearScreen draws none of it (F3c).
+  const pHover = perfT0();
   hoverEvidence = clearScreen ? null : drawHoverLabel(ctx, hovered, proj, projStatic);
+  perfT('hover', pHover);
+  // The whole statement (argument construction included) is the automap pass: its npc-name projection
+  // runs retail string lookups per npc every frame, and a pass timed only around the call would miss it.
+  const pAutomap = perfT0();
   automapOverlay?.draw(ctx, w, h, snapshot, terrainTiles, automapOverlay.isOpen ? { camera: cameraCentre(), font: automapFont,
     npcs: snapshot.entities.filter((e) => e.npc).map((e) => { const [sx, sy] = proj(...unitAnchor(e));
       const idx = Module.ccall('d2_monster_name_str', 'number', ['number'], [e.classId]);
       return { sx, sy, label: idx >= 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [idx]) : '' }; }) } : null);
+  perfT('automap', pAutomap);
   // A panel open on a half turns that half into tiled stone with its frame (SGD2FreeRes draw_screen_background).
+  const pWide = perfT0();
   wideFrameEvidence = null; globalThis.__d2WideFrame = false;
   if (window.__d2Entry?.fill && w > 800 && !clearScreen && ensureFreeRes()?.ready) {
     const [left, right] = panelSides(), sides = [left && 'left', right && 'right'].filter(Boolean), parts = [];
@@ -1963,6 +2233,11 @@ function drawFrame() {
     drawParts(ctx, freeResArt, parts);
     if (sides.length) { globalThis.__d2WideFrame = true; wideFrameEvidence = { sides, shiftX: viewCX() - w / 2, parts: parts.map(({ name, frame, x, y, w: pw, h: ph }) => ({ name, frame, x, y, w: pw, h: ph })) }; }
   }
+  perfT('wide', pWide);
+  // Everything from here to the end of the frame is HUD chrome (death screen, npc menu, every panel,
+  // the control panel, the belt, the area name, the help and message overlays): one 'hud' pass so the
+  // chrome's share of the frame is attributable, separate from the world.
+  const pHud = perfT0();
   const grid = 32, ox = w / 2 - snapshot.player.x * grid, oy = h / 2 - snapshot.player.y * grid;
   if (DEBUG_OVERLAY) {
     ctx.strokeStyle = '#182018'; ctx.lineWidth = 1;
@@ -2004,6 +2279,7 @@ function drawFrame() {
       npcMenuEvidence = npcMenu.draw(ctx, pt.x - cam.x + viewCX(), pt.y - cam.y + (h / 2 + UNIT_CENTRE_Y), snapshot.act); }
     else npcMenu.close();
   }
+  hireWindowEvidence = npcMenu?.hireOpen ? npcMenu.drawHire(ctx, snapshot.act) : null;
   // An open conversation draws over the world, the way retail's NPC window does.
   // A shop opening brings retail's inventory up beside it, on its opening tab.
   syncShopInventory();
@@ -2015,11 +2291,17 @@ function drawFrame() {
   // ack tells the server it was heard, it does not clear our copy), so "spoken" alone would redraw
   // the speech box over Akara's own shop forever once Trade was picked. A shop that is actually open
   // (her stock fetched -- shopOpen()) cannot happen in retail before its greeting is already gone.
-  if (npcState?.spoken && !shopOpen() && ensureSpeechBox()) {
-    try { npcPanelEvidence = speechBox.draw(ctx, npcState.greeting); npcPanelError = ''; }
+  if (npcState?.spoken != null && !shopOpen() && ensureSpeechBox()) {
+    try {
+      // P7b: an Introduction / Gossip speech auto-scrolls (retail talk-*-r22) and hands back to the topic box when it ends.
+      const scrolling = npcState.speechT0 !== undefined;
+      const spoke = speechBox.draw(ctx, npcState.greeting, undefined, scrolling ? { t0: npcState.speechT0 } : {});
+      npcPanelEvidence = spoke; npcPanelError = '';
+      if (scrolling && spoke.done) dismissSpeech();
+    }
     catch (error) { npcPanelError = String(error); npcPanelEvidence = null; }
   } else if (shopOpen() && !globalThis.__d2HideShop && ensureVendorPanel()) {
-    try { npcPanelEvidence = vendorPanel.draw(ctx, w, h, { ...npcState, act: snapshot?.act, stashGold: Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [0]) : -1 }); npcPanelError = ''; }
+    try { npcPanelEvidence = vendorPanel.draw(ctx, w, h, { ...npcState, pointer, act: snapshot?.act, stashGold: Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [0]) : -1 }); npcPanelError = ''; }
     catch (error) { npcPanelError = String(error); npcPanelEvidence = null; }
   } else if (npcState && ensureSpeechBox()) {
     // Plain talk, no shop, no active speech message: still the speech box (
@@ -2030,6 +2312,9 @@ function drawFrame() {
   } else if (npcState && ensureNpcPanel()) {
     try { npcPanelEvidence = npcPanel.draw(ctx, w, h, { ...npcState, playerItems: snapshot.items }); npcPanelError = ''; }
     catch (error) { npcPanelError = String(error); npcPanelEvidence = null; }
+  } else if (objectSpeech && ensureSpeechBox()) {
+    try { npcPanelEvidence = speechBox.draw(ctx, objectSpeech.text); npcPanelError = ''; }
+    catch (error) { npcPanelError = String(error); npcPanelEvidence = null; }
   } else npcPanelEvidence = null;
   // Inventory.txt's record is per class: re-read whenever the session's character changes (a new
   // session, a loaded save, another class), not only when none is cached.
@@ -2039,9 +2324,15 @@ function drawFrame() {
   if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && session ? { ...snapshot, gold: Module.ccall('d2_session_player_gold', 'number', [], []) } : snapshot, inventoryVisible);
   pollUiEvents();
   if (stashPanelRenderer) {
+    if (stashPanelRenderer?.plugy.on) { stashPanelRenderer.plugy.pageName = `${plugyStash.showShared ? 'Shared' : 'Personal'} Page n\u00b0${plugyStash.page + 1}`; stashPanelRenderer.plugy.nameColour = plugyStash.showShared ? 1 : 0; }
     try { stashEvidence = stashPanelRenderer.draw(ctx, w, h, stashOpen ? readStashLayout() : null, snapshot.items, stashOpen, snapshot.act); stashPanelError = ''; }
     catch (error) { stashPanelError = String(error); stashEvidence = null; }
-    plugyEvidence = plugyStash.draw(ctx, w, h, stashOpen ? readStashLayout() : null, stashOpen);
+    plugyStash.text = stashPanelRenderer.text; plugyStash.pointer(pointer.x, pointer.y, w, h);
+    plugyEvidence = plugyStash.draw(ctx, w, h, stashOpen ? readStashLayout() : null, stashOpen, snapshot.act || 1);
+  }
+  if (cubePanelRenderer) {
+    try { cubeEvidence = cubePanelRenderer.draw(ctx, w, h, cubeOpen ? readCubeLayout() : null, snapshot.items, cubeOpen, snapshot.act); }
+    catch (error) { stashPanelError = 'cube: ' + error; cubeEvidence = null; }
   }
   if (stashGoldRenderer) {
     try { stashGoldEvidence = stashGoldRenderer.draw(ctx, w, h, stashOpen ? readStashLayout() : null, stashOpen,
@@ -2085,7 +2376,7 @@ function drawFrame() {
       skillPoints: adv?.skillPoints ?? 0, skills: readClassSkills() || [],
       // SkillDesc's wStrName/wStrLong/wStrMana are .tbl indices, so the hover plate's name,
       // description and mana line are retail's own strings, not a table this client keeps.
-      line: (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]) } : null, skillsVisible);
+      line: (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]), skillDesc: readSkillDesc, skillMana: (id, level) => Module.ccall('d2_session_skill_mana', 'number', ['number', 'number'], [id, level]) } : null, skillsVisible);
   }
   // s693: retail's level-ENTRY banner -- the arriving level's own `EntryFile` art, drawn for 120 game
   // frames from the arrival. It goes here, before the HUD chrome, because that is where retail's own
@@ -2114,6 +2405,7 @@ function drawFrame() {
   // what retail's own draw lists show: charpanel and waypoint-menu (left) draw it 131 px right,
   // skilltree and skilltree-act5 (right) 128 px left, stash-town and vendor-malah-act5 (both sides)
   // draw no minipanel_s and no minipanelbtn at all while the arrow stays at x=392 in every one.
+  if (helpRenderer && helpVisible) helpRenderer.dim(ctx, w, h);   // retail: the world is dimmed, then the chrome and the screen are drawn over it
   if (controlPanelRenderer && clearScreen) controlPanelEvidence = null;
   if (controlPanelRenderer && !clearScreen) {
     const screen = readCharacterScreen();
@@ -2122,6 +2414,10 @@ function drawFrame() {
     const shift = HUD_LAYOUT.miniPanelShift;
     controlPanelEvidence = controlPanelRenderer.draw(ctx, w, h, snapshot, readAdvancement(),
       { iconRow: hudIconRow && !(left && right), offsetX: left && !right ? shift.left : right && !left ? shift.right : 0,
+        // The ARROW's own toggle, which is a different state from the row being hidden: retail
+        // keeps menubutton frame 2 while the row is gone (stash-town.txt), so only the arrow's own
+        // click may show frame 0. s391 measures this against retail's own list.
+        arrowOpen: hudIconRow,
         // The run/walk toggle is the ENGINE's, like every other HUD state here: the same flag that
         // decides whether d2_session_command_move sends retail's 0x01 Walk or its 0x03 Run packet
         // is what picks the run button's cel. The client never keeps its own copy of it.
@@ -2150,9 +2446,9 @@ function drawFrame() {
   // Skill / (Click to Change)" text occupies exactly the rows and columns this label lands on
   // (font16 rows 394..403 at x 714..790 against formal12 at x 620..730), and it is the screen this
   // label announces, so drawing it over the screen it opens is a collision, not information.
-  if (hudHelp && !clearScreen && !helpVisible && !skillsVisible && !shopOpen() && !stashOpen) {
+  if (hudHelp && !clearScreen && !helpVisible && !helpMenuSeen() && !skillsVisible && !shopOpen() && !stashOpen) {
     try { const ho = hudOrigin(w, h, 'bottom-right'); ctx.save(); ctx.translate(ho.x, ho.y);
-      try { hudHelpEvidence = { ...hudHelp.draw(ctx, snapshot.act || 1), origin: { x: ho.x, y: ho.y } }; } finally { ctx.restore(); } hudHelpError = ''; }
+      try { { const d = hudHelp.draw(ctx, snapshot.act || 1); hudHelpEvidence = { ...d, hit: { x: Math.round(ho.x + d.hit.x), y: Math.round(ho.y + d.hit.y), w: d.hit.w, h: d.hit.h }, origin: { x: ho.x, y: ho.y } }; } } finally { ctx.restore(); } hudHelpError = ''; }
     catch (error) { hudHelpEvidence = null; hudHelpError = String(error); }
   }
   // Retail's Help screen, over the HUD it describes -- its labels' leader lines point at HUD
@@ -2163,10 +2459,12 @@ function drawFrame() {
     const str = (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]);
     messageEvidence = messageLogRenderer.draw(ctx, w, h, { title: str('strMsgLog'), close: str('strClose'), lines: messageLines }, true, snapshot.act || 1);
   }
-  helpEvidence = null;
-  if (helpRenderer && helpVisible) {
-    try { helpEvidence = helpRenderer.draw(ctx, w, h); helpError = ''; }
-    catch (error) { helpEvidence = null; helpError = String(error); }
+  if (messageLogRenderer && chat !== null && !clearScreen) {
+    chatEvidence = messageLogRenderer.drawChatBar(ctx, w, h, chat, snapshot.act || 1);
+  } else chatEvidence = null;
+  postedEvidence = null;
+  if (messageLogRenderer && !messageVisible && chat === null && messageLines.length && performance.now() - postedAt < POSTED_MS && !clearScreen) {
+    postedEvidence = messageLogRenderer.drawPosted(ctx, w, h, messageLines[messageLines.length - 1], snapshot.act || 1);
   }
   // The belt is drawn with the HUD row's boxes, not the whole worn record (readBeltHudBoxes above):
   // `record`/`recordBoxes` carry which Belts.txt row the engine read and how many boxes it has, so a
@@ -2174,24 +2472,23 @@ function drawFrame() {
   // was actually laid out.
   if (beltRenderer) { const bo = hudOrigin(w, h, 'bottom');   // belt boxes are retail 800x600 coordinates; bottom-centre anchored
     ctx.save(); ctx.translate(bo.x, bo.y);
-    beltEvidence = { ...beltRenderer.draw(ctx, snapshot.items, readBeltHudBoxes()),
+    beltEvidence = { ...beltRenderer.draw(ctx, snapshot.items, readBeltHudBoxes(), true),
       record: readBeltIndex(), recordBoxes: readBeltBoxes()?.length ?? 0, origin: { x: bo.x, y: bo.y } };
     ctx.restore(); }
   else if (clearScreen) beltEvidence = null;
-  // The item on the cursor, over everything, where the pointer is (retail holds it there).
-  cursorItemEvidence = null;
-  if (session && inventoryPanelRenderer && Module._d2_session_cursor_item) {
-    const id = Module.ccall('d2_session_cursor_item', 'number', [], []);
-    const item = id ? snapshot.items.find((i) => i.id === id && i.mode === 4) || snapshot.items.find((i) => i.id === id) : null;
-    if (id) cursorItemEvidence = { engineId: id, drawn: item ? inventoryPanelRenderer.drawCursorItem(ctx, w, h, item, pointer.x, pointer.y) : null };
-  }
-  if (skillSelectRenderer && session && !clearScreen) { try { skillSelectEvidence = skillSelectRenderer.draw(ctx, w, h, readSkillChoices(), readSelectedSkills()); } catch (error) { skillSelectError = String(error); } }
+  // The item on the cursor and the world cel are drawn by the pointer layer in render(), after the
+  // Esc menu -- the last draw of the frame, which is where retail's own pointer goes.
+  if (skillSelectRenderer && session && !clearScreen) { try { skillSelectEvidence = skillSelectRenderer.draw(ctx, w, h, readSkillChoices(), readSelectedSkills(),
+    { act: snapshot.act, hotkeys: Array.from({ length: 8 }, (_, i) => ({ skill: Number(Module.ccall('d2_session_hotkey_skill', 'number', ['number'], [i])), left: Boolean(Module.ccall('d2_session_hotkey_hand', 'number', ['number'], [i])) })), skillStrings: readSkillStrings, plateState: skillPlateState(), line: (i) => (i ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) : '') }); } catch (error) { skillSelectError = String(error); } }
   else if (clearScreen) { skillSelectEvidence = null; skillSelectError = ''; }
-  // A carried item IS retail's pointer, so it wins; otherwise the last world blit is the context
-  // cursor, above every panel and sprite, exactly as D2Client draws its own pointer cel.
-  gameCursorEvidence = session && !cursorItemEvidence && gameCursor
-    ? gameCursor.draw(ctx, canvas, pointer.x, pointer.y, gameCursorContext(), snapshot.tick) : null;
+  // Retail draws the Help screen over the finished HUD chrome (belt, skill sockets): after them, not before.
+  helpEvidence = null;
+  if (helpRenderer && helpVisible) {
+    try { helpEvidence = helpRenderer.draw(ctx, w, h); helpError = ''; }
+    catch (error) { helpEvidence = null; helpError = String(error); }
+  }
   hud.textContent = hudLines(snapshot, Boolean(session), fps).join('\n');
+  perfT('hud', pHud);
 }
 
 // A throw anywhere in update/render used to escape this function, so requestAnimationFrame was
@@ -2228,9 +2525,16 @@ setInterval(() => {
 }, 200);
 
 function frame(now) {
+  perfSync();
+  // The rAF interval is the honest frame time in a real browser (a visible tab): what the player
+  // feels, vsync and all. It is recorded before `last` moves; in the test runner's background tab rAF
+  // never fires, so this pass is absent there and the per-frame samples are the engine's own cost.
+  if (perfEnabled()) perfSample('frameInterval', now - last);
   accumulator = Math.min(accumulator + now - last, STEP * 5); last = now;
   try {
+    const pUpdate = perfT0();
     while (accumulator >= STEP) { update(); accumulator -= STEP; }
+    perfT('update', pUpdate);
     render();
     frameError = '';
   } catch (error) {
@@ -2253,6 +2557,7 @@ function pollUiEvents() {
       // Retail opens the inventory beside the stash (s197). A close invalidates
       // any modal amount before another key can turn it into a stale transfer.
       if (code === 16) { stashOpen = true; inventoryVisible = true; }
+      else if (code === 21) { cubeOpen = true; inventoryVisible = true; }   // UPDATEUI_OPENCUBE, sent by the cube's use spell
       else if (code === 17) {
         stashOpen = false;
         inventoryVisible = false;
@@ -2339,6 +2644,15 @@ function itemCommand(name, ...args) {
   snapshot = session.snapshot();
   return result;
 }
+function readCubeLayout() {
+  if (cubeLayout) return cubeLayout;
+  const p = Module._malloc(48);
+  try {
+    const ok = Module.ccall('d2_session_inventory_layout', 'number', ['number', 'number', 'bigint', 'number'], [TRANSMOGRIFY_BOX_PAGE_1, 1, BigInt(p), 12]);
+    cubeLayout = ok ? stashGeometry(Array.from(new Int32Array(Module.HEAPU8.buffer.slice(p, p + 48)))) : null;
+  } finally { Module._free(p); }
+  return cubeLayout;
+}
 function readStashLayout() {
   if (stashLayout) return stashLayout;
   const p = Module._malloc(48);
@@ -2346,7 +2660,7 @@ function readStashLayout() {
     const ok = Module.ccall('d2_session_inventory_layout', 'number', ['number', 'number', 'bigint', 'number'], [BIG_BANK_PAGE_1, 1, BigInt(p), 12]);
     stashLayout = ok ? stashGeometry(Array.from(new Int32Array(Module.HEAPU8.buffer.slice(p, p + 48)))) : null;
   } finally { Module._free(p); }
-  return stashLayout;
+  return stashLayout && plugyStash.enabled && stashPanelRenderer?.plugy.on ? { ...stashLayout, ...PLUGY_GRID } : stashLayout;   // PY3: PlugY's 10x10 BigStash grid (the engine keeps its own 6x8 rows)
 }
 // Both figures are read from retail's stat list on every use. The dialog owns
 // no balance and never predicts a capped transfer; button 19/20 decides that.
@@ -2355,7 +2669,9 @@ function stashGoldStat(which) {
 }
 function openStashGold(mode) {
   const available = stashGoldStat(mode === 'withdraw' ? STASH_GOLD.bank : STASH_GOLD.carried);
-  stashGoldDialog = { open: true, mode, available, amount: available };
+  // Retail opens the deposit box on ALL the carried gold and the withdraw box on nothing (both measured,
+  // the retail captures and stash-gold-withdraw.txt).
+  stashGoldDialog = { open: true, mode, available, amount: mode === 'withdraw' ? 0 : available };
 }
 function closeStashGold() { stashGoldDialog = null; }
 function changeStashGoldAmount(delta) {
@@ -2377,14 +2693,16 @@ function submitStashGold() {
 // The level exit under the pointer: retail hit-tests the warp's LvlWarp selection box in SCREEN space
 // (SelectX/Y/DX/DY px, y down, from the warp's anchor = tile*5 + Offset - 2 subtiles; Diablerie Warp.cs).
 // The engine exports the box and anchor (D2SessionWarp); the smallest box containing the pointer wins.
-// Declared: the anchor's half-subtile convention is Diablerie's, not measured against retail.
+// Declared: the anchor's half-subtile convention is Diablerie's; retail measured the box size and edges, but only against a
+// hero-derived point, so the anchor (F6: measured O+(-16,+4) px, +-4) is unreconciled with `originX/Y`.
 function warpUnderPointer(px, py) {
   if (!session) return null;
   let best = null, bestArea = Infinity;
   for (const warp of snapshot.warps || []) {
     if (!warp.enabled || warp.located === false || !warp.select || warp.destinationLevel === snapshot.level) continue;
     const [ax, ay] = window.__d2Shell.project(warp.originX, warp.originY), b = warp.select;
-    if (px < ax + b.x || px >= ax + b.x + b.dx || py < ay + b.y || py >= ay + b.y + b.dy) continue;
+    // F6 MEASURED (retail, hover-select-f14-f6.json): edges are INCLUSIVE, the box is (DX+1)x(DY+1) px, y negative = up.
+    if (px < ax + b.x || px > ax + b.x + b.dx || py < ay + b.y || py > ay + b.y + b.dy) continue;
     if (b.dx * b.dy < bestArea) { best = warp; bestArea = b.dx * b.dy; }
   }
   return best;
@@ -2431,49 +2749,112 @@ function objectUnderPointer(px, py) {
     // drawn has no box at all, and an object's art need not cover its own anchor -- the class-24
     // gate's sprite box ends 2 px ABOVE its origin, and with the origin dropped that door could not
     // be opened at all, while the shared player's own gate walk and every scenario click the
-    // object's COORDINATES (project(x, y)). So the object's own tile keeps a small radius around
-    // it: 6 px, well inside the 16 px of the smallest aim F71 was measured at, and the smallest
-    // that holds a sprite which does not reach its own anchor.
+    // object's COORDINATES (project(x, y)). So an object whose art does not reach its own anchor
+    // keeps a small radius around it: 6 px, well inside the 16 px of the smallest aim F71 was
+    // measured at, and the smallest that holds a sprite which does not reach its own anchor.
+    // F98c: the radius is for that art, not for every object. An OPEN door (mode 2) paints retail's
+    // own 1x1 frame (F72, s961: `d5trlitonhth.dcc` is one opaque pixel), so its 6 px disk reached
+    // 6 px of floor on every side and a click beside an open doorway closed it (s438 flipped 2 -> 5
+    // on a repeat aimed at the door's own coordinates). A box that already covers its origin IS the
+    // object's whole pick box, and there the radius goes (s380 measures the contract).
     const box = objectRenderer?.measure ? objectRenderer.measure(object, snapshot.act) : null;
     const d = Math.hypot(ox - px, oy - py);
-    let hit = d <= 6;
-    if (!hit && box && box.width > 0 && box.height > 0) {
+    let inBox = false, coversOrigin = false;
+    if (box && box.width > 0 && box.height > 0) {
       const left = Math.round(ox + box.xOffset), top = Math.round(oy + box.yOffset);
-      hit = px >= left && px < left + box.width && py >= top && py < top + box.height;
+      inBox = px >= left && px < left + box.width && py >= top && py < top + box.height;
+      coversOrigin = box.xOffset <= 0 && box.xOffset + box.width > 0 && box.yOffset <= 0 && box.yOffset + box.height > 0;
     }
+    const hit = inBox || (!coversOrigin && d <= 6);
     if (hit && d < bestDistance) { best = object; bestDistance = d; }
   }
   return best;
 }
+// Pointer minus the unit's cel anchor, screen px (the box test's input).
+function unitBoxHit(entity, px, py) {
+  const camera = worldToScreen(cameraGrid().x, cameraGrid().y), point = worldToScreen(entity.x, entity.y);   // F101: the camera the SPRITE pass draws units with -- the F14 box is measured about retail's cel anchor, so it must sit on the anchor we draw at (cameraCentre() put it 8 px above)
+  // the cel anchor is an integer pixel (retail's measurement is 1 px exact), so round it the way the sprite is placed
+  return inUnitHoverBox(px - Math.round(point.x - camera.x + viewCX()), py - Math.round(point.y - camera.y + (canvas.height / 2 + UNIT_CENTRE_Y)));
+}
+
 function npcUnderPointer(px, py) {
   if (!session) return null;
-  const camera = worldToScreen(cameraGrid().x, cameraGrid().y);
-  const w = canvas.width, h = canvas.height;
-  let best = null, bestDistance = 36;   // within ~36px of the sprite's feet
+  let best = null, bestDistance = Infinity;
+  const at = pointerWorldAt(px, py);
   for (const entity of snapshot.entities) {
-    if (!entity.npc) continue;
-    const point = worldToScreen(entity.x, entity.y);
-    const ex = point.x - camera.x + viewCX(), ey = point.y - camera.y + (h / 2 + UNIT_CENTRE_Y);
-    const distance = Math.hypot(ex - px, ey - py);
+    if (!entity.npc || !unitBoxHit(entity, px, py)) continue;
+    const distance = (entity.x - at.x) ** 2 + (entity.y - at.y) ** 2;
     if (distance < bestDistance) { best = entity; bestDistance = distance; }
   }
   return best;
 }
 
+// Retail lists Cain's Identify Items only while the hero carries something he would identify
+//: the engine's own
+// ITEMS_GetNoOfUnidItems, the count the server's identify handler tests.
+const hasUnidentifiedItem = () => Module.ccall('d2_session_unidentified_count', 'number', [], []) > 0;
+// Kashya lists Hire only once A1Q2 (Sisters' Burial Grounds) is done, the Den alone gives Talk / Cancel
+//.
+const KASHYA = 150, S_HIRE = 3397;
+const menuEntriesFor = (npc) => {
+  const entries = npcMenuEntries(npc.classId)?.filter((e) => e.action !== 'identify' || hasUnidentifiedItem()) ?? null;
+  if (entries && npc.classId === KASHYA && questStatus(readQuestWords(), 1, 2) === 'done') entries.splice(1, 0, { stringId: S_HIRE, action: 'hire' });
+  return entries;
+};
+
+// The engine's 0x27 message list for the open interaction: [{ stringId, menu }] (D2SessionNpcDialog: u16 ids at +36, menus at +52).
+function readDialogMessages() {
+  const at = Number(Module.ccall('d2_session_npc_dialog', 'number', [], []));
+  if (!at) return [];
+  const view = new DataView(Module.HEAPU8.buffer, at, 64), n = Math.min(view.getUint32(32, true), 8);
+  return Array.from({ length: n }, (_, i) => ({ stringId: view.getUint16(36 + 2 * i, true), menu: Module.HEAPU8[at + 52 + i] }));
+}
+// P7b: Talk opens retail's topic box (Introduction / Gossip / one line per quest the NPC has a topic for / Cancel) over the same NPC.
+function openTalkBox(npcId, menuState) {
+  // Hearing a message changes the NPC's list (the server answers 0x31 with a fresh 0x27): ask the engine for the current one.
+  Module.ccall('d2_session_command_npc', 'number', ['number'], [npcId]);
+  noteIntro(menuState.classId);
+  // Hearing the intro (0x31) ends the engine's interaction, so the re-issue above is refused and the list is empty: the topics the
+  // list held when the conversation began (minus the ones heard since) are still the NPC's Talk topics.
+  const now = readDialogMessages();
+  if (now.length) npcTopics.set(npcId, now); else if (npcTopics.has(npcId)) now.push(...npcTopics.get(npcId));
+  const entries = talkEntries(now, (act, n) => Module.ccall('d2_lang_string', 'string', ['string'], [`qstsa${act}q${n}`]));
+  npcMenu.show(npcId, menuState.classId, Module.ccall('d2_lang_string_by_index', 'string', ['number'], [3381]), entries);
+}
+
+// Dismissing the speech (Esc, or the end of an auto-scrolled topic speech). Returns true when another message took its place.
+function dismissSpeech() {
+  // Dismissing the speech tells the server it was heard -- retail's 0x31 with the message id --
+  // which is where a quest message does its work (Akara's A1Q1 reward is granted on message 76).
+  // A `silent` speech (an intro/gossip line the engine's list does not hold) is never acked.
+  if (npcState.spoken != null && !npcState.silent) { Module.ccall('d2_session_command_npc_response', 'number', ['number', 'number'], [npcState.npcId, npcState.spoken]); npcTopics.set(npcState.npcId, (npcTopics.get(npcState.npcId) || []).filter((m) => m.stringId !== npcState.spoken)); }
+  // More messages queued (Drognan: the Tainted Sun thanks, then A2Q4's): the next one is shown, the interaction stays open.
+  if (npcState.spoken != null && !npcState.silent && npcMsgSkip.npcId === npcState.npcId) { npcMsgSkip.n++; const next = readNpcState(); if (next?.spoken != null) { npcState = next; return true; } }
+  // A first speech gives way to the NPC's menu, the interaction still open; otherwise Esc ends it.
+  if (menuAfterSpeech && menuAfterSpeech.npcId === npcState.npcId && ensureNpcMenu()) {
+    const m = menuAfterSpeech; menuAfterSpeech = null;
+    npcMenu.show(m.npcId, m.classId, m.name, m.entries); npcState = null;
+  } else {
+    menuAfterSpeech = null;
+    Module.ccall('d2_session_command_end_npc', 'number', ['number'], [npcState.npcId]);
+    npcState = readNpcState();
+  }
+  return false;
+}
 function talkToNpc(npcId) {
   try {
     if (!Module.ccall('d2_session_command_npc', 'number', ['number'], [npcId])) return false;
     // Retail's client answers the interaction with the NPC's MENU (D2Client's own table,
     // play/assets/npc-menu.mjs); what happens next is the entry the player picks.
     const npc = snapshot.entities.find((u) => u.id === npcId && u.type === 1);
-    const entries = npc ? npcMenuEntries(npc.classId) : null;
+    const entries = npc ? menuEntriesFor(npc) : null;
     if (entries && ensureNpcMenu()) {
       const nameStr = Module.ccall('d2_monster_name_str', 'number', ['number'], [npc.classId]);
       const name = nameStr >= 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [nameStr]) : '';
       // Retail (retail/frames/s1..s4): an NPC with something to say says it first -- Warriv's intro
       // plays on the click -- and the menu comes up when the speech is dismissed (Esc).
-      const said = readNpcState();
-      if (said?.spoken) { npcState = said; menuAfterSpeech = { npcId, classId: npc.classId, name, entries }; return true; }
+      const said = readNpcState(); { const l = readDialogMessages(); if (l.length) npcTopics.set(npcId, l); }
+      if (said?.spoken != null) { noteIntro(npc.classId); npcState = said; menuAfterSpeech = { npcId, classId: npc.classId, name, entries }; return true; }
       npcMenu.show(npcId, npc.classId, name, entries);
       npcState = null;
       return true;
@@ -2484,6 +2865,11 @@ function talkToNpc(npcId) {
     return true;
   } catch { return false; }
 }
+// P7b/F21: retail's scroll now lives in the box that draws it (speech-box.mjs): every speech
+// crawls, so the caller only names the speech's start and reads back `done`.
+// The hero-class introduction the engine offers (its plain menu-0 message), remembered: the list empties once it is heard.
+const npcIntroHeard = new Map(), npcTopics = new Map();   // npcTopics: npcId -> the dialog list last seen
+const noteIntro = (classId) => { const p = readDialogMessages().find((m) => m.menu === 0); if (p) npcIntroHeard.set(classId, p.stringId); };
 let npcMenu = null, npcMenuError = '', npcMenuEvidence = null, menuAfterSpeech = null;
 function ensureNpcMenu() {
   if (npcMenu || npcMenuError || !window.__d2?.ready) return npcMenu;
@@ -2501,34 +2887,74 @@ function chooseNpcMenu(entry) {
   npcMenu.close();
   // What Talk says is dismissed back to this menu, as the first speech is.
   // TODO(client-parity F18): after Talk retail's menu returning is assumed, not yet framed.
-  if (entry.action === 'talk') menuAfterSpeech = menuState;
+  if (entry.action === 'talk') { openTalkBox(npcId, menuState); return; }
+  // P7b: the Talk box's own entries. A quest topic speaks its message (0x31 goes out when the speech is dismissed, as for
+  // every message); Introduction / Gossip speak the engine's plain message when there is one -- which of the NPC's gossip
+  // lines retail picks, and the intro once it was heard, are uncaptured (P7b), so without one the box stays up.
+  if (entry.action === 'topic' || entry.action === 'intro' || entry.action === 'gossip') {
+    const inList = readDialogMessages(), plain = inList.find((m) => m.menu === 0);
+    // Introduction = the NPC's self-introduction (the first-click greeting, replayed identically); Gossip = its one fixed line.
+    const said = npcIntroHeard.get(menuState.classId), sp = npcSpeech(menuState.classId);
+    const id = entry.action === 'topic' ? entry.stringId : entry.action === 'intro' ? (plain?.stringId || said || sp?.intro) : sp?.gossip;
+    if (!id) { npcMenu.show(npcId, menuState.classId, menuState.name, menuState.entries); return; }
+    menuAfterSpeech = menuState;
+    npcState = { ...(readNpcState() || { npcId, classId: menuState.classId, items: [], gold: 0 }), npcId, spoken: id,
+      greeting: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [id]),
+      silent: !inList.some((m) => m.stringId === id), own: true };
+    if (entry.action !== 'topic') npcState.speechT0 = performance.now();
+    return;
+  }
   if (entry.action === 'cancel') { Module.ccall('d2_session_command_end_npc', 'number', ['number'], [npcId]); npcState = readNpcState(); return; }
   if (entry.action === 'trade') Module.ccall('d2_session_command_npc_vendor', 'number', ['number', 'number'], [npcId, 1]);
-  else if (entry.action === 'gamble') Module.ccall('d2_session_command_npc_vendor', 'number', ['number', 'number'], [npcId, 2]);
-  // client-parity P7: Hire opens retail's own hire list (0x38 {action 3} ->
-  // D2GAME_NPC_BuildHirelingList_6FCC6FF0, proved record-for-record by s85-session-hire) and hires
-  // the FIRST offer it names (retail's own 0x4E {u16 name, u32 seed} records) with 0x36 -- the exact
-  // sequence s85 already proves matches retail byte for byte. Declared simplification: retail lets
-  // the player CHOOSE among the list's offers through a window this client does not draw yet (no
-  // retail capture of that window exists to build it from); auto-picking the first is real, tested
-  // engine behaviour, not an invented one, so Hire stops being inert while the chooser stays a gap.
-  else if (entry.action === 'hire') {
-    Module.ccall('d2_session_command_npc_action_packet', 'number', ['number', 'number'], [npcId, 3]);
-    const len = Module.ccall('d2_session_packet_stream_length', 'number', [], []);
-    const base = Number(Module.ccall('d2_session_packet_stream', 'number', [], []));
-    const bytes = new Uint8Array(Module.HEAPU8.buffer, base, len);
-    let mercName = -1;
-    for (let p = 0; p < len;) {
-      const h = bytes[p];
-      if (h === 0x4e) { mercName = bytes[p + 1] | (bytes[p + 2] << 8); break; }
-      const sz = h === 0x4f ? 1 : h === 0x27 ? 40 : h === 0x28 ? 0x67 : h === 0x29 ? 0x61 : 0;
-      if (!sz) break;
-      p += sz;
-    }
-    lastHire = mercName >= 0
-      ? { npcId, mercName, result: Module.ccall('d2_session_command_hire_packet', 'number', ['number', 'number'], [npcId, mercName]) }
-      : { npcId, mercName: -1, result: -1, error: 'no 0x4E hireling offer in the 0x38 reply' };
+  // Cain: no window (retail capture f18-ui2-cain-menu-identify): 0x34 identifies every item at once and
+  // the menu is redrawn without the Identify row.
+  else if (entry.action === 'identify') {
+    const packet = new Uint8Array([0x34, npcId & 255, (npcId >>> 8) & 255, (npcId >>> 16) & 255, (npcId >>> 24) & 255]);
+    const raw = Module._malloc(5), at = Number(raw); Module.HEAPU8.set(packet, at);
+    try { Module.ccall('d2_session_client_packet', 'number', ['bigint', 'number'], [BigInt(at), 5]); } finally { Module._free(raw); }
+    const npc = snapshot.entities.find((u) => u.id === npcId && u.type === 1);
+    npcMenu.show(npcId, menuState.classId, menuState.name, npc ? menuEntriesFor(npc) : menuState.entries.filter((e) => e.action !== 'identify'));
+    return;
   }
+  else if (entry.action === 'gamble') Module.ccall('d2_session_command_npc_vendor', 'number', ['number', 'number'], [npcId, 2]);
+  else if (entry.action === 'hire') { openHireWindow(npcId); return; }
+  npcState = readNpcState();
+}
+
+// P7: Hire opens retail's 'Hire which Mercenary?' window over the vendor's own list: 0x38 {action 3} ->
+// D2GAME_NPC_BuildHirelingList (s85) answers 0x4F then one 0x4E {u16 name, u32 seed} per offer; each row's
+// Lvl / Life / Def / Cost is the engine's MONSTERS_HirelingInit for that offer (d2_session_hire_offer_info).
+// A click on a row sends 0x36 (s85), Cancel ends the interaction.
+const HIRE_DESC = [0, 3371, 3372, 11090, 11088, 11089, 3377, 3376, 3375];
+function openHireWindow(npcId) {
+  Module.ccall('d2_session_command_npc_action_packet', 'number', ['number', 'number'], [npcId, 3]);
+  const len = Module.ccall('d2_session_packet_stream_length', 'number', [], []);
+  const base = Number(Module.ccall('d2_session_packet_stream', 'number', [], []));
+  const bytes = new Uint8Array(Module.HEAPU8.buffer, base, len), view = new DataView(bytes.buffer, base, len);
+  const string = (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]);
+  const offers = [];
+  for (let p = 0; p < len;) {
+    const h = bytes[p];
+    if (h === 0x4e) {
+      const mercName = view.getUint16(p + 1, true), seed = view.getUint32(p + 3, true);
+      const at = Number(Module.ccall('d2_session_hire_offer_info', 'number', ['number', 'number'], [mercName, seed]));
+      if (at) { const v = new Int32Array(Module.HEAPU8.buffer, at, 13);
+        offers.push({ mercName, seed, name: string(mercName), level: v[1], life: v[2], def: v[7], cost: v[5], skill: string(HIRE_DESC[v[12]] || 0) }); }
+      p += 7; continue;
+    }
+    const sz = h === 0x4f ? 1 : h === 0x27 ? 40 : h === 0x28 ? 0x67 : h === 0x29 ? 0x61 : 0;
+    if (!sz) break;
+    p += sz;
+  }
+  npcMenu.showHire(npcId, offers, Module.ccall('d2_session_player_gold', 'number', [], []));
+}
+function chooseHire(hit) {
+  const { npcId, offers } = npcMenu.hireState;
+  npcMenu.closeHire();
+  if (hit?.row !== undefined) {
+    const o = offers[hit.row];
+    lastHire = { npcId, mercName: o.mercName, result: Module.ccall('d2_session_command_hire_packet', 'number', ['number', 'number'], [npcId, o.mercName]) };
+  } else Module.ccall('d2_session_command_end_npc', 'number', ['number'], [npcId]);
   npcState = readNpcState();
 }
 
@@ -2563,6 +2989,7 @@ function openPanelAt(x, y) {
   if (skillsVisible && inside(skillPanelRenderer?.panelRect?.())) return 'skills';
   if (inventoryVisible && inside(inventoryPanelRenderer?.panelRect?.())) return 'inventory';
   if (stashOpen && inside(stashPanelRenderer?.panelRect?.(readStashLayout()))) return 'stash';
+  if (cubeOpen && inside(cubePanelRenderer?.panelRect?.(readCubeLayout()))) return 'cube';
   return null;
 }
 
@@ -2591,6 +3018,20 @@ addEventListener('keydown', (e) => {
   // CommandInput's queue and ran the moment a game started, and a direction held there walked the
   // hero -- the handler had no screen gate at all (F3b).
   if (screen !== SCREEN.GAME) return;
+  // F218: the Configure Controls panel is modal over the Options page -- every key while it is up is
+  // its own, and this sits above the gameplay keys because a key press is what REBINDS a cell. Left
+  // below them, pressing I would open the inventory behind the panel and change nothing.
+  if (controlsPanel?.open) { controlsPanel.key(e.code); e.preventDefault(); return; }
+  // V8c: Enter opens the chat bar; typing fills it; Enter posts `<name>: text` to the message log (single player echoes it); Esc closes.
+  if (chat !== null) {
+    if (e.code === 'Escape') chat = null;
+    else if (e.code === 'Enter') { if (chat) { messageLines.push(`ÿc4${chosenName || 'Player'}ÿc0: ${chat}`); postedAt = performance.now(); } chat = null; }
+    else if (e.code === 'Backspace') chat = chat.slice(0, -1);
+    else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) chat += e.key;
+    else return;
+    e.preventDefault(); return;
+  }
+  if (e.code === 'Enter' && !e.repeat && !npcState && !gameMenu?.open) { chat = ''; e.preventDefault(); return; }
   actMusic?.play(snapshot.act - 1).catch((error) => { musicError = String(error); }); if (e.code === 'KeyI' && !e.repeat) { inventoryVisible = !inventoryVisible; e.preventDefault(); return; }
   if (e.code === 'KeyC' && !e.repeat) { characterVisible = !characterVisible; if (characterVisible) questVisible = false; e.preventDefault(); return; }
   if (e.code === 'KeyQ' && !e.repeat) { toggleQuest(); e.preventDefault(); return; }
@@ -2598,7 +3039,9 @@ addEventListener('keydown', (e) => {
   // Retail's ClearScreen (`CfgClearScreen`; OpenDiablo2's key_map.go ties it to KeySpace): hide the
   // HUD, and the same key restores it. The chrome's hit tests are gated with the flag below, so a
   // click where a hidden control used to be reaches the world instead of the invisible control (F3c).
-  if (e.code === 'Space' && !e.repeat) { clearScreen = !clearScreen; e.preventDefault(); return; }
+  // F3c, retail's own frames: Space closes an open
+  // panel and hides NO chrome -- the orbs, belt and mini panel stay drawn -- and with no panel open it does nothing.
+  if (e.code === 'Space' && !e.repeat) { inventoryVisible = characterVisible = skillsVisible = questVisible = messageVisible = false; e.preventDefault(); return; }
   // Retail's right-hand skill selector (`CfgSkillPick`; OpenDiablo2's ToggleRightSkillSelector is
   // KeyS): the SAME primitive as a click on the right socket, so there is one popup and one owner --
   // what it lists and what it selects is the engine's, exactly as the clicked path is.
@@ -2609,7 +3052,7 @@ addEventListener('keydown', (e) => {
   // Retail's Help screen (`H`, CfgHelp; OpenDiablo2's key_map.go ties ToggleHelpScreen to KeyH):
   // the key opens the screen and the same key closes it. While it is open the world does not get the
   // key, which is why this sits above the dropped-key list like Space and S.
-  if (e.code === 'KeyH' && !e.repeat) { helpVisible = !helpVisible; e.preventDefault(); return; }
+  if (e.code === 'KeyH' && !e.repeat) { helpVisible = !helpVisible; markHelpMenuSeen(); e.preventDefault(); return; }
   // Retail's Swap Weapons (`W`), which retail's own Configure Controls screen binds. The client does not swap anything itself:
   // it asks the engine, whose recovered `sub_6FC46840` moves the equipment between the two weapon sets
   // and flips the active one -- so what the paperdoll and the skills show afterwards is the engine's
@@ -2624,6 +3067,7 @@ addEventListener('keydown', (e) => {
   // the retail evidence): this is below the Esc menu, so the menu keeps its arrows, and it is the one
   // place the walk (W/A/S/D, the arrows) and the attack (Space) this shell used to give them are gone.
   if (DROPPED_GAMEPLAY_KEYS.has(e.code)) { e.preventDefault(); return; }
+  if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && npcMenu?.hireOpen) { chooseHire({ cancel: true }); e.preventDefault(); return; }
   if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && npcMenu?.open) { chooseNpcMenu({ action: 'cancel' }); e.preventDefault(); return; }
   // Dead, Esc continues (retail's youdiedinst: PRESS ESC TO CONTINUE): the player returns to town.
   if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && session && snapshot?.mode === 17) {
@@ -2632,8 +3076,14 @@ addEventListener('keydown', (e) => {
   }
   // The help screen is what Esc closes first while it is up (OpenDiablo2's onEscKey: an open overlay
   // is handled before the escape menu), and it does not open the menu behind it.
+  // F157: an object's speech is dismissed before anything else Esc does (it is drawn over the world, like an NPC's).
+  if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && objectSpeech && !npcState) { dismissObjectSpeech(); e.preventDefault(); return; }
   if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && helpVisible) { helpVisible = false; e.preventDefault(); return; }
-  if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && gameMenu?.open) { gameMenu.close(); e.preventDefault(); return; }
+  if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && cubeOpen) {
+    // TRADEBTN_CLOSECUBE (23): the window closes when the engine accepts it, as the stash's does.
+    if (Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [23, 0])) cubeOpen = false;
+    e.preventDefault(); return; }
+  if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && gameMenu?.open) { gameMenu.back(); e.preventDefault(); return; }
   if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && (messageVisible || questVisible) && !(waypointMenu || stashOpen || npcState || inventoryVisible || characterVisible || skillsVisible)) { messageVisible = false; questVisible = false; e.preventDefault(); return; }
   if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && !(waypointMenu || stashOpen || npcState || inventoryVisible || characterVisible || skillsVisible)) {
     ensureGameMenu()?.toggle(); e.preventDefault(); return;
@@ -2647,18 +3097,7 @@ addEventListener('keydown', (e) => {
       // the window closes when the engine accepts it.
       if (Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [18, 0])) { stashOpen = false; inventoryVisible = false; closeStashGold(); }
     } else if (npcState) {
-      // Dismissing the speech tells the server it was heard -- retail's 0x31 with the message id --
-      // which is where a quest message does its work (Akara's A1Q1 reward is granted on message 76).
-      if (npcState.spoken) Module.ccall('d2_session_command_npc_response', 'number', ['number', 'number'], [npcState.npcId, npcState.spoken]);
-      // A first speech gives way to the NPC's menu, the interaction still open; otherwise Esc ends it.
-      if (menuAfterSpeech && menuAfterSpeech.npcId === npcState.npcId && ensureNpcMenu()) {
-        const m = menuAfterSpeech; menuAfterSpeech = null;
-        npcMenu.show(m.npcId, m.classId, m.name, m.entries); npcState = null;
-      } else {
-        menuAfterSpeech = null;
-        Module.ccall('d2_session_command_end_npc', 'number', ['number'], [npcState.npcId]);
-        npcState = readNpcState();
-      }
+      if (dismissSpeech()) { e.preventDefault(); return; }
     } else { inventoryVisible = false; characterVisible = false; skillsVisible = false; }
     e.preventDefault(); return;
   }
@@ -2666,13 +3105,16 @@ addEventListener('keydown', (e) => {
   if (input.key(e.code, true, e.repeat)) e.preventDefault(); });
 addEventListener('keyup', (e) => { if (input.key(e.code, false)) e.preventDefault(); });
 addEventListener('blur', () => { input.keys.clear(); });
+canvas.addEventListener('wheel', (e) => { if (npcMenu?.hireOpen) { npcMenu.hireScroll(Math.sign(e.deltaY)); e.preventDefault(); } }, { passive: false });
 canvas.addEventListener('pointermove', (e) => {
   const [x, y] = canvasPoint(e);
   pointer.x = x; pointer.y = y;
   if (screen === SCREEN.GAME && gameMenu?.open) { gameMenu.hover(x, y, canvas.width, canvas.height); return; }
+  if (session && skillSelectRenderer && screen === SCREEN.GAME) skillSelectRenderer.hover(x, y, canvas.width, canvas.height, readSkillChoices());
   if (skillsVisible && skillPanelRenderer && session)
     skillPanelRenderer.hover(x, y, canvas.width, canvas.height, { skills: readClassSkills() || [] });
   if (screen === SCREEN.GAME && npcMenu?.open) npcMenu.hover(x, y);
+  if (screen === SCREEN.GAME && npcMenu?.hireOpen) npcMenu.hireHover(x, y);
   // Retail draws no pointer cel on the trademark screen (its draw list has none), so a move there
   // only ends the phase's clock through the click path below.
   if (screen === SCREEN.TITLE && titlePhase === 'menu') titleScreen?.hover(x, y, canvas.width, canvas.height);
@@ -2685,6 +3127,9 @@ canvas.addEventListener('pointerdown', (e) => {
   const click = noteClick(x, y, e.button);
   syncShopInventory();
   const modalOwner = modalPointerOwner({ gameMenuOpen: screen === SCREEN.GAME && gameMenu?.open, stashGoldDialogOpen: screen === SCREEN.GAME && stashGoldDialog?.open });
+  // F218: the Configure controls panel sits over the Options page and owns the pointer while it is
+  // up -- checked before the game menu because the menu is still "open" underneath it.
+  if (screen === SCREEN.GAME && controlsPanel?.open) { click.spent = 'configureControls'; const [mx, my] = canvasPoint(e); controlsPanel.click(mx, my, canvas.width, canvas.height); canvas.focus(); e.preventDefault(); return; }
   if (modalOwner === MODAL_POINTER_OWNER.GAME_MENU) { click.spent = 'gameMenu'; const [mx, my] = canvasPoint(e); gameMenu.click(mx, my, canvas.width, canvas.height); canvas.focus(); e.preventDefault(); return; }
   if (screen === SCREEN.TITLE || screen === SCREEN.CREDITS || screen === SCREEN.CINEMATICS || screen === SCREEN.CREATE || screen === SCREEN.SELECT) {
     click.spent = `screen-${screen}`;
@@ -2718,6 +3163,11 @@ canvas.addEventListener('pointerdown', (e) => {
     click.spent = closed ? 'help-close' : 'help';
     canvas.focus(); e.preventDefault(); return;
   }
+  // The HUD's Help button (drawn only while its label is, hudHelpEvidence): a left press on it opens the Help screen, as `H` does (F3d).
+  const hb = hudHelpEvidence?.hit;
+  if (e.button === 0 && screen === SCREEN.GAME && hb && x >= hb.x && x < hb.x + hb.w && y >= hb.y && y < hb.y + hb.h) {
+    helpVisible = true; markHelpMenuSeen(); click.spent = 'help-button'; canvas.focus(); e.preventDefault(); return;
+  }
   if (e.button === 0 && screen === SCREEN.GAME && messageVisible && messageLogRenderer && !(controlPanelRenderer?.hitMiniButton(controlPanelEvidence, x, y, canvas.width, canvas.height) >= 0)) {
     if (messageLogRenderer.hitClose(x, y, canvas.width, canvas.height)) messageVisible = false;
     click.spent = 'message-log'; canvas.focus(); e.preventDefault(); return;
@@ -2744,6 +3194,11 @@ canvas.addEventListener('pointerdown', (e) => {
   if (e.button === 0 && !clearScreen && (miniDown = controlPanelRenderer?.hitMiniButton(controlPanelEvidence, x, y, canvas.width, canvas.height) ?? -1) >= 0) {
     render(); canvas.focus(); e.preventDefault(); return;
   }
+  // F10: the lit add-point buttons either side of the belt open the panel that spends the points
+  // (left: character, right: skill tree), exactly as the mini-panel's icons / C and T do.
+  { const lv = !clearScreen && e.button === 0 ? (controlPanelRenderer?.hitLevelButton(controlPanelEvidence, x, y, canvas.width, canvas.height) ?? -1) : -1;
+    if (lv === 0) { characterVisible = !characterVisible; if (characterVisible) questVisible = false; render(); canvas.focus(); e.preventDefault(); return; }
+    if (lv === 1) { skillsVisible = !skillsVisible; render(); canvas.focus(); e.preventDefault(); return; } }
   // Retail's run/walk toggle: the click flips the ENGINE's flag (d2_session_toggle_run) -- the same
   // one that chooses the move packet and the hero's mode -- and the button's cel follows the engine
   // on the next frame, so the drawn state cannot disagree with the state the hero moves in.
@@ -2753,14 +3208,15 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   // Only a socket or an icon the renderer drew consumes the click; world input falls through.
   if (e.button === 0 && !clearScreen && dispatchSkillSelectHit(skillSelectRenderer, session, x, y, canvas.width, canvas.height, readSkillChoices(), selectSkill)) { canvas.focus(); e.preventDefault(); return; }
-  // The stash's coin button opens the retail amount dialog. Left deposits the
-  // gold carried by the player; right withdraws banked gold. Both submit the
-  // exact amount through retail 0x4F button 20/19, respectively.
+  // F162: the two gold coins open the two retail dialogs their own captures show. The stash panel's
+  // coin (155,100) opens WITHDRAW; the inventory panel's coin beside the carried gold (484,469) opens
+  // DEPOSIT. Each submit sends retail 0x4F with the dialog's own button (19 withdraw, 20 deposit).
   if (stashOpen && stashGoldRenderer && session) {
     const hit = stashGoldRenderer.hitAt(x, y, canvas.width, canvas.height, readStashLayout(), Boolean(stashGoldDialog));
     if (hit) {
       click.spent = 'stashGold';
-      if (hit.action === 'open') openStashGold(e.button === 2 ? 'withdraw' : 'deposit');
+      if (hit.action === 'withdraw') openStashGold('withdraw');
+      else if (hit.action === 'deposit') openStashGold('deposit');
       else if (hit.action === 'submit') submitStashGold();
       else if (hit.action === 'close') closeStashGold();
       else if (hit.action === 'increase') changeStashGoldAmount(1);
@@ -2799,6 +3255,12 @@ canvas.addEventListener('pointerdown', (e) => {
     else if (hit?.action === 'row' && hit.row.active) takeWaypoint(hit.row.levelId);
     canvas.focus(); e.preventDefault(); return;
   }
+  if (npcMenu?.hireOpen && e.button === 0) {
+    click.spent = 'hireWindow';
+    const hit = npcMenu.hireAt(x, y);
+    if (hit) chooseHire(hit);
+    canvas.focus(); e.preventDefault(); return;
+  }
   // An open NPC menu takes the click: an entry, or (anywhere else) Cancel, as retail's does.
   if (npcMenu?.open && e.button === 0) {
     click.spent = 'npcMenu';
@@ -2817,8 +3279,13 @@ canvas.addEventListener('pointerdown', (e) => {
     if (button === 'exit') { click.spent = 'vendorExit'; Module.ccall('d2_session_command_end_npc', 'number', ['number'], [npcState.npcId]); npcState = readNpcState(); canvas.focus(); e.preventDefault(); return; }
     if (handleVendorRepairClick(button, mine?.id, repairAtVendor)) { click.spent = 'vendorRepair'; canvas.focus(); e.preventDefault(); return; }
     if (button) { click.spent = 'vendorButton'; canvas.focus(); e.preventDefault(); return; }   // Buy / Sell are not modes; a click buys or sells directly.
+    // Which command a click on an offer is depends on the counter the ENGINE has open, not on the
+    // window: action 2 is a gambler's inventory and its offers are spent, action 1 is trade stock
+    // and they are bought. Sending the buy for a gamble offer asks the NPC for an item it never
+    // listed, so the click has to name the command the counter means.
     const item = vendorPanel.itemAt(x, y, canvas.width, canvas.height, npcState);
-    if (item) { click.spent = 'vendorBuy'; buyFromVendor(item.id); canvas.focus(); e.preventDefault(); return; }
+    if (item) { const gamble = npcState.action === 2; click.spent = gamble ? 'vendorGamble' : 'vendorBuy';
+      (gamble ? gambleAtVendor : buyFromVendor)(item.id); canvas.focus(); e.preventDefault(); return; }
     if (mine) { click.spent = 'vendorSell'; sellToVendor(mine.id); canvas.focus(); e.preventDefault(); return; }
   }
   // The item cursor (retail's inventory handling, the engine's packet handlers deciding): over the
@@ -2833,6 +3300,20 @@ canvas.addEventListener('pointerdown', (e) => {
     // cursor works on -- D2Inventory keeps the basket as a page, so 0x19 lifts out of it and 0x18
     // puts back into it with the page in the packet. The panel swallows its clicks: a click on it is
     // never a walk, and one off the grid leaves the held item on the cursor.
+    const cubeGeometry = cubeOpen && inventoryVisible ? readCubeLayout() : null;
+    if (cubeGeometry && cubePanelRenderer && cubePanelRenderer.contains(x, y, canvas.width, canvas.height, cubeGeometry)) {
+      if (cubePanelRenderer.transmuteAt(x, y, canvas.width, canvas.height, cubeGeometry)) {
+        // The engine's own cube recipe pass (TRADEBTN_TRANSMUTE); the result lands on page 3.
+        lastItemCommand = { name: 'transmute', args: [], result: Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [24, 0]), cursor: cursorId };
+      } else if (!cursorId) { const item = cubePanelRenderer.itemAt(x, y, canvas.width, canvas.height, cubeGeometry, snapshot.items); if (item) itemCommand('lift', item.id); }
+      else {
+        const held = snapshot.items.find((i) => i.id === cursorId) || { id: cursorId };
+        const cell = cubePanelRenderer.cellAt(x, y, canvas.width, canvas.height, cubeGeometry, held);
+        if (cell) itemCommand('put', cursorId, cell.x, cell.y, INVPAGE_CUBE);
+      }
+      click.spent = 'cubePanel';
+      snapshot = session.snapshot(); canvas.focus(); e.preventDefault(); return;
+    }
     const geometry = stashOpen ? readStashLayout() : null;
     if (geometry && stashPanelRenderer && stashPanelRenderer.contains(x, y, canvas.width, canvas.height, geometry)) {
       if (plugyStash.click(x, y, canvas.width, canvas.height, geometry, stashOpen)) { click.spent = 'stashPanel'; canvas.focus(); e.preventDefault(); return; }
@@ -2931,7 +3412,7 @@ canvas.addEventListener('pointerdown', (e) => {
   // still win. Only the world's own entity resolution is skipped.
   const panelOwner = openPanelAt(x, y);
   const worldAt = e.button === 0 && session && !panelOwner ? pointerWorldAt(x, y) : null;
-  const hostileHit = worldAt ? selectPrimaryTarget(snapshot, worldAt, 2) : null;
+  const hostileHit = worldAt ? selectPrimaryTarget(snapshot, worldAt, Infinity, (entity) => unitBoxHit(entity, x, y)) : null;
   // What the world dispatch itself saw under the pointer, whichever handler ends up spending the
   // click: the aim point it resolved, and the hostile unit standing on it (the same test the four
   // handlers below and the world path key off). Recorded here so "which handler spent it" and "what
@@ -3088,15 +3569,21 @@ canvas.addEventListener('contextmenu', (e) => { if (session && inventoryVisible 
     // it used to drop the item here, which retail never does.
     if (item && session.useItem(item.id)) { snapshot = session.snapshot(); pollUiEvents(); }
   } e.preventDefault(); });
-window.__d2Shell = { input, warpAt: (x, y) => warpUnderPointer(x, y), get snapshot() { return snapshot; },
+window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, ...tipFields(id, code) }), input, warpAt: (x, y) => warpUnderPointer(x, y), npcAt: (x, y) => npcUnderPointer(x, y)?.id ?? 0, get snapshot() { return snapshot; },
   // The ramp this shell actually blits every finished frame through (C1d), so a row can assert the
   // transform that reaches the canvas is retail's own rather than re-deriving the constant.
   displayRamp: DISPLAY_RAMP,
-  step() { update(true); },   // one shell update AND one game frame, so a scenario's own clock is exact
+  step() { const p = perfT0(); update(true); perfT('update', p); },   // one shell update AND one game frame, so a scenario's own clock is exact
   // The rAF path's cadence without requestAnimationFrame: n shell updates, the engine advanced by
   // the 25 Hz clock alone. `stepClock(25)` must advance the engine 10 frames, not 25 -- that is the
   // whole of retail's tick rate, asserted without a wall clock (s430).
-  stepClock(n) { for (let i = 0; i < n; i++) update(false); },
+  stepClock(n) { const p = perfT0(); for (let i = 0; i < n; i++) update(false); perfT('update', p); },
+  // --- The frame-cost instrument (assets/frame-perf.mjs). OFF unless __d2Perf is set; the row
+  // (s2310) sets it, drives frames with stepClock/renderNow, and reads perfReport(). ---
+  perfEnable() { globalThis.__d2Perf = true; perfSync(); return perfEnabled(); },
+  perfDisable() { globalThis.__d2Perf = false; perfSync(); return perfEnabled(); },
+  perfReset() { perfReset(); },
+  perfReport() { return perfReport(); },
   get gameStepMs() { return GAME_STEP; },
   // How many times the engine has been advanced. Retail's rule is a RATE -- 25 a second -- so the
   // only way to assert it is to compare this against the shell frames that produced it.
@@ -3110,11 +3597,13 @@ window.__d2Shell = { input, warpAt: (x, y) => warpUnderPointer(x, y), get snapsh
   // logic -- a click-walk in progress, the paused game menu, a screen other than the game -- runs the
   // full update instead, so this only skips re-reading a world nothing is waiting on.
   stepN(n) {
+    const p = perfT0();
     for (let i = 0; i < n - 1; i++) {
-      if (screen === SCREEN.GAME && session && !walkGoal && !gameMenu?.open && Module._d2_session_tick) Module.ccall('d2_session_tick', 'number', ['number'], [1]);
+      if (screen === SCREEN.GAME && session && !walkGoal && !gameMenu?.open && Module._d2_session_tick) { engineTicks++; Module.ccall('d2_session_tick', 'number', ['number'], [1]); drainUnitSounds(); const lv = Module.ccall('d2_session_player_level', 'number', [], []); if (lv !== entryBannerLevel) { entryBannerLevel = lv; entryBannerAt = engineTicks; } }
       else update(true);
     }
     if (n > 0) update(true);
+    perfT('update', p);
   },
   // Force one frame. requestAnimationFrame is throttled hard in a headless/background tab, so a
   // caller that drives the shell with step() and then reads PIXELS can otherwise be looking at a
@@ -3128,17 +3617,33 @@ window.__d2Shell = { input, warpAt: (x, y) => warpUnderPointer(x, y), get snapsh
   // World (subtile) -> canvas pixel, through the SAME isometric transform render() and the pointer
   // path use. Exposed so a caller aiming at a unit does not re-derive the projection and quietly
   // drift from it; input.pointer(...project(u.x, u.y)) round-trips back to that unit.
+  // F101: this is the STATIC-GRID point (centre camera): a unit's drawn anchor is 8 px below it. Objects, warps and the
+  // scenarios' aims were calibrated on this; unit hover boxes use the drawn anchor (unitBoxHit, cameraGrid).
   project(wx, wy) {
     const c = worldToScreen(cameraCentre().x, cameraCentre().y), p = worldToScreen(wx, wy);   // the static grid
     return [p.x - c.x + viewCX(), p.y - c.y + (canvas.height / 2 + UNIT_CENTRE_Y)];
+  },
+  // F101: the CENTRE of a unit's hover box (unitBoxHit: the drawn cel anchor via cameraGrid; a click on a tall NPC aims 32 px above it, the box centre). Aim unit clicks with this; the retail F14 box is x -24..19, y -78..15 about it.
+  // With `id`, the first of anchor / mid-body / head-height that resolves to THAT unit (a pack's boxes overlap: the anchor alone often names a neighbour).
+  unitAim(wx, wy, id) {
+    const c = worldToScreen(cameraGrid().x, cameraGrid().y), p = worldToScreen(wx, wy);
+    const bx = p.x - c.x + viewCX(), by = p.y - c.y + (canvas.height / 2 + UNIT_CENTRE_Y);
+    if (id != null) for (const [dx, dy] of [[0, 0], [-2, -32], [0, -16], [-2, -56], [-2, -8]]) if (resolvePointerTarget(bx + dx, by + dy)?.unitId === id) return [bx + dx, by + dy];
+    return [bx, by];
   },
   get playerRenderer() { return playerRenderer; }, get monsterRenderer() { return monsterRenderer; },
   get missileEvidence() { return missileEvidence.map((entry) => ({ ...entry })); },
   // Retail's weather (F11b): the level's own Rain byte and one identity per rain blit drawn this
   // frame -- the record shape retail's draw lists use, so a row can compare them record for record.
-  get weatherEvidence() { return { rain: weatherEvidence.rain, errors: weatherEvidence.errors ? weatherEvidence.errors.slice() : [], blits: weatherEvidence.blits.map((b) => ({ ...b })), lines: (weatherEvidence.lines || []).map((l) => ({ ...l })), streakError: weatherEvidence.streakError || null, cycle: weatherEvidence.cycle || null }; },
+  get weatherEvidence() { return { rain: weatherEvidence.rain, errors: weatherEvidence.errors ? weatherEvidence.errors.slice() : [], blits: weatherEvidence.blits.map((b) => ({ ...b })), ripples: weatherRenderer ? weatherRenderer.ripples : [], lines: (weatherEvidence.lines || []).map((l) => ({ ...l })), streakError: weatherEvidence.streakError || null, cycle: weatherEvidence.cycle || null }; },
   get weatherRenderer() { return weatherRenderer; },
   get npcSpeechAlertRenderer() { return npcSpeechAlertRenderer; },
+  // F22: the units the engine reports as having a speech pending, and one drawn-blit identity per
+  // alert actually painted this frame -- the cel's own rectangle on the canvas and the decoded hash
+  // of the frame rasterised into it, so a row reads the blit back rather than the request.
+  get npcSpeechAlerts() { return { pending: snapshot.entities.filter((e) => e.speechPending === true)
+      .map((e) => ({ id: e.id, classId: e.classId, x: e.x, y: e.y, preciseX: e.preciseX, preciseY: e.preciseY })), count: speechAlertCount }; },
+  get npcAlertEvidence() { return npcAlertEvidence.map((entry) => ({ ...entry })); },
   // F115: what the area-name block was asked for and what reached the canvas this frame -- the engine's
   // own level name, each line's anchor and every glyph blit (font path, frame, frame-bytes hash,
   // anchor, colour shift), so a row compares it blit by blit with retail's own records. `open` is the
@@ -3169,11 +3674,13 @@ window.__d2Shell = { input, warpAt: (x, y) => warpUnderPointer(x, y), get snapsh
     drawn: waypointEvidence && JSON.parse(JSON.stringify(waypointEvidence)), art: waypointPanelRenderer?.evidence ?? null,
     lastTravel: lastWaypointTravel }; },
   waypointTargets() { return waypointMenu ? waypointMenuInput.targets(canvas.width, canvas.height) : null; },
-  get plugyStash() { return { fail: plugyFail, ready: plugyReady, error: plugyError, settle: () => plugyLast, pages: plugyPages, enabled: plugyStash.enabled, set enabled(v) { plugyStash.enabled = v; }, page: plugyStash.page, drawn: plugyEvidence }; },
+  get plugyStash() { return { fail: plugyFail, ready: plugyReady, error: plugyError, settle: () => plugyLast, pages: plugyPages, artReady: Boolean(plugyStash.art), enabled: plugyStash.enabled, set enabled(v) { plugyStash.enabled = v; }, page: plugyStash.page, drawn: plugyEvidence }; },
   get stashEvidence() { return { open: stashOpen, error: stashPanelError, drawn: stashEvidence && JSON.parse(JSON.stringify(stashEvidence)),
     art: stashPanelRenderer?.evidence ?? null, gold: { error: stashGoldError, drawn: stashGoldEvidence && JSON.parse(JSON.stringify(stashGoldEvidence)),
       art: stashGoldRenderer?.evidence ?? null } }; },
   get questVisible() { return questVisible; }, set questVisible(v) { if (Boolean(v) !== questVisible) toggleQuest(); },
+  get chatOpen() { return chat !== null; }, get chatEvidence() { return chatEvidence; }, get postedEvidence() { return postedEvidence; }, get messageLines() { return messageLines.slice(); },
+  get objectSpeech() { return objectSpeech; }, dismissObjectSpeech,
   get messageVisible() { return messageVisible; }, set messageVisible(v) { messageVisible = Boolean(v); },
   get questEvidence() { return questEvidence; }, get messageEvidence() { return messageEvidence; },
   get skillsVisible() { return skillsVisible; },
@@ -3216,6 +3723,7 @@ window.__d2Shell = { input, warpAt: (x, y) => warpUnderPointer(x, y), get snapsh
   // no rectangle at all until the click routing needed one (s427). Each is the panel's own answer.
   get characterPanelRect() { const r = characterPanelRenderer?.panelRect(); return r ? { ...r } : null; },
   get skillPanelRect() { const r = skillPanelRenderer?.panelRect(); return r ? { ...r } : null; },
+  get cubeEvidence() { return { open: cubeOpen, error: stashPanelError, drawn: cubeEvidence && JSON.parse(JSON.stringify(cubeEvidence)), geometry: cubeOpen ? readCubeLayout() && { ...readCubeLayout() } : null }; },
   get stashGeometry() { const g = stashOpen ? readStashLayout() : null; return g ? JSON.parse(JSON.stringify(g)) : null; },
   get stashPanelRect() { const r = stashOpen ? stashPanelRenderer?.panelRect(readStashLayout()) : null; return r ? { ...r } : null; },
   get controlPanelEvidence() { return controlPanelEvidence && { ...controlPanelEvidence }; },
@@ -3224,6 +3732,8 @@ window.__d2Shell = { input, warpAt: (x, y) => warpUnderPointer(x, y), get snapsh
   // Retail's Help screen (`H`). No setter, deliberately: the only way it opens is the key (or its
   // Close box closing it), so a row cannot pass by flipping the flag itself.
   get helpVisible() { return helpVisible; },
+  get helpMenuSeen() { return helpMenuSeen(); },
+  resetHelpMenu() { try { localStorage.removeItem(HELP_MENU_KEY); } catch { /* no store */ } },
   get helpError() { return helpError; },
   get helpEvidence() { return helpEvidence && JSON.parse(JSON.stringify(helpEvidence)); },
   // The screen's own Close box, in canvas coordinates: the row asks the renderer that draws it
@@ -3267,16 +3777,7 @@ window.__d2Shell = { input, warpAt: (x, y) => warpUnderPointer(x, y), get snapsh
       return Boolean(ok);
     } catch { return false; }
   },
-  gambleForItem(itemId) {
-    if (!npcState) return false;
-    try {
-      const ok = Module.ccall('d2_session_command_vendor_gamble', 'number', ['number', 'number'],
-        [npcState.npcId, itemId]);
-      npcState = npcMenu?.open ? null : readNpcState();   // the menu comes first; the window opens on its entry
-      snapshot = session.snapshot();
-      return Boolean(ok);
-    } catch { return false; }
-  },
+  gambleForItem(itemId) { return gambleAtVendor(itemId); },
   get saleEvidence() { return lastSale ? { ...lastSale } : null; },
   // What the player is carrying that a vendor would take: inventory pages, not the ground.
   // The code is decoded to its four-character form so this list and the vendor's speak the same
@@ -3293,6 +3794,7 @@ window.__d2Shell = { input, warpAt: (x, y) => warpUnderPointer(x, y), get snapsh
     });
   },
   get purchaseEvidence() { return lastPurchase ? { ...lastPurchase } : null; },
+  get hireWindowEvidence() { return hireWindowEvidence && { ...hireWindowEvidence, offers: npcMenu.hireState.offers.map((o) => ({ ...o })) }; },
   get hireEvidence() { return lastHire ? { ...lastHire } : null; },
   get repairAllEvidence() { return lastRepairAll ? { ...lastRepairAll } : null; },
   // Both sides of the merge touched this line: main added the stall counter (the walk controller
@@ -3338,13 +3840,21 @@ window.__d2Shell = { input, warpAt: (x, y) => warpUnderPointer(x, y), get snapsh
   },
   get npcPanelEvidence() {
     return { open: Boolean(npcState), error: npcPanelError,
-      npcId: npcState?.npcId ?? 0, greeting: npcState?.greeting ?? '',
+      npcId: npcState?.npcId ?? 0, spoken: npcState?.spoken ?? 0, greeting: npcState?.greeting ?? '',
       items: npcState?.items?.length ?? 0,
       gold: npcState?.gold ?? -1,
       firstItems: (npcState?.items ?? []).slice(0, 6).map((i) => ({ id: i.id, code: i.code, name: i.name, cost: i.cost, invFile: i.invFile })),
       drawn: npcPanelEvidence, panel: (shopOpen() ? vendorPanel?.evidence : npcPanel?.evidence) ?? null };
   },
   get unitDrawEvidence() { return unitDrawEvidence.map((u) => ({ ...u })); },
+  talkTo(npcId) { return talkToNpc(npcId); },   // test hook (s2151): the click-arrival path
+  // Test hook (s2150): the plate a hovered monster of this class gets, drawn on a scratch canvas.
+  hoverPlateFor(classId) {
+    const idx = Module.ccall('d2_monster_name_str', 'number', ['number'], [classId]);
+    const label = Module.ccall('d2_lang_string_by_index', 'string', ['number'], [idx]);
+    const cv = document.createElement('canvas'); cv.width = canvas.width; cv.height = canvas.height;
+    return JSON.parse(JSON.stringify(drawHoverLabel(cv.getContext('2d'), { kind: 'unit', id: 0, classId, label, x: 0, y: 0 }, null, null)));
+  },
   get hoverEvidence() { return hoverEvidence && JSON.parse(JSON.stringify(hoverEvidence)); },
   get hoverFontReady() { return Boolean(hoverFont); },
   // s286 checks the hover/click boundary contract through the same resolver the input paths call.
@@ -3412,7 +3922,16 @@ window.__d2Shell = { input, warpAt: (x, y) => warpUnderPointer(x, y), get snapsh
   get corpseEvidence() { return corpseEvidence && { ...corpseEvidence }; }, get lastCorpseRecovery() { return lastCorpseRecovery && { ...lastCorpseRecovery }; },
   get npcMenuEvidence() { return npcMenuEvidence ? { ...npcMenuEvidence, error: npcMenuError } : { error: npcMenuError }; },
   get deathScreenEvidence() { return deathScreenEvidence ? { ...deathScreenEvidence, error: deathScreenError } : { error: deathScreenError }; },
+  get optionsEvidence() { return { open: !!gameMenu?.open && gameMenu.page === 'options' }; },
   get gameMenuEvidence() { return gameMenu ? { ...gameMenu.evidence, error: gameMenuError } : { open: false, error: gameMenuError }; },
+  // F218: retail's Configure Controls panel (the Options page's fourth line). The getter is the
+  // harness surface -- the panel itself, so a row can click/key it by retail's own coordinates and
+  // read the state it acted on; the evidence is the small truth a dossier wants.
+  get configureControls() { return controlsPanel; },
+  get configureControlsEvidence() {
+    if (!controlsPanel) return { open: false, error: controlsPanelError };
+    return { ...controlsPanel.evidence, error: controlsPanelError };
+  },
   // Hostile monsters near the player with what they are (d2_session_unit_info 8..11): MonsterData
   // type flags (0x04 champion, 0x08 unique, 0x10 minion, 0x02 superunique), monster level, damage%.
   get monsterTypes() {
@@ -3485,6 +4004,8 @@ window.__d2Shell = { input, warpAt: (x, y) => warpUnderPointer(x, y), get snapsh
       // The menu's own boxes, and only once the menu is up: retail shows the trademark screen first,
       // and during it there is nothing to click (the phase's click is what `titleAdvance` handles).
       out.title = titleScreen.targets(w, h);
+      // The region dialog is modal over the menu: while it is up, its rows are what the pointer hits.
+      if (titleScreen.gatewaysOpen()) out.titleGateways = titleScreen.gatewayTargets(w, h);
     }
     if (screen === SCREEN.CINEMATICS && cinematicsScreen) out.cinematics = cinematicsScreen.targets(w, h);
     if (screen === SCREEN.CREDITS && creditsScreen) out.credits = creditsScreen.targets(w, h);

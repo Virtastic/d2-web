@@ -1695,7 +1695,7 @@ void __fastcall QUESTS_ObjectEvents(D2GameStrc* pGame, D2UnitStrc* pUnit)
 						D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pFoundUnit->dwClassId);
 						if (pObjectsTxtRecord)
 						{
-							EVENT_SetEvent(pQuestData->pGame, pFoundUnit, EVENTTYPE_ENDANIM, pQuestData->pGame->dwGameFrame + (pObjectsTxtRecord->dwFrameCnt[1] >> 8), 0, 0);
+							EVENT_SetEvent(pQuestData->pGame, pFoundUnit, EVENTTYPE_ENDANIM, pQuestData->pGame->dwGameFrame + OBJECTS_GetOperatingTicks(pObjectsTxtRecord), 0, 0);
 						}
 					}
 				}
@@ -2642,7 +2642,7 @@ int32_t __fastcall QUESTS_SetObjectSelection(D2ObjOperateFnStrc* pOp)
 	else
 	{
 		UNITS_ChangeAnimMode(pObject, OBJMODE_OPERATING);
-		EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_ENDANIM, pOp->pGame->dwGameFrame + (pObjectsTxtRecord->dwFrameCnt[1] >> 8), 0, 0);
+		EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_ENDANIM, pOp->pGame->dwGameFrame + OBJECTS_GetOperatingTicks(pObjectsTxtRecord), 0, 0);
 	}
 
 	pObject->dwFlags &= ~UNITFLAG_TARGETABLE;

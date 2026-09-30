@@ -4370,9 +4370,12 @@ int __fastcall sub_6FD98220(int nMin, int nMax, int nUnused, void* pUserData)
 	D2_MAYBE_UNUSED(nUnused);
 	D2SeedStrc* v5 = NULL;
 
-	if (D2UnkMissileCalcStrc* pCalc = (D2UnkMissileCalcStrc*) pUserData)
+	// Retail reads the calc's first field (a 32-bit D2UnitStrc*) and rolls the seed at +0x20, i.e. pUnit->pSeed.
+	// A 32-bit field_0 + 32 on wasm64 truncated the pointer and rolled 32 bytes into the unit (nAct and padding,
+	// not the seed), so `rand(par3,par4)` skill calcs (Imp Inferno's length) depended on unit memory and layout (E1).
+	if (D2UnitStrc* pUnit = pUserData ? *(D2UnitStrc**)pUserData : nullptr)
 	{
-		v5 = (D2SeedStrc*)(pCalc->field_0 + 32);
+		v5 = &pUnit->pSeed;
 		if (nMin < nMax)
 		{
 			return nMin + SEED_RollLimitedRandomNumber(v5, nMax - nMin + 1);

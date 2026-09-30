@@ -730,7 +730,7 @@ void __fastcall OBJECTS_InitFunction59_VileDogAfterglow(D2ObjInitFnStrc* pOp)
 
     UNITS_ChangeAnimMode(pOp->pObject, OBJMODE_OPERATING);
     EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_MONUMOD, pOp->pGame->dwGameFrame + 27, 0, 0);
-    EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_ENDANIM, (pOp->pObjectTxt->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+    EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pOp->pObjectTxt) + pOp->pGame->dwGameFrame + 1, 0, 0);
 }
 
 //D2Game.0x6FC71110
@@ -740,7 +740,7 @@ void __fastcall OBJECTS_InitFunction12_PermanentPortal(D2ObjInitFnStrc* pOp)
     {
         UNITS_ChangeAnimMode(pOp->pObject, OBJMODE_OPERATING);
         UNITS_BlockCollisionPath(pOp->pObject, pOp->pRoom, pOp->nX, pOp->nY);
-        EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_ENDANIM, (pOp->pObjectTxt->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+        EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pOp->pObjectTxt) + pOp->pGame->dwGameFrame + 1, 0, 0);
     }
 
     switch (DUNGEON_GetLevelIdFromRoom(pOp->pRoom))
@@ -860,7 +860,7 @@ void __fastcall OBJECTS_InitFunction11_Portal(D2ObjInitFnStrc* pOp)
     if (pOp->pObject && pOp->pObject->dwAnimMode == OBJMODE_OPERATING)
     {
         UNITS_BlockCollisionPath(pOp->pObject, pOp->pRoom, pOp->nX, pOp->nY);
-        EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_ENDANIM, (pOp->pObjectTxt->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+        EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pOp->pObjectTxt) + pOp->pGame->dwGameFrame + 1, 0, 0);
     }
 }
 

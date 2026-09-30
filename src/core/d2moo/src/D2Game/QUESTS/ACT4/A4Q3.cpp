@@ -157,7 +157,7 @@ int32_t __fastcall OBJECTS_OperateFunction49_HellForge(D2ObjOperateFnStrc* pOp, 
 		if (ITEMS_FindQuestItem(pOp->pGame, pOp->pPlayer, ' ssm'))
 		{
 			UNITS_ChangeAnimMode(pObject, OBJMODE_OPERATING);
-			EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, pOp->pGame->dwGameFrame + (pObjectsTxtRecord->dwFrameCnt[1] >> 8), 0, 0);
+			EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, pOp->pGame->dwGameFrame + OBJECTS_GetOperatingTicks(pObjectsTxtRecord), 0, 0);
 
 			pQuestDataEx->nHellforgeObjectMode = OBJMODE_OPENED;
 			pQuestData->dwFlags &= 0xFFFFFF00;

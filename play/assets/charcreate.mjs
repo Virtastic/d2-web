@@ -16,7 +16,7 @@
 // background with the Units palette does not fail, it just comes out blown out in blue and white,
 // which is a wrong picture rather than an error.
 
-import { composeTiled, createBlender, createFont, decodeFontTbl, FRONTEND, recordTiled, TITLE_COLUMNS } from './frontend.mjs';
+import { composeTiled, createBlender, createFont, decodeFontTbl, FRONTEND, recordTiled, textColourPalette, TITLE_COLUMNS } from './frontend.mjs';
 import { createCharacterCreateCheckboxes } from './charcreate-checkboxes.mjs';
 import { createCharacterNameRenderer, NAME_FIELD } from './charcreate-name.mjs';
 import { recordDc6 } from './drawlist.mjs';
@@ -283,9 +283,20 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     // preserve each real Font16 cel call only while the selected hero's three labels are painted.
     onGlyph: (blit) => { if (descriptionGlyphs) descriptionGlyphs.push(blit); },
   });
+  // The three small labels (CHARACTER NAME and the two checkbox labels) are Font16 celcolor draws with
+  // extra=4 in retail's own list: the D2Win gold text shift, the same
+  // one the trademark screen's copyright uses. The description lines are extra=0, so they keep smallFont.
+  // Each glyph blit is kept so a row can assert font, frame, anchor and extra per glyph.
+  const labelGlyphs = [];
+  const goldLabelFont = createFont({
+    dc6: decodeDc6(read(FONT16.font)), tbl: decodeFontTbl(read(FONT16.fontTbl)),
+    palette: textColourPalette(read(CREATE_ASSETS.palette.replace(/pal\.dat$/i, 'pal.pl2')), palette, 4),
+    documentObject, path: FONT16.font, drawAs: { op: 'celcolor', mode: 5, extra: 4 },
+    onGlyph: (blit) => labelGlyphs.push(blit),
+  });
   // OpenDiablo2's SelectHeroClass gives clickbox.dc6's fechar cels and these anchors.  The
   // labels use this screen's existing Units Font16, exactly as its other small labels do.
-  const checkboxes = createCharacterCreateCheckboxes({ read, decodeDc6, palette, smallFont, string, documentObject });
+  const checkboxes = createCharacterCreateCheckboxes({ read, decodeDc6, palette, smallFont: goldLabelFont, string, documentObject });
 
   const blend = createBlender(read(CREATE_ASSETS.palette.replace(/pal\.dat$/i, 'pal.pl2')), palette);
   // Button labels: exocet10 glyphs in draw mode 4, fechar's PL2 MultiplicativeBlend over the button
@@ -437,6 +448,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
         // The caret's phase in this frame, and the cel it blitted when it drew one.
         caretLit: caretLit(),
         checkboxes: checkboxes.evidence,
+        labelGlyphs: labelGlyphs.map((g) => ({ ...g })),
         chosen: chosen >= 0 ? heroes[chosen].key : null,
         hovered: hovered >= 0 ? heroes[hovered].key : null,
         pressed,
@@ -567,7 +579,8 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
         recordDc6(CREATE_ASSETS.textBox, 0, textBoxDc6.frames[0], LAYOUT.nameBox.x, LAYOUT.nameBox.y);
         // Left-aligned at the position the layout gives, in the small font, so it sits above the box
         // rather than through it (retail's own Font16 record starts at x=321 with its bottom at 490).
-        smallFont.draw(ctx, nameLabel, LAYOUT.nameLabel.x, LAYOUT.nameLabel.y);
+        labelGlyphs.length = 0;
+        goldLabelFont.draw(ctx, nameLabel, LAYOUT.nameLabel.x, LAYOUT.nameLabel.y);
         drawnName = nameRenderer.draw(ctx, name, clock());
         checkboxes.draw(ctx);
         // Retail DRAWS the OK button whether or not it can be used -- what changes is the cel's draw
@@ -608,8 +621,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
         const h = heroes[i], stance = stances.stance(i, tick);
         if (stance === HERO_STANCE.APPROACHING) {
           const since = stances.elapsed(i, tick);
-          const duration = Math.max(1, Math.round(h.forwardMs * RETAIL_HZ / 1000));
-          const frame = Math.floor(since * h.forward.count / duration);
+          const frame = since;   // one frame per retail tick (F84)
           show(h, stance, pass, 'forward', frame);
           if (h.forwardOverlay) showOverlay(h, stance, pass, 'forwardOverlay', frame, h.overlay.forwardBlend ? OVERLAY_MODE : 0);
         } else if (stance === HERO_STANCE.RETREATING) {

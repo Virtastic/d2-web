@@ -1,5 +1,6 @@
 import { decodeDatPalette } from './d2-formats.mjs';
 import { decodeDcc } from './unit-formats.mjs';
+import { createBlender } from './frontend.mjs';
 import { dccDirection, indexedToRgba } from './unit-renderer.mjs';
 
 const MISSILE_CEL = Object.freeze({ 1: 'Javelin' });
@@ -24,11 +25,13 @@ export function parseMissileAnimations(bytes, count) {
 // `direction` is the unit's 64-slot facing and is resolved through the DCC's own direction count, the
 // same step a unit's DCC goes through (`dccDirection`); passing it straight in as an index was wrong
 // for any DCC with fewer than 64 directions.
-// Still open (F20): Missiles.txt nTrans is reported per missile by the engine (`direction`'s neighbour
-// on the record) but not applied -- retail's mapping from nTrans to a draw mode has no capture yet.
+// F20: nTrans 1 draws in mode 3 (retail: units-shaman-bolt-anim.txt, ShamanFireball nTrans 1, 368 of 368
+// records mode=3). nTrans 0 and 2 in flight are uncaptured and stay opaque.
 export function createMissileRenderer(read, documentObject = globalThis.document, celFile = null) {
   const palette = decodeDatPalette(read('data\\global\\palette\\units\\pal.dat'));
   const decoded = new Map(), rasters = new Map();
+  let blend = null;
+  for (const dir of ['units', 'ACT1']) { try { blend = createBlender(read(`data\\global\\palette\\${dir}\\pal.pl2`), palette); break; } catch { /* next */ } }
   return { draw(ctx, x, y, missile, direction = 0, tick = 0, frame = null, trans = null) {
     const cel = (celFile && celFile(missile?.classId)) || MISSILE_CEL[missile?.classId];
     if (!cel) return null;
@@ -44,10 +47,13 @@ export function createMissileRenderer(read, documentObject = globalThis.document
     const key = `${celFile_}:${dir}:${frameIndex}`; let canvas = rasters.get(key);
     if (!canvas) { canvas = documentObject.createElement('canvas'); canvas.width = drawnFrame.width; canvas.height = drawnFrame.height;
       canvas.getContext('2d').putImageData(new ImageData(indexedToRgba(drawnFrame.indexed, drawnFrame.opaque, palette),drawnFrame.width,drawnFrame.height),0,0);rasters.set(key,canvas); }
-    ctx.drawImage(canvas,Math.round(x+drawnFrame.xOffset),Math.round(y+(drawnFrame.bottomUp?drawnFrame.yOffset:drawnFrame.yOffset-drawnFrame.height+1)));
+    const left = Math.round(x + drawnFrame.xOffset), top = Math.round(y + (drawnFrame.bottomUp ? drawnFrame.yOffset : drawnFrame.yOffset - drawnFrame.height + 1));
+    const mode = trans === 1 && blend ? 3 : 0;
+    if (mode) blend(ctx, { width: drawnFrame.width, height: drawnFrame.height, indices: drawnFrame.indexed, opaque: drawnFrame.opaque }, left, top, mode);
+    else ctx.drawImage(canvas, left, top);
     let pixelHash=0x811c9dc5,opaque=0;for(let i=0;i<drawnFrame.indexed.length;i++){pixelHash^=drawnFrame.indexed[i];pixelHash=Math.imul(pixelHash,0x01000193);opaque+=drawnFrame.opaque[i];}
     return {classId:missile.classId,celFile:celFile_,direction:direction,directionIndex:dir,directions:dcc.directions,
-      frame:frameIndex,frames:count,framePrecise:frame == null ? null : Math.trunc(frame),trans,width:drawnFrame.width,
+      drawMode:mode,frame:frameIndex,frames:count,framePrecise:frame == null ? null : Math.trunc(frame),trans,width:drawnFrame.width,
       height:drawnFrame.height,opaque,pixelHash:pixelHash>>>0};
   }};
 }

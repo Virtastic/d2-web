@@ -182,15 +182,25 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     ctx.save(); ctx.translate(x0, y0); ctx.scale(scale, scale);
     // SGD2FreeRes: the orbs sit at the screen edges; `edge` is how far each moves out, 0 at 800x600.
     const edge = x0 / scale;
+    // Per-blit records in retail's own order: the six panel frames, then each orb's fluid
+    // (celex, extra = its percentage) and its overlap.
+    const PANEL_PATH = 'data\\global\\ui\\PANEL\\800ctrlpnl7.dc6', top = PANEL_SCREEN_TOP;
     ctx.drawImage(p[0], CONTROL_LAYOUT.healthX - edge, 0);
-    let x = CONTROL_LAYOUT.centerX; for (let i = 1; i <= 4; i++) { ctx.drawImage(p[i], x, CONTROL_LAYOUT.height - p[i].height); x += p[i].width; }
+    recordDc6(PANEL_PATH, 0, panel.frames[0], CONTROL_LAYOUT.healthX - edge, top);
+    let x = CONTROL_LAYOUT.centerX; for (let i = 1; i <= 4; i++) { ctx.drawImage(p[i], x, CONTROL_LAYOUT.height - p[i].height + 1); recordDc6(PANEL_PATH, i, panel.frames[i], x, top + CONTROL_LAYOUT.height - p[i].height + 1); x += p[i].width; }
     ctx.drawImage(p[5], CONTROL_LAYOUT.manaX + edge, 0);
+    recordDc6(PANEL_PATH, 5, panel.frames[5], CONTROL_LAYOUT.manaX + edge, top);
     const life = resourceRatio(snapshot?.player?.hp, snapshot?.player?.hpMax);
     const mana = resourceRatio(snapshot?.player?.mana, snapshot?.player?.manaMax);
     const drawFluid = (image, x, y, ratio) => { const top = Math.round(image.height * (1 - ratio)), shown = image.height - top;
       if (shown > 0) ctx.drawImage(image, 0, top, image.width, shown, x, y + top, image.width, shown); };
-    drawFluid(fluid[0], 30 - edge, 14, life); drawFluid(fluid[1], 691 + edge, 14, mana);
-    ctx.drawImage(overlap[0], 28 - edge, 6); ctx.drawImage(overlap[1], 691 + edge, 10);
+    drawFluid(fluid[0], 29 - edge, 12, life); drawFluid(fluid[1], 689 + edge, 12, mana);
+    ctx.drawImage(overlap[0], 28 - edge, 12); ctx.drawImage(overlap[1], 690 + edge, 8);
+    const FLUID_PATH = 'data\\global\\ui\\PANEL\\hlthmana.dc6', OVERLAP_PATH = 'data\\global\\ui\\PANEL\\overlap.dc6';
+    recordDc6(FLUID_PATH, 0, fluids.frames[0], 29 - edge, top + 12, { op: 'celex', extra: Math.round(life * 100) });
+    recordDc6(OVERLAP_PATH, 0, overlaps.frames[0], 28 - edge, top + 12);
+    recordDc6(FLUID_PATH, 1, fluids.frames[1], 689 + edge, top + 12, { op: 'celex', extra: Math.round(mana * 100) });
+    recordDc6(OVERLAP_PATH, 1, overlaps.frames[1], 690 + edge, top + 8);
     // The ornate strips between each skill button and the console (wide views only): hud.strips paints them.
     if (edge > 0 && hud.strips) hud.strips(ctx);
 
@@ -230,10 +240,16 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
         ratio: staminaRatio, pixels: staminaPixels, colours, record: { op: 'box', x: spec.x, y: spec.y,
           x2: spec.x + staminaPixels, y2: spec.y + spec.height, colour: spec.index, mode: 2 } };
     })();
-    const menu = (() => { const spec = HUD_LAYOUT.menuButton, at = local(spec), index = hud.iconRow === false ? spec.closedFrame : spec.openFrame;
+    // The arrow's cel follows the ARROW's OWN toggle (`hud.arrowOpen`), which is a different state
+    // from the row being hidden by a panel on each side: retail keeps menubutton frame 2 while the
+    // row is gone in stash-town.txt and vendor-malah-act5.txt (both carry the arrow, neither carries
+    // a minipanel record), so only a click on the arrow may show frame 0 -- and no capture of a
+    // collapsed row exists, so frame 0 is still the inference the module comment declares. Reading
+    // the ROW's visibility here instead is what s391 measures: it drew frame 0 in the stash state.
+    const menu = (() => { const spec = HUD_LAYOUT.menuButton, at = local(spec), index = hud.arrowOpen === false ? spec.closedFrame : spec.openFrame;
       const f = menuButtonDc6.frames[index];
       ctx.drawImage(frameCanvas(f, palette, documentObject), at.x, at.y);
-      return { ...record(spec, index, f, spec.x, spec.y), collapsed: hud.iconRow === false,
+      return { ...record(spec, index, f, spec.x, spec.y), collapsed: hud.arrowOpen === false,
         left: spec.x, top: spec.y, w: f.width, h: f.height }; })();
     // The two add-point buttons either side of the belt, at retail's own anchors and in retail's own
     // (disabled) frame -- see HUD_LAYOUT.levelButtons.
@@ -250,12 +266,17 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     if (hud.iconRow !== false) {
       const spec = HUD_LAYOUT.miniPanel, shift = Math.round(Number(hud.offsetX) || 0);
       ctx.drawImage(miniPanel, spec.x + shift, spec.y - PANEL_SCREEN_TOP);
+      // The container's record is emitted HERE, at its own draw, not when the evidence object is
+      // built: a record pushed after the buttons loop reads as the container drawn LAST, where
+      // retail's list is minipanel_s then its seven buttons (den-entry.txt lines 150-157). s391
+      // diffs our own order against retail's, which is the difference this closes.
+      const container = record(spec, spec.frame, miniPanelDc6.frames[spec.frame], spec.x + shift, spec.y);
       const buttons = HUD_LAYOUT.miniButtons.frames.map((index, i) => {
         const bf = miniButtonDc6.frames[index + (hud.miniPressed === i ? 1 : 0)], bx = HUD_LAYOUT.miniButtons.x + i * HUD_LAYOUT.miniButtons.stride + shift;
         ctx.drawImage(frameCanvas(bf, palette, documentObject), bx, HUD_LAYOUT.miniButtons.y - PANEL_SCREEN_TOP);
         return { ...record(HUD_LAYOUT.miniButtons, index + (hud.miniPressed === i ? 1 : 0), bf, bx, HUD_LAYOUT.miniButtons.y), left: bx, top: HUD_LAYOUT.miniButtons.y, w: bf.width, h: bf.height };
       });
-      mini = { container: record(spec, spec.frame, miniPanelDc6.frames[spec.frame], spec.x + shift, spec.y), buttons, offsetX: shift };
+      mini = { container, buttons, offsetX: shift };
     }
 
     const experience = Number(advancement?.experience);
@@ -279,5 +300,10 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
         height: CONTROL_LAYOUT.experienceHeight * scale } };
   }
 
-  return { draw, hitMenuButton, hitRunButton, hitMiniButton };
+  // The add-point button under (x, y) on the box the LAST frame placed, and only while it is LIT
+  // (frame 0: the engine holds points to spend): 0 = stat points (left), 1 = skill points (right), else -1.
+  // A disabled button (frame 2) is decoration and its click belongs to the world.
+  const hitLevelButton = (evidence, x, y, width, height) => (evidence?.hud?.levelButtons || [])
+    .findIndex((b) => b.frame === HUD_LAYOUT.levelButtons.litFrame && hitControlBox(b, x, y, width, height));
+  return { draw, hitMenuButton, hitRunButton, hitMiniButton, hitLevelButton };
 }

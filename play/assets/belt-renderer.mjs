@@ -1,4 +1,5 @@
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
+import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
 
 // The belt's boxes are TABLE DATA, not a layout this file gets to choose. Retail computes them in
 // DATATBLS_GetInvRectFromBeltsTxt (D2Common #10638) from Belts.txt, at the requested resolution,
@@ -29,6 +30,15 @@ export function beltBoxes(boxes) {
 export function createBeltRenderer(read, documentObject = globalThis.document) {
   const palette = decodeDatPalette(read('data\\global\\palette\\SKY\\pal.dat')), cache = new Map();
   const icon = name => { let c = cache.get(name); if (!c) { const d = decodeDc6(read(`data\\global\\items\\${name}.dc6`)); c = raster(d.frames[0], palette, documentObject); cache.set(name, c); } return c; };
+  // Retail labels the belt's four columns '1'..'4': `text '1' x=425 y=589 color=4` = Font16, gold shift
+  // (extra=4), 2 px in from each column's left and 27 px below its top.
+  const FONT = 'data\\local\\font\\latin\\font16';
+  let numFont = null;
+  const numbers = (ctx, rects) => {
+    numFont ??= createFont({ dc6: decodeDc6(read(FONT + '.dc6')), tbl: decodeFontTbl(read(FONT + '.tbl')),
+      palette: textColourPalette(read('data\\global\\palette\\SKY\\pal.pl2'), palette, 4), documentObject, path: FONT + '.dc6', drawAs: { op: 'celcolor', mode: 5, extra: 4 } });
+    rects.slice(0, 4).forEach((b, i) => numFont.drawAnchored(ctx, String(i + 1), b.left + 2, b.top + 27));
+  };
   return {
     itemAt(x, y, items, boxes) {
       const rects = beltBoxes(boxes);
@@ -36,7 +46,7 @@ export function createBeltRenderer(read, documentObject = globalThis.document) {
       if (slot < 0) return null;
       return (items || []).find(item => item.mode === 2 && item.gridX === slot) || null;
     },
-    draw(ctx, items, boxes) {
+    draw(ctx, items, boxes, labels = false) {   // labels: the HUD passes true; item-pixel rows count the sprites alone
       const rects = beltBoxes(boxes);
       let count = 0, pixels = 0;
       for (const item of items || []) {
@@ -46,6 +56,7 @@ export function createBeltRenderer(read, documentObject = globalThis.document) {
         ctx.drawImage(c, b.left + Math.floor((w - c.width) / 2), b.top + Math.floor((h - c.height) / 2));
         count++; pixels += c.width * c.height;
       }
+      if (labels) numbers(ctx, rects);
       return { count, pixels, boxes: rects.length, cell: rects.length ? rects[0].right - rects[0].left : 0 };
     },
   };

@@ -70,7 +70,9 @@ export function createHudHelp(read, documentObject = globalThis.document) {
         ctx.drawImage(buttonCanvas[i], x, top);
         return recordDc6(path, 0, frame, x, top, { op: 'cel', mode: 5 });
       });
-      return { button: buttonRecords, text: HUD_HELP_TEXT, art: HUD_HELP_ART, anchor: { ...HUD_HELP_ANCHOR }, act,
+      // The socket's own rect (the button a player presses; retail's Help (H) button), local to the HUD origin.
+      const sk = button[0], hit = { x: sk.x, y: sk.top, w: sk.frame.width, h: sk.frame.height };
+      return { hit, button: buttonRecords, text: HUD_HELP_TEXT, art: HUD_HELP_ART, anchor: { ...HUD_HELP_ANCHOR }, act,
         width: font.measure(HUD_HELP_TEXT),
         glyphs: [...HUD_HELP_TEXT].map((ch) => font.glyph(ch.codePointAt(0))?.index ?? -1) };
     },

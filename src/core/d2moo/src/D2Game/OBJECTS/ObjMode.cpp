@@ -171,7 +171,7 @@ void __fastcall sub_6FC748A0(D2GameStrc* pGame, D2UnitStrc* pObject)
                 //UNITS_GetRoom(pObject);
                 EVENT_SetEvent(pGame, pObject, EVENTTYPE_PERIODICSKILLS, pGame->dwGameFrame + ITEMS_RollRandomNumber(&OBJRGN_GetObjectControlFromGame(pGame)->pSeed) % 250 + 25, 0, 0);
                 UNITS_ChangeAnimMode(pObject, 1);
-                EVENT_SetEvent(pGame, pObject, EVENTTYPE_ENDANIM, (DATATBLS_GetObjectsTxtRecord(pObject->dwClassId)->dwFrameCnt[1] >> 8) + pGame->dwGameFrame + 1, 0, 0);
+                EVENT_SetEvent(pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(DATATBLS_GetObjectsTxtRecord(pObject->dwClassId)) + pGame->dwGameFrame + 1, 0, 0);
             }
             return;
         }
@@ -189,7 +189,7 @@ void __fastcall sub_6FC748A0(D2GameStrc* pGame, D2UnitStrc* pObject)
             if (!nAnimMode)
             {
                 UNITS_ChangeAnimMode(pObject, 1);
-                EVENT_SetEvent(pGame, pObject, EVENTTYPE_ENDANIM, (DATATBLS_GetObjectsTxtRecord(pObject ? pObject->dwClassId : -1)->dwFrameCnt[1] >> 8) + pGame->dwGameFrame + 1, 0, 0);
+                EVENT_SetEvent(pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(DATATBLS_GetObjectsTxtRecord(pObject ? pObject->dwClassId : -1)) + pGame->dwGameFrame + 1, 0, 0);
             }
 
             EVENT_SetEvent(pGame, pObject, EVENTTYPE_PERIODICSKILLS, pGame->dwGameFrame + 1000, 0, 0);
@@ -782,7 +782,7 @@ int32_t __fastcall OBJECTS_OperateFunction30_ExplodingChest(D2ObjOperateFnStrc* 
         UNITS_ChangeAnimMode(pObject, OBJMODE_OPERATING);
 
         D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pOp->nObjectIdx);
-        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
     }
 
     return 1;
@@ -919,7 +919,7 @@ int32_t __fastcall OBJECTS_OperateFunction47_Stair(D2ObjOperateFnStrc* pOp, int3
         UNITS_ChangeAnimMode(pObject, OBJMODE_OPERATING);
 
         D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pOp->nObjectIdx);
-        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
     }
     else if (pObject->dwAnimMode == OBJMODE_OPENED)
     {
@@ -981,7 +981,7 @@ int32_t __fastcall OBJECTS_OperateFunction61_HarrogathMainGate(D2ObjOperateFnStr
 
             UNITS_ChangeAnimMode(pObject, OBJMODE_OPERATING);
             pObject->dwTickCount = nTickCount;
-            EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+            EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
         }
         else if (pObject->dwAnimMode == OBJMODE_OPENED)
         {
@@ -1033,7 +1033,7 @@ int32_t __fastcall OBJECTS_OperateFunction29_SlimeDoor(D2ObjOperateFnStrc* pOp, 
 
         if (pObjectsTxtRecord->nMode[2])
         {
-            EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+            EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
         }
     }
 
@@ -1207,7 +1207,7 @@ void __fastcall sub_6FC75EB0(D2ObjOperateFnStrc* pOp)
         if (pObjectsTxtRecord->nMode[1])
         {
             UNITS_ChangeAnimMode(pOp->pObject, 1);
-            EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+            EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
         }
         else
         {
@@ -1229,7 +1229,7 @@ __forceinline void __fastcall OBJECTS_ChestEnd(D2ObjOperateFnStrc* pOp, int32_t 
     if (pObjectsTxtRecord->nMode[1])
     {
         UNITS_ChangeAnimMode(pOp->pObject, OBJMODE_OPERATING);
-        EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+        EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
     }
     else
     {
@@ -2430,7 +2430,7 @@ int32_t __fastcall OBJECTS_OperateFunction02_Shrine(D2ObjOperateFnStrc* pOp, int
         D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pOp->nObjectIdx);
         if (!pObjectsTxtRecord->nCycleAnim[1] && pObjectsTxtRecord->nMode[2])
         {
-            EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+            EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
         }
     }
 
@@ -2453,7 +2453,7 @@ int32_t __fastcall OBJECTS_OperateFunction01_Casket(D2ObjOperateFnStrc* pOp, int
         pObject->dwFlags &= ~(UNITFLAG_TARGETABLE);
 
         D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pOp->nObjectIdx);
-        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
 
         if (ITEMS_RollRandomNumber(&pOp->pObjectregion->pSeed) % 10000 & 0xFFFFE000)
         {
@@ -2490,7 +2490,7 @@ int32_t __fastcall OBJECTS_OperateFunction68_EvilUrn(D2ObjOperateFnStrc* pOp, in
         pObject->dwFlags &= ~(UNITFLAG_TARGETABLE);
 
         D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pOp->nObjectIdx);
-        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
 
         if (ITEMS_RollRandomNumber(&pOp->pObjectregion->pSeed) % 255 <= pObjectsTxtRecord->dwParm[7])
         {
@@ -2539,7 +2539,7 @@ int32_t __fastcall OBJECTS_OperateFunction33_WirtsBody(D2ObjOperateFnStrc* pOp, 
             UNITS_ChangeAnimMode(pObject, OBJMODE_OPERATING);
 
             D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pOp->nObjectIdx);
-            EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+            EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
             EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_QUESTFN, pOp->pGame->dwGameFrame + 10, 0, 0);
         }
     }
@@ -2563,7 +2563,7 @@ int32_t __fastcall OBJECTS_OperateFunction03_Urn_Basket_Jar(D2ObjOperateFnStrc* 
         pObject->dwFlags &= ~(UNITFLAG_TARGETABLE);
 
         D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pOp->nObjectIdx);
-        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
 
         if (ITEMS_RollRandomNumber(&pOp->pObjectregion->pSeed) % 100 <= 20)
         {
@@ -2597,7 +2597,7 @@ int32_t __fastcall OBJECTS_OperateFunction14_Corpse(D2ObjOperateFnStrc* pOp, int
         UNITS_ChangeAnimMode(pObject, OBJMODE_OPERATING);
 
         D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pOp->nObjectIdx);
-        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
 
         pObject->dwFlags &= ~(UNITFLAG_TARGETABLE);
 
@@ -2643,7 +2643,7 @@ int32_t __fastcall OBJECTS_OperateFunction51_JungleStash(D2ObjOperateFnStrc* pOp
 
         D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pOp->nObjectIdx);
 
-        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
         EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_AIRESET, pOp->pGame->dwGameFrame + pObjectsTxtRecord->dwParm[1] + 1, 0, 0);
 
         if (!pObjectsTxtRecord->nHasCollision[1])
@@ -2674,7 +2674,7 @@ int32_t __fastcall OBJECTS_OperateFunction18_SecretDoor(D2ObjOperateFnStrc* pOp,
         pObject->dwFlags &= ~(UNITFLAG_TARGETABLE);
 
         D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pOp->nObjectIdx);
-        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
 
         UNITS_FreeCollisionPath(pObject);
     }
@@ -2819,7 +2819,7 @@ int32_t __fastcall OBJECTS_OperateFunction05_Barrel(D2ObjOperateFnStrc* pOp, int
         }
 
         D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pOp->nObjectIdx);
-        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
     }
 
     return 1;
@@ -2881,7 +2881,7 @@ int32_t __fastcall OBJECTS_OperateFunction07_ExplodingBarrel(D2ObjOperateFnStrc*
         UNITS_FreeCollisionPath(pObject);
 
         D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pOp->nObjectIdx);
-        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
     }
 
     return 1;
@@ -3079,7 +3079,7 @@ int32_t __fastcall OBJECTS_OperateFunction34_ArcaneSanctuaryPortal(D2ObjOperateF
         UNITS_ChangeAnimMode(pObject, OBJMODE_OPERATING);
 
         D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pOp->nObjectIdx);
-        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
     }
 
     return 1;
@@ -3258,7 +3258,7 @@ int32_t __fastcall OBJECTS_OperateFunction15_Portal(D2ObjOperateFnStrc* pOp, int
                     if (pObject->dwAnimMode == OBJMODE_OPERATING)
                     {
                         D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pObject->dwClassId);
-                        EVENT_SetEvent(pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pGame->dwGameFrame + 1, 0, 0);
+                        EVENT_SetEvent(pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pGame->dwGameFrame + 1, 0, 0);
                     }
                 }
 
@@ -3351,7 +3351,7 @@ int32_t __fastcall OBJECTS_OperateFunction23_Waypoint(D2ObjOperateFnStrc* pOp, i
         UNITS_ChangeAnimMode(pObject, OBJMODE_OPERATING);
 
         D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pOp->nObjectIdx);
-        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
     }
     else if (pObject->dwAnimMode == OBJMODE_OPENED || pObject->dwAnimMode == OBJMODE_OPERATING)
     {
@@ -3609,7 +3609,7 @@ int32_t __fastcall OBJMODE_MainObeliskHandler(D2GameStrc* pGame, int32_t nPlayer
             }
             else
             {
-                EVENT_SetEvent(pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pGame->dwGameFrame + 1, 0, 0);
+                EVENT_SetEvent(pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pGame->dwGameFrame + 1, 0, 0);
             }
         }
         else
@@ -3853,7 +3853,7 @@ int32_t __fastcall OBJECTS_OperateFunction48_TrappedSoul(D2ObjOperateFnStrc* pOp
     {
         UNITS_ChangeAnimMode(pObject, OBJMODE_OPERATING);
 
-        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
+        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
         EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_PERIODICSTATS, pOp->pGame->dwGameFrame + 20, 0, 0);
     }
     else

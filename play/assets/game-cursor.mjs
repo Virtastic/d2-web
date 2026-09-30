@@ -19,21 +19,19 @@ function canvasFor(frame, palette, documentObject) {
   return canvas;
 }
 
-// RETAIL'S POINTER CLOCK, measured from retail's own multi-frame draw lists.
-// A cursor left on screen advances ONE CEL PER N RETAIL GAME FRAMES -- the hook's frame numbers are
-// retail's game frames (tools/drawlist.py), so these are the real rate:
-//   `orotate` 8 frames/cel, over 4.7 whole cycles of a held pointer (f51-warriv-series-stand, 300
-//     consecutive frames: 1,2,3,4,5,6,7 repeating every 64 frames; f97-catacombs-door-open confirms);
-//   `ohand`   4 frames/cel, all eight cels in a row in three independent captures (f7-hover-long2,
-//     f7-hover-long3, f7-away-long, each 0,1,2,3,4,5,6,7 at exactly 4 frames each).
-// The count starts at cel 0 the moment that cursor becomes the one drawn: three observed changes of
-// cursor (protate->ohand, ohand->orotate, and the head of each capture) all begin at cel 0. The front
-// end is a different cursor and does NOT run: `ohand` sits on cel 0 for >1,000 consecutive retail
-// frames across a dozen captures (create-selected-necromancer alone is 120).
-// `protate` advances too, but its per-cel runs in one held-pointer scene are 6, 7, 18, 20, 22, 24,
-// 32, 35, 40, 42, 44, 47 game frames -- NOT a fixed rate, so it is keyed to a state the corpus does
-// not name. Its rate is therefore not recovered; it keeps the clock the row declared.
-const CEL_GAME_FRAMES = Object.freeze({ hand: 4, attack: 12, talk: 8 });
+// RETAIL'S POINTER CLOCK, measured from retail's own per-frame draw lists.
+// The file is NOT chosen by the target. An unlabelled pointer runs one timed idle sequence:
+//   protate  76 game frames (cels 0,1,2.. irregular: 5/38/33 on empty ground, 25/51 parked-away --
+//            the per-cel split varies capture to capture, only the 76-frame total and the order hold)
+//   ohand    8 cels x 4 game frames = 32
+//   orotate  8 cels x 8 game frames, cycling forever
+// A pointer held on a LABELLED unit (the mode-7 highlight + name plate) pins `orotate`, 8 frames/cel,
+// cycling, in every frame of the capture. Hostile targets are not in that capture, so `attack` keeps
+// `protate` on the rate the row declared (12), stated as unmeasured. The sequence restarts at cel 0
+// when the context changes; the front end is a different cursor and does not run.
+export const IDLE_SEQUENCE = Object.freeze({ protate: 76, ohand: 32 });
+// protate's cel over its 76 frames: the empty-ground capture's split (frames 0-4, 5-42, 43-75).
+const protateCel = (e) => (e < 5 ? 0 : e < 43 ? 1 : 2);
 
 export function createGameCursor({ read, decodeDc6, documentObject = globalThis.document }) {
   const paletteBytes = read(GAME_CURSOR.palette);
@@ -44,6 +42,7 @@ export function createGameCursor({ read, decodeDc6, documentObject = globalThis.
       dc6, canvases: dc6.frames.map((frame) => canvasFor(frame, palette, documentObject)) };
   };
   const assets = Object.freeze({ hand: source(GAME_CURSOR.hand), attack: source(GAME_CURSOR.attack), talk: source(GAME_CURSOR.talk) });
+  const fileOf = { ohand: 'hand', protate: 'attack', orotate: 'talk' };
   // The clock's own state: which cursor is drawn and the tick it became the drawn one, so the cel
   // count restarts at 0 on a change of cursor exactly as retail's does. `tick` is the engine tick --
   // one retail game frame (the shell's 25 Hz step) -- which is the unit the rates above are in.
@@ -53,10 +52,14 @@ export function createGameCursor({ read, decodeDc6, documentObject = globalThis.
       const next = context?.kind === 'attack' || context?.kind === 'talk' ? context.kind : 'hand';
       // A tick below the start is a restarted session, not a cursor change: count from there.
       if (next !== kind || tick < startTick) { kind = next; startTick = tick; }
-      const asset = assets[kind];
-      const frames = asset.dc6.frames.length;
       const elapsed = Math.max(0, tick - startTick);
-      const frameIndex = frames > 1 ? Math.floor(elapsed / CEL_GAME_FRAMES[kind]) % frames : 0;
+      let file, frameIndex, perCel;
+      if (kind === 'talk') { file = 'orotate'; perCel = 8; frameIndex = Math.floor(elapsed / 8) % 8; }
+      else if (kind === 'attack') { file = 'protate'; perCel = 12; frameIndex = Math.floor(elapsed / 12) % 8; }
+      else if (elapsed < IDLE_SEQUENCE.protate) { file = 'protate'; perCel = null; frameIndex = protateCel(elapsed); }
+      else if (elapsed < IDLE_SEQUENCE.protate + IDLE_SEQUENCE.ohand) { file = 'ohand'; perCel = 4; frameIndex = Math.floor((elapsed - IDLE_SEQUENCE.protate) / 4); }
+      else { file = 'orotate'; perCel = 8; frameIndex = Math.floor((elapsed - IDLE_SEQUENCE.protate - IDLE_SEQUENCE.ohand) / 8) % 8; }
+      const asset = assets[fileOf[file]];
       const frame = asset.dc6.frames[frameIndex], image = asset.canvases[frameIndex];
       const left = Math.round(x) + frame.offsetX;
       const top = Math.round(y) - 1 + frame.offsetY - frame.height + 1;
@@ -74,7 +77,7 @@ export function createGameCursor({ read, decodeDc6, documentObject = globalThis.
       // the drawn one -- the row asserts the cel advances 1 per `clock` frames, and that the cel drawn
       // is the cel retail records for that index (blit.hash against the corpus's own hash).
       return { context: kind, target: context?.target ?? null, requested, partial: clipped,
-        clock: { framesPerCel: CEL_GAME_FRAMES[kind], since: elapsed, cels: frames },
+        clock: { framesPerCel: perCel, since: elapsed, cels: asset.dc6.frames.length, file },
         drawn: { path: drawPath(asset.path), frame: frameIndex, palette: drawPath(GAME_CURSOR.palette), bytesHash: asset.bytesHash,
           width: frame.width, height: frame.height, x: left, y: top, blit } };
     },
