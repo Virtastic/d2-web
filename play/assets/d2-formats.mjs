@@ -165,6 +165,10 @@ function decodeDt1TilePixels(bytes, tile, tileIndex) {
     if (px < 0 || py < 0 || px >= width || py >= height) {
       throw new RangeError(`DT1 tile ${tileIndex} block ${blockIndex} pixel outside bounds`);
     }
+    const block = tile.blocks[blockIndex];
+    const local = (y - block.y) * 32 + x - block.x;
+    block.pixels.indices[local] = index;
+    block.pixels.written[local] = 255;
     const destination = py * width + px;
     indices[destination] = index;
     opaque[destination] = index === 0 ? 0 : 255;
@@ -172,6 +176,8 @@ function decodeDt1TilePixels(bytes, tile, tileIndex) {
 
   for (let blockIndex = 0; blockIndex < tile.blocks.length; blockIndex++) {
     const block = tile.blocks[blockIndex];
+    const blockHeight = block.format === 1 ? 15 : 32;
+    block.pixels = { indices: new Uint8Array(32 * blockHeight), written: new Uint8Array(32 * blockHeight) };
     const start = tile.blockHeadersOffset + block.dataOffset;
     requireRange(bytes, start, block.dataLength,
       `DT1 tile ${tileIndex} block ${blockIndex} pixel data`);

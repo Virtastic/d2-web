@@ -503,6 +503,10 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
     }
   };
   return {
+    // F91: the front end's own font for a notice drawn by the client rather than by retail (the
+    // EXIT DIABLO II notice, play/assets/exit-sequence.mjs) -- the same gold FontFormal12 the two
+    // copyright lines use, so the one screen the browser leaves behind still looks like this client.
+    noticeFont: trademarkFont,
     get evidence() {
       resolveTrademark();
       return {

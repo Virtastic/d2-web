@@ -59,8 +59,18 @@ export function screenDeltaToWorld(dx, dy) {
 export function wallLightCells(o, A, B, j) {
   switch (o) {
     case 1: case 5: case 8: case 16: return [A + 2, B + 5 - 2 * j];
-    case 3: case 4: case 12: case 14: return [[A + 2, B + 5], [A + 2, B + 3], [A + 2, B + 2], [A + 2, B + 2], [A + 3, B + 2], [A + 5, B + 2]][j];
+    case 3: case 4: case 12: case 14: case 18: return [[A + 2, B + 5], [A + 2, B + 3], [A + 2, B + 2], [A + 2, B + 2], [A + 3, B + 2], [A + 5, B + 2]][j];
     case 7: return j < 3 ? [A - 5 + 2 * j, B + 2] : [A + 2, B + 5 - 2 * j];
+    // o18 (a lower-wall cliff face, isLower below) reads the SAME three-cell corner line as o3/o4/o12/o14,
+    // not the right-wall default this switch used to give it. MEASURED two ways, 2026-09-30 (F480):
+    //   * s257's own instrument, retail's recorded wall entries: the
+    //     o3 rule reproduces all 11 of retail's o18 records (right line 8, left 7, a uniform tile-centre
+    //     cell 8 -- the varying records like `t8-mesa-spire 18 5135 5090 -> 179 179 179 179 167 140` need
+    //     the corner line, which the right default cannot make);
+    //   * s260's single largest world cluster (1,133 of its 1,687 px, every one OURS BRIGHTER) is the
+    //     Fortress arrival's o18 Inv_Wall cliff -- where the tile sits in the far field, so the corner line
+    //     is six equal cells at the map's ambient and the right default reads the player's brighter light.
+    //     o16 keeps the left-wall line (s257: 94/94) and o17 the right line (s257: 42/42). F480.
     default: return [A - 5 + 2 * j, B + 2];
   }
 }
@@ -348,11 +358,27 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   // builds at +0x15450, which is exactly that). The pixel is PL2 LightLevelVariations[level][index].
   const litCache = new Map();
   const ISO_SKIP = [14, 12, 10, 8, 6, 4, 2, 0, 2, 4, 6, 8, 10, 12, 14], ISO_RUN = [4, 8, 12, 16, 20, 24, 28, 32, 28, 24, 20, 16, 12, 8, 4];
-  function litFloor(path, dt1Tile, index, grid) {
-    const key = `${path}:${index}:${grid.join(',')}`;
-    if (litCache.has(key)) return litCache.get(key);
-    const t = blendPl2(), px = dt1Tile.pixels;
-    if (!t || !px || !px.width) { litCache.set(key, null); return null; }
+  // A gouraud floor block the frame clips on the LEFT is shaded from the LEVEL TABLE one entry per DRAWN
+  // pixel from the row's own start, not by the pixel's column in the block: retail's two clipped gouraud
+  // drawers (D2gfx+0x9E90 RLE, +0xA5D0 iso) advance the table pointer once per pixel written while the
+  // source and destination pointers start at (skip + leftclip), and D2MOO's `sub_6FA72090` -- the 1.10f
+  // decompile of that same pair -- does `v24[i] = table[v19[i]][...]` with `v24 = buffer + skip + leftclip`
+  // and `v19 = table + skip`. So the index is `blockColumn - leftclip[r]`, leftclip[r] being how far the
+  // clip cuts into the row: clamp(canvasLeft - (blockScreenX + skip[r]), 0, run[r]). Unclipped blocks
+  // (leftclip 0) are unchanged: `blockColumn`. Read 2026-09-30; measured on F96's band -- 348 of 348
+  // misses, and 0 of them our old index, before the change (probe-f249-clip). F249.
+  const CLIP_LEFT = 0;
+  function litFloor(path, dt1Tile, index, grid, tileX, tileY) {
+    const px = dt1Tile.pixels;
+    const keyBase = `${path}:${index}:${grid.join(',')}`;
+    // Retail clips the left lookup and starts iso edge interpolation at the first visible row.
+    // Tiles crossing either boundary therefore need a position-dependent cache key.
+    const key = (px && px.width && tileX !== undefined && tileX < CLIP_LEFT
+      && dt1Tile.blocks.some((b) => tileX + b.x - px.originX < CLIP_LEFT)) ? `${keyBase}@${tileX}` : keyBase;
+    const positionKey = px && tileY !== undefined && dt1Tile.blocks.some((b) => b.format === 1 && tileY + b.y - px.originY < 0) ? `${key}:${tileY}` : key;
+    if (litCache.has(positionKey)) return litCache.get(positionKey);
+    const t = blendPl2();
+    if (!t || !px || !px.width) { litCache.set(positionKey, null); return null; }
     const idx = new Uint8Array(px.indices), opq = px.opaque;
     // The light buffer is an 8x8 padded grid of 12-byte entries (intensity first); a block at
     // (gridX, gridY) has its corners at (gridX+1..gridX+2, gridY+1..gridY+2). Read from D2gfx+0xA960.
@@ -366,18 +392,24 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       const E = [(P(x0, y0 + 2) + C + A + P(x0, y0 + 1)) >> 2, (P(x0 + 2, y0) + B + P(x0 + 1, y0) + A) >> 2,
         (P(x0 + 3, y0 + 2) + C + P(x0 + 3, y0 + 1) + B) >> 2, (P(x0 + 1, y0 + 3) + P(x0 + 2, y0 + 3) + D + C) >> 2];
       // RLE blocks (flag 4) go through D2gfx+0x8E30 (flat: the same light table) or D2gfx+0x8A40
-      // (gouraud: 15 rows, edges stepped once per row, the level table indexed by the pixel's column in
-      // the block, exactly as the iso path) -- read from the code.
+      // (gouraud: 15 rows, edges stepped once per row, the level table indexed exactly as the iso path)
+      // -- read from the code. Both index the table by the pixel's column in the block, less
+      // the row's leftclip (see CLIP_LEFT above, F249).
       const iso = b.format === 1, rows = 15;
       for (let r = 0; r < rows; r++) {
-        const rr = r;
+        // D2gfx 1.13c +0xA5D0 advances iso edges only for visible rows; RLE advances skipped rows too.
+        const topclip = iso && tileY !== undefined ? Math.max(0, -(tileY + b.y - px.originY)) : 0;
+        if (iso && r < topclip) continue;
+        const rr = r - topclip;
         const L = ((E[0] << 4) + rr * (E[3] - E[0])) >> 7, R = ((E[1] << 4) + rr * (E[2] - E[1])) >> 7;
         const skip = iso ? ISO_SKIP[r] : 0, run = iso ? ISO_RUN[r] : 32;
+        const leftclip = tileX === undefined ? 0 : Math.max(0, Math.min(run, CLIP_LEFT - (tileX + b.x - px.originX + skip)));
         for (let col = 0; col < run; col++) {
           const x = skip + col, q = (b.y + r - px.originY) * px.width + (b.x + x - px.originX);
-          if (!iso && (b.y + r - px.originY >= px.height || !opq[q])) continue;
-          const lvl = flat ? c.A >> 3 : L + Math.floor((R - L) * x / 32);
-          idx[q] = t[1024 + lvl * 256 + px.indices[q]];
+          // An RLE skip leaves earlier blocks intact: use this block's write mask and source.
+          if (b.y + r - px.originY >= px.height || !b.pixels.written[r * 32 + x]) continue;
+          const lvl = flat ? c.A >> 3 : L + Math.floor((R - L) * (x - leftclip) / 32);
+          idx[q] = t[1024 + lvl * 256 + b.pixels.indices[r * 32 + x]];
         }
       }
     }
@@ -386,7 +418,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     const canvas = documentObject.createElement('canvas'); canvas.width = px.width; canvas.height = px.height;
     canvas.getContext('2d').putImageData(new ImageData(rgba, px.width, px.height), 0, 0);
     if (litCache.size > 1500) litCache.clear();   // the light moves with the player: keep the cache bounded
-    litCache.set(key, canvas); return canvas;
+    litCache.set(positionKey, canvas); return canvas;
   }
   // Wall lighting: a wall reaches D2DDraw slot 39 with four light
   // entries, and D2DDraw+0x7320 lights each 32-px block from entry (blockX >> 5) to the next (corners
@@ -470,6 +502,102 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     return canvas;
   }
 
+  // PERF (F198): the identity search below is a pure function of the tile's own fields and the level's file list (libraries are decoded once
+  // per path and never change), and a level holds thousands of tiles that resolve the same way every frame. Resolved once per distinct tile
+  // shape, with the counters the pass reports carried on the record so the evidence is exactly what a per-frame resolve gave.
+  let resolveFiles = '';
+  const resolved_ = new Map();
+  function resolveTile(tile, files) {
+    const cacheable = tile.librarySlot >= 0 && tile.librarySlot < 64 && tile.orientation >= 0 && tile.orientation < 64 && tile.mainIndex >= 0 && tile.mainIndex < 4096
+      && tile.subIndex >= 0 && tile.subIndex < 4096 && tile.libraryIndex >= 0 && tile.libraryIndex < 65536 && tile.frameIndex >= 0 && tile.frameIndex < 65536
+      && (tile.entry === undefined || (tile.entry >= 0 && tile.entry < 65535));
+    let k1, k2, inner;
+    // F96 throwaway probe hook: globalThis.__d2VariantOverride forces the DRAWN DT1 variant of one tile
+    // (keyed `${a},${b},${layer},${identity}`, a,b = world subtiles) so a frame test can force each
+    // same-rarity sibling and count the misses. It disables the resolve cache so a redraw re-picks.
+    const vov = globalThis.__d2VariantOverride;
+    if (cacheable && !vov) {
+      k1 = ((tile.librarySlot * 64 + tile.orientation) * 4096 + tile.mainIndex) * 4096 + tile.subIndex;
+      k2 = (tile.libraryIndex * 65536 + tile.frameIndex) * 65536 + (tile.entry === undefined ? 0 : tile.entry + 1);
+      inner = resolved_.get(k1);
+      const hit = inner && inner.get(k2);
+      if (hit) return hit;
+    }
+    let searched = 0, ambiguous = 0, entryTiles = 0, entryExact = 0, entryDiffers = 0, rarityAmbiguous = 0, resolved = 0, wrongIdentity = 0;
+    // An empty/failed slot is not fatal any more: the identity search below can still find
+    // the tile in another library, which is the normal case now that librarySlot is per-room.
+    const lib = library(tile.librarySlot, files);
+    // Resolve by IDENTITY across the level's libraries, then by variant.
+    //
+    // `librarySlot` cannot be used to pick the file: it indexes the ROOM's own pTiles[] array,
+    // which holds only the libraries that room loaded, in its own order -- not the level's
+    // LvlTypes list. In Andariel's Lair slot 2 pointed at a stairway library while the tiles
+    // there wanted a floor identity, leaving 715 floors undrawn and the dungeon floorless.
+    //
+    // So the identity is the key and the libraries are searched. That is only safe if an
+    // identity lives in ONE library; `ambiguous` counts violations and s126 asserts it is zero,
+    // so if a level ever breaks that assumption it is reported rather than silently mispicked.
+    //
+    // `libraryIndex` is NOT an offset into the DT1's tile array. The engine derives it by
+    // walking the room's tile hash for this (type, style, sequence) -- orientation, mainIndex,
+    // subIndex -- and counting position within that bucket's ref list. Indexing the file array
+    // with it returns an unrelated tile, and because that lookup always succeeds the old
+    // `?? byKey` fallback never fired: every floor tile on screen was the wrong art, while the
+    // "0 unresolved tiles" check passed happily because something was always found.
+    const key = `${tile.orientation}:${tile.mainIndex}:${tile.subIndex}`;
+    let variants = lib.byKey.get(key), foundSlot = tile.librarySlot, matches = variants ? 1 : 0;
+    if (!variants) {
+      for (let slot = 0; slot < files.length; slot++) {
+        if (slot === tile.librarySlot) continue;
+        const other = library(slot, files);
+        const candidate = other.byKey.get(key);
+        if (!candidate) continue;
+        matches++;
+        if (!variants) { variants = candidate; foundSlot = slot; }
+      }
+      if (variants) searched++;
+    }
+    if (matches > 1) ambiguous++;
+    // The variant is the one whose own rarity is the tile's (nRarity_Frame of the entry the engine
+    // picked), not the libraryIndex-th: libraryIndex is the engine's hash-bucket position, which
+    // need not be the DT1's order -- s192 found grass floors drawn with a sibling variant's art
+    // while the draw list (which recorded the ASKED rarity) matched retail's.
+    const sameRarity = variants ? variants.filter((v) => v.rarity === tile.frameIndex) : [];
+    // libraryIndex counts the engine's hash-bucket ref list, which D2CMP builds by PREPENDING each
+    // DT1 entry: variant i of the bucket is the DT1's (n - 1 - i)-th entry of that identity (s192:
+    // same-rarity grass variants drew a sibling's art; reversing took town floors 118,824 -> 17,986
+    // differing pixels).
+    const vi = variants ? variants.length - 1 - tile.libraryIndex : 0;
+    // The engine's own entry (file index of the pTile the room picked) beats every heuristic above when
+    // it names a tile of this identity in this room's own library: the exact variant, not a guess.
+    const exact = variants && foundSlot === tile.librarySlot && tile.entry !== undefined ? lib.byIndex[tile.entry] : undefined;
+    const heur = variants ? (sameRarity.length === 1 ? sameRarity[0] : (variants[vi] ?? variants[0])) : undefined;
+    const exactOk = exact && `${exact.orientation}:${exact.mainIndex}:${exact.subIndex}` === key;
+    if (variants) { entryTiles++; if (exactOk) { entryExact++; if (exact !== heur) entryDiffers++; } }
+    let dt1Tile = variants ? (exactOk ? exact : heur) : undefined;
+    if (vov && variants) { const f = vov[`${tile.worldX * 5},${tile.worldY * 5},${tile.layer},${key}`]; if (f !== undefined && variants[f]) dt1Tile = variants[f]; }
+    if (variants && sameRarity.length !== 1) rarityAmbiguous++;
+    if (dt1Tile) {
+      resolved++;
+      // Structurally 0, and recorded here so no row quotes it as evidence (T10): `dt1Tile`
+      // comes out of `variants`, the byKey bucket the wanted identity was READ OUT OF, so the drawn
+      // identity cannot differ from the asked one -- the entry IS the key. It catches nothing, by
+      // construction. What catches a wrong lookup is the blob compared against RETAIL, not itself:
+      // `missing` (no entry at all) and the draw-list rows (s182/s183/s243/s330) that compare the
+      // variant drawn with the one retail drew. Kept because the shape is what a future non-search
+      // resolver would be checked with, and s126/s364/s370 still read it.
+      if (`${tile.orientation}:${tile.mainIndex}:${tile.subIndex}` !== `${dt1Tile.orientation}:${dt1Tile.mainIndex}:${dt1Tile.subIndex}`) wrongIdentity++;
+    }
+    // Keyed by the DRAWN variant (its position among the identity's variants), never the asked index.
+    const variantNo = variants ? variants.indexOf(dt1Tile) : -1;
+    const bitmap = dt1Tile && bitmapFor(files[foundSlot], dt1Tile,
+      `${tile.orientation}:${tile.mainIndex}:${tile.subIndex}:v${variantNo}`);
+    const rec = { lib, variants, foundSlot, dt1Tile, variantNo, bitmap, searched, ambiguous, entryTiles, entryExact, entryDiffers, rarityAmbiguous, resolved, wrongIdentity,
+      want: `${tile.orientation}:${tile.mainIndex}:${tile.subIndex}`, got: dt1Tile ? `${dt1Tile.orientation}:${dt1Tile.mainIndex}:${dt1Tile.subIndex}` : '' };
+    if (cacheable) { if (!inner) resolved_.set(k1, inner = new Map()); inner.set(k2, rec); }
+    return rec;
+  }
+
   return {
     errors,
     /** Light floors from a grid source: fn(a, b) -> 36 intensities or null. */
@@ -511,6 +639,8 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       const missingSample = [];
       let searched = 0, ambiguous = 0;
       // Resolve every tile to a bitmap and an on-screen box once, then split by layer.
+      const filesSig = files.join('|');
+      if (filesSig !== resolveFiles) { resolveFiles = filesSig; resolved_.clear(); }
       const floors = [], walls = [];
       let hidden = 0, popHidden = 0, rarityAmbiguous = 0, entryTiles = 0, entryExact = 0, entryDiffers = 0;
       // Attribution (one sample per frame): the per-tile resolve/lookup walk, separate from the blits.
@@ -530,73 +660,10 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         // the hero while this client painted the whole Exterior.dt1 15:2:4..15 plane (client-parity F44).
         if (tile.pop === 1) { popHidden++; continue; }
         requested++;
-        // An empty/failed slot is not fatal any more: the identity search below can still find
-        // the tile in another library, which is the normal case now that librarySlot is per-room.
-        const lib = library(tile.librarySlot, files);
-        // Resolve by IDENTITY across the level's libraries, then by variant.
-        //
-        // `librarySlot` cannot be used to pick the file: it indexes the ROOM's own pTiles[] array,
-        // which holds only the libraries that room loaded, in its own order -- not the level's
-        // LvlTypes list. In Andariel's Lair slot 2 pointed at a stairway library while the tiles
-        // there wanted a floor identity, leaving 715 floors undrawn and the dungeon floorless.
-        //
-        // So the identity is the key and the libraries are searched. That is only safe if an
-        // identity lives in ONE library; `ambiguous` counts violations and s126 asserts it is zero,
-        // so if a level ever breaks that assumption it is reported rather than silently mispicked.
-        //
-        // `libraryIndex` is NOT an offset into the DT1's tile array. The engine derives it by
-        // walking the room's tile hash for this (type, style, sequence) -- orientation, mainIndex,
-        // subIndex -- and counting position within that bucket's ref list. Indexing the file array
-        // with it returns an unrelated tile, and because that lookup always succeeds the old
-        // `?? byKey` fallback never fired: every floor tile on screen was the wrong art, while the
-        // "0 unresolved tiles" check passed happily because something was always found.
-        const key = `${tile.orientation}:${tile.mainIndex}:${tile.subIndex}`;
-        let variants = lib.byKey.get(key), foundSlot = tile.librarySlot, matches = variants ? 1 : 0;
-        if (!variants) {
-          for (let slot = 0; slot < files.length; slot++) {
-            if (slot === tile.librarySlot) continue;
-            const other = library(slot, files);
-            const candidate = other.byKey.get(key);
-            if (!candidate) continue;
-            matches++;
-            if (!variants) { variants = candidate; foundSlot = slot; }
-          }
-          if (variants) searched++;
-        }
-        if (matches > 1) ambiguous++;
-        // The variant is the one whose own rarity is the tile's (nRarity_Frame of the entry the engine
-        // picked), not the libraryIndex-th: libraryIndex is the engine's hash-bucket position, which
-        // need not be the DT1's order -- s192 found grass floors drawn with a sibling variant's art
-        // while the draw list (which recorded the ASKED rarity) matched retail's.
-        const sameRarity = variants ? variants.filter((v) => v.rarity === tile.frameIndex) : [];
-        // libraryIndex counts the engine's hash-bucket ref list, which D2CMP builds by PREPENDING each
-        // DT1 entry: variant i of the bucket is the DT1's (n - 1 - i)-th entry of that identity (s192:
-        // same-rarity grass variants drew a sibling's art; reversing took town floors 118,824 -> 17,986
-        // differing pixels).
-        const vi = variants ? variants.length - 1 - tile.libraryIndex : 0;
-        // The engine's own entry (file index of the pTile the room picked) beats every heuristic above when
-        // it names a tile of this identity in this room's own library: the exact variant, not a guess.
-        const exact = variants && foundSlot === tile.librarySlot && tile.entry !== undefined ? lib.byIndex[tile.entry] : undefined;
-        const heur = variants ? (sameRarity.length === 1 ? sameRarity[0] : (variants[vi] ?? variants[0])) : undefined;
-        const exactOk = exact && `${exact.orientation}:${exact.mainIndex}:${exact.subIndex}` === key;
-        if (variants) { entryTiles++; if (exactOk) { entryExact++; if (exact !== heur) entryDiffers++; } }
-        const dt1Tile = variants ? (exactOk ? exact : heur) : undefined;
-        if (variants && sameRarity.length !== 1) rarityAmbiguous++;
-        if (dt1Tile) {
-          resolved++;
-          // Structurally 0, and recorded here so no row quotes it as evidence (T10): `dt1Tile`
-          // comes out of `variants`, the byKey bucket the wanted identity was READ OUT OF, so the drawn
-          // identity cannot differ from the asked one -- the entry IS the key. It catches nothing, by
-          // construction. What catches a wrong lookup is the blob compared against RETAIL, not itself:
-          // `missing` (no entry at all) and the draw-list rows (s182/s183/s243/s330) that compare the
-          // variant drawn with the one retail drew. Kept because the shape is what a future non-search
-          // resolver would be checked with, and s126/s364/s370 still read it.
-          if (`${tile.orientation}:${tile.mainIndex}:${tile.subIndex}` !== `${dt1Tile.orientation}:${dt1Tile.mainIndex}:${dt1Tile.subIndex}`) wrongIdentity++;
-        }
-        // Keyed by the DRAWN variant (its position among the identity's variants), never the asked index.
-        const variantNo = variants ? variants.indexOf(dt1Tile) : -1;
-        const bitmap = dt1Tile && bitmapFor(files[foundSlot], dt1Tile,
-          `${tile.orientation}:${tile.mainIndex}:${tile.subIndex}:v${variantNo}`);
+        const rec = resolveTile(tile, files);
+        const { lib, variants, foundSlot, dt1Tile, variantNo, bitmap } = rec;
+        searched += rec.searched; ambiguous += rec.ambiguous; entryTiles += rec.entryTiles; entryExact += rec.entryExact; entryDiffers += rec.entryDiffers;
+        rarityAmbiguous += rec.rarityAmbiguous; resolved += rec.resolved; wrongIdentity += rec.wrongIdentity;
         // A tile the DT1 holds with no blocks at all (some shadow entries: Trees.dt1 13/1/n) is
         // empty in retail too -- drawn as nothing, not missing.
         // Retail still SUBMITS it (s271: Trees.dt1 13/1/5 and 13/1/6 in the Black Marsh's draw list,
@@ -650,8 +717,8 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         // Every floor tile once drew unrelated art while "0 unresolved" passed; only comparing these
         // two would have caught it.
         const entry = { variantNo, bitmap, x: Math.round(drawX), y: Math.round(drawY), depth: y, ordinal: tile.ordinal, tile, dt1Tile, slot: foundSlot,
-          want: `${tile.orientation}:${tile.mainIndex}:${tile.subIndex}`,
-          got: `${dt1Tile.orientation}:${dt1Tile.mainIndex}:${dt1Tile.subIndex}`, file: files[foundSlot] ?? "", variant: tile.libraryIndex, wall: tile.layer !== 0,
+          want: rec.want,
+          got: rec.got, file: files[foundSlot] ?? "", variant: tile.libraryIndex, wall: tile.layer !== 0,
           seam: Boolean(tile.seam) };
         (tile.layer === 0 ? floors : walls).push(entry);
       }
@@ -667,12 +734,33 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       // in the wall pass instead, their pale foot painted a vertical band over the Bloody Foothills'
       // ground (client-parity F31).
       const isLower = (e) => { const o = Number(e.want.split(':')[0]); return o >= 16 && o <= 19; };
+      // A wall's six light entries, from the light map cells wallLightCells picks (F42/F118b/F120/F187).
+      const wallEntries = (t) => { const A = t.worldX * 5, B = t.worldY * 5;
+        return lightCell ? [0, 1, 2, 3, 4, 5].map((j) => { const [a, b] = wallCells(t.orientation, A, B, j); return lightCell(a, b); }) : null; };
       // Lower walls + floors (litFloor runs here on a cache miss; a cached frame skips the palette work).
       const pFloor = perfT0();
-      for (const l of walls.filter(isLower).sort((a, b) => (a.depth - b.depth) || (a.ordinal - b.ordinal))) { ctx.drawImage(l.bitmap, l.x, l.y); drawn++; recordTile(l, files); }
+      // A lower wall (orientation 16-19) is terrain and retail draws it as a `wall` record -- the same
+      // lit wall entry the wall pass uses, not an unlit blit (the retail captures lines
+      // 3-12 are the Pandemonium Fortress's own o16/o17/o18 Inv_Wall.dt1 draws, all `wall`). Drawing
+      // them from the raw bitmap lit them at full palette, which is ~1.4x retail's on the Fortress's
+      // rubble where the map reads ambient (F38: s260's offending cluster is these very tiles). They
+      // stay on THIS pass -- their 800-px art runs beneath the neighbouring ground and drawing them in
+      // the wall pass painted a vertical band over the Bloody Foothills' ground (F31) -- so only their
+      // pixels change, never their order.
+      for (const l of walls.filter(isLower).sort((a, b) => (a.depth - b.depth) || (a.ordinal - b.ordinal))) {
+        const E = wallEntries(l.tile);
+        // Off unless globalThis.__d2TraceLower is an array: a lower wall (o16-19) is a lit `wall`
+        // record like the wall pass's, so a pixel attributed to one needs the same six light entries
+        // the wall pass traces (wallLightCells' own cells + E). Its own global so it never changes what
+        // __d2TraceBlits (= floors) holds for s448/s629.
+        if (globalThis.__d2TraceLower && E) globalThis.__d2TraceLower.push({ x: l.x, y: l.y, path: files[l.slot], want: l.want, variantNo: l.variantNo,
+          dt1Tile: l.dt1Tile, o: l.tile.orientation, E, a: l.tile.worldX * 5, b: l.tile.worldY * 5, lower: true });
+        const lit = E && litWall(files[l.slot], l.dt1Tile, l.want + ':v' + l.variantNo, E);
+        ctx.drawImage(lit || l.bitmap, l.x, l.y); drawn++; recordTile(l, files);
+      }
       for (const f of floors) {
         const grid = lightGrid && lightGrid(f.tile.worldX * 5, f.tile.worldY * 5);
-        const lit = grid && litFloor(files[f.slot], f.dt1Tile, f.want + ':v' + f.variantNo, grid);
+        const lit = grid && litFloor(files[f.slot], f.dt1Tile, f.want + ':v' + f.variantNo, grid, f.x, f.y);
         // Off unless globalThis.__d2TraceBlits is an array: then each drawn floor carries the dt1 art
         // and the 8x8 light grid it was lit from, so a row can recompute the LEVEL litFloor gave a
         // pixel (F96: our floor level is 1-2 above retail's on the frame's left edge). s448 reads it.
@@ -772,7 +860,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
           // its six fitted light entries (wallCells' own E array) and the dt1 art, so a row can recompute
           // litWall's per-block level and orientation the same way s448 reads litFloor's.
           if (globalThis.__d2TraceBlits && wallE) globalThis.__d2TraceBlits.push({ x: o.x, y: o.y, path: files[o.slot], want: o.want, variantNo: o.variantNo, dt1Tile: o.dt1Tile, orientation: o.tile.orientation, E: wallE, a: A, b: B, wall: true });
-          const lit = roofGrid ? litFloor(files[o.slot], o.dt1Tile, o.want + ':v' + o.variantNo, roofGrid) : wallE && litWall(files[o.slot], o.dt1Tile, o.want + ':v' + o.variantNo, wallE, fade < 255);
+          const lit = roofGrid ? litFloor(files[o.slot], o.dt1Tile, o.want + ':v' + o.variantNo, roofGrid, o.x, o.y) : wallE && litWall(files[o.slot], o.dt1Tile, o.want + ':v' + o.variantNo, wallE, fade < 255);
           // F66b: a wall the client hides fades to retail's transparent entry's alpha (roof-fade.mjs); alpha 0 draws nothing.
           if (fade > 0 && !(globalThis.__d2SkipFaded && fade < 255)) {   // __d2SkipFaded: a probe drawing the frame WITHOUT the hidden walls (their blend needs the pixel under them)
             const pf = perfT0();

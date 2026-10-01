@@ -11,7 +11,7 @@ import { BELT_FALLBACK, beltBoxes } from '../play/assets/belt-renderer.mjs';
 
 test('the fallback belt matches retail Belts.txt at 800x600', () => {
   // From d2_session_belt_boxes(2, 1, ...): 29x29 boxes, first column at x=423, bottom row y=562.
-  assert.deepEqual(BELT_FALLBACK, { x: 423, y: 562, cells: 4, cell: 29 });
+  assert.deepEqual(BELT_FALLBACK, { x: 423, y: 562, cells: 4, cell: 29, pitch: 31 });
 });
 
 test('the engine boxes are used verbatim when supplied', () => {
@@ -26,6 +26,6 @@ test('the fallback is a real four-column row when the engine has nothing', () =>
   const boxes = beltBoxes(null);
   assert.equal(boxes.length, 4);
   assert.deepEqual(boxes.map((b) => b.right - b.left), [29, 29, 29, 29]);
-  assert.deepEqual(boxes.map((b) => b.left), [423, 452, 481, 510]);
+  assert.deepEqual(boxes.map((b) => b.left), [423, 454, 485, 516]);
   assert.ok(boxes.every((b) => b.bottom - b.top === 29));
 });

@@ -37,6 +37,8 @@
 #include <D2States.h>
 #include <D2Items.h>
 #include <D2QuestRecord.h>
+#include <D2BitManip.h>
+#include <QUESTS/ACT5/A5Q3.h>
 #include <D2Inventory.h>
 #include <D2PacketDef.h>
 #include <DataTbls/ItemsTbls.h>
@@ -724,6 +726,29 @@ static void countSessionTilesSkipped() {
         if (level != g_lastLevel) countLevel(level);
 }
 
+// The inventory graphic retail's panel draws for an item (F481). ItemsTxt.invfile is only the FIRST
+// candidate: a unique item (or a set item) whose quality-specific file is non-empty uses THAT, and an
+// item whose ItemTypes row carries variable inventory graphics -- the seven types with a non-zero
+// `varinvgfx` are Ring, Amulet, Charm/Small/Medium/Large Charm and Jewel -- uses the variant its own
+// `nInvGfxIdx` picks (D2Common #10726/#10789/#10790, read from the save's 3-bit field, Items.cpp:5075).
+// The chain is fixed by the geared Fortress capture (`cov-a4g-inv`, F481/s1720): the unique full helm
+// drew `invfhlu` where ItemsTxt.invfile is `invfhl`; the unique kite shield `invkitu`/`invkit`; the
+// unique amulet `invamu1`/`invamu` and a ring `invrin5`/`invrin` (both ItemsTxt.uniqueinvfile EMPTY, so
+// the ItemTypes table's own `invgfx1..6`); while the unique light boots (`invlbt`), the normal plate
+// (`invplt`), belt (`invtbl`), gloves (`invtgl`) and the rare war axe (`invwax`) are their base
+// ItemsTxt.invfile -- so uniqueness alone does not change the graphic, only a non-empty quality file
+// does. No type carries BOTH a non-empty uniqueinvfile and a varinvgfx, so the two branches never
+// collide (checked over Items.txt/ItemTypes.txt); unique/set is tested first, matching the columns'
+// own meaning. This engine used to read szInvFile alone, which drew every unique helm/shield and every
+// ring/amulet/charm/jewel with the base art.
+static const char* sessionItemInventoryFile(D2UnitStrc* item, const D2ItemsTxt* txt) {
+    const int quality = ITEMS_GetItemQuality(item);
+    if (quality == ITEMQUAL_UNIQUE && txt->szUniqueInvFile[0]) return txt->szUniqueInvFile;
+    if (quality == ITEMQUAL_SET && txt->szSetInvFile[0]) return txt->szSetInvFile;
+    if (ITEMS_GetVarInvGfxCount(item)) return ITEMS_GetVarInvGfxString(item, ITEMS_GetVarGfxIndex(item));
+    return txt->szInvFile;
+}
+
 static void appendSessionItemPresentation(D2UnitStrc* item) {
     if (!item || item->dwUnitType != UNIT_ITEM) return;
     D2SessionItemPresentation out = {};
@@ -739,7 +764,7 @@ static void appendSessionItemPresentation(D2UnitStrc* item) {
     if (D2ItemsTxt* txt = DATATBLS_GetItemsTxtRecord(item->dwClassId)) {
         out.code = txt->dwCode;
         memcpy(out.flippyFile, txt->szFlippyFile, sizeof out.flippyFile);
-        memcpy(out.invFile, txt->szInvFile, sizeof out.invFile);
+        memcpy(out.invFile, sessionItemInventoryFile(item, txt), sizeof out.invFile);
         out.invWidth = txt->nInvWidth; out.invHeight = txt->nInvHeight;
     }
     g_sessionItemPresentations.push_back(out);
@@ -839,6 +864,48 @@ static uint32_t g_sessionAnchorClass = 0xFFFFFFFF;
 static int g_monspawnSessionCreate = 0;  // set only around a session create; direct d2_monspawn_level callers stay eager
 static int g_sessionCreating = 0;  // T12: set around ANY session create (lazy or eager), so the town's retail build order applies to both
 static int g_sessionFromSave = 0;  // T12/F67: set only around `d2_session_create_from_save`'s create -- a LOADED character joining at the act's town, whose arrival tile is the act start. A new-character or fixture create (the shell's `play=1` path, `d2_session_create_class`, and the direct `d2_session_create`/`_raw`) never sets it, so those keep the room order they have always built.
+
+// F254: a LOADED Harrogath placed its quest-gated town objects from the PRE-LOAD state -- Anya/Drehya
+// (MONSTER_DREHYA 512) absent while Nihlathak (514) stood, both halves of `ACT5Q3_Callback13_
+// PlayerStartedGame`. The level is built inside the create, so its objects run their init functions
+// BEFORE the save's quest record is applied and before `QUESTS_SequenceCycler`'s game-start pass; the
+// two objects read A5Q3's `unk0x84`/`unk0x88`, which that callback sets from the loaded record.
+//
+// Deferring the room population until after the quest pass fixes the placement but is WRONG: every unit
+// draws its own seed from the single `pGame->pGameSeed` stream (`SUNIT_InitSeed`), so moving the
+// population past the save application shifts every loaded-town unit's seed (measured in a throwaway
+// load probe: all 10 Harrogath town monsters' seeds move) and the Towner routes follow room activation
+// and the stream -- Qual-Kehk and Larzuk leave retail's captured positions (s916). So instead, with NO
+// unit created and NO seed drawn, set exactly the two fields the object inits read, from the save's own
+// A5Q3 record, here in the create before any room is populated. The level build is bit-for-bit what it
+// was; the later, real QUESTS_SequenceCycler sets and overwrites everything else (this only has to be
+// right at the moment the objects init).
+// Narrow on purpose (A5Q3's two town objects): it mirrors that one recovered callback, not the general
+// quest-pass-before-level-load ordering, which is a separate, larger row.
+static const uint8_t* g_sessionLoadSaveData = nullptr;
+static uint32_t g_sessionLoadSaveSize = 0;
+static void sessionPreloadA5Q3FlagsFromSave(int difficulty) {
+    const int32_t kRecordBytes = (int32_t)(sizeof(uint16_t) * NUM_QUEST_WORDS);   // 96, ReadQuestSection's record
+    const uint8_t* sec = g_sessionLoadSaveData;
+    const uint8_t* end = sec ? sec + g_sessionLoadSaveSize : nullptr;
+    if (!sec || difficulty < 0 || difficulty > 2) return;
+    if (sec + sizeof(D2SaveHeaderStrc) + 10 + 3 * kRecordBytes > end) return;
+    sec += sizeof(D2SaveHeaderStrc);
+    if (*(const uint32_t*)sec != 0x216F6F57u || *(const uint32_t*)(sec + 4) != 6) return;   // the quest section's own header
+    const uint8_t* record = sec + 10 + (int32_t)difficulty * kRecordBytes;
+    uint8_t buf[kRecordBytes];
+    D2BitBufferStrc tmp = {};
+    BITMANIP_Initialize(&tmp, buf, sizeof buf);
+    // retail's own transform, exactly what D2WEB_PLRSAVE2_ReadQuestSection applies on a real player.
+    QUESTRECORD_CopyBufferToRecord(&tmp, (uint8_t*)record, (uint16_t)kRecordBytes, 1);
+    if (!QUESTRECORD_GetQuestState(&tmp, QUESTSTATEFLAG_A5Q3, QFLAG_REWARDGRANTED)
+        && !QUESTRECORD_GetQuestState(&tmp, QUESTSTATEFLAG_A5Q3, QFLAG_COMPLETEDBEFORE)) return;
+    D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(g_game, QUEST_A5Q3_PRISONOFICE);
+    if (!pQuestData || !pQuestData->pQuestDataEx) return;
+    D2Act5Quest3Strc* pQuestDataEx = (D2Act5Quest3Strc*)pQuestData->pQuestDataEx;
+    pQuestDataEx->unk0x84 = 2;   // ACT5Q3_Callback13_PlayerStartedGame's REWARDGRANTED arm: spawn Drehya
+    pQuestDataEx->unk0x88 = 1;   // ... and suppress Nihlathak
+}
 static int32_t g_townCentreX = -1, g_townCentreY = -1;  // T12: tile of the sight lattice's centre room when the arrival was not the act's start (a save's own position)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_session_town_centre(int tx, int ty) { g_townCentreX = tx; g_townCentreY = ty; }
 static std::vector<int> g_townWalk;   // T12: tiles (x,y pairs) of the rooms the hero's walk after the arrival was centred on, in order; each builds as its own sight lattice
@@ -1337,6 +1404,11 @@ EMSCRIPTEN_KEEPALIVE int d2_monspawn_level(uint32_t seed, int difficulty, int ac
     if (!pLevel) { g_err = "level"; return 0; }
     if (!pLevel->pFirstRoomEx) DRLG_InitLevel(pLevel);
     g_lastLevel = pLevel;
+    // F254: a from-save create's level is built before the save's quest record is applied, so Harrogath's
+    // quest-gated town objects would run their init functions with A5Q3's pre-load defaults. Set the two
+    // fields they read from the save's own record here, before any room is populated and without drawing
+    // a seed (see `sessionPreloadA5Q3FlagsFromSave`).
+    if (g_sessionFromSave) sessionPreloadA5Q3FlagsFromSave(difficulty);
     // d2_monspawn_set_order: those rooms first, in that order (the retail capture tool MONS_ORDER's twin), then
     // the rest in list order; roomIdx stays the list index.
     std::vector<std::pair<D2DrlgRoomStrc*, uint16_t>> order;
@@ -1976,6 +2048,20 @@ EMSCRIPTEN_KEEPALIVE int d2_aiframe_advance(int frames) {
     for (int i = 0; i < frames; i++) {
         ++g_game->dwGameFrame;
         d2web_AdvanceTickCount(40);
+        // Retail's day/night clock, one tick per game frame: D2Common #10923
+        // ENVIRONMENT_UpdatePeriodOfDay, which advances the act's environment one tick and then
+        // recomputes the light intensity (sin(day)*128+128, clamped) and the cycle colour. Retail's
+        // client frame calls it; nothing in this tree did, so the environment held its creation state
+        // for ever -- NOON, intensity 128, white light -- and every level whose Levels.txt Intensity
+        // is 0 (Act I..III outdoors, Harrogath) was lit from that one number. Retail's own captures
+        // of such a level read the day phase instead (the Rogue Encampment 137/140/144/146 across
+        // four of its own captures, Harrogath 170 = Act V's own clamp in ENVIRONMENT_UpdateLightIntensity),
+        // which is why a light row must take its base from its capture rather than the engine
+        // (client-parity F11/F156). Driven, the engine's own base is that same day-phase value.
+        if (g_currentAct >= 0 && g_currentAct <= 4)
+            if (D2DrlgActStrc* pAct = g_game->pAct[g_currentAct])
+                if (pAct->pEnvironment)
+                    ENVIRONMENT_UpdatePeriodOfDay(pAct, g_targetPlayer ? UNITS_GetRoom(g_targetPlayer) : nullptr);
         EVENT_IterateEvents(g_game);
         // The retail game frame runs the quest timers every 20th frame (D2Game.0x6FC3xxxx game
         // loop: QUESTS_QuestUpdater when dwGameFrame % 20 == 0).
@@ -2656,6 +2742,33 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_room_stats() {
     g_sessionRoomStats[7] = g_lastLevel->pDrlg->nRoomsInitSinceLastUpdate;
     return g_sessionRoomStats;
 }
+// F67: a level's STATUS UNION -- the set of rooms carrying any of DRLGACTIVATE's four statuses, in
+// TILE coordinates, for a level that is not the one the session last stood in. retail's own roomhook
+// reads exactly this: `op 3` is "a room that appeared in the union of the DRLG's four per-status
+// lists", not "a room that was built" (the retail capture tool/roomhook/roomhook.cpp: "the room set of a level
+// IS the union of the DRLG's four status lists ... op 3 for a room that appeared"). s247 replayed
+// retail's decisions and compared that union against OUR CREATE LOG -- rooms built -- which is the
+// wrong side of the same event (a room in the OUT_OF_SIGHT/UNTILE rings is in the union long before
+// the per-frame DRLGACTIVATE_Update builds it). `fRoomStatus < ROOMSTATUS_COUNT` is the union
+// membership test d2_session_room_stats already uses, per level. Layout: {count, then count *
+// {tileX, tileY, fRoomStatus}}. Read-only.
+static std::vector<int32_t> g_sessionStatusCells;
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_room_status_cells(int32_t levelId) {
+    g_sessionStatusCells.clear();
+    if (!g_sessionLive || !g_game || g_currentAct < 0 || g_currentAct > 4 || !g_game->pAct[g_currentAct] || !g_game->pAct[g_currentAct]->pDrlg)
+        return g_sessionStatusCells.data();
+    D2DrlgLevelStrc* level = DRLG_GetLevel(g_game->pAct[g_currentAct]->pDrlg, levelId);
+    if (!level || !level->pFirstRoomEx) { g_sessionStatusCells.push_back(0); return g_sessionStatusCells.data(); }
+    g_sessionStatusCells.push_back(0);
+    for (D2DrlgRoomStrc* r = level->pFirstRoomEx; r; r = r->pDrlgRoomNext)
+        if (r->fRoomStatus < ROOMSTATUS_COUNT) {
+            g_sessionStatusCells.push_back(r->nTileXPos);
+            g_sessionStatusCells.push_back(r->nTileYPos);
+            g_sessionStatusCells.push_back((int32_t)r->fRoomStatus);
+        }
+    g_sessionStatusCells[0] = (int32_t)((g_sessionStatusCells.size() - 1) / 3);
+    return g_sessionStatusCells.data();
+}
 
 // PROBE (F52, lands with the measurement it justifies): where a level's exit data actually lives,
 // room by room, in one dump -- the generation-time sources (the map's own DS1 preset-unit list, the
@@ -2891,6 +3004,12 @@ EMSCRIPTEN_KEEPALIVE int d2_session_seam_edges(uint32_t destinationLevel) {
 }
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_seam_edge_data() { return g_sessionSeamEdges; }
 
+// F500's counterfactual knob (d2-web diagnosis, not retail): see game_glue.cpp's g_d2CrossLevelSight
+// and DrlgActivate.cpp's propagate walk. Default 1; a probe turns it off to measure what the
+// cross-level rooms cost a scene's object-control stream.
+extern "C" void d2_set_cross_level_sight(int on);
+EMSCRIPTEN_KEEPALIVE void d2_session_crosslevel_sight(int on) { d2_set_cross_level_sight(on); }
+
 // Levels.txt links with Warp -1 are seams: the two levels are continuous generated terrain and
 // the player simply walks across (s60). The route driver needs that crossing for any adjacent
 // pair, so this command finds the first passable subtile pair across the shared edge of two
@@ -3102,8 +3221,19 @@ static int sessionSightPointAct(D2DrlgActStrc* act, int levelId, int tileX, int 
     D2DrlgLevelStrc* level = DRLG_GetLevel(act->pDrlg, levelId);
     if (!level) return 0;
     if (!level->pFirstRoomEx) DRLG_InitLevel(level);
-    if (on) DUNGEON_SetClientIsInSight(act, levelId, tileX, tileY, nullptr);
-    else DUNGEON_UnsetClientIsInSight(act, levelId, tileX, tileY, nullptr);
+    // F67: retail's client passes the HERO's own room as the sight call's room hint -- `pPlayer->pRoom`,
+    // the very room a replay already has. The capture (the retail captures kind 33,
+    // "What it measures: the hint is the PLAYER's own room") measured it over two
+    // live runs: the calls' own points slide the lattice and the hint does not follow them, it follows
+    // the hero (a level-76 call carries the hero's room IN LEVEL 75). The hint is what makes
+    // DRLG_GetRoomExFromCoordinates resolve through the hint's own near-room list -- which crosses the
+    // level boundary at a seam -- so a level-75 lattice point can reach the level-76 room beside it and
+    // the propagation builds it; the nullptr path can only walk the sighted level's own chain. The
+    // entry burst (the first calls of a load, before retail knows the hero's room) passed none, and a
+    // hero with no room still passes nullptr here.
+    D2ActiveRoomStrc* here = g_targetPlayer ? UNITS_GetRoom(g_targetPlayer) : nullptr;
+    if (on) DUNGEON_SetClientIsInSight(act, levelId, tileX, tileY, here);
+    else DUNGEON_UnsetClientIsInSight(act, levelId, tileX, tileY, here);
     return 1;
 }
 EMSCRIPTEN_KEEPALIVE int d2_session_sight_point(int levelId, int tileX, int tileY, int on) {
@@ -3876,7 +4006,7 @@ static void appendVendorPresentation(D2UnitStrc* item) {
     if (D2ItemsTxt* txt = DATATBLS_GetItemsTxtRecord(item->dwClassId)) {
         out.code = txt->dwCode;
         memcpy(out.flippyFile, txt->szFlippyFile, sizeof out.flippyFile);
-        memcpy(out.invFile, txt->szInvFile, sizeof out.invFile);
+        memcpy(out.invFile, sessionItemInventoryFile(item, txt), sizeof out.invFile);
         // Same as the player-side producer below: the cells the item covers come from ItemsTxt, so a
         // two-handed axe is 2x4 on the vendor grid and a click anywhere on it buys it. Leaving these
         // zero made every vendor item a 1x1 for the client's hit test.
@@ -4320,6 +4450,14 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_fixture_quality_item(uint32_t code, uin
 EMSCRIPTEN_KEEPALIVE int d2_session_item_quality(uint32_t itemId) {
     D2UnitStrc* item = (g_sessionLive && g_game) ? SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId) : nullptr;
     return item && item->pItemData ? (int)item->pItemData->dwQualityNo : -1;
+}
+// F114: the SetItems.txt row index an item carries (ITEMS_GetFileIndex) -- for a SET item, which set
+// item the chooser (ItemsMagic sub_6FC542C0) picked. The set chooser and the file-index read are two
+// readers no scenario reached; this is the one number `s885` needs to name the row it compares the
+// item's boni against. -1 for an item with no file index (a normal/magic one carries -1).
+EMSCRIPTEN_KEEPALIVE int d2_session_item_file_index(uint32_t itemId) {
+    D2UnitStrc* item = (g_sessionLive && g_game) ? SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId) : nullptr;
+    return item ? ITEMS_GetFileIndex(item) : -1;
 }
 // What an item IS, by retail's own classifier: ITEMS_CheckItemTypeIdByItemId walks Items.txt's
 // wType[0]/wType[1] through ItemTypes.txt's equivalence LUT, so "is this a weapon" is a column retail
@@ -6133,7 +6271,14 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick_gate() {
 // against what it is, not inferred.
 // [12] = the SuperUniques.txt row of a boss monster (MONSTERUNIQUE_GetBossHcIdx; -1 otherwise):
 // the name retail prints over its life bar ("Shenk the Overseer" is row 42, Siege Boss).
-static int32_t g_unitInfo[13];
+// [13..16] F245: whether the unit is in STATE_ATTACHED, and the OWNER it stores when it is
+// (dwOwnerType, dwOwnerGUID) plus its AI special state. Retail makes a unit that is MOUNTING another
+// -- the act V Imp on a Barricade Tower / Siege Beast, `sub_6FD00EC0` -- non-targetable on purpose
+// (`pUnit->dwFlags &= 0xFFFFFFF1u` clears TARGETABLE|CANBEATTACKED|ISVALIDTARGET; the same function's
+// `UNITS_StoreOwner` both ways is what sets STOREOWNERINFO on it and on its mount), and the dismount
+// (`sub_6FD01010`, through the imp's own "Imp Teleport" skill) restores both. So a live, full-hit-point
+// unit that cannot be attacked is only a DEFECT when these say it is NOT attached and owns nothing.
+static int32_t g_unitInfo[17];
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_unit_info(int type, uint32_t id) {
     memset(g_unitInfo, 0, sizeof g_unitInfo);
     D2UnitStrc* u = g_game ? SUNIT_GetServerUnit(g_game, type, (int32_t)id) : nullptr;
@@ -6150,6 +6295,13 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_unit_info(int type, uint32_t id) 
         g_unitInfo[10] = STATLIST_UnitGetStatValue(u, STAT_DAMAGEPERCENT, 0);
     }
     g_unitInfo[12] = (u->dwUnitType == UNIT_MONSTER && u->pMonsterData && (u->pMonsterData->nTypeFlag & MONTYPEFLAG_SUPERUNIQUE)) ? MONSTERUNIQUE_GetBossHcIdx(u) : -1;
+    g_unitInfo[13] = STATES_CheckState(u, STATE_ATTACHED) ? 1 : 0;
+    g_unitInfo[14] = (int32_t)u->dwOwnerType; g_unitInfo[15] = (int32_t)u->dwOwnerGUID;
+    g_unitInfo[16] = -1;
+    if (u->dwUnitType == UNIT_MONSTER && u->pMonsterData) {
+        D2AiControlStrc* ctl = AIGENERAL_GetAiControlFromUnit(u);
+        if (ctl) g_unitInfo[16] = (int32_t)ctl->nAiSpecialState;   // AISPECIALSTATE_MOUNTING_UNIT is 16
+    }
     return g_unitInfo;
 }
 // The player's room and its near list: [near count, near rooms active, near rooms of this level,
@@ -6680,6 +6832,11 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tile_roll_count() {
     updateSessionSnapshot(); ensureSessionTiles(); return (int)g_sessionTileRolls.size();
 }
 extern std::vector<int32_t> g_d2webRollCalls;
+extern std::vector<int32_t> g_d2webRollLevels;
+// F511: the level of the room whose seed each roll record rolled, one int per record -- the record's
+// own rect is not unique to a level (act I's outdoor levels share the coordinate space).
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_roll_levels() { return g_d2webRollLevels.data(); }
+EMSCRIPTEN_KEEPALIVE int d2_session_roll_level_count() { return (int)g_d2webRollLevels.size(); }
 // T12: ordered GetTileCache calls, 10 int32 each: room x,y (tiles), type, style, seq, entries, weightSum, ladder, chosen rarity, seed low before.
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_roll_calls() { return g_d2webRollCalls.data(); }
 EMSCRIPTEN_KEEPALIVE int d2_session_roll_call_count() { return (int)(g_d2webRollCalls.size() / 10); }
@@ -6790,12 +6947,25 @@ static D2SessionLightmap g_sessionLightmap;
 static int lightOctagonal(int a, int b) { a = a < 0 ? -a : a; b = b < 0 ? -b : b; return b <= a ? (a * 0x3D7 + b * 0x197) >> 10 : (b * 0x3D7 + a * 0x197) >> 10; }
 // D2Client DRAW\LightMap.cpp's occlusion (1.13c D2Client+0xA9480 for units, +0xA9100/+0xA8F60 for
 // objects, which cache the same pattern; an earlier change). Around the source's cell a 64x64 grid B holds
-// 16 for every blocked cell (or one off the map), 0 otherwise; a shadow grid G is filled ring by ring
+// 16 for every blocked cell (a map cell that collides 0x22, or -- for an object -- an off-map cell
+// whose world subtile does; a monster's off-map cell counts blocked outright), 0 otherwise; a shadow grid G is filled ring by ring
 // from distance 2 outward, eight symmetric cells per step, each from its neighbours toward the source
 // (get = B if non-zero, else G): straight along an axis, or blended by the slope (f = minor<<8 / major)
 // between the two neighbours on the source's side. A cell then receives its light scaled by
 // (8 - G/2) / 8, none once G reaches 16.
 static int lightB[64 * 64], lightG[64 * 64];
+// Diagnostic for the off-map branch (F240): how many off-map pattern cells the one-hop resolver could
+// NOT reach this build, i.e. cells that were treated as OPEN because no built room answered. It is the
+// only way to see the branch's dependability: a wrong anchor shows up here as a non-zero count while the
+// map can still read exact in a scene whose player happens to sit where the anchor reaches. Reset per
+// d2_session_lightmap, read by d2_session_lightmap_offmap_unresolved.
+static int g_lightOffMapUnresolved = 0;
+// The same count asked of the PLAYER's room instead of the source's -- i.e. exactly what F240 shipped
+// before the review: a number here is the cells that build would have read as OPEN because the player
+// stood too far from the source for the one-hop resolver to reach its pattern. It is evidence, not a
+// gate (it must be zero under the source anchor; it is expected NON-zero here in a scene whose player
+// is several rooms from a lit edge object), and it is what makes the fix's gate non-vacuous.
+static int g_lightOffMapUnresolvedPlayer = 0;
 static inline int lightGet(int row, int col) { const int i = (row << 6) + col; return lightB[i] ? lightB[i] : lightG[i]; }
 static void lightShadowStep(int x, int y, int row, int col, int px, int py) {
     int dx = x - px, dy = y - py;
@@ -6808,17 +6978,51 @@ static void lightShadowStep(int x, int y, int row, int col, int px, int py) {
     else { const int f = (dx << 8) / dy; v = ((256 - f) * lightGet(row + sy, col) + f * lightGet(row + sy, col + sx)) >> 8; }
     lightG[(row << 6) + col] = v;
 }
-static void lightAddSource(int x, int y, int r, int intensity, bool occlude, bool offMapBlocks) {
+static void lightAddSource(int x, int y, int r, int intensity, bool occlude, bool offMapBlocks, D2ActiveRoomStrc* refRoom, D2ActiveRoomStrc* playerRoom) {
     D2SessionLightmap& m = g_sessionLightmap;
     if (r <= 0 || r >= 0x100) return;
     const int x0 = (x - (x & 7)) - r, y0 = (y - (y & 7)) - r, n = (r * 2 >> 3) + 1, r8 = r >> 3;
+    // A source whose pattern does not touch the 48x48 window lights no cell of it, so it is skipped
+    // outright: exact (every cell it could write is outside the map) and it keeps the per-frame cost
+    // to the sources that reach the window. Without it the Flayer Jungle -- hundreds of lit objects
+    // over 4,772 tiles -- resolved a world collision for every off-map pattern cell of every one of
+    // them and the frame row timed out at 120 s; with it only the three sources reaching the window do
+    // (F240). Checked in cell coordinates, the same ones the write loop uses.
+    const int px0 = x0 >> 3, px1 = (x0 + 8 * (n - 1)) >> 3, py0 = y0 >> 3, py1 = (y0 + 8 * (n - 1)) >> 3;
+    if (px1 < m.originX || px0 > m.originX + 47 || py1 < m.originY || py0 > m.originY + 47) return;
     const int scale = (int)(((int64_t)intensity << 16) / r);
     memset(lightG, 0, sizeof lightG); memset(lightB, 0, sizeof lightB);
     if (occlude) {
         for (int iy = 0; iy < n; iy++) for (int ix = 0; ix < n; ix++) {
-            const int gx = ((x0 + 8 * ix) >> 3) - m.originX, gy = ((y0 + 8 * iy) >> 3) - m.originY;
+            const int wx = (x0 + 8 * ix) >> 3, wy = (y0 + 8 * iy) >> 3;
+            const int gx = wx - m.originX, gy = wy - m.originY;
             const bool off = gx < 0 || gy < 0 || gx >= 48 || gy >= 48;
-            const bool blocked = off ? offMapBlocks : m.blocked[gy * 48 + gx] != 0;
+            bool blocked;
+            if (!off) blocked = m.blocked[gy * 48 + gx] != 0;
+            else if (offMapBlocks) blocked = true;
+            else {
+                // An object's occlusion pattern reaches cells outside the 48x48 window, and retail's
+                // pattern cell there is NOT a constant: it reads the WORLD's own collision at that
+                // subtile (the pattern is built from the collision grid, which extends past the map --
+                // "The light map"). The fortress right edge is a wall, so those
+                // cells block and the object lights nothing past them (F240); the open ground three
+                // rows past a town torch does not, so that torch lights its cells fully. A monster's
+                // off-map cell stays blocked (offMapBlocks), which is the rule the captures have shown
+                // so far.
+                //
+                // `refRoom` MUST be the SOURCE's own room (the pattern is the source's, built from the
+                // collision around it), never the player's: COLLISION_GetRoomBySubTileCoordinates tests
+                // one room plus its DRLG neighbours (this file, d2_session_room_active_at's note), which
+                // reaches the source's pattern but NOT its cells when the anchor is a player room
+                // several rooms away -- the cells would read "no room" and be treated open. Anchoring on
+                // the player made the off-map result depend on where the PLAYER stood, which the one gate
+                // F240 had (`s2135`, its player beside the objects) could not see; the review found it.
+                D2ActiveRoomStrc* wr = refRoom ? COLLISION_GetRoomBySubTileCoordinates(refRoom, wx, wy) : nullptr;
+                if (!wr) ++g_lightOffMapUnresolved;   // out of the one-hop resolver's reach -- treated open
+                if (playerRoom && playerRoom != refRoom)
+                    if (!COLLISION_GetRoomBySubTileCoordinates(playerRoom, wx, wy)) ++g_lightOffMapUnresolvedPlayer;
+                blocked = wr && COLLISION_CheckMask(wr, wx, wy, COLLIDE_VISIBLE | COLLIDE_BLANK) != 0;
+            }
             lightB[((32 - r8 + iy) << 6) + 32 - r8 + ix] = blocked ? 16 : 0;
         }
         const int cx = (x & ~7) + 4, cy = (y & ~7) + 4;
@@ -6849,24 +7053,31 @@ static void lightAddSource(int x, int y, int r, int intensity, bool occlude, boo
 // occludeUnits: D2Client occludes a unit's light only above a quality setting (the dispatcher's
 // argument > 1); objects always.
 EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_session_lightmap(int ambientOverride, int occludeUnits) {
-    D2SessionLightmap& m = g_sessionLightmap; memset(&m, 0, sizeof m);
+    D2SessionLightmap& m = g_sessionLightmap; memset(&m, 0, sizeof m); g_lightOffMapUnresolved = 0; g_lightOffMapUnresolvedPlayer = 0;
     if (!g_sessionLive || !g_targetPlayer || !g_targetPlayer->pDynamicPath || !g_lastLevel) return &m;
     const D2DynamicPathStrc* path = g_targetPlayer->pDynamicPath;
     m.originX = (int)path->tGameCoords.wPosX - 24; m.originY = (int)path->tGameCoords.wPosY - 24;
     // The map's base is the LEVEL's own Levels.txt Intensity where the level defines one, and the act's
-    // day/night environment only where it defines none (0). Retail's captured maps read exactly the
-    // level's value: Act IV Town 140, Mesa 3 (the City of the Damned) 40 and Lava 1 (the River of Flame)
-    // 120, each dumped from the running game over the capture of that scene (retail/drawlists/act4-*.bin
-    // via tools/drawlist-light.py); every Act I..III outdoor level defines 0 and its capture reads the
-    // environment's time of day instead (Act II town 141, Act III docks 153). Nothing in this build
-    // drives ENVIRONMENT_* (UpdateTicks/UpdatePeriodOfDay/InitializeEnvironment have no caller), so the
-    // environment holds its creation-time default and using it lit every level of every act alike --
-    // which is what made Act IV brighter than retail's own frames of it (client-parity F11/V2).
+    // day/night environment ONLY for an OUTDOOR level where it defines none (0). An INDOOR level that
+    // defines none stays at 0 -- its sources alone light it, which is why retail's caves, crypts and
+    // tombs are dark. Retail's captured maps read exactly this: Act IV Town 140, Mesa 3 (the City of
+    // the Damned) 40 and Lava 1 (the River of Flame) 120 are levels with their own Intensity; every
+    // Act I..III outdoor level defines 0 and reads the environment instead (Act II town 141, Act III
+    // docks 153, Harrogath 170); and every indoor level that defines 0 reads 0 -- the Halls of the Dead
+    // L2 (57) and Catacombs 2 (35) at 0, and the Cathedral (33) at 0 as well, and the Cathedral is a
+    // DRLGTYPE_PRESET level, so a DrlgType test would have sent it to the environment and is ruled out.
+    // The flag is Levels.txt's own IsInside (`D2LevelsTxt`, loaded with the rest of the table into
+    // sgptDataTables->pLevelsTxt): indoor is 1. Nothing in this build drove ENVIRONMENT_* before
+    // d2_aiframe_advance, so using it for an indoor level lit every cave of every act alike -- which is
+    // what F251 measured (`s2136`: Halls L2 base 128 against retail's 0, 2260 of 2304 cells).
     const int levelId = path->pRoom ? DUNGEON_GetLevelIdFromRoom(path->pRoom) : 0;
     const D2LevelDefBin* levelDef = levelId ? DATATBLS_GetLevelDefRecord(levelId) : nullptr;
     const int levelIntensity = levelDef ? (int)levelDef->nIntensity : 0;
+    const bool indoors = levelId > 0 && sgptDataTables && sgptDataTables->pLevelsTxt
+        && levelId < sgptDataTables->nLevelsTxtRecordCount && sgptDataTables->pLevelsTxt[levelId].nIsInside;
     m.ambient = ambientOverride >= 0 ? ambientOverride
-        : (levelIntensity ? levelIntensity : ENVIRONMENT_GetIntensityFromAct(g_game->pAct[g_currentAct]));
+        : (levelIntensity ? levelIntensity
+            : (indoors ? 0 : ENVIRONMENT_GetIntensityFromAct(g_game->pAct[g_currentAct])));
     memset(m.intensity, m.ambient > 255 ? 255 : m.ambient, sizeof m.intensity);
     for (int gy = 0; gy < 48; gy++) for (int gx = 0; gx < 48; gx++) {
         D2ActiveRoomStrc* room = COLLISION_GetRoomBySubTileCoordinates(path->pRoom, m.originX + gx, m.originY + gy);
@@ -6883,7 +7094,7 @@ EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_session_lightmap(int ambientOve
     // Retail clamps a non-positive radius to 0 before the setter; a light penalty deep enough to reach
     // it would otherwise put a negative radius in the source list this dump exposes.
     const int playerRadius = (playerLight > 18 ? 18 : (playerLight < 0 ? 0 : playerLight)) * 8;
-    lightAddSource(px, py, playerRadius, 255, occludeUnits != 0, true); m.source[0] = { 0, (int32_t)g_targetPlayer->dwClassId, px, py, playerRadius }; m.sources = 1;
+    lightAddSource(px, py, playerRadius, 255, occludeUnits != 0, true, path->pRoom, path->pRoom); m.source[0] = { 0, (int32_t)g_targetPlayer->dwClassId, px, py, playerRadius }; m.sources = 1;
     for (D2DrlgLevelStrc* level = g_lastLevel->pDrlg ? g_lastLevel->pDrlg->pLevel : nullptr; level; level = level->pNextLevel)
         for (D2DrlgRoomStrc* roomEx = level->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
             if (!roomEx->pRoom) continue;
@@ -6902,17 +7113,33 @@ EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_session_lightmap(int ambientOve
                 }
                 if (radius <= 0) continue;
                 const int r = (radius > 18 ? 18 : radius) * 8;
-                // An object's pattern is cached the first time D2Client computes it, when the object was
-                // on the map; retail's code counts an off-map cell as blocked, which only a pattern
-                // computed NOW (the object at the map's edge) would see. Town-lit: a torch 3 rows off
-                // the map lights the cells below it fully in retail. So off-map counts as open for objects.
-                lightAddSource(x, y, r, 255, unit->dwUnitType == UNIT_OBJECT || occludeUnits != 0, unit->dwUnitType != UNIT_OBJECT);
+                // An object's pattern cell beyond the map reads the WORLD's own collision there (see
+                // lightAddSource): off-map is not a constant, so a wall at the map's edge blocks and
+                // open ground does not. A monster's off-map cell stays blocked. The anchor is the
+                // UNIT's own room (`roomEx->pRoom`), not the player's (`path->pRoom`): the pattern is
+                // the source's, built from the collision around it, and a player-room anchor cannot
+                // reach an object's off-map cells when the player is several rooms away (the review's
+                // finding).
+                lightAddSource(x, y, r, 255, unit->dwUnitType == UNIT_OBJECT || occludeUnits != 0, unit->dwUnitType != UNIT_OBJECT, roomEx->pRoom, path->pRoom);
                 if (m.sources < 64) m.source[m.sources] = { (int32_t)unit->dwUnitType, (int32_t)unit->dwClassId, x, y, r };
                 m.sources++;
             }
         }
     return &m;
 }
+
+// The off-map pattern cells the last d2_session_lightmap could NOT resolve (no built room answered from
+// the source's own room), which are the cells treated as OPEN. Zero means every off-map cell the build
+// asked about was inside the one-hop resolver's reach, so the anchor reached the whole pattern; a
+// non-zero count is the anchor failing the pattern and the build reading "not built" where retail reads
+// the world -- the failure mode F240's player-anchored version had and `s2135` could not see.
+EMSCRIPTEN_KEEPALIVE int d2_session_lightmap_offmap_unresolved() { return g_lightOffMapUnresolved; }
+// The same count under the OLD anchor (the player's room): what F240 shipped before the review. It is
+// the control that the source-room anchor's zero is measured against -- a non-zero value here in a scene
+// whose map is nonetheless exact is the review's finding, reproduced: the old anchor read "not built"
+// (open) where retail read the world, and no cell of the map showed it because the player happened to
+// reach. Report it beside the source-anchor count, never gate on it.
+EMSCRIPTEN_KEEPALIVE int d2_session_lightmap_offmap_unresolved_player() { return g_lightOffMapUnresolvedPlayer; }
 
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_terrain_hash() {
     updateSessionSnapshot(); ensureSessionTiles(); return g_sessionTerrainHash;
@@ -7076,6 +7303,56 @@ EMSCRIPTEN_KEEPALIVE int d2_session_save_d2s(uint8_t* out, int cap) {
 
 EMSCRIPTEN_KEEPALIVE int d2_session_save_d2s_error() { return g_sessionSaveError; }
 
+// The character's saved automap, retail's `<character>.ma0`, written beside the .d2s at Save and Exit
+// (F268;. WHICH cells exist is the CLIENT's reveal -- D2Game's own
+// DUNGEON_AllocAct passes NULL for both automap callbacks, so the server reveals nothing and the layer
+// lives in D2Client -- so the caller hands the cells its layer holds and this composes the FILE, exactly
+// as d2_session_save_d2s composes the .d2s from the live session above. Layout: 100 little-endian dwords
+// indexed by LAYER NUMBER (Levels.txt `Layer`), each the file offset of that layer's first chunk, 0 =
+// none; then, per layer, a chunk = 32-byte header `{next, layer, 0, seed, floorBytes, wallBytes, 0, 0}`
+// followed by floorBytes/6 floor cells then wallBytes/6 wall cells, each cell 6 bytes
+// `{u16 cellNo (= the MaxiMap.dc6 frame), i16 x, i16 y}` in automap pixels. This writes ONE chunk per
+// layer: retail chains several, each with a per-save-session `seed`, and the loader UNIONS every chunk of
+// a layer without filtering on it, so a single chunk is a valid layer and the `seed` word's meaning stays
+// unread -- it is written 0.
+//
+// `cells` is `count` quints of `{layer, frame, x, y, wall}`; returns the byte count written, or <= 0:
+// -1 a bad argument, -2 the buffer is too small.
+EMSCRIPTEN_KEEPALIVE int d2_session_save_ma0(const int32_t* cells, int count, uint8_t* out, int cap) {
+    if (!cells || count < 0 || !out || cap <= 0) return -1;
+    constexpr int kLayers = 100, kTableBytes = kLayers * 4;   // 0x190, the recovered header table
+    struct Ma0Cell { int16_t frame, x, y; };
+    static_assert(sizeof(Ma0Cell) == 6, "a .ma0 cell is {u16 cellNo, i16 x, i16 y}");
+    std::vector<Ma0Cell> floors[kLayers], walls[kLayers];
+    for (int i = 0; i < count; i++) {
+        const int layer = cells[i * 5 + 0];
+        if (layer < 0 || layer >= kLayers) continue;
+        const Ma0Cell cell = { (int16_t)cells[i * 5 + 1], (int16_t)cells[i * 5 + 2], (int16_t)cells[i * 5 + 3] };
+        (cells[i * 5 + 4] ? walls[layer] : floors[layer]).push_back(cell);
+    }
+    uint32_t table[kLayers], at = kTableBytes;
+    for (int l = 0; l < kLayers; l++) {
+        const uint32_t bytes = (uint32_t)(floors[l].size() + walls[l].size()) * 6;
+        table[l] = bytes ? at : 0;
+        if (bytes) at += 32 + bytes;
+    }
+    if ((int)at > cap) return -2;
+    memset(out, 0, at);
+    for (int l = 0; l < kLayers; l++) memcpy(out + l * 4, &table[l], 4);
+    for (int l = 0; l < kLayers; l++) {
+        if (!table[l]) continue;
+        uint8_t* p = out + table[l];
+        const uint32_t f = (uint32_t)floors[l].size() * 6, w = (uint32_t)walls[l].size() * 6;
+        const uint32_t layer = (uint32_t)l, zero = 0, seed = 0;
+        memcpy(p + 0, &zero, 4); memcpy(p + 4, &layer, 4); memcpy(p + 8, &zero, 4); memcpy(p + 12, &seed, 4);
+        memcpy(p + 16, &f, 4); memcpy(p + 20, &w, 4); memcpy(p + 24, &zero, 4); memcpy(p + 28, &zero, 4);
+        uint8_t* q = p + 32;
+        for (const Ma0Cell& cell : floors[l]) { memcpy(q, &cell, 6); q += 6; }
+        for (const Ma0Cell& cell : walls[l]) { memcpy(q, &cell, 6); q += 6; }
+    }
+    return (int)at;
+}
+
 // Load a .d2s into the live player. Returns 0 on success, otherwise the PLRSAVE2 error code.
 EMSCRIPTEN_KEEPALIVE int d2_session_load_d2s(const uint8_t* data, int len) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !data || len <= 0) return -1;
@@ -7131,8 +7408,12 @@ EMSCRIPTEN_KEEPALIVE int d2_session_create_from_save(const uint8_t* data, int le
     // `DUNGEON_FindActSpawnLocationEx(act, town, 0)`, the same tile `LEVEL_ChangeAct` uses -- so the town is a
     // sight-lattice arrival and builds in the order retail's sight calls allocate its rooms (the reorder below).
     g_sessionFromSave = 1;
+    g_sessionLoadSaveData = copy.data();               // F254: staged for the level build's A5Q3 pre-set
+    g_sessionLoadSaveSize = (uint32_t)copy.size();
     const int nCreateOk = d2_session_create_class_bare(nSeed, difficulty, nAct, nLevel, read.nClass);
     g_sessionFromSave = 0;
+    g_sessionLoadSaveData = nullptr;
+    g_sessionLoadSaveSize = 0;
     if (!nCreateOk) return PLRSAVE2ERROR_UNKNOWN;
 
     // Everything below can only be asked once the game the character is joining exists.

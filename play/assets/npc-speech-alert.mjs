@@ -14,8 +14,16 @@ export const NPC_SPEECH_ALERT = Object.freeze({
   palette: 'data\\global\\palette\\ACT1\\pal.dat',
   frames: 16,
   animationRate: 9,
-  offsetX: -30,
-  offsetY: -50,
+  // Retail's Overlay.txt `npcalert` row: Xoffset = -5, Yoffset = -7 (columns 11/12).  The record's
+  // Height1..4 columns (-30, 0, 0, -50 -- columns 13..16) are NOT the draw offsets: retail adds the
+  // one the unit's MonStats2 `OverlayHeight` selects to Yoffset, and every talkable town NPC has
+  // OverlayHeight = 2 (MonStats2.txt: warriv1/kashya/gheed/charsi/akara/... all 2, so Height2 = 0),
+  // so the drawn offset is exactly (-5, -7).  Reading Height1/Height4 as the offsets -- the
+  // -30/-50 this module used to carry -- floated the balloon ~43 px too high and ~25 px too far
+  // left; measured against retail's own capture `retail/frames/w0.png`, where the balloon's bottom
+  // edge sits ~18 px above the NPC's head, not the ~56 px that -50 produced (see `s1370`).
+  offsetX: -5,
+  offsetY: -7,
 });
 
 // `pending` is intentionally a required boolean supplied by an engine export.  A

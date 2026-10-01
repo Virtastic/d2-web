@@ -1,6 +1,6 @@
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { BORDER_RIGHT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
-import { paperdollIdentity } from './paperdoll-identity.mjs';
+import { fnv1a32, paperdollIdentity } from './paperdoll-identity.mjs';
 import { PANEL_CLOSE_ART, panelCloseLayout } from './panel-close.mjs';
 
 // Inventory.txt Amazon2, normalized from its 800x600 screen coordinates to the
@@ -45,6 +45,18 @@ export const EMPTY_SLOT_ART = Object.freeze({
   1: ['inv_helm_glove', 1, 535, 118], 10: ['inv_helm_glove', 0, 420, 292],
   2: ['inv_ring_amulet', 0, 609, 118], 6: ['inv_ring_amulet', 1, 495, 263], 7: ['inv_ring_amulet', 1, 609, 263],
 });
+// The per-body-location constant D2Client adds after centring a WORN item's cell box in its
+// component rect (F257;. BodyLoc -> [dx, dy] in
+// screen pixels, read from D2Client 1.13c's own draw of the worn items (jump table 0x6fb45878):
+// torso +3 x; belt +2 x,-2 y; feet +2 x,-4 y; neck/rings/gloves -2 y; head and the arms none (the
+// arms take a (+4,-4) pair only while D2Client's expansion weapon-switch flag is set). Without this
+// table the panel centred every slot and four of the seven worn items in retail's own draw list
+// landed 2-4 px off.
+export const WORN_ANCHOR_OFFSET = Object.freeze({
+  1: [0, 0], 2: [0, -2], 3: [3, 0], 4: [0, 0], 5: [0, 0],
+  6: [0, -2], 7: [0, -2], 8: [2, -2], 9: [2, -4], 10: [0, -2],
+});
+
 // Retail's own anchors for InvChar6 frames 4..7 (left x, bottom y).
 const INV_PANEL = [[4, 400, 316], [5, 656, 316], [6, 400, 492], [7, 656, 492]];
 
@@ -106,29 +118,57 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
   const chrome = createPanelChrome(read, documentObject);
   const actPal = (act) => `data\\global\\palette\\ACT${Math.min(5, Math.max(1, act | 0))}\\pal.dat`;
   const icons = new Map();
-  function icon(invFile, act = 1) {
+  // The canvas AND the decoded frame, so an item's drawn identity (its cel bytes' FNV hash, the same
+  // function the draw list uses) is available to the evidence without a second decode.
+  function iconAt(invFile, act = 1) {
     const key = act + ':' + invFile;
-    let image = icons.get(key);
-    if (!image) {
+    let entry = icons.get(key);
+    if (!entry) {
       const decoded = decodeDc6(read(inventoryItemAsset(invFile)));
       if (!decoded.frames.length) throw new Error(`empty inventory item ${invFile}`);
-      image = frameCanvas(decoded.frames[0], decodeDatPalette(read(actPal(act))), documentObject); icons.set(key, image);
+      const frame = decoded.frames[0];
+      entry = { image: frameCanvas(frame, decodeDatPalette(read(actPal(act))), documentObject), frame }; icons.set(key, entry);
     }
-    return image;
+    return entry;
   }
-  // A grid item sits on retail's box, colour 234 in draw mode 0: the act PL2's AlphaBlend[2][under][234]
-  // (s197's frame buffer), read back from the canvas as palette indices (exact at scale 1).
+  const icon = (invFile, act = 1) => iconAt(invFile, act).image;
+  // A grid item sits on retail's own box: `box 419 315 448 344 color=138 mode=0` in
+  // the retail captures, one per cell of the item.
+  //
+  // The colour byte is the act PL2 transform's SOURCE index and the panel pixel underneath is its
+  // ROW -- the `pl2[base + under*256 + colour]` shape the HUD's stamina bar uses (control-panel.mjs).
+  // The table is AlphaBlend's THIRD (base 13568 + 2*65536), not the first -- solved against retail's
+  // frame buffer, not guessed, after the source byte below was: a throwaway probe read the panel
+  // cel's own palette index under every un-art'd box pixel of the Malah frame and counted hits per
+  // (table, src): (2, 138) 1081/1225, the next best 689.
+  const BOX_PL2_BASE = 13568 + 2 * 65536;
+  // The box colour is NOT a constant, and it is not ours to invent: retail's own records carry
+  // 234 for the 1x1 carried items of the act-I character (vendor-akara, f3c-inv-open,
+  // inv-gold-deposit, cursor-state-panel, f51-warriv) and 138 for ELDRA's 1x2 ones
+  // (vendor-malah-act5, cap9-a5-larzuk-shop3); a belt slot cell is 126, the belt grid's own base.
+  // Only the 2-cell case is measured and only it departs from the 234 the client already drew, so
+  // the key is the narrowest one that fits -- a 1x3 or 2x2 carried item is not captured anywhere and
+  // keeps 234. Checked against every scene that HAS an inventory box: s250 0 px (PASS), s340 2,471
+  // (unchanged), s256 8,836 -> 6,985.
+  const boxColour = (item) => ((item.invWidth || 1) * (item.invHeight || 1) === 2 ? 138 : 234);
+  // The box is half-open at the far corner (D2's own `x1..x2-1`), measured: 30 px wide scores worse
+  // than 29 (s256 7,167 -> 6,985), and 29 leaves retail's box1/box2 exactly contiguous.
+  const BOX_PX = 29;
   const blendByAct = new Map();
-  function itemBackground(ctx, act, x, y, w, h) {
+  function boxTransform(act) {
     let t = blendByAct.get(act);
     if (!t) { const pal = decodeDatPalette(read(actPal(act))), pl2 = read(actPal(act).replace(/pal\.dat$/i, 'pal.pl2')), index = new Map();
       for (let k = 255; k >= 0; k--) index.set((pal[k * 4] << 16) | (pal[k * 4 + 1] << 8) | pal[k * 4 + 2], k);
       t = { pal, pl2, index }; blendByAct.set(act, t); }
+    return t;
+  }
+  function itemBackground(ctx, act, x, y, w, h, colour) {
+    const t = boxTransform(act);
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
     const X = Math.round(x), Y = Math.round(y), W = Math.round(w), H = Math.round(h);
-    const img = ctx.getImageData(X, Y, W, H), d = img.data, base = 13568 + 2 * 65536;
+    const img = ctx.getImageData(X, Y, W, H), d = img.data, base = BOX_PL2_BASE;
     for (let i = 0; i < d.length; i += 4) { const u = t.index.get((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]); if (u === undefined) continue;
-      const c = t.pl2[base + u * 256 + 234]; d[i] = t.pal[c * 4]; d[i + 1] = t.pal[c * 4 + 1]; d[i + 2] = t.pal[c * 4 + 2]; }
+      const c = t.pl2[base + u * 256 + colour]; d[i] = t.pal[c * 4]; d[i + 1] = t.pal[c * 4 + 1]; d[i + 2] = t.pal[c * 4 + 2]; }
     ctx.putImageData(img, X, Y); ctx.restore();
   }
   // Engine geometry (inventoryLayoutFromEngine) once the shell has it; until then the Amazon2
@@ -225,16 +265,29 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
       // Retail's placement (s197's frame buffer): the item's box is its cells; in the grid the box is
       // backed by colour 234 in mode 0, and the art is drawn at the box's left, one row below its top.
       if (item.invPage === 0 && item.mode === 0) { const r = gridRect(item);
-        itemBackground(ctx, act, ox + r.left * scale, oy + r.top * scale, r.width * scale, r.height * scale);
+        // One box per CELL of the item, at the cell's own corner (retail's `box` records).
+        const cellW = r.width / Math.max(1, item.invWidth || 1), cellH = r.height / Math.max(1, item.invHeight || 1);
+        for (let cy = 0; cy < (item.invHeight || 1); cy++) for (let cx = 0; cx < (item.invWidth || 1); cx++)
+          itemBackground(ctx, act, ox + (r.left + cx * cellW) * scale, oy + (r.top + cy * cellH) * scale, BOX_PX * scale, BOX_PX * scale, boxColour(item));
         ctx.drawImage(image, r.left - sx, r.top - sy + 1); itemPixels += image.width * image.height;
-        drawn.push({ id: item.id, where: 'grid', gridX: item.gridX, gridY: item.gridY, left: r.left, top: r.top }); }
+        // `top` stays the CELL's top (s202 asserts the item landed in the cell it was put in);
+        // `blitTop` is where the ART actually landed -- one row lower, and the anchor retail's own
+        // `cel ?` record carries. An identity row must read `blitTop`, or it compares the cell.
+        drawn.push({ id: item.id, where: 'grid', gridX: item.gridX, gridY: item.gridY, invFile: item.invFile, frame: 0,
+          celHash: fnv1a32(iconAt(item.invFile, act).frame.encoded), left: r.left, top: r.top, blitTop: r.top + 1,
+          width: image.width, height: image.height,
+          ox: iconAt(item.invFile, act).frame.offsetX, oy: iconAt(item.invFile, act).frame.offsetY }); }
       else if (item.mode === 1 && slotRect(item.bodyLoc)) { const slot = slotRect(item.bodyLoc);
-        // On the body the box (cells of 29) is centred in the slot rounding down, the art one row lower.
-        const bw = Math.ceil(image.width / 29) * 29, bh = Math.ceil(image.height / 29) * 29;
-        const left = slot.left + Math.floor((slot.width - bw) / 2), top = slot.top + Math.floor((slot.height - bh) / 2) + 1;
+        // On the body the item's CELL box (29 px per Items.txt cell -- retail multiplies the grid's
+        // own box size by the item's invWidth/invHeight) is centred in the slot rounding down, the
+        // art one row lower, and then retail's per-body-location constant is added (WORN_ANCHOR_OFFSET).
+        const bw = 29 * (item.invWidth || Math.ceil(image.width / 29)), bh = 29 * (item.invHeight || Math.ceil(image.height / 29));
+        const [dx, dy] = WORN_ANCHOR_OFFSET[item.bodyLoc] || [0, 0];
+        const left = slot.left + Math.floor((slot.width - bw) / 2) + dx, top = slot.top + Math.floor((slot.height - bh) / 2) + 1 + dy;
         ctx.drawImage(image, left - sx, top - sy);
         equippedItemPixels += image.width * image.height; equippedItemCount++;
-        drawn.push(paperdollIdentity(item, decodeDc6(read(inventoryItemAsset(item.invFile))).frames[0], left, top, slot)); }
+        drawn.push({ ...paperdollIdentity(item, iconAt(item.invFile, act).frame, left, top, slot), width: image.width, height: image.height, blitTop: top,
+          ox: iconAt(item.invFile, act).frame.offsetX, oy: iconAt(item.invFile, act).frame.offsetY }); }
     }
     ctx.restore();
     // Gold, the gold button, the close button and the right-hand border (retail's anchors, s197).

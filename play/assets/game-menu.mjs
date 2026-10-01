@@ -88,7 +88,7 @@ function frameCanvas(frame, palette, documentObject) {
 }
 
 /** `onChoose(item)` receives one of the rows' `label`s. */
-export function createGameMenu({ read, decodeDc6, decodeDatPalette, onChoose, palettePath = 'data\\global\\palette\\ACT1\\pal.dat', documentObject = globalThis.document }) {
+export function createGameMenu({ read, decodeDc6, decodeDatPalette, onChoose, palettePath = 'data\\global\\palette\\ACT1\\pal.dat', documentObject = globalThis.document, initialVolume = null, onVolume = null }) {
   const resolved = () => (typeof palettePath === 'function' ? palettePath() : palettePath);
   let palette = null, paletteAt = null, blend = null;
   const sheets = new Map();       // file key -> { path, dc6, canvases }
@@ -156,7 +156,7 @@ export function createGameMenu({ read, decodeDc6, decodeDatPalette, onChoose, pa
   // it was opened from intact.
   let sub = null, subError = '';
   const subpages = () => {
-    if (!sub && !subError) { try { sub = createOptionsPages({ read, decodeDc6, decodeDatPalette, documentObject }); } catch (error) { subError = String(error); } }
+    if (!sub && !subError) { try { sub = createOptionsPages({ read, decodeDc6, decodeDatPalette, documentObject, initialVolume, onVolume }); } catch (error) { subError = String(error); } }
     return sub;
   };
   const choose = (label) => {

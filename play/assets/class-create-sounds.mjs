@@ -22,6 +22,11 @@ export function createClassSelectSoundPlayer(read, AudioContextClass = globalThi
   if (typeof read !== 'function') throw new TypeError('retail asset reader is required');
   if (!AudioContextClass) throw new Error('Web Audio is unavailable');
   const context = new AudioContextClass(), buffers = new Map(), sources = new Set(), events = [];
+  // F235: the Sound slider drives every SFX player through one gain node (see audio-volume.mjs).
+  const gain = typeof context.createGain === 'function' ? context.createGain() : null;
+  if (gain) gain.connect(context.destination);
+  const out = gain ?? context.destination;
+  let volume = 1;
   let queue = Promise.resolve(), nextStart = 0;
   function prepare(path) {
     let pending = buffers.get(path);
@@ -51,7 +56,7 @@ export function createClassSelectSoundPlayer(read, AudioContextClass = globalThi
       context.resume().catch(() => {});
       queue = queue.catch(() => {}).then(async () => {
         const buffer = await prepare(path);
-        const source = context.createBufferSource(); source.buffer = buffer; source.connect(context.destination);
+        const source = context.createBufferSource(); source.buffer = buffer; source.connect(out);
         source.onended = () => { sources.delete(source); source.disconnect(); };
         source.start(); sources.add(source);
         event.started = true; event.startIndex = nextStart++; event.startTime = context.currentTime;
@@ -60,6 +65,8 @@ export function createClassSelectSoundPlayer(read, AudioContextClass = globalThi
       return queue.then((started) => ({ ...started }));
     },
     get evidence() { return { events: events.map((event) => ({ ...event })), decoded: [...buffers.keys()], state: context.state }; },
+    setVolume(v) { volume = Math.max(0, Math.min(1, Number(v) || 0)); if (gain) gain.gain.value = volume; },
+    get volume() { return gain ? gain.gain.value : volume; },
     close() { for (const source of sources) { source.stop(); source.disconnect(); } sources.clear(); return context.close?.(); },
   };
 }

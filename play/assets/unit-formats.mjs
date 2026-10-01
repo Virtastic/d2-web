@@ -262,8 +262,28 @@ export function decodeDcc(input, options = {}) {
       ? decodeDccDirection(bytes, offset, offsets[i + 1] ?? bytes.length, framesPerDirection, i) : null) };
 }
 
+// PERF (F198): a composition is a pure function of the COF, the direction, the frame and WHICH decoded components fill the layers, and the
+// renderers asked for it again on every frame (monster, its shadow, objects). Kept per COF; callers only read the result.
+const composeMemo = new WeakMap(), dccIds = new WeakMap();
+let nextDccId = 1;
+const dccId = (dcc) => { let n = dccIds.get(dcc); if (!n) dccIds.set(dcc, n = nextDccId++); return n; };
+
 /** Compose available DCC component frames in the draw order selected by a COF. */
 export function composeCofFrame(cof, direction, frameIndex, components) {
+  if (cof && cof.priority?.[direction]?.[frameIndex]) {
+    const get = components instanceof Map ? (id) => components.get(id) : (id) => components?.[id];
+    let key = `${direction}:${frameIndex}`, ok = true;
+    for (const component of cof.priority[direction][frameIndex]) { const dcc = get(component); if (dcc) { if (typeof dcc !== 'object') { ok = false; break; } key += `,${component}=${dccId(dcc)}`; } }
+    if (ok) {
+      let memo = composeMemo.get(cof); if (!memo) composeMemo.set(cof, memo = new Map());
+      let hit = memo.get(key); if (!hit) memo.set(key, hit = composeCofFrameUncached(cof, direction, frameIndex, components));
+      return hit;
+    }
+  }
+  return composeCofFrameUncached(cof, direction, frameIndex, components);
+}
+
+function composeCofFrameUncached(cof, direction, frameIndex, components) {
   if (!cof || direction < 0 || direction >= cof.directions || frameIndex < 0 || frameIndex >= cof.framesPerDirection) {
     throw new RangeError('COF composition frame is outside the animation grid');
   }
@@ -271,12 +291,15 @@ export function composeCofFrame(cof, direction, frameIndex, components) {
   const selected = [];
   for (const component of cof.priority[direction][frameIndex]) {
     const dcc = get(component); if (!dcc) continue;
-    if (direction >= dcc.directions || frameIndex >= dcc.framesPerDirection) {
-      throw new RangeError(`DCC component ${component} does not cover COF frame`);
-    }
-    selected.push({ component, frame: dcc.directionRecords[direction].frames[frameIndex] });
+    // A component whose grid is short of the COF's holds its last cel for the frames it does not carry.
+    // F153: the Frozen Horror (`f0`) death COF f0DTHTH is 1x14 and AnimData.d2's own F0DTHTH record is
+    // 14 too (both read off the retail bytes, s716), but the shipped f0TRlitDThth.DCC carries 13 -- so
+    // retail's own 14th frame has no cel. Drawing the death's last pose twice shows a corpse; wrapping
+    // would snap it back to the standing frame 0. Clamp, for either axis: the same "does not cover" case.
+    const dir = Math.min(direction, dcc.directions - 1), frame = Math.min(frameIndex, dcc.framesPerDirection - 1);
+    selected.push({ component, frame: dcc.directionRecords[dir].frames[frame] });
   }
-  if (!selected.length) return { xOffset: 0, yOffset: 0, width: 0, height: 0, indexed: new Uint8Array(), opaque: new Uint8Array() };
+  if (!selected.length) return { xOffset: 0, yOffset: 0, width: 0, height: 0, bottomUp: false, indexed: new Uint8Array(), opaque: new Uint8Array() };
   const left = Math.min(...selected.map(({ frame }) => frame.xOffset));
   const top = Math.min(...selected.map(({ frame }) => frame.bottomUp ? frame.yOffset : frame.yOffset - frame.height + 1));
   const right = Math.max(...selected.map(({ frame }) => frame.xOffset + frame.width));
@@ -291,5 +314,5 @@ export function composeCofFrame(cof, direction, frameIndex, components) {
       const target = (y0 + y) * width + x0 + x; indexed[target] = frame.indexed[source]; opaque[target] = 1;
     }
   }
-  return { xOffset: left, yOffset: top, width, height, indexed, opaque };
+  return { xOffset: left, yOffset: top, width, height, bottomUp: selected.every(({ frame }) => frame.bottomUp), indexed, opaque };
 }

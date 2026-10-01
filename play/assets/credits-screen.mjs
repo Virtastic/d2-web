@@ -1,5 +1,5 @@
 // Retail credits: background and text paths follow OpenDiablo2's recovered credits screen.
-import { createFont, decodeFontTbl, composeTiled, textColourPalette, TITLE_COLUMNS } from './frontend.mjs';
+import { createFont, decodeFontTbl, composeTiled, textColourPalette, TITLE_COLUMNS, createBlender, LABEL_TINT } from './frontend.mjs';
 import { recordDc6 } from './drawlist.mjs';
 
 export const CREDITS_ASSETS = {
@@ -104,8 +104,15 @@ export function createCreditsScreen({ read, decodeDc6, decodeDatPalette, onExit 
   })]));
   const exitDc6 = decodeDc6(read(CREDITS_ASSETS.exitButton)), exitFrame = exitDc6.frames[0];
   const exitButton = { path: CREDITS_ASSETS.exitButton, frame: exitFrame, canvas: frameCanvas(exitFrame, palette, documentObject) };
-  const exitFont = createFont({ dc6: decodeDc6(read(CREDITS_ASSETS.exitFont)), tbl: decodeFontTbl(read(CREDITS_ASSETS.exitFontTbl)), palette, documentObject,
-    path: CREDITS_ASSETS.exitFont, drawAs: { op: 'celcolor', mode: 5 } });
+  // The EXIT label is a BUTTON LABEL, not body text: retail's own credits draw list
+  // draws its four FontExocet10 glyphs `celcolor` mode 4,
+  // extra 0 -- the same MultiplicativeBlend + 0x64 tint the title's labels use (frontend.mjs's
+  // `labelDraw`/LABEL_TINT), not the body text's mode 5. Drawing it opaque mode 5 painted a label
+  // retail does not draw (measured: our four glyphs recorded mode 5 against retail's mode 4, s886).
+  const labelTinted = (p) => { const t = p.slice(); for (let i = 0; i < t.length; i += 4) for (let k = 0; k < 3; k++) t[i + k] = Math.round(t[i + k] * LABEL_TINT); return t; };
+  const exitBlend = createBlender(read(CREDITS_ASSETS.pl2), palette);
+  const exitFont = createFont({ dc6: decodeDc6(read(CREDITS_ASSETS.exitFont)), tbl: decodeFontTbl(read(CREDITS_ASSETS.exitFontTbl)), palette: labelTinted(palette), documentObject,
+    path: CREDITS_ASSETS.exitFont, drawAs: { op: 'celcolor', mode: 4, blend: exitBlend } });
   const exitLabel = string('strExit') || 'EXIT';
   let drawingLine = null, glyphBlits = [], labelBlits = [], lastTick = 0;
   const scene = documentObject.createElement('canvas'); scene.width = SCREEN.width; scene.height = SCREEN.height;

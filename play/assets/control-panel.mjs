@@ -92,9 +92,17 @@ export const HUD_LAYOUT = Object.freeze({
     xs: [206, 563], y: 563, w: 30, h: 30 },
 });
 
+// PERF (F198): the panel's button cels were re-expanded into a fresh canvas on every frame (seven per frame); a frame object is decoded once
+// and its canvas only ever drawn from, so it is kept per (frame, palette).
+const frameCanvases = new WeakMap();
 function frameCanvas(frame, palette, documentObject) {
+  let byPalette = frameCanvases.get(frame);
+  if (!byPalette) frameCanvases.set(frame, byPalette = new WeakMap());
+  const kept = byPalette.get(palette);
+  if (kept && kept.doc === documentObject) return kept.canvas;
   const canvas = documentObject.createElement('canvas'); canvas.width = frame.width; canvas.height = frame.height;
   canvas.getContext('2d').putImageData(new ImageData(dc6FrameToRgba(frame, palette), frame.width, frame.height), 0, 0);
+  byPalette.set(palette, { canvas, doc: documentObject });
   return canvas;
 }
 

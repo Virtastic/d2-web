@@ -9,6 +9,11 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
   if (typeof read !== 'function') throw new TypeError('retail asset reader is required');
   if (!AudioContextClass) throw new Error('Web Audio is unavailable');
   const context = new AudioContextClass(), buffers = new Map(), events = [];
+  // F235: the Sound slider drives every SFX player through one gain node (see audio-volume.mjs).
+  const gain = typeof context.createGain === 'function' ? context.createGain() : null;
+  if (gain) gain.connect(context.destination);
+  const out = gain ?? context.destination;
+  let volume = 1;
   // A suspended context still schedules source.start(); it sounds once a trusted gesture resumes it.
   if (context.state === 'suspended' && typeof gestureTarget?.addEventListener === 'function') {
     const ac = new AbortController();
@@ -36,11 +41,13 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
       if (!r?.file) throw new Error(`Sounds.txt row ${row} has no file`);
       rec.handle = r.handle;
       context.resume().catch(() => {});
-      const source = context.createBufferSource(); source.buffer = await buffer(r.file, rec); source.connect(context.destination);
+      const source = context.createBufferSource(); source.buffer = await buffer(r.file, rec); source.connect(out);
       source.onended = () => source.disconnect();
       source.start(); started++; rec.started = true;
     } catch (error) { rec.error = String(error); }
     return rec;
   }
-  return { play, events, evidence: () => ({ started, events: events.map((x) => ({ ...x })), state: context.state }), close: () => context.close?.() };
+  return { play, events, setVolume(v) { volume = Math.max(0, Math.min(1, Number(v) || 0)); if (gain) gain.gain.value = volume; },
+    get volume() { return gain ? gain.gain.value : volume; },
+    evidence: () => ({ started, events: events.map((x) => ({ ...x })), state: context.state }), close: () => context.close?.() };
 }

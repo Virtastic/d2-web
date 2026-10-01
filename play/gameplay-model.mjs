@@ -97,6 +97,11 @@ export function normalizeSnapshot(value) {
       mode: Math.trunc(finite(e?.mode)), x: finite(e?.x), y: finite(e?.y),
       hp: Math.max(0, finite(e?.hp)), hpMax: Math.max(0, finite(e?.hpMax)),
       kind: String(e?.kind ?? 'entity'), hostile: Boolean(e?.hostile), roomOrdinal: Math.trunc(finite(e?.roomOrdinal)),
+      // F245: the engine's own dwFlags (parseSessionUnits reads D2SessionUnit.flags) must survive the
+      // normalisation, or the client cannot tell a monster the engine will refuse to let anyone attack
+      // -- UNITFLAG_TARGETABLE (0x2) -- from one it will. `undefined` when the source has no flags (a
+      // synthetic snapshot), never 0: 0 is a real engine word and means "not targetable".
+      flags: e?.flags === undefined || e?.flags === null ? undefined : ((Math.max(0, Math.trunc(finite(e.flags))) >>> 0)),
       animation: e?.animation && typeof e.animation === 'object' ? e.animation : null,
       // The engine's 16.16 position where the session has one (see gameplay-shell's unitAnchor):
       // null on an engine without d2_session_unit_coords, which falls back to the whole subtile.
@@ -225,7 +230,19 @@ export function viewportToWorld(screenX, screenY, width, height, player, pixelsP
 // Akara's wandering hull (x -22..+20, y -69..+11, +-4 px) lies inside it, so ONE box fits both. Not derived
 // per unit from cel extents: only these two units were measured, and the box exceeds their sprites.
 export const UNIT_HOVER_BOX = { x0: -24, x1: 19, y0: -78, y1: 15 };
-export const inUnitHoverBox = (dx, dy) => dx >= UNIT_HOVER_BOX.x0 && dx <= UNIT_HOVER_BOX.x1 && dy >= UNIT_HOVER_BOX.y0 && dy <= UNIT_HOVER_BOX.y1;
+// F14, MEASURED retail 1.13c: a MONSTER's hover region is NOT the
+// NPC box. One Cold Plains monster (class 165, DCC family CR) is hovered for pointer offsets x -12..+54,
+// y -74..+26 px from its cel anchor -- at least 67 px wide against the NPC's 44, so the one shared constant
+// cannot be right for hostiles (a hostile at dx +54 is hit by retail and missed by the NPC box). The capture
+// gives a LOWER BOUND (the region "may be wider in both directions"), so the hostile box is the measured
+// region UNION the NPC box: it contains every measured hit and drops none the shared box already hits (a
+// monotone widening -- the narrowest change that cannot regress a case the NPC box passes). The unit-overlap
+// tie-break is still a hypothesis, not a rule (see the F14 row), so selectPrimaryTarget's tie-break is unchanged.
+export const UNIT_HOVER_BOX_HOSTILE = { x0: -24, x1: 54, y0: -78, y1: 26 };
+export const inUnitHoverBox = (dx, dy, hostile = false) => {
+  const b = hostile ? UNIT_HOVER_BOX_HOSTILE : UNIT_HOVER_BOX;
+  return dx >= b.x0 && dx <= b.x1 && dy >= b.y0 && dy <= b.y1;
+};
 
 export function selectPrimaryTarget(snapshot, point = snapshot?.player, maxDistance = Infinity, accept = null) {
   const s = normalizeSnapshot(snapshot);
@@ -237,6 +254,15 @@ export function selectPrimaryTarget(snapshot, point = snapshot?.player, maxDista
     // A monster in MONMODE_DEATH (0) or DEAD (12) is a corpse even when its life reads above 0
     // (s000d: a Burning Soul at 2108 life in mode 12); retail refuses to attack it (reason 5).
     if (entity.type === 1 && (entity.mode === 0 || entity.mode === 12)) continue;
+    // F245: a monster the ENGINE will not let anyone attack is not a target, however the client drew
+    // it -- the engine's own refusal (reason 4, "target dead or untargetable") is UNITFLAG_TARGETABLE
+    // (0x2), which is this entity's own `flags` (D2SessionUnit.flags is `unit->dwFlags`; the same word
+    // `d2_session_unit_info` reports). It is not only the dead: retail clears it for the act V Imp
+    // while it rides a Barricade Tower / Siege Beast (`sub_6FD00EC0`), for a submerged maggot and for a
+    // Reanimated Horde mid-self-resurrect, and it restores it when each ends. Offering such a unit made
+    // every act V attack command a refusal -- 60-86 rounds a fight in the Frigid Highlands. `flags` is
+    // absent only on a synthetic snapshot, which keeps the older default (a target).
+    if (entity.type === 1 && entity.flags !== undefined && ((entity.flags >>> 0) & 2) === 0) continue;
     const dx = entity.x - x, dy = entity.y - y, candidate = dx * dx + dy * dy;
     if (candidate < distance2 || (candidate === distance2 && (!selected || entity.id < selected.id))) {
       selected = entity; distance2 = candidate;

@@ -170,6 +170,19 @@ test('DT1 decodes v7.6 tile metadata, isometric pixels, and RLE pixels', () => {
   assert.deepEqual([...tile.pixels.indices.slice(64 + 32, 64 + 34)], [9, 10]);
 });
 
+test('DT1 retains each overlapping block source and distinguishes skipped from written zero', () => {
+  const bytes = dt1Fixture();
+  // Place the RLE block over the iso row instead of beside it.
+  new DataView(bytes.buffer).setInt16(276 + 96 + 20, 14, true);
+  const tile = decodeDt1(bytes).tiles[0];
+  const [iso, rle] = tile.blocks;
+  assert.deepEqual([...iso.pixels.indices.slice(14, 18)], [0, 1, 2, 3]);
+  assert.deepEqual([...rle.pixels.indices.slice(0, 4)], [0, 7, 0, 8]);
+  assert.deepEqual([...rle.pixels.written.slice(0, 4)], [0, 255, 255, 255]);
+  assert.deepEqual([...tile.pixels.indices.slice(14, 18)], [0, 7, 0, 8]);
+  assert.equal(iso.pixels.indices[15], 1, 'later block must not replace earlier source');
+});
+
 test('DT1 rejects bad versions, pointer spans, block formats, and malformed RLE', () => {
   assert.throws(() => decodeDt1(new Uint8Array(275)), /truncated DT1 header/);
   const version = dt1Fixture(); new DataView(version.buffer).setInt32(4, 5, true);

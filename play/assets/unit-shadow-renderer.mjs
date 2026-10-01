@@ -5,9 +5,18 @@
 //     under `shadow dcc:<path>` and the DCC's own path (the retail captures: all 9 Barbarian
 //     layers, then the monsters' and the objects' -- 18 shadow draws, before the first wall).
 //   * the transform is a half-height shear: a source row h rows above the anchor lands at
-//     (x - h/2, y - h/2).  Over the union of the 18 draws it covers 4,043 pixels of the Rogue
-//     Encampment frame, and retail's own finished buffer differs from its own floors buffer at 3,789
-//     of them (91% darker) -- so the footprint is retail's shadow.
+//     (x - h/2, y - h/2), taken as the INTEGER step of the destination, not a per-pixel rounding.
+//     **F461:** retail's rasteriser keeps ONE destination row
+//     per TWO source rows -- it walks the cel's rows in storage order, samples every SECOND one and
+//     DISCARDS the row between (never merging the pair), stepping one row and one pixel left per
+//     destination row from a base of `anchor + trunc(celYOffset/2)`. The ported rule below is that
+//     exact walk; it reproduces retail's own shadow footprint cell-for-cell (s1510 PASS: 5,977/5,977
+//     town-lit, 4,218/4,218 den-shadow-lit). The pass used to keep EVERY source row and round each
+//     through `round(anchorY - 0.5h)`, which merged each pair onto one destination row and both over-
+//     and under-covered retail's shadow at run ends (the whole of F402's "scene-dependence"). Over the
+//     union of the 18 town-lit draws the old rule covered 4,043 pixels of the Rogue Encampment frame
+//     against retail's 5,977-pixel footprint; retail's finished buffer differs from its own floors
+//     buffer at 3,789 of them (91% darker) -- so the footprint is retail's shadow.
 //   * the colour is `LightLevelVariations[7]` of the DESTINATION index: replaying the 18 draws in
 //     retail's order from retail's own floors buffer reproduces 96.5% of the pixels retail changed
 //     (town-lit: 3,659 of 3,789; den-shadow-lit: 1,868 of 1,938).  The DCC's own palette index does
@@ -77,14 +86,29 @@ export function createUnitShadowRenderer(read) {
         let plane;
         try { plane = composeCofFrame(cof, direction, frame, new Map([[component, dcc]])); } catch { continue; }
         if (!plane.width || !plane.height) continue;
-        const left = Math.round(x + plane.xOffset), top = Math.round(y + plane.yOffset);
+        // Retail's rasteriser: walk the cel's rows in storage
+        // order and keep every SECOND one (the row between is DISCARDED, never merged into a
+        // destination row). Destination row k (k = 0 at the anchor) is that kept row placed at
+        // (x0 - k, y0 - k), with the base x0 = anchorX + celXOffset + trunc(celYOffset / 2) and
+        // y0 = anchorY + trunc(celYOffset / 2), C-truncating. The whole source row lands on one
+        // destination row: the run's own bytes are skipped, and every pixel takes the destination
+        // darkening (this pass's LightLevelVariations[7]). `plane.yOffset` is the composed cel's top,
+        // so the DCC frame header's own `yOffset` is recovered from it and the cel's bottomUp bit.
+        const yOff = plane.bottomUp ? plane.yOffset : plane.yOffset + plane.height - 1;
+        const half = Math.trunc(yOff / 2);
+        const baseX = Math.round(x + plane.xOffset) + half, baseY = Math.round(y) + half;
         const pixels = new Set();
-        for (let sy = 0; sy < plane.height; sy++) for (let sx = 0; sx < plane.width; sx++) {
-          if (!plane.opaque[sy * plane.width + sx]) continue;
-          const h = y - (top + sy);                       // the source row's height above the anchor
-          const px = Math.round(left + sx - 0.5 * h), py = Math.round(y - 0.5 * h);
-          if (px < 0 || py < 0 || px >= width || py >= height) continue;
-          pixels.add(py * width + px);
+        for (let sy = 0; sy < plane.height; sy++) {
+          const b = plane.height - 1 - sy;
+          if (b & 1) continue;                             // the discarded row: one destination row per two source rows
+          const k = b >> 1, py = baseY - k;                // one row up per destination row
+          if (py < 0 || py >= height) continue;
+          for (let sx = 0; sx < plane.width; sx++) {
+            if (!plane.opaque[sy * plane.width + sx]) continue;
+            const px = baseX - k + sx;                     // ... and one pixel left
+            if (px < 0 || px >= width) continue;
+            pixels.add(py * width + px);
+          }
         }
         if (pixels.size) layers.push({ component, pixels });
       }

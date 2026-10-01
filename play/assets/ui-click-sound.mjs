@@ -25,6 +25,11 @@ export function createUiClickSoundPlayer(read, canvas, AudioContextClass = globa
   if (!AudioContextClass) throw new Error('Web Audio is unavailable');
   const context = new AudioContextClass();
   unlockOnGesture(context, gestureTarget);
+  // F235: the Sound slider drives every SFX player through one gain node (see audio-volume.mjs).
+  const gain = typeof context.createGain === 'function' ? context.createGain() : null;
+  if (gain) gain.connect(context.destination);
+  const out = gain ?? context.destination;
+  let volume = 1;
   let buffer = null, preparing = null, requested = 0, started = 0, lastError = '';
   async function prepare() {
     if (buffer) return buffer;
@@ -44,7 +49,7 @@ export function createUiClickSoundPlayer(read, canvas, AudioContextClass = globa
     await context.resume();
     const decoded = await prepare();
     const source = context.createBufferSource();
-    source.buffer = decoded; source.connect(context.destination); source.start(); started++;
+    source.buffer = decoded; source.connect(out); source.start(); started++;
     return evidence();
   }
   function evidence() { return { ...UI_BUTTON_CLICK, decoded: Boolean(buffer), requested, started, state: context.state, error: lastError }; }
@@ -53,7 +58,8 @@ export function createUiClickSoundPlayer(read, canvas, AudioContextClass = globa
   canvas.addEventListener('pointerdown', (event) => {
     if (event.button === 0 && event.defaultPrevented) play().catch(() => {});
   });
-  const player = { prepare, play, evidence, close: () => context.close?.() };
+  const player = { prepare, play, evidence, setVolume(v) { volume = Math.max(0, Math.min(1, Number(v) || 0)); if (gain) gain.gain.value = volume; },
+    get volume() { return gain ? gain.gain.value : volume; }, close: () => context.close?.() };
   // Diagnostic evidence stays with the rendered target, avoiding a second
   // shell state store solely for this browser capability.
   Object.defineProperty(canvas, '__d2UiClickSound', { value: player });

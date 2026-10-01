@@ -110,7 +110,7 @@ const sourcePath = (path) => `${isWidget(path) ? WID : UI}${path}.dc6`;
  * The two pages, drawn and driven. Deps as elsewhere; `act` picks the in-game palette (the pages are
  * drawn over the game, so it is the act palette).
  */
-export function createOptionsPages({ read, decodeDc6, decodeDatPalette, documentObject = globalThis.document, act = 1 }) {
+export function createOptionsPages({ read, decodeDc6, decodeDatPalette, documentObject = globalThis.document, act = 1, initialVolume = null, onVolume = null }) {
   const palette = decodeDatPalette(read(ACT_PALETTE(act)));
   const decoded = new Map(), images = new Map();
   const dc6 = (path) => {
@@ -137,7 +137,9 @@ export function createOptionsPages({ read, decodeDc6, decodeDatPalette, document
   };
   const pent = decodeDc6(read(PENT)), pentCanvases = pent.frames.map(toCanvas);
 
-  const state = { npcspeech: 0, lighting: 0, shadows: 0 };
+  // F235: Sound and Music start at the value the audio graph is holding (retail's own defaults on a
+  // first visit), so the knob this page draws is the volume that will actually be played.
+  const state = { npcspeech: 0, lighting: 0, shadows: 0, ...(initialVolume ?? {}) };
   let page = null, selected = 0, tick = 0;
   const rows = () => OPTIONS_PAGE_ROWS[page];
   const view = (width, height) => {
@@ -151,7 +153,7 @@ export function createOptionsPages({ read, decodeDc6, decodeDatPalette, document
   const choose = (i, lx) => {
     const L = OPTIONS_PAGE_LAYOUT, row = rows()[i];
     if (!row) return null;
-    if (row.slider) { state[row.key] = Math.max(0, Math.min(1, (lx - L.trackX1) / (L.trackX2 - L.trackX1))); return { row: row.key, value: state[row.key] }; }
+    if (row.slider) { state[row.key] = Math.max(0, Math.min(1, (lx - L.trackX1) / (L.trackX2 - L.trackX1))); onVolume?.(row.key, state[row.key]); return { row: row.key, value: state[row.key] }; }
     if (row.key === 'npcspeech') { state.npcspeech = (state.npcspeech + 1) % NPC_SPEECH.length; return { row: row.key, value: state.npcspeech }; }
     if (row.key === 'lighting') { state.lighting = 1 - state.lighting; return { row: row.key, value: state.lighting }; }
     if (row.key === 'shadows') { state.shadows = 1 - state.shadows; return { row: row.key, value: state.shadows }; }

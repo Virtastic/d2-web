@@ -138,7 +138,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
       const wsum = (c.y - MA0_K.y) / 0.8, wdif = (c.x - MA0_K.x) / 1.6, wx = (wsum + wdif) / 2, wy = (wsum - wdif) / 2, kind = c.wall ? 1 : 0;
       if (!frames[c.frame]) continue;
       layer.set(`${wx / 5},${wy / 5},${kind}`, { frame: c.frame, requestedFrames: [c.frame], levelName: 'saved', tileName: '.ma0', style: -1, startSequence: -1, endSequence: -1,
-        orientation: -1, mainIndex: -1, subIndex: -1, layer: kind, world: [wx, wy] });
+        orientation: -1, mainIndex: -1, subIndex: -1, layer: kind, world: [wx, wy], saved: [c.x, c.y] });
     }
   };
   // Cells the AutoMap.txt route cannot name, per level: the frame's terrain read offers them, no row
@@ -274,6 +274,31 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
     // area-name block on it).
     get isOpen() { return visible; },
     toggle() { visible = !visible; },
-    setSaved(map) { saved = map; },
+    // The saved layer arrives AFTER the overlay exists (the file is fetched, or the store is read), so a
+    // level that already drew keeps its derived cells and gains the saved ones here -- otherwise the saved
+    // cells never enter a layer created on a frame between the overlay's construction and this call. A
+    // saved cell wins over a derived one at the same tile, as seed's own set does.
+    setSaved(map) { saved = map; for (const levelId of layers.keys()) seed(layers.get(levelId), levelId); },
+    // The character's automap layer as cells for retail's `<character>.ma0`, flat `{layer, frame, x, y,
+    // wall}` quints: every level this session holds, in automap pixels (ma0.mjs's own transform). The
+    // shell hands these to the engine's writer (d2_session_save_ma0) on Save and Exit -- the reveal is
+    // the CLIENT's, so the engine is given the cells rather than re-deriving them, and a seeded cell
+    // keeps its own pixels so the round trip is exact. Levels no session has drawn yet keep the cells
+    // the loaded file gave them, which is what a resumed character's other floors are.
+    savedCells() {
+      const out = [], seen = new Set();
+      const push = (layer, frame, x, y, wall) => { const k = `${layer},${x},${y},${wall}`; if (seen.has(k)) return; seen.add(k); out.push(layer, frame, x, y, wall); };
+      const covered = new Set();
+      for (const [levelId, layer] of layers) {
+        const n = levelLayer.get(levelId); if (n === undefined) continue;
+        covered.add(n);
+        for (const cell of layer.values()) {
+          const px = cell.saved || [Math.round((cell.world[0] - cell.world[1]) * 1.6 + MA0_K.x), Math.round((cell.world[0] + cell.world[1]) * 0.8 + MA0_K.y)];
+          push(n, cell.frame, px[0], px[1], cell.layer ? 1 : 0);
+        }
+      }
+      for (const [n, cells] of saved) { if (covered.has(n)) continue; for (const c of cells) push(n, c.frame, c.x, c.y, c.wall ? 1 : 0); }
+      return out;
+    },
   };
 }

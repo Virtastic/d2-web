@@ -98,7 +98,11 @@
   </div>
   <div id="viewport"><canvas id="game" width="800" height="600" tabindex="0" aria-label="Diablo II game viewport"></canvas><pre id="hud"></pre><div id="touch-overlay"></div></div>
   <div id="session-bar"><div id="session-status">starting engine…</div><label>Class <select id="class-select" disabled></select></label></div>
-  <div class="controls">Move: WASD / arrows / left click · Attack: Space · Right skill: 1 Attack, 2 Throw, 3 Kick · Use: right click · Interact / exit: E · Travel (caravan): T · Inventory: I · Respawn: R · Cancel: Esc</div>
+  <!-- The bindings the client ACTUALLY answers (F407): the shell's keydown handler plus CommandInput's
+       own map. The line this replaces was pre-F3b and named keys the client deliberately drops or has
+       rebound -- WASD/arrows move, E interact, R respawn and Space attack are all gone
+       (assets/retail-key-bindings.mjs), Space is retail's ClearScreen and W is Swap Weapons. -->
+  <div class="controls">Move: left click · Attack / use: right click · Belt: 1-4 · Skills: F1-F3 · Inventory: I · Character: C · Skill tree: T · Automap: Tab · Quest log: Q · Message log: M · Help: H · Skill picker: S · Swap weapons: W · Clear screen: Space · Chat: Enter · Menu / close / cancel: Esc</div>
   <pre id="log"></pre>
 </main>
 <script type="module" src="gameplay-shell.mjs"></script>

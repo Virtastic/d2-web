@@ -129,15 +129,21 @@ export function createSkillSelectRenderer(read, documentObject = globalThis.docu
         // Retail draws the button's icon (SkillIcon, 48x48) anchored at (117|635, 600): top-left (x, 553).
         if (s) icon(s, L[side].x, L[side].y + 3, side + 'Button', side);
       }
-      // Retail labels a hand's button 'F<n>' (Font16, gold shift) for every hotkey bound to the hand's skill in that hand
-      // (V9b). The left button's label sits at (x+30, y-35) of its icon, left-aligned (v9b-hotkey-f5-r29: 'F5' at 147,565); the
-      // right button's are right-aligned to the icon's right edge, in slot order (act4-fortress: 'F1'..'F8' x=665-669, y=565).
-      // The popup's icons carry the same label at (icon x+30, icon y-35) (v9b-popup-hotkey-r29: 110,431). Text y is the record's + 15.
+      // Retail labels a hand's button and the icons of its open popup 'F<n>' (Font16, gold shift) for every
+      // hotkey bound to that skill in that hand (V9b). ONE rule for all four places, measured off retail's
+      // own draw lists: the label's last pixel + 1 is the icon cell's RIGHT edge, and its bottom row is the
+      // icon's bottom anchor minus 35 (the cell is drawn at `y0`, its 48-tall cel bottom-anchored there).
+      //   left button   v9b-hotkey-f5-r29:      'F5' at 147,565 on the icon at 117,600  -> 117+48-1-17
+      //   left popup    v9b-popup-hotkey-r29:   'F5' at 110,431 on the icon at  80,466
+      //   right button  rightpopup-fkey-caps:   'F1'..'F8' at 665..669,565 on the icon at 635,600
+      //   right popup   rightpopup-fkey-caps:   'F6' at 607,431 on the icon at 576,466
+      // The x is right-aligned, NOT a fixed +30: the 30 that fits 'F5' is 48-1-17, and 48-1-width moves with
+      // the text (s570's own F5 check could not tell the two apart; the F1..F8 group can).
       const keysFor = (id, side) => (extra.hotkeys || []).map((k, i) => (k.skill === id && k.left === (side === 'left') ? 'F' + (i + 1) : null)).filter(Boolean);
       const labels = [];
       const label = (side, ids, x0, y0, text) => {
-        const f = labelFont(extra.act), tx = side === 'left' ? x0 + 30 : x0 + 48 - f.measure(text), ty = y0 - 35 + 15;
-        f.drawAnchored(ctx, text, tx, ty); labels.push({ where: ids, side, text, x: tx, y: y0 - 35 });
+        const f = labelFont(extra.act), tx = x0 + L.icon - 1 - f.measure(text), ty = y0 - 35;
+        f.drawAnchored(ctx, text, tx, ty); labels.push({ where: ids, side, text, x: tx, y: ty });
       };
       { const o = origin(width, height, 'left'), r = origin(width, height, 'right');
         for (const side of ['left', 'right']) { if (!(selected?.[side] >= 0)) continue; const oo = side === 'left' ? o : r;

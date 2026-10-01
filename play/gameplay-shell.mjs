@@ -18,18 +18,21 @@ import { createControlPanelRenderer, HUD_LAYOUT } from './assets/control-panel.m
 import { createHudHelp } from './assets/hud-help.mjs';
 import { createInventoryPanelRenderer, inventoryLayoutFromEngine } from './assets/inventory-panel.mjs';
 import { createCharacterPanelRenderer } from './assets/character-panel.mjs';
-import { createQuestLogRenderer, createMessageLogRenderer, QUESTS_IN_ACT, questStatus } from './assets/quest-log.mjs';
+import { createQuestLogRenderer, createMessageLogRenderer, QUESTS_IN_ACT, ACT_BASE, ACT_DONE, questStatus, messageScrollMax, COMPLETING } from './assets/quest-log.mjs';
 import { createSkillPanelRenderer, parseClassSkills, SESSION_SKILL_BYTES } from './assets/skill-panel.mjs';
 import { createSkillPointOverlay } from './assets/skill-plus.mjs';
 import { createSkillSelectRenderer, parseSkillChoices, SESSION_SKILL_CHOICE_BYTES } from './assets/skill-select.mjs';
 import { dispatchSkillSelectHit } from './assets/hud-hit-test.mjs';
-import { hudOrigin, panelShift } from './assets/hud-origin.mjs';
+import { hudOrigin } from './assets/hud-origin.mjs';
+import { panelSides as panelViewSides, viewCentreX } from './assets/panel-view-shift.mjs';
 import { createFreeResArt, barParts, halfParts, stoneTiles, drawParts } from './assets/wide-hud.mjs';
 import { createBeltRenderer } from './assets/belt-renderer.mjs';
 import { createActMusicPlayer } from './assets/act-music.mjs';
+import { createAudioVolume } from './assets/audio-volume.mjs';
 import { createUiClickSoundPlayer } from './assets/ui-click-sound.mjs';
 import { createUnitSoundPlayer } from './assets/unit-sound-player.mjs';
 import { createFont, createTitleScreen, decodeFontTbl, FRONTEND } from './assets/frontend.mjs';
+import { createExitSequence } from './assets/exit-sequence.mjs';
 import { loadBnetServers } from './assets/bnet-servers.mjs';
 import { BOOT_MOVIES, openMovie } from './assets/cinematics.mjs';
 import { createClassSelectSoundPlayer } from './assets/class-create-sounds.mjs';
@@ -91,7 +94,7 @@ const hud = document.querySelector('#hud');
 const status = document.querySelector('#session-status');
 const classSelect = document.querySelector('#class-select');
 const sessionBar = document.querySelector('#session-bar');
-const ctx = canvas.getContext('2d', { alpha: false });
+const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
 const input = new CommandInput();
 const frontendPointerStates = createFrontendPointerStates();
 // The front-end screen that owns a pointer gesture, with TITLE's trademark phase exempt: it owns
@@ -103,6 +106,9 @@ const moviePointerControl = { name: 'cinematic', press: () => 'cinematic', relea
 const frontendPointerControl = () => {
   if (screen === SCREEN.TITLE) {
     if (bootMovieSpec(titlePhase)) return moviePointerControl;
+    // F91: the exit sequence owns the front end once it starts -- retail's game is gone at this
+    // point, so nothing behind the fade is a control any more.
+    if (exitSeq?.active) return null;
     return titlePhase === 'trademark' ? trademarkPointerControl : titleScreen;
   }
   if (screen === SCREEN.CREDITS) return creditsScreen;
@@ -148,6 +154,10 @@ let speechAlertCount = 0;
 let npcPanel = null, npcPanelError = '', npcState = null, npcPanelEvidence = null;
 // A long walk in progress: where we are going, what to do on arrival, and how it is going.
 let walkGoal = null, walkIdle = 0, walkLast = null, walkEvidence = { active: false, hops: 0, reason: 0 };
+let walkMovePending = false;
+// F371: the last armed goal's cell, which a same-cell re-arm carries its give-up counters across (see
+// armWalk). Cleared when a walk ENDS, so a click after a finished walk starts fresh.
+let walkMemory = null;
 // Which handler spent each click, and what the click was aimed at. A leg of an s000 walk is a pointer
 // click, so a leg that walks away from its aim is a question about what its clicks RESOLVED to: bare
 // ground, an item, or a hostile unit standing on the aim point, which click dispatch acts on ahead of
@@ -309,16 +319,31 @@ let characterPanelRenderer = null, characterPanelEvidence = null, advancement = 
 let skillPanelRenderer = null, skillPanelEvidence = null, classSkills = null;
 // V8c: the quest log (Q) and message log (M). State is the engine's quest record; the client keeps only which
 // tab and quest are showing. `messageLines` is the log's feed (nothing wired yet: V8c).
-let questLogRenderer = null, messageLogRenderer = null, questVisible = false, messageVisible = false, questAct = 0, questSelected = 0, questEvidence = null, messageEvidence = null;
+let questLogRenderer = null, messageLogRenderer = null, questVisible = false, messageVisible = false, questAct = 0, questSelected = 0, questDescrOn = false, questEvidence = null, messageEvidence = null;
 const messageLines = [];
-let chatEvidence = null, postedEvidence = null, postedAt = 0;   // V8c: bar/posted-line geometry evidence; the line shows for POSTED_MS after posting (duration unmeasured)
-const POSTED_MS = 10000;
+let chatEvidence = null, postedEvidence = null, postedAt = 0;   // V8c: bar/posted-line geometry evidence; the line shows for POSTED_MS after posting
+const POSTED_MS = 10000;   // V8d: retail's posted-line duration, measured in F191 (posted-multi-caps: present 9.7 s, gone 10.2 s)
 let chat = null;   // V8c: the Enter chat bar's text while open (null = closed)
+let messageScroll = 0;   // V8d: the message log's scroll offset in lines (0 = newest line at the top)
+let questOpenedAt = 0;   // V8d: the engine tick the quest log was opened on, for the completion animation
+// V8d: which quest icons play the completion animation this open (the engine's QFLAG_COMPLETEDNOW), and
+// which have already played it -- the client's stand-in for retail moving COMPLETEDNOW -> COMPLETEDBEFORE
+// when the log closes (there is no engine export to clear the record bit; declared in client-parity.md).
+const questAnim = new Set(), questPlayed = new Set();
 const readQuestWords = () => { const p = Number(Module.ccall('d2_session_quest_record', 'number', [], [])); return p ? new Uint16Array(Module.HEAPU8.buffer.slice(p, p + 96)) : new Uint16Array(48); };
-const questTabs = (words, act) => { let top = act; for (let a = 1; a <= 5; a++) for (let i = 0; i < 8; i++) if (words[8 * (a - 1) + i] && i) top = Math.max(top, a); return Array.from({ length: Math.min(5, top) }, (_, i) => i + 1); };
+// An act shows a tab once any of its OWN quest words is set (its six quests, or the trailing COMPLETED
+// word where it has one). Act V's words are 35..40, not 32..39 -- ACT_BASE, F411.
+const questTabs = (words, act) => { let top = act; for (let a = 1; a <= 5; a++) { const end = ACT_DONE[a - 1] || QUESTS_IN_ACT[a - 1];
+  for (let i = 1; i <= end; i++) if (words[ACT_BASE[a - 1] + i]) { top = Math.max(top, a); break; } }
+  return Array.from({ length: Math.min(5, top) }, (_, i) => i + 1); };
 const questFirst = (words, act) => { for (let q = 1; q <= QUESTS_IN_ACT[act - 1]; q++) if (questStatus(words, act, q) !== 'locked') return q; return 0; };
-const toggleQuest = () => { questVisible = !questVisible; if (questVisible) { characterVisible = false; questAct = 0; } };
-const toggleMessage = () => { messageVisible = !messageVisible; };
+const toggleQuest = () => { questVisible = !questVisible; if (questVisible) { characterVisible = false; questAct = 0; questOpenedAt = engineTicks; questDescrOn = false;
+  // On open, the engine's own COMPLETING quests (QFLAG_COMPLETEDNOW) play once: OpenDiablo2's
+  // quest_log.go playQuestAnimations, which runs for the quests in QuestStatusCompleting.
+  questAnim.clear(); const words = readQuestWords();
+  for (let a = 1; a <= 5; a++) for (let q = 1; q <= QUESTS_IN_ACT[a - 1]; q++) { const key = `${a}q${q}`;
+    if ((words[ACT_BASE[a - 1] + q] & COMPLETING) && !questPlayed.has(key)) { questAnim.add(key); questPlayed.add(key); } } } };
+const toggleMessage = () => { messageVisible = !messageVisible; if (messageVisible) messageScroll = 0; };
 // The stash is open because the engine sent 0x77 UPDATEUI_OPENSTASH, and closed when retail's
 // TRADEBTN_CLOSESTASH was accepted -- never because of a click alone.
 // The Horadric Cube window (P3c): a right click on the cube in the pack USES it (0x20) and its spell sends 0x77 UPDATEUI_OPENCUBE (21),
@@ -450,6 +475,10 @@ function selectSkill(id, side) {
   return rc;
 }
 let actMusic = null, musicError = '';
+// F235: the Sound/Music sliders' values and the players they drive, one store for the whole page --
+// the options page writes it and every audio player (music and the three SFX players) is attached to
+// it. Retail's own volume persistence is unknown to us; localStorage is declared
+const audioVolume = createAudioVolume();
 // Constructed while the title is live, before its SINGLE PLAYER click. That first genuine pointer
 // gesture therefore unlocks the same AudioContext that later plays class-hover effects.
 let charCreateSounds = null, charCreateSoundError = '';
@@ -472,6 +501,7 @@ const PLAY_MODE = new URLSearchParams(location.search).get('play') === '1';
 const SCREEN = { TITLE: 'title', CREDITS: 'credits', CINEMATICS: 'cinematics', SELECT: 'select', CREATE: 'create', GAME: 'game' };
 let screen = PLAY_MODE ? SCREEN.GAME : SCREEN.TITLE;
 let titleScreen = null, titleError = '', titleTick = 0;
+let exitSeq = null;   // F91: EXIT DIABLO II's fade + close attempt + notice (assets/exit-sequence.mjs)
 // The Battle.net server list, read once from the repo's own config file (`play/assets/bnet-servers.json`,
 // loadBnetServers). Battle.net is OFF by default: the shipped file is empty, which resolves to the same
 // off state as a missing or malformed one, and the title screen then behaves exactly as retail's does.
@@ -508,7 +538,9 @@ function ensureGameMenu() {
   if (gameMenu || gameMenuError || !window.__d2?.ready) return gameMenu;
   try {
     gameMenu = createGameMenu({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette,
-      palettePath: () => actPalettePath(snapshot?.act ?? 1), onChoose: (item) => {
+      palettePath: () => actPalettePath(snapshot?.act ?? 1),
+      initialVolume: audioVolume.values, onVolume: (key, value) => { if (key === 'sound' || key === 'music') audioVolume.set(key, value); },
+      onChoose: (item) => {
       if (item === 'CONFIGURE CONTROLS') { ensureConfigureControls()?.openPanel(); return; }
       if (item === 'RETURN TO GAME') gameMenu.close();
       else if (item === 'SAVE AND EXIT GAME') {
@@ -813,12 +845,19 @@ async function bootstrapSession() {
     try { helpRenderer = createHelpOverlayRenderer(createMpqAssetReader(Module), (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key])); helpError = ''; }
     catch (error) { helpRenderer = null; helpError = String(error); }
     try { automapOverlay = createAutomapOverlay({ read: assetReader, Module, isGameplay: () => screen === SCREEN.GAME }); } catch (error) { sessionError = String(error); }
-    // ?ma0=<url>: the character's saved automap (F186); the real save path is not wired yet.
-    try { const u = new URLSearchParams(location.search).get('ma0'); if (u && automapOverlay) automapOverlay.setSaved(parseMa0(new Uint8Array(await (await fetch(u)).arrayBuffer()))); } catch (error) { sessionError = String(error); }
+    // The character's saved automap (F186/F268). ?ma0=<url> is the dev shortcut that seeds a layer from
+    // a file the page can fetch; otherwise a picked character reads the `<character>.ma0` the save store
+    // holds beside its .d2s (written at Save and Exit), so the player's map survives the session.
+    try {
+      const u = new URLSearchParams(location.search).get('ma0');
+      if (u && automapOverlay) automapOverlay.setSaved(parseMa0(new Uint8Array(await (await fetch(u)).arrayBuffer())));
+      else if (automapOverlay && chosenName) { const raw = await saveStore.getAux(automapAuxKey(chosenName)); if (raw) automapOverlay.setSaved(parseMa0(raw)); }
+    } catch (error) { sessionError = String(error); }
     try { skillSelectRenderer = createSkillSelectRenderer(createMpqAssetReader(Module)); } catch (error) { skillSelectError = String(error); }
     try { actMusic = createActMusicPlayer(assetReader); await actMusic.prepare(fixture.act0); musicError = ''; } catch (error) { musicError = String(error); }
-    try { createUiClickSoundPlayer(assetReader, canvas); } catch (error) { musicError = String(error); }
-    try { unitSounds = createUnitSoundPlayer(assetReader); canvas.__d2UnitSound = unitSounds; } catch (error) { musicError = String(error); }
+    audioVolume.attach('music', actMusic);
+    try { audioVolume.attach('sound', createUiClickSoundPlayer(assetReader, canvas)); } catch (error) { musicError = String(error); }
+    try { unitSounds = createUnitSoundPlayer(assetReader); canvas.__d2UnitSound = unitSounds; audioVolume.attach('sound', unitSounds); } catch (error) { musicError = String(error); }
 
     if (TERRAIN_ENABLED) loadSessionTerrain(fixture.act0);
     // A picked character is not applied to anything: createFromSave above already made it, sections
@@ -890,7 +929,7 @@ function ensureTitleScreen(entryPhase = null) {
   // Audio is progressive enhancement: an unavailable Web Audio implementation must not prevent
   // the retail title screen from existing (the player still gets an explicit sound error in its
   // evidence rather than a dead front door).
-  try { charCreateSounds ??= createClassSelectSoundPlayer(createMpqAssetReader(Module)); charCreateSoundError = ''; }
+  try { charCreateSounds ??= createClassSelectSoundPlayer(createMpqAssetReader(Module)); audioVolume.attach('sound', charCreateSounds); charCreateSoundError = ''; }
   catch (error) { charCreateSoundError = String(error); }
   try {
     titleScreen = createTitleScreen({
@@ -908,7 +947,7 @@ function ensureTitleScreen(entryPhase = null) {
         { label: 'OTHER MULTIPLAYER', action: () => {} },
         { label: 'CREDITS', action: () => { creditsTick = 0; screen = SCREEN.CREDITS; ensureCreditsScreen(); } },
         { label: 'CINEMATICS', action: () => { screen = SCREEN.CINEMATICS; ensureCinematicsScreen(); } },
-        { label: 'EXIT DIABLO II', action: () => { exitToTitle(); } },
+        { label: 'EXIT DIABLO II', action: () => { beginExit(); } },
       ],
     });
     if (entryPhase) setTitlePhase(entryPhase);
@@ -953,19 +992,30 @@ function tipFields(id, codeText) {
     costLabel: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [3329]) };
 }
 
-// Browser pages cannot close their own tab: rebuild the title screen as retail exit's equivalent.
+// Return to the front end's MENU: what the CREDITS and CINEMATICS screens' own EXIT/CANCEL do, and
+// what Escape out of the credits does (the same primitive).
 //
 // It comes back AT THE MENU, not at the trademark screen. Retail's trademark screen is a startup
 // phase -- it is what the front end opens on -- and every path that reaches this function is a
-// RETURN to the front end, not a boot: EXIT DIABLO II is our substitute for retail's app exit, and
-// Escape out of the credits (the same primitive) is retail's return to the menu it came from.
-// Replaying the phase here would cost a player ten seconds of copyright screen on a normal
-// navigation, which is what it did before the phase was parameterised (Codex review of title-b1;
-// asserted by s198 and s287).
+// RETURN to the front end, not a boot. Replaying the phase here would cost a player ten seconds of
+// copyright screen on a normal navigation, which is what it did before the phase was parameterised
+// (Codex review of title-b1; asserted by s198 and s287).
+//
+// The main menu's own EXIT DIABLO II does NOT come through here: that button is retail's app exit,
+// and beginExit() is its best browser equivalent (assets/exit-sequence.mjs, F91).
 function exitToTitle() {
   screen = SCREEN.TITLE; titleScreen = null; titleError = ''; titleTick = 0;
   exitEvidence = { count: exitEvidence.count + 1, screen };
   ensureTitleScreen('menu');
+}
+
+// F91: EXIT DIABLO II -- retail ends the process here; a page cannot, so it runs the fade, tries
+// `window.close()` and says so when the browser refuses (assets/exit-sequence.mjs has the reasoning).
+function beginExit() {
+  if (exitSeq?.active) return;
+  exitSeq = createExitSequence({ font: titleScreen?.noticeFont ?? null });
+  exitSeq.start();
+  exitEvidence = { count: exitEvidence.count + 1, screen };
 }
 
 // Retail's front end opens on the trademark screen (the copyright notice), which it holds for ten
@@ -1093,8 +1143,33 @@ function ensureCharSelect() {
 async function persistCurrentCharacter() {
   const bytes = saveCurrentCharacterBytes();
   if (!bytes) return null;
-  try { plugyPersist(); const header = await saveStore.put(bytes); await plugyLast; savesWritten++; lastSaveError = ''; return header; }
+  try { plugyPersist(); const header = await saveStore.put(bytes); await persistAutomap(header?.name); await plugyLast; savesWritten++; lastSaveError = ''; return header; }
   catch (error) { lastSaveError = String(error); return null; }
+}
+
+// The character's saved automap, retail's `<character>.ma0`, written beside the .d2s at Save and Exit
+// (F268). The layer is the CLIENT's -- a saved cell must not be lost when the room that revealed it is
+// freed -- so the shell hands the overlay's cells to the engine, which composes the FILE
+// (d2_session_save_ma0 "The .ma0 layout") exactly as it composes the .d2s. The save
+// store carries it, keyed the way PlugY's side blob is (`_LOD_<name>.ma0`), so it comes back with the
+// character at load. A layer with no cells writes nothing rather than a valid-but-empty file over one
+// the character already had.
+const automapAuxKey = (name) => `_LOD_${name}.ma0`;
+function saveAutomapBytes() {
+  if (!automapOverlay || !Module._d2_session_save_ma0) return null;
+  const cells = automapOverlay.savedCells();
+  if (!cells.length) return null;
+  const cap = 0x10000, inP = Module._malloc(cells.length * 4), outP = Module._malloc(cap);
+  try {
+    Module.HEAP32.set(Int32Array.from(cells), inP >> 2);
+    const n = Module.ccall('d2_session_save_ma0', 'number', ['bigint', 'number', 'bigint', 'number'], [BigInt(inP), cells.length / 5, BigInt(outP), cap]);
+    return n > 0 ? Module.HEAPU8.slice(Number(outP), Number(outP) + n) : null;
+  } finally { Module._free(inP); Module._free(outP); }
+}
+async function persistAutomap(name) {
+  if (!name) return false;
+  try { const bytes = saveAutomapBytes(); if (!bytes) return false; await saveStore.putAux(automapAuxKey(name), bytes); return true; }
+  catch (error) { lastSaveError = lastSaveError || String(error); return false; }
 }
 
 // Saving the engine-owned session is synchronous; only browser storage is asynchronous. Keeping
@@ -1180,7 +1255,22 @@ function readNpcState() {
     if (!dialogPtr) { npcMsgSkip = { npcId: 0, n: 0 }; return null; }
     const view = new DataView(Module.HEAPU8.buffer, dialogPtr, 64);
     const npcId = view.getUint32(16, true);
-    if (!npcId) { npcMsgSkip = { npcId: 0, n: 0 }; return null; }
+    // THE RECORD IS THE LAST ACTIVATION, NOT A LIVE CONVERSATION, and its own verdict says so:
+    // `d2_session_command_npc` writes `npcId` AND `result` on the full path, and `result` is the
+    // engine's answer -- `SUNIT_GetInteractInfo(...) && guid == npcId && MONSTERAI_IsInteractingWith`
+    // -- so a click the engine REFUSES still leaves the unit's id in a record this function read on
+    // `npcId` alone. A refused activation opens nothing in retail, but here it opened a conversation
+    // nobody was in: the next click is spent closing it (`click.spent = 'npcClose'`), and
+    // `d2_session_command_end_npc` refuses to end an interaction that was never established, so the
+    // record never clears and EVERY later click is eaten the same way -- the hero can no longer walk
+    // by click at all, while clickWalk's own tally still reads MOVE_OK (`d2_session_move_reason` is
+    // written only by a move command, so a click that never reached the world leaves the last reason
+    // standing). MEASURED, s000e-act5 step 25 (2026-09-30, engine 1fc1357db5b7, chained
+    // S000_BOOTSTRAP=1): after the step the record read `{npcId:8, result:0, msgs:0}` with the
+    // player's interact guid -1 and `npcPanelEvidence.open` true, and steps 26-28 then spent
+    // `clicks by handler {"npcClose":400}`, `world clicks {}` -- step 28 needs a 122-subtile walk to
+    // Anya's portal and could not take one.
+    if (!npcId || !view.getUint32(12, true)) { npcMsgSkip = { npcId: 0, n: 0 }; return null; }
     const messageCount = view.getUint32(32, true);
     if (npcMsgSkip.npcId !== npcId) npcMsgSkip = { npcId, n: 0 };
     // Only a menu-0 message speaks on the click; a menu-2 one is a Talk topic and waits for the Talk box (retail: Kashya's first click
@@ -1393,16 +1483,38 @@ const WALK_GIVE_UP_LEGS = 24;
 
 function chebyshev(ax, ay, bx, by) { return Math.max(Math.abs(ax - bx), Math.abs(ay - by)); }
 
+// F371: arm a walk. THE GIVE-UP COUNTERS LIVE ON THE GOAL (`walkGoal.stall`/`best`/`closeTries`), so a
+// re-arm used to start them at zero -- and a walk toward a goal the player keeps clicking (a stair
+// object whose own cell keeps the hero out of `within`) could then neither ARRIVE nor give up, and the
+// engine was never asked: `act3-chain10` lost step 26 to exactly that (~50 rounds, 66 s) on a class-386
+// stair (F370 records the chain half, F371 this client half). So carry the counters across a re-arm to
+// the SAME cell -- a second click on the same thing is the SAME intent, and the walk keeps its patience.
+// An arm elsewhere is a new intent and starts fresh. Only the counters carry (not the previous goal's
+// callbacks: an arm always brings its own). Everything that sets a walkGoal arms through here.
+function armWalk(goal) {
+  const same = walkMemory !== null && walkMemory.x === goal.x && walkMemory.y === goal.y;
+  if (same) { goal.stall = walkMemory.stall; goal.best = walkMemory.best; goal.closeTries = walkMemory.closeTries; }
+  // Keep accepted hops for stall accounting, but let this click issue its first leg without waiting
+  // on a move accepted by the previous request.
+  walkEvidence = { active: true, hops: same ? walkEvidence.hops : 0, reason: 0 };
+  // The prior click's move may still be finishing, but it cannot make this new click wait before
+  // issuing its first leg. Keep its accepted-hop count for stall accounting; reset only the wait gate.
+  walkMovePending = false;
+  walkGoal = goal;
+  walkMemory = walkGoal;
+  return walkGoal;
+}
+
 function walkStep() {
   if (!walkGoal || !session) return;
   const p = snapshot.player;
   const dist = chebyshev(p.x, p.y, walkGoal.x, walkGoal.y);
-  if (dist <= (walkGoal.within ?? 4)) { const done = walkGoal.onArrive; walkGoal = null; walkEvidence.active = false; done?.(); return; }
+  if (dist <= (walkGoal.within ?? 4)) { const done = walkGoal.onArrive; walkGoal = null; walkMemory = null; walkMovePending = false; walkEvidence.active = false; done?.(); return; }
 
   // Only pick a new leg once the last one has finished moving us.
   if (walkLast && walkLast.x === p.x && walkLast.y === p.y) walkIdle++; else walkIdle = 0;
   walkLast = { x: p.x, y: p.y };
-  if (walkIdle < 2 && walkEvidence.hops) return;
+  if (walkIdle < 2 && walkMovePending) return;
 
   // Hops accepted but the distance not closing (a pocket whose fan legs all end against its walls,
   // s000a's Den mouth after an earlier change's retail get-hit timing): ask the engine's own path to the goal.
@@ -1415,10 +1527,10 @@ function walkStep() {
   if (walkGoal.stall >= WALK_GIVE_UP_LEGS) {
     const reason = Module.ccall('d2_session_move_reason', 'number', [], []);
     walkEvidence = { active: false, hops: walkEvidence.hops, reason, stalled: walkGoal.stall };
-    const cb = walkGoal.onStuck; walkGoal = null; cb?.(); return;
+    const cb = walkGoal.onStuck; walkGoal = null; walkMemory = null; walkMovePending = false; cb?.(); return;
   }
   if (walkGoal.stall >= 4 && walkGoal.stall % 4 === 0 && session.move(walkGoal.x, walkGoal.y)) {
-    walkEvidence = { active: true, hops: walkEvidence.hops + 1, reason: 0 }; walkIdle = 0; return;
+    walkEvidence = { active: true, hops: walkEvidence.hops + 1, reason: 0 }; walkIdle = 0; walkMovePending = true; return;
   }
   const candidates = [];
   for (let a = 0; a < WALK_FAN; a++) {
@@ -1436,6 +1548,7 @@ function walkStep() {
     if (session.move(candidate.tx, candidate.ty)) {
       walkEvidence = { active: true, hops: walkEvidence.hops + 1, reason: 0 };
       walkIdle = 0;
+      walkMovePending = true;
       return;
     }
   }
@@ -1455,7 +1568,7 @@ function walkStep() {
     walkGoal.closeTries = (walkGoal.closeTries || 0) + 1;
     const stepx = p.x + Math.sign(walkGoal.x - p.x), stepy = p.y + Math.sign(walkGoal.y - p.y);
     if ((stepx !== p.x || stepy !== p.y) && session.move(stepx, stepy)) {
-      walkEvidence = { active: true, hops: walkEvidence.hops + 1, reason: 0 }; walkIdle = 0; return;
+      walkEvidence = { active: true, hops: walkEvidence.hops + 1, reason: 0 }; walkIdle = 0; walkMovePending = true; return;
     }
   }
   // Nothing reachable makes progress: stop rather than spin.
@@ -1463,7 +1576,7 @@ function walkStep() {
   // A goal whose own footprint keeps the player out of `within` (Harrogath's 1x7 main gate) still
   // gets its interaction: the engine's range test (UNITS_IsObjectInInteractRange) decides, as the
   // server does for retail's client.
-  const stuck = walkGoal.onStuck; walkGoal = null; stuck?.();
+  const stuck = walkGoal.onStuck; walkGoal = null; walkMemory = null; walkMovePending = false; stuck?.();
 }
 
 function readUnitKinds(count) {
@@ -1608,8 +1721,7 @@ function update(forceTick = false) {
             // walks the player toward it and attacks on arrival, as clicking an NPC walks and talks.
             if (!result) {
               const m = snapshot.entities.find((e) => e.id === underTarget && e.type === 1);   // ids are per unit type
-              if (m) { walkEvidence = { active: true, hops: 0, reason: 0 };
-                walkGoal = { x: m.x, y: m.y, within: 2, onArrive: () => { lastSkillCommand = { skill: useLeft ? leftId : 0, targetId: underTarget, result: swing(underTarget) }; } }; }
+              if (m) armWalk({ x: m.x, y: m.y, within: 2, onArrive: () => { lastSkillCommand = { skill: useLeft ? leftId : 0, targetId: underTarget, result: swing(underTarget) }; } });
               // The leg's aim was floor and it resolved to a unit: whatever the click's own aim point
               // was, the walk now goes to the UNIT, not to it (F14's monsters-first rule). That is the
               // one thing a leg that never closes on its plan can be doing.
@@ -1624,7 +1736,7 @@ function update(forceTick = false) {
             // DISPATCH_REFUSED: dying, dead or uninterruptable, retail's own dispatcher test) -- and
             // the walker's aim loop is only allowed to shorten its aim for the first kind.
             if (!moved) record.reason = Module.ccall('d2_session_move_reason', 'number', [], []); }
-          if (!moved) { walkEvidence = { active: true, hops: 0, reason: 0 }; walkGoal = { x: tx, y: ty, within: 2 }; }
+          if (!moved) armWalk({ x: tx, y: ty, within: 2 });
         }
       } else if (command.type === COMMAND.PRIMARY) {
         const resolved = command.x == null ? null : resolvePointerTarget(command.x, command.y);
@@ -1761,17 +1873,31 @@ function cameraCentre() {
 // named rather than repeated because a camera that disagreed with projStatic would slide the
 // scenery against the hero.
 // The world's screen centre column: the canvas centre, moved to the middle of the free half while a panel is open
-// on one side (SGD2FreeRes set_screen_shift). Fill mode only: ?parity=1 keeps today's fixed centre.
-function panelSides() { return [characterVisible || stashOpen || cubeOpen || Boolean(waypointMenu) || Boolean(npcState), skillsVisible || inventoryVisible]; }
+// on one side. Retail does this at its own 800x600 too, not only in the wide view (F264: panel-view-shift.mjs).
+function panelFlags() { return { character: characterVisible, quest: questVisible, stash: stashOpen, cube: cubeOpen, waypoint: Boolean(waypointMenu), npc: Boolean(npcState), skills: skillsVisible, inventory: inventoryVisible }; }
+function panelSides() { return panelViewSides(panelFlags()); }
 function viewCX() {
-  if (!window.__d2Entry?.fill || screen !== SCREEN.GAME || clearScreen) return canvas.width / 2;
-  const [left, right] = panelSides();
-  return canvas.width / 2 + panelShift(canvas.width, left, right);
+  if (screen !== SCREEN.GAME || clearScreen) return canvas.width / 2;
+  return viewCentreX(canvas.width, panelSides());
 }
+// __d2HidePanel: a panel row's no-panel render (lib/panel-frame.mjs toggle), never set by play. It
+// hides the side panel WITHOUT closing it, so F264's view shift stays put -- the panel's state (and
+// so viewCX) is unchanged, only the drawing is skipped. Closing the panel instead (the row's own key)
+// would ALSO move the world back, and the both-ways control then compares the world's own columns, not
+// the panel's: that is exactly the 461 px s251 read at x=400, the one column inside retail's panel
+// bbox where retail's own frame buffer shows shifted world rather than panel paint. s256 already does
+// this for the vendor panel as __d2HideShop.
+function panelShown(open) { return Boolean(open) && !globalThis.__d2HidePanel; }
 // SGD2FreeRes's art (not retail; staged by ci/stage.sh). Fill mode only -- ?parity=1 never loads it.
 let freeResArt = null, wideFrameEvidence = null;
 function ensureFreeRes() {
-  if (freeResArt || !window.__d2Entry?.fill || typeof Module === 'undefined') return freeResArt;
+  // `Module` EXISTS as a global from the first line of the emscripten glue but is uninitialized until
+  // `__d2.ready`, so `typeof Module === 'undefined'` is not the readiness test: the very first draw in
+  // fill mode (the loading screen, 1706px wide in a browser window) builds the reader, `ccall` throws
+  // "an initialized d2 wasm Module is required", and the failure is CACHED -- the widescreen wide bar
+  // and panel filler never load for the whole session and the alert banner sits over the page. Every
+  // sibling ensure* gates on the shell's own readiness flag; this one gates on it too (s1390).
+  if (freeResArt || !window.__d2Entry?.fill || !window.__d2?.ready) return freeResArt;
   const loud = (art) => { if (art.ready) return; console.error('SGD2FreeRes art not loaded: ' + art.error);
     const d = document.createElement('div'); d.id = 'freeres-notice'; d.setAttribute('role', 'alert');
     d.style.cssText = 'position:fixed;left:0;right:0;top:0;padding:6px 12px;background:#0b0c09;color:#c9ad68;border-bottom:1px solid #493d27;font:12px sans-serif;z-index:9';
@@ -2035,6 +2161,8 @@ function drawFrame() {
       ctx.fillText(titleError || 'loading…', w / 2, h / 2);
       hud.textContent = titleError ? `title screen: ${titleError}` : '';
     }
+    // F91: the exit fade, then the notice, are painted over the finished menu (assets/exit-sequence.mjs).
+    exitSeq?.draw(ctx, w, h);
     return;
   }
   if (screen === SCREEN.CINEMATICS) {
@@ -2321,7 +2449,7 @@ function drawFrame() {
   const layoutKey = session ? `${snapshot.playerClass}/${snapshot.playerId}/${snapshot.seed}` : '';
   if (inventoryPanelRenderer && session && (!inventoryPanelRenderer.layout || inventoryLayoutKey !== layoutKey)) {
     inventoryPanelRenderer.setLayout(readInventoryLayout()); inventoryLayoutKey = layoutKey; }
-  if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && session ? { ...snapshot, gold: Module.ccall('d2_session_player_gold', 'number', [], []) } : snapshot, inventoryVisible);
+  if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && session ? { ...snapshot, gold: Module.ccall('d2_session_player_gold', 'number', [], []) } : snapshot, panelShown(inventoryVisible));
   pollUiEvents();
   if (stashPanelRenderer) {
     if (stashPanelRenderer?.plugy.on) { stashPanelRenderer.plugy.pageName = `${plugyStash.showShared ? 'Shared' : 'Personal'} Page n\u00b0${plugyStash.page + 1}`; stashPanelRenderer.plugy.nameColour = plugyStash.showShared ? 1 : 0; }
@@ -2359,12 +2487,13 @@ function drawFrame() {
       mana: (snapshot.player?.mana ?? 0) >> 8, manaMax: (snapshot.player?.manaMax ?? 0) >> 8, act: snapshot.act,
       screen: characterVisible ? readCharacterScreen() : null,
       string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]),
-    }, characterVisible);
+    }, panelShown(characterVisible));
   }
   questEvidence = null;
-  if (questLogRenderer && questVisible && session && !clearScreen) {
+  if (questLogRenderer && panelShown(questVisible) && session && !clearScreen) {
     const words = readQuestWords(), act = questAct || (questAct = snapshot.act || 1, questSelected = questFirst(words, questAct), questAct);
-    questEvidence = questLogRenderer.draw(ctx, w, h, { act, tabs: questTabs(words, snapshot.act || 1), words, selected: questSelected,
+    questEvidence = questLogRenderer.draw(ctx, w, h, { act, tabs: questTabs(words, snapshot.act || 1), words, selected: questSelected, descrOn: questDescrOn,
+      anim: { quests: questAnim, tick: engineTicks - questOpenedAt },
       string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]) }, true, snapshot.act || 1);
   }
   if (skillPanelRenderer) {
@@ -2376,7 +2505,7 @@ function drawFrame() {
       skillPoints: adv?.skillPoints ?? 0, skills: readClassSkills() || [],
       // SkillDesc's wStrName/wStrLong/wStrMana are .tbl indices, so the hover plate's name,
       // description and mana line are retail's own strings, not a table this client keeps.
-      line: (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]), skillDesc: readSkillDesc, skillMana: (id, level) => Module.ccall('d2_session_skill_mana', 'number', ['number', 'number'], [id, level]) } : null, skillsVisible);
+      line: (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]), skillDesc: readSkillDesc, skillMana: (id, level) => Module.ccall('d2_session_skill_mana', 'number', ['number', 'number'], [id, level]) } : null, panelShown(skillsVisible));
   }
   // s693: retail's level-ENTRY banner -- the arriving level's own `EntryFile` art, drawn for 120 game
   // frames from the arrival. It goes here, before the HUD chrome, because that is where retail's own
@@ -2457,7 +2586,7 @@ function drawFrame() {
   messageEvidence = null;
   if (messageLogRenderer && messageVisible && !clearScreen) {
     const str = (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]);
-    messageEvidence = messageLogRenderer.draw(ctx, w, h, { title: str('strMsgLog'), close: str('strClose'), lines: messageLines }, true, snapshot.act || 1);
+    messageEvidence = messageLogRenderer.draw(ctx, w, h, { title: str('strMsgLog'), close: str('strClose'), lines: messageLines, scroll: messageScroll }, true, snapshot.act || 1);
   }
   if (messageLogRenderer && chat !== null && !clearScreen) {
     chatEvidence = messageLogRenderer.drawChatBar(ctx, w, h, chat, snapshot.act || 1);
@@ -2774,7 +2903,7 @@ function objectUnderPointer(px, py) {
 function unitBoxHit(entity, px, py) {
   const camera = worldToScreen(cameraGrid().x, cameraGrid().y), point = worldToScreen(entity.x, entity.y);   // F101: the camera the SPRITE pass draws units with -- the F14 box is measured about retail's cel anchor, so it must sit on the anchor we draw at (cameraCentre() put it 8 px above)
   // the cel anchor is an integer pixel (retail's measurement is 1 px exact), so round it the way the sprite is placed
-  return inUnitHoverBox(px - Math.round(point.x - camera.x + viewCX()), py - Math.round(point.y - camera.y + (canvas.height / 2 + UNIT_CENTRE_Y)));
+  return inUnitHoverBox(px - Math.round(point.x - camera.x + viewCX()), py - Math.round(point.y - camera.y + (canvas.height / 2 + UNIT_CENTRE_Y)), entity.hostile === true);
 }
 
 function npcUnderPointer(px, py) {
@@ -3170,11 +3299,14 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   if (e.button === 0 && screen === SCREEN.GAME && messageVisible && messageLogRenderer && !(controlPanelRenderer?.hitMiniButton(controlPanelEvidence, x, y, canvas.width, canvas.height) >= 0)) {
     if (messageLogRenderer.hitClose(x, y, canvas.width, canvas.height)) messageVisible = false;
+    else { const dir = messageLogRenderer.hitScroll(x, y, canvas.width, canvas.height);   // V8d: one arrow click scrolls ONE line
+      if (dir) messageScroll = Math.max(0, Math.min(messageScrollMax(messageLines.length), messageScroll + (dir === 'down' ? 1 : -1))); }
     click.spent = 'message-log'; canvas.focus(); e.preventDefault(); return;
   }
   if (e.button === 0 && screen === SCREEN.GAME && questVisible && questLogRenderer && questEvidence) {
     const words = readQuestWords(), hit = questLogRenderer.hit(x, y, canvas.width, canvas.height, questEvidence.tabs, questEvidence.act);
     if (hit?.close) questVisible = false;
+    else if (hit?.descr) questDescrOn = !questDescrOn;   // the questlast description toggle (V8d)
     else if (hit?.tab) { questAct = hit.tab; questSelected = questFirst(words, questAct); }
     else if (hit?.quest && questStatus(words, questAct, hit.quest) !== 'locked') questSelected = hit.quest;
     if (hit || openPanelAt(x, y) === 'quest') { click.spent = 'quest-log'; canvas.focus(); e.preventDefault(); return; }
@@ -3428,7 +3560,6 @@ canvas.addEventListener('pointerdown', (e) => {
     return best; })() : null;
   if (corpseHit) {
     click.spent = 'corpse'; click.walkTo = [corpseHit.x, corpseHit.y];
-    walkEvidence = { active: true, hops: 0, reason: 0 };
     const recover = (stuck) => {
       lastCorpseRecovery = { id: corpseHit.id, result: Module.ccall('d2_session_command_recover_corpse', 'number', ['number'], [corpseHit.id]), stuck };
       snapshot = session.snapshot(); };
@@ -3437,8 +3568,8 @@ canvas.addEventListener('pointerdown', (e) => {
     // Already beside it (the body's own cell and the monsters' blocking can keep a walk from ever
     // arriving or stalling -- s000a stood 3 subtiles from its second body, clicking): take it now.
     const p0 = snapshot.player;
-    if (Math.max(Math.abs(corpseHit.x - p0.x), Math.abs(corpseHit.y - p0.y)) <= 4) { recover(false); canvas.focus(); e.preventDefault(); return; }
-    walkGoal = { x: corpseHit.x, y: corpseHit.y, within: 2, onArrive: () => recover(false), onStuck: () => recover(true) };
+    if (Math.max(Math.abs(corpseHit.x - p0.x), Math.abs(corpseHit.y - p0.y)) <= 4) { walkEvidence = { active: true, hops: 0, reason: 0 }; recover(false); canvas.focus(); e.preventDefault(); return; }
+    armWalk({ x: corpseHit.x, y: corpseHit.y, within: 2, onArrive: () => recover(false), onStuck: () => recover(true) });
     canvas.focus(); e.preventDefault(); return;
   }
   const npcHit = !panelOwner && !hostileHit && e.button === 0 && session ? npcUnderPointer(x, y) : null;
@@ -3450,7 +3581,6 @@ canvas.addEventListener('pointerdown', (e) => {
   const warpHit = !panelOwner && !hostileHit && !npcHit && !objectHit && e.button === 0 && session ? warpUnderPointer(x, y) : null;
   if (warpHit) {
     click.spent = 'warp'; click.walkTo = [warpHit.x, warpHit.y];
-    walkEvidence = { active: true, hops: 0, reason: 0 };
     const takeWarp = (stuck) => {
       const previousAct = snapshot.act;
       const result = Module.ccall('d2_session_command_warp', 'number', ['number', 'number'], [warpHit.destinationLevel, warpHit.warpId]);
@@ -3460,14 +3590,12 @@ canvas.addEventListener('pointerdown', (e) => {
     };
     // A walk that stalls short of the exit (the Den's mouth, approached over its rocks) still asks:
     // the engine's warp command decides whether the player is close enough, as the server does.
-    walkGoal = { x: warpHit.x, y: warpHit.y, within: 2, onArrive: () => takeWarp(false), onStuck: () => takeWarp(true) };
+    armWalk({ x: warpHit.x, y: warpHit.y, within: 2, onArrive: () => takeWarp(false), onStuck: () => takeWarp(true) });
   } else if (npcHit) {
     click.spent = 'npc'; click.walkTo = [npcHit.x, npcHit.y];
-    walkEvidence = { active: true, hops: 0, reason: 0 };
-    walkGoal = { x: npcHit.x, y: npcHit.y, within: 4, onArrive: () => talkToNpc(npcHit.id) };
+    armWalk({ x: npcHit.x, y: npcHit.y, within: 4, onArrive: () => talkToNpc(npcHit.id) });
   } else if (objectHit) {
     click.spent = 'object'; click.walkTo = [objectHit.x, objectHit.y];
-    walkEvidence = { active: true, hops: 0, reason: 0 };
     // Retail's interact-range test (UNITS_IsObjectInInteractRange) can still refuse at two subtiles
     // -- the Cold Plains waypoint was clicked from there forever (s000a) -- while a portal's own
     // footprint keeps the player from getting closer. So: operate on arrival, and only if the engine
@@ -3484,9 +3612,9 @@ canvas.addEventListener('pointerdown', (e) => {
           const d = Math.hypot(x - p.x, y - p.y) + 3 * Math.max(Math.abs(dx), Math.abs(dy));
           if (d < best) { best = d; spot = { x, y }; }
         }
-        if (spot) { walkEvidence = { active: true, hops: 0, reason: 0 }; walkGoal = { x: spot.x, y: spot.y, within: 0, onArrive: () => operateObject(true) }; }
+        if (spot) armWalk({ x: spot.x, y: spot.y, within: 0, onArrive: () => operateObject(true) });
       } };
-    walkGoal = { x: objectHit.x, y: objectHit.y, within: 2, onArrive: () => operateObject(false), onStuck: () => operateObject(true) };
+    armWalk({ x: objectHit.x, y: objectHit.y, within: 2, onArrive: () => operateObject(false), onStuck: () => operateObject(true) });
   } else {
     // A "+" on the character screen spends a point through retail's 0x3A handler. Re-read rather
     // than adjust a local copy: the engine decides what a point did, including refusing it.
@@ -3679,9 +3807,15 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
     art: stashPanelRenderer?.evidence ?? null, gold: { error: stashGoldError, drawn: stashGoldEvidence && JSON.parse(JSON.stringify(stashGoldEvidence)),
       art: stashGoldRenderer?.evidence ?? null } }; },
   get questVisible() { return questVisible; }, set questVisible(v) { if (Boolean(v) !== questVisible) toggleQuest(); },
+  // V8d: the questlast description toggle's state (the button's own frame: 0 off, 1 on). Reset on open.
+  get questDescrOn() { return questDescrOn; }, set questDescrOn(v) { questDescrOn = Boolean(v); },
   get chatOpen() { return chat !== null; }, get chatEvidence() { return chatEvidence; }, get postedEvidence() { return postedEvidence; }, get messageLines() { return messageLines.slice(); },
   get objectSpeech() { return objectSpeech; }, dismissObjectSpeech,
   get messageVisible() { return messageVisible; }, set messageVisible(v) { messageVisible = Boolean(v); },
+  // V8d: the message log's scroll offset in lines (0 = newest at the top, one arrow click = one line).
+  get messageScroll() { return messageScroll; }, set messageScroll(v) { messageScroll = Math.max(0, Math.min(messageScrollMax(messageLines.length), v | 0)); },
+  get messageScrollMax() { return messageScrollMax(messageLines.length); },
+  scrollMessageLog(dir) { this.messageScroll = messageScroll + (dir === 'down' ? 1 : -1); return messageScroll; },
   get questEvidence() { return questEvidence; }, get messageEvidence() { return messageEvidence; },
   get skillsVisible() { return skillsVisible; },
   // The inventory panel's own visibility: the third of the three panel toggles, so a row can name the
@@ -3743,6 +3877,10 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
   get runToggle() { return readRunToggle(); },
   get lastRunToggle() { return lastRunToggle && { ...lastRunToggle }; },
   get automapEvidence() { return automapOverlay?.evidence ?? { open: false, error: 'not built' }; },
+  // The live automap layer's cells as retail `.ma0` quints {layer, frame, x, y, wall} -- what the
+  // engine's writer is handed on Save and Exit (F268). The scenario surface, so a row can compare the
+  // .ma0 the engine composed against the exact cells it was given.
+  automapCells() { return automapOverlay?.savedCells?.() ?? []; },
   get skillSelectEvidence() { return skillSelectEvidence && JSON.parse(JSON.stringify({ ...skillSelectEvidence, error: skillSelectError })); },
   get selectedSkill() { return Math.max(0, readSelectedSkills().right); }, get lastSkillCommand() { return lastSkillCommand && { ...lastSkillCommand }; },
   get lastBeltCommand() { return lastBeltCommand && { ...lastBeltCommand }; },
@@ -3820,7 +3958,7 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
     }
     return { clicks: clickDispatch.length, by, world, refusedBy, heroModes, last: clickDispatch.slice(-40).map((r) => ({ ...r })) };
   },
-  walkTo(x, y, within = 4) { walkEvidence = { active: true, hops: 0, reason: 0 }; walkGoal = { x, y, within }; },
+  walkTo(x, y, within = 4) { armWalk({ x, y, within }); },
   // `minDistance` (subtiles, 0 = no floor): talk to the nearest NPC at least that far away. s136
   // proves the WALKER by talking to someone the hero has to walk to, and with the corrected Rogue
   // Encampment spawn the nearest NPC is 7 subtiles away -- a step, not a walk.
@@ -3834,8 +3972,7 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
       if (d >= minDistance && d < best) { best = d; npc = entity; }
     }
     if (!npc) return false;
-    walkEvidence = { active: true, hops: 0, reason: 0 };
-    walkGoal = { x: npc.x, y: npc.y, within: 4, onArrive: () => talkToNpc(npc.id) };
+    armWalk({ x: npc.x, y: npc.y, within: 4, onArrive: () => talkToNpc(npc.id) });
     return true;
   },
   get npcPanelEvidence() {
@@ -3993,7 +4130,7 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
   set titlePhase(phase) { setTitlePhase(phase); },
   get cinematicsScreenEvidence() { return cinematicsScreen ? cinematicsScreen.evidence : { error: cinematicsError || 'not built' }; },
   get creditsEvidence() { return creditsScreen ? { ...creditsScreen.evidence, error: creditsError } : { error: creditsError || 'not built' }; },
-  get exitEvidence() { return { ...exitEvidence }; },
+  get exitEvidence() { return { ...exitEvidence, sequence: exitSeq ? exitSeq.evidence : null }; },
   /**
    * Canvas-pixel click targets for the front-end screens, from the same hit tests their clicks use.
    * s000 aims real pointer events with these, the way world clicks are aimed with project().
@@ -4081,6 +4218,8 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
   get terrainEvidence() { return { drawn: 0, missing: 0, ...(terrainStats || {}), live: Boolean(terrain), files: (terrainFiles || []).filter(Boolean), error: terrainError || '' }; },
   normalizeSnapshot };
 Object.defineProperty(window.__d2Shell, 'music', { get: () => actMusic?.evidence || null });
+// F235: the Sound/Music slider values and the live gain each player is actually held at.
+Object.defineProperty(window.__d2Shell, 'audioVolume', { get: () => audioVolume.evidence });
 // C3h: the tab-close save runs through the journal, then the page tears down exactly as before.
 // S2's UI click sound belongs on this one listener rather than a second beforeunload of its own: the
 // journal write must happen while the engine is still alive, and teardown() is the single place that

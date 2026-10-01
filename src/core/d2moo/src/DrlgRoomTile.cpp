@@ -65,7 +65,12 @@ static D2WebRollTrace s_d2webRollLast = {};
 // Ordered per-call log, the shape of retail's drawhook pick stream (PickRec): room tile x,y, type, style,
 // sequence, entries, weight sum, ladder steps, chosen rarity, seed low before the roll (T12).
 std::vector<int32_t> g_d2webRollCalls;
-void D2WEB_ResetRollTrace() { g_d2webRollCalls.clear(); g_d2webCrossRolls.clear(); g_d2webRollTrace.clear(); s_d2webRollCounter.clear(); s_d2webRollPending = false; g_d2webRollOrphans = 0; }
+// F511: one entry per g_d2webRollCalls RECORD (not per int) -- the LEVEL of the room whose seed was
+// rolled, which the 10-int record does not carry. A tile rect is NOT unique to a level, and
+// LinkedTileDataManager rolls the NEIGHBOUR's seed (a room that can belong to another level), so a
+// reader keying the stream by rect alone cannot tell a level-1 room's build from a level-2 one's.
+std::vector<int32_t> g_d2webRollLevels;
+void D2WEB_ResetRollTrace() { g_d2webRollCalls.clear(); g_d2webRollLevels.clear(); g_d2webCrossRolls.clear(); g_d2webRollTrace.clear(); s_d2webRollCounter.clear(); s_d2webRollPending = false; g_d2webRollOrphans = 0; }
 // The ladder walk of GetTileCache, re-run on an arbitrary seed low word. Returns the chosen
 // entry's +0x20 value. Pure: it never touches a seed.
 static uint32_t D2WEB_PickWithLow(D2TileLibraryEntryStrc** ppEntries, int nEntries, int nMax, uint32_t nLow)
@@ -150,8 +155,11 @@ D2TileLibraryEntryStrc* __fastcall DRLGROOMTILE_GetTileCache(D2DrlgRoomStrc* pDr
 		}
 
 		if (g_d2webRollTraceEnabled)
+		{
 			for (int32_t v : { pDrlgRoom->nTileXPos, pDrlgRoom->nTileYPos, (int32_t)nType, (int32_t)nStyle, (int32_t)nSequence, nEntries, nMax, nD2webLadder, (int32_t)D2CMP_10081_GetTileRarity(ppTileLibraryEntries[nId]), (int32_t)nD2webPrevLow })
 				g_d2webRollCalls.push_back(v);
+			g_d2webRollLevels.push_back(pDrlgRoom->pLevel->nLevelId);
+		}
 		D2WEB_NoteRoll(pDrlgRoom, (uint32_t)nEntries, (uint32_t)nId, ppTileLibraryEntries, nMax, nD2webPrevLow);
 		return ppTileLibraryEntries[nId];
 	}

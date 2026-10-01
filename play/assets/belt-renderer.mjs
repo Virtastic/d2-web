@@ -11,7 +11,7 @@ import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
 //
 // Kept only as the fallback for when the engine is not up (the panel still has to draw something
 // during boot), and marked as such rather than presented as the layout.
-export const BELT_FALLBACK = Object.freeze({ x: 423, y: 562, cells: 4, cell: 29 });
+export const BELT_FALLBACK = Object.freeze({ x: 423, y: 562, cells: 4, cell: 29, pitch: 31 });
 
 function raster(frame, palette, documentObject) { const c = documentObject.createElement('canvas'); c.width = frame.width; c.height = frame.height;
   c.getContext('2d').putImageData(new ImageData(dc6FrameToRgba(frame, palette), frame.width, frame.height), 0, 0); return c; }
@@ -22,9 +22,9 @@ function raster(frame, palette, documentObject) { const c = documentObject.creat
  */
 export function beltBoxes(boxes) {
   if (Array.isArray(boxes) && boxes.length) return boxes;
-  const { x, y, cells, cell } = BELT_FALLBACK;
+  const { x, y, cells, cell, pitch } = BELT_FALLBACK;
   return Array.from({ length: cells }, (_, i) =>
-    ({ left: x + i * cell, right: x + i * cell + cell, top: y, bottom: y + cell }));
+    ({ left: x + i * pitch, right: x + i * pitch + cell, top: y, bottom: y + cell }));
 }
 
 export function createBeltRenderer(read, documentObject = globalThis.document) {
@@ -53,7 +53,13 @@ export function createBeltRenderer(read, documentObject = globalThis.document) {
         if (item.mode !== 2 || item.gridX < 0 || item.gridX >= rects.length || !item.invFile) continue;
         const b = rects[item.gridX], c = icon(item.invFile);
         const w = b.right - b.left, h = b.bottom - b.top;
-        ctx.drawImage(c, b.left + Math.floor((w - c.width) / 2), b.top + Math.floor((h - c.height) / 2));
+        // The cel is 28x28 in a 29x29 Belts.txt box and sits one row BELOW the box's top row: retail
+        // draws the HUD belt poticon with its bottom row on the box's bottom row (cel ? 28x28 at
+        // y=590 against a box of 562..591), which is the same +1
+        // the inventory places a 28x28 cel in a 29x29 cell with (play/assets/inventory-panel.mjs:229
+        // grid, :234 body). Measured: F228/s813 reads our canvas 1 px up and finds 889 of 948 belt
+        // pixels wrong; at the +1 they are retail's.
+        ctx.drawImage(c, b.left + Math.floor((w - c.width) / 2), b.top + Math.floor((h - c.height) / 2) + 1);
         count++; pixels += c.width * c.height;
       }
       if (labels) numbers(ctx, rects);

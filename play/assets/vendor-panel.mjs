@@ -33,6 +33,11 @@ export const VENDOR_ASSETS = {
 export const VENDOR_LAYOUT = Object.freeze({ left: 80, top: 60, gridLeft: 96, gridTop: 123, columns: 10, rows: 10, cell: 29,
   tabStep: 80, buttonX: [195, 248, 300, 352], buttonFromBottom: 15 });   // buttonX: retail's draw list (vendor-akara), riiablo's 116..272 were off
 const TAB_NAMES = ['strBSArmor', 'strBSWeapons', 'strBSWeapons', 'strBSMisc'];
+// Retail's own tab-label x per tab (y=80), read from every captured vendor's draw list -- p8-smith-shop
+// ('Armor' 97, 'Weapons' 168/248, 'Misc' 346), p8-ui2-shop-5000g, vendor-akara and vendor-malah-act5 all
+// agree. It is a fixed table, not a centring formula: retail rounds 16.5 up (Armor) but 8.5 down
+// (Weapons), which no single rounding of (79+4-measure)/2 reproduces. (s733 asserts our label band.)
+const TAB_LABEL_X = [97, 168, 248, 346];
 const BUTTON_FRAMES = { blank: 0, buy: 2, sell: 4, repair: 6, exit: 10, repairAll: 18 };
 // The smiths (MonStats: Charsi, Fara, Hratli, Halbu, Larzuk) are the vendors D2GAME_NPC_Repair accepts;
 // their row is Buy / Sell / Repair / Repair All, every other vendor's Buy / Sell / (blank) / Exit
@@ -194,10 +199,10 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
       for (const t of lastTabs) {
         const r = tabRect(t), f = tabFrames[t === tab ? t : t + 4];
         ctx.drawImage(f, r.x, r.y);
-        // The open tab's name in D2Win colour 4 (gold), the others white, anchored at row 80.
+        // The open tab's name in D2Win colour 4 (gold), the others white, anchored at row 80. Retail
+        // draws each label at a fixed x (TAB_LABEL_X) -- see that table's note; it is not a centring rule.
         const label = string(TAB_NAMES[t]) || '', face = t === tab ? gold : font;
-        // x = tab + (w + 4 - text) / 2, fitted on retail's two labels (Weapons 168, Misc 346).
-        face.drawAnchored(ctx, label, r.x + Math.floor((r.w + 4 - face.measure(label)) / 2), 80);
+        face.drawAnchored(ctx, label, TAB_LABEL_X[t], 80);
       }
       // Retail's hover: the item under the pointer has its
       // cells' backing box colour 118 instead of 234, at 5000 gold AND at 0 -- there is NO affordability
@@ -234,9 +239,13 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
       // a smith's row is main's Buy / Sell / Repair / Repair All (not captured yet).
       const buttons = vendorButtons(state?.classId);
       buttons.forEach((b, i) => { const c = buttonFrames[BUTTON_FRAMES[b]]; if (c) ctx.drawImage(c, L.buttonX[i], 477 - c.height + 1); });
-      // The stash line (1.13 vendors take stash gold): string "stash" at (101, 434), the stash's gold at (266, 434).
+      // The stash line (1.13 vendors take stash gold): string "stash" at (101, 434), the stash's gold
+      // RIGHT-aligned so its last glyph starts at x 266. Retail's own per-glyph records hold the anchor:
+      // `text '180000' x=218 y=434` (vendor-malah-act5) draws 1,8,0,0,0,0 at 218,223,230,242,254,266 --
+      // last glyph 266 -- and `text '0' x=266` (vendor-akara) draws its only glyph there too. So the
+      // number is anchored by its END, and the start is 266 minus every advance but the last.
       font.drawAnchored(ctx, string('stash'), 101, 434);
-      if (state?.stashGold >= 0) font.drawAnchored(ctx, String(state.stashGold), 266, 434);
+      if (state?.stashGold >= 0) { const gold = String(state.stashGold); font.drawAnchored(ctx, gold, 266 - font.measure(gold.slice(0, -1)), 434); }
       // Retail's tooltip (same captures): a mode-2 black box, 16 px per line, centred on the pointer and
       // clamped to the screen, its bottom 25 px above the pointer; lines are centred, listed top down as
       // retail draws them (Cost first, then the name). The property lines come from the engine's

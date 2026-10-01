@@ -51,10 +51,16 @@ static uint32_t g_pickSeed = 0; static uint8_t g_pickDiff = 0; static uint16_t g
 extern const D2DrlgRoomStrc* g_d2webTileCacheRoom;
 // Parallel to g_picks: the room's tile rectangle (x, y, w, h) and its seed low word at the lookup.
 static std::vector<int32_t> g_pickRooms;
+// F511: the LEVEL of the rolled room (g_d2webTileCacheRoom), one int per pick -- the rect in
+// g_pickRooms is not unique to a level, and the record's own `level` field is the level whose
+// d2_drlg_level call is in progress, which is a different thing again (LinkedTileDataManager rolls
+// the NEIGHBOUR's seed, and that neighbour can belong to another level).
+static std::vector<int32_t> g_pickRoomLevel;
 static std::string g_pickNear;
 static void onGetTiles(int type, int style, int seq, int n, int firstFrame) {
     { const D2DrlgRoomStrc* q = g_d2webTileCacheRoom;
-      g_pickRooms.insert(g_pickRooms.end(), { q ? q->nTileXPos : -1, q ? q->nTileYPos : -1, q ? q->nTileWidth : 0, q ? q->nTileHeight : 0, q ? (int32_t)q->pSeed.nLowSeed : 0 }); }
+      g_pickRooms.insert(g_pickRooms.end(), { q ? q->nTileXPos : -1, q ? q->nTileYPos : -1, q ? q->nTileWidth : 0, q ? q->nTileHeight : 0, q ? (int32_t)q->pSeed.nLowSeed : 0 });
+      g_pickRoomLevel.push_back(q && q->pLevel ? (int32_t)q->pLevel->nLevelId : -1); }
     // First sighting of a room: its near-room list in list order (drawhook logs retail's the same way).
     { const D2DrlgRoomStrc* q = g_d2webTileCacheRoom; static std::vector<const D2DrlgRoomStrc*> seen;
       if (g_picks.empty()) seen.clear();
@@ -110,6 +116,13 @@ EMSCRIPTEN_KEEPALIVE void d2_drlg_act_end() {
     g_grid.clear(); g_grid.shrink_to_fit();
 }
 
+// F511 A/B (see d2_drlg_collect_picks below): 1 keeps every room of the level alive after its tile
+// stream is read -- the LIVE SESSION's eager build -- instead of the capture protocol's
+// SetClientIsInSight / read / UnsetClientIsInSight, which frees each room and so leaves a room's
+// shared-edge cells no live neighbour to merge into.
+static int g_drlgKeepAlive = 0;
+EMSCRIPTEN_KEEPALIVE void d2_drlg_keep_alive(int on) { g_drlgKeepAlive = on ? 1 : 0; }
+
 // Generates `level` in the current act; fills d2_drlg_out(). 1 on success.
 EMSCRIPTEN_KEEPALIVE int d2_drlg_level(int level) {
     if (!g_act) { g_err = "no act"; return 0; }
@@ -146,7 +159,7 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_level(int level) {
                 if (gx >= 0 && gy >= 0 && gx < (int64_t)w && gy < (int64_t)h) g_grid[(size_t)gy * w + (size_t)gx] = *p;
             }
         }
-        if (added) DUNGEON_UnsetClientIsInSight(g_act, level, rx, ry, nullptr);
+        if (added && !g_drlgKeepAlive) DUNGEON_UnsetClientIsInSight(g_act, level, rx, ry, nullptr);
         g_pickRoom = -1;
     }
     uint32_t hsh = D2VEC_FNV_INIT;
@@ -203,13 +216,14 @@ EMSCRIPTEN_KEEPALIVE const char* d2_drlg_dirt_paths(int level) {
 }
 // Collect the tile pick stream (vectorfmt.h D2VecTilePick) from the next d2_drlg_act_begin on.
 EMSCRIPTEN_KEEPALIVE void d2_drlg_collect_picks(int enable) {
-    g_picks.clear(); g_pickRooms.clear(); g_pickNear.clear();
+    g_picks.clear(); g_pickRooms.clear(); g_pickRoomLevel.clear(); g_pickNear.clear();
     g_d2webOnGetTiles = enable ? onGetTiles : nullptr;
     g_d2webOnTileRarity = enable ? onTileRarity : nullptr;
 }
 EMSCRIPTEN_KEEPALIVE const D2VecTilePick* d2_drlg_picks() { return g_picks.data(); }
 EMSCRIPTEN_KEEPALIVE int d2_drlg_pick_count() { return (int)g_picks.size(); }
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_drlg_pick_rooms() { return g_pickRooms.data(); }
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_drlg_pick_levels() { return g_pickRoomLevel.data(); }
 EMSCRIPTEN_KEEPALIVE const char* d2_drlg_pick_near() { return g_pickNear.c_str(); }   // near lists, first sighting per room   // 5 per pick: room x, y, w, h (tiles), seed low
 EMSCRIPTEN_KEEPALIVE void d2_drlg_collect_tiles(int enable) { g_collectTiles = enable != 0; g_tiles.clear(); }
 EMSCRIPTEN_KEEPALIVE const D2DrlgTileRec* d2_drlg_tiles() { return g_tiles.data(); }

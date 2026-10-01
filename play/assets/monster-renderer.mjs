@@ -77,7 +77,7 @@ export function loadMonsterAnimation(read, actor) {
 
 /** `shadow: true` draws the unit's shadow under its sprite first, as retail's draw list orders it. */
 export function createMonsterRenderer(read, documentObject = globalThis.document, { shadow = false } = {}) {
-  const animations = new Map(), failures = new Set(), palettes = new Map(), rasters = new Map(), blenders = new Map(), highlights = new Map();
+  const animations = new Map(), failures = new Set(), palettes = new Map(), rasters = new Map(), composedFrames = new Map(), blenders = new Map(), highlights = new Map();
   const shadows = shadow ? createUnitShadowRenderer(read) : null;
   const blenderFor = (act0) => { if (!blenders.has(act0)) { let b = null; try { b = createBlender(read(`data\\global\\palette\\${PALETTE[act0]}\\pal.pl2`), palettes.get(act0)); } catch {} blenders.set(act0, b); } return blenders.get(act0); };
   let lastEvidence = null;
@@ -99,7 +99,9 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
       const whole = actor.framePrecise >>> 8, count = animation.cof.framesPerDirection;
       const frame = (whole >= count && actor.frameCountPrecise && actor.framePrecise >= actor.frameCountPrecise ? count - 1 : whole % count) >>> 0;
       let composed;
-      try { composed = composeCofFrame(animation.cof, animation.direction, frame, animation.components); }
+      // PERF (F198): a composed frame is a pure function of the (cached) animation and the frame; composed once, its identity hash and opaque count with it.
+      const composeKey = `${baseKey}:${frame}`;
+      try { composed = composedFrames.get(composeKey); if (!composed) { composed = composeCofFrame(animation.cof, animation.direction, frame, animation.components); composedFrames.set(composeKey, composed); } }
       catch (e) { failures.add(baseKey); console.warn(`monster ${actor.code} mode ${actor.mode} dir ${actor.direction} frame ${frame}: ${e.message}`); return null; }   // a COF/DCC frame-count mismatch must not stop the frame loop
       const [act0, pal] = palette(act), key = `${baseKey}:${frame}:${act0}${highlight ? ':hl' : ''}`;
       if (highlight && !highlights.has(act0)) highlights.set(act0, highlightMap(read(`data\\global\\palette\\${PALETTE[act0]}\\pal.dat`)));
@@ -149,7 +151,8 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
           frame, frames: animation.cof.framesPerDirection, dir: actor.direction, token: animation.token,
           x: Math.round(x), y: Math.round(y), mode: highlight ? 7 : 5 });
       }
-      let pixelHash = 0x811c9dc5; for (const value of composed.indexed) { pixelHash ^= value; pixelHash = Math.imul(pixelHash, 0x01000193); }
+      if (composed.pixelHash === undefined) { let h = 0x811c9dc5; for (const value of composed.indexed) { h ^= value; h = Math.imul(h, 0x01000193); } composed.pixelHash = h; composed.opaqueCount = composed.opaque.reduce((a, v) => a + v, 0); }
+      const pixelHash = composed.pixelHash;
       // `directions` and `frames` are the COF's own lengths, so a caller comparing the drawn identity
       // against the engine's requested one (s278) can check the direction and frame against the
       // sequence they belong to without re-decoding the COF.
@@ -168,7 +171,7 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
         // told apart by measurement rather than assumed equal.
         animBox: (() => { let a = null; for (const dcc of animation.components.values()) { const d = dcc.directionRecords[animation.direction]; if (!d || !d.box) continue;
           const b = d.box; a = a ? { minX: Math.min(a.minX, b.minX), minY: Math.min(a.minY, b.minY), maxX: Math.max(a.maxX, b.maxX), maxY: Math.max(a.maxY, b.maxY) } : { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY }; } return a; })(),
-        height: composed.height, opaque: composed.opaque.reduce((a, v) => a + v, 0), pixelHash: pixelHash >>> 0, mode: highlight ? 7 : 5 };
+        height: composed.height, opaque: composed.opaqueCount, pixelHash: pixelHash >>> 0, mode: highlight ? 7 : 5 };
       return lastEvidence;
     },
     get lastEvidence() { return lastEvidence && { ...lastEvidence }; },

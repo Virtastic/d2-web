@@ -104,12 +104,14 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
   const fontPath = NPC_MENU_ASSETS.font, glyphs = { op: 'celcolor', mode: 5 };
   const white = createFont({ dc6, tbl, palette, documentObject, path: fontPath, drawAs: glyphs });
   // A coloured line is its glyphs' indices through the act PL2's TextColorShifts[colour] (retail's own
+  // Shifted indices address that SAME act palette, not Units (s2198: A2/A3 names
+  // had206/30 wrong pixels when those indices were read through Units).
   // 8-bit frame of this menu: Warriv's name, colour 4, 191 of 191 glyph pixels; an earlier change). Offsets per
   // OpenDiablo2's d2pl2 layout; gold is colour 4, blue colour 3.
   const TEXT_SHIFTS = 1024 + 8192 + 4096 + 256 + 5 * 65536 + 111 * 256 + 768 + 14 * 256 + 65536 + 256 + 39;
   const shifted = (colour, fallback, act = 1) => {
     try { const pl2 = read(`data\\global\\palette\\ACT${Math.min(5, Math.max(1, act | 0))}\\pal.pl2`), out = palette.slice();
-      for (let k = 0; k < 256; k++) { const j = pl2[TEXT_SHIFTS + colour * 256 + k]; out.set(palette.subarray(j * 4, j * 4 + 3), k * 4); }
+      for (let k = 0; k < 256; k++) { const j = pl2[TEXT_SHIFTS + colour * 256 + k]; out.set(pl2.subarray(j * 4, j * 4 + 3), k * 4); }
       return out; } catch { return tint(fallback); } };
   // Coloured fonts per act: the shift table is the CURRENT act's PL2 (Codex review: Act I's was read in
   // every act, so Lut Gholein's and Harrogath's menus shifted through the wrong table).

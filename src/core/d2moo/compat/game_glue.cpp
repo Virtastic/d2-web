@@ -27,6 +27,17 @@ int32_t g_d2CreateLog[4 * 8192]; int32_t g_d2CreateCount = 0;
 int32_t g_d2SeqLog[4 * 16384]; int32_t g_d2SeqCount = 0;
 static void noteSeq(int op, int level, int x, int y) { if (g_d2SeqCount < 16384) { int32_t* e = &g_d2SeqLog[4 * g_d2SeqCount++]; e[0] = op; e[1] = level; e[2] = x; e[3] = y; } }
 void d2_note_room_create(int level, int x, int y, int seed) { noteSeq(0, level, x, y); if (g_d2CreateCount < 8192) { int32_t* e = &g_d2CreateLog[4 * g_d2CreateCount++]; e[0] = level; e[1] = x; e[2] = y; e[3] = seed; } }
+// F500 (d2-web diagnosis, not retail): whether DUNGEON_SetClientIsInSight's status propagation may
+// follow a near-room link that crosses the room's OWN level boundary. Retail's code path is
+// unconditional (DRLGACTIVATE_RoomExPropagateSetStatus walks ppRoomsNear with no level test), so 1 is
+// the default and 0 is only the counterfactual a probe measures. Retail's own same-flow Fortress ->
+// River capture allocates all 12 Fortress rooms -- the three carrying the level-103/104 seam links
+// included -- and ZERO level-104 rooms, while this engine stagers 5 level-104 rooms on the same save
+// and the same click (s1480). Read by monspawn_check.cpp's d2_session_crosslevel_sight.
+int g_d2CrossLevelSight = 1;
+extern "C" void d2_set_cross_level_sight(int on) { g_d2CrossLevelSight = on ? 1 : 0; }
+extern "C" int d2_cross_level_sight_on(void) { return g_d2CrossLevelSight; }
+
 // The rooms flagged POPULATION_ZERO when a level's populated-room count (MonsterRegion unk0x0C) was taken:
 // {level, subtile x, subtile y, has room tiles, rooms near} per flagged room (d2_session_popzero_log).
 int32_t g_d2PopZeroLog[5 * 1024]; int32_t g_d2PopZeroCount = 0;
