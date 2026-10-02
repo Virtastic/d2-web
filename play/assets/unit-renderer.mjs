@@ -34,6 +34,18 @@ export function dccDirection(direction64, directions) {
   return Math.min(directions - 1, Math.trunc(direction * directions / 64));
 }
 
+// COF priority is indexed by retail's quantized facing; the DCC blocks use
+// their own direction order, which is rotated relative to COF (e.g. retail
+// facing 0 selects COF direction 0 and DCC block 4 for a 16-direction sprite).
+export function cofDirection(direction64, directions) {
+  const direction = ((Math.trunc(Number(direction64) || 0) % 64) + 64) % 64;
+  return Math.min(directions - 1, Math.trunc(direction * directions / 64));
+}
+
+export function playerRasterCacheKey({ classToken, token, weaponClass, variants, dccDirection, cofDirection, frame, act0 }) {
+  return `${classToken}:${token}:${weaponClass}:${variants}:${cofDirection}:${dccDirection}:${frame}:${act0}`;
+}
+
 export function animationFrame(cof, state = {}) {
   if (!cof?.framesPerDirection) return 0;
   const precise = Number(state.framePrecise);
@@ -86,8 +98,13 @@ export function loadAmazonAnimation(read, mode, options = {}) { return loadPlaye
 
 export function selectAmazonFrame(animation, state = {}) {
   const direction = dccDirection(state.direction, animation.cof.directions);
+  const cofFacing = cofDirection(state.direction, animation.cof.directions);
   const frame = animationFrame(animation.cof, state);
-  return { direction, frame, composed: composeCofFrame(animation.cof, direction, frame, animation.components) };
+  const cofPriority = animation.cof.priority[cofFacing][frame];
+  const layerDrawOrder = cofPriority.filter((component) => animation.components.get(component));
+  return { direction, cofDirection: cofFacing, frame,
+    cofPriority: [...cofPriority], layerDrawOrder,
+    composed: composeCofFrame(animation.cof, cofFacing, frame, animation.components, direction) };
 }
 
 export const selectPlayerFrame = selectAmazonFrame;
@@ -126,7 +143,9 @@ export function createPlayerRenderer(read, documentObject = globalThis.document,
       // source item the engine currently reports as worn.
       const drawn = activeAnimation.drawn.map((layer) => ({ ...layer,
         source: composition.source[COMPONENT.indexOf(layer.component)] || null }));
-      const key = `${activeAnimation.classToken}:${playerModeToken(state.mode)}:${activeAnimation.weaponClass}:${activeAnimation.drawn.map((layer) => layer.variant).join(',')}:${selected.direction}:${selected.frame}:${pal.act0}`;
+      const key = playerRasterCacheKey({ classToken: activeAnimation.classToken, token: playerModeToken(state.mode),
+        weaponClass: activeAnimation.weaponClass, variants: activeAnimation.drawn.map((layer) => layer.variant).join(','),
+        cofDirection: selected.cofDirection, dccDirection: selected.direction, frame: selected.frame, act0: pal.act0 });
       let canvas = rasters.get(key);
       if (!canvas) {
         const { composed } = selected;
@@ -139,7 +158,8 @@ export function createPlayerRenderer(read, documentObject = globalThis.document,
       }
       const { composed } = selected;
       shadows?.draw(ctx, Math.round(x), Math.round(y),
-        { cof: activeAnimation.cof, components: activeAnimation.components, direction: selected.direction, frame: selected.frame },
+        { cof: activeAnimation.cof, components: activeAnimation.components, direction: selected.cofDirection,
+          dccDirection: selected.direction, frame: selected.frame },
         { kind: 'player', classToken: activeAnimation.classToken, token: playerModeToken(state.mode), direction: selected.direction, frame: selected.frame, act: state.act });
       if (canvas.width && canvas.height) ctx.drawImage(canvas, Math.round(x + composed.xOffset), Math.round(y + composed.yOffset));
       // `direction` is the DCC direction DRAWN; `engineDirection` and `directions` are the REQUESTED
@@ -148,7 +168,9 @@ export function createPlayerRenderer(read, documentObject = globalThis.document,
       // `directions`). Without them a row can only compare the drawn direction against an engine read
       // taken LATER, which is a different tick's value whenever the engine advanced in between: that
       // is the cross-time comparison `s350`'s `dirMismatch` was forced into (F49).
-      lastEvidence = { playerClass: activeAnimation.playerClass, classToken: activeAnimation.classToken, token: playerModeToken(state.mode), direction: selected.direction, frame: selected.frame,
+      lastEvidence = { playerClass: activeAnimation.playerClass, classToken: activeAnimation.classToken, token: playerModeToken(state.mode), direction: selected.direction,
+        loadDirection: activeAnimation.direction, cofDirection: selected.cofDirection, cofPriority: [...selected.cofPriority],
+        layerDrawOrder: [...selected.layerDrawOrder], loadedComponents: [...activeAnimation.components.keys()], frame: selected.frame,
         engineDirection: state.direction, directions: activeAnimation.cof.directions,
         width: composed.width, height: composed.height, opaque: composed.opaque.reduce((a, value) => a + value, 0),
         components: activeAnimation.components.size, weaponClass: activeAnimation.weaponClass,

@@ -58,89 +58,86 @@ export async function loadBnetServers(fetchImpl = globalThis.fetch) {
   } catch (error) { return { enabled: false, servers: [], url, error: String(error) }; }
 }
 
-/**
- * Where the dialog puts its rows: one per configured server, on retail's own button geometry (a
- * WideButtonBlank cel is 272x35), centred as a block. The layout is OURS -- retail has no local
- * gateway screen to copy (the gateway list is Battle.net's own, drawn after a BNCS login, and this
- * repo has neither a capture nor prior art for it), so this is a declared gap, not a measurement.
- */
-export function gatewayRows(servers, { width = 800, height = 600, rowWidth = 272, rowHeight = 35, step = 44 } = {}) {
-  const total = rowHeight + Math.max(0, servers.length - 1) * step;
-  const top = Math.trunc((height - total) / 2);
+/** The measured retail 1.13c gateway screen (`the retail captures`, F233). */
+export const GATEWAY_LAYOUT = Object.freeze({
+  panel: { x: 237, y: 217, w: 340, h: 339, path: 'data\\global\\ui\\FrontEnd\\GWListBox.dc6',
+    tiles: [{ frame: 0, x: 0, y: 0 }, { frame: 1, x: 256, y: 0 }, { frame: 2, x: 0, y: 255 }, { frame: 3, x: 256, y: 255 }] },
+  heading: { text: 'SELECT GATEWAY', font: 'data\\local\\font\\latin\\font24.dc6', x: 302, y: 250, shift: 4 },
+  body: { font: 'data\\local\\font\\latin\\font8.dc6', x: 257, shift: 4,
+    lines: [{ text: 'If the current gateway does not best represent', y: 275 },
+      { text: 'your location, select another Battle.net gateway', y: 293 },
+      { text: 'connection.', y: 311 }] },
+  rows: { x: 253, textX: 257, firstAnchorY: 360, pitch: 24, hitTop: 338, w: 292, h: 24, shift: 4,
+    selectedShift: 0, selectedColor: '#404040', font: 'data\\local\\font\\latin\\fontformal12.dc6' },
+  button: { path: 'data\\global\\ui\\FrontEnd\\CancelButtonBlank.dc6', w: 96, h: 32,
+    y: 507, anchorY: 529, labelFont: 'data\\local\\font\\latin\\fontridiculous.dc6',
+    ok: { x: 281, label: 'OK' }, cancel: { x: 436, label: 'CANCEL' } },
+});
+
+/** Retail's listbox places one configured region per 24px row, in the measured panel. */
+export function gatewayRows(servers) {
   return servers.map((s, i) => ({ region: s.region, host: s.host, index: i,
-    x: Math.trunc((width - rowWidth) / 2), y: top + i * step, w: rowWidth, h: rowHeight }));
+    x: GATEWAY_LAYOUT.rows.x, y: GATEWAY_LAYOUT.rows.hitTop + i * GATEWAY_LAYOUT.rows.pitch,
+    w: GATEWAY_LAYOUT.rows.w, h: GATEWAY_LAYOUT.rows.pitch, anchorY: GATEWAY_LAYOUT.rows.firstAnchorY + i * GATEWAY_LAYOUT.rows.pitch }));
 }
 
-/**
- * The region-select dialog: the configured servers as retail's own buttons under retail's own font,
- * over a dimmed title screen. It owns no config -- it is handed the list the file gave -- and its only
- * verb a player has is `pick`.
- *
- * `evidence.drawn` is IDENTITY evidence: for each row, the glyphs actually blitted (character, font
- * DC6 frame index and path) and the button cels actually drawn (retail DC6 path, frame index, anchor,
- * FNV-1a of the encoded frame bytes). A row that only counted rows would pass on a screen of wrong
- * labels; a consumer compares the PAINTED text to the configured region.
- */
-export function createGatewaySelector({ servers, buttons, drawLabel, drawHeading = null, recordButton, width = 800, height = 600 }) {
-  // The row is retail's OWN composed button, not a box we invented: drawing a 512-wide
-  // WideButtonBlank inside a 272-wide rect would overflow the rect we hit-test against.
-  const rows = gatewayRows(servers, { width, height, rowWidth: buttons?.wide?.[0]?.width || 272,
-    rowHeight: buttons?.wide?.[0]?.height || 35 });
-  let open = false, selected = -1, hot = -1, pressed = -1, drawn = { heading: null, rows: [] };
+/** A repo-owned server list presented in retail 1.13c's measured gateway selection screen. */
+export function createGatewaySelector({ servers, screen, width = 800, height = 600 }) {
+  const rows = gatewayRows(servers);
+  const defaultIndex = Math.max(0, servers.findIndex((s) => s.region.toUpperCase() === 'U.S. EAST'));
+  let open = false, committed = servers.length ? defaultIndex : -1, choice = committed, hot = null, pressed = null;
+  let drawn = { panel: [], heading: null, body: [], rows: [], selection: null, buttons: [] };
   const rowAt = (x, y) => rows.findIndex((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
+  const buttonAt = (x, y) => Object.entries(GATEWAY_LAYOUT.button).filter(([k]) => k === 'ok' || k === 'cancel')
+    .find(([k, b]) => x >= b.x && x < b.x + GATEWAY_LAYOUT.button.w && y >= GATEWAY_LAYOUT.button.y && y < GATEWAY_LAYOUT.button.y + GATEWAY_LAYOUT.button.h)?.[0] ?? null;
+  const selectedServer = () => committed >= 0 ? { ...servers[committed] } : null;
   return {
     get open() { return open; },
-    get selected() { return selected >= 0 ? { ...servers[selected] } : null; },
+    get selected() { return selectedServer(); },
     get evidence() {
       return { enabled: true, configured: servers.map((s) => ({ region: s.region, host: s.host })),
-        rows: rows.map((r) => ({ region: r.region, host: r.host, x: r.x, y: r.y, w: r.w, h: r.h })),
-        open, hot: hot >= 0 ? rows[hot].region : null, selected: this.selected, drawn };
+        rows: rows.map((r) => ({ region: r.region, host: r.host, x: r.x, y: r.y, w: r.w, h: r.h, anchorY: r.anchorY })),
+        open, hot, selected: selectedServer(), highlighted: choice >= 0 ? servers[choice].region : null, drawn };
     },
-    openDialog() { if (!servers.length) return false; open = true; hot = -1; pressed = -1; return true; },
-    closeDialog() { open = false; pressed = -1; },
-    /** Row centres in CANVAS pixels, from the same hit test the pointer uses. */
+    openDialog() { if (!servers.length) return false; open = true; choice = committed; hot = null; pressed = null; return true; },
+    closeDialog() { open = false; choice = committed; pressed = null; },
     targets(w, h) {
       const scale = Math.min(w / width, h / height);
       const ox = Math.round((w - width * scale) / 2), oy = Math.round((h - height * scale) / 2);
-      return Object.fromEntries(rows.map((r) => [r.region,
-        [Math.round(ox + (r.x + r.w / 2) * scale), Math.round(oy + (r.y + r.h / 2) * scale)]]));
+      return Object.fromEntries([
+        ...rows.map((r) => [r.region, [Math.round(ox + (r.x + r.w / 2) * scale), Math.round(oy + (r.y + r.h / 2) * scale)]]),
+        ...['ok', 'cancel'].map((k) => { const b = GATEWAY_LAYOUT.button[k]; return [k.toUpperCase(), [Math.round(ox + (b.x + GATEWAY_LAYOUT.button.w / 2) * scale), Math.round(oy + (GATEWAY_LAYOUT.button.y + GATEWAY_LAYOUT.button.h / 2) * scale)]]; }),
+      ]);
     },
-    hitTest(x, y) { return open ? rowAt(x, y) : -1; },
-    hover(x, y) { hot = this.hitTest(x, y); return hot; },
-    press(x, y) { pressed = this.hitTest(x, y); hot = pressed; return pressed >= 0 ? `gateway:${pressed}` : null; },
+    hitTest(x, y) { return open ? { row: rowAt(x, y), button: buttonAt(x, y) } : { row: -1, button: null }; },
+    hover(x, y) {
+      const h = this.hitTest(x, y); hot = h.row >= 0 ? servers[h.row].region : h.button?.toUpperCase() ?? null; return hot;
+    },
+    press(x, y) {
+      const h = this.hitTest(x, y); pressed = h.row >= 0 ? `row:${h.row}` : h.button; hot = h.row >= 0 ? servers[h.row].region : h.button?.toUpperCase() ?? null;
+      return pressed ? `gateway:${pressed}` : null;
+    },
     release(token, x, y) {
-      const i = this.hitTest(x, y); pressed = -1;
-      if (i >= 0 && token === `gateway:${i}`) { selected = i; open = false; return selected; }
+      const h = this.hitTest(x, y), target = h.row >= 0 ? `row:${h.row}` : h.button, wasPressed = pressed;
+      pressed = null;
+      if (!target || token !== `gateway:${target}` || wasPressed !== target) return -1;
+      if (h.row >= 0) { choice = h.row; return choice; }
+      if (h.button === 'ok') { committed = choice; open = false; return committed; }
+      if (h.button === 'cancel') { choice = committed; open = false; return -1; }
       return -1;
     },
-    cancel() { pressed = -1; },
-    /** The bar under BATTLE.NET: retail's default until a region is picked (`gatewayBar`). */
-    gatewayBar() { return selected >= 0 ? GATEWAY_BAR_PREFIX + servers[selected].region : DEFAULT_GATEWAY_LABEL; },
-    /** Paint the dialog; returns the identity evidence for the frame just drawn. */
+    cancel() { pressed = null; },
+    gatewayBar() { return committed >= 0 ? GATEWAY_BAR_PREFIX + servers[committed].region.toUpperCase() : DEFAULT_GATEWAY_LABEL; },
     draw(ctx) {
-      drawn = { heading: null, rows: [] };
+      drawn = { panel: [], heading: null, body: [], rows: [], selection: null, buttons: [] };
       if (!open) return drawn;
-      ctx.fillStyle = 'rgba(0,0,0,0.65)';
-      ctx.fillRect(0, 0, width, height);
-      if (drawHeading) {
-        const glyphs = [];
-        drawHeading(ctx, 'SELECT GATEWAY', Math.trunc(height / 2) - rows.length * 22 - 28, (g) => glyphs.push(g));
-        drawn.heading = { text: glyphs.map((g) => g.character).join(''), glyphs: glyphs.map((g) => ({ character: g.character, index: g.index, path: g.path })) };
-      }
-      const b = buttons?.wide;
-      for (const r of rows) {
-        const glyphs = [];
-        let cels = [];
-        // Retail's own button states: hover and rest are the up cel, only the row the pointer is
-        // held on gets the down cel (the front-end press/release rule).
-        const cel = b?.[r.index === pressed ? 1 : 0];
-        if (cel) { ctx.drawImage(cel.canvas, r.x, r.y); cels = recordButton(cel, r.x, r.y) || []; }
-        drawLabel(ctx, r.region, r.x, r.y, r.w, r.h, 0, 0, (g) => glyphs.push(g));
-        drawn.rows.push({ region: r.region, host: r.host, x: r.x, y: r.y, w: r.w, h: r.h,
-          button: cels.map((c) => ({ path: c.path, frame: c.frame, x: c.x, y: c.y, hash: c.hash })),
-          text: glyphs.map((g) => g.character).join(''),
-          glyphs: glyphs.map((g) => ({ character: g.character, index: g.index, path: g.path })) });
-      }
+      // GWListBox.dc6's four retail frame tiles; the capture's panel is x=237..576, y=217..555.
+      drawn.panel = screen.drawPanel(ctx);
+      drawn.heading = screen.drawHeading(ctx);
+      drawn.body = screen.drawBody(ctx);
+      if (choice >= 0) drawn.selection = screen.drawSelection(ctx, rows[choice]);
+      for (const row of rows) drawn.rows.push({ ...screen.drawRegion(ctx, row, row.index === choice), region: row.region, host: row.host });
+      for (const key of ['ok', 'cancel']) drawn.buttons.push(screen.drawButton(ctx, key, pressed === key));
       return drawn;
     },
   };

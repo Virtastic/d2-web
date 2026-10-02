@@ -111,6 +111,19 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_act_begin(uint32_t seed, int difficulty, int ac
     return g_act != nullptr;
 }
 
+// Session-mode counterpart for probes that compare the vendored DRLG with an in-game server act.
+// LEVEL_LoadAct calls DUNGEON_AllocAct with bClient=FALSE, which initializes the town immediately
+// and omits DRLGFLAG_ONCLIENT; the vector capture path above intentionally remains client-mode.
+EMSCRIPTEN_KEEPALIVE int d2_drlg_act_begin_server(uint32_t seed, int difficulty, int act) {
+    static const int kActFirstLevel[6] = { 1, 40, 75, 103, 109, 137 };
+    if (g_act) { DUNGEON_FreeAct(g_act); g_act = nullptr; }
+    if (act < 1 || act > 5) return 0;
+    g_actNo = (uint8_t)(act - 1);
+    g_pickSeed = seed; g_pickDiff = (uint8_t)difficulty; g_pickLevel = 0; g_pickCall = 0; g_pickRoom = -1;
+    g_act = DUNGEON_AllocAct(g_actNo, seed, FALSE, nullptr, (uint8_t)difficulty, nullptr, kActFirstLevel[act - 1], nullptr, nullptr);
+    return g_act != nullptr;
+}
+
 EMSCRIPTEN_KEEPALIVE void d2_drlg_act_end() {
     if (g_act) { DUNGEON_FreeAct(g_act); g_act = nullptr; }
     g_grid.clear(); g_grid.shrink_to_fit();

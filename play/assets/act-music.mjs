@@ -9,7 +9,20 @@ export const ACT_MUSIC = Object.freeze(['Act1\\town1.wav', 'Act2\\town2.wav', 'A
 function unlockOnGesture(context, target = globalThis.window) {
   if (typeof target?.addEventListener !== 'function' || context.state !== 'suspended') return;
   const controller = new AbortController();
-  const unlock = () => { context.resume().catch(() => {}); controller.abort(); };
+  let resuming = false;
+  const unlock = () => {
+    if (resuming || context.state !== 'suspended') return;
+    resuming = true;
+    let resumed;
+    try { resumed = Promise.resolve(context.resume()); }
+    catch { resuming = false; return; }
+    resumed.then(() => {
+      resuming = false;
+      // A browser can reject resume() when the first event was not a qualifying user gesture.
+      // Keep the listeners installed in that case so a later real click/key/touch can unlock audio.
+      if (context.state !== 'suspended') controller.abort();
+    }, () => { resuming = false; });
+  };
   const opts = { signal: controller.signal, passive: true };
   for (const type of ['pointerdown', 'keydown', 'touchstart', 'gamepadconnected']) target.addEventListener(type, unlock, opts);
 }

@@ -82,6 +82,15 @@ function injectStyle(documentObject) {
       '.d2-touch-stick{position:fixed;left:calc((100vw - 100dvh * 4 / 3) / 4);bottom:12%;transform:translateX(-50%);' +
         'width:min(150px, calc((100vw - 100dvh * 4 / 3) / 2 - 16px))}' +
       '.d2-touch-bar{position:fixed;right:calc((100vw - 100dvh * 4 / 3) / 4);bottom:12%;transform:translateX(50%);flex-direction:column}' +
+    '}' +
+    // In portrait, the 4:3 game is centred with empty bands around it. Keep the virtual controls
+    // outside the canvas so they do not cover the life/mana orbs, belt or skill buttons.
+    '@media (pointer: coarse) and (orientation: portrait){' +
+      '.d2-touch-stick{position:fixed;left:5%;bottom:4%;transform:none;width:min(26vw,150px)}' +
+      '.d2-touch-bar{position:fixed;right:4%;bottom:3%;flex-direction:row;gap:6px}' +
+    '}' +
+    '@media (pointer: coarse) and (orientation: portrait) and (max-width:500px){' +
+      '.d2-touch-stick{top:4%;bottom:auto}' +
     '}';
   documentObject.head.appendChild(style);
 }
@@ -397,6 +406,32 @@ export function installTouchInput({ documentObject = globalThis.document, window
     shiftButton.classList.toggle('d2-touch-armed', shift.armed);
   }
 
+  // Scenario-driven touch runs use the same visible controls a player has.  The synthetic
+  // PointerEvents below enter the bar's real pointerdown listener; belt digits are represented by
+  // touching the corresponding retail HUD box, since a phone has no number row.
+  function touchKey(code) {
+    const button = bar.querySelector(`[data-touch-key="${code}"]`);
+    if (button) {
+      const init = { bubbles: true, cancelable: true, pointerId: 9100, pointerType: 'touch',
+        isPrimary: true, button: 0, buttons: 1 };
+      button.dispatchEvent(new PointerEvent('pointerdown', init));
+      button.dispatchEvent(new PointerEvent('pointerup', { ...init, buttons: 0 }));
+      return true;
+    }
+    const digit = /^Digit([1-4])$/.exec(code);
+    if (digit) {
+      const boxes = windowObject.__d2Shell?.beltHudBoxes || [];
+      const slot = Number(digit[1]) - 1;
+      const box = boxes[slot];
+      if (!box) throw new Error(`S000_INPUT=touch: belt slot ${digit[1]} has no retail HUD box`);
+      const origin = windowObject.__d2Shell.beltEvidence?.origin || { x: 0, y: 0 };
+      replay(origin.x + (box.left + box.right) / 2, origin.y + (box.top + box.bottom) / 2,
+        { button: 0, pointerType: 'touch', pointerId: 9101 });
+      return true;
+    }
+    throw new Error(`S000_INPUT=touch: no touch control for ${code}`);
+  }
+
   // ------------- issue 8: a focused input that opens the phone keyboard, forwarding to typeKey ----
   const nameInput = documentObject.createElement('input');
   nameInput.type = 'text'; nameInput.id = 'd2-touch-name'; nameInput.className = 'd2-touch-hit';
@@ -440,7 +475,7 @@ export function installTouchInput({ documentObject = globalThis.document, window
   // `shiftKey` is the latch's own state for a scripted tap (the real finger's replay reads it in the
   // pointerup handler above), and an explicit opt still wins -- lib/player.mjs's fillBelt passes
   // `{shiftKey: true}` for the click it knows is a shift-click.
-  return { canvas, container, stickBase, bar, nameInput, shiftButton,
+  return { canvas, container, stickBase, bar, nameInput, shiftButton, key: touchKey,
     isShiftArmed: () => shift.armed,
     setShift,
     tap: (x, y, opts = {}) => replay(x, y, { button: 0, pointerType: 'touch', pointerId: 9001, shiftKey: shift.armed, ...opts }),

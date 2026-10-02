@@ -6,12 +6,15 @@
 // clears on client packet 0x4D, which is retail's "this NPC's speech has been acknowledged".
 import { decodeDatPalette } from './d2-formats.mjs';
 import { decodeDcc } from './unit-formats.mjs';
-import { indexedToRgba } from './unit-renderer.mjs';
+import { createBlender } from './frontend.mjs';
 
 export const NPC_SPEECH_ALERT = Object.freeze({
   overlay: 'npcalert',
   path: 'data\\global\\overlays\\NPCSpeechBalloon.dcc',
   palette: 'data\\global\\palette\\ACT1\\pal.dat',
+  // Overlay.txt's Trans column is the D2Gfx draw mode. The npcalert row is mode 3
+  // (PL2 additive), which is what gives the retail speech marker its bright halo.
+  drawMode: 3,
   frames: 16,
   animationRate: 9,
   // Retail's Overlay.txt `npcalert` row: Xoffset = -5, Yoffset = -7 (columns 11/12).  The record's
@@ -28,31 +31,34 @@ export const NPC_SPEECH_ALERT = Object.freeze({
 
 // `pending` is intentionally a required boolean supplied by an engine export.  A
 // missing value is a negative result, not permission to infer a quest state here.
-export function createNpcSpeechAlertRenderer(read, documentObject = globalThis.document) {
-  let dcc = null, palette = null;
-  const frameCanvas = new Map();
-  const load = () => {
+export function createNpcSpeechAlertRenderer(read) {
+  let dcc = null;
+  const paletteState = new Map();
+  const load = (act) => {
     if (!dcc) dcc = decodeDcc(read(NPC_SPEECH_ALERT.path), { directions: [0] });
-    if (!palette) palette = decodeDatPalette(read(NPC_SPEECH_ALERT.palette));
+    const paletteId = Math.min(4, Math.max(0, (Number(act) | 0) - 1));
+    let state = paletteState.get(paletteId);
+    if (!state) {
+      const name = ['ACT1', 'ACT2', 'ACT3', 'ACT4', 'ACT5'][paletteId];
+      const palette = decodeDatPalette(read(`data\\global\\palette\\${name}\\pal.dat`));
+      const blend = createBlender(read(`data\\global\\palette\\${name}\\pal.pl2`), palette);
+      state = { palette, blend }; paletteState.set(paletteId, state);
+    }
+    return state;
   };
   return {
-    draw(ctx, x, y, npc, pending, tick = 0) {
+    draw(ctx, x, y, npc, pending, tick = 0, act = 1) {
       const anchor = { x: Math.round(x + NPC_SPEECH_ALERT.offsetX), y: Math.round(y + NPC_SPEECH_ALERT.offsetY) };
       if (pending !== true) return { id: npc?.id ?? 0, pending: false, drawn: false, anchor };
-      load();
+      const { blend } = load(act);
       const frame = Math.floor(Math.max(0, Number(tick) || 0) / NPC_SPEECH_ALERT.animationRate) % NPC_SPEECH_ALERT.frames;
       const image = dcc.directionRecords[0]?.frames[frame];
       if (!image) throw new Error(`NPCSpeechBalloon has no frame ${frame}`);
-      let canvas = frameCanvas.get(frame);
-      if (!canvas) {
-        canvas = documentObject.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
-        canvas.getContext('2d').putImageData(new ImageData(indexedToRgba(image.indexed, image.opaque, palette), image.width, image.height), 0, 0);
-        frameCanvas.set(frame, canvas);
-      }
       const screen = { x: Math.round(anchor.x + image.xOffset), y: Math.round(anchor.y + (image.bottomUp ? image.yOffset : image.yOffset - image.height + 1)) };
-      ctx.drawImage(canvas, screen.x, screen.y);
+      blend(ctx, { width: image.width, height: image.height, indices: image.indexed, opaque: image.opaque }, screen.x, screen.y, NPC_SPEECH_ALERT.drawMode);
       return { id: npc?.id ?? 0, pending: true, drawn: true, overlay: NPC_SPEECH_ALERT.overlay,
-        path: NPC_SPEECH_ALERT.path, palette: NPC_SPEECH_ALERT.palette, frame, anchor, screen,
+        path: NPC_SPEECH_ALERT.path, palette: `data\\global\\palette\\${['ACT1', 'ACT2', 'ACT3', 'ACT4', 'ACT5'][Math.min(4, Math.max(0, (Number(act) | 0) - 1))]}\\pal.dat`,
+        drawMode: NPC_SPEECH_ALERT.drawMode, frame, anchor, screen,
         offset: { x: NPC_SPEECH_ALERT.offsetX, y: NPC_SPEECH_ALERT.offsetY }, width: image.width, height: image.height,
         opaque: image.opaque.reduce((n, value) => n + value, 0) };
     },

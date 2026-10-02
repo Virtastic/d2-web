@@ -42,10 +42,10 @@ export class CommandInput {
     return true;
   }
 
-  pointer(x, y, button = 0) {
+  pointer(x, y, button = 0, held = false) {
     this.queue.push(button === 2
       ? { type: COMMAND.PRIMARY, x: Math.round(x), y: Math.round(y), secondary: true }
-      : { type: COMMAND.MOVE, x: Math.round(x), y: Math.round(y) });
+      : { type: COMMAND.MOVE, x: Math.round(x), y: Math.round(y), ...(held ? { held: true } : {}) });
   }
 
   drain() {
@@ -103,6 +103,10 @@ export function normalizeSnapshot(value) {
       // synthetic snapshot), never 0: 0 is a real engine word and means "not targetable".
       flags: e?.flags === undefined || e?.flags === null ? undefined : ((Math.max(0, Math.trunc(finite(e.flags))) >>> 0)),
       animation: e?.animation && typeof e.animation === 'object' ? e.animation : null,
+      // F20: retain the engine's missile sequence/frame/facing/transparency record through the
+      // snapshot boundary. Without this, the shell correctly joined it by unit id, then this
+      // normalization silently discarded it and missiles fell back to frame 0/facing 0/opaque.
+      missile: e?.missile && typeof e.missile === 'object' ? e.missile : null,
       // The engine's 16.16 position where the session has one (see gameplay-shell's unitAnchor):
       // null on an engine without d2_session_unit_coords, which falls back to the whole subtile.
       preciseX: Number.isFinite(Number(e?.preciseX)) ? Number(e.preciseX) : null,

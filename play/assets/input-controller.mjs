@@ -11,9 +11,8 @@
 //
 // Rework: the pad plays LIKE D2R and is easy to use -- D2R is the model, not a
 // byte-exact spec.
-// D2R has NO free cursor in the world -- see `selectWorldTarget` below -- and its six named panels
-// (inventory, stash, vendor, character, skill tree) use snap-to-slot navigation instead of a pointer
-// -- see `panelPoints`/`snapMove` below.
+// D2R has NO free cursor in the world -- see `selectWorldTarget` below -- and its panels, menus and
+// character-class list use snap-to-slot navigation instead of a pointer -- see `panelPoints`/`snapMove`.
 //
 // G16 (this pass) applied the researched three-guide consensus table ("Controller:
 // D2R's scheme, specified", `bc9f458c`) to BUTTON/DPAD_BELT/FACE_SKILL_KEYS/SHIFT_BANK_KEYS and found
@@ -26,11 +25,10 @@
 // proven G10 role (a HELD shift modifier the pack->belt move needs) rather than moving to the table's
 // run/walk toggle, which would cost that proven road for a button with nothing yet to press. Weapon
 // swap (already on L3's own bank, G12) and show-items (no engine road at all, an existing gap) are
-// unaffected. What DID change: G16 gives the title, character-select, escape (game) and NPC menus the
-// SAME snap-to-slot navigation as the six panels -- `uiTargets()` already returns their canvas points
-// (`title`/`select`/`gameMenu`/`npcMenu`), so no new geometry, only `panelPoints` reading four more of
-// its keys. The one screen still on the free cursor is character creation's class list (before the
-// name grid, G7, takes over) -- no `panelPoints` entry for it, an open gap, not a regression.
+// unaffected. G16 gave the title, character-select, escape (game) and NPC menus the SAME snap-nav as
+// the six panels. G17 extends it to character creation's class list, using `uiTargets().create.classes`
+// from the same hit boxes the shell click handler uses; once a class is chosen, the existing name grid
+// continues to own the d-pad and A button.
 //
 // Standard mapping (https://w3c.github.io/gamepad/#remapping), recorded in (G5):
 //   left stick (axes 0,1)  -- walk: the same click ahead of the hero a mouse user repeats (G2), and
@@ -219,6 +217,12 @@ export function panelPoints(targets) {
     ...entries(targets.inventorySlots, 'invs'),
   ];
   if (pts.length) return pts;
+  // Character creation exposes the class hit boxes and EXIT target. Once a class is chosen,
+  // nameGridOpen() takes over d-pad/A for text entry.
+  if (targets.create) {
+    const classes = entries(targets.create.classes, 'create');
+    if (classes.length) return [...classes, ...entries({ exit: targets.create.exit }, 'create')];
+  }
   if (targets.character && Object.keys(targets.character).length) return entries(targets.character, 'char');
   if (targets.skills && Object.keys(targets.skills).length) return entries(targets.skills, 'skill');
   // G16: the screens that were still the pre-D2R free cursor. Each is its own screen (never shown
@@ -227,6 +231,11 @@ export function panelPoints(targets) {
   if (targets.npcMenu && Object.keys(targets.npcMenu).length) return entries(targets.npcMenu, 'npcmenu');
   if (targets.title && Object.keys(targets.title).length) return entries(targets.title, 'title');
   if (targets.select && Object.keys(targets.select).length) return entries(targets.select, 'select');
+  // Character creation's class list already exposes the centre of each class's own hit box.
+  // The name grid takes over once a class is chosen; before that, use those same click points
+  // for D2R-style d-pad navigation instead of falling back to a free cursor (G17).
+  const classes = entries(targets.create?.classes, 'create');
+  if (classes.length) return classes;
   return null;
 }
 
@@ -511,10 +520,9 @@ function start() {
     // D2R's own world mode: the game screen with nothing modal, no snap panel and no typed field up --
     // the ONE state with no free cursor at all.
     const worldMode = screenName === 'game' && !modal && !panel && !fieldOpen;
-    // What is left over keeps the pre-D2R free cursor: the create screen's class list (its own name
-    // grid covers naming, G7, but the class buttons before it have no D2R source and no `panelPoints`
-    // entry) and any screen `uiTargets()` reports nothing for. Title, select, the escape menu and the
-    // NPC menu no longer land here (G16) -- `panel` is non-null for each while it is open.
+    // What is left over keeps the pre-D2R free cursor only for screens `uiTargets()` reports nothing
+    // for. Character creation's class list is now a panel too (G17); title, select, escape and NPC
+    // menus were already covered by G16.
     const cursorMode = !fieldOpen && !panel && !worldMode;
 
     // Right stick: the pre-D2R free cursor, now only live where D2R has not specified a road yet (G1
@@ -574,13 +582,16 @@ function start() {
         // highlight over rather than aiming a stale index at a point that used to be something else.
         state.mode = 'panel';
         const sig = panel.map((p) => p.key).join('|');
-        if (sig !== state.panelSig) { state.panelSig = sig; state.panelIndex = 0; }
+        const panelChanged = sig !== state.panelSig;
+        if (panelChanged) { state.panelSig = sig; state.panelIndex = 0; }
         if (edge(pad, BUTTON.DPAD_LEFT)) state.panelIndex = snapMove(panel, state.panelIndex, -1, 0);
         if (edge(pad, BUTTON.DPAD_RIGHT)) state.panelIndex = snapMove(panel, state.panelIndex, 1, 0);
         if (edge(pad, BUTTON.DPAD_UP)) state.panelIndex = snapMove(panel, state.panelIndex, 0, -1);
         if (edge(pad, BUTTON.DPAD_DOWN)) state.panelIndex = snapMove(panel, state.panelIndex, 0, 1);
         const cur = panel[Math.max(0, Math.min(panel.length - 1, state.panelIndex))];
+        const pointChanged = state.cursor.x !== cur.x || state.cursor.y !== cur.y;
         state.cursor.x = cur.x; state.cursor.y = cur.y; placeCursor(); cursorEl.style.display = 'block';
+        if (cur.key.startsWith('create:') && (panelChanged || pointChanged)) pointer(canvas, 'pointermove', cur.x, cur.y);
         if (edge(pad, BUTTON.A)) click(canvas, cur.x, cur.y, { button: 0, shiftKey: state.shift });
         if (edge(pad, BUTTON.B)) click(canvas, cur.x, cur.y, { button: 2, shiftKey: state.shift });
       } else if (worldMode) {

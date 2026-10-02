@@ -3,6 +3,7 @@ import { composeCofFrame, decodeCof, decodeDcc } from './unit-formats.mjs';
 import { dccDirection, indexedToRgba } from './unit-renderer.mjs';
 import { fourcc } from './monster-renderer.mjs';
 import { createBlender } from './frontend.mjs';
+import { highlightMap } from './unit-highlight.mjs';
 import { createUnitShadowRenderer } from './unit-shadow-renderer.mjs';
 import { createObjectShadowPolicy } from './object-shadow-policy.mjs';
 
@@ -30,7 +31,7 @@ export function parseObjectPresentations(bytes, count) {
  * counts and the negative control are
  */
 export function createObjectRenderer(read, documentObject = globalThis.document, { shadow = false } = {}) {
-  const animations = new Map(), failures = new Set(), rasters = new Map(), palettes = new Map(), blenders = new Map();
+  const animations = new Map(), failures = new Set(), rasters = new Map(), palettes = new Map(), blenders = new Map(), highlights = new Map();
   const shadows = shadow ? createUnitShadowRenderer(read) : null;
   const shadowPolicy = shadow ? createObjectShadowPolicy(read) : null;
   let lastEvidence = null, measuring = false;
@@ -47,7 +48,13 @@ export function createObjectRenderer(read, documentObject = globalThis.document,
   // and never read, so measuring an object never paints the frame the player sees.
   let scratch = null;
   const scratchContext = () => { if (!scratch) { scratch = documentObject.createElement('canvas'); scratch.width = 1; scratch.height = 1; } return scratch.getContext('2d'); };
-  const renderer = { draw(ctx, x, y, object, act) {
+  const highlightedIndices = (indices, opaque, act0) => {
+    if (!highlights.has(act0)) highlights.set(act0, highlightMap(read(`data\\global\\palette\\${PALETTE[act0]}\\pal.dat`)));
+    const map = highlights.get(act0), out = indices.slice();
+    for (let i = 0; i < out.length; i++) if (opaque[i]) out[i] = map[out[i]];
+    return out;
+  };
+  const renderer = { draw(ctx, x, y, object, act, highlight = false) {
     const mode = MODE[object.mode] || 'NU', base = `${object.token}:${mode}:${object.direction}:${object.componentMask}`;
     if (!object.token || failures.has(base)) return null;
     let animation = animations.get(base);
@@ -70,9 +77,10 @@ export function createObjectRenderer(read, documentObject = globalThis.document,
       { cof: animation.cof, components: animation.components, direction: animation.direction, frame },
       { kind: 'object', id: object.id, classId: object.classId, token: object.token, direction: animation.direction, frame, act }) : null;
     const composed = composeCofFrame(animation.cof, animation.direction, frame, animation.components), [act0, pal] = palette(act);
-    const key = `${base}:${frame}:${act0}`; let canvas = rasters.get(key);
+    const key = `${base}:${frame}:${act0}:${highlight ? 'highlight' : 'normal'}`; let canvas = rasters.get(key);
     if (!canvas) { canvas = documentObject.createElement('canvas'); canvas.width = composed.width; canvas.height = composed.height;
-      if (canvas.width && canvas.height) canvas.getContext('2d').putImageData(new ImageData(indexedToRgba(composed.indexed, composed.opaque, pal), canvas.width, canvas.height), 0, 0); rasters.set(key, canvas); }
+      if (canvas.width && canvas.height) canvas.getContext('2d').putImageData(new ImageData(indexedToRgba(
+        highlight ? highlightedIndices(composed.indexed, composed.opaque, act0) : composed.indexed, composed.opaque, pal), canvas.width, canvas.height), 0, 0); rasters.set(key, canvas); }
     // COF effects apply to individual layers.  Flattening the object first lost the additive
     // flames/glows/smoke and rendered their source indices as opaque black or grey (F28/F41).
     const layerEvidence = [];
@@ -87,8 +95,13 @@ export function createObjectRenderer(read, documentObject = globalThis.document,
         const left = Math.round(x + one.xOffset), top = Math.round(y + one.yOffset);
         const requestedMode = layer?.transparent && (layer.drawEffect === 3 || layer.drawEffect === 4) ? layer.drawEffect : 5;
         // Evidence states what reached the canvas. A missing PL2 must never be reported as a blend.
-        const mode = requestedMode !== 5 && blend ? requestedMode : 5;
-        if (mode !== 5 && blend) blend(ctx, { width: one.width, height: one.height, indices: one.indexed, opaque: one.opaque }, left, top, mode);
+        const mode = highlight ? 7 : (requestedMode !== 5 && blend ? requestedMode : 5);
+        if (highlight) {
+          const oneCanvas = documentObject.createElement('canvas'); oneCanvas.width = one.width; oneCanvas.height = one.height;
+          oneCanvas.getContext('2d').putImageData(new ImageData(indexedToRgba(
+            highlightedIndices(one.indexed, one.opaque, act0), one.opaque, pal), one.width, one.height), 0, 0);
+          ctx.drawImage(oneCanvas, left, top);
+        } else if (mode !== 5 && blend) blend(ctx, { width: one.width, height: one.height, indices: one.indexed, opaque: one.opaque }, left, top, mode);
         else {
           const oneCanvas = documentObject.createElement('canvas'); oneCanvas.width = one.width; oneCanvas.height = one.height;
           oneCanvas.getContext('2d').putImageData(new ImageData(indexedToRgba(one.indexed, one.opaque, pal), one.width, one.height), 0, 0);
@@ -105,8 +118,8 @@ export function createObjectRenderer(read, documentObject = globalThis.document,
         const layer = animation.cof.layerRecords.find((value) => value.component === componentId), component = COMPONENT[componentId];
         if (!layer || !component || !animation.components.has(componentId)) continue;
         const path = `objects\\${object.token}\\${component}\\${object.token}${component}lit${animation.mode}${layer.weaponClass}`.toLowerCase();
-        layerEvidence.push({ component, path, mode: 5, transparent: Boolean(layer.transparent), drawEffect: layer.drawEffect, shadow: Boolean(layer.shadow) });
-        if (Array.isArray(globalThis.__d2DrawList)) globalThis.__d2DrawList.push({ op: 'dcc', path, frame, x: Math.round(x), y: Math.round(y), mode: 5 });
+        layerEvidence.push({ component, path, mode: highlight ? 7 : 5, transparent: Boolean(layer.transparent), drawEffect: layer.drawEffect, shadow: Boolean(layer.shadow) });
+        if (Array.isArray(globalThis.__d2DrawList)) globalThis.__d2DrawList.push({ op: 'dcc', path, frame, x: Math.round(x), y: Math.round(y), mode: highlight ? 7 : 5 });
       }
     }
     let pixelHash = 0x811c9dc5; for (const value of composed.indexed) { pixelHash ^= value; pixelHash = Math.imul(pixelHash, 0x01000193); }

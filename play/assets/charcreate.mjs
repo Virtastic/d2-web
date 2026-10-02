@@ -187,7 +187,7 @@ function descriptionLines(text) {
 
 const SCREEN = { width: 800, height: 600 };
 
-function frameCanvas(frame, palette, documentObject) {
+export function frameCanvas(frame, palette, documentObject) {
   const canvas = documentObject.createElement('canvas');
   canvas.width = Math.max(1, frame.width);
   canvas.height = Math.max(1, frame.height);
@@ -335,14 +335,12 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     ...selectOverlayAnimations(SELECT_OVERLAYS[c.key], c, base, read, decodeDc6, palette, documentObject),
   }));
 
-  // The widgets are menu chrome, not part of the character scene: they index the SAME palette the
-  // title screen's buttons do, not fechar. Painting them with fechar gives blue-and-white noise --
-  // again a wrong picture, not an error, which is why each of these is pinned deliberately.
+  // Character-creation DC6 art uses the screen's fechar palette, including the name box and buttons.
   const stances = createHeroStances(heroes, { retailHz: RETAIL_HZ, updateHz: UPDATE_HZ });
   const textBoxDc6 = decodeDc6(read(CREATE_ASSETS.textBox));
-  const textBox = frameCanvas(textBoxDc6.frames[0], fontPalette, documentObject);
+  const textBox = frameCanvas(textBoxDc6.frames[0], palette, documentObject);
   const buttonDc6 = decodeDc6(read(CREATE_ASSETS.button));
-  // ...and it is painted with fechar (95% of its pixels exact in retail's frame; 38% with Units).
+  // Button art uses the same character-creation palette as the name box.
   const buttons = buttonDc6.frames.map((f) => frameCanvas(f, palette, documentObject));
 
   // D2Win's button label rule (frontend.mjs drawLabel; retail's draw list puts EXIT's glyphs at

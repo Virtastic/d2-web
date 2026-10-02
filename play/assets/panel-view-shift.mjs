@@ -19,8 +19,8 @@ import { panelShift } from './hud-origin.mjs';
 // and stash/vendor are one per side, all from the HUD mini-panel's own moves (control-panel.mjs
 // HUD_LAYOUT.miniPanelShift, measured off retail's draw lists); the quest log is added here on the
 // `cov-a4-questlog` frame buffer, which draws the panel on the left half and the world shifted +200.
-export function panelSides({ character, quest, stash, cube, waypoint, npc, skills, inventory }) {
-  return [Boolean(character || quest || stash || cube || waypoint || npc),
+export function panelSides({ character, quest, stash, cube, waypoint, skills, inventory, vendor }) {
+  return [Boolean(character || quest || stash || cube || waypoint || vendor),
           Boolean(skills || inventory)];
 }
 

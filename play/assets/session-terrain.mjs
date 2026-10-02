@@ -767,7 +767,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         if (globalThis.__d2TraceBlits) globalThis.__d2TraceBlits.push({ x: f.x, y: f.y, path: files[f.slot], want: f.want, variantNo: f.variantNo, dt1Tile: f.dt1Tile, grid, a: f.tile.worldX * 5, b: f.tile.worldY * 5, seam: Boolean(f.tile.seam) });
         ctx.drawImage(lit || f.bitmap, f.x, f.y); drawn++; recordTile(f, files);
       }
-      if (afterFloors) afterFloors(ctx);
+      if (afterFloors) afterFloors(ctx, floors, { width, height, offsetX, offsetY });
       perfT('terrain-floor', pFloor);
 
       // Walls and sprites in retail's order: tile by tile, rows (world Y) then columns (world X); a unit belongs to the

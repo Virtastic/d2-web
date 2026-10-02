@@ -58,7 +58,7 @@ export function createUnitShadowRenderer(read) {
      * Returns the blit's identity (evidence), or null when the unit or the act's PL2 cannot supply one.
      */
     draw(ctx, x, y, animation, identity = {}) {
-      const { cof, components, direction, frame } = animation || {};
+      const { cof, components, direction, dccDirection = direction, frame } = animation || {};
       if (!cof || !components || !(direction >= 0) || !(frame >= 0)) return null;
       if (direction >= cof.directions || frame >= cof.framesPerDirection) return null;
       const table = tables(identity.act);
@@ -84,7 +84,7 @@ export function createUnitShadowRenderer(read) {
         const layer = cof.layerRecords?.find((l) => l.component === component);
         if (layer && (!layer.shadow || (layer.transparent && layer.drawEffect === 0))) continue;
         let plane;
-        try { plane = composeCofFrame(cof, direction, frame, new Map([[component, dcc]])); } catch { continue; }
+        try { plane = composeCofFrame(cof, direction, frame, new Map([[component, dcc]]), dccDirection); } catch { continue; }
         if (!plane.width || !plane.height) continue;
         // Retail's rasteriser: walk the cel's rows in storage
         // order and keep every SECOND one (the row between is DISCARDED, never merged into a

@@ -12,7 +12,7 @@
 
 import { recordDc6 } from './drawlist.mjs';
 import RETAIL_MIX_HEX from './retail-mixpalette.mjs';
-import { createGatewaySelector, DEFAULT_GATEWAY_LABEL } from './bnet-servers.mjs';
+import { createGatewaySelector, DEFAULT_GATEWAY_LABEL, GATEWAY_LAYOUT } from './bnet-servers.mjs';
 
 /** 12-byte header, then one 14-byte record per code point. Layout per riiablo's FontTBL. */
 export function decodeFontTbl(bytes) {
@@ -259,6 +259,14 @@ export const FRONTEND = {
   headingFontTbl: 'data\\local\\font\\latin\\font30.tbl',
   smallFont: 'data\\local\\font\\latin\\fontridiculous.dc6',
   smallFontTbl: 'data\\local\\font\\latin\\fontridiculous.tbl',
+  gatewayPanel: 'data\\global\\ui\\FrontEnd\\GWListBox.dc6',
+  gatewayButton: 'data\\global\\ui\\FrontEnd\\CancelButtonBlank.dc6',
+  gatewayHeadingFont: 'data\\local\\font\\latin\\font24.dc6',
+  gatewayHeadingFontTbl: 'data\\local\\font\\latin\\font24.tbl',
+  gatewayBodyFont: 'data\\local\\font\\latin\\font8.dc6',
+  gatewayBodyFontTbl: 'data\\local\\font\\latin\\font8.tbl',
+  gatewayRegionFont: 'data\\local\\font\\latin\\fontformal12.dc6',
+  gatewayRegionFontTbl: 'data\\local\\font\\latin\\fontformal12.tbl',
   // The version label in the bottom-left corner and the menu pointer.
   versionFont: 'data\\local\\font\\latin\\font16.dc6',
   versionFontTbl: 'data\\local\\font\\latin\\font16.tbl',
@@ -396,20 +404,91 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
     short: buttonKind(FRONTEND.shortButton, 1), narrow: buttonKind(FRONTEND.narrowButton, 2) };
   const tinted = (p) => { const t = p.slice(); for (let i = 0; i < t.length; i += 4) for (let k = 0; k < 3; k++) t[i + k] = Math.round(t[i + k] * LABEL_TINT); return t; };
   const labelPalette = tinted(palette);
+  const skyPl2 = read('data\\global\\palette\\Sky\\pal.pl2');
   // Labels are recorded as retail's glyph path draws them (drawlist: pfCelDrawColor, mode 4); the
   // 0x64 tint is this client's rendering of that mode, measured against retail's frame (s174).
-  const blend = createBlender(read('data\\global\\palette\\Sky\\pal.pl2'), palette);
+  const blend = createBlender(skyPl2, palette);
+  const logoBlend = createBlender(skyPl2, skyPalette);
   const labelDraw = { op: 'celcolor', mode: 4, blend };
   // Composed unscaled (the blends read pixels back), then scaled onto the page.
   const scene = documentObject.createElement('canvas'); scene.width = 800; scene.height = 600;
   const sceneCtx = scene.getContext('2d', { willReadFrequently: true });
   const font = createFont({ dc6: decodeDc6(read(FRONTEND.font)), tbl: decodeFontTbl(read(FRONTEND.fontTbl)), palette: labelPalette, documentObject, path: FRONTEND.font, drawAs: labelDraw });
   const smallFont = createFont({ dc6: decodeDc6(read(FRONTEND.smallFont)), tbl: decodeFontTbl(read(FRONTEND.smallFontTbl)), palette: labelPalette, documentObject, path: FRONTEND.smallFont, drawAs: labelDraw });
+  // The local gateway screen is the same retail screen measured by F233. Keep its art and typography
+  // on the same 800x600 Sky surface as the menu, with the exact 1.13c files, colour shifts and anchors.
+  const gatewayPanelDc6 = decodeDc6(read(FRONTEND.gatewayPanel));
+  const gatewayButtonDc6 = decodeDc6(read(FRONTEND.gatewayButton));
+  const gatewayButton = gatewayButtonDc6.frames[0];
+  const gatewayButtonCanvas = frameCanvas(gatewayButton, skyPalette, documentObject);
+  const gatewayHeadingFont = createFont({ dc6: decodeDc6(read(FRONTEND.gatewayHeadingFont)),
+    tbl: decodeFontTbl(read(FRONTEND.gatewayHeadingFontTbl)),
+    palette: textColourPalette(skyPl2, palette, GATEWAY_LAYOUT.heading.shift), documentObject,
+    path: FRONTEND.gatewayHeadingFont, drawAs: { op: 'celcolor', mode: 5, extra: GATEWAY_LAYOUT.heading.shift } });
+  const gatewayBodyFont = createFont({ dc6: decodeDc6(read(FRONTEND.gatewayBodyFont)),
+    tbl: decodeFontTbl(read(FRONTEND.gatewayBodyFontTbl)),
+    palette: textColourPalette(skyPl2, palette, GATEWAY_LAYOUT.body.shift), documentObject,
+    path: FRONTEND.gatewayBodyFont, drawAs: { op: 'celcolor', mode: 5, extra: GATEWAY_LAYOUT.body.shift } });
+  const gatewayRegionFont = (shift) => createFont({ dc6: decodeDc6(read(FRONTEND.gatewayRegionFont)),
+    tbl: decodeFontTbl(read(FRONTEND.gatewayRegionFontTbl)),
+    // Retail's selected row is FontFormal12 color token 0: the unshifted Units font palette. Passing
+    // it through TextColorShifts[0] maps its white glyph pixels to black and reverses the highlight.
+    palette: shift === 0 ? palette : textColourPalette(skyPl2, palette, shift), documentObject,
+    path: FRONTEND.gatewayRegionFont, drawAs: { op: 'celcolor', mode: 5, extra: shift } });
+  const gatewayRegionFonts = { selected: gatewayRegionFont(GATEWAY_LAYOUT.rows.selectedShift), other: gatewayRegionFont(GATEWAY_LAYOUT.rows.shift) };
+  const drawGatewayFont = (fontObject, ctx, text, x, y) => {
+    const glyphs = [];
+    fontObject.drawAnchored(ctx, text, x, y, (g) => glyphs.push(g));
+    return { text: glyphs.map((g) => g.character).join(''), glyphs: glyphs.map((g) => ({ character: g.character, index: g.index, path: g.path, x: g.x, y: g.y })) };
+  };
+  const drawGatewayButtonLabel = (ctx, text, x) => {
+    const glyphs = [];
+    const start = x + Math.trunc((GATEWAY_LAYOUT.button.w - smallFont.measure(text)) / 2);
+    smallFont.drawAnchored(ctx, text, start, GATEWAY_LAYOUT.button.anchorY, (g) => glyphs.push(g));
+    return { text: glyphs.map((g) => g.character).join(''), glyphs: glyphs.map((g) => ({ character: g.character, index: g.index, path: g.path, x: g.x, y: g.y })) };
+  };
+  const gatewayScreen = {
+    drawPanel(ctx) {
+      return GATEWAY_LAYOUT.panel.tiles.map((tile) => {
+        const frame = gatewayPanelDc6.frames[tile.frame];
+        const x = GATEWAY_LAYOUT.panel.x + tile.x, y = GATEWAY_LAYOUT.panel.y + tile.y;
+        ctx.drawImage(frameCanvas(frame, skyPalette, documentObject), x, y);
+        const blit = recordDc6(FRONTEND.gatewayPanel, tile.frame, frame, x, y, { op: 'cel', mode: 5 });
+        return { ...blit, path: FRONTEND.gatewayPanel, frame: tile.frame, x, y };
+      });
+    },
+    drawHeading(ctx) {
+      const { text, font, x, y } = GATEWAY_LAYOUT.heading;
+      return { ...drawGatewayFont(gatewayHeadingFont, ctx, text, x, y), font, x, y };
+    },
+    drawBody(ctx) {
+      return GATEWAY_LAYOUT.body.lines.map((line) => ({ ...drawGatewayFont(gatewayBodyFont, ctx, line.text, GATEWAY_LAYOUT.body.x, line.y), font: GATEWAY_LAYOUT.body.font, x: GATEWAY_LAYOUT.body.x, y: line.y }));
+    },
+    drawSelection(ctx, row) {
+      const rect = { x: GATEWAY_LAYOUT.rows.x, y: row.anchorY - 22, w: GATEWAY_LAYOUT.rows.w, h: GATEWAY_LAYOUT.rows.h };
+      ctx.fillStyle = GATEWAY_LAYOUT.rows.selectedColor;
+      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+      return { ...rect, color: 190, rgb: [99, 99, 99] };
+    },
+    drawRegion(ctx, row, selected) {
+      const fontObject = selected ? gatewayRegionFonts.selected : gatewayRegionFonts.other;
+      return { ...drawGatewayFont(fontObject, ctx, row.region, GATEWAY_LAYOUT.rows.textX, row.anchorY), anchorY: row.anchorY,
+        font: FRONTEND.gatewayRegionFont, shift: selected ? GATEWAY_LAYOUT.rows.selectedShift : GATEWAY_LAYOUT.rows.shift,
+        x: GATEWAY_LAYOUT.rows.textX, y: row.anchorY, selected };
+    },
+    drawButton(ctx, key, pressed) {
+      const button = GATEWAY_LAYOUT.button[key];
+      ctx.drawImage(gatewayButtonCanvas, button.x, GATEWAY_LAYOUT.button.y);
+      const cel = recordDc6(FRONTEND.gatewayButton, 0, gatewayButton, button.x, GATEWAY_LAYOUT.button.y, { op: 'cel', mode: 5 });
+      const label = drawGatewayButtonLabel(ctx, button.label, button.x);
+      return { key, path: FRONTEND.gatewayButton, frame: 0, x: button.x, y: GATEWAY_LAYOUT.button.y,
+        w: gatewayButton.width, h: gatewayButton.height, pressed, cel, label };
+    },
+  };
   const versionFont = createFont({ dc6: decodeDc6(read(FRONTEND.versionFont)), tbl: decodeFontTbl(read(FRONTEND.versionFontTbl)), palette, documentObject, path: FRONTEND.versionFont, drawAs: { op: 'celcolor', mode: 5 } });
   // The copyright lines, in the font's own colour 4 (gold) through Sky's shift table -- the palette
   // entry each glyph pixel is remapped to before the palette lookup (textColourPalette), which is
   // what retail's celcolour draw with extra=4 does.
-  const skyPl2 = read('data\\global\\palette\\Sky\\pal.pl2');
   const goldPalette = textColourPalette(skyPl2, skyPalette, TRADEMARK_LAYOUT.colour);
   const trademarkFont = createFont({ dc6: decodeDc6(read(FRONTEND.trademarkFont)),
     tbl: decodeFontTbl(read(FRONTEND.trademarkFontTbl)), palette: goldPalette, documentObject,
@@ -474,9 +553,7 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
       error: cfg?.error ?? '', url: cfg?.url ?? null, configured: (cfg?.servers ?? []).map((s) => ({ region: s.region, host: s.host })) };
     if (!bnetState.enabled) return;
     gatewaySelector = createGatewaySelector({
-      servers: cfg.servers, buttons, recordButton, width: 800, height: 600,
-      drawLabel: (c, text, x, y, w, h, dx, dy, onGlyph) => drawLabel(c, text, x, y, w, h, dx, dy, onGlyph),
-      drawHeading: (c, text, anchorY, onGlyph) => smallFont.drawAnchored(c, text, Math.trunc((800 - smallFont.measure(text)) / 2), anchorY, onGlyph),
+      servers: cfg.servers, screen: gatewayScreen, width: 800, height: 600,
     });
   };
   if (bnet) Promise.resolve(bnet).then(applyBnet, (error) => applyBnet({ enabled: false, servers: [], error: String(error) }));
@@ -497,7 +574,7 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
       if (!frame || !canvas.width) continue;
       const fire = logo.path.toLowerCase().includes('fire');
       const left = 400 + frame.offsetX, top = 120 + frame.offsetY - frame.height + 1;
-      if (fire) blend(ctx, frame, left, top, 3);
+      if (fire) logoBlend(ctx, frame, left, top, 3);
       else ctx.drawImage(canvas, left, top);
       recordDc6(logo.path, frameIndex, frame, left, top, { op: 'cel', mode: fire ? 3 : 5 });
     }
@@ -554,8 +631,8 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
     hover(x, y, width, height) {
       const v = view(width, height);
       const sx = (x - v.ox) / v.scale, sy = (y - v.oy) / v.scale;
-      if (gatewaySelector?.open) return gatewaySelector.hover(sx, sy);
       pointer = [Math.trunc(sx), Math.trunc(sy)];
+      if (gatewaySelector?.open) return gatewaySelector.hover(sx, sy);
       hot = this.hitTest(x, y, width, height); return hot;
     },
     click(x, y, width, height) {
@@ -633,7 +710,7 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
       // Retail draws the pointer last (D2WinMain.cpp), so the region dialog goes under the pointer cel.
       if (pointer) {
         const f = cursorDc6.frames[0];
-        const left = pointer[0] + f.offsetX, top = pointer[1] - 1 + f.offsetY - f.height + 1;
+        const left = pointer[0] + f.offsetX, top = pointer[1] + f.offsetY - f.height + 1;
         ctx.drawImage(cursorCanvas, left, top);
         recordDc6(FRONTEND.cursor, 0, f, left, top);
       }

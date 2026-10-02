@@ -1339,6 +1339,9 @@ static D2GameStrc* makeGame(uint32_t seed, int difficulty) {
 
 extern "C" {
 
+// Test-only object-population seed input lives in game_glue.cpp; reset it with the session fixture.
+void d2_session_object_pop_seed_override_reset();
+
 
 EMSCRIPTEN_KEEPALIVE int d2_monspawn_init() {
     if (!d2::drlgLoadTables(d2::sharedVfs(), d2::sharedLang())) { g_err = "tables"; return 0; }
@@ -1348,6 +1351,7 @@ EMSCRIPTEN_KEEPALIVE int d2_monspawn_init() {
     return 1;
 }
 EMSCRIPTEN_KEEPALIVE void d2_monspawn_reset() {
+    d2_session_object_pop_seed_override_reset();
     // Force the next level call through makeGame even when seed/difficulty are unchanged.
     // The differential fixtures use one fresh retail process per record.
     detachTargetFixture(); g_gameSeed = ~0u; g_gameDiff = -1; g_lastLevel = nullptr;
@@ -4568,11 +4572,27 @@ extern int32_t g_d2SpawnLog[]; extern int32_t g_d2SpawnCount;
 extern int32_t g_d2CreateLog[]; extern int32_t g_d2CreateCount;
 extern int32_t g_d2PopZeroLog[]; extern int32_t g_d2PopZeroCount;
 extern int32_t g_d2SeqLog[]; extern int32_t g_d2SeqCount;
+extern int32_t g_d2ObjectPopTrace[]; extern int32_t g_d2ObjectPopTraceCount;
+extern int32_t g_d2ObjectPopTraceDropped;
+extern int32_t g_d2ObjectPopTraceEnabled; extern int32_t g_d2ObjectPopTraceRoomOrdinal;
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_room_sequence(int32_t* count) { if (count) *count = g_d2SeqCount; return g_d2SeqLog; }
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_popzero_log(int32_t* count) { if (count) *count = g_d2PopZeroCount; return g_d2PopZeroLog; }
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_room_create_log(int32_t* count) { if (count) *count = g_d2CreateCount; return g_d2CreateLog; }
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_spawn_log(int32_t* count) { if (count) *count = g_d2SpawnCount; return g_d2SpawnLog; }
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_activation_log(int32_t* count) { if (count) *count = g_d2ActivationCount; return g_d2ActivationLog; }
+// Opt-in/resettable room-boundary trace, one row per class-125 object (or one sentinel row when absent).
+// 18 int32 fields: ordinal, frame, level, roomX, roomY, roomSeedLoBefore, roomSeedHiBefore,
+// roomSeedLoAfter, roomSeedHiAfter, objectSeedLoBefore, objectSeedHiBefore, objectSeedLoAfter,
+// objectSeedHiAfter, unitId, objectX, objectY, mode, flags. Sentinel object fields are -1.
+EMSCRIPTEN_KEEPALIVE void d2_session_object_pop_trace_control(int32_t enabled, int32_t reset) {
+    if (reset) { g_d2ObjectPopTraceCount = 0; g_d2ObjectPopTraceDropped = 0; g_d2ObjectPopTraceRoomOrdinal = 0; }
+    g_d2ObjectPopTraceEnabled = enabled != 0;
+}
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_object_pop_trace(int32_t* count) {
+    if (count) *count = g_d2ObjectPopTraceCount;
+    return g_d2ObjectPopTrace;
+}
+EMSCRIPTEN_KEEPALIVE int32_t d2_session_object_pop_trace_dropped() { return g_d2ObjectPopTraceDropped; }
 // MonStats2.txt pixHeight for a monster class (the NPC menu sits above it), -1 without a record.
 EMSCRIPTEN_KEEPALIVE int32_t d2_monstats2_pixheight(int32_t classId) { const D2MonStats2Txt* t = UNITS_GetMonStats2TxtRecordFromMonsterId(classId); return t ? t->nPixHeight : -1; }
 // The inputs of SUNITDMG_ApplyDamageBonuses for the player's melee swing, as it reads them:
@@ -5385,6 +5405,28 @@ static int sessionCommandHandSkill(uint32_t targetUnitId, bool left) {
     return 1;
 }
 EMSCRIPTEN_KEEPALIVE int d2_session_command_right_skill(uint32_t targetUnitId) { return sessionCommandHandSkill(targetUnitId, false); }
+// Retail's 0x0C RightSkill packet targets world coordinates, while 0x0D targets a unit.
+// Ground casts (Fireball, etc.) must use the former; routing them through the unit command
+// silently drops the cast when the pointer is over bare ground.
+EMSCRIPTEN_KEEPALIVE int d2_session_command_right_skill_at(int32_t x, int32_t y) {
+    g_rightSkillRefusal = 1;
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath ||
+        g_targetPlayer->dwAnimMode == PLRMODE_DEAD || g_targetPlayer->dwAnimMode == PLRMODE_DEATH) return 0;
+    g_rightSkillRefusal = 2;
+    if (g_sessionAttack.state == 1 || g_sessionAttack.state == 2) return 0;
+    D2SkillStrc* skill = UNITS_GetRightSkill(g_targetPlayer);
+    g_rightSkillRefusal = 3;
+    if (!skill) return 0;
+    g_rightSkillRefusal = 10 + SKILLS_GetUseState(g_targetPlayer, skill);
+    if (SKILLS_GetUseState(g_targetPlayer, skill) != SKILLUSTATE_USABLE) return 0;
+    STATLIST_SetUnitStat(g_targetPlayer, STAT_PIERCE_IDX,
+        STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_PIERCE_IDX, 0) + 1, 0);
+    const int32_t result = sub_6FC83340(g_game, g_targetPlayer, skill, x, y);
+    if (result != 0) { g_rightSkillRefusal = 100 + result; return 0; }
+    g_rightSkillRefusal = 0;
+    updateSessionSnapshot();
+    return 1;
+}
 // The left hand's selected skill (V9b): the same path, UNITS_GetLeftSkill. The client uses it only when the
 // left skill is not the plain Attack, which keeps its own primary-attack path.
 EMSCRIPTEN_KEEPALIVE int d2_session_command_left_skill(uint32_t targetUnitId) { return sessionCommandHandSkill(targetUnitId, true); }

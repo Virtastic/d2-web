@@ -153,9 +153,9 @@ test('DT1 decodes v7.6 tile metadata, isometric pixels, and RLE pixels', () => {
   assert.deepEqual([dt1.versionMajor, dt1.versionMinor, dt1.tileCount], [7, 6, 1]);
   const tile = dt1.tiles[0];
   assert.deepEqual(
-    [tile.direction, tile.roofHeight, tile.soundIndex, tile.animated, tile.height, tile.width,
+    [tile.direction, tile.roofHeight, tile.materialFlags, tile.soundIndex, tile.animated, tile.height, tile.width,
       tile.orientation, tile.mainIndex, tile.subIndex, tile.rarity, tile.cacheIndex],
-    [3, -12, 4, 1, -80, 64, 15, 2, 9, 7, 23]);
+    [3, -12, 0x0104, 4, 1, -80, 64, 15, 2, 9, 7, 23]);
   assert.deepEqual([...tile.subtileFlags.slice(0, 5)], [1, 2, 4, 8, 32]);
   assert.deepEqual([tile.blocks[0].gridX, tile.blocks[0].gridY, tile.blocks[0].format], [2, 3, 1]);
   assert.deepEqual(

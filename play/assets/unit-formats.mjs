@@ -269,21 +269,21 @@ let nextDccId = 1;
 const dccId = (dcc) => { let n = dccIds.get(dcc); if (!n) dccIds.set(dcc, n = nextDccId++); return n; };
 
 /** Compose available DCC component frames in the draw order selected by a COF. */
-export function composeCofFrame(cof, direction, frameIndex, components) {
+export function composeCofFrame(cof, direction, frameIndex, components, dccDirection = direction) {
   if (cof && cof.priority?.[direction]?.[frameIndex]) {
     const get = components instanceof Map ? (id) => components.get(id) : (id) => components?.[id];
-    let key = `${direction}:${frameIndex}`, ok = true;
+    let key = `${direction}:${dccDirection}:${frameIndex}`, ok = true;
     for (const component of cof.priority[direction][frameIndex]) { const dcc = get(component); if (dcc) { if (typeof dcc !== 'object') { ok = false; break; } key += `,${component}=${dccId(dcc)}`; } }
     if (ok) {
       let memo = composeMemo.get(cof); if (!memo) composeMemo.set(cof, memo = new Map());
-      let hit = memo.get(key); if (!hit) memo.set(key, hit = composeCofFrameUncached(cof, direction, frameIndex, components));
+      let hit = memo.get(key); if (!hit) memo.set(key, hit = composeCofFrameUncached(cof, direction, frameIndex, components, dccDirection));
       return hit;
     }
   }
-  return composeCofFrameUncached(cof, direction, frameIndex, components);
+  return composeCofFrameUncached(cof, direction, frameIndex, components, dccDirection);
 }
 
-function composeCofFrameUncached(cof, direction, frameIndex, components) {
+function composeCofFrameUncached(cof, direction, frameIndex, components, dccDirection) {
   if (!cof || direction < 0 || direction >= cof.directions || frameIndex < 0 || frameIndex >= cof.framesPerDirection) {
     throw new RangeError('COF composition frame is outside the animation grid');
   }
@@ -296,7 +296,7 @@ function composeCofFrameUncached(cof, direction, frameIndex, components) {
     // 14 too (both read off the retail bytes, s716), but the shipped f0TRlitDThth.DCC carries 13 -- so
     // retail's own 14th frame has no cel. Drawing the death's last pose twice shows a corpse; wrapping
     // would snap it back to the standing frame 0. Clamp, for either axis: the same "does not cover" case.
-    const dir = Math.min(direction, dcc.directions - 1), frame = Math.min(frameIndex, dcc.framesPerDirection - 1);
+    const dir = Math.min(dccDirection, dcc.directions - 1), frame = Math.min(frameIndex, dcc.framesPerDirection - 1);
     selected.push({ component, frame: dcc.directionRecords[dir].frames[frame] });
   }
   if (!selected.length) return { xOffset: 0, yOffset: 0, width: 0, height: 0, bottomUp: false, indexed: new Uint8Array(), opaque: new Uint8Array() };

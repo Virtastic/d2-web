@@ -268,6 +268,9 @@ export function decodeDt1(input) {
     }
     const tile = {
       direction: view.getInt32(offset, true), roofHeight: view.getInt16(offset + 4, true),
+      // D2CMP's nFlags is the 16-bit material mask at +0x06. Keep the two source bytes too: callers
+      // that only need the former sound/animation labels remain source-compatible.
+      materialFlags: view.getUint16(offset + 6, true),
       soundIndex: bytes[offset + 6], animated: bytes[offset + 7],
       height: view.getInt32(offset + 8, true), width: view.getInt32(offset + 12, true),
       heightToBottom: view.getInt32(offset + 16, true),

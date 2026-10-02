@@ -2,6 +2,8 @@ import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { BORDER_RIGHT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
 import { fnv1a32, paperdollIdentity } from './paperdoll-identity.mjs';
 import { PANEL_CLOSE_ART, panelCloseLayout } from './panel-close.mjs';
+import { inventoryBoxColour } from './inventory-box-colour.mjs';
+import { inventoryItemColourIndex, inventoryItemColourKey } from './inventory-item-colour.mjs';
 
 // Inventory.txt Amazon2, normalized from its 800x600 screen coordinates to the
 // invchar6 panel origin. Retail leaves the final 80 pixels for the screen edge.
@@ -104,9 +106,14 @@ export function inventoryGridPosition(item, layout = AMAZON2_INVENTORY_LAYOUT) {
   return { x: layout.gridX + x * layout.cellWidth, y: layout.gridY + y * layout.cellHeight };
 }
 
-function frameCanvas(frame, palette, documentObject) {
+function frameCanvas(frame, palette, documentObject, item = null) {
   const canvas = documentObject.createElement('canvas'); canvas.width = frame.width; canvas.height = frame.height;
-  canvas.getContext('2d').putImageData(new ImageData(dc6FrameToRgba(frame, palette), frame.width, frame.height), 0, 0);
+  const rgba = dc6FrameToRgba(frame, palette);
+  if (item) for (let i = 0; i < frame.indices.length; i++) if (frame.opaque[i]) {
+    const colour = inventoryItemColourIndex(item, frame.indices[i]), source = colour * 4;
+    rgba.set(palette.subarray(source, source + 4), i * 4);
+  }
+  canvas.getContext('2d').putImageData(new ImageData(rgba, frame.width, frame.height), 0, 0);
   return canvas;
 }
 
@@ -120,18 +127,18 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
   const icons = new Map();
   // The canvas AND the decoded frame, so an item's drawn identity (its cel bytes' FNV hash, the same
   // function the draw list uses) is available to the evidence without a second decode.
-  function iconAt(invFile, act = 1) {
-    const key = act + ':' + invFile;
+  function iconAt(invFile, act = 1, item = null) {
+    const colourKey = inventoryItemColourKey(item), key = act + ':' + invFile + ':' + colourKey;
     let entry = icons.get(key);
     if (!entry) {
       const decoded = decodeDc6(read(inventoryItemAsset(invFile)));
       if (!decoded.frames.length) throw new Error(`empty inventory item ${invFile}`);
       const frame = decoded.frames[0];
-      entry = { image: frameCanvas(frame, decodeDatPalette(read(actPal(act))), documentObject), frame }; icons.set(key, entry);
+      entry = { image: frameCanvas(frame, decodeDatPalette(read(actPal(act))), documentObject, colourKey === 'identity' ? null : item), frame }; icons.set(key, entry);
     }
     return entry;
   }
-  const icon = (invFile, act = 1) => iconAt(invFile, act).image;
+  const icon = (invFile, act = 1, item = null) => iconAt(invFile, act, item).image;
   // A grid item sits on retail's own box: `box 419 315 448 344 color=138 mode=0` in
   // the retail captures, one per cell of the item.
   //
@@ -142,15 +149,6 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
   // cel's own palette index under every un-art'd box pixel of the Malah frame and counted hits per
   // (table, src): (2, 138) 1081/1225, the next best 689.
   const BOX_PL2_BASE = 13568 + 2 * 65536;
-  // The box colour is NOT a constant, and it is not ours to invent: retail's own records carry
-  // 234 for the 1x1 carried items of the act-I character (vendor-akara, f3c-inv-open,
-  // inv-gold-deposit, cursor-state-panel, f51-warriv) and 138 for ELDRA's 1x2 ones
-  // (vendor-malah-act5, cap9-a5-larzuk-shop3); a belt slot cell is 126, the belt grid's own base.
-  // Only the 2-cell case is measured and only it departs from the 234 the client already drew, so
-  // the key is the narrowest one that fits -- a 1x3 or 2x2 carried item is not captured anywhere and
-  // keeps 234. Checked against every scene that HAS an inventory box: s250 0 px (PASS), s340 2,471
-  // (unchanged), s256 8,836 -> 6,985.
-  const boxColour = (item) => ((item.invWidth || 1) * (item.invHeight || 1) === 2 ? 138 : 234);
   // The box is half-open at the far corner (D2's own `x1..x2-1`), measured: 30 px wide scores worse
   // than 29 (s256 7,167 -> 6,985), and 29 leaves retail's box1/box2 exactly contiguous.
   const BOX_PX = 29;
@@ -232,7 +230,7 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
   // art there). Returns what was drawn, for identity checks.
   drawCursorItem(ctx, width, height, item, pointerX, pointerY) {
     if (!item?.invFile) return null;
-    const image = icon(item.invFile), v = view(width, height);
+    const image = icon(item.invFile, 1, item), v = view(width, height);
     // Retail blits the cursor item at an INTEGER screen position, and a blit at a fractional offset is
     // not a blit retail can make: the Canvas API resamples it, so the cursor is blurry and its pixels
     // sit half a pixel away from the rect this returns. At scale 1 that is every pixel of the item,
@@ -261,14 +259,18 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     const sx = AMAZON2_INVENTORY_LAYOUT.screenX, sy = AMAZON2_INVENTORY_LAYOUT.screenY;
     for (const item of state?.items || []) {
       if (!item.invFile) continue;
-      const image = icon(item.invFile, act);
+      const image = icon(item.invFile, act, item);
       // Retail's placement (s197's frame buffer): the item's box is its cells; in the grid the box is
       // backed by colour 234 in mode 0, and the art is drawn at the box's left, one row below its top.
       if (item.invPage === 0 && item.mode === 0) { const r = gridRect(item);
         // One box per CELL of the item, at the cell's own corner (retail's `box` records).
         const cellW = r.width / Math.max(1, item.invWidth || 1), cellH = r.height / Math.max(1, item.invHeight || 1);
-        for (let cy = 0; cy < (item.invHeight || 1); cy++) for (let cx = 0; cx < (item.invWidth || 1); cx++)
-          itemBackground(ctx, act, ox + (r.left + cx * cellW) * scale, oy + (r.top + cy * cellH) * scale, BOX_PX * scale, BOX_PX * scale, boxColour(item));
+        const boxColour = inventoryBoxColour(item, act), boxRects = [];
+        for (let cy = 0; cy < (item.invHeight || 1); cy++) for (let cx = 0; cx < (item.invWidth || 1); cx++) {
+          const x = r.left + cx * cellW, y = r.top + cy * cellH;
+          itemBackground(ctx, act, ox + x * scale, oy + y * scale, BOX_PX * scale, BOX_PX * scale, boxColour);
+          boxRects.push({ x, y, width: BOX_PX, height: BOX_PX, colour: boxColour });
+        }
         ctx.drawImage(image, r.left - sx, r.top - sy + 1); itemPixels += image.width * image.height;
         // `top` stays the CELL's top (s202 asserts the item landed in the cell it was put in);
         // `blitTop` is where the ART actually landed -- one row lower, and the anchor retail's own
@@ -276,7 +278,8 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
         drawn.push({ id: item.id, where: 'grid', gridX: item.gridX, gridY: item.gridY, invFile: item.invFile, frame: 0,
           celHash: fnv1a32(iconAt(item.invFile, act).frame.encoded), left: r.left, top: r.top, blitTop: r.top + 1,
           width: image.width, height: image.height,
-          ox: iconAt(item.invFile, act).frame.offsetX, oy: iconAt(item.invFile, act).frame.offsetY }); }
+          ox: iconAt(item.invFile, act).frame.offsetX, oy: iconAt(item.invFile, act).frame.offsetY,
+          boxColour, boxRects }); }
       else if (item.mode === 1 && slotRect(item.bodyLoc)) { const slot = slotRect(item.bodyLoc);
         // On the body the item's CELL box (29 px per Items.txt cell -- retail multiplies the grid's
         // own box size by the item's invWidth/invHeight) is centred in the slot rounding down, the

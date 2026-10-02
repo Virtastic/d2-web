@@ -602,7 +602,26 @@ struct D2VecRoomSight {
 };
 static_assert(sizeof(D2VecRoomSight) == 20, "room sight record");
 
-enum D2VecKind : uint32_t { D2VEC_PRNG = 1, D2VEC_DRLG = 2, D2VEC_ITEMGEN = 3, D2VEC_MONSPAWN = 4, D2VEC_TABLE = 5, D2VEC_COMBAT = 6, D2VEC_AISPAWN = 7, D2VEC_AIFRAME = 8, D2VEC_AITARGET = 9, D2VEC_COMBATRESULT = 10, D2VEC_DAMAGECALC = 11, D2VEC_A1Q6 = 12, D2VEC_A1Q6PLAYER = 13, D2VEC_A1Q6TIMER = 14, D2VEC_A1Q6COMPLETE = 15, D2VEC_A1Q6DROP = 16, D2VEC_A1Q6TRAVEL = 17, D2VEC_NPCDIALOG = 18, D2VEC_NPCRESPONSE = 19, D2VEC_VENDORITEM = 20, D2VEC_VENDORBUY = 21, D2VEC_VENDORSELL = 22, D2VEC_HIRE = 23, D2VEC_VENDORMULTIBUY = 24, D2VEC_TILE = 25, D2VEC_TILEPICK = 26, D2VEC_AITRACE = 27, D2VEC_AIPATH = 28, D2VEC_MONDROP = 29, D2VEC_ROOMSIGHT = 30, D2VEC_QUEUEDUNIT = 31, D2VEC_ROOMCALLER = 32 };
+// TOWNPORTAL: state emitted by a retail Town Portal scroll use.
+// Kind 30 is now the distinct room-sight protocol; keep this older capture's 39-byte
+// record on its own kind so the two schemas cannot be confused by a reader.
+#pragma pack(push, 1)
+struct D2VecTownPortal {
+    uint32_t seed;
+    uint8_t difficulty;
+    uint16_t level;
+    uint32_t playerId, itemId;
+    uint8_t liftResult, insertResult, handlerResult;
+    uint16_t playerX, playerY;
+    uint8_t portalFound;
+    uint32_t portalId, portalClass;
+    uint16_t portalX, portalY;
+    uint32_t hash;
+};
+#pragma pack(pop)
+static_assert(sizeof(D2VecTownPortal) == 39, "town portal record");
+
+enum D2VecKind : uint32_t { D2VEC_PRNG = 1, D2VEC_DRLG = 2, D2VEC_ITEMGEN = 3, D2VEC_MONSPAWN = 4, D2VEC_TABLE = 5, D2VEC_COMBAT = 6, D2VEC_AISPAWN = 7, D2VEC_AIFRAME = 8, D2VEC_AITARGET = 9, D2VEC_COMBATRESULT = 10, D2VEC_DAMAGECALC = 11, D2VEC_A1Q6 = 12, D2VEC_A1Q6PLAYER = 13, D2VEC_A1Q6TIMER = 14, D2VEC_A1Q6COMPLETE = 15, D2VEC_A1Q6DROP = 16, D2VEC_A1Q6TRAVEL = 17, D2VEC_NPCDIALOG = 18, D2VEC_NPCRESPONSE = 19, D2VEC_VENDORITEM = 20, D2VEC_VENDORBUY = 21, D2VEC_VENDORSELL = 22, D2VEC_HIRE = 23, D2VEC_VENDORMULTIBUY = 24, D2VEC_TILE = 25, D2VEC_TILEPICK = 26, D2VEC_AITRACE = 27, D2VEC_AIPATH = 28, D2VEC_MONDROP = 29, D2VEC_ROOMSIGHT = 30, D2VEC_QUEUEDUNIT = 31, D2VEC_ROOMCALLER = 32, D2VEC_TOWNPORTAL = 34 };
 
 static inline uint32_t d2vec_fnv1a_step(uint32_t h, uint32_t v) {
     for (int i = 0; i < 4; i++) { h ^= (v >> (8 * i)) & 0xFF; h *= 16777619u; }

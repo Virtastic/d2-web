@@ -217,7 +217,7 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
       let seed = 0x9e3779b9 ^ (layer.particles * 2654435761);
       const next = (n) => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return (seed >>> 8) % n; };
       const particles = [];
-      for (let i = 0; i < layer.particles; i++) particles.push({ x: next(800), y: next(600), phase: 2 * (i % 5) });
+      for (let i = 0; i < layer.particles; i++) particles.push({ seed: next(0x1000000), phase: 2 * (i % 5) });
       layers.push({ ...layer, dc6, particles, bitmaps: new Map() });
     }
   };
@@ -287,7 +287,7 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
     },
     get cycle() { return cycle; },
     /** Live ripples of the last draw: world anchor (wx, wy) and screen anchor (sx, sy). */
-    get ripples() { return live.map((r) => ({ ...r })); },
+    get ripples() { return live.map((r) => ({ ...r, waterCell: r.waterCell && { ...r.waterCell } })); },
 
     active() { return levelRain === 1; },
 
@@ -300,9 +300,9 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
      * Returns one identity per blit -- `{ path, frame, x, y, w, h, hash }` in the draw list's own
      * conventions (play/assets/drawlist.mjs), the same record retail's hook writes.
      */
-    draw(ctx, width, height, tick, cx = 0, cy = 0) {
+    draw(ctx, width, height, tick, cx = 0, cy = 0, waterAnchors = []) {
       live = [];
-      if (!levelRain || cycle.intensity === 0) return [];   // ripples: retail draws none while dry (rain-dry-camp)
+      if (!levelRain || cycle.intensity === 0 || !waterAnchors.length) return [];   // retail draws none while dry or without water
       prepare();
       const step = Math.floor(Number(tick) / TICKS_PER_FRAME);
       const blits = [];
@@ -315,14 +315,19 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
           const index = ((step + particle.phase) % FRAMES + FRAMES) % FRAMES;
           // Particles live in WORLD (camera-origin) space: wx/wy = screen position + the camera's screen
           // position when spawned; drawn at wx - cx, so they scroll with the ground (F11b).
-          if (particle.wx === undefined) { particle.wx = particle.x + cx; particle.wy = particle.y + cy; }
+          if (particle.wx === undefined) {
+            const anchor = waterAnchors[particle.seed % waterAnchors.length];
+            particle.waterCell = { x: anchor.x, y: anchor.y };
+            particle.wx = anchor.sx + width / 2; particle.wy = anchor.sy + height / 2 - 8;
+          }
           if (particle.last === undefined) particle.last = index;
           // The animation wrapped (9 -> 0): retail gives the particle a NEW position, and keeps it for
           // the whole of the next pass -- the captured particles that did not wrap kept theirs exactly.
           else if (index < particle.last) {
-            const seed = (Math.imul(particle.x * 31 + particle.y * 17 + step, 1664525) + 1013904223) >>> 0;
-            particle.wx = ((seed >>> 8) % width) + cx;
-            particle.wy = ((seed >>> 20) % height) + cy;
+            particle.seed = (Math.imul(particle.seed ^ step, 1664525) + 1013904223) >>> 0;
+            const anchor = waterAnchors[particle.seed % waterAnchors.length];
+            particle.waterCell = { x: anchor.x, y: anchor.y };
+            particle.wx = anchor.sx + width / 2; particle.wy = anchor.sy + height / 2 - 8;
           }
           particle.x = particle.wx - cx; particle.y = particle.wy - cy;
           particle.last = index;
@@ -336,7 +341,7 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
           ctx.drawImage(bitmap, left, top);
           const record = recordDc6(layer.path, index, frame, left, top, { op: 'cel', mode: 3, extra: 0 });
           if (record && record.hash) blits.push(record);
-          live.push({ layer: layer.path, wx: particle.wx, wy: particle.wy, sx: particle.x, sy: particle.y, frame: index });
+          live.push({ layer: layer.path, wx: particle.wx, wy: particle.wy, sx: particle.x, sy: particle.y, frame: index, waterCell: particle.waterCell });
         }
       }
       ctx.restore();
