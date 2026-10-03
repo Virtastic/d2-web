@@ -2247,7 +2247,9 @@ function drawFrame() {
     return;
   }
   ensureTerrain();
-  ctx.fillStyle = '#080a08'; ctx.fillRect(0, 0, w, h);
+  // Retail leaves unpainted world pixels black. A tinted near-black field survives the display
+  // ramp as RGB(12,15,12), creating visible green islands in terrain holes (F38, s260).
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
   // The real map: one draw per placed tile, floors then walls, positioned by the engine's own
   // isometric screen coordinates. Falls back to the old act atlas only if terrain failed to load.
   // Diablo II is isometric. Everything world-anchored projects through the SAME transform the
@@ -2956,7 +2958,7 @@ function objectUnderPointer(px, py) {
 }
 // Pointer minus the unit's cel anchor, screen px (the box test's input).
 function unitBoxHit(entity, px, py) {
-  const camera = worldToScreen(cameraGrid().x, cameraGrid().y), point = worldToScreen(entity.x, entity.y);   // F101: the camera the SPRITE pass draws units with -- the F14 box is measured about retail's cel anchor, so it must sit on the anchor we draw at (cameraCentre() put it 8 px above)
+  const camera = worldToScreen(cameraGrid().x, cameraGrid().y), [anchorX, anchorY] = unitAnchor(entity), point = worldToScreen(anchorX, anchorY);   // F14: hover around the same engine-precise anchor the sprite pass draws; grid x/y lags a moving unit.
   // the cel anchor is an integer pixel (retail's measurement is 1 px exact), so round it the way the sprite is placed
   return inUnitHoverBox(px - Math.round(point.x - camera.x + viewCX()), py - Math.round(point.y - camera.y + (canvas.height / 2 + UNIT_CENTRE_Y)), entity.hostile === true);
 }
@@ -3447,7 +3449,8 @@ canvas.addEventListener('pointerdown', (e) => {
   if (waypointMenu && waypointPanelRenderer) {
     const rows = readWaypointTable().rows(waypointMenu.act);
     const hit = e.button === 0 && waypointMenuInput.hitTest(x, y, canvas.width, canvas.height, rows,
-      (px, py, width, height, menuRows) => waypointPanelRenderer.rowAt(px, py, width, height, menuRows));
+      (px, py, width, height, menuRows) => waypointPanelRenderer.rowAt(px, py, width, height, menuRows),
+      waypointEvidence?.tabs ?? []);
     click.spent = 'waypointMenu';
     if (hit?.action === 'tab') waypointMenu.act = hit.act;
     else if (hit?.action === 'close') takeWaypoint(0);
@@ -3892,7 +3895,7 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
   get waypointEvidence() { return { open: Boolean(waypointMenu), waypointId: waypointMenu?.id ?? 0, shownAct: waypointMenu?.act ?? 0, error: waypointPanelError,
     drawn: waypointEvidence && JSON.parse(JSON.stringify(waypointEvidence)), art: waypointPanelRenderer?.evidence ?? null,
     lastTravel: lastWaypointTravel }; },
-  waypointTargets() { return waypointMenu ? waypointMenuInput.targets(canvas.width, canvas.height) : null; },
+  waypointTargets() { return waypointMenu ? waypointMenuInput.targets(canvas.width, canvas.height, waypointEvidence?.tabs ?? []) : null; },
   get plugyStash() { return { fail: plugyFail, ready: plugyReady, error: plugyError, settle: () => plugyLast, pages: plugyPages, artReady: Boolean(plugyStash.art), enabled: plugyStash.enabled, set enabled(v) { plugyStash.enabled = v; }, page: plugyStash.page, drawn: plugyEvidence }; },
   get stashEvidence() { return { open: stashOpen, error: stashPanelError, drawn: stashEvidence && JSON.parse(JSON.stringify(stashEvidence)),
     art: stashPanelRenderer?.evidence ?? null, gold: { error: stashGoldError, drawn: stashGoldEvidence && JSON.parse(JSON.stringify(stashGoldEvidence)),

@@ -710,7 +710,9 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
       // Retail draws the pointer last (D2WinMain.cpp), so the region dialog goes under the pointer cel.
       if (pointer) {
         const f = cursorDc6.frames[0];
-        const left = pointer[0] + f.offsetX, top = pointer[1] + f.offsetY - f.height + 1;
+        // Like every other retail screen (charselect.mjs), D2Win anchors the ohand cel one pixel
+        // above the pointer; title.txt captures this at pointer (799,599), blit (799,598).
+        const left = pointer[0] + f.offsetX, top = pointer[1] - 1 + f.offsetY - f.height + 1;
         ctx.drawImage(cursorCanvas, left, top);
         recordDc6(FRONTEND.cursor, 0, f, left, top);
       }

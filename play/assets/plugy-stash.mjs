@@ -50,15 +50,19 @@ export function writeSss({ gold = 0, pages, legacy = false }) {   // legacy: Plu
 // Client persistence (PY1): the shell's stash pages as one .sss blob, pages kept as the engine's opaque
 // "JM" sections. Page name = "L<byteLen>" so a section splits back without the item decoder; flags bit 0
 // marks the page the engine's stash currently is. Throws on any malformed input (caller falls back).
-export const pagesToSss = (sections, cur) => writeSss({ pages: sections.map((s, i) => ({ flags: i === cur ? 1 : 0, name: 'L' + (s ? s.length : 0), section: s || new Uint8Array([0x4a, 0x4d, 0, 0]) })) });
+// PlugY 10.00 omits the flags word on every page. The active page is recovered by matching the
+// engine's saved stash section in plugyLoad; it is not encoded in this retail .sss layout.
+export const pagesToSss = (sections) => writeSss({ pages: sections.map((s) => ({ flags: 0, name: 'L' + (s ? s.length : 0), section: s || new Uint8Array([0x4a, 0x4d, 0, 0]) })), legacy: true });
 export function sssToPages(b) {
   if (u32(b, 0) !== 0x00535353 || String.fromCharCode(b[4], b[5]) !== '01') throw new Error('bad SSS header');
   const n = u32(b, 6), pages = []; let o = 10, cur = 0;
   if (n < 1 || n > 64) throw new Error('bad page count');
   for (let i = 0; i < n; i++) {
     if (u16(b, o) !== 0x5453) throw new Error('bad ST tag'); o += 2;
-    if (u32(b, o) & 1) cur = i;
-    o += 4; let e = o; while (b[e]) e++;
+    // PlugY 10.00 omits the flags word; a NUL-terminated name followed by JM identifies that
+    // legacy record. Modern records retain the 11.x flags word.
+    let e = o; while (b[e]) e++;
+    if (u16(b, e + 1) !== 0x4d4a) { const flags = u32(b, o); if (flags & 1) cur = i; o += 4; e = o; while (b[e]) e++; }
     const m = /^L(\d+)$/.exec(String.fromCharCode(...b.subarray(o, e))); if (!m) throw new Error('bad page name');
     o = e + 1; const len = +m[1];
     if (len < 4 || o + len > b.length || u16(b, o) !== 0x4d4a) throw new Error('bad JM section');

@@ -713,6 +713,14 @@ void __fastcall PLAYER_ApplyDeathPenalty(D2GameStrc* pGame, D2UnitStrc* pDefende
 
         nGoldPenalty = std::min(nGoldPenalty, nDefenderInventoryGold);
     }
+    else if (!bAttackedByAnotherPlayer && nDefenderBankGold >= (int32_t)UNITS_GetStashGoldLimit(pDefender))
+    {
+        // Retail 1.13c F248: with the stash already at its level-dependent cap, a PvE death
+        // charges the carried gold only. The death screen reports the full 1,000 carried gold,
+        // and STAT_GOLDBANK remains at 2,500,000. The 1.10f-derived total-gold formula above
+        // would otherwise debit the capped stash; do not generalize this boundary to non-full banks.
+        nGoldPenalty = std::min(nGoldPenalty, nDefenderInventoryGold);
+    }
 
     if (bAttackedByAnotherPlayer)
     {

@@ -379,11 +379,13 @@ struct D2SessionWarp {
 };
 #pragma pack(pop)
 static_assert(sizeof(D2SessionSnapshot) == 68);
+static_assert(offsetof(D2SessionSnapshot, x) == 28 && offsetof(D2SessionSnapshot, y) == 32);
 static_assert(sizeof(D2SessionRoom) == 36);
 static_assert(sizeof(D2SessionUnit) == 44);
 static_assert(sizeof(D2SessionMonsterAnimation) == 92);
 static_assert(sizeof(D2SessionMissileAnimation) == 24);
 static_assert(sizeof(D2SessionObjectPresentation) == 40);
+static_assert(sizeof(D2SessionCoords) == 16);
 static_assert(sizeof(D2SessionItemPresentation) == 112);
 static_assert(sizeof(D2SessionItemState) == 40);
 static_assert(sizeof(D2SessionResources) == 24);
@@ -3270,17 +3272,21 @@ static uint32_t g_sessionPacketStreamLength, g_sessionPacketStreamPackets;
 // Client packet 0x13 (interact with entity) through the recovered handler, exactly as a client
 // sends it: within 6 subtiles the NPC activates immediately and its reply is queued.
 // Fixture: place the player at (x,y) via the recovered teleport placement, finding the active
-// room that contains (x,y). Used to bring the player to Baal's throne so the crab-stairs form's
-// AITHINK (AiFunction03 case 1) acquires a target and runs AITHINK_Fn138_BaalToStairs.
+// room that contains (x,y). A missing destination is a refusal: passing null would make
+// sub_6FCBDFE0 resolve from the player's current room, which is a different lookup and can select a
+// nearby free coordinate. Return success only when the path actually lands on the requested whole
+// subtile; COLLISION_GetFreeCoordinates may adjust a blocked request, and callers need to know that.
+// Used to bring the player to Baal's throne so the crab-stairs form's AITHINK acquires a target.
 EMSCRIPTEN_KEEPALIVE int d2_session_fixture_place_player(int32_t x, int32_t y) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return 0;
     D2ActiveRoomStrc* dest = nullptr;
     for (D2DrlgRoomStrc* roomEx = g_lastLevel ? g_lastLevel->pFirstRoomEx : nullptr; roomEx; roomEx = roomEx->pDrlgRoomNext)
         if (roomEx->pRoom) { D2ActiveRoomStrc* r = COLLISION_GetRoomBySubTileCoordinates(roomEx->pRoom, x, y); if (r) { dest = r; break; } }
-    if (!sub_6FCBDFE0(g_game, g_targetPlayer, dest, x, y, 0, 0)) return 0;
+    if (!dest || !sub_6FCBDFE0(g_game, g_targetPlayer, dest, x, y, 0, 0)) return 0;
     g_sessionMovePending = false;
     updateSessionSnapshot();
-    return 1;
+    const D2DynamicPathStrc* path = g_targetPlayer->pDynamicPath;
+    return path->tGameCoords.wPosX == x && path->tGameCoords.wPosY == y ? 1 : 0;
 }
 // Same, then the sub-subtile fraction (16.16 low bits, 0..65535): a retail capture's light source sits
 // at a fractional position and the light map is read from dwPrecision (>>13), so whole subtiles are 0..7/8 off.

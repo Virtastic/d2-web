@@ -34,15 +34,23 @@ export function createWaypointMenuInput() {
   };
 
   return {
-    hitTest(px, py, width, height, rows, rowAt) {
+    hitTest(px, py, width, height, rows, rowAt, drawnTabs = []) {
       const point = menuPoint(px, py, width, height);
       if (contains(point, closeRect())) return { action: 'close' };
-      for (let act = 1; act <= 5; act++) if (contains(point, tabRect(act))) return { action: 'tab', act };
+      // Route tabs only when their cel actually reached the canvas. The engine's waypoint table
+      // decides which tabs exist; `drawnTabs` carries the renderer's per-blit evidence for that set.
+      // This prevents empty, undisplayed act slots from swallowing clicks or becoming phantom tabs.
+      for (const tab of drawnTabs) {
+        if (!tab?.drawn || !Number.isInteger(tab.act) || tab.act < 1 || tab.act > 5) continue;
+        if (contains(point, tabRect(tab.act))) return { action: 'tab', act: tab.act };
+      }
       const row = rowAt(px, py, width, height, rows);
       return row ? { action: 'row', row } : null;
     },
-    targets(width, height) {
-      return { tabs: Object.fromEntries(Array.from({ length: 5 }, (_, i) => [i + 1, canvasPoint(tabRect(i + 1), width, height)])),
+    targets(width, height, drawnTabs = []) {
+      const acts = [...new Set(drawnTabs.filter((tab) => tab?.drawn && Number.isInteger(tab.act) && tab.act >= 1 && tab.act <= 5)
+        .map((tab) => tab.act))].sort((a, b) => a - b);
+      return { tabs: Object.fromEntries(acts.map((act) => [act, canvasPoint(tabRect(act), width, height)])),
         close: canvasPoint(closeRect(), width, height) };
     },
   };

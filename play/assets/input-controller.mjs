@@ -591,7 +591,11 @@ function start() {
         const cur = panel[Math.max(0, Math.min(panel.length - 1, state.panelIndex))];
         const pointChanged = state.cursor.x !== cur.x || state.cursor.y !== cur.y;
         state.cursor.x = cur.x; state.cursor.y = cur.y; placeCursor(); cursorEl.style.display = 'block';
-        if (cur.key.startsWith('create:') && (panelChanged || pointChanged)) pointer(canvas, 'pointermove', cur.x, cur.y);
+        // F295: the escape menu keeps its own selected row for the pentagram highlight; move the same
+        // DOM pointer the mouse path uses whenever snap-nav focuses one of its targets.
+        if ((cur.key.startsWith('create:') || cur.key.startsWith('gamemenu:')) && (panelChanged || pointChanged)) {
+          pointer(canvas, 'pointermove', cur.x, cur.y);
+        }
         if (edge(pad, BUTTON.A)) click(canvas, cur.x, cur.y, { button: 0, shiftKey: state.shift });
         if (edge(pad, BUTTON.B)) click(canvas, cur.x, cur.y, { button: 2, shiftKey: state.shift });
       } else if (worldMode) {
