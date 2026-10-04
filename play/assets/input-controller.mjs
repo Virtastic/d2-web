@@ -502,7 +502,14 @@ function start() {
     // here, before everything below, because a typed field owns the d-pad and the A button too (and
     // its evidence getter is a deep copy -- once a poll, not twice).
     const nameUp = nameGridOpen(), goldUp = goldGridOpen();
-    const fieldOpen = nameUp || goldUp;
+    if (!nameUp) nameGrid.hidden = false;
+    if (!goldUp) goldGrid.hidden = false;
+    // A hidden grid gives navigation back to the screen below it. Toggle before
+    // choosing the input owner so the same poll can return to class snap-nav.
+    const activeField = goldUp ? goldGrid : nameUp ? nameGrid : null;
+    if (activeField && edge(pad, BUTTON.Y)) activeField.hidden = !activeField.hidden;
+    const typedFieldUp = Boolean(activeField) && !activeField.hidden;
+    const fieldOpen = typedFieldUp;
     const modal = modalPointerOwner({
       gameMenuOpen: screenName === 'game' && Boolean(shell?.gameMenuEvidence?.open),
       stashGoldDialogOpen: goldUp,
@@ -547,14 +554,6 @@ function start() {
     const target = !modal && origin && stickTarget(origin, pad.axes[0] || 0, pad.axes[1] || 0);
     const now = performance.now();
     if (target && now - state.lastStickWalk >= STICK_WALK_MS) { click(canvas, target[0], target[1]); state.lastStickWalk = now; }
-
-    if (!nameUp) nameGrid.hidden = false;
-    if (!goldUp) goldGrid.hidden = false;
-    // The amount box is a modal inside a game and the name box is a front-end screen, so they are
-    // never both up; the modal wins the tie-break so a stray read cannot put two grids on one press.
-    const activeField = goldUp ? goldGrid : nameUp ? nameGrid : null;
-    if (activeField && edge(pad, BUTTON.Y)) activeField.hidden = !activeField.hidden;
-    const typedFieldUp = Boolean(activeField) && !activeField.hidden;
 
     if (typedFieldUp) {
       state.mode = 'field';

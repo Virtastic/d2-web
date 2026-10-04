@@ -183,11 +183,10 @@ void __fastcall DRLGACTIVATE_RoomExStatusUnset_Untile(D2DrlgRoomStrc* pDrlgRoom)
 	}
 }
 
-// d2-web diagnosis (not retail): F500's counterfactual knob. The append in `sub_6FD77F00` puts a room
-// of the warp DESTINATION level into ppRoomsNear, so this walk crosses levels exactly as retail's does;
-// `d2_set_cross_level_sight(0)` skips those links so a probe can measure what the cross-level rooms
-// cost a scene's object-control stream. Default 1 -- retail's path is unconditional and nothing but a
-// probe ever turns it off. See F500.
+// F500: `sub_6FD77F00` can put a room of the warp DESTINATION level into ppRoomsNear. Live play follows
+// retail's cross-level status propagation; the session bulk-town-create window is gated in
+// d2_cross_level_sight_on because it sights every town room in one call. The explicit switch remains
+// a probe counterfactual. See F500.
 extern "C" int d2_cross_level_sight_on(void);
 
 //D2Common.0x6FD73A30

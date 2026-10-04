@@ -5,6 +5,13 @@
 set -euo pipefail
 SRC="${SRC:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$SRC"
+# A borrowed site is read-only. Following this link would overwrite another
+# run's immutable client while leaving its engine stamp unchanged.
+if [ -L build-wasm ] || [ -L build-wasm/site ]; then
+  echo "FATAL: refusing to stage through a borrowed build-wasm/site symlink." >&2
+  echo "       unlink the borrowed site and stage into this worktree's own directory." >&2
+  exit 1
+fi
 [ -f play/d2.wasm ] || { echo "FATAL: play/d2.wasm missing -- run ci/build.sh first" >&2; exit 1; }
 
 # A STALE ENGINE MUST NOT STAGE SILENTLY. play/d2.{js,wasm} are this worktree's own build artefacts,

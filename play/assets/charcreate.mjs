@@ -305,6 +305,9 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     dc6: decodeDc6(read(FRONTEND.font)), tbl: decodeFontTbl(read(FRONTEND.fontTbl)),
     palette, documentObject, path: FRONTEND.font, drawAs: { op: 'celcolor', mode: 4, blend },
   });
+  const cursorDc6 = decodeDc6(read(FRONTEND.cursor));
+  const cursorCanvas = frameCanvas(cursorDc6.frames[0], palette, documentObject);
+  let pointer = null, drawnCursor = null;
   const campfire = animation(read, decodeDc6, CREATE_ASSETS.campfire, palette, documentObject);
   // The scene is composed at 800x600 (the blend reads pixels back), then scaled onto the page.
   const scene = documentObject.createElement('canvas'); scene.width = 800; scene.height = 600;
@@ -411,6 +414,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     get evidence() {
       rehover();
       return {
+        cursor: drawnCursor,
         background: { width: background.width, height: background.height, rows: background.rows, columns: background.columns },
         fonts: { large: font.lineHeight, small: smallFont.lineHeight },
         classes: heroes.map((h) => ({ key: h.key, playerClass: h.playerClass,
@@ -469,8 +473,13 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
       return false;
     },
     submit() { if (canCreate()) onCreate?.({ playerClass: heroes[chosen].playerClass, name: name.trim(), key: heroes[chosen].key, checkboxes: checkboxes.states() }); },
+    setPointer(x, y, width, height) {
+      const p = toScreen(x, y, width, height);
+      pointer = [Math.trunc(p.x), Math.trunc(p.y)];
+    },
     hover(x, y, width, height) {
       const p = toScreen(x, y, width, height);
+      pointer = [Math.trunc(p.x), Math.trunc(p.y)];
       const next = heroes.findIndex((h) => inBox(p, h.hit));
       if (next !== hovered && next >= 0) sound(next, 'hover');
       if (hovered >= 0 && hovered !== next) stances.unhover(hovered, tick);
@@ -647,6 +656,16 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
         if ((pass === 'moving') === moving) renderHero(i, pass);
       }
       campfire.drawBlended(ctx, clock() % (campfire.count - 1), CAMPFIRE.x, CAMPFIRE.y, blend, 3);
+      // D2Win draws ohand last at mouse (x,y-1), using the screen's palette.
+      // Retail create-hover-barbarian.txt records anchor (409,285) for pointer (409,286).
+      drawnCursor = null;
+      if (pointer) {
+        const f = cursorDc6.frames[0];
+        const left = pointer[0] + f.offsetX, top = pointer[1] + f.offsetY - f.height;
+        ctx.drawImage(cursorCanvas, left, top);
+        recordDc6(FRONTEND.cursor, 0, f, left, top);
+        drawnCursor = { path: FRONTEND.cursor, frame: 0, anchor: [pointer[0], pointer[1] - 1], left, top, width: f.width, height: f.height };
+      }
       outCtx.save(); outCtx.imageSmoothingEnabled = false;
       outCtx.drawImage(scene, v.ox, v.oy, 800 * v.scale, 600 * v.scale);
       outCtx.restore();

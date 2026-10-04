@@ -10508,18 +10508,21 @@ uint8_t __fastcall sub_6FCE5EE0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 	D2UnitStrc* pTarget = sub_6FCCFD70(pGame, pUnit, &bCloseToTarget);
 	const int32_t nDistance = AIUTIL_GetDistanceToCoordinates_FullUnitSize(pUnit, pTarget);
 
-	if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER || !pUnit->pMonsterData || pUnit->pMonsterData->pMonInteract)
+	if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER || !pUnit->pMonsterData)
 	{
 		return 0;
 	}
 
-	int32_t v8 = MONSTERAI_IsInteractingWith(pUnit->pMonsterData->pMonInteract, pTarget);
+	// The matched 1.13c Warriv fixture follows the ordinary approach path. Treat interaction-list
+	// membership, rather than the presence of an interaction object, as active interaction state.
+	D2MonsterInteractStrc* pMonInteract = pUnit->pMonsterData->pMonInteract;
+	int32_t v8 = pMonInteract ? MONSTERAI_IsInteractingWith(pMonInteract, pTarget) : 0;
 	if (pTarget && pTarget->dwUnitType == UNIT_PLAYER && PLAYER_IsBusy(pTarget) == 1)
 	{
 		v8 = 1;
 	}
 
-	const int32_t v9 = MONSTERAI_HasInteractUnit(pUnit->pMonsterData->pMonInteract);
+	const int32_t v9 = pMonInteract ? MONSTERAI_HasInteractUnit(pMonInteract) : 0;
 
 	if (v9 || v8 || pAiTickParam->pAiControl->dwAiParam[0] > 0)
 	{

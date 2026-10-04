@@ -10,6 +10,10 @@
 #include "PLAYER/PlrModes.h"
 #include "UNIT/SUnit.h"
 
+// d2-web observation hook. The session fixture arms a single unit before stepping; keeping the
+// hook after normal AI handler return distinguishes an executed callback from timer snapshots.
+extern "C" void D2WEB_RecordSessionAiThinkEvent(D2GameStrc* pGame, uint32_t unitId, uint32_t frame);
+
 
 __forceinline int32_t EVENT_MapUnitTypeToIndex(int32_t nUnitType)
 {
@@ -218,6 +222,9 @@ static void __fastcall EVENT_ExecuteEventsImpl(ExecuteEventCallback pDefaultCall
             pTimerQueue->pCurrent = pTimer->pNextFreeEventTimer;
             if (pTimer->nExpireFrame == pGame->dwGameFrame)
             {
+                const bool observeAiThink = pTimer->nEventType == EVENTTYPE_AITHINK && !pTimer->pCallback &&
+                    pTimer->pUnit && pTimer->pUnit->dwUnitType == UNIT_MONSTER;
+                const uint32_t aiThinkUnitId = observeAiThink ? pTimer->pUnit->dwUnitId : 0;
                 pTimer->nFlags |= EVENTFLAG_0x1;
                 if (pTimer->pCallback)
                 {
@@ -227,6 +234,8 @@ static void __fastcall EVENT_ExecuteEventsImpl(ExecuteEventCallback pDefaultCall
                 {
                     pDefaultCallback(pGame, pTimer->pUnit, pTimer->nEventType, pTimer->dwEventCustomId, pTimer->dwEventCustomParam);
                 }
+                if (observeAiThink)
+                    D2WEB_RecordSessionAiThinkEvent(pGame, aiThinkUnitId, pGame->dwGameFrame);
                 pTimer->nFlags &= ~EVENTFLAG_0x1;
 
                 sub_6FC34890(pGame, pTimer);
@@ -241,6 +250,9 @@ static void __fastcall EVENT_ExecuteEventsImpl(ExecuteEventCallback pDefaultCall
         {
             pTimerQueue->pCurrent = pTimer->pNextFreeEventTimer;
 
+            const bool observeAiThink = pTimer->nEventType == EVENTTYPE_AITHINK && !pTimer->pCallback &&
+                pTimer->pUnit && pTimer->pUnit->dwUnitType == UNIT_MONSTER;
+            const uint32_t aiThinkUnitId = observeAiThink ? pTimer->pUnit->dwUnitId : 0;
             pTimer->nFlags |= EVENTFLAG_0x1;
             if (pTimer->pCallback)
             {
@@ -250,6 +262,8 @@ static void __fastcall EVENT_ExecuteEventsImpl(ExecuteEventCallback pDefaultCall
             {
                 pDefaultCallback(pGame, pTimer->pUnit, pTimer->nEventType, pTimer->dwEventCustomId, pTimer->dwEventCustomParam);
             }
+            if (observeAiThink)
+                D2WEB_RecordSessionAiThinkEvent(pGame, aiThinkUnitId, pGame->dwGameFrame);
             pTimer->nFlags &= ~EVENTFLAG_0x1;
 
             if (pTimer->nFlags & EVENTFLAG_0x8)

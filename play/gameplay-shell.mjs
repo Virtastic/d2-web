@@ -2190,7 +2190,7 @@ function drawFrame() {
   // system arrow would be a second one. IN GAME the pointer layer below owns this style instead: the
   // arrow has to be hidden exactly while a pointer is actually drawn, which only that layer knows.
   if (screen !== SCREEN.GAME) {
-    const cursorStyle = (screen === SCREEN.TITLE || screen === SCREEN.CINEMATICS || screen === SCREEN.SELECT) ? 'none' : '';
+    const cursorStyle = (screen === SCREEN.TITLE || screen === SCREEN.CINEMATICS || screen === SCREEN.SELECT || screen === SCREEN.CREATE) ? 'none' : '';
     if (canvas.style.cursor !== cursorStyle) canvas.style.cursor = cursorStyle;
   }
   if (screen === SCREEN.TITLE) {
@@ -2238,7 +2238,7 @@ function drawFrame() {
   }
   if (screen === SCREEN.CREATE) {
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
-    if (charCreate) charCreate.draw(ctx, w, h);
+    if (charCreate) { charCreate.setPointer(pointer.x, pointer.y, w, h); charCreate.draw(ctx, w, h); }
     else {
       ctx.fillStyle = '#c9ad68'; ctx.textAlign = 'center'; ctx.font = '16px Georgia,serif';
       ctx.fillText(charCreateError || 'loading…', w / 2, h / 2);

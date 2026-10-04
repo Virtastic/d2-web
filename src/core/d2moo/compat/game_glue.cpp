@@ -113,16 +113,17 @@ static void noteObjectPopTrace(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom,
     }
     if (!found) append(nullptr);
 }
-// F500 (d2-web diagnosis, not retail): whether DUNGEON_SetClientIsInSight's status propagation may
-// follow a near-room link that crosses the room's OWN level boundary. Retail's code path is
-// unconditional (DRLGACTIVATE_RoomExPropagateSetStatus walks ppRoomsNear with no level test), so 1 is
-// the default and 0 is only the counterfactual a probe measures. Retail's own same-flow Fortress ->
-// River capture allocates all 12 Fortress rooms -- the three carrying the level-103/104 seam links
-// included -- and ZERO level-104 rooms, while this engine stagers 5 level-104 rooms on the same save
-// and the same click (s1480). Read by monspawn_check.cpp's d2_session_crosslevel_sight.
+// F500: whether DUNGEON_SetClientIsInSight may follow a near-room link across level boundaries. Keep
+// retail's unconditional propagation enabled during live play; the session's single-call bulk town
+// construction is excluded by d2_session_bulk_town_create_active because retail's same-flow
+// Fortress-to-River capture builds all 12 town rooms but no level-104 rooms. The probe switch can
+// still disable propagation explicitly for its counterfactual arm.
 int g_d2CrossLevelSight = 1;
 extern "C" void d2_set_cross_level_sight(int on) { g_d2CrossLevelSight = on ? 1 : 0; }
-extern "C" int d2_cross_level_sight_on(void) { return g_d2CrossLevelSight; }
+extern "C" int d2_session_bulk_town_create_active(void);
+extern "C" int d2_cross_level_sight_on(void) {
+	return g_d2CrossLevelSight && !d2_session_bulk_town_create_active();
+}
 
 // The rooms flagged POPULATION_ZERO when a level's populated-room count (MonsterRegion unk0x0C) was taken:
 // {level, subtile x, subtile y, has room tiles, rooms near} per flagged room (d2_session_popzero_log).
