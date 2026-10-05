@@ -904,7 +904,7 @@ static int g_sessionFromSave = 0;  // T12/F67: set only around `d2_session_creat
 // each eager room's sight into warp-linked levels queues destination rooms the client has not
 // approached. Keep the retail cross-level propagation path intact once the session is live.
 extern "C" int d2_session_bulk_town_create_active() {
-    return g_sessionCreating && g_currentAct >= 0
+    return g_sessionCreating && g_sessionFromSave && g_currentAct >= 0
         && g_currentLevel == DUNGEON_GetTownLevelIdFromActNo(g_currentAct);
 }
 

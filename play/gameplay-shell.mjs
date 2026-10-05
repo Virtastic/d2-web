@@ -3678,25 +3678,72 @@ canvas.addEventListener('pointerdown', (e) => {
     armWalk({ x: npcHit.x, y: npcHit.y, within: 4, onArrive: () => talkToNpc(npcHit.id) });
   } else if (objectHit) {
     click.spent = 'object'; click.walkTo = [objectHit.x, objectHit.y];
-    // Retail's interact-range test (UNITS_IsObjectInInteractRange) can still refuse at two subtiles
-    // -- the Cold Plains waypoint was clicked from there forever (s000a) -- while a portal's own
-    // footprint keeps the player from getting closer. So: operate on arrival, and only if the engine
-    // refuses, step one subtile closer and try once more.
-    const operateObject = (closer) => { const level = snapshot.level; const done = session.operate(objectHit.id); snapshot = session.snapshot(); pollUiEvents();
-      // Refused = nothing happened: no change of mode, no window opened, no change of level.
-      if (!done && !waypointMenu && !stashOpen && snapshot.level === level && !closer) {
-        // The object's own cells are occupied; stand on the free cell beside it nearest the player.
-        const p = snapshot.player; let spot = null, best = Infinity;
-        for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
-          if (Math.max(Math.abs(dx), Math.abs(dy)) === 0) continue;
-          const x = objectHit.x + dx, y = objectHit.y + dy;
-          if (!Module.ccall('d2_session_walkable', 'number', ['number', 'number'], [x, y])) continue;
-          const d = Math.hypot(x - p.x, y - p.y) + 3 * Math.max(Math.abs(dx), Math.abs(dy));
-          if (d < best) { best = d; spot = { x, y }; }
-        }
-        if (spot) armWalk({ x: spot.x, y: spot.y, within: 0, onArrive: () => operateObject(true) });
-      } };
-    armWalk({ x: objectHit.x, y: objectHit.y, within: 2, onArrive: () => operateObject(false), onStuck: () => operateObject(true) });
+    // A fresh entity click replaces a previous ground-walk intent. Rapid click events may
+    // still be queued when the shell handles this one; draining one afterward would replace
+    // the object approach we are about to arm. Preserve held keyboard directions, cancel only
+    // queued pointer moves, and stop periodic retargets from an earlier held ground gesture.
+    input.cancelPointerMoves();
+    worldPointerHeld = false; heldPointerTicks = 0;
+    // The wrapper calls OBJECTS_OperateHandler directly, so it returns 0 when retail's
+    // UNITS_IsObjectInInteractRange refuses. Retail's 0x13 handler instead records an
+    // interaction target and lets the server walk the player into range. Reproduce that
+    // player-visible part with ordinary move commands: arrive at a reachable floor cell,
+    // ask the same engine predicate at the player's actual position, and only then operate.
+    // The draw hit test above stays authoritative; this only changes the post-click approach.
+    const triedSpots = new Set();
+    const clickedLevel = snapshot.level;
+    const refreshObjectTarget = () => {
+      snapshot = session.snapshot();
+      return snapshot.level === clickedLevel && snapshot.objects.some((o) => o.id === objectHit.id);
+    };
+    const approachObject = (closerOnly = false) => {
+      // Movement callbacks can fire after another action changed levels or the quest removed
+      // the target. Do not chase a stale screen-space hit into a different scene.
+      if (!refreshObjectTarget()) return;
+      const p = snapshot.player, candidates = [];
+      const fromObject = chebyshev(p.x, p.y, objectHit.x, objectHit.y);
+      // Object footprints and the interact predicate vary by class. Search a bounded local
+      // neighborhood, but let the engine predicate decide success after each normal walk.
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+        if (!dx && !dy) continue;
+        const x = objectHit.x + dx, y = objectHit.y + dy, key = `${x},${y}`;
+        if (triedSpots.has(key) || (x === p.x && y === p.y)) continue;
+        if (closerOnly && chebyshev(x, y, objectHit.x, objectHit.y) >= fromObject) continue;
+        if (!Module.ccall('d2_session_walkable', 'number', ['number', 'number'], [x, y])) continue;
+        candidates.push({ x, y, key, score: 100 * Math.max(Math.abs(dx), Math.abs(dy)) + Math.hypot(x - p.x, y - p.y) });
+      }
+      candidates.sort((a, b) => a.score - b.score);
+      const spot = candidates[0];
+      if (!spot) return;
+      triedSpots.add(spot.key);
+      armWalk({ x: spot.x, y: spot.y, within: 0,
+        onArrive: () => operateObject(), onStuck: () => approachObject(closerOnly) });
+    };
+    const operateObject = () => {
+      if (!refreshObjectTarget()) return;
+      // The prior click may already have queued this object's quest message. Capture it before
+      // another operate: 0x27 is the actual UI response for quest objects such as Horazon's
+      // Journal, whose handler can return 0 and leave its mode unchanged.
+      pollObjectSpeech();
+      if (objectSpeech?.guid === objectHit.id) return;
+      const range = Module.ccall('d2_session_object_in_interact_range', 'number', ['number'], [objectHit.id]);
+      if (!range) {
+        approachObject();
+        return;
+      }
+      const before = snapshot.objects.find((o) => o.id === objectHit.id)?.mode;
+      const done = session.operate(objectHit.id);
+      refreshObjectTarget();
+      pollObjectSpeech(); pollUiEvents();
+      // A successful operation may open a UI/portal without changing object mode. If the engine
+      // declined a still-unopened object, try another reachable stand cell. A message attached
+      // to this object is a successful quest interaction even when rc/mode do not change; never
+      // repeat its callback and queue duplicate speech. Never teleport or infer range from pixels.
+      const after = snapshot.objects.find((o) => o.id === objectHit.id)?.mode;
+      const questUiAdvanced = objectSpeech?.guid === objectHit.id;
+      if (!done && !questUiAdvanced && !waypointMenu && !stashOpen && snapshot.level === clickedLevel && after === before) approachObject(true);
+    };
+    armWalk({ x: objectHit.x, y: objectHit.y, within: 2, onArrive: operateObject, onStuck: operateObject });
   } else {
     // A "+" on the character screen spends a point through retail's 0x3A handler. Re-read rather
     // than adjust a local copy: the engine decides what a point did, including refusing it.

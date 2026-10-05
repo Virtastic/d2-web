@@ -1,19 +1,23 @@
 // Pointer routing for the waypoint menu.  The menu's state belongs to the shell (the engine owns
 // opening and 0x49); this module only converts canvas coordinates through the SAME 800x600 layout
-// that draws the menu and identifies which rendered control received the click.
+// that draws the menu and identifies which control received the click.
 //
-// The tab frames and anchors are now MEASURED, not declared (s492; retail's own Act II and Act IV
-// waypoint-menu captures): a tab stands at tabX + 62*(act-1) with frame 2*(act-1) if it is the shown
-// act's and 2*(act-1)+1 otherwise, and the cels are 63 wide on that 62 px pitch, so consecutive tabs
-// overlap by one column.  A tab's click band is the 62 px PITCH, not the 63 px cel: the overlapping
-// column is drawn by the later act's cel and belongs to it.  Retail's rects themselves are still not
-// captured -- the bands remain our approximation and stay declared in P6 --
-// and the close uses buysellbtn frame 10's 96x32 rendered-cell band.
+// The rectangles are RETAIL'S, recovered from D2Client 1.13c:
+//   mouse-down handler FUN_6FB5A4E0 works in panel coordinates px = x - 80, py = y - 60;
+//   tabs   FUN_6FB5A290 (expansion): py <= 30 (no lower bound), px < 64 -> tab 0, < 128 -> 1, < 192 -> 2,
+//          < 256 -> 3, else 4 (px <= 320); the zone is a 64 px column, NOT the 62 px cel pitch;
+//   close  px 273..308, py 387..420 -> screen x 353..388, y 447..480 (36x34, not buysellbtn's cell);
+//   rows   FUN_6FB5A240: px 18..296 and py in (hityRow, hityRow + 30) with the hit-y table
+//          60,96,132,168,205,241,277,313,349 (irregular 36/37 pitch) -> screen x 98..376.
+// A click on tab zone k selects the HIGHEST tab j <= k whose tabs 1..j are all available
+// (FUN_6FB5A090 lowers the choice while a lower act's flag is clear): on retail, with Acts II and III
+// hidden, a click on the IV or V tab selects Act I.  `drawnTabs` (the engine's tab set that actually
+// reached the canvas) stands in for those flags.
 import { WAYPOINT_LAYOUT } from './waypoint-panel.mjs';
 
-const TAB_HEIGHT = 32;
-const CLOSE_WIDTH = 96;
-const CLOSE_HEIGHT = 32;
+const PANEL_X = 80, PANEL_Y = 60;
+const TAB_ZONE_W = 64, TAB_PX_MAX = 0x140, TAB_PY_MAX = 0x1e;
+const CLOSE = { x: PANEL_X + 0x111, y: PANEL_Y + 0x183, w: 0x134 - 0x111 + 1, h: 0x1a4 - 0x183 + 1 };
 
 function menuPoint(px, py, width, height) {
   const scale = Math.min(1, width / 800, height / 600);
@@ -26,8 +30,15 @@ function contains(point, rect) {
 
 export function createWaypointMenuInput() {
   const L = WAYPOINT_LAYOUT;
-  const tabRect = (act) => ({ x: L.tabX + L.tabPitch * (act - 1), y: L.tabY - TAB_HEIGHT, w: L.tabPitch, h: TAB_HEIGHT });
-  const closeRect = () => ({ x: L.closeX, y: L.closeY - CLOSE_HEIGHT + 1, w: CLOSE_WIDTH, h: CLOSE_HEIGHT });
+  // The tab zone of tab index act-1: a 64 px column from the panel edge, from the top of the screen
+  // down to py = 30 (screen y 90).  The last zone ends at px 320 (the panel's right edge, x 400).
+  const tabRect = (act) => {
+    const x = PANEL_X + TAB_ZONE_W * (act - 1), right = act === 5 ? PANEL_X + TAB_PX_MAX + 1 : x + TAB_ZONE_W;
+    return { x: act === 1 ? 0 : x, y: 0, w: right - (act === 1 ? 0 : x), h: PANEL_Y + TAB_PY_MAX + 1 };
+  };
+  // A point inside a tab's zone AND on its drawn cel (cel top 63 = anchor 94 - 31), for pad/test targets.
+  const tabTarget = (act) => ({ x: PANEL_X + TAB_ZONE_W * (act - 1), y: L.tabY - 31, w: TAB_ZONE_W, h: 28 });
+  const closeRect = () => CLOSE;
   const canvasPoint = (rect, width, height) => {
     const scale = Math.min(1, width / 800, height / 600);
     return [Math.round((width - 800 * scale) / 2 + (rect.x + rect.w / 2) * scale), Math.round((height - 600 * scale) / 2 + (rect.y + rect.h / 2) * scale)];
@@ -40,9 +51,12 @@ export function createWaypointMenuInput() {
       // Route tabs only when their cel actually reached the canvas. The engine's waypoint table
       // decides which tabs exist; `drawnTabs` carries the renderer's per-blit evidence for that set.
       // This prevents empty, undisplayed act slots from swallowing clicks or becoming phantom tabs.
-      for (const tab of drawnTabs) {
-        if (!tab?.drawn || !Number.isInteger(tab.act) || tab.act < 1 || tab.act > 5) continue;
-        if (contains(point, tabRect(tab.act))) return { action: 'tab', act: tab.act };
+      const have = new Set(drawnTabs.filter((tab) => tab?.drawn && Number.isInteger(tab.act) && tab.act >= 1 && tab.act <= 5).map((tab) => tab.act));
+      for (let zone = 1; zone <= 5; zone++) {
+        if (!contains(point, tabRect(zone))) continue;
+        let act = 1;
+        for (let a = 2; a <= zone && have.has(a); a++) act = a;
+        return have.has(act) ? { action: 'tab', act } : null;
       }
       const row = rowAt(px, py, width, height, rows);
       return row ? { action: 'row', row } : null;
@@ -50,7 +64,7 @@ export function createWaypointMenuInput() {
     targets(width, height, drawnTabs = []) {
       const acts = [...new Set(drawnTabs.filter((tab) => tab?.drawn && Number.isInteger(tab.act) && tab.act >= 1 && tab.act <= 5)
         .map((tab) => tab.act))].sort((a, b) => a - b);
-      return { tabs: Object.fromEntries(acts.map((act) => [act, canvasPoint(tabRect(act), width, height)])),
+      return { tabs: Object.fromEntries(acts.map((act) => [act, canvasPoint(tabTarget(act), width, height)])),
         close: canvasPoint(closeRect(), width, height) };
     },
   };

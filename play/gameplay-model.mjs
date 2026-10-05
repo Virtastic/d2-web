@@ -48,6 +48,10 @@ export class CommandInput {
       : { type: COMMAND.MOVE, x: Math.round(x), y: Math.round(y), ...(held ? { held: true } : {}) });
   }
 
+  cancelPointerMoves() {
+    this.queue = this.queue.filter((command) => command.type !== COMMAND.MOVE || command.directional);
+  }
+
   drain() {
     let x = 0, y = 0;
     for (const code of this.keys) {

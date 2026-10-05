@@ -19,7 +19,7 @@
 //     tabX + tabPitch*(act-1) (a 63 px pitch would put act II at 148);
 //   - they are drawn in ACT ORDER, which is not cosmetic: consecutive cels overlap by the one column
 //     (the cel is 63 wide on a 62 px pitch), so the later act's cel owns it.
-// The click rectangles are still retail's not-recovered hit test and stay declared in P6.
+// The click rectangles are retail's (FUN_6FB5A4E0 and friends), recovered and verified
 
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
@@ -33,6 +33,8 @@ export const WAYGATE_ART = {
   border: 'data\\global\\ui\\PANEL\\800borderframe.dc6',
 };
 // The left panel's ornate border, drawn after the menu: 800borderframe frames 0..4 at these anchors.
+// Retail's row hit-y table (D2Client .data 0x6FB8E6D8, field 5 of each 6-dword entry), panel coordinates.
+const ROW_HIT_Y = [60, 96, 132, 168, 205, 241, 277, 313, 349];
 const BORDER = [[0, 253], [256, 63], [0, 484], [0, 553], [256, 553]];
 // Retail's draw list (anchors are cel anchors: left edge, BOTTOM row). The panel's four background
 // cels have their top-left at (80, 61); the act tab frame 2*(act-1) at (85 + 62*(act-1), 94); the
@@ -102,8 +104,10 @@ export function createWaypointPanelRenderer(read, documentObject = globalThis.do
     const top = anchorY + f.offsetY - f.height + 1;
     ctx.drawImage(c, x + f.offsetX, top); return recordDc6(WAYGATE_ART[key], i, f, x + f.offsetX, top);
   };
-  // The click band of row i: the text line's 35 px pitch (retail's hit test not yet recovered).
-  const rowRect = (i) => ({ x: L.iconX, y: L.textY - L.rowHeight + 6 + i * L.rowHeight, w: 280, h: L.rowHeight });
+  // The click band of row i is retail's (FUN_6FB5A240 "Hit test"): panel px 18..296
+  // (screen x 98..376) and py in (hityRow, hityRow + 30) with retail's own hit-y table, whose pitch is
+  // 36/37 rather than the text's 35 (screen y = py + 60 -> hityRow+61 .. hityRow+89).
+  const rowRect = (i) => ({ x: L.left + 18, y: ROW_HIT_Y[i] + 61, w: 279, h: 29 });
 
   return {
     evidence: Object.fromEntries(Object.entries(dc6).map(([k, d]) => [k, { frames: d.frames.length, sizes: d.frames.map((f) => [f.width, f.height]) }])),
