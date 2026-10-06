@@ -128,10 +128,19 @@ const CURSOR_STICK_CLICK_KEY = ['Space', ' '];
 // doing something is the one that is ALREADY one: L3, held for SHIFT (G10). Every other candidate is
 // a TAP button (RT is KeyT, Back is Tab, Start is Escape), so holding it to bank would fire its own
 // action on the way in -- a Help press that also opened the skill tree. L3 has no tap action at all.
-// While it is held, the d-pad's Up and Down are these two keys instead of belt columns 1 and 3; Left
-// and Right stay the belt, so nothing a player already reaches is lost, and each entry is the
-// identical `tapKey` the physical key produces -- never a gamepad-only path into the engine.
-const SHIFT_BANK_KEYS = { [BUTTON.DPAD_UP]: 'KeyH', [BUTTON.DPAD_DOWN]: 'KeyW' };
+// While it is held, all four d-pad directions are these four keys instead of the belt's four columns;
+// the belt is what L3 WITHOUT the bank still gives. Each entry is the identical `tapKey` the physical
+// key produces -- never a gamepad-only path into the engine.
+//
+// G12 filled Up/Down (KeyH Help, KeyW Swap Weapons). Audited again for F691: `Q` (retail's
+// CfgQuestLog) and `M` (CfgMessageLog) are live in the shell -- `gameplay-shell.mjs`'s keydown handler
+// toggles `questVisible`/`messageVisible` for them ABOVE its dropped-key check -- and neither has a
+// pad road at all: no button of the standard mapping is free, and their only click road (the control
+// panel's mini-panel icons) is unreachable because the game screen has NO free cursor under the D2R
+// scheme (worldMode, G15). So a pad-only player could not open the Quest Log or the Message Log.
+// Left/Right on the same bank is the fix; it costs the belt columns only while L3 is held, which is
+// the modifier's own trade (Up/Down already cost columns 1 and 3).
+const SHIFT_BANK_KEYS = { [BUTTON.DPAD_UP]: 'KeyH', [BUTTON.DPAD_DOWN]: 'KeyW', [BUTTON.DPAD_LEFT]: 'KeyQ', [BUTTON.DPAD_RIGHT]: 'KeyM' };
 
 // ------------- D2R targeting: no free cursor in the world -------------
 //

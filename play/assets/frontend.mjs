@@ -366,7 +366,7 @@ export function recordTiled(path, tiled, ox, oy) {
  * The flaming logo is two DC6s (left and right halves), each 30 frames, positioned by their own
  * frame offsets -- retail animates them over the static black logo underneath, in both phases.
  */
-export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, string = null, documentObject = globalThis.document, bnet = null }) {
+export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, string = null, documentObject = globalThis.document, bnet = null, onGateway = null }) {
   const palette = decodeDatPalette(read(FRONTEND.palette));
   // The whole title is ONE 8-bit frame shown through Sky (retail's frame buffer, s194), the buttons
   // too: Units differs from Sky in a few entries, the button gems among them. The trademark phase is
@@ -553,7 +553,7 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
       error: cfg?.error ?? '', url: cfg?.url ?? null, configured: (cfg?.servers ?? []).map((s) => ({ region: s.region, host: s.host })) };
     if (!bnetState.enabled) return;
     gatewaySelector = createGatewaySelector({
-      servers: cfg.servers, screen: gatewayScreen, width: 800, height: 600,
+      servers: cfg.servers, screen: gatewayScreen, width: 800, height: 600, onCommit: onGateway,
     });
   };
   if (bnet) Promise.resolve(bnet).then(applyBnet, (error) => applyBnet({ enabled: false, servers: [], error: String(error) }));

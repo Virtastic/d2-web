@@ -1,4 +1,5 @@
 import { dc6FrameToRgba, decodeDatPalette, decodeDc6 } from './d2-formats.mjs';
+import { spriteMetrics } from './sprite-metrics.mjs';
 
 const RECORD_SIZE = 112;
 
@@ -37,8 +38,8 @@ export function createItemRenderer(read, documentObject = globalThis.document) {
     if (!canvas) { canvas = documentObject.createElement('canvas'); canvas.width = frame.width; canvas.height = frame.height;
       if (frame.width && frame.height) canvas.getContext('2d').putImageData(new ImageData(dc6FrameToRgba(frame, palette), frame.width, frame.height), 0, 0); rasters.set(key, canvas); }
     if (canvas.width && canvas.height) ctx.drawImage(canvas, Math.round(x + frame.offsetX), Math.round(y + frame.offsetY - frame.height));
-    let pixelHash = 0x811c9dc5, opaque = 0; for (let i = 0; i < frame.indices.length; i++) { pixelHash ^= frame.indices[i]; pixelHash = Math.imul(pixelHash, 0x01000193); opaque += frame.opaque[i]; }
-    lastEvidence = { id: item.id, classId: item.classId, flippyFile: name, frame: frameIndex, width: frame.width, height: frame.height, opaque, pixelHash: pixelHash >>> 0 };
+    const { pixelHash, opaque } = spriteMetrics(frame, frame.indices, frame.opaque);
+    lastEvidence = { id: item.id, classId: item.classId, flippyFile: name, frame: frameIndex, width: frame.width, height: frame.height, opaque, pixelHash };
     return lastEvidence;
   }, get lastEvidence() { return lastEvidence && { ...lastEvidence }; }, get decoded() { return decoded.size; }, get failures() { return failures.size; } };
 }

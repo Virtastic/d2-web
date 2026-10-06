@@ -244,7 +244,11 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
         const bitmap = frames[cell.frame];
         const x = Math.round(cx + ((cell.world[0] - cell.world[1]) - (hero.x - hero.y)) * 16 * scale + AX);
         const y = Math.round(cy + ((cell.world[0] + cell.world[1]) - (hero.x + hero.y)) * 8 * scale + (LEVEL_NAMES[levelType] === '1 Cave' ? AY_CAVE : AY));   // '1 Cave' MEASURED +1 (Den, s960/s961: 81/81 and 82/82 cells at one shift); other dungeon types unmeasured
-        if (x + bitmap.width <= 0 || x >= width || y + bitmap.height <= 0 || y > height - 8) continue;   // retail lists only what is on screen: f5b's lowest cell is y=592 of 600, the next lattice row (596) is culled
+        // Retail lists only what is on screen, and it culls on the cell's ANCHOR row (its DC6 anchor is
+        // bottom-left, "the art fills the bottom of the box"), not the box top: f5b's lowest listing is y=592
+        // of 600 and the next lattice row (596) is culled. Culling on the box top kept every cell whose
+        // bottom rows fell past 592 -- 31 of s953's ours-only cells (the `.ma0` tail) were that, not reveal.
+        if (x + bitmap.width <= 0 || x >= width || y + bitmap.height <= 0 || y + bitmap.height - 1 > height - 8) continue;
         ctx.drawImage(bitmap, x, y);
         drawn.push({ source: AUTOMAP_PATH, frame: cell.frame, requestedFrames: [...cell.requestedFrames], levelName: cell.levelName,
           tileName: cell.tileName, style: cell.style, startSequence: cell.startSequence, endSequence: cell.endSequence,

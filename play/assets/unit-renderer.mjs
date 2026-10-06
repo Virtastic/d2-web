@@ -1,6 +1,7 @@
 import { decodeDatPalette } from './d2-formats.mjs';
 import { composeCofFrame, decodeCof, decodeDcc } from './unit-formats.mjs';
 import { createPlayerCompositeResolver } from './player-composite.mjs';
+import { spriteMetrics } from './sprite-metrics.mjs';
 import { createUnitShadowRenderer } from './unit-shadow-renderer.mjs';
 
 const COMPONENT = ['HD', 'TR', 'LG', 'RA', 'LA', 'RH', 'LH', 'SH', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8'];
@@ -172,7 +173,7 @@ export function createPlayerRenderer(read, documentObject = globalThis.document,
         loadDirection: activeAnimation.direction, cofDirection: selected.cofDirection, cofPriority: [...selected.cofPriority],
         layerDrawOrder: [...selected.layerDrawOrder], loadedComponents: [...activeAnimation.components.keys()], frame: selected.frame,
         engineDirection: state.direction, directions: activeAnimation.cof.directions,
-        width: composed.width, height: composed.height, opaque: composed.opaque.reduce((a, value) => a + value, 0),
+        width: composed.width, height: composed.height, opaque: spriteMetrics(composed, null, composed.opaque).opaque,
         components: activeAnimation.components.size, weaponClass: activeAnimation.weaponClass,
         drawn };
       if (Array.isArray(globalThis.__d2DrawList)) for (const layer of drawn) globalThis.__d2DrawList.push({ op: 'unit', ...layer, frame: selected.frame, x: Math.round(x), y: Math.round(y), mode: 5 });

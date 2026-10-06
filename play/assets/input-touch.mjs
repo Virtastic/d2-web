@@ -409,7 +409,7 @@ export function installTouchInput({ documentObject = globalThis.document, window
   // Scenario-driven touch runs use the same visible controls a player has.  The synthetic
   // PointerEvents below enter the bar's real pointerdown listener; belt digits are represented by
   // touching the corresponding retail HUD box, since a phone has no number row.
-  function touchKey(code) {
+  function touchKey(code, keyName = '') {
     const button = bar.querySelector(`[data-touch-key="${code}"]`);
     if (button) {
       const init = { bubbles: true, cancelable: true, pointerId: 9100, pointerType: 'touch',
@@ -429,7 +429,14 @@ export function installTouchInput({ documentObject = globalThis.document, window
         { button: 0, pointerType: 'touch', pointerId: 9101 });
       return true;
     }
-    throw new Error(`S000_INPUT=touch: no touch control for ${code}`);
+    // A key the overlay owns no control for -- a letter typed into the hero's name (s000a step 3,
+    // "create a barbarian by clicking and typing"), a Backspace correcting it, or any other key a
+    // physical keyboard would send -- is carried as the SAME event, through input-common's own
+    // tapKey(): the touch layer produces the keyboard's event, exactly as it produces the mouse's
+    // click, so a touch-driven segment reaches the identical engine outcome (
+    // "Control scheme"). This used to throw, which blocked a S000_INPUT=touch run at its third step.
+    tapKey(code, keyName);
+    return true;
   }
 
   // ------------- issue 8: a focused input that opens the phone keyboard, forwarding to typeKey ----

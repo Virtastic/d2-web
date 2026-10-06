@@ -39,6 +39,7 @@ import { BOOT_MOVIES, openMovie } from './assets/cinematics.mjs';
 import { createClassSelectSoundPlayer } from './assets/class-create-sounds.mjs';
 import { createCreditsScreen } from './assets/credits-screen.mjs';
 import { createCinematicsScreen } from './assets/cinematics-screen.mjs';
+import { createOtherMultiplayerScreen } from './assets/other-multiplayer.mjs';
 import { createSpeechBox } from './assets/speech-box.mjs';
 import { createCharacterCreate } from './assets/charcreate.mjs';
 import { createCharacterSelect } from './assets/charselect.mjs';
@@ -115,6 +116,7 @@ const frontendPointerControl = () => {
   }
   if (screen === SCREEN.CREDITS) return creditsScreen;
   if (screen === SCREEN.CINEMATICS) return cinematicsScreen;
+  if (screen === SCREEN.OTHER_MULTIPLAYER) return otherMultiplayerScreen;
   if (screen === SCREEN.SELECT) return charSelect;
   if (screen === SCREEN.CREATE) return charCreate;
   return null;
@@ -143,6 +145,18 @@ const DEBUG_OVERLAY = new URLSearchParams(location.search).get('debug') === '1';
 // ?perf=1 turns the frame-cost instrument on from the URL (assets/frame-perf.mjs), so a real browser
 // or the desktop build can be measured without injecting the flag first. Off otherwise.
 if (new URLSearchParams(location.search).get('perf') === '1') globalThis.__d2Perf = true;
+// ?seed=<hex|dec> overrides the map seed a NEW character is created at. Every frame row that walks
+// retail's title flow and diffs against a capture was silently generated at fixture seed 1
+// (DEFAULT_SESSION_FIXTURES below), while retail's captures are the Oracle character (seed
+// 0x2CD11524) -- so the world under the HUD was a different map, and no renderer fix could close it.
+// Read once here and applied ONLY to the fresh-character branch of bootstrapSession; a picked save
+// keeps the seed its own header carries. Default (no param) is unchanged, so no other row moves.
+const MAP_SEED_OVERRIDE = (() => {
+  const raw = new URLSearchParams(location.search).get('seed');
+  if (raw == null || raw === '') return null;
+  const n = Number(raw);   // Number parses "0x2CD11524" and "750899748" alike
+  return Number.isFinite(n) && n >= 0 ? (Math.trunc(n) >>> 0) : null;
+})();
 let terrain = null, terrainFiles = null, terrainStats = null, terrainError = '', terrainLevel = -1;
 let playerRenderer = null, playerRenderError = '', motion = {};
 let corpseRenderer = null, corpseEvidence = null, lastCorpseRecovery = null, missileRenderer = null, missileEvidence = [];
@@ -503,7 +517,7 @@ const PLAY_MODE = new URLSearchParams(location.search).get('play') === '1';
 // Retail opens on a title screen, so that is what a plain visit gets. `play=1` keeps booting
 // straight into a session: every browser scenario drives the game directly and must not have to
 // click through a menu to reach it.
-const SCREEN = { TITLE: 'title', CREDITS: 'credits', CINEMATICS: 'cinematics', SELECT: 'select', CREATE: 'create', GAME: 'game' };
+const SCREEN = { TITLE: 'title', CREDITS: 'credits', CINEMATICS: 'cinematics', OTHER_MULTIPLAYER: 'other-multiplayer', SELECT: 'select', CREATE: 'create', GAME: 'game' };
 let screen = PLAY_MODE ? SCREEN.GAME : SCREEN.TITLE;
 let titleScreen = null, titleError = '', titleTick = 0;
 let exitSeq = null;   // F91: EXIT DIABLO II's fade + close attempt + notice (assets/exit-sequence.mjs)
@@ -512,6 +526,11 @@ let exitSeq = null;   // F91: EXIT DIABLO II's fade + close attempt + notice (as
 // off state as a missing or malformed one, and the title screen then behaves exactly as retail's does.
 let bnetConfigPromise = null;
 let cinematicsScreen = null, cinematicsError = '';
+let otherMultiplayerScreen = null, otherMultiplayerError = '';
+// F89 transport: the client half of our realm protocol (BNCS/MCP/D2GS) driven over a byte-pipe
+// transport (play/assets/realm-client.mjs). The page reaches a configured region's realm the only way
+// a browser can -- a WebSocket through `tools/realmd/ws-bridge.mjs` -- and this records what happened.
+let realmTransport = { state: 'idle', server: null, result: null, error: '' };
 let creditsScreen = null, creditsError = '', creditsTick = 0, exitEvidence = { count: 0, screen: null };
 // Retail's front end opens on the Blizzard logo movies -- New_Bliz, then BlizNorth -- and only then
 // shows the trademark screen and the menu, which is what `titlePhase` counts through (assets/
@@ -795,7 +814,9 @@ async function bootstrapSession() {
       fixture = Object.freeze({ seed: snapshot.seed, difficulty: loadDifficulty, act0: snapshot.act - 1, level: snapshot.level });
       classSelect.value = String(snapshot.playerClass);   // the dropdown shows the class the file chose
     } else {
-      fixture = fixtures[0];
+      // ?seed= pins the map the new character generates at the capture's own seed; without it the
+      // fixture's seed 1 is used, exactly as before.
+      fixture = MAP_SEED_OVERRIDE != null ? Object.freeze({ ...fixtures[0], seed: MAP_SEED_OVERRIDE }) : fixtures[0];
       if (!api?.create(fixture, Number(classSelect.value))) throw new Error('d2_session_create failed');
       session = api; snapshot = api.snapshot(); gameClock = 0;   // a new game starts its own 25 Hz clock
     }
@@ -943,14 +964,21 @@ function ensureTitleScreen(entryPhase = null) {
       string: (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]),
       // Under the hood, not a player setting: the page reads the repo's server-list file at boot.
       bnet: (bnetConfigPromise ??= loadBnetServers()),
+      // F89: committing a region in the gateway dialog now DIALS it, through the browser-compatible
+      // transport (a WebSocket; a browser has no raw TCP) -- see connectConfiguredRegion.
+      onGateway: (server) => { void connectConfiguredRegion(server); },
       items: [
         { label: 'SINGLE PLAYER', action: () => { enterCharacterSelect(); } },
         // TODO(client-parity C2/C3): BATTLE.NET and OTHER MULTIPLAYER need a network backend.
         // With no servers configured BATTLE.NET stays inert, exactly as before. With servers
         // configured it opens the region dialog and points the client at the picked region; it
         // still dials nothing itself (F89: no retail capture of the screens behind it).
+        // F89: OTHER MULTIPLAYER now opens retail's OWN front-end screens (its menu, then TCP/IP
+        // Options; the retail captures, captured 2026-10-02). HOST GAME advances to character
+        // select as retail does; the host/join TRANSPORT (and the join dialog behind JOIN GAME) is
+        // the realm backend's work, so JOIN is handed to the shell and is a gap.
         { label: 'BATTLE.NET', action: () => { titleScreen?.openGateways(); } },
-        { label: 'OTHER MULTIPLAYER', action: () => {} },
+        { label: 'OTHER MULTIPLAYER', action: () => { screen = SCREEN.OTHER_MULTIPLAYER; ensureOtherMultiplayerScreen(); } },
         { label: 'CREDITS', action: () => { creditsTick = 0; screen = SCREEN.CREDITS; ensureCreditsScreen(); } },
         { label: 'CINEMATICS', action: () => { screen = SCREEN.CINEMATICS; ensureCinematicsScreen(); } },
         { label: 'EXIT DIABLO II', action: () => { beginExit(); } },
@@ -965,6 +993,50 @@ function ensureCinematicsScreen() {
   try { cinematicsScreen = createCinematicsScreen({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette, onExit: () => { cinematicsScreen = null; exitToTitle(); },
     string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]) }); }
   catch (error) { cinematicsError = String(error); }
+}
+
+// F89 transport: the region the player committed in the gateway dialog IS the endpoint the client
+// dials -- a project-configured region, never one the page hosts. A browser
+// cannot open a raw TCP socket, so a region is dialable only when its config entry carries a
+// browser-reachable `ws` endpoint (the realm's WebSocket bridge); a host-only region still lists but
+// dials nothing, recorded rather than guessed at. The BNCS login runs against the engine's own realm
+// protocol code (bindEngineProtocol), and an outcome is recorded, never thrown into the front end.
+async function connectConfiguredRegion(server) {
+  realmTransport = { state: 'connecting', server, result: null, error: '' };
+  const started = { server: server ? { region: server.region, host: server.host, ws: server.ws } : null };
+  try {
+    if (!server?.ws) throw new Error('region has no browser transport (ws); a browser cannot dial raw TCP');
+    const { webSocketTransport, bncsLogin, bindEngineProtocol } = await import('./assets/realm-client.mjs');
+    const protocol = bindEngineProtocol(Module);
+    const transport = webSocketTransport(server.ws);
+    try {
+      await transport.ready();
+      // No account/password UI exists yet (retail's Battle.net login screen is a client gap): a
+      // permissive realm accepts the placeholders, and the transport is what this row proves.
+      const login = await bncsLogin(transport, protocol, { account: 'player', password: '', realm: server.region });
+      realmTransport = { state: 'connected', ...started,
+        result: { realms: login.realmList.map((r) => r.title), ip: login.handoff.ip, port: login.handoff.port, mpq: login.mpq }, error: '' };
+    } finally { try { protocol.free(); } catch { /* engine gone */ } transport.close(); }
+  } catch (error) {
+    realmTransport = { state: 'failed', ...started, result: null, error: String(error) };
+  }
+}
+
+// F89: retail's OWN front-end OTHER MULTIPLAYER / TCP/IP screens. The art, anchors and labels are
+// retail's draw lists; the address line shows the page's own host, since
+// a browser has no LAN-IP to report the way retail's host machine does. CANCEL returns to the title;
+// HOST GAME advances to character select as retail's capture shows; the host/join transport (and
+// JOIN GAME's modal) is the realm backend's, so those are gaps.
+function ensureOtherMultiplayerScreen() {
+  if (screen !== SCREEN.OTHER_MULTIPLAYER || otherMultiplayerScreen || otherMultiplayerError || !window.__d2?.ready || window.__d2.error) return;
+  const host = (() => { try { return location.hostname || ''; } catch { return ''; } })();
+  try { otherMultiplayerScreen = createOtherMultiplayerScreen({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette,
+    ip: host,
+    onExit: () => { otherMultiplayerScreen = null; exitToTitle(); },
+    onHost: () => { otherMultiplayerScreen = null; enterCharacterSelect(); },
+    onJoin: () => {},
+    string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]) }); }
+  catch (error) { otherMultiplayerError = String(error); }
 }
 
 function ensureCreditsScreen() {
@@ -1681,6 +1753,7 @@ function update(forceTick = false) {
   }
   if (screen === SCREEN.CREDITS) { ensureCreditsScreen(); creditsTick++; return; }
   if (screen === SCREEN.CINEMATICS) { ensureCinematicsScreen(); cinematicsScreen?.step(); return; }
+  if (screen === SCREEN.OTHER_MULTIPLAYER) { ensureOtherMultiplayerScreen(); otherMultiplayerScreen?.step(); return; }
   if (screen === SCREEN.SELECT) { ensureCharSelect(); return; }
   if (screen === SCREEN.CREATE) { ensureCharCreate(); charCreate?.step(); return; }
   // "is the game's data mounted" has ONE answer, `window.__d2Entry.retail`, decided by
@@ -2145,9 +2218,27 @@ const RETAIL_RAMP_6BIT = [
 // all 1,838 creation-screen colours -- C2h), so that is the fill -- clamped at the same 254.
 const DISPLAY_RAMP = Uint8ClampedArray.from({ length: 256 }, (_, v) =>
   v === 255 ? 255 : v % 4 === 0 ? RETAIL_RAMP_6BIT[v >> 2] : Math.min(254, Math.floor(v * 155 / 100)));
+// PERF (F238): the ramp is a per-CHANNEL 8-bit LUT, so a whole pixel is two 16-bit lookups -- the low
+// pair (R,G) and the high pair (B with alpha) -- instead of three 8-bit ones, and one 32-bit store
+// instead of three clamped byte stores. Measured on a throwaway probe (retail 800x600 town): the
+// per-pixel loop 1.906 -> 1.178 ms, saving ~0.73 ms of the ramp pass's ~3.5 ms; getImageData is the
+// other 1.48 ms and putImageData 0.08. The tables are indexed into by the FRAME itself, whose colours
+// come from a 256-entry palette, so the active entry set is tiny. Alpha is preserved exactly (the old
+// loop never wrote byte 3), so the shipped frame is byte-identical. Little-endian only -- every Chrome
+// target is -- and the byte loop is the fallback wherever it is not.
+const RAMP_LE = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
+const RAMP16 = (() => {
+  if (!RAMP_LE) return null;
+  const lo = new Uint16Array(65536), hi = new Uint16Array(65536);
+  for (let x = 0; x < 65536; x++) { lo[x] = DISPLAY_RAMP[x & 0xff] | (DISPLAY_RAMP[(x >> 8) & 0xff] << 8); hi[x] = DISPLAY_RAMP[x & 0xff] | (x & 0xff00); }
+  return { lo, hi };
+})();
 function applyDisplayRamp(w, h) {
   const img = ctx.getImageData(0, 0, w, h), d = img.data;
-  for (let i = 0; i < d.length; i += 4) { d[i] = DISPLAY_RAMP[d[i]]; d[i + 1] = DISPLAY_RAMP[d[i + 1]]; d[i + 2] = DISPLAY_RAMP[d[i + 2]]; }
+  if (RAMP16 && d.byteOffset === 0 && (d.length & 3) === 0) {
+    const { lo, hi } = RAMP16, d32 = new Uint32Array(d.buffer, 0, d.length >>> 2);
+    for (let i = 0; i < d32.length; i++) { const p = d32[i]; d32[i] = lo[p & 0xffff] | (hi[p >>> 16] << 16); }
+  } else for (let i = 0; i < d.length; i += 4) { d[i] = DISPLAY_RAMP[d[i]]; d[i + 1] = DISPLAY_RAMP[d[i + 1]]; d[i + 2] = DISPLAY_RAMP[d[i + 2]]; }
   ctx.putImageData(img, 0, 0);
 }
 
@@ -2190,7 +2281,7 @@ function drawFrame() {
   // system arrow would be a second one. IN GAME the pointer layer below owns this style instead: the
   // arrow has to be hidden exactly while a pointer is actually drawn, which only that layer knows.
   if (screen !== SCREEN.GAME) {
-    const cursorStyle = (screen === SCREEN.TITLE || screen === SCREEN.CINEMATICS || screen === SCREEN.SELECT || screen === SCREEN.CREATE) ? 'none' : '';
+    const cursorStyle = (screen === SCREEN.TITLE || screen === SCREEN.CINEMATICS || screen === SCREEN.OTHER_MULTIPLAYER || screen === SCREEN.SELECT || screen === SCREEN.CREATE) ? 'none' : '';
     if (canvas.style.cursor !== cursorStyle) canvas.style.cursor = cursorStyle;
   }
   if (screen === SCREEN.TITLE) {
@@ -2217,6 +2308,13 @@ function drawFrame() {
     if (cinematicsScreen) cinematicsScreen.draw(ctx, w, h);
     else { ctx.fillStyle = '#c9ad68'; ctx.textAlign = 'center'; ctx.font = '16px Georgia,serif'; ctx.fillText(cinematicsError || 'loading…', w / 2, h / 2); }
     hud.textContent = cinematicsError ? `cinematics: ${cinematicsError}` : '';
+    return;
+  }
+  if (screen === SCREEN.OTHER_MULTIPLAYER) {
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
+    if (otherMultiplayerScreen) otherMultiplayerScreen.draw(ctx, w, h);
+    else { ctx.fillStyle = '#c9ad68'; ctx.textAlign = 'center'; ctx.font = '16px Georgia,serif'; ctx.fillText(otherMultiplayerError || 'loading…', w / 2, h / 2); }
+    hud.textContent = otherMultiplayerError ? `other multiplayer: ${otherMultiplayerError}` : '';
     return;
   }
   if (screen === SCREEN.CREDITS) {
@@ -2276,7 +2374,7 @@ function drawFrame() {
       // F20: the engine's own record for this missile -- its 64-slot facing and its sequence clock --
       // beside the Missiles.txt CelFile.  A missile the engine has no record for keeps the dot.
       const missile = entity.missile || null;
-      sprites.push({ depth: sy, wx: entity.x, wy: entity.y, draw(c) {
+      sprites.push({ depth: sy, wx: entity.x, wy: entity.y, pass: 'missile', draw(c) {
         let drawn = null;
         try { drawn = missileRenderer?.draw(c, sx, sy, entity, missile ? missile.direction : 0, snapshot.tick,
           missile ? (missile.framePrecise >>> 8) : null, missile ? missile.trans : null); } catch { drawn = null; }
@@ -2290,7 +2388,7 @@ function drawFrame() {
       // acts on (id/class/position/mode) and the anchor this blit was painted at -- the same point
       // the pointer path tests -- so a row can click the renderer's own anchor rather than
       // re-deriving the projection beside it and drifting from what was drawn.
-      sprites.push({ depth: sy, wx: entity.x, wy: entity.y, draw(c) {
+      sprites.push({ depth: sy, wx: entity.x, wy: entity.y, pass: 'player-corpse', draw(c) {
         const unit = { id: entity.id, classId: entity.classId, x: entity.x, y: entity.y, mode: entity.mode };
         const anchor = { x: Math.round(sx), y: Math.round(sy) };
         try { corpseEvidence = { unit, anchor, ...(corpseRenderer?.draw(c, sx, sy, { playerClass: entity.classId, mode: entity.mode, direction: 0, tick: snapshot.tick, act: snapshot.act }) || {}) }; }
@@ -2302,13 +2400,19 @@ function drawFrame() {
       // Draw the retail sprite for ANY unit that has an animation. This used to require
       // entity.hostile, which tied "has a body" to "is an enemy" -- so once town NPCs were
       // correctly marked non-hostile they stopped being drawn and Charsi became a dot.
+      // The body and the balloon are timed separately (F238): the monster pass already caches its
+      // composed plane (F198) while the npc-speech renderer recomputes its hash per draw.
+      const pBody = perfT0();
       const being = entity.animation ? monsterRenderer?.draw(c, sx, sy, entity.animation, snapshot.act, hovered?.kind === 'unit' && hovered.id === entity.id) : null;
+      perfT('units-monster', pBody);
       const drawn = Boolean(being);
       // F22: the alert's pending state is the ENGINE's per-unit bit (d2_session_npc_speech_alerts,
       // read into entity.speechPending above), never a client quest guess. The renderer's own record
       // of what it painted is kept beside the unit so a row can read the canvas back at that
       // rectangle -- the blit that reached the canvas, not the request that produced it.
+      const pAlert = perfT0();
       const alert = npcSpeechAlertRenderer?.draw(c, sx, sy, entity, entity.speechPending, snapshot.tick, snapshot.act);
+      perfT('units-npc-speech', pAlert);
       if (alert && alert.drawn) npcAlertEvidence.push({ id: entity.id, classId: entity.classId,
         anchorX: Math.round(sx), anchorY: Math.round(sy), tick: snapshot.tick, ...alert });
       // Per unit, what was drawn and where (s000e asserts Harrogath's townsfolk against retail's draw list).
@@ -2330,7 +2434,7 @@ function drawFrame() {
   for (const object of snapshot.objects) {
     const [sx, sy] = projStatic(object.x, object.y);
     const isHovered = hovered?.kind === 'object' && hovered.id === object.id;
-    sprites.push({ depth: sy, wx: object.x, wy: object.y, draw(c) {
+    sprites.push({ depth: sy, wx: object.x, wy: object.y, pass: 'object', draw(c) {
       const drawn = objectRenderer?.draw(c, sx, sy, object, snapshot.act, isHovered);
       if (drawn) objectDrawEvidence.push({ id: object.id, classId: object.classId, token: object.token,
         mode: drawn.mode, drawMode: isHovered ? 7 : 5, direction: drawn.direction, frame: drawn.frame,
@@ -2341,9 +2445,9 @@ function drawFrame() {
   }
   for (const item of snapshot.items) if (item.mode === 3 && item.invPage === 255) {
     const [sx, sy] = projStatic(item.x, item.y);
-    sprites.push({ depth: sy, wx: item.x, wy: item.y, draw(c) { itemRenderer?.draw(c, sx, sy, item); } });
+    sprites.push({ depth: sy, wx: item.x, wy: item.y, pass: 'item', draw(c) { itemRenderer?.draw(c, sx, sy, item); } });
   }
-  sprites.push({ depth: (h / 2 + UNIT_CENTRE_Y), wx: snapshot.player.x, wy: snapshot.player.y, draw: drawPlayer });
+  sprites.push({ depth: (h / 2 + UNIT_CENTRE_Y), wx: snapshot.player.x, wy: snapshot.player.y, pass: 'player', draw: drawPlayer });
 
   terrainStats = null;
   // The frame's own terrain read, handed to the automap: it fills its per-level cell layer from this
@@ -2703,6 +2807,7 @@ setInterval(() => {
   if (screen === SCREEN.TITLE) { ensureTitleScreen(); stepBootMovie(); }
   else if (screen === SCREEN.CREDITS) ensureCreditsScreen();
   else if (screen === SCREEN.CINEMATICS) { ensureCinematicsScreen(); cinematicsScreen?.step(); }
+  else if (screen === SCREEN.OTHER_MULTIPLAYER) { ensureOtherMultiplayerScreen(); otherMultiplayerScreen?.step(); }
   else if (screen === SCREEN.SELECT) ensureCharSelect();
   else if (screen === SCREEN.CREATE) ensureCharCreate();
   // play=1 boots straight into a session; the same trap applies (d2-lxc's headless tabs report
@@ -3191,6 +3296,7 @@ addEventListener('keydown', (e) => {
   if (screen === SCREEN.TITLE && bootMovieSpec(titlePhase) && e.code === 'Escape' && !e.repeat) { titleAdvance(); e.preventDefault(); return; }
   if (screen === SCREEN.CREDITS && e.code === 'Escape' && !e.repeat) { exitToTitle(); e.preventDefault(); return; }
   if (screen === SCREEN.CINEMATICS && e.code === 'Escape' && !e.repeat) { cinematicsScreen?.escape(); e.preventDefault(); return; }
+  if (screen === SCREEN.OTHER_MULTIPLAYER && e.code === 'Escape' && !e.repeat) { otherMultiplayerScreen?.escape(); e.preventDefault(); return; }
   if (screen === SCREEN.CREATE) { if (charCreate?.typeKey(e.code, e.key)) e.preventDefault(); return; }
   // The amount box is modal. It gets Esc/Enter and numeric typing before the
   // global bindings, so Esc does not accidentally close the stash behind it.
@@ -3311,6 +3417,7 @@ canvas.addEventListener('pointermove', (e) => {
   // only ends the phase's clock through the click path below.
   if (screen === SCREEN.TITLE && titlePhase === 'menu') titleScreen?.hover(x, y, canvas.width, canvas.height);
   else if (screen === SCREEN.CINEMATICS) cinematicsScreen?.hover(x, y, canvas.width, canvas.height);
+  else if (screen === SCREEN.OTHER_MULTIPLAYER) otherMultiplayerScreen?.hover(x, y, canvas.width, canvas.height);
   else if (screen === SCREEN.SELECT) charSelect?.hover(x, y, canvas.width, canvas.height);
   else if (screen === SCREEN.CREATE) charCreate?.hover(x, y, canvas.width, canvas.height);
 });
@@ -3323,7 +3430,7 @@ canvas.addEventListener('pointerdown', (e) => {
   // up -- checked before the game menu because the menu is still "open" underneath it.
   if (screen === SCREEN.GAME && controlsPanel?.open) { click.spent = 'configureControls'; const [mx, my] = canvasPoint(e); controlsPanel.click(mx, my, canvas.width, canvas.height); canvas.focus(); e.preventDefault(); return; }
   if (modalOwner === MODAL_POINTER_OWNER.GAME_MENU) { click.spent = 'gameMenu'; const [mx, my] = canvasPoint(e); gameMenu.click(mx, my, canvas.width, canvas.height); canvas.focus(); e.preventDefault(); return; }
-  if (screen === SCREEN.TITLE || screen === SCREEN.CREDITS || screen === SCREEN.CINEMATICS || screen === SCREEN.CREATE || screen === SCREEN.SELECT) {
+  if (screen === SCREEN.TITLE || screen === SCREEN.CREDITS || screen === SCREEN.CINEMATICS || screen === SCREEN.OTHER_MULTIPLAYER || screen === SCREEN.CREATE || screen === SCREEN.SELECT) {
     click.spent = `screen-${screen}`;
     const [tx, ty] = [x, y];
     // A front-end control is ARMED here and fires on the matching release (see the pointerup
@@ -3818,7 +3925,7 @@ globalThis.addEventListener('pointerup', (e) => {
 });
 canvas.addEventListener('pointerup', (e) => {
   if (e.button === 0) { worldPointerHeld = false; heldPointerTicks = 0; }
-  if (!(screen === SCREEN.TITLE || screen === SCREEN.CREDITS || screen === SCREEN.CINEMATICS || screen === SCREEN.CREATE || screen === SCREEN.SELECT)) return;
+  if (!(screen === SCREEN.TITLE || screen === SCREEN.CREDITS || screen === SCREEN.CINEMATICS || screen === SCREEN.OTHER_MULTIPLAYER || screen === SCREEN.CREATE || screen === SCREEN.SELECT)) return;
   const [x, y] = canvasPoint(e);
   frontendPointerStates.release(e.pointerId, frontendPointerControl(), x, y, canvas.width, canvas.height);
   canvas.focus(); e.preventDefault();
@@ -4271,6 +4378,9 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
   // A scenario pins the phase the way it pins titleTick (s198, s194).
   set titlePhase(phase) { setTitlePhase(phase); },
   get cinematicsScreenEvidence() { return cinematicsScreen ? cinematicsScreen.evidence : { error: cinematicsError || 'not built' }; },
+  get otherMultiplayerEvidence() { return otherMultiplayerScreen ? otherMultiplayerScreen.evidence : { error: otherMultiplayerError || 'not built' }; },
+  // F89: what the page's own realm client did when a configured region was committed.
+  get realmTransportEvidence() { return realmTransport; },
   get creditsEvidence() { return creditsScreen ? { ...creditsScreen.evidence, error: creditsError } : { error: creditsError || 'not built' }; },
   get exitEvidence() { return { ...exitEvidence, sequence: exitSeq ? exitSeq.evidence : null }; },
   /**
@@ -4287,6 +4397,7 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
       if (titleScreen.gatewaysOpen()) out.titleGateways = titleScreen.gatewayTargets(w, h);
     }
     if (screen === SCREEN.CINEMATICS && cinematicsScreen) out.cinematics = cinematicsScreen.targets(w, h);
+    if (screen === SCREEN.OTHER_MULTIPLAYER && otherMultiplayerScreen) out.otherMultiplayer = otherMultiplayerScreen.targets(w, h);
     if (screen === SCREEN.CREDITS && creditsScreen) out.credits = creditsScreen.targets(w, h);
     if (screen === SCREEN.CREATE && charCreate?.targets) out.create = charCreate.targets(w, h);
     if (screen === SCREEN.SELECT && charSelect?.targets) out.select = charSelect.targets(w, h);

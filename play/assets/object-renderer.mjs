@@ -122,11 +122,15 @@ export function createObjectRenderer(read, documentObject = globalThis.document,
         if (Array.isArray(globalThis.__d2DrawList)) globalThis.__d2DrawList.push({ op: 'dcc', path, frame, x: Math.round(x), y: Math.round(y), mode: highlight ? 7 : 5 });
       }
     }
-    let pixelHash = 0x811c9dc5; for (const value of composed.indexed) { pixelHash ^= value; pixelHash = Math.imul(pixelHash, 0x01000193); }
+    // PERF (F238): the FNV hash and opaque count are pure functions of the composed plane, and
+    // composeCofFrame memoises planes, so both are computed ONCE per plane and shared with the monster
+    // pass (same plane object, same F198 formula). Recomputing them per object per frame walked every
+    // composed plane's pixels every frame; the town carries dozens of torch/banner objects.
+    if (composed.pixelHash === undefined) { let h = 0x811c9dc5; for (const value of composed.indexed) { h ^= value; h = Math.imul(h, 0x01000193); } composed.pixelHash = h; composed.opaqueCount = composed.opaque.reduce((a, v) => a + v, 0); }
     lastEvidence = { id: object.id, classId: object.classId, token: object.token, mode: animation.mode, direction: animation.direction,
       frame, components: animation.components.size, width: composed.width, height: composed.height,
       xOffset: composed.xOffset, yOffset: composed.yOffset,
-      opaque: composed.opaque.reduce((a,v)=>a+v,0), pixelHash: pixelHash >>> 0, layers: layerEvidence,
+      opaque: composed.opaqueCount, pixelHash: composed.pixelHash >>> 0, layers: layerEvidence,
       // The shadow blit this draw made (or null).  `layers[].shadow` is the COF byte as retail shipped
       // it; `shadow.layers`/`shadow.components` is what the pass decided to draw -- so a row can assert
       // both a blit for a Shadow-set layer and none for a layer whose bytes say otherwise.

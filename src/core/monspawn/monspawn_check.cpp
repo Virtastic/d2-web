@@ -49,6 +49,7 @@
 #include <DataTbls/ObjectsTbls.h>
 #include <DataTbls/MonsterTbls.h>
 #include <Units/Monster.h>
+#include <D2Monsters.h>
 #include <Path/Path.h>
 #include <Path/PathMisc.h>
 #include <Path/Step.h>
@@ -472,6 +473,14 @@ static std::vector<D2SessionItemPresentation> g_sessionItemPresentations;
 // invFile and grid cell, which is exactly what D2SessionItemPresentation already carries.
 static std::vector<D2SessionItemPresentation> g_sessionVendorPresentations;
 static D2SessionItemState g_sessionItemState;
+// F715: the item a ground-pickup command is still walking to. sub_6FC828D0's ITEM branch starts the
+// walk but relies on retail's interaction-completion callback (sub_6FC7F780's ITEM case, reached
+// through the player's animation MODECHANGE event) to actually pick the item up on arrival; in this
+// headless session that callback is never reached for a walk to an ITEM, so the hero walks to the
+// pile, stops on it, and nothing picks it up (measured: the hero at distance 0, no collision, not
+// busy, interact data set -- and the pile stays IMODE_ONGROUND; a second command at that same spot
+// picks it up). This names the pile the walk is for, so the tick can complete it (below).
+static uint32_t g_sessionPendingPickup = 0;
 static std::vector<D2SessionTile> g_sessionTiles;
 // Parallel to g_sessionTiles: the index of the tile's entry in its DT1 file (UINT32_MAX: not a library entry).
 // Kept out of D2SessionTile so the terrain hash and every row pinning that stride stay as they were.
@@ -2190,6 +2199,7 @@ static int d2_session_create_for_class(uint32_t seed, int difficulty, int act, i
     memset(&g_sessionAttack, 0, sizeof g_sessionAttack); memset(&g_sessionProgress, 0, sizeof g_sessionProgress);
     memset(&g_sessionAdvancement, 0, sizeof g_sessionAdvancement); g_sessionAdvancementSkillId = SKILL_MAGICARROW;
     memset(&g_sessionItemState, 0, sizeof g_sessionItemState);
+    g_sessionPendingPickup = 0;
     memset(&g_sessionNpcInteraction, 0, sizeof g_sessionNpcInteraction);
     memset(&g_sessionNpcDialog, 0, sizeof g_sessionNpcDialog); D2WEB_ResetLastDialogPacket();
     memset(&g_sessionNpcResponse, 0, sizeof g_sessionNpcResponse);
@@ -4795,6 +4805,11 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_object_pop_trace(int32_t* count) 
 EMSCRIPTEN_KEEPALIVE int32_t d2_session_object_pop_trace_dropped() { return g_d2ObjectPopTraceDropped; }
 // MonStats2.txt pixHeight for a monster class (the NPC menu sits above it), -1 without a record.
 EMSCRIPTEN_KEEPALIVE int32_t d2_monstats2_pixheight(int32_t classId) { const D2MonStats2Txt* t = UNITS_GetMonStats2TxtRecordFromMonsterId(classId); return t ? t->nPixHeight : -1; }
+// MonStats2.txt Light for a monster class, and a live monster unit's component-item light
+// (MONSTERS_GetMaximalLightRadius, the 16-component Items.txt LightRadius scan D2Client's updater
+// maxes with MonStats2 Light). Diagnostics for the monster light-radius row; nothing reads them.
+EMSCRIPTEN_KEEPALIVE int32_t d2_monstats2_light(int32_t classId) { const D2MonStats2Txt* t = UNITS_GetMonStats2TxtRecordFromMonsterId(classId); return t ? (int32_t)t->nLight : -1; }
+EMSCRIPTEN_KEEPALIVE int32_t d2_monster_item_light(uint32_t unitId) { D2UnitStrc* u = g_game ? SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)unitId) : nullptr; return u ? (int32_t)MONSTERS_GetMaximalLightRadius(u) : -1; }
 // The inputs of SUNITDMG_ApplyDamageBonuses for the player's melee swing, as it reads them:
 // [weapon found, wield type, STAT_DAMAGEPERCENT, weapon strength bonus, dexterity bonus, mastery
 // bonus, the resulting damage percent before the -90 floor]. A fight that lands 1-hp hits names
@@ -5172,6 +5187,26 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
                 room && DUNGEON_IsRoomInTown(room) ? PLRMODE_TOWNNEUTRAL : PLRMODE_NEUTRAL);
         }
         if (!d2_aiframe_advance(1)) return 0;
+        // F715: the walk a ground-pickup command started (sub_6FC828D0's ITEM branch) has no
+        // completion here -- the hero reaches the pile and nothing picks it up (measured: at distance
+        // 0, no collision, not busy, interact data set, the pile stays IMODE_ONGROUND, while a fresh
+        // command at that same spot picks it up). Complete retail's interaction once the walk has
+        // arrived (its path is spent), then forget the pile: a pickup that still cannot complete
+        // leaves it for the player to click again, exactly as a refused retail pickup does.
+        if (g_sessionPendingPickup) {
+            D2UnitStrc* pending = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)g_sessionPendingPickup);
+            if (!pending || pending->dwAnimMode != IMODE_ONGROUND || !UNITS_GetRoom(pending)) {
+                g_sessionPendingPickup = 0;
+            } else if (!dying && g_targetPlayer->pDynamicPath && g_targetPlayer->pDynamicPath->dwPathPoints == 0) {
+                // One completion attempt per arrival: in reach (the ITEM case's own pickup range),
+                // run the interaction; a walk that ended out of reach (a later move command
+                // superseded it) just drops the stale pickup.
+                if (D2Common_10399(g_targetPlayer, pending) <= 4) {
+                    sub_6FC828D0(g_targetPlayer, UNIT_ITEM, (int32_t)g_sessionPendingPickup, 0, g_game);
+                }
+                g_sessionPendingPickup = 0;
+            }
+        }
         sub_6FC33670(g_game, g_targetClient);
         // C3r: retail's own order (Game.cpp:1858-1870 kind 31) runs the queued-unit
         // flush right after the per-client update, every frame -- the capture found no special handling
@@ -5822,14 +5857,48 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_pickup(uint32_t itemUnitId) {
     sub_6FC828D0(g_targetPlayer, UNIT_ITEM, (int32_t)itemUnitId, 0, g_game);
     if (INVENTORY_IsItemInInventory(g_targetPlayer->pInventory, item)) {
         g_sessionItemState.result = 1;
+        g_sessionPendingPickup = 0;
         return 1;
     }
     if (item->dwAnimMode == IMODE_ONGROUND && UNITS_GetRoom(item)) {
         g_sessionItemState.result = 2;
+        // Still on the ground: the command started a walk (F715). Name it so the tick completes the
+        // interaction when the hero arrives, instead of leaving the pile unpicked on its tile.
+        g_sessionPendingPickup = itemUnitId;
         return 2;
     }
     g_sessionItemState.result = 0;
+    g_sessionPendingPickup = 0;
     return 0;
+}
+
+// F715 probe: the ground-pickup decision's own inputs, so a walk-to-item stall is measured instead of
+// guessed at. words: [0] item dwAnimMode, [1] D2Common_10399(player,item), [2] the ITEM-case collision
+// test, [3] PLAYER_IsBusy, [4] cursor item != null, [5] player dwAnimMode, [6] room(item) != null,
+// [7..9] the player's interact slots 42/43/44 (type/value/...), [10] item already in inventory,
+// [11] sub_6FC7FB90 (the interact TYPE the completion reads), [12] sub_6FC7FBB0 (its GUID),
+// [13] item classId, [14] gate refuses.
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_pickup_probe(uint32_t itemUnitId) {
+    static int32_t out[16];
+    for (int i = 0; i < 16; ++i) out[i] = -1;
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pInventory) return out;
+    D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemUnitId);
+    if (!item) return out;
+    out[0] = (int)item->dwAnimMode;
+    out[1] = D2Common_10399(g_targetPlayer, item);
+    out[2] = UNITS_TestCollisionBetweenInteractingUnits(g_targetPlayer, item, COLLIDE_MASK_PLAYER_FLYING) ? 1 : 0;
+    out[3] = PLAYER_IsBusy(g_targetPlayer) ? 1 : 0;
+    out[4] = INVENTORY_GetCursorItem(g_targetPlayer->pInventory) ? 1 : 0;
+    out[5] = (int)g_targetPlayer->dwAnimMode;
+    out[6] = UNITS_GetRoom(item) ? 1 : 0;
+    D2PlayerDataStrc* pd = UNITS_GetPlayerData(g_targetPlayer);
+    if (pd) { out[7] = (int)pd->unk0xA8[42]; out[8] = (int)pd->unk0xA8[43]; out[9] = (int)pd->unk0xA8[44]; }
+    out[10] = INVENTORY_IsItemInInventory(g_targetPlayer->pInventory, item) ? 1 : 0;
+    out[11] = sub_6FC7FB90(g_targetPlayer);
+    out[12] = sub_6FC7FBB0(g_targetPlayer);
+    out[13] = (int)item->dwClassId;
+    out[14] = sessionDispatchGate(0x16) ? 1 : 0;
+    return out;
 }
 
 EMSCRIPTEN_KEEPALIVE int d2_session_command_drop(uint32_t itemUnitId) {
@@ -7385,8 +7454,28 @@ EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_session_lightmap(int ambientOve
                     if (txt && unit->dwAnimMode < 8) radius = txt->nLit[unit->dwAnimMode] >> 1;
                     x = unit->pStaticPath->tGameCoords.nX * 8 + 4; y = unit->pStaticPath->tGameCoords.nY * 8 + 4;
                 } else if (unit->dwUnitType == UNIT_MONSTER && unit->pDynamicPath) {
-                    const D2MonStats2Txt* txt = UNITS_GetMonStats2TxtRecordFromMonsterId((int)unit->dwClassId);
-                    if (txt) radius = txt->nLight;
+                    // Retail emits a monster's light only while the monster is alive AND awake. The two
+                    // retail captures at the Den mouth differ in nothing but that state: v2-den-mouth,
+                    // whose Blood Moor roster is still in the DRLG's spawn mode (every monster
+                    // MONMODE_NEUTRAL, the nearest two subtiles from the hero), lists NO monster source in
+                    // its light map; den-shadow-lit, the same place with its monsters aggroed, lists ten.
+                    // MONMODE_NEUTRAL is the placement mode DRLGPRESET puts every preset monster in
+                    // (DRLGPRESET.cpp:263, DRLGROOM_AllocPresetUnit, Monsters.cpp's spawn-mode table), so
+                    // it is the engine's own reading of "asleep"; MONMODE_DEATH and MONMODE_DEAD are the
+                    // dying animation and the corpse, which emit nothing (a killed monster must not gain a
+                    // light the sleeping one did not have -- s1422's "a kill leaves the map unchanged").
+                    const uint32_t animMode = unit->dwAnimMode;
+                    if (animMode != MONMODE_NEUTRAL && animMode != MONMODE_DEATH && animMode != MONMODE_DEAD) {
+                        const D2MonStats2Txt* txt = UNITS_GetMonStats2TxtRecordFromMonsterId((int)unit->dwClassId);
+                        int light = txt ? (int)txt->nLight : 0;
+                        // D2Client's updater gives a monster max(its component items' Items.txt
+                        // LightRadius, MonStats2 Light) -- MONSTERS_GetMaximalLightRadius is that
+                        // 16-component scan, and the radius rule named it. The branch read MonStats2 alone, which the comment above already said
+                        // was wrong.
+                        const int itemLight = (int)MONSTERS_GetMaximalLightRadius(unit);
+                        if (itemLight > light) light = itemLight;
+                        radius = light;
+                    }
                     x = (int)(unit->pDynamicPath->tGameCoords.dwPrecisionX >> 13) + 4; y = (int)(unit->pDynamicPath->tGameCoords.dwPrecisionY >> 13) + 4;
                 }
                 if (radius <= 0) continue;

@@ -169,7 +169,11 @@ function showBootFailure(why) {
     // not a state invented for the test:
     //   `?unsupported=1`          both missing (the generic browser-fault screen, s321)
     //   `?unsupported=isolated`   cross-origin isolation only: a capable browser served without
-    //                             COOP/COEP (the host-fault screen, s328)
+    //                             COOP/COEP, but from a secure context (the host-fault screen, s328)
+    //   `?unsupported=insecure`   the other host fault: a capable browser served over plain HTTP from
+    //                             a non-localhost address, where the page is not a secure context and
+    //                             SharedArrayBuffer is unavailable whatever the host sends (s328's
+    //                             second arm; measured live on Chrome 153, )
     //   `?unsupported=memory64`   Memory64 only: the state an Apple browser is in when the page IS
     //                             served right (Safari has COOP/COEP and no Memory64) -- row issue 2's
     //                             screen. No browser on this box reaches it unaided, and that is a
@@ -194,8 +198,11 @@ function showBootFailure(why) {
     const forced = force ? (force[1] === '1' ? ['isolated', 'memory64'] : force[1].split(',')) : [];
     const real = force ? probeCapabilities() : null;
     const caps = force
-      ? { crossOriginIsolated: forced.includes('isolated') ? false : real.crossOriginIsolated,
+      ? { crossOriginIsolated: forced.includes('isolated') || forced.includes('insecure') ? false : real.crossOriginIsolated,
           memory64: forced.includes('memory64') ? false : real.memory64,
+          // A non-secure origin is what makes COOP/COEP useless; `?unsupported=insecure` reproduces the
+          // state a plain-HTTP LAN host puts a capable browser in.
+          secureContext: forced.includes('insecure') ? false : real.secureContext,
           supported: false }
       : probeCapabilities();
     if (!caps.supported) {

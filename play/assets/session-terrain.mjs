@@ -829,7 +829,12 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       for (const o of overlay) o.k = key(o);
       overlay.sort((a, b) => (a.k[0] - b.k[0]) || (a.k[1] - b.k[1]) || (a.k[2] - b.k[2]) || (a.k[3] - b.k[3]));
       for (const o of shadows.concat(overlay).concat(roofs)) {
-        if (o.sprite) { const u = perfT0(); o.sprite.draw(ctx); unitsMs += perfT0() - u; continue; }
+        // Every world sprite -- monster, object, item, missile, the player, an npc speech balloon --
+        // is timed into the one `units` total; a sprite that names its own kind also splits its share
+        // into `units-<kind>` so a row can attribute the pass (F238: the item/missile/player/npc
+        // renderers carry the same per-draw redundancy as the monster pass but are rare in a town and
+        // invisible to `s2310`'s single total). perfSample is a no-op while the instrument is off.
+        if (o.sprite) { const u = perfT0(); o.sprite.draw(ctx); const ms = perfT0() - u; unitsMs += ms; if (o.sprite.pass) perfSample('units-' + o.sprite.pass, ms); continue; }
         if (o.tile.orientation === 13) {
           // A shadow tile repaints whatever is under it, so a row attributing a pixel to the terrain
           // blit that painted it has to see this pass too (same guarded trace, __d2TraceWalls).

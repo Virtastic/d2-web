@@ -36,8 +36,13 @@ export function parseBnetServers(text) {
   catch (error) { return { enabled: false, servers: [], error: `config is not JSON (${error})` }; }
   const raw = Array.isArray(parsed) ? parsed : parsed?.servers;
   if (!Array.isArray(raw)) return { enabled: false, servers: [], error: 'config has no "servers" array' };
+  // `host` is the realm's TCP endpoint (region identity / what a native client dials); `ws` is the
+  // SAME realm's browser-reachable WebSocket endpoint (through `tools/realmd/ws-bridge.mjs`), which
+  // is what the page can actually open -- a browser has no raw TCP. A region is usable by the page
+  // only when it carries `ws`; without it the region still lists, but selecting it dials nothing.
   const servers = raw
-    .map((s) => ({ region: String(s?.region ?? s?.name ?? '').trim(), host: String(s?.host ?? s?.address ?? '').trim() }))
+    .map((s) => ({ region: String(s?.region ?? s?.name ?? '').trim(), host: String(s?.host ?? s?.address ?? '').trim(),
+      ws: String(s?.ws ?? '').trim() }))
     .filter((s) => s.region && s.host);
   return { enabled: servers.length > 0, servers, error: '' };
 }
@@ -82,7 +87,7 @@ export function gatewayRows(servers) {
 }
 
 /** A repo-owned server list presented in retail 1.13c's measured gateway selection screen. */
-export function createGatewaySelector({ servers, screen, width = 800, height = 600 }) {
+export function createGatewaySelector({ servers, screen, width = 800, height = 600, onCommit = null }) {
   const rows = gatewayRows(servers);
   const defaultIndex = Math.max(0, servers.findIndex((s) => s.region.toUpperCase() === 'U.S. EAST'));
   let open = false, committed = servers.length ? defaultIndex : -1, choice = committed, hot = null, pressed = null;
@@ -122,7 +127,7 @@ export function createGatewaySelector({ servers, screen, width = 800, height = 6
       pressed = null;
       if (!target || token !== `gateway:${target}` || wasPressed !== target) return -1;
       if (h.row >= 0) { choice = h.row; return choice; }
-      if (h.button === 'ok') { committed = choice; open = false; return committed; }
+      if (h.button === 'ok') { committed = choice; open = false; if (onCommit && committed >= 0) onCommit({ ...servers[committed] }); return committed; }
       if (h.button === 'cancel') { choice = committed; open = false; return -1; }
       return -1;
     },

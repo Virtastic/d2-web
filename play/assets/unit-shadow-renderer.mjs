@@ -35,6 +35,32 @@ const ACT_PALETTE = ['ACT1', 'ACT2', 'ACT3', 'ACT4', 'ACT5'];
 // SelectedUnitShift(1) and the blend tables (OpenDiablo2-pl2 pkg/decode.go).
 const LIGHT_LEVEL_7 = 1024 + 7 * 256;
 
+// A composed plane's shadow footprint, as DESTINATION offsets (dx = sx - k, dy = -k) from the base cell,
+// deduplicated. Anchor-independent, so cached by plane identity (composeCofFrame memoises planes, so a
+// plane object is stable while its cel/frame does not change). Returns a flat Int32Array of [dx, dy,...].
+const maskCache = new WeakMap();
+function shadowMask(plane) {
+  let mask = maskCache.get(plane);
+  if (mask) return mask;
+  const seen = new Set(), offs = [];
+  for (let sy = 0; sy < plane.height; sy++) {
+    const b = plane.height - 1 - sy;
+    if (b & 1) continue;                                 // the discarded row: one destination row per two source rows
+    const k = b >> 1;                                    // one row up per destination row
+    for (let sx = 0; sx < plane.width; sx++) {
+      if (!plane.opaque[sy * plane.width + sx]) continue;
+      const dx = sx - k, dy = -k;                        // ... and one pixel left
+      const key = dy * 65536 + dx;                       // unique: |dx| stays far below 65536, so the pack is injective
+      if (seen.has(key)) continue;
+      seen.add(key);
+      offs.push(dx, dy);
+    }
+  }
+  mask = Int32Array.from(offs);
+  maskCache.set(plane, mask);
+  return mask;
+}
+
 export function createUnitShadowRenderer(read) {
   const acts = new Map();
   const act0Of = (act) => Math.min(4, Math.max(0, Math.trunc(Number(act) || 1) - 1));
@@ -97,20 +123,20 @@ export function createUnitShadowRenderer(read) {
         const yOff = plane.bottomUp ? plane.yOffset : plane.yOffset + plane.height - 1;
         const half = Math.trunc(yOff / 2);
         const baseX = Math.round(x + plane.xOffset) + half, baseY = Math.round(y) + half;
-        const pixels = new Set();
-        for (let sy = 0; sy < plane.height; sy++) {
-          const b = plane.height - 1 - sy;
-          if (b & 1) continue;                             // the discarded row: one destination row per two source rows
-          const k = b >> 1, py = baseY - k;                // one row up per destination row
-          if (py < 0 || py >= height) continue;
-          for (let sx = 0; sx < plane.width; sx++) {
-            if (!plane.opaque[sy * plane.width + sx]) continue;
-            const px = baseX - k + sx;                     // ... and one pixel left
-            if (px < 0 || px >= width) continue;
-            pixels.add(py * width + px);
-          }
+        // The footprint is a pure function of the composed plane: a kept source pixel (sx, sy) lands at
+        // a DESTINATION offset (sx - k, -k) from the base cell, wherever that is drawn. The offsets are
+        // cached per plane (the composer memoises planes, so the object is stable across frames for the
+        // same cel/frame) and the per-frame cost is the clipped copy below, not the whole plane rescan.
+        // Dedup is on the OFFSET -- two source pixels can share a destination offset through the shear;
+        // distinct offsets are distinct canvas pixels, so one entry per destination pixel is preserved.
+        const mask = shadowMask(plane);
+        const pixels = [];
+        for (let i = 0; i < mask.length; i += 2) {
+          const px = baseX + mask[i], py = baseY + mask[i + 1];
+          if (px < 0 || px >= width || py < 0 || py >= height) continue;
+          pixels.push(py * width + px);
         }
-        if (pixels.size) layers.push({ component, pixels });
+        if (pixels.length) layers.push({ component, pixels });
       }
       if (!layers.length) return null;
       let minX = width, minY = height, maxX = -1, maxY = -1;

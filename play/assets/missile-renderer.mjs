@@ -1,6 +1,7 @@
 import { decodeDatPalette } from './d2-formats.mjs';
 import { decodeDcc } from './unit-formats.mjs';
 import { createBlender } from './frontend.mjs';
+import { spriteMetrics } from './sprite-metrics.mjs';
 import { dccDirection, indexedToRgba } from './unit-renderer.mjs';
 
 const MISSILE_CEL = Object.freeze({ 1: 'Javelin' });
@@ -25,8 +26,10 @@ export function parseMissileAnimations(bytes, count) {
 // `direction` is the unit's 64-slot facing and is resolved through the DCC's own direction count, the
 // same step a unit's DCC goes through (`dccDirection`); passing it straight in as an index was wrong
 // for any DCC with fewer than 64 directions.
-// F20: nTrans 1 draws in mode 3 (retail: units-shaman-bolt-anim.txt, ShamanFireball nTrans 1, 368 of 368
-// records mode=3). nTrans 0 and 2 in flight are uncaptured and stay opaque.
+// F20/F185: Missiles.txt nTrans -> draw mode, recovered from D2Client 1.13c FUN_6FB1CC00 (image base
+// 0x6FAB0000, RVA 0x6CC00;: 0 -> normal (opaque), 1 -> mode 3
+// (PL2 additive), 2 -> mode 4 (PL2 multiplicative, UnholyBolt).  Retail only ever ships those three
+// Trans values; anything else is mode 5 (normal) = our opaque fallback.
 export function createMissileRenderer(read, documentObject = globalThis.document, celFile = null) {
   const palette = decodeDatPalette(read('data\\global\\palette\\units\\pal.dat'));
   const decoded = new Map(), rasters = new Map();
@@ -48,12 +51,12 @@ export function createMissileRenderer(read, documentObject = globalThis.document
     if (!canvas) { canvas = documentObject.createElement('canvas'); canvas.width = drawnFrame.width; canvas.height = drawnFrame.height;
       canvas.getContext('2d').putImageData(new ImageData(indexedToRgba(drawnFrame.indexed, drawnFrame.opaque, palette),drawnFrame.width,drawnFrame.height),0,0);rasters.set(key,canvas); }
     const left = Math.round(x + drawnFrame.xOffset), top = Math.round(y + (drawnFrame.bottomUp ? drawnFrame.yOffset : drawnFrame.yOffset - drawnFrame.height + 1));
-    const mode = trans === 1 && blend ? 3 : 0;
+    const mode = blend ? (trans === 1 ? 3 : trans === 2 ? 4 : 0) : 0;
     if (mode) blend(ctx, { width: drawnFrame.width, height: drawnFrame.height, indices: drawnFrame.indexed, opaque: drawnFrame.opaque }, left, top, mode);
     else ctx.drawImage(canvas, left, top);
-    let pixelHash=0x811c9dc5,opaque=0;for(let i=0;i<drawnFrame.indexed.length;i++){pixelHash^=drawnFrame.indexed[i];pixelHash=Math.imul(pixelHash,0x01000193);opaque+=drawnFrame.opaque[i];}
+    const { pixelHash, opaque } = spriteMetrics(drawnFrame, drawnFrame.indexed, drawnFrame.opaque);
     return {classId:missile.classId,celFile:celFile_,direction:direction,directionIndex:dir,directions:dcc.directions,
       drawMode:mode,frame:frameIndex,frames:count,framePrecise:frame == null ? null : Math.trunc(frame),trans,width:drawnFrame.width,
-      height:drawnFrame.height,opaque,pixelHash:pixelHash>>>0};
+      height:drawnFrame.height,opaque,pixelHash};
   }};
 }

@@ -7,6 +7,7 @@
 import { decodeDatPalette } from './d2-formats.mjs';
 import { decodeDcc } from './unit-formats.mjs';
 import { createBlender } from './frontend.mjs';
+import { spriteMetrics } from './sprite-metrics.mjs';
 
 export const NPC_SPEECH_ALERT = Object.freeze({
   overlay: 'npcalert',
@@ -60,7 +61,7 @@ export function createNpcSpeechAlertRenderer(read) {
         path: NPC_SPEECH_ALERT.path, palette: `data\\global\\palette\\${['ACT1', 'ACT2', 'ACT3', 'ACT4', 'ACT5'][Math.min(4, Math.max(0, (Number(act) | 0) - 1))]}\\pal.dat`,
         drawMode: NPC_SPEECH_ALERT.drawMode, frame, anchor, screen,
         offset: { x: NPC_SPEECH_ALERT.offsetX, y: NPC_SPEECH_ALERT.offsetY }, width: image.width, height: image.height,
-        opaque: image.opaque.reduce((n, value) => n + value, 0) };
+        opaque: spriteMetrics(image, null, image.opaque).opaque };
     },
   };
 }

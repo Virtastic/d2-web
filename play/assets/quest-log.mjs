@@ -99,7 +99,13 @@ export function createQuestLogRenderer(read, documentObject = globalThis.documen
       let text = null;
       if (s.selected && statuses[s.selected - 1] !== 'locked') {
         const font = fontFor(A), key = `qstsa${s.act}q${s.selected}`, name = s.string(key);
-        const body = statuses[s.selected - 1] === 'done' ? s.string('qstsprevious') : s.string(key + '1');
+        // F256: retail's questlast toggle swaps the description BODY -- it does NOT latch the button's
+        // frame (that was s814's falsified model). OFF shows the last-message string, ON the quest's own
+        // body string; the not-done half is inferred (the F256 capture is a done quest). Evidence:
+        // the retail captures{off,on}-2d.txt -- the box draws `qstsprevious` off, the
+        // quest's own `qstsa<act>q<n>1` on; A/B/A/B per click.
+        const done = statuses[s.selected - 1] === 'done';
+        const body = (done === !s.descrOn) ? s.string('qstsprevious') : s.string(key + '1');
         font.drawAnchored(ctx, name, QL.titleCentre - (font.measure(name) >> 1), QL.titleY);
         const lines = body && body !== key + '1' ? wrap(font, body) : [];
         lines.forEach((l, i) => font.drawAnchored(ctx, l, QL.descX, QL.descY + i * QL.descPitch));
@@ -107,11 +113,11 @@ export function createQuestLogRenderer(read, documentObject = globalThis.documen
       }
       cel(QUEST_ART.close, 10, QL.closeX, QL.closeY);
       // The description toggle (questlast.dc6, 1 direction x 2 frames per its own DC6 header = a toggle
-      // button, OpenDiablo2's ButtonTypeQuestDescr with Toggleable:true). Retail's own captures all show
-      // frame 0, so the OFF state is measured and frame 1 is the button's toggled art. What retail
-      // changes besides the button's own frame is not evidenced (OpenDiablo2's onDescrClicked is a stub)
-      // -- documented in V8d as needing a capture; this draws the toggle's state.
-      const descrFrame = s.descrOn ? 1 : 0;
+      // button, OpenDiablo2's ButtonTypeQuestDescr with Toggleable:true). F256 (retail-capture cap-t11):
+      // BOTH steady states draw frame 0 (hash 241aea7e) -- frame 1 (hash 731fe78e) is the HELD-PRESS
+      // visual only. The toggle's state still
+      // drives the description BODY (above); it no longer moves the button's frame.
+      const descrFrame = 0;
       cel(QUEST_ART.desc, descrFrame, QL.descBtnX, QL.descBtnY);
       BORDER_LEFT.forEach(([i, x, y]) => cel('data\\global\\ui\\PANEL\\800BorderFrame.dc6', i, x, y));
       ctx.restore();

@@ -126,8 +126,13 @@ export function createConfigureControls({ read, palettePath = () => 'data\\globa
     if (!f) {
       const pal = decodeDatPalette(read(resolved())), at = resolved();
       let pl2 = null; try { pl2 = read(at.replace(/pal\.dat$/i, 'pal.pl2')); } catch { /* the plain palette then */ }
+      // F713: colour 0 is "no shift" -- the glyphs draw through the RAW act palette, exactly as every
+      // other colour-0 font here (npc-menu's white, charselect's title, the version label). The act
+      // PL2's TextColorShifts[0] is all-zero bytes, so passing 0 into it maps EVERY ink pixel to
+      // palette[0] and the Function column drew black-on-dark. Retail's own frame draws that column
+      // white. A colourless font must not consult the shift table at all.
       f = createFont({ dc6: fontDc6, tbl, documentObject, path: FONT, drawAs: { op: 'celcolor', mode: 5, extra: colour },
-        palette: pl2 ? textColourPalette(pl2, pal, colour) : pal });
+        palette: (pl2 && colour) ? textColourPalette(pl2, pal, colour) : pal });
       fonts.set(key, f);
     }
     return f;

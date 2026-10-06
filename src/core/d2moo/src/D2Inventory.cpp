@@ -2906,7 +2906,7 @@ void __fastcall sub_6FD917B0(D2UnitStrc* pUnit, uint8_t* a2, uint8_t* pColor, D2
 			if (nComponent == COMPOSIT_LEFTHAND)
 			{
 				int nItemId = 0;
-				D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemRecordFromItemCode('til\0', &nItemId);
+				D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemRecordFromItemCode(' til', &nItemId);
 				if (pItemsTxtRecord)
 				{
 					INVENTORY_InitializeComponentArray();

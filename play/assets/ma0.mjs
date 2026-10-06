@@ -18,6 +18,9 @@ export function parseMa0(bytes) {
   }
   return layers;
 }
-// Automap pixels <-> the overlay's world subtiles: x = (wx-wy)*1.6 - 8, y = (wx+wy)*0.8 - 2028 (fitted to the
-// town's own tiles: 584 of 692 coincide, the rest is the fixture's differing reveal; s953).
-export const MA0_K = Object.freeze({ x: -8, y: -2028 });
+// Automap pixels <-> the overlay's world subtiles: x = round(1.6*(wx-wy)), y = round(0.8*(wx+wy)) -- no additive
+// constant (F592: retail's own amap5 save reproduces
+// 890/890 of the captured town cells position AND frame with K=(0,0); the old {x:-8,y:-2028} put every saved cell
+// ~2028 px off the viewport). Retail draws a cell at screen = cell - g, g = hero_cell - (400,294), applied by the
+// overlay's own draw line, so the cell itself carries the absolute lattice pixels.
+export const MA0_K = Object.freeze({ x: 0, y: 0 });

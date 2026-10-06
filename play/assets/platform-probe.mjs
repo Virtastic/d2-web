@@ -55,8 +55,15 @@ export function probeMemory64(wasm = globalThis.WebAssembly) {
  */
 export function probeCapabilities(g = globalThis) {
   const crossOriginIsolated = g.crossOriginIsolated === true;
+  // A cross-origin isolated page is a SECURE CONTEXT by construction: SharedArrayBuffer -- what the
+  // engine's threads need -- is exposed only on HTTPS or localhost, so COOP/COEP on a plain-HTTP LAN
+  // origin isolate nothing. Reading it here lets the host-fault screen say WHICH host fault it is
+  // (missing headers, or an insecure origin no headers can fix) instead of always blaming the headers.
+  // Measured: Chrome 153, http://<lan-host> with both COOP/COEP sent, reads crossOriginIsolated
+  // false, isSecureContext false, SharedArrayBuffer undefined -- .
+  const secureContext = g.isSecureContext === true;
   const memory64 = probeMemory64(g.WebAssembly);
-  return { crossOriginIsolated, memory64, supported: crossOriginIsolated && memory64 };
+  return { crossOriginIsolated, memory64, secureContext, supported: crossOriginIsolated && memory64 };
 }
 
 /** Best-effort browser name for the unsupported screen -- informational only, never the gate. */
@@ -111,6 +118,20 @@ export function unsupportedMessage(caps, ua = (typeof navigator !== 'undefined' 
   const cause = caps.memory64 && !caps.crossOriginIsolated ? 'host' : 'browser';
 
   if (cause === 'host') {
+    // Two host faults are indistinguishable to `crossOriginIsolated` but need different advice. A
+    // non-secure origin (plain HTTP from a non-localhost address) cannot be cross-origin isolated from
+    // ANY headers -- the game is unusable there whatever the host sends -- so telling the person to add
+    // COOP/COEP would send them to fix the one thing that will not help. Name the secure context first.
+    if (caps.secureContext === false) {
+      const missing = ['a secure context (HTTPS or localhost)'];
+      const summary = `This page is not a secure context, so the game cannot start.`;
+      const advice = `${browser} supports what the game needs, but the page was opened over plain `
+        + `HTTP from an address that is not a secure context. SharedArrayBuffer (the engine's threads) `
+        + `is available only on HTTPS or localhost, and the COOP/COEP headers cannot change that. Open `
+        + `it from an HTTPS host (this repo's play/serve.mjs does with D2_TLS_DIR) or from localhost, `
+        + `and reload.`;
+      return { browser, missing, cause, supportedBrowsers: '', summary, advice, text: `${summary} ${advice}` };
+    }
     const summary = `This page is not cross-origin isolated, so the game cannot start.`;
     const advice = `${browser} supports what the game needs -- the page was served without the `
       + `COOP/COEP headers the engine requires for SharedArrayBuffer. Open it from a server that `
