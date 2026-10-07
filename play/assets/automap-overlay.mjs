@@ -1,5 +1,5 @@
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
-import { TILE_SCREEN_W, UNIT_CENTRE_Y } from './session-terrain.mjs';
+import { UNIT_CENTRE_Y } from './session-terrain.mjs';
 import { MA0_K } from './ma0.mjs';
 import { perfT0, perfT, perfSample } from './frame-perf.mjs';
 
@@ -19,7 +19,11 @@ const TILE_NAMES = Object.freeze(['fl', 'wl', 'wr', 'wtlr', 'wtll', 'wtr', 'wbl'
 // automap is centred on the player, so it uses the same point; drawing it at height/2 instead put
 // the whole map 8 px below the world it describes.
 export const AUTOMAP_LAYOUT = Object.freeze({ width: 800, height: 600, centreX: 400, centreY: 292, background: 'transparent' });
-export const AUTOMAP_PATH = 'data\\global\\ui\\automap\\maximap.dc6';
+// F234: retail's two automap art families, from D2Client 1.13c. The loader `0x6fb0fb50` branches `dec eax; je` ONCE: mode 1
+// loads the `*S` small sheet, every other mode the full sheet. The AutoMap.txt Cel index is shared, so
+// a cell resolves to the same frame in either sheet and only the DC6 and the world->map divisor differ.
+export const AUTOMAP_PATHS = Object.freeze({ full: 'data\\global\\ui\\automap\\maximap.dc6', mini: 'data\\global\\ui\\automap\\maximaps.dc6' });
+export const AUTOMAP_PATH = AUTOMAP_PATHS.full;
 
 function decodeText(bytes) { return new TextDecoder('latin1').decode(bytes).replace(/^﻿/, ''); }
 function number(value) { const n = Number.parseInt(String(value ?? '').trim(), 10); return Number.isFinite(n) ? n : -1; }
@@ -99,17 +103,23 @@ const tileReadSignature = (tiles) => {
 export function createAutomapOverlay({ read, Module, documentObject = globalThis.document, isGameplay }) {
   const rows = rowsFromTxt(read('data\\global\\excel\\automap.txt'));
   const palette = decodeDatPalette(read('data\\global\\palette\\act1\\pal.dat'));
-  const map = decodeDc6(read(AUTOMAP_PATH));
-  const frames = map.frames.map((frame) => makeFrameCanvas(frame, palette, documentObject));
-  // THE AUTOMAP'S OWN STEP, read off the sheet rather than declared. A cell is one world tile, and
-  // the sheet packs every cell into a frame box exactly as wide as its widest cell art, so that box
-  // width is the tile's footprint on the map (the floor diamonds fill it; the wall pieces are taller
-  // and hang upward, which is why the box is 16x32 and not 16x8). The overlay used to declare 0.25 --
-  // 20 px per tile -- which spaces the cells 4 px apart, and the sparse floor dithers 8 px apart, so
-  // TAB drew a lattice of isolated marks instead of a map (measured: s950/s951).
-  const step = Math.max(...map.frames.map((frame) => frame.width));
-  const scale = step / (2 * TILE_SCREEN_W); // TILE_SCREEN_W is a tile diamond HALF-width: the 16 px box is the 160 px tile diamond (retail step 8/4 per tile, f5b-automap-town.txt)
-  const layout = Object.freeze({ ...AUTOMAP_LAYOUT, step, scale });
+  // F234: the two art families, built on first use. `divisor` is retail's `nAutoMapZoomDivisor`
+  // (0x6fba16b0): the loader writes 10 for the full map and 20 when mode == 1 (0x6fb1476b/0x6fb14777),
+  // and the world->map scale is 1/divisor. `step` is read off the sheet rather than declared (a cell is
+  // one world tile, so the sheet's widest frame box is the tile's footprint on the map); it is kept for
+  // evidence and confirmation, the divisor is what the RE'd rule fixes the scale to.
+  const buildFamily = (mode) => {
+    const key = mode === 'mini' ? 'mini' : 'full', path = AUTOMAP_PATHS[key], dc6 = decodeDc6(read(path));
+    return { key, path, divisor: key === 'mini' ? 20 : 10, step: Math.max(...dc6.frames.map((frame) => frame.width)),
+      frames: dc6.frames.map((frame) => makeFrameCanvas(frame, palette, documentObject)) };
+  };
+  const families = new Map([['full', buildFamily('full')]]);
+  const family = (mode) => { const key = mode === 'mini' ? 'mini' : 'full'; if (!families.has(key)) families.set(key, buildFamily(key)); return families.get(key); };
+  // F234's five options, exactly as the Automap Options page holds them (game-menu.mjs AUTOMAP_DEFAULTS).
+  // Default `full` is retail's page default and the layout this overlay drew before the options existed.
+  let settings = { mode: 'full', fade: 'off', center: 'yes', party: 'yes', names: 'yes' };
+  const makeLayout = () => { const f = family(settings.mode); return { ...AUTOMAP_LAYOUT, step: f.step, scale: 1 / f.divisor, divisor: f.divisor, mode: f.key, source: f.path }; };
+  let frames = family('full').frames, layout = Object.freeze(makeLayout());
   let visible = false, evidence = { open: false, drawn: [], unresolved: [], layout, error: null };
   // Retail's automap is CLIENT state and it is per level. D2Client keeps a D2AutomapLayerStrc per
   // level (`nLayerNo`, the pFloors/pWalls/pObjects/pExtras cell lists, `pNext` the next layer), and
@@ -154,7 +164,14 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
     // one. The layer is filled on EVERY frame, not only while TAB is up: retail's map fills as the
     // player explores, and a map that only grows while it is being looked at is not a map of where
     // the player has been.
-    draw(ctx, width, height, snapshot, tiles = null, view = null) {
+    draw(ctx, width, height, snapshot, tiles = null, view = null, nextSettings = null) {
+      // F234: the settings arrive from the Automap Options page (the shell reads gameMenu.settings). The
+      // art family follows the mode, so the active sheet and the layout move with it, BEFORE the layer
+      // seeding below reads `frames`.
+      if (nextSettings) settings = { ...settings, ...nextSettings };
+      frames = family(settings.mode).frames;
+      layout = Object.freeze(makeLayout());
+      const fam = family(settings.mode), mode = fam.key;
       const levelId = snapshot.level;
             if (!layers.has(levelId)) { const fresh = new Map(); seed(fresh, levelId); layers.set(levelId, fresh); unrevealed.set(levelId, new Set()); revealed.set(levelId, { rooms: new Set(), hero: null }); }
       const layer = layers.get(levelId), unnamed = unrevealed.get(levelId);
@@ -217,6 +234,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
       if (!visible) return (evidence = { open: false, drawn: [], unresolved: [], layout, error: null });
       const levelType = Module.ccall('d2_session_level_type', 'number', [], []);
       const drawn = [], unresolved = [];
+      const scale = layout.scale;   // 1/divisor: 0.1 for the full map (mode != 1), 0.05 for the mini map (mode 1)
       // These read-only DRLG surfaces are map geometry, not a JS reconstruction: the level's
       // placed rectangle gives the panel's extent, while seam segments identify adjacent areas.
       const geometry = { levelRect: levelRect(Module, levelId), seams: (snapshot.warps || []).filter((w) => w.destinationLevel !== levelId)
@@ -228,7 +246,16 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
       // 16x8 diamond, (8,4) per tile step -- every one of the 890 cells of f5b-automap-town.txt and 826 of
       // a3-forest-walkin.txt sits on that lattice, offset by the hero's sub-tile position (0 in the town, where
       // the hero starts on a tile origin; 4,3 in the forest).
-      const cx = Math.round(width / 2), cy = Math.round(height / 2 + UNIT_CENTRE_Y);
+      // F234: AutoMapCenter. Retail's "centre" recompute (0x6fb108d0) writes the scroll offset
+      // `screenW/3 - anchorX - 16` and fires ONLY for mode 1 (`dec eax; je`), zeroing it for every other
+      // mode. The anchor comes from AutoMapLeft (0x6fbcc240): the whole-screen viewport uses 2*screenW/3,
+      // the small centred box screenW/3 (anchorY 78 both ways). AutoMapLeft is not one of the page's five
+      // rows, so it is derived from the mode -- "Full Screen vs Mini Map" is exactly the whole-screen vs
+      // small-box split retail's two branches make -- and that derivation is recorded, not assumed.
+      const leftAnchorX = (mode === 'mini' ? 1 : 2) * width / 3;
+      const centre = settings.center === 'yes' && mode === 'mini'
+        ? { x: Math.round(width / 3 - leftAnchorX - 16), y: Math.round(width / 3 - 78 - 16) } : { x: 0, y: 0 };
+      const cx = Math.round(width / 2) + centre.x, cy = Math.round(height / 2 + UNIT_CENTRE_Y) + centre.y;
       const hero = view?.camera || { x: snapshot.player.x + .5, y: snapshot.player.y + .5 };
       if (!layer.size) unresolved.push({ reason: 'this level has no revealed cell yet' });
       ctx.save(); ctx.imageSmoothingEnabled = false;
@@ -250,7 +277,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
         // bottom rows fell past 592 -- 31 of s953's ours-only cells (the `.ma0` tail) were that, not reveal.
         if (x + bitmap.width <= 0 || x >= width || y + bitmap.height <= 0 || y + bitmap.height - 1 > height - 8) continue;
         ctx.drawImage(bitmap, x, y);
-        drawn.push({ source: AUTOMAP_PATH, frame: cell.frame, requestedFrames: [...cell.requestedFrames], levelName: cell.levelName,
+        drawn.push({ source: fam.path, frame: cell.frame, requestedFrames: [...cell.requestedFrames], levelName: cell.levelName,
           tileName: cell.tileName, style: cell.style, startSequence: cell.startSequence, endSequence: cell.endSequence,
           tile: { orientation: cell.orientation, style: cell.mainIndex, sequence: cell.subIndex, layer: cell.layer, world: cell.world },
           at: [x, y], size: [bitmap.width, bitmap.height], order: drawn.length, remembered: !live.has(key) });
@@ -258,21 +285,30 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
       // Unit markers, as retail draws them over the map (f5b-automap-town.txt, a3-forest-walkin.txt): a
       // 12-segment 16x8 glyph centred 8 right / 7 up of the unit's feet, palette index 151 for the hero and
       // 32 for a town NPC (the draw list's colour is index + 256*k), plus the NPC's name beside it.
-      const markers = [];
-      const cross = (x, y, index) => {
+      const markers = [], nameplates = [];
+      const cross = (x, y, index, kind) => {
         const r = palette[index * 4], g = palette[index * 4 + 1], b = palette[index * 4 + 2]; ctx.fillStyle = `rgb(${r},${g},${b})`;
         for (let i = 0; i < CROSS.length - 1; i++) line(ctx, x + CROSS[i][0], y + CROSS[i][1], x + CROSS[i + 1][0], y + CROSS[i + 1][1]);
-        markers.push({ index, at: [x, y] });
+        markers.push({ index, at: [x, y], kind });
       };
       if (view) {
-        for (const n of view.npcs || []) { cross(Math.round(n.sx) + 8, Math.round(n.sy) - 7, NPC_COLOUR); if (n.label && view.font) view.font.draw(ctx, n.label, Math.round(n.sx) - 18 + 8, Math.round(n.sy) - 10 + 2 - 7); }
-        cross(Math.round(cx) + 8, Math.round(cy) - 7, HERO_COLOUR);
+        // F234: AutoMapParty (0x6fb11bc1) gates a non-player unit's marker and AutoMapPartyNames
+        // (0x6fb11ac3) its nameplate; the hero's own marker is always drawn. With Party = No retail draws
+        // no party unit at all, and the page forces Names to No with it (game-menu.mjs cycle()).
+        if (settings.party === 'yes') for (const n of view.npcs || []) {
+          cross(Math.round(n.sx) + 8, Math.round(n.sy) - 7, NPC_COLOUR, 'party');
+          if (settings.names === 'yes' && n.label && view.font) { const at = [Math.round(n.sx) - 18 + 8, Math.round(n.sy) - 10 + 2 - 7]; view.font.draw(ctx, n.label, at[0], at[1]); nameplates.push({ text: n.label, at }); }
+        }
+        cross(Math.round(cx) + 8, Math.round(cy) - 7, HERO_COLOUR, 'hero');
       }
       ctx.restore();
-      return (evidence = { open: true, markers, levelType, levelName: LEVEL_NAMES[levelType] ?? 'None', cells: layer.size,
+      return (evidence = { open: true, markers, nameplates, levelType, levelName: LEVEL_NAMES[levelType] ?? 'None', cells: layer.size,
+        mode, divisor: fam.divisor, source: fam.path, settings: { ...settings }, centre,
         unrevealed: unnamed.size, drawn, unresolved, geometry, layout, error: null });
     },
     get evidence() { return JSON.parse(JSON.stringify(evidence)); },
+    /** F234: the Automap Options page's five settings, read by the shell from gameMenu.settings each frame. */
+    setSettings(next) { if (next) settings = { ...settings, ...next }; },
     // The overlay's own open state, as a boolean: the frame loop asks this every frame, and
     // `evidence` is a JSON copy of every drawn cell, which is not a per-frame read (F115 gates the
     // area-name block on it).

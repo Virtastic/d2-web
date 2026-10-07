@@ -2951,6 +2951,63 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_exit_probe(int32_t levelId, int32
     return g_sessionExitProbe.data();
 }
 
+// PROBE (F845/F805 adjacency diff, eng-edges): a DRLG room's ppRoomsNear list, room by room, WITH the
+// level id of each neighbour -- the difference between the geometric proximity list sub_6FD77BB0
+// builds (every room within 6 tiles, incl. self) and the list retail's f78 capture reports is the
+// warp-link path (sub_6FD77F00 appends a HAS_WARP destination room to ppRoomsNear). Reading the
+// neighbour's level id tells a same-level proximity entry apart from a cross-level warp entry, which
+// is the only way to name which room is the +1. Layout: {nRoomsNear} then nRoomsNear * {levelId,
+// tileX, tileY}. Read-only.
+static std::vector<int32_t> g_sessionNearProbe;
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_near_probe(int32_t levelId, int32_t ordinal) {
+    g_sessionNearProbe.clear();
+    if (!g_sessionLive || !g_lastLevel || !g_lastLevel->pDrlg) return g_sessionNearProbe.data();
+    D2DrlgLevelStrc* level = levelId < 0 ? g_lastLevel : DRLG_GetLevel(g_lastLevel->pDrlg, levelId);
+    if (!level) return g_sessionNearProbe.data();
+    D2DrlgRoomStrc* roomEx = level->pFirstRoomEx;
+    for (int32_t i = 0; roomEx && i < ordinal; ++i) roomEx = roomEx->pDrlgRoomNext;
+    if (!roomEx) { g_sessionNearProbe.push_back(-1); return g_sessionNearProbe.data(); }
+    g_sessionNearProbe.push_back(roomEx->nRoomsNear);
+    for (int32_t i = 0; i < roomEx->nRoomsNear; ++i) {
+        D2DrlgRoomStrc* n = roomEx->ppRoomsNear[i];
+        g_sessionNearProbe.push_back((n && n->pLevel) ? n->pLevel->nLevelId : -1);
+        g_sessionNearProbe.push_back(n ? n->nTileXPos : -1);
+        g_sessionNearProbe.push_back(n ? n->nTileYPos : -1);
+    }
+    return g_sessionNearProbe.data();
+}
+
+// PROBE (walk barrier, eng-pocket): the mover's own START room vs the room the hero stands in.
+//
+// D2Common_10142 (Path.cpp:384) sets `tPathInfo.pStartRoom = pPath->pRoom` and resolves the click's
+// target room as ONE DRLG hop from THAT room (`COLLISION_GetRoomBySubTileCoordinates(pStartRoom,
+// target)`) -- so the mover's whole reach is one hop from the path's OWN room, which retail re-roots
+// to the hero's current room as it moves (D2Common_10226 -> PATH_RecacheRoomAtCoordIfNeeded ->
+// PATH_RecacheRoom). If OUR path->pRoom is left behind as the hero walks, every click is measured
+// from a room he has LEFT and the pocket does not advance with him -- the barrier F825/F671 name, by
+// its own mechanism instead of by a hypothesis. This reads both rooms, so "stale start room" is a
+// measurement. Layout:
+//   { pRoom's ordinal on g_lastLevel's list (-1 = not on it), heroX, heroY,
+//     the level-list ordinal of the room covering the hero's own coords,
+//     1 if GetRoomAtPosition(pRoom, hero) resolves (0 = pRoom is beyond one hop from the hero),
+//     dwPathPoints, dwFlags }. Read-only.
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_path_room_probe() {
+    static int32_t p[7];
+    memset(p, 0, sizeof p); p[0] = -1; p[3] = -1;
+    if (!g_targetPlayer || !g_targetPlayer->pDynamicPath || !g_lastLevel) return p;
+    D2DynamicPathStrc* path = g_targetPlayer->pDynamicPath;
+    p[1] = path->tGameCoords.wPosX; p[2] = path->tGameCoords.wPosY;
+    p[5] = (int32_t)path->dwPathPoints; p[6] = (int32_t)path->dwFlags;
+    int32_t ord = 0;
+    for (D2DrlgRoomStrc* r = g_lastLevel->pFirstRoomEx; r; r = r->pDrlgRoomNext, ++ord)
+        if (r->pRoom && r->pRoom == path->pRoom) { p[0] = ord; break; }
+    ord = 0;
+    for (D2DrlgRoomStrc* r = g_lastLevel->pFirstRoomEx; r; r = r->pDrlgRoomNext, ++ord)
+        if (r->pRoom && DungeonTestRoomGame(r->pRoom, p[1], p[2])) { p[3] = ord; break; }
+    p[4] = COLLISION_GetRoomBySubTileCoordinates(path->pRoom, p[1], p[2]) ? 1 : 0;
+    return p;
+}
+
 // PROBE (F106's named instrument): the pending-rooms pass, which is the ONLY keeper that
 // can populate a room nobody walked into. `d2_session_exit_probe` already reads a room's preset lists
 // and `built`; this reads the OTHER half of the fork, so "the room was never populated" splits into
@@ -5193,14 +5250,29 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         // command at that same spot picks it up). Complete retail's interaction once the walk has
         // arrived (its path is spent), then forget the pile: a pickup that still cannot complete
         // leaves it for the player to click again, exactly as a refused retail pickup does.
+        //
+        // Hardening (F715/F684): complete the pickup ONLY when the walk whose path just spent was
+        // heading to THIS pile. Retail records the walked-to unit on the path itself -- the ITEM
+        // branch's mode-3 start (PLRMODE_StartID_WalkRunKnockback) calls PATH_SetTargetUnit(path,
+        // item), and every OTHER walk-starting command repoints or clears it (a plain move's
+        // D2COMMON_10170_PathSetTargetPos sets pTargetUnit = NULL; an object/NPC/tile/warp walk sets
+        // its own target). Without this test a pending pickup left over from an earlier command
+        // fires at the end of any UNRELATED walk that happens to finish within 4 subtiles of the
+        // pile: sub_6FC828D0 is re-issued, which starts a NEW walk, shifting the deterministic chain
+        // (the F715/F684 regressions). A walk that no longer names the pile supersedes the pickup --
+        // drop it.
         if (g_sessionPendingPickup) {
             D2UnitStrc* pending = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)g_sessionPendingPickup);
+            D2DynamicPathStrc* const ppath = g_targetPlayer->pDynamicPath;
             if (!pending || pending->dwAnimMode != IMODE_ONGROUND || !UNITS_GetRoom(pending)) {
                 g_sessionPendingPickup = 0;
-            } else if (!dying && g_targetPlayer->pDynamicPath && g_targetPlayer->pDynamicPath->dwPathPoints == 0) {
+            } else if (!ppath || ppath->pTargetUnit != pending) {
+                // The path's own goal is not this pile (repointed by another interaction, or cleared
+                // by a plain move): the pickup this command started was superseded. Forget it.
+                g_sessionPendingPickup = 0;
+            } else if (!dying && ppath->dwPathPoints == 0) {
                 // One completion attempt per arrival: in reach (the ITEM case's own pickup range),
-                // run the interaction; a walk that ended out of reach (a later move command
-                // superseded it) just drops the stale pickup.
+                // run the interaction; a walk that ended out of reach just drops the stale pickup.
                 if (D2Common_10399(g_targetPlayer, pending) <= 4) {
                     sub_6FC828D0(g_targetPlayer, UNIT_ITEM, (int32_t)g_sessionPendingPickup, 0, g_game);
                 }

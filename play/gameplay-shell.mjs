@@ -2511,7 +2511,7 @@ function drawFrame() {
   automapOverlay?.draw(ctx, w, h, snapshot, terrainTiles, automapOverlay.isOpen ? { camera: cameraCentre(), font: automapFont,
     npcs: snapshot.entities.filter((e) => e.npc).map((e) => { const [sx, sy] = proj(...unitAnchor(e));
       const idx = Module.ccall('d2_monster_name_str', 'number', ['number'], [e.classId]);
-      return { sx, sy, label: idx >= 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [idx]) : '' }; }) } : null);
+      return { sx, sy, label: idx >= 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [idx]) : '' }; }) } : null, gameMenu?.settings);
   perfT('automap', pAutomap);
   // A panel open on a half turns that half into tiled stone with its frame (SGD2FreeRes draw_screen_background).
   const pWide = perfT0();
