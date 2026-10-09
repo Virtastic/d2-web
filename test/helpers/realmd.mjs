@@ -7,28 +7,48 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-// Build realmd and start it on the given ports. Returns null when the box cannot build it, so the
-// caller can skip rather than fail.
+// Build realmd and start it on the given ports. Returns null only when the compiler is absent, so
+// callers can skip on that genuine prerequisite. Build and startup errors are test failures: in
+// particular, a bind conflict must not turn protocol coverage into a green SKIP.
 //
 // `tag` gives each test file its OWN binary. node --test runs files in parallel, so a shared output
 // path means one file's g++ rewrites the binary another file is currently executing -- which fails
 // as ETXTBSY, intermittently and confusingly.
-export async function startRealmd(ports, tag = 'test') {
+export async function startRealmd(ports, tag = 'test', extraArgs = []) {
   const BIN = join(ROOT, 'build-wasm', `realmd-${tag}`);
-  if (spawnSync('g++', ['--version']).status !== 0) return null;
-  if (spawnSync('bash', [join(ROOT, 'ci', 'build-realmd.sh'), BIN]).status !== 0) return null;
-  if (!existsSync(BIN)) return null;
-  const proc = spawn(BIN, ['--bncs', String(ports.bncs), '--mcp', String(ports.mcp), '--d2gs', String(ports.d2gs)],
+  const compiler = spawnSync('g++', ['--version'], { encoding: 'utf8' });
+  if (compiler.error?.code === 'ENOENT') return null;
+  if (compiler.status !== 0) {
+    throw new Error(`g++ --version failed (${compiler.status ?? compiler.error?.message}): ${compiler.stderr ?? ''}`);
+  }
+  const build = spawnSync('bash', [join(ROOT, 'ci', 'build-realmd.sh'), BIN], { encoding: 'utf8' });
+  if (build.status !== 0) {
+    throw new Error(`realmd build failed (${build.status ?? build.error?.message}):\n${build.stdout ?? ''}${build.stderr ?? ''}`);
+  }
+  if (!existsSync(BIN)) throw new Error(`realmd build succeeded but did not create ${BIN}`);
+  const proc = spawn(BIN, ['--bncs', String(ports.bncs), '--mcp', String(ports.mcp), '--d2gs', String(ports.d2gs), ...extraArgs],
     { stdio: ['ignore', 'pipe', 'pipe'] });
-  // realmd announces readiness on stdout, so wait for that rather than sleeping.
+  // realmd announces readiness on stdout, so wait for that rather than sleeping. A premature
+  // exit or timeout is an unexpected server failure, not an unavailable prerequisite.
+  let stdout = '';
+  let stderr = '';
   const ok = await new Promise((resolve) => {
     const t = setTimeout(() => resolve(false), 8000);
     proc.stdout.on('data', (d) => {
-      if (d.toString().includes('realmd listening')) { clearTimeout(t); resolve(true); }
+      stdout += d.toString();
+      if (stdout.includes('realmd listening')) { clearTimeout(t); resolve(true); }
     });
-    proc.once('exit', () => { clearTimeout(t); resolve(false); });
+    proc.stderr.on('data', (d) => { stderr += d.toString(); });
+    proc.once('error', (error) => { clearTimeout(t); resolve(error); });
+    proc.once('exit', (code, signal) => { clearTimeout(t); resolve({ code, signal }); });
   });
-  if (!ok) { proc.kill('SIGKILL'); return null; }
+  if (ok !== true) {
+    if (proc.exitCode === null && !proc.killed) proc.kill('SIGKILL');
+    const reason = ok instanceof Error ? ok.message
+      : ok === false ? 'timed out waiting for readiness'
+        : `exited with code ${ok.code}${ok.signal ? ` (signal ${ok.signal})` : ''}`;
+    throw new Error(`realmd ${tag} failed to start: ${reason}\nstdout: ${stdout}\nstderr: ${stderr}`);
+  }
   return proc;
 }
 

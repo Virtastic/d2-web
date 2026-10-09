@@ -17,6 +17,8 @@ import { createFont, decodeFontTbl, FRONTEND, TITLE_COLUMNS, composeTiled, creat
 import { drawPath, fnv1a, recordDc6, recordDcc } from './drawlist.mjs';
 import { CLASS_NAMES } from './save-store.mjs';
 import { createDeleteConfirmFlow } from './delete-confirm-flow.mjs';
+import { characterCardHitBox, createCharacterSelectCardInput } from './charselect-card-input.mjs';
+import { isButtonHeldOverTarget } from './frontend-pointer-states.mjs';
 import { decodeCof, decodeDcc } from './unit-formats.mjs';
 import { playerClassInfo, dccDirection } from './unit-renderer.mjs';
 
@@ -81,7 +83,7 @@ export const DELETE_STRINGS = { confirm: 5163, yes: 5166, no: 5167 };
 export const PORTRAIT = { x: 67, anchor: 165 };
 
 /** `characters` is the store's listing. onPlay(name), onCreate(), onCancel(), onDelete(name). */
-export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, characters, onPlay, onCreate, onCancel, onDelete = null, onConvert = null, string = null, componentToken = null, documentObject = globalThis.document }) {
+export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, characters, onPlay, onPlayRefused = null, onCreate, onCancel, onDelete = null, onConvert = null, string = null, componentToken = null, documentObject = globalThis.document }) {
   // Keep the requested path separate from the bytes that were actually decoded.  The latter is
   // carried to every confirmation blit: a constant copied into both sides of an assertion cannot
   // make a substituted DC6 or palette look correct.
@@ -280,7 +282,8 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
   const deleteFlow = createDeleteConfirmFlow(onDelete);
   // The pointer in 800x600 screen pixels, retail's own anchor for the ohand cel (D2Win draws it last,
   // at (mouse x, mouse y - 1)); null until the pointer has moved over the canvas.
-  let pointer = null, pressed = null;
+  let pointer = null, pressed = null, hot = null;
+  const cardInput = createCharacterSelectCardInput();
   const scene = documentObject.createElement('canvas'); scene.width = SCREEN.width; scene.height = SCREEN.height;
   const sceneCtx = scene.getContext('2d', { willReadFrequently: true });
 
@@ -303,12 +306,13 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       return null;
     }
     for (const id of ORDER) if (inBox(p, buttonBox(id))) return `button-${id}`;
-    for (let i = 0; i < list.length; i++) if (inBox(p, cardBox(i))) return `card-${i}`;
+    for (let i = 0; i < list.length; i++) if (inBox(p, characterCardHitBox(i))) return `card-${i}`;
     return null;
   };
   // Retail's rule: CONVERT is live only for a classic character (an expansion one cannot be converted); with no character it is dead too.
   const convertDisabled = () => selected < 0 || Boolean(list[selected].expansion);
-  const isDisabled = (id) => id === 'convert' ? convertDisabled() : Boolean(BUTTONS[id].disabled);
+  const isDisabled = (id) => id === 'convert' ? convertDisabled() :
+    (id === 'ok' || id === 'delete') ? selected < 0 : Boolean(BUTTONS[id].disabled);
   const describe = (ch) => `Level ${ch.level} ${CLASS_NAMES[ch.playerClass] ?? ch.className ?? ''}`;
 
   return {
@@ -343,9 +347,21 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       };
     },
     selectByName(name) { const i = list.findIndex((ch) => ch.name === name); if (i >= 0) selected = i; return i; },
-    play() { if (!deleteFlow.blocked && selected >= 0) onPlay?.(list[selected].name); },
+    play() {
+      if (deleteFlow.blocked || selected < 0) return false;
+      const character = list[selected];
+      // D2Launch's selected-character OK callback refuses a save carrying both HARDCORE and DEAD
+      // before it enters game creation (FUN_6FA4DEC0, 1.13c). Preserve that front-door result here.
+      if (character.hardcore && character.dead) {
+        onPlayRefused?.({ name: character.name, stringId: 0x14B8 });
+        return false;
+      }
+      onPlay?.(character.name);
+      return true;
+    },
     /** The pointer over this screen, in 800x600 pixels (retail's ohand anchor). */
-    hover(x, y, width, height) { const v = view(width, height); pointer = [Math.trunc((x - v.ox) / v.scale), Math.trunc((y - v.oy) / v.scale)]; },
+    hover(x, y, width, height) { const v = view(width, height), p = { x: (x - v.ox) / v.scale, y: (y - v.oy) / v.scale };
+      pointer = [Math.trunc(p.x), Math.trunc(p.y)]; hot = hitControl(p); },
     /** The store's listing changed under us (a character was deleted): rebuild the portraits. */
     setCharacters(next) { list.length = 0; list.push(...next.slice(0, 8)); portraits = list.map(portrait);
       selected = list.length ? Math.max(0, Math.min(selected, list.length - 1)) : -1; deleteFlow.cancel(); },
@@ -353,7 +369,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
     targets(width, height) {
       const v = view(width, height);
       const centre = (b) => [Math.round(v.ox + (b.x + b.w / 2) * v.scale), Math.round(v.oy + (b.y + b.h / 2) * v.scale)];
-      const characters = Object.fromEntries(list.map((ch, i) => [ch.name, centre(cardBox(i))]));
+      const characters = Object.fromEntries(list.map((ch, i) => [ch.name, centre(characterCardHitBox(i))]));
       const play = centre(buttonBox('ok')), create = centre(buttonBox('create')), exit = centre(buttonBox('exit'));
       // The confirmation's own targets: they exist only while it is open (retail's dialog is modal).
       const dialog = deleteFlow.armed >= 0 ? { DELETE_YES: centre(dialogButtonBox('yes')), DELETE_NO: centre(dialogButtonBox('no')) } : {};
@@ -378,10 +394,21 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
     },
     press(x, y, width, height) {
       const p = toScreen(x, y, width, height);
-      return (pressed = hitControl(p));
+      pressed = hitControl(p); hot = pressed;
+      if (pressed?.startsWith('card-') && !deleteFlow.blocked) {
+        const index = Number(pressed.slice('card-'.length));
+        const wasSelected = selected;
+        selected = index;
+        if (cardInput.down(index, wasSelected, globalThis.performance?.now?.() ?? Date.now()) && selected >= 0) {
+          this.play();
+        }
+      }
+      return pressed;
     },
     release(token, x, y, width, height) {
-      const p = toScreen(x, y, width, height), now = hitControl(p); pressed = null;
+      const p = toScreen(x, y, width, height), now = hitControl(p); pressed = null; hot = now;
+      // D2Launch's type-4 card callback runs on WM_LBUTTONDOWN and has no mouse-up callback.
+      if (token?.startsWith('card-')) return null;
       // The release point decides: a press on YES released anywhere else cancels the dialog
       // instead of deleting the character the player was dragging away from.
       return now === token ? this.click(x, y, width, height) : null;
@@ -403,7 +430,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       // the order is part of the record, not an artefact of the anchors: the anchor each line lands on is
       // retail's either way, only the call order moves. Ours is a comparison of call order, so it counts.
       for (const id of ORDER) {
-        const b = { ...BUTTONS[id], disabled: isDisabled(id) }, state = pressed === `button-${id}` ? 1 : 0, k = kinds[b.kind].states[state] || kinds[b.kind].states[0], bottom = b.top + k.frame.height - 1;
+        const b = { ...BUTTONS[id], disabled: isDisabled(id) }, token = `button-${id}`, state = isButtonHeldOverTarget(pressed, hot) && pressed === token ? 1 : 0, k = kinds[b.kind].states[state] || kinds[b.kind].states[0], bottom = b.top + k.frame.height - 1;
         if (b.disabled) trans50(g, k.frame, b.x, b.top); else g.drawImage(k.canvas, b.x, b.top);
         recordDc6(kinds[b.kind].path, state < kinds[b.kind].states.length ? state : 0, k.frame, b.x, b.top, { op: 'cel', mode: b.disabled ? 1 : 5 });
         // Retail's pressedButtonOffset: a held button's label moves 2 px left and 2 px down with its
@@ -452,7 +479,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
         confirmLines.forEach((line, n) => confirmFont.drawAnchored(g, line, Math.trunc(DELETE_DIALOG.label.x - confirmFont.measure(line) / 2), DELETE_DIALOG.label.anchor + n * confirmFont.lineHeight));
         for (const [id, text] of [['no', noText], ['yes', yesText]]) {
           const b = dialogButtonBox(id);
-          const state = pressed === `delete-${id}` ? 1 : 0, face = okCancel.states[state] || okCancel.states[0];
+          const token = `delete-${id}`, state = isButtonHeldOverTarget(pressed, hot) && pressed === token ? 1 : 0, face = okCancel.states[state] || okCancel.states[0];
           g.drawImage(face.canvas, b.x, b.y);
           dialogDraw('button', SELECT_ASSETS.okCancel, okCancelSource, 'data\\global\\palette\\Units\\pal.dat', unitsPaletteSource, recordDc6(okCancel.path, state < okCancel.states.length ? state : 0, face.frame, b.x, b.y));
           okCancelFont.drawAnchored(g, text, b.x + Math.trunc((b.w - okCancelFont.measure(text)) / 2), b.y + Math.trunc((b.h + okCancelFont.cellHeight) / 2) - 1);        }

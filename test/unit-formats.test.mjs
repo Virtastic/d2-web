@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { composeCofFrame, decodeCof, decodeDcc } from '../play/assets/unit-formats.mjs';
+import { cofLayerRecord, composeCofFrame, decodeCof, decodeDcc } from '../play/assets/unit-formats.mjs';
 
 function cofFixture() {
   // 2 layers, 2 frames, 1 direction: header + body prelude + layers + events + priorities.
@@ -40,6 +40,12 @@ test('COF decodes layers, events, and per-frame draw priorities', () => {
   const cof = decodeCof(cofFixture());
   assert.deepEqual([cof.layers, cof.framesPerDirection, cof.directions, cof.speed], [2, 2, 1, 128]);
   assert.equal(cof.layerRecords[0].weaponClass, 'HTH');
+  assert.equal(cofLayerRecord(cof, cof.layerRecords[1].component), cof.layerRecords[1]);
+  assert.equal(Object.keys(cof).includes('layerByComponent'), false, 'render lookup cache is not part of the decoded public shape');
+  const first = { component: 5 }, duplicate = { component: 5 };
+  assert.equal(cofLayerRecord({ layerRecords: [first, duplicate] }, 5), first, 'uncached COFs preserve array-find first-match behavior');
+  assert.equal(cofLayerRecord({ layerRecords: [first, duplicate], layerByComponent: new Map([[5, first]]) }, 5), first,
+    'cached COFs preserve the first duplicate record');
   assert.deepEqual(Array.from(cof.events), [0, 1]);
   assert.deepEqual(cof.priority, [[[1, 5], [5, 1]]]);
 });

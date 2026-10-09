@@ -272,7 +272,17 @@ void CLIENTS_UpdateCharacterProgression(D2ClientStrc* pClient, uint16_t nAct, ui
 void D2GAME_PACKETS_SendHeaderOnlyPacket(D2ClientStrc* pClient, uint8_t nHeader) {
     if (pClient) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &nHeader, 1);
 }
-void __fastcall D2GAME_PACKETS_SendPacket0x15_6FC3D0D0(D2ClientStrc*, char, char, int32_t, int16_t, int16_t, char) {}
+void __fastcall D2GAME_PACKETS_SendPacket0x15_6FC3D0D0(D2ClientStrc* pClient, char nHeader, char nUnitType,
+    int32_t dwUnitId, int16_t nX, int16_t nY, char nFlag) {
+    D2GSPacketSrv15 packet{};
+    packet.nHeader = static_cast<uint8_t>(nHeader);
+    packet.nUnitType = static_cast<uint8_t>(nUnitType);
+    packet.dwUnitGUID = static_cast<uint32_t>(dwUnitId);
+    packet.nPosX = static_cast<uint16_t>(nX);
+    packet.nPosY = static_cast<uint16_t>(nY);
+    packet.unk0x00A = static_cast<uint8_t>(nFlag);
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+}
 // 0x97 is the "your weapons swapped" item update, sent to the client that asked. The browser client
 // reads the engine's own state instead of a D2 packet stream, so there is nothing to send -- but the
 // symbol has to exist now that the swap itself is reachable (d2_session_command_swap_weapons, F3):

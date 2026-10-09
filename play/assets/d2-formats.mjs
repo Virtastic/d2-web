@@ -44,6 +44,22 @@ export function decodeDatPalette(input) {
   return rgba;
 }
 
+/** Convert indexed DT1 pixels through a decoded DAT palette without inventing opaque pixels. */
+export function tilePixelsToRgba(pixels, palette) {
+  if (!pixels?.indices || !pixels?.opaque || pixels.indices.length !== pixels.opaque.length) {
+    throw new TypeError('DT1 tile pixels require equal index and opacity planes');
+  }
+  if (!(palette instanceof Uint8Array) || palette.length !== 1024) {
+    throw new RangeError('decoded palette must contain 256 RGBA colors');
+  }
+  const rgba = new Uint8ClampedArray(pixels.indices.length * 4);
+  for (let i = 0; i < pixels.indices.length; i++) {
+    if (!pixels.opaque[i]) continue;
+    rgba.set(palette.subarray(pixels.indices[i] * 4, pixels.indices[i] * 4 + 4), i * 4);
+  }
+  return rgba;
+}
+
 function decodeDc6Frame(bytes, view, offset, frameIndex) {
   requireRange(bytes, offset, DC6_FRAME_HEADER_BYTES, `DC6 frame ${frameIndex} header`);
   const u32 = n => view.getUint32(offset + n, true);
@@ -160,24 +176,26 @@ function decodeDt1TilePixels(bytes, tile, tileIndex) {
   }
   const indices = new Uint8Array(width * height);
   const opaque = new Uint8Array(width * height);
-  const put = (blockIndex, x, y, index) => {
-    const px = x - x0, py = y - y0;
-    if (px < 0 || py < 0 || px >= width || py >= height) {
-      throw new RangeError(`DT1 tile ${tileIndex} block ${blockIndex} pixel outside bounds`);
-    }
-    const block = tile.blocks[blockIndex];
-    const local = (y - block.y) * 32 + x - block.x;
-    block.pixels.indices[local] = index;
-    block.pixels.written[local] = 255;
-    const destination = py * width + px;
-    indices[destination] = index;
-    opaque[destination] = index === 0 ? 0 : 255;
-  };
 
   for (let blockIndex = 0; blockIndex < tile.blocks.length; blockIndex++) {
     const block = tile.blocks[blockIndex];
     const blockHeight = block.format === 1 ? 15 : 32;
     block.pixels = { indices: new Uint8Array(32 * blockHeight), written: new Uint8Array(32 * blockHeight) };
+    // Runs are contiguous within one validated 32-pixel block row. Compute
+    // the two row offsets once, retaining each block's independent write mask
+    // and later-block overwrite order (including written palette index zero).
+    const putRun = (x, y, source, count) => {
+      let local = y * 32 + x;
+      let destination = (block.y + y - y0) * width + block.x + x - x0;
+      const blockIndices = block.pixels.indices, written = block.pixels.written;
+      for (let column = 0; column < count; column++) {
+        const index = bytes[source + column];
+        blockIndices[local] = index;
+        written[local++] = 255;
+        indices[destination] = index;
+        opaque[destination++] = index === 0 ? 0 : 255;
+      }
+    };
     const start = tile.blockHeadersOffset + block.dataOffset;
     requireRange(bytes, start, block.dataLength,
       `DT1 tile ${tileIndex} block ${blockIndex} pixel data`);
@@ -189,9 +207,8 @@ function decodeDt1TilePixels(bytes, tile, tileIndex) {
       }
       for (let row = 0; row < DT1_ISO_RUN.length; row++) {
         const count = DT1_ISO_RUN[row];
-        for (let column = 0; column < count; column++) {
-          put(blockIndex, block.x + DT1_ISO_SKIP[row] + column, block.y + row, bytes[cursor++]);
-        }
+        putRun(DT1_ISO_SKIP[row], row, cursor, count);
+        cursor += count;
       }
       continue;
     }
@@ -219,9 +236,9 @@ function decodeDt1TilePixels(bytes, tile, tileIndex) {
       if (cursor > end - run) {
         throw new RangeError(`truncated DT1 tile ${tileIndex} block ${blockIndex} RLE run`);
       }
-      for (let column = 0; column < run; column++) {
-        put(blockIndex, block.x + x++, block.y + y, bytes[cursor++]);
-      }
+      putRun(x, y, cursor, run);
+      x += run;
+      cursor += run;
     }
   }
   return { originX: x0, originY: y0, width, height, indices, opaque };

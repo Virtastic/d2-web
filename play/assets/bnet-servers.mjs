@@ -96,6 +96,18 @@ export function createGatewaySelector({ servers, screen, width = 800, height = 6
   const buttonAt = (x, y) => Object.entries(GATEWAY_LAYOUT.button).filter(([k]) => k === 'ok' || k === 'cancel')
     .find(([k, b]) => x >= b.x && x < b.x + GATEWAY_LAYOUT.button.w && y >= GATEWAY_LAYOUT.button.y && y < GATEWAY_LAYOUT.button.y + GATEWAY_LAYOUT.button.h)?.[0] ?? null;
   const selectedServer = () => committed >= 0 ? { ...servers[committed] } : null;
+  // The descriptor's keyboard action and matching pointer release share the same callback.
+  const finish = (button) => {
+    pressed = null;
+    open = false;
+    if (button === 'ok') {
+      committed = choice;
+      if (onCommit && committed >= 0) onCommit({ ...servers[committed] });
+      return committed;
+    }
+    choice = committed;
+    return -1;
+  };
   return {
     get open() { return open; },
     get selected() { return selectedServer(); },
@@ -127,9 +139,16 @@ export function createGatewaySelector({ servers, screen, width = 800, height = 6
       pressed = null;
       if (!target || token !== `gateway:${target}` || wasPressed !== target) return -1;
       if (h.row >= 0) { choice = h.row; return choice; }
-      if (h.button === 'ok') { committed = choice; open = false; if (onCommit && committed >= 0) onCommit({ ...servers[committed] }); return committed; }
-      if (h.button === 'cancel') { choice = committed; open = false; return -1; }
+      if (h.button) return finish(h.button);
       return -1;
+    },
+    // D2Launch type-6 descriptors bind VK_RETURN to OK and VK_ESCAPE to Cancel.
+    key(code) {
+      if (!open) return false;
+      const button = code === 'Enter' || code === 'NumpadEnter' ? 'ok' : code === 'Escape' ? 'cancel' : null;
+      if (!button) return false;
+      finish(button);
+      return true;
     },
     cancel() { pressed = null; },
     gatewayBar() { return committed >= 0 ? GATEWAY_BAR_PREFIX + servers[committed].region.toUpperCase() : DEFAULT_GATEWAY_LABEL; },

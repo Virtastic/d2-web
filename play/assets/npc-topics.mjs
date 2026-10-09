@@ -7,6 +7,5 @@ export const questOfMessage = (id) => { const r = QUEST_MESSAGE_RANGES.find(([a,
 // fixed gossip line per NPC (talk-*-r22: the same on 3-4 clicks). Measured for Kashya and Akara only; keyed by MonStats class id.
 export const NPC_SPEECH = { 150: { intro: 24, gossip: 30 }, 148: { intro: 11, gossip: 17 } };
 export const npcSpeech = (classId) => NPC_SPEECH[classId] || null;
-// F21: the speech box's scroll and its rate now live with the box that draws it -- speech-box.mjs's
-// SPEECH_PX_PER_S (9 px/s, fitted to talk-*-r22's ~20 s Kashya / ~60 s Akara speeches, the only
-// constant in that model no retail vector measures).
+// F21: native D2Client speech timing is implemented in speech-box.mjs from the numeric D2Lang
+// header and FUN_6FB2BB40's fixed-point tick formula; vectors still supply the captured text identity.

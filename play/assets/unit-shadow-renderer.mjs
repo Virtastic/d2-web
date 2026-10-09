@@ -6,10 +6,11 @@
 //     layers, then the monsters' and the objects' -- 18 shadow draws, before the first wall).
 //   * the transform is a half-height shear: a source row h rows above the anchor lands at
 //     (x - h/2, y - h/2), taken as the INTEGER step of the destination, not a per-pixel rounding.
-//     **F461:** retail's rasteriser keeps ONE destination row
-//     per TWO source rows -- it walks the cel's rows in storage order, samples every SECOND one and
-//     DISCARDS the row between (never merging the pair), stepping one row and one pixel left per
-//     destination row from a base of `anchor + trunc(celYOffset/2)`. The ported rule below is that
+//     **F461:** retail's rasteriser has an unclipped row budget
+//     of `height >> 1` destination rows -- it walks the cel's rows in storage order, samples every SECOND one and
+//     DISCARDS the row between (never merging the pair), omitting an odd-height final row, and
+//     stepping one row and one pixel left per destination row from a base of
+//     `anchor + trunc(celYOffset/2)`. The ported rule below is that
 //     exact walk; it reproduces retail's own shadow footprint cell-for-cell (s1510 PASS: 5,977/5,977
 //     town-lit, 4,218/4,218 den-shadow-lit). The pass used to keep EVERY source row and round each
 //     through `round(anchorY - 0.5h)`, which merged each pair onto one destination row and both over-
@@ -28,38 +29,14 @@
 // 1024-byte base palette), and it is byte-identical to MultiplicativeBlend[190] in all five acts, so
 // either name reaches the same table.  The base palette and pal.dat are identical in all five acts and
 // their 256 colours are distinct, so a canvas pixel's index is recoverable exactly.
-import { composeCofFrame } from './unit-formats.mjs';
+import { cofLayerRecord, composeCofFrame } from './unit-formats.mjs';
+import { shadowMaskLayout, shadowVisibleBounds } from './unit-shadow-raster.mjs';
+import { perfT0, perfT } from './frame-perf.mjs';
 
 const ACT_PALETTE = ['ACT1', 'ACT2', 'ACT3', 'ACT4', 'ACT5'];
 // PL2: 1024-byte base palette, then 32 LightLevelVariations tables, then InvColorVariations(16),
 // SelectedUnitShift(1) and the blend tables (OpenDiablo2-pl2 pkg/decode.go).
 const LIGHT_LEVEL_7 = 1024 + 7 * 256;
-
-// A composed plane's shadow footprint, as DESTINATION offsets (dx = sx - k, dy = -k) from the base cell,
-// deduplicated. Anchor-independent, so cached by plane identity (composeCofFrame memoises planes, so a
-// plane object is stable while its cel/frame does not change). Returns a flat Int32Array of [dx, dy,...].
-const maskCache = new WeakMap();
-function shadowMask(plane) {
-  let mask = maskCache.get(plane);
-  if (mask) return mask;
-  const seen = new Set(), offs = [];
-  for (let sy = 0; sy < plane.height; sy++) {
-    const b = plane.height - 1 - sy;
-    if (b & 1) continue;                                 // the discarded row: one destination row per two source rows
-    const k = b >> 1;                                    // one row up per destination row
-    for (let sx = 0; sx < plane.width; sx++) {
-      if (!plane.opaque[sy * plane.width + sx]) continue;
-      const dx = sx - k, dy = -k;                        // ... and one pixel left
-      const key = dy * 65536 + dx;                       // unique: |dx| stays far below 65536, so the pack is injective
-      if (seen.has(key)) continue;
-      seen.add(key);
-      offs.push(dx, dy);
-    }
-  }
-  mask = Int32Array.from(offs);
-  maskCache.set(plane, mask);
-  return mask;
-}
 
 export function createUnitShadowRenderer(read) {
   const acts = new Map();
@@ -90,9 +67,14 @@ export function createUnitShadowRenderer(read) {
       const table = tables(identity.act);
       if (!table) return null;
       const width = ctx.canvas.width, height = ctx.canvas.height;
+      const pShadow = perfT0();
       // One plane per COF layer, in the COF's own priority order: retail blends each layer's shadow
       // separately, so a pixel two layers cover is darkened twice.
       const layers = [];
+      const eligibleComponents = [];
+      let minX = width, minY = height, maxX = -1, maxY = -1;
+      const clippedBounds = [0, 0, 0, 0];
+      const pFootprint = perfT0();
       for (const component of cof.priority[direction][frame]) {
         const dcc = components.get ? components.get(component) : components[component];
         if (!dcc) continue;
@@ -107,14 +89,16 @@ export function createUnitShadowRenderer(read) {
         //     same three objects carry Objects.txt `Trans = 7` where the shadowed ones carry 0, but the
         //     renderer is handed no Objects.txt row, so the COF-only form is what runs.
         // Tyrael's LA/RA are the only transparent layers on a unit, and both have Shadow clear.
-        const layer = cof.layerRecords?.find((l) => l.component === component);
+        const layer = cofLayerRecord(cof, component);
         if (layer && (!layer.shadow || (layer.transparent && layer.drawEffect === 0))) continue;
         let plane;
         try { plane = composeCofFrame(cof, direction, frame, new Map([[component, dcc]]), dccDirection); } catch { continue; }
         if (!plane.width || !plane.height) continue;
-        // Retail's rasteriser: walk the cel's rows in storage
-        // order and keep every SECOND one (the row between is DISCARDED, never merged into a
-        // destination row). Destination row k (k = 0 at the anchor) is that kept row placed at
+        eligibleComponents.push(component);
+        // Retail's rasteriser: emit height >> 1 rows, walking the
+        // cel's rows in storage order and keeping every SECOND one (the row between is DISCARDED,
+        // never merged into a destination row); an odd-height final unpaired row is omitted.
+        // Destination row k (k = 0 at the anchor) is that kept row placed at
         // (x0 - k, y0 - k), with the base x0 = anchorX + celXOffset + trunc(celYOffset / 2) and
         // y0 = anchorY + trunc(celYOffset / 2), C-truncating. The whole source row lands on one
         // destination row: the run's own bytes are skipped, and every pixel takes the destination
@@ -127,29 +111,37 @@ export function createUnitShadowRenderer(read) {
         // a DESTINATION offset (sx - k, -k) from the base cell, wherever that is drawn. The offsets are
         // cached per plane (the composer memoises planes, so the object is stable across frames for the
         // same cel/frame) and the per-frame cost is the clipped copy below, not the whole plane rescan.
-        // Dedup is on the OFFSET -- two source pixels can share a destination offset through the shear;
-        // distinct offsets are distinct canvas pixels, so one entry per destination pixel is preserved.
-        const mask = shadowMask(plane);
-        const pixels = [];
-        for (let i = 0; i < mask.length; i += 2) {
-          const px = baseX + mask[i], py = baseY + mask[i + 1];
-          if (px < 0 || px >= width || py < 0 || py >= height) continue;
-          pixels.push(py * width + px);
+        // Kept source rows have unique k values, so their destination y offsets do not overlap; pixels
+        // within each row also have unique x offsets. The mask builder can append directly without a Set.
+        const layout = shadowMaskLayout(plane), mask = layout.offsets;
+        // Per-row binary search returns the same exact clipped pixel bounds as
+        // scanning every offset, with work proportional to cel height.
+        if (shadowVisibleBounds(layout, baseX, baseY, width, height, clippedBounds)) {
+          if (clippedBounds[0] < minX) minX = clippedBounds[0];
+          if (clippedBounds[1] < minY) minY = clippedBounds[1];
+          if (clippedBounds[2] > maxX) maxX = clippedBounds[2];
+          if (clippedBounds[3] > maxY) maxY = clippedBounds[3];
+          layers.push({ component, mask, baseX, baseY });
         }
-        if (pixels.length) layers.push({ component, pixels });
       }
-      if (!layers.length) return null;
-      let minX = width, minY = height, maxX = -1, maxY = -1;
-      for (const layer of layers) for (const at of layer.pixels) {
-        const px = at % width, py = (at - px) / width;
-        if (px < minX) minX = px; if (px > maxX) maxX = px;
-        if (py < minY) minY = py; if (py > maxY) maxY = py;
+      perfT('unit-shadow-footprint', pFootprint);
+      if (!layers.length) {
+        if (!eligibleComponents.length) return null;
+        // A native shadow call can have no raster output (for example, height 1 gives height>>1 = 0).
+        // Keep its attempted draw identity distinct from a COF-gated/no-shadow result.
+        const blit = { ...identity, x: Math.round(x), y: Math.round(y), layers: eligibleComponents.length,
+          components: eligibleComponents, pixels: 0, darkened: 0, method: 'pl2-lightlevel-7',
+          projection: 'x=-0.5h,y=-0.5h', act: act0Of(identity.act) + 1, rect: null, rasterized: false };
+        // `__d2UnitShadows` is the visible raster output list; keep this call identity only on the
+        // return value so zero-pixel calls cannot masquerade as visible shadows in pixel probes.
+        return blit;
       }
-      const image = ctx.getImageData(minX, minY, maxX - minX + 1, maxY - minY + 1);
+      const rectWidth = maxX - minX + 1;
+      const image = ctx.getImageData(minX, minY, rectWidth, maxY - minY + 1);
       const data = image.data, iw = image.width, pal = table.pl2;
       let pixels = 0, darkened = 0;
-      for (const layer of layers) for (const at of layer.pixels) {
-        const px = at % width, py = (at - px) / width;
+      for (const layer of layers) for (let i = 0; i < layer.mask.length; i += 2) {
+        const px = layer.baseX + layer.mask[i], py = layer.baseY + layer.mask[i + 1];
         if (px < minX || py < minY || px > maxX || py > maxY) continue;
         const p = ((py - minY) * iw + px - minX) * 4;
         const out = table.shadow[table.index(data[p], data[p + 1], data[p + 2])];
@@ -159,8 +151,9 @@ export function createUnitShadowRenderer(read) {
         pixels++;
       }
       ctx.putImageData(image, minX, minY);
+      perfT('unit-shadow-total', pShadow);
       const blit = { ...identity, x: Math.round(x), y: Math.round(y), layers: layers.length, components: layers.map((l) => l.component), pixels, darkened,
-        method: 'pl2-lightlevel-7', projection: 'x=-0.5h,y=-0.5h', act: act0Of(identity.act) + 1,
+        method: 'pl2-lightlevel-7', projection: 'x=-0.5h,y=-0.5h', act: act0Of(identity.act) + 1, rasterized: true,
         rect: [minX, minY, maxX - minX + 1, maxY - minY + 1] };
       if (Array.isArray(globalThis.__d2UnitShadows)) globalThis.__d2UnitShadows.push(blit);
       return blit;

@@ -143,6 +143,26 @@ struct D2DamageStatTableStrc
 using D2CombatTraceCallback = void (*)(D2UnitStrc* pAttacker, D2UnitStrc* pDefender, const D2DamageStrc* pDamage);
 extern D2CombatTraceCallback gpCombatTraceCallback;
 
+// Read-only diagnostic emitted at the exact player/monster hit-roll boundary. This is separate
+// from D2DamageStrc because misses still consume a hit roll and otherwise leave no combat record.
+struct D2CombatHitRollTrace
+{
+    int32_t nAttackerLevel;
+    int32_t nDefenderLevel;
+    int32_t nAttackRate;
+    int32_t nToHitPercent;
+    int32_t nTotalDefense;
+    int32_t nToHit;
+    int32_t nDefense;
+    int32_t nToHitFactor;
+    int32_t nChanceToHit;
+    int32_t nRoll;
+    int32_t bHit;
+};
+static_assert(sizeof(D2CombatHitRollTrace) == 44, "D2CombatHitRollTrace must contain eleven 32-bit fields");
+using D2CombatHitRollTraceCallback = void (*)(D2UnitStrc* pAttacker, D2UnitStrc* pDefender, const D2CombatHitRollTrace* pTrace);
+extern D2CombatHitRollTraceCallback gpCombatHitRollTraceCallback;
+
 
 
 //D2Game.0x6FCBE2F0

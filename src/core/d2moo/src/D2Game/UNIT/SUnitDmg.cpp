@@ -46,6 +46,7 @@
 
 extern const char* g_d2webRegenSite;
 D2CombatTraceCallback gpCombatTraceCallback = nullptr;
+D2CombatHitRollTraceCallback gpCombatHitRollTraceCallback = nullptr;
 
 
 #pragma pack(push, 1)
@@ -2564,6 +2565,14 @@ int32_t __fastcall SUNITDMG_IsHitSuccessful(D2UnitStrc* pAttacker, D2UnitStrc* p
 
 	const int32_t nChanceToHit = D2Clamp(2 * nAttackerLevel * nToHitFactor / (nDefenderLevel + nAttackerLevel), 5, 95);
 	const int32_t nRand = ITEMS_RollRandomNumber(&pAttacker->pSeed) % 100;
+	if (gpCombatHitRollTraceCallback)
+	{
+		const D2CombatHitRollTrace trace = {
+			nAttackerLevel, nDefenderLevel, nAttackRate, nToHitPercent, nTotalDefense,
+			nToHit, nDefense, nToHitFactor, nChanceToHit, nRand, nRand < nChanceToHit ? 1 : 0
+		};
+		gpCombatHitRollTraceCallback(pAttacker, pDefender, &trace);
+	}
 	//SUNIT_GetGameFromUnit(pAttacker);
 	//D2GAME_Return_6FCCD420(pDefender, nChanceToHit, nRand);
 	if (nRand >= nChanceToHit)

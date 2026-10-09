@@ -1,6 +1,7 @@
 #include "AI/AiThink.h"
 
 #include <algorithm>
+#include <bit>
 
 #include <D2BitManip.h>
 #include <D2Math.h>
@@ -7896,10 +7897,14 @@ void __fastcall AITHINK_Fn115_SiegeBeast(D2GameStrc* pGame, D2UnitStrc* pUnit, D
 //D2Game.0x6FCE0960
 int32_t __fastcall AITHINK_GetSquaredDistance(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2)
 {
-	const int32_t nXDiff = CLIENTS_GetUnitX(pUnit1) - CLIENTS_GetUnitX(pUnit2);
-	const int32_t nYDiff = CLIENTS_GetUnitY(pUnit1) - CLIENTS_GetUnitY(pUnit2);
+	// d2-web: 1.13c D2Game!0x6FC21900 uses 32-bit SUB/IMUL/ADD. Preserve
+	// their wrapping result, including the signed value seen by AI radius tests.
+	const uint32_t nXDiff = static_cast<uint32_t>(CLIENTS_GetUnitX(pUnit1))
+		- static_cast<uint32_t>(CLIENTS_GetUnitX(pUnit2));
+	const uint32_t nYDiff = static_cast<uint32_t>(CLIENTS_GetUnitY(pUnit1))
+		- static_cast<uint32_t>(CLIENTS_GetUnitY(pUnit2));
 
-	return nXDiff * nXDiff + nYDiff * nYDiff;
+	return std::bit_cast<int32_t>(nXDiff * nXDiff + nYDiff * nYDiff);
 }
 
 enum D2C_MinionAIParams
@@ -11149,13 +11154,15 @@ void __fastcall AITHINK_Fn054_NpcStationary(D2GameStrc* pGame, D2UnitStrc* pUnit
 	D2UnitStrc* pPlayer = sub_6FCCFD70(pGame, pUnit, &bCloseToTarget);
 
 	D2MonsterInteractStrc* pMonInteract = nullptr;
+	// d2-web: 1.13c 0x6FC35BB0 reads this unit's interaction list on the
+	// no-target Izual/Tyrael path too; an active dialogue prevents mode 0.
+	if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)
+	{
+		pMonInteract = pUnit->pMonsterData->pMonInteract;
+	}
 	if (pPlayer && pPlayer != pUnit)
 	{
 		const int32_t nDistance = AIUTIL_GetDistanceToCoordinates_FullUnitSize(pUnit, pPlayer);
-		if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)
-		{
-			pMonInteract = pUnit->pMonsterData->pMonInteract;
-		}
 
 		if (pPlayer->dwUnitType == UNIT_PLAYER && PLAYER_IsBusy(pPlayer) == 1 || MONSTERAI_HasInteractUnit(pMonInteract))
 		{

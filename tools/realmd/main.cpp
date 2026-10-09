@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <sys/socket.h>
 #include <sys/select.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
@@ -31,15 +32,104 @@ void d2_realm_bncs_session_reset(uint32_t serverToken, uint32_t uuid, uint32_t i
 int d2_realm_bncs_session_feed(const uint8_t* in, int len, uint8_t* out, int outCap);
 void d2_realm_mcp_session_reset(uint32_t gsIp, uint16_t gameToken, uint32_t gameHash, uint8_t charClass, uint8_t charLevel);
 int d2_realm_mcp_session_feed(const uint8_t* in, int len, uint8_t* out, int outCap);
-void d2_realm_d2gs_session_reset(uint32_t unitId, uint8_t charClass, uint8_t act, uint16_t level);
+void d2_realm_d2gs_session_reset(uint32_t unitId, uint8_t charClass, uint8_t act, uint16_t level,
+                                  uint16_t gameToken, uint32_t gameHash);
+#if defined(D2_REALMD_TEST_FIXTURE)
+void d2_realm_d2gs_session_fixture_reassign_on_keepalive(int enabled);
+void d2_realm_d2gs_session_fixture_reassign_on_walk(int enabled);
+void d2_realm_d2gs_session_fixture_monster_on_join(int enabled);
+void d2_realm_d2gs_session_fixture_remove_monster_on_walk(int enabled);
+void d2_realm_d2gs_session_fixture_other_player_on_join(int enabled);
+void d2_realm_d2gs_session_fixture_select_other_on_keepalive(int enabled);
+void d2_realm_d2gs_session_fixture_return_self_remove_other_on_walk(int enabled);
+#endif
 int d2_realm_d2gs_session_feed(const uint8_t* in, int len, uint8_t* out, int outCap);
 int d2_realm_d2gs_session_greeting(uint8_t* out);
+#if defined(D2_REALMD_TEST_FIXTURE)
+int d2_realm_d2gs_cs_packet_len(const uint8_t* in, int len);
+int d2_realm_huffman_compress(const uint8_t* in, int len, uint8_t* out, int outCap);
+int d2_realm_huffman_frame(const uint8_t* in, int len, uint8_t* out, int outCap);
+#endif
 }
 
 namespace {
 
+struct SessionConfig {
+    uint32_t gsIp = 0x7f000001u;
+    uint16_t gameToken = 0x1234;
+    uint32_t gameHash = 0xdeadbeefu;
+    uint32_t unitId = 1;
+    uint8_t charClass = 3;
+    uint8_t charLevel = 24;
+};
+
+SessionConfig sessionConfig;
+
 enum Proto { kBncs = 0, kMcp = 1, kD2gs = 2, kProtoCount = 3 };
 const char* kProtoName[kProtoCount] = { "BNCS", "MCP", "D2GS" };
+#if defined(D2_REALMD_TEST_FIXTURE)
+bool fixtureFireballOnJoin = false;
+bool fixtureFireballSent = false;
+bool fixtureOutdoorOnWalk = false;
+bool fixtureOutdoorSent = false;
+uint8_t fixtureInput[512]{};
+int fixtureInputLength = 0;
+
+int appendD2gsFixtureFrame(const uint8_t* payload, int length, uint8_t* out, int outLength, int outCap) {
+    uint8_t compressed[256], framed[320];
+    const int compressedLength = d2_realm_huffman_compress(payload, length, compressed, sizeof compressed);
+    if (compressedLength < 0) return -1;
+    const int framedLength = d2_realm_huffman_frame(compressed, compressedLength, framed, sizeof framed);
+    if (framedLength < 0 || outLength + framedLength > outCap) return -1;
+    std::memcpy(out + outLength, framed, static_cast<size_t>(framedLength));
+    return outLength + framedLength;
+}
+
+int applyD2gsFixtureReplies(const uint8_t* input, int length, uint8_t* out, int outLength, int outCap) {
+    if (length < 0 || length > int(sizeof fixtureInput) - fixtureInputLength) return -1;
+    std::memcpy(fixtureInput + fixtureInputLength, input, static_cast<size_t>(length));
+    fixtureInputLength += length;
+    int consumed = 0;
+    for (;;) {
+        const int packetLength = d2_realm_d2gs_cs_packet_len(fixtureInput + consumed, fixtureInputLength - consumed);
+        if (packetLength < 0) break;
+        if (!packetLength) return -1;
+        const uint8_t* packet = fixtureInput + consumed;
+        if (packet[0] == 0x68 && fixtureFireballOnJoin && !fixtureFireballSent) {
+            // Fixture-only server packets: learned prerequisites, learned Fireball, active right
+            // hand, and enough current mana. They are compressed with the production D2GS codec.
+            const uint8_t skills[12] = { 0x94, 2, 1, 0, 0, 0, 36, 0, 1, 47, 0, 3 };
+            const uint8_t active[13] = { 0x23, 0, 1, 0, 0, 0, 0, 47, 0, 0xff, 0xff, 0xff, 0xff };
+            const uint8_t mana[6] = { 0x1f, 8, 0x00, 0x64, 0x00, 0x00 };
+            outLength = appendD2gsFixtureFrame(skills, sizeof skills, out, outLength, outCap);
+            if (outLength < 0) return -1;
+            outLength = appendD2gsFixtureFrame(active, sizeof active, out, outLength, outCap);
+            if (outLength < 0) return -1;
+            outLength = appendD2gsFixtureFrame(mana, sizeof mana, out, outLength, outCap);
+            if (outLength < 0) return -1;
+            fixtureFireballSent = true;
+        }
+        if (packet[0] == 0x01 && fixtureOutdoorOnWalk && !fixtureOutdoorSent && packetLength >= 5 &&
+            (packet[1] | (uint16_t(packet[2]) << 8)) == 5860 &&
+            (packet[3] | (uint16_t(packet[4]) << 8)) == 5894) {
+            // The ordinary walk command gets a server-side MapReveal and player location update
+            // into seed-1 Blood Moor, where the subsequent local cast can use its native outdoor gate.
+            const uint8_t outdoor[17] = { 0x07, 0x58, 0x04, 0xa0, 0x04, 2,
+                0x15, 0, 1, 0, 0, 0, 0xba, 0x15, 0x22, 0x17, 0x5a };
+            outLength = appendD2gsFixtureFrame(outdoor, sizeof outdoor, out, outLength, outCap);
+            if (outLength < 0) return -1;
+            fixtureOutdoorSent = true;
+        }
+        consumed += packetLength;
+        if (consumed == fixtureInputLength) break;
+    }
+    if (consumed) {
+        fixtureInputLength -= consumed;
+        std::memmove(fixtureInput, fixtureInput + consumed, static_cast<size_t>(fixtureInputLength));
+    }
+    return outLength;
+}
+#endif
 
 int listenOn(uint16_t port) {
     const int fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -78,6 +168,11 @@ bool pump(int fd, Proto proto) {
         case kD2gs: n = d2_realm_d2gs_session_feed(in, (int)r, out, (int)sizeof out); break;
         default: return false;
     }
+#if defined(D2_REALMD_TEST_FIXTURE)
+    if (n >= 0 && proto == kD2gs) {
+        n = applyD2gsFixtureReplies(in, static_cast<int>(r), out, n, static_cast<int>(sizeof out));
+    }
+#endif
     if (n < 0) {
         fprintf(stderr, "[%s] framing failed; dropping the connection rather than desyncing\n", kProtoName[proto]);
         return false;
@@ -89,8 +184,27 @@ bool pump(int fd, Proto proto) {
 void resetFor(Proto proto) {
     switch (proto) {
         case kBncs: d2_realm_bncs_session_reset(0x1234abcdu, 0xabcd1234u, 0x7f000001u, 6113); break;
-        case kMcp:  d2_realm_mcp_session_reset(0x7f000001u, 0x1234, 0xdeadbeefu, 3, 24); break;
-        case kD2gs: d2_realm_d2gs_session_reset(1, 3, 0, 24); break;
+        case kMcp:
+#if defined(D2_REALMD_TEST_FIXTURE)
+            d2_realm_mcp_session_reset(sessionConfig.gsIp, sessionConfig.gameToken, sessionConfig.gameHash,
+                                       sessionConfig.charClass, sessionConfig.charLevel);
+#else
+            d2_realm_mcp_session_reset(sessionConfig.gsIp, sessionConfig.gameToken, sessionConfig.gameHash,
+                                       sessionConfig.charClass, sessionConfig.charLevel);
+#endif
+            break;
+        case kD2gs:
+#if defined(D2_REALMD_TEST_FIXTURE)
+            fixtureInputLength = 0;
+            fixtureFireballSent = false;
+            fixtureOutdoorSent = false;
+            d2_realm_d2gs_session_reset(sessionConfig.unitId, sessionConfig.charClass, 0, sessionConfig.charLevel,
+                                        sessionConfig.gameToken, sessionConfig.gameHash);
+#else
+            d2_realm_d2gs_session_reset(sessionConfig.unitId, sessionConfig.charClass, 0, sessionConfig.charLevel,
+                                        sessionConfig.gameToken, sessionConfig.gameHash);
+#endif
+            break;
         default: break;
     }
 }
@@ -99,11 +213,58 @@ void resetFor(Proto proto) {
 
 int main(int argc, char** argv) {
     uint16_t ports[kProtoCount] = { 6112, 6113, 4000 };
+#if defined(D2_REALMD_TEST_FIXTURE)
+    int fixtureReassignOnKeepalive = 0;
+    int fixtureReassignOnWalk = 0;
+    int fixtureMonsterOnJoin = 0;
+    int fixtureRemoveMonsterOnWalk = 0;
+    int fixtureOtherPlayerOnJoin = 0;
+    int fixtureSelectOtherOnKeepalive = 0;
+    int fixtureReturnSelfRemoveOtherOnWalk = 0;
+    int fixtureFireball = 0;
+    int fixtureOutdoor = 0;
+#endif
     for (int i = 1; i + 1 < argc; i += 2) {
         if (!strcmp(argv[i], "--bncs")) ports[kBncs] = (uint16_t)atoi(argv[i + 1]);
         else if (!strcmp(argv[i], "--mcp")) ports[kMcp] = (uint16_t)atoi(argv[i + 1]);
         else if (!strcmp(argv[i], "--d2gs")) ports[kD2gs] = (uint16_t)atoi(argv[i + 1]);
+        else if (!strcmp(argv[i], "--game-token")) sessionConfig.gameToken = (uint16_t)strtoul(argv[i + 1], nullptr, 0);
+        else if (!strcmp(argv[i], "--game-hash")) sessionConfig.gameHash = (uint32_t)strtoul(argv[i + 1], nullptr, 0);
+        else if (!strcmp(argv[i], "--unit-id")) sessionConfig.unitId = (uint32_t)strtoul(argv[i + 1], nullptr, 0);
+        else if (!strcmp(argv[i], "--char-class")) sessionConfig.charClass = (uint8_t)strtoul(argv[i + 1], nullptr, 0);
+        else if (!strcmp(argv[i], "--char-level")) sessionConfig.charLevel = (uint8_t)strtoul(argv[i + 1], nullptr, 0);
+        else if (!strcmp(argv[i], "--gs-ip")) {
+            in_addr address{};
+            if (inet_pton(AF_INET, argv[i + 1], &address) != 1) {
+                fprintf(stderr, "realmd: invalid IPv4 address for --gs-ip: %s\n", argv[i + 1]);
+                return 2;
+            }
+            sessionConfig.gsIp = ntohl(address.s_addr);
+        }
+#if defined(D2_REALMD_TEST_FIXTURE)
+        else if (!strcmp(argv[i], "--fixture-reassign-on-keepalive")) fixtureReassignOnKeepalive = atoi(argv[i + 1]);
+        else if (!strcmp(argv[i], "--fixture-reassign-on-walk")) fixtureReassignOnWalk = atoi(argv[i + 1]);
+        else if (!strcmp(argv[i], "--fixture-monster-on-join")) fixtureMonsterOnJoin = atoi(argv[i + 1]);
+        else if (!strcmp(argv[i], "--fixture-remove-monster-on-walk")) fixtureRemoveMonsterOnWalk = atoi(argv[i + 1]);
+        else if (!strcmp(argv[i], "--fixture-other-player-on-join")) fixtureOtherPlayerOnJoin = atoi(argv[i + 1]);
+        else if (!strcmp(argv[i], "--fixture-select-other-on-keepalive")) fixtureSelectOtherOnKeepalive = atoi(argv[i + 1]);
+        else if (!strcmp(argv[i], "--fixture-return-self-remove-other-on-walk")) fixtureReturnSelfRemoveOtherOnWalk = atoi(argv[i + 1]);
+        else if (!strcmp(argv[i], "--fixture-fireball-on-join")) fixtureFireball = atoi(argv[i + 1]);
+        else if (!strcmp(argv[i], "--fixture-outdoor-on-walk")) fixtureOutdoor = atoi(argv[i + 1]);
+        else if (!strcmp(argv[i], "--fixture-char-class")) sessionConfig.charClass = (uint8_t)atoi(argv[i + 1]);
+#endif
     }
+#if defined(D2_REALMD_TEST_FIXTURE)
+    d2_realm_d2gs_session_fixture_reassign_on_keepalive(fixtureReassignOnKeepalive);
+    d2_realm_d2gs_session_fixture_reassign_on_walk(fixtureReassignOnWalk);
+    d2_realm_d2gs_session_fixture_monster_on_join(fixtureMonsterOnJoin);
+    d2_realm_d2gs_session_fixture_remove_monster_on_walk(fixtureRemoveMonsterOnWalk);
+    d2_realm_d2gs_session_fixture_other_player_on_join(fixtureOtherPlayerOnJoin);
+    d2_realm_d2gs_session_fixture_select_other_on_keepalive(fixtureSelectOtherOnKeepalive);
+    d2_realm_d2gs_session_fixture_return_self_remove_other_on_walk(fixtureReturnSelfRemoveOtherOnWalk);
+    fixtureFireballOnJoin = fixtureFireball != 0;
+    fixtureOutdoorOnWalk = fixtureOutdoor != 0;
+#endif
 
     int lfd[kProtoCount];
     for (int p = 0; p < kProtoCount; p++) {

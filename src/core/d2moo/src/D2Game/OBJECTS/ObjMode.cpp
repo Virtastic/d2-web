@@ -3118,7 +3118,9 @@ int32_t __fastcall OBJECTS_OperateFunction46_HellGatePortal(D2ObjOperateFnStrc* 
         }
     }
 
-    return 1;
+    // Retail 1.13c OperateFn 46 returns zero even when it performs the Act III -> IV warp.
+    // The session command observes the changed player level and reports that postcondition.
+    return 0;
 }
 
 //D2Game.0x6FC78E00

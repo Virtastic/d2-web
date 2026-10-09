@@ -1,4 +1,6 @@
 import { decodeWav } from './wav.mjs';
+import { soundRowByFile } from './unit-sound-resolver.mjs';
+import { sliderPercent, soundSourceGain } from './sound-channel-volume.mjs';
 
 // Retail 1.13c `data/global/excel/Sounds.txt` entries 17..26. OpenDiablo2's
 // SelectHeroClass cross-checks the outgoing-deselect / incoming-select transition.
@@ -26,7 +28,14 @@ export function createClassSelectSoundPlayer(read, AudioContextClass = globalThi
   const gain = typeof context.createGain === 'function' ? context.createGain() : null;
   if (gain) gain.connect(context.destination);
   const out = gain ?? context.destination;
-  let volume = 1;
+  let volume = 1, sliders = { sound: 1, music: 1 }, soundsTxt = null;
+  const activeSources = new Map();
+  const table = () => soundsTxt ??= new TextDecoder('latin1').decode(read('data\\global\\excel\\Sounds.txt'));
+  const sourceGainFor = (row) => {
+    const master = sliderPercent(sliders.sound), music = sliderPercent(sliders.music);
+    const channel = soundSourceGain(row.volume, master, music, row.music);
+    return master === 0 ? 0 : channel / (master / 100);
+  };
   let queue = Promise.resolve(), nextStart = 0;
   function prepare(path) {
     let pending = buffers.get(path);
@@ -45,7 +54,7 @@ export function createClassSelectSoundPlayer(read, AudioContextClass = globalThi
       if (!sounds) return Promise.reject(new RangeError(`unknown character class sound: ${hero}`));
       const kind = trigger === 'deselect' ? 'deselect' : 'select';
       const path = sounds[kind];
-      const event = { hero, trigger, path, asset: `data\\global\\sfx\\${path}`, requested: events.length, started: false, startIndex: null, startTime: null };
+      const event = { hero, trigger, path, asset: `data\\global\\sfx\\${path}`, requested: events.length, started: false, startIndex: null, startTime: null, sourceVolume: null };
       events.push(event);
       // This call stays in the trusted pointer handler. The queued work below may run after the
       // gesture and after an MPQ decode, but Chrome has already received the resume request.
@@ -56,8 +65,12 @@ export function createClassSelectSoundPlayer(read, AudioContextClass = globalThi
       context.resume().catch(() => {});
       queue = queue.catch(() => {}).then(async () => {
         const buffer = await prepare(path);
-        const source = context.createBufferSource(); source.buffer = buffer; source.connect(out);
-        source.onended = () => { sources.delete(source); source.disconnect(); };
+        const source = context.createBufferSource(); source.buffer = buffer;
+        const row = soundRowByFile(table(), path); event.sourceVolume = row?.volume ?? null;
+        const sourceGain = row && typeof context.createGain === 'function' ? context.createGain() : null;
+        if (sourceGain) { sourceGain.gain.value = sourceGainFor(row); sourceGain.connect(out); source.connect(sourceGain); activeSources.set(sourceGain, row); }
+        else source.connect(out);
+        source.onended = () => { sources.delete(source); source.disconnect(); if (sourceGain) { sourceGain.disconnect(); activeSources.delete(sourceGain); } };
         source.start(); sources.add(source);
         event.started = true; event.startIndex = nextStart++; event.startTime = context.currentTime;
         return event;
@@ -65,7 +78,7 @@ export function createClassSelectSoundPlayer(read, AudioContextClass = globalThi
       return queue.then((started) => ({ ...started }));
     },
     get evidence() { return { events: events.map((event) => ({ ...event })), decoded: [...buffers.keys()], state: context.state }; },
-    setVolume(v) { volume = Math.max(0, Math.min(1, Number(v) || 0)); if (gain) gain.gain.value = volume; },
+    setVolume(v, nextSliders) { volume = Math.max(0, Math.min(1, Number(v) || 0)); sliders = nextSliders ? { sound: nextSliders.sound, music: nextSliders.music } : { sound: volume, music: 1 }; if (gain) gain.gain.value = volume; for (const [node, row] of activeSources) node.gain.value = sourceGainFor(row); },
     get volume() { return gain ? gain.gain.value : volume; },
     close() { for (const source of sources) { source.stop(); source.disconnect(); } sources.clear(); return context.close?.(); },
   };

@@ -12,8 +12,9 @@
 // retail's packet and re-reads the result.
 
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
-import { createFont, decodeFontTbl } from './frontend.mjs';
+import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
 import { BORDER_LEFT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
+import { characterPanelCloseFrame } from './character-panel-close.mjs';
 
 // Retail's own stat ids (D2StatList.h): the values the 0x3A packet carries.
 export const STAT = Object.freeze({ STRENGTH: 0, ENERGY: 1, DEXTERITY: 2, VITALITY: 3 });
@@ -65,6 +66,27 @@ export const STAT_PLUS_FRAME = 0;              // retail's enabled frame: a poin
 export const STAT_PLUS_DISABLED_FRAME = 2;     // OpenDiablo2's DisabledFrame, recorded for the day a
                                                // capture shows retail drawing the unlit state
 export const STAT_PLUS_SOCKET_OFFSET = Object.freeze({ x: -3, y: -2 });
+
+// OpenDiablo2's hero_stats_panel.go places the remaining-stat label as two localized Font6 rows
+// beside a separate Font16 count. Its positions are top-left coordinates; drawAnchored uses an
+// inclusive bottom-row anchor, so drawStatPoints converts with each decoded font's actual cell height.
+export const STAT_POINTS_LAYOUT = Object.freeze({
+  labelX: 92, labelRows: Object.freeze([411, 418]), countX: 188, countY: 411,
+  palette: 'data\\global\\palette\\SKY\\pal.dat',
+  pl2: 'data\\global\\palette\\SKY\\pal.pl2',
+  labelColour: 1,
+});
+
+export function drawStatPoints(font6, font16, ctx, points, string) {
+  if (!(points > 0)) return false;
+  const labelAnchor = (top) => top + font6.cellHeight - 1;
+  const redFont = font6.red || font6;
+  redFont.drawAnchored(ctx, string('strchrstat'), STAT_POINTS_LAYOUT.labelX, labelAnchor(STAT_POINTS_LAYOUT.labelRows[0]));
+  redFont.drawAnchored(ctx, string('strchrrema'), STAT_POINTS_LAYOUT.labelX, labelAnchor(STAT_POINTS_LAYOUT.labelRows[1]));
+  const count = String(points);
+  font16.drawAnchored(ctx, count, STAT_POINTS_LAYOUT.countX - Math.trunc(font16.measure(count) / 2), STAT_POINTS_LAYOUT.countY + font16.cellHeight - 1);
+  return true;
+}
 
 // Where the button goes, from the panel's own two independent readings: the attribute frames are the
 // panel ART's (CHARACTER_SLOTS, s154, and s251 pins the panel at 0 px), and OpenDiablo2's own button
@@ -137,6 +159,15 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
   // Fonts through the ACT's palette (the screen is shown in any act), cached per act.
   const f6 = { dc6: decodeDc6(read('data\\local\\font\\latin\\font6.dc6')), tbl: decodeFontTbl(read('data\\local\\font\\latin\\font6.tbl')) };
   const f16 = { dc6: decodeDc6(read('data\\local\\font\\latin\\font16.dc6')), tbl: decodeFontTbl(read('data\\local\\font\\latin\\font16.tbl')) };
+  const statPalette = decodeDatPalette(read(STAT_POINTS_LAYOUT.palette));
+  const statPl2 = read(STAT_POINTS_LAYOUT.pl2);
+  const statPointFonts = {
+    6: {
+      ...createFont({ ...f6, palette: statPalette, documentObject }),
+      red: createFont({ ...f6, palette: textColourPalette(statPl2, statPalette, STAT_POINTS_LAYOUT.labelColour), documentObject }),
+    },
+    16: createFont({ ...f16, palette: statPalette, documentObject }),
+  };
   const faces = new Map();
   const facesFor = (act) => { let f = faces.get(act); if (!f) { const palette = decodeDatPalette(read(`data\\global\\palette\\ACT${Math.min(5, Math.max(1, act | 0))}\\pal.dat`));
     f = { 6: createFont({ ...f6, palette, documentObject }), 16: createFont({ ...f16, palette, documentObject }) }; faces.set(act, f); } return f; };
@@ -203,7 +234,7 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
       const face = facesFor(state?.act || 1);
       for (const f of FIELDS) { const t = text[f.key]; if (t === undefined || t === null || t === '') continue;
         const str = String(t), font = face[f.size]; font.drawAnchored(ctx, str, Math.floor(f.centre - font.measure(str) / 2), f.y); }
-      chrome.cel(ctx, state?.act || 1, CHROME_ART.close, 10, 208, 480);
+      chrome.cel(ctx, state?.act || 1, CHROME_ART.close, characterPanelCloseFrame(state?.closePressed), 208, 480);
       // The "+" is retail art, blitted as retail blits the pair (socket first, then the button on
       // top), and every blit is carried out to the evidence by the cel's own requested/drawn record.
       const buttons = [];
@@ -213,7 +244,7 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
           r.x + STAT_PLUS_SOCKET_OFFSET.x, r.y + STAT_PLUS_SOCKET_OFFSET.y + 36 - 1);
         const plus = chrome.cel(ctx, act, STAT_PLUS_ART, STAT_PLUS_FRAME, r.x, r.y + 30 - 1);
         buttons.push({ stat, slot: STAT_BUTTON_RECTS[stat].slot, rect: { ...r }, socket, plus }); }
-      if (state?.statPoints > 0) font16.drawAnchored(ctx, `${S('strchrstat')} ${state.statPoints}`, 96, 420);
+      drawStatPoints(statPointFonts[6], statPointFonts[16], ctx, state?.statPoints, S);
       chrome.border(ctx, state?.act || 1, BORDER_LEFT);
       ctx.restore();
       return { x: v.ox, y: v.oy, scale: v.scale, buttons, statPoints: state?.statPoints ?? 0, skillPoints: state?.skillPoints ?? 0,

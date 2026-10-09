@@ -57,12 +57,43 @@ struct D2gsSession {
     uint8_t charClass;
     uint8_t act;
     uint16_t level;
+    uint32_t gameHash;
+    uint16_t gameToken;
     int error;
     int joined;
 };
 D2gsSession g_g;
+#if defined(D2_REALMD_TEST_FIXTURE)
+bool g_fixtureReassignOnKeepalive;
+bool g_fixtureReassignSent;
+bool g_fixtureReassignOnWalk;
+bool g_fixtureWalkReassignSent;
+bool g_fixtureMonsterOnJoin;
+bool g_fixtureRemoveMonsterOnWalk;
+bool g_fixtureOtherPlayerOnJoin;
+bool g_fixtureSelectOtherOnKeepalive;
+bool g_fixtureReturnSelfAndRemoveOtherOnWalk;
+#endif
 
 const char kCharName[] = "player";
+
+inline uint16_t rd16(const uint8_t* p) {
+    return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
+}
+
+inline uint32_t rd32(const uint8_t* p) {
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
+bool isSelectedCharacterName(const uint8_t* name) {
+    for (int i = 0; i < 16; ++i) {
+        const uint8_t expected = i < (int)(sizeof(kCharName) - 1)
+            ? (uint8_t)kCharName[i]
+            : 0;
+        if (name[i] != expected) return false;
+    }
+    return true;
+}
 
 }  // namespace
 
@@ -99,15 +130,50 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_cs_packet_len(const uint8_t* buf, int len
     return len < n ? -1 : n;
 }
 
-EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_reset(uint32_t unitId, uint8_t charClass, uint8_t act, uint16_t level) {
+EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_reset(uint32_t unitId, uint8_t charClass, uint8_t act, uint16_t level,
+                                                       uint16_t gameToken, uint32_t gameHash) {
     g_g.rxLen = 0;
     g_g.unitId = unitId;
     g_g.charClass = charClass;
     g_g.act = act;
     g_g.level = level;
+    g_g.gameToken = gameToken;
+    g_g.gameHash = gameHash;
     g_g.error = 0;
     g_g.joined = 0;
+#if defined(D2_REALMD_TEST_FIXTURE)
+    g_fixtureReassignSent = false;
+    g_fixtureWalkReassignSent = false;
+#endif
 }
+
+#if defined(D2_REALMD_TEST_FIXTURE)
+// Local integration-fixture switch. The stock server path leaves it disabled; s2901 enables it
+// to drive one native-format server update through the browser's actual receive loop.
+EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_fixture_reassign_on_keepalive(int enabled) {
+    g_fixtureReassignOnKeepalive = enabled != 0;
+    g_fixtureReassignSent = false;
+}
+EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_fixture_reassign_on_walk(int enabled) {
+    g_fixtureReassignOnWalk = enabled != 0;
+    g_fixtureWalkReassignSent = false;
+}
+EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_fixture_monster_on_join(int enabled) {
+    g_fixtureMonsterOnJoin = enabled != 0;
+}
+EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_fixture_remove_monster_on_walk(int enabled) {
+    g_fixtureRemoveMonsterOnWalk = enabled != 0;
+}
+EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_fixture_other_player_on_join(int enabled) {
+    g_fixtureOtherPlayerOnJoin = enabled != 0;
+}
+EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_fixture_select_other_on_keepalive(int enabled) {
+    g_fixtureSelectOtherOnKeepalive = enabled != 0;
+}
+EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_fixture_return_self_remove_other_on_walk(int enabled) {
+    g_fixtureReturnSelfAndRemoveOtherOnWalk = enabled != 0;
+}
+#endif
 
 EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_pending() { return g_g.rxLen; }
 EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_error() { return g_g.error; }
@@ -143,12 +209,67 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_feed(const uint8_t* in, int len, 
         if (size < 0) break;                            // need more bytes to tell the length
 
         if (op == 0x68) {
-            // GAMELOGON: answer with the game-entry burst -- load the act, assign the player unit,
-            // announce it -- composed by d2gs_packets.cpp, then compressed and framed as one frame.
+            // GAMELOGON is the admission handshake for this D2GS connection, not a
+            // repeatable enter-game command. Once this session has emitted its join
+            // burst, a second login on the same stream cannot allocate another seat.
+            // Treat it as a protocol error so we never duplicate the player's roster.
+            if (g_g.joined) {
+                g_g.error = 4;
+                return -1;
+            }
+            // GAMELOGON carries the exact ticket returned by MCP JOINGAME: hash at +1 and token
+            // at +5, both little-endian. Bind it to the selected character too; a ticket for a
+            // different name must not receive this session's player assignment.
+            const uint8_t* packet = g_g.rx + off;
+            if (rd32(packet + 1) != g_g.gameHash || rd16(packet + 5) != g_g.gameToken ||
+                !isSelectedCharacterName(packet + 21)) {
+                g_g.error = 3;
+                return -1;
+            }
+            // GAMELOGON: local deterministic fixture. Seed 1 / Normal / Act I's first level has
+            // a first client room at (1168,1176); emit MapReveal before PlayerAssign to exercise
+            // the native null-current-room branch, then LoadComplete after the player exists.
             int n = 0;
             n += d2_realm_d2gs_act_load(g_g.act, 1, 1, 0, burst + n);
+#if defined(D2_REALMD_TEST_FIXTURE)
+            burst[n++] = 0x07;
+            burst[n++] = 0x90; burst[n++] = 0x04; // x=1168, little endian
+            burst[n++] = 0x98; burst[n++] = 0x04; // y=1176, little endian
+            burst[n++] = 1;                       // eLevel=Act I town
+            // D2GS player coordinates are subtiles; MapReveal's room anchor is in tiles.
+            n += d2_realm_d2gs_player_assign(g_g.unitId, g_g.charClass, kCharName, 1168 * 5, 1176 * 5, burst + n);
+#else
             n += d2_realm_d2gs_player_assign(g_g.unitId, g_g.charClass, kCharName, 0, 0, burst + n);
+#endif
+            // The joining client's native order is self 0x59 construction, then 0x0B selection.
+            burst[n++] = 0x0b;
+            burst[n++] = 0; // player unit type
+            burst[n++] = (uint8_t)g_g.unitId;
+            burst[n++] = (uint8_t)(g_g.unitId >> 8);
+            burst[n++] = (uint8_t)(g_g.unitId >> 16);
+            burst[n++] = (uint8_t)(g_g.unitId >> 24);
             n += d2_realm_d2gs_player_in_game(g_g.unitId, g_g.charClass, kCharName, g_g.level, 0xFFFF, burst + n);
+#if defined(D2_REALMD_TEST_FIXTURE)
+            if (g_fixtureOtherPlayerOnJoin) {
+                const uint16_t otherX = 1168 * 5 + 4, otherY = 1176 * 5 + 4;
+                n += d2_realm_d2gs_player_assign(g_g.unitId + 1, 1, "other", otherX, otherY, burst + n);
+            }
+            burst[n++] = 0x04; // LoadComplete: the client handler requires an assigned player.
+            if (g_fixtureMonsterOnJoin) {
+                // 16 zero component-choice fields follow the component-present bit. The body is
+                // padded to cover all 16 table-derived field widths; choice zero selects the
+                // retail MonStats2 variant for each available component.
+                const uint8_t monster[29] = { 0xac, 0x01, 0xac, 0, 0, 0, 0,
+                    0xde, 0x16, 0x02, 0x17, 128, 29, 0x11 };
+                for (uint8_t byte : monster) burst[n++] = byte;
+                // A real server walk update for that GUID. The client must install and tick its
+                // DynamicPath before the ordinary renderer snapshot reaches these destination
+                // subtiles. Production builds never synthesize this fixture packet.
+                const uint8_t walk[16] = { 0x67, 0x01, 0xac, 0, 0, 1,
+                    0xe6, 0x16, 0x02, 0x17, 0, 0, 0, 0, 0, 0 };
+                for (uint8_t byte : walk) burst[n++] = byte;
+            }
+#endif
             const int pn = d2_realm_huffman_compress(burst, n, packed, (int)sizeof packed);
             if (pn < 0) { g_g.error = 1; return -1; }
             if (written + pn + 2 > outCap) { g_g.error = 1; return -1; }
@@ -156,8 +277,69 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_feed(const uint8_t* in, int len, 
             if (fn < 0) { g_g.error = 1; return -1; }
             written += fn;
             g_g.joined = 1;
+#if defined(D2_REALMD_TEST_FIXTURE)
+        } else if (op == 0x6d && g_g.joined && g_fixtureReassignOnKeepalive && !g_fixtureReassignSent) {
+            // Deterministic local fixture: one server location reassignment after the client's
+            // first keep-alive. This exercises the real WebSocket receive path without a test hook
+            // in the browser or any external realm traffic.
+            const uint16_t playerX = 1170 * 5, playerY = 1178 * 5;
+            uint8_t response[17] = { 0x15, 0, (uint8_t)g_g.unitId, (uint8_t)(g_g.unitId >> 8),
+                (uint8_t)(g_g.unitId >> 16), (uint8_t)(g_g.unitId >> 24), (uint8_t)playerX, (uint8_t)(playerX >> 8),
+                (uint8_t)playerY, (uint8_t)(playerY >> 8), 1 };
+            int responseLength = 11;
+            if (g_fixtureSelectOtherOnKeepalive) {
+                response[11] = 0x0b; response[12] = 0;
+                response[13] = (uint8_t)(g_g.unitId + 1); response[14] = (uint8_t)((g_g.unitId + 1) >> 8);
+                response[15] = (uint8_t)((g_g.unitId + 1) >> 16); response[16] = (uint8_t)((g_g.unitId + 1) >> 24);
+                responseLength = 17;
+            }
+            const int pn = d2_realm_huffman_compress(response, responseLength, packed, (int)sizeof packed);
+            if (pn < 0 || written + pn + 2 > outCap) { g_g.error = 1; return -1; }
+            const int fn = d2_realm_huffman_frame(packed, pn, out + written, outCap - written);
+            if (fn < 0) { g_g.error = 1; return -1; }
+            written += fn;
+            g_fixtureReassignSent = true;
+        } else if (op == 0x01 && g_g.joined && g_fixtureReassignOnWalk && !g_fixtureWalkReassignSent) {
+            // Test-only local realm echo: the browser's walk request reaches the real socket parser,
+            // and the server answers with an authoritative location update. Production builds do
+            // not synthesize this response.
+            const uint16_t playerX = (uint16_t)(g_g.rx[off + 1] | ((uint16_t)g_g.rx[off + 2] << 8));
+            const uint16_t playerY = (uint16_t)(g_g.rx[off + 3] | ((uint16_t)g_g.rx[off + 4] << 8));
+            uint8_t response[34] = {};
+            int responseLength = 0;
+            if (g_fixtureReturnSelfAndRemoveOtherOnWalk) {
+                response[responseLength++] = 0x0b; response[responseLength++] = 0;
+                response[responseLength++] = (uint8_t)g_g.unitId;
+                response[responseLength++] = (uint8_t)(g_g.unitId >> 8);
+                response[responseLength++] = (uint8_t)(g_g.unitId >> 16);
+                response[responseLength++] = (uint8_t)(g_g.unitId >> 24);
+            }
+            const uint8_t reassign[11] = { 0x15, 0, (uint8_t)g_g.unitId, (uint8_t)(g_g.unitId >> 8),
+                (uint8_t)(g_g.unitId >> 16), (uint8_t)(g_g.unitId >> 24), (uint8_t)playerX, (uint8_t)(playerX >> 8),
+                (uint8_t)playerY, (uint8_t)(playerY >> 8), 0x5a };
+            for (uint8_t byte : reassign) response[responseLength++] = byte;
+            if (g_fixtureReturnSelfAndRemoveOtherOnWalk) {
+                response[responseLength++] = 0x0a; response[responseLength++] = 0;
+                response[responseLength++] = (uint8_t)(g_g.unitId + 1); response[responseLength++] = (uint8_t)((g_g.unitId + 1) >> 8);
+                response[responseLength++] = (uint8_t)((g_g.unitId + 1) >> 16); response[responseLength++] = (uint8_t)((g_g.unitId + 1) >> 24);
+            }
+            const int pn = d2_realm_huffman_compress(response, responseLength, packed, (int)sizeof packed);
+            if (pn < 0 || written + pn + 2 > outCap) { g_g.error = 1; return -1; }
+            const int fn = d2_realm_huffman_frame(packed, pn, out + written, outCap - written);
+            if (fn < 0) { g_g.error = 1; return -1; }
+            written += fn;
+            g_fixtureWalkReassignSent = true;
+            if (g_fixtureRemoveMonsterOnWalk) {
+                const uint8_t remove[6] = { 0x0a, 1, 0x01, 0xac, 0, 0 };
+                const int rn = d2_realm_huffman_compress(remove, (int)sizeof remove, packed, (int)sizeof packed);
+                if (rn < 0 || written + rn + 2 > outCap) { g_g.error = 1; return -1; }
+                const int rfn = d2_realm_huffman_frame(packed, rn, out + written, outCap - written);
+                if (rfn < 0) { g_g.error = 1; return -1; }
+                written += rfn;
+            }
+#endif
         }
-        // 0x6d keep-alive and gameplay commands need no reply here; the engine only notes liveness.
+        // In the normal server build 0x6d keep-alive and gameplay commands need no reply here.
         off += size;
     }
 

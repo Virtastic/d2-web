@@ -11,6 +11,7 @@
 // comes out monospaced and wrong.
 
 import { recordDc6 } from './drawlist.mjs';
+import { isButtonHeldOverTarget } from './frontend-pointer-states.mjs';
 import RETAIL_MIX_HEX from './retail-mixpalette.mjs';
 import { createGatewaySelector, DEFAULT_GATEWAY_LABEL, GATEWAY_LAYOUT } from './bnet-servers.mjs';
 
@@ -50,6 +51,9 @@ export const PL2_MULTIPLICATIVE = PL2_ADDITIVE + 65536;
  *  (`cel MediumSelButtonBlank.dc6 frame=0 x=627 y=572 mode=1`, the retail captures),
  *  and character select's disabled CONVERT TO EXPANSION the same way. */
 export const PL2_ALPHA = PL2_ADDITIVE - 2 * 65536;
+/** The other two PL2 alpha banks used by retail DrawMode 0 and 2 (PL2 AlphaBlend[0] and [2]). */
+export const PL2_ALPHA_25 = PL2_ALPHA - 65536;
+export const PL2_ALPHA_75 = PL2_ALPHA + 65536;
 /** Offset of PL2 TextColorShifts (13 x 256; OpenDiablo2 d2pl2 layout). */
 export const PL2_TEXT_SHIFTS = 1024 + 8192 + 4096 + 256 + 5 * 65536 + 111 * 256 + 768 + 14 * 256 + 65536 + 256 + 39;
 /**
@@ -110,7 +114,13 @@ export function textColourPalette(pl2, palette, colour) {
 export function createBlender(pl2, palette) {
   const index = new Map();
   for (let j = 255; j >= 0; j--) index.set((palette[j * 4] << 16) | (palette[j * 4 + 1] << 8) | palette[j * 4 + 2], j);
-  const tables = { 1: pl2.subarray(PL2_ALPHA, PL2_ALPHA + 65536), 3: pl2.subarray(PL2_ADDITIVE, PL2_ADDITIVE + 65536), 4: pl2.subarray(PL2_MULTIPLICATIVE, PL2_MULTIPLICATIVE + 65536) };
+  const tables = {
+    0: pl2.subarray(PL2_ALPHA_25, PL2_ALPHA_25 + 65536),
+    1: pl2.subarray(PL2_ALPHA, PL2_ALPHA + 65536),
+    2: pl2.subarray(PL2_ALPHA_75, PL2_ALPHA_75 + 65536),
+    3: pl2.subarray(PL2_ADDITIVE, PL2_ADDITIVE + 65536),
+    4: pl2.subarray(PL2_MULTIPLICATIVE, PL2_MULTIPLICATIVE + 65536),
+  };
   // World art normally reaches this compositor as an exact palette colour. UI scaling and an
   // earlier blend do not, though. Source-index fallback makes an effect-3 cel opaque in that
   // case; choose the nearest palette entry, as the other PL2 consumer (the NPC menu box) does.
@@ -626,6 +636,7 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
     },
     /** Whether the Battle.net config listed servers, and the region dialog's row centres if so. */
     gatewaysOpen() { return Boolean(gatewaySelector?.open); },
+    key(code) { return gatewaySelector?.key(code) ?? false; },
     openGateways() { return gatewaySelector ? gatewaySelector.openDialog() : false; },
     gatewayTargets(width, height) { return gatewaySelector ? gatewaySelector.targets(width, height) : {}; },
     hover(x, y, width, height) {
@@ -649,7 +660,8 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
     // it is still over the same button. Hover alone never draws the down cel (retail's mouse-up).
     press(x, y, width, height) {
       if (gatewaySelector?.open) { const v = view(width, height); return gatewaySelector.press((x - v.ox) / v.scale, (y - v.oy) / v.scale); }
-      pressed = this.hitTest(x, y, width, height); return pressed >= 0 ? pressed : null;
+      hot = this.hitTest(x, y, width, height);
+      pressed = hot; return pressed >= 0 ? pressed : null;
     },
     release(token, x, y, width, height) {
       if (gatewaySelector?.open) { const v = view(width, height); return gatewaySelector.release(token, (x - v.ox) / v.scale, (y - v.oy) / v.scale); }
@@ -700,7 +712,7 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
           barDrawn = { text: glyphs.map((gl) => gl.character).join(''), glyphs: glyphs.map((gl) => ({ character: gl.character, index: gl.index, path: gl.path })) };
         }
         // Hover keeps retail's up cel; only a held pointer gets the down cel.
-        const down = items.indexOf(b.item) === pressed;
+        const down = isButtonHeldOverTarget(pressed, hot) && items.indexOf(b.item) === pressed;
         const state = down ? 1 : 0;
         ctx.drawImage(buttons[b.kind][state].canvas, b.x, b.y);
         recordButton(buttons[b.kind][state], b.x, b.y);

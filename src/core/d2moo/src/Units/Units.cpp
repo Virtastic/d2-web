@@ -3613,87 +3613,111 @@ BOOL __stdcall UNITS_IsCorpseUseable(D2UnitStrc* pUnit)
 	return 0;
 }
 
-//D2Common.0x6FDC2910 (#11307)
-BOOL __stdcall UNITS_IsObjectInInteractRange(D2UnitStrc* pUnit, D2UnitStrc* pObject)
+// D2Common_10399 with an explicit pair of game-coordinate positions. Keeping the size-adjusted table
+// in one place lets the ordinary predicate and candidate enumeration share the same native rule.
+static int D2Common_10399AtCoords(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, const D2CoordStrc& pCoords1, const D2CoordStrc& pCoords2)
 {
-	int nSizeX2 = 0;
-	int nSizeY1 = 0;
-	int nSizeY2 = 0;
-	int nX1 = 0;
-	int nY1 = 0;
-	int nX2 = 0;
-	int nY2 = 0;
-	int nX = 0;
-	int nY = 0;
-
-	if (!pObject || pObject->dwUnitType != UNIT_OBJECT)
+	static const int dword_6FDD3200[] =
 	{
-		return FALSE;
-	}
+		-1, -1, -1, 0, 2, 4, 6, 8,
+		-1, -1, 0, 1, 2, 4, 6, 8,
+		-1, 0, 0, 2, 3, 5, 7, 8,
+		0, 1, 2, 2, 4, 5, 7, 8,
+		2, 2, 3, 4, 5, 6, 7, 9,
+		4, 4, 5, 5, 6, 7, 8, 9,
+		6, 6, 7, 7, 7, 8, 10, 10,
+		8, 8, 8, 8, 9, 9, 10, 11,
+	};
 
-	if (!D2Common_10399(pUnit, pObject))
+	int nAbsoluteXDiff = abs(pCoords2.nX - pCoords1.nX);
+	int nAbsoluteYDiff = abs(pCoords2.nY - pCoords1.nY);
+	const int nSizeX1 = UNITS_GetUnitSizeX(pUnit1);
+	const int nSizeX2 = UNITS_GetUnitSizeX(pUnit2);
+	int nDist = 0;
+	if (nAbsoluteXDiff >= 8 || nAbsoluteYDiff >= 8 || nSizeX1 >= 4 || nSizeX2 >= 4)
 	{
-		return TRUE;
+		int nSizeDiff = ((unsigned int)nSizeX2 >> 1) + ((unsigned int)nSizeX1 >> 1);
+		if (nSizeDiff < 0) nSizeDiff = -nSizeDiff;
+		int nX = nAbsoluteXDiff - nSizeDiff;
+		int nY = nAbsoluteYDiff - nSizeDiff;
+		if (nX < 0) nX = 0;
+		if (nY < 0) nY = 0;
+		nDist = nY + 2 * nX;
+		if (nX <= nY) nDist = nX + 2 * nY;
 	}
+	else
+	{
+		nDist = dword_6FDD3200[nAbsoluteXDiff + 8 * nAbsoluteYDiff];
+		if (nDist >= 0)
+		{
+			if (nSizeX1 == 3 || nSizeX2 == 3) --nDist;
+			if (nDist < 0) nDist = 0;
+			if (nSizeX1 <= 1 || nSizeX2 <= 1) ++nDist;
+		}
+		else
+		{
+			return 0;
+		}
+	}
+	return nDist;
+}
 
-	nX1 = UNITS_GetXPosition(pUnit);
-	nY1 = UNITS_GetYPosition(pUnit);
+static BOOL UNITS_IsObjectInInteractRangeAt(D2UnitStrc* pUnit, D2UnitStrc* pObject, const D2CoordStrc& pUnitCoords)
+{
+	if (!pObject || pObject->dwUnitType != UNIT_OBJECT) return FALSE;
 
-	nX2 = UNITS_GetXPosition(pObject);
-	nY2 = UNITS_GetYPosition(pObject);
+	D2CoordStrc objectCoords = {};
+	objectCoords.nX = UNITS_GetXPosition(pObject);
+	objectCoords.nY = UNITS_GetYPosition(pObject);
+	if (!D2Common_10399AtCoords(pUnit, pObject, pUnitCoords, objectCoords)) return TRUE;
 
-	nSizeX2 = UNITS_GetUnitSizeX(pObject);
-	nSizeY2 = UNITS_GetUnitSizeY(pObject);
-
-	nX = nX2 - nSizeX2 / 2;
-	nY = nY2 - nSizeY2 / 2;
-
+	const int nSizeX2 = UNITS_GetUnitSizeX(pObject);
+	const int nSizeY2 = UNITS_GetUnitSizeY(pObject);
+	const int nX = objectCoords.nX - nSizeX2 / 2;
+	const int nY = objectCoords.nY - nSizeY2 / 2;
 	if (nSizeX2 >= 1 && nSizeY2 >= 1)
 	{
-		if (nX1 >= nX - 2 && nX1 <= nSizeX2 + nX + 2 && nY1 >= nY - 2 && nY1 <= nSizeY2 + nY + 2)
+		if (pUnitCoords.nX >= nX - 2 && pUnitCoords.nX <= nSizeX2 + nX + 2 &&
+			pUnitCoords.nY >= nY - 2 && pUnitCoords.nY <= nSizeY2 + nY + 2)
 		{
-			nSizeY1 = UNITS_GetUnitSizeY(pUnit);
-
-			if (nSizeY1 > 2)
+			const int nSizeY1 = UNITS_GetUnitSizeY(pUnit);
+			if (nSizeY1 > 2) return TRUE;
+			if (pUnitCoords.nY >= nY - 1)
+			{
+				if (pUnitCoords.nY <= nSizeY2 + nY + 1) return TRUE;
+				if (pUnitCoords.nX >= nX - 1)
+				{
+					if (pUnitCoords.nX > nSizeX2 + nX + 1) return FALSE;
+					return TRUE;
+				}
+			}
+			else if (pUnitCoords.nX >= nX - 1 && pUnitCoords.nX <= nSizeX2 + nX + 1)
 			{
 				return TRUE;
 			}
-
-			if (nY1 >= nY - 1)
-			{
-				if (nY1 <= nSizeY2 + nY + 1)
-				{
-					return TRUE;
-				}
-
-				if (nX1 >= nX - 1)
-				{
-					if (nX1 > nSizeX2 + nX + 1)
-					{
-						return FALSE;
-					}
-
-					return TRUE;
-				}
-			}
-			else
-			{
-				if (nX1 >= nX - 1 && nX1 <= nSizeX2 + nX + 1)
-				{
-					return TRUE;
-				}
-			}
 		}
-
 		return FALSE;
 	}
-
-	if (nX1 < nX - 1 || nX1 > nX + 1 || nY1 < nY - 1 || nY1 > nY + 1)
-	{
-		return FALSE;
-	}
-
+	if (pUnitCoords.nX < nX - 1 || pUnitCoords.nX > nX + 1 ||
+		pUnitCoords.nY < nY - 1 || pUnitCoords.nY > nY + 1) return FALSE;
 	return TRUE;
+}
+
+BOOL __stdcall UNITS_IsObjectInInteractRangeAt(D2UnitStrc* pUnit, D2UnitStrc* pObject, int32_t nX, int32_t nY)
+{
+	if (!pObject || pObject->dwUnitType != UNIT_OBJECT) return FALSE;
+	D2CoordStrc unitCoords = { nX, nY };
+	return UNITS_IsObjectInInteractRangeAt(pUnit, pObject, unitCoords);
+}
+
+//D2Common.0x6FDC2910 (#11307)
+BOOL __stdcall UNITS_IsObjectInInteractRange(D2UnitStrc* pUnit, D2UnitStrc* pObject)
+{
+	if (!pObject || pObject->dwUnitType != UNIT_OBJECT) return FALSE;
+	D2CoordStrc unitCoords = {};
+	unitCoords.nX = UNITS_GetXPosition(pUnit);
+	unitCoords.nY = UNITS_GetYPosition(pUnit);
+	return UNITS_IsObjectInInteractRangeAt(pUnit, pObject, unitCoords.nX, unitCoords.nY);
 }
 
 //D2Common.0x6FDC2C80
@@ -3712,101 +3736,10 @@ D2CharStatsTxt* __fastcall UNITS_GetCharStatsTxtRecord(int nRecordId)
 //TODO: Find a name
 int __stdcall D2Common_10399(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2)
 {
-	static const int dword_6FDD3200[] =
-	{
-		-1, -1, -1, 0, 2, 4, 6, 8,
-		-1, -1, 0, 1, 2, 4, 6, 8,
-		-1, 0, 0, 2, 3, 5, 7, 8,
-		0, 1, 2, 2, 4, 5, 7, 8,
-		2, 2, 3, 4, 5, 6, 7, 9,
-		4, 4, 5, 5, 6, 7, 8, 9,
-		6, 6, 7, 7, 7, 8, 10, 10,
-		8, 8, 8, 8, 9, 9, 10, 11,
-	};
-
-	int nAbsoluteXDiff = 0;
-	int nAbsoluteYDiff = 0;
-	int nSizeDiff = 0;
-	int nSizeX1 = 0;
-	int nSizeX2 = 0;
-	int nDist = 0;
-	int nX = 0;
-	int nY = 0;
-
-	D2CoordStrc pCoords1 = {};
-	D2CoordStrc pCoords2 = {};
-
-	UNITS_GetCoords(pUnit1, &pCoords1);
-	UNITS_GetCoords(pUnit2, &pCoords2);
-
-	nAbsoluteXDiff = pCoords2.nX - pCoords1.nX;
-	if (nAbsoluteXDiff < 0)
-	{
-		nAbsoluteXDiff = -nAbsoluteXDiff;
-	}
-
-	nAbsoluteYDiff = pCoords2.nY - pCoords1.nY;
-	if (nAbsoluteYDiff < 0)
-	{
-		nAbsoluteYDiff = -nAbsoluteYDiff;
-	}
-
-	nSizeX1 = UNITS_GetUnitSizeX(pUnit1);
-	nSizeX2 = UNITS_GetUnitSizeX(pUnit2);
-
-	if (nAbsoluteXDiff >= 8 || nAbsoluteYDiff >= 8 || nSizeX1 >= 4 || nSizeX2 >= 4)
-	{
-		nSizeDiff = ((unsigned int)nSizeX2 >> 1) + ((unsigned int)nSizeX1 >> 1);
-		if (nSizeDiff < 0)
-		{
-			nSizeDiff = -nSizeDiff;
-		}
-
-		nX = nAbsoluteXDiff - nSizeDiff;
-		nY = nAbsoluteYDiff - nSizeDiff;
-		if (nX < 0)
-		{
-			nX = 0;
-		}
-
-		if (nY < 0)
-		{
-			nY = 0;
-		}
-
-		nDist = nY + 2 * nX;
-		if (nX <= nY)
-		{
-			nDist = nX + 2 * nY;
-		}
-	}
-	else
-	{
-		nDist = dword_6FDD3200[nAbsoluteXDiff + 8 * nAbsoluteYDiff];
-		if (nDist >= 0)
-		{
-			if (nSizeX1 == 3 || nSizeX2 == 3)
-			{
-				--nDist;
-			}
-
-			if (nDist < 0)
-			{
-				nDist = 0;
-			}
-
-			if (nSizeX1 <= 1 || nSizeX2 <= 1)
-			{
-				++nDist;
-			}
-		}
-		else
-		{
-			return 0;
-		}
-	}
-
-	return nDist;
+	D2CoordStrc coords1 = {}, coords2 = {};
+	UNITS_GetCoords(pUnit1, &coords1);
+	UNITS_GetCoords(pUnit2, &coords2);
+	return D2Common_10399AtCoords(pUnit1, pUnit2, coords1, coords2);
 }
 
 //D2Common.0x6FDC2E40 (#10397)

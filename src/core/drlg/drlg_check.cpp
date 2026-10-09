@@ -5,24 +5,50 @@
 // RoomEx without an active room: AddRoomData / read collision grid / RemoveRoomData.
 #include <emscripten.h>
 #include <algorithm>
+#include <cstring>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include <D2Common.h>
 #include <D2Dungeon.h>
 #include <D2Collision.h>
 #include <D2CMP.h>
 #include <Drlg/D2DrlgDrlg.h>
+#include <Drlg/D2DrlgPreset.h>
 #include <Drlg/D2DrlgOutdoors.h>
 #include <Drlg/D2DrlgDrlgVer.h>
 #include <Drlg/D2DrlgOutRoom.h>
 #include "../d2moo/compat/datatbls_bridge.h"
 #include "../tables/shared.h"
+#include "drlg_room_trace.h"
+#include "drlg_room_snapshot.h"
 #include "../../../tools/vectorfmt/vectorfmt.h"
 
 static D2DrlgActStrc* g_act = nullptr;
 static uint8_t g_actNo = 0;
 static std::vector<uint16_t> g_grid;
 static std::string g_err;
+// Bounded diagnostic view of the generated Room2 list. One record per room, in list order.
+// The seed is sampled at enumeration: after conditional AddRoomData for inactive rooms, or without
+// that call for rooms already active. It is not the seed at D2Game's later AutoPos chooser.
+// Candidate trials and acceptance are not observed by this path.
+static constexpr size_t kDrlgRoomTraceLimit = 512;
+static std::vector<D2DrlgRoomTrace> g_roomTrace;
+static int g_roomTraceTruncated = 0;
+// Offline DRLG snapshot of the generated RoomEx list. Seed fields are deliberately split by
+// lifecycle: generationSeed is D2DrlgRoom.dwInitSeed; roomSeed is the RoomEx pSeed after
+// DRLG_InitLevel; activeSeed is the D2ActiveRoom pSeed after SetClientIsInSight has generated
+// the room's tiles and before D2Game population. The latter is not Radament's AutoPos input,
+// because room activation and earlier preset spawns consume it afterwards.
+static constexpr size_t kDrlgRoomSnapshotLimit = 512;
+static std::vector<D2DrlgRoomSnapshot> g_roomSnapshot;
+static int g_roomSnapshotTruncated = 0;
+// The linked RoomEx preset-unit order is the order D2Game sees before it reaches Radament's
+// encoded preset index. Keep those identities explicit; aggregate counts cannot establish which
+// earlier preset helpers may advance the active-room seed.
+static constexpr size_t kDrlgPresetSnapshotLimit = 16384;
+static std::vector<D2DrlgPresetSnapshot> g_presetSnapshot;
+static int g_presetSnapshotTruncated = 0;
 // Tile identity under the CAPTURE's activation protocol (s173). the retail capture tool reads a room's tiles
 // immediately after AddRoomData and before RemoveRoomData, one room at a time, so when it reads a
 // room fewer of its neighbours are alive than in a session that activates every room and keeps
@@ -32,6 +58,104 @@ static std::string g_err;
 struct D2DrlgTileRec { int32_t room, layer, x, y, orientation, main, sub, frame; };
 static bool g_collectTiles = false;
 static std::vector<D2DrlgTileRec> g_tiles;
+// Realm client terrain is the same act allocation and active-room state as the retail client. Keep
+// its tile records in the 84-byte session renderer format, but source them from the client-mode act
+// that LoadAct/MapReveal packets build above (never from a server-side session).
+struct D2DrlgClientTile {
+    uint32_t room, layer, ordinal;
+    int32_t orientation, mainIndex, subIndex, frameIndex;
+    uint32_t material;
+    int32_t tileX, tileY, worldX, worldY, screenX, screenY, width, height;
+    uint32_t flags, librarySlot, libraryIndex;
+    int32_t entryHint;
+    uint32_t pop;
+};
+static_assert(sizeof(D2DrlgClientTile) == 84);
+struct D2DrlgClientRoomInfo {
+    uint32_t version, size, level, tileX, tileY, tileWidth, tileHeight, sightRefs, active;
+};
+static_assert(offsetof(D2DrlgClientRoomInfo, sightRefs) == 28);
+static_assert(sizeof(D2DrlgClientRoomInfo) == 36);
+struct D2DrlgClientTileRef { D2TileLibraryEntryStrc* tile; D2DrlgClientTileRef* next; };
+struct D2DrlgClientTileNode {
+    int32_t style, sequence, type;
+    D2DrlgClientTileRef* refs;
+    D2DrlgClientTileNode* next;
+};
+struct D2DrlgClientTileHash { D2DrlgClientTileNode* nodes[128]; };
+static std::vector<D2DrlgClientTile> g_clientTiles;
+static std::vector<uint32_t> g_clientTileEntries;
+static std::vector<int32_t> g_clientStatusCells;
+static std::vector<std::string> g_clientTileLibraries;
+static int g_clientRenderLevel;
+static int g_clientTownLevelArgument;
+static int g_clientMapRoomHintUsed;
+static std::string g_clientTileFiles;
+extern "C" const char* D2WEB_TileLibraryNameFromHash(const D2TileLibraryHashStrc*);
+extern "C" uint32_t D2WEB_TileEntryFileIndex(const void*);
+extern "C" int d2_cross_level_sight_on(void);
+
+static uint32_t clientTileLibrary(const D2TileLibraryHashStrc* hash) {
+    const char* name = hash ? D2WEB_TileLibraryNameFromHash(hash) : nullptr;
+    if (!name) return UINT32_MAX;
+    for (size_t i = 0; i < g_clientTileLibraries.size(); ++i)
+        if (g_clientTileLibraries[i] == name) return (uint32_t)i;
+    g_clientTileLibraries.emplace_back(name);
+    return (uint32_t)(g_clientTileLibraries.size() - 1);
+}
+
+static void collectClientRoomTiles(D2DrlgRoomStrc* room, uint32_t ordinal, uint32_t layer,
+        const D2DrlgTileDataStrc* data, int count) {
+    if (!room || !data || count <= 0) return;
+    for (int i = 0; i < count; ++i) {
+        const D2DrlgTileDataStrc& source = data[i];
+        if (!source.pTile) continue;
+        const D2TileLibraryEntryStrc& tile = *source.pTile;
+        D2DrlgClientTile out{};
+        out.room = ordinal; out.layer = layer; out.ordinal = (uint32_t)i;
+        out.orientation = tile.nType; out.mainIndex = tile.nStyle; out.subIndex = tile.nSequence;
+        out.frameIndex = tile.nRarity_Frame; out.material = tile.nFlags;
+        out.tileX = source.nPosX; out.tileY = source.nPosY;
+        out.worldX = room->nTileXPos + source.nPosX; out.worldY = room->nTileYPos + source.nPosY;
+        out.screenX = source.nWidth; out.screenY = source.nHeight;
+        out.width = tile.nWidth; out.height = tile.nTotalHeight;
+        out.flags = source.dwFlags; out.entryHint = source.unk0x10;
+        out.pop = (source.unk0x24 & 2) ? (source.nGreen == 255 ? 1u : 2u) : 0u;
+        out.librarySlot = UINT32_MAX; out.libraryIndex = UINT32_MAX;
+        const uint32_t bucket = (uint32_t)(2 * (uint8_t)tile.nType - (uint8_t)tile.nSequence + (uint8_t)tile.nStyle) & 0x7Fu;
+        for (uint32_t slot = 0; slot < 32 && room->pTiles[slot]; ++slot) {
+            auto* hash = reinterpret_cast<D2DrlgClientTileHash*>(room->pTiles[slot]);
+            for (D2DrlgClientTileNode* node = hash->nodes[bucket]; node; node = node->next) {
+                if (node->type != tile.nType || node->style != tile.nStyle || node->sequence != tile.nSequence) continue;
+                uint32_t index = 0;
+                for (D2DrlgClientTileRef* ref = node->refs; ref; ref = ref->next, ++index) {
+                    if (ref->tile != source.pTile) continue;
+                    out.librarySlot = clientTileLibrary(room->pTiles[slot]); out.libraryIndex = index;
+                    break;
+                }
+                if (out.librarySlot != UINT32_MAX) break;
+            }
+            if (out.librarySlot != UINT32_MAX) break;
+        }
+        g_clientTiles.push_back(out);
+        g_clientTileEntries.push_back(D2WEB_TileEntryFileIndex(source.pTile));
+    }
+}
+
+static void rebuildClientRoomTiles(int level) {
+    g_clientTiles.clear(); g_clientTileEntries.clear(); g_clientTileLibraries.clear();
+    if (!g_act || !g_act->pDrlg) return;
+    D2DrlgLevelStrc* pLevel = DRLG_GetLevel(g_act->pDrlg, level);
+    if (!pLevel) return;
+    uint32_t ordinal = 0;
+    for (D2DrlgRoomStrc* room = pLevel->pFirstRoomEx; room; room = room->pDrlgRoomNext, ++ordinal) {
+        D2ActiveRoomStrc* active = room->pRoom;
+        if (!active || !active->pRoomTiles) continue;
+        collectClientRoomTiles(room, ordinal, 0, active->pRoomTiles->pFloorTiles, active->pRoomTiles->nFloors);
+        collectClientRoomTiles(room, ordinal, 1, active->pRoomTiles->pWallTiles, active->pRoomTiles->nWalls);
+        collectClientRoomTiles(room, ordinal, 2, active->pRoomTiles->pRoofTiles, active->pRoomTiles->nRoofs);
+    }
+}
 static void collectTiles(int32_t room, int32_t layer, const D2DrlgTileDataStrc* tiles, int count) {
     if (!tiles) return;
     for (int i = 0; i < count; ++i) {
@@ -101,14 +225,31 @@ static void __stdcall noAutomap(D2ActiveRoomStrc*) {}
 static void __stdcall noTownAutomap(int32_t, int32_t, int32_t, int32_t) {}
 
 // act is 1-based like the vectors; town level = first level of the act.
-EMSCRIPTEN_KEEPALIVE int d2_drlg_act_begin(uint32_t seed, int difficulty, int act) {
-    static const int kActFirstLevel[6] = { 1, 40, 75, 103, 109, 137 };
+static int beginClientAct(uint32_t seed, int difficulty, int act, int townLevel) {
     if (g_act) { DUNGEON_FreeAct(g_act); g_act = nullptr; }
+    g_clientTiles.clear(); g_clientTileEntries.clear(); g_clientTileLibraries.clear();
+    g_clientRenderLevel = 0;
     if (act < 1 || act > 5) return 0;
     g_actNo = (uint8_t)(act - 1);
     g_pickSeed = seed; g_pickDiff = (uint8_t)difficulty; g_pickLevel = 0; g_pickCall = 0; g_pickRoom = -1;   // LoadAct's own lookups: level 0
-    g_act = DUNGEON_AllocAct(g_actNo, seed, TRUE, nullptr, (uint8_t)difficulty, nullptr, kActFirstLevel[act - 1], noAutomap, noTownAutomap);
+    g_act = DUNGEON_AllocAct(g_actNo, seed, TRUE, nullptr, (uint8_t)difficulty, nullptr, townLevel, noAutomap, noTownAutomap);
+    g_clientTownLevelArgument = townLevel;
     return g_act != nullptr;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_drlg_client_town_level_argument() { return g_clientTownLevelArgument; }
+EMSCRIPTEN_KEEPALIVE int d2_drlg_client_map_room_hint_used() { return g_clientMapRoomHintUsed; }
+
+EMSCRIPTEN_KEEPALIVE int d2_drlg_act_begin(uint32_t seed, int difficulty, int act) {
+    static const int kActFirstLevel[6] = { 1, 40, 75, 103, 109, 137 };
+    if (act < 1 || act > 5) return 0;
+    return beginClientAct(seed, difficulty, act, kActFirstLevel[act - 1]);
+}
+
+// D2Client 0x03 carries nTownLevelId in bytes 6-7. Client DRLG allocation currently begins with
+// LEVEL_NONE, but retain and pass the native argument rather than substituting the vector default.
+EMSCRIPTEN_KEEPALIVE int d2_drlg_client_act_begin(uint32_t seed, int difficulty, int act, int townLevel) {
+    return beginClientAct(seed, difficulty, act, townLevel);
 }
 
 // Session-mode counterpart for probes that compare the vendored DRLG with an in-game server act.
@@ -127,6 +268,172 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_act_begin_server(uint32_t seed, int difficulty,
 EMSCRIPTEN_KEEPALIVE void d2_drlg_act_end() {
     if (g_act) { DUNGEON_FreeAct(g_act); g_act = nullptr; }
     g_grid.clear(); g_grid.shrink_to_fit();
+    g_roomTrace.clear(); g_roomTraceTruncated = 0;
+    g_roomSnapshot.clear(); g_roomSnapshotTruncated = 0;
+    g_presetSnapshot.clear(); g_presetSnapshotTruncated = 0;
+    g_clientTiles.clear(); g_clientTileEntries.clear(); g_clientTileLibraries.clear();
+    g_clientStatusCells.clear();
+    g_clientTownLevelArgument = 0; g_clientMapRoomHintUsed = 0;
+}
+
+// D2Client 1.13c opcode 0x07 calls D2Common ordinal 10401 with (act,eLevel,x,y,currentRoom).
+// That ordinal is DUNGEON_SetClientIsInSight in our 1.13c map (community APIs call it AddRoomData).
+// Apply every packet in arrival order; the active rooms are the client's terrain source.
+static D2ActiveRoomStrc* clientRoomAt(int level, int roomTileX, int roomTileY) {
+    if (!g_act || level <= 0) return nullptr;
+    for (D2ActiveRoomStrc* room = DUNGEON_GetRoomFromAct(g_act); room; room = room->pRoomNext) {
+        if (room->pDrlgRoom && room->pDrlgRoom->pLevel && room->pDrlgRoom->pLevel->nLevelId == level &&
+            room->pDrlgRoom->nTileXPos == roomTileX && room->pDrlgRoom->nTileYPos == roomTileY) return room;
+    }
+    return nullptr;
+}
+
+static D2ActiveRoomStrc* clientRoomHint(int playerLevel, int hasPlayer, int roomTileX, int roomTileY) {
+    if (!hasPlayer) return nullptr;
+    // D2Client passes the player's current room as the hint even when the packet's eLevel names
+    // another level. Resolve the coordinates only within the tracked player level; never reinterpret
+    // them in the sighted level.
+    return clientRoomAt(playerLevel, roomTileX, roomTileY);
+}
+
+// The realm state adapter uses this only to track the level of an already-active client room.
+// A player packet cannot invent a current level when its coordinates are not in an active room.
+EMSCRIPTEN_KEEPALIVE int d2_drlg_client_level_at(int playerX, int playerY) {
+    if (!g_act) return 0;
+    for (D2ActiveRoomStrc* room = DUNGEON_GetRoomFromAct(g_act); room; room = room->pRoomNext) {
+        if (room->pDrlgRoom && room->pDrlgRoom->pLevel && DungeonTestRoomGame(room, playerX, playerY))
+            return room->pDrlgRoom->pLevel->nLevelId;
+    }
+    return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_drlg_client_map_reveal(int level, int x, int y, int hasPlayer, int playerLevel, int playerX, int playerY) {
+    if (!g_act || level <= 0 || x < 0 || y < 0) { g_err = "invalid client MapReveal"; return 0; }
+    D2DrlgLevelStrc* pLevel = DRLG_GetLevel(g_act->pDrlg, level);
+    if (!pLevel) { g_err = "MapReveal level unavailable"; return 0; }
+    D2ActiveRoomStrc* hint = clientRoomHint(playerLevel, hasPlayer, playerX, playerY);
+    g_clientMapRoomHintUsed = hint != nullptr;
+    DUNGEON_SetClientIsInSight(g_act, level, x, y, hint);
+    if (hasPlayer && playerLevel > 0) g_clientRenderLevel = playerLevel;
+    else if (g_clientRenderLevel <= 0) g_clientRenderLevel = level;
+    rebuildClientRoomTiles(g_clientRenderLevel);
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_drlg_client_map_hide(int level, int x, int y, int hasPlayer, int playerLevel, int playerX, int playerY) {
+    if (!g_act || level <= 0 || x < 0 || y < 0) { g_err = "invalid client MapHide"; return 0; }
+    D2DrlgLevelStrc* pLevel = DRLG_GetLevel(g_act->pDrlg, level);
+    if (!pLevel) { g_err = "MapHide level unavailable"; return 0; }
+    D2ActiveRoomStrc* hint = clientRoomHint(playerLevel, hasPlayer, playerX, playerY);
+    g_clientMapRoomHintUsed = hint != nullptr;
+    DUNGEON_UnsetClientIsInSight(g_act, level, x, y, hint);
+    if (hasPlayer && playerLevel > 0) g_clientRenderLevel = playerLevel;
+    else if (g_clientRenderLevel <= 0) g_clientRenderLevel = level;
+    rebuildClientRoomTiles(g_clientRenderLevel);
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int d2_drlg_client_render_level() { return g_clientRenderLevel; }
+
+EMSCRIPTEN_KEEPALIVE int d2_drlg_client_select_render_level(int level) {
+    if (!g_act || level <= 0 || !DRLG_GetLevel(g_act->pDrlg, level)) return 0;
+    g_clientRenderLevel = level;
+    rebuildClientRoomTiles(level);
+    return 1;
+}
+
+// Engine-only readback for a local fixture to name a real room in the seeded client DRLG. This
+// does not alter room visibility; production terrain still changes only through MapReveal packets.
+EMSCRIPTEN_KEEPALIVE int d2_drlg_client_first_room_xy(int level, int32_t* out) {
+    if (!g_act || !out) return 0;
+    D2DrlgLevelStrc* pLevel = DRLG_GetLevel(g_act->pDrlg, level);
+    if (!pLevel) return 0;
+    if (!pLevel->pFirstRoomEx) DRLG_InitLevel(pLevel);
+    if (!pLevel->pFirstRoomEx) return 0;
+    out[0] = pLevel->pFirstRoomEx->nTileXPos;
+    out[1] = pLevel->pFirstRoomEx->nTileYPos;
+    return 1;
+}
+
+// Read the client Act's current DRLG status union in tile coordinates. This is the same
+// `fRoomStatus < ROOMSTATUS_COUNT` membership rule used by the retail room hook's op-3/op-4
+// census, but against the separately allocated client-mode Act rather than the game/server Act.
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_drlg_client_room_status_cells(int levelId) {
+    g_clientStatusCells.clear();
+    if (!g_act || !g_act->pDrlg) return g_clientStatusCells.data();
+    D2DrlgLevelStrc* level = DRLG_GetLevel(g_act->pDrlg, levelId);
+    g_clientStatusCells.push_back(0);
+    if (!level || !level->pFirstRoomEx) return g_clientStatusCells.data();
+    for (D2DrlgRoomStrc* room = level->pFirstRoomEx; room; room = room->pDrlgRoomNext) {
+        if (room->fRoomStatus >= ROOMSTATUS_COUNT) continue;
+        g_clientStatusCells.push_back(room->nTileXPos);
+        g_clientStatusCells.push_back(room->nTileYPos);
+        g_clientStatusCells.push_back((int32_t)room->fRoomStatus);
+    }
+    g_clientStatusCells[0] = (int32_t)((g_clientStatusCells.size() - 1) / 3);
+    return g_clientStatusCells.data();
+}
+
+EMSCRIPTEN_KEEPALIVE const D2DrlgClientTile* d2_drlg_client_tiles() { return g_clientTiles.data(); }
+EMSCRIPTEN_KEEPALIVE int d2_drlg_client_tile_count() { return (int)g_clientTiles.size(); }
+EMSCRIPTEN_KEEPALIVE const uint32_t* d2_drlg_client_tile_entries() { return g_clientTileEntries.data(); }
+EMSCRIPTEN_KEEPALIVE int d2_drlg_client_tile_files(char* out, int cap) {
+    if (!out || cap <= 0) return 0;
+    int written = 0, used = 0;
+    for (const std::string& name : g_clientTileLibraries) {
+        const int n = (int)name.size() + 1;
+        if (used + n > cap) break;
+        memcpy(out + used, name.c_str(), (size_t)n); used += n; written++;
+    }
+    return written;
+}
+
+// Resolve a client-side CUnit's existing active room without streaming a new room. Native client
+// constructors use this coordinate lookup before initializing the unit's seed; callers choose
+// whether this constructor consumes one active-room seed roll for dwInitSeed. This is distinct
+// from the CUnit's mutable pSeed. A later reassignment uses the same lookup without re-rolling.
+EMSCRIPTEN_KEEPALIVE int d2_drlg_client_unit_context(int x, int y, int rollRoomSeed,
+        uint32_t* levelId, uint32_t* roomTileX, uint32_t* roomTileY,
+        uint32_t* unitInitSeed) {
+    if (!levelId || !roomTileX || !roomTileY || !unitInitSeed) return 0;
+    *levelId = *roomTileX = *roomTileY = *unitInitSeed = 0;
+    if (!g_act) return 0;
+    // The native constructor skips room resolution only for an unpositioned (0,0) assignment.
+    if (x == 0 && y == 0) return 1;
+    D2ActiveRoomStrc* room = DUNGEON_FindRoomBySubtileCoordinates(g_act, x, y);
+    if (!room || !room->pDrlgRoom || !room->pDrlgRoom->pLevel) return 0;
+    D2DrlgRoomStrc* drlgRoom = room->pDrlgRoom;
+    *levelId = static_cast<uint32_t>(DUNGEON_GetLevelIdFromRoom(room));
+    *roomTileX = static_cast<uint32_t>(drlgRoom->nTileXPos);
+    *roomTileY = static_cast<uint32_t>(drlgRoom->nTileYPos);
+    if (rollRoomSeed) {
+        // D2Client's 0x59 constructor rolls the seed on the active client-room record returned by
+        // its Act-coordinate lookup. D2MOO names the logical record D2ActiveRoomStrc (its seed is
+        // not the D2DrlgRoom generation seed above).
+        *unitInitSeed = static_cast<uint32_t>(SEED_RollRandomNumber(&room->pSeed));
+    }
+    return 1;
+}
+
+// Compatibility name used by the realm 0x59/0x15 player assignment adapter. Keep this wrapper
+// so existing callers retain their ABI while missile and other client CUnit constructors share
+// the same native active-room lookup primitive.
+EMSCRIPTEN_KEEPALIVE int d2_drlg_client_player_context(int x, int y, int rollRoomSeed,
+        uint32_t* levelId, uint32_t* roomTileX, uint32_t* roomTileY,
+        uint32_t* unitInitSeed) {
+    return d2_drlg_client_unit_context(x, y, rollRoomSeed,
+        levelId, roomTileX, roomTileY, unitInitSeed);
+}
+
+// Readback for the production client's active-room seed. The protocol scenario uses this before
+// 0x59 to verify that assignment consumes exactly one native room-seed roll.
+EMSCRIPTEN_KEEPALIVE int d2_drlg_client_room_seed_at(int x, int y, uint32_t* low, uint32_t* high) {
+    if (!low || !high || !g_act) return 0;
+    D2ActiveRoomStrc* room = DUNGEON_FindRoomBySubtileCoordinates(g_act, x, y);
+    if (!room) return 0;
+    *low = room->pSeed.nLowSeed;
+    *high = room->pSeed.nHighSeed;
+    return 1;
 }
 
 // F511 A/B (see d2_drlg_collect_picks below): 1 keeps every room of the level alive after its tile
@@ -139,6 +446,9 @@ EMSCRIPTEN_KEEPALIVE void d2_drlg_keep_alive(int on) { g_drlgKeepAlive = on ? 1 
 // Generates `level` in the current act; fills d2_drlg_out(). 1 on success.
 EMSCRIPTEN_KEEPALIVE int d2_drlg_level(int level) {
     if (!g_act) { g_err = "no act"; return 0; }
+    g_roomTrace.clear(); g_roomTraceTruncated = 0;
+    g_roomSnapshot.clear(); g_roomSnapshotTruncated = 0;
+    g_presetSnapshot.clear(); g_presetSnapshotTruncated = 0;
     D2DrlgStrc* pDrlg = g_act->pDrlg;
     g_pickLevel = (uint16_t)level; g_pickCall = 0;
     D2DrlgLevelStrc* pLevel = DRLG_GetLevel(pDrlg, level);
@@ -157,6 +467,60 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_level(int level) {
         g_pickRoom = roomOrdinal;
         if (!r2->pRoom) { DUNGEON_SetClientIsInSight(g_act, level, rx, ry, nullptr); added = true; }
         D2ActiveRoomStrc* r1 = r2->pRoom;
+        if (g_roomTrace.size() < kDrlgRoomTraceLimit) {
+            D2DrlgRoomTrace trace{};
+            trace.ordinal = roomOrdinal; trace.type = r2->nType;
+            trace.tileX = r2->nTileXPos; trace.tileY = r2->nTileYPos;
+            trace.tileWidth = r2->nTileWidth; trace.tileHeight = r2->nTileHeight;
+            trace.activeSeedAtEnumerationLow = r1 ? r1->pSeed.nLowSeed : r2->pSeed.nLowSeed;
+            trace.activeSeedAtEnumerationHigh = r1 ? r1->pSeed.nHighSeed : r2->pSeed.nHighSeed;
+            if (r1 && r1->pCollisionGrid) {
+                const D2DrlgCoordsStrc& c = r1->pCollisionGrid->pRoomCoords;
+                trace.collisionX = c.nSubtileX; trace.collisionY = c.nSubtileY;
+                trace.collisionWidth = c.nSubtileWidth; trace.collisionHeight = c.nSubtileHeight;
+            } else trace.collisionX = trace.collisionY = -1;
+            g_roomTrace.push_back(trace);
+        } else g_roomTraceTruncated = 1;
+        if (g_roomSnapshot.size() < kDrlgRoomSnapshotLimit) {
+            D2DrlgRoomSnapshot snapshot{};
+            snapshot.ordinal = roomOrdinal; snapshot.roomType = r2->nType;
+            snapshot.tileX = rx; snapshot.tileY = ry;
+            snapshot.tileWidth = r2->nTileWidth; snapshot.tileHeight = r2->nTileHeight;
+            snapshot.presetId = r2->nType == DRLGTYPE_PRESET && r2->pMaze ? r2->pMaze->nLevelPrest : -1;
+            snapshot.generationSeed = r2->dwInitSeed;
+            snapshot.roomSeedLow = r2->pSeed.nLowSeed; snapshot.roomSeedHigh = r2->pSeed.nHighSeed;
+            snapshot.activeX = snapshot.activeY = -1;
+            snapshot.candidateMinX = snapshot.candidateMinY = 1;
+            snapshot.candidateMaxX = snapshot.candidateMaxY = 0;
+            snapshot.radamentAnchorX = snapshot.radamentAnchorY = -1;
+            if (r1) {
+                snapshot.activeSeedLow = r1->pSeed.nLowSeed; snapshot.activeSeedHigh = r1->pSeed.nHighSeed;
+                const D2DrlgCoordsStrc& c = r1->tCoords;
+                snapshot.activeX = c.nSubtileX; snapshot.activeY = c.nSubtileY;
+                snapshot.activeWidth = c.nSubtileWidth; snapshot.activeHeight = c.nSubtileHeight;
+                snapshot.candidateMinX = c.nSubtileX + 1; snapshot.candidateMinY = c.nSubtileY + 1;
+                snapshot.candidateMaxX = c.nSubtileX + c.nSubtileWidth - 2;
+                snapshot.candidateMaxY = c.nSubtileY + c.nSubtileHeight - 2;
+            }
+            // The 1.13c DS1 linker encodes Radament as monster preset index 734+10=744.
+            // Keep the map-local/room-relative preset anchor separate from AutoPos's later
+            // random candidate, which D2Game chooses after this DRLG snapshot is taken.
+            int32_t presetOrdinal = 0;
+            for (D2PresetUnitStrc* unit = r2->pPresetUnits; unit; unit = unit->pNext, ++presetOrdinal) {
+                if (g_presetSnapshot.size() < kDrlgPresetSnapshotLimit) {
+                    g_presetSnapshot.push_back({ roomOrdinal, presetOrdinal, unit->nUnitType, unit->nIndex,
+                        unit->nMode, unit->nXpos, unit->nYpos, unit->bSpawned });
+                } else g_presetSnapshotTruncated = 1;
+                if (unit->nUnitType == 1 && unit->nIndex == 744) {
+                    ++snapshot.radamentPresetCount;
+                    if (snapshot.radamentPresetCount == 1) {
+                        snapshot.radamentAnchorX = unit->nXpos;
+                        snapshot.radamentAnchorY = unit->nYpos;
+                    }
+                }
+            }
+            g_roomSnapshot.push_back(snapshot);
+        } else g_roomSnapshotTruncated = 1;
         if (g_collectTiles && r1 && r1->pRoomTiles) {
             collectTiles(roomOrdinal, 0, r1->pRoomTiles->pFloorTiles, r1->pRoomTiles->nFloors);
             collectTiles(roomOrdinal, 1, r1->pRoomTiles->pWallTiles, r1->pRoomTiles->nWalls);
@@ -183,6 +547,19 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_level(int level) {
 }
 
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_drlg_out() { return g_out; }
+// Diagnostic records for the last generated level (bounded to 512 rooms). The room rectangle and
+// active seed are snapshots at enumeration; collision words come from d2_drlg_grid.
+EMSCRIPTEN_KEEPALIVE const D2DrlgRoomTrace* d2_drlg_rooms() { return g_roomTrace.data(); }
+EMSCRIPTEN_KEEPALIVE int d2_drlg_room_count() { return (int)g_roomTrace.size(); }
+EMSCRIPTEN_KEEPALIVE int d2_drlg_room_trace_truncated() { return g_roomTraceTruncated; }
+// Ordered snapshot of the last generated level, bounded to 512 RoomEx records. Seed fields stop
+// before D2Game population; this diagnoses the generation inputs without claiming an AutoPos result.
+EMSCRIPTEN_KEEPALIVE const D2DrlgRoomSnapshot* d2_drlg_room_snapshot() { return g_roomSnapshot.data(); }
+EMSCRIPTEN_KEEPALIVE int d2_drlg_room_snapshot_count() { return (int)g_roomSnapshot.size(); }
+EMSCRIPTEN_KEEPALIVE int d2_drlg_room_snapshot_truncated() { return g_roomSnapshotTruncated; }
+EMSCRIPTEN_KEEPALIVE const D2DrlgPresetSnapshot* d2_drlg_preset_snapshot() { return g_presetSnapshot.data(); }
+EMSCRIPTEN_KEEPALIVE int d2_drlg_preset_snapshot_count() { return (int)g_presetSnapshot.size(); }
+EMSCRIPTEN_KEEPALIVE int d2_drlg_preset_snapshot_truncated() { return g_presetSnapshotTruncated; }
 // The rasterised dirt-path grid of every outdoor room tiled while collecting (s178), in
 // the retail capture tool's dirtgrid.txt form after its "seed diff level room" prefix:
 // "room <ordinal> at <tx>,<ty> <w>x<h> path <W>x<H> <row> <row> ..." with each row "v,v,...,".
@@ -255,5 +632,77 @@ EMSCRIPTEN_KEEPALIVE const char* d2_component_token(int index) {
     return g_componentToken.c_str();
 }
 EMSCRIPTEN_KEEPALIVE const char* d2_drlg_err() { return g_err.c_str(); }
+
+// Movement projections may attach a short-lived client CUnit to an existing visible room. These
+// accessors never stream rooms; the D2GS MapReveal/MapHide feed owns that lifetime.
+D2DrlgActStrc* d2_drlg_client_act() { return g_act; }
+D2ActiveRoomStrc* d2_drlg_client_active_room(int x, int y) {
+    return g_act ? DUNGEON_FindRoomBySubtileCoordinates(g_act, x, y) : nullptr;
+}
+int d2_drlg_client_room_freed_by_hide(int level, int x, int y, int hasPlayer, int playerLevel,
+        int playerX, int playerY, void* activeRoom);
+// Read-only native RoomEx identity for focused client MapReveal/MapHide lifecycle rows.
+// nearIndex -1 returns the room containing (x,y); nonnegative indices select its ppRoomsNear.
+EMSCRIPTEN_KEEPALIVE int d2_drlg_client_room_info(int x, int y, int nearIndex, D2DrlgClientRoomInfo* out) {
+    if (!out) return 0;
+    *out = {};
+    if (!g_act) return 0;
+    D2ActiveRoomStrc* active = DUNGEON_FindRoomBySubtileCoordinates(g_act, x, y);
+    D2DrlgRoomStrc* room = active ? active->pDrlgRoom : nullptr;
+    if (!room) return 0;
+    if (nearIndex >= 0) {
+        if (nearIndex >= room->nRoomsNear || !room->ppRoomsNear) return 0;
+        room = room->ppRoomsNear[nearIndex];
+    }
+    if (!room) return 0;
+    out->version = 1;
+    out->size = sizeof(*out);
+    out->level = room->pLevel ? static_cast<uint32_t>(room->pLevel->nLevelId) : 0;
+    out->tileX = static_cast<uint32_t>(room->nTileXPos);
+    out->tileY = static_cast<uint32_t>(room->nTileYPos);
+    out->tileWidth = static_cast<uint32_t>(room->nTileWidth);
+    out->tileHeight = static_cast<uint32_t>(room->nTileHeight);
+    out->sightRefs = room->wRoomsInList[ROOMSTATUS_CLIENT_IN_SIGHT];
+    out->active = room->pRoom != nullptr;
+    return 1;
+}
+EMSCRIPTEN_KEEPALIVE int d2_drlg_client_room_freed_by_hide_at(int level, int hideX, int hideY,
+        int carrierX, int carrierY, int hasPlayer, int playerLevel, int playerX, int playerY) {
+    D2ActiveRoomStrc* carrier = g_act ? DUNGEON_FindRoomBySubtileCoordinates(g_act, carrierX, carrierY) : nullptr;
+    return d2_drlg_client_room_freed_by_hide(level, hideX, hideY, hasPlayer, playerLevel,
+        playerX, playerY, carrier);
+}
+int d2_drlg_client_room_freed_by_hide(int level, int x, int y, int hasPlayer, int playerLevel,
+        int playerX, int playerY, void* activeRoom) {
+    if (!g_act || !g_act->pDrlg || !activeRoom) return 0;
+    D2DrlgLevelStrc* pLevel = DRLG_GetLevel(g_act->pDrlg, level);
+    D2ActiveRoomStrc* hint = clientRoomHint(playerLevel, hasPlayer, playerX, playerY);
+    D2DrlgRoomStrc* root = pLevel ? DRLG_GetRoomExFromCoordinates(x, y, g_act->pDrlg,
+        hint ? hint->pDrlgRoom : nullptr, pLevel) : nullptr;
+    if (!root || root->wRoomsInList[ROOMSTATUS_CLIENT_IN_SIGHT] == 0) return 0;
+
+    struct HideDelta { int32_t values[ROOMSTATUS_COUNT]{}; };
+    std::unordered_map<D2DrlgRoomStrc*, HideDelta> deltas;
+    auto propagate = [&](auto&& self, D2DrlgRoomStrc* room, int status) -> void {
+        if (!room || status >= ROOMSTATUS_COUNT) return;
+        for (int i = 0; i < room->nRoomsNear; ++i) {
+            D2DrlgRoomStrc* nearRoom = room->ppRoomsNear[i];
+            if (!nearRoom || (nearRoom->pLevel != room->pLevel && !d2_cross_level_sight_on())) continue;
+            deltas[nearRoom].values[status]--;
+            self(self, nearRoom, status + 1);
+        }
+    };
+    deltas[root].values[ROOMSTATUS_CLIENT_IN_SIGHT]--;
+    propagate(propagate, root, ROOMSTATUS_CLIENT_IN_SIGHT + 1);
+    auto* target = static_cast<D2ActiveRoomStrc*>(activeRoom)->pDrlgRoom;
+    if (!target) return 0;
+    auto it = deltas.find(target);
+    if (it == deltas.end()) return 0;
+    for (int status = 0; status < ROOMSTATUS_COUNT; ++status) {
+        const uint16_t after = static_cast<uint16_t>(target->wRoomsInList[status] + it->second.values[status]);
+        if (after != 0) return 0;
+    }
+    return 1;
+}
 
 } // extern "C"

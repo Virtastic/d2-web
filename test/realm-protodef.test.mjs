@@ -12,7 +12,9 @@ import assert from 'node:assert/strict';
 import { startRealmd, connect, reader, u32le, fourcc, bncsFrame, mcpFrame } from './helpers/realmd.mjs';
 import { loadSchema, decode } from './helpers/protodef.mjs';
 
-const PORTS = { bncs: 46122, mcp: 46123, d2gs: 44010 };
+// Keep this server separate from realmd-ws.test.mjs. Node runs test files in parallel, and both
+// suites need a live realmd at the same time while they exercise different protocol surfaces.
+const PORTS = { bncs: 46132, mcp: 46133, d2gs: 44020 };
 let proc = null;
 const sid = loadSchema('sid');
 const mcp = loadSchema('mcp');

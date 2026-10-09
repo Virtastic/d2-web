@@ -24,6 +24,7 @@
 // decoder at all. The decoder here is `blennies/unbikit` (MIT OR Apache-2.0), vendored under
 // assets/vendor/ -- see vendor/README.md.
 import { createBikDecoder } from './vendor/unbikit.js';
+import { createBikAudioPlayer } from './cinematic-audio.mjs';
 
 /**
  * Retail's boot movies, in the order they reach the screen (measured, see the file header). The path
@@ -88,12 +89,28 @@ export function parseBikHeader(bytes) {
  * yields between frames so a slow movie cannot stall the page's own loop. `draw()` is synchronous and
  * always blits the frame the last completed step left, so a frame never tears.
  */
-export async function openMovie({ read, path, documentObject = globalThis.document }) {
+export async function openMovie({ read, path, documentObject = globalThis.document,
+  AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext, gestureTarget = globalThis.window,
+  audioPlayer = null, isCurrent = () => true, createDecoder = createBikDecoder }) {
   const bytes = read(path);
   const header = parseBikHeader(bytes);
-  const decoder = await createBikDecoder(new Blob([bytes]));
+  // A title-film row calls openMovie from the user's release handler. Create its Web Audio
+  // context before the decoder's asynchronous startup so the trusted gesture can activate it.
+  // The boot sequence passes its already-created shared player, so this is only owned here for
+  // callers such as the explicit Cinematics menu.
+  const ownsAudio = !audioPlayer;
+  const audio = header.numAudioTracks ? (audioPlayer ?? createBikAudioPlayer(AudioContextClass, gestureTarget)) : null;
+  let decoder;
+  try { decoder = await createDecoder(new Blob([bytes])); }
+  catch (error) { if (ownsAudio) audio?.close?.(); throw error; }
+  // The front end may skip this phase while the decoder is being constructed. Do not decode or
+  // create any phase-owned state once its opener has gone stale.
+  if (!isCurrent()) { if (ownsAudio) audio?.close?.(); return null; }
   const fps = header.fpsDivider ? header.fpsDividend / header.fpsDivider : 0;
-  if (!decoder.isSupported) throw new Error(`${path}: unbikit cannot decode this Bink stream`);
+  if (!decoder.isSupported) {
+    if (ownsAudio) audio?.close?.();
+    throw new Error(`${path}: unbikit cannot decode this Bink stream`);
+  }
   const canvas = documentObject.createElement('canvas');
   canvas.width = header.width; canvas.height = header.height;
   const ctx2d = canvas.getContext('2d', { willReadFrequently: true });
@@ -107,6 +124,7 @@ export async function openMovie({ read, path, documentObject = globalThis.docume
   };
   let rgba = null;
   let stepping = false;   // one decode at a time: step() is called from two clocks
+  let audioStopped = false;
   const blit = () => {
     if (!rgba) return false;
     ctx2d.putImageData(new ImageData(rgba, header.width, header.height), 0, 0);
@@ -142,11 +160,16 @@ export async function openMovie({ read, path, documentObject = globalThis.docume
   const decodeOne = async () => {
     const frame = await decoder.getNextFrame();
     if (!frame || !frame.videoFrame) return false;
+    // A skip may change title phase while this asynchronous Bink decode is in flight. Do not let
+    // its eventual completion enqueue sound after the phase transition cleared the old movie queue.
+    if (!isCurrent() || audioStopped) return false;
+    audio?.play(frame.audioTracks);
     rgba = yuv420ToRgba(frame.videoFrame.yuv, frame.videoFrame.lineSize, header.width, header.height);
     state.frameIndex++;
     return true;
   };
-  await decodeOne();
+  try { await decodeOne(); }
+  catch (error) { if (ownsAudio) audio?.close?.(); throw error; }
   blit();
   return {
     ...state,
@@ -155,6 +178,12 @@ export async function openMovie({ read, path, documentObject = globalThis.docume
     get error() { return state.error; },
     get finished() { return state.durationMs > 0 && state.frameIndex >= header.numFrames - 1; },
     get canvas() { return canvas; },
+    get audioEvidence() { return audio?.evidence ?? null; },
+    stopAudio() { audioStopped = true; return audio?.stop?.(); },
+    // A late opener can belong to an old phase after a newer movie has begun using the shared
+    // audio player. Discard only this movie's future packets; do not stop the shared player's queue.
+    discard() { audioStopped = true; return ownsAudio ? audio?.close?.() : undefined; },
+    close() { audioStopped = true; return ownsAudio ? audio?.close?.() : audio?.stop?.(); },
     /**
      * Decode every frame the clock has reached. Returns the number of frames decoded this call.
      * Two callers reach this (the frame loop and the shell's 200 ms timer, one of which a background

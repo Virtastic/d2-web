@@ -393,7 +393,7 @@ void __fastcall ACT2Q4_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 				D2ActiveRoomStrc* pRoom = nullptr;
 				D2CoordStrc pCoord = {};
 				UNITS_GetCoords(pQuestArg->pPlayer, &pCoord);
-				QUESTS_GetFreePosition(pQuestDataEx->pRoom, &pCoord, 2, 0xBE11, &pRoom, 8);
+				QUESTS_GetFreePosition(pQuestDataEx->pRoom, &pCoord, 2, 0xBE11, &pRoom, 100);
 				if (pRoom && D2GAME_CreatePortalObject_6FD13DF0(pQuestData->pGame, pQuestArg->pPlayer, pRoom, pCoord.nX, pCoord.nY, LEVEL_CANYONOFTHEMAGI, 0, OBJECT_PERMANENT_TOWN_PORTAL, 0))
 				{
 					pQuestDataEx->bPortalToCanyonOpen = 1;
@@ -624,7 +624,7 @@ void __fastcall ACT2Q4_InitializeJerhynMonster(D2QuestDataStrc* pQuestData, D2Un
 	pCoord->nY = pCoord->nY - 3;
 
 	D2ActiveRoomStrc* pFoundRoom = D2GAME_GetRoom_6FC52070(pRoom, pCoord->nX, pCoord->nY);
-	QUESTS_GetFreePosition(pRoom, pCoord, 3, 0x100, &pFoundRoom, 9);
+	QUESTS_GetFreePosition(pRoom, pCoord, 3, 0x100, &pFoundRoom, 100);
 
 	D2UnitStrc* pJerhyn = D2GAME_SpawnMonster_6FC69F10(pQuestData->pGame, pFoundRoom, pCoord->nX, pCoord->nY, MONSTER_JERHYN, 1, -1, 0);
 	if (!pJerhyn)
@@ -747,7 +747,7 @@ void __fastcall ACT2Q4_InitializeJerhynStartObject(D2QuestDataStrc* pQuestData, 
 	pCoord.nX = pOp->nX;
 	pCoord.nY = pOp->nY;
 
-	QUESTS_GetFreePosition(pRoom, &pCoord, 2, 0x100, &pRoom, 10);
+	QUESTS_GetFreePosition(pRoom, &pCoord, 2, 0x100, &pRoom, 100);
 
 	D2UnitStrc* pJerhyn = D2GAME_SpawnMonster_6FC69F10(pQuestData->pGame, pRoom, pCoord.nX, pCoord.nY, MONSTER_JERHYN, 1, -1, 0);
 	if (pJerhyn)

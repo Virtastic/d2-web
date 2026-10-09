@@ -20,6 +20,52 @@ inline void wstr(uint8_t* p, const char* s, int n) {
 
 extern "C" {
 
+// Client-to-server location commands use the same wire shape for walk and run: opcode, then
+// subtile x/y as little-endian u16s. The caller chooses 0x01 or 0x03 from the client run toggle.
+// Prior art: libd2 `packages/net/src/cs.zig` (CoordCmd/RunToLocation) and d2-clientless
+// `src/game/bot.zig` both pin the five-byte shape; the local target build validates it through
+// D2GAME_PACKETCALLBACK_Rcv0x01_Walk / Rcv0x03_Run in `D2Game/PLAYER/PlrMsg.cpp`.
+// `d2_session_command_move` uses this composer before dispatching the same bytes into the local
+// retail D2Game handler, keeping the local command boundary byte-identical to the future socket path.
+EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_move_to(uint8_t opcode, uint16_t x, uint16_t y, uint8_t* out) {
+    if (!out || (opcode != 0x01 && opcode != 0x03)) return 0;
+    out[0] = opcode;
+    wu16(out + 1, x);
+    wu16(out + 3, y);
+    return 5;
+}
+
+// Right-hand ground skills have the same five-byte coordinate schema. The initial
+// click is 0x0C and a held repeat is 0x0F; native callbacks.
+EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_right_skill_at(uint8_t opcode, uint16_t x, uint16_t y, uint8_t* out) {
+    if (!out || (opcode != 0x0C && opcode != 0x0F)) return 0;
+    out[0] = opcode;
+    wu16(out + 1, x);
+    wu16(out + 3, y);
+    return 5;
+}
+
+// Right-hand skill on a server-owned unit uses the entity command schema, not a coordinate
+// packet: opcode, unit type:u32, unit GUID:u32. 0x0D is the initial press and 0x10 is its
+// held-repeat callback; the D2Game 1.13c handlers are recorded
+EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_right_skill_on_entity(uint8_t opcode, uint32_t unitType,
+        uint32_t guid, uint8_t* out) {
+    if (!out || (opcode != 0x0D && opcode != 0x10) || unitType > 5) return 0;
+    out[0] = opcode;
+    wu32(out + 1, unitType);
+    wu32(out + 5, guid);
+    return 9;
+}
+
+// Native 0x3C chooses the hand before a later coordinate cast (which carries no skill ID).
+EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_select_skill(uint16_t skill, uint8_t left, uint32_t owner, uint8_t* out) {
+    if (!out || left > 1) return 0;
+    out[0] = 0x3c;
+    wu32(out + 1, uint32_t(skill) | (left ? 0x80000000u : 0));
+    wu32(out + 5, owner);
+    return 9;
+}
+
 // 0x03 GameActLoad: act(u8), mapId(u32), areaId(u16), unk1(u32).  12 bytes.
 EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_act_load(uint8_t act, uint32_t mapId, uint16_t areaId, uint32_t unk1, uint8_t* out) {
     out[0] = 0x03;

@@ -1,3 +1,7 @@
+import { NPC_SPEECH_CYCLE, NPC_SPEECH_DEFAULT } from './npc-speech-setting.mjs';
+import { recordDc6, recordPrim } from './drawlist.mjs';
+import { VIDEO_RESOLUTIONS } from './video-resolution-settings.mjs';
+
 // F215 (SOUND OPTIONS) and F216 (VIDEO OPTIONS): the two pages the OPTIONS page's first two lines open.
 // Both are cel art, not font text -- retail draws them from DATA\LOCAL\UI\ENG\ plus the widget sliders,
 // so nothing here is derived from pixels: every anchor, frame, mode and box below is a record in
@@ -12,7 +16,6 @@
 // track from x=341 to x=630, the knob at its left end for v=0 and 266 px along for v=1 (measured:
 // Sound/Music/3DBias/Gamma/Contrast defaults and both click captures fit knobX = 339 + round(v*266)
 // exactly, with the box split 13 px right of the knob).
-import { recordDc6, recordPrim } from './drawlist.mjs';
 
 const UI = 'data\\local\\ui\\eng\\';
 const WID = 'data\\global\\ui\\widgets\\';
@@ -25,6 +28,15 @@ export const OPTIONS_PAGE_LAYOUT = Object.freeze({
   barDx: 340, barDy: 2, pentDx: 15, pentX: [99, 649],
   bandAbove: 11, bandBelow: 34,
 });
+
+// Native sound/music widgets have 21 positions. Their pointer branch uses a 265px
+// centre travel beginning 12px after the bar origin, then rounds to the nearest
+// position; the callback converts that position to an integer percentage.
+export function nativeAudioSliderValue(logicalX) {
+  const delta = Math.max(0, Math.min(265, Math.trunc(logicalX) - 352));
+  const position = Math.trunc(Math.trunc(1 + delta * 20 / 132.5) / 2);
+  return Math.trunc(position * 100 / 20) / 100;
+}
 
 // 7 rows each, 45 px apart: the last is retail's PREVIOUS cel (SPrevious.dc6) in both pages.
 // `labels` are [path, frame, anchorX] at the row's own y; `mode` is D2MOO's DrawMode (1 = dimmed, which
@@ -55,12 +67,17 @@ export const OPTIONS_PAGE_TITLES = Object.freeze({
   video: { path: 'VideoOptions', x: [252, 508] },
 });
 
+// Recovered from the 1.13c option callback and display helper. Choice 0 is 640x480 and
+// choice 1 is 800x600. The browser transition is an internal canvas resize; retail's
+// Wine/DDraw restart timing and its 640x480 draw list remain unverified (F221).
+export { VIDEO_RESOLUTIONS } from './video-resolution-settings.mjs';
+
 // The three multi-state rows: the cels retail drew for each state, from the page's toggle captures.
-const NPC_SPEECH = [
-  [['AudioText', 0, 370], ['AudioText', 1, 626]],   // both: the NPC's voice and the text
-  [['TextOnly', 0, 461]],
-  [['AudioOnly', 0, 446]],
-];
+const NPC_SPEECH = Object.freeze({
+  2: [['AudioText', 0, 370], ['AudioText', 1, 626]], // native value 2: both voice and text
+  0: [['AudioOnly', 0, 446]],                       // native value 0: voice only
+  1: [['TextOnly', 0, 461]],                        // native value 1: text only
+});
 const LIGHTING = [[['High', 0, 573]], [['Low', 0, 564]]];
 const SHADOWS = [[['SmallOn', 0, 590]], [['SmallOff', 0, 579]]];
 
@@ -76,7 +93,11 @@ export function optionsPageDrawOrder(name, state = {}) {
   rows.forEach((row, i) => {
     const y = L.rowY0 + i * L.pitch;
     for (const [path, frame, x] of row.labels) out.push({ op: 'cel', path, frame, x, y, mode: row.mode });
-    const value = row.key === 'npcspeech' ? NPC_SPEECH[state.npcspeech ?? 0]
+    const value = row.key === 'resolution'
+      // The 640x480 option's art cel/anchor has no capture evidence yet. Keep the value
+      // out of the draw list until that identity is measured; expose it through state instead.
+      ? (state.resolution === 0 ? [] : [['800x600', 0, 495]])
+      : row.key === 'npcspeech' ? NPC_SPEECH[state.npcspeech ?? NPC_SPEECH_DEFAULT]
       : row.key === 'lighting' ? LIGHTING[state.lighting ?? 0]
         : row.key === 'shadows' ? SHADOWS[state.shadows ?? 0] : row.value;
     for (const [path, frame, x] of value ?? []) out.push({ op: 'cel', path, frame, x, y, mode: row.mode });
@@ -110,7 +131,7 @@ const sourcePath = (path) => `${isWidget(path) ? WID : UI}${path}.dc6`;
  * The two pages, drawn and driven. Deps as elsewhere; `act` picks the in-game palette (the pages are
  * drawn over the game, so it is the act palette).
  */
-export function createOptionsPages({ read, decodeDc6, decodeDatPalette, documentObject = globalThis.document, act = 1, initialVolume = null, onVolume = null }) {
+export function createOptionsPages({ read, decodeDc6, decodeDatPalette, documentObject = globalThis.document, act = 1, initialVolume = null, initialNpcSpeech = NPC_SPEECH_DEFAULT, initialResolution = 1, onVolume = null, onNpcSpeech = null, onResolution = null }) {
   const palette = decodeDatPalette(read(ACT_PALETTE(act)));
   const decoded = new Map(), images = new Map();
   const dc6 = (path) => {
@@ -139,8 +160,10 @@ export function createOptionsPages({ read, decodeDc6, decodeDatPalette, document
 
   // F235: Sound and Music start at the value the audio graph is holding (retail's own defaults on a
   // first visit), so the knob this page draws is the volume that will actually be played.
-  const state = { npcspeech: 0, lighting: 0, shadows: 0, ...(initialVolume ?? {}) };
+  const state = { npcspeech: NPC_SPEECH_CYCLE.includes(initialNpcSpeech) ? initialNpcSpeech : NPC_SPEECH_DEFAULT,
+    lighting: 0, shadows: 0, resolution: initialResolution === 0 ? 0 : 1, ...(initialVolume ?? {}) };
   let page = null, selected = 0, tick = 0;
+  const optionPointers = new Map();
   const rows = () => OPTIONS_PAGE_ROWS[page];
   const view = (width, height) => {
     const scale = Math.min(width / 800, height / 600);
@@ -153,10 +176,21 @@ export function createOptionsPages({ read, decodeDc6, decodeDatPalette, document
   const choose = (i, lx) => {
     const L = OPTIONS_PAGE_LAYOUT, row = rows()[i];
     if (!row) return null;
-    if (row.slider) { state[row.key] = Math.max(0, Math.min(1, (lx - L.trackX1) / (L.trackX2 - L.trackX1))); onVolume?.(row.key, state[row.key]); return { row: row.key, value: state[row.key] }; }
-    if (row.key === 'npcspeech') { state.npcspeech = (state.npcspeech + 1) % NPC_SPEECH.length; return { row: row.key, value: state.npcspeech }; }
+    if (row.slider) { state[row.key] = row.key === 'sound' || row.key === 'music' ? nativeAudioSliderValue(lx) : Math.max(0, Math.min(1, (lx - L.trackX1) / (L.trackX2 - L.trackX1))); onVolume?.(row.key, state[row.key]); return { row: row.key, value: state[row.key] }; }
+    if (row.key === 'npcspeech') {
+      const index = NPC_SPEECH_CYCLE.indexOf(state.npcspeech);
+      state.npcspeech = NPC_SPEECH_CYCLE[(index + 1) % NPC_SPEECH_CYCLE.length];
+      onNpcSpeech?.(state.npcspeech);
+      return { row: row.key, value: state.npcspeech };
+    }
     if (row.key === 'lighting') { state.lighting = 1 - state.lighting; return { row: row.key, value: state.lighting }; }
     if (row.key === 'shadows') { state.shadows = 1 - state.shadows; return { row: row.key, value: state.shadows }; }
+    if (row.key === 'resolution') {
+      state.resolution = 1 - state.resolution;
+      const mode = VIDEO_RESOLUTIONS[state.resolution];
+      onResolution?.({ ...mode });
+      return { row: row.key, value: mode.name, width: mode.width, height: mode.height };
+    }
     // 3DSound/EAX/3DBias/Perspective are dimmed: retail reports the hardware absent and they do nothing.
     return null;
   };
@@ -164,8 +198,8 @@ export function createOptionsPages({ read, decodeDc6, decodeDatPalette, document
   return {
     get isOpen() { return page !== null; },   // not `open`: an object literal's `open(name)` method would shadow the getter
     get page() { return page; },
-    open(name) { if (!OPTIONS_PAGE_ROWS[name]) throw new Error(`unknown options page ${name}`); page = name; selected = rows().length - 1; },
-    close() { page = null; },
+    open(name) { if (!OPTIONS_PAGE_ROWS[name]) throw new Error(`unknown options page ${name}`); optionPointers.clear(); page = name; selected = rows().length - 1; },
+    close() { optionPointers.clear(); page = null; },
     get state() { return { ...state }; },
     get evidence() {
       if (!page) return { open: false };
@@ -176,7 +210,32 @@ export function createOptionsPages({ read, decodeDc6, decodeDatPalette, document
         draws: optionsPageDrawOrder(page, state).length,
       };
     },
-    hover(x, y, width, height) { const i = rowAt(x, y, width, height); if (i >= 0) selected = i; return i; },
+    /** Retail choice rows apply on a matching release; sliders keep their immediate down update. */
+    pointerDown(x, y, width, height, pointerId, button) {
+      if (!page) return false;
+      const i = rowAt(x, y, width, height);
+      if (button !== 0) return true;
+      if (i < 0) return false;
+      const row = rows()[i];
+      if (row.slider) return false;
+      selected = i;
+      optionPointers.set(pointerId, { row: i, button, page });
+      return true;
+    },
+    pointerUp(x, y, width, height, pointerId, button) {
+      if (!optionPointers.has(pointerId)) return false;
+      const pressed = optionPointers.get(pointerId);
+      optionPointers.delete(pointerId);
+      if (page === pressed.page && button === pressed.button && rowAt(x, y, width, height) === pressed.row)
+        return this.click(x, y, width, height) === 'previous' ? 'previous' : true;
+      return true;
+    },
+    pointerCancel(pointerId) { return optionPointers.delete(pointerId); },
+    pointerCancelAll() { optionPointers.clear(); },
+    hover(x, y, width, height) {
+      if (optionPointers.size) return selected;
+      const i = rowAt(x, y, width, height); if (i >= 0) selected = i; return i;
+    },
     /** Returns { row, value } | 'previous' | null, so a caller can route PREVIOUS back to the menu. */
     click(x, y, width, height) {
       const i = rowAt(x, y, width, height);

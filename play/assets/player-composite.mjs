@@ -1,15 +1,16 @@
 // Retail player composites are data driven: Armor.txt supplies the body layer's
 // light/medium/heavy variant (and the helmet/shield alternate graphic), while
-// Weapons.txt supplies both the hand graphic and the animation weapon class.
-// The engine owns which records are worn; this module only translates those
-// records through the same retail tables the game uses to name its DCC files.
+// Weapons.txt supplies the hand graphic. The engine supplies the animation
+// weapon class because dual-wield and two-handed selection depends on native
+// inventory rules, not a single item's row.
 
 const COMPONENT = ['HD', 'TR', 'LG', 'RA', 'LA', 'RH', 'LH', 'SH', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8'];
 const ARMOR_CLASS_COMPONENT = Object.freeze({ rarm: 3, larm: 4, torso: 1, legs: 2, rspad: 8, lspad: 9 });
-// D2Items.h: IFLAG_SWITCHIN / IFLAG_SWITCHOUT. The presentation record exposes
-// itemFlags directly, so the client need not infer which weapon set is live.
-const SWITCHIN = 0x40, SWITCHOUT = 0x80;
-const MAIN_HANDS = new Set([4, 5]), SWITCH_HANDS = new Set([11, 12]);
+// This mapping is walked from the player draw path; keep its pairs out of per-draw allocations.
+const ARMOR_CLASS_COMPONENT_ENTRIES = Object.freeze(Object.entries(ARMOR_CLASS_COMPONENT));
+// The native item compositor consumes body slots 4/5 for the hand split.
+// SWITCHIN/SWITCHOUT are update flags, not its active-set selector.
+const MAIN_HANDS = new Set([4, 5]);
 
 function rows(bytes) {
   const lines = new TextDecoder().decode(bytes).replace(/\r/g, '').split('\n').filter(Boolean);
@@ -27,17 +28,6 @@ function itemCode(item) {
   return String.fromCharCode(code & 255, (code >>> 8) & 255, (code >>> 16) & 255, (code >>> 24) & 255).replace(/\0/g, '').trim().toLowerCase();
 }
 
-function activeHand(item) {
-  const bodyLoc = Number(item?.bodyLoc);
-  const flags = Number(item?.itemFlags) >>> 0;
-  // Normal equips have neither transition flag. A retail weapon swap puts the
-  // active pair in RARM/LARM with SWITCHIN and the inactive pair in SWRARM/
-  // SWLARM with SWITCHOUT (ItemMode.cpp); honour both the steady and transition
-  // states rather than letting an arbitrary mode-1 record win by list order.
-  if (MAIN_HANDS.has(bodyLoc)) return !(flags & SWITCHOUT);
-  return SWITCH_HANDS.has(bodyLoc) && Boolean(flags & SWITCHIN);
-}
-
 /** Resolve worn presentation records into the exact variant requested per player component. */
 export function createPlayerCompositeResolver(read) {
   let tables = null;
@@ -51,27 +41,25 @@ export function createPlayerCompositeResolver(read) {
     return tables;
   }
   return {
-    resolve(items, defaults) {
+    resolve(items, defaults, engineWeaponClass, primaryWeaponId = 0) {
       const { armor, weapons, armorClass } = load();
       const components = { ...defaults }, source = {};
-      let weaponClass = 'hth';
-      // Choose the active weapons before assigning composite components.  The
-      // Weapons.txt `component` describes an item's normal presentation, not
-      // which equipped hand owns it: a Barbarian can wield two entries whose
-      // row both says RH.  Retail's body locations are the authority here.
+      const weaponClass = String(engineWeaponClass || '').toLowerCase();
+      if (!weaponClass) throw new TypeError('engine weapon class is required for player composition');
+      // Classify each active item once. This resolver runs from the player draw
+      // path, so a frame with a large inventory must not rescan the complete
+      // snapshot merely to find hands after assigning the body layers.
       const hands = new Map();
-      for (const item of items || []) {
-        if (item?.mode !== 1 || !activeHand(item)) continue;
-        const bodyLoc = Number(item.bodyLoc);
-        if (bodyLoc === 4 || bodyLoc === 5) hands.set(bodyLoc, item);
-      }
       for (const item of items || []) {
         if (item?.mode !== 1) continue;
         const code = itemCode(item), armorRow = armor.get(code), weaponRow = weapons.get(code);
+        const record = { item, code, armorRow, weaponRow };
+        const bodyLoc = Number(item.bodyLoc);
+        if (MAIN_HANDS.has(bodyLoc)) hands.set(bodyLoc, record);
         if (armorRow) {
           // Helmets and shields carry their own alternate DCC token (e.g. fhl, kit).
           const direct = Number(armorRow.component);
-          if ([0, 7].includes(direct) && armorRow.alternategfx && (direct !== 7 || activeHand(item))) {
+          if ((direct === 0 || direct === 7) && armorRow.alternategfx && (direct !== 7 || MAIN_HANDS.has(bodyLoc))) {
             components[direct] = armorRow.alternategfx.toLowerCase();
             source[direct] = code;
           }
@@ -80,25 +68,37 @@ export function createPlayerCompositeResolver(read) {
           // The six class columns belong to a torso composite (component TR). Shields
           // also carry zeroes in those columns; treating those zeroes as "lit" would
           // incorrectly erase the armour already selected by the torso item.
-          if (direct === 1) for (const [field, component] of Object.entries(ARMOR_CLASS_COMPONENT)) {
+          if (direct === 1) for (const [field, component] of ARMOR_CLASS_COMPONENT_ENTRIES) {
             const token = armorClass[Number(armorRow[field])];
             if (token) { components[component] = token; source[component] = code; }
           }
         }
       }
-      for (const [bodyLoc, item] of hands) {
-        const code = itemCode(item), weaponRow = weapons.get(code);
+      // A weapon's table component is its native presentation slot (not its
+      // body location): a bow in RARM still draws in LH. For dual weapon pairs
+      // the selected inventory weapon keeps its table component; a nonselected
+      // item is sent to component 6, matching the client composite callback.
+      const handWeapons = [];
+      for (const record of hands.values()) if (record.weaponRow) handWeapons.push(record);
+      const selectedId = Number(primaryWeaponId) >>> 0;
+      const selected = handWeapons.find(({ item }) => (Number(item.id) >>> 0) === selectedId) || null;
+      // The native client only applies its selected-item split when both table
+      // records have n2Handed == 0 (Items.txt/Weapons.txt `2handed`).
+      const dualWeaponPair = handWeapons.length === 2 && handWeapons.every(({ weaponRow }) => Number(weaponRow['2handed'] || 0) === 0);
+      const handAssignments = [];
+      for (const { item, code, weaponRow } of handWeapons) {
         if (!weaponRow?.alternategfx) continue;
-        const component = bodyLoc === 4 ? 5 : 6;
+        const nativeComponent = Number(weaponRow.component);
+        const component = dualWeaponPair && item !== selected?.item ? 6 : nativeComponent;
+        if (component !== 5 && component !== 6) continue;
+        handAssignments.push({ id: Number(item.id) >>> 0, code, component,
+          selected: item === selected?.item, nativeComponent });
         components[component] = weaponRow.alternategfx.toLowerCase();
         source[component] = code;
-        // The equipped right hand selects the COF; the left hand never gets
-        // to replace it merely because it followed in the presentation list.
-        if (bodyLoc === 4 && weaponRow.wclass) weaponClass = weaponRow.wclass.toLowerCase();
       }
       const layers = COMPONENT.map((component, index) => ({ component, variant: components[index] || '', source: source[index] || null }))
         .filter((layer) => layer.variant);
-      return { weaponClass, components, source, layers };
+      return { weaponClass, components, source, layers, primaryWeaponId: selectedId, handAssignments };
     },
   };
 }

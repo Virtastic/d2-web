@@ -392,7 +392,7 @@ void __fastcall ACT1Q4_SpawnCainInTristram(D2GameStrc* pGame, D2UnitStrc* pUnit)
 		pCoord.nY = nY;
 
 		D2ActiveRoomStrc* pFreeRoom = nullptr;
-		QUESTS_GetFreePosition(pRoom, &pCoord, 2, 0x100, &pFreeRoom, 3);
+		QUESTS_GetFreePosition(pRoom, &pCoord, 2, 0x100, &pFreeRoom, 100);
 		if (pFreeRoom)
 		{
 			pCain = D2GAME_SpawnMonster_6FC69F10(pGame, pFreeRoom, pCoord.nX, pCoord.nY, MONSTER_CAIN1, 1, -1, 0);
@@ -1490,7 +1490,7 @@ void __fastcall ACT1Q4_SpawnCainInTown(D2GameStrc* pGame, D2ActiveRoomStrc* pRoo
 	pCoord.nY = nTmpY;
 
 	D2ActiveRoomStrc* pFreeRoom = pRoom;
-	QUESTS_GetFreePosition(pRoom, &pCoord, 2, 0x100, &pFreeRoom, 1);
+	QUESTS_GetFreePosition(pRoom, &pCoord, 2, 0x100, &pFreeRoom, 100);
 
 	if (!pFreeRoom)
 	{
@@ -1524,7 +1524,7 @@ void __fastcall ACT1Q4_SpawnCainInTown(D2GameStrc* pGame, D2ActiveRoomStrc* pRoo
 			pCoord.nY = nY;
 		}
 
-		QUESTS_GetFreePosition(pFreeRoom, &pCoord, 2, 0x100, &pFreeRoom, 2);
+		QUESTS_GetFreePosition(pFreeRoom, &pCoord, 2, 0x100, &pFreeRoom, 100);
 
 		if (!pFreeRoom)
 		{
@@ -1901,7 +1901,7 @@ int32_t __fastcall ACT1Q4_CreateCowPortal(D2GameStrc* pGame, D2UnitStrc* pUnit)
 	D2CoordStrc pCoord = {};
 	UNITS_GetCoords(pUnit, &pCoord);
 	D2ActiveRoomStrc* pFreeRoom = nullptr;
-	QUESTS_GetFreePosition(pRoom, &pCoord, 3, 0x400, &pFreeRoom, 4);
+	QUESTS_GetFreePosition(pRoom, &pCoord, 3, 0x400, &pFreeRoom, 100);
 	if (pFreeRoom && D2GAME_CreatePortalObject_6FD13DF0(pGame, pUnit, pFreeRoom, pCoord.nX, pCoord.nY, LEVEL_MOOMOOFARM, 0, OBJECT_PERMANENT_TOWN_PORTAL, 0))
 	{
 		QUESTS_SetGlobalState(pGame, QUESTSTATEFLAG_A1Q4, QFLAG_CUSTOM7);
@@ -1979,7 +1979,7 @@ int32_t __fastcall ACT1Q4_CreateUberRunPortal(D2GameStrc* pGame, D2UnitStrc* pUn
 		D2CoordStrc pCoord;
 		D2ActiveRoomStrc* pFreeRoom = nullptr;
 		UNITS_GetCoords(pUnit, &pCoord);
-		QUESTS_GetFreePosition(pRoom, &pCoord, 3, 0x400, &pFreeRoom, 4/*, 100*/);
+		QUESTS_GetFreePosition(pRoom, &pCoord, 3, 0x400, &pFreeRoom, 100);
 		D2UnitStrc* pPortal;
 		if (pFreeRoom
 		&& D2GAME_CreatePortalObject_6FD13DF0(pGame, pUnit, pFreeRoom, pCoord.nX, pCoord.nY, nLevelId, &pPortal, OBJECT_PERMANENT_TOWN_PORTAL, 0))
@@ -2020,7 +2020,7 @@ int32_t __fastcall ACT1Q4_CreateUberFinalePortal(D2GameStrc* pGame, D2UnitStrc* 
 		D2CoordStrc pCoord;
 		D2ActiveRoomStrc* pFreeRoom = nullptr;
 		UNITS_GetCoords(pUnit, &pCoord);
-		QUESTS_GetFreePosition(pRoom, &pCoord, 3, 0x400, &pFreeRoom, 4/*, 100*/);
+		QUESTS_GetFreePosition(pRoom, &pCoord, 3, 0x400, &pFreeRoom, 100);
 		D2UnitStrc* pPortal;
 		if (pFreeRoom
 		&& D2GAME_CreatePortalObject_6FD13DF0(pGame, pUnit, pFreeRoom, pCoord.nX, pCoord.nY, LEVEL_PANDEMONIUMFINALE, &pPortal, OBJECT_PERMANENT_TOWN_PORTAL, 0))

@@ -18,25 +18,84 @@ import { recordPrim, recordDc6 } from './drawlist.mjs';
 export const SPEECH_PITCH = 18;
 export const SPEECH_BOX = Object.freeze({ x1: 237, y1: 7, x2: 562, y2: 129 });
 
-// The scroll (F21's second half; the salvage branch's `npc-speech.mjs` model, its constants
-// re-measured against retail's own vectors -- a retail measurement beats a reading).
-//   * The block enters with its first line one pitch under the box (set, `box.y2 + SPEECH_PITCH`
-//     -- the salvage's `y + height + lineHeight`) and rises at SPEECH_PX_PER_S.
-//   * It settles when its LAST line reaches SPEECH_REST_LAST_Y (123 = box.y2 - 6): retail's own
-//     at-rest frame is the retail captures, six lines at exactly 33,51,...,123 --
-//     the first one on the box.y1+26 inset this box has always drawn statically. A block that
-//     already fits therefore settles on that inset (33) and nothing about a short speech moves;
-//     a longer one keeps rising until its last line reaches 123, its head leaving through the top
-//     of the drawn window (box.y1+26 -- see the draw, where that bound is the measured one).
-//   * The salvage's other two numbers are the reason for that re-measurement: it read `retail/
-//     frames/s1.png` as a still and got a 15 px pitch and 30 px/s. Retail's own draw lists say 18
-//     (Warriv 33..123; Kashya 88,106,124), and 30 px/s finishes Kashya's measured ~20 s speech in
-//     2.6 s. So: pitch 18, and SPEECH_PX_PER_S, the rate the client already scrolls at.
-export const SPEECH_REST_LAST_Y = 123;
-/** The only constant here no vector measures -- a draw list is one instant. From the two measured
- *  speech totals (Kashya ~20 s, Akara ~60 s; npc-topics.mjs history). 9 px/s fits both. */
-export const SPEECH_PX_PER_S = 9;
+// D2Client 1.13c speech object: the first ASCII line is parsed with atoi and narrowed to WORD.
+// FUN_6FB2BB40 advances fixed-point offset by (timeGetTime() - startTick) >> 2, times that WORD.
+// Its renderer uses an 18 px (0x4800) line pitch and origin 12 + 112 = 124 px.
+export const SPEECH_RATE_FALLBACK = 8;
+export const SPEECH_FIXED_ONE = 1024;
+export const SPEECH_TICK_DIVISOR = 4;
+export const SPEECH_LINE_UNITS = 100;
+
+/** D2Client's line parser fills a 100-WCHAR scratch line before linking it. If a source line is
+ *  longer, the next node starts at the unconsumed code unit; JavaScript string slices use the same
+ *  UTF-16 code-unit indexing as the native buffer. */
+export function splitSpeechLines(spoken) {
+  const source = spoken ? String(spoken) : '';
+  const lines = [];
+  let offset = 0;
+  while (offset < source.length) {
+    let line = '';
+    let units = 0;
+    while (offset < source.length && source.charAt(offset) !== '\n' && units < SPEECH_LINE_UNITS) {
+      line += source.charAt(offset++);
+      units++;
+    }
+    // Native consumes LF only when the buffer stopped short of its 100-unit limit. If
+    // exactly full, the next parser iteration sees LF as an empty line node.
+    if (units < SPEECH_LINE_UNITS && source.charAt(offset) === '\n') offset++;
+    lines.push(line || ' ');
+  }
+  return lines;
+}
+
+export function parseSpeechHeader(text) {
+  const value = String(text || '');
+  const newline = value.indexOf('\n');
+  if (newline < 0) return { rate: SPEECH_RATE_FALLBACK, spoken: value, hasHeader: false };
+  const header = value.slice(0, newline);
+  // The native UTF-16-to-ASCII conversion rejects a non-ASCII header and uses 8.
+  if ([...header].some((ch) => ch.codePointAt(0) >= 0x80))
+    return { rate: SPEECH_RATE_FALLBACK, spoken: value.slice(newline + 1), hasHeader: true };
+  const parsed = /^[\t\n\v\f\r ]*([+-]?\d+)/.exec(header);
+  const rate = parsed ? (Number(parsed[1]) & 0xffff) : 0;
+  return { rate, spoken: value.slice(newline + 1), hasHeader: true };
+}
+export function speechOffsetFixed(rate, elapsedMs) {
+  const elapsed = Math.max(0, Math.floor(elapsedMs));
+  return ((Math.floor(elapsed / SPEECH_TICK_DIVISOR) * (rate & 0xffff)) >>> 0);
+}
+/** Model the renderer's repeated-timeGetTime branch, including its averaged sub-tick step. */
+export function createSpeechClock(rate) {
+  let startTick = null, lastTick = null, repeatStep = 0, repeatCount = 0, repeatAccum = 0;
+  return (tick) => {
+    tick >>>= 0;
+    if (startTick === null) { startTick = tick; lastTick = tick; return 0; }
+    let local = 0;
+    if (tick === lastTick) {
+      if (repeatStep === 0) repeatCount = (repeatCount + 1) & 0xffff;
+      else { repeatAccum = (repeatAccum + repeatStep) >>> 0; local = repeatAccum; }
+    } else {
+      repeatAccum = 0;
+      if (repeatStep === 0 && repeatCount !== 0)
+        repeatStep = Math.floor(((tick - lastTick) >>> 0) / repeatCount);
+      lastTick = tick;
+    }
+    const elapsedQuanta = Math.floor(((tick - startTick) >>> 0) / SPEECH_TICK_DIVISOR);
+    return (((local + elapsedQuanta) * (rate & 0xffff)) >>> 0);
+  };
+}
+
 export const SPEECH_BOX_ASSETS = { pieces: 'data\\global\\ui\\menu\\boxpieces.dc6' };
+
+/**
+ * D2Client centers the fixed 325 px speech object with integer division. The panel and text
+ * coordinates below are already expressed in the native 800x600 screen space (box starts at
+ * x=237, text starts at y=124), so only translate that coordinate space. In particular, speech
+ * stays pinned to the top of taller views instead of following the general HUD's vertical center.
+ */
+export function speechOrigin(width) {
+  return { scale: 1, x: Math.trunc((width - (SPEECH_BOX.x2 - SPEECH_BOX.x1)) / 2) - SPEECH_BOX.x1, y: 0 };
+}
 
 /** The boxpieces cels retail draws around the fixed speech box, in call order. */
 export function speechBoxPieces(box = SPEECH_BOX) {
@@ -66,63 +125,63 @@ export function createSpeechBox({ read, decodeDc6, decodeDatPalette, createFont,
     tbl: decodeFontTbl(read('data\\local\\font\\latin\\fontformal11.tbl')), palette, documentObject,
     path: 'data\\local\\font\\latin\\fontformal11.dc6', drawAs: { op: 'celcolor', mode: 5 } });
 
-  // The speech's own clock: the first draw of a given text starts its crawl.
-  let key = null, began = 0;
+  let clockKey = null, clockStart = null, clock = null;
 
   return {
-    /** `text` is the NPC's spoken line, already stripped of its leading numeric token.
-     *  `opts.t0` is the speech's start time (retail restarts a replayed speech from the top);
-     *  `opts.now` overrides the clock, `opts.top` pins the first line's y (retail's own captured
-     *  scroll position), both for a scenario to measure without a timer. */
+    /** `text` is the raw D2Lang value: native speech strings start with an atoi rate line. */
     draw(ctx, text, box = SPEECH_BOX, opts = {}) {
+      // FUN_6FB2D200 uses its own fixed-width dialog initializer, not the shared HUD viewport
+      // origin: x=(screen width-325)/2 and y=12. These coordinates already include that native
+      // y origin (box y=7, initial text anchor y=124), so translate only the 325 px box in x.
+      const width = ctx.canvas?.width || 800;
+      const origin = speechOrigin(width);
       ctx.save();
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(box.x1, box.y1, box.x2 - box.x1, box.y2 - box.y1);
-      recordPrim('box', box.x1, box.y1, box.x2, box.y2, 0, 1);
-      for (const [i, ax, ay] of speechBoxPieces(box)) {
-        const f = pieces.frames[i], left = ax + f.offsetX, top = ay + f.offsetY - f.height + 1;
-        ctx.drawImage(piece(i), left, top);
-        recordDc6(SPEECH_BOX_ASSETS.pieces, i, f, left, top);
+      try {
+        ctx.translate(origin.x, origin.y);
+        ctx.scale(origin.scale, origin.scale);
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(box.x1, box.y1, box.x2 - box.x1, box.y2 - box.y1);
+        recordPrim('box', box.x1, box.y1, box.x2, box.y2, 0, 1);
+        for (const [i, ax, ay] of speechBoxPieces(box)) {
+          const f = pieces.frames[i], left = ax + f.offsetX, top = ay + f.offsetY - f.height + 1;
+          ctx.drawImage(piece(i), left, top);
+          recordDc6(SPEECH_BOX_ASSETS.pieces, i, f, left, top);
+        }
+        const parsed = parseSpeechHeader(text);
+        const spoken = parsed.spoken;
+        const left = box.x1 + 16;
+        const lines = splitSpeechLines(spoken);
+        const now = opts.now ?? performance.now();
+        const messageKey = `${parsed.rate}\u0000${spoken}${opts.messageInstance === undefined ? '' : `\u0000${opts.messageInstance}`}`;
+        const startTick = opts.t0 === undefined ? null : Math.floor(opts.t0) >>> 0;
+        if (messageKey !== clockKey || (startTick !== null && startTick !== clockStart)) {
+          clockKey = messageKey; clockStart = startTick; clock = createSpeechClock(parsed.rate);
+        }
+        const offsetFixed = opts.top === undefined ? clock(Math.floor(now) >>> 0) : null;
+        const offsetPx = offsetFixed === null ? null : Math.floor(offsetFixed / SPEECH_FIXED_ONE);
+        // FUN_6FB2BB40 anchors the bottom of the linked text block at 124-offset, then walks up
+        // by 18 px. The native residual gate allows baselines from 31 through 124 inclusive.
+        const firstY = opts.top !== undefined ? opts.top : 124 - offsetPx;
+        const drawn = [];
+        lines.forEach((line, i) => {
+          const y = firstY + i * SPEECH_PITCH;
+          if (y >= 31 && y <= 124) { font.drawAnchored(ctx, line, left, y); drawn.push({ index: i, text: line, y }); }
+        });
+        // Native completion: ((max(1, lineCount-1)*18 + 112) < offsetPx).
+        const threshold = Math.max(1, lines.length - 1) * SPEECH_PITCH + 112;
+        const done = offsetPx !== null && threshold < offsetPx;
+        const screenBox = { x: origin.x + box.x1 * origin.scale, y: origin.y + box.y1 * origin.scale,
+          width: (box.x2 - box.x1) * origin.scale, height: (box.y2 - box.y1) * origin.scale };
+        return { box: { ...box }, origin, screenBox,
+          screenDrawn: drawn.map((line) => ({ ...line, x: origin.x + left * origin.scale,
+            screenX: origin.x + left * origin.scale, screenY: origin.y + line.y * origin.scale })),
+          lines: lines.length, shown: drawn.length, done, wrapped: lines, drawn,
+          firstY, restFirst: 124, enterFirst: 124, travel: 0, scroll: offsetPx,
+          pitch: SPEECH_PITCH, rate: parsed.rate, offsetFixed, offsetPx, threshold };
+      } finally {
+        ctx.restore();
       }
-      ctx.restore();
-      // Retail's dialogue values carry a leading numeric token and a newline before the spoken text
-      // (npc-panel.mjs's spokenText -- Charsi's greeting is "47\nHi there. I'm Charsi...").
-      const spoken = String(text || '').replace(/^\s*\d+\s*\n/, '');
-      const left = box.x1 + 16;
-      // The string's own line breaks are retail's: its lines keep the trailing space and a ' ' line is a blank one (measured:
-      // Kashya's "...our blacksmith, " is 1 line although wider than the old 293 px wrap). No re-wrapping.
-      const lines = spoken ? spoken.split('\n') : []; if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
-      lines.forEach((l, i) => { if (!l) lines[i] = ' '; });
-      // The scroll (see the constants above): left-aligned at box.x1+16, every line SPEECH_PITCH
-      // below the one before it, the whole block rising from under the box to its rest.
-      const now = opts.now ?? performance.now();
-      if (spoken !== key) { key = spoken; began = now; }          // a new speech starts its own crawl
-      const elapsed = Math.max(0, now - (opts.t0 ?? began));
-      const enterFirst = box.y2 + SPEECH_PITCH;
-      const restFirst = Math.min(box.y1 + 26, SPEECH_REST_LAST_Y - (lines.length - 1) * SPEECH_PITCH);
-      // One line has nothing to scroll and rests where it is shown (the salvage's rule, and the one
-      // arm of it no capture can falsify: no speech box in any vector holds a single line).
-      const travel = lines.length > 1 ? Math.max(0, enterFirst - restFirst) : 0;
-      const scroll = Math.min(travel, elapsed / 1000 * SPEECH_PX_PER_S);
-      const firstY = opts.top !== undefined ? opts.top : restFirst + travel - scroll;
-      const drawn = [];
-      // DRAWN WINDOW, measured rather than assumed: a line is painted while
-      // `box.y1 + 26 <= y <= box.y2` -- the box's own inset line at the top and its bottom edge. The top
-      // of the window is the fact the captures pin, not the box's fill edge: talk-kashya-firstclick-r22
-      // aligns its block one line below retail's first captured line and retail paints NOTHING at y=29,
-      // while akara-reward-2d paints a line at 35 -- so the window starts at 33 (the at-rest first
-      // line's own inset), and a longer speech's head leaves by NOT being painted rather than by rising
-      // over the box's top. (The engine-side s2174 diffs every glyph against these vectors and fails if
-      // the window is widened to the fill edge.)
-      lines.forEach((line, i) => {
-        const y = firstY + i * SPEECH_PITCH;
-        if (y >= box.y1 + 26 && y <= box.y2) { font.drawAnchored(ctx, line, left, y); drawn.push({ index: i, text: line, y }); }
-      });
-      // Settled and held: the caller's own "this speech is over" (retail's topic box returns by itself).
-      const done = opts.top === undefined && elapsed >= (travel + SPEECH_PITCH) / SPEECH_PX_PER_S * 1000;
-      return { box: { ...box }, lines: lines.length, shown: drawn.length, done, wrapped: lines, drawn,
-        firstY, restFirst, enterFirst, travel, scroll: opts.top === undefined ? scroll : null,
-        pitch: SPEECH_PITCH, pixelsPerSecond: SPEECH_PX_PER_S };
+
     },
   };
 }

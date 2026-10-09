@@ -9,10 +9,8 @@
 //   close  px 273..308, py 387..420 -> screen x 353..388, y 447..480 (36x34, not buysellbtn's cell);
 //   rows   FUN_6FB5A240: px 18..296 and py in (hityRow, hityRow + 30) with the hit-y table
 //          60,96,132,168,205,241,277,313,349 (irregular 36/37 pitch) -> screen x 98..376.
-// A click on tab zone k selects the HIGHEST tab j <= k whose tabs 1..j are all available
-// (FUN_6FB5A090 lowers the choice while a lower act's flag is clear): on retail, with Acts II and III
-// hidden, a click on the IV or V tab selects Act I.  `drawnTabs` (the engine's tab set that actually
-// reached the canvas) stands in for those flags.
+// A click on tab zone k selects the highest act whose preceding completion flags are all set
+// (FUN_6FB5A090). This is independent of which tab cels the waypoint table happened to draw.
 import { WAYPOINT_LAYOUT } from './waypoint-panel.mjs';
 
 const PANEL_X = 80, PANEL_Y = 60;
@@ -45,18 +43,25 @@ export function createWaypointMenuInput() {
   };
 
   return {
-    hitTest(px, py, width, height, rows, rowAt, drawnTabs = []) {
+    hitTest(px, py, width, height, rows, rowAt, completedActs = null) {
       const point = menuPoint(px, py, width, height);
       if (contains(point, closeRect())) return { action: 'close' };
-      // Route tabs only when their cel actually reached the canvas. The engine's waypoint table
-      // decides which tabs exist; `drawnTabs` carries the renderer's per-blit evidence for that set.
-      // This prevents empty, undisplayed act slots from swallowing clicks or becoming phantom tabs.
-      const have = new Set(drawnTabs.filter((tab) => tab?.drawn && Number.isInteger(tab.act) && tab.act >= 1 && tab.act <= 5).map((tab) => tab.act));
       for (let zone = 1; zone <= 5; zone++) {
         if (!contains(point, tabRect(zone))) continue;
-        let act = 1;
-        for (let a = 2; a <= zone && have.has(a); a++) act = a;
-        return have.has(act) ? { action: 'tab', act } : null;
+        // Native FUN_6FB5A090 checks reward-granted bit 0 for completed quest records
+        // [7, 0xF, 0x17, 0x1C], lowering the selected tab at the first missing act. The visible
+        // tab set comes from active waypoints and is not a substitute for these completion flags.
+        if (Array.isArray(completedActs) && completedActs.length === 4 && completedActs.every((v) => typeof v === 'boolean')) {
+          let act = 1;
+          for (let candidate = 2; candidate <= zone; candidate++) {
+            if (!completedActs[candidate - 2]) break;
+            act = candidate;
+          }
+          return { action: 'tab', act };
+        }
+        // A waypoint menu cannot be open without an active session. If its native record is
+        // unavailable, fail closed rather than deriving progression from the rendered tab set.
+        return null;
       }
       const row = rowAt(px, py, width, height, rows);
       return row ? { action: 'row', row } : null;

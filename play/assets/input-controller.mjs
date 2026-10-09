@@ -65,11 +65,9 @@ const POLL_MS = 50;          // setInterval, never requestAnimationFrame -- see 
 const STICK_WALK_MS = 250;   // a mouse user's own repeat rate for a held click-to-walk
 const CURSOR_SPEED = 14;     // canvas px per poll at full right-stick deflection
 const DEADZONE = 0.25;
-// How far the D2R-style "no cursor" targeting reaches, in subtiles, from the player -- a stand-in for
-// D2R's own screen-space cone (PS Blog: "a large cone", per-class weighted) until the button-table
-// research pass also recovers the cone's own numbers. Matches the existing mouse-hover radius order
-// (F14 in gameplay-shell.mjs: a live monster before an item at its feet) so a pad-only attack picks
-// the same kind of thing a mouse player's own click already prefers, just without aiming it.
+// How far this D2R-style "no cursor" targeting model reaches from the player. It is a stand-in for
+// D2R's own screen-space cone (PS Blog: "a large cone", per-class weighted) until its numbers are
+// recovered. It is a controller policy; F14 pointer hover uses a separate hit-candidate comparator.
 const TARGET_RADIUS = 12;
 const OBJECT_RADIUS = 7;   // gameplay-shell.mjs's own COMMAND.INTERACT nearest-object distance
 
@@ -147,22 +145,19 @@ const SHIFT_BANK_KEYS = { [BUTTON.DPAD_UP]: 'KeyH', [BUTTON.DPAD_DOWN]: 'KeyW', 
 // D2R's own devs (PlayStation Blog, 2021-08-13): "we are always scanning the playfield with a large
 // cone, and prioritizing targets at many levels -- monsters, items, objects you can interact with,
 // other players, your corpse... the priorities are tuned per class." Per-class tuning is not built
-// (no source gives the exact weights yet); this reuses retail's OWN nearest-hostile algorithm
-// (`selectPrimaryTarget`, gameplay-model.mjs -- the identical function the mouse's own click
-// resolution already calls, never re-derived) for the monster tier, then the same monsters-before-
-// items-before-objects-before-NPCs order gameplay-shell.mjs's mouse click path already uses (F14),
-// each tier limited to the nearest thing within TARGET_RADIUS/OBJECT_RADIUS of the PLAYER -- not of a
-// cursor, because there is no cursor. The caller turns the result into a canvas point with the
-// shell's own `project` and dispatches the IDENTICAL click a mouse hovering that unit would send, so
-// the shell's existing pointer handler (resolvePointerTarget) is what actually decides and acts; this
-// function only picks WHERE to click.
+// (no source gives the exact weights yet). The monster tier reuses the browser's selectPrimaryTarget
+// nearest-world helper; its mouse path calls that helper with a pointer-derived point and hit-test
+// filter, while this controller model searches around the player. The ordered controller tiers and
+// their player-centered TARGET_RADIUS/OBJECT_RADIUS are design choices, not F14 hover rules or retail
+// measurements. The caller projects the selected target and dispatches a normal canvas click through
+// the shell's existing click path; that wiring does not make the controller choice equivalent to the
+// mouse-hover winner.
 export function selectWorldTarget(shell) {
   const snapshot = shell.snapshot;
   if (!snapshot || !snapshot.player) return null;
   const p = snapshot.player;
-  // Monsters: retail's own nearest-hostile search, exactly as a mouse hover over empty ground near a
-  // monster resolves (gameplay-shell.mjs's resolvePointerTarget calls the same function at the click
-  // point; here the point is the player, which is what "no cursor" means).
+  // Monsters: use the browser's nearest-world helper around the player. The mouse path supplies a
+  // pointer-derived point and hit-test filter, so this player-centered choice is not its hover result.
   const unitId = selectPrimaryTarget(snapshot, p, TARGET_RADIUS);
   if (unitId) {
     const unit = (snapshot.entities || []).find((e) => e.id === unitId);
@@ -389,8 +384,8 @@ function start() {
       // specified"): 'world' (D2R's no-cursor targeting), 'panel' (snap-to-slot on one of the six
       // named panels), 'field' (the name/gold typed-field grid) or 'cursor' (the pre-D2R free cursor,
       // still the road for every screen the D2R research has not specified). `worldTarget` is exactly
-      // what `selectWorldTarget` picked this poll (or null), so a row can assert the pad attacked the
-      // SAME unit a mouse hovering that point would have.
+      // what selectWorldTarget picked this poll (or null); it records the controller model's choice
+      // and does not claim that the mouse-hover resolver would choose the same unit.
       return { connected: state.connected, index: state.index, cursor: { x: state.cursor.x, y: state.cursor.y }, shift: state.shift,
         mode: state.mode, worldTarget: state.worldTarget && { ...state.worldTarget }, panelIndex: state.panelIndex, panelSig: state.panelSig };
     },
@@ -607,9 +602,9 @@ function start() {
         if (edge(pad, BUTTON.A)) click(canvas, cur.x, cur.y, { button: 0, shiftKey: state.shift });
         if (edge(pad, BUTTON.B)) click(canvas, cur.x, cur.y, { button: 2, shiftKey: state.shift });
       } else if (worldMode) {
-        // D2R's own no-cursor targeting (G3): A/B act on whatever `selectWorldTarget` picked, by
-        // clicking its EXACT projected point -- the identical click a mouse hovering that unit would
-        // send, through the shell's own `resolvePointerTarget`, never a second engine command.
+        // D2R-style no-cursor targeting (G3): A/B dispatch a canvas click at the selected target's
+        // projected point through the shell's normal click path. This proves event routing only; it
+        // does not equate the controller's player-centered choice with F14 pointer-hover arbitration.
         state.mode = 'world';
         state.panelSig = null;
         const worldTarget = selectWorldTarget(shell);

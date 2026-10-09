@@ -4629,7 +4629,7 @@ void __stdcall ITEMS_SetItemFormat(D2UnitStrc* pItem, uint16_t nItemFormat)
 }
 
 //D2Common.0x6FDA0130 (#10878)
-int __stdcall ITEMS_GetWeaponAttackSpeed(D2UnitStrc* pUnit, D2UnitStrc* pWeapon)
+static int ITEMS_GetWeaponAttackSpeedImpl(D2UnitStrc* pUnit, D2UnitStrc* pWeapon, BOOL includeItemFasterAttackRate)
 {
 	D2ItemsTxt* pItemsTxtRecord = NULL;
 	int nWeaponClass = 0;
@@ -4658,10 +4658,21 @@ int __stdcall ITEMS_GetWeaponAttackSpeed(D2UnitStrc* pUnit, D2UnitStrc* pWeapon)
 	{
 		D2_ASSERT(nLength);
 
-		return (nLength << 8) / (v11 * (STATLIST_UnitGetStatValue(pWeapon, STAT_ATTACKRATE, 0) + STATLIST_UnitGetItemStatOrSkillStatValue(pWeapon, STAT_ITEM_FASTERATTACKRATE, 0) + 100) / 100);
+		const int nFasterAttackRate = includeItemFasterAttackRate ? STATLIST_UnitGetItemStatOrSkillStatValue(pWeapon, STAT_ITEM_FASTERATTACKRATE, 0) : 0;
+		return (nLength << 8) / (v11 * (STATLIST_UnitGetStatValue(pWeapon, STAT_ATTACKRATE, 0) + nFasterAttackRate + 100) / 100);
 	}
 
 	return 45;
+}
+
+int __stdcall ITEMS_GetWeaponAttackSpeed(D2UnitStrc* pUnit, D2UnitStrc* pWeapon)
+{
+	return ITEMS_GetWeaponAttackSpeedImpl(pUnit, pWeapon, TRUE);
+}
+
+int __stdcall ITEMS_GetWeaponAttackSpeedForUnidentified(D2UnitStrc* pUnit, D2UnitStrc* pWeapon)
+{
+	return ITEMS_GetWeaponAttackSpeedImpl(pUnit, pWeapon, FALSE);
 }
 
 //D2Common.0x6FDA02B0 (#10879)

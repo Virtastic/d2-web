@@ -115,15 +115,15 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_mcp_charlogon_reply(uint32_t result, uint8_t* 
     return 4;
 }
 
-// MCP_CREATEGAME (0x03) request body: request_id(u16=1), difficulty(u32), 1 (always), 0 (player
+// MCP_CREATEGAME (0x03) request body: request_id(u16), difficulty(u32), 1 (always), 0xFF (unrestricted
 // difficulty), maxPlayers(u8), then name / password / description as null-terminated strings
-// (d2-clientless realm.zig createGame).  Writes the body to `out`; returns its length.
-EMSCRIPTEN_KEEPALIVE int d2_realm_mcp_creategame_request(uint32_t difficulty, uint8_t maxPlayers, const char* name, const char* password, const char* description, uint8_t* out) {
+// (BNETDocs MCP_CREATEGAME; d2-clientless cross-check). Writes the body to `out`; returns its length.
+EMSCRIPTEN_KEEPALIVE int d2_realm_mcp_creategame_request(uint16_t requestId, uint32_t difficulty, uint8_t maxPlayers, const char* name, const char* password, const char* description, uint8_t* out) {
     int w = 0;
-    out[w++] = 0x01; out[w++] = 0x00;   // request id = 1
+    out[w++] = (uint8_t)requestId; out[w++] = (uint8_t)(requestId >> 8);
     out[w++] = (uint8_t)difficulty; out[w++] = (uint8_t)(difficulty >> 8); out[w++] = (uint8_t)(difficulty >> 16); out[w++] = (uint8_t)(difficulty >> 24);
     out[w++] = 1;   // always 1
-    out[w++] = 0;   // player difficulty
+    out[w++] = 0xff; // level restriction difference: no restriction
     out[w++] = maxPlayers;
     for (const char* p = name; p && *p; p++) out[w++] = (uint8_t)*p;
     out[w++] = 0;
@@ -134,11 +134,11 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_mcp_creategame_request(uint32_t difficulty, ui
     return w;
 }
 
-// MCP_JOINGAME (0x04) request body: request_id(u16=2), then name / password as null-terminated
-// strings (d2-clientless realm.zig joinGame).  Writes the body to `out`; returns its length.
-EMSCRIPTEN_KEEPALIVE int d2_realm_mcp_joingame_request(const char* name, const char* password, uint8_t* out) {
+// MCP_JOINGAME (0x04) request body: request_id(u16), then name / password as null-terminated
+// strings (d2-clientless realm.zig joinGame). Writes the body to `out`; returns its length.
+EMSCRIPTEN_KEEPALIVE int d2_realm_mcp_joingame_request(uint16_t requestId, const char* name, const char* password, uint8_t* out) {
     int w = 0;
-    out[w++] = 0x02; out[w++] = 0x00;   // request id = 2
+    out[w++] = (uint8_t)requestId; out[w++] = (uint8_t)(requestId >> 8);
     for (const char* p = name; p && *p; p++) out[w++] = (uint8_t)*p;
     out[w++] = 0;
     for (const char* p = password; p && *p; p++) out[w++] = (uint8_t)*p;

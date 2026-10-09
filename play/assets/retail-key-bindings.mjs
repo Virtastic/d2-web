@@ -1,5 +1,6 @@
-// Browser keyboard keys a game must not answer, because retail does not bind them or binds them to
-// something this client has no action for.
+// Browser keydowns that must not reach CommandInput's legacy physical-key switch. A configured
+// retail action is resolved and handled above this set; if that binding moves or is unbound, the
+// old fixed shortcut must not remain active underneath it.
 //
 // Retail 1.13c's oracle for its own binding set is its Configure Controls function list, which is the
 // engine's own data: `DataTbls/StringIds.h`'s `Cfg*` strings (3924-3985) name every function a player
@@ -17,17 +18,21 @@
 // aiming surface scenarios drive (s92 walks a subtile with `input.key('KeyA', true)`), and it is
 // untouched.
 export const DROPPED_GAMEPLAY_KEYS = new Set([
-  'KeyA', 'KeyD',    // unbound in retail (and in the prior art)
+  'KeyD',            // unbound in retail (and in the prior art)
   'KeyE',            // unbound in retail; this shell's old interact shortcut
   'KeyR',            // retail: CfgRunLock, the run/walk toggle -- the run action is another row (s630+), never a respawn
+  // These keys have native Configure Controls actions, but CommandInput also carries old fixed
+  // browser shortcuts for them. Their configured action is dispatched above this set; when a
+  // player rebinds/unbinds that action, do not leave the physical key's former shortcut active.
+  'KeyW', 'KeyA', 'KeyS', 'KeyT', 'Space',
+  'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8',
+  'Digit1', 'Digit2', 'Digit3', 'Digit4',
+  // The configured automap functions above own these keys. A cleared or rebound action must not
+  // expose a legacy physical-key path underneath it.
+  'Tab', 'KeyV', 'F9', 'F10', 'F11', 'F12',
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',   // unbound in retail: no movement function exists
 ]);
-// Bound now, so they are NOT dropped: `W` is retail's Swap Weapons (its own Configure Controls
-// screen binds it; the swap is the engine's `d2_session_command_swap_weapons`, F3), `Space` is
-// retail's CfgClearScreen (the HUD hides, the world fills the screen), `KeyS` is its right-hand
-// skill picker and `KeyH` opens retail's Help screen --
-// OpenDiablo2's key_map.go ties ClearScreen to KeySpace, ToggleRightSkillSelector to KeyS and
-// ToggleHelpScreen to KeyH, and all three actions live in the shell's keydown handler above this
-// list. the comments carries the table and the per-entry evidence; the rest of retail's
-// Configure Controls list (Q quest log, P party, M message log, V mini map, the wheel's skill cycle)
-// is still dropped rather than mis-bound -- F3c.
+// Bound actions are resolved from Configure Controls' committed retail function/key table before
+// this drop list (`configure-controls.mjs`, F218). The shell connects the actions it implements;
+// any physical key with no such action must still not become movement or an attack by falling into
+// CommandInput. the comments carries the captured table and supported-action boundary.

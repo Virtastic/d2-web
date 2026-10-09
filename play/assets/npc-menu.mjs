@@ -24,6 +24,7 @@
 import { createFont, decodeFontTbl, FRONTEND } from './frontend.mjs';
 import { recordDc6, recordPrim } from './drawlist.mjs';
 import { questOfMessage } from './npc-topics.mjs';
+import { hudOrigin } from './hud-origin.mjs';
 
 const TALK = 'talk', TRADE = 'trade', GAMBLE = 'gamble', HIRE = 'hire', IDENTIFY = 'identify', OTHER = 'other';
 const S_INTRO = 3399, S_GOSSIP = 3395, S_TALK = 3381, S_TRADE = 3396, S_TRADE_REPAIR = 3334, S_GAMBLE = 3398, S_HIRE = 3397, S_IDENTIFY = 4020, S_CANCEL = 3400;
@@ -63,6 +64,19 @@ export function npcMenuEntries(classId) {
   const row = NPC_MENU_TABLE.find(([cls]) => cls === classId);
   if (!row) return null;
   return [...row[1].map((stringId) => ({ stringId, action: ACTION[stringId] ?? OTHER })), { stringId: S_CANCEL, action: 'cancel' }];
+}
+
+/** Retail invokes an NPC menu callback on release over the row currently selected by the menu. */
+export function npcMenuChoiceOnRelease({ entryAtRelease, selectedEntry }) {
+  if (!entryAtRelease || entryAtRelease !== selectedEntry || !entryAtRelease.action) return null;
+  return entryAtRelease;
+}
+
+/** Literal 1.13c DWORD deadline test: uint32(now) < uint32(creationTick + 80). */
+export function npcMenuInputCoolingDown({ nowTick, creationTick }) {
+  const now = Math.trunc(nowTick) >>> 0;
+  const created = Math.trunc(creationTick) >>> 0;
+  return now < ((created + 80) >>> 0);
 }
 
 export const NPC_MENU_ASSETS = { palette: FRONTEND.palette, font: 'data\\local\\font\\latin\\font16.dc6', fontTbl: 'data\\local\\font\\latin\\font16.tbl',
@@ -200,30 +214,39 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
     get open() { return Boolean(state); },
     get state() { return state; },
     /** `entries` from npcMenuEntries; the menu hangs over the NPC (its feet at the anchor). */
-    show(npcId, classId, name, entries) { state = { npcId, classId, name, entries }; rows = []; box = null; selected = 0; },
+    show(npcId, classId, name, entries) { state = { npcId, classId, name, entries, openedAt: Math.trunc(performance.now()) >>> 0 }; rows = []; box = null; selected = 0; },
     /** The pointer moved: the entry under it is selected, none when it is elsewhere (retail). */
     hover(x, y) { if (state && rows.length) selected = rows.findIndex((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h); return selected; },
+    get selectedEntry() { return selected >= 0 ? rows[selected] ?? null : null; },
     close() { state = null; rows = []; box = null; },
     /** The hire window over offers [{ name, level, life, def, cost, skill, mercName }] and the hirer's gold. */
     showHire(npcId, offers, gold) { hire = { npcId, offers, gold, top: 0, selected: 0 }; },
     get hireOpen() { return Boolean(hire); },
     get hireState() { return hire; },
     closeHire() { hire = null; },
-    hireHover(x, y) { if (hire) hire.selected = this.hireAt(x, y)?.row ?? -1; },
+    hireHover(x, y, width = 800, height = 600) { if (hire) hire.selected = this.hireAt(x, y, width, height)?.row ?? -1; },
     hireScroll(d) { if (hire) hire.top = Math.max(0, Math.min(Math.max(0, hire.offers.length - HW.rows), hire.top + d)); },
     /** {row: index into offers} | {cancel: true} | null for a canvas point. */
-    hireAt(x, y) {
+    hireAt(x, y, width = 800, height = 600) {
       if (!hire) return null;
+      const origin = hudOrigin(width, height, 'centre');
+      x = (x - origin.x) / origin.scale;
+      y = (y - origin.y) / origin.scale;
       if (x >= HW.cancelX - 20 && x < HW.cancelX + 100 && y >= HW.cancelY - 16 && y < HW.cancelY + 8) return { cancel: true };
       for (let i = 0; i < Math.min(HW.rows, hire.offers.length - hire.top); i++) { const r = hireRow(i); if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) return { row: hire.top + i }; }
       return null;
     },
-    drawHire(ctx, act = 1) {
+    drawHire(ctx, act = 1, width = ctx.canvas?.width || 800, height = ctx.canvas?.height || 600) {
       if (!hire) return null;
       const { gold, blue } = fontsFor(act), n = hire.offers.length, shown = hire.offers.slice(hire.top, hire.top + HW.rows);
-      const b = { x: HW.x1, y: HW.y1, w: HW.x2 - HW.x1, h: HW.y2 - HW.y1 };
-      ctx.save();
+      const origin = hudOrigin(width, height, 'centre');
+      const b = { x: origin.x + HW.x1 * origin.scale, y: origin.y + HW.y1 * origin.scale,
+        w: (HW.x2 - HW.x1) * origin.scale, h: (HW.y2 - HW.y1) * origin.scale };
+      // This is a screen-centred modal in retail's 800x600 virtual coordinates. Darken takes
+      // device-space pixels (getImageData ignores the canvas transform); the pieces and text below
+      // use the same centre origin as the other responsive game panels.
       darken(ctx, b, act);
+      ctx.save(); ctx.translate(origin.x, origin.y); ctx.scale(origin.scale, origin.scale);
       recordPrim('box', HW.x1, HW.y1, HW.x2, HW.y2, 0, 1);
       const cel = (path, dc, i, ax, ay) => {   // anchor = bottom row for boxpieces, top row for the slider cels
         const f = dc.frames[i], left = ax + f.offsetX, top = ay + f.offsetY - f.height + 1;
@@ -236,7 +259,6 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
       cel(SLIDER, sliders, 9, HW.trackX, 136);
       for (let y = 148; y <= 388; y += 12) cel(SLIDER, sliders, 13, HW.trackX, y);
       cel(SLIDER, sliders, 8, HW.trackX, 388);
-      ctx.restore();
       shown.forEach((o, i) => {
         const on = hire.top + i === hire.selected, f = on ? blue : white, y = HW.firstBottom + i * HW.pitch;
         f.drawAnchored(ctx, `${o.name} - Lvl: ${String(o.level).padStart(2)}  Life: ${String(o.life).padStart(2)}  Def: ${String(o.def).padStart(2)}  Cost: ${o.cost}`, HW.textX, y);
@@ -251,7 +273,9 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
       gold.drawAnchored(ctx, head, centred(head), HW.headerY);
       const cancel = string(3400);
       white.drawAnchored(ctx, cancel, centred(cancel), HW.cancelY);
-      return { offers: shown.map((o) => o.name), rows: shown.length, total: n, selected: hire.selected, thumbCels: thumb };
+      ctx.restore();
+      return { offers: shown.map((o) => o.name), rows: shown.length, total: n, selected: hire.selected, thumbCels: thumb,
+        bounds: { x: b.x, y: b.y, width: b.w, height: b.h, centerX: b.x + b.w / 2, centerY: b.y + b.h / 2 } };
     },
     draw(ctx, feetX, feetY, act = 1) {
       if (!state) return null;

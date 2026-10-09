@@ -219,7 +219,7 @@ bool __fastcall ACT3Q7_SpawnVileDogs(D2GameStrc* pGame, D2QuestDataStrc* pQuestD
 		pCoords.nY += pAdjustCoords[i].nY;
 		pCoords.nX += pAdjustCoords[i].nX;
 		D2ActiveRoomStrc* pRoom = nullptr;
-		QUESTS_GetFreePosition(pCurrentRoom, &pCoords, 3, COLLIDE_MASK_PLACEMENT, &pRoom, 11);
+		QUESTS_GetFreePosition(pCurrentRoom, &pCoords, 3, COLLIDE_MASK_PLACEMENT, &pRoom, 100);
 
 		if (pRoom)
 		{

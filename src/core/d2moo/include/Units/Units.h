@@ -488,6 +488,7 @@ D2COMMON_DLL_DECL BOOL __stdcall UNITS_CanDualWield(D2UnitStrc* pUnit);
 D2COMMON_DLL_DECL BOOL __stdcall UNITS_IsCorpseUseable(D2UnitStrc* pUnit);
 //D2Common.0x6FDC2910 (#11307)
 D2COMMON_DLL_DECL BOOL __stdcall UNITS_IsObjectInInteractRange(D2UnitStrc* pUnit, D2UnitStrc* pObject);
+D2COMMON_DLL_DECL BOOL __stdcall UNITS_IsObjectInInteractRangeAt(D2UnitStrc* pUnit, D2UnitStrc* pObject, int32_t nX, int32_t nY);
 //D2Common.0x6FDC2C80
 struct D2CharStatsTxt* __fastcall UNITS_GetCharStatsTxtRecord(int nRecordId);
 //1.10f: D2Common.0x6FDC2CB0 (#10399)

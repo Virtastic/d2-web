@@ -62,8 +62,31 @@ export const OPTIONS_PAGE_ROWS = Object.freeze([
 // chosen by its setting; the pentagram sits at the selected row's anchor + 15 (these rows are 26 px,
 // not the menu's 36). Retail's coupling, measured on `opt-automap-names-toggled.txt`: Show Party = NO
 // draws Show Names dimmed (DrawMode 1) and dead, with the value forced to NO.
-export const AUTOMAP_DEFAULTS = Object.freeze({ mode: 'full', fade: 'off', center: 'yes', party: 'yes', names: 'yes' });
+// AutoMap Left is a client startup setting, not an Automap Options row. D2Client's bulk ini loader
+// seeds a missing `AutoMap Left` key to 1; retain that internal state without inventing a menu control.
+export const AUTOMAP_DEFAULTS = Object.freeze({ mode: 'full', fade: 'off', center: 'yes', party: 'yes', names: 'yes', left: 'yes' });
 export const AUTOMAP_PENTAGRAM_OFFSET = 15;
+export function shouldUpdateGameMenuSelectionOnPointerMove(gesture) { return !gesture; }
+export function gameMenuGestureMatchesRelease(gesture, pointerId, button, page, row) {
+  return Boolean(gesture && button === 0 && gesture.pointerId === pointerId && gesture.page === page && gesture.row === row);
+}
+/** Track the single mouse gesture that owns a pressed game-menu row. */
+export function createGameMenuPointerState() {
+  let armed = null;
+  return {
+    get current() { return armed; },
+    arm(gesture) { armed = gesture; return armed; },
+    release(pointerId) {
+      if (armed?.pointerId !== pointerId) return null;
+      const previous = armed; armed = null; return previous;
+    },
+    cancel(pointerId) {
+      if (armed?.pointerId !== pointerId) return false;
+      armed = null; return true;
+    },
+    clear() { const hadGesture = armed !== null; armed = null; return hadGesture; },
+  };
+}
 const AUTOMAP_TITLE = Object.freeze([['automapoptions', 0, 210, 137], ['automapoptions', 1, 466, 137]]);
 const AUTOMAP_ROWS = Object.freeze([
   { label: 'AUTOMAP MODE', key: 'mode', anchorY: 182, cels: [['automapmode', 0, 170, 182]],
@@ -88,7 +111,7 @@ function frameCanvas(frame, palette, documentObject) {
 }
 
 /** `onChoose(item)` receives one of the rows' `label`s. */
-export function createGameMenu({ read, decodeDc6, decodeDatPalette, onChoose, palettePath = 'data\\global\\palette\\ACT1\\pal.dat', documentObject = globalThis.document, initialVolume = null, onVolume = null }) {
+export function createGameMenu({ read, decodeDc6, decodeDatPalette, onChoose, onResolution = null, palettePath = 'data\\global\\palette\\ACT1\\pal.dat', documentObject = globalThis.document, initialVolume = null, initialNpcSpeech = 2, initialResolution = 1, onVolume = null, onNpcSpeech = null }) {
   const resolved = () => (typeof palettePath === 'function' ? palettePath() : palettePath);
   let palette = null, paletteAt = null, blend = null;
   const sheets = new Map();       // file key -> { path, dc6, canvases }
@@ -142,6 +165,7 @@ export function createGameMenu({ read, decodeDc6, decodeDatPalette, onChoose, pa
   const pentCanvases = pent.frames.map((f) => frameCanvas(f, palette, documentObject));
   let page = 'main', pentOffset = PENTAGRAM_TOP_OFFSET, rows = pages.main;
   let open = false, selected = rows.length - 1, tick = 0;
+  const pointerState = createGameMenuPointerState();
   const goto = (name) => { page = name; pentOffset = name === 'automap' ? AUTOMAP_PENTAGRAM_OFFSET : PENTAGRAM_TOP_OFFSET; rows = pages[name]; selected = rows.length - 1; };
   const cycle = (label) => {
     const r = AUTOMAP_ROWS.find((x) => x.label === label);
@@ -156,7 +180,7 @@ export function createGameMenu({ read, decodeDc6, decodeDatPalette, onChoose, pa
   // it was opened from intact.
   let sub = null, subError = '';
   const subpages = () => {
-    if (!sub && !subError) { try { sub = createOptionsPages({ read, decodeDc6, decodeDatPalette, documentObject, initialVolume, onVolume }); } catch (error) { subError = String(error); } }
+    if (!sub && !subError) { try { sub = createOptionsPages({ read, decodeDc6, decodeDatPalette, documentObject, initialVolume, initialNpcSpeech, initialResolution, onVolume, onNpcSpeech, onResolution }); } catch (error) { subError = String(error); } }
     return sub;
   };
   const choose = (label) => {
@@ -186,19 +210,26 @@ export function createGameMenu({ read, decodeDc6, decodeDatPalette, onChoose, pa
     get page() { return page; },
     /** F217: the Automap Options page's settings, read by the shell for the automap overlay. */
     get settings() { return { ...settings }; },
+    /** Configured keyboard actions share the same option state and name/party coupling as the page. */
+    toggleAutomapSetting(key) {
+      const row = AUTOMAP_ROWS.find((candidate) => candidate.key === key);
+      if (!row || (key === 'names' && settings.party === 'no')) return false;
+      cycle(row.label);
+      return true;
+    },
     get subpage() { return sub?.page ?? null; },
     get evidence() { return { open, page, subpage: sub?.page ?? null, selected: rows[selected]?.label ?? null, settings: { ...settings },
       rows: rows.filter((r) => r.label !== null).map((r) => ({ label: r.label, x: r.x, y: r.y, w: r.w, h: r.h, dim: r.dim })),
       sub: sub?.evidence ?? (subError ? { error: subError } : null) }; },
-    toggle() { open = !open; goto('main'); return open; },
-    close() { sub?.close(); open = false; goto('main'); },
+    toggle() { pointerState.clear(); sub?.pointerCancelAll?.(); open = !open; goto('main'); return open; },
+    close() { pointerState.clear(); sub?.pointerCancelAll?.(); sub?.close(); open = false; goto('main'); },
     /**
      * Esc. Retail: from a SOUND/VIDEO screen straight back to the ESC MENU -- `opt-sound-after-esc`
      * draws the menu (Options/Exit/ReturnToGame cels) with RETURN TO GAME flanked -- not the OPTIONS
      * page, so the sub-page closes AND the menu returns to `main`. From the OPTIONS page or AUTOMAP
      * back one page; from the escape menu, out.
      */
-    back() { if (sub?.isOpen) { sub.close(); return goto('main'); } if (page === 'main') open = false; else goto(page === 'automap' ? 'options' : 'main'); },
+    back() { pointerState.clear(); sub?.pointerCancelAll?.(); if (sub?.isOpen) { sub.close(); return goto('main'); } if (page === 'main') open = false; else goto(page === 'automap' ? 'options' : 'main'); },
     key(code) {
       if (!open) return false;
       if (sub?.isOpen) return true;   // retail's sound/video screens are pointer-driven
@@ -210,7 +241,36 @@ export function createGameMenu({ read, decodeDc6, decodeDatPalette, onChoose, pa
       else return false;
       return true;
     },
-    hover(x, y, width, height) { if (sub?.isOpen) return sub.hover(x, y, width, height); const i = rowAt(x, y, width, height); if (i >= 0) selected = i; return i; },
+    hover(x, y, width, height) {
+      if (sub?.isOpen) return sub.hover(x, y, width, height);
+      if (!shouldUpdateGameMenuSelectionOnPointerMove(pointerState.current)) return pointerState.current.row;
+      const i = rowAt(x, y, width, height); if (i >= 0) selected = i; return i;
+    },
+    pointerDown(x, y, width, height, pointerId, button) {
+      if (sub?.isOpen) return sub.pointerDown(x, y, width, height, pointerId, button);
+      if (button !== 0) return true;
+      const row = rowAt(x, y, width, height);
+      if (row < 0) return false;
+      selected = row;
+      pointerState.arm({ pointerId, page, row });
+      return true;
+    },
+    pointerUp(x, y, width, height, pointerId, button) {
+      if (sub?.isOpen) {
+        const result = sub.pointerUp(x, y, width, height, pointerId, button);
+        if (result === 'previous') sub.close();
+        return result;
+      }
+      if (button !== 0 || pointerState.current?.pointerId !== pointerId) return false;
+      const armed = pointerState.release(pointerId);
+      const row = rowAt(x, y, width, height);
+      if (open && gameMenuGestureMatchesRelease(armed, pointerId, button, page, row)) { selected = row; choose(rows[row].label); }
+      return true;
+    },
+    pointerCancel(pointerId) {
+      return pointerState.cancel(pointerId) || (sub?.pointerCancel(pointerId) ?? false);
+    },
+    pointerCancelAll() { pointerState.clear(); sub?.pointerCancelAll?.(); },
     click(x, y, width, height) {
       if (sub?.isOpen) { if (sub.click(x, y, width, height) === 'previous') sub.close(); return; }
       const i = rowAt(x, y, width, height); if (i >= 0) { selected = i; choose(rows[i].label); } return i;

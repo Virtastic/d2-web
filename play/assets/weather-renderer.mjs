@@ -48,8 +48,10 @@
 // continuously, which over-rains against retail's own dry captures; s561 counts it and F11b carries it
 // as the open half.
 import { decodeDatPalette, decodeDc6 } from './d2-formats.mjs';
+import { createBlender } from './frontend.mjs';
 import { recordDc6, recordPrim } from './drawlist.mjs';
 import { createWeatherCycle } from './weather-cycle.mjs';
+import { plotRainLine } from './weather-line.mjs';
 
 /** The two layers retail's captured frames draw, with the particle count of the Rogue Encampment's own
  *  peak episode (walls14: 45 Rain3 + 42 Rain4 -- its tiles are `Act1\Town\Floor`/`Fence`/`Objects`;
@@ -66,104 +68,42 @@ const TICKS_PER_FRAME = 2;  // measured above: 2169 and 2170 are the same animat
 /** The vector writes a cel path lower case with no `data\` and no extension. */
 const MPQ_PATH = (path) => path.toLowerCase();
 
-/**
- * A decoded palette (RGBA, 256 * 4) -> the additive grey each cel byte contributes. THE RAIN'S RULE,
- * and the one this file got wrong: the operand is the PALETTE'S VALUE for the byte, never the byte.
- * `ACT1\pal.dat` maps the rain cels' indices 172..179 to (4,4,4) .. (32,32,32); using the index adds
- * 172..179 instead, saturates every channel and drew the rain as solid white splats over the whole
- * town. Exported so test/weather-intensity.test.mjs can pin it against the real palette.
- */
-export function intensityTable(rgba) {
-  const table = new Uint8Array(256);
-  for (let i = 0; i < 256; i++) table[i] = Math.max(rgba[i * 4], rgba[i * 4 + 1], rgba[i * 4 + 2]);
-  return table;
-}
-
-/**
- * Every act palette maps the rain cels' indices 172..179 IDENTICALLY, so this renderer does not need
- * to be told which act it is drawing. MEASURED over reference/riiablo's vendored copies of retail's
- * own files, `pal.dat` 172..179: ACT1, ACT2, ACT3, ACT4, ACT5 and Sky are all
- * (4,4,4) (8,8,8) (12,12,12) (16,16,16) (20,20,20) (24,24,24) (24,28,36) (32,32,32), one distinct
- * mapping across six files. The other palettes in that set (menu, EndGame, Trademark, fechar) differ,
- * and none of them is an act.
- *
- * This is why the palette is read HERE rather than plumbed in from the caller: `belt-renderer.mjs`,
- * `character-panel.mjs` and `death-screen.mjs` all read their own `pal.dat` the same way, and the
- * caller-side plumbing this replaced is what the held attempt is suspected of breaking `s126` with.
- * The `act` argument stays on `setLevel` so a caller that knows the act can select it, but nothing
- * has to.
- */
+/** The renderer needs the active act because DrawMode 3 maps indices through that act's palette/PL2. */
 const ACT_PALETTE = (act) => `data\\global\\palette\\ACT${Math.min(5, Math.max(1, (act | 0) + 1))}\\pal.dat`;
 
-export function createWeatherRenderer({ read, documentObject = globalThis.document }) {
+export function createWeatherRenderer({ read }) {
   const layers = [];
   const errors = [];
   let prepared = false, levelRain = 0;
-  let actN = 0, grey = null, rgbaPal = null;
+  let actN = 0, rgbaPal = null, rippleBlend = null;
   const cycle = createWeatherCycle(), clock = { tick: null };
   const parity = new URLSearchParams(globalThis.location?.search ?? '').get('enhanced') !== '1' && new URLSearchParams(globalThis.location?.search ?? '').get('view') !== 'fill';
   let live = [];
   const streaks = { drops: [], w: 0, h: 0, tick: null, camX: null, camY: null, seed: 0x2545f491 };
 
-  /**
-   * 256-entry byte -> the additive grey that byte contributes, from the act's own palette. A palette
-   * that will not load is recorded on `errors` (which the row reads) and yields a table of ZEROES, so
-   * the frame draws no rain rather than a false one. Falling back to the raw index here would restore
-   * the exact defect this replaced: 172..179 added to every channel is solid white.
-   */
-  const greyTable = () => {
-    if (grey) return grey;
+  /** Load the active act's palette for source cels and PL2-composited ripple output. */
+  const palette = () => {
+    if (rgbaPal) return rgbaPal;
     try {
-      // decodeDatPalette returns RGBA (256 * 4), not one byte per entry: index by 4, not 3.
-      grey = intensityTable(decodeDatPalette(read(ACT_PALETTE(actN))));
+      rgbaPal = decodeDatPalette(read(ACT_PALETTE(actN)));
     } catch (error) {
       errors.push(`palette for act ${actN + 1}: ${error}`);
-      grey = new Uint8Array(256);                     // all zero: no false rain to look at
+      return null;
     }
-    return grey;
+    return rgbaPal;
   };
-
-  /**
-   * The rain's own bytes are the INTENSITY, not a palette index.  Every act palette maps the cels'
-   * dominant indices 172..179 to near-black -- `ACT1\\pal.dat` gives (4,4,4), (8,8,8) .. (32,32,32),
-   * and `ACT1\\pal.pl2`, `Units\\pal.dat` agree entry for entry -- while retail's own finished frame of
-   * the same draws (retail/drawlists/town3.png) has them as grey streaks: pixels 25 or more brighter
-   * than their neighbours 3 px above and below sit inside a captured rain blit's rect at luminance
-   * 74..179.  Additive drawing of the source byte over the ground reproduces that range; the palette
-   * cannot (it would brighten by 4..32).  Which D2DDraw path mode 3 takes is NOT recovered, so this is
-   * a model, stated here and on F11b -- the identity a row checks (cel, frame, frame bytes, geometry,
-   * mode) is retail's either way.
-   */
-  const bitmapOf = (layer, index) => {
-    let bitmap = layer.bitmaps.get(index);
-    if (bitmap === undefined) {
-      bitmap = null;
-      const frame = layer.dc6.frames[index];
-      if (frame && frame.width && frame.height) {
-        const rgba = new Uint8ClampedArray(frame.indices.length * 4);
-        for (let i = 0; i < frame.indices.length; i++) {
-          if (!frame.opaque[i]) continue;
-          // The intensity is the ACT PALETTE's value for this byte, NOT the byte itself. The cels'
-          // dominant indices are 172..179 and `ACT1\pal.dat` maps them to (4,4,4) .. (32,32,32); retail's
-          // own frame of the same draws (retail/drawlists/town3.png) has the streaks "25 or more brighter
-          // than their neighbours", which is that palette value. Drawing the raw index adds 172..179,
-          // saturates every channel, and is why the rain rendered as solid white splats over the town
-          // (seen on :8950 2026-09-27: 6,395 near-white px on the ground band against retail's 631, 96%
-          // of them moving -- the particle layer). Which D2DDraw path mode 3 takes is not recovered, so
-          // the additive model is still a model; the OPERAND is what the measured delta settles.
-          const value = greyTable()[frame.indices[i]];
-          rgba[i * 4] = value; rgba[i * 4 + 1] = value; rgba[i * 4 + 2] = value; rgba[i * 4 + 3] = 255;
-        }
-        const canvas = documentObject.createElement('canvas');
-        canvas.width = frame.width; canvas.height = frame.height;
-        canvas.getContext('2d').putImageData(new ImageData(rgba, frame.width, frame.height), 0, 0);
-        bitmap = canvas;
-      }
-      layer.bitmaps.set(index, bitmap);
+  const blender = () => {
+    if (rippleBlend) return rippleBlend;
+    const pal = palette();
+    if (!pal) return null;
+    try {
+      rippleBlend = createBlender(read(ACT_PALETTE(actN).replace(/pal\.dat$/i, 'pal.pl2')), pal);
+    } catch (error) {
+      errors.push(`PL2 for act ${actN + 1}: ${error}`);
+      return null;
     }
-    return bitmap;
+    return rippleBlend;
   };
-
 
   // ---- The falling drops: retail's LINE primitives (renderer slot 48, mode 127), ~250 a frame ----------
   // Measured on the retail captures{town-anim,run-by-click-anim}.txt (4 and 24 consecutive whole frames) --
@@ -200,10 +140,6 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
       if (d.x < -100 || d.x > streaks.w + 100) spawn(d, false);
     }
   };
-  const plot = (ctx, x0, y0, x1, y1) => {
-    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
-    for (let i = 0; i <= n; i++) ctx.fillRect(Math.round(x0 + (x1 - x0) * (n ? i / n : 0)), Math.round(y0 + (y1 - y0) * (n ? i / n : 0)), 1, 1);
-  };
 
   const prepare = () => {
     if (prepared) return;
@@ -218,7 +154,7 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
       const next = (n) => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return (seed >>> 8) % n; };
       const particles = [];
       for (let i = 0; i < layer.particles; i++) particles.push({ seed: next(0x1000000), phase: 2 * (i % 5) });
-      layers.push({ ...layer, dc6, particles, bitmaps: new Map() });
+      layers.push({ ...layer, dc6, particles });
     }
   };
 
@@ -226,16 +162,14 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
     /** The level's own Rain byte, straight from the engine's Levels.txt read. */
     /**
      * The level's own Rain byte, straight from the engine's Levels.txt read, and optionally the act
-     * that colours it. A change of act invalidates the palette table AND the per-frame bitmaps built
-     * from it. `act` is optional: every act palette agrees on the rain indices (ACT_PALETTE above), so
+     * that colours it. A change of act invalidates the palette and blend table. `act` is optional: every act palette agrees on the rain indices (ACT_PALETTE above), so
      * a caller that does not know the act still gets the right colours.
      */
     setLevel(rain, act) {
       levelRain = Number(rain) > 0 ? 1 : 0;
       const next = Number.isFinite(act) ? Math.min(4, Math.max(0, act | 0)) : actN;
       if (next !== actN) {
-        actN = next; grey = null; rgbaPal = null;
-        for (const layer of layers) layer.bitmaps.clear();
+        actN = next; rgbaPal = null; rippleBlend = null;
       }
     },
 
@@ -246,9 +180,7 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
      */
     drawStreaks(ctx, width, height, tick, cx, cy) {
       if (!levelRain) return [];
-      if (!rgbaPal) {
-        try { rgbaPal = decodeDatPalette(read(ACT_PALETTE(actN))); } catch (error) { errors.push(`palette: ${error}`); rgbaPal = new Uint8Array(1024); }
-      }
+      if (!palette()) return [];
       // The retail count IS the cycle's intensity on 800x600; a wider or taller viewport gets the same
       // DENSITY (?parity=1: exactly retail's count, whatever the viewport).
       const want = Math.round(cycle.intensity * (parity ? 1 : (width * height) / 480000));
@@ -271,7 +203,7 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
         const x0 = Math.round(d.x), y0 = Math.round(d.y), x1 = Math.round(d.x + wind * d.len), y1 = Math.round(d.y + d.len);
         const o = d.colour * 4;
         ctx.fillStyle = `rgb(${rgbaPal[o]},${rgbaPal[o + 1]},${rgbaPal[o + 2]})`;
-        plot(ctx, x0, y0, x1, y1);
+        plotRainLine(ctx, x0, y0, x1, y1);
         recordPrim('line', x0, y0, x1, y1, d.colour, 127);
         out.push({ x0, y0, x1, y1, colour: d.colour });
       }
@@ -306,10 +238,8 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
       prepare();
       const step = Math.floor(Number(tick) / TICKS_PER_FRAME);
       const blits = [];
-      ctx.save();
-      // Retail's rain cels are drawn with DrawMode 3 (modulate/add), not the normal 5 -- the streaks
-      // brighten what is under them.
-      ctx.globalCompositeOperation = 'lighter';
+      const blend = blender();
+      if (!blend) return [];
       for (const layer of layers) {
         for (const particle of layer.particles) {
           const index = ((step + particle.phase) % FRAMES + FRAMES) % FRAMES;
@@ -331,20 +261,24 @@ export function createWeatherRenderer({ read, documentObject = globalThis.docume
           }
           particle.x = particle.wx - cx; particle.y = particle.wy - cy;
           particle.last = index;
+          // D2Client 1.13c FUN_6FB2FC70 gates the anchor before applying cel offsets.
+          // Both Perspective branches require 0 <= y < screenHeight - 47; candidate
+          // water-floor eligibility does not replace this later submission check.
+          if (particle.y < 0 || particle.y >= height - 47) continue;
           const frame = layer.dc6.frames[index];
-          const bitmap = bitmapOf(layer, index);
-          if (!bitmap || !frame) continue;
+          if (!frame || !blend) continue;
           // Retail's anchor: a cel frame lands with its left edge at x + offsetX and its BOTTOM row at
           // y + offsetY, so the particle's (x, y) is the anchor above the streak.
           const left = particle.x + frame.offsetX;
           const top = particle.y + frame.offsetY - frame.height + 1;
-          ctx.drawImage(bitmap, left, top);
+          // Blend directly against the preexisting canvas. A source-over draw here would replace
+          // the terrain under opaque cel pixels before the PL2 lookup and blend the cel against itself.
+          blend(ctx, frame, left, top, 3);
           const record = recordDc6(layer.path, index, frame, left, top, { op: 'cel', mode: 3, extra: 0 });
           if (record && record.hash) blits.push(record);
           live.push({ layer: layer.path, wx: particle.wx, wy: particle.wy, sx: particle.x, sy: particle.y, frame: index, waterCell: particle.waterCell });
         }
       }
-      ctx.restore();
       return blits;
     },
   };

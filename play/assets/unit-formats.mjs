@@ -1,3 +1,5 @@
+import { Bits } from './dcc-bits.mjs';
+
 // COF and DCC layout is re-derived from the documented formats and cross-checked
 // against OpenDiablo2/{cof,dcc} (Apache-2.0). Retail files remain the oracle.
 
@@ -42,28 +44,21 @@ export function decodeCof(input) {
     }
     priority.push(frames);
   }
-  return { layers, framesPerDirection, directions, speed, layerRecords, events, priority };
+  const cof = { layers, framesPerDirection, directions, speed, layerRecords, events, priority };
+  const layerByComponent = new Map();
+  for (const record of layerRecords) if (!layerByComponent.has(record.component)) layerByComponent.set(record.component, record);
+  // Keep this renderer lookup cache out of the public decoded-data shape.
+  Object.defineProperty(cof, 'layerByComponent', { value: layerByComponent });
+  return cof;
+}
+
+/** Retrieve the first COF layer record for a component. */
+export function cofLayerRecord(cof, component) {
+  return cof?.layerByComponent?.get(component) ?? cof?.layerRecords?.find((record) => record.component === component);
 }
 
 const DCC_WIDTHS = [0, 1, 2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 26, 28, 30, 32];
 
-class Bits {
-  constructor(bytes, bit = 0, limit = bytes.length * 8) { this.bytes = bytes; this.bit = bit; this.limit = limit; }
-  read(count, label) {
-    if (count < 0 || count > 32 || this.bit + count > this.limit) {
-      throw new RangeError(`truncated DCC ${label} at bit ${this.bit} reading ${count}, limit ${this.limit}`);
-    }
-    let value = 0;
-    for (let i = 0; i < count; i++) value += ((this.bytes[(this.bit + i) >>> 3] >>> ((this.bit + i) & 7)) & 1) * 2 ** i;
-    this.bit += count;
-    return value >>> 0;
-  }
-  signed(count, label) {
-    const v = this.read(count, label);
-    if (!count || count === 32) return count === 32 ? v | 0 : 0;
-    return v & 2 ** (count - 1) ? v - 2 ** count : v;
-  }
-}
 
 function frameCells(frame, box) {
   const left = frame.xOffset, top = frame.bottomUp ? frame.yOffset : frame.yOffset - frame.height + 1;
@@ -156,9 +151,10 @@ function decodeDccPixels(bytes, direction, directionEnd, index) {
         if (!previous || previous.width !== cell.width || previous.height !== cell.height) {
           for (let y = 0; y < cell.height; y++) canvas.fill(0, (cell.y + y) * width + cell.x, (cell.y + y) * width + cell.x + cell.width);
         } else {
-          const copy = [];
-          for (let y = 0; y < cell.height; y++) copy.push(canvas.slice((previous.y + y) * width + previous.x, (previous.y + y) * width + previous.x + cell.width));
-          copy.forEach((row, y) => canvas.set(row, (cell.y + y) * width + cell.x));
+          for (let y = 0; y < cell.height; y++) {
+            const source = (previous.y + y) * width + previous.x;
+            canvas.copyWithin((cell.y + y) * width + cell.x, source, source + cell.width);
+          }
         }
       } else if (entry.values[0] === entry.values[1]) {
         for (let y = 0; y < cell.height; y++) canvas.fill(entry.values[0], (cell.y + y) * width + cell.x, (cell.y + y) * width + cell.x + cell.width);
@@ -269,10 +265,13 @@ let nextDccId = 1;
 const dccId = (dcc) => { let n = dccIds.get(dcc); if (!n) dccIds.set(dcc, n = nextDccId++); return n; };
 
 /** Compose available DCC component frames in the draw order selected by a COF. */
-export function composeCofFrame(cof, direction, frameIndex, components, dccDirection = direction) {
+export function composeCofFrame(cof, direction, frameIndex, components, dccDirection = direction, precomputedDirectionKey = null) {
   if (cof && cof.priority?.[direction]?.[frameIndex]) {
     const get = components instanceof Map ? (id) => components.get(id) : (id) => components?.[id];
-    let key = `${direction}:${dccDirection}:${frameIndex}`, ok = true;
+    const directionKey = dccDirection instanceof Map
+      ? (precomputedDirectionKey ?? [...dccDirection].sort(([a], [b]) => a - b).map(([component, value]) => `${component}.${value}`).join(','))
+      : dccDirection;
+    let key = `${direction}:${directionKey}:${frameIndex}`, ok = true;
     for (const component of cof.priority[direction][frameIndex]) { const dcc = get(component); if (dcc) { if (typeof dcc !== 'object') { ok = false; break; } key += `,${component}=${dccId(dcc)}`; } }
     if (ok) {
       let memo = composeMemo.get(cof); if (!memo) composeMemo.set(cof, memo = new Map());
@@ -296,7 +295,13 @@ function composeCofFrameUncached(cof, direction, frameIndex, components, dccDire
     // 14 too (both read off the retail bytes, s716), but the shipped f0TRlitDThth.DCC carries 13 -- so
     // retail's own 14th frame has no cel. Drawing the death's last pose twice shows a corpse; wrapping
     // would snap it back to the standing frame 0. Clamp, for either axis: the same "does not cover" case.
-    const dir = Math.min(dccDirection, dcc.directions - 1), frame = Math.min(frameIndex, dcc.framesPerDirection - 1);
+    // Native D2CMP resolves the 64-slot facing against each DCC's own direction
+    // count. Player COFs can be 16-direction while a particular layer DCC is 8.
+    // Callers may pass a per-component map; the scalar form remains for objects
+    // and callers whose layers share one DCC direction index.
+    const requestedDirection = dccDirection instanceof Map
+      ? dccDirection.get(component) ?? 0 : dccDirection;
+    const dir = Math.min(requestedDirection, dcc.directions - 1), frame = Math.min(frameIndex, dcc.framesPerDirection - 1);
     selected.push({ component, frame: dcc.directionRecords[dir].frames[frame] });
   }
   if (!selected.length) return { xOffset: 0, yOffset: 0, width: 0, height: 0, bottomUp: false, indexed: new Uint8Array(), opaque: new Uint8Array() };

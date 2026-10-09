@@ -5,6 +5,7 @@
 #include "D2DataTbls.h"
 #include "D2Dungeon.h"
 #include "D2Inventory.h"
+#include "Drlg/D2DrlgDrlgRoom.h"
 #include <D2BitManip.h>
 #include "D2Monsters.h"
 #include "Path/IDAStar.h"
@@ -429,6 +430,19 @@ int __stdcall D2Common_10142(D2DynamicPathStrc* pPath, D2UnitStrc* pUnit, int bA
 			{
 				tPathInfo.pStartRoom = pPath->pRoom;
 				tPathInfo.pTargetRoom = COLLISION_GetRoomBySubTileCoordinates(tPathInfo.pStartRoom, tPathInfo.tTargetCoord.X, tPathInfo.tTargetCoord.Y);
+				// F671: capture the resolver result from ordinal 10334 itself, after it has used the
+				// path's actual starting room. The wrapper's earlier room check is a distinct stage.
+				if (g_d2webWalkProbeActive && g_d2webWalkProbe.sequence && pUnit == pPath->pUnit) {
+					g_d2webWalkProbe.resolverCalled = 1;
+					g_d2webWalkProbe.resolverRoomFound = tPathInfo.pTargetRoom != nullptr;
+					g_d2webWalkProbe.resolverLevel = tPathInfo.pTargetRoom && tPathInfo.pTargetRoom->pDrlgRoom
+						? DRLGROOM_GetLevelId(tPathInfo.pTargetRoom->pDrlgRoom) : -1;
+					g_d2webWalkProbe.resolverPathType = pPath->dwPathType;
+					g_d2webWalkProbe.resolverStartX = tPathInfo.tStartCoord.X;
+					g_d2webWalkProbe.resolverStartY = tPathInfo.tStartCoord.Y;
+					g_d2webWalkProbe.resolverTargetX = tPathInfo.tTargetCoord.X;
+					g_d2webWalkProbe.resolverTargetY = tPathInfo.tTargetCoord.Y;
+				}
 
 				// d2-web: retail 1.13c D2Common 0x6FD86396..0x6FD863AD tests the start room AND the target room
 				// (`test ecx,ecx; je fail; test eax,eax; je fail`): a path to a subtile no room holds fails.
