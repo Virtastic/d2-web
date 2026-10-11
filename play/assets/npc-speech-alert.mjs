@@ -30,21 +30,6 @@ export const NPC_SPEECH_ALERT = Object.freeze({
   offsetY: -7,
 });
 
-const ACT_PALETTES = ['ACT1', 'ACT2', 'ACT3', 'ACT4', 'ACT5'];
-
-// Keep the recovered pending/frame/palette selection independent of asset loading
-// so its native inputs can be checked offline without an MPQ-backed renderer.
-export function npcSpeechAlertFrameState(pending, tick = 0, act = 1) {
-  const paletteId = Math.min(4, Math.max(0, (Number(act) | 0) - 1));
-  if (pending !== true) return { drawn: false, frame: null, paletteId };
-  const gameTick = Math.max(0, Number(tick) || 0);
-  return {
-    drawn: true,
-    frame: Math.floor(gameTick / NPC_SPEECH_ALERT.animationRate) % NPC_SPEECH_ALERT.frames,
-    paletteId,
-  };
-}
-
 // `pending` is intentionally a required boolean supplied by an engine export.  A
 // missing value is a negative result, not permission to infer a quest state here.
 export function createNpcSpeechAlertRenderer(read) {
@@ -55,7 +40,7 @@ export function createNpcSpeechAlertRenderer(read) {
     const paletteId = Math.min(4, Math.max(0, (Number(act) | 0) - 1));
     let state = paletteState.get(paletteId);
     if (!state) {
-      const name = ACT_PALETTES[paletteId];
+      const name = ['ACT1', 'ACT2', 'ACT3', 'ACT4', 'ACT5'][paletteId];
       const palette = decodeDatPalette(read(`data\\global\\palette\\${name}\\pal.dat`));
       const blend = createBlender(read(`data\\global\\palette\\${name}\\pal.pl2`), palette);
       state = { palette, blend }; paletteState.set(paletteId, state);
@@ -65,16 +50,15 @@ export function createNpcSpeechAlertRenderer(read) {
   return {
     draw(ctx, x, y, npc, pending, tick = 0, act = 1) {
       const anchor = { x: Math.round(x + NPC_SPEECH_ALERT.offsetX), y: Math.round(y + NPC_SPEECH_ALERT.offsetY) };
-      const state = npcSpeechAlertFrameState(pending, tick, act);
-      if (!state.drawn) return { id: npc?.id ?? 0, pending: false, drawn: false, anchor };
+      if (pending !== true) return { id: npc?.id ?? 0, pending: false, drawn: false, anchor };
       const { blend } = load(act);
-      const frame = state.frame;
+      const frame = Math.floor(Math.max(0, Number(tick) || 0) / NPC_SPEECH_ALERT.animationRate) % NPC_SPEECH_ALERT.frames;
       const image = dcc.directionRecords[0]?.frames[frame];
       if (!image) throw new Error(`NPCSpeechBalloon has no frame ${frame}`);
       const screen = { x: Math.round(anchor.x + image.xOffset), y: Math.round(anchor.y + (image.bottomUp ? image.yOffset : image.yOffset - image.height + 1)) };
       blend(ctx, { width: image.width, height: image.height, indices: image.indexed, opaque: image.opaque }, screen.x, screen.y, NPC_SPEECH_ALERT.drawMode);
       return { id: npc?.id ?? 0, pending: true, drawn: true, overlay: NPC_SPEECH_ALERT.overlay,
-        path: NPC_SPEECH_ALERT.path, palette: `data\\global\\palette\\${ACT_PALETTES[state.paletteId]}\\pal.dat`,
+        path: NPC_SPEECH_ALERT.path, palette: `data\\global\\palette\\${['ACT1', 'ACT2', 'ACT3', 'ACT4', 'ACT5'][Math.min(4, Math.max(0, (Number(act) | 0) - 1))]}\\pal.dat`,
         drawMode: NPC_SPEECH_ALERT.drawMode, frame, anchor, screen,
         offset: { x: NPC_SPEECH_ALERT.offsetX, y: NPC_SPEECH_ALERT.offsetY }, width: image.width, height: image.height,
         opaque: spriteMetrics(image, null, image.opaque).opaque };

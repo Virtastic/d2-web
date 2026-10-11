@@ -50,8 +50,6 @@ export function tooltipSpec(h) {
   return { lines: [`${h.costLabel || 'Cost: '}${h.cost}`, h.name || h.code, ...(h.props || [])], colours: [qc, qc, ...(h.propColours || [])] };
 }
 export const vendorButtons = (npcClass) => (SMITH_CLASSES.has(npcClass) ? ['buy', 'sell', 'repair', 'repairAll'] : ['buy', 'sell', 'blank', 'exit']);
-// D2Client's standard 800x600 action-row hit table, converted from strict integer bounds.
-export const vendorButtonHitRect = (layout, slot) => ({ x: layout.buttonX[slot] + 2, y: 432, w: 44, h: 43 });
 
 function frameCanvas(frame, palette, documentObject) {
   const canvas = documentObject.createElement('canvas');
@@ -146,11 +144,7 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
   // Retail's anchors: the panel's top row is y 61, a tab's too.
   const tabRect = (t) => ({ x: L.left + t * L.tabStep, y: L.top + 1, w: cur.tabFrames[t].width, h: cur.tabFrames[t].height });
   const buttonTop = () => 446;   // retail: bottom row 477, 32 tall (vendor-akara)
-  // D2Client's vendor WM_LBUTTONDOWN/UP path uses the action row's hit regions, which are
-  // deliberately taller than its 32px button cels. At the 800x600 layout those strict native
-  // bounds are x=(anchor+offset, anchor+offset+45), y=(431,475), where the button row is drawn
-  // with its baseline at 477. Convert strict integer comparisons to half-open rectangles.
-  const buttonRect = (i) => vendorButtonHitRect(L, i);
+  const buttonRect = (i, name) => { const f = cur.buttonFrames[BUTTON_FRAMES[name]]; return { x: L.buttonX[i], y: buttonTop(), w: f ? f.width : 32, h: f ? f.height : 32 }; };
   return {
     get tab() { return tab; },
     get evidence() { return { background: { width: cur.panel.width, height: cur.panel.height }, art: VENDOR_ASSETS.panel, layout: { ...L } }; },

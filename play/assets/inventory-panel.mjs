@@ -2,7 +2,6 @@ import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { BORDER_RIGHT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
 import { fnv1a32, paperdollIdentity } from './paperdoll-identity.mjs';
 import { PANEL_CLOSE_ART, panelCloseLayout } from './panel-close.mjs';
-import { inventoryCloseFrame } from './inventory-close-gesture.mjs';
 import { inventoryBoxColour } from './inventory-box-colour.mjs';
 import { inventoryItemColourIndex, inventoryItemColourKey } from './inventory-item-colour.mjs';
 
@@ -297,20 +296,18 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     // Gold, the gold button, the close button and the right-hand border (retail's anchors, s197).
     ctx.save(); ctx.translate(ox, oy); ctx.scale(scale, scale);
     chrome.text(ctx, act, String(state?.gold ?? 0), 508, 468);
-    const goldFrame = state?.inventoryGoldPressed ? 1 : 0;
-    const goldBlit = chrome.cel(ctx, act, CHROME_ART.gold, goldFrame, INVENTORY_GOLD_ANCHOR.x, INVENTORY_GOLD_ANCHOR.bottom);
-    // This is the cel's draw rectangle. Native input has its own inclusive hit rectangle (including
-    // one pixel above and to the right of this art) in inventory-close-gesture.mjs.
+    const goldBlit = chrome.cel(ctx, act, CHROME_ART.gold, 0, INVENTORY_GOLD_ANCHOR.x, INVENTORY_GOLD_ANCHOR.bottom);
+    // panelCloseLayout is the one place this rect lives now (panel-close.mjs) -- the drawn cel and
+    // the click hit-box both come from it, so they cannot drift apart the way 419,449 vs 418,476 did.
     const close = panelCloseLayout('inventory');
-    const closeFrame = inventoryCloseFrame(Boolean(state?.inventoryClosePressed));
-    const closeBlit = chrome.cel(ctx, act, PANEL_CLOSE_ART.path, closeFrame, close.x, close.y + close.height - 1);
+    const closeBlit = chrome.cel(ctx, act, PANEL_CLOSE_ART.path, PANEL_CLOSE_ART.frame, close.x, close.y + close.height - 1);
     chrome.border(ctx, act, BORDER_RIGHT);
     ctx.restore();
     return { x: baseX, y: baseY, scale, panelFrames: 4,
       panelPixels: [4, 5, 6, 7].reduce((sum, i) => sum + dc6.frames[i].width * dc6.frames[i].height, 0),
       itemCount: (state?.items || []).filter((item) => item.invPage === 0).length, itemPixels,
       equippedItemCount, equippedItemPixels, drawn, layout: layout ? 'engine' : 'amazon2',
-      gold: { path: CHROME_ART.gold, frame: goldFrame, blit: goldBlit },
-      close: { ...close, path: PANEL_CLOSE_ART.path, frame: closeFrame, blit: closeBlit } };
+      gold: { path: CHROME_ART.gold, frame: 0, blit: goldBlit },
+      close: { ...close, path: PANEL_CLOSE_ART.path, frame: PANEL_CLOSE_ART.frame, blit: closeBlit } };
   } };
 }

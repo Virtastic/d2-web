@@ -17,11 +17,7 @@ export function createFrontendPointerStates() {
      * Arm `control` for `pointerId`. Returns the token `control.press()` handed back -- the identity
      * of the thing under this pointer -- or null when nothing was hit.
      */
-    press(pointerId, control, x, y, width, height, button = 0) {
-      // D2Win type-6 front-end controls are left-button controls. Ignore secondary
-      // buttons before touching the active gesture: a right-button chord must not
-      // cancel an in-progress primary press or leave a new, unfinishable arm.
-      if (button !== 0) return null;
+    press(pointerId, control, x, y, width, height) {
       armed.delete(pointerId);   // a second press from the same pointer replaces its old gesture
       if (!control) return null;
       const token = control.press?.(x, y, width, height) ?? null;
@@ -34,10 +30,7 @@ export function createFrontendPointerStates() {
      * than re-hit-tested against a screen the player has left. The control re-hit-tests the release
      * point itself and fires only when it resolves to the same token its press armed.
      */
-    release(pointerId, current, x, y, width, height, button = 0) {
-      // D2Win type-6 front-end controls dispatch only their left-button-up handler. A secondary
-      // button release during a primary gesture is ignored and leaves that gesture armed.
-      if (button !== 0) return null;
+    release(pointerId, current, x, y, width, height) {
       const active = armed.get(pointerId);
       if (!active) return null;   // a release with no matching press does nothing
       armed.delete(pointerId);
@@ -56,9 +49,4 @@ export function createFrontendPointerStates() {
     },
     get armed() { return [...armed.entries()].map(([pointerId, a]) => ({ pointerId, token: a.token })); },
   };
-}
-
-/** Retail draws a type-6 button's down art only while its armed control is under the pointer. */
-export function isButtonHeldOverTarget(armed, hovered) {
-  return armed != null && armed === hovered;
 }

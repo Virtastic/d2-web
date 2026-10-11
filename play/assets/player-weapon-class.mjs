@@ -11,9 +11,3 @@ export function playerWeaponClassToken(id) {
   if (!token) throw new RangeError(`unknown engine weapon class id ${id}`);
   return token;
 }
-
-export function weaponClassTokenForMode(ccall, mode) {
-  if (typeof ccall !== 'function') throw new TypeError('engine ccall function is required');
-  const id = ccall('d2_session_player_weapon_class_id_for_presentation_mode', 'number', ['number'], [Number(mode)]);
-  return { id, token: playerWeaponClassToken(id) };
-}

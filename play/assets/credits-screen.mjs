@@ -18,10 +18,6 @@ const SCREEN = { width: 800, height: 600 }, TICKS_PER_PIXEL = 60 / 50;
 export const CREDITS_LAYOUT = { exit: { x: 33, y: 543 }, colours: { red: 1, gold: 4 } };
 const decodeCredits = (bytes) => new TextDecoder('utf-16le').decode(bytes).replace(/^\uFEFF/, '').split(/\r?\n/).map((line) => line.trim());
 
-export function creditsExitFrameIndex(frames, pressed) {
-  return pressed && frames.length > 1 ? 1 : 0;
-}
-
 // The evidence needs to distinguish the two transformed font palettes, not merely
 // report the token the line requested.  FNV-1a gives the scenario a compact identity
 // for the exact RGBA table handed to each font.
@@ -106,8 +102,8 @@ export function createCreditsScreen({ read, decodeDc6, decodeDatPalette, onExit 
       drawn: { font: blit.path, cel: blit.frame, x: blit.x, y: blit.y, mode, tableHash: colourTableHashes[mode] },
     }),
   })]));
-  const exitDc6 = decodeDc6(read(CREDITS_ASSETS.exitButton));
-  const exitButtons = exitDc6.frames.map((frame) => ({ path: CREDITS_ASSETS.exitButton, frame, canvas: frameCanvas(frame, palette, documentObject) }));
+  const exitDc6 = decodeDc6(read(CREDITS_ASSETS.exitButton)), exitFrame = exitDc6.frames[0];
+  const exitButton = { path: CREDITS_ASSETS.exitButton, frame: exitFrame, canvas: frameCanvas(exitFrame, palette, documentObject) };
   // The EXIT label is a BUTTON LABEL, not body text: retail's own credits draw list
   // draws its four FontExocet10 glyphs `celcolor` mode 4,
   // extra 0 -- the same MultiplicativeBlend + 0x64 tint the title's labels use (frontend.mjs's
@@ -123,23 +119,20 @@ export function createCreditsScreen({ read, decodeDc6, decodeDatPalette, onExit 
   const sceneCtx = scene.getContext('2d');
   const view = (width, height) => { const scale = Math.min(width / SCREEN.width, height / SCREEN.height); return { scale, ox: Math.round((width - SCREEN.width * scale) / 2), oy: Math.round((height - SCREEN.height * scale) / 2) }; };
   const schedule = scheduleCredits(lines, (text) => fonts.gold.measure(text));
-  const exitRect = { ...CREDITS_LAYOUT.exit, width: exitButtons[0].frame.width, height: exitButtons[0].frame.height };
-  let exitPressed = false;
+  const exitRect = { ...CREDITS_LAYOUT.exit, width: exitFrame.width, height: exitFrame.height };
   const hitExit = (x, y, width, height) => {
     const v = view(width, height), sx = (x - v.ox) / v.scale, sy = (y - v.oy) / v.scale;
     return sx >= exitRect.x && sx < exitRect.x + exitRect.width && sy >= exitRect.y && sy < exitRect.y + exitRect.height;
   };
   return {
-    get evidence() { return { background: { path: CREDITS_ASSETS.background, width: background.width, height: background.height, frames: backgroundDc6.frames.length, rows: background.rows, columns: background.columns }, text: { path: CREDITS_ASSETS.text, encoding: 'utf-16le', bytes: textBytes.length, lines: lines.length }, font: { path: CREDITS_ASSETS.font, glyphs: fonts.gold.measure('CREDITS'), lineHeight: fonts.gold.lineHeight, colourTableHashes, colourTokens: { ...CREDITS_LAYOUT.colours } }, exit: { path: CREDITS_ASSETS.exitButton, font: CREDITS_ASSETS.exitFont, label: exitLabel, rect: exitRect, pressed: exitPressed, frame: creditsExitFrameIndex(exitButtons, exitPressed) }, tick: lastTick, scrollPixels: Math.floor(lastTick / TICKS_PER_PIXEL), glyphBlits, labelBlits }; },
+    get evidence() { return { background: { path: CREDITS_ASSETS.background, width: background.width, height: background.height, frames: backgroundDc6.frames.length, rows: background.rows, columns: background.columns }, text: { path: CREDITS_ASSETS.text, encoding: 'utf-16le', bytes: textBytes.length, lines: lines.length }, font: { path: CREDITS_ASSETS.font, glyphs: fonts.gold.measure('CREDITS'), lineHeight: fonts.gold.lineHeight, colourTableHashes, colourTokens: { ...CREDITS_LAYOUT.colours } }, exit: { path: CREDITS_ASSETS.exitButton, font: CREDITS_ASSETS.exitFont, label: exitLabel, rect: exitRect }, tick: lastTick, scrollPixels: Math.floor(lastTick / TICKS_PER_PIXEL), glyphBlits, labelBlits }; },
     targets(width, height) { const v = view(width, height); return { EXIT: [Math.round(v.ox + (exitRect.x + exitRect.width / 2) * v.scale), Math.round(v.oy + (exitRect.y + exitRect.height / 2) * v.scale)] }; },
     click(x, y, width, height) { if (!hitExit(x, y, width, height)) return false; onExit(); return true; },
-    press(x, y, width, height) { exitPressed = hitExit(x, y, width, height); return exitPressed ? 'exit' : null; },
+    press(x, y, width, height) { return hitExit(x, y, width, height) ? 'exit' : null; },
     release(token, x, y, width, height) {
-      const activate = token === 'exit' && exitPressed && hitExit(x, y, width, height);
-      exitPressed = false;
-      return activate ? this.click(x, y, width, height) : false;
+      return token === 'exit' && hitExit(x, y, width, height) ? this.click(x, y, width, height) : false;
     },
-    cancel() { exitPressed = false; },
+    cancel() {},
     draw(ctx, width, height, tick) {
       sceneCtx.fillStyle = '#000'; sceneCtx.fillRect(0, 0, SCREEN.width, SCREEN.height); sceneCtx.drawImage(background.canvas, 0, 0);
       lastTick = tick; glyphBlits = []; labelBlits = [];
@@ -157,10 +150,8 @@ export function createCreditsScreen({ read, decodeDc6, decodeDatPalette, onExit 
           drawingLine = null;
         }
       }
-      const exitFrameIndex = creditsExitFrameIndex(exitButtons, exitPressed);
-      const exitFrame = exitButtons[exitFrameIndex];
-      sceneCtx.drawImage(exitFrame.canvas, exitRect.x, exitRect.y);
-      recordDc6(exitFrame.path, exitFrameIndex, exitFrame.frame, exitRect.x, exitRect.y);
+      sceneCtx.drawImage(exitButton.canvas, exitRect.x, exitRect.y);
+      recordDc6(exitButton.path, 0, exitButton.frame, exitRect.x, exitRect.y);
       exitFont.drawAnchored(sceneCtx, exitLabel, exitRect.x + Math.max(Math.trunc((exitRect.width - exitFont.measure(exitLabel)) / 2), 0), exitRect.y + exitRect.height - 9);
       const v = view(width, height); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, width, height); ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(scene, v.ox, v.oy, SCREEN.width * v.scale, SCREEN.height * v.scale); ctx.restore();
     },

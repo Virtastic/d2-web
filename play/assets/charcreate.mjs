@@ -17,13 +17,10 @@
 // which is a wrong picture rather than an error.
 
 import { composeTiled, createBlender, createFont, decodeFontTbl, FRONTEND, recordTiled, textColourPalette, TITLE_COLUMNS } from './frontend.mjs';
-import { createCharacterCreateCheckboxes, createCharacterCreateCheckboxInput } from './charcreate-checkboxes.mjs';
+import { createCharacterCreateCheckboxes } from './charcreate-checkboxes.mjs';
 import { createCharacterNameRenderer, NAME_FIELD } from './charcreate-name.mjs';
-import { isRetailEditBoxCharacter } from './charcreate-name-input.mjs';
 import { recordDc6 } from './drawlist.mjs';
 import { createHeroStances, HERO_STANCE } from './charcreate-stances.mjs';
-import { d2winHeldFrame } from './d2win-button-frame.mjs';
-import { isButtonHeldOverTarget } from './frontend-pointer-states.mjs';
 
 /**
  * Per-class layout, from OpenDiablo2's select_hero_class.go.
@@ -190,18 +187,6 @@ function descriptionLines(text) {
 
 const SCREEN = { width: 800, height: 600 };
 
-/**
- * D2Win sends every type-6 control its mouse-up message after a hit-tested mouse-down. For the
- * flags-0 OK and EXIT controls, that pending gesture invokes the callback on release without
- * checking where the pointer ended up. Keep this separate from hit testing: class and checkbox
- * gestures have their own handling.
- */
-export function releaseCharacterCreateButton(token, { submit, cancel }) {
-  if (token === 'ok') { submit(); return 'ok'; }
-  if (token === 'exit') { cancel(); return 'exit'; }
-  return null;
-}
-
 export function frameCanvas(frame, palette, documentObject) {
   const canvas = documentObject.createElement('canvas');
   canvas.width = Math.max(1, frame.width);
@@ -312,7 +297,6 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
   // OpenDiablo2's SelectHeroClass gives clickbox.dc6's fechar cels and these anchors.  The
   // labels use this screen's existing Units Font16, exactly as its other small labels do.
   const checkboxes = createCharacterCreateCheckboxes({ read, decodeDc6, palette, smallFont: goldLabelFont, string, documentObject });
-  const checkboxInput = createCharacterCreateCheckboxInput((key) => checkboxes.toggle(key));
 
   const blend = createBlender(read(CREATE_ASSETS.palette.replace(/pal\.dat$/i, 'pal.pl2')), palette);
   // Button labels: exocet10 glyphs in draw mode 4, fechar's PL2 MultiplicativeBlend over the button
@@ -412,8 +396,6 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     if (token.startsWith('class-')) return inBox(p, heroes.find((h) => h.key === token.slice('class-'.length))?.hit || {});
     return false;
   };
-  const isButtonHeld = (token) => isButtonHeldOverTarget(token,
-    pointer ? hitControl({ x: pointer[0], y: pointer[1] }) : null);
 
   const canCreate = () => chosen >= 0 && name.trim().length >= 2;
   // A hover that began mid-walk lands once the walk ends (Codex F99 review).
@@ -464,10 +446,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
         // the frame DREW in, so a row can compare it with retail's own record rather than with the
         // rule that chose it.
         okButton: { drawn: chosen >= 0, mode: chosen < 0 ? 0 : (canCreate() ? 5 : 1),
-          frame: chosen >= 0 ? d2winHeldFrame(buttonDc6.frames, 0, isButtonHeld('ok') && canCreate()) : null,
-          pressed: isButtonHeld('ok') && canCreate(), labelled: chosen >= 0, x: LAYOUT.okButton.x, y: LAYOUT.okButton.y },
-        exitButton: { frame: d2winHeldFrame(buttonDc6.frames, 0, isButtonHeld('exit')), pressed: isButtonHeld('exit'),
-          x: LAYOUT.exitButton.x, y: LAYOUT.exitButton.y },
+          labelled: chosen >= 0, x: LAYOUT.okButton.x, y: LAYOUT.okButton.y },
         // The caret's phase in this frame, and the cel it blitted when it drew one.
         caretLit: caretLit(),
         checkboxes: checkboxes.evidence,
@@ -490,7 +469,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
       if (code === 'Backspace') { name = name.slice(0, -1); return true; }
       if (code === 'Enter') { if (canCreate()) this.submit(); return true; }
       if (code === 'Escape') { onCancel?.(); return true; }
-      if (isRetailEditBoxCharacter(key) && name.length < 15) { name += key; return true; }
+      if (typeof key === 'string' && key.length === 1 && /[A-Za-z_-]/.test(key) && name.length < 15) { name += key; return true; }
       return false;
     },
     submit() { if (canCreate()) onCreate?.({ playerClass: heroes[chosen].playerClass, name: name.trim(), key: heroes[chosen].key, checkboxes: checkboxes.states() }); },
@@ -532,27 +511,21 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     },
     press(x, y, width, height) {
       const p = toScreen(x, y, width, height);
-      const token = hitControl(p);
-      // The type-6 mode-2 clickboxes toggle on down; later release or cancellation only clears
-      // this pointer's pressed identity and does not roll back the committed state.
-      checkboxInput.press(token);
-      return (pressed = token);
+      return (pressed = hitControl(p));
     },
     release(token, x, y, width, height) {
-      if (!token) { checkboxInput.cancel(); pressed = null; return null; }
+      if (!token) { pressed = null; return null; }
       const p = toScreen(x, y, width, height), now = hitControl(p), matches = releaseMatches(token, p); pressed = null;
-      // Mode 2 has no release callback. Preserve the captured identity only to end the gesture;
-      // overlapping checkbox hit regions must not redirect the already-committed down action.
-      const buttonAction = releaseCharacterCreateButton(token, {
-        submit: () => this.submit(), cancel: () => onCancel?.(),
-      });
-      checkboxInput.release(token);
-      const action = buttonAction ?? (matches && !token.startsWith('checkbox-') ? this.click(x, y, width, height) : null);
+      // Checkbox hit regions overlap vertically in the retail DC6; release preserves the captured
+      // checkbox identity instead of allowing that overlap to redirect the action to its neighbour.
+      const action = matches
+        ? token.startsWith('checkbox-') ? checkboxes.toggle(token.slice('checkbox-'.length)) : this.click(x, y, width, height)
+        : null;
       releaseEvidence = { token, now, matches, action };
       return action;
     },
     /** A cancelled gesture drops the down cel without activating the control. */
-    cancel() { checkboxInput.cancel(); pressed = null; },
+    cancel() { pressed = null; },
     step() { tick++; },
     /** The screen's clock in 60 Hz updates since it opened; a row pins it to a retail capture's tick. */
     get tick() { return tick; }, set tick(v) { tick = v; },
@@ -604,9 +577,8 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
       // then the "CHARACTER NAME" label, then the typed name, then each checkbox's label before its
       // box, and OK and its label last. Drawing them in another order is not a different picture, but
       // it IS a different draw list -- and the draw list is what this screen's identity rows read.
-      const exitFrame = d2winHeldFrame(buttonDc6.frames, 0, isButtonHeld('exit'));
-      ctx.drawImage(buttons[exitFrame], LAYOUT.exitButton.x, LAYOUT.exitButton.y);
-      recordDc6(CREATE_ASSETS.button, exitFrame, buttonDc6.frames[exitFrame], LAYOUT.exitButton.x, LAYOUT.exitButton.y);
+      ctx.drawImage(buttons[0], LAYOUT.exitButton.x, LAYOUT.exitButton.y);
+      recordDc6(CREATE_ASSETS.button, 0, buttonDc6.frames[0], LAYOUT.exitButton.x, LAYOUT.exitButton.y);
       buttonLabel(ctx, 'EXIT', LAYOUT.exitButton);
 
       if (chosen >= 0) {
@@ -625,9 +597,8 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
         // same frame carries OK's two FontExocet10 cels after the mode-1 button (records 162-163).
         // Drawing nothing made the button appear where retail has it on screen and unlit.
         if (canCreate()) {
-          const okFrame = d2winHeldFrame(buttonDc6.frames, 0, isButtonHeld('ok'));
-          ctx.drawImage(buttons[okFrame], LAYOUT.okButton.x, LAYOUT.okButton.y);
-          recordDc6(CREATE_ASSETS.button, okFrame, buttonDc6.frames[okFrame], LAYOUT.okButton.x, LAYOUT.okButton.y);
+          ctx.drawImage(buttons[0], LAYOUT.okButton.x, LAYOUT.okButton.y);
+          recordDc6(CREATE_ASSETS.button, 0, buttonDc6.frames[0], LAYOUT.okButton.x, LAYOUT.okButton.y);
         } else {
           blend(ctx, buttonDc6.frames[0], LAYOUT.okButton.x, LAYOUT.okButton.y, 1);
           recordDc6(CREATE_ASSETS.button, 0, buttonDc6.frames[0], LAYOUT.okButton.x, LAYOUT.okButton.y, { mode: 1 });

@@ -36,21 +36,8 @@ struct McpSession {
 McpSession g_m;
 
 const char kCharName[] = "player";
-constexpr uint32_t kCharLogonRefused = 0x46;
-
-bool isListedCharacter(const uint8_t* name, int nameLen) {
-    constexpr int expectedLen = sizeof(kCharName); // includes the required NUL
-    if (!name || nameLen != expectedLen) return false;
-    for (int i = 0; i < expectedLen; ++i) {
-        if (name[i] != static_cast<uint8_t>(kCharName[i])) return false;
-    }
-    return true;
-}
 
 inline uint16_t rd16(const uint8_t* p) { return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8)); }
-inline uint32_t rd32(const uint8_t* p) {
-    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
-}
 
 int emit(uint8_t op, const uint8_t* body, int bodyLen, uint8_t* out, int outCap, int written) {
     const int total = 3 + bodyLen;
@@ -131,23 +118,13 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_mcp_session_feed(const uint8_t* in, int len, u
                 break;
             case 0x19: { // CHARLIST2 -> one character
                 const int sn = buildStatstring(g_m.charClass, g_m.charLevel, stat);
-                // The client sends a little-endian DWORD, with a protocol maximum of eight.
-                // Reading only b[0] treated valid counts such as 0x00000100 as zero.
-                const uint32_t requested = bodyLen >= 4 ? rd32(b) : 8;
-                const uint16_t returnedLimit = (uint16_t)(requested > 8 ? 8 : requested);
-                n = d2_realm_mcp_charlist2_reply_header(returnedLimit, 1, 1, body);
+                n = d2_realm_mcp_charlist2_reply_header(bodyLen >= 4 ? (uint16_t)b[0] : 8, 1, 1, body);
                 n += d2_realm_mcp_charlist2_entry(0x7FFFFFFFu, kCharName, stat, sn, body + n);
                 written = emit(0x19, body, n, out, outCap, written);
                 break;
             }
-            case 0x07:   // CHARLOGON -> select only the character this session advertised
-                // The fixture currently has one character. Do not accept a different or
-                // unterminated name as a successful selection. D2Client 1.13c recognizes 0x46
-                // as a recoverable character-selection refusal, allowing a retry on this MCP
-                // session. tristramd also names 0x7A for logon failure, but that is not a safe
-                // refusal on the local 1.13c client path.
-                n = d2_realm_mcp_charlogon_reply(
-                    isListedCharacter(b, bodyLen) ? 0u : kCharLogonRefused, body);
+            case 0x07:   // CHARLOGON -> logged on
+                n = d2_realm_mcp_charlogon_reply(0, body);
                 written = emit(0x07, body, n, out, outCap, written);
                 break;
             case 0x03: { // CREATEGAME -> created, hand back the token

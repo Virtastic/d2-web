@@ -338,9 +338,6 @@ export function installTouchInput({ documentObject = globalThis.document, window
   // ---------------------------- M1 / M4: the virtual stick -----------------------------------
   const stickBase = documentObject.createElement('div');
   stickBase.id = 'd2-touch-stick'; stickBase.className = 'd2-touch-stick d2-touch-hit';
-  // Start hidden before inserting into the document. The state poll below runs every 200 ms;
-  // default-visible controls flashed over the title/select screens until its first tick.
-  stickBase.style.display = 'none';
   const knob = documentObject.createElement('div'); knob.className = 'd2-touch-knob';
   stickBase.appendChild(knob); container.appendChild(stickBase);
 
@@ -384,7 +381,6 @@ export function installTouchInput({ documentObject = globalThis.document, window
 
   // -------------------------------- M2: the button bar ---------------------------------------
   const bar = documentObject.createElement('div'); bar.id = 'd2-touch-bar'; bar.className = 'd2-touch-bar';
-  bar.style.display = 'none';
   for (const { code, label } of BAR_KEYS) {
     const btn = documentObject.createElement('div');
     btn.className = 'd2-touch-btn d2-touch-hit'; btn.dataset.touchKey = code; btn.textContent = label;

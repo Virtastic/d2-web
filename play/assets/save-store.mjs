@@ -46,7 +46,6 @@ export function readSaveHeader(bytes) {
     flags: view.getUint32(0x24, true) >>> 0,
     expansion: Boolean(view.getUint32(0x24, true) & 0x20),
     hardcore: Boolean(view.getUint32(0x24, true) & 0x04),
-    dead: Boolean(view.getUint32(0x24, true) & 0x08),
     difficulty, act0: Math.min(act0, 4),
     bytes: bytes.length,
     // The character-menu appearance (D2SaveHeaderStrc 0x88: 16 component indices, 0x98: 16 colours),
@@ -170,21 +169,14 @@ export function createSaveStore({ indexedDBObject = globalThis.indexedDB, storag
       const record = await run(await db(), 'readonly', (store) => store.get(name));
       return record ? Uint8Array.from(record.data) : null;
     },
-    async listProfile() {
+    async list() {
       await restoreUnloadJournal();
       const records = await run(await db(), 'readonly', (store) => store.getAll());
-      const rows = records || [];
-      const characters = rows
+      return (records || [])
         .map((record) => ({ ...readSaveHeader(Uint8Array.from(record.data)), saved: record.saved }))
         .filter((header) => header && header.name)
         .sort((a, b) => b.saved - a.saved);
-      // Retail's SINGLE PLAYER callback checks whether a *.d2s filename exists before it parses
-      // the save. Preserve that distinction: an unreadable file still routes to SELECT, where the
-      // character enumerator handles it, while auxiliary .sss/.ma0 records do not count as saves.
-      const hasSaveFiles = rows.some((record) => record && !record.aux && typeof record.name === 'string');
-      return { characters, hasSaveFiles };
     },
-    async list() { return (await this.listProfile()).characters; },
     // Deleting a character deletes everything it owns: its .d2s, its PlugY side blob and its saved
     // automap layer (F268, the `<character>.ma0` written beside it at Save and Exit).
     async remove(name) { journal.invalidate(name); await run(await db(), 'readwrite', (store) => { store.delete(`_LOD_${name}.sss`); store.delete(`_LOD_${name}.ma0`); return store.delete(name); }); },

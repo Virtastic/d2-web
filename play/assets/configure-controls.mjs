@@ -20,9 +20,10 @@
 //   0 description, 4 bound key, 5 'None' on a function that has another binding,
 //   1 red 'None' on a function with neither cell bound, 3 the focused (or armed) row.
 //
-// The list is 56 functions in 62 raw slots (including blank sentinels), with 15 visible. Native
-// FUN_6FAC1A80 changes the raw top index by one per accepted arrow tick; captured views are samples
-// taken after different amounts of held input, not a table of one-click transitions.
+// The list is 56 functions in 62 slots (gaps at 7, 28, 35, 42, 49, 58) and 15 slots are visible, so the
+// scroll has 23 stops. The stops and their thumb positions are TRANSCRIBED from retail's own 26-view
+// sweep (`CONFIGURE_CONTROLS_STOPS`): consecutive views move 2 to 12 slots, no constant step fits, so
+// the arithmetic behind retail's scroll is not reversed and is not claimed to be.
 import { decodeDatPalette, decodeDc6 } from './d2-formats.mjs';
 import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
 import { createPanelChrome } from './panel-chrome.mjs';
@@ -33,13 +34,6 @@ const FONT = 'data\\local\\font\\latin\\fontingamechat.dc6';
 const BOXPIECES = 'data\\global\\ui\\MENU\\boxpieces.dc6';
 const TEXTSLID = 'data\\global\\ui\\Menu\\TextSlid.dc6';
 export const CONFIGURE_CONTROLS_STORAGE_KEY = 'd2web.controls.bindings';
-
-/** Retail footer actions arm on left-button down and run only when that same pointer releases over
- * the same footer entry. */
-export function configureFooterRelease(press, pointerId, button, releasedButton) {
-  if (!press || press.pointerId !== pointerId) return { owned: false, activate: null };
-  return { owned: true, activate: button === 0 && releasedButton === press.name ? press.name : null };
-}
 
 /** Retail's own default binding table, as its Configure Controls screen prints it: 62 slots, 56
  *  functions, `null` where the sweep shows a blank line. `[name, key one, key two]`. */
@@ -71,9 +65,9 @@ export const CONFIGURE_CONTROLS_SLOTS = Object.freeze([
   ['Screen Shot', 'Print Screen', null], ['Clear Screen', 'Space', null], ['Clear Messages', 'N', null],
 ]);
 
-/** Captured examples of first nonblank text slot and thumb anchor. Blank raw slots may precede that
- *  text row; these are observations after varying held durations, not one-click transitions. */
-export const CONFIGURE_CONTROLS_CAPTURED_VIEWS = Object.freeze([
+/** `[first visible slot, thumb top y]` per down-arrow click, clamped at the last: retail's own 26-view
+ *  sweep's 23 stops (retail/drawlists/cc-sweep-01..26.bin), not a formula. */
+export const CONFIGURE_CONTROLS_STOPS = Object.freeze([
   [0, 129], [2, 136], [4, 144], [8, 156], [9, 164], [12, 176], [14, 184], [16, 192], [18, 200],
   [21, 212], [23, 220], [25, 227], [27, 235], [29, 243], [31, 251], [33, 259], [36, 267], [37, 275],
   [39, 283], [41, 291], [43, 299], [46, 311], [47, 315],
@@ -87,14 +81,6 @@ export const CONFIGURE_CONTROLS_LAYOUT = Object.freeze({
   slider: { trough: [679, 129, 21], thumb: [678, 5], up: [679, 117], down: [679, 375], step: 12 },
 });
 const L = CONFIGURE_CONTROLS_LAYOUT;
-const MAX_SCROLL_INDEX = Math.max(0, CONFIGURE_CONTROLS_SLOTS.length - L.rows);
-const THUMB_TRAVEL = 0xf6 - L.slider.thumb[1] * L.slider.step;
-
-// D2Client stores the top table index and maps it linearly to the thumb with integer division.
-// The native screen-relative base resolves to the captured top anchor (129) at this panel size.
-function thumbYForScrollIndex(index) {
-  return 129 + Math.trunc(THUMB_TRAVEL * index / MAX_SCROLL_INDEX);
-}
 
 /** The 270 boxpieces cels of the panel frame, in retail's own call order. */
 export function configureControlsPieces() {
@@ -217,15 +203,14 @@ export function createConfigureControls({ read, palettePath = () => 'data\\globa
     if (saved !== null && saved !== undefined) committed = restoreControlBindings(saved);
   } catch { /* blocked, absent or corrupt preference storage leaves retail's captured defaults */ }
   let pending = blank();           // the panel's own copy: what the panel draws and edits
-  let open = false, tick = 0, scrollIndex = 0;
+  let open = false, tick = 0, stop = 0;
   const scrollHold = createConfigureScrollHold();
   let focus = null, armed = null;  // focus/armed are {slot, cell}, cell 0 = Key/Button One
-  let buttonHover = null, buttonPress = null;
 
-  const slotAt = (i) => scrollIndex + i;   // native renderer advances through raw slots, including blanks
+  const slotAt = (i) => CONFIGURE_CONTROLS_STOPS[stop][0] + i;   // visible row i -> list slot
   const rowY = (i) => L.rowY + L.rowPitch * i;
-  const focusBox = () => (focus ? [L.focusX[0], rowY(focus.slot - scrollIndex) - L.rowPitch + 1,
-    L.focusX[1], rowY(focus.slot - scrollIndex) + 1] : null);
+  const focusBox = () => (focus ? [L.focusX[0], rowY(focus.slot - CONFIGURE_CONTROLS_STOPS[stop][0]) - L.rowPitch + 1,
+    L.focusX[1], rowY(focus.slot - CONFIGURE_CONTROLS_STOPS[stop][0]) + 1] : null);
   const blinkOff = () => (tick >> 1) % 2 === 1;
 
   /** What a canvas point lands on, at retail's own geometry. Retail's own capture clicks these exact
@@ -251,7 +236,7 @@ export function createConfigureControls({ read, palettePath = () => 'data\\globa
   };
 
   const arm = (slot, cell) => { if (pending[slot]) { armed = { slot, cell }; focus = { slot, cell }; tick = 0; } };
-  const scrollBy = (delta) => { scrollIndex = Math.min(MAX_SCROLL_INDEX, Math.max(0, scrollIndex + delta));
+  const scrollBy = (delta) => { stop = Math.min(CONFIGURE_CONTROLS_STOPS.length - 1, Math.max(0, stop + delta));
     // Retail's own scroll frame has no focus rectangle and no colour 3 anywhere: scrolling drops it.
     focus = null; armed = null; };
 
@@ -271,55 +256,20 @@ export function createConfigureControls({ read, palettePath = () => 'data\\globa
     get bindings() { return committed.map((b) => (b ? [...b] : null)); },
     isBound(functionName, code) { return controlBindingMatches(committed, functionName, code); },
     actionFor(code) { return controlActionForKey(committed, code); },
-    get evidence() { return { open, stop: scrollIndex, scrollIndex, firstSlot: scrollIndex, thumbY: thumbYForScrollIndex(scrollIndex),
+    get evidence() { return { open, stop, firstSlot: CONFIGURE_CONTROLS_STOPS[stop][0], thumbY: CONFIGURE_CONTROLS_STOPS[stop][1],
       focus, armed, tick, blinkOff: blinkOff(), pendingRows: pending.filter(Boolean).length,
       focusBox: focusBox(), bindings: this.bindings }; },
-    openPanel() { scrollHold.cancel(); open = true; scrollIndex = 0; focus = { slot: 0, cell: 0 }; armed = null; buttonHover = null; buttonPress = null; pending = committed.map((b) => (b ? [...b] : null)); tick = 0; },
-    close() { scrollHold.cancel(); buttonPress = null; open = false; },
+    openPanel() { scrollHold.cancel(); open = true; stop = 0; focus = { slot: 0, cell: 0 }; armed = null; pending = committed.map((b) => (b ? [...b] : null)); tick = 0; },
+    close() { scrollHold.cancel(); open = false; },
     pointerDown(px, py, width, height, pointerId, button) {
       if (!scrollHold.accepts(pointerId)) return null;
       const target = open ? hit(px, py, width, height) : null;
-      if (target?.button) {
-        scrollHold.down(pointerId, null, button, now());
-        buttonHover = target.button;
-        buttonPress = button === 0 ? { name: target.button, pointerId } : null;
-        return { ...target, armed: Boolean(buttonPress) };
-      }
-      buttonPress = null;
-      const time = now();
-      scrollHold.down(pointerId, target?.scroll, button, time);
-      if (button === 0 && target?.scroll) {
-        const delta = scrollHold.poll(time);
-        if (delta) scrollBy(delta);
-        return target;
-      }
+      scrollHold.down(pointerId, target?.scroll, button, now());
       return button === 0 ? this.click(px, py, width, height) : null;
     },
-    pointerMove(px, py, width, height, pointerId, buttons) {
-      const target = open ? hit(px, py, width, height) : null;
-      scrollHold.move(pointerId, target?.scroll ?? null, buttons);
-      buttonHover = target?.button ?? null;
-    },
-    pointerUp(pointerId, button, px, py, width, height) {
-      const press = buttonPress;
-      const released = open ? hit(px, py, width, height)?.button ?? null : null;
-      const result = configureFooterRelease(press, pointerId, button, released);
-      if (result.owned) {
-        buttonPress = null;
-        this.pointerMove(px, py, width, height, pointerId, 0);
-        if (result.activate) this.click(px, py, width, height);
-        return result;
-      }
-      return scrollHold.release(pointerId, button);
-    },
-    pointerCancel(pointerId) {
-      if (pointerId === undefined) {
-        buttonPress = null;
-        return scrollHold.cancel();
-      }
-      if (buttonPress?.pointerId === pointerId) { buttonPress = null; return true; }
-      return scrollHold.cancel(pointerId);
-    },
+    pointerMove(px, py, width, height, pointerId, buttons) { scrollHold.move(pointerId, open ? hit(px, py, width, height)?.scroll : null, buttons); },
+    pointerUp(pointerId, button) { return scrollHold.release(pointerId, button); },
+    pointerCancel(pointerId) { return scrollHold.cancel(pointerId); },
     step() { tick++; },
     /** `Esc` from an armed cell cancels the arm and leaves the focus ONE SLOT LOWER: measured, on
      *  retail's own capture, which shows the focus rectangle and the colour-3 cell on row 1 after the
@@ -385,12 +335,10 @@ export function createConfigureControls({ read, palettePath = () => 'data\\globa
         }
       }
       for (let i = 0; i < L.slider.trough[2]; i++) chrome.cel(ctx, actNo, TEXTSLID, 13, L.slider.trough[0], L.slider.trough[1] + L.slider.step * i);
-      for (let i = 0; i < L.slider.thumb[1]; i++) chrome.cel(ctx, actNo, TEXTSLID, 14, L.slider.thumb[0], thumbYForScrollIndex(scrollIndex) + L.slider.step * i);
+      for (let i = 0; i < L.slider.thumb[1]; i++) chrome.cel(ctx, actNo, TEXTSLID, 14, L.slider.thumb[0], CONFIGURE_CONTROLS_STOPS[stop][1] + L.slider.step * i);
       chrome.cel(ctx, actNo, TEXTSLID, 11, L.slider.up[0], L.slider.up[1]);
       chrome.cel(ctx, actNo, TEXTSLID, 10, L.slider.down[0], L.slider.down[1]);
-      const buttonColour = { Cancel: 1, Default: 3, Accept: 2 };
-      for (const [name, [x, y]] of Object.entries(L.buttons))
-        fontFor(name === buttonHover ? buttonColour[name] : 4).drawAnchored(ctx, name, x, y);
+      for (const [name, [x, y]] of Object.entries(L.buttons)) fontFor(4).drawAnchored(ctx, name, x, y);
       ctx.restore();
       return this.evidence;
     },

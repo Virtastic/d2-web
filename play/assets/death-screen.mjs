@@ -14,10 +14,12 @@
 // draws the HC cell unconditionally. Chosen on retail's own frame, which is the stronger oracle.)
 // That file also gives the layout: y = ScreenHeight / 2 - 94 = 206, then 48px per line, and the
 // colour: D2Win colour 1 (COL_RED, D2Ex2 Constants.h), retail's `extra=1` on both lines.
-// Penalty text branches on the live client save flags: softcore can show string 5094
-// "Death takes its toll of %d Gold" (stat 175 STAT_GOLDLOST) and string 5095 "You have lost
-// experience" on Nightmare/Hell; hardcore shows localized string 5096 "Your deeds of valor" in
-// their place. All strings come from the game's own language tables.
+// Two further lines exist only when the death cost something: string 5094
+// "Death takes its toll of %d Gold" (stat 175 STAT_GOLDLOST) on the next line, and string 5095
+// "You have lost experience" 48px below it on Nightmare and Hell. Both come from the .tbl through
+// d2_lang_string_by_index, never from a JS copy. (Retail's hardcore branch -- string 5096, "your
+// deeds of valor" -- is still owed: nothing in the shell knows the character's hardcore flag, and
+// no hardcore death has been captured.)
 //
 // Retail's capture also fixes the two off-by-ones this file used to have: the cell file's left edge
 // is 400 - floor(width / 2) - 1 over the whole file (261 for 276px, 184 for 431px), not
@@ -45,16 +47,6 @@ export const DEATH_SCREEN = {
 };
 const centre = 400;
 const actPalette = (act) => `data\\global\\palette\\ACT${Math.min(5, Math.max(1, act | 0))}\\pal.dat`;
-
-/** Native death-text branch: hardcore gets its own line; softcore gets gold and difficulty loss. */
-export function deathScreenPenaltyRows({ hardcore = false, goldLost = 0, difficulty = 0 } = {}) {
-  let y = 300 + DEATH_SCREEN.firstLineFromCentre + 2 * DEATH_SCREEN.lineStep;
-  if (hardcore) return [{ stringIndex: 5096, y }];
-  const rows = [];
-  if (goldLost) { rows.push({ stringIndex: DEATH_SCREEN.goldString, y }); y += DEATH_SCREEN.lineStep; }
-  if (difficulty > 0) rows.push({ stringIndex: DEATH_SCREEN.experienceString, y });
-  return rows;
-}
 
 function frameCanvas(frame, palette, documentObject) {
   const canvas = documentObject.createElement('canvas');
@@ -124,11 +116,8 @@ export function createDeathScreen({ read, decodeDc6, decodeDatPalette, string, d
         lines.push({ kind: 'text', stringIndex: index, text: s, x, y, glyphs, colour: DEATH_SCREEN.colour,
           font: DEATH_SCREEN.font, palette: art.palette });
       };
-      for (const row of deathScreenPenaltyRows({ hardcore, goldLost, difficulty })) {
-        const template = String(string(row.stringIndex) || '');
-        const value = row.stringIndex === DEATH_SCREEN.goldString ? template.replace('%d', goldLost) : template;
-        text(row.stringIndex, value, row.y);
-      }
+      if (!hardcore && goldLost) { bottom += DEATH_SCREEN.lineStep; text(DEATH_SCREEN.goldString, String(string(DEATH_SCREEN.goldString) || '').replace('%d', goldLost), bottom); }
+      if (!hardcore && difficulty > 0) text(DEATH_SCREEN.experienceString, String(string(DEATH_SCREEN.experienceString) || ''), bottom + DEATH_SCREEN.lineStep);
       ctx.restore();
       evidence = { lines };
       return evidence;

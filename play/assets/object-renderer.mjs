@@ -1,5 +1,5 @@
 import { decodeDatPalette } from './d2-formats.mjs';
-import { cofLayerRecord, composeCofFrame, decodeCof, decodeDcc } from './unit-formats.mjs';
+import { composeCofFrame, decodeCof, decodeDcc } from './unit-formats.mjs';
 import { dccDirection, indexedToRgba } from './unit-renderer.mjs';
 import { fourcc } from './monster-renderer.mjs';
 import { createBlender } from './frontend.mjs';
@@ -11,20 +11,6 @@ import { createObjectLayerRasterCache, drawObjectLayer } from './object-layer-ra
 const COMPONENT = ['HD','TR','LG','RA','LA','RH','LH','SH','S1','S2','S3','S4','S5','S6','S7','S8'];
 const MODE = ['NU','OP','ON','S1','S2','S3','S4','S5'];
 const PALETTE = ['ACT1','ACT2','ACT3','ACT4','ACT5'];
-
-function checkCacheLimit(name, limit) {
-  if (!Number.isInteger(limit) || limit < 1) throw new RangeError(`${name} must be a positive integer`);
-}
-
-function rememberBounded(collection, key, value, limit) {
-  collection.set(key, value);
-  while (collection.size > limit) collection.delete(collection.keys().next().value);
-}
-
-function rememberFailure(failures, key, limit) {
-  failures.add(key);
-  while (failures.size > limit) failures.delete(failures.values().next().value);
-}
 
 export function parseObjectPresentations(bytes, count) {
   const view = bytes instanceof DataView ? bytes : new DataView(bytes.buffer, bytes.byteOffset || 0, bytes.byteLength);
@@ -45,10 +31,7 @@ export function parseObjectPresentations(bytes, count) {
  * rogue's campfire. The gate is the layer's own COF Shadow byte and not its transparency byte; the
  * counts and the negative control are
  */
-export function createObjectRenderer(read, documentObject = globalThis.document, { shadow = false, rasterLimit = 256, rasterByteLimit = 64 * 1024 * 1024,
-  animationLimit = 256, failureLimit = 256 } = {}) {
-  checkCacheLimit('object animation cache limit', animationLimit);
-  checkCacheLimit('object failure cache limit', failureLimit);
+export function createObjectRenderer(read, documentObject = globalThis.document, { shadow = false, rasterLimit = 256, rasterByteLimit = 64 * 1024 * 1024 } = {}) {
   const animations = new Map(), failures = new Set(), palettes = new Map(), blenders = new Map(), highlights = new Map();
   const rasterCache = createObjectLayerRasterCache(documentObject, { limit: rasterLimit, byteLimit: rasterByteLimit });
   const shadows = shadow ? createUnitShadowRenderer(read) : null;
@@ -67,9 +50,11 @@ export function createObjectRenderer(read, documentObject = globalThis.document,
   // and never read, so measuring an object never paints the frame the player sees.
   let scratch = null;
   const scratchContext = () => { if (!scratch) { scratch = documentObject.createElement('canvas'); scratch.width = 1; scratch.height = 1; } return scratch.getContext('2d'); };
-  const highlightIndices = (act0) => {
+  const highlightedIndices = (indices, opaque, act0) => {
     if (!highlights.has(act0)) highlights.set(act0, highlightMap(read(`data\\global\\palette\\${PALETTE[act0]}\\pal.dat`)));
-    return highlights.get(act0);
+    const map = highlights.get(act0), out = indices.slice();
+    for (let i = 0; i < out.length; i++) if (opaque[i]) out[i] = map[out[i]];
+    return out;
   };
   const renderer = { draw(ctx, x, y, object, act, highlight = false) {
     const mode = MODE[object.mode] || 'NU', base = `${object.token}:${mode}:${object.direction}:${object.componentMask}`;
@@ -84,11 +69,8 @@ export function createObjectRenderer(read, documentObject = globalThis.document,
         try { components.set(layer.component, decodeDcc(read(path), { directions: [direction] })); } catch {}
       }
       if (!components.size) throw new Error('no DCC components');
-      // This selector depends only on the decoded COF. Keep it with the cached animation so static
-      // objects do not rescan the same layer records on every rendered frame.
-      const hasBlend = cof.layerRecords.some((layer) => layer.transparent && (layer.drawEffect === 3 || layer.drawEffect === 4));
-      animation = { cof, direction, components, mode, hasBlend }; rememberBounded(animations, base, animation, animationLimit);
-    } catch { rememberFailure(failures, base, failureLimit); return null; }
+      animation = { cof, direction, components, mode }; animations.set(base, animation);
+    } catch { failures.add(base); return null; }
     const frame = (object.framePrecise >>> 8) % animation.cof.framesPerDirection;
     // The shadow goes under the sprite, at the object's own anchor, one blit per COF layer whose Shadow
     // byte is set -- retail's own order (shadow records precede every cel of the same frame).
@@ -100,11 +82,12 @@ export function createObjectRenderer(read, documentObject = globalThis.document,
     // COF effects apply to individual layers.  Flattening the object first lost the additive
     // flames/glows/smoke and rendered their source indices as opaque black or grey (F28/F41).
     const layerEvidence = [];
-    if (animation.hasBlend) {
+    const hasBlend = animation.cof.layerRecords.some((layer) => layer.transparent && (layer.drawEffect === 3 || layer.drawEffect === 4));
+    if (hasBlend) {
       const blend = blender(act0, pal);
       for (const componentId of animation.cof.priority[animation.direction][frame]) {
         const dcc = animation.components.get(componentId); if (!dcc) continue;
-        const layer = cofLayerRecord(animation.cof, componentId);
+        const layer = animation.cof.layerRecords.find((value) => value.component === componentId);
         const one = composeCofFrame(animation.cof, animation.direction, frame, new Map([[componentId, dcc]]));
         if (!one.width || !one.height) continue;
         const left = Math.round(x + one.xOffset), top = Math.round(y + one.yOffset);
@@ -114,7 +97,7 @@ export function createObjectRenderer(read, documentObject = globalThis.document,
         const oneLayer = { width: one.width, height: one.height, indices: one.indexed, opaque: one.opaque };
         drawObjectLayer(ctx, rasterCache, { key: `${base}:layer:${frame}:${componentId}:${act0}:${highlight ? 'highlight' : 'normal'}`,
           width: one.width, height: one.height,
-          rgba: () => indexedToRgba(one.indexed, one.opaque, pal, highlight ? highlightIndices(act0) : null, false),
+          rgba: () => indexedToRgba(highlight ? highlightedIndices(one.indexed, one.opaque, act0) : one.indexed, one.opaque, pal),
           layer: oneLayer, left, top, mode, blend: highlight ? null : blend });
         const component = COMPONENT[componentId];
         const path = component && layer ? `objects\\${object.token}\\${component}\\${object.token}${component}lit${animation.mode}${layer.weaponClass}`.toLowerCase() : null;
@@ -124,10 +107,10 @@ export function createObjectRenderer(read, documentObject = globalThis.document,
     } else if (composed.width && composed.height) {
       const key = `${base}:composed:${frame}:${act0}:${highlight ? 'highlight' : 'normal'}`;
       const canvas = rasterCache.get(key, composed.width, composed.height, () => indexedToRgba(
-        composed.indexed, composed.opaque, pal, highlight ? highlightIndices(act0) : null, false));
+        highlight ? highlightedIndices(composed.indexed, composed.opaque, act0) : composed.indexed, composed.opaque, pal));
       ctx.drawImage(canvas, Math.round(x + composed.xOffset), Math.round(y + composed.yOffset));
       for (const componentId of animation.cof.priority[animation.direction][frame]) {
-        const layer = cofLayerRecord(animation.cof, componentId), component = COMPONENT[componentId];
+        const layer = animation.cof.layerRecords.find((value) => value.component === componentId), component = COMPONENT[componentId];
         if (!layer || !component || !animation.components.has(componentId)) continue;
         const path = `objects\\${object.token}\\${component}\\${object.token}${component}lit${animation.mode}${layer.weaponClass}`.toLowerCase();
         layerEvidence.push({ component, path, mode: highlight ? 7 : 5, transparent: Boolean(layer.transparent), drawEffect: layer.drawEffect, shadow: Boolean(layer.shadow) });

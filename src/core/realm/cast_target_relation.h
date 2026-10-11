@@ -24,30 +24,6 @@ bool applyCastTargetRelation(uint8_t opcode, Unit* target, int x, int y,
     return false;
 }
 
-// The decoded D2GS cast forms keep their native fields separate: 0x4C carries a
-// target type/GUID and aims at that unit's current position; 0x4D carries the
-// coordinate words directly and drops any prior unit relation. The caller owns
-// target eligibility (including room membership) in its resolver.
-template <typename Unit, typename ResolveTarget, typename GetX, typename GetY>
-bool resolveRemoteCastTarget(uint8_t opcode, uint8_t targetType, uint32_t targetGuid,
-        int coordinateX, int coordinateY, ResolveTarget&& resolveTarget,
-        GetX&& getX, GetY&& getY, Unit*& target, int& aimX, int& aimY) {
-    if (opcode == 0x4c) {
-        target = resolveTarget(targetType, targetGuid);
-        if (!target) return false;
-        aimX = getX(target);
-        aimY = getY(target);
-        return true;
-    }
-    if (opcode == 0x4d) {
-        target = nullptr;
-        aimX = coordinateX;
-        aimY = coordinateY;
-        return true;
-    }
-    return false;
-}
-
 // Client 6FB630F0 normalizes only moving missiles. Its 6FB50B30 fallback
 // replaces the descriptor coordinates with a point two subtiles along the
 // owner's eight-way facing, rather than incrementing the original aim.

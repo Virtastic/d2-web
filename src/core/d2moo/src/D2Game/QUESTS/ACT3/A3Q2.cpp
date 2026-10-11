@@ -843,8 +843,6 @@ void __fastcall ACT3Q2_UpdateKhalimItemCounts(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FCA8A30
-// In retail 1.13c OperateFn 57-59 return zero on every exit, including successful drops;
-// callers must observe the chest's state/reward effects instead of interpreting this result.
 int32_t __fastcall OBJECTS_OperateFunction57_KhalimChest(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
 	if (!pOp || !pOp->pObject)
@@ -856,7 +854,7 @@ int32_t __fastcall OBJECTS_OperateFunction57_KhalimChest(D2ObjOperateFnStrc* pOp
 
 	if (!QUESTS_SetObjectSelection(pOp))
 	{
-		return 0;
+		return 1;
 	}
 
 	D2SeedStrc* pSeed = QUESTS_GetGlobalSeed(pOp->pGame);
@@ -872,7 +870,7 @@ int32_t __fastcall OBJECTS_OperateFunction57_KhalimChest(D2ObjOperateFnStrc* pOp
 	if (!pQuestData || !pQuestData->pQuestDataEx)
 	{
 		OBJMODE_DropFromChestTCWithQuality(pOp, ITEMQUAL_MAGIC);
-		return 0;
+		return 1;
 	}
 
 	D2Act3Quest2Strc* pQuestDataEx = (D2Act3Quest2Strc*)pQuestData->pQuestDataEx;
@@ -890,7 +888,7 @@ int32_t __fastcall OBJECTS_OperateFunction57_KhalimChest(D2ObjOperateFnStrc* pOp
 	}
 
 	OBJMODE_DropFromChestTCWithQuality(pOp, ITEMQUAL_MAGIC);
-	return 0;
+	return 1;
 }
 
 //D2Game.0x6FCA8B10
@@ -921,7 +919,7 @@ int32_t __fastcall OBJECTS_OperateFunction58_KhalimChest(D2ObjOperateFnStrc* pOp
 
 	if (!QUESTS_SetObjectSelection(pOp))
 	{
-		return 0;
+		return 1;
 	}
 
 	D2SeedStrc* pSeed = QUESTS_GetGlobalSeed(pOp->pGame);
@@ -937,7 +935,7 @@ int32_t __fastcall OBJECTS_OperateFunction58_KhalimChest(D2ObjOperateFnStrc* pOp
 	if (!pQuestData || !pQuestData->pQuestDataEx)
 	{
 		OBJMODE_DropFromChestTCWithQuality(pOp, ITEMQUAL_MAGIC);
-		return 0;
+		return 1;
 	}
 
 	D2Act3Quest2Strc* pQuestDataEx = (D2Act3Quest2Strc*)pQuestData->pQuestDataEx;
@@ -955,7 +953,7 @@ int32_t __fastcall OBJECTS_OperateFunction58_KhalimChest(D2ObjOperateFnStrc* pOp
 	}
 
 	OBJMODE_DropFromChestTCWithQuality(pOp, ITEMQUAL_MAGIC);
-	return 0;
+	return 1;
 }
 
 //D2Game.0x6FCA8C40
@@ -987,7 +985,7 @@ int32_t __fastcall OBJECTS_OperateFunction59_KhalimChest(D2ObjOperateFnStrc* pOp
 
 	if (!QUESTS_SetObjectSelection(pOp))
 	{
-		return 0;
+		return 1;
 	}
 
 	D2SeedStrc* pSeed = QUESTS_GetGlobalSeed(pOp->pGame);
@@ -1003,7 +1001,7 @@ int32_t __fastcall OBJECTS_OperateFunction59_KhalimChest(D2ObjOperateFnStrc* pOp
 	if (!pQuestData || !pQuestData->pQuestDataEx)
 	{
 		OBJMODE_DropFromChestTCWithQuality(pOp, ITEMQUAL_MAGIC);
-		return 0;
+		return 1;
 	}
 
 	D2Act3Quest2Strc* pQuestDataEx = (D2Act3Quest2Strc*)pQuestData->pQuestDataEx;
@@ -1021,7 +1019,7 @@ int32_t __fastcall OBJECTS_OperateFunction59_KhalimChest(D2ObjOperateFnStrc* pOp
 	}
 
 	OBJMODE_DropFromChestTCWithQuality(pOp, ITEMQUAL_MAGIC);
-	return 0;
+	return 1;
 }
 
 //D2Game.0x6FCA8D70

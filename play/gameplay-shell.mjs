@@ -1,62 +1,42 @@
 import { parseSessionTiles, readSessionTerrain, readSessionLightmap, worldToScreen, screenDeltaToWorld, UNIT_CENTRE_Y } from './assets/session-terrain.mjs';
-import { auditSessionActiveNearFeed, readSessionActiveNearFeed } from './assets/session-active-near-feed.mjs';
 import { perfSync, perfEnabled, perfT0, perfT, perfSample, perfCountFrame, perfReset, perfReport } from './assets/frame-perf.mjs';
-import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, isPrimaryTargetEligible, nativeObjectHoverContains, nativeHoverSpecialGate, selectPointerCandidate, selectPrimaryTarget, viewportToWorld } from './gameplay-model.mjs';
+import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, selectPrimaryTarget, viewportToWorld } from './gameplay-model.mjs';
 import { createMpqAssetReader } from './assets/mpq-assets.mjs';
 import { recordPrim } from './assets/drawlist.mjs';
 import { loadLiveLevelTerrain, loadRealmClientTerrain, actPalettePath } from './assets/live-level-terrain.mjs';
 import { decodeDatPalette } from './assets/d2-formats.mjs';
 import { createPlayerRenderer, playerClassInfo } from './assets/unit-renderer.mjs';
-import { applyRealmPlayerFrame, selectPlayerRenderSource, sendRealmGroundWalk, sendRealmRightSkillAt, sendRealmRightSkillOnMonster, realmDirectionalAim, realmClientProjectilePredictor, realmFireballMonsterPredictor, visibleRealmPlayers } from './assets/realm-player-state.mjs';
-import { createRealmPlayerReassignFade } from './assets/realm-player-reassign-fade.mjs';
-import { createMonsterRenderer, parseMonsterAnimations, realmMonsterAnimationActor } from './assets/monster-renderer.mjs';
+import { applyRealmPlayerFrame, selectPlayerRenderSource, sendRealmGroundWalk, sendRealmRightSkillAt, sendRealmRightSkillOnMonster, realmDirectionalAim, realmFireballPredictor, realmFireballMonsterPredictor, visibleRealmPlayers } from './assets/realm-player-state.mjs';
+import { createMonsterRenderer, parseMonsterAnimations } from './assets/monster-renderer.mjs';
 import { createObjectRenderer, parseObjectPresentations } from './assets/object-renderer.mjs';
 import { drawObjectHoverLabel, objectRetailName, objectRetailNameOffset } from './assets/object-hover-label.mjs';
-import { interactWithWarpTile, runWarpInteraction, warpApproachGoal } from './assets/warp-interaction.mjs';
 import { waypointPadAnchor } from './assets/waypoint-pad-anchor.mjs';
-import { unitAnchor } from './assets/unit-anchor.mjs';
 import { createItemRenderer, parseItemPresentations } from './assets/item-renderer.mjs';
 import { createStashPanelRenderer, stashGeometry, BIG_BANK_PAGE_1, INVPAGE_STASH, INVPAGE_CUBE, TRANSMOGRIFY_BOX_PAGE_1 } from './assets/stash-panel.mjs';
 import { createStashGoldRenderer, STASH_GOLD } from './assets/stash-gold-dialog.mjs';
-import { createStashSpinnerRepeat } from './assets/stash-spinner-repeat.mjs';
 import { createWaypointPanelRenderer, tabActsOf } from './assets/waypoint-panel.mjs';
 import { createWaypointMenuInput } from './assets/waypoint-menu-input.mjs';
 import { createControlPanelRenderer, HUD_LAYOUT } from './assets/control-panel.mjs';
-import { miniPanelPressAction, miniPanelReleaseAction } from './assets/minipanel-input.mjs';
 import { orbAt, drawOrbReadouts } from './assets/orb-readout.mjs';
 import { createHudHelp } from './assets/hud-help.mjs';
-import { bindHudHelpPointer } from './assets/hud-help-pointer.mjs';
-import { createUiButtonGesture } from './assets/ui-button-gesture.mjs';
 import { createInventoryPanelRenderer, inventoryLayoutFromEngine } from './assets/inventory-panel.mjs';
-import { beginInventoryGoldPress, cancelInventoryGoldPress, finishInventoryGoldPress } from './assets/inventory-gold-gesture.mjs';
 import { createCharacterPanelRenderer } from './assets/character-panel.mjs';
-import { createItemPropertyCache } from './assets/item-property-cache.mjs';
-import { createNpcNameLabelCache } from './assets/npc-name-label-cache.mjs';
-import { savedCharacterReadError, setFrontdoorError } from './assets/frontdoor-error.mjs';
 import { createQuestLogRenderer, createMessageLogRenderer, QUESTS_IN_ACT, ACT_BASE, ACT_DONE, questStatus, messageScrollMax, COMPLETING } from './assets/quest-log.mjs';
-import { createQuestCloseGesture } from './assets/quest-close-gesture.mjs';
 import { createSkillPanelRenderer, parseClassSkills, SESSION_SKILL_BYTES } from './assets/skill-panel.mjs';
 import { createSkillPointOverlay } from './assets/skill-plus.mjs';
 import { createSkillSelectRenderer, parseSkillChoices, SESSION_SKILL_CHOICE_BYTES } from './assets/skill-select.mjs';
-import { armSkillTreeSelection, allocateSkillTreePointOnRelease } from './assets/skill-tree-input.mjs';
 import { dispatchSkillSelectHit } from './assets/hud-hit-test.mjs';
 import { nearestStandableNear } from './assets/walk-route.mjs';
-import { withinNativeWarpInteractionRange } from './assets/warp-interaction.mjs';
-import { decodeWalkProbe } from './assets/walk-command-trace.mjs';
 import { hudOrigin } from './assets/hud-origin.mjs';
 import { panelSides as panelViewSides, viewCentreX } from './assets/panel-view-shift.mjs';
 import { createFreeResArt, barParts, halfParts, stoneTiles, drawParts } from './assets/wide-hud.mjs';
 import { createBeltRenderer } from './assets/belt-renderer.mjs';
-import { createActMusicPlayer, createLevelMusicSync } from './assets/act-music.mjs';
+import { createActMusicPlayer } from './assets/act-music.mjs';
 import { createAudioVolume } from './assets/audio-volume.mjs';
-import { createNpcSpeechSetting, npcSpeechHasAudio, npcSpeechHasText } from './assets/npc-speech-setting.mjs';
-import { createVideoResolutionSettings } from './assets/video-resolution-settings.mjs';
 import { createUiClickSoundPlayer } from './assets/ui-click-sound.mjs';
-import { unitSoundNativeSpatial, unitSoundNativePanCode } from './assets/unit-sound-spatial.mjs';
+import { unitSoundNativeSpatial, unitSoundNativeTauntPanCode } from './assets/unit-sound-spatial.mjs';
 import { createUnitSoundPlayer } from './assets/unit-sound-player.mjs';
-import { playNpcDialogueVoice, npcDialogueVoiceSource } from './assets/npc-dialogue-voice.mjs';
-import { createNpcSpeechScrollGate } from './assets/npc-speech-scroll-gate.mjs';
-import { createNpcSpeechClickGate } from './assets/npc-speech-click.mjs';
+import { npcDialogueVoiceFile, npcDialogueVoiceHandle } from './assets/npc-dialogue-voice.mjs';
 import { createFont, createTitleScreen, decodeFontTbl, FRONTEND } from './assets/frontend.mjs';
 import { createExitSequence } from './assets/exit-sequence.mjs';
 import { loadBnetServers } from './assets/bnet-servers.mjs';
@@ -67,31 +47,26 @@ import { createClassSelectSoundPlayer } from './assets/class-create-sounds.mjs';
 import { createCreditsScreen } from './assets/credits-screen.mjs';
 import { createCinematicsScreen } from './assets/cinematics-screen.mjs';
 import { createScreenshotAction } from './assets/screenshot-action.mjs';
-import { sendCharacterPhrase } from './assets/chat-macros.mjs';
 import { createOtherMultiplayerScreen } from './assets/other-multiplayer.mjs';
 import { createSpeechBox } from './assets/speech-box.mjs';
-import { nativeObjectSpeechAcknowledgement } from './assets/object-speech-ack.mjs';
 import { createCharacterCreate } from './assets/charcreate.mjs';
 import { createCharacterSelect } from './assets/charselect.mjs';
 import { deleteAndRefreshCharacter } from './assets/character-delete-store.mjs';
 import { createSaveStore, CLASS_NAMES } from './assets/save-store.mjs';
-import { singlePlayerDestination, createCharacterEntryReader } from './assets/title-single-player-route.mjs';
 import { installUnloadAutosave } from './assets/unload-autosave.mjs';
 import { destroyNativeSession, replaceNativeSession } from './assets/session-lifecycle.mjs';
 import { createNpcPanel } from './assets/npc-panel.mjs';
 import { createGameMenu } from './assets/game-menu.mjs';
-import { saveBeforeExit } from './assets/save-exit.mjs';
 import { MODAL_POINTER_OWNER, modalPointerOwner } from './assets/modal-pointer-priority.mjs';
 import { heldPointerWorldAllowed } from './assets/held-pointer-world.mjs';
 import { queueHeldPointerRepeat } from './assets/held-pointer-repeat.mjs';
 import { createDeathScreen } from './assets/death-screen.mjs';
-import { createNpcMenu, npcMenuChoiceOnRelease, npcMenuInputCoolingDown, npcMenuEntries, talkEntries } from './assets/npc-menu.mjs';
+import { createNpcMenu, npcMenuEntries, talkEntries } from './assets/npc-menu.mjs';
 import { npcSpeech } from './assets/npc-topics.mjs';
 import { createWeatherRenderer } from './assets/weather-renderer.mjs';
 import { weatherWaterAnchors } from './assets/weather-water-anchors.mjs';
 import { createMissileRenderer, parseMissileAnimations } from './assets/missile-renderer.mjs';
 import { createNpcSpeechAlertRenderer } from './assets/npc-speech-alert.mjs';
-import { npcVendorIsOpen } from './assets/npc-vendor-state.mjs';
 import { createAreaNameBlockRenderer } from './assets/area-name-block.mjs';
 import { createEntryBanner, ENTRY_BANNER } from './assets/level-entry-banner.mjs';
 import { createVendorPanel, SMITH_CLASSES, tooltipSpec } from './assets/vendor-panel.mjs';
@@ -105,20 +80,15 @@ import { CONFIGURE_CONTROLS_SLOTS, CONFIGURE_CONTROLS_STORAGE_KEY, controlAction
 import { createAutomapOverlay } from './assets/automap-overlay.mjs';
 import { parseMa0 } from './assets/ma0.mjs';
 import { panelCloseAt } from './assets/panel-close.mjs';
-import { characterPanelCloseAt, createCharacterPanelCloseGesture } from './assets/character-panel-close.mjs';
-import { beginInventoryClosePress, cancelInventoryClosePress, finishInventoryClosePress, inventoryCloseAt } from './assets/inventory-close-gesture.mjs';
 import { installScrollSafeCanvasFocus } from './assets/canvas-focus.mjs';
 import { createPlugyStash, PLUGY_GRID, PLUGY_NAME_AT } from './assets/plugy-stash-ui.mjs';
 import { pagesToSss, sssToPages } from './assets/plugy-stash.mjs';
-import { plugyStashMode } from './assets/plugy-stash-mode.mjs';
 import { closeStashFromInventory } from './assets/stash-close.mjs';
 import { createFrontendPointerStates } from './assets/frontend-pointer-states.mjs';
-import { weaponClassTokenForMode } from './assets/player-weapon-class.mjs';
+import { playerWeaponClassToken } from './assets/player-weapon-class.mjs';
 
 const canvas = document.querySelector('#game');
 const screenshotAction = createScreenshotAction();
-const videoResolutionSettings = createVideoResolutionSettings();
-let requestedDisplayResolution = videoResolutionSettings.selected ? videoResolutionSettings.mode : null;
 // The game always sizes to the viewport (D2GL's resolution model, ): the game view is the
 // window's own size in DEVICE pixels (CSS px x devicePixelRatio) divided by one whole-number scale S, so the
 // bitmap has the window's aspect and no bars/stretch, and the CSS fill is an exact S-times nearest upscale.
@@ -127,12 +97,6 @@ let requestedDisplayResolution = videoResolutionSettings.selected ? videoResolut
 // ?view=800 (and the dev page) keeps retail's fixed 800x600.
 function fitView() {
   if (!window.__d2Entry?.fill) return;
-  if (requestedDisplayResolution) {
-    window.__d2ViewScale = 1;
-    if (canvas.width !== requestedDisplayResolution.width) canvas.width = requestedDisplayResolution.width;
-    if (canvas.height !== requestedDisplayResolution.height) canvas.height = requestedDisplayResolution.height;
-    return;
-  }
   const dpr = devicePixelRatio || 1, dw = Math.round(innerWidth * dpr), dh = Math.round(innerHeight * dpr);
   const q = dh / 600, S = Math.max(1, matchMedia('(pointer: coarse)').matches ? Math.round(q) : Math.floor(q));
   const w = Math.max(1, Math.floor(dw / S)), h = Math.max(1, Math.floor(dh / S));
@@ -143,7 +107,6 @@ function fitView() {
 fitView(); addEventListener('resize', fitView);
 installScrollSafeCanvasFocus(canvas);
 const hud = document.querySelector('#hud');
-const frontdoorError = document.querySelector('#frontdoor-error');
 const status = document.querySelector('#session-status');
 const classSelect = document.querySelector('#class-select');
 const sessionBar = document.querySelector('#session-bar');
@@ -182,7 +145,7 @@ const STEP = 1000 / 60;
 // once per shell update, which ran the whole game 2.4x fast.
 const GAME_STEP = 1000 / 25;
 let gameClock = 0, engineTicks = 0;
-let realmGameClock = 0, realmAnimationFrame = 0;
+let realmGameClock = 0;
 let session = null, bootstrapStarted = false, sessionError = '', inventoryLayoutKey = '';
 let currentFixture = null, fixtures = [], actSelect = null;
 // A picked save starts in the town of the act its header says it is in (save-store nTown); retail's
@@ -216,13 +179,6 @@ let corpseRenderer = null, corpseEvidence = null, lastCorpseRecovery = null, mis
 let weatherRenderer = null, weatherEvidence = { rain: -1, blits: [] };
 let frameError = '', frameErrors = 0;
 let npcCount = 0;
-// Monster class -> localized string-table name is stable for this loaded client. The automap asks
-// for each visible NPC every frame, so cache the result instead of crossing the engine boundary twice
-// per NPC per rendered frame.
-const npcNameLabels = createNpcNameLabelCache((classId) => {
-  const index = Module.ccall('d2_monster_name_str', 'number', ['number'], [classId]);
-  return index >= 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]) : '';
-});
 // F22: how many units the ENGINE reports as having a speech pending this frame.
 let speechAlertCount = 0;
 let npcPanel = null, npcPanelError = '', npcState = null, npcPanelEvidence = null;
@@ -253,14 +209,12 @@ let walkMemory = null;
 // lib/player.mjs' heroIsDead takes, hpMax 0 meaning no game at all), and `reason` the engine's own
 // d2_session_move_reason beside a refused move. Diagnosis only, like the rest of the ring.
 const clickDispatch = []; let clickDispatchN = 0;
-let walkPlannerContext = null;
 const noteClick = (x, y, button) => {
   const record = { n: ++clickDispatchN, screen, button, at: [Math.round(x), Math.round(y)],
     hero: snapshot?.player
       ? { hp: snapshot.player.hp, hpMax: snapshot.player.hpMax, mode: snapshot.mode }
       : { hp: 0, hpMax: 0, mode: null },
-    spent: null, aim: null, reason: null, result: null, walkTo: null,
-    planner: walkPlannerContext ? structuredClone(walkPlannerContext) : null };
+    spent: null, aim: null, reason: null, result: null, walkTo: null };
   clickDispatch.push(record);
   if (clickDispatch.length > 400) clickDispatch.shift();
   return record;
@@ -396,14 +350,12 @@ function readAdvancement() {
   return (advancement = out);
 }
 
-let inventoryPanelRenderer = null, inventoryPanelEvidence = null, inventoryGoldPress = null, inventoryClosePress = null, hirelingPanelEvidence = null;
+let inventoryPanelRenderer = null, inventoryPanelEvidence = null;
 let characterPanelRenderer = null, characterPanelEvidence = null, advancement = null;
 let skillPanelRenderer = null, skillPanelEvidence = null, classSkills = null;
 // V8c: the quest log (Q) and message log (M). State is the engine's quest record; the client keeps only which
 // tab and quest are showing. `messageLines` is the log's feed (nothing wired yet: V8c).
 let questLogRenderer = null, messageLogRenderer = null, questVisible = false, messageVisible = false, questAct = 0, questSelected = 0, questDescrOn = false, questEvidence = null, messageEvidence = null;
-const questCloseGesture = createQuestCloseGesture();
-const characterPanelCloseGesture = createCharacterPanelCloseGesture();
 const messageLines = [];
 let chatEvidence = null, postedEvidence = null, postedAt = 0;   // V8c: bar/posted-line geometry evidence; the line shows for POSTED_MS after posting
 const POSTED_MS = 10000;   // V8d: retail's posted-line duration, measured in F191 (posted-multi-caps: present 9.7 s, gone 10.2 s)
@@ -500,18 +452,16 @@ if (plugyStash.enabled) (async () => {
     plugyStash.setArt({ stash: canv(btns), gold: canv(gold) });
   } catch (e) { plugyError = `PlugY art: ${e}`; }
 })();
-let stashGoldRenderer = null, stashGoldEvidence = null, stashGoldError = '', stashGoldDialog = null, stashGoldPress = null;
-const stashGoldSpinnerRepeat = createStashSpinnerRepeat();
+let stashGoldRenderer = null, stashGoldEvidence = null, stashGoldError = '', stashGoldDialog = null;
 // The waypoint menu is open because the engine sent 0x63; waypointMenu holds that waypoint's unit id.
 let waypointPanelRenderer = null, waypointPanelError = '', waypointEvidence = null, waypointMenu = null, lastWaypointTravel = null;
 const waypointMenuInput = createWaypointMenuInput();
 let beltRenderer = null, beltEvidence = null, beltBoxCache = null, beltBoxRecord = -1;
-let miniDown = -1, miniPointerId = null;
+let miniDown = -1;
 let controlPanelRenderer = null, controlPanelEvidence = null, hudIconRow = true, lastRunToggle = null;
 const orbPins = { life: false, mana: false };
 let orbReadoutEvidence = [];
 let hudHelp = null, hudHelpEvidence = null, hudHelpError = '';
-let hudHelpPointer = null;
 // F210: retail's HUD Help button (Levelsocket+Level and its "Help (H)" label) is drawn until the Help screen has been used ONCE.
 // D2Client's `H` handler and the button's click handler both write the Storm registry value "Help Menu" = 1 (section "Diablo II"), and the
 // button's draw (D2Client 6fae7740) reads it back and draws nothing when it is set: per machine, not per character or save, so it never
@@ -525,16 +475,6 @@ const markHelpMenuSeen = () => { try { localStorage.setItem(HELP_MENU_KEY, '1');
 // describe. While it is open the world answers no click (OpenDiablo2 game_controls.go consumes the
 // press inside the overlay's rect) and Esc closes it before anything else (its onEscKey).
 let helpRenderer = null, helpVisible = false, helpEvidence = null, helpError = '';
-const gameUiButtonGesture = createUiButtonGesture();
-// This shell-owned token currently covers only the custom Help overlay Close control.
-let gameUiButtonDown = null;
-function cancelHelpClosePress(pointerId = null) {
-  const armed = gameUiButtonDown;
-  if (!armed || (pointerId !== null && armed.pointerId !== pointerId)) return false;
-  gameUiButtonGesture.cancel(armed.pointerId);
-  gameUiButtonDown = null;
-  return true;
-}
 let automapOverlay = null;
 // Retail's Space (CfgClearScreen) closes open panels and hides no chrome (F3c, retail's frames), so this flag is never set;
 // the chrome gates below stay as no-ops.
@@ -591,16 +531,10 @@ function selectSkill(id, side) {
   return rc;
 }
 let actMusic = null, musicError = '';
-const levelMusicSync = createLevelMusicSync((levelId) => actMusic.playLevel(levelId));
-function syncAreaMusic(levelId, options) {
-  if (!actMusic) return;
-  levelMusicSync.sync(levelId, options).then((result) => { if (result !== null) musicError = ''; }, (error) => { musicError = String(error); });
-}
 // F235: the Sound/Music sliders' values and the players they drive, one store for the whole page --
 // the options page writes it and every audio player (music and the three SFX players) is attached to
 // it. Retail's own volume persistence is unknown to us; localStorage is declared
 const audioVolume = createAudioVolume();
-const npcSpeechSetting = createNpcSpeechSetting();
 // Constructed while the title is live, before its SINGLE PLAYER click. That first genuine pointer
 // gesture therefore unlocks the same AudioContext that later plays class-hover effects.
 let charCreateSounds = null, charCreateSoundError = '';
@@ -622,21 +556,6 @@ const PLAY_MODE = new URLSearchParams(location.search).get('play') === '1';
 // straight into a session: every browser scenario drives the game directly and must not have to
 // click through a menu to reach it.
 const SCREEN = { TITLE: 'title', CREDITS: 'credits', CINEMATICS: 'cinematics', OTHER_MULTIPLAYER: 'other-multiplayer', SELECT: 'select', CREATE: 'create', GAME: 'game' };
-// Construct the boot-movie context with the shell, while the initial black loading screen is up.
-// Browsers may require a user gesture to unlock audio, and that gesture can happen before the MPQs
-// are ready and the first Bink packet is decoded. Creating the listener only in ensureBootMovie()
-// would miss that early gesture and silently drop the startup soundtrack until another one arrives.
-let bootMovieAudio = null;
-if (!PLAY_MODE) {
-  try { bootMovieAudio = createBikAudioPlayer(); } catch { /* startup video can still render without Web Audio */ }
-  // Construct the room-music context before the title/create buttons can consume the user's first
-  // browser gesture. The engine's native selector needs the active player's room, so the MPQ reader
-  // is intentionally deferred until a session has been created below.
-  try {
-    actMusic = createActMusicPlayer((path) => createMpqAssetReader(window.Module)(path));
-    audioVolume.attach('music', actMusic);
-  } catch (error) { musicError = String(error); }
-}
 let screen = PLAY_MODE ? SCREEN.GAME : SCREEN.TITLE;
 let titleScreen = null, titleError = '', titleTick = 0;
 let exitSeq = null;   // F91: EXIT DIABLO II's fade + close attempt + notice (assets/exit-sequence.mjs)
@@ -652,7 +571,6 @@ let otherMultiplayerScreen = null, otherMultiplayerError = '';
 let realmTransport = { state: 'idle', server: null, result: null, error: '' };
 let realmPlayerView = null;
 let realmPlayerRosterView = [];
-const realmPlayerReassignFade = createRealmPlayerReassignFade();
 let realmWorldView = null;
 let realmSceneActive = false, realmSceneError = '', realmSceneEvidence = null, realmSceneTiles = [], realmSceneRevision = 0;
 let realmMonsterViews = [];
@@ -670,13 +588,12 @@ let creditsScreen = null, creditsError = '', creditsTick = 0, exitEvidence = { c
 // the retail captures). The initial value below is replaced by setTitlePhase() at the foot
 // of this block, so the phase log opens on the first movie rather than on the trademark screen.
 let titlePhase = 'trademark';
-let bootMovie = null, bootMovieError = '', bootMovieIndex = 0, bootMovieStart = 0, bootMovieOpening = false;
+let bootMovie = null, bootMovieError = '', bootMovieIndex = 0, bootMovieStart = 0, bootMovieOpening = false, bootMovieAudio = null;
 let bootMovieGeneration = 0, bootMovieOpeningGeneration = -1;
 // >= 0 holds the movie on one frame for a row (pinMovieFrame); -1 is live playback.
 let moviePin = -1;
 let charCreate = null, charCreateError = '';
-let charSelect = null, charSelectError = '', savedCharacters = [], savedCharacterFilesExist = false, componentTablesReady = false;
-const characterEntryReader = createCharacterEntryReader();
+let charSelect = null, charSelectError = '', savedCharacters = [], componentTablesReady = false;
 // Esc's in-game menu (retail: OPTIONS / SAVE AND EXIT GAME / RETURN TO GAME). Single player pauses
 // while it is up, as retail does.
 let gameMenu = null, gameMenuError = '';
@@ -709,24 +626,14 @@ function ensureGameMenu() {
   try {
     gameMenu = createGameMenu({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette,
       palettePath: () => actPalettePath(snapshot?.act ?? 1),
-      initialVolume: audioVolume.values, initialResolution: videoResolutionSettings.index,
-      initialNpcSpeech: npcSpeechSetting.mode,
-      onVolume: (key, value) => { if (key === 'sound' || key === 'music') audioVolume.set(key, value); },
-      onNpcSpeech: (mode) => { npcSpeechSetting.set(mode); syncNpcDialogueVoice(npcState); },
-      onResolution: (mode) => {
-        const index = mode.name === '640x480' ? 0 : 1;
-        requestedDisplayResolution = videoResolutionSettings.set(index); fitView();
-      },
+      initialVolume: audioVolume.values, onVolume: (key, value) => { if (key === 'sound' || key === 'music') audioVolume.set(key, value); },
       onChoose: (item) => {
       if (item === 'CONFIGURE CONTROLS') { ensureConfigureControls()?.openPanel(); return; }
       if (item === 'RETURN TO GAME') gameMenu.close();
       else if (item === 'SAVE AND EXIT GAME') {
-        // Keep the session and menu available if persistence fails; only leave once the store
-        // confirms the character has been written.
-        void saveBeforeExit(persistCurrentCharacter, async () => {
-          gameMenu.close();
-          await enterCharacterSelect();
-        }).catch((error) => { gameMenuError = String(error); });
+        gameMenu.close();
+        // Retail writes the character and leaves the game for character select.
+        persistCurrentCharacter().finally(() => { enterCharacterSelect(); });
       }
     } });
   } catch (error) { gameMenuError = String(error); }
@@ -760,7 +667,6 @@ const saveStore = createSaveStore();
 let chosenClass = null, chosenName = '';
 const TERRAIN_ENABLED = new URLSearchParams(location.search).get('terrain') !== '0';
 let inventoryVisible = new URLSearchParams(location.search).get('inventory') === '1';
-let hirelingVisible = false;
 let characterVisible = new URLSearchParams(location.search).get('character') === '1';
 let skillsVisible = new URLSearchParams(location.search).get('skills') === '1';
 // Configure Controls has three hold actions. Keep the action resolved at keydown so rebinding while
@@ -803,30 +709,16 @@ function sessionAdapter() {
       kick(targetId) { return Module.ccall('d2_session_command_kick', 'number', ['number'], [targetId]); },
       pickup(itemId) { return Module.ccall('d2_session_command_pickup', 'number', ['number'], [itemId]); },
       drop(itemId) { return Module.ccall('d2_session_command_drop', 'number', ['number'], [itemId]); },
-      useBelt(slot) {
-        const result = Module.ccall('d2_session_command_use_belt', 'number', ['number'], [slot]);
-        propCache.clear(); return result;
-      },
-      useItem(itemId) {
-        const result = Module.ccall('d2_session_command_use_item', 'number', ['number'], [itemId]);
-        propCache.delete(itemId); return result;
-      },
-      swapWeapons() {
-        const changed = Module._d2_session_command_swap_weapons ? Module.ccall('d2_session_command_swap_weapons', 'number', [], []) : 0;
-        if (changed) propCache.clear();
-        return changed;
-      },
+      useBelt(slot) { return Module.ccall('d2_session_command_use_belt', 'number', ['number'], [slot]); },
+      useItem(itemId) { return Module.ccall('d2_session_command_use_item', 'number', ['number'], [itemId]); },
+      swapWeapons() { return Module._d2_session_command_swap_weapons ? Module.ccall('d2_session_command_swap_weapons', 'number', [], []) : 0; },
       operate(objectId) { return Module.ccall('d2_session_command_object', 'number', ['number'], [objectId]); },
-      objectClick(objectId) { return Module.ccall('d2_session_command_object_packet', 'number', ['number'], [objectId]); },
       talk(npcId) { return Module.ccall('d2_session_command_npc', 'number', ['number'], [npcId]); },
       talkNearest() { return Module.ccall('d2_session_command_nearest_npc', 'number', ['number'], [6]); },
       travelNearest() { const npc = Module._d2_session_nearest_travel_npc ? Module.ccall('d2_session_nearest_travel_npc', 'number', ['number'], [6]) : 0; return npc ? Module.ccall('d2_session_command_travel', 'number', ['number'], [npc]) : 0; },
       interact() { return Module.ccall('d2_session_command_nearest_warp', 'number', ['number'], [6]); },
       respawn() { return Module.ccall('d2_session_command_respawn', 'number', [], []); },
-      tick(n) {
-        const result = Module.ccall('d2_session_tick', 'number', ['number'], [n]);
-        invalidateWornItemProps(); return result;
-      },
+      tick(n) { return Module.ccall('d2_session_tick', 'number', ['number'], [n]); },
       // The player's path position at the engine's own 16.16 precision (d2_session_player_coords),
       // the value retail's client draws with. Rendering only ever saw the whole subtile, which is
       // what quantised the drawn world to 16 px steps at 25 Hz (s490).
@@ -857,19 +749,9 @@ function sessionAdapter() {
         const p = Number(Module.ccall('d2_session_snapshot', 'number', [], []));
         if (!p) throw new Error('d2_session_snapshot returned null');
         const base = parseSessionSnapshot(Module.HEAPU8.subarray(p, p + 68));
-        const weaponClass = weaponClassTokenForMode(Module.ccall, base.player.mode);
-        base.player.weaponClassId = weaponClass.id;
-        base.player.weaponClass = weaponClass.token;
-        if (Module._d2_session_player_render_identity) {
-          const identityPtr = Number(Module.ccall('d2_session_player_render_identity', 'number', [], []));
-          if (identityPtr) {
-            const identity = new DataView(Module.HEAPU8.buffer, identityPtr, 24);
-            if (identity.getUint32(0, true) === 1 && identity.getUint32(4, true) === 24) {
-              base.player.renderIdentity = { unitType: identity.getUint32(8, true), classId: identity.getInt32(12, true),
-                mode: identity.getInt32(16, true), weaponClassId: identity.getInt32(20, true) };
-            }
-          }
-        }
+        const weaponClassId = Module.ccall('d2_session_player_weapon_class_id', 'number', [], []);
+        base.player.weaponClassId = weaponClassId;
+        base.player.weaponClass = playerWeaponClassToken(weaponClassId);
         base.player.primaryWeaponId = Module.ccall('d2_session_left_hand_weapon', 'number', ['bigint'], [0n]) >>> 0;
         if (Module._d2_session_resources) {
           const rp = Number(Module.ccall('d2_session_resources', 'number', [], [])), rv = new DataView(Module.HEAPU8.buffer, rp, 24);
@@ -913,7 +795,7 @@ function sessionAdapter() {
         if (Module._d2_session_monster_animations) {
           const animationCount = Module.ccall('d2_session_monster_animation_count', 'number', [], []);
           const animationPtr = Number(Module.ccall('d2_session_monster_animations', 'number', [], []));
-          const byId = new Map(parseMonsterAnimations(Module.HEAPU8.subarray(animationPtr, animationPtr + animationCount * 96), animationCount)
+          const byId = new Map(parseMonsterAnimations(Module.HEAPU8.subarray(animationPtr, animationPtr + animationCount * 92), animationCount)
             .map((a) => [a.id, { ...a, gameFrame: base.tick }]));
           for (const entity of entities) if (entity.type === 1) entity.animation = byId.get(entity.id);
         }
@@ -981,7 +863,7 @@ function resetFixtureFromSelect() {
   currentFixture = fixture;
   snapshot = session.snapshot();
   motion = session.motion();
-  syncAreaMusic(fixture.level, { force: true });
+  actMusic?.prepare(fixture.act0).catch((error) => { musicError = String(error); });
   if (TERRAIN_ENABLED) loadSessionTerrain(fixture.act0);
 }
 
@@ -1007,14 +889,6 @@ async function bootstrapSession() {
     // The name has to reach the engine BEFORE the session is created: the save header reads the
     // character's identity from the client record, which is built during create.
     if (chosenName) Module.ccall('d2_session_set_character_name', 'number', ['string'], [chosenName]);
-    // Configure the shared InventoryBIN rows only for the local single-player
-    // bootstrap. The API restores the captured retail rows when disabled.
-    const stashGridMode = plugyStashMode({ enabled: plugyStash.enabled, screen,
-      gameScreen: SCREEN.GAME, realmState: realmTransport.state, realmSceneActive });
-    if (!Module.ccall('d2_session_configure_plugy_stash_grid', 'number', ['number', 'number'],
-      [stashGridMode.activeBigStash ? 1 : 0, stashGridMode.singlePlayer ? 1 : 0])) {
-      throw new Error('unable to configure PlugY stash grid');
-    }
     const api = sessionAdapter();
     let fixture;
     if (pendingLoad) {
@@ -1026,7 +900,6 @@ async function bootstrapSession() {
       lastLoad = { attempted: true, pending: false, rc, bytes: pendingLoad.length };
       if (rc !== 0) throw new Error(`loading ${chosenName || 'the saved character'} failed with PLRSAVE2 error ${rc}`);
       pendingLoad = null;
-      propCache.clear(); tooltipPlayerRequirements = null;
       session = api; snapshot = api.snapshot(); gameClock = 0;
       resetConfiguredHolds();
       fixture = Object.freeze({ seed: snapshot.seed, difficulty: loadDifficulty, act0: snapshot.act - 1, level: snapshot.level });
@@ -1036,7 +909,6 @@ async function bootstrapSession() {
       // fixture's seed 1 is used, exactly as before.
       fixture = MAP_SEED_OVERRIDE != null ? Object.freeze({ ...fixtures[0], seed: MAP_SEED_OVERRIDE }) : fixtures[0];
       if (!api?.create(fixture, Number(classSelect.value))) throw new Error('d2_session_create failed');
-      propCache.clear(); tooltipPlayerRequirements = null;
       session = api; snapshot = api.snapshot(); gameClock = 0;   // a new game starts its own 25 Hz clock
       resetConfiguredHolds();
     }
@@ -1101,16 +973,8 @@ async function bootstrapSession() {
       else if (automapOverlay && chosenName) { const raw = await saveStore.getAux(automapAuxKey(chosenName)); if (raw) automapOverlay.setSaved(parseMa0(raw)); }
     } catch (error) { sessionError = String(error); }
     try { skillSelectRenderer = createSkillSelectRenderer(createMpqAssetReader(Module)); } catch (error) { skillSelectError = String(error); }
-    try {
-      actMusic ??= createActMusicPlayer(assetReader);
-      audioVolume.attach('music', actMusic);
-      // FUN_6FAF5660 selects from the active player's current room. Start that selected loop as soon
-      // as the newly created session exposes its level instead of waiting for a later world input.
-      // The context above was created before the front-door gesture, so normal title-to-game entry
-      // can already be unlocked while this method reads and decodes the selected row.
-      levelMusicSync.reset();
-      syncAreaMusic(snapshot.level, { force: true });
-    } catch (error) { actMusic = null; musicError = String(error); }
+    try { actMusic = createActMusicPlayer(assetReader); await actMusic.prepare(fixture.act0); musicError = ''; } catch (error) { musicError = String(error); }
+    audioVolume.attach('music', actMusic);
     try { audioVolume.attach('sound', createUiClickSoundPlayer(assetReader, canvas)); } catch (error) { musicError = String(error); }
     try { unitSounds = createUnitSoundPlayer(assetReader); canvas.__d2UnitSound = unitSounds; audioVolume.attach('sound', unitSounds); } catch (error) { musicError = String(error); }
 
@@ -1164,6 +1028,7 @@ function ensureBootMovie() {
   const generation = bootMovieGeneration;
   bootMovieOpening = true;
   bootMovieOpeningGeneration = generation;
+  bootMovieAudio ??= createBikAudioPlayer();
   openMovie({ read: createMpqAssetReader(Module), path: spec.path, documentObject: document, audioPlayer: bootMovieAudio,
     isCurrent: () => generation === bootMovieGeneration && titlePhase === spec.phase })
     .then((movie) => {
@@ -1207,7 +1072,7 @@ function ensureTitleScreen(entryPhase = null) {
       // Committing a region opens the player's login flow. Endpoints still come only from our config.
       onGateway: (server) => { showConfiguredRealmLogin(server); },
       items: [
-        { label: 'SINGLE PLAYER', action: () => { enterSinglePlayer(); } },
+        { label: 'SINGLE PLAYER', action: () => { enterCharacterSelect(); } },
         // With no servers configured BATTLE.NET stays inert, exactly as before. A configured region
         // opens the credentials/character flow and dials only its repo-owned WebSocket paths.
         // The browser panel is functional but does not yet match retail's Battle.net screen art.
@@ -1215,10 +1080,10 @@ function ensureTitleScreen(entryPhase = null) {
         // Options; the retail captures, captured 2026-10-02). HOST GAME advances to character
         // select as retail does; the host/join TRANSPORT (and the join dialog behind JOIN GAME) is
         // the realm backend's work, so JOIN is handed to the shell and is a gap.
-        { label: 'BATTLE.NET', action: () => { characterEntryReader.cancel(); titleScreen?.openGateways(); } },
-        { label: 'OTHER MULTIPLAYER', action: () => { characterEntryReader.cancel(); screen = SCREEN.OTHER_MULTIPLAYER; ensureOtherMultiplayerScreen(); } },
-        { label: 'CREDITS', action: () => { characterEntryReader.cancel(); creditsTick = 0; screen = SCREEN.CREDITS; ensureCreditsScreen(); } },
-        { label: 'CINEMATICS', action: () => { characterEntryReader.cancel(); screen = SCREEN.CINEMATICS; ensureCinematicsScreen(); } },
+        { label: 'BATTLE.NET', action: () => { titleScreen?.openGateways(); } },
+        { label: 'OTHER MULTIPLAYER', action: () => { screen = SCREEN.OTHER_MULTIPLAYER; ensureOtherMultiplayerScreen(); } },
+        { label: 'CREDITS', action: () => { creditsTick = 0; screen = SCREEN.CREDITS; ensureCreditsScreen(); } },
+        { label: 'CINEMATICS', action: () => { screen = SCREEN.CINEMATICS; ensureCinematicsScreen(); } },
         { label: 'EXIT DIABLO II', action: () => { beginExit(); } },
       ],
     });
@@ -1259,12 +1124,10 @@ function releaseRealmFlow({ closeTransports = true } = {}) {
   monsterRenderer?.resetSession?.();
   realmPlayerView = null;
   realmPlayerRosterView = [];
-  realmPlayerReassignFade.reset();
   realmWorldView = null;
   realmMonsterViews = [];
   realmMissileViews = [];
   realmGameClock = 0;
-  realmAnimationFrame = 0;
   worldRightPointerHeld = false; heldRightPointerTicks = 0;
   realmMoveDuplicateState = {}; realmDirection = { x: 0, y: 0 }; realmDirectionTicks = 0;
   worldPointerHeld = false;
@@ -1288,7 +1151,6 @@ function ensureRealmLoginDialog() {
       realmTransport = { state: 'idle', server: null, result: null, error: '' };
       realmPlayerView = null;
       realmPlayerRosterView = [];
-      realmPlayerReassignFade.reset();
       realmWorldView = null;
       void releaseRealmFlow();
       realmLoginDialog.close();
@@ -1307,7 +1169,6 @@ function feedRealmPlayerFrame(bytes) {
   const update = applyRealmPlayerFrame(protocol, bytes);
   realmPlayerView = update.state;
   realmPlayerRosterView = update.players;
-  realmPlayerReassignFade.observe(update.players, update.state, performance.now());
   realmMonsterViews = update.monsters;
   realmWorldView = protocol.d2gsClientWorldState?.() ?? null;
   if (realmWorldView?.unloadCompleteEvent || !realmWorldView?.hasLoadAct ||
@@ -1322,16 +1183,10 @@ function feedRealmPlayerFrame(bytes) {
   return update;
 }
 function showConfiguredRealmLogin(server) {
-  characterEntryReader.cancel();
-  // The two InventoryBIN rows are shared by the local and realm client paths.
-  // Restore retail geometry before a realm login can progress into a game.
-  if (Module._d2_session_configure_plugy_stash_grid)
-    Module.ccall('d2_session_configure_plugy_stash_grid', 'number', ['number', 'number'], [0, 0]);
   const dialog = ensureRealmLoginDialog();
   realmFlow = { server, realmReply: null };
   realmPlayerView = null;
   realmPlayerRosterView = [];
-  realmPlayerReassignFade.reset();
   realmWorldView = null;
   realmTransport = { state: 'login-required', server: { region: server.region, host: server.host }, result: null, error: '' };
   dialog.show(server.region);
@@ -1388,11 +1243,8 @@ async function createAndJoinConfiguredGame({ character, gameName, gamePassword }
       difficulty: joined.game.difficulty });
     realmPlayerView = game.playerState;
     realmPlayerRosterView = protocol.d2gsClientPlayers?.() ?? (game.playerState ? [game.playerState] : []);
-    realmPlayerReassignFade.installRoster(realmPlayerRosterView);
-    if (game.transitionFade) realmPlayerReassignFade.queue();
     realmWorldView = game.worldState;
     realmGameClock = 0;
-    realmAnimationFrame = 0;
     realmTransport = { state: 'session-open', ...started, result: {
       realms: realmFlow.realms, mpq: realmFlow.mpq, character: joined.character, game: joined.game, ticket: joined.ticket,
       d2gs: { greeting: game.greeting, opcodes: game.opcodes, bytes: game.bytes, playerAssignment: game.playerAssignment,
@@ -1463,34 +1315,21 @@ function ensureCreditsScreen() {
   catch (error) { creditsError = String(error); }
 }
 
-// P8i: retail's tooltip property lines from the engine (d2_session_item_lines), cached for the
-// most recently inspected item IDs. Item IDs accumulate over a session, so this remains bounded.
-const propCache = createItemPropertyCache();
-let tooltipPlayerRequirements = null;
-function invalidateWornItemProps() {
-  // Combat can drain durability on equipped items during a game tick. The native item presentation
-  // has no tooltip revision, so retire only worn-item entries instead of clearing every cached ID.
-  for (const item of snapshot?.items ?? []) if (item.bodyLoc > 0 && item.bodyLoc < 255) propCache.delete(item.id);
-}
+// P8i: retail's tooltip property lines from the engine (d2_session_item_lines), cached per item id.
+const propCache = new Map();
 function itemProps(id) {
-  // Requirement colors depend on the hero as well as the item. Level-ups can happen during a
-  // normal tick, so compare the three retail stats whenever a tooltip is requested.
-  const playerRequirements = [0, 2, 12].map((stat) => Module.ccall('d2_session_player_stat', 'number', ['number', 'number'], [stat, 0])).join(':');
-  if (tooltipPlayerRequirements !== null && playerRequirements !== tooltipPlayerRequirements) propCache.clear();
-  tooltipPlayerRequirements = playerRequirements;
-  let cacheable = false;
-  return propCache.getOrRead(id, () => {
-    const buf = (itemProps.buf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [512])));
-    const n = Module.ccall('d2_session_item_lines', 'number', ['number', 'bigint', 'number'], [id, BigInt(buf), 512]);
-    // A line may start "\x01<digit>": its D2Win colour (P8j: 1 red unmet requirement, 3 blue magical property); none = white.
-    // "\x01v" (P8j): the label up to ": " is white and the value blue -- a damage line an affix modifies.
-    const raw = n ? Module.UTF8ToString(buf).split('\n').filter(Boolean) : [];
-    const lines = raw.map((l) => l.replace(/^\x01./, '')), colours = raw.map((l) => (l[0] === '\x01' ? (l[1] === 'v' ? 'v' : +l[1]) : 0));
-    const tb = (itemProps.tbuf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [128])));
-    const title = Module.ccall('d2_session_item_title', 'number', ['number', 'bigint', 'number'], [id, BigInt(tb), 128]) ? Module.UTF8ToString(tb) : '';
-    cacheable = n > 0;
-    return { lines, colours, title, quality: Module.ccall('d2_session_item_quality', 'number', ['number'], [id]) };
-  }, () => cacheable);
+  if (propCache.has(id)) return propCache.get(id);
+  const buf = (itemProps.buf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [512])));
+  const n = Module.ccall('d2_session_item_lines', 'number', ['number', 'bigint', 'number'], [id, BigInt(buf), 512]);
+  // A line may start "\x01<digit>": its D2Win colour (P8j: 1 red unmet requirement, 3 blue magical property); none = white.
+  // "\x01v" (P8j): the label up to ": " is white and the value blue -- a damage line an affix modifies.
+  const raw = n ? Module.UTF8ToString(buf).split('\n').filter(Boolean) : [];
+  const lines = raw.map((l) => l.replace(/^\x01./, '')), colours = raw.map((l) => (l[0] === '\x01' ? (l[1] === 'v' ? 'v' : +l[1]) : 0));
+  const tb = (itemProps.tbuf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [128])));
+  const title = Module.ccall('d2_session_item_title', 'number', ['number', 'bigint', 'number'], [id, BigInt(tb), 128]) ? Module.UTF8ToString(tb) : '';
+  const r = { lines, colours, title, quality: Module.ccall('d2_session_item_quality', 'number', ['number'], [id]) };
+  if (n) propCache.set(id, r);
+  return r;
 }
 
 // The tooltip fields of an item (shared by the shop grid and __d2Shell.tooltipSpec, the s2160 probe of any item id).
@@ -1520,7 +1359,6 @@ function exitToTitle() {
 // F91: EXIT DIABLO II -- retail ends the process here; a page cannot, so it runs the fade, tries
 // `window.close()` and says so when the browser refuses (assets/exit-sequence.mjs has the reasoning).
 function beginExit() {
-  characterEntryReader.cancel();
   if (exitSeq?.active) return;
   exitSeq = createExitSequence({ font: titleScreen?.noticeFont ?? null });
   exitSeq.start();
@@ -1558,9 +1396,6 @@ function setTitlePhase(phase) {
   // the decode is actually ready.
   bootMovie?.stopAudio?.();
   bootMovie = null; bootMovieStart = 0;
-  if (phase === 'menu' && titleScreen) {
-    actMusic?.playTitle().catch((error) => { musicError = String(error); });
-  }
   // Let the new phase open immediately. An older open's finally is generation-checked and cannot
   // clear this phase's opening state when it eventually settles.
   bootMovieOpening = false; bootMovieOpeningGeneration = -1;
@@ -1595,30 +1430,15 @@ function startGame() {
   if (!bootstrapStarted && window.__d2?.ready && !window.__d2.error && sessionAdapter()) bootstrapSession();
 }
 
-// Read and publish the profile together with its destination; a superseded storage request
-// cannot replace the current screen or its character rows.
-async function enterSavedCharacterScreen(singlePlayer) {
-  const sourceScreen = screen;
-  return characterEntryReader.read({
-    load: () => saveStore.listProfile(),
-    isCurrent: () => screen === sourceScreen,
-    describeError: savedCharacterReadError,
-    apply: (profile, error) => {
-      charSelect = null; charSelectError = error;
-      savedCharacters = profile.characters; savedCharacterFilesExist = profile.hasSaveFiles;
-      const destination = singlePlayer
-        ? singlePlayerDestination({ hasSaveFiles: savedCharacterFilesExist, error }) : 'select';
-      if (destination === 'create') { screen = SCREEN.CREATE; ensureCharCreate(); return; }
-      screen = SCREEN.SELECT; ensureCharSelect();
-    },
-  });
+// SINGLE PLAYER always opens the character list. With an empty save store the list is blank and
+// CREATE NEW CHARACTER is the player's next action, matching D2Launch's unconditional list build.
+async function enterCharacterSelect() {
+  charSelect = null; charSelectError = '';
+  try { savedCharacters = await saveStore.list(); }
+  catch (error) { charSelectError = String(error); savedCharacters = []; }
+  screen = SCREEN.SELECT;
+  ensureCharSelect();
 }
-
-// D2Launch's SINGLE PLAYER release selects CREATE on an empty save search, SELECT otherwise.
-function enterSinglePlayer() { return enterSavedCharacterScreen(true); }
-
-// Host Game and returning from a save enter SELECT directly.
-function enterCharacterSelect() { return enterSavedCharacterScreen(false); }
 
 // DELETE CHARACTER (client-parity C3i): through the confirmation the screen draws, then the store.
 async function deleteSavedCharacter(name) {
@@ -1655,10 +1475,7 @@ function ensureCharSelect() {
     charSelect = createCharacterSelect({
       read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette,
       characters: savedCharacters,
-      onPlay: (name) => { charSelectError = ''; playSavedCharacter(name); },
-      onPlayRefused: ({ stringId }) => {
-        charSelectError = Module.ccall('d2_lang_string_by_index', 'string', ['number'], [stringId]) || 'This Hardcore character is dead.';
-      },
+      onPlay: (name) => { playSavedCharacter(name); },
       onCreate: () => { screen = SCREEN.CREATE; ensureCharCreate(); },
       onCancel: () => { screen = SCREEN.TITLE; },
       onDelete: deleteSavedCharacter,
@@ -1783,30 +1600,19 @@ function ensureCharCreate() {
 // their stock if a trade is open. All of it is engine state; the panel only draws it.
 // Retail plays an NPC's message list in order: each dismissal acks the message and shows the next (npcMsgSkip.n = how many were heard).
 let npcMsgSkip = { npcId: 0, n: 0 };
-let unitSounds = null, soundBuf = 0, npcVoiceKey = null, npcVoiceGeneration = 0;
-const npcSpeechScrollGate = createNpcSpeechScrollGate();
-const npcSpeechClickGate = createNpcSpeechClickGate();
-let npcSpeechClickKey = null;
+let unitSounds = null, soundBuf = 0, npcVoiceKey = null;
 function syncNpcDialogueVoice(state) {
   const messageId = state?.spoken;
   if (messageId == null) {
-    unitSounds?.stopDialogue(); npcVoiceKey = null; npcVoiceGeneration++; npcSpeechScrollGate.cancel(); npcSpeechClickGate.cancel(); npcSpeechClickKey = null; return;
+    unitSounds?.stopDialogue(); npcVoiceKey = null; return;
   }
-  const clickKey = `${state.npcId}:${messageId}`;
-  if (clickKey !== npcSpeechClickKey) { npcSpeechClickKey = clickKey; npcSpeechClickGate.begin(performance.now()); }
-  const audioEnabled = npcSpeechHasAudio(npcSpeechSetting.mode);
-  const key = `${state.npcId}:${messageId}:${audioEnabled ? 1 : 0}`;
+  const key = `${state.npcId}:${messageId}`;
   if (key === npcVoiceKey && unitSounds) return;
   npcVoiceKey = key;
-  const source = npcDialogueVoiceSource(messageId);
-  if (!audioEnabled) { unitSounds?.stopDialogue(); npcVoiceGeneration++; npcSpeechScrollGate.cancel(); return; }
-  const generation = ++npcVoiceGeneration;
-  if (!source || !unitSounds) { unitSounds?.stopDialogue(); npcSpeechScrollGate.cancel(); return; }
-  const token = npcSpeechScrollGate.begin();
-  const playback = playNpcDialogueVoice(unitSounds, messageId);
-  void npcSpeechScrollGate.waitForVoice(token, playback, unitSounds).catch((error) => {
-    if (generation === npcVoiceGeneration) console.warn('NPC voice', source.handle || source.file, error);
-  });
+  const handle = npcDialogueVoiceHandle(messageId);
+  const file = npcDialogueVoiceFile(messageId);
+  if ((!handle && !file) || !unitSounds) { unitSounds?.stopDialogue(); return; }
+  unitSounds.playDialogue(handle, file).catch((error) => { npcVoiceKey = null; console.warn('NPC voice', handle || file, error); });
 }
 function readNpcState() {
   try {
@@ -1897,12 +1703,8 @@ function readNpcState() {
     // own updateSessionVendorItems switches on it), 0 when nothing is open. It decides which engine
     // command a click on an offer is (P8d/P8f); the window itself draws the same either way.
     const vendorPtr = Number(Module.ccall('d2_session_vendor', 'number', [], []));
-    const vendor = vendorPtr ? new DataView(Module.HEAPU8.buffer, vendorPtr, 60) : null;
-    const action = vendor ? vendor.getUint32(16, true) : 0;
-    const vendorNpcId = vendor ? vendor.getUint32(20, true) : 0;
-    const vendorResult = vendor ? vendor.getUint32(24, true) : 0;
-    const vendorOpen = npcVendorIsOpen({ npcId, vendorNpcId, action, result: vendorResult });
-    const state = { npcId, classId, greeting, spoken, items, gold, action, vendorOpen };
+    const action = vendorPtr ? new DataView(Module.HEAPU8.buffer, vendorPtr, 28).getUint32(16, true) : 0;
+    const state = { npcId, classId, greeting, spoken, items, gold, action };
     syncNpcDialogueVoice(state);
     return state;
   } catch (e) { syncNpcDialogueVoice(null); console.error('npcState', e); return null; }
@@ -1915,7 +1717,6 @@ function buyFromVendor(itemId) {
   try {
     const ok = Module.ccall('d2_session_command_vendor_buy', 'number', ['number', 'number'],
       [npcState.npcId, itemId]);
-    if (ok) propCache.clear();
     lastPurchase = { itemId, ok: Boolean(ok), goldBefore: npcState.gold };
     // Re-read: the stock, the gold and the inventory all moved.
     npcState = readNpcState();
@@ -1935,7 +1736,6 @@ function gambleAtVendor(itemId) {
   try {
     const ok = Module.ccall('d2_session_command_vendor_gamble', 'number', ['number', 'number'],
       [npcState.npcId, itemId]);
-    if (ok) propCache.clear();
     npcState = npcMenu?.open ? null : readNpcState();   // the menu comes first; the window opens on its entry
     snapshot = session.snapshot();
     return Boolean(ok);
@@ -1979,7 +1779,6 @@ function sellToVendor(itemId) {
   try {
     const ok = Module.ccall('d2_session_command_vendor_sell', 'number', ['number', 'number'],
       [npcState.npcId, itemId]);
-    if (ok) propCache.clear();
     lastSale = { itemId, ok: Boolean(ok), goldBefore: npcState.gold };
     npcState = readNpcState();
     lastSale.goldAfter = npcState ? npcState.gold : -1;
@@ -1996,7 +1795,6 @@ function repairAtVendor(itemId) {
   try {
     const ok = Module.ccall('d2_session_command_vendor_repair', 'number', ['number', 'number'],
       [npcState.npcId, itemId >>> 0]);
-    if (ok) propCache.delete(itemId >>> 0);
     npcState = readNpcState();
     snapshot = session.snapshot();
     return Boolean(ok);
@@ -2010,7 +1808,6 @@ function repairAllAtVendor() {
   if (!npcState || !Module._d2_session_command_vendor_repair_all) return false;
   const before = Module.ccall('d2_session_player_gold', 'number', [], []);
   const ok = Boolean(Module.ccall('d2_session_command_vendor_repair_all', 'number', ['number'], [npcState.npcId]));
-  if (ok) propCache.clear();
   npcState = readNpcState(); snapshot = session.snapshot();
   lastRepairAll = { npcId: npcState?.npcId ?? -1, ok, goldBefore: before, goldAfter: Module.ccall('d2_session_player_gold', 'number', [], []) };
   return ok;
@@ -2025,7 +1822,7 @@ function ensureVendorPanel() {
   catch (error) { vendorPanelError = String(error); }
   return vendorPanel;
 }
-const shopOpen = () => npcState?.vendorOpen === true;
+const shopOpen = () => Boolean(npcState?.items?.length);
 function ensureNpcPanel() {
   if (npcPanel || npcPanelError) return npcPanel;
   try { npcPanel = createNpcPanel({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette }); }
@@ -2237,23 +2034,20 @@ function advanceEngine(forced) {
 // renderer getters remain read-only and cannot move units more than once per frame.
 function advanceRealmMotion(forced) {
   if (!realmSceneActive || realmTransport.state !== 'session-open' || !realmFlow?.protocol?.d2gsClientMotionTick) {
-    if (realmTransport.state !== 'session-open') { realmGameClock = 0; realmAnimationFrame = 0; }
+    if (realmTransport.state !== 'session-open') realmGameClock = 0;
     return 0;
   }
   let ticks = 0;
-  const tickClientUnits = () => { realmFlow.protocol.d2gsClientMotionTick(); realmAnimationFrame++; };
-  if (forced) { realmGameClock = 0; tickClientUnits(); ticks = 1; }
+  if (forced) { realmGameClock = 0; realmFlow.protocol.d2gsClientMotionTick(); ticks = 1; }
   else {
     realmGameClock += STEP;
     while (realmGameClock >= GAME_STEP) {
       realmGameClock -= GAME_STEP;
-      tickClientUnits();
+      realmFlow.protocol.d2gsClientMotionTick();
       ticks++;
     }
   }
   if (ticks) {
-    for (const event of realmFlow.protocol.d2gsClientTakeMissileSounds?.() ?? [])
-      unitSounds?.playRow(event.soundRow, event).catch((error) => console.warn('Missile impact sound', error));
     realmPlayerRosterView = realmFlow.protocol.d2gsClientPlayers?.() ?? realmPlayerRosterView;
     realmPlayerView = realmFlow.protocol.d2gsClientPlayerState?.() ?? realmPlayerView;
     realmMonsterViews = realmFlow.protocol.d2gsClientMonsters?.() ?? realmMonsterViews;
@@ -2264,7 +2058,7 @@ function advanceRealmMotion(forced) {
 
 // S2: play what the engine attached to units this tick (d2_session_take_sounds), through the retail resolver.
 // F157: an OBJECT's quest message (packet 0x27 on an object, e.g. Anya's plea from her ice) is drawn as the speech box;
-// native 1.13c scroll responses use GUID -1 and the offered string ID for the known object-scroll IDs.
+// dismissing it reports it heard (0x31 {guid, string}), which is what advances the quest.
 let objectSpeech = null, objectMsgBuf = 0;
 function pollObjectSpeech() {
   if (objectSpeech || !session || screen !== SCREEN.GAME || !Module._d2_session_take_object_message) return;
@@ -2275,8 +2069,7 @@ function pollObjectSpeech() {
 }
 function dismissObjectSpeech() {
   const m = objectSpeech; objectSpeech = null;
-  const acknowledgement = nativeObjectSpeechAcknowledgement(m);
-  if (acknowledgement) Module.ccall('d2_session_command_npc_response_packet', 'number', ['number', 'number'], [acknowledgement.guid, acknowledgement.stringId]);
+  if (m) Module.ccall('d2_session_command_npc_response_packet', 'number', ['number', 'number'], [m.guid, m.stringId]);
 }
 function drainUnitSounds() {
   pollObjectSpeech();
@@ -2291,10 +2084,9 @@ function drainUnitSounds() {
   for (let i = 0; i < n; i++) {
     const event = { unitType: v[i * 7], unitId: v[i * 7 + 1], classId: v[i * 7 + 2], soundEvent: v[i * 7 + 3], updateUnitType: v[i * 7 + 4], updateUnitId: v[i * 7 + 5], nativeSelectedRow: v[i * 7 + 6] };
     if (event.soundEvent === 0x10) event.monsterTaunt = event.nativeSelectedRow;
-    if (event.soundEvent === 0x0c) event.skillStartSoundRow = event.nativeSelectedRow;
     const spatial = unitSoundNativeSpatial(event, snapshot, listener);
     event.nativeSpatialGainByte = spatial?.gainByte ?? null;
-    event.nativeSpatialPanCode = spatial?.panCode ?? unitSoundNativePanCode(event, snapshot, listener);
+    event.nativeSpatialPanCode = spatial?.panCode ?? unitSoundNativeTauntPanCode(event, snapshot, listener);
     unitSounds.play(event, local);
   }
 }
@@ -2352,7 +2144,7 @@ function update(forceTick = false) {
         }
         const destination = pointerWorldAt(command.x, command.y);
         const realmProtocol = realmFlow?.protocol;
-        const predictLocal = realmClientProjectilePredictor(realmProtocol);
+        const predictLocal = realmFireballPredictor(realmProtocol);
         const result = sendRealmRightSkillAt(realmFlow?.protocol, realmFlow?.d2gs,
           realmSceneActive && Boolean(realmPlayerView?.active), destination.x, destination.y,
           Boolean(command.held), realmMoveDuplicateState, performance.now(), predictLocal);
@@ -2472,13 +2264,6 @@ function update(forceTick = false) {
           }
           const moved = session.move(tx, ty);
           if (record) { record.result = `move (${tx},${ty}) -> ${moved}`; record.walkTo = moved ? null : [tx, ty];
-            // F671 discriminator: join this click's planner endpoint to the native wrapper packet,
-            // ordinal-10334 room result/path points and latest movement continuation snapshot.
-            // Read immediately; the fixed int32 ABI is explicitly versioned by compile-time offsets.
-            if (record.planner && Module._d2_session_walk_probe) {
-              const ptr = Module.ccall('d2_session_walk_probe', 'number', [], []);
-              record.walkProbe = decodeWalkProbe(new Int32Array(Module.HEAPU8.buffer, Number(ptr), 29));
-            }
             // Read immediately after the command, which is what d2_session_move_reason describes. A
             // refused move has TWO subjects -- the ground (3 NO_ROOM, 5 NO_PATH) and the player (6
             // DISPATCH_REFUSED: dying, dead or uninterruptable, retail's own dispatcher test) -- and
@@ -2604,9 +2389,6 @@ function update(forceTick = false) {
     }
     catch (error) { sessionError = String(error); session = null; }
   }
-  if (session && actMusic && Number.isInteger(snapshot?.level) && snapshot.level !== levelMusicSync.activeLevel) {
-    syncAreaMusic(snapshot.level);
-  }
   // Write the character periodically, and immediately on an act change -- the two moments retail
   // treats as worth persisting. Guarded against overlap: the store is async and a second save
   // starting before the first finished would race on the same key.
@@ -2648,11 +2430,6 @@ function selectedPlayerSource() {
     return selectPlayerRenderSource(snapshot, motion, true, realmPlayerView, (realmWorldView?.act ?? 0) + 1);
   if (!snapshot?.player) return { source: 'none', x: 0, y: 0, classId: null, renderState: null };
   const selected = selectPlayerRenderSource(snapshot, motion, false, realmPlayerView);
-  if (Number.isInteger(motion?.presentationMode) && motion.presentationMode !== snapshot.mode && selected.renderState) {
-    const presentationClass = weaponClassTokenForMode(Module.ccall, selected.renderState.mode);
-    selected.renderState.weaponClassId = presentationClass.id;
-    selected.renderState.weaponClass = presentationClass.token;
-  }
   // The native composite callback reads the inventory's selected weapon for each composition.
   // Keep this identity on the same live path instead of relying on the last shell snapshot, which
   // may predate a native class-selection refresh that initializes the inventory GUID.
@@ -2666,7 +2443,7 @@ function selectedPlayerSource() {
 // scenery against the hero.
 // The world's screen centre column: the canvas centre, moved to the middle of the free half while a panel is open
 // on one side. Retail does this at its own 800x600 too, not only in the wide view (F264: panel-view-shift.mjs).
-function panelFlags() { return { character: characterVisible, quest: questVisible, stash: stashOpen, cube: cubeOpen, waypoint: Boolean(waypointMenu), skills: skillsVisible, inventory: inventoryVisible || hirelingVisible, vendor: shopOpen() }; }
+function panelFlags() { return { character: characterVisible, quest: questVisible, stash: stashOpen, cube: cubeOpen, waypoint: Boolean(waypointMenu), skills: skillsVisible, inventory: inventoryVisible, vendor: shopOpen() }; }
 function panelSides() { return panelViewSides(panelFlags()); }
 function viewCX() {
   if (screen !== SCREEN.GAME || clearScreen) return canvas.width / 2;
@@ -2701,6 +2478,16 @@ function cameraGrid() {
   const c = cameraCentre();
   return { x: c.x - 0.5, y: c.y - 0.5 };
 }
+// Where a unit's sprite is anchored in the world. A unit with a dynamic path has the engine's own
+// 16.16 position (d2_session_unit_coords); drawing it at the whole subtile made a walking monster
+// hold still for several frames and then jump a square -- 16 px in x, 8 px in y, and on a diagonal
+// an x-step and a y-step alternately, which is the shake sees around monsters and NPCs (s491).
+// The `- 0.5` is the half subtile between a unit's centre and the integer grid proj() is built on --
+// the same half projStatic carries -- so an unmoving unit draws on exactly the pixel it did before.
+function unitAnchor(entity) {
+  return entity.preciseX != null ? [entity.preciseX - 0.5, entity.preciseY - 0.5] : [entity.x, entity.y];
+}
+
 // The player always sits at the centre of the viewport; it is a sprite like any other in the depth
 // sort, which is why it lives here rather than inline at the end of render().
 function drawPlayer(c) {
@@ -2722,10 +2509,9 @@ function itemCode(item) {
     (item.code >>> 16) & 255, (item.code >>> 24) & 255).replace(/\0/g, '').trim();
 }
 
-// Hover and click/action paths share pointer projection, but use separate selection policies:
-// selectPointerCandidate arbitrates hover candidates, while resolvePointerTarget supplies the
-// browser's click/action target. Retail's F14 hover winner rule is only partly recovered;
-// class/code and localized names stay engine/table owned.
+// The selection is deliberately the same F14 resolution that click dispatch uses: the unit or the
+// ground item the click point is nearest, with a unit winning a tie. The only client work here is
+// project + draw; class/code and their localized names stay engine/table owned.
 function pointerWorldAt(x, y) {
   const d = screenDeltaToWorld(x - viewCX(), y - (canvas.height / 2 + UNIT_CENTRE_Y));
   // The static grid lies under the player camera's half-subtile. Every pointer path (move,
@@ -2744,39 +2530,18 @@ function groundItemAtPointerCell(x, y) {
   const at = pointerWorldAt(x, y);
   return (snapshot.items || []).find((item) => item.mode === 3 && item.invPage === 255 && item.x === at.x && item.y === at.y) ?? null;
 }
-function groundItemsAtPointerCell(x, y) {
-  const at = pointerWorldAt(x, y);
-  return (snapshot.items || []).filter((item) => item.mode === 3 && item.invPage === 255 && item.x === at.x && item.y === at.y);
-}
 
-// Keep the browser's current hit tests as candidate membership, then arbitrate the accepted hover
-// candidates together. The hover callers pass the recovered player-path reference; native hit
-// eligibility and the stored-target path remain open.
-// Click candidates retain their independent policy and the nearby pickup-radius item stays a fallback.
+// Use one lazy candidate resolver for hover, cursor, and click routing. The exact-cell item is the
+// narrow exception that suppresses a town NPC; a selectable object can still win that same overlap
+// (F247's measured object -6 / item -4 priority). Hostile, corpse, and panel gates stay at their
+// existing callers. Lazy reads avoid scanning every NPC and object on every rendered frame.
 function resolvePointerCandidates(x, y) {
   const target = resolvePointerTarget(x, y);
   const candidates = { ...target };
   let itemRead = false, itemOnCell = null;
   let npcRead = false, npc = null;
   let objectRead = false, object = null, hoverObjectRead = false, hoverObject = null;
-  let unitsRead = false, units = null, itemsOnCellRead = false, itemsOnCell = null;
-  let objectsUnderPointerRead = false, objectsUnderPointer = null;
   Object.defineProperties(candidates, {
-    units: { get() {
-      if (!unitsRead) { unitsRead = true; units = unitsUnderPointer(x, y); }
-      return units;
-    } },
-    itemsOnCell: { get() {
-      if (!itemsOnCellRead) { itemsOnCellRead = true; itemsOnCell = groundItemsAtPointerCell(x, y); }
-      return itemsOnCell;
-    } },
-    objectsUnderPointer: { get() {
-      if (!objectsUnderPointerRead) {
-        objectsUnderPointerRead = true;
-        objectsUnderPointer = objectUnderPointer(x, y, { nativeHover: true, allCandidates: true });
-      }
-      return objectsUnderPointer;
-    } },
     itemOnCell: { get() {
       if (!itemRead) { itemRead = true; itemOnCell = target.unitId ? null : groundItemAtPointerCell(x, y); }
       return itemOnCell;
@@ -2797,6 +2562,22 @@ function resolvePointerCandidates(x, y) {
   return candidates;
 }
 
+// Hover/cursor policy: only when an exact-cell item and a selectable object share the point does the
+// object get promoted ahead of the item/NPC special case. In all other cases retain the existing
+// NPC-before-nearby-item behavior.
+function nonHostilePointerCandidate(candidates, { click = false } = {}) {
+  const object = click ? candidates.object : ('hoverObject' in candidates ? candidates.hoverObject : candidates.object);
+  if (candidates.itemOnCell && object) return { kind: 'object', target: object };
+  if (candidates.itemOnCell) return { kind: 'item', target: candidates.itemOnCell };
+  if (candidates.npc) return { kind: 'npc', target: candidates.npc };
+  // The click route already gives a selectable object the world interaction before a nearby item
+  // reaches the ordinary world command. Hover keeps its existing NPC/item ordering in that case.
+  if (click && object) return { kind: 'object', target: object };
+  if (candidates.item) return { kind: 'item', target: candidates.item };
+  if (object) return { kind: 'object', target: object };
+  return null;
+}
+
 // WHAT THE CLICK ACTS ON (F14). Retail's own hit test is still not recovered, so this is the
 // observed rule, and the observed rule is about what the cursor is OVER. A ground item occupies its
 // own cell, and the cursor is on that cell only at distance 0; a unit's sprite is far wider than its
@@ -2812,10 +2593,8 @@ function resolvePointerCandidates(x, y) {
 // decides every act's loot click, not only act IV's.
 function resolvePointerTarget(x, y) {
   const at = pointerWorldAt(x, y);
-  // This click/action approximation uses retail's measured screen-space unit box, not a subtile
-  // disc. Its nearest-world-point/lower-id overlap choice is browser policy, not the retail F14
-  // hover tie-break. F14's hover selector separately uses native signed priority and player-path
-  // distance; candidate eligibility and stored-target behavior remain open.
+  // F14 measured: the unit test is retail's screen-space box, not a subtile disc. The overlap tie-break
+  // (nearest world point to the pointer, lower id) is UNMEASURED and unchanged.
   const unitId = selectPrimaryTarget(snapshot, at, Infinity, (entity) => unitBoxHit(entity, x, y));
   const distance2 = (candidate) => (candidate.x - at.x) ** 2 + (candidate.y - at.y) ** 2;
   const ground = (snapshot.items || []).filter((candidate) => candidate.mode === 3 && candidate.invPage === 255)
@@ -2830,13 +2609,15 @@ function resolvePointerTarget(x, y) {
 function hoverTarget() {
   if (!session || screen !== SCREEN.GAME) return null;
   const candidates = resolvePointerCandidates(pointer.x, pointer.y);
-  const selected = selectPointerCandidate(candidates, { reference: snapshot.player });
-  if (selected?.kind === 'unit') {
-    const unit = selected.target;
+  const { unitId } = candidates;
+  if (unitId) {
+    const unit = snapshot.entities.find((entity) => entity.id === unitId && entity.type === 1);
+    if (!unit) return null;
     const stringIndex = Module.ccall('d2_monster_name_str', 'number', ['number'], [unit.classId]);
     const label = stringIndex >= 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [stringIndex]) : '';
     return label ? { kind: 'unit', id: unit.id, classId: unit.classId, stringIndex, label, x: unit.x, y: unit.y } : null;
   }
+  const selected = nonHostilePointerCandidate(candidates);
   if (selected?.kind === 'item') {
     const item = selected.target;
     const code = itemCode(item);
@@ -2863,8 +2644,9 @@ function hoverTarget() {
 function gameCursorContext() {
   if (!session || screen !== SCREEN.GAME) return null;
   const candidates = resolvePointerCandidates(pointer.x, pointer.y);
-  const selected = selectPointerCandidate(candidates, { reference: snapshot.player });
-  if (selected?.kind === 'unit') return { kind: 'attack', target: { id: selected.target.id, type: 1 } };
+  const { unitId } = candidates;
+  if (unitId) return { kind: 'attack', target: { id: unitId, type: 1 } };
+  const selected = nonHostilePointerCandidate(candidates);
   if (selected?.kind === 'npc') return { kind: 'talk', target: { id: selected.target.id, type: 1 } };
   return { kind: 'hand' };
 }
@@ -2918,7 +2700,7 @@ function drawHoverLabel(c, target, projectUnit, projectStatic) {
   }
   if (target.kind === 'object')
     return drawObjectHoverLabel(c, { ...target, nameOffset: objectRetailNameOffset(Module, target.classId) },
-      hoverFont, projectStatic, recordPrim, hoverGlyphPainting, Module, snapshot.act);
+      hoverFont, projectStatic, recordPrim, hoverGlyphPainting);
   // The drop stays world-anchored above its static-grid feet (retail's drop label: s286).
   const label = target.label, width = hoverFont.measure(label);
   const [worldX, foot] = projectStatic(target.x, target.y);
@@ -3006,7 +2788,6 @@ function applyDisplayRamp(w, h) {
 }
 
 function render() {
-  setFrontdoorError(frontdoorError, !realmSceneActive && screen === SCREEN.SELECT ? charSelectError : '');
   // The frame-cost instrument (assets/frame-perf.mjs) is refreshed per frame and, while off, every
   // perfT0()/perfT() below is a no-op: the shipped frame draws byte-identically.
   perfSync();
@@ -3095,7 +2876,9 @@ function drawRealmFrame() {
     const point = worldToScreen(monster.x, monster.y);
     const x = point.x - cam.x + sx, y = point.y - cam.y + sy;
     return { depth: y, wx: monster.x, wy: monster.y, pass: 'realm-monster', draw(c) {
-      const actor = realmMonsterAnimationActor(monster, realmAnimationFrame);
+      const actor = { id: monster.guid, classId: monster.classId, code: monster.code, mode: monster.mode,
+        direction: monster.direction, components: monster.components, framePrecise: monster.framePrecise,
+        frameCountPrecise: monster.frameCountPrecise };
       try {
         const drawn = monsterRenderer?.draw(c, x, y, actor, realmWorldView.act + 1);
         monsterEvidence.push({ guid: monster.guid, classId: monster.classId, code: monster.code,
@@ -3140,14 +2923,6 @@ function drawRealmFrame() {
   } catch (error) {
     realmSceneError = String(error); terrainError = realmSceneError;
     realmSceneEvidence.error = realmSceneError;
-  }
-  const transition = realmPlayerReassignFade.drawState(performance.now(), w, h);
-  if (transition) {
-    ctx.save();
-    ctx.globalAlpha = transition.alpha / 255;
-    ctx.fillStyle = transition.color;
-    ctx.fillRect(transition.x, transition.y, transition.width, transition.height);
-    ctx.restore();
   }
 }
 
@@ -3282,20 +3057,11 @@ function drawFrame() {
       // beside the Missiles.txt CelFile. Native failed-cell resolution returns without replacement art.
       const missile = entity.missile || null;
       sprites.push({ depth: sy, wx: entity.x, wy: entity.y, pass: 'missile', draw(c) {
-        // Retail's missile draw reads the CUnit's facing and sequence frame. Without that record we
-        // cannot identify the requested frame or direction; scene tick/zero-facing guesses invent art.
-        if (!missile) {
-          missileEvidence.push({ id: entity.id, classId: entity.classId, drawn: false, missingAnimation: true,
-            direction: entity.direction ?? null, nativeDirection: entity.direction ?? null,
-            hasDynamicPath: entity.hasDynamicPath ?? null, mode: null, x: Math.round(sx), y: Math.round(sy) });
-          return;
-        }
         let drawn = null, error = null;
-        try { drawn = missileRenderer?.draw(c, sx, sy, entity, missile.direction, snapshot.tick,
-          missile.framePrecise >>> 8, missile.trans, snapshot.act); } catch (failure) { error = String(failure); }
+        try { drawn = missileRenderer?.draw(c, sx, sy, entity, missile ? missile.direction : 0, snapshot.tick,
+          missile ? (missile.framePrecise >>> 8) : null, missile ? missile.trans : null, snapshot.act); } catch (failure) { error = String(failure); }
         missileEvidence.push({ ...drawn, id: entity.id, classId: entity.classId, drawn: Boolean(drawn),
-          nativeDirection: entity.direction ?? null, hasDynamicPath: entity.hasDynamicPath ?? null,
-          mode: missile.mode, x: Math.round(sx), y: Math.round(sy), ...(error ? { error } : {}) });
+          mode: missile ? missile.mode : null, x: Math.round(sx), y: Math.round(sy), ...(error ? { error } : {}) });
       } });
       continue;
     }
@@ -3408,12 +3174,7 @@ function drawFrame() {
           // A broken weather must not take the world down with it: the terrain pass catches nothing, and
           // the error is reported on the evidence a row reads rather than swallowed.
           weatherRenderer ? (c, floors, viewport) => {
-            try {
-              const activeNearFeed = readSessionActiveNearFeed(Module);
-              weatherEvidence = { rain, activeNearFeedAudit: auditSessionActiveNearFeed(activeNearFeed),
-                blits: weatherRenderer.draw(c, w, h, engineTicks, wcam.x, wcam.y,
-                weatherWaterAnchors(floors, activeNearFeed)), errors: weatherRenderer.errors };
-            }
+            try { weatherEvidence = { rain, blits: weatherRenderer.draw(c, w, h, engineTicks, wcam.x, wcam.y, weatherWaterAnchors(floors, viewport)), errors: weatherRenderer.errors }; }
             catch (error) { weatherEvidence = { rain, blits: [], errors: weatherRenderer.errors, error: String(error) }; }
           } : null, viewCX());
         perfT('terrain', pTerrain);
@@ -3449,9 +3210,10 @@ function drawFrame() {
   // The whole statement (argument construction included) is the automap pass: its npc-name projection
   // runs retail string lookups per npc every frame, and a pass timed only around the call would miss it.
   const pAutomap = perfT0();
-  automapOverlay?.draw(ctx, w, h, snapshot, terrainTiles, automapOverlay.isOpen ? { camera: cameraCentre(), font: automapFont, fadeTargetX: viewCX(),
+  automapOverlay?.draw(ctx, w, h, snapshot, terrainTiles, automapOverlay.isOpen ? { camera: cameraCentre(), font: automapFont,
     npcs: snapshot.entities.filter((e) => e.npc).map((e) => { const [sx, sy] = proj(...unitAnchor(e));
-      return { sx, sy, label: npcNameLabels.get(e.classId) }; }) } : null, gameMenu?.settings);
+      const idx = Module.ccall('d2_monster_name_str', 'number', ['number'], [e.classId]);
+      return { sx, sy, label: idx >= 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [idx]) : '' }; }) } : null, gameMenu?.settings);
   perfT('automap', pAutomap);
   // A panel open on a half turns that half into tiled stone with its frame (SGD2FreeRes draw_screen_background).
   const pWide = perfT0();
@@ -3497,10 +3259,7 @@ function drawFrame() {
   // STAT_GOLDLOST, which the engine's own death path (PLRMODE_StartID_Death ->
   // PLAYER_ApplyDeathPenalty) sets; retail draws its string only when it is non-zero.
   if (session && snapshot.mode === 17 && ensureDeathScreen()) {
-    const clientFlags = Module._d2_session_client_flags
-      ? Module.ccall('d2_session_client_flags', 'number', [], []) : 0;
-    deathScreenEvidence = deathScreen.draw(ctx, w, h, { hardcore: Boolean(clientFlags & 0x04),
-      difficulty: snapshot.difficulty ?? 0, act: snapshot.act,
+    deathScreenEvidence = deathScreen.draw(ctx, w, h, { difficulty: snapshot.difficulty ?? 0, act: snapshot.act,
       goldLost: Module.ccall('d2_session_player_stat', 'number', ['number', 'number'], [175, 0]) });
   } else deathScreenEvidence = null;
   // The NPC's menu hangs over their head until an entry is picked.
@@ -3524,16 +3283,14 @@ function drawFrame() {
   // the speech box over Akara's own shop forever once Trade was picked. A shop that is actually open
   // (her stock fetched -- shopOpen()) cannot happen in retail before its greeting is already gone.
   let pendingSpeech = null;
-  if (npcState?.spoken != null) {
+  if (npcState?.spoken != null && !shopOpen() && ensureSpeechBox()) {
     // Ordinary dialogue uses retail's viewport-centred dialog origin, regardless of side panels.
-    // Defer the draw until after those panels so they cannot paint over the text. Retail sets the
-    // active ordinary-speech flag before the voice-mode check, so Audio Only still draws subtitles.
-    if (!shopOpen() && ensureSpeechBox() && npcSpeechScrollGate.ready)
-      pendingSpeech = { text: npcState.greeting, messageInstance: npcVoiceGeneration, scrolling: true };
+    // Defer the draw until after those panels so they cannot paint over the text.
+    pendingSpeech = { text: npcState.greeting, t0: npcState.speechT0 };
   } else if (shopOpen() && !globalThis.__d2HideShop && ensureVendorPanel()) {
     try { npcPanelEvidence = vendorPanel.draw(ctx, w, h, { ...npcState, pointer, act: snapshot?.act, stashGold: Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [0]) : -1 }); npcPanelError = ''; }
     catch (error) { npcPanelError = String(error); npcPanelEvidence = null; }
-  } else if (npcState && npcSpeechHasText(npcSpeechSetting.mode) && ensureSpeechBox()) {
+  } else if (npcState && ensureSpeechBox()) {
     // Plain talk, no shop, no active speech message: still the speech box (
     // F21), not the trade panel -- that was drawn for every conversation regardless of whether the
     // NPC sells anything, which is not what retail shows for a Talk with no shop behind it.
@@ -3549,43 +3306,7 @@ function drawFrame() {
   const layoutKey = session ? `${snapshot.playerClass}/${snapshot.playerId}/${snapshot.seed}` : '';
   if (inventoryPanelRenderer && session && (!inventoryPanelRenderer.layout || inventoryLayoutKey !== layoutKey)) {
     inventoryPanelRenderer.setLayout(readInventoryLayout()); inventoryLayoutKey = layoutKey; }
-  if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && session ? { ...snapshot, gold: Module.ccall('d2_session_player_gold', 'number', [], []), inventoryGoldPressed: Boolean(inventoryGoldPress), inventoryClosePressed: Boolean(inventoryClosePress) } : snapshot, panelShown(inventoryVisible));
-  // O / the configurable Hireling Screen binding reads the engine's canonical pet roster. The
-  // window exposes only values the roster's live unit supplies; a nearby monster is never treated
-  // as this player's mercenary. The composition remains a declared client gap (F199) pending its
-  // native frame reconstruction.
-  hirelingPanelEvidence = null;
-  if (hirelingVisible && session && !clearScreen) {
-    const scale = Math.min(1, w / 800, h / 600), ox = (w - 800 * scale) / 2, oy = (h - 600 * scale) / 2;
-    const x = ox + 400 * scale, y = oy + 60 * scale, pw = 320 * scale, ph = 441 * scale;
-    const roster = readHirelingRoster();
-    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = 'rgba(7, 6, 5, .92)'; ctx.fillRect(x, y, pw, ph);
-    ctx.strokeStyle = '#a38a54'; ctx.lineWidth = Math.max(1, scale); ctx.strokeRect(x + .5, y + .5, pw - 1, ph - 1);
-    ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.font = `${Math.max(11, 16 * scale)}px Georgia, serif`;
-    ctx.fillStyle = '#c7b377'; ctx.fillText('Hireling', x + 16 * scale, y + 18 * scale);
-    const rows = roster.map((pet) => {
-      const life = Math.max(0, pet.life >> 8), maxLife = Math.max(0, pet.maxLife >> 8);
-      return { guid: pet.guid, classId: pet.classId, name: pet.name || '', level: pet.level, life, maxLife,
-        dead: Boolean(pet.flags & 1), unitPresent: pet.unitPresent };
-    });
-    if (!rows.length) {
-      ctx.fillStyle = '#ded3b1'; ctx.fillText('No hireling', x + 16 * scale, y + 58 * scale);
-    }
-    for (let i = 0; i < rows.length; i++) {
-      const pet = rows[i], ry = y + (58 + i * 72) * scale;
-      ctx.fillStyle = '#ded3b1'; ctx.fillText(pet.name, x + 16 * scale, ry);
-      ctx.fillStyle = '#9e927b'; ctx.font = `${Math.max(10, 13 * scale)}px Georgia, serif`;
-      ctx.fillText(`Level ${pet.level}`, x + 16 * scale, ry + 22 * scale);
-      ctx.fillStyle = '#5c1713'; ctx.fillRect(x + 16 * scale, ry + 44 * scale, 180 * scale, 10 * scale);
-      const fraction = pet.maxLife > 0 ? Math.max(0, Math.min(1, pet.life / pet.maxLife)) : 0;
-      ctx.fillStyle = pet.dead ? '#5c1713' : '#bb3827'; ctx.fillRect(x + 16 * scale, ry + 44 * scale, 180 * scale * fraction, 10 * scale);
-      ctx.fillStyle = '#ded3b1'; ctx.fillText(`${pet.life} / ${pet.maxLife}`, x + 204 * scale, ry + 40 * scale);
-      ctx.font = `${Math.max(11, 16 * scale)}px Georgia, serif`;
-    }
-    ctx.restore();
-    hirelingPanelEvidence = { open: true, roster: rows, bounds: { x, y, width: pw, height: ph }, composition: 'approximate' };
-  }
+  if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && session ? { ...snapshot, gold: Module.ccall('d2_session_player_gold', 'number', [], []) } : snapshot, panelShown(inventoryVisible));
   pollUiEvents();
   if (stashPanelRenderer) {
     if (stashPanelRenderer?.plugy.on) { stashPanelRenderer.plugy.pageName = `${plugyStash.showShared ? 'Shared' : 'Personal'} Page n\u00b0${plugyStash.page + 1}`; stashPanelRenderer.plugy.nameColour = plugyStash.showShared ? 1 : 0; }
@@ -3599,13 +3320,8 @@ function drawFrame() {
     catch (error) { stashPanelError = 'cube: ' + error; cubeEvidence = null; }
   }
   if (stashGoldRenderer) {
-    try {
-      if (stashGoldDialog && (stashGoldPress?.action === 'increase' || stashGoldPress?.action === 'decrease')) {
-        const step = stashGoldSpinnerRepeat.onRender(globalThis.performance?.now?.() ?? Date.now());
-        if (step) changeStashGoldAmount(stashGoldPress.action === 'increase' ? step : -step);
-      }
-      stashGoldEvidence = stashGoldRenderer.draw(ctx, w, h, stashOpen ? readStashLayout() : null, stashOpen,
-        { ...(stashGoldDialog || {}), bank: stashGoldStat(STASH_GOLD.bank) }); stashGoldError = ''; }
+    try { stashGoldEvidence = stashGoldRenderer.draw(ctx, w, h, stashOpen ? readStashLayout() : null, stashOpen,
+      { ...(stashGoldDialog || {}), bank: stashGoldStat(STASH_GOLD.bank) }); stashGoldError = ''; }
     catch (error) { stashGoldError = String(error); stashGoldEvidence = null; }
   }
   if (waypointPanelRenderer) {
@@ -3627,7 +3343,6 @@ function drawFrame() {
       life: (snapshot.player?.hp ?? 0) >> 8, lifeMax: (snapshot.player?.hpMax ?? 0) >> 8,
       mana: (snapshot.player?.mana ?? 0) >> 8, manaMax: (snapshot.player?.manaMax ?? 0) >> 8, act: snapshot.act,
       screen: characterVisible ? readCharacterScreen() : null,
-      closePressed: characterPanelCloseGesture.pressed,
       string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]),
     }, panelShown(characterVisible));
   }
@@ -3635,7 +3350,6 @@ function drawFrame() {
   if (questLogRenderer && panelShown(questVisible) && session && !clearScreen) {
     const words = readQuestWords(), act = questAct || (questAct = snapshot.act || 1, questSelected = questFirst(words, questAct), questAct);
     questEvidence = questLogRenderer.draw(ctx, w, h, { act, tabs: questTabs(words, snapshot.act || 1), words, selected: questSelected, descrOn: questDescrOn,
-      pressed: questCloseGesture.pressed ? 'close' : null,
       anim: { quests: questAnim, tick: engineTicks - questOpenedAt },
       string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]) }, true, snapshot.act || 1);
   }
@@ -3684,7 +3398,7 @@ function drawFrame() {
     // Ordinary NPC speech is screen-centred and does not consume the left half.
     // Only the actual vendor panel participates in the retail side-panel layout.
     const left = characterVisible || questVisible || stashOpen || waypointMenu || shopOpen();
-    const right = skillsVisible || inventoryVisible || hirelingVisible;
+    const right = skillsVisible || inventoryVisible;
     const shift = HUD_LAYOUT.miniPanelShift;
     controlPanelEvidence = controlPanelRenderer.draw(ctx, w, h, snapshot, readAdvancement(),
       { iconRow: hudIconRow && !(left && right), offsetX: left && !right ? shift.left : right && !left ? shift.right : 0,
@@ -3704,10 +3418,10 @@ function drawFrame() {
   // overlay order so inventory and quest art cannot cover the viewport-centred text.
   if (pendingSpeech) {
     try {
-      const spoke = speechBox.draw(ctx, pendingSpeech.text, undefined,
-        { messageInstance: pendingSpeech.messageInstance });
+      const scrolling = pendingSpeech.t0 !== undefined;
+      const spoke = speechBox.draw(ctx, pendingSpeech.text, undefined, scrolling ? { t0: pendingSpeech.t0 } : {});
       npcPanelEvidence = spoke; npcPanelError = '';
-      if (pendingSpeech.scrolling && spoke.done) dismissSpeech();
+      if (scrolling && spoke.done) dismissSpeech();
     } catch (error) { npcPanelError = String(error); npcPanelEvidence = null; }
   }
   // F115: retail's area-name block -- the level's own name above `v 1.13` and `EXPANSION` -- drawn
@@ -3732,7 +3446,7 @@ function drawFrame() {
   // label announces, so drawing it over the screen it opens is a collision, not information.
   if (hudHelp && !clearScreen && !helpVisible && !helpMenuSeen() && !skillsVisible && !shopOpen() && !stashOpen) {
     try { const ho = hudOrigin(w, h, 'bottom-right'); ctx.save(); ctx.translate(ho.x, ho.y);
-      try { { const d = hudHelp.draw(ctx, snapshot.act || 1, { pressed: hudHelpPointer.pressed }); hudHelpEvidence = { ...d, hit: { x: Math.round(ho.x + d.hit.x), y: Math.round(ho.y + d.hit.y), w: d.hit.w, h: d.hit.h }, origin: { x: ho.x, y: ho.y } }; } } finally { ctx.restore(); } hudHelpError = ''; }
+      try { { const d = hudHelp.draw(ctx, snapshot.act || 1); hudHelpEvidence = { ...d, hit: { x: Math.round(ho.x + d.hit.x), y: Math.round(ho.y + d.hit.y), w: d.hit.w, h: d.hit.h }, origin: { x: ho.x, y: ho.y } }; } } finally { ctx.restore(); } hudHelpError = ''; }
     catch (error) { hudHelpEvidence = null; hudHelpError = String(error); }
   }
   // Retail's Help screen, over the HUD it describes -- its labels' leader lines point at HUD
@@ -3771,7 +3485,7 @@ function drawFrame() {
   // Retail draws the Help screen over the finished HUD chrome (belt, skill sockets): after them, not before.
   helpEvidence = null;
   if (helpRenderer && helpVisible) {
-    try { helpEvidence = helpRenderer.draw(ctx, w, h, { closePressed: gameUiButtonGesture.token === 'help-close' }); helpError = ''; }
+    try { helpEvidence = helpRenderer.draw(ctx, w, h); helpError = ''; }
     catch (error) { helpEvidence = null; helpError = String(error); }
   }
   hud.textContent = hudLines(snapshot, Boolean(session), fps).join('\n');
@@ -3880,13 +3594,6 @@ function readWaypointTable() {
     return { rows: (act) => byAct.get(act) || [], tabs: tabActsOf(byAct) };
   } finally { Module._free(p); }
 }
-// D2Client FUN_6FB5A090 lowers tab clicks using completion flags, not the tabs that happened to
-// draw for this character's active waypoints. State bit 0 is QFLAG_REWARDGRANTED.
-function readWaypointActCompletion() {
-  const states = [7, 0x0f, 0x17, 0x1c];
-  const values = states.map((state) => Module.ccall('d2_session_quest_flag', 'number', ['number', 'number'], [state, 0]));
-  return values.every((value) => value === 0 || value === 1) ? values.map((value) => value === 1) : null;
-}
 // Retail's 0x49: travel to levelId through the open waypoint, or close the menu with 0.
 function takeWaypoint(levelId) {
   if (!waypointMenu) return 0;
@@ -3920,28 +3627,6 @@ function readInventoryLayout() {
     return { ...inventoryLayoutFromEngine(grid, comps), row };
   } finally { Module._free(p); }
 }
-// The hireling panel must follow PlayerPets' PETTYPE_HIREABLE roster, not pick the nearest
-// UNIT_MONSTER (which can be a hostile, summon, or another owner's hireling). The engine supplies
-// the hireling's translated name id and current fixed-point life values from that exact pet record.
-function readHirelingRoster() {
-  if (!session || !Module._d2_session_hireling_roster) return [];
-  const countAt = Number(Module.ccall('malloc', 'bigint', ['number'], [4]));
-  if (!countAt) return [];
-  try {
-    const pointer = Number(Module.ccall('d2_session_hireling_roster', 'number', ['bigint'], [BigInt(countAt)]));
-    const count = Module.HEAPU32[countAt >>> 2];
-    if (!pointer || count > 64) return [];
-    const v = new DataView(Module.HEAPU8.buffer, pointer, count * 40);
-    return Array.from({ length: count }, (_, i) => {
-      const o = i * 40, nameId = v.getUint32(o + 8, true);
-      return { guid: v.getUint32(o, true), classId: v.getUint32(o + 4, true), nameId,
-        name: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [nameId]),
-        seed: v.getUint32(o + 12, true), flags: v.getUint32(o + 16, true), hirelingId: v.getInt32(o + 20, true),
-        level: v.getInt32(o + 24, true), life: v.getInt32(o + 28, true), maxLife: v.getInt32(o + 32, true),
-        unitPresent: Boolean(v.getUint32(o + 36, true)) };
-    });
-  } finally { Module._free(countAt); }
-}
 // Retail's item-cursor packets, through the engine's recovered handlers. Each returns the handler's
 // result and is recorded in lastItemCommand.
 function itemCommand(name, ...args) {
@@ -3957,8 +3642,6 @@ function itemCommand(name, ...args) {
     const p = Module._malloc(3); Module.HEAPU8.set([0x1C, args[0] & 255, args[0] >> 8], Number(p));
     try { result = Module.ccall('d2_session_client_packet', 'number', ['bigint', 'number'], [BigInt(p), 3]); } finally { Module._free(p); }
   }
-  // Equipment changes affect the hero-dependent requirement and attack-speed lines on cached items.
-  if (name === 'equip' || name === 'swap' || name === 'unequip') propCache.clear();
   lastItemCommand = { name, args, result, cursor: Module.ccall('d2_session_cursor_item', 'number', [], []) };
   snapshot = session.snapshot();
   return result;
@@ -3990,18 +3673,9 @@ function openStashGold(mode) {
   const available = stashGoldStat(mode === 'withdraw' ? STASH_GOLD.bank : STASH_GOLD.carried);
   // Retail opens the deposit box on ALL the carried gold and the withdraw box on nothing (both measured,
   // the retail captures and stash-gold-withdraw.txt).
-  stashGoldPress = null;
-  stashGoldSpinnerRepeat.release();
-  stashGoldDialog = { open: true, mode, available, amount: mode === 'withdraw' ? 0 : available, pressedControl: null };
+  stashGoldDialog = { open: true, mode, available, amount: mode === 'withdraw' ? 0 : available };
 }
-function clearStashGoldPress(pointerId = null) {
-  if (!stashGoldPress || (pointerId !== null && stashGoldPress.pointerId !== pointerId)) return false;
-  stashGoldPress = null;
-  stashGoldSpinnerRepeat.release();
-  if (stashGoldDialog) stashGoldDialog.pressedControl = null;
-  return true;
-}
-function closeStashGold() { stashGoldPress = null; stashGoldSpinnerRepeat.release(); stashGoldDialog = null; }
+function closeStashGold() { stashGoldDialog = null; }
 function changeStashGoldAmount(delta) {
   if (!stashGoldDialog) return;
   stashGoldDialog.amount = Math.max(0, Math.min(stashGoldDialog.available, stashGoldDialog.amount + delta));
@@ -4079,12 +3753,11 @@ function resetConfiguredHolds() {
   heldConfiguredActions.clear(); heldRunKeys.clear(); heldStandStillKeys.clear(); heldShowItemsKeys.clear();
   runWalkLock = readRunToggle(); showItemsEvidence = []; standStillSuppressedMoves = 0;
 }
-function objectUnderPointer(px, py, { nativeHover = false, allCandidates = false } = {}) {
+function objectUnderPointer(px, py, { nativeHover = false } = {}) {
   if (!session) return null;
   const camera = worldToScreen(cameraCentre().x, cameraCentre().y);   // the SAME camera render() draws with
   const w = canvas.width, h = canvas.height;
   let best = null, bestDistance = Infinity;
-  const hoverCandidates = [];
   // Retail's hover skips an object its mode makes unselectable (Objects.txt Selectable<mode>): an
   // opened chest is not clicked again -- s000a re-operated one every 6 frames while picking up its
   // drop, and each operate re-armed its trap (96 trap-firebolt monsters from one chest).
@@ -4123,54 +3796,32 @@ function objectUnderPointer(px, py, { nativeHover = false, allCandidates = false
     // bottom-up edge convention); object clicks use the separate hitTest=0 path and retain the
     // narrower painted-box/anchor rule below. `measure()` reports the composed top-left, so the
     // native vertical top edge is one pixel above its first painted row, then receives 12 px pad.
-    // Native x86 uses signed `<`/`>` rejects around all four edges, so the rectangle is closed.
-    // Desktop cursor positions are integer pixels; browser test/input points are pixel centres.
+    let nativeHoverHit = false;
+    if (box && box.width > 0 && box.height > 0) {
+      let left = Math.round(ox + box.xOffset - 12), right = Math.round(ox + box.xOffset + box.width + 12);
+      let lowY = Math.round(oy + box.yOffset - 13), highY = Math.round(oy + box.yOffset + box.height + 11);
+      const narrowX = box.width + 24, narrowY = box.height + 24;
+      if (narrowX < 32) { const extra = (32 - narrowX) >> 1; left -= extra; right += extra; }
+      if (narrowY < 32) { const extra = (32 - narrowY) >> 1; lowY -= extra; highY += extra; }
+      // Native x86 uses signed `<`/`>` rejects around all four edges, so the rectangle is closed.
+      // Desktop cursor positions are integer pixels; browser test/input points are pixel centres.
+      nativeHoverHit = Math.floor(px) >= left && Math.floor(px) <= right && Math.floor(py) >= lowY && Math.floor(py) <= highY;
+    }
+    // The recovered client asks one active DCC cel. The single-layer issue 6 stash row below is an exact
+    // match for that shape; retain the prior object box for layered COFs until their native cel
+    // choice is independently mapped.
     const hit = nativeHover
-      ? nativeObjectHoverContains(px, py, box, ox, oy)
+      ? (box?.layers === 1 ? nativeHoverHit : (inBox || (!coversOrigin && d <= 6)))
       : (inBox || (!coversOrigin && d <= 6));
-    if (hit && nativeHover) {
-      // #11020 plus a client helper participates in retail's object branch. Their outcome semantics
-      // are unresolved, so expose that gap while ranking only this browser hit-test result.
-      hoverCandidates.push({ ...object, nativeHoverGate: nativeHoverSpecialGate({ type: 2 }) });
-      if (d < bestDistance) { best = object; bestDistance = d; }
-    } else if (hit && d < bestDistance) { best = object; bestDistance = d; }
+    if (hit && d < bestDistance) { best = object; bestDistance = d; }
   }
-  return nativeHover && allCandidates ? hoverCandidates : best;
+  return best;
 }
 // Pointer minus the unit's cel anchor, screen px (the box test's input).
 function unitBoxHit(entity, px, py) {
   const camera = worldToScreen(cameraGrid().x, cameraGrid().y), [anchorX, anchorY] = unitAnchor(entity), point = worldToScreen(anchorX, anchorY);   // F14: hover around the same engine-precise anchor the sprite pass draws; grid x/y lags a moving unit.
   // the cel anchor is an integer pixel (retail's measurement is 1 px exact), so round it the way the sprite is placed
   return inUnitHoverBox(px - Math.round(point.x - camera.x + viewCX()), py - Math.round(point.y - camera.y + (canvas.height / 2 + UNIT_CENTRE_Y)), entity.hostile === true);
-}
-
-function nativeUnitState143(entity) {
-  if (entity?.ordinal10494_8f === true || entity?.ordinal10494_8f === false) return entity.ordinal10494_8f;
-  if (!session || !Module._d2_session_unit_info || entity?.type !== 1) return undefined;
-  try {
-    // This server-side unit-info export reads STATES_CheckState(..., 143) at word 13. Call before
-    // taking the heap view because a native call may grow Wasm memory.
-    const ptr = Number(Module.ccall('d2_session_unit_info', 'number', ['number', 'number'], [1, entity.id]));
-    return new Int32Array(Module.HEAPU8.buffer, ptr, 14)[13] !== 0;
-  } catch { return undefined; }
-}
-
-function unitsUnderPointer(px, py) {
-  if (!session) return [];
-  const hits = [];
-  for (const entity of snapshot.entities) {
-    if (!(entity.hostile || entity.npc) || !unitBoxHit(entity, px, py)) continue;
-    const attackAccepted = isPrimaryTargetEligible(entity, (candidate) => unitBoxHit(candidate, px, py));
-    if (!entity.npc && !attackAccepted) continue;
-    const row = { ...entity, type: 1 };
-    const state143 = nativeUnitState143(row);
-    if (state143 !== undefined) row.ordinal10494_8f = state143;
-    // #10648 lowers type-1 mode 0/12 unit priority; native candidate eligibility and stored-target
-    // semantics remain open.
-    row.nativeHoverGate = nativeHoverSpecialGate(row);
-    hits.push(row);
-  }
-  return hits;
 }
 
 function npcUnderPointer(px, py) {
@@ -4225,7 +3876,7 @@ function openTalkBox(npcId, menuState) {
 function dismissSpeech() {
   // Retail disposes the current speech object on dismissal, then starts the next object. Reset even
   // when adjacent queued messages share a StringId so the same voice can play again.
-  unitSounds?.stopDialogue(); npcVoiceKey = null; npcVoiceGeneration++; npcSpeechScrollGate.cancel(); npcSpeechClickGate.cancel(); npcSpeechClickKey = null;
+  unitSounds?.stopDialogue(); npcVoiceKey = null;
   // Dismissing the speech tells the server it was heard -- retail's 0x31 with the message id --
   // which is where a quest message does its work (Akara's A1Q1 reward is granted on message 76).
   // A `silent` speech (an intro/gossip line the engine's list does not hold) is never acked.
@@ -4258,7 +3909,10 @@ function talkToNpc(npcId) {
       const said = readNpcState(); { const l = readDialogMessages(); if (l.length) npcTopics.set(npcId, l); }
       if (said?.spoken != null) {
         noteIntro(npc.classId);
-        npcState = { ...said, own: true };
+        // The opening greeting uses the same native scroll clock as a selected Talk topic. Without
+        // an explicit start time the text may scroll visually, but the draw path never calls
+        // dismissSpeech(), so 0x31 is not sent and the alert/menu remain stuck until a key press.
+        npcState = { ...said, speechT0: performance.now(), own: true };
         menuAfterSpeech = { npcId, classId: npc.classId, name, entries };
         return true;
       }
@@ -4277,7 +3931,7 @@ function talkToNpc(npcId) {
 // The hero-class introduction the engine offers (its plain menu-0 message), remembered: the list empties once it is heard.
 const npcIntroHeard = new Map(), npcTopics = new Map();   // npcTopics: npcId -> the dialog list last seen
 const noteIntro = (classId) => { const p = readDialogMessages().find((m) => m.menu === 0); if (p) npcIntroHeard.set(classId, p.stringId); };
-let npcMenu = null, npcMenuError = '', npcMenuEvidence = null, menuAfterSpeech = null, npcMenuPointerPress = null;
+let npcMenu = null, npcMenuError = '', npcMenuEvidence = null, menuAfterSpeech = null;
 function ensureNpcMenu() {
   if (npcMenu || npcMenuError || !window.__d2?.ready) return npcMenu;
   try {
@@ -4290,7 +3944,6 @@ function ensureNpcMenu() {
 // interaction already started), Trade/Gamble ask the server for the shop (retail's 0x38 with the
 // counter), Cancel ends the interaction (0x30).
 function chooseNpcMenu(entry) {
-  npcMenuPointerPress = null;
   const npcId = npcMenu.state.npcId, menuState = { ...npcMenu.state };
   npcMenu.close();
   // What Talk says is dismissed back to this menu, as the first speech is.
@@ -4309,6 +3962,7 @@ function chooseNpcMenu(entry) {
     npcState = { ...(readNpcState() || { npcId, classId: menuState.classId, items: [], gold: 0 }), npcId, spoken: id,
       greeting: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [id]),
       silent: !inList.some((m) => m.stringId === id), own: true };
+    npcState.speechT0 = performance.now();
     syncNpcDialogueVoice(npcState);
     return;
   }
@@ -4320,7 +3974,6 @@ function chooseNpcMenu(entry) {
     const packet = new Uint8Array([0x34, npcId & 255, (npcId >>> 8) & 255, (npcId >>> 16) & 255, (npcId >>> 24) & 255]);
     const raw = Module._malloc(5), at = Number(raw); Module.HEAPU8.set(packet, at);
     try { Module.ccall('d2_session_client_packet', 'number', ['bigint', 'number'], [BigInt(at), 5]); } finally { Module._free(raw); }
-    propCache.clear();
     const npc = snapshot.entities.find((u) => u.id === npcId && u.type === 1);
     npcMenu.show(npcId, menuState.classId, menuState.name, npc ? menuEntriesFor(npc) : menuState.entries.filter((e) => e.action !== 'identify'));
     return;
@@ -4397,7 +4050,6 @@ function openPanelAt(x, y) {
   if (questVisible && inside({ left: 80, top: 61, width: 320, height: 440 })) return 'quest';
   if (skillsVisible && inside(skillPanelRenderer?.panelRect?.())) return 'skills';
   if (inventoryVisible && inside(inventoryPanelRenderer?.panelRect?.())) return 'inventory';
-  if (hirelingVisible && inside({ left: 400, top: 60, width: 320, height: 441 })) return 'hireling';
   if (stashOpen && inside(stashPanelRenderer?.panelRect?.(readStashLayout()))) return 'stash';
   if (cubeOpen && inside(cubePanelRenderer?.panelRect?.(readCubeLayout()))) return 'cube';
   return null;
@@ -4417,27 +4069,13 @@ function canvasPoint(event) {
   const r = canvas.getBoundingClientRect();
   return [(event.clientX - r.left) * canvas.width / r.width, (event.clientY - r.top) * canvas.height / r.height];
 }
-hudHelpPointer = bindHudHelpPointer(canvas, {
-  point: canvasPoint,
-  hit: () => hudHelpEvidence?.hit,
-  enabled: () => screen === SCREEN.GAME && !helpVisible && !helpMenuSeen() && !skillsVisible &&
-    !shopOpen() && !stashOpen && !clearScreen && !controlsPanel?.open &&
-    modalPointerOwner({ gameMenuOpen: gameMenu?.open, stashGoldDialogOpen: stashGoldDialog?.open }) === null,
-  canActivate: () => screen === SCREEN.GAME && !helpVisible,
-  activate: () => { helpVisible = true; markHelpMenuSeen(); },
-  focus: () => canvas.focus(),
-  changed: () => render(),
-});
 addEventListener('keydown', (e) => {
   // Escape skips a boot movie, exactly as a click does (retail aborts the logo films on a key too).
   if (screen === SCREEN.TITLE && bootMovieSpec(titlePhase) && e.code === 'Escape' && !e.repeat) { titleAdvance(); e.preventDefault(); return; }
   if (screen === SCREEN.CREDITS && e.code === 'Escape' && !e.repeat) { exitToTitle(); e.preventDefault(); return; }
   if (screen === SCREEN.CINEMATICS && e.code === 'Escape' && !e.repeat) { cinematicsScreen?.escape(); e.preventDefault(); return; }
   if (screen === SCREEN.OTHER_MULTIPLAYER && e.code === 'Escape' && !e.repeat) { otherMultiplayerScreen?.escape(); e.preventDefault(); return; }
-  if (screen === SCREEN.TITLE && titlePhase === 'menu' && titleScreen?.key(e.code)) {
-    actMusic?.playTitle().catch((error) => { musicError = String(error); });
-    e.preventDefault(); render(); return;
-  }
+  if (screen === SCREEN.TITLE && titlePhase === 'menu' && titleScreen?.key(e.code)) { e.preventDefault(); render(); return; }
   if (screen === SCREEN.CREATE) { if (charCreate?.typeKey(e.code, e.key)) e.preventDefault(); return; }
   // The amount box is modal. It gets Esc/Enter and numeric typing before the
   // global bindings, so Esc does not accidentally close the stash behind it.
@@ -4471,9 +4109,6 @@ addEventListener('keydown', (e) => {
   // Configured functions own repeats too, even when they only act on the first press. Otherwise a
   // rebound key can fall through to CommandInput on repeat after its initial configured action.
   if (configuredAction && e.repeat) { e.preventDefault(); return; }
-  const characterPhrase = sendCharacterPhrase(configuredAction,
-    realmSceneActive && realmPlayerView?.active ? realmFlow?.d2gs : null);
-  if (characterPhrase.handled) { e.preventDefault(); return; }
   if (configuredAction === 'Run' || configuredAction === 'Stand Still' || configuredAction === 'Show Items') {
     heldConfiguredActions.set(e.code, configuredAction);
     if (configuredAction === 'Run') {
@@ -4485,9 +4120,8 @@ addEventListener('keydown', (e) => {
     e.preventDefault(); return;
   }
   if (configuredAction === 'Chat' && !e.repeat && !npcState && !gameMenu?.open) { chat = ''; e.preventDefault(); return; }
-  syncAreaMusic(snapshot.level);
-  if (configuredAction === 'Inventory Screen' && !e.repeat) { inventoryVisible = !inventoryVisible; if (inventoryVisible) hirelingVisible = false; e.preventDefault(); return; }
-  if (configuredAction === 'Hireling Screen' && !e.repeat) { hirelingVisible = !hirelingVisible; if (hirelingVisible) { inventoryVisible = false; skillsVisible = false; } e.preventDefault(); return; }
+  actMusic?.play(snapshot.act - 1).catch((error) => { musicError = String(error); });
+  if (configuredAction === 'Inventory Screen' && !e.repeat) { inventoryVisible = !inventoryVisible; e.preventDefault(); return; }
   if (configuredAction === 'Character Screen' && !e.repeat) { characterVisible = !characterVisible; if (characterVisible) questVisible = false; e.preventDefault(); return; }
   if (configuredAction === 'Quest Log' && !e.repeat) { toggleQuest(); e.preventDefault(); return; }
   if (configuredAction === 'Message Log' && !e.repeat) { toggleMessage(); e.preventDefault(); return; }
@@ -4505,7 +4139,7 @@ addEventListener('keydown', (e) => {
   // click where a hidden control used to be reaches the world instead of the invisible control (F3c).
   // F3c, retail's own frames: Space closes an open
   // panel and hides NO chrome -- the orbs, belt and mini panel stay drawn -- and with no panel open it does nothing.
-  if (configuredAction === 'Clear Screen' && !e.repeat) { inventoryVisible = characterVisible = skillsVisible = questVisible = messageVisible = hirelingVisible = false; e.preventDefault(); return; }
+  if (configuredAction === 'Clear Screen' && !e.repeat) { inventoryVisible = characterVisible = skillsVisible = questVisible = messageVisible = false; e.preventDefault(); return; }
   // Retail's right-hand skill selector (`CfgSkillPick`; OpenDiablo2's ToggleRightSkillSelector is
   // KeyS): the SAME primitive as a click on the right socket, so there is one popup and one owner --
   // what it lists and what it selects is the engine's, exactly as the clicked path is.
@@ -4533,7 +4167,7 @@ addEventListener('keydown', (e) => {
   // and flips the active one -- so what the paperdoll and the skills show afterwards is the engine's
   // answer, in one place (F3).
   if (configuredAction === 'Swap Weapons' && !e.repeat) { session?.swapWeapons?.(); e.preventDefault(); return; }
-  if (configuredAction === 'Skill Tree' && !e.repeat) { skillsVisible = !skillsVisible; if (skillsVisible) hirelingVisible = false; e.preventDefault(); return; }
+  if (configuredAction === 'Skill Tree' && !e.repeat) { skillsVisible = !skillsVisible; e.preventDefault(); return; }
   const belt = /^Use Belt ([1-4])$/.exec(configuredAction || '');
   if (belt && !e.repeat) { input.queue.push({ type: COMMAND.BELT, slot: Number(belt[1]) - 1 }); e.preventDefault(); return; }
   const skill = /^Skill ([1-8])$/.exec(configuredAction || '');
@@ -4570,11 +4204,11 @@ addEventListener('keydown', (e) => {
     if (Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [23, 0])) cubeOpen = false;
     e.preventDefault(); return; }
   if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && gameMenu?.open) { gameMenu.back(); e.preventDefault(); return; }
-  if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && (messageVisible || questVisible) && !(waypointMenu || stashOpen || npcState || inventoryVisible || hirelingVisible || characterVisible || skillsVisible)) { messageVisible = false; questVisible = false; e.preventDefault(); return; }
-  if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && !(waypointMenu || stashOpen || npcState || inventoryVisible || hirelingVisible || characterVisible || skillsVisible)) {
+  if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && (messageVisible || questVisible) && !(waypointMenu || stashOpen || npcState || inventoryVisible || characterVisible || skillsVisible)) { messageVisible = false; questVisible = false; e.preventDefault(); return; }
+  if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && !(waypointMenu || stashOpen || npcState || inventoryVisible || characterVisible || skillsVisible)) {
     ensureGameMenu()?.toggle(); e.preventDefault(); return;
   }
-  if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && (waypointMenu || stashOpen || npcState || inventoryVisible || hirelingVisible || characterVisible || skillsVisible)) {
+  if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && (waypointMenu || stashOpen || npcState || inventoryVisible || characterVisible || skillsVisible)) {
     if (waypointMenu) {
       // Retail closes the waypoint menu with 0x49 and level 0.
       takeWaypoint(0);
@@ -4584,22 +4218,18 @@ addEventListener('keydown', (e) => {
       if (Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [18, 0])) { stashOpen = false; inventoryVisible = false; closeStashGold(); }
     } else if (npcState) {
       if (dismissSpeech()) { e.preventDefault(); return; }
-    } else { inventoryVisible = false; hirelingVisible = false; characterVisible = false; skillsVisible = false; }
+    } else { inventoryVisible = false; characterVisible = false; skillsVisible = false; }
     e.preventDefault(); return;
   }
   if (input.key(e.code, true, e.repeat)) e.preventDefault(); });
 addEventListener('keyup', (e) => { if (releaseConfiguredHold(e.code) || input.key(e.code, false)) e.preventDefault(); });
-addEventListener('blur', () => { controlsPanel?.pointerCancel(); gameMenu?.pointerCancelAll(); releaseAllConfiguredHolds(); input.keys.clear(); hudHelpPointer.clear(); cancelHelpClosePress(); worldPointerHeld = false; worldRightPointerHeld = false; heldRightPointerTicks = 0; inventoryGoldPress = null; inventoryClosePress = null; clearStashGoldPress(); });
+addEventListener('blur', () => { controlsPanel?.pointerCancel(); releaseAllConfiguredHolds(); input.keys.clear(); worldPointerHeld = false; worldRightPointerHeld = false; heldRightPointerTicks = 0; });
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') {
     controlsPanel?.pointerCancel();
-    gameMenu?.pointerCancelAll();
     releaseAllConfiguredHolds();
-    hudHelpPointer.clear();
-    cancelHelpClosePress();
     worldPointerHeld = false;
     worldRightPointerHeld = false; heldRightPointerTicks = 0;
-    inventoryGoldPress = null; inventoryClosePress = null; clearStashGoldPress();
   }
 });
 canvas.addEventListener('wheel', (e) => { if (npcMenu?.hireOpen) { npcMenu.hireScroll(Math.sign(e.deltaY)); e.preventDefault(); } }, { passive: false });
@@ -4630,9 +4260,6 @@ canvas.addEventListener('pointermove', (e) => {
 });
 canvas.addEventListener('pointerleave', (e) => {
   controlsPanel?.pointerMove(-1, -1, canvas.width, canvas.height, e.pointerId, e.buttons);
-  if (screen === SCREEN.TITLE && titlePhase === 'menu') titleScreen?.hover(-1, -1, canvas.width, canvas.height);
-  else if (screen === SCREEN.SELECT) charSelect?.hover(-1, -1, canvas.width, canvas.height);
-  else if (screen === SCREEN.CREATE) charCreate?.setPointer(-1, -1, canvas.width, canvas.height);
 });
 canvas.addEventListener('pointerdown', (e) => {
   gameCursor?.noteInput();
@@ -4646,57 +4273,29 @@ canvas.addEventListener('pointerdown', (e) => {
   const modalOwner = modalPointerOwner({ gameMenuOpen: screen === SCREEN.GAME && gameMenu?.open, stashGoldDialogOpen: screen === SCREEN.GAME && stashGoldDialog?.open });
   // F218: the Configure controls panel sits over the Options page and owns the pointer while it is
   // up -- checked before the game menu because the menu is still "open" underneath it.
-  if (screen === SCREEN.GAME && controlsPanel?.open) {
-    click.spent = 'configureControls'; const [mx, my] = canvasPoint(e);
-    const target = controlsPanel.pointerDown(mx, my, canvas.width, canvas.height, e.pointerId, e.button);
-    if ((target?.scroll || target?.button) && e.button === 0) try { canvas.setPointerCapture(e.pointerId); } catch {}
-    render(); canvas.focus(); e.preventDefault(); return;
-  }
-  if (modalOwner === MODAL_POINTER_OWNER.GAME_MENU) {
-    click.spent = 'gameMenu'; const [mx, my] = canvasPoint(e);
-    if (!gameMenu.pointerDown(mx, my, canvas.width, canvas.height, e.pointerId, e.button)) gameMenu.click(mx, my, canvas.width, canvas.height);
-    else { try { canvas.setPointerCapture(e.pointerId); } catch {} render(); }
-    canvas.focus(); e.preventDefault(); return;
-  }
-  // D2Client routes both speech mouse-down messages through its active speech table. The first
-  // 100 ms are consumed; afterward either button dismisses the current speech object.
-  if (screen === SCREEN.GAME && npcState?.spoken != null && !shopOpen() && (e.button === 0 || e.button === 2)) {
-    click.spent = 'npcSpeech';
-    if (npcSpeechClickGate.pointerDown(e.button, performance.now()) === 'dismiss') { dismissSpeech(); render(); }
-    canvas.focus(); e.preventDefault(); return;
-  }
+  if (screen === SCREEN.GAME && controlsPanel?.open) { click.spent = 'configureControls'; const [mx, my] = canvasPoint(e); controlsPanel.pointerDown(mx, my, canvas.width, canvas.height, e.pointerId, e.button); canvas.focus(); e.preventDefault(); return; }
+  if (modalOwner === MODAL_POINTER_OWNER.GAME_MENU) { click.spent = 'gameMenu'; const [mx, my] = canvasPoint(e); gameMenu.click(mx, my, canvas.width, canvas.height); canvas.focus(); e.preventDefault(); return; }
   if (screen === SCREEN.TITLE || screen === SCREEN.CREDITS || screen === SCREEN.CINEMATICS || screen === SCREEN.OTHER_MULTIPLAYER || screen === SCREEN.CREATE || screen === SCREEN.SELECT) {
     click.spent = `screen-${screen}`;
-    if (screen === SCREEN.TITLE && titlePhase === 'menu') {
-      actMusic?.playTitle().catch((error) => { musicError = String(error); });
-    }
     const [tx, ty] = [x, y];
     // A front-end control is ARMED here and fires on the matching release (see the pointerup
     // listener): retail activates a button on mouse-up, and only when the pointer is still over
     // the control it went down on. The press is also what puts the button in its down cel -- hover
     // alone never does. TITLE keeps titleAdvance(): the trademark phase owns its own countdown, so
     // a press during it arms the phase rather than reaching the menu behind it (s198).
-    frontendPointerStates.press(e.pointerId, frontendPointerControl(), tx, ty, canvas.width, canvas.height, e.button);
+    frontendPointerStates.press(e.pointerId, frontendPointerControl(), tx, ty, canvas.width, canvas.height);
     canvas.focus(); e.preventDefault(); return;
   }
-  syncAreaMusic(snapshot.level);
+  actMusic?.play(snapshot.act - 1).catch((error) => { musicError = String(error); });
   // The amount box is modal, including outside its visible controls. Consume
   // its click before a skill socket or other HUD control can react behind it.
   if (modalOwner === MODAL_POINTER_OWNER.STASH_GOLD_DIALOG && stashGoldRenderer && session) {
     click.spent = 'stashGoldDialog';
     const hit = stashGoldRenderer.hitAt(x, y, canvas.width, canvas.height, readStashLayout(), true);
-    if (e.button === 0 && hit && ['submit', 'close', 'increase', 'decrease'].includes(hit.action)) {
-      stashGoldSpinnerRepeat.release();
-      stashGoldPress = { pointerId: e.pointerId, action: hit.action };
-      stashGoldDialog.pressedControl = hit.action;
-      try { canvas.setPointerCapture(e.pointerId); } catch {}
-      // Native spinner callbacks act on down; OK and close callbacks wait for a matching release.
-      if (hit.action === 'increase' || hit.action === 'decrease') {
-        stashGoldSpinnerRepeat.press(hit.action, globalThis.performance?.now?.() ?? Date.now());
-        changeStashGoldAmount(hit.action === 'increase' ? 1 : -1);
-      }
-      render();
-    }
+    if (hit?.action === 'submit') submitStashGold();
+    else if (hit?.action === 'close') closeStashGold();
+    else if (hit?.action === 'increase') changeStashGoldAmount(1);
+    else if (hit?.action === 'decrease') changeStashGoldAmount(-1);
     canvas.focus(); e.preventDefault(); return;
   }
   // Retail's Help screen owns the mouse while it is up: OpenDiablo2's game_controls.go consumes a
@@ -4704,16 +4303,15 @@ canvas.addEventListener('pointerdown', (e) => {
   // through the panel they are reading. The one control on it that answers is its Close box.
   if (screen === SCREEN.GAME && helpVisible && helpRenderer) {
     const closed = helpRenderer.hitClose(x, y, canvas.width, canvas.height);
-    if (e.button === 0 && closed && gameUiButtonGesture.token === null) {
-      gameUiButtonDown = { pointerId: e.pointerId, token: 'help-close' };
-      gameUiButtonGesture.press(e.pointerId, 'help-close');
-      try { canvas.setPointerCapture(e.pointerId); } catch {}
-      render();
-    }
+    if (closed) helpVisible = false;
     click.spent = closed ? 'help-close' : 'help';
     canvas.focus(); e.preventDefault(); return;
   }
-  if (e.__d2HelpPointerHandled) { click.spent = 'help-button'; canvas.focus(); e.preventDefault(); return; }
+  // The HUD's Help button (drawn only while its label is, hudHelpEvidence): a left press on it opens the Help screen, as `H` does (F3d).
+  const hb = hudHelpEvidence?.hit;
+  if (e.button === 0 && screen === SCREEN.GAME && hb && x >= hb.x && x < hb.x + hb.w && y >= hb.y && y < hb.y + hb.h) {
+    helpVisible = true; markHelpMenuSeen(); click.spent = 'help-button'; canvas.focus(); e.preventDefault(); return;
+  }
   if (e.button === 0 && screen === SCREEN.GAME && messageVisible && messageLogRenderer && !(controlPanelRenderer?.hitMiniButton(controlPanelEvidence, x, y, canvas.width, canvas.height) >= 0)) {
     if (messageLogRenderer.hitClose(x, y, canvas.width, canvas.height)) messageVisible = false;
     else { const dir = messageLogRenderer.hitScroll(x, y, canvas.width, canvas.height);   // V8d: one arrow click scrolls ONE line
@@ -4722,33 +4320,14 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   if (e.button === 0 && screen === SCREEN.GAME && questVisible && questLogRenderer && questEvidence) {
     const words = readQuestWords(), hit = questLogRenderer.hit(x, y, canvas.width, canvas.height, questEvidence.tabs, questEvidence.act);
-    if (hit?.close) {
-      if (questCloseGesture.press(e.pointerId)) {
-        try { canvas.setPointerCapture(e.pointerId); } catch {}
-        render();
-      }
-    }
+    if (hit?.close) questVisible = false;
     else if (hit?.descr) questDescrOn = !questDescrOn;   // the questlast description toggle (V8d)
     else if (hit?.tab) { questAct = hit.tab; questSelected = questFirst(words, questAct); }
     else if (hit?.quest && questStatus(words, questAct, hit.quest) !== 'locked') questSelected = hit.quest;
     if (hit || openPanelAt(x, y) === 'quest') { click.spent = 'quest-log'; canvas.focus(); e.preventDefault(); return; }
   }
-  if (e.button === 0 && screen === SCREEN.GAME && characterVisible && characterPanelCloseAt(x, y, canvas.width, canvas.height)) {
-    if (characterPanelCloseGesture.press(e.pointerId)) {
-      try { canvas.setPointerCapture(e.pointerId); } catch {}
-      render();
-    }
-    click.spent = 'character-panel-close'; canvas.focus(); e.preventDefault(); return;
-  }
-  if (e.button === 0 && inventoryCloseAt(x, y, canvas.width, canvas.height, inventoryVisible)) {
-    inventoryClosePress = beginInventoryClosePress(e.pointerId, inventoryVisible, true);
-    try { canvas.setPointerCapture(e.pointerId); } catch {}
-    render(); canvas.focus(); e.preventDefault(); return;
-  }
-  // Character and skill close controls keep their existing shared press handling. Inventory has
-  // its own native down/held/release path above.
-  const panelClose = e.button === 0 && panelCloseAt(x, y, canvas.width, canvas.height, { skills: skillsVisible && { playerClass: snapshot.playerClass, tab: skillPanelRenderer?.tab } });
-  if (panelClose) { skillsVisible = false; canvas.focus(); e.preventDefault(); return; }
+  const panelClose = e.button === 0 && panelCloseAt(x, y, canvas.width, canvas.height, { inventory: inventoryVisible, skills: skillsVisible && { playerClass: snapshot.playerClass, tab: skillPanelRenderer?.tab } });
+  if (panelClose) { if (panelClose.panel === 'inventory') { if (stashOpen) closeStashFromInventory({ stashOpen, commandButton: (button, amount) => Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [button, amount]), onAccepted: () => { stashOpen = false; inventoryVisible = false; closeStashGold(); } }); else inventoryVisible = false; } else skillsVisible = false; canvas.focus(); e.preventDefault(); return; }
   // The mini-panel's open/close arrow collapses and expands the icon row. It is a HUD control the
   // renderer actually placed, so only a click inside it consumes (hud-hit-test's rule).
   // ClearScreen hides the chrome, so the chrome answers nothing: each of these four hit tests is a
@@ -4758,20 +4337,9 @@ canvas.addEventListener('pointerdown', (e) => {
   if (e.button === 0 && !clearScreen && controlPanelRenderer?.hitMenuButton(controlPanelEvidence, x, y, canvas.width, canvas.height)) {
     hudIconRow = !hudIconRow; render(); canvas.focus(); e.preventDefault(); return;
   }
-  // Native #11017 reads pCursorItem: MiniPanel down/up callbacks decline input while an
-  // item is held, leaving that click to the inventory/world item route.
-  if (e.button === 0 && !clearScreen) {
-    const miniHit = controlPanelRenderer?.hitMiniButton(controlPanelEvidence, x, y, canvas.width, canvas.height) ?? -1;
-    if (miniHit >= 0) {
-      const cursorItem = Module._d2_session_cursor_item
-        ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0;
-      const action = miniPanelPressAction(miniHit, cursorItem);
-      if (action >= 0) {
-        miniDown = action; miniPointerId = e.pointerId;
-        try { canvas.setPointerCapture(e.pointerId); } catch {}
-        render(); canvas.focus(); e.preventDefault(); return;
-      }
-    }
+  // The mini-panel icons: press draws the pressed cel (frame+1), release over the same icon acts.
+  if (e.button === 0 && !clearScreen && (miniDown = controlPanelRenderer?.hitMiniButton(controlPanelEvidence, x, y, canvas.width, canvas.height) ?? -1) >= 0) {
+    render(); canvas.focus(); e.preventDefault(); return;
   }
   // F10: the lit add-point buttons either side of the belt open the panel that spends the points
   // (left: character, right: skill tree), exactly as the mini-panel's icons / C and T do.
@@ -4800,12 +4368,7 @@ canvas.addEventListener('pointerdown', (e) => {
     if (hit) {
       click.spent = 'stashGold';
       if (hit.action === 'withdraw') openStashGold('withdraw');
-      else if (hit.action === 'deposit' && e.button === 0) {
-        inventoryGoldPress = beginInventoryGoldPress(e.pointerId, Boolean(inventoryVisible && inventoryPanelEvidence?.gold?.blit));
-        if (!inventoryGoldPress) { canvas.focus(); e.preventDefault(); return; }
-        try { canvas.setPointerCapture(e.pointerId); } catch {}
-        render();
-      }
+      else if (hit.action === 'deposit') openStashGold('deposit');
       else if (hit.action === 'submit') submitStashGold();
       else if (hit.action === 'close') closeStashGold();
       else if (hit.action === 'increase') changeStashGoldAmount(1);
@@ -4844,7 +4407,7 @@ canvas.addEventListener('pointerdown', (e) => {
     const rows = readWaypointTable().rows(waypointMenu.act);
     const hit = e.button === 0 && waypointMenuInput.hitTest(x, y, canvas.width, canvas.height, rows,
       (px, py, width, height, menuRows) => waypointPanelRenderer.rowAt(px, py, width, height, menuRows),
-      readWaypointActCompletion());
+      waypointEvidence?.tabs ?? []);
     click.spent = 'waypointMenu';
     if (hit?.action === 'tab') waypointMenu.act = hit.act;
     else if (hit?.action === 'close') takeWaypoint(0);
@@ -4857,14 +4420,11 @@ canvas.addEventListener('pointerdown', (e) => {
     if (hit) chooseHire(hit);
     canvas.focus(); e.preventDefault(); return;
   }
-  // D2Client's NPC menu arms on down and invokes a row callback on matching release.
-  // A click outside a selectable row is not the explicit Cancel row.
-  if (npcMenu?.open && (e.button === 0 || e.button === 2)) {
+  // An open NPC menu takes the click: an entry, or (anywhere else) Cancel, as retail's does.
+  if (npcMenu?.open && e.button === 0) {
     click.spent = 'npcMenu';
-    const menuState = npcMenu.state;
-    const accepted = !npcMenuInputCoolingDown({ nowTick: performance.now(), creationTick: menuState.openedAt });
-    if (accepted) npcMenu.hover(x, y);
-    npcMenuPointerPress = { pointerId: e.pointerId, button: e.button, menuState };
+    const entry = npcMenu.entryAt(x, y);
+    chooseNpcMenu(entry || { action: 'cancel' });
     canvas.focus(); e.preventDefault(); return;
   }
   // An open shop: a tab switches the stock shown, an item in the grid is bought, and an item in the
@@ -4904,7 +4464,6 @@ canvas.addEventListener('pointerdown', (e) => {
       if (cubePanelRenderer.transmuteAt(x, y, canvas.width, canvas.height, cubeGeometry)) {
         // The engine's own cube recipe pass (TRADEBTN_TRANSMUTE); the result lands on page 3.
         lastItemCommand = { name: 'transmute', args: [], result: Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [24, 0]), cursor: cursorId };
-        propCache.clear();
       } else if (!cursorId) { const item = cubePanelRenderer.itemAt(x, y, canvas.width, canvas.height, cubeGeometry, snapshot.items); if (item) itemCommand('lift', item.id); }
       else {
         const held = snapshot.items.find((i) => i.id === cursorId) || { id: cursorId };
@@ -5036,16 +4595,13 @@ canvas.addEventListener('pointerdown', (e) => {
   const corpseHit = !panelOwner && !hostileHit && e.button === 0 && session ? (() => {
     const cam = worldToScreen(cameraGrid().x, cameraGrid().y); let best = null, bestD = 36;
     for (const u of snapshot.entities) if (u.kind === 'player' && u.id !== snapshot.playerId && u.mode === 17) {
-      // Corpse sprites use the unit projection and engine precise anchor. Comparing integer
-      // snapshot coordinates here can pick an adjacent body in a pile or while its path settles.
-      const pt = worldToScreen(...unitAnchor(u)), d = Math.hypot(pt.x - cam.x + viewCX() - x, pt.y - cam.y + (canvas.height / 2 + UNIT_CENTRE_Y) - y);
+      const pt = worldToScreen(u.x, u.y), d = Math.hypot(pt.x - cam.x + viewCX() - x, pt.y - cam.y + (canvas.height / 2 + UNIT_CENTRE_Y) - y);
       if (d < bestD) { best = u; bestD = d; } }
     return best; })() : null;
   if (corpseHit) {
     click.spent = 'corpse'; click.walkTo = [corpseHit.x, corpseHit.y];
     const recover = (stuck) => {
       lastCorpseRecovery = { id: corpseHit.id, result: Module.ccall('d2_session_command_recover_corpse', 'number', ['number'], [corpseHit.id]), stuck };
-      propCache.clear();
       snapshot = session.snapshot(); };
     // A walk that stalls short of the body (a monster or the body's own footprint in the way) still
     // asks: the engine's recovery decides, as it does for objects and exits.
@@ -5058,59 +4614,28 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   const pointerCandidates = !panelOwner && !hostileHit && e.button === 0 && session
     ? resolvePointerCandidates(x, y) : null;
-  const pointerSelection = pointerCandidates ? selectPointerCandidate(pointerCandidates, { click: true }) : null;
+  const pointerSelection = pointerCandidates ? nonHostilePointerCandidate(pointerCandidates, { click: true }) : null;
   const npcHit = !panelOwner && !hostileHit && e.button === 0 && session && pointerSelection?.kind === 'npc'
     ? pointerSelection.target : null;
   // Left-clicking an OBJECT walks to it and operates it, as retail does. What happens next is the
   // engine's: the stash, for one, answers with 0x77 UPDATEUI_OPENSTASH (pollUiEvents).
   const objectHit = !panelOwner && !hostileHit && !npcHit && e.button === 0 && session && !stashOpen && pointerSelection?.kind === 'object'
     ? pointerSelection.target : null;
-  // A same-act exit is the native UNIT_TILE target for packet 0x13. The engine handles approach
-  // through 50 subtiles; farther clicks keep the shell's ordinary walk and retry that packet.
+  // Left-clicking a level exit walks to it and takes it, through the engine's warp command (which
+  // only accepts a real generated exit of this level).
   const warpHit = !panelOwner && !hostileHit && !npcHit && !objectHit && e.button === 0 && session ? warpUnderPointer(x, y) : null;
   if (warpHit) {
-    click.spent = 'warp';
-    input.cancelPointerMoves();
-    worldPointerHeld = false;
-    walkGoal = null; walkMemory = null; walkMovePending = false; walkEvidence.active = false;
-    const interact = (stuck) => {
-      const outcome = runWarpInteraction({
-        warpHit, snapshot, motion, session,
-        invoke: (destination, warpId) => Module.ccall('d2_session_command_warp_interact', 'number', ['number', 'number'], [destination, warpId]),
-        onActChange: (act) => { if (TERRAIN_ENABLED) loadSessionTerrain(act - 1); },
-      });
-      lastWarpTaken = { destinationLevel: warpHit.destinationLevel, warpId: warpHit.warpId,
-        result: outcome.result, stuck, tooFar: outcome.tooFar, native: true };
-      snapshot = outcome.snapshot; motion = outcome.motion;
-      return outcome;
-    };
-    const takeLegacyWarp = (stuck) => {
-      if (stuck) {
-        const distance = Module.ccall('d2_session_warp_interaction_distance', 'number', ['number', 'number'], [warpHit.destinationLevel, warpHit.warpId]);
-        if (!withinNativeWarpInteractionRange(distance)) {
-          lastWarpTaken = { destinationLevel: warpHit.destinationLevel, warpId: warpHit.warpId, result: 0, stuck, nativeDistance: distance };
-          return;
-        }
-      }
+    click.spent = 'warp'; click.walkTo = [warpHit.x, warpHit.y];
+    const takeWarp = (stuck) => {
       const previousAct = snapshot.act;
-      const { inRange, result } = interactWithWarpTile(Module, warpHit.destinationLevel, warpHit.warpId);
-      lastWarpTaken = { destinationLevel: warpHit.destinationLevel, warpId: warpHit.warpId, result, stuck, inRange };
+      const result = Module.ccall('d2_session_command_warp', 'number', ['number', 'number'], [warpHit.destinationLevel, warpHit.warpId]);
+      lastWarpTaken = { destinationLevel: warpHit.destinationLevel, warpId: warpHit.warpId, result, stuck };
       if (result) { snapshot = session.snapshot(); motion = session.motion();
         if (TERRAIN_ENABLED && snapshot.act !== previousAct) loadSessionTerrain(snapshot.act - 1); }
     };
-    const first = interact(false);
-    if (first.tooFar) {
-      click.walkTo = [warpHit.x, warpHit.y];
-      armWalk(warpApproachGoal(warpHit, (stuck) => {
-        const retried = interact(stuck);
-        if (retried.legacy) takeLegacyWarp(stuck);
-      }));
-    } else if (first.legacy) {
-      // Cross-act exits keep main's existing LEVEL_WarpUnit transition path.
-      click.walkTo = [warpHit.x, warpHit.y];
-      armWalk({ x: warpHit.x, y: warpHit.y, within: 2,
-        onArrive: () => takeLegacyWarp(false), onStuck: () => takeLegacyWarp(true) });
-    }
+    // A walk that stalls short of the exit (the Den's mouth, approached over its rocks) still asks:
+    // the engine's warp command decides whether the player is close enough, as the server does.
+    armWalk({ x: warpHit.x, y: warpHit.y, within: 2, onArrive: () => takeWarp(false), onStuck: () => takeWarp(true) });
   } else if (npcHit) {
     click.spent = 'npc'; click.walkTo = [npcHit.x, npcHit.y];
     // F658: `npcId` is the signal walkStep's give-up branch keys on -- the click RESOLVED to an NPC, so
@@ -5124,11 +4649,66 @@ canvas.addEventListener('pointerdown', (e) => {
     // queued pointer moves, and stop periodic retargets from an earlier held ground gesture.
     input.cancelPointerMoves();
     worldPointerHeld = false;
-    // Dispatch the same deferred object interaction request as the native client. The receiver
-    // owns range checks, movement setup, retries and operation callbacks.
-    session.objectClick(objectHit.id);
-    snapshot = session.snapshot();
-    pollObjectSpeech(); pollUiEvents();
+    // The wrapper calls OBJECTS_OperateHandler directly, so it returns 0 when retail's
+    // UNITS_IsObjectInInteractRange refuses. Retail's 0x13 handler instead records an
+    // interaction target and lets the server walk the player into range. Reproduce that
+    // player-visible part with ordinary move commands: arrive at a reachable floor cell,
+    // ask the same engine predicate at the player's actual position, and only then operate.
+    // The draw hit test above stays authoritative; this only changes the post-click approach.
+    const triedSpots = new Set();
+    const clickedLevel = snapshot.level;
+    const refreshObjectTarget = () => {
+      snapshot = session.snapshot();
+      return snapshot.level === clickedLevel && snapshot.objects.some((o) => o.id === objectHit.id);
+    };
+    const approachObject = (closerOnly = false) => {
+      // Movement callbacks can fire after another action changed levels or the quest removed
+      // the target. Do not chase a stale screen-space hit into a different scene.
+      if (!refreshObjectTarget()) return;
+      const p = snapshot.player, candidates = [];
+      const fromObject = chebyshev(p.x, p.y, objectHit.x, objectHit.y);
+      // Object footprints and the interact predicate vary by class. Search a bounded local
+      // neighborhood, but let the engine predicate decide success after each normal walk.
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+        if (!dx && !dy) continue;
+        const x = objectHit.x + dx, y = objectHit.y + dy, key = `${x},${y}`;
+        if (triedSpots.has(key) || (x === p.x && y === p.y)) continue;
+        if (closerOnly && chebyshev(x, y, objectHit.x, objectHit.y) >= fromObject) continue;
+        if (!Module.ccall('d2_session_walkable', 'number', ['number', 'number'], [x, y])) continue;
+        candidates.push({ x, y, key, score: 100 * Math.max(Math.abs(dx), Math.abs(dy)) + Math.hypot(x - p.x, y - p.y) });
+      }
+      candidates.sort((a, b) => a.score - b.score);
+      const spot = candidates[0];
+      if (!spot) return;
+      triedSpots.add(spot.key);
+      armWalk({ x: spot.x, y: spot.y, within: 0,
+        onArrive: () => operateObject(), onStuck: () => approachObject(closerOnly) });
+    };
+    const operateObject = () => {
+      if (!refreshObjectTarget()) return;
+      // The prior click may already have queued this object's quest message. Capture it before
+      // another operate: 0x27 is the actual UI response for quest objects such as Horazon's
+      // Journal, whose handler can return 0 and leave its mode unchanged.
+      pollObjectSpeech();
+      if (objectSpeech?.guid === objectHit.id) return;
+      const range = Module.ccall('d2_session_object_in_interact_range', 'number', ['number'], [objectHit.id]);
+      if (!range) {
+        approachObject();
+        return;
+      }
+      const before = snapshot.objects.find((o) => o.id === objectHit.id)?.mode;
+      const done = session.operate(objectHit.id);
+      refreshObjectTarget();
+      pollObjectSpeech(); pollUiEvents();
+      // A successful operation may open a UI/portal without changing object mode. If the engine
+      // declined a still-unopened object, try another reachable stand cell. A message attached
+      // to this object is a successful quest interaction even when rc/mode do not change; never
+      // repeat its callback and queue duplicate speech. Never teleport or infer range from pixels.
+      const after = snapshot.objects.find((o) => o.id === objectHit.id)?.mode;
+      const questUiAdvanced = objectSpeech?.guid === objectHit.id;
+      if (!done && !questUiAdvanced && !waypointMenu && !stashOpen && snapshot.level === clickedLevel && after === before) approachObject(true);
+    };
+    armWalk({ x: objectHit.x, y: objectHit.y, within: 2, onArrive: operateObject, onStuck: operateObject });
   } else {
     // A "+" on the character screen spends a point through retail's 0x3A handler. Re-read rather
     // than adjust a local copy: the engine decides what a point did, including refusing it.
@@ -5139,12 +4719,8 @@ canvas.addEventListener('pointerdown', (e) => {
     if (skillHit?.tab) { click.spent = 'skillPanelTab'; skillPanelRenderer.tab = skillHit.tab; canvas.focus(); e.preventDefault(); return; }
     if (skillHit?.skill) {
       click.spent = 'skillPanel';
-      const token = armSkillTreeSelection(skillHit.skill.id, e.button, selectSkill);
-      if (token) {
-        gameUiButtonDown = { pointerId: e.pointerId, token };
-        gameUiButtonGesture.press(e.pointerId, token);
-        try { canvas.setPointerCapture(e.pointerId); } catch {}
-      }
+      Module.ccall('d2_session_command_add_skill', 'number', ['number'], [skillHit.skill.id]);
+      classSkills = null; advancement = null;
       canvas.focus(); e.preventDefault(); return;
     }
     const statHit = characterVisible && characterPanelRenderer && session
@@ -5152,7 +4728,6 @@ canvas.addEventListener('pointerdown', (e) => {
     if (statHit !== null && statHit !== undefined) {
       click.spent = 'statPanel';
       Module.ccall('d2_session_command_add_stat', 'number', ['number', 'number'], [statHit, 1]);
-      propCache.clear();
       advancement = null;
       canvas.focus(); e.preventDefault(); return;
     }
@@ -5197,159 +4772,41 @@ canvas.addEventListener('pointerdown', (e) => {
 // panels do not exist in the client yet, so those two press but open nothing.
 globalThis.addEventListener('pointerup', (e) => {
   gameCursor?.noteInput();
-  if (npcMenuPointerPress?.pointerId === e.pointerId && npcMenuPointerPress.button === e.button &&
-      (e.button === 0 || e.button === 2)) {
-    const press = npcMenuPointerPress; npcMenuPointerPress = null;
-    const [x, y] = canvasPoint(e), menuState = npcMenu?.open ? npcMenu.state : null;
-    const sameMenu = menuState === press.menuState;
-    const ready = sameMenu && !npcMenuInputCoolingDown({ nowTick: performance.now(), creationTick: menuState.openedAt });
-    const entry = ready ? npcMenuChoiceOnRelease({
-      entryAtRelease: npcMenu.entryAt(x, y), selectedEntry: npcMenu.selectedEntry }) : null;
-    if (entry) chooseNpcMenu(entry);
-    render(); canvas.focus(); if (e.cancelable) e.preventDefault(); return;
-  }
-  if (inventoryClosePress?.pointerId === e.pointerId) {
-    const press = inventoryClosePress; inventoryClosePress = null;
-    const [x, y] = canvasPoint(e);
-    const releasedOverClose = inventoryCloseAt(x, y, canvas.width, canvas.height, inventoryVisible);
-    const result = finishInventoryClosePress(press, e.pointerId, e.button === 0, inventoryVisible, releasedOverClose);
-    if (result.activate) {
-      if (stashOpen) closeStashFromInventory({ stashOpen, commandButton: (button, amount) => Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [button, amount]), onAccepted: () => { stashOpen = false; inventoryVisible = false; closeStashGold(); } });
-      else inventoryVisible = false;
-    }
-    render(); canvas.focus(); if (e.cancelable) e.preventDefault(); return;
-  }
-  if (gameUiButtonDown?.pointerId === e.pointerId) {
-    const down = gameUiButtonDown;
-    gameUiButtonDown = null;
-    const [x, y] = canvasPoint(e);
-    let releasedToken = null;
-    if (e.button === 0 && down.token === 'help-close' && helpVisible && helpRenderer?.hitClose(x, y, canvas.width, canvas.height)) {
-      releasedToken = 'help-close';
-    } else if (e.button === 0 && down.token?.startsWith('skill-tree:') && skillsVisible && skillPanelRenderer && session) {
-      const hit = skillPanelRenderer.skillAt(x, y, canvas.width, canvas.height, { skills: readClassSkills() || [] });
-      const id = Number(down.token.slice('skill-tree:'.length));
-      if (hit?.skill?.id === id) releasedToken = down.token;
-    }
-    const activated = gameUiButtonGesture.release(e.pointerId, releasedToken);
-    if (activated === 'help-close') helpVisible = false;
-    else if (activated?.startsWith('skill-tree:')) {
-      const id = Number(activated.slice('skill-tree:'.length));
-      const allocated = allocateSkillTreePointOnRelease(activated, id, readClassSkills() || [],
-        Math.max(0, readAdvancement()?.skillPoints ?? 0), (skillId) => {
-          Module.ccall('d2_session_command_add_skill', 'number', ['number'], [skillId]);
-        });
-      if (allocated) { propCache.clear(); classSkills = null; advancement = null; }
-    }
-    render(); canvas.focus(); if (e.cancelable) e.preventDefault(); return;
-  }
-  if (inventoryGoldPress?.pointerId === e.pointerId) {
-    const press = inventoryGoldPress; inventoryGoldPress = null;
-    let releasedOverCoin = false;
-    if (inventoryVisible && stashOpen && !stashGoldDialog && stashGoldRenderer && inventoryPanelEvidence?.gold?.blit) {
-      const [x, y] = canvasPoint(e);
-      releasedOverCoin = stashGoldRenderer.hitAt(x, y, canvas.width, canvas.height, readStashLayout(), false)?.action === 'deposit';
-    }
-    const enabled = Boolean(inventoryVisible && stashOpen && !stashGoldDialog && inventoryPanelEvidence?.gold?.blit);
-    if (finishInventoryGoldPress(press, e.pointerId, e.button === 0, enabled, releasedOverCoin).activate) openStashGold('deposit');
-    render(); canvas.focus(); if (e.cancelable) e.preventDefault(); return;
-  }
-  if (stashGoldPress?.pointerId === e.pointerId) {
-    const down = stashGoldPress; clearStashGoldPress(e.pointerId);
-    if (e.button === 0 && stashGoldDialog && (down.action === 'submit' || down.action === 'close')) {
-      const [x, y] = canvasPoint(e);
-      const up = stashGoldRenderer?.hitAt(x, y, canvas.width, canvas.height, readStashLayout(), true);
-      if (up?.action === down.action) {
-        if (down.action === 'submit') submitStashGold();
-        else closeStashGold();
-      }
-    }
-    render(); canvas.focus(); if (e.cancelable) e.preventDefault(); return;
-  }
   controlsPanel?.pointerUp(e.pointerId, e.button);
-  if (screen === SCREEN.GAME && gameMenu?.open) {
-    const [x, y] = canvasPoint(e);
-    if (gameMenu.pointerUp(x, y, canvas.width, canvas.height, e.pointerId, e.button)) {
-      canvas.focus(); render(); e.preventDefault(); return;
-    }
-  }
   if (e.button === 0) { worldPointerHeld = false; }
   if (e.button === 2) { worldRightPointerHeld = false; heldRightPointerTicks = 0; }
-  if (e.__d2HelpPointerHandled) return;
-  if (questCloseGesture.pointerId === e.pointerId) {
-    const [x, y] = canvasPoint(e);
-    const hit = questLogRenderer?.hit(x, y, canvas.width, canvas.height, questEvidence?.tabs ?? [], questEvidence?.act ?? questAct);
-    if (questCloseGesture.release(e.pointerId, hit?.close)) questVisible = false;
-    render();
-    return;
-  }
-  if (miniDown < 0 || miniPointerId !== e.pointerId || e.button !== 0) return;
-  const down = miniDown; miniDown = -1; miniPointerId = null;
+  if (miniDown < 0) return;
+  const down = miniDown; miniDown = -1;
   const [x, y] = canvasPoint(e);
-  const releaseHit = controlPanelRenderer?.hitMiniButton(controlPanelEvidence, x, y, canvas.width, canvas.height) ?? -1;
-  const cursorItem = e.button === 0 && Module._d2_session_cursor_item
-    ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0;
-  const action = miniPanelReleaseAction({ button: e.button, pressed: down, pointerMatches: true,
-    releaseHit, cursorItem });
-  if (action === 0) { setCharacterVisible(!characterVisible); if (characterVisible) questVisible = false; }
-  else if (action === 1) inventoryVisible = !inventoryVisible;
-  else if (action === 2) skillsVisible = !skillsVisible;
-  else if (action === 3) automapOverlay?.toggle();
-  else if (action === 4) toggleMessage();
-  else if (action === 5) toggleQuest();
-  else if (action === 6) ensureGameMenu()?.toggle();
+  if (controlPanelRenderer?.hitMiniButton(controlPanelEvidence, x, y, canvas.width, canvas.height) === down) {
+    if (down === 0) { characterVisible = !characterVisible; if (characterVisible) questVisible = false; }
+    else if (down === 1) inventoryVisible = !inventoryVisible;
+    else if (down === 2) skillsVisible = !skillsVisible;
+    else if (down === 3) automapOverlay?.toggle();
+    else if (down === 4) toggleMessage();
+    else if (down === 5) toggleQuest();
+    else if (down === 6) ensureGameMenu()?.toggle();
+  }
   render();
-  if (e.cancelable) e.preventDefault();
-  return;
 });
 canvas.addEventListener('pointerup', (e) => {
   if (e.button === 0) { worldPointerHeld = false; }
   if (e.button === 2) { worldRightPointerHeld = false; heldRightPointerTicks = 0; }
-  if (e.__d2HelpPointerHandled) return;
-  if (characterPanelCloseGesture.pointerId === e.pointerId) {
-    const [x, y] = canvasPoint(e);
-    if (e.button === 0 && characterVisible && characterPanelCloseGesture.release(e.pointerId, characterPanelCloseAt(x, y, canvas.width, canvas.height))) characterVisible = false;
-    else characterPanelCloseGesture.cancel(e.pointerId);
-    render(); canvas.focus(); if (e.cancelable) e.preventDefault(); return;
-  }
-  if (screen === SCREEN.GAME && controlsPanel?.open) {
-    const [x, y] = canvasPoint(e);
-    if (controlsPanel.pointerUp(e.pointerId, e.button, x, y, canvas.width, canvas.height)) {
-      render(); canvas.focus(); if (e.cancelable) e.preventDefault(); return;
-    }
-  }
   if (!(screen === SCREEN.TITLE || screen === SCREEN.CREDITS || screen === SCREEN.CINEMATICS || screen === SCREEN.OTHER_MULTIPLAYER || screen === SCREEN.CREATE || screen === SCREEN.SELECT)) return;
   const [x, y] = canvasPoint(e);
-  frontendPointerStates.release(e.pointerId, frontendPointerControl(), x, y, canvas.width, canvas.height, e.button);
+  frontendPointerStates.release(e.pointerId, frontendPointerControl(), x, y, canvas.width, canvas.height);
   canvas.focus(); e.preventDefault();
 });
 // Browsers cancel a touch for an interruption or a gesture the page is not handling; that gesture
 // is over, so it must neither activate its control later nor keep drawing it pressed.
 canvas.addEventListener('pointercancel', (e) => {
-  if (miniPointerId === e.pointerId) { miniDown = -1; miniPointerId = null; render(); }
-  if (npcMenuPointerPress?.pointerId === e.pointerId) npcMenuPointerPress = null;
-  if (cancelInventoryClosePress(inventoryClosePress, e.pointerId)) { inventoryClosePress = null; render(); }
   controlsPanel?.pointerCancel(e.pointerId);
-  if (characterPanelCloseGesture.cancel(e.pointerId)) render();
-  if (cancelInventoryGoldPress(inventoryGoldPress, e.pointerId)) { inventoryGoldPress = null; render(); }
-  if (clearStashGoldPress(e.pointerId)) { render(); canvas.focus(); e.preventDefault(); return; }
-  gameMenu?.pointerCancel(e.pointerId);
-  if (cancelHelpClosePress(e.pointerId)) render();
-  if (questCloseGesture.cancel(e.pointerId)) render();
   worldPointerHeld = false; worldRightPointerHeld = false; heldRightPointerTicks = 0;
   if (!frontendPointerStates.cancel(e.pointerId)) return;
   canvas.focus(); e.preventDefault();
 });
 canvas.addEventListener('lostpointercapture', (e) => {
-  if (miniPointerId === e.pointerId) { miniDown = -1; miniPointerId = null; render(); }
-  if (cancelInventoryClosePress(inventoryClosePress, e.pointerId)) { inventoryClosePress = null; render(); }
   controlsPanel?.pointerCancel(e.pointerId);
-  if (characterPanelCloseGesture.cancel(e.pointerId)) render();
-  if (cancelInventoryGoldPress(inventoryGoldPress, e.pointerId)) { inventoryGoldPress = null; render(); }
-  if (clearStashGoldPress(e.pointerId)) render();
-  gameMenu?.pointerCancel(e.pointerId);
-  if (cancelHelpClosePress(e.pointerId)) render();
-  if (questCloseGesture.cancel(e.pointerId)) render();
   worldPointerHeld = false;
   worldRightPointerHeld = false; heldRightPointerTicks = 0;
 });
@@ -5389,7 +4846,7 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
   stepN(n) {
     const p = perfT0();
     for (let i = 0; i < n - 1; i++) {
-      if (screen === SCREEN.GAME && session && !walkGoal && !gameMenu?.open && Module._d2_session_tick) { engineTicks++; session.tick(1); drainUnitSounds(); const lv = Module.ccall('d2_session_player_level', 'number', [], []); if (lv !== entryBannerLevel) { entryBannerLevel = lv; entryBannerAt = engineTicks; } }
+      if (screen === SCREEN.GAME && session && !walkGoal && !gameMenu?.open && Module._d2_session_tick) { engineTicks++; Module.ccall('d2_session_tick', 'number', ['number'], [1]); drainUnitSounds(); const lv = Module.ccall('d2_session_player_level', 'number', [], []); if (lv !== entryBannerLevel) { entryBannerLevel = lv; entryBannerAt = engineTicks; } }
       else update(true);
     }
     if (n > 0) update(true);
@@ -5464,9 +4921,6 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
   get waypointPadEvidence() { return waypointPadEvidence.map((entry) => JSON.parse(JSON.stringify(entry))); },
   get itemRenderer() { return itemRenderer; },
   get inventoryPanelEvidence() { return inventoryPanelEvidence && { ...inventoryPanelEvidence }; },
-  get hirelingRoster() { return readHirelingRoster().map((pet) => ({ ...pet })); },
-  get hirelingVisible() { return hirelingVisible; }, set hirelingVisible(value) { hirelingVisible = Boolean(value); if (hirelingVisible) { inventoryVisible = false; skillsVisible = false; } render(); },
-  get hirelingPanelEvidence() { return hirelingPanelEvidence && JSON.parse(JSON.stringify(hirelingPanelEvidence)); },
   get characterPanelEvidence() { return characterPanelEvidence && { ...characterPanelEvidence }; },
   get skillPanelEvidence() { return skillPanelEvidence && { ...skillPanelEvidence }; },
   get warpEvidence() { return { lastWarpTaken, warps: (snapshot.warps || []).map((w) => ({ destinationLevel: w.destinationLevel, warpId: w.warpId, enabled: w.enabled, x: w.x, y: w.y })) }; },
@@ -5633,7 +5087,6 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
     }
     return { clicks: clickDispatch.length, by, world, refusedBy, heroModes, last: clickDispatch.slice(-40).map((r) => ({ ...r })) };
   },
-  setWalkPlannerContext(context) { walkPlannerContext = context ? structuredClone(context) : null; },
   walkTo(x, y, within = 4) { armWalk({ x, y, within }); },
   // `minDistance` (subtiles, 0 = no floor): talk to the nearest NPC at least that far away. s136
   // proves the WALKER by talking to someone the hero has to walk to, and with the corrected Rogue
@@ -5683,9 +5136,8 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
   // hitTest=0 click/action box, and report the resolved object identity from each path.
   pointerObjectAt(x, y) {
     const candidates = resolvePointerCandidates(x, y);
-    const hoverWinner = selectPointerCandidate(candidates, { reference: snapshot.player });
-    const hover = hoverWinner?.kind === 'object' ? hoverWinner.target : null;
-    const click = selectPointerCandidate(candidates, { click: true })?.kind === 'object' ? candidates.object : null;
+    const hover = nonHostilePointerCandidate(candidates)?.kind === 'object' ? candidates.hoverObject : null;
+    const click = nonHostilePointerCandidate(candidates, { click: true })?.kind === 'object' ? candidates.object : null;
     const identity = (object) => object ? { id: object.id, classId: object.classId, token: object.token } : null;
     return { hover: identity(hover), click: identity(click) };
   },
@@ -5695,8 +5147,8 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
       itemOnCell: { kind: 'item', id: 1 }, npc: { kind: 'npc', id: 2 }, item: null,
       object: { kind: 'object', id: 3 },
     };
-    return { hover: selectPointerCandidate(candidates)?.kind ?? null,
-      click: selectPointerCandidate(candidates, { click: true })?.kind ?? null };
+    return { hover: nonHostilePointerCandidate(candidates)?.kind ?? null,
+      click: nonHostilePointerCandidate(candidates, { click: true })?.kind ?? null };
   },
   get hoverGlyphPainting() { return hoverGlyphPainting; },
   set hoverGlyphPainting(value) { hoverGlyphPainting = Boolean(value); },

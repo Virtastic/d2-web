@@ -622,17 +622,6 @@ D2UnitStrc* __fastcall D2GAME_CORPSE_Handler_6FC7FBD0(D2GameStrc* pGame, D2UnitS
                         D2GAME_DropItem_6FC52260(pGame, pUnit, pDupedItem, D2GAME_GetFreeSpaceEx_6FC4BF00(UNITS_GetRoom(pUnit), &pCoord, &pReturnCoords, 1), pReturnCoords.nX, pReturnCoords.nY);
                     }
                 }
-                else
-                {
-                    // Retail 1.13c's D2GAME_CORPSE_Handler (D2Game.dll 0x6FC99210) falls through
-                    // to the same ground-drop path when body-location placement itself fails.
-                    // D2MOO's source reconstruction nests that path under the successful placement
-                    // check, so preserve the native control flow explicitly here.
-                    D2CoordStrc pCoord = {};
-                    UNITS_GetCoords(pUnit, &pCoord);
-                    D2CoordStrc pReturnCoords = {};
-                    D2GAME_DropItem_6FC52260(pGame, pUnit, pDupedItem, D2GAME_GetFreeSpaceEx_6FC4BF00(UNITS_GetRoom(pUnit), &pCoord, &pReturnCoords, 1), pReturnCoords.nX, pReturnCoords.nY);
-                }
             }
         }
     }

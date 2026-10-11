@@ -23,7 +23,6 @@
 #include <errno.h>
 #include <sys/socket.h>
 #include <sys/select.h>
-#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
@@ -32,8 +31,7 @@ void d2_realm_bncs_session_reset(uint32_t serverToken, uint32_t uuid, uint32_t i
 int d2_realm_bncs_session_feed(const uint8_t* in, int len, uint8_t* out, int outCap);
 void d2_realm_mcp_session_reset(uint32_t gsIp, uint16_t gameToken, uint32_t gameHash, uint8_t charClass, uint8_t charLevel);
 int d2_realm_mcp_session_feed(const uint8_t* in, int len, uint8_t* out, int outCap);
-void d2_realm_d2gs_session_reset(uint32_t unitId, uint8_t charClass, uint8_t act, uint16_t level,
-                                  uint16_t gameToken, uint32_t gameHash);
+void d2_realm_d2gs_session_reset(uint32_t unitId, uint8_t charClass, uint8_t act, uint16_t level);
 #if defined(D2_REALMD_TEST_FIXTURE)
 void d2_realm_d2gs_session_fixture_reassign_on_keepalive(int enabled);
 void d2_realm_d2gs_session_fixture_reassign_on_walk(int enabled);
@@ -54,20 +52,10 @@ int d2_realm_huffman_frame(const uint8_t* in, int len, uint8_t* out, int outCap)
 
 namespace {
 
-struct SessionConfig {
-    uint32_t gsIp = 0x7f000001u;
-    uint16_t gameToken = 0x1234;
-    uint32_t gameHash = 0xdeadbeefu;
-    uint32_t unitId = 1;
-    uint8_t charClass = 3;
-    uint8_t charLevel = 24;
-};
-
-SessionConfig sessionConfig;
-
 enum Proto { kBncs = 0, kMcp = 1, kD2gs = 2, kProtoCount = 3 };
 const char* kProtoName[kProtoCount] = { "BNCS", "MCP", "D2GS" };
 #if defined(D2_REALMD_TEST_FIXTURE)
+int fixtureCharClass = 3;
 bool fixtureFireballOnJoin = false;
 bool fixtureFireballSent = false;
 bool fixtureOutdoorOnWalk = false;
@@ -186,11 +174,9 @@ void resetFor(Proto proto) {
         case kBncs: d2_realm_bncs_session_reset(0x1234abcdu, 0xabcd1234u, 0x7f000001u, 6113); break;
         case kMcp:
 #if defined(D2_REALMD_TEST_FIXTURE)
-            d2_realm_mcp_session_reset(sessionConfig.gsIp, sessionConfig.gameToken, sessionConfig.gameHash,
-                                       sessionConfig.charClass, sessionConfig.charLevel);
+            d2_realm_mcp_session_reset(0x7f000001u, 0x1234, 0xdeadbeefu, static_cast<uint8_t>(fixtureCharClass), 24);
 #else
-            d2_realm_mcp_session_reset(sessionConfig.gsIp, sessionConfig.gameToken, sessionConfig.gameHash,
-                                       sessionConfig.charClass, sessionConfig.charLevel);
+            d2_realm_mcp_session_reset(0x7f000001u, 0x1234, 0xdeadbeefu, 3, 24);
 #endif
             break;
         case kD2gs:
@@ -198,11 +184,9 @@ void resetFor(Proto proto) {
             fixtureInputLength = 0;
             fixtureFireballSent = false;
             fixtureOutdoorSent = false;
-            d2_realm_d2gs_session_reset(sessionConfig.unitId, sessionConfig.charClass, 0, sessionConfig.charLevel,
-                                        sessionConfig.gameToken, sessionConfig.gameHash);
+            d2_realm_d2gs_session_reset(1, static_cast<uint8_t>(fixtureCharClass), 0, 24);
 #else
-            d2_realm_d2gs_session_reset(sessionConfig.unitId, sessionConfig.charClass, 0, sessionConfig.charLevel,
-                                        sessionConfig.gameToken, sessionConfig.gameHash);
+            d2_realm_d2gs_session_reset(1, 3, 0, 24);
 #endif
             break;
         default: break;
@@ -228,19 +212,6 @@ int main(int argc, char** argv) {
         if (!strcmp(argv[i], "--bncs")) ports[kBncs] = (uint16_t)atoi(argv[i + 1]);
         else if (!strcmp(argv[i], "--mcp")) ports[kMcp] = (uint16_t)atoi(argv[i + 1]);
         else if (!strcmp(argv[i], "--d2gs")) ports[kD2gs] = (uint16_t)atoi(argv[i + 1]);
-        else if (!strcmp(argv[i], "--game-token")) sessionConfig.gameToken = (uint16_t)strtoul(argv[i + 1], nullptr, 0);
-        else if (!strcmp(argv[i], "--game-hash")) sessionConfig.gameHash = (uint32_t)strtoul(argv[i + 1], nullptr, 0);
-        else if (!strcmp(argv[i], "--unit-id")) sessionConfig.unitId = (uint32_t)strtoul(argv[i + 1], nullptr, 0);
-        else if (!strcmp(argv[i], "--char-class")) sessionConfig.charClass = (uint8_t)strtoul(argv[i + 1], nullptr, 0);
-        else if (!strcmp(argv[i], "--char-level")) sessionConfig.charLevel = (uint8_t)strtoul(argv[i + 1], nullptr, 0);
-        else if (!strcmp(argv[i], "--gs-ip")) {
-            in_addr address{};
-            if (inet_pton(AF_INET, argv[i + 1], &address) != 1) {
-                fprintf(stderr, "realmd: invalid IPv4 address for --gs-ip: %s\n", argv[i + 1]);
-                return 2;
-            }
-            sessionConfig.gsIp = ntohl(address.s_addr);
-        }
 #if defined(D2_REALMD_TEST_FIXTURE)
         else if (!strcmp(argv[i], "--fixture-reassign-on-keepalive")) fixtureReassignOnKeepalive = atoi(argv[i + 1]);
         else if (!strcmp(argv[i], "--fixture-reassign-on-walk")) fixtureReassignOnWalk = atoi(argv[i + 1]);
@@ -251,7 +222,7 @@ int main(int argc, char** argv) {
         else if (!strcmp(argv[i], "--fixture-return-self-remove-other-on-walk")) fixtureReturnSelfRemoveOtherOnWalk = atoi(argv[i + 1]);
         else if (!strcmp(argv[i], "--fixture-fireball-on-join")) fixtureFireball = atoi(argv[i + 1]);
         else if (!strcmp(argv[i], "--fixture-outdoor-on-walk")) fixtureOutdoor = atoi(argv[i + 1]);
-        else if (!strcmp(argv[i], "--fixture-char-class")) sessionConfig.charClass = (uint8_t)atoi(argv[i + 1]);
+        else if (!strcmp(argv[i], "--fixture-char-class")) fixtureCharClass = atoi(argv[i + 1]);
 #endif
     }
 #if defined(D2_REALMD_TEST_FIXTURE)

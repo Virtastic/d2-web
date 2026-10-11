@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { playerWeaponClassToken, weaponClassTokenForMode } from '../play/assets/player-weapon-class.mjs';
+import { playerWeaponClassToken } from '../play/assets/player-weapon-class.mjs';
 import { createPlayerCompositeResolver } from '../play/assets/player-composite.mjs';
 
 const tables = {
@@ -22,16 +22,6 @@ const tables = {
 test('engine weapon-class enum maps to retail animation tokens', () => {
   assert.deepEqual([2, 5, 10, 12, 13].map(playerWeaponClassToken), ['1hs', '2hs', '1ss', 'ht1', 'ht2']);
   assert.throws(() => playerWeaponClassToken(-1), /unknown engine weapon class id/);
-});
-
-test('COF weapon class selector receives the mode being drawn', () => {
-  const calls = [];
-  const result = weaponClassTokenForMode((...args) => {
-    calls.push(args);
-    return 5;
-  }, 7);
-  assert.deepEqual(result, { id: 5, token: '2hs' });
-  assert.deepEqual(calls, [['d2_session_player_weapon_class_id_for_presentation_mode', 'number', ['number'], [7]]]);
 });
 
 test('composite uses engine class for animation and worn records only for hand art', () => {

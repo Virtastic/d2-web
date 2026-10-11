@@ -14,7 +14,6 @@
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
 import { BORDER_LEFT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
-import { characterPanelCloseFrame } from './character-panel-close.mjs';
 
 // Retail's own stat ids (D2StatList.h): the values the 0x3A packet carries.
 export const STAT = Object.freeze({ STRENGTH: 0, ENERGY: 1, DEXTERITY: 2, VITALITY: 3 });
@@ -234,7 +233,7 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
       const face = facesFor(state?.act || 1);
       for (const f of FIELDS) { const t = text[f.key]; if (t === undefined || t === null || t === '') continue;
         const str = String(t), font = face[f.size]; font.drawAnchored(ctx, str, Math.floor(f.centre - font.measure(str) / 2), f.y); }
-      chrome.cel(ctx, state?.act || 1, CHROME_ART.close, characterPanelCloseFrame(state?.closePressed), 208, 480);
+      chrome.cel(ctx, state?.act || 1, CHROME_ART.close, 10, 208, 480);
       // The "+" is retail art, blitted as retail blits the pair (socket first, then the button on
       // top), and every blit is carried out to the evidence by the cel's own requested/drawn record.
       const buttons = [];

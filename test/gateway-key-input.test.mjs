@@ -73,11 +73,10 @@ test('production keydown forwards menu keys through the modal before the gamepla
   const end = source.indexOf('  // F218:', start);
   assert.ok(start >= 0 && end > start);
   const { selector, commits } = setup();
-  let handler, prevented = 0, renders = 0, titleMusicStarts = 0;
+  let handler, prevented = 0, renders = 0;
   const context = {
     addEventListener: (_type, callback) => { handler = callback; },
     screen: 'title', SCREEN: { TITLE: 'title', GAME: 'game' }, titlePhase: 'menu',
-    actMusic: { playTitle: () => { titleMusicStarts++; return Promise.resolve(); } }, musicError: '',
     bootMovieSpec: () => null, titleScreen: { key: (code) => selector.key(code) },
     render: () => { renders++; },
   };
@@ -86,7 +85,6 @@ test('production keydown forwards menu keys through the modal before the gamepla
   assert.deepEqual(commits, [servers[1]]);
   assert.equal(prevented, 1);
   assert.equal(renders, 1);
-  assert.equal(titleMusicStarts, 1, 'menu keyboard input also retries music unlock from a user gesture');
   handler({ code: 'Escape', preventDefault() { prevented++; } });
   assert.equal(prevented, 1, 'closed gateway does not bind keys to title menu entries');
 });

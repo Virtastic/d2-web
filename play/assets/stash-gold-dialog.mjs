@@ -147,11 +147,9 @@ export function createStashGoldRenderer(read, documentObject = globalThis.docume
         if (bg) { ctx.drawImage(bg, L.bgX, top); recordDc6(STASH_GOLD_ART.dialog, 0, dialog.frames[0], L.bgX, top); }
         dialogIdentity = blitIdentity(ctx, dialogRgba[0], { x: L.bgX, y: top, w: bg?.width || 0, h: bg?.height || 0 }, nativeCanvas);
         const ok = c.ok(), close = c.close();
-        const closeFrame = L.closeFrame + (state.pressedControl === 'close' ? 1 : 0);
-        const okFrame = L.okFrame + (state.pressedControl === 'submit' ? 1 : 0);
         // Retail's call order (the draw lists above): close, OK, amount + caret, spinners, prompt.
-        if (buttonFrames[closeFrame]) { ctx.drawImage(buttonFrames[closeFrame], close.x, close.y); recordDc6(STASH_GOLD_ART.buttons, closeFrame, buttons.frames[closeFrame], close.x, close.y); }
-        if (buttonFrames[okFrame]) { ctx.drawImage(buttonFrames[okFrame], ok.x, ok.y); recordDc6(STASH_GOLD_ART.buttons, okFrame, buttons.frames[okFrame], ok.x, ok.y); }
+        if (buttonFrames[L.closeFrame]) { ctx.drawImage(buttonFrames[L.closeFrame], close.x, close.y); recordDc6(STASH_GOLD_ART.buttons, L.closeFrame, buttons.frames[L.closeFrame], close.x, close.y); }
+        if (buttonFrames[L.okFrame]) { ctx.drawImage(buttonFrames[L.okFrame], ok.x, ok.y); recordDc6(STASH_GOLD_ART.buttons, L.okFrame, buttons.frames[L.okFrame], ok.x, ok.y); }
         const actionKey = state.mode === 'withdraw' ? 'strBankGoldWithdraw' : 'strBankGoldDeposit';
         const action = string(actionKey) || actionKey;
         const amount = String(Math.max(0, state.amount | 0));
@@ -163,16 +161,11 @@ export function createStashGoldRenderer(read, documentObject = globalThis.docume
         const caretLit = Math.floor(now() / CARET_BLINK_MS) % 2 === 0;
         if (caretLit) font.draw(ctx, '_', L.amountX + font.measure(shown), L.amountBottom - T);
         const up = c.up(), down = c.down();
-        const upFrame = state.pressedControl === 'increase' ? 2 : 0;
-        const downFrame = state.pressedControl === 'decrease' ? 3 : 1;
-        if (spinnerFrames[upFrame]) { ctx.drawImage(spinnerFrames[upFrame], up.x, up.y); recordDc6(STASH_GOLD_ART.spinner, upFrame, spinner.frames[upFrame], up.x, up.y); }
-        if (spinnerFrames[downFrame]) { ctx.drawImage(spinnerFrames[downFrame], down.x, down.y); recordDc6(STASH_GOLD_ART.spinner, downFrame, spinner.frames[downFrame], down.x, down.y); }
+        if (spinnerFrames[0]) { ctx.drawImage(spinnerFrames[0], up.x, up.y); recordDc6(STASH_GOLD_ART.spinner, 0, spinner.frames[0], up.x, up.y); }
+        if (spinnerFrames[1]) { ctx.drawImage(spinnerFrames[1], down.x, down.y); recordDc6(STASH_GOLD_ART.spinner, 1, spinner.frames[1], down.x, down.y); }
         const lines = wrap(action);
         lines.forEach((line, i) => font.draw(ctx, line, Math.trunc(L.promptCentreX - font.measure(line) / 2), L.promptBottoms[i] - T));
-        modal = { mode: state.mode, amount: state.amount, available: value, actionKey, action,
-          pressedControl: state.pressedControl || null,
-          controls: { ok: { ...ok, frame: okFrame }, close: { ...close, frame: closeFrame },
-            up: { ...up, frame: upFrame }, down: { ...down, frame: downFrame } } };
+        modal = { mode: state.mode, amount: state.amount, available: value, actionKey, action, controls: { ok, close, up: c.up(), down: c.down() } };
       }
       ctx.restore();
       const identity = { dialog: dialogIdentity };

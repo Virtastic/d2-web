@@ -16,14 +16,3 @@ export function nativeWallLightCell(dt1Entry, hidden, A, B, sample) {
   const [dx, dy] = patterns[(d - 1) % 5][hidden ? 1 : 0][sample];
   return [A + dx, B + dy];
 }
-
-/** Native six-cell wall sample set, or null when the DT1 direction has no recovered row. */
-export function nativeWallLightCells(dt1Entry, hidden, A, B) {
-  const cells = [];
-  for (let sample = 0; sample < 6; sample++) {
-    const cell = nativeWallLightCell(dt1Entry, hidden, A, B, sample);
-    if (!cell) return null;
-    cells.push(cell);
-  }
-  return cells;
-}

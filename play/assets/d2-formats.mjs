@@ -44,22 +44,6 @@ export function decodeDatPalette(input) {
   return rgba;
 }
 
-/** Convert indexed DT1 pixels through a decoded DAT palette without inventing opaque pixels. */
-export function tilePixelsToRgba(pixels, palette) {
-  if (!pixels?.indices || !pixels?.opaque || pixels.indices.length !== pixels.opaque.length) {
-    throw new TypeError('DT1 tile pixels require equal index and opacity planes');
-  }
-  if (!(palette instanceof Uint8Array) || palette.length !== 1024) {
-    throw new RangeError('decoded palette must contain 256 RGBA colors');
-  }
-  const rgba = new Uint8ClampedArray(pixels.indices.length * 4);
-  for (let i = 0; i < pixels.indices.length; i++) {
-    if (!pixels.opaque[i]) continue;
-    rgba.set(palette.subarray(pixels.indices[i] * 4, pixels.indices[i] * 4 + 4), i * 4);
-  }
-  return rgba;
-}
-
 function decodeDc6Frame(bytes, view, offset, frameIndex) {
   requireRange(bytes, offset, DC6_FRAME_HEADER_BYTES, `DC6 frame ${frameIndex} header`);
   const u32 = n => view.getUint32(offset + n, true);

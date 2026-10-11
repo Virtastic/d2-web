@@ -38,13 +38,10 @@ function rendererHarness({ blended = true, rendererOptions = {} } = {}) {
     bytes.set([1, 0, 1, hasBlend ? 1 : 0, hasBlend ? 3 : 0, 0x48, 0x54, 0x48, 0], 28); bytes[38] = 1;
     return bytes;
   };
-  const dcc = dccFixture(), palette = new Uint8Array(768), cofReads = new Map();
+  const dcc = dccFixture(), palette = new Uint8Array(768);
   for (let i = 0; i < 256; i++) palette.set([i, i, i], i * 3);
   const read = (path) => {
-    if (path.endsWith('.COF')) {
-      const token = path.split('\\')[3]; cofReads.set(token, (cofReads.get(token) || 0) + 1);
-      return cof(path.includes('\\BLD\\'));
-    }
+    if (path.endsWith('.COF')) return cof(path.includes('\\BLD\\'));
     if (path.endsWith('.DCC')) return dcc;
     if (path.endsWith('pal.dat')) return palette;
     throw new Error(`missing fixture ${path}`); // no PL2: effect layer must use raster fallback
@@ -62,7 +59,7 @@ function rendererHarness({ blended = true, rendererOptions = {} } = {}) {
   try {
     const renderer = createObjectRenderer(read, documentObject, rendererOptions), draws = [];
     const ctx = { drawImage(canvas, x, y) { draws.push({ canvas, x, y, pixels: Array.from(canvas.pixels) }); } };
-    return { renderer, draws, ctx, created: () => created, cofReads,
+    return { renderer, draws, ctx, created: () => created,
       object: { token: blended ? 'BLD' : 'TST', mode: 0, direction: 0, componentMask: 2, framePrecise: 0 } };
   } catch (error) {
     if (oldImageData === undefined) delete globalThis.ImageData;
@@ -86,26 +83,6 @@ test('object renderer reuses bounded blended-layer rasters without allocating an
     assert.equal(draws.length, 2, 'one layer draw is preserved per render in the same order');
     assert.equal(harness.created(), 1, 'the blended path allocates only its fallback layer canvas');
   } finally {
-    if (oldImageData === undefined) delete globalThis.ImageData;
-    else globalThis.ImageData = oldImageData;
-  }
-});
-
-test('object blend eligibility is scanned when its animation is decoded, not on repeated draws', () => {
-  const oldImageData = globalThis.ImageData, oldSome = Array.prototype.some;
-  const harness = rendererHarness({ blended: true });
-  let scans = 0;
-  try {
-    const { renderer, ctx, object } = harness;
-    Array.prototype.some = function (...args) { scans++; return oldSome.apply(this, args); };
-    const first = renderer.draw(ctx, 10, 20, object, 1);
-    const scansAfterDecode = scans;
-    const second = renderer.draw(ctx, 10, 20, object, 1);
-    assert.ok(first && second);
-    assert.ok(scansAfterDecode > 0, 'decoding determines whether this COF has PL2 layers');
-    assert.equal(scans, scansAfterDecode, 'a cached animation does not rescan its COF layer list per draw');
-  } finally {
-    Array.prototype.some = oldSome;
     if (oldImageData === undefined) delete globalThis.ImageData;
     else globalThis.ImageData = oldImageData;
   }
@@ -138,47 +115,6 @@ test('object renderer caches composed and blended rasters in one bounded FIFO', 
     const composedAgain = renderer.draw(ctx, 10, 20, object, 1);
     assert.equal(harness.created(), 3, 'the composed raster was evicted by the blended entry');
     assert.deepEqual(composedAgain, first);
-  } finally {
-    if (oldImageData === undefined) delete globalThis.ImageData;
-    else globalThis.ImageData = oldImageData;
-  }
-});
-
-test('object renderer bounds decoded animation retention with FIFO eviction', () => {
-  const oldImageData = globalThis.ImageData;
-  const harness = rendererHarness({ blended: false, rendererOptions: { animationLimit: 1 } });
-  try {
-    const { renderer, draws, ctx, object, cofReads } = harness;
-    const first = renderer.draw(ctx, 10, 20, object, 1);
-    const other = renderer.draw(ctx, 10, 20, { ...object, token: 'BLD' }, 1);
-    assert.ok(first && other);
-    assert.equal(renderer.decoded, 1, 'decoded animation entries stay within the configured limit');
-
-    const decodedAgain = renderer.draw(ctx, 10, 20, object, 1);
-    assert.deepEqual(decodedAgain, first, 'eviction and re-decode preserve rendered object evidence');
-    assert.equal(cofReads.get('TST'), 2, 'the oldest animation was evicted and decoded again');
-    assert.equal(renderer.decoded, 1);
-    assert.equal(draws.length, 3);
-  } finally {
-    if (oldImageData === undefined) delete globalThis.ImageData;
-    else globalThis.ImageData = oldImageData;
-  }
-});
-
-test('object renderer bounds failed animation retention with FIFO eviction', () => {
-  const oldImageData = globalThis.ImageData;
-  const harness = rendererHarness({ rendererOptions: { failureLimit: 1 } });
-  try {
-    const { renderer, ctx, cofReads } = harness;
-    const firstFailure = { token: 'TST', mode: 0, direction: 0, componentMask: 0, framePrecise: 0 };
-    const secondFailure = { ...firstFailure, token: 'BAD' };
-    assert.equal(renderer.draw(ctx, 0, 0, firstFailure, 1), null);
-    assert.equal(renderer.draw(ctx, 0, 0, secondFailure, 1), null);
-    assert.equal(renderer.failures, 1, 'failed keys stay within the configured limit');
-
-    assert.equal(renderer.draw(ctx, 0, 0, firstFailure, 1), null);
-    assert.equal(cofReads.get('TST'), 2, 'the oldest failure was evicted and its key was retried');
-    assert.equal(renderer.failures, 1);
   } finally {
     if (oldImageData === undefined) delete globalThis.ImageData;
     else globalThis.ImageData = oldImageData;

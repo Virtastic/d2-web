@@ -23,10 +23,8 @@ export function selectPlayerRenderSource(snapshot, motion, realmSessionOpen, rea
   if (!snapshot?.player) return { source: 'none', x: 0, y: 0, classId: null, renderState: null };
   return {
     source: 'local', x: snapshot.player.x, y: snapshot.player.y, classId: snapshot.playerClass,
-    renderState: { ...motion, playerClass: snapshot.playerClass,
-      mode: Number.isInteger(motion?.presentationMode) ? motion.presentationMode : snapshot.mode, tick: snapshot.tick,
+    renderState: { ...motion, playerClass: snapshot.playerClass, mode: snapshot.mode, tick: snapshot.tick,
       act: snapshot.act, weaponClass: snapshot.player.weaponClass,
-      renderIdentity: snapshot.player.renderIdentity ? { ...snapshot.player.renderIdentity } : null,
       primaryWeaponId: snapshot.player.primaryWeaponId, items: snapshot.items },
   };
 }
@@ -90,14 +88,11 @@ export function sendRealmRightSkillOnMonster(protocol, transport, sessionOpen, g
   return { sent: true, reason: '', guid, opcode, packet: Array.from(packet), predicted };
 }
 
-// The loaded native Skills/Missiles tables decide whether the selected right-hand
-// skill uses the supported ordinary SC projectile path. Do not keep a JS skill list.
-export function realmClientProjectilePredictor(protocol) {
+// The canonical engine validates table identity and usability for natural Fire Bolt/Fireball.
+// Select this bounded predictor only for those actual right-hand skills.
+export function realmFireballPredictor(protocol) {
   const selected = protocol?.d2gsSelectedSkills?.();
-  if (!Number.isInteger(selected?.right) || selected.right < 0 ||
-      typeof protocol?.d2gsClientProjectileSupported !== 'function' ||
-      protocol.d2gsClientProjectileSupported(selected.right) !== 1 ||
-      typeof protocol?.d2gsClientPredictRightCast !== 'function') return null;
+  if ((selected?.right !== 36 && selected?.right !== 47) || typeof protocol?.d2gsClientPredictRightCast !== 'function') return null;
   return (x, y) => protocol.d2gsClientPredictRightCast(x, y);
 }
 

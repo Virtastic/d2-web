@@ -611,7 +611,7 @@ void __fastcall OBJECTS_InitFunction71_LarzukStandard(D2ObjInitFnStrc* pOp)
 	pCoord.nY = pOp->nY;
 	pCoord.nX = pOp->nX;
 	D2ActiveRoomStrc* pRoom = nullptr;
-	QUESTS_GetFreePosition(pOp->pRoom, &pCoord, 2, 0x100, &pRoom, 100);
+	QUESTS_GetFreePosition(pOp->pRoom, &pCoord, 2, 0x100, &pRoom, 16);
 	if (!pRoom)
 	{
 		return;

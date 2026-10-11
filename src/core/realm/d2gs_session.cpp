@@ -57,8 +57,6 @@ struct D2gsSession {
     uint8_t charClass;
     uint8_t act;
     uint16_t level;
-    uint32_t gameHash;
-    uint16_t gameToken;
     int error;
     int joined;
 };
@@ -76,24 +74,6 @@ bool g_fixtureReturnSelfAndRemoveOtherOnWalk;
 #endif
 
 const char kCharName[] = "player";
-
-inline uint16_t rd16(const uint8_t* p) {
-    return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
-}
-
-inline uint32_t rd32(const uint8_t* p) {
-    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
-}
-
-bool isSelectedCharacterName(const uint8_t* name) {
-    for (int i = 0; i < 16; ++i) {
-        const uint8_t expected = i < (int)(sizeof(kCharName) - 1)
-            ? (uint8_t)kCharName[i]
-            : 0;
-        if (name[i] != expected) return false;
-    }
-    return true;
-}
 
 }  // namespace
 
@@ -130,15 +110,12 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_cs_packet_len(const uint8_t* buf, int len
     return len < n ? -1 : n;
 }
 
-EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_reset(uint32_t unitId, uint8_t charClass, uint8_t act, uint16_t level,
-                                                       uint16_t gameToken, uint32_t gameHash) {
+EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_reset(uint32_t unitId, uint8_t charClass, uint8_t act, uint16_t level) {
     g_g.rxLen = 0;
     g_g.unitId = unitId;
     g_g.charClass = charClass;
     g_g.act = act;
     g_g.level = level;
-    g_g.gameToken = gameToken;
-    g_g.gameHash = gameHash;
     g_g.error = 0;
     g_g.joined = 0;
 #if defined(D2_REALMD_TEST_FIXTURE)
@@ -209,23 +186,6 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_feed(const uint8_t* in, int len, 
         if (size < 0) break;                            // need more bytes to tell the length
 
         if (op == 0x68) {
-            // GAMELOGON is the admission handshake for this D2GS connection, not a
-            // repeatable enter-game command. Once this session has emitted its join
-            // burst, a second login on the same stream cannot allocate another seat.
-            // Treat it as a protocol error so we never duplicate the player's roster.
-            if (g_g.joined) {
-                g_g.error = 4;
-                return -1;
-            }
-            // GAMELOGON carries the exact ticket returned by MCP JOINGAME: hash at +1 and token
-            // at +5, both little-endian. Bind it to the selected character too; a ticket for a
-            // different name must not receive this session's player assignment.
-            const uint8_t* packet = g_g.rx + off;
-            if (rd32(packet + 1) != g_g.gameHash || rd16(packet + 5) != g_g.gameToken ||
-                !isSelectedCharacterName(packet + 21)) {
-                g_g.error = 3;
-                return -1;
-            }
             // GAMELOGON: local deterministic fixture. Seed 1 / Normal / Act I's first level has
             // a first client room at (1168,1176); emit MapReveal before PlayerAssign to exercise
             // the native null-current-room branch, then LoadComplete after the player exists.

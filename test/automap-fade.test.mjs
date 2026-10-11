@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBlender, PL2_ADDITIVE, PL2_ALPHA_25, PL2_ALPHA, PL2_ALPHA_75 } from '../play/assets/frontend.mjs';
 
-test('automap Fade DrawModes 0, 1 and 2 use their indexed PL2 AlphaBlend banks', () => {
+test('automap fade uses the three indexed PL2 AlphaBlend banks in DrawMode order', () => {
   const pl2 = new Uint8Array(PL2_ADDITIVE + 65536);
   const banks = [[0, PL2_ALPHA_25, 31], [1, PL2_ALPHA, 41], [2, PL2_ALPHA_75, 51]];
   for (const [, offset, result] of banks) pl2[offset + 2 * 256 + 7] = result;

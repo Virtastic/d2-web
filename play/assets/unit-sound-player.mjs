@@ -1,7 +1,7 @@
 import { decodeWav } from './wav.mjs';
 import { resolveUnitSound, soundRow, soundRowByHandle } from './unit-sound-resolver.mjs';
 import { retailSoundChannelVolume, soundSourceGain, sliderPercent } from './sound-channel-volume.mjs';
-import { unitSoundNativeSpatial, unitSoundNativePanCode, nativeSoundPanBalance } from './unit-sound-spatial.mjs';
+import { unitSoundNativeSpatial, unitSoundNativeTauntPanCode, nativeSoundPanBalance } from './unit-sound-spatial.mjs';
 
 // S2: drained engine sound events (d2_session_take_sounds septets) -> resolver -> Sounds.txt file -> Web Audio.
 // The engine decides the event, D2Client's resolver picks the row, Sounds.txt names the WAV; nothing is invented.
@@ -66,27 +66,11 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
   };
   // A suspended context still schedules source.start(); it sounds once a trusted gesture resumes it.
   if (context.state === 'suspended' && typeof gestureTarget?.addEventListener === 'function') {
-    const controller = new AbortController();
-    let resuming = false;
-    const unlock = () => {
-      if (resuming) return;
-      if (context.state !== 'suspended') { controller.abort(); return; }
-      resuming = true;
-      let resumed;
-      try { resumed = Promise.resolve(context.resume()); }
-      catch { resuming = false; return; }
-      resumed.then(() => {
-        resuming = false;
-        // Browsers can reject resume(), or fulfill it while leaving the context suspended.
-        // Keep listening until a trusted gesture actually unlocks this audio context.
-        if (context.state !== 'suspended') controller.abort();
-      }, () => { resuming = false; });
-    };
-    for (const t of ['pointerdown', 'keydown', 'touchstart', 'gamepadconnected'])
-      gestureTarget.addEventListener(t, unlock, { signal: controller.signal, passive: true });
+    const ac = new AbortController();
+    const unlock = () => { context.resume().catch(() => {}); ac.abort(); };
+    for (const t of ['pointerdown', 'keydown', 'touchstart', 'gamepadconnected']) gestureTarget.addEventListener(t, unlock, { signal: ac.signal, passive: true });
   }
   let soundsTxt = null, started = 0, dialogueGeneration = 0, dialogueSource = null;
-  let dialogueDone = Promise.resolve(), finishDialogue = null;
   const table = () => soundsTxt ??= new TextDecoder('latin1').decode(read('data\\global\\excel\\Sounds.txt'));
   const buffer = (path, rec) => {
     let b = buffers.get(path);
@@ -94,51 +78,38 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
     if (!b) { let bytes, err; for (const root of ROOTS) { try { bytes = read(root + path); rec.path = root + path; break; } catch (e) { err = e; } } if (!bytes) throw err; decodeWav(bytes); b = context.decodeAudioData(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)); b.path = rec.path; buffers.set(path, b); }
     return b;
   };
-  async function playTableRow(row, rec, { spatial = true } = {}) {
+  /** One drained event {unitType, unitId, classId, soundEvent, updateUnitType, updateUnitId}; localId = the hero's unit id. */
+  async function play(e, localId) {
+    // Audience: -1 = every client, else only the client of that unit.
+    if (e.updateUnitType !== -1 && e.updateUnitId !== localId) return null;
+    const row = resolveUnitSound({ unitType: e.unitType, classId: e.classId, soundEvent: e.soundEvent, isLocalPlayer: e.unitType === 0 && e.unitId === localId, monsterTaunt: e.monsterTaunt ?? e.nativeSelectedRow ?? 0 });
+    const rec = { ...e, row, handle: null, path: null, started: false, error: '' };
+    events.push(rec);
+    if (row == null) return rec;
     try {
       const r = soundRow(table(), row);
       if (!r?.file) throw new Error(`Sounds.txt row ${row} has no file`);
       rec.handle = r.handle;
       context.resume().catch(() => {});
       const source = context.createBufferSource(); source.buffer = await buffer(r.file, rec);
-      // Distance gain remains limited to the verified shrine row. Native pan applies
-      // to resolved mono sources whose Sounds.txt Tracking flag is set.
-      const tracksSpatialGain = spatial && !r.stereo && r.row === 2673 && rec.soundEvent === 0x0a;
-      const tracksSourcePan = spatial && !r.stereo && r.tracking;
+      // Distance gain remains limited to the verified shrine row. Monster taunts
+      // take their own mono/Tracking predicate for pan only; Falloff=4 gain is open.
+      const tracksSpatialGain = !r.stereo && r.row === 2673 && rec.soundEvent === 0x0a;
+      const tracksTauntPan = !r.stereo && r.tracking && rec.unitType === 1 && rec.soundEvent === 0x10;
       const spatialGainByte = tracksSpatialGain
         && Number.isInteger(rec.nativeSpatialGainByte) ? rec.nativeSpatialGainByte : 255;
       rec.appliedSpatialGainByte = spatialGainByte;
       const spatialGainEvent = tracksSpatialGain ? rec : null;
-      const spatialPanEvent = tracksSourcePan ? rec : null;
+      const spatialPanEvent = tracksSpatialGain || tracksTauntPan ? rec : null;
       const node = connectSource(source, r, spatialGainByte, spatialGainEvent, spatialPanEvent);
       source.onended = () => { source.disconnect(); disconnectSource(node); };
       source.start(); started++; rec.started = true;
     } catch (error) { rec.error = String(error); }
     return rec;
   }
-  /** One drained event {unitType, unitId, classId, soundEvent, updateUnitType, updateUnitId}; localId = the hero's unit id. */
-  async function play(e, localId) {
-    // Audience: -1 = every client, else only the client of that unit.
-    if (e.updateUnitType !== -1 && e.updateUnitId !== localId) return null;
-    const row = resolveUnitSound({ unitType: e.unitType, classId: e.classId, soundEvent: e.soundEvent, isLocalPlayer: e.unitType === 0 && e.unitId === localId,
-      monsterTaunt: e.monsterTaunt ?? (e.soundEvent === 0x10 ? e.nativeSelectedRow : 0),
-      skillStartSoundRow: e.skillStartSoundRow ?? (e.soundEvent === 0x0c ? e.nativeSelectedRow : 0) });
-    const rec = { ...e, row, handle: null, path: null, started: false, error: '' };
-    events.push(rec);
-    if (row == null) return rec;
-    return playTableRow(row, rec);
-  }
-  /** Play a Sounds.txt row selected by a table-driven engine event, such as missile HitSound. */
-  async function playRow(row, event = {}) {
-    const rec = { ...event, kind: 'table-row', row, handle: null, path: null, started: false, error: '' };
-    events.push(rec);
-    if (!Number.isInteger(row) || row < 0) { rec.error = `invalid Sounds.txt row ${row}`; return rec; }
-    return playTableRow(row, rec, { spatial: false });
-  }
   function stopDialogue() {
     dialogueGeneration++;
     const source = dialogueSource; dialogueSource = null;
-    finishDialogue?.(); finishDialogue = null;
     if (source) { try { source.stop(); } catch {} source.disconnect(); }
   }
   function updateSpatialGain(snapshot, listener) {
@@ -156,7 +127,7 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
       const panEvent = state.spatialPanEvent;
       if (state.balance && panEvent) {
         const panCode = gainSpatial && panEvent === gainEvent
-          ? gainSpatial.panCode : unitSoundNativePanCode(panEvent, snapshot, listener);
+          ? gainSpatial.panCode : unitSoundNativeTauntPanCode(panEvent, snapshot, listener);
         if (Number.isInteger(panCode) && panCode !== panEvent.appliedSpatialPanCode) {
           panEvent.nativeSpatialPanCode = panCode;
           applyBalance(state.balance, panEvent, panCode);
@@ -167,29 +138,22 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
   async function playDialogue(handle, fileOverride = null) {
     stopDialogue();
     const token = dialogueGeneration;
-    let resolveDone;
-    dialogueDone = new Promise((resolve) => { resolveDone = resolve; finishDialogue = resolve; });
-    const finish = () => { resolveDone(); if (finishDialogue === resolveDone) finishDialogue = null; };
     const row = handle ? soundRowByHandle(table(), handle) : null;
     const file = fileOverride || row?.file;
     const rec = { kind: 'dialogue', row: row?.row ?? null, handle, path: null, started: false, error: '' };
     events.push(rec);
-    if (!file) { rec.error = `Sounds.txt has no voice handle ${handle}`; finish(); return rec; }
+    if (!file) { rec.error = `Sounds.txt has no voice handle ${handle}`; return rec; }
     try {
       context.resume().catch(() => {});
       const audio = await buffer(file, rec);
-      if (token !== dialogueGeneration) { finish(); return rec; }
+      if (token !== dialogueGeneration) return rec;
       const source = context.createBufferSource(); source.buffer = audio; const node = connectSource(source, row ?? { volume: 255, music: false });
-      source.onended = () => {
-        source.disconnect(); disconnectSource(node);
-        if (dialogueSource === source) dialogueSource = null;
-        if (token === dialogueGeneration) finish();
-      };
+      source.onended = () => { source.disconnect(); disconnectSource(node); if (dialogueSource === source) dialogueSource = null; };
       source.start(); dialogueSource = source; started++; rec.started = true;
-    } catch (error) { rec.error = String(error); finish(); }
+    } catch (error) { rec.error = String(error); }
     return rec;
   }
-  return { play, playRow, playDialogue, stopDialogue, whenDialogueDone: () => dialogueDone, updateSpatialGain, events, setVolume(v, nextSliders) { volume = Math.max(0, Math.min(1, Number(v) || 0)); if (nextSliders) sliders = { sound: nextSliders.sound, music: nextSliders.music }; else sliders = { sound: volume, music: 1 }; if (gain) gain.gain.value = volume; for (const [node, state] of activeSources) node.gain.value = sourceGainFor(state.row, state.spatialGainByte); },
+  return { play, playDialogue, stopDialogue, updateSpatialGain, events, setVolume(v, nextSliders) { volume = Math.max(0, Math.min(1, Number(v) || 0)); if (nextSliders) sliders = { sound: nextSliders.sound, music: nextSliders.music }; else sliders = { sound: volume, music: 1 }; if (gain) gain.gain.value = volume; for (const [node, state] of activeSources) node.gain.value = sourceGainFor(state.row, state.spatialGainByte); },
     get volume() { return gain ? gain.gain.value : volume; },
-    evidence: () => ({ started, dialogueActive: Boolean(dialogueSource), events: events.map((x) => ({ ...x })), state: context.state }), close: () => context.close?.() };
+    evidence: () => ({ started, events: events.map((x) => ({ ...x })), state: context.state }), close: () => context.close?.() };
 }

@@ -14,41 +14,17 @@
 #include <D2Collision.h>
 #include <D2CMP.h>
 #include <Drlg/D2DrlgDrlg.h>
-#include <Drlg/D2DrlgPreset.h>
 #include <Drlg/D2DrlgOutdoors.h>
 #include <Drlg/D2DrlgDrlgVer.h>
 #include <Drlg/D2DrlgOutRoom.h>
 #include "../d2moo/compat/datatbls_bridge.h"
 #include "../tables/shared.h"
-#include "drlg_room_trace.h"
-#include "drlg_room_snapshot.h"
 #include "../../../tools/vectorfmt/vectorfmt.h"
 
 static D2DrlgActStrc* g_act = nullptr;
 static uint8_t g_actNo = 0;
 static std::vector<uint16_t> g_grid;
 static std::string g_err;
-// Bounded diagnostic view of the generated Room2 list. One record per room, in list order.
-// The seed is sampled at enumeration: after conditional AddRoomData for inactive rooms, or without
-// that call for rooms already active. It is not the seed at D2Game's later AutoPos chooser.
-// Candidate trials and acceptance are not observed by this path.
-static constexpr size_t kDrlgRoomTraceLimit = 512;
-static std::vector<D2DrlgRoomTrace> g_roomTrace;
-static int g_roomTraceTruncated = 0;
-// Offline DRLG snapshot of the generated RoomEx list. Seed fields are deliberately split by
-// lifecycle: generationSeed is D2DrlgRoom.dwInitSeed; roomSeed is the RoomEx pSeed after
-// DRLG_InitLevel; activeSeed is the D2ActiveRoom pSeed after SetClientIsInSight has generated
-// the room's tiles and before D2Game population. The latter is not Radament's AutoPos input,
-// because room activation and earlier preset spawns consume it afterwards.
-static constexpr size_t kDrlgRoomSnapshotLimit = 512;
-static std::vector<D2DrlgRoomSnapshot> g_roomSnapshot;
-static int g_roomSnapshotTruncated = 0;
-// The linked RoomEx preset-unit order is the order D2Game sees before it reaches Radament's
-// encoded preset index. Keep those identities explicit; aggregate counts cannot establish which
-// earlier preset helpers may advance the active-room seed.
-static constexpr size_t kDrlgPresetSnapshotLimit = 16384;
-static std::vector<D2DrlgPresetSnapshot> g_presetSnapshot;
-static int g_presetSnapshotTruncated = 0;
 // Tile identity under the CAPTURE's activation protocol (s173). the retail capture tool reads a room's tiles
 // immediately after AddRoomData and before RemoveRoomData, one room at a time, so when it reads a
 // room fewer of its neighbours are alive than in a session that activates every room and keeps
@@ -268,9 +244,6 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_act_begin_server(uint32_t seed, int difficulty,
 EMSCRIPTEN_KEEPALIVE void d2_drlg_act_end() {
     if (g_act) { DUNGEON_FreeAct(g_act); g_act = nullptr; }
     g_grid.clear(); g_grid.shrink_to_fit();
-    g_roomTrace.clear(); g_roomTraceTruncated = 0;
-    g_roomSnapshot.clear(); g_roomSnapshotTruncated = 0;
-    g_presetSnapshot.clear(); g_presetSnapshotTruncated = 0;
     g_clientTiles.clear(); g_clientTileEntries.clear(); g_clientTileLibraries.clear();
     g_clientStatusCells.clear();
     g_clientTownLevelArgument = 0; g_clientMapRoomHintUsed = 0;
@@ -288,12 +261,9 @@ static D2ActiveRoomStrc* clientRoomAt(int level, int roomTileX, int roomTileY) {
     return nullptr;
 }
 
-static D2ActiveRoomStrc* clientRoomHint(int playerLevel, int hasPlayer, int roomTileX, int roomTileY) {
-    if (!hasPlayer) return nullptr;
-    // D2Client passes the player's current room as the hint even when the packet's eLevel names
-    // another level. Resolve the coordinates only within the tracked player level; never reinterpret
-    // them in the sighted level.
-    return clientRoomAt(playerLevel, roomTileX, roomTileY);
+static D2ActiveRoomStrc* clientRoomHint(int level, int playerLevel, int hasPlayer, int roomTileX, int roomTileY) {
+    if (!hasPlayer || playerLevel != level) return nullptr;
+    return clientRoomAt(level, roomTileX, roomTileY);
 }
 
 // The realm state adapter uses this only to track the level of an already-active client room.
@@ -311,7 +281,7 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_client_map_reveal(int level, int x, int y, int 
     if (!g_act || level <= 0 || x < 0 || y < 0) { g_err = "invalid client MapReveal"; return 0; }
     D2DrlgLevelStrc* pLevel = DRLG_GetLevel(g_act->pDrlg, level);
     if (!pLevel) { g_err = "MapReveal level unavailable"; return 0; }
-    D2ActiveRoomStrc* hint = clientRoomHint(playerLevel, hasPlayer, playerX, playerY);
+    D2ActiveRoomStrc* hint = clientRoomHint(level, playerLevel, hasPlayer, playerX, playerY);
     g_clientMapRoomHintUsed = hint != nullptr;
     DUNGEON_SetClientIsInSight(g_act, level, x, y, hint);
     if (hasPlayer && playerLevel > 0) g_clientRenderLevel = playerLevel;
@@ -324,7 +294,7 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_client_map_hide(int level, int x, int y, int ha
     if (!g_act || level <= 0 || x < 0 || y < 0) { g_err = "invalid client MapHide"; return 0; }
     D2DrlgLevelStrc* pLevel = DRLG_GetLevel(g_act->pDrlg, level);
     if (!pLevel) { g_err = "MapHide level unavailable"; return 0; }
-    D2ActiveRoomStrc* hint = clientRoomHint(playerLevel, hasPlayer, playerX, playerY);
+    D2ActiveRoomStrc* hint = clientRoomHint(level, playerLevel, hasPlayer, playerX, playerY);
     g_clientMapRoomHintUsed = hint != nullptr;
     DUNGEON_UnsetClientIsInSight(g_act, level, x, y, hint);
     if (hasPlayer && playerLevel > 0) g_clientRenderLevel = playerLevel;
@@ -446,9 +416,6 @@ EMSCRIPTEN_KEEPALIVE void d2_drlg_keep_alive(int on) { g_drlgKeepAlive = on ? 1 
 // Generates `level` in the current act; fills d2_drlg_out(). 1 on success.
 EMSCRIPTEN_KEEPALIVE int d2_drlg_level(int level) {
     if (!g_act) { g_err = "no act"; return 0; }
-    g_roomTrace.clear(); g_roomTraceTruncated = 0;
-    g_roomSnapshot.clear(); g_roomSnapshotTruncated = 0;
-    g_presetSnapshot.clear(); g_presetSnapshotTruncated = 0;
     D2DrlgStrc* pDrlg = g_act->pDrlg;
     g_pickLevel = (uint16_t)level; g_pickCall = 0;
     D2DrlgLevelStrc* pLevel = DRLG_GetLevel(pDrlg, level);
@@ -467,60 +434,6 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_level(int level) {
         g_pickRoom = roomOrdinal;
         if (!r2->pRoom) { DUNGEON_SetClientIsInSight(g_act, level, rx, ry, nullptr); added = true; }
         D2ActiveRoomStrc* r1 = r2->pRoom;
-        if (g_roomTrace.size() < kDrlgRoomTraceLimit) {
-            D2DrlgRoomTrace trace{};
-            trace.ordinal = roomOrdinal; trace.type = r2->nType;
-            trace.tileX = r2->nTileXPos; trace.tileY = r2->nTileYPos;
-            trace.tileWidth = r2->nTileWidth; trace.tileHeight = r2->nTileHeight;
-            trace.activeSeedAtEnumerationLow = r1 ? r1->pSeed.nLowSeed : r2->pSeed.nLowSeed;
-            trace.activeSeedAtEnumerationHigh = r1 ? r1->pSeed.nHighSeed : r2->pSeed.nHighSeed;
-            if (r1 && r1->pCollisionGrid) {
-                const D2DrlgCoordsStrc& c = r1->pCollisionGrid->pRoomCoords;
-                trace.collisionX = c.nSubtileX; trace.collisionY = c.nSubtileY;
-                trace.collisionWidth = c.nSubtileWidth; trace.collisionHeight = c.nSubtileHeight;
-            } else trace.collisionX = trace.collisionY = -1;
-            g_roomTrace.push_back(trace);
-        } else g_roomTraceTruncated = 1;
-        if (g_roomSnapshot.size() < kDrlgRoomSnapshotLimit) {
-            D2DrlgRoomSnapshot snapshot{};
-            snapshot.ordinal = roomOrdinal; snapshot.roomType = r2->nType;
-            snapshot.tileX = rx; snapshot.tileY = ry;
-            snapshot.tileWidth = r2->nTileWidth; snapshot.tileHeight = r2->nTileHeight;
-            snapshot.presetId = r2->nType == DRLGTYPE_PRESET && r2->pMaze ? r2->pMaze->nLevelPrest : -1;
-            snapshot.generationSeed = r2->dwInitSeed;
-            snapshot.roomSeedLow = r2->pSeed.nLowSeed; snapshot.roomSeedHigh = r2->pSeed.nHighSeed;
-            snapshot.activeX = snapshot.activeY = -1;
-            snapshot.candidateMinX = snapshot.candidateMinY = 1;
-            snapshot.candidateMaxX = snapshot.candidateMaxY = 0;
-            snapshot.radamentAnchorX = snapshot.radamentAnchorY = -1;
-            if (r1) {
-                snapshot.activeSeedLow = r1->pSeed.nLowSeed; snapshot.activeSeedHigh = r1->pSeed.nHighSeed;
-                const D2DrlgCoordsStrc& c = r1->tCoords;
-                snapshot.activeX = c.nSubtileX; snapshot.activeY = c.nSubtileY;
-                snapshot.activeWidth = c.nSubtileWidth; snapshot.activeHeight = c.nSubtileHeight;
-                snapshot.candidateMinX = c.nSubtileX + 1; snapshot.candidateMinY = c.nSubtileY + 1;
-                snapshot.candidateMaxX = c.nSubtileX + c.nSubtileWidth - 2;
-                snapshot.candidateMaxY = c.nSubtileY + c.nSubtileHeight - 2;
-            }
-            // The 1.13c DS1 linker encodes Radament as monster preset index 734+10=744.
-            // Keep the map-local/room-relative preset anchor separate from AutoPos's later
-            // random candidate, which D2Game chooses after this DRLG snapshot is taken.
-            int32_t presetOrdinal = 0;
-            for (D2PresetUnitStrc* unit = r2->pPresetUnits; unit; unit = unit->pNext, ++presetOrdinal) {
-                if (g_presetSnapshot.size() < kDrlgPresetSnapshotLimit) {
-                    g_presetSnapshot.push_back({ roomOrdinal, presetOrdinal, unit->nUnitType, unit->nIndex,
-                        unit->nMode, unit->nXpos, unit->nYpos, unit->bSpawned });
-                } else g_presetSnapshotTruncated = 1;
-                if (unit->nUnitType == 1 && unit->nIndex == 744) {
-                    ++snapshot.radamentPresetCount;
-                    if (snapshot.radamentPresetCount == 1) {
-                        snapshot.radamentAnchorX = unit->nXpos;
-                        snapshot.radamentAnchorY = unit->nYpos;
-                    }
-                }
-            }
-            g_roomSnapshot.push_back(snapshot);
-        } else g_roomSnapshotTruncated = 1;
         if (g_collectTiles && r1 && r1->pRoomTiles) {
             collectTiles(roomOrdinal, 0, r1->pRoomTiles->pFloorTiles, r1->pRoomTiles->nFloors);
             collectTiles(roomOrdinal, 1, r1->pRoomTiles->pWallTiles, r1->pRoomTiles->nWalls);
@@ -547,19 +460,6 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_level(int level) {
 }
 
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_drlg_out() { return g_out; }
-// Diagnostic records for the last generated level (bounded to 512 rooms). The room rectangle and
-// active seed are snapshots at enumeration; collision words come from d2_drlg_grid.
-EMSCRIPTEN_KEEPALIVE const D2DrlgRoomTrace* d2_drlg_rooms() { return g_roomTrace.data(); }
-EMSCRIPTEN_KEEPALIVE int d2_drlg_room_count() { return (int)g_roomTrace.size(); }
-EMSCRIPTEN_KEEPALIVE int d2_drlg_room_trace_truncated() { return g_roomTraceTruncated; }
-// Ordered snapshot of the last generated level, bounded to 512 RoomEx records. Seed fields stop
-// before D2Game population; this diagnoses the generation inputs without claiming an AutoPos result.
-EMSCRIPTEN_KEEPALIVE const D2DrlgRoomSnapshot* d2_drlg_room_snapshot() { return g_roomSnapshot.data(); }
-EMSCRIPTEN_KEEPALIVE int d2_drlg_room_snapshot_count() { return (int)g_roomSnapshot.size(); }
-EMSCRIPTEN_KEEPALIVE int d2_drlg_room_snapshot_truncated() { return g_roomSnapshotTruncated; }
-EMSCRIPTEN_KEEPALIVE const D2DrlgPresetSnapshot* d2_drlg_preset_snapshot() { return g_presetSnapshot.data(); }
-EMSCRIPTEN_KEEPALIVE int d2_drlg_preset_snapshot_count() { return (int)g_presetSnapshot.size(); }
-EMSCRIPTEN_KEEPALIVE int d2_drlg_preset_snapshot_truncated() { return g_presetSnapshotTruncated; }
 // The rasterised dirt-path grid of every outdoor room tiled while collecting (s178), in
 // the retail capture tool's dirtgrid.txt form after its "seed diff level room" prefix:
 // "room <ordinal> at <tx>,<ty> <w>x<h> path <W>x<H> <row> <row> ..." with each row "v,v,...,".
@@ -676,7 +576,7 @@ int d2_drlg_client_room_freed_by_hide(int level, int x, int y, int hasPlayer, in
         int playerX, int playerY, void* activeRoom) {
     if (!g_act || !g_act->pDrlg || !activeRoom) return 0;
     D2DrlgLevelStrc* pLevel = DRLG_GetLevel(g_act->pDrlg, level);
-    D2ActiveRoomStrc* hint = clientRoomHint(playerLevel, hasPlayer, playerX, playerY);
+    D2ActiveRoomStrc* hint = clientRoomHint(level, playerLevel, hasPlayer, playerX, playerY);
     D2DrlgRoomStrc* root = pLevel ? DRLG_GetRoomExFromCoordinates(x, y, g_act->pDrlg,
         hint ? hint->pDrlgRoom : nullptr, pLevel) : nullptr;
     if (!root || root->wRoomsInList[ROOMSTATUS_CLIENT_IN_SIGHT] == 0) return 0;

@@ -1,5 +1,4 @@
 #include "Drlg/D2DrlgDrlgRoom.h"
-#include "Drlg/DrlgRoomNearList.h"
 
 #include "D2DataTbls.h"
 #include "Drlg/D2DrlgDrlg.h"
@@ -639,10 +638,8 @@ void __fastcall sub_6FD77BB0(void* pMemPool, D2DrlgRoomStrc* pDrlgRoom)
 
 		if (nX < 6 && nY < 6)
 		{
-			// d2-web: The 1.10 D2MOO mirror and archived source commit 9878347 both show this
-			// 30-slot temporary array with an unchecked append. Keep malformed or
-			// unusually dense room graphs from writing beyond it.
-			d2::drlg::appendNearRoom(ppNearRooms, pDrlgRoom->nRoomsNear, pCurrentRoomEx);
+			ppNearRooms[pDrlgRoom->nRoomsNear] = pCurrentRoomEx;
+			++pDrlgRoom->nRoomsNear;
 		}
 	}
 

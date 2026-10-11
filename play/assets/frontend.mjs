@@ -11,7 +11,6 @@
 // comes out monospaced and wrong.
 
 import { recordDc6 } from './drawlist.mjs';
-import { isButtonHeldOverTarget } from './frontend-pointer-states.mjs';
 import RETAIL_MIX_HEX from './retail-mixpalette.mjs';
 import { createGatewaySelector, DEFAULT_GATEWAY_LABEL, GATEWAY_LAYOUT } from './bnet-servers.mjs';
 
@@ -660,8 +659,7 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
     // it is still over the same button. Hover alone never draws the down cel (retail's mouse-up).
     press(x, y, width, height) {
       if (gatewaySelector?.open) { const v = view(width, height); return gatewaySelector.press((x - v.ox) / v.scale, (y - v.oy) / v.scale); }
-      hot = this.hitTest(x, y, width, height);
-      pressed = hot; return pressed >= 0 ? pressed : null;
+      pressed = this.hitTest(x, y, width, height); return pressed >= 0 ? pressed : null;
     },
     release(token, x, y, width, height) {
       if (gatewaySelector?.open) { const v = view(width, height); return gatewaySelector.release(token, (x - v.ox) / v.scale, (y - v.oy) / v.scale); }
@@ -712,7 +710,7 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
           barDrawn = { text: glyphs.map((gl) => gl.character).join(''), glyphs: glyphs.map((gl) => ({ character: gl.character, index: gl.index, path: gl.path })) };
         }
         // Hover keeps retail's up cel; only a held pointer gets the down cel.
-        const down = isButtonHeldOverTarget(pressed, hot) && items.indexOf(b.item) === pressed;
+        const down = items.indexOf(b.item) === pressed;
         const state = down ? 1 : 0;
         ctx.drawImage(buttons[b.kind][state].canvas, b.x, b.y);
         recordButton(buttons[b.kind][state], b.x, b.y);

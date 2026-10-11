@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <cstring>
 #include <emscripten.h>
-#include "d2gs_client_owned_item.h"
 
 struct D2RealmPlayerAssign {
     uint32_t guid;
@@ -24,33 +23,6 @@ struct D2RealmPlayerReassign {
     uint8_t reserved[2];
 };
 
-static_assert(offsetof(D2RealmOwnedItemPacket, itemGuid) == 0);
-static_assert(offsetof(D2RealmOwnedItemPacket, ownerGuid) == 4);
-static_assert(offsetof(D2RealmOwnedItemPacket, bitstreamOffset) == 8);
-static_assert(offsetof(D2RealmOwnedItemPacket, bitstreamLength) == 12);
-static_assert(offsetof(D2RealmOwnedItemPacket, action) == 16);
-static_assert(offsetof(D2RealmOwnedItemPacket, packetSize) == 17);
-static_assert(offsetof(D2RealmOwnedItemPacket, category) == 18);
-static_assert(offsetof(D2RealmOwnedItemPacket, ownerType) == 19);
-static_assert(sizeof(D2RealmOwnedItemPacket) == 20);
-
-// D2GS_GAMECHAT (0x26) preserves fields whose semantics are still unknown. Strings are kept in
-// bounded, NUL-terminated buffers matching the native handler's destinations (16 and 0x100 bytes).
-struct D2RealmGameChat {
-    uint32_t version;
-    uint32_t size;
-    uint32_t messageType;
-    uint32_t unknown2;
-    uint32_t subType;
-    uint32_t unitGuid;
-    uint32_t unknown8;
-    uint32_t color;
-    uint32_t nameLength;
-    uint32_t messageLength;
-    uint8_t name[16];
-    uint8_t message[256];
-};
-
 static_assert(offsetof(D2RealmPlayerAssign, guid) == 0);
 static_assert(offsetof(D2RealmPlayerAssign, classId) == 4);
 static_assert(offsetof(D2RealmPlayerAssign, name) == 5);
@@ -66,9 +38,6 @@ static_assert(offsetof(D2RealmPlayerReassign, unitType) == 8);
 static_assert(offsetof(D2RealmPlayerReassign, value) == 9);
 static_assert(offsetof(D2RealmPlayerReassign, reserved) == 10);
 static_assert(sizeof(D2RealmPlayerReassign) == 12);
-static_assert(offsetof(D2RealmGameChat, name) == 40);
-static_assert(offsetof(D2RealmGameChat, message) == 56);
-static_assert(sizeof(D2RealmGameChat) == 312);
 
 namespace {
 // NET_D2GS_CLIENT_INCOMING_SIZE for 1.13c. libd2 derives these entries from D2Net.dll 1.13c
@@ -175,35 +144,6 @@ int d2gsPacketSize113c(const uint8_t* packet, int length) {
 
 extern "C" {
 
-// D2GS_GAMECHAT follows the native byte layout: message type, unknown byte, subtype, unit GUID,
-// unknown byte, color, then bounded sender name and message strings.
-EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_parse_gamechat(
-    const uint8_t* packet, int length, D2RealmGameChat* out) {
-    if (!out) return 0;
-    std::memset(out, 0, sizeof(*out));
-    out->version = 1;
-    out->size = sizeof(*out);
-    if (!packet || length < 12 || packet[0] != 0x26) return 0;
-    int nameEnd = 10;
-    while (nameEnd < length && packet[nameEnd]) ++nameEnd;
-    if (nameEnd == length || nameEnd - 10 >= static_cast<int>(sizeof(out->name))) return 0;
-    const int messageStart = nameEnd + 1;
-    int messageEnd = messageStart;
-    while (messageEnd < length && packet[messageEnd]) ++messageEnd;
-    if (messageEnd != length - 1 || messageEnd - messageStart >= static_cast<int>(sizeof(out->message))) return 0;
-    out->messageType = packet[1];
-    out->unknown2 = packet[2];
-    out->subType = packet[3];
-    out->unitGuid = ru32(packet + 4);
-    out->unknown8 = packet[8];
-    out->color = packet[9];
-    out->nameLength = static_cast<uint32_t>(nameEnd - 10);
-    out->messageLength = static_cast<uint32_t>(messageEnd - messageStart);
-    std::memcpy(out->name, packet + 10, out->nameLength);
-    std::memcpy(out->message, packet + messageStart, out->messageLength);
-    return length;
-}
-
 // D2GS_CREATECLIENTPLAYER (server->client opcode 0x59), from the 1.13 packet schema:
 // guid:u32, class:u8, name[16], x:u16, y:u16, all little-endian. This parser consumes exactly
 // one packet; it does not apply state or infer a simulation unit. Returns the wire size (26) on
@@ -239,27 +179,6 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_parse_player_reassign(
     out->y = ru16(packet + 8);
     out->value = packet[10];
     return 11;
-}
-
-// Parse exactly one length-prefixed D2GS_ITEM_OWNED packet. 0x9d lays out
-// `[op,action,size,category,itemGuid:u32,ownerType,ownerGuid:u32,itemBits...]`.
-// A malformed packet zeroes the output and returns 0; otherwise the return is the
-// declared wire length. Item-bitstream interpretation is a separate operation.
-EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_parse_owned_item(
-    const uint8_t* packet, int length, D2RealmOwnedItemPacket* out) {
-    if (!out) return 0;
-    std::memset(out, 0, sizeof(*out));
-    if (!packet || length < 13 || packet[0] != 0x9d || packet[2] != length) return 0;
-
-    out->action = packet[1];
-    out->packetSize = packet[2];
-    out->category = packet[3];
-    out->itemGuid = ru32(packet + 4);
-    out->ownerType = packet[8];
-    out->ownerGuid = ru32(packet + 9);
-    out->bitstreamOffset = 13;
-    out->bitstreamLength = static_cast<uint32_t>(length - 13);
-    return length;
 }
 
 // Frame one decompressed server-to-client stream packet with the measured 1.13c D2Net size table.

@@ -1,5 +1,6 @@
-import { decodeDatPalette, decodeDt1, tilePixelsToRgba } from './d2-formats.mjs';
+import { decodeDatPalette, decodeDt1 } from './d2-formats.mjs';
 import { decodeDs1, decodeDs1Cell } from './ds1.mjs';
+import { tilePixelsToRgba } from './retail-tile-view.mjs';
 
 export const ACT_PRESET_ASSETS = Object.freeze([
   Object.freeze({ ds1: 'data\\global\\tiles\\ACT1\\TOWN\\townE1.ds1', palette: 'data\\global\\palette\\ACT1\\pal.dat' }),
@@ -22,23 +23,8 @@ export function normalizeDt1Dependency(path) {
   return normalized;
 }
 
-function indexOptions(lookup, mainIndex, subIndex, orientation, value) {
-  let bySubIndex = lookup.get(mainIndex);
-  if (!bySubIndex) lookup.set(mainIndex, bySubIndex = new Map());
-  let byOrientation = bySubIndex.get(subIndex);
-  if (!byOrientation) bySubIndex.set(subIndex, byOrientation = new Map());
-  let options = byOrientation.get(orientation);
-  if (!options) {
-    byOrientation.set(orientation, options = []);
-    options.push(value);
-    return true;
-  }
-  options.push(value);
-  return false;
-}
-
-function findOptions(lookup, mainIndex, subIndex, orientation) {
-  return lookup.get(mainIndex)?.get(subIndex)?.get(orientation);
+function key(mainIndex, subIndex, orientation) {
+  return `${mainIndex}:${subIndex}:${orientation}`;
 }
 
 function isDrawable(cell) {
@@ -67,7 +53,7 @@ function selectVariant(options, x, y, layer) {
 function addCommand(commands, lookup, raw, orientation, x, y, layer, kind) {
   const cell = decodeDs1Cell(raw, orientation);
   if (!isDrawable(cell)) return false;
-  const options = findOptions(lookup, cell.mainIndex, cell.subIndex, cell.orientation);
+  const options = lookup.get(key(cell.mainIndex, cell.subIndex, cell.orientation));
   if (!options?.length) return false;
   const chosen = selectVariant(options, x, y, layer);
   const anchorX = (x - y) * (TILE_WIDTH / 2);
@@ -82,13 +68,15 @@ export function composeDs1Map(map, libraries) {
     throw new TypeError('decoded DS1 and DT1 libraries are required');
   }
   const lookup = new Map();
-  let libraryTileCount = 0, identityCount = 0;
+  let libraryTileCount = 0;
   libraries.forEach((library, libraryIndex) => {
     if (!library?.tiles) throw new TypeError(`invalid DT1 library ${libraryIndex}`);
     libraryTileCount += library.tiles.length;
     library.tiles.forEach((tile, tileIndex) => {
-      if (indexOptions(lookup, tile.mainIndex, tile.subIndex, tile.orientation,
-        { tile, libraryIndex, tileIndex })) identityCount++;
+      const identity = key(tile.mainIndex, tile.subIndex, tile.orientation);
+      const options = lookup.get(identity) || [];
+      options.push({ tile, libraryIndex, tileIndex });
+      lookup.set(identity, options);
     });
   });
 
@@ -111,7 +99,7 @@ export function composeDs1Map(map, libraries) {
   walls.sort((a, b) => (a.x + a.y) - (b.x + b.y) || a.y - b.y || a.layer - b.layer);
   return {
     width: map.width, height: map.height, dependencies: map.dependencies.length,
-    libraries: libraries.length, libraryTileCount, identityCount,
+    libraries: libraries.length, libraryTileCount, identityCount: lookup.size,
     floorCount: floors.length, wallCount: walls.length,
     commands: [...floors, ...walls], floors, walls,
   };

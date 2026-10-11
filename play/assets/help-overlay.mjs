@@ -53,27 +53,11 @@ export function helpBorderPlacements(frames) {
 // frame 10 at its own anchor.
 export const HELP_LAYOUT = Object.freeze({
   title: { x: 328, y: 17, font: 'font16' },
-  // D2Client's close mouse handlers hit x=685..717 and y=24..56 inclusive at 800x600.
-  // Its art remains the 32x32 cel anchored at (685,56), whose painted pixels span x=685..716,
-  // y=25..56. The one-pixel top/right hit extension is part of the native predicate.
-  close: { labelX: 681, labelY: 73, font: 'font16', button: { x: 685, y: 24, w: 33, h: 33 }, cel: { frame: 10, x: 685, y: 56 } },
+  close: { labelX: 681, labelY: 73, font: 'font16', button: { x: 685, y: 25, w: 32, h: 32 }, cel: { frame: 10, x: 685, y: 56 } },
   listTextX: 117, listTextY: 78, listBulletX: 104, listBulletY: 73, listItemStep: 20,
   dim: [0, 0, 800, 551],                                // box, colour 0, mode 1 (50%), drawn before the HUD chrome
   white: 255,                                           // the leader lines' colour index
 });
-
-/** D2Client FUN_6fae6660 draws buysellbtn frame 10 idle and frame 11 while its close press is armed. */
-export function helpCloseFrame(pressed = false) { return HELP_LAYOUT.close.cel.frame + (pressed ? 1 : 0); }
-
-/** The local Help-close predicate, after inverting the renderer's 800x600 fit. */
-export function helpCloseContains(cx, cy, width, height) {
-  const scale = Math.min(1, width / 800, height / 600);
-  if (!(scale > 0)) return false;
-  const x = (cx - (width - 800 * scale) / 2) / scale;
-  const y = (cy - (height - 600 * scale) / 2) / scale;
-  const b = HELP_LAYOUT.close.button;
-  return x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h;
-}
 
 /** The bulleted list, in retail's order: label key, then the key the `%s` stands for. */
 export const HELP_BULLETS = Object.freeze([
@@ -151,10 +135,8 @@ export function createHelpOverlayRenderer(read, string, documentObject = globalT
   const fonts = { font16: font(HELP_OVERLAY_ART.font16), formal12: font(HELP_OVERLAY_ART.formal12) };
   const origin = (width, height) => { const scale = Math.min(1, width / 800, height / 600); return { scale, x: (width - 800 * scale) / 2, y: (height - 600 * scale) / 2 }; };
 
-  const closeFrames = decodeDc6(read(HELP_OVERLAY_ART.closeButton)).frames;
-  const closeCels = [closeFrames[HELP_LAYOUT.close.cel.frame], closeFrames[HELP_LAYOUT.close.cel.frame + 1]];
-  if (closeCels.some((cel) => !cel)) throw new RangeError('help close button needs idle and held frames');
-  const closeCanvases = closeCels.map((cel) => frameCanvas(cel, palette, documentObject));
+  const closeDc6 = decodeDc6(read(HELP_OVERLAY_ART.closeButton)).frames[HELP_LAYOUT.close.cel.frame];
+  const closeCanvas = frameCanvas(closeDc6, palette, documentObject);
   // Every label on the screen, in retail's draw order: the title and Close, the bulleted list, then the callouts.
   const labelPlan = [
     { key: 'Strhelp1', ...HELP_LAYOUT.title, where: 'title' },
@@ -169,9 +151,10 @@ export function createHelpOverlayRenderer(read, string, documentObject = globalT
     borderPlacements: placements,
     /** Screen (800x600) coordinates for a canvas point, the inverse of the draw transform. */
     toScreen(cx, cy, width, height) { const o = origin(width, height); return [(cx - o.x) / o.scale, (cy - o.y) / o.scale]; },
-    /** Retail's Close box: the panel's 32x32 buysellbtn cel drawn at (685, 56) by its bottom row. */
+    /** Retail's Close box: the panel's 32x32 buysellbtn cel (frame 10) drawn at (685, 56) by its bottom row. */
     hitClose(cx, cy, width, height) {
-      return helpCloseContains(cx, cy, width, height);
+      const [x, y] = this.toScreen(cx, cy, width, height), b = HELP_LAYOUT.close.button;
+      return x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h;
     },
     /** Retail dims the world (box 0,0,800,551, mode 1) BEFORE it draws the HUD chrome, so the chrome stays bright. */
     dim(ctx, width, height) {
@@ -181,7 +164,7 @@ export function createHelpOverlayRenderer(read, string, documentObject = globalT
       recordPrim('box', x1, y1, x2, y2, 0, 1);
       ctx.restore();
     },
-    draw(ctx, width, height, { closePressed = false } = {}) {
+    draw(ctx, width, height) {
       const o = origin(width, height);
       ctx.save(); ctx.translate(o.x, o.y); ctx.scale(o.scale, o.scale);
       const evidence = { palette: HELP_OVERLAY_ART.palette, border: [], bullets: [], labels: [], lines: [] };
@@ -190,10 +173,9 @@ export function createHelpOverlayRenderer(read, string, documentObject = globalT
         evidence.border.push({ path: HELP_OVERLAY_ART.border, cel: p.frame, left: p.left, top: p.top, width: p.width, height: p.height,
           blit: recordDc6(HELP_OVERLAY_ART.border, p.frame, borderFrames[p.frame], p.left, p.top) });
       }
-      const closeFrame = helpCloseFrame(closePressed), closeDc6 = closeFrames[closeFrame];
       const cl = HELP_LAYOUT.close.cel, closeTop = cl.y - closeDc6.height + 1;
-      ctx.drawImage(closeCanvases[closeFrame - cl.frame], cl.x, closeTop);
-      evidence.close = { blit: recordDc6(HELP_OVERLAY_ART.closeButton, closeFrame, closeDc6, cl.x, closeTop) };
+      ctx.drawImage(closeCanvas, cl.x, closeTop);
+      evidence.close = { blit: recordDc6(HELP_OVERLAY_ART.closeButton, cl.frame, closeDc6, cl.x, closeTop) };
       // A bullet's anchor is its BOTTOM row (drawlist.mjs), as everything retail draws.
       const dot = (kind, x, y, where) => {
         const b = bullets[kind], top = y - b.frame.height + 1;

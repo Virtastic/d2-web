@@ -51,7 +51,6 @@ import { decodeDatPalette, decodeDc6 } from './d2-formats.mjs';
 import { createBlender } from './frontend.mjs';
 import { recordDc6, recordPrim } from './drawlist.mjs';
 import { createWeatherCycle } from './weather-cycle.mjs';
-import { plotRainLine } from './weather-line.mjs';
 
 /** The two layers retail's captured frames draw, with the particle count of the Rogue Encampment's own
  *  peak episode (walls14: 45 Rain3 + 42 Rain4 -- its tiles are `Act1\Town\Floor`/`Fence`/`Objects`;
@@ -140,6 +139,10 @@ export function createWeatherRenderer({ read }) {
       if (d.x < -100 || d.x > streaks.w + 100) spawn(d, false);
     }
   };
+  const plot = (ctx, x0, y0, x1, y1) => {
+    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+    for (let i = 0; i <= n; i++) ctx.fillRect(Math.round(x0 + (x1 - x0) * (n ? i / n : 0)), Math.round(y0 + (y1 - y0) * (n ? i / n : 0)), 1, 1);
+  };
 
   const prepare = () => {
     if (prepared) return;
@@ -203,7 +206,7 @@ export function createWeatherRenderer({ read }) {
         const x0 = Math.round(d.x), y0 = Math.round(d.y), x1 = Math.round(d.x + wind * d.len), y1 = Math.round(d.y + d.len);
         const o = d.colour * 4;
         ctx.fillStyle = `rgb(${rgbaPal[o]},${rgbaPal[o + 1]},${rgbaPal[o + 2]})`;
-        plotRainLine(ctx, x0, y0, x1, y1);
+        plot(ctx, x0, y0, x1, y1);
         recordPrim('line', x0, y0, x1, y1, d.colour, 127);
         out.push({ x0, y0, x1, y1, colour: d.colour });
       }

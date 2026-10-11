@@ -68,3 +68,28 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_parse_player_move(
 }
 
 }
+
+extern "C" EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_parse_player_cast(
+    const uint8_t* packet, int length, D2RealmPlayerCast* output) {
+    if (output) std::memset(output, 0, sizeof(*output));
+    if (!packet || !output || (length != 16 && length != 17)) return 0;
+    if ((packet[0] != 0x4c || length != 16) && (packet[0] != 0x4d || length != 17)) return 0;
+    output->guid = read_u32(packet + 2);
+    output->unitType = packet[1];
+    output->owner = -1; // Both native callbacks construct a natural-skill owner, not a wire field.
+    output->opcode = packet[0];
+    if (packet[0] == 0x4d) {
+        output->skill = read_u32(packet + 6);
+        output->skillLevel = packet[10];
+        output->targetX = read_u16(packet + 11);
+        output->targetY = read_u16(packet + 13);
+        output->rawTail = read_u16(packet + 15);
+    } else {
+        output->skill = read_u16(packet + 6);
+        output->skillLevel = packet[8];
+        output->targetType = packet[9];
+        output->targetGuid = read_u32(packet + 10);
+        output->rawTail = read_u16(packet + 14);
+    }
+    return length;
+}
