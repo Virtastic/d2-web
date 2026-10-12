@@ -3,6 +3,7 @@ import { createBlender } from './frontend.mjs';
 import { UNIT_CENTRE_Y } from './session-terrain.mjs';
 import { MA0_K } from './ma0.mjs';
 import { perfT0, perfT, perfSample } from './frame-perf.mjs';
+import { fullMapFadeDrawMode } from './automap-full-fade.mjs';
 
 // DATATBLS_LoadAutomapTxt turns these LevelName strings into its automap-type
 // enum.  This is the same 1.13c table order as D2MOO's gszAutomapLevelNames;
@@ -25,6 +26,33 @@ export const AUTOMAP_LAYOUT = Object.freeze({ width: 800, height: 600, centreX: 
 // a cell resolves to the same frame in either sheet and only the DC6 and the world->map divisor differ.
 export const AUTOMAP_PATHS = Object.freeze({ full: 'data\\global\\ui\\automap\\maximap.dc6', mini: 'data\\global\\ui\\automap\\maximaps.dc6' });
 export const AUTOMAP_PATH = AUTOMAP_PATHS.full;
+
+// F234: D2Client's viewport producer (`0x6fb0f9f0`) uses this rectangle for marker gating, while
+// `0x6fb10250` supplies the separate small-map cell clip. The `selector284` input is deliberately
+// explicit: the binary's initial value is zero, but its runtime producer/meaning is not yet recovered.
+export function automapViewport(width, height, { mode = 'full', left = true, selector284 = 0 } = {}) {
+  const mini = mode === 'mini';
+  const anchorX = left ? (selector284 === 2 ? 0 : 96) : Math.floor(2 * width / 3);
+  const anchorY = left ? 0 : 78;
+  const viewport = mini
+    ? { left: anchorX - 8, top: anchorY, right: anchorX + Math.floor(width / 3), bottom: anchorY + Math.floor(height / 3) }
+    : { left: -16, top: -16, right: width, bottom: height };
+  const cellClip = !mini ? null : left
+    ? { left: 0, top: selector284 === 2 ? -21 : 75, right: 279, bottom: (selector284 === 2 ? -21 : 75) + 225 }
+    : { left: width - 281, top: 57, right: width - 2, bottom: 282 };
+  return { anchorX, anchorY, viewport, cellClip };
+}
+// D2Client's per-unit automap pass uses the recomputed global viewport (0x6fbcc228..0x6fbcc234)
+// as a marker gate. This is deliberately separate from the mini cell renderer's clip rectangle.
+// The native per-unit routine compares all four edges inclusively. Keep this predicate available
+// for native automap-projected points; ordinary world-projection `sx/sy` are not those points.
+export function automapMarkerInViewport(x, y, viewport) {
+  return x >= viewport.left && x <= viewport.right && y >= viewport.top && y <= viewport.bottom;
+}
+export function automapScrollOffset(width, height, { mode = 'full', center = 'yes', anchorX, anchorY } = {}) {
+  if (mode !== 'mini' || center !== 'yes') return { x: 0, y: 0 };
+  return { x: Math.floor(width / 3) - anchorX - 16, y: Math.floor(height / 3) - anchorY - 16 };
+}
 
 function decodeText(bytes) { return new TextDecoder('latin1').decode(bytes).replace(/^﻿/, ''); }
 function number(value) { const n = Number.parseInt(String(value ?? '').trim(), 10); return Number.isFinite(n) ? n : -1; }
@@ -109,6 +137,27 @@ export function getAutomapRevealState(revealed, levelId) {
   if (!revealed.has(levelId)) revealed.set(levelId, { rooms: new Set(), hero: null });
   return revealed.get(levelId);
 }
+// Retail's automap layer is drawn as typed lists. The browser keeps one Map, so the visible pass
+// sorts entries back into retail layer order. That order is stable until a saved or newly revealed
+// cell changes the Map; cache it between those mutations. Stable sort preserves insertion order for
+// equal layer types, matching the former per-frame operation.
+export function createAutomapCellOrderCache() {
+  const ordered = new WeakMap();
+  let builds = 0;
+  return {
+    get(layer) {
+      let entries = ordered.get(layer);
+      if (!entries) {
+        entries = [...layer.entries()].sort((a, b) => a[1].layer - b[1].layer);
+        ordered.set(layer, entries);
+        builds++;
+      }
+      return entries;
+    },
+    invalidate(layer) { ordered.delete(layer); },
+    get builds() { return builds; },
+  };
+}
 export function serializeAutomapLayers(layers, saved) {
   const out = [], seen = new Set(), covered = new Set();
   const push = (layer, frame, x, y, wall) => {
@@ -177,8 +226,12 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
   const family = (mode) => { const key = mode === 'mini' ? 'mini' : 'full'; if (!families.has(key)) families.set(key, buildFamily(key)); return families.get(key); };
   // F234's five options, exactly as the Automap Options page holds them (game-menu.mjs AUTOMAP_DEFAULTS).
   // Default `full` is retail's page default and the layout this overlay drew before the options existed.
-  let settings = { mode: 'full', fade: 'off', center: 'yes', party: 'yes', names: 'yes' };
-  const makeLayout = () => { const f = family(settings.mode); return { ...AUTOMAP_LAYOUT, step: f.step, scale: 1 / f.divisor, divisor: f.divisor, mode: f.key, source: f.path }; };
+  let settings = { mode: 'full', fade: 'off', center: 'yes', party: 'yes', names: 'yes', left: 'yes' };
+  const makeLayout = (width = AUTOMAP_LAYOUT.width, height = AUTOMAP_LAYOUT.height) => {
+    const f = family(settings.mode);
+    return { ...AUTOMAP_LAYOUT, step: f.step, scale: 1 / f.divisor, divisor: f.divisor, mode: f.key, source: f.path,
+      viewport: automapViewport(width, height, { mode: f.key, left: settings.left !== 'no' }) };
+  };
   let frames = family('full').frames, layout = Object.freeze(makeLayout());
   let visible = false, evidence = { open: false, drawn: [], unresolved: [], layout, error: null };
   // Retail's automap is CLIENT state and it is per level. D2Client keeps a D2AutomapLayerStrc per
@@ -188,6 +241,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
   // and the layer survives leaving and re-entering its level. Cells are stored by retail layer number;
   // reveal bookkeeping below stays per level id.
   const layers = new Map();
+  const orderedCells = createAutomapCellOrderCache();
   // The absorb is a PURE FUNCTION of (the frame's tile read, the level's revealed rooms), and both move
   // only when the player does something: rooms reveal as the hero enters them, the tile read changes as
   // rooms activate. Re-running it on a frame where neither changed absorbs nothing -- it re-keys every
@@ -202,12 +256,15 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
   let saved = new Map();
   const levelLayer = parseAutomapLevelLayers(read('data\\global\\excel\\levels.txt'));
   const seed = (layer, layerNo) => {
+    let changed = false;
     for (const c of saved.get(layerNo) || []) {
       const wsum = (c.y - MA0_K.y) / 0.8, wdif = (c.x - MA0_K.x) / 1.6, wx = (wsum + wdif) / 2, wy = (wsum - wdif) / 2, kind = c.wall ? 1 : 0;
       if (!frames[c.frame]) continue;
       layer.set(`${wx / 5},${wy / 5},${kind}`, { frame: c.frame, requestedFrames: [c.frame], levelName: 'saved', tileName: '.ma0', style: -1, startSequence: -1, endSequence: -1,
         orientation: -1, mainIndex: -1, subIndex: -1, layer: kind, world: [wx, wy], saved: [c.x, c.y] });
+      changed = true;
     }
+    if (changed) orderedCells.invalidate(layer);
   };
   // Cells the AutoMap.txt route cannot name, per level: the frame's terrain read offers them, no row
   // matches. Counted rather than dropped, because this is the one part of the map that still needs a
@@ -225,7 +282,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
       // seeding below reads `frames`.
       if (nextSettings) settings = { ...settings, ...nextSettings };
       frames = family(settings.mode).frames;
-      layout = Object.freeze(makeLayout());
+      layout = Object.freeze(makeLayout(width, height));
       const fam = family(settings.mode), mode = fam.key;
       const levelId = snapshot.level;
       const layer = getAutomapLayer(layers, levelLayer, levelId, seed);
@@ -263,6 +320,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
         } else {
           const pAbsorb = perfT0(); perfSample('automap-tiles', tiles.length);
           live = new Set();
+          const sizeBeforeAbsorb = layer.size;
           for (const tile of tiles) {
             if (tile.seam) continue;
             const key = cellKey(tile); live.add(key);
@@ -284,6 +342,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
               endSequence: selected.record.endSequence, orientation: tile.orientation, mainIndex: tile.mainIndex,
               subIndex: tile.subIndex, layer: tile.layer, world: [tile.worldX * 5, tile.worldY * 5] });
           }
+          if (layer.size !== sizeBeforeAbsorb) orderedCells.invalidate(layer);
           perfT('automap-absorb', pAbsorb);
           absorbed = { key: absorbKey, live };
         }
@@ -303,24 +362,25 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
       // 16x8 diamond, (8,4) per tile step -- every one of the 890 cells of f5b-automap-town.txt and 826 of
       // a3-forest-walkin.txt sits on that lattice, offset by the hero's sub-tile position (0 in the town, where
       // the hero starts on a tile origin; 4,3 in the forest).
-      // F234: AutoMapCenter. Retail's "centre" recompute (0x6fb108d0) writes the scroll offset
-      // `screenW/3 - anchorX - 16` and fires ONLY for mode 1 (`dec eax; je`), zeroing it for every other
-      // mode. The anchor comes from AutoMapLeft (0x6fbcc240): the whole-screen viewport uses 2*screenW/3,
-      // the small centred box screenW/3 (anchorY 78 both ways). AutoMapLeft is not one of the page's five
-      // rows, so it is derived from the mode -- "Full Screen vs Mini Map" is exactly the whole-screen vs
-      // small-box split retail's two branches make -- and that derivation is recorded, not assumed.
-      const leftAnchorX = (mode === 'mini' ? 1 : 2) * width / 3;
-      const centre = settings.center === 'yes' && mode === 'mini'
-        ? { x: Math.round(width / 3 - leftAnchorX - 16), y: Math.round(width / 3 - 78 - 16) } : { x: 0, y: 0 };
-      const cx = Math.round(width / 2) + centre.x, cy = Math.round(height / 2 + UNIT_CENTRE_Y) + centre.y;
+      // AutoMapLeft defaults on at native startup. Its initial selector state is zero in `.data`, so
+      // 0x6fb0f9f0 places the mini-map anchor at (96,0); the exact marker viewport and cell clip are
+      // carried in layout. AutoMapCenter is a SCROLL offset, so projected cells move opposite it.
+      const viewport = automapViewport(width, height, { mode, left: settings.left !== 'no' });
+      const centre = automapScrollOffset(width, height, { mode, center: settings.center,
+        anchorX: viewport.anchorX, anchorY: viewport.anchorY });
+      const cx = Math.round(width / 2) - centre.x, cy = Math.round(height / 2 + UNIT_CENTRE_Y) - centre.y;
       const hero = view?.camera || { x: snapshot.player.x + .5, y: snapshot.player.y + .5 };
       if (!layer.size) unresolved.push({ reason: 'this level has no revealed cell yet' });
       ctx.save(); ctx.imageSmoothingEnabled = false;
+      if (viewport.cellClip) {
+        const { left, top, right, bottom } = viewport.cellClip;
+        ctx.beginPath(); ctx.rect(left, top, right - left + 1, bottom - top + 1); ctx.clip();
+      }
       // RETAIL'S OWN LIST ORDER, not the order the cells happened to be discovered in: a layer holds
       // pFloors, pWalls, pObjects and pExtras and the client walks them in that order, while this map
       // drew floors and walls interleaved by insertion -- so a floor absorbed after a wall painted
       // over it. The engine's tile layer is the same 0 floors / 1 walls / 2 roofs split.
-      const ordered = [...layer.entries()].sort((a, b) => a[1].layer - b[1].layer);
+      const ordered = orderedCells.get(layer);
       for (const [key, cell] of ordered) {
         // D2Common chooses one Cel from this selected row. The browser has no access to that
         // private Automap RNG stream, so it deterministically uses the row's first valid Cel;
@@ -333,11 +393,13 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
         // of 600 and the next lattice row (596) is culled. Culling on the box top kept every cell whose
         // bottom rows fell past 592 -- 31 of s953's ours-only cells (the `.ma0` tail) were that, not reveal.
         if (x + bitmap.width <= 0 || x >= width || y + bitmap.height <= 0 || y + bitmap.height - 1 > height - 8) continue;
-        // F10 / AutoMapFade has a fully recovered mini-map branch: effective state 2 (Fade=No)
-        // selects DrawMode 1 for every map cell; Fade=Yes normalizes to 0 and leaves DrawMode 5.
-        // Full-map Fade uses a separate native distance/list gate and remains intentionally open.
-        const drawMode = mode === 'mini' && settings.fade === 'off' ? 1 : 5;
-        if (drawMode === 1) blend(ctx, fam.rawFrames[cell.frame], x, y, drawMode);
+        // F10 / AutoMapFade: the mini-map uses one PL2 blend mode when Fade is off;
+        // full-map mode 0 uses the native distance ramp for default MaxiMap cells.
+        const drawMode = mode === 'mini'
+          ? (settings.fade === 'off' ? 1 : 5)
+          : fullMapFadeDrawMode({ mode, fade: settings.fade, source: fam.path, x, y, width, height,
+            targetX: view?.fadeTargetX ?? width / 2 });
+        if (drawMode >= 0 && drawMode <= 2) blend(ctx, fam.rawFrames[cell.frame], x, y, drawMode);
         else ctx.drawImage(bitmap, x, y);
         const rawFrame = fam.rawFrames[cell.frame], firstOpaque = fam.samples[cell.frame];
         const sample = firstOpaque < 0 ? null : [x + firstOpaque % rawFrame.width, y + Math.floor(firstOpaque / rawFrame.width)];
@@ -346,6 +408,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
           tile: { orientation: cell.orientation, style: cell.mainIndex, sequence: cell.subIndex, layer: cell.layer, world: cell.world },
           at: [x, y], size: [bitmap.width, bitmap.height], drawMode, sample, order: drawn.length, remembered: !live.has(key) });
       }
+      if (viewport.cellClip) { ctx.restore(); ctx.save(); }
       // Unit markers, as retail draws them over the map (f5b-automap-town.txt, a3-forest-walkin.txt): a
       // 12-segment 16x8 glyph centred 8 right / 7 up of the unit's feet, palette index 151 for the hero and
       // 32 for a town NPC (the draw list's colour is index + 256*k), plus the NPC's name beside it.
@@ -356,11 +419,13 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
         markers.push({ index, at: [x, y], kind });
       };
       if (view) {
-        // F234: AutoMapParty (0x6fb11bc1) gates a non-player unit's marker and AutoMapPartyNames
-        // (0x6fb11ac3) its nameplate; the hero's own marker is always drawn. With Party = No retail draws
-        // no party unit at all, and the page forces Names to No with it (game-menu.mjs cycle()).
-        if (settings.party === 'yes') for (const n of view.npcs || []) {
-          cross(Math.round(n.sx) + 8, Math.round(n.sy) - 7, NPC_COLOUR, 'party');
+        // F234: the native per-unit pass gates map-space markers before its unit-type/options branches.
+        // This client only has ordinary world-screen `sx/sy` here, so it cannot safely apply that gate
+        // until the native automap projection is represented. Preserve the known NPC marker/name option
+        // behavior while leaving viewport culling open (canvas bounds still clip naturally).
+        for (const n of view.npcs || []) {
+          const markerX = Math.round(n.sx) + 8, markerY = Math.round(n.sy) - 7;
+          cross(markerX, markerY, NPC_COLOUR, 'npc');
           if (settings.names === 'yes' && n.label && view.font) { const at = [Math.round(n.sx) - 18 + 8, Math.round(n.sy) - 10 + 2 - 7]; view.font.draw(ctx, n.label, at[0], at[1]); nameplates.push({ text: n.label, at }); }
         }
         cross(Math.round(cx) + 8, Math.round(cy) - 7, HERO_COLOUR, 'hero');

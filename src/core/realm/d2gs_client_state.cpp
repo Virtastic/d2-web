@@ -32,9 +32,12 @@
 #include <Units/UnitRoom.h>
 #include <Drlg/D2DrlgDrlg.h>
 #include "d2gs_client_motion.h"
+#include "d2gs_client_target_relations.h"
 #include "d2gs_client_unit_resources.h"
 #include "client_fireball_hit.h"
+#include "client_missile_sound.h"
 #include "d2gs_client_player_motion.h"
+#include "d2gs_client_monster_death_events.h"
 #include "cast_target_relation.h"
 
 struct D2RealmPlayerAssign {
@@ -54,12 +57,21 @@ struct D2RealmPlayerReassign {
     uint8_t reserved[2];
 };
 
+struct D2RealmGameChat {
+    uint32_t version, size, messageType, unknown2, subType, unitGuid, unknown8, color, nameLength, messageLength;
+    uint8_t name[16];
+    uint8_t message[256];
+};
+
 static_assert(offsetof(D2RealmPlayerReassign, guid) == 0);
 static_assert(offsetof(D2RealmPlayerReassign, x) == 4);
 static_assert(offsetof(D2RealmPlayerReassign, y) == 6);
 static_assert(offsetof(D2RealmPlayerReassign, unitType) == 8);
 static_assert(offsetof(D2RealmPlayerReassign, value) == 9);
 static_assert(sizeof(D2RealmPlayerReassign) == 12);
+static_assert(offsetof(D2RealmGameChat, name) == 40);
+static_assert(offsetof(D2RealmGameChat, message) == 56);
+static_assert(sizeof(D2RealmGameChat) == 312);
 
 struct D2RealmClientPlayerState {
     uint32_t version;
@@ -298,9 +310,24 @@ D2RealmClientPlayerState g_player;
 std::vector<D2RealmClientPlayerEntry> g_players;
 int g_selectedPlayer = -1;
 D2RealmClientWorldState g_world;
+D2RealmGameChat g_gameChat{1, sizeof(D2RealmGameChat)};
+uint32_t g_gameChatCount;
 uint32_t g_clientDifficulty;
 std::vector<D2RealmClientMonster> g_monsters;
 std::vector<D2RealmClientMonsterView> g_monsterViews;
+std::vector<d2::realm::MonsterDeathModeEvent> g_monsterDeathModeEvents;
+std::vector<d2::realm::MonsterDeathModeEvent> g_monsterDeathModeEventView;
+uint32_t g_nextMonsterDeathModeSequence = 1;
+
+void clear_monster_death_mode_events() {
+    g_monsterDeathModeEvents.clear();
+    g_monsterDeathModeEventView.clear();
+}
+
+void reset_monster_death_mode_events() {
+    clear_monster_death_mode_events();
+    g_nextMonsterDeathModeSequence = 1;
+}
 
 class D2RealmBitReader {
 public:
@@ -367,9 +394,17 @@ void clear_world() {
     g_world.version = 2;
     g_world.size = sizeof(g_world);
 }
+
+void clear_game_chat() {
+    std::memset(&g_gameChat, 0, sizeof(g_gameChat));
+    g_gameChat.version = 1;
+    g_gameChat.size = sizeof(g_gameChat);
+    g_gameChatCount = 0;
+}
 }
 
 extern "C" {
+int d2_realm_d2gs_parse_gamechat(const uint8_t*, int, D2RealmGameChat*);
 int d2_realm_d2gs_parse_player_assign(const uint8_t*, int, D2RealmPlayerAssign*);
 int d2_realm_d2gs_parse_player_reassign(const uint8_t*, int, D2RealmPlayerReassign*);
 int d2_realm_d2gs_parse_player_move(const uint8_t*, int, D2RealmPlayerMove*);
@@ -404,13 +439,19 @@ bool d2_realm_client_motion_attach(D2UnitStrc* unit, int x, int y) {
     return unit->pDynamicPath != nullptr;
 }
 
-int d2_realm_client_motion_set_mode(D2UnitStrc* unit, uint32_t mode) {
-    if (!unit || !unit->pDynamicPath) return -1;
-    if (unit->dwAnimMode != mode || !unit->dwFrameCountPrecise) {
+static int d2_realm_client_unit_set_mode(D2UnitStrc* unit, uint32_t mode) {
+    if (!unit) return -1;
+    if (d2::realm::monsterAnimationModeNeedsSetup(unit->dwAnimMode, mode,
+            unit->dwFrameCountPrecise)) {
         unit->dwAnimMode = mode;
         UNITS_SetAnimStartFrame(unit);
     }
     return 1;
+}
+
+int d2_realm_client_motion_set_mode(D2UnitStrc* unit, uint32_t mode) {
+    if (!unit || !unit->pDynamicPath) return -1;
+    return d2_realm_client_unit_set_mode(unit, mode);
 }
 
 EMSCRIPTEN_KEEPALIVE uint32_t d2_realm_client_motion_refusal_mode(uint32_t unitType, uint32_t currentMode) {
@@ -538,26 +579,34 @@ static bool create_monster_motion(D2RealmClientMonster& monster) {
         }
         monster.motionUnit = unit;
     }
+    // Initialize the client-owned frame state even before MapReveal attaches a dynamic path.
+    // This is the CUnit state Common #11090 initializes when D2Client receives a mode update.
+    if (unit->dwAnimMode != monster.view.mode || !unit->dwFrameCountPrecise)
+        d2_realm_client_unit_set_mode(unit, monster.view.mode);
     // The GUID-owned CUnit can receive state packets before MapReveal activates its room.
     // Keep the canonical unit/stat lists alive and attach its path when the room becomes active.
     if (!unit->pDynamicPath && !d2_realm_client_motion_attach(unit,
-            static_cast<int>(monster.view.x), static_cast<int>(monster.view.y))) return true;
-    // Fresh 0xAC construction passes its four-bit mode nibble to native #11090.
-    // Initialize its matching frame state; rate setup alone leaves the precise count unset.
-    if (unit->pDynamicPath) d2_realm_client_motion_set_mode(unit, monster.view.mode);
+            static_cast<int>(monster.view.x), static_cast<int>(monster.view.y))) {
+        refresh_monster_motion_view(monster);
+        return true;
+    }
     refresh_monster_motion_view(monster);
     return true;
 }
 
 static void refresh_monster_motion_view(D2RealmClientMonster& monster) {
-    if (!monster.motionUnit || !monster.motionUnit->pDynamicPath) return;
-    monster.view.x = static_cast<uint32_t>(PATH_GetXPosition(monster.motionUnit->pDynamicPath));
-    monster.view.y = static_cast<uint32_t>(PATH_GetYPosition(monster.motionUnit->pDynamicPath));
-    monster.view.direction = PATH_GetDirection(monster.motionUnit->pDynamicPath);
+    if (!monster.motionUnit) return;
     monster.view.mode = monster.motionUnit->dwAnimMode;
     monster.view.framePrecise = monster.motionUnit->nSeqCurrentFramePrecise;
     monster.view.frameCountPrecise = monster.motionUnit->dwFrameCountPrecise;
     monster.view.animSpeed = static_cast<uint16_t>(monster.motionUnit->wAnimSpeed);
+    D2MonStats2Txt* stats2 = UNITS_GetMonStats2TxtRecordFromMonsterId(static_cast<int>(monster.view.classId));
+    monster.view.reserved = (monster.motionUnit->pAnimSeq ? 0x01u : 0u) |
+        (stats2 && (stats2->dwModeFlags & MONSTATS2MODEFLAG_DD) ? 0x02u : 0u);
+    if (!monster.motionUnit->pDynamicPath) return;
+    monster.view.x = static_cast<uint32_t>(PATH_GetXPosition(monster.motionUnit->pDynamicPath));
+    monster.view.y = static_cast<uint32_t>(PATH_GetYPosition(monster.motionUnit->pDynamicPath));
+    monster.view.direction = PATH_GetDirection(monster.motionUnit->pDynamicPath);
 }
 
 static int apply_monster_move(const uint8_t* packet, int length) {
@@ -821,13 +870,8 @@ static bool apply_monster_assign(const uint8_t* packet, int length) {
         if (existing.view.guid == monster.view.guid) {
             // Native duplicate-GUID handling reuses the CUnit and calls its mode setter; it does
             // not replace class, component set, or position from this assignment record.
-            if (existing.motionUnit && existing.motionUnit->pDynamicPath) {
-                d2_realm_client_motion_set_mode(existing.motionUnit, monster.view.mode);
-                refresh_monster_motion_view(existing);
-            } else {
-                if (existing.motionUnit) existing.motionUnit->dwAnimMode = monster.view.mode;
-                existing.view.mode = monster.view.mode;
-            }
+            if (existing.motionUnit) d2_realm_client_unit_set_mode(existing.motionUnit, monster.view.mode);
+            refresh_monster_motion_view(existing);
             existing.view.hpPct = monster.view.hpPct;
             if (monster.hasStats) {
                 existing.stats = std::move(monster.stats);
@@ -855,32 +899,69 @@ static bool remove_monster(const uint8_t* packet, int length) {
         (static_cast<uint32_t>(packet[5]) << 24);
     for (auto it = g_monsters.begin(); it != g_monsters.end();) {
         if (it->view.guid != guid) { ++it; continue; }
+        g_monsterDeathModeEvents.erase(std::remove_if(g_monsterDeathModeEvents.begin(), g_monsterDeathModeEvents.end(),
+            [guid](const auto& event) { return event.guid == guid; }), g_monsterDeathModeEvents.end());
         destroy_monster_motion(*it);
         it = g_monsters.erase(it);
     }
     return true;
 }
 
+static int apply_monster_death_mode(const uint8_t* packet, int length) {
+    d2::realm::MonsterDeathModePacket decoded{};
+    const int decodedResult = d2::realm::decodeMonsterDeathModePacket(packet, length, &decoded);
+    if (decodedResult <= 0) return decodedResult;
+    auto it = std::find_if(g_monsters.begin(), g_monsters.end(), [&decoded](const auto& monster) {
+        return monster.view.guid == decoded.guid;
+    });
+    if (it == g_monsters.end() || !it->motionUnit) return 0;
+
+    D2UnitStrc* const unit = it->motionUnit;
+    const uint32_t previousMode = unit->dwAnimMode;
+    if (decoded.wireState == 8) {
+        D2MonStatsTxt* stats = DATATBLS_GetMonStatsTxtRecord(static_cast<int>(it->view.classId));
+        const int minion = stats ? stats->wMinion[0] : -1;
+        if (stats && stats->nSplEndDeath == 1 && minion >= 0 &&
+            sgptDataTables && minion < sgptDataTables->nMonStatsTxtRecordCount) return 0;
+    }
+    // State 9 has an Izual-specific SQ replacement path. The ordinary DD path is
+    // grounded here; leave that class-specific transition to its own client behavior.
+    if (decoded.wireState == 9 && it->view.classId == 0x11c && previousMode == MONMODE_SEQUENCE) return 0;
+    if (d2_realm_client_unit_set_mode(unit, decoded.mode) < 0) return -1;
+    refresh_monster_motion_view(*it);
+    if (d2::realm::appendMonsterDeathModeEvent(g_monsterDeathModeEvents,
+            g_nextMonsterDeathModeSequence, decoded.guid, decoded.opcode, decoded.wireState,
+            previousMode, decoded.mode)) {
+        ++g_nextMonsterDeathModeSequence;
+        return 1;
+    }
+    return 0;
+}
+
 static int reject_stream(int error) {
     clear_client_missiles();
+    reset_monster_death_mode_events();
     destroy_all_monster_motion();
     clear_players();
     d2_drlg_act_end();
     clear_world();
     g_monsters.clear();
     g_monsterViews.clear();
+    clear_game_chat();
     g_pendingLength = 0;
     return error;
 }
 
 EMSCRIPTEN_KEEPALIVE void d2_realm_client_player_reset() {
     clear_client_missiles();
+    reset_monster_death_mode_events();
     destroy_all_monster_motion();
     clear_players();
     d2_drlg_act_end();
     clear_world();
     g_monsters.clear();
     g_monsterViews.clear();
+    clear_game_chat();
     g_pendingLength = 0;
 }
 
@@ -980,6 +1061,7 @@ static int remove_player(const uint8_t* packet, int length) {
         if (g_players[i].view.guid != guid) continue;
         const bool selected = static_cast<int>(i) == g_selectedPlayer;
         if (selected) clear_player();
+        clear_target_relations_to(g_players[i].motionUnit);
         destroy_player_motion(g_players[i]);
         g_players.erase(g_players.begin() + static_cast<std::ptrdiff_t>(i));
         if (selected) g_selectedPlayer = -1;
@@ -1155,14 +1237,19 @@ static uint32_t g_nextClientMissileId = 1;
 static void clear_target_relations_to(D2UnitStrc* target) {
     if (!target) return;
     for (auto& player : g_players) {
-        if (player.motionUnit && player.motionUnit->pDynamicPath &&
-            PATH_GetTargetUnit(player.motionUnit->pDynamicPath) == target)
-            UNITS_SetTargetUnitForDynamicUnit(player.motionUnit, nullptr);
+        d2::realm::clearTargetRelationTo(target, player.motionUnit,
+            [](D2UnitStrc* unit) { return unit->pDynamicPath; }, PATH_GetTargetUnit,
+            [](D2UnitStrc* unit) { UNITS_SetTargetUnitForDynamicUnit(unit, nullptr); });
+    }
+    for (auto& monster : g_monsters) {
+        d2::realm::clearTargetRelationTo(target, monster.motionUnit,
+            [](D2UnitStrc* unit) { return unit->pDynamicPath; }, PATH_GetTargetUnit,
+            [](D2UnitStrc* unit) { UNITS_SetTargetUnitForDynamicUnit(unit, nullptr); });
     }
     for (auto& missile : g_clientMissiles) {
-        if (missile.unit && missile.unit->pDynamicPath &&
-            PATH_GetTargetUnit(missile.unit->pDynamicPath) == target)
-            UNITS_SetTargetUnitForDynamicUnit(missile.unit, nullptr);
+        d2::realm::clearTargetRelationTo(target, missile.unit,
+            [](D2UnitStrc* unit) { return unit->pDynamicPath; }, PATH_GetTargetUnit,
+            [](D2UnitStrc* unit) { UNITS_SetTargetUnitForDynamicUnit(unit, nullptr); });
     }
 }
 // Bounded native generic SC projectiles: Fire Bolt58 and Fireball62.
@@ -1181,6 +1268,9 @@ struct RealmMissileEvent { uint32_t version,event,tick,id,classId,ownerGuid,skil
 static_assert(sizeof(RealmMissileEvent) == 36);
 static std::vector<RealmMissileEvent> g_clientMissileEvents;
 static uint32_t g_clientMissileTick = 0;
+struct RealmMissileSoundEvent { uint32_t version, tick, missileId, classId, event, soundRow; };
+static_assert(sizeof(RealmMissileSoundEvent) == 24);
+static std::vector<RealmMissileSoundEvent> g_clientMissileSoundEvents;
 static void record_client_missile_event(uint32_t event, D2UnitStrc* unit,
         uint32_t targetType = 0xffffffffu, uint32_t targetGuid = 0xffffffffu) {
     if (!unit) return;
@@ -1191,6 +1281,17 @@ static void record_client_missile_event(uint32_t event, D2UnitStrc* unit,
         isMissile ? static_cast<uint32_t>(MISSILE_GetSkill(unit)) :
             (UNITS_GetUsedSkill(unit) ? static_cast<uint32_t>(SKILLS_GetSkillIdFromSkill(UNITS_GetUsedSkill(unit), __FILE__, __LINE__)) : 0xffffffffu),targetType,targetGuid});
 }
+static void record_client_missile_impact_sound(uint32_t event, D2UnitStrc* unit,
+        const D2MissilesTxt* txt) {
+    if (!unit || !txt) return;
+    const int32_t row = d2::realm::fireballImpactSoundRow(
+        static_cast<uint32_t>(unit->dwClassId), event, static_cast<int16_t>(txt->wHitSound));
+    if (row < 0) return;
+    if (g_clientMissileSoundEvents.size() == 128)
+        g_clientMissileSoundEvents.erase(g_clientMissileSoundEvents.begin());
+    g_clientMissileSoundEvents.push_back({1, g_clientMissileTick, unit->dwUnitId,
+        static_cast<uint32_t>(unit->dwClassId), event, static_cast<uint32_t>(row)});
+}
 static void free_client_missile(D2UnitStrc* unit) {
     if (!unit) return;
     d2_realm_client_motion_detach(unit);
@@ -1200,6 +1301,7 @@ static void free_client_missile(D2UnitStrc* unit) {
 static void clear_client_missiles() {
     for (const auto& entry : g_clientMissiles) { record_client_missile_event(5, entry.unit); free_client_missile(entry.unit); }
     g_clientMissiles.clear();
+    g_clientMissileSoundEvents.clear();
 }
 
 // Recovered ordinary flying58/62 and static impact265 descriptor branches.
@@ -1384,8 +1486,10 @@ static void advance_client_missiles() {
             if (collided) hitGuid = context.hitGuid;
         }
         if (expired || collided) {
-            record_client_missile_event(expired ? 4 : (hitGuid != 0xffffffffu ? 3 : 2), unit,
+            const uint32_t terminalEvent = expired ? 4 : (hitGuid != 0xffffffffu ? 3 : 2);
+            record_client_missile_event(terminalEvent, unit,
                 hitGuid != 0xffffffffu ? UNIT_MONSTER : 0xffffffffu, hitGuid);
+            record_client_missile_impact_sound(terminalEvent, unit, txt);
             if (unit->dwClassId == 62 && (collided || (txt && txt->nAlwaysExplode)) && g_selectedPlayer >= 0 &&
                 static_cast<size_t>(g_selectedPlayer) < g_players.size()) {
                 d2::realm::createFireballHitChildren(unit, g_players[g_selectedPlayer].motionUnit,
@@ -1434,40 +1538,64 @@ static bool advance_client_projectile_cast(D2UnitStrc* unit) {
 // A bounded natural Fire Bolt/Fireball start for a remote caster. The owning local client normally
 // starts its skill before sending; local prediction and client missiles are separate paths.
 static int apply_remote_projectile_start(const uint8_t* packet, int length) {
-    D2RealmPlayerCast cast{};
-    if (!d2_realm_d2gs_parse_player_cast(packet, length, &cast)) return -1;
-    if ((cast.opcode != 0x4d && cast.opcode != 0x4c) || cast.unitType != UNIT_PLAYER || !is_natural_client_projectile(cast.skill)) return 0;
-    auto it = std::find_if(g_players.begin(), g_players.end(), [&cast](const auto& player) {
-        return player.view.guid == cast.guid;
-    });
-    if (it == g_players.end() || static_cast<int>(it - g_players.begin()) == g_selectedPlayer) return 0;
-    auto* unit = it->motionUnit;
-    if (!unit || !unit->pDynamicPath || !UNITS_GetRoom(unit) ||
-        DUNGEON_IsRoomInTown(UNITS_GetRoom(unit))) return 0;
-    // Bound retained relations to the monster lifetime cleanup implemented here.
-    if (cast.opcode == 0x4c && cast.targetType != UNIT_MONSTER) return 0;
-    D2UnitStrc* target = cast.opcode == 0x4c ? find_realm_client_unit(cast.targetType, cast.targetGuid) : nullptr;
-    if (cast.opcode == 0x4c && (!target || !UNITS_GetRoom(target))) return 0;
-    auto* txt = DATATBLS_GetSkillsTxtRecord(cast.skill);
-    if (!txt || txt->wCltStFunc != 0 || txt->wCltDoFunc != 0 || txt->nAnim != PLRMODE_CAST) return 0;
-    if (!unit->pSkills) unit->pSkills = SKILLS_AllocSkillList(nullptr);
-    if (!unit->pSkills) return -1;
-    PATH_ResetToPreviousType(unit->pDynamicPath);
-    const int targetX = cast.opcode == 0x4d ? cast.targetX : UNITS_GetXPosition(target);
-    const int targetY = cast.opcode == 0x4d ? cast.targetY : UNITS_GetYPosition(target);
-    if (!d2::realm::applyCastTargetRelation(cast.opcode, target, targetX, targetY,
-            [unit](int x, int y) { D2COMMON_10170_PathSetTargetPos(unit->pDynamicPath, x, y); },
-            [unit](D2UnitStrc* relation) { UNITS_SetTargetUnitForDynamicUnit(unit, relation); })) return 0;
-    UNITS_UpdateDirectionAndSpeed(unit, targetX, targetY);
-    // Native shared start may add the advertised natural skill for another player and
-    // assigns its server level. Existing hand selection is not changed by a cast packet.
-    SKILLS_AssignSkill(unit, cast.skill, cast.skillLevel, FALSE, __FILE__, __LINE__);
-    auto* skill = SKILLS_GetSkillById(unit, cast.skill, -1);
-    if (!skill) return 0;
-    UNITS_SetUsedSkill(unit, skill);
-    unit->dwFlags &= ~0x40u;
-    if (!UNITS_ChangeAnimMode(unit, SKILLS_GetSkillModeFromUnit(unit, skill))) return 0;
-    return 1;
+    struct Ops {
+        bool isPlayerType(uint8_t type) const { return type == UNIT_PLAYER; }
+        bool isNaturalProjectile(uint32_t skill) const { return is_natural_client_projectile(skill & 0xffffu); }
+        D2UnitStrc* resolveRemoteCaster(uint32_t guid) const {
+            auto it = std::find_if(g_players.begin(), g_players.end(), [guid](const auto& player) {
+                return player.view.guid == guid;
+            });
+            if (it == g_players.end() || static_cast<int>(it - g_players.begin()) == g_selectedPlayer) return nullptr;
+            return it->motionUnit;
+        }
+        bool casterCanStart(D2UnitStrc* unit) const {
+            auto* room = unit ? UNITS_GetRoom(unit) : nullptr;
+            return unit && unit->pDynamicPath && room && !DUNGEON_IsRoomInTown(room);
+        }
+        D2UnitStrc* resolveMonster(uint8_t type, uint32_t guid) const {
+            // Bound retained relations to the monster lifetime cleanup implemented here.
+            if (type != UNIT_MONSTER) return nullptr;
+            auto* resolved = find_realm_client_unit(type, guid);
+            return resolved && UNITS_GetRoom(resolved) ? resolved : nullptr;
+        }
+        int x(D2UnitStrc* unit) const { return UNITS_GetXPosition(unit); }
+        int y(D2UnitStrc* unit) const { return UNITS_GetYPosition(unit); }
+        bool skillCanStart(D2UnitStrc*, const D2RealmPlayerCast& cast) const {
+            const int skillId = cast.opcode == 0x4d ? static_cast<int>(cast.skill & 0xffffu) : static_cast<int>(cast.skill);
+            auto* txt = DATATBLS_GetSkillsTxtRecord(skillId);
+            return txt && txt->wCltStFunc == 0 && txt->wCltDoFunc == 0 && txt->nAnim == PLRMODE_CAST;
+        }
+        bool prepareStart(D2UnitStrc* unit) const {
+            if (!unit->pSkills) unit->pSkills = SKILLS_AllocSkillList(nullptr);
+            if (!unit->pSkills) return false;
+            PATH_ResetToPreviousType(unit->pDynamicPath);
+            return true;
+        }
+        void setAim(D2UnitStrc* unit, int x, int y) const {
+            D2COMMON_10170_PathSetTargetPos(unit->pDynamicPath, x, y);
+        }
+        void setTarget(D2UnitStrc* unit, D2UnitStrc* target) const {
+            UNITS_SetTargetUnitForDynamicUnit(unit, target);
+        }
+        bool start(D2UnitStrc* unit, const D2RealmPlayerCast& cast,
+                D2UnitStrc*, int targetX, int targetY) const {
+            UNITS_UpdateDirectionAndSpeed(unit, targetX, targetY);
+            const int skillId = cast.opcode == 0x4d ? static_cast<int>(cast.skill & 0xffffu) : static_cast<int>(cast.skill);
+            D2SkillStrc* skill = nullptr;
+            if (cast.opcode == 0x4c) {
+                SKILLS_AssignSkill(unit, skillId, cast.skillLevel, FALSE, __FILE__, __LINE__);
+                skill = SKILLS_GetSkillById(unit, skillId, -1);
+            } else {
+                // 0x4D byte +10 is hand selection. The canonical 0x94 skill list owns level.
+                skill = unit->pSkills ? SKILLS_GetSkillById(unit, skillId, -1) : nullptr;
+            }
+            if (!skill) return false;
+            UNITS_SetUsedSkill(unit, skill);
+            unit->dwFlags &= ~0x40u;
+            return UNITS_ChangeAnimMode(unit, SKILLS_GetSkillModeFromUnit(unit, skill)) != 0;
+        }
+    };
+    return d2::realm::applyRemoteProjectileCastPacket<D2UnitStrc>(packet, length, Ops{});
 }
 
 // The selected player's unit-target action (native Client action 0x16 -> 6FB530C0) resolves and
@@ -1716,7 +1844,13 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_feed(const uint8_t* bytes, int l
         if (size == 0) break;
         if (size < 0 || size > g_pendingLength - offset) return reject_stream(-2);
         const uint8_t* packet = g_pending + offset;
-        if (packet[0] == 0x59) {
+        if (packet[0] == 0x26) {
+            D2RealmGameChat parsed{};
+            if (d2_realm_d2gs_parse_gamechat(packet, size, &parsed) != size) return reject_stream(-2);
+            g_gameChat = parsed;
+            ++g_gameChatCount;
+            ++applied;
+        } else if (packet[0] == 0x59) {
             const int result = assign_player(packet, size);
             if (result < 0) return reject_stream(-3);
             applied += result;
@@ -1750,6 +1884,10 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_feed(const uint8_t* bytes, int l
         } else if (packet[0] == 0xac) {
             if (!apply_monster_assign(packet, size)) return reject_stream(-4);
             applied++;
+        } else if (packet[0] == 0x69 || packet[0] == 0x6a) {
+            const int result = apply_monster_death_mode(packet, size);
+            if (result < 0) return reject_stream(-4);
+            applied += result;
         } else if (packet[0] == 0x0a) {
             if (packet[1] == 0) {
                 const int result = remove_player(packet, size);
@@ -1787,6 +1925,7 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_feed(const uint8_t* bytes, int l
             g_player.clientRoomLevel = g_player.clientRoomTileX = g_player.clientRoomTileY = 0;
             g_monsters.clear();
             g_monsterViews.clear();
+            clear_monster_death_mode_events();
             store_selected_player();
             g_world.hasLoadAct = 1;
             g_world.act = packet[1];
@@ -1895,6 +2034,25 @@ static_assert(sizeof(RealmClientMissileView) == 76);
 static std::vector<RealmClientMissileView> g_clientMissileViews;
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_missile_event_count() { return static_cast<int>(g_clientMissileEvents.size()); }
 EMSCRIPTEN_KEEPALIVE const RealmMissileEvent* d2_realm_client_missile_events() { return g_clientMissileEvents.data(); }
+// Consumes class-62 terminal hit/expiry sound rows only. Record words are
+// {version,tick,missileId,classId,event,soundRow}; other missile sounds remain unsupported.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_take_missile_sounds(int32_t* out, int cap) {
+    if (!out || cap <= 0) return 0;
+    const int count = std::min(cap, static_cast<int>(g_clientMissileSoundEvents.size()));
+    for (int i = 0; i < count; ++i) {
+        const auto& event = g_clientMissileSoundEvents[static_cast<size_t>(i)];
+        const int offset = i * 6;
+        out[offset] = static_cast<int32_t>(event.version);
+        out[offset + 1] = static_cast<int32_t>(event.tick);
+        out[offset + 2] = static_cast<int32_t>(event.missileId);
+        out[offset + 3] = static_cast<int32_t>(event.classId);
+        out[offset + 4] = static_cast<int32_t>(event.event);
+        out[offset + 5] = static_cast<int32_t>(event.soundRow);
+    }
+    g_clientMissileSoundEvents.erase(g_clientMissileSoundEvents.begin(),
+        g_clientMissileSoundEvents.begin() + count);
+    return count;
+}
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_missile_count() { return static_cast<int>(g_clientMissiles.size()); }
 EMSCRIPTEN_KEEPALIVE const RealmClientMissileView* d2_realm_client_missiles() {
     g_clientMissileViews.clear();
@@ -1970,6 +2128,14 @@ EMSCRIPTEN_KEEPALIVE const D2RealmClientMonsterView* d2_realm_client_monsters() 
     g_monsterViews.reserve(g_monsters.size());
     for (const auto& monster : g_monsters) g_monsterViews.push_back(monster.view);
     return g_monsterViews.data();
+}
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_monster_death_mode_event_count() {
+    return static_cast<int>(g_monsterDeathModeEvents.size());
+}
+EMSCRIPTEN_KEEPALIVE const d2::realm::MonsterDeathModeEvent* d2_realm_client_monster_death_mode_events() {
+    g_monsterDeathModeEventView = g_monsterDeathModeEvents;
+    g_monsterDeathModeEvents.clear();
+    return g_monsterDeathModeEventView.data();
 }
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_monster_aux(uint32_t index, D2RealmClientMonsterAux* out) {
     if (!out || index >= g_monsters.size()) return 0;
@@ -2070,6 +2236,8 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_monster_motion_collision(uint32_t index
     return collision;
 }
 EMSCRIPTEN_KEEPALIVE const D2RealmClientPlayerState* d2_realm_client_player_state() { return &g_player; }
+EMSCRIPTEN_KEEPALIVE const D2RealmGameChat* d2_realm_client_game_chat() { return &g_gameChat; }
+EMSCRIPTEN_KEEPALIVE uint32_t d2_realm_client_game_chat_count() { return g_gameChatCount; }
 EMSCRIPTEN_KEEPALIVE uint32_t* d2_realm_client_player_unit_seed() {
     return g_player.active && g_player.cunitRngValid ? &g_player.cunitRngLow : nullptr;
 }

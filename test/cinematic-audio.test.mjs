@@ -2,12 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBikAudioPlayer, makeBikAudioBuffer } from '../play/assets/cinematic-audio.mjs';
 import { openMovie } from '../play/assets/cinematics.mjs';
+import { createCinematicPlayback } from '../play/assets/cinematic-playback.mjs';
 
 function deferred() {
   let resolve, reject;
   const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
 }
+
+async function settle() { await new Promise((resolve) => setImmediate(resolve)); }
 
 function movieBytes() {
   const bytes = new Uint8Array(44), view = new DataView(bytes.buffer);
@@ -63,6 +66,23 @@ test('Bink channel blocks are concatenated into the declared PCM frame', () => {
   assert.deepEqual([...buffer.data[0]], [1, 2, 3]);
   assert.deepEqual([...buffer.data[1]], [5, 6, 7]);
   assert.equal(buffer.sampleRate, 44100);
+});
+
+test('startup Bink audio connects directly to the output, outside the D2Sound volume graph', () => {
+  const sourceConnections = [], destination = { name: 'destination' };
+  class Context {
+    constructor() { this.state = 'running'; this.currentTime = 0; this.destination = destination; }
+    createBuffer(channels, length, sampleRate) {
+      const data = Array.from({ length: channels }, () => new Float32Array(length));
+      return { duration: length / sampleRate, getChannelData: (channel) => data[channel] };
+    }
+    createBufferSource() { return { connect(destination) { sourceConnections.push(destination); }, disconnect() {}, start() {}, stop() {} }; }
+  }
+  const player = createBikAudioPlayer(Context, null);
+  assert.equal('setVolume' in player, false, 'D2Sound slider code cannot apply its channel scale to Bink output');
+  assert.equal(player.play([{ header: { numChannels: 1, sampleRate: 8000 }, numSamples: 2,
+    blocks: [[Float32Array.of(0.25)]] }]), 1);
+  assert.deepEqual(sourceConnections, [destination], 'Bink sources use the configured output provider directly');
 });
 
 test('Bink packet byte count becomes per-channel sample frames while preserving declared silence', () => {
@@ -167,6 +187,24 @@ test('a phase change during decoder creation abandons the stale boot movie', asy
   await player.close();
 });
 
+test('an explicit film acquires its owned audio context before asynchronous decoder startup', async () => {
+  const creation = deferred();
+  let contexts = 0, closes = 0;
+  class Context {
+    constructor() { contexts++; this.state = 'running'; this.currentTime = 0; this.destination = {}; }
+    async close() { closes++; }
+  }
+  const documentObject = { createElement: () => ({ getContext: () => ({ putImageData() {} }) }) };
+  const opening = openMovie({ read: movieBytes, path: 'd2intro.bik', documentObject,
+    AudioContextClass: Context, gestureTarget: { addEventListener() {} },
+    createDecoder: () => creation.promise, isCurrent: () => false });
+
+  assert.equal(contexts, 1, 'openMovie starts synchronously in the trusted title-menu action');
+  creation.resolve({ isSupported: true, async getNextFrame() { throw new Error('stale movie decoded'); } });
+  assert.equal(await opening, null);
+  assert.equal(closes, 1, 'a decoder that becomes stale closes only its newly owned context');
+});
+
 test('a phase change during initial decode blocks old audio and stale discard preserves the new queue', async () => {
   const frame = deferred(), { player, calls } = runningAudio();
   let generation = 0;
@@ -190,4 +228,35 @@ test('a phase change during initial decode blocks old audio and stale discard pr
   assert.equal(player.evidence.scheduled, 1);
   assert.deepEqual(calls, [['start', 0]]);
   await player.close();
+});
+
+test('skipping while a title movie is opening closes a stale opener and permits a new movie', async () => {
+  const first = deferred(), opened = [];
+  const playback = createCinematicPlayback(({ path, isCurrent }) => {
+    opened.push({ path, isCurrent });
+    return path === 'old.bik' ? first.promise : Promise.resolve({ close() {}, discard() {} });
+  }, () => 123);
+  assert.equal(playback.play(0, 'old.bik'), true);
+  assert.equal(opened[0].isCurrent(), true);
+  playback.stop();
+  assert.equal(opened[0].isCurrent(), false, 'skip invalidates the opener predicate');
+  assert.equal(playback.play(0, 'new.bik'), true, 'skip releases the opening slot immediately');
+  first.resolve({ discard() { opened.push({ discarded: true }); } });
+  await settle();
+  assert.equal(opened.some((entry) => entry.discarded), true, 'the late old movie discards only its own resources');
+  assert.equal(playback.playing, 0);
+  assert.equal(playback.movie !== null, true, 'the newer movie remains active after the stale opener settles');
+});
+
+test('skipping after title movie playback starts closes its owned movie audio', async () => {
+  let closes = 0;
+  const playback = createCinematicPlayback(() => Promise.resolve({ close() { closes++; } }), () => 456);
+  playback.play(0, 'd2intro.bik');
+  await settle();
+  assert.equal(playback.movie !== null, true);
+  assert.equal(playback.startedAt, 456);
+  playback.stop();
+  assert.equal(closes, 1, 'skip closes the active movie, including its owned AudioContext and sources');
+  assert.equal(playback.movie, null);
+  assert.equal(playback.playing, null);
 });

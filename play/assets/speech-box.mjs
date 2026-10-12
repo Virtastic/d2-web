@@ -24,6 +24,30 @@ export const SPEECH_BOX = Object.freeze({ x1: 237, y1: 7, x2: 562, y2: 129 });
 export const SPEECH_RATE_FALLBACK = 8;
 export const SPEECH_FIXED_ONE = 1024;
 export const SPEECH_TICK_DIVISOR = 4;
+export const SPEECH_LINE_UNITS = 100;
+
+/** D2Client's line parser fills a 100-WCHAR scratch line before linking it. If a source line is
+ *  longer, the next node starts at the unconsumed code unit; JavaScript string slices use the same
+ *  UTF-16 code-unit indexing as the native buffer. */
+export function splitSpeechLines(spoken) {
+  const source = spoken ? String(spoken) : '';
+  const lines = [];
+  let offset = 0;
+  while (offset < source.length) {
+    let line = '';
+    let units = 0;
+    while (offset < source.length && source.charAt(offset) !== '\n' && units < SPEECH_LINE_UNITS) {
+      line += source.charAt(offset++);
+      units++;
+    }
+    // Native consumes LF only when the buffer stopped short of its 100-unit limit. If
+    // exactly full, the next parser iteration sees LF as an empty line node.
+    if (units < SPEECH_LINE_UNITS && source.charAt(offset) === '\n') offset++;
+    lines.push(line || ' ');
+  }
+  return lines;
+}
+
 export function parseSpeechHeader(text) {
   const value = String(text || '');
   const newline = value.indexOf('\n');
@@ -126,13 +150,11 @@ export function createSpeechBox({ read, decodeDc6, decodeDatPalette, createFont,
         const parsed = parseSpeechHeader(text);
         const spoken = parsed.spoken;
         const left = box.x1 + 16;
-        const lines = spoken ? spoken.split('\n') : [];
-        if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
-        for (let i = 0; i < lines.length; i++) if (!lines[i]) lines[i] = ' ';
+        const lines = splitSpeechLines(spoken);
         const now = opts.now ?? performance.now();
-        const messageKey = `${parsed.rate}\u0000${spoken}`;
-        const startTick = Math.floor(opts.t0 !== undefined ? opts.t0 : (messageKey === clockKey && clockStart !== null ? clockStart : now)) >>> 0;
-        if (messageKey !== clockKey || startTick !== clockStart) {
+        const messageKey = `${parsed.rate}\u0000${spoken}${opts.messageInstance === undefined ? '' : `\u0000${opts.messageInstance}`}`;
+        const startTick = opts.t0 === undefined ? null : Math.floor(opts.t0) >>> 0;
+        if (messageKey !== clockKey || (startTick !== null && startTick !== clockStart)) {
           clockKey = messageKey; clockStart = startTick; clock = createSpeechClock(parsed.rate);
         }
         const offsetFixed = opts.top === undefined ? clock(Math.floor(now) >>> 0) : null;

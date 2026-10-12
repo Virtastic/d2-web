@@ -296,7 +296,8 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     // Gold, the gold button, the close button and the right-hand border (retail's anchors, s197).
     ctx.save(); ctx.translate(ox, oy); ctx.scale(scale, scale);
     chrome.text(ctx, act, String(state?.gold ?? 0), 508, 468);
-    const goldBlit = chrome.cel(ctx, act, CHROME_ART.gold, 0, INVENTORY_GOLD_ANCHOR.x, INVENTORY_GOLD_ANCHOR.bottom);
+    const goldFrame = state?.inventoryGoldPressed ? 1 : 0;
+    const goldBlit = chrome.cel(ctx, act, CHROME_ART.gold, goldFrame, INVENTORY_GOLD_ANCHOR.x, INVENTORY_GOLD_ANCHOR.bottom);
     // panelCloseLayout is the one place this rect lives now (panel-close.mjs) -- the drawn cel and
     // the click hit-box both come from it, so they cannot drift apart the way 419,449 vs 418,476 did.
     const close = panelCloseLayout('inventory');
@@ -307,7 +308,7 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
       panelPixels: [4, 5, 6, 7].reduce((sum, i) => sum + dc6.frames[i].width * dc6.frames[i].height, 0),
       itemCount: (state?.items || []).filter((item) => item.invPage === 0).length, itemPixels,
       equippedItemCount, equippedItemPixels, drawn, layout: layout ? 'engine' : 'amazon2',
-      gold: { path: CHROME_ART.gold, frame: 0, blit: goldBlit },
+      gold: { path: CHROME_ART.gold, frame: goldFrame, blit: goldBlit },
       close: { ...close, path: PANEL_CLOSE_ART.path, frame: PANEL_CLOSE_ART.frame, blit: closeBlit } };
   } };
 }

@@ -23,6 +23,23 @@ struct D2RealmPlayerReassign {
     uint8_t reserved[2];
 };
 
+// D2GS_GAMECHAT (0x26) preserves fields whose semantics are still unknown. Strings are kept in
+// bounded, NUL-terminated buffers matching the native handler's destinations (16 and 0x100 bytes).
+struct D2RealmGameChat {
+    uint32_t version;
+    uint32_t size;
+    uint32_t messageType;
+    uint32_t unknown2;
+    uint32_t subType;
+    uint32_t unitGuid;
+    uint32_t unknown8;
+    uint32_t color;
+    uint32_t nameLength;
+    uint32_t messageLength;
+    uint8_t name[16];
+    uint8_t message[256];
+};
+
 static_assert(offsetof(D2RealmPlayerAssign, guid) == 0);
 static_assert(offsetof(D2RealmPlayerAssign, classId) == 4);
 static_assert(offsetof(D2RealmPlayerAssign, name) == 5);
@@ -38,6 +55,9 @@ static_assert(offsetof(D2RealmPlayerReassign, unitType) == 8);
 static_assert(offsetof(D2RealmPlayerReassign, value) == 9);
 static_assert(offsetof(D2RealmPlayerReassign, reserved) == 10);
 static_assert(sizeof(D2RealmPlayerReassign) == 12);
+static_assert(offsetof(D2RealmGameChat, name) == 40);
+static_assert(offsetof(D2RealmGameChat, message) == 56);
+static_assert(sizeof(D2RealmGameChat) == 312);
 
 namespace {
 // NET_D2GS_CLIENT_INCOMING_SIZE for 1.13c. libd2 derives these entries from D2Net.dll 1.13c
@@ -143,6 +163,35 @@ int d2gsPacketSize113c(const uint8_t* packet, int length) {
 }  // namespace
 
 extern "C" {
+
+// D2GS_GAMECHAT follows the native byte layout: message type, unknown byte, subtype, unit GUID,
+// unknown byte, color, then bounded sender name and message strings.
+EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_parse_gamechat(
+    const uint8_t* packet, int length, D2RealmGameChat* out) {
+    if (!out) return 0;
+    std::memset(out, 0, sizeof(*out));
+    out->version = 1;
+    out->size = sizeof(*out);
+    if (!packet || length < 12 || packet[0] != 0x26) return 0;
+    int nameEnd = 10;
+    while (nameEnd < length && packet[nameEnd]) ++nameEnd;
+    if (nameEnd == length || nameEnd - 10 >= static_cast<int>(sizeof(out->name))) return 0;
+    const int messageStart = nameEnd + 1;
+    int messageEnd = messageStart;
+    while (messageEnd < length && packet[messageEnd]) ++messageEnd;
+    if (messageEnd != length - 1 || messageEnd - messageStart >= static_cast<int>(sizeof(out->message))) return 0;
+    out->messageType = packet[1];
+    out->unknown2 = packet[2];
+    out->subType = packet[3];
+    out->unitGuid = ru32(packet + 4);
+    out->unknown8 = packet[8];
+    out->color = packet[9];
+    out->nameLength = static_cast<uint32_t>(nameEnd - 10);
+    out->messageLength = static_cast<uint32_t>(messageEnd - messageStart);
+    std::memcpy(out->name, packet + 10, out->nameLength);
+    std::memcpy(out->message, packet + messageStart, out->messageLength);
+    return length;
+}
 
 // D2GS_CREATECLIENTPLAYER (server->client opcode 0x59), from the 1.13 packet schema:
 // guid:u32, class:u8, name[16], x:u16, y:u16, all little-endian. This parser consumes exactly

@@ -270,6 +270,19 @@ test('DS1 compositor resolves declared DT1 identities at isometric tile spacing'
     [[TILE_WIDTH / 2, TILE_HEIGHT / 2, 2], [-TILE_WIDTH / 2, TILE_HEIGHT / 2, 3], [-TILE_WIDTH / 2, TILE_HEIGHT / 2, 4]]);
 });
 
+test('DS1 compositor keeps duplicate variants in declared library order', () => {
+  const raw = (main, sub) => (1 | sub << 8 | main << 20) >>> 0;
+  const first = { mainIndex: 2, subIndex: 7, orientation: 0, rarity: 1, pixels: {} };
+  const second = { mainIndex: 2, subIndex: 7, orientation: 0, rarity: 4, pixels: {} };
+  const plan = composeDs1Map({ width: 1, height: 1, dependencies: ['a', 'b'],
+    floors: [Uint32Array.of(raw(2, 7))], walls: [], orientations: [] },
+  [{ tiles: [first] }, { tiles: [second] }]);
+  assert.equal(plan.identityCount, 1);
+  assert.ok(plan.floors[0].tile === first || plan.floors[0].tile === second);
+  assert.deepEqual([plan.floors[0].libraryIndex, plan.floors[0].tileIndex],
+    plan.floors[0].tile === first ? [0, 0] : [1, 0]);
+});
+
 test('all acts declare listfile-backed presets and normalize DS1 dependency roots', () => {
   assert.equal(ACT_PRESET_ASSETS.length, 5);
   ACT_PRESET_ASSETS.forEach((asset, act0) => {

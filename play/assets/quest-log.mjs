@@ -6,6 +6,7 @@
 import { decodeDatPalette, decodeDc6 } from './d2-formats.mjs';
 import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
 import { createPanelChrome, BORDER_LEFT } from './panel-chrome.mjs';
+import { questCloseFrame } from './quest-close-gesture.mjs';
 
 const MENU = 'data\\global\\ui\\MENU\\';
 export const QUEST_ART = { bg: MENU + 'questbackground.dc6', tabs: MENU + 'expquesttabs.dc6', sockets: MENU + 'questsockets.dc6',
@@ -111,7 +112,8 @@ export function createQuestLogRenderer(read, documentObject = globalThis.documen
         lines.forEach((l, i) => font.drawAnchored(ctx, l, QL.descX, QL.descY + i * QL.descPitch));
         text = { name, lines };
       }
-      cel(QUEST_ART.close, 10, QL.closeX, QL.closeY);
+      const closeFrame = questCloseFrame(s.pressed === 'close');
+      cel(QUEST_ART.close, closeFrame, QL.closeX, QL.closeY);
       // The description toggle (questlast.dc6, 1 direction x 2 frames per its own DC6 header = a toggle
       // button, OpenDiablo2's ButtonTypeQuestDescr with Toggleable:true). F256 (retail-capture cap-t11):
       // BOTH steady states draw frame 0 (hash 241aea7e) -- frame 1 (hash 731fe78e) is the HELD-PRESS

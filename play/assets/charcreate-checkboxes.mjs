@@ -18,6 +18,25 @@ export const CHARACTER_CREATE_CHECKBOXES = Object.freeze({
   ]),
 });
 
+/**
+ * Retail registers the Character Create clickboxes as D2Win type-6 mode-2 controls. Their toggle
+ * callback runs on pointer-down; release and cancellation only end the gesture and cannot undo it.
+ */
+export function createCharacterCreateCheckboxInput(toggle) {
+  let armed = null;
+  return {
+    press(token) {
+      armed = typeof token === 'string' && token.startsWith('checkbox-') ? token : null;
+      return armed ? toggle(armed.slice('checkbox-'.length)) : null;
+    },
+    release(token) {
+      if (armed === token) armed = null;
+      return null;
+    },
+    cancel() { armed = null; },
+  };
+}
+
 function celCanvas(frame, palette, documentObject) {
   const canvas = documentObject.createElement('canvas');
   canvas.width = Math.max(1, frame.width); canvas.height = Math.max(1, frame.height);

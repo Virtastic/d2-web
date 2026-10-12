@@ -547,6 +547,8 @@ D2COMMON_DLL_DECL uint16_t __stdcall ITEMS_GetItemFormat(D2UnitStrc* pItem);
 D2COMMON_DLL_DECL void __stdcall ITEMS_SetItemFormat(D2UnitStrc* pItem, uint16_t nItemFormat);
 //D2Common.0x6FDA0130 (#10878)
 D2COMMON_DLL_DECL int __stdcall ITEMS_GetWeaponAttackSpeed(D2UnitStrc* pUnit, D2UnitStrc* pWeapon);
+// Tooltip-only equivalent using the base weapon speed without identified-only item IAS.
+D2COMMON_DLL_DECL int __stdcall ITEMS_GetWeaponAttackSpeedForUnidentified(D2UnitStrc* pUnit, D2UnitStrc* pWeapon);
 //D2Common.0x6FDA02B0 (#10879)
 D2COMMON_DLL_DECL int __stdcall ITEMS_HasUsedCharges(D2UnitStrc* pItem, BOOL* pHasChargedSkills);
 //D2Common.0x6FDA0340 (#10880)

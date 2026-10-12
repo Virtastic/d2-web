@@ -94,14 +94,23 @@ export async function openMovie({ read, path, documentObject = globalThis.docume
   audioPlayer = null, isCurrent = () => true, createDecoder = createBikDecoder }) {
   const bytes = read(path);
   const header = parseBikHeader(bytes);
-  const decoder = await createDecoder(new Blob([bytes]));
-  // The front end may skip this phase while the decoder is being constructed. Do not decode or
-  // create any phase-owned state once its opener has gone stale.
-  if (!isCurrent()) return null;
+  // A title-film row calls openMovie from the user's release handler. Create its Web Audio
+  // context before the decoder's asynchronous startup so the trusted gesture can activate it.
+  // The boot sequence passes its already-created shared player, so this is only owned here for
+  // callers such as the explicit Cinematics menu.
   const ownsAudio = !audioPlayer;
   const audio = header.numAudioTracks ? (audioPlayer ?? createBikAudioPlayer(AudioContextClass, gestureTarget)) : null;
+  let decoder;
+  try { decoder = await createDecoder(new Blob([bytes])); }
+  catch (error) { if (ownsAudio) audio?.close?.(); throw error; }
+  // The front end may skip this phase while the decoder is being constructed. Do not decode or
+  // create any phase-owned state once its opener has gone stale.
+  if (!isCurrent()) { if (ownsAudio) audio?.close?.(); return null; }
   const fps = header.fpsDivider ? header.fpsDividend / header.fpsDivider : 0;
-  if (!decoder.isSupported) throw new Error(`${path}: unbikit cannot decode this Bink stream`);
+  if (!decoder.isSupported) {
+    if (ownsAudio) audio?.close?.();
+    throw new Error(`${path}: unbikit cannot decode this Bink stream`);
+  }
   const canvas = documentObject.createElement('canvas');
   canvas.width = header.width; canvas.height = header.height;
   const ctx2d = canvas.getContext('2d', { willReadFrequently: true });
@@ -159,7 +168,8 @@ export async function openMovie({ read, path, documentObject = globalThis.docume
     state.frameIndex++;
     return true;
   };
-  await decodeOne();
+  try { await decodeOne(); }
+  catch (error) { if (ownsAudio) audio?.close?.(); throw error; }
   blit();
   return {
     ...state,

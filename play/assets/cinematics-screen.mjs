@@ -8,6 +8,7 @@
 import { createFont, createBlender, decodeFontTbl, composeTiled, recordTiled, textColourPalette, LABEL_TINT, FRONTEND, TITLE_COLUMNS } from './frontend.mjs';
 import { recordDc6 } from './drawlist.mjs';
 import { openMovie } from './cinematics.mjs';
+import { createCinematicPlayback } from './cinematic-playback.mjs';
 
 const P = 'data\\global\\ui\\FrontEnd\\';
 export const CINEMATICS_ASSETS = {
@@ -62,15 +63,11 @@ export function createCinematicsScreen({ read, decodeDc6, decodeDatPalette, onEx
   ];
   const hit = (x, y, w, h) => { const v = view(w, h), sx = (x - v.ox) / v.scale, sy = (y - v.oy) / v.scale;
     return boxes.find((b) => b.on && sx >= b.x && sx < b.x + b.w && sy >= b.y && sy < b.y + b.h) ?? null; };
-  let pressed = null, pointer = [799, 599], movie = null, opening = false, startedAt = 0, playing = null, error = '';
-  const stop = () => { movie = null; playing = null; startedAt = 0; };
-  const play = (i) => {
-    if (opening) return; playing = i; opening = true; error = '';
-    openMovie({ read, path: CINEMATICS[i].path, documentObject })
-      .then((m) => { if (playing === i) { movie = m; startedAt = performance.now(); } })
-      .catch((e) => { error = `${CINEMATICS[i].path}: ${e}`; stop(); })
-      .finally(() => { opening = false; });
-  };
+  let pressed = null, pointer = [799, 599];
+  const playback = createCinematicPlayback(({ path, isCurrent }) =>
+    openMovie({ read, path, documentObject, isCurrent }));
+  const stop = () => playback.stop();
+  const play = (i) => playback.play(i, CINEMATICS[i].path);
   const activate = (b) => { if (b.id === 'cancel') onExit(); else play(b.i); };
   // Retail's DrawMode 1 (the dimmed rows) is PL2's alpha-blend table over what is underneath, the same
   // path character create's disabled OK button takes (frontend.mjs PL2_ALPHA).
@@ -81,21 +78,22 @@ export function createCinematicsScreen({ read, decodeDc6, decodeDatPalette, onEx
   };
   const text = (font, s, x, y, w) => font.drawAnchored(sctx, s, x + Math.max(Math.trunc((w - font.measure(s)) / 2), 0), y);
   return {
-    get evidence() { return { boxes: boxes.map(({ id, x, y, w, h, on }) => ({ id, x, y, w, h, on })), rows: CINEMATICS.map((c) => ({ label: c.label ?? null, path: c.path })),
-      playing, movie: movie ? movie.evidence() : null, error }; },
+    get evidence() { const movie = playback.movie; return { boxes: boxes.map(({ id, x, y, w, h, on }) => ({ id, x, y, w, h, on })), rows: CINEMATICS.map((c) => ({ label: c.label ?? null, path: c.path })),
+      playing: playback.playing, movie: movie ? movie.evidence() : null, error: playback.error }; },
     targets(w, h) { const v = view(w, h); return Object.fromEntries(boxes.filter((b) => b.on).map((b) => [b.id, [Math.round(v.ox + (b.x + b.w / 2) * v.scale), Math.round(v.oy + (b.y + b.h / 2) * v.scale)]])); },
     hover(x, y, w, h) { const v = view(w, h); pointer = [Math.trunc((x - v.ox) / v.scale), Math.trunc((y - v.oy) / v.scale)]; },
     // While a film plays any press ends it (retail skips a movie on a click); otherwise a press arms a control.
-    press(x, y, w, h) { if (playing !== null) return 'movie'; pressed = hit(x, y, w, h); return pressed?.id ?? null; },
+    press(x, y, w, h) { if (playback.playing !== null) return 'movie'; pressed = hit(x, y, w, h); return pressed?.id ?? null; },
     release(token, x, y, w, h) {
       if (token === 'movie') { stop(); return true; }
       const b = hit(x, y, w, h); pressed = null;
       if (b && b.id === token) { activate(b); return true; } return false;
     },
     cancel() { pressed = null; },
-    escape() { if (playing !== null) stop(); else onExit(); },
+    escape() { if (playback.playing !== null) stop(); else onExit(); },
     /** Advance the film; the screen it returns to is this one. */
     async step() {
+      const movie = playback.movie, startedAt = playback.startedAt;
       if (!movie || !startedAt) return;
       const t = performance.now() - startedAt; await movie.step(t);
       if (t >= movie.durationMs) stop();
@@ -103,7 +101,8 @@ export function createCinematicsScreen({ read, decodeDc6, decodeDatPalette, onEx
     draw(out, w, h) {
       const v = view(w, h);
       out.fillStyle = '#000'; out.fillRect(0, 0, w, h); out.imageSmoothingEnabled = false;
-      if (playing !== null) {   // the film owns the screen, centred at 800 wide (its 640x292 aspect kept)
+      const movie = playback.movie;
+      if (playback.playing !== null) {   // the film owns the screen, centred at 800 wide (its 640x292 aspect kept)
         if (movie) { movie.draw(strip.getContext('2d'), 640, 292); out.drawImage(strip, v.ox, v.oy + Math.round((600 - 365) / 2 * v.scale), 800 * v.scale, 365 * v.scale); }
         return;
       }

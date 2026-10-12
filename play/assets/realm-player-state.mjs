@@ -25,6 +25,7 @@ export function selectPlayerRenderSource(snapshot, motion, realmSessionOpen, rea
     source: 'local', x: snapshot.player.x, y: snapshot.player.y, classId: snapshot.playerClass,
     renderState: { ...motion, playerClass: snapshot.playerClass, mode: snapshot.mode, tick: snapshot.tick,
       act: snapshot.act, weaponClass: snapshot.player.weaponClass,
+      renderIdentity: snapshot.player.renderIdentity ? { ...snapshot.player.renderIdentity } : null,
       primaryWeaponId: snapshot.player.primaryWeaponId, items: snapshot.items },
   };
 }

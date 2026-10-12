@@ -44,7 +44,17 @@ export function decodeCof(input) {
     }
     priority.push(frames);
   }
-  return { layers, framesPerDirection, directions, speed, layerRecords, events, priority };
+  const cof = { layers, framesPerDirection, directions, speed, layerRecords, events, priority };
+  const layerByComponent = new Map();
+  for (const record of layerRecords) if (!layerByComponent.has(record.component)) layerByComponent.set(record.component, record);
+  // Keep this renderer lookup cache out of the public decoded-data shape.
+  Object.defineProperty(cof, 'layerByComponent', { value: layerByComponent });
+  return cof;
+}
+
+/** Retrieve the first COF layer record for a component. */
+export function cofLayerRecord(cof, component) {
+  return cof?.layerByComponent?.get(component) ?? cof?.layerRecords?.find((record) => record.component === component);
 }
 
 const DCC_WIDTHS = [0, 1, 2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 26, 28, 30, 32];
@@ -141,9 +151,10 @@ function decodeDccPixels(bytes, direction, directionEnd, index) {
         if (!previous || previous.width !== cell.width || previous.height !== cell.height) {
           for (let y = 0; y < cell.height; y++) canvas.fill(0, (cell.y + y) * width + cell.x, (cell.y + y) * width + cell.x + cell.width);
         } else {
-          const copy = [];
-          for (let y = 0; y < cell.height; y++) copy.push(canvas.slice((previous.y + y) * width + previous.x, (previous.y + y) * width + previous.x + cell.width));
-          copy.forEach((row, y) => canvas.set(row, (cell.y + y) * width + cell.x));
+          for (let y = 0; y < cell.height; y++) {
+            const source = (previous.y + y) * width + previous.x;
+            canvas.copyWithin((cell.y + y) * width + cell.x, source, source + cell.width);
+          }
         }
       } else if (entry.values[0] === entry.values[1]) {
         for (let y = 0; y < cell.height; y++) canvas.fill(entry.values[0], (cell.y + y) * width + cell.x, (cell.y + y) * width + cell.x + cell.width);
@@ -254,11 +265,11 @@ let nextDccId = 1;
 const dccId = (dcc) => { let n = dccIds.get(dcc); if (!n) dccIds.set(dcc, n = nextDccId++); return n; };
 
 /** Compose available DCC component frames in the draw order selected by a COF. */
-export function composeCofFrame(cof, direction, frameIndex, components, dccDirection = direction) {
+export function composeCofFrame(cof, direction, frameIndex, components, dccDirection = direction, precomputedDirectionKey = null) {
   if (cof && cof.priority?.[direction]?.[frameIndex]) {
     const get = components instanceof Map ? (id) => components.get(id) : (id) => components?.[id];
     const directionKey = dccDirection instanceof Map
-      ? [...dccDirection].sort(([a], [b]) => a - b).map(([component, value]) => `${component}.${value}`).join(',')
+      ? (precomputedDirectionKey ?? [...dccDirection].sort(([a], [b]) => a - b).map(([component, value]) => `${component}.${value}`).join(','))
       : dccDirection;
     let key = `${direction}:${directionKey}:${frameIndex}`, ok = true;
     for (const component of cof.priority[direction][frameIndex]) { const dcc = get(component); if (dcc) { if (typeof dcc !== 'object') { ok = false; break; } key += `,${component}=${dccId(dcc)}`; } }

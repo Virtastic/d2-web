@@ -1,14 +1,17 @@
 // F218: D2Client 1.13c FUN_6FAC1A80 checks the currently hit arrow and the left-down
-// latch, then permits one scroll when GetTickCount() > previous + 0x32. The renderer
+// latch, then permits one scroll when GetTickCount() > previous + 0x32. Both arrow
+// directions share the same previous tick across pointer-down gestures. The renderer
 // calls it once per frame; missed frames never accumulate a catch-up queue.
 export function createConfigureScrollHold() {
-  let press = null;
+  // DAT_6FBCC548 is a zero-initialized native global, so the first poll is
+  // subject to the same strict > 50 ms check as every later scroll.
+  let press = null, lastScrollTick = 0;
   return {
     accepts(pointerId) { return !press || press.pointerId === pointerId; },
     down(pointerId, direction, button, now) {
       if (button !== 0 || (press && press.pointerId !== pointerId)) return false;
       press = direction === 'up' || direction === 'down'
-        ? { pointerId, direction, inside: true, previous: now } : null;
+        ? { pointerId, direction, inside: true } : null;
       return Boolean(press);
     },
     move(pointerId, direction, buttons) {
@@ -27,8 +30,11 @@ export function createConfigureScrollHold() {
       press = null; return true;
     },
     poll(now) {
-      if (!press || !press.inside || now <= press.previous + 50) return 0;
-      press.previous = now;
+      if (!press || !press.inside || now <= lastScrollTick + 50) return 0;
+      // FUN_6FAC1A80 shares DAT_6FBCC548 between both arrows and across presses.
+      // A new pointer-down does not get its own repeat clock; each accepted scroll
+      // advances this one native tick, and late frames still cause just one step.
+      lastScrollTick = now;
       return press.direction === 'down' ? 1 : -1;
     },
   };

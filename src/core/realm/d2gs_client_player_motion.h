@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "remote_cast_packet.h"
+
 struct D2UnitStrc;
 
 // Typed view of the fixed 1.13c D2GS 0x0F server-to-client PlayerMove record.
@@ -40,22 +42,4 @@ extern "C" int d2_realm_d2gs_parse_player_move(
 extern "C" int d2_realm_client_apply_player_move(
     D2UnitStrc* unit, const D2RealmPlayerMove* move);
 
-// 0x4D is a coordinate skill start; 0x4C is its unit-target counterpart in 1.13c.
-struct D2RealmPlayerCast {
-    uint32_t guid;
-    uint32_t skill;
-    uint32_t targetGuid;
-    int32_t owner;
-    uint16_t targetX;
-    uint16_t targetY;
-    uint16_t rawTail;
-    uint8_t unitType;
-    uint8_t skillLevel;
-    uint8_t targetType;
-    uint8_t opcode;
-    uint8_t reserved[2];
-};
-static_assert(sizeof(D2RealmPlayerCast) == 28);
-static_assert(offsetof(D2RealmPlayerCast, targetX) == 16);
-static_assert(offsetof(D2RealmPlayerCast, unitType) == 22);
 extern "C" int d2_realm_d2gs_parse_player_cast(const uint8_t*, int, D2RealmPlayerCast*);

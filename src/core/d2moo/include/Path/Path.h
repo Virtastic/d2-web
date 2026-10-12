@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include "D2CommonDefinitions.h"
 
 struct D2ActiveRoomStrc;
@@ -198,6 +199,26 @@ struct D2MapAIStrc
 };
 
 #pragma pack()
+
+// F671 diagnostic ABI shared by the ordinary move wrapper and the native path resolver. This is
+// an observation record only; all members are fixed-width so wasm64 host pointers never leak into
+// the test surface. Field order is pinned below and mirrored by d2_session_walk_probe().
+struct D2WebWalkProbe {
+	int32_t sequence;
+	int32_t commandX, commandY, commandStartX, commandStartY;
+	int32_t wrapperRoomFound, packetBuilt, packet0, packet1, packet2, packet3, packet4;
+	int32_t handlerResult, moveReason, pathPoints, pathIndex;
+	int32_t resolverCalled, resolverRoomFound, resolverLevel, resolverPathType;
+	int32_t resolverStartX, resolverStartY, resolverTargetX, resolverTargetY;
+	int32_t continuationTicks, continuationX, continuationY, continuationLevel, continuationPending;
+};
+static_assert(sizeof(D2WebWalkProbe) == 29 * sizeof(int32_t));
+static_assert(offsetof(D2WebWalkProbe, wrapperRoomFound) == 5 * sizeof(int32_t));
+static_assert(offsetof(D2WebWalkProbe, packetBuilt) == 6 * sizeof(int32_t));
+static_assert(offsetof(D2WebWalkProbe, resolverCalled) == 16 * sizeof(int32_t));
+static_assert(offsetof(D2WebWalkProbe, continuationTicks) == 24 * sizeof(int32_t));
+extern D2WebWalkProbe g_d2webWalkProbe;
+extern int32_t g_d2webWalkProbeActive;
 
 // Path "precise" positions are encoded using 16bits fixed point
 inline uint32_t PATH_ToFP16Corner(uint16_t value) {

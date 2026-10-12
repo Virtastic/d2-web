@@ -3,8 +3,8 @@
 // putting it in src/ would invent a server-side rule retail lacks.
 //   phase 0 dry 7500+r%7500 | 1 ramp up 250+r%250 | 2 full 3000+r%3000 | 3 ramp down 125+r%50
 // intensity: phase 1 floor(target*elapsed/total), 2 target, 3 floor(target*remaining/total), 0 zero;
-// the streak count on screen IS the intensity. Target: 255 for the game's first full phase, then 32+r%192
-// rolled once per cycle. A fresh game starts in phase 2 (2 of 2 capture-rain starts; f11b: 61 of 61 samples
+// the streak count on screen IS the intensity. Target: 255 for the game's first full phase, then 32+r%224
+// rolled once per cycle (native range 32..255). A fresh game starts in phase 2 (2 of 2 capture-rain starts; f11b: 61 of 61 samples
 // raining) -- f11b2's 308 dry samples are the one unexplained contradiction.
 const BASE = [7500, 250, 3000, 125], SPAN = [7500, 250, 3000, 50];
 
@@ -26,7 +26,7 @@ export function createWeatherCycle(seed = 0x1f2e3d4c) {
       for (; n > 0; n--) {
         if (--st.remaining > 0) continue;
         st.phase = (st.phase + 1) & 3;
-        if (st.phase === 1) st.target = 32 + rand(192);
+        if (st.phase === 1) st.target = 32 + rand(224);
         roll();
       }
     },

@@ -1,4 +1,5 @@
 import { parseRealmMissiles } from './realm-missiles.mjs';
+import { parseRealmMissileSoundEvents } from './realm-missile-sounds.mjs';
 // The realm CLIENT half: it drives our protocol (BNCS/MCP/D2GS) over a byte-pipe transport.
 //
 // Everything here is ORCHESTRATION and PARSING. The message BODIES are composed by the engine's own
@@ -294,6 +295,8 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
 
   const decoded = [];
   let frameCount = 0, assignOffset = -1, handshakeEnd = -1, playerAssignment = null;
+  let receiptScanAt = 0;
+  const joinReassignments = [];
   if (typeof protocol.d2gsFindPlayerAssign !== 'function') throw new Error('engine D2GS packet framing is unavailable');
   if (typeof protocol.d2gsClientPlayerFeed !== 'function') throw new Error('engine D2GS client state is unavailable');
   protocol.d2gsClientPlayerReset?.();
@@ -304,6 +307,20 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
     frameCount++;
     if (decoded.length > 65536 || frameCount > 32) throw new Error('D2GS join stream exceeded the player selection scan limit');
     const response = Uint8Array.from(decoded);
+    // Observe complete packets as soon as the decoded receive stream contains them. The engine
+    // roster is installed only after the matching 0x0B below, so a selected-player 0x15 during
+    // join cannot be inferred later from the already-updated roster.
+    while (receiptScanAt < response.length) {
+      const packet = response.subarray(receiptScanAt);
+      const packetLength = protocol.d2gsPacketSize(packet);
+      if (packetLength < 0) throw new Error('D2GS join stream contains an invalid 1.13c server packet');
+      if (packetLength === 0) break;
+      if (packet[0] === 0x15) {
+        const reassignment = protocol.d2gsPlayerReassign?.(packet.subarray(0, packetLength));
+        if (reassignment) joinReassignments.push({ offset: receiptScanAt, update: reassignment });
+      }
+      receiptScanAt += packetLength;
+    }
     const scan = protocol.d2gsFindPlayerAssign(response);
     if (scan.status === -2) throw new Error('D2GS join stream has an unknown or invalid 1.13c server packet');
     if (scan.status !== 1) continue;
@@ -349,9 +366,11 @@ export async function d2gsJoin(transport, protocol, { character, charClass, game
   if (!playerState?.active || playerState.guid !== playerAssignment.guid)
     throw new Error('D2GS engine did not select the assigned player after the 0x0B Handshake');
   const worldState = protocol.d2gsClientWorldState?.() ?? null;
+  const transitionFade = joinReassignments.some(({ offset, update }) => offset < handshakeEnd &&
+    update.unitType === 0 && update.guid === playerAssignment.guid && (update.value & 0xff) !== 0);
 
   const result = { greeting: { size: greetingSize, mode }, burstBytes: [...response], opcodes, bytes: response.length,
-    playerAssignment, playerState, worldState, gamelogon: gamelogon.length, gamelogonBytes: Array.from(gamelogon) };
+    playerAssignment, playerState, worldState, transitionFade, gamelogon: gamelogon.length, gamelogonBytes: Array.from(gamelogon) };
   const tail = response.subarray(handshakeEnd);
   const pending = tail.length ? [tail] : [];
   const readFrame = async () => pending.length ? pending.shift() : readD2gsFrame(reader, protocol, null);
@@ -471,6 +490,15 @@ export function bindEngineProtocol(Module, scratch = 65536) {
         classId: record[4], name: new TextDecoder().decode(Uint8Array.from(rawName.slice(0, end < 0 ? rawName.length : end))),
         x: record[22] | (record[23] << 8), y: record[24] | (record[25] << 8) };
     },
+    d2gsPlayerReassign: (bytes) => {
+      Module.HEAPU8.set(bytes, Number(P));
+      const n = call('d2_realm_d2gs_parse_player_reassign', 'number', ['bigint', 'number', 'bigint'], [BigInt(P), bytes.length, BigInt(O)]);
+      if (n !== 11) return null;
+      const record = rd(O, 12);
+      return { guid: (record[0] | (record[1] << 8) | (record[2] << 16) | (record[3] << 24)) >>> 0,
+        x: record[4] | (record[5] << 8), y: record[6] | (record[7] << 8),
+        unitType: record[8], value: record[9] };
+    },
     d2gsClientPlayerReset: () => call('d2_realm_client_player_reset', null, [], []),
     d2gsClientSetDifficulty: (difficulty) => call('d2_realm_client_set_difficulty', null, ['number'], [difficulty]),
     d2gsClientPlayerFeed: (bytes) => {
@@ -481,6 +509,20 @@ export function bindEngineProtocol(Module, scratch = 65536) {
       const ptr = call('d2_realm_client_player_state', 'bigint', [], []);
       return readPlayerPointer(ptr);
     },
+    d2gsClientGameChat: () => {
+      const ptr = call('d2_realm_client_game_chat', 'bigint', [], []);
+      if (!ptr) return null;
+      const at = Number(ptr), view = new DataView(Module.HEAPU8.buffer, at, 312);
+      if (view.getUint32(0, true) !== 1 || view.getUint32(4, true) !== 312) return null;
+      const nameLength = view.getUint32(32, true), messageLength = view.getUint32(36, true);
+      if (nameLength > 15 || messageLength > 255) return null;
+      return { messageType: view.getUint32(8, true), unknown2: view.getUint32(12, true),
+        subType: view.getUint32(16, true), unitGuid: view.getUint32(20, true),
+        unknown8: view.getUint32(24, true), color: view.getUint32(28, true),
+        name: Array.from(Module.HEAPU8.subarray(at + 40, at + 40 + nameLength)),
+        message: Array.from(Module.HEAPU8.subarray(at + 56, at + 56 + messageLength)) };
+    },
+    d2gsClientGameChatCount: () => call('d2_realm_client_game_chat_count', 'number', [], []),
     d2gsClientPlayerCount: () => call('d2_realm_client_player_count', 'number', [], []),
     d2gsClientPlayerAt: (index) => {
       const ptr = call('d2_realm_client_player_at', 'bigint', ['number'], [index]);
@@ -527,10 +569,33 @@ export function bindEngineProtocol(Module, scratch = 65536) {
     },
     d2gsClientMonsters: () => {
       const count = call('d2_realm_client_monster_count', 'number', [], []);
+      let modeEvents = [];
+      if (Module._d2_realm_client_monster_death_mode_event_count && Module._d2_realm_client_monster_death_mode_events) {
+        const eventCount = call('d2_realm_client_monster_death_mode_event_count', 'number', [], []);
+        if (eventCount) {
+          const eventPtr = Number(call('d2_realm_client_monster_death_mode_events', 'bigint', [], []));
+          if (!eventPtr) throw new Error('engine returned no monster death-mode events');
+          const eventView = new DataView(Module.HEAPU8.buffer, eventPtr, eventCount * 32);
+          modeEvents = Array.from({ length: eventCount }, (_, row) => {
+            const at = row * 32;
+            if (eventView.getUint32(at, true) !== 1 || eventView.getUint32(at + 4, true) !== 32)
+              throw new Error(`invalid monster death-mode event ${row}`);
+            return { sequence: eventView.getUint32(at + 8, true), guid: eventView.getUint32(at + 12, true),
+              packetOpcode: eventView.getUint32(at + 16, true), wireState: eventView.getUint32(at + 20, true),
+              fromMode: eventView.getUint32(at + 24, true), toMode: eventView.getUint32(at + 28, true) };
+          });
+        }
+      }
       if (!count) return [];
       const ptr = call('d2_realm_client_monsters', 'bigint', [], []);
       if (!ptr) throw new Error('engine returned no remote-monster records');
       const p = Number(ptr), view = new DataView(Module.HEAPU8.buffer, p, count * 116);
+      const eventsByGuid = new Map();
+      for (const event of modeEvents) {
+        const events = eventsByGuid.get(event.guid) ?? [];
+        events.push(event);
+        eventsByGuid.set(event.guid, events);
+      }
       return Array.from({ length: count }, (_, row) => {
         const at = row * 116;
         if (view.getUint32(at, true) !== 1 || view.getUint32(at + 4, true) !== 116)
@@ -540,6 +605,7 @@ export function bindEngineProtocol(Module, scratch = 65536) {
           framePrecise: view.getUint32(at + 24, true), frameCountPrecise: view.getUint32(at + 28, true),
           components: Array.from({ length: 16 }, (_, i) => fourcc(view.getUint32(at + 32 + i * 4, true))),
           animSpeed: view.getUint16(at + 96, true), direction: view.getUint8(at + 98),
+          animationFlags: view.getUint8(at + 99), modeEvents: eventsByGuid.get(view.getUint32(at + 8, true)) ?? [],
           x: view.getUint32(at + 100, true), y: view.getUint32(at + 104, true),
           hpPct: view.getUint32(at + 108, true), typeFlags: view.getUint32(at + 112, true) };
       });
@@ -552,6 +618,12 @@ export function bindEngineProtocol(Module, scratch = 65536) {
       return parseRealmMissiles(Module.HEAPU8.subarray(ptr, ptr + count * 76), count);
     },
     d2gsClientPredictRightCastOnMonster: (guid) => call('d2_realm_client_player_predict_right_cast_on_monster', 'number', ['number'], [guid]),
+    d2gsClientTakeMissileSounds: () => {
+      const cap = 128;
+      const count = call('d2_realm_client_take_missile_sounds', 'number', ['bigint','number'], [BigInt(T),cap]);
+      if (count < 0 || count > cap) throw new Error(`invalid client missile sound count ${count}`);
+      return parseRealmMissileSoundEvents(Module.HEAPU8.subarray(T, T + count * 24), count);
+    },
     d2gsClientPredictRightCast: (x,y) => call('d2_realm_client_player_predict_right_cast', 'number', ['number','number'], [x,y]),
     d2gsClientMotionTick: () => call('d2_realm_client_motion_tick', 'number', [], []),
     d2gsGamelogon: ({ character, charClass, gameToken, gameHash }) => { const n = call('d2_realm_d2gs_gamelogon', 'number', ['number', 'number', 'number', 'number', 'string', 'bigint'], [gameHash, gameToken, charClass, 0x0e, character, BigInt(T)]); return rd(T, n); },

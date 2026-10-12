@@ -8,12 +8,42 @@
 #include "Path/IDAStar.h"
 #include "Path/AStar.h"
 #include "Path/PathUtil.h"
+#include "Path/PathContinuation.h"
 #include "Path/Step.h"
 #include "Units/UnitRoom.h"
 #include "Units/Units.h"
 #include <Fog.h>
 #include <utility>
 #include <cmath>
+
+namespace d2::path {
+static D2PathContinuationTrace g_groundContinuationTrace;
+
+void PATH_BeginGroundContinuationTrace(const D2UnitStrc* unit)
+{
+	beginGroundContinuationTrace(g_groundContinuationTrace, unit);
+}
+
+void PATH_RecordGroundContinuationPredicate(const D2UnitStrc* unit, bool needsReplan)
+{
+	recordGroundContinuationPredicate(g_groundContinuationTrace, unit, needsReplan);
+}
+
+void PATH_RecordContinuationReplan(const D2UnitStrc* unit, int targetUnitArgument, int result)
+{
+	recordContinuationReplan(g_groundContinuationTrace, unit, targetUnitArgument, result);
+}
+
+void PATH_RecordGroundContinuationUpdate(const D2UnitStrc* unit, int result)
+{
+	recordGroundContinuationUpdate(g_groundContinuationTrace, unit, result);
+}
+
+const D2PathContinuationTrace* PATH_GetGroundContinuationTrace(const D2UnitStrc* unit)
+{
+	return g_groundContinuationTrace.unit == unit ? &g_groundContinuationTrace : nullptr;
+}
+} // namespace d2::path
 
 struct D2UnkPathStrc
 {
@@ -1186,12 +1216,16 @@ BOOL sub_6FD5DB70(D2DynamicPathStrc* pDynamicPath)
 	if (!pTargetUnit)
 	{
 		const D2PathPointStrc currentPoint = pDynamicPath->tGameCoords.ToPathPoint();
-		if (d2::path::needsGroundPathContinuationReplan(
+		const bool needsReplan = d2::path::needsGroundPathContinuationReplan(
 			pDynamicPath->dwCurrentPointIdx, pDynamicPath->dwPathPoints,
 			currentPoint.X, currentPoint.Y,
-			pDynamicPath->tFinalTargetCoord.X, pDynamicPath->tFinalTargetCoord.Y))
+			pDynamicPath->tFinalTargetCoord.X, pDynamicPath->tFinalTargetCoord.Y);
+		d2::path::PATH_RecordGroundContinuationPredicate(pDynamicPath->pUnit, needsReplan);
+		if (needsReplan)
 		{
-			return D2Common_10236(pDynamicPath->pUnit, FALSE);
+			const int result = D2Common_10236(pDynamicPath->pUnit, FALSE);
+			d2::path::PATH_RecordContinuationReplan(pDynamicPath->pUnit, FALSE, result);
+			return result;
 		}
 		return TRUE;
 	}
@@ -1219,7 +1253,9 @@ BOOL sub_6FD5DB70(D2DynamicPathStrc* pDynamicPath)
 			}
 		}
 	}
-	return D2Common_10236(pDynamicPath->pUnit, TRUE);
+	const int result = D2Common_10236(pDynamicPath->pUnit, TRUE);
+	d2::path::PATH_RecordContinuationReplan(pDynamicPath->pUnit, TRUE, result);
+	return result;
 }
 
 //1.00:  D2Common.0x1005EEB0 (#10223)
@@ -1227,9 +1263,14 @@ BOOL sub_6FD5DB70(D2DynamicPathStrc* pDynamicPath)
 //1.13c: D2Common.0x6FD5E230 (#10342)
 BOOL __stdcall D2Common_10226(D2UnitStrc* pUnit, signed int a2)
 {
+	if (pUnit->dwUnitType == UNIT_PLAYER)
+	{
+		d2::path::PATH_BeginGroundContinuationTrace(pUnit);
+	}
 	D2DynamicPathStrc* pDynamicPath = pUnit->pDynamicPath;
 	if (!pDynamicPath)
 	{
+		d2::path::PATH_RecordGroundContinuationUpdate(pUnit, FALSE);
 		return FALSE;
 	}
 
@@ -1275,6 +1316,7 @@ BOOL __stdcall D2Common_10226(D2UnitStrc* pUnit, signed int a2)
 					}
 					if (pDynamicPath->dwCurrentPointIdx < pDynamicPath->dwPathPoints)
 					{
+						d2::path::PATH_RecordGroundContinuationUpdate(pUnit, TRUE);
 						return TRUE;
 					}
 				}
@@ -1284,6 +1326,7 @@ BOOL __stdcall D2Common_10226(D2UnitStrc* pUnit, signed int a2)
 	}
 
 	PATH_ResetMovement(pDynamicPath);
+	d2::path::PATH_RecordGroundContinuationUpdate(pUnit, FALSE);
 	return FALSE;
 }
 

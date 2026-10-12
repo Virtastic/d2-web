@@ -42,22 +42,46 @@ export const HUD_HELP_ART = 'data\\local\\font\\latin\\font16.dc6';
 export const HUD_HELP_TBL = 'data\\local\\font\\latin\\font16.tbl';
 export const HUD_HELP_TEXT = 'Help (H)';
 export const HUD_HELP_ANCHOR = Object.freeze({ x: 714, y: 403 });   // screen 800x600, bottom row
+export const HUD_HELP_HITBOX = Object.freeze({ x: 725, y: 404, w: 36, h: 37 });
 
-// The button under the label: retail draws `Levelsocket.dc6` frame 0 (bottom row 440) then `Level.dc6`
-// frame 0 (bottom row 436, the cross gem) straight after the label's glyphs, in every capture that
-// draws the label and no other (the retail captures: 39+3 of 42 with both; the 7 without it are the
-// controls overlay covering the spot). Not gated on skill points: the fresh-character town-start
-// frame has it. Retail's y is a bottom row, recordDc6 takes the top.
+// The button under the label: retail draws `Levelsocket.dc6` frame 0 at rest and frame 1 while
+// held (bottom row 440), then `Level.dc6` frame 0 (bottom row 436), straight after
+// the label's glyphs. It appears in every capture that draws the label and no other (the retail captures:
+// 39+3 of 42 with both; the 7 without it are the controls overlay covering the spot). Not gated on
+// skill points: the fresh-character town-start frame has it. Retail's y is a bottom row, recordDc6
+// takes the top. The Help-specific frame selection is from D2Client's draw routine at 0x6FAE7740;
+// This does not infer gem-hover art from the other notification path.
 const BUTTON = [['data\\global\\ui\\PANEL\\levelsocket.dc6', 725, 440], ['data\\global\\ui\\PANEL\\level.dc6', 728, 436]];
+
+/** Half-open representation of D2Client's inclusive Help callback bounds. */
+export function hudHelpButtonContains(x, y, hit) {
+  return Number.isFinite(x) && Number.isFinite(y) && hit &&
+    x >= hit.x && x < hit.x + hit.w && y >= hit.y && y < hit.y + hit.h;
+}
 
 export function createHudHelp(read, documentObject = globalThis.document) {
   const dc6 = decodeDc6(read(HUD_HELP_ART)), tbl = decodeFontTbl(read(HUD_HELP_TBL));
   const perAct = new Map();
   const button = BUTTON.map(([path, x, bottom]) => {
-    const frame = decodeDc6(read(path)).frames[0];
-    return { path, x, top: bottom - frame.height + 1, frame };
+    const frames = decodeDc6(read(path)).frames;
+    const frame = frames[0];
+    return { path, x, top: bottom - frame.height + 1, frames };
   });
-  let buttonCanvas = null;
+  const buttonCanvases = new Map();
+  const buttonCanvas = (socketFrame, gemFrame) => {
+    const key = `${socketFrame}:${gemFrame}`;
+    if (!buttonCanvases.has(key)) {
+      const pal = decodeDatPalette(read('data\\global\\palette\\ACT1\\pal.dat'));
+      buttonCanvases.set(key, button.map(({ frames }, i) => {
+        const index = i === 0 ? socketFrame : gemFrame;
+        const frame = frames[index] ?? frames[0];
+        const c = documentObject.createElement('canvas'); c.width = frame.width; c.height = frame.height;
+        c.getContext('2d').putImageData(new ImageData(dc6FrameToRgba(frame, pal), frame.width, frame.height), 0, 0);
+        return c;
+      }));
+    }
+    return buttonCanvases.get(key);
+  };
   const fontFor = (act) => {
     let f = perAct.get(act);
     if (!f) {
@@ -74,21 +98,21 @@ export function createHudHelp(read, documentObject = globalThis.document) {
     anchor: HUD_HELP_ANCHOR,
     art: HUD_HELP_ART,
     /** Draw the label at retail's anchor. Returns what was asked for; the blits go to the draw list. */
-    draw(ctx, act = 1) {
+    draw(ctx, act = 1, { pressed = false } = {}) {
       const font = fontFor(act);
       font.drawAnchored(ctx, HUD_HELP_TEXT, HUD_HELP_ANCHOR.x, HUD_HELP_ANCHOR.y);
-      buttonCanvas ??= (() => {
-        const pal = decodeDatPalette(read('data\\global\\palette\\ACT1\\pal.dat'));
-        return button.map(({ frame }) => { const c = documentObject.createElement('canvas'); c.width = frame.width; c.height = frame.height;
-          c.getContext('2d').putImageData(new ImageData(dc6FrameToRgba(frame, pal), frame.width, frame.height), 0, 0); return c; });
-      })();
-      const buttonRecords = button.map(({ path, x, top, frame }, i) => {
-        ctx.drawImage(buttonCanvas[i], x, top);
-        return recordDc6(path, 0, frame, x, top, { op: 'cel', mode: 5 });
+      const hit = { ...HUD_HELP_HITBOX };
+      const socketFrameIndex = pressed ? 1 : 0;
+      const gemFrameIndex = 0;
+      const canvases = buttonCanvas(socketFrameIndex, gemFrameIndex);
+      const buttonRecords = button.map(({ path, x, top, frames }, i) => {
+        const frameIndex = i === 0 ? socketFrameIndex : gemFrameIndex;
+        const frame = frames[frameIndex] ?? frames[0];
+        ctx.drawImage(canvases[i], x, top);
+        return recordDc6(path, frameIndex, frame, x, top, { op: 'cel', mode: 5 });
       });
       // The socket's own rect (the button a player presses; retail's Help (H) button), local to the HUD origin.
-      const sk = button[0], hit = { x: sk.x, y: sk.top, w: sk.frame.width, h: sk.frame.height };
-      return { hit, button: buttonRecords, text: HUD_HELP_TEXT, art: HUD_HELP_ART, anchor: { ...HUD_HELP_ANCHOR }, act,
+      return { hit, pressed: Boolean(pressed), button: buttonRecords, text: HUD_HELP_TEXT, art: HUD_HELP_ART, anchor: { ...HUD_HELP_ANCHOR }, act,
         width: font.measure(HUD_HELP_TEXT),
         glyphs: [...HUD_HELP_TEXT].map((ch) => font.glyph(ch.codePointAt(0))?.index ?? -1) };
     },

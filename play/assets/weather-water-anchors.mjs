@@ -10,6 +10,10 @@ export function weatherWaterAnchors(floors) {
   const anchors = [];
   for (const floor of floors || []) {
     const tile = floor?.tile, dt1 = floor?.dt1Tile;
+    // FUN_6FAC4050 requests floor arrays for selectors 1 then 2. A completed renderer list can
+    // also contain other floor selector classes, so apply the native (dwFlags >> 14) & 7 gate.
+    const selector = ((tile?.flags ?? 0) >>> 14) & 7;
+    if (selector !== 1 && selector !== 2) continue;
     // D2Client 1.13c FUN_6FAC3CE0 reaches its water emission only after rejecting
     // D2DrlgTileDataStrc flags 0x408 and requiring D2TileLibraryEntryStrc.nType (+0x14) == 0.
     // `tile` is the former and `dt1Tile.orientation` is the latter. A renderer floor bucket alone

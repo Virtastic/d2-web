@@ -2,7 +2,7 @@
 import { terrainDrawOp } from './terrain-draw-identity.mjs';
 import { wallHidesPlayer } from './roof-hide.mjs';
 import { createRoofFades } from './roof-fade.mjs';
-import { nativeWallLightCell } from './native-wall-light.mjs';
+import { nativeWallLightCells } from './native-wall-light.mjs';
 import { perfT0, perfT, perfSample } from './frame-perf.mjs';
 //
 // What this replaces: retail-tile-view.mjs picked ONE hardcoded DT1 per act, took a dozen
@@ -433,8 +433,8 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   // entries, and D2DDraw+0x7320 lights each 32-px block from entry (blockX >> 5) to the next (corners
   // left, right, right, left). The entries are light map cells, wallLightCells (fitted per orientation).
   const wallCells = wallLightCells;
-  const sampleWallCell = (t, dt1, A, B, j) =>
-    nativeWallLightCell(dt1, Boolean(t.hidesPlayer), A, B, j) || wallCells(t.orientation, A, B, j);
+  const sampleWallCells = (t, dt1, A, B) => nativeWallLightCells(dt1, Boolean(t.hidesPlayer), A, B) ||
+    [0, 1, 2, 3, 4, 5].map((j) => wallCells(t.orientation, A, B, j));
   // roof: the block drawer of D2DDraw's transparent entry (slot 40 -> D2gfx 6fa89660) has no flat shortcut: every block reads the level table T[E[k]>>3][E[k+1]>>3][x]
   // (the wall drawer 6fa8abf0 draws a block flat at E[k] when |dE| is small); s996 fits every pixel of retail's two roof blits to one (a, b) per block.
   function litWall(path, dt1Tile, index, E, roof = false) {
@@ -750,7 +750,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       const isLower = (e) => { const o = Number(e.want.split(':')[0]); return o >= 16 && o <= 19; };
       // Native direction and the wall's current hidden bit select six light cells (F616).
       const wallEntries = (t, dt1) => { const A = t.worldX * 5, B = t.worldY * 5;
-        return lightCell ? [0, 1, 2, 3, 4, 5].map((j) => { const [a, b] = sampleWallCell(t, dt1, A, B, j); return lightCell(a, b); }) : null; };
+        return lightCell ? sampleWallCells(t, dt1, A, B).map(([a, b]) => lightCell(a, b)) : null; };
       // Lower walls + floors (litFloor runs here on a cache miss; a cached frame skips the palette work).
       const pFloor = perfT0();
       // A lower wall (orientation 16-19) is terrain and retail draws it as a `wall` record -- the same
@@ -871,14 +871,18 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
           // array; never populated otherwise, and it changes no drawing.
           const t = o.tile, fade = t.layer === 1 && t.hidesPlayer !== undefined
             ? roofFade(`${t.room}:${t.ordinal}:${t.worldX}:${t.worldY}:${t.orientation}:${t.mainIndex}:${t.subIndex}`, t.hidesPlayer, (globalThis.__d2Now || Date.now)()) : 0xff;
-          const wallE = at && !roofGrid ? [0, 1, 2, 3, 4, 5].map((j) => { const [a, b] = sampleWallCell(o.tile, o.dt1Tile, A, B, j); return at(a, b); }) : null;
+          const sampledCells = !roofGrid ? sampleWallCells(o.tile, o.dt1Tile, A, B) : null;
+          const wallE = at && sampledCells ? sampledCells.map(([a, b]) => at(a, b)) : null;
           if (globalThis.__d2TraceWalls) globalThis.__d2TraceWalls.push({ x: o.x, y: o.y, path: files[o.slot], want: o.want, o: o.tile.orientation,
-            dt1Tile: o.dt1Tile, A, B, cells: wallE && [0, 1, 2, 3, 4, 5].map((j) => sampleWallCell(o.tile, o.dt1Tile, A, B, j)), E: wallE, roof: Boolean(roofGrid), fade });
+            dt1Tile: o.dt1Tile, A, B, hidden: Boolean(o.tile.hidesPlayer), room: o.tile.room, ordinal: o.tile.ordinal,
+            cells: sampledCells, E: wallE, roof: Boolean(roofGrid), fade });
           // Off unless globalThis.__d2TraceBlits is an array: the wall counterpart of the floor trace
           // above (F117's own routing -- "s448's __d2TraceBlits is the hook") -- each drawn wall carries
           // its six fitted light entries (wallCells' own E array) and the dt1 art, so a row can recompute
           // litWall's per-block level and orientation the same way s448 reads litFloor's.
-          if (globalThis.__d2TraceBlits && wallE) globalThis.__d2TraceBlits.push({ x: o.x, y: o.y, path: files[o.slot], want: o.want, variantNo: o.variantNo, dt1Tile: o.dt1Tile, orientation: o.tile.orientation, E: wallE, a: A, b: B, wall: true });
+          if (globalThis.__d2TraceBlits && wallE) globalThis.__d2TraceBlits.push({ x: o.x, y: o.y, path: files[o.slot], want: o.want, variantNo: o.variantNo,
+            dt1Tile: o.dt1Tile, orientation: o.tile.orientation, hidden: Boolean(o.tile.hidesPlayer), room: o.tile.room,
+            ordinal: o.tile.ordinal, cells: sampledCells, E: wallE, a: A, b: B, wall: true });
           const lit = roofGrid ? litFloor(files[o.slot], o.dt1Tile, o.want + ':v' + o.variantNo, roofGrid, o.x, o.y) : wallE && litWall(files[o.slot], o.dt1Tile, o.want + ':v' + o.variantNo, wallE, fade < 255);
           // F66b: a wall the client hides fades to retail's transparent entry's alpha (roof-fade.mjs); alpha 0 draws nothing.
           if (fade > 0 && !(globalThis.__d2SkipFaded && fade < 255)) {   // __d2SkipFaded: a probe drawing the frame WITHOUT the hidden walls (their blend needs the pixel under them)

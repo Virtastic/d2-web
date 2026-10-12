@@ -28,21 +28,24 @@ const PLAYER_FIELD = { 0x13: 0x08, 0x14: 0x18, 0x15: 0x0c, 0x16: 0x10, 0x17: 0x1
 
 /**
  * Resolve one server sound event to a Sounds.txt row.
- * @param {{unitType:number, classId:number, soundEvent:number, isLocalPlayer?:boolean, monsterTaunt?:number}} e
+ * @param {{unitType:number, classId:number, soundEvent:number, isLocalPlayer?:boolean, monsterTaunt?:number, skillStartSoundRow?:number}} e
  *   `monsterTaunt` is the unit's MonSounds `Taunt` row (D2MonSoundsTxt+0x74; MonStats.MonSound/UMonSound, or the
- *   SuperUniques.MonSound record, picks the MonSounds row) -- the only event that reads the monster tables.
+ *   SuperUniques.MonSound record, picks the MonSounds row). `skillStartSoundRow` is the SkillsTxt `StSound`
+ *   selected through the unit's native 0x44 stat list for event 0x0c.
  * @returns {number|null} the row, or null when retail plays nothing (or the row depends on state not passed).
  */
-export function resolveUnitSound({ unitType, classId, soundEvent, isLocalPlayer = false, monsterTaunt = 0 }) {
+export function resolveUnitSound({ unitType, classId, soundEvent, isLocalPlayer = false, monsterTaunt = 0, skillStartSoundRow = 0 }) {
   const ev = soundEvent & 0xffff;
   if (ev in ANY_UNIT) return ANY_UNIT[ev];
   if (ev in BY_CLASS_271) return BY_CLASS_271[ev][classId === 271 ? 0 : 1];
   if (ev === 0x0f) return classId === 271 ? 4290 : null;
   if (ev === 0x10) return unitType === 1 && monsterTaunt > 0 ? monsterTaunt : null;
+  if (ev === 0x0c) return Number.isInteger(skillStartSoundRow) && skillStartSoundRow > 0 ? skillStartSoundRow : null;
   if (ev === 0x5b) return isLocalPlayer ? 8 : null;
-  // 0x0c (a stat-gated skill sound), 0x11 (monster taunt roll), 0x12 (computed by 6fb4cce0) depend on live
-  // unit state; 0x5c only arms a timer. None yields a row from (type, class, event) alone.
-  if (ev === 0x0c || ev === 0x11 || ev === 0x12 || ev === 0x5c) return null;
+  // Event 0x12 reads the unit class and chooses one of two fixed hireable-character rows.
+  if (ev === 0x12) return classId === 271 ? 4615 : 4625;
+  // 0x11 also needs client tick/RNG state; 0x5c only arms a timer.
+  if (ev === 0x11 || ev === 0x5c) return null;
   if (unitType !== 0 || classId < 0 || classId > 6) return null; // 6fad3f20 forwards only players to 6fad3200
   const voice = PLAYER_VOICE[classId];
   if (ev in PLAYER_FIXED) return PLAYER_FIXED[ev];

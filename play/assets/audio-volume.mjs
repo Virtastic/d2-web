@@ -16,6 +16,7 @@ const STORAGE_KEY = 'd2web.audio.volume';
 const DEFAULTS = Object.freeze({ sound: 1, music: 0.5 });
 
 const clamp01 = (v) => { const n = Number(v); return Math.max(0, Math.min(1, Number.isFinite(n) ? n : 0)); };
+const isStoredSliderValue = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
 
 /**
  * The Sound/Music slider values and the players they drive. Retail applies Master Volume to every
@@ -28,7 +29,10 @@ export function createAudioVolume({ storage = globalThis.localStorage } = {}) {
   try {
     const raw = storage?.getItem(STORAGE_KEY);
     const saved = raw ? JSON.parse(raw) : null;
-    for (const key of Object.keys(values)) if (Number.isFinite(Number(saved?.[key]))) values[key] = clamp01(saved[key]);
+    // Native D2Sound ignores an out-of-range registry value and keeps that slider's default.
+    // Preserve the same fallback for malformed browser preferences instead of coercing null to 0
+    // or clamping a corrupt value to an unintended endpoint.
+    for (const key of Object.keys(values)) if (isStoredSliderValue(saved?.[key])) values[key] = saved[key];
   } catch { /* absent, blocked or corrupt storage: retail's defaults stand and the slider still works */ }
   const attached = { sound: [], music: [] };
   const appliedVolume = (key) => key === 'music' ? values.sound * values.music : values.sound;

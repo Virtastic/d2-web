@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { advanceIzualGhostS1Clock, resetIzualGhostS1Clock } from '../play/assets/izual-ghost-clock.mjs';
+import { parseMonsterAnimations } from '../play/assets/monster-renderer.mjs';
 
 test('class-406 S1 starts at local frame zero and advances on the session frame clock', () => {
   const actor = { id: 9, classId: 406, mode: 8, gameFrame: 800, frameCountPrecise: 20 * 256, animSpeed: 17 };
@@ -13,7 +14,10 @@ test('class-406 S1 starts at local frame zero and advances on the session frame 
 });
 
 test('class-406 S1 uses the recovered native client speed of 120', () => {
-  const actor = { id: 9, classId: 406, mode: 8, gameFrame: 1200, frameCountPrecise: 20 * 256, animSpeed: 120 };
+  const bytes = new Uint8Array(96), view = new DataView(bytes.buffer);
+  view.setUint32(0, 9, true); view.setUint32(4, 406, true); view.setUint32(12, 8, true);
+  view.setUint32(20, 20 * 256, true); view.setUint16(88, 120, true);
+  const actor = { ...parseMonsterAnimations(bytes, 1)[0], gameFrame: 1200 };
   let clock = advanceIzualGhostS1Clock(actor);
   assert.equal(clock.framePrecise, 0);
   clock = advanceIzualGhostS1Clock({ ...actor, gameFrame: 1201 }, clock);
@@ -22,13 +26,32 @@ test('class-406 S1 uses the recovered native client speed of 120', () => {
   assert.equal(clock.framePrecise, 360);
 });
 
-test('class-406 S1 mode-8 policy clamps at the terminal boundary and holds the final cel', () => {
-  const actor = { classId: 406, mode: 8, gameFrame: 10, frameCountPrecise: 20 * 256, animSpeed: 0x100 };
-  let clock = { mode: 8, gameFrame: 9, framePrecise: 19 * 256 };
+test('class-406 S1 holds its current precise frame at the terminal step and waits for the mode snapshot', () => {
+  const actor = { classId: 406, mode: 8, gameFrame: 42, frameCountPrecise: 20 * 256, animSpeed: 120 };
+  // 5040 + 120 reaches 5120. The monster fallback row selects policy 1, which skips this step;
+  // policy 2 would clamp to 4864 and falsely describe the separate player-mode table.
+  let clock = { mode: 8, gameFrame: 41, framePrecise: 5040 };
   clock = advanceIzualGhostS1Clock(actor, clock);
-  assert.equal(clock.framePrecise, 19 * 256);
-  clock = advanceIzualGhostS1Clock({ ...actor, gameFrame: 11 }, clock);
-  assert.equal(clock.framePrecise, 19 * 256);
+  assert.equal(clock.framePrecise, 5040);
+  assert.equal(clock.framePrecise >>> 8, 19, 'the held precise value still draws the final S1 cel');
+  assert.equal(clock.mode, 8);
+  clock = advanceIzualGhostS1Clock({ ...actor, gameFrame: 43 }, clock);
+  assert.deepEqual(clock, { mode: 8, gameFrame: 43, framePrecise: 5040 });
+
+  // D2Game's end-animation event requests NU; presentation follows once that engine mode arrives.
+  assert.equal(advanceIzualGhostS1Clock({ ...actor, mode: 1, gameFrame: 44 }, clock), null);
+});
+
+test('class-406 S1 catch-up holds the terminal frame across batched engine frames', () => {
+  const actor = { classId: 406, mode: 8, frameCountPrecise: 20 * 256, animSpeed: 120 };
+  const start = { mode: 8, gameFrame: 9, framePrecise: 19 * 256 - 120 };
+  const terminal = advanceIzualGhostS1Clock({ ...actor, gameFrame: 13 }, start);
+  assert.deepEqual(terminal, { mode: 8, gameFrame: 13, framePrecise: 5104 });
+
+  const stepped = advanceIzualGhostS1Clock({ ...actor, gameFrame: 14 }, terminal);
+  const caughtUp = advanceIzualGhostS1Clock({ ...actor, gameFrame: 14 }, start);
+  assert.deepEqual(caughtUp, stepped);
+  assert.deepEqual(caughtUp, { mode: 8, gameFrame: 14, framePrecise: 5104 });
 });
 
 test('a session reset starts a reused actor ID at frame zero', () => {
@@ -59,6 +82,30 @@ test('leaving S1 and reentering it starts a fresh local clock', () => {
   clock = advanceIzualGhostS1Clock({ ...actor, gameFrame: 812 }, clocks.get(actor.id));
   if (clock) clocks.set(actor.id, clock); else clocks.delete(actor.id);
   assert.deepEqual(clock, { mode: 8, gameFrame: 812, framePrecise: 0 });
+});
+
+test('a native frame reset restarts S1 even when the intermediate mode was never drawn', () => {
+  const actor = { id: 9, classId: 406, mode: 8, gameFrame: 800, framePrecise: 0,
+    frameCountPrecise: 20 * 256, animSpeed: 120 };
+  let clock = advanceIzualGhostS1Clock(actor);
+  clock = advanceIzualGhostS1Clock({ ...actor, gameFrame: 802, framePrecise: 240 }, clock);
+  assert.equal(clock.framePrecise, 240);
+
+  // The native #11090 mode setter resets the CUnit frame on a real mode change. If the
+  // away-and-back assignment occurs between renders, this rollback is the surviving signal.
+  clock = advanceIzualGhostS1Clock({ ...actor, gameFrame: 803, framePrecise: 0 }, clock);
+  assert.equal(clock.framePrecise, 0);
+  clock = advanceIzualGhostS1Clock({ ...actor, gameFrame: 804, framePrecise: 120 }, clock);
+  assert.equal(clock.framePrecise, 120);
+});
+
+test('a same-mode native refresh preserves the S1 clock when its frame does not reset', () => {
+  const actor = { id: 9, classId: 406, mode: 8, gameFrame: 800, framePrecise: 0,
+    frameCountPrecise: 20 * 256, animSpeed: 120 };
+  let clock = advanceIzualGhostS1Clock(actor);
+  clock = advanceIzualGhostS1Clock({ ...actor, gameFrame: 802, framePrecise: 240 }, clock);
+  clock = advanceIzualGhostS1Clock({ ...actor, gameFrame: 803, framePrecise: 360 }, clock);
+  assert.equal(clock.framePrecise, 360);
 });
 
 test('the F37 clock does not apply to other classes, modes, or sequence-backed units', () => {

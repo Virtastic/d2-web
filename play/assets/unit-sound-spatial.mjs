@@ -23,12 +23,26 @@ export function nativeUnitSoundSpatial(source, listener) {
 /** The native row-2673 shrine sound is the only source whose full spatial inputs are wired here. */
 export function unitSoundNativeSpatial(event, snapshot, listener) {
   if (event?.soundEvent !== 0x0a || !listener) return null;
+  const source = unitSoundSourcePosition(event, snapshot);
+  if (!source) return null;
+  return nativeUnitSoundSpatial(source, listener);
+}
+
+function unitSoundSourcePosition(event, snapshot) {
+  if (!Number.isInteger(event?.unitType) || !Number.isInteger(event?.unitId)) return null;
   const sourceUnit = snapshot?.entities?.find((entity) => entity.type === event.unitType && entity.id === (event.unitId >>> 0));
   if (!sourceUnit) return null;
   const dynamic = event.unitType === 0 || event.unitType === 1 || event.unitType === 3;
-  const source = dynamic && sourceUnit.preciseX != null && sourceUnit.preciseY != null
+  return dynamic && sourceUnit.preciseX != null && sourceUnit.preciseY != null
     ? { x: sourceUnit.preciseX, y: sourceUnit.preciseY } : sourceUnit;
-  return nativeUnitSoundSpatial(source, listener);
+}
+
+// A Tracking Sounds.txt source uses the same native pan-byte path regardless of which
+// attached event selected it. Distance gain remains a separate, row-specific rule.
+export function unitSoundNativePanCode(event, snapshot, listener) {
+  if (!listener) return null;
+  const source = unitSoundSourcePosition(event, snapshot);
+  return source ? nativeUnitSoundSpatial(source, listener)?.panCode ?? null : null;
 }
 
 // Packet event 0x10 is D2Client's monster MonSounds.Taunt route. The native
@@ -37,11 +51,7 @@ export function unitSoundNativeSpatial(event, snapshot, listener) {
 export function unitSoundNativeTauntPanCode(event, snapshot, listener) {
   const selectedRow = event?.monsterTaunt ?? event?.nativeSelectedRow;
   if (event?.soundEvent !== 0x10 || event?.unitType !== 1 || !Number.isInteger(selectedRow) || selectedRow <= 0 || !listener) return null;
-  const sourceUnit = snapshot?.entities?.find((entity) => entity.type === 1 && entity.id === (event.unitId >>> 0));
-  if (!sourceUnit) return null;
-  const source = sourceUnit.preciseX != null && sourceUnit.preciseY != null
-    ? { x: sourceUnit.preciseX, y: sourceUnit.preciseY } : sourceUnit;
-  return nativeUnitSoundSpatial(source, listener)?.panCode ?? null;
+  return unitSoundNativePanCode(event, snapshot, listener);
 }
 
 export function unitSoundNativeGainByte(event, snapshot, listener) {

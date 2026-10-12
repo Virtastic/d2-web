@@ -23,3 +23,10 @@ test('retail master volume attenuates music and sound, music volume additionally
   assert.equal(sound.volume, 0.4);
   assert.deepEqual(volumes.evidence.applied, { sound: [0.4], music: [0.12] });
 });
+
+test('invalid stored slider values keep native defaults while valid zero remains muted', () => {
+  const restored = (value) => createAudioVolume({ storage: { getItem: () => JSON.stringify(value), setItem() {} } });
+
+  assert.deepEqual(restored({ sound: 1.1, music: -0.1 }).values, { sound: 1, music: 0.5 });
+  assert.deepEqual(restored({ sound: null, music: 0 }).values, { sound: 1, music: 0 });
+});

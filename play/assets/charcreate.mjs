@@ -17,8 +17,9 @@
 // which is a wrong picture rather than an error.
 
 import { composeTiled, createBlender, createFont, decodeFontTbl, FRONTEND, recordTiled, textColourPalette, TITLE_COLUMNS } from './frontend.mjs';
-import { createCharacterCreateCheckboxes } from './charcreate-checkboxes.mjs';
+import { createCharacterCreateCheckboxes, createCharacterCreateCheckboxInput } from './charcreate-checkboxes.mjs';
 import { createCharacterNameRenderer, NAME_FIELD } from './charcreate-name.mjs';
+import { isRetailEditBoxCharacter } from './charcreate-name-input.mjs';
 import { recordDc6 } from './drawlist.mjs';
 import { createHeroStances, HERO_STANCE } from './charcreate-stances.mjs';
 
@@ -187,6 +188,18 @@ function descriptionLines(text) {
 
 const SCREEN = { width: 800, height: 600 };
 
+/**
+ * D2Win sends every type-6 control its mouse-up message after a hit-tested mouse-down. For the
+ * flags-0 OK and EXIT controls, that pending gesture invokes the callback on release without
+ * checking where the pointer ended up. Keep this separate from hit testing: class and checkbox
+ * gestures have their own handling.
+ */
+export function releaseCharacterCreateButton(token, { submit, cancel }) {
+  if (token === 'ok') { submit(); return 'ok'; }
+  if (token === 'exit') { cancel(); return 'exit'; }
+  return null;
+}
+
 export function frameCanvas(frame, palette, documentObject) {
   const canvas = documentObject.createElement('canvas');
   canvas.width = Math.max(1, frame.width);
@@ -297,6 +310,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
   // OpenDiablo2's SelectHeroClass gives clickbox.dc6's fechar cels and these anchors.  The
   // labels use this screen's existing Units Font16, exactly as its other small labels do.
   const checkboxes = createCharacterCreateCheckboxes({ read, decodeDc6, palette, smallFont: goldLabelFont, string, documentObject });
+  const checkboxInput = createCharacterCreateCheckboxInput((key) => checkboxes.toggle(key));
 
   const blend = createBlender(read(CREATE_ASSETS.palette.replace(/pal\.dat$/i, 'pal.pl2')), palette);
   // Button labels: exocet10 glyphs in draw mode 4, fechar's PL2 MultiplicativeBlend over the button
@@ -469,7 +483,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
       if (code === 'Backspace') { name = name.slice(0, -1); return true; }
       if (code === 'Enter') { if (canCreate()) this.submit(); return true; }
       if (code === 'Escape') { onCancel?.(); return true; }
-      if (typeof key === 'string' && key.length === 1 && /[A-Za-z_-]/.test(key) && name.length < 15) { name += key; return true; }
+      if (isRetailEditBoxCharacter(key) && name.length < 15) { name += key; return true; }
       return false;
     },
     submit() { if (canCreate()) onCreate?.({ playerClass: heroes[chosen].playerClass, name: name.trim(), key: heroes[chosen].key, checkboxes: checkboxes.states() }); },
@@ -511,21 +525,27 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     },
     press(x, y, width, height) {
       const p = toScreen(x, y, width, height);
-      return (pressed = hitControl(p));
+      const token = hitControl(p);
+      // The type-6 mode-2 clickboxes toggle on down; later release or cancellation only clears
+      // this pointer's pressed identity and does not roll back the committed state.
+      checkboxInput.press(token);
+      return (pressed = token);
     },
     release(token, x, y, width, height) {
-      if (!token) { pressed = null; return null; }
+      if (!token) { checkboxInput.cancel(); pressed = null; return null; }
       const p = toScreen(x, y, width, height), now = hitControl(p), matches = releaseMatches(token, p); pressed = null;
-      // Checkbox hit regions overlap vertically in the retail DC6; release preserves the captured
-      // checkbox identity instead of allowing that overlap to redirect the action to its neighbour.
-      const action = matches
-        ? token.startsWith('checkbox-') ? checkboxes.toggle(token.slice('checkbox-'.length)) : this.click(x, y, width, height)
-        : null;
+      // Mode 2 has no release callback. Preserve the captured identity only to end the gesture;
+      // overlapping checkbox hit regions must not redirect the already-committed down action.
+      const buttonAction = releaseCharacterCreateButton(token, {
+        submit: () => this.submit(), cancel: () => onCancel?.(),
+      });
+      checkboxInput.release(token);
+      const action = buttonAction ?? (matches && !token.startsWith('checkbox-') ? this.click(x, y, width, height) : null);
       releaseEvidence = { token, now, matches, action };
       return action;
     },
     /** A cancelled gesture drops the down cel without activating the control. */
-    cancel() { pressed = null; },
+    cancel() { checkboxInput.cancel(); pressed = null; },
     step() { tick++; },
     /** The screen's clock in 60 Hz updates since it opened; a row pins it to a retail capture's tick. */
     get tick() { return tick; }, set tick(v) { tick = v; },
