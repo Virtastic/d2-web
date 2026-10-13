@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <set>
 #include <map>
+#include <tuple>
 #include <Drlg/D2DrlgActivate.h>
 #include <Drlg/D2DrlgDrlgRoom.h>
 #include <string>
@@ -62,11 +63,9 @@
 #include <Units/Missile.h>
 #include "../realm/client_fireball_hit.h"
 #include "monster_light_terminal.h"
+#include "light_occlusion_policy.h"
 #include "plugy_stash_grid.h"
-#include "player_attack_hand_selector.h"
 #include "path_attempt_trace.h"
-#include "player_presentation_clock.h"
-#include "item_descfunc11.h"
 #include "item_text_visibility.h"
 #include <D2Environment.h>
 #include <DataTbls/ObjectsTbls.h>
@@ -139,6 +138,10 @@ extern "C" int d2_drlg_client_unit_context(int x, int y, int rollRoomSeed, uint3
 extern "C" int d2_session_client_cunit_seed_init(D2SeedStrc* clientSeed,
     uint32_t* unitInitSeed, int x, int y, int playerCurrent);
 extern "C" void d2_drlg_act_end();
+
+extern "C" void D2WEB_ResetPacketStream();
+extern "C" const uint8_t* D2WEB_PacketStream(uint32_t* pLength, uint32_t* pPackets);
+static uint32_t g_sessionPacketStreamLength, g_sessionPacketStreamPackets;
 
 static std::string g_err;
 static D2GameStrc* g_game;
@@ -251,6 +254,7 @@ struct D2SessionMonsterAnimation {
     uint32_t componentCodes[16];
     uint16_t animSpeed;
     uint8_t direction, animationFlags;
+    uint32_t baseWeaponClass;
 };
 // A missile's own presentation record: what the client needs to draw the Missiles.txt CelFile at the
 // frame and facing the ENGINE has it in, instead of a frame guessed from the shell's tick.  Retail's
@@ -315,6 +319,15 @@ struct D2SessionTile {
     // `unk0x24` bit 1 and the direction in its green/blue pair; see sessionTilePop.
     uint32_t pop;
 };
+// F11b sidecar: D2Client traverses the current room's ordered active-near list, then each room's
+// floor records in selector/source order. Keep this separate from D2SessionTile so its browser ABI
+// and terrain hashes remain fixed. Room identity fields make the ordinal mapping auditable.
+struct D2SessionActiveNearFeedRecord {
+    uint32_t kind, roomOrdinal; // kind 0: room-order record; kind 1: floor source record
+    int32_t levelId, tileX, tileY;
+    uint32_t floorOrdinal, selector;
+};
+static_assert(sizeof(D2SessionActiveNearFeedRecord) == 28);
 struct D2SessionMotion {
     uint32_t version, size, gameFrame, mode;
     int32_t x, y, targetX, targetY;
@@ -487,8 +500,9 @@ static_assert(offsetof(D2SessionSnapshot, x) == 28 && offsetof(D2SessionSnapshot
 static_assert(sizeof(D2SessionRoom) == 36);
 static_assert(sizeof(D2SessionUnit) == 44);
 static_assert(sizeof(D2SessionUnitFacing) == 8);
-static_assert(sizeof(D2SessionMonsterAnimation) == 92);
+static_assert(sizeof(D2SessionMonsterAnimation) == 96);
 static_assert(offsetof(D2SessionMonsterAnimation, animSpeed) == 88);
+static_assert(offsetof(D2SessionMonsterAnimation, baseWeaponClass) == 92);
 static_assert(sizeof(D2SessionMissileAnimation) == 24);
 static_assert(sizeof(D2SessionObjectPresentation) == 40);
 static_assert(sizeof(D2SessionCoords) == 16);
@@ -596,6 +610,7 @@ static D2SessionItemState g_sessionItemState;
 static uint32_t g_sessionPendingPickup = 0;
 extern "C" int d2_realm_d2gs_move_to(uint8_t opcode, uint16_t x, uint16_t y, uint8_t* out);
 static std::vector<D2SessionTile> g_sessionTiles;
+static std::vector<D2SessionActiveNearFeedRecord> g_sessionActiveNearFeed;
 // Parallel to g_sessionTiles: the index of the tile's entry in its DT1 file (UINT32_MAX: not a library entry).
 // Kept out of D2SessionTile so the terrain hash and every row pinning that stride stay as they were.
 static std::vector<uint32_t> g_sessionTileEntry, g_sessionSeamTileEntry;
@@ -1451,6 +1466,7 @@ static void updateSessionWorld() {
                 animation.frameCountPrecise = unit->dwFrameCountPrecise; animation.animSpeed = unit->wAnimSpeed;
                 animation.direction = unit->pDynamicPath ? unit->pDynamicPath->nDirection : 0;
                 const D2MonStats2Txt* mon2 = UNITS_GetMonStats2TxtRecordFromMonsterId((int)unit->dwClassId);
+                animation.baseWeaponClass = mon2 ? static_cast<uint32_t>(mon2->nBaseW) : 0;
                 animation.animationFlags = (unit->pAnimSeq ? 0x01 : 0) |
                     (mon2 && (mon2->dwModeFlags & MONSTATS2MODEFLAG_DD) ? 0x02 : 0);
                 for (uint32_t component = 0; component < 16; ++component)
@@ -1594,6 +1610,73 @@ static void ensureSessionTiles() {
     for (const D2SessionTile& tile : g_sessionTiles) {
         const uint8_t* bytes = reinterpret_cast<const uint8_t*>(&tile);
         for (size_t i = 0; i < 76 /* pre-F66 bytes: entryHint (+0x4C) is not terrain identity, keeps pinned hashes */; ++i) { g_sessionTerrainHash ^= bytes[i]; g_sessionTerrainHash *= 16777619u; }
+    }
+}
+
+// Native D2Client 1.13c weather traversal starts at the client's current Room1 and consumes its
+// ordered adjacent-room array. This export reads the client-mode DRLG Act mirror, locates the room
+// from the session player's coordinates, then translates identities to exported world records.
+// The mirror is not retail's raw Room1 allocation; this is a client-mode candidate order, not a
+// byte-for-byte Room1 parity claim.
+static void buildSessionActiveNearFeed() {
+    g_sessionActiveNearFeed.clear();
+    D2DrlgActStrc* clientAct = d2_drlg_client_act();
+    if (!g_sessionLive || !g_sessionClientMapStarted || !clientAct || !clientAct->pDrlg || !g_targetPlayer) return;
+    D2ActiveRoomStrc* here = DUNGEON_FindRoomBySubtileCoordinates(clientAct,
+        CLIENTS_GetUnitX(g_targetPlayer), CLIENTS_GetUnitY(g_targetPlayer));
+    if (!here) return;
+    D2ActiveRoomStrc** nearRooms = nullptr;
+    int32_t nearCount = 0;
+    DUNGEON_GetAdjacentRoomsListFromRoom(here, &nearRooms, &nearCount);
+    if (!nearRooms || nearCount <= 0) return;
+
+    std::vector<D2ActiveRoomStrc*> currentRooms(nearRooms, nearRooms + nearCount);
+    std::vector<D2DrlgTileDataStrc*> currentFloors;
+    std::vector<int32_t> currentFloorCounts;
+    currentFloors.reserve((size_t)nearCount);
+    currentFloorCounts.reserve((size_t)nearCount);
+    for (D2ActiveRoomStrc* active : currentRooms) {
+        int32_t floorCount = 0;
+        D2DrlgTileDataStrc* floors = active ? DUNGEON_GetFloorTilesFromRoom(active, &floorCount) : nullptr;
+        currentFloors.push_back(floors);
+        currentFloorCounts.push_back(floorCount);
+    }
+
+    using RoomKey = std::tuple<int32_t, int32_t, int32_t>;
+    std::map<RoomKey, uint32_t> roomOrdinals;
+    uint32_t ordinal = 0;
+    if (!g_lastLevel) return;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext, ++ordinal)
+        roomOrdinals.emplace(RoomKey{roomEx->pLevel ? roomEx->pLevel->nLevelId : -1,
+                                    roomEx->nTileXPos, roomEx->nTileYPos}, ordinal);
+    uint32_t seamOrdinal = 0x10000;
+    for (D2DrlgLevelStrc* level = g_lastLevel->pDrlg ? g_lastLevel->pDrlg->pLevel : nullptr; level; level = level->pNextLevel) {
+        if (level == g_lastLevel) continue;
+        for (D2DrlgRoomStrc* roomEx = level->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext, ++seamOrdinal)
+            roomOrdinals.emplace(RoomKey{roomEx->pLevel ? roomEx->pLevel->nLevelId : -1,
+                                         roomEx->nTileXPos, roomEx->nTileYPos}, seamOrdinal);
+    }
+
+    for (int32_t r = 0; r < nearCount; ++r) {
+        D2ActiveRoomStrc* active = nearRooms[r];
+        if (!active || !active->pDrlgRoom) continue;
+        const D2DrlgRoomStrc* roomEx = active->pDrlgRoom;
+        const int32_t levelId = roomEx->pLevel ? roomEx->pLevel->nLevelId : -1;
+        const auto found = roomOrdinals.find(RoomKey{levelId, roomEx->nTileXPos, roomEx->nTileYPos});
+        const uint32_t roomOrdinal = found == roomOrdinals.end() ? UINT32_MAX : found->second;
+        g_sessionActiveNearFeed.push_back({0, roomOrdinal, levelId, roomEx->nTileXPos, roomEx->nTileYPos, 0, 0});
+
+        // FUN_6FAC4050 requests selectors 1 then 2 and scans each returned floor array from index 0.
+        const int32_t floorCount = currentFloorCounts[(size_t)r];
+        D2DrlgTileDataStrc* floors = currentFloors[(size_t)r];
+        if (!floors || floorCount <= 0) continue;
+        for (uint32_t selector = 1; selector <= 2; ++selector) {
+            for (int32_t i = 0; i < floorCount; ++i) {
+                if (((floors[i].dwFlags >> 14) & 7u) != selector) continue;
+                g_sessionActiveNearFeed.push_back({1, roomOrdinal, levelId, roomEx->nTileXPos, roomEx->nTileYPos,
+                    (uint32_t)i, selector});
+            }
+        }
     }
 }
 
@@ -2731,10 +2814,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_path_collision(int x, int y) {
     if (!path || !path->pRoom) return -1;
 
     const BOOL removedPlayerFootprint = PATH_RemoveCollisionFootprintForUnit(player, FALSE);
-    D2ActiveRoomStrc* room = COLLISION_GetRoomBySubTileCoordinates(path->pRoom, x, y);
-    const int collision = d2::path::collisionQueryResult(room != nullptr,
-        room && COLLISION_CheckAnyCollisionWithPattern(room, x, y, path->dwCollisionPattern,
-            (uint16_t)path->nMoveTestCollisionMask));
+    const int collision = d2::path::movementCollisionQuery(*path, x, y);
     if (removedPlayerFootprint) PATH_AddCollisionFootprintForUnit(player);
     return collision;
 }
@@ -3256,7 +3336,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_warp_interact(uint32_t destinationLe
             if (!sessionDispatchGate(0x13)) return -1;
             handlerInvoked = true;
             return D2GAME_PACKETCALLBACK_Rcv0x13_InteractWithEntity_6FC84D70(
-                g_game, g_targetPlayer, packet, packetLength);
+                g_game, g_targetPlayer, const_cast<uint8_t*>(packet), packetLength);
         });
 
     if (interaction.step == D2WarpInteractionStep::Reject) return 0;
@@ -3834,41 +3914,6 @@ static_assert(offsetof(D2Act4Quest3Strc, nGemDropTier) == 0x08);
 static_assert(offsetof(D2Act4Quest3Strc, nHits) == 0x0C);
 static_assert(offsetof(D2Act4Quest3Strc, nPlayersInAct) == 0x14);
 
-// Read-only F39/F512 probe. It joins the class-376 object's current state and
-// A4Q3 extension to the type-7 timer linked from that same UnitAny. Type 7 is
-// shared by MONUMOD/QUESTFN, so the object unit type is part of the match.
-EMSCRIPTEN_KEEPALIVE const D2HellforgeDiagnostic* d2_session_hellforge_diagnostic(uint32_t objectId) {
-    static D2HellforgeDiagnostic out{};
-    out = {};
-    out.version = 1;
-    out.size = sizeof(out);
-    out.forgeGuid = -1;
-    out.forgeAnimMode = -1;
-    out.questForgeMode = -1;
-    out.gameFrame = g_game ? g_game->dwGameFrame : -1;
-    out.scheduledEventType = -1;
-    out.scheduledEventUnitType = -1;
-    out.scheduledEventUnitGuid = -1;
-    out.scheduledEventDueFrame = -1;
-    if (!g_sessionLive || !g_game) return &out;
-
-    D2UnitStrc* object = SUNIT_GetServerUnit(g_game, UNIT_OBJECT, (int32_t)objectId);
-    if (!object || object->dwClassId != 376) return &out;
-    out.found = 1;
-    out.forgeGuid = (int32_t)object->dwUnitId;
-    out.forgeAnimMode = (int32_t)object->dwAnimMode;
-
-    D2QuestDataStrc* quest = QUESTS_GetQuestData(g_game, QUEST_A4Q3_HELLFORGE);
-    if (!quest || !quest->pQuestDataEx) return &out;
-    const auto* ex = static_cast<const D2Act4Quest3Strc*>(quest->pQuestDataEx);
-    out.questForgeMode = ex->nHellforgeObjectMode;
-    out.hitCount = ex->nHits;
-    out.gemDropTier = ex->nGemDropTier;
-    out.rewardDropsPending = ex->bRewardDropsPending;
-    out.soulstoneSmashed = ex->bSoulstoneSmashed;
-    d2HellforgeReadQuestEvents(out, SUNIT_GetTimerFromUnit(object), UNIT_OBJECT, object);
-    return &out;
-}
 EMSCRIPTEN_KEEPALIVE int d2_session_command_seam(uint32_t destinationLevel) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath || !g_lastLevel) return 0;
     updateSessionSnapshot();
@@ -4198,9 +4243,6 @@ EMSCRIPTEN_KEEPALIVE int d2_session_drlg_update(int n) {
 
 // Recovered UNIT_MONSTER branch of PlrMsg's interaction dispatcher: the click is accepted at
 // six subtiles, then D2Game owns the player/NPC interaction records and quest speech activation.
-extern "C" void D2WEB_ResetPacketStream();
-extern "C" const uint8_t* D2WEB_PacketStream(uint32_t* pLength, uint32_t* pPackets);
-static uint32_t g_sessionPacketStreamLength, g_sessionPacketStreamPackets;
 // Client packet 0x13 (interact with entity) through the recovered handler, exactly as a client
 // sends it: within 6 subtiles the NPC activates immediately and its reply is queued.
 // Fixture: place the player at (x,y) via the recovered teleport placement, finding the active
@@ -7814,11 +7856,16 @@ EMSCRIPTEN_KEEPALIVE int d2_session_player_weapon_class_id() {
 }
 // Match the native drawable-unit selector call: the caller supplies the mode
 // being drawn, and converted-mode substitution is disabled.
-EMSCRIPTEN_KEEPALIVE int d2_session_player_weapon_class_id_for_mode(int32_t mode) {
+// Named boundary for the mode chosen by the local drawable player renderer. The generic
+// explicit-mode export below remains available to existing callers; both use the same unit and inventory.
+EMSCRIPTEN_KEEPALIVE int d2_session_player_weapon_class_id_for_presentation_mode(int32_t presentationMode) {
     if (!g_targetPlayer) return -1;
     int weaponClassId = -1;
-    COMPOSIT_GetWeaponClassId(g_targetPlayer, g_targetPlayer->pInventory, &weaponClassId, mode, FALSE);
+    COMPOSIT_GetWeaponClassId(g_targetPlayer, g_targetPlayer->pInventory, &weaponClassId, presentationMode, FALSE);
     return weaponClassId;
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_player_weapon_class_id_for_mode(int32_t mode) {
+    return d2_session_player_weapon_class_id_for_presentation_mode(mode);
 }
 // Same effective type/class/mode tuple used by the native compositor path. The exported identity
 // deliberately keeps the source D2Unit as a player; the browser uses this tuple to choose the
@@ -8106,8 +8153,12 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_lines(uint32_t itemId, char* buf, 
     BOOL okS = TRUE, okD = TRUE, okL = TRUE;
     const int32_t reqPct = itemIdentified ? STATLIST_UnitGetItemStatOrSkillStatValue(item, STAT_ITEM_REQ_PERCENT, 0) : 0;
     const int32_t eth = (item->pItemData && (item->pItemData->dwItemFlags & IFLAG_ETHEREAL)) ? -10 : 0;
-    const int32_t reqStr = std::max(0, t->wReqStr + (int32_t)(t->wReqStr * (int64_t)reqPct / 100) + eth);
-    const int32_t reqDex = std::max(0, t->wReqDex + (int32_t)(t->wReqDex * (int64_t)reqPct / 100) + eth);
+    const int32_t reqStrBase = std::max(0, t->wReqStr + eth);
+    const int32_t reqDexBase = std::max(0, t->wReqDex + eth);
+    const int32_t reqStrCurrent = std::max(0, t->wReqStr + (int32_t)(t->wReqStr * (int64_t)reqPct / 100) + eth);
+    const int32_t reqDexCurrent = std::max(0, t->wReqDex + (int32_t)(t->wReqDex * (int64_t)reqPct / 100) + eth);
+    const int32_t reqStr = d2::item_text::visibleRequirement(itemIdentified, reqStrCurrent, reqStrBase);
+    const int32_t reqDex = d2::item_text::visibleRequirement(itemIdentified, reqDexCurrent, reqDexBase);
     const bool showLevelRequirement = t->nLevel && t->dwSpeed >= -1000;
     const int32_t lvlReq = showLevelRequirement ? (itemIdentified ? ITEMS_GetLevelRequirement(item, g_targetPlayer) : t->nLevelReq) : 0;
     if (g_targetPlayer) {
@@ -8432,6 +8483,13 @@ EMSCRIPTEN_KEEPALIVE int d2_session_cross_rolls(uint32_t* out, int cap) {
 EMSCRIPTEN_KEEPALIVE const D2SessionTile* d2_session_tiles() {
     updateSessionSnapshot(); ensureSessionTiles(); return g_sessionTiles.data();
 }
+EMSCRIPTEN_KEEPALIVE const D2SessionActiveNearFeedRecord* d2_session_active_near_feed() {
+    // The count call refreshes this view; read the pointer immediately afterward.
+    return g_sessionActiveNearFeed.data();
+}
+EMSCRIPTEN_KEEPALIVE int d2_session_active_near_feed_count() {
+    buildSessionActiveNearFeed(); return (int)g_sessionActiveNearFeed.size();
+}
 EMSCRIPTEN_KEEPALIVE const uint32_t* d2_session_tile_entries() {
     updateSessionSnapshot(); ensureSessionTiles(); return g_sessionTileEntry.data();
 }
@@ -8529,17 +8587,13 @@ static int lightOctagonal(int a, int b) { a = a < 0 ? -a : a; b = b < 0 ? -b : b
 // between the two neighbours on the source's side. A cell then receives its light scaled by
 // (8 - G/2) / 8, none once G reaches 16.
 static int lightB[64 * 64], lightG[64 * 64];
-// Diagnostic for the off-map branch (F240): how many off-map pattern cells the one-hop resolver could
-// NOT reach this build, i.e. cells that were treated as OPEN because no built room answered. It is the
-// only way to see the branch's dependability: a wrong anchor shows up here as a non-zero count while the
-// map can still read exact in a scene whose player happens to sit where the anchor reaches. Reset per
-// d2_session_lightmap, read by d2_session_lightmap_offmap_unresolved.
+// Diagnostic for the off-map branch (F240/F250): how many off-map pattern cells the one-hop resolver
+// could NOT reach this build. These now block as D2Common invalid cells; the count identifies scenes
+// that exercise that fallback. Reset per d2_session_lightmap, read by d2_session_lightmap_offmap_unresolved.
 static int g_lightOffMapUnresolved = 0;
-// The same count asked of the PLAYER's room instead of the source's -- i.e. exactly what F240 shipped
-// before the review: a number here is the cells that build would have read as OPEN because the player
-// stood too far from the source for the one-hop resolver to reach its pattern. It is evidence, not a
-// gate (it must be zero under the source anchor; it is expected NON-zero here in a scene whose player
-// is several rooms from a lit edge object), and it is what makes the fix's gate non-vacuous.
+// The same unresolved count asked of the PLAYER's room instead of the source's. It records the anchor
+// F240 originally shipped; the nonzero count no longer means open because unresolved cells follow the
+// same blocked invalid-cell rule. It is evidence, not a gate.
 static int g_lightOffMapUnresolvedPlayer = 0;
 static inline int lightGet(int row, int col) { const int i = (row << 6) + col; return lightB[i] ? lightB[i] : lightG[i]; }
 static bool sessionRoomHasClient(const D2ActiveRoomStrc* room, const D2ClientStrc* client) {
@@ -8693,14 +8747,18 @@ static void lightAddSource(int x, int y, int r, int intensity, bool occlude, boo
                 // collision around it), never the player's: COLLISION_GetRoomBySubTileCoordinates tests
                 // one room plus its DRLG neighbours (this file, d2_session_room_active_at's note), which
                 // reaches the source's pattern but NOT its cells when the anchor is a player room
-                // several rooms away -- the cells would read "no room" and be treated open. Anchoring on
-                // the player made the off-map result depend on where the PLAYER stood, which the one gate
-                // F240 had (`s2135`, its player beside the objects) could not see; the review found it.
+                // several rooms away. Those cells now take the native invalid-cell fallback and block,
+                // while the source anchor still resolves real nearby cells so open ground remains open.
+                // Anchoring on the player made the result depend on where the PLAYER stood, which the one
+                // gate F240 had (`s2135`, its player beside the objects) could not see; the review found it.
                 D2ActiveRoomStrc* wr = refRoom ? COLLISION_GetRoomBySubTileCoordinates(refRoom, wx, wy) : nullptr;
-                if (!wr) ++g_lightOffMapUnresolved;   // out of the one-hop resolver's reach -- treated open
+                if (!wr) ++g_lightOffMapUnresolved;   // diagnostic: outside the active-room resolver's reach
                 if (playerRoom && playerRoom != refRoom)
                     if (!COLLISION_GetRoomBySubTileCoordinates(playerRoom, wx, wy)) ++g_lightOffMapUnresolvedPlayer;
-                blocked = wr && COLLISION_CheckMask(wr, wx, wy, COLLIDE_VISIBLE | COLLIDE_BLANK) != 0;
+                const uint16_t collision = wr
+                    ? COLLISION_CheckMask(wr, wx, wy, COLLIDE_VISIBLE | COLLIDE_BLANK)
+                    : 0;
+                blocked = d2::monspawn::lightOcclusionCellBlocked(wr != nullptr, collision);
             }
             lightB[((32 - r8 + iy) << 6) + 32 - r8 + ix] = blocked ? 16 : 0;
         }
@@ -8849,16 +8907,13 @@ EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_session_lightmap(int ambientOve
 }
 
 // The off-map pattern cells the last d2_session_lightmap could NOT resolve (no built room answered from
-// the source's own room), which are the cells treated as OPEN. Zero means every off-map cell the build
-// asked about was inside the one-hop resolver's reach, so the anchor reached the whole pattern; a
-// non-zero count is the anchor failing the pattern and the build reading "not built" where retail reads
-// the world -- the failure mode F240's player-anchored version had and `s2135` could not see.
+// the source's own room), which now follow D2Common's invalid-collision result and block. Zero means
+// every off-map cell the build asked about was inside the one-hop resolver's reach; non-zero is a
+// diagnostic for F250's missing retail comparison case, not a behavior fallback.
 EMSCRIPTEN_KEEPALIVE int d2_session_lightmap_offmap_unresolved() { return g_lightOffMapUnresolved; }
-// The same count under the OLD anchor (the player's room): what F240 shipped before the review. It is
-// the control that the source-room anchor's zero is measured against -- a non-zero value here in a scene
-// whose map is nonetheless exact is the review's finding, reproduced: the old anchor read "not built"
-// (open) where retail read the world, and no cell of the map showed it because the player happened to
-// reach. Report it beside the source-anchor count, never gate on it.
+// The same unresolved count under the OLD anchor (the player's room): what F240 shipped before the
+// review. It is a reachability diagnostic only; the current implementation blocks cells it cannot
+// resolve under either anchor. Report it beside the source-anchor count, never gate on it.
 EMSCRIPTEN_KEEPALIVE int d2_session_lightmap_offmap_unresolved_player() { return g_lightOffMapUnresolvedPlayer; }
 
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_terrain_hash() {

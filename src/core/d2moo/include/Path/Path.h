@@ -217,8 +217,10 @@ static_assert(offsetof(D2WebWalkProbe, wrapperRoomFound) == 5 * sizeof(int32_t))
 static_assert(offsetof(D2WebWalkProbe, packetBuilt) == 6 * sizeof(int32_t));
 static_assert(offsetof(D2WebWalkProbe, resolverCalled) == 16 * sizeof(int32_t));
 static_assert(offsetof(D2WebWalkProbe, continuationTicks) == 24 * sizeof(int32_t));
+extern "C" {
 extern D2WebWalkProbe g_d2webWalkProbe;
 extern int32_t g_d2webWalkProbeActive;
+}
 
 // Path "precise" positions are encoded using 16bits fixed point
 inline uint32_t PATH_ToFP16Corner(uint16_t value) {

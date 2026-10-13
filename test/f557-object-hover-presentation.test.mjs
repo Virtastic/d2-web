@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   nativeDccHoverContains,
+  nativeObjectHoverContains,
   selectNativeHoverCandidate,
   selectNativeHoverWinner,
   selectPointerCandidate,
@@ -11,7 +12,14 @@ test('F557 single-cell object hover uses closed, padded bounds', () => {
   const stashCel = { xOffset: -25, yOffset: -30, width: 42, height: 43 };
   assert.equal(nativeDccHoverContains(29, 24, stashCel, 0, 0), true, 'native right/bottom edge is inclusive');
   assert.equal(nativeDccHoverContains(30, 24, stashCel, 0, 0), false, 'one pixel past the right edge misses');
+  assert.equal(nativeObjectHoverContains(29, 24, { ...stashCel, layers: 1 }, 0, 0), true);
+  assert.equal(nativeObjectHoverContains(30, 24, { ...stashCel, layers: 1 }, 0, 0), false);
+});
 
+test('F506 invalid object cel cannot create a native hover hit from the anchor fallback', () => {
+  assert.equal(nativeObjectHoverContains(4, 3, null, 0, 0), false,
+    'native D2Client returns no hit when it cannot build a current-cell rectangle');
+  assert.equal(nativeObjectHoverContains(4, 3, { ...null, width: 0, height: 0, layers: 0 }, 0, 0), false);
 });
 
 test('F557 hover ranking selects the greater signed native score across mixed accepted candidates', () => {

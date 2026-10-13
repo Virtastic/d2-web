@@ -1,4 +1,5 @@
 import { worldToScreen } from './session-terrain.mjs';
+import { orderFloorsByActiveNearFeed } from './session-active-near-feed.mjs';
 
 // F11b's retail captures place Rain3/Rain4 ground ripples on water. A DT1 subtile collision byte is
 // not a water label: +0x28 marks walk/collision properties and also equals 1 around dry town props
@@ -6,9 +7,9 @@ import { worldToScreen } from './session-terrain.mjs';
 // cross-checked against D2MOO D2CMP.h / MonsterSpawn.cpp and measured against rip-ford-full/dry.
 // Keep eligible positions in world-screen coordinates so camera motion cannot turn a ripple into a
 // screen-space mark.
-export function weatherWaterAnchors(floors) {
+export function weatherWaterAnchors(floors, activeNearFeed = null) {
   const anchors = [];
-  for (const floor of floors || []) {
+  for (const floor of orderFloorsByActiveNearFeed(floors, activeNearFeed)) {
     const tile = floor?.tile, dt1 = floor?.dt1Tile;
     // FUN_6FAC4050 requests floor arrays for selectors 1 then 2. A completed renderer list can
     // also contain other floor selector classes, so apply the native (dwFlags >> 14) & 7 gate.

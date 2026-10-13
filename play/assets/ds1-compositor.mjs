@@ -1,6 +1,5 @@
-import { decodeDatPalette, decodeDt1 } from './d2-formats.mjs';
+import { decodeDatPalette, decodeDt1, tilePixelsToRgba } from './d2-formats.mjs';
 import { decodeDs1, decodeDs1Cell } from './ds1.mjs';
-import { tilePixelsToRgba } from './retail-tile-view.mjs';
 
 export const ACT_PRESET_ASSETS = Object.freeze([
   Object.freeze({ ds1: 'data\\global\\tiles\\ACT1\\TOWN\\townE1.ds1', palette: 'data\\global\\palette\\ACT1\\pal.dat' }),

@@ -1978,7 +1978,7 @@ D2UnitStrc* __fastcall QUESTS_CreateItem(D2GameStrc* pGame, D2UnitStrc* pPlayer,
 			D2CoordStrc pCoord = {};
 			UNITS_GetCoords(pPlayer, &pCoord);
 			D2ActiveRoomStrc* pRoom = nullptr;
-			QUESTS_GetFreePosition(UNITS_GetRoom(pPlayer), &pCoord, 1, 0x3E01, &pRoom, 5);
+			QUESTS_GetFreePosition(UNITS_GetRoom(pPlayer), &pCoord, 1, 0x3E01, &pRoom, 100);
 			D2GAME_DropItem_6FC52260(pGame, nullptr, pItem, pRoom, pCoord.nX, pCoord.nY);
 			return pItem;
 		}
@@ -2431,7 +2431,8 @@ void __fastcall QUESTS_GetFreePosition(D2ActiveRoomStrc* pRoom, D2CoordStrc* pCo
 	int32_t nX = nCenterX;
 
 	int32_t j = 1;
-	for (int32_t i = -1; i > -100; --i)
+	// 1.13c 0x6FC54130 bounds the positive ring counter by the caller radius.
+	for (int32_t i = -1; j < nRadius; --i)
 	{
 		for (int32_t y = j; y > i; y -= 2)
 		{
@@ -2724,7 +2725,7 @@ D2UnitStrc* __fastcall QUESTS_SpawnCriticalMonster(D2GameStrc* pGame, int32_t nX
 
 	coord.nY = nX;
 
-	QUESTS_GetFreePosition(pRoom, &coord, 2, 0x100u, &ppRoom, 6);
+	QUESTS_GetFreePosition(pRoom, &coord, 2, 0x100u, &ppRoom, 100);
 
 	D2ActiveRoomStrc* pTargetRoom = ppRoom;
 	int32_t nTargetX = 0;
@@ -2775,7 +2776,7 @@ D2UnitStrc* __fastcall QUESTS_SpawnCriticalMonster(D2GameStrc* pGame, int32_t nX
 			coord.nY = nYpos;
 		}
 
-		QUESTS_GetFreePosition(pTargetRoom, &coord, 2, 0x100u, &ppRoom, 7);
+		QUESTS_GetFreePosition(pTargetRoom, &coord, 2, 0x100u, &ppRoom, 100);
 
 		pTargetRoom = ppRoom;
 		if (ppRoom)

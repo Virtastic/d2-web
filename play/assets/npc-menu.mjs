@@ -66,6 +66,19 @@ export function npcMenuEntries(classId) {
   return [...row[1].map((stringId) => ({ stringId, action: ACTION[stringId] ?? OTHER })), { stringId: S_CANCEL, action: 'cancel' }];
 }
 
+/** Retail invokes an NPC menu callback on release over the row currently selected by the menu. */
+export function npcMenuChoiceOnRelease({ entryAtRelease, selectedEntry }) {
+  if (!entryAtRelease || entryAtRelease !== selectedEntry || !entryAtRelease.action) return null;
+  return entryAtRelease;
+}
+
+/** Literal 1.13c DWORD deadline test: uint32(now) < uint32(creationTick + 80). */
+export function npcMenuInputCoolingDown({ nowTick, creationTick }) {
+  const now = Math.trunc(nowTick) >>> 0;
+  const created = Math.trunc(creationTick) >>> 0;
+  return now < ((created + 80) >>> 0);
+}
+
 export const NPC_MENU_ASSETS = { palette: FRONTEND.palette, font: 'data\\local\\font\\latin\\font16.dc6', fontTbl: 'data\\local\\font\\latin\\font16.tbl',
   pieces: 'data\\global\\ui\\menu\\boxpieces.dc6' };
 export const NPC_MENU_LAYOUT = Object.freeze({ padX: 20, firstLine: 21, pitch: 15, bottomBaseAboveFeet: 148, bottomPerLine: 10 });
@@ -201,9 +214,10 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
     get open() { return Boolean(state); },
     get state() { return state; },
     /** `entries` from npcMenuEntries; the menu hangs over the NPC (its feet at the anchor). */
-    show(npcId, classId, name, entries) { state = { npcId, classId, name, entries }; rows = []; box = null; selected = 0; },
+    show(npcId, classId, name, entries) { state = { npcId, classId, name, entries, openedAt: Math.trunc(performance.now()) >>> 0 }; rows = []; box = null; selected = 0; },
     /** The pointer moved: the entry under it is selected, none when it is elsewhere (retail). */
     hover(x, y) { if (state && rows.length) selected = rows.findIndex((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h); return selected; },
+    get selectedEntry() { return selected >= 0 ? rows[selected] ?? null : null; },
     close() { state = null; rows = []; box = null; },
     /** The hire window over offers [{ name, level, life, def, cost, skill, mercName }] and the hirer's gold. */
     showHire(npcId, offers, gold) { hire = { npcId, offers, gold, top: 0, selected: 0 }; },

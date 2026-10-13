@@ -1,8 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decodeDatPalette, decodeDc6, dc6FrameToRgba, decodeDt1 } from '../play/assets/d2-formats.mjs';
+import { decodeDatPalette, decodeDc6, dc6FrameToRgba, decodeDt1, tilePixelsToRgba } from '../play/assets/d2-formats.mjs';
 import { decodeDs1, decodeDs1Cell } from '../play/assets/ds1.mjs';
-import { ACT_TILE_ASSETS, representativeTiles, tilePixelsToRgba } from '../play/assets/retail-tile-view.mjs';
 import { ACT_PRESET_ASSETS, composeDs1Map, normalizeDt1Dependency, TILE_HEIGHT, TILE_WIDTH } from '../play/assets/ds1-compositor.mjs';
 
 function dc6Fixture(frameData, { width = 4, height = 2, pointer = 32 } = {}) {
@@ -99,24 +98,17 @@ test('DAT palette converts BGR entries to opaque RGBA', () => {
   assert.throws(() => decodeDatPalette(dat.subarray(1)), /exactly 768/);
 });
 
-test('all acts select distinct retail palette and DT1 libraries', () => {
-  assert.equal(ACT_TILE_ASSETS.length, 5);
-  for (let act0 = 0; act0 < 5; act0++) {
-    assert.match(ACT_TILE_ASSETS[act0].palette, new RegExp(`ACT${act0 + 1}`, 'i'));
-    assert.match(ACT_TILE_ASSETS[act0].dt1, /\.dt1$/i);
-  }
-  assert.match(ACT_TILE_ASSETS[4].dt1, /expansion/i);
-});
-
-test('DT1 presentation preserves opacity and selects drawable tiles', () => {
+test('DT1 palette conversion preserves transparent and opaque pixels', () => {
   const palette = new Uint8Array(1024);
   palette.set([11, 22, 33, 255], 4);
   const pixels = { width: 2, height: 1, indices: Uint8Array.of(1, 1), opaque: Uint8Array.of(255, 0) };
   assert.deepEqual(Array.from(tilePixelsToRgba(pixels, palette)), [11, 22, 33, 255, 0, 0, 0, 0]);
-  const empty = { rarity: 99, pixels: { width: 0, height: 0, indices: new Uint8Array(), opaque: new Uint8Array() } };
-  const low = { rarity: 1, pixels };
-  const high = { rarity: 5, pixels };
-  assert.deepEqual(representativeTiles({ tiles: [empty, low, high] }, 1), [high]);
+  assert.throws(() => tilePixelsToRgba({ indices: Uint8Array.of(1), opaque: new Uint8Array() }, palette), /equal index and opacity/);
+  assert.throws(() => tilePixelsToRgba(pixels, new Uint8Array(768)), /256 RGBA colors/);
+});
+
+test('obsolete per-act mock terrain atlas module is absent', async () => {
+  await assert.rejects(import('../play/assets/retail-tile-view.mjs'), { code: 'ERR_MODULE_NOT_FOUND' });
 });
 
 test('DC6 honors frame pointers and decodes bottom-up opaque and transparent runs', () => {

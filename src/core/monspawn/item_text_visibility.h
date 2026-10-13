@@ -18,6 +18,12 @@ inline int32_t visibleStatValue(bool isIdentified, int32_t currentValue, int32_t
     return isIdentified ? currentValue : baseValue;
 }
 
+// Item requirements follow the same client boundary: affix-adjusted values are not serialized
+// until identification, while the base requirement (including ethereal adjustment) is visible.
+inline int32_t visibleRequirement(bool isIdentified, int32_t currentRequirement, int32_t baseRequirement) {
+    return isIdentified ? currentRequirement : baseRequirement;
+}
+
 // ITEMS_CheckStatRequirement uses this exact positive-stat and threshold rule.
 // For unidentified items, apply it to the requirement the client can actually see.
 inline bool meetsStatRequirement(int32_t playerStat, int32_t visibleRequirement) {

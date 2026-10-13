@@ -256,7 +256,11 @@ export function createGameMenu({ read, decodeDc6, decodeDatPalette, onChoose, on
       return true;
     },
     pointerUp(x, y, width, height, pointerId, button) {
-      if (sub?.isOpen) return sub.pointerUp(x, y, width, height, pointerId, button);
+      if (sub?.isOpen) {
+        const result = sub.pointerUp(x, y, width, height, pointerId, button);
+        if (result === 'previous') sub.close();
+        return result;
+      }
       if (button !== 0 || pointerState.current?.pointerId !== pointerId) return false;
       const armed = pointerState.release(pointerId);
       const row = rowAt(x, y, width, height);

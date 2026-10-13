@@ -1,24 +1,28 @@
 import { parseSessionTiles, readSessionTerrain, readSessionLightmap, worldToScreen, screenDeltaToWorld, UNIT_CENTRE_Y } from './assets/session-terrain.mjs';
+import { auditSessionActiveNearFeed, readSessionActiveNearFeed } from './assets/session-active-near-feed.mjs';
 import { perfSync, perfEnabled, perfT0, perfT, perfSample, perfCountFrame, perfReset, perfReport } from './assets/frame-perf.mjs';
-import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, isPrimaryTargetEligible, nativeDccHoverContains, nativeHoverSpecialGate, selectPointerCandidate, selectPrimaryTarget, viewportToWorld } from './gameplay-model.mjs';
+import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, isPrimaryTargetEligible, nativeObjectHoverContains, nativeHoverSpecialGate, selectPointerCandidate, selectPrimaryTarget, viewportToWorld } from './gameplay-model.mjs';
 import { createMpqAssetReader } from './assets/mpq-assets.mjs';
 import { recordPrim } from './assets/drawlist.mjs';
 import { loadLiveLevelTerrain, loadRealmClientTerrain, actPalettePath } from './assets/live-level-terrain.mjs';
 import { decodeDatPalette } from './assets/d2-formats.mjs';
 import { createPlayerRenderer, playerClassInfo } from './assets/unit-renderer.mjs';
-import { applyRealmPlayerFrame, selectPlayerRenderSource, sendRealmGroundWalk, sendRealmRightSkillAt, sendRealmRightSkillOnMonster, realmDirectionalAim, realmFireballPredictor, realmFireballMonsterPredictor, visibleRealmPlayers } from './assets/realm-player-state.mjs';
+import { applyRealmPlayerFrame, selectPlayerRenderSource, sendRealmGroundWalk, sendRealmRightSkillAt, sendRealmRightSkillOnMonster, realmDirectionalAim, realmClientProjectilePredictor, realmFireballMonsterPredictor, visibleRealmPlayers } from './assets/realm-player-state.mjs';
 import { createRealmPlayerReassignFade } from './assets/realm-player-reassign-fade.mjs';
 import { createMonsterRenderer, parseMonsterAnimations, realmMonsterAnimationActor } from './assets/monster-renderer.mjs';
 import { createObjectRenderer, parseObjectPresentations } from './assets/object-renderer.mjs';
 import { drawObjectHoverLabel, objectRetailName, objectRetailNameOffset } from './assets/object-hover-label.mjs';
 import { interactWithWarpTile, runWarpInteraction, warpApproachGoal } from './assets/warp-interaction.mjs';
 import { waypointPadAnchor } from './assets/waypoint-pad-anchor.mjs';
+import { unitAnchor } from './assets/unit-anchor.mjs';
 import { createItemRenderer, parseItemPresentations } from './assets/item-renderer.mjs';
 import { createStashPanelRenderer, stashGeometry, BIG_BANK_PAGE_1, INVPAGE_STASH, INVPAGE_CUBE, TRANSMOGRIFY_BOX_PAGE_1 } from './assets/stash-panel.mjs';
 import { createStashGoldRenderer, STASH_GOLD } from './assets/stash-gold-dialog.mjs';
+import { createStashSpinnerRepeat } from './assets/stash-spinner-repeat.mjs';
 import { createWaypointPanelRenderer, tabActsOf } from './assets/waypoint-panel.mjs';
 import { createWaypointMenuInput } from './assets/waypoint-menu-input.mjs';
 import { createControlPanelRenderer, HUD_LAYOUT } from './assets/control-panel.mjs';
+import { miniPanelPressAction, miniPanelReleaseAction } from './assets/minipanel-input.mjs';
 import { orbAt, drawOrbReadouts } from './assets/orb-readout.mjs';
 import { createHudHelp } from './assets/hud-help.mjs';
 import { bindHudHelpPointer } from './assets/hud-help-pointer.mjs';
@@ -34,6 +38,7 @@ import { createQuestCloseGesture } from './assets/quest-close-gesture.mjs';
 import { createSkillPanelRenderer, parseClassSkills, SESSION_SKILL_BYTES } from './assets/skill-panel.mjs';
 import { createSkillPointOverlay } from './assets/skill-plus.mjs';
 import { createSkillSelectRenderer, parseSkillChoices, SESSION_SKILL_CHOICE_BYTES } from './assets/skill-select.mjs';
+import { armSkillTreeSelection, allocateSkillTreePointOnRelease } from './assets/skill-tree-input.mjs';
 import { dispatchSkillSelectHit } from './assets/hud-hit-test.mjs';
 import { nearestStandableNear } from './assets/walk-route.mjs';
 import { withinNativeWarpInteractionRange } from './assets/warp-interaction.mjs';
@@ -51,6 +56,7 @@ import { unitSoundNativeSpatial, unitSoundNativePanCode } from './assets/unit-so
 import { createUnitSoundPlayer } from './assets/unit-sound-player.mjs';
 import { playNpcDialogueVoice, npcDialogueVoiceSource } from './assets/npc-dialogue-voice.mjs';
 import { createNpcSpeechScrollGate } from './assets/npc-speech-scroll-gate.mjs';
+import { createNpcSpeechClickGate } from './assets/npc-speech-click.mjs';
 import { createFont, createTitleScreen, decodeFontTbl, FRONTEND } from './assets/frontend.mjs';
 import { createExitSequence } from './assets/exit-sequence.mjs';
 import { loadBnetServers } from './assets/bnet-servers.mjs';
@@ -61,23 +67,26 @@ import { createClassSelectSoundPlayer } from './assets/class-create-sounds.mjs';
 import { createCreditsScreen } from './assets/credits-screen.mjs';
 import { createCinematicsScreen } from './assets/cinematics-screen.mjs';
 import { createScreenshotAction } from './assets/screenshot-action.mjs';
+import { sendCharacterPhrase } from './assets/chat-macros.mjs';
 import { createOtherMultiplayerScreen } from './assets/other-multiplayer.mjs';
 import { createSpeechBox } from './assets/speech-box.mjs';
 import { nativeObjectSpeechAcknowledgement } from './assets/object-speech-ack.mjs';
+import { dispatchObjectSpeechPointer } from './assets/object-speech-input.mjs';
 import { createCharacterCreate } from './assets/charcreate.mjs';
 import { createCharacterSelect } from './assets/charselect.mjs';
 import { deleteAndRefreshCharacter } from './assets/character-delete-store.mjs';
 import { createSaveStore, CLASS_NAMES } from './assets/save-store.mjs';
-import { singlePlayerDestination } from './assets/title-single-player-route.mjs';
+import { singlePlayerDestination, createCharacterEntryReader } from './assets/title-single-player-route.mjs';
 import { installUnloadAutosave } from './assets/unload-autosave.mjs';
 import { destroyNativeSession, replaceNativeSession } from './assets/session-lifecycle.mjs';
 import { createNpcPanel } from './assets/npc-panel.mjs';
 import { createGameMenu } from './assets/game-menu.mjs';
+import { saveBeforeExit } from './assets/save-exit.mjs';
 import { MODAL_POINTER_OWNER, modalPointerOwner } from './assets/modal-pointer-priority.mjs';
 import { heldPointerWorldAllowed } from './assets/held-pointer-world.mjs';
 import { queueHeldPointerRepeat } from './assets/held-pointer-repeat.mjs';
 import { createDeathScreen } from './assets/death-screen.mjs';
-import { createNpcMenu, npcMenuEntries, talkEntries } from './assets/npc-menu.mjs';
+import { createNpcMenu, npcMenuChoiceOnRelease, npcMenuInputCoolingDown, npcMenuEntries, talkEntries } from './assets/npc-menu.mjs';
 import { npcSpeech } from './assets/npc-topics.mjs';
 import { createWeatherRenderer } from './assets/weather-renderer.mjs';
 import { weatherWaterAnchors } from './assets/weather-water-anchors.mjs';
@@ -97,6 +106,8 @@ import { CONFIGURE_CONTROLS_SLOTS, CONFIGURE_CONTROLS_STORAGE_KEY, controlAction
 import { createAutomapOverlay } from './assets/automap-overlay.mjs';
 import { parseMa0 } from './assets/ma0.mjs';
 import { panelCloseAt } from './assets/panel-close.mjs';
+import { characterPanelCloseAt, createCharacterPanelCloseGesture } from './assets/character-panel-close.mjs';
+import { beginInventoryClosePress, cancelInventoryClosePress, finishInventoryClosePress, inventoryCloseAt } from './assets/inventory-close-gesture.mjs';
 import { installScrollSafeCanvasFocus } from './assets/canvas-focus.mjs';
 import { createPlugyStash, PLUGY_GRID, PLUGY_NAME_AT } from './assets/plugy-stash-ui.mjs';
 import { pagesToSss, sssToPages } from './assets/plugy-stash.mjs';
@@ -386,13 +397,14 @@ function readAdvancement() {
   return (advancement = out);
 }
 
-let inventoryPanelRenderer = null, inventoryPanelEvidence = null, inventoryGoldPress = null, hirelingPanelEvidence = null;
+let inventoryPanelRenderer = null, inventoryPanelEvidence = null, inventoryGoldPress = null, inventoryClosePress = null, hirelingPanelEvidence = null;
 let characterPanelRenderer = null, characterPanelEvidence = null, advancement = null;
 let skillPanelRenderer = null, skillPanelEvidence = null, classSkills = null;
 // V8c: the quest log (Q) and message log (M). State is the engine's quest record; the client keeps only which
 // tab and quest are showing. `messageLines` is the log's feed (nothing wired yet: V8c).
 let questLogRenderer = null, messageLogRenderer = null, questVisible = false, messageVisible = false, questAct = 0, questSelected = 0, questDescrOn = false, questEvidence = null, messageEvidence = null;
 const questCloseGesture = createQuestCloseGesture();
+const characterPanelCloseGesture = createCharacterPanelCloseGesture();
 const messageLines = [];
 let chatEvidence = null, postedEvidence = null, postedAt = 0;   // V8c: bar/posted-line geometry evidence; the line shows for POSTED_MS after posting
 const POSTED_MS = 10000;   // V8d: retail's posted-line duration, measured in F191 (posted-multi-caps: present 9.7 s, gone 10.2 s)
@@ -490,11 +502,12 @@ if (plugyStash.enabled) (async () => {
   } catch (e) { plugyError = `PlugY art: ${e}`; }
 })();
 let stashGoldRenderer = null, stashGoldEvidence = null, stashGoldError = '', stashGoldDialog = null, stashGoldPress = null;
+const stashGoldSpinnerRepeat = createStashSpinnerRepeat();
 // The waypoint menu is open because the engine sent 0x63; waypointMenu holds that waypoint's unit id.
 let waypointPanelRenderer = null, waypointPanelError = '', waypointEvidence = null, waypointMenu = null, lastWaypointTravel = null;
 const waypointMenuInput = createWaypointMenuInput();
 let beltRenderer = null, beltEvidence = null, beltBoxCache = null, beltBoxRecord = -1;
-let miniDown = -1;
+let miniDown = -1, miniPointerId = null;
 let controlPanelRenderer = null, controlPanelEvidence = null, hudIconRow = true, lastRunToggle = null;
 const orbPins = { life: false, mana: false };
 let orbReadoutEvidence = [];
@@ -664,6 +677,7 @@ let bootMovieGeneration = 0, bootMovieOpeningGeneration = -1;
 let moviePin = -1;
 let charCreate = null, charCreateError = '';
 let charSelect = null, charSelectError = '', savedCharacters = [], savedCharacterFilesExist = false, componentTablesReady = false;
+const characterEntryReader = createCharacterEntryReader();
 // Esc's in-game menu (retail: OPTIONS / SAVE AND EXIT GAME / RETURN TO GAME). Single player pauses
 // while it is up, as retail does.
 let gameMenu = null, gameMenuError = '';
@@ -708,9 +722,12 @@ function ensureGameMenu() {
       if (item === 'CONFIGURE CONTROLS') { ensureConfigureControls()?.openPanel(); return; }
       if (item === 'RETURN TO GAME') gameMenu.close();
       else if (item === 'SAVE AND EXIT GAME') {
-        gameMenu.close();
-        // Retail writes the character and leaves the game for character select.
-        persistCurrentCharacter().finally(() => { enterCharacterSelect(); });
+        // Keep the session and menu available if persistence fails; only leave once the store
+        // confirms the character has been written.
+        void saveBeforeExit(persistCurrentCharacter, async () => {
+          gameMenu.close();
+          await enterCharacterSelect();
+        }).catch((error) => { gameMenuError = String(error); });
       }
     } });
   } catch (error) { gameMenuError = String(error); }
@@ -1199,10 +1216,10 @@ function ensureTitleScreen(entryPhase = null) {
         // Options; the retail captures, captured 2026-10-02). HOST GAME advances to character
         // select as retail does; the host/join TRANSPORT (and the join dialog behind JOIN GAME) is
         // the realm backend's work, so JOIN is handed to the shell and is a gap.
-        { label: 'BATTLE.NET', action: () => { titleScreen?.openGateways(); } },
-        { label: 'OTHER MULTIPLAYER', action: () => { screen = SCREEN.OTHER_MULTIPLAYER; ensureOtherMultiplayerScreen(); } },
-        { label: 'CREDITS', action: () => { creditsTick = 0; screen = SCREEN.CREDITS; ensureCreditsScreen(); } },
-        { label: 'CINEMATICS', action: () => { screen = SCREEN.CINEMATICS; ensureCinematicsScreen(); } },
+        { label: 'BATTLE.NET', action: () => { characterEntryReader.cancel(); titleScreen?.openGateways(); } },
+        { label: 'OTHER MULTIPLAYER', action: () => { characterEntryReader.cancel(); screen = SCREEN.OTHER_MULTIPLAYER; ensureOtherMultiplayerScreen(); } },
+        { label: 'CREDITS', action: () => { characterEntryReader.cancel(); creditsTick = 0; screen = SCREEN.CREDITS; ensureCreditsScreen(); } },
+        { label: 'CINEMATICS', action: () => { characterEntryReader.cancel(); screen = SCREEN.CINEMATICS; ensureCinematicsScreen(); } },
         { label: 'EXIT DIABLO II', action: () => { beginExit(); } },
       ],
     });
@@ -1306,6 +1323,7 @@ function feedRealmPlayerFrame(bytes) {
   return update;
 }
 function showConfiguredRealmLogin(server) {
+  characterEntryReader.cancel();
   // The two InventoryBIN rows are shared by the local and realm client paths.
   // Restore retail geometry before a realm login can progress into a game.
   if (Module._d2_session_configure_plugy_stash_grid)
@@ -1503,6 +1521,7 @@ function exitToTitle() {
 // F91: EXIT DIABLO II -- retail ends the process here; a page cannot, so it runs the fade, tries
 // `window.close()` and says so when the browser refuses (assets/exit-sequence.mjs has the reasoning).
 function beginExit() {
+  characterEntryReader.cancel();
   if (exitSeq?.active) return;
   exitSeq = createExitSequence({ font: titleScreen?.noticeFont ?? null });
   exitSeq.start();
@@ -1577,31 +1596,30 @@ function startGame() {
   if (!bootstrapStarted && window.__d2?.ready && !window.__d2.error && sessionAdapter()) bootstrapSession();
 }
 
-async function readSavedCharacters() {
-  charSelect = null; charSelectError = '';
-  try {
-    const profile = await saveStore.listProfile();
-    savedCharacters = profile.characters;
-    savedCharacterFilesExist = profile.hasSaveFiles;
-  } catch (error) { charSelectError = savedCharacterReadError(error); savedCharacters = []; savedCharacterFilesExist = false; }
+// Read and publish the profile together with its destination; a superseded storage request
+// cannot replace the current screen or its character rows.
+async function enterSavedCharacterScreen(singlePlayer) {
+  const sourceScreen = screen;
+  return characterEntryReader.read({
+    load: () => saveStore.listProfile(),
+    isCurrent: () => screen === sourceScreen,
+    describeError: savedCharacterReadError,
+    apply: (profile, error) => {
+      charSelect = null; charSelectError = error;
+      savedCharacters = profile.characters; savedCharacterFilesExist = profile.hasSaveFiles;
+      const destination = singlePlayer
+        ? singlePlayerDestination({ hasSaveFiles: savedCharacterFilesExist, error }) : 'select';
+      if (destination === 'create') { screen = SCREEN.CREATE; ensureCharCreate(); return; }
+      screen = SCREEN.SELECT; ensureCharSelect();
+    },
+  });
 }
 
-// D2Launch's SINGLE PLAYER callback branches on the save search: existing files go to character
-// select, while an empty profile enters character creation directly.
-async function enterSinglePlayer() {
-  await readSavedCharacters();
-  const destination = singlePlayerDestination({ hasSaveFiles: savedCharacterFilesExist, error: charSelectError });
-  if (destination === 'create') { screen = SCREEN.CREATE; ensureCharCreate(); return; }
-  screen = SCREEN.SELECT;
-  ensureCharSelect();
-}
+// D2Launch's SINGLE PLAYER release selects CREATE on an empty save search, SELECT otherwise.
+function enterSinglePlayer() { return enterSavedCharacterScreen(true); }
 
-// Other entry points (for example Host Game or returning from a save) build SELECT directly.
-async function enterCharacterSelect() {
-  await readSavedCharacters();
-  screen = SCREEN.SELECT;
-  ensureCharSelect();
-}
+// Host Game and returning from a save enter SELECT directly.
+function enterCharacterSelect() { return enterSavedCharacterScreen(false); }
 
 // DELETE CHARACTER (client-parity C3i): through the confirmation the screen draws, then the store.
 async function deleteSavedCharacter(name) {
@@ -1768,11 +1786,15 @@ function ensureCharCreate() {
 let npcMsgSkip = { npcId: 0, n: 0 };
 let unitSounds = null, soundBuf = 0, npcVoiceKey = null, npcVoiceGeneration = 0;
 const npcSpeechScrollGate = createNpcSpeechScrollGate();
+const npcSpeechClickGate = createNpcSpeechClickGate();
+let npcSpeechClickKey = null;
 function syncNpcDialogueVoice(state) {
   const messageId = state?.spoken;
   if (messageId == null) {
-    unitSounds?.stopDialogue(); npcVoiceKey = null; npcVoiceGeneration++; npcSpeechScrollGate.cancel(); return;
+    unitSounds?.stopDialogue(); npcVoiceKey = null; npcVoiceGeneration++; npcSpeechScrollGate.cancel(); npcSpeechClickGate.cancel(); npcSpeechClickKey = null; return;
   }
+  const clickKey = `${state.npcId}:${messageId}`;
+  if (clickKey !== npcSpeechClickKey) { npcSpeechClickKey = clickKey; npcSpeechClickGate.begin(performance.now()); }
   const audioEnabled = npcSpeechHasAudio(npcSpeechSetting.mode);
   const key = `${state.npcId}:${messageId}:${audioEnabled ? 1 : 0}`;
   if (key === npcVoiceKey && unitSounds) return;
@@ -2245,15 +2267,18 @@ function advanceRealmMotion(forced) {
 // F157: an OBJECT's quest message (packet 0x27 on an object, e.g. Anya's plea from her ice) is drawn as the speech box;
 // native 1.13c scroll responses use GUID -1 and the offered string ID for the known object-scroll IDs.
 let objectSpeech = null, objectMsgBuf = 0;
+const objectSpeechClickGate = createNpcSpeechClickGate();
 function pollObjectSpeech() {
   if (objectSpeech || !session || screen !== SCREEN.GAME || !Module._d2_session_take_object_message) return;
   if (!objectMsgBuf) objectMsgBuf = Number(Module.ccall('malloc', 'bigint', ['number'], [8]));
   if (!Module.ccall('d2_session_take_object_message', 'number', ['bigint'], [BigInt(objectMsgBuf)])) return;
   const v = new Int32Array(Module.HEAPU8.buffer.slice(objectMsgBuf, objectMsgBuf + 8));
   objectSpeech = { guid: v[0] >>> 0, stringId: v[1], text: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [v[1]]) };
+  objectSpeechClickGate.begin(performance.now());
 }
 function dismissObjectSpeech() {
   const m = objectSpeech; objectSpeech = null;
+  objectSpeechClickGate.cancel();
   const acknowledgement = nativeObjectSpeechAcknowledgement(m);
   if (acknowledgement) Module.ccall('d2_session_command_npc_response_packet', 'number', ['number', 'number'], [acknowledgement.guid, acknowledgement.stringId]);
 }
@@ -2331,7 +2356,7 @@ function update(forceTick = false) {
         }
         const destination = pointerWorldAt(command.x, command.y);
         const realmProtocol = realmFlow?.protocol;
-        const predictLocal = realmFireballPredictor(realmProtocol);
+        const predictLocal = realmClientProjectilePredictor(realmProtocol);
         const result = sendRealmRightSkillAt(realmFlow?.protocol, realmFlow?.d2gs,
           realmSceneActive && Boolean(realmPlayerView?.active), destination.x, destination.y,
           Boolean(command.held), realmMoveDuplicateState, performance.now(), predictLocal);
@@ -2627,6 +2652,11 @@ function selectedPlayerSource() {
     return selectPlayerRenderSource(snapshot, motion, true, realmPlayerView, (realmWorldView?.act ?? 0) + 1);
   if (!snapshot?.player) return { source: 'none', x: 0, y: 0, classId: null, renderState: null };
   const selected = selectPlayerRenderSource(snapshot, motion, false, realmPlayerView);
+  if (Number.isInteger(motion?.presentationMode) && motion.presentationMode !== snapshot.mode && selected.renderState) {
+    const presentationClass = weaponClassTokenForMode(Module.ccall, selected.renderState.mode);
+    selected.renderState.weaponClassId = presentationClass.id;
+    selected.renderState.weaponClass = presentationClass.token;
+  }
   // The native composite callback reads the inventory's selected weapon for each composition.
   // Keep this identity on the same live path instead of relying on the last shell snapshot, which
   // may predate a native class-selection refresh that initializes the inventory GUID.
@@ -2675,16 +2705,6 @@ function cameraGrid() {
   const c = cameraCentre();
   return { x: c.x - 0.5, y: c.y - 0.5 };
 }
-// Where a unit's sprite is anchored in the world. A unit with a dynamic path has the engine's own
-// 16.16 position (d2_session_unit_coords); drawing it at the whole subtile made a walking monster
-// hold still for several frames and then jump a square -- 16 px in x, 8 px in y, and on a diagonal
-// an x-step and a y-step alternately, which is the shake sees around monsters and NPCs (s491).
-// The `- 0.5` is the half subtile between a unit's centre and the integer grid proj() is built on --
-// the same half projStatic carries -- so an unmoving unit draws on exactly the pixel it did before.
-function unitAnchor(entity) {
-  return entity.preciseX != null ? [entity.preciseX - 0.5, entity.preciseY - 0.5] : [entity.x, entity.y];
-}
-
 // The player always sits at the centre of the viewport; it is a sprite like any other in the depth
 // sort, which is why it lives here rather than inline at the end of render().
 function drawPlayer(c) {
@@ -3392,7 +3412,12 @@ function drawFrame() {
           // A broken weather must not take the world down with it: the terrain pass catches nothing, and
           // the error is reported on the evidence a row reads rather than swallowed.
           weatherRenderer ? (c, floors, viewport) => {
-            try { weatherEvidence = { rain, blits: weatherRenderer.draw(c, w, h, engineTicks, wcam.x, wcam.y, weatherWaterAnchors(floors, viewport)), errors: weatherRenderer.errors }; }
+            try {
+              const activeNearFeed = readSessionActiveNearFeed(Module);
+              weatherEvidence = { rain, activeNearFeedAudit: auditSessionActiveNearFeed(activeNearFeed),
+                blits: weatherRenderer.draw(c, w, h, engineTicks, wcam.x, wcam.y,
+                weatherWaterAnchors(floors, activeNearFeed)), errors: weatherRenderer.errors };
+            }
             catch (error) { weatherEvidence = { rain, blits: [], errors: weatherRenderer.errors, error: String(error) }; }
           } : null, viewCX());
         perfT('terrain', pTerrain);
@@ -3505,8 +3530,9 @@ function drawFrame() {
   let pendingSpeech = null;
   if (npcState?.spoken != null) {
     // Ordinary dialogue uses retail's viewport-centred dialog origin, regardless of side panels.
-    // Defer the draw until after those panels so they cannot paint over the text.
-    if (npcSpeechHasText(npcSpeechSetting.mode) && !shopOpen() && ensureSpeechBox() && npcSpeechScrollGate.ready)
+    // Defer the draw until after those panels so they cannot paint over the text. Retail sets the
+    // active ordinary-speech flag before the voice-mode check, so Audio Only still draws subtitles.
+    if (!shopOpen() && ensureSpeechBox() && npcSpeechScrollGate.ready)
       pendingSpeech = { text: npcState.greeting, messageInstance: npcVoiceGeneration, scrolling: true };
   } else if (shopOpen() && !globalThis.__d2HideShop && ensureVendorPanel()) {
     try { npcPanelEvidence = vendorPanel.draw(ctx, w, h, { ...npcState, pointer, act: snapshot?.act, stashGold: Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [0]) : -1 }); npcPanelError = ''; }
@@ -3527,7 +3553,7 @@ function drawFrame() {
   const layoutKey = session ? `${snapshot.playerClass}/${snapshot.playerId}/${snapshot.seed}` : '';
   if (inventoryPanelRenderer && session && (!inventoryPanelRenderer.layout || inventoryLayoutKey !== layoutKey)) {
     inventoryPanelRenderer.setLayout(readInventoryLayout()); inventoryLayoutKey = layoutKey; }
-  if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && session ? { ...snapshot, gold: Module.ccall('d2_session_player_gold', 'number', [], []), inventoryGoldPressed: Boolean(inventoryGoldPress) } : snapshot, panelShown(inventoryVisible));
+  if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && session ? { ...snapshot, gold: Module.ccall('d2_session_player_gold', 'number', [], []), inventoryGoldPressed: Boolean(inventoryGoldPress), inventoryClosePressed: Boolean(inventoryClosePress) } : snapshot, panelShown(inventoryVisible));
   // O / the configurable Hireling Screen binding reads the engine's canonical pet roster. The
   // window exposes only values the roster's live unit supplies; a nearby monster is never treated
   // as this player's mercenary. The composition remains a declared client gap (F199) pending its
@@ -3577,8 +3603,13 @@ function drawFrame() {
     catch (error) { stashPanelError = 'cube: ' + error; cubeEvidence = null; }
   }
   if (stashGoldRenderer) {
-    try { stashGoldEvidence = stashGoldRenderer.draw(ctx, w, h, stashOpen ? readStashLayout() : null, stashOpen,
-      { ...(stashGoldDialog || {}), bank: stashGoldStat(STASH_GOLD.bank) }); stashGoldError = ''; }
+    try {
+      if (stashGoldDialog && (stashGoldPress?.action === 'increase' || stashGoldPress?.action === 'decrease')) {
+        const step = stashGoldSpinnerRepeat.onRender(globalThis.performance?.now?.() ?? Date.now());
+        if (step) changeStashGoldAmount(stashGoldPress.action === 'increase' ? step : -step);
+      }
+      stashGoldEvidence = stashGoldRenderer.draw(ctx, w, h, stashOpen ? readStashLayout() : null, stashOpen,
+        { ...(stashGoldDialog || {}), bank: stashGoldStat(STASH_GOLD.bank) }); stashGoldError = ''; }
     catch (error) { stashGoldError = String(error); stashGoldEvidence = null; }
   }
   if (waypointPanelRenderer) {
@@ -3600,6 +3631,7 @@ function drawFrame() {
       life: (snapshot.player?.hp ?? 0) >> 8, lifeMax: (snapshot.player?.hpMax ?? 0) >> 8,
       mana: (snapshot.player?.mana ?? 0) >> 8, manaMax: (snapshot.player?.manaMax ?? 0) >> 8, act: snapshot.act,
       screen: characterVisible ? readCharacterScreen() : null,
+      closePressed: characterPanelCloseGesture.pressed,
       string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]),
     }, panelShown(characterVisible));
   }
@@ -3963,15 +3995,17 @@ function openStashGold(mode) {
   // Retail opens the deposit box on ALL the carried gold and the withdraw box on nothing (both measured,
   // the retail captures and stash-gold-withdraw.txt).
   stashGoldPress = null;
+  stashGoldSpinnerRepeat.release();
   stashGoldDialog = { open: true, mode, available, amount: mode === 'withdraw' ? 0 : available, pressedControl: null };
 }
 function clearStashGoldPress(pointerId = null) {
   if (!stashGoldPress || (pointerId !== null && stashGoldPress.pointerId !== pointerId)) return false;
   stashGoldPress = null;
+  stashGoldSpinnerRepeat.release();
   if (stashGoldDialog) stashGoldDialog.pressedControl = null;
   return true;
 }
-function closeStashGold() { stashGoldPress = null; stashGoldDialog = null; }
+function closeStashGold() { stashGoldPress = null; stashGoldSpinnerRepeat.release(); stashGoldDialog = null; }
 function changeStashGoldAmount(delta) {
   if (!stashGoldDialog) return;
   stashGoldDialog.amount = Math.max(0, Math.min(stashGoldDialog.available, stashGoldDialog.amount + delta));
@@ -4095,9 +4129,8 @@ function objectUnderPointer(px, py, { nativeHover = false, allCandidates = false
     // native vertical top edge is one pixel above its first painted row, then receives 12 px pad.
     // Native x86 uses signed `<`/`>` rejects around all four edges, so the rectangle is closed.
     // Desktop cursor positions are integer pixels; browser test/input points are pixel centres.
-    const nativeHoverHit = nativeDccHoverContains(px, py, box, ox, oy);
     const hit = nativeHover
-      ? (box?.layers === 1 ? nativeHoverHit : (inBox || (!coversOrigin && d <= 6)))
+      ? nativeObjectHoverContains(px, py, box, ox, oy)
       : (inBox || (!coversOrigin && d <= 6));
     if (hit && nativeHover) {
       // #11020 plus a client helper participates in retail's object branch. Their outcome semantics
@@ -4196,7 +4229,7 @@ function openTalkBox(npcId, menuState) {
 function dismissSpeech() {
   // Retail disposes the current speech object on dismissal, then starts the next object. Reset even
   // when adjacent queued messages share a StringId so the same voice can play again.
-  unitSounds?.stopDialogue(); npcVoiceKey = null; npcVoiceGeneration++; npcSpeechScrollGate.cancel();
+  unitSounds?.stopDialogue(); npcVoiceKey = null; npcVoiceGeneration++; npcSpeechScrollGate.cancel(); npcSpeechClickGate.cancel(); npcSpeechClickKey = null;
   // Dismissing the speech tells the server it was heard -- retail's 0x31 with the message id --
   // which is where a quest message does its work (Akara's A1Q1 reward is granted on message 76).
   // A `silent` speech (an intro/gossip line the engine's list does not hold) is never acked.
@@ -4248,7 +4281,7 @@ function talkToNpc(npcId) {
 // The hero-class introduction the engine offers (its plain menu-0 message), remembered: the list empties once it is heard.
 const npcIntroHeard = new Map(), npcTopics = new Map();   // npcTopics: npcId -> the dialog list last seen
 const noteIntro = (classId) => { const p = readDialogMessages().find((m) => m.menu === 0); if (p) npcIntroHeard.set(classId, p.stringId); };
-let npcMenu = null, npcMenuError = '', npcMenuEvidence = null, menuAfterSpeech = null;
+let npcMenu = null, npcMenuError = '', npcMenuEvidence = null, menuAfterSpeech = null, npcMenuPointerPress = null;
 function ensureNpcMenu() {
   if (npcMenu || npcMenuError || !window.__d2?.ready) return npcMenu;
   try {
@@ -4261,6 +4294,7 @@ function ensureNpcMenu() {
 // interaction already started), Trade/Gamble ask the server for the shop (retail's 0x38 with the
 // counter), Cancel ends the interaction (0x30).
 function chooseNpcMenu(entry) {
+  npcMenuPointerPress = null;
   const npcId = npcMenu.state.npcId, menuState = { ...npcMenu.state };
   npcMenu.close();
   // What Talk says is dismissed back to this menu, as the first speech is.
@@ -4441,6 +4475,9 @@ addEventListener('keydown', (e) => {
   // Configured functions own repeats too, even when they only act on the first press. Otherwise a
   // rebound key can fall through to CommandInput on repeat after its initial configured action.
   if (configuredAction && e.repeat) { e.preventDefault(); return; }
+  const characterPhrase = sendCharacterPhrase(configuredAction,
+    realmSceneActive && realmPlayerView?.active ? realmFlow?.d2gs : null);
+  if (characterPhrase.handled) { e.preventDefault(); return; }
   if (configuredAction === 'Run' || configuredAction === 'Stand Still' || configuredAction === 'Show Items') {
     heldConfiguredActions.set(e.code, configuredAction);
     if (configuredAction === 'Run') {
@@ -4556,7 +4593,7 @@ addEventListener('keydown', (e) => {
   }
   if (input.key(e.code, true, e.repeat)) e.preventDefault(); });
 addEventListener('keyup', (e) => { if (releaseConfiguredHold(e.code) || input.key(e.code, false)) e.preventDefault(); });
-addEventListener('blur', () => { controlsPanel?.pointerCancel(); gameMenu?.pointerCancelAll(); releaseAllConfiguredHolds(); input.keys.clear(); hudHelpPointer.clear(); cancelHelpClosePress(); worldPointerHeld = false; worldRightPointerHeld = false; heldRightPointerTicks = 0; inventoryGoldPress = null; clearStashGoldPress(); });
+addEventListener('blur', () => { controlsPanel?.pointerCancel(); gameMenu?.pointerCancelAll(); releaseAllConfiguredHolds(); input.keys.clear(); hudHelpPointer.clear(); cancelHelpClosePress(); worldPointerHeld = false; worldRightPointerHeld = false; heldRightPointerTicks = 0; inventoryGoldPress = null; inventoryClosePress = null; clearStashGoldPress(); });
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') {
     controlsPanel?.pointerCancel();
@@ -4566,7 +4603,7 @@ document.addEventListener('visibilitychange', () => {
     cancelHelpClosePress();
     worldPointerHeld = false;
     worldRightPointerHeld = false; heldRightPointerTicks = 0;
-    inventoryGoldPress = null; clearStashGoldPress();
+    inventoryGoldPress = null; inventoryClosePress = null; clearStashGoldPress();
   }
 });
 canvas.addEventListener('wheel', (e) => { if (npcMenu?.hireOpen) { npcMenu.hireScroll(Math.sign(e.deltaY)); e.preventDefault(); } }, { passive: false });
@@ -4599,6 +4636,7 @@ canvas.addEventListener('pointerleave', (e) => {
   controlsPanel?.pointerMove(-1, -1, canvas.width, canvas.height, e.pointerId, e.buttons);
   if (screen === SCREEN.TITLE && titlePhase === 'menu') titleScreen?.hover(-1, -1, canvas.width, canvas.height);
   else if (screen === SCREEN.SELECT) charSelect?.hover(-1, -1, canvas.width, canvas.height);
+  else if (screen === SCREEN.CREATE) charCreate?.setPointer(-1, -1, canvas.width, canvas.height);
 });
 canvas.addEventListener('pointerdown', (e) => {
   gameCursor?.noteInput();
@@ -4624,6 +4662,18 @@ canvas.addEventListener('pointerdown', (e) => {
     else { try { canvas.setPointerCapture(e.pointerId); } catch {} render(); }
     canvas.focus(); e.preventDefault(); return;
   }
+  // D2Client routes both speech mouse-down messages through its active speech table. The first
+  // 100 ms are consumed; afterward either button dismisses the current speech object.
+  if (screen === SCREEN.GAME && npcState?.spoken != null && !shopOpen() && (e.button === 0 || e.button === 2)) {
+    click.spent = 'npcSpeech';
+    if (npcSpeechClickGate.pointerDown(e.button, performance.now()) === 'dismiss') { dismissSpeech(); render(); }
+    canvas.focus(); e.preventDefault(); return;
+  }
+  if (dispatchObjectSpeechPointer({ screenIsGame: screen === SCREEN.GAME, button: e.button,
+    speech: objectSpeech, dismiss: dismissObjectSpeech, clickGate: objectSpeechClickGate, now: performance.now() })) {
+    click.spent = 'objectSpeech';
+    render(); canvas.focus(); e.preventDefault(); return;
+  }
   if (screen === SCREEN.TITLE || screen === SCREEN.CREDITS || screen === SCREEN.CINEMATICS || screen === SCREEN.OTHER_MULTIPLAYER || screen === SCREEN.CREATE || screen === SCREEN.SELECT) {
     click.spent = `screen-${screen}`;
     if (screen === SCREEN.TITLE && titlePhase === 'menu') {
@@ -4645,12 +4695,15 @@ canvas.addEventListener('pointerdown', (e) => {
     click.spent = 'stashGoldDialog';
     const hit = stashGoldRenderer.hitAt(x, y, canvas.width, canvas.height, readStashLayout(), true);
     if (e.button === 0 && hit && ['submit', 'close', 'increase', 'decrease'].includes(hit.action)) {
+      stashGoldSpinnerRepeat.release();
       stashGoldPress = { pointerId: e.pointerId, action: hit.action };
       stashGoldDialog.pressedControl = hit.action;
       try { canvas.setPointerCapture(e.pointerId); } catch {}
       // Native spinner callbacks act on down; OK and close callbacks wait for a matching release.
-      if (hit.action === 'increase') changeStashGoldAmount(1);
-      else if (hit.action === 'decrease') changeStashGoldAmount(-1);
+      if (hit.action === 'increase' || hit.action === 'decrease') {
+        stashGoldSpinnerRepeat.press(hit.action, globalThis.performance?.now?.() ?? Date.now());
+        changeStashGoldAmount(hit.action === 'increase' ? 1 : -1);
+      }
       render();
     }
     canvas.focus(); e.preventDefault(); return;
@@ -4689,8 +4742,22 @@ canvas.addEventListener('pointerdown', (e) => {
     else if (hit?.quest && questStatus(words, questAct, hit.quest) !== 'locked') questSelected = hit.quest;
     if (hit || openPanelAt(x, y) === 'quest') { click.spent = 'quest-log'; canvas.focus(); e.preventDefault(); return; }
   }
-  const panelClose = e.button === 0 && panelCloseAt(x, y, canvas.width, canvas.height, { inventory: inventoryVisible, skills: skillsVisible && { playerClass: snapshot.playerClass, tab: skillPanelRenderer?.tab } });
-  if (panelClose) { if (panelClose.panel === 'inventory') { if (stashOpen) closeStashFromInventory({ stashOpen, commandButton: (button, amount) => Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [button, amount]), onAccepted: () => { stashOpen = false; inventoryVisible = false; closeStashGold(); } }); else inventoryVisible = false; } else skillsVisible = false; canvas.focus(); e.preventDefault(); return; }
+  if (e.button === 0 && screen === SCREEN.GAME && characterVisible && characterPanelCloseAt(x, y, canvas.width, canvas.height)) {
+    if (characterPanelCloseGesture.press(e.pointerId)) {
+      try { canvas.setPointerCapture(e.pointerId); } catch {}
+      render();
+    }
+    click.spent = 'character-panel-close'; canvas.focus(); e.preventDefault(); return;
+  }
+  if (e.button === 0 && inventoryCloseAt(x, y, canvas.width, canvas.height, inventoryVisible)) {
+    inventoryClosePress = beginInventoryClosePress(e.pointerId, inventoryVisible, true);
+    try { canvas.setPointerCapture(e.pointerId); } catch {}
+    render(); canvas.focus(); e.preventDefault(); return;
+  }
+  // Character and skill close controls keep their existing shared press handling. Inventory has
+  // its own native down/held/release path above.
+  const panelClose = e.button === 0 && panelCloseAt(x, y, canvas.width, canvas.height, { skills: skillsVisible && { playerClass: snapshot.playerClass, tab: skillPanelRenderer?.tab } });
+  if (panelClose) { skillsVisible = false; canvas.focus(); e.preventDefault(); return; }
   // The mini-panel's open/close arrow collapses and expands the icon row. It is a HUD control the
   // renderer actually placed, so only a click inside it consumes (hud-hit-test's rule).
   // ClearScreen hides the chrome, so the chrome answers nothing: each of these four hit tests is a
@@ -4700,9 +4767,20 @@ canvas.addEventListener('pointerdown', (e) => {
   if (e.button === 0 && !clearScreen && controlPanelRenderer?.hitMenuButton(controlPanelEvidence, x, y, canvas.width, canvas.height)) {
     hudIconRow = !hudIconRow; render(); canvas.focus(); e.preventDefault(); return;
   }
-  // The mini-panel icons: press draws the pressed cel (frame+1), release over the same icon acts.
-  if (e.button === 0 && !clearScreen && (miniDown = controlPanelRenderer?.hitMiniButton(controlPanelEvidence, x, y, canvas.width, canvas.height) ?? -1) >= 0) {
-    render(); canvas.focus(); e.preventDefault(); return;
+  // Native #11017 reads pCursorItem: MiniPanel down/up callbacks decline input while an
+  // item is held, leaving that click to the inventory/world item route.
+  if (e.button === 0 && !clearScreen) {
+    const miniHit = controlPanelRenderer?.hitMiniButton(controlPanelEvidence, x, y, canvas.width, canvas.height) ?? -1;
+    if (miniHit >= 0) {
+      const cursorItem = Module._d2_session_cursor_item
+        ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0;
+      const action = miniPanelPressAction(miniHit, cursorItem);
+      if (action >= 0) {
+        miniDown = action; miniPointerId = e.pointerId;
+        try { canvas.setPointerCapture(e.pointerId); } catch {}
+        render(); canvas.focus(); e.preventDefault(); return;
+      }
+    }
   }
   // F10: the lit add-point buttons either side of the belt open the panel that spends the points
   // (left: character, right: skill tree), exactly as the mini-panel's icons / C and T do.
@@ -4788,11 +4866,14 @@ canvas.addEventListener('pointerdown', (e) => {
     if (hit) chooseHire(hit);
     canvas.focus(); e.preventDefault(); return;
   }
-  // An open NPC menu takes the click: an entry, or (anywhere else) Cancel, as retail's does.
-  if (npcMenu?.open && e.button === 0) {
+  // D2Client's NPC menu arms on down and invokes a row callback on matching release.
+  // A click outside a selectable row is not the explicit Cancel row.
+  if (npcMenu?.open && (e.button === 0 || e.button === 2)) {
     click.spent = 'npcMenu';
-    const entry = npcMenu.entryAt(x, y);
-    chooseNpcMenu(entry || { action: 'cancel' });
+    const menuState = npcMenu.state;
+    const accepted = !npcMenuInputCoolingDown({ nowTick: performance.now(), creationTick: menuState.openedAt });
+    if (accepted) npcMenu.hover(x, y);
+    npcMenuPointerPress = { pointerId: e.pointerId, button: e.button, menuState };
     canvas.focus(); e.preventDefault(); return;
   }
   // An open shop: a tab switches the stock shown, an item in the grid is bought, and an item in the
@@ -4964,7 +5045,9 @@ canvas.addEventListener('pointerdown', (e) => {
   const corpseHit = !panelOwner && !hostileHit && e.button === 0 && session ? (() => {
     const cam = worldToScreen(cameraGrid().x, cameraGrid().y); let best = null, bestD = 36;
     for (const u of snapshot.entities) if (u.kind === 'player' && u.id !== snapshot.playerId && u.mode === 17) {
-      const pt = worldToScreen(u.x, u.y), d = Math.hypot(pt.x - cam.x + viewCX() - x, pt.y - cam.y + (canvas.height / 2 + UNIT_CENTRE_Y) - y);
+      // Corpse sprites use the unit projection and engine precise anchor. Comparing integer
+      // snapshot coordinates here can pick an adjacent body in a pile or while its path settles.
+      const pt = worldToScreen(...unitAnchor(u)), d = Math.hypot(pt.x - cam.x + viewCX() - x, pt.y - cam.y + (canvas.height / 2 + UNIT_CENTRE_Y) - y);
       if (d < bestD) { best = u; bestD = d; } }
     return best; })() : null;
   if (corpseHit) {
@@ -5065,9 +5148,12 @@ canvas.addEventListener('pointerdown', (e) => {
     if (skillHit?.tab) { click.spent = 'skillPanelTab'; skillPanelRenderer.tab = skillHit.tab; canvas.focus(); e.preventDefault(); return; }
     if (skillHit?.skill) {
       click.spent = 'skillPanel';
-      Module.ccall('d2_session_command_add_skill', 'number', ['number'], [skillHit.skill.id]);
-      propCache.clear();
-      classSkills = null; advancement = null;
+      const token = armSkillTreeSelection(skillHit.skill.id, e.button, selectSkill);
+      if (token) {
+        gameUiButtonDown = { pointerId: e.pointerId, token };
+        gameUiButtonGesture.press(e.pointerId, token);
+        try { canvas.setPointerCapture(e.pointerId); } catch {}
+      }
       canvas.focus(); e.preventDefault(); return;
     }
     const statHit = characterVisible && characterPanelRenderer && session
@@ -5120,11 +5206,50 @@ canvas.addEventListener('pointerdown', (e) => {
 // panels do not exist in the client yet, so those two press but open nothing.
 globalThis.addEventListener('pointerup', (e) => {
   gameCursor?.noteInput();
-  if (gameUiButtonDown?.pointerId === e.pointerId && e.button === 0) {
+  if (npcMenuPointerPress?.pointerId === e.pointerId && npcMenuPointerPress.button === e.button &&
+      (e.button === 0 || e.button === 2)) {
+    const press = npcMenuPointerPress; npcMenuPointerPress = null;
+    const [x, y] = canvasPoint(e), menuState = npcMenu?.open ? npcMenu.state : null;
+    const sameMenu = menuState === press.menuState;
+    const ready = sameMenu && !npcMenuInputCoolingDown({ nowTick: performance.now(), creationTick: menuState.openedAt });
+    const entry = ready ? npcMenuChoiceOnRelease({
+      entryAtRelease: npcMenu.entryAt(x, y), selectedEntry: npcMenu.selectedEntry }) : null;
+    if (entry) chooseNpcMenu(entry);
+    render(); canvas.focus(); if (e.cancelable) e.preventDefault(); return;
+  }
+  if (inventoryClosePress?.pointerId === e.pointerId) {
+    const press = inventoryClosePress; inventoryClosePress = null;
+    const [x, y] = canvasPoint(e);
+    const releasedOverClose = inventoryCloseAt(x, y, canvas.width, canvas.height, inventoryVisible);
+    const result = finishInventoryClosePress(press, e.pointerId, e.button === 0, inventoryVisible, releasedOverClose);
+    if (result.activate) {
+      if (stashOpen) closeStashFromInventory({ stashOpen, commandButton: (button, amount) => Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [button, amount]), onAccepted: () => { stashOpen = false; inventoryVisible = false; closeStashGold(); } });
+      else inventoryVisible = false;
+    }
+    render(); canvas.focus(); if (e.cancelable) e.preventDefault(); return;
+  }
+  if (gameUiButtonDown?.pointerId === e.pointerId) {
+    const down = gameUiButtonDown;
     gameUiButtonDown = null;
     const [x, y] = canvasPoint(e);
-    const inside = helpVisible && helpRenderer?.hitClose(x, y, canvas.width, canvas.height);
-    if (gameUiButtonGesture.release(e.pointerId, inside ? 'help-close' : null) === 'help-close') helpVisible = false;
+    let releasedToken = null;
+    if (e.button === 0 && down.token === 'help-close' && helpVisible && helpRenderer?.hitClose(x, y, canvas.width, canvas.height)) {
+      releasedToken = 'help-close';
+    } else if (e.button === 0 && down.token?.startsWith('skill-tree:') && skillsVisible && skillPanelRenderer && session) {
+      const hit = skillPanelRenderer.skillAt(x, y, canvas.width, canvas.height, { skills: readClassSkills() || [] });
+      const id = Number(down.token.slice('skill-tree:'.length));
+      if (hit?.skill?.id === id) releasedToken = down.token;
+    }
+    const activated = gameUiButtonGesture.release(e.pointerId, releasedToken);
+    if (activated === 'help-close') helpVisible = false;
+    else if (activated?.startsWith('skill-tree:')) {
+      const id = Number(activated.slice('skill-tree:'.length));
+      const allocated = allocateSkillTreePointOnRelease(activated, id, readClassSkills() || [],
+        Math.max(0, readAdvancement()?.skillPoints ?? 0), (skillId) => {
+          Module.ccall('d2_session_command_add_skill', 'number', ['number'], [skillId]);
+        });
+      if (allocated) { propCache.clear(); classSkills = null; advancement = null; }
+    }
     render(); canvas.focus(); if (e.cancelable) e.preventDefault(); return;
   }
   if (inventoryGoldPress?.pointerId === e.pointerId) {
@@ -5167,24 +5292,35 @@ globalThis.addEventListener('pointerup', (e) => {
     render();
     return;
   }
-  if (miniDown < 0) return;
-  const down = miniDown; miniDown = -1;
+  if (miniDown < 0 || miniPointerId !== e.pointerId || e.button !== 0) return;
+  const down = miniDown; miniDown = -1; miniPointerId = null;
   const [x, y] = canvasPoint(e);
-  if (controlPanelRenderer?.hitMiniButton(controlPanelEvidence, x, y, canvas.width, canvas.height) === down) {
-    if (down === 0) { characterVisible = !characterVisible; if (characterVisible) questVisible = false; }
-    else if (down === 1) inventoryVisible = !inventoryVisible;
-    else if (down === 2) skillsVisible = !skillsVisible;
-    else if (down === 3) automapOverlay?.toggle();
-    else if (down === 4) toggleMessage();
-    else if (down === 5) toggleQuest();
-    else if (down === 6) ensureGameMenu()?.toggle();
-  }
+  const releaseHit = controlPanelRenderer?.hitMiniButton(controlPanelEvidence, x, y, canvas.width, canvas.height) ?? -1;
+  const cursorItem = e.button === 0 && Module._d2_session_cursor_item
+    ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0;
+  const action = miniPanelReleaseAction({ button: e.button, pressed: down, pointerMatches: true,
+    releaseHit, cursorItem });
+  if (action === 0) { setCharacterVisible(!characterVisible); if (characterVisible) questVisible = false; }
+  else if (action === 1) inventoryVisible = !inventoryVisible;
+  else if (action === 2) skillsVisible = !skillsVisible;
+  else if (action === 3) automapOverlay?.toggle();
+  else if (action === 4) toggleMessage();
+  else if (action === 5) toggleQuest();
+  else if (action === 6) ensureGameMenu()?.toggle();
   render();
+  if (e.cancelable) e.preventDefault();
+  return;
 });
 canvas.addEventListener('pointerup', (e) => {
   if (e.button === 0) { worldPointerHeld = false; }
   if (e.button === 2) { worldRightPointerHeld = false; heldRightPointerTicks = 0; }
   if (e.__d2HelpPointerHandled) return;
+  if (characterPanelCloseGesture.pointerId === e.pointerId) {
+    const [x, y] = canvasPoint(e);
+    if (e.button === 0 && characterVisible && characterPanelCloseGesture.release(e.pointerId, characterPanelCloseAt(x, y, canvas.width, canvas.height))) characterVisible = false;
+    else characterPanelCloseGesture.cancel(e.pointerId);
+    render(); canvas.focus(); if (e.cancelable) e.preventDefault(); return;
+  }
   if (screen === SCREEN.GAME && controlsPanel?.open) {
     const [x, y] = canvasPoint(e);
     if (controlsPanel.pointerUp(e.pointerId, e.button, x, y, canvas.width, canvas.height)) {
@@ -5199,7 +5335,11 @@ canvas.addEventListener('pointerup', (e) => {
 // Browsers cancel a touch for an interruption or a gesture the page is not handling; that gesture
 // is over, so it must neither activate its control later nor keep drawing it pressed.
 canvas.addEventListener('pointercancel', (e) => {
+  if (miniPointerId === e.pointerId) { miniDown = -1; miniPointerId = null; render(); }
+  if (npcMenuPointerPress?.pointerId === e.pointerId) npcMenuPointerPress = null;
+  if (cancelInventoryClosePress(inventoryClosePress, e.pointerId)) { inventoryClosePress = null; render(); }
   controlsPanel?.pointerCancel(e.pointerId);
+  if (characterPanelCloseGesture.cancel(e.pointerId)) render();
   if (cancelInventoryGoldPress(inventoryGoldPress, e.pointerId)) { inventoryGoldPress = null; render(); }
   if (clearStashGoldPress(e.pointerId)) { render(); canvas.focus(); e.preventDefault(); return; }
   gameMenu?.pointerCancel(e.pointerId);
@@ -5210,7 +5350,10 @@ canvas.addEventListener('pointercancel', (e) => {
   canvas.focus(); e.preventDefault();
 });
 canvas.addEventListener('lostpointercapture', (e) => {
+  if (miniPointerId === e.pointerId) { miniDown = -1; miniPointerId = null; render(); }
+  if (cancelInventoryClosePress(inventoryClosePress, e.pointerId)) { inventoryClosePress = null; render(); }
   controlsPanel?.pointerCancel(e.pointerId);
+  if (characterPanelCloseGesture.cancel(e.pointerId)) render();
   if (cancelInventoryGoldPress(inventoryGoldPress, e.pointerId)) { inventoryGoldPress = null; render(); }
   if (clearStashGoldPress(e.pointerId)) render();
   gameMenu?.pointerCancel(e.pointerId);

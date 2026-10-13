@@ -1,9 +1,10 @@
 import { CHROME_ART } from './panel-chrome.mjs';
 
-// Retail close controls shared by the inventory and skill tree. `panelCloseLayout` is now the ONE
-// place that holds the button's position: it returns the TOP-LEFT rect that matches retail's own
-// draw-list anchor (buysellbtn frame 10, 32x32, bottom-row y), so the rect that DRAWS the button and
-// the rect that HIT-TESTS it can never drift apart again -- which is the bug F-button-align fixed:
+// Shared close-cel positions for the inventory and skill tree. `panelCloseLayout` returns the
+// TOP-LEFT rect that matches retail's draw-list anchor (buysellbtn frame 10, 32x32, bottom-row y).
+// Skill close hit testing uses this layout. Inventory input is its own native callback path, with
+// a separate inclusive rectangle in inventory-close-gesture.mjs; its hit target is slightly larger
+// than the cel. This split also preserves the bug F-button-align fixed:
 // the two read from separate numbers (the draw call used a retail anchor, the hit rect used
 // OpenDiablo2's inventory.go/skilltree.go widget coordinates unadjusted) and disagreed by 1-4 px, so
 // a click near the button's own edge missed a control that was visibly right there.

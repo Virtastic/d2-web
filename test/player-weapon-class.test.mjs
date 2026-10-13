@@ -31,7 +31,7 @@ test('COF weapon class selector receives the mode being drawn', () => {
     return 5;
   }, 7);
   assert.deepEqual(result, { id: 5, token: '2hs' });
-  assert.deepEqual(calls, [['d2_session_player_weapon_class_id_for_mode', 'number', ['number'], [7]]]);
+  assert.deepEqual(calls, [['d2_session_player_weapon_class_id_for_presentation_mode', 'number', ['number'], [7]]]);
 });
 
 test('composite uses engine class for animation and worn records only for hand art', () => {

@@ -288,9 +288,12 @@ static D2ActiveRoomStrc* clientRoomAt(int level, int roomTileX, int roomTileY) {
     return nullptr;
 }
 
-static D2ActiveRoomStrc* clientRoomHint(int level, int playerLevel, int hasPlayer, int roomTileX, int roomTileY) {
-    if (!hasPlayer || playerLevel != level) return nullptr;
-    return clientRoomAt(level, roomTileX, roomTileY);
+static D2ActiveRoomStrc* clientRoomHint(int playerLevel, int hasPlayer, int roomTileX, int roomTileY) {
+    if (!hasPlayer) return nullptr;
+    // D2Client passes the player's current room as the hint even when the packet's eLevel names
+    // another level. Resolve the coordinates only within the tracked player level; never reinterpret
+    // them in the sighted level.
+    return clientRoomAt(playerLevel, roomTileX, roomTileY);
 }
 
 // The realm state adapter uses this only to track the level of an already-active client room.
@@ -308,7 +311,7 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_client_map_reveal(int level, int x, int y, int 
     if (!g_act || level <= 0 || x < 0 || y < 0) { g_err = "invalid client MapReveal"; return 0; }
     D2DrlgLevelStrc* pLevel = DRLG_GetLevel(g_act->pDrlg, level);
     if (!pLevel) { g_err = "MapReveal level unavailable"; return 0; }
-    D2ActiveRoomStrc* hint = clientRoomHint(level, playerLevel, hasPlayer, playerX, playerY);
+    D2ActiveRoomStrc* hint = clientRoomHint(playerLevel, hasPlayer, playerX, playerY);
     g_clientMapRoomHintUsed = hint != nullptr;
     DUNGEON_SetClientIsInSight(g_act, level, x, y, hint);
     if (hasPlayer && playerLevel > 0) g_clientRenderLevel = playerLevel;
@@ -321,7 +324,7 @@ EMSCRIPTEN_KEEPALIVE int d2_drlg_client_map_hide(int level, int x, int y, int ha
     if (!g_act || level <= 0 || x < 0 || y < 0) { g_err = "invalid client MapHide"; return 0; }
     D2DrlgLevelStrc* pLevel = DRLG_GetLevel(g_act->pDrlg, level);
     if (!pLevel) { g_err = "MapHide level unavailable"; return 0; }
-    D2ActiveRoomStrc* hint = clientRoomHint(level, playerLevel, hasPlayer, playerX, playerY);
+    D2ActiveRoomStrc* hint = clientRoomHint(playerLevel, hasPlayer, playerX, playerY);
     g_clientMapRoomHintUsed = hint != nullptr;
     DUNGEON_UnsetClientIsInSight(g_act, level, x, y, hint);
     if (hasPlayer && playerLevel > 0) g_clientRenderLevel = playerLevel;
@@ -673,7 +676,7 @@ int d2_drlg_client_room_freed_by_hide(int level, int x, int y, int hasPlayer, in
         int playerX, int playerY, void* activeRoom) {
     if (!g_act || !g_act->pDrlg || !activeRoom) return 0;
     D2DrlgLevelStrc* pLevel = DRLG_GetLevel(g_act->pDrlg, level);
-    D2ActiveRoomStrc* hint = clientRoomHint(level, playerLevel, hasPlayer, playerX, playerY);
+    D2ActiveRoomStrc* hint = clientRoomHint(playerLevel, hasPlayer, playerX, playerY);
     D2DrlgRoomStrc* root = pLevel ? DRLG_GetRoomExFromCoordinates(x, y, g_act->pDrlg,
         hint ? hint->pDrlgRoom : nullptr, pLevel) : nullptr;
     if (!root || root->wRoomsInList[ROOMSTATUS_CLIENT_IN_SIGHT] == 0) return 0;

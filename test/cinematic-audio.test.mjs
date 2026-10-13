@@ -120,7 +120,9 @@ test('skipping a Bink movie discards locked audio before the next gesture', asyn
   const secondTrack = { ...track, blocks: [[Float32Array.of(0.5, 0.6, 0.7, 0.8)]] };
   assert.equal(player.play([track, secondTrack]), 2);
   assert.equal(player.evidence.scheduled, 0);
+  assert.equal(player.evidence.pending, 2, 'decoded buffers wait for activation while the context is suspended');
   player.stop();
+  assert.equal(player.evidence.pending, 0, 'stop discards the skipped phase buffers');
   target.fire('pointerdown');
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(player.evidence.scheduled, 0, 'a skipped movie must not leak its pending tracks into the title phase');
@@ -133,7 +135,7 @@ test('skipping a Bink movie discards locked audio before the next gesture', asyn
   assert.ok(calls.includes('stop'));
 });
 
-test('Bink audio drops suspended packets and schedules only packets decoded after gesture unlock', async () => {
+test('Bink audio schedules suspended buffers after a successful gesture unlock', async () => {
   const calls = [], contextListeners = new Map(), targetListeners = new Map();
   class Context {
     constructor() { this.state = 'suspended'; this.currentTime = 0; this.destination = {}; this.resumeCalls = 0; }
@@ -156,18 +158,22 @@ test('Bink audio drops suspended packets and schedules only packets decoded afte
   const track = { header: { numChannels: 1, sampleRate: 8000 }, numSamples: 4,
     blocks: [[Float32Array.of(0.1, 0.2, 0.3, 0.4)]] };
   assert.equal(player.play([track]), 1);
-  assert.equal(player.play([track]), 1, 'subsequent film packets are also dropped while suspended');
+  assert.equal(player.play([track]), 1, 'subsequent film packets also wait while suspended');
   assert.equal(player.evidence.scheduled, 0);
+  assert.equal(player.evidence.pending, 2);
   target.fire('pointerdown');
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(player.evidence.state, 'suspended');
   assert.equal(player.evidence.scheduled, 0);
+  assert.equal(player.evidence.pending, 2, 'a resume that remains suspended keeps both buffers pending');
   target.fire('pointerdown');
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(player.evidence.state, 'running');
+  assert.equal(player.evidence.scheduled, 2, 'successful activation schedules the pending audio');
+  assert.equal(player.evidence.pending, 0);
   assert.equal(player.play([track]), 1, 'a packet received after unlock is scheduled');
-  assert.equal(player.evidence.scheduled, 1);
-  assert.deepEqual(calls, [0]);
+  assert.equal(player.evidence.scheduled, 3);
+  assert.deepEqual(calls, [0, 0, 0.00025]);
   await player.close();
 });
 

@@ -30,7 +30,7 @@
 // either name reaches the same table.  The base palette and pal.dat are identical in all five acts and
 // their 256 colours are distinct, so a canvas pixel's index is recoverable exactly.
 import { cofLayerRecord, composeCofFrame } from './unit-formats.mjs';
-import { shadowMaskOffsets } from './unit-shadow-raster.mjs';
+import { shadowMaskLayout, shadowVisibleBounds } from './unit-shadow-raster.mjs';
 import { perfT0, perfT } from './frame-perf.mjs';
 
 const ACT_PALETTE = ['ACT1', 'ACT2', 'ACT3', 'ACT4', 'ACT5'];
@@ -73,6 +73,7 @@ export function createUnitShadowRenderer(read) {
       const layers = [];
       const eligibleComponents = [];
       let minX = width, minY = height, maxX = -1, maxY = -1;
+      const clippedBounds = [0, 0, 0, 0];
       const pFootprint = perfT0();
       for (const component of cof.priority[direction][frame]) {
         const dcc = components.get ? components.get(component) : components[component];
@@ -112,18 +113,16 @@ export function createUnitShadowRenderer(read) {
         // same cel/frame) and the per-frame cost is the clipped copy below, not the whole plane rescan.
         // Kept source rows have unique k values, so their destination y offsets do not overlap; pixels
         // within each row also have unique x offsets. The mask builder can append directly without a Set.
-        const mask = shadowMaskOffsets(plane);
-        // These are the exact clipped destinations appended below. Accumulating their bounds here
-        // avoids a second full walk (and x/y division) over every emitted pixel before getImageData.
-        let visible = false;
-        for (let i = 0; i < mask.length; i += 2) {
-          const px = baseX + mask[i], py = baseY + mask[i + 1];
-          if (px < 0 || px >= width || py < 0 || py >= height) continue;
-          visible = true;
-          if (px < minX) minX = px; if (px > maxX) maxX = px;
-          if (py < minY) minY = py; if (py > maxY) maxY = py;
+        const layout = shadowMaskLayout(plane), mask = layout.offsets;
+        // Per-row binary search returns the same exact clipped pixel bounds as
+        // scanning every offset, with work proportional to cel height.
+        if (shadowVisibleBounds(layout, baseX, baseY, width, height, clippedBounds)) {
+          if (clippedBounds[0] < minX) minX = clippedBounds[0];
+          if (clippedBounds[1] < minY) minY = clippedBounds[1];
+          if (clippedBounds[2] > maxX) maxX = clippedBounds[2];
+          if (clippedBounds[3] > maxY) maxY = clippedBounds[3];
+          layers.push({ component, mask, baseX, baseY });
         }
-        if (visible) layers.push({ component, mask, baseX, baseY });
       }
       perfT('unit-shadow-footprint', pFootprint);
       if (!layers.length) {

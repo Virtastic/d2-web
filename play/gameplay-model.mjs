@@ -394,6 +394,19 @@ export function nativeDccHoverContains(px, py, box, ox, oy) {
   return Math.floor(px) >= left && Math.floor(px) <= right && Math.floor(py) >= lowY && Math.floor(py) <= highY;
 }
 
+// D2Client's object hover validator must obtain a current DCC cell before it can form a hit rect.
+// Preserve the measured painted-box/anchor fallback for multi-layer compositions, but a missing
+// cell cannot become a hover hit just because the object's anchor is near the pointer.
+export function nativeObjectHoverContains(px, py, box, ox, oy) {
+  if (!box || !(box.width > 0) || !(box.height > 0)) return false;
+  if (box.layers === 1) return nativeDccHoverContains(px, py, box, ox, oy);
+  const left = Math.round(ox + box.xOffset), top = Math.round(oy + box.yOffset);
+  const inBox = px >= left && px < left + box.width && py >= top && py < top + box.height;
+  const coversOrigin = box.xOffset <= 0 && box.xOffset + box.width > 0 &&
+    box.yOffset <= 0 && box.yOffset + box.height > 0;
+  return inBox || (!coversOrigin && Math.hypot(ox - px, oy - py) <= 6);
+}
+
 // Native diagnostic picker helper. With a player reference, equal priorities use squared path
 // distance; candidates lacking coordinates retain the stable encounter-order fallback.
 function nativeHoverDistance2(candidate, reference) {

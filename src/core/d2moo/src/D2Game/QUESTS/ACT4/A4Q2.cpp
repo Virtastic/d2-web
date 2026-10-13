@@ -250,7 +250,7 @@ void __fastcall ACT4Q2_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 			pCoord.nX += 5;
 
 			D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pQuestArg->pTarget);
-			QUESTS_GetFreePosition(pRoom, &pCoord, 2, 0x400, &pRoom, 12);
+			QUESTS_GetFreePosition(pRoom, &pCoord, 2, 0x400, &pRoom, 100);
 			if (!pRoom)
 			{
 				return;
@@ -489,7 +489,7 @@ void __fastcall ACT4Q2_Callback02_NpcDeactivate(D2QuestDataStrc* pQuestData, D2Q
 	pCoord.nX += 5;
 
 	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pQuestArg->pTarget);
-	QUESTS_GetFreePosition(pRoom, &pCoord, 2, 0x400, &pRoom, 12);
+	QUESTS_GetFreePosition(pRoom, &pCoord, 2, 0x400, &pRoom, 100);
 	if (!pRoom)
 	{
 		return;
@@ -988,7 +988,8 @@ int32_t __fastcall OBJECTS_OperateFunction54_DiabloSeal(D2ObjOperateFnStrc* pOp,
 	}
 
 	D2ActiveRoomStrc* pNewRoom = nullptr;
-	QUESTS_GetFreePosition(pRoom, pCoord, 3, COLLIDE_MASK_PLACEMENT, &pNewRoom, 13);
+	// 1.13c routes all three spawn seals through 0x6FCDC050 with radius 100.
+	QUESTS_GetFreePosition(pRoom, pCoord, 3, COLLIDE_MASK_PLACEMENT, &pNewRoom, 100);
 	if (pNewRoom && SUNIT_AllocUnitData(UNIT_OBJECT, 131, pCoord->nX, pCoord->nY, pOp->pGame, pNewRoom, 1, 0, 0))
 	{
 		DUNGEON_ToggleHasPortalFlag(pNewRoom, 0);
@@ -1031,7 +1032,8 @@ int32_t __fastcall OBJECTS_OperateFunction55_DiabloSeal(D2ObjOperateFnStrc* pOp,
 	}
 
 	D2ActiveRoomStrc* pNewRoom = nullptr;
-	QUESTS_GetFreePosition(pRoom, pCoord, 3, COLLIDE_MASK_PLACEMENT, &pNewRoom, 14);
+	// 1.13c routes all three spawn seals through 0x6FCDC050 with radius 100.
+	QUESTS_GetFreePosition(pRoom, pCoord, 3, COLLIDE_MASK_PLACEMENT, &pNewRoom, 100);
 	if (pNewRoom && SUNIT_AllocUnitData(UNIT_OBJECT, 131, pCoord->nX, pCoord->nY, pOp->pGame, pNewRoom, 1, 0, 0))
 	{
 		DUNGEON_ToggleHasPortalFlag(pNewRoom, 0);
@@ -1074,7 +1076,8 @@ int32_t __fastcall OBJECTS_OperateFunction56_DiabloSeal(D2ObjOperateFnStrc* pOp,
 	}
 
 	D2ActiveRoomStrc* pNewRoom = nullptr;
-	QUESTS_GetFreePosition(pRoom, pCoord, 3, COLLIDE_MASK_PLACEMENT, &pNewRoom, 15);
+	// 1.13c routes all three spawn seals through 0x6FCDC050 with radius 100.
+	QUESTS_GetFreePosition(pRoom, pCoord, 3, COLLIDE_MASK_PLACEMENT, &pNewRoom, 100);
 	if (pNewRoom && SUNIT_AllocUnitData(UNIT_OBJECT, 131, pCoord->nX, pCoord->nY, pOp->pGame, pNewRoom, 1, 0, 0))
 	{
 		DUNGEON_ToggleHasPortalFlag(pNewRoom, 0);

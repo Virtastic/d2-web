@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 #include <emscripten.h>
+#include "d2gs_client_owned_item.h"
 
 struct D2RealmPlayerAssign {
     uint32_t guid;
@@ -22,6 +23,16 @@ struct D2RealmPlayerReassign {
     uint8_t value;
     uint8_t reserved[2];
 };
+
+static_assert(offsetof(D2RealmOwnedItemPacket, itemGuid) == 0);
+static_assert(offsetof(D2RealmOwnedItemPacket, ownerGuid) == 4);
+static_assert(offsetof(D2RealmOwnedItemPacket, bitstreamOffset) == 8);
+static_assert(offsetof(D2RealmOwnedItemPacket, bitstreamLength) == 12);
+static_assert(offsetof(D2RealmOwnedItemPacket, action) == 16);
+static_assert(offsetof(D2RealmOwnedItemPacket, packetSize) == 17);
+static_assert(offsetof(D2RealmOwnedItemPacket, category) == 18);
+static_assert(offsetof(D2RealmOwnedItemPacket, ownerType) == 19);
+static_assert(sizeof(D2RealmOwnedItemPacket) == 20);
 
 // D2GS_GAMECHAT (0x26) preserves fields whose semantics are still unknown. Strings are kept in
 // bounded, NUL-terminated buffers matching the native handler's destinations (16 and 0x100 bytes).
@@ -228,6 +239,27 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_parse_player_reassign(
     out->y = ru16(packet + 8);
     out->value = packet[10];
     return 11;
+}
+
+// Parse exactly one length-prefixed D2GS_ITEM_OWNED packet. 0x9d lays out
+// `[op,action,size,category,itemGuid:u32,ownerType,ownerGuid:u32,itemBits...]`.
+// A malformed packet zeroes the output and returns 0; otherwise the return is the
+// declared wire length. Item-bitstream interpretation is a separate operation.
+EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_parse_owned_item(
+    const uint8_t* packet, int length, D2RealmOwnedItemPacket* out) {
+    if (!out) return 0;
+    std::memset(out, 0, sizeof(*out));
+    if (!packet || length < 13 || packet[0] != 0x9d || packet[2] != length) return 0;
+
+    out->action = packet[1];
+    out->packetSize = packet[2];
+    out->category = packet[3];
+    out->itemGuid = ru32(packet + 4);
+    out->ownerType = packet[8];
+    out->ownerGuid = ru32(packet + 9);
+    out->bitstreamOffset = 13;
+    out->bitstreamLength = static_cast<uint32_t>(length - 13);
+    return length;
 }
 
 // Frame one decompressed server-to-client stream packet with the measured 1.13c D2Net size table.

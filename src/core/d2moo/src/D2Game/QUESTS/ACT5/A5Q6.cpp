@@ -251,7 +251,7 @@ int32_t __fastcall ACT5Q6_UnitIterate_CreateLastPortal(D2GameStrc* pGame, D2Unit
 	UNITS_GetCoords(pUnit, &pCoord);
 	pCoord.nX += 5;
 	pRoom = UNITS_GetRoom(pUnit);
-	QUESTS_GetFreePosition(pRoom, &pCoord, 5, 0x400, &pRoom, 18);
+	QUESTS_GetFreePosition(pRoom, &pCoord, 5, 0x400, &pRoom, 100);
 	if (pRoom)
 	{
 		SUNIT_AllocUnitData(UNIT_OBJECT, OBJECT_LAST_PORTAL, pCoord.nX, pCoord.nY, pGame, pRoom, 1, 1, 0);
@@ -910,7 +910,7 @@ void __fastcall ACT5Q6_SpawnTyrael(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D
 	coord.nY -= 5;
 
 	D2ActiveRoomStrc* pFreeRoom = nullptr;
-	QUESTS_GetFreePosition(pRoom, &coord, 5, 0x400u, &pFreeRoom, 19);
+	QUESTS_GetFreePosition(pRoom, &coord, 5, 0x400u, &pFreeRoom, 100);
 
 	if (pFreeRoom)
 	{

@@ -28,7 +28,7 @@ export function makeBikAudioBuffer(context, track) {
   return buffer;
 }
 
-function unlockOnGesture(context, target) {
+function unlockOnGesture(context, target, onRunning) {
   if (typeof target?.addEventListener !== 'function' || context.state !== 'suspended') return;
   const controller = new AbortController();
   let resuming = false;
@@ -42,7 +42,10 @@ function unlockOnGesture(context, target) {
       resuming = false;
       // Some browsers can resolve resume() without actually moving a suspended context to
       // running. Keep the listener so a later qualifying gesture can retry.
-      if (context.state !== 'suspended') controller.abort();
+      if (context.state !== 'suspended') {
+        controller.abort();
+        if (context.state === 'running') onRunning();
+      }
     }, () => { resuming = false; });
   };
   const options = { signal: controller.signal, passive: true };
@@ -52,9 +55,22 @@ function unlockOnGesture(context, target) {
 export function createBikAudioPlayer(AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext,
   gestureTarget = globalThis.window) {
   if (!AudioContextClass) return null;
-  const context = new AudioContextClass(), sources = new Set();
-  unlockOnGesture(context, gestureTarget);
+  const context = new AudioContextClass(), sources = new Set(), pending = [];
   let nextTime = 0, scheduled = 0;
+  const schedule = (buffers) => {
+    if (!buffers.length || context.state !== 'running') return;
+    const at = Math.max(context.currentTime, nextTime);
+    let duration = 0;
+    for (const buffer of buffers) {
+      const source = context.createBufferSource();
+      source.buffer = buffer; source.connect(context.destination);
+      source.onended = () => { sources.delete(source); source.disconnect(); };
+      source.start(at); sources.add(source); scheduled++;
+      duration = Math.max(duration, buffer.duration);
+    }
+    nextTime = at + duration;
+  };
+  unlockOnGesture(context, gestureTarget, () => schedule(pending.splice(0)));
   return {
     play(tracks) {
       const buffers = [];
@@ -64,25 +80,15 @@ export function createBikAudioPlayer(AudioContextClass = globalThis.AudioContext
         buffers.push(buffer);
       }
       const count = buffers.length;
-      if (count && context.state === 'running') {
-        const at = Math.max(context.currentTime, nextTime);
-        let duration = 0;
-        for (const buffer of buffers) {
-          const source = context.createBufferSource();
-          source.buffer = buffer; source.connect(context.destination);
-          source.onended = () => { sources.delete(source); source.disconnect(); };
-          source.start(at); sources.add(source); scheduled++;
-          duration = Math.max(duration, buffer.duration);
-        }
-        nextTime = at + duration;
-      }
+      if (count && context.state === 'running') schedule(buffers);
+      else if (count && context.state === 'suspended') pending.push(...buffers);
       return count;
     },
-    get evidence() { return { state: context.state, scheduled, sampleTime: nextTime }; },
+    get evidence() { return { state: context.state, scheduled, pending: pending.length, sampleTime: nextTime }; },
     // A title movie can be skipped before the browser grants audio activation. Stop any sources
-    // already scheduled; packets received while suspended are discarded in play() (the boot player
-    // is shared across both logo films).
-    stop() { for (const source of sources) { try { source.stop(); } catch {} source.disconnect(); } sources.clear(); nextTime = context.currentTime; },
+    // already scheduled and forget decoded buffers waiting for browser activation. The boot player
+    // is shared across phases, so a skipped film must not leak its pending audio into the next one.
+    stop() { pending.length = 0; for (const source of sources) { try { source.stop(); } catch {} source.disconnect(); } sources.clear(); nextTime = context.currentTime; },
     close() { this.stop(); return context.close?.(); },
   };
 }

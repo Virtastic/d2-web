@@ -913,7 +913,7 @@ void __fastcall ACT5Q2_UpdateQuestState(D2GameStrc* pGame, D2UnitStrc* pPlayer, 
 					if (!pPortal && pTargetRoom)
 					{
 						D2ActiveRoomStrc* pTemp = pTargetRoom;
-						QUESTS_GetFreePosition(pTargetRoom, &pCoord, 2, 0x8000u, &pTemp, 17);
+						QUESTS_GetFreePosition(pTargetRoom, &pCoord, 2, 0x8000u, &pTemp, 100);
 
 						if (pTemp)
 						{

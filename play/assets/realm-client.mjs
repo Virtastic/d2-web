@@ -624,6 +624,7 @@ export function bindEngineProtocol(Module, scratch = 65536) {
       if (count < 0 || count > cap) throw new Error(`invalid client missile sound count ${count}`);
       return parseRealmMissileSoundEvents(Module.HEAPU8.subarray(T, T + count * 24), count);
     },
+    d2gsClientProjectileSupported: (skillId) => call('d2_realm_client_projectile_supported', 'number', ['number'], [skillId]),
     d2gsClientPredictRightCast: (x,y) => call('d2_realm_client_player_predict_right_cast', 'number', ['number','number'], [x,y]),
     d2gsClientMotionTick: () => call('d2_realm_client_motion_tick', 'number', [], []),
     d2gsGamelogon: ({ character, charClass, gameToken, gameHash }) => { const n = call('d2_realm_d2gs_gamelogon', 'number', ['number', 'number', 'number', 'number', 'string', 'bigint'], [gameHash, gameToken, charClass, 0x0e, character, BigInt(T)]); return rd(T, n); },

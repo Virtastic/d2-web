@@ -1,10 +1,12 @@
+import { nativeAutomapMode } from './automap-mode.mjs';
+
 const DEFAULT_FULL_MAP = 'data\\global\\ui\\automap\\maximap.dc6';
 
 // D2Client 1.13c applies full-map Fade to mode 0's default MaxiMap cells.
 // The browser's Full option uses mode 0; its other full-sized native mode (2)
-// is not exposed by the current options page.
+// is accepted by the overlay, but is not exposed by the current options page.
 export function fullMapFadeDrawMode({ mode, fade, source, x, y, width, height, targetX = width / 2 }) {
-  if (mode !== 'full' || fade !== 'on' || String(source).toLowerCase() !== DEFAULT_FULL_MAP) return 5;
+  if (nativeAutomapMode(mode) !== 0 || fade !== 'on' || String(source).toLowerCase() !== DEFAULT_FULL_MAP) return 5;
 
   // Native tests the projected cell frame center after applying cell scale and scroll.
   const px = x + 8, py = y + 16;

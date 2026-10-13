@@ -22,6 +22,8 @@ import { createCharacterNameRenderer, NAME_FIELD } from './charcreate-name.mjs';
 import { isRetailEditBoxCharacter } from './charcreate-name-input.mjs';
 import { recordDc6 } from './drawlist.mjs';
 import { createHeroStances, HERO_STANCE } from './charcreate-stances.mjs';
+import { d2winHeldFrame } from './d2win-button-frame.mjs';
+import { isButtonHeldOverTarget } from './frontend-pointer-states.mjs';
 
 /**
  * Per-class layout, from OpenDiablo2's select_hero_class.go.
@@ -410,6 +412,8 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     if (token.startsWith('class-')) return inBox(p, heroes.find((h) => h.key === token.slice('class-'.length))?.hit || {});
     return false;
   };
+  const isButtonHeld = (token) => isButtonHeldOverTarget(token,
+    pointer ? hitControl({ x: pointer[0], y: pointer[1] }) : null);
 
   const canCreate = () => chosen >= 0 && name.trim().length >= 2;
   // A hover that began mid-walk lands once the walk ends (Codex F99 review).
@@ -460,7 +464,10 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
         // the frame DREW in, so a row can compare it with retail's own record rather than with the
         // rule that chose it.
         okButton: { drawn: chosen >= 0, mode: chosen < 0 ? 0 : (canCreate() ? 5 : 1),
-          labelled: chosen >= 0, x: LAYOUT.okButton.x, y: LAYOUT.okButton.y },
+          frame: chosen >= 0 ? d2winHeldFrame(buttonDc6.frames, 0, isButtonHeld('ok') && canCreate()) : null,
+          pressed: isButtonHeld('ok') && canCreate(), labelled: chosen >= 0, x: LAYOUT.okButton.x, y: LAYOUT.okButton.y },
+        exitButton: { frame: d2winHeldFrame(buttonDc6.frames, 0, isButtonHeld('exit')), pressed: isButtonHeld('exit'),
+          x: LAYOUT.exitButton.x, y: LAYOUT.exitButton.y },
         // The caret's phase in this frame, and the cel it blitted when it drew one.
         caretLit: caretLit(),
         checkboxes: checkboxes.evidence,
@@ -597,8 +604,9 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
       // then the "CHARACTER NAME" label, then the typed name, then each checkbox's label before its
       // box, and OK and its label last. Drawing them in another order is not a different picture, but
       // it IS a different draw list -- and the draw list is what this screen's identity rows read.
-      ctx.drawImage(buttons[0], LAYOUT.exitButton.x, LAYOUT.exitButton.y);
-      recordDc6(CREATE_ASSETS.button, 0, buttonDc6.frames[0], LAYOUT.exitButton.x, LAYOUT.exitButton.y);
+      const exitFrame = d2winHeldFrame(buttonDc6.frames, 0, isButtonHeld('exit'));
+      ctx.drawImage(buttons[exitFrame], LAYOUT.exitButton.x, LAYOUT.exitButton.y);
+      recordDc6(CREATE_ASSETS.button, exitFrame, buttonDc6.frames[exitFrame], LAYOUT.exitButton.x, LAYOUT.exitButton.y);
       buttonLabel(ctx, 'EXIT', LAYOUT.exitButton);
 
       if (chosen >= 0) {
@@ -617,8 +625,9 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
         // same frame carries OK's two FontExocet10 cels after the mode-1 button (records 162-163).
         // Drawing nothing made the button appear where retail has it on screen and unlit.
         if (canCreate()) {
-          ctx.drawImage(buttons[0], LAYOUT.okButton.x, LAYOUT.okButton.y);
-          recordDc6(CREATE_ASSETS.button, 0, buttonDc6.frames[0], LAYOUT.okButton.x, LAYOUT.okButton.y);
+          const okFrame = d2winHeldFrame(buttonDc6.frames, 0, isButtonHeld('ok'));
+          ctx.drawImage(buttons[okFrame], LAYOUT.okButton.x, LAYOUT.okButton.y);
+          recordDc6(CREATE_ASSETS.button, okFrame, buttonDc6.frames[okFrame], LAYOUT.okButton.x, LAYOUT.okButton.y);
         } else {
           blend(ctx, buttonDc6.frames[0], LAYOUT.okButton.x, LAYOUT.okButton.y, 1);
           recordDc6(CREATE_ASSETS.button, 0, buttonDc6.frames[0], LAYOUT.okButton.x, LAYOUT.okButton.y, { mode: 1 });

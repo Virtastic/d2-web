@@ -85,6 +85,16 @@ inline uint32_t rd32(const uint8_t* p) {
     return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
 }
 
+bool isSelectedCharacterName(const uint8_t* name) {
+    for (int i = 0; i < 16; ++i) {
+        const uint8_t expected = i < (int)(sizeof(kCharName) - 1)
+            ? (uint8_t)kCharName[i]
+            : 0;
+        if (name[i] != expected) return false;
+    }
+    return true;
+}
+
 }  // namespace
 
 extern "C" {
@@ -208,10 +218,11 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_feed(const uint8_t* in, int len, 
                 return -1;
             }
             // GAMELOGON carries the exact ticket returned by MCP JOINGAME: hash at +1 and token
-            // at +5, both little-endian. A realm must reject a client that dials the game server
-            // with a stale or unrelated handoff instead of admitting it into this game.
+            // at +5, both little-endian. Bind it to the selected character too; a ticket for a
+            // different name must not receive this session's player assignment.
             const uint8_t* packet = g_g.rx + off;
-            if (rd32(packet + 1) != g_g.gameHash || rd16(packet + 5) != g_g.gameToken) {
+            if (rd32(packet + 1) != g_g.gameHash || rd16(packet + 5) != g_g.gameToken ||
+                !isSelectedCharacterName(packet + 21)) {
                 g_g.error = 3;
                 return -1;
             }

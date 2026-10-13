@@ -5,6 +5,7 @@
 #include "D2DataTbls.h"
 #include "D2Dungeon.h"
 #include "D2Inventory.h"
+#include "Drlg/D2DrlgDrlgRoom.h"
 #include <D2BitManip.h>
 #include "D2Monsters.h"
 #include "Path/IDAStar.h"

@@ -2,7 +2,9 @@ import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { createBlender } from './frontend.mjs';
 import { UNIT_CENTRE_Y } from './session-terrain.mjs';
 import { MA0_K } from './ma0.mjs';
+import { createAutomapRecordIndex, selectIndexedAutomapRecord } from './automap-record-index.mjs';
 import { perfT0, perfT, perfSample } from './frame-perf.mjs';
+import { nativeAutomapMode } from './automap-mode.mjs';
 import { fullMapFadeDrawMode } from './automap-full-fade.mjs';
 
 // DATATBLS_LoadAutomapTxt turns these LevelName strings into its automap-type
@@ -31,7 +33,7 @@ export const AUTOMAP_PATH = AUTOMAP_PATHS.full;
 // `0x6fb10250` supplies the separate small-map cell clip. The `selector284` input is deliberately
 // explicit: the binary's initial value is zero, but its runtime producer/meaning is not yet recovered.
 export function automapViewport(width, height, { mode = 'full', left = true, selector284 = 0 } = {}) {
-  const mini = mode === 'mini';
+  const mini = nativeAutomapMode(mode) === 1;
   const anchorX = left ? (selector284 === 2 ? 0 : 96) : Math.floor(2 * width / 3);
   const anchorY = left ? 0 : 78;
   const viewport = mini
@@ -50,7 +52,7 @@ export function automapMarkerInViewport(x, y, viewport) {
   return x >= viewport.left && x <= viewport.right && y >= viewport.top && y <= viewport.bottom;
 }
 export function automapScrollOffset(width, height, { mode = 'full', center = 'yes', anchorX, anchorY } = {}) {
-  if (mode !== 'mini' || center !== 'yes') return { x: 0, y: 0 };
+  if (nativeAutomapMode(mode) !== 1 || center !== 'yes') return { x: 0, y: 0 };
   return { x: Math.floor(width / 3) - anchorX - 16, y: Math.floor(height / 3) - anchorY - 16 };
 }
 
@@ -76,12 +78,10 @@ function makeFrameCanvas(frame, palette, documentObject) {
 
 // The only selection rule here is DATATBLS_GetAutomapCellId's table predicate:
 // level type + DT1 tile orientation + main/sub indices -> a row and one of its Cels.
-function selectRecord(rows, levelType, tile) {
+function selectRecord(index, levelType, tile) {
   const levelName = LEVEL_NAMES[levelType] ?? 'None', tileName = TILE_NAMES[tile.orientation] ?? null;
   if (!tileName) return null;
-  const record = rows.find((row) => row.levelName === levelName && row.tileName === tileName &&
-    (row.style === -1 || row.style === tile.mainIndex) &&
-    (row.startSequence === -1 || (row.startSequence <= tile.subIndex && tile.subIndex <= row.endSequence)));
+  const record = selectIndexedAutomapRecord(index, levelName, tileName, tile);
   return record ? { record, levelName, tileName } : null;
 }
 // One retail marker: the 12 segments of its draw-list records as offsets from the glyph's centre.
@@ -207,6 +207,7 @@ const tileReadSignature = (tiles) => {
 
 export function createAutomapOverlay({ read, Module, documentObject = globalThis.document }) {
   const rows = rowsFromTxt(read('data\\global\\excel\\automap.txt'));
+  const recordIndex = createAutomapRecordIndex(rows);
   const palette = decodeDatPalette(read('data\\global\\palette\\act1\\pal.dat'));
   // D2Client's mini-map Fade=No path sends each ordinary cell through DrawMode 1 (PL2
   // AlphaBlend[1]); the town palette is the current measured automap palette.
@@ -217,19 +218,19 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
   // one world tile, so the sheet's widest frame box is the tile's footprint on the map); it is kept for
   // evidence and confirmation, the divisor is what the RE'd rule fixes the scale to.
   const buildFamily = (mode) => {
-    const key = mode === 'mini' ? 'mini' : 'full', path = AUTOMAP_PATHS[key], dc6 = decodeDc6(read(path));
+    const key = nativeAutomapMode(mode) === 1 ? 'mini' : 'full', path = AUTOMAP_PATHS[key], dc6 = decodeDc6(read(path));
     return { key, path, divisor: key === 'mini' ? 20 : 10, step: Math.max(...dc6.frames.map((frame) => frame.width)),
       rawFrames: dc6.frames, samples: dc6.frames.map((frame) => frame.opaque.findIndex((value) => value !== 0)),
       frames: dc6.frames.map((frame) => makeFrameCanvas(frame, palette, documentObject)) };
   };
   const families = new Map([['full', buildFamily('full')]]);
-  const family = (mode) => { const key = mode === 'mini' ? 'mini' : 'full'; if (!families.has(key)) families.set(key, buildFamily(key)); return families.get(key); };
+  const family = (mode) => { const key = nativeAutomapMode(mode) === 1 ? 'mini' : 'full'; if (!families.has(key)) families.set(key, buildFamily(key)); return families.get(key); };
   // F234's five options, exactly as the Automap Options page holds them (game-menu.mjs AUTOMAP_DEFAULTS).
   // Default `full` is retail's page default and the layout this overlay drew before the options existed.
   let settings = { mode: 'full', fade: 'off', center: 'yes', party: 'yes', names: 'yes', left: 'yes' };
   const makeLayout = (width = AUTOMAP_LAYOUT.width, height = AUTOMAP_LAYOUT.height) => {
     const f = family(settings.mode);
-    return { ...AUTOMAP_LAYOUT, step: f.step, scale: 1 / f.divisor, divisor: f.divisor, mode: f.key, source: f.path,
+    return { ...AUTOMAP_LAYOUT, step: f.step, scale: 1 / f.divisor, divisor: f.divisor, mode: f.key, nativeMode: nativeAutomapMode(settings.mode), source: f.path,
       viewport: automapViewport(width, height, { mode: f.key, left: settings.left !== 'no' }) };
   };
   let frames = family('full').frames, layout = Object.freeze(makeLayout());
@@ -283,7 +284,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
       if (nextSettings) settings = { ...settings, ...nextSettings };
       frames = family(settings.mode).frames;
       layout = Object.freeze(makeLayout(width, height));
-      const fam = family(settings.mode), mode = fam.key;
+      const fam = family(settings.mode), mode = fam.key, nativeMode = nativeAutomapMode(settings.mode);
       const levelId = snapshot.level;
       const layer = getAutomapLayer(layers, levelLayer, levelId, seed);
       if (!unrevealed.has(levelId)) unrevealed.set(levelId, new Set());
@@ -329,7 +330,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
             if (layer.has(key)) continue;
             const room = rooms.find((r) => inRoom(r, tile.worldX * 5, tile.worldY * 5));
             if (!room || !rv.rooms.has(`${room.x},${room.y}`)) continue;
-            const selected = selectRecord(rows, levelType, tile);
+            const selected = selectRecord(recordIndex, levelType, tile);
             if (!selected || !frames[selected.record.frames[0]]) { unnamed.add(key); continue; }
             // Retail rolls its private automap seed (gpAutomapSeed, low seed 0) per GetAutomapCellId call, in
             // the order retail adds cells -- an order this client does not have -- so the pick is a hash of the
@@ -397,7 +398,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
         // full-map mode 0 uses the native distance ramp for default MaxiMap cells.
         const drawMode = mode === 'mini'
           ? (settings.fade === 'off' ? 1 : 5)
-          : fullMapFadeDrawMode({ mode, fade: settings.fade, source: fam.path, x, y, width, height,
+          : fullMapFadeDrawMode({ mode: nativeMode, fade: settings.fade, source: fam.path, x, y, width, height,
             targetX: view?.fadeTargetX ?? width / 2 });
         if (drawMode >= 0 && drawMode <= 2) blend(ctx, fam.rawFrames[cell.frame], x, y, drawMode);
         else ctx.drawImage(bitmap, x, y);
@@ -432,7 +433,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
       }
       ctx.restore();
       return (evidence = { open: true, markers, nameplates, levelType, levelName: LEVEL_NAMES[levelType] ?? 'None', cells: layer.size,
-        mode, divisor: fam.divisor, source: fam.path, settings: { ...settings }, centre,
+        mode, nativeMode, divisor: fam.divisor, source: fam.path, settings: { ...settings }, centre,
         unrevealed: unnamed.size, drawn, unresolved, geometry, layout, error: null });
     },
     get evidence() { return JSON.parse(JSON.stringify(evidence)); },

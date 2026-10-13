@@ -206,7 +206,10 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
       const clock = advanceIzualGhostS1Clock(actor, izualGhostClocks.get(actor.id));
       if (clock) izualGhostClocks.set(actor.id, clock);
       else izualGhostClocks.delete(actor.id);
-      const baseKey = `${actor.code}:${actor.mode}:${actor.direction}:${actor.components.join(',')}`;
+      // Attack COFs depend on BaseW. Keep decoded assets, rasters and failed loads
+      // separate when the same token/components arrive with another class.
+      const attackClass = actor.mode === 4 || actor.mode === 5 ? actor.baseWeaponClass ?? '' : '';
+      const baseKey = `${actor.code}:${actor.mode}:${actor.direction}:${actor.components.join(',')}:${attackClass}`;
       if (failures.has(baseKey)) return null;
       let animation = animations.get(baseKey);
       if (!animation) { try { animation = loadMonsterAnimation(read, actor); animations.set(baseKey, animation); } catch { failures.add(baseKey); return null; } }

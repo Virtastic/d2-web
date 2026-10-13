@@ -9,16 +9,16 @@ const deferred = () => {
   return { promise, resolve };
 };
 
-test('voice gate withholds the combined speech box and text renderer', () => {
+test('voice completion gates scrolling, while ordinary subtitles ignore the audio mode', () => {
   const shell = readFileSync(new URL('../play/gameplay-shell.mjs', import.meta.url), 'utf8');
   const box = readFileSync(new URL('../play/assets/speech-box.mjs', import.meta.url), 'utf8');
   assert.match(shell, /waitForVoice\(token, playback, unitSounds\)/);
-  assert.match(shell, /if \(npcSpeechHasText\(npcSpeechSetting\.mode\) && !shopOpen\(\) && ensureSpeechBox\(\) && npcSpeechScrollGate\.ready\)\s*pendingSpeech = \{ text: npcState\.greeting, messageInstance: npcVoiceGeneration, scrolling: true \}/);
-  assert.match(shell, /npcSpeechHasText\(npcSpeechSetting\.mode\) && !shopOpen\(\) && ensureSpeechBox\(\) && npcSpeechScrollGate\.ready/);
+  assert.match(shell, /if \(!shopOpen\(\) && ensureSpeechBox\(\) && npcSpeechScrollGate\.ready\)\s*pendingSpeech = \{ text: npcState\.greeting, messageInstance: npcVoiceGeneration, scrolling: true \}/);
+  assert.match(shell, /else if \(npcState && npcSpeechHasText\(npcSpeechSetting\.mode\) && ensureSpeechBox\(\)\)/);
   assert.match(shell, /speechBox\.draw\(ctx, pendingSpeech\.text, undefined,\s*\{ messageInstance: pendingSpeech\.messageInstance \}\)/);
   assert.doesNotMatch(shell, /speechT0/);
-  // Native FUN_6FB2BB40 draws its container and text in one call; Text Only and Audio+Text share
-  // that renderer, while Audio Only does not invoke it.
+  // Native FUN_6FB2BB40 draws its container and text in one call. Ordinary FUN_6FB2D200 speech
+  // sets the active-speech flag, so that renderer admits subtitles in Audio Only as well.
   const draw = box.slice(box.indexOf('draw(ctx, text'), box.indexOf('\n    },', box.indexOf('draw(ctx, text')));
   assert.ok(draw.indexOf('ctx.fillRect(') >= 0);
   assert.ok(draw.indexOf('ctx.fillRect(') < draw.indexOf('font.drawAnchored('));

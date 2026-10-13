@@ -27,10 +27,6 @@ inline uint32_t read_u32(const uint8_t* bytes) {
 
 extern "C" {
 
-int d2_realm_d2gs_parse_player_cast(const uint8_t* packet, int length, D2RealmPlayerCast* output) {
-    return d2::realm::decodeRemotePlayerCast(packet, length, output);
-}
-
 static void apply_server_position_hint(D2UnitStrc* unit, const D2RealmPlayerMove* move) {
     // FUN_6FADA1B0 runs before action dispatch. In the local 1.13c body, both words must be
     // nonzero, flag 0x10000 must be clear, and player modes 0/0x11 return before these stores.

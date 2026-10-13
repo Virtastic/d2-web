@@ -163,7 +163,7 @@ export function createOptionsPages({ read, decodeDc6, decodeDatPalette, document
   const state = { npcspeech: NPC_SPEECH_CYCLE.includes(initialNpcSpeech) ? initialNpcSpeech : NPC_SPEECH_DEFAULT,
     lighting: 0, shadows: 0, resolution: initialResolution === 0 ? 0 : 1, ...(initialVolume ?? {}) };
   let page = null, selected = 0, tick = 0;
-  const resolutionPointers = new Map();
+  const optionPointers = new Map();
   const rows = () => OPTIONS_PAGE_ROWS[page];
   const view = (width, height) => {
     const scale = Math.min(width / 800, height / 600);
@@ -198,8 +198,8 @@ export function createOptionsPages({ read, decodeDc6, decodeDatPalette, document
   return {
     get isOpen() { return page !== null; },   // not `open`: an object literal's `open(name)` method would shadow the getter
     get page() { return page; },
-    open(name) { if (!OPTIONS_PAGE_ROWS[name]) throw new Error(`unknown options page ${name}`); resolutionPointers.clear(); page = name; selected = rows().length - 1; },
-    close() { resolutionPointers.clear(); page = null; },
+    open(name) { if (!OPTIONS_PAGE_ROWS[name]) throw new Error(`unknown options page ${name}`); optionPointers.clear(); page = name; selected = rows().length - 1; },
+    close() { optionPointers.clear(); page = null; },
     get state() { return { ...state }; },
     get evidence() {
       if (!page) return { open: false };
@@ -210,26 +210,32 @@ export function createOptionsPages({ read, decodeDc6, decodeDatPalette, document
         draws: optionsPageDrawOrder(page, state).length,
       };
     },
-    /** Retail applies Resolution only when the pointer is released on the row it pressed. */
+    /** Retail choice rows apply on a matching release; sliders keep their immediate down update. */
     pointerDown(x, y, width, height, pointerId, button) {
-      if (page !== 'video') return false;
+      if (!page) return false;
       const i = rowAt(x, y, width, height);
-      if (rows()[i]?.key !== 'resolution') return false;
+      if (button !== 0) return true;
+      if (i < 0) return false;
+      const row = rows()[i];
+      if (row.slider) return false;
       selected = i;
-      resolutionPointers.set(pointerId, { row: i, button });
+      optionPointers.set(pointerId, { row: i, button, page });
       return true;
     },
     pointerUp(x, y, width, height, pointerId, button) {
-      if (!resolutionPointers.has(pointerId)) return false;
-      const pressed = resolutionPointers.get(pointerId);
-      resolutionPointers.delete(pointerId);
-      if (page === 'video' && button === pressed.button && rowAt(x, y, width, height) === pressed.row)
-        this.click(x, y, width, height);
+      if (!optionPointers.has(pointerId)) return false;
+      const pressed = optionPointers.get(pointerId);
+      optionPointers.delete(pointerId);
+      if (page === pressed.page && button === pressed.button && rowAt(x, y, width, height) === pressed.row)
+        return this.click(x, y, width, height) === 'previous' ? 'previous' : true;
       return true;
     },
-    pointerCancel(pointerId) { return resolutionPointers.delete(pointerId); },
-    pointerCancelAll() { resolutionPointers.clear(); },
-    hover(x, y, width, height) { const i = rowAt(x, y, width, height); if (i >= 0) selected = i; return i; },
+    pointerCancel(pointerId) { return optionPointers.delete(pointerId); },
+    pointerCancelAll() { optionPointers.clear(); },
+    hover(x, y, width, height) {
+      if (optionPointers.size) return selected;
+      const i = rowAt(x, y, width, height); if (i >= 0) selected = i; return i;
+    },
     /** Returns { row, value } | 'previous' | null, so a caller can route PREVIOUS back to the menu. */
     click(x, y, width, height) {
       const i = rowAt(x, y, width, height);
