@@ -53,6 +53,7 @@ constexpr int kMaxPacket = 0x204;
 struct D2gsSession {
     uint8_t rx[kRxCap];
     int rxLen;
+    int clientActive;
     uint32_t unitId;
     uint8_t charClass;
     uint8_t act;
@@ -133,6 +134,7 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_cs_packet_len(const uint8_t* buf, int len
 EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_reset(uint32_t unitId, uint8_t charClass, uint8_t act, uint16_t level,
                                                        uint16_t gameToken, uint32_t gameHash) {
     g_g.rxLen = 0;
+    g_g.clientActive = 1;
     g_g.unitId = unitId;
     g_g.charClass = charClass;
     g_g.act = act;
@@ -145,6 +147,16 @@ EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_reset(uint32_t unitId, uint8_t c
     g_fixtureReassignSent = false;
     g_fixtureWalkReassignSent = false;
 #endif
+}
+
+// 1.13c D2Net+0x6090 (ordinal 10000) retires the indexed server client. The realmd host owns the
+// socket; this core half clears the matching D2GS session before the host closes it. realmd
+// currently supports one D2GS connection, assigned client slot zero.
+EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_disconnect_client(uint32_t clientId) {
+    if (clientId != 0 || !g_g.clientActive) return;
+    g_g.clientActive = 0;
+    g_g.rxLen = 0;
+    g_g.joined = 0;
 }
 
 #if defined(D2_REALMD_TEST_FIXTURE)

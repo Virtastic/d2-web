@@ -3,6 +3,7 @@
 static const int NUM_ARENA_TYPES = 1;
 
 //D2Common.0x6FD47840
+// 1.13c D2Common+0x80D50
 void __fastcall DATATBLS_LoadArenaTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
@@ -36,6 +37,7 @@ void __fastcall DATATBLS_UnloadArenaTxt()
 }
 
 //D2Common.0x6FD479D0
+// 1.13c D2Common+0x80000
 void __fastcall DATATBLS_LoadCharTemplateTxt(HD2ARCHIVE hArchive)
 {
 	int nMaxLevel = 0;

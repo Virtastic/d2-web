@@ -34,6 +34,7 @@ void d2_realm_mcp_session_reset(uint32_t gsIp, uint16_t gameToken, uint32_t game
 int d2_realm_mcp_session_feed(const uint8_t* in, int len, uint8_t* out, int outCap);
 void d2_realm_d2gs_session_reset(uint32_t unitId, uint8_t charClass, uint8_t act, uint16_t level,
                                   uint16_t gameToken, uint32_t gameHash);
+void d2_realm_d2gs_session_disconnect_client(uint32_t clientId);
 #if defined(D2_REALMD_TEST_FIXTURE)
 void d2_realm_d2gs_session_fixture_reassign_on_keepalive(int enabled);
 void d2_realm_d2gs_session_fixture_reassign_on_walk(int enabled);
@@ -153,6 +154,11 @@ bool writeAll(int fd, const uint8_t* p, int n) {
         n -= (int)w;
     }
     return true;
+}
+
+void closeConnection(int fd, Proto proto) {
+    if (proto == kD2gs) d2_realm_d2gs_session_disconnect_client(0);
+    close(fd);
 }
 
 // Handle whatever is readable on one connection. Returns false when it should be closed.
@@ -291,7 +297,7 @@ int main(int argc, char** argv) {
         // accept on another port.
         for (int p = 0; p < kProtoCount; p++) {
             if (conn[p] < 0 || !FD_ISSET(conn[p], &rs)) continue;
-            if (!pump(conn[p], (Proto)p)) { close(conn[p]); conn[p] = -1; }
+            if (!pump(conn[p], (Proto)p)) { closeConnection(conn[p], (Proto)p); conn[p] = -1; }
         }
         for (int p = 0; p < kProtoCount; p++) {
             if (!FD_ISSET(lfd[p], &rs)) continue;
@@ -299,7 +305,7 @@ int main(int argc, char** argv) {
             if (fd < 0) continue;
             // One session instance per protocol: a second connection replaces the first rather
             // than quietly sharing its state.
-            if (conn[p] >= 0) { close(conn[p]); }
+            if (conn[p] >= 0) { closeConnection(conn[p], (Proto)p); }
             int one = 1;
             setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof one);
             resetFor((Proto)p);
@@ -308,11 +314,11 @@ int main(int argc, char** argv) {
                 // The engine greets unprompted, before the client says anything.
                 uint8_t g[8];
                 const int n = d2_realm_d2gs_session_greeting(g);
-                if (!writeAll(fd, g, n)) { close(fd); conn[p] = -1; }
+                if (!writeAll(fd, g, n)) { closeConnection(fd, (Proto)p); conn[p] = -1; }
             }
         }
     }
-    for (int p = 0; p < kProtoCount; p++) if (conn[p] >= 0) close(conn[p]);
+    for (int p = 0; p < kProtoCount; p++) if (conn[p] >= 0) closeConnection(conn[p], (Proto)p);
     for (int p = 0; p < kProtoCount; p++) close(lfd[p]);
     return 0;
 }

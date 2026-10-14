@@ -307,6 +307,7 @@ void __fastcall SUNITPROXY_InitializeNpcControl(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FCCBF50
+// 1.13c D2Game+0x8F4E0 (checked: no delta)
 void __fastcall SUNITPROXY_InitializeItemCache(D2GameStrc* pGame, D2UnitProxyStrc* pUnitProxy, void* pUnused, int32_t nNpcInventoryId)
 {
     D2_ASSERT(nNpcInventoryId < MAX_NPC_INVENTORY);
@@ -807,6 +808,7 @@ void __fastcall SUNITPROXY_AllocNpcInventory(D2GameStrc* pGame, D2NpcRecordStrc*
 }
 
 //D2Game.0x6FCCCC40
+// 1.13c D2Game+0x8F850 (checked: no delta)
 void __fastcall SUNITPROXY_FillGlobalItemCache()
 {
     for (int32_t i = 0; i < sgptDataTables->nMonStatsTxtRecordCount; ++i)
@@ -888,6 +890,7 @@ void __fastcall SUNITPROXY_FillGlobalItemCache()
     }
 }
 
+// 1.13c D2Game+0x8F1B0 (checked: no delta)
 //D2Game.0x6FCCCED0
 void __fastcall SUNITPROXY_FillIGlobaltemCacheRecordForNpc(int32_t nNpcId)
 {

@@ -2,6 +2,7 @@
 #include <Fog.h>
 
 //D2Common.0x6FDC36E0 (#10901)
+// 1.13c D2Common+0x3D280
 D2TextHeaderStrc* __stdcall TEXT_AllocTextHeader(void* pMemPool)
 {
 	D2TextHeaderStrc* pTextHeader = D2_ALLOC_STRC_POOL(pMemPool, D2TextHeaderStrc);

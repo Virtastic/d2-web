@@ -753,6 +753,7 @@ void __fastcall sub_6FDB6C10(D2StatListExStrc* pStatListEx, D2SLayerStatIdStrc::
 }
 
 //D2Common.0x6FDB6E30
+// 1.13c D2Common+0x3A3B0
 void __stdcall D2Common_ExpireStatList_6FDB6E30(D2StatListStrc* pStatList)
 {
 	if (!pStatList)
@@ -863,6 +864,7 @@ void __stdcall D2Common_ExpireStatList_6FDB6E30(D2StatListStrc* pStatList)
 }
 
 //D2Common.0x6FDB7030 (#10485)
+// 1.13c D2Common+0x3AD40
 void __stdcall STATLIST_FreeStatList(D2StatListStrc* pStatList)
 {
 	if (pStatList && !STATLIST_IsExtended(pStatList))
@@ -872,6 +874,7 @@ void __stdcall STATLIST_FreeStatList(D2StatListStrc* pStatList)
 }
 
 //D2Common.0x6FDB7050
+// 1.13c D2Common+0x3A9F0
 void __fastcall D2Common_STATLIST_FreeStatListImpl_6FDB7050(D2StatListStrc* pStatList)
 {
 
@@ -922,6 +925,7 @@ void __fastcall D2Common_STATLIST_FreeStatListImpl_6FDB7050(D2StatListStrc* pSta
 }
 
 //D2Common.0x6FDB7110 (#10527)
+// 1.13c D2Common+0x3AED0
 void __stdcall STATLIST_FreeStatListEx(D2UnitStrc* pUnit)
 {
 	if (pUnit->pStatListEx)
@@ -1014,6 +1018,7 @@ int __stdcall STATLIST_GetFullStatsCountFromUnit(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDB72C0 (#10478)
+// 1.13c D2Common+0x38060
 void __stdcall STATLIST_SetState(D2StatListStrc* pStatList, int nState)
 {
 	if (pStatList)
@@ -1023,6 +1028,7 @@ void __stdcall STATLIST_SetState(D2StatListStrc* pStatList, int nState)
 }
 
 //D2Common.0x6FDB72E0 (#10479)
+// 1.13c D2Common+0x38040
 int __stdcall STATLIST_GetState(D2StatListStrc* pStatList)
 {
 	if (pStatList)
@@ -1603,6 +1609,7 @@ D2StatListStrc* __stdcall STATLIST_GetStatListFromUnitStateAndFlag(D2UnitStrc* p
 	return NULL;
 }
 
+// 1.13c D2Common+0x3AC90
 //D2Common.0x6FDB8310 (#10523)
 void __stdcall STATLIST_MergeStatLists(D2UnitStrc* pTarget, D2UnitStrc* pUnit, BOOL bType)
 {
@@ -1921,6 +1928,7 @@ void __stdcall STATLIST_MergeBaseStats(D2StatListStrc* pTargetStatList, D2StatLi
 }
 
 //D2Common.0x6FDB8CA0 (#10477)
+// 1.13c D2Common+0x37D70
 void __stdcall STATLIST_SetStatRemoveCallback(D2StatListStrc* pStatList, StatListRemoveCallback pfStatRemove)
 {
 	if (pStatList)
@@ -2069,6 +2077,7 @@ void __stdcall D2Common_10525(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2)
 }
 
 //D2Common.0x6FDB91C0 (#10474)
+// 1.13c D2Common+0x3A5F0
 void __stdcall D2Common_10474(D2UnitStrc* pUnused, D2StatListStrc* pStatList)
 {
 	D2_MAYBE_UNUSED(pUnused);
@@ -2143,6 +2152,7 @@ int __stdcall STATLIST_GetDefenseFromUnit(D2UnitStrc* pUnit)
 	return D2Common_11248(NULL, pUnit, STAT_ARMORCLASS);
 }
 
+// 1.13c D2Common+0x3A5D0
 //D2Common.0x6FDB9AE0 (#10524)
 void __stdcall STATLIST_ExpireUnitStatlist(D2UnitStrc* pUnused, D2UnitStrc* pUnit)
 {

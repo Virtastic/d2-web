@@ -2,6 +2,7 @@
 #include <D2DataTbls.h>
 
 //D2Common.0x6FD542D0
+// 1.13c D2Common+0x820A0
 void __fastcall DATATBLS_LoadInventoryTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =

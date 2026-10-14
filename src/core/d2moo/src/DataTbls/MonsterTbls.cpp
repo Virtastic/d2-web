@@ -152,6 +152,7 @@ void __fastcall DATATBLS_MonStatsSkillModeLinker(char* pSrc, void* pRecord, int 
 }
 
 //D2Common.0x6FD64DF0
+// 1.13c D2Common+0x5AA40
 void __fastcall DATATBLS_LoadMonStatsTxt(HD2ARCHIVE hArchive)
 {
 	long long v21 = 0; //TODO: Check / Remove
@@ -927,6 +928,7 @@ void __fastcall DATATBLS_UpdateTreasureClassProbabilities(D2TCExShortStrc* pTCEx
 	}
 }
 
+// 1.13c D2Common+0x11E0
 //D2Common.0x6FD68D40
 int __fastcall DATATBLS_ApplyRatio(signed int nValue, signed int nMultiplier, signed int nDivisor)
 {
@@ -1418,6 +1420,7 @@ int __stdcall DATATBLS_ShouldNeverCallInExpansion()
 }
 
 //D2Common.0x6FD69B90
+// 1.13c D2Common+0x59F70
 void __fastcall DATATBLS_LoadMonItemPercentTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
@@ -1446,9 +1449,10 @@ D2MonItemPercentDataTbl* __fastcall DATATBLS_GetMonItemPercentDataTables()
 }
 
 //D2Common.0x6FD69C60 (#10663)
+// 1.13c D2Common+0x53390 (#10015)
 D2MonItemPercentTxt* __stdcall DATATBLS_GetMonItemPercentTxtRecord(int nId)
 {
-	if (nId >= 0 && nId < sgptDataTables->pMonItemPercentDataTables.nMonItemPercentTxtRecordCount)
+	if (nId < sgptDataTables->pMonItemPercentDataTables.nMonItemPercentTxtRecordCount && nId != -1)
 	{
 		D2_ASSERT(sgptDataTables->pMonItemPercentDataTables.pMonItemPercentTxt);
 		D2_ASSERT(&sgptDataTables->pMonItemPercentDataTables.pMonItemPercentTxt[nId]);
@@ -1459,6 +1463,7 @@ D2MonItemPercentTxt* __stdcall DATATBLS_GetMonItemPercentTxtRecord(int nId)
 }
 
 //D2Common.0x6FD69CD0
+// 1.13c D2Common+0x59CB0
 void __fastcall DATATBLS_LoadMonUModTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
@@ -1590,6 +1595,7 @@ int __fastcall DATATBLS_GetSuperUniquesTxtRecordCount()
 }
 
 //D2Common.0x6FD6A480
+// 1.13c D2Common+0x58B60
 void __fastcall DATATBLS_LoadHirelingTxt(HD2ARCHIVE hArchive)
 {
 	const Unicode* pUnicode = NULL;
@@ -1873,6 +1879,7 @@ D2HirelingTxt* __stdcall DATATBLS_GetNextHirelingTxtRecordFromActAndDifficulty(B
 }
 
 //D2Common.0x6FD6B4F0
+// 1.13c D2Common+0x58820
 void __fastcall DATATBLS_LoadNpcTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
@@ -1917,6 +1924,7 @@ D2NpcTxt* __stdcall DATATBLS_GetNpcTxtRecord(uint32_t dwNpcId)
 }
 
 //D2Common.0x6FD6B850
+// 1.13c D2Common+0x58120
 void __fastcall DATATBLS_LoadMonSoundsTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
@@ -2088,6 +2096,7 @@ void __fastcall DATATBLS_MonStats2CompositLinker(char* pSrc, void* pRecord, int 
 }
 
 //D2Common.0x6FD6C150
+// 1.13c D2Common+0x56C10
 void __fastcall DATATBLS_LoadMonStats2Txt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
@@ -2336,6 +2345,7 @@ void __fastcall DATATBLS_UnloadMonTypeTxt()
 }
 
 //D2Common.0x6FD6D960
+// 1.13c D2Common+0x55A90
 void __fastcall DATATBLS_LoadMonPropTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
@@ -2439,6 +2449,7 @@ void __fastcall DATATBLS_LoadMonPropTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD6E8E0
+// 1.13c D2Common+0x55580
 void __fastcall DATATBLS_LoadMonLvlTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
@@ -2556,6 +2567,7 @@ void __fastcall DATATBLS_LoadMonPresetTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD6EF30 (#11256)
+// 1.13c D2Common+0x52E30
 D2MonPresetTxt* __stdcall DATATBLS_GetMonPresetTxtActSection(int nAct, int* pRecordCount)
 {
 	if (pRecordCount)

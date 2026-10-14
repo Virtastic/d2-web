@@ -741,6 +741,7 @@ void __fastcall sub_6FCC6540(D2UnitStrc* pUnit, D2ClientStrc* pClient)
 }
 
 //D2Game.0x6FCC6790
+// 1.13c D2Game+0x79FE0 (checked: no delta)
 void __fastcall D2GAME_SUNITMSG_FreeUnitMessages_6FCC6790(D2UnitStrc* pUnit)
 {
     D2UnitPacketListStrc* pMsg = pUnit->pMsgFirst;

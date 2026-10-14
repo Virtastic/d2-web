@@ -322,6 +322,7 @@ void __fastcall DATATBLS_SkillDescCalcLinker(char* pSrc, void* pRecord, int nOff
 }
 
 //D2Common.0x6FD49F60
+// 1.13c D2Common+0x61EC0
 void __fastcall DATATBLS_LoadSkills_SkillDescTxt(HD2ARCHIVE hArchive)
 {
 	D2PetTypeTxt* pPetTypeTxtRecord = NULL;

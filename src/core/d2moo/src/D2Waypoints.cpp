@@ -104,6 +104,7 @@ void __stdcall WAYPOINTS_CopyAndValidateWaypointData(D2WaypointDataStrc* pDestin
 }
 
 //D2Common.0x6FDC4060 (#11151)
+// 1.13c D2Common+0x67D00
 void __stdcall WAYPOINTS_ValidateAndCopyWaypointData(D2WaypointDataStrc* pSource, D2WaypointDataStrc* pDestination)
 {
 	if (pSource->nFlags[0] != 0x102)

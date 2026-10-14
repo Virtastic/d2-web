@@ -569,6 +569,7 @@ void __fastcall QUESTS_ChangeLevel(D2GameStrc* pGame, int32_t nOldLevelId, int32
 }
 
 //D2Game.0x6FC942D0
+// 1.13c D2Game+0x33CE0
 void __fastcall QUESTS_EventCallback(D2QuestArgStrc* pArgs, bool bCheckActive, bool bCheckAct)
 {
 	if (!pArgs || !pArgs->pGame || !pArgs->pGame->pQuestControl)
@@ -698,6 +699,7 @@ void __fastcall QUESTS_ItemDropped(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2Uni
 }
 
 //D2Game.0x6FC94580
+// 1.13c D2Game+0x33B70
 void __fastcall QUESTS_QuestUpdater(D2GameStrc* pGame)
 {
 	if (!pGame || !pGame->pQuestControl)

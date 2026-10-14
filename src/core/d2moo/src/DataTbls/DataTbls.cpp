@@ -75,6 +75,7 @@ void __fastcall DATATBLS_InitUnicodeClassNamesInCharStatsTxt()
 }
 
 //D2Common.0x6FD49660 (#11255)
+// 1.13c D2Common+0x5E1C0
 uint32_t __stdcall DATATBLS_GetCodeFromCompCodeTxt(int nCompCode)
 {
 	if (nCompCode < sgptDataTables->nCompCodeTxtRecordCount)
@@ -106,6 +107,7 @@ uint32_t __stdcall DATATBLS_GetExpRatio(int nLevel)
 	return 0;
 }
 
+// 1.13c D2Common+0x5E810
 //D2Common.0x6FD496B0 (#10628)
 uint32_t __stdcall DATATBLS_GetLevelThreshold(int nClass, uint32_t dwLevel)
 {
@@ -118,6 +120,7 @@ uint32_t __stdcall DATATBLS_GetLevelThreshold(int nClass, uint32_t dwLevel)
 }
 
 //D2Common.0x6FD496E0 (#10629)
+// 1.13c D2Common+0x5E7E0
 int __stdcall DATATBLS_GetMaxLevel(int nClass)
 {
 	if (nClass >= 0 && nClass < NUMBER_OF_PLAYERCLASSES)
@@ -227,6 +230,7 @@ D2AnimDataTableStrc* __fastcall DATATBLS_GetAnimData()
 }
 
 //D2Common.0x6FD4E4D0 (#10655)
+// 1.13c D2Common+0x603C0
 D2DifficultyLevelsTxt* __stdcall DATATBLS_GetDifficultyLevelsTxtRecord(int nDifficulty)
 {
 	if (nDifficulty < 0)
@@ -243,6 +247,7 @@ D2DifficultyLevelsTxt* __stdcall DATATBLS_GetDifficultyLevelsTxtRecord(int nDiff
 }
 
 //D2Common.0x6FD4E500
+// 1.13c D2Common+0x5F6E0
 void __fastcall DATATBLS_LoadStatesTxt(HD2ARCHIVE hArchive)
 {
 	uint32_t* pStateMasks = NULL;
@@ -446,6 +451,7 @@ D2StatesTxt* DATATBLS_GetStatesTxtRecord(int nStateId)
 }
 
 //D2Common.0x6FD4F5A0
+// 1.13c D2Common+0x5F310
 void __fastcall DATATBLS_LoadPetTypeTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
@@ -604,6 +610,7 @@ void __stdcall DATATBLS_WriteBinFile(char* szFileName, void* pWriteBuffer, size_
 }
 
 //D2Common.0x6FD4FD70 (#10578)
+// 1.13c D2Common+0x5EF40
 void* __stdcall DATATBLS_CompileTxt(HD2ARCHIVE hArchive, const char* szName, D2BinFieldStrc* pTbl, int* pRecordCount, size_t dwSize)
 {
 	D2BinFileStrc* pBinFile = NULL;
@@ -696,6 +703,7 @@ void __stdcall DATATBLS_ToggleCompileTxtFlag(BOOL bSilent)
 }
 
 //D2Common.0x6FD50110 (#10579)
+// 1.13c D2Common+0x5D710
 void __stdcall DATATBLS_UnloadBin(void* pBinFile)
 {
 	if (pBinFile)
@@ -1019,6 +1027,7 @@ void __fastcall DATATBLS_LoadSomeTxts(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD50FB0
+// 1.13c D2Common+0x60A80
 void __fastcall DATATBLS_LoadCharStatsTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
@@ -1103,6 +1112,7 @@ void __fastcall DATATBLS_LoadCharStatsTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD51BF0
+// 1.13c D2Common+0x603F0
 void __fastcall DATATBLS_LoadDifficultyLevelsTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =

@@ -1,4 +1,5 @@
 #include "D2Skills.h"
+#include <cstddef>
 
 #include "D2Collision.h"
 #include "D2Composit.h"
@@ -910,7 +911,7 @@ void* __stdcall D2Common_10959(D2UnitStrc* pUnit)
 	return NULL;
 }
 
-//D2Common.0x6FDB02C0 (#10960)
+// 1.13c D2Common+0x4F000 (#10335)
 void __stdcall SKILLS_FreeSkillList(D2UnitStrc* pUnit)
 {
 	D2SkillListStrc* pSkillList = NULL;
@@ -2104,6 +2105,7 @@ void __stdcall D2Common_11031(D2UnitStrc* pUnit, int nSkillId, int a3)
 }
 
 //D2Common.0x6FDB18B0 (#10974)
+// 1.13c D2Common+0x4E1A0
 void __stdcall SKILLS_SetSkillMode(D2SkillStrc* pSkill, int nSkillMode)
 {
 	if (pSkill && nSkillMode >= 0 && nSkillMode <= 32)
@@ -2238,6 +2240,7 @@ void __stdcall SKILLS_SetFlags(D2SkillStrc* pSkill, int nFlags)
 }
 
 //D2Common.0x6FDB1BA0 (#10985)
+// 1.13c D2Common+0x4DE40
 int __stdcall SKILLS_GetFlags(D2SkillStrc* pSkill)
 {
 	if (pSkill)
@@ -2446,7 +2449,7 @@ int __stdcall SKILLS_GetHighestSkillLevelById(D2UnitStrc* pUnit, int nSkillId)
 	return 0;
 }
 
-//D2Common.0x6FDB2280 (#11001)
+// 1.13c D2Common+0x4EA00 (#10090)
 int __stdcall SKILLS_GetManaCosts(int nSkillId, int nSkillLevel)
 {
 	D2SkillsTxt* pSkillsTxtRecord = DATATBLS_GetSkillsTxtRecord(nSkillId);
@@ -2786,6 +2789,9 @@ int __stdcall SKILLS_GetClassIdFromSkillId(int nSkillId)
 }
 
 //D2Common.0x6FDB2EC0 (#11010)
+// 1.13c D2Common+0x4F450
+static_assert(offsetof(D2SkillsTxt, nCharClass) == 0x0C);
+static_assert(sizeof(D2SkillsTxt) == 0x23C);
 BOOL __stdcall SKILLS_IsPlayerClassSkill(int nSkillId, int* pPlayerClass)
 {
 	D2_ASSERT(pPlayerClass);
@@ -2850,6 +2856,7 @@ int __stdcall D2Common_11014_ConvertShapeShiftedMode(int nArrayIndex, int nMonst
 }
 
 //D2Common.0x6FDB30A0 (#11013)
+// 1.13c D2Common+0x501E0
 void __stdcall D2COMMON_11013_ConvertMode(D2UnitStrc* pUnit, int* pType, int* pClass, int* pMode, const char* szFile, int nLine)
 {
 	if (!(pUnit && (pUnit->dwFlagEx & UNITFLAGEX_ISSHAPESHIFTED) && sgptDataTables->nTransformStates > 0))
@@ -3219,9 +3226,10 @@ int __stdcall D2Common_11028(int a1)
 }
 
 //D2Common.0x6FDB3AB0 (#11033)
+// 1.13c D2Common+0x4DC30
 int __stdcall D2Common_11033(int nLevel, int nParam, int nMax)
 {
-	int nValue = nParam + (nMax - nParam) * 110 * nLevel / (nLevel + 6) / 100;
+	int nValue = nParam + ((nLevel * 110) / (nLevel + 6)) * (nMax - nParam) / 100;
 
 	if (nValue > nMax)
 	{
@@ -3484,6 +3492,7 @@ int __stdcall SKILLS_GetClassSkillId(int nClassId, int nPosition)
 }
 
 //D2Common.0x6FDB4150 (#11042)
+// 1.13c D2Common+0x4E520
 int __stdcall SKILLS_GetPlayerSkillCount(int nClassId)
 {
 	if (nClassId >= 0 && nClassId < 7)

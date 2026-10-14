@@ -128,6 +128,7 @@ int __stdcall D2Common_11097(D2FieldStrc* pField, int nX, int nY)
 }
 
 //D2Common.0x6FD522A0 (#11098)
+// 1.13c D2Common+0x7E290
 int __stdcall D2Common_11098(D2FieldStrc* pField, int* pX, int* pY)
 {
 	

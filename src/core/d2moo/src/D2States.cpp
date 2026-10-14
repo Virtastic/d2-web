@@ -267,6 +267,7 @@ BOOL __stdcall STATES_CheckStateMaskAttRedOnUnit(D2UnitStrc* pUnit)
 	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_ATTRED);
 }
 
+// 1.13c D2Common+0x33B80
 //D2Common.0x6FDB4E60 (#10551)
 BOOL __stdcall STATES_IsUnitShapeShifted(D2UnitStrc* pUnit)
 {

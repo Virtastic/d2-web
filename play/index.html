@@ -335,6 +335,30 @@ function showBootFailure(why) {
           Module.ccall('d2_prng_check', null, ['number', 'number', 'number', 'number', 'bigint'], [low >>> 0, high >>> 0, nMax >>> 0, count >>> 0, BigInt(out)]);
           const r = Array.from(Module.HEAPU32.subarray(out >> 2, (out >> 2) + 3)); Module._free(out); return r;
         };
+        window.__d2.interactCount = (fields, count) => {
+          const p = Module._malloc(128);
+          try {
+            Module.HEAPU32.set(fields, Number(p) >> 2);
+            return Module.ccall('d2_interact_count_check', 'number', ['bigint', 'number'], [BigInt(p), count]);
+          } finally { Module._free(p); }
+        };
+        // FUNCTION vector s3408: opaque renderer handle supplied by platform state.
+        window.__d2.clientWindowHandle = (value) => {
+          Module.ccall('d2_client_window_handle_pin', null, ['number'], [value >>> 0]);
+          return [Module.ccall('d2_client_window_handle', 'number', [], []) >>> 0,
+                  Module.ccall('d2_client_window_handle', 'number', [], []) >>> 0];
+        };
+        // FUNCTION vector s3400: set the pinned D2Client global and call export ordinal 10001's model.
+        window.__d2.clientInitFlag = (globalValue, ignoredArg) => {
+          Module.ccall('d2_client_10001_pin', null, ['number'], [globalValue >>> 0]);
+          return Module.ccall('d2_client_10001', 'number', ['number'], [ignoredArg >>> 0]) >>> 0;
+        };
+        // FUNCTION vector s3401: pin one captured table byte and the initialized state for ordinal 10002.
+        window.__d2.clientByteLookup = (index, ignoredArg, tableByte) => {
+          Module.ccall('d2_client_10001_pin', null, ['number'], [1]);
+          Module.ccall('d2_client_10002_pin', null, ['number', 'number'], [index >>> 0, tableByte >>> 0]);
+          return Module.ccall('d2_client_10002', 'number', ['number', 'number'], [ignoredArg >>> 0, index | 0]) >>> 0;
+        };
         log('smoke: ' + r + '  i32: ' + i32);
       },
     };

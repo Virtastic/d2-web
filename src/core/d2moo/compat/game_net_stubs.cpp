@@ -203,6 +203,7 @@ void __fastcall CLIENTS_SetCreateTime(D2ClientStrc* pClient, DWORD dwCreateTime)
 // The iron golem restore needs it; nothing in this engine summons a golem, so it is never reached.
 void __fastcall CLIENTS_SetIronGolemItemGUID(D2ClientStrc* pClient, int32_t nIronGolemItemGUID) { if (pClient) pClient->nIronGolemItemGUID = nIronGolemItemGUID; }
 void __fastcall CLIENTS_SetPlayerInClient(D2ClientStrc* pClient, D2UnitStrc* pUnit) { if (pClient) pClient->pPlayer = pUnit; }
+// 1.13c D2Game+0x494E0
 void __fastcall CLIENTS_SetSkillHotKey(D2ClientStrc* pClient, int32_t nHotkeyId, int16_t nSkillId, uint8_t nHand, int32_t nItemGUID) {
     if (!pClient || nHotkeyId < 0 || nHotkeyId >= 16) return;
     pClient->HotkeySkills[nHotkeyId].nSkill = nSkillId;

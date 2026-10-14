@@ -2,6 +2,7 @@
 
 
 //D2Common.0x6FD720A0
+// 1.13c D2Common+0x82F90
 void __fastcall DATATBLS_LoadOverlayTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =

@@ -78,6 +78,7 @@ D2SeedStrc* gpAutomapSeed = &sgptDataTables->pAutomapSeed;
 LPCRITICAL_SECTION gpLvlSubTypeFilesCriticalSection;
 
 //D2Common.0x6FD5EAE0
+// 1.13c D2Common+0x6E130
 void __fastcall DATATBLS_LoadLevelsTxt(HD2ARCHIVE hArchive)
 {
 	int nMonsterCounter = 0;
@@ -283,9 +284,10 @@ void __fastcall DATATBLS_LoadLevelsTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD603C0 (#10631)
+// 1.13c D2Common+0x6CCC0
 D2LevelsTxt* __stdcall DATATBLS_GetLevelsTxtRecord(int nLevelId)
 {
-	if (nLevelId >= 0 && nLevelId < sgptDataTables->nLevelsTxtRecordCount)
+	if (nLevelId > 0 && nLevelId < sgptDataTables->nLevelsTxtRecordCount)
 	{
 		return &sgptDataTables->pLevelsTxt[nLevelId];
 	}
@@ -368,6 +370,7 @@ int* __fastcall DATATBLS_GetPortalLevels(int* pnPortalLevels)
 }
 
 //D2Common.0x6FD60570
+// 1.13c D2Common+0x6D9B0
 void __fastcall DATATBLS_LoadLevelDefsBin(HD2ARCHIVE hArchive)
 {
 	int nPortalIndex = 0;
@@ -475,6 +478,7 @@ D2LevelDefBin* __fastcall DATATBLS_GetLevelDefRecord(int nLevelId)
 }
 
 //D2Common.0x6FD60DC0
+// 1.13c D2Common+0x6D3A0
 void __fastcall DATATBLS_LoadLevelTypesTxt(HD2ARCHIVE hArchive)
 {	
 	int nLen = 0;
@@ -587,6 +591,7 @@ void __stdcall DATATBLS_GetFileNameFromLevelTypeAndFileId(int nLevelType, int nF
 }
 
 //D2Common.0x6FD61570
+// 1.13c D2Common+0x70110
 void __fastcall DATATBLS_LoadLvlPrestTxt(HD2ARCHIVE hArchive, int a2)
 {
 	int nLength = 0;
@@ -714,6 +719,7 @@ D2LvlPrestTxt* __fastcall DATATBLS_GetLvlPrestTxtRecordFromLevelId(int nLevelId)
 }
 
 //D2Common.0x6FD61BC0
+// 1.13c D2Common+0x6D190
 void __fastcall DATATBLS_LoadLvlWarpTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
@@ -764,6 +770,7 @@ D2LvlWarpTxt* __fastcall DATATBLS_GetLvlWarpTxtRecordFromLevelIdAndDirection(int
 }
 
 //D2Common.0x6FD61E60
+// 1.13c D2Common+0x6D050
 void __fastcall DATATBLS_LoadLvlMazeTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =

@@ -5,6 +5,8 @@
 // hand-ported fixups in src/core/tables/fixups.cpp remain the test runner's independent check.
 #include <D2Common.h>
 #include <D2DataTbls.h>
+#include <D2Skills.h>
+#include <D2Waypoints.h>
 #include "../../../assets/mpqvfs.h"
 #include "datatbls_bridge.h"
 
@@ -64,4 +66,29 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_datatbl(const char* name) {
 #undef T
     out = p ? std::to_string((uintptr_t)p) + ":" + std::to_string(c) : "";
     return out.c_str();
+}
+
+// s3000: drive the mapped 1.13c entry against the same loaded SkillsTxt rows. The null-table
+// variant changes only the retail guard input and restores the pointer before returning.
+extern "C" EMSCRIPTEN_KEEPALIVE int d2_skillclass_check(int skillId, int nullSkillsTable, int* playerClass) {
+    D2SkillsTxt* saved = sgptDataTables->pSkillsTxt;
+    if (nullSkillsTable) sgptDataTables->pSkillsTxt = nullptr;
+    const int result = SKILLS_IsPlayerClassSkill(skillId, playerClass);
+    sgptDataTables->pSkillsTxt = saved;
+    return result;
+}
+
+// s3029: index of DATATBLS_GetLevelsTxtRecord(id) in the loaded Levels.txt array, or -1 for NULL.
+extern "C" EMSCRIPTEN_KEEPALIVE int d2_levels_txt_record(int id) {
+    const D2LevelsTxt* r = DATATBLS_GetLevelsTxtRecord(id);
+    return r ? (int)(r - sgptDataTables->pLevelsTxt) : -1;
+}
+
+// s3049: WAYPOINTS_ValidateAndCopyWaypointData on a static 2x8 word block (wasm64 pointers are BigInt in JS,
+// so words are addressed by index): k 0-7 source, 8-15 destination. Arg k<0 runs the call.
+extern "C" EMSCRIPTEN_KEEPALIVE int d2_waypoint_copy(int k, int v) {
+    static uint16_t b[16];
+    if (k < 0) { WAYPOINTS_ValidateAndCopyWaypointData((D2WaypointDataStrc*)b, (D2WaypointDataStrc*)(b + 8)); return 0; }
+    if (v >= 0) b[k] = (uint16_t)v;
+    return b[k];
 }

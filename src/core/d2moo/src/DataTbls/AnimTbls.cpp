@@ -6,6 +6,7 @@
 #include <Archive.h>
 
 //D2Common.0x6FD473C0
+// 1.13c D2Common+0x41E50
 D2AnimDataTableStrc* __fastcall DATATBLS_LoadAnimDataD2(HD2ARCHIVE hArchive)
 {
 	D2AnimDataTableStrc* pAnimDataTable = D2_CALLOC_STRC_POOL(nullptr, D2AnimDataTableStrc);

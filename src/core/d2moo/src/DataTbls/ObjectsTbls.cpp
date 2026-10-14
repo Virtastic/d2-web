@@ -3,6 +3,7 @@
 
 
 //D2Common.0x6FD6FDF0
+// 1.13c D2Common+0x3F0C0
 void __fastcall DATATBLS_LoadObjectsTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
@@ -206,6 +207,7 @@ void __fastcall DATATBLS_UnloadObjGroupTxt()
 }
 
 //D2Common.0x6FD719A0
+// 1.13c D2Common+0x3EC60
 void __fastcall DATATBLS_LoadObjGroupTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
@@ -254,6 +256,7 @@ D2ObjGroupTxt* __stdcall DATATBLS_GetObjGroupTxtRecord(int nId)
 }
 
 //D2Common.0x6FD71E30
+// 1.13c D2Common+0x3EA90
 void __fastcall DATATBLS_LoadShrinesTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =

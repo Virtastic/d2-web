@@ -9246,8 +9246,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_convert_expansion(const uint8_t* data, int l
     if (len < 0x28 || (data[0x24] & 0x20)) return -2;
     std::vector<uint8_t> copy(data, data + len);
     copy[0x24] |= 0x20;
-    { uint32_t sum = 0; for (int i = 0; i < len; i++) { const uint32_t b = (i >= 12 && i < 16) ? 0 : copy[i]; sum = ((sum << 1) | (sum >> 31)) + b; }
-      memcpy(&copy[12], &sum, 4); }  // .d2s checksum over the file with bytes 12..15 zero
+    { const uint32_t sum = (uint32_t)D2GAME_SAVE_CalculateChecksum_6FC8A140((D2SaveHeaderStrc*)copy.data(), len);
+      memcpy(&copy[12], &sum, 4); }  // 1.13c CRC-32 (checksum field zeroed by the routine)
     const int rc = d2_session_create_from_save(copy.data(), len, difficulty);
     if (rc != 0) return rc > 0 ? -rc : -3;
     int n = d2_session_save_d2s(out, cap);

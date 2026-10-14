@@ -42,6 +42,7 @@ void __fastcall DATATBLS_LoadPlrType_ModeTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD72B30
+// 1.13c D2Common+0x19330
 void __fastcall DATATBLS_LoadMonModeTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
@@ -109,6 +110,7 @@ void __fastcall DATATBLS_LoadObjType_ModeTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD72FC0
+// 1.13c D2Common+0x19110
 void __fastcall DATATBLS_LoadCompositTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
@@ -122,6 +124,7 @@ void __fastcall DATATBLS_LoadCompositTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD73040
+// 1.13c D2Common+0x19090
 void __fastcall DATATBLS_LoadArmTypeTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =

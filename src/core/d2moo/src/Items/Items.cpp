@@ -32,6 +32,7 @@ void __stdcall ITEMS_AllocItemData(void* pMemPool, D2UnitStrc* pItem)
 	}
 }
 
+// 1.13c D2Common+0x2A5C0
 //D2Common.0x6FD983F0 (#10688)
 void __stdcall ITEMS_FreeItemData(void* pMemPool, D2UnitStrc* pItem)
 {
@@ -46,6 +47,7 @@ void __stdcall ITEMS_FreeItemData(void* pMemPool, D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD98430 (#10689)
+// 1.13c D2Common+0x23C50
 uint8_t __stdcall ITEMS_GetBodyLocation(D2UnitStrc* pItem)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -56,6 +58,7 @@ uint8_t __stdcall ITEMS_GetBodyLocation(D2UnitStrc* pItem)
 	return BODYLOC_NONE;
 }
 
+// 1.13c D2Common+0x23C30
 //D2Common.0x6FD98450 (#10690)
 void __stdcall ITEMS_SetBodyLocation(D2UnitStrc* pItem, uint8_t nBodyLoc)
 {
@@ -65,6 +68,7 @@ void __stdcall ITEMS_SetBodyLocation(D2UnitStrc* pItem, uint8_t nBodyLoc)
 	}
 }
 
+// 1.13c D2Common+0x23C10
 //D2Common.0x6FD98470 (#10691)
 D2SeedStrc* __stdcall ITEMS_GetItemSeed(D2UnitStrc* pItem)
 {
@@ -85,6 +89,7 @@ void __stdcall ITEMS_InitItemSeed(D2UnitStrc* pItem)
 	}
 }
 
+// 1.13c D2Common+0x23BC0
 //D2Common.0x6FD984B0 (#10693)
 int __stdcall ITEMS_GetItemStartSeed(D2UnitStrc* pItem)
 {
@@ -105,6 +110,7 @@ void __stdcall ITEMS_SetItemStartSeed(D2UnitStrc* pItem, int nSeed)
 	pItem->pItemData->dwInitSeed = nSeed;
 }
 
+// 1.13c D2Common+0x23B40
 //D2Common.0x6FD98550 (#10695)
 int __stdcall ITEMS_GetItemQuality(D2UnitStrc* pItem)
 {
@@ -116,6 +122,7 @@ int __stdcall ITEMS_GetItemQuality(D2UnitStrc* pItem)
 	return ITEMQUAL_NORMAL;
 }
 
+// 1.13c D2Common+0x23B20
 //D2Common.0x6FD98580 (#10696)
 void __stdcall ITEMS_SetItemQuality(D2UnitStrc* pItem, int nQuality)
 {
@@ -126,6 +133,7 @@ void __stdcall ITEMS_SetItemQuality(D2UnitStrc* pItem, int nQuality)
 }
 
 //D2Common.0x6FD985A0 (#10699)
+// 1.13c D2Common+0x23AF0
 uint16_t __stdcall ITEMS_GetPrefixId(D2UnitStrc* pItem, int nPrefixNo)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -136,6 +144,7 @@ uint16_t __stdcall ITEMS_GetPrefixId(D2UnitStrc* pItem, int nPrefixNo)
 	return 0;
 }
 
+// 1.13c D2Common+0x23AC0
 //D2Common.0x6FD985D0 (#10700)
 void __stdcall ITEMS_AssignPrefix(D2UnitStrc* pItem, uint16_t nPrefix, int nPrefixNo)
 {
@@ -156,6 +165,7 @@ uint16_t __stdcall ITEMS_GetAutoAffix(D2UnitStrc* pItem)
 	return 0;
 }
 
+// 1.13c D2Common+0x23A70
 //D2Common.0x6FD98630 (#10698)
 void __stdcall ITEMS_SetAutoAffix(D2UnitStrc* pItem, uint16_t nAffix)
 {
@@ -166,6 +176,7 @@ void __stdcall ITEMS_SetAutoAffix(D2UnitStrc* pItem, uint16_t nAffix)
 }
 
 //D2Common.0x6FD98650 (#10701)
+// 1.13c D2Common+0x23A40
 uint16_t __stdcall ITEMS_GetSuffixId(D2UnitStrc* pItem, int nSuffixNo)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -176,6 +187,7 @@ uint16_t __stdcall ITEMS_GetSuffixId(D2UnitStrc* pItem, int nSuffixNo)
 	return 0;
 }
 
+// 1.13c D2Common+0x23A10
 //D2Common.0x6FD98680 (#10702)
 void __stdcall ITEMS_AssignSuffix(D2UnitStrc* pItem, uint16_t nSuffix, int nSuffixNo)
 {
@@ -196,6 +208,7 @@ uint16_t __stdcall ITEMS_GetRarePrefixId(D2UnitStrc* pItem)
 	return 0;
 }
 
+// 1.13c D2Common+0x239C0
 //D2Common.0x6FD986E0 (#10704)
 void __stdcall ITEMS_AssignRarePrefix(D2UnitStrc* pItem, uint16_t nPrefix)
 {
@@ -216,6 +229,7 @@ uint16_t __stdcall ITEMS_GetRareSuffixId(D2UnitStrc* pItem)
 	return 0;
 }
 
+// 1.13c D2Common+0x23970
 //D2Common.0x6FD98730 (#10706)
 void __stdcall ITEMS_AssignRareSuffix(D2UnitStrc* pItem, uint16_t nSuffix)
 {
@@ -252,6 +266,7 @@ void __stdcall ITEMS_SetItemFlag(D2UnitStrc* pItem, uint32_t dwFlag, BOOL bSet)
 	}
 }
 
+// 1.13c D2Common+0x238E0
 //D2Common.0x6FD987C0 (#10709)
 uint32_t __stdcall ITEMS_GetItemFlags(D2UnitStrc* pItem)
 {
@@ -302,6 +317,7 @@ uint32_t __stdcall ITEMS_GetItemCMDFlags(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD98870 (#10717)
+// 1.13c D2Common+0x23810
 int __stdcall ITEMS_GetItemLevel(D2UnitStrc* pItem)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -316,6 +332,7 @@ int __stdcall ITEMS_GetItemLevel(D2UnitStrc* pItem)
 	return 1;
 }
 
+// 1.13c D2Common+0x237E0
 //D2Common.0x6FD988B0 (#10718)
 void __stdcall ITEMS_SetItemLevel(D2UnitStrc* pItem, int nItemLevel)
 {
@@ -330,6 +347,7 @@ void __stdcall ITEMS_SetItemLevel(D2UnitStrc* pItem, int nItemLevel)
 }
 
 //D2Common.0x6FD988E0 (#10719)
+// 1.13c D2Common+0x237C0
 uint8_t __stdcall ITEMS_GetInvPage(D2UnitStrc* pItem)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -340,6 +358,7 @@ uint8_t __stdcall ITEMS_GetInvPage(D2UnitStrc* pItem)
 	return -1;
 }
 
+// 1.13c D2Common+0x237A0
 //D2Common.0x6FD98900 (#10720)
 void __stdcall ITEMS_SetInvPage(D2UnitStrc* pItem, uint8_t nPage)
 {
@@ -390,6 +409,7 @@ void __stdcall ITEMS_SetItemCell(D2UnitStrc* pItem, int nItemCell)
 }
 
 //D2Common.0x6FD989A0 (#10723)
+// 1.13c D2Common+0x23700
 char* __stdcall ITEMS_GetEarName(D2UnitStrc* pItem)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -417,6 +437,7 @@ void __stdcall ITEMS_SetEarName(D2UnitStrc* pItem, char* szName)
 }
 
 //D2Common.0x6FD989F0 (#10725)
+// 1.13c D2Common+0x236B0
 uint8_t __stdcall ITEMS_GetEarLevel(D2UnitStrc* pItem)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -428,6 +449,7 @@ uint8_t __stdcall ITEMS_GetEarLevel(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD98A10 (#10726)
+// 1.13c D2Common+0x23690
 void __stdcall ITEMS_SetEarLevel(D2UnitStrc* pItem, uint8_t nLevel)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -448,6 +470,7 @@ uint8_t __stdcall ITEMS_GetVarGfxIndex(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD98A50 (#10728)
+// 1.13c D2Common+0x23650
 void __stdcall ITEMS_SetVarGfxIndex(D2UnitStrc* pItem, uint8_t nIndex)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -833,6 +856,7 @@ BOOL __stdcall ITEMS_CanBeNormal(D2UnitStrc* pItem)
 	return 0;
 }
 
+// 1.13c D2Common+0x23330
 //D2Common.0x6FD992C0 (#10744)
 uint32_t __stdcall ITEMS_GetWeaponClassCode(D2UnitStrc* pItem)
 {
@@ -903,6 +927,7 @@ uint8_t __stdcall ITEMS_GetComponent(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD99500 (#10749)
+// 1.13c D2Common+0x231A0
 void __stdcall ITEMS_GetDimensions(D2UnitStrc* pItem, uint8_t* pWidth, uint8_t* pHeight, const char* szFile, int nLine)
 {
 	if (pItem && pItem->dwUnitType == UNIT_ITEM)
@@ -981,6 +1006,7 @@ uint8_t __stdcall ITEMS_GetItemQlvl(const D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD99700 (#10754)
+// 1.13c D2Common+0x21FE0
 int __stdcall ITEMS_CheckIfFlagIsSet(int nFlags, int nFlag)
 {
 	return nFlags & nFlag;
@@ -1440,6 +1466,7 @@ int __fastcall ITEMS_GetRequiredLevel(D2UnitStrc* pItem, D2UnitStrc* pPlayer)
 	return nRequiredLevel;
 }
 
+// 1.13c D2Common+0x26DA0
 //D2Common.0x6FD9A3F0 (#10757)
 int __stdcall ITEMS_GetLevelRequirement(D2UnitStrc* pItem, D2UnitStrc* pUnit)
 {
@@ -3571,6 +3598,7 @@ int __stdcall ITEMS_GetClassOfClassSpecificItem(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD9E410 (#10823)
+// 1.13c D2Common+0x22430
 uint16_t __stdcall ITEMS_GetWeaponClassId(D2UnitStrc* pItem)
 {
 	static const D2CompositStrc stru_6FDE3C08[8] =
@@ -3624,6 +3652,7 @@ uint32_t __stdcall ITEMS_GetTransmogrify(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD9E550 (#10826)
+// 1.13c D2Common+0x24210
 int __stdcall ITEMS_IsMagSetRarUniCrfOrTmp(D2UnitStrc* pItem)
 {
 	if (D2ItemDataStrc* pItemData = ITEMS_GetItemData(pItem))

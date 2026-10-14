@@ -660,6 +660,7 @@ D2MapAIStrc* __fastcall DRLGPRESET_CreateCopyOfMapAI(void* pMemPool, D2MapAIStrc
 	return pNewMapAI;
 }
 
+// 1.13c D2Common+0x9DD0
 //D2Common.0x6FD864F0 (#10021)
 D2MapAIStrc* __fastcall DRLGPRESET_ChangeMapAI(D2MapAIStrc** ppMapAI1, D2MapAIStrc** ppMapAI2)
 {

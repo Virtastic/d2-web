@@ -144,6 +144,7 @@ void __fastcall DATATBLS_MissileCalcLinker(char* pSrc, void* pRecord, int nOffse
 }
 
 //D2Common.0x6FD63180
+// 1.13c D2Common+0x7C8D0
 void __fastcall DATATBLS_LoadMissilesTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =

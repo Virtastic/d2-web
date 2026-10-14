@@ -5,6 +5,7 @@
 #include "GAME/Game.h"
 
 //D2Game.0x6FCC3610
+// 1.13c D2Game+0x37220 (checked against decompile, no delta)
 void __fastcall SUNITEVENT_FreeEventList(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (!pUnit)

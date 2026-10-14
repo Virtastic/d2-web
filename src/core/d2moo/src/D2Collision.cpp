@@ -1241,6 +1241,7 @@ int __fastcall COLLISION_TrySetUnitCollisionMask(D2ActiveRoomStrc* pRoom1, int n
 	}
 }
 
+// 1.13c D2Common+0x4CD90
 //D2Common.0x6FD451D0 (#10133)
 void __fastcall COLLISION_SetUnitCollisionMask(D2ActiveRoomStrc* pRoom1, int nX1, int nY1, D2ActiveRoomStrc* pRoom2, int nX2, int nY2, int nCollisionPattern, uint16_t nCollisionMask)
 {

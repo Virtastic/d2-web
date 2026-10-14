@@ -47,6 +47,7 @@ int __stdcall UNITROOM_AddUnitToRoomEx(D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoo
 }
 
 //D2Common.0x6FDBD100 (#10384)
+// 1.13c D2Common+0x66900
 int __stdcall UNITROOM_AddUnitToRoom(D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoom)
 {
 	return UNITROOM_AddUnitToRoomEx(pUnit, pRoom, 1);

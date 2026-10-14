@@ -9,6 +9,18 @@
 #include <cstdint>
 #include <emscripten.h>
 
+namespace {
+
+// Opaque backing storage for the retail MCP-client context. The 1.13c reset
+// routine clears 99 dwords from its base; field meanings are not recovered yet.
+struct McpClientOpaquePrefix {
+    uint32_t words[99];
+};
+static_assert(sizeof(McpClientOpaquePrefix) == 0x18c);
+static McpClientOpaquePrefix g_mcpClientOpaquePrefix{};
+
+}
+
 // MCP message ids (one space, used both directions: a reply carries the request's id).
 enum : uint8_t {
     MCP_STARTUP = 0x01,
@@ -24,6 +36,11 @@ enum : uint8_t {
 };
 
 extern "C" {
+
+// 1.13c D2MCPClient+0x67F0: return the stable address of the MCP-client context.
+EMSCRIPTEN_KEEPALIVE void* d2_realm_mcp_client_storage() {
+    return &g_mcpClientOpaquePrefix;
+}
 
 // MCP frame header: [total:u16 LE][op:u8], where total counts the 3-byte header and the body.
 // Writes the 3 header bytes to `out`; returns the total frame length (3 + bodyLen), or -1 on

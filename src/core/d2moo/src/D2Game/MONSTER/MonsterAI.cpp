@@ -305,6 +305,12 @@ void __fastcall MONSTERAI_FreeMonsterInteract(D2GameStrc* pGame, D2MonsterIntera
     D2_FREE_POOL(pGame->pMemoryPool, pMonInteract);
 }
 
+// 1.13c D2Game+0x48390: retail offsets 0x00/0x08 use x86 pointers;
+// the packed wasm64 equivalents preserve field order with native pointers.
+static_assert(offsetof(D2MonsterInteractStrc, pInteractInfo) == 0);
+static_assert(offsetof(D2InteractInfoStrc, pUnit) == 0);
+static_assert(offsetof(D2InteractInfoStrc, pNext) == sizeof(void*) + sizeof(int32_t));
+static_assert(sizeof(D2InteractInfoStrc) == 2 * sizeof(void*) + sizeof(int32_t));
 //D2Game.0x6FC619F0
 int32_t __fastcall MONSTERAI_GetInteractUnitCount(D2MonsterInteractStrc* pMonInteract)
 {
@@ -322,6 +328,7 @@ int32_t __fastcall MONSTERAI_GetInteractUnitCount(D2MonsterInteractStrc* pMonInt
 }
 
 //D2Game.0x6FC61A10
+// 1.13c D2Game+0x48370
 int32_t __fastcall MONSTERAI_HasInteractUnit(D2MonsterInteractStrc* pMonInteract)
 {   
     for (D2InteractInfoStrc* i = pMonInteract->pInteractInfo; i; i = i->pNext)

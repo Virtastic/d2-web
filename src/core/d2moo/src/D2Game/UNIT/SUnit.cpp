@@ -654,6 +654,7 @@ D2UnitStrc* __fastcall SUNIT_AllocUnitData(int32_t nUnitType, int32_t nClassId, 
 }
 
 //D2Game.0x6FCBBB00
+// 1.13c D2Game+0xE03A0 (checked against decompile, no delta)
 D2UnitStrc* __fastcall SUNIT_GetServerUnit(D2GameStrc* pGame, int32_t nUnitType, int32_t nUnitGUID)
 {
     D2_ASSERT(pGame);

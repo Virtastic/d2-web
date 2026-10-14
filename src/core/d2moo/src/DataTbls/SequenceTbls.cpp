@@ -1161,6 +1161,7 @@ static const int gWeaponIndexToClassMap[NUM_WEAPON_CLASSES][2] =
 
 
 
+// 1.13c D2Common+0x2E940
 //D2Common.0x6FD727A0 (#10682)
 D2AnimSeqTxt* __stdcall DATATBLS_GetMonSeqTxtRecordFromUnit(D2UnitStrc* pUnit)
 {
@@ -1217,6 +1218,7 @@ D2AnimSeqRecordStrc* __fastcall DATATBLS_GetSeqRecordFromUnit(D2UnitStrc* pUnit)
 	return nullptr;
 }
 
+// 1.13c D2Common+0x2E920
 //D2Common.0x6FD728A0 (#10683)
 int __stdcall DATATBLS_GetSeqFramePointsCount(D2UnitStrc* pUnit)
 {
@@ -1242,6 +1244,7 @@ int __stdcall DATATBLS_GetSeqFrameCount(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FD728E0 (#10685)
+// 1.13c D2Common+0x2E6E0
 void __stdcall DATATBLS_ComputeSequenceAnimation(D2AnimSeqTxt* pMonSeqTxt, int nTargetFramePoint, int nCurrentFramePoint, unsigned int* pMode, unsigned int* pFrame, int* pDirection, int* pEvent)
 {
 	if (pMonSeqTxt)
@@ -1329,6 +1332,7 @@ void __fastcall DATATBLS_LoadMonSeqTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD6F200 (#11262)
+// 1.13c D2Common+0x52E00
 D2AnimSeqRecordStrc* __stdcall DATATBLS_GetMonSeqTableRecord(int nSequence)
 {
 	if (nSequence >= 0 && nSequence < sgptDataTables->nMonSeqTableRecordCount)

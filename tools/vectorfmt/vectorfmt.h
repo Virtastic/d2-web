@@ -621,7 +621,84 @@ struct D2VecTownPortal {
 #pragma pack(pop)
 static_assert(sizeof(D2VecTownPortal) == 39, "town portal record");
 
-enum D2VecKind : uint32_t { D2VEC_PRNG = 1, D2VEC_DRLG = 2, D2VEC_ITEMGEN = 3, D2VEC_MONSPAWN = 4, D2VEC_TABLE = 5, D2VEC_COMBAT = 6, D2VEC_AISPAWN = 7, D2VEC_AIFRAME = 8, D2VEC_AITARGET = 9, D2VEC_COMBATRESULT = 10, D2VEC_DAMAGECALC = 11, D2VEC_A1Q6 = 12, D2VEC_A1Q6PLAYER = 13, D2VEC_A1Q6TIMER = 14, D2VEC_A1Q6COMPLETE = 15, D2VEC_A1Q6DROP = 16, D2VEC_A1Q6TRAVEL = 17, D2VEC_NPCDIALOG = 18, D2VEC_NPCRESPONSE = 19, D2VEC_VENDORITEM = 20, D2VEC_VENDORBUY = 21, D2VEC_VENDORSELL = 22, D2VEC_HIRE = 23, D2VEC_VENDORMULTIBUY = 24, D2VEC_TILE = 25, D2VEC_TILEPICK = 26, D2VEC_AITRACE = 27, D2VEC_AIPATH = 28, D2VEC_MONDROP = 29, D2VEC_ROOMSIGHT = 30, D2VEC_QUEUEDUNIT = 31, D2VEC_ROOMCALLER = 32, D2VEC_TOWNPORTAL = 34 };
+// SKILLCLASS (s3000): table row index and whether the skills-table pointer is null; outputs are
+// the Boolean result and the output class. Null output is fatal in retail and is not replayable.
+#pragma pack(push, 1)
+struct D2VecSkillClass {
+    int32_t skillId;
+    uint8_t nullSkillsTable;
+    uint8_t result;
+    int32_t playerClass;
+};
+#pragma pack(pop)
+static_assert(sizeof(D2VecSkillClass) == 10, "skill-class record");
+
+struct D2VecClientInitFlag {
+    uint32_t globalValue;
+    uint32_t ignoredArg;
+    uint32_t result;
+};
+static_assert(sizeof(D2VecClientInitFlag) == 12, "client init flag record");
+
+struct D2VecClientByteLookup {
+    int32_t index;
+    uint32_t ignoredArg;
+    uint32_t tableByte;
+    uint32_t result;
+};
+static_assert(sizeof(D2VecClientByteLookup) == 16, "client byte lookup record");
+
+struct D2VecLevelsTxtRecord {
+    int32_t id;
+    uint32_t count;    // levels record count at sgptDataTables+0xC5C
+    int32_t index;     // (returned - base) / 0x220, -1 for NULL
+};
+static_assert(sizeof(D2VecLevelsTxtRecord) == 12, "levels txt record lookup");
+
+struct D2VecWaypointCopy {   // s3049: D2Common 0x67D00 validate-and-copy of a 16-byte waypoint block
+    uint16_t in[8];       // source block before the call (in[0] is 0, 0x101 or 0x102)
+    uint16_t srcAfter[8]; // source block after (flags[0] normalised to 0x102)
+    uint16_t out[8];      // destination block (pre-filled 0xFFFF)
+};
+static_assert(sizeof(D2VecWaypointCopy) == 48, "waypoint copy record");
+
+struct D2VecClientWindowHandle {
+    uint32_t globalValue;
+    uint32_t result;
+    uint32_t globalAfter;
+};
+static_assert(sizeof(D2VecClientWindowHandle) == 12, "client window handle record");
+
+struct D2VecGameReturnArgument {
+    int32_t input;
+    int32_t result;
+};
+static_assert(sizeof(D2VecGameReturnArgument) == 8, "game return argument record");
+
+struct D2VecGameClearFlag { int32_t before, after; };   // kind 40: D2Game+0x38BB0 sentinel in, global read back
+static_assert(sizeof(D2VecGameClearFlag) == 8, "game clear flag record");
+struct D2VecGameSetInitSeed {
+    int32_t input;
+    int32_t globalAfter;   // int32 at D2Game 0x6FD2E354 (rva 0x10E354) read back
+};
+static_assert(sizeof(D2VecGameSetInitSeed) == 8, "game set init seed record");
+
+// Retail NPC interaction snapshot; node identities are list-local, never host addresses.
+#pragma pack(push, 1)
+struct D2VecInteractNode { uint32_t unitIdentity; int32_t flag; };
+struct D2VecInteractCount {
+    uint32_t seed, npcClass, npcId, tick;
+    uint16_t level, playerX, playerY;
+    uint8_t difficulty, phase;
+    uint32_t nodeCount;
+    int32_t result;
+    D2VecInteractNode nodes[16];
+};
+#pragma pack(pop)
+static_assert(sizeof(D2VecInteractCount) == 160, "interaction snapshot layout");
+
+enum D2VecKind : uint32_t { D2VEC_PRNG = 1, D2VEC_DRLG = 2, D2VEC_ITEMGEN = 3, D2VEC_MONSPAWN = 4, D2VEC_TABLE = 5, D2VEC_COMBAT = 6, D2VEC_AISPAWN = 7, D2VEC_AIFRAME = 8, D2VEC_AITARGET = 9, D2VEC_COMBATRESULT = 10, D2VEC_DAMAGECALC = 11, D2VEC_A1Q6 = 12, D2VEC_A1Q6PLAYER = 13, D2VEC_A1Q6TIMER = 14, D2VEC_A1Q6COMPLETE = 15, D2VEC_A1Q6DROP = 16, D2VEC_A1Q6TRAVEL = 17, D2VEC_NPCDIALOG = 18, D2VEC_NPCRESPONSE = 19, D2VEC_VENDORITEM = 20, D2VEC_VENDORBUY = 21, D2VEC_VENDORSELL = 22, D2VEC_HIRE = 23, D2VEC_VENDORMULTIBUY = 24, D2VEC_TILE = 25, D2VEC_TILEPICK = 26, D2VEC_AITRACE = 27, D2VEC_AIPATH = 28, D2VEC_MONDROP = 29, D2VEC_ROOMSIGHT = 30, D2VEC_QUEUEDUNIT = 31, D2VEC_ROOMCALLER = 32, D2VEC_SKILLCLASS = 33, D2VEC_CLIENT_INIT_FLAG = 33, D2VEC_TOWNPORTAL = 34, D2VEC_CLIENT_BYTE_LOOKUP = 35, D2VEC_CLIENT_WINDOW_HANDLE = 36, D2VEC_GAME_RETURN_ARGUMENT = 37, D2VEC_GAME_SET_INIT_SEED = 38, D2VEC_LEVELS_TXT_RECORD = 39, D2VEC_GAME_CLEAR_FLAG = 40, D2VEC_WAYPOINT_COPY = 41, D2VEC_INTERACTCOUNT = 42 };
+
 
 static inline uint32_t d2vec_fnv1a_step(uint32_t h, uint32_t v) {
     for (int i = 0; i < 4; i++) { h ^= (v >> (8 * i)) & 0xFF; h *= 16777619u; }

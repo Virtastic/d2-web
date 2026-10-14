@@ -846,6 +846,7 @@ BOOL __stdcall MONSTERS_IsUndead(D2UnitStrc* pMonster)
 	return FALSE;
 }
 
+// 1.13c D2Common+0x1A550
 //D2Common.0x6FDA58A0 (#11060)
 BOOL __stdcall MONSTERS_IsBoss(D2MonStatsTxt* pMonStatsTxtRecord, D2UnitStrc* pMonster)
 {
@@ -1246,6 +1247,7 @@ void __stdcall D2Common_11066(D2UnitStrc* pMonster, int* pDirectionX, int* pDire
 	*pDirectionY = dword_6FDD1778[nIndex].nY;
 }
 
+// 1.13c D2Common+0x1A2D0
 //D2Common.0x6FDA6730 (#11067)
 int __stdcall MONSTERS_GetHirelingTypeId(D2UnitStrc* pHireling)
 {

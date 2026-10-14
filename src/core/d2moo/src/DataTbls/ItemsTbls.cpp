@@ -107,6 +107,7 @@ void __fastcall DATATBLS_ItemCalcLinker(char* pSrc, void* pRecord, int nOffset, 
 }
 
 //D2Common.0x6FD55280
+// 1.13c D2Common+0x787C0
 void __fastcall DATATBLS_LoadItemsTxt(HD2ARCHIVE hArchive)
 {
 	D2ItemsTxt* pWeapons = NULL;
@@ -399,9 +400,10 @@ int __stdcall DATATBLS_MapOldItemIndexToCurrent(int nItemId)
 }
 
 //D2Common.0x6FD57680 (#10600)
+// 1.13c D2Common+0x719A0: retail compares the id unsigned, so a negative id yields NULL
 D2ItemsTxt* __stdcall DATATBLS_GetItemsTxtRecord(int nItemId)
 {
-	if (nItemId < sgptDataTables->pItemDataTables.nItemsTxtRecordCount)
+	if ((uint32_t)nItemId < (uint32_t)sgptDataTables->pItemDataTables.nItemsTxtRecordCount)
 	{
 		D2_ASSERT(sgptDataTables->pItemDataTables.pItemsTxt);
 		return &sgptDataTables->pItemDataTables.pItemsTxt[nItemId];
@@ -423,6 +425,7 @@ D2ItemsTxt* __stdcall DATATBLS_GetItemRecordFromItemCode(uint32_t dwCode, int* p
 	return NULL;
 }
 
+// 1.13c D2Common+0x71940
 //D2Common.0x6FD57720 (#10602)
 int __stdcall DATATBLS_GetItemIdFromItemCode(uint32_t dwCode)
 {
@@ -486,6 +489,7 @@ void __fastcall DATATBLS_ItemParamLinker(char* pSrc, void* pRecord, int nOffset,
 }
 
 //D2Common.0x6FD57820
+// 1.13c D2Common+0x77F00
 void __fastcall DATATBLS_LoadMagicSuffix_Prefix_AutomagicTxt(HD2ARCHIVE hArchive)
 {
 	const Unicode* pUnicode = NULL;
@@ -680,6 +684,7 @@ D2RareAffixTxt* __stdcall DATATBLS_GetRareAffixTxtRecord(int nId)
 }
 
 //D2Common.0x6FD584E0
+// 1.13c D2Common+0x76F30
 void __fastcall DATATBLS_LoadUniqueItemsTxt(HD2ARCHIVE hArchive)
 {
 	const Unicode* pUnicode = NULL;
@@ -759,10 +764,7 @@ void __fastcall DATATBLS_LoadUniqueItemsTxt(HD2ARCHIVE hArchive)
 	sgptDataTables->pUniqueItemsLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
 	sgptDataTables->pUniqueItemsTxt = (D2UniqueItemsTxt*)DATATBLS_CompileTxt(hArchive, "uniqueitems", pTbl, &sgptDataTables->nUniqueItemsTxtRecordCount, sizeof(D2UniqueItemsTxt));
 
-	if (sgptDataTables->nUniqueItemsTxtRecordCount >= 32767)
-	{
-		FOG_DisplayWarning("uniqueitems table exceeded maximum number of entries.", __FILE__, __LINE__);
-	}
+	D2_ASSERT(sgptDataTables->nUniqueItemsTxtRecordCount < 32767); // 1.13c D2Common+0x76F30: fatal assert (1.10f only warned)
 
 	for (int i = 0; i < sgptDataTables->nUniqueItemsTxtRecordCount; ++i)
 	{
@@ -786,6 +788,7 @@ void __fastcall DATATBLS_UnloadUniqueItemsTxt()
 }
 
 //D2Common.0x6FD59140
+// 1.13c D2Common+0x75290
 void __fastcall DATATBLS_LoadSets_SetItemsTxt(HD2ARCHIVE hArchive)
 {
 	const Unicode* pUnicode = NULL;
@@ -963,18 +966,12 @@ void __fastcall DATATBLS_LoadSets_SetItemsTxt(HD2ARCHIVE hArchive)
 	sgptDataTables->pSetsLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
 	sgptDataTables->pSetsTxt = (D2SetsTxt*)DATATBLS_CompileTxt(hArchive, "sets", pSetsTbl, &sgptDataTables->nSetsTxtRecordCount, sizeof(D2SetsTxt));
 
-	if (sgptDataTables->nSetsTxtRecordCount >= 32767)
-	{
-		FOG_DisplayWarning("sets table exceeded maximum number of entries.", __FILE__, __LINE__);
-	}
+	D2_ASSERT(sgptDataTables->nSetsTxtRecordCount < 32767); // 1.13c D2Common+0x75290: fatal assert (1.10f only warned)
 
 	sgptDataTables->pSetItemsLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
 	sgptDataTables->pSetItemsTxt = (D2SetItemsTxt*)DATATBLS_CompileTxt(hArchive, "setitems", pSetItemsTbl, &sgptDataTables->nSetItemsTxtRecordCount, sizeof(D2SetItemsTxt));
 
-	if (sgptDataTables->nSetItemsTxtRecordCount >= 32767)
-	{
-		FOG_DisplayWarning("setitems table exceeded maximum number of entries.", __FILE__, __LINE__);
-	}
+	D2_ASSERT(sgptDataTables->nSetItemsTxtRecordCount < 32767); // 1.13c D2Common+0x75290: fatal assert (1.10f only warned)
 
 	for (int i = 0; i < sgptDataTables->nSetItemsTxtRecordCount; ++i)
 	{
@@ -1048,6 +1045,7 @@ D2SetsTxt* __stdcall DATATBLS_GetSetsTxtRecordFromSetItemId(int nSetItemId)
 }
 
 //D2Common.0x6FD5AE40
+// 1.13c D2Common+0x74E70
 void __fastcall DATATBLS_LoadQualityItemsTxt(HD2ARCHIVE hArchive)
 {
 	const Unicode* pUnicode = NULL;
@@ -1122,6 +1120,7 @@ D2QualityItemsTxt* __stdcall DATATBLS_GetQualityItemsTxtRecord(int nIndex)
 }
 
 //D2Common.0x6FD5B2F0
+// 1.13c D2Common+0x74660
 void __fastcall DATATBLS_LoadGemsTxt(HD2ARCHIVE hArchive)
 {
 	const Unicode* pUnicode = NULL;
@@ -1226,6 +1225,7 @@ D2GemsTxt* __stdcall DATATBLS_GetGemsTxtRecord(int nGemId)
 }
 
 //D2Common.0x6FD5BB70
+// 1.13c D2Common+0x744B0
 void __fastcall DATATBLS_LoadBooksTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
@@ -1320,6 +1320,7 @@ D2LowQualityItemsTxt* __stdcall DATATBLS_GetLowQualityItemsTxtRecord(int nId)
 }
 
 //D2Common.0x6FD5BED0
+// 1.13c D2Common+0x740C0
 void __fastcall DATATBLS_LoadItemRatioTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
@@ -1417,6 +1418,7 @@ int __cdecl DATATBLS_CompareItemStatCostDescs(const void* pRecord1, const void* 
 }
 
 //D2Common.0x6FD5C320
+// 1.13c D2Common+0x73330
 void __fastcall DATATBLS_LoadItemStatCostTxt(HD2ARCHIVE hArchive)
 {
 	uint16_t nOpBase = 0;
@@ -1501,7 +1503,10 @@ void __fastcall DATATBLS_LoadItemStatCostTxt(HD2ARCHIVE hArchive)
 		D2ItemStatCostTxt& rCurrentStatRecord = sgptDataTables->pItemStatCostTxt[nStatId];
 		uint8_t nCurrentStatOp = rCurrentStatRecord.nOp;
 		if (nCurrentStatOp <= 0 || nCurrentStatOp >= 14)
+		{
+			rCurrentStatRecord.nOp = 0; // 1.13c D2Common+0x73330: an out-of-range op is zeroed in the record
 			continue;
+		}
 
 		nOpBase = rCurrentStatRecord.wOpBase;
 
@@ -1628,6 +1633,7 @@ void __fastcall DATATBLS_UnloadItemStatCostTxt()
 }
 
 //D2Common.0x6FD5D0D0
+// 1.13c D2Common+0x72E20
 void __fastcall DATATBLS_LoadPropertiesTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =
@@ -1835,6 +1841,7 @@ BOOL __fastcall DATATBLS_CheckItemTypesEquivalenceNested(int nItemType1, int nIt
 }
 
 //D2Common.0x6FD5D8C0
+// 1.13c D2Common+0x72510
 void __fastcall DATATBLS_LoadItemTypesTxt(HD2ARCHIVE hArchive)
 {
 	uint32_t* pItemTypesNest = NULL;
@@ -1916,6 +1923,7 @@ void __fastcall DATATBLS_UnloadItemTypesTxt()
 }
 
 //D2Common.0x6FD5E020
+// 1.13c D2Common+0x71C20
 void __fastcall DATATBLS_LoadRunesTxt(HD2ARCHIVE hArchive)
 {
 	HSFILE pFileHandle = NULL;
@@ -1979,21 +1987,21 @@ void __fastcall DATATBLS_LoadRunesTxt(HD2ARCHIVE hArchive)
 	if (ARCHIVE_OpenFile(hArchive, szPath, &pFileHandle, TRUE))
 	{
 		ARCHIVE_CloseFile(hArchive, pFileHandle);
-		FOG_DisplayWarning("Found runessrv.txt in archive - This file should only be in server builds.", __FILE__, __LINE__);
+		D2_ASSERTM(false, "Found runessrv.txt in archive - This file should only be in server builds."); // 1.13c D2Common+0x71C20 (fatal, not a warning)
 	}
 
 	wsprintfA(szPath, "%s\\%s%s", "DATA\\GLOBAL\\EXCEL", "runessrv", ".bin");
 	if (ARCHIVE_OpenFile(hArchive, szPath, &pFileHandle, TRUE))
 	{
 		ARCHIVE_CloseFile(hArchive, pFileHandle);
-		FOG_DisplayWarning("Found runessrv.bin in archive - This file should only be in server builds.", __FILE__, __LINE__);
+		D2_ASSERTM(false, "Found runessrv.bin in archive - This file should only be in server builds."); // 1.13c D2Common+0x71C20 (fatal, not a warning)
 	}
 
 	wsprintfA(szPath, "%s\\%s%s", "DATA\\GLOBAL\\EXCEL", "runessrv", ".xls");
 	if (ARCHIVE_OpenFile(hArchive, szPath, &pFileHandle, TRUE))
 	{
 		ARCHIVE_CloseFile(hArchive, pFileHandle);
-		FOG_DisplayWarning("Found runessrv.xls in archive - This file should only be in server builds.", __FILE__, __LINE__);
+		D2_ASSERTM(false, "Found runessrv.xls in archive - This file should only be in server builds."); // 1.13c D2Common+0x71C20 (fatal, not a warning)
 	}
 
 	sgptDataTables->pRuneDataTables.pRunesTxt = (D2RunesTxt*)DATATBLS_CompileTxt(hArchive, "runes", pTbl, &sgptDataTables->pRuneDataTables.nRunesTxtRecordCount, sizeof(D2RunesTxt));
@@ -2053,8 +2061,13 @@ void __stdcall DATATBLS_AddOrChangeRunesTxtRecord(int nRecordId, D2RunesTxt* pRe
 }
 
 //D2Common.0x6FD5EAA0 (#10620)
+// 1.13c D2Common+0x70FA0
+static_assert(offsetof(D2RuneDataTbl, nRunesTxtRecordCount) == 0x00);
+static_assert(offsetof(D2RuneDataTbl, pRunesTxt) == 0x04);
+static_assert(offsetof(D2DataTablesStrc, pRuneDataTables) == 0x1240); // wasm64 layout; D2MOO's 0xEDC comment is the 32-bit layout
+static_assert(sizeof(D2RunesTxt) == 0x120);
 D2RunesTxt* __stdcall DATATBLS_GetRunesTxtRecord(int nRunewordId)
 {
-	D2_ASSERT(nRunewordId > 0 || nRunewordId < sgptDataTables->pRuneDataTables.nRunesTxtRecordCount);
+	D2_ASSERT(nRunewordId > 0 && nRunewordId < sgptDataTables->pRuneDataTables.nRunesTxtRecordCount);
 	return &sgptDataTables->pRuneDataTables.pRunesTxt[nRunewordId];
 }

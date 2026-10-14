@@ -337,6 +337,7 @@ int gnComponentArrayRecordCount;
 BOOL gbComponentArrayInitialized;
 
 
+// 1.13c D2Common+0x21640
 //D2Common.0x6FD8E210
 BOOL __fastcall INVENTORY_RemoveItem(D2UnitStrc* pItem)
 {
@@ -2132,6 +2133,7 @@ int __stdcall INVENTORY_GetItemCount(D2InventoryStrc* pInventory)
 }
 
 //D2Common.0x6FD90AE0 (#10285)
+// 1.13c D2Common+0x1FE10
 D2UnitStrc* __stdcall INVENTORY_GetBackPackItemByType(D2InventoryStrc* pInventory, int nItemType, D2UnitStrc* pCheckItem)
 {
 	if (!INVENTORY_GetPtrIfValid(pInventory))
@@ -2483,6 +2485,7 @@ int __stdcall INVENTORY_GetWieldType(D2UnitStrc* pPlayer, D2InventoryStrc* pInve
 	return -1;
 }
 
+// 1.13c D2Common+0x1DE70
 //D2Common.0x6FD91140 (#10292)
 void __stdcall INVENTORY_SetOwnerId(D2InventoryStrc* pInventory, D2UnitGUID nOwnerGuid)
 {
@@ -2533,6 +2536,7 @@ void __stdcall INVENTORY_CreateCorpseForPlayer(D2InventoryStrc* pInventory, int 
 }
 
 //D2Common.0x6FD91210 (#10295)
+// 1.13c D2Common+0x1DD40
 BOOL __stdcall INVENTORY_FreeCorpse(D2InventoryStrc* pInventory, int nUnitId, int a3)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory) && pInventory->pFirstCorpse)
@@ -3191,6 +3195,7 @@ D2UnitStrc* __stdcall INVENTORY_GetNextGridItem(D2UnitStrc* pItem)
 	return nullptr;
 }
 
+// 1.13c D2Common+0x1E400
 //D2Common.0x6FD920C0 (#10305)
 D2UnitStrc* __stdcall INVENTORY_UnitIsItem(D2UnitStrc* pItem)
 {

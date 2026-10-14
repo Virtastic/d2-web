@@ -43,28 +43,40 @@
 #include <ctime>
 #include <climits>
 
+// 1.13c D2Game+0x53170 (wraps CRC32 sub at D2Game+0xB470)
 //D2Game.0x6FC8A140
 int32_t __fastcall D2GAME_SAVE_CalculateChecksum_6FC8A140(D2SaveHeaderStrc* pSaveHeader, int32_t nSize)
 {
-    // Retail zeroes the checksum field itself while summing, then restores it. The sum is a 32-bit
-    // rotate-left-through-carry: the sign bit that falls off the top is added back in at the bottom.
-    const uint32_t nSavedChecksum = pSaveHeader->dwChecksum;
-    pSaveHeader->dwChecksum = 0;
-
-    int32_t nChecksum = 0;
+    // 1.13c: standard CRC-32 (poly 0xEDB88320, init/xorout 0xFFFFFFFF) over the buffer. For version > 0x5B
+    // the checksum, last-played time, play time and map seed are zeroed while summing, then restored.
+    // (1.10f's rotate-sum is gone.) Retail _exit()s on nSize == 0; not reproduced.
+    const bool bZero = pSaveHeader->dwVersion > 0x5B;
+    const uint32_t nChecksum = pSaveHeader->dwChecksum, nLast = pSaveHeader->dwLasTime, nPlay = pSaveHeader->dwPlayTime, nSeed = pSaveHeader->dwMapSeed;
+    if (bZero)
+    {
+        pSaveHeader->dwChecksum = 0;
+        pSaveHeader->dwLasTime = 0;
+        pSaveHeader->dwPlayTime = 0;
+        pSaveHeader->dwMapSeed = 0;
+    }
+    uint32_t nCrc = 0xFFFFFFFFu;
     const uint8_t* pData = (const uint8_t*)pSaveHeader;
     for (int32_t i = 0; i < nSize; ++i)
     {
-        int32_t nByte = pData[i];
-        if (nChecksum < 0)
+        nCrc ^= pData[i];
+        for (int32_t k = 0; k < 8; ++k)
         {
-            ++nByte;
+            nCrc = (nCrc >> 1) ^ (0xEDB88320u & (0u - (nCrc & 1u)));
         }
-        nChecksum = (int32_t)(((uint32_t)nChecksum << 1) + (uint32_t)nByte);
     }
-
-    pSaveHeader->dwChecksum = nSavedChecksum;
-    return nChecksum;
+    if (bZero)
+    {
+        pSaveHeader->dwChecksum = nChecksum;
+        pSaveHeader->dwLasTime = nLast;
+        pSaveHeader->dwPlayTime = nPlay;
+        pSaveHeader->dwMapSeed = nSeed;
+    }
+    return (int32_t)~nCrc;
 }
 
 //D2Game.0x6FC8CC50

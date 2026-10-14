@@ -2,6 +2,7 @@
 
 
 //D2Common.0x6FD48880
+// 1.13c D2Common+0x13400
 void __fastcall DATATBLS_LoadBeltsTxt(HD2ARCHIVE hArchive)
 {
 	int nRecordCount = 0;

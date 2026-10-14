@@ -444,6 +444,7 @@ D2UnitStrc* __stdcall DUNGEON_GetFirstUnitInRoom(D2ActiveRoomStrc* pRoom)
 }
 
 //D2Common.0x6FD8C4E0 (#10100)
+// 1.13c D2Common+0x3B6B0
 void __stdcall DUNGEON_IncreaseAlliedCountOfRoom(D2ActiveRoomStrc* pRoom)
 {
 	if (pRoom)
@@ -1036,6 +1037,7 @@ int __stdcall D2Common_10087(D2ActiveRoomStrc* pRoom)
 }
 
 //D2Common.0x6FD8D1C0 (#10090)
+// 1.13c D2Common+0x3C7E0
 int __stdcall DUNGEON_GetNumberOfPopulatedRoomsInLevel(D2DrlgActStrc* pAct, int nLevelId)
 {
 	return DRLG_GetNumberOfPopulatedRoomsInLevel(pAct->pDrlg, nLevelId);
@@ -1310,16 +1312,18 @@ void __stdcall DUNGEON_GameSubtileToClientCoords(int* pX, int* pY)
 }
 
 //D2Common.0x6FD8D660 (#10112)
+// 1.13c D2Common+0x4DB40 (#10132): arithmetic shifts, floor for negatives (1.10f divided, truncating toward zero)
 void __stdcall DUNGEON_GameToClientCoords(int* pX, int* pY)
 {
-	const int nOutX = (*pX - *pY) / 2;
-	const int nOutY = (*pX + *pY) / 4;
+	const int nOutX = (*pX - *pY) >> 1;
+	const int nOutY = (*pX + *pY) >> 2;
 
 	*pX = nOutX;
 	*pY = nOutY;
 }
 
 //D2Common.0x6FD8D8C0 (#10113)
+// 1.13c D2Common+0x4D8A0
 void __stdcall DUNGEON_GameTileToSubtileCoords(int* pX, int* pY)
 {
 	*pX *= 5;

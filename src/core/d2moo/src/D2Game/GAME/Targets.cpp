@@ -103,7 +103,7 @@ void __fastcall sub_6FC40280(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, i
     pUnit->dwNodeIndex = nNodeIndex;
 }
 
-//D2Game.0x6FC40310
+// 1.13c D2Game+0xEFD40
 void __fastcall D2GAME_FreeUnitNode_6FC40310(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (!pGame || !pUnit || (pUnit->dwUnitType != UNIT_PLAYER && pUnit->dwUnitType != UNIT_MONSTER))
@@ -132,7 +132,7 @@ void __fastcall D2GAME_FreeUnitNode_6FC40310(D2GameStrc* pGame, D2UnitStrc* pUni
     pGame->pTargetNodes[nNodeIndex] = nullptr;
 }
 
-//D2Game.0x6FC40380
+// 1.13c D2Game+0xEFC60
 void __fastcall D2GAME_TARGETS_Last_6FC40380(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (!pGame || !pUnit || (pUnit->dwUnitType != UNIT_PLAYER && pUnit->dwUnitType != UNIT_MONSTER))

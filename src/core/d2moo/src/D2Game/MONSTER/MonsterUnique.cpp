@@ -2220,6 +2220,7 @@ D2MonsterDataStrc* __fastcall MONSTERUNIQUE_GetMonsterData(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC6EBF0
+// 1.13c D2Game+0x21860
 int32_t __fastcall MONSTERUNIQUE_GetUModCount(uint8_t* pUMods)
 {
     int32_t nIndex = 0;

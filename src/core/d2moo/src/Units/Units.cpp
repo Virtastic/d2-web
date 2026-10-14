@@ -24,6 +24,7 @@
 #include <DataTbls/ObjectsIds.h>
 #include <D2Math.h>
 #include <limits>
+#include <cstddef>
 
 //D2Common.0x6FDBD520 (#10457)
 uint8_t __stdcall UNITS_GetDirection(D2UnitStrc* pUnit)
@@ -452,6 +453,7 @@ void __stdcall UNITS_SetTargetY(D2UnitStrc* pUnit, int nTargetY)
 }
 
 //D2Common.0x6FDBDD10 (#10332)
+// 1.13c D2Common+0x30050
 void __stdcall UNITS_GetCoords(D2UnitStrc* pUnit, D2CoordStrc* pCoord)
 {
 	D2_ASSERT(pUnit);
@@ -888,6 +890,7 @@ void __stdcall UNITS_SetCurrentRoomInvalid(D2UnitStrc* pUnit, int a2)
 }
 
 //D2Common.0x6FDBEB80 (#10357)
+// 1.13c D2Common+0x30DC0
 void __stdcall UNITS_RefreshInventory(D2UnitStrc* pUnit, BOOL bSetFlag)
 {
 	if (bSetFlag)
@@ -983,6 +986,7 @@ D2GfxLightStrc* __stdcall UNITS_ResetLightMap(D2UnitStrc* pUnit)
 	return pLight;
 }
 
+// 1.13c D2Common+0x2F1B0
 //D2Common.0x6FDBED10 (#10369)
 int __stdcall UNITS_GetAnimOrSeqMode(D2UnitStrc* pUnit)
 {
@@ -1113,6 +1117,7 @@ void __stdcall UNITS_StopSequence(D2UnitStrc* pUnit)
 	}
 }
 
+// 1.13c D2Common+0x2F090
 //D2Common.0x6FDBEFF0 (#10374)
 void __stdcall UNITS_UpdateFrame(D2UnitStrc* pUnit)
 {
@@ -1775,6 +1780,7 @@ void __stdcall UNITS_UpdateAnimRateAndVelocity(D2UnitStrc* pUnit, const char* sz
 	}
 }
 
+// 1.13c D2Common+0x30B40
 //D2Common.0x6FDBF8D0 (#10377)
 void __stdcall UNITS_SetAnimationSpeed(D2UnitStrc* pUnit, int nSpeed)
 {
@@ -2105,6 +2111,16 @@ void __stdcall UNITS_StoreOwner(D2UnitStrc* pUnit, D2UnitStrc* pOwner)
 		}
 	}
 }
+
+// 1.13c D2Common+0x2F9B0
+// The retail offsets are x86 offsets. The wasm64 D2UnitStrc widens pointer fields;
+// these assertions preserve the corresponding field positions after that widening.
+static_assert(offsetof(D2UnitStrc, dwUnitType) == 0x00);
+static_assert(offsetof(D2UnitStrc, dwUnitId) == 0x0C + (sizeof(void*) - 4));
+static_assert(offsetof(D2UnitStrc, dwKillerType) == 0x9C + 15 * (sizeof(void*) - 4));
+static_assert(offsetof(D2UnitStrc, dwKillerGUID) == 0xA0 + 15 * (sizeof(void*) - 4));
+static_assert(offsetof(D2UnitStrc, dwFlagEx) == 0xC8 + 18 * (sizeof(void*) - 4));
+static_assert(sizeof(D2UnitGUID) == 4);
 
 //D2Common.0x6FDC0060 (#10417)
 void __stdcall UNITS_StoreLastAttacker(D2UnitStrc* pUnit, D2UnitStrc* pKiller)
@@ -2555,6 +2571,7 @@ int __stdcall UNITS_GetBlockRate(D2UnitStrc* pUnit, BOOL bExpansion)
 
 //D2Common.0x6FDC0DA0 (#10434)
 //TODO: Find a name, v14
+// 1.13c D2Common+0x31B90
 D2UnitStrc* __stdcall D2Common_10434(D2UnitStrc* pUnit, BOOL a2)
 {
 	D2SkillsTxt* pSkillsTxtRecord = NULL;
@@ -2678,6 +2695,7 @@ D2UnitStrc* __stdcall UNITS_GetEquippedWeaponFromMonster(D2UnitStrc* pMonster)
 }
 
 //D2Common.0x6FDC0FC0 (#10436)
+// 1.13c D2Common+0x32220
 int __stdcall UNITS_GetFrameBonus(D2UnitStrc* pUnit)
 {
 	static const int gaClassesWeaponFrameBonus_6FDD3078[NUM_WEAPON_CLASSES][NUMBER_OF_PLAYERCLASSES] =
@@ -3075,6 +3093,7 @@ int __fastcall UNITS_GetHitClass(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDC1CE0 (#10366)
+// 1.13c D2Common+0x321C0
 int __fastcall UNITS_GetWeaponClass(D2UnitStrc* pUnit)
 {
 	if (D2UnitStrc* pItem = D2Common_10434(pUnit, TRUE))
@@ -3552,17 +3571,18 @@ void __stdcall UNITS_AllocStaticPath(D2UnitStrc* pUnit)
 	}
 }
 
+// 1.13c D2Common+0x2F3E0
 //D2Common.0x6FDC27C0 (#10461)
 void __stdcall UNITS_FreeStaticPath(D2UnitStrc* pUnit)
 {
 	if (pUnit->pStaticPath)
 	{
 		D2_FREE_POOL(pUnit->pMemoryPool, pUnit->pStaticPath);
-		pUnit->pStaticPath = NULL;
 	}
 }
 
 //D2Common.0x6FDC27F0 (#10462)
+// 1.13c D2Common+0x30530
 BOOL __stdcall UNITS_CanDualWield(D2UnitStrc* pUnit)
 {
 	if (pUnit)

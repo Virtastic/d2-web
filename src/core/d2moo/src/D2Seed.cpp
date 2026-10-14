@@ -16,6 +16,7 @@ int __fastcall SEED_GetRandomValue(int nValue)
 }
 
 //D2Common.0x6FDAEAB0 (#10912)
+// 1.13c D2Common+0x36750
 void __fastcall SEED_InitSeed(D2SeedStrc* pSeed)
 {
 	pSeed->nLowSeed = 1;
@@ -23,6 +24,7 @@ void __fastcall SEED_InitSeed(D2SeedStrc* pSeed)
 }
 
 //D2Common.0x6FDAEAC0 (#10913)
+// 1.13c D2Common+0x36740
 void __fastcall SEED_InitLowSeed(D2SeedStrc* pSeed, int nLowSeed)
 {
 	pSeed->nLowSeed = nLowSeed;
