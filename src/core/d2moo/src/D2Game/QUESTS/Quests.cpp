@@ -100,6 +100,7 @@ constexpr D2QuestInitTableStrc gpQuestInitTable[] =
 	{ ACT1Q4_InitQuestData, ACT_I,{ 0,0,0 }, 100, 0,{ 0,0,0 }, QUEST_A1Q4_CAIN, QUESTSTATEFLAG_A1Q4 },
 	{ ACT1Q5_InitQuestData, ACT_I,{ 0,0,0 }, 100, 0,{ 0,0,0 }, QUEST_A1Q5_COUNTESS, QUESTSTATEFLAG_A1Q5 },
 	{ ACT1Q6_InitQuestData, ACT_I,{ 0,0,0 }, 100, 0,{ 0,0,0 }, QUEST_A1Q6_ANDARIEL, QUESTSTATEFLAG_A1Q6 },
+	{ ACT1Q7_InitQuestData, ACT_I,{ 0,0,0 }, 100, 0,{ 0,0,0 }, 30, 41 },	// 1.13c D2Game+0xFDBF0 row 7: second A1Q7 init, chain 30, filter 41 (absent in 1.10f)
 
 	{ ACT2Q0_InitQuestData, ACT_II,{ 0,0,0 }, 100, 1,{ 0,0,0 }, QUEST_A2Q0_JERHYNGOSSIP, QUESTSTATEFLAG_A2Q0 },
 	{ ACT2Q1_InitQuestData, ACT_II,{ 0,0,0 }, 100, 0,{ 0,0,0 }, QUEST_A2Q1_RADAMENT, QUESTSTATEFLAG_A2Q1 },
@@ -337,6 +338,7 @@ void __fastcall QUESTS_InitScrollTextChain(D2QuestDataStrc* pQuest, D2TextHeader
 }
 
 //D2Game.0x6FC93DC0
+// 1.13c D2Game+0x348A0
 void __fastcall QUESTS_QuestInit(D2GameStrc* pGame)
 {
 	D2QuestDataStrc* pCurrent = nullptr;
@@ -537,7 +539,9 @@ void __fastcall QUESTS_ParseKill(D2GameStrc* pGame, D2UnitStrc* pDefender, D2Uni
 	QUESTS_StatusCycler(&pArgs, bForceActive);
 }
 
+// 1.13c D2Game+0x33C70 (checked against decompile, no delta)
 //D2Game.0x6FC94210
+// 1.13c D2Game+0x33C70
 void __fastcall QUESTS_StatusCycler(D2QuestArgStrc* pArgs, bool bForceActive)
 {
 	for (D2QuestChainStrc* i = pArgs->pTarget->pQuestEventList; i; i = i->pNext)
@@ -606,6 +610,7 @@ void __fastcall QUESTS_EventCallback(D2QuestArgStrc* pArgs, bool bCheckActive, b
 }
 
 //D2Game.0x6FC94390
+// 1.13c D2Game+0x34760
 void __fastcall QUESTS_PlayerDroppedWithQuestItem(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
 	if (!pGame || !pPlayer)
@@ -2331,6 +2336,7 @@ void __fastcall QUESTS_SetIntroFlags(D2GameStrc* pGame, D2UnitStrc* pPlayer, con
 	}
 }
 
+// 1.13c D2Game+0x33880 (checked against decompile, no delta)
 //D2Game.0x6FC96810
 void __fastcall QUESTS_AddPlayerGUID(D2QuestGUIDStrc* pQuestGUID, int32_t dwGUID)
 {
@@ -2348,6 +2354,7 @@ void __fastcall QUESTS_AddPlayerGUID(D2QuestGUIDStrc* pQuestGUID, int32_t dwGUID
 	++pQuestGUID->nPlayerCount;
 }
 
+// 1.13c D2Game+0x33830 (checked against decompile, no delta)
 //D2Game.0x6FC96840
 int32_t __fastcall QUESTS_FastRemovePlayerGUID(D2QuestGUIDStrc* pGUIDs, int32_t dwGUID)
 {
@@ -2368,6 +2375,7 @@ int32_t __fastcall QUESTS_FastRemovePlayerGUID(D2QuestGUIDStrc* pGUIDs, int32_t 
 	return 0;
 }
 
+// 1.13c D2Game+0x33800 (checked against decompile, no delta)
 //D2Game.0x6FC96880
 int32_t __fastcall QUESTS_QuickCheckPlayerGUID(D2QuestGUIDStrc* pGUIDs, int32_t dwGUID)
 {
@@ -2383,6 +2391,7 @@ int32_t __fastcall QUESTS_QuickCheckPlayerGUID(D2QuestGUIDStrc* pGUIDs, int32_t 
 }
 
 //D2Game.0x6FC968B0
+// 1.13c D2Game+0x337D0
 int32_t __fastcall QUESTS_CheckPlayerGUID(D2QuestDataStrc* pQuest, int32_t dwGUID)
 {
 	for (int32_t i = 0; i < pQuest->tPlayerGUIDs.nPlayerCount; ++i)

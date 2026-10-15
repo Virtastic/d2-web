@@ -1924,6 +1924,7 @@ void __stdcall SUNIT_ResetInteractInfo(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCBD8B0
+// 1.13c D2Game+0xDFA90
 int32_t __fastcall SUNIT_IsDead(D2UnitStrc* pUnit)
 {
     if (!pUnit || pUnit->dwFlags & 0x10000)

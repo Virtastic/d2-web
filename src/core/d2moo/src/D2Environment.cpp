@@ -236,6 +236,7 @@ BOOL __stdcall ENVIRONMENT_UpdatePeriodOfDay(D2DrlgActStrc* pAct, D2ActiveRoomSt
 	return nPreviousPeriodOfDay != pEnvironment->nPeriodOfDay;
 }
 
+// 1.13c D2Common+0x37570
 //D2Common.0x6FD8DC70
 void __fastcall ENVIRONMENT_UpdateTicks(D2DrlgEnvironmentStrc* pEnvironment, int nActNo)
 {
@@ -254,7 +255,7 @@ void __fastcall ENVIRONMENT_UpdateTicks(D2DrlgEnvironmentStrc* pEnvironment, int
 
 			if (nActNo == ACT_III)
 			{
-				pEnvironment->nTicks += 9;
+				pEnvironment->nTicks += 8; // 1.13c: +10 total (D2MOO 1.10f: +9)
 			}
 		}
 	}
@@ -266,7 +267,9 @@ void __fastcall ENVIRONMENT_UpdateTicks(D2DrlgEnvironmentStrc* pEnvironment, int
 	}
 
 	const int nNextEnvCycle = (pEnvironment->nCycleIndex + 1) % NUM_ENVIRONMENT_CYCLES;
-	const D2EnvironmentCycleStrc* pNextEnvCycle = ENVIRONMENT_GetCycle(nNextEnvCycle, nActNo, pEnvironment->bEclipse);
+	// 1.13c: non-eclipse always uses the normal table (even act IV); eclipse uses act IV table in act IV
+	const D2EnvironmentCycleStrc* pNextEnvCycle = !pEnvironment->bEclipse ? &gNormalEnvironmentCycle[nNextEnvCycle]
+		: (nActNo == ACT_IV ? &gAct4EnvironmentCycle[nNextEnvCycle] : &gEclipseEnvironmentCycle[nNextEnvCycle]);
 
 	if (pEnvironment->nTicks > pEnvironment->nTimeRate * pNextEnvCycle->nTicksBegin)
 	{

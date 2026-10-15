@@ -403,6 +403,7 @@ void __fastcall DRLG_UpdateAndFreeInactiveRooms(D2DrlgStrc* pDrlg)
 
 //1.10f: D2Common.0x6FD748D0 (#10013)
 //1.11:  D2Common.0x6FDC74A0 (#10204)
+// 1.13c D2Common+0x2D9B0
 D2DrlgLevelStrc* __fastcall DRLG_AllocLevel(D2DrlgStrc* pDrlg, int nLevelId)
 {
 	D2DrlgLevelStrc* pLevel = D2_CALLOC_STRC_POOL(pDrlg->pMempool, D2DrlgLevelStrc);
@@ -468,6 +469,7 @@ int __fastcall DRLG_GetHoradricStaffTombLevelId(D2DrlgStrc* pDrlg)
 }
 
 //D2Common.0x6FD749E0
+// 1.13c D2Common+0x2D470
 int __fastcall DRLG_GetDirectionFromCoordinates(D2DrlgCoordStrc* pDrlgCoord1, D2DrlgCoordStrc* pDrlgCoord2)
 {
 	if (pDrlgCoord1->nPosX <= pDrlgCoord2->nPosX)
@@ -645,6 +647,7 @@ int __fastcall DRLG_GetNumberOfPopulatedRoomsInLevel(D2DrlgStrc* pDrlg, int nLev
 }
 
 //D2Common.0x6FD74D90
+// 1.13c D2Common+0x2D3C0
 void __fastcall DRLG_GetMinAndMaxCoordinatesFromLevel(D2DrlgLevelStrc* pLevel, int* pTileMinX, int* pTileMinY, int* pTileMaxX, int* pTileMaxY)
 {
 	D2DrlgRoomStrc* pDrlgRoom = pLevel->pFirstRoomEx;
@@ -808,6 +811,7 @@ D2DrlgRoomStrc* __fastcall DRLG_GetRoomExFromCoordinates(int nX, int nY, D2DrlgS
 
 //1.10f: D2Common.0x6FD751C0
 //1.13c: D2Common.0x6FD7D320
+// 1.13c D2Common+0x2D320
 BOOL __fastcall DRLG_IsTownLevel(int nLevelId)
 {
 	switch (nLevelId)
@@ -854,6 +858,7 @@ void __fastcall DRLG_SetLevelPositionAndSize(D2DrlgStrc* pDrlg, D2DrlgLevelStrc*
 }
 
 //D2Common.0x6FD75300 (#10001)
+// 1.13c D2Common+0x2D2C0
 uint8_t __stdcall DRLG_GetActNoFromLevelId(int nLevelId)
 {
 	//IMPROVEMENT: Lookup the act from Levels.txt

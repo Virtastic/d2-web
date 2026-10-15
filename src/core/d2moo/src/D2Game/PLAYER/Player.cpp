@@ -277,6 +277,7 @@ void __fastcall PLAYER_PlaceItemInInventory(D2UnitStrc* pItem, D2UnitStrc* pPlay
 }
 
 //D2Game.0x6FC7BC30
+// 1.13c D2Game+0x385C0
 void __fastcall PLAYER_CreateStartItemsFromCharStatsTxt(D2UnitStrc* pPlayer, D2GameStrc* pGame, void* pUnused)
 {
     if (!pPlayer)

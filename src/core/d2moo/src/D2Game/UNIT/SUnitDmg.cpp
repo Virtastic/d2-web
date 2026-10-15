@@ -86,6 +86,7 @@ int32_t __fastcall SUNITDMG_SetHitClass(D2DamageStrc* pDamage, uint32_t nHitClas
 }
 
 //D2Game.0x6FCBE310
+// 1.13c D2Game+0xDAE20 (checked against decompile)
 int32_t __fastcall SUNITDMG_GetColdEffect(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
@@ -1736,6 +1737,7 @@ void __fastcall SUNITDMG_ApplyFreezeState(D2UnitStrc* pAttacker, D2UnitStrc* pDe
 }
 
 //D2Game.0x6FCC0E20
+// 1.13c D2Game+0xDA750
 void __fastcall SUNITDMG_FreeAttackerCombatList(D2GameStrc* pGame, D2UnitStrc* pAttacker)
 {
 	D2CombatStrc* pPrevious = nullptr;
@@ -1766,6 +1768,7 @@ void __fastcall SUNITDMG_FreeAttackerCombatList(D2GameStrc* pGame, D2UnitStrc* p
 }
 
 //D2Game.0x6FCC0E90
+// 1.13c D2Game+0xDA6D0 (checked against decompile)
 void __fastcall SUNITDMG_FreeAttackerDefenderCombatList(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender)
 {
 	if (!pAttacker || !pDefender)
@@ -2393,6 +2396,7 @@ void __fastcall SUNITDMG_DrainItemDurability(D2GameStrc* pGame, D2UnitStrc* pAtt
 }
 
 //D2Game.0x6FCC1D70
+// 1.13c D2Game+0xDAA90 (checked against decompile)
 D2DamageStrc* __fastcall SUNITDMG_GetDamageFromUnits(D2UnitStrc* pAttacker, D2UnitStrc* pDefender)
 {
 	if (!pAttacker || !pDefender)

@@ -215,6 +215,7 @@ void __fastcall OBJECTS_InitFunction44_HellGatePortal(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FCAC450
+// 1.13c D2Game+0xEA080 (checked against decompile)
 void __fastcall ACT3Q6_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));

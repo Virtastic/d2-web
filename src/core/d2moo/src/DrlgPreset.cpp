@@ -671,6 +671,7 @@ D2MapAIStrc* __fastcall DRLGPRESET_ChangeMapAI(D2MapAIStrc** ppMapAI1, D2MapAISt
 }
 
 //D2Common.0x6FD86500 (#10022)
+// 1.13c D2Common+0x9D90
 void __fastcall DRLGPRESET_FreeMapAI(void* pMemPool, D2MapAIStrc* pMapAI)
 {
 	D2_FREE_POOL(pMemPool, pMapAI->pPosition);
@@ -1611,7 +1612,7 @@ void __fastcall DRLGPRESET_FreeDrlgMap(void* pMemPool, D2DrlgMapStrc* pDrlgMap)
 	}
 }
 
-//D2Common.0x6FD881A0 (#10008)
+// 1.13c D2Common+0x9C20 (#10222)
 int __fastcall DRLGPRESET_GetLevelPrestIdFromRoomEx(D2DrlgRoomStrc* pDrlgRoom)
 {
 	return pDrlgRoom->pMaze->nLevelPrest;

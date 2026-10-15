@@ -157,6 +157,7 @@ void __fastcall ACT2Q1_UnitIterate_SetPrimaryGoalDone(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FC9F690
+// 1.13c D2Game+0xC7B40 (checked against decompile)
 void __fastcall ACT2Q1_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));

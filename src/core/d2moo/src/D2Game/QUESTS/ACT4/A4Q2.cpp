@@ -175,6 +175,7 @@ int32_t __fastcall ACT4Q2_IsChaosSanctumCleared(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FCAE690
+// 1.13c D2Game+0xBC5F0 (checked against decompile)
 void __fastcall ACT4Q2_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));
@@ -321,6 +322,7 @@ int32_t __fastcall ACT4Q2_UnitIterate_UpdateQuestStateFlags(D2GameStrc* pGame, D
 }
 
 //D2Game.0x6FCAE9D0
+// 1.13c D2Game+0xB9070 (fall-through fixed vs 1.10f)
 void __fastcall ACT4Q2_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	static const int32_t nIndices[] = { -1, 0, 1, -1, -1 };
@@ -338,10 +340,12 @@ void __fastcall ACT4Q2_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 		if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A4Q2, QFLAG_CUSTOM3) && nNpcId == MONSTER_TYRAEL2)
 		{
 			QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, MONSTER_TYRAEL2, 2);
+			return;
 		}
 		else if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A4Q2, QFLAG_CUSTOM2) && nNpcId == MONSTER_CAIN4)
 		{
 			QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, MONSTER_CAIN4, 2);
+			return;
 		}
 		else if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A4Q2, QFLAG_CUSTOM3))
 		{
@@ -349,6 +353,7 @@ void __fastcall ACT4Q2_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 			{
 				QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, MONSTER_CAIN4, 3);
 			}
+			return;
 		}
 		else if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A4Q2, QFLAG_CUSTOM2))
 		{
@@ -356,8 +361,9 @@ void __fastcall ACT4Q2_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 			{
 				QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, MONSTER_TYRAEL2, 3);
 			}
+			return;
 		}
-		return;
+		// 1.13c D2Game+0xB9070: neither custom flag set falls through to the shared tail (no early return)
 	}
 
 	if (QUESTRECORD_GetQuestState(pQuestFlags, pQuestData->nQuestFilter, QFLAG_REWARDGRANTED) == 1)

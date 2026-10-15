@@ -231,6 +231,7 @@ D2DrlgTileDataStrc* __fastcall DRLGROOMTILE_InitWallTileData(D2DrlgRoomStrc* pDr
 }
 
 //D2Common.0x6FD88AC0
+// 1.13c D2Common+0x68A90
 void __fastcall DRLGROOMTILE_InitializeTileDataFlags(D2DrlgRoomStrc* pDrlgRoom, D2DrlgTileDataStrc* pTileData, uint32_t nTileFlags, int nType, int nX, int nY)
 {
 	const D2C_PackedTileInformation nTileInfo{ nTileFlags };
@@ -1286,6 +1287,7 @@ void __fastcall DRLGROOMTILE_AllocTileGrid(D2DrlgRoomStrc* pDrlgRoom)
 }
 
 //D2Common.0x6FD8A050
+// 1.13c D2Common+0x68040
 void __fastcall DRLGROOMTILE_AllocTileData(D2DrlgRoomStrc* pDrlgRoom)
 {
 	void* pMemPool = pDrlgRoom->pLevel->pDrlg->pMempool;

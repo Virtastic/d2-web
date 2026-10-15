@@ -51,6 +51,7 @@ void __fastcall ACT4Q0_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 }
 
 //D2Game.0x6FCAD790
+// 1.13c D2Game+0xB9730 (checked against decompile)
 void __fastcall ACT4Q0_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	D2UnitStrc* pTarget = pQuestArg->pTarget;

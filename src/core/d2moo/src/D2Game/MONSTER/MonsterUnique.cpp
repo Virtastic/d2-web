@@ -154,6 +154,7 @@ int32_t __fastcall MONSTERUNIQUE_HasUMods(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC6AD10
+// 1.13c D2Game+0x23220
 int32_t __fastcall MONSTERUNIQUE_GetSuperUniqueBossHcIdx(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData && pUnit->pMonsterData->nTypeFlag & MONTYPEFLAG_SUPERUNIQUE)
@@ -231,6 +232,7 @@ void __fastcall MONSTERUNIQUE_UMod2_HealthBonus(D2UnitStrc* pUnit, int32_t nUMod
 }
 
 //D2Game.0x6FC6AF70
+// 1.13c D2Game+0x14D0 (checked, no delta)
 int32_t __fastcall MONSTERUNIQUE_CalculatePercentage(int32_t a1, int32_t a2, int32_t a3)
 {
     if (!a3)
@@ -262,6 +264,7 @@ int32_t __fastcall MONSTERUNIQUE_CalculatePercentage(int32_t a1, int32_t a2, int
 }
 
 //D2Game.0x6FC6AFF0
+// 1.13c D2Game+0x21E80
 void __fastcall MONSTERUNIQUE_UMod4_LevelBonus(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MONSTER)
@@ -378,6 +381,7 @@ void __fastcall MONSTERUNIQUE_UMod36_Ghostly(D2UnitStrc* pUnit, int32_t nUMod, i
 }
 
 //D2Game.0x6FC6B3A0
+// 1.13c D2Game+0x23810
 void __fastcall MONSTERUNIQUE_UMod37_Fanatic(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && bUnique)
@@ -1213,7 +1217,7 @@ void __fastcall MONSTERUNIQUE_CastColdUniqueMissile(D2GameStrc* pGame, D2UnitStr
     sub_6FD14170(pGame, pUnit, pUnit, MISSILE_COLDUNIQUE, 0, nLevel, DATATBLS_GetMissileVelocityFromMissilesTxt(MISSILE_FROSTNOVA, 0));
 }
 
-//D2Game.0x6FC6CDB0
+//D2Game.0x6FC6CDB0 -- 1.13c D2Game+0x26230
 void __fastcall MONSTERUNIQUE_CastCorpsePoisonCloud(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     const int32_t nLevel = std::max(STATLIST_UnitGetStatValue(pUnit, STAT_LEVEL, 0), 1);
@@ -2374,7 +2378,7 @@ uint32_t __fastcall MONSTERUNIQUE_CheckMonModeFlag(int32_t nMonsterId, int32_t n
     return 0;
 }
 
-//D2Game.0x6FC6F1D0
+//D2Game.0x6FC6F1D0 // 1.13c D2Game+0x15D0
 uint32_t __fastcall MONSTERUNIQUE_CheckMonStatsFlag(int32_t nMonsterId, int32_t nFlag)
 {
     D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nMonsterId);

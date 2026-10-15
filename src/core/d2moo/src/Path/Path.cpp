@@ -589,6 +589,7 @@ int __fastcall PATH_ComputePathClassicMissile(D2DynamicPathStrc* pDynamicPath, D
 }
 
 //D2Common.0x6FDA8FE0
+// 1.13c D2Common+0x35D40
 void __fastcall PATH_FindValidTargetCoordsByMovingOrthogonally(D2PathInfoStrc* pPathInfo)
 {
 	D2PathPointStrc tCoords = pPathInfo->tTargetCoord;
@@ -696,9 +697,10 @@ int __stdcall PATH_GetCollisionPatternFromMonStats2Txt(int nMonsterId)
 }
 
 //D2Common.0x6FDA9250 (#11281)
+// 1.13c D2Common+0x35360
 int __stdcall D2Common_11281_CollisionPatternFromSize(D2UnitStrc* pUnit, int nSize)
 {
-	if (nSize < 0 && nSize >= COLLISION_UNIT_SIZE_COUNT)
+	if (nSize < 0 || nSize >= COLLISION_UNIT_SIZE_COUNT)
 	{
 		return COLLISION_PATTERN_SMALL_UNIT_PRESENCE;
 	}
@@ -869,6 +871,7 @@ void __fastcall sub_6FDA9720(D2DynamicPathStrc* pDynamicPath, uint8_t nDirection
 
 //D2Common.0x6FDA9770 (#10193)
 //TODO: Check name
+// 1.13c D2Common+0x34D70
 void __stdcall D2COMMON_10193_PATH_AdjustDirection(D2DynamicPathStrc* pDynamicPath)
 {
 	if ((pDynamicPath->nDirection != pDynamicPath->nNewDirection) && !(pDynamicPath->dwFlags & PATH_UNKNOWN_FLAG_0x00040))
@@ -1114,6 +1117,7 @@ uint8_t __stdcall PATH_GetNewDirection(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDA9C20 (#10160)
+// 1.13c D2Common+0x35270
 //TODO: Check name
 void __stdcall D2COMMON_10160_PathUpdateDirection(D2DynamicPathStrc* pDynamicPath, uint8_t nDirection)
 {
@@ -1330,6 +1334,7 @@ BOOL __stdcall PATH_GetUnusedFlag_0x00004(D2DynamicPathStrc* pDynamicPath)
 	return pDynamicPath->dwFlags & PATH_UNUSED_FLAG_0x00004;
 }
 
+// 1.13c D2Common+0x35040
 //D2Common.0x6FDA9F40 (#10179)
 void __stdcall PATH_SetTargetUnit(D2DynamicPathStrc* pDynamicPath, D2UnitStrc* pUnit)
 {
@@ -1377,6 +1382,7 @@ int __stdcall PATH_GetFootprintCollisionMask(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDA9FE0 (#10182)
+// 1.13c D2Common+0x35640
 void __stdcall PATH_SetFootprintCollisionMask(D2DynamicPathStrc* pDynamicPath, int nCollisionMask)
 {
 	if (pDynamicPath->pRoom)

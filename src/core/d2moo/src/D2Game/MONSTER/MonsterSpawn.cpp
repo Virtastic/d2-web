@@ -889,6 +889,7 @@ void __fastcall sub_6FC69C00(D2UnkMonCreateStrc* pMonCreate, D2UnitStrc* pUnit)
 
 //1.10f:D2Game.0x6FC69F10
 //1.11: D2Game.0x6FCE80F0
+// 1.13c D2Game+0xEF650 (checked: same fields, struct order differs only in layout)
 D2UnitStrc* __fastcall D2GAME_SpawnMonster_6FC69F10(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t nMonsterId, int32_t nAnimMode, int32_t a7, int16_t nFlags)
 {
     D2UnkMonCreateStrc monCreate = {};

@@ -7895,6 +7895,7 @@ void __fastcall AITHINK_Fn115_SiegeBeast(D2GameStrc* pGame, D2UnitStrc* pUnit, D
 }
 
 //D2Game.0x6FCE0960
+// 1.13c D2Game+0x1900
 int32_t __fastcall AITHINK_GetSquaredDistance(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2)
 {
 	// d2-web: 1.13c D2Game!0x6FC21900 uses 32-bit SUB/IMUL/ADD. Preserve
@@ -17061,6 +17062,7 @@ BOOL __fastcall AITHINK_CanUnitSwitchAi(D2UnitStrc* pUnit, D2MonStatsTxt* pMonSt
 
 //1.10f: D2Game.0x6FCF0750
 //1.14d: 0x005B15D0
+// 1.13c D2Game+0x9D0F0
 const D2AiTableStrc* __fastcall AITHINK_GetAiTableRecord(D2UnitStrc* pUnit, D2C_AiSpecialState nAiSpecialState)
 {
 	//1.10f:D2Game.0x6FD3F990

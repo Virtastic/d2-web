@@ -175,6 +175,7 @@ void __fastcall PLRINTRO_CopyBufferToNpcIntroFlags(D2PlrIntroStrc* pPlayerIntro,
 }
 
 //D2Game.0x6FC7F1E0
+// 1.13c D2Game+0x69360 (checked against decompile)
 D2PlrIntroStrc* __fastcall PLRINTRO_Create(D2GameStrc* pGame)
 {
     D2PlrIntroStrc* pPlayerIntro = D2_ALLOC_STRC_POOL(pGame->pMemoryPool, D2PlrIntroStrc);
@@ -193,7 +194,7 @@ D2PlrIntroStrc* __fastcall PLRINTRO_Create(D2GameStrc* pGame)
     return pPlayerIntro;
 }
 
-//D2Game.0x6FC7F2A0
+// 1.13c D2Game+0x692D0
 void __fastcall PLRINTRO_Destroy(D2GameStrc* pGame, D2PlrIntroStrc* pPlayerIntro)
 {
     if (pPlayerIntro->pQuestIntroFlags)

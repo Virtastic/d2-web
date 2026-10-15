@@ -1036,13 +1036,13 @@ int __fastcall PATH_SimplifyToLines_6FDAC170(D2PathPointStrc* pOutPathPoints, D2
 	return 0;
 }
 
-//D2Common.0x6FDAC700 (#10215)
+// 1.13c D2Common+0x0D180 (#10493)
 int __stdcall PATH_ComputeDirection(int nX1, int nY1, int nX2, int nY2)
 {
 	D2CoordStrc pCoords = {};
 	int nDirection = 0;
 
-	PATH_GetDirectionVector(&pCoords, &nDirection, PATH_ToFP16Center(nX1), PATH_ToFP16Center(nY1), PATH_ToFP16Center(nX2), PATH_ToFP16Center(nY2));
+	PATH_GetDirectionVector(&pCoords, &nDirection, (uint32_t)nX1 * 0x10000u + 0x8000u, (uint32_t)nY1 * 0x10000u + 0x8000u, (uint32_t)nX2 * 0x10000u + 0x8000u, (uint32_t)nY2 * 0x10000u + 0x8000u); // full-int args, no 16-bit truncation (retail)
 
 	return nDirection;
 }

@@ -439,6 +439,7 @@ BOOL __fastcall PATH_AStar_EvaluateNeighbor(D2PathInfoStrc* pPathInfo, D2PathFoW
 // Takes a node list, and builds the path using straight lines into the path info.
 // Note that the node list stores the path from the end to the beginning (in reverse order).
 // It also seems like it won't copy the last point of the path list (first of the array), not sure if it's intended or not.
+// 1.13c D2Common+0x7AB50
 signed int __fastcall PATH_AStar_FlushNodeToDynamicPath(D2PathFoWallNodeStrc* pNode, D2PathInfoStrc* pPathInfo)
 {
 	if (!pNode)

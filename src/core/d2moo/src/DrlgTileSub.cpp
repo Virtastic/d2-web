@@ -544,6 +544,7 @@ BOOL __fastcall sub_6FD8B130(int a1, int a2, D2UnkOutdoorStrc2* a3, D2DrlgSubstG
 }
 
 //D2Common.0x6FD8B290
+// 1.13c D2Common+0x84500
 void __fastcall DRLGTILESUB_DoSubstitutions(D2UnkOutdoorStrc2* pOutdoorLevel, D2LvlSubTxt* pLvlSubTxtRecord)
 {
 	if (!pLvlSubTxtRecord->pDrlgFile->nSubstGroups)

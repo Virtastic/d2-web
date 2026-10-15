@@ -47,6 +47,7 @@ uint16_t __fastcall DATATBLS_GetStringIdFromReferenceString(char* szReference)
 }
 
 //D2Common.0x6FD49500 - Changed this function a lot (had 6 hardcoded (i.e. pre-defined) Args)
+// 1.13c D2Common+0x5E1E0
 void __fastcall DATATBLS_InitUnicodeClassNamesInCharStatsTxt()
 {
 	Unicode wszClass[512] = {};
@@ -132,6 +133,7 @@ int __stdcall DATATBLS_GetMaxLevel(int nClass)
 }
 
 //D2Common.0x6FD49710 (#10630)
+// 1.13c D2Common+0x608D0
 uint32_t __stdcall DATATBLS_GetCurrentLevelFromExp(int nClass, uint32_t dwExperience)
 {
 	if (nClass < 0 || nClass >= NUMBER_OF_PLAYERCLASSES)

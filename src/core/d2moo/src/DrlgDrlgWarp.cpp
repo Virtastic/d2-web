@@ -8,8 +8,9 @@
 #include "D2Seed.h"
 #include <Units/Units.h>
 
+// 1.13c D2Common+0x1A0D0
 //D2Common.0x6FD78780
-D2ActiveRoomStrc* __fastcall DRLGWARP_GetDestinationRoom(D2DrlgRoomStrc* pDrlgRoom, int nSourceLevel, int* pDestinationLevel, D2LvlWarpTxt** ppLvlWarpTxtRecord)
+D2ActiveRoomStrc* __fastcall DRLGWARP_GetDestinationRoom(int nSourceLevel, D2DrlgRoomStrc* pDrlgRoom, int* pDestinationLevel, D2LvlWarpTxt** ppLvlWarpTxtRecord)
 {	
 	for (D2RoomTileStrc* pSourceRoomTile = pDrlgRoom->pRoomTiles; pSourceRoomTile; pSourceRoomTile = pSourceRoomTile->pNext)
 	{
@@ -30,6 +31,7 @@ D2ActiveRoomStrc* __fastcall DRLGWARP_GetDestinationRoom(D2DrlgRoomStrc* pDrlgRo
 					return pSourceRoomTile->pDrlgRoom->pRoom;
 				}
 			}
+			return NULL; // 1.13c: first matching source tile decides; 1.10f kept scanning
 		}
 	}
 

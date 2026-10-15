@@ -149,6 +149,7 @@ void __fastcall D2GAME_DeleteTimersOnUnit_6FC34A30(D2GameStrc* pGame, D2UnitStrc
 
 //1.10f: D2Game.0x6FC34A80
 //1.13c: D2Game.6FCAE4D0
+// 1.13c D2Game+0x8E4D0 (usercall, pGame in EDI; verified identical)
 void __fastcall EVENT_FreeEventQueue(D2GameStrc* pGame)
 {
     if (!pGame->pTimerQueue)
@@ -169,6 +170,7 @@ void __fastcall EVENT_FreeEventQueue(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC34AE0
+// 1.13c D2Game+0x8E630 (usercall, pGame in EBX; verified identical shape)
 void __fastcall EVENT_AllocEventQueue(D2GameStrc* pGame)
 {
     EVENT_FreeEventQueue(pGame);
@@ -180,6 +182,7 @@ void __fastcall EVENT_AllocEventQueue(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC34BD0
+// 1.13c D2Game+0x8F070 (checked against decompile: order missile,player,monster,object,item; nArrayIndex=frame%64; no delta)
 void __fastcall EVENT_IterateEvents(D2GameStrc* pGame)
 {
     D2EventTimerQueueStrc* pTimerQueue = pGame->pTimerQueue;
@@ -277,18 +280,21 @@ static void __fastcall EVENT_ExecuteEventsImpl(ExecuteEventCallback pDefaultCall
 }
 
 //D2Game.0x6FC34CC0
+// 1.13c D2Game+0x8ECC0 (checked against decompile: shared Impl, default = 15-entry handler table; no delta)
 void __fastcall EVENT_ExecutePlayerEvents(D2GameStrc* pGame, D2EventTimerQueueStrc* pTimerQueue, D2EventTimerStrc* pEventTimer, int32_t a4)
 {
     EVENT_ExecuteEventsImpl(D2GAME_EVENTS_Callback_6FC81BD0, pGame, pTimerQueue, pEventTimer, a4);
 }
 
 //D2Game.0x6FC34DB0
+// 1.13c D2Game+0x8EBC0 (checked against decompile: shared Impl, default = monster mode handler; no delta)
 void __fastcall EVENT_ExecuteMonsterEvents(D2GameStrc* pGame, D2EventTimerQueueStrc* pTimerQueue, D2EventTimerStrc* pEventTimer, int32_t a4)
 {
     EVENT_ExecuteEventsImpl(MONSTERMODE_EventHandler, pGame, pTimerQueue, pEventTimer, a4);
 }
 
 //D2Game.0x6FC34EA0
+// 1.13c D2Game+0x8EF20 (checked against decompile: shared Impl, default = object mode handler; no delta)
 void __fastcall EVENT_ExecuteObjectEvents(D2GameStrc* pGame, D2EventTimerQueueStrc* pTimerQueue, D2EventTimerStrc* pEventTimer, int32_t a4)
 {
     EVENT_ExecuteEventsImpl(
@@ -299,6 +305,7 @@ void __fastcall EVENT_ExecuteObjectEvents(D2GameStrc* pGame, D2EventTimerQueueSt
 }
 
 //D2Game.0x6FC34F90
+// 1.13c D2Game+0x8E9A0 (checked against decompile: shared EVENT_ExecuteEventsImpl, default handler MISSMODE_SrvDoHandler; no delta)
 void __fastcall EVENT_ExecuteMissileEvents(D2GameStrc* pGame, D2EventTimerQueueStrc* pTimerQueue, D2EventTimerStrc* pEventTimer, int32_t a4)
 {
     EVENT_ExecuteEventsImpl(
@@ -309,6 +316,7 @@ void __fastcall EVENT_ExecuteMissileEvents(D2GameStrc* pGame, D2EventTimerQueueS
 }
 
 //D2Game.0x6FC35080
+// 1.13c D2Game+0x8EDD0 (checked against decompile: shared Impl, default = item event handler; no delta)
 void __fastcall EVENT_ExecuteItemEvents(D2GameStrc* pGame, D2EventTimerQueueStrc* pTimerQueue, D2EventTimerStrc* pEventTimer, int32_t a4)
 {
     EVENT_ExecuteEventsImpl(
@@ -435,7 +443,7 @@ D2EventTimerStrc** __fastcall sub_6FC353D0(D2GameStrc* pGame, int32_t nUnitType,
 }
 
 //1.10f: D2Game.0x6FC35410
-//1.13c: D2Game.0x6FCAE420
+// 1.13c D2Game+0x8E420
 D2EventTimerSlabListStrc* __fastcall EVENT_AllocTimerSlab(D2GameStrc* pGame)
 {
     D2EventTimerSlabListStrc* pSlab = D2_ALLOC_STRC_POOL(pGame->pMemoryPool,D2EventTimerSlabListStrc);

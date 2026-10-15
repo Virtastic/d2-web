@@ -15,7 +15,7 @@ struct D2UnitStrc;
 #pragma pack()
 
 //D2Common.0x6FD78780
-D2ActiveRoomStrc* __fastcall DRLGWARP_GetDestinationRoom(D2DrlgRoomStrc* pDrlgRoom, int nSourceLevel, int* pDestinationLevel, D2LvlWarpTxt** ppLvlWarpTxtRecord);
+D2ActiveRoomStrc* __fastcall DRLGWARP_GetDestinationRoom(int nSourceLevel, D2DrlgRoomStrc* pDrlgRoom, int* pDestinationLevel, D2LvlWarpTxt** ppLvlWarpTxtRecord);
 //D2Common.0x6FD787F0
 void __fastcall DRLGWARP_ToggleRoomTilesEnableFlag(D2DrlgRoomStrc* pDrlgRoom, BOOL bEnabled);
 //D2Common.0x6FD78810

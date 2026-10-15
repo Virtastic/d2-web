@@ -567,6 +567,7 @@ D2UnitStrc* __fastcall D2GAME_SpawnPresetMonster_6FC66560(D2GameStrc* pGame, D2A
 }
 
 //D2Game.0x6FC66FC0
+// 1.13c D2Game+0x1320
 D2MonStats2Txt* __fastcall MONSTERREGION_GetMonStats2TxtRecord(int32_t nMonsterId)
 {
     if (nMonsterId >= 0 && nMonsterId < sgptDataTables->nMonStatsTxtRecordCount)
@@ -1138,6 +1139,7 @@ D2MonRegDataStrc* __fastcall sub_6FC67FA0(D2MonsterRegionStrc** ppMonsterRegion,
 }
 
 //D2Game.0x6FC68110
+// 1.13c D2Game+0xCACC0
 void __fastcall sub_6FC68110(D2GameStrc* pGame)
 {
     D2SeedStrc seed = {};

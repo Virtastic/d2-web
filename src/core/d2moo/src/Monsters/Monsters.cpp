@@ -430,6 +430,7 @@ int __stdcall D2COMMON_11068_GetCompInfo(D2UnitStrc* pMonster, int nComponent)
 }
 
 //D2Common.0x6FDA52F0 (#11069)
+// 1.13c D2Common+0x84C70
 uint32_t __stdcall D2Common_11069(D2UnitStrc* pMonster, unsigned int nIndex, unsigned int nComponent)
 {
 	// NOLINTBEGIN(clang-diagnostic-multichar)
@@ -594,6 +595,7 @@ int __stdcall D2Common_11070(int nMonsterId, unsigned int nComponent, unsigned i
 }
 
 //D2Common.0x6FDA54E0 (#11050)
+// 1.13c D2Common+0x1B280
 int __stdcall D2Common_11050(D2UnitStrc* pUnit, int a2)
 {
 	D2MonStatsTxt* pMonStatsTxtRecord = NULL;
@@ -613,6 +615,12 @@ int __stdcall D2Common_11050(D2UnitStrc* pUnit, int a2)
 
 		nStart = (nFrame - pUnit->wAnimSpeed) >> 8;
 		nFrame >>= 8;
+
+		// 1.13c: no event scan when the window holds no whole frame step
+		if (nFrame <= nStart)
+		{
+			return -1;
+		}
 
 		nCounter = nStart;
 		while (nCounter <= nFrame)
@@ -750,6 +758,7 @@ void __fastcall MONSTERS_SetMonsterNameInMonsterData(D2UnitStrc* pMonster, const
 }
 
 //D2Common.0x6FDA56C0
+// 1.13c D2Common+0x1A660
 BOOL __fastcall MONSTERS_CanBeInTown(D2UnitStrc* pMonster)
 {
 	D2MonStatsTxt* pMonStatsTxtRecord = NULL;
@@ -769,6 +778,7 @@ BOOL __fastcall MONSTERS_CanBeInTown(D2UnitStrc* pMonster)
 	return FALSE;
 }
 
+// 1.13c D2Common+0x1A990
 //D2Common.0x6FDA5750 (#11057)
 BOOL __stdcall MONSTERS_IsSandLeaper(D2UnitStrc* pMonster, BOOL bAlwaysReturnFalse)
 {
@@ -1117,6 +1127,7 @@ void __stdcall MONSTERS_GetMinionSpawnInfo(D2UnitStrc* pMonster, int* pId, int* 
 }
 
 //D2Common.0x6FDA6410 (#11051)
+// 1.13c D2Common+0x1A900
 uint8_t __stdcall MONSTERS_GetMaximalLightRadius(D2UnitStrc* pMonster)
 {
 	D2ItemsTxt* pItemsTxtRecord = NULL;
@@ -1329,6 +1340,7 @@ int __fastcall MONSTERS_GetBaseIdFromMonsterId(int nMonsterId)
 }
 
 //D2Common.0x6FDA6950
+// 1.13c D2Common+0x1930
 int __fastcall MONSTERS_GetClassIdFromMonsterChain(int nMonsterId, int nChainId)
 {
 	D2MonStatsTxt* pMonStatsTxtRecord = NULL;

@@ -414,6 +414,7 @@ void __fastcall MONSTER_DeleteEvents(D2GameStrc* pGame, D2UnitStrc* pMonster)
 }
 
 //D2Game.0x6FC60E70
+// 1.13c D2Game+0xAF5D0
 int32_t __fastcall MONSTER_GetHpBonus(int32_t nPlayerCount)
 {
     static const int32_t gnHpBonusTable[] =
@@ -423,7 +424,7 @@ int32_t __fastcall MONSTER_GetHpBonus(int32_t nPlayerCount)
 
     if (nPlayerCount >= 9)
     {
-        return 10 * (5 * nPlayerCount - 10);
+        return (5 * nPlayerCount + 130) * 2; // 1.13c D2Game+0xAF5D0 (1.10f: 10 * (5 * n - 10))
     }
 
     return gnHpBonusTable[nPlayerCount];

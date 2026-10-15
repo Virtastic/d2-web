@@ -237,6 +237,7 @@ void __fastcall ACT3Q3_UnitIterate_SetGidbinnBroughtBackQuestState(D2GameStrc* p
 }
 
 //D2Game.0x6FCA9050
+// 1.13c D2Game+0xE9DC0 (checked against decompile)
 void __fastcall ACT3Q3_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));

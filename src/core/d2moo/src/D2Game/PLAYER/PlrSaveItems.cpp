@@ -663,6 +663,7 @@ int32_t __fastcall PLRSAVE2_ReadStatsEx(D2GameStrc* pGame, D2UnitStrc* pUnit, ui
 }
 
 // Recovered waypoint writer and reader.
+// 1.13c D2Game+0xEB700
 int32_t __fastcall PLRSAVE2_WriteWaypointData(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t** ppSection, const uint8_t* pEnd)
 {
     if (*ppSection + sizeof(D2WaypointSaveDataStrc) > pEnd)
@@ -700,6 +701,7 @@ int32_t __fastcall PLRSAVE2_WriteWaypointData(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 
+// 1.13c D2Game+0xEB4E0 (checked against decompile)
 int32_t __fastcall PLRSAVE2_ReadWaypointData(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t** ppSection, uint8_t* pEnd, int32_t nUnused)
 {
     if (*ppSection + sizeof(D2WaypointSaveDataStrc) > pEnd)

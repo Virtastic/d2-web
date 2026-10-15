@@ -619,7 +619,7 @@ void __stdcall UNITS_ResetRoom(D2UnitStrc* pUnit)
 }
 
 //1.10f: D2Common.0x6FDBE270 (#10342)
-//1.13c: D2Common.0x6FD7FE10 (#10331)
+// 1.13c D2Common+0x2FE10 (#10331)
 D2ActiveRoomStrc* __stdcall UNITS_GetRoom(D2UnitStrc* pUnit)
 {
 	D2_ASSERT(pUnit);
@@ -681,6 +681,7 @@ void __stdcall UNITS_SetTargetUnitForPlayerOrMonster(D2UnitStrc* pUnit, D2UnitSt
 }
 
 //D2Common.0x6FDBE470 (#10354)
+// 1.13c D2Common+0x2FD10
 void __stdcall UNITS_GetRunAndWalkSpeedForPlayer(int nUnused, int nCharId, int* pWalkSpeed, int* pRunSpeed)
 {
 	D2_MAYBE_UNUSED(nUnused);
@@ -1820,6 +1821,7 @@ void __stdcall UNITS_GetShiftedFrameMetrics(D2UnitStrc* pUnit, int* pFrameNo, in
 }
 
 //D2Common.0x6FDBF9E0 (#10380)
+// 1.13c D2Common+0x2EE60
 void __stdcall UNITS_GetFrameMetrics(D2UnitStrc* pUnit, int* pFrame, int* pFrameCount)
 {
 	if (pUnit)
@@ -1843,6 +1845,7 @@ void __stdcall UNITS_GetFrameMetrics(D2UnitStrc* pUnit, int* pFrame, int* pFrame
 }
 
 //D2Common.0x6FDBFA40 (#10381)
+// 1.13c D2Common+0x2EE10
 void __stdcall UNITS_SetAnimActionFrame(D2UnitStrc* pUnit, int nFrame)
 {
 	if (pUnit && pUnit->pAnimData)
@@ -2824,6 +2827,7 @@ BOOL __stdcall UNITS_TestCollisionByCoordinates(D2UnitStrc* pUnit, int nX, int n
 }
 
 //D2Common.0x6FDC13D0
+// 1.13c D2Common+0x30730
 BOOL __fastcall UNITS_TestCollision(int nX1, int nY1, int nSize1, int nX2, int nY2, int nSize2, D2ActiveRoomStrc* pRoom, int nCollisionMask)
 {
 	D2CoordStrc pCoords1 = {};
@@ -3022,6 +3026,7 @@ BOOL __stdcall UNITS_IsInMeleeRange(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, int 
 }
 
 //D2Common.0x6FDC1B40 (#10318)
+// 1.13c D2Common+0x313F0
 BOOL __stdcall UNITS_IsInMovingMode(D2UnitStrc* pUnit)
 {
 	if (pUnit == nullptr)
@@ -3059,6 +3064,7 @@ BOOL __stdcall UNITS_IsInMovingMode(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDC1C30 (#10319)
+// 1.13c D2Common+0x319A0
 BOOL __stdcall UNITS_IsInMovingModeEx(D2UnitStrc* pUnit)
 {
 	return UNITS_IsInMovingMode(pUnit) != 0;
@@ -3262,9 +3268,16 @@ uint8_t __stdcall UNITS_GetItemComponentId(D2UnitStrc* pUnit, D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FDC1FE0
+// 1.13c D2Common+0x13B0
 D2MonStats2Txt* __fastcall UNITS_GetMonStats2TxtRecordFromMonsterId(int nMonsterId)
 {
-	int nMonStatsEx = DATATBLS_GetMonStatsTxtRecord(nMonsterId)->wMonStatsEx;
+	// 1.13c D2Common+0x13B0: out-of-range monster id returns NULL
+	D2MonStatsTxt* pMonStatsTxt = DATATBLS_GetMonStatsTxtRecord(nMonsterId);
+	if (!pMonStatsTxt)
+	{
+		return NULL;
+	}
+	int nMonStatsEx = pMonStatsTxt->wMonStatsEx;
 
 	if (nMonStatsEx >= 0 && nMonStatsEx < sgptDataTables->nMonStats2TxtRecordCount)
 	{
@@ -3814,6 +3827,7 @@ int __stdcall UNITS_GetDistanceToOtherUnit(D2UnitStrc* pUnit1, D2UnitStrc* pUnit
 }
 
 //D2Common.0x6FDC2F50 (#10398)
+// 1.13c D2Common+0x7F5E0 (same body as 0x2F1E0; a second copy in retail)
 unsigned int __stdcall UNITS_GetDistanceToCoordinates(D2UnitStrc* pUnit, int nX, int nY)
 {
 	D2CoordStrc pCoords = {};

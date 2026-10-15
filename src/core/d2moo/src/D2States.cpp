@@ -292,6 +292,7 @@ BOOL __stdcall STATES_CheckStateMaskCurableByStateId(int nState)
 }
 
 //D2Common.0x6FDB4F00 (#10554)
+// 1.13c D2Common+0x33AB0
 BOOL __stdcall STATES_CheckStateMaskStayDeathOnUnitByStateId(D2UnitStrc* pUnit, int nState)
 {
 	if (nState >= 0 && nState < sgptDataTables->nStatesTxtRecordCount)
@@ -388,6 +389,7 @@ BOOL __stdcall STATES_CheckStateMaskExpOnUnit(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDB5500 (#10553)
+// 1.13c D2Common+0x33a70 (ordinal 10226; same body, lookup kept as the shared helper)
 BOOL __stdcall STATES_CheckStateMaskExpByStateId(int nState)
 {
 	return STATES_CheckStateMaskByStateId(nState, STATEMASK_EXP);

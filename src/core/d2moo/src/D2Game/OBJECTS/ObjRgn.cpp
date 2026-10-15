@@ -19,7 +19,7 @@
 #include "OBJECTS/ObjMode.h"
 
 
-//D2Game.0x6FC7A3A0
+//D2Game.0x6FC7A3A0 (1.13c D2Game+0xB9A0)
 int32_t __fastcall OBJRGN_AllocObjectControl(D2GameStrc* pGame)
 {
     D2_ASSERT(pGame);
@@ -152,6 +152,7 @@ void __fastcall OBJRGN_AllocObjectRoomCoords(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FC7A780
+// 1.13c D2Game+0xBD10
 void __fastcall OBJECTS_InitFunction17_Waypoint(D2ObjInitFnStrc* pOp)
 {
     D2ObjectRoomCoordStrc* pObjectRoomCoord = pOp->pGame->pObjectControl->pObjectRoomCoord;

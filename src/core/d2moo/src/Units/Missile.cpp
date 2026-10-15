@@ -302,6 +302,7 @@ int __stdcall MISSILE_GetStreamRange(D2UnitStrc* pMissile)
 }
 
 //D2Common.0x6FDBA340 (#11135)
+// 1.13c D2Common+0x6A050
 int __stdcall MISSILE_GetHitClass(D2UnitStrc* pMissile)
 {
 	D2MissilesTxt* pMissilesTxtRecord = NULL;
@@ -406,6 +407,7 @@ D2MissileStreamStrc* __fastcall MISSILE_GetStream(D2UnitStrc* pMissile)
 }
 
 //D2Common.0x6FDBA490 (#11140)
+// 1.13c D2Common+0x69FB0
 void __stdcall MISSILE_SetTargetX(D2UnitStrc* pMissile, int nTargetX)
 {
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
@@ -415,6 +417,7 @@ void __stdcall MISSILE_SetTargetX(D2UnitStrc* pMissile, int nTargetX)
 }
 
 //D2Common.0x6FDBA4B0 (#11141)
+// 1.13c D2Common+0x69F90
 int __stdcall MISSILE_GetTargetX(D2UnitStrc* pMissile)
 {
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
@@ -882,6 +885,7 @@ void __fastcall MISSILE_AddStatsToDamage(D2MissileDamageDataStrc* pMissileDamage
 }
 
 //D2Common.0x6FDBB060
+// 1.13c D2Common+0x69C60
 void __fastcall MISSILE_CalculateFinalDamage(D2MissileDamageDataStrc* pMissileDamageData, int nSrcDamage)
 {
 	if (nSrcDamage != 128)
@@ -1128,6 +1132,7 @@ int __stdcall MISSILE_GetMaxDamage(D2UnitStrc* pMissile, D2UnitStrc* pOwner, int
 }
 
 //D2Common.0x6FDBB880 (#11289)
+// 1.13c D2Common+0x69E70
 uint8_t __stdcall MISSILE_GetElemTypeFromMissileId(int nMissileId)
 {
 	D2MissilesTxt* pMissilesTxtRecord = DATATBLS_GetMissilesTxtRecord(nMissileId);

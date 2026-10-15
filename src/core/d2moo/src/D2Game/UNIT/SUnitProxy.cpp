@@ -97,6 +97,7 @@ void __fastcall SUNITPROXY_AllocNpcEvent(D2UnitStrc* pNpc, D2GameStrc* pGame, D2
 }
 
 //D2Game.0x6FCCBA30
+// 1.13c D2Game+0x8FBE0 (checked: no delta; the 1.13c table is data at 0x27870, same class/act/trader/force/gamble/refresh rules)
 void __fastcall SUNITPROXY_InitializeNpcControl(D2GameStrc* pGame)
 {
     constexpr D2NpcInitStrc dword_6FD3F640[] =
@@ -601,6 +602,7 @@ void __fastcall SUNITPROXY_OnClientRemovedFromGame(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FCCC7C0
+// 1.13c D2Game+0x8F720 (checked against decompile)
 void __fastcall SUNITPROXY_InitializeNpcEventChain(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     //GetTickCount();

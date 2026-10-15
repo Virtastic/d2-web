@@ -1100,6 +1100,7 @@ void __stdcall COLLISION_ResetMaskWithSizeXY(D2ActiveRoomStrc* pRoom, int nX, in
 }
 
 //D2Common.0x6FD44370
+// 1.13c D2Common+0x4ABD0
 void __fastcall COLLISION_ResetCollisionMaskForBoundingBox(D2RoomCollisionGridStrc* pCollisionGrid, D2BoundingBoxStrc* pBoundingBox, uint16_t nMask)
 {
 	const int32_t boxWidth = pBoundingBox->nRight - pBoundingBox->nLeft + 1;

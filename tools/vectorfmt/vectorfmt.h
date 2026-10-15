@@ -662,6 +662,164 @@ struct D2VecWaypointCopy {   // s3049: D2Common 0x67D00 validate-and-copy of a 1
 };
 static_assert(sizeof(D2VecWaypointCopy) == 48, "waypoint copy record");
 
+struct D2VecCommon10003 {   // s3002: D2Common 0x2D0B0 = SetBit(*target, mul*16 + add)
+    int32_t mul, add;
+    uint8_t before[64];   // bit field before the call
+    uint8_t after[64];    // bit field after
+};
+static_assert(sizeof(D2VecCommon10003) == 136, "common 10003 record");
+
+struct D2VecBackpackType {   // s3009: D2Common 0x1FE10 backpack item-type search over a synthetic inventory
+    int32_t ownerType, sigOk, itemType;  // owner unit type (0 player, 1 other), signature valid, type selector
+    int32_t cont, n, badIdx;             // continuation: -1 none, 0..n-1 chain item, 99 foreign item; chain length; chain index whose unit type is 1 (-1 none)
+    int32_t cls[6];                      // item classIds in grid-chain order
+    int32_t result;                      // chain index returned, -1 null
+};
+static_assert(sizeof(D2VecBackpackType) == 52, "backpack record");
+
+struct D2VecRunesTxtRecord {   // s3005: D2Common 0x70FA0 = &pRunesTxt[id] (valid ids only; invalid terminates)
+    int32_t id;
+    uint32_t count;       // rune record count (D2Common+0x9BBD4)
+    uint8_t bytes[0x120]; // the record at the returned pointer
+};
+static_assert(sizeof(D2VecRunesTxtRecord) == 296, "runes txt record");
+
+struct D2VecMonItemPercent {   // s3049: D2Common 0x53390 = id<count && id!=-1 ? &tbl[id] : null (signed ids, -8..count+3)
+    int32_t id;
+    uint32_t count;       // record count (D2Common+0xA0B5C)
+    int32_t isNull;       // returned null
+    int32_t offset;       // returned pointer - table base (0 when null)
+    uint8_t bytes[4];     // the 4 percent bytes at the returned pointer when 0<=id<count, else 0
+};
+static_assert(sizeof(D2VecMonItemPercent) == 20, "monitempercent record");
+
+struct D2VecEarLevelGet {   // s3053: D2Common 0x236B0 ITEMS_GetEarLevel(unit): synthetic unit {type, pItemData?}, data byte +0x48 = 0x37
+    uint32_t type;
+    uint32_t flags;       // bit0 pItemData non-null, bit1 unit pointer null
+    uint32_t level;       // returned byte
+};
+static_assert(sizeof(D2VecEarLevelGet) == 12, "earlevelget record");
+
+struct D2VecStackable22E20 {   // s3121: D2Common 0x22E20 (ordinal 10048) stackable byte of items.txt record, synthetic unit {type, classId}
+    uint32_t type;        // dwUnitType (flag 0x80000000 = null unit pointer)
+    uint32_t classId;
+    uint32_t result;      // returned byte
+};
+static_assert(sizeof(D2VecStackable22E20) == 12, "stackable22e20 record");
+
+struct D2VecUnitFinds12720 {   // s3122: D2Common 0x12720 (ordinal 10052) unit-find over a synthetic room graph with a callback test
+    int32_t x, y, size;       // search circle
+    uint32_t flags;           // pUnitFindData->nFlags (0x2000 = skip town rooms)
+    uint32_t maxEntries;      // initial array capacity (growth is +15)
+    uint32_t cbMask;          // callback accepts a unit when (unitId & cbMask) != 0
+    int32_t room[4][4];       // room 0 = the search room (list head), 1..3 = adjacent; {subtileX, subtileY, width, height}
+    uint32_t nAdj;            // adjacent rooms 0..3 (list = room 0 + these, used when the circle leaves room 0)
+    uint32_t townMask;        // bit i: room i sits on a town level (1) else level 5
+    uint32_t nUnits[4];       // units in each room; unit id = room * 100 + k + 1
+    uint32_t nullRoom;        // 1 = pRoom is NULL
+    uint32_t result;          // returned count
+    uint32_t nIndex;          // struct +0x18 afterwards
+    uint32_t maxAfter;        // struct +0x1C afterwards
+    uint32_t hash;            // FNV-1a over the unit ids stored in the array [0, nIndex)
+};
+static_assert(sizeof(D2VecUnitFinds12720) == 4 * (6 + 16 + 2 + 4 + 5), "unitfinds12720 record");
+
+struct D2VecStream3cda0 {   // s3123: D2Common 0x3CDA0 (ordinal 10053) stream the room at tile (x, y) of an act
+    uint32_t seed, difficulty, act;   // act 0-based, as LoadAct
+    int32_t x, y;                     // probe tile coordinates
+    uint32_t found;                   // returned non-NULL
+    int32_t level, ordinal;           // level id of the returned room's DrlgRoom and its index in that level's room list
+    int32_t rect[4];                  // that DrlgRoom's tile x, y, width, height
+};
+static_assert(sizeof(D2VecStream3cda0) == 4 * 12, "stream3cda0 record");
+
+struct D2VecDist7f5e0 {   // s3124: D2Common 0x7F5E0 distance from a unit's position to (x, y)
+    uint32_t type, nullPath;   // unit type; path pointer NULL
+    int32_t px, py;            // path position (static types 2/4/5: dword +0xC/+0x10; others: word +2/+6, zero-extended)
+    int32_t x, y;              // target point
+    int32_t result;
+};
+static_assert(sizeof(D2VecDist7f5e0) == 4 * 7, "dist7f5e0 record");
+
+struct D2VecAutomapCell6fac0 {   // s3131: D2Common 0x6FAC0 automap cell lookup (levelType, tileType, style, sequence) with the automap seed
+    int32_t levelType, tileType, style, seq;
+    uint32_t seedLo, seedHi;           // automap seed before the call
+    int32_t result;
+    uint32_t seedLoAfter, seedHiAfter; // automap seed after the call
+};
+static_assert(sizeof(D2VecAutomapCell6fac0) == 36, "automap cell 6fac0 record");
+
+struct D2VecPrestId9c20 {   // s3141: D2Common 0x9C20 level preset id from room (*(room+0x20))
+    uint32_t in, out;
+};
+static_assert(sizeof(D2VecPrestId9c20) == 8, "prestid9c20 record");
+
+struct D2VecRefresh665c0 {   // s3132: D2Common 0x665C0 queue a unit on its room's refresh list
+    uint32_t type, roomMode, unitFlags, headPresent, actIn;   // inputs
+    uint32_t unitFlagsOut, nextKind, headKind, actOut;        // kinds: 0 null, 1 other unit, 2 self (next) / self (head=1, other=2), 3 unknown
+};
+static_assert(sizeof(D2VecRefresh665c0) == 36, "refresh665c0 record");
+
+struct D2VecQuestState2d0f0 {   // s3133: D2Common 0x2D0F0 quest-record bit test
+    uint32_t buf[4], quest, state, result;
+};
+static_assert(sizeof(D2VecQuestState2d0f0) == 28, "queststate2d0f0 record");
+
+struct D2VecMoving313f0 {   // s3130: D2Common 0x313F0 UNITS_IsInMovingMode over a synthetic unit
+    uint32_t type, flags, classId, mode, seqMode;   // flags: bit0 anim-seq pointer set, bit1 null unit
+    int32_t result;
+};
+static_assert(sizeof(D2VecMoving313f0) == 24, "moving313f0 record");
+
+struct D2VecAnimAdj12d40 {   // s3135: D2Common 0x12D40 DRLGANIM_UpdateFrameInAdjacentRooms over synthetic Room2 graphs
+    uint32_t nullMask;          // bit0 room1 null, bit1 room2 null
+    uint32_t n1;                // room1 near-room count (0..3)
+    int32_t chain1[3];          // per room1 near room: -1 no tile grid, else anim-tile count (0 = grid without pAnimTiles)
+    uint32_t frame1[3];         // nCurrentFrame of the head anim tile of that near room
+    uint32_t n2;                // room2 near-room count
+    int32_t chain2[3];          // same, room2 near rooms
+    uint32_t init2[3][3];       // initial nCurrentFrame of each room2 anim tile
+    uint32_t out2[3][3];        // nCurrentFrame after the call (0 where no tile)
+};
+static_assert(sizeof(D2VecAnimAdj12d40) == 120, "animadj12d40 record");
+
+struct D2VecArmorComp437c0 { int32_t comp, result; };   // s3067: D2Common 0x437C0 COMPOSIT_IsArmorComponent
+static_assert(sizeof(D2VecArmorComp437c0) == 8, "armorcomp437c0 record");
+struct D2VecChain1930 { int32_t id, depth, count, result; };   // s3134: D2Common 0x1930 monster id + chain depth -> class id
+static_assert(sizeof(D2VecChain1930) == 16, "chain1930 record");
+struct D2VecGameCheckMonType1620 { int32_t type1, type2, result; };   // s3233: D2Game 0x1620 (ecx type1, eax type2) -> eax
+static_assert(sizeof(D2VecGameCheckMonType1620) == 12, "checkmontype 1620 record");
+
+struct D2VecGameGetMonStats1540 { int32_t type, hasMon, hasUnit, idx, result; };   // s3234: D2Game 0x1540 (eax unit) -> monstats nId or -1
+static_assert(sizeof(D2VecGameGetMonStats1540) == 20, "getmonstats 1540 record");
+
+struct D2VecHoverChat {   // s3137: D2Common 0x181F0/0x18220/0x18240 hover-message accessors (kinds 3137/3138/3139)
+    uint8_t in[64], out[64];   // in = hover struct image; out = copy buffer (3138) or lang/timeout in out[0..3]
+};
+static_assert(sizeof(D2VecHoverChat) == 128, "hoverchat record");
+
+struct D2VecSandLeaper1A990 { uint32_t present, type; int32_t classId, count; uint32_t flag, result; };   // s3140: D2Common 0x1A990 unit, flag, monstats count -> BOOL
+static_assert(sizeof(D2VecSandLeaper1A990) == 24, "sandleaper record");
+
+struct D2VecIso4da00 { int32_t a, b, x, y; };   // s3125: D2Common 0x4DA00 (a,b) -> (x,y)
+static_assert(sizeof(D2VecIso4da00) == 16, "iso4da00 record");
+
+struct D2VecEarName {   // s3054: D2Common 0x23700 ITEMS_GetEarName(unit): synthetic unit {type, pItemData?}
+    uint32_t type;
+    uint32_t flags;       // bit0 pItemData non-null, bit1 unit pointer null
+    int32_t isNull;       // returned null
+    int32_t offset;       // returned pointer - pItemData (0 when null)
+};
+static_assert(sizeof(D2VecEarName) == 16, "earname record");
+
+struct D2VecEarLevel {   // s3052: D2Common 0x23690 ITEMS_SetEarLevel(unit, level): synthetic unit {type, pItemData?}
+    uint32_t type;
+    uint32_t flags;       // bit0 pItemData non-null, bit1 unit pointer null
+    uint32_t level;       // nLevel argument
+    int32_t result;       // byte at pItemData+0x48 after the call (sentinel 0xAA pre-filled)
+};
+static_assert(sizeof(D2VecEarLevel) == 16, "earlevel record");
+
 struct D2VecClientWindowHandle {
     uint32_t globalValue;
     uint32_t result;
@@ -675,6 +833,44 @@ struct D2VecGameReturnArgument {
 };
 static_assert(sizeof(D2VecGameReturnArgument) == 8, "game return argument record");
 
+struct D2VecRunWalk2FD10 {   // kind 3150
+    uint32_t classId;
+    uint32_t out1;   // walk (record+0x40)
+    uint32_t out2;   // run (record+0x41)
+};
+static_assert(sizeof(D2VecRunWalk2FD10) == 12, "runwalk record");
+
+struct D2VecNet65D0 {   // kind 3606
+    uint32_t len;        // param_2
+    int32_t table;       // DAT_6fbfabd8[opcode] (0 when opcode >= 0x71), read before the call
+    int32_t outParam;    // *param_3 after the call (sentinel 0x7A7A7A7A pre-call)
+    int32_t result;
+    uint8_t buf[32];     // packet bytes, zero padded
+};
+static_assert(sizeof(D2VecNet65D0) == 48, "net 65D0 record");
+
+struct D2VecNetQueue {   // kind 3441: D2Net Fog-queue thunks after 0x6590 init(init0, init1)
+    uint32_t fn;                 // D2Net rva
+    uint32_t init0, init1;       // args of the 0x6590 init that built the queue
+    uint32_t a, b, c;            // thunk args (71E0: a = dest buffer, recorded in buf; 6170: 2nd arg = out byte, recorded in buf; b is then the 3rd arg)
+    int32_t ret;
+    uint32_t fault;              // 1 if the call faulted
+    uint32_t state[3];           // queue+0x86C, +0x87C, +0x884 after the call (0xDEAD: no queue)
+    uint8_t buf[16];             // first 16 bytes of the 0xA5-filled buffer after the call
+};
+static_assert(sizeof(D2VecNetQueue) == 60, "net queue record");
+
+// kind 3442: D2Common 0x241D0 stdcall(unit) over a fixture unit {type +0, id +4, item data +0x14 -> flags +0x18}.
+struct D2VecItemPlain241d0 { uint32_t type, id, hasData, flags, ret; };
+static_assert(sizeof(D2VecItemPlain241d0) == 20, "241d0 record");
+// kind 3443: D2Common 0x33C20 (eax = struct, ecx = mask) and 0x34000 (stdcall(struct), mask = [[0x6FDE9E1C]+0xE0]).
+// Fixture struct: +0x5c -> rec {+0x10 flag word, +0x58 -> bits}. nwords = ([[0x6FDE9E1C]+0xC4]+31)/32 (recorded, pinned by the tables).
+struct D2VecBitmask33c20 { uint32_t fn, hasStruct, hasRec, recFlag, hasBits, nwords, mask[8], bits[8], ret; };
+static_assert(sizeof(D2VecBitmask33c20) == 92, "33c20 record");
+
+struct D2VecGameAccessor { int32_t a, b; uint32_t result; };   // kinds 3240/3241: D2Game accessor (a,b) -> result
+static_assert(sizeof(D2VecGameAccessor) == 12, "game accessor record");
+
 struct D2VecGameClearFlag { int32_t before, after; };   // kind 40: D2Game+0x38BB0 sentinel in, global read back
 static_assert(sizeof(D2VecGameClearFlag) == 8, "game clear flag record");
 struct D2VecGameSetInitSeed {
@@ -682,6 +878,43 @@ struct D2VecGameSetInitSeed {
     int32_t globalAfter;   // int32 at D2Game 0x6FD2E354 (rva 0x10E354) read back
 };
 static_assert(sizeof(D2VecGameSetInitSeed) == 8, "game set init seed record");
+
+struct D2VecGameCacc0 { uint32_t seedLoIn, seedHiIn, difficulty, seedLo, seedHi, dwMonSeed; };   // kind 3260: D2Game+0xCACC0 (ESI=pGame, 0xCAB30 stubbed); seed +0xD0/+0xD4, dwMonSeed +0xEC after
+static_assert(sizeof(D2VecGameCacc0) == 24, "game cacc0 record");
+struct D2VecNpcRec8FBE0 { int32_t nNPC; uint8_t nAct, bTrader, bLevelRefresh, bInited, bForceVendor, b27, pad[2]; uint32_t dw0C; };   // rec +0,+0x22..+0x27,+0xC (bGambleInit is dw0C: set to 1 by the gamble classes)
+static_assert(sizeof(D2VecNpcRec8FBE0) == 16, "npc record");
+struct D2VecNpcCtl8FBE0 { uint32_t nInitSeed, preSeedLo, preSeedHi, postSeedLo, postSeedHi, nArraySize, unk10, ctlSeedLo, ctlSeedHi; D2VecNpcRec8FBE0 rec[64]; };   // kind 3261: D2Game+0x8FBE0 stdcall(pGame); control at pGame+0x1D24
+static_assert(sizeof(D2VecNpcCtl8FBE0) == 36 + 64 * 16, "npc control record");
+struct D2VecGameSeedInit2A900 { uint32_t nInitSeed, dwInitSeed7C, initSeedFlag84, seedLo, seedHi; };   // kind 3250: D2Game+0x2A900 (EDI=zeroed pGame), pGame+0x7C/+0x84/+0xD0..D7 after
+static_assert(sizeof(D2VecGameSeedInit2A900) == 20, "game seed init 2A900 record");
+
+struct D2VecQuestInitEntry { int32_t nQuestNo; uint8_t nAct, bNotIntro, bActive, pad; };
+struct D2VecQuestInit348A0 {   // kind 3251: D2Game+0x348A0 on a fresh game; chain walked pLastQuest -> prev (+0xF4)
+    uint32_t nInitSeed;
+    uint32_t preControlNonNull, preSeedLo, preSeedHi;   // pGame+0x10F4 != 0 before the call; pGame+0xD0..D7 before
+    uint32_t postSeedLo, postSeedHi;                    // pGame+0xD0..D7 after
+    uint32_t info[9];                                   // control block +0..0x23 after, pointers (+0,+0xC,+0x10) reduced to non-null 0/1
+    uint32_t nRecords;
+    D2VecQuestInitEntry rec[96];
+};
+struct D2VecEventQueue8E630 {   // kind 3252: D2Game+0x8E630 (EBX=pGame) called twice; pointers reduced to non-null flags
+    uint32_t nInitSeed, b8Pre, b8After1, slab1, b8After2, b8Changed2, slab2, queue2Equal1, q1[0x288];   // q1[0x287] = slab-head non-null flag
+};
+static_assert(sizeof(D2VecEventQueue8E630) == 4 * 8 + 0xA20, "event queue 8E630 record");
+struct D2VecFreeQ8E4D0 { uint32_t nInitSeed, kase, chainBefore, queueAfter, poolSame; };   // kind 3255: D2Game+0x8E4D0 (EDI=pGame); kase 0/1/2 = 1 slab / 3 slabs / queue already null
+static_assert(sizeof(D2VecFreeQ8E4D0) == 20, "freeq 8E4D0 record");
+struct D2VecTimerSlab8E420 { uint32_t nInitSeed, nonNull, nonZeroWords, fnv, headOff, lastNextOff, secondNextOff; };   // kind 3254: D2Game+0x8E420 (EAX=pGame) slab 0x7088 B; pointers -> offsets from base; fnv = FNV-1a over the 0x1C22 normalized dwords
+// kind 3253: D2Common+0x3A280 STATLIST_SetStat(list, packedId, value) on a freshly built list; listKind 0 NULL, 1 plain, 2 extended owner type 0, 3 extended owner type 1; preseed set 0/1
+struct D2VecStatList3A280 { uint32_t listKind, preset, packedId, value, ret, hasMod, nBase, base[24][2], nMod, mod[24]; };
+static_assert(sizeof(D2VecStatList3A280) == 4 * 7 + 192 + 4 + 96, "statlist 3A280 record");
+static_assert(sizeof(D2VecQuestInit348A0) == 4 * 15 + 4 + 96 * 8, "quest init 348A0 record");
+
+struct D2VecGfxViewModeSelector { uint32_t input, globalAfter; };   // kind 3715: D2Gfx+0xB190 (ECX in), uint32 at D2Gfx+0x11270 read back
+static_assert(sizeof(D2VecGfxViewModeSelector) == 8, "gfx view mode selector record");
+struct D2VecLangStrstrB020 { uint16_t hay[16], needle[8]; int32_t offset; uint32_t nullMask; };   // kind 3723: D2Lang+0xB020; offset -1 = NULL; nullMask bit0 hay NULL, bit1 needle NULL
+static_assert(sizeof(D2VecLangStrstrB020) == 56, "lang strstr b020 record");
+struct D2VecLangStrncpyB0D0 { uint16_t src[16]; uint16_t dst[16]; int32_t count; int32_t retOffset; };   // kind 3726: D2Lang+0xB0D0; dst pre-filled 0xCCCC; retOffset = ret - dst
+static_assert(sizeof(D2VecLangStrncpyB0D0) == 72, "lang strncpy b0d0 record");
 
 // Retail NPC interaction snapshot; node identities are list-local, never host addresses.
 #pragma pack(push, 1)
@@ -697,8 +930,104 @@ struct D2VecInteractCount {
 #pragma pack(pop)
 static_assert(sizeof(D2VecInteractCount) == 160, "interaction snapshot layout");
 
-enum D2VecKind : uint32_t { D2VEC_PRNG = 1, D2VEC_DRLG = 2, D2VEC_ITEMGEN = 3, D2VEC_MONSPAWN = 4, D2VEC_TABLE = 5, D2VEC_COMBAT = 6, D2VEC_AISPAWN = 7, D2VEC_AIFRAME = 8, D2VEC_AITARGET = 9, D2VEC_COMBATRESULT = 10, D2VEC_DAMAGECALC = 11, D2VEC_A1Q6 = 12, D2VEC_A1Q6PLAYER = 13, D2VEC_A1Q6TIMER = 14, D2VEC_A1Q6COMPLETE = 15, D2VEC_A1Q6DROP = 16, D2VEC_A1Q6TRAVEL = 17, D2VEC_NPCDIALOG = 18, D2VEC_NPCRESPONSE = 19, D2VEC_VENDORITEM = 20, D2VEC_VENDORBUY = 21, D2VEC_VENDORSELL = 22, D2VEC_HIRE = 23, D2VEC_VENDORMULTIBUY = 24, D2VEC_TILE = 25, D2VEC_TILEPICK = 26, D2VEC_AITRACE = 27, D2VEC_AIPATH = 28, D2VEC_MONDROP = 29, D2VEC_ROOMSIGHT = 30, D2VEC_QUEUEDUNIT = 31, D2VEC_ROOMCALLER = 32, D2VEC_SKILLCLASS = 33, D2VEC_CLIENT_INIT_FLAG = 33, D2VEC_TOWNPORTAL = 34, D2VEC_CLIENT_BYTE_LOOKUP = 35, D2VEC_CLIENT_WINDOW_HANDLE = 36, D2VEC_GAME_RETURN_ARGUMENT = 37, D2VEC_GAME_SET_INIT_SEED = 38, D2VEC_LEVELS_TXT_RECORD = 39, D2VEC_GAME_CLEAR_FLAG = 40, D2VEC_WAYPOINT_COPY = 41, D2VEC_INTERACTCOUNT = 42 };
+struct D2VecClient1230 { int32_t index; uint32_t count; uint32_t offset; uint32_t isNull; };   // kind 3410
+static_assert(sizeof(D2VecClient1230) == 16, "client 1230 record");
 
+struct D2VecClient1260 { int32_t index; uint32_t count; uint32_t count2; int32_t field; uint32_t offset; uint32_t isNull; };   // kind 3411
+struct D2VecClient1300 { int32_t index; uint32_t count; uint32_t offset; uint32_t isNull; };   // kind 3412
+static_assert(sizeof(D2VecClient1300) == 16, "client 1300 record");
+struct D2VecClient1580 { int32_t index; uint32_t count; uint32_t offset; uint32_t isNull; };   // kind 3416
+static_assert(sizeof(D2VecClient1580) == 16, "client 1580 record");
+struct D2VecClient15b0 { int32_t index; uint32_t count; uint32_t offset; uint32_t isNull; };   // kind 3417
+static_assert(sizeof(D2VecClient15b0) == 16, "client 15b0 record");
+struct D2VecClient1630 { int32_t type; uint32_t pathPresent; uint32_t staticX; uint32_t dynX; uint32_t result; };   // kind 3418
+static_assert(sizeof(D2VecClient1630) == 20, "client 1630 record");
+struct D2VecClient1660 { int32_t type; uint32_t pathPresent; uint32_t staticY; uint32_t dynY; uint32_t result; };   // kind 3419
+static_assert(sizeof(D2VecClient1660) == 20, "client 1660 record");
+struct D2VecClient17B0 { int32_t idx; uint32_t count; uint32_t field; uint32_t inRange; uint32_t result; };   // kind 3420
+static_assert(sizeof(D2VecClient17B0) == 20, "client 17B0 record");
+struct D2VecClient18D0 { uint32_t seedLo, seedHi; int32_t range, base; uint32_t outLo, outHi, result; };   // kind 3421
+static_assert(sizeof(D2VecClient18D0) == 28, "client 18D0 record");
+struct D2VecClient2DC0 { uint32_t seedLo, seedHi; int32_t max, min; uint32_t outLo, outHi, result; };   // kind 3424
+static_assert(sizeof(D2VecClient2DC0) == 28, "client 2DC0 record");
+struct D2VecClient1A60 { uint32_t unitPresent; int32_t type; uint32_t extPresent; uint32_t idx; uint32_t result; };   // kind 3422
+static_assert(sizeof(D2VecClient1A60) == 20, "client 1A60 record");
+struct D2VecClient2D50 { uint32_t unitPresent, first, innerPresent, a, b, c, o150, o154, o158, o15c; };   // kind 3423
+static_assert(sizeof(D2VecClient2D50) == 40, "client 2D50 record");
+struct D2VecClient1330 { uint32_t lowIn, highIn; int32_t n; uint32_t lowOut, highOut, result; };   // kind 3413
+static_assert(sizeof(D2VecClient1330) == 24, "client 1330 record");
+struct D2VecClient1380 { uint32_t lowIn, highIn; int32_t n; uint32_t lowOut, highOut, result; };   // kind 3414
+static_assert(sizeof(D2VecClient1380) == 24, "client 1380 record");
+struct D2VecClient1400 { int32_t rooms[4][8]; int32_t room, x, y, result; };   // kind 3415; rooms = x0,y0,w,h,n,near[3]
+static_assert(sizeof(D2VecClient1400) == 144, "client 1400 record");
+static_assert(sizeof(D2VecClient1260) == 24, "client 1260 record");
+
+enum D2VecKind : uint32_t { D2VEC_PRNG = 1, D2VEC_DRLG = 2, D2VEC_ITEMGEN = 3, D2VEC_MONSPAWN = 4, D2VEC_TABLE = 5, D2VEC_COMBAT = 6, D2VEC_AISPAWN = 7, D2VEC_AIFRAME = 8, D2VEC_AITARGET = 9, D2VEC_COMBATRESULT = 10, D2VEC_DAMAGECALC = 11, D2VEC_A1Q6 = 12, D2VEC_A1Q6PLAYER = 13, D2VEC_A1Q6TIMER = 14, D2VEC_A1Q6COMPLETE = 15, D2VEC_A1Q6DROP = 16, D2VEC_A1Q6TRAVEL = 17, D2VEC_NPCDIALOG = 18, D2VEC_NPCRESPONSE = 19, D2VEC_VENDORITEM = 20, D2VEC_VENDORBUY = 21, D2VEC_VENDORSELL = 22, D2VEC_HIRE = 23, D2VEC_VENDORMULTIBUY = 24, D2VEC_TILE = 25, D2VEC_TILEPICK = 26, D2VEC_AITRACE = 27, D2VEC_AIPATH = 28, D2VEC_MONDROP = 29, D2VEC_ROOMSIGHT = 30, D2VEC_QUEUEDUNIT = 31, D2VEC_ROOMCALLER = 32, D2VEC_SKILLCLASS = 33, D2VEC_CLIENT_INIT_FLAG = 33, D2VEC_TOWNPORTAL = 34, D2VEC_CLIENT_BYTE_LOOKUP = 35, D2VEC_CLIENT_WINDOW_HANDLE = 36, D2VEC_GAME_RETURN_ARGUMENT = 37, D2VEC_GAME_SET_INIT_SEED = 38, D2VEC_LEVELS_TXT_RECORD = 39, D2VEC_GAME_CLEAR_FLAG = 40, D2VEC_WAYPOINT_COPY = 41, D2VEC_INTERACTCOUNT = 42, D2VEC_COMMON_10003 = 43, D2VEC_RUNES_TXT_RECORD = 44, D2VEC_BACKPACK_TYPE = 45, D2VEC_MONITEMPERCENT = 46, D2VEC_EARNAME = 47, D2VEC_EARLEVEL = 48, D2VEC_EARLEVELGET = 49, D2VEC_GFX_VIEW_MODE_SELECTOR = 3715, D2VEC_LANG_STRSTR_B020 = 3723, D2VEC_STACKABLE_22E20 = 5022, D2VEC_CLIENT_1230 = 3410, D2VEC_UNITFINDS_12720 = 5023, D2VEC_STREAM_3CDA0 = 3123, D2VEC_CLIENT_1260 = 3411, D2VEC_DIST_7F5E0 = 3124, D2VEC_CLIENT_1300 = 3412, D2VEC_CLIENT_1330 = 3413, D2VEC_CLIENT_1380 = 3414, D2VEC_CLIENT_1400 = 3415, D2VEC_CLIENT_1580 = 3416, D2VEC_CLIENT_15B0 = 3417, D2VEC_CLIENT_1630 = 3418, D2VEC_ISO_4DA00 = 3125, D2VEC_AUTOMAP_CELL_6FAC0 = 3131, D2VEC_REFRESH_665C0 = 3132, D2VEC_QUESTSTATE_2D0F0 = 3133, D2VEC_CLIENT_1660 = 3419, D2VEC_MOVING_313F0 = 3130, D2VEC_ARMORCOMP_437C0 = 3067, D2VEC_CLIENT_17B0 = 3420, D2VEC_CLIENT_18D0 = 3421, D2VEC_CLIENT_1A60 = 3422, D2VEC_CLIENT_2D50 = 3423, D2VEC_CHAIN_1930 = 3141, D2VEC_SANDLEAPER_1A990 = 3140, D2VEC_ANIMADJ_12D40 = 3135, D2VEC_GAME_CHECKMONTYPE_1620 = 3233, D2VEC_GAME_GETMONSTATS_1540 = 3234, D2VEC_HOVER_LANG = 3137, D2VEC_HOVER_COPY = 3138, D2VEC_HOVER_TIMEOUT = 3139, D2VEC_CLIENT_2DC0 = 3424, D2VEC_GAME_MONFLAG_15D0 = 3240, D2VEC_GAME_UNIQDROP_E250 = 3241, D2VEC_PRESTID_9C20 = 3141, D2VEC_NET_65D0 = 3606, D2VEC_RUNWALK_2FD10 = 3150, D2VEC_CLIENT_10DF0 = 3425, D2VEC_CLIENT_10EC0 = 3426, D2VEC_CLIENT_11070 = 3427, D2VEC_CLIENT_110C0 = 3429, D2VEC_CLIENT_11240 = 3430, D2VEC_GAME_SEEDINIT_2A900 = 3250, D2VEC_QUESTINIT_348A0 = 3251, D2VEC_EVENTQUEUE_8E630 = 3252, D2VEC_STATLIST_3A280 = 3253, D2VEC_FN = 3950, D2VEC_CLIENT_11360 = 3431, D2VEC_CLIENT_11410 = 3432, D2VEC_LANG_STRNCPY_B0D0 = 3726, D2VEC_TIMERSLAB_8E420 = 3254, D2VEC_FREEQ_8E4D0 = 3255, D2VEC_CLIENT_114F0 = 3433, D2VEC_CLIENT_119C0 = 3436, D2VEC_GAME_CACC0 = 3260, D2VEC_GAME_2CBE0 = 3247, D2VEC_GAME_GETPLAYER_4AD10 = 3246, D2VEC_NPCCTL_8FBE0 = 3261, D2VEC_CLIENT_11630 = 3434, D2VEC_CLIENT_11A20 = 3437, D2VEC_CLIENT_11F80 = 3438, D2VEC_STATARRAY_38640 = 3439, D2VEC_LANG_USHORT_1010 = 3440, D2VEC_NET_QUEUE = 3441, D2VEC_ITEMPLAIN_241D0 = 3442, D2VEC_BITMASK_33C20 = 3443 };
+// kind 3950 (checked against retail): ONE record shape for every function captured by the generic FN path (the retail capture tool/fn/,
+// the retail captures). args are the inputs as 32-bit words (what they mean is the descriptor's and
+// the probe's business), result is the return value. A struct-argument function keeps a bespoke capture block
+// but may still write this shape, so its replay stays generic.
+struct D2VecFn { uint32_t args[4]; uint32_t result; };
+static_assert(sizeof(D2VecFn) == 20, "fn record");
+
+// s3425: D2Client 0x10DF0 (resolution apply). mode = ESI, cur = pinned D2Gfx ordinal 10031 result; the six
+// globals read after.
+struct D2VecClient10df0 { uint32_t mode, cur, w, h, wide, e18, bc50, e14; };
+static_assert(sizeof(D2VecClient10df0) == 32, "10df0 record");
+
+// s3426: D2Client 0x10EC0 (fade box). Inputs: layout [0x6FBCC414], deadline [0x6FBCC554], pinned GetTickCount
+// now, W [0x6FB8BC48], H [0x6FB8BC4C]. drew = D2Gfx 10045 call count; a[] = its six stdcall args in order; the
+// deadline global read after.
+struct D2VecClient10ec0 { uint32_t layout, deadline, now, w, h, drew, a[6], deadlineAfter; };
+static_assert(sizeof(D2VecClient10ec0) == 52, "10ec0 record");
+
+// s3427: D2Client 0x11070 (button hit test): x = ESI, y = EDI, W [0x6FB8BC48], hudH [0x6FBA9E18]; result = EAX.
+struct D2VecClient11070 { int32_t x, y; uint32_t w, hudH, result; };
+static_assert(sizeof(D2VecClient11070) == 20, "11070 record");
+// s3429: D2Client 0x110C0 (sibling hit test): same record shape and inputs as 0x11070.
+struct D2VecClient110c0 { int32_t x, y; uint32_t w, hudH, result; };
+static_assert(sizeof(D2VecClient110c0) == 20, "110c0 record");
+// s3430: D2Client 0x11240 (no args): reads G [0x6FBCC4FC] and hudH [0x6FBA9E18]; result = EAX.
+struct D2VecClient11240 { uint32_t g, hudH, result; };
+static_assert(sizeof(D2VecClient11240) == 12, "11240 record");
+// s3431: D2Client 0x11360 (ECX = n): reads G,D,P [0x6FBCC4FC/500/534] and hudH; writes P and y [0x6FBD33F4].
+struct D2VecClient11360 { int32_t n, g, d, p, h, newP, y; };
+static_assert(sizeof(D2VecClient11360) == 28, "11360 record");
+// s3432: D2Client 0x11410: reads flag [0x6FBC9854]; writes ptr [0x6FBA8B94], G [0x6FBCC4FC], D [0x6FBCC500], X [0x6FBCC504].
+struct D2VecClient11410 { uint32_t f, ptr, g, d, x; };
+static_assert(sizeof(D2VecClient11410) == 20, "11410 record");
+// s3433: D2Client 0x114F0 (stdcall param): which of the 3 panel refreshes (0x6FBA8C50/44/38) and the 0x6FB6E920 reset run.
+// sm = GetSystemMetrics(0x4B); c [0x6FBCC3CC], m [0x6FBC9898], s [0x6FBC988C], u [0x6FBC9890]; mask bits 0-2 = calls, 3 = reset call, 4 = [0x6FBCC540] cleared.
+struct D2VecClient119c0 { uint32_t idx, entry, param, ret, out, n3a, ecx, seenParam, outBefore, n114, arg114, g54C; };   // kind 3436
+struct D2VecGetPlayer4ad10 { uint32_t flags, ign, playerSet, type, id, layout, ret, after; };   // kind 3246; ret/after: 0 null, 1 sentinel pPlayer, 2/3/4 unit A/B/C
+static_assert(sizeof(D2VecGetPlayer4ad10) == 32, "4ad10 record");
+struct D2VecSub2cbe0 { uint32_t pend0, pend1, n0, in[3][4], a1[4], rec2E, b318, pend0A, pend1A, out[3][3], a1out[3], logN; uint8_t log[48]; };   // kind 3247; room = +0x34,+0x6C,+0x70,+0x78 in; +0x34,+0x6C,+0x70 out; log = stub ids
+static_assert(sizeof(D2VecSub2cbe0) == 4 * (3 + 12 + 4 + 2 + 2 + 9 + 3 + 1) + 48, "2cbe0 record");
+struct D2VecClient114f0 { uint32_t param, sm, c, m, s, u, mask; };
+static_assert(sizeof(D2VecClient114f0) == 28, "114f0 record");
+// s3435: D2Client 0x11630 (no args): inputs W [0x6FB8BC48], H [0x6FBA9E18], G, D, P, label WORDs [0x6FBA8B98+0x1A*i], the three widths (D2Win thunk 0xD35A);
+// outputs the 12 ints [0x6FBA8BA2/A6/AA/AE +0x1A*i] (o[4*i+k]), y [0x6FBD33F4], the two SetFont args (13, then the previous value).
+struct D2VecClient11630 { int32_t W, H, w[3], G, D, P; uint32_t lab[3]; int32_t o[12], y; uint32_t font[2]; };
+static_assert(sizeof(D2VecClient11630) == 4 * 8 + 12 + 48 + 12, "11630 record");
+static_assert(sizeof(D2VecClient119c0) == 48, "119c0 record");
+
+// a retail recording batch 9: D2Client 0x11A20 (no args, callees 11630 D2Win thunks stubbed, 2B420 stubbed). Inputs: flag [0x6FBC9854], W [0x6FB8BC48], H [0x6FBA9E18],
+// P [0x6FBCC534] before the call, widths w[3], label WORDs lab[3]. Outputs: ptr [0x6FBA8B94], G D X [0x6FBCC4FC/500/504], rects o[12], p534 p538, p544 (2B420 return kept),
+// y [0x6FBD33F4], 2B420 call count / stack arg / eax-buffer string (NUL padded to 32), the two SetFont args.
+struct D2VecClient11A20 { uint32_t flag; int32_t W, H, P, w[3]; uint32_t lab[3]; uint32_t ptr, G, D, X; int32_t o[12]; uint32_t p534, p538, p544, y, n2b420, arg2b420, font[2]; char str[32]; };
+static_assert(sizeof(D2VecClient11A20) == 168, "11a20 record");
+// D2Client 0x11F80: inputs gate [0x6FBCC540], flag [0x6FBD349C], seed (src dwords [0x6FBC9E68+4i] = seed + 0x01010101*i); outputs dst hash/first/last/guard (dst 0x6FBCA2E0+0x474),
+// [0x6FBCC434], [0x6FBD349C], [0x6FBCC2F8], [0x6FBCC2F4], [0x6FBCC540], then the stubbed callee log: n calls, each {id, eax, [esp+4], [esp+8]}
+// (id 1 = 0x114F0 arg0, 2 = 0x3A3A0, 3 = Ordinal_10048 thunk, 4 = 0x2CCC0 eax=4 ptr,h, 5 = 0x42880).
+struct D2VecClient11F80 { uint32_t gate, flag, seed, dstHash, dstFirst, dstLast, guard, p434, p349c, p2f8, p2f4, p540, nCalls, call[5][4]; };
+static_assert(sizeof(D2VecClient11F80) == 4 * 13 + 80, "11f80 record");
+// D2Common 0x38640 StatArray_InsertStat (eax = packed id, esi = array {ptr, count +4, cap +6}, stack arg pool=0): array built from own earlier inserts of ids0[n0],
+// probe id; out: slot index (-1 = NULL), count/cap before and after, element ids/values after (<= 10).
+struct D2VecStatArray38640 { uint32_t n0, ids0[8], probe; int32_t idx; int32_t cnt0, cap0, cnt1, cap1; uint32_t id[10], val[10]; };
+static_assert(sizeof(D2VecStatArray38640) == 4 * 10 + 4 + 16 + 80, "38640 record");
+// D2Lang 0x1010 operator unsigned short (ECX = this -> 16-bit unit, plus 2 guard bytes after): in unit, out AX (zero-extended EAX recorded too)
+struct D2VecLangUShort1010 { uint32_t unit, ax, eax; };
+static_assert(sizeof(D2VecLangUShort1010) == 12, "lang ushort record");
 
 static inline uint32_t d2vec_fnv1a_step(uint32_t h, uint32_t v) {
     for (int i = 0; i < 4; i++) { h ^= (v >> (8 * i)) & 0xFF; h *= 16777619u; }

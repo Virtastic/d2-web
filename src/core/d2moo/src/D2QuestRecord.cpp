@@ -3,6 +3,7 @@
 #include "D2BitManip.h"
 
 
+// 1.13c D2Common+0x2D0F0
 //D2Common.0x6FDAE800 (#11107)
 BOOL __stdcall QUESTRECORD_GetQuestState(D2BitBufferStrc* pQuestRecord, int nQuest, int nState)
 {
@@ -39,6 +40,7 @@ void __stdcall QUESTRECORD_ResetIntermediateStateFlags(D2BitBufferStrc* pQuestRe
 }
 
 //D2Common.0x6FDAE920 (#11111)
+// 1.13c D2Common+0x2CFC0
 D2BitBufferStrc* __stdcall QUESTRECORD_AllocRecord(void* pMemPool)
 {
 	D2BitBufferStrc* pBitBuffer = D2_ALLOC_STRC_POOL(pMemPool, D2BitBufferStrc);
@@ -50,6 +52,7 @@ D2BitBufferStrc* __stdcall QUESTRECORD_AllocRecord(void* pMemPool)
 }
 
 //D2Common.0x6FDAE970 (#11112)
+// 1.13c D2Common+0x2CF80
 void __stdcall QUESTRECORD_FreeRecord(void* pMemPool, D2BitBufferStrc* pQuestRecord)
 {
 	if (pQuestRecord)

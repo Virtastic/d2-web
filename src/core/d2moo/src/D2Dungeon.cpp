@@ -90,7 +90,7 @@ D2UnitStrc* __stdcall DUNGEON_GetWarpTileFromRoomAndSourceLevelId(D2ActiveRoomSt
 	D2_ASSERT(pRoom);
 
 	int nDestinationLevel = 0;
-	D2ActiveRoomStrc* pDestRoom = DRLGWARP_GetDestinationRoom(pRoom->pDrlgRoom, nSourceLevel, &nDestinationLevel, ppLvlWarpTxtRecord);
+	D2ActiveRoomStrc* pDestRoom = DRLGWARP_GetDestinationRoom(nSourceLevel, pRoom->pDrlgRoom, &nDestinationLevel, ppLvlWarpTxtRecord);
 	D2_ASSERT(pDestRoom);
 
 	for (D2UnitStrc* pTile = pDestRoom->pUnitFirst; pTile; pTile = pTile->pRoomNext)
@@ -113,6 +113,7 @@ D2LvlWarpTxt* __stdcall DUNGEON_GetLvlWarpTxtRecordFromRoomAndUnit(D2ActiveRoomS
 }
 
 //D2Common.0x6FD8BAF0 (#10030)
+// 1.13c D2Common+0x3BB50
 D2DrlgTileDataStrc* __stdcall DUNGEON_GetFloorTilesFromRoom(D2ActiveRoomStrc* pRoom, int* pFloorCount)
 {
 	if (pRoom && pRoom->pRoomTiles)
@@ -543,6 +544,7 @@ void __stdcall DUNGEON_ChangeClientRoom(D2ActiveRoomStrc* pRoom1, D2ActiveRoomSt
 }
 
 //D2Common.0x6FD8C730 (#10065)
+// 1.13c D2Common+0x3CDA0
 D2ActiveRoomStrc* __stdcall DUNGEON_StreamRoomAtCoords(D2DrlgActStrc* pAct, int nX, int nY)
 {
 	D2_ASSERT(pAct);
@@ -611,6 +613,7 @@ const char* __stdcall DUNGEON_GetPickedLevelPrestFilePathFromRoom(D2ActiveRoomSt
 }
 
 //D2Common.0x6FD8C860 (#10066)
+// 1.13c D2Common+0x3B500
 void __stdcall DUNGEON_AllocDrlgDelete(D2ActiveRoomStrc* pRoom, int nUnitType, D2UnitGUID nUnitGUID)
 {
 	D2DrlgDeleteStrc* pDrlgDelete = NULL;
@@ -983,6 +986,7 @@ D2DrlgRoomStrc* __fastcall DUNGEON_GetRoomExFromRoom(D2ActiveRoomStrc* pRoom)
 }
 
 //D2Common.0x6FD8D0D0 (#10086)
+// 1.13c D2Common+0x3B230
 BOOL __stdcall DUNGEON_IsTownLevelId(int nLevelId)
 {
 	return DRLG_IsTownLevel(nLevelId);
@@ -1210,7 +1214,11 @@ void __stdcall DUNGEON_AnimateTiles(D2ActiveRoomStrc* pRoom)
 	}
 }
 
+// function probe hook (src/core/fn/d2common_3b040.cpp): the capture recorded the callee's two arguments with a stub; null in the game.
+void (__fastcall* g_pfnInitRoomTileAnimCallee)(D2DrlgRoomStrc*, D2DrlgRoomStrc*) = NULL;
+#define DRLGANIM_UpdateFrameInAdjacentRooms(a, b) (g_pfnInitRoomTileAnimCallee ? g_pfnInitRoomTileAnimCallee(a, b) : DRLGANIM_UpdateFrameInAdjacentRooms(a, b))
 //D2Common.0x6FD8D580 (#10105)
+// 1.13c D2Common+0x3B040
 void __stdcall DUNGEON_InitRoomTileAnimation(D2DrlgActStrc* pAct, D2ActiveRoomStrc* pRoom1, D2ActiveRoomStrc* pRoom2)
 {
 	D2DrlgRoomStrc* pDrlgRoom1 = NULL;
@@ -1252,6 +1260,7 @@ void __stdcall DUNGEON_SetActCallbackFunc(D2DrlgActStrc* pAct, ACTCALLBACKFN pAc
 }
 
 //D2Common.0x6FD8D600 (#10106)
+// 1.13c D2Common+0x3AFD0
 void __stdcall DUNGEON_SaveKilledUnitGUID(D2ActiveRoomStrc* pRoom, D2UnitGUID nUnitGUID)
 {
 	if (pRoom)
@@ -1292,6 +1301,7 @@ void __stdcall DUNGEON_ClientToGameCoords(int* pX, int* pY)
 }
 
 //D2Common.0x6FD8D6E0 (#10110)
+// 1.13c D2Common+0x4DAC0
 void __stdcall DUNGEON_GameTileToClientCoords(int* pX, int* pY)
 {
 	int nX = *pX;
@@ -1302,6 +1312,7 @@ void __stdcall DUNGEON_GameTileToClientCoords(int* pX, int* pY)
 }
 
 //D2Common.0x6FD8D630 (#10111)
+// 1.13c D2Common+0x4DB70
 void __stdcall DUNGEON_GameSubtileToClientCoords(int* pX, int* pY)
 {
 	const int nOutX = 16 * (*pX - *pY);

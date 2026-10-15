@@ -16,6 +16,17 @@ Unicode::operator unsigned short() const { return ch; }
 Unicode& Unicode::operator=(const Unicode& o) { ch = o.ch; return *this; }
 Unicode* Unicode::strcpy(Unicode* dest, const Unicode* src) { Unicode* d = dest; while ((*d++ = *src++).ch) {} return dest; }
 Unicode* Unicode::strcat(Unicode* dest, const Unicode* src) { Unicode* d = dest; while (d->ch) d++; strcpy(d, src); return dest; }
+// 1.13c D2Lang+0xB020 (#10046): first occurrence of substr in str; NULL for a NULL arg, an empty substr, or no match.
+Unicode* Unicode::strstr(const Unicode* str, const Unicode* substr) {
+    if (!str || !substr || !substr->ch) return nullptr;
+    for (; str->ch; str++) {
+        const Unicode *a = str, *b = substr;
+        while (b->ch && a->ch == b->ch) { a++; b++; }
+        if (!b->ch) return const_cast<Unicode*>(str);
+    }
+    return nullptr;
+}
+// 1.13c D2Lang+0xB0D0 (#10044): copy up to count units, NUL-pad the rest of count, return dest.
 Unicode* Unicode::strncpy(Unicode* dest, const Unicode* src, int count) {
     int i = 0;
     for (; i < count && src[i].ch; i++) dest[i] = src[i];
@@ -66,3 +77,18 @@ char* Unicode::unicode2Win(char* dest, const Unicode* src, int count) {
 // D2Lang #10009 (1.13c): the string table language. English tables only.
 #include <D2StrTable.h>
 D2C_Language STRTABLE_GetLanguage() { return LANGUAGE_ENGLISH; }
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+// Replay hook for s3723: offset in units of the match, -1 for NULL.
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_lang_strstr_b020(const uint16_t* h, const uint16_t* n) {
+    const Unicode* r = Unicode::strstr((const Unicode*)h, (const Unicode*)n);
+    return r ? (int32_t)(r - (const Unicode*)h) : -1;
+}
+// Replay hook for s3717: the unit read through operator unsigned short.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_lang_ushort_1010(const uint16_t* p) { return (unsigned short)*(const Unicode*)p; }
+// Replay hook for s3726: returned pointer minus dst, in units.
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_lang_strncpy_b0d0(uint16_t* d, const uint16_t* s, int32_t n) {
+    return (int32_t)((uint16_t*)Unicode::strncpy((Unicode*)d, (const Unicode*)s, n) - d);
+}
+#endif

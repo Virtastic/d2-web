@@ -437,6 +437,7 @@ void __fastcall ACT1Q5_Callback10_PlayerLeavesGame(D2QuestDataStrc* pQuestData, 
 	ACT1Q5_UpdateUnitGUIDLists(pQuestDataEx, nUnitId, 0);
 }
 
+// 1.13c D2Game+0x61030 (checked against decompile, no delta)
 //D2Game.0x6FC9D6A0
 void __fastcall ACT1Q5_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {

@@ -61,6 +61,6 @@ D2COMMON_DLL_DECL void __stdcall UNITFINDS_InitializeUnitFindData(void* pMemPool
 //D2Common.0x6FDBCA50 (#10402)
 D2COMMON_DLL_DECL void __stdcall UNITFINDS_FreeUnitFindData(D2UnitFindDataStrc* pUnitFindData);
 //D2Common.0x6FDBCA80 (#10403)
-D2COMMON_DLL_DECL void __stdcall UNITFINDS_FindAllMatchingUnitsInNeighboredRooms(D2UnitFindDataStrc* pUnitFindData);
+D2COMMON_DLL_DECL int __stdcall UNITFINDS_FindAllMatchingUnitsInNeighboredRooms(D2UnitFindDataStrc* pUnitFindData);
 //D2Common.0x6FDBCCA0 (#10404)
 D2COMMON_DLL_DECL int __stdcall UNITFINDS_TestUnit(D2UnitStrc* pUnit, D2UnitFindArgStrc* pUnitFindArg);

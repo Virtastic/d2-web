@@ -226,6 +226,7 @@ void __fastcall DRLGVER_CreateVertices(void* pMemPool, D2DrlgVertexStrc** ppVert
 }
 
 //D2Common.0x6FD786C0
+// 1.13c D2Common+0x1B3D0
 void __fastcall DRLGVER_FreeVertices(void* pMemPool, D2DrlgVertexStrc** ppVertices)
 {
 	D2DrlgVertexStrc* pVertex = NULL;

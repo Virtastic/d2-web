@@ -591,6 +591,7 @@ int32_t __fastcall OBJECTS_GetShrineId(D2GameStrc* pGame, uint8_t nShrineClass, 
     return nShrineId;
 }
 
+// 1.13c D2Game+0x336F0 (checked against decompile, no delta)
 //D2Game.0x6FC70CA0
 void __fastcall OBJECTS_InitFunction22_Fire(D2ObjInitFnStrc* pOp)
 {
@@ -734,6 +735,7 @@ void __fastcall OBJECTS_InitFunction59_VileDogAfterglow(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FC71110
+// 1.13c D2Game+0x333D0
 void __fastcall OBJECTS_InitFunction12_PermanentPortal(D2ObjInitFnStrc* pOp)
 {
     if (!pOp->pObject || pOp->pObject->dwAnimMode == OBJMODE_NEUTRAL)
@@ -1646,6 +1648,7 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn2_WaypointShrine(D2GameStrc* pGame, D2A
 }
 
 //D2Game.0x6FC73050
+// 1.13c D2Game+0x1780
 int32_t __fastcall OBJECTS_RollRandomNumber(D2SeedStrc* pSeed, int32_t nMin, int32_t nMax)
 {
     return ITEMS_RollLimitedRandomNumber(pSeed, nMax - nMin) + nMin;
@@ -2228,6 +2231,7 @@ void __fastcall OBJECTS_RemoveAll(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC74590
+// 1.13c D2Game+0x2E4F0
 void __fastcall OBJECTS_SetUnitIdInTimerArg(D2UnitStrc* pPortal, int32_t nUnitId)
 {
     D2TimerArgStrc* pTimerArg = UNITS_GetTimerArg(pPortal);

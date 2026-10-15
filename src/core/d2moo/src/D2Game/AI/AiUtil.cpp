@@ -64,6 +64,7 @@ int32_t __fastcall AIUTIL_GetDistanceToCoordinatesWithSize(D2UnitStrc* pUnit, in
 }
 
 //D2Game.0x6FCF1210
+// 1.13c D2Game+0xB0A20 (checked against decompile)
 int32_t __fastcall AIUTIL_GetDistanceToCoordinates_FullUnitSize(D2UnitStrc* pTarget, D2UnitStrc* pSource)
 {
 	return AIUTIL_GetDistanceToCoordinatesWithSize(pTarget, CLIENTS_GetUnitX(pSource), CLIENTS_GetUnitY(pSource), UNITS_GetUnitSizeX(pTarget));
@@ -76,6 +77,7 @@ int32_t __fastcall AIUTIL_GetDistanceToCoordinates_HalfUnitSize(D2UnitStrc* pUni
 }
 
 //D2Game.0x6FCF13B0
+// 1.13c D2Game+0xB08F0 (checked against decompile)
 int32_t __fastcall AIUTIL_GetDistanceToCoordinates_NoUnitSize(D2UnitStrc* pUnit, int32_t nX, int32_t nY)
 {
 	const int32_t nXDiff = std::abs(CLIENTS_GetUnitX(pUnit) - nX);

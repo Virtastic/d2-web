@@ -1873,6 +1873,7 @@ int32_t __fastcall sub_6FD017F0(int32_t nMonsterId, int32_t nNoInChain)
 }
 
 //D2Game.0x6FD01860
+// 1.13c D2Game+0xD530
 int32_t __fastcall SKILLS_SrvDo132_ImpFireMissile(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);

@@ -257,6 +257,7 @@ void __fastcall DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(D2DrlgLevelStrc* pLevel, 
 }
 
 //D2Common.0x6FD7E0F0
+// 1.13c D2Common+0x42EB0
 BOOL __fastcall DRLGOUTDOORS_SpawnPresetFarAway(D2DrlgLevelStrc* pLevel, D2DrlgCoordStrc* pDrlgCoord, int nLvlPrestId, int nRand, int nOffset, char nFlags)
 {
 	int nHeight = 0;
@@ -1152,6 +1153,7 @@ void __fastcall DRLGOUTDOORS_SpawnAct1DirtPaths(D2DrlgLevelStrc* pLevel)
 }
 
 //D2Common.0x6FD7F500
+// 1.13c D2Common+0x3D4A0
 void __fastcall DRLGOUTDOORS_CalculatePathCoordinates(D2DrlgLevelStrc* pLevel, D2DrlgVertexStrc* pVertex1, D2DrlgVertexStrc* pVertex2)
 {
 	pVertex2->nPosX = pVertex1->nPosX - pLevel->nPosX;

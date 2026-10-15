@@ -53,7 +53,7 @@ int __stdcall UNITROOM_AddUnitToRoom(D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoom)
 	return UNITROOM_AddUnitToRoomEx(pUnit, pRoom, 1);
 }
 
-//D2Common.0x6FDBD120 (#10385)
+// 1.13c D2Common+0x665C0 (#10158)
 void __stdcall UNITROOM_RefreshUnit(D2UnitStrc* pUnit)
 {
 

@@ -55,12 +55,14 @@ uint32_t __stdcall CHAT_GetDisplayTimeFromHoverMsg(D2HoverTextStrc* pHoverMsg)
 	return pHoverMsg->dwDisplayTime;
 }
 
+// 1.13c D2Common+0x18240
 //D2Common.0x6FDC3CB0 (#10895)
 uint32_t __stdcall CHAT_GetTimeoutFromHoverMsg(D2HoverTextStrc* pHoverMsg)
 {
 	return pHoverMsg->dwExpireTime;
 }
 
+// 1.13c D2Common+0x18220
 //D2Common.0x6FDC3CC0 (#10896)
 void __stdcall CHAT_CopyHoverMsgToBuffer(D2HoverTextStrc* pHoverMsg, char* szMessage)
 {
@@ -93,6 +95,7 @@ void __stdcall CHAT_SetUsedInHoverMsg(D2HoverTextStrc* pHoverMsg, BOOL bUsed)
 	pHoverMsg->bUsed = bUsed;
 }
 
+// 1.13c D2Common+0x181F0
 //D2Common.0x6FDC3D00 (#10899)
 uint8_t __stdcall CHAT_GetLangIdFromHoverMsg(D2HoverTextStrc* pHoverMsg)
 {

@@ -649,6 +649,7 @@ D2SkillStrc* __fastcall SKILLS_GetHighestLevelSkillFromSkillId(D2UnitStrc* pUnit
 }
 
 //D2Common.0x6FDAFC80 (#10942)
+// 1.13c D2Common+0x4E460
 int __stdcall SKILLS_GetSkillModeFromUnit(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 {
 	if (pUnit && pSkill)
@@ -1886,6 +1887,7 @@ BOOL __fastcall SKILLS_CheckSkillDelay(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 }
 
 //D2Common.0x6FDB1540 (#10966)
+// 1.13c D2Common+0x4E1C0
 D2SkillsTxt* __fastcall SKILLS_GetSkillsTxtRecordFromSkill(D2SkillStrc* pSkill)
 {
 	if (pSkill)
@@ -2224,6 +2226,7 @@ void __stdcall SKILLS_SetParam3(D2SkillStrc* pSkill, int nPar3)
 }
 
 //D2Common.0x6FDB1B40 (#10983)
+// 1.13c D2Common+0x4DEA0
 void __stdcall SKILLS_SetParam4(D2SkillStrc* pSkill, int nPar4)
 {
 	D2_ASSERT(pSkill);
@@ -2231,6 +2234,7 @@ void __stdcall SKILLS_SetParam4(D2SkillStrc* pSkill, int nPar4)
 	pSkill->nPar4 = nPar4;
 }
 
+// 1.13c D2Common+0x4DE60
 //D2Common.0x6FDB1B70 (#10984)
 void __stdcall SKILLS_SetFlags(D2SkillStrc* pSkill, int nFlags)
 {
@@ -2265,6 +2269,7 @@ int __stdcall SKILLS_GetRequiredLevel(int nSkillId)
 	return 0x7FFFFFFF;
 }
 
+// 1.13c D2Common+0x4F510 (#10339)
 //D2Common.0x6FDB1C00 (#10987)
 int __stdcall SKILLS_GetRequiredLevelBasedOnCurrent(D2UnitStrc* pUnit, int nSkillId)
 {
@@ -2410,6 +2415,7 @@ BOOL __stdcall SKILLS_CheckRequiredAttributes(D2UnitStrc* pUnit, int nSkillId)
 }
 
 //D2Common.0x6FDB2110 (#10999)
+// 1.13c D2Common+0x4EA50
 int __stdcall SKILLS_GetToHitFactor(D2UnitStrc* pUnit, int nSkillId, int nSkillLevel)
 {
 	D2SkillsTxt* pSkillsTxtRecord = NULL;
@@ -2463,6 +2469,7 @@ int __stdcall SKILLS_GetManaCosts(int nSkillId, int nSkillLevel)
 }
 
 //D2Common.0x6FDB22E0
+// 1.13c D2Common+0x4DDB0
 int __fastcall SKILLS_CalculateDamageBonusByLevel(int nLevel, int* pLevelDamage)
 {
 	if (nLevel > 1 && pLevelDamage)
@@ -2776,6 +2783,7 @@ int __stdcall SKILLS_Return0(int arg)
 }
 
 //D2Common.0x6FDB2E80 (#11008)
+// 1.13c D2Common+0x4E8C0
 int __stdcall SKILLS_GetClassIdFromSkillId(int nSkillId)
 {
 	D2SkillsTxt* pSkillsTxtRecord = DATATBLS_GetSkillsTxtRecord(nSkillId);
@@ -2800,6 +2808,7 @@ BOOL __stdcall SKILLS_IsPlayerClassSkill(int nSkillId, int* pPlayerClass)
 	return *pPlayerClass != 7;
 }
 
+// 1.13c D2Common+0x4DD70
 //D2Common.0x6FDB2F40 (#11011)
 int __stdcall SKILLS_GetQuantity(D2SkillStrc* pSkill)
 {
@@ -2808,6 +2817,7 @@ int __stdcall SKILLS_GetQuantity(D2SkillStrc* pSkill)
 	return pSkill->nQuantity;
 }
 
+// 1.13c D2Common+0x4DD30
 //D2Common.0x6FDB2F70 (#11012)
 void __stdcall SKILLS_SetQuantity(D2SkillStrc* pSkill, int nQuantity)
 {

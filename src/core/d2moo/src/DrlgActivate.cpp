@@ -190,6 +190,7 @@ void __fastcall DRLGACTIVATE_RoomExStatusUnset_Untile(D2DrlgRoomStrc* pDrlgRoom)
 extern "C" int d2_cross_level_sight_on(void);
 
 //D2Common.0x6FD73A30
+// 1.13c D2Common+0x7BFA0
 void __fastcall DRLGACTIVATE_RoomExPropagateSetStatus(void* pMemPool, D2DrlgRoomStrc* pDrlgRoom, uint8_t nStatus)
 {
 	if (pDrlgRoom->nRoomsNear == 0)
@@ -221,6 +222,7 @@ void __fastcall DRLGACTIVATE_RoomExPropagateSetStatus(void* pMemPool, D2DrlgRoom
 }
 
 //D2Common.0x6FD73BE0
+// 1.13c D2Common+0x7BB20
 void __fastcall DRLGACTIVATE_RoomExPropagateUnsetStatus(D2DrlgRoomStrc* pDrlgRoom, uint8_t nStatus)
 {
 	for (int i = 0; i < pDrlgRoom->nRoomsNear; ++i)

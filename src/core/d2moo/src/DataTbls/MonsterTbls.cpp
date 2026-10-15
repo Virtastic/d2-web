@@ -874,6 +874,7 @@ void __fastcall DATATBLS_ReallocTCExInfo(D2TCExShortStrc* pTCExShort, int nNewRe
 }
 
 //D2Common.0x6FD68C40
+// 1.13c D2Common+0x53650
 void __fastcall DATATBLS_UpdateTreasureClassProbabilities(D2TCExShortStrc* pTCExShort, D2TCExInfoStrc* pTCExInfo, int nProbability, BOOL bExpansion)
 {
 	int nRecordId = 0;

@@ -89,6 +89,7 @@ void __fastcall DRLGOUTJUNG_BuildJungle(D2DrlgLevelStrc* pLevel)
 
 //D2Common.0x6FD7FE50
 //TODO: v5, v10
+// 1.13c D2Common+0x85360
 void __fastcall DRLGOUTJUNG_BuildLowerKurast(D2DrlgLevelStrc* pLevel)
 {
 	int nWidth = pLevel->nWidth / 8 - 1;
@@ -129,6 +130,7 @@ void __fastcall DRLGOUTJUNG_BuildLowerKurast(D2DrlgLevelStrc* pLevel)
 
 //D2Common.0x6FD7FFA0
 //TODO: v7, v8
+// 1.13c D2Common+0x85220
 void __fastcall DRLGOUTJUNG_BuildKurastBazaar(D2DrlgLevelStrc* pLevel)
 {
 	int nWidth = pLevel->nWidth / 8 - 1;
@@ -166,6 +168,7 @@ void __fastcall DRLGOUTJUNG_BuildKurastBazaar(D2DrlgLevelStrc* pLevel)
 }
 
 //D2Common.0x6FD800E0
+// 1.13c D2Common+0x850D0
 //TODO: v8
 void __fastcall DRLGOUTJUNG_BuildUpperKurast(D2DrlgLevelStrc* pLevel)
 {
@@ -206,6 +209,7 @@ void __fastcall DRLGOUTJUNG_BuildUpperKurast(D2DrlgLevelStrc* pLevel)
 
 //D2Common.0x6FD80230
 //TODO: Rename variables
+// 1.13c D2Common+0x84E40
 void __fastcall DRLGOUTJUNG_SpawnRandomPreset(D2DrlgLevelStrc* pLevel, int nLevelPrestId1, int nLevelPrestId2, int a4)
 {
 	int v8; // edi@1

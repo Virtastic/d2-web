@@ -224,7 +224,7 @@ void __fastcall DRLGANIM_AllocAnimationTileGrid(D2DrlgRoomStrc* pDrlgRoom, int n
 	}
 }
 
-//D2Common.0x6FD75B00
+// 1.13c D2Common+0x12D40
 void __fastcall DRLGANIM_UpdateFrameInAdjacentRooms(D2DrlgRoomStrc* pDrlgRoom1, D2DrlgRoomStrc* pDrlgRoom2)
 {
 	if (!pDrlgRoom2)

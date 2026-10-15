@@ -2,6 +2,7 @@
 
 
 //D2Game.0x6FC40170
+// 1.13c D2Game+0xEFED0
 void __fastcall D2GAME_TARGETS_First_6FC40170(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3)
 {
     if (!pGame || !pUnit || pUnit->dwUnitType != UNIT_PLAYER || pUnit->dwNodeIndex != 11)

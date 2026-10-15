@@ -495,6 +495,7 @@ D2ItemExtraDataStrc* __fastcall INVENTORY_GetItemExtraDataFromItem(D2UnitStrc* p
 }
 
 //D2Common.0x6FD8E4C0 (#10240)
+// 1.13c D2Common+0x1E710
 D2InventoryStrc* __stdcall INVENTORY_AllocInventory(void* pMemPool, D2UnitStrc* pOwner)
 {
 	if (!pMemPool && pOwner)
@@ -522,6 +523,7 @@ D2InventoryStrc* __stdcall INVENTORY_AllocInventory(void* pMemPool, D2UnitStrc* 
 }
 
 //D2Common.0x6FD8E520 (#10241)
+// 1.13c D2Common+0x21B40
 void __stdcall INVENTORY_FreeInventory(D2InventoryStrc* pInventory)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory))
@@ -2046,6 +2048,7 @@ D2InventoryNodeStrc* __stdcall INVENTORY_GetTradeInventory(D2InventoryStrc* pInv
 }
 
 //D2Common.0x6FD90960 (#10281)
+// 1.13c D2Common+0x1DF20
 void __stdcall INVENTORY_FreeTradeInventory(D2InventoryStrc* pInventory)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory))
@@ -2063,6 +2066,7 @@ void __stdcall INVENTORY_FreeTradeInventory(D2InventoryStrc* pInventory)
 }
 
 //D2Common.0x6FD909B0 (#10282)
+// 1.13c D2Common+0x1DEE0
 BOOL __stdcall INVENTORY_CheckForItemInTradeInventory(D2InventoryStrc* pInventory, int nItemId)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory))
@@ -2507,6 +2511,7 @@ int __stdcall INVENTORY_GetOwnerId(D2InventoryStrc* pInventory)
 }
 
 //D2Common.0x6FD91190 (#10294)
+// 1.13c D2Common+0x1DDD0
 void __stdcall INVENTORY_CreateCorpseForPlayer(D2InventoryStrc* pInventory, int nUnitId, int a3, int a4)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory))

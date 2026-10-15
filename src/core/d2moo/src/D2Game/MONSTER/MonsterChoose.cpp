@@ -215,6 +215,7 @@ D2UnkMonCreateStrc2* __fastcall sub_6FC62640(D2ActiveRoomStrc* pRoom)
 }
 
 //D2Game.0x6FC62670
+// 1.13c D2Game+0xDF080
 int32_t __fastcall MONSTERCHOOSE_GetBossSpawnType(D2MonsterRegionStrc* pMonsterRegion, D2ActiveRoomStrc* pRoom)
 {
     if (pMonsterRegion->dwUniqueCount < pMonsterRegion->nBossMin && pMonsterRegion->unk0x0C && (ITEMS_RollRandomNumber(&pRoom->pSeed) % 100) < 100 * pMonsterRegion->unk0x04 / pMonsterRegion->unk0x0C)

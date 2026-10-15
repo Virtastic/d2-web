@@ -339,6 +339,7 @@ void __fastcall DATATBLS_UnloadLevelsTxt()
 }
 
 //D2Common.0x6FD604F0 (#11247)
+// 1.13c D2Common+0x6E0C0
 int __stdcall DATATBLS_GetMonsterLevelInArea(int nLevelId, uint8_t nDifficulty, BOOL bExpansion)
 {
 	D2LevelsTxt* pLevelsTxtRecord = NULL;
@@ -705,6 +706,7 @@ D2LvlPrestTxt* __stdcall DATATBLS_GetLvlPrestTxtRecord(int nId)
 }
 
 //D2Common.0x6FD61B80
+// 1.13c D2Common+0x6C950
 D2LvlPrestTxt* __fastcall DATATBLS_GetLvlPrestTxtRecordFromLevelId(int nLevelId)
 {
 	for (int i = 0; i < sgptDataTables->nLvlPrestTxtRecordCount; ++i)
@@ -1140,6 +1142,7 @@ void __fastcall DATATBLS_LoadAutomapTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD62D30 (#10011)
+// 1.13c D2Common+0x6FAC0
 int __fastcall DATATBLS_GetAutomapCellId(uint32_t dwAutomapLevelType, uint32_t dwAutomapTileType, int nStyle, int nSequence)
 {
 	int nStart = 0;
@@ -1160,11 +1163,12 @@ int __fastcall DATATBLS_GetAutomapCellId(uint32_t dwAutomapLevelType, uint32_t d
 	if (nStart < nEnd)
 	{
 		i = nStart;
+		// 1.13c compares style/sequence as unsigned bytes (0xFF = any; EndSequence 255 is a real bound)
 		while (sgptDataTables->pAutoMap[i].dwAutomapLevelType != dwAutomapLevelType
 			   || sgptDataTables->pAutoMap[i].dwAutomapTileType != dwAutomapTileType
-			   || sgptDataTables->pAutoMap[i].nStyle != -1 && sgptDataTables->pAutoMap[i].nStyle != nStyle
-			   || sgptDataTables->pAutoMap[i].nStartSequence != -1
-			   && (sgptDataTables->pAutoMap[i].nStartSequence > nSequence || sgptDataTables->pAutoMap[i].nEndSequence < nSequence))
+			   || (uint8_t)sgptDataTables->pAutoMap[i].nStyle != 0xFF && (uint32_t)(uint8_t)sgptDataTables->pAutoMap[i].nStyle != (uint32_t)nStyle
+			   || (uint8_t)sgptDataTables->pAutoMap[i].nStartSequence != 0xFF
+			   && ((int)(uint8_t)sgptDataTables->pAutoMap[i].nStartSequence > nSequence || nSequence > (int)(uint8_t)sgptDataTables->pAutoMap[i].nEndSequence))
 		{
 			++i;
 			if (i >= nEnd)

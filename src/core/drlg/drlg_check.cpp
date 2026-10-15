@@ -705,4 +705,29 @@ int d2_drlg_client_room_freed_by_hide(int level, int x, int y, int hasPlayer, in
     return 1;
 }
 
+// s3123 (kind 3123): DUNGEON_StreamRoomAtCoords = D2Common 0x3CDA0. w[0..4] = seed, difficulty, act (0-based),
+// x, y; out w[5..11] = found, level, Room2 ordinal, tile rect x/y/w/h. The act is rebuilt as LoadAct does
+// (server mode) and every level of it is GetLevel+InitLevel'd, in order, when (seed, act) changes.
+EMSCRIPTEN_KEEPALIVE void d2_stream3cda0_probe(uint32_t* w) {
+    static const int first[6] = { 1, 40, 75, 103, 109, 137 };
+    static uint32_t curSeed = 0, curAct = 99;
+    if (!g_act || curSeed != w[0] || curAct != w[2]) {
+        d2_drlg_act_begin_server(w[0], (int)w[1], (int)w[2] + 1);
+        curSeed = w[0]; curAct = w[2];
+        for (int l = first[w[2]]; l < first[w[2] + 1]; ++l) {
+            D2DrlgLevelStrc* lv = DRLG_GetLevel(g_act->pDrlg, l);
+            if (lv && !lv->pFirstRoomEx) DRLG_InitLevel(lv);
+        }
+    }
+    D2ActiveRoomStrc* r1 = DUNGEON_StreamRoomAtCoords(g_act, (int)w[3], (int)w[4]);
+    w[5] = r1 != nullptr; w[6] = 0xFFFFFFFFu; w[7] = 0xFFFFFFFFu; w[8] = w[9] = w[10] = w[11] = 0;
+    if (!r1) return;
+    D2DrlgRoomStrc* room = r1->pDrlgRoom;
+    w[6] = (uint32_t)room->pLevel->nLevelId;
+    uint32_t o = 0;
+    for (D2DrlgRoomStrc* q = room->pLevel->pFirstRoomEx; q && q != room; q = q->pDrlgRoomNext) ++o;
+    w[7] = o;
+    w[8] = (uint32_t)room->nTileXPos; w[9] = (uint32_t)room->nTileYPos; w[10] = (uint32_t)room->nTileWidth; w[11] = (uint32_t)room->nTileHeight;
+}
+
 } // extern "C"

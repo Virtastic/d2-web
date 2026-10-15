@@ -117,6 +117,7 @@ void __fastcall OBJECTS_InitFunction43_DarkWanderer(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FCAD460
+// 1.13c D2Game+0xE5920 (checked against decompile)
 void __fastcall ACT3Q7_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));

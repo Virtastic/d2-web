@@ -451,6 +451,7 @@ int32_t __fastcall AITACTICS_RunToTargetUnitWithSteps(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FCD0560
+// 1.13c D2Game+0xF2D80 (checked against decompile; byte distance fixed)
 int32_t __fastcall D2GAME_AICORE_Escape_6FCD0560(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t nMaxDistance, int32_t bDeleteAiEventCallback)
 {
 	if (!pUnit || !pTarget)
@@ -460,6 +461,8 @@ int32_t __fastcall D2GAME_AICORE_Escape_6FCD0560(D2GameStrc* pGame, D2UnitStrc* 
 
 	const int32_t nX = CLIENTS_GetUnitX(pUnit);
 	const int32_t nY = CLIENTS_GetUnitY(pUnit);
+	// 1.13c takes the distance as a byte: compare, clamp and multiply all use the low 8 bits.
+	nMaxDistance = (uint8_t)nMaxDistance;
 	const int32_t nXSign = D2signum(nX - CLIENTS_GetUnitX(pTarget));
 	const int32_t nYSign = D2signum(nY - CLIENTS_GetUnitY(pTarget));
 

@@ -435,6 +435,7 @@ BOOL __fastcall DRLG_CheckOverlappingWithOrthogonalMargin(D2DrlgCoordStrc* pDrlg
 }
 
 //D2Common.0x6FD77890
+// 1.13c D2Common+0x44EB0
 BOOL __fastcall DRLGMAZE_CheckRoomNotOverlaping(D2DrlgLevelStrc* pLevel, D2DrlgRoomStrc* pDrlgRoom1, D2DrlgRoomStrc* pIgnoredRoom, int nMargin)
 {
 	for (D2DrlgRoomStrc* pCurrentRoomEx = pLevel->pFirstRoomEx; pCurrentRoomEx; pCurrentRoomEx = pCurrentRoomEx->pDrlgRoomNext)
@@ -524,7 +525,7 @@ int __fastcall DRLGROOM_GetWarpDestinationLevel(D2DrlgRoomStrc* pDrlgRoom, int n
 {
 	int nDestinationLevel = 0;
 	D2LvlWarpTxt* pLvlWarpTxtRecord = nullptr;
-	D2ActiveRoomStrc* pRoom = DRLGWARP_GetDestinationRoom(pDrlgRoom, nSourceLevel, &nDestinationLevel, &pLvlWarpTxtRecord);
+	D2ActiveRoomStrc* pRoom = DRLGWARP_GetDestinationRoom(nSourceLevel, pDrlgRoom, &nDestinationLevel, &pLvlWarpTxtRecord);
 	D2_ASSERT(pRoom);
 	
 	pDrlgRoom = DUNGEON_GetRoomExFromRoom(pRoom);
@@ -577,6 +578,7 @@ const char* __fastcall DRLGROOM_GetPickedLevelPrestFilePathFromRoomEx(D2DrlgRoom
 }
 
 //D2Common.0x6FD77B50
+// 1.13c D2Common+0x44540
 int __fastcall DRLGROOM_ReorderNearRoomList(D2DrlgRoomStrc* pDrlgRoom, D2ActiveRoomStrc** ppRoomList)
 {
 	int nRooms = 0;
@@ -751,6 +753,7 @@ void __fastcall sub_6FD77BB0(void* pMemPool, D2DrlgRoomStrc* pDrlgRoom)
 }
 
 //D2Common.0x6FD77EB0
+// 1.13c D2Common+0x445A0
 void __fastcall DRLGROOM_SortRoomListByPosition(D2DrlgRoomStrc** ppRoomList, int nListSize)
 {
 	D2DrlgRoomStrc* pDrlgRoom1 = NULL;

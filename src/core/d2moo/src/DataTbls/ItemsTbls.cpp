@@ -412,6 +412,7 @@ D2ItemsTxt* __stdcall DATATBLS_GetItemsTxtRecord(int nItemId)
 	return NULL;
 }
 
+// 1.13c D2Common+0x71960
 //D2Common.0x6FD576D0 (#10601)
 D2ItemsTxt* __stdcall DATATBLS_GetItemRecordFromItemCode(uint32_t dwCode, int* pItemId)
 {
@@ -1363,6 +1364,7 @@ D2ItemRatioDataTbl* __fastcall DATATBLS_GetItemRatioDataTables()
 }
 
 //D2Common.0x6FD5C220 (#10623)
+// 1.13c D2Common+0x74000
 D2ItemRatioTxt* __stdcall DATATBLS_GetItemRatioTxtRecord(int nItemId, uint8_t nDifficulty, uint16_t wVersion)
 {
 	int nClass = 0;

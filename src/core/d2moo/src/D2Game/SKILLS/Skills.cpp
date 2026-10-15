@@ -3781,6 +3781,7 @@ void __fastcall D2GAME_SetSkills_6FD14C60(D2UnitStrc* pUnit, int32_t nSkillId, i
 }
 
 //D2Game.0x6FD14CC0
+// 1.13c D2Game+0x9E370 (checked against decompile)
 void __fastcall D2GAME_RefreshPassiveSkills_6FD14CC0(D2UnitStrc* pUnit)
 {
     if (pUnit->pSkills)

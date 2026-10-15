@@ -64,7 +64,7 @@ D2UniqueItemsTxt* __fastcall ITEMS_GetUniqueItemsTxtRecord(int32_t nUniqueItemId
     return nullptr;
 }
 
-//D2Game.0x6FC4D4A0
+//D2Game.0x6FC4D4A0 // 1.13c D2Game+0xE250
 uint32_t __fastcall ITEMS_HasUniqueBeenDroppedAlready(D2GameStrc* pGame, int32_t nUniqueItemId)
 {
     if (!pGame)
@@ -72,12 +72,13 @@ uint32_t __fastcall ITEMS_HasUniqueBeenDroppedAlready(D2GameStrc* pGame, int32_t
         return 0;
     }
 
-    if (nUniqueItemId < 0 || nUniqueItemId >= (ARRAY_SIZE(pGame->dwUniqueFlags) << 5))
+    if (nUniqueItemId < 0 || nUniqueItemId > 4096)
     {
         return 1;
     }
 
-    return pGame->dwUniqueFlags[nUniqueItemId >> 5] & gdwBitMasks[nUniqueItemId & 0x1F];
+    // 1.13c: index 4096 is in range and reads the dword after dwUniqueFlags (+0x1D24)
+    return (&pGame->dwUniqueFlags[0])[nUniqueItemId >> 5] & gdwBitMasks[nUniqueItemId & 0x1F];
 }
 
 //D2Game.0x6FC4D4E0
@@ -606,6 +607,7 @@ int32_t __fastcall sub_6FC4E430(D2GameStrc* pGame, D2ItemDropStrc* pItemDrop, D2
 }
 
 //D2Game.0x6FC4E4D0
+// 1.13c D2Game+0x1180
 uint32_t __fastcall ITEMS_RollLimitedRandomNumber(D2SeedStrc* pSeed, int32_t nMax)
 {
     return SEED_RollLimitedRandomNumber(pSeed, nMax);
@@ -1593,6 +1595,7 @@ int32_t __fastcall ITEMS_IsInPlayersInventory(D2UnitStrc* pPlayer, D2UnitStrc* p
 }
 
 //D2Game.0x6FC50410
+// 1.13c D2Game+0xE660
 D2UnitStrc* __fastcall ITEMS_FindQuestItem(D2GameStrc* pGame, D2UnitStrc* pUnit, uint32_t dwItemCode)
 {
     if (!pUnit->pInventory)

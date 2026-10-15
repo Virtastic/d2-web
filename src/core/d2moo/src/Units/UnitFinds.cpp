@@ -166,85 +166,91 @@ void __stdcall UNITFINDS_FreeUnitFindData(D2UnitFindDataStrc* pUnitFindData)
 }
 
 //D2Common.0x6FDBCA80 (#10403)
-void __stdcall UNITFINDS_FindAllMatchingUnitsInNeighboredRooms(D2UnitFindDataStrc* pUnitFindData)
+// 1.13c D2Common+0x12720 (sub_12720); the 1.13c shape: a centre-room fast path (RVA 0x12250), a per-room
+// overlap test (0x121D0), and no re-test of the room list. 
+int __stdcall UNITFINDS_FindAllMatchingUnitsInNeighboredRooms(D2UnitFindDataStrc* pUnitFindData)
 {
-	D2ActiveRoomStrc** ppRoomList = NULL;
-	D2ActiveRoomStrc* pRoom = NULL;
-	D2UnitStrc* pNextUnit = NULL;
-	int nUnitTest = 0;
-	int nNumRooms = 0;
-	int nIndex = 0;
-	int nSize = 0;
-	int nX = 0;
-	int nY = 0;
-	D2DrlgCoordsStrc pRoomCoord = {};
-
 	D2_ASSERT(pUnitFindData);
 
-	pRoom = pUnitFindData->pRoom;
+	D2ActiveRoomStrc* pRoom = pUnitFindData->pRoom;
 	if (!pRoom)
 	{
 		pUnitFindData->nIndex = 0;
-		return;
+		return 0;
 	}
 
-	nX = pUnitFindData->nX;
-	nY = pUnitFindData->nY;
-	nSize = pUnitFindData->nSize;
+	const int nX = pUnitFindData->nX;
+	const int nY = pUnitFindData->nY;
+	const int nSize = pUnitFindData->nSize;
 
-	DUNGEON_GetRoomCoordinates(pRoom, &pRoomCoord);
+	D2DrlgCoordsStrc c = {};
+	DUNGEON_GetRoomCoordinates(pRoom, &c);
+	// 0x12250: the circle's box is strictly inside the room -> only this room matters
+	const bool bInside = c.nSubtileX < nX - nSize && c.nSubtileY < nY - nSize
+		&& nX + nSize < c.nSubtileX + c.nSubtileWidth && nY + nSize < c.nSubtileY + c.nSubtileHeight;
 
-	if (nX - nSize <= pRoomCoord.nSubtileX || nY - nSize <= pRoomCoord.nSubtileY || nSize + nX >= pRoomCoord.nSubtileX + pRoomCoord.nSubtileWidth || nSize + nY >= pRoomCoord.nSubtileY + pRoomCoord.nSubtileHeight)
+	D2ActiveRoomStrc** ppRoomList = &pUnitFindData->pRoom;
+	int nNumRooms = 1;
+	if (!bInside)
 	{
-		DUNGEON_GetAdjacentRoomsListFromRoom(pUnitFindData->pRoom, &ppRoomList, &nNumRooms);
-	}
-	else
-	{
-		ppRoomList = &pUnitFindData->pRoom;
-		nNumRooms = 1;
+		DUNGEON_GetAdjacentRoomsListFromRoom(pRoom, &ppRoomList, &nNumRooms);
 	}
 
+	int nIndex = 0;
 	for (int i = 0; i < nNumRooms; ++i)
 	{
-		if (!(pUnitFindData->nFlags & 0x2000) || !DUNGEON_IsRoomInTown(ppRoomList[i]))
+		if ((pUnitFindData->nFlags & 0x2000) && ppRoomList[i] && DUNGEON_IsRoomInTown(ppRoomList[i]))
 		{
-			DUNGEON_GetRoomCoordinates(ppRoomList[i], &pRoomCoord);
+			continue;
+		}
 
-			if ((nX + nSize >= pRoomCoord.nSubtileX || nX - nSize <= pRoomCoord.nSubtileX + pRoomCoord.nSubtileWidth)
-				&& (nY + nSize >= pRoomCoord.nSubtileY || nY - nSize <= pRoomCoord.nSubtileY + pRoomCoord.nSubtileHeight))
+		DUNGEON_GetRoomCoordinates(ppRoomList[i], &c);
+		// 0x121D0, transcribed branch for branch
+		bool bOverlap;
+		const bool yOk = c.nSubtileY <= nY + nSize || nY - nSize <= c.nSubtileHeight + c.nSubtileY;
+		if (nX + nSize < c.nSubtileX)
+		{
+			bOverlap = nX - nSize <= c.nSubtileWidth + c.nSubtileX && yOk;
+		}
+		else
+		{
+			bOverlap = yOk;
+		}
+		if (!bOverlap)
+		{
+			continue;
+		}
+
+		D2UnitStrc* pNextUnit = nullptr;
+		for (D2UnitStrc* pUnit = ppRoomList[i]->pUnitFirst; pUnit; pUnit = pNextUnit)
+		{
+			pNextUnit = pUnit->pRoomNext;
+			int nUnitTest;
+			if (pUnitFindData->pfnUnitTest)
 			{
-				
-				for (D2UnitStrc* pUnit = ppRoomList[i]->pUnitFirst; pUnit; pUnit = pNextUnit)
+				D2_ASSERT(!IsBadCodePtr((FARPROC)pUnitFindData->pfnUnitTest));
+				nUnitTest = pUnitFindData->pfnUnitTest(pUnit, pUnitFindData->pUnitFindArg);
+			}
+			else
+			{
+				nUnitTest = UNITFINDS_TestUnit(pUnit, pUnitFindData->pUnitFindArg);
+			}
+
+			if (nUnitTest)
+			{
+				pUnitFindData->pUnitsArray[nIndex] = pUnit;
+				++nIndex;
+				if (nIndex == pUnitFindData->nMaxArrayEntries)
 				{
-					pNextUnit = pUnit->pRoomNext;
-					if (pUnitFindData->pfnUnitTest)
-					{
-						D2_ASSERT(!IsBadCodePtr((FARPROC)pUnitFindData->pfnUnitTest));
-
-						nUnitTest = pUnitFindData->pfnUnitTest(pUnit, pUnitFindData->pUnitFindArg);
-					}
-					else
-					{
-						nUnitTest = UNITFINDS_TestUnit(pUnit, pUnitFindData->pUnitFindArg);
-					}
-
-					if (nUnitTest)
-					{
-						pUnitFindData->pUnitsArray[nIndex] = pUnit;
-						++nIndex;
-
-						if (nIndex == pUnitFindData->nMaxArrayEntries)
-						{
-							pUnitFindData->nMaxArrayEntries += UNIT_FIND_ARRAY_SIZE;
-							pUnitFindData->pUnitsArray = (D2UnitStrc**)D2_REALLOC_POOL(pUnitFindData->pMemPool, pUnitFindData->pUnitsArray, sizeof(D2UnitStrc*) * pUnitFindData->nMaxArrayEntries);
-						}
-					}
+					pUnitFindData->nMaxArrayEntries += UNIT_FIND_ARRAY_SIZE;
+					pUnitFindData->pUnitsArray = (D2UnitStrc**)D2_REALLOC_POOL(pUnitFindData->pMemPool, pUnitFindData->pUnitsArray, sizeof(D2UnitStrc*) * pUnitFindData->nMaxArrayEntries);
 				}
 			}
 		}
 	}
 
 	pUnitFindData->nIndex = nIndex;
+	return nIndex;
 }
 
 //D2Common.0x6FDBCCA0 (#10404)

@@ -154,6 +154,7 @@ static_assert(ARRAY_SIZE(lutTanToDirection) == 128, "There should be 128 entries
 
 //1.00:  D2Common.0x1005E6D0
 //1.10f: D2Common.0x6FDAC5E0
+// 1.13c D2Common+0xCF40
 void __fastcall PATH_GetDirectionVector(D2CoordStrc* pDirectionVector, int* pOutDirection, DWORD dwStartPrecisionX, DWORD dwStartPrecisionY, DWORD dwTargetPrecisionX, DWORD dwTargetPrecisionY)
 {
 	bool bXStartLessThanTarget;

@@ -83,6 +83,7 @@ int StatArray_DichotomicSearch(const T* pStatArray, D2SLayerStatIdStrc::PackedTy
 
 // Helper function
 template<class T>
+// 1.13c D2Common+0x38640
 decltype(T::pStat) __fastcall StatArray_InsertStat(void* pMemPool, T* pStatsArray, D2SLayerStatIdStrc::PackedType nLayer_StatId, int insertionIdx)
 {
 	typedef decltype(T::pStat) StatType;
@@ -441,6 +442,7 @@ int __fastcall sub_6FDB5830(D2StatListExStrc* pStatListEx, D2SLayerStatIdStrc::P
 
 
 //D2Common.0x6FDB6300
+// 1.13c D2Common+0x382B0
 int __fastcall STATLIST_FindStatIndex_6FDB6300(D2StatsArrayStrc* pStatArray, D2SLayerStatIdStrc::PackedType nLayer_StatId)
 {
 	return StatArray_DichotomicSearch(pStatArray, nLayer_StatId);
@@ -656,6 +658,7 @@ D2StatStrc* __fastcall STATLIST_InsertStatOrFail_6FDB6970(void* pMemPool, D2Stat
 }
 
 //D2Common.0x6FDB6A30
+// 1.13c D2Common+0x381A0
 void __fastcall STATLIST_RemoveStat_6FDB6A30(void* pMemPool, D2StatsArrayStrc* pStatEx, D2StatStrc* pStat)
 {
 	int nIndex = pStat - pStatEx->pStat;
@@ -703,6 +706,7 @@ void __fastcall STATLIST_UpdateUnitStat_6FDB6AB0(D2StatListExStrc* pStatListEx, 
 }
 
 //D2Common.0x6FDB6C10
+// 1.13c D2Common+0x39F70
 void __fastcall sub_6FDB6C10(D2StatListExStrc* pStatListEx, D2SLayerStatIdStrc::PackedType nLayer_StatId, int nValue, D2UnitStrc* pUnit)
 {
 	if (!nValue)
@@ -940,6 +944,7 @@ void __stdcall STATLIST_FreeStatListEx(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDB7140 (#10470)
+// 1.13c D2Common+0x38100
 D2StatListStrc* __stdcall STATLIST_AllocStatList(void* pMemPool, uint32_t fFilter, uint32_t dwTimeout, int nUnitType, D2UnitGUID nUnitGUID)
 {
 	D2StatListStrc* pStatList = D2_CALLOC_STRC_POOL(pMemPool, D2StatListStrc);
@@ -954,6 +959,7 @@ D2StatListStrc* __stdcall STATLIST_AllocStatList(void* pMemPool, uint32_t fFilte
 }
 
 //D2Common.0x6FDB7190 (#10526)
+// 1.13c D2Common+0x3AF00
 void __stdcall STATLIST_AllocStatListEx(D2UnitStrc* pUnit, char nFlags, StatListValueChangeFunc pfOnValueChanged, D2GameStrc* pGame)
 {
 	STATLIST_FreeStatListEx(pUnit);
@@ -967,7 +973,7 @@ void __stdcall STATLIST_AllocStatListEx(D2UnitStrc* pUnit, char nFlags, StatList
 	pStatListEx->pfOnValueChanged = pfOnValueChanged;
 	pStatListEx->pGame = pGame;
 	pStatListEx->dwFlags = (nFlags & STATLIST_BASIC) | STATLIST_EXTENDED;
-	pStatListEx->StatFlags = (uint32_t*)D2_CALLOC_POOL(pUnit->pMemoryPool, 2 * sizeof(uint32_t) * (sgptDataTables->nStatesTxtRecordCount + 31) / 32);
+	pStatListEx->StatFlags = (uint32_t*)D2_CALLOC_POOL(pUnit->pMemoryPool, 2 * sizeof(uint32_t) * ((sgptDataTables->nStatesTxtRecordCount + 31) / 32) + 32); // +32: heap slack, not retail; the exact 1.13c size exposes a latent DRLG stale-link read (README)
 
 	pUnit->pStatListEx = pStatListEx;
 }
@@ -1206,6 +1212,7 @@ void __stdcall STATLIST_AddStat(D2StatListStrc* pStatList, int nStatId, int nVal
 }
 
 //D2Common.0x6FDB7690
+// 1.13c D2Common+0x38550
 void __fastcall STATLIST_InsertStatModOrFail_6FDB7690(D2StatListStrc* pStatList, D2SLayerStatIdStrc::PackedType nLayer_StatId)
 {
 	if (D2StatListExStrc* pStatListEx = STATLIST_StatListExCast(pStatList))
@@ -1236,12 +1243,14 @@ void __fastcall STATLIST_InsertStatModOrFail_6FDB7690(D2StatListStrc* pStatList,
 }
 
 //D2Common.0x6FDB77B0 (#10463)
+// 1.13c D2Common+0x3A280
 BOOL __stdcall STATLIST_SetStat(D2StatListStrc* pStatList, int nStatId, int nValue, uint16_t nLayer)
 {
 	return STATLIST_SetBaseStat(pStatList, nStatId, nValue, nLayer, NULL);
 }
 
 //D2Common.0x6FDB7910 (#10465)
+// 1.13c D2Common+0x3A7B0
 void __stdcall STATLIST_SetStatIfListIsValid(D2StatListStrc* pStatList, int nStatId, int nValue, uint16_t nLayer)
 {
 	if (pStatList)
@@ -1530,6 +1539,7 @@ D2StatListStrc* __stdcall D2Common_GetStateFromStatListEx_6FDB8190(D2StatListExS
 }
 
 //D2Common.0x6FDB81E0 (#10480)
+// 1.13c D2Common+0x38520
 D2StatListStrc* __stdcall STATLIST_GetStatListFromUnitAndState(D2UnitStrc* pUnit, int nState)
 {
 	if (pUnit->pStatListEx && STATLIST_IsExtended(pUnit->pStatListEx))
@@ -1701,6 +1711,7 @@ void __stdcall D2Common_10513(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, void (__fa
 }
 
 //D2Common.0x6FDB85D0 (#10511)
+// 1.13c D2Common+0x37E20
 void __stdcall STATLIST_FreeModStats(D2UnitStrc* pUnit)
 {
 	if (pUnit && pUnit->pStatListEx && STATLIST_IsExtended(pUnit->pStatListEx))
@@ -1842,6 +1853,7 @@ uint32_t* __stdcall D2COMMON_STATES_GetListGfxFlags_6FDB8AC0(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDB8B10 (#10516)
+// 1.13c D2Common+0x3ADD0
 void __stdcall STATLIST_UpdateStatListsExpiration(D2UnitStrc* pUnit, int nFrame)
 {
 	if (pUnit == nullptr || pUnit->pStatListEx == nullptr || !STATLIST_IsExtended(pUnit->pStatListEx))
@@ -1906,6 +1918,7 @@ int __stdcall STATLIST_GetFullStatsDataFromUnit(D2UnitStrc* pUnit, D2StatStrc* p
 }
 
 //D2Common.0x6FDB8C00 (#11243)
+// 1.13c D2Common+0x383C0
 int __stdcall STATLIST_GetBaseStatsData(D2StatListStrc* pStatListEx, D2StatStrc* pOutStatBuffer, int nBufferSize)
 {
 	if (pStatListEx)
@@ -1938,6 +1951,7 @@ void __stdcall STATLIST_SetStatRemoveCallback(D2StatListStrc* pStatList, StatLis
 }
 
 //D2Common.0x6FDB8CC0 (#10469)
+// 1.13c D2Common+0x3AD60
 void __stdcall D2Common_10469(D2UnitStrc* pUnit)
 {
 	if (pUnit && pUnit->pStatListEx && STATLIST_IsExtended(pUnit->pStatListEx))
@@ -2335,4 +2349,23 @@ BOOL __stdcall D2Common_11274(D2UnitStrc* pTarget, D2UnitStrc* pUnit)
 BOOL __stdcall D2Common_11275(D2UnitStrc* pTarget, D2UnitStrc* pUnit)
 {
 	return D2Common_11274_11275_Impl(pTarget, pUnit, false);
+}
+
+// s3439 replay probe for 1.13c D2Common+0x38640. w = one D2VecStatArray38640 record (35 words);
+// builds the array from ids0 by the function's own inserts, inserts the probe id, overwrites the output words.
+#include <emscripten.h>
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_statarray_38640(uint32_t* w)
+{
+	D2StatsArrayStrc a = { nullptr, 0, 0 };
+	auto ins = [&](uint32_t id) -> int32_t {
+		bool found = false;
+		const int idx = StatArray_FindInsertionIndex(&a, id, &found);
+		if (found) return -1;
+		return (int32_t)(StatArray_InsertStat(nullptr, &a, id, idx) - a.pStat);
+	};
+	for (uint32_t i = 0; i < w[0]; i++) ins(w[1 + i]);
+	w[11] = a.nStatCount; w[12] = a.nCapacity;
+	w[10] = (uint32_t)ins(w[9]);
+	w[13] = a.nStatCount; w[14] = a.nCapacity;
+	for (int i = 0; i < 10; i++) { w[15 + i] = i < a.nStatCount ? a.pStat[i].nPackedValue : 0; w[25 + i] = i < a.nStatCount ? (uint32_t)a.pStat[i].nValue : 0; }
 }

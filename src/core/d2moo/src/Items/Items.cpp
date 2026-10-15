@@ -400,6 +400,7 @@ uint8_t __stdcall ITEMS_GetItemCell(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD98980 (#10854)
+// 1.13c D2Common+0x23720
 void __stdcall ITEMS_SetItemCell(D2UnitStrc* pItem, int nItemCell)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -421,6 +422,7 @@ char* __stdcall ITEMS_GetEarName(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD989C0 (#10724)
+// 1.13c D2Common+0x236D0
 void __stdcall ITEMS_SetEarName(D2UnitStrc* pItem, char* szName)
 {
 	int nCounter = 0;
@@ -459,6 +461,7 @@ void __stdcall ITEMS_SetEarLevel(D2UnitStrc* pItem, uint8_t nLevel)
 }
 
 //D2Common.0x6FD98A30 (#10727)
+// 1.13c D2Common+0x23670
 uint8_t __stdcall ITEMS_GetVarGfxIndex(D2UnitStrc* pItem)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -1555,6 +1558,7 @@ int __stdcall ITEMS_GetMissileType(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD9A5E0 (#10761)
+// 1.13c D2Common+0x22F20
 uint8_t __stdcall ITEMS_GetMeleeRange(D2UnitStrc* pItem)
 {
 	if (pItem && pItem->dwUnitType == UNIT_ITEM)
@@ -1608,6 +1612,7 @@ uint32_t __stdcall ITEMS_CheckWeaponIfTwoHanded(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD9A750 (#10767)
+// 1.13c D2Common+0x22E20 (ordinal 10048)
 uint32_t __stdcall ITEMS_CheckIfStackable(D2UnitStrc* pItem)
 {
 	D2ItemsTxt* pItemsTxtRecord = NULL;
@@ -1648,6 +1653,7 @@ uint32_t __stdcall ITEMS_CheckIfBeltable(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD9A820 (#10769)
+// 1.13c D2Common+0x22CD0
 BOOL __stdcall ITEMS_ComparePotionTypes(D2UnitStrc* pItem1, D2UnitStrc* pItem2)
 {
 	static const int szHealthPotCodes[] =
@@ -3399,6 +3405,7 @@ BOOL __stdcall ITEMS_CheckItemTypeIdByItemId(int nItemId, int nItemType)
 }
 
 //D2Common.0x6FD9DC80 (#10730)
+// 1.13c D2Common+0x22820
 BOOL __stdcall ITEMS_CheckType(int nItemType1, int nItemType2)
 {
 	if (nItemType1 >= 0 && nItemType1 < sgptDataTables->nItemTypesTxtRecordCount && nItemType2 >= 0 && nItemType2 < sgptDataTables->nItemTypesTxtRecordCount)
@@ -4519,6 +4526,7 @@ D2SetItemsTxt* __stdcall ITEMS_GetSetItemsTxtRecordFromItem(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD9FE20 (#10839)
+// 1.13c D2Common+0x23EF0
 BOOL __stdcall ITEMS_CanBeEquipped(D2UnitStrc* pItem)
 {
 	if (pItem)
@@ -4535,20 +4543,23 @@ BOOL __stdcall ITEMS_CanBeEquipped(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD9FE70 (#10840)
+// 1.13c D2Common+0x287D0
 BOOL __stdcall ITEMS_IsCharmUsable(D2UnitStrc* pItem, D2UnitStrc* pPlayer)
 {
-	D2ItemDataStrc* pItemData = ITEMS_GetItemData(pItem);
-	if (pItemData->dwItemFlags & IFLAG_BROKEN || pItemData->dwItemFlags & IFLAG_NOEQUIP)
+	// 1.13c D2Common+0x287D0: broken/noequip check applies only to item units; non-items fall through to the unit-type test
+	if (!pItem)
 	{
 		return FALSE;
 	}
-	
-	if (ITEMS_CheckItemTypeId(pItem, ITEMTYPE_CHARM))
+
+	if (pItem->dwUnitType == UNIT_ITEM && pItem->pItemData && (pItem->pItemData->dwItemFlags & (IFLAG_BROKEN | IFLAG_NOEQUIP)))
 	{
-		if (pItem->dwUnitType == UNIT_ITEM && pItemData->nInvPage == INVPAGE_INVENTORY)
-		{
-			return ITEMS_CheckRequirements(pItem, pPlayer, FALSE, NULL, NULL, NULL) != 0;
-		}
+		return FALSE;
+	}
+
+	if (ITEMS_CheckItemTypeId(pItem, ITEMTYPE_CHARM) && pItem->dwUnitType == UNIT_ITEM && pItem->pItemData && pItem->pItemData->nInvPage == INVPAGE_INVENTORY)
+	{
+		return ITEMS_CheckRequirements(pItem, pPlayer, FALSE, NULL, NULL, NULL) != 0;
 	}
 
 	return FALSE;
@@ -4620,6 +4631,7 @@ int __stdcall ITEMS_GetBonusLifeBasedOnClass(D2UnitStrc* pPlayer, int nValue)
 	}
 }
 
+// 1.13c D2Common+0x22210
 //D2Common.0x6FD9FFE0 (#10842)
 int __stdcall ITEMS_GetBonusManaBasedOnClass(D2UnitStrc* pPlayer, int nValue)
 {
@@ -6285,6 +6297,7 @@ void __fastcall ITEMS_ReadStatFromItemBitstream(D2BitBufferStrc* pBuffer, D2Stat
 }
 
 //D2Common.0x6FDA2BA0 (#10881)
+// 1.13c D2Common+0x29D00
 size_t __stdcall ITEMS_SerializeItemToBitstream(D2UnitStrc* pItem, uint8_t* pBitstream, size_t nSize, BOOL bServer, BOOL bSaveItemInv, BOOL bGamble)
 {
 	D2BitBufferStrc pBuffer = {};

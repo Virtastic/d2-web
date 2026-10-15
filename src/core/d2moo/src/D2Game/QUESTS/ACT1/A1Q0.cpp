@@ -57,6 +57,7 @@ void __fastcall ACT1Q0_Callback11_ScrollMessage(D2QuestDataStrc* pQuestData, D2Q
 	}
 }
 
+// 1.13c D2Game+0x62410 (checked against decompile, no delta)
 //D2Game.0x6FC97870
 void __fastcall ACT1Q0_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {

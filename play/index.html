@@ -359,6 +359,47 @@ function showBootFailure(why) {
           Module.ccall('d2_client_10002_pin', null, ['number', 'number'], [index >>> 0, tableByte >>> 0]);
           return Module.ccall('d2_client_10002', 'number', ['number', 'number'], [ignoredArg >>> 0, index | 0]) >>> 0;
         };
+        // FUNCTION vector s3410: D2Client+0x1230 record lookup over a pinned (count, base).
+        window.__d2.client1230 = (index, count) => {
+          Module.ccall('d2_client_1230_pin', null, ['number', 'number'], [4096, count >>> 0]);
+          return Module.ccall('d2_client_1230', 'number', ['number'], [index | 0]) >>> 0;
+        };
+        // FUNCTION vector s3411: D2Client+0x1260 monstats->monstats2 lookup over pinned counts/field.
+        window.__d2.client1330 = (lo, hi, n) => {   // returns [result, lo', hi']
+          const r = Module.ccall('d2_client_1330', 'number', ['number', 'number', 'number'], [lo >>> 0, hi >>> 0, n | 0]) >>> 0;
+          return [r, Module.ccall('d2_client_1330_lo', 'number', [], []) >>> 0, Module.ccall('d2_client_1330_hi', 'number', [], []) >>> 0];
+        };
+        window.__d2.client1380 = (lo, hi, n) => {   // returns [result, lo', hi']
+          const r = Module.ccall('d2_client_1380', 'number', ['number', 'number', 'number'], [lo >>> 0, hi >>> 0, n | 0]) >>> 0;
+          return [r, Module.ccall('d2_client_1380_lo', 'number', [], []) >>> 0, Module.ccall('d2_client_1380_hi', 'number', [], []) >>> 0];
+        };
+        window.__d2.client1400 = (rooms, room, x, y) => {   // rooms: 4 x [x0,y0,w,h,n,a,b,c]; returns index or -1
+          rooms.forEach((r, i) => Module.ccall('d2_client_1400_pin', null, Array(9).fill('number'), [i, ...r]));
+          return Module.ccall('d2_client_1400', 'number', ['number', 'number', 'number'], [room, x, y]) | 0;
+        };
+        window.__d2.client1300 = (index, count) => {
+          Module.ccall('d2_client_1300_pin', null, ['number', 'number'], [4096, count >>> 0]);
+          return Module.ccall('d2_client_1300', 'number', ['number'], [index | 0]) >>> 0;
+        };
+        window.__d2.client1580 = (index, count) => {
+          Module.ccall('d2_client_1580_pin', null, ['number', 'number'], [4096, count >>> 0]);
+          return Module.ccall('d2_client_1580', 'number', ['number'], [index | 0]) >>> 0;
+        };
+        window.__d2.client15b0 = (index, count) => {
+          Module.ccall('d2_client_15b0_pin', null, ['number', 'number'], [4096, count >>> 0]);
+          return Module.ccall('d2_client_15b0', 'number', ['number'], [index | 0]) >>> 0;
+        };
+        window.__d2.client1630 = (type, present, sx, dx) => Module.ccall('d2_client_1630', 'number', ['number', 'number', 'number', 'number'], [type | 0, present >>> 0, sx >>> 0, dx >>> 0]) >>> 0;
+        window.__d2.client1660 = (type, present, sx, dx) => Module.ccall('d2_client_1660', 'number', ['number', 'number', 'number', 'number'], [type | 0, present >>> 0, sx >>> 0, dx >>> 0]) >>> 0;
+        window.__d2.client17b0 = (idx, count, field, inRange) => Module.ccall('d2_client_17b0', 'number', ['number', 'number', 'number', 'number'], [idx | 0, count >>> 0, field | 0, inRange >>> 0]) >>> 0;
+        window.__d2.client2d50 = (u, f, i, a, b, c, k) => Module.ccall('d2_client_2d50', 'number', ['number','number','number','number','number','number','number'], [u >>> 0, f >>> 0, i >>> 0, a >>> 0, b >>> 0, c >>> 0, k >>> 0]) >>> 0;
+        window.__d2.client1a60 = (u, type, e, idx) => Module.ccall('d2_client_1a60', 'number', ['number', 'number', 'number', 'number'], [u >>> 0, type | 0, e >>> 0, idx >>> 0]) >>> 0;
+        window.__d2.client18d0 = (lo, hi, range, base) => { const r = Module.ccall('d2_client_18d0', 'number', ['number', 'number', 'number', 'number'], [lo >>> 0, hi >>> 0, range | 0, base | 0]) >>> 0; return [Module.ccall('d2_client_18d0_seed', 'number', ['number'], [0]) >>> 0, Module.ccall('d2_client_18d0_seed', 'number', ['number'], [1]) >>> 0, r]; };
+        window.__d2.client2dc0 = (lo, hi, max, min) => { const r = Module.ccall('d2_client_2dc0', 'number', ['number', 'number', 'number', 'number'], [lo >>> 0, hi >>> 0, max | 0, min | 0]) >>> 0; return [Module.ccall('d2_client_2dc0_seed', 'number', ['number'], [0]) >>> 0, Module.ccall('d2_client_2dc0_seed', 'number', ['number'], [1]) >>> 0, r]; };
+        window.__d2.client1260 = (index, count, count2, field) => {
+          Module.ccall('d2_client_1260_pin', null, ['number', 'number', 'number', 'number'], [4096, count >>> 0, count2 >>> 0, field | 0]);
+          return Module.ccall('d2_client_1260', 'number', ['number'], [index | 0]) >>> 0;
+        };
         log('smoke: ' + r + '  i32: ' + i32);
       },
     };

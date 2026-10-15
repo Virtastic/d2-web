@@ -14,6 +14,7 @@ D2TextHeaderStrc* __stdcall TEXT_AllocTextHeader(void* pMemPool)
 }
 
 //D2Common.0x6FDC3710 (#10902)
+// 1.13c D2Common+0x3D450
 void __stdcall TEXT_FreeTextHeader(D2TextHeaderStrc* pTextHeader)
 {
 	D2TextNodeStrc* pNode = NULL;
@@ -31,6 +32,7 @@ void __stdcall TEXT_FreeTextHeader(D2TextHeaderStrc* pTextHeader)
 }
 
 //D2Common.0x6FDC3760 (#10903)
+// 1.13c D2Common+0x3D210
 void __stdcall TEXT_AddNodeToTextList(D2TextHeaderStrc* pTextHeader, short nStringId, int nMenu)
 {
 	D2TextNodeStrc* pNode = NULL;

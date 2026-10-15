@@ -110,6 +110,7 @@ D2AiCmdStrc* __fastcall AIGENERAL_AllocAiCommand(D2GameStrc* pGame, D2UnitStrc* 
 }
 
 //D2Game.0x6FCCEE40
+// 1.13c D2Game+0x20EC0
 void __fastcall AIGENERAL_FreeCurrentAiCommand(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
@@ -145,6 +146,7 @@ void __fastcall AIGENERAL_FreeCurrentAiCommand(D2GameStrc* pGame, D2UnitStrc* pU
 }
 
 //D2Game.0x6FCCEEB0
+// 1.13c D2Game+0x21420
 void __fastcall AIGENERAL_FreeAllAiCommands(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
@@ -172,6 +174,7 @@ D2AiCmdStrc* __fastcall AIGENERAL_GetCurrentAiCommandFromUnit(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCCEF10
+// 1.13c D2Game+0x20E00
 D2AiCmdStrc* __fastcall AIGENERAL_GetAiCommandFromParam(D2UnitStrc* pUnit, int32_t nCmdParam, int32_t bSet)
 {
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
@@ -322,15 +325,11 @@ void __fastcall AIGENERAL_FreeAiControl(D2GameStrc* pGame, D2AiControlStrc* pAiC
 	D2_FREE_POOL(pGame->pMemoryPool, pAiControl);
 }
 
-//D2Game.0x6FCCF240
+// 1.13c D2Game+0x20DE0
+// 1.13c does not null-check the control: with none it returns &((D2AiControlStrc*)nullptr)->pMapAi (0x38).
 D2MapAIStrc** __stdcall AIGENERAL_GetMapAiFromUnit(D2UnitStrc* pUnit)
 {
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
-	if (!pAiControl)
-	{
-		return nullptr;
-	}
-
 	return &pAiControl->pMapAi;
 }
 

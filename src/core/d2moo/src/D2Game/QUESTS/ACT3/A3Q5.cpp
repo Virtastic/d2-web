@@ -438,6 +438,7 @@ void __fastcall OBJECTS_InitFunction60_CompellingOrb(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FCAB620
+// 1.13c D2Game+0xE9200 (checked against decompile)
 void __fastcall ACT3Q5_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));
