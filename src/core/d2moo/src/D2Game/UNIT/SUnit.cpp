@@ -75,6 +75,7 @@ extern uint32_t dword_6FD4DC40;   // d2-web: defined in PLAYER/PlayerList.cpp (u
 
 
 //D2Game.0x6FCBAEE0
+// 1.13c D2Game+0xE20A0 (checked against decompile, no delta; first half is retail 0xE0C80)
 void __fastcall SUNIT_RemoveUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2_ASSERT(pGame);
@@ -427,7 +428,7 @@ void __fastcall SUNIT_WarpPlayer(D2GameStrc* pGame, D2UnitStrc* pTarget, D2UnitS
     D2GAME_PACKETS_SendPacket0x0D_6FC3C920(UNITS_GetPlayerData(pTarget)->pClient, 0xDu, pTarget->dwUnitType, pTarget->dwUnitId, 1, nX, nY, 0, UNITS_GetCurrentLifePercentage(pTarget));
 }
 
-//D2Game.0x6FCBB630
+// 1.13c D2Game+0xE0110 (checked against decompile and bytes, no delta)
 void __fastcall SUNIT_InitSeed(D2UnitStrc* pUnit, D2SeedStrc* pSeed)
 {
     D2_ASSERT(pUnit);
@@ -1157,6 +1158,9 @@ void __fastcall SUNIT_SpawnPresetUnit(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom
 
 //1.10: D2Game.0x6FCBC780
 //1.14d: 0x005559A0
+// 1.13c D2Game+0x6FD01430 replay seam (kind 3452, s3255): stands in for the three retail callees (A664 presets, A556 level, E13B0 spawn); null in the game.
+struct D2Gate1430Seam { D2PresetUnitStrc* (*presets)(D2ActiveRoomStrc*); int32_t (*level)(D2ActiveRoomStrc*); void (*spawn)(D2GameStrc*, D2ActiveRoomStrc*, D2PresetUnitStrc*); };
+D2Gate1430Seam g_d2Gate1430 = {};
 void __fastcall SUNIT_SpawnPresetUnitsInRoom(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom)
 {
     if (!pGame)
@@ -1164,7 +1168,8 @@ void __fastcall SUNIT_SpawnPresetUnitsInRoom(D2GameStrc* pGame, D2ActiveRoomStrc
         return;
     }
 
-    D2PresetUnitStrc* pPresetUnit = DUNGEON_GetPresetUnitsFromRoom(pRoom);
+    const D2Gate1430Seam& z = g_d2Gate1430;
+    D2PresetUnitStrc* pPresetUnit = z.presets ? z.presets(pRoom) : DUNGEON_GetPresetUnitsFromRoom(pRoom);
 #ifdef D2_MONS_TRACE
     if (DUNGEON_GetLevelIdFromRoom(pRoom) == d2_trace_level) for (D2PresetUnitStrc* q = pPresetUnit; q; q = q->pNext) fprintf(stderr, "  preset type %d index %d at (%d,%d) mode %d spawned %d\n", q->nUnitType, q->nIndex, q->nXpos, q->nYpos, q->nMode, q->bSpawned);
 #endif
@@ -1174,7 +1179,7 @@ void __fastcall SUNIT_SpawnPresetUnitsInRoom(D2GameStrc* pGame, D2ActiveRoomStrc
     // Furnace of Pain skip the sparkly chest (Forgotten Sands additionally drops the
     // (dwInitSeed % 3 + 3)-th preset, counted across the level in pGame->dwUberSandsCounter);
     // Tristram (finale) skips Wirt's body, the gibbet and the gold placeholder.
-    const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(pRoom);
+    const int32_t nLevelId = z.level ? z.level(pRoom) : DUNGEON_GetLevelIdFromRoom(pRoom);
     for (D2PresetUnitStrc* i = pPresetUnit; i; i = i->pNext)
     {
         if (i->nUnitType == UNIT_MONSTER || (i->bSpawned & 1))
@@ -1188,7 +1193,7 @@ void __fastcall SUNIT_SpawnPresetUnitsInRoom(D2GameStrc* pGame, D2ActiveRoomStrc
             {
                 continue;
             }
-            SUNIT_SpawnPresetUnit(pGame, pRoom, i);
+            (z.spawn ? z.spawn : SUNIT_SpawnPresetUnit)(pGame, pRoom, i);
         }
         else if (nLevelId == LEVEL_PANDEMONIUMRUN1 || nLevelId == LEVEL_PANDEMONIUMRUN3)
         {
@@ -1196,23 +1201,27 @@ void __fastcall SUNIT_SpawnPresetUnitsInRoom(D2GameStrc* pGame, D2ActiveRoomStrc
             {
                 continue;
             }
-            SUNIT_SpawnPresetUnit(pGame, pRoom, i);
+            (z.spawn ? z.spawn : SUNIT_SpawnPresetUnit)(pGame, pRoom, i);
         }
         else if (nLevelId == LEVEL_PANDEMONIUMRUN2)
         {
-            if (i->nUnitType == UNIT_OBJECT && i->nIndex == OBJECT_VALLEY_WAYPOINT)
+            // 1.13c 0xE1430 (kind 3452): only objects are counted; any other preset type spawns without touching the counter.
+            if (i->nUnitType == UNIT_OBJECT)
             {
-                continue;
+                if (i->nIndex == OBJECT_VALLEY_WAYPOINT)
+                {
+                    continue;
+                }
+                if (++pGame->dwUberSandsCounter == pGame->dwInitSeed % 3 + 3)
+                {
+                    continue;
+                }
             }
-            if (++pGame->dwUberSandsCounter == pGame->dwInitSeed % 3 + 3)
-            {
-                continue;
-            }
-            SUNIT_SpawnPresetUnit(pGame, pRoom, i);
+            (z.spawn ? z.spawn : SUNIT_SpawnPresetUnit)(pGame, pRoom, i);
         }
         else
         {
-            SUNIT_SpawnPresetUnit(pGame, pRoom, i);
+            (z.spawn ? z.spawn : SUNIT_SpawnPresetUnit)(pGame, pRoom, i);
         }
     }
 
@@ -1222,7 +1231,7 @@ void __fastcall SUNIT_SpawnPresetUnitsInRoom(D2GameStrc* pGame, D2ActiveRoomStrc
         {
             if (i->nUnitType == UNIT_MONSTER && !(i->bSpawned & 1))
             {
-                SUNIT_SpawnPresetUnit(pGame, pRoom, i);
+                (z.spawn ? z.spawn : SUNIT_SpawnPresetUnit)(pGame, pRoom, i);
             }
         }
     }
@@ -1231,7 +1240,7 @@ void __fastcall SUNIT_SpawnPresetUnitsInRoom(D2GameStrc* pGame, D2ActiveRoomStrc
     {
         if (i->nUnitType != UNIT_MONSTER && !(i->bSpawned & 1))
         {
-            SUNIT_SpawnPresetUnit(pGame, pRoom, i);
+            (z.spawn ? z.spawn : SUNIT_SpawnPresetUnit)(pGame, pRoom, i);
         }
     }
 
@@ -1239,7 +1248,7 @@ void __fastcall SUNIT_SpawnPresetUnitsInRoom(D2GameStrc* pGame, D2ActiveRoomStrc
     {
         if (i->nUnitType == UNIT_MONSTER && !(i->bSpawned & 1))
         {
-            SUNIT_SpawnPresetUnit(pGame, pRoom, i);
+            (z.spawn ? z.spawn : SUNIT_SpawnPresetUnit)(pGame, pRoom, i);
         }
     }
 #endif
@@ -1369,6 +1378,7 @@ D2UnitStrc* __fastcall SUNIT_GetPortalOwner(D2GameStrc* pGame, D2UnitStrc* pPort
 }
 
 //D2Game.0x6FCBCC40
+// 1.13c D2Game+0xDFCC0 (checked against decompile, no delta; register-convention wrapper)
 void __fastcall SUNIT_IterateUnitsOfType(D2GameStrc* pGame, int32_t nType, void* pArg, int32_t(__fastcall* pfIterate)(D2GameStrc*, D2UnitStrc*, void*))
 {
     D2_ASSERT(pGame);
@@ -1409,6 +1419,7 @@ void __fastcall SUNIT_IterateUnitsOfType(D2GameStrc* pGame, int32_t nType, void*
 }
 
 //D2Game.0x6FCBCD70
+// 1.13c D2Game+0xDFC10 (checked against decompile; register-convention wrapper, no semantic delta)
 void __fastcall SUNIT_IterateLivingPlayers(D2GameStrc* pGame, void(__fastcall* pfIterate)(D2GameStrc*, D2UnitStrc*, void*), void* pArg)
 {
     D2_ASSERT(pGame && pfIterate);
@@ -1788,6 +1799,7 @@ D2UnitStrc* __fastcall SUNIT_GetInteractUnit(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FCBD550
+// 1.13c D2Game+0xE1110 (checked against decompile; retail's page-3/charm calls are no-op ordinals, left out)
 void __fastcall SUNIT_RemoveAllItemsFromInventory(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2_ASSERT(pUnit);
@@ -1893,6 +1905,7 @@ int32_t __stdcall SUNIT_GetInteractInfo(D2UnitStrc* pUnit, int32_t* pInteractUni
 }
 
 //D2Game.0x6FCBD840
+// 1.13c D2Game+0xDFAE0
 void __stdcall SUNIT_SetInteractInfo(D2UnitStrc* pUnit, int32_t nInteractUnitType, int32_t nInteractUnitGUID)
 {
     if (pUnit->nInteract)
@@ -2372,7 +2385,7 @@ int32_t __fastcall sub_6FCBDFE0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ActiveRo
     return 1;
 }
 
-//D2Game.0x6FCBE2D0
+// 1.13c D2Game+0xDFA60
 int16_t __fastcall SUNIT_GetPartyId(D2UnitStrc* pPlayer)
 {
     if (pPlayer && pPlayer->pGame && pPlayer->dwUnitType == UNIT_PLAYER)

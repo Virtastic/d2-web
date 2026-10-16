@@ -231,7 +231,7 @@ inline bool DungeonTestRoomGame(const D2ActiveRoomStrc* pRoom, int nX, int nY)
         && nY >= pRoom->tCoords.nSubtileY && nY < (pRoom->tCoords.nSubtileY + pRoom->tCoords.nSubtileHeight);
 
 }
-// Helper function
+// Helper function (1.13c D2Common+0x1330)
 inline D2ActiveRoomStrc* __fastcall DUNGEON_GetRoomAtPosition(D2ActiveRoomStrc* pRoom, int32_t nSubtileX, int32_t nSubtileY)
 {
     if (!pRoom)

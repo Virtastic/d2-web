@@ -166,6 +166,7 @@ int32_t __fastcall MONSTERUNIQUE_GetSuperUniqueBossHcIdx(D2GameStrc* pGame, D2Un
 }
 
 //D2Game.0x6FC6AD50
+// 1.13c D2Game+0x23020
 void __fastcall MONSTERUNIQUE_UMod1_RandomName(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (pUnit && bUnique && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)
@@ -275,6 +276,7 @@ void __fastcall MONSTERUNIQUE_UMod4_LevelBonus(D2UnitStrc* pUnit, int32_t nUMod,
 }
 
 //D2Game.0x6FC6B030
+// 1.13c D2Game+0x22DA0
 void __fastcall MONSTERUNIQUE_UMod16_Champion(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
@@ -308,6 +310,12 @@ void __fastcall MONSTERUNIQUE_UMod16_Champion(D2UnitStrc* pUnit, int32_t nUMod, 
     {
         nDamagePercent = nDamagePercent * pDifficultyLevelsTxtRecord->dwChampionDmgBonus / 100;
         nToHitPercent = nToHitPercent * pDifficultyLevelsTxtRecord->dwChampionDmgBonus / 100;
+
+        // 1.13c D2Game+0x22DA0: base class 0x76 halves the champion damage bonus (absent in 1.10f); range check of retail's 0x1850 is implied (class already validated)
+        if (pMonStatsTxtRecord->nBaseId == 0x76)
+        {
+            nDamagePercent /= 2;
+        }
     }
 
     STATLIST_AddUnitStat(pUnit, STAT_DAMAGEPERCENT, nDamagePercent, 0);
@@ -446,6 +454,7 @@ void __fastcall MONSTERUNIQUE_UMod41_AlwaysRun(D2UnitStrc* pUnit, int32_t nUMod,
 }
 
 //D2Game.0x6FC6B610
+// 1.13c D2Game+0x21BE0
 void __fastcall MONSTERUNIQUE_UMod8_Resistant(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER || !bUnique)

@@ -178,7 +178,7 @@ void __fastcall sub_6FC7CF50(D2GameStrc* pGame, int32_t nPetGUID)
     SUNIT_IterateLivingPlayers(pGame, PLAYERPETS_PlayerIterate_SynchronizeWithClient, &arg);
 }
 
-//D2Game.0x6FC7D060
+//D2Game.0x6FC7D060 -- 1.13c D2Game+0x97640
 void __fastcall PLAYERPETS_FreePetsFromPlayerData(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pUnit);

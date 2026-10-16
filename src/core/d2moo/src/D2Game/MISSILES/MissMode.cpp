@@ -527,6 +527,7 @@ void __fastcall MISSMODE_AddDamageValue(D2GameStrc* pGame, D2UnitStrc* pMissile,
 }
 
 //D2Game.0x6FC568F0
+// 1.13c D2Game+0x3D680 (checked against decompile, no delta)
 int32_t __fastcall MISSMODE_CreatePoisonCloudHitSubmissiles(D2GameStrc* pGame, D2UnitStrc* pOwner, D2UnitStrc* pOrigin, int32_t nMissileId, int32_t nSkillId, int32_t nSkillLevel, int32_t nSubStep, int32_t nMainStep, int32_t nLoops)
 {
     D2MissilesTxt* pMissilesTxtRecord = SKILLS_GetMissilesTxtRecord(nMissileId);
@@ -808,6 +809,7 @@ int32_t __fastcall MISSMODE_SrvDo03_PoisonCloud_Blizzard_ThunderStorm_HandOfGod(
 }
 
 //D2Game.0x6FC571D0
+// 1.13c D2Game+0x41980 (checked against decompile, no delta)
 int32_t __fastcall MISSMODE_SrvDo05_FireWall_ImmolationFire_MeteorFire_MoltenBoulderFirePath(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
     if (!pMissile)
@@ -2808,6 +2810,7 @@ int32_t __fastcall MISSMODE_SrvHit14_MeteorCenter_CatapultMeteor_RoyalStrikeMete
 }
 
 //D2Game.0x6FC5B910
+// 1.13c D2Game+0x3CEC0 (checked against decompile, no delta)
 void __fastcall MISSMODE_CreateMeteor_MoltenBoulderSubmissiles(D2GameStrc* pGame, D2UnitStrc* pMissile, int32_t nMissileId, int32_t nRange, int32_t nStep)
 {
     if (nMissileId < 0)
@@ -3010,6 +3013,7 @@ int32_t __fastcall MISSMODE_SrvHit18_Shout_BattleCommand_BattleOrders(D2GameStrc
 }
 
 //D2Game.0x6FC5BF30
+// 1.13c D2Game+0x3E8A0 (checked against decompile, no delta)
 int32_t __fastcall MISSMODE_SrvHit19_FingerMageSpider(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     const int32_t nSkillId = MISSILE_GetSkill(pMissile);
@@ -4666,6 +4670,7 @@ D2MonStats2Txt* __fastcall D2GAME_GetMonStats2TxtRecord_6FC5F4B0(int32_t nRecord
 }
 
 //D2Game.0x6FC5F4E0
+// 1.13c D2Game+0x3AE10 (checked against decompile, no delta)
 void __fastcall MISSMODE_SetDamageFlags(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pDefender, D2DamageStrc* pDamage)
 {
     if (!pMissile || pMissile->dwUnitType != UNIT_MISSILE)

@@ -117,6 +117,7 @@ export function parseAutomapLevelLayers(bytes) {
   const out = new Map();
   for (const [index, line] of lines.slice(1).entries()) {
     const fields = line.split('\t'), idText = fields[id]?.trim(), layerText = fields[layer]?.trim();
+    if (!idText && !layerText) continue; // retail's blank-Id 'Expansion' separator row (data row 110)
     const levelId = /^\d+$/.test(idText || '') ? Number(idText) : -1;
     const layerNo = /^\d+$/.test(layerText || '') ? Number(layerText) : -1;
     if (!Number.isSafeInteger(levelId) || levelId < 0 || !Number.isSafeInteger(layerNo) || layerNo < 0 || layerNo >= 100 || out.has(levelId)) {

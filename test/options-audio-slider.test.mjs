@@ -86,13 +86,12 @@ test('NPC Speech follows retail native values and one-click Audio Only selection
     assert.equal(page.state.npcspeech, 2, 'retail default is Audio and Text');
     assert.ok(optionsPageDrawOrder('sound', page.state).some((draw) => draw.path === 'AudioText'));
 
-    assert.deepEqual(page.click(400, 384, 800, 600), { row: 'npcspeech', value: 0 });
-    assert.ok(optionsPageDrawOrder('sound', page.state).some((draw) => draw.path === 'AudioOnly'));
-    assert.deepEqual(page.click(400, 384, 800, 600), { row: 'npcspeech', value: 1 });
-    assert.ok(optionsPageDrawOrder('sound', page.state).some((draw) => draw.path === 'TextOnly'));
-    assert.deepEqual(page.click(400, 384, 800, 600), { row: 'npcspeech', value: 2 });
-    assert.ok(optionsPageDrawOrder('sound', page.state).some((draw) => draw.path === 'AudioText'));
-    assert.deepEqual(transitions, [0, 1, 2]);
+    // Retail record (s2134): one click from the default gives Text Only; cycle is 2 -> 1 -> 0 -> 2.
+    for (const [value, path] of [[1, 'TextOnly'], [0, 'AudioOnly'], [2, 'AudioText']]) {
+      assert.deepEqual(page.click(400, 384, 800, 600), { row: 'npcspeech', value });
+      assert.ok(optionsPageDrawOrder('sound', page.state).some((draw) => draw.path === path));
+    }
+    assert.deepEqual(transitions, [1, 0, 2]);
   } finally {
     if (previousImageData === undefined) delete globalThis.ImageData;
     else globalThis.ImageData = previousImageData;

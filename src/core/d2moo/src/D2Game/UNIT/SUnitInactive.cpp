@@ -1070,6 +1070,7 @@ void __fastcall SUNITINACTIVE_DeleteSingleListNode(D2GameStrc* pGame, uint16_t n
 }
 
 //D2Game.0x6FCC4DC0
+// 1.13c D2Game+0x1E960 (checked against decompile, no delta)
 D2InactiveUnitListStrc* __fastcall SUNITINACTIVE_GetListNodeFromActAndCoordinates(D2GameStrc* pGame, int32_t nAct, int32_t nX, int32_t nY, int32_t bAllocNewNode)
 {
 	int32_t bFound = 0;

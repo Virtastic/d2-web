@@ -302,6 +302,7 @@ void __fastcall MONSTER_InitializeStatsAndSkills(D2GameStrc* pGame, D2ActiveRoom
 }
 
 //D2Game.0x6FC60B10
+// 1.13c D2Game+0xAFAB0 (checked against decompile, no delta)
 int32_t __fastcall MONSTER_SetVelocityAndPosition(D2GameStrc* pGame, D2UnitStrc* pMonster, int32_t nX, int32_t nY, int32_t a5)
 {
     int32_t nAnimMode = 0;
@@ -338,9 +339,14 @@ void __fastcall MONSTER_RemoveAll(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC60C10
+// 1.13c D2Game+0xAFB90 (checked against decompile, no delta)
+// Replay seam (kind 3448, s3248): when set, each callee below is logged (site, a, b) instead of run. Null in the game.
+void (*g_d2MonsterFreeSeam)(int32_t nSite, void* a, void* b) = nullptr;
+#define MONSTER_FREE_SEAM(site, a, b, call) do { if (g_d2MonsterFreeSeam) g_d2MonsterFreeSeam(site, (void*)(a), (void*)(b)); else { call; } } while (0)
+
 void __fastcall MONSTER_Free(D2GameStrc* pGame, D2UnitStrc* pMonster)
 {
-    SUNITDMG_FreeAttackerCombatList(pGame, pMonster);
+    MONSTER_FREE_SEAM(1, pGame, pMonster, SUNITDMG_FreeAttackerCombatList(pGame, pMonster));
 
     if (!pMonster)
     {
@@ -352,24 +358,24 @@ void __fastcall MONSTER_Free(D2GameStrc* pGame, D2UnitStrc* pMonster)
         D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(pMonster->dwClassId);
         if (!pMonStatsTxtRecord || !(pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_INTERACT]))
         {
-            SUNIT_RemoveAllItemsFromInventory(pGame, pMonster);
-            INVENTORY_FreeInventory(pMonster->pInventory);
+            MONSTER_FREE_SEAM(2, pGame, pMonster, SUNIT_RemoveAllItemsFromInventory(pGame, pMonster));
+            MONSTER_FREE_SEAM(3, pMonster->pInventory, nullptr, INVENTORY_FreeInventory(pMonster->pInventory));
         }
     }
 
     if (pMonster->pHoverText)
     {
-        CHAT_FreeHoverMsg(pGame->pMemoryPool, pMonster->pHoverText);
+        MONSTER_FREE_SEAM(4, pGame->pMemoryPool, pMonster->pHoverText, CHAT_FreeHoverMsg(pGame->pMemoryPool, pMonster->pHoverText));
     }
 
     if (pMonster->dwUnitType == UNIT_MONSTER && pMonster->pMonsterData)
     {
-        AIGENERAL_FreeAiControl(pGame, pMonster->pMonsterData->pAiControl);
-        D2GAME_MONSTERMODE_FreeParams_6FC63020(pGame, pMonster->pMonsterData->pAiParam);
-        MONSTERAI_FreeMonsterInteract(pGame, pMonster->pMonsterData->pMonInteract);
+        MONSTER_FREE_SEAM(5, pGame, pMonster->pMonsterData->pAiControl, AIGENERAL_FreeAiControl(pGame, pMonster->pMonsterData->pAiControl));
+        MONSTER_FREE_SEAM(6, pGame, pMonster->pMonsterData->pAiParam, D2GAME_MONSTERMODE_FreeParams_6FC63020(pGame, pMonster->pMonsterData->pAiParam));
+        MONSTER_FREE_SEAM(7, pGame, pMonster->pMonsterData->pMonInteract, MONSTERAI_FreeMonsterInteract(pGame, pMonster->pMonsterData->pMonInteract));
     }
 
-    sub_6FC349F0(pGame, pMonster);
+    MONSTER_FREE_SEAM(8, pGame, pMonster, sub_6FC349F0(pGame, pMonster));
 }
 
 //D2Game.0x6FC60CD0

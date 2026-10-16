@@ -1462,6 +1462,7 @@ D2UnitStrc* __fastcall D2GAME_DropItemAtUnit_6FC4FEC0(D2GameStrc* pGame, D2UnitS
     return pItem;
 }
 
+// 1.13c D2Game+0x11980 (checked against decompile)
 //D2Game.0x6FC501A0
 D2UnitStrc* __fastcall D2GAME_CreateItemUnit_6FC501A0(D2UnitStrc* pPlayer, int32_t nItemId, D2GameStrc* pGame, int32_t nSpawnTarget, int32_t nQuality, int32_t bNoSockets, int32_t bNoEthereal, int32_t nItemLevel, int32_t bUseSeed, int32_t dwSeed, int32_t dwItemSeed)
 {
@@ -2590,7 +2591,7 @@ void __fastcall D2GAME_DropTC_6FC51360(D2GameStrc* pGame, D2UnitStrc* pMonster, 
     }
 }
 
-//D2Game.0x6FC52070
+// 1.13c D2Game+0x1280 (checked against decompile, no delta; shared helper, 75 callers, hence early RVA)
 D2ActiveRoomStrc* __fastcall D2GAME_GetRoom_6FC52070(D2ActiveRoomStrc* pRoom, int32_t nSubtileX, int32_t nSubtileY)
 {
     return DUNGEON_GetRoomAtPosition(pRoom, nSubtileX, nSubtileY);

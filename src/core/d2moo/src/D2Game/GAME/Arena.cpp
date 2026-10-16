@@ -20,14 +20,13 @@ int32_t __fastcall D2Game_10001_Return0()
     return dword_6FD43FB0;
 }
 
-//D2Game.0x6FC31040
+//D2Game.0x6FC31040 -- 1.13c D2Game+0xB2560 (template argument not stored)
 void __fastcall ARENA_AllocArena(D2GameStrc* pGame, int32_t nUnused, uint32_t nFlags, int32_t nTemplate)
 {
     D2ArenaStrc* pArena = D2_CALLOC_STRC_POOL(pGame->pMemoryPool, D2ArenaStrc);
 
     pGame->pArenaCtrl = pArena;
     pArena->fFlags = nFlags & (GAMEFLAG_ARENA_LADDER | GAMEFLAG_ARENA_EXPANSION | GAMEFLAG_ARENA_ACTIVE | 0x4000 | 0x2000 | 0x1000 | GAMEFLAG_ARENA_HARDCORE | 0x100 | 0x80 | 0x40 | GAMEFLAG_ARENA_UPDATECLIENTS | GAMEFLAG_ARENA_MODE | 0x01);
-    pArena->nTemplate = nTemplate;
 }
 
 //D2Game.0x6FC31090

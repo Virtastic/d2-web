@@ -722,6 +722,7 @@ int32_t __fastcall AITACTICS_ChangeModeAndTargetCoordinatesNoStep(D2GameStrc* pG
 
 //D2Game.0x6FCD10C0
 // TODO: Check name
+// 1.13c D2Game+0xF1D90 (checked against decompile)
 int32_t __fastcall AITACTICS_MoveInRadiusToTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t nMode, int32_t a5, int32_t a6)
 {
 	const int32_t nDistance = AIUTIL_GetDistanceToCoordinates_FullUnitSize(pUnit, pTarget);
@@ -821,6 +822,7 @@ D2UnitStrc* __fastcall AITACTICS_GetTargetMinion(D2GameStrc* pGame, D2UnitStrc* 
 	}
 }
 
+// 1.13c D2Game+0xF2420 (checked against decompile)
 //D2Game.0x6FCD1490
 void __fastcall AITACTICS_UseSkillInRange(D2UnitStrc* pUnit, int32_t nRange, uint16_t wSkillId, uint8_t nMode)
 {

@@ -653,6 +653,7 @@ void __fastcall PLAYER_SetVirtualPlayerCount(int32_t nPlayers)
     }
 }
 
+// 1.13c D2Game+0x379A0 (checked against decompile)
 //D2Game.0x6FC7C4A0
 int32_t __fastcall PLAYER_GetPlayerCount(D2GameStrc* pGame)
 {

@@ -45,6 +45,7 @@ void __fastcall SEED_SetSeeds(D2SeedStrc* pSeed, uint32_t  nLowSeed, uint32_t  n
 }
 
 //D2Common.0x6FDAEAF0 (#10922)
+// 1.13c D2Common+0x36710
 void __fastcall SEED_GetSeeds(D2SeedStrc* pSeed, uint32_t* pLowSeed, uint32_t* pHighSeed)
 {
 	*pLowSeed = pSeed->nLowSeed;

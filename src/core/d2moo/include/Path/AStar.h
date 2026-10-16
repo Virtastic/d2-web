@@ -20,6 +20,7 @@ struct D2PathFoWallNodeStrc					    //sizeof 0x38
 	D2PathFoWallNodeStrc* pNextCachePoint;		//0x30
 	D2PathFoWallNodeStrc* pNextSortedByFScore;	//0x34
 };
+static_assert(offsetof(D2PathFoWallNodeStrc, nBestDistanceFromStart) == 0x08 && offsetof(D2PathFoWallNodeStrc, pBestParent) == 0x0C || sizeof(void*) > 4, "node layout (retail 32-bit offsets hold only with 32-bit pointers)");
 
 struct D2PathFoWallContextStrc						  //sizeof 0x32EC
 {

@@ -64,6 +64,34 @@ void __fastcall D2GAME_PopulateRoom_6FC67190(D2GameStrc* pGame, D2ActiveRoomStrc
 int32_t __fastcall sub_6FC67570(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, int32_t nMonsterId, D2UnkMonCreateStrc2* a5, int32_t* pX, int32_t* pY);
 //D2Game.0x6FC677D0
 D2UnitStrc* __fastcall sub_6FC677D0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, int32_t nMonsterId, uint8_t nMin, uint8_t nMax);
+// 1.13c D2Game+0x47820 (split out of sub_6FC679F0; replay kind 3446)
+void sub_47820(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nLevelId, struct D2LevelsTxt* pLevelsTxtRecord);
+// 1.13c D2Game+0x47A20 callee seams (replay kind 3450, s3252); all null in the game
+struct D2Populate47A20Seam
+{
+    int32_t (*gate)(D2GameStrc*, D2ActiveRoomStrc*);                                                             // 0x46CD0
+    D2RoomCoordListStrc* (*coordList)(D2ActiveRoomStrc*);                                                        // 0xB22E
+    int32_t (*levelId)(D2ActiveRoomStrc*);                                                                       // 0xB204
+    int32_t (*preset)(D2GameStrc*, D2MonsterRegionStrc*, D2ActiveRoomStrc*, D2MonStatsTxt**, int32_t, int32_t);  // 0xDF4A0
+    int32_t (*bossType)(D2MonsterRegionStrc*, D2ActiveRoomStrc*);                                                // 0xDF080
+    int32_t (*fallenScarab)(int32_t);                                                                            // 0x46D40
+    int32_t (*group)(D2GameStrc*, D2ActiveRoomStrc*, D2RoomCoordListStrc*, int32_t, uint8_t, uint8_t);           // 0x47700
+    int32_t (*boss)(D2GameStrc*, D2ActiveRoomStrc*, int32_t, D2UnkMonCreateStrc2*);                              // 0x47900
+    int32_t (*champion)(D2GameStrc*, D2ActiveRoomStrc*, D2RoomCoordListStrc*, int32_t);                          // 0x479B0
+};
+extern D2Populate47A20Seam g_d2Pop47A20;
+// 1.13c D2Game+0x46CD0 callee seams (replay kind 3451, s3253); all null in the game
+struct D2Gate46CD0Seam
+{
+    int32_t (*roomLevel)(D2ActiveRoomStrc*);            // 0xA556
+    int32_t (*populatedLevel)(D2ActiveRoomStrc*);       // 0xB204
+    int32_t (*countRooms)(D2DrlgActStrc*, int32_t);     // 0xB18C
+    int32_t (*chaosCleared)(D2GameStrc*);               // 0xB8940
+};
+extern D2Gate46CD0Seam g_d2Gate46CD0;
+int32_t D2GAME_Gate46CD0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom);
+
+extern void (*g_d2Wander47660Seam)(D2GameStrc*, D2ActiveRoomStrc*, D2MonsterRegionStrc*);
 //D2Game.0x6FC679F0
 void __fastcall sub_6FC679F0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom);
 //D2Game.0x6FC67B90

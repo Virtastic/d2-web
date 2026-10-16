@@ -79,6 +79,26 @@ int32_t __fastcall D2GAME_SAVE_CalculateChecksum_6FC8A140(D2SaveHeaderStrc* pSav
     return (int32_t)~nCrc;
 }
 
+// .d2s checksum. Retail 1.13c files (version 0x60, the retail captures) verify with the 32-bit
+// rotate-left-through-carry sum over the whole file with the checksum field zeroed; the CRC-32 at
+// D2Game+0x53170 (kept below, a retail recording) is not what the file carries (s1002).
+int32_t D2GAME_SAVE_FileChecksum(D2SaveHeaderStrc* pSaveHeader, int32_t nSize)
+{
+    const uint32_t nSaved = pSaveHeader->dwChecksum;
+    pSaveHeader->dwChecksum = 0;
+    int32_t nChecksum = 0;
+    const uint8_t* pData = (const uint8_t*)pSaveHeader;
+    for (int32_t i = 0; i < nSize; ++i)
+    {
+        int32_t nByte = pData[i];
+        if (nChecksum < 0)
+            ++nByte;
+        nChecksum = (int32_t)(((uint32_t)nChecksum << 1) + (uint32_t)nByte);
+    }
+    pSaveHeader->dwChecksum = nSaved;
+    return nChecksum;
+}
+
 //D2Game.0x6FC8CC50
 int16_t __fastcall PLRSAVE2_GetItemIndex(D2UnitStrc* pPlayer, int32_t nGUID)
 {
@@ -409,7 +429,7 @@ int32_t __fastcall PLRSAVE2_CreateSaveFile(D2GameStrc* pGame, D2UnitStrc* pPlaye
     D2SaveHeaderStrc* pHeader = (D2SaveHeaderStrc*)pStart;
     pHeader->dwSize = nFileSize;
     pHeader->dwChecksum = 0;
-    pHeader->dwChecksum = (uint32_t)D2GAME_SAVE_CalculateChecksum_6FC8A140(pHeader, (int32_t)nFileSize);
+    pHeader->dwChecksum = (uint32_t)D2GAME_SAVE_FileChecksum(pHeader, (int32_t)nFileSize);
 
     *pSize = nFileSize;
     return PLRSAVE2ERROR_SUCCESS;
@@ -685,7 +705,7 @@ int32_t __fastcall D2WEB_PLRSAVE2_LoadIntoPlayer(D2GameStrc* pGame, D2UnitStrc* 
 
     // Retail verifies the checksum before trusting any of it.
     const uint32_t nStoredChecksum = pSaveHeader->dwChecksum;
-    const uint32_t nComputed = (uint32_t)D2GAME_SAVE_CalculateChecksum_6FC8A140(pSaveHeader, (int32_t)nSize);
+    const uint32_t nComputed = (uint32_t)D2GAME_SAVE_FileChecksum(pSaveHeader, (int32_t)nSize);
     if (nStoredChecksum != nComputed) return PLRSAVE2ERROR_INVALID_CHECKSUM;
 
     const uint32_t nVersion = pSaveHeader->dwVersion;
@@ -844,7 +864,7 @@ int32_t __fastcall D2WEB_PLRSAVE2_ReadSaveHeader(uint8_t* pSaveFile, uint32_t nS
     // Retail zeroes the checksum field and sums the WHOLE remaining buffer, which at the file's
     // start is the whole file. The checksum routine restores the field itself.
     const uint32_t nCheckSum = pSaveHeader->dwChecksum;
-    if ((uint32_t)D2GAME_SAVE_CalculateChecksum_6FC8A140(pSaveHeader, (int32_t)nSize) != nCheckSum)
+    if ((uint32_t)D2GAME_SAVE_FileChecksum(pSaveHeader, (int32_t)nSize) != nCheckSum)
     {
         return PLRSAVE2ERROR_INVALID_CHECKSUM;
     }

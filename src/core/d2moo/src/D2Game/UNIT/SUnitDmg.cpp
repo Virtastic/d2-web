@@ -732,6 +732,7 @@ int32_t __fastcall SUNITDMG_CheckMonType(int32_t nMonType1, int32_t nMonType2)
 }
 
 //D2Game.0x6FCBF450
+// 1.13c D2Game+0xDBED0
 int32_t __fastcall SUNITDMG_RollDamageValueInRange(D2UnitStrc* pUnit, int32_t nMinDamage, int32_t nMaxDamage, int32_t nMinDamageBonusPct, int32_t nMaxDamageBonusPct, int32_t nDamage)
 {
 	if (nMaxDamage > 0)
@@ -2826,6 +2827,7 @@ int32_t __fastcall SUNITDMG_ApplyDodge(D2UnitStrc* pAttacker, D2UnitStrc* pDefen
 }
 
 //D2Game.0x6FCC2850
+// 1.13c D2Game+0xDA540
 int32_t __fastcall SUNITDMG_GetWeaponBlock(D2UnitStrc* pUnit)
 {
 	if (!pUnit)

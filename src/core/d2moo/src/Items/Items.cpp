@@ -322,7 +322,7 @@ int __stdcall ITEMS_GetItemLevel(D2UnitStrc* pItem)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
 	{
-		if (pItemData->dwItemLevel < 1)
+		if (static_cast<int32_t>(pItemData->dwItemLevel) < 1)
 		{
 			pItemData->dwItemLevel = 1;
 		}
@@ -3275,6 +3275,7 @@ int __stdcall ITEMS_GetGemApplyType(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD9D9D0 (#10821)
+// 1.13c D2Common+0x245C0
 BOOL __stdcall ITEMS_IsSocketFiller(D2UnitStrc* pItem)
 {
 	return ITEMS_CheckItemTypeId(pItem, ITEMTYPE_SOCKET_FILLER);
@@ -3702,6 +3703,7 @@ uint8_t __stdcall ITEMS_GetHitClassFromItem(D2UnitStrc* pItem)
 	return pItemsTxtRecord->nHitClass;
 }
 
+// 1.13c D2Common+0x22310
 //D2Common.0x6FD9E670 (#10828)
 int __stdcall ITEMS_Is1Or2Handed(D2UnitStrc* pPlayer, D2UnitStrc* pItem)
 {

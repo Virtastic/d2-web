@@ -75,6 +75,7 @@ int32_t __fastcall AIGENERAL_GetAiControlParam(D2UnitStrc* pUnit, int32_t nIndex
 }
 
 //D2Game.0x6FCCEDC0
+// 1.13c D2Game+0x20F30
 D2AiCmdStrc* __fastcall AIGENERAL_AllocAiCommand(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);

@@ -168,6 +168,10 @@ int32_t __fastcall D2WEB_PLRSAVE2_ReadQuestSection(D2UnitStrc* pPlayer, uint8_t*
 int32_t __fastcall D2WEB_PLRSAVE2_ReadPlrIntroSection(D2UnitStrc* pPlayer, uint8_t** ppSection, const uint8_t* pEnd);
 // Load a complete .d2s into an EXISTING player: the second half of PLRSAVE2_ProcessSaveFile, which
 // also creates the unit. See PlrSaveFile.cpp.
+// Save-file checksum shared by the writer, reader and classic-to-expansion converter.
+// This is distinct from the CRC helper at 1.13c D2Game+0x53170.
+int32_t D2GAME_SAVE_FileChecksum(D2SaveHeaderStrc* pSaveHeader, int32_t nSize);
+
 int32_t __fastcall D2WEB_PLRSAVE2_LoadIntoPlayer(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint8_t* pSaveFile, uint32_t nSize);
 
 // What PLRSAVE2_ReadSaveHeader derives from a file before a character can exist: the class its unit

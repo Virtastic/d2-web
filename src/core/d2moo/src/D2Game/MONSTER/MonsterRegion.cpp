@@ -625,149 +625,177 @@ int32_t __fastcall sub_6FC670A0(int32_t nMonsterId)
     }
 }
 
-//D2Game.0x6FC67190
-void __fastcall D2GAME_PopulateRoom_6FC67190(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom)
+// 1.13c D2Game+0x47A20 replay seams (kind 3450, s3252): each member stands in for one retail callee when set; all null in the game.
+D2Populate47A20Seam g_d2Pop47A20 = {};
+D2Gate46CD0Seam g_d2Gate46CD0 = {};
+
+// 1.13c D2Game+0x46CD0 (register convention EDI = room, EBX = game): the region/level/density gate that opens 0x47A20
+static int32_t sub_46CD0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom)
 {
-    // TODO: v24
-    D2MonsterRegionStrc* pMonsterRegion = MONSTERREGION_GetMonsterRegionFromLevelId(pGame->pMonReg, DUNGEON_GetLevelIdFromRoom(pRoom));
+    const D2Gate46CD0Seam& z = g_d2Gate46CD0;
+    D2MonsterRegionStrc* pMonsterRegion = MONSTERREGION_GetMonsterRegionFromLevelId(pGame->pMonReg, z.roomLevel ? z.roomLevel(pRoom) : DUNGEON_GetLevelIdFromRoom(pRoom));
     if (!pMonsterRegion)
     {
-        return;
+        return 0;
     }
 
     ++pMonsterRegion->unk0x04;
 
-    const int32_t nLevelId = DUNGEON_GetLevelIdFromPopulatedRoom(pRoom);
+    const int32_t nLevelId = z.populatedLevel ? z.populatedLevel(pRoom) : DUNGEON_GetLevelIdFromPopulatedRoom(pRoom);
     if (!nLevelId)
     {
-        return;
+        return 0;
     }
 
     if (pMonsterRegion->unk0x0C < 0)
     {
-        pMonsterRegion->unk0x0C = DUNGEON_GetNumberOfPopulatedRoomsInLevel(pGame->pAct[pMonsterRegion->nAct], nLevelId);
+        pMonsterRegion->unk0x0C = z.countRooms ? z.countRooms(pGame->pAct[pMonsterRegion->nAct], nLevelId) : DUNGEON_GetNumberOfPopulatedRoomsInLevel(pGame->pAct[pMonsterRegion->nAct], nLevelId);
         // d2-web diagnosis (not retail): which of the level's rooms read as unpopulated when the count was taken.
-        { extern void d2_note_popzero(D2DrlgActStrc*, int32_t); d2_note_popzero(pGame->pAct[pMonsterRegion->nAct], nLevelId); }
+        if (!z.countRooms) { extern void d2_note_popzero(D2DrlgActStrc*, int32_t); d2_note_popzero(pGame->pAct[pMonsterRegion->nAct], nLevelId); }
     }
 
 #ifdef D2_MONS_TRACE
     fprintf(stderr, "populate: level %d monden %u rooms %d\n", nLevelId, pMonsterRegion->dwMonDen, pMonsterRegion->unk0x0C);
 #endif
-    if (!pMonsterRegion->dwMonDen || !pMonsterRegion->unk0x0C || (DUNGEON_GetLevelIdFromRoom(pRoom) == LEVEL_CHAOSSANCTUM && ACT4Q2_IsChaosSanctumCleared(pGame)))
+    return pMonsterRegion->dwMonDen && pMonsterRegion->unk0x0C && !((z.roomLevel ? z.roomLevel(pRoom) : DUNGEON_GetLevelIdFromRoom(pRoom)) == LEVEL_CHAOSSANCTUM && (z.chaosCleared ? z.chaosCleared(pGame) : ACT4Q2_IsChaosSanctumCleared(pGame)));
+}
+
+int32_t D2GAME_Gate46CD0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom) { return sub_46CD0(pGame, pRoom); }   // replay entry (kind 3451, s3253)
+
+// 1.13c D2Game+0x479B0: champion group (unit, its 1-3 minions)
+static int32_t sub_479B0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, int32_t nChampionId)
+{
+    D2UnitStrc* pChampion = sub_6FC6E8D0(pGame, pRoom, pRoomCoordList, nChampionId, 1, 0, 0, 1);
+    if (!pChampion)
+    {
+        return 0;
+    }
+
+    if (MONSTERUNIQUE_CheckMonTypeFlag(pChampion, MONTYPEFLAG_CHAMPION))
+    {
+        for (int32_t j = ITEMS_RollLimitedRandomNumber(&pChampion->pSeed, 3) + 1; j > 0; --j)
+        {
+            D2UnitStrc* pMinion = sub_6FC69F70(pGame, pRoomCoordList, pChampion, nChampionId, 1, 4, 0);
+            if (pMinion)
+            {
+                D2GAME_MONSTERS_Unk_6FC6FFD0(pGame, pMinion, MONUMOD_CHAMPMODS);
+            }
+        }
+    }
+
+    return 1;
+}
+
+// 1.13c D2Game+0x47900: boss placement + spawn
+static int32_t sub_47900(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nMonsterId, D2UnkMonCreateStrc2* v24)
+{
+    int32_t nX = 0;
+    int32_t nY = 0;
+    return sub_6FC67570(pGame, pRoom, nullptr, nMonsterId, v24, &nX, &nY) && sub_6FC6A350(pGame, pRoom, nX, nY, nullptr, nMonsterId, 1, v24, 0);
+}
+
+// 1.13c D2Game+0x46D40: the class (through its base class) is monster 0x13 or 0x5B (fallen / scarab)
+static int32_t sub_46D40(int32_t nMonsterId)
+{
+    const D2MonStatsTxt* pRecord = MONSTERMODE_GetMonStatsTxtRecord(nMonsterId);
+    const int32_t nBaseId = pRecord ? pRecord->nBaseId : nMonsterId;
+    return nBaseId == MONSTER_FALLEN1 || nBaseId == MONSTER_SCARAB1;
+}
+
+//D2Game.0x6FC67190
+// 1.13c D2Game+0x47A20
+void __fastcall D2GAME_PopulateRoom_6FC67190(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom)
+{
+    const D2Populate47A20Seam& z = g_d2Pop47A20;
+    if (!(z.gate ? z.gate(pGame, pRoom) : sub_46CD0(pGame, pRoom)))
     {
         return;
     }
 
-    D2RoomCoordListStrc* pRoomCoordList = DUNGEON_GetRoomCoordList(pRoom);
+    D2RoomCoordListStrc* pRoomCoordList = z.coordList ? z.coordList(pRoom) : DUNGEON_GetRoomCoordList(pRoom);
     if (!pRoomCoordList)
     {
         return;
     }
 
-    pMonsterRegion = MONSTERREGION_GetMonsterRegionFromLevelId(pGame->pMonReg, DUNGEON_GetLevelIdFromPopulatedRoom(pRoom));
+    D2MonsterRegionStrc* pMonsterRegion = MONSTERREGION_GetMonsterRegionFromLevelId(pGame->pMonReg, z.levelId ? z.levelId(pRoom) : DUNGEON_GetLevelIdFromPopulatedRoom(pRoom));
     if (pMonsterRegion->dwMonDen > 10000)
     {
         pMonsterRegion->dwMonDen = 10000;
     }
 
     int32_t bIncrease = 0;
-    
-#ifdef D2_MONS_TRACE
-    if (nLevelId == d2_trace_level) for (D2RoomCoordListStrc* q = pRoomCoordList; q; q = q->pNext) fprintf(stderr, "  coordlist idx %d node %d active %d box0 %d,%d %dx%d box1 %d,%d %dx%d\n", q->nIndex, q->bNode, q->bRoomActive, q->pBox[0].nPosX, q->pBox[0].nPosY, q->pBox[0].nWidth, q->pBox[0].nHeight, q->pBox[1].nPosX, q->pBox[1].nPosY, q->pBox[1].nWidth, q->pBox[1].nHeight);
-#endif
-    while (pRoomCoordList)
+    for (; pRoomCoordList; pRoomCoordList = pRoomCoordList->pNext)
     {
-        if (pRoomCoordList->nIndex && !pRoomCoordList->bNode)
+        if (!pRoomCoordList->nIndex || pRoomCoordList->bNode)
         {
-            D2DrlgCoordStrc drlgCoord = {};
-            memcpy(&drlgCoord, &pRoomCoordList->pBox[1], sizeof(D2DrlgCoordStrc));
-
-            if (drlgCoord.nPosX || drlgCoord.nWidth)
-            {
-                DUNGEON_GameTileToSubtileCoords(&drlgCoord.nPosX, &drlgCoord.nPosY);
-                DUNGEON_GameTileToSubtileCoords(&drlgCoord.nWidth, &drlgCoord.nHeight);
-
-                for (int32_t i = ((drlgCoord.nWidth - drlgCoord.nPosX) / 3) * ((drlgCoord.nHeight - drlgCoord.nPosY) / 3); i > 0; --i)   // d2-web: 1.13c multiplies the two quotients (0x6FC67AE7)
-                {
-                    if ((ITEMS_RollRandomNumber(&pGame->pGameSeed) % 100000) <= pMonsterRegion->dwMonDen)
-                    {
-                        D2MonStatsTxt* pMonStatsTxtRecord = nullptr;
-                        const int32_t nMonsterId = MONSTERCHOOSE_GetPresetMonsterId(pGame, pMonsterRegion, pRoom, &pMonStatsTxtRecord, 20u, 0);
-#ifdef D2_MONS_TRACE
-                        fprintf(stderr, "  pick: monster %d rec %p\n", nMonsterId, (void*)pMonStatsTxtRecord);
-#endif
-                        if (!pMonStatsTxtRecord)
-                        {
-                            return;
-                        }
-
-                        int32_t nType = MONSTERCHOOSE_GetBossSpawnType(pMonsterRegion, pRoom);
-#ifdef D2_MONS_TRACE
-                        fprintf(stderr, "  type %d\n", nType);
-#endif
-                        if (nType == 1)
-                        {
-                            nType = 2;
-                        }
-
-                        if (nType == 0)
-                        {
-                            const int32_t nChampionId = MONSTERCHOOSE_GetPresetMonsterId(pGame, pMonsterRegion, pRoom, &pMonStatsTxtRecord, 0, 1);
-                            D2UnitStrc* pChampion = sub_6FC6E8D0(pGame, pRoom, pRoomCoordList, nChampionId, 1, 0, 0, 1);
-                            if (pChampion)
-                            {
-                                if (MONSTERUNIQUE_CheckMonTypeFlag(pChampion, MONTYPEFLAG_CHAMPION))
-                                {
-                                    for (int32_t j = ITEMS_RollLimitedRandomNumber(&pChampion->pSeed, 3) + 1; j > 0; --j)
-                                    {
-                                        D2UnitStrc* pMinion = sub_6FC69F70(pGame, pRoomCoordList, pChampion, nChampionId, 1, 4, 0);
-                                        if (pMinion)
-                                        {
-                                            D2GAME_MONSTERS_Unk_6FC6FFD0(pGame, pMinion, MONUMOD_CHAMPMODS);
-                                        }
-                                    }
-                                }
-
-                                bIncrease = 1;
-                            }
-                        }
-                        else if (nType == 1)
-                        {
-                            D2UnkMonCreateStrc2* v24 = sub_6FC62640(pRoom);
-                            int32_t nX = 0;
-                            int32_t nY = 0;
-                            if (sub_6FC67570(pGame, pRoom, nullptr, nMonsterId, v24, &nX, &nY) && sub_6FC6A350(pGame, pRoom, nX, nY, nullptr, nMonsterId, 1, v24, 0))
-                            {
-                                bIncrease = 1;
-                            }
-                        }
-                        else
-                        {
-                            uint8_t nMinGrp = 1;
-                            uint8_t nMaxGrp = 1;
-
-                            const int32_t nBaseId = pMonStatsTxtRecord->nBaseId;
-                            if (nBaseId != MONSTER_FALLEN1 && nBaseId != MONSTER_SCARAB1)
-                            {
-                                nMinGrp = pMonStatsTxtRecord->nMinGrp;
-                                nMaxGrp = pMonStatsTxtRecord->nMaxGrp;
-                            }
-
-                            if ((!pMonStatsTxtRecord->nSparsePopulate || (ITEMS_RollRandomNumber(&pGame->pGameSeed) % 100) <= pMonStatsTxtRecord->nSparsePopulate) && sub_6FC677D0(pGame, pRoom, pRoomCoordList, nMonsterId, nMinGrp, nMaxGrp))
-                            {
-                                bIncrease = 1;
-                            }
-#ifdef D2_MONS_TRACE
-                            else fprintf(stderr, "  group spawn failed (sparse %d grp %d-%d)\n", pMonStatsTxtRecord->nSparsePopulate, nMinGrp, nMaxGrp);
-#endif
-                        }
-
-                    }
-                }
-            }
+            continue;
         }
 
-        pRoomCoordList = pRoomCoordList->pNext;
+        D2DrlgCoordStrc drlgCoord = {};
+        memcpy(&drlgCoord, &pRoomCoordList->pBox[1], sizeof(D2DrlgCoordStrc));
+        if (!drlgCoord.nPosX && !drlgCoord.nWidth)
+        {
+            continue;
+        }
+
+        DUNGEON_GameTileToSubtileCoords(&drlgCoord.nPosX, &drlgCoord.nPosY);
+        DUNGEON_GameTileToSubtileCoords(&drlgCoord.nWidth, &drlgCoord.nHeight);
+
+        for (int32_t i = ((drlgCoord.nWidth - drlgCoord.nPosX) / 3) * ((drlgCoord.nHeight - drlgCoord.nPosY) / 3); i > 0; --i)   // d2-web: 1.13c multiplies the two quotients (0x6FC67AE7)
+        {
+            if ((ITEMS_RollRandomNumber(&pGame->pGameSeed) % 100000) > pMonsterRegion->dwMonDen)
+            {
+                continue;
+            }
+
+            D2MonStatsTxt* pMonStatsTxtRecord = nullptr;
+            const int32_t nMonsterId = z.preset ? z.preset(pGame, pMonsterRegion, pRoom, &pMonStatsTxtRecord, 20, 0) : MONSTERCHOOSE_GetPresetMonsterId(pGame, pMonsterRegion, pRoom, &pMonStatsTxtRecord, 20u, 0);
+            if (!pMonStatsTxtRecord)
+            {
+                return;
+            }
+
+            int32_t nType = z.bossType ? z.bossType(pMonsterRegion, pRoom) : MONSTERCHOOSE_GetBossSpawnType(pMonsterRegion, pRoom);
+            if (nType == 1)
+            {
+                nType = 2;
+            }
+
+            int32_t bSpawned;
+            if (nType == 0)
+            {
+                const int32_t nChampionId = z.preset ? z.preset(pGame, pMonsterRegion, pRoom, &pMonStatsTxtRecord, 0, 1) : MONSTERCHOOSE_GetPresetMonsterId(pGame, pMonsterRegion, pRoom, &pMonStatsTxtRecord, 0, 1);
+                bSpawned = z.champion ? z.champion(pGame, pRoom, pRoomCoordList, nChampionId) : sub_479B0(pGame, pRoom, pRoomCoordList, nChampionId);
+            }
+            else if (nType == 1)   // unreachable (1 became 2 above), as in retail
+            {
+                D2UnkMonCreateStrc2* v24 = sub_6FC62640(pRoom);
+                bSpawned = z.boss ? z.boss(pGame, pRoom, nMonsterId, v24) : sub_47900(pGame, pRoom, nMonsterId, v24);
+            }
+            else
+            {
+                uint8_t nMinGrp = 1;
+                uint8_t nMaxGrp = 1;
+                if (!(z.fallenScarab ? z.fallenScarab(nMonsterId) : sub_46D40(nMonsterId)))
+                {
+                    nMinGrp = pMonStatsTxtRecord->nMinGrp;
+                    nMaxGrp = pMonStatsTxtRecord->nMaxGrp;
+                }
+
+                if (pMonStatsTxtRecord->nSparsePopulate && (ITEMS_RollRandomNumber(&pGame->pGameSeed) % 100) > pMonStatsTxtRecord->nSparsePopulate)
+                {
+                    continue;
+                }
+
+                bSpawned = z.group ? z.group(pGame, pRoom, pRoomCoordList, nMonsterId, nMinGrp, nMaxGrp) : sub_6FC677D0(pGame, pRoom, pRoomCoordList, nMonsterId, nMinGrp, nMaxGrp) != nullptr;
+            }
+
+            if (bSpawned)
+            {
+                bIncrease = 1;
+            }
+        }
     }
 
     if (bIncrease)
@@ -896,12 +924,28 @@ D2UnitStrc* __fastcall sub_6FC677D0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, 
     return pMonster;
 }
 
+static void sub_47660(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2MonsterRegionStrc* pMonsterRegion, D2LevelsTxt* pLevelsTxtRecord);
+
+// 1.13c D2Game+0x47820 (thiscall room, stdcall level): roll %100 < 3 + region count gate, then 0x47660
+void sub_47820(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nLevelId, D2LevelsTxt* pLevelsTxtRecord)
+{
+    if ((int32_t)(ITEMS_RollRandomNumber(&pRoom->pSeed) % 100) >= 3)
+    {
+        return;
+    }
+
+    D2MonsterRegionStrc* pMonsterRegion = MONSTERREGION_GetMonsterRegionFromLevelId(pGame->pMonReg, nLevelId);
+    if (pMonsterRegion->unk0x2C4 >= 3)
+    {
+        return;
+    }
+
+    sub_47660(pGame, pRoom, pMonsterRegion, pLevelsTxtRecord);
+}
+
 //D2Game.0x6FC679F0
 void __fastcall sub_6FC679F0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom)
 {
-    constexpr int32_t dword_6FD2EE44[] = { MONSTER_ROGUE2 };
-    constexpr uint8_t byte_6FD2EE48[10] = { 0, 1, 0, 0, 0, 0, 0, 0, 0, 0 };
-
     if (!pRoom || ITEMS_RollRandomNumber(&pRoom->pSeed) & 0x7FFF || pRoom->nNumClients)
     {
         return;
@@ -914,13 +958,23 @@ void __fastcall sub_6FC679F0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom)
         return;
     }
 
-    if ((int32_t)(ITEMS_RollRandomNumber(&pRoom->pSeed) % 100) >= 3)
+    sub_47820(pGame, pRoom, nLevelId, pLevelsTxtRecord);
+}
+
+// 1.13c D2Game+0x47660 (the part of 1.10f sub_6FC679F0 after the region gate; its caller 0x47820 passes room, game, region)
+void (*g_d2Wander47660Seam)(D2GameStrc*, D2ActiveRoomStrc*, D2MonsterRegionStrc*) = nullptr;   // replay seam (kind 3446, s3249), null in the game
+static void sub_47660(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2MonsterRegionStrc* pMonsterRegion, D2LevelsTxt* pLevelsTxtRecord)
+{
+    if (g_d2Wander47660Seam)
     {
+        g_d2Wander47660Seam(pGame, pRoom, pMonsterRegion);
         return;
     }
 
-    D2MonsterRegionStrc* pMonsterRegion = MONSTERREGION_GetMonsterRegionFromLevelId(pGame->pMonReg, nLevelId);
-    if (pMonsterRegion->unk0x2C4 >= 3 || pLevelsTxtRecord->nAct >= 5u)
+    constexpr int32_t dword_6FD2EE44[] = { MONSTER_ROGUE2 };
+    constexpr uint8_t byte_6FD2EE48[10] = { 0, 1, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+    if (pLevelsTxtRecord->nAct >= 5u)
     {
         return;
     }

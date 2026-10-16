@@ -614,6 +614,7 @@ int32_t __fastcall PLRSAVE2_WritePlayerStats(D2GameStrc* pGame, D2UnitStrc* pPla
     return 0;
 }
 
+// 1.13c D2Game+0xEB910 (checked against decompile)
 int32_t __fastcall PLRSAVE2_ReadStatsEx(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t** ppSection, uint8_t* pEnd, uint32_t nVersion)
 {
     uint8_t* pData = *ppSection + 2;
@@ -806,6 +807,7 @@ int32_t __fastcall D2WEB_PLRSAVE2_ReadQuestSection(D2UnitStrc* pPlayer, uint8_t*
 }
 
 // Recovered player-intro writer and the paired inline reader from PLRSAVE2_ProcessSaveFile.
+// 1.13c D2Game+0xEB610 (checked against disassembly; retail inlines the copy helpers)
 int32_t __fastcall PLRSAVE2_WritePlrIntroSection(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t** ppSection, const uint8_t* pEnd)
 {
     if (*ppSection + sizeof(D2PlrIntroSaveStrc) > pEnd) return 1;

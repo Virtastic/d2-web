@@ -14,6 +14,27 @@ static_assert(sizeof(Unicode) == 2, "Unicode is one UCS-2 unit");
 Unicode::Unicode(unsigned short c) : ch(c) {}
 Unicode::operator unsigned short() const { return ch; }
 Unicode& Unicode::operator=(const Unicode& o) { ch = o.ch; return *this; }
+// 1.13c D2Lang+0x1040/0x1050/0x1070/0x10A0/0x10C0
+static_assert(sizeof(Unicode) == 2, "Unicode is one 16-bit char at +0");
+BOOL Unicode::isNewline() const { return ch == 10; }
+BOOL Unicode::isPipe() const { return ch == 0xFF; }
+BOOL Unicode::isASCII() const { return ch < 0x80; }
+// 1.13c D2Lang+0x1080 isAlpha, +0x1160 isWordEnd: C-locale ASCII classes
+static bool d2lang_alnum(uint16_t c) { return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); }
+BOOL Unicode::isAlpha() const { return ch < 0x80 && ((ch | 0x20) >= 'a' && (ch | 0x20) <= 'z'); }
+BOOL Unicode::isWordEnd(const Unicode* str, size_t index) { return index != 0 && d2lang_alnum(str[index].ch) && !d2lang_alnum(str[index + 1].ch); }
+// retail's 256-entry tables: Windows-1252 style Latin-1 case map; toLower shares the Latin-1 upper-casing (vanilla bug)
+static unsigned short latin1Upper(unsigned short c) {
+    if (c == 0x9A || c == 0x9C) return c - 0x10;
+    if ((c >= 0xE0 && c <= 0xF6) || (c >= 0xF8 && c <= 0xFE)) return c - 0x20;
+    return c == 0xFF ? 0x9F : c;
+}
+Unicode Unicode::toUpper() const { return ch >= 0x100 ? *this : Unicode(ch >= 'a' && ch <= 'z' ? ch - 0x20 : latin1Upper(ch)); }
+Unicode Unicode::toLower() const { return ch >= 0x100 ? *this : Unicode(ch >= 'A' && ch <= 'Z' ? ch + 0x20 : latin1Upper(ch)); }
+// 1.13c D2Lang+0x10E0/0x1120/0x1020: case-folded equality via the toUpper table; isWhitespace = C-locale isspace (retail returns the CRT _SPACE mask, 8)
+BOOL Unicode::compare(Unicode o) const { return toUpper().ch == o.toUpper().ch; }
+BOOL __fastcall Unicode::compare(Unicode l, Unicode r) { return l.toUpper().ch == r.toUpper().ch; }
+BOOL Unicode::isWhitespace() const { return ch == 32 || (ch >= 9 && ch <= 13); }
 Unicode* Unicode::strcpy(Unicode* dest, const Unicode* src) { Unicode* d = dest; while ((*d++ = *src++).ch) {} return dest; }
 Unicode* Unicode::strcat(Unicode* dest, const Unicode* src) { Unicode* d = dest; while (d->ch) d++; strcpy(d, src); return dest; }
 // 1.13c D2Lang+0xB020 (#10046): first occurrence of substr in str; NULL for a NULL arg, an empty substr, or no match.
@@ -66,11 +87,11 @@ const Unicode* D2LANG_GetStringFromTblIndex(short index) {
     const std::u16string* v = d2::sharedLang().byTblIndex((uint16_t)index);
     return (const Unicode*)(v ? v : &empty)->c_str();
 }
-// D2Lang #10055: UCS-2 to the Windows code page; ASCII range only here (names in log lines).
+// 1.13c D2Lang+0x82F0 (#10055): each unit narrowed to its low byte, at most count-1 units, then NUL.
 char* Unicode::unicode2Win(char* dest, const Unicode* src, int count) {
-    int i = 0;
-    for (; i < count - 1 && src[i].ch; i++) dest[i] = src[i].ch < 0x80 ? (char)src[i].ch : '?';
-    dest[i] = 0;
+    char* p = dest;
+    for (; count > 1 && src->ch; src++, count--) *p++ = (char)src->ch;
+    *p = 0;
     return dest;
 }
 

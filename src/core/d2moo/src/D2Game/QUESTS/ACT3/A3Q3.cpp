@@ -693,6 +693,7 @@ void __fastcall ACT3Q3_Callback09_PlayerDroppedWithQuestItem(D2QuestDataStrc* pQ
 	}
 }
 
+// 1.13c D2Game+0xE6000 (checked against decompile)
 //D2Game.0x6FCA9A70
 void __fastcall ACT3Q3_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {

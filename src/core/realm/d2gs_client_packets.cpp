@@ -298,3 +298,43 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_find_player_assign(
 }
 
 }  // extern "C"
+
+// 1.13c D2Net+0x6750 (ordinal 10033): size of the server packet at buf. Returns the size (0 = unknown or
+// incomplete) and writes *out like retail: the table entry, then the body rule for -1 entries (an
+// incomplete body leaves the table entry, 0xFFFFFFFF, in *out). No write when avail==0 or opcode>0xb4.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_realm_d2net_6750(const uint8_t* buf, uint32_t avail, uint32_t* out) {
+    if (avail == 0 || buf[0] > 0xb4) return 0;
+    const int e = kServerPacketSize113c[buf[0]];
+    *out = static_cast<uint32_t>(e);
+    if (e == 0) return 0;
+    if (e > 0) return *out;
+    const int sz = variablePacketSize(buf[0], buf, static_cast<int>(avail));
+    if (sz == -2) return 0;  // gate unmet: *out stays the table entry
+    if (sz == 0 && buf[0] != 0xae) { *out = 0; return 0; }  // opcode with no body rule
+    if (buf[0] == 0x26) {  // retail needs the whole packet present, else *out stays
+        return static_cast<uint32_t>(sz) <= avail ? (*out = sz) : 0;
+    }
+    return *out = static_cast<uint32_t>(sz);
+}
+
+// 1.13c D2Net+0x6bd0: split a received byte run into server packets (sub_6750 sizes) and append each as a
+// node to one of two FIFO queues: opcode <= 0xae -> normal, 0xaf..0xb4 -> second. Retail's error paths
+// (size > 0x204, size < 1, opcode > 0xb4) print and _exit(-1); here they return false. Returns true when
+// the run was consumed or ended on an incomplete packet.
+struct D2NetPktNode { uint8_t data[0x204]; uint32_t size, tick; D2NetPktNode* next; };
+struct D2NetPktQueues { D2NetPktNode *normal, *second; };
+bool d2_realm_d2net_6bd0(const uint8_t* buf, int len, D2NetPktQueues* q, D2NetPktNode* (*alloc)(), uint32_t tick) {
+    while (len >= 1) {
+        uint32_t sz = 0;
+        if (!d2_realm_d2net_6750(buf, static_cast<uint32_t>(len), &sz)) return true;
+        if (sz > 0x204 || sz < 1 || buf[0] > 0xb4) return false;
+        D2NetPktNode* n = alloc();
+        memcpy(n->data, buf, sz);
+        n->size = sz; n->tick = tick; n->next = nullptr;
+        D2NetPktNode** head = buf[0] > 0xae ? &q->second : &q->normal;
+        while (*head) head = &(*head)->next;
+        *head = n;
+        buf += sz; len -= static_cast<int>(sz);
+    }
+    return true;
+}

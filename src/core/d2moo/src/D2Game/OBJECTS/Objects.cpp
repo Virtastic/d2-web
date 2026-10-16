@@ -213,6 +213,7 @@ D2UnitStrc* __fastcall OBJECTS_SpawnArcaneSymbol(D2GameStrc* pGame, D2ActiveRoom
 }
 
 //D2Game.0x6FC70570
+// 1.13c D2Game+0x2E830 (checked against decompile, no delta)
 D2UnitStrc* __fastcall OBJECTS_SpawnPresetObject(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nClassId, int32_t nX, int32_t nY, int32_t nMode)
 {
     using PresetFunc = D2UnitStrc * (__fastcall*)(D2GameStrc*, D2ActiveRoomStrc*, int32_t, int32_t, int32_t, int32_t);
@@ -1312,6 +1313,7 @@ void __fastcall OBJECTS_SpawnFliesOnCorpse(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC723F0
+// 1.13c D2Game+0x32CE0
 D2UnitStrc* __fastcall OBJECTS_PopulateFn3_CommonObjects(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, uint8_t nDensity, uint32_t nObjectId, uint16_t nChance)
 {
     D2_ASSERT(nDensity <= 128);
@@ -1381,6 +1383,7 @@ D2UnitStrc* __fastcall OBJECTS_CreateObject(D2GameStrc* pGame, int32_t nClassId,
 }
 
 //D2Game.0x6FC726D0
+// 1.13c D2Game+0x32BC0
 D2UnitStrc* __fastcall OBJECTS_PopulateFn9_TrappedSoul(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, uint8_t nDensity, uint32_t nObjectId, uint16_t nProbability)
 {
     D2_ASSERT(nDensity <= 128);

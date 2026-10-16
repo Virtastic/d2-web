@@ -662,7 +662,7 @@ void __fastcall ACT5Q1_Callback10_PlayerLeavesGame(D2QuestDataStrc* pQuestData, 
 	}
 }
 
-//Inlined in D2Game.0x6FC975A0
+// 1.13c D2Game+0x5A5C0 (checked against decompile, no delta)
 void __fastcall ACT5Q1_ChangeLarzukMapAI(D2GameStrc* pGame, D2UnitStrc* pUnit, D2MapAIStrc* pMapAi)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A5Q1_SHENK);

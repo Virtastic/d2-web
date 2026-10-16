@@ -273,7 +273,7 @@ BOOL __stdcall STATES_IsUnitShapeShifted(D2UnitStrc* pUnit)
 {
 	if (pUnit)
 	{
-		return pUnit->dwFlagEx & UNITFLAGEX_ISSHAPESHIFTED;
+		return (pUnit->dwFlagEx & UNITFLAGEX_ISSHAPESHIFTED) != 0;
 	}
 
 	return FALSE;

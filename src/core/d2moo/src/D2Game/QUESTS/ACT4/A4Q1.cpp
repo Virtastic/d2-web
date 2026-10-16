@@ -283,6 +283,7 @@ int32_t __fastcall ACT4Q1_UnitIterate_StatusCyclerEx(D2GameStrc* pGame, D2UnitSt
 }
 
 //D2Game.0x6FCADD70
+// 1.13c D2Game+0xB9560
 void __fastcall ACT4Q1_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	static const int32_t nIndices[] =
@@ -308,7 +309,7 @@ void __fastcall ACT4Q1_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 	{
 		QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, nNpcId, 3);
 	}
-	else if (QUESTS_CheckPlayerGUID(pQuestData, pQuestArg->pTarget ? pQuestArg->pTarget->dwUnitId : -1) == 1)
+	else if (QUESTS_CheckPlayerGUID(pQuestData, pQuestArg->pPlayer ? pQuestArg->pPlayer->dwUnitId : -1) == 1)
 	{
 		QUESTS_InitScrollTextChain(pQuestData, pQuestArg->pTextControl, nNpcId, 4);
 	}

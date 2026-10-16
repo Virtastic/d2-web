@@ -591,6 +591,7 @@ D2MagicAffixDataTbl* __stdcall DATATBLS_GetMagicAffixDataTables()
 }
 
 //D2Common.0x6FD580C0 (#10604)
+// 1.13c D2Common+0x71820
 D2MagicAffixTxt* __stdcall DATATBLS_GetMagicAffixTxtRecord(int nIndex)
 {
 	D2_ASSERT(sgptDataTables->pMagicAffixDataTables.pMagicAffixTxt);
@@ -2067,6 +2068,7 @@ void __stdcall DATATBLS_AddOrChangeRunesTxtRecord(int nRecordId, D2RunesTxt* pRe
 static_assert(offsetof(D2RuneDataTbl, nRunesTxtRecordCount) == 0x00);
 static_assert(offsetof(D2RuneDataTbl, pRunesTxt) == 0x04);
 static_assert(offsetof(D2DataTablesStrc, pRuneDataTables) == 0x1240); // wasm64 layout; D2MOO's 0xEDC comment is the 32-bit layout
+static_assert(sizeof(D2MagicAffixTxt) == 0x90); // retail 1.13c stride, D2Common+0x71820
 static_assert(sizeof(D2RunesTxt) == 0x120);
 D2RunesTxt* __stdcall DATATBLS_GetRunesTxtRecord(int nRunewordId)
 {

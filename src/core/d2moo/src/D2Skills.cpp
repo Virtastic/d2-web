@@ -2252,7 +2252,6 @@ int __stdcall SKILLS_GetFlags(D2SkillStrc* pSkill)
 		return pSkill->dwFlags;
 	}
 
-	REMOVE_LATER_Trace("SKILLS_GetFlags: NULL pointer");
 	return 0;
 }
 
@@ -3202,6 +3201,7 @@ BOOL __stdcall D2Common_11025(int nX1, int nY1, int nX2, int nY2, D2ActiveRoomSt
 }
 
 //D2Common.0x6FDB3960 (#11026)
+// 1.13c D2Common+0x4F160
 BOOL __stdcall D2Common_11026(int nX, int nY, D2UnitStrc* pUnit, uint16_t nColMask)
 {
 	D2CoordStrc pCoords1 = {};
@@ -3491,6 +3491,7 @@ BOOL __stdcall SKILLS_RemoveTransformStatesFromShapeshiftedUnit(D2UnitStrc* pUni
 }
 
 //D2Common.0x6FDB4100 (#11041)
+// 1.13c D2Common+0x4E550
 int __stdcall SKILLS_GetClassSkillId(int nClassId, int nPosition)
 {
 	if (nClassId >= 0 && nClassId < NUMBER_OF_PLAYERCLASSES && nPosition >= 0 && nPosition < sgptDataTables->nClassSkillCount[nClassId])

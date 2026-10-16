@@ -401,6 +401,7 @@ int32_t __fastcall sub_6FD0F8B0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nV
 }
 
 //D2Game.0x6FD0FA00
+// 1.13c D2Game+0xA0370 (checked against decompile, no delta)
 int32_t __fastcall sub_6FD0FA00(D2UnitStrc* pUnit, D2UnitStrc* pTarget, uint32_t nAuraFilter)
 {
     D2UnitStrc* pAttacker = pUnit;
@@ -644,7 +645,18 @@ void __fastcall sub_6FD0FE50(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t (__fa
     pCallback(&auraCallback, pUnit);
 }
 
+//D2Game.0x6FCBE610
+// 1.13c D2Game+0x9E610 (checked against decompile, no delta; inlined in 1.10f)
+static int32_t sub_6FCBE610(D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t nAuraRange)
+{
+    D2DrlgCoordsStrc drlgCoords = {};
+    DUNGEON_GetRoomCoordinates(pRoom, &drlgCoords);
+    return (nX + nAuraRange >= drlgCoords.nSubtileX || nX - nAuraRange <= drlgCoords.nSubtileX + drlgCoords.nSubtileWidth)
+        && (nY + nAuraRange >= drlgCoords.nSubtileY || nY - nAuraRange <= drlgCoords.nSubtileY + drlgCoords.nSubtileHeight);
+}
+
 //D2Game.0x6FD0FE80
+// 1.13c D2Game+0xA0C70 (checked against decompile, no delta)
 void __fastcall sub_6FD0FE80(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY, int32_t nAuraRange, uint32_t nAuraFilter, int32_t(__fastcall* pCallback)(D2AuraCallbackStrc*, D2UnitStrc*), void* pCallbackArgs, int32_t bCheckMonAuraFlag, const char* szFile, int32_t nLine)
 {
     if (!pGame || !pUnit || !pCallback || nAuraRange <= 0)
@@ -683,11 +695,7 @@ void __fastcall sub_6FD0FE80(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, i
         D2ActiveRoomStrc* pRoom = ppRoomList[i];
         if (!(nAuraFilter & 0x2000) || !DUNGEON_IsRoomInTown(pRoom))
         {
-            D2DrlgCoordsStrc drlgCoords = {};
-            DUNGEON_GetRoomCoordinates(pRoom, &drlgCoords);
-
-            if ((nX + nAuraRange >= drlgCoords.nSubtileX || nX - nAuraRange <= drlgCoords.nSubtileX + drlgCoords.nSubtileWidth)
-                && (nY + nAuraRange >= drlgCoords.nSubtileY || nY - nAuraRange <= drlgCoords.nSubtileY + drlgCoords.nSubtileHeight))
+            if (sub_6FCBE610(pRoom, nX, nY, nAuraRange))
             {
                 D2UnitStrc* pTarget = pRoom->pUnitFirst;
                 while (pTarget)
@@ -2217,6 +2225,7 @@ int32_t __fastcall SKILLS_SrvDo004_Unsummon(D2GameStrc* pGame, D2UnitStrc* pUnit
 }
 
 //D2Game.0x6FD126B0
+// 1.13c D2Game+0xA2B40
 int32_t __fastcall SKILLS_SrvDo003_Throw(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (!pUnit->pInventory)
@@ -2442,6 +2451,7 @@ int32_t __fastcall sub_6FD12950(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nS
 }
 
 //D2Game.0x6FD12BA0
+// 1.13c D2Game+0xA19A0 (rule: globals instead of the pGame tables, register convention)
 int32_t __fastcall D2GAME_SKILLS_Handler_6FD12BA0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, int32_t a5, int32_t a6, int32_t a7)
 {
     if (!pGame || !pUnit)

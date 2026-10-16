@@ -440,7 +440,7 @@ void __fastcall PARTY_SynchronizeWithClient(D2GameStrc* pGame, D2UnitStrc* pUnit
     }
 }
 
-//D2Game.0x6FCBA5F0
+//D2Game.0x6FCBA5F0 -- 1.13c D2Game+0x9BEB0
 int16_t __fastcall PARTY_GetPartyIdForUnitOwner(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2_ASSERT(pUnit && pUnit->dwUnitType == UNIT_PLAYER);

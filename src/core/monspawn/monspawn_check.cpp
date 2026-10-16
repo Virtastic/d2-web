@@ -6262,7 +6262,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         }
         // Deferred item interaction still relies on the headless session's legacy pre-event path
         // step. Keep it until the missing retail interaction-completion callback is recovered.
-        if (g_sessionMovePending && !dying && !D2Common_10226(g_targetPlayer, 1024)) {
+        if (g_sessionMovePending && !dying && !D2Common_10226(g_targetPlayer, 1024) && !(g_targetPlayer->pPlayerData && g_targetPlayer->pPlayerData->unk0xA8[42])) {   // not while a 0x13 approach is pending: the reset drops its interact (s396)
             D2ActiveRoomStrc* room = g_targetPlayer->pDynamicPath->pRoom;
             SUNIT_SetCombatMode(g_game, g_targetPlayer,
                 room && DUNGEON_IsRoomInTown(room) ? PLRMODE_TOWNNEUTRAL : PLRMODE_NEUTRAL);
@@ -9246,8 +9246,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_convert_expansion(const uint8_t* data, int l
     if (len < 0x28 || (data[0x24] & 0x20)) return -2;
     std::vector<uint8_t> copy(data, data + len);
     copy[0x24] |= 0x20;
-    { const uint32_t sum = (uint32_t)D2GAME_SAVE_CalculateChecksum_6FC8A140((D2SaveHeaderStrc*)copy.data(), len);
-      memcpy(&copy[12], &sum, 4); }  // 1.13c CRC-32 (checksum field zeroed by the routine)
+    { const uint32_t sum = (uint32_t)D2GAME_SAVE_FileChecksum((D2SaveHeaderStrc*)copy.data(), len);
+      memcpy(&copy[12], &sum, 4); }  // Save-file checksum (checksum field zeroed by the routine)
     const int rc = d2_session_create_from_save(copy.data(), len, difficulty);
     if (rc != 0) return rc > 0 ? -rc : -3;
     int n = d2_session_save_d2s(out, cap);

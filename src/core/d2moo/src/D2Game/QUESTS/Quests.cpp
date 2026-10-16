@@ -318,6 +318,7 @@ int32_t __fastcall QUESTS_CreateChainRecord(D2GameStrc* pGame, D2UnitStrc* pUnit
 }
 
 //D2Game.0x6FC93D60
+// 1.13c D2Game+0x33EB0 (checked against decompile, no delta)
 void __fastcall QUESTS_InitScrollTextChain(D2QuestDataStrc* pQuest, D2TextHeaderStrc* pTextControl, int32_t nNPCID, int32_t nIndex)
 {
 	D2NPCMessageTableStrc* pNpcMessageTable = &pQuest->pNPCMessages[nIndex];
@@ -763,6 +764,7 @@ void __fastcall QUESTS_QuestUpdater(D2GameStrc* pGame)
 	pGame->pQuestControl->bExecuting = 0;
 }
 
+// 1.13c D2Game+0x33AF0 (checked against decompile)
 //D2Game.0x6FC94690
 void __fastcall QUESTS_CreateTimer(D2QuestDataStrc* pQuest, QUESTUPDATE pfnCallback, int32_t nTicks)
 {
@@ -1077,6 +1079,7 @@ void __fastcall QUESTS_NPCMessage(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_
 }
 
 //D2Game.0x6FC94DB0
+// 1.13c D2Game+0x35090 (checked against decompile, no delta)
 void __fastcall QUESTS_SequenceCycler(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t bGameEnter)
 {
 	if (!pGame || !pGame->pQuestControl)
@@ -1284,7 +1287,7 @@ int32_t __stdcall QUESTS_CheckFirstPickedSet(D2GameStrc* pGame)
 	return pGame->pQuestControl->bPickedSet;
 }
 
-//D2Game.0x6FC953A0 (#10038)
+//D2Game.0x6FC953A0 (#10038) -- 1.13c D2Game+0x33970
 int32_t __stdcall QUESTS_CheckNotIntroQuest(D2GameStrc* pGame, int32_t nQuestId)
 {
 	D2_ASSERT(pGame && pGame->pQuestControl && pGame->pQuestControl->bPickedSet);
@@ -1885,6 +1888,7 @@ void __fastcall OBJECTS_InitFunction23_LamEsenTomeStand(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FC95D10
+// 1.13c D2Game+0x36140
 void __fastcall QUESTS_SetJadeFigurineBoss(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
@@ -2882,7 +2886,7 @@ D2UnitStrc* __fastcall QUESTS_SpawnMonster(D2GameStrc* pGame, D2UnitStrc* pUnit,
 	return nullptr;
 }
 
-//D2Game.0x6FC975A0
+// 1.13c D2Game+0x35E50 (checked against decompile, no delta)
 void __fastcall QUESTS_MapPresetSpawn(D2GameStrc* pGame, D2UnitStrc* pUnit, D2MapAIStrc* pMapAI)
 {
 	if (!pUnit || pUnit->dwUnitType != UNIT_OBJECT)

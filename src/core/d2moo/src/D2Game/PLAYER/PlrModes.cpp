@@ -78,7 +78,7 @@ constexpr D2PlrModeCallbackStrc stru_6FD28EA0[] =
 };
 
 
-//D2Game.0x6FC7F340
+// 1.13c D2Game+0x77FA0 (checked against decompile and bytes, no delta)
 int32_t __fastcall D2GAME_PLRMODES_First_6FC7F340(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMode, int32_t a4, D2SkillStrc* pSkill)
 {
     if (STATES_CheckState(pUnit, STATE_UNINTERRUPTABLE) || !pUnit || pUnit->dwAnimMode == PLRMODE_DEATH || pUnit->dwAnimMode == PLRMODE_DEAD)
@@ -156,6 +156,7 @@ int32_t __fastcall D2GAME_PLRMODES_First_6FC7F340(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FC7F550
+// 1.13c D2Game+0x782F0
 void __fastcall PLRMODE_StartXY_Neutral(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nMode, int32_t nX, int32_t nY)
 {
     D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pPlayer);
@@ -171,7 +172,7 @@ void __fastcall PLRMODE_StartXY_Neutral(D2GameStrc* pGame, D2UnitStrc* pPlayer, 
     UNITS_SetUsedSkill(pPlayer, 0);
 }
 
-//D2Game.0x6FC7F5A0
+// 1.13c D2Game+0x78760 (checked against decompile, no delta)
 void __fastcall PLRMODE_StartID_WalkRunKnockback(D2GameStrc* pGame, D2UnitStrc* a2, int32_t a3, D2UnitStrc* pTargetUnit)
 {
     D2_ASSERT(pGame);
@@ -183,7 +184,7 @@ void __fastcall PLRMODE_StartID_WalkRunKnockback(D2GameStrc* pGame, D2UnitStrc* 
     }
 }
 
-//D2Game.0x6FC7F600
+// 1.13c D2Game+0x78610 (checked against decompile, no delta; event order DA750,set mode,E0750,E0B40 matches)
 void __fastcall sub_6FC7F600(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nMode)
 {
     D2_ASSERT(pGame);
@@ -233,6 +234,7 @@ void __fastcall sub_6FC7F600(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nMo
 }
 
 //D2Game.0x6FC7F730
+// 1.13c D2Game+0x78710
 void __fastcall PLRMODE_StartXY_WalkRunKnockback(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nMode, int32_t nX, int32_t nY)
 {
     D2_ASSERT(pGame);
@@ -1575,7 +1577,7 @@ void __fastcall sub_6FC817D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStrc* 
     }
 }
 
-//D2Game.0x6FC81890
+// 1.13c D2Game+0x78340 (checked against decompile and bytes, no delta; the sequence case is D2Game+0x78100 and the 5-frame test D2Game+0x77E00, both inlined)
 int32_t __fastcall sub_6FC81890(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMode)
 {
     if (pUnit->pInventory && INVENTORY_GetCursorItem(pUnit->pInventory) && nMode != PLRMODE_DEATH && nMode != PLRMODE_DEAD)
@@ -1658,7 +1660,7 @@ int32_t __fastcall sub_6FC81890(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nM
     return 1;
 }
 
-//D2Game.0x6FC81A00
+// 1.13c D2Game+0x78430 (checked against decompile, no delta; retail logs "StartModeID: Bad Target" on a null target, ours does not)
 void __fastcall D2GAME_PLAYERMODE_Change_6FC81A00(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2SkillStrc* pSkill, BYTE nMode, int32_t nUnitType, int32_t nTargetGUID, int32_t bAllowReEnter)
 {
     D2_ASSERT(pGame);

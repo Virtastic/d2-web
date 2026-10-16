@@ -41,6 +41,7 @@ int32_t dword_6FD4DC30;
 
 
 //D2Game.0x6FC8F3D0
+// 1.13c D2Game+0x71290 (checked against decompile)
 int32_t __fastcall OBJECTS_OperateFunction32_Bank(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
     if (!pOp || !pOp->pObject)

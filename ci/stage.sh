@@ -51,7 +51,7 @@ for f in play/d2.js play/d2.wasm; do
 done
 cp -r play/assets build-wasm/site/assets
 # Committed ground truth, served so scenarios can fetch it into the page.
-cp -r vectors build-wasm/site/vectors
+[ -d vectors ] && mkdir -p build-wasm/site/vectors && cp -ru vectors/. build-wasm/site/vectors/
 FR="${D2_FREERES_DIR:-third-party/sgd2freeres}"
 [ -d "$FR" ] && mkdir -p build-wasm/site/freeres && cp "$FR"/*.dc6 build-wasm/site/freeres/ || true
 [ -d build-wasm/diag ] && cp -r build-wasm/diag build-wasm/site/diag   # diagnosis captures (D2_ITEMGEN_FILE=diag/...), never committed

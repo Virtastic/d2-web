@@ -1,8 +1,8 @@
 const STORAGE_KEY = 'd2web.audio.npcSpeech';
 export const NPC_SPEECH_DEFAULT = 2;
 
-// Retail cycles its native values 2 (Audio + Text), 0 (Audio Only), 1 (Text Only).
-export const NPC_SPEECH_CYCLE = Object.freeze([2, 0, 1]);
+// Retail cycles 2 (Audio + Text), 1 (Text Only), 0 (Audio Only); s2134 record: first click gives Text Only.
+export const NPC_SPEECH_CYCLE = Object.freeze([2, 1, 0]);
 
 export function npcSpeechHasAudio(mode) {
   return mode === 0 || mode === 2;

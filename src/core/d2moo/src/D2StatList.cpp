@@ -36,6 +36,7 @@ BOOL __stdcall STATLIST_AreUnitsAligned(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2)
 
 // Helper function
 template<class T>
+// 1.13c D2Common+0x38270
 static int __fastcall StatArray_FindInsertionIndex(const T* pStatsArray, D2SLayerStatIdStrc::PackedType nLayer_StatId, bool* pAlreadyInArray)
 {
 	if (pAlreadyInArray)
@@ -810,8 +811,11 @@ void __stdcall D2Common_ExpireStatList_6FDB6E30(D2StatListStrc* pStatList)
 		{
 			D2SLayerStatIdStrc nLayer_StatIds[16] = {};
 			int nCounter = 0;
-			for (D2StatStrc* i = pStatListEx->FullStats.pStat; i < &pStatListEx->FullStats.pStat[pStatListEx->FullStats.nStatCount]; ++i)
+			// Retail +0x3A44E sign-extends the stored count word.
+			const int nFullStatCount = static_cast<int16_t>(pStatListEx->FullStats.nStatCount);
+			for (int nStat = 0; nStat < nFullStatCount; ++nStat)
 			{
+				D2StatStrc* i = &pStatListEx->FullStats.pStat[nStat];
 				D2ItemStatCostTxt* pItemStatCostTxtRecord = ITEMS_GetItemStatCostTxtRecord(i->nStat);
 				if (pItemStatCostTxtRecord && pItemStatCostTxtRecord->bHasOpApplyingToItem)
 				{
@@ -833,17 +837,16 @@ void __stdcall D2Common_ExpireStatList_6FDB6E30(D2StatListStrc* pStatList)
 		{
 			D2StatsArrayStrc* pStatsArray = STATLIST_IsExtended(pStatList) ? &pStatListEx->FullStats : &pStatList->Stats;
 
-			D2StatListExStrc* pParentStatListEx = STATLIST_StatListExCast(pParentStatList);
-			// Something looks wrong, seems like some checks were eluded in D2Common.0x6FDB6C10
-			// Or inversely, the check above is useless as pParentStatListEx is in fact always an extended statlist
-			// if it exists or when STATLIST_SET is set on the current statlist ?
-			// In any case, we add an assert here
-			D2_ASSERT(pParentStatListEx);
+			// Retail passes the parent unchanged; +0x39F70 handles plain parents too.
+			D2StatListExStrc* pParentStatListEx = reinterpret_cast<D2StatListExStrc*>(pParentStatList);
+			// Retail +0x3A513 sign-extends both plain and extended count words.
+			const int nStatCount = static_cast<int16_t>(pStatsArray->nStatCount);
 
 			if (pStatList->dwFlags & STATLIST_DYNAMIC)
 			{
-				for (D2StatStrc* i = pStatsArray->pStat; i < &pStatsArray->pStat[pStatsArray->nStatCount]; ++i)
+				for (int nStat = 0; nStat < nStatCount; ++nStat)
 				{
+					D2StatStrc* i = &pStatsArray->pStat[nStat];
 					D2ItemStatCostTxt* pItemStatCostTxtRecord = ITEMS_GetItemStatCostTxtRecord(i->nStat);
 					if (pItemStatCostTxtRecord && !(pItemStatCostTxtRecord->dwItemStatFlags & gdwBitMasks[ITEMSTATCOSTFLAGINDEX_DAMAGERELATED]))
 					{
@@ -853,8 +856,9 @@ void __stdcall D2Common_ExpireStatList_6FDB6E30(D2StatListStrc* pStatList)
 			}
 			else
 			{
-				for (D2StatStrc* i = pStatsArray->pStat; i < &pStatsArray->pStat[pStatsArray->nStatCount]; ++i)
+				for (int nStat = 0; nStat < nStatCount; ++nStat)
 				{
+					D2StatStrc* i = &pStatsArray->pStat[nStat];
 					sub_6FDB6C10(pParentStatListEx, i->nPackedValue, -i->nValue, pOwner);
 				}
 			}
@@ -1454,6 +1458,7 @@ int __stdcall STATLIST_GetUnitStatBonus(D2UnitStrc* pUnit, int nStatId, uint16_t
 }
 
 //D2Common.0x6FDB80C0 (#10515)
+// 1.13c D2Common+0x3AE60
 void __stdcall STATLIST_DeactivateTemporaryStates(D2UnitStrc* pUnit)
 {
 	if (pUnit->pStatListEx == nullptr || !(pUnit->pStatListEx->dwFlags & STATLIST_NEWLENGTH))
@@ -1831,6 +1836,7 @@ void __stdcall D2Common_STATES_ToggleState_6FDB8900(D2UnitStrc* pUnit, int nStat
 }
 
 //D2Common.0x6FDB8A90
+// 1.13c D2Common+0x33CA0: same body
 uint32_t* __stdcall D2COMMON_STATES_GetStatFlags_6FDB8A90(D2UnitStrc* pUnit)
 {
 	if (pUnit && pUnit->pStatListEx && STATLIST_IsExtended(pUnit->pStatListEx))
@@ -1842,6 +1848,7 @@ uint32_t* __stdcall D2COMMON_STATES_GetStatFlags_6FDB8A90(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDB8AC0
+// 1.13c D2Common+0x342D0 (retail exits on a null unit; ours returns NULL)
 uint32_t* __stdcall D2COMMON_STATES_GetListGfxFlags_6FDB8AC0(D2UnitStrc* pUnit)
 {
 	if (pUnit && pUnit->pStatListEx && STATLIST_IsExtended(pUnit->pStatListEx))
@@ -2178,6 +2185,7 @@ void __stdcall STATLIST_ExpireUnitStatlist(D2UnitStrc* pUnused, D2UnitStrc* pUni
 }
 
 //D2Common.0x6FDB9B00 (#10531)
+// 1.13c D2Common+0x3A5C0
 int __stdcall D2Common_10531_SetStatInStatListLayer0(D2StatListStrc* pStatList, int nStatId, int nValue, int nUnused)
 {
 	D2_MAYBE_UNUSED(nUnused);

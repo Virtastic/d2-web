@@ -426,7 +426,6 @@ void __fastcall DATATBLS_LoadLevelDefsBin(HD2ARCHIVE hArchive)
 	sgptDataTables->pLevelDefBin = (D2LevelDefBin*)DATATBLS_CompileTxt(hArchive, "leveldefs", pTbl, 0, sizeof(D2LevelDefBin));
 
 	sgptDataTables->nPortalLevels = 0;
-	sgptDataTables->pPortalLevels = NULL;
 
 	for (int i = 0; i < sgptDataTables->nLevelsTxtRecordCount; ++i)
 	{

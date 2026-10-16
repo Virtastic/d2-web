@@ -572,6 +572,7 @@ void __fastcall D2GAME_ITEMS_UpdateItemStatlist_6FC42310(D2GameStrc* pGame, D2Un
 }
 
 //D2Game.0x6FC424E0
+// 1.13c D2Game+0xD46B0 (checked against decompile, no delta)
 void __fastcall D2GAME_ITEMS_UpdateTransferredProperties_6FC424E0(D2GameStrc* pGame, D2UnitStrc* pItem, D2UnitStrc* pTarget, int32_t bUpdateStatList, int32_t bUpdateVitals)
 {
     if (!pTarget || !pItem || pItem->dwUnitType != UNIT_ITEM || (pTarget->dwUnitType == UNIT_PLAYER && STATES_CheckState(pTarget, STATE_PLAYERBODY)) || pTarget != STATLIST_GetOwner(pItem, nullptr))
@@ -1928,6 +1929,7 @@ int32_t __fastcall sub_6FC446B0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nI
 }
 
 //D2Game.0x6FC44A90
+// 1.13c D2Game+0xD51A0
 void __fastcall D2GAME_ITEMS_UpdateInventoryItems_6FC44A90(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t bRefresh)
 {
     D2UnkItemModeStrc a2 = {};
@@ -5586,6 +5588,7 @@ int32_t __fastcall sub_6FC4AD80(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitSt
 }
 
 //D2Game.0x6FC4B240
+// 1.13c D2Game+0xD24B0
 void __fastcall D2GAME_UpdatePlayerVitals_6FC4B240(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (!pUnit || !pUnit->pInventory)

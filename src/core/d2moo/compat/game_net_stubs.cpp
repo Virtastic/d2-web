@@ -290,7 +290,12 @@ void __fastcall D2GAME_PACKETS_SendPacket0x15_6FC3D0D0(D2ClientStrc* pClient, ch
 // wasm-ld drops an unreferenced function's calls, so sub_6FC46840 linked without this until then.
 void __fastcall D2GAME_PACKETS_SendPacket0x97_6FC3FB60(D2ClientStrc* pClient) {}
 void D2GAME_PACKETS_SendPacket0x03_6FC3C810(D2ClientStrc* pClient, char nHeader, char nAct, int32_t nInitSeed, int32_t nObjectSeed, int16_t nTownId) {}
-void D2GAME_PACKETS_SendPacket0x07_6FC3D120(D2ClientStrc* pClient, uint8_t nAreaId, uint16_t nTileX, uint16_t nTileY) {}
+// 1.13c D2Game+0x8BF50: packet 0x07 {nX, nY, level}, 6 bytes (retail: EAX = x, ECX = y, stack client, level).
+void D2GAME_PACKETS_SendPacket0x07_6FC3D120(D2ClientStrc* pClient, uint8_t nAreaId, uint16_t nTileX, uint16_t nTileY) {
+    D2GSPacketSrv07 packet{};
+    packet.nHeader = 0x07; packet.nX = nTileX; packet.nY = nTileY; packet.nLevelId = nAreaId;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+}
 void D2GAME_PACKETS_SendPacket0x09_6FC3D1A0(D2ClientStrc* pClient, BYTE a2, BYTE a3, DWORD a4, BYTE a5, WORD a6, WORD a7) {}
 void D2GAME_PACKETS_SendPacket0x0A_RemoveObject_6FC3D3A0(D2ClientStrc* pClient, char alw0x0A, char nUnitType, int32_t nUnitId) {}
 void D2GAME_PACKETS_SendPacket0x0D_6FC3C920(D2ClientStrc* pClient, char nPacketId, int32_t nUnitType, int32_t nUnitId, char a5, WORD nX, WORD nY, char a8, char nLife) {}
@@ -508,6 +513,7 @@ void __fastcall D2GAME_UpdateClientItem_6FC3E9D0(D2ClientStrc* pClient, D2UnitSt
 // is unreachable. There is no socket-backed peer to remove in the headless game.
 void __fastcall GAME_DisconnectClient(D2GameStrc*, D2ClientStrc*, D2C_SRV2CLT5A_TYPES) {}
 void D2Game_10034_Return(int a1) {}
+// retail D2Game 0x29820 (NOT implemented, empty stub; unverified), 
 void GAME_ForEachIngameClient(D2GameStrc* pGame, GAME_ForEachIngameClientCallbackPtr pFn, void* pContext) {}
 D2CharStatsTxt* PLRSAVE2_GetCharStatsTxtRecord(int32_t nClass) { return UNITS_GetCharStatsTxtRecord(nClass); }
 void SCMD_Send0x75_PartyRosterUpdate(D2UnitStrc* pLocalPlayer, D2UnitStrc* pOtherPlayer) {}

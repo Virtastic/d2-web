@@ -94,6 +94,7 @@ int32_t __fastcall AIUTIL_GetDistanceToCoordinates_NoUnitSize(D2UnitStrc* pUnit,
 }
 
 //D2Game.0x6FCF1440
+// 1.13c D2Game+0xB07B0
 uint32_t __fastcall AIUTIL_GetDistanceToCoordinates(D2UnitStrc* pUnit, int32_t nX, int32_t nY)
 {
 	D2_ASSERT(pUnit);
@@ -1133,6 +1134,7 @@ D2UnitStrc* __fastcall AIUTIL_FindTargetInAdjacentRooms(D2GameStrc* pGame, D2Uni
 }
 
 //D2Game.0x6FCF2C00
+// 1.13c D2Game+0xB0CE0
 D2UnitStrc* __fastcall AIUTIL_FindTargetInAdjacentActiveRooms(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pArg, D2UnitStrc*(__fastcall* pfCallback)(D2GameStrc*, D2UnitStrc*, D2UnitStrc*, void*))
 {
 	if (!pUnit || (pUnit->dwUnitType != UNIT_PLAYER && pUnit->dwUnitType != UNIT_MONSTER) || SUNIT_IsDead(pUnit))

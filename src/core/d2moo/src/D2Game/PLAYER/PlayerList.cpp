@@ -30,6 +30,7 @@ void __fastcall PLAYERLIST_FreePlayerLists(D2GameStrc* pGame, D2UnitStrc* pPlaye
     pPlayerData->pPlayerList = nullptr;
 }
 
+// 1.13c D2Game+0xEFFD0 (checked against decompile)
 //D2Game.0x6FCBA6E0
 void __fastcall PLAYERLIST_IterateCallback_FreePlayerList(D2GameStrc* pGame, D2UnitStrc* pPlayer, void* pArg)
 {

@@ -62,6 +62,7 @@ struct D2UnkHireStrc5
 
 
 //D2Common.0x6FDA4C10 (#11082)
+// 1.13c D2Common+0x2CCC0
 int __fastcall MONSTERS_HirelingInit(BOOL bExpansion, D2UnitStrc* pMonster, int nLowSeed, int nAct, int nDifficulty, D2HirelingInitStrc* pHirelingInit)
 {
 	D2HirelingTxt* pHirelingTxtRecord = NULL;
@@ -840,6 +841,7 @@ BOOL __stdcall MONSTERS_IsDemon(D2UnitStrc* pMonster)
 }
 
 //D2Common.0x6FDA5830 (#11059)
+// 1.13c D2Common+0x1A5B0
 BOOL __stdcall MONSTERS_IsUndead(D2UnitStrc* pMonster)
 {
 	D2MonStatsTxt* pMonStatsTxtRecord = NULL;

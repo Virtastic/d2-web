@@ -56,6 +56,7 @@ uint32_t __fastcall DATATBLS_StringToCode(char* szText)
 
 
 //D2Common.0x6FD64C40 (#10592)
+// 1.13c D2Common+0x53850
 int __stdcall DATATBLS_GetMonsterChainInfo(int nMonsterId, int* pMaxChainId, int* pChainId)
 {
 	D2MonStatsTxt* pMonStatsTxtRecord = DATATBLS_GetMonStatsTxtRecord(nMonsterId);
@@ -974,6 +975,7 @@ D2TCExShortStrc* __stdcall DATATBLS_GetTreasureClassExRecordFromName(char* szTex
 }
 
 //D2Common.0x6FD68DF0 (#10659)
+// 1.13c D2Common+0x53420
 D2TCExShortStrc* __stdcall DATATBLS_GetTreasureClassExRecordFromIdAndLevel(uint16_t wTCId, int nLvl)
 {
 	D2TCExShortStrc* pTCExRecord = NULL;
@@ -1846,6 +1848,7 @@ D2HirelingTxt* __stdcall DATATBLS_GetNextHirelingTxtRecordFromVendorIdAndDifficu
 }
 
 //D2Common.0x6FD6B440 (#10584)
+// 1.13c D2Common+0x53050
 D2HirelingTxt* __stdcall DATATBLS_GetNextHirelingTxtRecordFromActAndDifficulty(BOOL bExpansion, int nAct, int nDifficulty, D2HirelingTxt* pOldRecord)
 {
 	D2HirelingTxt* pHirelingTxtRecord = NULL;

@@ -466,6 +466,7 @@ int __stdcall DUNGEON_GetAlliedCountFromRoom(D2ActiveRoomStrc* pRoom)
 }
 
 //D2Common.0x6FD8C510 (#10101)
+// 1.13c D2Common+0x3B650
 void __stdcall DUNGEON_DecreaseAlliedCountOfRoom(D2ActiveRoomStrc* pRoom)
 {
 	if (pRoom)

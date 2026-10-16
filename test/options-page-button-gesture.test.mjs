@@ -40,7 +40,7 @@ test('Sound and Video option rows activate only on matching release and keep the
     instance.hover(...instance.targets(800, 600).previous, 800, 600);
     assert.equal(instance.evidence.sub.selected, 'npcspeech', 'movement does not move the held marker');
     instance.pointerUp(...npcSpeech, 800, 600, 7, 0);
-    assert.equal(instance.evidence.sub.state.npcspeech, 0);
+    assert.equal(instance.evidence.sub.state.npcspeech, 1); // retail record (s2134): first click from default is Text Only
 
     const previous = instance.targets(800, 600).previous;
     assert.equal(instance.pointerDown(...previous, 800, 600, 8, 0), true);

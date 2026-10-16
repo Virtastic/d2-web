@@ -348,12 +348,14 @@ BOOL __fastcall INVENTORY_RemoveItem(D2UnitStrc* pItem)
 		return FALSE;
 	}
 
+	D2InventoryStrc* const pInventory = pItemExtraData->pParentInv;
+
 	if (pItemExtraData->nNodePos > 0)
 	{
 		const int nNodePos = pItemExtraData->nNodePos - 1;
-		if (pItemExtraData->pParentInv->nGridCount > nNodePos)
+		if (pInventory->nGridCount > nNodePos)
 		{
-			D2InventoryGridStrc* pInventoryGrid = &pItemExtraData->pParentInv->pGrids[nNodePos];
+			D2InventoryGridStrc* pInventoryGrid = &pInventory->pGrids[nNodePos];
 
 			if (pItemExtraData->pPreviousGridItem)
 			{
@@ -420,9 +422,9 @@ BOOL __fastcall INVENTORY_RemoveItem(D2UnitStrc* pItem)
 		}
 	}
 
-	if (pItemExtraData->pParentInv->pCursorItem == pItem)
+	if (pInventory->pCursorItem == pItem)
 	{
-		pItemExtraData->pParentInv->pCursorItem = nullptr;
+		pInventory->pCursorItem = nullptr;
 	}
 	else
 	{
@@ -436,9 +438,9 @@ BOOL __fastcall INVENTORY_RemoveItem(D2UnitStrc* pItem)
 		}
 		else
 		{
-			if (pItemExtraData->pParentInv->pFirstItem == pItem)
+			if (pInventory->pFirstItem == pItem)
 			{
-				pItemExtraData->pParentInv->pFirstItem = pItemExtraData->pNextItem;
+				pInventory->pFirstItem = pItemExtraData->pNextItem;
 			}
 		}
 
@@ -452,33 +454,35 @@ BOOL __fastcall INVENTORY_RemoveItem(D2UnitStrc* pItem)
 		}
 		else
 		{
-			if (pItemExtraData->pParentInv->pLastItem == pItem)
+			if (pInventory->pLastItem == pItem)
 			{
-				pItemExtraData->pParentInv->pLastItem = pItemExtraData->pPreviousItem;
+				pInventory->pLastItem = pItemExtraData->pPreviousItem;
 			}
 		}
 
 		pItemExtraData->pNextItem = nullptr;
 		pItemExtraData->pPreviousItem = nullptr;
 
-		--pItemExtraData->pParentInv->dwItemCount;
+		--pInventory->dwItemCount;
 	}
 
-	ITEMS_SetOwnerId(pItem, -1);
-
-	if (pItemExtraData->pParentInv->pOwner)
-	{
-		STATLIST_ExpireUnitStatlist(pItemExtraData->pParentInv->pOwner, pItem);
-	}
-
-	if (pItemExtraData->pParentInv->dwLeftItemGUID == pItem->dwUnitId)
-	{
-		pItemExtraData->pParentInv->dwLeftItemGUID = D2UnitInvalidGUID;
-	}
-
+	// Retail detaches before owner/stat cleanup, which can invoke removal callbacks.
 	pItemExtraData->pParentInv = nullptr;
 	pItemExtraData->nNodePos = 0;
 	pItemExtraData->nNodePosOther = 0;
+
+	ITEMS_SetOwnerId(pItem, -1);
+
+	if (pInventory->pOwner)
+	{
+		STATLIST_ExpireUnitStatlist(pInventory->pOwner, pItem);
+	}
+
+	if (pInventory->dwLeftItemGUID == pItem->dwUnitId)
+	{
+		pInventory->dwLeftItemGUID = D2UnitInvalidGUID;
+	}
+
 
 	return TRUE;
 }
@@ -978,6 +982,7 @@ BOOL __stdcall INVENTORY_PlaceItemAtFreePosition(D2InventoryStrc* pInventory, D2
 }
 
 //D2Common.0x6FD8F250
+// 1.13c D2Common+0x218a0
 BOOL __fastcall INVENTORY_PlaceItemInGrid(D2InventoryStrc* pInventory, D2UnitStrc* pItem, int nXPos, int nYPos, int nInventoryGrid, int nInventoryRecordId, BOOL bUnused)
 {
 	D2_MAYBE_UNUSED(bUnused);
@@ -1355,6 +1360,7 @@ D2UnitStrc* __stdcall INVENTORY_GetItemFromBodyLoc(D2InventoryStrc* pInventory, 
 }
 
 //D2Common.0x6FD8FB20 (#10255)
+// 1.13c D2Common+0x20490
 void __stdcall INVENTORY_GetSecondWieldingWeapon(D2UnitStrc* pPlayer, D2InventoryStrc* pInventory, D2UnitStrc** ppItem, int nBodyLoc)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory) && !*ppItem && INVENTORY_ValidateBodyLoc(nBodyLoc))
@@ -1836,6 +1842,7 @@ BOOL __stdcall INVENTORY_PlaceItemInFreeBeltSlot(D2InventoryStrc* pInventory, D2
 	return FALSE;
 }
 
+// 1.13c D2Common+0x1E5B0
 //D2Common.0x6FD90550 (#10271)
 D2UnitStrc* __stdcall INVENTORY_GetItemFromBeltSlot(D2InventoryStrc* pInventory, int nSlotId)
 {
@@ -2346,6 +2353,7 @@ int __stdcall INVENTORY_GetSetItemEquipCountByFileIndex(D2InventoryStrc* pInvent
 }
 
 //D2Common.0x6FD90ED0 (#10289)
+// 1.13c D2Common+0x20620
 void __stdcall INVENTORY_UpdateWeaponGUIDOnInsert(D2InventoryStrc* pInventory, D2UnitStrc* pItem)
 {
 	if (pInventory && INVENTORY_UnitIsItem(pItem) && ITEMS_CheckItemTypeId(pItem, ITEMTYPE_WEAPON))
@@ -2374,6 +2382,7 @@ void __stdcall INVENTORY_UpdateWeaponGUIDOnInsert(D2InventoryStrc* pInventory, D
 }
 
 //D2Common.0x6FD90F80 (#10290)
+// 1.13c D2Common+0x1FC70
 void __stdcall INVENTORY_UpdateWeaponGUIDOnRemoval(D2InventoryStrc* pInventory, D2UnitStrc* pItem)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory) && INVENTORY_UnitIsItem(pItem) && ITEMS_CheckItemTypeId(pItem, ITEMTYPE_WEAPON))

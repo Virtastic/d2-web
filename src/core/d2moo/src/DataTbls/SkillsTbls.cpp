@@ -732,19 +732,13 @@ void __fastcall DATATBLS_LoadSkills_SkillDescTxt(HD2ARCHIVE hArchive)
 
 	sgptDataTables->pSkillsLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
 	sgptDataTables->pSkillsTxt = (D2SkillsTxt*)DATATBLS_CompileTxt(hArchive, "skills", pSkillTbl, &sgptDataTables->nSkillsTxtRecordCount, sizeof(D2SkillsTxt));
-	if (sgptDataTables->nSkillsTxtRecordCount >= 32767)
-	{
-		FOG_DisplayWarning("Skills table exceeded maximum number of entries.", __FILE__, __LINE__);
-	}
+	D2_ASSERT(sgptDataTables->nSkillsTxtRecordCount < 32767); // 1.13c D2Common+0x61EC0: fatal count limit (1.10f only warned)
 
 	sgptDataTables->nPassiveSkills = 0;
 
 	sgptDataTables->pSkillDescLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
 	sgptDataTables->pSkillDescTxt = (D2SkillDescTxt*)DATATBLS_CompileTxt(hArchive, "skilldesc", pSkillDescTbl, &sgptDataTables->nSkillDescTxtRecordCount, sizeof(D2SkillDescTxt));
-	if (sgptDataTables->nSkillDescTxtRecordCount >= 32767)
-	{
-		FOG_DisplayWarning("SkillDesc table exceeded maximum number of entries.", __FILE__, __LINE__);
-	}
+	D2_ASSERT(sgptDataTables->nSkillDescTxtRecordCount < 32767); // 1.13c D2Common+0x61EC0: fatal count limit (1.10f only warned)
 
 	if (sgptDataTables->bCompileTxt)
 	{

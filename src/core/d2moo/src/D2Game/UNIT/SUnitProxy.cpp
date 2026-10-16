@@ -50,7 +50,7 @@ int32_t dword_6FD4DD80;
 int32_t dword_6FD4DD84;
 
 
-//D2Game.0x6FCCB8A0
+// 1.13c D2Game+0x8F5C0 (checked against decompile, no delta)
 D2NpcRecordStrc* __fastcall SUNITPROXY_GetNpcRecordFromClassId(D2GameStrc* pGame, int32_t nNpcClassId, int32_t* pIndex)
 {
     *pIndex = 0;

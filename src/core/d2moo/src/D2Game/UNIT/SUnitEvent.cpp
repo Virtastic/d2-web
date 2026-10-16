@@ -119,6 +119,7 @@ D2UnitEventStrc* __fastcall SUNITEVENT_GetEvent(D2GameStrc* pGame, D2UnitStrc* p
     return nullptr;
 }
 
+// 1.13c D2Game+0x37030 (checked against decompile)
 //D2Game.0x6FCC3790
 void __fastcall SUNITEVENT_Trigger(D2GameStrc* pGame, D2C_UnitEventTypes nUnitEvent, D2UnitStrc* pUnit, D2UnitStrc* pEventSourceUnit, D2DamageStrc* pDamage)
 {
@@ -136,6 +137,7 @@ void __fastcall SUNITEVENT_Trigger(D2GameStrc* pGame, D2C_UnitEventTypes nUnitEv
             pUnitEvent->nFlags |= UNITEVENTFLAG_IN_CALLBACK;
             pUnitEvent->pCallback(pGame, nUnitEvent, pUnit, pEventSourceUnit, pDamage, pUnitEvent->nGUID1, pUnitEvent->nGUID2);
             pUnitEvent->nFlags &= ~UNITEVENTFLAG_IN_CALLBACK;
+            pNext = pUnitEvent->pNext; // 1.13c re-reads next after the callback (it may unlink events)
 
             if ((pUnitEvent->nFlags & UNITEVENTFLAG_SHOULD_BE_FREED) || !pUnitEvent->nQueueNo)
             {

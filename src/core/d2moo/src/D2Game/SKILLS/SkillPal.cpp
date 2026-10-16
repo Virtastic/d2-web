@@ -224,6 +224,7 @@ int32_t __fastcall SKILLS_SrvDo150_Smite(D2GameStrc* pGame, D2UnitStrc* pUnit, i
 }
 
 //D2Game.0x6FD18900
+// 1.13c D2Game+0x9A8D0 (checked against decompile, no delta)
 int32_t __fastcall SKILLS_SrvDo065_BasicAura(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -307,7 +308,47 @@ int32_t __fastcall SKILLS_SrvDo065_BasicAura(D2GameStrc* pGame, D2UnitStrc* pUni
     return 1;
 }
 
+//D2Game.0x6FCB9B60
+// 1.13c D2Game+0x99B60 (checked against decompile; inlined in the 1.10f callback, split out here)
+static int32_t SKILLS_AuraPoisonLengthResist(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nPercent)
+{
+    int32_t bPoisonedOrCursed = 0;
+    if (STATES_CheckState(pUnit, STATE_POISON))
+    {
+        D2StatListStrc* pPoisonStatList = STATLIST_GetStatListFromUnitAndState(pUnit, STATE_POISON);
+        if (pPoisonStatList)
+        {
+            const int32_t nExpireFrame = pGame->dwGameFrame + MONSTERUNIQUE_CalculatePercentage(D2COMMON_10473(pPoisonStatList) - pGame->dwGameFrame, nPercent, 100);
+            D2COMMON_10476(pPoisonStatList, nExpireFrame);
+            EVENT_SetEvent(pGame, pUnit, EVENTTYPE_REMOVESTATE, nExpireFrame, 0, 0);
+            bPoisonedOrCursed = 1;
+        }
+    }
+
+    for (int32_t i = 0; i < sgptDataTables->nCurseStates; ++i)
+    {
+        const int32_t nCurseStateId = sgptDataTables->pCurseStates[i];
+        if (STATES_CheckState(pUnit, nCurseStateId))
+        {
+            D2StatListStrc* pCurseStatList = STATLIST_GetStatListFromUnitAndState(pUnit, nCurseStateId);
+            if (pCurseStatList)
+            {
+                if (STATES_CheckStateMaskCurableByStateId(nCurseStateId))
+                {
+                    const int32_t nExpireFrame = pGame->dwGameFrame + MONSTERUNIQUE_CalculatePercentage(D2COMMON_10473(pCurseStatList) - pGame->dwGameFrame, nPercent, 100);
+                    D2COMMON_10476(pCurseStatList, nExpireFrame);
+                    EVENT_SetEvent(pGame, pUnit, EVENTTYPE_REMOVESTATE, nExpireFrame, 0, 0);
+                }
+                bPoisonedOrCursed = 1;
+            }
+        }
+    }
+
+    return bPoisonedOrCursed;
+}
+
 //D2Game.0x6FD18BC0
+// 1.13c D2Game+0x9A1A0 (checked against decompile, no delta)
 int32_t __fastcall SKILLS_AuraCallback_BasicAura(D2AuraCallbackStrc* pAuraCallback, D2UnitStrc* pUnit)
 {
     D2BasicAuraParamStrc* pArgs = (D2BasicAuraParamStrc*)pAuraCallback->pArgs;
@@ -349,39 +390,7 @@ int32_t __fastcall SKILLS_AuraCallback_BasicAura(D2AuraCallbackStrc* pAuraCallba
             {
                 if (nStatId == STAT_ITEM_POISONLENGTHRESIST)
                 {
-                    int32_t bPoisonedOrCursed = 0;
-                    if (STATES_CheckState(pUnit, STATE_POISON))
-                    {
-                        D2StatListStrc* pPoisonStatList = STATLIST_GetStatListFromUnitAndState(pUnit, STATE_POISON);
-                        if (pPoisonStatList)
-                        {
-                            const int32_t nExpireFrame = pAuraCallback->pGame->dwGameFrame + MONSTERUNIQUE_CalculatePercentage(D2COMMON_10473(pPoisonStatList) - pAuraCallback->pGame->dwGameFrame, pArgs->nAuraStatCalcValue[j], 100);
-                            D2COMMON_10476(pPoisonStatList, nExpireFrame);
-                            EVENT_SetEvent(pAuraCallback->pGame, pUnit, EVENTTYPE_REMOVESTATE, nExpireFrame, 0, 0);
-                            bPoisonedOrCursed = 1;
-                        }
-                    }
-
-                    for (int32_t i = 0; i < sgptDataTables->nCurseStates; ++i)
-                    {
-                        const int32_t nCurseStateId = sgptDataTables->pCurseStates[i];
-                        if (STATES_CheckState(pUnit, nCurseStateId))
-                        {
-                            D2StatListStrc* pCurseStatList = STATLIST_GetStatListFromUnitAndState(pUnit, nCurseStateId);
-                            if (pCurseStatList)
-                            {
-                                if (STATES_CheckStateMaskCurableByStateId(nCurseStateId))
-                                {
-                                    const int32_t nExpireFrame = pAuraCallback->pGame->dwGameFrame + MONSTERUNIQUE_CalculatePercentage(D2COMMON_10473(pCurseStatList) - pAuraCallback->pGame->dwGameFrame, pArgs->nAuraStatCalcValue[j], 100);
-                                    D2COMMON_10476(pCurseStatList, nExpireFrame);
-                                    EVENT_SetEvent(pAuraCallback->pGame, pUnit, EVENTTYPE_REMOVESTATE, nExpireFrame, 0, 0);
-                                }
-                                bPoisonedOrCursed = 1;
-                            }
-                        }
-                    }
-
-                    if (bPoisonedOrCursed)
+                    if (SKILLS_AuraPoisonLengthResist(pAuraCallback->pGame, pUnit, pArgs->nAuraStatCalcValue[j]))
                     {
                         ++pArgs->field_40;
                     }

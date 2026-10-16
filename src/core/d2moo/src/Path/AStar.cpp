@@ -245,6 +245,7 @@ BOOL __fastcall PATH_AStar_ExploreChildren(D2PathInfoStrc* pPathInfo, D2PathFoWa
 // |2 3 5 7
 // |0 2 4 6
 // +-------dX
+// 1.13c D2Common+0x7AF70
 int __stdcall PATH_AStar_Heuristic(D2PathPointStrc tPoint1, D2PathPointStrc tPoint2)
 {
 	const int nDiffX = std::abs(tPoint1.X - tPoint2.X);
@@ -274,7 +275,7 @@ int16_t PATH_AStar_HeuristicForNeighbor(D2PathPointStrc tPoint, D2PathPointStrc 
 
 //1.00:  D2Common.0x10057A10
 //1.10f: D2Common.0x6FDA7280
-//1.13c: D2Common.0x6FDCAF20
+//1.13c D2Common+0x7AF20 (6FDCAF20)
 D2PathFoWallNodeStrc* __fastcall PATH_AStar_GetNodeFromPendingCache(D2PathFoWallContextStrc* pContext, D2PathPointStrc tPathPoint)
 {
 	const uint8_t nHash = uint8_t((gaIdaStar_PointCacheHashMaskX[tPathPoint.X & 0x7F] + gaIdaStar_PointCacheHashMaskY[tPathPoint.Y & 0x7F]) & 0x7F);

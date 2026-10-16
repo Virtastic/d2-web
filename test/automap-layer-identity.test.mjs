@@ -65,3 +65,8 @@ test('automap reveal room state remains isolated per level while the cell layer 
   assert.equal(bloodMoor.hero, null);
   assert.strictEqual(getAutomapRevealState(revealed, 1), town);
 });
+
+test('blank-Id separator row (retail "Expansion") is skipped, not fatal', () => {
+  const m = parseAutomapLevelLayers(new TextEncoder().encode('Name\tId\tLayer\nA\t1\t0\nExpansion\t\t\nB\t2\t0'));
+  assert.deepEqual([...m], [[1, 0], [2, 0]]);
+});

@@ -193,7 +193,7 @@ void __stdcall PATH_GetClientCoordsVelocity(D2UnitStrc* pUnit, int* pX, int* pY)
 	}
 }
 
-//D2Common.0x6FDA8320 (#10222)
+//D2Common.0x6FDA8320 (#10222)  // 1.13c D2Common+0x359D0
 void __stdcall PATH_AddCollisionFootprintForUnit(D2UnitStrc* pUnit)
 {
 	D2CoordStrc pCoords = {};
@@ -833,6 +833,7 @@ void __stdcall PATH_AllocDynamicPath(void* pMemPool, D2ActiveRoomStrc* pRoom, in
 
 //D2Common.0x6FDA9720
 //TODO: Find a name
+// 1.13c D2Common+0x350B0 (verified line by line: type 2/4 set, missile flag 0x40, default smoothing)
 void __fastcall sub_6FDA9720(D2DynamicPathStrc* pDynamicPath, uint8_t nDirection)
 {
 	D2C_UnitTypes nUnitType;
@@ -1060,6 +1061,7 @@ void __stdcall D2COMMON_10208_PathSetPathingFlag(D2DynamicPathStrc* pDynamicPath
 
 //D2Common.0x6FDA9B70 (#10209)
 //TODO: Check name
+// 1.13c D2Common+0x34C70
 BOOL __stdcall D2COMMON_10209_PathCheckPathingFlag(D2DynamicPathStrc* pDynamicPath)
 {
 	return (pDynamicPath->dwFlags & PATH_UNKNOWN_FLAG_0x00020);
@@ -1425,6 +1427,7 @@ void __stdcall PATH_SetMoveTestCollisionMask(D2DynamicPathStrc* pDynamicPath, in
 }
 
 //D2Common.0x6FDAA0E0 (#10185)
+// 1.13c D2Common+0x34F80
 void __stdcall PATH_SetType(D2DynamicPathStrc* pDynamicPath, int nPathType)
 {
 
@@ -1451,6 +1454,7 @@ void __stdcall PATH_SetType(D2DynamicPathStrc* pDynamicPath, int nPathType)
 }
 
 //D2Common.0x6FDAA1E0 (#10186)
+// 1.13c D2Common+0x35210
 void __stdcall PATH_ResetToPreviousType(D2DynamicPathStrc* pDynamicPath)
 {
 	D2_ASSERT(pDynamicPath->pUnit);
@@ -1488,6 +1492,7 @@ void __stdcall D2COMMON_10190_PATH_SetDistance(D2DynamicPathStrc* pDynamicPath, 
 
 //D2Common.0x6FDAA270 (#10191)
 // TODO: rename
+// 1.13c D2Common+0x34870
 uint8_t __stdcall D2COMMON_10191_PATH_GetDistance(D2DynamicPathStrc* pDynamicPath)
 {
 	return pDynamicPath->nDist;
@@ -1637,6 +1642,7 @@ void __stdcall D2Common_10207(D2DynamicPathStrc* pDynamicPath, char a2, char a3)
 }
 
 //D2Common.0x6FDAA4E0 (#10217)
+// 1.13c D2Common+0x34630
 void __stdcall PATH_SetDistance(D2DynamicPathStrc* pDynamicPath, int nDist)
 {
 	D2_ASSERT(nDist >= 0 && nDist <= 255);

@@ -858,7 +858,7 @@ function sessionAdapter() {
         const p = Number(Module.ccall('d2_session_snapshot', 'number', [], []));
         if (!p) throw new Error('d2_session_snapshot returned null');
         const base = parseSessionSnapshot(Module.HEAPU8.subarray(p, p + 68));
-        const weaponClass = weaponClassTokenForMode(Module.ccall, base.player.mode);
+        const weaponClass = weaponClassTokenForMode(Module.ccall, base.mode);
         base.player.weaponClassId = weaponClass.id;
         base.player.weaponClass = weaponClass.token;
         if (Module._d2_session_player_render_identity) {
@@ -4262,7 +4262,7 @@ function talkToNpc(npcId) {
       const said = readNpcState(); { const l = readDialogMessages(); if (l.length) npcTopics.set(npcId, l); }
       if (said?.spoken != null) {
         noteIntro(npc.classId);
-        npcState = { ...said, own: true };
+        npcState = said;
         menuAfterSpeech = { npcId, classId: npc.classId, name, entries };
         return true;
       }
@@ -5133,6 +5133,7 @@ canvas.addEventListener('pointerdown', (e) => {
     // queued pointer moves, and stop periodic retargets from an earlier held ground gesture.
     input.cancelPointerMoves();
     worldPointerHeld = false;
+    walkGoal = null; walkMemory = null; walkMovePending = false; walkEvidence.active = false;   // as the warp click: the stale ground walk would carry the hero off the server's approach
     // Dispatch the same deferred object interaction request as the native client. The receiver
     // owns range checks, movement setup, retries and operation callbacks.
     session.objectClick(objectHit.id);

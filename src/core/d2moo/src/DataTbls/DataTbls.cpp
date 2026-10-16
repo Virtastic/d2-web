@@ -88,6 +88,7 @@ uint32_t __stdcall DATATBLS_GetCodeFromCompCodeTxt(int nCompCode)
 }
 
 //D2Common.0x6FD49680 (#11249)
+// 1.13c D2Common+0x5E840
 uint32_t __stdcall DATATBLS_GetExpRatio(int nLevel)
 {
 	if (sgptDataTables->pExperienceTxt)
@@ -331,12 +332,9 @@ void __fastcall DATATBLS_LoadStatesTxt(HD2ARCHIVE hArchive)
 	sgptDataTables->pStatesLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
 	sgptDataTables->pStatesTxt = (D2StatesTxt*)DATATBLS_CompileTxt(hArchive, "states", pTbl, &sgptDataTables->nStatesTxtRecordCount, sizeof(D2StatesTxt));
 
-	if (sgptDataTables->nStatesTxtRecordCount >= 256)
-	{
-		FOG_DisplayWarning("Exceeded maximum allowable number of states", __FILE__, __LINE__);
-	}
+	D2_ASSERT(sgptDataTables->nStatesTxtRecordCount < 256);
 
-	sgptDataTables->pStateMasks = (uint32_t*)D2_CALLOC_POOL(nullptr, ARRAY_SIZE(sgptDataTables->fStateMasks) * sizeof(uint32_t) * (sgptDataTables->nStatesTxtRecordCount + 31) / 32);
+	sgptDataTables->pStateMasks = (uint32_t*)D2_CALLOC_POOL(nullptr, ARRAY_SIZE(sgptDataTables->fStateMasks) * sizeof(uint32_t) * ((sgptDataTables->nStatesTxtRecordCount + 31) / 32));
 	
 	for (int i = 0; i < ARRAY_SIZE(sgptDataTables->fStateMasks); ++i)
 	{
@@ -484,15 +482,8 @@ void __fastcall DATATBLS_LoadPetTypeTxt(HD2ARCHIVE hArchive)
 	sgptDataTables->pPetTypeLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
 	sgptDataTables->pPetTypeTxt = (D2PetTypeTxt*)DATATBLS_CompileTxt(hArchive, "pettype", pTbl, &sgptDataTables->nPetTypeTxtRecordCount, sizeof(D2PetTypeTxt));
 
-	if (sgptDataTables->nPetTypeTxtRecordCount > 0)
-	{
-		if (sgptDataTables->nPetTypeTxtRecordCount >= 256)
-		{
-			FOG_DisplayWarning("Pet types table exceeded maximum number of entries.", __FILE__, __LINE__);
-			sgptDataTables->nPetTypeTxtRecordCount = 256;
-		}
-	}
-	else
+	D2_ASSERT(sgptDataTables->nPetTypeTxtRecordCount < 256);
+	if (sgptDataTables->nPetTypeTxtRecordCount < 1)
 	{
 		sgptDataTables->nPetTypeTxtRecordCount = 0;
 	}

@@ -14,7 +14,9 @@ import { loadSchema, decode } from './helpers/protodef.mjs';
 
 // Keep this server separate from realmd-ws.test.mjs. Node runs test files in parallel, and both
 // suites need a live realmd at the same time while they exercise different protocol surfaces.
-const PORTS = { bncs: 46132, mcp: 46133, d2gs: 44020 };
+// Per-process ports: parallel worktrees run this suite concurrently, and fixed ports made the push gate flaky.
+const PB = 47000 + (process.pid % 600) * 3;
+const PORTS = { bncs: PB, mcp: PB + 1, d2gs: PB + 2 };
 let proc = null;
 const sid = loadSchema('sid');
 const mcp = loadSchema('mcp');

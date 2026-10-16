@@ -175,6 +175,7 @@ void __fastcall D2GAME_SUNITMSG_FirstFn_6FCC5520(D2GameStrc* pGame, D2UnitStrc* 
 }
 
 //D2Game.0x6FCC58E0
+// 1.13c D2Game+0x7A940 (checked against decompile, no delta)
 void __fastcall D2GAME_STATES_SendUnitStates_6FCC58E0(D2UnitStrc* pUnit, D2ClientStrc* pClient)
 {
     D2BitBufferStrc bitBuffer = {};

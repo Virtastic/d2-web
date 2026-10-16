@@ -463,6 +463,7 @@ void __fastcall ACT3Q5_InitQuestData(D2QuestDataStrc* pQuestData)
 	pQuestData->pQuestDataEx = pQuestDataEx;
 }
 
+// 1.13c D2Game+0xE3970 (checked against decompile)
 //D2Game.0x6FCAB6F0
 void __fastcall ACT3Q5_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {

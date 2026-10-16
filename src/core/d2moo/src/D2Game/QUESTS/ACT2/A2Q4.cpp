@@ -673,6 +673,7 @@ bool __fastcall ACT2Q4_SeqCallback(D2QuestDataStrc* pQuestData)
 }
 
 //D2Game.0x6FCA31E0
+// 1.13c D2Game+0xC3320
 void __fastcall ACT2Q4_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty];

@@ -16,6 +16,7 @@
 
 
 //D2Game.0x6FC7EA50
+// 1.13c D2Game+0xEB2C0 (checked against decompile; one deliberate order delta, see spec)
 void __fastcall PLAYERSTATS_SetStatsForStartingAct(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t nAct)
 {
     constexpr int32_t nTargetLevels[] =

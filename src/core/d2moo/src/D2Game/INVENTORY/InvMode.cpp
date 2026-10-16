@@ -237,7 +237,7 @@ int32_t __fastcall sub_6FC410E0(D2UnitStrc* pPlayer, D2UnitStrc* pItem, D2UnitSt
     return 0;
 }
 
-//D2Game.0x6FC415F0
+// 1.13c D2Game+0x9B340 (checked against decompile, no delta)
 void __fastcall D2GAME_ResetSomeItemFlags_6FC415F0(D2GameStrc* pGame, D2UnitStrc* pItem)
 {
     constexpr uint32_t nItemCmdFlags[21] =

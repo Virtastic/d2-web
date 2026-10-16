@@ -195,6 +195,7 @@ void __stdcall UNITS_SetYForStaticUnit(D2UnitStrc* pUnit, int nY)
 }
 
 //D2Common.0x6FDBD900 (#10336)
+// 1.13c D2Common+0x30F80
 int __stdcall UNITS_GetUnitSizeX(D2UnitStrc* pUnit)
 {
 	D2MonStats2Txt* pMonStats2TxtRecord = NULL;
@@ -211,7 +212,7 @@ int __stdcall UNITS_GetUnitSizeX(D2UnitStrc* pUnit)
 			pMonStats2TxtRecord = UNITS_GetMonStats2TxtRecordFromMonsterId(pUnit->dwClassId);
 			if (pMonStats2TxtRecord)
 			{
-				return pMonStats2TxtRecord->nSizeX;
+				return (int8_t)pMonStats2TxtRecord->nSizeX;
 			}
 			return COLLISION_UNIT_SIZE_NONE;
 
@@ -238,6 +239,7 @@ int __stdcall UNITS_GetUnitSizeX(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDBDA00 (#10337)
+// 1.13c D2Common+0x30EE0
 int __stdcall UNITS_GetUnitSizeY(D2UnitStrc* pUnit)
 {
 	D2MonStats2Txt* pMonStats2TxtRecord = NULL;
@@ -254,7 +256,7 @@ int __stdcall UNITS_GetUnitSizeY(D2UnitStrc* pUnit)
 			pMonStats2TxtRecord = UNITS_GetMonStats2TxtRecordFromMonsterId(pUnit->dwClassId);
 			if (pMonStats2TxtRecord)
 			{
-				return pMonStats2TxtRecord->nSizeY;
+				return (int8_t)pMonStats2TxtRecord->nSizeY;
 			}
 			return 0;
 
@@ -919,6 +921,7 @@ void __stdcall UNITS_RefreshInventory(D2UnitStrc* pUnit, BOOL bSetFlag)
 }
 
 //D2Common.0x6FDBEBE0 (#10409)
+// 1.13c D2Common+0x2FB60
 int __stdcall UNITS_GetInventoryRecordId(D2UnitStrc* pUnit, int nInvPage, BOOL bLoD)
 {
 	static const int nInventoryRecordMappings[NUMBER_OF_PLAYERCLASSES] =
@@ -1804,6 +1807,7 @@ int __stdcall UNITS_IsAtEndOfFrameCycle(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDBF970 (#10379)
+// 1.13c D2Common+0x2EEC0
 void __stdcall UNITS_GetShiftedFrameMetrics(D2UnitStrc* pUnit, int* pFrameNo, int* pFrameCount)
 {
 	D2_ASSERT(pUnit);
@@ -2011,6 +2015,7 @@ void __stdcall UNITS_SetShrineTxtRecordInObjectData(D2UnitStrc* pUnit, D2Shrines
 }
 
 //D2Common.0x6FDBFDB0 (#10413)
+// 1.13c D2Common+0x317F0 (unit-level wrapper: same body, probe d2common_317f0)
 void __stdcall UNITS_UpdateDirectionAndSpeed(D2UnitStrc* pUnit, int nX, int nY)
 {
 	if (pUnit->pDynamicPath)
@@ -2940,6 +2945,7 @@ void __fastcall UNITS_ToggleUnitFlag(D2UnitStrc* pUnit, int nFlag, BOOL bSet)
 }
 
 //D2Common.0x6FDC1790 (#10363)
+// 1.13c D2Common+0x319C0
 //TODO: v4 + v26
 BOOL __stdcall UNITS_TestCollisionBetweenInteractingUnits(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2, int nCollisionMask)
 {
@@ -3776,6 +3782,7 @@ int __stdcall D2Common_10399(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2)
 }
 
 //D2Common.0x6FDC2E40 (#10397)
+// 1.13c D2Common+0x7FBD0
 int __stdcall UNITS_GetDistanceToOtherUnit(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2)
 {
 	D2CoordStrc pCoords1 = {};

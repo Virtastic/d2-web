@@ -789,6 +789,7 @@ int32_t __fastcall OBJECTS_OperateFunction30_ExplodingChest(D2ObjOperateFnStrc* 
 }
 
 //D2Game.0x6FC755A0
+// 1.13c D2Game+0x6A9D0
 int32_t __fastcall OBJECTS_OperateFunction08_Door(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
     if (!pOp || !pOp->pObject)
@@ -1248,6 +1249,7 @@ __forceinline void __fastcall OBJECTS_ChestEnd(D2ObjOperateFnStrc* pOp, int32_t 
 }
 
 //D2Game.0x6FC76030
+// 1.13c D2Game+0x6F040 (checked against decompile)
 int32_t __fastcall OBJECTS_OperateFunction04_Chest(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
     // TODO: Refactor int32_to smaller functions
@@ -1258,6 +1260,11 @@ int32_t __fastcall OBJECTS_OperateFunction04_Chest(D2ObjOperateFnStrc* pOp, int3
     }
 
     D2UnitStrc* pObject = pOp->pObject;
+    if (pObject->dwAnimMode != OBJMODE_NEUTRAL)
+    {
+        return 1; // 1.13c: only a neutral chest opens
+    }
+
     const uint8_t nType = pObject->pObjectData->InteractType;
 
     int32_t nDrops = 1;
@@ -2439,6 +2446,7 @@ int32_t __fastcall OBJECTS_OperateFunction02_Shrine(D2ObjOperateFnStrc* pOp, int
 }
 
 //D2Game.0x6FC77E80
+// 1.13c D2Game+0x6EF40 (checked against decompile)
 int32_t __fastcall OBJECTS_OperateFunction01_Casket(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
     if (!pOp || !pOp->pObject)
