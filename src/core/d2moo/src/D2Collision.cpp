@@ -315,6 +315,7 @@ void __fastcall COLLISION_FreeRoomCollisionGrid(void* pMemPool, D2ActiveRoomStrc
 }
 
 //D2Common.0x6FD41650 (#10118)
+// 1.13c D2Common+0x4C9D0
 uint16_t __stdcall COLLISION_CheckMask(D2ActiveRoomStrc* pRoom, int nX, int nY, uint16_t nMask)
 {
 	return COLLISION_CheckCollisionMask(pRoom, nX, nY, nMask);

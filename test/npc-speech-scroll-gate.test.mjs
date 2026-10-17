@@ -24,17 +24,13 @@ test('voice completion gates scrolling, while ordinary subtitles ignore the audi
   assert.ok(draw.indexOf('ctx.fillRect(') < draw.indexOf('font.drawAnchored('));
 });
 
-test('speech clock stays unopened until playback and the active voice channel finish', async () => {
+test('speech box opens when the voice starts, not when it finishes', async () => {
   const gate = createNpcSpeechScrollGate();
   const playback = deferred(), voice = deferred();
   const token = gate.begin();
   const waiting = gate.waitForVoice(token, playback.promise, { whenDialogueDone: () => voice.promise });
-
   assert.equal(gate.ready, false);
   playback.resolve({ started: true });
-  await Promise.resolve();
-  assert.equal(gate.ready, false);
-  voice.resolve();
   await waiting;
   assert.equal(gate.ready, true);
 });

@@ -266,6 +266,7 @@ void __fastcall PLAYER_CreateStartItem(D2GameStrc* pGame, D2UnitStrc* pPlayer, D
 }
 
 //D2Game.0x6FC7BB50
+// 1.13c D2Game+0x383F0
 void __fastcall PLAYER_PlaceItemInInventory(D2UnitStrc* pItem, D2UnitStrc* pPlayer, D2GameStrc* pGame, int32_t a8)
 {
     D2_ASSERT(pItem);
@@ -321,6 +322,7 @@ void __fastcall PLAYER_SynchronizeItemsToClient(D2UnitStrc* pUnit, D2ClientStrc*
 }
 
 //D2Game.0x6FC7BD50
+// 1.13c D2Game+0x37680
 int32_t __fastcall PLAYER_IsBusy(D2UnitStrc* pUnit)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_PLAYER)
@@ -348,6 +350,7 @@ void __fastcall PLAYER_ResetBusyState(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC7BDF0
+// 1.13c D2Game+0x38930
 void __fastcall PLAYER_StopInteractions(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     int32_t nUnitType = 0;
@@ -396,6 +399,7 @@ void __fastcall PLAYER_StopInteractions(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC7BEC0
+// 1.13c D2Game+0x74200
 void __fastcall sub_6FC7BEC0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     int32_t nUnitType = 0;
@@ -497,6 +501,7 @@ void __fastcall PLAYER_SetUniqueIdInPlayerData(D2UnitStrc* pPlayer, int32_t nUni
 }
 
 //D2Game.0x6FC7C120
+// 1.13c D2Game+0x37440
 int32_t __fastcall PLAYER_GetUniqueIdFromPlayerData(D2UnitStrc* pPlayer)
 {
     D2_ASSERT(pPlayer);
@@ -551,6 +556,7 @@ void __fastcall sub_6FC7C170(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 }
 
 //D2Game.0x6FC7C260
+// 1.13c D2Game+0x37F80
 int32_t __fastcall sub_6FC7C260(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUnitGUID, uint32_t nValue)
 {
     if (SUNIT_GetServerUnit(pGame, UNIT_PLAYER, nUnitGUID) != pUnit)

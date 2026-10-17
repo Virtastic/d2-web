@@ -1,7 +1,7 @@
-import { parseSessionTiles, readSessionTerrain, readSessionLightmap, worldToScreen, screenDeltaToWorld, UNIT_CENTRE_Y } from './assets/session-terrain.mjs';
+import { parseSessionTiles, readSessionTerrain, readSessionLightmap, worldToScreen, screenDeltaToWorld, SUBTILE_SCREEN_X, SUBTILE_SCREEN_Y, UNIT_CENTRE_Y } from './assets/session-terrain.mjs';
 import { auditSessionActiveNearFeed, readSessionActiveNearFeed } from './assets/session-active-near-feed.mjs';
 import { perfSync, perfEnabled, perfT0, perfT, perfSample, perfCountFrame, perfReset, perfReport } from './assets/frame-perf.mjs';
-import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, isPrimaryTargetEligible, nativeObjectHoverContains, nativeHoverSpecialGate, selectPointerCandidate, selectPrimaryTarget, viewportToWorld } from './gameplay-model.mjs';
+import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, isPrimaryTargetEligible, nativeDccHoverContains, nativeObjectHoverContains, nativeHoverSpecialGate, selectPointerCandidate, selectPrimaryTarget, viewportToWorld } from './gameplay-model.mjs';
 import { createMpqAssetReader } from './assets/mpq-assets.mjs';
 import { recordPrim } from './assets/drawlist.mjs';
 import { loadLiveLevelTerrain, loadRealmClientTerrain, actPalettePath } from './assets/live-level-terrain.mjs';
@@ -65,7 +65,7 @@ import { BOOT_MOVIES, openMovie } from './assets/cinematics.mjs';
 import { createBikAudioPlayer } from './assets/cinematic-audio.mjs';
 import { createClassSelectSoundPlayer } from './assets/class-create-sounds.mjs';
 import { createCreditsScreen } from './assets/credits-screen.mjs';
-import { createCinematicsScreen } from './assets/cinematics-screen.mjs';
+import { createCinematicsScreen, CINEMATICS } from './assets/cinematics-screen.mjs';
 import { createScreenshotAction } from './assets/screenshot-action.mjs';
 import { sendCharacterPhrase } from './assets/chat-macros.mjs';
 import { createOtherMultiplayerScreen } from './assets/other-multiplayer.mjs';
@@ -95,6 +95,7 @@ import { createNpcSpeechAlertRenderer } from './assets/npc-speech-alert.mjs';
 import { npcVendorIsOpen } from './assets/npc-vendor-state.mjs';
 import { createAreaNameBlockRenderer } from './assets/area-name-block.mjs';
 import { createEntryBanner, ENTRY_BANNER } from './assets/level-entry-banner.mjs';
+import { hudBarTooltip } from './assets/hud-bar-tooltip.mjs';
 import { createVendorPanel, SMITH_CLASSES, tooltipSpec } from './assets/vendor-panel.mjs';
 import { handleVendorRepairClick } from './assets/vendor-repair-control.mjs';
 import { decodeDc6 } from './assets/d2-formats.mjs';
@@ -114,6 +115,7 @@ import { pagesToSss, sssToPages } from './assets/plugy-stash.mjs';
 import { plugyStashMode } from './assets/plugy-stash-mode.mjs';
 import { closeStashFromInventory } from './assets/stash-close.mjs';
 import { createFrontendPointerStates } from './assets/frontend-pointer-states.mjs';
+import { hoverLife, plateBoxes, paintHoverPlate } from './assets/hover-lifebar.mjs';
 import { weaponClassTokenForMode } from './assets/player-weapon-class.mjs';
 
 const canvas = document.querySelector('#game');
@@ -297,6 +299,9 @@ let itemRenderer = null;
 // retail string resolved from that selected object's engine identity.
 let hoverEvidence = null;
 let hoverFont = null, automapFont = null;
+// The palette the plate's rectangles are indexed in: the same pal.dat its glyphs are decoded with
+// (Units), whose entries 0 and 5 are the ones D2Win 0x133A0's plate rectangles name.
+let hoverPlatePalette = null;
 // The scenario turns this off once to prove its per-glyph identity assertion rejects a suppressed
 // paint. It is otherwise always true in the game.
 let hoverGlyphPainting = true;
@@ -394,6 +399,7 @@ function readAdvancement() {
   const v = new DataView(Module.HEAPU8.buffer, 0, Module.HEAPU8.byteLength);
   const out = {};
   for (const [key, offset] of Object.entries(ADVANCEMENT)) out[key] = v.getInt32(ptr + offset, true);
+  out.prevExperience = Number(Module.ccall('d2_session_level_threshold', 'number', [], []));
   return (advancement = out);
 }
 
@@ -527,7 +533,9 @@ const markHelpMenuSeen = () => { try { localStorage.setItem(HELP_MENU_KEY, '1');
 // press inside the overlay's rect) and Esc closes it before anything else (its onEscKey).
 let helpRenderer = null, helpVisible = false, helpEvidence = null, helpError = '';
 const gameUiButtonGesture = createUiButtonGesture();
-// This shell-owned token currently covers only the custom Help overlay Close control.
+// This shell-owned token covers the custom Help overlay Close control, the skill-tree close
+// (`panel-close:skills`) and the `skill-tree:<id>` skill allocation -- every momentary UI button
+// that must draw its held frame on down and act on the matching release.
 let gameUiButtonDown = null;
 function cancelHelpClosePress(pointerId = null) {
   const armed = gameUiButtonDown;
@@ -937,6 +945,8 @@ function sessionAdapter() {
           const count = Module.ccall('d2_session_item_presentation_count', 'number', [], []);
           const ptr = Number(Module.ccall('d2_session_item_presentations', 'number', [], []));
           items = parseItemPresentations(Module.HEAPU8.subarray(ptr, ptr + count * 112), count);
+          const cp = Number(Module.ccall('d2_session_item_colours', 'number', [], []));
+          items.forEach((it, i) => { it.colourByte = Module.HEAPU8[cp + i]; });
         }
         let warps = [];
         if (Module._d2_session_warps) {
@@ -1050,6 +1060,7 @@ async function bootstrapSession() {
     // The client already uses Units for the retail font renderer in its front end and NPC menus;
     // Font16's glyphs therefore remain on a loaded, 8-bit retail palette in the browser.
     const hoverPalette = decodeDatPalette(assetReader(FRONTEND.palette));
+    hoverPlatePalette = hoverPalette;
     hoverFont = createFont({ dc6: decodeDc6(assetReader('data\\local\\font\\latin\\font16.dc6')),
       tbl: decodeFontTbl(assetReader('data\\local\\font\\latin\\font16.tbl')), palette: hoverPalette,
       documentObject: document, path: 'data\\local\\font\\latin\\font16.dc6', drawAs: { op: 'celcolor', mode: 5 } });
@@ -1229,9 +1240,31 @@ function ensureTitleScreen(entryPhase = null) {
 
 function ensureCinematicsScreen() {
   if (screen !== SCREEN.CINEMATICS || cinematicsScreen || cinematicsError || !window.__d2?.ready || window.__d2.error) return;
-  try { cinematicsScreen = createCinematicsScreen({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette, onExit: () => { cinematicsScreen = null; exitToTitle(); },
+  try { cinematicsScreen = createCinematicsScreen({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette, onExit: () => { cinematicsScreen = null; const back = cinematicsReturnTo; cinematicsReturnTo = SCREEN.TITLE; if (back === SCREEN.GAME) screen = SCREEN.GAME; else exitToTitle(); },
     string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]) }); }
   catch (error) { cinematicsError = String(error); }
+}
+
+// Retail plays an act's film on the first entry to that act: the engine's act-change/completion quest
+// branches send D2GS opcode 0x61 {0x61, filmIndex} and D2Client's receiver (D2Client+0xAF940, played by
+// +0x899A0 -- src/core/d2client/movie_select.h) plays the row that byte names. The browser reads the
+// same requests out of the engine and plays its row for the SAME index; the screen returns to the game,
+// not the title. index 0 is the promo film, which the front end has no asset or row for.
+let cinematicsReturnTo = SCREEN.TITLE;
+const inGameMovies = [];
+const inGameMoviesUnmapped = [];
+function pollMovieRequest() {
+  if (!session || screen !== SCREEN.GAME || typeof Module === 'undefined' || !Module._d2_session_next_movie_request) return;
+  const index = Module._d2_session_next_movie_request();
+  if (index < 0) return;
+  inGameMovies.push(index);
+  if (index < 1 || index > CINEMATICS.length) { inGameMoviesUnmapped.push(index); return; }   // row 0 is the promo film; the front end has no asset for it
+  cinematicsReturnTo = SCREEN.GAME;
+  screen = SCREEN.CINEMATICS;
+  ensureCinematicsScreen();
+  if (!cinematicsScreen?.playIndex(index - 1)) {   // the screen's assets, not the film's: the transition still happened
+    cinematicsScreen = null; cinematicsReturnTo = SCREEN.TITLE; screen = SCREEN.GAME; inGameMoviesUnmapped.push(index);
+  }
 }
 
 // The only dialable destinations are paths derived from the repo-owned region's `/bncs` WebSocket
@@ -2326,6 +2359,9 @@ function update(forceTick = false) {
   // the moment the bare host became the player's page: the page would mount the MPQs and this gate
   // would still refuse the session for a URL that never spelled `retail=1`.
   if (!bootstrapStarted && PLAY_MODE && window.__d2Entry.retail && window.__d2?.ready && !window.__d2.error && sessionAdapter()) bootstrapSession();
+  // The engine's act-change film request takes the screen before the frame draws (D2Client+0xAF940).
+  pollMovieRequest();
+  if (screen !== SCREEN.GAME) return;
   if (gameMenu?.open) { gameMenu.step(); controlsPanel?.step(); input.drain(); return; }   // single player pauses under the menu
   const commands = input.drain();
   if (realmTransport.state === 'session-open') {
@@ -2730,27 +2766,52 @@ function itemCode(item) {
 // selectPointerCandidate arbitrates hover candidates, while resolvePointerTarget supplies the
 // browser's click/action target. Retail's F14 hover winner rule is only partly recovered;
 // class/code and localized names stay engine/table owned.
-function pointerWorldAt(x, y) {
+function pointerWorldExact(x, y) {
   const d = screenDeltaToWorld(x - viewCX(), y - (canvas.height / 2 + UNIT_CENTRE_Y));
+  const cam = cameraCentre();
+  return { x: cam.x + d.x, y: cam.y + d.y };
+}
+function pointerWorldAt(x, y) {
   // The static grid lies under the player camera's half-subtile. Every pointer path (move,
   // primary skill and hover) passes through this one rounding point, so it reads the SAME camera
   // the world is drawn with: a pointer resolved against a quantised camera lands up to half a
   // subtile off once the camera glides.
-  const cam = cameraCentre();
-  return { x: Math.round(cam.x + d.x), y: Math.round(cam.y + d.y) };
+  const at = pointerWorldExact(x, y);
+  return { x: Math.round(at.x), y: Math.round(at.y) };
 }
 
 // F247 measures retail's hover candidate priorities as item=-4 and neutral unit=0; F506 records a
 // separate click/action picker that also ranks filtered candidates (FUN_6FB01650 -> Ordinal_10080,
 // hitTest=0). Keep the local NPC walk handoff from stealing the item's own projected cell, while a
 // nearby item remains insufficient to suppress an NPC hit.
-function groundItemAtPointerCell(x, y) {
-  const at = pointerWorldAt(x, y);
-  return (snapshot.items || []).find((item) => item.mode === 3 && item.invPage === 255 && item.x === at.x && item.y === at.y) ?? null;
+//
+// HOW FAR FROM AN ITEM RETAIL CALLS IT HOVERED (F14/F506). D2Client's validator FUN_6FB568E0
+// (0xA68E0) never tests a ground item's grid cell. For every candidate type -- items included, at
+// priority -4 -- it asks FUN_6FB56730 (0xA6730) for the padded rectangle of that unit's CURRENT mode
+// cel and accepts the cursor inside it. For an item that cel IS the flippy the item is drawn from, so the region is the drawn
+// sprite widened by 12 px a side with any side under 32 px widened to 32 -- the same rectangle the
+// object path already takes from the same function. Testing the item's own 16x8 px subtile instead
+// left the sprite's painted pixels unhoverable (they sit above the anchor its feet stand on) and
+// accepted pixels below the anchor that the item does not occupy: the label appeared only when the
+// cursor had been moved a long way off the item, which is the offset the report names.
+function groundItemHoverContains(item, x, y) {
+  const box = itemRenderer?.measure(item);
+  if (!box) return false;
+  // The item's draw-origin pixel relative to the cursor. `projStatic` draws the item at
+  // projStatic(item.x, item.y) = proj(item.x - 0.5, item.y - 0.5), so inverting the same transform
+  // about the same camera gives the offset in exactly one step: (item - 0.5) - cursorWorld. No cell
+  // rounding enters it -- the native rect builder is handed the unit's exact screen x/y
+  // (Ordinal_10651/11142), and rounding here would shift a small flippy's box off its own pixels.
+  const at = pointerWorldExact(x, y);
+  const dx = item.x - 0.5 - at.x, dy = item.y - 0.5 - at.y;
+  return nativeDccHoverContains(x, y, box,
+    x + (dx - dy) * SUBTILE_SCREEN_X, y + (dx + dy) * SUBTILE_SCREEN_Y);
 }
-function groundItemsAtPointerCell(x, y) {
-  const at = pointerWorldAt(x, y);
-  return (snapshot.items || []).filter((item) => item.mode === 3 && item.invPage === 255 && item.x === at.x && item.y === at.y);
+function groundItemUnderPointer(x, y) {
+  return (snapshot.items || []).find((item) => item.mode === 3 && item.invPage === 255 && groundItemHoverContains(item, x, y)) ?? null;
+}
+function groundItemsUnderPointer(x, y) {
+  return (snapshot.items || []).filter((item) => item.mode === 3 && item.invPage === 255 && groundItemHoverContains(item, x, y));
 }
 
 // Keep the browser's current hit tests as candidate membership, then arbitrate the accepted hover
@@ -2771,7 +2832,7 @@ function resolvePointerCandidates(x, y) {
       return units;
     } },
     itemsOnCell: { get() {
-      if (!itemsOnCellRead) { itemsOnCellRead = true; itemsOnCell = groundItemsAtPointerCell(x, y); }
+      if (!itemsOnCellRead) { itemsOnCellRead = true; itemsOnCell = groundItemsUnderPointer(x, y); }
       return itemsOnCell;
     } },
     objectsUnderPointer: { get() {
@@ -2782,7 +2843,7 @@ function resolvePointerCandidates(x, y) {
       return objectsUnderPointer;
     } },
     itemOnCell: { get() {
-      if (!itemRead) { itemRead = true; itemOnCell = target.unitId ? null : groundItemAtPointerCell(x, y); }
+      if (!itemRead) { itemRead = true; itemOnCell = target.unitId ? null : groundItemUnderPointer(x, y); }
       return itemOnCell;
     } },
     npc: { get() {
@@ -2831,6 +2892,14 @@ function resolvePointerTarget(x, y) {
   return { at, unitId, item: unit ? null : (ground?.item ?? null) };
 }
 
+// Single-player: the client's hp% byte (D2Game 0x0C/0x69) is (life>>8)*100/(maxlife>>8) of the server unit (stats 6, 7).
+function sessionHp(id) {
+  const stat = (n) => Module.ccall('d2_session_unit_stat', 'number', ['number', 'number', 'number', 'number'], [1, id, n, 0]);
+  const hp = stat(6), maxHp = stat(7);
+  if (hp === -2147483648 || maxHp < 256) return {};
+  return { hpPct: Math.trunc(((hp >> 8) * 100) / (maxHp >> 8)), hp, maxHp };   // stats are life<<8; the fallback reads the raw stat 6 / maxhp
+}
+
 function hoverTarget() {
   if (!session || screen !== SCREEN.GAME) return null;
   const candidates = resolvePointerCandidates(pointer.x, pointer.y);
@@ -2839,7 +2908,7 @@ function hoverTarget() {
     const unit = selected.target;
     const stringIndex = Module.ccall('d2_monster_name_str', 'number', ['number'], [unit.classId]);
     const label = stringIndex >= 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [stringIndex]) : '';
-    return label ? { kind: 'unit', id: unit.id, classId: unit.classId, stringIndex, label, x: unit.x, y: unit.y } : null;
+    return label ? { kind: 'unit', id: unit.id, classId: unit.classId, stringIndex, label, x: unit.x, y: unit.y, life: hoverLife({ type: 1, mode: unit.mode, flags: unit.flags, hpPct: unit.hpPct ?? realmMonsterViews.find((m) => m.guid === unit.id)?.hpPct, ...sessionHp(unit.id) }) } : null;
   }
   if (selected?.kind === 'item') {
     const item = selected.target;
@@ -2900,25 +2969,31 @@ function drawHoverLabel(c, target, projectUnit, projectStatic) {
       const bottom = Math.min(Math.max(textHeight - 5, storedY + 2), canvas.height - 5);
       const top = bottom - textHeight, glyphY = bottom - glyphFromBottom;
       const box = { x: left, y: top, width: boxWidth, height: textHeight };
-      c.save(); c.fillStyle = 'rgba(0,0,0,.5)'; c.fillRect(box.x, box.y, box.width, box.height); c.restore();
-      recordPrim('box', box.x, box.y, box.x + box.width, box.y + box.height, 0, 2);
+      // An NPC is not a monster: D2Client 0xC0590 returns 0 for it, so D2Win's plate is the single
+      // dark rectangle. The paint
+      // is the same one a monster's plate gets, so neither family can lose its rectangle.
+      const painted = paintHoverPlate(c, plateBoxes(box.x, box.y, box.width, box.height, 0), hoverPlatePalette, recordPrim);
       if (hoverGlyphPainting) hoverFont.drawAnchored(c, text, left + 4, glyphY, (glyph) => glyphs.push(glyph));
       return { ...target, requested: target.label, font, glyphs, plateText: text, x: cx, y: glyphY,
         anchorX: cx, anchorY: unitY, storedY, pixHeight: tableHeight, nativeTextHeight: textHeight,
-        box, placement: 'above-npc' };
+        box, painted, placement: 'above-npc' };
     }
     // Retail: a colour-5 mode-1 box centred on the HUD's top
     // centre, the name as Font16 glyphs padded by two spaces each side (baseline y=31), then the
     // MonType line (MonType.txt StrSing, "Demon") as centred Font6 at y=49.
     const text = `  ${target.label}  `, width = hoverFont.measure(text), cx = Math.round(canvas.width / 2);
     const left = cx - Math.trunc(width / 2), box = { x: left, y: 18, width: width + 8, height: 16 };
-    c.save(); c.fillStyle = 'rgba(0,0,0,.5)'; c.fillRect(box.x, box.y, box.width, box.height); c.restore();
-    recordPrim('box', box.x, box.y, box.x + box.width, box.y + box.height, 5, 1);
+    // The plate's own rectangle list IS the bar: at full life D2Win draws a single index-5 mode-1
+    // rect across the whole plate (the dark red fill), at damaged life index 5 up to lifeW then
+    // index 0 mode 2 for the remainder, and at life 0 only the dark rect. Painting anything else
+    // here (a fixed translucent black, as this site did) shows the name with no bar under it.
+    const boxes = plateBoxes(box.x, box.y, box.width, box.height, target.life ?? 128);
+    const painted = paintHoverPlate(c, boxes, hoverPlatePalette, recordPrim);
     if (hoverGlyphPainting) hoverFont.drawAnchored(c, text, left + 4, 31, (glyph) => glyphs.push(glyph));
     const typeIndex = Module.ccall('d2_monster_type_str', 'number', ['number'], [target.classId]);
     const typeLine = typeIndex > 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [typeIndex]) : '';
     if (typeLine && automapFont && !target.npc) automapFont.drawAnchored(c, typeLine + ' ', cx - Math.trunc(automapFont.measure(typeLine + ' ') / 2) + 4, 49);   // +4: retail's Font6 centred-text glyphs start 4px right of the text origin (measured, f7 vector)
-    return { ...target, requested: target.label, font, glyphs, plateText: text, typeLine, x: cx, y: 31, box, placement: 'hud-top-centre' };
+    return { ...target, requested: target.label, font, glyphs, plateText: text, typeLine, x: cx, y: 31, box, boxes, painted, placement: 'hud-top-centre' };
   }
   if (target.kind === 'object')
     return drawObjectHoverLabel(c, { ...target, nameOffset: objectRetailNameOffset(Module, target.classId) },
@@ -3395,7 +3470,7 @@ function drawFrame() {
         terrainFiles = files;
         // Floors are lit from the engine's light map, as D2Client lights them.
         const lightmap = readSessionLightmap(Module);
-        terrain.setLightGrid(lightmap ? (a, b) => lightmap.grid(a, b) : null, lightmap?.at, lightmap?.ambient);
+        terrain.setLightGrid(lightmap ? (a, b) => lightmap.grid(a, b) : null, lightmap?.at, lightmap?.ambient, lightmap);
         // Retail's weather (F11b): the level's own Levels.txt `Rain` byte decides, and the rain draws
         // between the floors and the walls, where retail's own frame puts it (session-terrain.mjs).
         const rain = weatherRenderer && Module._d2_session_level_rain ? Module.ccall('d2_session_level_rain', 'number', [], []) : -1;
@@ -3650,6 +3725,9 @@ function drawFrame() {
       playerClass: snapshot.playerClass ?? 0, level: adv?.level ?? 1, act: snapshot.act,
       string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]),
       skillPoints: adv?.skillPoints ?? 0, skills: readClassSkills() || [],
+      // The close control's held state: down arms it and draws buysellbtn 11, up fires the close
+      // (native FUN_6FB296F0 / FUN_6FB28FC0, proven through the shared widget below).
+      closePressed: gameUiButtonGesture.token === 'panel-close:skills',
       // SkillDesc's wStrName/wStrLong/wStrMana are .tbl indices, so the hover plate's name,
       // description and mana line are retail's own strings, not a table this client keeps.
       line: (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]), skillDesc: readSkillDesc, skillMana: (id, level) => Module.ccall('d2_session_skill_mana', 'number', ['number', 'number'], [id, level]) } : null, panelShown(skillsVisible));
@@ -3703,6 +3781,19 @@ function drawFrame() {
         // The ornate bar strips between the skill buttons and the console (wide views only; fitView's `fill`).
         strips: w > 800 && ensureFreeRes()?.ready ? (c) => { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); drawParts(c, freeResArt, barParts(w, h)); c.restore(); } : null,
         stamina: screen ? { value: screen[4], maximum: screen[5] } : null });
+  }
+  // Retail D2Client+0x26970/+0x278B0: XP / stamina bar hover text,
+  // a centred Font16 plate (D2Win #10085: box = text + 8, bottom = y + 2, glyphs 3 above the bottom).
+  if (controlPanelRenderer && !clearScreen && hoverFont) {
+    const adv = readAdvancement(), scr = readCharacterScreen();
+    const tip = adv && scr && hudBarTooltip(w, h, pointer.x, pointer.y, { experience: adv.experience, nextExperience: adv.nextExperience,
+      stamina: scr[4], staminaMax: scr[5], fmtExp: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [4163]),
+      fmtStamina: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [4164]) });
+    if (tip) {
+      const bw = hoverFont.measure(tip.text) + 8, left = Math.min(Math.max(tip.x - (bw >> 1), 0), w - bw), bottom = tip.y + 2;
+      ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(left, bottom - 16, bw, 16); ctx.restore();
+      hoverFont.drawAnchored(ctx, tip.text, left + 4, bottom - 3);
+    }
   }
   // FUN_6FB739E0 draws ordinary speech after the main gameplay/panel passes. Match that late
   // overlay order so inventory and quest art cannot cover the viewport-centred text.
@@ -4754,10 +4845,18 @@ canvas.addEventListener('pointerdown', (e) => {
     try { canvas.setPointerCapture(e.pointerId); } catch {}
     render(); canvas.focus(); e.preventDefault(); return;
   }
-  // Character and skill close controls keep their existing shared press handling. Inventory has
-  // its own native down/held/release path above.
+  // The skill-tree close is the shared momentary-button widget, not a click: retail's down handler
+  // only arms the held flag and draws frame 11 (FUN_6FB296F0 sets DAT_6FBCBFB4), and the close runs
+  // on the matching release that is still over the rect (FUN_6FB28FC0). Acting on the down is the
+  // defect this row fixes. Inventory has its own native down/held/release path above.
   const panelClose = e.button === 0 && panelCloseAt(x, y, canvas.width, canvas.height, { skills: skillsVisible && { playerClass: snapshot.playerClass, tab: skillPanelRenderer?.tab } });
-  if (panelClose) { skillsVisible = false; canvas.focus(); e.preventDefault(); return; }
+  if (panelClose && gameUiButtonGesture.token === null) {
+    const token = `panel-close:${panelClose.panel}`;
+    gameUiButtonDown = { pointerId: e.pointerId, token };
+    gameUiButtonGesture.press(e.pointerId, token);
+    try { canvas.setPointerCapture(e.pointerId); } catch {}
+    render(); canvas.focus(); e.preventDefault(); return;
+  }
   // The mini-panel's open/close arrow collapses and expands the icon row. It is a HUD control the
   // renderer actually placed, so only a click inside it consumes (hud-hit-test's rule).
   // ClearScreen hides the chrome, so the chrome answers nothing: each of these four hit tests is a
@@ -5034,7 +5133,7 @@ canvas.addEventListener('pointerdown', (e) => {
   const panelOwner = openPanelAt(x, y);
   const worldAt = e.button === 0 && session && !panelOwner ? pointerWorldAt(x, y) : null;
   const hostileHit = worldAt ? selectPrimaryTarget(snapshot, worldAt, Infinity, (entity) => unitBoxHit(entity, x, y)) : null;
-  const itemHit = worldAt && !hostileHit ? groundItemAtPointerCell(x, y) : null;
+  const itemHit = worldAt && !hostileHit ? groundItemUnderPointer(x, y) : null;
   // What the world dispatch itself saw under the pointer, whichever handler ends up spending the
   // click: the aim point it resolved, and the hostile unit standing on it (the same test the four
   // handlers below and the world path key off). Recorded here so "which handler spent it" and "what
@@ -5236,6 +5335,11 @@ globalThis.addEventListener('pointerup', (e) => {
     let releasedToken = null;
     if (e.button === 0 && down.token === 'help-close' && helpVisible && helpRenderer?.hitClose(x, y, canvas.width, canvas.height)) {
       releasedToken = 'help-close';
+    } else if (e.button === 0 && down.token === 'panel-close:skills' && skillsVisible
+        && panelCloseAt(x, y, canvas.width, canvas.height, { skills: { playerClass: snapshot.playerClass, tab: skillPanelRenderer?.tab } })) {
+      // Native release-side bounds: the close fires only if the release is still inside the rect
+      // (the down already proved the press; FUN_6FB28FC0 re-tests the same point).
+      releasedToken = down.token;
     } else if (e.button === 0 && down.token?.startsWith('skill-tree:') && skillsVisible && skillPanelRenderer && session) {
       const hit = skillPanelRenderer.skillAt(x, y, canvas.width, canvas.height, { skills: readClassSkills() || [] });
       const id = Number(down.token.slice('skill-tree:'.length));
@@ -5243,6 +5347,7 @@ globalThis.addEventListener('pointerup', (e) => {
     }
     const activated = gameUiButtonGesture.release(e.pointerId, releasedToken);
     if (activated === 'help-close') helpVisible = false;
+    else if (activated === 'panel-close:skills') skillsVisible = false;
     else if (activated?.startsWith('skill-tree:')) {
       const id = Number(activated.slice('skill-tree:'.length));
       const allocated = allocateSkillTreePointOnRelease(activated, id, readClassSkills() || [],
@@ -5301,7 +5406,7 @@ globalThis.addEventListener('pointerup', (e) => {
     ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0;
   const action = miniPanelReleaseAction({ button: e.button, pressed: down, pointerMatches: true,
     releaseHit, cursorItem });
-  if (action === 0) { setCharacterVisible(!characterVisible); if (characterVisible) questVisible = false; }
+  if (action === 0) { characterVisible = !characterVisible; if (characterVisible) questVisible = false; }
   else if (action === 1) inventoryVisible = !inventoryVisible;
   else if (action === 2) skillsVisible = !skillsVisible;
   else if (action === 3) automapOverlay?.toggle();
@@ -5673,13 +5778,14 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
   get objectDrawEvidence() { return objectDrawEvidence.map((o) => ({ ...o })); },
   talkTo(npcId) { return talkToNpc(npcId); },   // test hook (s2151): the click-arrival path
   // Test hook (s2150): the plate a hovered monster of this class gets, drawn on a scratch canvas.
-  hoverPlateFor(classId, npc = false, screenAnchor = null) {
+  hoverPlateFor(classId, npc = false, screenAnchor = null, id = 0) {
     const idx = Module.ccall('d2_monster_name_str', 'number', ['number'], [classId]);
     const label = Module.ccall('d2_lang_string_by_index', 'string', ['number'], [idx]);
     const cv = document.createElement('canvas'); cv.width = canvas.width; cv.height = canvas.height;
     if (npc && (!screenAnchor || !Number.isFinite(screenAnchor.x) || !Number.isFinite(screenAnchor.y)))
       throw new Error('NPC hover plate fixtures require an explicit screen anchor');
-    const target = { kind: 'unit', id: 0, classId, label, x: 0, y: 0, npc, screenAnchor };
+    const target = { kind: 'unit', id: 0, classId, label, x: 0, y: 0, npc, screenAnchor,
+      life: id ? hoverLife({ type: 1, mode: 1, ...sessionHp(id) }) : 128 };
     return JSON.parse(JSON.stringify(drawHoverLabel(cv.getContext('2d'), target, null, null)));
   },
   get hoverEvidence() { return hoverEvidence && JSON.parse(JSON.stringify(hoverEvidence)); },
@@ -5845,6 +5951,11 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
   // A scenario pins the phase the way it pins titleTick (s198, s194).
   set titlePhase(phase) { setTitlePhase(phase); },
   get cinematicsScreenEvidence() { return cinematicsScreen ? cinematicsScreen.evidence : { error: cinematicsError || 'not built' }; },
+  /**
+   * The in-game films the ENGINE asked for, in order, and the ones it asked for that have no browser
+   * row (D2Client film row 0, the promo film). D2GS opcode 0x61 -> D2Client+0xAF940/0x899A0.
+   */
+  get inGameMovieEvidence() { return { played: inGameMovies.map((i) => ({ index: i, row: CINEMATICS[i - 1]?.path ?? null })), unmapped: [...inGameMoviesUnmapped] }; },
   get otherMultiplayerEvidence() { return otherMultiplayerScreen ? otherMultiplayerScreen.evidence : { error: otherMultiplayerError || 'not built' }; },
   // F89: what the page's own realm client did when a configured region was committed.
   get realmTransportEvidence() { return realmTransport; },

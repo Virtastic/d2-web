@@ -28,6 +28,7 @@
 
 
 //D2Game.0x6FC3BBA0
+// 1.13c D2Game+0x9DCD0
 void __fastcall LEVEL_UpdateUnitsInAdjacentRooms(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2ClientStrc* pClient)
 {
     // TODO: v10
@@ -137,7 +138,21 @@ void __fastcall LEVEL_FreeDrlgDeletes(D2GameStrc* pGame)
     }
 }
 
+// 1.13c D2Game+0x9D950: the first-client monster loop of LEVEL_AddClient. Retail takes pRoom in EAX
+// and pGame in ESI; the loop is a separate function there and is inlined in 1.10f.
+static void LEVEL_AddClientMonsterEvents(D2ActiveRoomStrc* pRoom, D2GameStrc* pGame)
+{
+    for (D2UnitStrc* pUnit = pRoom->pUnitFirst; pUnit; pUnit = pUnit->pRoomNext)
+    {
+        if (pUnit->dwUnitType == UNIT_MONSTER)
+        {
+            MONSTER_UpdateAiCallbackEvent(pGame, pUnit);
+        }
+    }
+}
+
 //D2Game.0x6FC3BE40
+// 1.13c D2Game+0x9DC10
 void __fastcall LEVEL_AddClient(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2ClientStrc* pClient)
 {
     D2_ASSERT(pRoom);
@@ -150,13 +165,7 @@ void __fastcall LEVEL_AddClient(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2Cl
 
     if (pRoom->nNumClients <= 1u)
     {
-        for (D2UnitStrc* pUnit = pRoom->pUnitFirst; pUnit; pUnit = pUnit->pRoomNext)
-        {
-            if (pUnit->dwUnitType == UNIT_MONSTER)
-            {
-                MONSTER_UpdateAiCallbackEvent(pGame, pUnit);
-            }
-        }
+        LEVEL_AddClientMonsterEvents(pRoom, pGame);
     }
 
     D2UnitStrc* pPlayer = CLIENTS_GetPlayerFromClient(pClient, 0); 
@@ -170,13 +179,17 @@ void __fastcall LEVEL_AddClient(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2Cl
 }
 
 //D2Game.0x6FC3BF00
+// 1.13c D2Game+0x9D980
 void __fastcall LEVEL_RemoveClient(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2ClientStrc* pClient)
 {
     D2_ASSERT(pRoom);
 
     for (D2UnitStrc* pUnit = pRoom->pUnitFirst; pUnit; pUnit = pUnit->pRoomNext)
     {
-        D2GAME_PACKETS_SendPacket0x0A_RemoveObject_6FCC5F80(pUnit, pClient);
+        if (pUnit->dwUnitType != UNIT_MISSILE)   // 1.13c skips missiles (6fcbd9b5: cmp al,3); 1.10f sent 0x0A for them too
+        {
+            D2GAME_PACKETS_SendPacket0x0A_RemoveObject_6FCC5F80(pUnit, pClient);
+        }
     }
 
     DUNGEON_RemoveClientFromRoom(pRoom, pClient);
@@ -232,6 +245,7 @@ void __fastcall LEVEL_SynchronizeDayNightCycleWithClient(D2GameStrc* pGame, D2Cl
 }
 
 //D2Game.0x6FC3C0B0
+// 1.13c D2Game+0x9DF40
 void __fastcall LEVEL_ChangeAct(D2GameStrc* pGame, D2ClientStrc* pClient, int32_t nDestinationLevelId, int32_t nTileCalc)
 {
     if (ARENA_IsInArenaMode(pGame))
@@ -310,6 +324,7 @@ void __fastcall LEVEL_ChangeAct(D2GameStrc* pGame, D2ClientStrc* pClient, int32_
 }
 
 //D2Game.0x6FC3C410
+// 1.13c D2Game+0x9E170
 void __fastcall LEVEL_WarpUnit(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nDestinationLevelId, int32_t nTileCalc)
 {
     D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);

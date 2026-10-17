@@ -85,6 +85,7 @@ void __stdcall DUNGEON_ToggleRoomTilesEnableFlag(D2ActiveRoomStrc* pRoom, BOOL b
 }
 
 //D2Common.0x6FD8BA20 (#10027)
+// 1.13c D2Common+0x3CD00
 D2UnitStrc* __stdcall DUNGEON_GetWarpTileFromRoomAndSourceLevelId(D2ActiveRoomStrc* pRoom, int nSourceLevel, D2LvlWarpTxt** ppLvlWarpTxtRecord)
 {
 	D2_ASSERT(pRoom);
@@ -127,6 +128,7 @@ D2DrlgTileDataStrc* __stdcall DUNGEON_GetFloorTilesFromRoom(D2ActiveRoomStrc* pR
 }
 
 //D2Common.0x6FD8BB20 (#10031)
+// 1.13c D2Common+0x3BB10
 D2DrlgTileDataStrc* __stdcall DUNGEON_GetWallTilesFromRoom(D2ActiveRoomStrc* pRoom, int* pWallCount)
 {
 	D2_ASSERT(pRoom);
@@ -135,7 +137,15 @@ D2DrlgTileDataStrc* __stdcall DUNGEON_GetWallTilesFromRoom(D2ActiveRoomStrc* pRo
 	return pRoom->pRoomTiles->pWallTiles;
 }
 
+// 1.13c room-tile block (retail 32-bit offsets): pWallTiles/nWalls at 0x00/0x04, pFloorTiles/nFloors at
+// 0x08/0x0C, pRoofTiles/nRoofs at 0x10/0x14. This build widens pointers, so pin the field order instead.
+static_assert(offsetof(D2ActiveRoomStrc, pRoomTiles) == sizeof(D2DrlgCoordsStrc), "room-tiles block follows the coords");
+// The struct is `#pragma pack(1)`: each widened pointer adds sizeof(void*) - 4 bytes before the field.
+static_assert(offsetof(D2DrlgRoomTilesStrc, pRoofTiles) == 0x10 + 2 * (sizeof(void*) - 4), "1.13c room-tiles block+0x10");
+static_assert(offsetof(D2DrlgRoomTilesStrc, nRoofs)     == 0x14 + 3 * (sizeof(void*) - 4), "1.13c room-tiles block+0x14");
+
 //D2Common.0x6FD8BB60 (#10032)
+// 1.13c D2Common+0x3BAD0
 D2DrlgTileDataStrc* __stdcall DUNGEON_GetRoofTilesFromRoom(D2ActiveRoomStrc* pRoom, int* pRoofCount)
 {
 	D2_ASSERT(pRoom);
@@ -631,6 +641,7 @@ void __stdcall DUNGEON_AllocDrlgDelete(D2ActiveRoomStrc* pRoom, int nUnitType, D
 }
 
 //D2Common.0x6FD8C8B0 (#10067)
+// 1.13c D2Common+0x3B4A0
 void __stdcall DUNGEON_FreeDrlgDelete(D2ActiveRoomStrc* pRoom)
 {
 	D2DrlgDeleteStrc* pNext = NULL;
@@ -718,6 +729,7 @@ BOOL __stdcall D2Common_10074(D2ActiveRoomStrc* pRoom)
 }
 
 //D2Common.0x6FD8CB10 (#10075)
+// 1.13c D2Common+0x3B3F0
 void __stdcall D2Common_10075(D2ActiveRoomStrc* pRoom, BOOL bSet)
 {
 	D2_ASSERT(pRoom);
@@ -847,6 +859,7 @@ int __stdcall D2Common_10081_GetTileCountFromRoom(D2ActiveRoomStrc* pRoom)
 }
 
 //D2Common.0x6FD8CE40
+// 1.13c D2Common+0x3C870 (register-arg room teardown, inlined here)
 void __fastcall DUNGEON_FreeRoom(void* pMemPool, D2ActiveRoomStrc* pRoom)
 {
 	for (D2UnitStrc* i = pRoom->pUnitFirst; i; i = pRoom->pUnitFirst)
@@ -874,6 +887,7 @@ void __fastcall DUNGEON_FreeRoom(void* pMemPool, D2ActiveRoomStrc* pRoom)
 }
 
 //D2Common.0x6FD8CF10 (#10076)
+// 1.13c D2Common+0x3CA20
 void __stdcall DUNGEON_RemoveRoomFromAct(D2DrlgActStrc* pAct, D2ActiveRoomStrc* pRoom)
 {
 	D2ActiveRoomStrc* pPreviousRoom = NULL;

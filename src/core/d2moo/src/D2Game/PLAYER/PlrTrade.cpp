@@ -1048,6 +1048,7 @@ void __fastcall PLRTRADE_Free(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC90AE0
+// 1.13c D2Game+0x716D0
 void __fastcall sub_6FC90AE0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3)
 {
     if (!pUnit || !UNITS_GetPlayerData(pUnit)->pTrade)
@@ -2048,6 +2049,7 @@ int32_t __fastcall PLRTRADE_AllocPlayerTrade(D2GameStrc* pGame, D2UnitStrc* pPla
 }
 
 //D2Game.0x6FC92890
+// 1.13c D2Game+0x8AC90
 void __fastcall PLRTRADE_AddGold(D2UnitStrc* pUnit, int32_t nStat, int32_t nValue)
 {
     if (!pUnit)
@@ -2212,6 +2214,7 @@ int32_t __fastcall sub_6FC92A90(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitS
 }
 
 //D2Game.0x6FC92CF0
+// 1.13c D2Game+0x73AA0
 void __fastcall PLRTRADE_StopAllPlayerInteractions(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
     int32_t nUnitType = 0;
@@ -2263,6 +2266,7 @@ void __fastcall sub_6FC92EE0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC92EF0
+// 1.13c D2Game+0x71270
 void __fastcall sub_6FC92EF0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     SUNIT_ResetInteractInfo(pUnit);

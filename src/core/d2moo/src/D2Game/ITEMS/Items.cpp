@@ -614,6 +614,7 @@ uint32_t __fastcall ITEMS_RollLimitedRandomNumber(D2SeedStrc* pSeed, int32_t nMa
 }
 
 //D2Game.0x6FC4E520
+// 1.13c D2Game+0x11070
 int32_t __fastcall D2GAME_InitItemStats_6FC4E520(D2GameStrc* pGame, D2UnitStrc** ppUnit, D2ItemDropStrc* pItemDrop, int32_t bQuestItem)
 {
     if (ITEMS_GetItemType(*ppUnit) == ITEMTYPE_GOLD)
@@ -791,6 +792,7 @@ uint32_t __fastcall ITEMS_RollRandomNumber(D2SeedStrc* pSeed)
 }
 
 //D2Game.0x6FC4EC10
+// 1.13c D2Game+0xEAE0
 D2UnitStrc* __fastcall sub_6FC4EC10(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, BYTE* pBitstream, uint32_t nBufferSize, int32_t bCheckForHeader, D2ItemSaveStrc* pItemSave, uint32_t* pSize, uint32_t dwVersion)
 {
     if (!pGame)
@@ -828,6 +830,7 @@ D2UnitStrc* __fastcall sub_6FC4EC10(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, 
 }
 
 //D2Game.0x6FC4ED80
+// 1.13c D2Game+0x11490
 D2UnitStrc* __fastcall D2GAME_CreateItemEx_6FC4ED80(D2GameStrc* pGame, D2ItemDropStrc* pItemDrop, int32_t bUseSeed)
 {    
     if (!pGame->bExpansion)
@@ -1100,6 +1103,7 @@ int32_t __fastcall sub_6FC4F4A0(D2GameStrc* pGame, D2SeedStrc* pSeed, int32_t nL
 }
 
 //D2Game.0x6FC4F640
+// 1.13c D2Game+0x120E0
 void __fastcall sub_6FC4F640(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2CoordStrc* pCoords)
 {
     int32_t nItemLevel = DATATBLS_GetMonsterLevelInArea(DUNGEON_GetLevelIdFromRoom(pRoom), pGame->nDifficulty, pGame->bExpansion);
@@ -1505,6 +1509,7 @@ D2UnitStrc* __fastcall D2GAME_CreateItemUnit_6FC501A0(D2UnitStrc* pPlayer, int32
 }
 
 //D2Game.0x6FC502B0
+// 1.13c D2Game+0x387E0
 void __fastcall sub_6FC502B0(D2GameStrc* pGame, D2UnitStrc* pItem)
 {
     if (ITEMS_CheckIfSocketable(pItem))
@@ -1540,6 +1545,7 @@ void __fastcall ITEMS_RemoveAll(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC50320
+// 1.13c D2Game+0xD2C70
 void __fastcall ITEMS_RemoveFromAllPlayers(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     SUNIT_IterateLivingPlayers(pGame, ITEMS_PlayerIterateCallback_RemoveItem, pUnit);
@@ -1630,6 +1636,7 @@ D2UnitStrc* __fastcall ITEMS_FindQuestItem(D2GameStrc* pGame, D2UnitStrc* pUnit,
 }
 
 //D2Game.0x6FC504F0
+// 1.13c D2Game+0xE5D0
 int32_t __fastcall ITEMS_GetItemLevelForNewItem(D2UnitStrc* pUnit, int32_t nLevelId)
 {
     if (pUnit)
@@ -1974,6 +1981,7 @@ int32_t __fastcall ITEMS_GetManaPotionDropCode(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC51070
+// 1.13c D2Game+0x107E0
 D2UnitStrc* __fastcall ITEMS_Duplicate(D2GameStrc* pGame, D2UnitStrc* pItem, D2UnitStrc* pOwner, int32_t bDuplicateSocketFillers)
 {
     D2ItemSaveStrc itemSave = {};
@@ -2598,6 +2606,7 @@ D2ActiveRoomStrc* __fastcall D2GAME_GetRoom_6FC52070(D2ActiveRoomStrc* pRoom, in
 }
 
 //D2Game.0x6FC52110
+// 1.13c D2Game+0x12D60
 void __fastcall sub_6FC52110(D2GameStrc* pGame, D2UnitStrc* pMonster, D2UnitStrc* pPlayer, int32_t nTCId, int32_t nQuality, int32_t nItemLevel, int32_t a7, D2UnitStrc** ppItems, int32_t* pnItemsDropped, int32_t nMaxItems)
 {
     int32_t nLevel = 0;
@@ -2618,6 +2627,7 @@ void __fastcall sub_6FC52110(D2GameStrc* pGame, D2UnitStrc* pMonster, D2UnitStrc
 }
 
 //D2Game.0x6FC521D0
+// 1.13c D2Game+0xE0A0
 int32_t __fastcall ITEMS_GetGroundRemovalTime(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (ITEMS_IsQuestItem(pUnit))

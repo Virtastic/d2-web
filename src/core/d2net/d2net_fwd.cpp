@@ -67,3 +67,29 @@ extern "C" uint32_t d2net_sub_7240(uint32_t server, uint32_t a, uint32_t eaxv, u
     f111(); if (mode != 1 && mode != 2) *slot = 0;
     return 0;
 }
+// 1.13c D2Net+0x63E0 (ord 10002, stdcall(flag, client, buf, len)): the outgoing dispatcher. Mode (DAT_6fbfb418) 1 or 2 queues the
+// run and returns its length. Else flag 0 with buf[0] == 0xaf (the always-uncompressed opcode) and flag 2 only get decoded;
+// everything else is decoded and then compressed (Fog #10223) into a 0x40c-byte frame: n < 0xef sends frame[1..] with the
+// one-byte length in frame[1] (n+1), otherwise frame[0..] with the two-byte prefix (n+2; frame[0] = 0xf0 | (n+2) >> 8). The send
+// is Fog #10157 on the socket DAT_6fbfb424; a 0 from it makes the result 0. Retail _exit(-1)s on len > 0x204 and on compress 0:
+// those two paths are not modelled.
+extern "C" uint32_t d2net_sub_63e0(uint32_t flag, uint32_t client, uint8_t* buf, uint32_t len, uint32_t mode, uint32_t sock,
+                                   void (*queue)(const uint8_t*, uint32_t), void (*decode)(const uint8_t*, uint32_t),
+                                   uint32_t (*compress)(uint8_t*, uint32_t, const uint8_t*, uint32_t),
+                                   uint32_t (*send)(uint32_t, uint32_t, const uint8_t*, uint32_t)) {
+    if (mode == 1 || mode == 2) { queue(buf, len); return len; }
+    if (flag != 0 || buf[0] != 0xaf) {
+        decode(buf, len);
+        if (flag != 2) {
+            uint8_t frame[0x40c];
+            const uint32_t n = compress(frame + 2, 0x408, buf, len);
+            if (!n) return 0;
+            const uint32_t m = n + 1;
+            if (m < 0xf0) { frame[1] = (uint8_t)m; return send(sock, client, frame + 1, m) ? m : 0; }
+            const uint32_t m2 = m + 1;
+            frame[0] = (uint8_t)((m2 >> 8) | 0xf0); frame[1] = (uint8_t)m2;
+            return send(sock, client, frame, m2) ? m2 : 0;
+        }
+    }
+    return send(sock, client, buf, len) ? len : 0;
+}

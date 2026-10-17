@@ -168,4 +168,95 @@ template <class E> uint32_t ExecuteSkill(E& e, uint32_t u, uint32_t game, uint32
     }
     return r14;
 }
+
+// --- sub_A1880 / sub_A28F0 / sub_9F4A0 / sub_A16A0 (the next layer under sub_A19A0) ---
+// A unit's x/y as the skill code reads it: types 2, 4, 5 keep them in the unit's path block (+0xC/+0x10), the rest ask
+// the D2Common ordinals (0xA454 / 0xA3B8) with the block pointer, 0 without one.
+template <class E> uint32_t UnitCoord(E& e, uint32_t u, uint32_t off, uint32_t rva)
+{
+    const int32_t k = (int32_t)e.rd32(u); const uint32_t d = e.rd32(u + 0x2C);
+    if (k == 2 || (k >= 4 && k <= 5)) return e.rd32(d + off);
+    return d ? S(e, rva, d) : 0;
+}
+// The 0x5C-byte missile/skill request both builders hand to sub_6F930 (ecx = pGame, edx = &request). Only its stack
+// address reaches the log, so the request is built on a local array exactly as retail lays it out.
+template <class E> uint32_t SendRequest(E& e, uint32_t game, uint32_t* q) { return e.h(0x6F930, 0, game, e.stk(q)); }
+template <class E> uint32_t TargetOrSkip(E& e, uint32_t u, uint32_t game, uint32_t* q)   // 0x9FA30 into q[7], q[8]
+{ return e.h(0x9FA30, u, game, 0, e.stk(q + 7), 0, e.stk(q + 8)); }
+
+// 0xA1880: eax = X (target x hint), esi = pUnit, stack = (game, a1, a2, a3, dx, dy, y, check); ret 0x20.
+template <class E> uint32_t BuildSkillRequestA(E& e, uint32_t X, uint32_t u, uint32_t game, uint32_t a1, uint32_t a2, uint32_t a3,
+                                               uint32_t dx, uint32_t dy, uint32_t y, uint32_t check)
+{
+    uint32_t q[23] = {};
+    q[0] = 0x420; q[1] = q[2] = u; q[4] = a1; q[11] = a2; q[12] = a3;
+    q[5] = UnitCoord(e, u, 0xC, 0xA454) + dx;
+    q[6] = UnitCoord(e, u, 0x10, 0xA3B8) + dy;
+    if (X && y) { q[7] = X; q[8] = y; }
+    else if (!TargetOrSkip(e, u, game, q)) return 0;
+    if (check && e.rd32(u) == 0 && (int32_t)e.h(0xA1790, 0, 0, 0, u, 0, game) < 1) return 0;
+    return SendRequest(e, game, q);
+}
+
+// 0xA28F0: ecx = pGame, edx = a0 (goes to request word 4), stack = (u, a1, a2, dx, dy, px, py, check); ret 0x20.
+template <class E> uint32_t BuildSkillRequestB(E& e, uint32_t game, uint32_t a0, uint32_t u, uint32_t a1, uint32_t a2,
+                                               uint32_t dx, uint32_t dy, uint32_t px, uint32_t py, uint32_t check)
+{
+    uint32_t q[23] = {};
+    q[0] = 0x21; q[1] = u; q[4] = a0;
+    q[5] = UnitCoord(e, u, 0xC, 0xA454) + dx;
+    q[6] = UnitCoord(e, u, 0x10, 0xA3B8) + dy;
+    q[11] = a1; q[12] = a2;
+    if (px && py) { q[7] = px; q[8] = py; }
+    else if (!TargetOrSkip(e, u, game, q)) return 0;
+    if (!q[7] || !q[8]) return 0;
+    if (e.rd32(u) == 1) { const uint32_t f = S(e, 0xA42A, u, 0x13, 0); if (f) { q[18] = f; q[0] |= 0x1000; } }
+    if (check && e.rd32(u) == 0 && (int32_t)e.h(0xA1790, 0, 0, 0, u, 0, game) < 1) return 0;
+    return SendRequest(e, game, q);
+}
+
+// 0x9F4A0: eax = pGame (null: retail logs 0x2D3 and _exit(-1)), ecx = key, edx = pUnit, stack = pSkill; ret 4. Looks the key up in
+// the game's 128-slot chain (+0x1720, node +0xC key, +0xE4 next), asks 0xAE20 for the entry (out: count, handle), clamps and
+// stores it back through 0xAE86 / 0x8B010. dt = &sgptDataTables slot (E::dtPtr), shifts at +0xC6C, mask at +0xC70.
+template <class E> uint32_t StoreSkillEntry(E& e, uint32_t game, uint32_t key, uint32_t u, uint32_t sk)
+{
+    uint32_t n = e.rd32(game + 0x1720 + (key & 0x7F) * 4);
+    while (n && e.rd32(n + 0xC) != key) n = e.rd32(n + 0xE4);
+    if (!n) return 0;
+    const uint32_t id = S(e, 0xA49C, sk, e.fileStr, 0x382);
+    const uint32_t lvl = S(e, 0xA400, u, sk, 0);
+    uint32_t out[2] = {};   // out[0] = count (+0x18), out[1] = handle (+0x10)
+    if (!e.h(0xAE20, 0, 0, 0, 0, 0, n, id, lvl, e.stk(out), e.stk(out + 1))) return 0;
+    uint32_t cnt = out[0], hdl = out[1];
+    if ((int32_t)cnt <= 0) return 0;
+    const uint32_t dt = e.rd32(e.rd32(e.dtPtr));
+    const uint32_t key2 = (id << (e.rd32(dt + 0xC6C) & 31)) + (e.rd32(dt + 0xC70) & lvl);
+    int32_t v = (int32_t)S(e, 0xA712, hdl, 0xCC, key2);
+    if (!v) return 0;
+    v >>= 8;
+    if (v <= 0 || v > 0xFF) return 0;
+    int32_t c = (int32_t)cnt - 1; if (c < 0) c = 0; if (c >= v) c = v;
+    const uint32_t packed = ((uint32_t)v << 8) + ((uint32_t)c & 0xFF);
+    e.h(0xAE86, 0, 0, 0, 0, 0, hdl, 0xCC, packed, key2);
+    const uint32_t rec = (u && e.rd32(u) == 0) ? e.rd32(S(e, 0xA4C0, u) + 0x9C) : 0;
+    e.h(0x8B010, n, 0, 0, key2, 0, rec, 1, 0xCC, packed);
+    return 1;
+}
+
+// 0xA16A0: esi = pUnit, stack = (a0, a1); ret 8. Spend one use of the hand item's skill (stat 0x46) and refresh stat 0x48.
+template <class E> uint32_t SpendHandUse(E& e, uint32_t u, uint32_t a0, uint32_t a1)
+{
+    if (!u) return 0;
+    bool bad = false;
+    int32_t lvl = (int32_t)S(e, 0xA42A, u, 0x46, 0) - 1;
+    if (lvl < 0) { bad = true; lvl = 0; }
+    S(e, 0xA472, u, 0x46, (uint32_t)lvl, 0);
+    e.h(0xEA10, 0, 0, 0, u, 0, a0);
+    auto rec = [&] { return (a1 && e.rd32(a1) == 0) ? e.rd32(S(e, 0xA4C0, a1) + 0x9C) : 0u; };
+    e.h(0x8B010, u, 0, 0, 0, 0, rec(), 1, 0x46, (uint32_t)lvl);
+    const uint32_t d = S(e, 0xAA00, u);
+    if (S(e, 0xA42A, u, 0x48, 0) != d) { S(e, 0xA472, u, 0x48, d, 0); e.h(0x8B010, u, 0, 0, 0, 0, rec(), 1, 0x48, d); }
+    e.h(0x79100, a1, 0, 0, 0, 0, a0);
+    return bad ? 0 : (uint32_t)lvl + 1;
+}
 }

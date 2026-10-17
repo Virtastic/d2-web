@@ -259,6 +259,7 @@ void __fastcall ACT5Q5_UnitIterate_SetPrimaryGoalDone(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FCB6C20
+// 1.13c D2Game+0x5BF70
 void __fastcall ACT5Q5_RewardPlayer(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	QUESTS_UpdatePlayerFlags(pGame, pUnit);
@@ -824,6 +825,7 @@ int32_t __fastcall ACT5Q5_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2Uni
 }
 
 //D2Game.0x6FCB77C0
+// 1.13c D2Game+0x5C100
 int32_t __fastcall ACT5Q5_UnitIterate_SetPrimaryGoalDoneForPartyMembers(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
@@ -981,6 +983,7 @@ void __fastcall ACT5Q5_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 }
 
 //D2Game.0x6FCB7AF0
+// 1.13c D2Game+0x37480
 void __fastcall ACT5Q5_OnPortalOpened(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
@@ -1003,6 +1006,7 @@ void __fastcall ACT5Q5_OnPortalOpened(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCB7B40
+// 1.13c D2Game+0x8C280
 void __fastcall ACT5Q5_OnPortalClosed(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
@@ -1385,6 +1389,7 @@ int32_t __fastcall ACT5Q5_UnitIterate_CountLivingPlayers(D2GameStrc* pGame, D2Un
 	return 0;
 }
 
+// 1.13c D2Game+0x58DA0
 //D2Game.0x6FCB8190
 int32_t __fastcall OBJECTS_OperateFunction69_InvisibleAncient(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
@@ -1395,7 +1400,7 @@ int32_t __fastcall OBJECTS_OperateFunction69_InvisibleAncient(D2ObjOperateFnStrc
 		QUESTS_SendScrollMessage(pOp->pPlayer, pOp->pObject, 20169);
 	}
 
-	return 1;
+	return 0;
 }
 
 //D2Game.0x6FCB81F0

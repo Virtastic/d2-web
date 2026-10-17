@@ -39,28 +39,29 @@ static void unlinkLink(W l) {
     W p = b < 0 ? (W)~b : l - w(n, 4) + (W)b;
     w(p, 0) = n; w(n, 4) = w(l, 4); w(l, 0) = 0; w(l, 4) = 0;
 }
-static void unlinkAll(W list) { for (int32_t n; (n = (int32_t)w(list, 8)) > 0;) unlinkLink(w(list, 0) + (W)n); }   // 0x2180
-static void listUninit(W list) { unlinkAll(list); unlinkLink(list + 4); }   // 0x1FE0 (and its 0x1F60 wrapper)
-static void listInit(W list) { w(list, 0) = 0xdddddddd; w(list, 4) = list + 4; w(list, 8) = ~(list + 4); }   // 0x24B0
+void unlinkAll(W list) { for (int32_t n; (n = (int32_t)w(list, 8)) > 0;) unlinkLink(w(list, 0) + (W)n); }   // 0x2180
+void listUninit(W list) { unlinkAll(list); unlinkLink(list + 4); }   // 0x1FE0 (and its 0x1F60 wrapper)
+void listInit(W list) { w(list, 0) = 0xdddddddd; w(list, 4) = list + 4; w(list, 8) = ~(list + 4); }   // 0x24B0
 
 // Storage for the slot array (SMemReAlloc/SMemAlloc of 0x2630): old block, byte size -> new block. The default hands back a fresh zeroed block:
 // retail's realloc keeps the old bytes, whose list heads point into the old block, but Grow (0x22D0) re-inits every slot whose +0 is not 4 and the
 // nodes are already parked, so a zeroed block is the safe equal. The capture hook returns a pre-zeroed blob the same way.
 W (*d2game_tbl_realloc)(W old, W bytes) = [](W old, W bytes) -> W { void* p = calloc(1, bytes); free((void*)(uintptr_t)old); return (W)(uintptr_t)p; };
 
+void d2game_25a0_construct(W p) { if (p) listInit(p); }   // 0x25A0 (stdcall: null-checks then 0x24B0)
 // 0x25F0 (eax = n, stack = array hdr), 0x2630 (ebx = cap, esi = hdr), 0x2510 (eax = hdr, edi = n): the growable array {cap, count, data, align} at table+0x14.
-static W arrAlign(W n, W hdr) {
+W arrAlign(W n, W hdr) {
     if (n >= 0x15) { w(hdr, 0xc) = 0x15; return 0x15; }
     for (W c = (n - 1) & n; c; c = (n - 1) & n) n = c;
     return n < 1 ? 1 : n;
 }
-static void arrSetCap(W hdr, W cap) {   // the OOM copy-construct fallback of 0x2630 (via 0x26F0/0x2740) is not modelled
+void arrSetCap(W hdr, W cap) {   // the OOM copy-construct fallback of 0x2630 (via 0x26F0/0x2740) is not modelled
     W old = w(hdr, 8);
     for (W i = cap; i < w(hdr, 4); ++i) listUninit(old + i * 12);
     w(hdr, 0) = cap;
     w(hdr, 8) = d2game_tbl_realloc(old, cap * 12);
 }
-static void arrSetCount(W hdr, W n) {
+void arrSetCount(W hdr, W n) {
     W c = w(hdr, 4);
     if (n > c) {
         if (n > w(hdr, 0)) {

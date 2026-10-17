@@ -11,11 +11,16 @@ export function applyRealmPlayerFrame(protocol, bytes) {
 
 export function selectPlayerRenderSource(snapshot, motion, realmSessionOpen, realmPlayer, realmAct = null) {
   if (realmSessionOpen && realmPlayer?.active && realmPlayer.clientRoomActive && (realmPlayer.x !== 0 || realmPlayer.y !== 0)) {
+    // Draw the client CUnit's current animation, not the fixed assignment record: a server mode
+    // change (walk, gethit, death) is written to that unit and must reach the renderer.
+    const live = realmPlayer.motion?.active ? realmPlayer.motion : null;
     return {
       source: 'realm', guid: realmPlayer.guid, x: realmPlayer.x, y: realmPlayer.y,
       classId: realmPlayer.classId, reassignments: realmPlayer.reassignments,
-      renderState: { playerClass: realmPlayer.classId, mode: realmPlayer.initialMode ?? 5,
-        direction: realmPlayer.initialDirection ?? 0, tick: snapshot?.tick ?? 0, act: realmAct ?? snapshot?.act ?? 0,
+      renderState: { playerClass: realmPlayer.classId, mode: live?.mode ?? realmPlayer.initialMode ?? 5,
+        direction: live?.direction ?? realmPlayer.initialDirection ?? 0, framePrecise: live?.framePrecise,
+        frameCountPrecise: live?.frameCountPrecise, animSpeed: live?.animSpeed,
+        tick: snapshot?.tick ?? 0, act: realmAct ?? snapshot?.act ?? 0,
         weaponClass: 'hth', items: [] },
     };
   }

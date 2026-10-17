@@ -93,6 +93,7 @@ D2UnitStrc* __stdcall UNITS_AllocUnit(void* pMemPool, int nUnitType)
 	return pUnit;
 }
 
+// 1.13c D2Common+0x33990 (inlined STATLIST_FreeStatListEx and the ordinal renumbering are the only deltas)
 //D2Common.0x6FDBD720 (#11260)
 void __stdcall UNITS_FreeUnit(D2UnitStrc* pUnit)
 {
@@ -869,6 +870,7 @@ int __stdcall UNITS_IsCurrentRoomInvalid(D2UnitStrc* pUnit)
 
 //D2Common.0x6FDBEB20 (#10356)
 //TODO: Find a name
+// 1.13c D2Common+0x2FC50
 void __stdcall UNITS_SetCurrentRoomInvalid(D2UnitStrc* pUnit, int a2)
 {
 	D2_ASSERT(pUnit);
@@ -4076,6 +4078,7 @@ D2UnitStrc* __stdcall D2Common_10406(D2UnitStrc* pUnit, int (__fastcall* pCallba
 }
 
 //D2Common.0x6FDC33C0 (#10407)
+// 1.13c D2Common+0x7F6A0
 //TODO: Find a name
 D2UnitStrc* __stdcall D2Common_10407(D2ActiveRoomStrc* pRoom, int nX, int nY, int (__fastcall* pCallback)(D2UnitStrc*, void*), void* a5, int a6)
 {

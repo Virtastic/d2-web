@@ -1,5 +1,7 @@
 #include "D2Inventory.h"
 
+#include <cstddef>
+
 #include "D2Composit.h"
 #include "D2DataTbls.h"
 #include <DataTbls/MonsterIds.h>
@@ -1472,6 +1474,7 @@ D2UnitStrc* __stdcall INVENTORY_GetSecondaryWeapon(D2InventoryStrc* pInventory)
 }
 
 //D2Common.0x6FD8FDD0 (#10259)
+// 1.13c D2Common+0x20830
 D2UnitStrc* __stdcall INVENTORY_GetCompositItem(D2InventoryStrc* pInventory, int nComponent)
 {
 	if (!INVENTORY_GetPtrIfValid(pInventory))
@@ -1530,6 +1533,7 @@ int __stdcall INVENTORY_GetBodyLocFromEquippedItem(D2InventoryStrc* pInventory, 
 }
 
 //D2Common.0x6FD8FED0 (#11278)
+// 1.13c D2Common+0x1E600
 int __stdcall INVENTORY_GetItemsXPosition(D2InventoryStrc* pInventory, D2UnitStrc* pItem)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory) && INVENTORY_UnitIsItem(pItem))
@@ -1539,6 +1543,15 @@ int __stdcall INVENTORY_GetItemsXPosition(D2InventoryStrc* pInventory, D2UnitStr
 
 	return 0;
 }
+
+// 1.13c D2Common+0x21790
+// The fields the 1.13c body reads: inventory signature and cursor slot, unit type and item data, parent inventory.
+static_assert(offsetof(D2InventoryStrc, dwSignature) == 0x00);
+static_assert(offsetof(D2InventoryStrc, pCursorItem) == 0x20 + 5 * (sizeof(void*) - 4));
+static_assert(offsetof(D2UnitStrc, dwUnitType) == 0x00);
+static_assert(offsetof(D2UnitStrc, pItemData) == 0x14 + 1 * (sizeof(void*) - 4));
+static_assert(offsetof(D2ItemDataStrc, pExtraData) == 0x5C);
+static_assert(offsetof(D2ItemExtraDataStrc, pParentInv) == 0x00);
 
 //D2Common.0x6FD8FF20 (#10261)
 void __stdcall INVENTORY_SetCursorItem(D2InventoryStrc* pInventory, D2UnitStrc* pItem)
@@ -1624,6 +1637,7 @@ D2UnitStrc* __stdcall INVENTORY_FindBackPackItemForStack(D2InventoryStrc* pInven
 	return nullptr;
 }
 
+// 1.13c D2Common+0x20FD0
 //D2Common.0x6FD90080 (#10264)
 D2UnitStrc* __stdcall INVENTORY_FindEquippedItemForStack(D2InventoryStrc* pInventory, D2UnitStrc* pStackable, D2UnitStrc* pCheckItem)
 {
@@ -1762,6 +1776,7 @@ BOOL __stdcall INVENTORY_HasSimilarPotionInBelt(D2InventoryStrc* pInventory, D2U
 }
 
 //D2Common.0x6FD90340 (#10269)
+// 1.13c D2Common+0x200D0
 BOOL __stdcall INVENTORY_GetFreeBeltSlot(D2InventoryStrc* pInventory, D2UnitStrc* pItem, int* pFreeSlotId)
 {
 	if (!INVENTORY_GetPtrIfValid(pInventory) || !INVENTORY_UnitIsItem(pItem) || !ITEMS_CheckIfBeltable(pItem))
@@ -1831,6 +1846,7 @@ BOOL __stdcall INVENTORY_GetFreeBeltSlot(D2InventoryStrc* pInventory, D2UnitStrc
 }
 
 //D2Common.0x6FD904F0 (#10270)
+// 1.13c D2Common+0x21E80
 BOOL __stdcall INVENTORY_PlaceItemInFreeBeltSlot(D2InventoryStrc* pInventory, D2UnitStrc* pItem)
 {
 	int nFreeSlot = 0;
@@ -2091,6 +2107,7 @@ BOOL __stdcall INVENTORY_CheckForItemInTradeInventory(D2InventoryStrc* pInventor
 }
 
 //D2Common.0x6FD909F0 (#10283)
+// 1.13c D2Common+0x1E4F0
 void __stdcall INVENTORY_AddItemToTradeInventory(D2InventoryStrc* pInventory, D2UnitStrc* pItem)
 {
 	if (INVENTORY_UnitIsItem(pItem))

@@ -19,6 +19,15 @@ struct McpClientOpaquePrefix {
 static_assert(sizeof(McpClientOpaquePrefix) == 0x18c);
 static McpClientOpaquePrefix g_mcpClientOpaquePrefix{};
 
+// 1.13c D2MCPClient+0x6990 dispatches an inbound frame through this table at 0xA900, 26 pointers, indexed
+// by the frame's first byte.  22 slots are handlers; 0x01, 0x13, 0x15 and 0x16 are null -- the client has
+// no inbound handler for those opcodes, and a frame with one is dropped without a trace.
+const uint32_t kMcpRxHandlerRva[26] = {
+    0x60A0u, 0u,      0x6590u, 0x6540u, 0x64D0u, 0x63E0u, 0x6280u, 0x6570u, 0x6080u, 0x6060u,
+    0x6250u, 0x6210u, 0x61F0u, 0x6180u, 0x61A0u, 0x6160u, 0x60F0u, 0x5F10u, 0x5EE0u, 0u,
+    0x60D0u, 0u,      0u,      0x60C0u, 0x6230u, 0x60B0u,
+};
+
 }
 
 // MCP message ids (one space, used both directions: a reply carries the request's id).
@@ -185,6 +194,23 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_mcp_joingame_reply(uint16_t requestId, uint16_
     out[10] = (uint8_t)hash; out[11] = (uint8_t)(hash >> 8); out[12] = (uint8_t)(hash >> 16); out[13] = (uint8_t)(hash >> 24);
     out[14] = (uint8_t)result; out[15] = (uint8_t)(result >> 8); out[16] = (uint8_t)(result >> 16); out[17] = (uint8_t)(result >> 24);
     return 18;
+}
+
+// ── Inbound: the poll D2Client drives once per frame (D2MCPClient ordinal 10050) ─────────────
+// 1.13c D2MCPClient+0x6990: with no MCP socket open ([0xb028] == 0), return 0 and touch nothing --
+// that is the whole of the "not connected" cost.  Otherwise recv up to 0x400 bytes through the
+// Fog#10072 thunk (0x5E10); a zero-length receive (and only zero: the recv result is truncated to a
+// `short`, so a 0x10000-byte length also reads as 0) means no frame.  A frame's first byte is its
+// opcode: >= 0x1A is dropped, and so is an opcode whose table slot is null.  A dispatched handler is
+// called with ECX = the buffer and EDX = the received length; its return value is discarded.
+// Returns 1 whenever the socket was open, whatever the frame did -- the caller ignores it.
+EMSCRIPTEN_KEEPALIVE int d2_realm_mcp_rx_dispatch(uint32_t socket, const uint8_t* pkt, int len, uint32_t* outHandlerRva) {
+    *outHandlerRva = 0;
+    if (socket == 0) return 0;
+    if ((uint16_t)len == 0) return 1;
+    const uint8_t op = pkt[0];
+    if (op < 26) *outHandlerRva = kMcpRxHandlerRva[op];
+    return 1;
 }
 
 }  // extern "C"

@@ -664,6 +664,7 @@ D2UnitStrc* __fastcall D2GAME_CORPSE_Handler_6FC7FBD0(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FC802F0
+// 1.13c D2Game+0x78D00
 void __fastcall sub_6FC802F0(D2GameStrc* pGame, int32_t nBodyloc, D2UnitStrc* pItem, D2UnitStrc* pUnit)
 {
     INVENTORY_UpdateWeaponGUIDOnRemoval(pUnit->pInventory, pItem);

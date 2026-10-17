@@ -813,6 +813,7 @@ void __fastcall ACT5Q3_SendPacket0x5DToClient(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCB4190
+// 1.13c D2Game+0x5C690
 void __fastcall ACT5Q3_SpawnDrehyaInTown(D2QuestDataStrc* pQuestData, D2Act5Quest3Strc* pQuestDataEx)
 {
 	if (pQuestDataEx->bDrehyaInTownInitialized != 1)
@@ -1698,6 +1699,7 @@ void __fastcall OBJECTS_InitFunction74_FrozenAnya(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FCB54D0
+// 1.13c D2Game+0x5CD50
 int32_t __fastcall OBJECTS_OperateFunction67_FrozenAnya(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
 	if (!pOp || !pOp->pObject)

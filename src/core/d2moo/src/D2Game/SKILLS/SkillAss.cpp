@@ -441,6 +441,7 @@ void __fastcall sub_6FCF5870(D2UnitStrc* pUnit, D2DamageStrc* pDamage)
 }
 
 //D2Game.0x6FCF5B90
+// 1.13c D2Game+0x8E900
 D2SkillsTxt* __fastcall SKILLS_GetSkillsTxtRecord(int32_t nSkillId)
 {
     if (nSkillId >= 0 && nSkillId < sgptDataTables->nSkillsTxtRecordCount)
@@ -452,6 +453,7 @@ D2SkillsTxt* __fastcall SKILLS_GetSkillsTxtRecord(int32_t nSkillId)
 }
 
 //D2Game.0x6FCF5BC0
+// 1.13c D2Game+0x918D0
 void __fastcall sub_6FCF5BC0(D2UnitStrc* pUnit, D2StatListStrc* pStatList, D2DamageStrc* pDamage)
 {
     const int32_t nSkillId = STATLIST_GetStatValue(pStatList, STAT_MODIFIERLIST_SKILL, 0);
@@ -1014,6 +1016,7 @@ int32_t __fastcall SKILLS_SrvDo041_RoyalStrike_ProgressiveFn3(D2GameStrc* pGame,
 }
 
 //D2Game.0x6FCF77E0
+// 1.13c D2Game+0x91B70
 void __fastcall sub_6FCF77E0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2DamageStrc* pDamage)
 {
     if (!pDamage || !(pDamage->wResultFlags & DAMAGERESULTFLAG_SUCCESSFULHIT))
@@ -1324,6 +1327,7 @@ int32_t __fastcall SKILLS_SrvDo042_DragonTalon(D2GameStrc* pGame, D2UnitStrc* pU
 }
 
 //D2Game.0x6FCF8330
+// 1.13c D2Game+0x93990
 int32_t __fastcall sub_6FCF8330(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit, int32_t nMissileId, int32_t nSubMissiles, int32_t nRange, int32_t nSkillId, int32_t nSkillLevel)
 {
     int32_t nTargetX = 0;
@@ -1392,6 +1396,7 @@ int32_t __fastcall SKILLS_SrvDo043_ShockField(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FCF8610
+// 1.13c D2Game+0x95D50
 D2UnitStrc* __fastcall sub_6FCF8610(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY, D2SkillsTxt* pSkillsTxtRecord, int32_t nSkillId, int32_t nSkillLevel)
 {
     int32_t nSpawnMode = 0;
@@ -1541,6 +1546,7 @@ int32_t __fastcall SKILLS_SrvDo045_Sentry(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 //D2Game.0x6FCF8BA0
+// 1.13c D2Game+0x93270
 int32_t __fastcall SKILLS_SrvDo046_DragonClaw(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
@@ -2128,6 +2134,7 @@ int32_t __fastcall SKILLS_SrvSt27_DragonTail(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FCF9C70
+// 1.13c D2Game+0x93110
 int32_t __fastcall SKILLS_SrvDo050_DragonTail(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);

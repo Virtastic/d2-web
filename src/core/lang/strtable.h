@@ -39,7 +39,9 @@ public:
     // D2LANG_GetTblIndex: patch (10000+) > expansion (20000+) > string (0+); 0 when absent.
     uint16_t tblIndex(const std::string& key, const std::u16string** value = nullptr) const;
     // D2LANG_GetStringFromTblIndex: the inverse of tblIndex (10000+ patch, 20000+ expansion).
-    const std::u16string* byTblIndex(uint16_t index) const;
+    // `table` (0 classic, 1 patch, 2 expansion) and `inTable` report the table an index dispatches
+    // to and the index looked up inside it: 1.13c D2Lang+0x9450's whole content.
+    const std::u16string* byTblIndex(uint16_t index, int* table = nullptr, uint16_t* inTable = nullptr) const;
 };
 
 // UTF-8 -> UTF-16 the way D2Lang's Unicode::utf8ToUnicode does for the 1-3 byte forms.

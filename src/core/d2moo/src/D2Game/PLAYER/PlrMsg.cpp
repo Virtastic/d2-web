@@ -222,6 +222,7 @@ void __fastcall sub_6FC82270(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc*
 }
 
 //D2Game.0x6FC822D0
+// 1.13c D2Game+0xCC2F0
 void __fastcall D2GAME_UpdateAttribute_6FC822D0(D2UnitStrc* pUnit, WORD nStat, uint32_t nNewValue, D2UnitStrc* pPlayer)
 {
     D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
@@ -1757,6 +1758,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x15_HandleChatMessage_6FC84950(D2Ga
 }
 
 //D2Game.0x6FC84C70
+// 1.13c D2Game+0xCBE70
 void __fastcall sub_6FC84C70(D2GameStrc* pGame, const char* szMessage, uint8_t nColor)
 {
     D2GSPacketSrv26 pPacket = {};
@@ -3970,6 +3972,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x61_DropPickupMercItem_6FC88930(D2G
         {
             SUNIT_AttachSound(pMerc, 0x55u, pUnit);
         }
+        // 1.13c D2Game+0xCFBC0
         else if (D2GAME_MERCS_EquipItem_6FC88D10(pGame, pUnit, pMerc, pItem))
         {
             SUNIT_AttachSound(pMerc, 0x57u, pUnit);

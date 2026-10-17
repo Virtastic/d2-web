@@ -75,6 +75,7 @@ void __fastcall PLAYERSTATS_SetStatsForStartingAct(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FC7EC00
+// 1.13c D2Game+0xEB090
 void __fastcall PLAYERSTATS_LevelUp(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     int32_t nClassId = -1;

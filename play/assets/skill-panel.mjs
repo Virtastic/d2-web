@@ -13,7 +13,7 @@ import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { textColourPalette } from './frontend.mjs';
 import { BORDER_RIGHT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
 import { createFont, decodeFontTbl } from './frontend.mjs';
-import { PANEL_CLOSE_ART, panelCloseLayout } from './panel-close.mjs';
+import { PANEL_CLOSE_ART, panelCloseFrame, panelCloseLayout } from './panel-close.mjs';
 
 export const SESSION_SKILL_BYTES = 26;   // D2SessionSkill: thirteen uint16 (manaLine/manaCost are V19's)
 
@@ -361,7 +361,10 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
       // both come from it now, so they cannot drift the way close.x-1,close.y+28 vs the raw table
       // entry did.
       const close = panelCloseLayout('skills', { playerClass: state.playerClass, tab });
-      const closeBlit = chrome.cel(ctx, act, PANEL_CLOSE_ART.path, PANEL_CLOSE_ART.frame, close.x, close.y + close.height - 1);
+      // The frame is the widget's held/rest state (FUN_6FB28240 draws `held + 10`), so the cel the
+      // player sees while the button is down is the one D2Client itself would blit.
+      const closeFrame = panelCloseFrame(state.closePressed);
+      const closeBlit = chrome.cel(ctx, act, PANEL_CLOSE_ART.path, closeFrame, close.x, close.y + close.height - 1);
       chrome.border(ctx, act, BORDER_RIGHT);
 
       // The hovered skill's own retail text: SkillDesc's wStrName and wStrLong are .tbl indices the
@@ -420,7 +423,7 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
       // shape of the defect that drew a green block, and a count of drawn icons cannot see it.
       return { x: o.x, y: o.y, scale: o.scale, tab, drawn, plus, missingIcons, namePlate, plate, cels, labels, digits,
         icons: icons.length, skillPoints: state.skillPoints ?? 0, total: (state.skills || []).length,
-        close: { ...close, path: PANEL_CLOSE_ART.path, frame: PANEL_CLOSE_ART.frame, blit: closeBlit } };
+        close: { ...close, path: PANEL_CLOSE_ART.path, frame: closeFrame, pressed: Boolean(state.closePressed), blit: closeBlit } };
     },
   };
 }

@@ -36,6 +36,7 @@
 
 
 //D2Game.0x6FCC5520
+// 1.13c D2Game+0x7B0A0
 void __fastcall D2GAME_SUNITMSG_FirstFn_6FCC5520(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc* pClient)
 {
     if (!pUnit)
@@ -422,6 +423,7 @@ void __fastcall D2GAME_PACKETS_SendPacket0x0A_RemoveObject_6FCC5F80(D2UnitStrc* 
 }
 
 //D2Game.0x6FCC5FA0
+// 1.13c D2Game+0x7ACB0
 void __fastcall sub_6FCC5FA0(D2UnitStrc* pUnit, D2ClientStrc* pClient)
 {
     if (!pUnit)
@@ -454,6 +456,7 @@ void __fastcall sub_6FCC5FA0(D2UnitStrc* pUnit, D2ClientStrc* pClient)
 }
 
 //D2Game.0x6FCC6080
+// 1.13c D2Game+0x7AC50
 void __fastcall D2GAME_UpdateUnit_6FCC6080(D2UnitStrc* pPlayer, D2ClientStrc* pClient)
 {
     if (!pPlayer->pUpdateUnit || CLIENTS_GetPlayerFromClient(pClient, 0) == pPlayer->pUpdateUnit)
@@ -571,6 +574,7 @@ void __fastcall sub_6FCC6270(D2UnitStrc* pUnit, uint8_t a2)
 }
 
 //D2Game.0x6FCC6300
+// 1.13c D2Game+0x7A190
 void __fastcall sub_6FCC6300(D2UnitStrc* pUnit, D2UnitStrc* pTargetUnit, int16_t nSkillId, int16_t nSkillLevel, int32_t nX, int32_t nY, uint8_t a7)
 {
     D2UnitPacketListStrc* pMsg = (D2UnitPacketListStrc*)D2_CALLOC_POOL(pUnit->pMemoryPool, 40);
@@ -610,6 +614,7 @@ void __fastcall sub_6FCC6300(D2UnitStrc* pUnit, D2UnitStrc* pTargetUnit, int16_t
 }
 
 //D2Game.0x6FCC63D0
+// 1.13c D2Game+0x7A0F0
 void __fastcall sub_6FCC63D0(D2UnitStrc* pUnit, int16_t a2)
 {
     STATES_ToggleState(pUnit, STATE_SKILL_MOVE, 0);
@@ -683,6 +688,7 @@ void __fastcall sub_6FCC64D0(D2UnitStrc* pUnit, uint8_t bLeftSkill, int16_t nSki
 }
 
 //D2Game.0x6FCC6540
+// 1.13c D2Game+0x7ADF0
 void __fastcall sub_6FCC6540(D2UnitStrc* pUnit, D2ClientStrc* pClient)
 {
     for (D2UnitPacketListStrc* pMsg = pUnit->pMsgFirst; pMsg; pMsg = pMsg->pNext)

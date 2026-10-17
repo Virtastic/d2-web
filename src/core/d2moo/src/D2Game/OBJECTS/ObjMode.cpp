@@ -1551,6 +1551,7 @@ int32_t __fastcall OBJECTS_OperateFunction04_Chest(D2ObjOperateFnStrc* pOp, int3
 }
 
 //D2Game.0x6FC764B0
+// 1.13c D2Game+0x6DD60
 void __fastcall  D2GAME_SetTrapCallback_6FC764B0(D2ObjOperateFnStrc* pOp, uint8_t nTrapType)
 {
     using TrapFunc = void(__fastcall*)(D2GameStrc*, D2UnitStrc*);
@@ -3633,6 +3634,7 @@ int32_t __fastcall OBJMODE_MainObeliskHandler(D2GameStrc* pGame, int32_t nPlayer
 }
 
 //D2Game.0x6FC79B50
+// 1.13c D2Game+0x73D90
 void __fastcall sub_6FC79B50(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pObject)
 {
     if (pObject)
@@ -3717,6 +3719,7 @@ void __fastcall sub_6FC79C30(D2GameStrc* pGame, int32_t nUnused, int32_t nPortal
 }
 
 //D2Game.0x6FC79D90
+// 1.13c D2Game+0x6A560
 int32_t __fastcall OBJECTS_OperateFunction22_Well(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
     if (!pOp || !pOp->pObject || !pOp->pPlayer)
@@ -3879,6 +3882,7 @@ int32_t __fastcall OBJECTS_OperateFunction48_TrappedSoul(D2ObjOperateFnStrc* pOp
 }
 
 //D2Game.0x6FC7A140
+// 1.13c D2Game+0x11A70
 D2UnitStrc* __fastcall OBJMODE_DropItemWithCodeAndQuality(D2GameStrc* pGame, D2UnitStrc* pUnit, uint32_t dwCode, int32_t nItemQuality)
 {
     const int32_t nItemId = DATATBLS_GetItemIdFromItemCode(dwCode);
@@ -3915,6 +3919,7 @@ D2UnitStrc* __fastcall OBJMODE_DropItemWithCodeAndQuality(D2GameStrc* pGame, D2U
 }
 
 //D2Game.0x6FC7A220
+// 1.13c D2Game+0x6B570
 D2UnitStrc* __fastcall OBJMODE_DropFromChestTCWithQuality(D2ObjOperateFnStrc* pOp, int32_t nItemQuality)
 {
     constexpr int32_t nLevelIds[] =

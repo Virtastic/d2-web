@@ -1806,6 +1806,7 @@ void __fastcall OBJECTS_InitFunction13_InvisibleObject(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FC9C460
+// 1.13c D2Game+0x683C0
 void __fastcall ACT1Q4_UpdateQuestStateOnActChange(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
@@ -2266,6 +2267,7 @@ void __fastcall ACT1Q4_OnCainInTownActivated(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC9CC00
+// 1.13c D2Game+0x49A80
 int32_t __fastcall ACT1Q4_IsCainInTristramDeactivated(D2GameStrc* pGame)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A1Q4_CAIN);

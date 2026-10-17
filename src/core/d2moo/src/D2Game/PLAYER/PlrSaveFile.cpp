@@ -126,6 +126,7 @@ int16_t __fastcall PLRSAVE2_GetItemIndex(D2UnitStrc* pPlayer, int32_t nGUID)
 }
 
 //D2Game.0x6FC8CCD0
+// 1.13c D2Game+0xEC120
 void __fastcall PLRSAVE2_WriteMercData(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2SaveHeaderStrc* pMercData)
 {
     D2UnitStrc* pHireling = sub_6FC7E8B0(pGame, pPlayer, PETTYPE_HIREABLE, 1);
@@ -162,6 +163,7 @@ void __fastcall PLRSAVE2_WriteMercData(D2GameStrc* pGame, D2UnitStrc* pPlayer, D
 }
 
 //D2Game.0x6FC8CD80
+// 1.13c D2Game+0xEC470
 int32_t __fastcall PLRSAVE2_WriteSaveHeader(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint8_t** ppSection, const uint8_t* pEnd)
 {
     D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
@@ -279,6 +281,7 @@ int32_t __fastcall PLRSAVE2_WriteSaveHeader(D2GameStrc* pGame, D2UnitStrc* pPlay
 // The order is not a guess: PLRSAVE2's own error enum enumerates it (BAD_QUESTRECORD, BAD_WAYPOINT,
 // BAD_PLAYERINTRO, BAD_STATS, BAD_SKILLS, BAD_ITEMS, BAD_CORPSES, BAD_PET, BAD_IRONGOLEM), and the
 // reader validates in the same sequence.
+// 1.13c D2Game+0xEC7F0
 int32_t __fastcall PLRSAVE2_CreateSaveFile(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint8_t* pData, uint32_t* pSize, uint32_t nMaxSize, int32_t a6, int32_t a7)
 {
     *pSize = 0;
@@ -443,6 +446,7 @@ int32_t __fastcall PLRSAVE2_CreateSaveFile(D2GameStrc* pGame, D2UnitStrc* pPlaye
 // wNameFirst), so the reader adds it back and clamps into the range. A record with no seed, no
 // experience and no name is "no mercenary" and creates nothing -- which is what every save we hold
 // carries, so a character without a hireling is unaffected by the sections below.
+// 1.13c D2Game+0x55AD0
 D2UnitStrc* __fastcall D2WEB_PLRSAVE2_ReadMercData(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2MercSaveDataStrc* pData, uint32_t dwVersion)
 {
     if (!pData->nExperience && !pData->nSeed && !pData->wName)
@@ -574,6 +578,7 @@ int32_t __fastcall D2WEB_PLRSAVE2_ReadPetSection(D2GameStrc* pGame, D2UnitStrc* 
 // mercenary's own item sections use the bulk reader (PLRSAVE_ReadItems), which is a different
 // function. Nothing in this engine summons an iron golem, so this is ported for the section chain's
 // sake and is unasserted -- see C3d.
+// 1.13c D2Game+0xED710
 int32_t __fastcall D2WEB_PLRSAVE2_CreateItem(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc** ppItem,
     uint8_t** ppSection, uint8_t* pEnd, uint32_t dwVersion)
 {

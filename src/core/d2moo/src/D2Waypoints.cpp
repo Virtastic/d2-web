@@ -5,6 +5,7 @@
 static const int gnNumberOfWaypoints = 7 * 8 * sizeof(short);
 
 //D2Common.0x6FDC3D20 (#11153)
+// 1.13c D2Common+0x67EB0
 BOOL __stdcall WAYPOINTS_GetLevelIdFromWaypointNo(short nWaypointNo, int* pLevelId)
 {
 	*pLevelId = 0;

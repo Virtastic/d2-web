@@ -46,8 +46,25 @@ constexpr uint32_t dword_6FD3F464 = 2;
 
 
 
+static void __fastcall SUNITINACTIVE_RestoreInactiveRest(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, uint8_t nAct, D2DrlgCoordsStrc* pCoords);
+
+// 1.13c D2Game+0x1FB90: the monster half of 1.10f's RestoreInactiveUnits; 1.13c's
+// RestoreInactiveUnits (D2Game+0x200E0) calls it first. Delta: a node with INACTIVEMONSTERFLAG_NODEINDEXUNEQUAL11 and a
+// good/neutral alignment flag is freed without being spawned (1.10f spawned it, then sub_6FC40280 with slot 8/9).
+void __fastcall SUNITINACTIVE_RestoreInactiveMonsters(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom);
+
 //D2Game.0x6FCC3850
 void __fastcall SUNITINACTIVE_RestoreInactiveUnits(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom)
+{
+	SUNITINACTIVE_RestoreInactiveMonsters(pGame, pRoom);
+
+	D2DrlgCoordsStrc pDrlgCoords = {};
+	const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(pRoom);
+	const uint8_t nAct = DRLG_GetActNoFromLevelId(nLevelId);
+	SUNITINACTIVE_RestoreInactiveRest(pGame, pRoom, nAct, &pDrlgCoords);
+}
+
+void __fastcall SUNITINACTIVE_RestoreInactiveMonsters(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom)
 {
 	D2DrlgCoordsStrc pDrlgCoords = {};
 	DUNGEON_GetRoomCoordinates(pRoom, &pDrlgCoords);
@@ -92,7 +109,13 @@ void __fastcall SUNITINACTIVE_RestoreInactiveUnits(D2GameStrc* pGame, D2ActiveRo
 			if (!bContinue)
 			{
 				D2UnitStrc* pUnit = nullptr;
-				if (!(pInactiveMonsterNode->nUnitFlagsEx & UNITFLAGEX_HASBEENDELETED))
+				if (!(pInactiveMonsterNode->nUnitFlagsEx & UNITFLAGEX_HASBEENDELETED)
+					&& (pInactiveMonsterNode->nTypeFlags & INACTIVEMONSTERFLAG_NODEINDEXUNEQUAL11)
+					&& (pInactiveMonsterNode->nTypeFlags & (INACTIVEMONSTERFLAG_ALIGNMENT_GOOD | INACTIVEMONSTERFLAG_ALIGNMENT_NEUTRAL)))
+				{
+					SUNITINACTIVE_FreeInactiveMonsterNode(pGame, pInactiveMonsterNode); // 1.13c: skipped, freed
+				}
+				else if (!(pInactiveMonsterNode->nUnitFlagsEx & UNITFLAGEX_HASBEENDELETED))
 				{
 					int32_t nFlags = 0;
 					if (pInactiveMonsterNode->nTypeFlags & INACTIVEMONSTERFLAG_UNKSUMMONERFLAG)
@@ -260,12 +283,18 @@ void __fastcall SUNITINACTIVE_RestoreInactiveUnits(D2GameStrc* pGame, D2ActiveRo
 			pInactiveMonsterNode = pNextMonsterNode;
 		}
 	}
+}
 
+// 1.13c D2Game+0x200E0
+static void __fastcall SUNITINACTIVE_RestoreInactiveRest(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, uint8_t nAct, D2DrlgCoordsStrc* pCoords)
+{
+	D2DrlgCoordsStrc& pDrlgCoords = *pCoords;
 	DUNGEON_GetRoomCoordinates(pRoom, &pDrlgCoords);
 
 	D2InactiveUnitListStrc* pPreviousList = nullptr;
 	D2InactiveItemNodeStrc* pInactiveItemNode = nullptr;
 	D2InactiveUnitNodeStrc* pInactiveUnitNode = nullptr;
+	D2InactiveUnitListStrc* pInactiveUnitList = nullptr;
 	pInactiveUnitList = pGame->pInactiveUnitList[nAct];
 	while (pInactiveUnitList)
 	{
@@ -452,6 +481,7 @@ void __fastcall SUNITINACTIVE_RestoreInactiveUnits(D2GameStrc* pGame, D2ActiveRo
 }
 
 //D2Game.0x6FCC40D0
+// 1.13c D2Game+0x9D230
 D2AiControlStrc* __fastcall AIGENERAL_GetAiControlFromUnit(D2UnitStrc* pUnit)
 {
 	if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)
@@ -763,6 +793,7 @@ void __fastcall SUNITINACTIVE_CompressUnitIfNeeded(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FCC4650
+// 1.13c D2Game+0x203D0
 void __fastcall SUNITINACTIVE_CompressInactiveUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
@@ -1286,6 +1317,7 @@ void __fastcall SUNITINACTIVE_SaveSpecialMonsterParameters(D2GameStrc* pGame, D2
 }
 
 //D2Game.0x6FCC52C0
+// 1.13c D2Game+0x1EE50
 int32_t __fastcall SUNITINACTIVE_IsUnitInsideRoom(D2GameStrc* pGame, D2ActiveRoomStrc* pRoomNear, int32_t nGameX, int32_t nGameY, int32_t nClassId)
 {
 	D2_ASSERT(pGame);

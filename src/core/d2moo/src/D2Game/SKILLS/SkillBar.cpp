@@ -337,6 +337,7 @@ int32_t __fastcall SKILLS_SrvDo070_DoubleSwing(D2GameStrc* pGame, D2UnitStrc* pU
 }
 
 //D2Game.0x6FCFB320
+// 1.13c D2Game+0x27130
 int32_t __fastcall SKILLS_Callback_FindTargetForTaunt(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
@@ -528,6 +529,7 @@ int32_t __fastcall SKILLS_SrvDo074_DoubleThrow(D2GameStrc* pGame, D2UnitStrc* pU
 }
 
 //D2Game.0x6FCFB8A0
+// 1.13c D2Game+0x27C90
 int32_t __fastcall SKILLS_SrvDo075_GrimWard(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -705,6 +707,7 @@ void __fastcall SKILLS_ApplyFrenzyStats(D2GameStrc* pGame, D2UnitStrc* pUnit, in
 }
 
 //D2Game.0x6FCFBE80
+// 1.13c D2Game+0x29600
 int32_t __fastcall SKILLS_SrvDo009_Frenzy(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
@@ -749,6 +752,7 @@ void __fastcall SKILLS_CurseStateCallback_Whirlwind(D2UnitStrc* pUnit, int32_t n
 }
 
 //D2Game.0x6FCFBFE0
+// 1.13c D2Game+0x28290
 int32_t __fastcall SKILLS_SrvSt38_Whirlwind(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -913,6 +917,7 @@ int32_t __fastcall SKILLS_RemoveWhirlwindStats(D2GameStrc* pGame, D2UnitStrc* pU
 }
 
 //D2Game.0x6FCFC4C0
+// 1.13c D2Game+0x28BE0
 int32_t __fastcall SKILLS_SrvDo076_Whirlwind(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1272,6 +1277,7 @@ int32_t __fastcall SKILLS_SrvSt40_Leap(D2GameStrc* pGame, D2UnitStrc* pUnit, int
             return 0;
         }
 
+        // 1.13c D2Game+0x26B30
         if (!SKILLS_FindLeapTargetPosition(pUnit, nSkillId, nSkillLevel, &nX, &nY))
         {
             return 0;
@@ -1409,6 +1415,7 @@ int32_t __fastcall SKILLS_SrvDo077_Leap(D2GameStrc* pGame, D2UnitStrc* pUnit, in
 }
 
 //D2Game.0x6FCFD3C0
+// 1.13c D2Game+0x26A80
 int32_t __fastcall SKILLS_SetVelocityForLeap(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 {
     if (!pUnit->pDynamicPath)
@@ -1561,6 +1568,7 @@ int32_t __fastcall SKILLS_Leap(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStrc
 }
 
 //D2Game.0x6FCFD880
+// 1.13c D2Game+0x28600
 int32_t __fastcall SKILLS_SrvSt41_LeapAttack(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillStrc* pSkill = SKILLS_GetHighestLevelSkillFromUnitAndId(pUnit, nSkillId);
@@ -1618,6 +1626,7 @@ int32_t __fastcall SKILLS_SrvSt41_LeapAttack(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FCFD9B0
+// 1.13c D2Game+0x293B0
 int32_t __fastcall SKILLS_SrvDo078_LeapAttack(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillStrc* pSkill = SKILLS_GetHighestLevelSkillFromUnitAndId(pUnit, nSkillId);

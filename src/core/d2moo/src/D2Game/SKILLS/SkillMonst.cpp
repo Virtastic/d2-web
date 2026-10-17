@@ -80,6 +80,7 @@ int32_t __fastcall SKILLS_SrvSt42_FireHit(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 //D2Game.0x6FD062E0
+// 1.13c D2Game+0xB4660
 int32_t __fastcall SKILLS_SrvDo083_FireHit(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
@@ -261,6 +262,7 @@ int32_t __fastcall SKILLS_SrvDo086_MaggotDown(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FD06880
+// 1.13c D2Game+0xB42D0
 int32_t __fastcall SKILLS_SrvDo087_MaggotLay(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     // TODO: Name
@@ -486,6 +488,7 @@ int32_t __fastcall SKILLS_SrvSt47_Jump(D2GameStrc* pGame, D2UnitStrc* pUnit, int
 }
 
 //D2Game.0x6FD070F0
+// 1.13c D2Game+0xB60C0
 int32_t __fastcall SKILLS_SrvDo089_Jump(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillStrc* pSkill = UNITS_GetUsedSkill(pUnit);
@@ -659,6 +662,7 @@ int32_t __fastcall SKILLS_SrvDo090_SwarmMove(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FD075E0
+// 1.13c D2Game+0xB5FB0
 int32_t __fastcall SKILLS_SrvSt49_Nest_EvilHutSpawner(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (!SKILLS_GetSkillsTxtRecord(nSkillId))
@@ -695,6 +699,7 @@ int32_t __fastcall SKILLS_SrvSt49_Nest_EvilHutSpawner(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FD07770
+// 1.13c D2Game+0xB5E50
 int32_t __fastcall SKILLS_SrvDo091_Nest_EvilHutSpawner(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1289,6 +1294,7 @@ int32_t __fastcall SKILLS_ResurrectUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FD089E0
+// 1.13c D2Game+0xB5BD0
 int32_t __fastcall SKILLS_SrvDo097_Resurrect(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {    
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -2374,6 +2380,7 @@ D2UnitStrc* __fastcall SKILLS_CreateSpiderLayMissile(D2GameStrc* pGame, D2UnitSt
 }
 
 //D2Game.0x6FD0AE10
+// 1.13c D2Game+0xB39F0
 int32_t __fastcall SKILLS_SrvDo111_FetishAura(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     int32_t nX = 0;

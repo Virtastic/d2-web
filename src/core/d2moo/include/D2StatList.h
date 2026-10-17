@@ -599,6 +599,8 @@ D2StatListStrc* __stdcall D2Common_GetStateFromStatListEx_6FDB8190(D2StatListExS
 D2COMMON_DLL_DECL D2StatListStrc* __stdcall STATLIST_GetStatListFromUnitAndState(D2UnitStrc* pUnit, int nState);
 //D2Common.0x6FDB8200 (#10482)
 D2COMMON_DLL_DECL D2StatListStrc* __stdcall STATLIST_GetStatListFromFlag(D2StatListStrc* pStatList, int nFlag);
+// 1.13c D2Common+0x37F40 (1.10f inlined it into 0x6FDB8230)
+D2COMMON_DLL_DECL D2StatListStrc* __fastcall STATLIST_GetStatListFromStatListExAndFlag(D2StatListExStrc* pStatListEx, int nFlag);
 //D2Common.0x6FDB8230 (#10481)
 D2COMMON_DLL_DECL D2StatListStrc* __stdcall STATLIST_GetStatListFromUnitAndFlag(D2UnitStrc* pUnit, int nFlag);
 //D2Common.0x6FDB8270 (#10483)

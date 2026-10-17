@@ -103,6 +103,7 @@ uint16_t __fastcall MONSTERUNIQUE_GetNameSeed(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC6AC70
+// 1.13c D2Game+0x1850
 int32_t __fastcall MONSTERUNIQUE_CheckMonTypeFlag(D2UnitStrc* pUnit, uint16_t nFlag)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)
@@ -614,6 +615,7 @@ void __fastcall MONSTERUNIQUE_UMod26_Teleport(D2UnitStrc* pUnit, int32_t nUMod, 
 
 //1.10: D2Game.0x6FC6B910
 //1.14d: 0x005A1650
+// 1.13c D2Game+0x24CD0
 void __fastcall MONSTERUNIQUE_UMod30_AuraEnchanted(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     constexpr D2AuraModStrc gAuraMods[8] =
@@ -1458,6 +1460,7 @@ void __fastcall sub_6FC6D440(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod
 }
 
 //D2Game.0x6FC6D690
+// 1.13c D2Game+0x24440
 void __fastcall MONSTERUNIQUE_StealBeltItem(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     if (!bUnique)
@@ -2089,6 +2092,7 @@ void __fastcall sub_6FC6E8B0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* p
 }
 
 //D2Game.0x6FC6E8D0
+// 1.13c D2Game+0xE8780
 D2UnitStrc* __fastcall sub_6FC6E8D0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, int32_t nSuperUniqueId, int32_t a5, uint16_t nX, uint16_t nY, int32_t a8)
 {
     D2UnitStrc* pMonster = D2GAME_SpawnMonster_6FC6F220(pGame, pRoom, pRoomCoordList, nX, nY, -1, nSuperUniqueId, a8);
@@ -2103,6 +2107,7 @@ D2UnitStrc* __fastcall sub_6FC6E8D0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, 
 }
 
 //D2Game.0x6FC6E940
+// 1.13c D2Game+0x23CA0
 void __fastcall sub_6FC6E940(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3)
 {
     if (!pGame || pGame->nDifficulty >= 3u)
@@ -2400,6 +2405,7 @@ uint32_t __fastcall MONSTERUNIQUE_CheckMonStatsFlag(int32_t nMonsterId, int32_t 
 }
 
 //D2Game.0x6FC6F220
+// 1.13c D2Game+0x24950
 D2UnitStrc* __fastcall D2GAME_SpawnMonster_6FC6F220(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, int32_t nX, int32_t nY, int32_t nUnitGUID, int32_t nClassId, int32_t a8)
 {
     if (!nX && !nY)
@@ -2846,6 +2852,7 @@ D2UnitStrc* __fastcall D2GAME_SpawnSuperUnique_6FC6F690(D2GameStrc* pGame, D2Act
 }
 
 //D2Game.0x6FC6FBA0
+// 1.13c D2Game+0x24E70
 D2UnitStrc* __fastcall sub_6FC6FBA0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t nClassId, int32_t nUnitGUID, uint16_t nNameSeed, int32_t bChampion, int32_t bSuperUnique, int16_t nBossHcIdx, uint8_t* pUMods)
 {
     D2UnitStrc* pMonster = D2GAME_SpawnMonster_6FC6F220(pGame, pRoom, 0, nX, nY, nUnitGUID, nClassId, 1);
@@ -2928,6 +2935,7 @@ D2UnitStrc* __fastcall sub_6FC6FBA0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, 
 }
 
 //D2Game.0x6FC6FDC0
+// 1.13c D2Game+0x246D0
 D2UnitStrc* __fastcall sub_6FC6FDC0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t nClassId, int32_t nUnitGUID, uint8_t* pUMods)
 {
     D2UnitStrc* pMonster = sub_6FC6A0F0(pGame, pRoom, nX, nY, nClassId, 1, nUnitGUID, -1, 98);
@@ -2970,6 +2978,27 @@ D2UnitStrc* __fastcall sub_6FC6FDC0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, 
     return pMonster;
 }
 
+// 1.13c D2Game+0x23260 (1.10f inlines this block in D2GAME_BOSSES_AssignUMod_6FC6FF10 and the unique-spawn path)
+void __fastcall MONSTERUNIQUE_SetUniqueFlag_6FC43260(D2GameStrc* pGame, D2UnitStrc* pUnit)
+{
+    if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
+    {
+        return;
+    }
+
+    const int32_t nLevelId = pUnit->pMonsterData ? pUnit->pMonsterData->dwTxtLevelNo : 0;
+    D2MonsterRegionStrc* pMonRegion = MONSTERREGION_GetMonsterRegionFromLevelId(pGame->pMonReg, nLevelId);
+    if (pMonRegion && (!pUnit->pMonsterData || !(pUnit->pMonsterData->nTypeFlag & MONTYPEFLAG_UNIQUE)))
+    {
+        ++pMonRegion->dwUniqueCount;
+    }
+
+    if (pUnit->pMonsterData)
+    {
+        pUnit->pMonsterData->nTypeFlag |= MONTYPEFLAG_UNIQUE;
+    }
+}
+
 //D2Game.0x6FC6FF10
 void __fastcall D2GAME_BOSSES_AssignUMod_6FC6FF10(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
@@ -2981,13 +3010,7 @@ void __fastcall D2GAME_BOSSES_AssignUMod_6FC6FF10(D2GameStrc* pGame, D2UnitStrc*
 
     if (bUnique)
     {
-        D2MonsterRegionStrc* pMonRegion = MONSTERREGION_GetMonsterRegionFromLevelId(pGame->pMonReg, MONSTER_GetLevelId(pUnit));
-        if (pMonRegion && !(pUnit->pMonsterData->nTypeFlag & MONTYPEFLAG_UNIQUE))
-        {
-            ++pMonRegion->dwUniqueCount;
-        }
-
-        pUnit->pMonsterData->nTypeFlag |= MONTYPEFLAG_UNIQUE;
+        MONSTERUNIQUE_SetUniqueFlag_6FC43260(pGame, pUnit);
     }
 
     for (int32_t i = 0; i < 9; ++i)

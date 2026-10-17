@@ -90,6 +90,7 @@ D2DrlgStrc* __fastcall DRLG_AllocDrlg(D2DrlgActStrc* pAct, uint8_t nActNo, HD2AR
 }
 
 //D2Common.0x6FD743B0 (#10012)
+// 1.13c D2Common+0x2E020
 void __fastcall DRLG_FreeDrlg(D2DrlgStrc* pDrlg)
 {
 	D2DrlgLevelStrc* pNextLevel = NULL;
@@ -444,6 +445,7 @@ D2DrlgLevelStrc* __fastcall DRLG_AllocLevel(D2DrlgStrc* pDrlg, int nLevelId)
 }
 
 //D2Common.0x6FD749A0 (#10005)
+// 1.13c D2Common+0x2DD80
 D2DrlgLevelStrc* __stdcall DRLG_GetLevel(D2DrlgStrc* pDrlg, int nLevelId)
 {
 	for (D2DrlgLevelStrc* pLevel = pDrlg->pLevel; pLevel; pLevel = pLevel->pNextLevel)

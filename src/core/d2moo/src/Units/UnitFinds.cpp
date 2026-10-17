@@ -39,6 +39,7 @@ BOOL __stdcall UNITFINDS_AreUnitsInNeighboredRooms(D2UnitStrc* pDestUnit, D2Unit
 }
 
 //D2Common.0x6FDBC720 (#11087)
+// 1.13c D2Common+0x122B0 (ordinal 10754): same rule; only the null-room assert differs. 
 D2UnitStrc* __stdcall UNITFINDS_FindUnitInNeighboredRooms(D2ActiveRoomStrc* pRoom, int nUnitType, int nClassId)
 {
 	D2ActiveRoomStrc** ppRoomList = NULL;

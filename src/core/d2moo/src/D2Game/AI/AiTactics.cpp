@@ -66,6 +66,7 @@ D2UnitStrc* __fastcall sub_6FCCF9D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiCo
 }
 
 //D2Game.0x6FCCFC00
+// 1.13c D2Game+0xF3150
 D2UnitStrc* __fastcall sub_6FCCFC00(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiControlStrc* pAiControl, int32_t* pDistance, int32_t* pCombat)
 {
 	D2UnitStrc* pResult = sub_6FCF2110(pGame, pUnit, pAiControl, pDistance, pCombat);
@@ -102,6 +103,7 @@ D2UnitStrc* __fastcall sub_6FCCFD40(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiCo
 }
 
 //D2Game.0x6FCCFD70
+// 1.13c D2Game+0xF30C0
 D2UnitStrc* __fastcall sub_6FCCFD70(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t* bCloseToTarget)
 {
 	if (!UNITS_GetRoom(pUnit))
@@ -190,6 +192,7 @@ int32_t __fastcall AITACTICS_ChangeModeAndTargetCoordinates(D2GameStrc* pGame, D
 }
 
 //D2Game.0x6FCCFF20
+// 1.13c D2Game+0xF2120
 int32_t __fastcall AITACTICS_UseSequenceSkill(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, D2UnitStrc* pTargetUnit, int32_t nX, int32_t nY)
 {
 	if (nSkillId < 0 || nSkillId >= sgptDataTables->nSkillsTxtRecordCount)
@@ -210,6 +213,7 @@ int32_t __fastcall AITACTICS_UseSequenceSkill(D2GameStrc* pGame, D2UnitStrc* pUn
 	return D2GAME_ModeChange_6FC65220(pGame, &modeChange, 0);
 }
 
+// 1.13c D2Game+0xF2380
 //D2Game.0x6FCCFFB0
 int32_t __fastcall AITACTICS_UseSkill(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t nMode, int32_t nSkillId, D2UnitStrc* pTarget, int32_t nX, int32_t nY)
 {
@@ -254,6 +258,7 @@ void __fastcall AITACTICS_IdleInNeutralMode(D2GameStrc* pGame, D2UnitStrc* pUnit
 }
 
 //D2Game.0x6FCD0110
+// 1.13c D2Game+0xF20C0
 void __fastcall AITACTICS_Idle(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nFrames)
 {
 	if (!nFrames)
@@ -266,6 +271,7 @@ void __fastcall AITACTICS_Idle(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nFr
 }
 
 //D2Game.0x6FCD0150
+// 1.13c D2Game+0xF2040
 void __fastcall sub_6FCD0150(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nFrames)
 {
 	if (!nFrames)
@@ -282,6 +288,7 @@ void __fastcall sub_6FCD0150(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nFram
 }
 
 //D2Game.0x6FCD01B0
+// 1.13c D2Game+0x1560
 void __fastcall AITACTICS_SetVelocity(D2UnitStrc* pUnit, int32_t a2, int32_t nVel, uint8_t a4)
 {
 	D2_ASSERT((nVel >= -126) && (nVel <= 126));
@@ -502,6 +509,7 @@ int32_t __fastcall sub_6FCD06D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
 	return AITACTICS_MoveToTarget(pGame, pUnit, 0, MONMODE_RUN, nX + nXSign * nMaxDistance, nY + nYSign * nMaxDistance, 1u, bDeleteAiEventCallback != 0 ? 4 : 0);
 }
 
+// 1.13c D2Game+0xF1B10
 //D2Game.0x6FCD0840
 int32_t __fastcall AITACTICS_WalkCloseToUnit(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMaxDistance)
 {
@@ -568,12 +576,13 @@ int32_t __fastcall AITACTICS_WanderToTarget(D2GameStrc* pGame, D2UnitStrc* pUnit
 	return AITACTICS_MoveToTarget(pGame, pUnit, nullptr, MONMODE_WALK, nTargetX + nOffsetX, nTargetY + nOffsetY, 1u, 0);
 }
 
+// 1.13c D2Game+0xF2870: null owner passes the caller's nMaxDistance (AL) through, not the 1.10f constant 2
 //D2Game.0x6FCD0B60
 int32_t __fastcall D2GAME_AICORE_WalkToOwner_6FCD0B60(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pOwner, int32_t nMaxDistance)
 {
 	if (!pOwner)
 	{
-		return AITACTICS_WalkCloseToUnit(pGame, pUnit, 2);
+		return AITACTICS_WalkCloseToUnit(pGame, pUnit, nMaxDistance);
 	}
 
 	return AITACTICS_WanderToTarget(pGame, pUnit, pOwner, nMaxDistance);
@@ -613,6 +622,7 @@ int32_t __fastcall AITACTICS_RunCloseToTargetUnit(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FCD0E80
+// 1.13c D2Game+0xF26B0
 int32_t __fastcall sub_6FCD0E80(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t a4, int32_t bDeleteAiEventCallback)
 {
 	//TODO: v8

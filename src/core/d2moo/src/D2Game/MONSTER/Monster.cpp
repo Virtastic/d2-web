@@ -150,6 +150,7 @@ D2MonPropTxt* __fastcall MONSTER_GetMonPropTxtRecord(int32_t nId)
 }
 
 //D2Game.0x6FC603D0
+// 1.13c D2Game+0xAFDB0
 void __fastcall MONSTER_InitializeStatsAndSkills(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2UnitStrc* pUnit, D2MonRegDataStrc* pMonRegData)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER || !pUnit->pMonsterData || !pUnit->pMonsterData->pMonstatsTxt)
@@ -379,6 +380,7 @@ void __fastcall MONSTER_Free(D2GameStrc* pGame, D2UnitStrc* pMonster)
 }
 
 //D2Game.0x6FC60CD0
+// 1.13c D2Game+0xAF920
 void __fastcall MONSTER_UpdateAiCallbackEvent(D2GameStrc* pGame, D2UnitStrc* pMonster)
 {
     D2GAME_EVENTS_Delete_6FC34840(pGame, pMonster, EVENTTYPE_AITHINK, 0);
@@ -413,6 +415,7 @@ void __fastcall MONSTER_UpdateAiCallbackEvent(D2GameStrc* pGame, D2UnitStrc* pMo
 }
 
 //D2Game.0x6FC60E50
+// 1.13c D2Game+0xAF8D0
 void __fastcall MONSTER_DeleteEvents(D2GameStrc* pGame, D2UnitStrc* pMonster)
 {
     D2GAME_EVENTS_Delete_6FC34840(pGame, pMonster, EVENTTYPE_AITHINK, 0);
@@ -453,6 +456,7 @@ int32_t __fastcall MONSTER_GetExperienceBonus(int32_t nPlayerCount)
 }
 
 //D2Game.0x6FC60E90
+// 1.13c D2Game+0xAF840
 void __fastcall MONSTER_GetPlayerCountBonus(D2GameStrc* pGame, D2PlayerCountBonusStrc* pPlayerCountBonus, D2ActiveRoomStrc* pRoom, D2UnitStrc* pMonster)
 {
     if (!pPlayerCountBonus)

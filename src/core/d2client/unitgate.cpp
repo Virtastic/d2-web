@@ -37,17 +37,21 @@ extern "C" uint32_t d2_client_a54a0(D2cHost h, const uint32_t* u, uint32_t uaddr
 
 // 1.13c D2Client+0x1BBC0. ESI = ctx (+0 flags, +4 unit, +8 p2, +0x1C c7). dt = *sgptDataTables (+0xB98 table base, +0xBA0 count,
 // rows of 0x23C bytes, byte +0x14). g = D2Client+0x1234C0.
-extern "C" uint32_t d2_client_1bbc0(D2cHost h, uint32_t* ctx, uint32_t ctxaddr, uint32_t* g, const uint32_t* dt) {
+static uint32_t gate_1bbc0(D2cHost h, uint32_t* ctx, uint32_t ctxaddr, uint32_t* g, const uint32_t* dt, uint32_t line) {
     if (!d2_client_185e0(ctx, g)) return 1;
     ctx[7] = go(h, { 0xC5CE, 0, 0, 0, 0, 0, { ctx[1], 0, 0, 0 } });
     if (!d2_client_a54a0(h, (const uint32_t*)(uintptr_t)ctx[1], ctx[1], ctx[7])) return 1;
-    int32_t i = (int32_t)go(h, { 0xC42A, 0, 0, 0, 0, 0, { ctx[7], 0xB2000000u | 0xD6F7Cu, 0x9FD, 0 } });
+    int32_t i = (int32_t)go(h, { 0xC42A, 0, 0, 0, 0, 0, { ctx[7], 0xB2000000u | 0xD6F7Cu, line, 0 } });
     const uint8_t* row = 0;
     if (i >= 0 && i < (int32_t)dt[0xBA0 / 4]) row = (const uint8_t*)(uintptr_t)dt[0xB98 / 4] + (uint32_t)i * 0x23C;
     if ((row ? row[0x14] : 0) == 1 && !(ctx[0] & 0x40)) ctx[0] |= 0x80;
     go(h, { 0x1B7F0, ctxaddr, 0, 0, 0, 0, { 0, 0, 0, 0 } });
     return 1;
 }
+
+extern "C" uint32_t d2_client_1bbc0(D2cHost h, uint32_t* ctx, uint32_t ctxaddr, uint32_t* g, const uint32_t* dt) { return gate_1bbc0(h, ctx, ctxaddr, g, dt, 0x9FD); }
+// 1.13c D2Client+0x1BC40: the same body as 0x1BBC0, only the Player.cpp line passed to #10601 differs (0x9DD).
+extern "C" uint32_t d2_client_1bc40(D2cHost h, uint32_t* ctx, uint32_t ctxaddr, uint32_t* g, const uint32_t* dt) { return gate_1bbc0(h, ctx, ctxaddr, g, dt, 0x9DD); }
 
 // 1.13c D2Client+0x1C890. Index of the first of 41 16-byte rows (table at D2Client+0xF8190) whose dword +0 == key; -1 if none.
 extern "C" int32_t d2_client_1c890(const uint32_t* tbl, uint32_t key) {
@@ -89,4 +93,25 @@ extern "C" uint32_t d2_client_1bcc0(D2cHost h, uint32_t* ctx, uint32_t ctxaddr, 
     }
     go(h, { 0x1B7F0, ctxaddr, 0, 0, 0, 0, { 0, 0, 0, 0 } });
     return 1;
+}
+
+// 1.13c D2Client+0x1BDE0. ESI = ctx (+0 flags, +4 unit, +8 p2, +0x1C c7), no args, returns 1 (0 only on the C202-record exit).
+// g = D2Client+0x1234C0, mode = the dword at D2Client+0x11B864. 43E0 sends the 5 bytes {0x4C, -1} (mode 8) or {0x17, rec[+0xC]}.
+extern "C" uint32_t d2_client_1bde0(D2cHost h, uint32_t* ctx, uint32_t ctxaddr, uint32_t* g, uint32_t mode) {
+    if (!d2_client_185e0(ctx, g)) return 1;
+    uint32_t ua = ctx[1];
+    const uint32_t* u = (const uint32_t*)(uintptr_t)ua;
+    ctx[7] = go(h, { 0xC5BC, 0, 0, 0, 0, 0, { ua, 0, 0, 0 } });
+    if (d2_client_a54a0(h, u, ua, ctx[7])) {
+        ctx[0] |= 0x80;
+        go(h, { 0x1B7F0, ctxaddr, 0, 0, 0, 0, { 0, 0, 0, 0 } });
+        return 1;
+    }
+    if (mode == 6) go(h, { 0xBEB90, 0, 0, 0, 0, 0, { 0, 0, 0, 0 } });
+    else if (mode == 8) go(h, { 0x143E0, 0, 0, 0, 5, 0, { 0xB3000000u, 0, 0, 0 } });   // buf {0x4C, 0xFFFFFFFF}
+    uint32_t r = go(h, { 0xC202, 0, 0, 0, 0, 0, { u[0x18], 0, 0, 0 } });
+    if (!r) return 1;
+    volatile uint32_t b17 = ((const uint32_t*)(uintptr_t)r)[3];   // buf {0x17, b17}; the stack buffer is not in the log
+    go(h, { 0x143E0, 0, 0, 0, 5, 0, { 0xB3000000u, 0, 0, 0 } });
+    return 0;
 }

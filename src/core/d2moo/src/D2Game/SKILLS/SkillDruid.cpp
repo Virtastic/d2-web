@@ -146,6 +146,9 @@ int32_t __fastcall SKILLS_SrvDo115_Vines(D2GameStrc* pGame, D2UnitStrc* pUnit, i
     return 1;
 }
 
+// 1.13c D2Game+0x449F0: the 1.13c build outlines the mode/report block below (unit-type 6 / unit-id -1
+// defaults, the mode argument, the D2Common ConvertMode report at SkillDruid.cpp line 156) into its own
+// single-caller EAX-convention function; 1.10f has it inlined here. 
 //D2Game.0x6FCFE030
 void __fastcall sub_6FCFE030(D2UnitStrc* pUnit, int32_t nStateId, D2StatListStrc* pStatList)
 {
@@ -221,6 +224,7 @@ void __fastcall sub_6FCFE0E0(D2UnitStrc* pUnit, D2StatListStrc* pStatList, D2Ski
 }
 
 //D2Game.0x6FCFE200
+// 1.13c D2Game+0x447D0
 void __fastcall sub_6FCFE200(D2UnitStrc* pUnit, D2StatListStrc* pStatList, D2SkillsTxt* pSkillsTxtRecord, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (!pUnit || !pStatList)
@@ -911,6 +915,7 @@ int32_t __fastcall SKILLS_SrvDo122_Hunger(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 //D2Game.0x6FCFF710
+// 1.13c D2Game+0x45850
 int32_t __fastcall SKILLS_SrvDo123_Volcano(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (!SKILLS_GetSkillsTxtRecord(nSkillId))
@@ -1244,6 +1249,7 @@ int32_t __fastcall D2GAME_EventFunc25_6FD00140(D2GameStrc* pGame, int32_t nEvent
 }
 
 //D2Game.0x6FD00370
+// 1.13c D2Game+0x44AC0
 int32_t __fastcall sub_6FD00370(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillLevel)
 {
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
@@ -1459,6 +1465,7 @@ int32_t __fastcall SKILLS_SrvSt60_SuckBlood(D2GameStrc* pGame, D2UnitStrc* pUnit
 }
 
 //D2Game.0x6FD00BE0
+// 1.13c D2Game+0xCF00
 int32_t __fastcall SKILLS_SrvDo127_SuckBlood(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -2406,6 +2413,7 @@ int32_t __fastcall SKILLS_AreaEffect_BaalCorpseExplode(D2GameStrc* pGame, D2Unit
 }
 
 //D2Game.0x6FD02A80
+// 1.13c D2Game+0xC1F0
 D2UnitStrc* __fastcall SKILLS_FindUseableCorpse(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pOwner, int32_t nUnitSize)
 {
     D2UnitFindArgStrc unitFindArg = {};

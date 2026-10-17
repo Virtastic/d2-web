@@ -2660,6 +2660,7 @@ void __fastcall ITEMMODS_UpdateFullSetBoni(D2UnitStrc* pUnit, D2UnitStrc* pItem,
 }
 
 //D2Common.0x6FD95BE0 (#10859)
+// 1.13c D2Common+0x45E50
 BOOL __stdcall ITEMMODS_CanItemHaveMagicAffix(D2UnitStrc* pItem, const D2MagicAffixTxt* pMagicAffixTxtRecord)
 {
 	D2PropertiesTxt* pPropertiesTxtRecord = NULL;
@@ -2720,6 +2721,7 @@ BOOL __stdcall ITEMMODS_CanItemHaveMagicAffix(D2UnitStrc* pItem, const D2MagicAf
 }
 
 //D2Common.0x6FD95CC0 (#10860)
+// 1.13c D2Common+0x45D30
 BOOL __stdcall ITEMMODS_CanItemHaveRareAffix(D2UnitStrc* pItem, D2RareAffixTxt* pRareAffixTxtRecord)
 {
 	if ((ITEMS_GetItemFormat(pItem) >= 100 || !ITEMS_CheckIfStackable(pItem) && !ITEMS_CheckIfThrowable(pItem)) && (pRareAffixTxtRecord->wVersion < 100 || ITEMS_GetItemFormat(pItem) >= 100))

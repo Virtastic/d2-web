@@ -158,6 +158,7 @@ void __fastcall sub_6FC62780(D2UnitStrc* pAttacker, D2UnitStrc* pDefender, D2Gam
 }
 
 //D2Game.0x6FC627B0
+// 1.13c D2Game+0x77240
 void __fastcall sub_6FC627B0(D2UnitStrc* pUnit, int32_t nMode)
 {
     constexpr int32_t dword_6FD2870C[] =
@@ -399,6 +400,7 @@ void __fastcall D2GAME_MONSTER_ApplyCriticalDamage_6FC62E70(D2UnitStrc* pAttacke
 }
 
 //D2Game.0x6FC62F50
+// 1.13c D2Game+0x77060
 uint8_t __fastcall sub_6FC62F50(D2UnitStrc* pUnit)
 {
     if (pUnit)
@@ -489,6 +491,7 @@ void __fastcall D2GAME_MONSTERMODE_Unk_6FC63040(D2GameStrc* pGame, D2ModeChangeS
 }
 
 //D2Game.0x6FC631B0
+// 1.13c D2Game+0x75680
 void __fastcall sub_6FC631B0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a7, D2ModeChangeStrc* pModeChange)
 {    
     D2_ASSERT(pUnit);
@@ -574,6 +577,7 @@ void __fastcall sub_6FC631B0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a7, D
 }
 
 //D2Game.0x6FC63440
+// 1.13c D2Game+0x76740
 void __fastcall D2GAME_MONSTER_ApplyStatRegen_6FC63440(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t a4)
 {
     pUnit = pUnit;
@@ -675,6 +679,7 @@ void __fastcall D2GAME_MONSTER_ApplyStatRegen_6FC63440(D2GameStrc* pGame, D2Unit
 }
 
 //D2Game.0x6FC63650
+// 1.13c D2Game+0x11D0
 D2MonStatsTxt* __fastcall MONSTERMODE_GetMonStatsTxtRecord(int32_t nMonsterId)
 {
     if (nMonsterId >= 0 && nMonsterId < sgptDataTables->nMonStatsTxtRecordCount)
@@ -686,6 +691,7 @@ D2MonStatsTxt* __fastcall MONSTERMODE_GetMonStatsTxtRecord(int32_t nMonsterId)
 }
 
 //D2Game.0x6FC63680
+// 1.13c D2Game+0x76BF0
 void __fastcall sub_6FC63680(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
@@ -1828,6 +1834,8 @@ int32_t __stdcall D2GAME_ModeChange_6FC65220(D2GameStrc* pGame, D2ModeChangeStrc
             pAiParam = pUnit->pMonsterData->pAiParam;
         }
 
+        // 1.13c D2Game+0x74F90: the compiler factorised this block out of the mode change
+        // into sub_74F90 (AI-param overrides, the -1/10 sentinel, the two path-type counters).
         int32_t v31 = pModeChange->unk0x18;
         uint8_t nPathType = pModeChange->unk0x14[1];
         uint8_t dwNewDist = pModeChange->unk0x1C;
@@ -2011,6 +2019,7 @@ int32_t __stdcall D2GAME_ModeChange_6FC65220(D2GameStrc* pGame, D2ModeChangeStrc
 }
 
 //D2Game.0x6FC65680
+// 1.13c D2Game+0x74D50
 int32_t __fastcall sub_6FC65680(D2UnitStrc* pUnit, int32_t nPathType, D2AiParamStrc* pAiParam, int32_t dwNewDist)
 {
     PATH_SetNewDistance(pUnit->pDynamicPath, dwNewDist);

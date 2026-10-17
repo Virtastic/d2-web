@@ -1,5 +1,6 @@
 import { dc6FrameToRgba, decodeDatPalette, decodeDc6 } from './d2-formats.mjs';
 import { spriteMetrics } from './sprite-metrics.mjs';
+import RETAIL_MIX_HEX from './retail-mixpalette.mjs';
 
 const RECORD_SIZE = 112;
 
@@ -14,7 +15,7 @@ export function parseItemPresentations(bytes, count) {
   if (!Number.isInteger(count) || count < 0 || raw.byteLength < count * RECORD_SIZE) throw new RangeError('truncated item presentation records');
   const view = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
   return Array.from({ length: count }, (_, row) => { const at = row * RECORD_SIZE; return {
-    id: view.getUint32(at, true), classId: view.getUint32(at + 4, true), code: view.getUint32(at + 8, true), mode: view.getUint32(at + 12, true),
+    colourByte: 0xFF, id: view.getUint32(at, true), classId: view.getUint32(at + 4, true), code: view.getUint32(at + 8, true), mode: view.getUint32(at + 12, true),
     x: view.getInt32(at + 16, true), y: view.getInt32(at + 20, true), quality: view.getUint32(at + 24, true), itemFlags: view.getUint32(at + 28, true),
     framePrecise: view.getUint32(at + 32, true), frameCountPrecise: view.getUint32(at + 36, true),
     flippyFile: cstring(raw, at + 40, 32), invFile: cstring(raw, at + 72, 32),
@@ -24,22 +25,49 @@ export function parseItemPresentations(bytes, count) {
   }; });
 }
 
+// D2Client draws a ground flippy through the item's own ITEMS_GetColor remap (the engine exports its
+// component colour byte per item, 0xFF = none): entry k of the palette becomes entry table[k].
+// Retail's 126 captured MixPalette tables are keyed by that byte; an unknown byte stays unmapped.
+export function itemColourPalette(palette, colourByte) {
+  const hex = RETAIL_MIX_HEX[colourByte]; if (!hex) return palette;
+  const out = new Uint8Array(1024);
+  for (let k = 0; k < 256; k++) { const t = parseInt(hex.substr(k * 2, 2), 16); out.set(palette.subarray(t * 4, t * 4 + 4), k * 4); }
+  return out;
+}
+
 export function createItemRenderer(read, documentObject = globalThis.document) {
   const decoded = new Map(), rasters = new Map(), failures = new Set();
   const palette = decodeDatPalette(read('data\\global\\palette\\units\\pal.dat'));
   let lastEvidence = null;
-  return { draw(ctx, x, y, item) {
+  // The cel the item is DRAWN from. The blit and the hover hit test both resolve the frame here, so
+  // the rectangle D2Client's FUN_6FB56730 (0xA6730) builds comes from the same cel as the sprite.
+  function frameFor(item) {
     const name = item.flippyFile?.trim(); if (!name || failures.has(name)) return null;
     let dc6 = decoded.get(name);
     if (!dc6) try { dc6 = decodeDc6(read(`data\\global\\items\\${name}.dc6`)); decoded.set(name, dc6); }
       catch { failures.add(name); return null; }
-    const frameIndex = Math.min(dc6.frames.length - 1, Math.max(0, (item.framePrecise >>> 8) % dc6.frames.length));
-    const key = `${name}:${frameIndex}`; let canvas = rasters.get(key); const frame = dc6.frames[frameIndex];
+    const index = Math.min(dc6.frames.length - 1, Math.max(0, (item.framePrecise >>> 8) % dc6.frames.length));
+    return { name, dc6, index, frame: dc6.frames[index] };
+  }
+  return { draw(ctx, x, y, item) {
+    const resolved = frameFor(item); if (!resolved) return null;
+    const name = resolved.name, frameIndex = resolved.index, frame = resolved.frame;
+    const colour = item.colourByte ?? 0xFF; const key = `${name}:${frameIndex}:${colour}`; let canvas = rasters.get(key);
     if (!canvas) { canvas = documentObject.createElement('canvas'); canvas.width = frame.width; canvas.height = frame.height;
-      if (frame.width && frame.height) canvas.getContext('2d').putImageData(new ImageData(dc6FrameToRgba(frame, palette), frame.width, frame.height), 0, 0); rasters.set(key, canvas); }
+      if (frame.width && frame.height) canvas.getContext('2d').putImageData(new ImageData(dc6FrameToRgba(frame, itemColourPalette(palette, colour)), frame.width, frame.height), 0, 0); rasters.set(key, canvas); }
     if (canvas.width && canvas.height) ctx.drawImage(canvas, Math.round(x + frame.offsetX), Math.round(y + frame.offsetY - frame.height));
     const { pixelHash, opaque } = spriteMetrics(frame, frame.indices, frame.opaque);
     lastEvidence = { id: item.id, classId: item.classId, flippyFile: name, frame: frameIndex, width: frame.width, height: frame.height, opaque, pixelHash };
     return lastEvidence;
-  }, get lastEvidence() { return lastEvidence && { ...lastEvidence }; }, get decoded() { return decoded.size; }, get failures() { return failures.size; } };
+  },
+  // The current frame's cel box in the convention D2Client's rect builder reads: the blit origin is
+  // (x + offsetX, y + offsetY - height), so `yOffset` here is the box's TOP in screen space (y down)
+  // and the sprite occupies [yOffset, yOffset + height). nativeDccHoverContains pads this box.
+  measure(item) {
+    const resolved = frameFor(item); if (!resolved) return null;
+    const frame = resolved.frame;
+    return { flippyFile: resolved.name, frame: resolved.index, xOffset: frame.offsetX,
+      yOffset: frame.offsetY - frame.height, width: frame.width, height: frame.height };
+  },
+  get lastEvidence() { return lastEvidence && { ...lastEvidence }; }, get decoded() { return decoded.size; }, get failures() { return failures.size; } };
 }

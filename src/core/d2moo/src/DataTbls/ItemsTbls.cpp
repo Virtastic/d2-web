@@ -9,6 +9,7 @@
 #include <Storm.h>
 #include <cstddef>
 extern "C" void d2web_msvc_qsort(void* base, size_t num, size_t width, int (*cmp)(const void*, const void*));   // d2-web: compat/msvc_qsort.cpp
+#include "../../../d2common/runes_tbl.h"   // d2-web: the growth/copy body of 0x70FF0, shared with the s3004 probe
 
 //D2Common.0x6FD550E0
 int __fastcall DATATBLS_MapItemsTxtKeywordToNumber(char* szKey)
@@ -2028,39 +2029,18 @@ D2RuneDataTbl* __fastcall DATATBLS_GetRuneDataTables()
 	return &sgptDataTables->pRuneDataTables;
 }
 
-//D2Common.0x6FD5E9F0 (#10621)
+// 1.13c D2Common+0x70FF0 (#10621)
+// D2MOO.0x6FD5E9F0. The body matches the 1.13c decompile line for line; it lives in
+// src/core/d2common/runes_tbl.cpp so the s3004 shallow probe can pin the record array, its count and the
+// realloc-pool call to its own blobs.
 void __stdcall DATATBLS_AddOrChangeRunesTxtRecord(int nRecordId, D2RunesTxt* pRecord)
 {
-	D2RunesTxt* pRunesTxt = NULL;
-	D2RunesTxt* pTmp = NULL;
-
-	int nSize = 0;
-
-	if (nRecordId >= sgptDataTables->pRuneDataTables.nRunesTxtRecordCount)
-	{
-		pRunesTxt = sgptDataTables->pRuneDataTables.pRunesTxt;
-		nSize = sizeof(D2RunesTxt) * (nRecordId + 1);
-
-		if (DATATBLS_LoadFromBin)
-		{
-			pRunesTxt = (D2RunesTxt*)((char*)sgptDataTables->pRuneDataTables.pRunesTxt - 4);
-			nSize += 4;
-		}
-
-		pTmp = (D2RunesTxt*)D2_REALLOC_POOL(NULL, pRunesTxt, nSize);
-
-		if (DATATBLS_LoadFromBin)
-		{
-			*(uint32_t*)pTmp = nRecordId + 1;
-			pTmp = (D2RunesTxt*)((char*)pTmp + 4);
-		}
-		sgptDataTables->pRuneDataTables.pRunesTxt = pTmp;
-
-		memset(&pTmp[sgptDataTables->pRuneDataTables.nRunesTxtRecordCount], 0x00, sizeof(D2RunesTxt) * (nRecordId - sgptDataTables->pRuneDataTables.nRunesTxtRecordCount));
-		sgptDataTables->pRuneDataTables.nRunesTxtRecordCount = nRecordId + 1;
-	}
-
-	memcpy(&sgptDataTables->pRuneDataTables.pRunesTxt[nRecordId], pRecord, sizeof(sgptDataTables->pRuneDataTables.pRunesTxt[nRecordId]));
+	RunesTblEnv e = { (uint32_t*)&sgptDataTables->pRuneDataTables.nRunesTxtRecordCount,
+	                  (uint8_t**)&sgptDataTables->pRuneDataTables.pRunesTxt,
+	                  DATATBLS_LoadFromBin ? 1u : 0u,
+	                  [](uint8_t* pOld, uint32_t nSize, void*) -> uint8_t* { return (uint8_t*)D2_REALLOC_POOL(NULL, pOld, nSize); },
+	                  NULL };
+	D2Common_70FF0_AddOrChangeRunesTxtRecord(e, nRecordId, (const uint8_t*)pRecord);
 }
 
 //D2Common.0x6FD5EAA0 (#10620)

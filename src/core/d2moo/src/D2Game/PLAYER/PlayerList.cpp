@@ -305,6 +305,7 @@ void __fastcall PLAYERLIST_sub_6FCBAD60(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 }
 
 //D2Game.0x6FCBAE20
+// 1.13c D2Game+0xF00E0 (checked against decompile)
 int32_t __fastcall PLAYERLIST_GetHostileDelay(D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2)
 {
     if (!pPlayer2)

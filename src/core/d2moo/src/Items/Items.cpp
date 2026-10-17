@@ -918,6 +918,7 @@ uint32_t __stdcall ITEMS_GetAltGfx(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD99480 (#10748)
+// 1.13c D2Common+0x231E0
 uint8_t __stdcall ITEMS_GetComponent(D2UnitStrc* pItem)
 {
 	D2_ASSERT(pItem);
@@ -1016,6 +1017,7 @@ int __stdcall ITEMS_CheckIfFlagIsSet(int nFlags, int nFlag)
 }
 
 //D2Common.0x6FD99710 (#10755)
+// 1.13c D2Common+0x21FB0
 void __stdcall ITEMS_SetOrRemoveFlag(int* pFlags, int nFlag, BOOL bSet)
 {
 	if (bSet)
@@ -3418,6 +3420,8 @@ BOOL __stdcall ITEMS_CheckType(int nItemType1, int nItemType2)
 }
 
 //D2Common.0x6FD9DCE0 (#10731)
+// 1.13c D2Common+0x24430: retail fuses this null guard with ITEMS_CheckItemTypeIdByItemId's body;
+// the class id reaches items.txt through DATATBLS_GetItemTypeFromItemId (same result, see the spec).
 BOOL __stdcall ITEMS_CheckItemTypeId(const D2UnitStrc* pItem, int nItemType)
 {
 	if (pItem)
@@ -4657,6 +4661,7 @@ int __stdcall ITEMS_GetBonusManaBasedOnClass(D2UnitStrc* pPlayer, int nValue)
 	return nValue;
 }
 
+// 1.13c D2Common+0x221C0
 //D2Common.0x6FDA0030 (#10875)
 uint16_t __stdcall ITEMS_GetItemFormat(D2UnitStrc* pItem)
 {
@@ -4762,6 +4767,7 @@ int __stdcall ITEMS_HasUsedCharges(D2UnitStrc* pItem, BOOL* pHasChargedSkills)
 }
 
 //D2Common.0x6FDA0340 (#10880)
+// 1.13c D2Common+0x23E00
 BOOL __stdcall ITEMS_IsEthereal(D2UnitStrc* pItem)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -4827,6 +4833,49 @@ BOOL __stdcall ITEMS_GetCompactItemDataFromBitstream(uint8_t* pBitstream, size_t
 
 		return TRUE;
 	}
+}
+
+// 1.13c D2Common+0x22000 (ordinal 11171): ITEMS_GetCompactItemDataFromBitstream plus a trailing version word.
+// Delta vs 1.10f: nVersion <= 0x5C turns the code 'nec ' into 'neg '; the code lookup is the items linker, no error log.
+BOOL __stdcall ITEMS_GetCompactItemDataFromBitstreamVersioned(uint8_t* pBitstream, size_t nSize, BOOL bCheckForHeader, D2ItemSaveStrc* pItemSave, int32_t nVersion)
+{
+	D2BitBufferStrc pBuffer = {};
+	BITMANIP_Initialize(&pBuffer, pBitstream, nSize);
+	if (bCheckForHeader && BITMANIP_ReadSigned(&pBuffer, 16) != 'MJ')
+	{
+		return FALSE;
+	}
+	pItemSave->dwFlags = BITMANIP_Read(&pBuffer, 32);
+	BITMANIP_Read(&pBuffer, 10);
+	pItemSave->nAnimMode = (uint8_t)BITMANIP_Read(&pBuffer, 3);
+	if (pItemSave->nAnimMode == IMODE_ONGROUND || pItemSave->nAnimMode == IMODE_DROPPING)
+	{
+		pItemSave->nX = (uint16_t)BITMANIP_Read(&pBuffer, 16);
+		pItemSave->nY = (uint16_t)BITMANIP_Read(&pBuffer, 16);
+	}
+	else
+	{
+		pItemSave->nBodyloc = (uint8_t)BITMANIP_Read(&pBuffer, 4);
+		pItemSave->nX = (uint16_t)BITMANIP_Read(&pBuffer, 4);
+		pItemSave->nY = (uint16_t)BITMANIP_Read(&pBuffer, 4);
+		pItemSave->nStorePage = (uint8_t)BITMANIP_Read(&pBuffer, 3) - 1;
+	}
+	int dwCode;
+	if (pItemSave->dwFlags & IFLAG_ISEAR)
+	{
+		dwCode = ' rae';
+	}
+	else
+	{
+		dwCode = BITMANIP_Read(&pBuffer, 32);
+		if (nVersion < 0x5D && dwCode == ' cen')
+		{
+			dwCode = ' gen';
+		}
+	}
+	pItemSave->nClassId = FOG_GetLinkIndex(sgptDataTables->pItemsLinker, dwCode, 0);
+	pItemSave->nItemFileIndex = (pItemSave->dwFlags & (IFLAG_LOWQUALITY | IFLAG_COMPACTSAVE)) ? 0 : BITMANIP_Read(&pBuffer, 3);
+	return TRUE;
 }
 
 //D2Common.0x6FDA0490 (#10882)

@@ -25,6 +25,9 @@ struct D2LevelFileListStrc
 	D2LevelFileListStrc* pNext;				//0x10C
 };
 
+// 1.10f field order kept: our engine is m64 and reaches every field by name, so the retail 4-byte
+// offsets are documentation only. 1.13c D2Common reorders this struct (nMode 0x00, nIndex 0x04,
+// nXpos 0x08, pNext 0x0C, pMapAI 0x10, nUnitType 0x14, nYpos 0x18, bSpawned 0x1C, size 0x20); see
 struct D2PresetUnitStrc
 {
 	int32_t nUnitType;						//0x00
@@ -95,6 +98,9 @@ D2COMMON_DLL_DECL int __stdcall DRLGPRESET_GetObjectIndexFromObjPreset(uint8_t n
 void __fastcall DRLGPRESET_ParseDS1File(D2DrlgFileStrc* pDrlgFile, HD2ARCHIVE hArchive, const char* szFileName);
 //D2Common.0x6FD86050
 void __fastcall DRLGPRESET_LoadDrlgFile(D2DrlgFileStrc** ppDrlgFile, HD2ARCHIVE hArchive, const char* szFile);
+//1.13c D2Common+0x9FA0: the .ds1 file body's teardown, which 1.13c keeps as its own function and D2MOO
+//1.10f inlines into DRLGPRESET_FreeDrlgFile below. Exported for the FN vector (src/core/fn/d2common_9fa0.cpp).
+void __fastcall DRLGPRESET_FreeDrlgFileStruct(D2DrlgFileStrc* pDrlgFile);
 //D2Common.0x6FD86190
 void __fastcall DRLGPRESET_FreeDrlgFile(D2DrlgFileStrc** ppDrlgFile);
 //D2Common.0x6FD86310

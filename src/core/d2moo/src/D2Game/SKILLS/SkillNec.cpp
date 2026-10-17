@@ -1291,6 +1291,7 @@ int32_t __fastcall sub_6FD0D000(D2AuraCallbackStrc* pAuraCallback, D2UnitStrc* p
 }
 
 //D2Game.0x6FD0D0D0
+// 1.13c D2Game+0x4F4D0
 int32_t __fastcall SKILLS_SrvDo055_CorpseExplosion(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);

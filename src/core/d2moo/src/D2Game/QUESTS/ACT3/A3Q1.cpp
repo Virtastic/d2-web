@@ -426,6 +426,7 @@ void __fastcall ACT3Q1_InitQuestData(D2QuestDataStrc* pQuestData)
 }
 
 //D2Game.0x6FCA7670
+// 1.13c D2Game+0xE7BE0 (checked against decompile; the function names it ACT3Q3_Callback03 but it is the Lam Esen quest)
 void __fastcall ACT3Q1_Callback03_ChangedLevel(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	if (pQuestArg->nNewLevel == LEVEL_LOWERKURAST && pQuestData->bNotIntro && pQuestData->fState < 1)
@@ -534,6 +535,7 @@ void __fastcall ACT3Q1_Callback14_PlayerJoinedGame(D2QuestDataStrc* pQuestData, 
 }
 
 //D2Game.0x6FCA78D0
+// 1.13c D2Game+0xE50C0 (checked against decompile)
 void __fastcall ACT3Q1_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pQuestArg->pPlayer)->pQuestData[pQuestArg->pGame->nDifficulty];

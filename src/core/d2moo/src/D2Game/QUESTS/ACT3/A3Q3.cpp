@@ -796,16 +796,18 @@ void __fastcall OBJECTS_InitFunction25_Gidbinn(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FCA9C30
+// 1.13c D2Game+0xE9C80: every path returns 0 (1.10f upstream returned 1 on the no-quest and success paths)
 int32_t __fastcall OBJECTS_OperateFunction31_GidbinnDecoy(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
-	if (!pOp || !pOp->pObject)
+	if (!pOp)
 	{
 		return 0;
 	}
 
 	D2UnitStrc* pObject = pOp->pObject;
 
-	if (pObject->dwAnimMode != OBJMODE_NEUTRAL)
+	// 1.13c: a null object falls through into the quest logic
+	if (pObject && pObject->dwAnimMode != OBJMODE_NEUTRAL)
 	{
 		return 0;
 	}
@@ -823,7 +825,7 @@ int32_t __fastcall OBJECTS_OperateFunction31_GidbinnDecoy(D2ObjOperateFnStrc* pO
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pOp->pGame, QUEST_A3Q3_GIDBINN);
 	if (!pQuestData || !pQuestData->bNotIntro)
 	{
-		return 1;
+		return 0;
 	}
 
 	if (!pQuestData->fState)
@@ -845,7 +847,7 @@ int32_t __fastcall OBJECTS_OperateFunction31_GidbinnDecoy(D2ObjOperateFnStrc* pO
 		QUESTS_CreateTimer(pQuestData, ACT3Q3_SpawnGidbinnBoss, 7);
 	}
 
-	return 1;
+	return 0;
 }
 
 //D2Game.0x6FCA9D50

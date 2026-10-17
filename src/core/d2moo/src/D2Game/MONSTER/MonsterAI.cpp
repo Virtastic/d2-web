@@ -40,6 +40,7 @@
 
 
 //D2Game.0x6FC61190
+// 1.13c D2Game+0xAFCE0
 void __fastcall sub_6FC61190(D2GameStrc* pGame, D2UnitStrc* pMonster, Unk* pItemCode, DWORD dwILvl, DWORD dwQuality)
 {
     if (!pMonster || pMonster->dwUnitType != UNIT_MONSTER)
@@ -83,6 +84,7 @@ void __fastcall sub_6FC61190(D2GameStrc* pGame, D2UnitStrc* pMonster, Unk* pItem
 }
 
 //D2Game.0x6FC61270
+// 1.13c D2Game+0x48FC0
 void __fastcall sub_6FC61270(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pUnit, int16_t nId, D2MercDataStrc* pMercData, int32_t bDead)
 {
     if (!pPlayer || !pUnit || !pMercData || pPlayer->dwUnitType != UNIT_PLAYER)
@@ -155,6 +157,7 @@ void __fastcall sub_6FC61270(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
 }
 
 //D2Game.0x6FC61490
+// 1.13c D2Game+0x48950
 void __fastcall MONSTERAI_SendMercStats(D2GameStrc* pGame, D2UnitStrc* pPlayer, DWORD dwZero)
 {
     D2UnitStrc* pMerc = sub_6FC7E8B0(pGame, pPlayer, PETTYPE_HIREABLE, 0);

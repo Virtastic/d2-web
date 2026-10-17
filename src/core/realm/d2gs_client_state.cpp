@@ -38,6 +38,7 @@
 #include "client_fireball_hit.h"
 #include "client_missile_sound.h"
 #include "d2gs_client_player_motion.h"
+#include "d2gs_client_player_stop.h"
 #include "d2gs_client_monster_death_events.h"
 #include "cast_target_relation.h"
 #include "remote_unit_skill_start.h"
@@ -948,6 +949,8 @@ static int apply_monster_death_mode(const uint8_t* packet, int length) {
     // State 9 has an Izual-specific SQ replacement path. The ordinary DD path is
     // grounded here; leave that class-specific transition to its own client behavior.
     if (decoded.wireState == 9 && it->view.classId == 0x11c && previousMode == MONMODE_SEQUENCE) return 0;
+    // The projected family is the whole 0x69/0x6A selector column, so a GETHIT selector (6)
+    // reaches the same mode setter as the two death selectors.
     if (d2_realm_client_unit_set_mode(unit, decoded.mode) < 0) return -1;
     refresh_monster_motion_view(*it);
     if (d2::realm::appendMonsterDeathModeEvent(g_monsterDeathModeEvents,
@@ -1125,6 +1128,30 @@ static D2UnitStrc* find_realm_client_unit(uint8_t unitType, uint32_t guid) {
             if (monster.view.guid == guid) return monster.motionUnit;
     }
     return nullptr;
+}
+
+// The selector-6 arm writes the record's hit-class byte to D2UnitStrc+0xB0 (retail:
+// 0x199DF mov [ebx+0xB0],edx); the wasm64 struct widens the 18 pointers before it.
+static_assert(offsetof(D2UnitStrc, dwLastHitClass) == 0xB0 + 18 * (sizeof(void*) - 4),
+    "D2UnitStrc dwLastHitClass is the 0x0D hit-class slot");
+
+// 1.13c D2Client+0xAF590: the D2GS 0x0D receiver. It builds a
+// three-field record {x, y, hitClass}, hands it to FUN_6FADA750 with the record's action selector
+// (byte +6), then stores the record's life byte on the client-unit-list node its by-id lookup
+// returns. Selector 6 is the GETHIT column of FUN_6FAC9830; every other selector reaches its own
+// client handler and is not projected here.
+static int apply_player_stop(const uint8_t* packet, int length) {
+    d2::realm::D2RealmPlayerStop stop{};
+    if (d2::realm::decodePlayerStopPacket(packet, length, &stop) != 1) return -1;
+    const int mode = d2::realm::playerStopModeFromAction(stop.action);
+    if (mode < 0) return 0;
+    D2UnitStrc* const unit = find_realm_client_unit(stop.unitType, stop.guid);
+    if (!unit) return 0;
+    // Selector 6 first writes the record's third field into the unit's last-hit-class slot
+    // (D2Client+0x19830: mov [ebx+0xB0], the zero-extended packet byte at +11), then sets the mode.
+    unit->dwLastHitClass = stop.hitClass;
+    if (d2_realm_client_unit_set_mode(unit, static_cast<uint32_t>(mode)) < 0) return -1;
+    return 1;
 }
 
 static D2UnitStrc* find_realm_client_owned_item(uint32_t guid) {
@@ -1995,6 +2022,10 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_feed(const uint8_t* bytes, int l
             const int result = packet[0] == 0x4c
                 ? apply_remote_unit_skill_start(packet, size)
                 : apply_remote_projectile_start(packet, size);
+            if (result < 0) return reject_stream(-2);
+            applied += result;
+        } else if (packet[0] == 0x0d) {
+            const int result = apply_player_stop(packet, size);
             if (result < 0) return reject_stream(-2);
             applied += result;
         } else if (packet[0] == 0x0f) {

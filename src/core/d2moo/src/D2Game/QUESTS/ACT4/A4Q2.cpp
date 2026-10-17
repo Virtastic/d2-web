@@ -162,6 +162,7 @@ void __fastcall ACT4Q2_UnitIterate_SetPrimaryGoalDone(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FCAE670
+// 1.13c D2Game+0xB8940
 int32_t __fastcall ACT4Q2_IsChaosSanctumCleared(D2GameStrc* pGame)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A4Q2_DIABLO);
@@ -1258,6 +1259,7 @@ void __fastcall OBJECTS_InitFunction78_LastLastPortal(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FCAFDF0
+// 1.13c D2Game+0xBB550
 int32_t __fastcall OBJECTS_OperateFunction73_LastLastPortal(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
 	if (!pOp || !pOp->pGame)

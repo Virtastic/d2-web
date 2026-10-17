@@ -114,6 +114,7 @@ uint32_t __fastcall AIUTIL_GetDistanceToCoordinates(D2UnitStrc* pUnit, int32_t n
 }
 
 //D2Game.0x6FCF14D0
+// 1.13c D2Game+0xB0E90
 int32_t __fastcall sub_6FCF14D0(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2)
 {
 	constexpr uint8_t nOffsets[25] = { 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4 };
@@ -520,6 +521,7 @@ D2UnitStrc* __fastcall sub_6FCF1E30(D2GameStrc* pGame, D2UnitStrc* pUnit, D2Unit
 }
 
 //D2Game.0x6FCF1E80
+// 1.13c D2Game+0xB17B0
 D2UnitStrc* __fastcall sub_6FCF1E80(D2GameStrc* pGame, D2UnitStrc* pUnit, void* a3, D2UnitStrc*(__fastcall* a4)(D2GameStrc*, D2UnitStrc*, D2UnitStrc*, void*), int32_t nCallbackId)
 {
 	D2UnkAiTableStrc stru_6FD29600[13] =
@@ -674,6 +676,7 @@ void __fastcall sub_6FCF20E0(D2UnitStrc* pUnit, void* pArg, void* ppUnit)
 }
 
 //D2Game.0x6FCF2110
+// 1.13c D2Game+0xB1C90
 D2UnitStrc* __fastcall sub_6FCF2110(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiControlStrc* pAiControl, int32_t* pDistance, int32_t* pCombat)
 {
 	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
@@ -879,6 +882,7 @@ D2UnitStrc* __fastcall sub_6FCF2110(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiCo
 }
 
 //D2Game.0x6FCF27B0
+// 1.13c D2Game+0xB1AB0
 int32_t __fastcall sub_6FCF27B0(D2UnitStrc* pUnit, D2UnitStrc** ppTarget, int32_t* pTargetDistance, D2UnitStrc* a4, int32_t a5)
 {
 	if ((pUnit && pUnit->dwUnitType == UNIT_PLAYER) || !a4)
@@ -1171,6 +1175,7 @@ D2UnitStrc* __fastcall AIUTIL_FindTargetInAdjacentActiveRooms(D2GameStrc* pGame,
 }
 
 //D2Game.0x6FCF2CC0
+// 1.13c D2Game+0xB1BC0
 D2UnitStrc* __fastcall sub_6FCF2CC0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t* pDistance, int32_t* pInMeleeRange)
 {
 	D2UnitStrc* pTarget = nullptr;

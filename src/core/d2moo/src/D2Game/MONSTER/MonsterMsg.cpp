@@ -127,6 +127,7 @@ static bool IsPathCircling(int32_t nAnimMode, D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Game.0x6FC65C70
+// 1.13c D2Game+0xF35C0
 void __fastcall sub_6FC65C70(D2GameStrc* pGame, D2UnitStrc* pMonster, D2ClientStrc* pClient)
 {
     // TODO: Names
@@ -273,6 +274,10 @@ void __fastcall sub_6FC65C70(D2GameStrc* pGame, D2UnitStrc* pMonster, D2ClientSt
             nUnitLife |= 0x80u;
         }
 
+        // 1.13c D2Game+0xF35C0: the get-hit life byte rides the 0x69/0x6A packet's direction slot
+        // (0x8C100 param_7 -> byte 0x0A). 1.10f computed it into `nUnitLife` and dropped it, which
+        // is why retail's GH packet carries the life percentage and ours carried 0.
+        nDirection = nUnitLife;
         v39 = LOBYTE(pMonster->dwLastHitClass);
         break;
     }

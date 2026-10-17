@@ -51,6 +51,7 @@ struct D2WaypointSaveDataStrc
 static_assert(sizeof(D2WaypointSaveDataStrc) == 80);
 static_assert(sizeof(D2PlrIntroSaveStrc) == 52);
 
+// 1.13c D2Game+0x545D0
 int32_t __fastcall sub_6FC898F0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pItem, D2UnitStrc* a4)
 {
     if (!pItem)
@@ -386,7 +387,9 @@ int32_t __fastcall PLRSAVE_ReadItems_6FC8B8A0(D2GameStrc* pGame, D2UnitStrc* pPl
             pParentItem = nullptr;
         }
 
-        for (int32_t j = 0; j < itemSave.nItemFileIndex; ++j)
+        // 1.13c D2Game+0x54810: the socket count is read once (local_24); the loop below overwrites itemSave
+        const int32_t nSocketCount = itemSave.nItemFileIndex;
+        for (int32_t j = 0; j < nSocketCount; ++j)
         {
             const uint32_t nSocketableBitstreamSize = pSection - pItemBitstream + nSize;
             ITEMS_GetCompactItemDataFromBitstream(pItemBitstream, nSocketableBitstreamSize, 1, &itemSave);
@@ -436,6 +439,7 @@ int32_t __fastcall PLRSAVE_ReadItems_6FC8B8A0(D2GameStrc* pGame, D2UnitStrc* pPl
     return 0;
 }
 
+// 1.13c D2Game+0x54A20
 int32_t __fastcall sub_6FC8BAA0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pItem, D2UnitStrc* a4)
 {
     if (!pItem)
@@ -734,6 +738,7 @@ int32_t __fastcall PLRSAVE2_ReadWaypointData(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 // Recovered current-version player skill reader.
+// 1.13c D2Game+0x53D40
 int32_t __fastcall PLRSAVE2_ReadSkills(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint8_t** ppSection, uint8_t* pEnd, uint32_t nVersion, int32_t nSkills)
 {
     uint8_t* pData = *ppSection + 2;

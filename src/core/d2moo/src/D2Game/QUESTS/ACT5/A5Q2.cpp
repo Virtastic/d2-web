@@ -560,18 +560,22 @@ int32_t __fastcall ACT5Q2_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2Uni
 }
 
 //D2Game.0x6FCB28D0
+// 1.13c D2Game+0x5B1E0
 void __fastcall ACT5Q2_Callback03_ChangedLevel(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	if (pQuestArg->nNewLevel >= LEVEL_ID_ACT5_BARRICADE_1 && pQuestArg->nNewLevel <= LEVEL_ARREATPLATEAU && pQuestData->bNotIntro && ((D2Act5Quest2Strc*)pQuestData->pQuestDataEx)->nKilledWussies < 5)
 	{
-		if (pQuestData->fState == 1 || pQuestData->fState == 2)
+		// 1.13c D2Game+0x5B1E0: the state test is kept in a local, because
+		// QUESTS_StateDebug overwrites fState with 3
+		const bool bStateWasActive = pQuestData->fState == 1 || pQuestData->fState == 2;
+		if (bStateWasActive)
 		{
 			QUESTS_StateDebug(pQuestData, 3, __FILE__, __LINE__);
 		}
 
 		if (pQuestData->fLastState)
 		{
-			if (pQuestData->fState != 1 && pQuestData->fState != 2)
+			if (!bStateWasActive)
 			{
 				return;
 			}

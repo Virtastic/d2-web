@@ -276,6 +276,7 @@ void __fastcall PARTY_CountLivingUnits(D2GameStrc* pGame, D2UnitStrc* pUnit, voi
 }
 
 //D2Game.0x6FCBA100
+// 1.13c D2Game+0x9C160
 void __fastcall PARTY_IteratePartyMembers(D2GameStrc* pGame, int16_t nPartyId, PartyCallbackFunction pCallback, void* pArgs)
 {
     D2_ASSERT(!pGame->pPartyControl);   // d2-web: upstream asserted the opposite (nothing allocated yet)

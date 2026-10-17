@@ -50,6 +50,8 @@ D2UnitStrc* __fastcall SUNIT_GetServerUnit(D2GameStrc* pGame, int32_t nUnitType,
 D2UnitStrc* __fastcall SUNIT_GetOwner(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FCBBC00
 D2UnitStrc* __fastcall SUNIT_GetLastAttacker(D2GameStrc* pGame, D2UnitStrc* pUnit);
+//D2Game.0xE0310 (1.13c; the sorted unit-list insert outlined from the 1.10f SUNIT_Add tail)
+D2UnitStrc* __fastcall SUNIT_AddUnitToList(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FCBBCB0
 void __fastcall SUNIT_Add(D2UnitStrc* pUnit, int32_t nX, int32_t nY, D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t a6);
 //D2Game.0x6FCBBFE0

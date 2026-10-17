@@ -6,6 +6,12 @@ export function resourceRatio(value, maximum) {
   return Number.isFinite(max) && max > 0 && Number.isFinite(current) ? Math.min(1, Math.max(0, current / max)) : 0;
 }
 
+// Retail's XP bar spans the current level only: (exp - levelStart) / (next - levelStart).
+export function experienceBarRatio(exp, next, levelStart) {
+  const start = Number(levelStart) || 0;
+  return resourceRatio(Number(exp) - start, Number(next) - start);
+}
+
 // The console is CENTRED between the orbs, and the world shows either side of it. That is what
 // retail looks like -- the panel is two orbs plus a centre console, not a solid band across the
 // screen. The arithmetic confirms the offsets are exact rather than hand-placed: the orbs are 117
@@ -289,7 +295,7 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
 
     const experience = Number(advancement?.experience);
     const nextExperience = Number(advancement?.nextExperience);
-    const experienceRatio = resourceRatio(experience, nextExperience);
+    const experienceRatio = experienceBarRatio(experience, nextExperience, advancement?.prevExperience);
     // D2's renderer truncates the float width to an integer before its DrawRect call.
     const experiencePixels = Math.floor(experienceRatio * CONTROL_LAYOUT.experienceWidth);
     if (experiencePixels > 0) {

@@ -81,7 +81,7 @@ const Unicode* D2LANG_GetStringByReferenceString(char* szReference) {
     return (const Unicode*)it->second.c_str();
 }
 
-// D2Lang #10004: the string a table index names (the inverse of D2LANG_GetTblIndex); "" when absent.
+// 1.13c D2Lang+0x9450 (#10003): the string a table index names (the inverse of D2LANG_GetTblIndex); "" when absent.
 const Unicode* D2LANG_GetStringFromTblIndex(short index) {
     static const std::u16string empty;
     const std::u16string* v = d2::sharedLang().byTblIndex((uint16_t)index);

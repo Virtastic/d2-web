@@ -1284,6 +1284,7 @@ void __stdcall DATATBLS_ComputeSequenceAnimation(D2AnimSeqTxt* pMonSeqTxt, int n
 }
 
 //D2Common.0x6FD72990 (#10686)
+// 1.13c D2Common+0x2E6B0
 void __stdcall DATATBLS_GetSequenceEvent(D2AnimSeqTxt* pMonSeqTxt, int nSeqFramePoint, int* pEvent)
 {
 	if (pMonSeqTxt)

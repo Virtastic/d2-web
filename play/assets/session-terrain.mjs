@@ -229,10 +229,18 @@ function readSessionTerrainHeld(Module) {
     const v = new DataView(Module.HEAPU8.buffer, ptr, n * 20);
     const px = Module.ccall('d2_session_player_x', 'number', [], []), py = Module.ccall('d2_session_player_y', 'number', [], []);
     const player = { tileX: Math.trunc(px / 5), tileY: Math.trunc(py / 5), list: Module.ccall('d2_session_player_coordlist', 'number', [], []) };
+    // PERF: only a layer-1 (wall) tile reads the coord record -- `t.layer === 1` gates `wallHidesPlayer`
+    // below and nothing else in the client or a row touches `tile.coord`. A town frame is ~3,300 tiles,
+    // ~2,800 of them floors, so building the record (and its five DataView reads) for every tile is pure
+    // waste on the per-frame world read. Wall tiles keep the record bit-for-bit; a floor/roof tile now
+    // reads `undefined` where it read `false`, which every consumer already treats as falsy
+    // (terrain.draw's `layer === 1 && hidesPlayer !== undefined` fade gate, sampleWallCells's
+    // `Boolean(t.hidesPlayer)`, terrain-draw-identity), so no drawn pixel or record changes.
     into.forEach((t, i) => {
+      if (t.layer !== 1) return;
       const nIndex = v.getInt32(i * 20, true);
       t.coord = nIndex < 0 ? null : { nIndex, x0: v.getInt32(i * 20 + 4, true), y0: v.getInt32(i * 20 + 8, true), x1: v.getInt32(i * 20 + 12, true), y1: v.getInt32(i * 20 + 16, true) };
-      t.hidesPlayer = t.layer === 1 && wallHidesPlayer(t, t.coord, player);
+      t.hidesPlayer = wallHidesPlayer(t, t.coord, player);
     });
   };
   coords(count > 0 && Module._d2_session_tile_coordlists ? Number(Module.ccall('d2_session_tile_coordlists', 'number', [], [])) : 0, count, tiles);
@@ -377,9 +385,12 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   // (leftclip 0) are unchanged: `blockColumn`. Read 2026-09-30; measured on F96's band -- 348 of 348
   // misses, and 0 of them our old index, before the change (probe-f249-clip). F249.
   const CLIP_LEFT = 0;
-  function litFloor(path, dt1Tile, index, grid, tileX, tileY) {
+  function litFloor(path, dt1Tile, index, grid, tileX, tileY, gridKey = null) {
     const px = dt1Tile.pixels;
-    const keyBase = `${path}:${index}:${grid.join(',')}`;
+    // `gridKey` is `grid.join(',')`, precomputed by the caller's own per-tile grid memo (gridFor): the key
+    // is character for character the one built here, so the cache behaves identically and only the per-frame
+    // join is skipped.
+    const keyBase = `${path}:${index}:${gridKey === null ? grid.join(',') : gridKey}`;
     // Retail clips the left lookup and starts iso edge interpolation at the first visible row.
     // Tiles crossing either boundary therefore need a position-dependent cache key.
     const key = (px && px.width && tileX !== undefined && tileX < CLIP_LEFT
@@ -490,6 +501,29 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   let lightAmbient = null;   // the light map's ambient: roofs are lit flat at it
   let lightCell = null;   // (subtileX, subtileY) -> the light map cell, for walls
   let lightGrid = null;   // (worldSubtileX, worldSubtileY) -> 36 corner intensities, or null (unlit)
+  // The light map behind `lightGrid`, when the caller hands it over: a floor tile's lit cache is keyed on
+  // the 8x8 grid it reads, and rebuilding those 64 intensities plus their `join(',')` (~150 characters)
+  // for every visible floor tile on every frame is pure key-building on a cache HIT -- the intensities
+  // themselves are only read when the cache misses. So the grid and its key are memoised per
+  // (worldSubtileX, worldSubtileY) and refreshed only when a byte of the light map moved (gridGen).
+  // The LIT CACHE KEY IS UNCHANGED -- it is still `${path}:${index}:${grid.join(',')}` -- so the hit/miss
+  // pattern and every drawn pixel are exactly what they were; only the per-frame string and array work is
+  // gone. `lightGridKeyed` is false for any caller that does not hand over the map (the roof pass's own
+  // grids, a test grid), which then takes the old path verbatim.
+  let lightGridSource = null, lightGridKeyed = false, gridGen = 0;
+  const grids = new Map();   // worldSubtileX -> Map(worldSubtileY -> { gen, grid, key })
+  function gridFor(a, b) {
+    let byB = grids.get(a);
+    if (!byB) grids.set(a, byB = new Map());
+    let e = byB.get(b);
+    if (!e) byB.set(b, e = { gen: -1, grid: null, key: null });
+    if (e.gen !== gridGen) {
+      e.grid = lightGrid ? lightGrid(a, b) : null;
+      e.key = e.grid ? e.grid.join(',') : null;
+      e.gen = gridGen;
+    }
+    return e;
+  }
 
   function bitmapFor(path, tile, index) {
     const key = `${path}:${index}`;
@@ -611,8 +645,23 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
 
   return {
     errors,
-    /** Light floors from a grid source: fn(a, b) -> 36 intensities or null. */
-    setLightGrid(fn, cell = null, ambient = null) { lightGrid = fn; lightCell = fn ? cell : null; lightAmbient = fn ? ambient : null; },
+    /**
+     * Light floors from a grid source: fn(a, b) -> 36 intensities or null.
+     * `source` is readSessionLightmap's result when fn is that map's own grid; it is compared
+     * byte-for-byte against the previous frame's and a generation counter is bumped only when a cell or the
+     * map origin actually moved, which is what lets the floor pass skip rebuilding each tile's grid (below).
+     */
+    setLightGrid(fn, cell = null, ambient = null, source = null) {
+      lightGrid = fn; lightCell = fn ? cell : null; lightAmbient = fn ? ambient : null;
+      if (!fn || !source || !source.cells) { lightGridKeyed = false; lightGridSource = null; return; }
+      const cells = source.cells, origin = source.origin || null, prev = lightGridSource;
+      let same = Boolean(prev) && prev.cells.length === cells.length && Boolean(origin) && Boolean(prev.origin)
+        && origin[0] === prev.origin[0] && origin[1] === prev.origin[1];
+      if (same) { const p = prev.cells; for (let i = 0; i < cells.length; i++) if (cells[i] !== p[i]) { same = false; break; } }
+      if (!same) gridGen++;
+      lightGridSource = { cells, origin };
+      lightGridKeyed = true;
+    },
     /**
      * Draw the level. `tiles` is parseSessionTiles output, `files` readLevelTileFiles output,
      * `player` the snapshot player (subtile coords). Floors (layer 0) draw before walls (layer 1)
@@ -773,12 +822,18 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         ctx.drawImage(lit || l.bitmap, l.x, l.y); drawn++; recordTile(l, files);
       }
       for (const f of floors) {
-        const grid = lightGrid && lightGrid(f.tile.worldX * 5, f.tile.worldY * 5);
-        const lit = grid && litFloor(files[f.slot], f.dt1Tile, f.want + ':v' + f.variantNo, grid, f.x, f.y);
+        // gridFor returns this frame's grid for the tile's own world subtile: unchanged intensities stay
+        // the same array (and the same precomputed join) as last frame, so a cache HIT costs no 64-cell
+        // rebuild and no ~150-character key. A light map that moved (gridGen) rebuilds both, and a caller
+        // that did not hand over the map (`lightGridKeyed` false) takes the original read here.
+        const a = f.tile.worldX * 5, b = f.tile.worldY * 5;
+        const e = lightGridKeyed && lightGrid ? gridFor(a, b) : null;
+        const grid = e ? e.grid : (lightGrid && lightGrid(a, b));
+        const lit = grid && litFloor(files[f.slot], f.dt1Tile, f.want + ':v' + f.variantNo, grid, f.x, f.y, e ? e.key : null);
         // Off unless globalThis.__d2TraceBlits is an array: then each drawn floor carries the dt1 art
         // and the 8x8 light grid it was lit from, so a row can recompute the LEVEL litFloor gave a
         // pixel (F96: our floor level is 1-2 above retail's on the frame's left edge). s448 reads it.
-        if (globalThis.__d2TraceBlits) globalThis.__d2TraceBlits.push({ x: f.x, y: f.y, path: files[f.slot], want: f.want, variantNo: f.variantNo, dt1Tile: f.dt1Tile, grid, a: f.tile.worldX * 5, b: f.tile.worldY * 5, seam: Boolean(f.tile.seam) });
+        if (globalThis.__d2TraceBlits) globalThis.__d2TraceBlits.push({ x: f.x, y: f.y, path: files[f.slot], want: f.want, variantNo: f.variantNo, dt1Tile: f.dt1Tile, grid, a, b, seam: Boolean(f.tile.seam) });
         ctx.drawImage(lit || f.bitmap, f.x, f.y); drawn++; recordTile(f, files);
       }
       if (afterFloors) afterFloors(ctx, floors, { width, height, offsetX, offsetY });

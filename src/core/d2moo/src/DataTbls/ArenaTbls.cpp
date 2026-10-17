@@ -40,9 +40,6 @@ void __fastcall DATATBLS_UnloadArenaTxt()
 // 1.13c D2Common+0x80000
 void __fastcall DATATBLS_LoadCharTemplateTxt(HD2ARCHIVE hArchive)
 {
-	int nMaxLevel = 0;
-	int nLevel = 0;
-
 	D2BinFieldStrc pTbl[] =
 	{
 		{ "Name", TXTFIELD_ASCII, 29, 0, NULL },
@@ -128,11 +125,20 @@ void __fastcall DATATBLS_LoadCharTemplateTxt(HD2ARCHIVE hArchive)
 
 	gpCharTemplateTxtTable = (D2CharTemplateTxt*)DATATBLS_CompileTxt(hArchive, "chartemplate", pTbl, &gnCharTemplateTxtTableRecordCount, sizeof(D2CharTemplateTxt));
 
+	DATATBLS_LoadCharTemplateStartIds(gpCharTemplateTxtTable, gnCharTemplateTxtTableRecordCount);
+}
+
+//D2Common.0x6FD48000 (inlined into 1.10f's 0x6FD47840 loader; a separate 1.13c function)
+// 1.13c D2Common+0x7FEE0
+void __fastcall DATATBLS_LoadCharTemplateStartIds(D2CharTemplateTxt* pCharTemplateTxtTable, int nRecords)
+{
+	int nMaxLevel = 0;
+
 	memset(gnCharTemplateStartIds, 0x00, sizeof(gnCharTemplateStartIds));
 
-	for (int i = 0; i < gnCharTemplateTxtTableRecordCount; ++i)
+	for (int i = 0; i < nRecords; ++i)
 	{
-		nLevel = gpCharTemplateTxtTable[i].nLevel;
+		const int nLevel = pCharTemplateTxtTable[i].nLevel;
 
 		D2_ASSERT(nLevel >= nMaxLevel);
 

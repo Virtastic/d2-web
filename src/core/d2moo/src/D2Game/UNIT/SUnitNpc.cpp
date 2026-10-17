@@ -107,6 +107,7 @@ void __fastcall D2GAME_NPC_FirstFn_6FCC67D0(D2GameStrc* pGame, int32_t nVendorId
 }
 
 //D2Game.0x6FCC6970
+// 1.13c D2Game+0xBD9B0
 void __fastcall D2GAME_NPC_RepairItem_6FCC6970(D2GameStrc* pGame, D2UnitStrc* pItem, D2UnitStrc* pPlayer)
 {
     if (ITEMS_IsRepairable(pItem))
@@ -316,6 +317,7 @@ void __fastcall sub_6FCC6F10(D2UnitStrc* pNpc, D2UnitStrc* pItem, D2GameStrc* pG
 }
 
 //D2Game.0x6FCC6FF0
+// 1.13c D2Game+0xBD160
 void __fastcall D2GAME_NPC_BuildHirelingList_6FCC6FF0(D2GameStrc* pGame, D2ClientStrc* pClient, D2UnitStrc* pUnit, int32_t a4)
 {
     if (!pUnit)
@@ -1062,6 +1064,7 @@ void __fastcall sub_6FCC8430(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCC84D0
+// 1.13c D2Game+0xC0B90
 void __fastcall sub_6FCC84D0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pPet)
 {
     if (!pPet || !pPlayer)
@@ -1520,6 +1523,7 @@ int32_t __fastcall D2GAME_NPC_BuyItemHandler_6FCC92A0(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FCC9350
+// 1.13c D2Game+0xC0DB0
 void __fastcall D2GAME_NPC_ResurrectMerc_6FCC9350(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nNpcUnitId)
 {
     D2UnitStrc* pInteractUnit = SUNIT_GetInteractUnit(pGame, pPlayer);

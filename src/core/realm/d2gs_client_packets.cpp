@@ -338,3 +338,34 @@ bool d2_realm_d2net_6bd0(const uint8_t* buf, int len, D2NetPktQueues* q, D2NetPk
     }
     return true;
 }
+
+// 1.13c D2Net+0x6d60: sub_6BD0's splitter run on the module's own receive buffer (pending byte count at
+// buf+0x7b8). Node (0x210 bytes) = packet + size@0x204 + 8 zero bytes (next@0x20c); opcode 0x8f stamps tick at
+// node+0xd. Opcode 0xaf with a nonzero second byte sets the result flag (0x81 would also push a nibble table
+// to Fog #10219; not modelled). The unconsumed tail moves to the buffer start. Retail's size > 0x204 _exit
+// returns -1. Links are 32-bit addresses as in the retail image: headNormal = DLL+0xb3fc (<= 0xae),
+// headSecond = DLL+0xb3f4 (> 0xae).
+extern "C" int d2_realm_d2net_6d60(uint8_t* buf, uint32_t* headNormal, uint32_t* headSecond, uint8_t* (*alloc)(), uint32_t tick) {
+    uint32_t size = ru32(buf + 0x7b8);
+    uint8_t* src = buf;
+    int flag = 0;
+    while (size != 0) {
+        uint32_t sz = 0;
+        if (!d2_realm_d2net_6750(src, size, &sz)) break;
+        if (sz > 0x204) return -1;
+        if (static_cast<int>(size) < static_cast<int>(sz)) break;
+        uint8_t* n = alloc();
+        memcpy(n, src, sz);
+        memcpy(n + 0x204, &sz, 4);
+        memset(n + 0x208, 0, 8);
+        if (src[0] == 0xaf && src[1] != 0) flag = 1;
+        else if (src[0] == 0x8f) memcpy(n + 0xd, &tick, 4);
+        uint32_t* head = src[0] > 0xae ? headSecond : headNormal;
+        while (*head) head = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(*head) + 0x20c);
+        *head = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(n));
+        src += sz; size -= sz;
+    }
+    memcpy(buf + 0x7b8, &size, 4);
+    if (size != 0 && src != buf) memmove(buf, src, size);
+    return flag;
+}

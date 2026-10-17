@@ -43,6 +43,7 @@
 #include <D2QuestRecord.h>
 #include <D2BitManip.h>
 #include "quest_object_operation.h"
+#include "../realm/d2gs_client_monster_death_clock.h"
 #include "npc_vendor_transition.h"
 #include "npc_dialog_transition.h"
 #include "pickup_path_probe.h"
@@ -141,6 +142,7 @@ extern "C" void d2_drlg_act_end();
 
 extern "C" void D2WEB_ResetPacketStream();
 extern "C" const uint8_t* D2WEB_PacketStream(uint32_t* pLength, uint32_t* pPackets);
+extern "C" uint32_t D2WEB_TakeMovieRequests(uint8_t* out, uint32_t cap);
 static uint32_t g_sessionPacketStreamLength, g_sessionPacketStreamPackets;
 
 static std::string g_err;
@@ -590,9 +592,15 @@ static uint32_t g_sessionKills;
 static std::vector<D2SessionRoom> g_sessionRooms;
 static std::vector<D2SessionUnit> g_sessionUnits;
 static std::vector<D2SessionMonsterAnimation> g_sessionMonsterAnimations;
+struct ClientMonsterClock { uint32_t mode = 0; bool valid = false; int32_t clock = 0; };
+static std::unordered_map<uint32_t, ClientMonsterClock> g_clientMonsterClock;
 static std::vector<D2SessionMissileAnimation> g_sessionMissileAnimations;
 static std::vector<D2SessionObjectPresentation> g_sessionObjectPresentations;
 static std::vector<D2SessionItemPresentation> g_sessionItemPresentations;
+// Parallel to the above: ITEMS_GetColor(nullptr, item, &c, 0) -> c+1 (0xFF = no transform), the same
+// component colour byte the save header carries. A monster's drop is magic/rare/unique/set: its ground
+// flippy is drawn through that item's MixPalette remap, a normal item's is not.
+static std::vector<uint8_t> g_sessionItemColours;
 // The shop's stock as PRESENTATION records, parallel to the existing vendor list rather than bolted
 // onto it. D2SessionVendorItem is 32 bytes with a hash over its own fields, and proven rows read it
 // at that stride (s50, s54) -- widening it would move their hashes for no reason. Retail's trade
@@ -608,6 +616,14 @@ static D2SessionItemState g_sessionItemState;
 // busy, interact data set -- and the pile stays IMODE_ONGROUND; a second command at that same spot
 // picks it up). This names the pile the walk is for, so the tick can complete it (below).
 static uint32_t g_sessionPendingPickup = 0;
+// #9: a unit-target command whose melee approach walk is still running. Retail's Rcv0x0D records the
+// same intent (UNITS_SetInteractData) and the walk mode's per-frame handler sub_6FC7F780 re-issues it
+// when the approach path completes (PlrModes.cpp: when the path ends it reads the saved skill and
+// restarts it). The session's attack/cast commands returned "move pending" and nothing resumed them,
+// so an out-of-range left click only walked. Remember which command started the walk; the tick
+// re-issues it once, at the same place it detects the walk completed.
+static int g_sessionApproachKind = 0;         // 1 primary attack, 2 right skill, 3 left skill (0: none)
+static uint32_t g_sessionApproachTarget = 0;  // the monster the walk is closing on
 extern "C" int d2_realm_d2gs_move_to(uint8_t opcode, uint16_t x, uint16_t y, uint8_t* out);
 static std::vector<D2SessionTile> g_sessionTiles;
 static std::vector<D2SessionActiveNearFeedRecord> g_sessionActiveNearFeed;
@@ -942,6 +958,8 @@ static void appendSessionItemPresentation(D2UnitStrc* item) {
         out.invWidth = txt->nInvWidth; out.invHeight = txt->nInvHeight;
     }
     g_sessionItemPresentations.push_back(out);
+    uint8_t colour = 0;
+    g_sessionItemColours.push_back(ITEMS_GetColor(nullptr, item, &colour, 0) ? (uint8_t)(colour + 1) : 0xFF);
 }
 
 static void syncSessionLevelFromPlayer() {
@@ -1386,7 +1404,7 @@ static int g_worldHold = 0; static bool g_worldHoldBuilt = false;
 static void updateSessionWorld() {
     if (g_worldHold && g_worldHoldBuilt) return;
     if (g_worldHold) g_worldHoldBuilt = true;
-    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionUnitFacings.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionWarps.clear(); g_sessionWarpOrigins.clear(); g_sessionMissileAnimations.clear();
+    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionUnitFacings.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionItemColours.clear(); g_sessionWarps.clear(); g_sessionWarpOrigins.clear(); g_sessionMissileAnimations.clear();
     g_sessionWorldHash = D2VEC_FNV_INIT;
     g_sessionNavigationHash = D2VEC_FNV_INIT;
     // The tile lists are built from this world only when a tile export asks (ensureSessionTiles):
@@ -1463,6 +1481,9 @@ static void updateSessionWorld() {
                 animation.id = unit->dwUnitId; animation.classId = unit->dwClassId;
                 animation.code = unit->pMonsterData->pMonstatsTxt ? unit->pMonsterData->pMonstatsTxt->dwCode : 0;
                 animation.mode = unit->dwAnimMode; animation.framePrecise = unit->nSeqCurrentFramePrecise;
+                { auto it = g_clientMonsterClock.find(unit->dwUnitId);
+                  if (it != g_clientMonsterClock.end() && it->second.valid && it->second.mode == unit->dwAnimMode)
+                      animation.framePrecise = it->second.clock; }
                 animation.frameCountPrecise = unit->dwFrameCountPrecise; animation.animSpeed = unit->wAnimSpeed;
                 animation.direction = unit->pDynamicPath ? unit->pDynamicPath->nDirection : 0;
                 const D2MonStats2Txt* mon2 = UNITS_GetMonStats2TxtRecordFromMonsterId((int)unit->dwClassId);
@@ -2623,6 +2644,7 @@ static int d2_session_create_for_class(uint32_t seed, int difficulty, int act, i
     memset(&g_sessionAdvancement, 0, sizeof g_sessionAdvancement); g_sessionAdvancementSkillId = SKILL_MAGICARROW;
     memset(&g_sessionItemState, 0, sizeof g_sessionItemState);
     g_sessionPendingPickup = 0;
+    g_sessionApproachKind = 0; g_sessionApproachTarget = 0;
     memset(&g_sessionNpcInteraction, 0, sizeof g_sessionNpcInteraction);
     memset(&g_sessionNpcDialog, 0, sizeof g_sessionNpcDialog); D2WEB_ResetLastDialogPacket();
     memset(&g_sessionNpcResponse, 0, sizeof g_sessionNpcResponse);
@@ -4313,9 +4335,27 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_npc_packet(uint32_t npcId) {
     updateSessionSnapshot();
     return result;
 }
+// Defect #16 (the unfiltered 0x13 open-object click): retail's client only sends 0x13 for an object its
+// CURRENT mode makes selectable (Objects.txt Selectable<mode>, the same column the client's hover reads),
+// and every such object of the shipped 1.13c tables is one whose OperateFn column has no operation
+// function -- so an 0x13 that reaches OBJECTS_OperateHandler for it dies on the gpObjOperateFnTable bound
+// / non-null asserts (D2_ASSERT(pOperateFn), table[0] == nullptr). Suppress the click HERE, upstream of the
+// click path; the assert itself is not to be relaxed. The 1.13c oracle (D2Game+0x6A330, FUN_6fc8a330)
+// separates the same two cases but returns 0 instead of aborting, so this keeps our crash out of a path
+// retail answers with "no operation".
+static bool objectClickIsSelectable(D2UnitStrc* object) {
+    if (!object || !object->pObjectData || !object->pObjectData->pObjectTxt) return false;
+    const uint32_t mode = object->dwAnimMode;
+    return mode < 8 && object->pObjectData->pObjectTxt->nSelectable[mode] != 0;
+}
+
 // Retail's 0x13 entity receiver handles object clicks, including deferred range approach.
 EMSCRIPTEN_KEEPALIVE int d2_session_command_object_packet(uint32_t objectId) {
     if (!g_sessionLive || !g_game || !g_targetPlayer) return -1;
+    // The object branch of the receiver (sub_6FC828D0's UNIT_OBJECT case) goes straight to
+    // OBJECTS_OperateHandler through sub_6FC78B20 once the target is in range, so an unfiltered click on a
+    // non-selectable object aborts the game. Refuse it where the click is ISSUED, as retail's client does.
+    if (!objectClickIsSelectable(SUNIT_GetServerUnit(g_game, UNIT_OBJECT, (int32_t)objectId))) return 0;
     const int32_t oldLevel = DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(g_targetPlayer));
     D2WEB_ResetPacketStream();
     if (!sessionDispatchGate(0x13)) return 0;
@@ -4696,6 +4736,14 @@ EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_quest_record() {
 EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_packet_stream() { return D2WEB_PacketStream(nullptr, nullptr); }
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_packet_stream_length() { return g_sessionPacketStreamLength; }
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_packet_stream_packets() { return g_sessionPacketStreamPackets; }
+// The next film the engine asked the client to play, or -1. D2Game's act/completion quest branches
+// send opcode 0x61 {nHeader, filmIndex} (QUESTS_ActChange_HirelingChangeAct, QUESTS_HellPortalActChange);
+// D2Client's receiver for it is D2Client+0xAF940, which hands the byte to the film player +0x899A0
+// (src/core/d2client/movie_select.h). Drains one per call, oldest first.
+EMSCRIPTEN_KEEPALIVE int d2_session_next_movie_request() {
+    uint8_t index = 0;
+    return D2WEB_TakeMovieRequests(&index, 1) == 1 ? (int)index : -1;
+}
 EMSCRIPTEN_KEEPALIVE int d2_session_player_x() { return g_targetPlayer && g_targetPlayer->pDynamicPath ? g_targetPlayer->pDynamicPath->tGameCoords.wPosX : -1; }
 EMSCRIPTEN_KEEPALIVE int d2_session_player_y() { return g_targetPlayer && g_targetPlayer->pDynamicPath ? g_targetPlayer->pDynamicPath->tGameCoords.wPosY : -1; }
 // The character screen's computed numbers, as retail's panel shows them (the retail captures,
@@ -5910,6 +5958,13 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_session_unit_stat(int type, uint32_t id, uint32_
     D2UnitStrc* u = g_game ? SUNIT_GetServerUnit(g_game, type, (int32_t)id) : nullptr;
     return u ? STATLIST_UnitGetStatValue(u, (int32_t)statId, (uint16_t)layer) : INT32_MIN;
 }
+// Fixture: write any unit's stat (a damaged monster for the hover life bar, s3401); 0 if no unit.
+EMSCRIPTEN_KEEPALIVE int d2_session_fixture_set_unit_stat(int type, uint32_t id, uint32_t statId, int32_t value) {
+    D2UnitStrc* u = g_game ? SUNIT_GetServerUnit(g_game, type, (int32_t)id) : nullptr;
+    if (!u) return 0;
+    STATLIST_SetUnitStat(u, (int32_t)statId, value, 0);
+    return 1;
+}
 EMSCRIPTEN_KEEPALIVE int32_t d2_session_player_stat(uint32_t statId, uint32_t layer) {
     return (g_sessionLive && g_targetPlayer) ? STATLIST_UnitGetStatValue(g_targetPlayer, (int32_t)statId, (uint16_t)layer) : -1;
 }
@@ -6237,6 +6292,11 @@ static void advanceClientCastClock() {
     }
 }
 
+// The commands the approach-walk resume below re-issues (defined further down).
+EMSCRIPTEN_KEEPALIVE int d2_session_command_primary_attack(uint32_t targetUnitId);
+EMSCRIPTEN_KEEPALIVE int d2_session_command_right_skill(uint32_t targetUnitId);
+EMSCRIPTEN_KEEPALIVE int d2_session_command_left_skill(uint32_t targetUnitId);
+
 EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath || frames < 0) return 0;
     for (int i = 0; i < frames; ++i) {
@@ -6401,7 +6461,28 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
                     // `PATH_CheckCollisionsToNextPosition` asserts on.
                     if (animUnit->dwUnitType == UNIT_PLAYER || animUnit->dwUnitType == UNIT_MONSTER)
                         D2COMMON_10193_PATH_AdjustDirection(animUnit->pDynamicPath);
-                    if (animUnit->dwFrameCountPrecise > 0) UNITS_UpdateFrame(animUnit);
+                    // 1.13c D2Client monster pass: DT (mode 0) clamps to its last cel and DD (12) holds at
+                    // the end (policy rows 0x6FBA2268); a plain wrap would replay the death.
+                    if (animUnit->dwFrameCountPrecise > 0) {
+                        // Retail's client keeps its own unit copy whose clock restarts at bonus<<8 on a mode
+                        // change (UNITS_SetAnimStartFrame); the server's stamp (dwGameFrame<<8) is not it.
+                        // Run the clock on a client shadow and leave the server counter untouched.
+                        const int32_t serverClock = animUnit->nSeqCurrentFramePrecise;
+                        if (animUnit->dwUnitType == UNIT_MONSTER) {
+                            auto& c = g_clientMonsterClock[animUnit->dwUnitId];
+                            if (c.mode != animUnit->dwAnimMode || !c.valid) {
+                                c.mode = animUnit->dwAnimMode; c.valid = true;
+                                c.clock = UNITS_GetFrameBonus(animUnit) << 8;
+                            }
+                            animUnit->nSeqCurrentFramePrecise = c.clock;
+                        }
+                        if (!d2_realm_client_apply_monster_death_terminal_clock(*animUnit,
+                                [](D2UnitStrc* u) { return UNITS_IsAtEndOfFrameCycle(u) != 0; })) UNITS_UpdateFrame(animUnit);
+                        if (animUnit->dwUnitType == UNIT_MONSTER) {
+                            g_clientMonsterClock[animUnit->dwUnitId].clock = animUnit->nSeqCurrentFramePrecise;
+                            animUnit->nSeqCurrentFramePrecise = serverClock;
+                        }
+                    }
                 }
             }
         }
@@ -6437,6 +6518,23 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         watchPlayerHp();
         D2DynamicPathStrc* path = g_targetPlayer->pDynamicPath;
         g_sessionMovePending = path->dwPathPoints > 0 && path->dwCurrentPointIdx < path->dwPathPoints;
+        // #9: the approach walk is over (the path is spent this frame, where it was still running the
+        // last). Retail re-issues the pending unit-target command here -- sub_6FC7F780 restarts the
+        // saved skill once the walk mode's path completes -- so an out-of-range click attacks the
+        // moment the hero is in range. A path repointed at another unit since the command (the F715
+        // stale-command case) supersedes it and drops the resume.
+        if (wasMoving && !g_sessionMovePending && g_sessionApproachKind) {
+            const int approachKind = g_sessionApproachKind;
+            const uint32_t approachTarget = g_sessionApproachTarget;
+            D2UnitStrc* approachUnit = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)approachTarget);
+            const bool superseded = !approachUnit || (path->pTargetUnit && path->pTargetUnit != approachUnit);
+            g_sessionApproachKind = 0; g_sessionApproachTarget = 0;
+            if (!superseded && !dying) {
+                if (approachKind == 1) d2_session_command_primary_attack(approachTarget);
+                else if (approachKind == 2) d2_session_command_right_skill(approachTarget);
+                else d2_session_command_left_skill(approachTarget);
+            }
+        }
         if (g_d2webWalkProbe.sequence) {
             ++g_d2webWalkProbe.continuationTicks;
             g_d2webWalkProbe.continuationX = path->tGameCoords.wPosX;
@@ -6539,7 +6637,28 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_busy_watch() {
         (g_game && g_targetPlayer) ? EVENT_GetEventFrame(g_game, g_targetPlayer, EVENTTYPE_MODECHANGE) : -1, std::max(g_busyLongest, g_busyStreak));
     out = buf; if (!g_busyLog.empty()) out += "; streaks >= 20: " + g_busyLog; return out.c_str();
 }
+// D2Client's unit-target skill start (1.13c D2Client+0x6FB530C0) turns the caster toward the target's
+// precise position before the skill mode starts; the server never does (this session shares one unit).
+static void sessionFaceTarget(D2UnitStrc* target) {
+    D2DynamicPathStrc* const path = g_targetPlayer->pDynamicPath;
+    D2COMMON_10160_PathUpdateDirection(path, static_cast<uint8_t>(PATH_ComputeDirectionFromPreciseCoords_6FDAC760(
+        path->tGameCoords.dwPrecisionX, path->tGameCoords.dwPrecisionY,
+        target->pDynamicPath->tGameCoords.dwPrecisionX, target->pDynamicPath->tGameCoords.dwPrecisionY)));
+}
+// Test hook: set the player's facing outright (scenario fixture for the face-target check).
+EMSCRIPTEN_KEEPALIVE void d2_session_set_facing(uint32_t dir) { if (g_sessionLive && g_targetPlayer) PATH_SetDirection(g_targetPlayer->pDynamicPath, (uint8_t)dir); }
+// The unit-target skill-do, with the turn retail's callback does first. 1.13c D2Client+0x6FB530C0
+// (the unit-resolved action) resolves the target, attaches it to the caster's path and runs
+// 6FB55FB0, which reads the target unit's coordinates off the path and writes the target-derived
+// facing (D2Common #10739 on the path) before shared skill start 6FB51CF0. Every unit-target skill
+// this adapter starts routes through here, so no command path can begin its skill still facing the
+// old way -- the right-click cast (sessionCommandHandSkill) and kick were the ones that did (#3a).
+static int32_t sessionSkillDoOnUnit(D2UnitStrc* target, D2SkillStrc* skill, uint32_t targetUnitId) {
+    sessionFaceTarget(target);
+    return sub_6FC836D0(g_game, g_targetPlayer, skill, UNIT_MONSTER, (int32_t)targetUnitId, 1);
+}
 EMSCRIPTEN_KEEPALIVE int d2_session_command_primary_attack(uint32_t targetUnitId) {
+    g_sessionApproachKind = 0; g_sessionApproachTarget = 0;   // this command supersedes any pending approach walk
     g_sessionAttackReason = ATTACK_NO_SESSION;
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath ||
         !g_targetPlayer->pDynamicPath->pRoom || g_targetPlayer->dwAnimMode == PLRMODE_DEAD ||
@@ -6564,6 +6683,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_primary_attack(uint32_t targetUnitId
         g_sessionTargetX = target->pDynamicPath->tGameCoords.wPosX;
         g_sessionTargetY = target->pDynamicPath->tGameCoords.wPosY;
         if (!g_sessionMovePending) g_sessionAttackReason = ATTACK_NO_PATH;
+        else { g_sessionApproachKind = 1; g_sessionApproachTarget = targetUnitId; }
         updateSessionSnapshot(); return g_sessionMovePending ? 2 : 0;
     }
     D2SkillStrc* skill = SKILLS_GetHighestLevelSkillFromUnitAndId(g_targetPlayer, SKILL_ATTACK);
@@ -6585,6 +6705,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_primary_attack(uint32_t targetUnitId
     g_sessionAttackTarget = target; g_sessionAttackSkill = skill;
     g_sessionAttackResolved = false; g_sessionTargetKillCounted = false;
     UNITS_SetUsedSkill(g_targetPlayer, skill); UNITS_SetTargetUnitForDynamicUnit(g_targetPlayer, target);
+    sessionFaceTarget(target);
     SUNIT_SetCombatMode(g_game, g_targetPlayer, skillMode);
     g_targetPlayer->dwFlags &= ~UNITFLAG_SKSRVDOFUNC;
     SKILLS_SrvSt01_Attack_LeftHandSwing(g_game, g_targetPlayer, skillId,
@@ -6614,7 +6735,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_throw(uint32_t targetUnitId) {
     g_sessionAttack.targetHpBefore = STATLIST_UnitGetStatValue(target, STAT_HITPOINTS, 0);
     g_sessionAttack.targetHpAfter = g_sessionAttack.targetHpBefore; g_sessionAttack.attacks = ++g_sessionAttackCount;
     g_sessionAttackTarget = target; g_sessionAttackSkill = skill; g_sessionAttackResolved = false;
-    const int32_t result = sub_6FC836D0(g_game, g_targetPlayer, skill, UNIT_MONSTER, (int32_t)targetUnitId, 1);
+    const int32_t result = sessionSkillDoOnUnit(target, skill, targetUnitId);
     if (result != 0) { g_sessionAttack.state = 0; return 0; }
     g_sessionAttack.eventFrame = EVENT_GetEventFrame(g_game, g_targetPlayer, EVENTTYPE_MODECHANGE);
     g_sessionAttackEndFrame = EVENT_GetEventFrame(g_game, g_targetPlayer, EVENTTYPE_ENDANIM);
@@ -6640,7 +6761,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_kick(uint32_t targetUnitId) {
     g_sessionAttack.targetHpBefore = STATLIST_UnitGetStatValue(target, STAT_HITPOINTS, 0);
     g_sessionAttack.targetHpAfter = g_sessionAttack.targetHpBefore; g_sessionAttack.attacks = ++g_sessionAttackCount;
     g_sessionAttackTarget = target; g_sessionAttackSkill = skill; g_sessionAttackResolved = false;
-    const int32_t result = sub_6FC836D0(g_game, g_targetPlayer, skill, UNIT_MONSTER, (int32_t)targetUnitId, 1);
+    const int32_t result = sessionSkillDoOnUnit(target, skill, targetUnitId);
     if (result != 0) { g_sessionAttack.state = 0; return 0; }
     g_sessionAttack.eventFrame = EVENT_GetEventFrame(g_game, g_targetPlayer, EVENTTYPE_MODECHANGE);
     g_sessionAttackEndFrame = EVENT_GetEventFrame(g_game, g_targetPlayer, EVENTTYPE_ENDANIM);
@@ -6718,6 +6839,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_skill_choices(D2SessionSkillChoice* out
 static int g_rightSkillRefusal = 0;
 EMSCRIPTEN_KEEPALIVE int d2_session_right_skill_refusal() { return g_rightSkillRefusal; }
 static int sessionCommandHandSkill(uint32_t targetUnitId, bool left) {
+    g_sessionApproachKind = 0; g_sessionApproachTarget = 0;   // this command supersedes any pending approach walk
     // The same refusal reasons as the left click (d2_session_attack_reason), so a stalled right-hand
     // fight names why instead of showing the last left click's reason.
     g_sessionAttackReason = (g_sessionAttack.state == 1 || g_sessionAttack.state == 2) ? ATTACK_BUSY : ATTACK_NO_SESSION;
@@ -6741,6 +6863,7 @@ static int sessionCommandHandSkill(uint32_t targetUnitId, bool left) {
     if (txt && txt->nRange == 1 && !UNITS_IsInMeleeRange(g_targetPlayer, target, 1)) {
         PLRMODE_StartID_WalkRunKnockback(g_game, g_targetPlayer, PLRMODE_WALK, target);
         g_sessionMovePending = g_targetPlayer->pDynamicPath->dwPathPoints > 0;
+        if (g_sessionMovePending) { g_sessionApproachKind = left ? 3 : 2; g_sessionApproachTarget = targetUnitId; }
         g_sessionAttackReason = g_sessionMovePending ? ATTACK_OK : ATTACK_NO_PATH;
         updateSessionSnapshot(); return g_sessionMovePending ? 2 : 0;
     }
@@ -6752,7 +6875,7 @@ static int sessionCommandHandSkill(uint32_t targetUnitId, bool left) {
     g_sessionAttack.targetHpBefore = STATLIST_UnitGetStatValue(target, STAT_HITPOINTS, 0);
     g_sessionAttack.targetHpAfter = g_sessionAttack.targetHpBefore; g_sessionAttack.attacks = ++g_sessionAttackCount;
     g_sessionAttackTarget = target; g_sessionAttackSkill = skill; g_sessionAttackResolved = false; g_sessionTargetKillCounted = false;
-    const int32_t result = sub_6FC836D0(g_game, g_targetPlayer, skill, UNIT_MONSTER, (int32_t)targetUnitId, 1);
+    const int32_t result = sessionSkillDoOnUnit(target, skill, targetUnitId);
     if (result != 0) { g_sessionAttack.state = 0; g_rightSkillRefusal = 100 + result; return 0; }
     g_sessionAttack.eventFrame = EVENT_GetEventFrame(g_game, g_targetPlayer, EVENTTYPE_MODECHANGE);
     g_sessionAttackEndFrame = EVENT_GetEventFrame(g_game, g_targetPlayer, EVENTTYPE_ENDANIM);
@@ -6850,6 +6973,14 @@ EMSCRIPTEN_KEEPALIVE int d2_session_fixture_experience(uint32_t experience) {
 
 // Fixture: raise the player to a level the way a kill's experience does
 // (SUNITDMG_AddExperienceForPlayer: experience to the level's threshold, then PLAYERSTATS_LevelUp).
+// XP bar floor: experience.txt threshold of the player's CURRENT level (retail's bar is
+// (exp - this) / (next - this), so it empties on level-up instead of staying near full).
+EMSCRIPTEN_KEEPALIVE int d2_session_level_threshold() {
+    if (!g_sessionLive || !g_targetPlayer) return 0;
+    const int32_t level = STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_LEVEL, 0);
+    return level > 1 ? (int32_t)DATATBLS_GetLevelThreshold(g_targetPlayer->dwClassId, level - 1) : 0;
+}
+
 EMSCRIPTEN_KEEPALIVE int d2_session_fixture_level(uint32_t level) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || level < 1) return 0;
     const int32_t classId = (int32_t)g_targetPlayer->dwClassId;
@@ -7944,6 +8075,9 @@ EMSCRIPTEN_KEEPALIVE const D2SessionObjectPresentation* d2_session_object_presen
 }
 EMSCRIPTEN_KEEPALIVE const D2SessionItemPresentation* d2_session_item_presentations() {
     updateSessionSnapshot(); return g_sessionItemPresentations.data();
+}
+EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_item_colours() {
+    updateSessionSnapshot(); return g_sessionItemColours.data();
 }
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_presentation_count() {
     updateSessionSnapshot(); return (uint32_t)g_sessionItemPresentations.size();
@@ -9282,11 +9416,13 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_navigation_hash() {
 }
 
 EMSCRIPTEN_KEEPALIVE void d2_session_destroy() {
+    g_clientMonsterClock.clear(); // unit ids are reused by the next session
     g_sessionMonsterLights.clear();
     resetSessionClientMapMirror();
     d2_monspawn_reset(); g_sessionLive = false; g_sessionMovePending = false;
     g_sessionAttackTarget = nullptr; g_sessionAttackSkill = nullptr;
-    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionUnitFacings.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionTiles.clear(); g_sessionSeamTiles.clear(); g_sessionTileRolls.clear(); g_sessionTileLibraries.clear(); g_sessionWarps.clear(); g_sessionWarpOrigins.clear(); g_sessionMissileAnimations.clear();
+    g_sessionApproachKind = 0; g_sessionApproachTarget = 0;
+    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionUnitFacings.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionItemColours.clear(); g_sessionTiles.clear(); g_sessionSeamTiles.clear(); g_sessionTileRolls.clear(); g_sessionTileLibraries.clear(); g_sessionWarps.clear(); g_sessionWarpOrigins.clear(); g_sessionMissileAnimations.clear();
     memset(&g_sessionItemState, 0, sizeof g_sessionItemState);
     memset(&g_sessionNpcInteraction, 0, sizeof g_sessionNpcInteraction);
     memset(&g_sessionNpcDialog, 0, sizeof g_sessionNpcDialog); D2WEB_ResetLastDialogPacket();

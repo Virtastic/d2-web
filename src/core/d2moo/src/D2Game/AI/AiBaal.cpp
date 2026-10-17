@@ -414,6 +414,7 @@ void __fastcall AITHINK_Fn145_UberBaal(D2GameStrc* pGame, D2UnitStrc* pUnit, D2A
 #endif
 
 //D2Game.0x6FCCD630
+// 1.13c D2Game+0xB7090
 D2UnitStrc* __fastcall AIBAAL_GetTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t* pMax, int32_t* pCount, void* pArgs, int32_t(__fastcall* pfCull)(D2UnitStrc*, D2UnitStrc*))
 {
 	D2_ASSERT(pfCull);
@@ -852,6 +853,7 @@ int32_t __fastcall AI_GetRandomArrayIndex(int32_t* pArray, int32_t nArraySize, D
 }
 
 //D2Game.0x6FCCE1A0
+// 1.13c D2Game+0xB7380
 int32_t __fastcall AIBAAL_RollRandomAiParamForNonCollidingUnit(D2GameStrc* pGame, D2AiControlStrc* pAiControl, D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t nCount, int32_t bInMediumRange, int32_t bInFarRange, int32_t bInCloseRange, int32_t nMax)
 {
 	int32_t aiParams[16] = { 0, 0, 5, 5, 5, 0, 5, 0, 40, 40, 0, 70, 80, 60, 20, 0};

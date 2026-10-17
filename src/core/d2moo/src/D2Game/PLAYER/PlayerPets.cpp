@@ -142,6 +142,7 @@ void __fastcall PLAYERPETS_PlayerIterate_SynchronizeWithClient(D2GameStrc* pGame
 }
 
 //D2Game.0x6FC7CF50
+// 1.13c D2Game+0xD6C80
 void __fastcall sub_6FC7CF50(D2GameStrc* pGame, int32_t nPetGUID)
 {
     D2UnitStrc* pPet = SUNIT_GetServerUnit(pGame, UNIT_MONSTER, nPetGUID);
@@ -227,6 +228,7 @@ void __fastcall sub_6FC7D150(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nPe
 }
 
 //D2Game.0x6FC7D260
+// 1.13c D2Game+0x97B50
 void __fastcall sub_6FC7D260(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nPetGUID, int32_t a4)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
@@ -354,6 +356,7 @@ void __fastcall sub_6FC7D470(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
 }
 
 //D2Game.0x6FC7D5F0
+// 1.13c D2Game+0x98070
 int32_t __fastcall sub_6FC7D5F0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pPet)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
@@ -413,6 +416,7 @@ void __fastcall PLAYERPETS_PlayerIterate_UpdateClient(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FC7D7A0
+// 1.13c D2Game+0x97C20
 void __fastcall sub_6FC7D7A0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pPet, int32_t nPetType, int32_t nPetMax)
 {
     if (!pPlayer || pPlayer->dwUnitType != UNIT_PLAYER)

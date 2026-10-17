@@ -44,7 +44,103 @@ static void MONSTERREGION_StorePackedPointer(D2MonsterRegionStrc** slot, D2Monst
     for (size_t i = 0; i < sizeof(value); ++i) dst[i] = src[i];
 }
 
-//D2Game.0x6FC66260
+// 1.13c D2Game+0x46C30 (1.10f had this block inline in sub_6FC66260): the subtile bounds the roll adds
+// to / takes the modulus of. With a coord list: pBox[1] through DUNGEON_GameTileToSubtileCoords. Else
+// the room's own coords. 1.13c passes the coord list in EAX, the room and &nRight on the stack and the
+// other three outs in EBX/ESI/EDI; here they are ordinary parameters.
+void __fastcall sub_46C30(D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, int32_t* pLeft, int32_t* pTop, int32_t* pRight, int32_t* pBottom)
+{
+    if (pRoomCoordList)
+    {
+        D2DrlgCoordStrc drlgCoord = {};
+        memcpy(&drlgCoord, &pRoomCoordList->pBox[1], sizeof(drlgCoord));
+        DUNGEON_GameTileToSubtileCoords(&drlgCoord.nPosX, &drlgCoord.nPosY);
+        DUNGEON_GameTileToSubtileCoords(&drlgCoord.nWidth, &drlgCoord.nHeight);
+        *pLeft = drlgCoord.nPosX + 1;
+        *pTop = drlgCoord.nPosY + 1;
+        *pRight = drlgCoord.nWidth - (drlgCoord.nPosX + 1);
+        *pBottom = drlgCoord.nHeight - (drlgCoord.nPosY + 1);
+    }
+    else
+    {
+        D2DrlgCoordsStrc drlgCoords = {};
+        DUNGEON_GetRoomCoordinates(pRoom, &drlgCoords);
+        *pLeft = drlgCoords.nSubtileX + 1;
+        *pTop = drlgCoords.nSubtileY + 1;
+        *pRight = drlgCoords.nSubtileWidth - 1;
+        *pBottom = drlgCoords.nSubtileHeight - 1;
+    }
+}
+
+// 1.13c D2Game+0x46B20 (1.10f had this block inline in sub_6FC66260; 0x47450 is its only caller):
+// 1 when (nX,nY) lies within the level's WarpDist of a warp of the room, or of the act's start
+// location (11 = the spawn-type DUNGEON_FindActSpawnLocation is asked for).
+// d2-web: the five D2Common lookups are the FN replay's seams (null in the game).
+D2Spawn46B20Seam g_d2Spawn46B20;
+
+int32_t __fastcall sub_46B20(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY)
+{
+    if (!pRoom)
+    {
+        return 0;
+    }
+
+    const int32_t nLevelId = g_d2Spawn46B20.levelId ? g_d2Spawn46B20.levelId(pRoom) : DUNGEON_GetLevelIdFromRoom(pRoom);
+    if (!nLevelId)
+    {
+        return 0;
+    }
+
+    int32_t* pWarpCoordinates = g_d2Spawn46B20.warpCoordinates ? g_d2Spawn46B20.warpCoordinates(pRoom) : DUNGEON_GetWarpCoordinatesFromRoom(pRoom);
+    if (!pWarpCoordinates)
+    {
+        return 0;
+    }
+
+    const D2LevelsTxt* pLevelsTxt = g_d2Spawn46B20.levelsRecord ? g_d2Spawn46B20.levelsRecord(nLevelId) : DATATBLS_GetLevelsTxtRecord(nLevelId);
+    const int32_t nWarpDist = pLevelsTxt->dwWarpDist;
+    for (int32_t j = 0; j < pWarpCoordinates[18]; ++j)
+    {
+        const int32_t nXDiff = nX - pWarpCoordinates[j];
+        const int32_t nYDiff = nY - pWarpCoordinates[j + 9];
+        if (nXDiff * nXDiff + nYDiff * nYDiff < nWarpDist)
+        {
+            return 1;
+        }
+    }
+
+    const uint8_t nActNo = g_d2Spawn46B20.actNo ? g_d2Spawn46B20.actNo(nLevelId) : DRLG_GetActNoFromLevelId(nLevelId);
+    D2DrlgActStrc* const pAct = pGame->pAct[nActNo];
+
+    int32_t nSpawnX = 0;
+    int32_t nSpawnY = 0;
+    if (g_d2Spawn46B20.actSpawnLocation)
+    {
+        g_d2Spawn46B20.actSpawnLocation(pAct, nLevelId, 11, &nSpawnX, &nSpawnY);
+    }
+    else
+    {
+        DUNGEON_FindActSpawnLocation(pAct, nLevelId, 11, &nSpawnX, &nSpawnY);
+    }
+    if (nSpawnX > 0 && nSpawnY > 0)
+    {
+        DUNGEON_GameTileToSubtileCoords(&nSpawnX, &nSpawnY);
+        const int32_t nXDiff = nX - nSpawnX;
+        const int32_t nYDiff = nY - nSpawnY;
+        if (nXDiff * nXDiff + nYDiff * nYDiff < nWarpDist)
+        {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+// 1.13c D2Game+0x47450 callee seams; both null in the game
+D2Spawn47450Seam g_d2Spawn47450;
+
+//1.10f:D2Game.0x6FC66260
+// 1.13c D2Game+0x47450
 int32_t __fastcall sub_6FC66260(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, int32_t nSuperUniqueId, int32_t* pX, int32_t* pY, int32_t a7)
 {
     int32_t nLeft = 0;
@@ -52,26 +148,7 @@ int32_t __fastcall sub_6FC66260(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2Ro
     int32_t nRight = 0;
     int32_t nBottom = 0;
 
-    if (pRoomCoordList)
-    {
-        D2DrlgCoordStrc drlgCoord = {};
-        memcpy(&drlgCoord, &pRoomCoordList->pBox[1], sizeof(drlgCoord));
-        DUNGEON_GameTileToSubtileCoords(&drlgCoord.nPosX, &drlgCoord.nPosY);
-        DUNGEON_GameTileToSubtileCoords(&drlgCoord.nWidth, &drlgCoord.nHeight);
-        nLeft = drlgCoord.nPosX + 1;
-        nTop = drlgCoord.nPosY + 1;
-        nRight = drlgCoord.nWidth - (drlgCoord.nPosX + 1);
-        nBottom = drlgCoord.nHeight - (drlgCoord.nPosY + 1);
-    }
-    else
-    {
-        D2DrlgCoordsStrc drlgCoords = {};
-        DUNGEON_GetRoomCoordinates(pRoom, &drlgCoords);
-        nLeft = drlgCoords.nSubtileX + 1;
-        nTop = drlgCoords.nSubtileY + 1;
-        nRight = drlgCoords.nSubtileWidth - 1;
-        nBottom = drlgCoords.nSubtileHeight - 1;
-    }
+    sub_46C30(pRoom, pRoomCoordList, &nLeft, &nTop, &nRight, &nBottom);
 
     int32_t nRoomCoordListIndex = 0;
     if (pRoomCoordList)
@@ -93,49 +170,10 @@ int32_t __fastcall sub_6FC66260(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2Ro
         // d2-web: retail (1.13c D2Game 0x6FC66B20, called from 0x6FC67450) REJECTS a spot within
         // the level's WarpDist of any warp or of the act's start location; the upstream decompile
         // had the test the other way round (and a `break` that left the search loop), which left
-        // every level empty. Written from the 1.13c listing.
-        if (a7 && pRoom)
+        // every level empty. Written from the 1.13c listing; 1.13c has it as the callee sub_46B20.
+        if (a7 && pRoom && (g_d2Spawn47450.warpCheck ? g_d2Spawn47450.warpCheck(pGame, pRoom, nX, nY) : sub_46B20(pGame, pRoom, nX, nY)))
         {
-            const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(pRoom);
-            if (nLevelId)
-            {
-                int32_t* pWarpCoordinates = DUNGEON_GetWarpCoordinatesFromRoom(pRoom);
-                if (pWarpCoordinates)
-                {
-                    const int32_t nWarpDist = DATATBLS_GetLevelsTxtRecord(nLevelId)->dwWarpDist;
-                    BOOL bTooClose = FALSE;
-                    for (int32_t j = 0; j < pWarpCoordinates[18]; ++j)
-                    {
-                        const int32_t nXDiff = nX - pWarpCoordinates[j];
-                        const int32_t nYDiff = nY - pWarpCoordinates[j + 9];
-                        if (nXDiff * nXDiff + nYDiff * nYDiff < nWarpDist)
-                        {
-                            bTooClose = TRUE;
-                            break;
-                        }
-                    }
-                    if (!bTooClose)
-                    {
-                        int32_t nSpawnX = 0;
-                        int32_t nSpawnY = 0;
-                        DUNGEON_FindActSpawnLocation(pGame->pAct[DRLG_GetActNoFromLevelId(nLevelId)], nLevelId, 11, &nSpawnX, &nSpawnY);
-                        if (nSpawnX > 0 && nSpawnY > 0)
-                        {
-                            DUNGEON_GameTileToSubtileCoords(&nSpawnX, &nSpawnY);
-                            const int32_t nXDiff = nX - nSpawnX;
-                            const int32_t nYDiff = nY - nSpawnY;
-                            if (nXDiff * nXDiff + nYDiff * nYDiff < nWarpDist)
-                            {
-                                bTooClose = TRUE;
-                            }
-                        }
-                    }
-                    if (bTooClose)
-                    {
-                        continue;
-                    }
-                }
-            }
+            continue;
         }
 
         const int32_t bSpawnMonster = 1;
@@ -144,16 +182,27 @@ int32_t __fastcall sub_6FC66260(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2Ro
 #endif
         if (bSpawnMonster)
         {
+            // 1.13c D2Game 0x47450 builds the create-struct inline and calls 0xEEF10 directly (the
+            // two 1.10f wrappers sub_6FC6A030 / D2GAME_SpawnMonster_6FC69F10 folded in here).
+            D2UnkMonCreateStrc monCreate = {};
+            monCreate.pGame = pGame;
+            monCreate.pRoom = pRoom;
+            monCreate.nMonsterId = nSuperUniqueId;
+            monCreate.nAnimMode = 1;
+            monCreate.nX = nX;
+            monCreate.nY = nY;
+            monCreate.field_20 = -1;
+            monCreate.nFlags = 1;
             if (pRoomCoordList)
             {
-                if (D2Common_10095(pRoom, nX, nY) == nRoomCoordListIndex && sub_6FC6A030(pGame, pRoom, pRoomCoordList, nX, nY, nSuperUniqueId, 1, -1, 1))
+                if (D2Common_10095(pRoom, nX, nY) != nRoomCoordListIndex)
                 {
-                    *pX = nX;
-                    *pY = nY;
-                    return 1;
+                    continue;
                 }
+                monCreate.pRoomCoordList = pRoomCoordList;
             }
-            else if (D2GAME_SpawnMonster_6FC69F10(pGame, pRoom, nX, nY, nSuperUniqueId, 1, -1, 1))
+
+            if ((g_d2Spawn47450.spawn ? g_d2Spawn47450.spawn(&monCreate) : D2GAME_SpawnNormalMonster_6FC68E30(&monCreate)) != nullptr)
             {
                 *pX = nX;
                 *pY = nY;
@@ -165,7 +214,21 @@ int32_t __fastcall sub_6FC66260(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2Ro
     return 0;
 }
 
+// 1.13c D2Game+0x47CF0 callee seams; all null in the game
+D2Spawn47CF0Seam g_d2Spawn47CF0;
+
+static int32_t s47cf0_levelId(D2ActiveRoomStrc* pRoom) { return g_d2Spawn47CF0.levelId ? g_d2Spawn47CF0.levelId(pRoom) : DUNGEON_GetLevelIdFromRoom(pRoom); }
+static int32_t s47cf0_questCheck(D2GameStrc* pGame, int32_t nQuest) { return g_d2Spawn47CF0.questCheck ? g_d2Spawn47CF0.questCheck(pGame, nQuest) : QUESTS_CheckNotIntroQuest(pGame, nQuest); }
+static D2UnitStrc* s47cf0_spawnSupUniq(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t nSuperUniqueId) { return g_d2Spawn47CF0.spawnSuperUnique ? g_d2Spawn47CF0.spawnSuperUnique(pGame, pRoom, nX, nY, nSuperUniqueId) : D2GAME_SpawnSuperUnique_6FC6F690(pGame, pRoom, nX, nY, nSuperUniqueId); }
+static D2UnitStrc* s47cf0_spawnMon(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t nMonsterId, int32_t nAnimMode, int32_t a7, int16_t nFlags) { return g_d2Spawn47CF0.spawnMonster ? g_d2Spawn47CF0.spawnMonster(pGame, pRoom, nX, nY, nMonsterId, nAnimMode, a7, nFlags) : D2GAME_SpawnMonster_6FC69F10(pGame, pRoom, nX, nY, nMonsterId, nAnimMode, a7, nFlags); }
+static int32_t s47cf0_randomId(D2ActiveRoomStrc* pRoom, int32_t nMonsterId) { return g_d2Spawn47CF0.randomId ? g_d2Spawn47CF0.randomId(pRoom, nMonsterId) : D2Common_11063(pRoom, nMonsterId); }
+
 //D2Game.0x6FC66560
+// 1.13c D2Game+0x47CF0: the regular path is outlined at 0x46F70, the 24/26 group spawn at 0x470F0,
+// the fallen/shaman id chain at 0x46E80, the champion minion loop at 0x47880 and the 10/11 chain at
+// 0x1D30; both D2Common_11063 call sites (thunk 0xADFC) are wrapped in SanitizeMonsterId (0x1850),
+// which is the identity for every id these two sites can carry. The body is otherwise the 1.10f body,
+// plus the D2Spawn47CF0Seam indirection above (all seam members are null in the game). See
 D2UnitStrc* __fastcall D2GAME_SpawnPresetMonster_6FC66560(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nClassId, int32_t nX, int32_t nY, int32_t nMode)
 {
     if (nClassId < 0)
@@ -179,27 +242,27 @@ D2UnitStrc* __fastcall D2GAME_SpawnPresetMonster_6FC66560(D2GameStrc* pGame, D2A
         const int32_t nSuperUniqueId = nClassId - sgptDataTables->nMonStatsTxtRecordCount;
         if (nSuperUniqueId < sgptDataTables->nSuperUniquesTxtRecordCount)
         {
-            return D2GAME_SpawnSuperUnique_6FC6F690(pGame, pRoom, nX, nY, nSuperUniqueId);
+            return s47cf0_spawnSupUniq(pGame, pRoom, nX, nY, nSuperUniqueId);
         }
 
         nClassId = nSuperUniqueId - sgptDataTables->nSuperUniquesTxtRecordCount;
         bRegularId = 0;
     }
 
-    const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(pRoom);
+    const int32_t nLevelId = s47cf0_levelId(pRoom);
 
     if (bRegularId == 1)
     {
         if (nClassId == MONSTER_CATAPULT2)
         {
-            if (QUESTS_CheckNotIntroQuest(pGame, QUEST_A5Q1_SHENK) && DUNGEON_GetLevelIdFromRoom(pRoom) == LEVEL_BLOODYFOOTHILLS)
+            if (s47cf0_questCheck(pGame, QUEST_A5Q1_SHENK) && s47cf0_levelId(pRoom) == LEVEL_BLOODYFOOTHILLS)
             {
                 nClassId = MONSTER_CATAPULT3;
             }
         }
         else if (nClassId == MONSTER_CATAPULTSPOTTER2)
         {
-            if (QUESTS_CheckNotIntroQuest(pGame, QUEST_A5Q1_SHENK) && DUNGEON_GetLevelIdFromRoom(pRoom) == LEVEL_BLOODYFOOTHILLS)
+            if (s47cf0_questCheck(pGame, QUEST_A5Q1_SHENK) && s47cf0_levelId(pRoom) == LEVEL_BLOODYFOOTHILLS)
             {
                 nClassId = MONSTER_CATAPULTSPOTTER3;
             }
@@ -220,7 +283,7 @@ D2UnitStrc* __fastcall D2GAME_SpawnPresetMonster_6FC66560(D2GameStrc* pGame, D2A
         {
             --nX;
 
-            if (!QUESTS_CheckNotIntroQuest(pGame, QUEST_A5Q2_RESCUESOLDIERS))
+            if (!s47cf0_questCheck(pGame, QUEST_A5Q2_RESCUESOLDIERS))
             {
                 nMode = MONMODE_DEAD;
             }
@@ -238,7 +301,7 @@ D2UnitStrc* __fastcall D2GAME_SpawnPresetMonster_6FC66560(D2GameStrc* pGame, D2A
             nFlags = 8;
         }
 
-        D2UnitStrc* pMonster = D2GAME_SpawnMonster_6FC69F10(pGame, pRoom, nX, nY, nClassId, nMode, -1, nFlags);
+        D2UnitStrc* pMonster = s47cf0_spawnMon(pGame, pRoom, nX, nY, nClassId, nMode, -1, nFlags);
         if (!pMonster)
         {
             if (!sub_6FC670A0(nClassId))
@@ -246,7 +309,7 @@ D2UnitStrc* __fastcall D2GAME_SpawnPresetMonster_6FC66560(D2GameStrc* pGame, D2A
                 return nullptr;
             }
 
-            pMonster = D2GAME_SpawnMonster_6FC69F10(pGame, pRoom, nX, nY, nClassId, nMode, 4, nFlags);
+            pMonster = s47cf0_spawnMon(pGame, pRoom, nX, nY, nClassId, nMode, 4, nFlags);
             if (!pMonster)
             {
                 return nullptr;
@@ -289,7 +352,7 @@ D2UnitStrc* __fastcall D2GAME_SpawnPresetMonster_6FC66560(D2GameStrc* pGame, D2A
             return nullptr;
         }
 
-        D2UnitStrc* pMonster = D2GAME_SpawnMonster_6FC69F10(pGame, pRoom, nX, nY, nMonsterId, nMode, -1, 0);
+        D2UnitStrc* pMonster = s47cf0_spawnMon(pGame, pRoom, nX, nY, nMonsterId, nMode, -1, 0);
         if (!pMonster)
         {
             return nullptr;
@@ -315,15 +378,15 @@ D2UnitStrc* __fastcall D2GAME_SpawnPresetMonster_6FC66560(D2GameStrc* pGame, D2A
     }
     case 4:
     {
-        return D2GAME_SpawnMonster_6FC69F10(pGame, pRoom, nX, nY, MONSTER_NAVI, nMode, -1, 0);
+        return s47cf0_spawnMon(pGame, pRoom, nX, nY, MONSTER_NAVI, nMode, -1, 0);
     }
     case 5:
     {
-        return D2GAME_SpawnMonster_6FC69F10(pGame, pRoom, nX, nY, MONSTER_BLOODRAVEN, nMode, -1, 0);
+        return s47cf0_spawnMon(pGame, pRoom, nX, nY, MONSTER_BLOODRAVEN, nMode, -1, 0);
     }
     case 8:
     {
-        return D2GAME_SpawnMonster_6FC69F10(pGame, pRoom, nX, nY, MONSTER_MAGGOTQUEEN1, nMode, -1, 8);
+        return s47cf0_spawnMon(pGame, pRoom, nX, nY, MONSTER_MAGGOTQUEEN1, nMode, -1, 8);
     }
     case 10:
     case 11:
@@ -380,7 +443,7 @@ D2UnitStrc* __fastcall D2GAME_SpawnPresetMonster_6FC66560(D2GameStrc* pGame, D2A
             }
         }
 
-        return D2GAME_SpawnMonster_6FC69F10(pGame, pRoom, nX, nY, nMonsterId, nMode, -1, nFlags);
+        return s47cf0_spawnMon(pGame, pRoom, nX, nY, nMonsterId, nMode, -1, nFlags);
     }
     case 17:
     case 18:
@@ -440,7 +503,7 @@ D2UnitStrc* __fastcall D2GAME_SpawnPresetMonster_6FC66560(D2GameStrc* pGame, D2A
             break;
         }
 
-        nMonsterId = D2Common_11063(pRoom, nMonsterId);
+        nMonsterId = s47cf0_randomId(pRoom, MONSTERREGION_SanitizeMonsterId(nMonsterId));
         int32_t nBaseId = nMonsterId;
         D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nMonsterId);
         if (pMonStatsTxtRecord)
@@ -488,10 +551,10 @@ D2UnitStrc* __fastcall D2GAME_SpawnPresetMonster_6FC66560(D2GameStrc* pGame, D2A
             nFlags = 8;
         }
 
-        D2UnitStrc* pMonster = D2GAME_SpawnMonster_6FC69F10(pGame, pRoom, nX, nY, nMonsterId, nMode, -1, nFlags);
+        D2UnitStrc* pMonster = s47cf0_spawnMon(pGame, pRoom, nX, nY, nMonsterId, nMode, -1, nFlags);
         if (!pMonster)
         {
-            pMonster = D2GAME_SpawnMonster_6FC69F10(pGame, pRoom, nX, nY, nMonsterId, nMode, 4, nFlags);
+            pMonster = s47cf0_spawnMon(pGame, pRoom, nX, nY, nMonsterId, nMode, 4, nFlags);
             if (!pMonster)
             {
                 return nullptr;
@@ -536,7 +599,7 @@ D2UnitStrc* __fastcall D2GAME_SpawnPresetMonster_6FC66560(D2GameStrc* pGame, D2A
             nMonsterId = MONSTER_MINION1;
         }
 
-        nMonsterId = D2Common_11063(pRoom, nMonsterId);
+        nMonsterId = s47cf0_randomId(pRoom, MONSTERREGION_SanitizeMonsterId(nMonsterId));
         D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nMonsterId);
         
         const uint8_t nMaxGrp = pMonStatsTxtRecord->nMaxGrp;
@@ -963,6 +1026,7 @@ void __fastcall sub_6FC679F0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom)
 
 // 1.13c D2Game+0x47660 (the part of 1.10f sub_6FC679F0 after the region gate; its caller 0x47820 passes room, game, region)
 void (*g_d2Wander47660Seam)(D2GameStrc*, D2ActiveRoomStrc*, D2MonsterRegionStrc*) = nullptr;   // replay seam (kind 3446, s3249), null in the game
+// 1.13c D2Game+0x47660
 static void sub_47660(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2MonsterRegionStrc* pMonsterRegion, D2LevelsTxt* pLevelsTxtRecord)
 {
     if (g_d2Wander47660Seam)
@@ -1137,6 +1201,7 @@ D2MonsterRegionStrc* __fastcall MONSTERREGION_GetMonsterRegionFromLevelId(D2Mons
 }
 
 //D2Game.0x6FC67FA0
+// 1.13c D2Game+0xCA5F0
 D2MonRegDataStrc* __fastcall sub_6FC67FA0(D2MonsterRegionStrc** ppMonsterRegion, D2ActiveRoomStrc* pRoom, D2UnitStrc* pUnit)
 {
     int32_t nClassId = -1;

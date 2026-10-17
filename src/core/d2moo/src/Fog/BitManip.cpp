@@ -153,7 +153,9 @@ uint32_t __stdcall BITMANIP_Read(D2BitBufferStrc* pBuffer, int nBits)
 		n = 0;
 	}
 
-	uint32_t dwBitsLeft = nBits - n;
+	// 1.13c Fog+0x13CD0 (the body behind export 0x14100) keeps this signed: `while (0 < iVar4)`.
+	// D2MOO's 1.10f reconstruction has it `uint32_t`, which loops forever when nBits < n. Signed matches retail.
+	int dwBitsLeft = nBits - n;
 	if (n)
 	{
 		pBuffer->bFull = TRUE;

@@ -17,6 +17,14 @@ import { CHROME_ART } from './panel-chrome.mjs';
 //   confirms the -1, fixed y here rather than per class/tab.
 export const PANEL_CLOSE_ART = Object.freeze({ path: CHROME_ART.close, frame: 10 });
 
+// The close control is a mouse-down/mouse-up state machine, not a click. Native 1.13c's skill-tree
+// pair proves it: FUN_6FB296F0 (WM_LBUTTONDOWN) sets the held flag DAT_6FBCBFB4 = 1 when the cursor
+// is inside the close rect and leaves the panel open; FUN_6FB28FC0 (WM_LBUTTONUP) clears it first
+// and only a release still inside the rect runs the close. The renderer FUN_6FB28240 draws
+// `(held != 0) + 10`, so the held frame is buysellbtn 11 and the rest frame 10. The character sheet
+// is the same widget with its own flag (DAT_6FBCBFF4, F933) -- one frame rule for both.
+export const panelCloseFrame = (pressed) => pressed ? 11 : 10;
+
 const SKILL_CLOSE_X = Object.freeze([
   [572, 501, 416], // Amazon
   [416, 416, 572], // Sorceress

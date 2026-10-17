@@ -1745,6 +1745,7 @@ void __fastcall GAME_ProcessNetworkMessages()
 }
 
 //D2Game.0x6FC385A0
+// 1.13c D2Game+0x2CB80
 void __fastcall sub_6FC385A0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom)
 {
     sub_6FC679F0(pGame, pRoom);
@@ -3158,6 +3159,7 @@ void __stdcall GAME_SetGlobalAct(int32_t nAct)
 }
 
 //D2Game.0x6FC3B2B0
+// 1.13c D2Game+0x2CD10
 void __fastcall sub_6FC3B2B0(D2UnitStrc* pUnit, D2GameStrc* pGame)
 {
     D2_ASSERT(pGame);

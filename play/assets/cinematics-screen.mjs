@@ -64,10 +64,14 @@ export function createCinematicsScreen({ read, decodeDc6, decodeDatPalette, onEx
   const hit = (x, y, w, h) => { const v = view(w, h), sx = (x - v.ox) / v.scale, sy = (y - v.oy) / v.scale;
     return boxes.find((b) => b.on && sx >= b.x && sx < b.x + b.w && sy >= b.y && sy < b.y + b.h) ?? null; };
   let pressed = null, pointer = [799, 599];
+  // An engine-requested film (D2GS 0x61 -> D2Client+0xAF940) is not a menu choice: when it ends --
+  // or fails to open, or is skipped -- the screen leaves instead of falling back to the selection UI.
+  let requested = false;
   const playback = createCinematicPlayback(({ path, isCurrent }) =>
     openMovie({ read, path, documentObject, isCurrent }));
   const stop = () => playback.stop();
-  const play = (i) => playback.play(i, CINEMATICS[i].path);
+  const finish = () => { const wasRequested = requested; requested = false; if (wasRequested) { onExit(); return true; } return false; };
+  const play = (i) => { requested = false; return playback.play(i, CINEMATICS[i].path); };
   const activate = (b) => { if (b.id === 'cancel') onExit(); else play(b.i); };
   // Retail's DrawMode 1 (the dimmed rows) is PL2's alpha-blend table over what is underneath, the same
   // path character create's disabled OK button takes (frontend.mjs PL2_ALPHA).
@@ -84,19 +88,25 @@ export function createCinematicsScreen({ read, decodeDc6, decodeDatPalette, onEx
     hover(x, y, w, h) { const v = view(w, h); pointer = [Math.trunc((x - v.ox) / v.scale), Math.trunc((y - v.oy) / v.scale)]; },
     // While a film plays any press ends it (retail skips a movie on a click); otherwise a press arms a control.
     press(x, y, w, h) { if (playback.playing !== null) return 'movie'; pressed = hit(x, y, w, h); return pressed?.id ?? null; },
+    // The engine's film for row `i` (0-based into CINEMATICS = D2Client row i+1), played as the game's
+    // own act film. false when there is no such row.
+    playIndex(i) { if (!CINEMATICS[i]) return false; playback.play(i, CINEMATICS[i].path); requested = true; return true; },
     release(token, x, y, w, h) {
-      if (token === 'movie') { stop(); return true; }
+      if (token === 'movie') { stop(); finish(); return true; }
       const b = hit(x, y, w, h); pressed = null;
       if (b && b.id === token) { activate(b); return true; } return false;
     },
     cancel() { pressed = null; },
-    escape() { if (playback.playing !== null) stop(); else onExit(); },
+    escape() { if (playback.playing !== null) { stop(); if (finish()) return; } else onExit(); },
     /** Advance the film; the screen it returns to is this one. */
     async step() {
+      // An engine film that never opened (no asset) or already stopped leaves: `playing` is set
+      // synchronously by play(), so null here means finished, skipped or failed.
+      if (requested && playback.playing === null) { requested = false; if (finish()) return; }
       const movie = playback.movie, startedAt = playback.startedAt;
       if (!movie || !startedAt) return;
       const t = performance.now() - startedAt; await movie.step(t);
-      if (t >= movie.durationMs) stop();
+      if (t >= movie.durationMs) { stop(); finish(); }
     },
     draw(out, w, h) {
       const v = view(w, h);

@@ -741,6 +741,7 @@ int32_t __fastcall OBJECTS_OperateFunction44_SewerStairs(D2ObjOperateFnStrc* pOp
 }
 
 //D2Game.0x6FCA8810
+// 1.13c D2Game+0xBDB10
 int32_t __fastcall OBJECTS_OperateFunction45_SewerLever(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
 	if (!pOp || !pOp->pObject)
@@ -819,6 +820,7 @@ void __fastcall OBJECTS_InitFunction42_SewerLever(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FCA89C0
+// 1.13c D2Game+0xD4670
 void __fastcall ACT3Q2_UpdateKhalimItemCounts(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	//D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];

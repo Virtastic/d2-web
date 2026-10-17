@@ -77,6 +77,7 @@ int32_t __fastcall ARENA_GetAlternateStartTown(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC31190
+// 1.13c D2Game+0xB2940
 void __fastcall ARENA_ProcessKillEvent(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender)
 {
     if (!pGame->pArenaCtrl || !pAttacker)

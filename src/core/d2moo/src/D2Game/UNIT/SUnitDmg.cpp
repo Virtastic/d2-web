@@ -1416,6 +1416,7 @@ D2MonStatsTxt* __fastcall SUNITDMG_GetMonStatsTxtRecordFromUnit(D2UnitStrc* pUni
 }
 
 //D2Game.0x6FCC05F0
+// 1.13c D2Game+0xDB570
 int32_t __fastcall SUNITDMG_AddLeechedLife(D2UnitStrc* pUnit, int32_t nLifeLeeched)
 {
 	if (nLifeLeeched <= 0 || SUNIT_IsDead(pUnit) || STATES_CheckState(pUnit, STATE_DEATH_DELAY))
@@ -1805,6 +1806,7 @@ void __fastcall SUNITDMG_FreeAttackerDefenderCombatList(D2GameStrc* pGame, D2Uni
 }
 
 //D2Game.0x6FCC0F10
+// 1.13c D2Game+0xDEEE0
 void __fastcall SUNITDMG_KillMonster(D2GameStrc* pGame, D2UnitStrc* pDefender, D2UnitStrc* pAttacker, int32_t bPetKill)
 {
 	if (!pDefender)
@@ -2427,6 +2429,7 @@ bool __stdcall D2Game_10033(D2UnitStrc* pUnit, int32_t* a2, int32_t* a3)
 
 //1.10: Inlined
 //1.14d: 0x0057D810
+// 1.13c D2Game+0xDCE70
 void __fastcall SUNITDMG_PreventMonsterHeal(D2UnitStrc* pAttacker, D2UnitStrc* pDefender)
 {
 	if (pAttacker->dwUnitType == UNIT_PLAYER && pDefender->dwUnitType == UNIT_MONSTER && STATLIST_UnitGetItemStatOrSkillStatValue(pAttacker, STAT_ITEM_PREVENTHEAL, 0))
@@ -2451,6 +2454,7 @@ void __fastcall SUNITDMG_PreventMonsterHeal(D2UnitStrc* pAttacker, D2UnitStrc* p
 }
 
 //D2Game.0x6FCC1E70
+// 1.13c D2Game+0xDDE90
 int32_t __fastcall SUNITDMG_IsHitSuccessful(D2UnitStrc* pAttacker, D2UnitStrc* pDefender, int32_t nStatValue, int32_t bMissile)
 {
 	if (!pDefender || !pAttacker)
@@ -2591,6 +2595,7 @@ int32_t __fastcall SUNITDMG_IsHitSuccessful(D2UnitStrc* pAttacker, D2UnitStrc* p
 }
 
 //D2Game.0x6FCC2300
+// 1.13c D2Game+0xDE5A0
 uint16_t __fastcall SUNITDMG_GetResultFlags(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender, int32_t nStatValue, int32_t nRangeOffset)
 {
 	if (!pAttacker || !pDefender || pAttacker->dwUnitType != UNIT_PLAYER && pAttacker->dwUnitType != UNIT_MONSTER || pDefender->dwUnitType != UNIT_PLAYER && pDefender->dwUnitType != UNIT_MONSTER || !sub_6FCBD900(pGame, pAttacker, pDefender))
@@ -2754,6 +2759,7 @@ int32_t __fastcall SUNITDMG_ApplyBlockOrDodge(D2GameStrc* pGame, D2UnitStrc* pAt
 }
 
 //D2Game.0x6FCC2610
+// 1.13c D2Game+0xDB030
 int32_t __fastcall SUNITDMG_ApplyDodge(D2UnitStrc* pAttacker, D2UnitStrc* pDefender, int32_t bAvoid)
 {
 	if (pDefender)
@@ -2860,6 +2866,7 @@ int32_t __fastcall SUNITDMG_GetWeaponBlock(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCC2910
+// 1.13c D2Game+0xDE380
 int32_t __fastcall SUNITDMG_SetMissileDamageFlagsForNearbyUnits(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, int32_t nY, int32_t nSize, D2DamageStrc* pDamage, int32_t a7, int32_t a8, int32_t(__fastcall* pfCallback)(D2GameStrc*, D2UnitStrc*, D2UnitStrc*), int32_t a10)
 {
 	D2ActiveRoomStrc* pRoom = D2GAME_GetRoom_6FC52070(UNITS_GetRoom(pUnit), nX, nY);
@@ -3212,6 +3219,7 @@ void __fastcall SUNITDMG_PartyCallback_ComputePartyExperience(D2GameStrc* pGame,
 }
 
 //D2Game.0x6FCC3360
+// 1.13c D2Game+0xDDCB0
 void __fastcall SUNITDMG_AddExperienceForHireling(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pHireling, uint32_t nLevel, uint32_t nExperienceBonus)
 {
 	if (nExperienceBonus <= 0)
@@ -3287,6 +3295,7 @@ void __fastcall SUNITDMG_AddExperience(D2GameStrc* pGame, D2UnitStrc* pUnit, uin
 }
 
 //D2Game.0x6FCC3510
+// 1.13c D2Game+0xDE750
 void __fastcall SUNITDMG_SetExperienceForTargetLevel(D2GameStrc* pGame, D2UnitStrc* pUnit, uint32_t nTargetLevel)
 {
 	if (!pUnit || (pUnit->dwUnitType != UNIT_PLAYER && pUnit->dwUnitType != UNIT_MONSTER))

@@ -428,6 +428,7 @@ void __fastcall ACT2Q5_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 }
 
 //D2Game.0x6FCA4560
+// 1.13c D2Game+0xC6600
 void __fastcall ACT2Q5_OnSummonerActivated(D2GameStrc* pGame)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A2Q5_SUMMONER);

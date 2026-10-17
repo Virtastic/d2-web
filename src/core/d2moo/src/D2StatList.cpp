@@ -11,6 +11,7 @@
 
 
 //D2Common.0x6FDB57C0 (#10563)
+// 1.13c D2Common+0x84D30
 BOOL __stdcall STATLIST_AreUnitsAligned(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2)
 {
 	if (pUnit1 && pUnit2)
@@ -1363,7 +1364,14 @@ int __stdcall STATLIST_GetUnitBaseStat(D2UnitStrc* pUnit, int nStatId, uint16_t 
 
 // Helper function
 // Different than STATLIST_GetStatValue in that it may use FullStats
-static int32_t __stdcall STATLIST_GetTotalStatValue(D2StatListStrc* pStatList, int nStatId, uint16_t nLayer)
+// The field order 1.13c D2Common+0x38BD0 and its callee depend on (`Stats` vs `FullStats`, the owner type,
+// the flags). wasm64 widens the pointers, so these are the retail offsets plus one word per pointer.
+static_assert(offsetof(D2StatStrc, nValue) == 4 && sizeof(D2StatStrc) == 8, "stat entry: packed layer/statId then value");
+static_assert(offsetof(D2StatsArrayStrc, nStatCount) == sizeof(void*), "stat array: pStat then nStatCount");
+static_assert(offsetof(D2StatListStrc, dwFlags) == 2 * sizeof(void*) + 8, "statlist: pMemPool, pUnit, owner type/id, flags");
+static_assert(offsetof(D2StatListExStrc, FullStats) == offsetof(D2StatListExStrc, pOwner) + sizeof(void*), "statlist ex: full stats right after the owner");
+// 1.13c D2Common+0x38BD0
+int32_t __stdcall STATLIST_GetTotalStatValue(D2StatListStrc* pStatList, int nStatId, uint16_t nLayer)
 {
 	if (!pStatList)
 	{
@@ -1571,23 +1579,47 @@ D2StatListStrc* __stdcall STATLIST_GetStatListFromFlag(D2StatListStrc* pStatList
 	return pStatList;
 }
 
+// 1.13c D2Common+0x37F40: the walk 1.10f folded into STATLIST_GetStatListFromUnitAndFlag is a separate
+// helper in 1.13c (pStatListEx in EAX, nFlag in ECX). Null -> null; a non-extended list starts the walk at
+// its own header, an extended one at pMyStats when nFlag has STATLIST_SET else pMyLastList; the set bit is
+// then cleared; walk pPrevLink to the first list whose flags overlap the rest of nFlag.
+D2StatListStrc* __fastcall STATLIST_GetStatListFromStatListExAndFlag(D2StatListExStrc* pStatListEx, int nFlag)
+{
+	if (!pStatListEx)
+	{
+		return nullptr;
+	}
+
+	D2StatListStrc* pStatList;
+	if (STATLIST_IsExtended(pStatListEx))
+	{
+		pStatList = nFlag & STATLIST_SET ? pStatListEx->pMyStats : pStatListEx->pMyLastList;
+	}
+	else
+	{
+		pStatList = pStatListEx;
+	}
+
+	nFlag &= ~STATLIST_SET;
+
+	while (pStatList && !(nFlag & pStatList->dwFlags))
+	{
+		pStatList = pStatList->pPrevLink;
+	}
+
+	return pStatList;
+}
+
 //D2Common.0x6FDB8230 (#10481)
+// 1.13c D2Common+0x384F0
 D2StatListStrc* __stdcall STATLIST_GetStatListFromUnitAndFlag(D2UnitStrc* pUnit, int nFlag)
 {
 	if (pUnit->pStatListEx && STATLIST_IsExtended(pUnit->pStatListEx))
 	{
-		D2StatListStrc* pStatList = pStatList = nFlag & STATLIST_SET ? pUnit->pStatListEx->pMyStats : pUnit->pStatListEx->pMyLastList;
-		nFlag &= ~STATLIST_SET;
-
-		while (pStatList && !(nFlag & pStatList->dwFlags))
-		{
-			pStatList = pStatList->pPrevLink;
-		}
-
-		return pStatList;
+		return STATLIST_GetStatListFromStatListExAndFlag(pUnit->pStatListEx, nFlag);
 	}
 
-	return NULL;
+	return nullptr;
 }
 
 //D2Common.0x6FDB8270 (#10483)
@@ -1732,6 +1764,7 @@ void __stdcall STATLIST_FreeModStats(D2UnitStrc* pUnit)
 	}
 }
 
+// 1.13c D2Common+0x391F0
 //D2Common.0x6FDB8620 (#10562)
 int __stdcall STATLIST_GetUnitAlignment(D2UnitStrc* pUnit)
 {
@@ -1915,6 +1948,10 @@ int __stdcall STATLIST_CopyStatsData(D2StatsArrayStrc* pStatsArray, D2StatStrc* 
 }
 
 //D2Common.0x6FDB8BA0 (#11268)
+// 1.13c D2Common+0x38410
+// Fields this function reads, wasm64-measured (retail 0x5C/0x48/0x04/8): widening the pointers is the only
+// difference from the 32-bit layout.
+static_assert(offsetof(D2UnitStrc, pStatListEx) == 124, "unit: statlist ex pointer (retail +0x5C, wasm64 widened)");
 int __stdcall STATLIST_GetFullStatsDataFromUnit(D2UnitStrc* pUnit, D2StatStrc* pOutStatBuffer, int nBufferSize)
 {
 	if (pUnit && pUnit->pStatListEx && STATLIST_IsExtended(pUnit->pStatListEx))
@@ -2348,6 +2385,7 @@ BOOL __stdcall D2Common_11274_11275_Impl(D2UnitStrc* pTarget, D2UnitStrc* pUnit,
 }
 
 //D2Common.0x6FDB9D90 (#11274)
+// 1.13c D2Common+0x3A100
 BOOL __stdcall D2Common_11274(D2UnitStrc* pTarget, D2UnitStrc* pUnit)
 {
 	return D2Common_11274_11275_Impl(pTarget, pUnit, true);
@@ -2375,5 +2413,12 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_statarray_38640(uint32_t* w)
 	w[11] = a.nStatCount; w[12] = a.nCapacity;
 	w[10] = (uint32_t)ins(w[9]);
 	w[13] = a.nStatCount; w[14] = a.nCapacity;
+	// The 4-byte mod-stat instantiation (same function, other element size): insert 2 then 1 (memmove path); a wrong order poisons the slot word.
+	{
+		D2ModStatsArrayStrc m = { nullptr, 0, 0 };
+		StatArray_InsertStat(nullptr, &m, 2, 0);
+		StatArray_InsertStat(nullptr, &m, 1, 0);
+		if (m.nStatCount != 2 || m.pStat[0].nPackedValue != 1 || m.pStat[1].nPackedValue != 2) w[10] = 0xdeadbeefu;
+	}
 	for (int i = 0; i < 10; i++) { w[15 + i] = i < a.nStatCount ? a.pStat[i].nPackedValue : 0; w[25 + i] = i < a.nStatCount ? (uint32_t)a.pStat[i].nValue : 0; }
 }

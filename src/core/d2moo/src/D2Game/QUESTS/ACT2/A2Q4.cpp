@@ -729,6 +729,7 @@ void __fastcall ACT2Q4_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 }
 
 //D2Game.0x6FCA3320
+// 1.13c D2Game+0xC7C20
 void __fastcall ACT2Q4_InitializeJerhynStartObject(D2QuestDataStrc* pQuestData, D2ObjInitFnStrc* pOp)
 {
 	D2Act2Quest4Strc* pQuestDataEx = (D2Act2Quest4Strc*)pQuestData->pQuestDataEx;
@@ -759,6 +760,7 @@ void __fastcall ACT2Q4_InitializeJerhynStartObject(D2QuestDataStrc* pQuestData, 
 }
 
 //D2Game.0x6FCA33F0
+// 1.13c D2Game+0xC9B70
 void __fastcall ACT2Q4_InitializeJerhynPalaceObject(D2QuestDataStrc* pQuestData, D2ObjInitFnStrc* pOp)
 {
 	D2Act2Quest4Strc* pQuestDataEx = (D2Act2Quest4Strc*)pQuestData->pQuestDataEx;

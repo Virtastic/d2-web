@@ -7,7 +7,7 @@
 struct D2GCC550Seam { uint32_t (*call)(uint32_t id, uint32_t a, uint32_t b); };
 
 // unitMode = *(unit+0x10) (read only when unit != 0); stateWord = &client->+0x1dc4
-static uint32_t GAME_CC550(const D2GCC550Seam& s, const uint8_t* pkt, uint32_t unit, uint32_t unitMode, uint32_t client, uint32_t* stateWord)
+uint32_t GAME_CC550(const D2GCC550Seam& s, const uint8_t* pkt, uint32_t unit, uint32_t unitMode, uint32_t client, uint32_t* stateWord)
 {
     const uint32_t op = pkt[0];
     if (op == 0 || op > 0x66 || !s.call(3, op, 0)) return 3;
@@ -20,4 +20,13 @@ static uint32_t GAME_CC550(const D2GCC550Seam& s, const uint8_t* pkt, uint32_t u
     if (!run) return 0;
     if (*stateWord > 1) *stateWord = s.call(2, 0, 0);
     return s.call(4, op, client); // retail: IsBadCodePtr -> log + _exit(-1) on a bad handler, not reproducible
+}
+
+// Replay entry (checked against retail): gate only, no live handlers. A dispatch outcome returns 0xD15C0001 (never captured: the descriptor avoids it).
+static bool g_ord, g_slot;
+static uint32_t gateSeam(uint32_t id, uint32_t, uint32_t) { return id == 1 ? g_ord : id == 3 ? g_slot : id == 2 ? 0 : 0xD15C0001u; }
+uint32_t GAME_CC550_Gate(const uint8_t* pkt, uint32_t unitMode, bool hasUnit, bool ord10494, bool slotNonNull)
+{
+    g_ord = ord10494; g_slot = slotNonNull; uint32_t sw = 0;
+    return GAME_CC550({gateSeam}, pkt, hasUnit, unitMode, 0, &sw);
 }

@@ -38,6 +38,7 @@ void __fastcall D2GAME_TARGETS_First_6FC40170(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FC401F0
+// 1.13c D2Game+0xEFE40
 void __fastcall D2GAME_UpdateSummonAI_6FC401F0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t nNodeIndex)
 {
     if (!pGame || !pUnit || pUnit->dwNodeIndex != 11 || nNodeIndex >= 8 || (pUnit->dwUnitType != UNIT_PLAYER && pUnit->dwUnitType != UNIT_MONSTER))
@@ -75,6 +76,7 @@ void __fastcall D2GAME_UpdateSummonAI_6FC401F0(D2GameStrc* pGame, D2UnitStrc* pU
 }
 
 //D2Game.0x6FC40280
+// 1.13c D2Game+0xEFDB0
 void __fastcall sub_6FC40280(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t nNodeIndex)
 {
     if (!pGame || !pUnit || pUnit->dwNodeIndex != 11 || nNodeIndex < 8 || nNodeIndex >= 10 || (pUnit->dwUnitType != UNIT_PLAYER && pUnit->dwUnitType != UNIT_MONSTER))

@@ -1324,6 +1324,7 @@ int32_t __fastcall SKILLITEM_CalculateOpenWoundsHpRegen(int32_t nLevel, const in
 }
 
 //D2Game.0x6FD04CF0
+// 1.13c D2Game+0xAD410
 int32_t __fastcall SKILLITEM_EventFunc15_OpenWounds(D2GameStrc* pGame, int32_t nEvent, D2UnitStrc* pAttacker, D2UnitStrc* pUnit, D2DamageStrc* pDamage, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (!pAttacker || !pUnit)
@@ -1895,6 +1896,7 @@ int32_t __fastcall SKILLITEM_FindTargetPosition(D2GameStrc* pGame, D2UnitStrc* p
 }
 
 //D2Game.0x6FD05D70
+// 1.13c D2Game+0xF14F0
 int32_t __fastcall SKILLITEM_HandleItemEffectSkill(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, D2UnitStrc* pTargetUnit, int32_t nX, int32_t nY, int32_t* pUnitType, int32_t* pUnitGUID, int32_t* pX, int32_t* pY, int32_t a7)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);

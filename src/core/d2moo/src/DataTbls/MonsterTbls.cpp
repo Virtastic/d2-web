@@ -1761,6 +1761,7 @@ D2HirelingTxt* __stdcall DATATBLS_GetHirelingTxtRecordFromIdAndLevel(BOOL bExpan
 }
 
 //D2Common.0x6FD6B270 (#10585)
+// 1.13c D2Common+0x53220
 D2HirelingTxt* __stdcall DATATBLS_GetNextHirelingTxtRecordFromNameId(BOOL bExpansion, uint16_t nNameId, D2HirelingTxt* pOldRecord)
 {
 	D2HirelingTxt* pHirelingTxtRecord = NULL;
@@ -1790,6 +1791,7 @@ D2HirelingTxt* __stdcall DATATBLS_GetNextHirelingTxtRecordFromNameId(BOOL bExpan
 }
 
 //D2Common.0x6FD6B310 (#10586)
+// 1.13c D2Common+0x53190
 D2HirelingTxt* __stdcall DATATBLS_GetNextHirelingTxtRecordFromClassId(BOOL bExpansion, int nClass, D2HirelingTxt* pOldRecord)
 {
 	D2HirelingTxt* pHirelingTxtRecord = NULL;
@@ -2589,6 +2591,7 @@ D2MonPresetTxt* __stdcall DATATBLS_GetMonPresetTxtActSection(int nAct, int* pRec
 }
 
 //D2Common.0x6FD6EF70 (#11258)
+// 1.13c D2Common+0x53AA0
 int __stdcall DATATBLS_MapSuperUniqueId(int nType, int nSuperUnique)
 {
 	switch (nType)

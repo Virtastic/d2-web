@@ -66,9 +66,10 @@ const std::u16string* StrTable::findByIndex(uint16_t index) const {
     for (const Entry& e : entries_) if (e.active && e.index == index) return &e.value;
     return nullptr;
 }
-const std::u16string* LangTables::byTblIndex(uint16_t index) const {
-    if (index >= 20000) return expansion.findByIndex((uint16_t)(index - 20000));
-    if (index >= 10000) return patch.findByIndex((uint16_t)(index - 10000));
+const std::u16string* LangTables::byTblIndex(uint16_t index, int* table, uint16_t* inTable) const {
+    if (index >= 20000) { if (table) *table = 2; if (inTable) *inTable = (uint16_t)(index - 20000); return expansion.findByIndex((uint16_t)(index - 20000)); }
+    if (index >= 10000) { if (table) *table = 1; if (inTable) *inTable = (uint16_t)(index - 10000); return patch.findByIndex((uint16_t)(index - 10000)); }
+    if (table) *table = 0; if (inTable) *inTable = index;
     return classic.findByIndex(index);
 }
 

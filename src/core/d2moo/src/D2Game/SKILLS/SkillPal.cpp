@@ -106,6 +106,7 @@ int32_t __fastcall SKILLS_SrvSt29_Sacrifice(D2GameStrc* pGame, D2UnitStrc* pUnit
 }
 
 //D2Game.0x6FD184B0
+// 1.13c D2Game+0x99290
 int32_t __fastcall SKILLS_SrvDo064_Sacrifice(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -345,6 +346,12 @@ static int32_t SKILLS_AuraPoisonLengthResist(D2GameStrc* pGame, D2UnitStrc* pUni
     }
 
     return bPoisonedOrCursed;
+}
+
+// 1.13c D2Game+0x99B60 fn-capture entry (the retail capture tool/fn/d2game-99b60.txt): the probe is another TU.
+extern "C" int32_t D2Game_Capture_99B60(void* pGame, void* pUnit, int32_t nPercent)
+{
+    return SKILLS_AuraPoisonLengthResist((D2GameStrc*)pGame, (D2UnitStrc*)pUnit, nPercent);
 }
 
 //D2Game.0x6FD18BC0
@@ -1057,6 +1064,7 @@ int32_t __fastcall SKILLS_SrvSt35_Vengeance(D2GameStrc* pGame, D2UnitStrc* pUnit
 }
 
 //D2Game.0x6FD1A200
+// 1.13c D2Game+0x994C0
 int32_t __fastcall SKILLS_SrvDo073_BlessedHammer(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (SKILLS_GetSkillsTxtRecord(nSkillId))

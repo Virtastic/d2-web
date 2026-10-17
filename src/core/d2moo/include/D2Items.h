@@ -555,6 +555,7 @@ D2COMMON_DLL_DECL int __stdcall ITEMS_HasUsedCharges(D2UnitStrc* pItem, BOOL* pH
 D2COMMON_DLL_DECL BOOL __stdcall ITEMS_IsEthereal(D2UnitStrc* pItem);
 //D2Common.0x6FDA0370 (#10883)
 D2COMMON_DLL_DECL BOOL __stdcall ITEMS_GetCompactItemDataFromBitstream(uint8_t* pBitstream, size_t nSize, BOOL bCheckForHeader, D2ItemSaveStrc* pItemSave);
+D2COMMON_DLL_DECL BOOL __stdcall ITEMS_GetCompactItemDataFromBitstreamVersioned(uint8_t* pBitstream, size_t nSize, BOOL bCheckForHeader, D2ItemSaveStrc* pItemSave, int32_t nVersion);
 //D2Common.0x6FDA0490 (#10882)
 D2COMMON_DLL_DECL size_t __stdcall ITEMS_DecodeItemFromBitstream(D2UnitStrc* pItem, uint8_t* pBitstream, size_t nSize, BOOL bCheckForHeader, int* pSocketedItemCount, uint32_t dwVersion, BOOL* pFail);
 //D2Common.0x6FDA0620

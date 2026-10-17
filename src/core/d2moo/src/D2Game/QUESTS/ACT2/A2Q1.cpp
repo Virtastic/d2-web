@@ -418,6 +418,7 @@ int32_t __fastcall ACT2Q1_UnitIterate_SetCompletionFlag(D2GameStrc* pGame, D2Uni
 }
 
 //D2Game.0x6FC9FD10
+// 1.13c D2Game+0xC6070
 int32_t __fastcall ACT2Q1_UnitIterate_SetPrimaryGoalDoneForPartyMembers(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
 	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);

@@ -10,7 +10,7 @@ struct D2G2F0D0Seam { uint32_t (*call)(uint32_t id, const uint32_t* w); };
 
 // lcg = the 64-bit seed at room+0x6C (low dword is the multiplicand, high dword the addend); levelsRec/region come from seam reads.
 // Returns 0 normally, 1 when an assert-exit fired.
-static uint32_t GAME_2F0D0(const D2G2F0D0Seam& s, uint32_t game, uint32_t room, uint64_t& lcg)
+uint32_t GAME_2F0D0(const D2G2F0D0Seam& s, uint32_t game, uint32_t room, uint64_t& lcg)
 {
     auto step = [&] { lcg = (uint64_t)(uint32_t)lcg * 0x6AC690C5ull + (uint32_t)(lcg >> 32); return (uint32_t)lcg; };
     auto rd = [&](uint32_t p, uint32_t off, uint32_t n) { const uint32_t w[7] = { p, off, n }; return s.call(7, w); };

@@ -25,6 +25,7 @@ D2UnkMonCreateStrc2* off_6FD2E9DC = &dword_6FD2E9A0;
 
 
 //D2Game.0x6FC62020
+// 1.13c D2Game+0xDF1A0
 void __stdcall sub_6FC62020(D2SeedStrc* pSeed, D2MonRegDataStrc* pMonRegData, int32_t nCount)
 {
     D2_ASSERT(pSeed);

@@ -483,6 +483,7 @@ void __stdcall MISSILE_GetHomeType(D2UnitStrc* pMissile, int* nHomeType, D2UnitG
 }
 
 //D2Common.0x6FDBA5B0 (#11217)
+// 1.13c D2Common+0x6BAA0
 void __stdcall MISSILE_CalculateDamageData(D2MissileDamageDataStrc* pMissileDamageData, D2UnitStrc* pOwner, D2UnitStrc* pOrigin, D2UnitStrc* pMissile, int nLevel)
 {
 	D2MissilesTxt* pMissilesTxtRecord = NULL;
@@ -1022,10 +1023,10 @@ void __stdcall MISSILE_SetDamageStats(D2UnitStrc* pOwner, D2UnitStrc* pMissile, 
 }
 
 //D2Common.0x6FDBB5A0 (#11285)
+// 1.13c D2Common+0x6A580
 int __stdcall MISSILE_GetMinDamage(D2UnitStrc* pMissile, D2UnitStrc* pOwner, int nMissileId, int nLevel)
 {
 	D2MissilesTxt* pMissilesTxtRecord = NULL;
-	long long int nBonus = 0;
 	int nMissileIdLevel = 0;
 	int nPercentage = 0;
 	int nMissile = 0;
@@ -1063,13 +1064,11 @@ int __stdcall MISSILE_GetMinDamage(D2UnitStrc* pMissile, D2UnitStrc* pOwner, int
 
 				if (nPercentage)
 				{
-					nBonus = nDamage * nPercentage / 100;
-
-					nDamage += (int)nBonus;
+					nDamage += DATATBLS_ApplyRatio(nDamage, nPercentage, 100);
 				}
 			}
 
-			return nDamage << pMissilesTxtRecord->nHitShift;
+			return nDamage << (pMissilesTxtRecord->nHitShift & 0x1f);
 		}
 	}
 
@@ -1077,10 +1076,10 @@ int __stdcall MISSILE_GetMinDamage(D2UnitStrc* pMissile, D2UnitStrc* pOwner, int
 }
 
 //D2Common.0x6FDBB710 (#11286)
+// 1.13c D2Common+0x6A4B0
 int __stdcall MISSILE_GetMaxDamage(D2UnitStrc* pMissile, D2UnitStrc* pOwner, int nMissileId, int nLevel)
 {
 	D2MissilesTxt* pMissilesTxtRecord = NULL;
-	long long int nBonus = 0;
 	int nMissileIdLevel = 0;
 	int nPercentage = 0;
 	int nMissile = 0;
@@ -1118,13 +1117,11 @@ int __stdcall MISSILE_GetMaxDamage(D2UnitStrc* pMissile, D2UnitStrc* pOwner, int
 
 				if (nPercentage)
 				{
-					nBonus = nDamage * nPercentage / 100;
-
-					nDamage += (int)nBonus;
+					nDamage += DATATBLS_ApplyRatio(nDamage, nPercentage, 100);
 				}
 			}
 
-			return nDamage << pMissilesTxtRecord->nHitShift;
+			return nDamage << (pMissilesTxtRecord->nHitShift & 0x1f);
 		}
 	}
 
@@ -1146,10 +1143,10 @@ uint8_t __stdcall MISSILE_GetElemTypeFromMissileId(int nMissileId)
 }
 
 //D2Common.0x6FDBB8C0 (#11287)
+// 1.13c D2Common+0x6B360
 int __stdcall MISSILE_GetMinElemDamage(D2UnitStrc* pMissile, D2UnitStrc* pOwner, int nMissileId, int nLevel)
 {
 	D2MissilesTxt* pMissilesTxtRecord = NULL;
-	long long int nBonus = 0;
 	int nMissileIdLevel = 0;
 	int nPercentage = 0;
 	int nMissile = 0;
@@ -1187,13 +1184,11 @@ int __stdcall MISSILE_GetMinElemDamage(D2UnitStrc* pMissile, D2UnitStrc* pOwner,
 
 				if (nPercentage)
 				{
-					nBonus = nDamage * nPercentage / 100;
-
-					nDamage += (int)nBonus;
+					nDamage += DATATBLS_ApplyRatio(nDamage, nPercentage, 100);
 				}
 			}
 
-			return nDamage << pMissilesTxtRecord->nHitShift;
+			return nDamage << (pMissilesTxtRecord->nHitShift & 0x1f);
 		}
 	}
 
@@ -1201,10 +1196,10 @@ int __stdcall MISSILE_GetMinElemDamage(D2UnitStrc* pMissile, D2UnitStrc* pOwner,
 }
 
 //D2Common.0x6FDBBA30 (#11288)
+// 1.13c D2Common+0x6A3E0
 int __stdcall MISSILE_GetMaxElemDamage(D2UnitStrc* pMissile, D2UnitStrc* pOwner, int nMissileId, int nLevel)
 {
 	D2MissilesTxt* pMissilesTxtRecord = NULL;
-	long long int nBonus = 0;
 	int nMissileIdLevel = 0;
 	int nPercentage = 0;
 	int nMissile = 0;
@@ -1242,13 +1237,11 @@ int __stdcall MISSILE_GetMaxElemDamage(D2UnitStrc* pMissile, D2UnitStrc* pOwner,
 
 				if (nPercentage)
 				{
-					nBonus = nDamage * nPercentage / 100;
-
-					nDamage += (int)nBonus;
+					nDamage += DATATBLS_ApplyRatio(nDamage, nPercentage, 100);
 				}
 			}
 
-			return nDamage << pMissilesTxtRecord->nHitShift;
+			return nDamage << (pMissilesTxtRecord->nHitShift & 0x1f);
 		}
 	}
 
@@ -1256,6 +1249,7 @@ int __stdcall MISSILE_GetMaxElemDamage(D2UnitStrc* pMissile, D2UnitStrc* pOwner,
 }
 
 //D2Common.0x6FDBBBA0 (#11221)
+// 1.13c D2Common+0x69DC0
 int __stdcall MISSILE_GetElementalLength(int nUnused, D2UnitStrc* pMissile, int nMissileId, int nLevel)
 {
 	D2_MAYBE_UNUSED(nUnused);
@@ -1289,6 +1283,7 @@ int __stdcall MISSILE_GetElementalLength(int nUnused, D2UnitStrc* pMissile, int 
 }
 
 //D2Common.0x6FDBBC50 (#11290)
+// 1.13c D2Common+0x6A790
 int __stdcall MISSILE_GetSpecialParamValue(D2UnitStrc* pMissile, D2UnitStrc* pOwner, uint8_t nParamId, int nMissileId, int nLevel)
 {
 	D2MissilesTxt* pMissilesTxtRecord = NULL;

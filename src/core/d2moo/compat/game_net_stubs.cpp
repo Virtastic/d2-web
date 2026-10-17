@@ -34,11 +34,28 @@
 static uint8_t g_d2webPacketStream[512];
 static uint32_t g_d2webPacketStreamLength = 0;
 static uint32_t g_d2webPacketStreamPackets = 0;
-extern "C" void D2WEB_ResetPacketStream() { g_d2webPacketStreamLength = 0; g_d2webPacketStreamPackets = 0; }
+// Retail server->client 0x61 is "play movie <index>": payload byte 1 selects one of D2Client's own
+// film-name templates (id 1 d2intro%s.bik, 2 ACT02START, 3 ACT03START, 4 ACT04START, 5 ACT04END,
+// 6 D2X_INTRO, 7 D2X_OUT). The server records every 0x61 into this bounded queue -- the same
+// boundary 0x27/0x5D/0x63 use -- so the browser client can enter its movie state because the ENGINE
+// asked it to. The four act-change sends (Quests.cpp) and A4Q2/A5Q6's direct composition all pass
+// through D2GAME_PACKETS_SendPacket_6FC3C710, which fills this.
+static uint8_t g_d2webMovieRequests[16];
+static uint32_t g_d2webMovieRequestCount = 0;
+extern "C" void D2WEB_ResetPacketStream() { g_d2webPacketStreamLength = 0; g_d2webPacketStreamPackets = 0; g_d2webMovieRequestCount = 0; }
 extern "C" const uint8_t* D2WEB_PacketStream(uint32_t* pLength, uint32_t* pPackets) {
     if (pLength) *pLength = g_d2webPacketStreamLength;
     if (pPackets) *pPackets = g_d2webPacketStreamPackets;
     return g_d2webPacketStream;
+}
+
+// Drains the queued movie indices, oldest first. Returns how many bytes were written.
+extern "C" uint32_t D2WEB_TakeMovieRequests(uint8_t* out, uint32_t cap) {
+    const uint32_t n = g_d2webMovieRequestCount < cap ? g_d2webMovieRequestCount : cap;
+    if (out && n) std::memcpy(out, g_d2webMovieRequests, n);
+    for (uint32_t i = n; i < g_d2webMovieRequestCount; ++i) g_d2webMovieRequests[i - n] = g_d2webMovieRequests[i];
+    g_d2webMovieRequestCount -= n;
+    return n;
 }
 
 static D2GSPacketSrv63 g_d2webLastWaypointMenu = {};
@@ -303,7 +320,7 @@ void D2GAME_PACKETS_SendPacket0x0F_6FC3CA00(D2ClientStrc* pClient, char nHeader,
 void D2GAME_PACKETS_SendPacket0x10_6FC3C9A0(D2ClientStrc* pClient, char nHeader, char a3, int32_t a4, char a5, char a6, int32_t a7, int16_t a8, int16_t a9) {}
 void D2GAME_PACKETS_SendPacket0x1D_E_F_6FC3D480(D2ClientStrc* pClient, uint16_t nStatId, uint32_t nValue) {}
 void D2GAME_PACKETS_SendPacket0x21_UpdateSkills_6FC3DB50(D2ClientStrc* pClient, D2UnitStrc* pUnit, WORD nSkillId, BYTE nSkillLevel, BYTE a4) {}
-// D2Game.0x6FC3DBE0 (1.13c 0x6FCAD570): item skill quantity update; bytes 2 and 0xA are never
+// D2Game.0x6FC3DBE0 (1.13c D2Game+0x8D570 = 0x6FCAD570): item skill quantity update; bytes 2 and 0xA are never
 // written by retail's composer (stack residue on the wire), zero here.  Byte 0xB is 1 only when
 // the unit exists and has STATE_PLAYERBODY (1.13c disassembly; D2MOO's 1.10f reading inverts it).
 void __fastcall D2GAME_PACKETS_SendPacket0x22_6FC3DBE0(D2ClientStrc* pClient, BYTE nUnitType, int32_t nUnitGUID, int16_t nSkillId, char a5) {
@@ -334,13 +351,32 @@ void D2GAME_PACKETS_SendPacket0x3F_6FC3EDC0(D2ClientStrc* pClient, D2UnitStrc* p
 void D2GAME_PACKETS_SendPacket0x42_6FC3EE40(D2ClientStrc* pClient, D2UnitStrc* pUnit) {}
 void D2GAME_PACKETS_SendPacket0x51_6FC3D300(D2ClientStrc* pClient, char nHeader, uint8_t nUnitType, int32_t nUnitGUID, int16_t nObjectId, int16_t nX, int16_t nY, char a8, char a9) {}
 void D2GAME_PACKETS_SendPacket0x5A_6FC3DEC0(D2ClientStrc* pClient, D2GSPacketSrv5A* pPacket) {}
-void D2GAME_PACKETS_SendPacket0x61_6FC3F590(D2ClientStrc* pClient, BYTE unk) {}
+void D2GAME_PACKETS_SendPacket0x61_6FC3F590(D2ClientStrc* pClient, BYTE unk) {
+    D2GSPacketSrv61 packet = {}; packet.nHeader = 0x61; packet.unk0x001 = unk;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+}
 void D2GAME_PACKETS_SendPacket0x67_6FC3CBC0(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int16_t nX, int16_t nY, int8_t a7) {}
 void D2GAME_PACKETS_SendPacket0x67_6FC3CDE0(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int16_t nX, int16_t nY, int8_t a7, int8_t a8, int8_t a9) {}
 void D2GAME_PACKETS_SendPacket0x68_6FC3CA90(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int8_t a5, int32_t a6, int8_t a7) {}
 void D2GAME_PACKETS_SendPacket0x68_6FC3CCB0(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int8_t a5, int32_t a6, int8_t a7, int8_t a8, int8_t a9) {}
-void D2GAME_PACKETS_SendPacket0x69_6FC3CF30(D2ClientStrc* pClient, char a2, int32_t a3, char a4, int16_t a5, int16_t a6, char a7, char a8) {}
-void D2GAME_PACKETS_SendPacket0x6A_6FC3CEE0(D2ClientStrc* pClient, char a2, int32_t nUnitGUID, char a4, char a5, int32_t a6, char nDirection) {}
+// 1.13c D2Game+0x8C100: the 0x67/0x69-family monster mode packet
+// {header, unitId, state, x, y, lifeByte, lastHitClass}. Byte 5 is the animation state the client
+// keys on -- 6 is GETHIT, which is how a landed monster hit reaches the client at all -- and byte
+// 0x0A is the clamped life percentage retail fills in on the get-hit path.
+void D2GAME_PACKETS_SendPacket0x69_6FC3CF30(D2ClientStrc* pClient, char a2, int32_t a3, char a4, int16_t a5, int16_t a6, char a7, char a8) {
+    D2GSPacketSrv69 packet = {};
+    packet.nHeader = a2; packet.unk0x01 = a3; packet.unk0x05 = a4;
+    packet.unk0x06 = a5; packet.unk0x08 = a6; packet.unk0x0A = a7; packet.unk0x0B = a8;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+}
+// 1.13c D2Game+0x8C160: the 0x68/0x6A-family twin, same byte 5 state
+// byte but a target unit (type + guid) instead of coordinates.
+void D2GAME_PACKETS_SendPacket0x6A_6FC3CEE0(D2ClientStrc* pClient, char a2, int32_t nUnitGUID, char a4, char a5, int32_t a6, char nDirection) {
+    D2GSPacketSrv6A packet = {};
+    packet.nHeader = a2; packet.nUnitGUID = nUnitGUID; packet.unk0x05 = a4;
+    packet.nTargetUnitType = a5; packet.nTargetUnitGuid = a6; packet.nDirection = nDirection;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+}
 void D2GAME_PACKETS_SendPacket0x6B_6FC3D000(D2ClientStrc* pClient, char a2, int32_t a3, char a4, int16_t a5, int16_t a6, char a7, char a8, int16_t a9, int16_t a10) {}
 void D2GAME_PACKETS_SendPacket0x6C_6FC3CF90(D2ClientStrc* pClient, char a2, int32_t a3, char a4, char a5, int32_t a6, char a7, int16_t a8, int16_t a9) {}
 void D2GAME_PACKETS_SendPacket0x6D_6FC3D080(D2ClientStrc* pClient, DWORD dwUnitId, WORD nX, WORD nY, BYTE nUnitLife) {}
@@ -410,6 +446,13 @@ void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, in
         static_cast<D2GSPacketSrv63*>(pPacket)->nHeader == 0x63) {
         g_d2webLastWaypointMenu = *static_cast<D2GSPacketSrv63*>(pPacket);
         g_d2webHasWaypointMenu = true;
+    }
+    // 0x61 is "play movie <index>" (payload byte 1 = D2Client's film row). Kept whole, like 0x27, so
+    // the browser enters its movie state because the ENGINE sent it.
+    if (pClient && pPacket && nPacketSize == (int32_t)sizeof(D2GSPacketSrv61) &&
+        static_cast<D2GSPacketSrv61*>(pPacket)->nHeader == 0x61 &&
+        g_d2webMovieRequestCount < sizeof g_d2webMovieRequests) {
+        g_d2webMovieRequests[g_d2webMovieRequestCount++] = static_cast<D2GSPacketSrv61*>(pPacket)->unk0x001;
     }
     if (pClient && pPacket && nPacketSize > 0 && g_d2webPacketStreamLength + (uint32_t)nPacketSize <= sizeof g_d2webPacketStream) {
         std::memcpy(g_d2webPacketStream + g_d2webPacketStreamLength, pPacket, (size_t)nPacketSize);

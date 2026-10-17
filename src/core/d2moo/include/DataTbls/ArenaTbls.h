@@ -64,6 +64,8 @@ D2COMMON_DLL_DECL D2ArenaTxt* __fastcall DATATBLS_GetArenaTxtRecord(int nArenaTy
 void __fastcall DATATBLS_UnloadArenaTxt();
 //D2Common.0x6FD479D0
 void __fastcall DATATBLS_LoadCharTemplateTxt(HD2ARCHIVE hArchive);
+//D2Common.0x6FD48000 (no 1.10f address of its own: 1.13c split it out of the loader, see the spec)
+void __fastcall DATATBLS_LoadCharTemplateStartIds(D2CharTemplateTxt* pCharTemplateTxtTable, int nRecords);
 //D2Common.0x6FD48770
 void __fastcall DATATBLS_UnloadCharTemplateTxt();
 //D2Common.0x6FD48790 (#10664)

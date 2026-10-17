@@ -139,6 +139,11 @@ export function createBlender(pl2, palette) {
   return (ctx, frame, left, top, mode) => {
     const table = tables[mode];
     if (!frame.width || !frame.height) return;
+    // A cel entirely outside the target canvas paints nothing: getImageData would read transparent
+    // black and putImageData would clip every pixel, so the round trip is pure cost. Most town
+    // objects (torches, the waypoint) are blended at anchors far off the 800x600 frame.
+    const canvas = ctx.canvas;
+    if (canvas && (left >= canvas.width || top >= canvas.height || left + frame.width <= 0 || top + frame.height <= 0)) return;
     const img = ctx.getImageData(left, top, frame.width, frame.height), d = img.data;
     for (let k = 0; k < frame.indices.length; k++) {
       if (!frame.opaque[k]) continue;

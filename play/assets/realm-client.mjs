@@ -507,7 +507,18 @@ export function bindEngineProtocol(Module, scratch = 65536) {
     },
     d2gsClientPlayerState: () => {
       const ptr = call('d2_realm_client_player_state', 'bigint', [], []);
-      return readPlayerPointer(ptr);
+      const player = readPlayerPointer(ptr);
+      // The selected player is one of the roster entries. The 92-byte assignment view stays as it
+      // is, but the same live motion the roster exposes must travel with it so a server mode change
+      // reaches the selected player's draw instead of the assignment's fixed initialMode.
+      if (player?.active) {
+        const count = call('d2_realm_client_player_count', 'number', [], []);
+        for (let index = 0; index < count; index++) {
+          const other = readPlayerPointer(call('d2_realm_client_player_at', 'bigint', ['number'], [index]));
+          if (other?.guid === player.guid) { player.motion = protocol.d2gsClientPlayerMotionAt(index); break; }
+        }
+      }
+      return player;
     },
     d2gsClientGameChat: () => {
       const ptr = call('d2_realm_client_game_chat', 'bigint', [], []);

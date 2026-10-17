@@ -185,6 +185,7 @@ int32_t __fastcall MISSMODE_UnitFindCallback_CanMissileDestroy(D2UnitStrc* pUnit
 }
 
 //D2Game.0x6FC55F80
+// 1.13c D2Game+0x3A4E0
 void __stdcall MISSMODE_FillDamageParams(D2UnitStrc* pMissile, D2UnitStrc* pTarget, D2DamageStrc* pDamage)
 {
     memset(pDamage, 0x00, sizeof(*pDamage));
@@ -649,6 +650,7 @@ void __fastcall MISSMODE_CreateImmolationArrowHitSubmissiles(D2GameStrc* pGame, 
 }
 
 //D2Game.0x6FC56D50
+// 1.13c D2Game+0x3F320
 int32_t __fastcall MISSMODE_HandleMissileCollision(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
     if (!pMissile)
@@ -1129,6 +1131,7 @@ int32_t __fastcall MISSMODE_SrvDo12_DiabWallMaker(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FC57F00
+// 1.13c D2Game+0x40EB0
 int32_t __fastcall MISSMODE_SrvDo13_BoneWallMaker(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
     if (!SUNIT_GetOwner(pGame, pMissile) || !MISSILE_GetTargetY(pMissile))
@@ -1822,6 +1825,7 @@ int32_t __fastcall MISSMODE_SrvDo33_VineRecyclerDelay(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FC598D0
+// 1.13c D2Game+0x3FB40
 int32_t __fastcall MISSMODE_SrvDo30_RabiesPlague(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
     if (!pMissile)
@@ -3187,6 +3191,7 @@ int32_t __fastcall MISSMODE_SrvHit21_BattleCry(D2GameStrc* pGame, D2UnitStrc* pM
 }
 
 //D2Game.0x6FC5C4D0
+// 1.13c D2Game+0x272C0
 int32_t __fastcall MISSMODE_SrvHit22_FistOfTheHeavensDelay(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pMissile)
@@ -5196,6 +5201,7 @@ void __fastcall MISSMODE_ToggleStateOff(D2UnitStrc* pUnit, int32_t nState, D2Sta
 }
 
 //D2Game.0x6FC60090
+// 1.13c D2Game+0x3E3F0
 void __fastcall MISSMODE_SrvDoHandler(D2GameStrc* pGame, D2UnitStrc* pMissile, D2C_EventTypes nEventType)
 {
 	D2_MAYBE_UNUSED(nEventType);

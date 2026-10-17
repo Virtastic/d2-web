@@ -215,6 +215,7 @@ D2AiCmdStrc* __fastcall AIGENERAL_GetAiCommandFromParam(D2UnitStrc* pUnit, int32
 }
 
 //D2Game.0x6FCCEF70
+// 1.13c D2Game+0x212F0
 void __fastcall AIGENERAL_AllocCommandsForMinions(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiCmdStrc* pAiCmd)
 {
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
@@ -255,6 +256,7 @@ D2AiCmdStrc* __fastcall AIGENERAL_CopyAiCommand(D2GameStrc* pGame, D2UnitStrc* p
 }
 
 //D2Game.0x6FCCF090
+// 1.13c D2Game+0x21290
 D2AiCmdStrc* __fastcall AIGENERAL_SetCurrentAiCommand(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nCmdParam, int32_t bSet)
 {
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
@@ -370,6 +372,7 @@ void __fastcall AIGENERAL_GetOwnerData(D2UnitStrc* pUnit, int32_t* pUnitGUID, in
 }
 
 //D2Game.0x6FCCF320
+// 1.13c D2Game+0x21260
 D2UnitStrc* __fastcall AIGENERAL_GetMinionOwner(D2UnitStrc* pUnit)
 {
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);

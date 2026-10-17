@@ -1989,6 +1989,7 @@ int __fastcall SKILLS_GetBonusSkillLevel(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 }
 
 //D2Common.0x6FDB1700 (#10968)
+// 1.13c D2Common+0x505C0
 int __stdcall SKILLS_GetSkillLevel(D2UnitStrc* pUnit, D2SkillStrc* pSkill, BOOL bBonus)
 {
 	int nSkillLevel = 0;
@@ -2633,6 +2634,7 @@ int __stdcall SKILLS_GetMaxPhysDamage(D2UnitStrc* pUnit, int nSkillId, int nSkil
 }
 
 //D2Common.0x6FDB2810 (#11004)
+// 1.13c D2Common+0x50460
 int __stdcall SKILLS_GetMinElemDamage(D2UnitStrc* pUnit, int nSkillId, int nSkillLevel, BOOL a4)
 {
 	D2SkillsTxt* pSkillsTxtRecord = NULL;
@@ -3032,6 +3034,7 @@ BOOL __stdcall SKILLS_CanUnitCorpseBeSelected(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDB35B0 (#11024)
+// 1.13c D2Common+0x4F200
 int __stdcall D2Common_11024(D2UnitStrc* pUnit, D2UnitStrc* pItem, D2SkillStrc* pSkill, int nType, BOOL* pHasThrowBonus)
 {
 	int nStatId = 0;

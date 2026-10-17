@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include "Path/Path.h"
 
 #include "D2Collision.h"
@@ -218,6 +219,21 @@ void __stdcall PATH_AddCollisionFootprintForUnit(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDA8450 (#10223)
+// 1.13c D2Common+0x35800
+// d2-web: the fields this routine reads. The offsets are retail's 32-bit ones; each pointer ahead of a
+// field widens the field by (sizeof(void*) - 4) in the wasm64 build.
+static_assert(offsetof(D2UnitStrc, dwUnitType) == 0x00);
+static_assert(offsetof(D2UnitStrc, dwAnimMode) == 0x10 + 1 * (sizeof(void*) - 4));                  // after pMemoryPool
+static_assert(offsetof(D2UnitStrc, pObjectData) == 0x14 + 1 * (sizeof(void*) - 4));                 // after pMemoryPool
+static_assert(offsetof(D2UnitStrc, pDynamicPath) == 0x2C + 3 * (sizeof(void*) - 4));                // after pMemoryPool, pPlayerData, pDrlgAct
+static_assert(offsetof(D2DynamicPathStrc, tGameCoords) == 0x00);
+static_assert(offsetof(D2FP32_16, wPosX) == 0x02 && offsetof(D2FP32_16, wPosY) == 0x06);            // the dynamic path's x and y words
+static_assert(offsetof(D2DynamicPathStrc, dwCollisionPattern) == 0x48 + 4 * (sizeof(void*) - 4));   // after pRoom, pPreviousRoom, unk0x2C, pUnit
+static_assert(offsetof(D2StaticPathStrc, tGameCoords) == 0x0C + 1 * (sizeof(void*) - 4));           // after pRoom
+static_assert(offsetof(D2CoordStrc, nX) == 0 && offsetof(D2CoordStrc, nY) == 0x04);
+static_assert(offsetof(D2ObjectDataStrc, pObjectTxt) == 0x00);
+static_assert(offsetof(D2ObjectsTxt, nHasCollision) == 0x120);
+
 BOOL __stdcall PATH_RemoveCollisionFootprintForUnit(D2UnitStrc* pUnit, BOOL bForce)
 {
 	D2CoordStrc pCoords = {};
@@ -727,6 +743,7 @@ int __stdcall D2Common_11281_CollisionPatternFromSize(D2UnitStrc* pUnit, int nSi
 
 //D2Common.0x6FDA92F0 (#10214)
 //TODO: Find a name
+// 1.13c D2Common+0x35CF0
 void __stdcall D2Common_10214(D2UnitStrc* pUnit)
 {
 	if (pUnit->pDynamicPath)
@@ -928,6 +945,7 @@ void __stdcall D2Common_10228(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDA9870 (#10143)
+// 1.13c D2Common+0x365A0
 void __stdcall PATH_SetUnitDeadCollision(D2UnitStrc* pUnit, BOOL bForGameLogic)
 {
 	D2_ASSERT(pUnit->pDynamicPath != nullptr);
@@ -948,6 +966,7 @@ void __stdcall PATH_SetUnitDeadCollision(D2UnitStrc* pUnit, BOOL bForGameLogic)
 }
 
 //D2Common.0x6FDA98F0 (#10144)
+// 1.13c D2Common+0x35BE0
 void __stdcall PATH_SetUnitAliveCollision(D2UnitStrc* pUnit, BOOL bForGameLogic)
 {
 	if (bForGameLogic)
@@ -1549,6 +1568,7 @@ void __stdcall PATH_SetIDAStarInitFScore(D2DynamicPathStrc* pDynamicPath, int nI
 
 //D2Common.0x6FDAA350 (#10198)
 //TODO: Check name
+// 1.13c D2Common+0x347C0
 int __stdcall D2COMMON_10198_PathGetSaveStep(D2DynamicPathStrc* pDynamicPath, D2PathPointStrc** ppPathPoints)
 {
 	D2_ASSERT(pDynamicPath->dwFlags & PATH_SAVE_STEPS_MASK);

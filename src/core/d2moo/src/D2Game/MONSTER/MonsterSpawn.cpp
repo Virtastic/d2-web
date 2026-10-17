@@ -28,6 +28,7 @@
 
 
 //D2Game.0x6FC68350
+// 1.13c D2Game+0xF3D20
 int32_t __fastcall sub_6FC68350(int32_t nMonsterId, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t a5)
 {
     D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nMonsterId);
@@ -96,6 +97,7 @@ int32_t __fastcall sub_6FC68350(int32_t nMonsterId, D2ActiveRoomStrc* pRoom, int
 }
 
 //D2Game.0x6FC68630
+// 1.13c D2Game+0xF3E30
 int32_t __fastcall sub_6FC68630(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, D2UnitStrc* pTarget, int32_t nX, int32_t nY)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -236,6 +238,7 @@ int32_t __fastcall MONSTERSPAWN_GetResurrectMode(D2UnitStrc* pUnit, int32_t a2)
 }
 
 //D2Game.0x6FC68D70
+// 1.13c D2Game+0xEDDB0
 D2UnitStrc* __fastcall sub_6FC68D70(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMonsterId, int32_t nAnimMode, int32_t a5, int16_t nFlags)
 {
     D2UnkMonCreateStrc monCreate = {};
@@ -342,6 +345,7 @@ static D2ActiveRoomStrc* MONSTERSPAWN_FindRoomAt(D2ActiveRoomStrc* pRoom, int32_
     return nullptr;
 }
 
+// 1.13c D2Game+0xEEF10
 D2UnitStrc* __fastcall D2GAME_SpawnNormalMonster_6FC68E30(D2UnkMonCreateStrc* pMonCreate)
 {
     const int32_t nMonsterId = pMonCreate->nMonsterId;
@@ -909,6 +913,7 @@ D2UnitStrc* __fastcall D2GAME_SpawnMonster_6FC69F10(D2GameStrc* pGame, D2ActiveR
 }
 
 //D2Game.0x6FC69F70
+// 1.13c D2Game+0xEF510
 D2UnitStrc* __fastcall sub_6FC69F70(D2GameStrc* pGame, D2RoomCoordListStrc* pRoomCoordList, D2UnitStrc* pUnit, int32_t nMonsterId, int32_t nAnimMode, int32_t a6, int16_t nFlags)
 {
     D2UnkMonCreateStrc monCreate = {};
@@ -966,6 +971,7 @@ D2UnitStrc* __fastcall sub_6FC6A090(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, 
 }
 
 //D2Game.0x6FC6A0F0
+// 1.13c D2Game+0xEF450
 D2UnitStrc* __fastcall sub_6FC6A0F0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t nMonsterId, int32_t nMode, int32_t nUnitId, int32_t a8, int16_t nFlags)
 {
     D2UnkMonCreateStrc monCreate = {};
@@ -1323,6 +1329,7 @@ int32_t __fastcall sub_6FC6A8C0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nM
 }
 
 //D2Game.0x6FC6AA70
+// 1.13c D2Game+0xEF6B0
 int32_t __fastcall MONSTERSPAWN_SpawnRandomMonsterForLevel(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY)
 {
     D2LevelsTxt* pLevelsTxtRecord = DATATBLS_GetLevelsTxtRecord(DUNGEON_GetLevelIdFromRoom(pRoom));

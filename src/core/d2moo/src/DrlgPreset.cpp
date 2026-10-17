@@ -138,6 +138,7 @@ static void SkipInt32s(int32_t*& pData, uint32_t nbToSkip)
 	pData += nbToSkip;
 }
 
+// 1.13c D2Common+0xB560
 //D2Common.0x6FD85A10
 void __fastcall DRLGPRESET_ParseDS1File(D2DrlgFileStrc* pDrlgFile, HD2ARCHIVE hArchive, const char* szFileName)
 {
@@ -382,7 +383,6 @@ void __fastcall DRLGPRESET_ParseDS1File(D2DrlgFileStrc* pDrlgFile, HD2ARCHIVE hA
 					for (int j = 0; j < 3; ++j)
 					{
 						szItemCode[j] = tolower(szItemCode[j]);
-						++j;
 					}
 
 					DATATBLS_GetItemRecordFromItemCode(DATATBLS_StringToCode(szItemCode), &nUnitId);
@@ -494,6 +494,7 @@ void __fastcall DRLGPRESET_ParseDS1File(D2DrlgFileStrc* pDrlgFile, HD2ARCHIVE hA
 	}
 }
 
+// 1.13c D2Common+0xBE50
 //D2Common.0x6FD86050
 void __fastcall DRLGPRESET_LoadDrlgFile(D2DrlgFileStrc** ppDrlgFile, HD2ARCHIVE hArchive, const char* szFile)
 {
@@ -533,6 +534,40 @@ void __fastcall DRLGPRESET_LoadDrlgFile(D2DrlgFileStrc** ppDrlgFile, HD2ARCHIVE 
 	{
 		LeaveCriticalSection(gpLvlSubTypeFilesCriticalSection);
 	}
+}
+
+// 1.13c D2Common+0x9FA0 (retail keeps it as its own function; D2MOO 1.10f inlines it into
+// DRLGPRESET_FreeDrlgFile, and this port did too until the FN vector for the row needed to replay it).
+// The teardown of the loaded .ds1 file body: the raw file buffer, the substitution-group block, every
+// preset unit (its map-AI position array, its map-AI, the unit itself), then the file struct itself -- the
+// argument. Retail's 0x50b free is this function's last action (mov ebp,edx before the 0x9228 call), so the
+// struct is freed here, not by the caller; the split is so src/core/fn/d2common_9fa0.cpp can call exactly
+// this and nothing of the caller's.
+void __fastcall DRLGPRESET_FreeDrlgFileStruct(D2DrlgFileStrc* pDrlgFile)
+{
+	if (pDrlgFile->pDS1File)
+	{
+		D2_FREE(pDrlgFile->pDS1File);
+	}
+
+	if (pDrlgFile->pSubstGroups)
+	{
+		D2_FREE_POOL(nullptr, pDrlgFile->pSubstGroups);
+	}
+
+	D2PresetUnitStrc* pPresetUnit = pDrlgFile->pPresetUnit;
+	while (pPresetUnit)
+	{
+		D2PresetUnitStrc* pNextPresetUnit = pPresetUnit->pNext;
+
+		DRLGPRESET_FreePresetUnit(NULL, pPresetUnit);
+
+		pPresetUnit = pNextPresetUnit;
+	}
+
+	// 1.13c Preset.cpp:0x50b -- the file struct, freed by this function (retail's last pool free is of EBP,
+	// the argument). The caller below no longer frees it.
+	D2_FREE_POOL(nullptr, pDrlgFile);
 }
 
 //D2Common.0x6FD86190
@@ -578,27 +613,8 @@ void __fastcall DRLGPRESET_FreeDrlgFile(D2DrlgFileStrc** ppDrlgFile)
 				LeaveCriticalSection(gpLvlSubTypeFilesCriticalSection);
 			}
 
-			if ((*ppDrlgFile)->pDS1File)
-			{
-				D2_FREE((*ppDrlgFile)->pDS1File);
-			}
-
-			if ((*ppDrlgFile)->pSubstGroups)
-			{
-				D2_FREE_POOL(nullptr, (*ppDrlgFile)->pSubstGroups);
-			}
-
-			D2PresetUnitStrc* pPresetUnit = (*ppDrlgFile)->pPresetUnit;
-			while (pPresetUnit)
-			{
-				D2PresetUnitStrc* pNextPresetUnit = pPresetUnit->pNext;
-
-				DRLGPRESET_FreePresetUnit(NULL, pPresetUnit);
-
-				pPresetUnit = pNextPresetUnit;
-			}
-
-			D2_FREE_POOL(nullptr, *ppDrlgFile);
+			// 1.13c D2Common+0x9FA0: retail's own function, split out above; it frees the file struct too
+			DRLGPRESET_FreeDrlgFileStruct(*ppDrlgFile);
 			D2_FREE_POOL(nullptr, pCurrent);
 			*ppDrlgFile = nullptr;
 		}
@@ -612,6 +628,7 @@ void __fastcall DRLGPRESET_FreeDrlgFile(D2DrlgFileStrc** ppDrlgFile)
 	}
 }
 
+// 1.13c D2Common+0x9EA0
 //D2Common.0x6FD86310
 D2PresetUnitStrc* __fastcall DRLGPRESET_CopyPresetUnit(void* pMemPool, D2PresetUnitStrc* pPresetUnit, int nX, int nY)
 {
@@ -923,6 +940,7 @@ void __fastcall DRLGPRESET_FreePresetRoomData(D2DrlgRoomStrc* pDrlgRoom)
 	}
 }
 
+// 1.13c D2Common+0xA440
 //D2Common.0x6FD86CE0
 void __fastcall DRLGPRESET_FreeDrlgGrids(void* pMemPool, D2DrlgRoomStrc* pDrlgRoom)
 {
@@ -1308,6 +1326,7 @@ D2DrlgRoomStrc* __fastcall DRLGPRESET_BuildArea(D2DrlgLevelStrc* pLevel, D2DrlgM
 	return pDrlgRoom;
 }
 
+// 1.13c D2Common+0xC060
 //D2Common.0x6FD87760
 void __fastcall DRLGPRESET_BuildPresetArea(D2DrlgLevelStrc* pLevel, D2DrlgGridStrc* pDrlgGrid, int nFlags, D2DrlgMapStrc* pDrlgMap, BOOL bSingleRoom)
 {
@@ -1515,6 +1534,7 @@ void __fastcall DRLGPRESET_SetPickedFileInDrlgMap(D2DrlgMapStrc* pDrlgMap, int n
 	pDrlgMap->nPickedFile = nPickedFile;
 }
 
+// 1.13c D2Common+0xBC60
 //D2Common.0x6FD87E20
 D2DrlgMapStrc* __fastcall DRLGPRESET_AllocDrlgMap(D2DrlgLevelStrc* pLevel, int nLvlPrestId, D2DrlgCoordStrc* pDrlgCoord, D2SeedStrc* pSeed)
 {
@@ -1557,6 +1577,7 @@ int __fastcall DRLGPRESET_GetSizeY(int nLvlPrestId)
 	return DATATBLS_GetLvlPrestTxtRecord(nLvlPrestId)->nSizeY;
 }
 
+// 1.13c D2Common+0xA8E0
 //D2Common.0x6FD87F20
 void __fastcall DRLGPRESET_FreeDrlgMap(void* pMemPool, D2DrlgMapStrc* pDrlgMap)
 {
@@ -1793,6 +1814,7 @@ void __fastcall DRLGPRESET_InitLevelData(D2DrlgLevelStrc* pLevel)
 	DRLG_SetLevelPositionAndSize(pLevel->pDrlg, pLevel);
 }
 
+// 1.13c D2Common+0xCD10
 //D2Common.0x6FD886F0
 void __fastcall DRLGPRESET_GenerateLevel(D2DrlgLevelStrc* pLevel)
 {

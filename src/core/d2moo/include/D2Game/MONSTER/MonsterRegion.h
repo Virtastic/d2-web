@@ -3,6 +3,7 @@
 #include <Units/Units.h>
 #include <Drlg/D2DrlgDrlg.h>
 
+struct D2UnkMonCreateStrc;		// d2-web: the 0x47450 callee seam below names it (MonsterSpawn.h defines it)
 struct D2UnkMonCreateStrc2;
 
 #pragma pack(1)
@@ -47,7 +48,42 @@ struct D2MonsterRegionStrc
 #pragma pack()
 
 //D2Game.0x6FC66260
+// 1.13c D2Game+0x47450
 int32_t __fastcall sub_6FC66260(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, int32_t nSuperUniqueId, int32_t* pX, int32_t* pY, int32_t a7);
+// 1.13c D2Game+0x46C30 (extracted out of the 1.10f sub_6FC66260 body; also called from 0x471E0)
+void __fastcall sub_46C30(D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, int32_t* pLeft, int32_t* pTop, int32_t* pRight, int32_t* pBottom);
+// 1.13c D2Game+0x46B20 (extracted out of the 1.10f sub_6FC66260 body; only called from 0x47450)
+int32_t __fastcall sub_46B20(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY);
+// d2-web: 1.13c D2Game+0x46B20 callee seams; all null in the game. The five
+// D2Common lookups sub_46B20 makes need a live game, so the probe scripts them out of the room blob
+//; #11158 (tile -> subtile) runs for real on both sides.
+struct D2LevelsTxt;
+struct D2Spawn46B20Seam
+{
+    int32_t (*levelId)(D2ActiveRoomStrc*);                                            // D2Common #10826
+    int32_t* (*warpCoordinates)(D2ActiveRoomStrc*);                                   // D2Common #10779
+    D2LevelsTxt* (*levelsRecord)(int nLevelId);                                       // D2Common #10014
+    uint8_t (*actNo)(int nLevelId);                                                   // D2Common #10459
+    void (*actSpawnLocation)(D2DrlgActStrc*, int, int, int*, int*);                   // D2Common #10942
+};
+extern D2Spawn46B20Seam g_d2Spawn46B20;
+// 1.13c D2Game+0x47450 callee seams; both null in the game
+struct D2Spawn47450Seam
+{
+    int32_t (*warpCheck)(D2GameStrc*, D2ActiveRoomStrc*, int32_t, int32_t);  // 0x46B20
+    D2UnitStrc* (*spawn)(D2UnkMonCreateStrc*);                              // 0xEEF10
+};
+extern D2Spawn47450Seam g_d2Spawn47450;
+// 1.13c D2Game+0x47CF0 callee seams; all null in the game
+struct D2Spawn47CF0Seam
+{
+    int32_t (*levelId)(D2ActiveRoomStrc*);                                                            // 0xA556
+    int32_t (*questCheck)(D2GameStrc*, int32_t);                                                      // 0x53970
+    D2UnitStrc* (*spawnSuperUnique)(D2GameStrc*, D2ActiveRoomStrc*, int32_t, int32_t, int32_t);       // 0x251F0
+    D2UnitStrc* (*spawnMonster)(D2GameStrc*, D2ActiveRoomStrc*, int32_t, int32_t, int32_t, int32_t, int32_t, int16_t);  // 0xEF650
+    int32_t (*randomId)(D2ActiveRoomStrc*, int32_t);                                                  // 0xADFC
+};
+extern D2Spawn47CF0Seam g_d2Spawn47CF0;
 //D2Game.0x6FC66560
 D2UnitStrc* __fastcall D2GAME_SpawnPresetMonster_6FC66560(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nClassId, int32_t nX, int32_t nY, int32_t nMode);
 //D2Game.0x6FC66FC0

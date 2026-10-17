@@ -7,11 +7,12 @@
 #include <cstdint>
 #include <cstring>
 #include <cstdlib>
-static uint32_t mcp_send(const void* s, const uint8_t* buf, uint32_t n, uint32_t aeb4) {
+static uint32_t mcp_send(const void* s, const uint8_t* buf, uint32_t n, uint32_t aeb4, bool zeroAed8 = false) {
     uint32_t* hl = (uint32_t*)((const char*)s - 88), *lg = (uint32_t*)((const char*)hl - 1128), *gd = (uint32_t*)((const char*)lg - 40), *gp = (uint32_t*)((const char*)gd - 40);
     if (gp[0] != 0xC0DEAD01 || gp[1] != 0xC0DEAD02 || gp[2] != 0xC0DEAD03) abort();   // blob layout moved: fail loudly
     const uint32_t sock = gp[0];
     gd[0] = 0; gd[1] = aeb4 == ~0u ? gp[2] : (gp[2] & 0xFFFF0000u) | aeb4;   // [0xb1c8] = 0; [0xaeb4] low word := word (or untouched)
+    if (zeroAed8) gd[2] = 0;   // 7330 also zeroes [0xaed8] (pin it at gp+12, dump at gd+8 to check it)
     lg[0] = 1; lg[1] = n; memcpy(lg + 2, buf, n); memset((char*)(lg + 2) + n, 0, (4 - n % 4) % 4);
     const uint32_t e[10] = { 0x5DE6, 0, 0, 0, 0, 0, sock, 0xB3000000u, n, 0 };   // the stack buffer is a local: 0xB3000000
     hl[0] = 1; memcpy(hl + 1, e, sizeof e);

@@ -593,6 +593,7 @@ void __fastcall ACT5Q1_SetRewardGranted(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCB1D90
+// 1.13c D2Game+0x5C3A0
 void __fastcall OBJECTS_InitFunction71_LarzukStandard(D2ObjInitFnStrc* pOp)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pOp->pGame, QUEST_A5Q1_SHENK);

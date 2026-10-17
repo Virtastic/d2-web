@@ -18,6 +18,8 @@
 #include <DataTbls/LevelsIds.h>
 #include <Path/PathMisc.h>
 
+#include "core/d2game/sunit_init_item_seeds.h"   // 1.13c D2Game+0xE00C0, the outlined item-seed branch
+
 
 #include "AI/AiGeneral.h"
 #include "GAME/Arena.h"
@@ -239,6 +241,7 @@ D2UnitStrc* __fastcall SUNIT_GetNextUnitFromList(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCBB190
+// 1.13c D2Game+0xE1610
 void __fastcall sub_6FCBB190(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoom)
 {
     if (!UNITS_IsCurrentRoomInvalid(pUnit))
@@ -380,6 +383,7 @@ void __fastcall sub_6FCBB190(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ActiveRoomS
 }
 
 //D2Game.0x6FCBB440
+// 1.13c D2Game+0xE1C00
 void __fastcall SUNIT_WarpPlayer(D2GameStrc* pGame, D2UnitStrc* pTarget, D2UnitStrc* pRoomTile)
 {
     D2_ASSERT(pGame);
@@ -417,6 +421,7 @@ void __fastcall SUNIT_WarpPlayer(D2GameStrc* pGame, D2UnitStrc* pTarget, D2UnitS
 
     int32_t nX = pCoord.nX;
     int32_t nY = pCoord.nY;
+    // 1.13c D2Game+0xE19C0
     if (!sub_6FCBDFE0(pGame, pTarget, pWarpTileRoom, nX, nY, 0, 0))
     {
         return;
@@ -502,9 +507,7 @@ D2UnitStrc* __fastcall SUNIT_AllocUnitData(int32_t nUnitType, int32_t nClassId, 
         if (nUnitType == UNIT_ITEM)
         {
             ITEMS_AllocItemData(pGame->pMemoryPool, pUnit);
-            ITEMS_InitItemSeed(pUnit);
-            ITEMS_SetItemStartSeed(pUnit, ITEMS_RollRandomNumber(&pGame->pGameSeed));
-            SEED_InitLowSeed(ITEMS_GetItemSeed(pUnit), ITEMS_GetItemStartSeed(pUnit));
+            SUNIT_InitItemSeeds(pUnit, &pGame->pGameSeed);
         }
     }
 
@@ -685,6 +688,7 @@ D2UnitStrc* __fastcall SUNIT_GetServerUnit(D2GameStrc* pGame, int32_t nUnitType,
 }
 
 //D2Game.0x6FCBBB70
+// 1.13c D2Game+0x3D1E0
 D2UnitStrc* __fastcall SUNIT_GetOwner(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (!pUnit || !(pUnit->dwFlagEx & UNITFLAGEX_STOREOWNERINFO))
@@ -708,7 +712,49 @@ D2UnitStrc* __fastcall SUNIT_GetLastAttacker(D2GameStrc* pGame, D2UnitStrc* pUni
     return SUNIT_GetServerUnit(pGame, pUnit->dwKillerType, pUnit->dwKillerGUID);
 }
 
+// 1.13c D2Game+0xE0310 (row a retail recording): the sorted unit-list insert that 1.10f inlines at the end of SUNIT_Add.
+// Convention EDX = pGame, ESI = pUnit, no stack words. The callee leaves the walk's stop node in EAX -- 0
+// on an empty list or when the walk runs off the end -- and the FN vector records it, so it is the return
+// value here; SUNIT_Add ignores it. 1.13c selects the slot from the D2Game+0xFB014 type table and reads it
+// directly; SUNIT_GetUnitList is that same table.
+D2UnitStrc* __fastcall SUNIT_AddUnitToList(D2GameStrc* pGame, D2UnitStrc* pUnit)
+{
+    D2UnitStrc** ppUnitList = pUnit->dwUnitType == UNIT_TILE ? &pGame->pTileList : SUNIT_GetUnitList(pUnit->dwUnitType, pGame, pUnit->dwUnitId);
+
+    D2UnitStrc* pNode = *ppUnitList;
+    D2UnitStrc* pPrevious = nullptr;
+    while (pNode)
+    {
+        if (pNode->dwUnitId <= pUnit->dwUnitId)
+        {
+            if (pNode->dwUnitId == pUnit->dwUnitId)
+            {
+                FOG_DisplayHalt("Tried to add a duplicate unit", __FILE__, __LINE__);   // 1.13c: FOG_CallerReturnAddress(0x356) -> FOG_DisplayHalt("", caller, 0x356) -> _exit(-1)
+                exit(-1);
+            }
+            break;
+        }
+
+        pPrevious = pNode;
+        pNode = pNode->pListNext;
+    }
+
+    pUnit->pListNext = pNode;
+
+    if (pPrevious)
+    {
+        pPrevious->pListNext = pUnit;
+    }
+    else
+    {
+        *ppUnitList = pUnit;
+    }
+
+    return pNode;
+}
+
 //D2Game.0x6FCBBCB0
+// 1.13c D2Game+0xE0F40 (checked against decompile; no semantic delta: act/pDrlgAct from the room, per-type placement, sorted unit-list insert with duplicate-id fatal, refresh, invalidate-current-room when a6 == 0)
 void __fastcall SUNIT_Add(D2UnitStrc* pUnit, int32_t nX, int32_t nY, D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t a6)
 {
     D2_ASSERT(pGame);
@@ -787,46 +833,7 @@ void __fastcall SUNIT_Add(D2UnitStrc* pUnit, int32_t nX, int32_t nY, D2GameStrc*
         return;
     }
 
-    D2UnitStrc** ppUnitList = nullptr;
-    if (pUnit->dwUnitType == UNIT_TILE)
-    {
-        ppUnitList = &pGame->pTileList;
-    }
-    else
-    {
-        ppUnitList = SUNIT_GetUnitList(pUnit->dwUnitType, pGame, pUnit->dwUnitId);
-    }
-
-    D2UnitStrc* i = nullptr;
-    i = SUNIT_LoadPackedPointer(ppUnitList);
-    D2UnitStrc* pPrevious = nullptr;
-    while (i)
-    {
-        if (i->dwUnitId <= pUnit->dwUnitId)
-        {
-            if (i->dwUnitId == pUnit->dwUnitId)
-            {
-                char szMessage[256] = {};
-                FOG_DisplayAssert(FOG_csprintf(szMessage, "Tried to add a duplicate unit - Type:%d Class:%d Id:%u\n", pUnit->dwUnitType, pUnit->dwClassId, pUnit->dwUnitId), __FILE__, __LINE__);
-                exit(-1);
-            }
-            break;
-        }
-
-        pPrevious = i;
-        i = i->pListNext;
-    }
-
-    pUnit->pListNext = i;
-
-    if (pPrevious)
-    {
-        pPrevious->pListNext = pUnit;
-    }
-    else
-    {
-        SUNIT_StorePackedPointer(ppUnitList, pUnit);
-    }
+    SUNIT_AddUnitToList(pGame, pUnit);
 
     if (UNITS_GetRoom(pUnit))
     {
@@ -1044,6 +1051,7 @@ void __fastcall SUNIT_AttachSound(D2UnitStrc* pUnit, int32_t nUpdateType, D2Unit
 }
 
 //D2Game.0x6FCBC4D0
+// 1.13c D2Game+0xDFF10
 void __fastcall sub_6FCBC4D0(D2UnitStrc* pUnit)
 {
     D2_ASSERT(pUnit);
@@ -1291,6 +1299,7 @@ void __fastcall sub_6FCBC7E0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCBC900
+// 1.13c D2Game+0xE07A0
 D2UnitStrc* __stdcall SUNIT_GetTargetUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     sub_6FCBC7E0(pGame, pUnit);
@@ -1304,6 +1313,7 @@ D2UnitStrc* __stdcall SUNIT_GetTargetUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCBC930
+// 1.13c D2Game+0xE1930
 int32_t __fastcall sub_6FCBC930(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
     D2_ASSERT(pGame);
@@ -1357,6 +1367,7 @@ void __fastcall sub_6FCBC9C0(D2UnitStrc* pFirst, D2UnitStrc* pSecond)
 }
 
 //D2Game.0x6FCBCB30
+// 1.13c D2Game+0x8CA20
 D2UnitStrc* __fastcall SUNIT_GetPortalOwner(D2GameStrc* pGame, D2UnitStrc* pPortal)
 {
     D2_ASSERT(pPortal);
@@ -1459,6 +1470,7 @@ D2EventTimerStrc* __fastcall SUNIT_GetTimerFromUnit(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCBCE50
+// 1.13c D2Game+0xE0750
 void __fastcall D2GAME_DeletePlayerPerFrameEvents_6FCBCE50(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_MODECHANGE, 0);
@@ -1466,6 +1478,7 @@ void __fastcall D2GAME_DeletePlayerPerFrameEvents_6FCBCE50(D2GameStrc* pGame, D2
 }
 
 //D2Game.0x6FCBCE70
+// 1.13c D2Game+0xDF7B0
 void __fastcall sub_6FCBCE70(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     int32_t nFrame = pGame->dwGameFrame;
@@ -1616,6 +1629,7 @@ void __fastcall sub_6FCBCFD0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3)
 }
 
 //D2Game.0x6FCBD120
+// 1.13c D2Game+0xE2480
 void __fastcall sub_6FCBD120(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3)
 {
     if (a3 <= 0)
@@ -1755,6 +1769,7 @@ void __fastcall D2GAME_SKILLS_RewindSkillEx_6FCBD260(D2GameStrc* pGame, D2UnitSt
 }
 
 //D2Game.0x6FCBD3A0
+// 1.13c D2Game+0xE0B40
 void __fastcall sub_6FCBD3A0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_MODECHANGE, 0);
@@ -1855,6 +1870,7 @@ void __fastcall SUNIT_RemoveAllItemsFromInventory(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FCBD730
+// 1.13c D2Game+0xDF780
 D2GameStrc* __fastcall SUNIT_GetGameFromUnit(D2UnitStrc* pUnit)
 {
     D2_ASSERT(pUnit);
@@ -2161,6 +2177,7 @@ int32_t __fastcall SUNIT_AreUnitsAligned(D2GameStrc* pGame, D2UnitStrc* pUnit1, 
 }
 
 //D2Game.0x6FCBDD30
+// 1.13c D2Game+0xE0460
 void __fastcall sub_6FCBDD30(D2UnitStrc* pUnit, uint8_t nAlignNew, int32_t a3)
 {
     int32_t nAlignment = UNIT_ALIGNMENT_UNASSIGNED;
@@ -2242,6 +2259,7 @@ void __fastcall sub_6FCBDD30(D2UnitStrc* pUnit, uint8_t nAlignNew, int32_t a3)
 }
 
 //D2Game.0x6FCBDE90
+// 1.13c D2Game+0xE2240
 void __fastcall sub_6FCBDE90(D2UnitStrc* pUnit, int32_t bSetUninterruptable)
 {
     STATES_ToggleState(pUnit, STATE_UNINTERRUPTABLE, bSetUninterruptable);

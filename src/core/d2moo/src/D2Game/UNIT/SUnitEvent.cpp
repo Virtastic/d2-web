@@ -100,6 +100,7 @@ void __fastcall SUNITEVENT_Unregister(D2GameStrc* pGame, D2UnitStrc* pUnit, int3
     }
 }
 
+// 1.13c D2Game+0x370E0 (checked against decompile)
 //D2Game.0x6FCC3750
 D2UnitEventStrc* __fastcall SUNITEVENT_GetEvent(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nTimerQueueNo, int32_t a4, int32_t nGUID1)
 {

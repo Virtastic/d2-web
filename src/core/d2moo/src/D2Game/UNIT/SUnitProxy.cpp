@@ -70,6 +70,7 @@ D2NpcRecordStrc* __fastcall SUNITPROXY_GetNpcRecordFromClassId(D2GameStrc* pGame
 }
 
 //D2Game.0x6FCCB910
+// 1.13c D2Game+0x8F820
 D2NpcRecordStrc* __fastcall SUNITPROXY_GetNpcRecordFromUnit(D2GameStrc* pGame, D2UnitStrc* pNpc, int32_t* pIndex)
 {
     return SUNITPROXY_GetNpcRecordFromClassId(pGame, pNpc ? pNpc->dwClassId : -1, pIndex);
