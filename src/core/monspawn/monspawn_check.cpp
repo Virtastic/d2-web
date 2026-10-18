@@ -50,6 +50,7 @@
 #include "session_path_room_probe.h"
 #include "object_interaction_gate.h"
 #include "object_interaction_packet.h"
+#include "object_interaction_pending.h"
 #include "hellforge_diagnostic.h"
 #include "monster_sound_profile.h"
 #include <QUESTS/ACT5/A5Q3.h>
@@ -616,6 +617,13 @@ static D2SessionItemState g_sessionItemState;
 // busy, interact data set -- and the pile stays IMODE_ONGROUND; a second command at that same spot
 // picks it up). This names the pile the walk is for, so the tick can complete it (below).
 static uint32_t g_sessionPendingPickup = 0;
+// The object a live 0x13 click is still walking to. sub_6FC828D0's UNIT_OBJECT branch starts the
+// walk and stores the interact target, but its completion lives in the walk-mode handler
+// sub_6FC7F780, which this session does not reach; without naming the object here an out-of-range
+// click only walked. Retail then re-enters sub_6FC828D0 on arrival, which operates the object:
+// UNITS_ChangeAnimMode(OBJMODE_OPERATING) for chests/corpses/barrels and the shrine callback
+// (gpShrineTable_6FD28D18) that applies the boon. `d2_session_tick` completes it.
+static uint32_t g_sessionPendingObject = 0;
 // #9: a unit-target command whose melee approach walk is still running. Retail's Rcv0x0D records the
 // same intent (UNITS_SetInteractData) and the walk mode's per-frame handler sub_6FC7F780 re-issues it
 // when the approach path completes (PlrModes.cpp: when the path ends it reads the saved skill and
@@ -2644,6 +2652,7 @@ static int d2_session_create_for_class(uint32_t seed, int difficulty, int act, i
     memset(&g_sessionAdvancement, 0, sizeof g_sessionAdvancement); g_sessionAdvancementSkillId = SKILL_MAGICARROW;
     memset(&g_sessionItemState, 0, sizeof g_sessionItemState);
     g_sessionPendingPickup = 0;
+    g_sessionPendingObject = 0;
     g_sessionApproachKind = 0; g_sessionApproachTarget = 0;
     memset(&g_sessionNpcInteraction, 0, sizeof g_sessionNpcInteraction);
     memset(&g_sessionNpcDialog, 0, sizeof g_sessionNpcDialog); D2WEB_ResetLastDialogPacket();
@@ -4355,7 +4364,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_object_packet(uint32_t objectId) {
     // The object branch of the receiver (sub_6FC828D0's UNIT_OBJECT case) goes straight to
     // OBJECTS_OperateHandler through sub_6FC78B20 once the target is in range, so an unfiltered click on a
     // non-selectable object aborts the game. Refuse it where the click is ISSUED, as retail's client does.
-    if (!objectClickIsSelectable(SUNIT_GetServerUnit(g_game, UNIT_OBJECT, (int32_t)objectId))) return 0;
+    D2UnitStrc* clickedObject = SUNIT_GetServerUnit(g_game, UNIT_OBJECT, (int32_t)objectId);
+    if (!objectClickIsSelectable(clickedObject)) return 0;
     const int32_t oldLevel = DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(g_targetPlayer));
     D2WEB_ResetPacketStream();
     if (!sessionDispatchGate(0x13)) return 0;
@@ -4364,6 +4374,12 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_object_packet(uint32_t objectId) {
             return D2GAME_PACKETCALLBACK_Rcv0x13_InteractWithEntity_6FC84D70(
                 g_game, g_targetPlayer, const_cast<uint8_t*>(bytes), static_cast<uint32_t>(length));
         });
+    // Out of interact range the receiver started the approach walk (sub_6FC828D0's UNIT_OBJECT
+    // branch, player mode 3 with the object as the path target). Remember it for the tick to
+    // complete; an in-range click has already operated, and clears any older pending walk.
+    D2DynamicPathStrc* clickedPath = g_targetPlayer->pDynamicPath;
+    g_sessionPendingObject = clickedObject && clickedPath && clickedPath->pTargetUnit == clickedObject &&
+        clickedPath->dwPathPoints > clickedPath->dwCurrentPointIdx ? objectId : 0;
     D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets);
     const int32_t newLevel = DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(g_targetPlayer));
     if (newLevel != oldLevel) adoptSessionLevelChange(oldLevel, newLevel);
@@ -6320,6 +6336,13 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             UNITS_SetUsedSkill(g_targetPlayer, nullptr); UNITS_SetTargetUnitForDynamicUnit(g_targetPlayer, nullptr);
             g_sessionAttack.state = 3;
         }
+        // Retail advances a unit along its dynamic path only while its animation is a moving mode:
+        // #10141 PATH_GetClientCoordsVelocity gates the movement vector on #10318
+        // UNITS_IsInMovingMode, so a walk/run whose mode gives way to a throw/attack/cast ends the
+        // walk instead of sliding the unit under the skill's animation. Without this the session's
+        // pending move kept the last path stepping after a throw started (the glide: throw sequence
+        // over a translating unit).
+        if (g_sessionMovePending && !dying && !UNITS_IsInMovingMode(g_targetPlayer)) g_sessionMovePending = false;
         // Deferred item interaction still relies on the headless session's legacy pre-event path
         // step. Keep it until the missing retail interaction-completion callback is recovered.
         if (g_sessionMovePending && !dying && !D2Common_10226(g_targetPlayer, 1024) && !(g_targetPlayer->pPlayerData && g_targetPlayer->pPlayerData->unk0xA8[42])) {   // not while a 0x13 approach is pending: the reset drops its interact (s396)
@@ -6360,6 +6383,22 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
                     sub_6FC828D0(g_targetPlayer, UNIT_ITEM, (int32_t)g_sessionPendingPickup, 0, g_game);
                 }
                 g_sessionPendingPickup = 0;
+            }
+        }
+        // 1.13c D2Game+0xD01D0 (sub_6FC828D0, re-entered on arrival)
+        // The object a live 0x13 click walked to. Retail's walk-mode handler (sub_6FC7F780)
+        // re-enters sub_6FC828D0 with the stored interact target once the path ends; the session
+        // completes the same interaction here, so the object operates (open animation, shrine
+        // callback/boon) instead of the click only walking. A repointed path supersedes it.
+        if (g_sessionPendingObject) {
+            const uint32_t pendingObject = g_sessionPendingObject;
+            D2UnitStrc* pending = SUNIT_GetServerUnit(g_game, UNIT_OBJECT, (int32_t)pendingObject);
+            D2DynamicPathStrc* ppath = g_targetPlayer->pDynamicPath;
+            if (!d2::monspawn::objectInteractionIsPendingOn(ppath, pending)) {
+                g_sessionPendingObject = 0;   // superseded by another move/interaction, or object gone
+            } else if (d2::monspawn::objectInteractionShouldComplete(ppath, pending, dying)) {
+                g_sessionPendingObject = 0;
+                sub_6FC828D0(g_targetPlayer, UNIT_OBJECT, (int32_t)pendingObject, 0, g_game);
             }
         }
         sub_6FC33670(g_game, g_targetClient);
@@ -9422,6 +9461,7 @@ EMSCRIPTEN_KEEPALIVE void d2_session_destroy() {
     d2_monspawn_reset(); g_sessionLive = false; g_sessionMovePending = false;
     g_sessionAttackTarget = nullptr; g_sessionAttackSkill = nullptr;
     g_sessionApproachKind = 0; g_sessionApproachTarget = 0;
+    g_sessionPendingObject = 0;
     g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionUnitFacings.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionItemColours.clear(); g_sessionTiles.clear(); g_sessionSeamTiles.clear(); g_sessionTileRolls.clear(); g_sessionTileLibraries.clear(); g_sessionWarps.clear(); g_sessionWarpOrigins.clear(); g_sessionMissileAnimations.clear();
     memset(&g_sessionItemState, 0, sizeof g_sessionItemState);
     memset(&g_sessionNpcInteraction, 0, sizeof g_sessionNpcInteraction);

@@ -210,7 +210,7 @@ void __fastcall QUESTS_FreeChainRecord(D2GameStrc* pGame, D2QuestChainStrc* pRec
 }
 
 //D2Game.0x6FC93B90
-// 1.13c D2Game+0x2A3C
+// 1.13c D2Game 0x33F30 (walk is the same; 1.13c keeps the link at quest record +0xF4, 1.10f at +0xF0 -- layout only)
 D2QuestDataStrc* __fastcall QUESTS_GetQuestData(D2GameStrc* pGame, int32_t nId)
 {
 	D2_ASSERT(nId >= 0);

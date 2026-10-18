@@ -1,7 +1,7 @@
-import { parseSessionTiles, readSessionTerrain, readSessionLightmap, worldToScreen, screenDeltaToWorld, SUBTILE_SCREEN_X, SUBTILE_SCREEN_Y, UNIT_CENTRE_Y } from './assets/session-terrain.mjs';
-import { auditSessionActiveNearFeed, readSessionActiveNearFeed } from './assets/session-active-near-feed.mjs';
+import { parseSessionTiles, readSessionTerrain, readSessionLightmap, worldToScreen, screenDeltaToWorld, UNIT_CENTRE_Y } from './assets/session-terrain.mjs';
+import { readSessionActiveNearFeed } from './assets/session-active-near-feed.mjs';
 import { perfSync, perfEnabled, perfT0, perfT, perfSample, perfCountFrame, perfReset, perfReport } from './assets/frame-perf.mjs';
-import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, isPrimaryTargetEligible, nativeDccHoverContains, nativeObjectHoverContains, nativeHoverSpecialGate, selectPointerCandidate, selectPrimaryTarget, viewportToWorld } from './gameplay-model.mjs';
+import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, groundItemsUnderPointerAt, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, isPrimaryTargetEligible, nativeObjectHoverContains, nativeHoverSpecialGate, selectPointerCandidate, selectPrimaryTarget, viewportToWorld } from './gameplay-model.mjs';
 import { createMpqAssetReader } from './assets/mpq-assets.mjs';
 import { recordPrim } from './assets/drawlist.mjs';
 import { loadLiveLevelTerrain, loadRealmClientTerrain, actPalettePath } from './assets/live-level-terrain.mjs';
@@ -12,10 +12,11 @@ import { createRealmPlayerReassignFade } from './assets/realm-player-reassign-fa
 import { createMonsterRenderer, parseMonsterAnimations, realmMonsterAnimationActor } from './assets/monster-renderer.mjs';
 import { createObjectRenderer, parseObjectPresentations } from './assets/object-renderer.mjs';
 import { drawObjectHoverLabel, objectRetailName, objectRetailNameOffset } from './assets/object-hover-label.mjs';
+import { areaEntranceLabel, warpAtPoint } from './assets/area-hover-label.mjs';
 import { interactWithWarpTile, runWarpInteraction, warpApproachGoal } from './assets/warp-interaction.mjs';
 import { waypointPadAnchor } from './assets/waypoint-pad-anchor.mjs';
 import { unitAnchor } from './assets/unit-anchor.mjs';
-import { createItemRenderer, parseItemPresentations } from './assets/item-renderer.mjs';
+import { createItemRenderer, parseItemPresentations, itemStringKey } from './assets/item-renderer.mjs';
 import { createStashPanelRenderer, stashGeometry, BIG_BANK_PAGE_1, INVPAGE_STASH, INVPAGE_CUBE, TRANSMOGRIFY_BOX_PAGE_1 } from './assets/stash-panel.mjs';
 import { createStashGoldRenderer, STASH_GOLD } from './assets/stash-gold-dialog.mjs';
 import { createStashSpinnerRepeat } from './assets/stash-spinner-repeat.mjs';
@@ -57,7 +58,7 @@ import { createUnitSoundPlayer } from './assets/unit-sound-player.mjs';
 import { playNpcDialogueVoice, npcDialogueVoiceSource } from './assets/npc-dialogue-voice.mjs';
 import { createNpcSpeechScrollGate } from './assets/npc-speech-scroll-gate.mjs';
 import { createNpcSpeechClickGate } from './assets/npc-speech-click.mjs';
-import { createFont, createTitleScreen, decodeFontTbl, FRONTEND } from './assets/frontend.mjs';
+import { createFont, createTitleScreen, decodeFontTbl, FRONTEND, textColourPalette } from './assets/frontend.mjs';
 import { createExitSequence } from './assets/exit-sequence.mjs';
 import { loadBnetServers } from './assets/bnet-servers.mjs';
 import { createRealmLoginDialog } from './assets/realm-login.mjs';
@@ -85,6 +86,7 @@ import { saveBeforeExit } from './assets/save-exit.mjs';
 import { MODAL_POINTER_OWNER, modalPointerOwner } from './assets/modal-pointer-priority.mjs';
 import { heldPointerWorldAllowed } from './assets/held-pointer-world.mjs';
 import { queueHeldPointerRepeat } from './assets/held-pointer-repeat.mjs';
+import { heldWorldAction, leftHandCommand } from './assets/world-click-dispatch.mjs';
 import { createDeathScreen } from './assets/death-screen.mjs';
 import { createNpcMenu, npcMenuChoiceOnRelease, npcMenuInputCoolingDown, npcMenuEntries, talkEntries } from './assets/npc-menu.mjs';
 import { npcSpeech } from './assets/npc-topics.mjs';
@@ -211,7 +213,7 @@ const MAP_SEED_OVERRIDE = (() => {
   const n = Number(raw);   // Number parses "0x2CD11524" and "750899748" alike
   return Number.isFinite(n) && n >= 0 ? (Math.trunc(n) >>> 0) : null;
 })();
-let terrain = null, terrainFiles = null, terrainStats = null, terrainError = '', terrainLevel = -1;
+let terrain = null, terrainFiles = null, terrainStats = null, terrainError = '', terrainLevel = -1, terrainAct = -1;
 let playerRenderer = null, playerRenderError = '', motion = {};
 let corpseRenderer = null, corpseEvidence = null, lastCorpseRecovery = null, missileRenderer = null, missileEvidence = [];
 // Retail's weather (client-parity F11b): the rain, and the identity of every rain blit it drew this
@@ -298,7 +300,7 @@ let itemRenderer = null;
 // F7: the game owns the selected unit/item; this record proves the label we drew is the
 // retail string resolved from that selected object's engine identity.
 let hoverEvidence = null;
-let hoverFont = null, automapFont = null;
+let hoverFont = null, automapFont = null, groundLabelFont = () => hoverFont;
 // The palette the plate's rectangles are indexed in: the same pal.dat its glyphs are decoded with
 // (Units), whose entries 0 and 5 are the ones D2Win 0x133A0's plate rectangles name.
 let hoverPlatePalette = null;
@@ -781,7 +783,7 @@ let runWalkLock = false, showItemsEvidence = [], standStillSuppressedMoves = 0;
 // Build terrain for the CURRENT level from the engine's own tile list. Keyed by level, not act:
 // that distinction is the whole bug -- every level in an act used to draw the same mocked ground.
 function loadSessionTerrain(act0) {
-  terrain = null; terrainFiles = null; terrainStats = null; terrainError = ''; terrainLevel = -1;
+  terrain = null; terrainFiles = null; terrainStats = null; terrainError = ''; terrainLevel = -1; terrainAct = act0;
   ({ terrain, files: terrainFiles, error: terrainError } = loadLiveLevelTerrain(Module, act0));
 }
 
@@ -946,7 +948,10 @@ function sessionAdapter() {
           const ptr = Number(Module.ccall('d2_session_item_presentations', 'number', [], []));
           items = parseItemPresentations(Module.HEAPU8.subarray(ptr, ptr + count * 112), count);
           const cp = Number(Module.ccall('d2_session_item_colours', 'number', [], []));
-          items.forEach((it, i) => { it.colourByte = Module.HEAPU8[cp + i]; });
+          items.forEach((it, i) => { it.colourByte = Module.HEAPU8[cp + i];
+            // A gold pile's pile-size frame comes from STAT_GOLD (D2Client 0x6CC00's own bucket).
+            if (it.flippyFile.trim().toLowerCase() === 'flpgld')
+              it.goldAmount = Module.ccall('d2_session_unit_stat', 'number', ['number', 'number', 'number', 'number'], [4, it.id, 0x0E, 0]); });
         }
         let warps = [];
         if (Module._d2_session_warps) {
@@ -1067,6 +1072,23 @@ async function bootstrapSession() {
     automapFont = createFont({ dc6: decodeDc6(assetReader('data\\local\\font\\latin\\font6.dc6')),
       tbl: decodeFontTbl(assetReader('data\\local\\font\\latin\\font6.tbl')), palette: hoverPalette,
       documentObject: document, path: 'data\\local\\font\\latin\\font6.dc6', drawAs: { op: 'celcolor', mode: 5 } });
+    // D2Win item-name colours are palette remaps through the act's pal.pl2 (the vendor panel's rule,
+    // P8j: quality 4 magic is colour 3 blue). Cached per act+colour; colour 0 is the plain font.
+    const tinted = new Map();
+    groundLabelFont = (colour) => {
+      if (!colour) return hoverFont;
+      const act = Math.min(5, Math.max(1, snapshot.act | 0)), key = `${act}:${colour}`;
+      let font = tinted.get(key);
+      if (!font) {
+        const dir = `data\\global\\palette\\ACT${act}\\`;
+        font = createFont({ dc6: decodeDc6(assetReader('data\\local\\font\\latin\\font16.dc6')),
+          tbl: decodeFontTbl(assetReader('data\\local\\font\\latin\\font16.tbl')),
+          palette: textColourPalette(assetReader(`${dir}pal.pl2`), decodeDatPalette(assetReader(`${dir}pal.dat`)), colour),
+          documentObject: document, path: 'data\\local\\font\\latin\\font16.dc6', drawAs: { op: 'celcolor', mode: 5 } });
+        tinted.set(key, font);
+      }
+      return font;
+    };
     gameCursor = createGameCursor({ read: assetReader, decodeDc6, documentObject: document });
     pointerLayer = createPointerLayer({ gameCursor,
       cursorItem: (c, w, h, item, x, y) => inventoryPanelRenderer?.drawCursorItem(c, w, h, item, x, y) });
@@ -1528,7 +1550,11 @@ function itemProps(id) {
 }
 
 // The tooltip fields of an item (shared by the shop grid and __d2Shell.tooltipSpec, the s2160 probe of any item id).
-function tipFields(id, codeText) {
+function tipFields(id, code) {
+  // Inventory presentations carry the item code as its 4-byte int; vendor offers pass the text.
+  const codeText = typeof code === 'number'
+    ? String.fromCharCode(code & 255, (code >>> 8) & 255, (code >>> 16) & 255, (code >>> 24) & 255).replace(/\0/g, '').trim()
+    : code;
   const p = itemProps(id);
   return { name: p.title || Module.ccall('d2_lang_string', 'string', ['string'], [codeText]) || codeText, quality: p.quality, props: p.lines, propColours: p.colours,
     costLabel: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [3329]) };
@@ -2442,6 +2468,18 @@ function update(forceTick = false) {
     }
   }
   if (session) {
+    // One left-hand action for both a fresh click and every held repeat: the selected left skill
+    // when it is not the plain Attack, else the primary attack. Returns the engine's result (1
+    // started, 2 walking into range, 0 refused).
+    const swingLeftHand = (unitId) => {
+      const leftId = Math.max(0, readSelectedSkills().left);
+      const useLeft = leftHandCommand(leftId) === 'left-skill' && !!Module._d2_session_command_left_skill;
+      const result = useLeft
+        ? Module.ccall('d2_session_command_left_skill', 'number', ['number'], [unitId])
+        : session.attack(unitId);
+      lastSkillCommand = { skill: useLeft ? leftId : 0, targetId: unitId, result };
+      return result;
+    };
     for (const command of commands) {
       if (command.type === COMMAND.MOVE) {
         // Retail's Stand Still modifier prevents a ground move from being issued while the held
@@ -2455,13 +2493,14 @@ function update(forceTick = false) {
         lastMoveCommand = { type: command.type, x: command.x, y: command.y, directional: !!command.directional, held: !!command.held };
         if (command.directional) session.move(snapshot.player.x + command.x, snapshot.player.y + command.y);
         else if (command.held) {
-          // Retail keeps the left-button walk command aimed at the current pointer while held.
-          // Held retargets are ground moves, so passing over a unit does not turn the gesture into
-          // an attack or pickup.
+          // Retail re-issues the left-button action while it is held: a unit under the pointer is
+          // struck again on every engine advance (repeated presses were held MOVEs that only
+          // walked, so a held button never re-attacked), and only bare ground walks.
           const target = resolvePointerTarget(command.x, command.y);
+          walkGoal = null;
+          if (heldWorldAction(target) === 'strike') { swingLeftHand(target.unitId); continue; }
           const { x: tx, y: ty } = target.at;
           const moved = session.move(tx, ty);
-          walkGoal = null;
           if (!moved) armWalk({ x: tx, y: ty, within: 2 });
         }
         else {
@@ -2491,18 +2530,15 @@ function update(forceTick = false) {
           if (record) record.aim = { world: [tx, ty], unitId: underTarget || 0, itemId: underItem?.id ?? 0 };
           if (underItem) { if (record) record.result = `pickup item ${underItem.id} at (${underItem.x},${underItem.y})`; session.pickup(underItem.id); continue; }
           if (underTarget) {
-            // The left hand's chosen skill (V9b): anything but the plain Attack/Throw/Kick runs through the engine's own
-            // left skill; Attack keeps the primary path.
-            const leftId = Math.max(0, readSelectedSkills().left);
-            const useLeft = leftId > 2 && Module._d2_session_command_left_skill;
-            const swing = (id) => useLeft ? Module.ccall('d2_session_command_left_skill', 'number', ['number'], [id]) : session.attack(id);
-            const result = swing(underTarget);
-            lastSkillCommand = { skill: useLeft ? leftId : 0, targetId: underTarget, result };
+            // The left hand's chosen skill (V9b): anything but the plain Attack runs through the
+            // engine's own left skill; Attack keeps the primary path. Throw (2) must take the left
+            // skill too, or the swing starts SKILL_ATTACK's A1 instead of the throw's TH.
+            const result = swingLeftHand(underTarget);
             // A monster out of reach (rooms away, or no path for the walk-into-range leg): retail
             // walks the player toward it and attacks on arrival, as clicking an NPC walks and talks.
             if (!result) {
               const m = snapshot.entities.find((e) => e.id === underTarget && e.type === 1);   // ids are per unit type
-              if (m) armWalk({ x: m.x, y: m.y, within: 2, onArrive: () => { lastSkillCommand = { skill: useLeft ? leftId : 0, targetId: underTarget, result: swing(underTarget) }; } });
+              if (m) armWalk({ x: m.x, y: m.y, within: 2, onArrive: () => { swingLeftHand(underTarget); } });
               // The leg's aim was floor and it resolved to a unit: whatever the click's own aim point
               // was, the walk now goes to the UNIT, not to it (F14's monsters-first rule). That is the
               // one thing a leg that never closes on its plan can be doing.
@@ -2741,6 +2777,12 @@ function cameraGrid() {
   const c = cameraCentre();
   return { x: c.x - 0.5, y: c.y - 0.5 };
 }
+// World (subtile) -> canvas pixel, through the SAME isometric transform render() and the pointer
+// path use: the static grid (cameraCentre minus the half-subtile, which is projStatic's camera).
+function projectStatic(wx, wy) {
+  const c = worldToScreen(cameraCentre().x, cameraCentre().y), p = worldToScreen(wx, wy);
+  return [p.x - c.x + viewCX(), p.y - c.y + (canvas.height / 2 + UNIT_CENTRE_Y)];
+}
 // The player always sits at the centre of the viewport; it is a sprite like any other in the depth
 // sort, which is why it lives here rather than inline at the end of render().
 function drawPlayer(c) {
@@ -2794,24 +2836,14 @@ function pointerWorldAt(x, y) {
 // left the sprite's painted pixels unhoverable (they sit above the anchor its feet stand on) and
 // accepted pixels below the anchor that the item does not occupy: the label appeared only when the
 // cursor had been moved a long way off the item, which is the offset the report names.
-function groundItemHoverContains(item, x, y) {
-  const box = itemRenderer?.measure(item);
-  if (!box) return false;
-  // The item's draw-origin pixel relative to the cursor. `projStatic` draws the item at
-  // projStatic(item.x, item.y) = proj(item.x - 0.5, item.y - 0.5), so inverting the same transform
-  // about the same camera gives the offset in exactly one step: (item - 0.5) - cursorWorld. No cell
-  // rounding enters it -- the native rect builder is handed the unit's exact screen x/y
-  // (Ordinal_10651/11142), and rounding here would shift a small flippy's box off its own pixels.
-  const at = pointerWorldExact(x, y);
-  const dx = item.x - 0.5 - at.x, dy = item.y - 0.5 - at.y;
-  return nativeDccHoverContains(x, y, box,
-    x + (dx - dy) * SUBTILE_SCREEN_X, y + (dx + dy) * SUBTILE_SCREEN_Y);
+// The rule itself is pure (gameplay-model.mjs groundItemsUnderPointerAt): the item is DRAWN at
+// projectStatic(item.x, item.y), so its exact draw origin -- never a rounded cell -- is what the
+// padded box is placed against.
+function groundItemsUnderPointer(x, y) {
+  return groundItemsUnderPointerAt(snapshot.items, x, y, projectStatic, (item) => itemRenderer?.measure(item));
 }
 function groundItemUnderPointer(x, y) {
-  return (snapshot.items || []).find((item) => item.mode === 3 && item.invPage === 255 && groundItemHoverContains(item, x, y)) ?? null;
-}
-function groundItemsUnderPointer(x, y) {
-  return (snapshot.items || []).filter((item) => item.mode === 3 && item.invPage === 255 && groundItemHoverContains(item, x, y));
+  return groundItemsUnderPointer(x, y)[0] ?? null;
 }
 
 // Keep the browser's current hit tests as candidate membership, then arbitrate the accepted hover
@@ -2913,8 +2945,10 @@ function hoverTarget() {
   if (selected?.kind === 'item') {
     const item = selected.target;
     const code = itemCode(item);
-    const label = Module.ccall('d2_lang_string', 'string', ['string'], [code]) || code;
-    return { kind: 'item', id: item.id, classId: item.classId, code, label, x: item.x, y: item.y };
+    // Retail's drop label is the item's NAME (magic/rare title included), not its base code string;
+    // the shared engine builder is the same one the inventory box uses (d2_session_item_title).
+    const fields = tipFields(item.id, itemStringKey(code));
+    return { kind: 'item', id: item.id, classId: item.classId, code, label: fields.name, quality: fields.quality, x: item.x, y: item.y };
   }
   if (selected?.kind === 'npc') {
     const npc = selected.target;
@@ -2923,11 +2957,16 @@ function hoverTarget() {
     if (npcLabel) return { kind: 'unit', npc: true, id: npc.id, classId: npc.classId, stringIndex: npcIndex, label: npcLabel,
       x: npc.x, y: npc.y, preciseX: npc.preciseX, preciseY: npc.preciseY };
   }
-  if (selected?.kind !== 'object') return null;
-  const object = selected.target;
-  const label = objectRetailName(Module, object.classId);
-  return label ? { kind: 'object', id: object.id, classId: object.classId, token: object.token,
-    label, x: object.x, y: object.y } : null;
+  if (selected?.kind === 'object') {
+    const object = selected.target;
+    const label = objectRetailName(Module, object.classId);
+    if (label) return { kind: 'object', id: object.id, classId: object.classId, token: object.token,
+      label, x: object.x, y: object.y };
+  }
+  // A level entrance is a UNIT_TILE warp, not an object unit: its label is the destination level's
+  // name resolved from the engine's own Levels.txt row (the same name the waypoint menu shows).
+  const warp = warpUnderPointer(pointer.x, pointer.y);
+  return warp ? areaEntranceLabel(warp, engineLevelName(warp.destinationLevel)) : null;
 }
 
 // V4/F6b: WHICH cel retail draws is decided by what is under the pointer, and the shell already
@@ -2998,16 +3037,19 @@ function drawHoverLabel(c, target, projectUnit, projectStatic) {
   if (target.kind === 'object')
     return drawObjectHoverLabel(c, { ...target, nameOffset: objectRetailNameOffset(Module, target.classId) },
       hoverFont, projectStatic, recordPrim, hoverGlyphPainting, Module, snapshot.act);
-  // The drop stays world-anchored above its static-grid feet (retail's drop label: s286).
-  const label = target.label, width = hoverFont.measure(label);
+  // The drop stays world-anchored above its static-grid feet (retail's drop label: s286). Its one
+  // line is the item's name in its quality colour (magic = blue, the only measured colour: P8j).
+  const colour = target.quality === 4 ? 3 : 0, labelFont = groundLabelFont(colour);
+  const label = target.label, width = labelFont.measure(label);
   const [worldX, foot] = projectStatic(target.x, target.y);
   const x = Math.round(worldX), y = Math.round(foot - 37);
   const left = Math.round(x - width / 2 - 5), top = y - hoverFont.lineHeight - 5;
   c.save(); c.fillStyle = 'rgba(0,0,0,.5)'; c.fillRect(left, top, width + 10, hoverFont.lineHeight + 10); c.restore();
-  if (hoverGlyphPainting) hoverFont.draw(c, label, Math.round(x - width / 2), y - hoverFont.lineHeight,
+  if (hoverGlyphPainting) labelFont.draw(c, label, Math.round(x - width / 2), y - hoverFont.lineHeight,
     (glyph) => glyphs.push(glyph));
-  return { ...target, requested: label, font, glyphs,
-    x, y, box: { x: left, y: top, width: width + 10, height: hoverFont.lineHeight + 10 }, placement: 'above-ground-drop' };
+  return { ...target, requested: label, font, colour, glyphs,
+    x, y, box: { x: left, y: top, width: width + 10, height: hoverFont.lineHeight + 10 },
+    placement: target.kind === 'warp' ? 'above-area-entrance' : 'above-ground-drop' };
 }
 
 // The level's DT1 libraries come from LvlTypes.txt via the level's TYPE, so terrain must be rebuilt
@@ -3017,9 +3059,16 @@ function drawHoverLabel(c, target, projectUnit, projectStatic) {
 // route into a level -- fixture, waypoint, warp, act travel -- is covered by one rule.
 function ensureTerrain() {
   if (!TERRAIN_ENABLED || !session) return;
-  if (terrain && terrainLevel === snapshot.level) return;
-  if (terrainLevel === snapshot.level && terrainError) return;   // failed for this level; do not spin
-  loadSessionTerrain(snapshot.act - 1);
+  // A new LEVEL of the same act needs no new terrain object: its libraries and bitmaps are keyed by
+  // the DT1's own file path (already decoded art is the same art), the level's file list is re-read
+  // on every frame below, and the resolve cache is cleared by that list's signature. Only the ACT's
+  // palette (pal.dat/pal.pl2) belongs to the act, so an act change is the one rebuild. Recreating it
+  // per level threw every decoded library and rasterised bitmap away and re-made them inside one
+  // frame -- a ~1 s stall at an area transition (tools/perf-area-load.mjs, a retail recording).
+  const act0 = snapshot.act - 1;
+  if (terrain && terrainAct === act0) { terrainLevel = snapshot.level; return; }
+  if (terrainAct === act0 && terrainError) return;   // failed for this act; do not spin
+  loadSessionTerrain(act0);
   terrainLevel = snapshot.level;
 }
 
@@ -3078,8 +3127,11 @@ const RAMP16 = (() => {
 function applyDisplayRamp(w, h) {
   const img = ctx.getImageData(0, 0, w, h), d = img.data;
   if (RAMP16 && d.byteOffset === 0 && (d.length & 3) === 0) {
-    const { lo, hi } = RAMP16, d32 = new Uint32Array(d.buffer, 0, d.length >>> 2);
-    for (let i = 0; i < d32.length; i++) { const p = d32[i]; d32[i] = lo[p & 0xffff] | (hi[p >>> 16] << 16); }
+    // PERF (a retail recording): the length is read into a local once, not tested through the view every pixel.
+    // Measured on a throwaway 800x600 probe: 1.20 -> 0.84 ms per frame for the loop, same output
+    // bytes (an FNV hash of the whole ImageData agrees across every loop shape tried).
+    const { lo, hi } = RAMP16, d32 = new Uint32Array(d.buffer, 0, d.length >>> 2), n = d32.length;
+    for (let i = 0; i < n; i++) { const p = d32[i]; d32[i] = lo[p & 0xffff] | (hi[p >>> 16] << 16); }
   } else for (let i = 0; i < d.length; i += 4) { d[i] = DISPLAY_RAMP[d[i]]; d[i + 1] = DISPLAY_RAMP[d[i + 1]]; d[i + 2] = DISPLAY_RAMP[d[i + 2]]; }
   ctx.putImageData(img, 0, 0);
 }
@@ -3448,7 +3500,9 @@ function drawFrame() {
   }
   for (const item of snapshot.items) if (item.mode === 3 && item.invPage === 255) {
     const [sx, sy] = projStatic(item.x, item.y);
-    sprites.push({ depth: sy, wx: item.x, wy: item.y, pass: 'item', draw(c) { itemRenderer?.draw(c, sx, sy, item); } });
+    // The hovered ground item is drawn in retail's DrawMode 7, like a hovered object/unit (V5).
+    const isHovered = hovered?.kind === 'item' && hovered.id === item.id;
+    sprites.push({ depth: sy, wx: item.x, wy: item.y, pass: 'item', draw(c) { itemRenderer?.draw(c, sx, sy, item, isHovered); } });
   }
   const source = selectedPlayerSource();
   sprites.push({ depth: (h / 2 + UNIT_CENTRE_Y), wx: source.x, wy: source.y, pass: 'player', draw: drawPlayer });
@@ -3489,8 +3543,11 @@ function drawFrame() {
           weatherRenderer ? (c, floors, viewport) => {
             try {
               const activeNearFeed = readSessionActiveNearFeed(Module);
-              weatherEvidence = { rain, activeNearFeedAudit: auditSessionActiveNearFeed(activeNearFeed),
-                blits: weatherRenderer.draw(c, w, h, engineTicks, wcam.x, wcam.y,
+              // PERF (a retail recording): the feed's audit is NOT computed here. It was, once per frame, into a
+              // weatherEvidence field the public getter below never returns -- 0.25 ms of Maps, Sets and
+              // key strings per frame reachable by nothing. `auditSessionActiveNearFeed` itself stays
+              // (test/session-terrain-weather-feed.test.mjs and any caller that wants the diagnostic).
+              weatherEvidence = { rain, blits: weatherRenderer.draw(c, w, h, engineTicks, wcam.x, wcam.y,
                 weatherWaterAnchors(floors, activeNearFeed)), errors: weatherRenderer.errors };
             }
             catch (error) { weatherEvidence = { rain, blits: [], errors: weatherRenderer.errors, error: String(error) }; }
@@ -3516,8 +3573,8 @@ function drawFrame() {
   if (!clearScreen && heldShowItemsKeys.size && hoverFont) {
     for (const item of snapshot.items || []) {
       if (item.mode !== 3 || item.invPage !== 255) continue;
-      const code = itemCode(item), label = Module.ccall('d2_lang_string', 'string', ['string'], [code]) || code;
-      const plate = drawHoverLabel(ctx, { kind: 'item', id: item.id, classId: item.classId, code, label, x: item.x, y: item.y }, null, projStatic);
+      const code = itemCode(item), fields = tipFields(item.id, itemStringKey(code));
+      const plate = drawHoverLabel(ctx, { kind: 'item', id: item.id, classId: item.classId, code, label: fields.name, quality: fields.quality, x: item.x, y: item.y }, null, projStatic);
       if (plate) showItemsEvidence.push({ id: item.id, code, label: plate.requested, box: plate.box,
         glyphs: plate.glyphs.map((glyph) => ({ ...glyph })) });
     }
@@ -3628,7 +3685,7 @@ function drawFrame() {
   const layoutKey = session ? `${snapshot.playerClass}/${snapshot.playerId}/${snapshot.seed}` : '';
   if (inventoryPanelRenderer && session && (!inventoryPanelRenderer.layout || inventoryLayoutKey !== layoutKey)) {
     inventoryPanelRenderer.setLayout(readInventoryLayout()); inventoryLayoutKey = layoutKey; }
-  if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && session ? { ...snapshot, gold: Module.ccall('d2_session_player_gold', 'number', [], []), inventoryGoldPressed: Boolean(inventoryGoldPress), inventoryClosePressed: Boolean(inventoryClosePress) } : snapshot, panelShown(inventoryVisible));
+  if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && session ? { ...snapshot, pointer, itemTip: (item) => tipFields(item.id, item.code), gold: Module.ccall('d2_session_player_gold', 'number', [], []), inventoryGoldPressed: Boolean(inventoryGoldPress), inventoryClosePressed: Boolean(inventoryClosePress) } : snapshot, panelShown(inventoryVisible));
   // O / the configurable Hireling Screen binding reads the engine's canonical pet roster. The
   // window exposes only values the roster's live unit supplies; a nearby monster is never treated
   // as this player's mercenary. The composition remains a declared client gap (F199) pending its
@@ -4120,15 +4177,7 @@ function submitStashGold() {
 // hero-derived point, so the anchor (F6: measured O+(-16,+4) px, +-4) is unreconciled with `originX/Y`.
 function warpUnderPointer(px, py) {
   if (!session) return null;
-  let best = null, bestArea = Infinity;
-  for (const warp of snapshot.warps || []) {
-    if (!warp.enabled || warp.located === false || !warp.select || warp.destinationLevel === snapshot.level) continue;
-    const [ax, ay] = window.__d2Shell.project(warp.originX, warp.originY), b = warp.select;
-    // F6 MEASURED (retail, hover-select-f14-f6.json): edges are INCLUSIVE, the box is (DX+1)x(DY+1) px, y negative = up.
-    if (px < ax + b.x || px > ax + b.x + b.dx || py < ay + b.y || py > ay + b.y + b.dy) continue;
-    if (b.dx * b.dy < bestArea) { best = warp; bestArea = b.dx * b.dy; }
-  }
-  return best;
+  return warpAtPoint(snapshot.warps || [], px, py, window.__d2Shell.project, snapshot.level);
 }
 let lastWarpTaken = null;
 // The object under the pointer, the same way npcUnderPointer finds a person.
@@ -5527,8 +5576,7 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
   // F101: this is the STATIC-GRID point (centre camera): a unit's drawn anchor is 8 px below it. Objects, warps and the
   // scenarios' aims were calibrated on this; unit hover boxes use the drawn anchor (unitBoxHit, cameraGrid).
   project(wx, wy) {
-    const c = worldToScreen(cameraCentre().x, cameraCentre().y), p = worldToScreen(wx, wy);   // the static grid
-    return [p.x - c.x + viewCX(), p.y - c.y + (canvas.height / 2 + UNIT_CENTRE_Y)];
+    return projectStatic(wx, wy);   // the static grid
   },
   // F101: the CENTRE of a unit's hover box (unitBoxHit: the drawn cel anchor via cameraGrid; a click on a tall NPC aims 32 px above it, the box centre). Aim unit clicks with this; the retail F14 box is x -24..19, y -78..15 about it.
   // With `id`, the first of anchor / mid-body / head-height that resolves to THAT unit (a pack's boxes overlap: the anchor alone often names a neighbour).

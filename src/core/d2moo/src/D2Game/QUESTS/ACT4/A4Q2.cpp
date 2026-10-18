@@ -364,7 +364,7 @@ void __fastcall ACT4Q2_Callback00_NpcActivate(D2QuestDataStrc* pQuestData, D2Que
 			}
 			return;
 		}
-		// 1.13c D2Game+0xB9070: neither custom flag set falls through to the shared tail (no early return)
+		// 1.13c D2Game 0xB9070: neither custom flag set falls through to the shared tail (no early return)
 	}
 
 	if (QUESTRECORD_GetQuestState(pQuestFlags, pQuestData->nQuestFilter, QFLAG_REWARDGRANTED) == 1)

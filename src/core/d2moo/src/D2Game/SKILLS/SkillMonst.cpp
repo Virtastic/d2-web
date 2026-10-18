@@ -183,7 +183,7 @@ int32_t __fastcall SKILLS_SrvDo085_UnholyBolt_ShamanFire(D2GameStrc* pGame, D2Un
     DATATBLS_GetMonsterChainInfo(nClassId, nullptr, &nMissileId);
     nMissileId += pSkillsTxtRecord->wSrvMissileA;
 
-    // 1.13c D2Game+0xB58A0: out-of-range missile id returns 0 (1.10f upstream had && here, never true)
+    // 1.13c D2Game 0xB58A0: out-of-range missile id returns 0 (1.10f upstream had && here, never true)
     if (nMissileId < 0 || nMissileId >= sgptDataTables->nMissilesTxtRecordCount)
     {
         return 0;

@@ -60,3 +60,34 @@ extern "C" int32_t d2_client_bb34(uint32_t fd, int32_t size, D2cHost h) {
     go(h, kLseek, fd, cur, 0, 0);                         // restore the position
     return rc;
 }
+
+namespace {
+// The three kernel32 imports are raw IAT-slot calls (retail 0x6FB7EF80 / 0x6FB7EF74 / 0x6FB7EF48),
+// and the two literals are at 0x6FB7F174 ("mscoree.dll") / 0x6FB7F164 ("CorExitProcess").
+constexpr uint32_t kGetModuleHandleA = 0xCEF80, kGetProcAddress = 0xCEF74, kExitProcess = 0xCEF48;
+static_assert(kGetModuleHandleA + 0x6FAB0000u == 0x6FB7EF80u, "GetModuleHandleA IAT slot");
+static_assert(kGetProcAddress + 0x6FAB0000u == 0x6FB7EF74u, "GetProcAddress IAT slot");
+static_assert(kExitProcess + 0x6FAB0000u == 0x6FB7EF48u, "ExitProcess IAT slot");
+}  // namespace
+
+// 1.13c D2Client+0x34DD = MSVC 2003 CRT ___crtExitProcess(code). Rule: hModule =
+// GetModuleHandleA("mscoree.dll"); if (hModule) { p = GetProcAddress(hModule, "CorExitProcess");
+// if (p) (*p)(code); } ExitProcess(code). No D2Client global or struct is touched, and no path returns
+// in retail (int3 pad). The host seam stands in for the three imports; the indirect CorExitProcess call
+// is reported as a D2cCall whose rva is the address GetProcAddress returned.
+extern "C"
+void d2_client_34dd(int32_t code, D2cHost h) {
+    static const char kMscoree[] = "mscoree.dll";
+    static const char kCorExit[] = "CorExitProcess";
+    uint32_t mod = go(h, kGetModuleHandleA, (uint32_t)(uintptr_t)kMscoree, 0, 0, 0);
+    if (mod != 0) {
+        uint32_t p = go(h, kGetProcAddress, mod, (uint32_t)(uintptr_t)kCorExit, 0, 0);
+        if (p != 0) {
+            D2cCall c = {};
+            c.rva = p;
+            c.s[0] = (uint32_t)code;
+            h(&c);
+        }
+    }
+    go(h, kExitProcess, (uint32_t)code, 0, 0, 0);
+}

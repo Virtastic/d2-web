@@ -433,7 +433,7 @@ int32_t __fastcall MONSTER_GetHpBonus(int32_t nPlayerCount)
 
     if (nPlayerCount >= 9)
     {
-        return (5 * nPlayerCount + 130) * 2; // 1.13c D2Game+0xAF5D0 (1.10f: 10 * (5 * n - 10))
+        return (5 * nPlayerCount + 130) * 2; // 1.13c D2Game 0xAF5D0 (1.10f: 10 * (5 * n - 10))
     }
 
     return gnHpBonusTable[nPlayerCount];

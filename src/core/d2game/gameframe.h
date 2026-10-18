@@ -1,6 +1,3 @@
-// 1.13c D2Game+0x2D9B0: the per-frame client state machine (stdcall, game; ret 4). Written from the 1.13c decompile ONE definition, included by the capture
-// (the retail capture tool/game-frame.inc, i686) as the model retail must agree with, and by the wasm replay (game_gameframe.cpp). Clients are 1-based indices into rec.cl (0 ends a chain),
-// units 1-based indices into rec.un; every callee is a logged seam call whose result is scripted by the record.
 #pragma once
 #include <cstdint>
 #include <cstring>
@@ -38,6 +35,9 @@ struct GfCtx {
     }
 };
 
+// 1.13c D2Game+0x2D9B0: the per-frame client state machine (stdcall, game; ret 4). Written from the 1.13c decompile ONE definition, included by the capture
+// (the retail capture tool/game-frame.inc, i686) as the model retail must agree with, and by the wasm replay (game_gameframe.cpp). Clients are 1-based indices into rec.cl (0 ends a chain),
+// units 1-based indices into rec.un; every callee is a logged seam call whose result is scripted by the record.
 static inline void GF_2D9B0(GfCtx& x)
 {
     GfRec& r = *x.r;

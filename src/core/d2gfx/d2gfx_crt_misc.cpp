@@ -1,0 +1,58 @@
+#include <cstdint>
+#include <cstdlib>
+
+// 1.13c D2Gfx+0x13BD -- MSVC 2003 Release CRT _unlock(8), the _EXIT_LOCK1 call-site wrapper. Bytes are
+// `push 8; call __unlock 0x19BC; pop ecx; ret`; __unlock(8) is LeaveCriticalSection(&locktable[8]) with
+// the LPCRITICAL_SECTION table at +0x90048 (stride 8). Its only callers are _unlock 0x166E, itself only
+// reached by _onexit 0x163C. Our engine models no CRT lock table (no 0x1A71 __lock either) and nothing
+// in the ported engine takes lock 8, so the contract here is the one observable thing left: a void
+// no-argument cdecl call that releases nothing and returns.
+extern "C"
+void d2gfx_unlock_8(void) {
+}
+
+// 1.13c D2Gfx+0x4293 -- MSVC 2003 Release CRT __security_check_cookie, __fastcall (cookie in ECX).
+// 14 bytes: compare the cookie word against the module cookie at +0x906E0; equal -> ret; different ->
+// report_failure 0x4262 (__SEH_prolog, 0x608C, ExitProcess(3)), which does not return.
+// Our build runs no CRT startup, so there is no __security_init_cookie and no /GS-instrumented frame;
+// the module cookie is a zero-initialised cell and the mismatch path is ExitProcess(3)'s wasm analogue.
+static uintptr_t g_stack_cookie;   // +0x906E0
+extern "C"
+void d2gfx_security_check_cookie(uintptr_t cookie) {
+    if (cookie == g_stack_cookie) return;
+    abort();
+}
+
+// 1.13c D2Gfx+0x042B0 -- MSVC 2003 Release CRT __aulldvrm, the unsigned 64/64 divide used by _output's
+// digit loop. Dividend EDX:EAX (hi=param_2, lo=param_1), divisor ECX:EBX (hi=param_4, lo=param_3);
+// quotient returned EDX:EAX, remainder ECX:EBX. The decompile's two branches (divisor-high==0 splits the
+// quotient into a 64/32 word plus the overflow word; else it normalises the divisor by shifts and
+// corrects by one) are the restored divide: both give dividend/divisor and dividend%divisor. A zero
+// divisor raises #DE in retail; the wasm i64 divide traps the same way.
+// 1.13c D2Gfx+0x042B0
+extern "C"
+uint64_t d2_fn_d2gfx_42b0(uint32_t lo, uint32_t hi, uint32_t dlo, uint32_t dhi, uint64_t* rem) {
+    uint64_t n = ((uint64_t)hi << 32) | lo;
+    uint64_t d = ((uint64_t)dhi << 32) | dlo;
+    *rem = n % d;
+    return n / d;
+}
+
+// 1.13c D2Gfx+0x3922 -- MSVC 2003 Release CRT __local_unwind2 (104 B), the compiler's SEH scope-table
+// walker. frame+8 is the scope table base, frame+0xC the current trylevel; an entry is 0xC bytes:
+// to_state (next index), filter, handler. Walk until the trylevel is -1 or equals target; each step
+// stores the entry's to_state back into frame+0xC and, when the entry has no filter, runs the handler.
+// Retail brackets the walk with the fs:[0] ExceptionList chain (pushed 12-byte local, restored on exit);
+// the caller's frame is not linked by this function, so nothing observable is left to model there.
+// The 0x39B6 helper (undecoded, the __NLG_Notify-style thunk) is a notification only; ours does nothing.
+struct D2GfxSehEntry { int32_t to_state; int32_t filter; uintptr_t handler; };
+extern "C"
+void d2gfx_local_unwind2(uintptr_t frame, int32_t target) {
+    int32_t* f = (int32_t*)frame;
+    int32_t idx;
+    while ((idx = f[3]) != -1 && idx != target) {
+        D2GfxSehEntry* e = (D2GfxSehEntry*)(uintptr_t)(uint32_t)f[2] + idx;
+        f[3] = e->to_state;
+        if (e->filter == 0) ((void (*)(void))e->handler)();
+    }
+}

@@ -28,7 +28,7 @@ fi
 LOCK_DIR="$(cd "$(git rev-parse --git-common-dir 2>/dev/null || echo .git)/.." && pwd)/build-wasm"
 mkdir -p "$LOCK_DIR"
 # D2_BUILD_SLOTS parallel builds share this checkout (default 8).
-SLOTS="${D2_BUILD_SLOTS:-3}"; got=""; T0=$(date +%s)
+SLOTS="${D2_BUILD_SLOTS:-5}"; got=""; T0=$(date +%s)
 while [ -z "$got" ]; do
   for i in $(seq 0 $((SLOTS - 1))); do
     exec 9>"$LOCK_DIR/.build.lock.$i"

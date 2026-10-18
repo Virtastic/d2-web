@@ -103,7 +103,6 @@ uint16_t __fastcall MONSTERUNIQUE_GetNameSeed(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC6AC70
-// 1.13c D2Game+0x1850
 int32_t __fastcall MONSTERUNIQUE_CheckMonTypeFlag(D2UnitStrc* pUnit, uint16_t nFlag)
 {
     if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)
@@ -312,7 +311,7 @@ void __fastcall MONSTERUNIQUE_UMod16_Champion(D2UnitStrc* pUnit, int32_t nUMod, 
         nDamagePercent = nDamagePercent * pDifficultyLevelsTxtRecord->dwChampionDmgBonus / 100;
         nToHitPercent = nToHitPercent * pDifficultyLevelsTxtRecord->dwChampionDmgBonus / 100;
 
-        // 1.13c D2Game+0x22DA0: base class 0x76 halves the champion damage bonus (absent in 1.10f); range check of retail's 0x1850 is implied (class already validated)
+        // 1.13c D2Game 0x22DA0: base class 0x76 halves the champion damage bonus (absent in 1.10f); range check of retail's 0x1850 is implied (class already validated)
         if (pMonStatsTxtRecord->nBaseId == 0x76)
         {
             nDamagePercent /= 2;

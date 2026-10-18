@@ -149,7 +149,7 @@ EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_reset(uint32_t unitId, uint8_t c
 #endif
 }
 
-// 1.13c D2Net+0x6090 (ordinal 10000) retires the indexed server client. The realmd host owns the
+// 0x6090 (ordinal 10000) retires the indexed server client. The realmd host owns the
 // socket; this core half clears the matching D2GS session before the host closes it. realmd
 // currently supports one D2GS connection, assigned client slot zero.
 EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_disconnect_client(uint32_t clientId) {

@@ -1,4 +1,3 @@
-// 1.13c D2Game+0x2060 (handle alloc), +0x2130 (Ptr), +0x2090 (New), +0x21D0 (MonitorFullness), +0x22D0 (Grow), +0x24B0 +0x25A0 +0x25F0 +0x2510 +0x2630 +0x1FE0 +0x2180 +0x1F60
 // Storm TSExportTableSimpleReuse/TSHashTable instantiated for the game table, on retail's 32-bit field layout
 //. Table words are 32-bit; pointers are the low 32 bits.
 #include <emscripten.h>
@@ -20,6 +19,7 @@ W d2game_2130_ptr(W t, W h) {
 }
 
 // 0x2060: GenerateUniqueHandle (edi=table): returns the new sequence at +0x48
+// 1.13c D2Game+0x2060 (handle alloc), +0x2130 (Ptr), +0x2090 (New), +0x21D0 (MonitorFullness), +0x22D0 (Grow), +0x24B0 +0x25A0 +0x25F0 +0x2510 +0x2630 +0x1FE0 +0x2180 +0x1F60
 W d2game_2060_genhandle(W t) {
     for (;;) {
         W seq;
@@ -31,7 +31,6 @@ W d2game_2060_genhandle(W t) {
 }
 
 // Storm TSExplicitList link ops (nodes: link = node+listOffset; {next, prev-or-~head-slot}); the table's slots are 12-byte lists {offset, head link, ~first}.
-// 1.13c D2Game+0x1FE0 / +0x2180 / +0x1F60 / +0x24B0 / +0x25A0 (list uninit, unlink-all, element destroy/construct), all on 32-bit words.
 static void unlinkLink(W l) {
     W n = w(l, 0);
     if (!n) return;
@@ -40,7 +39,9 @@ static void unlinkLink(W l) {
     w(p, 0) = n; w(n, 4) = w(l, 4); w(l, 0) = 0; w(l, 4) = 0;
 }
 void unlinkAll(W list) { for (int32_t n; (n = (int32_t)w(list, 8)) > 0;) unlinkLink(w(list, 0) + (W)n); }   // 0x2180
+// 1.13c D2Game+0x1FE0 / +0x2180 / +0x1F60 / +0x24B0 / +0x25A0 (list uninit, unlink-all, element destroy/construct), all on 32-bit words.
 void listUninit(W list) { unlinkAll(list); unlinkLink(list + 4); }   // 0x1FE0 (and its 0x1F60 wrapper)
+// 1.13c D2Game+0x24B0 (probe src/core/fn/d2game_24b0.cpp)
 void listInit(W list) { w(list, 0) = 0xdddddddd; w(list, 4) = list + 4; w(list, 8) = ~(list + 4); }   // 0x24B0
 
 // Storage for the slot array (SMemReAlloc/SMemAlloc of 0x2630): old block, byte size -> new block. The default hands back a fresh zeroed block:
@@ -109,6 +110,7 @@ void d2game_22d0_grow(W t) {
 // 0x2090: New slot node link (edi=table): hash, extrabytes, flags; internalNew = vtable[1].
 // MonitorFullness (0x21D0, ecx = table, eax = slot): chain length > 13 resets the counter and grows the table (0x22D0).
 typedef W (*InternalNewFn)(W list, W extra, W flags);
+// 1.13c D2Game+0x21D0 (probe src/core/fn/d2game_21d0.cpp)
 int d2game_21d0_fullness(W t, W slot) {
     if (w(t, 0x24) > 0x3fe) return 0;
     W& f = w(t, 0x10);
@@ -123,6 +125,7 @@ int d2game_21d0_fullness(W t, W slot) {
     return 0;
 }
 
+// 1.13c D2Game+0x2090 (probe src/core/fn/d2game_2090.cpp)
 W d2game_2090_new(W t, W hash, W extra, W flags, InternalNewFn internalNew) {
     W slot = hash & w(t, 0x24);
     if (d2game_21d0_fullness(t, slot)) slot = hash & w(t, 0x24);

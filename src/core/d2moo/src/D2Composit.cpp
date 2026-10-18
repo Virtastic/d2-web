@@ -436,6 +436,7 @@ BOOL __stdcall COMPOSIT_IsArmorComponent(int nComponent)
 }
 
 //D2Common.0x6FD47230 (#10890)
+// 1.13c D2Common+0x44350
 BOOL __stdcall COMPOSIT_IsWeaponBowOrXBow(D2UnitStrc* pUnit)
 {
 	int nWeaponClassId = 0;

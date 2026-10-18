@@ -4,6 +4,17 @@ import { wallHidesPlayer } from './roof-hide.mjs';
 import { createRoofFades } from './roof-fade.mjs';
 import { nativeWallLightCells } from './native-wall-light.mjs';
 import { perfT0, perfT, perfSample } from './frame-perf.mjs';
+
+/**
+ * A unit's brightness from the light map cell under it: D2Client+0x9F120 reads that cell into the
+ * unit's colour, so a unit standing outside every light source is drawn through the palette's
+ * level-0 row (black) and a unit in full daylight at level 31. The cell is the engine's own
+ * ceiling value here, clamped: there is no separate unit-light knob.
+ */
+export function unitLightAlpha(intensity) {
+  return Math.max(0, Math.min(255, intensity | 0)) / 255;
+}
+
 //
 // What this replaces: retail-tile-view.mjs picked ONE hardcoded DT1 per act, took a dozen
 // "representative" tiles out of it, and tiled them as a backdrop. Every level in an act therefore
@@ -351,7 +362,9 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     let entry = { byKey: new Map(), byIndex: [], error: path ? '' : 'empty slot' };
     if (path) {
       try {
+        const pDt1 = perfT0();
         const dt1 = decodeDt1(read(path));
+        perfT('terrain-dt1', pDt1);
         entry.byIndex = dt1.tiles;
         // Group by identity, keeping FILE ORDER within each group: a tile's `libraryIndex` counts
         // variants that share an identity, so the n-th tile with this (orientation, main, sub) is
@@ -374,6 +387,17 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   // ((E1<<4) + r*(E2-E1)) >> 7, per column x level L + floor((R-L)*x/32) (the 32x32x32 table D2gfx
   // builds at +0x15450, which is exactly that). The pixel is PL2 LightLevelVariations[level][index].
   const litCache = new Map();
+  // Floor blinds are cached by (path, index, gridKey) in nested maps instead of one `${path}:${index}:${grid}`
+  // string. The concatenation was a fresh ~200-character key per visible tile per frame -- flattening and
+  // hashing it on every Map lookup (measured 0.52 -> 0.25 ms per 800 tiles in a standalone loop). gridKey is
+  // the caller's memoised `grid.join(',')` string, so looking it up re-hashes nothing; the cache partitions
+  // exactly as the old single key did. Position-dependent variants (left/top clipping) keep the string key
+  // in `litCache`, which also holds walls.
+  const litFloorCache = new Map();
+  let litFloorEntries = 0;
+  const litEvict = () => {
+    if (litCache.size + litFloorEntries > 1500) { litCache.clear(); litFloorCache.clear(); litFloorEntries = 0; }
+  };
   const ISO_SKIP = [14, 12, 10, 8, 6, 4, 2, 0, 2, 4, 6, 8, 10, 12, 14], ISO_RUN = [4, 8, 12, 16, 20, 24, 28, 32, 28, 24, 20, 16, 12, 8, 4];
   // A gouraud floor block the frame clips on the LEFT is shaded from the LEVEL TABLE one entry per DRAWN
   // pixel from the row's own start, not by the pixel's column in the block: retail's two clipped gouraud
@@ -390,15 +414,26 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     // `gridKey` is `grid.join(',')`, precomputed by the caller's own per-tile grid memo (gridFor): the key
     // is character for character the one built here, so the cache behaves identically and only the per-frame
     // join is skipped.
-    const keyBase = `${path}:${index}:${gridKey === null ? grid.join(',') : gridKey}`;
+    const keyBase = gridKey === null ? grid.join(',') : gridKey;
     // Retail clips the left lookup and starts iso edge interpolation at the first visible row.
     // Tiles crossing either boundary therefore need a position-dependent cache key.
-    const key = (px && px.width && tileX !== undefined && tileX < CLIP_LEFT
-      && dt1Tile.blocks.some((b) => tileX + b.x - px.originX < CLIP_LEFT)) ? `${keyBase}@${tileX}` : keyBase;
-    const positionKey = px && tileY !== undefined && dt1Tile.blocks.some((b) => b.format === 1 && tileY + b.y - px.originY < 0) ? `${key}:${tileY}` : key;
-    if (litCache.has(positionKey)) return litCache.get(positionKey);
+    const positional = px && px.width && tileX !== undefined && tileX < CLIP_LEFT
+      && dt1Tile.blocks.some((b) => tileX + b.x - px.originX < CLIP_LEFT);
+    const topClipped = px && tileY !== undefined && dt1Tile.blocks.some((b) => b.format === 1 && tileY + b.y - px.originY < 0);
+    let key = null, inner = null;
+    if (positional || topClipped) {
+      key = `${path}:${index}:${keyBase}` + (positional ? `@${tileX}` : '') + (topClipped ? `:${tileY}` : '');
+      if (litCache.has(key)) return litCache.get(key);
+    } else {
+      let byIndex = litFloorCache.get(path);
+      if (!byIndex) litFloorCache.set(path, byIndex = new Map());
+      inner = byIndex.get(index);
+      if (inner === undefined) byIndex.set(index, inner = new Map());
+      const hit = inner.get(keyBase);
+      if (hit !== undefined) return hit;
+    }
     const t = blendPl2();
-    if (!t || !px || !px.width) { litCache.set(positionKey, null); return null; }
+    if (!t || !px || !px.width) { if (key !== null) litCache.set(key, null); else { inner.set(keyBase, null); litFloorEntries++; litEvict(); } return null; }
     const idx = new Uint8Array(px.indices), opq = px.opaque;
     // The light buffer is an 8x8 padded grid of 12-byte entries (intensity first); a block at
     // (gridX, gridY) has its corners at (gridX+1..gridX+2, gridY+1..gridY+2). Read from D2gfx+0xA960.
@@ -437,8 +472,8 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     for (let q = 0; q < idx.length; q++) { if (!opq[q]) continue; rgba[q * 4] = t[idx[q] * 4]; rgba[q * 4 + 1] = t[idx[q] * 4 + 1]; rgba[q * 4 + 2] = t[idx[q] * 4 + 2]; rgba[q * 4 + 3] = 255; }
     const canvas = documentObject.createElement('canvas'); canvas.width = px.width; canvas.height = px.height;
     canvas.getContext('2d').putImageData(new ImageData(rgba, px.width, px.height), 0, 0);
-    if (litCache.size > 1500) litCache.clear();   // the light moves with the player: keep the cache bounded
-    litCache.set(positionKey, canvas); return canvas;
+    if (key !== null) litCache.set(key, canvas); else { inner.set(keyBase, canvas); litFloorEntries++; litEvict(); }
+    return canvas;
   }
   // Wall lighting: a wall reaches D2DDraw slot 39 with four light
   // entries, and D2DDraw+0x7320 lights each 32-px block from entry (blockX >> 5) to the next (corners
@@ -475,7 +510,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     const canvas = documentObject.createElement('canvas'); canvas.width = px.width; canvas.height = px.height;
     canvas.getContext('2d').putImageData(new ImageData(rgba, px.width, px.height), 0, 0);
     canvas.paletteIdx = idx; canvas.paletteOpaque = opq;   // the lit wall's own palette indices: a hidden wall is BLENDED through a PL2 table, which is indexed by them (drawFaded)
-    if (litCache.size > 1500) litCache.clear();
+    litEvict();   // the light moves with the player: keep the cache bounded
     litCache.set(key, canvas); return canvas;
   }
   // A wall the client hides is drawn through D2DDraw's transparent entry (40) at the fade's alpha (F66b). Its block drawer writes per
@@ -532,6 +567,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     let canvas = null;
     const px = tile?.pixels;
     if (px && px.width > 0 && px.height > 0) {
+      const pBitmap = perfT0();
       const pal = paletteBytes();
       const rgba = new Uint8ClampedArray(px.indices.length * 4);
       for (let i = 0; i < px.indices.length; i++) {
@@ -542,6 +578,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       canvas = documentObject.createElement('canvas');
       canvas.width = px.width; canvas.height = px.height;
       canvas.getContext('2d').putImageData(new ImageData(rgba, px.width, px.height), 0, 0);
+      perfT('terrain-bitmap', pBitmap);
     }
     bitmaps.set(key, canvas);
     return canvas;
@@ -903,7 +940,16 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         // into `units-<kind>` so a row can attribute the pass (F238: the item/missile/player/npc
         // renderers carry the same per-draw redundancy as the monster pass but are rare in a town and
         // invisible to `s2310`'s single total). perfSample is a no-op while the instrument is off.
-        if (o.sprite) { const u = perfT0(); o.sprite.draw(ctx); const ms = perfT0() - u; unitsMs += ms; if (o.sprite.pass) perfSample('units-' + o.sprite.pass, ms); continue; }
+        if (o.sprite) { const u = perfT0();
+          // A unit is lit by the map cell under it (D2Client+0x9F120), not by its renderer: outside the
+          // player's radius the cell is 0 and retail draws the unit black, so paint it at the cell's own
+          // fraction instead of full brightness. The ground it stands on is shaded by the same map, so a
+          // faded unit reads as a dark shape rather than a lit one floating outside the radius.
+          const light = lightCell && o.sprite.wx !== undefined
+            ? unitLightAlpha(lightCell(Math.round(o.sprite.wx), Math.round(o.sprite.wy))) : 1;
+          if (light < 1) { ctx.save(); ctx.globalAlpha *= light; o.sprite.draw(ctx); ctx.restore(); }
+          else o.sprite.draw(ctx);
+          const ms = perfT0() - u; unitsMs += ms; if (o.sprite.pass) perfSample('units-' + o.sprite.pass, ms); continue; }
         if (o.tile.orientation === 13) {
           // A shadow tile repaints whatever is under it, so a row attributing a pixel to the terrain
           // blit that painted it has to see this pass too (same guarded trace, __d2TraceWalls).

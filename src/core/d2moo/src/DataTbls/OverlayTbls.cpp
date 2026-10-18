@@ -50,6 +50,7 @@ void __fastcall DATATBLS_UnloadOverlayTxt()
 }
 
 //D2Common.0x6FD72530 (#10674)
+// 1.13c D2Common+0x82F00
 uint32_t __stdcall DATATBLS_GetFramesFromOverlayTxt(int nOverlayId)
 {
 	D2OverlayTxt* pOverlayTxt = DATATBLS_GetOverlayTxtRecord(nOverlayId);
@@ -138,6 +139,7 @@ int __stdcall DATATBLS_GetRadiusAndColorFromOverlayTxt(int nOverlayId, int* pIni
 	return FALSE;
 }
 
+// 1.13c D2Common+0x82D20 (#10799)
 //D2Common.0x6FD72720 (#10680)
 uint32_t __stdcall DATATBLS_Get1OfNFromOverlayTxt(int nOverlayId)
 {
@@ -152,6 +154,7 @@ uint32_t __stdcall DATATBLS_Get1OfNFromOverlayTxt(int nOverlayId)
 }
 
 //D2Common.0x6FD72760 (#10681)
+// 1.13c D2Common+0x82CE0: overlay.txt nDir (+0x50), 0 when the id is out of range.
 int __stdcall DATATBLS_GetDirFromOverlayTxt(int nOverlayId)
 {
 	D2OverlayTxt* pOverlayTxt = DATATBLS_GetOverlayTxtRecord(nOverlayId);

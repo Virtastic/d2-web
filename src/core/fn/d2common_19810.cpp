@@ -1,5 +1,5 @@
-// 1.13c D2Common+0x19810; r[0] = key, r[1] = owner blob; void
-// 1.13c D2Common+0x19860: the mirror, same probe shape
+// D2Common 1.13c +0x19810; r[0] = key, r[1] = owner blob; void
+// D2Common 1.13c +0x19860: the mirror, same probe shape
 #include <emscripten.h>
 #include <cstdint>
 static uint32_t* P(const uint8_t* b, uint32_t o) { return (uint32_t*)(uintptr_t)*(const uint32_t*)(b + o); }
@@ -13,5 +13,7 @@ static void run(uint32_t key, const uint8_t* a, uint32_t clr, uint32_t set) {
         return;
     }
 }
+// 1.13c D2Common+0x19810
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_19810(uint32_t* r) { run(r[0], (const uint8_t*)(uintptr_t)r[1], 0xC, 0x14); r[4] = 0; }
+// 1.13c D2Common+0x19860
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_19860(uint32_t* r) { run(r[0], (const uint8_t*)(uintptr_t)r[1], 0x14, 0xC); r[4] = 0; }

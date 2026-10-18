@@ -82,8 +82,15 @@ struct D2Spawn47CF0Seam
     D2UnitStrc* (*spawnSuperUnique)(D2GameStrc*, D2ActiveRoomStrc*, int32_t, int32_t, int32_t);       // 0x251F0
     D2UnitStrc* (*spawnMonster)(D2GameStrc*, D2ActiveRoomStrc*, int32_t, int32_t, int32_t, int32_t, int32_t, int16_t);  // 0xEF650
     int32_t (*randomId)(D2ActiveRoomStrc*, int32_t);                                                  // 0xADFC
+    // the four 0x46F70-only callees (the outlined regular path); null in the game
+    uint32_t (*checkMonStats2Flag)(int32_t, int32_t);                                                 // 0x13B0
+    void (*allocUnit)(int32_t, int32_t, int32_t, int32_t, D2GameStrc*, D2ActiveRoomStrc*, char, int32_t, uint32_t);   // 0xE1D90
+    int32_t (*unitX)(D2UnitStrc*);                                                                    // 0x1100
+    int32_t (*unitY)(D2UnitStrc*);                                                                    // 0x1130
 };
 extern D2Spawn47CF0Seam g_d2Spawn47CF0;
+//D2Game.0x6FC66F70 (outlined regular path of 0x6FC66560)
+D2UnitStrc* __fastcall D2GAME_SpawnRegularMonster_6FC66F70(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nClassId, int32_t nX, int32_t nY, int32_t nMode);
 //D2Game.0x6FC66560
 D2UnitStrc* __fastcall D2GAME_SpawnPresetMonster_6FC66560(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nClassId, int32_t nX, int32_t nY, int32_t nMode);
 //D2Game.0x6FC66FC0
@@ -100,7 +107,7 @@ void __fastcall D2GAME_PopulateRoom_6FC67190(D2GameStrc* pGame, D2ActiveRoomStrc
 int32_t __fastcall sub_6FC67570(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, int32_t nMonsterId, D2UnkMonCreateStrc2* a5, int32_t* pX, int32_t* pY);
 //D2Game.0x6FC677D0
 D2UnitStrc* __fastcall sub_6FC677D0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, int32_t nMonsterId, uint8_t nMin, uint8_t nMax);
-// 1.13c D2Game+0x47820 (split out of sub_6FC679F0; replay kind 3446)
+// 1.13c D2Game 0x47820 (split out of sub_6FC679F0; replay kind 3446)
 void sub_47820(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nLevelId, struct D2LevelsTxt* pLevelsTxtRecord);
 // 1.13c D2Game+0x47A20 callee seams (replay kind 3450, s3252); all null in the game
 struct D2Populate47A20Seam

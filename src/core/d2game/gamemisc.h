@@ -1,6 +1,3 @@
-// 1.13c D2Game+0x2CA20 / 0x29BE0 / 0x2CF30 / 0x2C0F0 (kinds 3473-3476): the four GAME_UpdateProgress callees that only call other functions. Written from the 1.13c decompile etc.
-// ONE definition, included by the capture (the retail capture tool/game-misc.inc, i686) as the model retail must agree with, and by the wasm replay (game_gamemisc.cpp).
-// Every callee is a logged seam call; its result is scripted from the record's input words (the result a callee returns is part of the model, not of retail).
 #pragma once
 #include <cstdint>
 enum { GM_IN = 64, GM_EX = 8, GM_LOG = 64, GM_OUT = 2 + GM_EX + GM_LOG * 5 };
@@ -69,6 +66,9 @@ static inline void GM_2CF30(GmCtx& x)
 
 // in: [0..4] act present, [5..9] ordinal 11045 result, [10+3a..12+3a] ordinal 11062 outs, [25] clients (0-3), [26+8c..33+8c] client c: flags, +0x174 (0-3), +0x170, +0x16C, +0x1A8, +4, +0x1AC, SUnit result (0-3)
 // ex: the three clients' +0x174 after
+// 1.13c D2Game+0x2CA20 / 0x29BE0 / 0x2CF30 / 0x2C0F0 (kinds 3473-3476): the four GAME_UpdateProgress callees that only call other functions. Written from the 1.13c decompile etc.
+// ONE definition, included by the capture (the retail capture tool/game-misc.inc, i686) as the model retail must agree with, and by the wasm replay (game_gamemisc.cpp).
+// Every callee is a logged seam call; its result is scripted from the record's input words (the result a callee returns is part of the model, not of retail).
 static inline void GM_2CA20(GmCtx& x)
 {
     const uint32_t* in = x.r->in; uint32_t cur[3] = { in[27], in[35], in[43] };

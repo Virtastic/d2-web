@@ -3330,6 +3330,7 @@ BOOL __fastcall INVENTORY_CanItemBePlacedInTradeInventory(D2InventoryStrc* pTrad
 	return TRUE;
 }
 
+// 1.13c D2Common+0x21C50 (#10762)
 //D2Common.0x6FD921D0 (#10302)
 BOOL __stdcall INVENTORY_CanItemsBeTraded(void* pMemPool, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, D2TradeStates* pTradeState)
 {	

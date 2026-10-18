@@ -767,7 +767,7 @@ void __fastcall DATATBLS_LoadUniqueItemsTxt(HD2ARCHIVE hArchive)
 	sgptDataTables->pUniqueItemsLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
 	sgptDataTables->pUniqueItemsTxt = (D2UniqueItemsTxt*)DATATBLS_CompileTxt(hArchive, "uniqueitems", pTbl, &sgptDataTables->nUniqueItemsTxtRecordCount, sizeof(D2UniqueItemsTxt));
 
-	D2_ASSERT(sgptDataTables->nUniqueItemsTxtRecordCount < 32767); // 1.13c D2Common+0x76F30: fatal assert (1.10f only warned)
+	D2_ASSERT(sgptDataTables->nUniqueItemsTxtRecordCount < 32767); // D2Common 1.13c +0x76F30: fatal assert (1.10f only warned)
 
 	for (int i = 0; i < sgptDataTables->nUniqueItemsTxtRecordCount; ++i)
 	{
@@ -969,12 +969,12 @@ void __fastcall DATATBLS_LoadSets_SetItemsTxt(HD2ARCHIVE hArchive)
 	sgptDataTables->pSetsLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
 	sgptDataTables->pSetsTxt = (D2SetsTxt*)DATATBLS_CompileTxt(hArchive, "sets", pSetsTbl, &sgptDataTables->nSetsTxtRecordCount, sizeof(D2SetsTxt));
 
-	D2_ASSERT(sgptDataTables->nSetsTxtRecordCount < 32767); // 1.13c D2Common+0x75290: fatal assert (1.10f only warned)
+	D2_ASSERT(sgptDataTables->nSetsTxtRecordCount < 32767); // D2Common 1.13c +0x75290: fatal assert (1.10f only warned)
 
 	sgptDataTables->pSetItemsLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
 	sgptDataTables->pSetItemsTxt = (D2SetItemsTxt*)DATATBLS_CompileTxt(hArchive, "setitems", pSetItemsTbl, &sgptDataTables->nSetItemsTxtRecordCount, sizeof(D2SetItemsTxt));
 
-	D2_ASSERT(sgptDataTables->nSetItemsTxtRecordCount < 32767); // 1.13c D2Common+0x75290: fatal assert (1.10f only warned)
+	D2_ASSERT(sgptDataTables->nSetItemsTxtRecordCount < 32767); // D2Common 1.13c +0x75290: fatal assert (1.10f only warned)
 
 	for (int i = 0; i < sgptDataTables->nSetItemsTxtRecordCount; ++i)
 	{
@@ -1213,6 +1213,7 @@ D2GemDataTbl* __fastcall DATATBLS_GetGemDataTables()
 }
 
 //D2Common.0x6FD5BB00 (#10616)
+// 1.13c D2Common+0x71570
 D2GemsTxt* __stdcall DATATBLS_GetGemsTxtRecord(int nGemId)
 {
 	if (nGemId >= sgptDataTables->pGemDataTables.nGemsTxtRecordCount || nGemId == -1)
@@ -1508,7 +1509,7 @@ void __fastcall DATATBLS_LoadItemStatCostTxt(HD2ARCHIVE hArchive)
 		uint8_t nCurrentStatOp = rCurrentStatRecord.nOp;
 		if (nCurrentStatOp <= 0 || nCurrentStatOp >= 14)
 		{
-			rCurrentStatRecord.nOp = 0; // 1.13c D2Common+0x73330: an out-of-range op is zeroed in the record
+			rCurrentStatRecord.nOp = 0; // D2Common 1.13c +0x73330: an out-of-range op is zeroed in the record
 			continue;
 		}
 
@@ -1991,21 +1992,21 @@ void __fastcall DATATBLS_LoadRunesTxt(HD2ARCHIVE hArchive)
 	if (ARCHIVE_OpenFile(hArchive, szPath, &pFileHandle, TRUE))
 	{
 		ARCHIVE_CloseFile(hArchive, pFileHandle);
-		D2_ASSERTM(false, "Found runessrv.txt in archive - This file should only be in server builds."); // 1.13c D2Common+0x71C20 (fatal, not a warning)
+		D2_ASSERTM(false, "Found runessrv.txt in archive - This file should only be in server builds."); // D2Common 1.13c +0x71C20 (fatal, not a warning)
 	}
 
 	wsprintfA(szPath, "%s\\%s%s", "DATA\\GLOBAL\\EXCEL", "runessrv", ".bin");
 	if (ARCHIVE_OpenFile(hArchive, szPath, &pFileHandle, TRUE))
 	{
 		ARCHIVE_CloseFile(hArchive, pFileHandle);
-		D2_ASSERTM(false, "Found runessrv.bin in archive - This file should only be in server builds."); // 1.13c D2Common+0x71C20 (fatal, not a warning)
+		D2_ASSERTM(false, "Found runessrv.bin in archive - This file should only be in server builds."); // D2Common 1.13c +0x71C20 (fatal, not a warning)
 	}
 
 	wsprintfA(szPath, "%s\\%s%s", "DATA\\GLOBAL\\EXCEL", "runessrv", ".xls");
 	if (ARCHIVE_OpenFile(hArchive, szPath, &pFileHandle, TRUE))
 	{
 		ARCHIVE_CloseFile(hArchive, pFileHandle);
-		D2_ASSERTM(false, "Found runessrv.xls in archive - This file should only be in server builds."); // 1.13c D2Common+0x71C20 (fatal, not a warning)
+		D2_ASSERTM(false, "Found runessrv.xls in archive - This file should only be in server builds."); // D2Common 1.13c +0x71C20 (fatal, not a warning)
 	}
 
 	sgptDataTables->pRuneDataTables.pRunesTxt = (D2RunesTxt*)DATATBLS_CompileTxt(hArchive, "runes", pTbl, &sgptDataTables->pRuneDataTables.nRunesTxtRecordCount, sizeof(D2RunesTxt));

@@ -1,5 +1,4 @@
 #include <cstdint>
-// 1.13c D2Game+0x2F0D0
 
 // 1.13c D2Game+0x2F0D0 (stack pGame, pRoom in a register): per-room object-group population, 
 // Every D2Common ordinal, DLL memory read and function-pointer-table access goes through the seam so a replay can feed recorded values.
@@ -10,6 +9,7 @@ struct D2G2F0D0Seam { uint32_t (*call)(uint32_t id, const uint32_t* w); };
 
 // lcg = the 64-bit seed at room+0x6C (low dword is the multiplicand, high dword the addend); levelsRec/region come from seam reads.
 // Returns 0 normally, 1 when an assert-exit fired.
+// 1.13c D2Game+0x2F0D0
 uint32_t GAME_2F0D0(const D2G2F0D0Seam& s, uint32_t game, uint32_t room, uint64_t& lcg)
 {
     auto step = [&] { lcg = (uint64_t)(uint32_t)lcg * 0x6AC690C5ull + (uint32_t)(lcg >> 32); return (uint32_t)lcg; };

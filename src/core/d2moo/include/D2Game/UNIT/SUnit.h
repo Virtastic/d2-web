@@ -51,6 +51,9 @@ D2UnitStrc* __fastcall SUNIT_GetOwner(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FCBBC00
 D2UnitStrc* __fastcall SUNIT_GetLastAttacker(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0xE0310 (1.13c; the sorted unit-list insert outlined from the 1.10f SUNIT_Add tail)
+// Retail convention: ECX unused, EDX = pGame, ESI = pUnit, no stack words, plain ret; EAX leaves the
+// walk's stop node (the decompiler types the function void). `__fastcall` below is this C++ tree's
+// internal convention only -- it does not describe retail's registers. 
 D2UnitStrc* __fastcall SUNIT_AddUnitToList(D2GameStrc* pGame, D2UnitStrc* pUnit);
 //D2Game.0x6FCBBCB0
 void __fastcall SUNIT_Add(D2UnitStrc* pUnit, int32_t nX, int32_t nY, D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t a6);

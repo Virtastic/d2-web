@@ -475,6 +475,7 @@ int __fastcall sub_6FDAF7A0(int nSkillId, int a2, int a3, void* pUserData)
 	return 0;
 }
 
+// 1.13c D2Common+0x51BF0 (#10786)
 //D2Common.0x6FDAF7E0 (#11276)
 int __stdcall SKILLS_EvaluateSkillFormula(D2UnitStrc* pUnit, unsigned int nCalc, int nSkillId, int nSkillLevel)
 {
@@ -801,6 +802,7 @@ D2SkillStrc* __fastcall SKILLS_GetHighestLevelSkillFromUnitAndId(D2UnitStrc* pUn
 	return SKILLS_GetHighestLevelSkillFromSkillId(pUnit, nSkillId);
 }
 
+// 1.13c D2Common+0x52C80 (#10773)
 //D2Common.0x6FDAFFD0 (#10951)
 void __stdcall SKILLS_RemoveSkill(D2UnitStrc* pUnit, int nSkillId, const char* szFile, int nLine)
 {
@@ -1257,6 +1259,7 @@ BOOL __stdcall SKILLS_SetCharges(D2SkillStrc* pSkill, int nCharges)
 }
 
 //D2Common.0x6FDB09A0 (#10961)
+// 1.13c D2Common+0x4ED60
 void __stdcall SKILLS_SetLeftActiveSkill(D2UnitStrc* pUnit, int nSkillId, D2UnitGUID nOwnerGUID)
 {
 	D2SkillsTxt* pSkillsTxtRecord = DATATBLS_GetSkillsTxtRecord(nSkillId);
@@ -1291,6 +1294,7 @@ void __stdcall SKILLS_SetLeftActiveSkill(D2UnitStrc* pUnit, int nSkillId, D2Unit
 }
 
 //D2Common.0x6FDB0A30 (#10962)
+// 1.13c D2Common+0x4ECC0
 void __stdcall SKILLS_SetRightActiveSkill(D2UnitStrc* pUnit, int nSkillId, D2UnitGUID nOwnerGUID)
 {
 	D2SkillsTxt* pSkillsTxtRecord = NULL;

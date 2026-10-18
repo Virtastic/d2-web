@@ -447,6 +447,7 @@ void __stdcall UNITS_SetTargetX(D2UnitStrc* pUnit, int nTargetX)
 	PATH_SetClientCoordX(pUnit->pDynamicPath, nTargetX);
 }
 
+// 1.13c D2Common+0x300E0
 //D2Common.0x6FDBDCD0 (#10341)
 void __stdcall UNITS_SetTargetY(D2UnitStrc* pUnit, int nTargetY)
 {
@@ -651,6 +652,7 @@ void __stdcall UNITS_SetTargetUnitForDynamicUnit(D2UnitStrc* pUnit, D2UnitStrc* 
 }
 
 //D2Common.0x6FDBE330 (#10345)
+// 1.13c D2Common+0x2FDB0
 int __stdcall UNITS_GetTargetTypeFromDynamicUnit(D2UnitStrc* pUnit)
 {
 	int nUnitType = 0;
@@ -2003,6 +2005,7 @@ D2ShrinesTxt* __stdcall UNITS_GetShrineTxtRecordFromObject(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDBFD50 (#10396)
+// 1.13c D2Common+0x2EC60: null/type guards use fatal codes 0xE60/0xE67; the store is identical.
 void __stdcall UNITS_SetShrineTxtRecordInObjectData(D2UnitStrc* pUnit, D2ShrinesTxt* pShrinesTxtRecord)
 {
 	D2_ASSERT(pUnit);
@@ -2268,6 +2271,8 @@ void __stdcall UNITS_FreePlayerData(void* pMemPool, D2UnitStrc* pPlayer)
 }
 
 //D2Common.0x6FDC04A0 (#10422)
+// 1.13c D2Common+0x2EC00: retail calls SStrCopy(playerData, name, 0x7FFFFFFF); the 16-byte
+// szName buffer makes strcpy_s truncate at 15, which no legal player name reaches.
 void __stdcall UNITS_SetNameInPlayerData(D2UnitStrc* pUnit, char* szName)
 {
 	D2_ASSERT(pUnit);
@@ -3079,6 +3084,7 @@ BOOL __stdcall UNITS_IsInMovingModeEx(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDC1C50 (#10365)
+// 1.13c D2Common+0x321E0
 int __fastcall UNITS_GetHitClass(D2UnitStrc* pUnit)
 {
 	if (pUnit)
@@ -3279,7 +3285,7 @@ uint8_t __stdcall UNITS_GetItemComponentId(D2UnitStrc* pUnit, D2UnitStrc* pItem)
 // 1.13c D2Common+0x13B0
 D2MonStats2Txt* __fastcall UNITS_GetMonStats2TxtRecordFromMonsterId(int nMonsterId)
 {
-	// 1.13c D2Common+0x13B0: out-of-range monster id returns NULL
+	// D2Common 1.13c +0x13B0: out-of-range monster id returns NULL
 	D2MonStatsTxt* pMonStatsTxt = DATATBLS_GetMonStatsTxtRecord(nMonsterId);
 	if (!pMonStatsTxt)
 	{
@@ -3360,6 +3366,7 @@ void __stdcall UNITS_InitSwitchLeftSkill(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDC21F0 (#10447)
+// 1.13c D2Common+0x2F800: non-player/missing data writes (0, -1); player reads nRightSkillId/nRightSkillFlags.
 void __stdcall UNITS_GetRightSkillData(D2UnitStrc* pUnit, int* pRightSkillId, int* pRightSkillFlags)
 {
 	if (pUnit && pUnit->dwUnitType == UNIT_PLAYER)
@@ -3438,6 +3445,7 @@ void __stdcall UNITS_GetSwitchLeftSkillDataResetLeftSkill(D2UnitStrc* pUnit, int
 }
 
 //D2Common.0x6FDC23B0 (#10451)
+// 1.13c D2Common+0x2F630
 void __stdcall UNITS_GetSwitchLeftSkillData(D2UnitStrc* pUnit, int* pSwitchLeftSkillId, int* pSwitchLeftSkillFlags)
 {
 	if (pUnit && pUnit->dwUnitType == UNIT_PLAYER)
@@ -3454,6 +3462,7 @@ void __stdcall UNITS_GetSwitchLeftSkillData(D2UnitStrc* pUnit, int* pSwitchLeftS
 	}
 }
 
+// 1.13c D2Common+0x2F5C0 (#10756)
 //D2Common.0x6FDC2420 (#10452)
 void __stdcall UNITS_GetSwitchRightSkillData(D2UnitStrc* pUnit, int* pSwitchRightSkillId, int* pSwitchRightSkillFlags)
 {

@@ -1,4 +1,4 @@
-// 1.13c D2Game+0x2CA20 / 0x29BE0 / 0x2CF30 / 0x2C0F0 replay (s3277-s3280): the models in gamemisc.h run over a vector record's input words.
+// 1.13c D2Game 0x2CA20 / 0x29BE0 / 0x2CF30 / 0x2C0F0 replay (s3277-s3280): the models in gamemisc.h run over a vector record's input words.
 #include "gamemisc.h"
 #include <emscripten.h>
 static GmRec gGm;

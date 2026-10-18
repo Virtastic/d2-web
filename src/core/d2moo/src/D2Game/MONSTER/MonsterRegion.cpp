@@ -222,6 +222,80 @@ static int32_t s47cf0_questCheck(D2GameStrc* pGame, int32_t nQuest) { return g_d
 static D2UnitStrc* s47cf0_spawnSupUniq(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t nSuperUniqueId) { return g_d2Spawn47CF0.spawnSuperUnique ? g_d2Spawn47CF0.spawnSuperUnique(pGame, pRoom, nX, nY, nSuperUniqueId) : D2GAME_SpawnSuperUnique_6FC6F690(pGame, pRoom, nX, nY, nSuperUniqueId); }
 static D2UnitStrc* s47cf0_spawnMon(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t nMonsterId, int32_t nAnimMode, int32_t a7, int16_t nFlags) { return g_d2Spawn47CF0.spawnMonster ? g_d2Spawn47CF0.spawnMonster(pGame, pRoom, nX, nY, nMonsterId, nAnimMode, a7, nFlags) : D2GAME_SpawnMonster_6FC69F10(pGame, pRoom, nX, nY, nMonsterId, nAnimMode, a7, nFlags); }
 static int32_t s47cf0_randomId(D2ActiveRoomStrc* pRoom, int32_t nMonsterId) { return g_d2Spawn47CF0.randomId ? g_d2Spawn47CF0.randomId(pRoom, nMonsterId) : D2Common_11063(pRoom, nMonsterId); }
+// the four callees only the 0x46F70 regular path reaches
+static uint32_t s47cf0_checkFlag(int32_t nMonsterId, int32_t nFlag) { return g_d2Spawn47CF0.checkMonStats2Flag ? g_d2Spawn47CF0.checkMonStats2Flag(nMonsterId, nFlag) : MONSTERREGION_CheckMonStats2Flag(nMonsterId, nFlag); }
+static void s47cf0_allocUnit(int32_t nUnitType, int32_t nClassId, int32_t nX, int32_t nY, D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, char a7, int32_t nMode, uint32_t a3) { if (g_d2Spawn47CF0.allocUnit) g_d2Spawn47CF0.allocUnit(nUnitType, nClassId, nX, nY, pGame, pRoom, a7, nMode, a3); else SUNIT_AllocUnitData(nUnitType, nClassId, nX, nY, pGame, pRoom, a7, nMode, a3); }
+static int32_t s47cf0_unitX(D2UnitStrc* pUnit) { return g_d2Spawn47CF0.unitX ? g_d2Spawn47CF0.unitX(pUnit) : CLIENTS_GetUnitX(pUnit); }
+static int32_t s47cf0_unitY(D2UnitStrc* pUnit) { return g_d2Spawn47CF0.unitY ? g_d2Spawn47CF0.unitY(pUnit) : CLIENTS_GetUnitY(pUnit); }
+
+// 1.13c D2Game+0x46F70: the regular (MonStats) path, outlined by 1.13c LTCG out of
+// D2GAME_SpawnPresetMonster_6FC66560. Convention: EDI = nClassId, stack (ret 0x14) = pGame, pRoom,
+// nX, nY, nMode; result in EAX. Body is the 1.10f inline block, unchanged except that the critter test
+// is the callee 0x13B0 (CheckMonStats2Flag(nClassId, 0xd)) rather than a direct MonStats2 record read,
+// which is the same test. 
+D2UnitStrc* __fastcall D2GAME_SpawnRegularMonster_6FC66F70(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nClassId, int32_t nX, int32_t nY, int32_t nMode)
+{
+    if (nClassId < 0 || nClassId >= sgptDataTables->nMonStatsTxtRecordCount)
+    {
+        return nullptr;
+    }
+
+    D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nClassId);
+    if (!pMonStatsTxtRecord)
+    {
+        return nullptr;
+    }
+
+    if (nClassId == MONSTER_PRISONDOOR)
+    {
+        --nX;
+
+        if (!s47cf0_questCheck(pGame, QUEST_A5Q2_RESCUESOLDIERS))
+        {
+            nMode = MONMODE_DEAD;
+        }
+    }
+
+    if (s47cf0_checkFlag(nClassId, MONSTATS2FLAGINDEX_CRITTER))
+    {
+        return nullptr;
+    }
+
+    int16_t nFlags = 0;
+    if (pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_NEVERCOUNT])
+    {
+        nFlags = 8;
+    }
+
+    D2UnitStrc* pMonster = s47cf0_spawnMon(pGame, pRoom, nX, nY, nClassId, nMode, -1, nFlags);
+    if (!pMonster)
+    {
+        if (!sub_6FC670A0(nClassId))
+        {
+            return nullptr;
+        }
+
+        pMonster = s47cf0_spawnMon(pGame, pRoom, nX, nY, nClassId, nMode, 4, nFlags);
+        if (!pMonster)
+        {
+            return nullptr;
+        }
+    }
+
+    if (s47cf0_checkFlag(nClassId, MONSTATS2FLAGINDEX_OBJCOL))
+    {
+        if (nClassId == MONSTER_BARRICADEDOOR1)
+        {
+            s47cf0_allocUnit(UNIT_OBJECT, 571, s47cf0_unitX(pMonster), s47cf0_unitY(pMonster), pGame, pRoom, 1, 0, 0);
+        }
+        else if (nClassId == MONSTER_BARRICADEDOOR2)
+        {
+            s47cf0_allocUnit(UNIT_OBJECT, 572, s47cf0_unitX(pMonster), s47cf0_unitY(pMonster), pGame, pRoom, 1, 0, 0);
+        }
+    }
+
+    return pMonster;
+}
 
 //D2Game.0x6FC66560
 // 1.13c D2Game+0x47CF0: the regular path is outlined at 0x46F70, the 24/26 group spawn at 0x470F0,
@@ -273,62 +347,7 @@ D2UnitStrc* __fastcall D2GAME_SpawnPresetMonster_6FC66560(D2GameStrc* pGame, D2A
             return nullptr;
         }
 
-        D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nClassId);
-        if (!pMonStatsTxtRecord)
-        {
-            return nullptr;
-        }
-
-        if (nClassId == MONSTER_PRISONDOOR)
-        {
-            --nX;
-
-            if (!s47cf0_questCheck(pGame, QUEST_A5Q2_RESCUESOLDIERS))
-            {
-                nMode = MONMODE_DEAD;
-            }
-        }
-
-        D2MonStats2Txt* pMonStats2TxtRecord = MONSTERREGION_GetMonStats2TxtRecord(nClassId);
-        if (pMonStats2TxtRecord && pMonStats2TxtRecord->dwFlags & gdwBitMasks[MONSTATS2FLAGINDEX_CRITTER])
-        {
-            return nullptr;
-        }
-
-        int16_t nFlags = 0;
-        if (pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_NEVERCOUNT])
-        {
-            nFlags = 8;
-        }
-
-        D2UnitStrc* pMonster = s47cf0_spawnMon(pGame, pRoom, nX, nY, nClassId, nMode, -1, nFlags);
-        if (!pMonster)
-        {
-            if (!sub_6FC670A0(nClassId))
-            {
-                return nullptr;
-            }
-
-            pMonster = s47cf0_spawnMon(pGame, pRoom, nX, nY, nClassId, nMode, 4, nFlags);
-            if (!pMonster)
-            {
-                return nullptr;
-            }
-        }
-
-        if (MONSTERREGION_CheckMonStats2Flag(nClassId, MONSTATS2FLAGINDEX_OBJCOL))
-        {
-            if (nClassId == MONSTER_BARRICADEDOOR1)
-            {
-                SUNIT_AllocUnitData(UNIT_OBJECT, 571, CLIENTS_GetUnitX(pMonster), CLIENTS_GetUnitY(pMonster), pGame, pRoom, 1, 0, 0);
-            }
-            else if (nClassId == MONSTER_BARRICADEDOOR2)
-            {
-                SUNIT_AllocUnitData(UNIT_OBJECT, 572, CLIENTS_GetUnitX(pMonster), CLIENTS_GetUnitY(pMonster), pGame, pRoom, 1, 0, 0);
-            }
-        }
-
-        return pMonster;
+        return D2GAME_SpawnRegularMonster_6FC66F70(pGame, pRoom, nClassId, nX, nY, nMode);
     }
 
     switch (nClassId)
@@ -646,6 +665,7 @@ D2MonStats2Txt* __fastcall MONSTERREGION_GetMonStats2TxtRecord(int32_t nMonsterI
 }
 
 //D2Game.0x6FC67010
+// 1.13c D2Game+0x13B0: same body (id range, wMonStatsEx, MonStats2 flag byte/bit), EAX = id, EDX = flag
 uint32_t __fastcall MONSTERREGION_CheckMonStats2Flag(int32_t nMonsterId, int32_t nFlag)
 {
     D2MonStats2Txt* pMonStats2TxtRecord = MONSTERREGION_GetMonStats2TxtRecord(nMonsterId);
@@ -659,6 +679,7 @@ uint32_t __fastcall MONSTERREGION_CheckMonStats2Flag(int32_t nMonsterId, int32_t
 }
 
 //D2Game.0x6FC67080
+// 1.13c D2Game+0x1850: same body (range check -> id or -1; 24 bytes)
 int32_t __fastcall MONSTERREGION_SanitizeMonsterId(int32_t nMonsterId)
 {
     if (nMonsterId >= 0 && nMonsterId < sgptDataTables->nMonStatsTxtRecordCount)
@@ -670,6 +691,7 @@ int32_t __fastcall MONSTERREGION_SanitizeMonsterId(int32_t nMonsterId)
 }
 
 //D2Game.0x6FC670A0
+// 1.13c D2Game+0x46D90: same sanitize-then-switch body (0xE5, 0x11C..0x120, 0x188, 0x189 -> 0); 
 int32_t __fastcall sub_6FC670A0(int32_t nMonsterId)
 {
     switch (MONSTERREGION_SanitizeMonsterId(nMonsterId))
@@ -989,7 +1011,6 @@ D2UnitStrc* __fastcall sub_6FC677D0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, 
 
 static void sub_47660(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2MonsterRegionStrc* pMonsterRegion, D2LevelsTxt* pLevelsTxtRecord);
 
-// 1.13c D2Game+0x47820 (thiscall room, stdcall level): roll %100 < 3 + region count gate, then 0x47660
 void sub_47820(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nLevelId, D2LevelsTxt* pLevelsTxtRecord)
 {
     if ((int32_t)(ITEMS_RollRandomNumber(&pRoom->pSeed) % 100) >= 3)
@@ -1007,6 +1028,7 @@ void sub_47820(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nLevelId, D2L
 }
 
 //D2Game.0x6FC679F0
+// 1.13c D2Game+0x47820 (thiscall room, stdcall level): roll %100 < 3 + region count gate, then 0x47660
 void __fastcall sub_6FC679F0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom)
 {
     if (!pRoom || ITEMS_RollRandomNumber(&pRoom->pSeed) & 0x7FFF || pRoom->nNumClients)

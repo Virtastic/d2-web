@@ -218,7 +218,40 @@ void __fastcall CLIENTS_SetFlags(D2ClientStrc* pClient, int32_t nFlags) {
 void __fastcall CLIENTS_SetCreateTime(D2ClientStrc* pClient, DWORD dwCreateTime) { if (pClient) pClient->nCreateTime = dwCreateTime; }
 // Declared in D2Game's Clients.h with no definition in the vendored tree (like the setters above).
 // The iron golem restore needs it; nothing in this engine summons a golem, so it is never reached.
-void __fastcall CLIENTS_SetIronGolemItemGUID(D2ClientStrc* pClient, int32_t nIronGolemItemGUID) { if (pClient) pClient->nIronGolemItemGUID = nIronGolemItemGUID; }
+// 1.13c D2Game+0x49B40
+// Prior art: D2MOO Clients.cpp CLIENTS_SetIronGolemItemGUID; retail requires a client.
+void __fastcall CLIENTS_SetIronGolemItemGUID(D2ClientStrc* pClient, int32_t nIronGolemItemGUID)
+{
+    D2_ASSERT(pClient);
+    pClient->nIronGolemItemGUID = nIronGolemItemGUID;
+}
+
+// 1.13c D2Game+0xEBA40
+// Prior art: D2MOO PlrSave2.cpp's player-load/create initialization sequences.
+// Retail factors the sequence into this helper (client in EAX, player in ECX,
+// game on the stack). Use native struct fields rather than x86 byte offsets.
+void D2GAME_AttachPlayerToClient_1_13c(D2ClientStrc* pClient, D2UnitStrc* pPlayer, D2GameStrc* pGame)
+{
+    D2_ASSERT(pClient);
+    if (!pPlayer)
+    {
+        pClient->pPlayer = nullptr;
+    }
+    D2_ASSERT(pPlayer);
+    pClient->dwUnitType = pPlayer->dwUnitType;
+    pClient->dwUnitGUID = pPlayer->dwUnitId;
+    pClient->pPlayer = pPlayer;
+    D2_ASSERT(pPlayer->dwUnitType == UNIT_PLAYER);
+    UNITS_GetPlayerData(pPlayer)->pClient = pClient;
+    UNITS_SetNameInPlayerData(pPlayer, pClient->szName);
+    SUNIT_InitSeed(pPlayer, &pGame->pGameSeed);
+    UNITS_ChangeAnimMode(pPlayer, PLRMODE_NEUTRAL);
+    D2PlayerDataStrc* pData = UNITS_GetPlayerData(pPlayer);
+    pData->pTrade = nullptr;
+    pData->dwTradeState = 0;
+    pData->dwAcceptTradeTick = 0;
+    pData->unk0x54 = 0;
+}
 void __fastcall CLIENTS_SetPlayerInClient(D2ClientStrc* pClient, D2UnitStrc* pUnit) { if (pClient) pClient->pPlayer = pUnit; }
 // 1.13c D2Game+0x494E0
 void __fastcall CLIENTS_SetSkillHotKey(D2ClientStrc* pClient, int32_t nHotkeyId, int16_t nSkillId, uint8_t nHand, int32_t nItemGUID) {
@@ -481,47 +514,66 @@ void D2GAME_SetClientDead_6FC33830(D2ClientStrc* pClient, void* pAlwaysNull) {}
 // Item action packets (D2Game 0x6FC3E570 / 0x6FC3E6F0 and their wrappers, ported from D2MOO's
 // SCmd.cpp): the item's wire bitstream behind an action code, 0x9C for items on the ground or
 // the player's own, 0x9D with the owning unit.  Socketed children follow as ITEMINSOCKET.
+// 1.13c D2Game+0x8C890: the socketed children of pItem, each sent
+// as a 0x9D ITEMINSOCKET packet whose owning unit is pItem.  Returns 1 when the item is socketable
+// with an inventory, 0 otherwise; the 8 flag is set on a caller-local copy of dwFlag per child.
+int32_t __fastcall D2GAME_SendItemSocketPackets_6FCAC890(D2ClientStrc* pClient, D2UnitStrc* pItem, DWORD dwFlag) {
+    int32_t nFlags = (int32_t)dwFlag;
+    if (!ITEMS_CheckIfSocketable(pItem) || ITEMS_CheckIfFlagIsSet(nFlags, IFLAG_QUANTITY) || !pItem->pInventory)
+        return 0;
+    for (D2UnitStrc* i = INVENTORY_GetFirstItem(pItem->pInventory); i; i = INVENTORY_GetNextItem(i)) {
+        ITEMS_SetOrRemoveFlag(&nFlags, IFLAG_DELETED, 1);
+        D2GAME_SendPacket0x9D_6FC3E6F0(pClient, pItem, INVENTORY_UnitIsItem(i), ITEMACTION_ITEMINSOCKET, (DWORD)nFlags, 0);
+    }
+    return 1;
+}
+// 1.13c D2Game+0x8D3D0: the 0x9C composer.  pClient->dwFlags bit 0 keeps the cached player,
+// else it is re-resolved through SUNIT_GetServerUnit (and cleared when the unit is gone).  A NULL
+// item is legal on the wire: nItemId becomes -1.  The 0x8C890 child loop runs after the send.
 void __fastcall D2GAME_SendPacket0x9C_6FC3E570(D2ClientStrc* pClient, D2UnitStrc* pItem, char nAction, DWORD dwFlag, int32_t bGamble) {
-    D2UnitStrc* pPlayer = CLIENTS_GetPlayerFromClient(pClient, 0);
-    if (!pPlayer || !pItem) return;
+    if (!pClient) return;                       // retail: Fog assert 0xFB + exit
+    D2UnitStrc* pPlayer;
+    if (pClient->dwFlags & CLIENTFLAGEX_PLAYER_UNIT_ALIVE) {
+        pPlayer = pClient->pPlayer;
+    } else {
+        pPlayer = pClient->pPlayer;
+        if (pPlayer) {
+            pPlayer = SUNIT_GetServerUnit(pClient->pGame, (int32_t)pClient->dwUnitType, pClient->dwUnitGUID);
+            if (!pPlayer) pClient->pPlayer = nullptr;
+        }
+    }
+    if (!pPlayer) return;                       // retail: Fog assert 0x77B + exit
     D2GSPacketSrv9C packet = {};
-    packet.nHeader = 0x9C; packet.nAction = nAction; packet.nItemId = pItem->dwUnitId;
+    packet.nHeader = 0x9C; packet.nAction = nAction;
+    packet.nItemId = pItem ? (int32_t)pItem->dwUnitId : -1;
     packet.nComponent = UNITS_GetItemComponentId(pPlayer, pItem);
     const uint32_t nOldItemFlags = ITEMS_GetItemFlags(pItem);
     ITEMS_SetItemFlag(pItem, dwFlag, 1);
-    const uint32_t nLength = (uint32_t)ITEMS_SerializeItemToBitstream(pItem, packet.pBitstream, 0xF4u, 0, 0, bGamble) + 8;
+    const uint32_t nLength = (uint32_t)(pItem ? ITEMS_SerializeItemToBitstream(pItem, packet.pBitstream, 0xF4u, 0, 0, bGamble) : 0) + 8;
+    if (nLength > 0xFC) return;                 // retail: Fog assert 0x78C + exit
     packet.nPacketSize = (uint8_t)nLength;
     ITEMS_SetItemFlag(pItem, 0xFFFFFFFFu, 0);
     ITEMS_SetItemFlag(pItem, nOldItemFlags, 1);
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, (int32_t)nLength);
-    int32_t nFlags = (int32_t)dwFlag;
-    if (ITEMS_CheckIfSocketable(pItem) && !ITEMS_CheckIfFlagIsSet(nFlags, IFLAG_QUANTITY) && pItem->pInventory)
-        for (D2UnitStrc* i = INVENTORY_GetFirstItem(pItem->pInventory); i; i = INVENTORY_GetNextItem(i)) {
-            ITEMS_SetOrRemoveFlag(&nFlags, IFLAG_DELETED, 1);
-            D2GAME_SendPacket0x9D_6FC3E6F0(pClient, pItem, INVENTORY_UnitIsItem(i), ITEMACTION_ITEMINSOCKET, (DWORD)nFlags, 0);
-        }
+    D2GAME_SendItemSocketPackets_6FCAC890(pClient, pItem, dwFlag);
 }
+// 1.13c D2Game+0x8B0F0: the 0x9D composer (action code + owning unit + item bitstream).
 void __fastcall D2GAME_SendPacket0x9D_6FC3E6F0(D2ClientStrc* pClient, D2UnitStrc* pUnit, D2UnitStrc* pItem, char nAction, DWORD dwFlag, int32_t bGamble) {
-    if (!pItem) return;
     D2GSPacketSrv9D packet = {};
     packet.nHeader = 0x9D; packet.nAction = nAction;
     packet.nComponent = UNITS_GetItemComponentId(pUnit, pItem);
-    packet.nItemId = pItem->dwUnitId;
+    packet.nItemId = pItem ? (int32_t)pItem->dwUnitId : -1;
     if (pUnit) { packet.nUnitType = (uint8_t)pUnit->dwUnitType; packet.nUnitId = pUnit->dwUnitId; }
     else { packet.nUnitType = 6; packet.nUnitId = -1; }
     const uint32_t nOldItemFlags = ITEMS_GetItemFlags(pItem);
     ITEMS_SetItemFlag(pItem, dwFlag, 1);
-    const uint32_t nLength = (uint32_t)ITEMS_SerializeItemToBitstream(pItem, packet.pBitstream, 0xF4u, 0, 0, bGamble) + 13;
+    const uint32_t nLength = (uint32_t)(pItem ? ITEMS_SerializeItemToBitstream(pItem, packet.pBitstream, 0xF4u, 0, 0, bGamble) : 0) + 13;
+    if (nLength > 0xFC) return;                 // retail: Fog assert 0x7B4 + exit
     ITEMS_SetItemFlag(pItem, 0xFFFFFFFFu, 0);
     ITEMS_SetItemFlag(pItem, nOldItemFlags, 1);
     packet.nPacketSize = (uint8_t)nLength;
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, (int32_t)nLength);
-    int32_t nFlags = (int32_t)dwFlag;
-    if (ITEMS_CheckIfSocketable(pItem) && !ITEMS_CheckIfFlagIsSet(nFlags, IFLAG_QUANTITY) && pItem->pInventory)
-        for (D2UnitStrc* i = INVENTORY_GetFirstItem(pItem->pInventory); i; i = INVENTORY_GetNextItem(i)) {
-            ITEMS_SetOrRemoveFlag(&nFlags, IFLAG_DELETED, 1);
-            D2GAME_SendPacket0x9D_6FC3E6F0(pClient, pItem, INVENTORY_UnitIsItem(i), ITEMACTION_ITEMINSOCKET, (DWORD)nFlags, 0);
-        }
+    D2GAME_SendItemSocketPackets_6FCAC890(pClient, pItem, dwFlag);
 }
 void __fastcall D2GAME_SendP0x9C_ItemAction_AddToGround_6FC3E850(D2ClientStrc* pClient, D2UnitStrc* pItem, DWORD dwFlag) {
     D2GAME_SendPacket0x9C_6FC3E570(pClient, pItem, ITEMACTION_ADDTOGROUND, dwFlag, 0);

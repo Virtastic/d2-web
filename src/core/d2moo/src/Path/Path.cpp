@@ -1763,6 +1763,7 @@ void __stdcall PATH_AddCollisionFootprintForOptionalUnit(D2UnitStrc* pUnit)
 
 //D2Common.0x6FDAA6F0 (#10237)
 //TODO: Find a name
+// 1.13c D2Common+0x34550
 BOOL __stdcall D2Common_10237(D2UnitStrc* pUnit)
 {
 	if (pUnit && pUnit->pDynamicPath)

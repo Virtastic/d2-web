@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x33C20 and +0x34020 (#10341)
+// D2Common 1.13c +0x33C20 (callee) and +0x34020 (#10341)
 #include <cstdint>
 #include <cstddef>
 #include "D2DataTbls.h"

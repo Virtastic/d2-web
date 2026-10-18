@@ -565,7 +565,7 @@ void __fastcall ACT5Q2_Callback03_ChangedLevel(D2QuestDataStrc* pQuestData, D2Qu
 {
 	if (pQuestArg->nNewLevel >= LEVEL_ID_ACT5_BARRICADE_1 && pQuestArg->nNewLevel <= LEVEL_ARREATPLATEAU && pQuestData->bNotIntro && ((D2Act5Quest2Strc*)pQuestData->pQuestDataEx)->nKilledWussies < 5)
 	{
-		// 1.13c D2Game+0x5B1E0: the state test is kept in a local, because
+		// 1.13c D2Game 0x5B1E0: the state test is kept in a local, because
 		// QUESTS_StateDebug overwrites fState with 3
 		const bool bStateWasActive = pQuestData->fState == 1 || pQuestData->fState == 2;
 		if (bStateWasActive)

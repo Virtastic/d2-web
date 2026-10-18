@@ -394,6 +394,23 @@ export function nativeDccHoverContains(px, py, box, ox, oy) {
   return Math.floor(px) >= left && Math.floor(px) <= right && Math.floor(py) >= lowY && Math.floor(py) <= highY;
 }
 
+// F14/S286: which ground item the pointer is over. Items are units, so D2Client's validator
+// FUN_6FB568E0 applies the SAME padded-rectangle rule as for any other unit; it never tests the
+// item's grid cell. `project(item.x, item.y)` must be the projection the item was DRAWN with (the
+// shell's static-grid transform) and `measure(item)` the cel box of the frame drawn: retail's rect
+// builder FUN_6FB56730 receives the unit's exact screen x/y, so no cell rounding is applied here.
+// The capture of the exact rect builder is still owed.
+export function groundItemsUnderPointerAt(items, x, y, project, measure) {
+  const hits = [];
+  for (const item of items || []) {
+    if (item.mode !== 3 || item.invPage !== 255) continue;
+    const box = measure(item); if (!box) continue;
+    const [sx, sy] = project(item.x, item.y);
+    if (nativeDccHoverContains(x, y, box, sx, sy)) hits.push(item);
+  }
+  return hits;
+}
+
 // D2Client's object hover validator must obtain a current DCC cell before it can form a hit rect.
 // Preserve the measured painted-box/anchor fallback for multi-layer compositions, but a missing
 // cell cannot become a hover hit just because the object's anchor is near the pointer.

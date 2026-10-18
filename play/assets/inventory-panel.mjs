@@ -5,6 +5,7 @@ import { PANEL_CLOSE_ART, panelCloseLayout } from './panel-close.mjs';
 import { inventoryCloseFrame } from './inventory-close-gesture.mjs';
 import { inventoryBoxColour } from './inventory-box-colour.mjs';
 import { inventoryItemColourIndex, inventoryItemColourKey } from './inventory-item-colour.mjs';
+import { createItemTooltip, itemTooltipSpec } from './item-tooltip.mjs';
 
 // Inventory.txt Amazon2, normalized from its 800x600 screen coordinates to the
 // invchar6 panel origin. Retail leaves the final 80 pixels for the screen edge.
@@ -107,6 +108,27 @@ export function inventoryGridPosition(item, layout = AMAZON2_INVENTORY_LAYOUT) {
   return { x: layout.gridX + x * layout.cellWidth, y: layout.gridY + y * layout.cellHeight };
 }
 
+// An item's rectangle on the 800x600 screen: its grid cells, or the body slot it is worn in. Pure,
+// so the hover lookup below and its test share one geometry (F938).
+export function inventoryGridRect(item, layout = null) {
+  if (layout) { const g = layout.grid; return { left: g.left + item.gridX * g.cellWidth, top: g.top + item.gridY * g.cellHeight,
+    width: (item.invWidth || 1) * g.cellWidth, height: (item.invHeight || 1) * g.cellHeight }; }
+  const at = inventoryGridPosition(item);
+  return { left: AMAZON2_INVENTORY_LAYOUT.screenX + at.x, top: AMAZON2_INVENTORY_LAYOUT.screenY + at.y,
+    width: (item.invWidth || 1) * 29, height: (item.invHeight || 1) * 29 };
+}
+
+// The carried item under an 800x600 screen point: draw order is the list order, so the last match is
+// the one on top. Worn items are reached through the slot lookup, not here.
+export function inventoryItemAt(items, x, y, layout = null) {
+  for (let i = (items?.length || 0) - 1; i >= 0; i--) {
+    const item = items[i], r = inventoryGridRect(item, layout);
+    if (item.invPage === 0 && item.mode === 0 && x >= r.left && x < r.left + r.width && y >= r.top && y < r.top + r.height)
+      return item;
+  }
+  return null;
+}
+
 function frameCanvas(frame, palette, documentObject, item = null) {
   const canvas = documentObject.createElement('canvas'); canvas.width = frame.width; canvas.height = frame.height;
   const rgba = dc6FrameToRgba(frame, palette);
@@ -176,13 +198,8 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
   const view = (width, height) => { const scale = Math.min(1, width / 800, height / 600);
     return { scale, ox: (width - 800 * scale) / 2, oy: (height - 600 * scale) / 2 }; };
   // An item's rectangle on the 800x600 screen: its grid cells, or the body slot it is worn in.
-  const gridRect = (item) => {
-    if (layout) { const g = layout.grid; return { left: g.left + item.gridX * g.cellWidth, top: g.top + item.gridY * g.cellHeight,
-      width: (item.invWidth || 1) * g.cellWidth, height: (item.invHeight || 1) * g.cellHeight }; }
-    const at = inventoryGridPosition(item);
-    return { left: AMAZON2_INVENTORY_LAYOUT.screenX + at.x, top: AMAZON2_INVENTORY_LAYOUT.screenY + at.y,
-      width: (item.invWidth || 1) * 29, height: (item.invHeight || 1) * 29 };
-  };
+  const gridRect = (item) => inventoryGridRect(item, layout);
+  const tooltip = createItemTooltip(read, documentObject);
   const slotRect = (bodyLoc) => {
     if (layout) { const r = layout.slots[bodyLoc]; return r ? { left: r.left, top: r.top, width: r.right - r.left, height: r.bottom - r.top } : null; }
     const r = AMAZON2_EQUIPMENT_LAYOUT[bodyLoc];
@@ -196,7 +213,7 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
   gridRect, slotRect,
   itemAt(screenX, screenY, width, height, state) {
     const [x, y] = toScreen(width, height, screenX, screenY);
-    return [...(state?.items || [])].reverse().find((item) => item.invPage === 0 && item.mode === 0 && inside(x, y, gridRect(item))) || null;
+    return inventoryItemAt(state?.items, x, y, layout);
   },
   // The worn item under the pointer, or the empty slot: { bodyLoc, item }.
   slotAt(screenX, screenY, width, height, state) {
@@ -306,7 +323,17 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     const closeBlit = chrome.cel(ctx, act, PANEL_CLOSE_ART.path, closeFrame, close.x, close.y + close.height - 1);
     chrome.border(ctx, act, BORDER_RIGHT);
     ctx.restore();
-    return { x: baseX, y: baseY, scale, panelFrames: 4,
+    // The hovered item's tooltip, last so it is on top of the panel, its gold and its close button.
+    // The lines are the engine's (the shell passes `itemTip`, d2_session_item_title +
+    // d2_session_item_lines, the same source the vendor tooltip reads).
+    let tooltipEvidence = null;
+    const hovered = state?.pointer && state?.itemTip ? this.itemAt(state.pointer.x, state.pointer.y, width, height, state) : null;
+    if (hovered) {
+      const spec = itemTooltipSpec(state.itemTip(hovered));
+      const record = tooltip.draw(ctx, act, state.pointer, width, height, spec.lines, spec.colours);
+      if (record) tooltipEvidence = { id: hovered.id, ...record };
+    }
+    return { x: baseX, y: baseY, scale, panelFrames: 4, tooltip: tooltipEvidence,
       panelPixels: [4, 5, 6, 7].reduce((sum, i) => sum + dc6.frames[i].width * dc6.frames[i].height, 0),
       itemCount: (state?.items || []).filter((item) => item.invPage === 0).length, itemPixels,
       equippedItemCount, equippedItemPixels, drawn, layout: layout ? 'engine' : 'amazon2',

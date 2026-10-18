@@ -18,7 +18,7 @@
 #include <DataTbls/LevelsIds.h>
 #include <Path/PathMisc.h>
 
-#include "core/d2game/sunit_init_item_seeds.h"   // 1.13c D2Game+0xE00C0, the outlined item-seed branch
+#include "core/d2game/sunit_init_item_seeds.h"   // 1.13c D2Game 0xE00C0, the outlined item-seed branch
 
 
 #include "AI/AiGeneral.h"

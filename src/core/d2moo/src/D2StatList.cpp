@@ -85,7 +85,7 @@ int StatArray_DichotomicSearch(const T* pStatArray, D2SLayerStatIdStrc::PackedTy
 
 // Helper function
 template<class T>
-// 1.13c D2Common+0x38640
+// D2Common 1.13c +0x38640 (StatArray_InsertStat)
 decltype(T::pStat) __fastcall StatArray_InsertStat(void* pMemPool, T* pStatsArray, D2SLayerStatIdStrc::PackedType nLayer_StatId, int insertionIdx)
 {
 	typedef decltype(T::pStat) StatType;
@@ -1623,6 +1623,7 @@ D2StatListStrc* __stdcall STATLIST_GetStatListFromUnitAndFlag(D2UnitStrc* pUnit,
 }
 
 //D2Common.0x6FDB8270 (#10483)
+// 1.13c D2Common+0x384B0
 D2StatListStrc* __stdcall STATLIST_GetStatListFromUnitStateOrFlag(D2UnitStrc* pUnit, int nState, int nFlag)
 {
 	if (pUnit->pStatListEx && STATLIST_IsExtended(pUnit->pStatListEx))
@@ -2047,6 +2048,7 @@ static void STATLIST_ClampStat(D2StatListExStrc* pStatListEx, int nStatId)
 }
 
 //D2Common.0x6FDB8D30 (#10514)
+// 1.13c D2Common+0x3AB30
 void __stdcall STATLIST_ClampStaminaManaHP(D2UnitStrc* pUnit)
 {
 	if (pUnit && pUnit->pStatListEx)
@@ -2143,6 +2145,7 @@ void __stdcall D2Common_10474(D2UnitStrc* pUnused, D2StatListStrc* pStatList)
 }
 
 //D2Common.0x6FDB91D0 (#10564)
+// 1.13c D2Common+0x390F0
 int __stdcall STATLIST_GetMaxLifeFromUnit(D2UnitStrc* pUnit)
 {
 	return D2Common_11248(NULL, pUnit, STAT_MAXHP);
@@ -2180,6 +2183,7 @@ int __stdcall STATLIST_GetMaxDamageFromUnit(D2UnitStrc* pUnit, BOOL b2Handed)
 }
 
 //D2Common.0x6FDB96F0 (#10569)
+// 1.13c D2Common+0x38ED0
 int __stdcall STATLIST_GetMinDamageFromUnit(D2UnitStrc* pUnit, BOOL b2Handed)
 {
 	if (b2Handed)

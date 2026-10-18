@@ -657,6 +657,7 @@ uint32_t __stdcall ITEMS_GetAutoStack(D2UnitStrc* pItem)
 	return 0;
 }
 
+// 1.13c D2Common+0x23540
 //D2Common.0x6FD98EA0 (#10786)
 uint32_t __stdcall ITEMS_GetReload(D2UnitStrc* pItem)
 {
@@ -754,6 +755,7 @@ uint8_t __stdcall ITEMS_GetVarInvGfxCount(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD990A0 (#10790)
+// 1.13c D2Common+0x24DA0
 char* __stdcall ITEMS_GetVarInvGfxString(D2UnitStrc* pItem, int nId)
 {
 	D2ItemTypesTxt* pItemTypesTxtRecord = NULL;
@@ -889,6 +891,7 @@ uint32_t __stdcall ITEMS_Get2HandWeaponClassCode(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD99370 (#10746)
+// 1.13c D2Common+0x23290
 uint32_t __stdcall ITEMS_GetBaseCode(D2UnitStrc* pItem)
 {
 	D2_ASSERT(pItem);
@@ -972,6 +975,7 @@ void __stdcall ITEMS_GetAllowedBodyLocations(D2UnitStrc* pItem, uint8_t* pBodyLo
 }
 
 //D2Common.0x6FD995D0 (#10751)
+// 1.13c D2Common+0x230F0
 uint32_t __stdcall ITEMS_GetItemType(D2UnitStrc* pItem)
 {
 	D2ItemsTxt* pItemsTxtRecord = NULL;
@@ -1630,6 +1634,7 @@ uint32_t __stdcall ITEMS_CheckIfStackable(D2UnitStrc* pItem)
 	return 0;
 }
 
+// 1.13c D2Common+0x24BA0 (#10792)
 //D2Common.0x6FD9A7A0 (#10768)
 uint32_t __stdcall ITEMS_CheckIfBeltable(D2UnitStrc* pItem)
 {
@@ -3384,6 +3389,8 @@ static uint32_t* ITEMS_TypeEquivalenceLUT(int nItemTypeLUT)
 }
 
 //D2Common.0x6FD9DBA0 (#10729)
+// 1.13c D2Common+0x24500: the type-equivalence walk is the vendored one step for step -- the
+// primary wType[0] lookup, then wType[1] only when the primary misses and is in range.
 BOOL __stdcall ITEMS_CheckItemTypeIdByItemId(int nItemId, int nItemType)
 {
 	if (nItemType >= 0 && nItemType < sgptDataTables->nItemTypesTxtRecordCount)
@@ -3733,12 +3740,12 @@ int __stdcall ITEMS_Is1Or2Handed(D2UnitStrc* pPlayer, D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD9E710 (#10829)
+// 1.13c D2Common+0x251C0
 uint8_t* __stdcall ITEMS_GetColor(D2UnitStrc* pPlayer, D2UnitStrc* pItem, uint8_t* pColor, int nTransType)
 {
 	D2UniqueItemsTxt* pUniqueItemsTxtRecord = NULL;
 	D2MagicAffixTxt* pMagicAffixTxtRecord = NULL;
 	D2MagicAffixTxt* pAutoAffixTxtRecord = NULL;
-	D2ItemTypesTxt* pItemTypesTxtRecord = NULL;
 	D2SetItemsTxt* pSetItemsTxtRecord = NULL;
 	D2ItemsTxt* pGemItemsTxtRecord = NULL;
 	D2ItemsTxt* pItemsTxtRecord = NULL;
@@ -3748,8 +3755,6 @@ uint8_t* __stdcall ITEMS_GetColor(D2UnitStrc* pPlayer, D2UnitStrc* pItem, uint8_
 	int nItemQuality = 0;
 	int nGemSockets = 0;
 	int nMaxSockets = 0;
-	int nItemLevel = 0;
-	int nItemType = 0;
 	int nCounter = 0;
 	uint16_t nAutoAffix = 0;
 
@@ -3758,7 +3763,9 @@ uint8_t* __stdcall ITEMS_GetColor(D2UnitStrc* pPlayer, D2UnitStrc* pItem, uint8_
 		return NULL;
 	}
 
-	if (pPlayer)
+	// The 1.13c body (this row) gates the colour-state path on the first argument being a player,
+	// monster or missile unit; objects and other unit types never reach the states loop.
+	if (pPlayer && (pPlayer->dwUnitType == UNIT_PLAYER || pPlayer->dwUnitType == UNIT_MONSTER || pPlayer->dwUnitType == UNIT_MISSILE))
 	{
 		for (int i = 0; i < sgptDataTables->nColourStates; ++i)
 		{
@@ -3957,67 +3964,39 @@ uint8_t* __stdcall ITEMS_GetColor(D2UnitStrc* pPlayer, D2UnitStrc* pItem, uint8_
 		return NULL;
 
 	default:
-		if (pItem->dwUnitType == UNIT_ITEM)
+		// The 1.13c body (this row) tests the item id for socketability (0x22920) and the item's
+		// socket capacity (0x24610), then the socketed flag and the inventory signature, and only then
+		// takes the first inventory item when it is a gem. The 1.10f body computed the same socket
+		// count inline from the item type record.
+		if (pItem->dwUnitType == UNIT_ITEM && ITEMS_CheckIfSocketableByItemId(pItem->dwClassId) && ITEMS_GetMaxSockets(pItem) != 0)
 		{
-			pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
-			if (pItemsTxtRecord && pItemsTxtRecord->nHasInv)
+			if (pItem->pItemData && (pItem->pItemData->dwItemFlags & IFLAG_SOCKETED) && pItem->pInventory && INVENTORY_CheckSignature(pItem->pInventory))
 			{
-				nItemType = ITEMS_GetItemTypeFromItemId(pItem->dwClassId);
-				if (nItemType >= 0 && nItemType < sgptDataTables->nItemTypesTxtRecordCount)
+				pInventoryItem = INVENTORY_GetFirstItem(pItem->pInventory);
+				if (pInventoryItem && INVENTORY_UnitIsItem(pInventoryItem) && ITEMS_CheckItemTypeId(pInventoryItem, ITEMTYPE_GEM))
 				{
-					pItemTypesTxtRecord = &sgptDataTables->pItemTypesTxt[nItemType];
-					if (pItemTypesTxtRecord)
+					pGemItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pInventoryItem->dwClassId);
+					if (pGemItemsTxtRecord)
 					{
-						nGemSockets = ITEMS_GetAllowedGemSocketsFromItemId(pItem->dwClassId);
-						nItemLevel = ITEMS_GetItemLevel(pItem);
-						if (nItemLevel > 25)
+						pGemsTxtRecord = DATATBLS_GetGemsTxtRecord(pGemItemsTxtRecord->dwGemOffset);
+						pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
+
+						if (pItemsTxtRecord->nTransform <= 0 || pItemsTxtRecord->nTransform >= 9 || pGemsTxtRecord->nTransForm >= 21)
 						{
-							if (nItemLevel > 40)
-							{
-								nMaxSockets = pItemTypesTxtRecord->nMaxSock40;
-							}
-							else
-							{
-								nMaxSockets = pItemTypesTxtRecord->nMaxSock25;
-							}
+							*pColor = 0;
 						}
 						else
 						{
-							nMaxSockets = pItemTypesTxtRecord->nMaxSock1;
+							*pColor = (pGemsTxtRecord->nTransForm & 31) + 32 * pItemsTxtRecord->nTransform;
 						}
 
-						if (nGemSockets >= nMaxSockets)
+						if (nTransType)
 						{
-							nGemSockets = nMaxSockets;
+							return D2CMP_MixPalette(pItemsTxtRecord->nInvTrans, pGemsTxtRecord->nTransForm);
 						}
-
-						if (nGemSockets && pItem->dwUnitType == UNIT_ITEM && pItem->pItemData && pItem->pItemData->dwItemFlags & IFLAG_SOCKETED)
+						else
 						{
-							pInventoryItem = INVENTORY_GetFirstItem(pItem->pInventory);
-							if (pInventoryItem && INVENTORY_UnitIsItem(pInventoryItem) && ITEMS_CheckItemTypeId(pInventoryItem, ITEMTYPE_GEM))
-							{
-								pGemItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pInventoryItem->dwClassId);
-								D2_ASSERT(pGemItemsTxtRecord);
-
-								pGemsTxtRecord = DATATBLS_GetGemsTxtRecord(pGemItemsTxtRecord->dwGemOffset);
-								if (pItemsTxtRecord->nTransform <= 0 || pItemsTxtRecord->nTransform >= 9 || pGemsTxtRecord->nTransForm >= 21)
-								{
-									*pColor = 0;
-								}
-								else
-								{
-									*pColor = (pGemsTxtRecord->nTransForm & 31) + 32 * pItemsTxtRecord->nTransform;
-								}
-
-								if (nTransType)
-								{
-									return D2CMP_MixPalette(pItemsTxtRecord->nInvTrans, pGemsTxtRecord->nTransForm);
-								}
-								else
-								{
-									return D2CMP_MixPalette(pItemsTxtRecord->nTransform, pGemsTxtRecord->nTransForm);
-								}
-							}
+							return D2CMP_MixPalette(pItemsTxtRecord->nTransform, pGemsTxtRecord->nTransForm);
 						}
 					}
 				}
@@ -4124,6 +4103,7 @@ BOOL __stdcall ITEMS_IsImbueable(D2UnitStrc* pItem)
 	return FALSE;
 }
 
+// 1.13c D2Common+0x240D0 (#10796)
 //D2Common.0x6FD9F080 (#10832)
 BOOL __stdcall ITEMS_IsPersonalizable(D2UnitStrc* pItem)
 {
@@ -4552,7 +4532,7 @@ BOOL __stdcall ITEMS_CanBeEquipped(D2UnitStrc* pItem)
 // 1.13c D2Common+0x287D0
 BOOL __stdcall ITEMS_IsCharmUsable(D2UnitStrc* pItem, D2UnitStrc* pPlayer)
 {
-	// 1.13c D2Common+0x287D0: broken/noequip check applies only to item units; non-items fall through to the unit-type test
+	// D2Common 1.13c +0x287D0: broken/noequip check applies only to item units; non-items fall through to the unit-type test
 	if (!pItem)
 	{
 		return FALSE;

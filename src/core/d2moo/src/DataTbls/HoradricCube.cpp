@@ -710,14 +710,14 @@ void __fastcall DATATBLS_LoadCubeMainTxt(HD2ARCHIVE hArchive)
 	if (ARCHIVE_OpenFile(hArchive, szPath, &pFileHandle, TRUE))
 	{
 		FOG_DisplayWarning("Found cubeserver.bin in data path.  This file should only be on the server\n", __FILE__, __LINE__);
-		exit(-1); // 1.13c D2Common+0x1C4C0: the client finds a server-only file -> fatal report, _exit(-1)
+		exit(-1); // D2Common 1.13c +0x1C4C0: the client finds a server-only file -> fatal report, _exit(-1)
 	}
 
 	wsprintfA(szPath, "%s\\%s", "DATA\\GLOBAL\\EXCEL", "cubeserver.txt");
 	if (ARCHIVE_OpenFile(hArchive, szPath, &pFileHandle, TRUE))
 	{
 		FOG_DisplayWarning("Found cubeserver.txt in data path.  This file should only be on the server\n", __FILE__, __LINE__);
-		exit(-1); // 1.13c D2Common+0x1C4C0: the client finds a server-only file -> fatal report, _exit(-1)
+		exit(-1); // D2Common 1.13c +0x1C4C0: the client finds a server-only file -> fatal report, _exit(-1)
 	}
 
 	sgptDataTables->pCubeMainTxt = (D2CubeMainTxt*)DATATBLS_CompileTxt(hArchive, "cubemain", pTbl, &sgptDataTables->nCubeMainTxtRecordCount, sizeof(D2CubeMainTxt));
@@ -730,6 +730,7 @@ void __fastcall DATATBLS_UnloadCubeMainTxt()
 	sgptDataTables->pCubeMainTxt = NULL;
 }
 
+// 1.13c D2Common+0x1B890 (#10783)
 //D2Common.0x6FD54260 (#11232)
 D2CubeMainTxt* __stdcall DATATBLS_GetCubemainTxtRecord(int nIndex)
 {

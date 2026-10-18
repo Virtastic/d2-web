@@ -732,13 +732,13 @@ void __fastcall DATATBLS_LoadSkills_SkillDescTxt(HD2ARCHIVE hArchive)
 
 	sgptDataTables->pSkillsLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
 	sgptDataTables->pSkillsTxt = (D2SkillsTxt*)DATATBLS_CompileTxt(hArchive, "skills", pSkillTbl, &sgptDataTables->nSkillsTxtRecordCount, sizeof(D2SkillsTxt));
-	D2_ASSERT(sgptDataTables->nSkillsTxtRecordCount < 32767); // 1.13c D2Common+0x61EC0: fatal count limit (1.10f only warned)
+	D2_ASSERT(sgptDataTables->nSkillsTxtRecordCount < 32767); // D2Common 1.13c +0x61EC0: fatal count limit (1.10f only warned)
 
 	sgptDataTables->nPassiveSkills = 0;
 
 	sgptDataTables->pSkillDescLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, __LINE__);
 	sgptDataTables->pSkillDescTxt = (D2SkillDescTxt*)DATATBLS_CompileTxt(hArchive, "skilldesc", pSkillDescTbl, &sgptDataTables->nSkillDescTxtRecordCount, sizeof(D2SkillDescTxt));
-	D2_ASSERT(sgptDataTables->nSkillDescTxtRecordCount < 32767); // 1.13c D2Common+0x61EC0: fatal count limit (1.10f only warned)
+	D2_ASSERT(sgptDataTables->nSkillDescTxtRecordCount < 32767); // D2Common 1.13c +0x61EC0: fatal count limit (1.10f only warned)
 
 	if (sgptDataTables->bCompileTxt)
 	{

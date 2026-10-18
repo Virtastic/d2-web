@@ -1,8 +1,8 @@
 #include <D2Game/GAME/Game.h>
 
+// 1.13c D2Game+0x29AD0
 int32_t __stdcall GAME_ReturnArgument(int32_t value)
 {
-    // 1.13c D2Game+0x29AD0
     return value;
 }
 
@@ -673,8 +673,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8a3e0_run()
 }
 
 // 1.13c D2Game+0x8C380
-// 1.13c D2Game+0x4AB70
-// 1.13c D2Game+0x8A980
 // Small server->client packet builders; each fills a stack buffer and hands it to 0x8A3E0 (`send(client, buf, n)`).
 // 8C380 (AL = type, ECX = value, stack client): {type, value LE32}, 5 bytes. 4AB70 (EAX = unit or null, stack client): {0x0B, unit type low byte, unit id LE32}, 6 bytes; null unit sends type 6, id -1.
 // 8A980 (EAX = word, CL = byte, EDX = dword, stack client, flag): {0x7B, byte, (word & 0xFFF | 0x8000 if flag) LE16, dword LE32}, 8 bytes.
@@ -682,11 +680,13 @@ template <class Send> static void GAME_8C380(uint8_t type, uint32_t value, void*
 {
     uint8_t b[5]; b[0] = type; memcpy(b + 1, &value, 4); send(client, b, 5);
 }
+// 1.13c D2Game+0x4AB70
 template <class Send> static void GAME_4AB70(const D2UnitStrc* unit, void* client, Send send)
 {
     uint32_t type = unit ? unit->dwUnitType : 6, id = unit ? unit->dwUnitId : 0xFFFFFFFFu;
     uint8_t b[6]; b[0] = 0x0B; b[1] = (uint8_t)type; memcpy(b + 2, &id, 4); send(client, b, 6);
 }
+// 1.13c D2Game+0x8A980
 template <class Send> static void GAME_8A980(uint32_t word, uint8_t byte, uint32_t dword, void* client, int flag, Send send)
 {
     uint16_t w = (uint16_t)((word & 0xFFF) | (flag ? 0x8000 : 0));

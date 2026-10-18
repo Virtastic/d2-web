@@ -745,6 +745,7 @@ void __stdcall D2Common_10075(D2ActiveRoomStrc* pRoom, BOOL bSet)
 }
 
 //D2Common.0x6FD8CB60 (#10079)
+// 1.13c D2Common+0x3C460
 void __stdcall DUNGEON_AddClientToRoom(D2ActiveRoomStrc* pRoom, D2ClientStrc* pClient)
 {
 	D2_ASSERT(pRoom);
@@ -1174,6 +1175,7 @@ void __stdcall DUNGEON_GetPortalLevelArrayFromPortalFlags(void* pMemPool, int nF
 }
 
 //D2Common.0x6FD8D4B0 (#10099)
+// 1.13c D2Common+0x3BC40
 int __stdcall DUNGEON_GetPortalFlagFromLevelId(int nPortalLevelId)
 {
 	int* pPortalLevels = NULL;

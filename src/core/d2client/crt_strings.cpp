@@ -54,6 +54,28 @@ extern "C" const uint8_t* d2c_strpbrk(const uint8_t* s, const uint8_t* set) {
     return nullptr;
 }
 
+struct D2cLocInfo {
+    uint8_t pad0[0x14];
+    int32_t locale_handle;      // +0x14: LCID; 0 = C locale
+    uint8_t pad1[0x0C];
+    int32_t single_byte_flag;   // +0x24
+};
+static_assert(offsetof(D2cLocInfo, locale_handle) == 0x14);
+static_assert(offsetof(D2cLocInfo, single_byte_flag) == 0x24);
+
+// 1.13c D2Client+0x7604 (___tolower_mt, 200 B): lowercase one byte through the thread locale block.
+// Fast path (locale handle at +0x14 == 0, our port's C locale, or single-byte flag +0x24 set and c < 0x80):
+// fold 0x41..0x5A by +0x20 and return every other byte unchanged. The slower path (a loaded code page for
+// c >= 0x80) needs the CRT's pctype/LCMapStringA tables, which this port does not carry.
+extern "C" int32_t d2c_tolower_mt(const D2cLocInfo* loc, int32_t c) {
+    if (loc->locale_handle == 0 || (loc->single_byte_flag != 0 && c < 0x80)) {
+        // ponytail: ASCII-only, the fast path our zeroed locale block always takes;
+        // add the pctype/LCMapStringA tables if a caller ever loads a code page.
+        if (c > 0x40 && c < 0x5B) return c + 0x20;
+    }
+    return c;
+}
+
 #define P(i) ((const uint8_t*)(uintptr_t)r[i])
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2client_4a60(uint32_t* r) { r[4] = (uint32_t)d2c_strcmp(P(0), P(1)); }
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2client_76f0(uint32_t* r) { r[4] = (uint32_t)d2c_stricmp(P(0), P(1)); }
