@@ -241,4 +241,8 @@ F80 d2game_F4940(X87& x,F80 denominator,F80 numerator) {
 // 1.13c D2Game+0xF4EF6
 F80 d2game_F4EF6(X87& x,F80 st0,F80 st1) { return d2game_F4940(x,st0,st1); }
 
+// Reverse-pop companion: ST1 is the denominator, ST0 the numerator.
+// 1.13c D2Game+0xF4F09
+F80 d2game_F4F09(X87& x,F80 st0,F80 st1) { return d2game_F4940(x,st1,st0); }
+
 }

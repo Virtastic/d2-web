@@ -1,11 +1,19 @@
-// 1.13c D2Client+0x15FC0 and +0x36170: D2Gfx#10041 cell draws
-// with a zeroed 72-byte context {frame at +0, cel at +0x34}; args after the context are (x, y, -1, 5, 0).
-#include <cstdint>
+#include "cell_draw.h"
 
-typedef void (*CellDraw)(uint32_t frame, int32_t x, int32_t y);
+// 1.13c D2Client+0x15FC0: globals {cel, frame, x1, x2, y}.
+uint32_t d2client_sub_15FC0(const int32_t* g, D2ClientCellDraw draw, void* user) {
+    D2ClientCellContext ctx{};
+    ctx.cel = static_cast<uint32_t>(g[0]);
+    ctx.frame = static_cast<uint32_t>(g[1]);
+    return draw(user, &ctx, g[2] + g[3], g[4] + 0x21, -1, 5, 0);
+}
 
-// 1.13c D2Client+0x15FC0: frame = [+0x11B858], cel = [+0x11B850] (caller reads it), x = [+0x11B82C]+[+0x11B828], y = [+0x11B824]+0x21.
-void d2client_sub_15FC0(const int32_t* g /* {cel, frame, x1, x2, y} */, CellDraw draw) { draw((uint32_t)g[1], g[2] + g[3], g[4] + 0x21); }
-
-// 1.13c D2Client+0x36170: frame 0, x = 0x68, y = 0x49 + 0x14*i for i in 0..7; cel = [+0x11C440].
-void d2client_sub_36170(CellDraw draw) { for (int32_t i = 0, y = 0x49; i < 8; i++, y += 0x14) draw(0, 0x68, y); }
+// 1.13c D2Client+0x36170: cel is global +0x11C440.
+uint32_t d2client_sub_36170(uint32_t cel, D2ClientCellDraw draw, void* user) {
+    D2ClientCellContext ctx{};
+    ctx.cel = cel;
+    uint32_t result = 0;
+    for (int32_t i = 0, y = 0x49; i < 8; ++i, y += 0x14)
+        result = draw(user, &ctx, 0x68, y, -1, 5, 0);
+    return result;
+}

@@ -1,15 +1,17 @@
-// src/core/d2game/d2game_batch_3e70.cpp -- six UNMAPPED 1.13c D2Game.dll rows reimplemented from the
+// src/core/d2game/d2game_batch_3e70.cpp -- 1.13c D2Game.dll CRT rows reimplemented from the
 // cached decompiles (build-wasm/ghidra-d2game/decomp/0x<RVA>.c), in RVA order: the MSVC 2003 Release CRT
-// 64-bit divide helper, two critical-section wrappers, __amsg_exit, __flsbuf and _output (the printf
-// formatter). Alpha batch lane (OBJECTIVE v8.3): implementation + marker only, no spec, no vector.
+// 64-bit divide helper, critical-section wrappers and teardown, __amsg_exit, __flsbuf and _output (the
+// printf formatter). __mtdeletelocks (0x3F21) has its own spec and awaits a FUNCTION-mode vector.
 //
 // Host model: retail's 32-bit module globals are the statics below (retail RVA noted). Callees whose
 // implementations live elsewhere are seam function pointers on D2GameBatch16Env, in retail argument order;
 // the CRT output helpers already recovered (0x4352 write_char, 0x43A9 write_string, src/core/crt_write.cpp)
 // are called directly. Critical sections are the compat no-ops (src/core/d2moo/compat/Windows.h).
+#include "d2game_scalar_helpers.h"
 #include <cstdint>
 #include <cstddef>
 #include <cstring>
+#include <cstdlib>
 #include <unistd.h>
 #include <emscripten.h>
 #include <Windows.h>      // CRITICAL_SECTION no-ops
@@ -56,8 +58,15 @@ static inline uint16_t rd16(const void* p, uint32_t o) { uint16_t v; std::memcpy
 static inline uint32_t rd32(const void* p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
 
 // ---- module state --------------------------------------------------------------------------------
-// 0x6FD1F210: CRT lock table, 8-byte CRITICAL_SECTION stride (indexed as dwords by the decompiler).
-static uint8_t g_crtLockTable[0x800];
+// Retail records are 8 bytes; these host records keep native pointers separate from 32-bit flags.
+struct D2GameCrtLock { void* section; uint32_t staticFlag; };
+static D2GameCrtLock g_crtLockTable[0x24] = {
+    {nullptr,1},{nullptr,1},{nullptr,0},{nullptr,1},{nullptr,1},{nullptr,0},
+    {nullptr,1},{nullptr,1},{nullptr,1},{nullptr,0},{nullptr,1},{nullptr,0},
+    {nullptr,1},{nullptr,1},{nullptr,1},{nullptr,0},{nullptr,1},{nullptr,1},{nullptr,1}
+};
+alignas(CRITICAL_SECTION) static uint8_t g_crtStaticLockSections[0x24 * 0x18];
+extern "C" void* d2game_crt_lock_section(uint32_t index) { return g_crtLockTable[index].section; }
 // 0x6FD2FD74 / 0x6FD2FD78: __error_mode / __app_type.
 static int32_t g_errorMode;
 static int32_t g_appType;
@@ -89,7 +98,7 @@ static const uint16_t g_wideNull[] = { '(', 'n', 'u', 'l', 'l', ')', 0 };   // 0
 // quotient (the divisor-high==0 path splits it into a 64/32 quotient plus the overflow word), so the
 // single 64-bit divide below is the rule. A zero divisor raises #DE in retail and here alike.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint64_t d2_fn_d2game_3e70(uint32_t lo, uint32_t hi, uint32_t dlo, uint32_t dhi) {
+EMSCRIPTEN_KEEPALIVE uint64_t d2game_aulldiv(uint32_t lo, uint32_t hi, uint32_t dlo, uint32_t dhi) {
     return ((uint64_t)hi << 32 | lo) / ((uint64_t)dhi << 32 | dlo);
 }
 
@@ -98,7 +107,7 @@ EMSCRIPTEN_KEEPALIVE uint64_t d2_fn_d2game_3e70(uint32_t lo, uint32_t hi, uint32
 // pointer; the compat build's critical sections are no-ops, so the table read and call are the rule.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3f76(int32_t lockNum) {
-    LeaveCriticalSection((LPCRITICAL_SECTION)(g_crtLockTable + (uint32_t)lockNum * 8));
+    LeaveCriticalSection((LPCRITICAL_SECTION)g_crtLockTable[(uint32_t)lockNum].section);
 }
 
 // 1.13c D2Game+0x3F8B (__mtinitlocknum): create the critical section for lock lockNum. Returns 1 when
@@ -108,7 +117,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3f76(int32_t lockNum) {
 // __local_unwind2 rather than the finally call).
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_3f8b(int32_t lockNum, const D2GameBatch16Env* env) {
-    uint32_t* slot = (uint32_t*)(g_crtLockTable + (uint32_t)lockNum * 8);
+    void** slot = &g_crtLockTable[(uint32_t)lockNum].section;
     if (*slot != 0) return 1;
     void* mem = env->malloc(0x18);
     if (mem == nullptr) {
@@ -123,12 +132,54 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_3f8b(int32_t lockNum, const D2GameBatc
             env->unlock(10);          // the enclosing __finally
             return 0;
         }
-        *slot = (uint32_t)(uintptr_t)mem;
+        *slot = mem;
     } else {
         env->free(mem);
     }
     env->unlock(10);
     return 1;
+}
+
+// 1.13c D2Game+0x3ED8 (__mtinitlocks): initialize the image's statically flagged CRT locks. Retail's
+// 0x24 records begin at 0x6FD1F210 and its 0x24 24-byte critical sections at 0x6FD2FD98. Each flagged
+// record receives the next section; a failed 0x7DE3 initializer clears that pointer and returns 0.
+extern "C" int32_t d2_fn_d2game_7de3(void* cs, uint32_t spin,
+                                      const struct D2GameCrtInitCritSecEnv* env);
+extern "C"
+EMSCRIPTEN_KEEPALIVE int32_t d2_game_3ed8(void) {
+    uint8_t* next = g_crtStaticLockSections;
+    for (uint32_t i = 0; i < 0x24; ++i) {
+        D2GameCrtLock& slot = g_crtLockTable[i];
+        if (slot.staticFlag != 1) continue;
+        slot.section = next;
+        next += 0x18;
+        if (d2_fn_d2game_7de3(slot.section, 4000, nullptr) == 0) {
+            slot.section = nullptr;
+            return 0;
+        }
+    }
+    return 1;
+}
+
+
+
+// 1.13c D2Game+0x3F21 (__mtdeletelocks): walk the 0x24 CRT lock records twice. The first walk deletes
+// and frees each allocated lock (flag != 1), clearing its pointer; the second deletes initialized
+// statically-backed locks (flag == 1) without freeing their in-module storage. The record layout shares
+// g_crtLockTable with __mtinitlocknum (0x3F8B) and __unlock (0x3F76).
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3f21(void) {
+    for (auto& slot : g_crtLockTable) {
+        if (slot.section != nullptr && slot.staticFlag != 1) {
+            DeleteCriticalSection((LPCRITICAL_SECTION)slot.section);
+            std::free(slot.section);
+            slot.section = nullptr;
+        }
+    }
+    for (auto& slot : g_crtLockTable) {
+        if (slot.section != nullptr && slot.staticFlag == 1)
+            DeleteCriticalSection((LPCRITICAL_SECTION)slot.section);
+    }
 }
 
 // 1.13c D2Game+0x3820 (__amsg_exit): print a runtime-error message for message id msg, then terminate

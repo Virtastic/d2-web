@@ -34,6 +34,8 @@ const char* FOG_csprintf(char* dst, const char* fmt, ...) { va_list a; va_start(
 
 // --- Archive: DS1 reads go through our layered MPQ VFS ----------------------------------------
 namespace d2 { extern MpqVfs* g_drlgVfs; }
+// The existence-only VFS probe can fail only with file-not-found (Win32 2).
+uint32_t ARCHIVE_GetLastError() { return 2; }
 BOOL ARCHIVE_OpenFile(HD2ARCHIVE, const char* szFilePath, HSFILE* phFile, BOOL) { *phFile = nullptr; return d2::g_drlgVfs && d2::g_drlgVfs->has(szFilePath) ? TRUE : FALSE; }
 void* ARCHIVE_AllocateBufferAndReadFile(HD2ARCHIVE, const char* szFilePath, size_t* pdwBytesWritten, const char* szSrcPath, int nLine) {
     std::vector<uint8_t> buf;

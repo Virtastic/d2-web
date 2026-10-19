@@ -4145,6 +4145,7 @@ int32_t __fastcall MISSMODE_SrvHit54_BaalSpawnMonsters(D2GameStrc* pGame, D2Unit
 }
 
 //D2Game.0x6FC5E220
+// 1.13c D2Game+0x396E0
 int32_t __fastcall MISSMODE_SrvHit55_Baalnferno(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_PLAYER)

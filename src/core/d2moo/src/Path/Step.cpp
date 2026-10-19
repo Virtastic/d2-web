@@ -237,6 +237,8 @@ void __fastcall PATH_GetDirectionVector(D2CoordStrc* pDirectionVector, int* pOut
 
 
 //D2Common.0x6FDAB810
+// 1.13c D2Common+0x3E110
+// Prior art used: D2MOO Step.cpp; 1.13c retains signed, paired shifts at +/-65536.
 void __fastcall sub_6FDAB810(int* a1, int* a2)
 {
 	if (*a1 < 0)
@@ -706,7 +708,21 @@ void PATH_StopMovement(D2DynamicPathStrc* pDynamicPath)
 
 //1.00:  Inlined
 //1.10f: Inlined
-//1.13c: D2Common.0x6FD5DDC0
+// Retail x86 offsets, adjusted only for the native pointer fields before each member.
+static_assert(offsetof(D2DynamicPathStrc, tGameCoords) == 0x00 + 0 * (sizeof(void*) - 4));
+static_assert(offsetof(D2DynamicPathStrc, pRoom) == 0x1C + 0 * (sizeof(void*) - 4));
+static_assert(offsetof(D2DynamicPathStrc, dwCurrentPointIdx) == 0x24 + 2 * (sizeof(void*) - 4));
+static_assert(offsetof(D2DynamicPathStrc, dwPathPoints) == 0x28 + 2 * (sizeof(void*) - 4));
+static_assert(offsetof(D2DynamicPathStrc, pUnit) == 0x30 + 3 * (sizeof(void*) - 4));
+static_assert(offsetof(D2DynamicPathStrc, dwFlags) == 0x34 + 4 * (sizeof(void*) - 4));
+static_assert(offsetof(D2DynamicPathStrc, dwUnitSize) == 0x44 + 4 * (sizeof(void*) - 4));
+static_assert(offsetof(D2DynamicPathStrc, dwCollisionPattern) == 0x48 + 4 * (sizeof(void*) - 4));
+static_assert(offsetof(D2DynamicPathStrc, nFootprintCollisionMask) == 0x4C + 4 * (sizeof(void*) - 4));
+static_assert(offsetof(D2DynamicPathStrc, tVelocityVector) == 0x72 + 5 * (sizeof(void*) - 4));
+static_assert(offsetof(D2FP32_16, wPosX) == 2 && offsetof(D2FP32_16, wPosY) == 6);
+static_assert(offsetof(D2UnitStrc, dwUnitType) == 0);
+static_assert(offsetof(D2CoordStrc, nX) == 0 && offsetof(D2CoordStrc, nY) == 4);
+// 1.13c D2Common+0x0DDC0
 BOOL __stdcall D2Common_10231_Impl(D2DynamicPathStrc* pDynamicPath, D2ActiveRoomStrc* pRoomDest, D2PathPointStrc tDest)
 {
 	D2PathPointStrc tCurrentPos;
@@ -739,7 +755,7 @@ BOOL __stdcall D2Common_10231_Impl(D2DynamicPathStrc* pDynamicPath, D2ActiveRoom
 	{
 		pDynamicPath->dwFlags |= PATH_UNKNOWN_FLAG_0x00001;
 	}
-	PATH_RecacheRoomAtCoordIfNeeded(pDynamicPath, pRoomDest, PATH_FP16FitToCenter(tDest.X), PATH_FP16FitToCenter(tDest.Y));
+	PATH_RecacheRoomAtCoordIfNeeded(pDynamicPath, pRoomDest, PATH_ToFP16Center(tDest.X), PATH_ToFP16Center(tDest.Y));
 
 	D2_ASSERT(COORD_TEST_EQUAL(tDest, sgctZeroGameCoord) || COLLISION_GetRoomBySubTileCoordinates(pRoomDest, tDest.X, tDest.Y));
 	PATH_StopMovement(pDynamicPath);
@@ -762,6 +778,7 @@ int __stdcall D2Common_10231(D2DynamicPathStrc* pDynamicPath, D2UnitStrc* pUnit_
 //1.00:  D2Common.0x1005F220
 //1.10f: D2Common.0x6FDACC40
 //1.13c: D2Common.0x6FD5DA40
+// 1.13c D2Common+0x0DA40
 void PATH_RecacheRoomAtCoordIfNeeded(D2DynamicPathStrc* pPath, D2ActiveRoomStrc* pHintRoom, uint32_t nPrecisionX, uint32_t nPrecisionY)
 {
 	if ((pPath->dwFlags & PATH_MISSILE_MASK) == 0
@@ -784,6 +801,7 @@ void PATH_RecacheRoomAtCoordIfNeeded(D2DynamicPathStrc* pPath, D2ActiveRoomStrc*
 //1.00:  Inlined
 //1.10f: D2Common.0x6FDAD330
 //1.13c: D2Common.0x6FD5DC80
+// 1.13c D2Common+0x0DC80
 void PATH_ResetMovement(D2DynamicPathStrc* pDynamicPath)
 {
 	PATH_RecacheRoomAtCoordIfNeeded(

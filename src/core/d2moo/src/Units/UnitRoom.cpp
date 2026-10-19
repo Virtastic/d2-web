@@ -6,9 +6,10 @@
 #include "Path/Path.h"
 
 
-//TODO: Find names (used by Path Functions)
-int dword_6FDD2580;
-int dword_6FDD2584;
+// 1.13c D2Common +0x0D540 reads DAT_6fddd458/45c. Both addresses are in
+// .rdata and contain zero in the 1.13c DLL; +0x3C870 reads the same pair.
+constexpr int dword_6FDDD458 = 0;
+constexpr int dword_6FDDD45C = 0;
 
 //D2Common.0x6FDBCF10 (#11279)
 int __stdcall UNITROOM_AddUnitToRoomEx(D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoom, int nUnused)
@@ -124,6 +125,26 @@ void __stdcall UNITROOM_SortUnitListByTargetY(D2ActiveRoomStrc* pRoom)
 	}
 }
 
+// 1.13c D2Common+0x0D540
+// Retail passes the path in ESI; room and unit fields remain native pointers.
+static void UNITROOM_ResetDynamicPath(D2DynamicPathStrc* pPath)
+{
+	pPath->tGameCoords.dwPrecisionX = dword_6FDDD458;
+	pPath->tGameCoords.dwPrecisionY = dword_6FDDD45C;
+
+	pPath->dwClientCoordX = dword_6FDDD458;
+	pPath->dwClientCoordY = dword_6FDDD45C;
+
+	pPath->dwPathPoints = 0;
+
+	if (pPath->pRoom)
+	{
+		pPath->pPreviousRoom = pPath->pRoom;
+		UNITROOM_RemoveUnitFromRoom(pPath->pUnit);
+		pPath->dwFlags |= PATH_CURRENT_ROOM_INVALID;
+	}
+}
+
 //1.00:  D2Common.0x1006D1E0 (#10385)
 //1.10f: D2Common.0x6FDBD250 (#10390)
 // 1.13c D2Common+0x668A0
@@ -136,20 +157,7 @@ void __stdcall UNITROOM_UpdatePath(D2UnitStrc* pUnit)
 	case UNIT_PLAYER:
 	case UNIT_MONSTER:
 	case UNIT_MISSILE:
-		pUnit->pDynamicPath->tGameCoords.dwPrecisionX = dword_6FDD2580;
-		pUnit->pDynamicPath->tGameCoords.dwPrecisionY = dword_6FDD2584;
-
-		pUnit->pDynamicPath->dwClientCoordX = dword_6FDD2580;
-		pUnit->pDynamicPath->dwClientCoordY = dword_6FDD2584;
-
-		pUnit->pDynamicPath->dwPathPoints = 0;
-		
-		if (pUnit->pDynamicPath->pRoom)
-		{
-			pUnit->pDynamicPath->pPreviousRoom = pUnit->pDynamicPath->pRoom;
-			UNITROOM_RemoveUnitFromRoom(pUnit->pDynamicPath->pUnit);
-			pUnit->pDynamicPath->dwFlags |= PATH_CURRENT_ROOM_INVALID;
-		}
+		UNITROOM_ResetDynamicPath(pUnit->pDynamicPath);
 		break;
 
 	case UNIT_OBJECT:

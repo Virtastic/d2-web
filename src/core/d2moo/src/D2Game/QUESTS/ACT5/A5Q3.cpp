@@ -1649,6 +1649,8 @@ void __fastcall sub_6FCB53D0(D2GameStrc* pGame)
 
 //D2Game.0x6FCB5400
 //TODO: Find a name
+// 1.13c D2Game+0x56950
+// Prior art: D2MOO 1.10f A5Q3.cpp; checked against the complete cached 1.13c body.
 int32_t __fastcall sub_6FCB5400(D2GameStrc* pGame)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A5Q3_PRISONOFICE);

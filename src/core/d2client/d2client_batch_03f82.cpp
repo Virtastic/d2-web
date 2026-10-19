@@ -17,8 +17,9 @@
 #include "client_host.h"
 
 // The CRT's FILE fields these rows touch (retail: _ptr +0, _cnt +4, _base +8, _flag +0xC, _file +0x10,
-// _charbuf +0x14, _bufsiz +0x18, _tmpfname +0x1C), in the tree's packed wasm64 form: every pointer
-// field ahead of an offset widens it by sizeof(void*) - 4.
+// _charbuf +0x14, _bufsiz +0x18, _tmpfname +0x1C), in the tree's packed wasm64 form: the three
+// pointer fields widen, while the one-byte inline _charbuf keeps its retail width and three bytes
+// of explicit padding preserve the following field offsets.
 #pragma pack(push, 1)
 struct D2cFile {
     char*    ptr;       // +0x00
@@ -26,7 +27,8 @@ struct D2cFile {
     char*    base;      // +0x08
     int32_t  flag;      // +0x0C
     int32_t  file;      // +0x10  file descriptor
-    uint8_t* charbuf;   // +0x14
+    uint8_t  charbuf;   // +0x14 (retail inline fallback byte storage; do not widen)
+    uint8_t  charbuf_pad[3]; // +0x15..+0x17
     int32_t  bufsiz;    // +0x18
     char*    tmpfname;  // +0x1C
 };
@@ -36,8 +38,9 @@ static_assert(offsetof(D2cFile, base) == 0x08 + 1 * (sizeof(void*) - 4), "FILE._
 static_assert(offsetof(D2cFile, flag) == 0x0C + 2 * (sizeof(void*) - 4), "FILE._flag");
 static_assert(offsetof(D2cFile, file) == 0x10 + 2 * (sizeof(void*) - 4), "FILE._file");
 static_assert(offsetof(D2cFile, charbuf) == 0x14 + 2 * (sizeof(void*) - 4), "FILE._charbuf");
-static_assert(offsetof(D2cFile, bufsiz) == 0x18 + 3 * (sizeof(void*) - 4), "FILE._bufsiz");
-static_assert(offsetof(D2cFile, tmpfname) == 0x1C + 3 * (sizeof(void*) - 4), "FILE._tmpfname");
+static_assert(sizeof(((D2cFile*)nullptr)->charbuf) == 1, "FILE._charbuf is one retail byte");
+static_assert(offsetof(D2cFile, bufsiz) == 0x18 + 2 * (sizeof(void*) - 4), "FILE._bufsiz");
+static_assert(offsetof(D2cFile, tmpfname) == 0x1C + 2 * (sizeof(void*) - 4), "FILE._tmpfname");
 
 // +0x1239A0  DAT_6fbd39a0: file-descriptor table; fd >> 5 selects a block of 0x20 records of 0x24
 // bytes, and byte +4 of a record is its OS device flags (0x80 = text newline translation, 0x20 = the
@@ -219,8 +222,8 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_client_40c5(void* dst, uint32_t element_size, u
 // not read-only-and-not-write (0x82 clear) asks the fd record (console record for fd -1): device flags
 // 0x82 mark the UTF-8/text console translation and set stream flag 0x2000. A 0x200 buffer on a
 // malloc'ed (0x08) non-user (0x400) stream grows to 0x1000. Then _cnt = count - 1, the byte at _ptr
-// is returned and _ptr advances. __read (0x8383) and __getbuf (0x9F56) are UNMAPPED, so they are
-// host seams AFTER the retail argument.
+// is returned and _ptr advances. __read (0x8383) is a host seam AFTER the retail argument; __getbuf
+// (0x9F56) is recovered below and is passed as the callback.
 typedef void (*D2cGetbufFn)(void* file);   // same as the write-flush section's below
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_client_80c5(D2cFile* f, D2cReadFn read_, D2cGetbufFn getbuf) {
@@ -254,6 +257,57 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_80c5(D2cFile* f, D2cReadFn read_, D2cGetb
     f->flag |= n != 0 ? 0x20 : 0x10;
     f->cnt = 0;
     return -1;
+}
+
+// --- stdio buffer allocation --------------------------------------------------------------------
+typedef void* (*D2cMallocGetbufFn)(uint32_t size);
+extern uint32_t g_streamCount;   // +0x0FAA50, d2client_batch_0312a.cpp
+
+// 1.13c D2Client+0x09F56 (68 B, callers 0x080C5 __filbuf, 0x04AE8 __flsbuf, 0x0A975): __getbuf.
+// Bump the stream counter, then _malloc(0x1000) into _base. On failure _flag |= 4 (F_ERR) and the
+// stream falls back to the address of its inline _charbuf field with _bufsiz = 2; on success
+// _flag |= 8 (the buffer is malloc'ed) with _bufsiz = 0x1000. Either way _cnt = 0, _ptr = _base.
+// _malloc (0x7D5F) is recovered, but takes its own host env; it is a seam here like __read and __write.
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_client_9f56(D2cFile* f, D2cMallocGetbufFn malloc_) {
+    ++g_streamCount;
+    char* base = (char*)malloc_(0x1000);
+    f->base = base;
+    if (base == nullptr) {
+        f->flag |= 4;
+        f->base = (char*)&f->charbuf;   // retail stores &_charbuf, not its value
+        f->bufsiz = 2;
+    } else {
+        f->flag |= 8;
+        f->bufsiz = 0x1000;
+    }
+    f->cnt = 0;
+    f->ptr = f->base;
+}
+
+// 1.13c D2Client+0x0A975 (108 B, callers 0x061BC and 0x09F56): _ungetc.
+// Push one byte back into a CRT FILE buffer.  The malloc callback is a host seam for
+// the only nested call, __getbuf (0x09F56), and follows the retail FILE argument.
+extern "C"
+EMSCRIPTEN_KEEPALIVE int32_t d2_client_a975(int32_t ch, D2cFile* f, D2cMallocGetbufFn malloc_) {
+    uint32_t flag = (uint32_t)f->flag;
+    if (ch == -1 || (((flag & 1u) == 0) && ((flag & 0x80000000u) == 0 || (flag & 2u) != 0)))
+        return -1;
+    if (f->base == nullptr) d2_client_9f56(f, malloc_);
+    if (f->ptr == f->base) {
+        if (f->cnt != 0) return -1;
+        ++f->ptr;
+    }
+    --f->ptr;
+    if ((flag & 0x40u) == 0) {
+        *f->ptr = (char)ch;
+    } else if ((uint8_t)*f->ptr != (uint8_t)ch) {
+        ++f->ptr;
+        return -1;
+    }
+    ++f->cnt;
+    f->flag = (int32_t)(((uint32_t)f->flag & ~0x10u) | 1u);
+    return ch & 0xFF;
 }
 
 // --- stdio positioning --------------------------------------------------------------------------
@@ -331,7 +385,7 @@ struct D2cInitCritSecEnv {
     uint32_t (*get_module_handle)(const char* name);
     D2cInitCritSecFn (*get_proc_address)(uint32_t mod, const char* name);
 };
-extern "C" void d2_client_908f(void* cs, uint32_t spin, const D2cInitCritSecEnv* env);
+extern "C" int32_t d2_client_908f(void* cs, uint32_t spin, const D2cInitCritSecEnv* env);
 
 // 1.13c D2Client+0x0470D (73 B, caller 0x74DE __mtinit): __mtinitlocks. For every slot whose flag word
 // is 1 (the statically-initialised locks), point it at its 0x18-byte block and initialise it through

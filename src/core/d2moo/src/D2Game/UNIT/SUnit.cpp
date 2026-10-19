@@ -1263,6 +1263,7 @@ void __fastcall SUNIT_SpawnPresetUnitsInRoom(D2GameStrc* pGame, D2ActiveRoomStrc
 }
 
 //D2Game.0x6FCBC7E0
+// 1.13c D2Game+0xE07A0
 void __fastcall sub_6FCBC7E0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2_ASSERT(pUnit);
@@ -1299,7 +1300,7 @@ void __fastcall sub_6FCBC7E0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCBC900
-// 1.13c D2Game+0xE07A0
+// 1.13c D2Game+0xE0BD0
 D2UnitStrc* __stdcall SUNIT_GetTargetUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     sub_6FCBC7E0(pGame, pUnit);

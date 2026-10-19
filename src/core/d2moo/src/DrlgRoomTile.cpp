@@ -1185,6 +1185,8 @@ void __fastcall DRLGROOMTILE_GetCreateLinkedTileData(void* pMemPool, D2DrlgRoomS
 }
 
 //D2Common.0x6FD89E30
+// 1.13c D2Common+0x68660
+// Prior art used: D2MOO DrlgRoomTile.cpp; 1.13c retains edge extension, coordinate fallback and independent wall/floor/shadow counts.
 void __fastcall DRLGROOMTILE_CountAllTileTypes(D2DrlgRoomStrc* pDrlgRoom, D2DrlgGridStrc* pTileInfoGrid, BOOL bCheckCoordinatesValidity, BOOL bKillEdgeX, BOOL bKillEdgeY)
 {
 	const int nTileCountX = pDrlgRoom->nTileWidth + (bKillEdgeX == 0);
@@ -1215,6 +1217,8 @@ void __fastcall DRLGROOMTILE_CountAllTileTypes(D2DrlgRoomStrc* pDrlgRoom, D2Drlg
 }
 
 //D2Common.0x6FD89F00
+// 1.13c D2Common+0x685D0
+// Prior art used: D2MOO DrlgRoomTile.cpp; 1.13c retains type 3 and type 10/11 handling, including six hidden-warp floors.
 void __fastcall DRLGROOMTILE_CountWallWarpTiles(D2DrlgRoomStrc* pDrlgRoom, D2DrlgGridStrc* pTileInfoGrid, D2DrlgGridStrc* pTileTypeGrid, BOOL bKillEdgeX, BOOL bKillEdgeY)
 {
 	const int nTileCountX = pDrlgRoom->nTileWidth + (bKillEdgeX == 0);

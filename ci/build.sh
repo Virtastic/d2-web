@@ -12,6 +12,12 @@ set -euo pipefail
 SRC="${SRC:-$(cd "$(dirname "$0")/.." && pwd)}"
 IMAGE="${BUILDER_IMAGE:-d2-builder64:1}"
 cd "$SRC"
+source "$(dirname "${BASH_SOURCE[0]}")/../tools/artifact-lock.sh"
+d2_artifact_lock "$SRC"
+if [ -L build-wasm ] || [ -L build-wasm/site ]; then
+  echo "FATAL: refusing to build through a borrowed build-wasm/site symlink." >&2
+  exit 1
+fi
 
 [ -f third_party/StormLib/CMakeLists.txt ] || { echo "FATAL: submodules not checked out (git submodule update --init)" >&2; exit 1; }
 
@@ -24,7 +30,8 @@ if [ "$want" != "$have" ]; then
 fi
 
 # Engine builds are rationed on this box: every worktree
-# queues on the same lock in the main checkout. Staging (ci/stage.sh) stays outside it.
+# queues on the same slot pool in the main checkout. The worktree artifact lock
+# also spans compilation, staging and cache publication; separate trees still build in parallel.
 LOCK_DIR="$(cd "$(git rev-parse --git-common-dir 2>/dev/null || echo .git)/.." && pwd)/build-wasm"
 mkdir -p "$LOCK_DIR"
 # D2_BUILD_SLOTS parallel builds share this checkout (default 8).
@@ -68,7 +75,8 @@ MSYS_NO_PATHCONV=1 docker run --rm \
 flock -u 9; exec 9>&-
 
 bash ci/stage.sh
-bash tools/engine-cache.sh put . || true   # share this build with every worktree (tools/engine-sync.sh)
+if [ -z "${D2_CXXFLAGS:-}" ]; then bash tools/engine-cache.sh put . || true; else rm -f play/.engine-key; fi # custom builds never publish as normal engines
+# Custom engines keep their own compiler configuration and never seed release worktrees.
 # One line per build in the main checkout's timing.log.
 mkdir -p "$(dirname "$LOCK_DIR")/wasm-build/harness-out"
 printf '%s\tbuild\t%s\twait=%s\tdur=%s\n' "$(date -Is)" "$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')" "$WAIT" "$(( $(date +%s) - T0 - WAIT ))" \

@@ -1739,6 +1739,7 @@ void __fastcall sub_6FD82360(D2DrlgLevelStrc* pLevel, int nIteration, int* pRand
 
 //D2Common.0x6FD823C0
 //TODO: v28 stuff
+// 1.13c D2Common+0x16E10
 void __fastcall sub_6FD823C0(D2DrlgStrc* pDrlg, D2DrlgLinkStrc* pDrlgLink, int(__fastcall* a3)(D2DrlgLevelLinkDataStrc*, int), void(__fastcall* a4)(D2DrlgLevelStrc*, int, int*))
 {
 	D2DrlgLevelLinkDataStrc pLevelLinkData = {};
@@ -1879,6 +1880,7 @@ void __fastcall sub_6FD823C0(D2DrlgStrc* pDrlg, D2DrlgLinkStrc* pDrlgLink, int(_
 }
 
 //D2Common.0x6FD826D0
+// 1.13c D2Common+0x16CF0
 void __fastcall sub_6FD826D0(D2DrlgStrc* pDrlg, int nStartId, int nEndId)
 {
 	D2DrlgWarpStrc* pDrlgWarp = NULL;
@@ -1900,6 +1902,7 @@ void __fastcall sub_6FD826D0(D2DrlgStrc* pDrlg, int nStartId, int nEndId)
 }
 
 //D2Common.0x6FD82750
+// 1.13c D2Common+0x17760
 void __fastcall sub_6FD82750(D2DrlgStrc* pDrlg, int nStartId, int nEndId)
 {
 	D2DrlgLevelStrc* pWarpLevel = NULL;

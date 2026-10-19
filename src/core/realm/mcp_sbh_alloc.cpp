@@ -5,6 +5,7 @@
 // import (the wasm module has no PE import table) is a host seam AFTER the retail arguments, which
 // keep their order.
 #include <cstdint>
+#include <bit>
 #include <cstring>
 #include <emscripten.h>
 
@@ -256,8 +257,10 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_3a44(uint32_t region, uint32_t block, uint32
 // the region owning the last free, that cursor is cleared. Returns the user pointer (node+4) or 0.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_mcp_3d23(uint32_t size, const D2McpSbhAllocEnv* env) {
-    uint32_t req = (size + 0x17u) & 0xfffffff0u;
-    int32_t firstBucket = (int32_t)((size + 0x17u) >> 4) - 1;
+    uint32_t rounded = size + 0x17u;
+    uint32_t req = rounded & 0xfffffff0u;
+    // Retail converts the wrapped 32-bit sum back to signed before its arithmetic shift.
+    int32_t firstBucket = (std::bit_cast<int32_t>(rounded) >> 4) - 1;
     uint32_t end = g_sbh_regions + g_sbh_count * 0x14u;
     uint8_t b8 = (uint8_t)firstBucket;
     uint32_t region = g_sbh_last_region;

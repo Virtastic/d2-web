@@ -6990,6 +6990,7 @@ void __fastcall AITHINK_Fn082_InvisoSpawner(D2GameStrc* pGame, D2UnitStrc* pUnit
 }
 
 //D2Game.0x6FCDEAF0
+// 1.13c D2Game+0x164A0
 void __fastcall AITHINK_Fn083_MosquitoNest(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	if (pAiTickParam->nTargetDistance > AI_GetParamValue(pGame, pAiTickParam, SPAWNER_AI_PARAM_ACTIVATION_DISTANCE))
@@ -7000,7 +7001,7 @@ void __fastcall AITHINK_Fn083_MosquitoNest(D2GameStrc* pGame, D2UnitStrc* pUnit,
 
 	if (pAiTickParam->pAiControl->dwAiParam[1] <= AI_GetParamValue(pGame, pAiTickParam, SPAWNER_AI_PARAM_NUM_TO_SPAWN))
 	{
-		if (pAiTickParam->pMonstatsTxt->nSkill[0] >= 0 && pGame->dwGameFrame > pAiTickParam->pAiControl->dwAiParam[0] && sub_6FC68350(MONSTER_SUCKERNEST1, UNITS_GetRoom(pUnit), CLIENTS_GetUnitX(pUnit), CLIENTS_GetUnitY(pUnit), 0))
+		if (pAiTickParam->pMonstatsTxt->nSkill[0] >= 0 && pGame->dwGameFrame > pAiTickParam->pAiControl->dwAiParam[0] && sub_6FC68350(MONSTER_SUCKERNEST1 < sgptDataTables->nMonStatsTxtRecordCount ? MONSTER_SUCKERNEST1 : -1, UNITS_GetRoom(pUnit), CLIENTS_GetUnitX(pUnit), CLIENTS_GetUnitY(pUnit), 0))
 		{
 			pAiTickParam->pAiControl->dwAiParam[0] = pGame->dwGameFrame + AI_GetParamValue(pGame, pAiTickParam, SPAWNER_AI_PARAM_DELAY);
 			++pAiTickParam->pAiControl->dwAiParam[1];
@@ -7199,6 +7200,7 @@ void __fastcall AITHINK_Fn085_HighPriest(D2GameStrc* pGame, D2UnitStrc* pUnit, D
 }
 
 //D2Game.0x6FCDF2E0
+// 1.13c D2Game+0x15660
 D2UnitStrc* __fastcall AITHINK_TargetCallback_HighPriest(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, void* pCallbackArg)
 {
 	D2HighPriestAiCallbackArgStrc* pArg = (D2HighPriestAiCallbackArgStrc*)pCallbackArg;
@@ -7437,6 +7439,7 @@ enum D2C_ArcaneTowerAIParams
 };
 
 //D2Game.0x6FCDFA50
+// 1.13c D2Game+0x16270
 void __fastcall AITHINK_Fn093_ArcaneTower(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	if (!pAiTickParam->pAiControl->dwAiParam[1])
@@ -7775,6 +7778,7 @@ void __fastcall AITHINK_Fn113_SiegeTower(D2GameStrc* pGame, D2UnitStrc* pUnit, D
 }
 
 //D2Game.0x6FCE0430
+// 1.13c D2Game+0x15B00
 D2UnitStrc* __fastcall AITHINK_TargetCallback_SiegeBeast(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, void* pCallbackArg)
 {
 	D2SiegeBeastTowerAiCallbackArgStrc* pArg = (D2SiegeBeastTowerAiCallbackArgStrc*)pCallbackArg;
@@ -7791,7 +7795,8 @@ D2UnitStrc* __fastcall AITHINK_TargetCallback_SiegeBeast(D2GameStrc* pGame, D2Un
 		nClassId = pMonStatsTxtRecord->nBaseId;
 	}
 
-	if (nClassId != MONSTER_IMP1 || !STATLIST_AreUnitsAligned(pUnit, pTarget) || STATLIST_GetUnitAlignment(pTarget) != UNIT_ALIGNMENT_EVIL || SUNIT_GetOwner(pGame, pUnit))
+	const int32_t nImpClassId = MONSTER_IMP1 < sgptDataTables->nMonStatsTxtRecordCount ? MONSTER_IMP1 : -1;
+	if (nClassId != nImpClassId || !STATLIST_AreUnitsAligned(pUnit, pTarget) || STATLIST_GetUnitAlignment(pTarget) != UNIT_ALIGNMENT_EVIL || SUNIT_GetOwner(pGame, pUnit))
 	{
 		return 0;
 	}
@@ -8388,6 +8393,7 @@ enum D2C_MinionSpawnerAIParams
 };
 
 //D2Game.0x6FCE1B90
+// 1.13c D2Game+0x17BC0
 void __fastcall AITHINK_Fn121_MinionSpawner(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	D2MinionSpawnerAiCallbackArgStrc arg = {};
@@ -8413,6 +8419,7 @@ void __fastcall AITHINK_Fn121_MinionSpawner(D2GameStrc* pGame, D2UnitStrc* pUnit
 }
 
 //D2Game.0x6FCE1CA0
+// 1.13c D2Game+0x15890
 D2UnitStrc* __fastcall AITHINK_TargetCallback_MinionSpawner(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, void* pCallbackArg)
 {
 	D2MinionSpawnerAiCallbackArgStrc* pArg = (D2MinionSpawnerAiCallbackArgStrc*)pCallbackArg;
@@ -8429,7 +8436,8 @@ D2UnitStrc* __fastcall AITHINK_TargetCallback_MinionSpawner(D2GameStrc* pGame, D
 		nTargetBaseClass = pMonStatsTxtRecord->nBaseId;
 	}
 
-	if ((nTargetBaseClass == MONSTER_MINION1 || nTargetBaseClass == MONSTER_SUICIDEMINION1) && STATLIST_GetUnitAlignment(pTarget) == UNIT_ALIGNMENT_EVIL)
+	if (nTargetBaseClass >= 0 && nTargetBaseClass < sgptDataTables->nMonStatsTxtRecordCount
+		&& (nTargetBaseClass == MONSTER_MINION1 || nTargetBaseClass == MONSTER_SUICIDEMINION1) && STATLIST_GetUnitAlignment(pTarget) == UNIT_ALIGNMENT_EVIL)
 	{
 		++pArg->nMinions;
 	}
@@ -8668,6 +8676,7 @@ enum D2C_FrozenHorrorAIParams
 };
 
 //D2Game.0x6FCE25D0
+// 1.13c D2Game+0x179A0
 void __fastcall AITHINK_Fn124_FrozenHorror(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	int32_t nSkillLevel = 0;
@@ -8718,6 +8727,7 @@ enum D2C_BloodLordAIParams
 };
 
 //D2Game.0x6FCE2760
+// 1.13c D2Game+0x177E0
 void __fastcall AITHINK_Fn125_BloodLord(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	if (pAiTickParam->bCombat)
@@ -10293,6 +10303,8 @@ void __fastcall D2GAME_AI_Unk129_6FCE5610(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 	pAiTickParam->pAiControl->nMinionSpawnClassId = -1;
 }
 
+bool __fastcall AITHINK_SelectGenericSpawn113(D2UnitStrc*, D2GameStrc*, int32_t*);
+
 //D2Game.0x6FCE5640
 void __fastcall AITHINK_Fn129_GenericSpawner(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
@@ -10304,33 +10316,7 @@ void __fastcall AITHINK_Fn129_GenericSpawner(D2GameStrc* pGame, D2UnitStrc* pUni
 
 	if (pAiTickParam->pAiControl->nMinionSpawnClassId == -1)
 	{
-		pAiTickParam->pAiControl->nMinionSpawnClassId = MONSTER_MINION1;
-
-		D2MonsterRegionStrc* pMonsterRegion = pGame->pMonReg[MONSTER_GetLevelId(pUnit)];
-
-		const int32_t nMonsterId = pMonsterRegion->pMonData[ITEMS_RollLimitedRandomNumber(&pUnit->pSeed, pMonsterRegion->nMonCount)].nMonHcIdx;
-		D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nMonsterId);
-
-		if (pMonStatsTxtRecord && pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_GENERICSPAWN])
-		{
-			pAiTickParam->pAiControl->nMinionSpawnClassId = nMonsterId;
-		}
-		else
-		{
-			pAiTickParam->pAiControl->nMinionSpawnClassId = MONSTER_IMP5;
-
-			for (int32_t i = 0; i < pMonsterRegion->nMonCount; ++i)
-			{
-				D2MonRegDataStrc* pMonRegData = &pMonsterRegion->pMonData[i];
-				pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(pMonRegData->nMonHcIdx);
-
-				if (pMonStatsTxtRecord && pMonStatsTxtRecord->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_GENERICSPAWN])
-				{
-					pAiTickParam->pAiControl->nMinionSpawnClassId = pMonRegData->nMonHcIdx;
-					break;
-				}
-			}
-		}
+		AITHINK_SelectGenericSpawn113(pUnit, pGame, &pAiTickParam->pAiControl->nMinionSpawnClassId);
 	}
 
 	if (pAiTickParam->nTargetDistance > 20)
@@ -17625,4 +17611,82 @@ int32_t __fastcall sub_6FCF0E40(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickPa
 
 	AITACTICS_UseSkill(pGame, pUnit, MONMODE_ATTACK1, SKILL_MONTELEPORT, 0, nX, nY);
 	return 1;
+}
+
+// Prior art: D2MOO AiThink's inline generic-spawn and NPC command handling.
+// These helpers were split out in 1.13c. Native pointers remain native; only
+// seeds, command operands and table identifiers have retail 32-bit width.
+// 1.13c D2Game+0x15730
+bool __fastcall AITHINK_SelectGenericSpawn113(D2UnitStrc* unit, D2GameStrc* game, int32_t* result)
+{
+    auto valid = [](int32_t id) { return id >= 0 && id < sgptDataTables->nMonStatsTxtRecordCount; };
+    *result = valid(0x1c5) ? 0x1c5 : -1;
+    auto region = game->pMonReg[MONSTER_GetLevelId(unit)];
+    const uint32_t index = ITEMS_RollLimitedRandomNumber(&unit->pSeed, region->nMonCount);
+    const int32_t id = region->pMonData[index].nMonHcIdx;
+    if (valid(id) && MONSTERUNIQUE_CheckMonStatsFlag(id, 21))
+    {
+        *result = id;
+        return true;
+    }
+    for (int32_t i = 0; i < region->nMonCount; ++i)
+    {
+        const int32_t candidate = region->pMonData[i].nMonHcIdx;
+        if (valid(candidate) && (sgptDataTables->pMonStatsTxt[candidate].dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_GENERICSPAWN]))
+        {
+            *result = candidate;
+            return true;
+        }
+    }
+    *result = valid(0x1f0) ? 0x1f0 : -1;
+    return true;
+}
+
+// 1.13c D2Game+0x158F0
+void __fastcall AITHINK_SetClosestTowerImp113(D2UnitStrc* unit, D2UnitStrc* candidate)
+{
+    auto ai = AIGENERAL_GetAiControlFromUnit(unit);
+    if (!candidate) { ai->dwAiParam[0] = -1; return; }
+    D2_ASSERT(unit && unit->pGame);
+    auto previous = SUNIT_GetServerUnit(unit->pGame, UNIT_MONSTER, ai->dwAiParam[0]);
+    if (previous && AITHINK_GetSquaredDistance(unit, previous) < AITHINK_GetSquaredDistance(unit, candidate))
+        return;
+    ai->dwAiParam[0] = candidate->dwUnitId;
+}
+
+// 1.13c D2Game+0x15D10
+bool __fastcall AITHINK_EnsureHomeCommand113(D2GameStrc* game, D2UnitStrc* unit)
+{
+    auto command = AIGENERAL_GetAiCommandFromParam(unit, 10, 0);
+    if (!command)
+    {
+        D2AiCmdStrc initial = {};
+        initial.nCmdParam[0] = 10;
+        AIGENERAL_CopyAiCommand(game, unit, &initial);
+    }
+    command = AIGENERAL_GetAiCommandFromParam(unit, 10, 0);
+    if (!command || command->nCmdParam[1] || command->nCmdParam[2]) return false;
+    command->nCmdParam[1] = CLIENTS_GetUnitX(unit);
+    command->nCmdParam[2] = CLIENTS_GetUnitY(unit);
+    AITACTICS_IdleInNeutralMode(game, unit, 20);
+    return true;
+}
+
+// 1.13c D2Game+0x16610
+bool __fastcall AITHINK_ReturnHome113(D2GameStrc* game, D2UnitStrc* unit, uint32_t distance)
+{
+    auto home = AIGENERAL_GetAiCommandFromParam(unit, 10, 0);
+    if (!home) return AITHINK_EnsureHomeCommand113(game, unit);
+    if (static_cast<uint32_t>(AIUTIL_GetDistanceToCoordinates(unit, home->nCmdParam[1], home->nCmdParam[2])) <= distance)
+        return false;
+    auto command = AIGENERAL_SetCurrentAiCommand(game, unit, 4, 0);
+    if (command)
+    {
+        command->nCmdParam[1] = home->nCmdParam[1];
+        command->nCmdParam[2] = home->nCmdParam[2];
+        command->nCmdParam[3] = 12;
+        command->nCmdParam[4] = 10;
+    }
+    AITACTICS_IdleInNeutralMode(game, unit, 10);
+    return true;
 }

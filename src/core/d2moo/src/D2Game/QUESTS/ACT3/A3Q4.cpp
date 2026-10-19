@@ -765,6 +765,9 @@ void __fastcall ACT3Q4_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2Q
 }
 
 //D2Game.0x6FCAAF60
+// 1.13c D2Game+0xE2B40
+// Prior art: D2MOO ACT3Q4_GoldenBirdBroughtToAlkor. Cached 1.13c checks
+// quest 18 and normalizes its extension byte 0 to a boolean; absence is false.
 bool __fastcall ACT3Q4_GoldenBirdBroughtToAlkor(D2GameStrc* pGame)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A3Q4_GOLDENBIRD);
@@ -773,6 +776,9 @@ bool __fastcall ACT3Q4_GoldenBirdBroughtToAlkor(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FCAAF80
+// 1.13c D2Game+0xE2B10
+// Prior art: D2MOO ACT3Q4_ResetAlkor. Cached 1.13c clears only extension
+// byte 0 of quest 18, preserving every other quest and extension byte.
 void __fastcall ACT3Q4_ResetAlkor(D2GameStrc* pGame)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A3Q4_GOLDENBIRD);

@@ -2,8 +2,14 @@
 #include <Units/Units.h>
 #include <Fog.h>
 
+static_assert(offsetof(D2DynamicPathStrc, tTargetCoord) == 0x10);
+static_assert(offsetof(D2DynamicPathStrc, pTargetUnit) == 0x58 + 4 * (sizeof(void*) - 4));
+static_assert(offsetof(D2DynamicPathStrc, dwSpeed) == 0x68 + 5 * (sizeof(void*) - 4));
+static_assert(offsetof(D2DynamicPathStrc, nDirection) == 0x64 + 5 * (sizeof(void*) - 4));
+static_assert(offsetof(D2UnitStrc, pDynamicPath) == 0x2C + 3 * (sizeof(void*) - 4));
+
 //1.10f: D2Common.0x6FDAB890
-//1.13c: D2Common.0x6FD8E080
+// 1.13c D2Common+0x3E080
 void __fastcall PATHUtil_AdvanceTowardsTarget_6FDAB890(D2DynamicPathStrc* ptPath)
 {
 	D2_ASSERT(ptPath);

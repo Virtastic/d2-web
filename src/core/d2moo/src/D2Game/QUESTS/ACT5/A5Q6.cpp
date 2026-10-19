@@ -740,6 +740,8 @@ void __fastcall ACT5Q6_OpenWorldStoneChamber(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FCB9190
+// 1.13c D2Game+0x56570
+// Prior art: D2MOO 1.10f A5Q6.cpp; checked against the complete cached 1.13c body.
 int32_t __fastcall ACT5Q6_IsWorldStoneChamberClosed(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A5Q6_BAAL);

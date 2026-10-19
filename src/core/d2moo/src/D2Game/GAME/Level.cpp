@@ -1,4 +1,5 @@
 #include "GAME/Level.h"
+#include "../../../../d2game/pending_unit_updates.h"
 
 #include <D2Collision.h>
 #include <D2Dungeon.h>
@@ -401,27 +402,18 @@ void __fastcall LEVEL_RemoveAllUnits(D2GameStrc* pGame)
 // 1.13c D2Game 0x9D850
 void __fastcall LEVEL_UpdateQueuedUnitsInAllActs(D2GameStrc* pGame)
 {
-    for (int32_t i = 0; i < NUM_ACTS; ++i)
-    {
-        D2DrlgActStrc* pAct = pGame->pAct[i];
-        if (pAct && pAct->bHasPendingUnitListUpdates)
-        {
-            for (D2ActiveRoomStrc* pRoom = DUNGEON_GetRoomFromAct(pAct); pRoom; pRoom = pRoom->pRoomNext)
-            {
-                for (D2UnitStrc* pUnit = pRoom->pUnitUpdate; pUnit; pUnit = pUnit->pChangeNextUnit)
-                {
-                    sub_6FCBC300(pGame, pUnit);
-                }
-
-                UNITROOM_ClearUpdateQueue(pRoom);
-            }
-
-            pAct->bHasPendingUnitListUpdates = FALSE;
-        }
-    }
-
-    if (pGame->pArenaCtrl)
-    {
-        pGame->pArenaCtrl->fFlags &= 0xFFFFFBFF;
-    }
+    struct Environment {
+        D2GameStrc* game;
+        D2DrlgActStrc* act(int i) { return game->pAct[i]; }
+        bool pending(D2DrlgActStrc* a) { return a->bHasPendingUnitListUpdates != 0; }
+        D2ActiveRoomStrc* firstRoom(D2DrlgActStrc* a) { return DUNGEON_GetRoomFromAct(a); }
+        D2ActiveRoomStrc* nextRoom(D2ActiveRoomStrc* r) { return r->pRoomNext; }
+        D2UnitStrc* firstUnit(D2ActiveRoomStrc* r) { return r->pUnitUpdate; }
+        D2UnitStrc* nextUnit(D2UnitStrc* u) { return u->pChangeNextUnit; }
+        void finishUnit(D2UnitStrc* u) { sub_6FCBC300(game, u); }
+        void clearQueue(D2ActiveRoomStrc* r) { UNITROOM_ClearUpdateQueue(r); }
+        void clearPending(D2DrlgActStrc* a) { a->bHasPendingUnitListUpdates = FALSE; }
+        void clearArenaFlag() { if (game->pArenaCtrl) game->pArenaCtrl->fFlags &= 0xFFFFFBFF; }
+    } env{pGame};
+    d2game::updateQueuedUnits(env);
 }

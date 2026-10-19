@@ -12,11 +12,7 @@ import assert from 'node:assert/strict';
 import { startRealmd, connect, reader, u32le, fourcc, bncsFrame, mcpFrame } from './helpers/realmd.mjs';
 import { loadSchema, decode } from './helpers/protodef.mjs';
 
-// Keep this server separate from realmd-ws.test.mjs. Node runs test files in parallel, and both
-// suites need a live realmd at the same time while they exercise different protocol surfaces.
-// Per-process ports: parallel worktrees run this suite concurrently, and fixed ports made the push gate flaky.
-const PB = 47000 + (process.pid % 600) * 3;
-const PORTS = { bncs: PB, mcp: PB + 1, d2gs: PB + 2 };
+const PORTS = { bncs: 0, mcp: 0, d2gs: 0 };
 let proc = null;
 const sid = loadSchema('sid');
 const mcp = loadSchema('mcp');

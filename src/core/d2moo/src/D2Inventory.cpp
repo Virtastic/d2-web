@@ -1,4 +1,5 @@
 #include "D2Inventory.h"
+#include "InventoryItemDataGuard.h"
 
 #include <cstddef>
 
@@ -492,7 +493,7 @@ BOOL __fastcall INVENTORY_RemoveItem(D2UnitStrc* pItem)
 //D2Common.0x6FD8E4A0
 D2ItemExtraDataStrc* __fastcall INVENTORY_GetItemExtraDataFromItem(D2UnitStrc* pItem)
 {
-	if (D2ItemDataStrc* pItemData = ITEMS_GetItemData(pItem))
+	if (D2ItemDataStrc* pItemData = ITEMS_GetItemData(pItem); INVENTORY_HasItemExtraData(pItemData))
 	{
 		return &pItemData->pExtraData;
 	}

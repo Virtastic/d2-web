@@ -5,8 +5,28 @@
 // shim makes the effects invisible.
 #include <Windows.h>
 #include <cstdint>
+#include <cstdlib>
 
-static uint32_t g_lock_table[0x40];   // +0x10048, one CRITICAL_SECTION pointer per lock index
+static uint32_t g_lock_table[0x24 * 2];   // +0x10048..+0x10168, 36 pointer/flag pairs
+
+// 1.13c D2Gfx+0x01967 (__mtdeletelocks): release heap-allocated sections and clear their
+// table pointers first, then delete the sections held in static module storage. The flag at
+// pair +4 distinguishes static storage (1) from heap storage; static pointers remain set.
+extern "C" void d2gfx_mtdeletelocks(void) {
+    for (uint32_t i = 0; i < 0x24; ++i) {
+        uint32_t* slot = &g_lock_table[i * 2];
+        if (slot[0] != 0 && slot[1] != 1) {
+            DeleteCriticalSection((LPCRITICAL_SECTION)(uintptr_t)slot[0]);
+            std::free((void*)(uintptr_t)slot[0]);
+            slot[0] = 0;
+        }
+    }
+    for (uint32_t i = 0; i < 0x24; ++i) {
+        uint32_t* slot = &g_lock_table[i * 2];
+        if (slot[0] != 0 && slot[1] == 1)
+            DeleteCriticalSection((LPCRITICAL_SECTION)(uintptr_t)slot[0]);
+    }
+}
 
 static void d2gfx_unlock(uint32_t idx) { LeaveCriticalSection((LPCRITICAL_SECTION)(uintptr_t)g_lock_table[idx * 2]); }
 

@@ -2,6 +2,7 @@
 #include <cstdio>
 
 #include <algorithm>
+#include <iterator>
 
 #include <Fog.h>
 
@@ -67,6 +68,7 @@ struct D2ObjectCoordInitStrc
 
 
 //D2Game.0x6FC70180
+// 1.13c D2Game+0x325C0
 D2UnitStrc* __fastcall OBJECTS_SpawnShrine(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nClassId, int32_t nX, int32_t nY, int32_t nMode)
 {
     constexpr D2ObjectTableStrc stru_6FD28C78[8] =
@@ -101,6 +103,7 @@ D2UnitStrc* __fastcall OBJECTS_SpawnShrine(D2GameStrc* pGame, D2ActiveRoomStrc* 
 }
 
 //D2Game.0x6FC70270
+// 1.13c D2Game+0x322B0
 D2UnitStrc* __fastcall OBJECTS_SpawnPresetChest(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nClassId, int32_t nX, int32_t nY, int32_t nMode)
 {
     D2ObjectControlStrc* pObjectControl = OBJRGN_GetObjectControlFromGame(pGame);
@@ -203,6 +206,7 @@ D2UnitStrc* __fastcall OBJECTS_SpawnSpecialChest(D2GameStrc* pGame, D2ActiveRoom
 }
 
 //D2Game.0x6FC70520
+// 1.13c D2Game+0x32110
 D2UnitStrc* __fastcall OBJECTS_SpawnArcaneSymbol(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nClassId, int32_t nX, int32_t nY, int32_t nMode)
 {
     const int32_t nObjectId = ACT2Q6_GetObjectIdForArcaneThing(pGame);
@@ -988,6 +992,7 @@ void __fastcall OBJECTS_InitFunction46_TrappedSoulPlaceHolder(D2ObjInitFnStrc* p
 }
 
 //D2Game.0x6FC718C0
+// 1.13c D2Game+0x31000
 D2UnitStrc* __fastcall OBJECTS_PopulateFn1_CasketJarSarcophagusUrn(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, uint8_t nDensity, uint32_t nObjectId, uint16_t nProbability)
 {
     // TODO: Improve
@@ -1092,14 +1097,14 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn1_CasketJarSarcophagusUrn(D2GameStrc* p
     {
         const int32_t nClassId = objectIds[ITEMS_RollLimitedRandomNumber(&pObjectControl->pSeed, nMaxObjects)];
 
-        uint16_t nX = drlgCoords.nSubtileX + ITEMS_RollLimitedRandomNumber(&pObjectControl->pSeed, drlgCoords.nSubtileWidth - pObjectsTxtRecord->dwSizeX - 1);
-        uint16_t nY = drlgCoords.nSubtileY + ITEMS_RollLimitedRandomNumber(&pObjectControl->pSeed, drlgCoords.nSubtileHeight - pObjectsTxtRecord->dwSizeY - 1);
+        int32_t nX = drlgCoords.nSubtileX + ITEMS_RollLimitedRandomNumber(&pObjectControl->pSeed, drlgCoords.nSubtileWidth - pObjectsTxtRecord->dwSizeX - 1);
+        int32_t nY = drlgCoords.nSubtileY + ITEMS_RollLimitedRandomNumber(&pObjectControl->pSeed, drlgCoords.nSubtileHeight - pObjectsTxtRecord->dwSizeY - 1);
         if (drlgCoords.nSubtileWidth >= pObjectsTxtRecord->dwSizeX + 2
             && drlgCoords.nSubtileHeight >= pObjectsTxtRecord->dwSizeY + 2
-            && nX > drlgCoords.nSubtileX + 1
-            && nY > drlgCoords.nSubtileY + 1
-            && nX < drlgCoords.nSubtileX - pObjectsTxtRecord->dwSizeX + drlgCoords.nSubtileWidth - 2
-            && nY < drlgCoords.nSubtileY - pObjectsTxtRecord->dwSizeY + drlgCoords.nSubtileHeight - 2
+            && uint16_t(nX) > drlgCoords.nSubtileX + 1
+            && uint16_t(nY) > drlgCoords.nSubtileY + 1
+            && uint16_t(nX) < drlgCoords.nSubtileX - pObjectsTxtRecord->dwSizeX + drlgCoords.nSubtileWidth - 2
+            && uint16_t(nY) < drlgCoords.nSubtileY - pObjectsTxtRecord->dwSizeY + drlgCoords.nSubtileHeight - 2
             && !COLLISION_CheckMaskWithSizeXY(pRoom, nX, nY, pObjectsTxtRecord->dwSizeX + 7, pObjectsTxtRecord->dwSizeY + 7, 0xC01u)
             && !COLLISION_CheckMaskWithSizeXY(pRoom, nX, nY, pObjectsTxtRecord->dwSizeX, pObjectsTxtRecord->dwSizeY, COLLIDE_MASK_PLACEMENT))
         {
@@ -1138,10 +1143,10 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn1_CasketJarSarcophagusUrn(D2GameStrc* p
                     {
                         if (drlgCoords.nSubtileWidth >= 2
                             && drlgCoords.nSubtileHeight >= 2
-                            && nX > drlgCoords.nSubtileX + 2
-                            && nY > drlgCoords.nSubtileY + 2
-                            && nX < drlgCoords.nSubtileWidth + drlgCoords.nSubtileX - pObjectsTxtRecord->dwSizeX
-                            && nY < drlgCoords.nSubtileHeight + drlgCoords.nSubtileY - pObjectsTxtRecord->dwSizeY
+                            && uint16_t(nX) > drlgCoords.nSubtileX + 2
+                            && uint16_t(nY) > drlgCoords.nSubtileY + 2
+                            && uint16_t(nX) < drlgCoords.nSubtileWidth + drlgCoords.nSubtileX - pObjectsTxtRecord->dwSizeX
+                            && uint16_t(nY) < drlgCoords.nSubtileHeight + drlgCoords.nSubtileY - pObjectsTxtRecord->dwSizeY
                             && !COLLISION_CheckMaskWithSizeXY(pRoom, nX, nY, pObjectsTxtRecord->dwSizeX + 2, pObjectsTxtRecord->dwSizeY + 2, COLLIDE_MASK_PLACEMENT))
                         {
                             v28 = 1;
@@ -1151,10 +1156,10 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn1_CasketJarSarcophagusUrn(D2GameStrc* p
                     {
                         if (drlgCoords.nSubtileWidth >= pObjectsTxtRecord->dwSizeX + 2
                             && drlgCoords.nSubtileHeight >= pObjectsTxtRecord->dwSizeY + 2
-                            && nX > drlgCoords.nSubtileX + 1
-                            && nY > drlgCoords.nSubtileY + 1
-                            && nX < drlgCoords.nSubtileX - pObjectsTxtRecord->dwSizeX + drlgCoords.nSubtileWidth - 2
-                            && nY < drlgCoords.nSubtileY - pObjectsTxtRecord->dwSizeY + drlgCoords.nSubtileHeight - 2
+                            && uint16_t(nX) > drlgCoords.nSubtileX + 1
+                            && uint16_t(nY) > drlgCoords.nSubtileY + 1
+                            && uint16_t(nX) < drlgCoords.nSubtileX - pObjectsTxtRecord->dwSizeX + drlgCoords.nSubtileWidth - 2
+                            && uint16_t(nY) < drlgCoords.nSubtileY - pObjectsTxtRecord->dwSizeY + drlgCoords.nSubtileHeight - 2
                             && !COLLISION_CheckMaskWithSizeXY(pRoom, nX, nY, pObjectsTxtRecord->dwSizeX + 7, pObjectsTxtRecord->dwSizeY + 7, 0xC01u)
                             && !COLLISION_CheckMaskWithSizeXY(pRoom, nX, nY, pObjectsTxtRecord->dwSizeX, pObjectsTxtRecord->dwSizeY, COLLIDE_MASK_PLACEMENT))
                         {
@@ -1295,6 +1300,7 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn7_RogueOnStick(D2GameStrc* pGame, D2Act
 }
 
 //D2Game.0x6FC72340
+// 1.13c D2Game+0x30E50
 void __fastcall OBJECTS_SpawnFliesOnCorpse(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2ObjectControlStrc* pObjectControl = OBJRGN_GetObjectControlFromGame(pGame);
@@ -1453,7 +1459,79 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn6_RogueGuardCorpse(D2GameStrc* pGame, D
     return pObject;
 }
 
+// Prior art: D2MOO Objects.cpp placement loops, checked against 1.13c instructions.
+// 1.13c D2Game+0x31B40
+static D2UnitStrc* OBJECTS_PlaceWell(D2GameStrc* pGame, int32_t nClassId,
+    int32_t nSizeX, int32_t nSizeY, D2ActiveRoomStrc* pRoom, int32_t nLevelId,
+    bool (__fastcall* pFilter)(D2GameStrc*, int32_t, int32_t, int32_t))
+{
+    D2DrlgCoordsStrc c = {};
+    DUNGEON_GetRoomCoordinates(pRoom, &c);
+    if (c.nSubtileWidth < 2 || c.nSubtileHeight < 2 || c.nSubtileWidth <= nSizeX || c.nSubtileHeight <= nSizeY)
+        return nullptr;
+    D2SeedStrc* seed = pRoom ? &pRoom->pSeed : nullptr;
+    for (int32_t i = 0; i < 5; ++i)
+    {
+        const int32_t x = c.nSubtileX + ITEMS_RollLimitedRandomNumber(seed, c.nSubtileWidth - nSizeX - 1);
+        const int32_t y = c.nSubtileY + ITEMS_RollLimitedRandomNumber(seed, c.nSubtileHeight - nSizeY - 1);
+        if (!x || !y || uint16_t(x) < c.nSubtileX + 1 || uint16_t(y) < c.nSubtileY + 1
+            || uint16_t(x) >= c.nSubtileX + c.nSubtileWidth - 1 || uint16_t(y) >= c.nSubtileY + c.nSubtileHeight - 1)
+            continue;
+        D2_ASSERT(!IsBadCodePtr((FARPROC)pFilter));
+        if (!COLLISION_CheckMaskWithSizeXY(pRoom, x, y, nSizeX + 6, nSizeY + 6, COLLIDE_MASK_PLACEMENT)
+            && pFilter(pGame, nLevelId, x, y))
+        {
+            D2_ASSERT(pRoom);
+            return SUNIT_AllocUnitData(UNIT_OBJECT, nClassId, x, y, pGame, pRoom, 1, 0, 0);
+        }
+    }
+    return nullptr;
+}
+
+// 1.13c D2Game+0x317F0
+static D2UnitStrc* OBJECTS_PlaceShrine(D2GameStrc* pGame, int32_t nClassId,
+    int32_t nSizeX, int32_t nSizeY, D2ActiveRoomStrc* pRoom, int32_t nLevelId, uint8_t nOrientation,
+    bool (__fastcall* pFilter)(D2GameStrc*, int32_t, int32_t, int32_t))
+{
+    D2DrlgCoordsStrc c = {};
+    DUNGEON_GetRoomCoordinates(pRoom, &c);
+    if (c.nSubtileWidth < nSizeX + 2 || c.nSubtileHeight < nSizeY + 2)
+        return nullptr;
+    D2SeedStrc* seed = pRoom ? &pRoom->pSeed : nullptr;
+    for (int32_t i = 0; i < 5; ++i)
+    {
+        int32_t x, y;
+        if (nOrientation == 1)
+        {
+            x = c.nSubtileX + c.nSubtileWidth / 4 + ITEMS_RollLimitedRandomNumber(seed, c.nSubtileWidth / 2);
+            y = c.nSubtileY + OBJECTS_RollRandomNumber(seed, 1, 2);
+        }
+        else if (nOrientation == 2)
+        {
+            x = c.nSubtileX + OBJECTS_RollRandomNumber(seed, 1, 2);
+            y = c.nSubtileY + c.nSubtileHeight / 4 + ITEMS_RollLimitedRandomNumber(seed, c.nSubtileHeight / 2);
+        }
+        else
+        {
+            x = c.nSubtileX + ITEMS_RollLimitedRandomNumber(seed, c.nSubtileWidth - nSizeX - 1);
+            y = c.nSubtileY + ITEMS_RollLimitedRandomNumber(seed, c.nSubtileHeight - nSizeY - 1);
+        }
+        if (!x || !y || uint16_t(x) < c.nSubtileX + 1 || uint16_t(y) < c.nSubtileY + 1
+            || uint16_t(x) >= c.nSubtileX + c.nSubtileWidth - 1 || uint16_t(y) >= c.nSubtileY + c.nSubtileHeight - 1)
+            continue;
+        D2_ASSERT(!IsBadCodePtr((FARPROC)pFilter));
+        if (!COLLISION_CheckMaskWithSizeXY(pRoom, x, y, nSizeX + 6, nSizeY + 6, COLLIDE_MASK_PLACEMENT)
+            && pFilter(pGame, nLevelId, x, y))
+        {
+            D2_ASSERT(pRoom);
+            return SUNIT_AllocUnitData(UNIT_OBJECT, nClassId, x, y, pGame, pRoom, 1, 0, 0);
+        }
+    }
+    return nullptr;
+}
+
 //D2Game.0x6FC728C0
+// 1.13c D2Game+0x32A10
 D2UnitStrc* __fastcall OBJECTS_PopulateFn8_Well(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, uint8_t nDensity, uint32_t nObjectId, uint16_t nProbability)
 {
     const int32_t nLevelId = DUNGEON_GetLevelIdFromPopulatedRoom(pRoom);
@@ -1477,62 +1555,22 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn8_Well(D2GameStrc* pGame, D2ActiveRoomS
         return nullptr;
     }
 
-    D2UnitStrc* pObject = nullptr;
-    const int32_t nSizeX = 2 * pObjectsTxtRecord->dwSizeX + 1;
-    const int32_t nSizeY = 2 * pObjectsTxtRecord->dwSizeY + 1;
-    for (int32_t i = 0; i < 1; ++i)
+    D2UnitStrc* pObject = OBJECTS_PlaceWell(pGame, nObjectId, 2 * pObjectsTxtRecord->dwSizeX + 1,
+        2 * pObjectsTxtRecord->dwSizeY + 1, pRoom, nLevelId, OBJRGN_CanSpawnWell);
+    if (pObject)
     {
-        D2DrlgCoordsStrc drlgCoords = {};
-        DUNGEON_GetRoomCoordinates(pRoom, &drlgCoords);
-
-        pObject = nullptr;
-        if (drlgCoords.nSubtileWidth >= 2 && drlgCoords.nSubtileHeight >= 2 && drlgCoords.nSubtileWidth > nSizeX && drlgCoords.nSubtileHeight > nSizeY)
-        {
-            for (int32_t j = 0; j < 5; ++j)
-            {
-                const int32_t nX = drlgCoords.nSubtileX + ITEMS_RollLimitedRandomNumber(pSeed, drlgCoords.nSubtileWidth - nSizeX - 1);
-                const int32_t nY = drlgCoords.nSubtileY + ITEMS_RollLimitedRandomNumber(pSeed, drlgCoords.nSubtileHeight - nSizeY - 1);
-                if (nX && nY 
-                    && (uint16_t)nX >= drlgCoords.nSubtileX + 1
-                    && (uint16_t)nY >= drlgCoords.nSubtileY + 1
-                    && (uint16_t)nX < drlgCoords.nSubtileX + drlgCoords.nSubtileWidth - 1
-                    && (uint16_t)nY < drlgCoords.nSubtileHeight + drlgCoords.nSubtileY - 1)
-                {
-                    if (IsBadCodePtr((FARPROC)OBJRGN_CanSpawnWell))
-                    {
-                        FOG_DisplayAssert("ptFilter", __FILE__, __LINE__);
-                        exit(-1);
-                    }
-
-                    if (!COLLISION_CheckMaskWithSizeXY(pRoom, nX, nY, nSizeX + 6, nSizeY + 6, COLLIDE_MASK_PLACEMENT) && OBJRGN_CanSpawnWell(pGame, nLevelId, nX, nY))
-                    {
-                        D2_ASSERT(pRoom);
-
-                        pObject = SUNIT_AllocUnitData(UNIT_OBJECT, nObjectId, nX, nY, pGame, pRoom, 1, 0, 0);
-                        if (pObject)
-                        {
-                            if (pObjectsTxtRecord->nSelectable[pObject->dwAnimMode])
-                            {
-                                pObject->dwFlags |= UNITFLAG_TARGETABLE;
-                            }
-                            else
-                            {
-                                pObject->dwFlags &= ~UNITFLAG_TARGETABLE;
-                            }
-
-                            OBJRGN_SetWellCoordinates(pGame, nLevelId, CLIENTS_GetUnitX(pObject), CLIENTS_GetUnitY(pObject));
-                        }
-                        break;
-                    }
-                }
-            }
-        }
+        if (pObjectsTxtRecord->nSelectable[pObject->dwAnimMode])
+            pObject->dwFlags |= UNITFLAG_TARGETABLE;
+        else
+            pObject->dwFlags &= ~UNITFLAG_TARGETABLE;
+        OBJRGN_SetWellCoordinates(pGame, nLevelId, CLIENTS_GetUnitX(pObject), CLIENTS_GetUnitY(pObject));
     }
 
     return pObject;
 }
 
 //D2Game.0x6FC72C30
+// 1.13c D2Game+0x327D0
 D2UnitStrc* __fastcall OBJECTS_PopulateFn2_WaypointShrine(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, uint8_t nDensity, uint32_t nObjectId, uint16_t nProbability)
 {
     D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(nObjectId);
@@ -1564,84 +1602,42 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn2_WaypointShrine(D2GameStrc* pGame, D2A
 
     while (nCounter > 0)
     {
-        D2DrlgCoordsStrc drlgCoords = {};
-        DUNGEON_GetRoomCoordinates(pRoom, &drlgCoords);
-
-        if (drlgCoords.nSubtileWidth >= (int32_t)(pObjectsTxtRecord->dwSizeX + 2) && drlgCoords.nSubtileHeight >= (int32_t)(pObjectsTxtRecord->dwSizeY + 2))
+        D2UnitStrc* pObject = OBJECTS_PlaceShrine(pGame, nObjectId, pObjectsTxtRecord->dwSizeX,
+            pObjectsTxtRecord->dwSizeY, pRoom, nLevelId, pObjectsTxtRecord->nOrientation, OBJRGN_CanSpawnShrine);
+        if (pObject)
         {
-            for (int32_t nProbabilitya = 0; nProbabilitya < 5; ++nProbabilitya)
+            if (pObjectsTxtRecord->nSelectable[pObject->dwAnimMode])
             {
-                int32_t nX = 0;
-                int32_t nY = 0;
-                if (pObjectsTxtRecord->nOrientation == 1)
-                {
-                    nX = drlgCoords.nSubtileX + drlgCoords.nSubtileWidth / 4 + ITEMS_RollLimitedRandomNumber(pSeed, drlgCoords.nSubtileWidth / 2);
-                    nY = drlgCoords.nSubtileY + OBJECTS_RollRandomNumber(pSeed, 1, 2);
-                }
-                else if (pObjectsTxtRecord->nOrientation == 2)
-                {
-                    nX = drlgCoords.nSubtileX + OBJECTS_RollRandomNumber(pSeed, 1, 2);
-                    nY = ITEMS_RollLimitedRandomNumber(pSeed, drlgCoords.nSubtileHeight / 2) + drlgCoords.nSubtileY + drlgCoords.nSubtileHeight / 4;
-                }
-                else
-                {
-                    nX = drlgCoords.nSubtileX + ITEMS_RollLimitedRandomNumber(pSeed, drlgCoords.nSubtileWidth - pObjectsTxtRecord->dwSizeX - 1);
-                    nY = drlgCoords.nSubtileY + ITEMS_RollLimitedRandomNumber(pSeed, drlgCoords.nSubtileHeight - pObjectsTxtRecord->dwSizeY - 1);
-                }
-
-                if (nX && nY && (uint16_t)nX >= drlgCoords.nSubtileX + 1 && (uint16_t)nY >= drlgCoords.nSubtileY + 1 && (uint16_t)nX < drlgCoords.nSubtileX + drlgCoords.nSubtileWidth - 1 && (uint16_t)nY < drlgCoords.nSubtileY + drlgCoords.nSubtileHeight - 1)
-                {
-                    if (IsBadCodePtr((FARPROC)OBJRGN_CanSpawnShrine))
-                    {
-                        FOG_DisplayAssert("ptFilter", __FILE__, __LINE__);
-                        exit(-1);
-                    }
-
-                    if (!COLLISION_CheckMaskWithSizeXY(pRoom, nX, nY, pObjectsTxtRecord->dwSizeX + 6, pObjectsTxtRecord->dwSizeY + 6, COLLIDE_MASK_PLACEMENT) && OBJRGN_CanSpawnShrine(pGame, nLevelId, nX, nY))
-                    {
-                        D2_ASSERT(pRoom);
-
-                        D2UnitStrc* pObject = SUNIT_AllocUnitData(UNIT_OBJECT, nObjectId, nX, nY, pGame, pRoom, 1, 0, 0);
-                        if (pObject)
-                        {
-                            if (pObjectsTxtRecord->nSelectable[pObject->dwAnimMode])
-                            {
-                                pObject->dwFlags |= UNITFLAG_TARGETABLE;
-                            }
-                            else
-                            {
-                                pObject->dwFlags &= ~UNITFLAG_TARGETABLE;
-                            }
-
-                            if (pObject->pObjectData->InteractType == 2)
-                            {
-                                OBJRGN_IncreaseHealingShrineCount(pGame, nLevelId);
-                            }
-                            else if (bSpawnHealingWell)
-                            {
-                                const int32_t nClassId = DATATBLS_GetObjectsTxtRecord(pObject->dwClassId)->dwParm[1];
-
-                                pObject->dwClassId = OBJECT_HEALINGWELL;
-                                if (nClassId && nClassId < 573)
-                                {
-                                    pObject->dwClassId = nClassId;
-                                }
-
-                                OBJECTS_GetShrineId(pGame, 2u, 1, pRoom);
-                                pObject->pObjectData->InteractType = 2;
-                                UNITS_SetShrineTxtRecordInObjectData(pObject, DATATBLS_GetShrinesTxtRecord(2));
-                                OBJRGN_IncreaseHealingShrineCount(pGame, nLevelId);
-                            }
-
-                            OBJRGN_SetShrineCoordinates(pGame, nLevelId, CLIENTS_GetUnitX(pObject), CLIENTS_GetUnitY(pObject));
-
-                            return pObject;
-                        }
-
-                        break;
-                    }
-                }
+                pObject->dwFlags |= UNITFLAG_TARGETABLE;
             }
+            else
+            {
+                pObject->dwFlags &= ~UNITFLAG_TARGETABLE;
+            }
+
+            if (pObject->pObjectData->InteractType == 2)
+            {
+                OBJRGN_IncreaseHealingShrineCount(pGame, nLevelId);
+            }
+            else if (bSpawnHealingWell)
+            {
+                const int32_t nClassId = DATATBLS_GetObjectsTxtRecord(pObject->dwClassId)->dwParm[1];
+
+                pObject->dwClassId = OBJECT_HEALINGWELL;
+                if (nClassId && nClassId < 573)
+                {
+                    pObject->dwClassId = nClassId;
+                }
+
+                OBJECTS_GetShrineId(pGame, 2u, 1, pRoom);
+                pObject->pObjectData->InteractType = 2;
+                UNITS_SetShrineTxtRecordInObjectData(pObject, DATATBLS_GetShrinesTxtRecord(2));
+                OBJRGN_IncreaseHealingShrineCount(pGame, nLevelId);
+            }
+
+            OBJRGN_SetShrineCoordinates(pGame, nLevelId, CLIENTS_GetUnitX(pObject), CLIENTS_GetUnitY(pObject));
+
+            return pObject;
         }
 
         --nCounter;
@@ -1658,6 +1654,7 @@ int32_t __fastcall OBJECTS_RollRandomNumber(D2SeedStrc* pSeed, int32_t nMin, int
 }
 
 //D2Game.0x6FC730C0
+// 1.13c D2Game+0x30800
 D2UnitStrc* __fastcall OBJECTS_PopulateFn4_Barrel(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, uint8_t nDensity, uint32_t nObjectId, uint16_t nProbability)
 {
     constexpr int signX[] =
@@ -1758,6 +1755,7 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn4_Barrel(D2GameStrc* pGame, D2ActiveRoo
 }
 
 //D2Game.0x6FC73550
+// 1.13c D2Game+0x30150
 D2UnitStrc* __fastcall OBJECTS_PopulateFn5_Crate(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, uint8_t nDensity, uint32_t nObjectId, uint16_t nProbability)
 {
     constexpr int32_t gnUrnIds[] =
@@ -1825,7 +1823,8 @@ D2UnitStrc* __fastcall OBJECTS_PopulateFn5_Crate(D2GameStrc* pGame, D2ActiveRoom
                 bool bSpawnObject = true;
                 int32_t nMax = 1;
                 pObject = nullptr;
-                while (!ITEMS_RollLimitedRandomNumber(&pObjectControl->pSeed, nMax / 2) || bSpawnObject)
+                // 1.13c 0x6FC50568/0x6FC50576 exits on either a nonzero roll or a failed placement.
+                while (!ITEMS_RollLimitedRandomNumber(&pObjectControl->pSeed, nMax / 2) && bSpawnObject)
                 {
                     bSpawnObject = false;
                     int32_t nCount = 4;
@@ -1884,25 +1883,26 @@ int32_t __fastcall OBJECTS_SpawnNothing(D2GameStrc* pGame, D2ActiveRoomStrc* pRo
 }
 
 //D2Game.0x6FC73A80
+// 1.13c D2Game+0x2FEC0
 int32_t __fastcall OBJECTS_SpawnBarrel(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2DrlgCoordsStrc* pDrlgCoords)
 {
-    const uint16_t nXEnd = pDrlgCoords->nSubtileX + pDrlgCoords->nSubtileWidth + 1;
-    const uint16_t nYEnd = pDrlgCoords->nSubtileY + pDrlgCoords->nSubtileHeight + 1;
+    const uint32_t nXEnd = pDrlgCoords->nSubtileX + pDrlgCoords->nSubtileWidth + 1;
+    const uint32_t nYEnd = pDrlgCoords->nSubtileY + pDrlgCoords->nSubtileHeight + 1;
     D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(OBJECT_BARREL);
     D2ObjectControlStrc* pObjectControl = OBJRGN_GetObjectControlFromGame(pGame);
 
     int32_t nCounter = 0;
 
-    for (uint16_t nX = pDrlgCoords->nSubtileX; nX < nXEnd; nX += 2)
+    for (uint32_t nX = pDrlgCoords->nSubtileX; nX < nXEnd; nX += 2)
     {
-        for (uint16_t nY = pDrlgCoords->nSubtileY; nY < nYEnd; nY += 2)
+        for (uint32_t nY = pDrlgCoords->nSubtileY; nY < nYEnd; nY += 2)
         {
             const int32_t nClassId = ((ITEMS_RollRandomNumber(&pObjectControl->pSeed) & 3) == 0) ? OBJECT_EXPLODING_BARREL : OBJECT_BARREL;
 
-            if (pDrlgCoords->nSubtileWidth >= 2 && pDrlgCoords->nSubtileHeight >= 2 && nX > pDrlgCoords->nSubtileX + 2 && nY > pDrlgCoords->nSubtileY + 2)
+            if (pDrlgCoords->nSubtileWidth >= 2 && pDrlgCoords->nSubtileHeight >= 2 && uint16_t(nX) > pDrlgCoords->nSubtileX + 2 && uint16_t(nY) > pDrlgCoords->nSubtileY + 2)
             {
-                if (nX < (int32_t)(pDrlgCoords->nSubtileWidth + pDrlgCoords->nSubtileX - pObjectsTxtRecord->dwSizeX)
-                    && nY < (int32_t)(pDrlgCoords->nSubtileHeight + pDrlgCoords->nSubtileY - pObjectsTxtRecord->dwSizeY))
+                if (uint16_t(nX) < (int32_t)(pDrlgCoords->nSubtileWidth + pDrlgCoords->nSubtileX - pObjectsTxtRecord->dwSizeX)
+                    && uint16_t(nY) < (int32_t)(pDrlgCoords->nSubtileHeight + pDrlgCoords->nSubtileY - pObjectsTxtRecord->dwSizeY))
                 {
                     if (!COLLISION_CheckMaskWithSizeXY(pRoom, nX, nY, pObjectsTxtRecord->dwSizeX + 2, pObjectsTxtRecord->dwSizeY + 2, COLLIDE_MASK_PLACEMENT))
                     {

@@ -101,6 +101,11 @@ int __stdcall ITEMS_GetItemStartSeed(D2UnitStrc* pItem)
 	return 0;
 }
 
+static_assert(offsetof(D2ItemDataStrc, dwInitSeed) == 0x10);
+static_assert(offsetof(D2ItemDataStrc, dwFileIndex) == 0x28);
+
+// 1.13c D2Common+0x23B70
+// Retail requires a non-null item unit with item data; +0x10 is the initial seed.
 //D2Common.0x6FD984D0 (#10694)
 void __stdcall ITEMS_SetItemStartSeed(D2UnitStrc* pItem, int nSeed)
 {
@@ -3480,10 +3485,14 @@ BOOL __stdcall ITEMS_IsNotQuestItemByItemId(int nItemId)
 	return pItemsTxtRecord->nQuest < 1 && pItemsTxtRecord->wType[0] != ITEMTYPE_QUEST;
 }
 
+// 1.13c D2Common+0x22640
+// Retail checks unit, item type and data separately before reading data +0x28.
 //D2Common.0x6FD9DEE0 (#10732)
 int __stdcall ITEMS_GetFileIndex(D2UnitStrc* pItem)
 {
-	D2_ASSERT(ITEMS_GetItemData(pItem));
+	D2_ASSERT(pItem);
+	D2_ASSERT(pItem->dwUnitType == UNIT_ITEM);
+	D2_ASSERT(pItem->pItemData);
 	return pItem->pItemData->dwFileIndex;
 }
 

@@ -4,20 +4,7 @@
 
 // Host operations are explicit: classification and conversion are Windows NLS answers,
 // not an ASCII approximation. State belongs to this DLL, not to the BNClient CRT copy.
-struct McpStringTypeHost {
-    uint32_t wide_state;       // module global +0xAD80: 0 unknown, 1 wide, 2 ANSI
-    uint32_t default_locale;   // +0xAD68
-    uint32_t default_codepage; // +0xAD78
-    int32_t (*wide_type)(uint32_t, const uint16_t*, int32_t, uint16_t*);
-    uint32_t (*last_error)();
-    int32_t (*to_wide)(uint32_t, uint32_t, const char*, int32_t, uint16_t*, int32_t);
-    int32_t (*ansi_codepage)(uint32_t); // +0x5909
-    char* (*convert)(uint32_t, uint32_t, const char*, uint32_t*, char*, int32_t); // +0x5950
-    int32_t (*ansi_type)(uint32_t, uint32_t, const char*, int32_t, uint16_t*);
-    void* (*temporary)(uint32_t); // replaces x86 stack allocation / calloc fallback
-    void (*release)(void*);
-    void (*free_converted)(void*); // +0x1BB4
-};
+#include "mcp_stringtype.h"
 
 // 1.13c D2MCPClient+0x04C38
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_crt_getstringtype_4c38(

@@ -9,8 +9,9 @@ void D2Client_RelinkNode(uint8_t* link) {
     uint32_t node = rd32(link);
     if (!node) return;
     uint32_t offs = rd32(link + 4);
+    // Subtract in retail uint32 arithmetic, then sign-extend the wrapped displacement.
     uintptr_t t = (int32_t)offs < 0 ? (uintptr_t)(uint32_t)~offs
-                                    : (uintptr_t)link + (uint32_t)(offs - rd32((const uint8_t*)(uintptr_t)node + 4));
+                                    : (uintptr_t)link + (intptr_t)(int32_t)(uint32_t)(offs - rd32((const uint8_t*)(uintptr_t)node + 4));
     std::memcpy((void*)t, &node, 4);
     uint32_t n2 = rd32(link), o2 = rd32(link + 4);   // retail re-reads the link after the store (target may alias it)
     std::memcpy((uint8_t*)(uintptr_t)n2 + 4, &o2, 4);

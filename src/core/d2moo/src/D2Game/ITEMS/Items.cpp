@@ -81,6 +81,25 @@ uint32_t __fastcall ITEMS_HasUniqueBeenDroppedAlready(D2GameStrc* pGame, int32_t
     return (&pGame->dwUniqueFlags[0])[nUniqueItemId >> 5] & gdwBitMasks[nUniqueItemId & 0x1F];
 }
 
+// 1.13c D2Game+0x0E800
+// ESI = game, EDI = item. Retail returns 0 unless the item's quality is unique; then it
+// returns whether that item's unique-file-index bit is set in the game's 4097-bit unique mask.
+// An out-of-range id returns 1, and a null game returns 0.
+int32_t __fastcall sub_E800(D2GameStrc* pGame, D2UnitStrc* pItem)
+{
+    if (ITEMS_GetItemQuality(pItem) != ITEMQUAL_UNIQUE)
+    {
+        return 0;
+    }
+
+    if (!pGame)
+    {
+        return 0;
+    }
+
+    return ITEMS_HasUniqueBeenDroppedAlready(pGame, ITEMS_GetFileIndex(pItem));
+}
+
 //D2Game.0x6FC4D4E0
 int32_t __fastcall ITEMS_CanUniqueItemBeDropped(D2GameStrc* pGame, D2UnitStrc* pItem)
 {

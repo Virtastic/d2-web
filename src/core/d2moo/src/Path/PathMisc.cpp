@@ -1168,6 +1168,7 @@ int __stdcall D2Common_10236(D2UnitStrc* pUnit, int a2)
 
 //1.10f: Inlined
 //1.13c: D2Common.0x6FD5CEB0
+// 1.13c D2Common+0x0CEB0
 void sub_6FD5CEB0(D2DynamicPathStrc* pDynamicPath, int nBaseVelocity)
 {
 	if (nBaseVelocity <= 0)
@@ -1182,7 +1183,7 @@ void sub_6FD5CEB0(D2DynamicPathStrc* pDynamicPath, int nBaseVelocity)
 		{
 			const int nOldVelocity = pDynamicPath->dwMaxVelocity;
 			pDynamicPath->dwVelocity = nAcceleration + pDynamicPath->dwVelocity;
-			if (pDynamicPath->dwVelocity >= nOldVelocity)
+			if (pDynamicPath->dwVelocity > nOldVelocity)
 			{
 				pDynamicPath->dwVelocity = nOldVelocity;
 				pDynamicPath->dwAcceleration = 0;

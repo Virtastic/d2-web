@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <emscripten.h>
+#include <cstdlib>
+#include "pending_unit_updates.h"
 
 #pragma pack(push, 1)
 struct D2G9D850Game { uint8_t pad[0xBC]; uint32_t act[5]; uint8_t pad2[0x1D28 - 0xD0]; uint32_t arena; };
@@ -10,19 +12,30 @@ struct D2G9D850Arena { uint32_t pad0, pad4, flags; };
 #pragma pack(pop)
 static_assert(offsetof(D2G9D850Game, act) == 0xBC && offsetof(D2G9D850Game, arena) == 0x1D28 && offsetof(D2G9D850Arena, flags) == 8, "game fields");
 
-// walkRooms(act): rooms (10717, next +0x7C), each queue (+0x1C, next +0xE0) through E0860(game, unit), then 10127(room).
-template <class Ptr, class Walk> static void GAME_9D850(D2G9D850Game* g, Ptr p, Walk walkRooms)
-{
-    for (int i = 0; i < 5; ++i) {
-        uint32_t* a = (uint32_t*)p(g->act[i]);
-        if (a && *a) { walkRooms(a); *a = 0; }
+// FN currently has no complete 0xE0860 binding. Do not turn a pending
+// act into an apparent success by clearing its flag without visiting its units.
+struct PendingReplay {
+    D2G9D850Game* game;
+    uint32_t act(int i) { return game->act[i]; }
+    bool pending(uint32_t a) { return *(uint32_t*)(uintptr_t)a != 0; }
+    uint32_t firstRoom(uint32_t) { std::abort(); }
+    uint32_t nextRoom(uint32_t) { std::abort(); }
+    uint32_t firstUnit(uint32_t) { std::abort(); }
+    uint32_t nextUnit(uint32_t) { std::abort(); }
+    void finishUnit(uint32_t) { std::abort(); }
+    void clearQueue(uint32_t) { std::abort(); }
+    void clearPending(uint32_t a) { *(uint32_t*)(uintptr_t)a = 0; }
+    void clearArenaFlag() {
+        if (game->arena) ((D2G9D850Arena*)(uintptr_t)game->arena)->flags &= 0xFFFFFBFFu;
     }
-    if (g->arena) ((D2G9D850Arena*)p(g->arena))->flags &= 0xFFFFFBFFu;
+};
+static void GAME_9D850(D2G9D850Game* game)
+{
+    PendingReplay env{game};
+    d2game::updateQueuedUnits(env);
 }
-
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9d850(uint32_t* r)
 {
-    // ponytail: the replay never sets an act flag (retail would walk real rooms), so the walk seam stays empty.
-    GAME_9D850((D2G9D850Game*)(uintptr_t)r[0], [](uint32_t v) { return (void*)(uintptr_t)v; }, [](uint32_t*) {});
+    GAME_9D850((D2G9D850Game*)(uintptr_t)r[0]);
     r[4] = 0;
 }

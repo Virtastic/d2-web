@@ -7,15 +7,16 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-// Build realmd and start it on the given ports. Returns null only when the compiler is absent, so
-// callers can skip on that genuine prerequisite. Build and startup errors are test failures: in
+// Build realmd and start it on the given ports (zero asks the OS to allocate a free port).
+// Updates ports from readiness while the listeners remain bound, with no reservation race.
+// Returns null only when the compiler is absent, so callers can skip that genuine prerequisite. Build and startup errors are test failures: in
 // particular, a bind conflict must not turn protocol coverage into a green SKIP.
 //
-// `tag` gives each test file its OWN binary. node --test runs files in parallel, so a shared output
+// `tag` and PID give each test file/process its OWN binary. node --test runs files in parallel, so a shared output
 // path means one file's g++ rewrites the binary another file is currently executing -- which fails
 // as ETXTBSY, intermittently and confusingly.
 export async function startRealmd(ports, tag = 'test', extraArgs = []) {
-  const BIN = join(ROOT, 'build-wasm', `realmd-${tag}`);
+  const BIN = join(ROOT, 'build-wasm', `realmd-${tag}-${process.pid}`);
   const compiler = spawnSync('g++', ['--version'], { encoding: 'utf8' });
   if (compiler.error?.code === 'ENOENT') return null;
   if (compiler.status !== 0) {
@@ -36,7 +37,11 @@ export async function startRealmd(ports, tag = 'test', extraArgs = []) {
     const t = setTimeout(() => resolve(false), 8000);
     proc.stdout.on('data', (d) => {
       stdout += d.toString();
-      if (stdout.includes('realmd listening')) { clearTimeout(t); resolve(true); }
+      const ready = stdout.match(/realmd listening bncs=(\d+) mcp=(\d+) d2gs=(\d+)\n/);
+      if (ready) {
+        Object.assign(ports, { bncs: Number(ready[1]), mcp: Number(ready[2]), d2gs: Number(ready[3]) });
+        clearTimeout(t); resolve(true);
+      }
     });
     proc.stderr.on('data', (d) => { stderr += d.toString(); });
     proc.once('error', (error) => { clearTimeout(t); resolve(error); });

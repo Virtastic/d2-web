@@ -90,6 +90,8 @@ void __stdcall STATES_ClearGfxStateFlags(D2UnitStrc* pUnit)
 	}
 }
 
+// 1.13c D2Common+0x34330
+// Retail inlines the extended-list gfx-word lookup; the helper below preserves native pointers.
 //D2Common.0x6FDB4710 (#10490)
 BOOL __stdcall STATES_IsAnyGfxStateFlagSet(D2UnitStrc* pUnit)
 {

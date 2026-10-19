@@ -1,4 +1,5 @@
 #include "MONSTER/MonsterUnique.h"
+#include "core/d2game/d2game_21880.h"
 
 #include <algorithm>
 
@@ -2084,10 +2085,7 @@ void __fastcall sub_6FC6E8A0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 //D2Game.0x6FC6E8B0
 void __fastcall sub_6FC6E8B0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pMissile)
 {
-    if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pMissile)
-    {
-        sub_6FC6E780(pGame, pUnit, pMissile, 5);
-    }
+    d2game_21880(pGame, pUnit, pMissile);
 }
 
 //D2Game.0x6FC6E8D0

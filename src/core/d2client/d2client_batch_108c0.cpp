@@ -69,14 +69,6 @@ uint32_t d2_client_a5480(const uint32_t* g11bbfc, uint32_t (*ord_10331)(uint32_t
     return *g11bbfc ? ord_10331(*g11bbfc) : 0u;
 }
 
-// 1.13c D2Client+0xA5B00 (20 B): fastcall(idx=ECX, value=EDX); forwards to D2Client+0xA6EF0 with
-// (entry pointer = 0x10A608 + idx*0x80, value&0x7F, value, idx). tbl is the global array at RVA 0x10A608.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_a5b00(uint8_t* tbl, int32_t idx, uint32_t value,
-    void (*callee)(uint8_t*, uint32_t, uint32_t, int32_t)) {
-    callee(tbl + idx * 0x80, value & 0x7f, value, idx);
-}
-
 // 1.13c D2Client+0x1C720 (20 B): clear the global mode word at RVA 0x1223D8 (DAT_6fbd23d8) if it is 1.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_1c720(uint32_t* g1223d8) {

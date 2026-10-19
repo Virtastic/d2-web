@@ -1631,6 +1631,29 @@ bool __fastcall ACT1Q4_SeqCallback(D2QuestDataStrc* pQuestData)
 	return pQuest->pfSeqFilter(pQuest);
 }
 
+static_assert(offsetof(D2Act1Quest4Strc, unk0x52) == 0x52);
+static_assert(offsetof(D2Act1Quest4Strc, bQuestCompleteBefore) == 0x63);
+static_assert(offsetof(D2Act1Quest4Strc, bChangePortalInTownToSpecialMode)
+    == 0x92 + sizeof(D2UnitStrc*) - sizeof(uint32_t));
+
+// Retail outlined setters walk the Cain quest chain; keep native pointer links.
+// Prior art: D2MOO A1Q4 player-start callback and QUESTS_GetQuestData.
+// 1.13c D2Game+0x60590
+static void ACT1Q4_MarkCainNotSpawned(D2GameStrc* pGame)
+{
+    D2QuestDataStrc* pQuest = QUESTS_GetQuestData(pGame, QUEST_A1Q4_CAIN);
+    if (pQuest)
+        ((D2Act1Quest4Strc*)pQuest->pQuestDataEx)->unk0x52 = 1;
+}
+
+// 1.13c D2Game+0x605C0
+static void ACT1Q4_MarkQuestCompleteBefore(D2GameStrc* pGame)
+{
+    D2QuestDataStrc* pQuest = QUESTS_GetQuestData(pGame, QUEST_A1Q4_CAIN);
+    if (pQuest)
+        ((D2Act1Quest4Strc*)pQuest->pQuestDataEx)->bQuestCompleteBefore = 1;
+}
+
 //D2Game.0x6FC9C0A0
 void __fastcall ACT1Q4_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
@@ -1640,11 +1663,7 @@ void __fastcall ACT1Q4_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 
 	if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q4, QFLAG_REWARDGRANTED) == 1)
 	{
-		D2QuestDataStrc* pQuest = QUESTS_GetQuestData(pQuestData->pGame, QUEST_A1Q4_CAIN);
-		if (pQuest)
-		{
-			((D2Act1Quest4Strc*)pQuest->pQuestDataEx)->unk0x52 = 1;
-		}
+		ACT1Q4_MarkCainNotSpawned(pQuestData->pGame);
 
 		QUESTS_SetGlobalState(pQuestData->pGame, QUESTSTATEFLAG_A1Q4, QFLAG_PRIMARYGOALDONE);
 		pQuestDataEx->nCainGibbetObjectMode = OBJMODE_SPECIAL1;
@@ -1653,17 +1672,9 @@ void __fastcall ACT1Q4_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 	}
 	else if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A1Q4, QFLAG_COMPLETEDBEFORE) == 1)
 	{
-		D2QuestDataStrc* pQuest = QUESTS_GetQuestData(pQuestData->pGame, QUEST_A1Q4_CAIN);
-		if (pQuest)
-		{
-			((D2Act1Quest4Strc*)pQuest->pQuestDataEx)->unk0x52 = 1;
-		}
+		ACT1Q4_MarkCainNotSpawned(pQuestData->pGame);
 
-		pQuest = QUESTS_GetQuestData(pQuestData->pGame, QUEST_A1Q4_CAIN);
-		if (pQuest)
-		{
-			((D2Act1Quest4Strc*)pQuest->pQuestDataEx)->bQuestCompleteBefore = 1;
-		}
+		ACT1Q4_MarkQuestCompleteBefore(pQuestData->pGame);
 
 		pQuestDataEx->nCainGibbetObjectMode = OBJMODE_SPECIAL1;
 		pQuestDataEx->unk0x4C = 1;
@@ -2256,6 +2267,7 @@ void __fastcall ACT1Q4_SpawnCainPortalInTown(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC9CBE0
+// 1.13c D2Game+0x603D0
 void __fastcall ACT1Q4_OnCainInTownActivated(D2GameStrc* pGame)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A1Q4_CAIN);

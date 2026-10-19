@@ -5,6 +5,7 @@
 #include <cstddef>
 
 #include "D2DataTbls.h"
+#include "D2Inventory.h"
 
 #ifndef EMSCRIPTEN_KEEPALIVE
 #define EMSCRIPTEN_KEEPALIVE
@@ -14,8 +15,6 @@
 static uint32_t s_nStatsAllocCount;
 static uintptr_t s_pStatsAllocArrays[2];
 
-// Callee D2Common+0x1050 belongs to another row; bind it weakly so this row links on its own.
-extern "C" uint32_t d2_fn_d2common_1050(uintptr_t pStat) __attribute__((weak));
 
 // 1.13c D2Common+0x18E90
 extern "C"
@@ -45,7 +44,9 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_1e630(uintptr_t pHeader, uintptr_t 
     if (pHeader != 0 && *(const uint32_t*)pHeader == 0x01020304u &&
         pStat != 0 && *(const uint32_t*)pStat == 4u)
     {
-        uint32_t nValue = (&d2_fn_d2common_1050) ? d2_fn_d2common_1050(pStat) : 0u;
+        // 0x1050 reads the unit X coordinate. Its FN export is a register-array
+        // probe, so call the typed native owner with the engine unit layout.
+        uint32_t nValue = (uint32_t)UNITS_GetXPosition(reinterpret_cast<D2UnitStrc*>(pStat));
         // retail keeps the value only when it is <= 10
         return nValue & (uint32_t)((10 < (int32_t)nValue) - 1);
     }

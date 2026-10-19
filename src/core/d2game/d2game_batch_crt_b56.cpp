@@ -263,15 +263,23 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9C16(int32_t failureKind, const D2GameBat
 //
 // Host model: _tfpecode is a 4-byte token (0 = null, 1 = the process default block, 2 = the static
 // block) because the field is 4 bytes and a wasm64 host pointer is 8. The port creates no foreign
-// locale, so the release walk only ever sees those two blocks, both zeroed (their sub-object fields are
-// null and the +1 walks do nothing).
-static uint8_t g_defaultTlocinfo[0x90];      // 0x6FD1F0CC process default locale (host model)
+// locale, so the release walk only sees those two blocks; their child fields are null and the sub-object
+// walks do nothing. The process default's initial refcount is 1, matching the shipped .data record.
+// The shipped 1.13c default locale record starts with refcount 1 (the record at 0x6FD1F078).
+// Model that initialized .data dword explicitly; __freefls drops each thread's reference from it.
+static uint8_t g_defaultTlocinfo[0x90] = { 1 }; // 0x6FD1F0CC process default locale (host model)
 static uint8_t g_staticTlocinfo[0x90];       // 0x6FD1F078 static locale never freed
 
 static uint8_t* b56_locale(uint32_t token) {
     if (token == 1) return g_defaultTlocinfo;
     if (token == 2) return g_staticTlocinfo;
     return nullptr;
+}
+
+// Share the modeled CRT locale records with __freefls@4. The token is the 32-bit value stored in
+// _tiddata+0x64; token 1 and 2 resolve to the same records this module updates in ___updatetlocinfo_lk.
+extern "C" void* d2game_crt_locale_from_token(uint32_t token) {
+    return b56_locale(token);
 }
 
 extern "C"

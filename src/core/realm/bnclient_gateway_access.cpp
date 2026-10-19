@@ -1,3 +1,4 @@
+#include "bnclient_gateway_access.h"
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -35,17 +36,16 @@ static_assert(sizeof(BNGatewayAccess32) == 0x24);
 }  // namespace
 
 // 1.13c BNClient+0x01050
-BNGatewayAccess32* d2_bnclient_gateway_access_assign(
-    BNGatewayAccess32* destination, const BNGatewayAccess32* source) {
-    destination->opaque_00 = source->opaque_00;
-    destination->selection_changed_04 = source->selection_changed_04;
-    destination->gateway_count_08 = source->gateway_count_08;
-    destination->current_gateway_0c = source->current_gateway_0c;
-    destination->gateway_buffer_ptr_10 = source->gateway_buffer_ptr_10;
-    destination->gateway_buffer_bytes_14 = source->gateway_buffer_bytes_14;
-    destination->gateway_list_value_18 = source->gateway_list_value_18;
-    destination->override_list_1c = source->override_list_1c;
-    destination->realms_buffer_ptr_20 = source->realms_buffer_ptr_20;
+void* d2_bnclient_gateway_access_assign(void* destination, const void* source) {
+    auto* dst = static_cast<unsigned char*>(destination);
+    const auto* src = static_cast<const unsigned char*>(source);
+    // Preserve retail's ascending dword loads/stores even for partial overlap.
+    // Byte copies avoid C++ struct lifetime/aliasing assumptions about FN blobs.
+    for (size_t offset = 0; offset < sizeof(BNGatewayAccess32); offset += 4) {
+        uint32_t word;
+        std::memcpy(&word, src + offset, sizeof(word));
+        std::memcpy(dst + offset, &word, sizeof(word));
+    }
     return destination;
 }
 

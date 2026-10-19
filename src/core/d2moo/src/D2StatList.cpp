@@ -707,6 +707,26 @@ void __fastcall STATLIST_UpdateUnitStat_6FDB6AB0(D2StatListExStrc* pStatListEx, 
 	STATLIST_SetUnitStatNewValue(pStatListEx, pStatsArray, pStat, nLayer_StatId, nNewValue, pItemStatCostTxtRecord, pUnit);
 }
 
+// Prior art used: D2MOO stat-array insertion/removal and callback helpers.
+// Retail's additive FullStats path differs from the general setter: dirty only
+// for positive results, and notify even when the additive delta is zero.
+// 1.13c D2Common+0x389E0
+static int STATLIST_AddFullStatValue(D2StatListExStrc* list,
+    D2SLayerStatIdStrc::PackedType id, int delta,
+    D2ItemStatCostTxt* cost, D2UnitStrc* unit)
+{
+    D2StatStrc* stat = STATLIST_GetOrInsertStat(list->pMemPool, &list->FullStats, id);
+    const int previous = stat->nValue;
+    const int value = static_cast<int32_t>(static_cast<uint32_t>(previous) + static_cast<uint32_t>(delta));
+    stat->nValue = value;
+    if (value > 0 && cost->bHasOpApplyingToItem)
+        list->dwFlags |= STATLIST_PERMANENT;
+    if (value == 0 && !cost->nKeepZero)
+        STATLIST_RemoveStat_6FDB6A30(list->pMemPool, &list->FullStats, stat);
+    STATLIST_NotifyUnitOfStatValueChange(cost, list, unit, id, previous, value);
+    return value;
+}
+
 //D2Common.0x6FDB6C10
 // 1.13c D2Common+0x39F70
 void __fastcall sub_6FDB6C10(D2StatListExStrc* pStatListEx, D2SLayerStatIdStrc::PackedType nLayer_StatId, int nValue, D2UnitStrc* pUnit)
@@ -742,12 +762,7 @@ void __fastcall sub_6FDB6C10(D2StatListExStrc* pStatListEx, D2SLayerStatIdStrc::
 		}
 		else
 		{
-			D2StatStrc* pStat = STATLIST_GetOrInsertStat(pParentStatList->pMemPool, &pParentStatList->FullStats, nLayer_StatId);
-
-			int nNewValue = pStat->nValue + nValue;
-			D2_ASSERTM(!(nNewValue < 0 && pItemStatCostTxtRecord->bHasOpApplyingToItem), 
-				"Original game does not set STATLIST_PERMANENT if (nNewValue <= 0), while we do when (nNewValue != 0).");
-			STATLIST_SetUnitStatNewValue(pParentStatList, &pParentStatList->FullStats, pStat, nLayer_StatId, nNewValue, pItemStatCostTxtRecord, pUnit);
+			STATLIST_AddFullStatValue(pParentStatList, nLayer_StatId, nValue, pItemStatCostTxtRecord, pUnit);
 		}
 		if ((pParentStatList->dwFlags & STATLIST_SET) || (bStatIsDamageRelated && (pParentStatList->dwFlags & STATLIST_DYNAMIC)))
 		{
@@ -1323,6 +1338,7 @@ void __stdcall STATLIST_SetBaseStat2(D2StatListStrc* pStatList, int nStatId, int
 	}
 }
 
+// 1.13c D2Common+0x3A740
 //D2Common.0x6FDB7AB0 (#10517)
 void __stdcall STATLIST_SetUnitStat(D2UnitStrc* pUnit, int nStatId, int nValue, uint16_t nLayer)
 {
@@ -1335,6 +1351,7 @@ void __stdcall STATLIST_SetUnitStat(D2UnitStrc* pUnit, int nStatId, int nValue, 
 	}
 }
 
+// 1.13c D2Common+0x3A710
 //D2Common.0x6FDB7B00 (#10518)
 void __stdcall STATLIST_AddUnitStat(D2UnitStrc* pUnit, int nStatId, int nValue, uint16_t nLayer)
 {

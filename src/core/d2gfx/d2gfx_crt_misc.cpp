@@ -1,28 +1,6 @@
 #include <cstdint>
 #include <cstdlib>
 
-// 1.13c D2Gfx+0x13BD -- MSVC 2003 Release CRT _unlock(8), the _EXIT_LOCK1 call-site wrapper. Bytes are
-// `push 8; call __unlock 0x19BC; pop ecx; ret`; __unlock(8) is LeaveCriticalSection(&locktable[8]) with
-// the LPCRITICAL_SECTION table at +0x90048 (stride 8). Its only callers are _unlock 0x166E, itself only
-// reached by _onexit 0x163C. Our engine models no CRT lock table (no 0x1A71 __lock either) and nothing
-// in the ported engine takes lock 8, so the contract here is the one observable thing left: a void
-// no-argument cdecl call that releases nothing and returns.
-extern "C"
-void d2gfx_unlock_8(void) {
-}
-
-// 1.13c D2Gfx+0x4293 -- MSVC 2003 Release CRT __security_check_cookie, __fastcall (cookie in ECX).
-// 14 bytes: compare the cookie word against the module cookie at +0x906E0; equal -> ret; different ->
-// report_failure 0x4262 (__SEH_prolog, 0x608C, ExitProcess(3)), which does not return.
-// Our build runs no CRT startup, so there is no __security_init_cookie and no /GS-instrumented frame;
-// the module cookie is a zero-initialised cell and the mismatch path is ExitProcess(3)'s wasm analogue.
-static uintptr_t g_stack_cookie;   // +0x906E0
-extern "C"
-void d2gfx_security_check_cookie(uintptr_t cookie) {
-    if (cookie == g_stack_cookie) return;
-    abort();
-}
-
 // 1.13c D2Gfx+0x042B0 -- MSVC 2003 Release CRT __aulldvrm, the unsigned 64/64 divide used by _output's
 // digit loop. Dividend EDX:EAX (hi=param_2, lo=param_1), divisor ECX:EBX (hi=param_4, lo=param_3);
 // quotient returned EDX:EAX, remainder ECX:EBX. The decompile's two branches (divisor-high==0 splits the

@@ -1032,6 +1032,8 @@ int32_t __fastcall ACT5Q5_IsNotActivatable(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FCB7BB0
+// 1.13c D2Game+0x566D0
+// Prior art: D2MOO 1.10f A5Q5.cpp; checked against the complete cached 1.13c body.
 int32_t __fastcall ACT5Q5_GetPortalCount(D2GameStrc* pGame)
 {
 	return ((D2Act5Quest5Strc*)QUESTS_GetQuestData(pGame, QUEST_A5Q5_ANCIENTS)->pQuestDataEx)->nActivePortalCount;

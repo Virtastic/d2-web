@@ -1,4 +1,5 @@
 #include "UNIT/SUnitProxy.h"
+#include "../../../../d2game/inventory_drain.h"
 
 #include <algorithm>
 
@@ -379,15 +380,7 @@ void __fastcall SUNITPROXY_ClearNpcRecordData(D2GameStrc* pGame, D2NpcRecordStrc
             D2NpcGambleStrc* pNextGamble = pGamble->pNext;
             if (pGamble->pInventory)
             {
-                D2UnitStrc* pItem = INVENTORY_GetFirstItem(pGamble->pInventory);
-                while (pItem)
-                {
-                    D2UnitStrc* pNextItem = INVENTORY_GetNextItem(pItem);
-                    D2_ASSERT(INVENTORY_UnitIsItem(pItem));
-                    //INVENTORY_GetItemNodePage(pItem);
-                    SUNIT_RemoveUnit(pGame, pItem);
-                    pItem = pNextItem;
-                }
+                D2GAME_DrainInventory_113c(pGamble->pInventory, pGame);
                 INVENTORY_FreeInventory(pGamble->pInventory);
                 pGamble->pInventory = nullptr;
             }
@@ -399,15 +392,7 @@ void __fastcall SUNITPROXY_ClearNpcRecordData(D2GameStrc* pGame, D2NpcRecordStrc
 
     if (pNpcRecord->pInventory)
     {
-        D2UnitStrc* pItem = INVENTORY_GetFirstItem(pNpcRecord->pInventory);
-        while (pItem)
-        {
-            D2UnitStrc* pNextItem = INVENTORY_GetNextItem(pItem);
-            D2_ASSERT(INVENTORY_UnitIsItem(pItem));
-            //INVENTORY_GetItemNodePage(pItem);
-            SUNIT_RemoveUnit(pGame, pItem);
-            pItem = pNextItem;
-        }
+        D2GAME_DrainInventory_113c(pNpcRecord->pInventory, pGame);
     }
     INVENTORY_FreeInventory(pNpcRecord->pInventory);
     pNpcRecord->pInventory = nullptr;
@@ -675,16 +660,7 @@ void __fastcall SUNITPROXY_FreeVendorChain(D2GameStrc* pGame, D2UnitStrc* pPlaye
 
                         if (pGamble->pInventory)
                         {
-                            D2UnitStrc* pItem = INVENTORY_GetFirstItem(pGamble->pInventory);
-                            while (pItem)
-                            {
-                                D2_ASSERT(INVENTORY_UnitIsItem(pItem));
-
-                                D2UnitStrc* pNext = INVENTORY_GetNextItem(pItem);
-                                //INVENTORY_GetItemNodePage(pItem);
-                                SUNIT_RemoveUnit(pGame, pItem);
-                                pItem = pNext;
-                            }
+                            D2GAME_DrainInventory_113c(pGamble->pInventory, pGame);
 
                             INVENTORY_FreeInventory(pGamble->pInventory);
                             pGamble->pInventory = nullptr;
@@ -1006,15 +982,7 @@ void __fastcall SUNITPROXY_FreeNpcGamble(D2GameStrc* pGame, D2UnitStrc* pNpc, D2
 
                 if (pGamble->pInventory)
                 {
-                    D2UnitStrc* pInventoryItem = INVENTORY_GetFirstItem(pGamble->pInventory);
-                    while (pInventoryItem)
-                    {
-                        D2UnitStrc* pNextItem = INVENTORY_GetNextItem(pInventoryItem);
-                        D2_ASSERT(INVENTORY_UnitIsItem(pInventoryItem));
-                        //INVENTORY_GetItemNodePage(pInventoryItem);
-                        SUNIT_RemoveUnit(pGame, pInventoryItem);
-                        pInventoryItem = pNextItem;
-                    }
+                    D2GAME_DrainInventory_113c(pGamble->pInventory, pGame);
                     INVENTORY_FreeInventory(pGamble->pInventory);
                     pGamble->pInventory = nullptr;
                 }

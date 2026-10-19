@@ -1,6 +1,8 @@
 #include "ITEMS/ItemMode.h"
 
 #include <algorithm>
+#include <bit>
+#include <cstring>
 
 #include <D2BitManip.h>
 #include <D2Math.h>
@@ -6342,6 +6344,163 @@ int32_t __fastcall sub_6FC4C5F0_End(D2GameStrc* pGame, D2UnitStrc* pItem, D2Item
     return 1;
 }
 
+// 1.13c D2Game+0xF370
+// Retail's three stack arguments are game, item, drop (ret 0xC). Ghidra's
+// unaff_retaddr is the third argument, not a return-address-relative object.
+int32_t __fastcall ITEMS_SelectUnique_F370(D2GameStrc* pGame, D2UnitStrc* pItem, D2ItemDropStrc* pItemDrop)
+{
+    D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem ? pItem->dwClassId : -1);
+    if (!pItemsTxtRecord)
+    {
+        return 0;
+    }
+    static_assert(sizeof(D2UniqueItemsTxt) == 0x14C);
+    static_assert(offsetof(D2UniqueItemsTxt, wVersion) == 0x24);
+    static_assert(offsetof(D2UniqueItemsTxt, dwBaseItemCode) == 0x28);
+    static_assert(offsetof(D2UniqueItemsTxt, dwUniqueItemFlags) == 0x2C);
+    static_assert(offsetof(D2UniqueItemsTxt, wRarity) == 0x30);
+    static_assert(offsetof(D2UniqueItemsTxt, wLvl) == 0x34);
+    static_assert(offsetof(D2ItemsTxt, dwCode) == 0x80);
+    static_assert(offsetof(D2ItemsTxt, nQuest) == 0x12A);
+    const auto scaleDurability = [](int32_t value) {
+        return std::min(std::bit_cast<int32_t>(static_cast<uint32_t>(value) * 5u), 255);
+    };
+    const uint16_t nItemFormat = ITEMS_GetItemFormat(pItem);
+    if (ITEMS_HasDurability(pItem) && !nItemFormat)
+    {
+        const int32_t durability = STATLIST_UnitGetStatValue(pItem, STAT_DURABILITY, 0);
+        const int32_t maxDurability = STATLIST_GetUnitBaseStat(pItem, STAT_MAXDURABILITY, 0);
+        STATLIST_SetUnitStat(pItem, STAT_DURABILITY, scaleDurability(durability), 0);
+        STATLIST_SetUnitStat(pItem, STAT_MAXDURABILITY, scaleDurability(maxDurability), 0);
+    }
+
+    if (!pItemDrop->bForce)
+    {
+        if (!nItemFormat)
+        {
+            for (int32_t i = 0; i < sgptDataTables->nUniqueItemsTxtRecordCount; ++i)
+            {
+                D2UniqueItemsTxt* pUniqueItemsTxtRecord = &sgptDataTables->pUniqueItemsTxt[i];
+                if (pUniqueItemsTxtRecord->wVersion < 100)
+                {
+                    if (pUniqueItemsTxtRecord->dwUniqueItemFlags & gdwBitMasks[UNIQUEITEMSFLAGINDEX_ENABLED])
+                    {
+                        if (pGame->nGameType || pGame->dwGameType || !(pUniqueItemsTxtRecord->dwUniqueItemFlags & gdwBitMasks[UNIQUEITEMSFLAGINDEX_LADDER]))
+                        {
+                            if (pItemsTxtRecord->dwCode == pUniqueItemsTxtRecord->dwBaseItemCode)
+                            {
+                                if (!ITEMS_HasUniqueBeenDroppedAlready(pGame, i) || pItemsTxtRecord->nQuest)
+                                {
+                                    ITEMS_SetFileIndex(pItem, i);
+                                    ITEMS_SetItemFlag(pItem, IFLAG_IDENTIFIED, 0);
+                                    ITEMMODS_AssignProperty(3, nullptr, pItem, nullptr, 0, 0);
+                                    return 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            int32_t nCount = 0;
+            int32_t nUniqueItemId = -1;
+            int32_t nMax = 0;
+            for (int32_t i = 0; i < sgptDataTables->nUniqueItemsTxtRecordCount; ++i)
+            {
+                D2UniqueItemsTxt* pUniqueItemsTxtRecord = &sgptDataTables->pUniqueItemsTxt[i];
+                if (pUniqueItemsTxtRecord->wVersion < 100 || nItemFormat >= 100)
+                {
+                    if (pUniqueItemsTxtRecord->dwUniqueItemFlags & gdwBitMasks[UNIQUEITEMSFLAGINDEX_ENABLED] && pItemsTxtRecord->dwCode == pUniqueItemsTxtRecord->dwBaseItemCode && (pGame->nGameType || pGame->dwGameType || !(pUniqueItemsTxtRecord->dwUniqueItemFlags & gdwBitMasks[UNIQUEITEMSFLAGINDEX_LADDER])))
+                    {
+                        if (static_cast<int16_t>(pUniqueItemsTxtRecord->wLvl) <= ITEMS_GetItemLevel(pItem))
+                        {
+                            if (pItemDrop->nItemIndex && static_cast<uint32_t>(pItemDrop->nItemIndex) - 1u == static_cast<uint32_t>(i))
+                            {
+                                nUniqueItemId = i;
+                            }
+
+                            stru_6FD45C18[nCount].nIndex = i;
+                            stru_6FD45C18[nCount].nAccumulatedRarity = nMax;
+
+                            ++nCount;
+                            // Retail loads a signed dword at +0x30, including the +0x32 padding.
+                            int32_t nRarity;
+                            std::memcpy(&nRarity, &pUniqueItemsTxtRecord->wRarity, sizeof(nRarity));
+                            nMax = std::bit_cast<int32_t>(static_cast<uint32_t>(nMax)
+                                + static_cast<uint32_t>(std::max(nRarity, 1)));
+                        }
+                    }
+                }
+            }
+
+            if (nCount > 0)
+            {
+                if (nUniqueItemId < 0)
+                {
+                    const int32_t nChance = static_cast<int32_t>(ITEMS_RollLimitedRandomNumber(ITEMS_GetItemSeed(pItem), nMax));
+                    int32_t i = 1;
+                    while (i < nCount && nChance >= stru_6FD45C18[i].nAccumulatedRarity)
+                    {
+                        ++i;
+                    }
+                    nUniqueItemId = stru_6FD45C18[i - 1].nIndex;
+                }
+
+                if (!pItemsTxtRecord->nQuest && ITEMS_HasUniqueBeenDroppedAlready(pGame, nUniqueItemId))
+                {
+                    ITEMS_SetFileIndex(pItem, -1);
+                }
+                else
+                {
+                    D2UniqueItemsTxt* pUniqueItemsTxtRecord = ITEMS_GetUniqueItemsTxtRecord(nUniqueItemId);
+                    if (pUniqueItemsTxtRecord && pItemsTxtRecord->dwCode == pUniqueItemsTxtRecord->dwBaseItemCode)
+                    {
+                        ITEMS_SetFileIndex(pItem, nUniqueItemId);
+                        if (ITEMS_CanUniqueItemBeDropped(pGame, pItem))
+                        {
+                            ITEMS_SetItemFlag(pItem, IFLAG_IDENTIFIED, 0);
+                            ITEMMODS_AssignProperty(3, nullptr, pItem, nullptr, 0, 0);
+                            return 1;
+                        }
+                        else
+                        {
+                            ITEMS_SetFileIndex(pItem, -1);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                if (ITEMS_GetUniqueColumnFromItemsTxt(pItem))
+                {
+                    return 1;
+                }
+
+                ITEMS_SetFileIndex(pItem, -1);
+            }
+        }
+    }
+    else
+    {
+        D2UniqueItemsTxt* pUniqueItemsTxtRecord = ITEMS_GetUniqueItemsTxtRecord(pItemDrop->nItemIndex);
+        if (pUniqueItemsTxtRecord)
+        {
+            ITEMS_SetFileIndex(pItem, pItemDrop->nItemIndex);
+            if (pUniqueItemsTxtRecord->dwBaseItemCode == pItemsTxtRecord->dwCode)
+            {
+                ITEMS_SetItemFlag(pItem, IFLAG_IDENTIFIED, 0);
+                ITEMMODS_AssignProperty(3, nullptr, pItem, nullptr, 0, 0);
+            }
+
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 //D2Game.0x6FC4C5F0
 int32_t __fastcall sub_6FC4C5F0(D2GameStrc* pGame, D2UnitStrc** ppUnit, D2ItemDropStrc* pItemDrop)
 {
@@ -6583,131 +6742,9 @@ int32_t __fastcall sub_6FC4C5F0(D2GameStrc* pGame, D2UnitStrc** ppUnit, D2ItemDr
         ITEMS_SetFileIndex(pItem, -1);
         nSeed = SEED_GetLowSeed(ITEMS_GetItemSeed(pItem));
 
-        const uint16_t nItemFormat = ITEMS_GetItemFormat(pItem);
-        if (ITEMS_HasDurability(pItem) && !nItemFormat)
+        if (ITEMS_SelectUnique_F370(pGame, pItem, pItemDrop))
         {
-            STATLIST_SetUnitStat(pItem, STAT_DURABILITY, std::min(5 * STATLIST_UnitGetStatValue(pItem, STAT_DURABILITY, 0), 255), 0);
-            STATLIST_SetUnitStat(pItem, STAT_MAXDURABILITY, std::min(5 * STATLIST_GetUnitBaseStat(pItem, STAT_MAXDURABILITY, 0), 255), 0);
-        }
-
-        if (!pItemDrop->bForce)
-        {
-            if (!nItemFormat)
-            {
-                for (int32_t i = 0; i < sgptDataTables->nUniqueItemsTxtRecordCount; ++i)
-                {
-                    D2UniqueItemsTxt* pUniqueItemsTxtRecord = &sgptDataTables->pUniqueItemsTxt[i];
-                    if (pUniqueItemsTxtRecord->wVersion < 100)
-                    {
-                        if (pUniqueItemsTxtRecord->dwUniqueItemFlags & gdwBitMasks[UNIQUEITEMSFLAGINDEX_ENABLED])
-                        {
-                            if (pGame->nGameType || pGame->dwGameType || !(pUniqueItemsTxtRecord->dwUniqueItemFlags & gdwBitMasks[UNIQUEITEMSFLAGINDEX_LADDER]))
-                            {
-                                if (pItemsTxtRecord->dwCode == pUniqueItemsTxtRecord->dwBaseItemCode)
-                                {
-                                    if (!ITEMS_HasUniqueBeenDroppedAlready(pGame, i) || pItemsTxtRecord->nQuest)
-                                    {
-                                        ITEMS_SetFileIndex(pItem, i);
-                                        ITEMS_SetItemFlag(pItem, IFLAG_IDENTIFIED, 0);
-                                        ITEMMODS_AssignProperty(3, nullptr, pItem, nullptr, 0, 0);
-                                        return sub_6FC4C5F0_End(pGame, pItem, pItemDrop, pItemsTxtRecord);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            else
-            {
-                int32_t nCount = 0;
-                int32_t nUniqueItemId = -1;
-                int32_t nMax = 0;
-                for (int32_t i = 0; i < sgptDataTables->nUniqueItemsTxtRecordCount; ++i)
-                {
-                    D2UniqueItemsTxt* pUniqueItemsTxtRecord = &sgptDataTables->pUniqueItemsTxt[i];
-                    if (pUniqueItemsTxtRecord->wVersion < 100 || nItemFormat >= 100)
-                    {
-                        if (pUniqueItemsTxtRecord->dwUniqueItemFlags & gdwBitMasks[UNIQUEITEMSFLAGINDEX_ENABLED] && pItemsTxtRecord->dwCode == pUniqueItemsTxtRecord->dwBaseItemCode && (pGame->nGameType || pGame->dwGameType || !(pUniqueItemsTxtRecord->dwUniqueItemFlags & gdwBitMasks[UNIQUEITEMSFLAGINDEX_LADDER])))
-                        {
-                            if (pUniqueItemsTxtRecord->wLvl <= ITEMS_GetItemLevel(pItem))
-                            {
-                                if (pItemDrop->nItemIndex && pItemDrop->nItemIndex - 1 == i)
-                                {
-                                    nUniqueItemId = i;
-                                }
-
-                                stru_6FD45C18[nCount].nIndex = i;
-                                stru_6FD45C18[nCount].nAccumulatedRarity = nMax;
-
-                                ++nCount;
-                                nMax += std::max((int32_t)pUniqueItemsTxtRecord->wRarity, 1);
-                            }
-                        }
-                    }
-                }
-
-                if (nCount > 0)
-                {
-                    if (nUniqueItemId < 0)
-                    {
-                        const uint32_t nChance = ITEMS_RollLimitedRandomNumber(ITEMS_GetItemSeed(pItem), nMax);
-                        int32_t i = 1;
-                        while (i < nCount && nChance >= stru_6FD45C18[i].nAccumulatedRarity)
-                        {
-                            ++i;
-                        }
-                        nUniqueItemId = stru_6FD45C18[i - 1].nIndex;
-                    }
-
-                    if (!pItemsTxtRecord->nQuest && ITEMS_HasUniqueBeenDroppedAlready(pGame, nUniqueItemId))
-                    {
-                        ITEMS_SetFileIndex(pItem, -1);
-                    }
-                    else
-                    {
-                        D2UniqueItemsTxt* pUniqueItemsTxtRecord = ITEMS_GetUniqueItemsTxtRecord(nUniqueItemId);
-                        if (pUniqueItemsTxtRecord && pItemsTxtRecord->dwCode == pUniqueItemsTxtRecord->dwBaseItemCode)
-                        {
-                            ITEMS_SetFileIndex(pItem, nUniqueItemId);
-                            if (ITEMS_CanUniqueItemBeDropped(pGame, pItem))
-                            {
-                                ITEMS_SetItemFlag(pItem, IFLAG_IDENTIFIED, 0);
-                                ITEMMODS_AssignProperty(3, nullptr, pItem, nullptr, 0, 0);
-                                return sub_6FC4C5F0_End(pGame, pItem, pItemDrop, pItemsTxtRecord);
-                            }
-                            else
-                            {
-                                ITEMS_SetFileIndex(pItem, -1);
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    if (ITEMS_GetUniqueColumnFromItemsTxt(pItem))
-                    {
-                        return sub_6FC4C5F0_End(pGame, pItem, pItemDrop, pItemsTxtRecord);
-                    }
-
-                    ITEMS_SetFileIndex(pItem, -1);
-                }
-            }
-        }
-        else
-        {
-            D2UniqueItemsTxt* pUniqueItemsTxtRecord = ITEMS_GetUniqueItemsTxtRecord(pItemDrop->nItemIndex);
-            if (pUniqueItemsTxtRecord)
-            {
-                ITEMS_SetFileIndex(pItem, pItemDrop->nItemIndex);
-                if (pUniqueItemsTxtRecord->dwBaseItemCode == pItemsTxtRecord->dwCode)
-                {
-                    ITEMS_SetItemFlag(pItem, IFLAG_IDENTIFIED, 0);
-                    ITEMMODS_AssignProperty(3, nullptr, pItem, nullptr, 0, 0);
-                }
-
-                return sub_6FC4C5F0_End(pGame, pItem, pItemDrop, pItemsTxtRecord);
-            }
+            return sub_6FC4C5F0_End(pGame, pItem, pItemDrop, pItemsTxtRecord);
         }
 
         if (ITEMS_HasDurability(pItem) && ITEMS_GetItemFormat(pItem) >= 1u)

@@ -258,6 +258,8 @@ int32_t __fastcall ACT2Q4_UnitIterate_UpdateQuestStateFlags(D2GameStrc* pGame, D
 }
 
 //D2Game.0x6FCA2780
+// 1.13c D2Game+0xC2040
+// Retail inlines the quest-chain lookup; native pointers retain the same fields and branches.
 int32_t __fastcall ACT2Q4_IsHaremBlockerObjectOpened(D2GameStrc* pGame)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A2Q4_HORAZONTOME);
@@ -796,6 +798,8 @@ void __fastcall ACT2Q4_InitializeJerhynPalaceObject(D2QuestDataStrc* pQuestData,
 }
 
 //D2Game.0x6FCA34D0
+// 1.13c D2Game+0xC1F90
+// Retail inlines the quest-chain lookup; native pointers retain the same fields and branches.
 int32_t __fastcall ACT2Q4_IsGuardMoving(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A2Q4_HORAZONTOME);
@@ -886,6 +890,8 @@ int32_t __fastcall ACT2Q4_IsJerhynPalaceActivated(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FCA36A0
+// 1.13c D2Game+0xC1F40
+// Retail inlines the quest-chain lookup; native pointers retain the same fields and branches.
 int32_t __fastcall ACT2Q4_HasGuardMovedToEndPosition(D2GameStrc* pGame)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A2Q4_HORAZONTOME);
@@ -904,6 +910,8 @@ int32_t __fastcall ACT2Q4_HasGuardMovedToEndPosition(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FCA36E0
+// 1.13c D2Game+0xC1EE0
+// Retail inlines the quest-chain lookup; native pointers retain the same fields and branches.
 int32_t __fastcall ACT2Q4_GetGuardCoordinates(D2GameStrc* pGame, D2CoordStrc* pCoord)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A2Q4_HORAZONTOME);

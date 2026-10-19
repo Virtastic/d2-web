@@ -19,6 +19,20 @@
 #include "UNIT/SUnit.h"
 
 
+// 1.13c D2Game+0x58260
+// Retail outlines this lookup; EAX is the soldier, ECX the quest. Keep the
+// native pointers typed and share the first-match rule with its callers.
+static int32_t ACT5Q2_FindSoldierGroup(D2QuestDataStrc* pQuestData, D2UnitStrc* pSoldier)
+{
+    const int32_t nGUID = pSoldier ? static_cast<int32_t>(pSoldier->dwUnitId) : -1;
+    const auto* pExtra = static_cast<D2Act5Quest2Strc*>(pQuestData->pQuestDataEx);
+    for (int32_t group = 0; group < 3; ++group)
+        for (int32_t slot = 0; slot < 5; ++slot)
+            if (pExtra->unk0xB0[5 * group + slot] == nGUID)
+                return group;
+    return -1;
+}
+
 //D2Game.0x6FD3C430
 D2NPCMessageTableStrc gpAct5Q2NpcMessages[] =
 {
@@ -513,24 +527,10 @@ void __fastcall ACT5Q2_Callback08_MonsterKilled(D2QuestDataStrc* pQuestData, D2Q
 		}
 	}
 
-	int32_t* pGUIDs = pQuestDataEx->unk0xB0;
-	int32_t nCounter = 0;
-	int32_t nIndex = 0;
-	while (nUnitGUID != pGUIDs[nCounter])
+	const int32_t nIndex = ACT5Q2_FindSoldierGroup(pQuestData, pQuestArg->pTarget);
+	if (nIndex < 0)
 	{
-		++nCounter;
-		if (nCounter >= 5)
-		{
-			++nIndex;
-
-			if (nIndex >= 3)
-			{
-				return;
-			}
-
-			pGUIDs += 5;
-			nCounter = 0;
-		}
+		return;
 	}
 
 	if (nIndex >= 0)
@@ -760,6 +760,7 @@ void __fastcall OBJECTS_InitFunction62_CagedWussie(D2ObjInitFnStrc* pOp)
 	}
 }
 
+// 1.13c D2Game+0x59290
 //D2Game.0x6FCB2CF0
 int32_t __fastcall ACT5Q2_CheckWussieCounters(D2GameStrc* pGame, D2UnitStrc* pWussie)
 {
@@ -771,30 +772,10 @@ int32_t __fastcall ACT5Q2_CheckWussieCounters(D2GameStrc* pGame, D2UnitStrc* pWu
 
 	D2Act5Quest2Strc* pQuestDataEx = (D2Act5Quest2Strc*)pQuestData->pQuestDataEx;
 
-	int32_t nWussieGUID = -1;
-	if (pWussie)
+	const int32_t nIndex = ACT5Q2_FindSoldierGroup(pQuestData, pWussie);
+	if (nIndex < 0)
 	{
-		nWussieGUID = pWussie->dwUnitId;
-	}
-
-	int32_t* pGUIDs = pQuestDataEx->unk0xB0;
-	int32_t nCounter = 0;
-	int32_t nIndex = 0;
-	while (nWussieGUID != pGUIDs[nCounter])
-	{
-		++nCounter;
-		if (nCounter >= 5)
-		{
-			++nIndex;
-
-			if (nIndex >= 3)
-			{
-				return 0;
-			}
-
-			pGUIDs += 5;
-			nCounter = 0;
-		}
+		return 0;
 	}
 
 	if (nIndex >= 0 && pQuestDataEx->unk0x114[nIndex])
@@ -805,6 +786,7 @@ int32_t __fastcall ACT5Q2_CheckWussieCounters(D2GameStrc* pGame, D2UnitStrc* pWu
 	return 0;
 }
 
+// 1.13c D2Game+0x59230
 //D2Game.0x6FCB2D60
 void __fastcall ACT5Q2_UpdateWussieCounters(D2GameStrc* pGame, int32_t nUnused, D2UnitStrc* pWussie)
 {
@@ -815,26 +797,13 @@ void __fastcall ACT5Q2_UpdateWussieCounters(D2GameStrc* pGame, int32_t nUnused, 
 	}
 
 	D2Act5Quest2Strc* pQuestDataEx = (D2Act5Quest2Strc*)pQuestData->pQuestDataEx;
-	int32_t nUnitGUID = -1;
-	if (pWussie)
+	const int32_t nIndex = ACT5Q2_FindSoldierGroup(pQuestData, pWussie);
+	if (nIndex >= 0)
 	{
-		nUnitGUID = pWussie->dwUnitId;
-	}
-
-	for (int32_t i = 0; i < 3; ++i)
-	{
-		for (int32_t j = 0; j < 5; ++j)
+		++pQuestDataEx->unk0x114[nIndex];
+		if (pQuestDataEx->unk0x114[nIndex] >= 5)
 		{
-			if (nUnitGUID == pQuestDataEx->unk0xB0[j + 5 * i])
-			{
-				++pQuestDataEx->unk0x114[i];
-				if (pQuestDataEx->unk0x114[i] >= 5)
-				{
-					pQuestDataEx->unk0x108[i] = 1;
-				}
-
-				return;
-			}
+			pQuestDataEx->unk0x108[nIndex] = 1;
 		}
 	}
 }
@@ -1023,6 +992,8 @@ int32_t __fastcall ACT5Q2_UnitIterate_AttachCompletionSound(D2GameStrc* pGame, D
 }
 
 //D2Game.0x6FCB32D0
+// 1.13c D2Game+0x56B80
+// Prior art: D2MOO 1.10f A5Q2.cpp; checked against the complete cached 1.13c body.
 int32_t __fastcall ACT5Q2_GetBarbsToBeRescued(D2QuestDataStrc* pQuestData)
 {
 	D2Act5Quest2Strc* pQuestDataEx = (D2Act5Quest2Strc*)pQuestData->pQuestDataEx;
@@ -1111,30 +1082,10 @@ int32_t __fastcall ACT5Q2_FindPortal(D2GameStrc* pGame, D2UnitStrc* pUnit, D2Uni
 
 	D2Act5Quest2Strc* pQuestDataEx = (D2Act5Quest2Strc*)pQuestData->pQuestDataEx;
 
-	int32_t nUnitGUID = -1;
-	if (pUnit)
+	const int32_t nIndex = ACT5Q2_FindSoldierGroup(pQuestData, pUnit);
+	if (nIndex < 0)
 	{
-		nUnitGUID = pUnit->dwUnitId;
-	}
-
-	int32_t* pGUIDs = pQuestDataEx->unk0xB0;
-	int32_t nCounter = 0;
-	int32_t nIndex = 0;
-	while (nUnitGUID != pGUIDs[nCounter])
-	{
-		++nCounter;
-		if (nCounter >= 5)
-		{
-			++nIndex;
-
-			if (nIndex >= 3)
-			{
-				return 0;
-			}
-
-			pGUIDs += 5;
-			nCounter = 0;
-		}
+		return 0;
 	}
 
 	if (!pQuestDataEx->bPortalSpawned[nIndex])

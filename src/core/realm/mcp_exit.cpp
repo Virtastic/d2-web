@@ -1,3 +1,4 @@
+#include "mcp_onexit.h"
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -21,21 +22,29 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_exit(int code) {
 // `_C_Exit_Done` = 1; `___crtExitProcess(code)` (+0x1000, `ExitProcess`). Both `__initterm` tables are
 // EMPTY in the shipped image -- one NULL slot each (read from retail 1.13c D2MCPClient.dll, SHA-256
 // d40431969cab1cf9b7335dc3de4a51c1330527cc068d4caf9ce2dc1bf67469be) -- and the onexit head/tail are 0
-// (unbacked .data), so both `quick` branches call nothing and the only writes are the three globals.
+// (unbacked .data), before initialization; registered native callbacks are shared with __onexit.
 //
-// Our engine has no process to terminate and never runs this CRT shutdown, so this is a shim: it models
-// the two flag writes and the `retcaller` branch, not `TerminateProcess` / `___crtExitProcess` (no wasm
-// analogue) nor the empty onexit/`__initterm` walks (nothing to call), which is why the row's vector
-// records the three globals only.
+// The native callback table is shared with init/registration. The terminal host-process paths remain
+// a shim; empty-table FN vectors still observe only these three globals. Native exhaustion leaves
+// end == begin instead of retail's one-before-begin sentinel, avoiding invalid C++ pointer arithmetic.
 static uint32_t g_C_Termination_Done;   // +0xAA20
 static uint32_t g_C_Exit_Done;          // +0xAA24
 static uint8_t  g_exitflag;             // +0xAA1C
 
 extern "C" void d2_mcp_doexit(uint32_t code, uint32_t quick, uint32_t retcaller) {
-    (void)quick;                        // both quick branches are empty walks in this image
-    if (g_C_Exit_Done == 1) return;     // retail: TerminateProcess(GetCurrentProcess(), code)
-    g_C_Termination_Done = 1;
-    g_exitflag = (uint8_t)retcaller;    // byte store
+    {
+        d2_mcp_lock8_1030();
+        struct Unlock { ~Unlock() { d2_mcp_unlock8_1039(); } } unlock;
+        if (g_C_Exit_Done == 1) return;     // retail: TerminateProcess(GetCurrentProcess(), code)
+        g_C_Termination_Done = 1;
+        g_exitflag = (uint8_t)retcaller;    // byte store
+        if (quick == 0 && g_mcp_onexit.onexit_begin != nullptr) {
+            while (g_mcp_onexit.onexit_end > g_mcp_onexit.onexit_begin) {
+                void* callback = *--g_mcp_onexit.onexit_end;
+                if (callback != nullptr) reinterpret_cast<void (*)()>(callback)();
+            }
+        }
+    } // Retail unlocks before the return/final-exit decision; also release on native unwinding.
     (void)code;                         // code reaches only the terminating (unmodelled) paths
     if (retcaller != 0) return;         // ___crtExitProcess not reached
     g_C_Exit_Done = 1;
@@ -48,7 +57,7 @@ extern "C" void d2_mcp_doexit_snapshot(uint32_t* s) {
 
 // 1.13c D2MCPClient+0x011A9 (15 B, caller 0x011B8 __CRT_INIT@12): `__cexit` = doexit(0, quick=0,
 // retcaller=1): run the onexit list and the C tables, then return instead of terminating. The onexit
-// and __initterm lists are empty in the shipped image (see d2_mcp_doexit), so the call is the whole rule.
+// table uses the same native callbacks as __onexit; the shipped __initterm tables are empty.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_mcp_cexit_11a9(void) {
     d2_mcp_doexit(0, 0, 1);
@@ -108,13 +117,20 @@ extern "C" EMSCRIPTEN_KEEPALIVE size_t d2_mcp_strlen(const char* s) {
 // walk the C++-initializer table +0xA000..+0xA008 -- 2 slots, [NULL, 0x559D ___security_init_cookie] --
 // calling every non-NULL slot and ignoring its status, then return 0.
 //
-// The tables live in our module with the same slots. All three installed callees are rows of their own
-// and still UNMAPPED, so their slots stay NULL (the same wiring d2ddraw_batch_rowex.cpp uses); the
-// registered 0x170A thunk is never run by our doexit shim (its onexit list is empty), so a clean walk
-// is the observable result 0.
+// The tables have the retail slot counts. The 0x1654 entry is bound to the shared onexit initializer;
+// 0x34DE (___initmbctable) and 0x559D (___security_init_cookie) remain seams. The 0x170A registration
+// call uses the shared one-argument _atexit path and is consumed by doexit. See
+// for the remaining boundary and capture requirements.
 static int (*g_mcp_cinit_dyn_init)(int);    // +0x125D8 DAT_6fa325d8
-static int (*g_mcp_xi[3])(void);            // +0xA00C: [NULL, ___onexitinit, ___initmbctable]
+extern "C" int32_t d2_mcp_onexitinit(void);
+static int (*g_mcp_xi[3])(void) = {nullptr, d2_mcp_onexitinit, nullptr}; // +0xA00C: [NULL, ___onexitinit, ___initmbctable]
 static int (*g_mcp_xc[2])(void);            // +0xA000: [NULL, ___security_init_cookie]
+
+// The cinit table state is still a seam. Use a native function token for the retail code pointer:
+// RVA 0x170A is not a valid wasm64 function pointer. The real one-argument _atexit path appends it to
+// the same callback table that __onexitinit and doexit use.
+static void mcp_cinit_exit_thunk_170a(void) {}
+extern "C" int32_t d2_mcp_atexit_16b4(void* func);
 
 extern "C"
 EMSCRIPTEN_KEEPALIVE int d2_mcp_cinit(int param) {
@@ -125,6 +141,9 @@ EMSCRIPTEN_KEEPALIVE int d2_mcp_cinit(int param) {
         if (g_mcp_xi[i] != nullptr) result = g_mcp_xi[i]();
     }
     if (result == 0) {
+        // 1.13c registers LAB_6fa2170a through _atexit after all C initializers succeed and before
+        // entering the C++ table. The one-argument callee appends to the shared initialized table.
+        (void)d2_mcp_atexit_16b4(reinterpret_cast<void*>(&mcp_cinit_exit_thunk_170a));
         for (size_t i = 0; i < 2; ++i)
             if (g_mcp_xc[i] != nullptr) (void)g_mcp_xc[i]();
         result = 0;

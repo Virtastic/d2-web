@@ -27,6 +27,7 @@
 #include <cstddef>
 
 //D2Common.0x6FDBD520 (#10457)
+// 1.13c D2Common+0x304E0
 uint8_t __stdcall UNITS_GetDirection(D2UnitStrc* pUnit)
 {
 	D2_ASSERT(pUnit);
@@ -284,47 +285,29 @@ int __stdcall UNITS_GetUnitSizeY(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDBDB10 (#10333)
+// 1.13c D2Common+0x30290
 int __stdcall UNITS_GetClientCoordX(D2UnitStrc* pUnit)
 {
 	D2_ASSERT(pUnit);
-
-	switch (pUnit->dwUnitType)
+	if (pUnit->dwUnitType == UNIT_OBJECT || pUnit->dwUnitType == UNIT_ITEM || pUnit->dwUnitType == UNIT_TILE)
 	{
-	case UNIT_OBJECT:
-	case UNIT_ITEM:
-	case UNIT_TILE:
 		return pUnit->pStaticPath->dwClientCoordX;
-
-	case UNIT_PLAYER:
-	case UNIT_MONSTER:
-	case UNIT_MISSILE:
-		return PATH_GetClientCoordX(pUnit->pDynamicPath);
-
-	default:
-		return 0;
 	}
+	// Retail uses the dynamic-path layout for every other type, including invalid IDs.
+	return PATH_GetClientCoordX(pUnit->pDynamicPath);
 }
 
 //D2Common.0x6FDBDB60 (#10334)
+// 1.13c D2Common+0x30240
 int __stdcall UNITS_GetClientCoordY(D2UnitStrc* pUnit)
 {
 	D2_ASSERT(pUnit);
-
-	switch (pUnit->dwUnitType)
+	if (pUnit->dwUnitType == UNIT_OBJECT || pUnit->dwUnitType == UNIT_ITEM || pUnit->dwUnitType == UNIT_TILE)
 	{
-	case UNIT_OBJECT:
-	case UNIT_ITEM:
-	case UNIT_TILE:
 		return pUnit->pStaticPath->dwClientCoordY;
-
-	case UNIT_PLAYER:
-	case UNIT_MONSTER:
-	case UNIT_MISSILE:
-		return PATH_GetClientCoordY(pUnit->pDynamicPath);
-
-	default:
-		return 0;
 	}
+	// Retail uses the dynamic-path layout for every other type, including invalid IDs.
+	return PATH_GetClientCoordY(pUnit->pDynamicPath);
 }
 
 //D2Common.0x6FDBDBB0 (#10411)
@@ -440,6 +423,7 @@ int __stdcall UNITS_GetAbsoluteYDistance(D2UnitStrc* pUnit1, D2UnitStrc* pUnit2)
 }
 
 //D2Common.0x6FDBDC90 (#10340)
+// 1.13c D2Common+0x30120
 void __stdcall UNITS_SetTargetX(D2UnitStrc* pUnit, int nTargetX)
 {
 	D2_ASSERT(pUnit);
@@ -644,6 +628,7 @@ D2ActiveRoomStrc* __stdcall UNITS_GetRoom(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDBE2D0 (#10344)
+// 1.13c D2Common+0x30E80
 void __stdcall UNITS_SetTargetUnitForDynamicUnit(D2UnitStrc* pUnit, D2UnitStrc* pTargetUnit)
 {
 	D2_ASSERT(pUnit);

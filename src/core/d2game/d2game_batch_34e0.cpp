@@ -152,6 +152,10 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_359f(uint32_t* r) {
     r[4] = (uint32_t)(uintptr_t)self;
 }
 
+// __RTC_Initialize(void): the retail callback range begins and ends at DAT_6fd1d35c, so its
+// initialization loop performs no calls. The host runtime has no D2Game RTC callbacks to register.
+static void d2_fn_d2game_405c() {} // 1.13c D2Game+0x0405C
+
 // 1.13c D2Game+0x35BB
 // __CRT_INIT@12(hinst, reason): the MSVC 2003 CRT startup. PROCESS_ATTACH records the OS version and runs
 // heap/multithread/RTC/cmdline/environment/io/argv/envp/cinit, incrementing the live-init count;
@@ -172,6 +176,8 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_35bb(uint32_t* r) {
         return;
     case 1: // DLL_PROCESS_ATTACH
         // GetVersionExA + __heap_init + __mtinit + __RTC_Initialize + command line/environment +
+        // __RTC_Initialize's callback range is empty (start == end), so this step has no side effects.
+        d2_fn_d2game_405c();
         // __ioinit/__setargv/__setenvp/__cinit: all succeed under the host runtime in this order; a
         // failure at any point unwinds the steps already taken and returns 0.
         ++g_crtInitCount;

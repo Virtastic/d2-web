@@ -1,5 +1,5 @@
-// src/core/realm/mcp_crt_init.cpp -- one UNMAPPED 1.13c D2MCPClient.dll row reimplemented from the
-// decompile in build-wasm/ghidra-d2mcpclient/decomp/0x11B8.c (alpha lane). Base 0x6FA20000; every RVA
+// src/core/realm/mcp_crt_init.cpp -- 1.13c D2MCPClient.dll CRT init recovered from the local decompile.
+// Base 0x6FA20000; every RVA
 // and global below is retail's. Prior art: the VC7.1 CRT leaves already recovered in
 // src/core/realm/mcp_crt_mem.cpp (0x1C25 calloc) and src/core/realm/bnclient_batch2_crt.cpp; the
 // runtime itself is Visual Studio 2003 Release (Ghidra "Library Function - Single Match").
@@ -13,6 +13,7 @@
 // is returned. The two four-byte stack locals the decompile writes ('\b','\x13',-0x5e,'o' and its
 // sibling) are the SEH registration frame, not program data.
 
+#include "mcp_onexit.h"
 #include <cstdint>
 #include <cstdlib>
 #include <emscripten.h>
@@ -31,8 +32,8 @@ static_assert(sizeof(D2McpOsVersionInfo) == 0x94, "1.13c OSVERSIONINFOA layout")
 
 // _tiddata as 0x1C25 allocates it (0x8C bytes); only the two fields this body sets are named.
 struct D2McpTiddata {
-    uint32_t tid;        // +0x00
-    uint32_t thandle;    // +0x04
+    uint32_t tid;            // +0x00, also seeded by __mtinit
+    uint32_t thandle;        // +0x04
 };
 static_assert(__builtin_offsetof(D2McpTiddata, tid) == 0x0 &&
               __builtin_offsetof(D2McpTiddata, thandle) == 0x4, "1.13c VC7.1 _tiddata layout");
@@ -154,32 +155,27 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_crt_init(void* dll_handle, uint32_t reason, 
 // store the block in the table head +0x125D0 (DAT_6fa325d0), zero its first slot (the list terminator),
 // and set the end pointer +0x125CC (DAT_6fa325cc) to the same block; return 0. That head/end pair is the
 // list d2_mcp_doexit walks (mcp_exit.cpp); retail registers 0x170A with _atexit just after this runs.
-static void* g_mcp_onexit_head;   // +0x125D0 DAT_6fa325d0
-static void* g_mcp_onexit_end;    // +0x125CC DAT_6fa325cc
-
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_onexitinit(void) {
-    void* table = std::malloc(0x80);
-    if (table == nullptr) return 0x18;
-    g_mcp_onexit_head = table;
-    *(uint32_t*)table = 0;
-    g_mcp_onexit_end = table;
+    // Retail stores _malloc's return to DAT_6fa325d0 before the failure test. A failed
+    // reinitialization therefore clears the head while leaving the end pointer untouched.
+    g_mcp_onexit.onexit_begin = g_mcp_onexit.realloc(nullptr, 0x80);
+    if (g_mcp_onexit.onexit_begin == nullptr) return 0x18;
+    void** table = g_mcp_onexit.onexit_begin;
+    *reinterpret_cast<uint32_t*>(table) = 0;
+    g_mcp_onexit.onexit_end = table;
     return 0;
 }
 
-// 1.13c D2MCPClient+0x016C6 (61 B, caller 0x011B8 __CRT_INIT): `__RTC_Initialize`. Walks the
-// runtime-check initialiser table from DAT_6fa2924c to DAT_6fa2924c and calls every non-null entry
-// in order. In this build the two bounds are the same address, so the table is empty and the body
-// calls nothing; the loop is still the rule. The 61 bytes are mostly the injected __SEH_prolog /
-// __SEH_epilog glue, not program data. Pure in its two bounds; returns how many hooks ran.
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_mcp_rtc_initialize(void (**begin)(void), void (**end)(void)) {
-    uint32_t called = 0;
-    for (void (**slot)(void) = begin; slot < end; ++slot) {
-        if (*slot != nullptr) {
-            (*slot)();
-            ++called;
-        }
-    }
-    return called;
+// 1.13c D2MCPClient+0x016C6 (61 B, caller 0x011B8 __CRT_INIT): `__RTC_Initialize`. Retail walks
+// the runtime-check initialiser table at DAT_6fa2924c to the same address, so there are no entries
+// in the decompiled range. This bound analysis, rather than the FN vector, establishes that no
+// table callbacks run. Keep the empty range at the module-global address: this is a
+// no-argument, void CRT hook, and the 61-byte body is mostly injected __SEH_prolog/__SEH_epilog.
+static void (*g_mcp_rtc_table[1])(void);  // 1.13c +0x924C; begin == end
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_rtc_initialize(void) {
+    void (**begin)(void) = g_mcp_rtc_table;
+    void (**end)(void) = g_mcp_rtc_table;
+    for (void (**slot)(void) = begin; slot < end; ++slot)
+        if (*slot != nullptr) (*slot)();
 }

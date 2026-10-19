@@ -1,6 +1,7 @@
 #include "SKILLS/Skills.h"
 
 #include <algorithm>
+#include <bit>
 
 #include <D2BitManip.h>
 
@@ -1815,6 +1816,7 @@ int32_t __fastcall sub_6FD11C90(D2UnitStrc* pUnit, int32_t nStateId, int32_t a3)
 }
 
 //D2Game.0x6FD11D90
+// 1.13c D2Game+0x9E9B0 -- elemental lengths and Skills.txt nEType checked against retail.
 void __fastcall sub_6FD11D90(D2UnitStrc* pUnit, D2DamageStrc* pDamage, int32_t nLength, int32_t nSkillId)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -3191,29 +3193,36 @@ int32_t __fastcall D2GAME_GetXAndYFromTargetUnit_6FD14020(D2GameStrc* pGame, D2U
 }
 
 //D2Game.0x6FD140D0
+// 1.13c D2Game+0x9E490
 void __fastcall sub_6FD140D0(int32_t* pX, int32_t* pY)
 {
-    int32_t nDistance = *pX * *pX + *pY * *pY;
+    // Retail IMUL/ADD and shifts wrap at 32 bits, including extreme coordinates.
+    const auto distance = [&]() {
+        const uint32_t x = uint32_t(*pX), y = uint32_t(*pY);
+        return std::bit_cast<int32_t>(x * x + y * y);
+    };
+    int32_t nDistance = distance();
     if (nDistance < 4)
     {
-        *pX *= 4;
-        *pY *= 4;
-        nDistance = *pX * *pX + *pY * *pY;
+        *pX = std::bit_cast<int32_t>(uint32_t(*pX) * 4u);
+        *pY = std::bit_cast<int32_t>(uint32_t(*pY) * 4u);
+        nDistance = distance();
     }
 
     if (nDistance < 16)
     {
-        *pX *= 2;
-        *pY *= 2;
+        *pX = std::bit_cast<int32_t>(uint32_t(*pX) * 2u);
+        *pY = std::bit_cast<int32_t>(uint32_t(*pY) * 2u);
     }
 }
 
 //D2Game.0x6FD14120
+// 1.13c D2Game+0x9E450
 void __fastcall sub_6FD14120(int32_t* pX, int32_t* pY)
 {
     int32_t nX = *pY;
-    int32_t nY = -*pX;
-    while (nX * nX + nY * nY > 3)
+    int32_t nY = std::bit_cast<int32_t>(0u - uint32_t(*pX));
+    while (std::bit_cast<int32_t>(uint32_t(nX) * uint32_t(nX) + uint32_t(nY) * uint32_t(nY)) > 3)
     {
         nX /= 2;
         nY /= 2;

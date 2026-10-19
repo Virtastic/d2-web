@@ -60,8 +60,8 @@ extern "C" void    d2_client_35a1(uint32_t code, uint32_t quick, uint32_t return
 // each non-NULL entry goes through the invoke seam.
 static uint32_t g_xcInit[5];    // +0x0DB064  __xc_a .. __xc_z
 static uint32_t g_xiInit[24];   // +0x0DB000  __xi_a .. __xi_z
-static uint32_t g_streamCount;  // +0x0FAA50  _DAT_6fbaaa50: bumped once per successful __openfile
-                                //            (also in __allocbuf 0x9F56; never read by this file)
+uint32_t g_streamCount;         // +0x0FAA50  _DAT_6fbaaa50: bumped once in __openfile and again in
+                                //            __getbuf 0x9F56 (d2client_batch_03f82.cpp); never read
 static uint32_t g_fileFlagBase; // +0x0FABDC  DAT_6fbaabdc: ORed into every new stream's _flag at entry.
                                 //            Shipped 0 and never stored anywhere in the image, so it is
                                 //            constant 0; only reader in the DLL is this function.

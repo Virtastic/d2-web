@@ -345,3 +345,16 @@ extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_5003(void) {
     d2_fn_d2game_3f76(1);
 }
+
+// Frame-unwind cleanup: VC7.1's processing-throw counter is the dword at
+// PTD+0x84 (Ghidra misnames this _purecall). Preserve the second TLS lookup.
+// 1.13c D2Game+0xF58B9
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_f58b9(const D2GameBatch3b93Env* env) {
+    void* ptd = d2_fn_d2game_3b93(env);
+    uint32_t count; std::memcpy(&count, static_cast<uint8_t*>(ptd)+0x84, 4);
+    if (static_cast<int32_t>(count) > 0) {
+        ptd = d2_fn_d2game_3b93(env);
+        std::memcpy(&count, static_cast<uint8_t*>(ptd)+0x84, 4);
+        --count; std::memcpy(static_cast<uint8_t*>(ptd)+0x84, &count, 4);
+    }
+}

@@ -45,3 +45,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8bb9(int32_t fileHandle, const D2GameCrtU
 // 1.13c D2Game+0x08A76
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8a76(void) { d2_fn_d2game_3f76(10); }
+
+// 1.13c D2Game+0x08B10 (unlock(0xB), the finally of __alloc_osfhnd 0x899D)
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8b10(void) { d2_fn_d2game_3f76(0xB); }

@@ -12,6 +12,8 @@ if [ -L build-wasm ] || [ -L build-wasm/site ]; then
   echo "       unlink the borrowed site and stage into this worktree's own directory." >&2
   exit 1
 fi
+source "$(dirname "${BASH_SOURCE[0]}")/../tools/artifact-lock.sh"
+d2_artifact_lock "$SRC"
 [ -f play/d2.wasm ] || { echo "FATAL: play/d2.wasm missing -- run ci/build.sh first" >&2; exit 1; }
 
 # A STALE ENGINE MUST NOT STAGE SILENTLY. play/d2.{js,wasm} are this worktree's own build artefacts,

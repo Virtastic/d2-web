@@ -21,7 +21,7 @@ extern D2InventoryGridInfoStrc gBodyLocInventoryGridInfo;
 // Implemented in other d2common batches; declared here without a header.
 D2UnitStrc* D2Common_20320_GetLeftHandWeapon(D2InventoryStrc* pInventory);
 bool D2Common_22EC0_CheckWeaponClassByItemId(uint32_t nItemId, int32_t nWeapClass);
-BOOL D2Common_10217_ITEMS_CheckBodyLocation(D2UnitStrc* pItem, uint8_t nBodyLoc);
+BOOL D2Common_10217_ITEMS_CheckBodyLocation(D2UnitStrc* pItem, uint32_t nBodyLoc);
 
 extern "C"
 {
@@ -166,7 +166,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_211d0(uint32_t pUnit, ui
 
 	if (pInvItem)
 	{
-		if (!D2Common_10217_ITEMS_CheckBodyLocation(pInvItem, static_cast<uint8_t>(nBodyLoc)))
+		if (!D2Common_10217_ITEMS_CheckBodyLocation(pInvItem, nBodyLoc))
 			return 0;
 		if (!bDontCheckReqs && (!g_d2common_fn_26DB0 || !g_d2common_fn_26DB0(pInvItem, pUn, 1)))
 			return 0;

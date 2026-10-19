@@ -13,6 +13,7 @@
 //   * 0xEC020 == PLRSAVE2_WriteIronGolemSection ('fk'), 0xEC260 == PLRSAVE2_WriteCorpsesSection ('MJ')
 // The register-only arguments (Ghidra in_EAX/unaff_EBX/unaff_EDI) are explicit parameters below.
 // The probes are the FN-path exports; the alpha lane ships no vector, so their default env is inert.
+#include "d2game_scalar_helpers.h"
 #include <cstdint>
 #include <cstddef>
 #include <cstring>
@@ -294,16 +295,6 @@ static void FreeInactiveChains(void* unit, const D2GameBatchEEnv* env)
     }
 }
 
-// ---- 0x3E70: __aulldiv -------------------------------------------------------------------------
-// (nHi:nLo) / (dHi:dLo), quotient returned as hi:lo. The CRT helper; retail would fault on a zero
-// divisor, we return 0 instead.
-static uint64_t Aulldiv(uint32_t lo, uint32_t hi, uint32_t dlo, uint32_t dhi)
-{
-    const uint64_t dividend = ((uint64_t)hi << 32) | lo;
-    const uint64_t divisor = ((uint64_t)dhi << 32) | dlo;
-    return divisor != 0 ? dividend / divisor : 0;
-}
-
 // ---- 0x20B30: free an AiGeneral chain (node unlink pointer at +0x04) ---------------------------
 static void FreeAiChain(void* pool, void* node, const D2GameBatchEEnv* env)
 {
@@ -425,7 +416,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_1ebd0(uint32_t* r)
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3e70(uint32_t* r)
 {
-    const uint64_t q = Aulldiv(r[0], r[1], r[2], r[3]);
+    const uint64_t q = d2game_aulldiv(r[0], r[1], r[2], r[3]);
     r[4] = (uint32_t)q;
     r[5] = (uint32_t)(q >> 32);
 }

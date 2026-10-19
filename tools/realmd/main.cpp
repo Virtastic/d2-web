@@ -132,7 +132,7 @@ int applyD2gsFixtureReplies(const uint8_t* input, int length, uint8_t* out, int 
 }
 #endif
 
-int listenOn(uint16_t port) {
+int listenOn(uint16_t& port) {
     const int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) return -1;
     int one = 1;
@@ -143,6 +143,9 @@ int listenOn(uint16_t port) {
     a.sin_port = htons(port);
     if (bind(fd, (sockaddr*)&a, sizeof a) < 0) { close(fd); return -1; }
     if (listen(fd, 4) < 0) { close(fd); return -1; }
+    socklen_t length = sizeof a;
+    if (getsockname(fd, (sockaddr*)&a, &length) < 0) { close(fd); return -1; }
+    port = ntohs(a.sin_port);
     return fd;
 }
 

@@ -812,6 +812,10 @@ void DRLGPRESET_SpawnRiver(D2DrlgMapStrc* pMazeMap, const D2DrlgCoordStrc& tDrlg
 	DRLGPRESET_AddPresetRiverObjects(pMazeMap, pDrlgMemPool, nOffsetX, pDrlgGrid);
 }
 
+// 1.13c D2Common+0x0BF70
+// Prior art: D2MOO DRLGPRESET_SpawnHardcodedPresetUnits. Retail 1.13c
+// factors the Navi and river branches into AF20/BD60; retain their native
+// typed bodies here. The room completion flag is set even when no initialization is pending.
 //D2Common.0x6FD867A0
 void __fastcall DRLGPRESET_SpawnHardcodedPresetUnits(D2DrlgRoomStrc* pDrlgRoom)
 {
@@ -823,7 +827,12 @@ void __fastcall DRLGPRESET_SpawnHardcodedPresetUnits(D2DrlgRoomStrc* pDrlgRoom)
 		DRLGPRESET_AddPresetUnitToDrlgMap(pDrlgMemPool, pMazeMap, &pDrlgRoom->pSeed);
 	}
 
-	if (pMazeMap->bInited == 1)
+	if (pMazeMap->bInited != 1)
+	{
+		pDrlgRoom->dwFlags |= DRLGROOMFLAG_PRESET_UNITS_ADDED;
+		return;
+	}
+
 	{
 		pMazeMap->bInited = 0;
 
@@ -1789,15 +1798,17 @@ void __fastcall DRLGPRESET_TogglePopsVisibility(D2DrlgRoomStrc* pDrlgRoom, int n
 	}
 }
 
+// 1.13c D2Common+0x0BBC0. Allocate before lookup; attach only after validation. No function vector yet.
 //D2Common.0x6FD88610
 void __fastcall DRLGPRESET_InitLevelData(D2DrlgLevelStrc* pLevel)
 {
+	D2DrlgPresetInfoStrc* pPreset = D2_ALLOC_STRC_POOL(pLevel->pDrlg->pMempool, D2DrlgPresetInfoStrc);
 	D2LvlPrestTxt* pLvlPrestTxtRecord = NULL;
 
 	pLvlPrestTxtRecord = DATATBLS_GetLvlPrestTxtRecordFromLevelId(pLevel->nLevelId);
 	D2_ASSERTM(pLvlPrestTxtRecord, "Level labeled as Preset, but no preset claims the level");
 
-	pLevel->pPreset = D2_ALLOC_STRC_POOL(pLevel->pDrlg->pMempool, D2DrlgPresetInfoStrc);
+	pLevel->pPreset = pPreset;
 
 	pLevel->pPreset->pDrlgMap = NULL;
 	pLevel->pPreset->nDirection = 0;

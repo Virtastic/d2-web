@@ -1,4 +1,4 @@
-// src/core/d2client/d2client_batch_908f.cpp -- thirteen UNMAPPED 1.13c D2Client.dll CRT leaves
+// src/core/d2client/d2client_batch_908f.cpp -- fourteen UNMAPPED 1.13c D2Client.dll CRT leaves
 // reimplemented from the decompiles in build-wasm/ghidra-d2client/decomp/0x<RVA>.c (alpha lane).
 // Image base 0x6FAB0000; every global is named at its retail RVA. Callees that are not recovered yet
 // (and every kernel32/user32 import, since the wasm module has no PE import table) are host seams
@@ -50,7 +50,7 @@ struct D2ClientInitCritSecEnv {
 // (platform word 1) retail never asks kernel32; otherwise a null GetModuleHandleA or
 // GetProcAddress leaves the no-spin thunk 0x907F in the slot. Then call the slot with (cs, spin).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_client_908f(void* cs, uint32_t spin, const D2ClientInitCritSecEnv* env) {
+EMSCRIPTEN_KEEPALIVE int32_t d2_client_908f(void* cs, uint32_t spin, const D2ClientInitCritSecEnv* env) {
     if (g_init_spin == nullptr) {
         D2cInitCritSecFn resolved = nullptr;
         if (g_platform_word != 1) {
@@ -60,7 +60,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_908f(void* cs, uint32_t spin, const D2Client
         }
         g_init_spin = resolved != nullptr ? resolved : d2_client_907f;
     }
-    g_init_spin(cs, spin);
+    return g_init_spin(cs, spin);   // retail leaves the initialiser's EAX; callers test it
 }
 
 // 0x091F2 ___abnormal_termination, already implemented in d2client_batch_1e70.cpp: it stores EAX,
@@ -89,6 +89,24 @@ EMSCRIPTEN_KEEPALIVE void d2_client_915e(uint8_t* frame, int32_t target, uint32_
         }
     }
     g_exception_list = saved_list;
+}
+
+// 1.13c D2Client+0x091C6 (35 B): __abnormal_termination. Reads FS:[0] (the chain head 0x915E
+// publishes). 1 only when the head record's handler word (record+4) is __local_unwind2's resume
+// label 0x6FAB913C and its saved frame word (record+8) equals [record+0xC][0xC], the scope table's
+// current index; otherwise 0.
+extern "C"
+EMSCRIPTEN_KEEPALIVE int32_t d2_client_91c6(void) {
+    uint32_t rec = g_exception_list;
+    return *(uint32_t*)(uintptr_t)(rec + 4) == 0x6FAB913Cu &&
+           *(uint32_t*)(uintptr_t)(rec + 8) ==
+               *(uint32_t*)(uintptr_t)(*(uint32_t*)(uintptr_t)(rec + 0xc) + 0xc);
+}
+
+// Scenario setup: the SEH chain head (FS:[0]) the check reads.
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_client_91c6_pin(uint32_t exception_list) {
+    g_exception_list = exception_list;
 }
 
 // 1.13c D2Client+0x09252 (43 B): first 0x14-byte region whose base (record+0xC) is within 0x100000

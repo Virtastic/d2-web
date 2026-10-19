@@ -38,6 +38,14 @@ EMSCRIPTEN_KEEPALIVE void* d2_mcp_memmove_5260(void* dst, const void* src, uint3
     return dst;
 }
 
+// 1.13c D2MCPClient+0x4230 (size 672, callers 0x221B and 0x29EA): VC7.1 `_memcpy`.
+// The optimized retail body copies backward when dst overlaps src from above, so this is memmove
+// semantics despite its CRT name. The already mapped sibling implements that byte rule.
+extern "C"
+EMSCRIPTEN_KEEPALIVE void* d2_mcp_memcpy_4230(void* dst, const void* src, uint32_t size) {
+    return d2_mcp_memmove_5260(dst, src, size);
+}
+
 // 1.13c D2MCPClient+0x2841 (size 111, caller 0x28BC __nh_malloc): the VC7.1 `__heap_alloc`. With the
 // small-block heap active and the request within its threshold, take 0x3D23 under _lock(4)/_unlock(4)
 // and return that block if it succeeds. Otherwise HeapAlloc(handle, 0, bytes), where a zero request is

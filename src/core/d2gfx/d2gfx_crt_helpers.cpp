@@ -80,6 +80,41 @@ int64_t d2gfx_lseeki64_lk(uint32_t fh, int32_t offset_low, int32_t offset_high, 
     return -1;
 }
 
+struct D2GfxCloseLkHost {
+    int32_t (*get_osfhandle)(int32_t fh);
+    int32_t (*close_handle)(uint32_t handle);
+    uint32_t (*get_last_error)(void);
+    int32_t (*free_osfhnd)(int32_t fh);
+    void (*dosmaperr)(uint32_t error);
+};
+
+// 1.13c D2Gfx+0x074DA __close_lk: caller owns the descriptor lock. A missing OS handle skips
+// CloseHandle. Stdout/stderr also skip it when they share one OS handle. Every path releases the CRT
+// handle association and clears osfile; only a failed CloseHandle maps a Windows error and returns -1.
+extern "C" int32_t d2gfx_close_lk(uint32_t fh, const D2GfxCloseLkHost* host) {
+    uint32_t error = 0;
+    const int32_t handle = host->get_osfhandle((int32_t)fh);
+    if (handle != -1) {
+        bool shared_std_handle = false;
+        if (fh == 1 || fh == 2) {
+            const int32_t stderr_handle = host->get_osfhandle(2);
+            const int32_t stdout_handle = host->get_osfhandle(1);
+            shared_std_handle = stdout_handle == stderr_handle;
+        }
+        if (!shared_std_handle) {
+            const int32_t close_handle = host->get_osfhandle((int32_t)fh);
+            if (host->close_handle((uint32_t)close_handle) == 0) error = host->get_last_error();
+        }
+    }
+    host->free_osfhnd((int32_t)fh);
+    g_ioinfo[fh >> 5][(fh & 31u) * 0x24u + 4] = 0;
+    if (error != 0) {
+        host->dosmaperr(error);
+        return -1;
+    }
+    return 0;
+}
+
 // 1.13c D2Gfx+0x05C93 __get_osfhandle (65 bytes): intptr_t __cdecl __get_osfhandle(int fh). An
 // out-of-range handle (`cmp [nfile], eax; jae` -- unsigned, so a negative int is out of range) or a
 // closed one (ioinfo osfile FOPEN bit clear) sets errno = EBADF (9) and _doserrno = 0 and returns -1;
@@ -94,6 +129,40 @@ int32_t d2gfx_get_osfhandle(int32_t fh) {
         if ((io[4] & 0x01) != 0) return *(int32_t*)io;       // osfhnd
     }
     *d2gfx_errno() = 9;                                      // EBADF
+    *d2gfx_doserrno() = 0;
+    return -1;
+}
+
+struct D2GfxFreeOsfhndEnv {
+    int32_t (*set_std_handle)(uint32_t which, void* handle);
+    uint32_t osplatform; // 0x0DF8: _osplatform
+};
+
+// 1.13c D2Gfx+0x05C14 __free_osfhnd: on NT, clear the corresponding standard handle for
+// descriptors 0..2, then set the ioinfo osfhnd to INVALID_HANDLE_VALUE. Invalid, closed, and
+// already-unassigned descriptors set errno=EBADF, clear _doserrno, and return -1.
+// 1.13c D2Gfx+0x05C14
+extern "C" int32_t d2gfx_free_osfhnd(int32_t fh, const D2GfxFreeOsfhndEnv* env) {
+    const uint32_t ufh = (uint32_t)fh;
+    if (ufh < g_nfile) {
+        const uint32_t record_offset = (ufh & 0x1Fu) * 0x24u;
+        uint8_t* io = &g_ioinfo[ufh >> 5][record_offset];
+        int32_t osfhnd;
+        __builtin_memcpy(&osfhnd, io, sizeof(osfhnd));
+        if ((io[4] & 0x01u) != 0 && osfhnd != -1) {
+            if (env->osplatform == 1) {
+                uint32_t which = 0;
+                if (fh == 0) which = 0xFFFFFFF6u;      // STD_INPUT_HANDLE
+                else if (fh == 1) which = 0xFFFFFFF5u; // STD_OUTPUT_HANDLE
+                else if (fh == 2) which = 0xFFFFFFF4u; // STD_ERROR_HANDLE
+                if (which != 0) env->set_std_handle(which, nullptr);
+            }
+            const uint32_t invalid = 0xFFFFFFFFu;
+            __builtin_memcpy(io, &invalid, sizeof(invalid));
+            return 0;
+        }
+    }
+    *d2gfx_errno() = 9; // EBADF
     *d2gfx_doserrno() = 0;
     return -1;
 }

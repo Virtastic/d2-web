@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <emscripten.h>
+#include "crt_security_init_cookie_b645.h"
 
 // 1.13c D2Client+0x047AB: _unlock(idx), recovered in src/core/d2client/d2client_batch_3664.cpp.
 extern "C" void d2_client_47ab(uint32_t idx);
@@ -22,7 +23,7 @@ struct D2ClientBatch4857Env {
 
 // Retail module state, all zero-initialised.
 static uint32_t g_newMode;      // +0x0FAAC64  DAT_6fbaac64: _newmode, __nh_malloc's second argument
-static uint32_t g_stackCookie;  // +0x0DB780   DAT_6fb8b780: __security_cookie / __security_cookie_complement pair
+uint32_t d2_client_stack_cookie_db780;  // +0x0DB780: shared module __security_cookie
 static uint8_t  g_ptd[0x40];    // __getptd (0x72F7) per-thread block; _terrno sits at +8
 
 // 1.13c D2Client+0x04857: `push 0xA; call 0x47AB` -- release CRT lock 10. The critical section is kernel
@@ -58,7 +59,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_client_7d5f(uint32_t size, const D2ClientBatch4857
 // __security_cookie -> return; otherwise __report_gsfailure(), which never returns in retail.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_77d2(uint32_t cookie, const D2ClientBatch4857Env* env) {
-    if (cookie == g_stackCookie) return;
+    if (cookie == d2_client_stack_cookie_db780) return;
     env->report_failure();
 }
 

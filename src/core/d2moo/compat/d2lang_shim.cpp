@@ -6,6 +6,10 @@
 #include <D2Lang.h>
 #include <D2BitManip.h>
 #include <unordered_map>
+#include <charconv>
+#include <cstdlib>
+#include <cstring>
+#include <Fog.h>
 #include "../../lang/strtable.h"
 #include "../../tables/shared.h"
 
@@ -98,6 +102,43 @@ char* Unicode::unicode2Win(char* dest, const Unicode* src, int count) {
 // D2Lang #10009 (1.13c): the string table language. English tables only.
 #include <D2StrTable.h>
 D2C_Language STRTABLE_GetLanguage() { return LANGUAGE_ENGLISH; }
+
+// Prior art: D2MOO D2StrTable.cpp STR_GroupIntDigits/GroupCStrDigits. Checked
+// against the cached 1.13c body; the strict capacity comparison is intentional.
+// 1.13c D2Lang+0x9BC0
+void __stdcall STR_GroupIntDigits(Unicode* destination, int value, int capacity) {
+    if (capacity < 3) {
+        FOG_DisplayAssert("nMaxLength > 2", "D2Lang\\D2StrTable.cpp", 0x4c7);
+        std::exit(-1);
+    }
+    if (value < 0) {
+        *destination++ = Unicode('-');
+        --capacity;
+        // x86 neg wraps at INT_MIN. The following signed decimal conversion
+        // consequently retains a second minus sign in that one retail case.
+        const uint32_t magnitude = 0u - static_cast<uint32_t>(value);
+        std::memcpy(&value, &magnitude, sizeof(value));
+    }
+    char digits[64];
+    const auto result = std::to_chars(digits, digits + sizeof(digits), value);
+    const int count = static_cast<int>(result.ptr - digits);
+    int output = count + (count - 1) / 3;
+    if (output >= capacity - 1) {
+        destination[0] = Unicode('*');
+        destination[1] = Unicode(0);
+        return;
+    }
+    destination[output] = Unicode(0);
+    int group = 0;
+    for (int input = count; input > 0;) {
+        destination[--output] = Unicode(static_cast<unsigned char>(digits[--input]));
+        if (++group == 3 && count > 3 && output > 0) {
+            group = 0;
+            destination[--output] = Unicode(',');
+        }
+    }
+}
+
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>

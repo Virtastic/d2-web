@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <emscripten.h>
+#include "native_list_abi.h"
 #include <Windows.h>   // CRITICAL_SECTION no-ops and the deterministic GetTickCount
 
 // Retail module state, all zero-initialised.
@@ -21,14 +22,7 @@ static uint32_t g_seh8e4;               // +0x0DB8E4  DAT_6fb8b8e4
 static uint32_t g_slots10A608[8 * 0x20]; // +0x10A608  slot lists, row stride 0x80 (0xA5B00/0xA5B40)
 static uint32_t g_slots109A08[4 * 0x80]; // +0x109A08  slot lists, row stride 0x200 (0xA7340)
 
-struct D2ClientBatch1e70Env {
-    uint32_t (*ord10044)();                                                     // imported ordinal 10044
-    void (*insert)(void* rowBase, uint32_t slot, uint32_t value, uint32_t owner); // 0xA6EF0, __fastcall + 4 stack
-    void* (*find)(uint32_t key, void* rowBase, uint32_t slot);                   // 0xA4E20; EAX = slot
-    void (*removeAll)(void* obj);                                                // 0xA8630; ESI = obj
-    void (*dispatch)(int32_t* obj, uint32_t arg, uint32_t kind);                 // 0x212F0
-    void* (*fsopen)(const char* name, const char* mode, int shflag);             // 0x3695 __fsopen
-};
+
 
 // FUN_6fab47ab(idx): LeaveCriticalSection(&DAT_6fb8b0c8[idx * 2]) -- byte stride 8.
 static void leave_cs(uint32_t idx) {
@@ -65,6 +59,15 @@ EMSCRIPTEN_KEEPALIVE void d2_client_3f7c(void) {
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_91f2(uint32_t eax, uint32_t ebp, uint32_t stack8) {
     g_seh8e0 = stack8;
+    g_seh8dc = eax;
+    g_seh8e4 = ebp;
+}
+
+// 1.13c D2Client+0x091E9 (9 B, __NLG_Notify1): the __fastcall sibling of 0x91F2 above -- stores the
+// ECX argument, EAX and EBP into the same three SEH globals, in that order.
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_client_91e9(uint32_t ecx, uint32_t eax, uint32_t ebp) {
+    g_seh8e0 = ecx;
     g_seh8dc = eax;
     g_seh8e4 = ebp;
 }

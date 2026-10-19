@@ -1,4 +1,5 @@
 #include "QUESTS/Quests.h"
+#include "../../../../quests/chain_record.h"
 
 #include <algorithm>
 #include <D2BitManip.h>
@@ -253,6 +254,13 @@ void __fastcall QUESTS_AttachLevelChainRecord(D2GameStrc* pGame, D2UnitStrc* pUn
 //D2Game.0x6FC93C40
 int32_t __fastcall QUESTS_CreateChainRecord(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nQuestId)
 {
+	// 1.13c D2Game+0x35890: signed rejection precedes quest lookup.
+	if (nQuestId < 0)
+	{
+		FOG_DisplayAssert("nQuestId >= 0", __FILE__, 0xE0);
+		exit(-1);
+	}
+
 	if (!pGame)
 	{
 		FOG_Trace("Invalid questinfo for item\n");
@@ -299,24 +307,11 @@ int32_t __fastcall QUESTS_CreateChainRecord(D2GameStrc* pGame, D2UnitStrc* pUnit
 	//	}
 	//}
 
-	for (D2QuestChainStrc* i = pUnit->pQuestEventList; i; i = i->pNext)
-	{
-		if (!i->pQuestData)
-		{
-			break;
-		}
-
-		if (i->pQuestData == pQuestData)
-		{
-			return 0;
-		}
-	}
-
-	D2QuestChainStrc* pNew = D2_ALLOC_STRC_POOL(pGame->pMemoryPool, D2QuestChainStrc);
-	pNew->pQuestData = pQuestData;
-	pNew->pNext = pUnit->pQuestEventList;
-	pUnit->pQuestEventList = pNew;
-	return 1;
+	// 1.13c D2Game+0x35890, D2Game+0x33f80. Pool ownership remains
+	// with the unit and QUESTS_FreeChainRecord, including native wasm64 links.
+	auto allocate = [pGame]() { return D2_ALLOC_STRC_POOL(pGame->pMemoryPool, D2QuestChainStrc); };
+	d2::quests::NativeChainStorage<D2QuestChainStrc, decltype(allocate)> storage{allocate};
+	return d2::quests::prependChain(storage, pUnit->pQuestEventList, pQuestData);
 }
 
 //D2Game.0x6FC93D60

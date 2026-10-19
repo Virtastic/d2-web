@@ -58,41 +58,6 @@ void d2_client_1150(uint32_t node) {
     d2c_unlink(node);
 }
 
-// 1.13c D2Client+0x010B0 (160 B): doubly-linked-list splice. ABI: EAX = list base, ECX = anchor,
-// stack = node and mode. A null node/anchor selects the embedded node at list base+4. The node is
-// unlinked first, then spliced before the anchor when mode == 1, otherwise after the anchor. The
-// back-link stores the caller's node argument (0 included), as retail does.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_10b0(uint32_t list_base, uint32_t anchor, uint32_t node, uint32_t mode) {
-    uint32_t a = node ? node : list_base + 4;
-    d2c_unlink(a);
-    uint32_t b = anchor ? anchor : list_base + 4;
-    if (mode == 1) {
-        *(uint32_t*)(uintptr_t)a = b;
-        uint32_t enc = *(const uint32_t*)(uintptr_t)(b + 4);
-        *(uint32_t*)(uintptr_t)(a + 4) = enc;
-        uint32_t rel = *(const uint32_t*)(uintptr_t)list_base;
-        uint32_t target;
-        if ((int32_t)enc < 0) {
-            target = ~enc;
-        } else {
-            if ((int32_t)rel < 0) {
-                uint32_t first = *(const uint32_t*)(uintptr_t)b;
-                rel = (uint32_t)(b - *(const uint32_t*)(uintptr_t)(first + 4));
-            }
-            target = (uint32_t)(enc + rel);
-        }
-        *(uint32_t*)(uintptr_t)target = a;
-        *(uint32_t*)(uintptr_t)(b + 4) = node;
-        return;
-    }
-    uint32_t first = *(const uint32_t*)(uintptr_t)b;
-    *(uint32_t*)(uintptr_t)a = first;
-    *(uint32_t*)(uintptr_t)(a + 4) = *(const uint32_t*)(uintptr_t)(first + 4);
-    *(uint32_t*)(uintptr_t)(first + 4) = node;
-    *(uint32_t*)(uintptr_t)b = a;
-}
-
 // 1.13c D2Client+0x012E0 (31 B): call fn(count) times over an array. ABI: EAX = count, EBX = callee,
 // ECX = first object, stack = stride. A count <= 0 performs no call; the callee receives the current
 // object as its ECX argument and the object advances by stride between calls.

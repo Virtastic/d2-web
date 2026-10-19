@@ -2696,6 +2696,7 @@ void __fastcall DATATBLS_LoadMonEquipTxt(HD2ARCHIVE hArchive)
 	}
 }
 
+// 1.13c D2Common+0x5D570
 //D2Common.0x6FD6F580
 void __fastcall DATATBLS_LoadSomeMonsterTxts(HD2ARCHIVE hArchive)
 {

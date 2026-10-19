@@ -74,14 +74,14 @@ struct D2GameBatch2a6dEnv {
 };
 
 // ---- module state --------------------------------------------------------------------------------
-// 0x6FD1F210: CRT lock table, 8-byte CRITICAL_SECTION stride (the decompile indexes it as dwords).
-static uint8_t  g_crtLockTable[0x800];
+// The CRT lock table is shared with __mtinitlocks/__mtinitlocknum in d2game_batch_3e70.cpp.
+extern "C" void* d2game_crt_lock_section(uint32_t index);
 static uint32_t g_exceptionList;     // FS:[0] SEH chain head (single-threaded here)
 
 static const char kPlayerPetsFile[] = "..\\Source\\D2Game\\PLAYER\\PlayerPets.cpp";  // the free call-site literal
 
 static void leave_crt_lock(uint32_t index) {
-    LeaveCriticalSection((LPCRITICAL_SECTION)(g_crtLockTable + (size_t)index * 8));
+    LeaveCriticalSection((LPCRITICAL_SECTION)d2game_crt_lock_section(index));
 }
 
 // 1.13c D2Game+0x2A6D (_sprintf): VS2003 unbounded formatted print. The destination FILE is fixed at
@@ -143,10 +143,10 @@ EMSCRIPTEN_KEEPALIVE void d2_game_2a28(uint32_t stack10, uint32_t edi) {
 // 0x11 if that fails, then enter the critical section at table[_File * 2].
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_game_402b(int32_t file, const D2GameBatch2a6dEnv* env) {
-    LPCRITICAL_SECTION lock = (LPCRITICAL_SECTION)(g_crtLockTable + (size_t)(uint32_t)file * 8);
-    if (((const uint32_t*)lock)[0] == 0) {
+    if (d2game_crt_lock_section((uint32_t)file) == nullptr) {
         if (env->mtInitLockNum(file) == 0) env->amsgExit(0x11);
     }
+    LPCRITICAL_SECTION lock = (LPCRITICAL_SECTION)d2game_crt_lock_section((uint32_t)file);
     EnterCriticalSection(lock);
 }
 

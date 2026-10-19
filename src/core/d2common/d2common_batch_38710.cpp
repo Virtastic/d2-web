@@ -15,6 +15,14 @@ template<class T> T at(const void* p, size_t offset) {
 template<class T> void put(void* p, size_t offset, T value) {
     std::memcpy(static_cast<uint8_t*>(p) + offset, &value, sizeof value);
 }
+// These objects are retail-layout images: pointer slots in the x86-32 images are DWORDs even
+// though the engine that hosts these functions is wasm64. Resolve the guest value explicitly;
+// never load a native pointer-sized value from a retail offset.
+using RetailPointerResolver = void* (*)(uint32_t guestAddress);
+void* retailPointer(const void* p, size_t offset, RetailPointerResolver resolve) {
+    const uint32_t guestAddress = at<uint32_t>(p, offset);
+    return guestAddress != 0 && resolve != nullptr ? resolve(guestAddress) : nullptr;
+}
 }
 
 // 1.13c D2Common+0x38710
@@ -27,8 +35,10 @@ void D2Common_38710_ForwardRoomSelection(void* room, uint32_t flags, int mode,
 void D2Common_1DAD0_VisitPathCells(void* unit, uint32_t mask, int context,
                                     void (*onCell)(), void (*step)(void*, void*, int),
                                     void* (*roomOf)(void*), uint16_t (*collides)(void*, unsigned, unsigned, int, uint32_t),
-                                    void* (*find)(void*, unsigned, unsigned, int)) {
-    auto* path = at<uint8_t*>(unit, 0x2c);
+                                    void* (*find)(void*, unsigned, unsigned, int),
+                                    RetailPointerResolver resolve) {
+    auto* path = static_cast<uint8_t*>(retailPointer(unit, 0x2c, resolve));
+    if (!path) return;
     put(path, 0x34, at<uint32_t>(path, 0x34) & 0xfff800ffu);
     put(path, 0x3c, uint32_t{0x10});
     put(path, 0x98, uint32_t{0});
@@ -55,9 +65,10 @@ void D2Common_3B760_RoomBounds(const void* room, int32_t out[4]) {
 
 // 1.13c D2Common+0x2FA20
 uint32_t D2Common_2FA20_PathDirection(const void* unit,
-                                      uint32_t (*directionTo)(const void*, unsigned, unsigned)) {
+                                      uint32_t (*directionTo)(const void*, unsigned, unsigned),
+                                      RetailPointerResolver resolve) {
     if (!unit) return 0; // retail asserts
-    const auto* path = at<const uint8_t*>(unit, 0x2c);
+    const auto* path = static_cast<const uint8_t*>(retailPointer(unit, 0x2c, resolve));
     if (!path) return 0;
     const int type = at<int32_t>(unit, 0);
     const bool dynamic = type == 2 || type == 4 || type == 5;
@@ -71,9 +82,11 @@ uint32_t D2Common_2FA20_PathDirection(const void* unit,
 
 // 1.13c D2Common+0x37350
 void D2Common_37350_GetRoomFields(const void* object, uint32_t* a, uint32_t* b,
-                                   uint32_t* c, uint32_t* d) {
+                                   uint32_t* c, uint32_t* d,
+                                   RetailPointerResolver resolve) {
     if (!object) return; // retail asserts
-    const auto* data = at<const uint8_t*>(object, 4);
+    const auto* data = static_cast<const uint8_t*>(retailPointer(object, 4, resolve));
+    if (!data) return;
     *a = at<uint32_t>(data, 0x1c);
     *b = at<uint32_t>(data, 0x20);
     *c = at<uint32_t>(data, 0x24);
@@ -94,9 +107,11 @@ void D2Common_3C070_IsoBounds(const void* room, int32_t out[4]) {
 }
 
 // 1.13c D2Common+0x3BBD0
-void D2Common_3BBD0_AnimateRoomTiles(const void* room, void (*animate)()) {
+void D2Common_3BBD0_AnimateRoomTiles(const void* room, void (*animate)(),
+                                    RetailPointerResolver resolve) {
     if (!room) return;
-    const auto* data = at<const uint8_t*>(room, 0x10);
+    const auto* data = static_cast<const uint8_t*>(retailPointer(room, 0x10, resolve));
+    if (!data) return;
     for (int32_t i = 0, count = at<int32_t>(data, 0x2c); i < count; ++i) animate();
 }
 
@@ -117,9 +132,9 @@ void D2Common_12890_WriteGameLog(FILE* stream, int game, int frame, int client,
 }
 
 // 1.13c D2Common+0x37430
-uint32_t D2Common_37430_GetRoomField(const void* object) {
+uint32_t D2Common_37430_GetRoomField(const void* object, RetailPointerResolver resolve) {
     if (!object) return 0; // retail asserts
-    const auto* data = at<const uint8_t*>(object, 4);
+    const auto* data = static_cast<const uint8_t*>(retailPointer(object, 4, resolve));
     return data ? at<uint32_t>(data, 0x14) : 0;
 }
 
@@ -128,20 +143,22 @@ uint8_t D2Common_325C0_MeleeRange(void* unit,
                                    int (*equippedHand)(void*, void**, int*, int*),
                                    uint8_t (*itemRange)(void*),
                                    const void* (*monStats)(int),
-                                   void (*weaponClass)(void*, void*, void**, int, int)) {
+                                   void (*weaponClass)(void*, void*, void**, int, int),
+                                   RetailPointerResolver resolve) {
     if (!unit) return 0; // retail asserts
     const int type = at<int32_t>(unit, 0);
     if (type == 0) {
         void* item = unit;
         int body = 0, held = 0;
-        if (equippedHand(at<void*>(unit, 0x60), &item, &body, &held)) return itemRange(unit);
+        void* inventory = retailPointer(unit, 0x60, resolve);
+        if (inventory && equippedHand(inventory, &item, &body, &held)) return itemRange(unit);
     } else if (type == 1) {
         const auto* stats = static_cast<const uint8_t*>(monStats(at<int32_t>(unit, 4)));
         if (stats) {
             const uint8_t range = at<uint8_t>(stats, 0x0e);
             if (range != 0xff) return range;
             void* value = unit;
-            weaponClass(unit, at<void*>(unit, 0x60), &value, -1, 1);
+            weaponClass(unit, retailPointer(unit, 0x60, resolve), &value, -1, 1);
             return value == reinterpret_cast<void*>(6) ? 0 : 2;
         }
     }

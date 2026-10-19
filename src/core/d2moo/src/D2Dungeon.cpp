@@ -185,6 +185,26 @@ void __stdcall DUNGEON_GetAdjacentRoomsListFromRoom(D2ActiveRoomStrc* pRoom, D2A
 	*pppRoomList = pRoom->ppRoomList;
 }
 
+// 1.13c D2Common+0x3C200
+// Prior art: D2MOO Dungeon.cpp's AllocRoom adjacency block. Retail factors
+// allocation/reordering into this helper; pointers remain native-width here.
+static void DUNGEON_InitializeAdjacentRooms(D2ActiveRoomStrc* pRoom)
+{
+	pRoom->ppRoomList = (D2ActiveRoomStrc**)D2_ALLOC_POOL(pRoom->pAct->pMemPool, sizeof(D2ActiveRoomStrc*) * pRoom->pDrlgRoom->nRoomsNear);
+	pRoom->nNumRooms = DRLGROOM_ReorderNearRoomList(pRoom->pDrlgRoom, pRoom->ppRoomList);
+
+	for (int i = 0; i < pRoom->nNumRooms; ++i)
+	{
+		D2ActiveRoomStrc* pAdjacentRoom = pRoom->ppRoomList[i];
+		D2_ASSERT(pAdjacentRoom);
+
+		if (pAdjacentRoom != pRoom)
+		{
+			pAdjacentRoom->nNumRooms = DRLGROOM_ReorderNearRoomList(pAdjacentRoom->pDrlgRoom, pAdjacentRoom->ppRoomList);
+		}
+	}
+}
+
 //D2Common.0x6FD8BC50
 D2ActiveRoomStrc* __fastcall DUNGEON_AllocRoom(D2DrlgActStrc* pAct, D2DrlgRoomStrc* pDrlgRoom, D2DrlgCoordsStrc* pDrlgCoords, D2DrlgRoomTilesStrc* pRoomTiles, int nLowSeed, uint32_t dwFlags)
 {
@@ -206,19 +226,7 @@ D2ActiveRoomStrc* __fastcall DUNGEON_AllocRoom(D2DrlgActStrc* pAct, D2DrlgRoomSt
 
 	DRLGROOM_SetRoom(pDrlgRoom, pRoom);
 
-	pRoom->ppRoomList = (D2ActiveRoomStrc**)D2_ALLOC_POOL(pAct->pMemPool, sizeof(D2ActiveRoomStrc*) * pRoom->pDrlgRoom->nRoomsNear);
-	pRoom->nNumRooms = DRLGROOM_ReorderNearRoomList(pRoom->pDrlgRoom, pRoom->ppRoomList);
-
-	for (int i = 0; i < pRoom->nNumRooms; ++i)
-	{
-		D2ActiveRoomStrc* pAdjacentRoom = pAdjacentRoom = pRoom->ppRoomList[i];
-		D2_ASSERT(pAdjacentRoom);
-
-		if (pAdjacentRoom != pRoom)
-		{
-			pAdjacentRoom->nNumRooms = DRLGROOM_ReorderNearRoomList(pAdjacentRoom->pDrlgRoom, pAdjacentRoom->ppRoomList);
-		}
-	}
+	DUNGEON_InitializeAdjacentRooms(pRoom);
 
 	COLLISION_AllocRoomCollisionGrid(pAct->pMemPool, pRoom);
 
@@ -366,6 +374,8 @@ void __stdcall DUNGEON_GetRGB_IntensityFromRoom(D2ActiveRoomStrc* pRoom, uint8_t
 }
 
 //D2Common.0x6FD8C240 (#10041)
+// 1.13c D2Common+0x3B710
+// Cached retail: null act, linked-list order, inclusive lower/exclusive upper bounds.
 D2ActiveRoomStrc* __stdcall DUNGEON_FindRoomBySubtileCoordinates(D2DrlgActStrc* pAct, int nX, int nY)
 {
 	if (pAct)
@@ -594,11 +604,19 @@ int __stdcall DUNGEON_GetWarpDestinationLevel(D2ActiveRoomStrc* pRoom, int nSour
 }
 
 //D2Common.0x6FD8C7E0 (#10059)
+// 1.13c D2Common+0x3BFB0
+// Cached retail inlines the populated-room check and aborts on a missing
+// room-ex. Keep the 0x800000 flag and level field through native pointers.
 int __stdcall DUNGEON_GetLevelIdFromPopulatedRoom(D2ActiveRoomStrc* pRoom)
 {
 	if (pRoom)
 	{
-		return DRLGROOM_GetLevelIdFromPopulatedRoom(pRoom->pDrlgRoom);
+		D2DrlgRoomStrc* pDrlgRoom = pRoom->pDrlgRoom;
+		D2_ASSERT(pDrlgRoom);
+		if (!(pDrlgRoom->dwFlags & DRLGROOMFLAG_POPULATION_ZERO))
+		{
+			return pDrlgRoom->pLevel->nLevelId;
+		}
 	}
 
 	return 0;

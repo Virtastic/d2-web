@@ -31,7 +31,8 @@ W d2game_2060_genhandle(W t) {
 }
 
 // Storm TSExplicitList link ops (nodes: link = node+listOffset; {next, prev-or-~head-slot}); the table's slots are 12-byte lists {offset, head link, ~first}.
-static void unlinkLink(W l) {
+// Non-static for the 0x1FA0 call sites in src/core/d2game/d2game_unwind_tiny_1018.cpp (0xF7810/0xF7850).
+void unlinkLink(W l) {
     W n = w(l, 0);
     if (!n) return;
     int32_t b = (int32_t)w(l, 4);
