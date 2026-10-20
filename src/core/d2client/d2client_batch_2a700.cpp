@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstring>
 #include <emscripten.h>
+#include "file_services.h"
 
 // D2Client call gate. Arguments keep the retail register/stack order where the cached decompile
 // exposes it; `out` lets a host seam return pointer-like values without widening retail's 32-bit ABI.
@@ -227,12 +228,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_2b090(
 // order, helper sequence, and literal
 // return follow the cached 1.13c body. The literal is the function's actual return, not the archive
 // helper's result.
-struct D2ClientBatch2b420Env {
-    const char* (*ordinal10070)(void);
-    uint32_t (*ordinal10016)(const char*);
-    int32_t (*helper_bd810)(uint32_t, uint32_t*);
-    void (*ordinal10006)(int32_t, uint32_t*, const char*, uint32_t, uint32_t, char*);
-};
 extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_2b420(
     const char* path, uint32_t arg, const uint8_t acStack_108_initial[4],
     D2ClientBatch2b420Env* env) {
@@ -261,10 +256,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_2b420(
         pcVar8[i] = '\0';
     }
     char* append_start = reinterpret_cast<char*>(&frame.uStack_10c) + 4;
-    uint32_t file = env->ordinal10016(append_start);
-    int32_t archive = env->helper_bd810(file, nullptr);
+    const char* file = env->ordinal10016(append_start);
+    void* archive = env->helper_bd810(file, nullptr);
     char helper_out[4]{};
-    uint32_t archive_arg = 0;
+    void* archive_arg = nullptr;
     env->ordinal10006(archive, &archive_arg,
         "..\\Source\\D2Client\\CORE\\ARCHIVE.CPP", 0x56, 0xFFFFFFFFu, helper_out);
     return "..\\Source\\D2Client\\CORE\\ARCHIVE.CPP";

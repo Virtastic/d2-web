@@ -29,7 +29,7 @@ struct D2ClientInflateBlocks {
     uint32_t mode;
     union {
         D2ClientInflateCodes* codes; // retail +04, mode 6
-        struct { uint32_t table, index; uint32_t* lengths; } trees; // lengths +0c
+        struct { uint32_t table, index; uint32_t* lengths; uint32_t bits; D2ClientInflateHuft* tree; } trees; // lengths +0c, bits +10, tree +14
     } sub;
     uint32_t last, bitCount, bitBuffer;
     D2ClientInflateHuft* workspace;

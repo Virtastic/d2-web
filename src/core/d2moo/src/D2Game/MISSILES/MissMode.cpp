@@ -2433,6 +2433,50 @@ int32_t __fastcall MISSMODE_SrvHit09_ImmolationArrow(D2GameStrc* pGame, D2UnitSt
     return 3;
 }
 
+// Prior art: D2MOO SrvHit10 flight reset; checked against the 1.13c helper.
+// 1.13c D2Game+0x397C0
+void __fastcall MISSMODE_ResetGuidedFlight(D2UnitStrc* pMissile, D2UnitStrc* pTarget)
+{
+    if (!pMissile)
+    {
+        return;
+    }
+    D2MissilesTxt* pRecord = SKILLS_GetMissilesTxtRecord(pMissile->dwClassId);
+    if (!pRecord)
+    {
+        return;
+    }
+    if (pTarget && SUNIT_IsDead(pTarget))
+    {
+        pTarget = nullptr;
+    }
+    // Retail sign-extends these table words before its 32-bit multiply/add.
+    const int32_t nFrames = int32_t((uint32_t(MISSILE_GetLevel(pMissile)) - 1u)
+        * uint32_t(int16_t(pRecord->wLevRange)) + uint32_t(int16_t(pRecord->wRange)));
+    MISSILE_SetTotalFrames(pMissile, nFrames);
+    MISSILE_SetCurrentFrame(pMissile, nFrames);
+    int32_t nDistance;
+    if (pTarget)
+    {
+        PATH_SetTargetUnit(pMissile->pDynamicPath, pTarget);
+        MISSILE_SetTargetX(pMissile, 5);
+        nDistance = UNITS_GetDistanceToOtherUnit(pMissile, pTarget);
+    }
+    else
+    {
+        const uint32_t nOffset = MISSILE_GetTargetY(pMissile);
+        const int32_t nX = int32_t(uint32_t(CLIENTS_GetUnitX(pMissile)) + uint32_t(int16_t(nOffset)));
+        const int32_t nY = int32_t(uint32_t(CLIENTS_GetUnitY(pMissile)) + uint32_t(int16_t(nOffset >> 16)));
+        D2COMMON_10170_PathSetTargetPos(pMissile->pDynamicPath, nX, nY);
+        MISSILE_SetTargetX(pMissile, 6);
+        nDistance = UNITS_GetDistanceToCoordinates(pMissile, nX, nY);
+    }
+    if (nDistance < 25)
+    {
+        D2Common_10142(pMissile->pDynamicPath, pMissile, 0);
+    }
+}
+
 //D2Game.0x6FC5AD40
 int32_t __fastcall MISSMODE_SrvHit10_GuidedArrow_BoneSpirit(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
@@ -2492,35 +2536,7 @@ int32_t __fastcall MISSMODE_SrvHit10_GuidedArrow_BoneSpirit(D2GameStrc* pGame, D
         pTarget = nullptr;
     }
 
-    const int32_t nFrames = pMissilesTxtRecord->wRange + pMissilesTxtRecord->wLevRange * (MISSILE_GetLevel(pMissile) - 1);
-    MISSILE_SetTotalFrames(pMissile, nFrames);
-    MISSILE_SetCurrentFrame(pMissile, nFrames);
-
-    if (pTarget)
-    {
-        PATH_SetTargetUnit(pMissile->pDynamicPath, pTarget);
-        MISSILE_SetTargetX(pMissile, 5);
-
-        if (UNITS_GetDistanceToOtherUnit(pMissile, pTarget) >= 25)
-        {
-            return 4;
-        }
-    }
-    else
-    {
-        const int32_t nParam = MISSILE_GetTargetY(pMissile);
-        const int32_t nX = CLIENTS_GetUnitX(pMissile) + (int16_t)nParam;
-        const int32_t nY = CLIENTS_GetUnitY(pMissile) + (int16_t)(nParam >> 16);
-        D2COMMON_10170_PathSetTargetPos(pMissile->pDynamicPath, nX, nY);
-        MISSILE_SetTargetX(pMissile, 6);
-
-        if (UNITS_GetDistanceToCoordinates(pMissile, nX, nY) >= 25)
-        {
-            return 4;
-        }
-    }
-
-    D2Common_10142(pMissile->pDynamicPath, pMissile, 0);
+    MISSMODE_ResetGuidedFlight(pMissile, pTarget);
     return 4;
 }
 
@@ -4575,90 +4591,46 @@ void __fastcall MISSMODE_SrvDmg13_BlessedHammerEx(D2GameStrc* pGame, D2UnitStrc*
     }
 }
 
-//D2Game.0x6FC5F250
+// Prior art: D2MOO MoltenBoulder damage callback; retail uses the flag helper.
+// 1.13c D2Game+0x39A40
 void __fastcall MISSMODE_SrvDmg14_MoltenBoulder(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit, D2DamageStrc* pDamage)
 {
-    if (!pMissile || pMissile->dwUnitType != UNIT_MISSILE || !pUnit)
+    if (!pMissile || pMissile->dwUnitType != UNIT_MISSILE)
     {
         return;
     }
-
-    D2MissilesTxt* pMissilesTxtRecord = SKILLS_GetMissilesTxtRecord(pMissile->dwClassId);
-    if (!pMissilesTxtRecord)
+    D2MissilesTxt* pRecord = SKILLS_GetMissilesTxtRecord(pMissile->dwClassId);
+    if (!pRecord || !pUnit)
     {
         return;
     }
-
-    uint32_t nChance = 0;
-    switch (pUnit->dwUnitType)
+    const int32_t nParam = pRecord->dwDmgParam[0];
+    uint32_t nMultiplier = 1;
+    if (pUnit->dwUnitType == UNIT_PLAYER)
     {
-    case UNIT_PLAYER:
-    {
-        if (pMissilesTxtRecord->dwDmgParam[0] < 1)
-        {
-            return;
-        }
-
-        nChance = pMissilesTxtRecord->dwDmgParam[1];
-        break;
+        if (nParam < 1) return;
     }
-    case UNIT_MONSTER:
+    else if (pUnit->dwUnitType == UNIT_MONSTER)
     {
-        D2MonStats2Txt* pMonStats2TxtRecord = MONSTERREGION_GetMonStats2TxtRecord(pUnit->dwClassId);
-        if (!pMonStats2TxtRecord)
-        {
-            return;
-        }
-
-        const int32_t nParam = pMissilesTxtRecord->dwDmgParam[0];
+        const bool bSmall = MONSTERREGION_CheckMonStats2Flag(pUnit->dwClassId, 10) != 0;
         if (nParam < 1)
         {
-            if (!(pMonStats2TxtRecord->dwFlags & gdwBitMasks[MONSTATS2FLAGINDEX_SMALL]))
-            {
-                return;
-            }
-
-            nChance = pMissilesTxtRecord->dwDmgParam[1];
+            if (!bSmall) return;
         }
         else if (nParam == 1)
         {
-            if (pMonStats2TxtRecord->dwFlags & gdwBitMasks[MONSTATS2FLAGINDEX_SMALL])
-            {
-                nChance = 2 * pMissilesTxtRecord->dwDmgParam[1];
-            }
-            else if (!(pMonStats2TxtRecord->dwFlags & gdwBitMasks[MONSTATS2FLAGINDEX_LARGE]))
-            {
-                nChance = pMissilesTxtRecord->dwDmgParam[1];
-            }
-            else
-            {
-                return;
-            }
+            if (bSmall) nMultiplier = 2;
+            else if (MONSTERREGION_CheckMonStats2Flag(pUnit->dwClassId, 11)) return;
         }
         else
         {
-            if (pMonStats2TxtRecord->dwFlags & gdwBitMasks[MONSTATS2FLAGINDEX_SMALL])
-            {
-                nChance = 3 * pMissilesTxtRecord->dwDmgParam[1];
-            }
-            else if (!(pMonStats2TxtRecord->dwFlags & gdwBitMasks[MONSTATS2FLAGINDEX_LARGE]))
-            {
-                nChance = 2 * pMissilesTxtRecord->dwDmgParam[1];
-            }
-            else
-            {
-                nChance = pMissilesTxtRecord->dwDmgParam[1];
-            }
+            if (bSmall) nMultiplier = 3;
+            else if (!MONSTERREGION_CheckMonStats2Flag(pUnit->dwClassId, 11)) nMultiplier = 2;
         }
-        break;
     }
-    default:
-    {
-        return;
-    }
-    }
-
-    if (nChance > 0 && (ITEMS_RollRandomNumber(&pMissile->pSeed) % 100) < nChance)
+    else return;
+    const int32_t nChance = int32_t(uint32_t(pRecord->dwDmgParam[1]) * nMultiplier);
+    if (nChance > 0 && int32_t(ITEMS_RollLimitedRandomNumber(&pMissile->pSeed, 100)) < nChance)
     {
         pDamage->wResultFlags |= 8u;
     }

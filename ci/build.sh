@@ -58,9 +58,19 @@ mkdir -p build-wasm
 # pwd -W: git-bash on Windows, where the daemon wants C:/... and MSYS would otherwise mangle
 # the "/c/...:/build" pair into a semicolon list. MSYS_NO_PATHCONV stops the second mangling.
 MOUNT="$(pwd -W 2>/dev/null || pwd)"
-MSYS_NO_PATHCONV=1 docker run --rm \
-  -e HOME=/tmp -e D2_CXXFLAGS="${D2_CXXFLAGS:-}" -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" \
-  -v "$MOUNT:/build" "$IMAGE" bash wasm-build/link-d2.sh
+# Optional: D2_COMPILER_CACHE=1 shares compiler results, never mutable build objects.
+CACHE_ARGS=()
+if [ "${D2_COMPILER_CACHE:-0}" = 1 ]; then
+  mkdir -p "$LOCK_DIR/compiler-cache"
+  CACHE_ARGS=(-v "$LOCK_DIR/compiler-cache:/d2-compiler-cache" -e D2_COMPILER_CACHE=1)
+fi
+TOOLCHAIN_ID=$(docker image inspect "$IMAGE" --format '{{.Id}}')
+[[ "$TOOLCHAIN_ID" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "FATAL: invalid builder image ID" >&2; exit 1; }
+# Pin every consumer, including stage/cache keys, to the image actually executed.
+export BUILDER_IMAGE="$TOOLCHAIN_ID"
+MSYS_NO_PATHCONV=1 docker run --rm "${CACHE_ARGS[@]}" \
+  -e D2_TOOLCHAIN_ID="$TOOLCHAIN_ID" -e HOME=/tmp -e D2_CXXFLAGS="${D2_CXXFLAGS:-}" -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" \
+  -v "$MOUNT:/build" "$TOOLCHAIN_ID" bash wasm-build/link-d2.sh
 
 echo "==> synthetic smoke.mpq"
 NODE_BIN="$(command -v node || command -v node.exe || true)"
@@ -69,7 +79,7 @@ NODE_BIN="$(command -v node || command -v node.exe || true)"
 
 echo "==> precompress engine (in $IMAGE)"
 MSYS_NO_PATHCONV=1 docker run --rm \
-  -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" -v "$MOUNT:/build" "$IMAGE" \
+  -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" -v "$MOUNT:/build" "$TOOLCHAIN_ID" \
   bash -c 'bash wasm-build/make_br.sh && chown "$D2_OUTPUT_OWNER" play/d2.js.br play/d2.wasm.br'
 
 flock -u 9; exec 9>&-

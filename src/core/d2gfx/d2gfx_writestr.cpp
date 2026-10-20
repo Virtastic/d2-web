@@ -3,6 +3,7 @@
 // adds the functions the function list still had UNMAPPED.
 #include <cstdint>
 #include <cstdlib>
+#include <emscripten.h>
 
 // The 1.13c FILE (32-bit CRT): ptr 0x0, cnt 0x4, base 0x8, flag 0xC, file 0x10, charbuf 0x14,
 // bufsiz 0x18, tmpfname 0x1C. Same definition as src/core/fn/crt_leaves_b19.cpp (one class, two TUs).
@@ -29,3 +30,5 @@ void d2gfx_write_string(int32_t* pcount, const uint8_t* s, CrtStream32* f, int32
         *pcount += len;
     }
 }
+// r[0]=&count (EAX), r[1]=s (ECX), r[2]=the FILE blob (EDI), r[3]=len (stack); the blob and the count are compared.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2gfx_1df1(uint32_t* r) { d2gfx_write_string((int32_t*)(uintptr_t)r[0], (const uint8_t*)(uintptr_t)r[1], (CrtStream32*)(uintptr_t)r[2], (int32_t)r[3]); r[4] = 0; }

@@ -41,6 +41,8 @@ D2DrlgRoomStrc* __fastcall DRLGMAZE_AddAdjacentMazeRoom(D2DrlgRoomStrc* pDrlgRoo
 void __fastcall DRLGMAZE_InitBasicMazeLayout(D2DrlgLevelStrc* pLevel, int nRoomsPerDirection);
 //D2Common.0x6FD7A340
 BOOL __fastcall DRLGMAZE_LinkMazeRooms(D2DrlgRoomStrc* pDrlgRoom1, D2DrlgRoomStrc* pDrlgRoom2, int nDirection);
+void __fastcall DRLGMAZE_MergeWithTouchingRooms(D2DrlgRoomStrc* pNewRoomEx);
+D2DrlgRoomStrc* __fastcall DRLGMAZE_AllocLinkedMazeRoom(D2DrlgRoomStrc* pParent, int nDirection, BOOL bMergeRooms);
 //D2Common.0x6FD7A450
 void __fastcall DRLGMAZE_MergeMazeRooms(D2DrlgRoomStrc* pDrlgRoom);
 //D2Common.0x6FD7A570

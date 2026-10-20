@@ -9,6 +9,10 @@
 #include <cstdint>
 #include <cstdlib>
 #include <mutex>
+#include <chrono>
+#include <thread>
+#include <functional>
+#include <unistd.h>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #else
@@ -75,6 +79,36 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_callnewh(uint32_t size, int32_t (*handler)(u
 
 // +0x6FA2A6C0 DAT_6fa2a6c0: __security_cookie (zero-initialised until the CRT security init sets it).
 static uint32_t g_stackCookie;
+
+// Host entropy is the boundary: retail requests FILETIME, process/thread IDs, tick count and
+// performance counter, in that order. Native clocks/IDs supply those values on this platform.
+// The pinned helper keeps the x86 XOR/fallback rule independently replayable.
+extern "C" uint32_t d2_mcp_security_cookie_from_entropy(const uint32_t words[7]) {
+    uint32_t value = 0;
+    for (unsigned i = 0; i != 7; ++i) value ^= words[i];
+    return value != 0 ? value : 0xbb40e64eU;
+}
+
+// 1.13c D2MCPClient+0x0559D
+// VC7.1 ___security_init_cookie. An established non-default cookie is left untouched.
+// Uses the very same module cookie that __security_check_cookie reads below.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_security_init_cookie(void) {
+    if (g_stackCookie != 0 && g_stackCookie != 0xbb40e64eU) return;
+    using namespace std::chrono;
+    // FILETIME's 100ns epoch is 1601, while system_clock's is 1970.
+    const uint64_t filetime = static_cast<uint64_t>(
+        duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count() / 100)
+        + 116444736000000000ULL;
+    const uint32_t process = static_cast<uint32_t>(getpid());
+    const uint32_t thread = static_cast<uint32_t>(std::hash<std::thread::id>{}(std::this_thread::get_id()));
+    const uint32_t ticks = static_cast<uint32_t>(
+        duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count());
+    const uint64_t counter = static_cast<uint64_t>(steady_clock::now().time_since_epoch().count());
+    const uint32_t words[7] = {static_cast<uint32_t>(filetime >> 32),
+        static_cast<uint32_t>(filetime), process, thread, ticks,
+        static_cast<uint32_t>(counter >> 32), static_cast<uint32_t>(counter)};
+    g_stackCookie = d2_mcp_security_cookie_from_entropy(words);
+}
 
 // 1.13c D2MCPClient+0x047C5 (__security_check_cookie): fastcall, the expected cookie arrives in ECX.
 // `cmp ecx, __security_cookie; jne report_failure; ret` -- equal returns; unequal tail-jumps to 0x4794

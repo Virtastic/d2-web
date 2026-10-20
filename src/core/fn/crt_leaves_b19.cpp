@@ -62,24 +62,14 @@ void d2gfx_write_char(CrtStream32* f, uint8_t ch, int32_t* count) {
     }
     *count += 1;
 }
-// 1.13c D2Gfx+0x01DCD write_multi_char: the MSVC 2003 cdecl (ch, num) pad/zero emitter -- stream in
-// ECX, &chars_written in ESI. It emits at least one char when num >= 1, stops after the write that
+// 1.13c D2Gfx+0x01DCD write_multi_char: the MSVC 2003 (ch, num, FILE*) pad/zero emitter -- &chars_written
+// in EAX, the three on the stack (cdecl). It emits at least one char when num >= 1, stops after the write that
 // leaves the count at -1, and returns immediately when num < 1 (the -1 check is at the loop bottom).
 EMSCRIPTEN_KEEPALIVE void d2gfx_write_multi_char(uint8_t ch, int32_t num, CrtStream32* f, int32_t* pCount) {
     do {
         if (num < 1) return;
         num--;
         d2gfx_write_char(f, ch, pCount);
-    } while (*pCount != -1);
-}
-// 1.13c D2Gfx+0x01DF1 write_string: stream in EDI, string in ECX, &chars_written in ESI, length on the
-// stack. _IOSTRG with no base only counts; otherwise one write_char per byte, stopping after a -1 count.
-void d2gfx_write_string(CrtStream32* f, const char* s, int32_t* pCount, int32_t len) {
-    if ((f->flag & 0x40) != 0 && f->base == 0) { *pCount += len; return; }
-    do {
-        if (len < 1) return;
-        len--;
-        d2gfx_write_char(f, (uint8_t)*s++, pCount);
     } while (*pCount != -1);
 }
 // 1.13c D2Gfx+0x1E28 _output: the MSVC CRT format engine that _sprintf (0x153C) drives -- its three
@@ -120,4 +110,6 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2gfx_1d9a(uint32_t* r) { d2gfx_write_char(P(Crt
 // r[0]=the FILE blob, r[1]=the format blob, r[2]=the argument-word blob;
 // every blob's bytes after the call are compared, which is what pins ptr/cnt/flag and the %n store.
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2gfx_1e28(uint32_t* r) { r[4] = (uint32_t)d2gfx_output(P(CrtStream32*, 0), P(const char*, 1), P(const uint32_t*, 2)); }
+// r[0]=&count (EAX), r[1]=ch, r[2]=num, r[3]=the FILE blob; the blob and the count after the call are compared.
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2gfx_1dcd(uint32_t* r) { d2gfx_write_multi_char((uint8_t)r[1], (int32_t)r[2], P(CrtStream32*, 3), P(int32_t*, 0)); r[4] = 0; }
 }

@@ -192,7 +192,8 @@ D2ObjModeDataTbl* __fastcall DATATBLS_GetObjMode_TypeDataTables()
 //D2Common.0x6FD73180 (#10646)
 D2PlrModeTypeTxt* __stdcall DATATBLS_GetPlrModeTypeTxtRecord(int nIndex, int bGetMode)
 {
-	if (nIndex >= sgptDataTables->pPlrModeDataTables.nPlrModeTypeTxtRecordCount)
+	// 1.13c treats the index and count as unsigned before any table access.
+	if (static_cast<uint32_t>(nIndex) >= static_cast<uint32_t>(sgptDataTables->pPlrModeDataTables.nPlrModeTypeTxtRecordCount))
 	{
 		return NULL;
 	}

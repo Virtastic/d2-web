@@ -60,3 +60,8 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_crt_init_crit_sec_and_spin_count(
     }
     return impl(cs, spin, env);
 }
+
+// Test seam: forget the process-wide cache (the retail cold state, DAT_6fa2acb0 == 0).
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_crt_init_crit_sec_cache_reset(void) {
+    g_mcp_crit_sec_impl = nullptr;
+}

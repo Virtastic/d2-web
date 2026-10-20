@@ -790,6 +790,7 @@ void __fastcall ACT3Q4_ResetAlkor(D2GameStrc* pGame)
 }
 
 //
+// 1.13c D2Game+0xE3B30
 void __fastcall ACT3Q4_Callback10_PlayerLeavesGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	QUESTS_RemovePlayerGUID(pQuestData, pQuestArg);

@@ -29,7 +29,7 @@ struct D2GfxInitCritSecEnv {
 // no-spin thunk 0x37BD in the slot. Then call the slot with (cs, spin).
 // 1.13c D2Gfx+0x037CD
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2gfx_37cd(void* cs, uint32_t spin, const D2GfxInitCritSecEnv* env) {
+EMSCRIPTEN_KEEPALIVE void d2_gfx_init_crit_sec_and_spin_count(void* cs, uint32_t spin, const D2GfxInitCritSecEnv* env) {
     if (g_init_spin == nullptr) {
         D2GfxInitCritSecFn resolved = nullptr;
         if (g_os_platform != 1) {

@@ -17,18 +17,21 @@
 # refuses a comparison on. Decide WHETHER TO REBUILD with this key; decide WHAT RAN with that stamp.
 set -euo pipefail
 cd "${1:-.}"
-k=$(git rev-parse HEAD:src HEAD:wasm-build/link-d2.sh HEAD:third_party HEAD:ci/build.sh 2>/dev/null | sha256sum | cut -c1-12)
+# Resolve the actual image, not its mutable tag or only its Dockerfile recipe.
+# Failure is a cache miss: an unavailable/unknown toolchain must never reuse an engine.
+image_id=$(docker image inspect "${BUILDER_IMAGE:-d2-builder64:1}" --format '{{.Id}}')
+[[ "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'engine-key: invalid builder image ID' >&2; exit 1; }
+k=$({ printf '%s\n' "$image_id"; git rev-parse HEAD:src HEAD:wasm-build/link-d2.sh HEAD:third_party HEAD:ci/build.sh HEAD:Dockerfile.builder64 HEAD:tools/compiler-cache.sh 2>/dev/null; } | sha256sum | cut -c1-12)
 # The source key covers WHAT was compiled; D2_CXXFLAGS covers HOW, and link-d2.sh ties both the
 # objects (OBJDIR) and the link line to it -- so ci/sanitize.sh's "-g -O1 -sASSERTIONS=2 -sSAFE_HEAP=1"
 # build is a DIFFERENT engine. Without this term it took the release build's cache slot, and
 # `engine-cache.sh put` could then hand the sanitizer wasm to every worktree under the release key
 # (measured 2026-09-30: two worktrees each served a 4 MB sanitizer build under a clean release
 # key). Empty (the default release build) leaves the key unchanged, so cached release engines stay a
-# hit. Known remaining gap: Dockerfile.builder64 (the toolchain) is not in the key either; adding it
-# now would move every existing key and force a rebuild of every worktree, so it is left for a change
-# that lands with a full rebuild.
+# hit. The recipe and compiler cache setup now participate too: a toolchain recipe
+# change invalidates existing engines as well as the local object and StormLib caches.
 [ -z "${D2_CXXFLAGS:-}" ] || k="$k-cxx$(printf '%s' "$D2_CXXFLAGS" | sha256sum | cut -c1-8)"
-inputs=(src wasm-build/link-d2.sh third_party ci/build.sh)
+inputs=(src wasm-build/link-d2.sh third_party ci/build.sh Dockerfile.builder64 tools/compiler-cache.sh)
 if [ -n "$(git status --porcelain -- "${inputs[@]}")" ]; then
   edits=$(
     {

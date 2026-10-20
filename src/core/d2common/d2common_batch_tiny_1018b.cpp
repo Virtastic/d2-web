@@ -369,3 +369,22 @@ extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_85DF0_ApplyThree(D2CommonApplyInde
 	fnApply(1, 0x16C);
 	fnApply(3, 0x16C);
 }
+
+// 1.13c D2Common+0x3475 (__getptd, 113 B): the current thread's _ptiddata, created on first use (same
+// shape as BNClient+0x3255): TLS miss -> calloc(1,0x8C); _initaddr +0x54 = retail VA 0x6FDE9720 (RVA 0x99720),
+// _holdrand +0x14 = 1, _thandle +0x04 = -1, _tid +0x00 = thread id; failure runs __amsg_exit(0x10).
+// Single-threaded engine: the TLS slot is this one static block, _tid = 1. GetLastError is untouched.
+static uint8_t g_d2c_ptd[0x8C];
+static bool    g_d2c_ptd_ready;
+
+extern "C" EMSCRIPTEN_KEEPALIVE void* D2Common_3475_GetPtd(void)
+{
+	if (!g_d2c_ptd_ready) {
+		*(uint32_t*)(g_d2c_ptd + 0x54) = 0x99720;
+		*(uint32_t*)(g_d2c_ptd + 0x14) = 1;
+		*(uint32_t*)(g_d2c_ptd + 0x04) = 0xFFFFFFFFu;
+		*(uint32_t*)(g_d2c_ptd + 0x00) = 1;
+		g_d2c_ptd_ready = true;
+	}
+	return g_d2c_ptd;
+}

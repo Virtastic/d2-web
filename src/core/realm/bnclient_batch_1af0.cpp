@@ -3,6 +3,7 @@
 // (build-wasm/ghidra-bnclient/decomp) of the retail image (base 0x6FF20000). Each d2_fn_* probe takes its
 // arguments in r[0..] and writes its return value in r[4] (0x1F1F, six arguments, uses r[6]).
 #include <emscripten.h>
+#include "bnclient_crt_arguments.h"
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -65,7 +66,7 @@ static void bn_crt_default_voidptr(void*) {}
 static const BnCrtInitEnv g_bn_crt_default = {
     bn_crt_default_version, bn_crt_default_ok,        bn_crt_default_ok,
     bn_crt_default_void,    bn_crt_default_empty,     bn_crt_default_empty,
-    bn_crt_default_io_init, bn_crt_default_ok,        bn_crt_default_ok,
+    bn_crt_default_io_init, bn_setargv,               bn_crt_default_ok,
     bn_crt_default_cinit,   bn_crt_default_void,      bn_crt_default_void,
     bn_crt_default_void,    bn_crt_default_void,      bn_crt_default_ok,
     bn_crt_default_tid,     bn_crt_default_voidptr,
@@ -85,7 +86,7 @@ static int bn_crt_init_apply(uint32_t hinst, int action, const BnCrtInitEnv* env
         if (!env->heap_init()) return 0;
         if (!env->mt_init()) { env->heap_term(); return 0; }
         if (env->rtc_initialize) env->rtc_initialize();
-        if (env->command_line) (void)env->command_line();
+        bn_crt_argument_inputs(env->command_line ? env->command_line() : nullptr);
         if (env->environment_strings) (void)env->environment_strings();
         if (env->io_init() >= 0) {
             if (env->set_argv() >= 0 && env->set_envp() >= 0 && env->cinit(0) == 0) {

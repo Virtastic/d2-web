@@ -302,4 +302,75 @@ void drawVersionLabels(const Host& h, int32_t x1, uint32_t ignored, int32_t x3,
     (void)ignored2;
 }
 
+// 1.13c D2Client+0x2D8E0 (201 B). ret 0x14; EDI = guest Unicode destination.
+// Stack a1..a5 = key1, key2, key3, value, plus flag. value 0 -> return 0. Format
+// "+%d" when plus != 0 and value >= 0, else "%d"; append key1 text, the number,
+// key2 text, key3 text, then string 0xF9E (each via D2Lang #10003); return 1.
+uint32_t appendSignedValue(const Host& h, Address edi, uint32_t key1, uint32_t key2,
+                           uint32_t key3, int32_t value, uint32_t plus) {
+    if (!value) return 0;
+    char ascii[32]{};
+    std::snprintf(ascii, sizeof(ascii), (plus && value >= 0) ? "+%d" : "%d", value);
+    char16_t number[64]{};
+    for (size_t i = 0; ascii[i]; ++i) number[i] = static_cast<unsigned char>(ascii[i]);
+    appendRef(h, edi, key1);
+    appendLocal(h, edi, number);
+    appendRef(h, edi, key2);
+    appendRef(h, edi, key3);
+    appendRef(h, edi, 0xF9E);
+    return 1;
+}
+
+} // namespace d2client_batch_2c8c0
+
+namespace d2client_batch_2c8c0 {
+// 1.13c D2Client+0x2D9B0 (183 B). ret 0x10; EBX = guest Unicode destination.
+// Stack: key1, key2, value, plus. value 0 -> 0. Format "+%d" when plus and
+// value >= 0 else "%d" into a 32-unit local; append key1 text, number, key2
+// text, then string 0xF9E (each via D2Lang #10003); return 1.
+uint32_t appendSignedValue2(const Host& h, Address ebx, uint32_t key1, uint32_t key2,
+                            int32_t value, uint32_t plus) {
+    if (!value) return 0;
+    char ascii[32]{};
+    std::snprintf(ascii, sizeof(ascii), (plus && value >= 0) ? "+%d" : "%d", value);
+    char16_t number[32]{};
+    for (size_t i = 0; ascii[i] && i < 31; ++i) number[i] = static_cast<unsigned char>(ascii[i]);
+    appendRef(h, ebx, key1);
+    appendLocal(h, ebx, number);
+    appendRef(h, ebx, key2);
+    appendRef(h, ebx, 0xF9E);
+    return 1;
+}
+} // namespace d2client_batch_2c8c0
+
+namespace d2client_batch_2c8c0 {
+// 1.13c D2Client+0x2DA70 (177 B). ret 0x10; EBP = guest Unicode destination, EBX = value;
+// stack: arg0 (unused), strA, strB, plus. value 0 -> 0. Else "+%d" (plus && value >= 0) or "%d",
+// append it, then text(value==1 ? strA : strB), then text 0xF9E (each via D2Lang #10003); return 1.
+uint32_t appendSignedValue3(const Host& h, Address ebp, int32_t ebx, uint32_t /*arg0*/,
+                            uint32_t strA, uint32_t strB, uint32_t plus) {
+    if (!ebx) return 0;
+    char ascii[32]{};
+    std::snprintf(ascii, sizeof(ascii), (plus && ebx >= 0) ? "+%d" : "%d", ebx);
+    char16_t number[32]{};
+    for (size_t i = 0; ascii[i] && i < 31; ++i) number[i] = static_cast<unsigned char>(ascii[i]);
+    appendLocal(h, ebp, number);
+    appendRef(h, ebp, ebx == 1 ? strA : strB);
+    appendRef(h, ebp, 0xF9E);
+    return 1;
+}
+// 1.13c D2Client+0x2DA70 (177 B). value==0 -> 0. Else format "+%d" (plus!=0 && value>=0) or "%d",
+// append it to dest, then the localized string (value==1 ? strA : strB) and string 0xF9E; return 1.
+uint32_t appendSignedValue(const Host& h, Address dest, int32_t value, uint32_t strA, uint32_t strB, uint32_t plus) {
+    if (value == 0) return 0;
+    char16_t text[32]{};
+    char ascii[32];
+    std::snprintf(ascii, sizeof ascii, (plus && value >= 0) ? "+%d" : "%d", value);
+    for (size_t i = 0; ascii[i] && i < 31; ++i) text[i] = static_cast<unsigned char>(ascii[i]);
+    appendLocal(h, dest, text);
+    appendRef(h, dest, value == 1 ? strA : strB);
+    appendRef(h, dest, 0xF9E);
+    return 1;
+}
+
 } // namespace d2client_batch_2c8c0

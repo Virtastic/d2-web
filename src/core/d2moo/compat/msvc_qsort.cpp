@@ -1,5 +1,5 @@
 // The retail DLLs sort with the Microsoft C runtime's qsort: a median-of-three quicksort with an
-// insertion-sort cutoff of 8 whose order for equal keys is what the game's tables end up in
+// selection-sort cutoff of 8 whose order for equal keys is what the game's tables end up in
 // (the gamble selection list is sorted by item level with many ties; kind-20 phase-2 vectors
 // measured the difference against musl's sort).  This is that algorithm, element for element.
 #include <cstddef>
@@ -14,6 +14,9 @@ void swapElements(char* a, char* b, size_t width) {
     if (a == b) return;
     while (width--) { const char t = *a; *a++ = *b; *b++ = t; }
 }
+// 1.13c D2Common+0x01B40
+// Prior art used: this existing MSVC sort port, validated against cached 1.13c.
+// The high bound arrives in retail EAX; select the first strict maximum each pass.
 void shortSort(char* lo, char* hi, size_t width, Compare cmp) {
     while (hi > lo) {
         char* max = lo;
@@ -24,6 +27,9 @@ void shortSort(char* lo, char* hi, size_t width, Compare cmp) {
 }
 }  // namespace
 
+// 1.13c D2Common+0x01BB0
+// Both retail callers are the ItemsTbls loaders already using this native owner.
+// Cached 1.13c confirms pivot relocation, equal-key trimming and larger-side stack.
 extern "C" void d2web_msvc_qsort(void* base, size_t num, size_t width, Compare cmp) {
     if (num < 2 || width == 0) return;
     char* lostk[kStackSize]; char* histk[kStackSize]; int stkptr = 0;

@@ -436,6 +436,7 @@ void __fastcall DATATBLS_LoadMonStatsTxt(HD2ARCHIVE hArchive)
 		nCounter = 0;
 		do
 		{
+			// 1.13c D2Common+0x538E0 (separate function in 1.13c; inlined here, chain-length/chain-id walk)
 			bFoundInChain = false;
 
 			nChainId = 0;
@@ -1326,6 +1327,7 @@ void DATATBLS_ParseTreasureClassItem(D2TCExShortStrc* pTCExTxtRecord, D2Treasure
 }
 
 //D2Common.0x6FD68EC0
+// 1.13c D2Common+0x5A030
 void __fastcall DATATBLS_LoadTreasureClassExTxt(HD2ARCHIVE hArchive)
 {
 	D2BinFieldStrc pTbl[] =

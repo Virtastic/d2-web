@@ -159,3 +159,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_mcp_req_7480(const char* s, uint32_t
     out[0] = 2; memcpy(out + 1, &cls, 4); out[5] = flags & 0xFF; out[6] = (uint8_t)(flags >> 8);
     return app(s, &len, out + 7) ? len + 7 : 0;
 }
+
+// 1.13c D2MCPClient+0x07510: startup request { 0x01, reply[0..15], reply[24..71], strz account at reply+0x48 };
+// the account via sub_6EC0 (exit at >= 0x400). Zeroes [0xb1c8] (probe glue). Returns the frame length, 0 where retail dies.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_mcp_req_7510(const uint8_t* reply, uint8_t* out) {
+    uint32_t len = 0;
+    out[0] = 1; memcpy(out + 1, reply, 16); memcpy(out + 17, reply + 24, 48);
+    return app((const char*)reply + 0x48, &len, out + 0x41) ? len + 0x41 : 0;
+}

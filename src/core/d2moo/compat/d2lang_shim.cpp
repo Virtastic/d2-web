@@ -99,9 +99,54 @@ char* Unicode::unicode2Win(char* dest, const Unicode* src, int count) {
     return dest;
 }
 
-// D2Lang #10009 (1.13c): the string table language. English tables only.
+// Prior art used: D2MOO D2StrTable.cpp STRTABLE_GetLanguage (archive-backed,
+// once-only locale); the 1.13c GetLocale body and immutable locale descriptors.
 #include <D2StrTable.h>
-D2C_Language STRTABLE_GetLanguage() { return LANGUAGE_ENGLISH; }
+#include <Archive.h>
+
+// 1.13c D2Lang+0x09290
+D2C_Language STRTABLE_GetLanguage() {
+    static bool initialized = false;
+    static D2C_Language language = LANGUAGE_ENGLISH;
+    if (!initialized) {
+        // Retail publishes this flag before reading, including on a failed read.
+        initialized = true;
+        auto* bytes = static_cast<unsigned char*>(
+            ARCHIVE_ALLOC_BUFFER_AND_READ_FILE_TO_IT(nullptr, "data\\local\\use", nullptr));
+        // Retail dereferences this result unconditionally. Missing locale data
+        // cannot silently turn into an English game.
+        if (!bytes) std::abort();
+        const unsigned value = *bytes;
+        std::free(bytes);
+        language = static_cast<D2C_Language>(value <= 12 ? value : 0);
+    }
+    return language;
+}
+
+// 1.13c D2Lang+0x09D00
+void __stdcall STRTABLE_GetLocale(char* destination, int field) {
+    struct Locale { const char* strings[3]; const char* code; };
+    static const Locale locales[13] = {
+        {{"ENG", "ENG", "USA"}, "SUne"},
+        {{"ESP", "ESP", "ESP"}, "SEse"},
+        {{"DEU", "DEU", "DEU"}, "EDed"},
+        {{"FRA", "FRA", "FRA"}, "RFrf"},
+        {{"POR", "POR", "BRA"}, "RBtp"},
+        {{"ITA", "ITA", "ITA"}, "TIti"},
+        {{"JPN", "ENG", "JPN"}, "AJaj"},
+        {{"KOR", "ENG", "HAN"}, "RKok"},
+        {{"SIN", "ENG", "SIN"}, "NChz"},
+        {{"CHI", "ENG", "CHI"}, "WThz"},
+        {{"POL", "POL", "POL"}, "LPlp"},
+        {{"RUS", "RUS", "RUS"}, "URur"},
+        {{"ENG", "ENG", "HAN"}, "RKok"},
+    };
+    const auto& locale = locales[static_cast<unsigned>(STRTABLE_GetLanguage())];
+    // Retail's table scan matches the identity language ids 0..12. The fatal
+    // first-row-id guard is unreachable: the immutable English row has id 0.
+    if (field == 3) std::memcpy(destination, locale.code, 4);
+    else std::strcpy(destination, locale.strings[field == 1 ? 1 : field == 2 ? 2 : 0]);
+}
 
 // Prior art: D2MOO D2StrTable.cpp STR_GroupIntDigits/GroupCStrDigits. Checked
 // against the cached 1.13c body; the strict capacity comparison is intentional.

@@ -1,3 +1,4 @@
+#include "../../../../d2game/d2game_21880.h"
 #include "MONSTER/MonsterUnique.h"
 #include "core/d2game/d2game_21880.h"
 
@@ -2034,28 +2035,12 @@ void __fastcall sub_6FC6E780(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* p
         return;
     }
 
-    if (nIndex == 5)
-    {
-        for (int32_t i = 0; i < 9; ++i)
-        {
-            MonUModFunc pUModFunc = stru_6FD2F0C8[pUMods[i]].unk0x00[nIndex];
-            if (pUModFunc)
-            {
-                pUModFunc(pGame, pMissile, pUMods[i], bUnique);
-            }
-        }
-    }
-    else
-    {
-        for (int32_t i = 0; i < 9; ++i)
-        {
-            MonUModFunc pUModFunc = stru_6FD2F0C8[pUMods[i]].unk0x00[nIndex];
-            if (pUModFunc)
-            {
-                pUModFunc(pGame, pUnit, pUMods[i], bUnique);
-            }
-        }
-    }
+    d2game_268e0_walk(pGame, pUnit, pMissile, nIndex, pUMods, bUnique,
+        [&stru_6FD2F0C8](uint8_t id, int column, D2GameStrc* game,
+                          D2UnitStrc* target, int unique) {
+            MonUModFunc callback = stru_6FD2F0C8[id].unk0x00[column];
+            if (callback) callback(game, target, id, unique);
+        });
 }
 
 //D2Game.0x6FC6E860

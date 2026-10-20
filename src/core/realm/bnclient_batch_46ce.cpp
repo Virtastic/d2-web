@@ -17,8 +17,7 @@ EMSCRIPTEN_KEEPALIVE int32_t bn_heap_select(uint32_t os_platform, uint32_t win_m
 }
 
 // +0x1F980 DAT_6ff3f980: the 0x40-dword (0x100-byte) codepage table, followed at +0x1FA80 by one byte.
-static uint32_t g_bn_sbcs_table_1f980[0x40];
-static uint8_t  g_bn_mbcs_1fa80;
+static uint8_t g_bn_sbcs_table_1f980[257];
 // +0x1FA84, +0x1F960, +0x1F958, +0x1FA90..+0x1FA98: the remaining locale-state dwords.
 static uint32_t g_bn_mbcs_1fa84;
 static uint32_t g_bn_mbcs_1f960;
@@ -33,11 +32,15 @@ static uint32_t g_bn_mbcs_1fa98;
 extern "C"
 EMSCRIPTEN_KEEPALIVE void bn_set_sbcs(void) {
     std::memset(g_bn_sbcs_table_1f980, 0, sizeof g_bn_sbcs_table_1f980);
-    g_bn_mbcs_1fa80 = 0;
     g_bn_mbcs_1fa84 = 0;
     g_bn_mbcs_1f960 = 0;
     g_bn_mbcs_1f958 = 0;
     g_bn_mbcs_1fa90 = 0;
     g_bn_mbcs_1fa94 = 0;
     g_bn_mbcs_1fa98 = 0;
+}
+
+// The parser reads the CRT owner's byte classification table, including its trailing byte.
+extern "C" const uint8_t* bn_mbctype() {
+    return reinterpret_cast<const uint8_t*>(g_bn_sbcs_table_1f980);
 }

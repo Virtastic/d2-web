@@ -118,13 +118,14 @@ extern "C" EMSCRIPTEN_KEEPALIVE size_t d2_mcp_strlen(const char* s) {
 // calling every non-NULL slot and ignoring its status, then return 0.
 //
 // The tables have the retail slot counts. The 0x1654 entry is bound to the shared onexit initializer;
-// 0x34DE (___initmbctable) and 0x559D (___security_init_cookie) remain seams. The 0x170A registration
+// 0x34DE (___initmbctable) remains a seam; 0x559D initializes the shared cookie. The 0x170A registration
 // call uses the shared one-argument _atexit path and is consumed by doexit. See
 // for the remaining boundary and capture requirements.
 static int (*g_mcp_cinit_dyn_init)(int);    // +0x125D8 DAT_6fa325d8
 extern "C" int32_t d2_mcp_onexitinit(void);
 static int (*g_mcp_xi[3])(void) = {nullptr, d2_mcp_onexitinit, nullptr}; // +0xA00C: [NULL, ___onexitinit, ___initmbctable]
-static int (*g_mcp_xc[2])(void);            // +0xA000: [NULL, ___security_init_cookie]
+extern "C" void d2_mcp_security_init_cookie(void);
+static void (*g_mcp_xc[2])(void) = {nullptr, d2_mcp_security_init_cookie};            // +0xA000: [NULL, ___security_init_cookie]
 
 // The cinit table state is still a seam. Use a native function token for the retail code pointer:
 // RVA 0x170A is not a valid wasm64 function pointer. The real one-argument _atexit path appends it to
@@ -145,7 +146,7 @@ EMSCRIPTEN_KEEPALIVE int d2_mcp_cinit(int param) {
         // entering the C++ table. The one-argument callee appends to the shared initialized table.
         (void)d2_mcp_atexit_16b4(reinterpret_cast<void*>(&mcp_cinit_exit_thunk_170a));
         for (size_t i = 0; i < 2; ++i)
-            if (g_mcp_xc[i] != nullptr) (void)g_mcp_xc[i]();
+            if (g_mcp_xc[i] != nullptr) g_mcp_xc[i]();
         result = 0;
     }
     return result;

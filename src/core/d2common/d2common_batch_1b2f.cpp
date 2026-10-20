@@ -4,15 +4,14 @@
 // __fsopen 0x1FE7) are named in ponytail notes and not called.
 #include <cstdint>
 #include <cstdio>
+#include "d2common_crt_exit.h"
 
 // 1.13c D2Common+0x1B2F
-// __cexit = doexit(code=0, quick=0, returning=1): run the CRT exit handlers, then return to the
-// caller instead of terminating. Retail's observable is the handler walk in doexit (0x1A4A), which
-// is a separate UNMAPPED row; with no handlers ported the remaining rule is "return to the caller".
-// ponytail: the onexit/initterm walk lands with 0x1A4A.
+// __cexit runs shared module shutdown and returns to its caller.
 extern "C"
 void D2Common_1B2F_Cexit(void)
 {
+    D2Common_1A4A_DoExit(0, 0, 1);
 }
 
 // 1.13c D2Common+0x1FDC
@@ -43,10 +42,22 @@ void D2Common_2039_UnlockFile(void* pFile)
 // assign it). Our stdio is the host CRT, so std::fopen is the same share-mode-default open.
 // ponytail: the retail __fsopen's error-path unlock (0x1FE7/0x2039) is host CRT behaviour until
 // 0x1FE7 is implemented.
+// 1.13c D2Common+0x1FE7
+// MSVC CRT __fsopen(name, mode, shflag): reject null/empty args, _getstream, _openfile, unlock on
+// the way out. Host CRT stands in for the stream table; the share flag has no host meaning.
+// ponytail: stream-table lock/unlock (0x2039) is a no-op on the host.
+extern "C"
+void* D2Common_1FE7_fsopen(const char* pName, const char* pMode, int shflag)
+{
+    (void)shflag;
+    if (!pName || !pMode || !*pName || !*pMode) return nullptr;
+    return std::fopen(pName, pMode);
+}
+
 extern "C"
 void* D2Common_2043_FSopen(const char* pName, const char* pMode)
 {
-    return std::fopen(pName, pMode);
+    return D2Common_1FE7_fsopen(pName, pMode, 0x40);
 }
 
 // 1.13c D2Common+0x219F

@@ -9,6 +9,8 @@ static uint32_t pk(uint32_t op, uint32_t c, uint32_t d, int size, int cw, int dw
 }
 // 1.13c D2Client+0x14910: [op, ecx32, edx32], 9 bytes
 extern "C" uint32_t d2_client_14910(uint32_t op, uint32_t c, uint32_t d, uint8_t* o) { return pk(op, c, d, 9, 4, 4, 5, o); }
+// 1.13c D2Client+0x149A0: [op, cx16, dx16, stack16], 7 bytes
+extern "C" uint32_t d2_client_149a0(uint32_t op, uint32_t c, uint32_t d, uint32_t s, uint8_t* o) { pk(op, c, d, 7, 2, 2, 3, o); put(o, 5, s, 2); return 7; }
 // 1.13c D2Client+0x149E0: [op, cx16, dx16], 5 bytes
 extern "C" uint32_t d2_client_149e0(uint32_t op, uint32_t c, uint32_t d, uint8_t* o) { return pk(op, c, d, 5, 2, 2, 3, o); }
 // 1.13c D2Client+0x14A10: [op, cx16], 3 bytes
@@ -22,6 +24,7 @@ static uint32_t fold(uint32_t n, const uint8_t* b) {
     return h;
 }
 #define PROBE(R) extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2client_##R(uint32_t* r) { uint8_t b[16] = {}; r[4] = fold(d2_client_##R(r[0], r[1], r[2], b), b); }
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2client_149a0(uint32_t* r) { uint8_t b[16] = {}; r[4] = fold(d2_client_149a0(r[0], r[1], r[2], r[3], b), b); }
 PROBE(14910) PROBE(149e0) PROBE(14a10) PROBE(14a30)
 extern "C" uint32_t d2_client_148a0_build(uint8_t*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
 // 1.13c D2Client+0x148A0: [op, ecx32, edx32, c32, d32], 17 bytes (r[3]=c, r[5]=d)

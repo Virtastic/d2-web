@@ -1,23 +1,8 @@
 // Stage A leaves checked against cached 1.13c decompiles and retail bytes.
-// Prior art: D2MOO SUnit.cpp and Quests.cpp; existing 0x340C0 register-block
-// implementation and VC7.1 CRT mantissa/string/PMD conventions. Not a parity verdict.
+// Prior art: VC7.1 CRT mantissa/string/PMD conventions. Not a parity verdict.
 #include <cstdint>
 #include <cstring>
 #include <emscripten.h>
-extern "C" void d2_fn_d2game_340c0(uint32_t*);
-static void questWrapper(uint32_t* r) {
-    uint32_t rr[6] = {r[0], r[1], 0, 0, 0, r[5]};
-    d2_fn_d2game_340c0(rr);
-}
-// Quest callbacks preserve the quest/argument pair (ECX/EDX -> ESI/EBX).
-// 1.13c D2Game+0xE3390
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_e3390(uint32_t* r) { questWrapper(r); }
-// 1.13c D2Game+0xE3960
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_e3960(uint32_t* r) { questWrapper(r); }
-// 1.13c D2Game+0xE3B30
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_e3b30(uint32_t* r) { questWrapper(r); }
-// 1.13c D2Game+0xE5220
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_e5220(uint32_t* r) { questWrapper(r); }
 // Three sequential dword transfers, including forward-overlap behaviour.
 // 1.13c D2Game+0xF66D3
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_f66d3(void* dst,const void* src) {

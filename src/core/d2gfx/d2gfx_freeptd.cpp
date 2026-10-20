@@ -18,8 +18,7 @@ struct D2GfxFreeptdEnv {
 // TODO(spec): freefls (0x296F __freefls@4) body not read; it stays a seam like the two resolved Fls*/Tls*
 // slots, which mtinit installs.
 // 1.13c D2Gfx+0x02AB6
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2gfx_2ab6(void* ptd, const D2GfxFreeptdEnv* env) {
+void d2gfx_freeptd(void* ptd, const D2GfxFreeptdEnv* env) {
     if (env->tls_index == -1) return;
     if (ptd == nullptr) ptd = env->get((uint32_t)env->tls_index);
     env->freefls(ptd);

@@ -10,7 +10,7 @@
 # Use:    docker run --rm -v "$PWD:/build" d2-builder64:1 bash wasm-build/link-d2.sh
 # TODO if the toolchain changes: repin the emsdk tag and re-run the assertions below.
 FROM emscripten/emsdk:6.0.5
-RUN apt-get update && apt-get install -y --no-install-recommends ninja-build brotli git \
+RUN apt-get update && apt-get install -y --no-install-recommends ninja-build brotli git ccache \
  && rm -rf /var/lib/apt/lists/*
 ENV ROOT=/build EMSDK_BIN=/emsdk/upstream/emscripten
 WORKDIR /build

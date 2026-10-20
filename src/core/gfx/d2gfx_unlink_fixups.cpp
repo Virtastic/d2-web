@@ -77,3 +77,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE bool d2gfx_unlink_fixups(D2GfxGuestMemory mem, u
 extern "C" EMSCRIPTEN_KEEPALIVE bool d2gfx_unlink_slot(D2GfxGuestMemory mem, uint32_t slot) {
     return unlink_slot(mem, slot);
 }
+
+// SEH unwind funclets: each loads its arg (the unwound object) and tail-calls the unlink above.
+// 1.13c D2Gfx+0xCBC0: d2gfx_unlink_slot(obj + 4)
+extern "C" bool d2gfx_unwind_cbc0(D2GfxGuestMemory mem, uint32_t obj) { return unlink_slot(mem, obj + 4); }
+// 1.13c D2Gfx+0xCBE0: d2gfx_unlink_slot(obj + 4)
+extern "C" bool d2gfx_unwind_cbe0(D2GfxGuestMemory mem, uint32_t obj) { return unlink_slot(mem, obj + 4); }
+// 1.13c D2Gfx+0xCBEB: d2gfx_unlink_fixups(obj)
+extern "C" bool d2gfx_unwind_cbeb(D2GfxGuestMemory mem, uint32_t obj) { return d2gfx_unlink_fixups(mem, obj); }
+// 1.13c D2Gfx+0xCC00 (SEH funclet): d2gfx_unlink_fixups(*(frame+4)); the owner pointer is read from the unwound frame.
+extern "C" bool d2gfx_unwind_cc00(D2GfxGuestMemory mem, uint32_t owner) { return d2gfx_unlink_fixups(mem, owner); }

@@ -1364,6 +1364,10 @@ int32_t __fastcall SKILLS_SrvSt59_ImpInferno(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FD00710
+// 1.13c D2Game+0x0DE70
+// Prior art: D2MOO ImpInferno; validated against the cached 1.13c body.
+// Retail inlines table lookup and timer deletion; this native body retains those
+// same bounds, velocity / 8 truncation, missile lifetime and timeout branches.
 int32_t __fastcall SKILLS_SrvDo126_ImpInferno(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);

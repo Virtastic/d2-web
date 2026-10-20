@@ -816,6 +816,7 @@ void __fastcall ACT3Q6_SetObjectModes(D2GameStrc* pGame)
 }
 
 //
+// 1.13c D2Game+0xE3390
 void __fastcall ACT3Q6_Callback10_PlayerLeavesGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	QUESTS_RemovePlayerGUID(pQuestData, pQuestArg);

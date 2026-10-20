@@ -34,7 +34,7 @@ static uint32_t sbh_payload_size(const void* block) {
 // 1.13c D2Gfx+0x025E4
 // State is owned by the module/caller and persists across calls, including any
 // changes made by new-handler callbacks. Failed allocation keeps the old block.
-extern "C" EMSCRIPTEN_KEEPALIVE void* d2_fn_d2gfx_25e4(
+void* d2gfx_realloc_25e4(
     void* block, uint32_t size, D2GfxReallocState* state) {
     if (!block) return state->malloc_(size);
     if (!size) {

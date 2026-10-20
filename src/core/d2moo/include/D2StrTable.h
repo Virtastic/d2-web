@@ -42,6 +42,10 @@
  */
 D2LANG_DLL_DECL D2C_Language STRTABLE_GetLanguage();
 
+// Retail 1.13c #10004: locale resource name (0), font name (1), country (2),
+// or four packed locale bytes (3). Other fields select the resource name.
+D2LANG_DLL_DECL void __stdcall STRTABLE_GetLocale(char* destination, int field);
+
 /**
  * Converts an integer value into a into a null-terminated UCS-2 string,
  * with commas separating every group of three digits. If the required

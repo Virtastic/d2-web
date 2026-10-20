@@ -198,29 +198,6 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_35bb(uint32_t* r) {
     }
 }
 
-// 1.13c D2Game+0x340C0
-// Quest reward/GUID helper shared by the quest callbacks (pQuestData in ESI, pQuestArg in EBX): when the
-// player's quest record has flag 1 (REWARDPENDING) and flag 0 (REWARDGRANTED) set and the quest's GUID
-// list is non-empty, remove the player's GUID (or -1 when pQuestArg->pPlayer is NULL).
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_340c0(uint32_t* r) {
-    const D2GameBatch20Env& env = d2game_env(r);
-    void* pQuest = (void*)(uintptr_t)r[0];
-    void* pQuestArg = (void*)(uintptr_t)r[1];
-    void* pGame = rdptr(pQuest, 4);
-    void* pPlayer = rdptr(pQuestArg, 0xC);
-    void* pPlayerData = env.getPlayerData(pPlayer);
-    void* pQuestFlags = rdptr(pPlayerData, 0x10 + (uint32_t)rd8(pGame, 0x6D) * 4);
-    const int32_t nFilter = (int32_t)rd32(pQuest, 0xE0);
-
-    if (env.getQuestState(pQuestFlags, nFilter, 1) == 1 &&
-        env.getQuestState(pQuestFlags, nFilter, 0) != 0 &&
-        rd16(pQuest, 0x9C) != 0) {
-        const int32_t dwGUID = pPlayer != nullptr ? (int32_t)rd32(pPlayer, 0xC) : -1;
-        env.fastRemovePlayerGUID((uint8_t*)pQuest + 0x1C, dwGUID);
-    }
-    r[4] = 0;
-}
-
 // 1.13c D2Game+0x34440
 // ResetQuest(pGame in EAX, nQuestId in ECX): clear bNotIntro (+9), bActive (+0xA) and fLastState (+0xB)
 // of the quest record; a missing record is the retail 0x5F3 assert.

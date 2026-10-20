@@ -8,7 +8,7 @@
 // Called only by __setmbcp (0x558C); the codepage arrives in EAX in retail, so it is the sole
 // host argument here (the batch-b45 convention for register-only inputs).
 extern "C"
-uint32_t d2_fn_d2gfx_5399(uint32_t codepage) {
+uint32_t d2gfx_sub_5399(uint32_t codepage) {
     switch (codepage) {
     case 0x3A4: return 0x411;
     case 0x3A8: return 0x804;

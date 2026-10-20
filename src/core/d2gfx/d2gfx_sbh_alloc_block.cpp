@@ -34,7 +34,7 @@ struct D2GfxSbhAllocEnv {
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2gfx_4b87(uint32_t size, const D2GfxSbhAllocEnv* env) {
     uint32_t req = (size + 0x17u) & 0xfffffff0u;
-    int32_t firstBucket = (int32_t)((size + 0x17u) >> 4) - 1;
+    int32_t firstBucket = ((int32_t)(size + 0x17u) >> 4) - 1;  // retail shifts the signed sum
     uint32_t end = g_sbh_regions + g_sbh_count * 0x14u;
     uint8_t b8 = (uint8_t)firstBucket;
     uint32_t region = g_sbh_last;

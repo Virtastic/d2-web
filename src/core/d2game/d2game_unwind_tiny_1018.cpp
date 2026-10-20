@@ -1,6 +1,6 @@
-// src/core/d2game/d2game_unwind_tiny_1018.cpp -- eight UNMAPPED 1.13c D2Game.dll leaves transcribed from
+// src/core/d2game/d2game_unwind_tiny_1018.cpp -- seven 1.13c D2Game.dll leaves transcribed from
 // the cached decompiles (build-wasm/ghidra-d2game/decomp/0x<RVA>.c), in RVA order: six VC7.1 SEH unwind
-// funclets of the game-table construction/destruction scopes, the sub_C44D0 __fastcall thunk into 0x340C0,
+// funclets of the game-table construction/destruction scopes
 // and the CRT _CallMemberFunction1 tail-jump helper. Alpha batch lane (OBJECTIVE v8.3): implementation +
 // marker only, no spec, no vector.
 //
@@ -8,18 +8,14 @@
 // pattern), reads its operands by retail EBP offset and tail-jumps into the callee. The list helpers are the
 // ones already modelled in gametbl_hash32.cpp: 0x1FE0 listUninit and 0x1FA0 unlinkLink (the terminator link
 // unlink, de-static'd there for reuse); a frame address handed to them is truncated to the 32-bit guest
-// address space those helpers use. 0x340C0 keeps its register-block contract (r[0] = ESI, r[1] = EBX,
-// r[5] = env). The member-function call in 0xF458A is a seam: it is a stack-layout tail jump, not callable
-// from a C signature.
+// address space those helpers use. The member-function call in 0xF458A is a seam: it is a stack-layout
+// tail jump, not callable from a C signature.
 #include <cstdint>
 #include <emscripten.h>
 
 // 0x1FE0 listUninit and 0x1FA0 unlinkLink (src/core/d2game/gametbl_hash32.cpp).
 void listUninit(uint32_t list);
 void unlinkLink(uint32_t link);
-
-// 0x340C0 quest reward/GUID helper (src/core/d2game/d2game_batch_34e0.cpp), register block r[0..5].
-extern "C" void d2_fn_d2game_340c0(uint32_t* r);
 
 static inline uint32_t guestAddr(const uint32_t* p) { return (uint32_t)(uintptr_t)p; }
 
@@ -59,15 +55,6 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_f7880(const uint32_t* ebp) {
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_f788a(const uint32_t* ebp) {
     listUninit(guestAddr(ebp - 6));
-}
-
-// 1.13c D2Game+0x0C44D0 (14 B): push ebx; push esi; ebx=edx; esi=ecx; call 0x340C0; pop esi; pop ebx; ret.
-// A __fastcall thunk: the caller passes pQuest in ECX and pQuestArg in EDX, which 0x340C0 reads from ESI
-// and EBX; the register block is preserved across the call and r[5] (the host env) passes through.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_c44d0(uint32_t* r) {
-    uint32_t rr[6] = { r[0], r[1], 0, 0, 0, r[5] };
-    d2_fn_d2game_340c0(rr);
 }
 
 // 0xF458A (_CallMemberFunction1) seam: pfn is called with pthis in ECX and arg as its first stack argument.

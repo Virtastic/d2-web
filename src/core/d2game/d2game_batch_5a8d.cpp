@@ -21,12 +21,13 @@
 #include <cerrno>
 #include <unistd.h>
 #include <emscripten.h>
+#include "crt_security_cookie_9bb0.h"
 
 // Defined in src/core/d2game/d2game_batch_3e70.cpp.
 extern "C" void d2_fn_d2game_3f76(int32_t lockNum);
 
 // ---- CRT module state (retail RVA in the comment) ------------------------------------------------
-static uintptr_t g_stackCookie;              // 0x6FD1F980 __security_cookie
+static uint32_t g_stackCookie;              // 0x6FD1F980 __security_cookie
 static int32_t   g_errorMode;                // 0x6FD2FD74 __error_mode
 static int32_t   g_appType;                  // 0x6FD2FD78 __app_type
 static void    (*g_pfnmsg)(void);            // 0x6FD2FFFC _pfnmsg
@@ -100,6 +101,23 @@ EMSCRIPTEN_KEEPALIVE size_t d2_fn_d2game_7460(const char* s) {
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_751c(uintptr_t cookie) {
     if (cookie != g_stackCookie) _exit(3);
+}
+
+// Prior art used: D2Client's VC7.1 cookie initializer; local 1.13c D2Game
+// decompile confirms identical XOR rule and the shared +0xFF980 owner used above.
+// 1.13c D2Game+0x09BB0: initialize the actual module cookie read by 0x0751C.
+// The native OS boundary supplies FILETIME and performance-counter halves in call order.
+extern "C" void d2_game_security_init_cookie_9bb0(const D2GameCookieEnv* env) {
+    constexpr uint32_t initial = 0xBB40E64Eu;
+    if (g_stackCookie != 0 && g_stackCookie != initial) return;
+    const auto time = env->system_time_filetime();
+    const uint32_t process = env->process_id();
+    const uint32_t thread = env->thread_id();
+    const uint32_t tick = env->tick_count();
+    const auto counter = env->performance_counter();
+    const uint32_t value = time.low ^ time.high ^ process ^ thread ^ tick ^
+                           counter.low ^ counter.high;
+    g_stackCookie = value == 0 ? initial : value;
 }
 
 // 1.13c D2Game+0x07832 (__local_unwind2): walk frame+8's table from index frame+0xC until -1 or the

@@ -15,6 +15,9 @@ STORM_SRC="$ROOT/third_party/StormLib"
 STORM_BUILD="$BUILD/stormlib-wasm64"
 mkdir -p "$BUILD"
 cd "$ROOT"
+source "$ROOT/tools/compiler-cache.sh"
+TOOLCHAIN_KEY=$(d2_toolchain_key)
+d2_enable_compiler_cache
 
 # ci/build.sh runs the container as root so mixed Git-Bash/WSL ownership cannot block CMake.
 # Restore only generated outputs to the invoking user even when compilation exits early.
@@ -40,6 +43,9 @@ restore_output_owner   # recover obj/ a previous (killed) build left root-owned,
 # the sysroot. Static, -pthread to match everything else (an archive compiled without -pthread
 # links fine and then faults at runtime on the first atomic -- the bad failure mode).
 storm_rev=$(git -c safe.directory="$STORM_SRC" -C "$STORM_SRC" rev-parse HEAD 2>/dev/null || echo unknown)
+# Include dirty/untracked bundled source and headers as well as the submodule revision.
+storm_inputs=$(find "$STORM_SRC" -type f ! -name .git -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
+storm_rev=$(printf '%s\n' "$storm_rev" "$storm_inputs" "$TOOLCHAIN_KEY" | sha256sum | cut -d' ' -f1)
 if [ ! -f "$STORM_BUILD/libstorm.a" ] || [ "$(cat "$STORM_BUILD/.rev" 2>/dev/null)" != "$storm_rev" ]; then
   echo "==> StormLib @ $storm_rev"
   # Clear the contents, not the directory itself. On Windows/WSL Docker bind mounts the output
@@ -73,7 +79,7 @@ CXXFLAGS="-m64 -std=c++20 -O2 -pthread -fno-strict-aliasing -fwrapv ${D2_CXXFLAG
 # lines; a full rebuild is minutes, a one-file change is seconds). Each compile emits a depfile
 # and a content digest for the complete user-header closure. Content, rather than mtimes, matters:
 # GitHub checkout gives every source a fresh timestamp when restoring older cached objects.
-OBJDIR="$BUILD/obj/$(echo "$CXXFLAGS" | md5sum | cut -c1-12)"; mkdir -p "$OBJDIR"
+OBJDIR="$BUILD/obj/$(printf '%s\n' "$CXXFLAGS" "$TOOLCHAIN_KEY" | sha256sum | cut -c1-16)"; mkdir -p "$OBJDIR"
 dependency_digest() {
   # Read only the depfile's first rule; -MP appends header-only phony rules afterwards.
   awk 'NR == 1 { sub(/^[^:]*:/, "") }

@@ -309,6 +309,32 @@ void __fastcall DRLGMAZE_InitLevelData(D2DrlgLevelStrc* pLevel)
 	DRLG_SetLevelPositionAndSize(pLevel->pDrlg, pLevel);
 }
 
+// 1.13c D2Common+0x0FE70 (compiler-split tail of GenerateLevel, catacombs "prev" stairs room; pLevelFirstRoomEx == pLevel->pFirstRoomEx)
+static void DRLGMAZE_PlaceCatacombsPrev(D2DrlgLevelStrc* pLevel, BOOL bLevel1)
+{
+	D2DrlgRoomStrc* pLevelFirstRoomEx = pLevel->pFirstRoomEx;
+	if (bLevel1)
+	{
+		DRLGMAZE_AddAdjacentMazeRoom(pLevelFirstRoomEx, ALTDIR_NORTH, TRUE);
+		DRLGMAZE_AddAdjacentMazeRoom(pLevelFirstRoomEx, ALTDIR_EAST, TRUE);
+		DRLGMAZE_AddAdjacentMazeRoom(pLevelFirstRoomEx, ALTDIR_SOUTH, TRUE);
+		DRLGMAZE_AddAdjacentMazeRoom(pLevelFirstRoomEx, ALTDIR_WEST, TRUE);
+		DRLGMAZE_SetPickedFileAndPresetId(pLevelFirstRoomEx, LVLPREST_ACT1_CATACOMBS_PREV_NSEW, -1, FALSE);
+	}
+	else if (SEED_RollRandomNumber(&pLevel->pSeed) & 1)
+	{
+		DRLGMAZE_AddAdjacentMazeRoom(pLevelFirstRoomEx, ALTDIR_WEST, TRUE);
+		DRLGMAZE_AddAdjacentMazeRoom(pLevelFirstRoomEx, ALTDIR_EAST, TRUE);
+		DRLGMAZE_SetPickedFileAndPresetId(pLevelFirstRoomEx, LVLPREST_ACT1_CATACOMBS_PREV_EW, -1, FALSE);
+	}
+	else
+	{
+		DRLGMAZE_AddAdjacentMazeRoom(pLevelFirstRoomEx, ALTDIR_NORTH, TRUE);
+		DRLGMAZE_AddAdjacentMazeRoom(pLevelFirstRoomEx, ALTDIR_SOUTH, TRUE);
+		DRLGMAZE_SetPickedFileAndPresetId(pLevelFirstRoomEx, LVLPREST_ACT1_CATACOMBS_PREV_NS, -1, FALSE);
+	}
+}
+
 //1.10: D2Common.0x6FD794A0
 //1.14d: 0x00673B30
 void __fastcall DRLGMAZE_GenerateLevel(D2DrlgLevelStrc* pLevel)
@@ -635,29 +661,7 @@ void __fastcall DRLGMAZE_GenerateLevel(D2DrlgLevelStrc* pLevel)
 		break;
 
 	case LVLTYPE_ACT1_CATACOMBS:
-		if (pLevel->nLevelId == LEVEL_CATACOMBSLEV1)
-		{
-			DRLGMAZE_AddAdjacentMazeRoom(pLevelFirstRoomEx, ALTDIR_NORTH, TRUE);
-			DRLGMAZE_AddAdjacentMazeRoom(pLevelFirstRoomEx, ALTDIR_EAST, TRUE);
-			DRLGMAZE_AddAdjacentMazeRoom(pLevelFirstRoomEx, ALTDIR_SOUTH, TRUE);
-			DRLGMAZE_AddAdjacentMazeRoom(pLevelFirstRoomEx, ALTDIR_WEST, TRUE);
-			DRLGMAZE_SetPickedFileAndPresetId(pLevelFirstRoomEx, LVLPREST_ACT1_CATACOMBS_PREV_NSEW, -1, FALSE);
-		}
-		else
-		{
-			if (SEED_RollRandomNumber(&pLevel->pSeed) & 1)
-			{
-				DRLGMAZE_AddAdjacentMazeRoom(pLevelFirstRoomEx, ALTDIR_WEST, TRUE);
-				DRLGMAZE_AddAdjacentMazeRoom(pLevelFirstRoomEx, ALTDIR_EAST, TRUE);
-				DRLGMAZE_SetPickedFileAndPresetId(pLevelFirstRoomEx, LVLPREST_ACT1_CATACOMBS_PREV_EW, -1, FALSE);
-			}
-			else
-			{
-				DRLGMAZE_AddAdjacentMazeRoom(pLevelFirstRoomEx, ALTDIR_NORTH, TRUE);
-				DRLGMAZE_AddAdjacentMazeRoom(pLevelFirstRoomEx, ALTDIR_SOUTH, TRUE);
-				DRLGMAZE_SetPickedFileAndPresetId(pLevelFirstRoomEx, LVLPREST_ACT1_CATACOMBS_PREV_NS, -1, FALSE);
-			}
-		}
+		DRLGMAZE_PlaceCatacombsPrev(pLevel, pLevel->nLevelId == LEVEL_CATACOMBSLEV1);
 
 		nRooms = pLevel->pMaze->dwRooms[pLevel->pDrlg->nDifficulty];
 
@@ -1023,6 +1027,71 @@ D2DrlgRoomStrc* __fastcall DRLGMAZE_AddAdjacentMazeRoom(D2DrlgRoomStrc* pDrlgRoo
 
 	DRLGMAZE_PickRoomPreset(pNewRoomEx, 1);
 	return pNewRoomEx;
+}
+
+// 1.13c D2Common+0x0F000
+// Alloc a preset room of the maze size next to pParent in nDirection (direction arrives in EAX), link it,
+// optionally merge with touching rooms, push it at the head of the level list. NULL (room freed) if it does not fit.
+D2DrlgRoomStrc* __fastcall DRLGMAZE_AllocLinkedMazeRoom(D2DrlgRoomStrc* pParent, int nDirection, BOOL bMergeRooms)
+{
+	D2DrlgRoomStrc* pNewRoomEx = DRLGROOM_AllocRoomEx(pParent->pLevel, DRLGTYPE_PRESET);
+	pNewRoomEx->nTileWidth = pNewRoomEx->pLevel->pMaze->dwSizeX;
+	pNewRoomEx->nTileHeight = pNewRoomEx->pLevel->pMaze->dwSizeY;
+	if (!DRLGMAZE_LinkMazeRooms(pNewRoomEx, pParent, nDirection))
+	{
+		DRLGROOM_FreeRoomEx(pNewRoomEx);
+		return nullptr;
+	}
+	DRLGROOM_AllocDrlgOrthsForRooms(pParent, pNewRoomEx, nDirection);
+	if (bMergeRooms)
+	{
+		DRLGMAZE_MergeWithTouchingRooms(pNewRoomEx);
+	}
+	DRLGROOM_AddRoomExToLevel(pParent->pLevel, pNewRoomEx);
+	return pNewRoomEx;
+}
+
+// 1.13c D2Common+0x0EB80
+// Merge pass split out of DRLGMAZE_PlaceAdjacentPresetRoom in 1.13c: for each other
+// map-less room that touches pNewRoomEx diagonally-free, roll its seed against dwMerge.
+void __fastcall DRLGMAZE_MergeWithTouchingRooms(D2DrlgRoomStrc* pNewRoomEx)
+{
+	if (DRLGMAZE_HasMapDS1(pNewRoomEx))
+	{
+		return;
+	}
+	const uint32_t nMerge = pNewRoomEx->pLevel->pMaze->dwMerge;
+	for (D2DrlgRoomStrc* i = pNewRoomEx->pLevel->pFirstRoomEx; i; i = i->pDrlgRoomNext)
+	{
+		if (i == pNewRoomEx || DRLGMAZE_HasMapDS1(i))
+		{
+			continue;
+		}
+		int nX = pNewRoomEx->nTileXPos < i->nTileXPos ? (i->nTileXPos - pNewRoomEx->nTileWidth) - pNewRoomEx->nTileXPos : (pNewRoomEx->nTileXPos - i->nTileWidth) - i->nTileXPos;
+		int nY = pNewRoomEx->nTileYPos < i->nTileYPos ? (i->nTileYPos - pNewRoomEx->nTileHeight) - pNewRoomEx->nTileYPos : (pNewRoomEx->nTileYPos - i->nTileHeight) - i->nTileYPos;
+		if (nX >= 1 || nY >= 1 || nX == nY)
+		{
+			continue;
+		}
+		D2DrlgOrthStrc* pDrlgOrth = pNewRoomEx->pDrlgOrth;
+		while (pDrlgOrth && pDrlgOrth->pDrlgRoom != i)
+		{
+			pDrlgOrth = pDrlgOrth->pNext;
+		}
+		if (pDrlgOrth)
+		{
+			continue;
+		}
+		if ((int)((unsigned int)SEED_RollRandomNumber(&i->pSeed) % 1000) < (int)nMerge)
+		{
+			const int nDir = DRLG_GetDirectionFromCoordinates(&i->pDrlgCoord, &pNewRoomEx->pDrlgCoord);
+			if (nDir != DIRECTION_INVALID)
+			{
+				DRLGROOM_AllocDrlgOrthsForRooms(i, pNewRoomEx, nDir);
+				DRLGMAZE_PickRoomPreset(i, 1);
+			}
+		}
+	}
 }
 
 //D2Common.0x6FD7A110
@@ -1552,6 +1621,10 @@ static int DRLGMAZE_ArcaneSanctuaryDirectionFromRoomIdx(int nBranchDirection, in
 	}
 }
 
+// 1.13c D2Common+0xF220
+// Retail expands the same 4 x 15 branch walk below; indices 8 and 12 are
+// terminal offshoots omitted from the picked-file array. Seed draw precedes all
+// allocations, and the original central room receives file 4 after the walk.
 //D2Common.0x6FD7ABC0
 // This function has been rewritten using a loop to avoid having macros / 15 calls to the same functions.
 void __fastcall DRLGMAZE_PlaceArcaneSanctuary(D2DrlgLevelStrc* pLevel)

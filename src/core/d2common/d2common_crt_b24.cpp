@@ -10,6 +10,7 @@
 // wasm process with the same code (as src/core/realm/mcp_exit.cpp does).
 #include <cstdint>
 #include <cstdlib>
+#include "d2common_crt_exit.h"
 
 #include <Windows.h>   // Enter/LeaveCriticalSection: host (kernel) state, a no-op under wasm
 
@@ -63,17 +64,33 @@ void D2Common_1AF9_DoExitUnlock(uint32_t nStack10, uint32_t nEdi)
 
 // 1.13c D2Common+0x1B0D
 // _exit(code) = doexit(code, quick=0, returning=0): lock 8, the onexit list, both initterm tables,
-// then terminate the process and never return. Our port has no doexit (0x1A4A is not implemented) and
-// no process to end, so termination with the same code is the stand-in, as for D2MCPClient's _exit.
+// then terminate the process and never return. Delegate to the module-owned shutdown state.
 void D2Common_1B0D_Exit(int32_t nCode)
 {
-    std::exit(nCode);
+    D2Common_1A4A_DoExit(static_cast<uint32_t>(nCode), 0, 0);
 }
 
 // 1.13c D2Common+0x1B1E
 // __exit(code) = doexit(code, quick=1, returning=0): the quick branch skips the onexit walk, still
-// runs the terminator table, then terminates. Same stand-in and same reason as _exit above.
+// runs the terminator table, then terminates through the same module shutdown state.
 void D2Common_1B1E_QuickExit(int32_t nCode)
 {
-    std::exit(nCode);
+    D2Common_1A4A_DoExit(static_cast<uint32_t>(nCode), 1, 0);
+}
+
+// 1.13c D2Common+0x422D
+// __lock_file2(index, file): stream slots below 0x14 live in the static lock table, so take table lock
+// index+0x10 (0x2EF9 __lock, here enter_cs); otherwise the FILE carries its own critical section at +0x20.
+void D2Common_422D_LockFile2(int32_t nIndex, void* pFile)
+{
+    if (nIndex < 0x14) enter_cs((uint32_t)nIndex + 0x10);
+    else EnterCriticalSection((LPCRITICAL_SECTION)((uint8_t*)pFile + 0x20));
+}
+
+// 1.13c D2Common+0x2EF9
+// __lock(index): ensure lock-table entry `index` exists (lazy create via 0x2E59 __mtinitlocknum, fatal
+// 0x2D73 __amsg_exit on failure) then enter it. Our table is statically backed, so creation is a no-op.
+void D2Common_2EF9_Lock(uint32_t nIdx)
+{
+    enter_cs(nIdx);
 }

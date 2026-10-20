@@ -791,6 +791,7 @@ void __fastcall DRLGPRESET_AddPresetUnitToDrlgMap(void* pMemPool, D2DrlgMapStrc*
 
 static const int nRiverBlockSizeInTilesX = 5;
 static const int nRiverBlockSizeInTilesY = 4;
+// 1.13c D2Common+0xB290 (sound-object column loop of SpawnRiver; retail inlines it)
 // Helper function
 void DRLGPRESET_SpawnRiver(D2DrlgMapStrc* pMazeMap, const D2DrlgCoordStrc& tDrlgCoord,void* pDrlgMemPool, D2DrlgGridStrc* pDrlgGrid, int nOffsetX)
 {
@@ -810,6 +811,46 @@ void DRLGPRESET_SpawnRiver(D2DrlgMapStrc* pMazeMap, const D2DrlgCoordStrc& tDrlg
 	}
 
 	DRLGPRESET_AddPresetRiverObjects(pMazeMap, pDrlgMemPool, nOffsetX, pDrlgGrid);
+}
+
+// 1.13c D2Common+0xBD60 (river branch; BF70 calls it)
+static void DRLGPRESET_SpawnRiverBranch(D2DrlgRoomStrc* pDrlgRoom, D2DrlgMapStrc* pMazeMap, void* pDrlgMemPool)
+{
+	if (pDrlgRoom->dwFlags & DRLGROOMFLAG_AUTOMAP_REVEAL)
+	{
+		D2DrlgCoordStrc tDrlgCoord = {};
+		tDrlgCoord.nPosX = 0;
+		tDrlgCoord.nPosY = 0;
+		tDrlgCoord.nWidth = pMazeMap->pDrlgCoord.nWidth;
+		tDrlgCoord.nHeight = pMazeMap->pDrlgCoord.nHeight;
+
+		D2DrlgGridStrc tDrlgGrid = {};
+		int nCellFlags[256] = {};
+		DRLGGRID_AssignCellsOffsetsAndFlags(&tDrlgGrid, (int*)pMazeMap->pFile->pFloorLayer[0], &tDrlgCoord, pMazeMap->pDrlgCoord.nWidth + 1, nCellFlags);
+
+		tDrlgCoord.nPosX = pMazeMap->pDrlgCoord.nPosX;
+		tDrlgCoord.nPosY = pMazeMap->pDrlgCoord.nPosY;
+
+		if (pMazeMap->pLvlPrestTxtRecord->dwDef == LVLPREST_ACT1_RIVER_LOWER)
+		{
+			DRLGPRESET_SpawnRiver(pMazeMap, tDrlgCoord, pDrlgMemPool, &tDrlgGrid, -1);
+		}
+		else
+		{
+			for (int nOffsetX = 0; nOffsetX < tDrlgCoord.nWidth; ++nOffsetX)
+			{
+				const uint32_t nGridEntry = DRLGGRID_GetGridEntry(&tDrlgGrid, nOffsetX, 0);
+				const D2C_PackedTileInformation nTileInfo{ nGridEntry };
+				if (nTileInfo.nTileStyle == 2 && nTileInfo.nTileSequence == 24)
+				{
+					DRLGPRESET_SpawnRiver(pMazeMap, tDrlgCoord, pDrlgMemPool, &tDrlgGrid, nOffsetX);
+					nOffsetX += (nRiverBlockSizeInTilesX - 1);
+				}
+			}
+		}
+
+		DRLGGRID_ResetGrid(&tDrlgGrid);
+	}
 }
 
 // 1.13c D2Common+0x0BF70
@@ -841,6 +882,7 @@ void __fastcall DRLGPRESET_SpawnHardcodedPresetUnits(D2DrlgRoomStrc* pDrlgRoom)
 		if ((nLevelPrestId >= LVLPREST_ACT1_WILD_BORDER_1 && nLevelPrestId <= LVLPREST_ACT1_WILD_BORDER_4)
 			&& (pDrlgRoom->pLevel->nLevelId == LEVEL_BLOODMOOR && pMazeMap->nPickedFile == 3))
 		{
+			// 1.13c D2Common+0x0AF20 (Navi branch, inlined here; ESI=pMazeMap)
 			int nX = pMazeMap->pDrlgCoord.nPosX + pMazeMap->pDrlgCoord.nWidth / 2;
 			int nY = pMazeMap->pDrlgCoord.nPosY + pMazeMap->pDrlgCoord.nHeight / 2;
 
@@ -852,48 +894,14 @@ void __fastcall DRLGPRESET_SpawnHardcodedPresetUnits(D2DrlgRoomStrc* pDrlgRoom)
 			|| (nLevelPrestId >= LVLPREST_ACT1_RIVER_UPPER && nLevelPrestId <= LVLPREST_ACT1_BRIDGE)
 			|| nLevelPrestId == LVLPREST_ACT1_TRISTRAM)
 		{
-			if (pDrlgRoom->dwFlags & DRLGROOMFLAG_AUTOMAP_REVEAL)
-			{
-				D2DrlgCoordStrc tDrlgCoord = {};
-				tDrlgCoord.nPosX = 0;
-				tDrlgCoord.nPosY = 0;
-				tDrlgCoord.nWidth = pMazeMap->pDrlgCoord.nWidth;
-				tDrlgCoord.nHeight = pMazeMap->pDrlgCoord.nHeight;
-
-				D2DrlgGridStrc tDrlgGrid = {};
-				int nCellFlags[256] = {};
-				DRLGGRID_AssignCellsOffsetsAndFlags(&tDrlgGrid, (int*)pMazeMap->pFile->pFloorLayer[0], &tDrlgCoord, pMazeMap->pDrlgCoord.nWidth + 1, nCellFlags);
-
-				tDrlgCoord.nPosX = pMazeMap->pDrlgCoord.nPosX;
-				tDrlgCoord.nPosY = pMazeMap->pDrlgCoord.nPosY;
-
-				if (pMazeMap->pLvlPrestTxtRecord->dwDef == LVLPREST_ACT1_RIVER_LOWER)
-				{
-					DRLGPRESET_SpawnRiver(pMazeMap, tDrlgCoord, pDrlgMemPool, &tDrlgGrid, -1);
-				}
-				else
-				{
-					for (int nOffsetX = 0; nOffsetX < tDrlgCoord.nWidth; ++nOffsetX)
-					{
-						const uint32_t nGridEntry = DRLGGRID_GetGridEntry(&tDrlgGrid, nOffsetX, 0);
-						const D2C_PackedTileInformation nTileInfo{ nGridEntry };
-						if (nTileInfo.nTileStyle == 2 && nTileInfo.nTileSequence == 24)
-						{
-							DRLGPRESET_SpawnRiver(pMazeMap, tDrlgCoord, pDrlgMemPool, &tDrlgGrid, nOffsetX);
-							nOffsetX += (nRiverBlockSizeInTilesX - 1);
-						}
-					}
-				}
-
-				DRLGGRID_ResetGrid(&tDrlgGrid);
-			}
+			DRLGPRESET_SpawnRiverBranch(pDrlgRoom, pMazeMap, pDrlgMemPool);
 		}
 	}
 
 	pDrlgRoom->dwFlags |= DRLGROOMFLAG_PRESET_UNITS_ADDED;
 }
 
-//D2Common.0x6FD86AC0
+// 1.13c D2Common+0xAFD0
 void __fastcall DRLGPRESET_AddPresetRiverObjects(D2DrlgMapStrc* pDrlgMap, void* pMemPool, int nOffsetX, D2DrlgGridStrc* pDrlgGrid)
 {
 	int nX = nOffsetX < 0 ? 0 : nOffsetX;
@@ -991,6 +999,7 @@ void __fastcall DRLGPRESET_AllocPresetRoomData(D2DrlgRoomStrc* pDrlgRoom)
 	pDrlgRoom->pMaze = D2_CALLOC_STRC_POOL(pDrlgRoom->pLevel->pDrlg->pMempool, D2DrlgPresetRoomStrc);
 }
 
+// 1.13c D2Common+0xAE10
 //D2Common.0x6FD86DC0
 D2DrlgRoomStrc* __fastcall DRLGPRESET_InitPresetRoomData(D2DrlgLevelStrc* pLevel, D2DrlgMapStrc* pDrlgMap, D2DrlgCoordStrc* pDrlgCoord, uint32_t dwDT1Mask, int dwRoomFlags, int dwPresetFlags, D2DrlgGridStrc* a7)
 {
@@ -1028,6 +1037,9 @@ D2DrlgRoomStrc* __fastcall DRLGPRESET_InitPresetRoomData(D2DrlgLevelStrc* pLevel
 	return pDrlgRoom;
 }
 
+// 1.13c D2Common+0xAB50
+// Retail uses map width + 1 for each borrowed layer stride, tags layers before
+// setting edge flags, then transfers the contained preset units (0xA360).
 //D2Common.0x6FD86E50
 void __fastcall DRLGPRESET_InitPresetRoomGrids(D2DrlgRoomStrc* pDrlgRoom)
 {
@@ -1136,6 +1148,50 @@ void __fastcall DRLGPRESET_GetTombStoneTileCoords(D2DrlgRoomStrc* pDrlgRoom, D2C
 	}
 }
 
+// 1.13c D2Common+0xAA80
+// Collects up to 6 burial-ground tombstone subtile coords (style 10, seq 23..27) once per room.
+static void DRLGPRESET_CollectTombStoneTiles(D2DrlgRoomStrc* pDrlgRoom)
+{
+	D2DrlgPresetRoomStrc* pMaze = pDrlgRoom->pMaze;
+	if (pDrlgRoom->pLevel->nLevelId == LEVEL_BURIALGROUNDS && !pMaze->pTombStoneTiles)
+	{
+		int nTombStoneTiles = 0;
+
+		pMaze->pTombStoneTiles = (D2CoordStrc*)D2_ALLOC_POOL(pDrlgRoom->pLevel->pDrlg->pMempool, 6 * sizeof(D2CoordStrc));
+
+		for (int i = 0; i < pDrlgRoom->nTileHeight; ++i)
+		{
+			for (int j = 0; j < pDrlgRoom->nTileWidth; ++j)
+			{
+				uint32_t nPackedTileInformation = DRLGGRID_GetGridEntry(pMaze->pWallGrid, j, i);
+				D2C_PackedTileInformation nTileInformation{ nPackedTileInformation };
+				if (nTileInformation.nTileStyle == 10
+					&& nTileInformation.nTileSequence >= 23u && nTileInformation.nTileSequence <= 27u)
+				{
+					if (nTombStoneTiles < 6)
+					{
+						int nX = j + pDrlgRoom->nTileXPos;
+						int nY = i + pDrlgRoom->nTileYPos;
+
+						DUNGEON_GameTileToSubtileCoords(&nX, &nY);
+
+						pMaze->pTombStoneTiles[nTombStoneTiles].nX = nX + 2;
+						pMaze->pTombStoneTiles[nTombStoneTiles].nY = nY + 2;
+
+						++nTombStoneTiles;
+					}
+				}
+			}
+		}
+
+		pMaze->nTombStoneTiles = nTombStoneTiles;
+	}
+}
+
+// 1.13c D2Common+0xC940
+// Retail counts floor/wall/shadow tiles before allocation, then loads in that
+// order, initializes animation and logical coordinates, and collects burial
+// tombstones last. Native grids and room tile storage carry the state below.
 //D2Common.0x6FD87130
 void __fastcall DRLGPRESET_AddPresetRoomMapTiles(D2DrlgRoomStrc* pDrlgRoom)
 {
@@ -1243,41 +1299,11 @@ void __fastcall DRLGPRESET_AddPresetRoomMapTiles(D2DrlgRoomStrc* pDrlgRoom)
 		DRLGGRID_ResetGrid(&tTownOrGraveyardTileInfoGrid);
 	}
 
-	if (pDrlgRoom->pLevel->nLevelId == LEVEL_BURIALGROUNDS && !pMaze->pTombStoneTiles)
-	{
-		int nTombStoneTiles = 0;
-
-		pMaze->pTombStoneTiles = (D2CoordStrc*)D2_ALLOC_POOL(pDrlgRoom->pLevel->pDrlg->pMempool, 6 * sizeof(D2CoordStrc));
-
-		for (int i = 0; i < pDrlgRoom->nTileHeight; ++i)
-		{
-			for (int j = 0; j < pDrlgRoom->nTileWidth; ++j)
-			{
-				uint32_t nPackedTileInformation = DRLGGRID_GetGridEntry(pMaze->pWallGrid, j, i);
-				D2C_PackedTileInformation nTileInformation{ nPackedTileInformation };
-				if (nTileInformation.nTileStyle == 10
-					&& nTileInformation.nTileSequence >= 23u && nTileInformation.nTileSequence <= 27u)
-				{
-					if (nTombStoneTiles < 6)
-					{
-						int nX = j + pDrlgRoom->nTileXPos;
-						int nY = i + pDrlgRoom->nTileYPos;
-
-						DUNGEON_GameTileToSubtileCoords(&nX, &nY);
-
-						pMaze->pTombStoneTiles[nTombStoneTiles].nX = nX + 2;
-						pMaze->pTombStoneTiles[nTombStoneTiles].nY = nY + 2;
-
-						++nTombStoneTiles;
-					}
-				}
-			}
-		}
-
-		pMaze->nTombStoneTiles = nTombStoneTiles;
-	}
+	DRLGPRESET_CollectTombStoneTiles(pDrlgRoom);
 }
 
+// 1.13c D2Common+0xC690
+// Delta: the per-cell room's pMazeGrid argument is the map's own info grid entry at (nGridX,nGridY), not the preset cell flags.
 //D2Common.0x6FD87560
 D2DrlgRoomStrc* __fastcall DRLGPRESET_BuildArea(D2DrlgLevelStrc* pLevel, D2DrlgMapStrc* pDrlgMap, int nFlags, BOOL bSingleRoom)
 {
@@ -1324,7 +1350,7 @@ D2DrlgRoomStrc* __fastcall DRLGPRESET_BuildArea(D2DrlgLevelStrc* pLevel, D2DrlgM
 				int nGridFlags = DRLGGRID_GetGridEntry(&tDrlgGrid, nGridX, nGridY);
 
 				if (tDrlgCoord.nWidth && tDrlgCoord.nHeight)
-					pDrlgRoom = DRLGPRESET_InitPresetRoomData(pLevel, pDrlgMap, &tDrlgCoord, pDrlgMap->pLvlPrestTxtRecord->dwDt1Mask, nGridFlags, DRLGPRESETROOMFLAG_NONE, (D2DrlgGridStrc*)(pDrlgMap->bHasInfo ? nGridFlags : 0));
+					pDrlgRoom = DRLGPRESET_InitPresetRoomData(pLevel, pDrlgMap, &tDrlgCoord, pDrlgMap->pLvlPrestTxtRecord->dwDt1Mask, nGridFlags, DRLGPRESETROOMFLAG_NONE, (D2DrlgGridStrc*)(intptr_t)(pDrlgMap->bHasInfo ? DRLGGRID_GetGridEntry(&pDrlgMap->pMapGrid, nGridX, nGridY) : 0));
 					
 				++nGridX;
 			}

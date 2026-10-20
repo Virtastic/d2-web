@@ -120,17 +120,27 @@ extern "C" int32_t d2gfx_close_lk(uint32_t fh, const D2GfxCloseLkHost* host) {
 // closed one (ioinfo osfile FOPEN bit clear) sets errno = EBADF (9) and _doserrno = 0 and returns -1;
 // the block table is not indexed on that path. Otherwise it returns the handle's osfhnd dword (record
 // offset 0). No locking, no other state touched.
+// 1.13c D2Gfx+0x05C93 core of __get_osfhandle(fh): a descriptor below _nfile (unsigned compare, so a negative fh
+// is invalid) whose ioinfo record (block fh>>5, slot fh&31, stride 0x24) has FOPEN (osfile +4, bit 0)
+// returns the record's osfhnd dword (+0). Anything else sets _terrno = EBADF (9) and _tdoserrno = 0 and
+// returns -1; the block table is not indexed on that path. `blocks` is _pioinfo, `nfile` is _nfile.
+extern "C"
+uint32_t d2gfx_get_osfhandle_at(int32_t fh, uint32_t nfile, uint8_t* const* blocks, int* err, uint32_t* doserr) {
+    if ((uint32_t)fh < nfile) {
+        const uint8_t* rec = blocks[(uint32_t)fh >> 5] + ((uint32_t)fh & 0x1F) * 0x24;
+        if (rec[4] & 1u) return *(const uint32_t*)rec;
+    }
+    *err = 9;
+    *doserr = 0;
+    return 0xFFFFFFFFu;
+}
+
 // 1.13c D2Gfx+0x05C93
 extern "C"
 int32_t d2gfx_get_osfhandle(int32_t fh) {
-    const uint32_t ufh = (uint32_t)fh;
-    if (ufh < g_nfile) {
-        uint8_t* io = &g_ioinfo[ufh >> 5][(ufh & 0x1F) * 0x24];
-        if ((io[4] & 0x01) != 0) return *(int32_t*)io;       // osfhnd
-    }
-    *d2gfx_errno() = 9;                                      // EBADF
-    *d2gfx_doserrno() = 0;
-    return -1;
+    uint8_t* blocks[64];
+    for (int i = 0; i < 64; ++i) blocks[i] = g_ioinfo[i];
+    return (int32_t)d2gfx_get_osfhandle_at(fh, g_nfile, blocks, d2gfx_errno(), d2gfx_doserrno());
 }
 
 struct D2GfxFreeOsfhndEnv {

@@ -14,7 +14,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2game_heap_init_674a(int32_t mtflag,
     env->heap = env->heap_create(mtflag == 0 ? 1u : 0u, 0x1000u, 0u);
     if (env->heap == nullptr) return 0;
     env->heap_mode = static_cast<uint32_t>(d2_fn_d2game_6730(env->os_platform, env->os_major));
-    if (env->heap_mode == 3 && env->sbh_heap_init(0x3f8u) == 0) {
+    if (env->heap_mode == 3 &&
+        (env->sbh_heap_init ? env->sbh_heap_init(0x3f8u) :
+         d2game_sbh_heap_init_8bd5(0x3f8u, env->heap, &env->sbh, env->heap_alloc)) == 0) {
         env->heap_destroy(env->heap);
         return 0;
     }

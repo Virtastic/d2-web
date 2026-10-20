@@ -55,7 +55,7 @@ static uint32_t g_os_version;                // +0x20DB0
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2gfx_crtMessageBoxA(const char* text, const char* caption,
                                                   uint32_t type, const D2GfxMsgBoxEnv* env) {
-    uint32_t hwnd = 0;
+    uint32_t hwnd = 0, station;  // retail keeps the station handle apart from the owner
 
     if (g_msgbox_a == nullptr) {
         void* hmod = env->load_library_a("user32.dll");
@@ -74,8 +74,8 @@ EMSCRIPTEN_KEEPALIVE int32_t d2gfx_crtMessageBoxA(const char* text, const char* 
     uint8_t  objinfo[16] = {};
     uint32_t needed = 0;
     if (g_getprocesswindowstation == nullptr ||
-        ((hwnd = env->get_process_window_station()) != 0 &&
-         env->get_user_object_information_a(hwnd, 1, objinfo, 0xC, &needed) != 0 &&
+        ((station = env->get_process_window_station()) != 0 &&
+         env->get_user_object_information_a(station, 1, objinfo, 0xC, &needed) != 0 &&
          (objinfo[8] & 1) != 0)) {
         if (g_getactivewindow != nullptr &&
             (hwnd = env->get_active_window()) != 0 &&

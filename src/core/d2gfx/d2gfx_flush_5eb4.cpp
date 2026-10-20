@@ -22,7 +22,7 @@ struct D2GfxFlushEnv {
 // read/write bit 0x2 when flag's sign bit (0x80) is set; a short write sets the error bit 0x20 and
 // returns -1. Every path then zeroes cnt and rewinds ptr to base. Returns 0 otherwise.
 // 1.13c D2Gfx+0x05EB4
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2gfx_5eb4(D2GfxFile* file, const D2GfxFlushEnv* env) {
+extern "C" int32_t d2gfx_flush_5eb4(D2GfxFile* file, const D2GfxFlushEnv* env) {
     int32_t rc = 0;
     if (((uint8_t)file->flag & 3) == 2 && (file->flag & 0x108) != 0) {
         uint32_t n = file->ptr - file->base;

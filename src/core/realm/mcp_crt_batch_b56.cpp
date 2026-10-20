@@ -291,7 +291,7 @@ static uint32_t g_mcp_env_strings_kind;     // +0x2ACA8 DAT_6fa2aca8: 0 untried,
 static char     g_mcp_module_path[0x104];   // +0x2ABA0 DAT_6fa2aba0
 static char*    g_mcp_pgmptr;               // +0x2AA14 _DAT_6fa2aa14 (_pgmptr)
 static uint32_t g_mcp_argc;                 // +0x2A9F8 _DAT_6fa2a9f8
-static char**   g_mcp_argv;                 // +0x2A9FC _DAT_6fa2a9fc
+static uint32_t* g_mcp_argv;                // +0x2A9FC _DAT_6fa2a9fc
 static uint32_t g_mcp_setargv_static;       // +0x2ACA4 DAT_6fa2aca4
 
 static bool mcp_lead_byte(uint8_t b) { return (g_mcp_mbctable[(size_t)b + 1] & 0x04) != 0; }
@@ -344,7 +344,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_setenvp(const D2McpCrtEnv56* env) {
 // passes cmdstart/args/count in registers; the port takes them as arguments. Returns the character
 // count (retail's ESI) and stores the slot count including the final NULL slot in *slots.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_parse_cmdline(char** argv, int32_t* slots, const char* cmd,
+EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_parse_cmdline(uint32_t* argv, int32_t* slots, const char* cmd,
                                                   char* args) {
     const uint8_t* p = (const uint8_t*)cmd;
     uint8_t* out = (uint8_t*)args;
@@ -353,7 +353,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_parse_cmdline(char** argv, int32_t* slots, c
     uint8_t c;
 
     *slots = 1;
-    if (argv != nullptr) *argv++ = args;
+    if (argv != nullptr) *argv++ = (uint32_t)(uintptr_t)args;   // 32-bit slots, as retail's array
     do {
         if (*p == '"') {
             in_quote = !in_quote;
@@ -382,7 +382,7 @@ first_item_done:
     while (*p != 0) {
         while (*p == ' ' || *p == '\t') ++p;
         if (*p == 0) break;
-        if (argv != nullptr) *argv++ = (char*)out;
+        if (argv != nullptr) *argv++ = (uint32_t)(uintptr_t)out;
         ++*slots;
         for (;;) {
             bool copychar = true;
@@ -418,13 +418,14 @@ first_item_done:
         if (out != nullptr) *out++ = 0;
         ++count;
     }
-    if (argv != nullptr) *argv = nullptr;
+    if (argv != nullptr) *argv = 0;
     ++*slots;
     return count;
 }
 
 // 1.13c D2MCPClient+0x02179 (162 B, caller 0x011B8 __CRT_INIT): `__setargv`. Ensure the code-page
-// table, clear the wildcard word, publish GetModuleFileNameA(0) as _pgmptr, size the command line
+// table, clear the wildcard word, publish GetModuleFileNameA(0) as _pgmptr, take _acmdln (the module
+// path when it is null or empty), size the command line
 // with the first parse_cmdline, allocate the argv array and the string area in one block
 // (slots*4 + character count), fill both with the second pass, and publish _argc = slots-1 and
 // _argv. Returns 0, or -1 when the block cannot be allocated.
@@ -435,10 +436,11 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_setargv(const D2McpCrtEnv56* env) {
     g_mcp_setargv_static = 0;
     e->get_module_file_name(g_mcp_module_path, 0x104);
     g_mcp_pgmptr = g_mcp_module_path;
-    const char* cmd = e->get_command_line();
+    const char* cmd = e->get_command_line();     // _acmdln (DAT_6fa325c0)
+    if (cmd == nullptr || *cmd == 0) cmd = g_mcp_module_path;   // retail falls back to the module path
     int32_t slots = 0;
     int32_t chars = d2_mcp_parse_cmdline(nullptr, &slots, cmd, nullptr);
-    char** argv = (char**)e->malloc((uint32_t)chars + (uint32_t)slots * 4);
+    uint32_t* argv = (uint32_t*)e->malloc((uint32_t)chars + (uint32_t)slots * 4);   // ponytail: slots hold 32-bit addresses; fine below 4 GiB
     if (argv == nullptr) return -1;
     d2_mcp_parse_cmdline(argv, &slots, cmd, (char*)(argv + slots));
     g_mcp_argc = (uint32_t)(slots - 1);
@@ -598,4 +600,19 @@ extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_mcp_global_unwind2(void* frame, const D2McpCrtEnv56* env) {
     const D2McpCrtEnv56* e = env ? env : &g_mcp_env56;
     e->rtl_unwind(frame, (void*)(uintptr_t)0x22914, nullptr, nullptr);
+}
+
+// The CRT globals above, for a capture probe (src/core/fn/d2mcpclient_2179.cpp) to pin and read back.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_crt_state(void** out) {
+    out[0] = &g_mcp_mbctable_done; out[1] = g_mcp_mbctable; out[2] = g_mcp_module_path;
+    out[3] = &g_mcp_pgmptr; out[4] = &g_mcp_argc; out[5] = &g_mcp_argv; out[6] = &g_mcp_setargv_static;
+}
+
+// Probe entry: the four seams __setargv reaches, in one call (the env struct stays private to this file).
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_setargv_cb(int32_t (*init_mbc)(void),
+        uint32_t (*module_file)(char*, uint32_t), const char* (*cmdline)(void), void* (*alloc)(uint32_t)) {
+    D2McpCrtEnv56 e = {};
+    e.init_mbctable = init_mbc; e.get_module_file_name = module_file;
+    e.get_command_line = cmdline; e.malloc = alloc;
+    return d2_mcp_setargv(&e);
 }

@@ -93,3 +93,58 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_96f8(const D2GameBatchTinyEnv* env) {
     env->raise_(0x16);
     _exit(3);
 }
+
+// 1.13c D2Game+0x09EAF _siglookup: table in EDX, signal in ESI, count DAT_6fd1f7e4; entries are
+// {exception, signal, action} (12 bytes). Returns the matching entry or null (retail's pointer is
+// only valid on a match; callers test the signal again). Same body as BNClient+0x183D2.
+extern "C" EMSCRIPTEN_KEEPALIVE const uint32_t* d2_fn_d2game_9eaf(const uint32_t* table, uint32_t count, int32_t signal) {
+    uint32_t i = 0;
+    do { if ((int32_t)table[i * 3 + 1] == signal) break; ++i; } while (i < count);
+    return i < count && (int32_t)table[i * 3 + 1] == signal ? table + i * 3 : nullptr;
+}
+
+// 1.13c D2Game+0x09EDD _raise: host model. Retail globals are env fields: the handler slots for
+// SIGINT(2)/SIGTERM(0xF)/SIGBREAK(0x15)/SIGABRT(0x16) at 0x6FD301C0/CC/C4/C8 (sig[0..3]), the FP
+// exception range start/count (0x6FD1F7D8/DC); the per-thread block's _initarg/_pxcptacttab/_initaddr
+// are ptd fields; __getptd, siglookup(0x9EAF), __lock(0)/sub_A018(0) (unlock) and __exit(3) are seams.
+// Handler values: 0 = SIG_DFL (exit 3), 1 = SIG_IGN.
+typedef void (*D2GameSigHandler)(int32_t sig, ...);
+struct D2GameRaiseEnv {
+    D2GameSigHandler* slot[4];                         // &0x6FD301C0, C4(0x15), C8(0x16), CC(0xF)
+    struct Ptd { void* initarg; void* pxcptacttab; uint32_t* initaddr; }* ptd;   // __getptd()
+    D2GameSigHandler* (*siglookup)(int32_t sig);       // &entry->action for SIGFPE/SEGV/ILL, else null
+    int32_t fpeFirst, fpeCount;                        // 0x6FD1F7D8 / 0x6FD1F7DC
+    void (*lock)(int32_t); void (*unlock)(int32_t);    // __lock / sub_A018
+    void (*exit_)(int32_t);                            // __exit
+};
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_9edd(int32_t sig, const D2GameRaiseEnv* env) {
+    D2GameSigHandler* p; bool global = false;
+    switch (sig) {
+        case 2: p = env->slot[0]; global = true; break;
+        case 0x15: p = env->slot[1]; global = true; break;
+        case 0x16: p = env->slot[2]; global = true; break;
+        case 0xF: p = env->slot[3]; global = true; break;
+        case 4: case 8: case 0xB: p = env->siglookup(sig); break;
+        default: return -1;
+    }
+    D2GameSigHandler h = *p;
+    if (h == (D2GameSigHandler)1) return 0;
+    if (h == nullptr) { env->exit_(3); return 0; }
+    auto* t = env->ptd;
+    void *savedArg = nullptr, *savedAct = nullptr;
+    if (global) env->lock(0);
+    if (sig == 8 || sig == 0xB || sig == 4) {
+        savedArg = t->initarg; t->initarg = nullptr;
+        if (sig == 8) { savedAct = t->pxcptacttab; t->pxcptacttab = (void*)0x8c; }
+    }
+    if (sig == 8) {
+        for (int32_t i = env->fpeFirst; i < env->fpeCount + env->fpeFirst; ++i) t->initaddr[i * 3 + 2] = 0;
+    } else *p = nullptr;
+    env->unlock(0);
+    if (sig == 8) h(8, t->pxcptacttab); else h(sig);
+    if (sig == 0xB || sig == 4 || sig == 8) {
+        t->initarg = savedArg;
+        if (sig == 8) t->pxcptacttab = savedAct;
+    }
+    return 0;
+}

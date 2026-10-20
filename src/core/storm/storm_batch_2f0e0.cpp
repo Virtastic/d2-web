@@ -5,14 +5,7 @@
 #include <cstring>
 #include <algorithm>
 
-struct Storm2fVector {
-    uint32_t capacity, count;
-    uint32_t* data;
-    uint32_t growth, offset;
-};
-struct Storm2fScratch { Storm2fVector slots[16]; uint32_t used; };
-struct Storm2fBytes { uint32_t capacity, count; uint8_t* data; uint32_t growth; };
-struct Storm2fBig { Storm2fVector value; Storm2fScratch scratch; Storm2fBytes bytes; };
+#include "storm_big_types.h"
 struct Storm2fEvent { Storm2fEvent* next; Storm2fEvent* prev; uint32_t a,b; void* payload; };
 // Caller-owned state and actual callee seams: no private duplicate retail globals.
 struct StormBatch2f0e0Env {

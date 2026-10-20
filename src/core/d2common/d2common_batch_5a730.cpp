@@ -134,8 +134,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_710f0(HD2ARCHIVE archive,
         if (ARCHIVE_GetLastError() != 2) FOG_Trace("Error opening file: %s", path);
         return 0;
     }
-    // ARCHIVE_OpenFile is an existence-only VFS seam: success intentionally has no handle.
-    // Retail asserts the returned real archive handle here; the VFS boolean is its equivalent.
     ARCHIVE_CloseFile(archive, file);
     return 1;
 }

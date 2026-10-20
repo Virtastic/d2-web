@@ -1,59 +1,51 @@
-// src/core/realm/mcp_freetlocinfo.cpp -- one UNMAPPED 1.13c D2MCPClient.dll row (alpha lane) reimplemented
-// from build-wasm/ghidra-d2mcpclient/decomp/0x2E3B.c. Retail base 0x6FA20000; every global below is a
-// static named at its retail RVA.
-//
-// MSVC 2003 (VC7.1) Release CRT `___freetlocinfo(plocinfo)`: release the referenced locale tables whose
-// refcount reached zero and which are not the CRT defaults, then the block itself. Prior art: the
-// byte-identical bodies in src/core/realm/bnclient_batch_030c3.cpp (___freetlocinfo BNClient+0x3601) and
-// src/core/d2client/d2client_batch_b56.cpp (D2Client+0x70F2). The four deep-free callees and `_free` are
-// seams; the default-pointer globals are arguments because they live in retail's .data.
-#include <cstdint>
-#include <emscripten.h>
+// Prior art: MSVC 2003 CRT locale ownership, cross-checked against the
+// BNClient+0x6975/0x69d4 reading. Retail 1.13c cached bodies settle bounds:
+// monetary owns SEVEN pointers (+0x0c..+0x24), numeric owns three.
+#include "mcp_locale_free.h"
 
-struct D2McpFreeTlocinfoEnv {
-    uint32_t  default_locinfo;                     // +0x2AD38  DAT_6fa2ad38 (collate/ctype default)
-    uint32_t  default_lconv_mon;                   // +0x32244  DAT_6fa32244
-    uint32_t  default_lconv_num;                   // +0x32248  DAT_6fa32248
-    uint32_t  default_lc_time;                     // +0x32240  DAT_6fa32240 (the +0x40 block default)
-    uint32_t  lc_time_global;                      // +0x2AD34  DAT_6fa2ad34 (the +0x50 record default)
-    void     (*free)(void* p);                     // 0x1BB4 _free
-    void     (*free_lconv_mon)(uint32_t locinfo);  // 0x49C2 ___free_lconv_mon
-    void     (*free_lconv_num)(uint32_t locinfo);  // 0x4963 ___free_lconv_num
-    void     (*free_lc_time)(void* lc_time);       // 0x47D3 ___free_lc_time
-};
-
-// 1.13c D2MCPClient+0x02E3B (208 B, callers 0x194F __freefls, 0x2F0B ___updatetlocinfo_lk).
-// +0x3C is the collate/codepage table; when it is neither the default nor null and the +0x2C string's
-// refcount is zero, free the mon table (+0x34) and the num table (+0x30) when each is non-default and
-// unreferenced (running its deep free against +0x3C), then the +0x2C string and +0x3C table.
-// +0x40 (with base +0x44-0xFE) and +0x50 (refcount at +0xB4) follow under the same rule. Free the block.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_mcp_freetlocinfo(uint32_t plocinfo, const D2McpFreeTlocinfoEnv* env) {
-    const uint32_t p3c = *(uint32_t*)(uintptr_t)(plocinfo + 0x3C);
-    const uint32_t p2c = *(uint32_t*)(uintptr_t)(plocinfo + 0x2C);
-    if (p3c != env->default_locinfo && p3c != 0 && *(uint32_t*)(uintptr_t)p2c == 0) {
-        uint32_t p = *(uint32_t*)(uintptr_t)(plocinfo + 0x34);
-        if (p != 0 && *(uint32_t*)(uintptr_t)p == 0 && p != env->default_lconv_mon) {
-            env->free((void*)(uintptr_t)p);
-            env->free_lconv_mon(p3c);
+namespace {
+void release_fields(D2McpLconv* table, const D2McpLocaleFreeHost* h,
+                    unsigned first, unsigned end) {
+    if (!table) return;
+    for (unsigned i = first; i < end; ++i) {
+        void* value = table->strings[i];
+        if (value != h->current->strings[i] && value != h->initial->strings[i])
+            h->release(value); // retail also passes null to _free
+    }
+}
+}
+// 1.13c D2MCPClient+0x04963
+extern "C" void d2_mcp_free_lconv_num(D2McpLconv* table, const D2McpLocaleFreeHost* h) {
+    release_fields(table, h, 0, 3);
+}
+// 1.13c D2MCPClient+0x049C2
+extern "C" void d2_mcp_free_lconv_mon(D2McpLconv* table, const D2McpLocaleFreeHost* h) {
+    release_fields(table, h, 3, 10);
+}
+// 1.13c D2MCPClient+0x02E3B
+// Native adapter for retail's pointer-bearing locale object. Defaults and
+// allocator come from its owner; no second locale state or integer handles.
+extern "C" void d2_mcp_freetlocinfo(D2McpLocaleOwned* p, const D2McpFreeTlocinfoEnv* h) {
+    auto release = h->strings.release;
+    if (p->table_3c != h->default_locinfo && p->table_3c && *p->ref_2c == 0) {
+        if (p->ref_34 && *p->ref_34 == 0 && p->ref_34 != h->default_lconv_mon) {
+            release(p->ref_34);
+            d2_mcp_free_lconv_mon(p->table_3c, &h->strings);
         }
-        p = *(uint32_t*)(uintptr_t)(plocinfo + 0x30);
-        if (p != 0 && *(uint32_t*)(uintptr_t)p == 0 && p != env->default_lconv_num) {
-            env->free((void*)(uintptr_t)p);
-            env->free_lconv_num(p3c);
+        if (p->ref_30 && *p->ref_30 == 0 && p->ref_30 != h->default_lconv_num) {
+            release(p->ref_30);
+            d2_mcp_free_lconv_num(p->table_3c, &h->strings);
         }
-        env->free((void*)(uintptr_t)p2c);
-        env->free((void*)(uintptr_t)p3c);
+        release(p->ref_2c);
+        release(p->table_3c);
     }
-    uint32_t p = *(uint32_t*)(uintptr_t)(plocinfo + 0x40);
-    if (p != env->default_lc_time && p != 0 && *(uint32_t*)(uintptr_t)p == 0) {
-        env->free((void*)(uintptr_t)p);
-        env->free((void*)(uintptr_t)(*(uint32_t*)(uintptr_t)(plocinfo + 0x44) - 0xFE));
+    if (p->ref_40 != h->default_lc_time && p->ref_40 && *p->ref_40 == 0) {
+        release(p->ref_40);
+        release(p->biased_44 - 0xfe);
     }
-    p = *(uint32_t*)(uintptr_t)(plocinfo + 0x50);
-    if (p != env->lc_time_global && p != 0 && *(uint32_t*)(uintptr_t)(p + 0x2D * 4) == 0) {
-        env->free_lc_time((void*)(uintptr_t)p);
-        env->free((void*)(uintptr_t)p);
+    if (p->time_50 != h->lc_time_global && p->time_50 && *p->time_references == 0) {
+        h->free_lc_time(p->time_50);
+        release(p->time_50);
     }
-    env->free((void*)(uintptr_t)plocinfo);
+    release(p);
 }

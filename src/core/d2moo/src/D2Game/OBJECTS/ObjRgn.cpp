@@ -140,6 +140,9 @@ D2ShrineDataStrc* __fastcall OBJRGN_GetShrineDataFromGame(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC7A6E0
+// 1.13c D2Game+0x0B800
+// Prior art: D2MOO OBJRGN_AllocObjectRoomCoords; 1.13c retains the same
+// unit-coordinate reads and head insertion into the game-owned waypoint room list.
 void __fastcall OBJRGN_AllocObjectRoomCoords(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoom)
 {
     D2ObjectRoomCoordStrc* pObjectRoomCoord = D2_ALLOC_STRC_POOL(pGame->pMemoryPool, D2ObjectRoomCoordStrc);

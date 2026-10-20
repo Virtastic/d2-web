@@ -121,3 +121,13 @@ uint32_t D2Common_18A0_GetMonStatsFlagBit(int32_t nMonsterId, uint32_t nBit)
 	if (!pRow) return 0;
 	return pRow->nMonStatsFlags[nBit >> 3] & gdwBitMasks[nBit & 7];
 }
+
+// 1.13c D2Common+0x18F0 (skill id arrives in EAX): 1 if the skill's wSkillDesc (+0x194) indexes a valid SkillDesc row
+int32_t D2Common_18F0_SkillHasValidDesc(int32_t nSkillId)
+{
+	if (nSkillId < 0 || nSkillId >= sgptDataTables->nSkillsTxtRecordCount) return 0;
+	const uint8_t* pRec = (const uint8_t*)sgptDataTables->pSkillsTxt + (uintptr_t)nSkillId * 0x23C;
+	if (!pRec) return 0;
+	const int32_t nDesc = *(const int16_t*)(pRec + 0x194);
+	return nDesc >= 0 && nDesc < sgptDataTables->nSkillDescTxtRecordCount;
+}

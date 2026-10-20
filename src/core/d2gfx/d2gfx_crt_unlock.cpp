@@ -36,8 +36,13 @@ void d2gfx_sub_2c27(void) { d2gfx_unlock(4); }
 
 extern "C"
 // 1.13c D2Gfx+0x274C
-void d2gfx_sub_274c(void) { d2gfx_unlock(4); }
+void d2gfx_sub_274c_h(void (*unlock)(int32_t)) { unlock(4); }   // probe seam: the callee as a callback
+extern "C" void d2gfx_sub_274c(void) { d2gfx_unlock(4); }
 
 extern "C"
 // 1.13c D2Gfx+0x2803
 void d2gfx_sub_2803(void) { d2gfx_unlock(4); }
+
+extern "C"
+// 1.13c D2Gfx+0xCB3B (SEH funclet): `if ([ebp-0x1c] != ecx) _unlock(ecx)`; frame value and lock index come from the unwound frame.
+void d2gfx_sub_cb3b(uint32_t frame_val, uint32_t idx) { if (frame_val != idx) d2gfx_unlock(idx); }

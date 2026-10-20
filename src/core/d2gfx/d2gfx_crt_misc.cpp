@@ -9,7 +9,7 @@
 // divisor raises #DE in retail; the wasm i64 divide traps the same way.
 // 1.13c D2Gfx+0x042B0
 extern "C"
-uint64_t d2_fn_d2gfx_42b0(uint32_t lo, uint32_t hi, uint32_t dlo, uint32_t dhi, uint64_t* rem) {
+uint64_t d2gfx_aulldvrm_42b0(uint32_t lo, uint32_t hi, uint32_t dlo, uint32_t dhi, uint64_t* rem) {
     uint64_t n = ((uint64_t)hi << 32) | lo;
     uint64_t d = ((uint64_t)dhi << 32) | dlo;
     *rem = n % d;
