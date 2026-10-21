@@ -21,6 +21,9 @@ extern "C" uintptr_t d2gfx_window_handle() {
     return g_d2gfx_window_handle;
 }
 
+// probe seam (checked against retail)
+extern "C" void d2gfx_set_window_handle(uintptr_t v) { g_d2gfx_window_handle = v; }
+
 // 1.13c D2Gfx+0x0BBEE (7 B, callers 0x0C2FC/0x0C0D4): the VC7.1
 // _CallMemberFunction1 tail thunk installs pthis in ECX and jumps to the
 // member target. In the host ABI, carry that this pointer as an explicit arg.

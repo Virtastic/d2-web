@@ -59,3 +59,16 @@ EMSCRIPTEN_KEEPALIVE void d2_client_5590(D2cFile* file, const D2ClientBatch0544B
     }
     EnterCriticalSection((LPCRITICAL_SECTION)(file + 1));
 }
+
+extern "C" void d2_client_47ab(uint32_t idx);   // 0x47AB _unlock
+
+// 1.13c D2Client+0x055E2 (__unlock_file, 47 B): mirror of __lock_file -- an _iob stream releases lock
+// 0x10 + index, any other stream leaves the CRITICAL_SECTION one FILE record past it.
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_client_55e2(D2cFile* file) {
+    if (file >= &g_iob[0] && file < &g_iob[0x13]) {
+        d2_client_47ab(0x10 + (uint32_t)(file - &g_iob[0]));
+        return;
+    }
+    LeaveCriticalSection((LPCRITICAL_SECTION)(file + 1));
+}

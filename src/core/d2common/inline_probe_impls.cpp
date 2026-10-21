@@ -72,3 +72,6 @@ uint32_t D2Game_DF9A0(uint32_t u) {
 }
 // 1.13c D2Common+0x4e1d0 D2GetByCodeItemStatsBIN: p ? (int16)**p : 0
 uint32_t D2Common_4E1D0(uint32_t p) { return p ? (uint32_t)(int32_t)*(int16_t*)P(*(uint32_t*)P(p)) : 0; }
+// 1.13c D2Game+0x0373C entry (CRT DllMain wrapper around DllMain body 0x131D0).
+// ponytail: no CRT/_pRawDllMain in wasm; DllMain body is a no-op that succeeds, so return 1.
+uint32_t D2Game_373C(uint32_t, uint32_t, uint32_t) { return 1; }

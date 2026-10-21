@@ -238,3 +238,15 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_client_3f4a(uint32_t func, D2cLock8 lock8, D2cM
     d2_client_3f7c();
     return result;
 }
+
+// 1.13c D2Client+0x0B7F6 (71 B, callers 0x77E0, 0xAB3B): locale -> ANSI code page. GetLocaleInfoA(lcid,
+// 0x1004 LOCALE_IDEFAULTANSICODEPAGE, buf, 6) (buf[5]=0 pre-set); 0 chars -> -1, else _atol(buf) (0x393C).
+// The platform supplies GetLocaleInfoA as `get_locale_info`.
+extern "C"
+EMSCRIPTEN_KEEPALIVE int32_t d2_client_b7f6(uint32_t locale,
+                                             int32_t (*get_locale_info)(uint32_t, uint32_t, char*, int32_t)) {
+    char buf[6];
+    buf[5] = 0;
+    if (get_locale_info(locale, 0x1004, buf, 6) == 0) return -1;
+    return d2_client_393c(buf);
+}

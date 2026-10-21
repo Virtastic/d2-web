@@ -793,7 +793,7 @@ void __fastcall SUNITINACTIVE_CompressUnitIfNeeded(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FCC4650
-// 1.13c D2Game+0x203D0
+// 1.13c D2Game+0x204E0 (non-monster dispatch; monster branch = 0x1F600, item branch = 0x203D0)
 void __fastcall SUNITINACTIVE_CompressInactiveUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);

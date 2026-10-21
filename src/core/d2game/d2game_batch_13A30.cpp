@@ -465,3 +465,52 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8DFD0(void* unit, void* client
     if (id != (uint32_t)(uintptr_t)client) d2game_fatal(0x7E6);
     env->sub8D3D0(client, item, 3, dwFlag, 0);
 }
+
+// 0x13E60: the 137F0 sibling for the second item layout. Same roll/prefix/type-0x2D/0x32 flow, but the
+// prefix value is data+0x112 * 33 / 100 (min 1) and the type-0x2D stats are scaled to 75% only
+// (0x9F/0xA0 via 0x13230 floors 2/1). Every path, matched or not, ends in 0x13DE0(item, arg) and answers
+// 1 when the prefix pass or a type matched, else 0. Seam sub13DE0 is the unmapped 0x13DE0 (EAX=item).
+// 1.13c D2Game+0x13E60
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_13E60(void* item, uint32_t arg,
+        void (*sub13DE0)(void* item, uint32_t arg), const D2GameBatchB87Env* env) {
+    void* g   = env->ordinal10926();
+    void* rec = env->ordinal10695(item ? rd32(item, 4) : 0xFFFFFFFFu);
+    if (!g || !rec) return 0;
+    env->ordinal10536(item, d2_b87_roll(env->ordinal10411(item), rd32(g, 0)));
+    int32_t ret = 0;
+    if (env->ordinal10865(item)) {
+        void* rec2 = env->ordinal10695(item ? rd32(item, 4) : 0xFFFFFFFFu);
+        if (rec2) {
+            int32_t v = (int32_t)(rd8(rec2, 0x112) * 0x21u) / 100;
+            if (v < 1) v = 1;
+            int32_t half  = (int32_t)((uint32_t)v >> 1);
+            int32_t extra = (int32_t)d2_b87_roll((uint8_t*)item + 0x20, (uint32_t)half) + half;
+            if (extra == 0) extra = 1;
+            env->ordinal10887(item, 0x48, (uint32_t)extra, 0);
+            env->ordinal10887(item, 0x49, (uint32_t)v, 0);
+        }
+    }
+    if (env->ordinal10744(item, 0x2D)) {
+        static const uint32_t stat[4] = { 0x16, 0x15, 0x18, 0x17 };
+        static const int32_t floorv[4] = { 2, 1, 2, 1 };
+        for (int i = 0; i < 4; i++) {
+            int32_t q = d2_b87_pct((int32_t)env->ordinal10587(item, stat[i], 0));
+            if (q < floorv[i]) q = floorv[i];
+            env->ordinal10887(item, stat[i], (uint32_t)q, 0);
+        }
+        if (env->ordinal10711(item)) {
+            env->ordinal10887(item, 0x9F,
+                (uint32_t)GAME_PercentOfWithFloor((int32_t)env->ordinal10910(item, 0x9F, 0), 2, 0x4B), 0);
+            env->ordinal10887(item, 0xA0,
+                (uint32_t)GAME_PercentOfWithFloor((int32_t)env->ordinal10910(item, 0xA0, 0), 1, 0x4B), 0);
+        }
+        ret = 1;
+    } else if (env->ordinal10744(item, 0x32)) {
+        int32_t q = d2_b87_pct((int32_t)env->ordinal10587(item, 0x1F, 0));
+        if (q <= 0) q = 1;
+        env->ordinal10887(item, 0x1F, (uint32_t)q, 0);
+        ret = 1;
+    }
+    sub13DE0(item, arg);
+    return ret;
+}

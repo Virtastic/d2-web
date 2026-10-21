@@ -32,6 +32,7 @@ struct Out {
         }
         ++count;
     }
+    // 1.13c D2Common+0x0392A
     void multi(uint8_t b, int n) { // _write_multi_char
         while (n > 0) { --n; ch(b); if (count == -1) return; }
     }

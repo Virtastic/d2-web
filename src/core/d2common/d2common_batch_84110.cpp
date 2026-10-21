@@ -34,6 +34,25 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_84110(uintptr_t a1, uintptr_t ebx,
 	}
 }
 
+// 1.13c D2Common+0x17B70: advance node n (EAX) one step (cursor +0x18, dir +0x1c, count +0x14); on the
+// count reaching 3 climb parents (+0x20) until the root (*ctx, EDI), advancing each. Returns the node.
+EMSCRIPTEN_KEEPALIVE uintptr_t d2_fn_d2common_17b70(uintptr_t n, const uint32_t* ctx) {
+	auto adv = [](uintptr_t a) {
+		uintptr_t c = w(a, 0x18) + 1;
+		put(a, 0x18, c);
+		*(uint8_t*)p(a + 0x1c) = (uint8_t)((*(int8_t*)p(c) + *(int8_t*)p(a + 0x1c)) & 3);
+	};
+	if (iw(n, 0x14) < 4) adv(n);
+	if (++iw(n, 0x14) == 3) {
+		while (n != *ctx) {
+			n = w(n, 0x20);
+			adv(n);
+			if (++iw(n, 0x14) != 3) break;
+		}
+	}
+	return n;
+}
+
 // 1.13c D2Common+0x17D00: bounded path search over the node pool in ctx (900 nodes of 10 dwords at
 // dword 1, used-count at dword 0x2329); target {x,y} in tgt. Returns the node reached or 0.
 EMSCRIPTEN_KEEPALIVE uintptr_t d2_fn_d2common_17d00(uintptr_t ctx, int32_t limit, int32_t a3, const int32_t* tgt,
@@ -170,4 +189,21 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_69090(uintptr_t self, int32_t x, in
 	}
 	return 0;
 }
+}
+
+// 1.13c D2Common+0x68340: find the sound-table row for (levelType key, packed id). Group table A (retail
+// 6fddbd68, 38 rows of {key, first, last} dwords) is scanned for key == a; inside [first,last] the row
+// of table B (retail 6fddbf28, stride 0x1c) matches when its dword 0 == (id>>20 & 0x3f), dword 1 ==
+// (id>>8 & 0xff) and dword 2 == c (the caller's EBX). Returns the row index or -1.
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_68340(int32_t a, uint32_t id, uint32_t c,
+	const int32_t* ga /*retail 6fddbd68*/, const uint8_t* tb /*retail 6fddbf28*/) {
+	for (int r = 0; r < 38; ++r) {
+		const int32_t* g = ga + r * 3;
+		if (g[0] != a) continue;
+		for (int32_t i = g[1]; i <= g[2]; ++i) {
+			const uint32_t* e = reinterpret_cast<const uint32_t*>(tb + i * 0x1c);
+			if ((id >> 20 & 0x3f) == e[0] && (id >> 8 & 0xff) == e[1] && c == e[2]) return i;
+		}
+	}
+	return -1;
 }

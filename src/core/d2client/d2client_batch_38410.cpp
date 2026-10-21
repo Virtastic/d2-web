@@ -82,6 +82,10 @@ void sub_3CBC0(Services& api,uint32_t* p){ api.sendClose(reinterpret_cast<void*>
 void sub_3CC60(Services& api,int32_t count,bool param1,const uint8_t* arr,int32_t sel){
  if(!param1)api.fatal(0x18c);
  for(const uint8_t* e=arr+4;count>0;--count,e+=12){ int32_t id; std::memcpy(&id,e,4); sub_3CA00(api,true,sel,id); } }
+// 1.13c D2Client+0x3CCC0  (count=EAX; sel is ESI inherited from caller)
+void sub_3CCC0(Services& api,int32_t count,bool param1,const uint8_t* arr,int32_t sel){
+ if(!param1)api.fatal(0x179);
+ for(const uint8_t* e=arr+4;count>0;--count,e+=12){ int32_t id; std::memcpy(&id,e,4); sub_3CA80(api,true,sel,id); } }
 // 1.13c D2Client+0x3CE60  (nonnull=EAX, want=EBX); always returns 0
 uint32_t sub_3CE60(Services& api,bool nonnull,int32_t want){
  if(nonnull){ int32_t it=api.listFirst();

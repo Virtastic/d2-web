@@ -380,3 +380,16 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8d210(void* client, int32_t ebx, ui
     wr16(b, 0xF, (uint16_t)s6);
     env->send8A3E0(client, b, 0x11);
 }
+
+// 0x8D670: 14-byte packet (id = the byte arg, 0x51 from 0x7B0A0 case 2) to the client in ESI. The unit id
+// is in EDI; the unit (type in EAX, not visible in the decompile; player = 0 assumed) must resolve in the
+// client's game or the process exits (0x996 without a game, 0x341 otherwise). Bytes 1..13 are stack
+// garbage in retail (decompile shows a 1-byte local); zeroed here.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8d670(void* client, uint32_t unitId, uint8_t id, const D2GameBatch16Env* env) { // 1.13c D2Game+0x8D670
+    uint8_t b[14];
+    std::memset(b, 0, sizeof b);
+    b[0] = id;
+    if (!client) d2game_fatal(0x996);
+    if (!env->getUnit(rdptr(client, 0x1A8), 0, unitId)) d2game_fatal(0x341);
+    env->send8A3E0(client, b, 14);
+}

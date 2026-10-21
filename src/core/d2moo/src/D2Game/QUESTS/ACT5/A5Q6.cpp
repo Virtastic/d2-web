@@ -722,6 +722,7 @@ void __fastcall ACT5Q6_Callback13_PlayerStartedGame(D2QuestDataStrc* pQuestData,
 }
 
 //D2Game.0x6FCB9150
+// 1.13c D2Game+0x598B0 (checked against decompile, no delta; register-convention wrapper)
 void __fastcall ACT5Q6_OpenWorldStoneChamber(D2GameStrc* pGame)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A5Q6_BAAL);

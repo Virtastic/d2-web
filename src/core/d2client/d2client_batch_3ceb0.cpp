@@ -55,6 +55,20 @@ void sub_3D080(State& s,int32_t eax,int32_t p1){
   pkt51(s,eax*0x10000+(s.a9e20[eax]!=0?0x8000:0)+v,t);
  }
 }
+// 1.13c D2Client+0x3D180 (slot p: rebind to the 48-px cell under the mouse, dedupe other slots)
+void sub_3D180(State& s,int32_t p){
+ for(int k=0;k<60;++k){
+  if(s.mouseX>=s.a968[k] && s.mouseX<=s.a968[k]+0x30 && s.aA58[k]-0x30<=s.mouseY && s.mouseY<=s.aA58[k]){
+   if(s.a9d30[p]!=-1) pkt51(s,p*0x10000+0xffff,-1);
+   int32_t v=s.aB48[k]; s.a9d30[p]=v; s.a9e20[p]=s.g_cc420==0?0:1;
+   int32_t t=s.aC38[k]; s.a9dd0[p]=t;
+   pkt51(s,p*0x10000+(s.a9e20[p]!=0?0x8000:0)+v,t);
+   int32_t m=0xffff;
+   for(int i=0;i<16;++i,m+=0x10000)
+    if(s.a9d30[p]==s.a9d30[i] && s.a9dd0[p]==s.a9dd0[i] && p!=i){ s.a9d30[i]=s.a9e20[i]=s.a9dd0[i]=-1; pkt51(s,m,-1); }
+  }
+ }
+}
 // 1.13c D2Client+0x3D320
 void sub_3D320(State& s,const int16_t* p1,int32_t p2){
  for(int k=0;k<60;++k) if(s.aB48[k]==(int32_t)*p1){

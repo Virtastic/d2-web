@@ -12,7 +12,7 @@ extern "C" uintptr_t d2gfx_getrange_be31(uintptr_t fi, int32_t state, int32_t ca
         if (i == 0xffffffffu) return 0;
         i--;
         uintptr_t e = map + 20 * (uintptr_t)i;
-        if (((int32_t)rd(e + 4) < catchLevel && catchLevel <= (int32_t)rd(e + 8)) || i == 0xffffffffu) {
+        if (i == 0xffffffffu || ((int32_t)rd(e + 4) < catchLevel && catchLevel <= (int32_t)rd(e + 8))) {
             state--; hi = i; end = cur;
         } else hi = cur;
     }

@@ -3495,6 +3495,22 @@ EMSCRIPTEN_KEEPALIVE int d2_session_collision_level(int x, int y) {
         }
     return -1;
 }
+// Retained-capture query for the s354 #10573 collision comparison: explicit level, size and mask.
+// Read-only twin of d2_session_collision_level (restores the export F645 s354 calls).
+EMSCRIPTEN_KEEPALIVE int d2_session_collision_size_level(int levelId, int x, int y, int size, int mask) {
+    if (!g_sessionLive || !g_game || g_currentAct < 0 || g_currentAct >= 5) return -1;
+    D2DrlgActStrc* act = g_game->pAct[g_currentAct];
+    if (!act || !act->pDrlg) return -1;
+    for (D2DrlgLevelStrc* lv = act->pDrlg->pLevel; lv; lv = lv->pNextLevel) {
+        if (lv->nLevelId != levelId) continue;
+        for (D2DrlgRoomStrc* roomEx = lv->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
+            D2ActiveRoomStrc* room = roomEx->pRoom;
+            if (!room || !DungeonTestRoomGame(room, x, y)) continue;
+            return (int)COLLISION_CheckMaskWithSize(room, x, y, size, (uint16_t)mask);
+        }
+    }
+    return -1;
+}
 // The level-list ordinal (the same index updateSessionWorld and the snapshots use) of the room
 // covering a subtile, or -1 when no built room covers it. Read-only.
 EMSCRIPTEN_KEEPALIVE int d2_session_room_ordinal_at(int x, int y) {

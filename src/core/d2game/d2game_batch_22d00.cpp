@@ -136,3 +136,20 @@ extern "C" void d2_fn_d2game_24030(void* game, void* target, void* source, int32
         }
     }
 }
+
+// Retail passes unit in EBX and percentage in EDI (not in the decompiler signature).
+// getStat0A3A0 reads the unit's current value via the unit-in-EBX thunk; setStat0A472
+// is (unit, stat, value, layer). The three division forms differ in where /100 lands.
+// 1.13c D2Game+0x21EC0
+extern "C" void d2_fn_d2game_21EC0(void* unit, int32_t pct, void* ctx,
+        int32_t (*getStat0A3A0)(void*, void* unit),
+        void (*setStat0A472)(void*, void* unit, int32_t stat, int32_t value, int32_t layer)) {
+    const int32_t v = getStat0A3A0(ctx, unit);
+    int32_t delta;
+    if (v > 0x100000)      delta = (v / 100) * pct;           // wraps in 32 bits
+    else if (pct > 0x10000) delta = (pct / 100) * v;
+    else                   delta = static_cast<int32_t>(static_cast<uint32_t>(v) * static_cast<uint32_t>(pct)) / 100;
+    const int32_t nv = static_cast<int32_t>(static_cast<uint32_t>(v) + static_cast<uint32_t>(delta));
+    setStat0A472(ctx, unit, 7, nv, 0);
+    setStat0A472(ctx, unit, 6, nv, 0);
+}

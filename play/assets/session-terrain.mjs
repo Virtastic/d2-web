@@ -396,7 +396,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   const litFloorCache = new Map();
   let litFloorEntries = 0;
   const litEvict = () => {
-    if (litCache.size + litFloorEntries > 1500) { litCache.clear(); litFloorCache.clear(); litFloorEntries = 0; }
+    if (litCache.size + litFloorEntries > 1500) { litCache.clear(); litFloorCache.clear(); litWallMemo = new WeakMap(); litFloorEntries = 0; }
   };
   const ISO_SKIP = [14, 12, 10, 8, 6, 4, 2, 0, 2, 4, 6, 8, 10, 12, 14], ISO_RUN = [4, 8, 12, 16, 20, 24, 28, 32, 28, 24, 20, 16, 12, 8, 4];
   // A gouraud floor block the frame clips on the LEFT is shaded from the LEVEL TABLE one entry per DRAWN
@@ -483,7 +483,17 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     [0, 1, 2, 3, 4, 5].map((j) => wallCells(t.orientation, A, B, j));
   // roof: the block drawer of D2DDraw's transparent entry (slot 40 -> D2gfx 6fa89660) has no flat shortcut: every block reads the level table T[E[k]>>3][E[k+1]>>3][x]
   // (the wall drawer 6fa8abf0 draws a block flat at E[k] when |dE| is small); s996 fits every pixel of retail's two roof blits to one (a, b) per block.
+  // PERF (a retail recording): a wall's cache key is a ~100-char string built every frame per wall; the (tile object,
+  // short key) memo in front of it returns the same canvas litCache holds and is dropped with it.
+  let litWallMemo = new WeakMap();
   function litWall(path, dt1Tile, index, E, roof = false) {
+    let m = litWallMemo.get(dt1Tile); if (!m) litWallMemo.set(dt1Tile, m = new Map());
+    const mk = `${index}:${roof}:${E.join(',')}`, hit = m.get(mk);
+    if (hit !== undefined) return hit.v;
+    const v = litWallSlow(path, dt1Tile, index, E, roof);
+    m.set(mk, { v }); return v;
+  }
+  function litWallSlow(path, dt1Tile, index, E, roof = false) {
     const key = `w${roof ? 'r' : ''}${path}:${index}:${E.join(',')}`;
     if (litCache.has(key)) return litCache.get(key);
     const t = blendPl2(), px = dt1Tile.pixels;

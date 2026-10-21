@@ -32,8 +32,12 @@ static void leave_cs(uint32_t idx) { d2_mcp_host_unlock(idx); }
 // 1.13c D2MCPClient+0x01C07: `push 4; call 0x14EE; pop ecx; ret` -- the 9-byte CRT wrapper releasing
 // lock 4.
 extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_mcp_unlock4_1c07_seam(void (*unlock)(uint32_t)) {
+    unlock(4);
+}
+extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_mcp_unlock4_1c07(void) {
-    leave_cs(4);
+    d2_mcp_unlock4_1c07_seam(leave_cs);
 }
 
 // 1.13c D2MCPClient+0x01CEB: the identical 9-byte wrapper at 0x1CEB (`push 4; call 0x14EE; pop ecx;
@@ -46,8 +50,12 @@ EMSCRIPTEN_KEEPALIVE void d2_mcp_unlock4_1ceb(void) {
 // 1.13c D2MCPClient+0x028B3: the same 9-byte wrapper (`push 4; call 0x14EE; pop ecx; ret`) reached from
 // the small-block allocator 0x2841; releasing lock 4 is the whole rule.
 extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_mcp_unlock4_28b3_seam(void (*unlock)(uint32_t)) {
+    unlock(4);
+}
+extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_mcp_unlock4_28b3(void) {
-    leave_cs(4);
+    d2_mcp_unlock4_28b3_seam(leave_cs);
 }
 
 // +0x6FA2A418 DAT_6fa2a418: the CRT's unwind-call record written by the SEH hook 0x29D2. Ghidra splits it
@@ -137,8 +145,12 @@ EMSCRIPTEN_KEEPALIVE void d2_mcp_unlock8_1039(void) {
 // `p = __onexit(func); return (p != 0) - 1` -- 0 when the registration succeeded, -1 when __onexit
 // answered null. The callee shares the native callback table with init and shutdown.
 extern "C"
+EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_atexit_16b4_seam(void* func, void* (*onexit)(void*)) {
+    return (onexit(func) != nullptr) - 1;
+}
+extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_atexit_16b4(void* func) {
-    return (d2_mcp_onexit_167c(func) != nullptr) - 1;
+    return d2_mcp_atexit_16b4_seam(func, d2_mcp_onexit_167c);
 }
 
 // 1.13c D2MCPClient+0x0167C: lock exit table 8, append, unlock, return the callback or NULL.

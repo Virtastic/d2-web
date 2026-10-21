@@ -163,6 +163,7 @@ void __fastcall sub_6FC65C70(D2GameStrc* pGame, D2UnitStrc* pMonster, D2ClientSt
         pTarget = nullptr;
     }
 
+    // 1.13c D2Game+0xF34C0 (SEQUENCE/used-skill branch, split out in 1.13c; spec sub_F35C0.md)
     if (nAnimMode == MONMODE_SEQUENCE || UNITS_GetUsedSkill(pMonster))
     {
         D2SkillStrc* pSkill = UNITS_GetUsedSkill(pMonster);

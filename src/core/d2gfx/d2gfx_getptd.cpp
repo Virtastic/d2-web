@@ -15,7 +15,8 @@ struct D2GfxGetptdHost {
     void     (*amsg_exit)(int32_t code);
 };
 
-static uint32_t g_ptd_tls_index;   // DAT_6fa90170 (RVA 0x10170), the TlsAlloc index
+extern "C" uint32_t d2gfx_ptd_tls_index;
+uint32_t d2gfx_ptd_tls_index;   // DAT_6fa90170 (RVA 0x10170), the TlsAlloc index
 
 // 1.13c D2Gfx+0x028FE __getptd (113 bytes): _ptiddata __cdecl __getptd(void).
 // GetLastError is saved, TlsGetValue(DAT_6fa90170) returns the calling thread's block or NULL. On a miss,
@@ -28,11 +29,11 @@ static uint32_t g_ptd_tls_index;   // DAT_6fa90170 (RVA 0x10170), the TlsAlloc i
 extern "C"
 void* d2gfx_getptd(const D2GfxGetptdHost* host) {
     uint32_t saved = host->get_last_error();
-    uint8_t* ptd = (uint8_t*)host->tls_get_value(g_ptd_tls_index);
+    uint8_t* ptd = (uint8_t*)host->tls_get_value(d2gfx_ptd_tls_index);
     if (ptd == nullptr) {
         ptd = (uint8_t*)host->calloc_(1, 0x8C);
         if (ptd != nullptr) {
-            if (host->tls_set_value(g_ptd_tls_index, ptd) != 0) {
+            if (host->tls_set_value(d2gfx_ptd_tls_index, ptd) != 0) {
                 *(uint32_t*)(ptd + 0x54) = 0x101A0u;        // _initaddr, retail 0x6FA901A0
                 *(uint32_t*)(ptd + 0x14) = 1;               // _holdrand
                 uint32_t tid = host->get_current_thread_id();

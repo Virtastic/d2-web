@@ -77,6 +77,16 @@ extern "C" void d2game_265e0(D2GameStrc* game, D2UnitStrc* unit)
     MONSTERUNIQUE_CastCorpseExplode2(game, unit, 0, 0);
 }
 
+// EAX=unit; true when both hand composit items are type 0x2e.
+// 1.13c D2Game+0x26A30
+extern "C" int32_t d2game_26a30(D2UnitStrc* unit)
+{
+    if (!unit->pInventory) return 0;
+    auto* left = INVENTORY_GetCompositItem(unit->pInventory, COMPOSIT_LEFTHAND);
+    auto* right = INVENTORY_GetCompositItem(unit->pInventory, COMPOSIT_RIGHTHAND);
+    return left && ITEMS_CheckItemTypeId(left, 0x2e) && right && ITEMS_CheckItemTypeId(right, 0x2e);
+}
+
 // EAX=skill id; coordinates are writable native pointers.
 // 1.13c D2Game+0x26BB0
 extern "C" int32_t d2game_26bb0(D2UnitStrc* unit, int32_t skillId, int32_t level, int32_t* x, int32_t* y)

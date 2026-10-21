@@ -27,8 +27,7 @@ void d2_fn_d2gfx_5867(void (*unlock)(uint32_t)) {
 }
 
 // 1.13c D2Gfx+0x07897: release CRT lock 14 through _unlock (0x19BC).
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2gfx_7897(void (*unlock)(uint32_t)) {
+extern "C" void d2gfx_sub_7897(void (*unlock)(uint32_t)) {
     unlock(14);
 }
 
@@ -38,8 +37,7 @@ extern "C" void d2gfx_sub_1000(
 
 // 1.13c D2Gfx+0x078A0: run ~type_info (0x785A), conditionally pass this to
 // operator delete (0x1000) when flags bit 0 is set, and return this either way.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void* d2_fn_d2gfx_78a0(
+extern "C" void* d2gfx_sub_78a0(
     void* self, uint32_t flags,
     void (*typeinfo_dtor)(void*),
     void (*storm_free)(void*, const char*, uint32_t, uint32_t)) {
