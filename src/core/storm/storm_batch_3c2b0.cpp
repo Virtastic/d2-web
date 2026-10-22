@@ -43,8 +43,8 @@ uint32_t g_videoList;           // 0x6FC459F0  open video list head (next at +4)
 constexpr const char* kSvidCpp = "..\\3rdParty\\STORM\\SOURCE\\SVID.CPP";
 constexpr const char* kEmpty = "";
 
-void SetLastError(uint32_t e) { g_lastError = (int32_t)e; }
-void set_storm_error(uint32_t e) { g_lastError = (int32_t)e; SetLastError(e); }
+void StormSetLastError(uint32_t e) { g_lastError = (int32_t)e; }
+void set_storm_error(uint32_t e) { g_lastError = (int32_t)e; StormSetLastError(e); }
 void FreeLibrary(uint32_t) {}
 void CloseHandle(uint32_t) {}
 
@@ -217,7 +217,7 @@ uint32_t Storm_SRegDeleteValue(StormBatch3c2b0Env& e, const char* key, const cha
 extern "C"
 void Storm_SErrSetLastError(uint32_t code) {
     g_lastError = (int32_t)code;
-    SetLastError(code);
+    StormSetLastError(code);
 }
 
 // 1.13c Storm+0x2F250: SErrRegisterMessageSource. Lazy-init the SErr lock, allocate a 12-byte node

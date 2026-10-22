@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <vector>
 
 struct BnclientSha1Context {
     uint32_t state[5];
@@ -86,4 +87,37 @@ extern "C" void d2_bnclient_sha1_final(BnclientSha1Context* ctx, uint8_t* digest
     while ((ctx->bitLow & 0x1f8) != 0x1c0) d2_bnclient_sha1_update(ctx, &padding, 1);
     d2_bnclient_sha1_update(ctx, count, 8);
     for (unsigned i = 0; i < 20; ++i) digest[i] = uint8_t(ctx->state[i >> 2] >> (24 - 8 * (i & 3)));
+}
+
+// SRP SHA interleave: hidden EAX = length, param_2 = data, out = 40 bytes.
+// Skips leading zeros, drops one byte if odd, hashes even-index bytes into
+// out[0,2,..] and odd-index bytes into out[1,3,..]. Context seed assumed
+// standard SHA-1 (init is outside this function); NAMED, not vectored.
+// 1.13c BNClient+0x9E90
+extern "C" bool d2_bnclient_srp_interleave(const uint8_t* data, uint32_t len, uint8_t* out) {
+    while (len && !*data) { ++data; --len; }
+    if (len & 1) { ++data; --len; }
+    const uint32_t half = len >> 1;
+    std::vector<uint8_t> tmp(half ? half : 1);
+    for (unsigned pass = 0; pass < 2; ++pass) {
+        for (uint32_t i = 0; i < half; ++i) tmp[i] = data[i * 2 + pass];
+        BnclientSha1Context c{};
+        c.state[0] = 0x67452301; c.state[1] = 0xefcdab89; c.state[2] = 0x98badcfe;
+        c.state[3] = 0x10325476; c.state[4] = 0xc3d2e1f0;
+        d2_bnclient_sha1_update(&c, tmp.data(), half);
+        uint8_t d[20];
+        d2_bnclient_sha1_final(&c, d);
+        for (unsigned i = 0; i < 20; ++i) out[i * 2 + pass] = d[i];
+    }
+    return true;
+}
+
+// Hashes 0x20, 0x14, 0x28 bytes from three buffers into the context (EBX in
+// retail), then finalizes; digest register (EDI) is the caller's.
+// 1.13c BNClient+0x0A610
+extern "C" void d2_bnclient_sub_a610(BnclientSha1Context* ctx, uint8_t* a, uint8_t* b, uint8_t* c, uint8_t* digest) {
+    d2_bnclient_sha1_update(ctx, a, 0x20);
+    d2_bnclient_sha1_update(ctx, b, 0x14);
+    d2_bnclient_sha1_update(ctx, c, 0x28);
+    d2_bnclient_sha1_final(ctx, digest);
 }

@@ -67,7 +67,7 @@ int32_t  g_41a18;      // 0x6FC41A18  capture rect height
 uint32_t g_41a20;      // 0x6FC41A20  screen width
 uint32_t g_41a24;      // 0x6FC41A24  screen height
 
-void SetLastError(uint32_t e) { g_error = (int32_t)e; }
+void StormSetLastError(uint32_t e) { g_error = (int32_t)e; }
 
 } // namespace
 
@@ -82,7 +82,7 @@ uint32_t Storm_Sub1EFC0(void* hwnd, uint32_t mode, void* clip, int32_t param_4, 
     int32_t local_50 = -(int32_t)(hwnd != nullptr);
     if (mode == 0 || hwnd == nullptr) {
         g_error = 0x57;
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     if (!env->is_window(hwnd)) return 0;
@@ -234,6 +234,6 @@ uint32_t Storm_Sub1EFC0(void* hwnd, uint32_t mode, void* clip, int32_t param_4, 
         return 1;
     }
     g_error = 0x57;
-    SetLastError(0x57);
+    StormSetLastError(0x57);
     return 1;
 }

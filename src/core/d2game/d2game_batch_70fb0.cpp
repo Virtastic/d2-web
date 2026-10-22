@@ -211,55 +211,60 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_75900(int* param1, void* edi, 
 // ---- 0x75A40 (NAMED, last) / 0x75C60 ---------------------------------------------------------------
 struct D2Game75a40Env {
     const uint8_t* monstats; int32_t monCount;     // *(sgptDataTables+0xA78/0xA80), 0x1A8 records
-    void (*f7a0)(void* game);                      // 0xD007A0 / 0xE07A0 (GUESS: game)
-    void* (*a10392)(uint32_t id);
-    void (*a10983)(uint32_t); void (*a10764)(uint32_t);
-    uint32_t (*a10867)(uint32_t); void (*a10750)(uint32_t);
-    void (*a10336)(uint32_t id, uint32_t v); void (*a10936)(); void (*a10614)();
-    void (*a10286)(uint32_t room, int x, int y);
+    void (*f7a0)(void* game, void* unit);          // 0xD007A0 / 0xE07A0 (EAX=unit, ECX=game)
+    void* (*a10392)(uint32_t id);                  // D2Common #10392 (A598)
+    uint32_t (*a10983)(uint32_t); uint32_t (*a10764)(uint32_t);   // AAC6 / AAD8: x / y of the path
+    uint32_t (*a10867)(uint32_t); uint32_t (*a10750)(uint32_t);   // A454 / A3B8: x / y of the path
+    void (*a10336)(uint32_t id, uint32_t v);       // A5FE
+    void (*a10936)(uint64_t* seed); void (*a10614)(uint64_t* seed, uint32_t v);   // A616 / A628 (ECX=seed, EDX=v)
+    void (*a10286)(uint32_t id, int x, int y);     // AB2C
     void* (*spawn)(void* game, uint32_t, void* unit, int, int, int, int, int, int, int);   // 0xCC28F0
 };
-// 1.13c-NAMED D2Game+0x75A40: for a monster whose class is 0x3f, release its owner link and respawn
-// |n| children jittered +-5. GUESS: baseX(ESI), baseY(EBP), room(local), tag(local) unattributed;
-// seed state (uStack_14) initial value is the unit seed pair, and the unit-type ladder follows decompile.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_75a40(void* game, int32_t* unit, int baseX, int baseY,
-                                                        uint32_t room, uint32_t tag, const D2Game75a40Env* e) {
+// 1.13c D2Game+0x75A40: custom convention, stack args (game, tag) retd 8, EDI=unit. For a monster whose class
+// is 0x3f, take the owner link's position, then respawn the per-difficulty count (monstats+0x62+game[0x6d]*2)
+// of children at +-5 jitter around it (seed lo from #10936/#10614, hi=unit[3]), finally restore the link.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_75a40(void* game, uint32_t tag, int32_t* unit, const D2Game75a40Env* e) {
     if (!unit || unit[0] != 1 || unit[1] < 0) return;
     int32_t cls = unit[1];
-    if (cls < e->monCount) cls = rd16(e->monstats + (uint32_t)cls * 0x1a8, 2);
+    if (cls < e->monCount) { const uint8_t* r = e->monstats + (uint32_t)cls * 0x1a8; if (r) cls = (int16_t)rd16(r, 2); }
     if (cls < 0 || cls >= e->monCount || cls != 0x3f) return;
     uint32_t id = unit[0xb];
-    e->f7a0(game);
-    int32_t* owner = (int32_t*)e->a10392(id);
-    uint32_t keep = 0;
-    if (owner == unit || owner == nullptr) { e->a10983(id); e->a10764(id); owner = nullptr; }
-    else {
+    e->f7a0(game, unit);
+    int32_t* owner = (int32_t*)e->a10392(unit[0xb]);
+    uint32_t x, y;
+    if (owner == unit || owner == nullptr) {
+        x = e->a10983(id); y = e->a10764(id);
+        owner = nullptr;
+    } else {
         int t = owner[0];
-        if (t == 2 || (t > 3 && t < 6)) keep = rd32(rdp(&owner[0xb], 0), 0xc);
-        else keep = owner[0xb] ? e->a10867(owner[0xb]) : 0;
-        if (t != 2 && (t < 4 || t > 5) && owner[0xb]) e->a10750(owner[0xb]);
+        bool pathStruct = t == 2 || (t > 3 && t < 6);
+        uint32_t p = owner[0xb];
+        x = pathStruct ? rd32((const void*)(uintptr_t)p, 0xc) : (p ? e->a10867(p) : 0);
+        y = pathStruct ? rd32((const void*)(uintptr_t)p, 0x10) : (p ? e->a10750(p) : 0);
     }
     int sx = 5, sy = 5;
-    e->a10336(id, 0); e->a10936(); e->a10614();
-    uint64_t seed = ((uint64_t)(uint32_t)unit[3] << 32) | (uint32_t)(uintptr_t)owner;
+    e->a10336(id, 0);
+    uint64_t seed;
+    e->a10936(&seed); e->a10614(&seed, 0x53454953);
+    seed = (seed & 0xffffffffULL) | ((uint64_t)(uint32_t)unit[3] << 32);
     int c = unit[1];
     const uint8_t* rec = (c < 0 || c >= e->monCount) ? nullptr : e->monstats + (uint32_t)c * 0x1a8;
-    int n = (int16_t)rd16(rec, 0x62 + (uint32_t)rd8(game, 0x6d) * 2);   // GUESS: byte at game+0x6d
+    int n = (int16_t)rd16(rec, 0x62 + (uint32_t)rd8(game, 0x6d) * 2);
     for (; n > 0; n--) {
         uint64_t s = (seed & 0xffffffff) * 0x6ac690c5ULL + (seed >> 32);
         if (s & 1) sx = -sx;
         seed = (s & 0xffffffff) * 0x6ac690c5ULL + (s >> 32);
         if (seed & 1) sy = -sy;
-        e->a10286(room, sx + baseX, sy + baseY);
+        e->a10286(id, sx + (int)x, sy + (int)y);
         e->spawn(game, tag, unit, 0, 1, 0, 0, 0, 0, 0);
     }
-    e->a10336(id, keep);
+    e->a10336(id, (uint32_t)(uintptr_t)owner);
 }
 
 struct D2Game75c60Env {
     int (*a10362)(); void* (*a10237)(uint8_t); uint32_t (*a10973)();
     int32_t (*spawn)(void* game, int, int32_t* unit, int, int, int, int, int, int, int);
-    void (*f75a40)(void* game);
+    void (*f75a40)(void* game, uint32_t tag, int32_t* unit);
 };
 // 1.13c-NAMED D2Game+0x75C60: EAX=unit, EBX=game. GUESS: a10362/a10973 register args hidden.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_75c60(int32_t* unit, void* game, const D2Game75c60Env* e) {
@@ -269,7 +274,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_75c60(int32_t* unit, void*
     void* t = e->a10237(rd8(game, 0x6d));
     int lvl = (int)rd32(t, 0x10) + 1;
     if ((unit[0x31] >> 9) & 1) lvl = (int)e->a10973();
-    if (e->spawn(game, k, unit, 0, lvl, 0, 0, 0, 0, 1)) e->f75a40(game);
+    if (e->spawn(game, k, unit, 0, lvl, 0, 0, 0, 0, 1)) e->f75a40(game, (uint32_t)k, unit);
     return 1;
 }
 

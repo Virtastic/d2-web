@@ -84,7 +84,7 @@ void*    g_45808;                 // 0x6FC45808  (also a count test in 0x18F00)
 void*    g_4580c;                 // 0x6FC4580C
 void*    g_45810;                 // 0x6FC45810
 
-void SetLastError(uint32_t e) { g_lastError = (int32_t)e; }
+void StormSetLastError(uint32_t e) { g_lastError = (int32_t)e; }
 
 // (**(code **)(*obj + off))(obj, ...) -- retail calls the object's vtable slot.
 template <typename Fn>
@@ -99,7 +99,7 @@ Fn vcall(void* obj, uintptr_t off) {
 extern "C"
 uint32_t Storm_Sub38EB0(void* param_1, const StormBatch382c0Env* env) {
     if (param_1 == nullptr) {
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     EnterCriticalSection(&g_imgLock);
@@ -131,7 +131,7 @@ uint32_t Storm_Sub331F0(const char* name, int32_t palette, void* dst, int32_t wi
     if (bpp == 8 && palette == 0) ok = 0; else ok = 0xffffffffu;
     if (!((name != nullptr && *name != '\0') && dst != nullptr && ok == 0xffffffffu &&
           width >= 1 && height >= 1)) {
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     const char* ext = env->f_22710(name);
@@ -172,7 +172,7 @@ uint32_t Storm_Sub329C0(int32_t param_1, int16_t* param_2, uint32_t param_3, uin
     if (param_9 != nullptr) *param_9 = 0;
     uint32_t uVar1 = (param_6 == 0 && param_5 != nullptr) ? 0 : 0xffffffffu;
     if (!((param_2 != nullptr && param_3 != 0) && uVar1 == 0xffffffffu)) {
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     if (param_1 == 0 && param_3 > 1) {

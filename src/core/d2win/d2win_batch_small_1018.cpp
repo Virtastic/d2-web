@@ -98,3 +98,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_F8A0(void* p,const D2WinSmall
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2win_wctomb(char* out,uint16_t ch,const D2WinSmallEnv* e) {
     return e->wctombMt(locale(e),out,ch);
 }
+// 1.13c D2Win+0x159E0 -- null -> line 0x6E, non-type-1 -> line 0x70 (fatal); else 0x17FC0.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_159E0(void* p,const D2WinSmallEnv* e) {
+    if(!p) fail(e,0x6E);
+    if(read32(p,0)!=1) fail(e,0x70);
+    e->removeControl(p);
+}

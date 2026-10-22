@@ -18,15 +18,20 @@ __attribute__((weak)) void* DAT_6fdeff6c;
 __attribute__((weak)) char DAT_6fdda728[1];
 
 [[noreturn]] static void fail(int32_t code) {
- D2Common_Ord10024(DAT_6fdda728, D2Common_Ord10265(code));
+ if (D2Common_Ord10265 && D2Common_Ord10024) // weak seams: skip the report if unlinked, still trap
+  D2Common_Ord10024(DAT_6fdda728, D2Common_Ord10265(code));
  __builtin_trap();
 }
 
 // 1.13c D2Common+0x49F30
+// Weak callees below are required: a missing one traps instead of jumping to 0.
+#define REQ(f) do { if (!(f)) __builtin_trap(); } while (0)
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_49f30(int32_t p1, void* p2, int32_t* unit, int32_t p4, int32_t p5, int32_t p6, int32_t p7, uint32_t p8) {
  if (!unit) fail(0x1505);
  if (unit[0] != 4) fail(0x1506);
  if (!unit[5]) fail(0x1508);
+ REQ(D2Common_464D0); REQ(D2Common_47EF0); REQ(D2Common_47020); REQ(D2Common_3A330);
+ REQ(D2Common_38B00); REQ(DATATBLS_GetItemsTxtRecord); REQ(D2Common_Ord10213); REQ(sgptDataTables);
  const bool hasExtra = *reinterpret_cast<int16_t*>(static_cast<intptr_t>(unit[5]) + 0x30) != 0;
  if (hasExtra) {
   if (!p4) fail(0x349);

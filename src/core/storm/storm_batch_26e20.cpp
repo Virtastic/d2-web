@@ -55,7 +55,7 @@ void wr32(void* p, uint32_t v) { std::memcpy(p, &v, 4); }
 uint8_t* at(uint32_t p, uintptr_t off) { return (uint8_t*)(uintptr_t)(p + off); }
 
 // kernel32 seams (compat/Windows.h carries no thread, event or file-size API)
-void SetLastError(uint32_t e) { g_lastError = (int32_t)e; }
+void StormSetLastError(uint32_t e) { g_lastError = (int32_t)e; }
 bool SetEvent(uint32_t) { return true; }
 bool CloseHandle(uint32_t) { return true; }
 uint32_t WaitForSingleObject(uint32_t, uint32_t) { return 0x102; }      // WAIT_TIMEOUT
@@ -175,7 +175,7 @@ uint32_t Storm_Sub266C0(uint32_t param_1, uint32_t* param_2, uint32_t* param_3) 
     }
     if (!ok) {
         g_lastError = 0x85100072;
-        SetLastError(0x85100072);
+        StormSetLastError(0x85100072);
     }
     if (param_2 != nullptr) *param_2 = out2;
     if (param_3 != nullptr) *param_3 = out3;
@@ -188,7 +188,7 @@ extern "C"
 uint32_t Storm_Sub265B0(uint32_t param_1) {
     if (param_1 == 0) {
         g_lastError = 0x57;
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     g_dword42FFC = param_1;

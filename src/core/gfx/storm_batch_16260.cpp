@@ -101,7 +101,7 @@ int32_t StormSub11F10(uint32_t*, uint32_t*, uint32_t*, uint32_t* a, uint32_t* b,
     return 1;
 }
 void StormSub169A0() {}                       // 0x169A0 SDlg init
-int32_t StormSub1220() { return 1; }          // 0x1220 SDlg class registration
+int32_t StormSub1220() { return 1; }          // 1.13c Storm+0x21220: SDlg class registration (Win32 RegisterClassA; no-op, returns true)
 void* StormSub1DF90(void*, int*, HWND, void*, LPARAM) { return nullptr; }  // 0x1DF90 dialog create
 void StormSub1D600() {}                       // 0x1D600 message pump
 uint32_t StormSub16AC0(void*, int32_t) { return 0xFFFFFFFFu; }  // 0x16AC0 find hash entry

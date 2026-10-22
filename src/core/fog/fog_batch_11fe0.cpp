@@ -91,6 +91,8 @@ int32_t fog_key_compare(const uint8_t* a, const uint8_t* b) {
 
 }  // namespace
 
+uint8_t fog_fold_byte_ext(uint8_t c) { return fog_fold_byte(c); }  // for Fog+0x1F8A0
+
 // 1.13c Fog+0x11FE0 (ordinal 10255)
 // String from a row index: reject a NULL linker, a negative index and an index >= nSize by returning
 // the "???" sentinel (the +0x11DF0 miss value). Otherwise look the index up in the +0x0C string tree

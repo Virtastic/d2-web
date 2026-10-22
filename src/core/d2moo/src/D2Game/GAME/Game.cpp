@@ -2139,6 +2139,7 @@ void __fastcall sub_6FC38E00()
 
 //1.10f:D2Game.0x6FC38E20 (#10004)
 //1.13c:D2Game.0x6FC4E1E0 (#10008)
+// 1.13c D2Game+0x2E1E0
 int32_t __stdcall GAME_UpdateGamesProgress(int32_t a1)
 {
     // TODO: Names
@@ -2929,6 +2930,7 @@ void __fastcall GAME_GetMissileDescription(char* szDescription, int32_t nClassId
 
 //D2Game.0x6FC3A8B0 (#10019)
 // Note: used by server only to retrieve unit lists
+// 1.13c D2Game+0x2B160
 void __stdcall GAME_GetUnitsDescriptions(uint16_t nGameId, D2UnitDescriptionListStrc* pUnitDescriptionsList, uint32_t eType)
 {
     const D2GameGUID nGUID = GAME_GetGameGUIDFromGameId(nGameId);

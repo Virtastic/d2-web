@@ -10,10 +10,9 @@
 #include <emscripten.h>
 #include <Windows.h>   // DeleteCriticalSection: host (kernel) state, a no-op under wasm
 
-// +0xA038 DAT_6fa2a038: the CRT lock table, 0x24 slots of 8 bytes (walk ends before 0xA158); dword 0 of
-// a slot is the CRITICAL_SECTION pointer, dword 1 the "static lock" flag. Filled by 0x1450
-// (__mtinitlocks) and its __mtinitlocknum sibling, so it is zero-initialised here.
-static uint32_t g_mcpLockTable[0x24 * 2];
+// +0xA038: the CRT lock table filled by 0x1450 (__mtinitlocks); one table, defined there.
+struct D2McpLockSlot { uintptr_t cs; uint32_t init; uint32_t pad; };
+extern D2McpLockSlot g_lockTable[0x24];
 
 // 1.13c D2MCPClient+0x01499 (__mtdeletelocks): two walks of the lock table. First, every slot holding a
 // heap lock (pointer set, flag != 1) is deleted, freed and its pointer cleared. Second, every slot
@@ -21,19 +20,15 @@ static uint32_t g_mcpLockTable[0x24 * 2];
 // 1.13c D2MCPClient+0x01499
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2mcpclient_1499(void) {
-    uint32_t* table = g_mcpLockTable;
-    uint32_t* end = table + 0x24 * 2;
-    for (uint32_t* p = table; p < end; p += 2) {
-        uint32_t cs = p[0];
-        if (cs != 0 && p[1] != 1) {
-            DeleteCriticalSection((LPCRITICAL_SECTION)(uintptr_t)cs);
-            std::free((void*)(uintptr_t)cs);
-            p[0] = 0;
+    D2McpLockSlot* end = g_lockTable + 0x24;
+    for (D2McpLockSlot* p = g_lockTable; p < end; ++p) {
+        if (p->cs != 0 && p->init != 1) {
+            DeleteCriticalSection((LPCRITICAL_SECTION)p->cs);
+            std::free((void*)p->cs);
+            p->cs = 0;
         }
     }
-    for (uint32_t* p = table; p < end; p += 2) {
-        if (p[0] != 0 && p[1] == 1) {
-            DeleteCriticalSection((LPCRITICAL_SECTION)(uintptr_t)p[0]);
-        }
+    for (D2McpLockSlot* p = g_lockTable; p < end; ++p) {
+        if (p->cs != 0 && p->init == 1) DeleteCriticalSection((LPCRITICAL_SECTION)p->cs);
     }
 }

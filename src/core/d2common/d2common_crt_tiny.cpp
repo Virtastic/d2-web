@@ -40,3 +40,11 @@ extern "C" void d2common_free(D2CommonFreeHost* h, void* p) {
     }
     h->heap_free(p);
 }
+
+extern "C" void D2Common_8C7A_SecurityFailure(int32_t nCode); // D2Common+0x8C7A, defined in d2common_sub_8c7a.cpp
+
+// 1.13c D2Common+0x06BDB
+// _report_failure(): report code 1 through 0x8C7A, then ExitProcess(3) (0x8C7A already exits with 3; never returns).
+extern "C" void D2Common_6BDB_ReportFailure() {
+    D2Common_8C7A_SecurityFailure(1);
+}

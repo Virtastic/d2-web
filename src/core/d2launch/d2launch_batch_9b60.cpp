@@ -183,3 +183,48 @@ int32_t d2launch_cinit(int32_t param, D2LaunchCinitEnv env) {
     }
     return result;
 }
+
+// ---- CRT glue (b47 batch). Retail FILE/_iobuf, the stream table and the per-stream locks do not exist
+// in wasm64; the wrappers keep the retail call shape over the host libc stream, which has the same
+// observable contract (open/read/close, EOF and error flags, NULL/-1 on failure).
+#include <cstdlib>
+#include <ctime>
+
+// 1.13c D2Launch+0x0166C __exit(code): doexit(code, quick=1, retain=0). doexit (0x1598) is STALLED
+// (CRT-private atexit tables), so the quick-exit path is the host terminate.
+extern "C" void d2launch_crt_exit(unsigned code) { _Exit((int)code); }
+
+// 1.13c D2Launch+0x0168C __fsopen: take a free stream slot (EMFILE 0x18 when none), open, unlock.
+extern "C" FILE* d2launch_crt_fsopen(const char* name, const char* mode, int /*shflag*/) {
+    return fopen(name, mode);
+}
+
+// 1.13c D2Launch+0x016DE / 0x01826 / 0x018FE SEH-tail thunks: __unlock_file(stream); single-threaded here.
+extern "C" void d2launch_crt_unlock_tail(FILE*) {}
+
+// 1.13c D2Launch+0x016E8 fopen(name, mode) = __fsopen(name, mode, _SH_DENYNO 0x40).
+extern "C" FILE* d2launch_crt_fopen(const char* name, const char* mode) {
+    return d2launch_crt_fsopen(name, mode, 0x40);
+}
+
+// 1.13c D2Launch+0x016FB __fread_lk and 0x017E4 _fread: count*size bytes; return whole elements read
+// (0 when the product is 0); retail sets _IOEOF 0x10 / _IOERR 0x20, which libc keeps in the stream.
+extern "C" size_t d2launch_crt_fread_lk(void* dst, size_t size, size_t count, FILE* f) {
+    if (size * count == 0) return 0;
+    return fread(dst, size, count, f);
+}
+extern "C" size_t d2launch_crt_fread(void* dst, size_t size, size_t count, FILE* f) {
+    return d2launch_crt_fread_lk(dst, size, count, f);
+}
+
+// 1.13c D2Launch+0x01869 __fclose_lk and 0x018B5 _fclose: flush, free buffer, close handle, drop temp
+// name; -1 on failure, 0 on success.
+extern "C" int d2launch_crt_fclose_lk(FILE* f) { return fclose(f) == 0 ? 0 : -1; }
+extern "C" int d2launch_crt_fclose(FILE* f) { return f ? d2launch_crt_fclose_lk(f) : -1; }
+
+// 1.13c D2Launch+0x01830 _time32(out): FILETIME - 1970 epoch offset, /10^7; stored when out != NULL.
+extern "C" int32_t d2launch_crt_time32(int32_t* out) {
+    const int32_t t = (int32_t)time(nullptr);
+    if (out) *out = t;
+    return t;
+}

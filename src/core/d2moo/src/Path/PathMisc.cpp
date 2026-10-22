@@ -263,39 +263,79 @@ BOOL __fastcall PATH_CheckTestDirForCollisions(const D2PathInfoStrc* pPathInfo, 
 }
 
 //1.10f: Inlined
-//1.13c: D2Common.0x6FD85E00
+// 1.13c D2Common+0x35E00
 BOOL PATH_PreparePathTargetForPathUpdate(D2PathInfoStrc* pPathInfo)
 {
-	int pTestDir[3];
-
 	D2DynamicPathStrc* pPath = pPathInfo->pDynamicPath;
 	D2_ASSERT(!(pPath->dwFlags & PATH_MISSILE_MASK));
 
-	D2PathPointStrc aTestDirPathPoints[3] = { pPathInfo->tTargetCoord, pPathInfo->tTargetCoord, pPathInfo->tTargetCoord };
+	const uint16_t nStartX = (uint16_t)pPathInfo->tStartCoord.X;
+	const uint16_t nStartY = (uint16_t)pPathInfo->tStartCoord.Y;
+	// retail: unit type, 6 (never player) when there is no unit
+	const int nUnitType = pPath->pUnit ? (int)pPath->pUnit->dwUnitType : 6;
 
-	sub_6FDAB7D0(pTestDir, 0 /*unused*/, pPathInfo->tTargetCoord, pPathInfo->tStartCoord);
-	while (1)
+	// Walk three candidate points (primary, secondary, tertiary direction), each stepping from the target toward the start.
+	const D2PathPointStrc tTarget = pPathInfo->tTargetCoord;
+	uint16_t aX[3] = { (uint16_t)tTarget.X, (uint16_t)tTarget.X, (uint16_t)tTarget.X };
+	uint16_t aY[3] = { (uint16_t)tTarget.Y, (uint16_t)tTarget.Y, (uint16_t)tTarget.Y };
+
+	const auto& tDirs = byte_6FDD2288[sub_6FDAB6A0(tTarget, pPathInfo->tStartCoord)];
+	uint32_t nDir0 = tDirs.unk0x00;
+	const uint32_t nDir1 = tDirs.unk0x01;
+	const uint32_t nDir2 = tDirs.unk0x02;
+
+	while (true)
 	{
-		if (pPathInfo->tStartCoord == aTestDirPathPoints[0])
+		if (nStartX == aX[0] && nStartY == aY[0])
 		{
 			return 0;
 		}
 
-		int nFreeOfCollisionDirectionIndex = -1;
-		if (PATH_CheckTestDirForCollisions(pPathInfo, pTestDir, aTestDirPathPoints, &nFreeOfCollisionDirectionIndex))
+		aY[0] += (uint16_t)gatDirectionToOffset[nDir0].nY;
+		aX[0] += (uint16_t)gatDirectionToOffset[nDir0].nX;
+		int nPick = -1;
+		if (!COLLISION_CheckAnyCollisionWithPattern(pPathInfo->pStartRoom, aX[0], aY[0], pPathInfo->nCollisionPattern, pPathInfo->nCollisionMask))
 		{
-			pPathInfo->tTargetCoord = aTestDirPathPoints[nFreeOfCollisionDirectionIndex];
-			if (pPathInfo->tStartCoord == aTestDirPathPoints[0])
+			nPick = 0;
+		}
+		else
+		{
+			aX[1] += (uint16_t)gatDirectionToOffset[nDir1].nX;
+			aY[1] += (uint16_t)gatDirectionToOffset[nDir1].nY;
+			if (!COLLISION_CheckAnyCollisionWithPattern(pPathInfo->pStartRoom, aX[1], aY[1], pPathInfo->nCollisionPattern, pPathInfo->nCollisionMask))
+			{
+				nPick = 1;
+			}
+			else if (nDir2 != 0xFF)
+			{
+				aY[2] += (uint16_t)gatDirectionToOffset[nDir2].nY;
+				aX[2] += (uint16_t)gatDirectionToOffset[nDir2].nX;
+				if (!COLLISION_CheckAnyCollisionWithPattern(pPathInfo->pStartRoom, aX[2], aY[2], pPathInfo->nCollisionPattern, pPathInfo->nCollisionMask))
+				{
+					nPick = 2;
+				}
+			}
+		}
+
+		if (nPick >= 0)
+		{
+			pPathInfo->tTargetCoord.X = aX[nPick];
+			pPathInfo->tTargetCoord.Y = aY[nPick];
+			if (aX[nPick] == nStartX && aY[nPick] == nStartY)
 			{
 				return 0;
 			}
-			if (pPath->pUnit && pPath->pUnit->dwUnitType == UNIT_PLAYER)
+			if (nUnitType == 0)
 			{
 				PATH_FindValidTargetCoordsByMovingOrthogonally(pPathInfo);
 			}
 			return 1;
 		}
-		pTestDir[0] = byte_6FDD2288[sub_6FDAB6A0(aTestDirPathPoints[0], pPathInfo->tStartCoord)].unk0x00;
+
+		D2PathPointStrc tCur;
+		tCur.X = aX[0];
+		tCur.Y = aY[0];
+		nDir0 = byte_6FDD2288[sub_6FDAB6A0(tCur, pPathInfo->tStartCoord)].unk0x00;
 	}
 }
 

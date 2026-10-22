@@ -124,3 +124,41 @@ int D2CMP_10079_GetTileFlags(D2TileLibraryEntryStrc* e)    { D2_ASSERT(e); uint1
 int D2CMP_10081_GetTileRarity(D2TileLibraryEntryStrc* e)   { D2_ASSERT(e); const int v = tileRarity((const uint8_t*)e); if (g_d2webOnTileRarity) g_d2webOnTileRarity(v); return v; }
 int D2CMP_10082_GetTileSequence(D2TileLibraryEntryStrc* e) { D2_ASSERT(e); return tileSeq((const uint8_t*)e); }
 uint8_t* D2CMP_10085_GetTileFlagArray(D2TileLibraryEntryStrc* e) { D2_ASSERT(e); return (uint8_t*)e + 0x28; }
+
+// 1.13c D2CMP+0x14EC0 -- row index into the 256-byte-record static table (base DAT_6fe34aa8); -1 = retail's NULL.
+// Table bytes are retail data, so the pointer itself is not reproduced; the index is.
+int D2CMP_14EC0_TableIndex(int a, int b) { return (a < 9 && b < 0x15 && a != 0 && (a < 3 || a > 4)) ? a * 0x69 + b : -1; }
+
+// 1.13c D2CMP+0x17020
+// Cache bucket lookup. Retail gets bucket index + key hash from 0x16E80 (register args); the caller supplies them.
+// Node: +4 id, +8..+18 five key ints, +1C hash, +2C next (void*). Key: +4 flags, +8 kind, +C idA, +14 idB, +18..+28 five ints.
+const uint8_t* D2CMP_17020_CacheFind(const uint8_t* pTable, const uint8_t* pKey, uint32_t nBucket, uint32_t nHash) {
+    auto I = [](const uint8_t* p, int o) { int v; memcpy(&v, p + o, 4); return v; };
+    const uint8_t* n; memcpy(&n, pTable + 0x8000 + (size_t)nBucket * sizeof n, sizeof n);
+    const int kind = I(pKey, 8);
+    for (; n; memcpy(&n, n + 0x2c, sizeof n)) {
+        bool ok = true;
+        for (int k = 0; k < 5; k++) ok = ok && I(pKey, 0x18 + 4 * k) == I(n, 8 + 4 * k);
+        if (kind == 3 || kind == 4) ok = ok && I(pKey, 0xc) == I(n, 4);
+        else if (kind == 6 && (I(pKey, 4) & 2)) ok = ok && I(pKey, 0x14) == I(n, 4);
+        if (ok && nHash == (uint32_t)I(n, 0x1c)) return n;
+    }
+    return nullptr;
+}
+
+// 1.13c D2CMP+0xC0B0 -- sprite-cache init (SpriteCache.cpp): 0x1400 doubly linked 0x1c-byte nodes
+// (next at +0x14, prev at +0x18), head/tail kept at [9]/[10], critical section created once.
+// Stateful, register args (eax,ecx,edx -> a,b,c): no FN vector; mapped from the decompile.
+struct D2SpriteCache { void *a, *b; uint32_t c; uint8_t* pNodes; uint32_t z[4]; uint8_t* pHead; uint8_t* pTail; uint32_t arg; void* pLock; };
+void D2CMP_SpriteCacheInit(D2SpriteCache* p, void* a, void* b, uint32_t c) {
+    p->arg = c; p->a = a; p->b = b; p->c = 0;
+    p->pNodes = (uint8_t*)calloc(0x1400, 0x1c);
+    for (int i = 0; i < 0x1400; i++) {
+        uint8_t* n = p->pNodes + i * 0x1c;
+        if (i < 0x13ff) *(uint8_t**)(n + 0x14) = n + 0x1c;
+        if (i > 0)      *(uint8_t**)(n + 0x18) = n - 0x1c;
+    }
+    p->pHead = p->pNodes; p->pTail = p->pNodes + 0x22fe4;
+    p->z[0] = p->z[1] = p->z[2] = p->z[3] = 0;
+    if (!p->pLock) p->pLock = calloc(1, 0x18);   // CRITICAL_SECTION stand-in
+}

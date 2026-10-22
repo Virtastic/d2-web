@@ -481,3 +481,81 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_23e0(uint32_t* r) {
     if ((r[1] & 1) && h) StormFree(h);
     r[4] = (uint32_t)(uintptr_t)h;
 }
+
+// ---- b46-storm-0 batch: SEH wrappers, scalar-deleting dtors, fixed-array tails, id generator ----
+// Retail's SEH frames (ExceptionList push/pop) carry no behaviour of their own; they are omitted.
+extern "C" void d2_fn_storm_1660(uint32_t* r);
+
+namespace {
+// 1.13c Storm+0x1C30: free source/rectf/foundparam storage, then unlink the element (0x1CF0).
+void StormElementDestroy(StormElement* e) {
+    if (e->foundparam.data) StormFree(e->foundparam.data);
+    if (e->rectf.data) StormFree(e->rectf.data);
+    if (e->source.data) StormFree(e->source.data);
+    StormElementUnlink(e);
+}
+}  // namespace
+
+// 1.13c Storm+0x1B20: scalar-deleting dtor over 0x1660 (CS delete + foundation dtor).
+extern "C" void* Storm_Sub1B20(void* self, uint8_t flags) {
+    uint32_t r[5] = {(uint32_t)(uintptr_t)self, 0, 0, 0, 0};
+    d2_fn_storm_1660(r);
+    if ((flags & 1) && self) StormFree(self);
+    return self;
+}
+// 1.13c Storm+0x1B50: scalar-deleting dtor over 0x1990.
+extern "C" void* Storm_Sub1B50(void* self, uint8_t flags) {
+    StormHashTableFoundationDestroy((StormHashTable*)self);
+    if ((flags & 1) && self) StormFree(self);
+    return self;
+}
+// 1.13c Storm+0x1B80: TSList dtor (SEH wrapper over 0x22D0).
+extern "C" void Storm_Sub1B80(StormList* list) { StormListDestroy(list); }
+// 1.13c Storm+0x1BC0: scalar-deleting dtor over 0x1A70.
+extern "C" void* Storm_Sub1BC0(void* self, uint8_t flags) {
+    StormHashTableBaseDestroy((StormHashTable*)self);
+    if ((flags & 1) && self) StormFree(self);
+    return self;
+}
+// 1.13c Storm+0x1BF0: TSGrowableArray<TSList> dtor (SEH wrapper over 0x2290).
+extern "C" void Storm_Sub1BF0(StormGrowableArray* a) { StormListArrayDestroy(a); }
+// 1.13c Storm+0x1C30
+extern "C" void Storm_Sub1C30(StormElement* e) { StormElementDestroy(e); }
+// 1.13c Storm+0x1DA0: free the SOURCE array storage (data at +8).
+extern "C" void Storm_Sub1DA0(StormFixedArray* a) { if (a->data) StormFree(a->data); }
+// 1.13c Storm+0x1DF0: free the RECTF array storage.
+extern "C" void Storm_Sub1DF0(StormFixedArray* a) { if (a->data) StormFree(a->data); }
+// 1.13c Storm+0x1E40: free the FOUNDPARAM array storage.
+extern "C" void Storm_Sub1E40(StormFixedArray* a) { if (a->data) StormFree(a->data); }
+
+// 1.13c Storm+0x1EB0: set a 0x1C-byte-element fixed array to `count` copies of src[0..count).
+extern "C" void Storm_Sub1EB0(StormFixedArray* a, uintptr_t count, const uint8_t* src) {
+    a->alloc = count;
+    if (a->data || count) {
+        a->data = StormRealloc(a->data, count * 0x1c);
+        if (count) std::memcpy(a->data, src, count * 0x1c);
+    }
+    a->count = count;
+}
+
+// 1.13c Storm+0x24B0: chunk dtor (SEH wrapper over 0x2740).
+extern "C" void Storm_Sub24B0(StormChunk* c) { StormChunkDestroy(c); }
+
+// 1.13c Storm+0x24F0: next unused 32-bit id: bump the counter (+0x48); on wrap set the wrapped
+// flag (+0x4c) and skip 0; once wrapped, skip ids still present in their bucket's chain.
+extern "C" uint32_t Storm_Sub24F0(StormHashTable* h) {
+    for (;;) {
+        uint32_t id = (uint32_t)++h->field48;
+        if (id == 0) { h->field4c = 1; continue; }
+        if (h->field4c == 0) return id;
+        StormList* b = &h->buckets.data[h->bucketMask & id];
+        uintptr_t n = b->term.next;
+        if ((intptr_t)n < 1) n = 0;
+        bool taken = false;
+        while ((intptr_t)n > 0) {
+            if (*(uint32_t*)n == id) { taken = true; break; }
+            n = *(uintptr_t*)(n + (uintptr_t)b->linkoffset + sizeof(uintptr_t));
+        }
+        if (!taken) return id;
+    }
+}

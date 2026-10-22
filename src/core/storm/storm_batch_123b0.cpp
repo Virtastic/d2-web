@@ -11,6 +11,7 @@
 //   * 0x10720 case 4/6 copy a fixed 4-byte value (pcVar2 = 4), not a string;
 //   * 0x10720's "*param_4 = extraout_EDX" is the length copied, modelled as min(size, srcLen).
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <Windows.h>
 
@@ -39,9 +40,46 @@ uint32_t g_4516c;                 // 0x6FC4516C  saved by 0x170B0
 uint32_t g_table[0x10][4];        // 0x6FC41A38  per-index {value0,value1,value2,callbackIdx}
 
 // ---- unmapped internal callees, retail argument order -----------------------------------------
-int32_t Storm_Sub11C90(uint32_t* a, uint32_t b);
 int32_t Storm_SubFF80(void* a);
-void Storm_Sub169A0(void);
+
+// 1.13c Storm+0x11C90: fetch the provider's list (vtable +0x28), count entries whose flags (+4) & 0xB are 0 into *cnt (retail EAX),
+// and pack those 0x23C-byte nodes plus their payload (+0x12C ptr, +0x130 len) into one fresh block stored at *out (retail ESI).
+// ponytail: malloc stands in for the SCode pool allocator 0x1C580; g_smack is never set here, so 123B0 never reaches this.
+int32_t Storm_Sub11C90(uint32_t* head, uint32_t arg, int32_t* cnt, uint32_t** out) {
+    typedef int (*Fetch)(uint32_t, uint32_t*, uint32_t**);
+    typedef void (*Release)(uint32_t*, uint32_t*);
+    uint32_t* tail = head;
+    *cnt = 0;
+    if (!((Fetch)(((void**)g_smack)[0x28 / sizeof(void*)]))(arg, head, &tail)) return 0;
+    *cnt = 0;
+    if (head) {
+        for (uint32_t* n = head; n; n = (uint32_t*)(uintptr_t)n[0x4a]) if ((n[1] & 0xb) == 0) ++*cnt;
+        if (*cnt) {
+            uint8_t* dst = (uint8_t*)malloc((size_t)*cnt * 0x23c);
+            *out = (uint32_t*)dst;
+            uint32_t* prev = nullptr;
+            for (uint32_t* n = head; n; n = (uint32_t*)(uintptr_t)n[0x4a]) {
+                if ((n[1] & 0xb) != 0) continue;
+                uint32_t* d = (uint32_t*)dst;
+                if (prev) prev[0x4a] = (uint32_t)(uintptr_t)d;
+                prev = d;
+                memcpy(d, n, 0x4f * 4);
+                dst += 0x4f * 4;
+                if (n[0x4b]) {
+                    memcpy(dst, (void*)(uintptr_t)n[0x4b], n[0x4c]);
+                    d[0x4b] = (uint32_t)(uintptr_t)dst;
+                    dst += n[0x4c];
+                }
+            }
+        }
+    }
+    ((Release)(((void**)g_smack)[0x4c / sizeof(void*)]))(head, tail);
+    return 1;
+}
+// 1.13c Storm+0x169A0: one-shot SNP provider scan (*.snp beside the module, SnpQuery per file,
+// each provider appended to the list at 0x6FC45A48). The web build has no .snp modules, so the
+// scan finds nothing: only the once-flag (0x6FC45844) is set.
+void Storm_Sub169A0(void) { g_45844 = 1; }
 void Storm_Sub12740(void* a);
 int32_t* Storm_Sub12690(void);
 void Storm_Sub14F20(void);
@@ -59,7 +97,7 @@ uint32_t rd32(const uint8_t* p, uintptr_t off) { uint32_t v; std::memcpy(&v, p +
 // kernel32 seams: compat/Windows.h carries no TEB. SetLastError only mirrors the error the retail
 // bodies already store at 0x6FC45388, and the system clock is deterministic-zero until a platform
 // layer supplies one (same policy as compat/Windows.h GetLocalTime).
-void SetLastError(uint32_t e) { g_lastError = (int32_t)e; }
+void StormSetLastError(uint32_t e) { g_lastError = (int32_t)e; }
 void GetSystemTime(SYSTEMTIME* t) { std::memset(t, 0, sizeof(*t)); }
 int32_t SystemTimeToFileTime(const SYSTEMTIME*, FILETIME* out) {
     out->dwLowDateTime = 0;
@@ -72,15 +110,15 @@ int32_t SystemTimeToFileTime(const SYSTEMTIME*, FILETIME* out) {
 uint32_t Storm_Sub123B0(uint32_t param_1, uint32_t* param_2, void* param_3, uint32_t* param_4) {
     if (param_3 == nullptr) {
         g_lastError = 0x57;
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     EnterCriticalSection(&g_lock);
     if (param_4 != nullptr) *param_4 = 0;
     if (g_smack == nullptr) {
         g_lastError = 0x4b4;
-        SetLastError(0x4b4);
-    } else if (Storm_Sub11C90(param_2, param_1) != 0) {
+        StormSetLastError(0x4b4);
+    } else if (Storm_Sub11C90(param_2, param_1, (int32_t*)param_4, (uint32_t**)param_3) != 0) {
         LeaveCriticalSection(&g_lock);
         return 1;
     }
@@ -96,7 +134,7 @@ uint32_t Storm_Sub16D90(int* param_1, Storm_Enum105 param_2) {
     uint32_t uVar4 = (param_1 == nullptr || *param_1 == 0x24) ? 0xFFFFFFFFu : 0u;
     if ((-(uint32_t)(param_2 != nullptr) & uVar4) == 0) {
         g_lastError = 0x57;
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     EnterCriticalSection(&g_lock);
@@ -131,13 +169,13 @@ uint32_t Storm_Sub10720(uint32_t param_1, void* param_2, uint32_t param_3, uint3
     if (param_4 != nullptr) *param_4 = 0;
     if (g_smack == nullptr) {
         g_lastError = 0x4b4;
-        SetLastError(0x4b4);
+        StormSetLastError(0x4b4);
         LeaveCriticalSection(&g_lock);
         return 0;
     }
     if (g_41b4c == 0xFF) {
         g_lastError = 0x85100070;
-        SetLastError(0x85100070);
+        StormSetLastError(0x85100070);
         LeaveCriticalSection(&g_lock);
         return 0;
     }
@@ -154,7 +192,7 @@ uint32_t Storm_Sub10720(uint32_t param_1, void* param_2, uint32_t param_3, uint3
             puVar5 = (uint8_t*)g_45358;
             if (g_45358 == nullptr) {
                 g_lastError = 0x57;
-                SetLastError(0x57);
+                StormSetLastError(0x57);
                 LeaveCriticalSection(&g_lock);
                 return 0;
             }
@@ -162,7 +200,7 @@ uint32_t Storm_Sub10720(uint32_t param_1, void* param_2, uint32_t param_3, uint3
         case 6: puVar5 = (uint8_t*)&g_45170; srcLen = 4; break;
         default:
             g_lastError = 0x57;
-            SetLastError(0x57);
+            StormSetLastError(0x57);
             LeaveCriticalSection(&g_lock);
             return 0;
     }
@@ -183,7 +221,7 @@ uint32_t Storm_Sub10610(uint32_t param_1, uint32_t* param_2) {
     if ((-(uint32_t)(param_2 != nullptr) & (uint32_t)((param_1 == 0) - 1) &
          (uint32_t)((4 < param_1) - 1)) == 0) {
         g_lastError = 0x57;
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     EnterCriticalSection(&g_lock);
@@ -195,7 +233,7 @@ uint32_t Storm_Sub10610(uint32_t param_1, uint32_t* param_2) {
         } else {
             if (param_1 != 2 && param_1 != 4) {
                 g_lastError = 0x57;
-                SetLastError(0x57);
+                StormSetLastError(0x57);
                 LeaveCriticalSection(&g_lock);
                 return 0;
             }
@@ -217,7 +255,7 @@ uint32_t Storm_Sub10610(uint32_t param_1, uint32_t* param_2) {
         return 1;
     }
     g_lastError = 0x4b4;
-    SetLastError(0x4b4);
+    StormSetLastError(0x4b4);
     LeaveCriticalSection(&g_lock);
     return 0;
 }
@@ -232,7 +270,7 @@ uint32_t Storm_Sub104F0(uint32_t* param_1, uint32_t* param_2, int32_t* param_3) 
     uint8_t bVar1 = g_41b4c;
     if (g_smack == nullptr) {
         g_lastError = 0x4b4;
-        SetLastError(0x4b4);
+        StormSetLastError(0x4b4);
     } else {
         if (g_41b4c != 0xFF) {
             if (param_1 != nullptr) *param_1 = (uint32_t)g_41b4c + (uint32_t)iVar2;
@@ -261,7 +299,7 @@ uint32_t Storm_Sub104F0(uint32_t* param_1, uint32_t* param_2, int32_t* param_3) 
             return 1;
         }
         g_lastError = 0x85100070;
-        SetLastError(0x85100070);
+        StormSetLastError(0x85100070);
     }
     LeaveCriticalSection(&g_lock);
     return 0;
@@ -271,7 +309,7 @@ uint32_t Storm_Sub104F0(uint32_t* param_1, uint32_t* param_2, int32_t* param_3) 
 uint32_t Storm_Sub16030(int32_t* param_1) {
     if (param_1 == nullptr) {
         g_lastError = 0x57;
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     EnterCriticalSection(&g_lock);
@@ -279,7 +317,7 @@ uint32_t Storm_Sub16030(int32_t* param_1) {
     *param_1 = 0;
     if (bVar3) {
         g_lastError = 0x4b4;
-        SetLastError(0x4b4);
+        StormSetLastError(0x4b4);
     } else {
         if (g_41b4c != 0xFF) {
             Storm_Sub14F20();
@@ -313,7 +351,7 @@ uint32_t Storm_Sub16030(int32_t* param_1) {
             }
         }
         g_lastError = 0x85100070;
-        SetLastError(0x85100070);
+        StormSetLastError(0x85100070);
     }
     LeaveCriticalSection(&g_lock);
     return 0;
@@ -324,7 +362,7 @@ uint32_t Storm_Sub103F0(uint32_t param_1, uint32_t* param_2, uint32_t* param_3, 
                         FILETIME* param_5, uint32_t* param_6) {
     if (param_1 == 0 || param_1 > 0xF || param_2 == nullptr) {
         g_lastError = 0x57;
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     EnterCriticalSection(&g_lock);
@@ -358,7 +396,7 @@ uint32_t Storm_Sub103F0(uint32_t param_1, uint32_t* param_2, uint32_t* param_3, 
 uint32_t Storm_Sub102E0(int32_t param_1, int32_t* param_2) {
     if (param_2 == nullptr || *param_2 == 0x24) {
         g_lastError = 0x57;
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     EnterCriticalSection(&g_lock);
@@ -367,10 +405,10 @@ uint32_t Storm_Sub102E0(int32_t param_1, int32_t* param_2) {
     uint8_t* iVar1 = g_archive0;
     if (g_smack == nullptr || g_archive0 == nullptr) {
         g_lastError = 0x4b4;
-        SetLastError(0x4b4);
+        StormSetLastError(0x4b4);
     } else if (g_41b4c == 0xFF) {
         g_lastError = 0x85100070;
-        SetLastError(0x85100070);
+        StormSetLastError(0x85100070);
     } else {
         int32_t* iVar2 = Storm_SubFEB0(param_1 - g_45830);
         if (iVar2 != nullptr) {
@@ -381,7 +419,7 @@ uint32_t Storm_Sub102E0(int32_t param_1, int32_t* param_2) {
             return 1;
         }
         g_lastError = 0x8510006a;
-        SetLastError(0x8510006a);
+        StormSetLastError(0x8510006a);
     }
     LeaveCriticalSection(&g_lock);
     return 0;
@@ -391,7 +429,7 @@ uint32_t Storm_Sub102E0(int32_t param_1, int32_t* param_2) {
 uint32_t Storm_Sub10200(int32_t param_1, uint8_t* param_2, int32_t param_3) {
     if (param_2 == nullptr || param_3 == 0) {
         g_lastError = 0x57;
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     EnterCriticalSection(&g_lock);
@@ -399,10 +437,10 @@ uint32_t Storm_Sub10200(int32_t param_1, uint8_t* param_2, int32_t param_3) {
     *param_2 = 0;
     if (bVar2) {
         g_lastError = 0x4b4;
-        SetLastError(0x4b4);
+        StormSetLastError(0x4b4);
     } else if (g_41b4c == 0xFF) {
         g_lastError = 0x85100070;
-        SetLastError(0x85100070);
+        StormSetLastError(0x85100070);
     } else {
         uint8_t* iVar1 = (uint8_t*)(uintptr_t)Storm_SubFEB0(param_1 - g_45830);
         if (iVar1 != nullptr && (*(uint8_t*)(iVar1 + 0x118) & 4) == 0) {
@@ -411,7 +449,7 @@ uint32_t Storm_Sub10200(int32_t param_1, uint8_t* param_2, int32_t param_3) {
             return 1;
         }
         g_lastError = 0x8510006a;
-        SetLastError(0x8510006a);
+        StormSetLastError(0x8510006a);
     }
     LeaveCriticalSection(&g_lock);
     return 0;
@@ -421,7 +459,7 @@ uint32_t Storm_Sub10200(int32_t param_1, uint8_t* param_2, int32_t param_3) {
 uint32_t Storm_Sub10140(int32_t* param_1) {
     if (param_1 == nullptr || *param_1 == 0x24) {
         g_lastError = 0x57;
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     EnterCriticalSection(&g_lock);
@@ -433,7 +471,7 @@ uint32_t Storm_Sub10140(int32_t* param_1) {
         return 1;
     }
     g_lastError = 0x4b4;
-    SetLastError(0x4b4);
+    StormSetLastError(0x4b4);
     LeaveCriticalSection(&g_lock);
     return 0;
 }
@@ -448,10 +486,10 @@ uint32_t Storm_Sub12170(uint32_t param_1, uint32_t param_2, uint32_t* param_3, u
     uint32_t local_50[20];
     if (g_smack == nullptr) {
         g_lastError = 0x4b4;
-        SetLastError(0x4b4);
+        StormSetLastError(0x4b4);
     } else if (Storm_Sub11F10(param_3, param_4, param_5, local_b0, local_50, local_a0) == 0) {
         g_lastError = 0x57;
-        SetLastError(0x57);
+        StormSetLastError(0x57);
     } else {
         auto cb = (int32_t (*)(uint32_t, uint8_t*, uint32_t*, uint32_t*, uint32_t*)) *
             (void**)((uint8_t*)g_smack + 0x20);
@@ -477,7 +515,7 @@ uint32_t Storm_Sub170B0(uint32_t param_1, uint32_t param_2, uint32_t* param_3, u
     uint32_t local_50[20];
     if (Storm_Sub11F10(param_3, param_4, param_5, local_b0, local_50, local_a0) == 0) {
         g_lastError = 0x57;
-        SetLastError(0x57);
+        StormSetLastError(0x57);
     } else {
         Storm_Sub36020(0x534e4554, 1);
         Storm_Sub36020(0x534e4554, 2);
@@ -504,7 +542,7 @@ uint32_t Storm_Sub170B0(uint32_t param_1, uint32_t param_2, uint32_t* param_3, u
             }
         } else {
             g_lastError = 0xA4;
-            SetLastError(0xA4);
+            StormSetLastError(0xA4);
         }
     }
     LeaveCriticalSection(&g_lock);

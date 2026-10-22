@@ -206,6 +206,9 @@ static void DUNGEON_InitializeAdjacentRooms(D2ActiveRoomStrc* pRoom)
 }
 
 //D2Common.0x6FD8BC50
+// 1.13c D2Common+0x3C720 (retail's body from the assert on: the low-seed init and the stack/EBP
+// inputs come from its caller-side prologue at 0x3C6xx; fields, list-link order and the
+// 3C200 -> 4D010 -> callback tail match)
 D2ActiveRoomStrc* __fastcall DUNGEON_AllocRoom(D2DrlgActStrc* pAct, D2DrlgRoomStrc* pDrlgRoom, D2DrlgCoordsStrc* pDrlgCoords, D2DrlgRoomTilesStrc* pRoomTiles, int nLowSeed, uint32_t dwFlags)
 {
 	D2_ASSERT(pAct);

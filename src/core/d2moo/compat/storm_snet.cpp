@@ -30,3 +30,15 @@ extern "C" int storm_sub_14210(const char* a0, const char* a1, const char* a2, c
                                uint32_t a7, uint32_t a8, uint32_t* a9) {
     return storm_sub_13eb0(a0, a1, a2, a3, 0, 0, a4, a5, a6, a7, (const char*)(uintptr_t)a8, a9);
 }
+
+// 1.13c Storm+0xFDF0: SNet worker-thread stop. Retail signals and joins the thread behind the handle global (RVA 0x55854),
+// then clears it; ours never starts one (handle is 0), so the guard is false and nothing happens.
+extern "C" void storm_sub_fdf0() {}
+
+// 1.13c Storm+0x11690: drains the two SNet message queues (list heads at RVA 0x55A3C / 0x55A64, count at +8) by calling
+// sub_11630 while a count is positive. Ours never queues (counts stay 0), so both loops fall through.
+extern "C" void storm_sub_11690() {}
+
+// 1.13c Storm+0x11630: SNet queue teardown (register-passed list head): runs the message drain (0x115B0) 13 times, then frees
+// the list object (0x52D0) and its allocation (0x1B960). Ours has no queues (see 11690), so every drain finds count 0 and there is no object to free.
+extern "C" void storm_sub_11630() {}

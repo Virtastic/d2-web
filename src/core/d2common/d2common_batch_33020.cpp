@@ -49,13 +49,40 @@ EMSCRIPTEN_KEEPALIVE D2SetItemsTxt* D2Common_10218_ITEMS_GetSetItemsTxtRecordFro
 // refresh the room (+0x665C0); if the list is an extended one (flags +0x10 < 0) find the state-0x62
 // list in the two child chains (+0x3C, +0x40, next +0x2C, state +0x14), expire and free it. Always
 // clears unit flag 0x400 (+0xC8).
-extern "C" {
-__attribute__((weak)) void d2_sub_32CA0_10210(int32_t nType, int32_t nId) { (void)nType; (void)nId; }
+// 1.13c D2Common+0x32CA0: owner-identity writer (unit in EDI, type/id on the stack).
+static void SetOwnerSourceUnit(D2UnitStrc* pUnit, int32_t nType, int32_t nId)
+{
+	if (!pUnit) return;
+	pUnit->dwOwnerType = nType;
+	pUnit->dwOwnerGUID = nId;
+	if (pUnit->pStatListEx) {
+		if (sgptDataTables->nStatesTxtRecordCount > 0x62) {
+			STATES_ToggleState(pUnit, 0x62, TRUE);
+			UNITROOM_RefreshUnit(pUnit);
+		}
+		D2StatListStrc* pFound = nullptr;
+		D2StatListExStrc* pEx = pUnit->pStatListEx;
+		if (pEx && (pEx->dwFlags & 0x80000000u)) {
+			for (D2StatListStrc* c = pEx->pMyLastList; c && !pFound; c = c->pPrevLink)
+				if (c->dwStateNo == 0x62) pFound = c;
+			for (D2StatListStrc* c = pEx->pMyStats; c && !pFound; c = c->pPrevLink)
+				if (c->dwStateNo == 0x62) pFound = c;
+		}
+		if (!pFound) {
+			pFound = STATLIST_AllocStatList(pUnit->pMemoryPool, 0, 0, pUnit->dwUnitType, pUnit->dwUnitId);
+			if (!pFound) return;
+			pFound->dwStateNo = 0x62;
+			D2COMMON_10475_PostStatToStatList(pUnit, pFound, TRUE);
+		}
+		STATLIST_SetStat(pFound, 0x161, nType, 0);
+		STATLIST_SetStat(pFound, 0x162, nId, 0);
+	}
+	pUnit->dwFlagEx |= 0x400u;
 }
 
 extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_10210_sub_33020(D2UnitStrc* pUnit, int32_t* pOwner)
 {
-	if (pOwner) { d2_sub_32CA0_10210(pOwner[0], pOwner[3]); return; }
+	if (pOwner) { SetOwnerSourceUnit(pUnit, pOwner[0], pOwner[3]); return; }
 	if (!pUnit) return;
 	pUnit->dwOwnerType = 0;
 	pUnit->dwOwnerGUID = 0;

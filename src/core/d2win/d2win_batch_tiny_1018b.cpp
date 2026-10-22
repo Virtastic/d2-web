@@ -107,3 +107,13 @@ extern "C"
 EMSCRIPTEN_KEEPALIVE void d2win_cexit(void) {
     d2win_doexit(0, 0, 1, nullptr);
 }
+
+extern "C" [[noreturn]] void d2_mcp_startup_overflow(uint32_t message); // Fog#10265(msg)/#10024("") then _exit(-1); C linkage like realm/mcp_startup.h
+
+// 1.13c D2Win+0x164A0 (41 B, __fastcall ecx=p): p->kind (+0) must be 8, else fatal (Fog code 0x3B,
+// _exit(-1)); on success clear the dword at +0x30.
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2win_sub_164A0(uint32_t* p) {
+    if (p[0] != 8) d2_mcp_startup_overflow(0x3b);
+    p[0xc] = 0;
+}

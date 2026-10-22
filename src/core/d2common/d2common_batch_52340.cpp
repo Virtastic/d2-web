@@ -21,8 +21,12 @@ W bool sub_52210(intptr_t skill);                                // 0x52210
 // 1.13c D2Common+0x52340: skill usability check. param_1 = unit, param_2 = skill (dwords:
 // +0 record ptr (32-bit), +0x28 level, +0x34 -1 = add bonus level). Returns a reason code, 0 = ok-ish.
 EMSCRIPTEN_KEEPALIVE int32_t sub_52340(int32_t* param_1, int32_t* param_2) {
+ // Weak seams: trap rather than jump to 0 / read a null table. (gdwBitMasks_exref is a zero
+ // placeholder when unlinked, its values are not settled here.)
+ if (!sub_4FCB0 || !sub_4F590 || !sub_4FDC0 || !sub_50930 || !sub_50AF0 || !sub_50870 || !sub_50F00 ||
+     !sub_52210 || !DAT_6fdf0b50) __builtin_trap();
  if (!param_2) {
-  Ordinal_10024(DAT_6fdda728, Ordinal_10265(0x8ea));
+  if (Ordinal_10265 && Ordinal_10024) Ordinal_10024(DAT_6fdda728, Ordinal_10265(0x8ea));
   __builtin_trap(); // retail: _exit(-1)
  }
  const uint8_t* rec = reinterpret_cast<const uint8_t*>(static_cast<intptr_t>(static_cast<uint32_t>(param_2[0])));

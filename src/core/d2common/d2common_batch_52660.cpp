@@ -325,10 +325,23 @@ void D2Common_31850_SetCollisionWithSize(D2UnitStrc* pUnit, D2ActiveRoomStrc* pR
 	}
 }
 
+static int32_t StatArray_Find25(const D2StatsArrayStrc* a)
+{
+	int32_t lo = 0, hi = (int16_t)a->nStatCount;
+	while (lo < hi)
+	{
+		const int32_t mid = lo + (hi - lo) / 2;
+		const int32_t id = *(const int32_t*)&a->pStat[mid];
+		if (id < 25) lo = mid + 1;
+		else if (id > 25) hi = mid;
+		else return mid;
+	}
+	return -1;
+}
+
 // 1.13c D2Common+0x4FE80 (#10037) skill stat value: guards, state 0x2A membership, the
 // itemstatcost record 25 value scaled by skills.txt dwParam[0] and divided by 8.
-// partial: the record-25 value (0x38B00) is not translated, so the scaled result is 0 while no
-// itemstatcost record 25 text row exists.
+// 0x38B00 (stat 25 value with the FMIN floor, register args ebx=stat list, edi=25) is inlined.
 int32_t D2Common_4FE80_GetSkillStatValue(D2UnitStrc* pUnit, int32_t nSkillId)
 {
 	if (!pUnit) return 0;
@@ -359,7 +372,20 @@ int32_t D2Common_4FE80_GetSkillStatValue(D2UnitStrc* pUnit, int32_t nSkillId)
 
 	if (!pStateList) return 0;
 
-	int32_t nValue = 0; // 0x38B00(itemstatcost row 25) not translated
+	int32_t nValue = 0;
+	D2ItemStatCostTxt* pRec = (sgptDataTables->nItemStatCostTxtRecordCount < 0x1A) ? nullptr : &sgptDataTables->pItemStatCostTxt[25];
+	if (pRec)
+	{
+		const int nIdx = pStatList->Stats.nStatCount ? StatArray_Find25(&pStatList->Stats) : -1;
+		if (nIdx >= 0)
+		{
+			nValue = pStatList->Stats.pStat[nIdx].nValue;
+			D2UnitStrc* pOwner = pStatList->pOwner;
+			if ((pRec->dwItemStatFlags & gdwBitMasks[8]) && (int32_t)pStatList->dwFlags < 0 && pOwner
+				&& (pOwner->dwUnitType == 0 || pOwner->dwUnitType == 1) && nValue < pRec->dwMinAccr)
+				nValue = pRec->dwMinAccr << (pRec->nValShift & 0x1F);
+		}
+	}
 
 	if (nSkillId >= 0 && nSkillId < sgptDataTables->nSkillsTxtRecordCount)
 	{
@@ -372,9 +398,9 @@ int32_t D2Common_4FE80_GetSkillStatValue(D2UnitStrc* pUnit, int32_t nSkillId)
 
 // 1.13c D2Common+0x3C810 (#10043) compare the stat-flag pointers reached from two retail 32-bit
 // images and adjust a counter by -1/+1 when they differ.
-// partial: 0x2DF80's counter adjustment (unit +0xC/+0x1D4/+0x1D0/+0x1B4 and its 8-slot array)
-// is not translated, so a difference currently has no effect.
-void D2Common_3C810_CompareStatFlags(const uint8_t* pFirst, const uint8_t* pSecond)
+extern "C" void d2_fn_d2common_2df80(uint32_t pContext, int32_t nDelta);
+// pContext is retail's ESI, passed through untouched to 0x2DF80.
+void D2Common_3C810_CompareStatFlags(const uint8_t* pFirst, const uint8_t* pSecond, uint32_t pContext)
 {
 	const uint32_t nRecFirst = pFirst ? *(const uint32_t*)(pFirst + 0x10) : 0;
 	const uint32_t nRecSecond = pSecond ? *(const uint32_t*)(pSecond + 0x10) : 0;
@@ -384,7 +410,7 @@ void D2Common_3C810_CompareStatFlags(const uint8_t* pFirst, const uint8_t* pSeco
 
 	if (nFlagsFirst != nFlagsSecond)
 	{
-		// if (nFlagsFirst) D2Common_2DF80_AdjustCounter(-1);
-		// if (nFlagsSecond) D2Common_2DF80_AdjustCounter(1);
+		if (nFlagsFirst) d2_fn_d2common_2df80(pContext, -1);
+		if (nFlagsSecond) d2_fn_d2common_2df80(pContext, 1);
 	}
 }

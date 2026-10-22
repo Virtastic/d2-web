@@ -27,7 +27,7 @@ bool Storm_Sub257F0(char** string, int32_t* entry, uint32_t* listHead, void* cal
 void Storm_Sub24CD0(void* errorHandler);
 
 uint32_t rd32(const void* p) { uint32_t v; std::memcpy(&v, p, 4); return v; }
-void SetLastError(uint32_t e) { g_lastError = (int32_t)e; }
+void StormSetLastError(uint32_t e) { g_lastError = (int32_t)e; }
 
 const char kDelims[] = " ,;\"\t\n\r\x1a";
 
@@ -41,7 +41,7 @@ extern "C"
 int32_t Storm_Sub25890(char** string, uint32_t param_2, void* callback, void* errorHandler) {
     if (string == nullptr) {
         g_lastError = 0x57;
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     if (param_2 != 0) Storm_Sub3B3A0(string, nullptr, nullptr, kDelims, nullptr);

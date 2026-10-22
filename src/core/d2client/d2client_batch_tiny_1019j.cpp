@@ -51,6 +51,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_521a0(int32_t span, uint32_t* deadline, cons
 // (0xCACC4 = fistpll under the default FPU mode). The DAT_6fbd3710 != 0 branch (0xC9FF7 opcode 0x0D) is
 // the CRT's software x87 divide and produces the same quotient. Integer arithmetic below is exact:
 // every uint32 operand is exact in x87 and an exact .5 quotient has a finite binary representation.
+// 1.13c D2Client+0x636A0
 static uint64_t d2_client_636a0_body(const void* self, int32_t ecx, int32_t edx) {
     const uint32_t n = *reinterpret_cast<const uint32_t*>(static_cast<const uint8_t*>(self) + 0x120);
     const uint64_t num = (uint64_t)(uint32_t)(n - 1) * (uint64_t)(uint32_t)(ecx - edx + 1);

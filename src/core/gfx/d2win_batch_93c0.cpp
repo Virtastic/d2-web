@@ -310,6 +310,27 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_114A0(void* box, const char* text, uint3
     return 1;
 }
 
+extern "C" __attribute__((weak)) void Storm_Close252(uint32_t h);
+extern "C" __attribute__((weak)) void Fog_Free10043(void* p, int32_t a, int32_t b);
+void* d2win_g_6f9a9cc4;                          // 0xA340 (only ever released here)
+
+// 1.13c D2Win+0x0A340
+// Release six MPQ handle boxes in order d8, c0, c4, b4, c8, dc. Each non-null box: Storm #252 on *box
+// if nonzero, *box = 0, Fog #10043(0x26e,0), global = null.
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2win_sub_A340(void) {
+    void** g[6] = {&d2win_g_6f9a9cd8, &d2win_g_6f9a9cc0, &d2win_g_6f9a9cc4,
+                   &d2win_g_6f9a9cb4, &d2win_g_6f9a9cc8, &d2win_g_6f9a9cdc};
+    for (void** p : g) {
+        uint32_t* b = (uint32_t*)*p;
+        if (!b) continue;
+        if (*b && Storm_Close252) Storm_Close252(*b);
+        *b = 0;
+        if (Fog_Free10043) Fog_Free10043(nullptr, 0x26e, 0);
+        *p = nullptr;
+    }
+}
+
 // 1.13c D2Win+0x0A890 (export #10005, 396 bytes): open the game's MPQs. __fastcall: ECX and EDX are
 // the two arguments 0x7E60 receives as its last stack words; two stack arguments follow (ret 8), the
 // second of which is an optional object whose function pointer at +0x20D must return nonzero to take

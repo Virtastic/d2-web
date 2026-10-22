@@ -180,3 +180,34 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4fdc0(uint32_t unit,uint
   (!e || !e->tables || i32(p(e->tables),0xc4)<13 || !e->state || !e->state(12))) return 0;
  return 1;
 }
+
+struct D2Common20E80Env {
+ int32_t (*weapon_class)(uint32_t,uint32_t,uint32_t*,int32_t,int32_t); // +0x441E0
+ uint8_t (*slot)(uint32_t); // +0x231E0
+ uint32_t (*component)(uint32_t,int32_t); // +0x20830
+ uint32_t (*items_txt)(uint32_t); // +0x719A0
+ uint32_t (*item_by_code)(uint32_t); // +0x71960
+ uint32_t (*composite)(uint32_t,uint32_t,uint32_t); // +0x1FB50, args unknown: unit,item,record
+};
+// 1.13c D2Common+0x20E80: bow/crossbow items set composite byte 5 or 6 of the weapon-held tables.
+// Null unit/item is fatal in retail (_exit); here it is a no-op.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_20e80(uint32_t unit,uint32_t out_a,uint32_t out_b,
+ uint32_t item,const D2Common20E80Env* e) {
+ if (!unit || !item || !e) return;
+ uint32_t data=u32(p(item),0x14);
+ if (i32(p(item),0)!=4 || !data) return;
+ uint8_t t=p(data)[0x44]; if (t!=4 && t!=5) return;
+ uint32_t inv=u32(p(unit),0x60), tmp=out_a;
+ int32_t code=e->weapon_class(unit,inv,&tmp,-1,1);
+ uint8_t slot=e->slot(item);
+ if (code==0x20776278) {
+  if ((slot!=5 && slot!=6) || !inv) return;
+  uint32_t c=e->component(inv,5); if (!c) return;
+  uint32_t rec=e->items_txt(u32(p(c),4)); if (!rec) return; // retail: fatal
+  int32_t n=static_cast<int32_t>(e->composite(unit,item,rec));
+  if (n>0) p(out_a)[6]=static_cast<uint8_t>(n); else p(out_a)[6]=p(out_b)[6]=0xff;
+ } else if (code==0x20776f62 && slot==6 && e->item_by_code(0x2074696c)) {
+  uint32_t n=e->composite(unit,item,0);
+  if (n==0) p(out_a)[5]=p(out_b)[5]=0xff; else p(out_a)[5]=static_cast<uint8_t>(n);
+ }
+}

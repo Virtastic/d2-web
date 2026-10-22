@@ -8,6 +8,19 @@
 #include "DataTbls/ItemsTbls.h"
 #include "DataTbls/MonsterTbls.h"
 
+extern "C" {
+__attribute__((weak)) uint32_t Ordinal_10265(uint32_t);
+__attribute__((weak)) void Ordinal_10024(const void*, uint32_t);
+__attribute__((weak)) char DAT_6fdda728[1];
+}
+// retail fatal: Ordinal_10024(&DAT_6fdda728, Ordinal_10265(code)); _exit(-1). Seams are weak; skip if unlinked.
+[[noreturn]] static void d2_fatal(uint32_t code)
+{
+    if (Ordinal_10265 && Ordinal_10024)
+        Ordinal_10024(DAT_6fdda728, Ordinal_10265(code));
+    __builtin_trap();
+}
+
 // 1.13c D2Common+0x1A330 (#10065): monster chain-id pair lookup.
 // pUnit must be a UNIT_MONSTER (dwUnitType 0, +0x00); dwClassId (+0x04) indexes monsters.txt
 // (stride 0x1A8) and its byte +0x4B (nChainId) must be <= 3 (else retail fatals with 0x2C8).
@@ -18,15 +31,15 @@ uint32_t D2Common_1A330_MonsterChainPair(const void* pUnit, uint32_t* pOutChain,
 {
     static_assert(offsetof(D2MonStatsTxt, nChainId) == 0x4B, "monsters.txt nChainId");
     static const uint32_t kChainPair[4][2] = { { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 } };
-    if (pUnit == nullptr || pOutChain == nullptr || pOutMax == nullptr)
-        return 0;
+    if (pOutChain == nullptr || pOutMax == nullptr)
+        return 0;                                   // retail has no check (would fault)
     const uint32_t* u = static_cast<const uint32_t*>(pUnit);
-    if (u[0] != 1)                                  // retail fatal 700: not a monster unit
-        return 0;
+    if (pUnit == nullptr || u[0] != 1)
+        d2_fatal(700);                              // not a monster unit
     const D2MonStatsTxt* pRow = DATATBLS_GetMonStatsTxtRecord(static_cast<int32_t>(u[1]));
     uint32_t nChain = pRow != nullptr ? pRow->nChainId : 0;  // out of range -> 0, as retail
-    if (nChain > 3)                                 // retail fatal 0x2C8
-        return 0;
+    if (nChain > 3)
+        d2_fatal(0x2C8);
     *pOutChain = kChainPair[nChain][0];
     *pOutMax   = kChainPair[nChain][1];
     return 1;
@@ -59,21 +72,25 @@ int32_t D2Common_2A210_InventoryRepairCount(void* pArg1, void* pUnit, int32_t nA
 }
 
 // 1.13c D2Common+0x22880 (#10081): items.txt row nItemId, byte +0x13E (nGemApplyType).
-// Out of range is fatal in retail (_exit); we return 0, as DATATBLS_GetItemsTxtRecord does.
+// Out of range is fatal in retail (_exit).
 uint32_t D2Common_22880_ItemGemApplyType(uint32_t nItemId)
 {
     static_assert(offsetof(D2ItemsTxt, nGemApplyType) == 0x13E, "items.txt nGemApplyType");
     const D2ItemsTxt* pRow = DATATBLS_GetItemsTxtRecord(static_cast<int32_t>(nItemId));
-    return pRow != nullptr ? pRow->nGemApplyType : 0;
+    if (!pRow)
+        d2_fatal(0xF29);   // retail: 0x1EF if the table is unloaded, else 0xF29; the getter cannot tell them apart
+    return pRow->nGemApplyType;
 }
 
 // 1.13c D2Common+0x230A0 (#10082): items.txt row nItemId, int16 at +0x11E (wType[0]), sign-extended.
-// Out of range is fatal in retail; we return 0.
+// Out of range is fatal in retail.
 int32_t D2Common_230A0_ItemTypeFromItemId(uint32_t nItemId)
 {
     static_assert(offsetof(D2ItemsTxt, wType) == 0x11E, "items.txt wType");
     const D2ItemsTxt* pRow = DATATBLS_GetItemsTxtRecord(static_cast<int32_t>(nItemId));
-    return pRow != nullptr ? static_cast<int16_t>(pRow->wType[0]) : 0;
+    if (!pRow)
+        d2_fatal(0x68E);   // retail: 0x1EF if the table is unloaded, else 0x68E
+    return static_cast<int16_t>(pRow->wType[0]);
 }
 
 // 1.13c D2Common+0x27090 (#10087): item usability gate.

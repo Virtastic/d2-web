@@ -20,6 +20,7 @@ __attribute__((weak)) uint32_t D2Common_66800(void* unit, uint32_t room);
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_36030(int32_t y, uint32_t* unit, int32_t flag, int32_t x, uint32_t room)
 {
 	uint32_t* p = static_cast<uint32_t*>(Fog_Alloc10045("..\\Source\\D2Common\\PATH\\Path.cpp", 0x453, 0));
+	if (!p) { Fog_Fatal10265_10024(0x870); return; }
 	std::memset(p, 0, 0x200);
 	unit[0xb] = static_cast<uint32_t>(reinterpret_cast<intptr_t>(p));
 	p[0xc] = static_cast<uint32_t>(reinterpret_cast<intptr_t>(unit));

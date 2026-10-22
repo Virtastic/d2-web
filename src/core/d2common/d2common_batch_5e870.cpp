@@ -7,7 +7,7 @@
 extern "C" {
 #define W __attribute__((weak))
 W void Ordinal_10046(const char* file, int32_t line, int32_t z);
-W void Ordinal_10043(int32_t a, int32_t b);
+__attribute__((weak)) W void Ordinal_10043(int32_t a, int32_t b);
 W void Ordinal_10212(uint32_t p);
 W void d2_fn_d2common_18f90();
 W void d2_fn_d2common_53bd0();
@@ -115,7 +115,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_5e870() {
   d2_fn_d2common_18f90();
   leak(DAT_6fdf0b50);
   if (V(DAT_6fdf0b4c)) {
-    Ordinal_10043(0xbb,0);
+     Ordinal_10043(0xbb,0);
     Ordinal_10046("..\\Source\\D2Common\\DATATBLS\\AnimTbls.cpp",0xbc,0);
   }
   d2_fn_d2common_54200();

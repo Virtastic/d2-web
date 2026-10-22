@@ -8,6 +8,8 @@
 // Prior art: D2MOO 1.10f reference/D2MOO/source/D2CMP (export map only; the CRT starts are stubs).
 #include <cstdint>
 #include <cstddef>
+#include <cstdlib>
+#include <unistd.h>
 #include <Windows.h>   // CRITICAL_SECTION no-ops under wasm
 
 // 0x6FE32060: CRT _locktable, a pointer plus its debug dword every 8 bytes; _lock/_unlock index the
@@ -62,4 +64,42 @@ void d2cmp_28d0(uint32_t code) {
 extern "C"
 void d2cmp_28e1(uint32_t code) {
     d2cmp_280d(code, 1, 0);
+}
+
+// CRT exit state: 0x6FE34640 _C_Exit_Done-style flag, 0x6FE3463C retcaller byte, 0x6FE34644 dying,
+// 0x6FF14FB0/0x6FF14FAC the _onexit table begin/end, 0x6FE32030/0x6FE3203C the two terminator
+// tables (xp / xt). Tables are linker-built host state, empty under wasm.
+static uint32_t g_d2cmp_6fe34640, g_d2cmp_6fe34644;
+static uint8_t g_d2cmp_6fe3463c;
+static void** g_d2cmp_onexit_begin;   // DAT_6ff14fb0
+static void** g_d2cmp_onexit_end;     // DAT_6ff14fac
+static void* g_d2cmp_xp_6fe32030[1];
+static void* g_d2cmp_xt_6fe3203c[1];
+
+// 1.13c D2CMP+0x0280D (181 bytes): _doexit(code, fast, retcaller). Lock 8; if already dying,
+// TerminateProcess; set the exit flags; unless fast, drain the _onexit table backwards and run the
+// first terminator table; always run the second; unlock (0x28BC); a nonzero retcaller returns,
+// else mark dying and end the process via ___crtExitProcess (0x2749, a host no-op here).
+// 1.13c D2CMP+0x0280D
+extern "C"
+void d2cmp_280d(uint32_t code, int32_t fast, int32_t retcaller) {
+    EnterCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(
+        static_cast<uintptr_t>(g_d2cmp_locktable_6fe32060[8 * 2])));
+    if (g_d2cmp_6fe34644 == 1) _exit((int)code);   // TerminateProcess(GetCurrentProcess(), code)
+    g_d2cmp_6fe34640 = 1;
+    g_d2cmp_6fe3463c = static_cast<uint8_t>(retcaller);
+    if (fast == 0) {
+        if (g_d2cmp_onexit_begin != nullptr) {
+            while (--g_d2cmp_onexit_end, g_d2cmp_onexit_begin <= g_d2cmp_onexit_end) {
+                if (*g_d2cmp_onexit_end != nullptr)
+                    reinterpret_cast<void (*)()>(*g_d2cmp_onexit_end)();
+            }
+        }
+        d2cmp_278b(g_d2cmp_xp_6fe32030, g_d2cmp_xp_6fe32030);
+    }
+    d2cmp_278b(g_d2cmp_xt_6fe3203c, g_d2cmp_xt_6fe3203c);
+    d2cmp_28bc(static_cast<uint32_t>(retcaller));
+    if (retcaller != 0) return;
+    g_d2cmp_6fe34644 = 1;
+    // ___crtExitProcess(code): process end, host-side.
 }

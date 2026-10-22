@@ -26,7 +26,7 @@ struct D2GfxSbhEnv {
 
 // 1.13c D2Gfx+0x043D3
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2gfx_43d3(uint32_t region, uint32_t block,
+EMSCRIPTEN_KEEPALIVE int32_t d2_gfx_sbh_free_block_43d3(uint32_t region, uint32_t block,
                                               const D2GfxSbhEnv* env) {
     uint32_t uVar6 = P32(region)[4];                              // heap control block
     uint32_t puVar12 = block - 4;                                 // block header
@@ -139,4 +139,9 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2gfx_43d3(uint32_t region, uint32_t block,
     g_sbh_entry = region;
     g_sbh_seq = uVar14;
     return 0;
+}
+
+// FN-probe seam (the retail capture tool/fn/d2gfx-43d3.txt): pin the entry global, read entry/seq back.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_gfx_sbh_free_state(uint32_t set, uint32_t* entry, uint32_t* seq) {
+    if (set) { g_sbh_entry = *entry; g_sbh_seq = *seq; } else { *entry = g_sbh_entry; *seq = g_sbh_seq; }
 }

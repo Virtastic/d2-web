@@ -5235,6 +5235,7 @@ enum D2C_IzualAIParams
 };
 
 //D2Game.0x6FCDB3E0
+// 1.13c D2Game+0x7EA10 (fastcall ecx=pGame edx=pUnit, stack pAiTickParam; ChangeModeAndTargetUnit and the roll helpers are inlined in retail; no delta)
 void __fastcall AITHINK_Fn055_Izual(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	const int32_t nX = CLIENTS_GetUnitX(pAiTickParam->pTarget);

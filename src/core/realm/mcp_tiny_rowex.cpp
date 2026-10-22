@@ -122,10 +122,16 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_security_init_cookie(void) {
 // `cmp ecx, __security_cookie; jne report_failure; ret` -- equal returns; unequal tail-jumps to 0x4794
 // report_failure, which never returns (ExitProcess(3) on its final path). The compare is the rule; the
 // terminating branch is the engine's process-exit stand-in, src/core/realm/mcp_exit.cpp.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_security_cookie_set(uint32_t v) { g_stackCookie = v; }  // FN probe pin
+
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_mcp_security_check_cookie_with(uint32_t cookie, void (*fail)()) {
+    if (cookie != g_stackCookie) fail();   // retail: jne 0x4794 report_failure
+}
+static void mcp_cookie_exit() { std::exit(3); }
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_mcp_security_check_cookie(uint32_t cookie) {
-    if (cookie == g_stackCookie) return;
-    std::exit(3);
+    d2_mcp_security_check_cookie_with(cookie, mcp_cookie_exit);
 }
 
 // 1.13c D2MCPClient+0x01030: the 9-byte CRT wrapper `push 8; call 0x15A3 (__lock); pop ecx; ret`,

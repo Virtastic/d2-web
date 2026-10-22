@@ -72,6 +72,110 @@ extern "C" void d2cmp_17270(D2CMPLruCache& c, uint32_t identity, uint32_t budget
         + uintptr_t(capacity) * sizeof(D2CMPLruNode) - sizeof(D2CMPLruNode));
 }
 
+// ESI cache, EDI size hidden register args. Takes a free node onto the active
+// tail and charges size; null when full or over budget; fatal if no free node.
+// 1.13c D2CMP+0x171E0
+extern "C" D2CMPLruNode* d2cmp_171e0(D2CMPLruCache& c, uint32_t size) {
+    if (c.count == c.capacity || c.budget < c.used + size) return nullptr;
+    D2CMPLruNode* n = c.freeHead;
+    if (n) {
+        c.freeHead = n->next;
+        if (c.freeHead) c.freeHead->previous = nullptr;
+        else c.freeTail = nullptr;
+        n->next = n->previous = nullptr;
+    }
+    if (!c.tail) c.head = n;
+    else if (n) { c.tail->next = n; n->previous = c.tail; }
+    else c.tail->next = n;
+    c.tail = n;
+    if (!n) std::_Exit(-1);
+    ++c.count;
+    c.used += size;
+    return n;
+}
+
+// EAX size, EBX owner, ESI cache hidden register args (EDI = size for 171E0).
+// Evicts from the head until a node fits, then allocates the node's block.
+// 1.13c D2CMP+0x174B0
+extern "C" D2CMPLruNode* d2cmp_174b0(D2CMPLruCache& c, uint32_t size, D2CMPCachePayload* owner,
+    const D2CMPCacheMemory& memory) {
+    if (c.budget <= size) std::_Exit(-1);
+    ++c.misses;
+    ++c.hits;
+    D2CMPLruNode* n;
+    while (!(n = d2cmp_171e0(c, size))) {
+        if (c.count) {
+            if ((n = c.head)) {
+                c.head = n->next;
+                if (c.head) c.head->previous = nullptr;
+                else c.tail = nullptr;
+                n->next = n->previous = nullptr;
+                c.used -= n->bytes;
+                if (n->payload) c.destroyPayload(*n);
+                if (n->allocation) {
+                    memory.release(c.identity, n->allocation, lruFile, 200);
+                    n->allocation = nullptr;
+                    n->bytes = 0;
+                    n->payload = nullptr;
+                }
+                if (!c.freeTail) c.freeHead = n;
+                else {
+                    c.freeTail->next = n;
+                    n->previous = c.freeTail;
+                }
+                c.freeTail = n;
+            }
+            --c.count;
+        }
+    }
+    n->allocation = memory.allocate(c.identity, size, lruFile, 0x84);
+    if (!n->allocation) std::_Exit(-1);
+    n->bytes = size;
+    n->payload = owner;
+    return n;
+}
+
+// EAX node (null = head), EDI cache hidden register args. Unlinks the node
+// from the active list (17320 semantics), releases it, appends to the free tail.
+// 1.13c D2CMP+0x17400
+extern "C" void d2cmp_17400(D2CMPLruCache& c, D2CMPLruNode* n, const D2CMPCacheMemory& memory) {
+    if (!c.count) return;
+    if (!n) {
+        n = c.head;
+        if (!n) { --c.count; return; }
+        c.head = n->next;
+        if (c.head) c.head->previous = nullptr; else c.tail = nullptr;
+        n->next = n->previous = nullptr;
+    } else if (c.head) {
+        if (n == c.head) {
+            c.head = n->next;
+            if (c.head) c.head->previous = nullptr; else c.tail = nullptr;
+        } else if (n == c.tail) {
+            c.tail = n->previous;
+            c.tail->next = nullptr;
+        } else {
+            n->previous->next = n->next;
+            n->next->previous = n->previous;
+        }
+        n->next = n->previous = nullptr;
+    }
+    c.used -= n->bytes;
+    if (n->payload) c.destroyPayload(*n);
+    if (n->allocation) {
+        memory.release(c.identity, n->allocation, lruFile, 200);
+        n->allocation = nullptr;
+        n->bytes = 0;
+        n->payload = nullptr;
+    }
+    if (!c.freeTail) { c.freeHead = c.freeTail = n; }
+    else {
+        c.freeTail->next = n;
+        n->previous = c.freeTail;
+        c.freeTail = n;
+    }
+    --c.count;
+}
+
 // EDI cache was a hidden register argument. Count is decremented even when
 // no head exists; freeing the node table does not clear the other queue fields.
 // 1.13c D2CMP+0x175C0

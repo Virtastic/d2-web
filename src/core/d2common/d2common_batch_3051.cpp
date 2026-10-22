@@ -162,3 +162,33 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_41d00(const char* left,
     if (std::strlen(right) > 8) fatal(env, 0xd7);
     return std::memcmp(left, right, 8) == 0;
 }
+
+// Callees are explicit: lookupId=0x2D5B0 (id of the owner's room rect holding x,y),
+// getOrCreate=0x2D9B0, loadRoom=0x2E360, touch=0x2D600. `cur` is the register-passed room.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2e5c0(void* cur, int32_t x, int32_t y,
+    void* owner, void* room, const D2Common3051Env* env,
+    int32_t (*lookupId)(void*, int32_t, int32_t),
+    void* (*getOrCreate)(void*, int32_t), void (*loadRoom)(void*),
+    void (*touch)(void*, int32_t, int32_t)) { // 1.13c D2Common+0x2E5C0
+    auto inside = [&](void* r) {
+        return signed32(r, 0x34) <= x && signed32(r, 0x38) <= y &&
+            x < add32(signed32(r, 0x3c), signed32(r, 0x34)) &&
+            y < add32(signed32(r, 0x40), signed32(r, 0x38));
+    };
+    if (cur) {
+        if (inside(cur)) return;
+        void** list = static_cast<void**>(env->resolve(read32(cur, 8)));
+        for (int32_t i = 0; i < signed32(cur, 0x2c); i++) {
+            void* o = env->resolve(read32(list + i, 0));
+            if (o != cur && inside(o)) return;
+        }
+    }
+    if (!room) {
+        const int32_t id = lookupId(owner, x, y);
+        room = link(owner, 0x47c, env);
+        while (room && signed32(room, 0x1d0) != id) room = link(room, 0x1ac, env);
+        if (!room) room = getOrCreate(owner, id);
+    }
+    if (!read32(room, 0x10)) loadRoom(room);
+    touch(owner, x, y);
+}

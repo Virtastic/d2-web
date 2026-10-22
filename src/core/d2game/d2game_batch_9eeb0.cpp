@@ -14,7 +14,6 @@ namespace d2game_batch_9eeb0 {
 template <class T> static T rd(const void* p, int off) { T v; std::memcpy(&v, (const char*)p + off, sizeof v); return v; }
 template <class T> static void wr(void* p, int off, T v) { std::memcpy((char*)p + off, &v, sizeof v); }
 
-// 1.13c D2Game+0x9F340 : thunk to 9EEB0 with the stack arg at +0x18
 // 1.13c D2Game+0x9EEB0 : iterate a table callback; ctx offsets: 0 count,4,0xc,0x10,0x14,0x18 arg,0x1c arg,0x20 callback
 struct Hooks9EEB0 {
     uint32_t (*resolve)(uint32_t p1, uint32_t key);          // FUN 21b10
@@ -36,6 +35,7 @@ bool D2GAME_9EEB0_ForEach(uint32_t p1, const uint8_t* ctx, const Hooks9EEB0& h)
         h.cb(h.item(out[1], i), rd<uint32_t>(ctx, 0x18), rd<uint32_t>(ctx, 0x1c));
     return true;
 }
+// 1.13c D2Game+0x9F340 : thunk to 9EEB0 with the stack arg at +0x18
 bool D2GAME_9F340_Thunk(uint32_t stackArg18, const uint8_t* ctx, const Hooks9EEB0& h)
 {
     return D2GAME_9EEB0_ForEach(stackArg18, ctx, h);

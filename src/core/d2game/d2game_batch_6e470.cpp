@@ -25,7 +25,7 @@ void D2C_10408(void* unit);                        // Ordinal_10408
 void D2GAME_6DD60(int v);                          // 0x6DD60
 void D2GAME_6E680(void* thisv, void* game, uint32_t id, short kind); // 0x6E680 (args guessed, see header)
 void D2GAME_6A1A0(void* unit);                     // 0x6A1A0
-int D2GAME_E03A0(void* p, uint32_t v);             // 0xE03A0
+void* D2GAME_E03A0(void* p, uint32_t v);             // 0xE03A0
 }
 
 static inline u8* PT(u8* p, int off) { return *(u8**)(p + off); }

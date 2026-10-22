@@ -124,6 +124,7 @@ Function:		BITMANIP_ReadSigned
 Address:		Fog.#10129
 Notes:
 */
+// 1.13c Fog+0x140C0
 int __stdcall BITMANIP_ReadSigned(D2BitBufferStrc* pBuffer, int nBits)
 {
 	int nResult = BITMANIP_Read(pBuffer, nBits);
@@ -197,6 +198,7 @@ Function:		BITMANIP_GoToNextByte
 Address:		Fog.#10131
 Notes:
 */
+// 1.13c Fog+0x13CA0
 void __stdcall BITMANIP_GoToNextByte(D2BitBufferStrc* pBuffer)
 {
 	if (pBuffer->nPosBits)
@@ -229,6 +231,7 @@ Function:		BITMANIP_GoToNextByte
 Address:		Fog.#10119
 Notes:
 */
+// 1.13c Fog+0x14070
 int __stdcall BITMANIP_GetBitState(uint8_t* pBitStream, int nBit)
 {
 	return pBitStream[nBit >> 3] & (uint8_t)gdwBitMasks[nBit & 7];
@@ -242,4 +245,31 @@ Notes:
 void __stdcall BITMANIP_MaskBitstate(uint8_t* pBitStream, int nBit)
 {
 	pBitStream[nBit >> 3] &= (uint8_t)gdwInvBitMasks[nBit & 7];
+}
+
+// 1.13c Fog+0x14010 (#10121) sub_14010: toggle bit
+void __stdcall BITMANIP_ToggleBit(uint8_t* pBitStream, int nBit)
+{
+	pBitStream[nBit >> 3] ^= (uint8_t)gdwBitMasks[nBit & 7];
+}
+
+// 1.13c Fog+0x18090 (#10086) sub_18090: 7-bit varint pair.
+void __stdcall FOG_Encode14(uint8_t* pOut, uint32_t nValue)
+{
+	pOut[0] = (uint8_t)nValue | 0x80;
+	pOut[1] = (uint8_t)(nValue >> 7) | 0x80;
+}
+
+// 1.13c Fog+0x13F70 (#10122) sub_13F70: pDst[i] = pSrcA[i] & pSrcB[i] for (nBits+7)/8 bytes
+void __stdcall BITMANIP_AndBits(const uint8_t* pSrcA, const uint8_t* pSrcB, uint8_t* pDst, int nBits)
+{
+	for (int i = 0, n = (nBits + 7) / 8; i < n; ++i)
+		pDst[i] = pSrcA[i] & pSrcB[i];
+}
+
+// 1.13c Fog+0x13ED0 (#10123) sub_13ED0: pDst[i] = pSrcA[i] | pSrcB[i] for (nBits+7)/8 bytes
+void __stdcall BITMANIP_OrBits(const uint8_t* pSrcA, const uint8_t* pSrcB, uint8_t* pDst, int nBits)
+{
+	for (int i = 0, n = (nBits + 7) / 8; i < n; ++i)
+		pDst[i] = pSrcA[i] | pSrcB[i];
 }

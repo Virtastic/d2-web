@@ -12,7 +12,7 @@
 // Head and count are arguments here because no D2Gfx sbh state file owns them yet; the walk itself
 // is a pure function of (list, count, block).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void* d2_fn_d2gfx_43a8(uint32_t headerList, uint32_t headerCount,
+EMSCRIPTEN_KEEPALIVE void* d2_gfx_sbh_find_block_43a8(uint32_t headerList, uint32_t headerCount,
                                             uint32_t block) {
     const uint32_t end = headerList + headerCount * 0x14u;
     for (uint32_t h = headerList; h < end; h += 0x14u) {

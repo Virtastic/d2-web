@@ -1778,6 +1778,7 @@ void __fastcall sub_6FCBD3A0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCBD3D0
+// 1.13c D2Game+0xDFB30 (checked against decompile; identical)
 void __fastcall SUNIT_FillUnitInfo(D2UnitStrc* pUnit, D2UnitInfoStrc* pInfo)
 {
     D2_ASSERT(pInfo);

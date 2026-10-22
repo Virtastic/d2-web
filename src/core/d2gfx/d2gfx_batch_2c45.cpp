@@ -32,7 +32,7 @@ struct D2GfxCallocEnv {
 // whether the whole allocation is retried (rounded size carried forward) or the call answers NULL.
 // 1.13c D2Gfx+0x02C45
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2gfx_2c45(uint32_t count, uint32_t size,
+EMSCRIPTEN_KEEPALIVE uint32_t d2gfx_calloc_2c45(uint32_t count, uint32_t size,
                                                const D2GfxCallocEnv* env) {
     if (count != 0 && size > 0xffffffe0u / count) return 0;
     uint32_t request = count * size;

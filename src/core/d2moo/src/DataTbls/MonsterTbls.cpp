@@ -1502,6 +1502,7 @@ void __fastcall DATATBLS_LoadMonUModTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD69FA0
+// 1.13c D2Common+0x59870
 void __fastcall DATATBLS_LoadSuperUniquesTxt(HD2ARCHIVE hArchive)
 {
 	int nId = 0;

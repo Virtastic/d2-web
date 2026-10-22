@@ -279,3 +279,24 @@ uint32_t d2cmp_15330(const void* obj) {
     if (obj == nullptr) d2cmp_fatal(0x7A);
     return rd32(obj, 0x18);
 }
+
+// 1.13c D2CMP+0x15660 (198 bytes): relocate a loaded tile blob in place. EAX = name, ECX = blob, arg = out.
+// Version dword must be 7 (fatal 0x37F). If flag 2 at +4: +0x110 += blob, name copied to +8, each 0x60-byte
+// row's +0x58 = blob+8 (its +0x54 and +0x5C must be 0, fatal 0x3A2/0x3A3), flags = (flags & ~2) | 4, *out = blob.
+// 1.13c D2CMP+0x15660
+extern "C"
+void d2cmp_15660(const char* name, uint8_t* blob, void** out) {
+    if (*(int32_t*)blob != 7) d2cmp_fatal(0x37F);
+    if (!(blob[4] & 2)) return;
+    uint8_t* rows = blob + *(int32_t*)(blob + 0x110);
+    *(uint8_t**)(blob + 0x110) = rows;
+    strcpy((char*)blob + 8, name);
+    for (int32_t i = 0; i < *(int32_t*)(blob + 0x10C); ++i) {
+        uint8_t* r = rows + (size_t)i * 0x60;
+        *(uint8_t**)(r + 0x58) = blob + 8;
+        if (*(int32_t*)(r + 0x54)) d2cmp_fatal(0x3A2);
+        if (*(int32_t*)(r + 0x5C)) d2cmp_fatal(0x3A3);
+    }
+    *(uint32_t*)(blob + 4) = (*(uint32_t*)(blob + 4) & ~2u) | 4;
+    *out = blob;
+}

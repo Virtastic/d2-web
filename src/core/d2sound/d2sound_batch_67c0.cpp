@@ -63,6 +63,7 @@ struct D2SoundEnv {
                           uint32_t* outLen);                                  // 0x8790
     uint16_t (*attenuate)(float a, float b, float c);                         // 0x8830
     uint64_t (*mixValue)(void);                                               // 0xACCC
+    int32_t (*storm258)(uint32_t h, uint32_t* a, uint8_t* b);                 // Storm.dll#258 (0x5F4A thunk)
 };
 
 // 1.13c D2Sound+0x67C0
@@ -70,6 +71,17 @@ struct D2SoundEnv {
 uint32_t D2Sound_67C0(void* obj) {
     if (!obj) d2sound_fatal(0x37A);
     return rd32(obj, 0x48) != 0 ? 1u : 0u;
+}
+
+// 1.13c D2Sound+0x68D0
+// If flag bit 1 (+0x34) is set, call method +0x4C of the interface at +0xC with (a, b, c, 0).
+void D2Sound_68D0(void* obj, uint32_t a, uint32_t b, uint32_t c) {
+    if (!obj || !rd32(obj, 0)) d2sound_fatal(0x302);
+    if (rd32(obj, 0x34) & 2) {
+        void* iface = rdptr(obj, 0xC);
+        void** vt = *(void***)iface;
+        ((void (*)(void*, uint32_t, uint32_t, uint32_t, uint32_t))vt[0x4C / 4])(iface, a, b, c, 0);
+    }
 }
 
 // 1.13c D2Sound+0x6920
@@ -297,4 +309,317 @@ int32_t* D2Sound_8980(int32_t* riff, uint32_t* size, uint16_t* out, const D2Soun
                                    0x61746164u, &dataLen);               // 'data'
     if (data && dataLen <= *size) { *size = dataLen; return data; }
     return nullptr;
+}
+
+// ---- 0x7D30 music-track picker state (retail addresses) -----------------------------------------
+struct D2SoundTrack { uint32_t name; uint32_t played; };   // {path ptr, "already played" flag}
+static D2SoundTrack g_tracksA[64];     // 0x6F9C5950  intro-first list (used while g_listSel != 0)
+static D2SoundTrack g_tracksB[64];     // 0x6F9C5908  common list
+static int32_t  g_trackCount = 0;      // 0x6F9C5948
+static int32_t  g_trackCount2 = 0;     // 0x6F9C5990  must equal g_trackCount or retail dies (id 0x52)
+static uint32_t g_listInit;            // 0x6F9C65E0
+static uint32_t g_listSel;             // 0x6F9C65DC  copied from g_listDefault on first use
+static uint32_t g_listDefault;         // 0x6F9C65B4
+static uint32_t g_firstPick;           // 0x6F9C65C4  nonzero: take entry 0 once
+
+// Host seams for 0x7D30's unmapped callees.
+struct D2SoundPickEnv {
+    void (*resetPlayed)(void);                       // 0x7BC0 (clears every played flag)
+    void (*setVolume)(void* obj, uint32_t v);        // 0x6E20
+    uint32_t (*play)(void* obj, uint32_t a, uint32_t b);  // 0x66F0
+    const D2SoundEnv* env;                           // for 0x7650
+};
+
+// Retail's inlined track lookup: lazy list select, the two fatal checks (0x52, 0x53), the table.
+static D2SoundTrack* d2sound_track(int32_t i) {
+    if (!g_listInit) { g_listInit = 1; g_listSel = g_listDefault; }
+    if (g_trackCount != g_trackCount2) d2sound_fatal(0x52);
+    if (i >= g_trackCount || i < 0) d2sound_fatal(0x53);
+    return (g_listSel ? g_tracksA : g_tracksB) + i;
+}
+
+// 1.13c D2sound+0x7D30
+// Pick the next unplayed music track, start it on the primary stream, return 1; 0 if none/not ready.
+uint32_t D2Sound_7D30(const D2SoundPickEnv* pe) {
+    EnterCriticalSection(&g_lock);
+    auto ready = [] { auto* p = (uint8_t*)g_primary; return p && g_soundOn && g_masterVolume && rd32(p, 0x48) == 0; };
+    if (!ready()) { LeaveCriticalSection(&g_lock); return 0; }
+    bool reset = false;
+    for (;;) {
+        D2SoundTrack* t = nullptr;
+        for (int32_t i = 0; i < g_trackCount; i++) {
+            D2SoundTrack* c = d2sound_track(i);
+            if (!c->played) { t = c; break; }
+        }
+        if (!t) {
+            if (reset) { g_stopFlag = 0; LeaveCriticalSection(&g_lock); return 0; }
+            pe->resetPlayed();
+            reset = true;
+        }
+        if (g_firstPick == 0) {
+            int32_t i = rand() % g_trackCount;
+            for (;; ) {
+                t = d2sound_track(i);
+                if (!t->played) break;
+                if (++i >= g_trackCount) i = 0;
+            }
+        } else {
+            t = d2sound_track(0);
+            if (g_trackCount < 1) d2sound_fatal(0x53);
+            g_firstPick = 0;
+        }
+        t->played = 1;
+        if (ready() && t->name) {
+            D2Sound_7650(g_primary, pe->env);
+            pe->setVolume(g_primary, 0x6E);
+            if (pe->play(g_primary, 0, 0)) { LeaveCriticalSection(&g_lock); return 1; }
+        }
+    }
+}
+
+// 1.13c D2sound+0x06850
+// Query the stream handle at +0x48 through Storm #258; returns its first out word >> 2, 0 if no handle/failed.
+uint32_t D2Sound_6850(void* obj, const D2SoundEnv* env) {
+    if (!obj) d2sound_fatal(0x310);
+    uint32_t a = 0; uint8_t b[4];
+    EnterCriticalSection(&g_lock);
+    uint32_t h = rd32(obj, 0x48);
+    if (h && env->storm258(h, &a, b)) { LeaveCriticalSection(&g_lock); return a >> 2; }
+    LeaveCriticalSection(&g_lock);
+    return 0;
+}
+
+// 1.13c D2sound+0x06820
+// Store v at obj+0x40; null obj is fatal (0x32F).
+void D2Sound_6820(void* obj, uint32_t v) {
+    if (!obj) d2sound_fatal(0x32F);
+    wr32(obj, 0x40, v);
+}
+
+// 1.13c D2sound+0x080A0
+// 1 if any of the 8 streams has a nonzero +0x1C; a null stream or zero head word is fatal. 0 if uninitialized/none.
+uint32_t D2Sound_80A0(void) {
+    if (!g_initialized) return 0;
+    for (int i = 0; i < 8; i++) {
+        void* p = g_streams[i];
+        if (!p || rd32(p, 0) == 0) d2sound_fatal(0x2A5);
+        if (rd32(p, 0x1C)) return 1;
+    }
+    return 0;
+}
+
+// 1.13c D2sound+0x06F30
+// Call the stream interface's vtable+0x30 (0,0,1) under the lock; on success set +0x1C=1, return 1; failure returns 0.
+uint32_t D2Sound_6F30(void* obj) {
+    if (!obj) d2sound_fatal(0x279);
+    EnterCriticalSection(&g_lock);
+    void* iface = *(void**)obj;
+    void** vt = *(void***)iface;
+    if ((int32_t)((uint32_t(*)(void*, uint32_t, uint32_t, uint32_t))vt[0x30 / 4])(iface, 0, 0, 1) < 0) {
+        LeaveCriticalSection(&g_lock);
+        return 0;
+    }
+    wr32(obj, 0x1C, 1);
+    LeaveCriticalSection(&g_lock);
+    return 1;
+}
+
+// Host seams for 0x66F0's imports.
+struct D2SoundPlayEnv {
+    uint32_t (*fogReady)(void);                                                         // Fog#10102 (0x5F6E)
+    void (*fogFail)(void);                                                              // Fog#10103 (0x5F74)
+    int32_t (*storm255)(void*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t); // Storm#255 (0x5F3E)
+};
+
+// 1.13c D2sound+0x066F0
+// Start the stream under the lock via Storm#255(obj,+4,flags,volume*4,max,max,*obj); on success +0x48=+4, +0x1C=1, +0x30=-1, return 1.
+uint32_t D2Sound_66F0(void* obj, int32_t volume, int32_t loop, const D2SoundPlayEnv* pe) {
+    if (!obj) d2sound_fatal(0x3DB);
+    if (!pe->fogReady()) return 0;
+    EnterCriticalSection(&g_lock);
+    uint32_t f4 = rd32(obj, 4);
+    if (pe->storm255(obj, f4, loop ? 0x40000u : 0u, (uint32_t)volume * 4, 0x7FFFFFFFu, 0x7FFFFFFFu, rd32(obj, 0))) {
+        wr32(obj, 0x48, f4);
+        wr32(obj, 0x1C, 1);
+        wr32(obj, 0x30, 0xFFFFFFFFu);
+        LeaveCriticalSection(&g_lock);
+        return 1;
+    }
+    pe->fogFail();
+    LeaveCriticalSection(&g_lock);
+    return 0;
+}
+
+// 1.13c D2sound+0x06680
+// Release the stream's backing object: under the lock, if +0x48 is set, hand it to Fog ordinal 257
+// (free), call interface method +0x48, run Fog ordinal 10103, then clear +0x48 and +0x1C.
+// The two ordinals are host seams (freeBacking takes +0x48; afterRelease takes nothing).
+void D2Sound_6680(void* obj, void (*freeBacking)(uint32_t), void (*afterRelease)(void)) {
+    if (!obj || !rd32(obj, 0)) d2sound_fatal(0x400);
+    EnterCriticalSection(&g_lock);
+    if (rd32(obj, 0x48)) {
+        freeBacking(rd32(obj, 0x48));
+        void* iface = rdptr(obj, 0);
+        void** vt = *(void***)iface;
+        ((void (*)(void*))vt[0x48 / 4])(iface);
+        afterRelease();
+        wr32(obj, 0x48, 0);
+        wr32(obj, 0x1C, 0);
+    }
+    LeaveCriticalSection(&g_lock);
+}
+
+// 1.13c D2sound+0x06950  (Ordinal 10044; ECX = stream record) -> record+0x1C, fatal if null or +0 == 0.
+uint32_t d2sound_6950(const void* s) {
+    if (s && rd32(s, 0)) return rd32(s, 0x1C);
+    d2sound_fatal(0x2a5);
+    return 0;
+}
+
+// 1.13c D2sound+0x067F0  (ECX = record, EDX = value) -> record+0x44 = value; fatal if record null.
+void D2Sound_67F0(void* rec, uint32_t v) {
+    if (!rec) d2sound_fatal(0x33a);
+    wr32(rec, 0x44, v);
+}
+
+// 1.13c D2sound+0x07D00
+// Set the music-stop flag; on a 0 -> nonzero edge clear every played flag (0x7BC0) and arm the first pick.
+void D2Sound_7D00(uint32_t on, void (*resetPlayed)(void)) {
+    if (on && !g_stopFlag) { resetPlayed(); g_firstPick = 1; }
+    g_stopFlag = on;
+}
+
+// ---- batch b47: list/query helpers and the stream create/queue paths -----------------------------
+// Extra seams: 0x7090 (stream setup, nonzero = ok), 0x72D0 (buffer fill), 0x6F30's caller env.
+struct D2SoundEnvB {
+    const D2SoundEnv* base;
+    const D2SoundPlayEnv* play;
+    uint32_t (*setup)(void* obj, uint32_t flags);                  // 0x7090
+    void (*fill)(void* a, uint32_t b, void* c);                    // 0x72D0 (called (0,0,stream+4))
+};
+static uint32_t g_dsAvail;             // 0x6F9C6590  tested by 0x7740
+static uint32_t g_tag6584;             // 0x6F9C6584  last 0x7740 argument
+static uint8_t* g_pending;             // 0x6F9C65BC  queue of {name, ..., +0x50 data, +0x54 size, +0x58 id, +0x5C next}
+
+// 1.13c D2sound+0x06EC0 (Ordinal 10054)
+// Call interface method +0x24 of the stream's +0x00 object under the lock; the result is always 0.
+uint32_t D2Sound_6EC0(void* obj) {
+    if (!obj || !rd32(obj, 0)) d2sound_fatal(0x2B0);
+    EnterCriticalSection(&g_lock);
+    void* iface = rdptr(obj, 0);
+    void** vt = *(void***)iface;
+    ((int32_t (*)(void*))vt[0x24 / 4])(iface);
+    LeaveCriticalSection(&g_lock);
+    return 0;
+}
+
+// 1.13c D2sound+0x07B10 (Ordinal 10057)
+uint32_t D2Sound_7B10(void) { return g_primary && rd32(g_primary, 0x48) ? 1u : 0u; }
+
+// 1.13c D2sound+0x06B60 (Ordinal 10064)
+uint32_t D2Sound_6B60(void) { return g_soundOn ? g_masterVolume : 0u; }
+
+// 1.13c D2sound+0x086C0 (Ordinal 10062)
+// Unlink the first node holding `value` and free it.
+void D2Sound_86C0(D2SoundNode** list, uint32_t value) {
+    D2SoundNode *prev = nullptr, *n = *list;
+    for (; n; prev = n, n = n->next) {
+        if (n->value != value) continue;
+        if (n == *list) *list = n->next;
+        if (prev) prev->next = n->next;
+        std::free(n);
+        return;
+    }
+}
+
+// 1.13c D2sound+0x08920 (Ordinal 10063)
+// Free every node (retail re-walks from the head for the head's value each pass).
+void D2Sound_8920(D2SoundNode** list) {
+    while (*list) { D2SoundNode* h = *list; D2Sound_86C0(list, h->value); }
+}
+
+// 1.13c D2sound+0x07480 (Ordinal 10061)
+// Set the master volume (0..0xFF, fatal outside) and re-apply it to every listed stream's +0x38 level.
+void D2Sound_7480(uint32_t v, const D2SoundEnv* env) {
+    if (!g_soundOn || (int32_t)v == (int32_t)g_masterVolume) return;
+    if ((int32_t)v < 0 || (int32_t)v > 0xFF) d2sound_fatal(0x3B9);
+    EnterCriticalSection(&g_lock);
+    g_masterVolume = v;
+    for (D2SoundNode* n = (D2SoundNode*)g_list; n; n = n->next) {
+        void* s = (void*)(uintptr_t)n->value;
+        if (!s) d2sound_fatal(0x2E4);
+        env->setVolume(s, rd32(s, 0x38));
+    }
+    LeaveCriticalSection(&g_lock);
+}
+
+// 1.13c D2sound+0x07740 (Ordinal 10065)
+// Allocate a zeroed 0x60-byte stream, run 0x7090 on it, and push it on the global list.
+void* D2Sound_7740(uint32_t flags, uint32_t tag, const D2SoundEnvB* e) {
+    g_tag6584 = tag;
+    if (((flags & 2) && !g_dsAvail) || ((flags & 2) && (flags & 1))) return nullptr;
+    void* s = std::calloc(1, 0x60);
+    if (!e->setup(s, flags)) { std::free(s); return nullptr; }
+    EnterCriticalSection(&g_lock);
+    D2SoundNode* n = (D2SoundNode*)std::malloc(sizeof(D2SoundNode));
+    n->value = (uint32_t)(uintptr_t)s;
+    n->next = (D2SoundNode*)g_list;
+    g_list = n;
+    LeaveCriticalSection(&g_lock);
+    return s;
+}
+
+// 1.13c D2sound+0x07C60 (Ordinal 10068)
+// Restart the primary stream from 0 at volume 0x6E when it is idle; 1 on success.
+uint32_t D2Sound_7C60(int32_t enable, int32_t loop, const D2SoundEnvB* e) {
+    if (g_primary && g_soundOn && g_masterVolume && rd32(g_primary, 0x48) == 0 && enable) {
+        D2Sound_7650(g_primary, e->base);
+        e->base->setVolume(g_primary, 0x6E);
+        if (D2Sound_66F0(g_primary, 0, loop, e->play)) return 1;
+    }
+    return 0;
+}
+
+// 1.13c D2sound+0x07580
+// Bind a WAVE image to the stream: parse the header, and if the payload is longer than +0x44 store
+// (len, fmt) at +0x18/+0x14, refill, mark +0x28, and set the +0x30 cursor. Fatal on any failure.
+uint32_t D2Sound_7580(void* s, int32_t* wav, uint32_t size, const D2SoundEnvB* e) {
+    if (!s || !rd32(s, 0) || !wav || !size) d2sound_fatal(599);
+    EnterCriticalSection(&g_lock);
+    uint16_t fmt[10];
+    uint32_t len = size;
+    int32_t* data = D2Sound_8980(wav, &len, fmt, e->base);
+    if (rd32(s, 0x44) >= len) d2sound_fatal(0x25F);
+    wr32(s, 0x18, len);
+    wr32(s, 0x14, (uint32_t)(uintptr_t)data);
+    e->fill(nullptr, 0, rdptr(s, 4));
+    wr32(s, 0x28, 1);
+    wr32(s, 0x30, (!rd32(s, 0x40) && rd32(s, 0x18) < rd32(s, 4)) ? rd32(s, 0x18) : 0xFFFFFFFFu);
+    LeaveCriticalSection(&g_lock);
+    return 1;
+}
+
+// 1.13c D2sound+0x08200
+// Find the queued entry named `name`, then hand its sound to the first of the 8 streams whose id
+// matches the entry's and which is idle (+0x1C == 0): reset, bind (0x7580), volume 0xFF, play-state 0x6F30.
+void D2Sound_8200(const uint8_t* name, const D2SoundEnvB* e, uint32_t (*after6F30)(void*)) {
+    if (!g_initialized) return;
+    EnterCriticalSection(&g_initLock);
+    uint8_t* ent = g_pending;
+    while (ent && std::strcmp((const char*)ent, (const char*)name) != 0) ent = *(uint8_t**)(ent + 0x5C);
+    if (ent) {
+        for (int i = 0; i < 8; ++i) {
+            void* s = g_streams[i];
+            if (rd32(s, 0x34) != rd32(ent, 0x58)) continue;   // +0x34 is retail's piVar2[0xd]
+            if (!s || !rd32(s, 0)) d2sound_fatal(0x2A5);
+            if (rd32(s, 0x1C) == 0) {
+                D2Sound_7650(s, e->base);
+                D2Sound_7580(s, (int32_t*)rdptr(ent, 0x50), rd32(ent, 0x54), e);
+                e->base->setVolume(s, 0xFF);
+                after6F30(s);
+                break;
+            }
+        }
+    }
+    LeaveCriticalSection(&g_initLock);
 }

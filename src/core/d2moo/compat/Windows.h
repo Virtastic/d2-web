@@ -115,3 +115,17 @@ inline void InitializeCriticalSection(LPCRITICAL_SECTION) {}
 inline void DeleteCriticalSection(LPCRITICAL_SECTION) {}
 inline int IsBadCodePtr(FARPROC p) { return p == nullptr; }
 inline int IsBadReadPtr(const void* p, size_t) { return p == nullptr; }
+
+// Win32 file/event calls named by batch ports (storm, d2sound); weak, so an unlinked seam is null, never a build break.
+#define INVALID_HANDLE_VALUE ((HANDLE)(intptr_t)-1)
+typedef DWORD (*LPTHREAD_START_ROUTINE)(void*);
+extern "C" {
+__attribute__((weak)) int CloseHandle(HANDLE);
+__attribute__((weak)) void SetLastError(uint32_t);
+__attribute__((weak)) int WriteFile(HANDLE, const void*, DWORD, DWORD*, void*);
+__attribute__((weak)) HANDLE CreateFileA(const char*, DWORD, DWORD, void*, DWORD, DWORD, HANDLE);
+__attribute__((weak)) HANDLE CreateFileMappingA(HANDLE, void*, DWORD, DWORD, DWORD, const char*);
+__attribute__((weak)) void* MapViewOfFile(HANDLE, DWORD, DWORD, DWORD, size_t);
+__attribute__((weak)) HANDLE CreateEventA(void*, int, int, const char*);
+}
+extern "C" __attribute__((weak)) HANDLE CreateThread(void*, size_t, LPTHREAD_START_ROUTINE, void*, DWORD, DWORD*);

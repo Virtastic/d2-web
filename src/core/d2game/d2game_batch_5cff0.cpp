@@ -6,7 +6,7 @@ extern "C" {
 i32 o10920(i32*); i32 o10331(i32); i32 o10826(i32); void r_386F0(); i32 o10265(i32); void o10024(const void*, i32);
 }
 
-// 1.13c D2Game+0x5CFF0 (fastcall: ecx = game, edx = unit)
+// 1.13c D2Game+0x5CFF0
 i32 D2GAME_5CFF0(i32 game, i32 unit) // REG? ecx/edx assumed from __fastcall; r_386F0 takes no visible args (REG? none shown)
 {
     i32 code;

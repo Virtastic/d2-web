@@ -39,7 +39,7 @@ uint32_t rd32(const void* p) { uint32_t v; std::memcpy(&v, p, 4); return v; }
 void wr32(void* p, uint32_t v) { std::memcpy(p, &v, 4); }
 
 // kernel32 seams (compat/Windows.h carries no file-pointer API)
-void SetLastError(uint32_t e) { g_lastError = (int32_t)e; }
+void StormSetLastError(uint32_t e) { g_lastError = (int32_t)e; }
 uint32_t SetFilePointer(HANDLE, int32_t, int32_t*, uint32_t) { return 0; }
 
 }  // namespace
@@ -59,7 +59,7 @@ extern "C"
 uint32_t Storm_Sub26190(uint32_t* param_1) {
     if (param_1 == nullptr) {
         g_lastError = 0x57;
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     if ((char)*param_1 == '\0') {
@@ -70,7 +70,7 @@ uint32_t Storm_Sub26190(uint32_t* param_1) {
     char last = ((const char*)param_1)[len - 1];
     if (len + (last != '\\') + 1 > 0x104) {
         g_lastError = 0xa1;
-        SetLastError(0xa1);
+        StormSetLastError(0xa1);
         return 0;
     }
     EnterCriticalSection(&g_lock);
@@ -89,7 +89,7 @@ uint32_t Storm_Sub26030(int32_t param_1, int32_t param_2, int32_t* param_3, uint
     uint8_t* h = (uint8_t*)(uintptr_t)param_1;
     if (param_3 != nullptr && *param_3 != 0) {
         g_lastError = 0x57;
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0xFFFFFFFFu;
     }
     EnterCriticalSection(&g_lock);
@@ -144,7 +144,7 @@ uint32_t Storm_Sub26330(int32_t param_1, char* param_2, uint32_t param_3) {
         return 1;
     }
     g_lastError = 0x57;
-    SetLastError(0x57);
+    StormSetLastError(0x57);
     return 0;
 }
 
@@ -166,7 +166,7 @@ extern "C"
 uint32_t Storm_Sub26C40(void* param_1) {
     if (param_1 == nullptr) {
         g_lastError = 0x57;
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     Storm_Sub1B960(param_1, "..\\3rdParty\\STORM\\SOURCE\\SFILE.CPP", 0x1366);

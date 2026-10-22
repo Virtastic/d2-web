@@ -30,6 +30,8 @@ struct D2CommonBatchDrlgEnv {
     void* (*search)(void* nodeBuf, int32_t limit, void* pLevel, int32_t* endpoints, int32_t* poolUsed);
     const int32_t* dirTable;                           // DAT_6fddc320, 12-byte stride
     uint32_t nodeTableToken;                           // DAT_6fddcab8 address token
+    const int32_t* trimDx;                             // 0x3D920: DAT_6fde4020, 4 ints
+    const int32_t* trimDy;                             // 0x3D920: DAT_6fde4030, 4 ints
 };
 
 // 1.13c D2Common+0x15840 -- walk the four grid corners inward, calling the cell visitor on each
@@ -223,4 +225,44 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_7e9f0(void* pLevel, int3
         if ((flags[o] & 2) || (flags[o + 4] & 2)) return 0;
     }
     return 1;
+}
+
+// 1.13c D2Common+0x3D920 -- (EAX = path index, ESI = level) trim one path's vertex chain: stamp the head
+// with the first-set endpoints, then scale each interior vertex to world coordinates with a seeded jitter.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3d920(void* pLevel, int32_t idx, const D2CommonBatchDrlgEnv* env) { // 1.13c D2Common+0x3D920
+    if (!pLevel || !env || !env->resolve) return;
+    uint8_t* od = B(env->resolve(R32(pLevel, 0x14)));
+    auto step = [&]() { // seed = lo*0x6ac690c5 + hi, stored as 64 bits at level+0x1c4
+        uint64_t v = (uint64_t)R32(pLevel, 0x1c4) * 0x6ac690c5u + R32(pLevel, 0x1c8);
+        W32(pLevel, 0x1c4, (uint32_t)v); W32(pLevel, 0x1c8, (uint32_t)(v >> 32));
+        return (uint32_t)v;
+    };
+    uint8_t* head = B(env->resolve(R32(od, 0x68 + idx * 4)));
+    uint32_t c = step() & 3;
+    if (!head) return;
+    uint8_t* e = od + idx * 0x14;
+    if (R8(od, 0x1f0 + idx * 0x14) != 4) {
+        uint8_t* n = B(env->alloc(0x14));
+        std::memset(n, 0, 0x14);
+        W32(n, 0, R32(e, 0x1e8)); W32(n, 4, R32(e, 0x1ec)); W32(n, 0x10, env->tokenOf(head));
+        W32(od, 0x68 + idx * 4, env->tokenOf(n));
+    }
+    W32(head, 0, R32(e, 0x170)); W32(head, 4, R32(e, 0x174));
+    uint8_t* v = B(env->resolve(R32(head, 0x10)));
+    if (!v) return;
+    while (R32(v, 0x10) != 0) {
+        const uint32_t s1 = step(); const int32_t dx = env->trimDx[c];
+        const uint32_t s2 = step(); const int32_t dy = env->trimDy[c];
+        c = (c + 1) & 3;
+        const int32_t y0 = RI32(v, 4), x0 = RI32(v, 0);
+        WI32(v, 0, RI32(pLevel, 0x1c) + x0 * 8 + 3 + (int32_t)((s1 & 1) + 2) * dx);
+        WI32(v, 4, RI32(pLevel, 0x20) + y0 * 8 + 3 + (int32_t)((s2 & 1) + 2) * dy);
+        v = B(env->resolve(R32(v, 0x10)));
+        if (!v) return;
+    }
+    W32(v, 0, R32(e, 0xf8)); W32(v, 4, R32(e, 0xfc));
+    uint8_t* n = B(env->alloc(0x14));
+    std::memset(n, 0, 0x14);
+    W32(n, 0, R32(e, 0x80)); W32(n, 4, R32(e, 0x84));
+    W32(v, 0x10, env->tokenOf(n));
 }

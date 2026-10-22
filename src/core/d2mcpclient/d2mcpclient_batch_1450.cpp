@@ -8,7 +8,8 @@
 // RVA 0xA038: _locktable, 0x24 entries of 8 bytes. The slot itself is the dword pair; the decompile
 // reads dword [i*2] (the section pointer) and dword [i*2+1] (the image's "initialise me" flag).
 struct D2McpLockSlot { uintptr_t cs; uint32_t init; uint32_t pad; };
-static D2McpLockSlot g_lockTable[0x24] = {
+// Slots 19..0x23 are zero in the retail image (read from the 1.13c file at 0xA038); shared with 0x1499.
+D2McpLockSlot g_lockTable[0x24] = {
     {0,1,0}, {0,1,0}, {0,0,0}, {0,1,0}, {0,1,0}, {0,0,0},
     {0,1,0}, {0,1,0}, {0,1,0}, {0,0,0}, {0,1,0}, {0,0,0},
     {0,1,0}, {0,1,0}, {0,1,0}, {0,0,0}, {0,1,0}, {0,1,0}, {0,1,0}

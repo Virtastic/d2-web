@@ -19,9 +19,19 @@ extern "C" uint32_t FOG_FCloseFile(void* file) {
     return !file || d2::sharedVfs().closeFile(file);
 }
 
+// 1.13c Fog+0x17D80
+// Retail: CloseHandle(h). No OS handles in wasm; nothing to release.
+extern "C" void FOG_CloseHandle(void*) {}
+
 // 1.13c Fog+0x17DF0
 extern "C" uint32_t FOG_FGetFileSize(void* file, uint32_t* high) {
     return d2::sharedVfs().fileSize(file, high);
+}
+
+// 1.13c Fog+0x17DD0
+// Forwards to Storm #271 (SFileSetFilePointer): same native StormLib handle as the VFS owns.
+extern "C" uint32_t FOG_FSeek(void* file, int32_t lo, int32_t* hi, uint32_t method) {
+    return SFileSetFilePointer(file, lo, (LONG*)hi, method);
 }
 
 // Fog 0x17E00 (#10104) is deliberately not mapped here: its Storm #289

@@ -86,7 +86,7 @@ struct EvtNode   { uint32_t key, seq, handler, next; };        // 0x10
 struct EvtGroup  { uint32_t buckets, size, used, next; };      // 0x10
 struct EvtRecord { uint32_t k1, k2, seq, group, next; };       // 0x14
 
-void SetLastError(uint32_t e) { g_lastError = (int32_t)e; }
+void StormSetLastError(uint32_t e) { g_lastError = (int32_t)e; }
 
 // (**(code **)(*obj + off))(obj, ...) -- retail calls the object's vtable slot.
 template <typename Fn>
@@ -107,7 +107,7 @@ extern "C"
 uint32_t Storm_Sub19040(uint32_t param_1, uint32_t param_2, const StormBatch19040Env* env) {
     (void)env;
     if ((int32_t)param_1 < 0 || param_1 > 3) {
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     if (g_display == nullptr || g_draw[param_1] == nullptr) return 0;
@@ -201,7 +201,7 @@ uint32_t Storm_Sub192A0(uint32_t param_1, uint32_t* param_2, uint32_t* param_3, 
     if (param_4 != nullptr) *param_4 = 0;
 
     if ((int32_t)param_1 < 0 || param_1 > 3 || param_3 == nullptr) {
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     if (g_display == nullptr || g_draw[param_1] == nullptr) return 0;
@@ -259,7 +259,7 @@ extern "C"
 uint32_t Storm_Sub19520(uint32_t param_1, uint32_t param_2, uint32_t* param_3, uint32_t param_4,
                         const StormBatch19040Env* env) {
     if (param_1 + param_2 > 0x100u || param_3 == nullptr) {
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     if (g_display == nullptr || g_paletteIface == nullptr) return 0;
@@ -512,7 +512,7 @@ uint32_t Storm_Sub36290(uint32_t param_1, uint32_t param_2, uint32_t param_3, ui
                         uint32_t param_5, const StormBatch19040Env* env) {
     static const char* const kSevt = "..\\3rdParty\\STORM\\SOURCE\\SEVT.CPP";
     if (param_4 == 0 || param_5 == 0) {
-        SetLastError(0x57);
+        StormSetLastError(0x57);
         return 0;
     }
     EnterCriticalSection(&g_evtLock);

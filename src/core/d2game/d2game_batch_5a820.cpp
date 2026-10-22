@@ -56,25 +56,23 @@ void D2GAME_5A820(i32* p1)
     r_DFCC0(p1, 0);
 }
 
-#define STATE_CB(NAME, RVA, ST, CB) \
-    /* 1.13c D2Game+RVA */ \
-    i32 NAME(i32 p1, i32* p2) \
-    { \
-        i32 a = o10920(p2); \
-        i32 b = o10174(rd(a, 0x10 + *(u8*)(intptr_t)(p1 + 0x6d) * 4), ST, 0xd); \
-        if (b && p2 && p2[0x20] && *p2 == 0 && r_9BEB0() != -1) r_9C160((void*)(intptr_t)CB); \
-        return 0; \
-    }
+static i32 stateCb(i32 p1, i32* p2, i32 st, void* cb)
+{
+    i32 a = o10920(p2);
+    i32 b = o10174(rd(a, 0x10 + *(u8*)(intptr_t)(p1 + 0x6d) * 4), st, 0xd);
+    if (b && p2 && p2[0x20] && *p2 == 0 && r_9BEB0() != -1) r_9C160(cb);
+    return 0;
+}
 // 1.13c D2Game+0x5AB00
-STATE_CB(D2GAME_5AB00, 0x5AB00, 0x28, r_58C90)
+i32 D2GAME_5AB00(i32 p1, i32* p2) { return stateCb(p1, p2, 0x28, (void*)r_58C90); }
 // 1.13c D2Game+0x5AF50
-STATE_CB(D2GAME_5AF50, 0x5AF50, 0x26, r_57830)
+i32 D2GAME_5AF50(i32 p1, i32* p2) { return stateCb(p1, p2, 0x26, (void*)r_57830); }
 // 1.13c D2Game+0x5B120
-STATE_CB(D2GAME_5B120, 0x5B120, 0x25, r_580A0)
+i32 D2GAME_5B120(i32 p1, i32* p2) { return stateCb(p1, p2, 0x25, (void*)r_580A0); }
 // 1.13c D2Game+0x5B180
-STATE_CB(D2GAME_5B180, 0x5B180, 0x24, r_582E0)
+i32 D2GAME_5B180(i32 p1, i32* p2) { return stateCb(p1, p2, 0x24, (void*)r_582E0); }
 // 1.13c D2Game+0x5B490
-STATE_CB(D2GAME_5B490, 0x5B490, 0x23, r_58640)
+i32 D2GAME_5B490(i32 p1, i32* p2) { return stateCb(p1, p2, 0x23, (void*)r_58640); }
 
 // 1.13c D2Game+0x5B030 (p2 = in_EAX, REG? unit)
 bool D2GAME_5B030(i32 p1, i32* in_EAX)

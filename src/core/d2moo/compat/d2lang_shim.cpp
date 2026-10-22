@@ -16,6 +16,8 @@
 static_assert(sizeof(Unicode) == 2, "Unicode is one UCS-2 unit");
 
 Unicode::Unicode(unsigned short c) : ch(c) {}
+// 1.13c D2Lang+0x11C0 Unicode default constructor closure: *(u16*)this = 0 (this = Unicode(0))
+static inline void Unicode_default_ctor_closure(Unicode* t) { *t = Unicode(0); }
 Unicode::operator unsigned short() const { return ch; }
 Unicode& Unicode::operator=(const Unicode& o) { ch = o.ch; return *this; }
 // 1.13c D2Lang+0x1040/0x1050/0x1070/0x10A0/0x10C0
@@ -58,6 +60,47 @@ Unicode* Unicode::strncpy(Unicode* dest, const Unicode* src, int count) {
     for (; i < count; i++) dest[i] = Unicode(0);
     return dest;
 }
+// 1.13c D2Lang+0xB0B0 (#10040): length in units; 0 for NULL.
+int __fastcall Unicode::strlen(const Unicode* s) { int n = 0; if (s) while (s[n].ch) n++; return n; }
+// 1.13c D2Lang+0xB170 (#10035): first unit equal to ch; NULL if absent or if the match is the terminator.
+Unicode* __fastcall Unicode::strchr(const Unicode* s, Unicode c) {
+    for (; s->ch; s++) if (s->ch == c.ch) return const_cast<Unicode*>(s);
+    return nullptr;
+}
+// 1.13c D2Lang+0xB200 (#10036): unsigned unit compare, -1/0/1.
+int __fastcall Unicode::strcmp(const Unicode* a, const Unicode* b) {
+    while (a->ch && b->ch && a->ch == b->ch) { a++; b++; }
+    return a->ch < b->ch ? -1 : a->ch > b->ch;
+}
+// 1.13c D2Lang+0xB1B0 (#10042): as strcmp over at most count units; 0 when count runs out.
+int __fastcall Unicode::strncmp(const Unicode* a, const Unicode* b, size_t n) {
+    while (a->ch && b->ch && n) { if (a->ch != b->ch) return a->ch < b->ch ? -1 : 1; a++; b++; n--; }
+    return 0;
+}
+// 1.13c D2Lang+0xB610 (#10039): strcmp through the toUpper table; a shorter prefix sorts first.
+int __fastcall Unicode::stricmp(const Unicode* a, const Unicode* b) {
+    for (;; a++, b++) {
+        if (!a->ch) return b->ch ? -1 : 0;
+        if (!b->ch) return 1;
+        unsigned short x = a->toUpper().ch, y = b->toUpper().ch;
+        if (x != y) return x < y ? -1 : 1;
+    }
+}
+// 1.13c D2Lang+0xB560 (#10045): stricmp over at most count units; 0 when count runs out.
+int __fastcall Unicode::strnicmp(const Unicode* a, const Unicode* b, size_t n) {
+    for (; n && a->ch && b->ch; a++, b++, n--) {
+        unsigned short x = a->toUpper().ch, y = b->toUpper().ch;
+        if (x != y) return x < y ? -1 : 1;
+    }
+    return 0;
+}
+// 1.13c D2Lang+0xB120 (#10041): append at most count units of src to dest, always NUL-terminate.
+Unicode* __fastcall Unicode::strncat(Unicode* dest, const Unicode* src, int count) {
+    Unicode* d = dest; while (d->ch) d++;
+    for (; count && src->ch; count--) *d++ = *src++;
+    d->ch = 0;
+    return dest;
+}
 Unicode* Unicode::toUnicode(Unicode* dest, const char* src, int count) {
     std::u16string u = d2::utf8ToU16(src ? src : "");
     int n = (int)u.size(); if (n > count - 1) n = count - 1; if (n < 0) n = 0;
@@ -68,6 +111,7 @@ Unicode* Unicode::toUnicode(Unicode* dest, const char* src, int count) {
 
 // D2LANG_GetTblIndex (#10013): index the string table assigns the key (0 when absent), and the
 // string itself through pUnicode. D2LANG_GetStringByReferenceString (#10003): the string or NULL.
+// 1.13c D2Lang+0xA8A0 (wrapper over 0xA7B0: returns its index result, string via out slot)
 short D2LANG_GetTblIndex(char* szReference, const Unicode** pUnicode) {
     const std::u16string* v = nullptr;
     uint16_t idx = d2::sharedLang().tblIndex(szReference ? szReference : "", &v);
@@ -199,3 +243,35 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_lang_strncpy_b0d0(uint16_t* d, const 
     return (int32_t)((uint16_t*)Unicode::strncpy((Unicode*)d, (const Unicode*)s, n) - d);
 }
 #endif
+
+// 1.13c D2Lang+0x09E20 (#10005): release one init reference; the last one frees every
+// table/list (Fog free, ordinal 10043) and unloads the system map. Our tables live in
+// static storage, so only the reference count is modelled. Stateful: NAMED, no vector.
+static int g_d2langInitRefs = 0;
+void __stdcall D2LANG_Release() {
+    if (g_d2langInitRefs != 0 && --g_d2langInitRefs == 0) {
+        // no heap tables to free here
+    }
+}
+// 1.13c D2Lang+0x8320 Unicode::win2Unicode: widen bytes, NUL-terminate; truncation overwrites the last unit
+Unicode* __fastcall Unicode::win2Unicode(Unicode* dst, const char* src, int n) {
+    uint16_t* d = (uint16_t*)dst;
+    int i = 0;
+    for (; i < n && src[i]; i++) d[i] = (uint8_t)src[i];
+    if (src[i]) d[i - 1] = 0; else d[i] = 0;
+    return dst;
+}
+// 1.13c D2Lang+0x8520 (ESI=wide str, stack=narrow set; caller Personalize): true when the wide string's last unit
+// equals any of the first 19 narrow chars. Custom register convention: NAMED, no vector.
+static bool d2lang_lastCharIn(const uint16_t* w, const char* set) {
+    int n = 0;
+    while (n < 19 && set[n]) n++;
+    int wl = 0;
+    if (w) while (w[wl]) wl++;
+    if (wl == 0) return false;  // retail reads w[-1] here
+    for (int i = 0; i < n; i++) if (w[wl - 1] == (uint8_t)set[i]) return true;
+    return false;
+}
+
+// 1.13c D2Lang+0x0AC40 Unicode::unloadSysMap: delete[] the three sysmap tables (0x6fc10a58, 0a50, 0a5c), null each.
+// Stateful, no-op here (the shim holds no sysmap tables).

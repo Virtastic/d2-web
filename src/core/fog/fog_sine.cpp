@@ -68,3 +68,4 @@ static const uint32_t kSine[512] = {
   0xbe47c5b7,0xbe3b6ec4,0xbe2f1097,0xbe22abaa,0xbe164078,0xbe09cf7b,0xbdfab25c,0xbde1bc17,
   0xbdc8bd1f,0xbdafb669,0xbd96a8ed,0xbd7b2b45,0xbd48fb01,0xbd16c2fd,0xbcc90a52,0xbc490dd5 };
 extern "C" float fog_sub_16730(int32_t n) { float f; uint32_t b = kSine[((uint32_t)n + 0x80) & 0x1FF]; memcpy(&f, &b, 4); return f; }
+extern "C" float fog_sub_16710(uint32_t n) { float f; uint32_t b = kSine[n & 0x1FF]; memcpy(&f, &b, 4); return f; }  // 1.13c Fog+0x16710
