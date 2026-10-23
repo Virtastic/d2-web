@@ -550,3 +550,9 @@ uint32_t Storm_Sub170B0(uint32_t param_1, uint32_t param_2, uint32_t* param_3, u
 }
 
 }  // namespace
+
+// 1.13c Storm+0x168B0: load "caps.dat" from an SNP provider module (open archive 0x1A0B0, read
+// 0x18960/0x195B0 into a SMemAlloc'd buffer, SNET.CPP:0x2ff); returns the buffer or null on any
+// failure. Its only caller (0x169A0) finds no .snp modules in the web build, so no archive opens:
+// the failure path (null, nothing allocated, nothing to close) is the only reachable one.
+void* Storm_Sub168B0(void* /*snpModule*/) { return nullptr; }

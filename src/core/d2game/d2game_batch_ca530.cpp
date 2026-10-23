@@ -59,7 +59,7 @@ struct D2GameBatchCA530Env {
     void     (*ordinal10977)(uint32_t unit, uint32_t flag, int32_t value);            // ITEMS_SetItemFlag
 };
 
-// 1.13c D2Game+0xCA530, __fastcall(param_1 ECX, pUnit EDX, pMonRegBase stack,
+// 1.13c D2Game+0xca530 -- __fastcall(param_1 ECX, pUnit EDX, pMonRegBase stack,
 //                                  unaff_EBX = old alignment, unaff_EDI = new alignment)
 // pMonRegBase is the caller's pGame->pMonReg (0xF0); 0xE01A0 passes param_1 = its own first
 // argument, which the body never reads. Keeping the monster-region spawn counter in step with an
@@ -119,7 +119,7 @@ int32_t d2_fn_d2game_101E0(uint32_t ppItem, uint32_t pLowSeed, uint32_t pItemDro
     return (int32_t)env->sub140B0(item, pItemDrop);
 }
 
-// 1.13c D2Game+0x103C0, __fastcall(ppItem ECX, pItemDrop EDX, unaff_EBX stack/live-in)
+// 1.13c D2Game+0x103c0, __fastcall(ppItem ECX, pItemDrop EDX, unaff_EBX stack/live-in)
 // The magic affix roll (1.10f sub_6FC4D5E0). A negative nPrefix[0] skips the prefix roll and marks
 // v5; otherwise roll a prefix (0x148A0 for legacy item format 0, else 0x144D0) and assign it. A
 // zero prefix marks v5; a rolled prefix with a negative nSuffix[0] skips the suffix roll. The

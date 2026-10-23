@@ -99,7 +99,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_31d20(uint32_t pUnit, int32_t nScale
 // 1.13c D2Common+0x3BF60 (#10233): unit+0x10 (the unit's data block) non-null and its dword +0x28
 // carries 0x30000. A null unit or a null data block is fatal in retail (0x363 / 0x276); both return 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3bf60(uint32_t pUnit)
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_3BF60(uint32_t pUnit)
 {
 	uint8_t* u = P(pUnit);
 	if (!u)
@@ -514,7 +514,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_12140(uint32_t pOwner, uint32_t pOut
 // 1.13c D2Common+0x4E2B0 (#10304): the dword at pObject+0x34. A null object is fatal in retail
 // (0x638); modelled as a 0 return.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4e2b0(uint32_t pObject)
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_4E2B0_GetField34(uint32_t pObject)
 {
 	uint8_t* o = P(pObject);
 	if (!o)

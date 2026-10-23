@@ -121,7 +121,7 @@ int32_t D2Client_InflateDynamicTrees(uint32_t literals, uint32_t distances,
     return result;
 }
 
-// 1.13c D2Client+0x0F1E0
+// 1.13c D2Client+0x0f1e0
 int32_t D2Client_InflateBitTree(const uint32_t* lengths, uint32_t& bits,
     D2ClientInflateHuft*& tree, D2ClientInflateHuft* workspace,
     const D2ClientInflateAllocator& allocator, const char*& message) {

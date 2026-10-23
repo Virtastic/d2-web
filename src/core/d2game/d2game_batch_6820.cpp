@@ -32,6 +32,7 @@ static inline void*    rdptr(const void* p, uint32_t o) { void* v; std::memcpy(&
 // 4 KB, touching each guard page, and re-pushes the return address below the new frame. Both the input
 // and the result are ESP/EAX -- outside the C ABI -- so a host callee can only take the frame size and
 // do nothing: the wasm stack is grown by the host runtime and has no guard page to touch.
+// 1.13c D2Game+0x06820
 void D2Game_ChkStk(uint32_t frameBytes)
 {
     (void)frameBytes;
@@ -62,6 +63,7 @@ size_t D2Game_CrtFwrite(const void* data, size_t size, size_t count, FILE* strea
 // _fclose: result -1; a stream with _IOSTRG (0x40) set skips the close and only clears _flag, every
 // other stream is locked and closed by __fclose_lk, then FUN_6fc23300 unlocks. Host stdio streams are
 // never _IOSTRG, so the branch is unobservable; closing is the whole effect.
+// 1.13c D2Game+0x032B7
 int D2Game_CrtFclose(FILE* stream)
 {
     return std::fclose(stream);

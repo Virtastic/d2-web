@@ -114,6 +114,7 @@ struct D2SkillStrc
 	int32_t nQuantity;							//0x30
 	D2UnitGUID nOwnerGUID;						//0x34 -1 = Native Skill
 	int32_t nCharges;							//0x38
+	int32_t bChargesSet;						//0x3C 1.13c: set to 1 by SetCharges
 };
 
 struct D2SkillListStrc

@@ -164,6 +164,7 @@ int __fastcall DATATBLS_GetCharTemplateTxtRecordCount()
 }
 
 //D2Common.0x6FD487A0 (#10665)
+// 1.13c D2Common+0x7fe40
 D2CharTemplateTxt* __fastcall DATATBLS_GetCharTemplateTxtRecord(int nTemplate, int nLevel)
 {
 	D2_ASSERT(nTemplate > 0);
@@ -173,7 +174,8 @@ D2CharTemplateTxt* __fastcall DATATBLS_GetCharTemplateTxtRecord(int nTemplate, i
 	return &gpCharTemplateTxtTable[nIndex];
 }
 
-//D2Common.0x6FD48810 (#10666)
+//D2Common.0x6FD48810 (#10666) -- 1.13c D2Common+0x7FFB0 (ordinal 10241)
+// 1.13c D2Common+0x7FFB0
 int __fastcall DATATBLS_GetClassFromCharTemplateTxtRecord(int nTemplate, int nLevel)
 {
 	return DATATBLS_GetCharTemplateTxtRecord(nTemplate, nLevel)->nClass;

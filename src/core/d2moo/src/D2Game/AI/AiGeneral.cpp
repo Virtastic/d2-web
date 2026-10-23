@@ -296,6 +296,7 @@ void __fastcall AIGENERAL_FreeAiControl(D2GameStrc* pGame, D2AiControlStrc* pAiC
 		D2_FREE_POOL(pGame->pMemoryPool, i);
 	}
 
+	// 1.13c D2Game+0x20B60 (command-chain free loop, ESI=pAiControl; no delta vs 1.10f)
 	for (D2AiCmdStrc* i = pAiControl->pLastCmd; i; i = pAiControl->pLastCmd)
 	{
 		D2AiCmdStrc* pCurrentCmd = pAiControl->pCurrentCmd;
@@ -357,6 +358,7 @@ void __fastcall AIGENERAL_SetOwnerData(D2GameStrc* pGame, D2UnitStrc* pUnit, int
 }
 
 //D2Game.0x6FCCF2D0
+// 1.13c D2Game+0x20d50
 void __fastcall AIGENERAL_GetOwnerData(D2UnitStrc* pUnit, int32_t* pUnitGUID, int32_t* pUnitType)
 {
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);

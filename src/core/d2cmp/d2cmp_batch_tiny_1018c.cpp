@@ -18,7 +18,7 @@
 static uint8_t g_d2cmp_csTable_6fe32060[0x200];
 
 // 1.13c D2CMP+0x2DD8 (21 bytes, 15 callers): release CRT lock-table entry `index`.
-// 1.13c D2CMP+0x2DD8
+// 1.13c D2CMP+0x02dd8
 extern "C"
 void d2cmp_2dd8(uint32_t index) {
     LeaveCriticalSection((LPCRITICAL_SECTION)(g_d2cmp_csTable_6fe32060 + (size_t)index * 8));
@@ -65,4 +65,12 @@ void* d2cmp_272d(void* this_, uint32_t flags, const D2CMPBatchTiny1018cEnv* env)
     env->destroyTypeInfo(this_);
     if ((flags & 1) != 0) env->freeObject(this_);
     return this_;
+}
+
+// 1.13c D2CMP+0x1A998 (13 bytes, caller 0x1A85D _raise): the SEH-cleanup fragment `if (frame[-0x1c] != lock)
+// _unlock(lock)`. The decompile reads the caller's EBP frame; `frameLockSlot` is that slot's value.
+// 1.13c D2CMP+0x1A998
+extern "C"
+void d2cmp_1a998(int32_t lock, int32_t frameLockSlot) {
+    if (frameLockSlot != lock) d2cmp_2dd8((uint32_t)lock);
 }

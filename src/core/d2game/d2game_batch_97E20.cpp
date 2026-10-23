@@ -68,7 +68,7 @@ struct D2GameBatch97E20Env {
 // (guid, unit id, unit +0x04 low word, pet type, blob[0], blob[1], 0) goes to 0xDFC10. The decompile
 // merges the index and pointer roles of param_3; the index is taken as the integer it is
 // range-checked as, and the two blob reads come from the same stack area 0x97A20 reads.
-// 1.13c D2Game+0x97E20
+// 1.13c D2Game+0x97e20
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_97E20(uint32_t param1, uint32_t param2, int32_t petType,
                                              uint32_t eaxUnit, const uint32_t* stackBlob,
@@ -172,7 +172,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8ADE0(uint32_t param1, uint32_t param2, u
 // SCmd command dispatch on the byte in AL. '8' asserts through #10202 (SCmd.cpp line 0x9C2) when
 // #10516 answers non-zero, then runs the shared tail. '9' brackets the tail with #10020 before and
 // #10728 -> #10012 after, then restores the original value with #10012. Other bytes return.
-// 1.13c D2Game+0x8DDA0
+// 1.13c D2Game+0x8dda0
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8DDA0(uint32_t param1, uint8_t cmd,
                                              const D2GameBatch97E20Env* env)
@@ -198,7 +198,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8DDA0(uint32_t param1, uint8_t cmd,
 // Shared assertion tail of the three handlers: with a unit whose first dword is non-zero (or a null
 // unit) the expected id is 0, otherwise the player-data +0x9C; a mismatch is fatal (0x85C / 0x853 /
 // 0x849 respectively), then 0x8D3D0 runs. The no-argument #10920 call carries the unit in EAX.
-// 1.13c D2Game+0x8DE50
+// 1.13c D2Game+0x8de50
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8DE50(uint32_t eaxUnit, uint32_t param1,
                                              const D2GameBatch97E20Env* env)
@@ -250,7 +250,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8DF70(uint32_t eaxUnit, uint32_t param1,
     env->sub8D3D0();
 }
 
-// 1.13c D2Game+0x8E090
+// 1.13c D2Game+0x8e090
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8E090(uint32_t eaxUnit, uint32_t param1, uint32_t param2,
                                              const D2GameBatch97E20Env* env)

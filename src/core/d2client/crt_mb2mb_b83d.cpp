@@ -16,7 +16,7 @@ struct D2cMb2MbEnv {
                                        char* dst, int32_t cb_dst, const char* def, int32_t* used_def);
 };
 
-// 1.13c D2Client+0x0B83D
+// 1.13c D2Client+0xb83d
 extern "C"
 EMSCRIPTEN_KEEPALIVE char* d2c_mb2mb(uint32_t cp_from, uint32_t cp_to, const char* src, uint32_t* pcb,
                                      char* dst, int32_t cb_dst, const D2cMb2MbEnv* env) {

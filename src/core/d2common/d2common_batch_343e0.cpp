@@ -23,8 +23,9 @@ namespace
 // Guards: nIndex in [0, datas+0xC4 count), a null unit or stat list or second array yields 0, and the
 // stat list header +0x10 must be negative. The array base is +0x58, advanced past ceil(count/32)
 // dwords (the first bit array); the bit is taken with the standard 1 << (nIndex & 31) mask.
+// 1.13c D2Common+0x343E0
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_343e0(uint32_t pUnit, uint32_t nIndex)
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_StatListTestFlagBit(uint32_t pUnit, uint32_t nIndex)
 {
 	uint8_t* t = T();
 	const int32_t nCount = static_cast<int32_t>(R(t, 0xC4));
@@ -57,7 +58,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_343e0(uint32_t pUnit, uint32_t nInd
 // 0x10009, +0x0C zero, +0x10 the text and +0x11+n a terminator. 0x10045 (allocation) and 0x10009 are
 // env seams; their retail debug file/line operands are not reproduced.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_18280(uint32_t nFrameAddend, const char* szText,
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_ChatNodeNew_18280(uint32_t nFrameAddend, const char* szText,
 	void* (*pfnAlloc10045)(const char*, int32_t, int32_t),
 	uint32_t (*pfn10009)(void))
 {
@@ -92,6 +93,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_18280(uint32_t nFrameAddend, const 
 // tables' MonStats count (+0xA80) gives the row at +0xA78, whose short +0x32 is tested. An out-of-range
 // class id reaches a decompiler artefact (a short read at absolute 0x32); it yields 0 here.
 extern "C"
+// 1.13c D2Common+0x50150
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_50150(uint32_t pUnit, int32_t nAllowZero,
 	int32_t (*pfn33C20)(uint32_t),
 	uint32_t (*pfn1470)(uint32_t, int32_t))
@@ -122,13 +124,13 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_50150(uint32_t pUnit, int32_t nAllow
 	return *reinterpret_cast<const int16_t*>(P(pRows) + nIndex * 0x1A8 + 0x32) != 0 ? 1 : 0;
 }
 
-// 1.13c D2Common+0x260F0 (#10463): item-unit value capped at 0x1FF.
+// 1.13c D2Common+0x260F0 D2SetStatWithNoTest (#10463): item-unit value capped at 0x1FF.
 // Item unit only (type 4). The base value is 0x22B70(class id). When the stat list (+0x5C) exists and
 // the data tables' +0xBD4 dword is at least 0xFF and the pointer at +0xBCC plus 0x14178 is non-null,
 // 0x38A80 adds a total for that stat list. A null unit (retail fatal 0xD5B) and a non-item unit
 // (0xD5C) return 0. The 0x38A80 operand the decompiler drops is passed as 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_260f0(uint32_t pUnit,
+EMSCRIPTEN_KEEPALIVE int32_t D2SetStatWithNoTest(uint32_t pUnit,
 	int32_t (*pfn22B70)(uint32_t),
 	int32_t (*pfn38A80)(uint32_t, uint32_t))
 {
@@ -161,7 +163,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_260f0(uint32_t pUnit,
 // latter takes the data tables as its hidden ECX), and the three retail tables are seam data pointers.
 // A null param_1 (retail fatal 0x547) returns.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_37a20(uint32_t pUnit, uint32_t pOther,
+EMSCRIPTEN_KEEPALIVE void D2Common_37A20_AdvanceEnvState(uint32_t pUnit, uint32_t pOther,
 	const int32_t* pTable0, const int32_t* pTable1, const int32_t* pThresholds,
 	void (*pfn376F0)(int32_t),
 	void (*pfn371C0)(uint32_t, uint32_t, uint32_t))
@@ -243,7 +245,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_37a20(uint32_t pUnit, uint32_t pOther,
 // non-type-4 node or null/0xFFFFFFA4 data. Class ids outside the items table are retail fatal 0x1447.
 // 0x1E420, 0x21300, 0x1FB50, 0x251C0 and 0x43710 are env seams.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_21420(uint32_t pUnit, uint32_t nArg2, uint32_t nArg3,
+EMSCRIPTEN_KEEPALIVE void D2Common_21420_RefreshItemNodes(uint32_t pUnit, uint32_t nArg2, uint32_t nArg3,
 	void (*pfn1E420)(uint8_t*),
 	void (*pfn21300)(uint32_t, uint32_t, uint32_t, uint32_t),
 	uint32_t (*pfn1FB50)(void),

@@ -74,6 +74,7 @@ static void __fastcall SUNITEVENT_FreeEvent(D2GameStrc* pGame, D2UnitStrc* pUnit
 }
 
 //D2Game.0x6FCC36D0
+// 1.13c D2Game+0x37110 (checked against decompile)
 void __fastcall SUNITEVENT_Unregister(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nTimerQueueNo, int32_t a4)
 {
     if (!pUnit)

@@ -47,6 +47,7 @@ void __stdcall TEXT_AddNodeToTextList(D2TextHeaderStrc* pTextHeader, short nStri
 }
 
 //D2Common.0x6FDC37A0 (#10904)
+// 1.13c D2Common+0x3d1c0
 void __stdcall TEXT_RemoveNodeFromTextList(D2TextHeaderStrc* pTextHeader, short nStringId)
 {
 	D2TextNodeStrc* pPrevious = NULL;

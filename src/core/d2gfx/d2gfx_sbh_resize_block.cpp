@@ -11,7 +11,7 @@ static inline uint8_t*  P8(uint32_t a)  { return (uint8_t*)(uintptr_t)a; }
 
 // 1.13c D2Gfx+0x48A8
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2gfx_48a8(uint32_t region, uint32_t block, uint32_t requested) {
+EMSCRIPTEN_KEEPALIVE int32_t d2_gfx_sbh_resize_block_48a8(uint32_t region, uint32_t block, uint32_t requested) {
     uint32_t control = P32(region)[4];                             // heap control block
     uint32_t group = (block - P32(region)[3]) >> 0xf;              // subregion index
     uint32_t buckets = group * 0x204u + 0x144u + control;          // bucket descriptor array

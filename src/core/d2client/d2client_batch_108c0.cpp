@@ -29,9 +29,10 @@ uint32_t d2_client_cd148(int32_t param, int32_t frame_m1c, uint32_t* w) {
     return 1;
 }
 
-// 1.13c D2Client+0x1E1D2 (16 B): switch case body, tail-call to D2Client+0xA53A0 with no arguments.
+// 1.13c D2Client+0x1E1D2 (16 B): switch case body. Calls D2Client+0xA53A0, which
+// takes EAX; the case does not touch EAX, so the live value passes straight through.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_1e1d2(uint32_t* w) { w[0] = 0xA53A0u; }
+void d2_client_1e1d2(uint32_t eax, void (*a53a0)(uint32_t)) { a53a0(eax); }
 
 // 1.13c D2Client+0xCB5D2 (18 B): CRT __setdefaultprecision: __controlfp(0x10000, 0x30000), which forwards
 // to __control87(0x10000, 0x30000 & 0xFFF7FFFF = 0x30000). There is no x87 control word in wasm; the call

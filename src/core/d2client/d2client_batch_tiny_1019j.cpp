@@ -18,7 +18,7 @@ struct D2ClientTiny1019jEnv {
 };
 
 // 0x17F0 (src/core/d2client/d2client_batch_1760.cpp) is the skills.txt -> skilldesc.txt lookup.
-extern "C" void* d2_fn_17f0(int32_t nSkillId);
+extern "C" void* d2_client_skilldesc_for_skill(int32_t nSkillId);
 
 // 1.13c D2Client+0x2FD10
 // stdcall, one stack word = skilldesc column; EAX = skill id (the ABI the caller 0x54E10 uses: `push 0;
@@ -26,7 +26,7 @@ extern "C" void* d2_fn_17f0(int32_t nSkillId);
 // little-endian word at row + 8 + index * 2. The index is not range-checked in retail.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_client_2fd10(int32_t index, int32_t skillId) {
-    const uint8_t* desc = reinterpret_cast<const uint8_t*>(d2_fn_17f0(skillId));
+    const uint8_t* desc = reinterpret_cast<const uint8_t*>(d2_client_skilldesc_for_skill(skillId));
     if (desc == nullptr) return 0x1506;
     uint16_t v = 0;
     std::memcpy(&v, desc + 8 + index * 2, sizeof(v));

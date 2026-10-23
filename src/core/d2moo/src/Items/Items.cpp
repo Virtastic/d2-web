@@ -202,6 +202,7 @@ void __stdcall ITEMS_AssignSuffix(D2UnitStrc* pItem, uint16_t nSuffix, int nSuff
 	}
 }
 
+// 1.13c D2Common+0x239E0
 //D2Common.0x6FD986B0 (#10703)
 uint16_t __stdcall ITEMS_GetRarePrefixId(D2UnitStrc* pItem)
 {
@@ -223,6 +224,7 @@ void __stdcall ITEMS_AssignRarePrefix(D2UnitStrc* pItem, uint16_t nPrefix)
 	}
 }
 
+// 1.13c D2Common+0x23990
 //D2Common.0x6FD98700 (#10705)
 uint16_t __stdcall ITEMS_GetRareSuffixId(D2UnitStrc* pItem)
 {
@@ -311,6 +313,7 @@ void __stdcall ITEMS_SetItemCMDFlag(D2UnitStrc* pItem, int nFlag, BOOL bSet)
 }
 
 //D2Common.0x6FD98850 (#10712)
+// 1.13c D2Common+0x23850
 uint32_t __stdcall ITEMS_GetItemCMDFlags(D2UnitStrc* pItem)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -374,6 +377,7 @@ void __stdcall ITEMS_SetInvPage(D2UnitStrc* pItem, uint8_t nPage)
 }
 
 //D2Common.0x6FD98920 (#10721)
+// 1.13c D2Common+0x23780
 uint8_t __stdcall ITEMS_GetCellOverlap(D2UnitStrc* pItem)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -385,6 +389,7 @@ uint8_t __stdcall ITEMS_GetCellOverlap(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD98940 (#10722)
+// 1.13c D2Common+0x23760
 void __stdcall ITEMS_SetCellOverlap(D2UnitStrc* pItem, int nCellOverlap)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -1558,6 +1563,7 @@ int __stdcall ITEMS_CheckIfThrowable(D2UnitStrc* pItem)
 	return 0;
 }
 
+// 1.13c D2Common+0x22F50
 //D2Common.0x6FD9A5B0 (#10760)
 int __stdcall ITEMS_GetMissileType(D2UnitStrc* pItem)
 {
@@ -1780,6 +1786,7 @@ BOOL __stdcall ITEMS_ComparePotionTypes(D2UnitStrc* pItem1, D2UnitStrc* pItem2)
 }
 
 //D2Common.0x6FD9A960 (#10770)
+// 1.13c D2Common+0x24B20
 BOOL __stdcall ITEMS_CheckIfAutoBeltable(D2InventoryStrc* pInventory, D2UnitStrc* pItem)
 {
 	D2_ASSERT(pItem);
@@ -1832,6 +1839,7 @@ BOOL __stdcall ITEMS_IsQuestItem(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD9AB90
+// 1.13c D2Common+0x25810
 int __fastcall ITEMS_CalculateAdditionalCostsForChargedSkills(D2UnitStrc* pUnit, int nBaseCost)
 {
 	D2SkillsTxt* pSkillsTxtRecord = NULL;
@@ -2632,6 +2640,7 @@ int __stdcall ITEMS_CheckBitField1Flag8(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD9D0F0 (#10804)
+// 1.13c D2Common+0x24710
 int __stdcall ITEMS_GetSpellIcon(D2UnitStrc* pItem)
 {
 	D2BooksTxt* pBooksTxtRecord = NULL;
@@ -3141,6 +3150,7 @@ BOOL __stdcall ITEMS_IsSocketFiller(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD9D9E0 (#10822)
+// 1.13c D2Common+0x26ba0
 const D2RunesTxt* __stdcall ITEMS_GetRunesTxtRecordFromItem(const D2UnitStrc* pItem)
 {
 	if (!pItem)
@@ -3162,8 +3172,12 @@ const D2RunesTxt* __stdcall ITEMS_GetRunesTxtRecordFromItem(const D2UnitStrc* pI
 		int nSocketableIds[6] = {};
 		int nSocketedItems = 0;
 
-		for (D2UnitStrc* pInventoryItem = INVENTORY_GetFirstItem(pItem->pInventory); pInventoryItem && INVENTORY_UnitIsItem(pInventoryItem); pInventoryItem = INVENTORY_GetNextItem(pInventoryItem))
+		for (D2UnitStrc* pInventoryItem = INVENTORY_GetFirstItem(pItem->pInventory); pInventoryItem; pInventoryItem = INVENTORY_GetNextItem(pInventoryItem))
 		{
+			if (!INVENTORY_UnitIsItem(pInventoryItem))
+			{
+				return nullptr; // 1.13c delta: non-item in inventory chain aborts
+			}
 			nSocketableIds[nSocketedItems] = pInventoryItem->dwClassId;
 			++nSocketedItems;
 		}
@@ -3197,7 +3211,7 @@ const D2RunesTxt* __stdcall ITEMS_GetRunesTxtRecordFromItem(const D2UnitStrc* pI
 					++nRuneCounter;
 				}
 
-				if (bMatch)
+				if (bMatch && nSockets <= nRuneCounter) // 1.13c delta: recipe must cover all sockets
 				{
 					// All runes are a match, now check if the item types correspond
 					bool isItemTypeExcluded = false;
@@ -3365,7 +3379,7 @@ void __stdcall ITEMS_GetRealmData(D2UnitStrc* pItem, int* pRealmData0, int* pRea
 	}
 }
 
-//D2Common.0x6FD9E070 (#11245)
+// 1.13c D2Common+0x22560 (#11063, alias 0x5E070 #11245)
 void __stdcall ITEMS_SetRealmData(D2UnitStrc* pItem, int a2, int a3)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -3959,39 +3973,34 @@ BOOL __stdcall ITEMS_IsImbueable(D2UnitStrc* pItem)
 	return FALSE;
 }
 
-// 1.13c D2Common+0x240D0 (#10796)
-//D2Common.0x6FD9F080 (#10832)
+// 1.13c D2Common+0x240d0 (#10796)
+// 1.13c delta: no unit-type gate; non-items fall through to the items.txt lookup by dwClassId.
 BOOL __stdcall ITEMS_IsPersonalizable(D2UnitStrc* pItem)
 {
-	D2ItemsTxt* pItemsTxtRecord = NULL;
-
 	D2_ASSERT(pItem);
-	if (pItem->dwUnitType == UNIT_ITEM)
+	if (pItem->dwUnitType == UNIT_ITEM && DATATBLS_GetItemsTxtRecord(pItem->dwClassId)->wType[0] == ITEMTYPE_GOLD)
 	{
-		pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
-		D2_ASSERT(pItemsTxtRecord);
-
-		if (pItemsTxtRecord->wType[0] == ITEMTYPE_GOLD || pItemsTxtRecord->wType[0] == ITEMTYPE_BOW_QUIVER
-			|| pItemsTxtRecord->wType[0] == ITEMTYPE_CROSSBOW_QUIVER || pItemsTxtRecord->wType[0] == ITEMTYPE_PLAYER_BODY_PART)
-		{
-			return FALSE;
-		}
-
-		if (pItem->pItemData && (pItem->pItemData->dwItemFlags & IFLAG_NOSELL || pItem->pItemData->dwItemFlags & IFLAG_BROKEN))
-		{
-			return FALSE;
-		}
-
-		if (!pItem->pItemData || !(pItem->pItemData->dwItemFlags & IFLAG_PERSONALIZED))
-		{
-			if (!pItemsTxtRecord->nCompactSave)
-			{
-				return pItemsTxtRecord->nNameable != 0;
-			}
-		}
+		return FALSE;
 	}
 
-	return FALSE;
+	if (pItem->dwUnitType == UNIT_ITEM && pItem->pItemData && (pItem->pItemData->dwItemFlags & IFLAG_NOSELL))
+	{
+		return FALSE;
+	}
+
+	const int32_t nType = pItem->dwUnitType == UNIT_ITEM ? DATATBLS_GetItemsTxtRecord(pItem->dwClassId)->wType[0] : 0;
+	if (nType == ITEMTYPE_PLAYER_BODY_PART || nType == ITEMTYPE_BOW_QUIVER || nType == ITEMTYPE_CROSSBOW_QUIVER)
+	{
+		return FALSE;
+	}
+
+	if (pItem->dwUnitType == UNIT_ITEM && pItem->pItemData && (pItem->pItemData->dwItemFlags & (IFLAG_BROKEN | IFLAG_PERSONALIZED)))
+	{
+		return FALSE;
+	}
+
+	D2ItemsTxt* pTxt = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
+	return !pTxt->nCompactSave && pTxt->nNameable != 0;
 }
 
 //D2Common.0x6FD9F260 (#10831)
@@ -7509,6 +7518,7 @@ BOOL __fastcall sub_6FDA4490(D2UnitStrc* pUnit, D2UnitStrc* pItem, int a3)
 }
 
 //D2Common.0x6FDA4640 (#10866)
+// 1.13c D2Common+0x2C910
 BOOL __stdcall ITEMS_UpdateSets(D2UnitStrc* pUnit, D2UnitStrc* pItem, int a3, int a4)
 {
 	unsigned int nSetItemMask = 0;

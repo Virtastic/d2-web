@@ -335,6 +335,7 @@ static void DRLGMAZE_PlaceCatacombsPrev(D2DrlgLevelStrc* pLevel, BOOL bLevel1)
 	}
 }
 
+// 1.13c D2Common+0x11BF0 (delta: ACT3 sewer-1 preset replace failure halts+exit(-1), 1.10f only warned)
 //1.10: D2Common.0x6FD794A0
 //1.14d: 0x00673B30
 void __fastcall DRLGMAZE_GenerateLevel(D2DrlgLevelStrc* pLevel)
@@ -773,22 +774,22 @@ void __fastcall DRLGMAZE_GenerateLevel(D2DrlgLevelStrc* pLevel)
 
 			if (!DRLGMAZE_ReplaceRoomPreset(pLevel, LVLPREST_ACT3_SEWER_SW, LVLPREST_ACT3_SEWER_PREV_SW, -1, 0))
 			{
-				FOG_DisplayWarning("ptRoom", __FILE__, __LINE__);
+				{ FOG_DisplayHalt("ptRoom", __FILE__, __LINE__); exit(-1); }
 			}
 
 			if (!DRLGMAZE_ReplaceRoomPreset(pLevel, LVLPREST_ACT3_SEWER_SE, LVLPREST_ACT3_SEWER_PREV_SE, -1, 0))
 			{
-				FOG_DisplayWarning("ptRoom", __FILE__, __LINE__);
+				{ FOG_DisplayHalt("ptRoom", __FILE__, __LINE__); exit(-1); }
 			}
 
 			if (!DRLGMAZE_ReplaceRoomPreset(pLevel, LVLPREST_ACT3_SEWER_NW, LVLPREST_ACT3_SEWER_PREV_NW, -1, 0))
 			{
-				FOG_DisplayWarning("ptRoom", __FILE__, __LINE__);
+				{ FOG_DisplayHalt("ptRoom", __FILE__, __LINE__); exit(-1); }
 			}
 
 			if (!DRLGMAZE_ReplaceRoomPreset(pLevel, LVLPREST_ACT3_SEWER_NE, LVLPREST_ACT3_SEWER_PREV_NE, -1, 0))
 			{
-				FOG_DisplayWarning("ptRoom", __FILE__, __LINE__);
+				{ FOG_DisplayHalt("ptRoom", __FILE__, __LINE__); exit(-1); }
 			}
 		}
 		else

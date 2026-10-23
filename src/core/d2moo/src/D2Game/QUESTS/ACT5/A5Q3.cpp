@@ -264,6 +264,7 @@ void __fastcall ACT5Q3_UpdateResistances(D2GameStrc* pGame, D2UnitStrc* pUnit, i
 }
 
 //D2Game.0x6FCB3810
+// 1.13c D2Game+0x5B0B0
 void __fastcall ACT5Q3_ApplyResistanceReward(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pUnit);

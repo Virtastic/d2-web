@@ -96,3 +96,14 @@ extern "C" void storm_sub_1D0B0(i32 src /*eax*/, i32* pOut /*ebx*/, u8* hdr /*es
     *o1 = 0; *o2 = 0; *o3 = 0; *o4 = 0;
     *o5 = *pOut + 2 + sub_6868((i16*)(uintptr_t)(u32)*pOut) * 2;
 }
+
+// 1.13c Storm+0x04FC0  (p1 unused, size stack, flags stack), hidden edi=list. Allocates size+0x238
+// tagged ".?AUPROVIDERINFO@@" (line -2, flags|8), zeroes its first two dwords, links it via 4390.
+extern "C" u32* storm_sub_4FC0(u32 /*p1*/, i32 size, u32 flags, i32* list /*edi*/,
+                               u32* (*alloc_1C580)(u32, const char*, i32, u32),
+                               void (*link_4390)(i32* node, i32* list)) {
+    u32* p = alloc_1C580((u32)(size + 0x238), ".?AUPROVIDERINFO@@", -2, flags | 8);
+    if (p) { p[0] = 0; p[1] = 0; }
+    if (list) link_4390((i32*)p, list);
+    return p;
+}

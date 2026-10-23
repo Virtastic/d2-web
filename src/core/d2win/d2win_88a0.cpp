@@ -6,7 +6,7 @@
 
 extern "C" [[noreturn]] void d2_mcp_startup_overflow(uint32_t message);
 
-// 1.13c D2Win+0xACB0: child must be type 5 (else fatal 0x65); dword[0x13] = min(idx, dword[0x12]).
+// 1.13c D2Win+0x0acb0: child must be type 5 (else fatal 0x65); dword[0x13] = min(idx, dword[0x12]).
 static void d2win_sub_ACB0(int32_t* c, int32_t idx) {
     if (c[0] != 5) d2_mcp_startup_overflow(0x65);
     c[0x13] = idx < c[0x12] ? idx : c[0x12];

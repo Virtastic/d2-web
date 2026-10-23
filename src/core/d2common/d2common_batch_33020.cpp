@@ -107,3 +107,16 @@ extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_10210_sub_33020(D2UnitStrc* pUnit,
 	}
 	pUnit->dwFlagEx &= 0xfffffbffu;
 }
+
+extern "C" void D2Common_1B0D_Exit(int32_t);
+
+// 1.13c D2Common+0x22880 (#10081): ItemsTxt[nItemId].nGemApplyType (+0x13E). An out-of-range id
+// (or no table) is fatal in retail: it logs a message (ordinals 10265/10024) and _exit(-1)s; we
+// skip the log line and take the same exit.
+EMSCRIPTEN_KEEPALIVE uint8_t D2Common_22880_ITEMS_GetGemApplyType(uint32_t nItemId)
+{
+	const D2ItemsTxt* pItemsTxt = DATATBLS_GetItemsTxtRecord(nItemId);
+	if (!pItemsTxt)
+		D2Common_1B0D_Exit(-1);
+	return pItemsTxt->nGemApplyType;
+}

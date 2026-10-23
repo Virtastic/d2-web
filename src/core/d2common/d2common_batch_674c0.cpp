@@ -44,3 +44,21 @@ fin:
  p[0x28 / 4] = static_cast<uint32_t>(n);
 }
 }
+
+// 1.13c D2Common+0x671B0 (FUN_6fdb71b0): try up to three candidate directions c[0..2] from position pos
+// (x low16, y high16); first whose collision test (FUN_6fd9ce90 = coll) returns 0 is stored to *out.
+// Retail takes the path-state in EAX (s); stepTab = DAT_6fddc2e0. Fatal paths (_exit) trap.
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_671b0(const uint32_t* s, uint32_t pos, const int32_t* c,
+  int32_t* out, const int16_t* stepTab, uint32_t (*coll)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t)) {
+ const uint32_t* st = reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(s[0x30 / 4]));
+ const uint32_t* p = reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(st[0x30 / 4]));
+ if (!p || p[0] > 1) __builtin_trap();
+ const uint32_t a = s[8 / 4], b = s[0x28 / 4], d = s[0x2c / 4];
+ for (int k = 0; k < 3; ++k) {
+  if (k == 2 && c[2] == 0xff) __builtin_trap();
+  const uint32_t x = static_cast<uint16_t>(stepTab[c[k] * 2] + static_cast<int16_t>(pos));
+  const uint32_t y = static_cast<uint16_t>(stepTab[c[k] * 2 + 1] + static_cast<int16_t>(pos >> 16));
+  if (coll(a, x, y, b, d) == 0) { *out = c[k]; return 1; }
+ }
+ return 0;
+}

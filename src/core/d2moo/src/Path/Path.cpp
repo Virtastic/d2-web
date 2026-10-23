@@ -681,6 +681,7 @@ void __stdcall PATH_FreeDynamicPath(void* pMemPool, D2DynamicPathStrc* pDynamicP
 }
 
 //D2Common.0x6FDA91B0 (#11282)
+// 1.13c D2Common+0x353D0
 //Unused
 int __stdcall PATH_GetCollisionPatternFromMonStats2Txt(int nMonsterId)
 {
@@ -1065,6 +1066,7 @@ void __stdcall D2Common_10153(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDA9B40 (#10208)
+// 1.13c D2Common+0x34C80
 //TODO: Check name
 void __stdcall D2COMMON_10208_PathSetPathingFlag(D2DynamicPathStrc* pDynamicPath, BOOL bSet)
 {
@@ -1093,6 +1095,7 @@ int __stdcall PATH_GetNumberOfPathPoints(D2DynamicPathStrc* pDynamicPath)
 	return pDynamicPath->dwPathPoints;
 }
 
+// 1.13c D2Common+0x35080
 //D2Common.0x6FDA9B90 (#11291)
 void __stdcall PATH_SetNumberOfPathPoints(D2DynamicPathStrc* pDynamicPath, int a2)
 {
@@ -1336,6 +1339,7 @@ void __stdcall PATH_SetCurrentRoomInvalid(D2DynamicPathStrc* pDynamicPath, BOOL 
 	}
 }
 
+// 1.13c D2Common+0x34960
 //D2Common.0x6FDA9F00 (#10145)
 void __stdcall PATH_SetUnusedFlag_0x00004(D2DynamicPathStrc* pDynamicPath, BOOL bSet)
 {
@@ -1559,9 +1563,10 @@ uint16_t __stdcall D2Common_10202(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDAA310 (#10192)
+// 1.13c D2Common+0x34810 (#10359): retail asserts dwPathType == PATHTYPE_IDASTAR (1.10f source had it inverted)
 void __stdcall PATH_SetIDAStarInitFScore(D2DynamicPathStrc* pDynamicPath, int nIDAStarInitFScore)
 {
-	D2_ASSERT(pDynamicPath->dwPathType != PATHTYPE_IDASTAR);
+	D2_ASSERT(pDynamicPath->dwPathType == PATHTYPE_IDASTAR);
 
 	pDynamicPath->nIDAStarInitFScore = nIDAStarInitFScore;
 }
@@ -1606,6 +1611,7 @@ int __stdcall D2COMMON_10200_PathGetSaveY(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDAA430 (#10203)
+// 1.13c D2Common+0x346F0
 //TODO: Check name
 void __stdcall D2COMMON_10203_PATH_SetRotateFlag(D2DynamicPathStrc* pDynamicPath, BOOL bReset)
 {
@@ -1655,6 +1661,7 @@ int __stdcall PATH_GetStepNum(D2DynamicPathStrc* pDynamicPath)
 
 //D2Common.0x6FDAA4C0 (#10207)
 //TODO: Find a name
+// 1.13c D2Common+0x34670
 void __stdcall D2Common_10207(D2DynamicPathStrc* pDynamicPath, char a2, char a3)
 {
 	pDynamicPath->unk0x67 = a2;
@@ -1698,6 +1705,7 @@ void __stdcall PATH_SetUnitCollisionPattern(D2UnitStrc* pUnit, int nCollisionPat
 	pUnit->pDynamicPath->dwCollisionPattern = nCollisionPattern;
 }
 
+// 1.13c D2Common+0x34EE0
 //D2Common.0x6FDAA5A0 (#10212)
 //TODO: Check name
 void __stdcall D2COMMON_10212_PATH_SetMoveFlags(D2UnitStrc* pUnit, BOOL bSet)
@@ -1720,6 +1728,7 @@ void __stdcall D2COMMON_10212_PATH_SetMoveFlags(D2UnitStrc* pUnit, BOOL bSet)
 
 //D2Common.0x6FDAA600 (#10213)
 //TODO: Find a name
+// 1.13c D2Common+0x36650
 void __stdcall D2Common_10213(D2UnitStrc* pUnit)
 {
 	if (pUnit && !(pUnit->dwFlags & UNITFLAG_ISASYNC) && (pUnit->dwFlagEx & UNITFLAGEX_UNK_PATH_RELATED))
@@ -1753,6 +1762,7 @@ int __stdcall PATH_ComputeSquaredDistance(int nX1, int nY1, int nX2, int nY2)
 }
 
 //D2Common.0x6FDAA6D0 (#10221)
+// 1.13c D2Common+0x35b80
 void __stdcall PATH_AddCollisionFootprintForOptionalUnit(D2UnitStrc* pUnit)
 {
 	if (pUnit)

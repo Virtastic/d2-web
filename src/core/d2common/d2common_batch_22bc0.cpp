@@ -54,7 +54,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_250B0_ItemPredicate(const int32_t* pUnit)
     const uint8_t* pItemData = pUnit[5] != 0
         ? *reinterpret_cast<const uint8_t* const*>(reinterpret_cast<const uint8_t*>(pUnit) + 0x14)
         : nullptr;
-    const uint32_t dwItemFlags = pItemData != nullptr ? *reinterpret_cast<const uint32_t*>(pItemData + 0x18) : 0;
+    const uint32_t dwItemFlags = (pUnit[0] == 4 && pItemData != nullptr) ? *reinterpret_cast<const uint32_t*>(pItemData + 0x18) : 0;
     if (pUnit[0] == 4 && pItemData != nullptr && (dwItemFlags & 0x1000) != 0)
         return 0;
     const uint32_t nClassId = static_cast<uint32_t>(pUnit[1]);

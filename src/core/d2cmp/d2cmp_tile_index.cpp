@@ -49,7 +49,7 @@ extern "C" void d2cmp_12c30(D2CMPTileIndexEntry** bucket, const void* tile,
     entry->tiles = link;
 }
 // ESI=entry, EDI=tile. Duplicate identity is pointer equality, not key equality.
-// 1.13c D2CMP+0x12CD0
+// 1.13c D2CMP+0x12cd0
 extern "C" void d2cmp_12cd0(D2CMPTileIndexEntry* entry, const void* tile,
                             const D2CMPTileIndexMemory* memory) {
     for (auto* p = entry->tiles; p; p = p->next) if (p->tile == tile) return;
@@ -59,7 +59,7 @@ extern "C" void d2cmp_12cd0(D2CMPTileIndexEntry* entry, const void* tile,
     entry->tiles = link;
 }
 // ECX=index, EAX=tile; match complete dwords after hashing their low bytes.
-// 1.13c D2CMP+0x12F20
+// 1.13c D2CMP+0x12f20
 extern "C" void d2cmp_12f20(D2CMPTileIndex* index, const void* tile,
                             const D2CMPTileIndexMemory* memory) {
     if (!index) tileIndexFatal(0xa5);
@@ -75,7 +75,7 @@ extern "C" void d2cmp_12f20(D2CMPTileIndex* index, const void* tile,
 }
 // EAX=index, EBX=key1c; stack output,capacity,key14,key18 (callee pops 16).
 // Checks precede the zero-capacity return. Output pointers retain native width.
-// 1.13c D2CMP+0x12E60
+// 1.13c D2CMP+0x12e60
 extern "C" uint32_t d2cmp_12e60(const D2CMPTileIndex* index, uint32_t key1c,
                                const void** output, uint32_t capacity,
                                uint32_t key14, uint32_t key18) {
@@ -92,7 +92,7 @@ extern "C" uint32_t d2cmp_12e60(const D2CMPTileIndex* index, uint32_t key1c,
     return 0;
 }
 // Stack index (callee pops four); release links, entries, then owning index.
-// 1.13c D2CMP+0x12D30
+// 1.13c D2CMP+0x12d30
 extern "C" void d2cmp_12d30(D2CMPTileIndex* index, const D2CMPTileIndexMemory* memory) {
     if (!index) return;
     for (auto& bucket : index->buckets) {

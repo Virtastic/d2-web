@@ -269,7 +269,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_53370_GetCountedTableRecord(
     return nIndex < nCount ? retailBase + uint32_t(nIndex) * 0x34u : 0u;
 }
 
-// 1.13c D2Common+0x533F0 (#10924): required Fog seams preserve native text/context
+// 1.13c D2Common+0x533f0 (#10924): required Fog seams preserve native text/context
 // pointers; retail always terminates after reporting the error.
 using D2CommonFogErrorTextFn = const char* (*)(uint32_t);
 using D2CommonFogDisplayHaltFn = void (*)(void*, const char*);

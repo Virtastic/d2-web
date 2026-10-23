@@ -31,7 +31,7 @@ void D2Common_38710_ForwardRoomSelection(void* room, uint32_t flags, int mode,
     select(room, flags, mode);
 }
 
-// 1.13c D2Common+0x1DAD0
+// 1.13c D2Common+0x1dad0
 void D2Common_1DAD0_VisitPathCells(void* unit, uint32_t mask, int context,
                                     void (*onCell)(), void (*step)(void*, void*, int),
                                     void* (*roomOf)(void*), uint16_t (*collides)(void*, unsigned, unsigned, int, uint32_t),

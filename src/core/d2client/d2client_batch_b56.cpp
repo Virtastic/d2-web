@@ -263,7 +263,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_5943(uint32_t fd, const char* buf, uint32
     return -1;
 }
 
-// 1.13c D2Client+0x05BAA
+// 1.13c D2Client+0x05baa
 // __flush: a write stream (flag & 3 == 2) with a buffer (flag & 0x108) writes _ptr - _base bytes;
 // a short write sets the error bit 0x20 and returns -1, otherwise the 0x80 clear-bit is dropped. _cnt
 // is reset and _ptr rewound to _base on every path.
@@ -298,7 +298,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_5c07(CrtFile* file, const D2ClientBatchB5
     return 0;
 }
 
-// 1.13c D2Client+0x05D20
+// 1.13c D2Client+0x05d20
 // _memcpy: the release CRT's overlapping-aware copy -- memmove semantics, byte-identical result.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void* d2_client_5d20(void* dst, const void* src, uint32_t size) {
@@ -353,7 +353,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_60e0(uint32_t fd, const D2ClientBatchB56E
     return -1;
 }
 
-// 1.13c D2Client+0x0617B
+// 1.13c D2Client+0x0617b
 // __freebuf: only a stream with a buffer (flag & 0x83 and flag & 8) frees _base, clears the _IOMYBUF
 // (8) and _IOYOURBUF (0x1000 -> 0xF7FF mask) bits -- a 16-bit store, so only the low half of _flag is
 // written -- and rewinds _ptr/_base/_cnt.
@@ -368,7 +368,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_617b(CrtFile* file, const D2ClientBatchB56En
     }
 }
 
-// 1.13c D2Client+0x0707B
+// 1.13c D2Client+0x0707b
 // ___isctype_mt(self, locale, c, mask): a byte in [0, 0x100] is classified from the locale's 16-bit
 // ctype table at locale+0x48. Anything else is converted through ___crtGetStringTypeA: a two-byte
 // sequence only when the high byte's table entry has the MBCS lead-bit 0x80; the API's output word is
@@ -401,7 +401,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_client_707b(void* self, void* locale, int32_t c
     return (uint32_t)type & mask;
 }
 
-// 1.13c D2Client+0x070F2
+// 1.13c D2Client+0x070f2
 // ___freetlocinfo(locale): release a locale block's referenced tables when their refcount is zero and
 // they are not the CRT defaults: lconv (three tables at +0x34/+0x30/+0x2c keyed off +0x3c), the
 // codepage buffer at +0x40 with its +0x44 base, the lc_time block at +0x50, and the block itself. Each

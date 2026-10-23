@@ -68,7 +68,10 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_30b80(int32_t unitType, uint32_t uni
  if (table == 0) {
   if (unitType == 10) return 1;
   if (unitType != 0x12 || !unit || !typeOf || !modeOf) return 0;
-  return typeOf(unit) != 0 && modeOf(unit) != 0;
+  if (typeOf(unit) == 0) return 0;
+  // modeOf is retail 0x1250: yields the skills record; its byte +0x12 must be 10
+  const auto rec = static_cast<uint32_t>(modeOf(unit));
+  return rec != 0 && rd<uint8_t>(reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(rec)), 0x12) == 10;
  }
  return table == 1 && unitType == 7;
 }
@@ -81,10 +84,13 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_30c70(int32_t index, int32_t table, 
  if (!records) return 0;
  const uint32_t* rec = nullptr;
  if (table == 0) rec = records + index * 5;
- else if (table == 1 && sgptDataTables && monster >= 0 && monster < sgptDataTables->nMonStatsTxtRecordCount) {
-  const auto* m = reinterpret_cast<const uint8_t*>(sgptDataTables->pMonStatsTxt) + monster * 0x1a8;
-  if ((rd<uint8_t>(m, 0x0d) & 1u) && (index == 2 || index == 0xf)) return 1;
-  rec = records + (monster < 0x19a ? 0x19a : 0) + index * 5;
+ else if (table == 1) {
+  // in-range monster flagged (+0x0d & bit0) answers 1 only for index 2 / 0xf; otherwise (or out of range) fall to the table
+  if (sgptDataTables && monster >= 0 && monster < sgptDataTables->nMonStatsTxtRecordCount) {
+   const auto* m = reinterpret_cast<const uint8_t*>(sgptDataTables->pMonStatsTxt) + monster * 0x1a8;
+   if (rd<uint8_t>(m, 0x0d) & 1u) return (index == 2 || index == 0xf) ? 1 : 0;
+  }
+  rec = records + (monster < 0x19a ? 0 : 0x19a) + index * 5;
  } else return 0;
  if (rec[1]) return 1;
  if (!rec[0] || !unit || !unitFlags) return 0;

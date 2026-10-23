@@ -22,7 +22,7 @@ struct D2CrtFile32 {
 // (ch, stream, written count) call shape. Replace with a direct call once 0x04C01 lands.
 typedef void (*D2cWriteCharFn)(uint8_t ch, D2CrtFile32* f, int32_t* written);
 
-// 1.13c D2Client+0x4C34
+// 1.13c D2Client+0x04c34
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2client_4c34(uint8_t ch, int32_t num, D2CrtFile32* f,
                                               int32_t* written, D2cWriteCharFn write_char) {

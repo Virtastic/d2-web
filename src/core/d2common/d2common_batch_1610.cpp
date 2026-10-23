@@ -119,7 +119,7 @@ uint32_t D2Common_18A0_GetMonStatsFlagBit(int32_t nMonsterId, uint32_t nBit)
 {
 	const D2MonStatsTxt* pRow = DATATBLS_GetMonStatsTxtRecord(nMonsterId);
 	if (!pRow) return 0;
-	return pRow->nMonStatsFlags[nBit >> 3] & gdwBitMasks[nBit & 7];
+	return pRow->nMonStatsFlags[(int32_t)nBit >> 3] & gdwBitMasks[nBit & 7];
 }
 
 // 1.13c D2Common+0x18F0 (skill id arrives in EAX): 1 if the skill's wSkillDesc (+0x194) indexes a valid SkillDesc row

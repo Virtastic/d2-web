@@ -87,7 +87,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2win_sub_10070(void* obj, uint32_t unused) {
 
 // 1.13c D2Win+0x100B0 (81 bytes): the caller's cap is clamped to D2CMP #10086(obj[1]) - 1, then to
 // zero from below (signed), and stored at +0x40. Returns 1; a type other than 2 is fatal 0x8B.
-// 1.13c D2Win+0x100B0
+// 1.13c D2Win+0x100b0
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2win_sub_100B0(void* obj, int32_t cap, const D2WinBatch10030Env* env) {
     if (rd32(obj, 0x00) != 2) d2win_fatal(0x8B);

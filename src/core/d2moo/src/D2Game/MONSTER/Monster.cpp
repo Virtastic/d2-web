@@ -324,6 +324,7 @@ int32_t __fastcall MONSTER_SetVelocityAndPosition(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FC60BC0
+// 1.13c D2Game+0x33290 (retail name LEVEL_RemoveAllUnits is a misnomer: this is the 128-bucket monster walk)
 void __fastcall MONSTER_RemoveAll(D2GameStrc* pGame)
 {
     for (int32_t i = 0; i < 128; ++i)
@@ -524,6 +525,7 @@ void __fastcall MONSTER_SetComponents(D2MonRegDataStrc* pMonRegData, D2UnitStrc*
 }
 
 //D2Game.0x6FC610C0
+// 1.13c D2Game+0xAF610 (retail takes the unit in EAX; non-monster/null data derefs null = crash, we return 1)
 int32_t __fastcall MONSTER_HasComponents(D2UnitStrc* pMonster)
 {
     if (!pMonster || pMonster->dwUnitType != UNIT_MONSTER || !pMonster->pMonsterData)

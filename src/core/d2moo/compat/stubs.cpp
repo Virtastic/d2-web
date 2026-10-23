@@ -1,6 +1,7 @@
 // Compat: the non-table externals the vendored D2MOO DRLG links against, in wasm terms.
 // Everything that touched units, paths, environment or Win32 is a no-op here: the DRLG is run
 // headless for grid parity (M1), exactly the way the retail capture tool drives retail D2Common.
+#include <cstdlib>
 #include <D2Common.h>
 #include <Archive.h>
 #include <D2Seed.h>
@@ -82,3 +83,33 @@ void FOG_Encode14BitsToString(uint16_t* p2, uint32_t v) { p2[0] = (uint16_t)(0x2
 #include <math.h>
 float FOG_10083_Cos_LUT(int16_t i) { return (float)cos((double)(i & 511) * 6.283185307179586 / 512.0); }
 float FOG_10084_Sin_LUT(int16_t i) { return (float)sin((double)(i & 511) * 6.283185307179586 / 512.0); }
+
+// 1.13c D2CMP+0x04ABC -- CRT _NMSG_WRITE: looks rtc code up in the 0x13-entry table; console mode writes the text to stderr, else (code != 0xFC) a "Runtime Error!" MessageBox. Web has neither; abort path only.
+extern "C" void d2cmp_crt_nmsg_write(int) {}
+// 1.13c D2CMP+0x07875 -- MSVC CRT __security_error/report_failure: fatal, never returns.
+// Retail shows a message box (or calls the user handler) then exit(3); we abort the process.
+extern "C" [[noreturn]] void d2cmp_crt_report_failure_7875(int code)
+{
+    (void)code; // 1 = "Buffer overrun detected!", else "Unknown security failure detected!"
+    abort();
+}
+
+// 1.13c D2CMP+0x19EBB -- MSVC CRT _XcptFilter-style SEH filter: if the exception is a C++ throw
+// (code 0xE06D7363, 3 params, magic 0x19930520/21) call terminate(); else call the user filter
+// (DAT_6ff13be0) when set and valid, returning its result; otherwise 0. Web has no SEH: terminate.
+extern "C" int d2cmp_crt_xcpt_filter_19ebb(int code, int nparams, int magic)
+{
+    if (code == -0x1f928c9d && nparams == 3 && (magic == 0x19930520 || magic == 0x19930521)) abort();
+    return 0; // no user filter installed
+}
+
+// 1.13c Fog+0x21BF7 -- MSVC CRT x87 helper (pow/fmod range-reduction dispatch): jump table on
+// (EAX & 0x3f) selecting FPU-stack register pairs for sub_21AE0 or returning x/x (NaN) / ST1.
+// Operates on the x87 register stack, not expressible in wasm64; Fog never reaches it (only
+// caller is CRT sub_212C0). Deliberately no wasm body.
+void fog_sub_21bf7_x87_dispatch(void) {}
+
+// 1.13c D2CMP+0x19B65 -- MSVC CRT _atoflt: parse the C string with the CRT's 12-byte long-double
+// scanner (sub_1A153) and narrow to a 32-bit float stored through the out pointer. Only caller
+// is CRT __fassign (sub_18ABC), unreachable from D2CMP's decoders; strtof is the same grammar.
+void d2cmp_crt_atoflt(float* out, const char* str) { *out = strtof(str, nullptr); }

@@ -20,7 +20,7 @@ __attribute__((weak)) intptr_t Ordinal_10045(...);  // variadic like d2game_batc
 __attribute__((weak)) void Ordinal_10041(void*, int32_t, int32_t, uint32_t, uint32_t, void*);
 __attribute__((weak)) void Ordinal_10011(void*, int32_t, int32_t);
 __attribute__((weak)) void Ordinal_10014(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t);
-__attribute__((weak)) void* Ordinal_10003(uint32_t);
+__attribute__((weak)) void* Ordinal_10003(uint32_t) __asm__("d2win_Ordinal_10003");  // distinct import: the flat Ordinal_10003 name is declared with other signatures by D2Multi/D2Launch
 __attribute__((weak)) void* Ordinal_10211(const char*, int32_t);
 __attribute__((weak)) void Ordinal_10215(void*, uint32_t);
 __attribute__((weak)) void* Ordinal_10208(void*, void*);
@@ -43,13 +43,14 @@ extern uint8_t* d2win_g_6f9a8c78;
 extern uint8_t* d2win_g_6f9a8c80;
 extern uint16_t* d2win_g_6f9a8c88;
 extern void* d2win_g_6f9a8ca0;
+extern uint32_t d2win_g_6f9a8ca4;
 extern const char d2win_g_6f8fcc00[4];
 extern const char d2win_g_6f8fcdb0[];   // table-file extension
 __attribute__((weak)) void Ordinal_10046_p(const char*, int32_t, int32_t) __asm__("Ordinal_10046"); // link sig matches d2common b5e870; hidden-reg ptr dropped
 __attribute__((weak)) void Unicode_toUnicode(char16_t*, const char*, int32_t);
 __attribute__((weak)) void Unicode_strcat(char16_t*, const char16_t*);
 __attribute__((weak)) void Unicode_strcpy(char16_t*, const char16_t*);
-__attribute__((weak)) void Unicode_sprintf(int32_t, char16_t*, const char16_t*);
+__attribute__((weak)) void Unicode_sprintf(int32_t, char16_t*, const char16_t*, ...);
 __attribute__((weak)) void Unicode_win2Unicode(char16_t*, const char*, int32_t);
 __attribute__((weak)) int32_t Unicode_strlen(const char16_t*);
 extern char d2win_g_6f8fcc04;
@@ -66,10 +67,10 @@ extern "C" {
 #define G(T, n) __attribute__((weak)) T n = {}
 G(char, d2win_g_6f8fcc04); G(char, d2win_g_6f9a9d12); G(int32_t, d2win_g_6f900c2c);
 G(uint32_t, d2win_g_6f8ffdac); G(uint32_t, d2win_g_6f8ffe00); G(uint32_t, d2win_g_6f8ffe98);
-G(uint32_t, d2win_g_6f9a9e3c); G(uint32_t, d2win_g_6f9a9e44); G(uint32_t, d2win_g_6f9a9e48); G(uint32_t, d2win_g_6f9a9e50);
+G(uint32_t, d2win_g_6f9a9e38); G(uint32_t, d2win_g_6f9a9e40); G(uint32_t, d2win_g_6f9a9e4c); G(uint32_t, d2win_g_6f9a9e3c); G(uint32_t, d2win_g_6f9a9e44); G(uint32_t, d2win_g_6f9a9e48); G(uint32_t, d2win_g_6f9a9e50);
 G(int32_t, d2win_g_6f9a8c68); G(int32_t, d2win_g_6f9a8c74); G(int32_t, d2win_g_6f9a8c7c); G(int32_t, d2win_g_6f9a8c84);
 G(uint8_t*, d2win_g_6f9a8c6c); G(uint8_t*, d2win_g_6f9a8c70); G(uint8_t*, d2win_g_6f9a8c78); G(uint8_t*, d2win_g_6f9a8c80);
-G(uint16_t*, d2win_g_6f9a8c88); G(void*, d2win_g_6f9a8ca0);
+G(uint16_t*, d2win_g_6f9a8c88); G(void*, d2win_g_6f9a8ca0); G(uint32_t, d2win_g_6f9a8ca4);
 G(const char*, d2win_g_6f8fc884); G(const char*, d2win_g_6f8fc8a8); G(const char*, d2win_g_6f9014f4); G(const char*, d2win_g_FontInGameChat);
 __attribute__((weak)) const char* d2win_g_fontNames[32] = {};
 __attribute__((weak)) extern const char d2win_g_6f8fcc00[4] = {'.', 't', 'x', 't'};
@@ -192,7 +193,7 @@ int32_t* d2win_sub_C810(const char* name, void* thisp, int32_t stride, int32_t* 
     return data;
 }
 
-// 1.13c D2Win+0x0CBA0 -- eax/ebp/esi = the three excel file contexts (hidden inputs); builds the merged
+// 1.13c D2Win+0x0cba0 -- eax/ebp/esi = the three excel file contexts (hidden inputs); builds the merged
 // 0x1A8-byte component table and its lookup arrays.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2win_sub_CBA0(void* ctxA, void* ctxB, void* ctxC, const D2WinB69Env* env,
@@ -201,12 +202,12 @@ void d2win_sub_CBA0(void* ctxA, void* ctxB, void* ctxC, const D2WinB69Env* env,
     static const char kTerm[] = "";
     // names at 6f8fcd98 / 6f8fcd90 / 6f8fcd2c are retail data strings; seams keep them opaque
     const Col cols[12] = {
-        {"version", 3, 0, 0xf6, nullptr}, {d2win_g_6f8fcdb0, 0xf, 0, 0x11e, &d2win_g_6f9a8ca0},
-        {kTerm, 9, 0, 0x80, nullptr},     {"alternategfx", 4, 0, 0x90, nullptr},
+        {"version", 3, 0, 0xf6, nullptr}, {d2win_g_6f8fcdb0, 0xf, 0, 0x11e, &d2win_g_6f9a8ca4},
+        {kTerm, 9, 0, 0x80, nullptr},     {"alternategfx", 9, 0, 0x90, nullptr},
         {"spawnable", 4, 0, 0x133, nullptr}, {"level", 4, 0, 0xfd, nullptr},
         {"component", 4, 0, 0x115, nullptr}, {"wclass", 9, 0, 0xc0, nullptr},
         {"2handedwclass", 9, 0, 0xc4, nullptr}, {"1or2handed", 6, 0, 0x13d, nullptr},
-        {"Transform", 0, 0, 0x141, nullptr},  {kTerm, 0, 0, 0, nullptr}};
+        {"Transform", 4, 0, 0x141, nullptr},  {kTerm, 0, 0, 0, nullptr}};
     const char* const F = "..\\Source\\D2Win\\Src\\D2Comp.cpp";
     int32_t* a = sub_C810((const char*)ctxA, ctxA, cols, &d2win_g_6f9a8c74);
     int32_t* b = sub_C810((const char*)ctxB, ctxB, cols, &d2win_g_6f9a8c7c);
@@ -376,8 +377,12 @@ uint32_t d2win_sub_E5F0(uint32_t arg, uint32_t* p, const D2WinB69Env* env) {
     }
     p[2] = cur + p[4];
     if ((int32_t)(p[3] - 1) <= (int32_t)(cur + p[4]) >> 8) p[2] = 0;
-    uint32_t now = 0;   // GetTickCount: seam-free, caller's clock; host passes via d2win_g_6f9a9e38 update
-    (void)now;
+    uint32_t now = (uint32_t)emscripten_get_now();  // GetTickCount, ms
+    if (d2win_g_6f9a9e38 < now) {
+        d2win_g_6f9a9e38 = now + 0x42;
+        if (d2win_g_6f9a9e40 <= ++d2win_g_6f9a9e44) d2win_g_6f9a9e44 = 0;
+        if (d2win_g_6f9a9e4c <= ++d2win_g_6f9a9e50) d2win_g_6f9a9e50 = 0;
+    }
     if (m[9] & p[0]) {
         if (!d2win_g_6f9a9e3c) d2win_fatal(0x666);
         memset(s, 0, sizeof s);
@@ -387,7 +392,7 @@ uint32_t d2win_sub_E5F0(uint32_t arg, uint32_t* p, const D2WinB69Env* env) {
     return 1;
 }
 
-// 1.13c D2Win+0x0EA30 -- EAX = p: draw a character's equipment-layer overlays (layer ids < 0x10).
+// 1.13c D2Win+0x0ea30 -- EAX = p: draw a character's equipment-layer overlays (layer ids < 0x10).
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2win_sub_EA30(uint32_t* p, const D2WinB69Env* env) {
     if (!p) d2win_fatal(0x5a8);
@@ -410,4 +415,11 @@ void d2win_sub_EA30(uint32_t* p, const D2WinB69Env* env) {
         env->sub_E5C0((uint8_t)p[1], frame, s, p, lay[i]);
         Ordinal_10011(s, x, y);
     }
+}
+
+// 1.13c D2Win+0x0BE00 -- loads the 8 item palettes: ECX = 1..8 (slot), EAX = name; last call is a tail jmp.
+extern "C" EMSCRIPTEN_KEEPALIVE
+void d2win_sub_BE00(const D2WinB69Env* env) {
+    static const char* const k[8] = {"grey", "grey2", "gold", "brown", "greybrown", "invgrey", "invgrey2", "invgreybrown"};
+    for (int i = 0; i < 8; i++) d2win_sub_B250(k[i], env);  // ponytail: slot ECX=i+1 not modelled in sub_B250's seam
 }

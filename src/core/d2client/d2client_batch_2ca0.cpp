@@ -22,12 +22,12 @@ static const uint8_t* skill_row(int32_t nSkill) {
            static_cast<uintptr_t>(nSkill) * sizeof(D2SkillsTxt);
 }
 
-// 1.13c D2Client+0x2CA0 (112 B): deleting destructor thunk. EAX = this, [esp+4] = flags, [esp+8] = the
+// 1.13c D2Client+0x02CA0 (40 B): deleting destructor thunk. EAX = this, [esp+4] = flags, [esp+8] = the
 // real destructor 0x38410, [esp+0xC] = the debug operator delete (0xBE6C). Runs the destructor, then, when
 // (flags & 1) and this, frees this through "delete" with type 0xFFFFFFFF and line 0. Both callees are
 // host seams: 0x38410 is not yet implemented and 0xBE6C is an import-recorder fold in the port.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void* d2_fn_d2client_2ca0(void* self, uint32_t flags, void (*dtor)(void*),
+EMSCRIPTEN_KEEPALIVE void* d2client_deleting_dtor_thunk(void* self, uint32_t flags, void (*dtor)(void*),
                                                void (*dbgFree)(void*, const char*, uint32_t, uint32_t)) {
     dtor(self);
     if ((flags & 1u) != 0 && self != nullptr) dbgFree(self, "delete", 0xFFFFFFFFu, 0);
@@ -37,7 +37,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_d2client_2ca0(void* self, uint32_t flags, void 
 // 1.13c D2Client+0x2CD0 (56 B): EAX = skill id, EDX = level. Invalid id or null row or level <= 0 -> 0;
 // otherwise (level - 1) * row->dwParam[1] + row->dwParam[0], 32-bit wrap.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2client_2cd0(int32_t nSkill, int32_t nLevel) {
+EMSCRIPTEN_KEEPALIVE int32_t d2client_skill_param_by_level(int32_t nSkill, int32_t nLevel) {
     const uint8_t* row = skill_row(nSkill);
     if (row == nullptr || nLevel <= 0) return 0;
     const int32_t* param = reinterpret_cast<const int32_t*>(row + 0x148);
@@ -46,19 +46,19 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2client_2cd0(int32_t nSkill, int32_t nLevel)
                                 static_cast<uint32_t>(param[0]));
 }
 
-// 1.13c D2Client+0x2D20 (56 B): EAX = skill id, EDX ignored. Invalid id or null row -> 0; otherwise
+// 1.13c D2Client+0x02D20 (48 B): EAX = skill id, EDX ignored. Invalid id or null row -> 0; otherwise
 // row->dwParam[0] (the level-1 value).
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2client_2d20(int32_t nSkill) {
+EMSCRIPTEN_KEEPALIVE int32_t d2_client_skill_param0(int32_t nSkill) {
     const uint8_t* row = skill_row(nSkill);
     if (row == nullptr) return 0;
     return *reinterpret_cast<const int32_t*>(row + 0x148);
 }
 
-// 1.13c D2Client+0x2E20 (62 B): EAX = base, [esp+4] = the inline Unicode default constructor 0xCEB00.
+// 1.13c D2Client+0x2E20 (57 B): EAX = base, [esp+4] = the inline Unicode default constructor 0xCEB00.
 // Builds six arrays of 300 elements of stride 2 at base+0x118 + i*0x26A with d2_client_12e0. Returns base.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void* d2_fn_d2client_2e20(void* base, void (*unicodeDefaultCtor)(uint32_t)) {
+EMSCRIPTEN_KEEPALIVE void* d2_client_2e20(void* base, void (*unicodeDefaultCtor)(uint32_t)) {
     for (int32_t i = 0; i < 6; ++i) {
         d2_client_12e0(300, unicodeDefaultCtor,
                        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(
@@ -68,10 +68,10 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_d2client_2e20(void* base, void (*unicodeDefault
     return base;
 }
 
-// 1.13c D2Client+0x2E60: EAX = this, [esp+4] = the inline Unicode default constructor 0xCEB00.
+// 1.13c D2Client+0x02E60 EAX = this, [esp+4] = the inline Unicode default constructor 0xCEB00.
 // 300 constructor calls on consecutive 2-byte elements starting at this+7. Returns this.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void* d2_fn_d2client_2e60(void* self, void (*unicodeDefaultCtor)(uint32_t)) {
+EMSCRIPTEN_KEEPALIVE void* d2client_init_300_unicode_2e60(void* self, void (*unicodeDefaultCtor)(uint32_t)) {
     uint32_t p = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(self) + 7);
     for (int32_t i = 0; i < 300; ++i) {
         unicodeDefaultCtor(p);
@@ -80,10 +80,10 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_d2client_2e60(void* self, void (*unicodeDefault
     return self;
 }
 
-// 1.13c D2Client+0x2E90 (46 B): EAX = skill id, EDX ignored. Invalid id or null row -> 0; otherwise
+// 1.13c D2Client+0x2E90 (48 B): EAX = skill id, EDX ignored. Invalid id or null row -> 0; otherwise
 // row->dwParam[5].
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2client_2e90(int32_t nSkill) {
+EMSCRIPTEN_KEEPALIVE int32_t skillDataParam5(int32_t nSkill) {
     const uint8_t* row = skill_row(nSkill);
     if (row == nullptr) return 0;
     return reinterpret_cast<const int32_t*>(row + 0x148)[5];

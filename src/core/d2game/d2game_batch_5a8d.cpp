@@ -41,21 +41,21 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_4022(void) {
 // 1.13c D2Game+0x04E65 (sub_4E65, __getptd()->_terrno): the thread's errno slot. The host models the
 // CRT thread data on the C library's own thread-local errno.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t* d2_fn_d2game_4e65(void) {
+EMSCRIPTEN_KEEPALIVE int32_t* d2game_errno_ptr(void) {
     return &errno;
 }
 
 // 1.13c D2Game+0x05A8D (_free): the small-block heap (0x6FD3A210 == 3) is libc's allocator here; both
 // its find_block path and the HeapFree fallback collapse to the host free. A null block returns.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_5a8d(void* mem) {
+EMSCRIPTEN_KEEPALIVE void d2game_free_5a8d(void* mem) {
     if (mem != nullptr) std::free(mem);
 }
 
 // 1.13c D2Game+0x05F78 (_malloc): __nh_malloc(size, _newmode). The host allocator is the heap; a
 // failure returns null (retail then calls the new handler, which the engine never installs).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_5f78(size_t size) {
+EMSCRIPTEN_KEEPALIVE void* d2game_malloc(size_t size) {
     return std::malloc(size);
 }
 
@@ -64,7 +64,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_5f78(size_t size) {
 // for any code but 0xFC, show "Runtime Error!\n\nProgram: " + module name + "\n\n" + text. The module
 // name and the modal box are Win32-only, so that branch writes its text to stderr (see the header).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_69dc(int32_t code, const uint32_t* table) {
+EMSCRIPTEN_KEEPALIVE void d2game_nmsg_write(int32_t code, const uint32_t* table) {
     uint32_t i = 0;
     while (i < 0x13 && code != (int32_t)table[i * 2]) ++i;
     if (i == 0x13) return;
@@ -79,14 +79,14 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_69dc(int32_t code, const uint32_t* table)
     }
 }
 
-// 1.13c D2Game+0x06B54 (__FF_MSGBANNER): when the error mode selects the banner, write message 0xFC,
+// 1.13c D2Game+0x06B54 __FF_MSGBANNER: when the error mode selects the banner, write message 0xFC,
 // call the app hook when installed, then write message 0xFF.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_6b54(const uint32_t* table) {
+EMSCRIPTEN_KEEPALIVE void d2game_ff_msgbanner_6b54(const uint32_t* table) {
     if (g_errorMode == 1 || (g_errorMode == 0 && g_appType == 1)) {
-        d2_fn_d2game_69dc(0xFC, table);
+        d2game_nmsg_write(0xFC, table);
         if (g_pfnmsg != nullptr) g_pfnmsg();
-        d2_fn_d2game_69dc(0xFF, table);
+        d2game_nmsg_write(0xFF, table);
     }
 }
 
@@ -96,7 +96,7 @@ EMSCRIPTEN_KEEPALIVE size_t d2_fn_d2game_7460(const char* s) {
     return std::strlen(s);
 }
 
-// 1.13c D2Game+0x0751C (__security_check_cookie): fastcall, the expected cookie in ECX. A mismatch
+// 1.13c D2Game+0x0751c (__security_check_cookie): fastcall, the expected cookie in ECX. A mismatch
 // goes report_failure (0x74EB): 0x9C16(1) then ExitProcess(3), whose observable is the exit code.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_751c(uintptr_t cookie) {

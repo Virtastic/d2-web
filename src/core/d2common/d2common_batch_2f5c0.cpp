@@ -93,7 +93,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3b1a0(uint32_t pRecord)
 	return rd32(rd32(pRecord, 0x10), 0x58) + 0x1E0;
 }
 
-// 1.13c D2Common+0x1EF90 (#10801)
+// 1.13c D2Common+0x1ef90 (#10801)
 // An inventory (magic 0x01020304 at +0) answers the cell pointer at (x, y) of the grid layout that
 // 0x81FB0 builds for record nRec: x must be in [0, width] and y in [0, height] (the counts are the
 // bytes at +8 and +9 of the grid descriptor), and the cell is at cells(+0xC)[width * y + x]. A

@@ -33,6 +33,7 @@ void EnterCriticalSection(void*);
 void LeaveCriticalSection(void*);
 void DeleteCriticalSection(void*);
 long InterlockedDecrement(volatile long*);
+long InterlockedIncrement(volatile long*);
 }
 
 [[noreturn]] static void b78_fatal(int line) {
@@ -163,4 +164,24 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t Fog_E8C0(int* esi, uint32_t* ebx, uint3
   if (Ordinal_19((int)c[4]) != -1) return 1;
   Ordinal_111();
   return 0;
+}
+
+// 1.13c Fog+0x1FF60  (EDI = async log/queue object, hidden; Win32 calls injected as seams)
+extern "C" void FUN_6ff5e420(void);
+typedef int (*b78_writefile_fn)(void*, const void*, uint32_t, uint32_t*, void*);
+typedef uint32_t (*b78_u32_fn)(void);
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t Fog_1FF60(uint8_t* edi, b78_writefile_fn WriteFile, b78_u32_fn GetLastError) {
+  uint32_t* buf = *(uint32_t**)(edi + 0x74);
+  if (!buf) return 1;
+  InterlockedIncrement((volatile long*)(edi + 8));
+  void* h = *(void**)(edi + 0x10);
+  if (h == (void*)0xffffffff) b78_fatal(0x511);
+  uint32_t n;
+  int ok = WriteFile(h, buf + 2, buf[0], &n, edi + 0x5c);
+  uint32_t err = GetLastError();
+  if (!ok) {
+    if (err != 0x3e5) { FUN_6ff5e420(); Fog_E550(0, edi); return 0; }
+  } else if (err != 0x3e5) return 1;
+  *(uint32_t*)(edi + 0x70) |= 4;
+  return 1;
 }

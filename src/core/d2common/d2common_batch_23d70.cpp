@@ -26,7 +26,7 @@ struct D2Common23D70Env
 // 1.13c D2Common+0x23D70 (#10550): setitems.txt nSetItems for a set item, else -1.
 // The unit must be type 4 (item) and its item data quality must be 5 (set).
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_23d70(uint32_t pUnit, const D2Common23D70Env* pEnv)
+EMSCRIPTEN_KEEPALIVE int32_t ITEMS_GetSetItemNSetItems(uint32_t pUnit, const D2Common23D70Env* pEnv)
 {
 	if (!pUnit)
 		return -1;

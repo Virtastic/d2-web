@@ -56,7 +56,7 @@ static bool unlink_slot(const D2GfxGuestMemory& mem, uint32_t slot) {
 // 1.13c D2Gfx+0x01340: unlink every pending slot. Retail reloads the buffer
 // pointer and the pending offset on each pass because the linked write can
 // change either; malformed state can loop, as it does in retail.
-static bool unlink_pending(const D2GfxGuestMemory& mem, uint32_t owner) {
+bool unlink_pending(const D2GfxGuestMemory& mem, uint32_t owner) {
     while (true) {
         uint32_t buffer, pending;
         if (!read32(mem, owner, buffer) || !read32(mem, owner + 8, pending)) return false;
@@ -65,6 +65,7 @@ static bool unlink_pending(const D2GfxGuestMemory& mem, uint32_t owner) {
     }
 }
 
+extern "C" bool d2gfx_unlink_fixups_pending(D2GfxGuestMemory mem, uint32_t owner) { return unlink_pending(mem, owner); }
 // 1.13c D2Gfx+0x010E0: unlink the pending slot(s), then the owner's first
 // node.
 extern "C" EMSCRIPTEN_KEEPALIVE bool d2gfx_unlink_fixups(D2GfxGuestMemory mem, uint32_t owner) {

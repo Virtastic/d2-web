@@ -66,7 +66,7 @@
 
   // cache is a Map used as an LRU: insertion order IS the recency order (delete+set moves to end),
   // so eviction pops the first (oldest) key. No separate order array → O(1) hit path, no linear scan.
-  const S = { worker: null, ctrl: null, data: null, cache: new Map(), nextId: 1, urlSrcs: new Map() };
+  const S = { worker: null, ctrl: null, data: null, cache: new Map(), nextId: 1, urlSrcs: new Map(), mounts: new Map(), warming: new Set() };
 
   // d2-web divergence: MEASURED 2026-09-25 -- in Firefox 156 the worker+Atomics round trip below
   // never completes. The Range fetch's own headers resolve in milliseconds (confirmed by a
@@ -163,7 +163,7 @@
   // lastReadMs/lastReadUrl: the most recent Firefox synchronous read and what it cost. A read
   // that stalls is the one fact a report of a frozen tab needs, and it is gone by the time the error
   // is caught unless it is kept here.
-  const ST = { hits: 0, misses: 0, stallMs: 0, evictions: 0, bytes: 0, lastReadMs: 0, lastReadUrl: '' };
+  const ST = { hits: 0, misses: 0, stallMs: 0, evictions: 0, bytes: 0, lastReadMs: 0, lastReadUrl: '', warmed: 0 };
 
   function workerSource() {
     return `
@@ -192,6 +192,21 @@
         // A Blob (BSA from the Cache API) reads exactly like a File (slice + arrayBuffer), so it
         // goes straight into the files map and the m.id read path below slices it locally.
         if (m.mountBlob) { files.set(m.mountBlob.id, m.mountBlob.blob); return; }
+        // WARM (s-perf-streaming): fetch a chunk with no one waiting and hand it to the main thread's
+        // in-memory cache, so the later synchronous read is a hit instead of a stalled round trip.
+        if (m.warm) {
+          try {
+            let buf = null;
+            const ckey = m.pkey ? 'https://sfs.chunk/' + encodeURIComponent(m.pkey) + '/' + m.start : null;
+            if (ckey) { try { const hit = await (await caches.open('mwdata-chunks-v1')).match(ckey); if (hit) buf = new Uint8Array(await hit.arrayBuffer()); } catch (e) {} }
+            if (!buf) {
+              buf = await readRange(m.url, m.start, m.end);
+              if (ckey) caches.open('mwdata-chunks-v1').then((c) => c.put(ckey, new Response(buf.slice()))).catch(() => {});
+            }
+            postMessage({ warmed: m.key, buf }, [buf.buffer]);
+          } catch (e) { postMessage({ warmed: m.key, buf: null }); }
+          return;
+        }
         // m: {url|id, start, end, gen}
         try {
           let buf;
@@ -352,6 +367,19 @@
     return node;
   }
 
+  // Background warm queue: at most WARM_INFLIGHT chunk fetches ride behind the worker at once so a
+  // synchronous read never queues behind a long prefetch backlog. Newest requests go first.
+  const WARM_INFLIGHT = 2;
+  let warmQ = [];
+  function pumpWarm() {
+    while (S.warming.size < WARM_INFLIGHT && warmQ.length) {
+      const w = warmQ.pop();
+      if (S.cache.has(w.key) || S.warming.has(w.key)) continue;
+      S.warming.add(w.key);
+      S.worker.postMessage(w);
+    }
+  }
+
   window.StreamFS = {
     // Live streaming cost: misses each blocked the main thread for a worker round-trip.
     // High misses + high evictions = the working set exceeds LRU_MAX and is thrashing.
@@ -373,9 +401,37 @@
       // never starting (M0a: StormLib's first read came ~50 ms after init()). openmw-web never
       // hit this because its engine takes seconds to reach its first read. Callers await
       // StreamFS.ready before the first synchronous read.
-      S.ready = new Promise((res) => { S.worker.onmessage = (e) => { if (e.data && e.data.ready) res(); }; });
+      S.ready = new Promise((res) => { S.worker.onmessage = (e) => {
+        if (e.data && e.data.ready) res();
+        else if (e.data && e.data.warmed) {
+          const k = e.data.warmed; S.warming.delete(k);
+          if (e.data.buf && !S.cache.has(k)) {
+            S.cache.set(k, e.data.buf); ST.bytes += e.data.buf.length; ST.warmed++;
+            if (S.cache.size > LRU_MAX) { S.cache.delete(S.cache.keys().next().value); ST.evictions++; }
+          }
+          pumpWarm();
+        }
+      }; });
       S.worker.postMessage({ init: 1, ctrl: ctrlBuf, data: dataBuf });
       try { Object.defineProperty(window, '__streamfsStats', { get: () => window.StreamFS.stats() }); } catch (e) {}
+    },
+
+    // Ask for the chunks covering [pos, pos+len) of the file mounted at `path` to be fetched in the
+    // background into the in-memory cache. Fire and forget; a read that beats it just misses as before.
+    warm(path, pos, len) {
+      const m = S.mounts.get(path); if (!m || !S.worker || !m.src.url || NEEDS_SYNC_XHR) return;   // Firefox: a worker fetch stalls behind the spin
+      for (let cs = Math.floor(pos / CHUNK) * CHUNK; cs < pos + len && cs < m.size; cs += CHUNK) {
+        const key = m.abs + ':' + cs;
+        if (S.cache.has(key) || S.warming.has(key) || warmQ.some((w) => w.key === key)) continue;
+        warmQ.push({ warm: 1, key, url: m.src.url, pkey: m.src.pkey, start: cs, end: Math.min(cs + CHUNK, m.size) });
+      }
+      pumpWarm();
+    },
+
+    // Synchronous read of [pos, pos+len) of a mounted file (through the same cache the engine uses).
+    readAt(path, pos, len) {
+      const m = S.mounts.get(path); const out = new Uint8Array(len);
+      readSync(m.src, m.abs, m.size, out, 0, len, pos); return out;
     },
 
     // Resolves once the worker is running. Await it before the first synchronous read.
@@ -399,7 +455,7 @@
       // Registered so the URL can be refreshed later (presigned locker URLs expire): the cache
       // key stays `abs` (stable across renewals — the bytes are the same file), only src.url
       // changes, so a re-signed URL is used for future Range fetches without dropping the cache.
-      S.urlSrcs.set(path, src);
+      S.urlSrcs.set(path, src); S.mounts.set(path, { src, abs, size });
       return makeNode(path, size, function (buffer, offset, length, position) {
         return readSync(src, abs, size, buffer, offset, length, position);
       });

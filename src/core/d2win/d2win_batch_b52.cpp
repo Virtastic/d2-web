@@ -23,7 +23,7 @@ struct D2WinB52Env {
     int (*fmt)(char* buf, const char* f, const char* a);   // wsprintfA
 };
 
-// 1.13c D2Win+0x8B50
+// 1.13c D2Win+0x08b50
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2win_sub_8b50(int32_t font, const D2WinB52Env* e) {
     auto cls = [&]() { return e->fontTab[*e->curFont * 5][10]; };

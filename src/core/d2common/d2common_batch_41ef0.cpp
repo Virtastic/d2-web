@@ -50,7 +50,7 @@ int32_t d2_fn_d2common_41ef0(char* szPath, int32_t* pOutLength, int32_t* pOutAni
 // row: dwAlternateGfx (+0x90) when set, else dwCode (+0x80). A null unit, another unit type or a
 // missing row is fatal (0x628 / 0x629 / 0x62C) and answers 0 here.
 extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t d2_fn_d2common_23230(const int32_t* pUnit)
+uint32_t D2Common_23230_GetObjectsBIN(const int32_t* pUnit)
 {
 	if (pUnit == nullptr || pUnit[0] != 4)
 		return 0;
@@ -64,8 +64,8 @@ uint32_t d2_fn_d2common_23230(const int32_t* pUnit)
 
 // 1.13c D2Common+0x23050 (#10395): items.txt nLevel (+0xFD) of a type-4 unit. Null unit, another
 // type or a missing row is fatal (0x697 / 0x698 / 0x69B) and answers 0 here.
-extern "C" EMSCRIPTEN_KEEPALIVE
-uint8_t d2_fn_d2common_23050(const int32_t* pUnit)
+
+uint8_t D2Common_23050_GetItemLevel(const int32_t* pUnit)
 {
 	if (pUnit == nullptr || pUnit[0] != 4)
 		return 0;
@@ -81,7 +81,7 @@ uint8_t d2_fn_d2common_23050(const int32_t* pUnit)
 // skills.txt row and the level must be positive; both bounds are checked before the row is used.
 // The value is the 0x4DC30 formula over the row's dwParam[2] (0x150) and dwParam[3] (0x154).
 extern "C" EMSCRIPTEN_KEEPALIVE
-int32_t d2_fn_d2common_4e630(int32_t nLevel, int32_t nSkillId)
+int32_t D2Common_4E630_SkillParamCurve(int32_t nLevel, int32_t nSkillId)
 {
 	if (sgptDataTables == nullptr)
 		return 0;
@@ -100,7 +100,7 @@ int32_t d2_fn_d2common_4e630(int32_t nLevel, int32_t nSkillId)
 // table lives at sgptDataTables+0x1094 (count +0x1098). An id outside [0, count) is fatal
 // (0x15F / 0x160) and answers 0 here.
 extern "C" EMSCRIPTEN_KEEPALIVE
-int32_t d2_fn_d2common_3e910(int32_t nShrineId)
+int32_t D2Common_3E910_GetShrinesTxtRecord(int32_t nShrineId)
 {
 	if (sgptDataTables == nullptr || sgptDataTables->pShrinesTxt == nullptr)
 		return 0;
@@ -116,7 +116,7 @@ int32_t d2_fn_d2common_3e910(int32_t nShrineId)
 // at +2/+6 of the dynamic path otherwise), then the room, both footprint sizes and the unit's
 // collision mask are passed to the 0x4BAB0 grid reset. This is the vendored 1.10f twin.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2common_318c0(D2UnitStrc* pUnit)
+void d2common_unit_free_collision_318c0(D2UnitStrc* pUnit)
 {
 	UNITS_FreeCollisionPath(pUnit);
 }
@@ -125,7 +125,7 @@ void d2_fn_d2common_318c0(D2UnitStrc* pUnit)
 // items and tiles read the static path's nX (+0x0C); players, monsters and missiles read the
 // dynamic path's wPosX (+2); a missing path counts as 0.
 extern "C" EMSCRIPTEN_KEEPALIVE
-int32_t d2_fn_d2common_301d0(D2UnitStrc* pUnitA, D2UnitStrc* pUnitB)
+int32_t d2common_UnitsXDistance_301d0(D2UnitStrc* pUnitA, D2UnitStrc* pUnitB)
 {
 	const int32_t nDelta = UNITS_GetXPosition(pUnitA) - UNITS_GetXPosition(pUnitB);
 	return nDelta < 0 ? -nDelta : nDelta;
@@ -137,7 +137,7 @@ int32_t d2_fn_d2common_301d0(D2UnitStrc* pUnitA, D2UnitStrc* pUnitB)
 // must be in range (0xC4) and set on the unit (0x37DB0 bit test over types 0/1/3), and only then
 // is the skill refreshed (0x52480). This is the vendored 1.10f twin.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2common_52ae0(D2UnitStrc* pUnit)
+void D2Common_52AE0_RefreshPassives(D2UnitStrc* pUnit)
 {
 	SKILLS_RefreshPassiveSkills(pUnit);
 }
@@ -146,7 +146,7 @@ void d2_fn_d2common_52ae0(D2UnitStrc* pUnit)
 // dynamic path stores the unit at +0x58 and, when it is non-null, its type at +0x5C and its id at
 // +0x60. A null unit is fatal 0x8DC and another unit type fatal 0x8DE; both are returns here.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2common_30e20(D2UnitStrc* pUnit, D2UnitStrc* pTargetUnit)
+void D2Common_30E20_SetTargetUnit(D2UnitStrc* pUnit, D2UnitStrc* pTargetUnit)
 {
 	if (pUnit == nullptr)
 		return;
@@ -158,13 +158,13 @@ void d2_fn_d2common_30e20(D2UnitStrc* pUnit, D2UnitStrc* pTargetUnit)
 
 // 1.13c D2Common+0x247C0 (#10432): minimum stack of the items.txt row of a type-4 unit. Null unit
 // is fatal 0xD94 and another unit type fatal 0xD95; both are returns here.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2common_247c0(const int32_t* pUnit)
+// ponytail: no export, plain C++
+int32_t D2Common_247C0_UnitItemMinStack(const int32_t* pUnit)
 {
 	if (pUnit == nullptr || pUnit[0] != 4)
-		return;
+		return 0;
 
-	D2Common_22AD0_ItemMinStack(static_cast<uint32_t>(pUnit[1]));
+	return D2Common_22AD0_ItemMinStack(static_cast<uint32_t>(pUnit[1]));
 }
 
 // The skill-description evaluator is the Fog ordinal 10253 (RVA 0x9270), which walks the byte code
@@ -179,7 +179,7 @@ struct D2Common_51B80_Env
 // block is the pinned skill-desc block (sgptDataTables+0x4C, size +0x50) and the three user dwords
 // are the caller's first, third and fourth arguments.
 extern "C" EMSCRIPTEN_KEEPALIVE
-int32_t d2_fn_d2common_51b80(uint32_t nContext, uint32_t nIndex, uint32_t nArg1, uint32_t nArg2,
+int32_t D2Common_SkillDescEval(uint32_t nContext, uint32_t nIndex, uint32_t nArg1, uint32_t nArg2,
                              const D2Common_51B80_Env* pEnv)
 {
 	if (sgptDataTables == nullptr || sgptDataTables->pSkillDescCode == nullptr)
@@ -196,7 +196,7 @@ int32_t d2_fn_d2common_51b80(uint32_t nContext, uint32_t nIndex, uint32_t nArg1,
 	                      static_cast<int32_t>(sgptDataTables->nSkillDescCodeSize - nIndex), user);
 }
 
-// 1.13c D2Common+0x234A0 (#11075): the store page (itemtypes.txt nStorePage, byte +0x22) of a
+// 1.13c D2Common+0x234a0 (#11075): the store page (itemtypes.txt nStorePage, byte +0x22) of a
 // type-4 unit's item type. A null unit, another type, an item type outside the row count or a
 // -1/absent row answers -1.
 extern "C" EMSCRIPTEN_KEEPALIVE

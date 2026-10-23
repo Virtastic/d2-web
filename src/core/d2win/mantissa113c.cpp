@@ -63,3 +63,19 @@ extern "C" int32_t d2win_18ff1(const uint32_t* mantissa, int32_t bit) {
         tail = mantissa[limb];
     }
 }
+
+// 1.13c D2Win+0x19070
+extern "C" int32_t d2win_19070(uint32_t* mantissa, int32_t bit) {
+    int32_t carry = 0;
+    const int32_t limb = bit / 32;
+    const uint32_t sh = (31u - uint32_t(bit % 32)) & 31;
+    if ((mantissa[limb] & (uint32_t{1} << sh)) && d2win_18ff1(mantissa, bit) == 0) {
+        // __IncMan(bit-1) inlined: its EAX at exit (the last ___addl carry) is the return value.
+        const int32_t b = bit - 1, l = b / 32;
+        carry = int32_t(addCarry(mantissa[l], uint32_t{1} << ((31u - uint32_t(b % 32)) & 31), mantissa + l));
+        for (int32_t i = l - 1; i >= 0 && carry; --i) carry = int32_t(addCarry(mantissa[i], 1, mantissa + i));
+    }
+    mantissa[limb] &= UINT32_MAX << sh;
+    for (int32_t i = limb + 1; i < 3; ++i) mantissa[i] = 0;
+    return carry;
+}

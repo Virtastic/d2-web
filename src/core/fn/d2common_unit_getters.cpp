@@ -12,3 +12,12 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_7e390(uint32_t* r) {   // 1.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30420(uint32_t* r) { r[4] = u32(pA8(r[0]))[0xC / 4]; }   // 1.13c d2common+0x30420
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_303a0(uint32_t* r) { r[4] = pA8(r[0]) ? u32(pA8(r[0]))[0x10 / 4] : 0; }   // 1.13c d2common+0x303A0
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30460(uint32_t* r) { r[4] = u32(pA8(r[0]))[8 / 4]; }   // 1.13c d2common+0x30460
+// 1.13c D2Common+0x30670 sub_30670: stdcall(unit), player only (unit type 0).
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30670(uint32_t* r) {   // 1.13c d2common+0x30670
+    uint32_t* u = (uint32_t*)(uintptr_t)r[0];
+    if (u[0] != 0) return;
+    uint32_t* pd = (uint32_t*)(uintptr_t)u[0x14 / 4];
+    const uint32_t* sk = u32(u32(pA8(r[0]))[8 / 4]);
+    pd[0x74 / 4] = (uint32_t)(int32_t)*(const int16_t*)(uintptr_t)sk[0];
+    pd[0x7C / 4] = sk[0x34 / 4];
+}

@@ -32,6 +32,7 @@ struct D2UnkMonMsgStrc
 
 
 //D2Game.0x6FC659E0
+// 1.13c D2Game+0xf3a40
 void __fastcall sub_6FC659E0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2ClientStrc* pClient, int32_t a4)
 {
     if (pUnit)

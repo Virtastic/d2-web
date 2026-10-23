@@ -24,7 +24,7 @@ struct D2GameEA10Env {
                          uint32_t a5, uint32_t a6, uint32_t a7);
 };
 
-// 1.13c D2Game+0x0EA10
+// 1.13c D2Game+0xea10
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_ea10(uint32_t param1, uint32_t ebxUnit, uint32_t eaxUnit,
                                             uint32_t esiSelector, const D2GameEA10Env* env) {
@@ -35,7 +35,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_ea10(uint32_t param1, uint32_t ebxUnit, u
     env->sub8EA80(param1, ebxUnit, 3, (uint32_t)delay, 0, 0, 0);
 }
 
-// 1.13c D2Game+0x0EA70: byte-identical to 0x0EA10 (different callers only).
+// 1.13c D2Game+0xea70: byte-identical to 0x0EA10 (different callers only).
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_ea70(uint32_t param1, uint32_t ebxUnit, uint32_t eaxUnit,
                                             uint32_t esiSelector, const D2GameEA10Env* env) {

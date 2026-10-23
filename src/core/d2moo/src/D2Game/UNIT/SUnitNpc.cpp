@@ -1097,7 +1097,7 @@ void __fastcall sub_6FCC84D0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
     MONSTERAI_SendMercStats(pGame, pPlayer, 0);
 }
 
-//D2Game.0x6FCC8630
+// 1.13c D2Game+0xC1250 (SUnitNpc.cpp:D2GAME_MERCS_Create_6FCC8630; retail inlines SUNIT_AllocUnitData, same sequence)
 D2UnitStrc* __fastcall D2GAME_MERCS_Create_6FCC8630(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint16_t wName, uint32_t nSeed, int16_t wVersion, int32_t nBaseMonster, int32_t bDead)
 {
     uint8_t nAct = pPlayer->nAct;
@@ -2817,6 +2817,7 @@ void __fastcall D2GAME_NPC_AssignMercenary_6FCCB520(D2GameStrc* pGame, D2UnitStr
 }
 
 //D2Game.0x6FCCB7D0
+// 1.13c D2Game+0xbc840
 int32_t __fastcall D2GAME_NPC_IsItemInNpcInventory_6FCCB7D0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pNpc, D2UnitStrc* pItem, int32_t a4)
 {
     int32_t nUnused = 0;

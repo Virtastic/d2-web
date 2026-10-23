@@ -204,6 +204,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int fog_isalnum(int c) {  // 1.13c Fog+0x237B
     return 0;
 }
 
+// 1.13c Fog+0x5863 (input engine; host vsscanf stands in, )
 // 1.13c Fog+0x23BA
 // _sscanf(src, fmt, ...): builds the read-only FILE view {_flag = 0x49, _base = _ptr = src,
 // _cnt = strlen(src)} and runs the input engine at 0x55863 over the stack arguments, returning the

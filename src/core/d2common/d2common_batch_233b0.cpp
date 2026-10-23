@@ -32,11 +32,11 @@ struct D2CommonBatch233B0Env
 	void (*clear_unit_flag)(uint32_t pOwnerBlob, uint32_t nKey);  // 0x19810
 };
 
-// 1.13c D2Common+0x233B0: whether an item unit's ItemTypesTxt row (reachable through 0x230F0 and the
+// 1.13c D2Common+0x233B0 (ITEMS_CanBeMagic_1_13c): whether an item unit's ItemTypesTxt row (reachable through 0x230F0 and the
 // item's class id) has nMagic set. The 1.10f twin is ITEMS_CanBeMagic; a null or non-item unit, an
 // out-of-range type index and a null row all yield 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_233b0(uint32_t pItem)
+EMSCRIPTEN_KEEPALIVE uint8_t ITEMS_CanBeMagic_1_13c(uint32_t pItem)
 {
 	return ITEMS_CanBeMagic(reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pItem))) ? 1 : 0;
 }
@@ -44,7 +44,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_233b0(uint32_t pItem)
 // 1.13c D2Common+0x24C30 (community name D2ItemSetFlags, but the body reads the item type's
 // nThrowable byte at +0x10): the 1.10f twin is ITEMS_CheckIfThrowable.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_24c30(uint32_t pItem)
+EMSCRIPTEN_KEEPALIVE uint8_t D2Common_ItemIsThrowable_24C30(uint32_t pItem)
 {
 	return static_cast<uint8_t>(ITEMS_CheckIfThrowable(
 		reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pItem))));
@@ -54,7 +54,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_24c30(uint32_t pItem)
 // ppRoomList is +0x00 and nNumRooms +0x24; a null list entry is a retail assert (0x1B3). The 1.10f
 // twin is DUNGEON_GetAdjacentRoomByTileCoordinates; 0x3B910 is 1.13c's AreTileCoordinatesInsideRoom.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3c120(uint32_t pRoom, int32_t nX, int32_t nY)
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_3C120_GetAdjacentRoomByTile(uint32_t pRoom, int32_t nX, int32_t nY)
 {
 	D2ActiveRoomStrc* pFound = DUNGEON_GetAdjacentRoomByTileCoordinates(
 		reinterpret_cast<D2ActiveRoomStrc*>(static_cast<uintptr_t>(pRoom)), nX, nY);
@@ -108,7 +108,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_12d20(const char* szFile, const D2Commo
 	}
 }
 
-// 1.13c D2Common+0x374E0: dword at +0x0C of the object pointed to by +0x04; a null +0x04 yields 0.
+// 1.13c D2Common+0x374e0: dword at +0x0C of the object pointed to by +0x04; a null +0x04 yields 0.
 // Null param is retail fatal 0x547.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_374e0(uint32_t pArg)
@@ -122,7 +122,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_374e0(uint32_t pArg)
 	return R(P(pInner), 0x0C);
 }
 
-// 1.13c D2Common+0x3B470: dword at unit+0x18. Null unit is retail fatal 0x3A6.
+// 1.13c D2Common+0x3b470: dword at unit+0x18. Null unit is retail fatal 0x3A6.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3b470(uint32_t pUnit)
 {
@@ -132,7 +132,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3b470(uint32_t pUnit)
 	return W(u, 0x18);
 }
 
-// 1.13c D2Common+0x3A030 (community name D2SetAnim): merge/remove a unit's damage-related stats. The
+// 1.13c D2Common+0x3a030 (community name D2SetAnim): merge/remove a unit's damage-related stats. The
 // body is the subtract direction of the 1.10f twin shared by D2Common_11274 (0x3A100) and
 // D2Common_11275, including the stat-list merge, the extended-list requirement and the -value removal
 // for stats whose ItemStatCostTxt flags carry gdwBitMasks[DAMAGERELATED]. A null target or source unit
@@ -144,7 +144,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3a030(uint32_t pTarget, uint32_t pU
 	                      reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit))) ? 1 : 0;
 }
 
-// 1.13c D2Common+0x4E0E0: dword at unit+0x14. Null unit is retail fatal 0xA36.
+// 1.13c D2Common+0x4e0e0: dword at unit+0x14. Null unit is retail fatal 0xA36.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4e0e0(uint32_t pUnit)
 {
@@ -154,7 +154,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4e0e0(uint32_t pUnit)
 	return W(u, 0x14);
 }
 
-// 1.13c D2Common+0x3B120: call 0x19810 with the owner blob at +0x10 and the second argument as the
+// 1.13c D2Common+0x3b120: call 0x19810 with the owner blob at +0x10 and the second argument as the
 // key. The decompiler drops both the second stack argument and the register argument; retail's
 // `mov eax,[esp+8]; mov ecx,[ecx+0x10]; call` is reproduced here. Null param is retail fatal 0x5CF.
 extern "C"

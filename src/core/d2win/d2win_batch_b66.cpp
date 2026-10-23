@@ -96,7 +96,7 @@ int32_t* d2win_b66_115A0(int32_t x, int32_t y, int32_t p3, int32_t width, int32_
     return w;
 }
 
-// 1.13c D2Win+0x09C00 -- new type-4 widget (0xAC bytes). this=ECX=x(w0); hidden: ebx=w[3], ebp=w[4],
+// 1.13c D2Win+0x09c00 -- new type-4 widget (0xAC bytes). this=ECX=x(w0); hidden: ebx=w[3], ebp=w[4],
 // retaddr=w[6] (stack). Decompile names: param_1..4 = [0x10],[0x11],[1],[0xd].
 extern "C" EMSCRIPTEN_KEEPALIVE
 int32_t* d2win_b66_9C00(int32_t thisX, int32_t p1, int32_t p2, int32_t p3, int32_t p4, uint32_t flags,
@@ -205,7 +205,7 @@ void d2win_b66_12B40(int32_t idx, const D2WinB66Env* e) {
     s[0] = v; s[1] = v; s[2] = v + 0xc;
 }
 
-// 1.13c D2Win+0x13AC0 -- edit-box scroll window [0x4c,0x50] recompute. ESI = edit widget (hidden).
+// 1.13c D2Win+0x13ac0 -- edit-box scroll window [0x4c,0x50] recompute. ESI = edit widget (hidden).
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2win_b66_13AC0(uint8_t* esi, const D2WinB66Env* e) {
     auto I = [&](int off) -> int32_t& { return *(int32_t*)(esi + off); };

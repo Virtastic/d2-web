@@ -89,3 +89,28 @@ int fog_sub_1E910(const uint8_t* obj, uint32_t a, uint16_t b) {
     }
     return -1;
 }
+
+// Seams for Fog+0x1E880 (socket send under the object's critical section at +0xC).
+struct fog_sub_1E880_Env {
+    void (*prepCs)(void* cs);                      // Fog+0x11690
+    void (*enterCs)(void* cs);
+    void (*leaveCs)(void* cs);
+    int (*send)(uint32_t sock, uint32_t buf, uint32_t len, int flags); // WSOCK32 #19
+    int (*lastError)();                            // WSOCK32 #111
+};
+// 1.13c Fog+0x1E880  (obj in EAX; returns bytes sent, 0 on WSAEWOULDBLOCK, -1 on error)
+int fog_sub_1E880(uint8_t* obj, uint32_t buf, uint32_t len, const fog_sub_1E880_Env& e) {
+    uint32_t v; memcpy(&v, obj ? obj + 0x2c : (uint8_t*)&v, 4);
+    if (!obj || v) return -1;
+    void* cs = obj + 0xc;
+    e.prepCs(cs);
+    e.enterCs(cs);
+    uint32_t sock; memcpy(&sock, obj + 8, 4);
+    int r = e.send(sock, buf, len, 0);
+    if (r != -1) { e.leaveCs(cs); return r; }
+    int err = e.lastError();
+    memcpy(obj + 0x34, &err, 4);
+    if (err == 0x2733) { e.leaveCs(cs); return 0; }
+    uint32_t four = 4; memcpy(obj + 0x30, &four, 4);
+    return -1; // CS left held, as retail
+}

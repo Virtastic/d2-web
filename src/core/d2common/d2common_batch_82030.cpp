@@ -42,7 +42,7 @@ extern "C"
 }
 
 // 0x3A650 is implemented (d2common_batch_37ca0.cpp).
-extern "C" void d2_fn_d2common_3a650(uint32_t pList);
+extern "C" void D2Common_3A650_DropListEntries(uint32_t pList);
 
 // Retail globals read by 0x82030. They are filled by the module's position-table loader; zero is the
 // only value available until the rows that fill them are mapped.
@@ -173,7 +173,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_34450_ToggleStatListState(D2UnitSt
 	UNITROOM_RefreshUnit(pUnit);
 }
 
-// 1.13c D2Common+0x3AC50 (#11040): clear bit 8 of the unit's stat-list dwFlags (+0x10). If the list is
+// 1.13c D2Common+0x3ac50 (#11040): clear bit 8 of the unit's stat-list dwFlags (+0x10). If the list is
 // still extended (bit 31), allocate a 0x80-byte block (0x37F40) and hand it to 0x3A650. A null unit or
 // stat list, or a non-extended list, does nothing; a failed allocation is ignored.
 extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_3AC50_ClearStatListFlag(D2UnitStrc* pUnit) {  // 1.13c D2Common+0x3AC50 (#11040)
@@ -187,7 +187,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_3AC50_ClearStatListFlag(D2UnitStrc
 		return;
 	const uint32_t pBlock = g_d2common_fn_37F40(0x80);
 	if (pBlock != 0)
-		d2_fn_d2common_3a650(pBlock);
+		D2Common_3A650_DropListEntries(pBlock);
 }
 
 // 1.13c D2Common+0x21DA0 (#11041): class-skill id at nPosition in the unit's class skill list, i.e.

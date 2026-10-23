@@ -91,7 +91,8 @@ void D2GAME_8B5A0_SendSkills(D2ClientStrc* client, D2UnitStrc* unit)
     std::vector<uint8_t> packet(6 + 3 * count);
     packet[0] = 0x94;
     packet[1] = static_cast<uint8_t>(count);
-    const uint32_t id = unit->dwUnitId;
+    // retail reads the id from the client's player unit (client+0x1a8 -> +0xc), not from the argument
+    const uint32_t id = *reinterpret_cast<uint32_t*>(*reinterpret_cast<uint8_t**>(reinterpret_cast<uint8_t*>(client) + 0x1a8) + 0xc);
     for (unsigned b = 0; b < 4; ++b) packet[2+b] = static_cast<uint8_t>(id >> (b*8));
     size_t offset = 6;
     for (auto* s = SKILLS_GetFirstSkillFromSkillList(unit->pSkills); s; s = SKILLS_GetNextSkill(s)) {

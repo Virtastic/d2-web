@@ -347,7 +347,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E73C0(void* game, void* unit, 
     env->invokeCallback(0, env->cbAfterState, 0, u);
 }
 
-// 0xE2CD0: read the state byte the same 0x10F4 list's type-0x13 node carries at record +4. EAX=game.
+// 0xE2CD0: read the state byte the 0x10F4 list's first type-0x11 node carries at record +4. EAX=game.
 // 1.13c D2Game+0xE2CD0
 extern "C" EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2game_E2CD0(void* game) {
     if (!game) return 0;

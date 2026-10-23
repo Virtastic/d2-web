@@ -152,3 +152,22 @@ uint32_t D2sound_84A0(void* dest, const char* path, uint32_t* size) {
     SetLastError(err);
     return ret;
 }
+
+// 1.13c D2sound+0x6A40
+// Silence a DirectSoundBuffer region (this = ESI = IDirectSoundBuffer*, stdcall(offset, bytes)): under the
+// global CS at 0x6F9C6530, Lock(offset, bytes, &p1, &len1, 0,0,0) (vtbl+0x2c); on failure leave, return 0.
+// Else zero len1 bytes at p1, Unlock(p1, len1, 0, 0) (vtbl+0x4c), leave, return 1. NULL this -> fatal (_exit(-1)).
+uint32_t D2sound_6A40(void* dsb, uint32_t offset, uint32_t bytes, CRITICAL_SECTION* cs) {
+    if (!dsb) _exit(-1);
+    EnterCriticalSection(cs);
+    void** vt = *(void***)dsb;
+    void* p1 = nullptr; uint32_t len1 = bytes;
+    if ((int)((int (__stdcall*)(void*, uint32_t, uint32_t, void**, uint32_t*, void*, void*, uint32_t))vt[0x2c / 4])(dsb, offset, bytes, &p1, &len1, nullptr, nullptr, 0) < 0) {
+        LeaveCriticalSection(cs);
+        return 0;
+    }
+    std::memset(p1, 0, len1);
+    ((int (__stdcall*)(void*, void*, uint32_t, void*, uint32_t))vt[0x4c / 4])(dsb, p1, len1, nullptr, 0);
+    LeaveCriticalSection(cs);
+    return 1;
+}

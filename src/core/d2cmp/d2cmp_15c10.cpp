@@ -1,7 +1,7 @@
 // Rules from cached 1.13c body. Null object path (assert message + _exit(-1)) is an injected hook.
 #include <cstdint>
 
-// 1.13c D2CMP+0x15C10
+// 1.13c D2CMP+0x15c10
 // Relocates entries (stride 0x14, count obj+0x50, table obj+0x54): entry+0x10 += table base.
 extern "C" void d2cmp_15c10(uint8_t* obj, void (*fatal)()) {
     if (!obj) { fatal(); return; }

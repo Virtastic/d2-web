@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <cassert>
 
-// 1.13c D2Client+0x0DF60
+// 1.13c D2Client+0x0df60
 int32_t D2Client_InflateFast(uint32_t literalBits, uint32_t distanceBits,
     const D2ClientInflateHuft* literalTree, const D2ClientInflateHuft* distanceTree,
     D2ClientInflateBlocks& blocks, D2ClientInflateInput& input) {

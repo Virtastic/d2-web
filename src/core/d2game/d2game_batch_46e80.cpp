@@ -87,7 +87,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_46E80(int32_t eaxValue, int32_t edi,
 
 // Bump the per-slot counter at param_2+0x90+param_1*4, wrapping -1 back to 1; param_1 above 5 is the
 // retail fatal (Fog #10265 case 0x1C5). __fastcall: param_1 is ECX, param_2 EDX.
-// 1.13c D2Game+0xDF9C0
+// 1.13c D2Game+0xdf9c0
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DF9C0(int32_t param1, void* param2)
 {

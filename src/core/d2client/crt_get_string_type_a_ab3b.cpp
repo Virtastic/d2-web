@@ -29,7 +29,7 @@ static uint32_t g_string_type_api;      // DAT_6FBAAE0, RVA 0x0FAABE0: 0 unknown
 static uint32_t g_default_locale;       // DAT_6FBAC1C, RVA 0x0FAC1C
 static uint32_t g_default_codepage;     // DAT_6FBAC2C, RVA 0x0FAC2C
 
-// 1.13c D2Client+0x0AB3B
+// 1.13c D2Client+0x0ab3b
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2c_crt_get_string_type_a(uint32_t info_type, const char* src,
                                                        int32_t cch_src, uint16_t* char_type,

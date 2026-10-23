@@ -35,7 +35,7 @@ void d2win_sub_16470(D2WinCtl* c, void* cb6360, const D2WinB51Env* e) {
     c->cb20 = cb6360;
 }
 
-// 1.13c D2Win+0x136E0
+// 1.13c D2Win+0x136e0
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2win_sub_136e0(D2WinCtl* c, uint32_t v, const D2WinB51Env* e) {
     if (!c) e->fatal(0x445);
@@ -64,7 +64,7 @@ int32_t d2win_sub_11e80(const uint16_t* s, uint32_t fontByte, int32_t scale, con
     return (int32_t)(fontByte * (uint32_t)scale * (uint32_t)n) / 10;
 }
 
-// 1.13c D2Win+0x17FC0
+// 1.13c D2Win+0x17fc0
 extern "C" EMSCRIPTEN_KEEPALIVE
 uint32_t d2win_sub_17fc0(D2WinCtl* c, const D2WinB51Env* e) {
     if (*e->g14b0 == c) *e->g14b0 = nullptr;

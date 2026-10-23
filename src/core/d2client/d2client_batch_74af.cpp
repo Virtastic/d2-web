@@ -15,7 +15,7 @@ struct D2ClientFreeptdEnv {
     void    (*freefls)(void* ptd);                         // 0x7368 __freefls@4 (still UNMAPPED)
 };
 
-// 1.13c D2Client+0x074AF (47 B): free the calling thread's _tiddata. No-op when the slot is -1. A null
+// 1.13c D2Client+0x074af (47 B): free the calling thread's _tiddata. No-op when the slot is -1. A null
 // argument means "this thread's block": it is fetched with TlsGetValue(slot). __freefls releases the
 // block's owned buffers and the block itself, then the slot is cleared with TlsSetValue(slot, NULL).
 // Both TLS calls act on the slot index, not on the block, so the block's address is the only thing the

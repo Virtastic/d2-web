@@ -51,7 +51,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_client_7283(const D2ClientBatch057AEEnv* env) {
     return locale;
 }
 
-// 1.13c D2Client+0x072C7 (__mtterm): release the thread-data TLS index (through the TlsFree slot the
+// 1.13c D2Client+0x072c7 (__mtterm): release the thread-data TLS index (through the TlsFree slot the
 // MULTITHREAD init installed) and mark it free, then tear down the CRT's lock table.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_72c7(const D2ClientBatch057AEEnv* env) {

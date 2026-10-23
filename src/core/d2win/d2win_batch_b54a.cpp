@@ -29,7 +29,7 @@ void d2win_sub_7a60(int32_t esi, const D2WinB54aEnv* e) {
     e->fatal(id);
 }
 
-// 1.13c D2Win+0xB4F0 -- is `target` in the tree rooted at node `root` (children shorts at +4/+6)?
+// 1.13c D2Win+0x0b4f0 (a.k.a. 0xB4F0) -- is `target` in the tree rooted at node `root` (children shorts at +4/+6)?
 extern "C" EMSCRIPTEN_KEEPALIVE
 uint32_t d2win_sub_b4f0(int32_t root, int32_t target, const D2WinB54aEnv* e) {
     int32_t st[64];
@@ -53,7 +53,7 @@ uint32_t d2win_sub_b4f0(int32_t root, int32_t target, const D2WinB54aEnv* e) {
     }
 }
 
-// 1.13c D2Win+0xB7B0 -- validate table[row(mask)][idx] <= 0x40; idx = (uint8)a.
+// 1.13c D2Win+0x0b7b0 -- validate table[row(mask)][idx] <= 0x40; idx = (uint8)a.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2win_sub_b7b0(uint32_t a, uint32_t mask, const D2WinB54aEnv* e) {
     if ((uint8_t)a >= 0x40) { e->fatal(0x56b); return; }
@@ -74,7 +74,7 @@ uint8_t* d2win_sub_b810(uint32_t v, const D2WinB54aEnv* e) {
     return 0;
 }
 
-// 1.13c D2Win+0xB860 -- find node whose entry has +4 == key1 and +0xC == key2; list head in EAX.
+// 1.13c D2Win+0x0b860 -- find node whose entry has +4 == key1 and +0xC == key2; list head in EAX.
 struct D2WinB54aEntry { int32_t pad0; int32_t k1; int32_t pad8; int32_t k2; };
 struct D2WinB54aNode { D2WinB54aEntry* entry; D2WinB54aNode* next; };
 extern "C" EMSCRIPTEN_KEEPALIVE
@@ -85,7 +85,7 @@ D2WinB54aNode* d2win_sub_b860(D2WinB54aNode** head, int32_t key1, int32_t key2, 
     return 0;
 }
 
-// 1.13c D2Win+0xC980 -- append a text row (0x208-byte stride; width at +0x400, height at +0x408).
+// 1.13c D2Win+0x0c980 -- append a text row (0x208-byte stride; width at +0x400, height at +0x408).
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2win_sub_c980(uint8_t* base, const uint16_t* text, int32_t* totalH, int32_t* maxW, int32_t* count, const D2WinB54aEnv* e) {
     uint8_t* row = base + *count * 0x208;

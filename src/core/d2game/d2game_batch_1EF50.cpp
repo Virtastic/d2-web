@@ -257,7 +257,7 @@ level_lookup:
 
 // Clear a one-shot flag: EAX+0x18 is a small record; when its +2 byte is 1 and its +4 dword equals
 // param_1's +0xC dword (or both are the -1 sentinel for a null param_1), it becomes +2 = 0, +1 = 1.
-// 1.13c D2Game+0xE3B00
+// 1.13c D2Game+0xe3b00
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E3B00(uint32_t eaxUnit, uint32_t param1,
                                              const D2GameBatch1EF50Env* env)
@@ -309,6 +309,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_7A570(uint32_t esiUnit, const D2GameBatch
     }
     wr16(buf, 6, (uint16_t)iVar1);
     wr8(buf, 0, 0x11);
+    wr8(buf, 1, type);
     wr16(buf, 2, (uint16_t)uVar2);
     wr16(buf, 4, (uint16_t)(uVar2 >> 16));
 
@@ -317,7 +318,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_7A570(uint32_t esiUnit, const D2GameBatch
 
 // 11-byte 0x47 message: tag 0x47, type byte the EAX unit's first dword (6 when null), the unit's +0xC
 // dword (0xFFFFFFFF when null), then three zero bytes.
-// 1.13c D2Game+0x8AEC0
+// 1.13c D2Game+0x8aec0
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8AEC0(uint32_t eaxUnit, const D2GameBatch1EF50Env* env)
 {
@@ -342,7 +343,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8AEC0(uint32_t eaxUnit, const D2GameBatch
 // Callback dispatch: EBX+0x10 indexes 0xC-byte rows of the 0x6FD22CE0 table; a non-null first dword is
 // called as (param_2, index) after an IsBadCodePtr gate whose failure logs the 0x148 allocation and
 // exits.
-// 1.13c D2Game+0xCB8F0
+// 1.13c D2Game+0xcb8f0
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CB8F0(uint32_t param1, uint32_t param2, uint32_t ebx,
                                              const D2GameBatch1EF50Env* env)
@@ -359,7 +360,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CB8F0(uint32_t param1, uint32_t param2, u
 // 11-byte 0x15 message for the ESI unit: tag, type byte, +0xC dword, then the two coordinate words -- the
 // unit's +0x14 record +0xC (Fog #10867) at +6 and its +0x10 (Fog #10750) at +8 -- followed by param_2.
 // Units of type 2 or 4/5 read the words straight out of that record instead.
-// 1.13c D2Game+0xCBB10
+// 1.13c D2Game+0xcbb10
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CBB10(uint32_t param1, uint8_t param2, uint32_t esiUnit,
                                              const D2GameBatch1EF50Env* env)
@@ -443,7 +444,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9D8E0(uint32_t eax, const D2GameBatch1EF5
 
 // Pet-list teardown: from the head at param_1, walk each node's +0x14 link paying 0x977E0(EBX, node+4)
 // and one Fog #10046 (PlayerPets.cpp, line 0x4A5, 0) per node, then clear both head words.
-// 1.13c D2Game+0x964B0
+// 1.13c D2Game+0x964b0
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_964B0(uint32_t param1, uint32_t ebx,
                                              const D2GameBatch1EF50Env* env)
@@ -465,7 +466,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_964B0(uint32_t param1, uint32_t ebx,
 // param_1+0x1320+(id&0x7F)*4, then walk that chain (next +0xE4) for a +0xC match. Both the chain node and
 // param_2 supply their coordinate pairs (record +0xC/+0x10, Fog #10867/#10750 or direct for types 2/4/5);
 // Fog #10769 of ((param2 +0xC),(param2 +0x10),(node +0xC),(node +0x10)) above param_3 calls 0x97B50.
-// 1.13c D2Game+0x96C00
+// 1.13c D2Game+0x96c00
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_96C00(uint32_t param1, uint32_t param2, int32_t param3,
                                              uint32_t eaxList, const D2GameBatch1EF50Env* env)
@@ -514,7 +515,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_96C00(uint32_t param1, uint32_t param2, i
 
 // Single pass over the EAX list: for each unflagged node, hash the +4 id into EBX+0x1320 and walk the
 // chain (next +0xE4) for a +0xC match, paying 0x971F0(EBX) per hit.
-// 1.13c D2Game+0x972C0
+// 1.13c D2Game+0x972c0
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_972C0(uint32_t eaxList, uint32_t ebx,
                                              const D2GameBatch1EF50Env* env)
@@ -540,7 +541,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_972C0(uint32_t eaxList, uint32_t ebx,
 
 // 7-byte 0x9B message; the decompile initialises only byte 0 and hands the stack block to 0x8A3E0, so
 // bytes 1..6 are indeterminate there and are zero here.
-// 1.13c D2Game+0x8A690
+// 1.13c D2Game+0x8a690
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8A690(const D2GameBatch1EF50Env* env)
 {

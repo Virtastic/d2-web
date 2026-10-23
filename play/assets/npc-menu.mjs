@@ -206,7 +206,7 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
     const y2 = Math.trunc(feetY) - L.bottomBaseAboveFeet + L.bottomPerLine * labels.length,
       y1 = y2 - (L.pitch * labels.length + L.firstLine);
     const bottoms = labels.map((_, i) => y1 + L.firstLine + i * L.pitch);
-    rows = state.entries.map((e, i) => ({ ...e, label: labels[i + 1], x: x1, y: bottoms[i + 1] - 12, w, h: 15, inkBottom: bottoms[i + 1] }));
+    rows = state.entries.map((e, i) => ({ ...e, label: labels[i + 1], x: x1 + 16, y: bottoms[i + 1] - 12, w: w - 31, h: 15, inkBottom: bottoms[i + 1] }));
     box = { x: x1, y: y1, w, h: y2 - y1, x1, y1, x2, y2 };
     return { labels, bottoms, cx };
   };
@@ -218,6 +218,8 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
     /** The pointer moved: the entry under it is selected, none when it is elsewhere (retail). */
     hover(x, y) { if (state && rows.length) selected = rows.findIndex((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h); return selected; },
     get selectedEntry() { return selected >= 0 ? rows[selected] ?? null : null; },
+    /** 1.13c FUN_6FB54860: outside the menu rect widened by 4 on every side. */
+    outside(x, y) { return Boolean(box) && (x < box.x1 - 4 || x > box.x2 + 4 || y < box.y1 - 4 || y > box.y2 + 4); },
     close() { state = null; rows = []; box = null; },
     /** The hire window over offers [{ name, level, life, def, cost, skill, mercName }] and the hirer's gold. */
     showHire(npcId, offers, gold) { hire = { npcId, offers, gold, top: 0, selected: 0 }; },

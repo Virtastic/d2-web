@@ -18,7 +18,7 @@
 #include <unistd.h>
 #include <emscripten.h>
 
-extern "C" void d2_fn_d2game_69dc(int32_t code, const uint32_t* table);   // 0x69DC __NMSG_WRITE
+extern "C" void d2game_nmsg_write(int32_t code, const uint32_t* table);   // 0x69DC __NMSG_WRITE
 
 // 1.13c D2Game+0x078DE: map a Windows code page to its CRT locale identifier.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_78de(uint32_t codepage) {
@@ -89,7 +89,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_7db5(const D2GameBatchTinyEnv* env) {
 // the wasm host that is _exit(3).
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_96f8(const D2GameBatchTinyEnv* env) {
-    d2_fn_d2game_69dc(10, env->nmsgTable);
+    d2game_nmsg_write(10, env->nmsgTable);
     env->raise_(0x16);
     _exit(3);
 }

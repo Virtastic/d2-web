@@ -9,7 +9,7 @@ struct D2Cmp8f70Ops {
     void (*exit_)(int);            // _exit(-1), does not return
 };
 
-// 1.13c D2CMP+0x08F70
+// 1.13c D2CMP+0x8f70
 // Returns when handle nonzero and Ordinal_10106 != -1; otherwise reports and exits.
 extern "C" void d2cmp_8f70(void* esi, const char* msg, const D2Cmp8f70Ops& ops) {
     if (esi) {

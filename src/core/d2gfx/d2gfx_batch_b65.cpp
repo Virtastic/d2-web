@@ -66,3 +66,8 @@ extern "C" void d2gfx_sub_C006(D2GfxPtd* ptd, int32_t* frameState, int32_t maxSt
     epilogue();
     *frameState = s;
 }
+
+// 1.13c D2Gfx+0x0BF40 _CallCatchBlock2: pushes a nested SEH frame (handler LAB_6fa8bc7d, state param_4+1) then
+// returns __CallSettingFrame_12(handler, regNode, flags). The SEH frame has no wasm analogue; the result is the
+// catch funclet's continuation address.
+void* d2gfx_call_catch_block2(void* (*catchFunclet)()) { return catchFunclet(); }

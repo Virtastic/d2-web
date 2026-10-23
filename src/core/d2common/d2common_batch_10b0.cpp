@@ -107,7 +107,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_10b0(uint32_t* r)
 }
 
 // 1.13c D2Common+0x1100: the second copy of the same body, nMax arriving in ESI instead of EAX.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_1100(uint32_t* r)
+EMSCRIPTEN_KEEPALIVE __attribute__((weak)) void d2_fn_d2common_1100(uint32_t* r)
 {
 	r[4] = RollLimited(reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(r[0])), r[1]);
 }

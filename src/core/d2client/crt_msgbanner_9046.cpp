@@ -23,7 +23,7 @@ void nmsg(D2cHost h, uint32_t msg) {
 }
 }  // namespace
 
-// 1.13c D2Client+0x9046
+// 1.13c D2Client+0x09046
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_9046(D2cHost h) {
     if (!(g_error_mode == 1 || (g_error_mode == 0 && g_app_type == 1))) return;

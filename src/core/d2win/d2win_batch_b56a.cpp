@@ -4,16 +4,16 @@
 #include <initializer_list>
 #include <emscripten.h>
 
-// 1.13c D2Win+0x6C85
+// 1.13c D2Win+0x6c85
 extern "C" EMSCRIPTEN_KEEPALIVE void d2win_fptrap(void (*amsg_exit)(int32_t)) { amsg_exit(2); }
 
-// 1.13c D2Win+0x2DBC
+// 1.13c D2Win+0x2dbc
 extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_2dbc(void (*sub_2396)(int32_t)) { sub_2396(4); }
 
-// 1.13c D2Win+0x41F0 (&ptd->_terrno; ptd = __getptd())
+// 1.13c D2Win+0x41f0 (&ptd->_terrno; ptd = __getptd())
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t* d2win_sub_41f0(int32_t* ptd_terrno) { return ptd_terrno; }
 
-// 1.13c D2Win+0x41F9 (&ptd->_tdoserrno)
+// 1.13c D2Win+0x41f9 (&ptd->_tdoserrno)
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t* d2win_sub_41f9(uint32_t* ptd_tdoserrno) { return ptd_tdoserrno; }
 
 // 1.13c D2Win+0x5C8D

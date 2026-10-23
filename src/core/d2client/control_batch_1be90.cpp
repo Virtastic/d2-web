@@ -47,7 +47,7 @@ void sub_1BE90(State& s, Unit* edi) {
  uint32_t active=s.api.active(u); if(s.active!=active && !active)s.api.deactivate();
  s.active=active; s.value=s.api.unitValue(u); s.api.update();
 }
-// 1.13c D2Client+0x1C740
+// 1.13c D2Client+0x1c740
 void sub_1C740(State& s,const uint8_t* p) { if(read<uint16_t>(p,1)==1)for(unsigned i=0;i<3;++i)s.packetValues[i]=read<uint16_t>(p,3+2*i); }
 // 1.13c D2Client+0x1C940
 void sub_1C940(State& s,int32_t command) { for(auto& b:s.bindings)if(b.command==command){s.slots[b.slot]=b.value;return;} }
@@ -66,7 +66,7 @@ void sub_1CA00(State& s,uint32_t incoming) {
 // 1.13c D2Client+0x1CAD0
 void sub_1CAD0(State& s) {for(void*& p:s.controls)if(p){s.api.destroy(p);s.api.sound(0x7a,0);p=nullptr;}}
 // AL is the boolean result; preserve retail's otherwise incidental upper EAX bytes.
-// 1.13c D2Client+0x1D6E0
+// 1.13c D2Client+0x1d6e0
 uint32_t sub_1D6E0(State& s,uint32_t eax) {
  if(!s.selectionActive)return eax&0xffffff00u;
  for(Unit* p=s.buckets[s.selectionId&127];p;p=p->next)if(uint32_t(p->id)==s.selectionId){if(p->type==1)return (p->retailAddress&0xffffff00u)|1u;s.api.fatal(0x5a);}
@@ -91,7 +91,7 @@ bool sub_1D840(State& s,int32_t x,int32_t y) {
  auto index=sub_1C980(s,s.viewportMode);auto r=s.rects[index];int32_t dx=s.viewportMode==2?add(s.width,-640)/2:0;
  int32_t dy=add(s.height,-480);return add(r.left,dx)<x && x<add(r.right,dx) && add(r.top,dy)<y && y<add(r.bottom,dy);
 }
-// 1.13c D2Client+0x1D8F0
+// 1.13c D2Client+0x1d8f0
 void sub_1D8F0(State& s,uint32_t incoming){if(s.closeMode<5)sub_1CA00(s,incoming);s.closeValue=0;s.flag=0;s.flag2=0;sub_1CAD0(s);}
 // 1.13c D2Client+0x1FD00
 bool sub_1FD00(Unit* u,uint16_t mask){return u && u->type==1 && u->data && (read<uint16_t>(u->data,0x16)&mask);}

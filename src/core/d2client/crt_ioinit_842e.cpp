@@ -49,7 +49,7 @@ static uint32_t client_io_word(const uint8_t* p) {
     return value;
 }
 
-// 1.13c D2Client+0x0842E
+// 1.13c D2Client+0x0842e
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_ioinit(D2ClientIoInitEnv* e) {
     auto* first = client_io_allocate(e);
     if (!first) return -1;

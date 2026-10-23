@@ -294,6 +294,7 @@ static void __fastcall SUNITINACTIVE_RestoreInactiveRest(D2GameStrc* pGame, D2Ac
 	D2InactiveUnitListStrc* pPreviousList = nullptr;
 	D2InactiveItemNodeStrc* pInactiveItemNode = nullptr;
 	D2InactiveUnitNodeStrc* pInactiveUnitNode = nullptr;
+	// 1.13c D2Game+0x1EA40 (inlined here in 1.10f; separate in 1.13c: unlink the (x,y) list node, return item+unit lists, free node)
 	D2InactiveUnitListStrc* pInactiveUnitList = nullptr;
 	pInactiveUnitList = pGame->pInactiveUnitList[nAct];
 	while (pInactiveUnitList)
@@ -557,7 +558,7 @@ D2UnitStrc* __fastcall SUNITINACTIVE_RestoreInactiveItem(D2GameStrc* pGame, D2Ac
 	return pItem;
 }
 
-//D2Game.0x6FCC4270
+//D2Game.0x6FCC4270  // 1.13c D2Game+0x1ED80
 void __fastcall SUNITINACTIVE_FreeInactiveUnitLists(D2GameStrc* pGame)
 {
 	for (int32_t i = 0; i < 5; ++i)
@@ -599,7 +600,7 @@ void __fastcall SUNITINACTIVE_FreeInactiveUnitLists(D2GameStrc* pGame)
 	}
 }
 
-//D2Game.0x6FCC4370
+//D2Game.0x6FCC4370  // 1.13c D2Game+0x20760 (monster half; 0x209B0 dispatches; checked against decompile, no delta)
 void __fastcall SUNITINACTIVE_CompressUnitIfNeeded(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	int32_t bCompress = 0;
@@ -936,7 +937,7 @@ void __fastcall SUNITINACTIVE_CompressInactiveUnit(D2GameStrc* pGame, D2UnitStrc
 	{
 		D2InactiveUnitListStrc* pInactiveUnitList = SUNITINACTIVE_GetListNodeFromRoom(pGame, pRoom, 1);
 
-		if (pUnit->dwUnitType == UNIT_ITEM)
+		if (pUnit->dwUnitType == UNIT_ITEM) // 1.13c D2Game+0x203D0 (item branch, split out of 0x204E0)
 		{
 			uint8_t pBitstream[1024] = {};
 			const size_t nBitstreamSize = ITEMS_SerializeItemToBitstream(pUnit, pBitstream, ARRAY_SIZE(pBitstream), 1, 1, 0);
@@ -1162,7 +1163,7 @@ D2InactiveUnitListStrc* __fastcall SUNITINACTIVE_GetListNodeFromRoom(D2GameStrc*
 	return SUNITINACTIVE_GetListNodeFromActAndCoordinates(pGame, DRLG_GetActNoFromLevelId(DUNGEON_GetLevelIdFromRoom(pRoom)), pCoord.nSubtileX, pCoord.nSubtileY, bAllocNewNode);
 }
 
-//D2Game.0x6FCC4ED0
+// 1.13c D2Game+0x1F2D0 (1.10f D2Game.0x6FCC4ED0)
 void __fastcall SUNITINACTIVE_RestoreSpecialMonsterParameters(D2GameStrc* pGame, D2UnitStrc* pUnit, D2InactiveMonsterNodeStrc* pInactiveMonsterNode)
 {
 	const int32_t nClassId = pUnit->dwClassId;

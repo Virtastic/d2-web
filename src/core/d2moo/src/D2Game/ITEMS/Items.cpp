@@ -1541,6 +1541,7 @@ void __fastcall sub_6FC502B0(D2GameStrc* pGame, D2UnitStrc* pItem)
 }
 
 //D2Game.0x6FC502E0
+// 1.13c D2Game+0x13180
 void __fastcall ITEMS_RemoveAll(D2GameStrc* pGame)
 {
     D2UnitStrc** ppUnit = pGame->pUnitList[3];
@@ -1592,7 +1593,7 @@ void __fastcall ITEMS_PlayerIterateCallback_RemoveItem(D2GameStrc* pGame, D2Unit
     }
 }
 
-//D2Game.0x6FC503A0
+//D2Game.0x6FC503A0 // 1.13c D2Game+0xE150
 int32_t __fastcall ITEMS_IsInPlayersInventory(D2UnitStrc* pPlayer, D2UnitStrc* pItem, D2InventoryStrc* pInventoryArg)
 {
     D2InventoryStrc* pInventory = pPlayer->pInventory;
@@ -2646,7 +2647,7 @@ void __fastcall sub_6FC52110(D2GameStrc* pGame, D2UnitStrc* pMonster, D2UnitStrc
 }
 
 //D2Game.0x6FC521D0
-// 1.13c D2Game+0xE0A0
+// 1.13c D2Game+0x0E0A0
 int32_t __fastcall ITEMS_GetGroundRemovalTime(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (ITEMS_IsQuestItem(pUnit))
@@ -2655,6 +2656,11 @@ int32_t __fastcall ITEMS_GetGroundRemovalTime(D2GameStrc* pGame, D2UnitStrc* pUn
     }
 
 	const int32_t nItemQuality = ITEMS_GetItemQuality(pUnit);
+    if (nItemQuality == ITEMQUAL_MAGIC)
+    {
+        return pGame->dwGameFrame + 30000; // 1.13c delta: magic items
+    }
+
     if (nItemQuality > ITEMQUAL_MAGIC && nItemQuality <= ITEMQUAL_TEMPERED)
     {
         return pGame->dwGameFrame + 45000;
@@ -2680,6 +2686,7 @@ int32_t __fastcall ITEMS_GetGroundRemovalTime(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FC52260
+// 1.13c D2Game+0xE990
 void __fastcall D2GAME_DropItem_6FC52260(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pItem, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY)
 {
     if (!pRoom)

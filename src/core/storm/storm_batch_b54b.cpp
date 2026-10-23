@@ -39,7 +39,13 @@ uint32_t Storm_RegDeleteValue(void* key, const char* name);
 
 // 1.13c Storm+0x6851: strtoul via the CRT worker (unsigned flag).
 unsigned long Storm_strtoul_6851(const char* s, char** end, int radix) {
-    return (uint32_t)strtoul(s, end, radix);
+    // retail's 32-bit worker clamps to 0xFFFFFFFF past 32 bits (host strtoul is 64-bit here)
+    const char* q = s; while (*q == ' ' || (*q >= 9 && *q <= 13)) ++q;
+    bool neg = *q == '-';
+    unsigned long long v = strtoull(s, end, radix);
+    unsigned long long m = neg ? 0 - v : v;
+    if (m > 0xFFFFFFFFull) return 0xFFFFFFFFul;
+    return (uint32_t)v;
 }
 
 // 1.13c Storm+0x1ACF0: record the error code (ESI implicit) and report it when reporting is on.

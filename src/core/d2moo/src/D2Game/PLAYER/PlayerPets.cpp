@@ -603,6 +603,7 @@ void __fastcall sub_6FC7DBF0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
 }
 
 //D2Game.0x6FC7DD10
+// 1.13c D2Game+0x96600
 int32_t __fastcall PLAYERPETS_GetPetTypeFromPetGUID(D2UnitStrc* pPlayer, int32_t nPetGUID)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
@@ -691,6 +692,7 @@ int32_t __fastcall sub_6FC7DD90(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitSt
 }
 
 //D2Game.0x6FC7DEB0
+// 1.13c D2Game+0x96570
 D2PetInfoStrc* __fastcall PLAYERPETS_GetPetInfoFromPetGUID(D2UnitStrc* pUnit, int32_t nUnitGUID)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pUnit);
@@ -858,6 +860,7 @@ void __fastcall sub_6FC7E310(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t a3,
 }
 
 //D2Game.0x6FC7E550
+// 1.13c D2Game+0x971f0 (1.13c register-arg variant of the same body; )
 void __fastcall sub_6FC7E550(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2PetDataStrc* pPetData, D2ActiveRoomStrc* pRoom, int32_t a5, int32_t a6)
 {
     D2ActiveRoomStrc* pPlayerRoom = UNITS_GetRoom(pPlayer);

@@ -11,7 +11,7 @@ struct D2Client2c70Env {
                       uint32_t flags);                                        // Storm ordinal 403
 };
 
-// 1.13c D2Client+0x02C70 (41 B): scalar deleting destructor (vtable slot). Runs the destructor body
+// 1.13c D2Client+0x02C70 d2client_batch_2c70.cpp:d2_client_2c70 (41 B): scalar deleting destructor (vtable slot). Runs the destructor body
 // 0x38770(self), then when flags bit 0 is set and self is non-null frees it with
 // SMemFree(self, "delete", -1, 0); returns self in EAX.
 extern "C"

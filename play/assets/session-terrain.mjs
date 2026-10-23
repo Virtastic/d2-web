@@ -386,18 +386,24 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   // level A>>3, others gouraud -- per row r the edge levels ((E0<<4) + r*(E3-E0)) >> 7 and
   // ((E1<<4) + r*(E2-E1)) >> 7, per column x level L + floor((R-L)*x/32) (the 32x32x32 table D2gfx
   // builds at +0x15450, which is exactly that). The pixel is PL2 LightLevelVariations[level][index].
-  const litCache = new Map();
+  let litCache = new Map(), litCacheOld = new Map();
   // Floor blinds are cached by (path, index, gridKey) in nested maps instead of one `${path}:${index}:${grid}`
   // string. The concatenation was a fresh ~200-character key per visible tile per frame -- flattening and
   // hashing it on every Map lookup (measured 0.52 -> 0.25 ms per 800 tiles in a standalone loop). gridKey is
   // the caller's memoised `grid.join(',')` string, so looking it up re-hashes nothing; the cache partitions
   // exactly as the old single key did. Position-dependent variants (left/top clipping) keep the string key
   // in `litCache`, which also holds walls.
-  const litFloorCache = new Map();
+  let litFloorCache = new Map(), litFloorOld = new Map();
   let litFloorEntries = 0;
+  // PERF (s-perf-freezes): the cache is two generations, not one wipe. Clearing everything at 1500 entries
+  // re-lit every visible floor and wall on the next frame (a 25-70 ms hitch every ~57 frames of walking, the
+  // light moves so dead grid variants pile up). Now the full generation becomes `old`, a hit in `old` is
+  // promoted, and only entries unused for a whole generation are dropped. Same canvases, same pixels.
   const litEvict = () => {
-    if (litCache.size + litFloorEntries > 1500) { litCache.clear(); litFloorCache.clear(); litWallMemo = new WeakMap(); litFloorEntries = 0; }
+    if (litCache.size + litFloorEntries > 1500) { litCacheOld = litCache; litCache = new Map(); litFloorOld = litFloorCache; litFloorCache = new Map(); litWallMemoOld = litWallMemo; litWallMemo = new WeakMap(); litFloorEntries = 0; }
   };
+  const litCacheGet = (k) => { let v = litCache.get(k); if (v === undefined) { v = litCacheOld.get(k); if (v !== undefined) litCache.set(k, v); } return v; };
+  const pal32 = new WeakMap();   // blend table -> 256 packed RGBA words (litFloor)
   const ISO_SKIP = [14, 12, 10, 8, 6, 4, 2, 0, 2, 4, 6, 8, 10, 12, 14], ISO_RUN = [4, 8, 12, 16, 20, 24, 28, 32, 28, 24, 20, 16, 12, 8, 4];
   // A gouraud floor block the frame clips on the LEFT is shaded from the LEVEL TABLE one entry per DRAWN
   // pixel from the row's own start, not by the pixel's column in the block: retail's two clipped gouraud
@@ -423,7 +429,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     let key = null, inner = null;
     if (positional || topClipped) {
       key = `${path}:${index}:${keyBase}` + (positional ? `@${tileX}` : '') + (topClipped ? `:${tileY}` : '');
-      if (litCache.has(key)) return litCache.get(key);
+      const hit = litCacheGet(key); if (hit !== undefined) return hit;
     } else {
       let byIndex = litFloorCache.get(path);
       if (!byIndex) litFloorCache.set(path, byIndex = new Map());
@@ -431,6 +437,8 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       if (inner === undefined) byIndex.set(index, inner = new Map());
       const hit = inner.get(keyBase);
       if (hit !== undefined) return hit;
+      const old = litFloorOld.get(path)?.get(index)?.get(keyBase);
+      if (old !== undefined) { inner.set(keyBase, old); litFloorEntries++; return old; }
     }
     const t = blendPl2();
     if (!t || !px || !px.width) { if (key !== null) litCache.set(key, null); else { inner.set(keyBase, null); litFloorEntries++; litEvict(); } return null; }
@@ -463,13 +471,16 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
           const x = skip + col, q = (b.y + r - px.originY) * px.width + (b.x + x - px.originX);
           // An RLE skip leaves earlier blocks intact: use this block's write mask and source.
           if (b.y + r - px.originY >= px.height || !b.pixels.written[r * 32 + x]) continue;
-          const lvl = flat ? c.A >> 3 : L + Math.floor((R - L) * (x - leftclip) / 32);
+          const lvl = flat ? c.A >> 3 : L + (((R - L) * (x - leftclip)) >> 5);   // >> 5 is floor(/ 32) on these integers
           idx[q] = t[1024 + lvl * 256 + b.pixels.indices[r * 32 + x]];
         }
       }
     }
-    const rgba = new Uint8ClampedArray(idx.length * 4);
-    for (let q = 0; q < idx.length; q++) { if (!opq[q]) continue; rgba[q * 4] = t[idx[q] * 4]; rgba[q * 4 + 1] = t[idx[q] * 4 + 1]; rgba[q * 4 + 2] = t[idx[q] * 4 + 2]; rgba[q * 4 + 3] = 255; }
+    // One 32-bit store per pixel from a per-table palette (little-endian ABGR), not four byte stores.
+    let pal = pal32.get(t); if (!pal) { pal = new Uint32Array(256); for (let i = 0; i < 256; i++) pal[i] = (0xff000000 | (t[i * 4 + 2] << 16) | (t[i * 4 + 1] << 8) | t[i * 4]) >>> 0; pal32.set(t, pal); }
+    const px32 = new Uint32Array(idx.length);
+    for (let q = 0; q < idx.length; q++) if (opq[q]) px32[q] = pal[idx[q]];
+    const rgba = new Uint8ClampedArray(px32.buffer);
     const canvas = documentObject.createElement('canvas'); canvas.width = px.width; canvas.height = px.height;
     canvas.getContext('2d').putImageData(new ImageData(rgba, px.width, px.height), 0, 0);
     if (key !== null) litCache.set(key, canvas); else { inner.set(keyBase, canvas); litFloorEntries++; litEvict(); }
@@ -485,17 +496,19 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   // (the wall drawer 6fa8abf0 draws a block flat at E[k] when |dE| is small); s996 fits every pixel of retail's two roof blits to one (a, b) per block.
   // PERF (a retail recording): a wall's cache key is a ~100-char string built every frame per wall; the (tile object,
   // short key) memo in front of it returns the same canvas litCache holds and is dropped with it.
-  let litWallMemo = new WeakMap();
+  let litWallMemo = new WeakMap(), litWallMemoOld = new WeakMap();
   function litWall(path, dt1Tile, index, E, roof = false) {
     let m = litWallMemo.get(dt1Tile); if (!m) litWallMemo.set(dt1Tile, m = new Map());
-    const mk = `${index}:${roof}:${E.join(',')}`, hit = m.get(mk);
+    const mk = `${index}:${roof}:${E.join(',')}`;
+    let hit = m.get(mk);
+    if (hit === undefined) { hit = litWallMemoOld.get(dt1Tile)?.get(mk); if (hit !== undefined) m.set(mk, hit); }
     if (hit !== undefined) return hit.v;
     const v = litWallSlow(path, dt1Tile, index, E, roof);
     m.set(mk, { v }); return v;
   }
   function litWallSlow(path, dt1Tile, index, E, roof = false) {
     const key = `w${roof ? 'r' : ''}${path}:${index}:${E.join(',')}`;
-    if (litCache.has(key)) return litCache.get(key);
+    { const hit = litCacheGet(key); if (hit !== undefined) return hit; }
     const t = blendPl2(), px = dt1Tile.pixels;
     if (!t || !px || !px.width) { litCache.set(key, null); return null; }
     const idx = new Uint8Array(px.indices), opq = px.opaque;

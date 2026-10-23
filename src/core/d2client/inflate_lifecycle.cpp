@@ -4,7 +4,7 @@
 #include "inflate_lifecycle.h"
 #include <new>
 
-// 1.13c D2Client+0x0F3F0
+// 1.13c D2Client+0x0f3f0
 void D2Client_ResetInflateBlocks(D2ClientInflateBlocks& blocks,
     const D2ClientInflateAllocator& allocator, uint32_t& streamChecksum,
     uint32_t* previousChecksum) {
@@ -24,7 +24,7 @@ void D2Client_ResetInflateBlocks(D2ClientInflateBlocks& blocks,
     }
 }
 
-// 1.13c D2Client+0x0F450
+// 1.13c D2Client+0x0f450
 int32_t D2Client_FreeInflateBlocks(D2ClientInflateBlocks* blocks,
     const D2ClientInflateAllocator& allocator, uint32_t& streamChecksum) {
     D2Client_ResetInflateBlocks(*blocks, allocator, streamChecksum, nullptr);
@@ -61,7 +61,7 @@ D2ClientInflateBlocks* D2Client_NewInflateBlocks(const D2ClientInflateAllocator&
     return blocks;
 }
 
-// 1.13c D2Client+0x0E310
+// 1.13c D2Client+0x0e310
 D2ClientInflateCodes* D2Client_NewInflateCodes(const D2ClientInflateAllocator& allocator,
     uint8_t literalBits, uint8_t distanceBits, D2ClientInflateHuft* literalTree,
     D2ClientInflateHuft* distanceTree) {

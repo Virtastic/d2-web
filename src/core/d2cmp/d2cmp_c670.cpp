@@ -12,7 +12,7 @@ static uint8_t* c670_name(uint8_t* o, uint32_t v)
     return o;
 }
 
-// 1.13c D2CMP+0x0C670
+// 1.13c D2CMP+0x0c670
 uint32_t d2cmp_c670(char* out, uint8_t* rec, int32_t gFlag)
 {
     auto u32 = [&](int off) { return *(uint32_t*)(rec + off); };

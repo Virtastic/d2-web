@@ -85,3 +85,30 @@ int sub_2F330(char* param_1, char* esi, int ebx) {
   }
   return 0;
 }
+
+// 1.13c Storm+0x53C0 helper: drain list at +8 (Storm+0x1310), then unlink node at +4.
+static void storm_52d0_elem(char* e) {
+  for (intptr_t* n; (n = *(intptr_t**)(e + 8)) && (intptr_t)n > 0;) {
+    intptr_t* hdr = (intptr_t*)n[0];
+    if (!hdr) break;
+    intptr_t v = n[1];
+    intptr_t* t = (v < 0) ? (intptr_t*)~v : (intptr_t*)((char*)n + (v - hdr[1]));
+    *t = (intptr_t)hdr; ((intptr_t*)n[0])[1] = n[1]; n[0] = 0; n[1] = 0;
+  }
+  intptr_t* p = (intptr_t*)(e + 4);
+  if (p[0]) {
+    intptr_t* hdr = (intptr_t*)p[0];
+    intptr_t v = p[1];
+    intptr_t* t = (v < 0) ? (intptr_t*)~v : (intptr_t*)((char*)p + (v - hdr[1]));
+    *t = (intptr_t)hdr; hdr[1] = p[1]; p[0] = 0; p[1] = 0;
+  }
+}
+
+// 1.13c Storm+0x52D0
+void sub_52D0(intptr_t* p) {
+  char* b = (char*)p;
+  storm_52d0_elem(b + 0x1C0);
+  for (int off : {0x190, 0x160, 0x130})   // 4 elements of 0xc each, destroyed in reverse
+    for (int i = 3; i >= 0; i--) storm_52d0_elem(b + off + i * 0xc);
+  sub_4B80(p);
+}

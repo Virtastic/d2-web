@@ -68,7 +68,7 @@ struct D2ClientCrtInitEnv {
     uint32_t tls_index;           // +0x0DB774  DAT_6fb8b774 (the _tiddata TLS slot; -1 = unset)
 };
 
-// 1.13c D2Client+0x4475. Reason 1 (attach): query the OS version once with dwOSVersionInfoSize = 0x94;
+// 1.13c D2Client+0x04475. Reason 1 (attach): query the OS version once with dwOSVersionInfoSize = 0x94;
 // on success publish platform, major, minor, the build with bit 15 clear (and bit 15 set unless the
 // platform is 2), and major*0x100+minor. Then __heap_init, __mtinit, __RTC_Initialize,
 // GetCommandLineA, the environment strings, __ioinit, __setargv, __setenvp, __cinit(0), in that order;

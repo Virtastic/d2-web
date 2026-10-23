@@ -143,7 +143,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8ba50(void* client, uint32_t ecxIn,
 }
 
 // 0x8A6C0: 7-byte packet 0x98 to the client in EAX; bytes 1..4 = ECX, 5..6 = DX.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8a6c0(void* client, uint32_t ecxIn, uint16_t dxIn, const D2GameBatch16Env* env) { // 1.13c D2Game+0x8A6C0
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8a6c0(void* client, uint32_t ecxIn, uint16_t dxIn, const D2GameBatch16Env* env) { // 1.13c D2Game+0x8a6c0
     uint8_t b[7];
     b[0] = 0x98;
     wr32(b, 1, ecxIn);
@@ -165,7 +165,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8aae0(void* client, void* unit, con
 
 // 0xCD2C0: forward to 0xCB950, then if EDX equals the client's current unit send stat 0xAF of that
 // unit back to it (#10973 supplies the value, 0xCC2F0 the packet).
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_cd2c0(uint32_t ecxIn, void* edxIn, void* unit, uint32_t a4, const D2GameBatch16Env* env) { // 1.13c D2Game+0xCD2C0
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_cd2c0(uint32_t ecxIn, void* edxIn, void* unit, uint32_t a4, const D2GameBatch16Env* env) { // 1.13c D2Game+0xcd2c0
     env->subCB950(ecxIn, edxIn, unit, a4);
     if (!unit) d2game_fatal(0xFB);
     void* cur = d2game_current_unit(unit, env);
@@ -231,11 +231,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_6f740(void* game, void* unit, void*
 }
 
 // 0x8D040: 0x82 party/unit record. Game in EAX, unit id in EDI; stack args are the client and a
-// packet field. Walks the type-3 list for the id, follows #10181 to the linked id (0xFFFFFFFF when
+// packet field. Walks the 0x1520 (index 2) list for the id, follows #10181 to the linked id (0xFFFFFFFF when
 // the node has no link), then walks the player list for that id and copies its 16-byte name.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8d040(void* game, uint32_t unitId, void* client, uint32_t field, const D2GameBatch16Env* env) { // 1.13c D2Game+0x8D040
     if (!game) d2game_fatal(0x2D3);
-    void* node = rdptr(game, kUnitListHead[3] + (unitId & 0x7F) * 4);
+    void* node = rdptr(game, kUnitListHead[2] + (unitId & 0x7F) * 4);
     while (node && rd32(node, 0xC) != unitId) node = rdptr(node, 0xE4);
     if (!node) return;
     void* link = env->ordinal10181(node);
@@ -279,7 +279,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8d5f0(void* target, void* unit, uin
 // 0x8D710: 0x59 chat/string packet to the client in EAX, then a 0x8D120 refresh of the named unit
 // when it is present in the client's game. Unit id in EDI, the string is the first stack argument,
 // the two trailing words are the last two.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8d710(void* client, uint32_t ecxIn, uint32_t unitId, const char* str, uint16_t arg2, uint16_t arg3, const D2GameBatch16Env* env) { // 1.13c D2Game+0x8D710
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8d710(void* client, uint32_t ecxIn, uint32_t unitId, const char* str, uint16_t arg2, uint16_t arg3, const D2GameBatch16Env* env) { // 1.13c D2Game+0x8d710
     uint8_t b[0x1A];
     std::memset(b, 0, sizeof b);
     b[0] = 0x59;

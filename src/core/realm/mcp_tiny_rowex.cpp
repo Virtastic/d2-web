@@ -162,10 +162,15 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_atexit_16b4(void* func) {
 // 1.13c D2MCPClient+0x0167C: lock exit table 8, append, unlock, return the callback or NULL.
 // Native unwinding releases the lock if the allocator seam throws, matching the SEH cleanup.
 extern "C"
+EMSCRIPTEN_KEEPALIVE void* d2_mcp_onexit_167c_seam(void* func, void (*lock)(), void* (*append)(void*), void (*unlock)()) {
+    lock();
+    struct U { void (*f)(); ~U() { f(); } } u{unlock};
+    return append(func);
+}
+static void* onexit_append(void* f) { return d2_mcp_onexit_lk(f, &g_mcp_onexit); }
+extern "C"
 EMSCRIPTEN_KEEPALIVE void* d2_mcp_onexit_167c(void* func) {
-    d2_mcp_lock8_1030();
-    struct Unlock { ~Unlock() { d2_mcp_unlock8_1039(); } } unlock;
-    return d2_mcp_onexit_lk(func, &g_mcp_onexit);
+    return d2_mcp_onexit_167c_seam(func, d2_mcp_lock8_1030, onexit_append, d2_mcp_unlock8_1039);
 }
 
 // 1.13c D2MCPClient+0x018A5 (9 B, caller 0x01AC5): the FlsAlloc fallback thunk `call TlsAlloc; ret`.

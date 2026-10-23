@@ -272,19 +272,20 @@ int32_t __fastcall ARENA_Return0()
 
 //1.10f: D2Game.0x6FC31790
 //1.13c: D2Game.0x6FCD2620
+// 1.13c D2Game+0xB2620
 uint32_t __fastcall ARENA_ShouldTreatClassIdAsTemplateId(D2GameStrc* pGame)
 {
     D2ArenaStrc* pArena = pGame->pArenaCtrl;
     D2_ASSERT(pArena);
 
-    return pArena->fFlags & GAMEFLAG_ARENA_CLASS_OR_TEMPLATE_ID;
+    return (pArena->fFlags & GAMEFLAG_ARENA_CLASS_OR_TEMPLATE_ID) >> 8; // 1.13c returns 0/1 (bit 8), 1.10f returned 0/0x100
 }
 
-//D2Game.0x6FC317C0
+//D2Game.0x6FC317C0 -- 1.13c D2Game+0xB22D0 (retail returns the byte at +0xC)
 int32_t __fastcall ARENA_GetTemplateType(D2GameStrc* pGame)
 {
     D2ArenaStrc* pArena = pGame->pArenaCtrl;
     D2_ASSERT(pArena);
 
-    return pArena->nTemplate;
+    return (uint8_t)pArena->nTemplate;
 }

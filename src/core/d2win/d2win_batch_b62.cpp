@@ -22,7 +22,7 @@ inline uint32_t& u32(void* p, int off) { return *reinterpret_cast<uint32_t*>(sta
 struct MsvcFile { char* _ptr; int _cnt; char* _base; int _flag; };
 }
 
-// 1.13c D2Win+0x1AAE  write_char: AL=ch, ECX=file, ESI=charsWritten*
+// 1.13c D2Win+0x1aae  write_char: AL=ch, ECX=file, ESI=charsWritten*
 void D2Win_1AAE(uint8_t al, MsvcFile* ecx, int* esi)
 {
     if ((ecx->_flag & 0x40) == 0 || ecx->_base != nullptr) {
@@ -34,14 +34,16 @@ void D2Win_1AAE(uint8_t al, MsvcFile* ecx, int* esi)
     ++*esi;
 }
 
-// 1.13c D2Win+0xC680  EAX=table ptr
-void D2Win_C680(uint8_t* eax, int p1, int p2)
+// 1.13c D2Win+0x0c680  EAX=table ptr; returns the layout-entry pointer (EAX stays live; callers test it)
+uint8_t* D2Win_C680(uint8_t* eax, int p1, int p2)
 {
     if (!eax) fatal(0x3f5);
-    if (eax + ((uint32_t)eax[1] * p1 + 9 + p2) * (uint32_t)eax[0] + eax[1] + 0x1c == nullptr) fatal(0x3fd);
+    uint8_t* r = eax + ((uint32_t)eax[1] * p1 + 9 + p2) * (uint32_t)eax[0] + eax[1] + 0x1c;
+    if (!r) fatal(0x3fd);
+    return r;
 }
 
-// 1.13c D2Win+0xE0D0  EAX=src object, ESI=dst record
+// 1.13c D2Win+0x0e0d0  EAX=src object, ESI=dst record
 void D2Win_E0D0(uint8_t* eax, uint8_t* esi)
 {
     u32(esi, 0x0c) = u32(eax, 0x1c);

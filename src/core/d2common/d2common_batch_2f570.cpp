@@ -35,7 +35,7 @@ extern "C"
 	void (*g_d2common_fn_5E410)(int32_t) = nullptr;
 }
 
-// 1.13c D2Common+0x2F570: stores the switched left skill id and flags in a player unit's player data
+// 1.13c D2Common+0x2f570: stores the switched left skill id and flags in a player unit's player data
 // (+0x84 and +0x8C). Non-player units and null units are ignored; a player unit without player data
 // is fatal 0x14A8 in retail, we return.
 extern "C"
@@ -125,7 +125,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_37660(uint32_t pOwner, int32_t nAct
 	return 1;
 }
 
-// 1.13c D2Common+0x3BE90: checks that a pointer array is consistent with its owner. The count at
+// 1.13c D2Common+0x3be90: checks that a pointer array is consistent with its owner. The count at
 // +0x24 must equal the count at (owner+0x10)+0x2C, and every one of the +0x24 pointers in the array
 // at owner+0x00 must point at an object whose byte +0x34 has bit 0 set. Empty counts pass. A null
 // owner is fatal 0x3EF in retail; we return 0 (as for a null array or element).
@@ -160,7 +160,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3be90(uint32_t pOwner)
 	return 1;
 }
 
-// 1.13c D2Common+0x5F1C0: formats a unit description into pBuffer from an explicit unit type and
+// 1.13c D2Common+0x5f1c0: formats a unit description into pBuffer from an explicit unit type and
 // class id (the buffer's first byte is cleared). Types 0, 1, 2 and 4 dispatch to 0x5E4D0, 0x5E480,
 // 0x5D800 and 0x5E410, type 3 writes "missile %d", and any other type writes "Invalid Unit Type".
 // Returns pBuffer.
@@ -168,6 +168,7 @@ extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_5f1c0(uint32_t nUnitType, int32_t nClassId,
                                                    uint32_t pBuffer)
 {
+	nClassId = static_cast<int16_t>(nClassId); // retail param is a short, sign-extended
 	uint8_t* buf = P(pBuffer);
 	if (!buf)
 		return pBuffer;

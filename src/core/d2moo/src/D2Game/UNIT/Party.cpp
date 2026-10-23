@@ -32,6 +32,7 @@ void __fastcall PARTY_AllocPartyControl(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FCB9BA0
+// 1.13c D2Game+0x9BD90
 void __fastcall PARTY_FreePartyControl(D2GameStrc* pGame)
 {
     D2_ASSERT(pGame);

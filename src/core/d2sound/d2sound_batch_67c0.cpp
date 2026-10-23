@@ -623,3 +623,42 @@ void D2Sound_8200(const uint8_t* name, const D2SoundEnvB* e, uint32_t (*after6F3
     }
     LeaveCriticalSection(&g_initLock);
 }
+
+// 1.13c D2sound+0x072D0
+// Stream refill. Retail takes the stream in EBX and (pos, lockOffset, bytes) on the stack. Locks
+// `bytes` of the buffer object (+0x00, method +0x2C), copies from data(+0x14) at `pos` wrapping at
+// +0x18 back to +0x44, zero-pads a non-looping tail up to the +0x30 limit, unlocks (+0x4C).
+uint32_t D2Sound_72D0(void* s, uint32_t pos, uint32_t lockOff, uint32_t bytes) {
+    if (!s || !rd32(s, 0) || !rd32(s, 0x14) || !bytes) d2sound_fatal(0xDD);
+    EnterCriticalSection(&g_lock);
+    void* iface = rdptr(s, 0);
+    void** vt = *(void***)iface;
+    uint8_t* dst = nullptr;
+    uint32_t got = bytes;
+    if (((int32_t (*)(void*, uint32_t, uint32_t, void*, void*, uint32_t, uint32_t, uint32_t))vt[0x2C / 4])(
+            iface, lockOff, bytes, &dst, &got, 0, 0, 0) < 0) {
+        LeaveCriticalSection(&g_lock);
+        return 0;
+    }
+    uint8_t* d = dst;
+    uint32_t n = bytes, written = 0;
+    for (;;) {
+        uint32_t end = rd32(s, 0x18);
+        if (end <= pos) { uint32_t b = rd32(s, 0x44); pos = (pos - b) % (end - b) + b; }
+        uint32_t c = (int32_t)n < (int32_t)(end - pos) ? n : end - pos;
+        std::memcpy(d, (const uint8_t*)rdptr(s, 0x14) + pos, c);
+        d += c; wr32(s, 0x24, rd32(s, 0x24) + c); n -= c; written += c; pos += c;
+        if (rd32(s, 0x40) == 0) break;
+        if (n == 0) goto done;
+    }
+    if (n) {
+        uint32_t lim = rd32(s, 0x30);
+        if (lim != 0xFFFFFFFFu) { if (lim <= written) goto done; n = lim - written; }
+        std::memset(d, 0, n);
+    }
+done:
+    ((int32_t (*)(void*, void*, uint32_t, void*, uint32_t))vt[0x4C / 4])(iface, dst, got, nullptr, 0);
+    if (rd32(s, 0x40) == 0 && rd32(s, 0x18) <= rd32(s, 0x24)) wr32(s, 0x2C, 1);
+    LeaveCriticalSection(&g_lock);
+    return 1;
+}

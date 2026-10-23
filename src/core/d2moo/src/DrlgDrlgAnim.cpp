@@ -100,6 +100,29 @@ static int AnimationFrameIntegerToFixedPoint(int nIntegerPart)
 	return nIntegerPart << 8;
 }
 
+// 1.13c D2Common+0x12DC0: the per-room body of the loop below (room in EAX); runs only when the room
+// has the animated-floor flag and a tile grid. Same steps as the loop body.
+void __fastcall DRLGANIM_AnimateRoomTiles_12DC0(D2DrlgRoomStrc* pCurrentRoomEx)
+{
+	if (pCurrentRoomEx->dwFlags & DRLGROOMFLAG_ANIMATED_FLOOR && pCurrentRoomEx->pTileGrid)
+	{
+		for (D2DrlgAnimTileGridStrc* j = pCurrentRoomEx->pTileGrid->pAnimTiles; j; j = j->pNext)
+		{
+			D2DrlgTileDataStrc* pTileData = j->ppMapTileData[AnimationFrameFixedPointToInteger(j->nCurrentFrame)];
+			if (pTileData)
+			{
+				pTileData->dwFlags |= MAPTILE_HIDDEN;
+			}
+			j->nCurrentFrame = (j->nCurrentFrame + j->nAnimationSpeed) % AnimationFrameIntegerToFixedPoint(j->nFrames);
+			pTileData = j->ppMapTileData[AnimationFrameFixedPointToInteger(j->nCurrentFrame)];
+			if (pTileData)
+			{
+				pTileData->dwFlags &= ~MAPTILE_HIDDEN;
+			}
+		}
+	}
+}
+
 //D2Common.0x6FD756B0
 void __fastcall DRLGANIM_AnimateTiles(D2DrlgRoomStrc* pDrlgRoom)
 {

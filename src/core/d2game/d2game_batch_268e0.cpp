@@ -126,7 +126,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_74E60(uint32_t param1, void* param2,
 // 0x1320 for a record and answer the mask bit (in_EAX & 7) of byte record+0x104+(in_EAX >> 3).
 // 1.13c D2Game+0x74F20
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_74F20(uint32_t param1, uint32_t eaxValue,
+EMSCRIPTEN_KEEPALIVE uint32_t D2GAME_ClassStateProbe(uint32_t param1, uint32_t eaxValue,
                                                  const D2GameBatch268E0Env* env)
 {
     if (param1 != 0 && (int32_t)eaxValue < 0x10) {
@@ -150,7 +150,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_74F20(uint32_t param1, uint32_t eaxVa
 // returned. EDI and the two stack values are explicit here.
 // 1.13c D2Game+0x750F0
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_750F0(uint32_t param1, int32_t edi, void* ctx,
+EMSCRIPTEN_KEEPALIVE uint32_t D2GAME_750F0_GuardedEntry(uint32_t param1, int32_t edi, void* ctx,
                                                  const D2GameBatch268E0Env* env)
 {
     env->ordinal11103();
@@ -167,7 +167,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_750F0(uint32_t param1, int32_t edi, v
 // The value arrives in EAX.
 // 1.13c D2Game+0x75260
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_75260(void* param1, int32_t eaxValue,
+EMSCRIPTEN_KEEPALIVE void UNIT_SetModeFromRecord_75260(void* param1, int32_t eaxValue,
                                              const D2GameBatch268E0Env* env)
 {
     (void)env;

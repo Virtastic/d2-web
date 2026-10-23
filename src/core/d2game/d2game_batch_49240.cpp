@@ -49,9 +49,9 @@ struct D2GameBatchB31Env {
     void     (*sendPacket)(const void* packet, uint32_t length);
 };
 
-// 1.13c D2Game+0x49240
+// 1.13c D2Game+0x49240 (file:function d2game_batch_49240.cpp:D2Game_GetClientUpdateRecord)
 extern "C"
-EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_49240(void* client)
+EMSCRIPTEN_KEEPALIVE void* D2Game_GetClientUpdateRecord(void* client)
 {
     // FUN_6fc69240: the per-client update record used by 0xCC030. The client arrives in EAX; NULL is
     // the 0xCFC fatal through Ordinal_10265/Ordinal_10024. The record lives at client+0x48C.
@@ -61,7 +61,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_49240(void* client)
 
 // 1.13c D2Game+0x8BDA0
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8BDA0(uint32_t context, uint32_t value, uint32_t previous,
+EMSCRIPTEN_KEEPALIVE void D2GAME_PACKETS_SendPacket0x1A_B_C_6FC3D410(uint32_t context, uint32_t value, uint32_t previous,
                                              const D2GameBatchB31Env* env)
 {
     // FUN_6fcabda0: send one changed stat as a delta frame when the delta is non-negative and fits in
@@ -88,9 +88,9 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8BDA0(uint32_t context, uint32_t value, u
     env->sendPacket(packet, 5);                                // 0x8A3E0
 }
 
-// 1.13c D2Game+0x8BE10
+// 1.13c D2Game+0x8BE10 (d2game_batch_49240.cpp:d2game_send_stat_change)
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8BE10(uint32_t context, uint32_t value, uint32_t previous,
+EMSCRIPTEN_KEEPALIVE void d2game_send_stat_change(uint32_t context, uint32_t value, uint32_t previous,
                                              const D2GameBatchB31Env* env)
 {
     // FUN_6fcabe10: send one changed stat as an increase frame when the increase is positive and
@@ -128,7 +128,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8BE10(uint32_t context, uint32_t value, u
 
 // 1.13c D2Game+0x8B750
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8B750(const D2GameBatchB31Env* env)
+EMSCRIPTEN_KEEPALIVE void d2game_send_update_96(const D2GameBatchB31Env* env)
 {
     // FUN_6fcab750: build and send the 0x96 client-update packet. Writer state is Ghidra's
     // local_14[4]+uStack_10, the packet bytes local_20[4]+uStack_18 (ten bytes); the writer is
@@ -174,7 +174,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8B7F0(const D2GameBatchB31Env* env)
 
 // 1.13c D2Game+0x8B8C0
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8B8C0(const D2GameBatchB31Env* env)
+EMSCRIPTEN_KEEPALIVE void GAME_SendUpdate18_8B8C0(const D2GameBatchB31Env* env)
 {
     // FUN_6fcab8c0: build and send the 0x18 client-update packet. Writer state is local_24[4]+
     // uStack_28, the packet bytes local_14[4]+uStack_10; auStack_20[4]+uStack_18 is written first

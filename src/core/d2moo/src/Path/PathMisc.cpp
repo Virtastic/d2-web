@@ -1245,6 +1245,7 @@ void sub_6FD5CEB0(D2DynamicPathStrc* pDynamicPath, int nBaseVelocity)
 
 //1.10f: Inlined
 //1.13c: D2Common.0x6FD5DB70
+// 1.13c D2Common+0xDB70
 BOOL sub_6FD5DB70(D2DynamicPathStrc* pDynamicPath)
 {
 	if ((pDynamicPath->dwPathType == PATHTYPE_MON_CIRCLE_CW || pDynamicPath->dwPathType == PATHTYPE_MON_CIRCLE_CCW)
@@ -1278,25 +1279,25 @@ BOOL sub_6FD5DB70(D2DynamicPathStrc* pDynamicPath)
 	D2PathPointStrc a3;
 	sub_6FDAB940(&a3, pDynamicPath);
 
-	if (pTargetUnit)
+	// 1.13c delta: a target that is not player/monster skips the replan and takes the
+	// "arrived but off final target" test below, same as a close player/monster target.
+	if (pTargetUnit->dwUnitType == UNIT_PLAYER || pTargetUnit->dwUnitType == UNIT_MONSTER)
 	{
-		if (pTargetUnit->dwUnitType == UNIT_PLAYER || pTargetUnit->dwUnitType == UNIT_MONSTER)
+		if (std::abs(pDynamicPath->tPrevTargetCoord.X - a3.X) > 5 || std::abs(pDynamicPath->tPrevTargetCoord.Y - a3.Y) > 5)
 		{
-			const int nAbsDiffX = std::abs(pDynamicPath->tPrevTargetCoord.X - a3.X);
-			const int nAbsDiffY = std::abs(pDynamicPath->tPrevTargetCoord.Y - a3.Y);
-			if (nAbsDiffX <= 5 && nAbsDiffY <= 5)
-			{
-				if (pDynamicPath->dwCurrentPointIdx < pDynamicPath->dwPathPoints
-					|| pDynamicPath->tFinalTargetCoord == pDynamicPath->tGameCoords.ToPathPoint() )
-				{
-					return TRUE;
-				}
-			}
+			const int result = D2Common_10236(pDynamicPath->pUnit, TRUE);
+			d2::path::PATH_RecordContinuationReplan(pDynamicPath->pUnit, TRUE, result);
+			return result;
 		}
 	}
-	const int result = D2Common_10236(pDynamicPath->pUnit, TRUE);
-	d2::path::PATH_RecordContinuationReplan(pDynamicPath->pUnit, TRUE, result);
-	return result;
+	if (pDynamicPath->dwCurrentPointIdx >= pDynamicPath->dwPathPoints
+		&& pDynamicPath->tFinalTargetCoord != pDynamicPath->tGameCoords.ToPathPoint())
+	{
+		const int result = D2Common_10236(pDynamicPath->pUnit, TRUE);
+		d2::path::PATH_RecordContinuationReplan(pDynamicPath->pUnit, TRUE, result);
+		return result;
+	}
+	return TRUE;
 }
 
 //1.00:  D2Common.0x1005EEB0 (#10223)
@@ -1372,6 +1373,7 @@ BOOL __stdcall D2Common_10226(D2UnitStrc* pUnit, signed int a2)
 }
 
 //D2Common.0x6FDAD530 (#10227)
+// 1.13c D2Common+0x0D3D0
 //TODO: Find a name
 BOOL __stdcall D2Common_10227(D2UnitStrc* pUnit)
 {

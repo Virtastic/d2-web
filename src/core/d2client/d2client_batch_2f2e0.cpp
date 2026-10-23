@@ -223,4 +223,10 @@ uint32_t sub_30270(const Host& h, Address esiBuf, uint32_t p1, Address p2) {
     }
     return 1;
 }
+
+// 1.13c D2Client+0x2FD10 (28 B): skill-desc record (0x17F0) -> u16 at +8+idx*2, or 0x1506 when none.
+uint16_t sub_2FD10(const Host& h, int32_t idx) {
+    Address rec = static_cast<Address>(h.call(0x17F0));
+    return rec ? h.read<uint16_t>(rec + 8 + idx * 2) : 0x1506;
+}
 } // namespace d2client_batch_2f2e0

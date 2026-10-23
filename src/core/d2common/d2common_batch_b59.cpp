@@ -92,6 +92,7 @@ struct D2Common39B30Env
 	int32_t (*has_item)(uint32_t pInventory, int32_t nItemId16);					//0x00 0x39530
 };
 
+// 1.13c D2Common+0x39b30
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_39b30(uint32_t pUnit, int32_t nItemId,
                                                   const D2Common39B30Env* pEnv)
@@ -106,7 +107,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_39b30(uint32_t pUnit, int32_t nItemI
 	return pEnv->has_item(pInventory, static_cast<int32_t>(static_cast<uint32_t>(nItemId) << 16));
 }
 
-// 1.13c D2Common+0x4E5E0 (#10832): skills.txt row nSkillId -> its combined value at nLevel, the
+// 1.13c D2Common+0x4e5e0 (#10832): skills.txt row nSkillId -> its combined value at nLevel, the
 // same interpolation as D2Common_11033 over dwParam[4] (0x158) and dwParam[5] (0x15C). A bad id
 // or a non-positive level yields 0.
 extern "C"
@@ -120,7 +121,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_4e5e0(int32_t nLevel, int32_t nSkill
 	return D2Common_11033(nLevel, pTxt->dwParam[4], pTxt->dwParam[5]);
 }
 
-// 1.13c D2Common+0x2F8A0 (#10835): items.txt nBelt (+0x130) for an item unit's class id
+// 1.13c D2Common+0x2f8a0 (#10835): items.txt nBelt (+0x130) for an item unit's class id
 // (unit type 4, class id at +0x04). Retail treats a non-item unit or a bad class id as a fatal
 // error; those paths answer 0 here.
 extern "C"

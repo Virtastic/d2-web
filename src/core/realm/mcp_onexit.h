@@ -7,6 +7,7 @@ struct D2McpOnexitLkEnv {
     void** (*realloc)(void**, uint32_t);
     void** onexit_begin; // retail +0x125D0
     void** onexit_end;   // retail +0x125CC
+    uint32_t slot = sizeof(void*); // table entry bytes: 4 replays retail's 32-bit table (checked against retail), else native
 };
 extern D2McpOnexitLkEnv g_mcp_onexit;
 extern "C" void* d2_mcp_onexit_lk(void* func, D2McpOnexitLkEnv* env);

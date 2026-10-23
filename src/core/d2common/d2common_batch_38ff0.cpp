@@ -8,7 +8,7 @@ W int32_t sub_38B00(intptr_t);   // 0x38B00
 W int32_t sub_38A80(intptr_t);   // 0x38A80
 W uint8_t* sgptDataTables;
 
-// 1.13c D2Common+0x38FF0: stat-table record 0x49 base gate; needs param_1->+0x5C set.
+// 1.13c D2Common+0x38ff0: stat-table record 0x49 base gate; needs param_1->+0x5C set.
 EMSCRIPTEN_KEEPALIVE int32_t sub_38FF0(int32_t param_1) {
  if (param_1 == 0 || *(int32_t*)(sgptDataTables + 0xbd4) <= 0x49) return 0;
  const intptr_t rec = *(int32_t*)(sgptDataTables + 0xbcc) + 0x5c64;

@@ -35,7 +35,7 @@ static inline void     wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint
 // Defined in src/core/d2game/d2game_batch_3e70.cpp (0x3F76 __unlock(lockNum)).
 extern "C" void d2_fn_d2game_3f76(int32_t lockNum);
 // Defined below (0x7DE3); 0x4EEA initialises the stream section through it.
-extern "C" int32_t d2_fn_d2game_7de3(void* cs, uint32_t spin, const struct D2GameCrtInitCritSecEnv* env);
+extern "C" int32_t d2game_crt_init_crit_sec_and_spin_count(void* cs, uint32_t spin, const struct D2GameCrtInitCritSecEnv* env);
 
 // CRT lock number for __lock/__unlock; the compat critical sections are no-ops (d2game_batch_3261.cpp).
 static void d2game_crt_lock(uint32_t lockNum) { (void)lockNum; }
@@ -95,7 +95,7 @@ struct D2GameBatchEbd10Env {
 // 1.13c D2Game+0x49AB0
 // unit arrived in EAX. A null unit is a Fog assertion (id 0x98B); otherwise the dword at +0x488.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_49ab0(void* unit) {
+EMSCRIPTEN_KEEPALIVE uint32_t D2GAME_GetClientCreateTime(void* unit) {
     if (unit == nullptr) d2game_fatal(0x98B);
     return rd32(unit, 0x488);
 }
@@ -115,7 +115,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2game_49bf0(void* unit) {
 // stream) and 0x6FD1F598, both unsigned and inclusive; the 0x1C+8 offset vanishes under the >>5 because
 // the streams sit on 0x20 boundaries.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_4cab(void* stream) {
+EMSCRIPTEN_KEEPALIVE void D2Game_CrtUnlockFile(void* stream) {
     const uintptr_t p = (uintptr_t)stream;
     if (p >= 0x6FD1F338u && p <= 0x6FD1F598u) {
         d2_fn_d2game_3f76((int32_t)((p - 0x6FD1F338u) >> 5) + 0x10);
@@ -124,12 +124,12 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_4cab(void* stream) {
     LeaveCriticalSection((LPCRITICAL_SECTION)((uint8_t*)stream + 0x20));
 }
 
-// 1.13c D2Game+0x4CFD (__openfile): parse the first mode letter into the MSVC open flags, then
+// 1.13c D2Game+0x04CFD (__openfile): parse the first mode letter into the MSVC open flags, then
 // __sopen(name, flags, share, 0x1A4). Host model (d2game_batch_28ee.cpp): the CRT FILE is the host
 // stdio stream, so the flags drive the host fopen and the free slot `file` is unused; the open-stream
 // counter at 0x6FD2FEE8 has no host reader. NULL is the failure result.
 extern "C"
-EMSCRIPTEN_KEEPALIVE FILE* d2_fn_d2game_4cfd(const char* filename, const char* mode, int32_t shareFlag,
+EMSCRIPTEN_KEEPALIVE FILE* d2game_openfile(const char* filename, const char* mode, int32_t shareFlag,
                                             FILE* file) {
     (void)shareFlag;
     (void)file;
@@ -172,7 +172,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_4eea(const D2GameCrtStreamEnv* env) {
             stream = (uint8_t*)std::malloc(0x38);
             g_crtStreams[i] = stream;
             if (stream == nullptr) break;
-            if (d2_fn_d2game_7de3(stream + 0x20, 4000, e.initEnv) == 0) {
+            if (d2game_crt_init_crit_sec_and_spin_count(stream + 0x20, 4000, e.initEnv) == 0) {
                 std::free(stream);
                 g_crtStreams[i] = nullptr;
                 break;
@@ -332,7 +332,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_5380(void* dst, const void* src, uint32_
 // a full write clears the read bit when _flag is negative. The buffer is then emptied. Host stdio owns
 // those counters and flags and reports the same 0/-1 result, so std::fflush is the whole rule.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_5924(FILE* stream) {
+EMSCRIPTEN_KEEPALIVE int32_t D2Game_CrtFlush(FILE* stream) {
     return (int32_t)std::fflush(stream);
 }
 
@@ -341,7 +341,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_5924(FILE* stream) {
 // __close_lk; either way _unlock_fhandle runs. A bad handle sets errno 9 and doserrno 0 and returns -1.
 // ioinfo records are 0x24 bytes in 32 blocks of 32 (d2game_crt_write.cpp).
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_5b81(int32_t fileHandle, const D2GameCrtCloseEnv* env) {
+EMSCRIPTEN_KEEPALIVE int32_t D2Game_CrtClose(int32_t fileHandle, const D2GameCrtCloseEnv* env) {
     const uint32_t fd = (uint32_t)fileHandle;
     if (fd < env->nhandle) {
         uint8_t* osfile = env->pioinfo[fd >> 5] + 4 + (fd & 0x1f) * 0x24;
@@ -363,12 +363,12 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_5b81(int32_t fileHandle, const D2GameC
     return -1;
 }
 
-// 1.13c D2Game+0x5C1C (__freebuf): a stream with (_flag & 0x83) and _IOFBF-ish bit 8 frees _base and
+// 1.13c D2Game+0x5C1C (__freebuf) d2game_batch_7de3.cpp:d2game_freebuf -- a stream with (_flag & 0x83) and _IOFBF-ish bit 8 frees _base and
 // clears 0x408 in the flag word and the three buffer fields. In the host model (d2game_batch_3261.cpp)
 // the FILE is the glibc stream: its buffer belongs to glibc and is released by fclose, so there is no
 // host buffer to free and no host field to reset -- the function has no observable effect.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_5c1c(FILE* stream) {
+EMSCRIPTEN_KEEPALIVE void d2game_freebuf(FILE* stream) {
     (void)stream;
 }
 
@@ -396,7 +396,7 @@ static int32_t d2game_init_crit_sec_spin_fallback(void* cs, uint32_t spin) {
 // when the lookup fails; then call the slot with (cs, spin). The result is the API's BOOL, which the
 // 0x4EEA caller tests against 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_7de3(void* cs, uint32_t spin,
+EMSCRIPTEN_KEEPALIVE int32_t d2game_crt_init_crit_sec_and_spin_count(void* cs, uint32_t spin,
                                                const D2GameCrtInitCritSecEnv* env) {
     static const D2GameCrtInitCritSecEnv kNoEnv = {};
     const D2GameCrtInitCritSecEnv& e = env ? *env : kNoEnv;
@@ -420,12 +420,12 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_7de3(void* cs, uint32_t spin,
 }
 
 // ---- inventory item-id lookup --------------------------------------------------------------------
-// 1.13c D2Game+0xEBD10: the 1-based index of the inventory item whose unit id (+0x0C) is `itemId`.
+// 1.13c D2Game+0xEBD10 (sub_EBD10): the 1-based index of the inventory item whose unit id (+0x0C) is `itemId`.
 // Both arguments are stack dwords (unit, itemId). -1, a null inventory or an absent id give 0; the walk
 // counts every chain node, using -1 for a node that INVENTORY_UnitIsItem rejects. Index 0x7FFF and
 // above is a Fog assertion (id 0x185). Only the low 16 bits are the result.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint16_t d2_fn_d2game_ebd10(void* unit, int32_t itemId,
+EMSCRIPTEN_KEEPALIVE uint16_t D2GAME_FindInventoryItemIndex(void* unit, int32_t itemId,
                                                  const D2GameBatchEbd10Env* env) {
     if (itemId == -1) return 0;
     void* pInventory = unit != nullptr ? (void*)(uintptr_t)rd32(unit, 0x60) : nullptr;

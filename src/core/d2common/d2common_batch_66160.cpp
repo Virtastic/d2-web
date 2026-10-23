@@ -18,7 +18,7 @@ W void d2_fn_d2common_5d570(void* a);
 W void d2_fn_d2common_6c3a0(void* a);
 W void d2_fn_d2common_6fba0(void* a, int32_t b, int32_t c);
 void d2_fn_d2common_6ccf0(HD2ARCHIVE a);
-W void* d2_fn_d2common_9900(void* a, void* b);
+void* D2ReadFile(void*, const char* filename, uint32_t* size);
 W void d2_fn_d2common_7e4f0(void* a);
 W void Ordinal_10046(const char* file, int32_t line, int32_t z);
 W void Ordinal_10212(uint32_t p);
@@ -79,8 +79,8 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_66160(HD2ARCHIVE h, int32_t p2, int32_t
  DATATBLS_LoadObjGroupTxt(h);
  DATATBLS_LoadShrinesTxt(h);
  DATATBLS_LoadInventoryTxt(h);
- uint32_t tmp[1]; // retail builds "DATA\\GLOBAL\\expfield.d2" via wsprintfA; the path is consumed implicitly by 9900
- d2_fn_d2common_7e4f0(d2_fn_d2common_9900(a, tmp));
+ uint32_t sz;
+ d2_fn_d2common_7e4f0(D2ReadFile(a, "DATA\\GLOBAL\\expfield.d2", &sz)); // retail: wsprintfA("%s\\expfield.d2")
  DATATBLS_LoadBeltsTxt(h);
  DATATBLS_LoadMonItemPercentTxt(h);
  DATATBLS_LoadCubeMainTxt(h);

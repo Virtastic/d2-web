@@ -29,12 +29,12 @@ struct D2GameBatch53470Env {
                              int32_t bSaveItemInv, int32_t bGamble);
 };
 
-// 1.13c D2Game+0x53470
+// 1.13c D2Game+0x53470 ITEMS_SerializeItemChecked
 // EAX = pItem, stack = pBuffer, EDX = nSize. A null item, or an item whose dword at +0xC8 has bit
 // 0xF set, serializes as zero bytes. Otherwise the item is written through D2Common #10987 with the
 // flags (1, 1, 0) and its byte count returned; a zero-byte result is fatal (Fog 0x75A).
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_53470(void* pItem, void* pBuffer, uint32_t nSize,
+EMSCRIPTEN_KEEPALIVE int32_t ITEMS_SerializeItemChecked(void* pItem, void* pBuffer, uint32_t nSize,
                                                 const D2GameBatch53470Env* env)
 {
     if (pItem == nullptr || ((rd32(pItem, 0xC8) >> 0xF) & 1) != 0) return 0;

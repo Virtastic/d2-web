@@ -183,6 +183,7 @@ void __fastcall MONSTERAI_SendMercStats(D2GameStrc* pGame, D2UnitStrc* pPlayer, 
 }
 
 //D2Game.0x6FC61610
+// 1.13c D2Game+0x48ba0
 void __fastcall MONSTERAI_UpdateMercStatsAndSkills(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pMerc, int32_t nLevel)
 {
     D2_ASSERT(pGame);
@@ -360,6 +361,7 @@ int32_t __fastcall MONSTERAI_IsInteractingWith(D2MonsterInteractStrc* pMonIntera
 }
 
 //D2Game.0x6FC61A50
+// 1.13c D2Game+0x48300
 void __fastcall MONSTERAI_RemoveInteractInfoFor(D2GameStrc* pGame, D2UnitStrc* pMonster, D2MonsterInteractStrc* pMonInteract)
 {
     if (!pMonInteract)

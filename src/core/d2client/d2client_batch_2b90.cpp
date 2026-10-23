@@ -3,11 +3,11 @@
 #include <cstdint>
 #include <emscripten.h>
 
-// 1.13c D2Client+0x2B90 (78 B): initialise an intrusive-list head at self+4. Stores *src at self[0],
+// 1.13c D2Client+0x02B90 (78 B): initialise an intrusive-list head at self+4. Stores *src at self[0],
 // zeroes the head, then publishes it as self-referential and empty: successor at self[1] points at
 // the head itself and the encoded predecessor at self[2] is ~(address of the head). Caller 0x2B40.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2client_2b90(void* self, const uint32_t* src) {
+EMSCRIPTEN_KEEPALIVE void d2_client_list_head_init(void* self, const uint32_t* src) {
     uint32_t* obj = (uint32_t*)self;
     uint32_t head = (uint32_t)(uintptr_t)self + 4;
     obj[1] = 0;

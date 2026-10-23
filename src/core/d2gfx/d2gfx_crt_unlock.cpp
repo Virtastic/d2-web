@@ -28,7 +28,8 @@ extern "C" void d2gfx_mtdeletelocks(void) {
     }
 }
 
-static void d2gfx_unlock(uint32_t idx) { LeaveCriticalSection((LPCRITICAL_SECTION)(uintptr_t)g_lock_table[idx * 2]); }
+extern "C" void (*d2gfx_unlock_probe)(uint32_t) = nullptr;   // FN-replay seam: logs the lock index
+static void d2gfx_unlock(uint32_t idx) { if (d2gfx_unlock_probe) { d2gfx_unlock_probe(idx); return; } LeaveCriticalSection((LPCRITICAL_SECTION)(uintptr_t)g_lock_table[idx * 2]); }
 
 extern "C"
 // 1.13c D2Gfx+0x2C27

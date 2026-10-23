@@ -36,7 +36,7 @@ struct D2ClientBatch1510Env {
 // 0x2050 is another row of this batch (declared here because 0x1FB0 calls it).
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_2050(void* obj, const D2ClientBatch1510Env* env);
 
-// 1.13c D2Client+0x01510: EAX = monster class, EDX = bit. Reads MonStatsTxt[class].wMonStatsEx (+0x18,
+// 1.13c D2Client+0x01510 (d2client_batch_1510.cpp:d2_client_1510): EAX = monster class, EDX = bit. Reads MonStatsTxt[class].wMonStatsEx (+0x18,
 // signed), range-checks it against the monstats2 count, then returns bit `bit` of the byte at record+4
 // (MonStats2Txt nFlags/dwFlags). ECX (the decompile's param_1) is never read. Any failed check -> 0.
 extern "C"
@@ -61,7 +61,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_1510_pin(uint32_t monStats, int32_t monStats
     g_mon2_1510 = monStats2; g_mon2Count1510 = monStats2Count;
 }
 
-// 1.13c D2Client+0x01C10: identical lookup to 0x1510 against the byte at record+0xF0
+// 1.13c D2Client+0x01C10 d2client_batch_1510.cpp:d2_client_1c10 -- identical lookup to 0x1510 against the byte at record+0xF0
 // (MonStats2Txt nModeFlags/dwModeFlags). EAX = monster class, EDX = bit, ECX unused.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_client_1c10(int32_t nClass, uint32_t nBit) {
@@ -141,7 +141,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_1fb0(void* obj, const D2ClientBatch1510Env* 
     d2_client_2050(obj, env);
 }
 
-// 1.13c D2Client+0x02050: base destructor -- vtable slot 0xD60E0, 0x2360(this, 1), 0x2540(this), then
+// 1.13c D2Client+0x2050 (0x02050): base destructor -- vtable slot 0xD60E0, 0x2360(this, 1), 0x2540(this), then
 // tear down the member at this+4 through 0x2580.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_2050(void* obj, const D2ClientBatch1510Env* env) {

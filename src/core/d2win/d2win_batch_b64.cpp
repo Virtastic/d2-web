@@ -47,12 +47,13 @@ struct D2WinB64Env {
     void (*unicodeInit)(uint16_t*);                        // closure ctor
     void (*win2Unicode)(uint16_t*, const char*, int32_t);
     void (*sub_8920)(uint16_t*, int32_t, int32_t);
+    int32_t (*fog10117)(void);                             // Fog #10117 (result ignored by 0xA820)
 };
 extern D2WinB64Env g_d2winB64;
 #define E g_d2winB64
 
 // 1.13c D2Win+0x0F240
-uint32_t d2win_sub_F240(int32_t mode, const char* path) {
+uint32_t d2win_load_palette_pl2(int32_t mode, const char* path) {
     char a[260], b[260];
     if (mode == 0) {
         snprintf(a, sizeof a, "%s\\%s", "DATA\\GLOBAL", "palette\\act1\\pal.dat");
@@ -101,7 +102,7 @@ uint32_t d2win_sub_18060(void) {
     return 1;
 }
 
-// 1.13c D2Win+0x0E3C0 -- hidden EBP (cols, 16 bytes) and retaddr slot (tx, 16 chars) are leading params.
+// 1.13c D2Win+0xe3c0 -- hidden EBP (cols, 16 bytes) and retaddr slot (tx, 16 chars) are leading params.
 uint32_t* d2win_sub_E3C0(const uint8_t* cols, const char* tx) {
     uint32_t* w = (uint32_t*)E.alloc(0x234, 0);
     if (!w) { E.fatal(0xc66); return nullptr; }
@@ -201,7 +202,7 @@ void d2win_sub_E240(uint32_t* w, uint32_t p2, uint32_t p3, const uint8_t* cols, 
     if (E.fn_dff0() != 0) E.fn_c410(w, p3);
 }
 
-// 1.13c D2Win+0x0A250 -- __fastcall(ecx=p1, edx=p2); hidden EBX (r5) and retaddr slot (r6) lead.
+// 1.13c D2Win+0xa250 -- __fastcall(ecx=p1, edx=p2); hidden EBX (r5) and retaddr slot (r6) lead.
 uint32_t* d2win_sub_A250(uint32_t r5, uint32_t r6, uint32_t p1, uint32_t p2, uint32_t p3, const uint32_t* p4) {
     uint32_t* o = (uint32_t*)E.alloc(0x24, 0);
     for (int i = 0; i < 0x16; i++) o[i] = 0;
@@ -220,8 +221,9 @@ uint32_t* d2win_sub_A250(uint32_t r5, uint32_t r6, uint32_t p1, uint32_t p2, uin
     return o;
 }
 
-// 1.13c D2Win+0x0A820
+// 1.13c D2Win+0x0a820
 uint32_t d2win_sub_A820(int32_t expansion) {
+    if (E.fog10117) E.fog10117();
     if (expansion == 0) { *E.mpqVideo = E.openMpq("D2Win.DLL", "d2video.mpq", "D2VIDEO"); return *E.mpqVideo != nullptr; }
     *E.mpqExpansion = E.openMpq("D2Win.DLL", "d2Xvideo.mpq", "D2EXPANSION");
     return *E.mpqExpansion != nullptr;
@@ -233,13 +235,13 @@ void d2win_sub_B3A0(uint32_t* w, uint32_t v) {
     w[6] = v;
 }
 
-// 1.13c D2Win+0x0F6B0 -- __fastcall
+// 1.13c D2Win+0x0f6b0 -- __fastcall
 void d2win_sub_F6B0(int32_t* w, int32_t v) {
     if (w[0] != 6) { E.fatal(0xd6); return; }
     w[0x17] = v;
 }
 
-// 1.13c D2Win+0x08A50 -- __fastcall(ecx unused)
+// 1.13c D2Win+0x08a50 -- __fastcall(ecx unused)
 void d2win_sub_8A50(uint32_t /*ecx*/, const char* s, int32_t a, int32_t b) {
     uint16_t buf[0x400];
     for (auto& c : buf) E.unicodeInit(&c);

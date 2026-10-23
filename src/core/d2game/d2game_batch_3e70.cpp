@@ -143,7 +143,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_3f8b(int32_t lockNum, const D2GameBatc
 // 1.13c D2Game+0x3ED8 (__mtinitlocks): initialize the image's statically flagged CRT locks. Retail's
 // 0x24 records begin at 0x6FD1F210 and its 0x24 24-byte critical sections at 0x6FD2FD98. Each flagged
 // record receives the next section; a failed 0x7DE3 initializer clears that pointer and returns 0.
-extern "C" int32_t d2_fn_d2game_7de3(void* cs, uint32_t spin,
+extern "C" int32_t d2game_crt_init_crit_sec_and_spin_count(void* cs, uint32_t spin,
                                       const struct D2GameCrtInitCritSecEnv* env);
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_game_3ed8(void) {
@@ -153,7 +153,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_game_3ed8(void) {
         if (slot.staticFlag != 1) continue;
         slot.section = next;
         next += 0x18;
-        if (d2_fn_d2game_7de3(slot.section, 4000, nullptr) == 0) {
+        if (d2game_crt_init_crit_sec_and_spin_count(slot.section, 4000, nullptr) == 0) {
             slot.section = nullptr;
             return 0;
         }
@@ -182,7 +182,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3f21(void) {
     }
 }
 
-// 1.13c D2Game+0x3820 (__amsg_exit): print a runtime-error message for message id msg, then terminate
+// 1.13c D2Game+0x03820 (__amsg_exit): print a runtime-error message for message id msg, then terminate
 // with exit code 0xFF. The banner is printed only when __error_mode is 1, or 0 with __app_type 1; the
 // message writer is __NMSG_WRITE (0x69DC). Retail leaves through the app's __exit pointer; the model
 // takes the default target, _exit.
@@ -193,7 +193,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3820(int32_t msg, const D2GameBatch16Env*
     _exit(0xFF);
 }
 
-// 1.13c D2Game+0x4239 (__flsbuf): flush a character to a CRT stream. `ch` is the character to append.
+// 1.13c D2Game+0x04239 (__flsbuf): flush a character to a CRT stream. `ch` is the character to append.
 // The stream must be writable ((_flag & 0x82) != 0) and not string-backed (_flag & 0x40): otherwise the
 // error bit 0x20 is set and -1 returned. A read-mode stream is reset (_cnt = 0, and with _flag & 0x10
 // the pointer returns to the buffer base). Buffering: a non-buffered stream writes the character
@@ -203,7 +203,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3820(int32_t msg, const D2GameBatch16Env*
 // is the write returning exactly the expected length, and the character (masked to 8 bits) is returned;
 // otherwise the error bit is set and -1 returned.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_4239(int32_t ch, CrtFileStrc* f, const D2GameBatch16Env* env) {
+EMSCRIPTEN_KEEPALIVE int32_t D2Game_CrtFlsbuf(int32_t ch, CrtFileStrc* f, const D2GameBatch16Env* env) {
     uint32_t flag = (uint32_t)f->_flag;
     int32_t fd = f->_file;
     int32_t written = 0;

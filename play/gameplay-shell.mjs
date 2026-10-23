@@ -3,6 +3,7 @@ import { readSessionActiveNearFeed } from './assets/session-active-near-feed.mjs
 import { perfSync, perfEnabled, perfT0, perfT, perfSample, perfCountFrame, perfReset, perfReport } from './assets/frame-perf.mjs';
 import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, groundItemsUnderPointerAt, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, isPrimaryTargetEligible, nativeObjectHoverContains, nativeHoverSpecialGate, selectPointerCandidate, selectPrimaryTarget, viewportToWorld } from './gameplay-model.mjs';
 import { createMpqAssetReader } from './assets/mpq-assets.mjs';
+import { createAreaPrefetch } from './assets/area-prefetch.mjs';
 import { recordPrim } from './assets/drawlist.mjs';
 import { loadLiveLevelTerrain, loadRealmClientTerrain, actPalettePath } from './assets/live-level-terrain.mjs';
 import { decodeDatPalette } from './assets/d2-formats.mjs';
@@ -117,7 +118,7 @@ import { pagesToSss, sssToPages } from './assets/plugy-stash.mjs';
 import { plugyStashMode } from './assets/plugy-stash-mode.mjs';
 import { closeStashFromInventory } from './assets/stash-close.mjs';
 import { createFrontendPointerStates } from './assets/frontend-pointer-states.mjs';
-import { hoverLife, plateBoxes, paintHoverPlate } from './assets/hover-lifebar.mjs';
+import { hoverLife, plateBoxes, paintHoverPlate, groundLabelPlate } from './assets/hover-lifebar.mjs';
 import { weaponClassTokenForMode } from './assets/player-weapon-class.mjs';
 
 const canvas = document.querySelector('#game');
@@ -1901,7 +1902,7 @@ function readNpcState() {
     const all = Array.from({ length: Math.min(messageCount, 8) }, (_, i) => i)
       .sort((a, b) => view.getUint16(36 + 2 * a, true) - view.getUint16(36 + 2 * b, true));
     const zero = all.filter((i) => Module.HEAPU8[dialogPtr + 52 + i] === 0);
-    const plain = zero.length ? zero : all;   // a list of topics only is spoken as before (Drognan's ordered messages, s000b step 29)
+    const plain = zero;   // retail speaks only menu-0 messages on the click; a topics-only list (menu 2) waits for the Talk box, and speaking it here acked it and dropped it from Talk
     // A string id of 0 is a REAL message, so it cannot double as "nothing to say": retail's own 0x27
     // for Warriv is count 1, ids [0], menus [0], and
     // D2's ACT1Q0_Callback11_ScrollMessage acks "0 or 1" by design. With 0 read as silence the client
@@ -2605,6 +2606,8 @@ function update(forceTick = false) {
       } else if (command.type === COMMAND.INTERACT) {
         const previousAct = snapshot.act;
         let accepted = session.talkNearest();
+        // The key opens the same interaction a click does (speech, then the NPC's menu): the engine's nearest NPC is the dialog record's.
+        if (accepted) { const d = Number(Module.ccall('d2_session_npc_dialog', 'number', [], [])); if (d && talkToNpc(new DataView(Module.HEAPU8.buffer, d, 64).getUint32(16, true), true)) accepted = 1; }
         let nearest = null, distance = 7;
         for (const object of snapshot.objects) { const candidate = Math.max(Math.abs(object.x - snapshot.player.x), Math.abs(object.y - snapshot.player.y));
           if (candidate < distance || candidate === distance && (!nearest || object.id < nearest.id)) { nearest = object; distance = candidate; } }
@@ -3043,12 +3046,11 @@ function drawHoverLabel(c, target, projectUnit, projectStatic) {
   const label = target.label, width = labelFont.measure(label);
   const [worldX, foot] = projectStatic(target.x, target.y);
   const x = Math.round(worldX), y = Math.round(foot - 37);
-  const left = Math.round(x - width / 2 - 5), top = y - hoverFont.lineHeight - 5;
-  c.save(); c.fillStyle = 'rgba(0,0,0,.5)'; c.fillRect(left, top, width + 10, hoverFont.lineHeight + 10); c.restore();
-  if (hoverGlyphPainting) labelFont.draw(c, label, Math.round(x - width / 2), y - hoverFont.lineHeight,
-    (glyph) => glyphs.push(glyph));
+  const { box, textX, anchorY } = groundLabelPlate(x, y, width);
+  c.save(); c.fillStyle = 'rgba(0,0,0,.5)'; c.fillRect(box.x, box.y, box.width, box.height); c.restore();
+  if (hoverGlyphPainting) labelFont.drawAnchored(c, label, textX, anchorY, (glyph) => glyphs.push(glyph));
   return { ...target, requested: label, font, colour, glyphs,
-    x, y, box: { x: left, y: top, width: width + 10, height: hoverFont.lineHeight + 10 },
+    x, y, box,
     placement: target.kind === 'warp' ? 'above-area-entrance' : 'above-ground-drop' };
 }
 
@@ -3057,8 +3059,15 @@ function drawHoverLabel(c, target, projectUnit, projectStatic) {
 // the catacombs kept the town's tile set, and on first load the engine has not resolved a level
 // yet, so the file list came back empty and the map never appeared at all. Doing it here means any
 // route into a level -- fixture, waypoint, warp, act travel -- is covered by one rule.
+let areaPrefetch = null, areaPrefetchFrame = 0;
 function ensureTerrain() {
   if (!TERRAIN_ENABLED || !session) return;
+  // Warm the neighbouring levels' DT1 chunks in the background (assets/area-prefetch.mjs): once a second,
+  // and only where streamfs is a network source (window.StreamFS exists).
+  if (++areaPrefetchFrame % 25 === 1 && window.StreamFS?.warm && Module?.HEAPU8) {
+    areaPrefetch ??= createAreaPrefetch({ read: createMpqAssetReader(Module), StreamFS: window.StreamFS });
+    areaPrefetch(snapshot.level, (snapshot.warps || []).filter((w) => w.enabled).map((w) => w.destinationLevel));
+  }
   // A new LEVEL of the same act needs no new terrain object: its libraries and bitmaps are keyed by
   // the DT1's own file path (already decoded art is the same art), the level's file list is re-read
   // on every frame below, and the resolve cache is cleared by that list's signature. Only the ACT's
@@ -4387,9 +4396,9 @@ function dismissSpeech() {
   }
   return false;
 }
-function talkToNpc(npcId) {
+function talkToNpc(npcId, started) {
   try {
-    if (!Module.ccall('d2_session_command_npc', 'number', ['number'], [npcId])) return false;
+    if (!started && !Module.ccall('d2_session_command_npc', 'number', ['number'], [npcId])) return false;
     // Retail's client answers the interaction with the NPC's MENU (D2Client's own table,
     // play/assets/npc-menu.mjs); what happens next is the entry the player picks.
     const npc = snapshot.entities.find((u) => u.id === npcId && u.type === 1);
@@ -4814,6 +4823,26 @@ canvas.addEventListener('pointerdown', (e) => {
     click.spent = 'objectSpeech';
     render(); canvas.focus(); e.preventDefault(); return;
   }
+  // The NPC menu and hire window are modal (D2Client's menu handler table takes the press first): they sit before every HUD hit-test,
+  // which used to eat clicks that landed on a row drawn over the belt / mini-panel / panels.
+  if (npcMenu?.hireOpen && e.button === 0) {
+    click.spent = 'hireWindow';
+    const hit = npcMenu.hireAt(x, y, canvas.width, canvas.height);
+    if (hit) chooseHire(hit);
+    canvas.focus(); e.preventDefault(); return;
+  }
+  // D2Client's NPC menu arms on down and invokes a row callback on matching release.
+  // A click outside a selectable row is not the explicit Cancel row.
+  if (npcMenu?.open && (e.button === 0 || e.button === 2)) {
+    click.spent = 'npcMenu';
+    const menuState = npcMenu.state;
+    const accepted = !npcMenuInputCoolingDown({ nowTick: performance.now(), creationTick: menuState.openedAt });
+    if (accepted) npcMenu.hover(x, y);
+    // 1.13c FUN_6FB54860: a press that hits no row and lies outside the box (+-4) calls the menu's cancel callback at once.
+    if (accepted && !npcMenu.selectedEntry && npcMenu.outside(x, y)) { chooseNpcMenu({ action: 'cancel' }); render(); canvas.focus(); e.preventDefault(); return; }
+    npcMenuPointerPress = { pointerId: e.pointerId, button: e.button, menuState };
+    canvas.focus(); e.preventDefault(); return;
+  }
   if (screen === SCREEN.TITLE || screen === SCREEN.CREDITS || screen === SCREEN.CINEMATICS || screen === SCREEN.OTHER_MULTIPLAYER || screen === SCREEN.CREATE || screen === SCREEN.SELECT) {
     click.spent = `screen-${screen}`;
     if (screen === SCREEN.TITLE && titlePhase === 'menu') {
@@ -5006,22 +5035,6 @@ canvas.addEventListener('pointerdown', (e) => {
     if (hit?.action === 'tab') waypointMenu.act = hit.act;
     else if (hit?.action === 'close') takeWaypoint(0);
     else if (hit?.action === 'row' && hit.row.active) takeWaypoint(hit.row.levelId);
-    canvas.focus(); e.preventDefault(); return;
-  }
-  if (npcMenu?.hireOpen && e.button === 0) {
-    click.spent = 'hireWindow';
-    const hit = npcMenu.hireAt(x, y, canvas.width, canvas.height);
-    if (hit) chooseHire(hit);
-    canvas.focus(); e.preventDefault(); return;
-  }
-  // D2Client's NPC menu arms on down and invokes a row callback on matching release.
-  // A click outside a selectable row is not the explicit Cancel row.
-  if (npcMenu?.open && (e.button === 0 || e.button === 2)) {
-    click.spent = 'npcMenu';
-    const menuState = npcMenu.state;
-    const accepted = !npcMenuInputCoolingDown({ nowTick: performance.now(), creationTick: menuState.openedAt });
-    if (accepted) npcMenu.hover(x, y);
-    npcMenuPointerPress = { pointerId: e.pointerId, button: e.button, menuState };
     canvas.focus(); e.preventDefault(); return;
   }
   // An open shop: a tab switches the stock shown, an item in the grid is bought, and an item in the

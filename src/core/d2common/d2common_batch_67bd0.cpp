@@ -21,6 +21,13 @@
 bool D2Common_24D00_ItemIsBaseVariantNotQuest(uint32_t nItemId);
 // Implemented in d2common_batch_1fb80.cpp; called by 0x51C60.
 D2UnitStrc* D2Common_20320_GetLeftHandWeapon(D2InventoryStrc* pInventory);
+// Implemented in d2common_batch_33020.cpp / d2common_batch_0a090.cpp; called by 0x51C60.
+short D2Common_10213_ITEMS_GetStrengthBonus(D2UnitStrc* pItem);
+int16_t D2Common_22970_ItemDexBonus(D2UnitStrc* pUnit);
+extern "C" {
+__attribute__((weak)) intptr_t sub_1E1B0(const char* env);
+__attribute__((weak)) char DAT_6fded378[1];
+}
 
 namespace
 {
@@ -110,10 +117,13 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_d2common_12330(D2UnitStrc* pUnit, int32_t nX, i
 
 	for (int32_t i = 0; i < nCount; ++i)
 	{
-		D2UnitStrc* pCandidate = (D2UnitStrc*)(uintptr_t)pUnitArray[i];
-		if (!pCandidate || !Batch26_UnitInSearchBox(pCandidate, nX)) continue;
+		// element i is a room (not a unit): 0x121D0 tests its bounds, +0x74 heads its unit list
+		// and +0xE8 (dword 0x3A) links the units.
+		const uint8_t* pNear = (const uint8_t*)(uintptr_t)pUnitArray[i];
+		if (!pNear || !Batch26_UnitInSearchBox((D2UnitStrc*)pNear, nX)) continue;
 
-		for (D2UnitStrc* p = pCandidate; p; p = p->pRoomNext)
+		for (D2UnitStrc* p = *(D2UnitStrc* const*)(pNear + 0x74); p;
+		     p = *(D2UnitStrc* const*)((const uint8_t*)p + 0xE8))
 		{
 			const int32_t nDistance = (int32_t)UNITS_GetDistanceToCoordinates(p, nX, nY);
 			if (nDistance < nThreshold && nDistance < nBestDistance && pfnFilter() != 0)
@@ -198,9 +208,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_22f50(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x51C60 (#10323) item damage/speed contribution: adds the itemstatcost row 137
 // total to both accumulators, merges the left-hand weapon's stat list into the unit, then folds the
 // item's min/max damage, strength/dexterity percentages, stat 0x19 and stat 0x11 into the outputs.
-// partial: the inventory item block (0x1E1B0 needs its global inventory.txt environment, exactly
-// as noted in src/core/d2common/d2common_batch_663b0.cpp) and the stat ids passed into 0x38B70
-// (registers in retail) are not recovered; the fixed row-137 read uses stat id 137.
+// ApplyRatio's divisor (register in retail) is taken as 100, as at its other callers.
 namespace
 {
 	bool Batch26_ShouldMerge(D2UnitStrc* pItem)
@@ -269,8 +277,31 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_51c60(D2UnitStrc* pUnit, int32_t* pMinO
 		}
 	}
 
-	// The inventory item block (signature 0x01020304, grid through 0x1E1B0) is unreachable until
-	// the global inventory.txt environment is wired in; see the note in d2common_batch_663b0.cpp.
+	// Inventory item block: signature 0x01020304, table record from 0x1E1B0(&DAT_6fded378), item at
+	// (record+0xC)->+0x24.
+	if (*(uint32_t*)pInventory == 0x01020304 && sub_1E1B0 && sub_1E1B0(DAT_6fded378))
+	{
+		const intptr_t e = sub_1E1B0(DAT_6fded378);
+		D2UnitStrc* pEq = *(D2UnitStrc**)(*(intptr_t*)(e + 0xC) + 0x24);
+		const D2ItemsTxt* pTxt = (pEq && pEq->dwUnitType == UNIT_ITEM) ? DATATBLS_GetItemsTxtRecord(pEq->dwClassId) : nullptr;
+		if (pTxt)
+		{
+			int32_t nMin = pTxt->nMinDam + nBase;
+			int32_t nMax = pTxt->nMaxDam + nBase;
+			int32_t nPct = 0;
+			if (D2Common_10213_ITEMS_GetStrengthBonus(pEq))
+				nPct = DATATBLS_ApplyRatio(100, Batch26_GetTotalStat(pUnit, 0), 100);
+			if (D2Common_22970_ItemDexBonus(pEq))
+				nPct += DATATBLS_ApplyRatio(100, Batch26_GetTotalStat(pUnit, 2), 100);
+			nPct += Batch26_GetTotalStat(pUnit, 0x19);
+			if (nPct < -0x59) nPct = -0x5A;
+			const int32_t nStat11 = Batch26_GetTotalStat(pUnit, 0x11);
+			if (nMax <= nMin) nMax = nMin;
+			*pBonusOut += nStat11 + nPct;
+			*pMinOut += nMin;
+			*pMaxOut += nMax;
+		}
+	}
 
 	if (pLeft)
 	{
@@ -290,6 +321,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_4e0a0(uint8_t* pObject, uint32_t nValue
 // 1.13c D2Common+0x24BF0 (#10326) items.txt n2Handed (+0x11C) of an item unit; any other unit type
 // answers 0. The items row is reached through 0x22E70, whose stride is 0x1A8 and whose out-of-range
 // path is a fatal report in retail; we answer 0.
+// 1.13c D2Common+0x24BF0
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_24bf0(D2UnitStrc* pUnit)
 {
@@ -332,7 +364,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_1d760(D2UnitStrc* pUnit)
 // +0x08) into the caller's four dwords. A missing table or row is fatal in retail (0x79/0x7A/0x8F);
 // here a no-op.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_13340(int32_t nIndex, int32_t nHigherRes,
+EMSCRIPTEN_KEEPALIVE void d2common_GetGlobalBeltSlotPosition(int32_t nIndex, int32_t nHigherRes,
 	int32_t* pOut, int32_t nBoxId)
 {
 	static_assert(sizeof(D2BeltsTxt) == 0x108, "belts.txt record stride");

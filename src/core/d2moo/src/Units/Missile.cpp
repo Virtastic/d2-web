@@ -62,6 +62,7 @@ uint32_t __stdcall MISSILE_GetFlags(D2UnitStrc* pMissile)
 }
 
 //D2Common.0x6FDB9FE0 (#11118)
+// 1.13c D2Common+0x6a310
 void __stdcall MISSILE_SetFlags(D2UnitStrc* pMissile, uint32_t dwFlags)
 {
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
@@ -192,6 +193,7 @@ int __stdcall MISSILE_GetCurrentFrame(D2UnitStrc* pMissile)
 }
 
 //D2Common.0x6FDBA160 (#11125)
+// 1.13c D2Common+0x6a240
 int __stdcall MISSILE_GetRemainingFrames(D2UnitStrc* pMissile)
 {
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
@@ -203,6 +205,7 @@ int __stdcall MISSILE_GetRemainingFrames(D2UnitStrc* pMissile)
 }
 
 //D2Common.0x6FDBA190 (#11128)
+// 1.13c D2Common+0x6A220
 int __stdcall MISSILE_GetClassId(D2UnitStrc* pMissile)
 {
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE)
@@ -261,6 +264,7 @@ BOOL __stdcall MISSILE_CheckUnitIfOwner(D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 	return FALSE;
 }
 
+// 1.13c D2Common+0x6A110
 //D2Common.0x6FDBA2B0 (#11131)
 void __stdcall MISSILE_SetStreamMissile(D2UnitStrc* pMissile, uint16_t nStreamMissile)
 {
@@ -271,6 +275,7 @@ void __stdcall MISSILE_SetStreamMissile(D2UnitStrc* pMissile, uint16_t nStreamMi
 }
 
 //D2Common.0x6FDBA2D0 (#11132)
+// 1.13c D2Common+0x6a0e0
 int __stdcall MISSILE_GetStreamMissile(D2UnitStrc* pMissile)
 {
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
@@ -353,6 +358,7 @@ int __stdcall MISSILE_GetActivateFrame(D2UnitStrc* pMissile)
 }
 
 //D2Common.0x6FDBA3F0 (#11138)
+// 1.13c D2Common+0x6a010
 int __stdcall MISSILE_GetAnimSpeed(D2UnitStrc* pMissile)
 {
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE)
@@ -364,6 +370,7 @@ int __stdcall MISSILE_GetAnimSpeed(D2UnitStrc* pMissile)
 }
 
 //D2Common.0x6FDBA410 (#11139)
+// 1.13c D2Common+0x6A650
 void __stdcall MISSILE_SetAnimSpeed(D2UnitStrc* pMissile, int nAnimSpeed)
 {
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE)
@@ -439,6 +446,7 @@ void __stdcall MISSILE_SetTargetY(D2UnitStrc* pMissile, int nTargetY)
 }
 
 //D2Common.0x6FDBA4F0 (#11143)
+// 1.13c D2Common+0x69f50
 int __stdcall MISSILE_GetTargetY(D2UnitStrc* pMissile)
 {
 	if (pMissile && pMissile->dwUnitType == UNIT_MISSILE && pMissile->pMissileData)
@@ -449,6 +457,7 @@ int __stdcall MISSILE_GetTargetY(D2UnitStrc* pMissile)
 	return 0;
 }
 
+// 1.13c D2Common+0x69F10
 //D2Common.0x6FDBA510 (#11144)
 void __stdcall MISSILE_SetHomeType(D2UnitStrc* pMissile, D2UnitStrc* pTarget)
 {

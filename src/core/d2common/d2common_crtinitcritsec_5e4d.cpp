@@ -9,7 +9,7 @@ struct D2CommonCritInitEnv {
     void  (*noSpin)(void* cs, uint32_t spin);    // ___crtInitCritSecNoSpinCount@8 (0x5E3D)
 };
 
-// 1.13c D2Common+0x05E4D (103 B): resolve the init routine once (OS export unless flag==1, else the
+// 1.13c D2Common+0x5E4D (103 B): resolve the init routine once (OS export unless flag==1, else the
 // no-spin fallback), cache it, then call it with (cs, spin).
 extern "C" void D2Common_5E4D_CrtInitCritSecAndSpinCount(void* cs, uint32_t spin, const D2CommonCritInitEnv* env)
 {

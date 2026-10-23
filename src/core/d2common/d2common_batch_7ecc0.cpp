@@ -68,7 +68,7 @@ found:
 // Shared tail of 0x68CD0 / 0x68F00: apply the 'flags' word (unaff_EBX / param_5) to rec[5].
 static void ApplyFlags(int32_t* r, uint32_t f, uint32_t (*ord10051)(int32_t))
 {
-    if ((int8_t)f < 0) r[5] = 1;
+    if ((int8_t)f < 0) r[5] |= 1;
     if (f & 0x10000000) r[5] |= 0x102;
     if (f & 0x20000)    r[5] |= 0x40;
     if (f & 0x10000)    r[5] |= 0x80;

@@ -218,7 +218,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_game_4a0a0(uint32_t clientId, const D2GameBatch7En
 }
 
 // 1.13c D2Game+0x4A780
-// CLIENTS_UpdatePing(clientId, sentTick, delay): resolve the game and the client in it. With a game
+// CLIENTS_UpdatePing(clientId, sentTick, delay): (branches corrected against the decompile) resolve the game and the client in it. With a game
 // client and a ping count +0x500 below 10, fold this sample into the 64-bit moving average
 // (+0x4F8) as (count*avg + now - sentTick - delay) / (count+1); always send packet 0x8F and stamp
 // +0x3D8, then bump the count once more. Without a game client, under the client-list lock the
@@ -239,15 +239,16 @@ EMSCRIPTEN_KEEPALIVE void d2_game_4a780(uint32_t clientId, int32_t sentTick, int
                 if (rd32(c, 0x00) != clientId) continue;
                 const DWORD now = GetTickCount();
                 uint32_t count = rd32(c, 0x500);
-                if ((int32_t)count < 10) {
-                    const int64_t sum = (int64_t)count * (int64_t)rd64(c, 0x4F8) +
-                                        (int64_t)(int32_t)((now - (DWORD)sentTick) - (DWORD)delay);
-                    wr32(c, 0x500, count + 1);
-                    wr64(c, 0x4F8, (uint64_t)(sum / (int64_t)(count + 1)));
-                }
-                env->sendPacket8F(c);              // 0x8A730
+                wr32(c, 0x4B4 + 4 * (count & 0xF), (now - (DWORD)sentTick) - (DWORD)delay);
+                count += 1;
+                wr32(c, 0x500, count);
+                const uint32_t n = (int32_t)count > 0x10 ? 0x10 : count;
+                uint64_t sum = 0;
+                for (uint32_t i = 0; i < n; ++i) sum += rd32(c, 0x4B4 + 4 * i);
+                wr64(c, 0x4F8, sum / n);
+                uint8_t pkt[0x21] = { 0x8F };
+                env->queuePacket(c, pkt, 0x21);    // 0x8A3E0
                 wr32(c, 0x3D8, now);
-                wr32(c, 0x500, rd32(c, 0x500) + 1);
                 break;
             }
             if (rdptr(game, 0x18) == nullptr) d2game_fatal(0x100F);
@@ -262,17 +263,16 @@ EMSCRIPTEN_KEEPALIVE void d2_game_4a780(uint32_t clientId, int32_t sentTick, int
     for (void* c = g_clientList[clientId & 0xFF]; c != nullptr; c = rdptr(c, 0x4AC)) {
         if (rd32(c, 0x00) != clientId) continue;
         const DWORD now = GetTickCount();
-        const uint32_t delta = (now - (DWORD)sentTick) - (DWORD)delay;
-        uint32_t count = rd32(c, 0x500);
-        wr32(c, 0x4B4 + 4 * (count & 0xF), delta); // aPingHistory[count & 0xF]
-        count += 1;
-        wr32(c, 0x500, count);
-        uint32_t n = count > 0x10 ? 0x10 : count;
-        uint64_t sum = 0;
-        for (uint32_t i = 0; i < n; ++i) sum += rd32(c, 0x4B4 + 4 * i);
-        wr64(c, 0x4F8, sum / n);
+        const uint32_t count = rd32(c, 0x500);
+        if ((int32_t)count < 10) {
+            const int64_t sum = (int64_t)count * (int64_t)rd64(c, 0x4F8) +
+                                (int64_t)(int32_t)((now - (DWORD)sentTick) - (DWORD)delay);
+            wr32(c, 0x500, count + 1);
+            wr64(c, 0x4F8, (uint64_t)(sum / (int64_t)(count + 1)));
+        }
         env->sendPacket8F(c);                      // 0x8A730
         wr32(c, 0x3D8, now);
+        wr32(c, 0x500, rd32(c, 0x500) + 1);
         break;
     }
     LeaveCriticalSection(&g_clientListLock);

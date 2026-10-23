@@ -12,7 +12,7 @@ extern "C" void d2_client_a4ac(const uint32_t* ebp, const D2ClientCrtUnwindEnv* 
 
 // The 1.13c body initializes its local held flag and SEH state, delegates the open to __tsopen_lk,
 // marks the finally state, then invokes the recovered 0x0A4AC cleanup funclet.
-// 1.13c D2Client+0x0A467
+// 1.13c D2Client+0x0a467
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_a467(const char* filename, uint32_t open_flag,
                                                        uint32_t share_flag, uint32_t mode,
                                                        const D2ClientSopenEnv* env) {

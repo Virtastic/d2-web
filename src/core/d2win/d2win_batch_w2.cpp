@@ -41,7 +41,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_13640(uint8_t* a, uint8_t* b, con
     wr32(b, 0x9f * 4, (uint32_t)(uintptr_t)a);
 }
 
-// 1.13c D2Win+0x136A0 (ordinal 10166): pointer to the type-1 control's embedded block at +0x5C.
+// 1.13c D2Win+0x136a0 (ordinal 10166): pointer to the type-1 control's embedded block at +0x5C.
 extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* d2win_sub_136A0(uint8_t* ctrl, const D2WinW2Env* env) {
     if (!ctrl) w2_fatal(env, 0x47e);
     if (rd32(ctrl, 0) != 1) w2_fatal(env, 0x480);
@@ -65,7 +65,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2win_sub_17890(const int32_t* r) {
     return x >= r[0] && x < r[2] && y >= r[1] && y < r[3];
 }
 
-// 1.13c D2Win+0x086E0 (ordinal 10160): type-4 control whose child (+0x90) is type 5: child+0x48 =
+// 1.13c D2Win+0x86e0 (ordinal 10160): type-4 control whose child (+0x90) is type 5: child+0x48 =
 // max(value, 0). Returns 1.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_86E0(uint8_t* ctrl, int32_t value, const D2WinW2Env* env) {
     if (!ctrl) w2_fatal(env, 0x582);
@@ -87,7 +87,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_97C0(void* box, const char* s,
     addText(box, buf, 4, 0, 0);
 }
 
-// 1.13c D2Win+0x0EE50 (ordinal 10164): entry idx of the 0x100-byte-stride table at 0x6F935B60.
+// 1.13c D2Win+0xee50 (ordinal 10164): entry idx of the 0x100-byte-stride table at 0x6F935B60.
 extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* d2win_sub_EE50(uint8_t* table, int32_t idx) {
     return table + (uint32_t)idx * 0x100;
 }

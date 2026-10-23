@@ -9,7 +9,7 @@ W void Ordinal_10024(const void*, uint32_t);
 W char DAT_6fdda728[1];
 W uint32_t DAT_6fdf1400[1];
 
-// 1.13c D2Common+0x7FF80 (D2InvRemoveItem): 0x1C-byte record address for index idx; idx > 0 is fatal.
+// 1.13c D2Common+0x7ff80 (D2InvRemoveItem): 0x1C-byte record address for index idx; idx > 0 is fatal.
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_7ff80(int32_t idx) {
  if (0 < idx) {
   Ordinal_10024(DAT_6fdda728, Ordinal_10265(0x41));

@@ -23,7 +23,7 @@ extern "C" uint32_t d2win_sub_93C0(void* box, const uint16_t* text, int32_t para
 // and the third argument to D2Win+0x93C0 with two zero words. A null control is fatal 0x11E.
 // __fastcall: ECX = control, EDX = UTF-8 string, stack = third argument. Returns void; the appender's
 // result is discarded.
-// 1.13c D2Win+0x9740
+// 1.13c D2Win+0x09740
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2win_sub_9740(int32_t* param_1, const char* param_2, int32_t param_3,
                                          const D2WinBatch93C0Env* env) {

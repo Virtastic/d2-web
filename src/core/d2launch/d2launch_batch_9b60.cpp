@@ -88,7 +88,7 @@ void d2launch_shortsort(uint8_t* lo, uint8_t* hi, uint32_t width, D2LaunchCompar
 extern "C" void d2web_msvc_qsort(void* base, size_t num, size_t width, D2LaunchCompare cmp);
 
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2launch_qsort(void* base, size_t num, size_t width, D2LaunchCompare cmp) {
+EMSCRIPTEN_KEEPALIVE __attribute__((weak)) void d2launch_qsort(void* base, size_t num, size_t width, D2LaunchCompare cmp) {
     d2web_msvc_qsort(base, num, width, cmp);
 }
 

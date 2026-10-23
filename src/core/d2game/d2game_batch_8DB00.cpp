@@ -113,7 +113,7 @@ struct D2GameBatch8DB00Env {
 // a2 (word), a3 (word), a4 (byte). Walks the type-1 unit list at game+0x1320, then fills the packet
 // from the unit's path block (unit+0x2C) and the layer-0x43 stat of the unit.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8db00(uint32_t eaxUnitId, uint32_t ebxClient, uint8_t dl,
+EMSCRIPTEN_KEEPALIVE void d2game_8db00_impl(uint32_t eaxUnitId, uint32_t ebxClient, uint8_t dl,
                                              uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4,
                                              const D2GameBatch8DB00Env* env)
 {
@@ -152,7 +152,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8db00(uint32_t eaxUnitId, uint32_t ebxCli
     if (v < -0x8000) v = -0x8000;
     if (v > 0x7FFF) v = 0x7FFF;
     wr16(pkt, 0x0D, (uint16_t)v);
-    pkt[0x0B] = env->ordinal11058(path);
+    pkt[0x0F] = env->ordinal11058(path);
     env->sendPacket(ebxClient, pkt, 16);
 }
 
@@ -241,28 +241,8 @@ EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2game_486d0(uint32_t ecxId, uint32_t eaxUnit
     return 0;
 }
 
-// 1.13c D2Game+0x8FAA0
-// ECX = key, EAX = unit (its id is read but unused), EDI = lookup unit. Resolves ECX through
-// 0x8F5C0, then walks that record's list at +8 for an entry whose +4 equals EDI's id (or -1 when
-// EDI is null) and returns its first dword; 0 on any miss.
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_8faa0(uint32_t ecxKey, uint32_t eaxUnit, uint32_t ediUnit,
-                                                 const D2GameBatch8DB00Env* env)
-{
-    if (eaxUnit != 0) (void)rd32((void*)(uintptr_t)eaxUnit, 4);
-    const uint32_t rec = env->sub8F5C0(&ecxKey);
-    if (rec == 0 || rd32((void*)(uintptr_t)rec, 0x0C) == 0) return 0;
-    const uint32_t want = (ediUnit == 0) ? 0xFFFFFFFFu : rd32((void*)(uintptr_t)ediUnit, 0x0C);
-    void* entry = rdptr((void*)(uintptr_t)rec, 8);
-    while (entry != nullptr) {
-        if (rd32(entry, 4) == want) return rd32(entry, 0);
-        entry = rdptr(entry, 8);
-    }
-    return 0;
-}
-
 // 1.13c D2Game+0xF3360
-// EAX = unit, stack arg = client. Packet 0x13 (9 bytes): unit id, unit+0xB0 byte, and a 0..0x80
+// EAX = unit, stack arg = client. Packet 0x13 (9 bytes): unit id, a zero byte, and a 0..0x80
 // ratio of the layer-6 stat over the unit's #10913 value, decremented when above 1 and flagged
 // with 0x80 for a type-1 unit whose player-data flag at +0x17 is set.
 extern "C"
@@ -270,7 +250,6 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_f3360(uint32_t eaxUnit, uint32_t client,
                                              const D2GameBatch8DB00Env* env)
 {
     const void* unit = (void*)(uintptr_t)eaxUnit;
-    const uint8_t unitB0 = rd8(unit, 0xB0);
     const int32_t num = env->ordinal10973(eaxUnit, 6, 0) >> 8;
     const int32_t den = env->ordinal10913(eaxUnit) >> 8;
     uint8_t ratio;
@@ -291,7 +270,6 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_f3360(uint32_t eaxUnit, uint32_t client,
     pkt[1] = 0x01;
     wr32(pkt, 2, rd32(unit, 0x0C));
     pkt[6] = 0x13;
-    pkt[7] = unitB0;
     pkt[8] = ratio;
     env->sendPacket(client, pkt, 9);
 }

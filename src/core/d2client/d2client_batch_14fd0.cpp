@@ -4,7 +4,7 @@
 typedef int32_t i32; typedef uint32_t u32;
 extern "C" {
 
-// 1.13c D2Client+0x14FD0
+// 1.13c D2Client+0x14fd0
 struct E14FD0 { i32 tblCount; uint8_t* tblBase;  // sgptDataTables+0xba0 / +0xb98 (0x23c stride)
   i32 (*o10511)(); i32 (*o10179)(); i32 (*o10649)();
   void (*f54e20)(i32, i32 slotPtr, i32); i32 slotBase;  // DAT 0xBBA608, stride 0x80

@@ -70,6 +70,8 @@ uint8_t  g_heapReady;             // 0x6FC45168  non-zero once the pool is usabl
 uint32_t* g_heapTrack;            // 0x6FC45160  heap node to validate after an allocation
 uint32_t g_heapLists[0x100];      // 0x6FC43150  per-id heap nodes (next at +0, id at +4)
 CRITICAL_SECTION g_heapLocks[0x100]; // 0x6FC43558  0x18-byte lock per id
+int32_t  g_heapDirty[0x100];      // 0x6FC44D60  per-id: list has freeable nodes
+void     StormSeamVirtualFree(void*, uint32_t, uint32_t) {} // 0x6FC3323C, node is released by the host
 
 // SEVT command table (0x36290 et al.).
 uint32_t g_evtTable;              // 0x6FC45370  hash buckets of group records
@@ -282,6 +284,29 @@ uint32_t Storm_Sub19520(uint32_t param_1, uint32_t param_2, uint32_t* param_3, u
     }
 lab_95e6:
     return Storm_Sub191F0(env);
+}
+
+// 1.13c Storm+0x1A600: sweep the SCode pool. Clears the tracked heap, then for every dirty id unlinks
+// and releases each node whose use count (+0x14) is zero and whose size (+4) is below 0x80000000.
+extern "C"
+void Storm_Sub1A600() {
+    g_heapTrack = nullptr;
+    for (int i = 0; i < 0x100; i++) {
+        if (g_heapDirty[i] == 0) continue;
+        EnterCriticalSection(&g_heapLocks[i]);
+        g_heapDirty[i] = 0;
+        uint32_t* link = &g_heapLists[i];
+        while (*link != 0) {
+            uint32_t* n = ptr<uint32_t>(*link);
+            if (n[5] == 0 && n[1] < 0x80000000u) {
+                *link = n[0];
+                StormSeamVirtualFree(n, 0, 0x8000);
+            } else {
+                link = n;
+            }
+        }
+        LeaveCriticalSection(&g_heapLocks[i]);
+    }
 }
 
 // 1.13c Storm+0x1C580: SCode pool allocate. The pool id selects a 256-entry heap list guarded by its

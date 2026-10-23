@@ -43,7 +43,7 @@ extern "C" void* d2cmp_40f3(uint32_t count, uint32_t size) {
 
 // 1.13c D2CMP+0x4C34 (57 bytes): __FF_MSGBANNER -- app-type globals select console; the GUI path writes nothing.
 // With neither console flag set there is nothing to emit.
-// 1.13c D2CMP+0x4C34
+// 1.13c D2CMP+0x04c34
 extern "C" void d2cmp_4c34(void) {}
 
 // 1.13c D2CMP+0x4C7D (103 bytes): __crtInitCritSecAndSpinCount -- critical sections are no-ops here.
@@ -59,5 +59,5 @@ extern "C" [[noreturn]] void d2cmp_6232(void) {
 
 // 1.13c D2CMP+0x70C0 (672 bytes): _memmove -- overlap-safe copy, returns dst (the word/byte
 // unrolling is an implementation detail with identical results).
-// 1.13c D2CMP+0x70C0
+// 1.13c D2CMP+0x070c0
 extern "C" void* d2cmp_70c0(void* dst, const void* src, size_t n) { return memmove(dst, src, n); }

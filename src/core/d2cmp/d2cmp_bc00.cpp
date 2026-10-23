@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <cstring>
 
-// 1.13c D2CMP+0x0BC00
+// 1.13c D2CMP+0x0bc00
 // Walks obj+0x10C records (stride 0x60) at obj+0x110; each with node (+0x5C) set is released via 17400,
 // then data (+0x54) and node (+0x5C) are cleared.
 extern "C" void d2cmp_bc00(void* cache, uint8_t* obj, void (*release)(void* cache)) {

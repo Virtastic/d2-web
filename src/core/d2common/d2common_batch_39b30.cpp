@@ -14,6 +14,8 @@
 #include <emscripten.h>
 
 #include "D2DataTbls.h"
+#include "D2Inventory.h"
+#include "D2Items.h"
 #include "D2StatList.h"
 #include "DataTbls/ItemsTbls.h"
 #include "Units/Units.h"
@@ -22,6 +24,8 @@ static_assert(offsetof(D2ItemsTxt, wType) == 0x11E, "items.txt wType");
 static_assert(sizeof(D2ItemTypesTxt) == 0xE4, "itemtypes.txt stride");
 static_assert(offsetof(D2ItemTypesTxt, nClass) == 0x21, "itemtypes.txt nClass");
 static_assert(sizeof(D2ItemStatCostTxt) == 0x144, "itemstatcost.txt stride");
+
+extern D2InventoryGridInfoStrc gBodyLocInventoryGridInfo;
 
 namespace
 {
@@ -115,7 +119,7 @@ EMSCRIPTEN_KEEPALIVE bool d2_fn_d2common_24320(uint32_t nItemId)
 	return RdU8(reinterpret_cast<const uint8_t*>(&sgptDataTables->pItemTypesTxt[nType]), 0x21) < 7;
 }
 
-// 1.13c D2Common+0x38E30 (#10845): item stat 159 (0xC93C = 159 * 0x144) from the stat list at
+// 1.13c D2Common+0x38e30 (#10845): item stat 159 (0xC93C = 159 * 0x144) from the stat list at
 // unit+0x5C. No unit, no stat list, or no itemstatcost row answers 0.
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_38e30(uint32_t pUnit)
@@ -131,7 +135,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_38e30(uint32_t pUnit)
 	return STATLIST_GetTotalStat_6FDB63E0(pStatList, 159, &sgptDataTables->pItemStatCostTxt[159]);
 }
 
-// 1.13c D2Common+0x391A0 (#10848): total of one itemstatcost stat on a stat list. Null list or an
+// 1.13c D2Common+0x391a0 (#10848): total of one itemstatcost stat on a stat list. Null list or an
 // out-of-range stat id answers 0.
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_391a0(uint32_t pStatList, int32_t nStatId)
@@ -168,11 +172,10 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_d2common_5a7d0(uint32_t pUnit)
 	return g_d2common_dat_6fdf1484;
 }
 
-// 1.13c D2Common+0x1FF40 (#10854): look up a server inventory item (magic 0x01020304) and report
-// it when it is a unit-item of item type 0x33 that can be equipped. The inventory is the server
-// global reached through 0x1E1B0 (DAT_6F6DED378 descriptor); that grid wiring and its global
-// inventory are not recovered here, so both lookups take the vendored 0x1EC30 path and answer 0.
-// ponytail: replace the 0 when 0x1E1B0's global-inventory environment is wired.
+// 1.13c D2Common+0x1FF40 (#10854): report the first usable item among the two hand slots of an
+// inventory (body-loc grid cells +0x10 then +0x14) that is of item type 0x33. Cell 4 is taken
+// only when it is a non-item-type-4 unit or a type-4 unit whose itemdata flags lack 0x100 and
+// 0x4000; cell 5 must pass ITEMS_CanBeEquipped. 
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_1ff40(uint32_t pInventory, uint32_t pOutItem)
 {
@@ -184,12 +187,34 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_1ff40(uint32_t pInventory, uint32_t 
 	if (pOut)
 		W(pOut, 0) = 0;
 
-	if (RdU32(p, 0) != 0x01020304u)
-		return 0;
+	D2UnitStrc* pItem = nullptr;
+	if (RdU32(p, 0) == 0x01020304u)
+	{
+		D2InventoryGridStrc* pGrid = INVENTORY_GetGrid(reinterpret_cast<D2InventoryStrc*>(p), INVGRID_BODYLOC, &gBodyLocInventoryGridInfo);
+		if (pGrid)
+		{
+			pItem = pGrid->ppItems[4];
+			if (pItem)
+			{
+				const uint8_t* u = reinterpret_cast<const uint8_t*>(pItem);
+				const uint8_t* d = P(RdU32(u, 0x14));
+				if ((RdU32(u, 0) != 4 || (!d || !(RdU32(d, 0x18) & 0x100)) && (!d || !(RdU32(d, 0x18) & 0x4000)))
+					&& ITEMS_CheckItemTypeId(pItem, 0x33))
+				{
+					if (pOut)
+						W(pOut, 0) = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pItem));
+					return 1;
+				}
+			}
+			pItem = pGrid->ppItems[5];
+		}
+	}
 
-	// The first two item lookups (grid cells +0x10 and +0x14 of 0x1E1B0's result) need the
-	// unmodelled global inventory; the remaining check is ITEMS_CheckItemTypeId(item, 0x33).
-	return 0;
+	if (!ITEMS_CanBeEquipped(pItem) || !ITEMS_CheckItemTypeId(pItem, 0x33))
+		return 0;
+	if (pOut)
+		W(pOut, 0) = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pItem));
+	return 1;
 }
 
 // 1.13c D2Common+0x4E3F0 (#10856): allocate and zero the 24-byte skill record through Fog ordinal

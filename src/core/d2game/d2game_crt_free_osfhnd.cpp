@@ -20,7 +20,7 @@ struct D2GameCrtFreeOsfhndEnv {
     uint8_t** pioinfo;                                         // 0x6FD3A220 _pioinfo
 };
 
-// 1.13c D2Game+0x0881B
+// 1.13c D2Game+0x0881b
 // __free_osfhnd(fh): a handle below _nfile whose ioinfo record has FOPEN set and a live OS handle clears
 // that OS handle to -1 and returns 0. On an NT platform (_osplatform == 1) fds 0, 1 and 2 additionally
 // clear the matching standard handle (STD_INPUT/OUTPUT/ERROR_HANDLE, -10/-11/-12) first. Anything else

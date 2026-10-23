@@ -18,7 +18,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_12250(uint32_t room, int32_t x, int
  return !(b[0] < x-radius && b[1] < y-radius && x+radius < b[0]+b[2] && y+radius < b[1]+b[3]);
 }
 // 1.13c D2Common+0x4E480: select a skill node by id, passive flag, and highest level.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4e480(uint32_t unit, int32_t skillId) {
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_4E480_FindSkillNode(uint32_t unit, int32_t skillId) {
  if (!unit || !w(unit,0xA8)) return 0;
  uint32_t best=0;
  for (uint32_t n=w(w(unit,0xA8),4); n; n=w(n,4)) {
@@ -76,8 +76,8 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_455b0(uint32_t first, uint32_t seco
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_2f100(uint32_t unit, uint32_t target,
  void (*compute)(uint32_t,uint32_t,uint32_t,uint32_t*,uint32_t*,int32_t*,uint32_t*)) {
  if (!unit || !compute) return 0;
- uint32_t old=w(unit,0x40),mode=target,frame=0,event=0; int32_t dir=0;
- compute(w(unit,0x30),target,w(unit,0x38),&mode,&frame,&dir,&event);
+ uint32_t old=w(unit,0x40),mode=0,frame=0,event=0; int32_t dir=0;
+ compute(w(unit,0x30),w(unit,0x38),target,&mode,&frame,&dir,&event);
  w(unit,0x44)=frame<<8; w(unit,0x40)=mode; p(unit)[0x4E]=static_cast<uint8_t>(event);
  return mode!=old;
 }
@@ -95,7 +95,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_4f870(uint32_t unit, int32_t categor
  return applyRatio ? applyRatio(100,ratio) : 0;
 }
 // 1.13c D2Common+0x3B3A0: validate the room's counted unit-id array.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3b3a0(uint32_t room) {
+extern "C" uint32_t D2Common_3B3A0_ValidateUnitIds(uint32_t room) {
  if (!room) return 0;
  uint32_t count=w(room,0x78), a=w(room,0x48);
  if (count && !a) return 0;

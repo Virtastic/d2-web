@@ -4,6 +4,17 @@
 // callees is a Stage A stub whose comment names what is unproven.
 #include <cstdint>
 #include <emscripten.h>
+#include "D2DataTbls.h"
+#include "Units/Units.h"
+
+#include "D2DataTbls.h"
+#include "DataTbls/ItemsTbls.h"
+
+extern "C" uint32_t d2_fn_d2common_24610(uint32_t pUnit);
+extern "C" {
+__attribute__((weak)) int32_t d2_sub_38b70_get(uint32_t pUnit, int32_t nStat);
+__attribute__((weak)) void d2_sub_3a740_set(uint32_t pUnit, int32_t nStat, int32_t nValue);
+}
 
 namespace
 {
@@ -11,29 +22,53 @@ namespace
 	inline uint32_t& W(uint8_t* b, int o) { return *reinterpret_cast<uint32_t*>(b + o); }
 }
 
-// +0x2A480 (#10992): item socket count. Stub: the body is carried by the still-UNMAPPED 0x24610
-// (socket-count helper), 0x38B70 (stat getter) and 0x3A740 (stat setter). Proven shape: only for unit
+// +0x2A480 (#10992): item socket count. Carried by 0x24610 (stub), 0x38B70 and 0x3A740 (weak seams). Shape: only for unit
 // type 4 with item data (unit+0x14); the base cap is ItemsTxt[nClassId].nInvWidth (byte +0x10F) *
 // nInvHeight (+0x110), capped at 6, then by the item-data quality dword (+0x00): 4 -> 4, 6 -> 2,
 // 8/9 -> 3, 5/7 -> 1 when stat 0xC2 (STAT_ITEM_NUMSOCKETS) is below 1; finally the low byte of 0x24610
 // and the caller's count (at least 1) cap it. A positive result sets IFLAG_SOCKETED (0x800) at item
 // data +0x18 and writes stat 0xC2.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2a480(uint32_t pUnit, uint32_t nMax) { // 1.13c D2Common+0x2A480
-	(void)pUnit;
-	(void)nMax;
+	uint8_t* u = P(pUnit);
+	if (!u || W(u, 0) != 4) return;
+	const uint8_t* t = reinterpret_cast<const uint8_t*>(DATATBLS_GetItemsTxtRecord(static_cast<int32_t>(W(u, 4))));
+	uint32_t nCap = t ? uint32_t(t[0x10F]) * t[0x110] : 0;
+	if (nCap == 0) return;
+	uint32_t n = nCap < 6 ? nCap : 6;
+	int32_t nMaxI = static_cast<int32_t>(nMax);
+	uint8_t* d = P(W(u, 0x14));
+	switch (d ? W(d, 0) : 2u)
+	{
+	case 4: if (n > 3) n = 4; break;
+	case 5: case 7:
+		nMaxI = d2_sub_38b70_get(pUnit, 0xC2);
+		if (nMaxI < 1) { nMaxI = static_cast<int32_t>(nMax); if (n) n = 1; }
+		break;
+	case 6: if (n > 1) n = 2; break;
+	case 8: case 9: if (n > 2) n = 3; break;
+	}
+	const uint32_t q = d2_fn_d2common_24610(pUnit) & 0xFF;
+	if (q <= n) n = q;
+	if (nMaxI < 2) nMaxI = 1;
+	if (nMaxI < static_cast<int32_t>(n)) n = static_cast<uint32_t>(nMaxI);
+	if (static_cast<int32_t>(n) > 0)
+	{
+		if (d) W(d, 0x18) |= 0x800;
+		d2_sub_3a740_set(pUnit, 0xC2, static_cast<int32_t>(n));
+	}
 }
 
-// +0x344F0 (#10993): forwards the data-tables pointer at +0xDC and the argument to 0x34080.
-// Stub: 0x34080 is UNMAPPED; nothing of the call is written.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_344f0(uint32_t pArg) { // 1.13c D2Common+0x344F0
-	(void)pArg;
+// +0x344F0 (#10993): forwards the state mask at data-tables +0xDC (fStateMasks[4]) and the unit to 0x34080.
+extern "C" void d2_fn_d2common_34080(const uint32_t* mask, D2UnitStrc* unit);
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_344f0(uint32_t pArg) { // 1.13c D2Common+0x344f0
+	d2_fn_d2common_34080(sgptDataTables->fStateMasks[4], reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pArg)));
 }
 
 // +0x460B0 (#10996): per-mode emit loop. Stub: every side effect is a still-UNMAPPED callee -- 0x22640
 // and 0x221C0 (item format) pick the element, 0x45AA0 emits, 0x458C0 selects the slot, 0x1800/0x1830
 // gate modes 3/4 -- with iteration counts 3 for modes 0/2/5, 2 for mode 1, 12 for mode 3 and 2/9/10
 // for mode 4. Unknown modes fatal 0xAF.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_460b0(uint32_t nMode, uint32_t nArg2, uint32_t pArg3, uint32_t pArg4, uint32_t nArg5) { // 1.13c D2Common+0x460B0
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_460b0(uint32_t nMode, uint32_t nArg2, uint32_t pArg3, uint32_t pArg4, uint32_t nArg5) { // 1.13c D2Common+0x460b0
 	(void)nMode;
 	(void)nArg2;
 	(void)pArg3;
@@ -84,10 +119,18 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_71610(int32_t nQuest) { 
 	return 0;
 }
 
-// +0x50EA0 (#11008): clamp a value. Stub: the value is 0x4E480's dword +0x28, plus 0x4FCB0 when its
-// dword +0x34 is -1, clamped to at least 0 and then to the cap at *DAT_6fdf0b50; a zero from 0x4E480
-// yields 0. Both callees and the cap global are UNMAPPED.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_50ea0(int32_t nArg) { // 1.13c D2Common+0x50EA0
-	(void)nArg;
-	return 0;
+extern "C" uint32_t D2Common_4E480_FindSkillNode(uint32_t, int32_t);
+extern "C" int32_t d2_fn_d2common_4fcb0(D2UnitStrc*, D2SkillStrc*);
+// +0x50EA0 (#11008): clamped skill level. param_1 is the unit (0 -> 0); the skill id arrives in ESI
+// (unmodelled, passed as nSkill). Node = 0x4E480(unit, skill); none -> 0. Level = node+0x28, plus
+// 0x4FCB0 when node+0x34 is -1; floored at 0, then capped at *DAT_6fdf0b50 (passed as pCap).
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_50ea0(D2UnitStrc* pUnit, int32_t nSkill, const int32_t* pCap) { // 1.13c D2Common+0x50EA0
+	if (!pUnit) return 0;
+	const uint32_t node = D2Common_4E480_FindSkillNode(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pUnit)), nSkill);
+	if (!node) return 0;
+	int32_t v = *reinterpret_cast<int32_t*>(static_cast<uintptr_t>(node) + 0x28);
+	if (*reinterpret_cast<int32_t*>(static_cast<uintptr_t>(node) + 0x34) == -1)
+		v += d2_fn_d2common_4fcb0(pUnit, reinterpret_cast<D2SkillStrc*>(node));
+	if (v < 0) v = 0;
+	return v < *pCap ? v : *pCap;
 }

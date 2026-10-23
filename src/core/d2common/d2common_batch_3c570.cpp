@@ -14,7 +14,7 @@ namespace
 
 // 1.13c D2Common+0x3C570 (#10547): resolve the +0x30 slot of a stat record.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3c570(uint32_t pUnit, uint32_t pArg)
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_3C570_GetLinkedSlot30(uint32_t pUnit, uint32_t pArg)
 {
 	if (!pUnit || !pArg)  // fatal 0x3CE / 0x3D1 in retail
 		return 0;

@@ -51,7 +51,7 @@ struct D2WaypointSaveDataStrc
 static_assert(sizeof(D2WaypointSaveDataStrc) == 80);
 static_assert(sizeof(D2PlrIntroSaveStrc) == 52);
 
-// 1.13c D2Game+0x545D0
+// 1.13c D2Game+0x54BC0
 int32_t __fastcall sub_6FC898F0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pItem, D2UnitStrc* a4)
 {
     if (!pItem)

@@ -58,4 +58,3 @@ void d2_client_8a4d0(uint32_t* s, int32_t l, int32_t t, int32_t r, int32_t b,
     s[0] |= 1;
 }
 
-// 1.13c D2Client+0x88A70: not implemented (register-passed args, unrecovered callees); row skipped.

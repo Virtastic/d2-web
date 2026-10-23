@@ -32,7 +32,7 @@ void D2Client_CopyPitchedRows(uint8_t* destination, const uint8_t* source,
     } while (true);
 }
 
-// 1.13c D2Client+0x0EA40
+// 1.13c D2Client+0x0ea40
 // Window begin/end/read/write +28/+2c/+30/+34, checkfn/check +38/+3c;
 // stream next_out/avail_out/total_out/adler +c/+10/+14/+30. Native views
 // preserve each mutation without packing host pointers into x86 fields.

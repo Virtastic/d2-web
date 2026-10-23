@@ -855,6 +855,7 @@ void __stdcall PATH_RecacheRoomIfNeeded(D2DynamicPathStrc* pDynamicPath)
 //1.00:  D2Common.0x10060C40 (#10231)
 //1.10f: D2Common.0x6FDAE500 (#10234)
 //TODO: Find a name
+// 1.13c D2Common+0xCE90
 BOOL __stdcall D2Common_10234(D2DynamicPathStrc* pDynamicPath)
 {
 	if (pDynamicPath)

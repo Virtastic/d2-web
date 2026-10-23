@@ -148,6 +148,7 @@ void GAME_LogMessage(int32_t a1, const char* szFormat, ...)
 }
 
 //D2Game.0x6FC357C0
+// 1.13c D2Game+0x2D4B0
 int32_t __stdcall D2Game_10046()
 {
     SRegLoadValue("Diablo II", "PlayerPos", 0, &dword_6FD4582C);
@@ -159,6 +160,7 @@ int32_t __stdcall D2Game_10046()
     return TRUE;
 }
 
+// 1.13c D2Game+0x2A9A0
 //D2Game.0x6FC35810
 int32_t __stdcall D2Game_10050()
 {
@@ -172,6 +174,7 @@ int32_t __stdcall D2Game_10050()
 }
 
 //D2Game.0x6FC35840
+// 1.13c D2Game+0x2A3B0 (delta: 1.13c indexes the handle array by nGameId directly and returns the raw handle; 1.10f form kept, array is internal)
 D2GameGUID __fastcall GAME_GetGameGUIDFromGameId(uint16_t nGameId)
 {
 	D2GameGUID nGUID = 0;
@@ -1164,6 +1167,7 @@ void __fastcall GAME_JoinGame(int32_t dwClientId, uint16_t nGameId, int32_t nCla
 //D2Game.0x6FC37450
 _Requires_lock_held_(*pGame->lpCriticalSection)
 _Releases_lock_(*pGame->lpCriticalSection)
+// 1.13c D2Game+0x2CD30
 void __fastcall GAME_FreeGame(D2GameGUID nGameGUID, D2GameStrc* pGame)
 {
     if (pGame)
@@ -1392,7 +1396,7 @@ void __fastcall sub_6FC37B10(D2GameStrc* pGame)
     }
 }
 
-//D2Game.0x6FC37B90
+//D2Game.0x6FC37B90  // 1.13c D2Game+0x2D140
 void __fastcall CLIENT_SendSaveHeaderPart_6FC37B90(D2GameStrc* pGame, D2ClientStrc* pClient)
 {
     if (!CLIENT_GetSaveHeader_6FC34350(pClient))
@@ -1421,7 +1425,7 @@ void __fastcall CLIENT_SendSaveHeaderPart_6FC37B90(D2GameStrc* pGame, D2ClientSt
     }
 
 	ClientPacketSaveHeaderPart* pPacket = D2_ALLOC_STRC_POOL(pClient->pGame->pMemoryPool, ClientPacketSaveHeaderPart);
-	pPacket->nHeaderId = 0xB2u;
+	pPacket->nHeaderId = 0xB3u;
 	pPacket->nPartDataSize = nDataSize;
 	pPacket->bFirstPart = pClient->nSaveHeaderDataSentBytes == 0;
 	pPacket->nSaveHeaderSize = pClient->nSaveHeaderSize;
@@ -1709,6 +1713,7 @@ void __fastcall sub_6FC38140(void *a1, int32_t a2)
 }
 
 //D2Game.0x6FC38530 (#10003)
+// 1.13c D2Game+0x2E460
 void __fastcall GAME_ProcessNetworkMessages()
 {
     uint8_t buffer[520] = {};
@@ -2583,9 +2588,11 @@ int32_t __stdcall D2Game_10057()
 }
 
 //D2Game.0x6FC39C70 (#10053)
+// 1.13c D2Game+0x2B900
 void __stdcall D2Game_10053(int16_t* pCount, int32_t nArraySize)
 {
-    memset(pCount, 0, nArraySize);
+    // 1.13c delta: nArraySize is the max index; buffer is (nArraySize + 1) int16 entries
+    memset(pCount, 0, (uint32_t)nArraySize * 2 + 2);
 
     for (int32_t i = 0; i < 1024; ++i)
     {
@@ -3244,6 +3251,7 @@ D2GameStrc* __fastcall D2GameDataTable_New(D2GameDataTableStrc* pGameDataTable, 
 
 //D2Game.0x6FC3B6A0
 // Should be __thiscall, nUnused is present due to using __fastcall 
+// 1.13c D2Game+0x02130
 D2GameStrc* __fastcall D2GameDataTable_Ptr(D2GameDataTableStrc* pGameDataTable, int32_t nUnused, D2GameGUID nGameGUID, const HASHKEY_NONE* pHashKey)
 {
     return static_cast<TSHashTable<D2GameStrc,HASHKEY_NONE>&>(pGameDataTable->tHashTable).Ptr((uint32_t)nGameGUID, *pHashKey);

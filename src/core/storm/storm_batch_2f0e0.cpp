@@ -152,3 +152,8 @@ void Storm_112E0(StormBatch2f0e0Env& e) {
         e.free_memory(p,".?AUUSEREVENT@@",-2);
     }
 }
+// 1.13c Storm+0x39A0 (SBig ctor; inlines 0x37C0: 16 zeroed vectors, used=0)
+Storm2fBig* Storm_39A0(Storm2fBig* p) {
+    *p = Storm2fBig{};
+    return p;
+}

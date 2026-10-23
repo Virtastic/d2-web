@@ -109,8 +109,9 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_232e0(uint32_t pUnit)
 // +0x02 word otherwise) is below 0xB. nGrid/nGridInfo are the hidden 0x1E1B0 operands (inventory.txt
 // grid); pStopItem, when non-null, bounds the scan to the item before it. The struct behind unit+0x2C
 // is unnamed in 1.13c, so it is read raw. The unit chain runs through item data (+0x14) +0x70.
+// 1.13c D2Common+0x1ED00
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_1ed00(uint32_t pInventory, int32_t nItemCode,
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_1ED00_FindItemInGrid(uint32_t pInventory, int32_t nItemCode,
 	uint32_t pStopItem, int32_t nGrid, uint32_t pGridInfo)
 {
 	uint8_t* inv = P(pInventory);
@@ -175,7 +176,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_1ed00(uint32_t pInventory, int32_t 
 // 1.13c D2Common+0x2FD50 (#10669): for unit types 0, 1 and 3, the dword at path(+0x2C)+0x60 when
 // path+0x58 is non-zero. The other paths are fatal in retail and yield 0 here.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_2fd50(uint32_t pUnit)
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_2FD50_PathField60(uint32_t pUnit)
 {
 	uint8_t* u = P(pUnit);
 	if (!u)
@@ -205,7 +206,7 @@ struct D2Common32890Env
 
 // 1.13c D2Common+0x32890
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_32890(uint32_t pUnit, const D2Common32890Env* pEnv)
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_32890_ScaledDefense(uint32_t pUnit, const D2Common32890Env* pEnv)
 {
 	uint8_t* u = P(pUnit);
 	uint8_t* sl = StatListOf(u);
@@ -279,10 +280,10 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_32890(uint32_t pUnit, const D2Commo
 		static_cast<int64_t>(static_cast<int32_t>(nResult)) / 100);
 }
 
-// 1.13c D2Common+0x50090 (#10678): unit type 1 with mode 0xC whose stat-list flags hit the state
-// mask table entry at datas+0x150 (fStateMasks[33]), or else whose hidden 0x51470(unit,7) is set.
+// 1.13c D2Common+0x50090 (#10678): unit type 1 with mode 0xC whose stat-list flags do NOT hit the
+// state mask table entry at datas+0x150 (fStateMasks[33]) and whose 0x1470(unit,7) is set.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_50090(uint32_t pUnit,
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_50090_UnitStateHit(uint32_t pUnit,
 	uint32_t (*pfn51470)(uint32_t pUnit, int32_t nIndex))
 {
 	uint8_t* u = P(pUnit);
@@ -295,14 +296,14 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_50090(uint32_t pUnit,
 		sl ? static_cast<int32_t>(W(sl, 0x10)) : 0,
 		sl ? reinterpret_cast<const uint32_t*>(P(W(sl, 0x58))) : nullptr,
 		pMask, nWords) != 0)
-		return 1;
+		return 0;
 	return (pfn51470 && pfn51470(pUnit, 7) != 0) ? 1 : 0;
 }
 
 // 1.13c D2Common+0x66410 (#10681): unlink the unit from its room's list (room+0x1C head, next at
 // unit+0xE0). A missing room with a non-null unit+0xE0 is fatal in retail and yields no unlink here.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_66410(uint32_t pUnit)
+EMSCRIPTEN_KEEPALIVE void D2Common_66410_UnlinkUnitFromRoom(uint32_t pUnit)
 {
 	uint8_t* u = P(pUnit);
 	if (!u)
@@ -340,7 +341,7 @@ struct D2Common46920Env
 
 // 1.13c D2Common+0x46920
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_46920(uint32_t pUnit, const D2Common46920Env* pEnv,
+EMSCRIPTEN_KEEPALIVE void D2Common_ITEMS_RollEthDefault_46920(uint32_t pUnit, const D2Common46920Env* pEnv,
 	void (*pfn38550)())
 {
 	uint8_t* u = P(pUnit);
@@ -430,7 +431,7 @@ EMSCRIPTEN_KEEPALIVE void GetGlobalEquipmentSlotLayout(int32_t nRow, int32_t nSu
 // 1.13c D2Common+0x386E0 (#10702): collect up to nMax stats of itemstatcost id nStatId from the
 // unit's extended stat list into pOut (packed+value pairs); returns the count copied.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_386e0(uint32_t pUnit, int32_t nStatId,
+EMSCRIPTEN_KEEPALIVE int32_t D2Common_386E0_CollectExtStats(uint32_t pUnit, int32_t nStatId,
 	void* pOut, int32_t nMax)
 {
 	uint8_t* u = P(pUnit);
@@ -445,7 +446,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_386e0(uint32_t pUnit, int32_t nStatI
 // 1.13c D2Common+0x4E680 (#10703): skills.txt record nSkillId's dwParam[0..1] scaled by
 // D2Common_11033(nLevel, param0, param1); 0 for a bad id or a non-positive level.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_4e680(int32_t nLevel, int32_t nSkillId)
+EMSCRIPTEN_KEEPALIVE int32_t D2Common_10703_SkillParamCurve(int32_t nLevel, int32_t nSkillId)
 {
 	if (!sgptDataTables || !sgptDataTables->pSkillsTxt || nSkillId < 0 ||
 		nSkillId >= sgptDataTables->nSkillsTxtRecordCount || nLevel <= 0)

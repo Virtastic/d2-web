@@ -16,7 +16,7 @@ struct D2GfxWctombMtEnv {
 
 // 1.13c D2Gfx+0x041DB
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2gfx_41db(uint32_t locale, char* mbch, uint16_t wch,
+EMSCRIPTEN_KEEPALIVE int32_t d2gfx_wctomb_mt(uint32_t locale, char* mbch, uint16_t wch,
                                               const D2GfxWctombMtEnv* env) {
     if (mbch == nullptr) return 0;                        // stateful-encoding query; C locale: 0
     if (*(uint32_t*)(uintptr_t)(locale + 0x14) == 0) {    // mbctype word zero: the C locale

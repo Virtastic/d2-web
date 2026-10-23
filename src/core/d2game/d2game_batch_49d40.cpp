@@ -198,8 +198,7 @@ static uint32_t d2game_seed_step(void* pSeed)
 // checks for a ranged MonStats flag. The chosen id is removed with memmove; when it is a spawnable
 // MonStats record its id and nRarity are written into pMonData (+0x14, stride 0x34), nTotalRarity
 // (+0x11) and nSpawnCount (+0x12) accumulate, and nMonCount (+0x10) increments. An empty spawn list
-// returns early. Delta vs 1.10f: the ranged retry is an unrolled 4-check/5-count ladder, i.e. at most
-// 16 rolls, where 1.10f loops 20 times.
+// returns early. The ranged retry is unrolled 5 check+roll steps per pass, 4 passes (20 rolls), same as 1.10f.
 EMSCRIPTEN_KEEPALIVE void d2_game_ca760(const void* pLevels, void* pMonsterRegion, void* pSeed,
                                         uint32_t bNightmareHell, const D2GameBatch12Env* env)
 {
@@ -235,6 +234,10 @@ EMSCRIPTEN_KEEPALIVE void d2_game_ca760(const void* pLevels, void* pMonsterRegio
         monsterId = ids[index];
         if (spawned == 0 && rd8(pLevels, 0x31) != 0) {
             for (uint32_t attempts = 0; attempts < 0x14; attempts += 5) {
+                if (env->monStatsIsRanged(monsterId)) break;
+                r = d2game_seed_step(pSeed);
+                index = powerOfTwo == 0 ? (nList - 1) & r : r % nList;
+                monsterId = ids[index];
                 if (env->monStatsIsRanged(monsterId)) break;
                 r = d2game_seed_step(pSeed);
                 index = powerOfTwo == 0 ? (nList - 1) & r : r % nList;

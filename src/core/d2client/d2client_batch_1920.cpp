@@ -24,7 +24,7 @@ struct D2ClientBatch1920Env {
 static const char kEngineH[]  = "..\\Source\\D2Client/Engine.h";                       // 0x0D4EA4
 static const char kWardenCpp[] = "..\\Source\\D2Client\\WARDEN\\WardenClient.cpp";     // 0x0D4938
 
-// 1.13c D2Client+0x01920: RC4 PRGA stream XOR -- i = (i+1) & 0xFF, j = (j + S[i]) & 0xFF, swap
+// 1.13c D2Client+0x01920 (d2client_batch_1920.cpp:d2_client_1920): RC4 PRGA stream XOR -- i = (i+1) & 0xFF, j = (j + S[i]) & 0xFF, swap
 // S[i]/S[j], data[k] ^= S[(S[i] + S[j]) & 0xFF]. State in EAX; ret 8 (data and len on the stack).
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_1920(uint8_t* data, uint32_t len, D2ClientRc4State* state) {
@@ -78,7 +78,7 @@ EMSCRIPTEN_KEEPALIVE uintptr_t d2_client_1af0(const int32_t* obj, const D2Client
     return (uintptr_t)(uint32_t)env->animOrSeqMode(obj);
 }
 
-// 1.13c D2Client+0x01B50: NULL -> -1; bit 3 clear -> obj[1]; set -> the two D2Common calls (line
+// 1.13c D2Client+0x01B50 d2_client_1b50: NULL -> -1; bit 3 clear -> obj[1]; set -> the two D2Common calls (line
 // 0x116) and the object in EAX.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uintptr_t d2_client_1b50(const int32_t* obj, const D2ClientBatch1920Env* env) {

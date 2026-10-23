@@ -65,7 +65,7 @@ void D2Common_1AF9_DoExitUnlock(uint32_t nStack10, uint32_t nEdi)
 // 1.13c D2Common+0x1B0D
 // _exit(code) = doexit(code, quick=0, returning=0): lock 8, the onexit list, both initterm tables,
 // then terminate the process and never return. Delegate to the module-owned shutdown state.
-void D2Common_1B0D_Exit(int32_t nCode)
+extern "C" void D2Common_1B0D_Exit(int32_t nCode)
 {
     D2Common_1A4A_DoExit(static_cast<uint32_t>(nCode), 0, 0);
 }

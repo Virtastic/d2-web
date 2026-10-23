@@ -63,6 +63,42 @@ struct D2WinB57MsgEnv {
     void (*user_hook)();                // DAT_6f9012bc, may be null
 };
 
+struct D2WinB57NmsgEnv {
+    int32_t mode_a, mode_b;              // DAT_6f901034 / DAT_6f901038
+    const int32_t* ids;                  // DAT_6f8ff3b8 table, 0x13 {id,msg} pairs
+    const char* const* msgs;
+    void (*write_stdout)(const char* s, uint32_t n);      // GetStdHandle(-12)+WriteFile
+    int32_t (*module_name)(char* buf, uint32_t cap);      // GetModuleFileNameA(0,..,0x104); 0 = fail
+    void (*message_box)(const char* text, const char* title, uint32_t flags);  // ___crtMessageBoxA
+};
+
+// 1.13c D2Win+0x379C  (_NMSG_WRITE)
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2win_NMSG_WRITE_379c(int32_t id, const D2WinB57NmsgEnv* env) {
+    uint32_t i = 0;
+    do { if (id == env->ids[i]) break; i++; } while (i < 0x13);
+    if (id != env->ids[i]) return;
+    const char* msg = env->msgs[i];
+    uint32_t mlen = (uint32_t)__builtin_strlen(msg);
+    if (env->mode_a == 1 || (env->mode_a == 0 && env->mode_b == 1)) {
+        env->write_stdout(msg, mlen);
+    } else if (id != 0xfc) {
+        char prog[0x105]; prog[0x104] = 0;
+        if (env->module_name(prog, 0x104) == 0) __builtin_strcpy(prog, "<program name unknown>");
+        const char* p = prog;
+        uint32_t plen = (uint32_t)__builtin_strlen(p);
+        if (plen + 1 > 0x3c) {              // CRT: tail of the path behind "..."
+            p = prog + plen + 1 - 0x3c;
+            __builtin_memcpy(prog + plen + 1 - 0x3c, "...", 3);
+        }
+        char out[0x104 + 0x80 + 0x100 + 64];
+        char* o = out;
+        auto cat = [&](const char* s) { while ((*o = *s++)) o++; };
+        cat("Runtime Error!\n\nProgram: "); cat(p); cat("\n\n"); cat(msg);
+        env->message_box(out, "Microsoft Visual C++ Runtime Library", 0x12010);
+    }
+}
+
 // 1.13c D2Win+0x3914
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2win_FF_MSGBANNER_3914(const D2WinB57MsgEnv* env) {

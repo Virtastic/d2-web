@@ -34,7 +34,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_dce0(D2DynamicPathStrc* pPath, D2Uni
 // same answer DATATBLS_GetItemsTxtRecord gives for an out-of-range id. The 1.10f body is
 // ITEMS_GetTransmogrifyFromItemId (Items.cpp), which asserts the row exists.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_223d0(int32_t nItemId)
+EMSCRIPTEN_KEEPALIVE uint32_t d2common_IsTransmogrify_223d0(int32_t nItemId)
 {
 	static_assert(offsetof(D2ItemsTxt, nTransmogrify) == 0x139, "items.txt nTransmogrify");
 	const D2ItemsTxt* pRow = DATATBLS_GetItemsTxtRecord(nItemId);

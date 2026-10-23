@@ -686,6 +686,7 @@ void __fastcall DRLG_GetMinAndMaxCoordinatesFromLevel(D2DrlgLevelStrc* pLevel, i
 }
 
 //D2Common.0x6FD74E10
+// 1.13c D2Common+0x2D660
 void __fastcall DRLG_UpdateRoomExCoordinates(D2DrlgLevelStrc* pLevel)
 {
 	D2DrlgRoomStrc* pDrlgRoom = NULL;

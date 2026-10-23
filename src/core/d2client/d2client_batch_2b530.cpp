@@ -4,6 +4,7 @@
 // go through Services::ord / Services::fn.
 #include <cstdint>
 #include <cstring>
+extern "C" void* d2_client_skilldesc_for_skill(int32_t);
 namespace d2client_batch_2b530 {
 struct Services {
  virtual ~Services()=default;
@@ -98,7 +99,7 @@ void sub_34AB0(Services& s,void* unit,void* b,int32_t c){
 }
 // 1.13c D2Client+0x34C00
 void sub_34C00(Services& s,void* unit,int32_t a,const uint8_t* rec,int32_t d){
- if(!a||!rec)return; intptr_t r=s.fn(0x17F0); if(!r)return;
+ if(!a||!rec)return; intptr_t r=(intptr_t)d2_client_skilldesc_for_skill(rd<int16_t>(rec,0)); if(!r)return;
  s.ord(10601,a,0x98C); s.ord(10435,(intptr_t)unit,rd<int32_t>((void*)r,0x18));
  s.ord(10601,a,0x98D); s.ord(10435,(intptr_t)unit,rd<int32_t>((void*)r,0x1C));
  int32_t x=0,y=0,z=0; sub_33240(s,unit,&x,&y,&z);
@@ -117,7 +118,7 @@ void sub_34D70(Services& s,void* unit,int32_t* outX,int32_t* outY,int32_t scale)
 }
 // 1.13c D2Client+0x34E00
 void sub_34E00(Services& s,void* unit,int32_t a,const uint8_t* rec,int32_t d){
- if(a&&rec&&s.fn(0x17F0))sub_34C00(s,unit,a,rec,d);
+ if(a&&rec&&(intptr_t)d2_client_skilldesc_for_skill(rd<int16_t>(rec,0)))sub_34C00(s,unit,a,rec,d);
 }
 // 1.13c D2Client+0x34E50
 void sub_34E50(Services& s,void* unit,int32_t a,int32_t b,const uint8_t* rec){

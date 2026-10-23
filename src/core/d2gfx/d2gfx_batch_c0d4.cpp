@@ -106,3 +106,26 @@ int32_t d2gfx_raise(const D2GfxRaiseHost* h, int32_t sig) {
     if (sig == 8) *(uint32_t*)(ptd + 0x5C) = oldfpe;
     return 0;
 }
+
+// 1.13c D2Gfx+0x0C4DF FindHandlerForForeignException: for a non-breakpoint (0x80000003) foreign SEH code,
+// unless an installed SE translator (ptd->_translator) handled it, scan the try blocks in
+// [start,end) from GetRangeOfTrysToCheck(funcinfo, state, catchDepth); each whose [tryLow,tryHigh]
+// holds `state` and whose LAST handler is catch(...) (type null, or type name[0]==0 at +8) -> CatchIt.
+// Try-block entries are 20 bytes: tryLow, tryHigh, catchHigh, nCatches, handlerArray; handlers 16 bytes, type at +4.
+extern "C"
+void d2gfx_find_handler_foreign_exception(uint8_t* mem, uint32_t excRecord, int32_t catchDepth, int32_t state,
+        uint32_t funcInfo, uint32_t ptdTranslator,
+        int (*call_se_translator)(),
+        uint32_t (*get_range)(uint32_t funcInfo, int32_t state, int32_t depth, uint32_t* start, uint32_t* end),
+        void (*catch_it)(uint32_t tryBlock)) {
+    if (*(int32_t*)(mem + excRecord) == (int32_t)0x80000003) return;
+    if (ptdTranslator != 0 && call_se_translator() != 0) return;
+    uint32_t lo = 0, hi = 0;
+    uint32_t tb = get_range(funcInfo, state, catchDepth, &lo, &hi);
+    for (; lo < hi; ++lo, tb += 20) {
+        if (*(int32_t*)(mem + tb) > state || state > *(int32_t*)(mem + tb + 4)) continue;
+        uint32_t last = *(uint32_t*)(mem + tb + 16) + (*(int32_t*)(mem + tb + 12) - 1) * 16;
+        uint32_t type = *(uint32_t*)(mem + last + 4);
+        if (type == 0 || mem[type + 8] == 0) catch_it(tb);
+    }
+}

@@ -133,7 +133,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_3537(int32_t param_1, const D2ClientBatch
     return ret;
 }
 
-// 1.13c D2Client+0x03686 (__cexit): doexit(0, 0, returning=1).
+// 1.13c D2Client+0x3686 (__cexit): doexit(0, 0, returning=1).
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_3686(D2cHost h) {
     d2_client_35a1(0, 0, 1, h);
@@ -216,7 +216,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_client_3704(const uint8_t* p, uint32_t size, ui
     return (total - remaining) / size;
 }
 
-// 1.13c D2Client+0x0380B (_fwrite): lock the stream (0x5590), run __fwrite_lk, release the stream
+// 1.13c D2Client+0x0380b (_fwrite): lock the stream (0x5590), run __fwrite_lk, release the stream
 // through the 0x384D funclet ([EBP+0x14] = the FILE argument), return __fwrite_lk's count.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_client_380b(const uint8_t* str, uint32_t size, uint32_t count,
@@ -233,7 +233,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_client_380b(const uint8_t* str, uint32_t size, 
     return n;
 }
 
-// 1.13c D2Client+0x0384D: __unlock_file(*(FILE**)(caller EBP + 0x14)) -- the _fwrite funclet.
+// 1.13c D2Client+0x0384d: __unlock_file(*(FILE**)(caller EBP + 0x14)) -- the _fwrite funclet.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_384d(CrtFile* file, const D2ClientBatch312AEnv* env) {
     env->unlock_file(file);

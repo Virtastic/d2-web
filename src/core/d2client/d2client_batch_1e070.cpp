@@ -109,7 +109,7 @@ static uintptr_t g_animTbl[64];      // +0x0F9FE0  5-dword stride; +0x0F9FF0 is 
 static uint8_t  g_conv1223D0[16];    // +0x1223D0  DAT_6fbd23d0, the Unicode conversion scratch
 static int32_t  g_ctx48[0x48 / 4];   // the throwaway context 0x1E5F0 builds (frame +0, cel +0x34)
 
-// 1.13c D2Client+0x01E070: while the byte flag is set, advance the 64-bit client RNG at state+0x20
+// 1.13c D2Client+0x1e070: while the byte flag is set, advance the 64-bit client RNG at state+0x20
 // (x = lo32 * 0x6AC690C5 + hi32, stored back), take used = lo32 % 3, and for i in [0, used+2) spawn
 // actor record {id = ++counter (0x0DE834, wraps 0xFFFFFFFF->0; type 0x95; x = param_1 + (i&1);
 // y = param_2 + (i&1); 0; 0; 1} through 0xA7780; publish flag 1 and the low byte of the returned
@@ -201,7 +201,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_1e5f0(uint32_t mode1C980, const D2ClientBatc
     env->drawCel(g_11C304, frame, x + 3, y - 4, -1, 5);
 }
 
-// 1.13c D2Client+0x0200E0: 10569(param_1, &kind, &other); when the object is absent or its +0x10
+// 1.13c D2Client+0x200e0: 10569(param_1, &kind, &other); when the object is absent or its +0x10
 // word is 0, and kind is 4, refresh the two position accessors of +0x2C for every object type except
 // 2 and 4..5, then call 0xB0450. Retail's 0xB0450 argument is the caller's ECX (an artifact of the
 // previous call), modelled as 0.
@@ -260,7 +260,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_20180(void* self, int32_t param_1,
     if (*piVar5 == 1 && piVar5[5] != 0) *(uint8_t*)(piVar5[5] + 0x16) &= 0x7F;
 }
 
-// 1.13c D2Client+0x020340: __fastcall(param_1 /*ECX*/, param_2 /*EDX*/), eaxIn = EAX (0 becomes 1).
+// 1.13c D2Client+0x20340 (0x020340): __fastcall(param_1 /*ECX*/, param_2 /*EDX*/), eaxIn = EAX (0 becomes 1).
 // Skip only when param_2 == 0xC3 and the object is not a live type-1 object with bit 0 of +0x17 at
 // obj[5]. Build the 0x5C-byte draw context {+0 = 0x21; +4 = obj; +0x10 = param_2; +0x14 = x; +0x18 =
 // y; +0x1C/+0x20 = per-tile x/y; +0x2C = 0; +0x30 = eaxIn; +0x54 = 0x73B60 unless param_2 == 0x141;
@@ -314,7 +314,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_20340(int32_t* param_1, uint32_t param_2, in
     }
 }
 
-// 1.13c D2Client+0x020620: __fastcall(param_1, param_2 /*EDX*/, param_3). param_3 == 0 returns.
+// 1.13c D2Client+0x20620: __fastcall(param_1, param_2 /*EDX*/, param_3). param_3 == 0 returns.
 // Builds a 600-wide-character Unicode buffer (300 default constructions at stride 4), converts the
 // single space, then: for a live type-1 object, bit 2 of obj[5]+0x16 draws 10038(word at +0x26)
 // through 10971; bit 4 appends the 10003 strings via the format helper 0x90CB0 and prints. Otherwise
@@ -392,7 +392,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_20620(int32_t* param_1, uint32_t param_2, in
     env->ord10971();
 }
 
-// 1.13c D2Client+0x020A60: __fastcall with the object in ESI. Refresh 10867/10750 for every type but 2
+// 1.13c D2Client+0x20a60: __fastcall with the object in ESI. Refresh 10867/10750 for every type but 2
 // and 4..5 when +0x2C is set, emit two 0xB30F0 draws of a zeroed 0x5C-byte context whose first dword is
 // 1, then 0x88A70(obj, 0, 0, 0).
 extern "C"
@@ -411,7 +411,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_20a60(int32_t* obj, const D2ClientBatch1de0E
     env->fn88A70(obj, 0, 0, 0);
 }
 
-// 1.13c D2Client+0x020B70: 10569(param_1, &kind, &other); when the object is absent, its +0x10 word is
+// 1.13c D2Client+0x20b70: 10569(param_1, &kind, &other); when the object is absent, its +0x10 word is
 // 0 or 3, and kind is 2, send 10973(param_1, 0x0C, 0) and run 0x20340(param_1, 0xE1) with the retail
 // EAX (0 -> 1 inside 0x20340).
 extern "C"
@@ -424,7 +424,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_20b70(int32_t* param_1, const D2ClientBatch1
     }
 }
 
-// 1.13c D2Client+0x020F20: __fastcall, object in EBX. Only a live type-1 object whose obj[5] is set and
+// 1.13c D2Client+0x20f20: __fastcall, object in EBX. Only a live type-1 object whose obj[5] is set and
 // whose byte at +0x1C is nonzero: play, with the bit-3 flag of obj[5]+0x16, every non-null callback at
 // 0x0FAA340[index], first for the four indexes at 0x0D6D2C..0x0D6D38, then for the nine bytes at
 // obj[5]+0x1C.
@@ -446,7 +446,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_20f20(int32_t* obj) {
     }
 }
 
-// 1.13c D2Client+0x020FB0: __fastcall, dispatch table on the dword at param_1+4, each handler gated on
+// 1.13c D2Client+0x20fb0: __fastcall, dispatch table on the dword at param_1+4, each handler gated on
 // the sub-state at +0x10: 0x2D/0x9C/0xD3/0xE5/0xF2/0xF3/0x100/0x10B/0x16E/0x1DF/0x220 at 0 (0x9C also
 // receives param_1 twice, 0x1DF receives param_1), 0x11C only at 0x0E, and 0x21C..0x21E at 0.
 extern "C"
@@ -479,7 +479,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_20fb0(int32_t* param_1, const D2ClientBatch1
     }
 }
 
-// 1.13c D2Client+0x0212F0: live type-1 object with obj[5] set; play the bit-3 flag of obj[5]+0x16
+// 1.13c D2Client+0x212f0: live type-1 object with obj[5] set; play the bit-3 flag of obj[5]+0x16
 // through the nine callbacks at 0x0F9FE0 indexed by param_3 + byte*5 (the 0x0F9FF0 table Ghidra shows
 // for param_3 == 4 is the same array four dwords in, so the index is identical).
 extern "C"

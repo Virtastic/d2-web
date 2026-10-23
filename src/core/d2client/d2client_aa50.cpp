@@ -19,7 +19,7 @@ struct D2ClientMbtowcEnv {
     int32_t* (*errno_slot)();
 };
 
-// 1.13c D2Client+0x0AA50
+// 1.13c D2Client+0x0aa50
 // VC7.1 ___mbtowc_mt: converts one multibyte character using the locale state.
 // Win32 conversion and CRT errno access are explicit host seams; flags=9 is the
 // retail MB_PRECOMPOSED | MB_ERR_INVALID_CHARS combination.

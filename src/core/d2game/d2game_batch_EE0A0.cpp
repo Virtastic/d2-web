@@ -517,8 +517,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_15240(uint32_t unaff_ESI, 
                 if (iVar9 > 2) fatal(0x31d);
                 const uint32_t w = env->sub144D0(unaff_ESI, 1, 1, 0, 1, *puVar8, 0);
                 if ((int16_t)w == 0) {
-                    iVar13 = 1;
-                    iStack_40 = iStack_40 - 1;
+                    iVar13 = 1; // failure: decompile's -1 then the common +1 = no advance
                 } else {
                     env->ordinal10312();
                     iVar9 = iVar9 + 1;
@@ -530,8 +529,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_15240(uint32_t unaff_ESI, 
                 if (iVar10 > 2) fatal(0x32e);
                 const uint32_t w = env->sub144D0(unaff_ESI, 1, 1, 0, 0, *puVar14, 0);
                 if ((int16_t)w == 0) {
-                    uVar4 = 1;
-                    iStack_40 = iStack_40 - 1;
+                    uVar4 = 1; // failure: -1 then common +1 = no advance
                 } else {
                     env->ordinal10525();
                     iVar10 = iVar10 + 1;

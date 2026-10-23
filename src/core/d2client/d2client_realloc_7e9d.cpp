@@ -41,7 +41,7 @@ inline uint32_t old_size(const void* p) {
 inline uint32_t min32(uint32_t a, uint32_t b) { return a <= b ? a : b; }
 }  // namespace
 
-// 1.13c D2Client+0x07E9D. cdecl; [esp+4] = p, [esp+8] = size. NULL p is _malloc(size); a zero size
+// 1.13c D2Client+0x07e9d. cdecl; [esp+4] = p, [esp+8] = size. NULL p is _malloc(size); a zero size
 // _free's p and returns NULL. With the small-block heap active (mode 3) and p inside a region, resize
 // in place when the request is within the sbh threshold; otherwise allocate a fresh block, copy
 // min(size, old size) and free the old one. Blocks outside a region (or with the heap in another mode)
@@ -114,7 +114,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_client_7e9d(void* p, uint32_t size, const D2Client
     return nullptr;
 }
 
-// 1.13c D2Client+0x0804F (__msize). With the small-block heap active, lock 4, find p in the regions
+// 1.13c D2Client+0x0804f (__msize). With the small-block heap active, lock 4, find p in the regions
 // and, inside one, return the head sentinel word (p-4) minus 9 (the stored size+1 word counts the two
 // 4-byte sentinels: 8 + 1); unlock (0x80BC, the same _unlock(4)). Blocks outside a region, and any
 // heap mode other than 3, ask HeapSize(DAT_6fbd3988, 0, p).

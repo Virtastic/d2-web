@@ -71,7 +71,7 @@ struct D2CommonBatch2F7A0Env {
 // two out pointers. Anything else stores 0 and 0xFFFFFFFF. A null record is the retail fatal 0x1449,
 // which never returns, so nothing is stored.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2F7A0(uint32_t pUnit, uint32_t* pSkillId, uint32_t* pFlags)
+EMSCRIPTEN_KEEPALIVE void D2Common_sub_2F7A0(uint32_t pUnit, uint32_t* pSkillId, uint32_t* pFlags)
 {
 	if (pUnit != 0 && rd32(pUnit, 0) == 0) {
 		const uint32_t pPlayer = rd32(pUnit, 0x14);
@@ -228,7 +228,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_4A3D0(const D2CommonBatch2F7A0Env* env)
 // compared with the low byte of its dword's bits 8.. and the first pair where the low byte is smaller
 // stores 0 and answers 1; the whole scan answers 1.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_24FF0(uint32_t pUnit, uint32_t* pOut,
+EMSCRIPTEN_KEEPALIVE int32_t D2Common_24FF0_StatScan(uint32_t pUnit, uint32_t* pOut,
                                                   const D2CommonBatch2F7A0Env* env)
 {
 	if (pOut != nullptr) *pOut = 1;
@@ -267,7 +267,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3B0A0(uint32_t pRecord)
 // Item hit class: item units (type 4) answer items.txt nHitClass (+0x13C) of their class id (+0x04).
 // A null unit (fatal 0x1190), another type (fatal 0x1191) and a missing row (fatal 0x1193) answer 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_22380(uint32_t pUnit)
+EMSCRIPTEN_KEEPALIVE uint8_t D2Common_22380_ItemHitClass(uint32_t pUnit)
 {
 	static_assert(offsetof(D2ItemsTxt, nHitClass) == 0x13C, "items.txt nHitClass");
 	if (pUnit == 0 || rd32(pUnit, 0) != 4) return 0;
@@ -283,7 +283,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_22380(uint32_t pUnit)
 // through the vendored STATLIST_GetTotalStat, the body of the 1.13c 0x38A80 (list in its register
 // operand, packed layer-0 id in its other).
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_31EA0(uint32_t pUnit)
+EMSCRIPTEN_KEEPALIVE int32_t D2Common_PlayerAttackRating(uint32_t pUnit)
 {
 	static_assert(offsetof(D2CharStatsTxt, dwToHitFactor) == 0x3C, "charstats dwToHitFactor");
 	if (pUnit == 0 || rd32(pUnit, 0) != 0) return 0;
@@ -324,7 +324,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_31EA0(uint32_t pUnit)
 // word is non-zero is decremented, the 0x99BF8 callback runs, and the record is propagated with
 // status 1 through the vendored DRLGACTIVATE_RoomExPropagateUnsetStatus (1.13c 0x7BB20).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3CC40(uint32_t pFirst, uint32_t pSecond,
+EMSCRIPTEN_KEEPALIVE void DRLGACTIVATE_RoomUnsetAndPropagateStatus(uint32_t pFirst, uint32_t pSecond,
                                                const D2CommonBatch2F7A0Env* env)
 {
 	const uint32_t pA = pFirst != 0 ? rd32(pFirst, 0x10) : 0;

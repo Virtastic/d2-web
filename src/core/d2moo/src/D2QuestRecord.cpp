@@ -29,6 +29,7 @@ void __stdcall QUESTRECORD_ClearQuestState(D2BitBufferStrc* pQuestRecord, int nQ
 }
 
 //D2Common.0x6FDAE8D0 (#11110)
+// 1.13c D2Common+0x2D020
 void __stdcall QUESTRECORD_ResetIntermediateStateFlags(D2BitBufferStrc* pQuestRecord, int nQuest)
 {
 	D2_ASSERT(pQuestRecord);

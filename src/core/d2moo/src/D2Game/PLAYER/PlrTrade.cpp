@@ -1025,6 +1025,7 @@ void __fastcall PLRTRADE_CreateCubeOutputs(D2GameStrc* pGame, D2UnitStrc* pUnit,
     }
 }
 
+// 1.13c D2Game+0x700C0
 //D2Game.0x6FC90A60
 void __fastcall PLRTRADE_Free(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
@@ -2404,6 +2405,7 @@ void __fastcall sub_6FC931D0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
 }
 
 //D2Game.0x6FC933F0
+// 1.13c D2Game+0x53B40 (PlrTrade.cpp:PLRTRADE_CopyTradeSaveDataToBuffer). Delta: retail takes an extra game arg and falls back to 0x537D0 (WriteItems) when no cached trade save fits or its length is 0; the vendored body returns 0 there.
 int32_t __fastcall PLRTRADE_CopyTradeSaveDataToBuffer(D2UnitStrc* pUnit, uint8_t* pBuffer, int32_t nBufferSize)
 {
     D2PlayerTradeStrc* pTrade = UNITS_GetPlayerData(pUnit)->pTrade;

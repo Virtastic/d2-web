@@ -27,6 +27,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_exit(int code) {
 // The native callback table is shared with init/registration. The terminal host-process paths remain
 // a shim; empty-table FN vectors still observe only these three globals. Native exhaustion leaves
 // end == begin instead of retail's one-before-begin sentinel, avoiding invalid C++ pointer arithmetic.
+// 1.13c D2Win+0x0113b: the same statically linked MSVC 2003 CRT `_doexit`, 181 B, identical
+// control flow (globals 0x6F901020/24/1C, onexit 0x6F9ABC4C/50, tables 0x6F8FF034/3C); d2_mcp_doexit below is the stand-in.
 static uint32_t g_C_Termination_Done;   // +0xAA20
 static uint32_t g_C_Exit_Done;          // +0xAA24
 static uint8_t  g_exitflag;             // +0xAA1C

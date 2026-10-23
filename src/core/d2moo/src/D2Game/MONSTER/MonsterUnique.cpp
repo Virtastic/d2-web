@@ -1795,6 +1795,7 @@ void __fastcall sub_6FC6DFC0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod
 }
 
 //D2Game.0x6FC6E070
+// 1.13c D2Game+0x218A0
 void __fastcall MONSTERUNIQUE_SetTrapDamage(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 {
     int32_t nLevel = 2;
@@ -2491,6 +2492,7 @@ void __fastcall D2GAME_SpawnMinions_6FC6F440(D2GameStrc* pGame, D2ActiveRoomStrc
         D2MonsterDataStrc* pMonsterData = MONSTERUNIQUE_GetMonsterData(pUnit);
         if (!pMonsterData || !(pMonsterData->nTypeFlag & 4))
         {
+            // 1.13c D2Game+0x21f60 (inlined: minion class redirect via monstats wMinion[0])
             int32_t nMinionId = pUnit->dwClassId;
 
             D2MonStatsTxt* pMonStatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(pUnit->dwClassId);
@@ -2645,6 +2647,7 @@ void __fastcall sub_6FC6F670(D2UnitStrc* pUnit, int32_t nUMod, int32_t bUnique)
 }
 
 //D2Game.0x6FC6F690
+// 1.13c D2Game+0x251f0
 D2UnitStrc* __fastcall D2GAME_SpawnSuperUnique_6FC6F690(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t nSuperUnique)
 {
     if (pGame->nDifficulty >= 3u)

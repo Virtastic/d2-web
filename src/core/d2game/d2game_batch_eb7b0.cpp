@@ -110,6 +110,7 @@ static int32_t QuestSection(void* pPlayer, uint8_t** ppSection, const uint8_t* p
 }
 
 // ---- 0xEBC40: 'fi' skill section ---------------------------------------------------------------
+// 1.13c D2Game+0xEBC40
 // 1.13c writes the marker before resolving the class id (1.10f resolved it first) and leaves the
 // section cursor unadvanced on the BAD_CLASS return.
 static int32_t SkillSection(void* pPlayer, uint8_t** ppSection, const uint8_t* pEnd, const D2GameBatchEEnv* env)
@@ -140,6 +141,7 @@ static int32_t SkillSection(void* pPlayer, uint8_t** ppSection, const uint8_t* p
     d2game_fatal(0x8A4);
 }
 
+// 1.13c D2Game+0xEC020
 // ---- 0xEC020: PLRSAVE2_WriteIronGolemSection ('fk') --------------------------------------------
 // Retail advances by the serializer's length even when it reported failure; only the present flag is
 // cleared (same as the 1.10f body).
@@ -447,7 +449,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_1e900(uint32_t* r)
     r[4] = 0;
 }
 
-// 1.13c D2Game+0x20CF0
+// 1.13c D2Game+0x20cf0
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_20cf0(uint32_t* r)
 {

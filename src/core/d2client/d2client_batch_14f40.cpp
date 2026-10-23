@@ -17,7 +17,6 @@ struct Host {
  I (*opi)(U id,P a,P b,P c);                // generic callee returning int
 };
 // 1.13c D2Client+0x14F40
-// 1.13c D2Client+0x14F40
 I sub_14F40(const Host& H,P unit,I idx){
  if(*((uint8_t*)unit+0x4e)!=3) return 1;
  const uint8_t* dt=H.dataTables();

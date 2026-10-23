@@ -141,7 +141,7 @@ void GAME_1F30(void* object, bool leaveLock, const D2GameBatchSeams& s)
 }
 
 // ---- CRT exit path ------------------------------------------------------------------------------
-// 1.13c D2Game+0x2979
+// 1.13c D2Game+0x02979
 void d2game_doexit(const D2GameBatchSeams& s, uint32_t code, int skipOnexit, int keepProcess)
 {
     // __lock(8): compat no-op.

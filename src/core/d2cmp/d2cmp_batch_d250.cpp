@@ -7,6 +7,7 @@
 // mscoree CorExitProcess then ExitProcess; host process exit is not ours), 0x2E8D __lock and
 // 0x2EBE _free (small-block-heap + CRT lock table, state we do not carry), 0x7806 __fptrap
 // (__amsg_exit(2), a runtime-abort message). 0x3DD2 _malloc and 0x6120 _strlen map to libc.
+#include <cstdio>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -26,7 +27,7 @@ struct D2CmpCacheEnv {
 
 extern "C" {
 
-// 1.13c D2CMP+0x0D250: resize node (EDI) of cache (EAX) to node.size = param_1 + node.size, evict
+// 1.13c D2CMP+0x0d250: resize node (EDI) of cache (EAX) to node.size = param_1 + node.size, evict
 // until the cache total fits its budget; the node is pinned (flag 2) while evicting.
 void d2cmp_d250(uint32_t* cache, uint32_t* node, uint32_t param_1, const D2CmpCacheEnv* e) {
     void* cs = (void*)(uintptr_t)cache[0x30 / 4];
@@ -53,7 +54,7 @@ void d2cmp_d250(uint32_t* cache, uint32_t* node, uint32_t param_1, const D2CmpCa
     e->unlock(cs);
 }
 
-// 1.13c D2CMP+0x0C030: (EDI=cache, EBX=bytes) account a new entry if under the entry cap (0x1400)
+// 1.13c D2CMP+0x0c030 (0x0C030): (EDI=cache, EBX=bytes) account a new entry if under the entry cap (0x1400)
 // and the byte budget; returns the slot found, 0 if none/not taken.
 int d2cmp_c030(uint32_t* cache, uint32_t bytes, uint32_t param_1, const D2CmpCacheEnv* e) {
     int r = 0;
@@ -71,7 +72,7 @@ int d2cmp_c030(uint32_t* cache, uint32_t bytes, uint32_t param_1, const D2CmpCac
     return r;
 }
 
-// 1.13c D2CMP+0x0D7F0: (EAX=dcc, ESI=sprite, EBX=dir count) fill a sprite's per-frame offsets from
+// 1.13c D2CMP+0x0d7f0: (EAX=dcc, ESI=sprite, EBX=dir count) fill a sprite's per-frame offsets from
 // the directory table and allocate its pixel block; 0 ok, -1 on mismatch/alloc failure.
 int d2cmp_d7f0(uint8_t* hdr, int dcc, uint8_t* spr, int dirs, int frame, const D2CmpCacheEnv* e) {
     if (!hdr) e->fatal(e->fatalFmt, e->lookupString(0x398));
@@ -114,10 +115,24 @@ have:
 // 1.13c D2CMP+0x03DD2 _malloc (__nh_malloc with the new-handler mode; host libc here)
 void* d2cmp_malloc(size_t n) { return malloc(n); }
 
+// 1.13c D2CMP+0x03B03 _realloc: NULL -> malloc; size 0 -> free, NULL; else resize (host libc replaces the sbh/HeapReAlloc paths)
+void* d2cmp_realloc(void* p, size_t n) {
+    if (!p) return malloc(n);
+    if (!n) { free(p); return nullptr; }
+    if (n > 0xFFFFFFE0u) return nullptr;  // retail: __callnewh, returns NULL
+    return realloc(p, n);
+}
+
 // 1.13c D2CMP+0x06120 _strlen
 size_t d2cmp_strlen(const char* s) { return strlen(s); }
 
 // 1.13c D2CMP+0x06263 __security_check_cookie: mismatch -> report_failure (abort)
 void d2cmp_security_check_cookie(uintptr_t v, uintptr_t cookie) { if (v != cookie) abort(); }
+
+// 1.13c D2CMP+0x18D38 _cftog: %g of *dbl into buf with `digits` significant digits; exponent < -4 or >= digits -> %e form (caps = upper E), else %f form; host snprintf replaces __fptostr/__cftoe2/__cftof2
+void d2cmp_cftog(const double* dbl, char* buf, size_t digits, int caps) {
+    char f[8]; snprintf(f, sizeof f, caps ? "%%.*G" : "%%.*g");
+    snprintf(buf, digits + 16, f, (int)(digits ? digits - 1 : 0) + 1, *dbl);
+}
 
 }

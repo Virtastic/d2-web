@@ -347,7 +347,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_9B630(uint32_t self, uint32_t param1,
 
 // _doserrno: the per-thread data block (0x3B93) plus the VS2003 _ptiddata offset 0x0C (the long
 // after _terrno at 0x08). Returns the address, never the value.
-// 1.13c D2Game+0x4E6E
+// 1.13c D2Game+0x04e6e
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t* d2_fn_d2game_4E6E(const D2GameBatchC2150Env* env)
 {
@@ -422,9 +422,9 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_56BD(uint32_t fd, const char* buf, uin
 
 // __lock_fhandle(fh): the ioinfo record is _pioinfo[fh >> 5] + (fh & 0x1F) * 0x24. Its +0x08 slot is
 // created under __lock(10) when zero: __crtInitCritSecAndSpinCount(record + 0xC, 4000) failure returns
-// 0 (the SEH unwind skips the unlock), otherwise the slot is incremented and __unlock(10) runs.
-// EnterCriticalSection on record + 0xC always follows; returns 1.
-// 1.13c D2Game+0x88DB
+// 0 (__local_unwind2 to -1 runs the finally, so __unlock(10) still runs, without entering), otherwise
+// the slot is incremented and __unlock(10) runs. EnterCriticalSection on record + 0xC follows; returns 1.
+// 1.13c D2Game+0x088db
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_88DB(int32_t fileHandle, const D2GameBatchC2150Env* env)
 {
@@ -433,7 +433,10 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_88DB(int32_t fileHandle, const D2GameB
     if (rd32(io, 8) == 0) {
         env->lock(10);
         if (rd32(io, 8) == 0) {
-            if (env->crtInitCritSecAndSpinCount(io + 0xC, 4000) == 0) return 0;
+            if (env->crtInitCritSecAndSpinCount(io + 0xC, 4000) == 0) {
+                env->unlock(10);
+                return 0;
+            }
             wr32(io, 8, rd32(io, 8) + 1);
         }
         env->unlock(10);
@@ -445,7 +448,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_88DB(int32_t fileHandle, const D2GameB
 // __lseek_lk(fh, offset, origin): __get_osfhandle(fh) == -1 sets errno EBADF (9) and returns -1.
 // Otherwise SetFilePointer(hFile, offset, NULL, origin); on -1 GetLastError decides: no error clears
 // ioinfo +0x04 bit 0x02 (FEOFLAG), any other error goes through __dosmaperr and the result is -1.
-// 1.13c D2Game+0x8097
+// 1.13c D2Game+0x08097
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_8097(uint32_t fd, int32_t offset, uint32_t origin,
                                                 const D2GameBatchC2150Env* env)
@@ -469,7 +472,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_8097(uint32_t fd, int32_t offset, uin
 }
 
 // Tail of the CRT lock/unlock pair: FUN_6fc23f76(4).
-// 1.13c D2Game+0x5AE0
+// 1.13c D2Game+0x05ae0
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_5AE0(const D2GameBatchC2150Env* env)
 {
@@ -525,7 +528,7 @@ static void sbh_clear_bucket(uint32_t param1, uint32_t uVar6, uint32_t uVar14, u
 // and when its bitmap is all ones the region array entry itself is freed and the array memmoved down
 // by 0x14, count decremented, param1 adjusted past the removed entry on a smaller address, and
 // 0x6FD39FC4 set to the array base. The freed region/index become the current ones.
-// 1.13c D2Game+0x8C48
+// 1.13c D2Game+0x08c48
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8C48(uint32_t param1, uint32_t param2,
                                             const D2GameBatchC2150Env* env)

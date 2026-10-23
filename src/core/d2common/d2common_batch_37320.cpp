@@ -19,7 +19,7 @@ static_assert(sizeof(D2ItemTypesTxt) == 0xE4, "itemtypes.txt record stride");
 // vendored struct places them by name, so they are reached through sgptDataTables rather than raw.
 
 // 0x260F0 (src/core/d2common/d2common_batch_343e0.cpp) and 0x22B70 (d2common_batch_22ec0.cpp).
-extern "C" int32_t d2_fn_d2common_260f0(uint32_t pUnit, int32_t (*pfn22B70)(uint32_t),
+extern "C" int32_t D2SetStatWithNoTest(uint32_t pUnit, int32_t (*pfn22B70)(uint32_t),
 	int32_t (*pfn38A80)(uint32_t, uint32_t));
 uint32_t D2Common_22B70_GetMaxStack(uint32_t nItemId);
 uint32_t D2Common_230A0_ItemTypeFromItemId(uint32_t nItemId);
@@ -80,7 +80,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3bb80(uint32_t pRecord, uint32_t nValue
 		U(P(n), 0x08) = nValue;
 }
 
-// 1.13c D2Common+0x24E10: itemtypes.txt nAutoStack (+0x13) of an item unit's item type. Anything
+// 1.13c D2Common+0x24e10: itemtypes.txt nAutoStack (+0x13) of an item unit's item type. Anything
 // but a type-4 unit, an out-of-range item type or a missing row answers 0.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_24e10(uint32_t pUnit) {   // 1.13c D2Common+0x24E10
@@ -186,7 +186,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_20bc0(uint32_t pInventory, uint32_t
 					if (nVer >= 0x47 && pStatList != 0 && g_d2common_fn_38a80)
 						nThreshold = g_d2common_fn_38a80(pStatList);
 				}
-				const int32_t nValue = d2_fn_d2common_260f0(pItem, &MaxStackThunk, nullptr);
+				const int32_t nValue = D2SetStatWithNoTest(pItem, &MaxStackThunk, nullptr);
 				if (nThreshold < nValue) return pItem;
 			}
 		}

@@ -129,7 +129,7 @@ uint8_t* D2CMP_10085_GetTileFlagArray(D2TileLibraryEntryStrc* e) { D2_ASSERT(e);
 // Table bytes are retail data, so the pointer itself is not reproduced; the index is.
 int D2CMP_14EC0_TableIndex(int a, int b) { return (a < 9 && b < 0x15 && a != 0 && (a < 3 || a > 4)) ? a * 0x69 + b : -1; }
 
-// 1.13c D2CMP+0x17020
+// 1.13c D2CMP+0x17020 (verified against decompile)
 // Cache bucket lookup. Retail gets bucket index + key hash from 0x16E80 (register args); the caller supplies them.
 // Node: +4 id, +8..+18 five key ints, +1C hash, +2C next (void*). Key: +4 flags, +8 kind, +C idA, +14 idB, +18..+28 five ints.
 const uint8_t* D2CMP_17020_CacheFind(const uint8_t* pTable, const uint8_t* pKey, uint32_t nBucket, uint32_t nHash) {
@@ -146,7 +146,7 @@ const uint8_t* D2CMP_17020_CacheFind(const uint8_t* pTable, const uint8_t* pKey,
     return nullptr;
 }
 
-// 1.13c D2CMP+0xC0B0 -- sprite-cache init (SpriteCache.cpp): 0x1400 doubly linked 0x1c-byte nodes
+// 1.13c D2CMP+0xc0b0 -- sprite-cache init (SpriteCache.cpp): 0x1400 doubly linked 0x1c-byte nodes
 // (next at +0x14, prev at +0x18), head/tail kept at [9]/[10], critical section created once.
 // Stateful, register args (eax,ecx,edx -> a,b,c): no FN vector; mapped from the decompile.
 struct D2SpriteCache { void *a, *b; uint32_t c; uint8_t* pNodes; uint32_t z[4]; uint8_t* pHead; uint8_t* pTail; uint32_t arg; void* pLock; };
@@ -161,4 +161,46 @@ void D2CMP_SpriteCacheInit(D2SpriteCache* p, void* a, void* b, uint32_t c) {
     p->pHead = p->pNodes; p->pTail = p->pNodes + 0x22fe4;
     p->z[0] = p->z[1] = p->z[2] = p->z[3] = 0;
     if (!p->pLock) p->pLock = calloc(1, 0x18);   // CRITICAL_SECTION stand-in
+}
+
+// 1.13c D2CMP+0x08710 -- statically linked CRT __convertcp(fromCP, toCP, src, &len, dst, dstLen).
+// Retail goes through MultiByteToWideChar/WideCharToMultiByte; we have no codepages, so both are
+// treated as single-byte identity (ponytail: Latin-1 ceiling). from==to -> NULL. len==-1 -> NUL-terminated.
+// dst==NULL -> malloc'd result (caller frees), *len updated unless -1; else copy into dst, return dst.
+#include <stdlib.h>
+#include <string.h>
+extern "C" void* d2cmp_convertcp_8710(unsigned from, unsigned to, const char* src, unsigned* len, char* dst, int dstLen)
+{
+	if (from == to) return nullptr;
+	// 1.13c D2CMP+0x06120 (_strlen = libc strlen)
+	unsigned n = *len == 0xFFFFFFFFu ? (unsigned)strlen(src) + 1 : *len;
+	if (dst) { if ((int)n > dstLen) return nullptr; memcpy(dst, src, n); return dst; }
+	char* out = (char*)malloc(n);
+	if (!out) return nullptr;
+	memcpy(out, src, n);
+	return out;
+}
+
+// 1.13c D2CMP+0x0EDD0
+// Register-convention blend row loop (EAX=dst, ECX=src stream, ESI=blend table, EDI=remap table).
+// Stream byte b: b>=0x80 -> skip (b&0x7f) dst px, 0 ends the row; else (b&7) + 8*(b>>3) pixels follow,
+// each dst = blend[dst*256 + remap[src]] (esi base). Rows advance by stride; `rows` rows.
+// Returns the src stream pointer after the last row.
+extern "C" const uint8_t* d2cmp_edd0_blend_rows(uint8_t* dst, const uint8_t* src, const uint8_t* blend,
+                                                const uint8_t* remap, int rows, int stride) {
+	for (; rows; --rows) {
+		uint8_t* next = dst + stride;
+		for (;;) {
+			uint8_t b = *src++;
+			if (b & 0x80) {
+				if (!(b & 0x7f)) break;
+				dst += b & 0x7f;
+				continue;
+			}
+			for (int n = (b & 7) + (b >> 3) * 8; n > 0; --n, ++dst, ++src)
+				*dst = blend[*dst * 256 + remap[*src]];
+		}
+		dst = next;
+	}
+	return src;
 }

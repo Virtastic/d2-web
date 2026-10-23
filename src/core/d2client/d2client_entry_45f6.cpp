@@ -27,7 +27,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_45f6_seams(int32_t (*crt_init)(uint32_t, int
     g_praw_dll_main = raw_dll_main;
 }
 
-// 1.13c D2Client+0x45F6
+// 1.13c D2Client+0x045f6
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_client_45f6(uint32_t module, int32_t reason, uint32_t reserved) {
     int32_t result = 1;

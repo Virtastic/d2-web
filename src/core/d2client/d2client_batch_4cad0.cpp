@@ -8,7 +8,7 @@ struct Node { Inner* p30; };
 struct Unit { int32_t type; void* path; Node* node; uint32_t flags31; uint32_t flagsC8; uint32_t seed[2]; };
 struct Frame { uint32_t w[18]; }; // 0x48-byte record: w[0]=active, w[13]=colour global, w[16]=0
 struct G {
- int32_t cc414{},d2bc48{},d2bc4c{},cb828{},cc300{},cc304{},cc308{},cc30c{},c9960{},cc418{},c995c{};
+ int32_t cc414{},d2bc48{},d2bc4c{},cb828{},cb824{},cc300{},cc304{},cc308{},cc30c{},c9960{},cc418{},c995c{};
  int32_t aada4{},aad90{},aadb0{},aadd8{},aad84{},aad88{},aadac{},aad98{},aad9c{},d5d0{};
  uint8_t c9663{},c9721{}; uint8_t aad80[64]{}; int32_t ptr538Mode[64]{}; uint32_t table601c[5]{};
  struct Q { Q* next; int32_t id; int32_t v; }* queue{}; // list at DAT_6fbcc4d4: +8 id, +0x2c value, +0x30 next
@@ -139,19 +139,19 @@ void sub_50430(Svc& s,G& g){
  s.o10060(s.o10021(a)); s.o10003(0,0,0); s.o10028();
  if(s.gfxMode()!=2){ s.o10003(g.d2bc4c-0x8e,0,0); s.o10150(); s.o10041(a,x,g.d2bc4c-0x69,-1,5,0); }
  Frame b; blank(b,g); int32_t on;
- if(s.gfxMode()==2) on=g.cc308?s.f4ff10():0; else on=g.cc308?sub_4FF60(g,g.cb828,s.gfxMode(),0 /*esi: caller register, unrecovered*/):0;
+ if(s.gfxMode()==2) on=g.cc308?s.f4ff10():0; else on=g.cc308?sub_4FF60(g,g.cb828,s.gfxMode(),g.cb824 /*esi = mouse Y, DAT_6fbcb824*/):0;
  b.w[0]=on?1:0;
  s.o10060(s.o10021(b)); s.o10003(0,0,0); s.o10028();
  if(s.gfxMode()!=2){ s.o10041(b,x+3,g.d2bc4c-0x6d,-1,5,0); return; }
  if(s.f4ff10()&&!g.aada4){ s.o10003(g.d2bc4c-0x32,0,1); s.o10085(); }
  s.o10041(b,g.d2bc48/2-0xc2,g.d2bc4c-8,-1,5,0);
 }
-struct Msg { uint16_t x; int32_t f18,f1c; };
+struct Msg { uint16_t x,y; int32_t f18,f1c; };
 // 1.13c D2Client+0x50750
 void sub_50750(Svc& s,G& g,Msg* m){
  int32_t mode=s.gfxMode(), saved=g.cc414;
  if(mode==2&&g.aada4) return;
- int32_t hit=(s.gfxMode()==2)?s.f4ff10():sub_4FF60(g,m->x,s.gfxMode(),0 /*esi unrecovered*/);
+ int32_t hit=(s.gfxMode()==2)?s.f4ff10():sub_4FF60(g,m->x,s.gfxMode(),m->y);
  if(!hit){ m->f18=0; return; }
  g.cc308=1; s.f38a70(); s.f16360();
  if(saved!=2||!s.f46150()||g.c9663!=1){ m->f18=1; m->f1c=0; s.o511(m); }

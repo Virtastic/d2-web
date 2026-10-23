@@ -43,3 +43,30 @@ extern "C" int d2lang_crt_sprintf(char* dst, const char* fmt, ...)
 	va_end(ap);
 	return n;
 }
+
+// 1.13c D2Lang+0x7C00: fatal-read-check tail (register args: ESI=handle, EDI=expected, local=actual size).
+// handle==0 -> msg 0x87; Fog#10104 read fails -> Storm#276 then msg 0x8f; size mismatch -> msg 0x92;
+// otherwise returns. Failure: Fog#10265(msg) -> Fog#10024(fmt 0x6fc0d274, text), _exit(-1).
+struct D2LangReadCheckHooks {
+	int (*fogRead)();            // Fog#10104
+	void (*stormLastError)();    // Storm#276
+	unsigned (*fogMsg)(unsigned); // Fog#10265
+	void (*fogLog)(unsigned);    // Fog#10024 with the 0x6fc0d274 format
+};
+extern "C" void d2lang_readcheck_7c00(const void* handle, int expected, int actual, const D2LangReadCheckHooks& h)
+{
+	unsigned msg;
+	if (!handle) msg = 0x87;
+	else if (!h.fogRead()) { h.stormLastError(); msg = 0x8f; }
+	else if (expected == actual) return;
+	else msg = 0x92;
+	h.fogLog(h.fogMsg(msg));
+	d2lang_crt_exit(-1);
+}
+
+// 1.13c D2Lang+0x03E37: ___free_lc_time -- free the 43 owned strings of a time-locale block.
+extern "C" void d2lang_crt_free_lc_time(void** p)
+{
+	if (!p) return;
+	for (int i = 0; i < 43; i++) free(p[i]);
+}

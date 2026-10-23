@@ -242,6 +242,7 @@ D2ActiveRoomStrc* __fastcall DUNGEON_AllocRoom(D2DrlgActStrc* pAct, D2DrlgRoomSt
 }
 
 //D2Common.0x6FD8BD90 (#10040)
+// 1.13c D2Common+0x3b970
 BOOL __stdcall DUNGEON_DoRoomsTouchOrOverlap(D2ActiveRoomStrc* ptFirst, D2ActiveRoomStrc* ptSecond)
 {
 	D2_ASSERT(ptFirst);
@@ -263,6 +264,7 @@ BOOL __stdcall DUNGEON_AreTileCoordinatesInsideRoom(D2ActiveRoomStrc* pRoom, int
 }
 
 //D2Common.0x6FD8BE90 (#10048)
+// 1.13c D2Common+0x3B860
 int __stdcall DUNGEON_CheckRoomsOverlapping_BROKEN(D2ActiveRoomStrc* pPrimary, D2ActiveRoomStrc* pSecondary)
 {
 	//This was probably meant to check if 2 rooms are overlaping / adjacent, but pSecondary is unused.
@@ -458,6 +460,7 @@ D2ActiveRoomStrc* __stdcall DUNGEON_FindActSpawnLocationEx(D2DrlgActStrc* pAct, 
 }
 
 //D2Common.0x6FD8C4A0 (#10029)
+// 1.13c D2Common+0x3C640
 D2UnitStrc* __stdcall DUNGEON_GetFirstUnitInRoom(D2ActiveRoomStrc* pRoom)
 {
 	D2_ASSERT(pRoom);
@@ -864,6 +867,7 @@ void __stdcall DUNGEON_RemoveClientFromRoom(D2ActiveRoomStrc* pRoom, D2ClientStr
 }
 
 //D2Common.0x6FD8CDF0 (#10081)
+// 1.13c D2Common+0x3B350
 int __stdcall D2Common_10081_GetTileCountFromRoom(D2ActiveRoomStrc* pRoom)
 {
 	D2_ASSERT(pRoom);
@@ -1161,6 +1165,7 @@ D2RoomCoordListStrc* __stdcall DUNGEON_GetRoomCoordList(D2ActiveRoomStrc* pRoom)
 	return DRLGLOGIC_GetRoomCoordList(pRoom->pDrlgRoom);
 }
 
+// 1.13c D2Common+0x3BC80
 //D2Common.0x6FD8D3D0 (#10098)
 void __stdcall DUNGEON_GetPortalLevelArrayFromPortalFlags(void* pMemPool, int nFlags, int** ppLevels, int* pnLevels)
 {
@@ -1309,6 +1314,7 @@ void __stdcall DUNGEON_SaveKilledUnitGUID(D2ActiveRoomStrc* pRoom, D2UnitGUID nU
 }
 
 //D2Common.0x6FD8D690 (#10107)
+// 1.13c D2Common+0x4daf0
 void __stdcall DUNGEON_ClientToGameTileCoords(int* pX, int* pY)
 {
 	const int nOutX = (2 * *pY + *pX) / 160;
@@ -1319,16 +1325,19 @@ void __stdcall DUNGEON_ClientToGameTileCoords(int* pX, int* pY)
 }
 
 //D2Common.0x6FD8D870 (#10108)
+// 1.13c D2Common+0x4D8E0
 void __stdcall DUNGEON_ClientToGameSubtileCoords(int* pX, int* pY)
 {
-	const int nOutX = (2 * *pY + *pX) / 32;
-	const int nOutY = (2 * *pY - *pX) / 32;
+	// retail shifts arithmetically (floor); 1.10f divided (truncate): differs for negatives
+	const int nOutX = (2 * *pY + *pX) >> 5;
+	const int nOutY = (2 * *pY - *pX) >> 5;
 
 	*pX = nOutX;
 	*pY = nOutY;
 }
 
 //D2Common.0x6FD8D8A0 (#10109)
+// 1.13c D2Common+0x4d8c0
 void __stdcall DUNGEON_ClientToGameCoords(int* pX, int* pY)
 {
 	int nX = 2 * *pY + *pX;
@@ -1380,6 +1389,7 @@ void __stdcall DUNGEON_GameTileToSubtileCoords(int* pX, int* pY)
 }
 
 //D2Common.0x6FD8D710 (#10114)
+// 1.13c D2Common+0x4DA40
 void __stdcall DUNGEON_ClientTileDrawPositionToGameCoords(int nX, int nY, int* pX, int* pY)
 {
 	*pX = 2 * nY + nX;
@@ -1414,6 +1424,7 @@ void __stdcall DUNGEON_GameToClientTileDrawPositionCoords(int nX, int nY, int* p
 }
 
 //D2Common.0x6FD8D7D0 (#10116)
+// 1.13c D2Common+0x4d9a0
 void __stdcall DUNGEON_ClientSubileDrawPositionToGameCoords(int nX, int nY, int* pX, int* pY)
 {
 	*pX = 2 * nY + nX;

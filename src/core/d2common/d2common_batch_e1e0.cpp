@@ -20,7 +20,7 @@ struct D2CommonE1E0Env
 // 1.13c D2Common+0xE1E0 (#10533): update one room tile and reset the room's pending dword.
 // param_2 is unused by the body. The two 16-bit coordinates pack as (nHi << 16) | nLo.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_e1e0(uint32_t pRoom, uint32_t unused2, uint32_t pArg,
+EMSCRIPTEN_KEEPALIVE int32_t D2Common_RoomUpdateTileAndClearPending(uint32_t pRoom, uint32_t unused2, uint32_t pArg,
                                                  uint16_t nLo, uint16_t nHi, const D2CommonE1E0Env* pEnv)
 {
 	(void)unused2;

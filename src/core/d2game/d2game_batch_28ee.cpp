@@ -84,7 +84,8 @@ static char* d2game_strrev(char* str) {
 // stream table is exhausted. Host stdio has neither a stream table nor a share mode: fopen fills the
 // host stream and reports the open failure by returning NULL, so that is the whole observable result
 // (same collapse that 0x2FD0 -> D2Game_CrtFopen already makes).
-static FILE* d2game_fsopen(const char* filename, const char* mode, int32_t shareFlag) {
+// 1.13c D2Game+0x02F74
+FILE* d2game_fsopen(const char* filename, const char* mode, int32_t shareFlag) {
     (void)shareFlag;
     return std::fopen(filename, mode);
 }
@@ -169,13 +170,12 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_2e10(uint32_t* r) {
     r[4] = (uint32_t)(uintptr_t)d2game_strrev((char*)(uintptr_t)r[0]);
 }
 
-// 1.13c D2Game+0x2F74
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_2f74(uint32_t* r) {
     r[4] = (uint32_t)(uintptr_t)d2game_fsopen((const char*)(uintptr_t)r[0],
                                               (const char*)(uintptr_t)r[1], (int32_t)r[2]);
 }
 
-// 1.13c D2Game+0x2FC6
+// 1.13c D2Game+0x02FC6
 // SEH fragment in __fsopen: __unlock_file(*(FILE**)(EBP - 0x1C)). The caller's frame operand is not an
 // argument, so a probe passes the stream in r[5].
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_2fc6(uint32_t* r) {
@@ -204,7 +204,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_310e(uint32_t* r) {
 }
 
 // 1.13c D2Game+0x3118
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3118(uint32_t* r) {
+EMSCRIPTEN_KEEPALIVE void D2Game_CrtFwriteLk(uint32_t* r) {
     r[4] = (uint32_t)d2game_fwrite_lk((const void*)(uintptr_t)r[0], (size_t)r[1], (size_t)r[2],
                                       (FILE*)(uintptr_t)r[3]);
 }

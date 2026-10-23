@@ -46,7 +46,7 @@ void sub_173E0(Host& h, Unit* u, uint32_t mag, uint32_t aux) {
  uint32_t a = mag & 0xff, b = a;
  if (rnd(u) & 1) b = -a;
  if (rnd(u) & 1) a = -a;
- int32_t t[6] = {(int32_t)b + x, (int32_t)a + y, 0, h.pathFlags(u), (int32_t)(h.pathDir(u) & 0xff), 0};
+ int32_t t[6] = {x, y, (int32_t)b + x, (int32_t)a + y, h.pathFlags(u), (int32_t)(h.pathDir(u) & 0xff)};
  (void)aux; h.walk(u, t);
 }
 // 1.13c D2Client+0x17500 : step one cell toward target unit t, true if the cell was free
@@ -54,7 +54,7 @@ int32_t sub_17500(Host& h, Unit* self, Unit* t, int32_t x, int32_t y, uint8_t st
  int32_t sx = ux(h, self), sy = uy(h, self), tx = ux(h, t), ty = uy(h, t);
  int32_t dx = (sx < tx) ? -1 : (tx < sx ? 1 : 0), dy = (sy < ty) ? -1 : (ty < sy ? 1 : 0);
  if (h.collide(h.room(x + dx, y + dy, 1), x + dx, y + dy, 0, 0) != 0) return 0;
- int32_t t2[6] = {x + dx * step, y + dy * step, 0, h.pathFlags(self), (int32_t)(h.pathDir(self) & 0xff), 0};
+ int32_t t2[6] = {x, y, x + dx * step, y + dy * step, h.pathFlags(self), (int32_t)(h.pathDir(self) & 0xff)};
  h.walk(self, t2); return 1;
 }
 }

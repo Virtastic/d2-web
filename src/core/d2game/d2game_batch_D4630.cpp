@@ -95,6 +95,18 @@ struct D2GameBatchD4630Env {
     void     (*ordinal10771)();
     // 0x9DCD0(param_1): the per-node call of the 0x9DE10 list walk.
     void     (*sub9DCD0)(void* param1);
+    // 0x4AD10(0): the client's player unit (ECX is a leaked this the callees ignore).
+    void*    (*sub4AD10)(uint32_t zero);
+    // 0x7B0A0(param_1, unit): announce a not-yet-seen unit to the client.
+    void     (*sub7B0A0)(void* param1, uint32_t unit);
+    // 0x788B0(param_1, eax, flag): type 0 handler.
+    void     (*sub788B0)(void* param1, uint32_t eax, int32_t flag);
+    // 0xF3A40(this, param_1, unit, eax, flag): type 1 handler.
+    void     (*subF3A40)(void* param1, uint32_t unit, uint32_t eax, int32_t flag);
+    // 0x6B200(this, eax): type 2 handler.
+    void     (*sub6B200)(uint32_t eax);
+    // 0xD4550(): type 4 handler.
+    void     (*subD4550)();
 };
 
 // D2_ASSERT helper: a null record is fatal 0x395; in_EAX zero is fatal 0x396; otherwise the record's
@@ -109,6 +121,17 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_D4630(void* param1, int32_t eaxValue,
     if (rd32(param1, 0) == 0) env->subD43E0(param1);
 }
 
+// Twin of 0xD4630 with fatal codes 0x24E (null record) / 0x24F (in_EAX zero).
+// 1.13c D2Game+0xD4670
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_D4670(void* param1, int32_t eaxValue,
+                                             const D2GameBatchD4630Env* env)
+{
+    if (param1 == nullptr) d2game_fatal(0x24E);
+    if (eaxValue == 0) d2game_fatal(0x24F);
+    if (rd32(param1, 0) == 0) env->subD43E0(param1);
+}
+
 // Spawn a group from a record stream: the word at param_3+0xC is the stream length, the payload starts
 // at +0xE. The first record creates the lead unit (its +0x14 record's +0x24 takes the stack4 record's
 // +0x04, or that plus 15000 when smaller). stack14 further records are then created, each appended with
@@ -116,7 +139,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_D4630(void* param1, int32_t eaxValue,
 // in the decompile and arrives here as 0; stackC/stack14/stack4 are the decompile's stack locals.
 // 1.13c D2Game+0x1F9F0
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_1F9F0(uint32_t param1, uint32_t param2, uint32_t param3,
+EMSCRIPTEN_KEEPALIVE uint32_t RestoreInactiveUnit(uint32_t param1, uint32_t param2, uint32_t param3,
                                                   uint32_t stackC, int32_t stack14, uint32_t stack4,
                                                   const D2GameBatchD4630Env* env)
 {
@@ -163,7 +186,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_1F9F0(uint32_t param1, uint32_t param
 // the second unit's +0x2CC and, for param_6[0]==1 with the +0x16 bit set, its +0x2C8 as well.
 // 1.13c D2Game+0xCA410
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CA410(uint32_t param1, int32_t param2, int32_t param3,
+EMSCRIPTEN_KEEPALIVE void D2GAME_ReleaseUnitSlotRefs(uint32_t param1, int32_t param2, int32_t param3,
                                              int32_t param4, int32_t param5, void* param6,
                                              uint32_t eaxBase, int32_t ebxValue,
                                              const D2GameBatchD4630Env* env)
@@ -199,7 +222,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CA410(uint32_t param1, int32_t param2, in
 // (1, stack4, stack8); a null callback pointer is fatal 0x811.
 // 1.13c D2Game+0x37E20
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_37E20(uint32_t esiGame, uint32_t ediUnit,
+EMSCRIPTEN_KEEPALIVE void D2GAME_SUnitArmTimers_37E20(uint32_t esiGame, uint32_t ediUnit,
                                              uint32_t stack4, uint32_t stack8,
                                              const D2GameBatchD4630Env* env)
 {
@@ -223,7 +246,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_37E20(uint32_t esiGame, uint32_t ediUnit,
 // reconstruct a single frame: the ids are modelled as one array and the callback receives it.
 // 1.13c D2Game+0x2EAD0
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_2EAD0(void* thisp, uint32_t param1, uint32_t param2,
+EMSCRIPTEN_KEEPALIVE uint32_t GAME_RandomActionRoll_2EAD0(void* thisp, uint32_t param1, uint32_t param2,
                                                   const D2GameBatchD4630Env* env)
 {
     if ((int32_t)rd32(thisp, 8) < (int32_t)rd32(thisp, 0xC) * 10) return 0;
@@ -401,7 +424,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_B2C20(uint32_t param1, uint32_t param2, u
 // bits 10, 8, 15 of +0xC4 run 0x9AC50, 0x9ACB0(player), 0xEBBB0; #11149 -> 0x9A5E0 and #10354 ->
 // 0x9A570; #10771 five times. The decompile's extraout_ECX values are call-clobbered ECX; the `this`
 // object is passed through as the callers' thiscall receiver. param_1 null is fatal 0xFB.
-// 1.13c D2Game+0x788B0
+// 1.13c D2Game+0x788b0
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_788B0(void* thisp, void* param1, uint32_t param2,
                                              void* eaxUnit, const D2GameBatchD4630Env* env)
@@ -493,7 +516,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_35B60(uint32_t eaxUnit, uint32_t blMode, 
 
 // List walk: EAX zero is fatal 0x44; from the unit's +0x1C node, each node's +0xE0 link is taken and
 // 0x9DCD0(param_1) runs per node.
-// 1.13c D2Game+0x9DE10
+// 1.13c D2Game+0x9de10
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9DE10(void* param1, uint32_t eaxUnit,
                                              const D2GameBatchD4630Env* env)
@@ -501,6 +524,30 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9DE10(void* param1, uint32_t eaxUnit,
     if (eaxUnit == 0) d2game_fatal(0x44);
     for (uint32_t node = rd32(eaxUnit, 0x1C); node != 0; node = rd32(node, 0xE0)) {
         env->sub9DCD0(param1);
+    }
+}
+
+// Per-unit update dispatch; EAX = in_EAX (client/context), EDI = unit (null is fatal 0x15). A unit with
+// flag bit 4 (+0xC4 bit 4) that is not 0x4AD10(0)'s player: type 3 returns, else 0x7B0A0 and flag=1.
+// Then by unit type: 0 -> 0x788B0, 1 -> 0xF3A40, 2 -> 0x6B200, 4 -> 0xD4550.
+// 1.13c D2Game+0x9dcd0
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9DCD0(void* param1, uint32_t eax, uint32_t unit,
+                                             const D2GameBatchD4630Env* env)
+{
+    if (unit == 0) d2game_fatal(0x15);
+    const uint32_t type = rd32(unit, 0);
+    int32_t flag = 0;
+    if ((rd32(unit, 0xC4) >> 4 & 1) != 0 && (uint32_t)(uintptr_t)env->sub4AD10(0) != unit) {
+        if (type == 3) return;
+        env->sub7B0A0(param1, unit);
+        flag = 1;
+    }
+    switch (rd32(unit, 0)) {
+    case 0: env->sub788B0(param1, eax, flag); break;
+    case 1: env->subF3A40(param1, unit, eax, flag); break;
+    case 2: env->sub6B200(eax); break;
+    case 4: env->subD4550(); break;
     }
 }
 

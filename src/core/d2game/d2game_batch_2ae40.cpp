@@ -68,7 +68,7 @@ inline void unlockGameOrDie(void* pGame)
     LeaveCriticalSection(pLock);
 }
 
-// TASK_LinkList_Remove (0x1E50) for a task's pTaskBalanceLink / pTaskQueueLink node: pPrev at +0,
+// 1.13c D2Game+0x01E50 TASK_LinkList_Remove for a task's pTaskBalanceLink / pTaskQueueLink node: pPrev at +0,
 // pNext at +4. A null node is the 0x87 assert.
 void taskLinkListRemove(void* pLink)
 {

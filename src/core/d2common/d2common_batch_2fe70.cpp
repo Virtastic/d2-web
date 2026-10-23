@@ -17,7 +17,7 @@
 // a live path (object, item, tile clear the first path dword; every other type clears the path's
 // room pointer at +0x1C). A null unit is fatal in retail (0x87D); we return.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2fe70(D2UnitStrc* pUnit)
+EMSCRIPTEN_KEEPALIVE void D2Common_10481_ClearPathRoom(D2UnitStrc* pUnit)
 {
 	if (!pUnit) return;
 
@@ -40,7 +40,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2fe70(D2UnitStrc* pUnit)
 // take that state's list, expire it, free it when it is no longer extended, then toggle the state off
 // and refresh the unit. Returns 1 when the outer guard held.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_51ed0(D2UnitStrc* pUnit)
+EMSCRIPTEN_KEEPALIVE int32_t D2Common_sub_51ED0(D2UnitStrc* pUnit)
 {
 	if (!pUnit) return 0;
 	if (((*(const uint32_t*)((const uint8_t*)pUnit + 0xC8) >> 3) & 1) == 0) return 0;
@@ -85,13 +85,13 @@ namespace
 	};
 }
 
-// 1.13c D2Common+0x6B4A0 (#10484): apply an affix stat block to a missile unit. The two flag bits of
+// 1.13c D2Common+0x6B4A0 (#10484; collected entries are 8 bytes at word 1+2i of the buffer, value = values[2i+1]): apply an affix stat block to a missile unit. The two flag bits of
 // the value block are folded into the missile data flags (+0x14), then thirty stat id/value pairs go
 // through STATLIST_SetStat, four flag bits add stat 0x67/0x68/0x6A/0x8D, and the owning unit's stat
 // 0xB4 list (read through 0x382F0, 0x80 entries) is copied onto the missile. The retail follow-up
 // STATLIST_InsertStatModOrFail branch is unreachable: the unit type is 3 for the whole body.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_6b4a0(D2UnitStrc* pOwner, D2UnitStrc* pMissile,
+EMSCRIPTEN_KEEPALIVE void D2Common_6B4A0_ApplyAffixStats(D2UnitStrc* pOwner, D2UnitStrc* pMissile,
 	uint32_t* pValues, int32_t nValue12, const Batch2_6B4A0Env* pEnv)
 {
 	static const int32_t nStatIds[] =
@@ -138,7 +138,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_6b4a0(D2UnitStrc* pOwner, D2UnitStrc* p
 
 	for (int32_t i = 0; i < nCount; ++i)
 	{
-		STATLIST_SetStat(pStatList, 0xB4, (int32_t)values[i * 2], 0);
+		STATLIST_SetStat(pStatList, 0xB4, (int32_t)values[i * 2 + 1], 0);
 	}
 }
 
@@ -158,7 +158,7 @@ namespace
 // the previous head at +8) onto the owner's list, bumping the owner's short count at +4. A null
 // owner (0x10B), a null list (0x10C) or a count of 8 or more (0x112) is fatal in retail; we return.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3d380(uint32_t* pOwner, const uint8_t* pList,
+EMSCRIPTEN_KEEPALIVE void D2Common_3D380_AddTextEntries(uint32_t* pOwner, const uint8_t* pList,
 	const Batch2_3D380Env* pEnv)
 {
 	if (!pOwner) return;

@@ -820,7 +820,6 @@ void __fastcall OBJECTS_InitFunction42_SewerLever(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FCA89C0
-// 1.13c D2Game+0xD4670
 void __fastcall ACT3Q2_UpdateKhalimItemCounts(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	//D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];

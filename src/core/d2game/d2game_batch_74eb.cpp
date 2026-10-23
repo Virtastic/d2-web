@@ -35,7 +35,7 @@ static inline void     wr32(uint32_t a, uint32_t o, uint32_t v) { wr32((void*)(u
 // Defined elsewhere in src/core/d2game/ (marker there).
 extern "C" void     d2_fn_d2game_3b51(void);              // 0x3B51 __unlock(0xC)
 extern "C" void     d2_fn_d2game_3f76(int32_t lockNum);   // 0x3F76 __unlock
-extern "C" int32_t* d2_fn_d2game_4e65(void);              // 0x4E65 __getptd()->_terrno
+extern "C" int32_t* d2game_errno_ptr(void);              // 0x4E65 __getptd()->_terrno
 
 // ---- 0x74EB report_failure -----------------------------------------------------------------------
 struct D2GameBatch74ebEnv {
@@ -139,7 +139,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_8224(uint32_t localeBlock, char* dest,
                                                    &usedDefault);
         if (n != 0 && usedDefault == 0) return n;
     }
-    *d2_fn_d2game_4e65() = 0x2A;
+    *d2game_errno_ptr() = 0x2A;
     return -1;
 }
 
@@ -220,11 +220,11 @@ static D2GameUserObjectFn g_getUserObjectInformationA;  // 0x6FD300F0 DAT_6fd300
 static uint32_t g_osPlatform = 2;               // 0x6FD2FD24 DAT_6fd2fd24
 static uint32_t g_osVersion;                    // 0x6FD2FD30 DAT_6fd2fd30
 
-// 1.13c D2Game+0x0972B
+// 1.13c D2Game+0x0972b
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_972b(const char* text, const char* caption,
                                                uint32_t type, const D2GameBatch972bEnv* env) {
-    int32_t hwnd = 0;
+    int32_t hwnd = 0, station;
     uint8_t info[0xC] = {};              // local_14 .. local_c: USEROBJECTFLAGS, +8 is the bit byte
     uint32_t needed = 0;                 // local_8
     if (g_messageBoxA == nullptr) {
@@ -245,8 +245,8 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_972b(const char* text, const char* cap
     }
 
     if (g_getProcessWindowStation == nullptr ||
-        ((hwnd = g_getProcessWindowStation()) != 0 &&
-         ((hwnd = g_getUserObjectInformationA(hwnd, 1, info, 0xC, &needed)) != 0) &&
+        ((station = g_getProcessWindowStation()) != 0 &&
+         g_getUserObjectInformationA(station, 1, info, 0xC, &needed) != 0 &&
          (info[8] & 1) != 0)) {
         if (g_getActiveWindow != nullptr && (hwnd = g_getActiveWindow()) != 0 &&
             g_getLastActivePopup != nullptr) {
@@ -278,7 +278,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_78c6(uint32_t eaxValue, uint32_t stackArg
 }
 
 // ---- 0x7DD3 ___crtInitCritSecNoSpinCount@8 ------------------------------------------------------
-// 1.13c D2Game+0x07DD3
+// 1.13c D2Game+0x07dd3
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_7dd3(void* cs) {
     InitializeCriticalSection((LPCRITICAL_SECTION)cs);
@@ -296,7 +296,7 @@ struct D2GameBatch86c7Env {
 // __sopen(name, openFlags, shareFlags, mode): the share value is passed as __tsopen_lk's `this` and
 // the two out slots are this frame's locals; the returned handle/length is the result. The cleanup
 // tail (0x870C) then releases the handle the call registered.
-// 1.13c D2Game+0x086C7
+// 1.13c D2Game+0x086c7
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_86c7(const char* filename, int32_t openFlag,
                                                int32_t shareFlag, int32_t mode,
@@ -318,7 +318,7 @@ struct D2GameBatch4c88Env {
 };
 
 // Index below 0x14 takes CRT lock index+0x10; any other stream enters the critical section at +0x20.
-// 1.13c D2Game+0x04C88
+// 1.13c D2Game+0x04c88
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_4c88(int32_t index, void* file,
                                             const D2GameBatch4c88Env* env) {

@@ -1231,6 +1231,7 @@ int __stdcall DATATBLS_GetSeqFramePointsCount(D2UnitStrc* pUnit)
 	return 0;
 }
 
+// 1.13c D2Common+0x2E900
 //D2Common.0x6FD728C0 (#10684)
 int __stdcall DATATBLS_GetSeqFrameCount(D2UnitStrc* pUnit)
 {

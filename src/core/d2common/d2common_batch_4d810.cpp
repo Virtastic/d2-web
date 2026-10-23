@@ -21,14 +21,14 @@ static_assert(offsetof(D2ItemsTxt, dwBitField1) == 0xdc);
 static_assert(offsetof(D2SkillsTxt, dwFlags) == 4);
 static_assert(offsetof(D2SkillsTxt, nReqSkill) == 0x17e);
 
-// 1.13c D2Common+0x4D810
+// 1.13c D2Common+0x4d810
 extern "C" void D2Common_4D810_FindFreeCoordinates(D2ActiveRoomStrc* room,
     D2CoordStrc* position, int size, uint32_t mask, int increment)
 {
     COLLISION_GetFreeCoordinatesEx(room, position, size, mask, increment);
 }
 
-// 1.13c D2Common+0x234F0
+// 1.13c D2Common+0x234f0
 extern "C" uint8_t D2Common_234F0_GetReEquip(D2UnitStrc* item)
 {
     if (!item || item->dwUnitType != UNIT_ITEM) return 0;
@@ -130,7 +130,7 @@ extern "C" void D2Common_303E0_SetUsedSkill(D2UnitStrc* unit, D2SkillStrc* skill
     if (unit->pSkills) unit->pSkills->pUsedSkill = skill;
 }
 
-// 1.13c D2Common+0x21DD0
+// 1.13c D2Common+0x21dd0
 extern "C" void D2Common_21DD0_PlaceAtPage(D2InventoryStrc* inventory,
     D2UnitStrc* item, int x, int y, int record, BOOL unused, uint8_t page)
 {

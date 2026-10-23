@@ -75,3 +75,5 @@ uint32_t D2Common_4E1D0(uint32_t p) { return p ? (uint32_t)(int32_t)*(int16_t*)P
 // 1.13c D2Game+0x0373C entry (CRT DllMain wrapper around DllMain body 0x131D0).
 // ponytail: no CRT/_pRawDllMain in wasm; DllMain body is a no-op that succeeds, so return 1.
 uint32_t D2Game_373C(uint32_t, uint32_t, uint32_t) { return 1; }
+// 1.13c D2Common+0x3B270: returns the dword at +0x48 of its argument
+uint32_t D2Common_3B270(uint32_t p) { return *(uint32_t*)(P(p) + 0x48); }

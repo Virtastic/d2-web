@@ -43,7 +43,7 @@ static void eh3rn_move_front(int32_t index, uint32_t page) {
     }
 }
 
-// 1.13c D2Client+0x09D2D (553 B, caller 0x0498C): the VC7.1 `__ValidateEH3RN`. Returns 1 when the node is
+// 1.13c D2Client+0x09d2d (553 B, caller 0x0498C): the VC7.1 `__ValidateEH3RN`. Returns 1 when the node is
 // accepted, 0 when it is corrupt and 0xFFFFFFFF when the page cannot be validated at all. The scopetable
 // pointer at +0x08 must be 4-byte aligned, outside the thread stack [StackLimit, StackBase), and (when
 // no handler in levels 0..trylevel has a nonzero filter) the saved value at node-8 must lie in

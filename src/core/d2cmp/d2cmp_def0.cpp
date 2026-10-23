@@ -11,7 +11,7 @@ struct D2cmpDef0Callees {
     uint32_t (*load)(uint32_t*, uint8_t*, int);      // 0xDC80
 };
 
-// 1.13c D2CMP+0xDEF0
+// 1.13c D2CMP+0x0DEF0
 extern "C" uint32_t d2cmp_def0(void* self, uint32_t* p, const D2cmpDef0Callees& c, const void* cacheKey) {
     char name[520];
     if (!p) _exit(-1);

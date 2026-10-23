@@ -47,7 +47,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_2341(void) {
 
 extern "C" void d2win_sub_244B(int32_t lock_num);
 
-// 1.13c D2Win+0x23AB (__mtinitlocknum): lazily allocate lock block `lock_num` (0x18 B) under lock 10.
+// 1.13c D2Win+0x23ab (__mtinitlocknum): lazily allocate lock block `lock_num` (0x18 B) under lock 10.
 // Returns 1, or 0 with errno = ENOMEM(12) on allocation failure.
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2win_sub_23AB(int32_t lock_num) {
     uint32_t *slot = &d2win_g_6f8ff050[lock_num * 2];
@@ -63,7 +63,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2win_sub_23AB(int32_t lock_num) {
     return 1;
 }
 
-// 1.13c D2Win+0x244B (__lock): create the slot's lock on first use (fatal _amsg_exit(0x11) if that
+// 1.13c D2Win+0x0244b (__lock): create the slot's lock on first use (fatal _amsg_exit(0x11) if that
 // fails), then enter it.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_244B(int32_t lock_num) {
     if (d2win_g_6f8ff050[lock_num * 2] == 0 && d2win_sub_23AB(lock_num) == 0 && d2win_sub_1962)

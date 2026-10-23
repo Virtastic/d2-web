@@ -296,7 +296,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_79100(uint32_t eaxUnit, uint32_t param1,
     env->sub77B20();
 }
 
-// 1.13c D2Game+0x8B010
+// 1.13c D2Game+0x8b010
 // Packet 0x3E (item stat update) writer; the 1.10f form is
 // D2GAME_PACKETS_SendPacket0x3E_6FC3EC20(pClient, pItem, a3, nStatId, nValue, a6). The packet is
 // {0x3E, size, 0x20-byte bit payload}. Fields in order: variable-width GUID (item+0xC, or -1 for a
@@ -356,7 +356,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_97120(uint32_t param1, uint32_t ebxGame,
     env->sub96F40(ebxGame);
 }
 
-// 1.13c D2Game+0x97A20
+// 1.13c D2Game+0x97a20
 // Add one pet to a player's pet list; the 1.10f form is sub_6FC7DA40. EBX = game, ECX = player,
 // ESI = D2PetListStrc, EDX = pet unit or null, param_3 = D2PetInfoStrc (seed, name, unk06,
 // hireling id). An empty list is rebuilt through 0x96FA0; if it stays empty the pet is dropped
@@ -434,7 +434,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d40f0(uint32_t ediUnit, uint32_t ebxArg,
     env->sub8DFD0(ebxArg);
 }
 
-// 1.13c D2Game+0xD4550
+// 1.13c D2Game+0xd4550
 // Guard for 0xD40F0: EAX = unit, and only when bit 0 of unit+0xC4 is set is 0xD40F0 called. EDI and
 // EBX are register-only pass-throughs to 0xD40F0.
 extern "C"

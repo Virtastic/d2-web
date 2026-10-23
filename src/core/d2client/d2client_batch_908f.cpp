@@ -46,7 +46,7 @@ struct D2ClientInitCritSecEnv {
     D2cInitCritSecFn (*get_proc_address)(uint32_t mod, const char* name);  // IAT 0xCEF74 GetProcAddress
 };
 
-// 1.13c D2Client+0x0908F (103 B): resolve InitializeCriticalSectionAndSpinCount once. On NT
+// 1.13c D2Client+0x0908F (103 B) d2client_batch_908f.cpp:d2_client_908f: resolve InitializeCriticalSectionAndSpinCount once. On NT
 // (platform word 1) retail never asks kernel32; otherwise a null GetModuleHandleA or
 // GetProcAddress leaves the no-spin thunk 0x907F in the slot. Then call the slot with (cs, spin).
 extern "C"
@@ -365,7 +365,7 @@ struct D2ClientResetStkEnv {
                                 uint32_t* old_protect);
 };
 
-// 1.13c D2Client+0x07D71 (227 B): __resetstkoflw. Restore the guard page one page below the stack slot
+// 1.13c D2Client+0x07d71 (227 B): __resetstkoflw. Restore the guard page one page below the stack slot
 // the caller probed. `stack_slot` is the address of the decompile's local `uStack_60` (retail stores
 // its own return address 0x6FAB7D82 there; only the address is read). With platform != 1 (Win9x) the
 // committed region covering the stack is found by walking regions up from AllocationBase, a region
@@ -504,7 +504,7 @@ EMSCRIPTEN_KEEPALIVE char* d2_client_3ac0(char* dst, const char* src, uint32_t c
     return out;
 }
 
-// 1.13c D2Client+0x06FF0 (139 B): _strlen.
+// 1.13c D2Client+0x06FF0 (139 B): _strlen -- count bytes up to the NUL (retail unrolls it by dwords; same result).
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_client_6ff0(const char* s) {
     const char* p = s;
@@ -512,10 +512,11 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_client_6ff0(const char* s) {
     return (uint32_t)(p - s);
 }
 
-// 1.13c D2Client+0x07BD0 (232 B): _strcpy -- copy through the terminator, return dst.
+// 1.13c D2Client+0x07BD0 (232 B): _strcat -- append src (with terminator) at end of dst, return dst.
 extern "C"
 EMSCRIPTEN_KEEPALIVE char* d2_client_7bd0(char* dst, const char* src) {
-    char* out = dst;
-    while ((*dst++ = *src++) != 0) {}
-    return out;
+    char* d = dst;
+    while (*d != 0) ++d;
+    while ((*d++ = *src++) != 0) {}
+    return dst;
 }

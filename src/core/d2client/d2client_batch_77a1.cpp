@@ -368,7 +368,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_client_8797(uint32_t count, uint32_t size, const D
     }
 }
 
-// 1.13c D2Client+0x0920A (___sbh_heap_init): take the 0x140-byte region array from the big-block heap
+// 1.13c D2Client+0x0920a (___sbh_heap_init): take the 0x140-byte region array from the big-block heap
 // (HeapAlloc(DAT_6fbd3988, 0, 0x140)); on success zero the region list and count, point the current
 // region at the array, publish the small-block threshold and the 0x10-record capacity. Returns 1, or 0
 // when the allocation fails (retail leaves the globals untouched then).

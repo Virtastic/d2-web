@@ -173,3 +173,15 @@ void tokenize(State& s,const char** input,char* out,uint32_t capacity,const char
     *input=p; if(quoted) *quoted=sawQuote;
 }
 } // namespace storm25220
+
+namespace storm25220 {
+// 1.13c Storm+0x11AF0
+// Builds "<prefix><sep>" then appends the version: override string (info->+4) if set, else the
+// exe's ProductVersion (Win32 version resource; no analogue on wasm, so left empty).
+// sep = DAT_6fc36a4c (2 bytes incl. NUL; value not recovered, ' ' assumed).
+void versionString(State& s,char* out,const char* prefix,uint32_t capacity,const char* override_) {
+    copy(s,out,prefix,capacity-2);
+    char* p=out+length(s,out); p[0]=' '; p[1]=0;
+    if(override_ && override_[0]) append(s,out,override_,capacity);
+}
+}

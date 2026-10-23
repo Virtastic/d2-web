@@ -228,7 +228,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_8e810(void* game, void* unit, uint32_t type,
 // looked up in bucket game+0x1320+(id&0x7F)*4 and the chain (next at +0xE4) is followed until the
 // node's id at +0x0C matches; a missing node returns. A node with bit 8 of +0xC8 set is fatal
 // (0x5A); otherwise +0xC4 gains flag 0x4000000 and either the 0x15D0(0,0xF) branch calls
-// Ordinal 11103 and hands {node, 0xE0A20(game), 0, 0, 0x6400, 0} to 0x75E10, or 0xDEEE0(game, node,
+// Ordinal 11103 and hands the 8-word block {0, node, 0xE0A20(game), 0, 0, 0x6400, 0, 0} to 0x75E10, or 0xDEEE0(game, node,
 // 0, 0) runs. Both paths finish with a zero-filled 7-word record whose first word is the unit id,
 // passed to 0xDFC10.
 extern "C"
@@ -247,10 +247,10 @@ EMSCRIPTEN_KEEPALIVE void d2_game_977e0(void* game, uint32_t unitId, const D2Gam
 
     if (env->sub15d0(0, 0xF) == 0) {
         env->ordinal11103(node);                                     // D2Common Ordinal 11103
-        uint32_t block[7] = { 0, 0, 0, 0, 0, 0, 0 };
-        block[0] = (uint32_t)(uintptr_t)node;
-        block[1] = env->sube0a20(game);                              // 0xE0A20
-        block[4] = 0x6400;
+        uint32_t block[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+        block[1] = (uint32_t)(uintptr_t)node;
+        block[2] = env->sube0a20(game);                              // 0xE0A20
+        block[5] = 0x6400;
         env->sub75e10(game, block);                                  // 0x75E10
     }
     else {

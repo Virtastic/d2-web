@@ -28,15 +28,18 @@ I* sub_51390(U* out0,U* out1,I* unit,U x,U fallback,P client,Calls& c,U unk){
  return unit;
 }
 // 1.13c D2Client+0x51500
-// Probes 8 neighbour offsets (tables at DAT_6fb85ec8/ee4/f04); returns first valid object, else null.
+// unit = EBX, start = EBP (initial rotation reset), st = [ebp-4] state struct, tbl = {order[5] @85ec8, dy[8] @85ee4, dx[8] @85f04}.
+// Probes the 5 order entries; returns first object whose +0xc4 bit2 passes the st[6]/mask test, else null.
 struct Probe { const I* order; const I* dx; const I* dy; I n; };
-P sub_51500(P unit,Calls& c,const Probe& t,U start,P ctx,U (*ok)(P,P,P),P a,P b){
+P sub_51500(P unit,Calls& c,const Probe& t,U start,const uint8_t* st,U mask10,U cb11b0,
+            U (*f1510)(const uint8_t*,I),U (*f562a0)(P)){
  U s=(c.o11117()&0xff)>>3; P room=c.resolve(0);
- for(I i=0;i<t.n;++i){
+ for(I i=0;i<5;++i){
   s=(U(t.order[i])+s)&7; I x=I(ux(unit,c))+t.dx[s], y=I(uy(unit,c))+t.dy[s];
-  if(c.o10573(room,x,y,1,0x180)){ P o=c.o10389(room,x,y,nullptr,0,1);
-   if(o&&((rd(o,0xc4)>>2)&1)&&ok(o,a,b)){c.o11129();return o;} }
-  s=start; (void)ctx;
+  if(int16_t(c.o10573(room,x,y,1,0x180))!=0){
+   P o=c.o10389(room,x,y,reinterpret_cast<P>(uintptr_t(cb11b0)),0,1);
+   if(o&&((rd(o,0xc4)>>2)&1)&&(((mask10&st[6])&0xff)==0||(I(rd(o,0))==1&&f1510(st,6)!=0)||f562a0(unit)!=0)){c.o11129();return o;} }
+  s=start;
  }
  return nullptr;
 }

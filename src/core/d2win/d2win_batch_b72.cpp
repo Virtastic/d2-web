@@ -25,7 +25,7 @@ __attribute__((weak)) int32_t* sub_7C60(int, int32_t*);
 
 static int32_t* g_head() { return d2win_list_head; }
 
-// 1.13c D2Win+0xC590  trim text to pixel width param_2; returns cut index
+// 1.13c D2Win+0x0c590  trim text to pixel width param_2; returns cut index
 extern "C" int32_t sub_C590(uint16_t* text, int32_t width) {
   char buf[300]; int32_t cut = 0, i = 0; bool hit = false;
   d2win_unicode2Win(buf, text, 300);
@@ -44,7 +44,8 @@ extern "C" int32_t sub_C590(uint16_t* text, int32_t width) {
   return cut;
 }
 
-// 1.13c D2Win+0xB8B0  build COF path; this=ecx(col), idx=esi, out=edi
+// 1.13c D2Win+0xb8b0  build COF path; this=ecx(col), idx=esi, out=edi
+extern "C" void d2win_exit(uint32_t code);
 extern "C" void sub_B8B0(uint32_t col, uint32_t idx, char* out, uint32_t a, uint8_t) {
   uint32_t err;
   if (idx < 0x19) {
@@ -62,9 +63,10 @@ extern "C" void sub_B8B0(uint32_t col, uint32_t idx, char* out, uint32_t a, uint
     err = 0x47e;
   } else err = 0x47d;
   Ordinal_10024("", Ordinal_10265(err));
+  d2win_exit(UINT32_MAX);  // _exit(-1)
 }
 
-// 1.13c D2Win+0xCA00  find/create refcounted node keyed (ebx,param_1,edi)
+// 1.13c D2Win+0xca00  find/create refcounted node keyed (ebx,param_1,edi)
 extern "C" int32_t* sub_CA00(int32_t key2, int32_t key1, int32_t key3) {
   int32_t* p = g_head();
   for (; p; p = (int32_t*)(intptr_t)p[6])
@@ -79,5 +81,6 @@ extern "C" int32_t* sub_CA00(int32_t key2, int32_t key1, int32_t key3) {
   uint32_t e = !r ? 0x3e1 : 0x3ea;
   if (r && ((uint8_t*)r)[3] == 0x14) { p[5] = (int32_t)(intptr_t)r; return p; }
   Ordinal_10024("", Ordinal_10265(e));
+  d2win_exit(UINT32_MAX);  // _exit(-1), does not return
   return p;
 }

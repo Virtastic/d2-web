@@ -59,7 +59,7 @@ struct D2GameBatch17Env {
     const void* currentTlocinfo;
 };
 
-// 1.13c D2Game+0x1480
+// 1.13c D2Game+0x01480
 // Multiplicand RNG roll: ECX = the 64-bit state {lo,hi}, ESI = count, EDI = base. count <= 0 returns
 // base without advancing the state; otherwise one LCG step (state = lo*0x6AC690C5 + hi, both halves
 // stored back) and the result is base plus lo % count, or base plus (count-1 & lo) when count is a
@@ -159,7 +159,7 @@ void d2_fn_d2game_1cd0(void* buffer, uint32_t value, const D2GameBatch17Env* env
     }
 }
 
-// 1.13c D2Game+0x1D30
+// 1.13c D2Game+0x01d30
 // Walk the MonStats nNextInClass chain: ECX = starting class id, EBX = step limit. Returns -1 when
 // the start is negative, out of range or its row address is null. Otherwise it starts at the row's
 // int16 +2 (nBaseId) and, while fewer than EBX steps have been taken, moves to int16 +4

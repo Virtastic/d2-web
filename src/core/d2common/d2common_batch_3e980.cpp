@@ -4,7 +4,7 @@
 
 extern "C" {
 // 1.13c D2Common+0x3E980: record pointer for index; out of range -> error report then _exit(-1).
-EMSCRIPTEN_KEEPALIVE uintptr_t d2_fn_d2common_3e980(int32_t idx, uintptr_t base, int32_t count) {
+EMSCRIPTEN_KEEPALIVE uintptr_t D2Common_3E980_GetRecord(int32_t idx, uintptr_t base, int32_t count) {
  if (idx < count) {
   if (idx > -1) return base + static_cast<uintptr_t>(static_cast<int64_t>(idx) * 0x1c0);
  }

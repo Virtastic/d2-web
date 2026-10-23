@@ -89,7 +89,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_client_1f10(void* self, const D2ClientBatch1de0Env
     return self;
 }
 
-// 1.13c D2Client+0x02160 (40 B): scalar deleting destructor (vtable slot). Runs the 0x2050 destructor
+// 1.13c D2Client+0x02160 (40 B) d2client_batch_1de0.cpp:d2_client_2160: scalar deleting destructor (vtable slot). Runs the 0x2050 destructor
 // body, then for flags bit 0 frees the object with SMemFree(this, "delete", -1, 0); returns this.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void* d2_client_2160(void* self, uint8_t flags,
@@ -143,7 +143,7 @@ static void d2_client_2320(void* self, const D2ClientBatch1de0Env* env) {
     }
 }
 
-// 1.13c D2Client+0x02360 (148 B): teardown of a 12-byte-row table. Clears this+0x10, calls 0x30A0,
+// (superseded by d2client_batch_2190.cpp:d2_client_2360) teardown of a 12-byte-row table. Clears this+0x10, calls 0x30A0,
 // then walks this[6] rows at this[7]; while a row's word at +8 is positive, either calls the object's
 // vtable slot 0 with that word (mode 0) or unlinks the node at rowBase + word (mode != 0).
 static void d2_client_2360(void* self, int32_t mode,

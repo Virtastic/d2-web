@@ -23,7 +23,7 @@ struct D2ClientHeapTermEnv {
     int32_t (*heap_destroy)(uint32_t heap);
 };
 
-// 1.13c D2Client+0x08CD0 (__heap_term): on heap type 3, decommit and release each
+// 1.13c D2Client+0x08cd0 (__heap_term): on heap type 3, decommit and release each
 // region's 1 MiB reservation, free its block header, then the region array; finally destroy
 // the process heap. The callback arguments preserve the retail 32-bit handles and call order.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_heap_term_8cd0(D2ClientHeapTermEnv* env) {

@@ -106,7 +106,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2gfx_153c(uint32_t* r) { r[4] = (uint32_t)Crt_S
 // r[0]=ch, r[1]=the FILE blob; the blob's bytes after the call are compared too.
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2gfx_1c81(uint32_t* r) { r[4] = (uint32_t)d2gfx_flsbuf((int32_t)r[0], P(CrtStream32*, 1)); }
 // r[0]=the FILE blob, r[1]=ch, r[2]=the caller's count word; the blob and the count after the call are compared.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2gfx_1d9a(uint32_t* r) { d2gfx_write_char(P(CrtStream32*, 0), (uint8_t)r[1], P(int32_t*, 2)); r[4] = 0; }
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2gfx_1d9a(uint32_t* r) { d2gfx_write_char(P(CrtStream32*, 0), (uint8_t)r[1], P(int32_t*, 2)); r[4] = (uint8_t)r[1]; }   // eax still holds the char on the buffered and no-base paths (retmask 0xFF); the flsbuf path is not vectored
 // r[0]=the FILE blob, r[1]=the format blob, r[2]=the argument-word blob;
 // every blob's bytes after the call are compared, which is what pins ptr/cnt/flag and the %n store.
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2gfx_1e28(uint32_t* r) { r[4] = (uint32_t)d2gfx_output(P(CrtStream32*, 0), P(const char*, 1), P(const uint32_t*, 2)); }

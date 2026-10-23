@@ -4,8 +4,10 @@
 // are separate, still-UNMAPPED rows are named in ponytail notes and are not called.
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 
 #include "D2Collision.h"
+#include "inv_place.h"
 #include "D2Dungeon.h"
 #include "D2Items.h"
 #include "D2Skills.h"
@@ -73,22 +75,36 @@ void D2Common_3C3B0_RemoveRoomUnit(uint32_t pRoom, uint32_t nUnitId)
 	DUNGEON_UpdateClientListOfRoom(reinterpret_cast<D2ActiveRoomStrc*>(room));
 }
 
-// 1.13c D2Common+0x1EC30 (#10145): count belt items of one item-data type.
-// The inventory must carry magic 0x1020304 at +0x00. The walk starts at the grid's first item
-// and follows item data at item+0x14 -> +0x70. An item counts when the unit type is 4
-// (UNIT_ITEM), the item data type (item data +0x00) is 5, the dword at item data +0x28 equals
-// nItemType, and the item stat value at unit +0xB, dword +0xC, is below 11. Retail fatals
-// 0x1074 on a null item data.
-int32_t D2Common_1EC30_CountBeltItems(uint32_t pInventory, uint32_t nItemType)
+// 1.13c D2Common+0x1EC30 (#10145): count belt items of one item-data type. stdcall(inventory, nItemType).
+// The inventory must carry magic 0x1020304 at +0x00. Grid 0 comes from 0x1E1B0 with the global
+// 2-byte size record at 0x6FDED378 (pBeltInfo here); the walk starts at the grid's first item (+0x00)
+// and follows item data (unit+0x14) -> +0x70. An item counts when unit type is 4, item data +0x00 is 5,
+// item data +0x28 equals nItemType, and the dword at (unit+0x2C)+0xC is below 11. Retail fatals 0x1074
+// on a null item data; the walk also stops on item data 0 or 0xFFFFFFA4.
+int32_t D2Common_1EC30_CountBeltItems(const InvEnv& e, uint32_t pInventory, uint32_t nItemType, uint32_t pBeltInfo)
 {
 	uint8_t* inventory = P(pInventory);
 	if (!inventory || W(inventory, 0) != 0x01020304u)
 		return 0;
-
-	// ponytail: retail resolves the grid through 0x1E1B0 with its global inventory.txt
-	// environment (DAT_6fded378). Our D2Common_1E1B0_GetGrid takes an InvEnv supplied by the
-	// caller; until that wiring exists here the chain walk is unreachable.
-	return 0;
+	uint8_t* grid = P(D2Common_1E1B0_GetGrid(e, pInventory, 0, pBeltInfo));
+	if (!grid || !W(grid, 0))
+		return 0;
+	int32_t count = 0;
+	uint8_t* unit = P(W(grid, 0));
+	while (W(unit, 0) == 4)
+	{
+		uint8_t* data = P(W(unit, 0x14));
+		if (data && W(data, 0) == 5 && W(data, 0x28) == nItemType && W(P(W(unit, 0x2C)), 0xC) < 0xB)
+			++count;
+		const uint32_t d = W(unit, 0x14);
+		if (d == 0 || d == 0xFFFFFFA4u)
+			break;
+		const uint32_t next = W(P(d), 0x70);
+		if (!next)
+			break;
+		unit = P(next);
+	}
+	return count;
 }
 
 // 1.13c D2Common+0x24D00 (#10146): base-variant check over items.txt.
@@ -239,19 +255,49 @@ uint32_t D2Common_1EEE0_InventoryHasPotion(uint32_t pInventory, uint32_t pItem)
 // +0, dword value at +4, next at +8) into a scratch array, sorts it with 0x3CF30 and the
 // comparator at LAB_6fd8d040, copies the entries back into the nodes in list order, and frees
 // the scratch array.
-// ponytail: 0x3CF30, its comparator, and the scratch allocator (ordinal 0x10045) are separate
-// still-UNMAPPED rows, so a longer list keeps its existing order until they land.
+// Comparator at 0x3D040: 1 when the first u16 id is greater, -1 when smaller, 0 when equal.
+extern "C" void d2_fn_d2common_3cf30(uint32_t records, uint32_t count, int32_t (*compare)(uintptr_t, uintptr_t));
+static int32_t TextCompare_3D040(uintptr_t a, uintptr_t b)
+{
+	const uint16_t x = *reinterpret_cast<const uint16_t*>(a), y = *reinterpret_cast<const uint16_t*>(b);
+	return x > y ? 1 : (x < y ? -1 : 0);
+}
+
 void D2Common_3D2B0_SortTextList(uint32_t pList)
 {
 	uint8_t* list = P(pList);
 	if (!list)
 		return;
+	const uint16_t count = *reinterpret_cast<uint16_t*>(list + 4);
+	if (count < 2)
+		return;
+	// ponytail: retail allocs via ordinal 10045 (unmapped); the scratch is unobservable, so calloc.
+	uint8_t* scratch = static_cast<uint8_t*>(calloc(1, 12u * count));
+	if (!scratch)
+		return;
+	uint8_t* out = scratch;
+	for (uint32_t n = W(list, 8); n; n = W(P(n), 8), out += 12)
+	{
+		*reinterpret_cast<uint16_t*>(out) = *reinterpret_cast<uint16_t*>(P(n));
+		W(out, 4) = W(P(n), 4);
+	}
+	d2_fn_d2common_3cf30(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(scratch)), count, TextCompare_3D040);
+	out = scratch;
+	uint32_t n = W(list, 8);
+	for (uint32_t i = 0; i < count; ++i, out += 12)
+	{
+		*reinterpret_cast<uint16_t*>(P(n)) = *reinterpret_cast<uint16_t*>(out);
+		W(P(n), 4) = W(out, 4);
+		n = W(P(n), 8);
+	}
+	free(scratch);
 }
 
 // 1.13c D2Common+0x3C520 (#10163): give the room the text list it currently lacks.
 // Retail fatals 0x3DD on a null room, 0x3DE when room+0x50 is already set, and 0x3DF on a null
 // text list; otherwise it calls 0x7BA00(0, *(int*)(pText + 0x10)).
-// ponytail: 0x7BA00 is still UNMAPPED, so the assignment is not made here.
+// The 0x7BA00 call is a pure predicate whose result is discarded, so the only retail effects are the
+// three fatal exits (_exit(-1)); this port returns on those, matching the file's convention.
 void D2Common_3C520_AssignTextToRoom(uint32_t pRoom, uint32_t pText)
 {
 	uint8_t* room = P(pRoom);

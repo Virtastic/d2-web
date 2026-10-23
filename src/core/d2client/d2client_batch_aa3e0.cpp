@@ -68,6 +68,16 @@ static void appendNode(Env& e){
 // 1.13c D2Client+0xAB780
 void appendNode780(Env& e){ appendNode(e); }
 
+// 1.13c D2Client+0xABA10  (ordinals none; push a 16-byte record {DAT_6fbc97f8,a,b,c} onto the current node, spill to a new node at 500)
+void pushRecord(Env& e,uint32_t a,uint32_t b,uint32_t c){
+ uintptr_t n=GP(e,R_CURNODE);
+ if((int32_t)r32(n+8000)>499){ appendNode780(e); n=GP(e,R_CURNODE); }
+ int32_t i=(int32_t)r32(n+8000);
+ w32(n+8000,(uint32_t)(i+1));
+ uintptr_t r=n+(uintptr_t)i*0x10;
+ w32(r,G32(e,0x1197F8)); w32(r+4,a); w32(r+8,b); w32(r+12,c);
+}
+
 // 1.13c D2Client+0xAB8D0
 void loadRecord(Env& e){
  uintptr_t h=e.fopenR("Record.dr1"); uint8_t tmp[4];

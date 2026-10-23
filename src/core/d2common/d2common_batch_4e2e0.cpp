@@ -11,7 +11,7 @@ namespace
 
 // 1.13c D2Common+0x4E2E0 (#10549): unit+0xA8 -> +0x14, else 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4e2e0(uint32_t pUnit)
+EMSCRIPTEN_KEEPALIVE uint32_t D2haveLightResMalus(uint32_t pUnit)
 {
 	if (!pUnit)
 		return 0;

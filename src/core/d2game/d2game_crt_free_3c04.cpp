@@ -12,7 +12,7 @@
 #include <cstring>
 #include <emscripten.h>
 
-extern "C" void d2_fn_d2game_5a8d(void* mem);   // 0x5A8D _free, ours
+extern "C" void d2game_free_5a8d(void* mem);   // 0x5A8D _free, ours
 extern "C" void* d2game_crt_locale_from_token(uint32_t token); // modeled records from 0x3A5E
 
 static inline uint32_t rd32(const void* p, uint32_t o) {
@@ -53,17 +53,17 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3c04(uint8_t* ptd, const D2GameFreeflsEnv
     static const uint32_t kOwned[] = { 0x24, 0x2C, 0x34, 0x3C, 0x44, 0x48 };
     for (uint32_t off : kOwned) {
         const uint32_t p = rd32(ptd, off);
-        if (p != 0) d2_fn_d2game_5a8d((void*)(uintptr_t)p);
+        if (p != 0) d2game_free_5a8d((void*)(uintptr_t)p);
     }
     const uint32_t initaddr = rd32(ptd, 0x54);
-    if (initaddr != 0xFF760u) d2_fn_d2game_5a8d((void*)(uintptr_t)initaddr);
+    if (initaddr != 0xFF760u) d2game_free_5a8d((void*)(uintptr_t)initaddr);
 
     env->lock_(0xD);
     const uint32_t mbc = rd32(ptd, 0x60);
     if (mbc != 0) {
         wr32((void*)(uintptr_t)mbc, 0, rd32((void*)(uintptr_t)mbc, 0) - 1);
         if (rd32((void*)(uintptr_t)mbc, 0) == 0 && mbc != env->default_mbc)
-            d2_fn_d2game_5a8d((void*)(uintptr_t)mbc);
+            d2game_free_5a8d((void*)(uintptr_t)mbc);
     }
     env->unlockD();
 
@@ -88,7 +88,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3c04(uint8_t* ptd, const D2GameFreeflsEnv
     }
     env->unlockC();
 
-    d2_fn_d2game_5a8d(ptd);
+    d2game_free_5a8d(ptd);
 }
 
 // Callers of 0x3D4B supply the TLS slot and the 0x3C04 environment.

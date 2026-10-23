@@ -112,7 +112,7 @@ void D2Common_4DEE0_SetField20(uint32_t pBlock, uint32_t dwValue)
 
 // ---------------------------------------------------------------------------------------------
 // 0x3B440: flag bit 1 of the dword at +0x34. Retail asserts on a null block (0x42f).
-// 1.13c D2Common+0x3B440 (#10752)
+// 1.13c D2Common+0x3b440 (#10752)
 uint32_t D2Common_3B440_GetFlag2(uint32_t pBlock)
 {
 	if (!pBlock)
@@ -124,7 +124,7 @@ uint32_t D2Common_3B440_GetFlag2(uint32_t pBlock)
 // 0x2EBB0: retail's unit-field validator. Null block (0xfa5), null field +0x14 (0xfa7) and a
 // non-zero first dword (0xfa8) are all fatal asserts; only "block set, +0x14 set, type 0" passes.
 // The assert machinery has no wasm equivalent, so every path returns void.
-// 1.13c D2Common+0x2EBB0 (#10746)
+// 1.13c D2Common+0x2ebb0 (#10746)
 void D2Common_2EBB0_ValidateUnitFields(uint32_t pBlock)
 {
 	if (!pBlock)
@@ -270,6 +270,9 @@ bool D2Common_51870_FindPlacement(int32_t* pUnit, int32_t* pTarget, uint32_t* pO
 	if (nCollision != 0)
 	{
 		const int32_t nSizeX = pEnv->unit_size_x ? pEnv->unit_size_x(reinterpret_cast<int32_t*>(pRoom)) : 0;
+		// retail seeds the in/out point with the TARGET coords (not the extrapolated ones)
+		nNewX = nTargetX;
+		nNewY = nTargetY;
 		pEntry = pEnv->place ? pEnv->place(reinterpret_cast<int32_t*>(pRoom), &nNewX, &nNewY, nSizeX,
 		                                   0x1C09, 0x1C09, 0, 0x32, 1)
 		                     : nullptr;
@@ -360,7 +363,7 @@ struct D2Common1AA00Env
 	void (*fatal)(int32_t);						//0x04 retail assert + _exit
 };
 
-// 1.13c D2Common+0x1AA00 (#10751)
+// 1.13c D2Common+0x1aa00 (#10751)
 void D2Common_1AA00_MonstersGetMinionSpawnInfo(uint32_t pMonster, int32_t* pId, uint32_t* pX,
                                                uint32_t* pY, uint32_t* pSpawnMode, uint32_t nDifficulty,
                                                int32_t (*pfSpawnClassCallback)(uint32_t),
@@ -465,7 +468,8 @@ void D2Common_1AA00_MonstersGetMinionSpawnInfo(uint32_t pMonster, int32_t* pId, 
 		*pX = UnitCoordX(pUnit);
 		*pY = UnitCoordY(pUnit) + 2;
 		*pSpawnMode = 1;
-		if (sgptDataTables->nStatesTxtRecordCount >= 0x93)
+		if (sgptDataTables->nStatesTxtRecordCount < 0x93)
+			return; // retail returns before the room refresh
 		{
 			const uint32_t pMonsterData = static_cast<uint32_t>(pUnit[0x17]);
 			if (pMonsterData && RdI32(PC(pMonsterData), 0x10) < 0)

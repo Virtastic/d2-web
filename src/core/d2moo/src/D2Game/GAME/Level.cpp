@@ -29,7 +29,7 @@
 
 
 //D2Game.0x6FC3BBA0
-// 1.13c D2Game+0x9DCD0
+// 1.13c room walk (RVA not 0x9DCD0; that is the per-unit dispatch in d2game_batch_D4630.cpp)
 void __fastcall LEVEL_UpdateUnitsInAdjacentRooms(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2ClientStrc* pClient)
 {
     // TODO: v10
@@ -121,7 +121,7 @@ void __fastcall LEVEL_RemoveUnitsExceptClientPlayer(D2ActiveRoomStrc* pRoom, D2C
     }
 }
 
-//D2Game.0x6FC3BDE0
+// 1.13c D2Game+0x9D5B0 (1.10f 0x6FC3BDE0); retail takes pGame in EAX
 void __fastcall LEVEL_FreeDrlgDeletes(D2GameStrc* pGame)
 {
     for (int32_t i = 0; i < NUM_ACTS; ++i)

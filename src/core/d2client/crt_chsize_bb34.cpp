@@ -70,7 +70,7 @@ static_assert(kGetProcAddress + 0x6FAB0000u == 0x6FB7EF74u, "GetProcAddress IAT 
 static_assert(kExitProcess + 0x6FAB0000u == 0x6FB7EF48u, "ExitProcess IAT slot");
 }  // namespace
 
-// 1.13c D2Client+0x34DD = MSVC 2003 CRT ___crtExitProcess(code). Rule: hModule =
+// 1.13c D2Client+0x034DD = MSVC 2003 CRT ___crtExitProcess(code). Rule: hModule =
 // GetModuleHandleA("mscoree.dll"); if (hModule) { p = GetProcAddress(hModule, "CorExitProcess");
 // if (p) (*p)(code); } ExitProcess(code). No D2Client global or struct is touched, and no path returns
 // in retail (int3 pad). The host seam stands in for the three imports; the indirect CorExitProcess call

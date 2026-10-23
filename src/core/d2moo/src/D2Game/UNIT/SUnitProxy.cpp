@@ -325,6 +325,7 @@ void __fastcall SUNITPROXY_InitializeItemCache(D2GameStrc* pGame, D2UnitProxyStr
 }
 
 //D2Game.0x6FCCC030
+// 1.13c D2Game+0x90450
 void __fastcall SUNITPROXY_FreeNpcControl(D2GameStrc* pGame)
 {
     D2NpcControlStrc* pNpcControl = pGame->pNpcControl;
@@ -541,6 +542,7 @@ void __fastcall SUNITPROXY_CountPlayersInLevel(D2GameStrc* pGame, D2UnitStrc* pU
 }
 
 //D2Game.0x6FCCC6B0
+// 1.13c D2Game+0x90560 (checked against decompile)
 void __fastcall SUNITPROXY_OnClientRemovedFromGame(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (pGame->nGameType == 3)
@@ -934,6 +936,7 @@ void __fastcall SUNITPROXY_FillIGlobaltemCacheRecordForNpc(int32_t nNpcId)
 }
 
 //D2Game.0x6FCCD120
+// 1.13c D2Game+0x8F140
 void __fastcall SUNITPROXY_ClearGlobalItemCache()
 {
     for (int32_t i = 0; i < MAX_NPC_INVENTORY; ++i)

@@ -17,7 +17,7 @@ struct D2CommonE150Env
 	int32_t (*update_tile)(uint32_t pRoom, uint32_t pArg, uint32_t nCoords);
 };
 
-// 1.13c D2Common+0xE150 (#10906): update one room tile and set the room's +0x38 dword to 15.
+// 1.13c D2Common+0x0e150 (#10906): update one room tile and set the room's +0x38 dword to 15.
 // param_2 is unused by the body. The two 16-bit coordinates pack as (nHi << 16) | nLo.
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_e150(uint32_t pRoom, uint32_t unused2, uint32_t pArg,

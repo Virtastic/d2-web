@@ -24,7 +24,7 @@ extern "C" int32_t g_d2common_dat_6fdeff5c = 0;
 // row's wMonStatsEx: component nComponent (0..15) choice nChoice selects a byte in the 0x26 array
 // (0xC per component), which indexes the global drop-room table. Every out-of-range index answers 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_84b40(int32_t nMonsterId, uint32_t nComponent,
+EMSCRIPTEN_KEEPALIVE uint32_t D2GetDropRoom(int32_t nMonsterId, uint32_t nComponent,
 	uint32_t nChoice)
 {
 	if (nComponent > 0xF) return 0;
@@ -60,7 +60,7 @@ namespace
 // 1.13c D2Common+0x4EBA0 (#10497): 2 when the unit is one of the three state-bearing types and state
 // 0x86 (checked through 0x37DB0) is set; 0 otherwise.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4eba0(D2UnitStrc* pUnit)
+EMSCRIPTEN_KEEPALIVE uint32_t d2common_4EBA0_UnitState86(D2UnitStrc* pUnit)
 {
 	if (!pUnit) return 0;
 
@@ -92,7 +92,7 @@ namespace
 
 // 1.13c D2Common+0x30160 (#10500): absolute difference of the two units' compared values.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_30160(D2UnitStrc* pFirst, D2UnitStrc* pSecond)
+EMSCRIPTEN_KEEPALIVE int32_t D2Common_UnitPathValueDelta(D2UnitStrc* pFirst, D2UnitStrc* pSecond)
 {
 	const int32_t nDelta = (int32_t)(Batch2_UnitCompareValue(pFirst) - Batch2_UnitCompareValue(pSecond));
 	return nDelta < 0 ? -nDelta : nDelta;
@@ -118,7 +118,7 @@ namespace
 // and has MonStats2 flag bit 7 set. The decompiler loses the class-id register of the 0x1470 call;
 // the unit's own class id is the only source. Returns 0 otherwise.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4ff80(D2UnitStrc* pUnit)
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_4FF80_MonsterAnim12NoStateFlag7(D2UnitStrc* pUnit)
 {
 	if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER) return 0;
 	if (pUnit->dwAnimMode != 0xC) return 0;

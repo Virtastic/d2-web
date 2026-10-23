@@ -23,7 +23,7 @@
 #include "Units/Units.h"
 
 // 0x223D0 and 0x30420 are already NAMED rows in their own files.
-extern "C" uint32_t d2_fn_d2common_223d0(int32_t nItemId);
+extern "C" uint32_t d2common_IsTransmogrify_223d0(int32_t nItemId);
 extern "C" void d2_fn_d2common_30420(uint32_t* r);
 
 static_assert(offsetof(D2OverlayTxt, dwOffsetX) == 0x54, "overlay.txt dwOffsetX");
@@ -56,7 +56,7 @@ namespace
 // a non-extended one or a missing bit array is a no-op. Prior art: D2MOO 1.10f
 // STATES_UpdateStayDeathFlags, whose three branches this reproduces.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_34150(D2UnitStrc* pUnit, int32_t bBoss)
+EMSCRIPTEN_KEEPALIVE void D2Common_UpdateStayDeathFlags(D2UnitStrc* pUnit, int32_t bBoss)
 {
 	if (!pUnit || !sgptDataTables)
 		return;
@@ -92,7 +92,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_34150(D2UnitStrc* pUnit, int32_t bBoss)
 // item and tile units read the static path (x +0x04, y +0x08), everything else the dynamic path
 // (x +0x08, y +0x0C). A missing path yields 0/0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2ffe0(D2UnitStrc* pUnit, uint32_t* pOut)
+EMSCRIPTEN_KEEPALIVE void D2Common_2FFE0_GetUnitClientCoords(D2UnitStrc* pUnit, uint32_t* pOut)
 {
 	if (!pOut)
 		return;
@@ -123,7 +123,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2ffe0(D2UnitStrc* pUnit, uint32_t* pOut
 // 1.13c D2Common+0x6CA70 (#10629): copy file name nFile (0..0x1F) of lvltypes.txt record nRecord to
 // szOut. A missing table or record index leaves szOut empty; the source field is 60 bytes.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_6ca70(int32_t nRecord, int32_t nFile, char* szOut)
+EMSCRIPTEN_KEEPALIVE void D2COMMON_GetLvlTypeFile(int32_t nRecord, int32_t nFile, char* szOut)
 {
 	if (!szOut)
 		return;
@@ -148,7 +148,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_6ca70(int32_t nRecord, int32_t nFile, c
 // best's +0x34 is not -1 and its +0x28 is lower. Returns the chosen node, 0 when none. 0x4E480 is
 // still an UNMAPPED row; its loop is reproduced here with the thunk's own registers as arguments.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4f070(uint32_t pOwner, int32_t nMatch)
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_FindSkillNodeById_4F070(uint32_t pOwner, int32_t nMatch)
 {
 	if (!pOwner)
 		return 0;
@@ -182,7 +182,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4f070(uint32_t pOwner, int32_t nMat
 // 1.13c D2Common+0x82E80 (#10632): overlay.txt record nOverlay's dwOffsetX (+0x54). An index
 // outside the table or a missing table yields 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_82e80(int32_t nOverlay)
+EMSCRIPTEN_KEEPALIVE uint32_t D2COMMON_GetOverlayOffsetX(int32_t nOverlay)
 {
 	if (!sgptDataTables || !sgptDataTables->pOverlayTxt)
 		return 0;
@@ -233,7 +233,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_50ce0(D2UnitStrc* pUnit, const D2Com
 // flagged 0x10 in their item data are skipped. The walk follows the item data's pNextItem (+0x64)
 // and stops on a null or sentinel (0xFFFFFFA4) data pointer.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_23e30(D2UnitStrc* pUnit)
+EMSCRIPTEN_KEEPALIVE int32_t d2common_CountItemsByNodePos_23e30(D2UnitStrc* pUnit)
 {
 	int32_t nCount = 0;
 	if (!pUnit)
@@ -277,7 +277,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_23e30(D2UnitStrc* pUnit)
 // returns) and that record's +0x34 word into the player data at +0x80/+0x88. Null unit, a non-player
 // unit or missing player data is a no-op; a null record writes the id 0 (retail then exits).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30600(D2UnitStrc* pUnit)
+EMSCRIPTEN_KEEPALIVE void D2Common_SetPlayerSwitchRightSkill(D2UnitStrc* pUnit)
 {
 	if (!pUnit || pUnit->dwUnitType != 0)
 		return;
@@ -303,32 +303,23 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30600(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x4E000 (#10649): the dword at +0x1C of the given block. A null block yields 0
 // (retail exits).
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4e000(uint32_t pBlock)
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_BlockDword1C(uint32_t pBlock)
 {
 	if (!pBlock)
 		return 0;
 	return R(P(pBlock), 0x1C);
 }
 
-// 0x4D140 is a still-UNMAPPED row.
-struct D2Common4D7E0Env
-{
-	int32_t* (*pFindFieldRecord)(uint32_t, int32_t*, uint32_t*, uint32_t, uint32_t, uint32_t,
-	                             int32_t, int32_t, int32_t);
-};
+struct D2Common4D140Env;
+extern "C" int* D2Common_4D140_FindFreeSpot(const D2Common4D140Env* e, void* pLevel, int* pPos, uint32_t* pUnit,
+	uint32_t p4, uint32_t p5, uint32_t p6, int p7, int p8, int p9);
 
-// 1.13c D2Common+0x4D7E0 (#10654): forwarder to 0x4D140 with radius 0x32 and step 1.
+// 1.13c D2Common+0x4D7E0 (#10654): forwarder to 0x4D140 with p8 = 0x32, p9 = 1.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_4d7e0(uint32_t nContext, int32_t* pCoords,
-                                                uint32_t* pMatchBlock, uint32_t nFlags,
-                                                uint32_t nRadiusFlags, uint32_t nStepFlags,
-                                                int32_t nAllowUntouched, const D2Common4D7E0Env* pEnv)
+int* D2Common_4D7E0_FindFreeSpotR50(const D2Common4D140Env* e, void* pLevel, int* pPos, uint32_t* pUnit,
+                                    uint32_t p4, uint32_t p5, uint32_t p6, int p7)
 {
-	if (pEnv != nullptr && pEnv->pFindFieldRecord != nullptr)
-	{
-		pEnv->pFindFieldRecord(nContext, pCoords, pMatchBlock, nFlags, nRadiusFlags, nStepFlags,
-		                       nAllowUntouched, 0x32, 1);
-	}
+	return D2Common_4D140_FindFreeSpot(e, pLevel, pPos, pUnit, p4, p5, p6, p7, 0x32, 1);
 }
 
 // 0x21D70 is a still-UNMAPPED row.
@@ -340,7 +331,7 @@ struct D2Common21EE0Env
 // 1.13c D2Common+0x21EE0 (#10655): whether a 1x1 item that is belt-able fits the belt slot
 // requested through 0x21D70. Non-item units, non-belt-able items and other item sizes yield 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_21ee0(int32_t nArg, D2UnitStrc* pItem,
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_ItemBeltSlotFits_21ee0(int32_t nArg, D2UnitStrc* pItem,
                                                    const D2Common21EE0Env* pEnv)
 {
 	if (!pItem || pItem->dwUnitType != 4)
@@ -360,9 +351,9 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_21ee0(int32_t nArg, D2UnitStrc* pIt
 // 1.13c D2Common+0x24240 (#10661): items.txt record for an item unit's class id must report
 // nTransmogrify (0x223D0). A null unit or another unit type is a no-op (retail exits).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_24240(D2UnitStrc* pItem)
+EMSCRIPTEN_KEEPALIVE void d2common_ItemTransmogrifyAssert_24240(D2UnitStrc* pItem)
 {
 	if (!pItem || pItem->dwUnitType != 4)
 		return;
-	d2_fn_d2common_223d0(pItem->dwClassId);
+	d2common_IsTransmogrify_223d0(pItem->dwClassId);
 }

@@ -1207,6 +1207,7 @@ BOOL __stdcall INVENTORY_CanItemBePlaced(D2InventoryStrc* pInventory, D2UnitStrc
 }
 
 //D2Common.0x6FD8F780 (#10248)
+// 1.13c D2Common+0x1f040
 BOOL __stdcall INVENTORY_CanItemsBeExchanged(D2InventoryStrc* pInventory, D2UnitStrc* pItem, int nXPos, int nYPos, int nInventoryRecordId, D2UnitStrc** ppExchangeItem, uint8_t nPage, BOOL bCheckIfCube)
 {
 	if (!INVENTORY_GetPtrIfValid(pInventory) || !INVENTORY_UnitIsItem(pItem) || nPage == uint8_t(-1) || nXPos < 0 || nYPos < 0)
@@ -1586,6 +1587,7 @@ D2UnitStrc* __stdcall INVENTORY_GetCursorItem(D2InventoryStrc* pInventory)
 	return nullptr;
 }
 
+// 1.13c D2Common+0x210b0
 //D2Common.0x6FD8FFA0 (#10263)
 D2UnitStrc* __stdcall INVENTORY_FindBackPackItemForStack(D2InventoryStrc* pInventory, D2UnitStrc* pStackable, D2UnitStrc* pCheckItem)
 {
@@ -1876,6 +1878,7 @@ D2UnitStrc* __stdcall INVENTORY_GetItemFromBeltSlot(D2InventoryStrc* pInventory,
 }
 
 //D2Common.0x6FD90590 (#10272)
+// 1.13c D2Common+0x20010
 BOOL __stdcall INVENTORY_GetUseableItemFromBeltSlot(D2InventoryStrc* pInventory, D2UnitStrc* pItem, int nSlotId, D2UnitStrc** ppItem)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory))
@@ -2016,6 +2019,7 @@ BOOL __stdcall INVENTORY_GetEquippedWeapon(D2InventoryStrc* pInventory, D2UnitSt
 }
 
 //D2Common.0x6FD90850 (#10275)
+// 1.13c D2Common+0x1FEF0
 BOOL __stdcall INVENTORY_HasBodyArmorEquipped(D2InventoryStrc* pInventory)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory))
@@ -2049,6 +2053,7 @@ BOOL __stdcall INVENTORY_IsItemBodyLocFree(D2InventoryStrc* pInventory, D2UnitSt
 }
 
 //D2Common.0x6FD90910 (#10279)
+// 1.13c D2Common+0x21760
 void __stdcall INVENTORY_RemoveInventoryItems(D2InventoryStrc* pInventory)
 {
 	if (INVENTORY_GetPtrIfValid(pInventory))
@@ -3295,6 +3300,7 @@ D2UnitGUID __stdcall INVENTORY_GetItemGUIDFromNode(D2InventoryNodeStrc* pNode)
 }
 
 //D2Common.0x6FD92180 (#10300)
+// 1.13c D2Common+0x21710
 BOOL __stdcall INVENTORY_RemoveAllItems(D2InventoryStrc* pInventory)
 {
 	if (!INVENTORY_GetPtrIfValid(pInventory))
@@ -3368,6 +3374,7 @@ BOOL __stdcall INVENTORY_CanItemsBeTraded(void* pMemPool, D2UnitStrc* pPlayer1, 
 }
 
 //D2Common.0x6FD923C0
+// 1.13c D2Common+0x1E7B0
 BOOL __fastcall INVENTORY_CopyUnitItemsToTradeInventory(D2InventoryStrc* pTradeInventory, D2UnitStrc* pUnit)
 {
 	if (INVENTORY_GetPtrIfValid(pTradeInventory))

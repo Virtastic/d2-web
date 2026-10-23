@@ -207,3 +207,24 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_68340(int32_t a, uint32_t
 	}
 	return -1;
 }
+
+extern "C" {
+// 1.13c D2Common+0x3E230: direction index from the offsets (eax - x2, y1 - y2) (fastcall: ecx=y1, edx=y2,
+// stack=x2, eax=x1). Same body as the private copy in d2common_batch_15840.cpp.
+EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_3e230(int32_t eax, int32_t y1, int32_t y2, int32_t x2) {
+	uint32_t a = (uint32_t)(eax - x2), b = (uint32_t)(y1 - y2);
+	int32_t ax = (int32_t)a < 0 ? -(int32_t)a : (int32_t)a, ay = (int32_t)b < 0 ? -(int32_t)b : (int32_t)b;
+	if (ax < ay * 2) {
+		if (ax * 2 <= ay) {
+			if ((int32_t)a < 0) { a = 0xffffffffu; goto L; }
+			a &= 1;
+		}
+	} else if ((int32_t)b < 0) b = 0xffffffffu;
+	else b &= 1;
+	if ((int32_t)a < -1) a = 0xfffffffeu; else if ((int32_t)a > 1) a = 2;
+L:
+	if ((int32_t)b < -1) return (int32_t)(a * 5 + 10);
+	if ((int32_t)b > 1) b = 2;
+	return (int32_t)(a * 5 + 0xc + b);
+}
+}

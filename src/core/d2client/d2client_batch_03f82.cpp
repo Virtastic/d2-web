@@ -115,7 +115,7 @@ static uint32_t d2c_ctype_lookup(int32_t c, uint32_t mask, const D2cGetptdEnv* e
     return *(const uint16_t*)(uintptr_t)(table + (uint32_t)c * 2) & mask;
 }
 
-// 1.13c D2Client+0x03F94 (63 B, caller 0x38CD0): _isalpha -- ctype mask 0x103 (_ALPHA, _UPPER/_LOWER).
+// 1.13c D2Client+0x03f94 (63 B, caller 0x38CD0): _isalpha -- ctype mask 0x103 (_ALPHA, _UPPER/_LOWER).
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_client_3f94(int32_t c, const D2cGetptdEnv* env,
                                             D2cUpdatetlocinfoFn updatetlocinfo,
@@ -123,7 +123,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_3f94(int32_t c, const D2cGetptdEnv* env,
     return (int32_t)d2c_ctype_lookup(c, 0x103, env, updatetlocinfo, isctype_mt);
 }
 
-// 1.13c D2Client+0x03FD3 (58 B, callers 0x61BC, 0x38CD0, 0xCB1C5, 0xCC903): _iscntrl -- mask 4.
+// 1.13c D2Client+0x03fd3 (58 B, callers 0x61BC, 0x38CD0, 0xCB1C5, 0xCC903): _iscntrl -- mask 4.
 // (Retail's byte read of the 16-bit entry is the compiler narrowing its own table; the mask keeps the
 // low bit only, so the 16-bit read above is identical.)
 extern "C"
@@ -133,7 +133,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_3fd3(int32_t c, const D2cGetptdEnv* env,
     return (int32_t)d2c_ctype_lookup(c, 4, env, updatetlocinfo, isctype_mt);
 }
 
-// 1.13c D2Client+0x0400D (63 B, caller 0x61BC): _isxdigit -- mask 0x80.
+// 1.13c D2Client+0x0400d (63 B, caller 0x61BC): _isxdigit -- mask 0x80.
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_client_400d(int32_t c, const D2cGetptdEnv* env,
                                             D2cUpdatetlocinfoFn updatetlocinfo,
@@ -141,7 +141,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_400d(int32_t c, const D2cGetptdEnv* env,
     return (int32_t)d2c_ctype_lookup(c, 0x80, env, updatetlocinfo, isctype_mt);
 }
 
-// 1.13c D2Client+0x0404C (58 B, caller 0x61BC): _isspace -- mask 8.
+// 1.13c D2Client+0x0404c (58 B, caller 0x61BC): _isspace -- mask 8.
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_client_404c(int32_t c, const D2cGetptdEnv* env,
                                             D2cUpdatetlocinfoFn updatetlocinfo,
@@ -263,7 +263,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_80c5(D2cFile* f, D2cReadFn read_, D2cGetb
 typedef void* (*D2cMallocGetbufFn)(uint32_t size);
 extern uint32_t g_streamCount;   // +0x0FAA50, d2client_batch_0312a.cpp
 
-// 1.13c D2Client+0x09F56 (68 B, callers 0x080C5 __filbuf, 0x04AE8 __flsbuf, 0x0A975): __getbuf.
+// 1.13c D2Client+0x09f56 (68 B, callers 0x080C5 __filbuf, 0x04AE8 __flsbuf, 0x0A975): __getbuf.
 // Bump the stream counter, then _malloc(0x1000) into _base. On failure _flag |= 4 (F_ERR) and the
 // stream falls back to the address of its inline _charbuf field with _bufsiz = 2; on success
 // _flag |= 8 (the buffer is malloc'ed) with _bufsiz = 0x1000. Either way _cnt = 0, _ptr = _base.
@@ -286,6 +286,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_9f56(D2cFile* f, D2cMallocGetbufFn malloc_) 
 }
 
 // 1.13c D2Client+0x0A975 (108 B, callers 0x061BC and 0x09F56): _ungetc.
+// 1.13c D2Client+0x0a975 (108 B): FID_conflict__ungetc / __ungetc_lk.
 // Push one byte back into a CRT FILE buffer.  The malloc callback is a host seam for
 // the only nested call, __getbuf (0x09F56), and follows the retail FILE argument.
 extern "C"
@@ -299,7 +300,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_a975(int32_t ch, D2cFile* f, D2cMallocGet
         ++f->ptr;
     }
     --f->ptr;
-    if ((flag & 0x40u) == 0) {
+    if (((uint32_t)f->flag & 0x40u) == 0) {
         *f->ptr = (char)ch;
     } else if ((uint8_t)*f->ptr != (uint8_t)ch) {
         ++f->ptr;
@@ -349,7 +350,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_41fa(void* file, D2cLseekFn lseek_) {
         if (f->cnt == 0) {
             buffered = 0;
         } else {
-            int32_t end = buffered + f->cnt;
+            int32_t end = (int32_t)(f->ptr - f->base) + f->cnt;   // raw, not newline-augmented
             if ((d2c_fd_record(handle)[4] & 0x80) != 0) {
                 if (lseek_(handle, 0, 2) == pos) {
                     const char* p = f->base;
@@ -360,7 +361,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_41fa(void* file, D2cLseekFn lseek_) {
                 } else {
                     lseek_(handle, pos, 0);
                     int32_t size = 0x200;
-                    if (0x200 < end || ((uint32_t)f->flag & 8) == 0 ||
+                    if (0x200u < (uint32_t)end || ((uint32_t)f->flag & 8) == 0 ||
                         ((uint32_t)f->flag & 0x400) != 0) {
                         size = f->bufsiz;
                     }
@@ -387,7 +388,7 @@ struct D2cInitCritSecEnv {
 };
 extern "C" int32_t d2_client_908f(void* cs, uint32_t spin, const D2cInitCritSecEnv* env);
 
-// 1.13c D2Client+0x0470D (73 B, caller 0x74DE __mtinit): __mtinitlocks. For every slot whose flag word
+// 1.13c D2Client+0x0470d (73 B, caller 0x74DE __mtinit): __mtinitlocks. For every slot whose flag word
 // is 1 (the statically-initialised locks), point it at its 0x18-byte block and initialise it through
 // ___crtInitCritSecAndSpinCount (0x908F) with spin count 4000. Returns 1.
 // ponytail: 0x908F returns void in this tree and the wasm host has no failing initialiser, so retail's
@@ -489,7 +490,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_4ae8(int32_t ch, void* file, D2cIsattyFn 
     return -1;
 }
 
-// 1.13c D2Client+0x04C01 (51 B, callers 0x4C34, 0x4C58, 0x4C8F): _write_char. Unless this is a string
+// 1.13c D2Client+0x04c01 (51 B, callers 0x4C34, 0x4C58, 0x4C8F): _write_char. Unless this is a string
 // stream (flag 0x40) without a base, cnt is decremented first: a negative cnt flushes through 0x4AE8
 // __flsbuf, otherwise the byte lands at _ptr and _ptr advances. A -1 result stores -1 in the byte
 // counter (ESI on retail) and returns; otherwise the counter advances by one.
@@ -517,7 +518,7 @@ void d2_client_4c01(D2cFile* f, uint8_t ch, int32_t* written, D2cIsattyFn isatty
 // --- formatted-output string emitter -------------------------------------------------------------
 typedef void (*D2cWriteCharFn)(D2cFile* file, uint8_t ch, int32_t* written);
 
-// 1.13c D2Client+0x04C58 (55 B, caller 0x4C8F): MSVC 2003 Release CRT _write_string (output.c), the
+// 1.13c D2Client+0x04c58 (55 B, caller 0x4C8F): MSVC 2003 Release CRT _write_string (output.c), the
 // helper the vsnprintf-style formatter at 0x4C8F emits its runs of literal/formatted characters with.
 // Register contract: EAX = &written, ECX = text, EDI = FILE, the length on the stack. A string stream
 // (flag 0x40) with no buffer only adds the length to the byte count; every other stream emits the

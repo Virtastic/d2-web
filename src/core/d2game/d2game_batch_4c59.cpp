@@ -66,8 +66,8 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_4c59(void* _File, const D2GameBatch4c59En
 // find in the game unit hash table (pGame+0x1120, 0x80 buckets, chain link +0xE4, id +0x0C).
 // The pair arrives in EAX (explicit here) and holds two dwords passed to ordinal #10075 and re-used
 // in the 0x8E request. pUnit+0xDC is a list of nodes (type byte +0x00, next +0x24); the types 3, 4
-// and 6 are replayed to 0x8E6F0. When ordinal #11134 reports a container (-1 = none), an 8-byte
-// 0x8E/1 request {u32 container, u32 pair[0]} goes to 0xDFC10.
+// and 6 are replayed to 0x8E6F0. When ordinal #11134 reports a container (-1 = none), a 10-byte
+// 0x8E/1 request {u8 0x8E, u8 1, u32 container @2, u32 pair[0] @6} goes to 0xDFC10.
 // Ghidra reconstructs overlapping call frames, so the stack stores are transcribed in call order.
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_37b10(void* self, void* pGame, uint32_t nUnitId,
                                              const uint32_t* pPair,
@@ -93,6 +93,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_37b10(void* self, void* pGame, uint32_t n
     env->ord11090(unitHandle);
     wr32(pUnit, 0xC4, rd32(pUnit, 0xC4) & 0xFFFFFFF7u);
     env->ord10945(pUnit, 7, 1);
+    wr32(pUnit, 0xC4, rd32(pUnit, 0xC4) | 0x10);
 
     static const uint8_t kTypes[3] = { 3, 4, 6 };
     for (uint32_t t = 0; t < 3; ++t) {
@@ -107,11 +108,11 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_37b10(void* self, void* pGame, uint32_t n
 
     const int32_t nContainer = env->ord11134(rd32(pUnit, 0x60));
     if (nContainer != -1) {
-        uint8_t req[8];
+        uint8_t req[10];
         req[0] = 0x8E;
         req[1] = 1;
         wr32(req, 2, (uint32_t)nContainer);
-        wr32(req, 4, pPair[0]);
+        wr32(req, 6, pPair[0]);
         env->sendRequest8E(req);
     }
 }
@@ -129,7 +130,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2game_49db0(void* pClient)
 // Packet 0x23 (13 bytes): header byte, one uninitialised gap byte in the retail frame, then the four
 // caller fields. Fastcall arguments param_1/param_3 are unused by the body.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8b710(uint32_t param_1, uint32_t param_2, uint32_t param_3,
+EMSCRIPTEN_KEEPALIVE void D2GAME_SendPacket0x23_8B710(uint32_t param_1, uint32_t param_2, uint32_t param_3,
                                              uint8_t param_4, uint16_t param_5, uint32_t param_6,
                                              const D2GameBatch4c59Env* env)
 {
@@ -147,7 +148,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8b710(uint32_t param_1, uint32_t param_2,
 // Packet 0x0B (11 bytes): a leading byte not written by this body, then a byte from param_1 and the
 // caller fields. Fastcall argument param_3 is unused by the body.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8bf80(uint32_t param_1, uint32_t param_2, uint32_t param_3,
+EMSCRIPTEN_KEEPALIVE void d2game_8bf80_packet0B(uint32_t param_1, uint32_t param_2, uint32_t param_3,
                                              uint16_t param_4, uint16_t param_5, uint8_t param_6,
                                              const D2GameBatch4c59Env* env)
 {
@@ -168,7 +169,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8bf80(uint32_t param_1, uint32_t param_2,
 // 0x108 fatal); that container's units get the same table lookup and 0x9B630 is called on `self`
 // directly. The game arrives in EBX (explicit pGame; null is the 0x2D3 fatal) and client+0x60 null is
 // the 0xF4 fatal. When ordinal #11104 reports a nonzero value, 0xDF51A0(pGame, client) runs.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9bb10(void* self, int* pClient, void* pGame,
+EMSCRIPTEN_KEEPALIVE void GAME_RemoveClientUnitsFromGame_9BB10(void* self, int* pClient, void* pGame,
                                              const D2GameBatch4c59Env* env)
 {
     if ((void*)pClient[0x18] == nullptr) d2game_fatal(0xF4);

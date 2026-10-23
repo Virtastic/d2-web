@@ -225,7 +225,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_771D0(uint32_t ebx, void* esi, const D2Ga
 }
 
 // Store param_1 into the +0x54 dword of a type-1 unit's +0x14 record.
-// 1.13c D2Game+0xAF710
+// 1.13c D2Game+0xaf710
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_AF710(uint32_t param1, void* eaxIn,
                                              const D2GameBatch54420Env* env)
@@ -240,7 +240,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_AF710(uint32_t param1, void* eaxIn,
 // fail, the +0x4C distance must reach 0x100, and the distance divided by a per-type divisor, half and
 // quarter of it (or the 0x1450 fallback) must all be at most it; a type-1 ESI unit additionally needs
 // 0x1560(limit, 3). Answer 1 when any gate fails, 0 when all pass.
-// 1.13c D2Game+0xDB910
+// 1.13c D2Game+0xdb910
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_DB910(uint32_t param1, uint32_t param2, uint32_t retaddr,
                                                  void* esi, const D2GameBatch54420Env* env)
@@ -290,7 +290,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_777F0(void* self, uint32_t param1, void* 
 // Type-1 unit with a +0x14 record whose +0x28 record has a non-null +0x28: the 0xE03A0 probe must
 // succeed, the unit's +0x04 index must select a data-table record whose signed +0xA8 short is positive
 // and within DataTables+0xBA0; then 0x9E330(param_1) runs.
-// 1.13c D2Game+0x9F2B0
+// 1.13c D2Game+0x9f2b0
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9F2B0(void* param1, void* eaxIn,
                                              const D2GameBatch54420Env* env)
@@ -354,7 +354,7 @@ EMSCRIPTEN_KEEPALIVE uint16_t d2_fn_d2game_53260(uint32_t eaxIn, const D2GameBat
 // 0x10306 probes. The 0x1C mask bit takes the 0xA19A0 + 0x9F3B0 tail; otherwise 0x10945/0x10871
 // supply a unit (0x11013 from EDI when 0x10871 answers 0) that 0x10785/0x10725/0x11081/0x10807 and two
 // 0x10188 stat writes are applied to, then 0x9F3B0(1, EDI).
-// 1.13c D2Game+0xA1D10
+// 1.13c D2Game+0xa1d10
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_A1D10(uint32_t param1, int32_t param2, void* ebx, void* edi,
                                              const D2GameBatch54420Env* env)
@@ -460,7 +460,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_24C70(void* self, void* param1, uint32_t
 // the per-mode 0x14xxx/0x10xxx action, then the high-99 stat scaling (0xEBB0/0xEC90 doubling, the
 // 0x14B50 roll and the 11050/10248/10996 tail). Answer 1 when the final 10106 is positive and its
 // no-argument probe is below 10, else 0.
-// 1.13c D2Game+0x10A20
+// 1.13c D2Game+0x10a20
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_10A20(uint32_t param1, void* param2, void* esiPtr,
                                                  const D2GameBatch54420Env* env)

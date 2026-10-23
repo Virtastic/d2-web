@@ -29,7 +29,7 @@ static inline uint32_t rd32(const void* p, uint32_t o) { uint32_t v; std::memcpy
 static inline void wr8(void* p, uint32_t o, uint8_t v) { ((uint8_t*)p)[o] = v; }
 static inline void wr16(void* p, uint32_t o, uint16_t v) { std::memcpy((uint8_t*)p + o, &v, 2); }
 static inline void wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)p + o, &v, 4); }
-static inline void* rdptr(const void* p, uint32_t o) { void* v; std::memcpy(&v, (const uint8_t*)p + o, sizeof v); return v; }
+static inline void* rdptr(const void* p, uint32_t o) { return (void*)(uintptr_t)rd32(p, o); }   // retail structs hold 32-bit pointers; wasm64 sizeof(void*) is 8
 
 [[noreturn]] static void d2game_fatal(uint32_t) { _exit(-1); }
 
@@ -199,15 +199,22 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_35bb(uint32_t* r) {
 }
 
 // 1.13c D2Game+0x34440
-// ResetQuest(pGame in EAX, nQuestId in ECX): clear bNotIntro (+9), bActive (+0xA) and fLastState (+0xB)
+// ResetQuest(pGame in EAX, nQuestId in ECX; the vector's regs are `ecx eax`, so r[0]=nQuestId, r[1]=pGame): clear bNotIntro (+9), bActive (+0xA) and fLastState (+0xB)
 // of the quest record; a missing record is the retail 0x5F3 assert.
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_34440(uint32_t* r) {
-    void* pQuest = d2game_env(r).getQuestData((void*)(uintptr_t)r[0], (int32_t)r[1]);
+    const D2GameBatch20Env& env = d2game_env(r);
+    void* pQuest;
+    if (env.getQuestData != nullptr) pQuest = env.getQuestData((void*)(uintptr_t)r[1], (int32_t)r[0]);
+    else {   // no host seam (the FN replay passes none): walk 0x33F30's chain, game+0x10F4 -> pLastQuest, id at +0, pPrev at +0xF4
+        void* ctl = rdptr((void*)(uintptr_t)r[1], 0x10F4);
+        pQuest = ctl ? rdptr(ctl, 0) : nullptr;
+        while (pQuest != nullptr && rd32(pQuest, 0) != r[0]) pQuest = rdptr(pQuest, 0xF4);
+    }
     if (pQuest == nullptr) d2game_fatal(0x5F3);
     wr8(pQuest, 9, 0);
     wr8(pQuest, 0xA, 0);
     wr8(pQuest, 0xB, 0);
-    r[4] = 0;
+    r[4] = (uint32_t)(uintptr_t)pQuest;   // EAX out: the record (vector result is the blob pointer)
 }
 
 // 1.13c D2Game+0x34510

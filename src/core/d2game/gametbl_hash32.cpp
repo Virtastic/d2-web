@@ -50,6 +50,8 @@ void listInit(W list) { w(list, 0) = 0xdddddddd; w(list, 4) = list + 4; w(list, 
 // nodes are already parked, so a zeroed block is the safe equal. The capture hook returns a pre-zeroed blob the same way.
 W (*d2game_tbl_realloc)(W old, W bytes) = [](W old, W bytes) -> W { void* p = calloc(1, bytes); free((void*)(uintptr_t)old); return (W)(uintptr_t)p; };
 
+// 1.13c D2Game+0x2740 (thiscall-like: dst=ecx/arg, src): copy-construct a 12-byte slot; +0 copied from src, +4/+8 re-initialised as an empty list. Only the OOM fallback of 0x2630 (via 0x26F0) calls it.
+void d2game_2740_copyConstruct(W dst, W src) { w(dst, 0) = w(src, 0); w(dst, 4) = dst + 4; w(dst, 8) = ~(dst + 4); }
 void d2game_25a0_construct(W p) { if (p) listInit(p); }   // 0x25A0 (stdcall: null-checks then 0x24B0)
 // 0x25F0 (eax = n, stack = array hdr), 0x2630 (ebx = cap, esi = hdr), 0x2510 (eax = hdr, edi = n): the growable array {cap, count, data, align} at table+0x14.
 W arrAlign(W n, W hdr) {
@@ -57,6 +59,7 @@ W arrAlign(W n, W hdr) {
     for (W c = (n - 1) & n; c; c = (n - 1) & n) n = c;
     return n < 1 ? 1 : n;
 }
+// 1.13c D2Game+0x26f0 (thiscall(this,p): if p, 0x2740(p,this); only reached from the OOM fallback below, not modelled)
 void arrSetCap(W hdr, W cap) {   // the OOM copy-construct fallback of 0x2630 (via 0x26F0/0x2740) is not modelled
     W old = w(hdr, 8);
     for (W i = cap; i < w(hdr, 4); ++i) listUninit(old + i * 12);

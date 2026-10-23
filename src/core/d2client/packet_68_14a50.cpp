@@ -29,7 +29,7 @@ struct D2ClientPacket68 {
 static_assert(sizeof(D2ClientPacket68) == 0x25);
 static_assert(offsetof(D2ClientPacket68, name) == 0x15);
 
-// 1.13c D2Client+0x14A50
+// 1.13c D2Client+0x14a50
 // eax/cx are register args. flags = DAT 6fb9264c, byte_a = 6fb92650, byte_b = 6fbc991c,
 // src = 6fbc9928, bytes_sent = 6fbcc4e0, packets_sent = 6fbcc4e8.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_14a50(uint32_t eax, uint16_t cx, uint32_t flags, uint8_t byte_a,

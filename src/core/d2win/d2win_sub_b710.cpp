@@ -1,4 +1,4 @@
-// 1.13c D2Win+0xB710 (sub_B710): unlink a node (prev @+0xc8, next @+0xc4) from a doubly linked list.
+// 1.13c D2Win+0x0b710 (sub_B710): unlink a node (prev @+0xc8, next @+0xc4) from a doubly linked list.
 // Stateful (global list head DAT_6f9a9e30, Fog #10043 seam); NAMED only, no vector.
 #include <cstdint>
 #include <cstring>

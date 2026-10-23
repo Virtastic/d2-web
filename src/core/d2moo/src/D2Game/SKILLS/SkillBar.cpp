@@ -246,6 +246,7 @@ int32_t __fastcall SKILLS_SrvDo069_FindPotion(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FCFB070
+// 1.13c D2Game+0x29240 (checked against decompile)
 int32_t __fastcall SKILLS_ApplyWarcryStats(D2GameStrc* pGame, D2UnitStrc* a2, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -358,6 +359,7 @@ int32_t __fastcall SKILLS_Callback_FindTargetForTaunt(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FCFB390
+// 1.13c D2Game+0x29000 (checked against decompile)
 int32_t __fastcall SKILLS_SrvDo071_Taunt(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -653,6 +655,7 @@ int32_t __fastcall SKILLS_RollFrenzyDamage(D2GameStrc* pGame, D2UnitStrc* pUnit,
 }
 
 //D2Game.0x6FCFBCE0
+// 1.13c D2Game+0x28E70
 void __fastcall SKILLS_ApplyFrenzyStats(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -776,6 +779,12 @@ int32_t __fastcall SKILLS_SrvSt38_Whirlwind(D2GameStrc* pGame, D2UnitStrc* pUnit
         return 0;
     }
 
+    // 1.13c: unit in state 12 (STATE_INFERNO) fails the start outright, no cleanup call
+    if (STATES_CheckState(pUnit, STATE_INFERNO))
+    {
+        return 0;
+    }
+
     D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
     if (pTarget && UNITS_IsInMeleeRange(pUnit, pTarget, 0))
     {
@@ -878,6 +887,7 @@ int32_t __fastcall SKILLS_SrvSt38_Whirlwind(D2GameStrc* pGame, D2UnitStrc* pUnit
 }
 
 //D2Game.0x6FCFC3A0
+// 1.13c D2Game+0x28170 (checked against decompile, no delta)
 int32_t __fastcall SKILLS_RemoveWhirlwindStats(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStrc* pSkill, int32_t a4, int32_t nX, int32_t nY)
 {
     // TODO: v9, pUnita
@@ -1104,6 +1114,7 @@ int32_t __fastcall SKILLS_SrvDo076_Whirlwind(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FCFC8E0
+// 1.13c D2Game+0x289A0
 int32_t __fastcall SKILLS_SrvSt39_Berserk(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1192,6 +1203,7 @@ int32_t __fastcall SKILLS_SrvSt39_Berserk(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 //D2Game.0x6FCFCB30
+// 1.13c D2Game+0x27F30
 int32_t __fastcall SKILLS_SrvSt40_Leap(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1369,6 +1381,7 @@ int32_t __fastcall SKILLS_FindLeapTargetPosition(D2UnitStrc* pUnit, int32_t nSki
 }
 
 //D2Game.0x6FCFD280
+// 1.13c D2Game+0x294A0 (checked against decompile, no delta)
 int32_t __fastcall SKILLS_SrvDo077_Leap(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -1456,6 +1469,7 @@ int32_t __fastcall SKILLS_SetVelocityForLeap(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FCFD4C0
+// 1.13c D2Game+0x28740
 int32_t __fastcall SKILLS_Leap(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 {
     if (!pUnit->pDynamicPath)
@@ -1724,6 +1738,7 @@ int32_t __fastcall SKILLS_SrvDo078_LeapAttack(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FCFDC40
+// 1.13c D2Game+0x272C0
 D2UnitStrc* __fastcall SKILLS_FindLeapAttackTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 {
     if (!pSkill)
@@ -1757,14 +1772,7 @@ D2UnitStrc* __fastcall SKILLS_FindLeapAttackTarget(D2GameStrc* pGame, D2UnitStrc
         return pTarget;
     }
 
-    pTarget = sub_6FD107F0(pGame, pUnit, 0, 0, sub_6FD15460(pUnit), 0x20003u, -1, 0);
-    if (!pTarget)
-    {
-        SKILLS_SetParam3(pSkill, 6);
-        return nullptr;
-    }
-
-    SKILLS_SetParam3(pSkill, pTarget->dwUnitType);
-    SKILLS_SetParam4(pSkill, pTarget->dwUnitId);
-    return pTarget;
+    // 1.13c has no nearby-target search here (1.10f did): it logs an error and marks the skill target invalid.
+    SKILLS_SetParam3(pSkill, 6);
+    return nullptr;
 }

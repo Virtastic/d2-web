@@ -11,6 +11,7 @@ struct FogB54aSeams {
     void (*sub1D620)(uint32_t* a, uint32_t* b, uint32_t c, uint32_t d);  // Fog+0x1D620
     int32_t cpuVendor;                                               // Fog+0x1C5B0 result (1 Intel,2 AMD,3 Cyrix)
     uint32_t cpuSignature;                                           // Fog+0x1C020 low dword (CPUID.1 EAX)
+    uint64_t cpuid1BxCx;                                             // CPUID.1 EBX (low) : ECX (high), as Fog+0x1C6E0 reads it
     int32_t cpuLevel;                                                // DAT_6ff82f30
 };
 FogB54aSeams g_fogB54a;
@@ -95,4 +96,12 @@ extern "C" uint32_t fog_sub_170F0(int32_t key, uint8_t* hdr, int32_t* o1, int32_
     for (uint32_t i = 0; i < n; i++, e += 3)
         if (e[0] == key) { *o1 = e[1]; *o2 = e[2]; return 0; }
     return 0x16;
+}
+
+// 1.13c Fog+0x1C6E0 -- on Intel with family 6 model>=8 (or family>6) return CPUID.1 EBX:ECX, else 0 in the low dword.
+extern "C" uint64_t fog_sub_1C6E0(uint64_t edxIn) {  // 1.13c Fog+0x1C6E0
+    uint32_t fam = g_fogB54a.cpuSignature >> 8 & 0xf;
+    if (g_fogB54a.cpuVendor == 1 && (fam > 6 || (fam == 6 && (g_fogB54a.cpuSignature & 0xf0) > 0x7f)))
+        return g_fogB54a.cpuid1BxCx;
+    return edxIn << 32;  // leftover EDX of the failed path; the caller discards it
 }

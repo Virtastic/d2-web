@@ -27,7 +27,7 @@ static uint32_t d2win_sub_8920(uint8_t* c, const uint16_t* text, int32_t row, in
     return 1;
 }
 
-// 1.13c D2Win+0x8A30 (ordinal 10120) -- fastcall wrapper: ecx unused, eax = control (set by caller).
+// 1.13c D2Win+0x08A30 (ordinal 10120) -- fastcall wrapper: ecx unused, eax = control (set by caller).
 extern "C" EMSCRIPTEN_KEEPALIVE
 uint32_t d2win_sub_8A30(void* ctrl, const uint16_t* text, int32_t row, int32_t col) {
     return d2win_sub_8920((uint8_t*)ctrl, text, row, col);

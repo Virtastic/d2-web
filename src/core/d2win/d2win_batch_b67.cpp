@@ -28,7 +28,7 @@ struct D2WinB67Env {
     uint32_t (*getTickCount)(void);
 };
 
-// 1.13c D2Win+0x0BF60 -- mode = EAX, p = ESI (byte*): remap *p onto a valid slot.
+// 1.13c D2Win+0x0bf60 -- mode = EAX, p = ESI (byte*): remap *p onto a valid slot.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2win_sub_BF60(int32_t mode, uint8_t* p, const D2WinB67Env* env) {
     const int32_t n = d2win_g_6f9a98a4;
@@ -89,7 +89,7 @@ int32_t d2win_sub_C180(int32_t param_1, const uint8_t* rec, const D2WinB67Env* e
     return (a == 1 && b == 1) ? 1 : 0;
 }
 
-// 1.13c D2Win+0x07C60 -- param_2 receives the 0x7A60 result; returns the Ordinal_10042(0xcf) block.
+// 1.13c D2Win+0x07c60 -- param_2 receives the 0x7A60 result; returns the Ordinal_10042(0xcf) block.
 // unaff_retaddr in retail is a stack slot compared to 0 after 0x7970; passed here as `check`.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void* d2win_sub_7C60(uint32_t* param_2, uint32_t check, const D2WinB67Env* env) {
@@ -104,7 +104,7 @@ void* d2win_sub_7C60(uint32_t* param_2, uint32_t check, const D2WinB67Env* env) 
     return r;
 }
 
-// 1.13c D2Win+0x164D0 -- ESI = esi, caller return address = retaddr; links a 0x48-byte node at list tail.
+// 1.13c D2Win+0x164d0 -- ESI = esi, caller return address = retaddr; links a 0x48-byte node at list tail.
 extern "C" EMSCRIPTEN_KEEPALIVE
 uint32_t* d2win_sub_164D0(uint32_t esi, uint32_t retaddr, uint32_t fn63e0, uint32_t lab6310,
                           const uint32_t* bitMasks, uint32_t** head, const D2WinB67Env* env) {

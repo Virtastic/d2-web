@@ -54,6 +54,7 @@ BOOL __stdcall DATATBLS_InitializeCollisionFieldTable(char* pExpField, int nSize
 }
 
 //D2Common.0x6FD520F0 (#11090)
+// 1.13c D2Common+0x7e4a0
 BOOL __stdcall DATATBLS_FreeCollisionFieldTable()
 {
 	if (sgptDataTables->pFieldData)
@@ -72,6 +73,7 @@ BOOL __stdcall DATATBLS_FreeCollisionFieldTable()
 }
 
 //D2Common.0x6FD52140 (#11091)
+// 1.13c D2Common+0x7E480
 void __stdcall DATATBLS_GetCollisionFieldCenter(int* pCenterX, int* pCenterY)
 {
 	*pCenterX = sgptDataTables->pCollisionField.nCenterX;
@@ -122,6 +124,7 @@ void __stdcall DATATBLS_SetFieldCoordinates(D2FieldStrc* pField, int nX, int nY)
 }
 
 //D2Common.0x6FD52250 (#11097)
+// 1.13c D2Common+0x7E340
 int __stdcall D2Common_11097(D2FieldStrc* pField, int nX, int nY)
 {
 	D2_ASSERT(pField);

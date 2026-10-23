@@ -35,7 +35,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_ded0() {
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_df00(D2ClientMessageSource source) {
     d2_client_ded0();
     std::lock_guard<std::recursive_mutex> guard(d2_client_message_sources_mutex);
-    auto* node = static_cast<D2ClientMessageNode*>(d2_fn_d2client_2f70(
+    auto* node = static_cast<D2ClientMessageNode*>(d2_client_2f70(
         reinterpret_cast<uintptr_t>(d2_client_message_sources), 0, 0, 1, allocate_source));
     // Retail dereferences allocation unconditionally; preserve that failure contract.
     node->source = source;

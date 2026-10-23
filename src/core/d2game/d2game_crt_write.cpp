@@ -27,9 +27,9 @@ static int32_t d2game_5879_bad(const D2GameCrtWriteSeams* s) {
     return -1;
 }
 
-// 1.13c D2Game+0x05879
+// 1.13c D2Game+0x05879 d2game_crt_write.cpp:D2Game_CrtWrite
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_5879(int32_t _FileHandle, void* _Buf, uint32_t _MaxCharCount,
+EMSCRIPTEN_KEEPALIVE int32_t D2Game_CrtWrite(int32_t _FileHandle, void* _Buf, uint32_t _MaxCharCount,
                                                const D2GameCrtWriteSeams* s) {
     const uint32_t fd = (uint32_t)_FileHandle;
     int32_t result;

@@ -735,6 +735,7 @@ BOOL __stdcall DATATBLS_CalculateMonsterStatsByLevel(int nMonsterId, int nGameTy
 }
 
 //D2Common.0x6FD689B0 (#10642)
+// 1.13c D2Common+0x53800
 void __stdcall DATATBLS_SetVelocityInMonStatsTxtRecord(int nMonsterId, short nVelocity)
 {
 	D2MonStatsTxt* pMonStatsTxtRecord = NULL;
@@ -742,7 +743,11 @@ void __stdcall DATATBLS_SetVelocityInMonStatsTxtRecord(int nMonsterId, short nVe
 	D2_ASSERT(sgptDataTables->pMonStatsTxt);
 
 	pMonStatsTxtRecord = DATATBLS_GetMonStatsTxtRecord(nMonsterId);
-	pMonStatsTxtRecord->nVelocity = nVelocity;
+	// 1.13c: out-of-range id is silently ignored (1.10f dereferenced NULL)
+	if (pMonStatsTxtRecord)
+	{
+		pMonStatsTxtRecord->nVelocity = nVelocity;
+	}
 }
 
 //D2Common.0x6FD68A00
@@ -1996,6 +2001,7 @@ D2MonSoundsTxt* __stdcall DATATBLS_GetMonSoundsTxtRecordFromSoundId(int nSoundId
 	return NULL;
 }
 
+// 1.13c D2Common+0x52fa0
 //D2Common.0x6FD6BF80 (#11250)
 D2MonSoundsTxt* __stdcall DATATBLS_GetMonSoundsTxtRecordFromMonsterId(int nMonsterId)
 {

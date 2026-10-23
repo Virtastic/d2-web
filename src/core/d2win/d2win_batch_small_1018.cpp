@@ -76,7 +76,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_17020(void* p,const D2WinSmallEnv
     if(read32(p,8)==2) e->setActive(0);
     write32(p,0x18,0); write32(p,0x1C,0);
 }
-// 1.13c D2Win+0xE5C0 -- incoming EAX is saved at +34; stack source becomes
+// 1.13c D2Win+0x0e5c0 -- incoming EAX is saved at +34; stack source becomes
 // EAX for initialization. The byte store intentionally overlaps the word at +4.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_E5C0(uint32_t ecx,uint32_t edx,void* p,
     void* source,uint8_t kind,uint32_t eax,const D2WinSmallEnv* e) {

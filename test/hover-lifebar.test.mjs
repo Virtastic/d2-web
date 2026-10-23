@@ -47,3 +47,14 @@ test('a full-life plate paints one rectangle and a life-0 plate paints a black o
   assert.notDeepEqual(paint(m({ hpPct: 100 })), paint(m({ hpPct: 50 })));
   assert.deepEqual(paint(m({ hpPct: 50 })), ['rgba(92,0,0,0.5)', 'rgba(0,0,0,0.75)']);
 });
+import { groundLabelPlate } from '../play/assets/hover-lifebar.mjs';
+test('ground label plate: text centred in the box (4px each side), 16 high', () => {
+  for (const [cx, w] of [[400, 61], [400, 62], [123, 7]]) {
+    const p = groundLabelPlate(cx, 300, w);
+    assert.equal(p.textX - p.box.x, 4);
+    assert.equal(p.box.x + p.box.width - (p.textX + w), 4);
+    assert.equal(p.box.height, 16);
+    assert.equal(p.anchorY, p.box.y + 13);
+    assert.ok(Math.abs(p.box.x + p.box.width / 2 - cx) <= 0.5);
+  }
+});

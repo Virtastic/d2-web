@@ -14,7 +14,7 @@ struct D2WinB49Env {
   void (*o10104)(uint32_t); void (*o10005)(uint32_t); void (*o10068)(uint32_t, uint32_t, uint32_t, uint32_t);
 };
 
-// 1.13c D2Win+0x9290
+// 1.13c D2Win+0x09290
 uint32_t d2win_sub_9290(D2WinB49Env& e, int32_t* c, const uint16_t* s, int32_t n, uint32_t p4, uint8_t p5) {
   if (!c) e.fatal(0x1a7);
   if (*c != 4) e.fatal(0x1a8);
@@ -50,7 +50,7 @@ void d2win_sub_a6f0(D2WinB49Env& e, uint32_t cel) {
   if (cel) e.fogFree(0x5c, 0);
 }
 
-// 1.13c D2Win+0xC720
+// 1.13c D2Win+0xc720
 void d2win_sub_c720(D2WinB49Env& e, int32_t* p, int32_t v) {
   if (!p) e.fatal(0xd6b);
   int32_t mx = p[3] * 0x100, x = v < 1 ? 0 : v;
@@ -72,7 +72,7 @@ void d2win_sub_17c00(D2WinB49Env& e, uint32_t m) {
   if (m == 1) e.o10068(0, 0x800000, 0x7d000, 0);
 }
 
-// 1.13c D2Win+0x120C0 (caller 0x12410): width of up to n chars of a UTF-16 string, skipping 0xff 'c' [0-6] colour codes.
+// 1.13c D2Win+0x120c0 (caller 0x12410): width of up to n chars of a UTF-16 string, skipping 0xff 'c' [0-6] colour codes.
 int32_t d2win_sub_120c0(D2WinB49Env& e, const uint16_t* s, int32_t n) {
   int32_t i = 0, w = 0, lim = 3;
   while (*s) {

@@ -49,12 +49,12 @@ extern "C"
 // 1.13c D2Common+0x38DC0 (#10597): forwards to the stat getter 0x38B70 with its own second and
 // third arguments; the first argument is unused.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_38dc0(uint32_t nUnused, uint32_t pUnit, int32_t nStatId)
+EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_38dc0(uint32_t nUnused, uint32_t pUnit, int32_t nStatId)
 {
 	(void)nUnused;
 	if (!g_d2common_fn_38B70)
-		return;
-	g_d2common_fn_38B70(pUnit, nStatId);
+		return 0;
+	return g_d2common_fn_38B70(pUnit, nStatId);
 }
 
 // 1.13c D2Common+0x2A3D0 (#10599): for a UNIT_ITEM, set the number of sockets added by the item's
@@ -62,7 +62,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_38dc0(uint32_t nUnused, uint32_t pUnit,
 // whole block is skipped when the item's inventory footprint is zero. The item's dwItemFlags gets
 // bit 0x800 and stat 0xC2 is set to the result through 0x3A740.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2a3d0(uint32_t pUnit, int32_t nRequest)
+EMSCRIPTEN_KEEPALIVE void ITEMS_SetSocketCount(uint32_t pUnit, int32_t nRequest)
 {
 	D2UnitStrc* unit = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit));
 	if (!unit || unit->dwUnitType != UNIT_ITEM)
@@ -104,7 +104,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2a3d0(uint32_t pUnit, int32_t nRequest)
 // unit (fatal 0xD9E), another unit type (0xD9F) or a missing row (0xDA1) is fatal in retail; we
 // return 0 for all three.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_22a70(uint32_t pUnit)
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_22A70_ItemsTxtBit3(uint32_t pUnit)
 {
 	D2UnitStrc* unit = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit));
 	if (!unit || unit->dwUnitType != UNIT_ITEM)
@@ -115,11 +115,11 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_22a70(uint32_t pUnit)
 	return pRow->dwBitField1 & 8;
 }
 
-// 1.13c D2Common+0x35B00 (#10604, D2GetAffixBIN): two dwords derived from the unit's path velocity
+// 1.13c D2Common+0x35B00 (#10604, name in function list is wrong): two dwords derived from the unit's path velocity
 // when the unit is in moving mode and its path has points. out1 = (vx - vy) >> 1 and
 // out2 = (vy + vx) >> 2 after both velocities are shifted right by 11. Everything else writes 0/0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_35b00(uint32_t pUnit, int32_t* pOutA, int32_t* pOutB)
+EMSCRIPTEN_KEEPALIVE void UNITS_GetVelocityIsoPair(uint32_t pUnit, int32_t* pOutA, int32_t* pOutB)
 {
 	D2UnitStrc* unit = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit));
 	if (!unit || !UNITS_IsInMovingMode(unit))
@@ -147,7 +147,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_35b00(uint32_t pUnit, int32_t* pOutA, i
 // (at +0x18/+0x1C) are kept in step and the unit's seed becomes (value, 0x29A). A missing node is
 // fatal 0xA53 in retail; we return.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_4f390(uint32_t pUnit, int32_t nMode, int16_t nSkillId)
+EMSCRIPTEN_KEEPALIVE void UNITS_ReseedFromNativeSkill_4F390(uint32_t pUnit, int32_t nMode, int16_t nSkillId)
 {
 	D2UnitStrc* unit = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit));
 	if (!unit)
@@ -225,7 +225,7 @@ extern "C"
 // record together with its stat offsets. nClass != 0 applies the class bonus block at +0x1C stride.
 // A null unit/record or a class outside 0..2 is a 0 return.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_2ca10(uint32_t nSeedLow, int32_t* pOut, uint8_t nClass)
+EMSCRIPTEN_KEEPALIVE int32_t D2Common_FillAffixRecord(uint32_t nSeedLow, int32_t* pOut, uint8_t nClass)
 {
 	if (!nSeedLow || !pOut || nClass >= 3)
 		return 0;

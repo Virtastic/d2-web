@@ -16,7 +16,7 @@
 // makes no calls. The slot exists so the walk is written exactly as retail's.
 static void (*g_rtcInitTable[1])(void);
 
-// 1.13c D2Client+0x0544B (__RTC_Initialize, 61 B): walk the RTC initialiser table, invoking every
+// 1.13c D2Client+0x0544b (__RTC_Initialize, 61 B): walk the RTC initialiser table, invoking every
 // non-NULL entry. The table is empty in this image, so the walk returns immediately.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_544b(void) {

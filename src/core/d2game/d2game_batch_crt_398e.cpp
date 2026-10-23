@@ -13,7 +13,7 @@
 #include <cstdint>
 #include <emscripten.h>
 
-extern "C" void d2_fn_d2game_5a8d(void* mem);   // 0x5A8D _free
+extern "C" void d2game_free_5a8d(void* mem);   // 0x5A8D _free
 
 // Host seams for the retail CRT defaults the decompiles compare against: 0x6FD3000C (default
 // collate/codepage block), 0x6FD3A204/0x6FD3A208 (default lconv mon/num), 0x6FD3A200 (default
@@ -36,9 +36,9 @@ struct D2GameFreeTlocinfoEnv {
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_6FDA(uint32_t* lcTime) {
     if (lcTime == nullptr) return;
-    for (int i = 1; i <= 6; ++i) d2_fn_d2game_5a8d((void*)(uintptr_t)lcTime[i]);
-    d2_fn_d2game_5a8d((void*)(uintptr_t)lcTime[0]);
-    for (int i = 8; i <= 0x2A; ++i) d2_fn_d2game_5a8d((void*)(uintptr_t)lcTime[i]);
+    for (int i = 1; i <= 6; ++i) d2game_free_5a8d((void*)(uintptr_t)lcTime[i]);
+    d2game_free_5a8d((void*)(uintptr_t)lcTime[0]);
+    for (int i = 8; i <= 0x2A; ++i) d2game_free_5a8d((void*)(uintptr_t)lcTime[i]);
 }
 
 // 1.13c D2Game+0x0716A
@@ -50,7 +50,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_716A(uint32_t* loconv, const uint32_t* de
     if (loconv == nullptr) return;
     for (int i = 0; i < 3; ++i) {
         const uint32_t p = loconv[i];
-        if (p != defaultLconv[i] && p != staticNum[i]) d2_fn_d2game_5a8d((void*)(uintptr_t)p);
+        if (p != defaultLconv[i] && p != staticNum[i]) d2game_free_5a8d((void*)(uintptr_t)p);
     }
 }
 
@@ -63,7 +63,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_71C9(uint32_t* loconv, const uint32_t* de
     if (loconv == nullptr) return;
     for (int i = 3; i <= 9; ++i) {
         const uint32_t p = loconv[i];
-        if (p != defaultLconv[i] && p != staticMon[i - 3]) d2_fn_d2game_5a8d((void*)(uintptr_t)p);
+        if (p != defaultLconv[i] && p != staticMon[i - 3]) d2game_free_5a8d((void*)(uintptr_t)p);
     }
 }
 
@@ -80,30 +80,30 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_398E(uint32_t plocinfo, const D2GameFreeT
         *(uint32_t*)(uintptr_t)(*(uint32_t*)(uintptr_t)(plocinfo + 0x2C)) == 0) {
         p = *(uint32_t*)(uintptr_t)(plocinfo + 0x34);
         if (p != 0 && *(uint32_t*)(uintptr_t)p == 0 && p != env->default_lconv_mon) {
-            d2_fn_d2game_5a8d((void*)(uintptr_t)p);
+            d2game_free_5a8d((void*)(uintptr_t)p);
             d2_fn_d2game_71C9((uint32_t*)(uintptr_t)locinfo,
                               (const uint32_t*)(uintptr_t)env->default_lconv,
                               (const uint32_t*)(uintptr_t)env->static_lconv_mon);
         }
         p = *(uint32_t*)(uintptr_t)(plocinfo + 0x30);
         if (p != 0 && *(uint32_t*)(uintptr_t)p == 0 && p != env->default_lconv_num) {
-            d2_fn_d2game_5a8d((void*)(uintptr_t)p);
+            d2game_free_5a8d((void*)(uintptr_t)p);
             d2_fn_d2game_716A((uint32_t*)(uintptr_t)locinfo,
                               (const uint32_t*)(uintptr_t)env->default_lconv,
                               (const uint32_t*)(uintptr_t)env->static_lconv_num);
         }
-        d2_fn_d2game_5a8d((void*)(uintptr_t)(*(uint32_t*)(uintptr_t)(plocinfo + 0x2C)));
-        d2_fn_d2game_5a8d((void*)(uintptr_t)locinfo);
+        d2game_free_5a8d((void*)(uintptr_t)(*(uint32_t*)(uintptr_t)(plocinfo + 0x2C)));
+        d2game_free_5a8d((void*)(uintptr_t)locinfo);
     }
     p = *(uint32_t*)(uintptr_t)(plocinfo + 0x40);
     if (p != env->default_lc_time && p != 0 && *(uint32_t*)(uintptr_t)p == 0) {
-        d2_fn_d2game_5a8d((void*)(uintptr_t)p);
-        d2_fn_d2game_5a8d((void*)(uintptr_t)(*(uint32_t*)(uintptr_t)(plocinfo + 0x44) - 0xFE));
+        d2game_free_5a8d((void*)(uintptr_t)p);
+        d2game_free_5a8d((void*)(uintptr_t)(*(uint32_t*)(uintptr_t)(plocinfo + 0x44) - 0xFE));
     }
     p = *(uint32_t*)(uintptr_t)(plocinfo + 0x50);
     if (p != env->lc_time_global && p != 0 && *(uint32_t*)(uintptr_t)(p + 0xB4) == 0) {
         d2_fn_d2game_6FDA((uint32_t*)(uintptr_t)p);
-        d2_fn_d2game_5a8d((void*)(uintptr_t)p);
+        d2game_free_5a8d((void*)(uintptr_t)p);
     }
-    d2_fn_d2game_5a8d((void*)(uintptr_t)plocinfo);
+    d2game_free_5a8d((void*)(uintptr_t)plocinfo);
 }

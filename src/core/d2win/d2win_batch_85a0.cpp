@@ -50,7 +50,7 @@ uint32_t d2win_sub_17070(uint32_t a, uint32_t b) {
     return 1;
 }
 
-// 1.13c D2Win+0x17B60 -- first call saves window size and rect, then resize to mode; fatal on failure.
+// 1.13c D2Win+0x17b60 -- first call saves window size and rect, then resize to mode; fatal on failure.
 extern "C" EMSCRIPTEN_KEEPALIVE
 uint32_t d2win_sub_17B60(uint32_t mode, const D2WinBatch85A0Env* env) {
     if (d2win_g_6f90149c == 0 && d2win_g_6f9014d4 == 0) {

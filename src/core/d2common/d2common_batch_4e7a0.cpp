@@ -29,7 +29,7 @@ struct D2Common4E7A0Env
 // 1.13c D2Common+0x4E7A0 (#10548): evaluate a passive-stat formula.
 // nVariant 0/1/2 picks stat pairs (0x156,0x159), (0x157,0x15A), (0x158,0x15B); anything else is 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_4e7a0(uint32_t nContext, int32_t nSkillId, int32_t nLevel,
+EMSCRIPTEN_KEEPALIVE int32_t D2haveColdResMalus(uint32_t nContext, int32_t nSkillId, int32_t nLevel,
                                                   int32_t nVariant, const D2Common4E7A0Env* pEnv)
 {
 	if (nSkillId < 0 || nSkillId >= sgptDataTables->nSkillsTxtRecordCount)

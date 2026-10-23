@@ -8,7 +8,7 @@ struct D2GameE0A60Env {
 };
 static uint32_t rd(uint32_t p, uint32_t o) { return *(const uint32_t*)(uintptr_t)(p + o); }
 
-// 1.13c D2Game+0xE0A60
+// 1.13c D2Game+0xe0a60
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_E0A60(uint32_t a, uint32_t b, uint32_t game, const D2GameE0A60Env* e)
 {
     if (a) {

@@ -80,6 +80,8 @@ struct Batch5Env {
     // 0xDFC10 unit state update; 0x8C570 D2GAME_PACKETS_SendPacket0x8D
     void     (*unitUpdate)(void* unit);
     void     (*sendPacket8D)(void* unit);
+    // D2Common Ordinal 10046(file, line, flag): non-fatal warning (Party.cpp:0x148 after the 0x8D send)
+    void     (*displayWarning)(const char* file, int line, int flag);
 
     // D2Common import #10383 resets the unit's light map; the comments reads a count from the
     // register pair.  #10144 applies the per-entry collision update.
@@ -113,10 +115,12 @@ static bool nameFits15(const char* name)
 }
 
 // 1.13c D2Game+0x2C910
-// GAME_TriggerClientSave: resolve pClient's player (0x4AD10); when it exists, save it through
-// 0x54320. When that save succeeds, walk the game's client list: save every other client's player,
-// and for every client with a player, call the ladder callback (+0x28) with the client's name,
-// class, level and experience stats, flags and save timestamp.
+// GAME_TriggerClientSave(client, game): when client has a player (0x4AD10) and its save (0x54320)
+// succeeds, walk the game's client list (game+0x88, next +0x4A8). Per client the save unit is
+// flag(+0x3D4) bit 0 ? +0x174 : (+0x174 == 0 ? none : E03A0(+0x1A8, +0x170), a failed lookup
+// clears +0x174). With a unit: save it (0x54320, name +0x0D, 0) unless it is `client`; then, when
+// the callback table slot +0x28 and game+0x74 are set, b = stat(unit,12,0, stat(unit,13,0)), call
+// callback(name, unit+4, b) as in 0x2C830.
 void GAME_TriggerClientSave_113c(void* client, void* game, const Batch5Env* env)
 {
     if (client == nullptr) return;
@@ -125,21 +129,25 @@ void GAME_TriggerClientSave_113c(void* client, void* game, const Batch5Env* env)
     if (!env->saveWriteFile(game, player, (const char*)client + 0x0D, 1)) return;
 
     for (void* i = rdptr(game, 0x88); i != nullptr; i = rdptr(i, 0x4A8)) {
-        void* p = env->getPlayerFromClient(i, 0);
-        if (p == nullptr) continue;
-        if (i != client) env->saveWriteFile(game, p, (const char*)i + 0x0D, 0);
-        if (env->callbackTable != nullptr && env->callbackTable[10 /* +0x28 pfUpdateCharacterLadder */] != nullptr) {
-            const int32_t level = env->unitGetBaseStat(p, 0x0C, 0);   // STAT_LEVEL
-            const int32_t exp = env->unitGetBaseStat(p, 0x0D, 0);     // STAT_EXPERIENCE
-            // (name, classId, level, experience, 0, client flags, &nSaveCreationTimestamp)
-            typedef int32_t (*LadderFn)(const char*, int32_t, int32_t, int32_t, int32_t, uint32_t, void*);
-            ((LadderFn)env->callbackTable[10])((const char*)i + 0x0D, (int32_t)rd32(p, 0x04),
-                                               level, exp, 0, rd32(i, 0x3D4), (uint8_t*)i + 0x190);
+        void* unit = rdptr(i, 0x174);
+        if ((rd32(i, 0x3D4) & 1) == 0) {
+            if (unit == nullptr) continue;
+            unit = env->getServerUnit(rd32(i, 0x1A8), rd32(i, 0x170), rd32(i, 0x16C));
+            if (unit == nullptr) { wrptr(i, 0x174, nullptr); continue; }
+        }
+        if (unit == nullptr) continue;
+        if (i != client) env->saveWriteFile(game, unit, (const char*)i + 0x0D, 0);
+        if (env->callbackTable != nullptr && env->callbackTable[10] != nullptr && rd32(game, 0x74) != 0) {
+            const int32_t a = env->unitGetBaseStat(unit, 0x0D, 0);
+            const int32_t b = env->unitGetBaseStat(unit, 0x0C, 0);
+            (void)a;
+            typedef int32_t (*LadderFn)(const char*, int32_t, int32_t);
+            ((LadderFn)env->callbackTable[10])((const char*)i + 0x0D, (int32_t)rd32(unit, 0x04), b);
         }
     }
 }
 
-// 1.13c D2Game+0x4AE90
+// 1.13c D2Game+0x4ae90
 // CLIENTS_FillCharacterPreviewInfo: encode the 14-bit version, resolve the client's player (the
 // 1.13c body inlines the +0x3D4/+0x174/0xE03A0 lookup), copy the 11 component ids and colours
 // (zero colours become 0xFF), then write class+1 (or 1), level (1 when 0 or >99), the encoded
@@ -149,7 +157,7 @@ void GAME_TriggerClientSave_113c(void* client, void* game, const Batch5Env* env)
 // cleared. Returns without touching the preview when the client has no player.
 void CLIENTS_FillCharacterPreviewInfo(void* client, uint8_t* preview, const Batch5Env* env)
 {
-    env->encode14(preview, 10);                       // nVersion
+    env->encode14(preview, 0xD);                      // nVersion (1.13c: 0xD)
     if (client == nullptr) fatal(0x130);              // D2_ASSERT(pClient)
 
     void* player = env->getPlayerFromClient(client, 0);
@@ -165,10 +173,10 @@ void CLIENTS_FillCharacterPreviewInfo(void* client, uint8_t* preview, const Batc
     std::memcpy(preview + 0x02, components, 11);      // pComponents
     std::memcpy(preview + 0x0E, colors, 11);          // pComponentColors
 
-    const int32_t classId = (int32_t)rd32(player, 0x04);   // dwClassId
+    const uint8_t classId = (uint8_t)rd32(player, 0x04);   // dwClassId, byte compare (bl)
     preview[0x0D] = (uint8_t)(classId < 7 ? classId + 1 : 1);
 
-    const uint32_t level = (uint32_t)env->unitGetBaseStat(player, 0x0C, 0);   // STAT_LEVEL
+    const uint8_t level = (uint8_t)env->unitGetBaseStat(player, 0x0C, 0);   // STAT_LEVEL, kept as a byte (al)
     preview[0x19] = (uint8_t)((level != 0 && level <= 99) ? level : 1);
 
     uint16_t flags = rd16(client, 0x0A);              // D2PackedClientSaveFlags
@@ -213,6 +221,7 @@ void PARTY_LeaveParty_113c(void* unit, const Batch5Env* env)
             else wrptr(previous, 0x04, rdptr(node, 0x04));
             env->unitUpdate(unit);                     // 0xDFC10
             env->sendPacket8D(unit);                   // 0x8C570
+            env->displayWarning("..\\Source\\D2Game\\UNIT\\Party.cpp", 0x148, 0);  // Ordinal 10046
             break;
         }
         previous = node;

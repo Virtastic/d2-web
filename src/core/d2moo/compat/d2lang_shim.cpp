@@ -86,13 +86,17 @@ int __fastcall Unicode::stricmp(const Unicode* a, const Unicode* b) {
         if (x != y) return x < y ? -1 : 1;
     }
 }
-// 1.13c D2Lang+0xB560 (#10045): stricmp over at most count units; 0 when count runs out.
+// 1.13c D2Lang+0xB560 (#10045): stricmp over at most count units. The first pair is compared
+// unconditionally (retail quirk: empty/zero-count still orders a differing first pair); after that
+// a terminator or exhausted count returns 0.
 int __fastcall Unicode::strnicmp(const Unicode* a, const Unicode* b, size_t n) {
-    for (; n && a->ch && b->ch; a++, b++, n--) {
-        unsigned short x = a->toUpper().ch, y = b->toUpper().ch;
-        if (x != y) return x < y ? -1 : 1;
+    unsigned short x = a->toUpper().ch, y = b->toUpper().ch;
+    while (a->ch && b->ch && n && x == y) {
+        a++; b++; n--;
+        if (!(a->ch && b->ch && n)) return 0;
+        x = a->toUpper().ch; y = b->toUpper().ch;
     }
-    return 0;
+    return x == y ? 0 : x < y ? -1 : 1;
 }
 // 1.13c D2Lang+0xB120 (#10041): append at most count units of src to dest, always NUL-terminate.
 Unicode* __fastcall Unicode::strncat(Unicode* dest, const Unicode* src, int count) {
@@ -111,7 +115,7 @@ Unicode* Unicode::toUnicode(Unicode* dest, const char* src, int count) {
 
 // D2LANG_GetTblIndex (#10013): index the string table assigns the key (0 when absent), and the
 // string itself through pUnicode. D2LANG_GetStringByReferenceString (#10003): the string or NULL.
-// 1.13c D2Lang+0xA8A0 (wrapper over 0xA7B0: returns its index result, string via out slot)
+// 1.13c D2Lang+0xA8A0, +0xA7B0 (wrapper over 0xA7B0: returns its index result, string via out slot)
 short D2LANG_GetTblIndex(char* szReference, const Unicode** pUnicode) {
     const std::u16string* v = nullptr;
     uint16_t idx = d2::sharedLang().tblIndex(szReference ? szReference : "", &v);
@@ -229,6 +233,29 @@ void __stdcall STR_GroupIntDigits(Unicode* destination, int value, int capacity)
 }
 
 
+// 1.13c D2Lang+0x9790 (#10007): u64 as comma-grouped digits, at most 4 groups dropped and replaced
+// by a K/M/B/T suffix (defaults of D2Lang+0x9590; the string-table overrides are not modelled).
+// "*" when it does not fit capacity.
+void __stdcall STR_GroupCStrDigits(Unicode* dst, uint64_t value, int capacity) {
+    if (capacity < 3) std::exit(-1);
+    char d[32];
+    const int n = static_cast<int>(std::to_chars(d, d + sizeof(d), value).ptr - d);
+    int k = (n - 1) / 3 - 1;
+    k = k < 0 ? 0 : k > 4 ? 4 : k;
+    int left = n - k * 3;
+    int pos = (left - 1) / 3 + left;
+    if (pos < 1 || pos >= capacity - 2) { dst[0] = Unicode('*'); dst[1] = Unicode(0); return; }
+    static const char suffix[5] = {0, 'K', 'M', 'B', 'T'};
+    dst[pos + 1] = Unicode(0);
+    dst[pos] = Unicode(suffix[k]);
+    for (int run = 0; left;) {
+        if (pos == 0) std::exit(-1);
+        dst[--pos] = Unicode(static_cast<unsigned char>(d[--left]));
+        if (++run > 2) { run = 0; if (pos > 0) dst[--pos] = Unicode(','); }
+    }
+}
+
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 // Replay hook for s3723: offset in units of the match, -1 for NULL.
@@ -275,3 +302,36 @@ static bool d2lang_lastCharIn(const uint16_t* w, const char* set) {
 
 // 1.13c D2Lang+0x0AC40 Unicode::unloadSysMap: delete[] the three sysmap tables (0x6fc10a58, 0a50, 0a5c), null each.
 // Stateful, no-op here (the shim holds no sysmap tables).
+
+// 1.13c D2Lang+0x016E4 d2lang_strtok_16e4: CRT strtok (byte, 256-bit delimiter set, per-thread token pointer; one thread here).
+unsigned char* d2lang_strtok_16e4(unsigned char* s, const unsigned char* delim) {
+    static unsigned char* tok;
+    unsigned char set[32] = {0};
+    unsigned char c;
+    do { c = *delim++; set[c >> 3] |= 1 << (c & 7); } while (c);
+    if (!s) s = tok;
+    unsigned char* p = s;
+    while ((set[*p >> 3] >> (*p & 7) & 1) && *p) p++;
+    s = p;
+    while (*p) {
+        if (set[*p >> 3] >> (*p & 7) & 1) { *p++ = 0; break; }
+        p++;
+    }
+    tok = p;
+    return s != p ? s : nullptr;
+}
+
+// 1.13c D2Lang+0x7EF0: read a whole file into a fresh buffer; *size_out gets its length. NULL when the file cannot be opened
+// (retail's other failure paths -- zero size, short read, no memory -- print a message and _exit(-1)).
+unsigned char* d2lang_read_file_7ef0(const char* path, int* size_out) {
+    FILE* f = path ? fopen(path, "rb") : nullptr;
+    if (!f) return nullptr;
+    fseek(f, 0, SEEK_END);
+    long n = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    unsigned char* buf = n > 0 ? (unsigned char*)malloc((size_t)n) : nullptr;
+    if (!buf || fread(buf, 1, (size_t)n, f) != (size_t)n) { fclose(f); free(buf); return nullptr; }
+    fclose(f);
+    if (size_out) *size_out = (int)n;
+    return buf;
+}

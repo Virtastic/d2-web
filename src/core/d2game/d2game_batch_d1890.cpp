@@ -172,7 +172,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_D4FF0(void* client, const D2GameBatchBd18
 // (low32 % 100) and replaces the id with the table's +0x20 word when it exceeds param_5.
 // Returns the table index (or the negative id) and stores the entry pointer in *param_4 (0 on miss).
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_DF4A0(uint32_t param_1, uint8_t* param_2, uint8_t* param_3,
+EMSCRIPTEN_KEEPALIVE int32_t D2GAME_PickMonsterStatsRecord_DF4A0(uint32_t param_1, uint8_t* param_2, uint8_t* param_3,
                                                 uint32_t* param_4, uint8_t param_5, void* eaxUnit,
                                                 const D2GameBatchBd18Env* env)
 {
@@ -241,11 +241,11 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_DF4A0(uint32_t param_1, uint8_t* param
     return index;
 }
 
-// 1.13c D2Game+0xDF6C0
+// 1.13c D2Game+0xDF6C0 (D2Game_GetUnitByte78)
 // A one-byte accessor on the unit in EAX (+0x78). A null unit is retail's fatal 0xA51
 // (Fog 10265 -> 10024 -> _exit); only the exit is observable.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2game_DF6C0(void* unit, const D2GameBatchBd18Env* env)
+EMSCRIPTEN_KEEPALIVE uint8_t D2Game_GetUnitByte78(void* unit, const D2GameBatchBd18Env* env)
 {
     if (unit == nullptr) d2game_fatal(0xA51);
     (void)env;
@@ -321,7 +321,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_B2D40(uint32_t eaxVal, void* esi, const D
 // byte 0 is not 3 sends a 6-byte packet { 10, node[0], node[1] dword } through 0x8A3E0. A null
 // in_EAX is fatal 0x84; a null player is fatal 0x88.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9D780(uint32_t eaxHandle, const D2GameBatchBd18Env* env)
+EMSCRIPTEN_KEEPALIVE void GAME_9D780(uint32_t eaxHandle, const D2GameBatchBd18Env* env)
 {
     if (eaxHandle == 0) d2game_fatal(0x84);
 
@@ -354,7 +354,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9D780(uint32_t eaxHandle, const D2GameBat
 // dword non-zero) is live, the in_EAX handle must be non-null (else fatal 0x57) and ordinal 10383's
 // unit count is consumed by repeated 0x9DE10(EDI) calls. A null param_1 is fatal 0x7CB.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9DEC0(void* param_1, uint32_t eaxHandle, void* edi,
+EMSCRIPTEN_KEEPALIVE void D2GAME_RepeatSlotAction_9DEC0(void* param_1, uint32_t eaxHandle, void* edi,
                                              const D2GameBatchBd18Env* env)
 {
     if (param_1 == nullptr) d2game_fatal(0x7CB);
@@ -474,7 +474,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_B27D0(void* record, const D2GameBatchBd18
 // bytes 1..3 repeat the mode byte and the +0x7C word, and the callee's tail bytes are patched from
 // the block; the block's low byte is replaced by the handle's low byte. Both go through 0x8A3E0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9D610(void* param_1, uint32_t ebpVal, void* esi,
+EMSCRIPTEN_KEEPALIVE void d2game_9D610_sendInventoryPackets(void* param_1, uint32_t ebpVal, void* esi,
                                              const D2GameBatchBd18Env* env)
 {
     if (esi == nullptr) d2game_fatal(0x7CB);

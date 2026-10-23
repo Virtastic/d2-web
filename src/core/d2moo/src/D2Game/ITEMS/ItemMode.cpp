@@ -6054,6 +6054,7 @@ void __fastcall D2GAME_ITEMMODE_Unk_6FC4BC10(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FC4BD50
+// 1.13c D2Game+0xD2380
 int32_t __fastcall D2GAME_RechargeItem_6FC4BD50(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pItem)
 {
     if (!pGame || !pItem || pItem->dwUnitType != UNIT_ITEM)

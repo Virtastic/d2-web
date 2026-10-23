@@ -16,7 +16,7 @@ struct CbHooks {
     void (*release)(void*);                  // Ordinal_10046(SpriteCache.cpp,0xa22)
 };
 
-// 1.13c D2CMP+0xCB60
+// 1.13c D2CMP+0x0cb60
 // EAX = alt, ECX = node (or null: take the queue head), ESI = cache. Returns the released node or null.
 CbNode* d2cmp_cb60(CbCache& c, CbNode* n, uint32_t alt, const CbHooks& h) {
     if (!c.count) return nullptr;

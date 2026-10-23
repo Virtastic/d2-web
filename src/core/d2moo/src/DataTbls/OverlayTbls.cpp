@@ -115,6 +115,7 @@ int __stdcall DATATBLS_GetTransFromOverlayTxt(int nOverlayId)
 	return 0;
 }
 
+// 1.13c D2Common+0x82D60 (#10125)
 //D2Common.0x6FD72670 (#10679)
 int __stdcall DATATBLS_GetRadiusAndColorFromOverlayTxt(int nOverlayId, int* pInitRadius, int* pRadius, uint8_t* pRed, uint8_t* pGreen, uint8_t* pBlue)
 {
@@ -139,7 +140,7 @@ int __stdcall DATATBLS_GetRadiusAndColorFromOverlayTxt(int nOverlayId, int* pIni
 	return FALSE;
 }
 
-// 1.13c D2Common+0x82D20 (#10799)
+// 1.13c D2Common+0x82d20 (#10799)
 //D2Common.0x6FD72720 (#10680)
 uint32_t __stdcall DATATBLS_Get1OfNFromOverlayTxt(int nOverlayId)
 {

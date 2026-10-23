@@ -58,7 +58,7 @@ namespace
 	}
 }
 
-// 1.13c D2Common+0x46A40 (#10890)
+// 1.13c D2Common+0x46a40 (#10890)
 // Seeds an item unit's base stats: an item of item type 0x2D (ITEMTYPE_WEAPON) gets the six damage
 // stats below, any other item gets armour class. Each stat is written as 3/2 of the stat list's
 // current base value (0 when the ItemStatCost row, the table or the list is missing); a successful

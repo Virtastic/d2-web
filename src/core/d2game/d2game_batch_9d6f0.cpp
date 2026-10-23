@@ -145,7 +145,7 @@ void PLAYERPETS_UpdatePetsIfPresent_113c(void* pGame, void* pUnit, const D2GameB
 
 // 1.13c D2Game+0x9D6F0
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9d6f0(uint32_t* r)
+EMSCRIPTEN_KEEPALIVE void d2_game_9d6f0(uint32_t* r)
 {
     LEVEL_LoadAct_113c((void*)(uintptr_t)r[0], (uint8_t)r[1], &batchEnv(r));
     r[4] = 0;

@@ -93,7 +93,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_5AFE(int32_t fileHandle, const D2GameB
     return -1;
 }
 
-// 1.13c D2Game+0x0E860
+// 1.13c D2Game+0x0e860
 // FUN_6fc2e860(unit in EDI): take the dword at unit+4 (or -1 for a null unit) through D2Common #10695; a
 // null result is the retail 0x1DB fatal. Then for each set byte of the result -- 0xFF, 0xFE, 0x102, 0x103
 // and 0x101 -- call D2Common #10887 (0x101 twice). The decompile shows that call without arguments.
@@ -124,7 +124,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_F700(uint32_t param_1, const D2GameBatchB
     env->ordinal10887Stat((void*)(uintptr_t)param_1, 0x1F, roll, 0);
 }
 
-// 1.13c D2Game+0x04E77
+// 1.13c D2Game+0x04e77
 // __dosmaperr(osError): record the DOS error in the thread block (+0x0C), then map it to errno (+0x08)
 // through the 0x2D-entry table (the MSVC 2003 table at 0x6FD1F5B8; first match wins). The ranges
 // 0x13..0x24 and 0xBC..0xCA map to 0x0D and 8; everything else maps to EINVAL (0x16).
@@ -194,13 +194,13 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_897B(int32_t fileHandle, const D2GameBatc
 }
 
 // 1.13c D2Game+0x08972
-// Nine-byte thunk: __unlock(0x10).
+// Nine-byte thunk: __unlock(10).
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8972(void) {
-    d2_fn_d2game_3f76(0x10);
+    d2_fn_d2game_3f76(10);
 }
 
-// 1.13c D2Game+0x0889A
+// 1.13c D2Game+0x0889a
 // __get_osfhandle(fh): a handle below _nfile whose ioinfo FOPEN bit is set returns the OS handle at
 // record+0. Anything else sets errno 9, _doserrno 0 and returns -1.
 extern "C"
@@ -215,7 +215,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_889A(int32_t fileHandle, const D2Game
     return 0xFFFFFFFFu;
 }
 
-// 1.13c D2Game+0x05ED1
+// 1.13c D2Game+0x5ed1 (0x05ED1)
 // __heap_alloc(size): the small-block heap (mode 3) takes sizes up to the sbh threshold under __lock(4),
 // released by the 0x5F43 __unlock(4) thunk; a null small-block result falls through. A zero size becomes
 // one byte, sizes are rounded up to 16 unless the heap is in mode 1, and HeapAlloc(heap, 0, size) is the

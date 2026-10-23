@@ -14,6 +14,7 @@ struct D2ClientTsopenLkEnv {
     uint32_t (*lseek_lk)(uint32_t fd, int32_t offset, uint32_t origin);
     int32_t (*read_nolock)(uint32_t fd, void* dst, uint32_t count);
     int32_t (*close_lk)(uint32_t fd);
+    int32_t (*chsize_lk)(uint32_t fd, uint32_t size);   // 1.13c D2Client+0x0BB34
     uint32_t (*open_mode)(void);       // DAT_6fbaac7c
     uint32_t (*textmode)(void);
     uint32_t (*share_default)(void);   // DAT_6fbaa8a4
@@ -61,7 +62,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_a180(
     case 0x000: case 0x400: creation = 3; break;
     case 0x100: creation = 4; break;
     case 0x200: case 0x600: creation = 5; break;
-    case 0x300: case 0x500: case 0x700: creation = 1; break;
+    case 0x300: creation = 2; break;
+    case 0x500: case 0x700: creation = 1; break;
     default: return invalid();
     }
     uint32_t attributes = 0x80;
@@ -108,12 +110,12 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_a180(
     if ((dev_flags & 0x48) == 0 && (int8_t)initialized_flags < 0 && (flags & 2u) != 0) {
         const uint32_t end = env->lseek_lk(fd, -1, 2);
         if (end == UINT32_MAX) {
-            if (*d2_client_579c() != 0x83) goto append_done;
+            if (*d2_client_57a5() != 0x83) goto append_done;
         } else {
             char last = 0;
             const int32_t got = env->read_nolock(fd, &last, 1);
-            if (got != 0 || last != 0x1A ||
-                env->lseek_lk(fd, (int32_t)end, 0) != UINT32_MAX)
+            if ((got != 0 || last != 0x1A || env->chsize_lk(fd, end) != -1) &&
+                env->lseek_lk(fd, 0, 0) != UINT32_MAX)
                 goto append_done;
         }
         env->close_lk(fd);

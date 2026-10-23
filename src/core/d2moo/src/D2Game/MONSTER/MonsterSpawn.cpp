@@ -1052,7 +1052,7 @@ int32_t __fastcall sub_6FC6A230(D2GameStrc* pGame, D2UnitStrc* pOwner, int32_t n
     return nResult;
 }
 
-//D2Game.0x6FC6A350
+//D2Game.0x6FC6A350  // 1.13c D2Game+0xEF940
 int32_t __fastcall sub_6FC6A350(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, D2UnitStrc* pOwner, int32_t nClassId, int32_t nAnimMode, D2UnkMonCreateStrc2* a8, int16_t nFlags)
 {
     D2UnitStrc* pUnit = nullptr;

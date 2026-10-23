@@ -60,7 +60,7 @@ void d2cmp_28d0(uint32_t code) {
 
 // 1.13c D2CMP+0x028E1 (17 bytes): __exit(code) -- doexit(code, 1, 0): skip the _onexit walk that
 // doexit does for its fast==0 path, then end the process with the code.
-// 1.13c D2CMP+0x028E1
+// 1.13c D2CMP+0x028e1
 extern "C"
 void d2cmp_28e1(uint32_t code) {
     d2cmp_280d(code, 1, 0);

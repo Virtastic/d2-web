@@ -158,3 +158,31 @@ void Storm_Sub2DE00(Storm34d60Env& e,uint32_t* object,void* a,void* b) {
 void Storm_Sub2D460(Storm34d60Env& e,void* object,const void* data,uint32_t size) {e.insert(object,data,size);}
 // 1.13c Storm+0x2D440
 void Storm_Sub2D440(Storm34d60Env& e,void* object,uint32_t value) {e.append(object,value);}
+
+// 1.13c Storm+0x3A870  Jenkins lookup2 hash; ECX=key, stack=len, EAX=seed (golden ratio a=b).
+uint32_t Storm_Sub3A870(const uint8_t* k, uint32_t len, uint32_t seed) {
+    uint32_t a = 0x9e3779b9, b = a, c = seed, l = len;
+    auto mix = [&]() {
+        a = (a - b - c) ^ (c >> 13); b = (b - c - a) ^ (a << 8);  c = (c - a - b) ^ (b >> 13);
+        a = (a - b - c) ^ (c >> 12); b = (b - c - a) ^ (a << 16); c = (c - a - b) ^ (b >> 5);
+        a = (a - b - c) ^ (c >> 3);  b = (b - c - a) ^ (a << 10); c = (c - a - b) ^ (b >> 15);
+    };
+    auto w = [&](int o) { return (uint32_t)k[o] | k[o+1] << 8 | k[o+2] << 16 | (uint32_t)k[o+3] << 24; };
+    for (; l >= 12; l -= 12, k += 12) { a += w(0); b += w(4); c += w(8); mix(); }
+    c += len;
+    switch (l) {
+    case 11: c += (uint32_t)k[10] << 24; [[fallthrough]];
+    case 10: c += (uint32_t)k[9] << 16;  [[fallthrough]];
+    case 9:  c += (uint32_t)k[8] << 8;   [[fallthrough]];
+    case 8:  b += (uint32_t)k[7] << 24;  [[fallthrough]];
+    case 7:  b += (uint32_t)k[6] << 16;  [[fallthrough]];
+    case 6:  b += (uint32_t)k[5] << 8;   [[fallthrough]];
+    case 5:  b += k[4];                  [[fallthrough]];
+    case 4:  a += (uint32_t)k[3] << 24;  [[fallthrough]];
+    case 3:  a += (uint32_t)k[2] << 16;  [[fallthrough]];
+    case 2:  a += (uint32_t)k[1] << 8;   [[fallthrough]];
+    case 1:  a += k[0];
+    }
+    mix();
+    return c;
+}

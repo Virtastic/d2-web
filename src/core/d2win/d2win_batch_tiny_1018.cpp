@@ -36,6 +36,10 @@ EMSCRIPTEN_KEEPALIVE void d2win_sub_2396(int32_t lock_num) {
     LeaveCriticalSection((LPCRITICAL_SECTION)(uintptr_t)d2win_g_6f8ff050[lock_num * 2]);
 }
 
+// 1.13c D2Win+0x4585 (9 B, caller 0x4518): push 4, __unlock, pop = unlock lock number 4.
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2win_sub_4585(void) { d2win_sub_2396(4); }
+
 // 1.13c D2Win+0x10A7 (9 B, _lockexit): push 8, __lock, pop. Called by __onexit (0x2524).
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2win_sub_10A7(void) { d2win_lock(8); }
@@ -56,3 +60,31 @@ EMSCRIPTEN_KEEPALIVE void d2win_sub_11EA(int32_t param_3) {
 // 1.13c D2Win+0x2442 (9 B): push 0xA, __unlock, pop. Called by __mtinitlocknum (0x23AB).
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2win_sub_2442(void) { d2win_sub_2396(10); }
+
+// 1.13c D2Win+0x02A51 (9 B): push 0xC, __unlock, pop. Called by ___updatetlocinfo (0x2A1F).
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2win_sub_2A51(void) { d2win_sub_2396(12); }
+
+// 1.13c D2Win+0x2EA0 (9 B): push 4, __unlock, pop. Called by 0x2DDA.
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2win_sub_2EA0(void) { d2win_sub_2396(4); }
+
+// 1.13c D2Win+0x05C1E (9 B): push 0xD, __unlock, pop. Called by __setmbcp (0x5AD7).
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2win_sub_5C1E(void) { d2win_sub_2396(13); }
+
+// 1.13c D2Win+0x2C36 (9 B): push 0xD, __unlock, pop. Called by __freefls (0x2B04).
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2win_sub_2C36(void) { d2win_sub_2396(13); }
+
+// 1.13c D2Win+0x2C42 (9 B): push 0xC, __unlock, pop. Called by __freefls (0x2B04).
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2win_sub_2C42(void) { d2win_sub_2396(12); }
+
+// 1.13c D2Win+0x3FAD (9 B): push 4, __unlock, pop. Called by __heap_alloc (0x3F3B).
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2win_sub_3FAD(void) { d2win_sub_2396(4); }
+
+// 1.13c D2Win+0x69D3 (9 B): push 0xA, __unlock, pop. Called by __lock_fhandle (0x693C).
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2win_sub_69D3(void) { d2win_sub_2396(10); }

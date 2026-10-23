@@ -137,7 +137,7 @@ static const D2GameBatchB64Env& batchEnv(const uint32_t* r) {
     return r[5] ? *(const D2GameBatchB64Env*)(uintptr_t)r[5] : kNoEnv;
 }
 
-// 1.13c D2Game+0x9E330
+// 1.13c D2Game+0x9e330
 // Three table lookups; the first two are shifted right by 8 before being stored. param_1 is the
 // output array (three int32 at +0x00/+0x04/+0x08).
 static void d2game_9E330_113c(int32_t* pOut, const D2GameBatchB64Env& env)
@@ -162,7 +162,7 @@ static void d2game_9F9A0_113c(void* pUnit, int32_t nMissileId, const D2GameBatch
     }
 }
 
-// 1.13c D2Game+0xCA5B0
+// 1.13c D2Game+0xca5b0
 // Dispatcher entry from the 0xEEF10 table: `this` (ECX) selects an increment of the level record's
 // +0x2CC counter through a table indexed by the level id from #10826(param_2); otherwise, for a
 // monster unit (type 1), set flag 0x02 in its monster data at +0x5C. The level-record table comes
@@ -249,7 +249,7 @@ static void d2game_D2D90_113c(void* pGame, void* pEaxUnit, void* pEsiUnit,
     env.fnE20A0(pGame, pEsiUnit);
 }
 
-// 1.13c D2Game+0x9F3B0
+// 1.13c D2Game+0x9f3b0
 // __thiscall: this = the game, param_1 = the caster. EAX = missile id, EBX/EBP preserved as
 // arguments below (EBX selects the chain-walk branch; EBP becomes its high argument).
 // Reject an invalid missile record unless one of the record's two update bitmasks (0x18/0x14)
@@ -292,7 +292,7 @@ static uint32_t d2game_9F3B0_113c(void* pThis, void* pParam1, int32_t nMissileId
     return 1;
 }
 
-// 1.13c D2Game+0x9FAE0
+// 1.13c D2Game+0x9fae0
 // __fastcall: ECX = param_1 (the unit), EAX = the missile id. Valid missile record required. If the
 // record names a skill (+0x170), remove/learn it through #10708/#10306 and convert the missile
 // count with #10786; otherwise the count starts at 1. Only when the unit's stat 5 (mana) is at
@@ -321,7 +321,7 @@ static uint32_t d2game_9FAE0_113c(void* pUnit, int32_t nMissileId, const D2GameB
         if (pUnit != nullptr && rd32(pUnit, 0x00) == 0) env.fn96fa0(rdptr(pUnit, 0x80), pUnit);
         if (nSaved != 0) {
             env.ord10306(pUnit, nSaved, 0);
-            if (pUnit != nullptr && rd32(pUnit, 0x00) == 0) env.ord10920();
+            if (pUnit != nullptr && rd32(pUnit, 0x00) == 0) env.ord10920p(pUnit);
             env.fn8D5F0();
             const int32_t n = env.ord10313();
             if (n != 0) env.ord10945(pUnit, n, 1);
@@ -335,7 +335,7 @@ static uint32_t d2game_9FAE0_113c(void* pUnit, int32_t nMissileId, const D2GameB
     return 0;
 }
 
-// 1.13c D2Game+0xEDF60
+// 1.13c D2Game+0xedf60
 // Random room probe around a dungeon room: after the #10544 gate, seed the RNG at game+0x6C through
 // 0x11D0 (0 -> 1), read the room coordinates with #10561 and walk the room slots (stride 0x30, room
 // pointer at +0x18) starting at a random index, wrapping modulo ESI. A room whose #10051 result has
@@ -381,7 +381,7 @@ static uint32_t d2game_EDF60_113c(void* pGame, uint32_t nModulus, uint32_t* pOut
     return 0;
 }
 
-// 1.13c D2Game+0xEE260
+// 1.13c D2Game+0xee260
 // EAX = the unit, EDI = the same unit (the 0x232B0 target). Take the unit's class id (+0xC); when it
 // indexes the monster-stats table (stride 0x1A8, count +0xA80, base +0xA78) replace it with the
 // record's int16 at +0x2. Then classify the resulting id and assign the boss UMod flag through
@@ -550,7 +550,9 @@ static uint32_t d2game_140B0_113c(uint32_t nParam1, uint32_t nParam2, uint32_t n
 
         int32_t nScan = 0;
         if ((int32_t)nCount < 1) return 0;
-        while (nScan < (int32_t)sizeof visited && visited[nScan] != 0) {
+        for (;;) {
+            nParam1 = nParam2;  // retail's loop condition reloads param_1 from the second stack arg
+            if (!(nScan < (int32_t)sizeof visited && visited[nScan] != 0)) break;
             nScan = nScan + 1;
             if ((int32_t)nCount <= nScan) return 0;
         }
@@ -558,7 +560,7 @@ static uint32_t d2game_140B0_113c(uint32_t nParam1, uint32_t nParam2, uint32_t n
     return 0;
 }
 
-// 1.13c D2Game+0x9E330
+// 1.13c D2Game+0x9e330
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9e330(uint32_t* r)
 {
@@ -646,7 +648,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_140b0(uint32_t* r)
     r[4] = d2game_140B0_113c(r[0], r[1], r[2], (void*)(uintptr_t)r[3], batchEnv(r));
 }
 
-// 1.13c D2Game+0xEE7B0
+// 1.13c D2Game+0xee7b0
 // __fastcall: ECX = param_1 (the unit handed to the callbacks), EAX = a second unit whose id (+0x00)
 // and class id (+0x0C) drive the dispatch. The class id is replaced by the monster record's int16
 // +0x2 when it indexes the monster-stats table (stride 0x1A8). The switch below reproduces the
@@ -817,7 +819,7 @@ static void d2game_EE7B0_113c(void* pEaxUnit, void* pParam1, const D2GameBatchB6
         env.ord10973(pParam1, 0x0C, 0);
         // Retail static table addressed past the a2q8 source-path literal, selected by param_1[1]
         // and walked in 0x18-byte strides. The table itself is retail content in env.
-        const uint8_t* pEntry = (const uint8_t*)env.a2q8Table + (size_t)nSel * 8;
+        const uint8_t* pEntry = (const uint8_t*)env.a2q8Table + 0x20 + (size_t)nSel * 8;  // a2q8Table = retail literal base
         for (int k = 0; k < 4; ++k) {
             uint32_t local = 0;
             env.ord10450(*(const uint32_t*)(pEntry + (size_t)k * 0x18), &local);

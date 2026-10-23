@@ -1,4 +1,4 @@
-// 1.13c D2Win+0xC7C0 (sub_C7C0): destroy every object on the global list (head DAT_6f9a9e30).
+// 1.13c D2Win+0x0C7C0 (sub_C7C0): destroy every object on the global list (head DAT_6f9a9e30).
 // Stateful (global list head, seams D2Win+0xC4A0 and Fog #10043); NAMED only, no vector.
 #include <cstdint>
 #include <cstring>

@@ -16,7 +16,7 @@ extern "C" __attribute__((weak)) void d2cmp_4c34(void);      // 0x4C34 __FF_MSGB
 extern "C" __attribute__((weak)) int  d2cmp_callnewh(size_t); // 0x6315 __callnewh
 
 // 1.13c D2CMP+0x2F11 (9 bytes): release CRT lock 4 (the heap lock).
-// 1.13c D2CMP+0x2F11
+// 1.13c D2CMP+0x02f11
 extern "C" void d2cmp_2f11(void) { d2cmp_2dd8(4); }
 
 // Per-thread CRT block (0x8C bytes in retail); only the fields __getptd initialises are modelled.
@@ -32,13 +32,20 @@ extern "C" D2CMPPtd* d2cmp_getptd(void) {
     return &g_ptd;
 }
 
+// 1.13c D2CMP+0x18FC3 (27 bytes): SEH unwind-depth decrement -- if ptd+0x84 (the _purecall slot, used as a counter) > 0, subtract 1.
+// 1.13c D2CMP+0x18FC3
+extern "C" void d2cmp_18fc3(void) {
+    int32_t* c = (int32_t*)((uint8_t*)d2cmp_getptd() + 0x84);
+    if (0 < *c) --*c;
+}
+
 // 1.13c D2CMP+0x4D08 (9 bytes): _errno() -- &__getptd()->_terrno.
 // 1.13c D2CMP+0x4D08
 extern "C" int32_t* d2cmp_4d08(void) { return &d2cmp_getptd()->terrno; }
 
 // 1.13c D2CMP+0x2D07 (51 bytes): __amsg_exit -- banner (when the app type asks), message, exit(255).
 // The two app-type globals (6fe34654/58) are the console/GUI selector; the GUI path (neither) skips the banner.
-// 1.13c D2CMP+0x2D07
+// 1.13c D2CMP+0x02d07
 extern "C" void d2cmp_2d07(int msg) {
     if (d2cmp_4c34) d2cmp_4c34();
     if (d2cmp_4abc) d2cmp_4abc(msg);
@@ -59,7 +66,7 @@ extern "C" void* d2cmp_3da6(size_t size, int nhFlag) {
 // 1.13c D2CMP+0x2DED (151 bytes): __mtinitlocknum -- lazily create CRT lock `n` (0x18-byte section).
 // Critical sections are no-ops here, so the entry is the 0x18-byte block itself. Returns 1/0, errno=12 on OOM.
 static void* g_lockTab[64];
-// 1.13c D2CMP+0x2DED
+// 1.13c D2CMP+0x02ded
 extern "C" int d2cmp_2ded(int lockNum) {
     void** slot = &g_lockTab[lockNum];
     if (*slot) return 1;

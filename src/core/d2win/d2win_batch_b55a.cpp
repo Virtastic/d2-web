@@ -15,13 +15,13 @@ struct d2win_b55a_Env {
 static d2win_b55a_Env g_d2win_b55a_env;
 void d2win_b55a_SetEnv(const d2win_b55a_Env& e) { g_d2win_b55a_env = e; }
 
-// 1.13c D2Win+0x3EB0
+// 1.13c D2Win+0x3eb0
 size_t d2win_b55a_strlen(const char* s) { size_t n = 0; while (s[n]) n++; return n; }
 
 // 1.13c D2Win+0x3FE2
 void* d2win_b55a_malloc(size_t size) { return g_d2win_b55a_env.nhMalloc(size); }
 
-// 1.13c D2Win+0x3D17
+// 1.13c D2Win+0x03d17
 int d2win_b55a_isatty(int fh) {
     if (g_d2win_b55a_env.nhandles <= (uint32_t)fh) return 0;
     return (int)(char)g_d2win_b55a_env.handleTable[(uint32_t)fh >> 5][4 + ((uint32_t)fh & 0x1f) * 0x24] & 0x40;
@@ -38,7 +38,7 @@ void d2win_b55a_getbuf(d2win_b55a_File* f) {
     f->_ptr = f->_base;
 }
 
-// 1.13c D2Win+0x40AC
+// 1.13c D2Win+0x40ac
 void d2win_b55a_security_check_cookie(uintptr_t c) {
     if (c == g_d2win_b55a_env.cookie) return;
     g_d2win_b55a_env.reportFailure();

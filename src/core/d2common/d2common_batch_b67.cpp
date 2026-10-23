@@ -26,7 +26,7 @@ namespace
 // a packed record { key, owner, 0, 0, 0 }.
 extern "C" void d2_fn_d2common_19860(uint32_t* pArgs);
 
-// 1.13c D2Common+0x3B160 (#10880)
+// 1.13c D2Common+0x3b160 (#10880)
 // Two stdcall arguments: a record and a key (disassembly: [esp+4] -> ecx, [esp+8] -> eax). A null
 // record is the 1.13c assert at line 0x5C4 (fatal); it returns here. The owner pointer is the
 // record's dword at +0x10. The body forwards (key, owner) to 0x19860 unchanged.

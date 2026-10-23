@@ -33,7 +33,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_67fb0(const void* pArg)
 // 1.13c D2Common+0x22170 (#10503): write the item data's wItemFormat (+0x30). A null unit (0x1510),
 // a non-item unit (0x1511) and a missing item data (0x1513) are fatal in retail; we return.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_22170(D2UnitStrc* pUnit, uint16_t nItemFormat)
+EMSCRIPTEN_KEEPALIVE void ITEMS_SetItemFormat(D2UnitStrc* pUnit, uint16_t nItemFormat)
 {
 	if (!pUnit) return;
 	if (pUnit->dwUnitType != UNIT_ITEM) return;
@@ -68,7 +68,7 @@ namespace
 // 7 (max life), 9 (max mana), 6 (life), 8 (mana) and 12 (level): 0 when both missing pools are 0
 // after an 8-bit shift, otherwise ((missingHP >> 8) + (missingMana >> 8)) * row12 >> 2.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_32040(D2UnitStrc* pUnit, const Batch3_32040Env* pEnv)
+EMSCRIPTEN_KEEPALIVE uint32_t UNIT_GetLevelRegenPenalty_32040(D2UnitStrc* pUnit, const Batch3_32040Env* pEnv)
 {
 	const int32_t nMaxLife = ReadItemStatCostValue(pUnit, 7, pEnv);
 	const int32_t nMaxMana = ReadItemStatCostValue(pUnit, 9, pEnv);
@@ -86,30 +86,17 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_32040(D2UnitStrc* pUnit, const Batc
 	return ((nManaGap + nLifeGap) * (uint32_t)nLevel) >> 2;
 }
 
-namespace
-{
-	// 0x4ECC0 is still UNMAPPED; the vendored SKILLS_SetRightActiveSkill is the same operation and
-	// the loader wires this seam to it.
-	struct Batch3_529E0Env
-	{
-		void (*setRightActiveSkill)(D2UnitStrc* pUnit, int32_t nSkillId, int32_t nOwnerGUID); // 0x4ECC0
-	};
-}
-
 // 1.13c D2Common+0x529E0 (#10506): give a player unit its class base skills. Unless the skill list
 // already holds skill 0 with owner -1, add skill 0 and the ten nBaseSkill entries of the charstats
 // row (guarded by the skills.txt count), then make sure the left and right active skills are set.
-// A null skill list (0x3EA) is fatal in retail; we return.
+// A null skill list after the adds is fatal in retail; we return.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_529e0(D2UnitStrc* pUnit, const Batch3_529E0Env* pEnv)
+EMSCRIPTEN_KEEPALIVE void D2Common_529E0_InitBaseSkills(D2UnitStrc* pUnit)
 {
 	if (!pUnit) return;
 
-	D2SkillListStrc* pSkillList = pUnit->pSkills;
-	if (!pSkillList) return;
-
 	bool bHasNativeSkill = false;
-	for (D2SkillStrc* pSkill = pSkillList->pFirstSkill; pSkill; pSkill = pSkill->pNextSkill)
+	for (D2SkillStrc* pSkill = pUnit->pSkills ? pUnit->pSkills->pFirstSkill : nullptr; pSkill; pSkill = pSkill->pNextSkill)
 	{
 		if (pSkill->pSkillsTxt && pSkill->pSkillsTxt->nSkillId == 0 && pSkill->nOwnerGUID == 0xFFFFFFFF)
 		{
@@ -135,7 +122,9 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_529e0(D2UnitStrc* pUnit, const Batch3_5
 		}
 	}
 
+	// list is re-read: AddSkill may have created it. Null here is fatal in retail (0x3EA/0x40F).
+	D2SkillListStrc* pSkillList = pUnit->pSkills;
+	if (!pSkillList) return;
 	if (!pSkillList->pLeftSkill) SKILLS_SetLeftActiveSkill(pUnit, 0, -1);
-	if (pSkillList->pRightSkill) return;
-	if (pEnv && pEnv->setRightActiveSkill) pEnv->setRightActiveSkill(pUnit, 0, -1);
+	if (pUnit->pSkills && !pUnit->pSkills->pRightSkill) SKILLS_SetRightActiveSkill(pUnit, 0, -1);
 }

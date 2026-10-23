@@ -1,7 +1,7 @@
 #include <cstdint>
 #include <emscripten.h>
 
-// 1.13c D2Client+0xA050 -- MSVC __aulldvrm. The four retail words are the
+// 1.13c D2Client+0x0a050 -- MSVC __aulldvrm. The four retail words are the
 // dividend (low, high) and divisor (low, high). EDX:EAX receives the quotient;
 // ECX:EBX receives the remainder. Integer division retains retail's zero-
 // divisor trap, while fixed-width words keep the x86 register layout explicit.

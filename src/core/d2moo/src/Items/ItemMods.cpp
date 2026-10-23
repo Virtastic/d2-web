@@ -524,6 +524,7 @@ static const PROPERTYASSIGNFN off_6FDE3920[] =
 static const int dword_6FDE39B0 = ARRAY_SIZE(off_6FDE3920);
 
 
+// 1.13c D2Common+0x45890
 //D2Common.0x6FD92640 (#10844)
 void __stdcall D2Common_10844_ITEMMODS_First(int nDataBits, int* pLayer, int* pValue)
 {
@@ -531,6 +532,7 @@ void __stdcall D2Common_10844_ITEMMODS_First(int nDataBits, int* pLayer, int* pV
 	*pValue = (nDataBits >> 9) & 31;
 }
 
+// 1.13c D2Common+0x45840
 //D2Common.0x6FD92670 (#10846)
 void __stdcall D2Common_10846(int nDataBits, int* a2, int* a3, int* a4, int* a5)
 {
@@ -679,6 +681,7 @@ BOOL __stdcall ITEMMODS_UpdateItemWithSkillCharges(D2UnitStrc* pItem, int nSkill
 }
 
 //D2Common.0x6FD928D0 (#10843)
+// 1.13c D2Common+0x46330
 int __stdcall ITEMMODS_GetByTimeAdjustment(int nAmount, int nPeriodOfDay, int nBaseTime, int* pItemModPeriodOfDay, int* pItemModMin, int* pItemModMax)
 {
 	// Time works in a cycle of 360 degrees. Each unit is 1 degree.
@@ -756,12 +759,14 @@ int __stdcall ITEMMODS_GetByTimeAdjustment(int nAmount, int nPeriodOfDay, int nB
 	return nTempItemModMax - (((nTempItemModMax - nTempItemModMin) * nClampedTimeDiff) / ENV_HALF_CIRCLE_DEGREES);
 }
 
+// 1.13c D2Common+0x45830
 //D2Common.0x6FD929A0 (#10849)
 int __stdcall D2Common_10849(int a1, int a2)
 {
 	return a1 + (a2 << 9);
 }
 
+// 1.13c D2Common+0x45800
 //D2Common.0x6FD929B0 (#10845)
 void __stdcall D2Common_10845(int nDataBits, int* a2, int* a3, int* a4)
 {
@@ -770,12 +775,14 @@ void __stdcall D2Common_10845(int nDataBits, int* a2, int* a3, int* a4)
 	*a4 = (nDataBits >> 14) & 127;
 }
 
+// 1.13c D2Common+0x457e0
 //D2Common.0x6FD929E0 (#10850)
 int __stdcall D2Common_10850(int a1, int a2, int a3)
 {
 	return a1 + ((a2 + 32 * a3) << 9);
 }
 
+// 1.13c D2Common+0x45780
 //D2Common.0x6FD92A00 (#10848)
 void __stdcall D2Common_10848(int nDataBits, int* pClass, int* pTab, int* pLevel)
 {
@@ -787,6 +794,7 @@ void __stdcall D2Common_10848(int nDataBits, int* pClass, int* pTab, int* pLevel
 }
 
 //D2Common.0x6FD92A60 (#10851)
+// 1.13c D2Common+0x45760 (alias of #10487)
 int __stdcall D2Common_10851(int a1, int a2, int a3)
 {
 	return a2 + 3 * a1 + 32 * a3;

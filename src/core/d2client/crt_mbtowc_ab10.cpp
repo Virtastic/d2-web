@@ -21,7 +21,7 @@ struct D2ClientMbtowcEnv {
     uint32_t ptlocinfo_offset;             // _tfpecode offset in retail's _ptiddata
 };
 
-// 1.13c D2Client+0x0AB10
+// 1.13c D2Client+0x0ab10
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_client_ab10(uint16_t* dst, const char* src, uint32_t src_size,
                                             const D2ClientMbtowcEnv* env) {

@@ -1,7 +1,7 @@
 // D2CMP frame-record walk: sprite table (EAX) + data base (EBX) + request (ECX). Returns record ptr offset or 0.
 #include <cstdint>
 
-// 1.13c D2CMP+0x0D140
+// 1.13c D2CMP+0x0d140
 // lookup = FUN_12240(param_1[0x10], mask) (global table, unmapped). *req < tbl[4] so the loop always runs.
 int d2cmp_d140(const uint8_t* tbl, int base, const uint32_t* req, uint32_t (*lookup)(int, uint32_t))
 {

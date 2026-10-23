@@ -18,7 +18,7 @@ extern "C" uint32_t d2_client_d6a0(const D2ClientFileServices& api, const char* 
     return 0;
 }
 
-// 1.13c D2Client+0xD810
+// 1.13c D2Client+0x0d810
 extern "C" void* d2_client_d810(const D2ClientFileServices& api, const char* path,
                     uint32_t* sizeOut) {
     void* file;

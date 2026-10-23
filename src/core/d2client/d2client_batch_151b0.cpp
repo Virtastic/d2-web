@@ -192,7 +192,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2client_15500(
     return 1;
 }
 
-// 1.13c D2Client+0x15AB0. Builds one placement descriptor for each eligible entry in the
+// 1.13c D2Client+0x15ab0. Builds one placement descriptor for each eligible entry in the
 // selected range and dispatches it to the client's placement worker.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2client_15ab0(
     void* owner, int32_t index, const D2ClientBatch151Host* h) {
@@ -214,6 +214,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2client_15ab0(
     PlacementDescriptor151 desc;
     desc.flags = 0x21;
     desc.owner = owner;
+    desc.source = reinterpret_cast<void*>(static_cast<uintptr_t>(static_cast<uint32_t>(first))); // retail dword 2 = 0x40550 result
     desc.window = reinterpret_cast<void*>(window);
     desc.x = static_cast<uint32_t>(selectedX) * 2u - static_cast<uint32_t>(ownerX);
     desc.y = static_cast<uint32_t>(selectedY) * 2u - static_cast<uint32_t>(ownerY);
@@ -226,7 +227,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2client_15ab0(
     return 1;
 }
 
-// 1.13c D2Client+0x15C40. Creates a UI placement descriptor, chooses its mode from the
+// 1.13c D2Client+0x15c40 (sub_15C40). Creates a UI placement descriptor, chooses its mode from the
 // current client selection state, and returns the selected unit's screen-relative coordinates.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2client_15c40(
     void* owner, int32_t index, uint32_t extra, const D2ClientBatch151Host* h) {

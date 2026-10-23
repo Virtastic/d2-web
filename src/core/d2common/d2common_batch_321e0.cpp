@@ -49,7 +49,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_4c940(uint32_t nUnused, int32_t nX, int
 	*pCell &= static_cast<uint16_t>(~nFlags);
 }
 
-// 1.13c D2Common+0x4E750 (#10864, community name D2GetMaxGoldBank): a thin wrapper over the collision
+// 1.13c D2Common+0x4e750 (#10864, community name D2GetMaxGoldBank): a thin wrapper over the collision
 // ray walk 0x4AD20 (still UNMAPPED, hence the seam). The first four values are the start point
 // (nFromX, nFromY) and the end point (nToX, nToY), the last the collision mask; the first argument is
 // the collision record 0x4AD20 walks from. The answer is true when the walk finds nothing (result 0).

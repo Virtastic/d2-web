@@ -86,6 +86,9 @@ struct D2TaskStrc {
     D2LinkStrc pTaskQueueLink;     //0x10
 };
 
+// Sort key the comments reads at word [-3] of a list node.
+inline int32_t linkKey(D2LinkStrc* p) { return *reinterpret_cast<int32_t*>(reinterpret_cast<uint8_t*>(p) - 0xC); }
+
 inline D2TaskStrc* taskFromQueueLink(D2LinkStrc* pLink)
 {
     return reinterpret_cast<D2TaskStrc*>(reinterpret_cast<uint8_t*>(pLink) - kTaskQueueLink);
@@ -448,12 +451,12 @@ void TASK_InsertIntoQueues(D2TaskStrc* pTask)
             pUnlinkedLink->pNext = nullptr;
 
             // Insert pIteratorNext into the new task's balance list, ordered by the queued task's slot
-            // (nTaskQ, stored at -0x10 from a queue link), walking back from the head sentinel.
+            // (dword at node-0xC), walking back from the head sentinel.
             D2LinkStrc* pCurrent = pTaskBalanceLink->pPrev;
             while (pCurrent != pTaskBalanceLink)
             {
-                const int32_t nQueuedSlot = taskFromQueueLink(pBalanceIterator)->nTaskQ;
-                const int32_t nCurrentSlot = taskFromQueueLink(pCurrent)->nTaskQ;
+                const int32_t nQueuedSlot = linkKey(pBalanceIterator);
+                const int32_t nCurrentSlot = linkKey(pCurrent);
                 if (nQueuedSlot - nCurrentSlot <= 0) break;
                 pCurrent = pCurrent->pPrev;
             }
@@ -485,8 +488,8 @@ void TASK_InsertIntoQueues(D2TaskStrc* pTask)
                     {
                         do
                         {
-                            const int32_t nNextSlot = taskFromQueueLink(pNext)->nTaskQ;
-                            const int32_t nCompareSlot = taskFromQueueLink(pCompare)->nTaskQ;
+                            const int32_t nNextSlot = linkKey(pNext);
+                            const int32_t nCompareSlot = linkKey(pCompare);
                             if (nNextSlot - nCompareSlot <= 0) break;
                             pCurrent = pCompare;
                             pCompare = pCompare->pNext;

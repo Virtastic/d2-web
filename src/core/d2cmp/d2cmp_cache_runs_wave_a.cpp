@@ -51,7 +51,7 @@ extern "C" D2CMPQueueNode* d2cmp_bf00(D2CMPCacheQueues* cache) {
 }
 
 // EAX selects the alternate queue when nonzero, EDX supplies the cache.
-// 1.13c D2CMP+0x0BF40
+// 1.13c D2CMP+0x0bf40
 extern "C" D2CMPQueueNode* d2cmp_bf40(D2CMPCacheQueues* cache, uint32_t alternate) {
     return pop_unlocked(alternate ? cache->alternate : cache->normal);
 }

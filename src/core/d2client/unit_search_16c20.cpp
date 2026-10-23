@@ -55,7 +55,7 @@ extern "C" int32_t d2_client_16c20(D2UnitStrc* source, Predicate predicate,
         }
     return 0;
 }
-// 1.13c D2Client+0x16CB0
+// 1.13c D2Client+0x16cb0
 extern "C" int32_t d2_client_16cb0(D2UnitStrc* unit,D2UnitStrc* other,const Ops* ops) {
     const auto x=coordinate(unit,false,*ops), y=coordinate(unit,true,*ops);
     const auto ox=coordinate(other,false,*ops), oy=coordinate(other,true,*ops);
@@ -72,7 +72,7 @@ extern "C" D2UnitStrc* d2_client_16d80(D2UnitStrc* source,int32_t* distance,
     }
     return result;
 }
-// 1.13c D2Client+0x16DD0
+// 1.13c D2Client+0x16dd0
 extern "C" int32_t d2_client_16dd0(D2UnitStrc* source,D2UnitStrc* candidate,
                                    D2UnitStrc** result,int32_t* distance,
                                    const State* state,const Ops* ops) {

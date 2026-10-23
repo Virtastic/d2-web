@@ -968,6 +968,7 @@ int __stdcall UNITS_GetInventoryRecordId(D2UnitStrc* pUnit, int nInvPage, BOOL b
 	return -1;
 }
 
+// 1.13c D2Common+0x2F1E0
 //D2Common.0x6FDBECD0 (#10383)
 D2GfxLightStrc* __stdcall UNITS_ResetLightMap(D2UnitStrc* pUnit)
 {
@@ -998,7 +999,7 @@ int __stdcall UNITS_GetAnimOrSeqMode(D2UnitStrc* pUnit)
 	return 0;
 }
 
-//D2Common.0x6FDBED40 (#10370)
+// 1.13c D2Common+0x2F160 (#10199 in 1.13c; #10370 in 1.10f)
 void __stdcall UNITS_SetAnimOrSeqMode(D2UnitStrc* pUnit, int nAnimMode)
 {
 	D2_ASSERT(pUnit);
@@ -1122,7 +1123,7 @@ void __stdcall UNITS_UpdateFrame(D2UnitStrc* pUnit)
 	}
 }
 
-//D2Common.0x6FDBF020 (#10375)
+// 1.13c D2Common+0x2F060 (#10023)
 void __stdcall D2COMMON_10375_UNITS_SetFrameNonRate(D2UnitStrc* pUnit, int nRate, int nFailRate)
 {
 	pUnit->nSeqCurrentFramePrecise += pUnit->wAnimSpeed;
@@ -1950,6 +1951,7 @@ bool __fastcall UNITS_CheckIfObjectOrientationIs1(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDBFC90 (#10393)
+// 1.13c D2Common+0x2ed30
 BOOL __stdcall UNITS_IsShrine(D2UnitStrc* pUnit)
 {
 	if (pUnit->dwUnitType == UNIT_OBJECT && pUnit->pObjectData->pObjectTxt->nSubClass & OBJSUBCLASS_SHRINE)
@@ -2307,6 +2309,7 @@ int __stdcall UNITS_GetPlayerPortalFlags(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDC06C0 (#10353)
+// 1.13c D2Common+0x2eab0
 uint32_t __stdcall UNITS_GetNameOffsetFromObject(D2UnitStrc* pUnit)
 {
 	D2_ASSERT(pUnit);
@@ -2335,6 +2338,7 @@ void __stdcall UNITS_SetObjectPortalFlags(D2UnitStrc* pUnit, uint8_t nPortalFlag
 	pUnit->pObjectData->nPortalFlags = nPortalFlag;
 }
 
+// 1.13c D2Common+0x2E9E0
 //D2Common.0x6FDC07C0 (#10429)
 BOOL __stdcall UNITS_CheckObjectPortalFlag(D2UnitStrc* pUnit, uint8_t nFlag)
 {
@@ -3872,6 +3876,7 @@ unsigned int __stdcall UNITS_GetDistanceToCoordinates(D2UnitStrc* pUnit, int nX,
 }
 
 //D2Common.0x6FDC2FF0 (#10400)
+// 1.13c D2Common+0x7F550
 BOOL __stdcall UNITS_IsInRange(D2UnitStrc* pUnit, D2CoordStrc* pCoord, int nDistance)
 {
 	D2CoordStrc pCoords = {};
@@ -4065,6 +4070,7 @@ D2UnitStrc* __stdcall D2Common_10407_Impl(D2ActiveRoomStrc* pRoom, int nX, int n
 }
 
 //D2Common.0x6FDC3090 (#10406)
+// 1.13c D2Common+0x7F910
 //TODO: Find a name
 D2UnitStrc* __stdcall D2Common_10406(D2UnitStrc* pUnit, int (__fastcall* pCallback)(D2UnitStrc*, void*), void* a3)
 {

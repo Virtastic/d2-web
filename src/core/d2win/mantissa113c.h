@@ -7,5 +7,6 @@ void d2win_190e2(uint32_t* destination, const uint32_t* source);
 void d2win_196d1(uint32_t* destination, const uint32_t* source);
 void d2win_19023(uint32_t* mantissa, int32_t bit);
 void d2win_19116(uint32_t* mantissa, int32_t shift);
+int32_t d2win_19070(uint32_t* mantissa, int32_t bit);
 int32_t d2win_18ff1(const uint32_t* mantissa, int32_t bit);
 }

@@ -110,6 +110,30 @@ extern "C" void Storm_Sub34BA0(uint32_t id, StormState3b1e0& s, const StormCalls
     if (!n) { c.leave(logLock(bucket)); return; }
     flushLog(*n,c,id); c.close(n->file); c.logRelease(n,bucket);
 }
+// 1.13c Storm+0x347B0: find/create the log node for id (EDI) in bucket id&3; on success returns
+// with the bucket lock HELD and *bucket=id&3; on failure lock released, *bucket=~0.
+extern "C" StormLog3b1e0* Storm_Sub347B0(uint32_t id, uint32_t* bucket, uint32_t create,
+                                         StormState3b1e0& s, const StormCalls3b1e0& c,
+                                         StormLog3b1e0* (*alloc)()) {
+    if (!id) { *bucket = ~0u; return nullptr; }
+    uint32_t b = id & 3;
+    c.enter(logLock(b));
+    *bucket = b;
+    StormLog3b1e0** link = &s.logs[b];
+    for (auto* n = *link; n; n = *link) {
+        if (n->id == id) return n;
+        link = &n->next;
+    }
+    if (create) {
+        auto* n = alloc(); // VirtualAlloc(0x1001c)
+        *link = n; // retail stores the result even when null
+        if (n) { n->id = id; n->next = nullptr; n->file = reinterpret_cast<void*>(~uintptr_t{0});
+                 n->used = 0; n->position = 0; return n; }
+    }
+    c.leave(logLock(b));
+    *bucket = ~0u;
+    return nullptr;
+}
 // 1.13c Storm+0x34AE0
 extern "C" uint32_t Storm_Sub34AE0(const char* name, uint32_t /*unused*/, uint32_t* out,
                                     StormState3b1e0& s, const StormCalls3b1e0& c) {
@@ -134,4 +158,16 @@ extern "C" void Storm_Sub349E0(uint32_t scratch, StormState3b1e0& s, const Storm
         for (auto* n = s.logs[bucket]; n; n = n->next) flushLog(*n,c,scratch);
         c.leave(logLock(bucket));
     }
+}
+// 1.13c Storm+0x34410: ensure a group node keyed ESI exists in the list at 0x458e0, then dispatch
+// 0x35CD0(command, key, a, b). The list walk and 0x15E0 creation are seams (list identity 0x458e0).
+struct StormEvent34410Calls {
+    bool (*hasGroup)(uint32_t list, uint32_t key);
+    void (*createGroup)(uint32_t list, uint32_t key); // 0x15E0, node[2] = key
+    void (*dispatch)(uint32_t command, uint32_t key, uint32_t a, uint32_t b); // 0x35CD0
+};
+extern "C" void Storm_Sub34410(uint32_t command, uint32_t a, uint32_t b, uint32_t key,
+                               const StormEvent34410Calls& c) {
+    if (!c.hasGroup(0x458e0, key)) c.createGroup(0x458e0, key);
+    c.dispatch(command, key, a, b);
 }

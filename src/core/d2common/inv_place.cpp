@@ -133,3 +133,30 @@ uint32_t D2Common_20B50_CanPlaceSlot(const InvEnv& e, uint32_t inv, uint32_t fla
     int32_t x = 0, y = 0;
     return D2Common_208E0_GetFreePosition(e, inv, item, rec, (uint32_t)(uintptr_t)&x, (uint32_t)(uintptr_t)&y, 0) ? 1 : 0;
 }
+// 1.13c D2Common+0x1F1F0: stdcall(inv,item,x,y,rec,&exch,&hovered,page). Unlike 1.10f, a column past the grid width only ends that row's scan (the next row is still walked and can still bump *hovered); only a row past the grid height returns at once.
+uint32_t D2Common_1F1F0_CanItemBePlaced(const InvEnv& e, uint32_t inv, uint32_t item, int32_t x, int32_t y, int32_t rec, uint32_t pExch, uint32_t pHover, uint8_t page)
+{
+    W(P(pHover), 0) = 0;
+    uint8_t* v = P(inv); uint8_t* u = P(item);
+    if (!v || W(v, 0) != 0x01020304 || !u || W(u, 0) != 4 || page == 0xFF || x < 0 || y < 0) return 0;
+    uint8_t w = (uint8_t)inv, h = page;   // retail's out bytes alias its argument slots
+    Dims(e, item, &w, &h);
+    if (!w || !h) return 0;
+    uint8_t info[24];
+    if (!LayoutInfo(e, rec, info)) return 0;
+    uint8_t* g = P(D2Common_1E1B0_GetGrid(e, inv, (int32_t)page + 2, (uint32_t)(uintptr_t)info));
+    if (!g) return 0;
+    uint32_t ok = 1;
+    for (int32_t r = y; r < y + h; ++r) {
+        if (r >= g[9]) return 0;
+        for (int32_t c = x; c < x + w; ++c) {
+            if (c >= g[8]) { ok = 0; break; }
+            uint32_t it = W(P(W(g, 0xC)), ((uint32_t)g[8] * r + c) * 4);
+            if (!it) continue;
+            ok = 0;
+            if (W(P(pExch), 0) == it) break;
+            W(P(pExch), 0) = it; W(P(pHover), 0)++;
+        }
+    }
+    return ok;
+}

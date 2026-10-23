@@ -101,7 +101,7 @@ extern "C" {
 // 1.13c D2Game+0x3261
 // SEH fragment in _fwrite (0x321F): __unlock_file(*(FILE**)(EBP + 0x14)), i.e. the fourth argument. A
 // probe passes the stream in r[5].
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3261(uint32_t* r) {
+EMSCRIPTEN_KEEPALIVE void D2Game_CrtFwriteUnlockFrag(uint32_t* r) {
     d2game_file_unlock((FILE*)(uintptr_t)r[5]);
     r[4] = 0;
 }

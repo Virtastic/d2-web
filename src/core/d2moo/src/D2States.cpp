@@ -171,6 +171,7 @@ uint32_t* __stdcall D2COMMON_10494_STATES_GetStatFlags(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDB4900 (#10495)
+// 1.13c D2Common+0x33c80
 int __fastcall STATES_GetNumberOfStateFlags()
 {
 	return (sgptDataTables->nStatesTxtRecordCount + 31) / 32;

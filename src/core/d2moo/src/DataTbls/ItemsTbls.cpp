@@ -362,6 +362,7 @@ void __fastcall DATATBLS_LoadItemsTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD575D0
+// 1.13c D2Common+0x71A50: matches 1.10f (linker free, free items + old-index map, null pItemsTxt)
 void __fastcall DATATBLS_UnloadItemsTxt()
 {
 	FOG_FreeLinker(sgptDataTables->pItemsLinker);
@@ -386,6 +387,7 @@ D2ItemDataTbl* __stdcall DATATBLS_GetItemDataTables()
 }
 
 //D2Common.0x6FD57630 (#10597)
+// 1.13c D2Common+0x719F0: matches 1.10f (signed range check, u16 table read, -1 when out of range)
 int __stdcall DATATBLS_MapOldItemIndexToCurrent(int nItemId)
 {
 	if (nItemId < sgptDataTables->pItemDataTables.nItemsTxtRecordCount)
@@ -673,6 +675,7 @@ D2RareAffixDataTbl* __fastcall DATATBLS_GetRareAffixDataTables()
 }
 
 //D2Common.0x6FD58490 (#10606)
+// 1.13c D2Common+0x71790
 D2RareAffixTxt* __stdcall DATATBLS_GetRareAffixTxtRecord(int nId)
 {
 	if (nId > sgptDataTables->pRareAffixDataTables.nRareAffixTxtRecordCount || nId <= 0)
@@ -1615,6 +1618,7 @@ void __fastcall DATATBLS_LoadItemStatCostTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD5D070
+// 1.13c D2Common+0x71330: guarded bin release, linker/pool release, count cleared, nulled slots.
 void __fastcall DATATBLS_UnloadItemStatCostTxt()
 {
 	if (sgptDataTables->pItemStatCostTxt)

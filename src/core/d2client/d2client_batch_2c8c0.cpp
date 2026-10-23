@@ -240,7 +240,6 @@ uint64_t appendScaledRange(const Host& h, Address destination, int32_t low, int3
     int32_t a = static_cast<int32_t>(static_cast<uint32_t>(low) + scaled(low) + offset);
     int32_t b = static_cast<int32_t>(static_cast<uint32_t>(high) + scaled(high) + offset);
     if (a == 0 && b == 0) return uint64_t(static_cast<uint32_t>(sharedOffset)) << 32;
-    if (sharedOffset) { a = static_cast<int32_t>(uint32_t(a) + sharedOffset); b = static_cast<int32_t>(uint32_t(b) + sharedOffset); }
     std::u16string number = formatNumber(a, b, true);
     appendCurrentRef(h, destination);
     appendLocal(h, destination, number.c_str());

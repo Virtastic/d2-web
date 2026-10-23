@@ -148,6 +148,7 @@ void __fastcall PLAYERLIST_ToggleFlag(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D
 }
 
 //D2Game.0x6FCBA8E0
+// 1.13c D2Game+0xf02a0
 int32_t __fastcall PLAYERLIST_CheckFlag(D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, uint32_t nFlags)
 {
     if (pPlayer1 == pPlayer2)

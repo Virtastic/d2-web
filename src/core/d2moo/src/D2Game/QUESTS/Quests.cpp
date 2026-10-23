@@ -408,6 +408,7 @@ void __fastcall QUESTS_QuestInit(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC93FD0
+// 1.13c D2Game+0x33DC0
 void __fastcall QUESTS_QuestFree(D2GameStrc* pGame)
 {
 	if (!pGame || !pGame->pQuestControl)
@@ -2217,6 +2218,7 @@ void __fastcall QUESTS_ActChange_HirelingChangeAct(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FC964B0
+// 1.13c D2Game+0x365E0 (checked against decompile, no delta)
 void __fastcall QUESTS_DeleteItemEx(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2InventoryStrc* pInventory, D2UnitStrc* pItem)
 {
 	D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
@@ -2595,6 +2597,7 @@ int32_t __fastcall QUESTS_FXIterate(D2GameStrc* pGame, D2UnitStrc* pUnit, void* 
 }
 
 //D2Game.0x6FC96F10
+// 1.13c D2Game+0x35910 (checked against decompile, no delta)
 void __fastcall QUESTS_NPCActivateSpeeches(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pTarget)
 {
 	D2TextHeaderStrc* pTextHeader = TEXT_AllocTextHeader(pGame->pMemoryPool);
@@ -2647,6 +2650,7 @@ int32_t __fastcall QUESTS_PortalCheck(D2GameStrc* pGame, D2CoordStrc* pCoord, in
 }
 
 //D2Game.0x6FC97040
+// 1.13c D2Game+0x36B90 (checked against decompile)
 int32_t __fastcall QUESTS_SetObjectSelection(D2ObjOperateFnStrc* pOp)
 {
 	D2UnitStrc* pObject = pOp->pObject;
@@ -2856,6 +2860,7 @@ void __fastcall QUESTS_MonsterSpawn(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC97400
+// 1.13c D2Game+0x34020 (checked against decompile)
 int32_t __fastcall QUESTS_LevelWarpCheck(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nSourceLevel, int32_t nTargetLevel)
 {
 	switch (nTargetLevel)

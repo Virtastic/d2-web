@@ -47,7 +47,7 @@ static void unitList(void* window,const D2C189a0Env* e) {
         return;
     }
 }
-// 1.13c D2Client+0x189A0
+// 1.13c D2Client+0x189a0
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_189a0(void* client,uint32_t rgb,const D2C189a0Env* e) {
     if(client && word(client,0)<=1 && word(client,0x64)) call(e,0xA86C0,rgb?(rgb>>16)&255:255,rgb?(rgb>>8)&255:255,rgb?rgb&255:255);
 }
@@ -62,7 +62,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_18ac0(int32_t a,int32_t b,cons
     void* client=ptr(e,*e->globalClient); if(!client || word(client,0)!=0) return 0;
     void* msg=ptr(e,word(client,0x14)); return msg && word(msg,0x154)==0x13 && word(msg,0x158)==uint32_t(a) && word(msg,0x15c)==uint32_t(b);
 }
-// 1.13c D2Client+0x18BC0
+// 1.13c D2Client+0x18bc0
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_18bc0(void* client,const D2C189a0Env* e) {
     if(!client || word(client,0)>1 || !word(client,0x64)) return;
     if(word(client,0)) { if(!call(e,0x1260)) return; call(e,11077); } call(e,0xA8B60);
@@ -75,9 +75,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_18e20(void* client,uint32_t p1,ui
         opened=call(e,10392,host(ptr(e,word(client,0x2c))));
         if(!opened) call(e,0xA1340,host(&type),host(&id)); }
     call(e,10906,host(ptr(e,old)),host(client),p1,p2,p3);
-    if(active) { uint32_t tuple[7]={};
-        if(opened) { tuple[0]=word(reinterpret_cast<void*>(opened),0); tuple[1]=word(reinterpret_cast<void*>(opened),0xc); }
-        else { tuple[0]=type; tuple[1]=id; }
+    if(p3) { uint32_t tuple[4]={}; // decompile zeroes the locals before the call: A1340/opened outputs are discarded
         uint32_t next=opened?(mode==3?0x18:0):(mode==3?0x17:1); call(e,0x19830,next,host(client),host(tuple),0);
     }
 }

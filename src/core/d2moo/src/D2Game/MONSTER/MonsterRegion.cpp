@@ -890,6 +890,7 @@ void __fastcall D2GAME_PopulateRoom_6FC67190(D2GameStrc* pGame, D2ActiveRoomStrc
 }
 
 //D2Game.0x6FC67570
+// 1.13c D2Game+0x471E0
 int32_t __fastcall sub_6FC67570(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, int32_t nMonsterId, D2UnkMonCreateStrc2* a5, int32_t* pX, int32_t* pY)
 {
     int32_t nLeft = 0;
@@ -1204,6 +1205,7 @@ void __fastcall MONSTERREGION_InitializeAll(void* pMemPool, D2MonsterRegionStrc*
 }
 
 //D2Game.0x6FC67F30
+// 1.13c D2Game+0xCA3B0
 void __fastcall MONSTERREGION_FreeAll(void* pMemPool, D2MonsterRegionStrc** ppMonsterRegion)
 {
     for (int32_t i = 1; i < sgptDataTables->nLevelsTxtRecordCount; ++i)

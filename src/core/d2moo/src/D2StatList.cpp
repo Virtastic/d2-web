@@ -1022,6 +1022,7 @@ D2UnitGUID __stdcall STATLIST_GetOwnerGUID(D2StatListStrc* pStatList)
 }
 
 //D2Common.0x6FDB7280 (#11304)
+// 1.13c D2Common+0x380C0
 int __stdcall STATLIST_GetBaseStatsCount(D2StatListStrc* pStatList)
 {
 	if (pStatList)
@@ -1517,6 +1518,7 @@ void __stdcall STATLIST_DeactivateTemporaryStates(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDB8120 (#10467)
+// 1.13c D2Common+0x37FD0 (ordinal 10307 in 1.13c)
 int __stdcall D2Common_10467(D2StatListStrc* pStatList, int nStat)
 {
 	if (pStatList && nStat < pStatList->Stats.nStatCount)
@@ -1991,6 +1993,7 @@ int __stdcall STATLIST_GetBaseStatsData(D2StatListStrc* pStatListEx, D2StatStrc*
 }
 
 //D2Common.0x6FDB8C50 (#10573)
+// 1.13c D2Common+0x3A600
 void __stdcall STATLIST_MergeBaseStats(D2StatListStrc* pTargetStatList, D2StatListStrc* pSourceStatlist)
 {
 	if (pTargetStatList && pSourceStatlist)
@@ -2407,6 +2410,7 @@ BOOL __stdcall D2Common_11274_11275_Impl(D2UnitStrc* pTarget, D2UnitStrc* pUnit,
 
 //D2Common.0x6FDB9D90 (#11274)
 // 1.13c D2Common+0x3A100
+// 1.13c D2Common+0x3a030 (subtract direction, addOrSubstract=false, via D2Common_11275)
 BOOL __stdcall D2Common_11274(D2UnitStrc* pTarget, D2UnitStrc* pUnit)
 {
 	return D2Common_11274_11275_Impl(pTarget, pUnit, true);

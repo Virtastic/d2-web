@@ -32,7 +32,7 @@ struct D2ClientBatch1cb0Env {
 
 // Declarations for the in-file forward calls (0x1E80 -> 0x1FB0 -> 0x2050).
 extern "C" void d2_fn_d2client_1fb0(void* obj, const D2ClientBatch1cb0Env* env);
-extern "C" void d2_fn_d2client_2050(void* obj, const D2ClientBatch1cb0Env* env);
+extern "C" void d2client_1cb0_local_2050(void* obj, const D2ClientBatch1cb0Env* env);
 
 // 1.13c D2Client+0x001CB0 (196 B): default-construct six arrays of 0x400 four-byte Unicode objects
 // (blocks every 0x1000 bytes from the base). Returns the base.
@@ -45,10 +45,10 @@ void* d2_fn_d2client_1cb0(void* base, const D2ClientBatch1cb0Env* env) {
     return base;
 }
 
-// 1.13c D2Client+0x001D80 (40 B): scalar deleting destructor. Run 0x17940(this); when flag bit 0 is
+// 1.13c D2Client+0x01D80 (40 B): scalar deleting destructor. Run 0x17940(this); when flag bit 0 is
 // set and this is non-NULL, operator delete(this). Returns this.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void* d2_fn_d2client_1d80(void* obj, uint32_t flags, const D2ClientBatch1cb0Env* env) {
+void* d2client_scalar_dtor_1d80(void* obj, uint32_t flags, const D2ClientBatch1cb0Env* env) {
     env->dtor17940(obj);
     if ((flags & 1) != 0 && obj != nullptr) env->opDelete(obj);
     return obj;
@@ -80,7 +80,7 @@ uintptr_t d2_fn_d2client_1e10(int32_t index) {
     return (uintptr_t)array;
 }
 
-// 1.13c D2Client+0x001E80 (76 B): destructor -- DeleteCriticalSection at +0x50, then the 0x1FB0 body.
+// 1.13c D2Client+0x01E80 (76 B): destructor -- DeleteCriticalSection at +0x50, then the 0x1FB0 body.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_fn_d2client_1e80(void* obj, const D2ClientBatch1cb0Env* env) {
     DeleteCriticalSection((LPCRITICAL_SECTION)((uint8_t*)obj + 0x50));
@@ -93,7 +93,7 @@ void d2_fn_d2client_1ed0(void* obj, const D2ClientBatch1cb0Env* env) {
     d2_fn_d2client_1fb0(obj, env);
 }
 
-// 1.13c D2Client+0x001F10 (84 B): constructor -- 0x22C0(this), vtable RVA 0xD60D0 at +0, then
+// 1.13c D2Client+0x01F10 (84 B): constructor -- 0x22C0(this), vtable RVA 0xD60D0 at +0, then
 // InitializeCriticalSection at +0x50. Returns this.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void* d2_fn_d2client_1f10(void* obj, const D2ClientBatch1cb0Env* env) {
@@ -101,13 +101,6 @@ void* d2_fn_d2client_1f10(void* obj, const D2ClientBatch1cb0Env* env) {
     *(uint32_t*)obj = 0xD60D0u;
     InitializeCriticalSection((LPCRITICAL_SECTION)((uint8_t*)obj + 0x50));
     return obj;
-}
-
-// 1.13c D2Client+0x001F70 (30 B): destructor -- 0x21D0(this), then operator delete(this).
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2client_1f70(void* obj, const D2ClientBatch1cb0Env* env) {
-    env->dtor21d0(obj);
-    env->opDelete(obj);
 }
 
 // 1.13c D2Client+0x001FB0 (125 B): destructor body. vtable RVA 0xD60B0 at +0; 0x2320(this, EDI);
@@ -118,13 +111,13 @@ void d2_fn_d2client_1fb0(void* obj, const D2ClientBatch1cb0Env* env) {
     env->hashDtor2320(obj);
     env->listUnlink2580((uint8_t*)obj + 0x38);
     env->listUnlink2580((uint8_t*)obj + 0x28);
-    d2_fn_d2client_2050(obj, env);
+    d2client_1cb0_local_2050(obj, env);
 }
 
-// 1.13c D2Client+0x002050 (114 B): destructor body. vtable RVA 0xD60E0 at +0; 0x2360(this, EBX; 1);
+// 1.13c D2Client+0x02050 (114 B): destructor body. vtable RVA 0xD60E0 at +0; 0x2360(this, EBX; 1);
 // 0x2540(this, EAX); unlink the node at +4.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2client_2050(void* obj, const D2ClientBatch1cb0Env* env) {
+void d2client_1cb0_local_2050(void* obj, const D2ClientBatch1cb0Env* env) {
     *(uint32_t*)obj = 0xD60E0u;
     env->tsClear2360(obj, 1);
     env->listFree2540(obj);

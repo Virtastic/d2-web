@@ -41,6 +41,10 @@ static const char kModuleName[] = "D2Game.dll";
 
 // Every callee of the twelve that src/ does not implement, at its retail address.
 struct D2GameBatch10160Env {
+    // ---- 0x11CA0 ------------------------------------------------------------------------------
+    uint32_t (*ordinal10826_u)(void* unit);           // Ordinal_10826 with the unit argument
+    int32_t  (*ordinal10057)(void* unit);             // Ordinal_10057
+    int32_t  (*sub2F780)(void* esi, void* a, int32_t b, int32_t c, int32_t d, int32_t e);  // 0x2F780
     // ---- 0x10160 ------------------------------------------------------------------------------
     void     (*ordinal10977_v)(void* unit);           // Ordinal_10977, unit in a register
     void     (*ordinal11166)(void);                   // Ordinal_11166
@@ -487,4 +491,39 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_12EE0(void* edi, void* esi,
         }
     }
     return iVar3;
+}
+
+// 0x11CA0: pick a count (1 unless the unit resolves and is not flagged, then Ordinal_10894 minus one
+// when above 1), call 0x2F780 for an item id, and if Ordinal_10654 finds room send the type-3 packet.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_11CA0(void* param_1, uint32_t param_2, int32_t param_3, const int32_t* param_4, const uint32_t* eax_pair, void* esi, const D2GameBatch10160Env* env) {  // 1.13c D2Game+0x11CA0
+    uint8_t pkt[0x84] = {};
+    const uint32_t id = env->ordinal10826_u(param_1);
+    int32_t cnt;
+    if (id == 0 || env->ordinal10057(param_1) != 0) {
+        cnt = 1;
+    } else {
+        cnt = env->ordinal10894(id, rd8(esi, 0x6D), rd32(esi, 0x70));
+        if (1 < cnt) cnt -= 1;
+    }
+    void* const pos = param_1 != nullptr ? (uint8_t*)param_1 + 0x6C : nullptr;
+    const int32_t flag = (param_4 != nullptr && param_4[0] == 1) ? 1 : 0;
+    const int32_t item = env->sub2F780(esi, pos, cnt, (int32_t)param_2, param_3, flag);
+    wr32(pkt, 0x10, eax_pair[0]);
+    wr32(pkt, 0x14, eax_pair[1]);
+    wr32(pkt, 0x18, (uint32_t)item);
+    env->sub21280();
+    const int32_t r = env->ordinal10654(param_1, pkt + 0x08, pkt + 0x10, 1, 0x3E01, 0x801, 1);
+    wr32(pkt, 0x24, (uint32_t)r);
+    if (r != 0) {
+        std::memset(pkt, 0, sizeof pkt);
+        wrptr(pkt, 0x00, param_4);
+        wr16(pkt, 0x2A, rd16(esi, 0x78));
+        wr32(pkt, 0x18, 3);
+        wr16(pkt, 0x28, 1);
+        wr32(pkt, 0x30, 0);
+        wr32(pkt, 0x04, 0x3E01);
+        wr32(pkt, 0x1C, 0x801);
+        wr32(pkt, 0x20, 1);
+        env->sub31490(esi, pkt);
+    }
 }

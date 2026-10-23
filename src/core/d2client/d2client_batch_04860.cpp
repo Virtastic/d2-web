@@ -52,7 +52,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_4860(int32_t locknum, const D2ClientBatch048
     EnterCriticalSection((LPCRITICAL_SECTION)(uintptr_t)slot[0]);
 }
 
-// 1.13c D2Client+0x055BF (FID_conflict:__lock_file2): a stream lock reached only from __fsopen ->
+// 1.13c D2Client+0x055bf (FID_conflict:__lock_file2): a stream lock reached only from __fsopen ->
 // __getstream. An index below 0x14 is CRT lock index+0x10; any other stream enters the critical
 // section embedded in the FILE at +0x20.
 extern "C"
@@ -147,10 +147,11 @@ EMSCRIPTEN_KEEPALIVE void d2_client_8ece(int32_t code, const D2ClientBatch04860E
         if (env->module_file_name(name, 0x104) == 0)
             std::strcpy(name, "<program name unknown>");
         size_t len = std::strlen(name);
-        if (len + 1 > 60) std::strncpy(name + len - 59, "...", 3);
+        const char* shown = name;                // retail _Str: the tail of the path after truncation
+        if (len + 1 > 60) { shown = name + len - 59; std::strncpy(name + len - 59, "...", 3); }
         char msg[0x300];                         // name[0x104] + text + the literals, retail alloca
         std::strcpy(msg, "Runtime Error!\n\nProgram: ");
-        std::strcat(msg, name);
+        std::strcat(msg, shown);
         std::strcat(msg, "\n\n");
         std::strcat(msg, text);
         env->message_box(msg, "Microsoft Visual C++ Runtime Library", 0x12010);

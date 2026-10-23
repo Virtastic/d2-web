@@ -37,7 +37,7 @@ extern "C"
 // 1.13c D2Common+0x22590 (#10572): the two dwords at pItemData+0x1C/+0x20 for a UNIT_ITEM with a
 // non-null item data block; everything else (null unit, another unit type, null data) writes 0/0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_22590(uint32_t pUnit, uint32_t* pOut1C, uint32_t* pOut20)
+EMSCRIPTEN_KEEPALIVE void ITEMS_GetRealmData(uint32_t pUnit, uint32_t* pOut1C, uint32_t* pOut20)
 {
 	D2UnitStrc* unit = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit));
 	if (unit && unit->dwUnitType == UNIT_ITEM)
@@ -58,7 +58,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_22590(uint32_t pUnit, uint32_t* pOut1C,
 // +0x00 = nValue, +0x0C = nCenter, +0x04 = (nCenter - nHalf) * 0x10, +0x1C = 0 (byte), +0x10 =
 // nHalf, +0x08 = (nCenter + nHalf) * 8. A null unit is fatal 0x866 in retail; we return.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2fed0(uint32_t pUnit, uint32_t nValue, int32_t nCenter,
+EMSCRIPTEN_KEEPALIVE void D2SetEnabledStat(uint32_t pUnit, uint32_t nValue, int32_t nCenter,
                                                 int32_t nHalf)
 {
 	D2UnitStrc* unit = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit));
@@ -76,7 +76,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2fed0(uint32_t pUnit, uint32_t nValue, 
 // 1.13c D2Common+0x39050 (#10578): the unit's total stat 11 (max stamina, layer 0, packed
 // 0xB0000) from ItemStatCost row 11. Guards: null unit, null stat list, fewer than 12 rows.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_39050(D2UnitStrc* pUnit)
+EMSCRIPTEN_KEEPALIVE int32_t UNITS_GetTotalMaxStamina_39050(D2UnitStrc* pUnit)
 {
 	if (!pUnit || !pUnit->pStatListEx)
 		return 0;
@@ -92,7 +92,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_39050(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x38E80 (#10583): the unit's total stat 160 (layer 0, packed 0xA00000) from
 // ItemStatCost row 160. Guards: null unit, null stat list, 160 or fewer rows.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_38e80(D2UnitStrc* pUnit)
+EMSCRIPTEN_KEEPALIVE int32_t D2Common_GetUnitStat160_38E80(D2UnitStrc* pUnit)
 {
 	if (!pUnit || !pUnit->pStatListEx)
 		return 0;
@@ -121,10 +121,9 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_38c20(D2UnitStrc* pUnit, int32_t nSt
 	if (!pUnit->pStatListEx)
 		return 0;
 	const int32_t nPacked = (nStatId << 16) | (nLayer & 0xFFFF);
-	if (!g_d2common_fn_38B00)
-		return 0;
-	return g_d2common_fn_38B00(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pUnit->pStatListEx)),
-	                           nPacked);
+	return STATLIST_GetBaseStat_6FDB6340(STATLIST_StatListExCast(pUnit->pStatListEx),
+		D2SLayerStatIdStrc::Make(static_cast<uint16_t>(nLayer), nStatId).nPackedValue,
+		&sgptDataTables->pItemStatCostTxt[nStatId]);
 }
 
 // 1.13c D2Common+0x2D070 (#10593): clear bit (nRow * 0x10 + nColumn) of the bit array whose

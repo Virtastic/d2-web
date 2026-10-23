@@ -36,12 +36,11 @@ static uint32_t g_109c0_slots[4];
 // +0x11C568  DAT_6fbcc568: the live-entry count.
 static uint32_t g_109c0_count;
 
-// 1.13c D2Client+0x109C0 (95 B): pop the front dword of the four-slot queue. When the count is zero the
+// 1.13c D2Client+0x109c0 (95 B): pop the front dword of the four-slot queue. When the count is zero the
 // retail path is fatal: Fog ordinal 10265 supplies the caller's return address and Fog ordinal 10024
 // (FOG_DisplayHalt) reports "queue is empty" with the format at +0x0D359F, then _exit(-1). Otherwise it
 // returns slot[0], shifts slot[0] <- slot[1] and slot[2] <- slot[3], and decrements the count. The
-// decompile also hoists slot[2] into a variable the return path never reads; the store set is what it
-// emits, so slot[1] keeps its old value.
+// decompile reads slot[2] before overwriting it and stores it into slot[1] (slot[1] <- old slot[2]).
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_client_109c0(const D2ClientBatch109C0Fog* fog) {
     if (g_109c0_count == 0) {
@@ -50,8 +49,10 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_client_109c0(const D2ClientBatch109C0Fog* fog) 
         fog->exit_(-1);
     }
     uint32_t front = g_109c0_slots[0];
+    uint32_t old2 = g_109c0_slots[2];
     g_109c0_slots[0] = g_109c0_slots[1];
     g_109c0_slots[2] = g_109c0_slots[3];
+    g_109c0_slots[1] = old2;
     g_109c0_count--;
     return front;
 }
@@ -67,7 +68,7 @@ static const char* g_10a60_names[7];
 // +0x11C564  DAT_6fbcc564: the one-shot guard for the developer user-name check.
 static uint32_t g_10a60_checked;
 
-// 1.13c D2Client+0x10A60 (163 B): resolve a command-line option record. Walk the seven name pointers;
+// 1.13c D2Client+0x10a60 (163 B): resolve a command-line option record. Walk the seven name pointers;
 // the first non-NULL one that __stricmp(0x39C9) matches case-insensitively against the record's name at
 // +0x18 selects that index (stored in the state word) and returns 1. With no match, the first call only
 // reads the Windows user name into a 16-byte buffer (size 0xF) and compares it with Storm #508 SStrCmp
@@ -104,7 +105,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_10a60(void* rec, const D2ClientBatch109C0
 // DAT_6fb8bc48, h = +0x0F9E18 DAT_6fba9e18, thumbY = +0x1233F4 DAT_6fbd33f4, count = +0x11C500
 // DAT_6fbcc500 (the thumb travel is count * 0xC).
 
-// 1.13c D2Client+0x10F70 (91 B), hit F: right-hand column, y between the bottom of the thumb track and
+// 1.13c D2Client+0x10f70 (91 B), hit F: right-hand column, y between the bottom of the thumb track and
 // the panel bottom: x in [w-m-0x1F, w-m-0x12], m = (w-0x26C)/2; thumbY + count*0xC < y < (h-0x1A4)/2 +
 // 0x125. Strict on the y edges.
 extern "C"
@@ -197,7 +198,7 @@ struct D2ClientBatch109C0Scroll {
     int32_t (*row_count_1240)(void);
 };
 
-// 1.13c D2Client+0x117C0 (333 B): move the selection by ECX (0 = no-op). |n| > 1 is applied one unit at a
+// 1.13c D2Client+0x117c0 (333 B): move the selection by ECX (0 = no-op). |n| > 1 is applied one unit at a
 // time through recursive calls. -1 clamps the selected row down to 0; +1 stops at total-1. It then
 // ensures the selected row is inside the 15-row window starting at the first visible row, scrolling the
 // window by one row at a time and recomputing the thumb Y each step:
@@ -276,13 +277,13 @@ static uint32_t g_12eb0_gate;        // +0x11C540  DAT_6fbcc540, set to 1 at ent
 static uint32_t g_12eb0_flag;        // +0x12349C  DAT_6fbd349c, read by 0x12DD0
 static uint32_t g_12eb0_ids[6];      // +0x0F8BF4  0xC-stride records, first dword only
 static uint32_t g_12eb0_sel;         // +0x11C3CC  DAT_6fbcc3cc
-static uint32_t g_12eb0_mode;        // +0x11B898  DAT_6fbc9898
-static uint32_t g_12eb0_sub;         // +0x11B88C  DAT_6fbc988c
-static uint32_t g_12eb0_sub2;        // +0x11B890  DAT_6fbc9890
+static uint32_t g_12eb0_mode;        // +0x119898  DAT_6fbc9898
+static uint32_t g_12eb0_sub;         // +0x11988C  DAT_6fbc988c
+static uint32_t g_12eb0_sub2;        // +0x119890  DAT_6fbc9890
 
-// 1.13c D2Client+0x12EB0 (358 B, caller 0x130B0): reset the UI. Latch the gate (+0x11C540 = 1); if either
-// user-interface predicate (0x42090, 0x420E0) holds, draw block +0x0F80774 through 0x3CC60; always draw
-// +0x0F806D8; close the UI with 0x12DD0(0) (gate is now 1, so its close block is skipped); if the Fog
+// 1.13c D2Client+0x12eb0 (358 B, caller 0x130B0): reset the UI. Latch the gate (+0x11C540 = 1); if either
+// user-interface predicate (0x42090, 0x420E0) holds, draw block +0x0D0774 through 0x3CC60; always draw
+// +0x0D06D8; close the UI with 0x12DD0(0) (gate is now 1, so its close block is skipped); if the Fog
 // surface handle (ordinal 10048) is 0, fatal via Fog 10265/10024 and _exit(-1); feed the six record ids
 // at +0x0F8BF4 to 0x3CA80; then, in the selected/visible-mode states, draw +0x0F8C38, +0x0F8C44 and (when
 // the vertical scroll metric is present) +0x0F8C50 through 0x3CCC0. Every 0x3CC60/0x3CCC0 call re-reads
@@ -293,8 +294,8 @@ EMSCRIPTEN_KEEPALIVE void d2_client_12eb0(const D2ClientBatch109C0Reset* env,
     uint32_t out[16];
     g_12eb0_gate = 1;
     if (env->is_42090() != 0 || env->is_420E0() != 0)
-        env->f_3cc60(4, env->fog_10048(), 0x0F80774u);
-    env->f_3cc60(4, env->fog_10048(), 0x0F806D8u);
+        env->f_3cc60(4, env->fog_10048(), 0x0D0774u);
+    env->f_3cc60(4, env->fog_10048(), 0x0D06D8u);
     d2_client_12dd0(0, g_12eb0_gate, g_12eb0_flag, out);
     if (env->fog_10048() == 0) {
         uint32_t ra = fog->fogCallerReturnAddress();

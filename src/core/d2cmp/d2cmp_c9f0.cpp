@@ -3,7 +3,7 @@
 struct D2CmpUNode { uint32_t _0[3]; uint32_t flags; uint32_t tick; D2CmpUNode* next; D2CmpUNode* prev; };
 struct D2CmpUCache { uint32_t _0[5]; D2CmpUNode* head0; D2CmpUNode* tail0; D2CmpUNode* head1; D2CmpUNode* tail1; };
 
-// 1.13c D2CMP+0x0C9F0
+// 1.13c D2CMP+0x0c9f0
 void d2cmp_c9f0(D2CmpUCache* c, D2CmpUNode* n, void (*fatal)())
 {
     if (!n) { fatal(); return; } // retail: string 0xb44 via Ordinal_10265/10024, _exit(-1)

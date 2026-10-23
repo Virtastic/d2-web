@@ -96,7 +96,7 @@ extern "C" D2CMPLruNode* d2cmp_171e0(D2CMPLruCache& c, uint32_t size) {
 
 // EAX size, EBX owner, ESI cache hidden register args (EDI = size for 171E0).
 // Evicts from the head until a node fits, then allocates the node's block.
-// 1.13c D2CMP+0x174B0
+// 1.13c D2CMP+0x174b0
 extern "C" D2CMPLruNode* d2cmp_174b0(D2CMPLruCache& c, uint32_t size, D2CMPCachePayload* owner,
     const D2CMPCacheMemory& memory) {
     if (c.budget <= size) std::_Exit(-1);
@@ -178,7 +178,7 @@ extern "C" void d2cmp_17400(D2CMPLruCache& c, D2CMPLruNode* n, const D2CMPCacheM
 
 // EDI cache was a hidden register argument. Count is decremented even when
 // no head exists; freeing the node table does not clear the other queue fields.
-// 1.13c D2CMP+0x175C0
+// 1.13c D2CMP+0x175c0
 extern "C" void d2cmp_175c0(D2CMPLruCache& c, const D2CMPCacheMemory& memory) {
     while (c.count) {
         if (D2CMPLruNode* n = c.head) {

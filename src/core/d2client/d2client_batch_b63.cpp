@@ -42,7 +42,7 @@ struct D2cE51650 {
 // 1.13c D2Client+0x51650  (eax = in_EAX attacker-state ptr, stack retaddr slot = unaff_retaddr)
 // Picks the nearest valid target unit from a room scan; req layout [0x00]=flags [0x0C]=z [0x20]=player.
 EMSCRIPTEN_KEEPALIVE i32* d2c_51650(const D2cE51650* e, const uint8_t* in_EAX, const i32* bitmask, i32 player,
-    i32* param_1, i32* param_2, i32* param_3, i32* param_4, const i32* retaddr, i32* scanBuf, i32 scanCnt) {
+    i32* param_1, i32* param_2, i32* param_3, i32* param_4, const i32* retaddr, i32 cb11d0) {
     if (param_2) {
         if ((*bitmask & in_EAX[7]) && !(param_2[0x31] & 0x10000)) {
             if (param_2[0] == 0 && (param_2[4] == 0 || param_2[4] == 0x11)) return param_2;
@@ -52,24 +52,25 @@ EMSCRIPTEN_KEEPALIVE i32* d2c_51650(const D2cE51650* e, const uint8_t* in_EAX, c
         *param_3 = (t == 2 || (t > 3 && t < 6)) ? rd((const void*)(intptr_t)param_2[0xb], 0xc) : (param_2[0xb] ? e->pathx(param_2[0xb]) : 0);
         *param_4 = (t == 2 || (t > 3 && t < 6)) ? rd((const void*)(intptr_t)param_2[0xb], 0x10) : (param_2[0xb] ? e->pathy(param_2[0xb]) : 0);
     }
-    i32 cnt = ((in_EAX[7] & *bitmask) ? 0xfff : 0) + 0x2003;
-    if (!((in_EAX[7] & *bitmask))) cnt = 0x2003;
+    i32 cnt = ((in_EAX[7] & *bitmask & 0xff) ? 0xfff : 0) + 0x2003;
+    i32 cb = 0;
     if (e->ord10601() == 0x5a) {
         if (param_2 && param_2[0] == 4 && e->ord11064(0)) return param_2;
-        cnt = 0x20;
+        cnt = 0x20; cb = cb11d0;
     }
+    // frame is contiguous in the original: f[0]=*retaddr, f[1..4]={*param_1, 9, callback, &req}
     i32 req[14] = {0};
-    req[0] = cnt; req[2] = player; req[3] = *retaddr; req[0xd] = *param_1;
-    i32 call[3] = {*param_1, 9, *retaddr};
-    e->ord10591(0, call, player ? e->ord10331(player) : 0);
-    e->ord10052(call);
+    req[0] = cnt; req[2] = player; req[3] = *retaddr; req[4] = *param_1; req[5] = 9;
+    i32 f[5] = {*retaddr, *param_1, 9, cb, (i32)(intptr_t)req};
+    e->ord10591(0, f + 1, player ? e->ord10331(player) : 0);
+    e->ord10052(f + 1);
     i32 best = 10;
-    for (i32 i = 0; i < cnt && i < scanCnt; i++) {
-        i32* u = (i32*)(intptr_t)scanBuf[i];
+    for (i32 i = 0; i < cnt; i++) {
+        i32* u = (i32*)(intptr_t)((const i32*)(intptr_t)f[1])[i];
         i32 d = e->ord10080((i32)(intptr_t)u, *param_3, *param_4);
         if (e->f568e0((i32)(intptr_t)u, 0, 0, 0) && d < best) { param_2 = u; best = d; }
     }
-    e->ord10344(call);
+    e->ord10344(f);
     return param_2;
 }
 
@@ -105,7 +106,7 @@ tail:
             i32 id = in_EAX[1], a = e->f1230();
             if (a && e->f1260()) {
                 i32 b = e->f1260();
-                if (!(bitmask[0] & rd((void*)(intptr_t)a, 0xd)) && rd((void*)(intptr_t)a, 0x4c) % 256 != 1 &&
+                if (!(bitmask[0] & rd((void*)(intptr_t)a, 0xd) & 0xff) && (rd((void*)(intptr_t)a, 0x4c) & 0xff) != 1 &&
                     (rd((void*)(intptr_t)b, 5) & bitmask[1] & 0xff)) {
                     g->hover[0] = id;
                     if (!(rd((void*)(intptr_t)b, 6) & bitmask[1] & 0xff)) g->hover[1] = id;
@@ -122,24 +123,51 @@ tail:
     }
 }
 
-// 1.13c D2Client+0x51AE0  (eax = in_EAX target unit; ecx-style stack retaddr = unaff_retaddr)
-// Seams collapse the 51650/51500/51390 follow-ups into `follow`, selected by the player's mode bitmask.
-EMSCRIPTEN_KEEPALIVE i32* d2c_51AE0(i32 mode6, const i32* bitmask, i32* in_EAX, i32* player, i32* param_1, i32* param_2,
-    i32* param_3, uint8_t param_4, i32 (*ord10143)(i32*), i32 (*ord10787)(i32*, i32*), i32 g985c, i32 g97f8,
-    i32* (*follow650)(i32*, i32*), i32* (*follow500)(), i32* (*follow390)(), i32 (*xs)(i32*), i32 (*ys)(i32*),
-    void (*f50b30)(i32*)) {
+struct D2cE51AE0 {
+    i32 (*ord10858)(); i32 (*f55440)(); i32* (*f2c5c0)(); i32 (*f55b40)(i32 id, i32 type);
+    i32 (*ord10331)(i32 p, i32 q); void (*ord10742)(i32); i32 (*f1630)(i32*); i32 (*f1660)(i32*);
+    i32 (*pathx)(i32 path); i32 (*pathy)(i32 path); void (*f50b30)(i32*);
+    i32 (*ord10143)(i32*); i32 (*ord10787)(i32*, i32*);
+    i32* (*f1650)(i32*, i32*, const i32*); i32* (*f1500)(); i32* (*f1390)(const i32*);
+};
+struct D2cG51AE0 { i32 g2f8, g3a68, g2f4, g964c, g9638, g985c, g97f8; uint8_t* g3afa; i32* flags; i32* player; };
+static i32 unit_pos(const D2cE51AE0* e, const i32* u, int off) {
+    i32 t = u[0];
+    if (t == 2 || (t > 3 && t < 6)) return rd((const void*)(intptr_t)u[0xb], off);
+    return u[0xb] == 0 ? 0 : (off == 0xc ? e->pathx(u[0xb]) : e->pathy(u[0xb]));
+}
+// 1.13c D2Client+0x51AE0  (eax = in_EAX target unit; retaddr = unaff_retaddr; g->player = DAT_6fbcbbfc)
+EMSCRIPTEN_KEEPALIVE i32* d2c_51AE0(const D2cE51AE0* e, D2cG51AE0* g, const i32* bitmask, i32* in_EAX, i32* param_1,
+    i32* param_2, i32* param_3, uint8_t param_4, const i32* retaddr) {
+    const uint8_t* st = (const uint8_t*)(intptr_t)e->ord10858();
+    i32* piVar6 = g->player;
+    bool skip = false;
     if (in_EAX) {
-        if (*in_EAX == 0 && ((in_EAX[0x31] & 0x10000) || in_EAX[4] == 0 || in_EAX[4] == 0x11)) return in_EAX;
-        *param_2 = xs(in_EAX); *param_3 = ys(in_EAX);
-        in_EAX = nullptr;
+        if (in_EAX[0] == 0 && ((in_EAX[0x31] & 0x10000) || in_EAX[4] == 0 || in_EAX[4] == 0x11)) return in_EAX;
+        if (((uint8_t)bitmask[0] & st[7]) || !e->f55440()) skip = true;
+        else {
+            if (g->g2f8 == 0) {
+                if (!g->g3a68 || e->f2c5c0()) {
+                    *g->g3afa = 0;
+                    if (g->g2f4 && g->g964c == 5) {
+                        i32 p = e->f55b40(g->g9638, 5);
+                        if (p) { e->ord10742(e->ord10331(p, rd((void*)(intptr_t)p, 4))); *g->flags |= 1; }
+                    }
+                    g->g2f4 = 0;
+                } else *g->g3afa = 0;
+            }
+            *param_2 = e->f1630(in_EAX);
+            *param_3 = e->f1660(in_EAX);
+            in_EAX = nullptr;
+        }
     }
-    if (*param_2 == xs(player) && *param_3 == ys(player)) f50b30(param_2);
-    if ((!((param_4 & 8) && (param_4 & 1) && !(param_4 & 0x20)) || !ord10143(player)) &&
-        !ord10787(player, param_1) && g985c <= g97f8) {
-        u32 m = (u32)mode6;
-        if ((u32)bitmask[6] & m) return follow650(param_1, in_EAX);
-        if (!in_EAX && ((u32)bitmask[5] & m) && param_3) return follow500();
-        if ((u32)bitmask[7] & m) return follow390();
+    if (!skip && *param_2 == unit_pos(e, piVar6, 0xc) && *param_3 == unit_pos(e, piVar6, 0x10)) e->f50b30(param_2);
+    if ((!((param_4 & 8) && (param_4 & 1) && !(param_4 & 0x20)) || !e->ord10143(piVar6)) &&
+        !e->ord10787(piVar6, param_1) && (piVar6 != g->player || g->g985c <= g->g97f8)) {
+        u32 b6 = st[6];
+        if ((u32)bitmask[6] & b6) return e->f1650(param_1, in_EAX, retaddr);
+        if (!in_EAX && ((u32)bitmask[5] & b6) && param_3) return e->f1500();
+        if ((u32)bitmask[7] & b6) return e->f1390(retaddr);
     }
     return in_EAX;
 }
@@ -224,4 +252,21 @@ EMSCRIPTEN_KEEPALIVE u32* d2c_5D7A0(const D2cE5D7A0* e, uint8_t* tbl, i32 tblCnt
 // 1.13c D2Client+0x63620 and 1.13c D2Client+0x636A0 (identical bodies: CRT stack-probe wrapper)
 EMSCRIPTEN_KEEPALIVE uint64_t d2c_63620(i32 g3710, void (*f9ff7)(), uint64_t (*facc4)()) { if (g3710) f9ff7(); return facc4(); }
 EMSCRIPTEN_KEEPALIVE uint64_t d2c_636A0(i32 g3710, void (*f9ff7)(), uint64_t (*facc4)()) { if (g3710) f9ff7(); return facc4(); }
+}
+
+extern "C" {
+// 1.13c D2Client+0x51230  (esi = other-unit/point block; param_1 = second point's x, from the 2nd Ordinal_10141)
+// Twin of 0x512E0: same gate and range test; the else-branch compares stack addresses (decompiler artefact).
+EMSCRIPTEN_KEEPALIVE i32 d2c_51230(const i32* esi, i32 param_1, i32 player, i32 (*getpt)(i32 unit, i32* out),
+    i32 (*ord10296)(), i32 (*flagbyte)(i32 base)) {
+    if (esi && esi[4]) return 0;
+    i32 pt[2] = {0, 0};
+    if (player) getpt(player, pt);
+    i32 base = ord10296();
+    if (flagbyte(base + 0x13c) == 1) {
+        if (pt[0] < param_1 && param_1 < (i32)(intptr_t)esi) return 0;
+        if (param_1 < pt[0] && (i32)(intptr_t)esi < param_1) return 0;
+    }
+    return 1;
+}
 }

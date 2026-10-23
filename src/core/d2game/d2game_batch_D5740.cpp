@@ -24,6 +24,18 @@ static void w32(void* p,uint32_t o,uint32_t v) { std::memcpy(static_cast<uint8_t
 static Word a(const void* p) { return reinterpret_cast<Word>(p); }
 [[noreturn]] static void fatal(Env& e,uint32_t line) { auto text=e.call(10265,{line}); e.call(10024,{text}); std::abort(); }
 
+// 1.13c D2Game+0xD1A50
+// EAX unit: *left = #10061(inv), then pick slot 4 (or 5 when slot 4 equals *left) via #11139; keep it only if
+// #10744(item,0x2d) is non-zero. Inputs are the unit's inventory pointer (+0x60) and the two out slots.
+void d2game_D1A50(Env& e,void* inventory,Word* first,Word* second) {
+    *second=0; *first=0;
+    if(!inventory) return;
+    *first=e.call(10061,{a(inventory)});
+    Word w4=e.call(11139,{a(inventory),4}), w5=e.call(11139,{a(inventory),5});
+    *second=(*first==w4)?w5:w4;
+    if(*second && !e.call(10744,{*second,0x2d})) *second=0;
+}
+
 // 1.13c D2Game+0xD1950
 int d2game_D1950(const int32_t* x,const int32_t* y) {
     if ((x[0]&&y[2]) || (x[2]&&y[0]) || (x[1]&&y[3]) || (x[3]&&y[1])) return 1;
@@ -122,7 +134,7 @@ int d2game_54D90(Env& e,const uint8_t* section,void* game,void* player,uint32_t 
     // this build never enters its duplicate-skip path.
     for(unsigned n=0;n<r16(section,2);++n) {
         Saved item;
-        auto read=[&]() { if(r16(section,offset)!=0x4d4a)return false;offset+=2;offset+=d2game_52BD0(e,section+offset,item);return true; };
+        auto read=[&]() { item=Saved{}; if(r16(section,offset)!=0x4d4a)return false;offset+=2;offset+=d2game_52BD0(e,section+offset,item);return true; };
         if(!read())return 14;
         void* parent=nullptr;int32_t sockets=0;
         const uint32_t callee=corpse?0x54a20:0x54bc0;
@@ -158,12 +170,12 @@ int d2game_D57F0(Env& e,void* game,void* player,uint32_t id,uint32_t bodyLocatio
     if(!removed)fatal(e,0x1513);
     if(removed!=item)fatal(e,0x1514);
     const uint32_t layout=uint32_t(e.call(10584,{a(player),0,r32(game,0x70)}));
-    const uint32_t body=bodyLocation&255;
+    const uint32_t body=layout&255; // retail: slot comes from 10584, bodyLocation is not a parameter
     auto y=e.call(0x1130,{a(item)}),x=e.call(0x1100,{a(item)});
     e.call(10869,{0x1516,a(inv),x,y,layout,0,0});e.call(10012,{a(item),255});
     if(!e.call(11041,{a(inv),a(item),body}))fatal(e,0x1538);
     if(!e.call(10405,{a(inv),a(item),3})) {e.call(10608,{a(inv),body});fatal(e,0x1535);}
-    e.call(10058,{a(item),bodyLocation});e.call(10138,{a(inv),a(item)});e.call(10466,{a(inv),0});
+    e.call(10058,{a(item),0});e.call(10138,{a(inv),a(item)});e.call(10466,{a(inv),0});
     if(e.call(10744,{a(item),13}))fatal(e,0x151e);
     e.call(0xd47c0,{a(game),a(item),a(player),0});w32(item,0xc4,r32(item,0xc4)&~2u);
     e.call(11090,{a(item),1});e.call(10012,{a(item),255});e.call(10892,{a(item),0x8000,1});

@@ -13,22 +13,6 @@
 // Retail extracts several helpers that D2MOO inlines; the outdoor initializer
 // aliases retain those helpers in their original order. Stage A only, no parity verdict.
 
-// 1.13c D2Common+0x2D660
-void __fastcall d2c_2d660_update_room_coordinates(D2DrlgLevelStrc* level)
-{
-	D2_ASSERT(level);
-	D2_ASSERT(level->pFirstRoomEx);
-	int minX, minY, maxX, maxY;
-	DRLG_GetMinAndMaxCoordinatesFromLevel(level, &minX, &minY, &maxX, &maxY);
-	D2_ASSERT(level->nWidth >= maxX - minX);
-	D2_ASSERT(level->nHeight >= maxY - minY);
-	for (auto* room = level->pFirstRoomEx; room; room = room->pDrlgRoomNext)
-	{
-		room->nTileXPos += level->nPosX - minX;
-		room->nTileYPos += level->nPosY - minY;
-	}
-}
-
 // 1.13c D2Common+0x1B6E0
 void __fastcall d2c_1b6e0_create_vertices(void* pool, D2DrlgVertexStrc** vertices,
 	D2DrlgCoordStrc* coord, uint8_t direction, D2DrlgOrthStrc* roomData)

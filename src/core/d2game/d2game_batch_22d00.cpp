@@ -140,7 +140,7 @@ extern "C" void d2_fn_d2game_24030(void* game, void* target, void* source, int32
 // Retail passes unit in EBX and percentage in EDI (not in the decompiler signature).
 // getStat0A3A0 reads the unit's current value via the unit-in-EBX thunk; setStat0A472
 // is (unit, stat, value, layer). The three division forms differ in where /100 lands.
-// 1.13c D2Game+0x21EC0
+// 1.13c D2Game+0x21ec0
 extern "C" void d2_fn_d2game_21EC0(void* unit, int32_t pct, void* ctx,
         int32_t (*getStat0A3A0)(void*, void* unit),
         void (*setStat0A472)(void*, void* unit, int32_t stat, int32_t value, int32_t layer)) {
@@ -152,4 +152,30 @@ extern "C" void d2_fn_d2game_21EC0(void* unit, int32_t pct, void* ctx,
     const int32_t nv = static_cast<int32_t>(static_cast<uint32_t>(v) + static_cast<uint32_t>(delta));
     setStat0A472(ctx, unit, 7, nv, 0);
     setStat0A472(ctx, unit, 6, nv, 0);
+}
+
+struct D2GameSkill241B0Env {
+    void* context;
+    void* (*resolve)(void*, uint32_t);
+    const void* dataTables;
+    void (*addSkill10302)(void*, void* unit, int32_t skill, int32_t a, int32_t b);
+    void (*update10418)(void*, void* unit);
+    void (*free96FA0)(void*, uint32_t game, void* unit);
+    void (*rollStat)(void*); // ord 10630(4) feeding ord 10368
+};
+
+// 1.13c D2Game+0x241B0
+extern "C" void d2_fn_d2game_241B0(void* unit, int32_t arg, const D2GameSkill241B0Env* e) {
+    if (!unit || read<int32_t>(unit, 0) != 1 || !arg) return;
+    if (read<int32_t>(e->dataTables, 0xba0) > 0xb8) {
+        e->addSkill10302(e->context, unit, 0xb8, 1, 1);
+        e->update10418(e->context, unit);
+        if (read<int32_t>(unit, 0) == 0) e->free96FA0(e->context, read<uint32_t>(unit, 0x80), unit);
+    }
+    e->rollStat(e->context);
+    if (read<int32_t>(unit, 0) == 1 && read<uint32_t>(unit, 0x14)) {
+        void* m = e->resolve(e->context, read<uint32_t>(unit, 0x14));
+        void* ai = e->resolve(e->context, read<uint32_t>(m, 0x28));
+        write<uint8_t>(ai, 8, read<uint8_t>(ai, 8) | 0x20u);
+    }
 }

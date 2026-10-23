@@ -414,6 +414,7 @@ D2ActiveRoomStrc* __fastcall DRLGACTIVATE_GetARoomInSightButWithoutClient(D2Drlg
 }
 
 //D2Common.0x6FD73EF0 (#10015)
+// 1.13c D2Common+0x7B810
 void __fastcall DRLGACTIVATE_GetRoomsAllocationStats(int* pOutStatsClientAllocatedRooms, int* pOutStatsClientFreedRooms, int* pOutStatsAllocatedRooms, int* pOutStatsFreedRooms)
 {
 	*pOutStatsClientAllocatedRooms = gStatsClientAllocatedRooms;

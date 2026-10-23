@@ -371,6 +371,7 @@ const Unicode* __fastcall MONSTERS_GetHirelingDescString(int nId)
 	return NULL;
 }
 
+// 1.13c D2Common+0x2c9e0
 //D2Common.0x6FDA51C0 (#11086)
 int __fastcall MONSTERS_GetActFromHirelingTxt(BOOL bExpansion, int nClassId, uint16_t nNameId)
 {

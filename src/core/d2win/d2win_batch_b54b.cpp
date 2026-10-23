@@ -5,7 +5,7 @@
 #include <cstring>
 #include <emscripten.h>
 
-// 1.13c D2Win+0x17A00 : append node to the singly linked list headed at DAT_6f9014a4 (next at +0x3c).
+// 1.13c D2Win+0x17a00 : append node to the singly linked list headed at DAT_6f9014a4 (next at +0x3c).
 extern "C" EMSCRIPTEN_KEEPALIVE
 int32_t d2win_sub_17a00(uint8_t** head, uint8_t* node) {
     *(uint8_t**)(node + 0x3c) = nullptr;
@@ -27,7 +27,7 @@ struct D2WinB54bEnv {
     int32_t (*sub_7b30)();                         // 0x7B30
 };
 
-// 1.13c D2Win+0x7DC0
+// 1.13c D2Win+0x07dc0
 extern "C" EMSCRIPTEN_KEEPALIVE
 char* d2win_sub_7dc0(char* buf, const char* name, const D2WinB54bEnv* e) {
     e->ord501();

@@ -348,7 +348,7 @@ struct D2ClientGridEnv {
 };
 
 // 1.13c D2Client+0x13390
-// Records are filled only at param_4 == 0 or on the 20 border cells; the offset-shifted x comes from the
+// Records are filled only at param_4 == 0 or on the four corner cells; the offset-shifted x comes from the
 // 0x10023 transform, the y straight through. Bytes 0..3 of every filled record are 0xFF.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_13390(uint8_t* out, int32_t mode, int32_t a, int32_t b,
                                                      uint32_t p3, int32_t cornersOnly, uint32_t w,

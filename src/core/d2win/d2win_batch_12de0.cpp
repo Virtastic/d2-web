@@ -152,13 +152,13 @@ static int32_t line_advance(const D2WinBatch12DE0Env* env) {
 // (kept only below 13, signed) becomes the palette shift and draws nothing; a 0xFF not followed by
 // L'c' is drawn as an ordinary glyph, and the loop then steps back to it. L'\n' advances y by the
 // retail line advance and, when centered, re-centers using the width of the line that follows it
-// against the same x that the first-line centering produced.
+// against the caller's raw x.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2win_sub_12940(int32_t x, const uint16_t* text, int32_t y, int32_t centerWidth,
                      int32_t paletteShift, int32_t centered, const D2WinBatch12DE0Env* env) {
     int32_t n = u16_len(text);
-    int32_t origX = x;
-    if (centered) origX = x + ((centerWidth - d2win_sub_11f00(text, env)) >> 1);
+    const int32_t origX = x;   // retail re-centers from the caller's raw x (in_EAX), not the centered x
+    if (centered) x = origX + ((centerWidth - d2win_sub_11f00(text, env)) >> 1);
 
     uint8_t block[0x48];
     std::memset(block, 0, sizeof block);
@@ -201,7 +201,7 @@ void d2win_sub_12940(int32_t x, const uint16_t* text, int32_t y, int32_t centerW
     }
 }
 
-// 1.13c D2Win+0x12DE0 -- a filled, horizontally centered one-shot line (the edit-box/tooltip
+// 1.13c D2Win+0x12DE0 (d2win_batch_12de0.cpp:d2win_sub_12de0) -- a filled, horizontally centered one-shot line (the edit-box/tooltip
 // caption path). Width is the widest line. x is pulled left so the text fits the screen; y is
 // y0+2, clamped to screenH-31, then doubled if the text would start above the top (retail's own
 // rule). The fill spans fontHeight above y; the text itself is drawn at y-2, centered on the

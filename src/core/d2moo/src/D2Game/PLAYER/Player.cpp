@@ -141,6 +141,7 @@ void __fastcall PLAYER_Destroy(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 }
 
 //D2Game.0x6FC7B750
+// 1.13c D2Game+0x38860 (checked against decompile, no delta)
 void __fastcall PLAYER_RemoveAllPlayers(D2GameStrc* pGame)
 {
     for (int32_t i = 0; i < 128; ++i)
@@ -811,6 +812,7 @@ void __fastcall PLAYER_ApplyDeathPenalty(D2GameStrc* pGame, D2UnitStrc* pDefende
 }
 
 //D2Game.0x6FC7C750
+// 1.13c D2Game+0x37AC0 (checked against decompile, no delta)
 int32_t __fastcall D2GAME_IteratePlayers_6FC7C750(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (!pGame || !pUnit || pUnit->dwUnitType != UNIT_PLAYER)

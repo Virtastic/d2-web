@@ -12,7 +12,7 @@
 // D2Client+0x028A0: initialise the 3-word intrusive-list field an element carries.
 extern "C" void d2_client_28a0(int32_t* field);
 
-// 1.13c D2Client+0x029F0
+// 1.13c D2Client+0x029F0 (d2client_29f0.cpp:d2_client_29f0)
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_29f0(int32_t* elem) {
     if (elem != nullptr) d2_client_28a0(elem);

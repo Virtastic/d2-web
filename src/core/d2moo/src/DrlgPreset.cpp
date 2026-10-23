@@ -1133,7 +1133,7 @@ void __fastcall DRLGPRESET_InitPresetRoomGrids(D2DrlgRoomStrc* pDrlgRoom)
 	}
 }
 
-//D2Common.0x6FD870F0
+// 1.13c D2Common+0x3B0D0 (1.10f: 0x6FD870F0)
 void __fastcall DRLGPRESET_GetTombStoneTileCoords(D2DrlgRoomStrc* pDrlgRoom, D2CoordStrc** ppTombStoneTiles, int* pnTombStoneTiles)
 {
 	if (pDrlgRoom->nType == DRLGTYPE_PRESET)
@@ -1675,6 +1675,7 @@ int __fastcall DRLGPRESET_GetLevelPrestIdFromRoomEx(D2DrlgRoomStrc* pDrlgRoom)
 }
 
 //D2Common.0x6FD881B0 (#10009)
+// 1.13c D2Common+0x09c00
 char* __fastcall DRLGPRESET_GetPickedLevelPrestFilePathFromRoomEx(D2DrlgRoomStrc* pDrlgRoom)
 {
 	return pDrlgRoom->pMaze->pMap->pLvlPrestTxtRecord->szFile[pDrlgRoom->pMaze->pMap->nPickedFile];

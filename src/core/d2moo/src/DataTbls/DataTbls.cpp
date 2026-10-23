@@ -400,7 +400,7 @@ void __fastcall DATATBLS_LoadStatesTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD4F4A0
-void __fastcall DATATBLS_UnloadStatesTxt()
+void __fastcall DATATBLS_UnloadStatesTxt() // 1.13c D2Common+0x5D8B0
 {
 	if (sgptDataTables->pStateMasks)
 	{
@@ -586,6 +586,7 @@ char* __stdcall DATATBLS_GetUnitNameFromUnitTypeAndClassId(int nUnitType, int nC
 }
 
 //D2Common.0x6FD4FCF0 (#10580)
+// 1.13c D2Common+0x5d770
 void __stdcall DATATBLS_WriteBinFile(char* szFileName, void* pWriteBuffer, size_t nBufferSize, int nRecordCount)
 {
 	FILE* pFile = NULL;
@@ -690,6 +691,7 @@ void* __stdcall DATATBLS_CompileTxt(HD2ARCHIVE hArchive, const char* szName, D2B
 }
 
 //D2Common.0x6FD500F0 (#11242)
+// 1.13c D2Common+0x5D750
 void __stdcall DATATBLS_ToggleCompileTxtFlag(BOOL bSilent)
 {
 	sgptDataTables->bCompileTxt = !bSilent;

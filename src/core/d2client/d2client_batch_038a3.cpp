@@ -43,6 +43,7 @@ static bool d2c_is_space(uint32_t c) {
 static char* g_d2c_token;
 
 typedef int32_t (*D2cFcloseLk)(void* file);
+// 1.13c D2Client+0x38a3
 // 1.13c D2Client+0x038A3 (70 B, caller 0xAC530, callee 0x3857 __fclose_lk): _fclose. When the FILE's
 // _flag has bit 0x40 clear, take the file lock, run __fclose_lk, release the lock and return its
 // result; when bit 0x40 is set, clear _flag and return -1 without touching the lock. The port has no
@@ -59,7 +60,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_38a3(void* file, D2cFcloseLk fclose_lk) {
 }
 
 typedef int32_t (*D2cScanfEngine)(void* file, const char* fmt, void* args);
-// 1.13c D2Client+0x038F4 (52 B, caller 0x89830, callee 0x61BC): _sscanf builds a read-only FILE view of
+// 1.13c D2Client+0x38f4 (52 B, caller 0x89830, callee 0x61BC): _sscanf builds a read-only FILE view of
 // the source string -- _flag = 0x49, _base = _ptr = _Src, _cnt = strlen(_Src) -- and runs the shared
 // scanf engine over it with the caller's argument slot. The engine (0x61BC, 3562 B) is still UNMAPPED,
 // so it is the seam; the return is its field count.
@@ -74,7 +75,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_38f4(const char* src, const char* fmt, vo
     return engine(&view, fmt, args);
 }
 
-// 1.13c D2Client+0x0393C (136 B, caller 0xB7F6): _atol. Skip every leading byte the C-locale table
+// 1.13c D2Client+0x393c / 0x0393C (136 B, caller 0xB7F6): _atol. Skip every leading byte the C-locale table
 // marks as space (bit 8); then read one optional '-' or '+'; then accumulate digits with
 // value = digit + value * 10 until a non-digit; a '-' makes the result negative. Ghidra's integer
 // division/overflow wrapping is plain 32-bit arithmetic.
@@ -98,7 +99,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_393c(const char* s) {
     return value;
 }
 
-// 1.13c D2Client+0x039C9 (105 B, callers 0x10A60, 0x707F0, 0x70500): __stricmp. The CRT compares with
+// 1.13c D2Client+0x39c9 (= 0x039C9; 105 B, callers 0x10A60, 0x707F0, 0x70500): __stricmp. The CRT compares with
 // the caller's thread locale; with lc_category[0].wlocale NULL it calls ___ascii_stricmp (0x76F0). The
 // port's locale block is zeroed (the bn_updatetlocinfo convention), so that path is the only one.
 extern "C"
@@ -106,7 +107,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_39c9(const char* a, const char* b) {
     return d2c_stricmp((const uint8_t*)a, (const uint8_t*)b);
 }
 
-// 1.13c D2Client+0x03A32 (127 B, caller 0x707F0): __strnicmp. A zero count returns 0 before the locale
+// 1.13c D2Client+0x3a32 (0x03A32, 127 B, caller 0x707F0): __strnicmp. A zero count returns 0 before the locale
 // is considered; otherwise the same locale branch as __stricmp, ASCII path ___ascii_strnicmp (0x7740).
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_client_3a32(const char* a, const char* b, size_t count) {
@@ -114,6 +115,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_3a32(const char* a, const char* b, size_t
     return d2c_strnicmp((const uint8_t*)a, (const uint8_t*)b, (uint32_t)count);
 }
 
+// 1.13c D2Client+0x3be4
 // 1.13c D2Client+0x03BE4 (191 B, callers 0x70700, 0x70500): unnamed CRT helper -- _strtok. Build the
 // 32-byte (256-bit) delimiter set, NUL included. A null input resumes from the thread's _token. Skip
 // leading delimiters (a NUL is not skipped); then scan to the next delimiter: on NUL store the pointer

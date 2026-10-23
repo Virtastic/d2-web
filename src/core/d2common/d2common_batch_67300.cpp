@@ -5,7 +5,7 @@
 extern "C" {
 __attribute__((weak)) void d2_sub_66A00(uint32_t a, uint32_t b, int32_t* out2);  // out[0]=local_8, out[1]=local_4
 __attribute__((weak)) void* d2_sub_3E110(int32_t* p);
-__attribute__((weak)) uint32_t d2_sub_66FB0(void* self, uint32_t a, uint32_t* p);
+__attribute__((weak)) uint32_t d2_sub_66FB0(const uint8_t* eax, void* self, uint32_t a, uint32_t* p);
 __attribute__((weak)) uint32_t d2_ord_10265(uint32_t);
 __attribute__((weak)) void d2_ord_10024(const void* fmt, uint32_t v);
 
@@ -23,6 +23,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_67300(const uint8_t* p1, uint32_t p
   }
  }
  void* self = d2_sub_3E110(&l[1]);
- return d2_sub_66FB0(self, p2, &p3);
+ return d2_sub_66FB0(p1, self, p2, &p3);
 }
 }

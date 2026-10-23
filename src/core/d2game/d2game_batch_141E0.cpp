@@ -130,7 +130,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_14B50(void* item, void* ebx, void* edi
 // prefix unit (0x344D0/0x348A0 with the record's +0x68 or +0x74 dword array and the picked flag),
 // probing 11028/10257 + 10248 until the created unit matches, and descends the array index on three
 // misses. The tail record pointer is the stack argument (the dispatcher's EDI).
-// 1.13c D2Game+0x14BF0
+// 1.13c D2Game+0x14bf0
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_14BF0(void* item, void* record,
                                                             const D2GameBatch141E0Env* env)
@@ -299,12 +299,13 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_23060(void* self, uint32_t mode, void* re
     if (at >= 9) return;
 
     const int32_t count = (int32_t)rd32(env->dataTables, 0xC54);
+    uint8_t* w = dst + at;  // write cursor advances only on a write; 'at' counts every source byte
     while (*src != 0) {
         const uint32_t id = *src;
         if (count <= (int32_t)id) return;
         const uint32_t row = rd32(env->dataTables, 0xC50) + id * 0x20;
         if (row == 0) return;
-        if (rd8(row, 7) != 0) dst[at++] = (uint8_t)id;
+        if (rd8(row, 7) != 0) *w++ = (uint8_t)id;
         ++src;
         if (++at > 8) return;
     }
@@ -397,7 +398,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_97920(uint32_t self, void* game, void* li
 // feed 0xEDDB0(monsterId, arg2, summoner, game, arg3, arg4). Each spawned unit that comes back type 1
 // records the summoner's GUID (+0xC) and the game in its +0x14 record's +0x2C/+0x30/+0x28, then
 // 0x20CF0 pushes it onto the summoner's minion list. Answer 1 when at least one spawn succeeded.
-// 1.13c D2Game+0xEDE90
+// 1.13c D2Game+0xede90
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_EDE90(void* unit, int32_t count, void* game,
                                                             uint32_t arg1, uint32_t arg2,

@@ -18,7 +18,7 @@ static uintptr_t s_pStatsAllocArrays[2];
 
 // 1.13c D2Common+0x18E90
 extern "C"
-EMSCRIPTEN_KEEPALIVE uintptr_t d2_fn_d2common_18e90(uint32_t nIndex, int32_t nArray)
+EMSCRIPTEN_KEEPALIVE uintptr_t D2AllocNewStats(uint32_t nIndex, int32_t nArray)
 {
     if (s_nStatsAllocCount <= nIndex)
     {
@@ -39,14 +39,14 @@ EMSCRIPTEN_KEEPALIVE uintptr_t d2_fn_d2common_18e90(uint32_t nIndex, int32_t nAr
 
 // 1.13c D2Common+0x1E630
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_1e630(uintptr_t pHeader, uintptr_t pStat)
+EMSCRIPTEN_KEEPALIVE uint32_t D2UpdateDisabledStat(uintptr_t pHeader, uintptr_t pStat)
 {
     if (pHeader != 0 && *(const uint32_t*)pHeader == 0x01020304u &&
         pStat != 0 && *(const uint32_t*)pStat == 4u)
     {
-        // 0x1050 reads the unit X coordinate. Its FN export is a register-array
-        // probe, so call the typed native owner with the engine unit layout.
-        uint32_t nValue = (uint32_t)UNITS_GetXPosition(reinterpret_cast<D2UnitStrc*>(pStat));
+        // 0x1050 (type 4 branch): dword at [unit+0x2c]+0xc
+        const uint32_t* u = (const uint32_t*)pStat;
+        uint32_t nValue = *(const uint32_t*)((uintptr_t)u[0xb] + 0xc);
         // retail keeps the value only when it is <= 10
         return nValue & (uint32_t)((10 < (int32_t)nValue) - 1);
     }
@@ -55,7 +55,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_1e630(uintptr_t pHeader, uintptr_t 
 
 // 1.13c D2Common+0x3C020
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3c020(uintptr_t pUnit)
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_3C020_TakeUnitDataValue(uintptr_t pUnit)
 {
     if (pUnit == 0)
     {
@@ -92,7 +92,7 @@ EMSCRIPTEN_KEEPALIVE uint16_t d2_fn_d2common_34720(uintptr_t pPath)
 
 // 1.13c D2Common+0x22C80
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_22c80(uintptr_t pItem)
+EMSCRIPTEN_KEEPALIVE uint8_t D2Common_22C80_GetItemTxtByte11D(uintptr_t pItem)
 {
     if (pItem != 0 && *(const uint32_t*)pItem == 4u)
     {
@@ -108,7 +108,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_22c80(uintptr_t pItem)
 
 // 1.13c D2Common+0x2F720
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2f720(uintptr_t pPlayer, uintptr_t pOutValue, uintptr_t pOutFlags)
+EMSCRIPTEN_KEEPALIVE void D2Common10472(uintptr_t pPlayer, uintptr_t pOutValue, uintptr_t pOutFlags)
 {
     if (pPlayer != 0 && *(const uint32_t*)pPlayer == 0u)
     {

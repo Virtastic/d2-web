@@ -164,7 +164,7 @@ static uint32_t g_d2cmp_useExcl_6fe88324;       // 0x6FE88324: nonzero = honour 
 // sum of the three per-channel entries of the centred 511-entry table (index 255 + difference), kept
 // in unsigned arithmetic and compared strictly less than. Returns the lowest byte of the best index,
 // or 0 when the range is empty.
-// 1.13c D2CMP+0x9A10
+// 1.13c D2CMP+0x09A10
 extern "C"
 uint32_t d2cmp_9a10(uint8_t r, uint8_t g, uint8_t b) {
     uint32_t bestDistance = 0x7FFFFFFFu;

@@ -79,15 +79,15 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2client_30a0(uintptr_t* self) {
     while (static_cast<intptr_t>(self[2]) > 0)
         d2_fn_d2client_2ff0(reinterpret_cast<uintptr_t*>(self[0] + self[2]));
 }
-// 1.13c D2Client+0x2EC0: drain then detach the embedded sentinel pair.
+// 1.13c D2Client+0x02EC0 (wraps 0x2580): drain then detach the embedded sentinel pair.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2client_2ec0(void* self) {
     auto* list = static_cast<uintptr_t*>(self);
     d2_fn_d2client_30a0(list);
     d2_fn_d2client_2ff0(list + 1);
 }
-// 1.13c D2Client+0x2F70: scalar allocation/debug arguments remain 32-bit; the two links
+// 1.13c D2Client+0x02F70: scalar allocation/debug arguments remain 32-bit; the two links
 // and callback slot are native pointer words. The trailing size is retail's extra byte count.
-extern "C" EMSCRIPTEN_KEEPALIVE void* d2_fn_d2client_2f70(
+extern "C" EMSCRIPTEN_KEEPALIVE void* d2_client_2f70(
     uintptr_t list, int32_t size, uint32_t line, uint32_t mode, D2ClientListAlloc alloc) {
     const uint32_t bytes = static_cast<uint32_t>(size) + 3u * sizeof(uintptr_t);
     auto* node = static_cast<uintptr_t*>(alloc(bytes, "__AUTMESSAGESOURCE__", 0xFFFFFFFEu, line | 8u));

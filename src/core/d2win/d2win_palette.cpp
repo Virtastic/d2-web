@@ -48,7 +48,7 @@ uint32_t nearest_index(const uint8_t* pal, uint32_t n, uint32_t a0, uint32_t a1,
     return (n & 0xFFFFFF00u) | (idx & 0xFFu);
 }
 
-// 1.13c D2Win+0xEF20 (sub_EF20, its own row, still UNMAPPED): this whole bank load. Retail also
+// 1.13c D2Win+0x0ef20 (sub_EF20): this whole bank load. Retail also
 // opens pal.dat and reads it into a 0xCF*4 buffer, both unused, and prints a message (Fog #10265)
 // then _exit(-1) when a file is missing -- not modelled, a miss is a 0 return.
 int palette_banks_load(const char* pl2) {

@@ -16,7 +16,7 @@ D2McpOnexitLkEnv g_mcp_onexit{onexit_size, onexit_realloc, nullptr, nullptr};
 extern "C"
 EMSCRIPTEN_KEEPALIVE void* d2_mcp_onexit_lk(void* func, D2McpOnexitLkEnv* env) {
     const uint32_t size = env->msize(env->onexit_begin);
-    const auto used = env->onexit_begin ? env->onexit_end - env->onexit_begin : 0;
+    const auto used = env->onexit_begin ? ((char*)env->onexit_end - (char*)env->onexit_begin) / env->slot : 0;
     if (size < static_cast<uint32_t>(used * 4 + 4)) {
         const uint32_t grow = size < 0x800 ? size : 0x800;
         void** block = env->realloc(env->onexit_begin, grow + size);
@@ -24,9 +24,11 @@ EMSCRIPTEN_KEEPALIVE void* d2_mcp_onexit_lk(void* func, D2McpOnexitLkEnv* env) {
             block = env->realloc(env->onexit_begin, size + 0x10);
             if (block == nullptr) return nullptr;
         }
-        env->onexit_end = block + used;
+        env->onexit_end = (void**)((char*)block + used * env->slot);
         env->onexit_begin = block;
     }
-    *env->onexit_end++ = func;
+    if (env->slot == 4) *(uint32_t*)env->onexit_end = (uint32_t)(uintptr_t)func;
+    else *env->onexit_end = func;
+    env->onexit_end = (void**)((char*)env->onexit_end + env->slot);
     return func;
 }

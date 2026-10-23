@@ -11,7 +11,7 @@ struct CeCache {
     std::mutex* lock;                  // +30
 };
 
-// 1.13c D2CMP+0xCE40
+// 1.13c D2CMP+0xce40
 // lookup = sub_BF40(key, cache); release = Ordinal_10046 / Ordinal_10043 (free).
 void d2cmp_ce40(CeCache& c, CeNode* (*lookup)(uint32_t, CeCache&), void (*release)(void*)) {
     while (c.count) {

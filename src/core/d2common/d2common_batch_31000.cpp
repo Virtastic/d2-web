@@ -17,7 +17,7 @@ static inline void Pos(const int32_t* u, int32_t& x, int32_t& y) {
 }
 
 // 1.13c D2Common+0x31000: is unit u2 (must be type 2) within one/two cells of unit u1's footprint.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_31000(const int32_t* u1, const int32_t* u2) {
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_31000_UnitInReach(const int32_t* u1, const int32_t* u2) {
  if (!u2 || u2[0] != 2) return 0;
  if (d2_sub_7FCD0(u1, u2) == 0) return 1;
  int32_t ax, ay, bx, by;

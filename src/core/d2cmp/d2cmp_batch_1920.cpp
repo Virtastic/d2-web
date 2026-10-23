@@ -23,7 +23,7 @@ void d2cmp_1920(const D2CmpEnv1920* e, uint32_t* self) {
     self[2] = 0;
 }
 
-// 1.13c D2CMP+0x3D9D
+// 1.13c D2CMP+0x3d9d
 void d2cmp_3d9d(const D2CmpEnv1920* e) { e->f2DD8(4); }
 // 1.13c D2CMP+0x41B9
 void d2cmp_41b9(const D2CmpEnv1920* e) { e->f2DD8(4); }
@@ -40,7 +40,7 @@ char* d2cmp_6d90(char* dst, const char* src) {
     return dst;
 }
 
-// 1.13c D2CMP+0x6DA0  strcat
+// 1.13c D2CMP+0x6da0  strcat
 char* d2cmp_6da0(char* dst, const char* src) {
     char* d = dst;
     while (*d) d++;
@@ -48,7 +48,7 @@ char* d2cmp_6da0(char* dst, const char* src) {
     return dst;
 }
 
-// 1.13c D2CMP+0x6F90  strncpy (zero-pads to count)
+// 1.13c D2CMP+0x6f90  strncpy (zero-pads to count)
 char* d2cmp_6f90(char* dst, const char* src, uint32_t n) {
     uint32_t i = 0;
     for (; i < n && src[i]; i++) dst[i] = src[i];

@@ -1,4 +1,5 @@
 // src/core/d2client/crt_free_lc_time_acf5.cpp -- 1.13c D2Client+0x0ACF5 = MSVC 2003 Release CRT
+// 1.13c D2Client+0xacf5
 // ___free_lc_time (build-wasm/ghidra-d2client/decomp/0xACF5.c). It frees the 43 pointer slots (indices
 // 0x00-0x2A, byte offsets 0x00-0xA8) of the __lconv-style time block in retail's slot order and does
 // nothing for a NULL block. The callee is the recovered _free, D2Client+0x04891, which ignores NULL.

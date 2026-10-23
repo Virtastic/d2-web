@@ -7,7 +7,7 @@
 #include <cstdio>
 #include <emscripten.h>
 
-// 1.13c D2Win+0x101F (_sprintf): format into the caller's buffer through the CRT formatter, NUL-terminate,
+// 1.13c D2Win+0x0101f (_sprintf): format into the caller's buffer through the CRT formatter, NUL-terminate,
 // return the character count (excluding the NUL). A null buffer still formats and counts (the string
 // stream has 0x7fffffff room; the terminator is skipped when _Dest is null).
 extern "C"
@@ -18,7 +18,7 @@ EMSCRIPTEN_KEEPALIVE int d2win_sub_101F(char* dest, const char* fmt, ...) {
     return n;
 }
 
-// 1.13c D2Win+0x1570 (_strncpy): copy up to count bytes of src, then zero-fill the rest of count;
+// 1.13c D2Win+0x01570 (_strncpy): copy up to count bytes of src, then zero-fill the rest of count;
 // no terminator when src is count or longer. Returns dest. count==0 touches nothing.
 extern "C"
 EMSCRIPTEN_KEEPALIVE char* d2win_sub_1570(char* dest, const char* src, uint32_t count) {

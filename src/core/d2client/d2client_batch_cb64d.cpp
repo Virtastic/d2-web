@@ -69,6 +69,7 @@ void DestructExceptionObject(const Env& e, P exc) {
  P fn = e.rd32(e.rd32(exc + 0x1c) + 4);
  if (fn) e.callMemberFn1(e.rd32(exc + 0x18), fn);
 }
+// 1.13c D2CMP+0x19197
 // 1.13c D2Client+0xCB941  (SEH finally part of CallCatchBlock; locals passed in)
 void CallCatchBlock_finally(const Env& e, P edi, P exc, uint32_t savedFrame, P frameInfo,
                             P oldUnexpected, P oldTranslator, int32_t flag48, int32_t flag20) {

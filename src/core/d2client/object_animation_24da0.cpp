@@ -26,7 +26,7 @@ extern "C" uint8_t d2_client_24fa0(void*p,Services*h){return timed(p,*h,false);}
 // 1.13c D2Client+0x251E0
 extern "C" void d2_client_251e0(void*p,Services*h){if(u(p,0x10)==3)put(p,0x10,0);else{if(u(p,0x10)!=1)fatal(*h,0x11f);h->activate(p);put(p,0x10,2);}put(p,0x44,b(record(p,*h),0x129+u(p,0x10)));refresh(p,*h);h->update(p);collision(p,record(p,*h));}
 // 1.13c D2Client+0x25280
-extern "C" uint32_t d2_client_25280(void*p,uint32_t suppress,Services*h){void*r=record(p,*h);if(!b(r,0x139))return 0;int32_t n=h->periodOfDay(h->resolve(h->act),nullptr);if(n){if(n<1||n>3)fatal(*h,0x66);if(u(p,0x10)==0){put(p,0x10,1);if(!suppress)refresh(p,*h);h->update(p);h->flags(p,2,b(r,0xc4+u(p,0x10)));}anim(p,r,*h);return 1;}if(u(p,0x10)==1||u(p,0x10)==2){put(p,0x10,0);if(!suppress)refresh(p,*h);h->update(p);anim(p,r,*h);collision(p,r);return 1;}return 0;}
+extern "C" __attribute__((weak)) uint32_t d2_client_25280(void*p,uint32_t suppress,Services*h){void*r=record(p,*h);if(!b(r,0x139))return 0;int32_t n=h->periodOfDay(h->resolve(h->act),nullptr);if(n){if(n<1||n>3)fatal(*h,0x66);if(u(p,0x10)==0){put(p,0x10,1);if(!suppress)refresh(p,*h);h->update(p);h->flags(p,2,b(r,0xc4+u(p,0x10)));}anim(p,r,*h);return 1;}if(u(p,0x10)==1||u(p,0x10)==2){put(p,0x10,0);if(!suppress)refresh(p,*h);h->update(p);anim(p,r,*h);collision(p,r);return 1;}return 0;}
 // 1.13c D2Client+0x25400
 extern "C" void d2_client_25400(void*p,Services*h){int32_t mode=s(p,0x10),frame=s(p,0x44),speed=get<int16_t>(p,0x4c);if(mode==1){int32_t end=sub(s(record(p,*h),0xdc),256);if(frame!=end){frame=add(frame,speed);put(p,0x44,frame>end?end:frame);return;}}else{if(mode!=3)fatal(*h,0x155);if(frame>0){put(p,0x44,frame<speed?0:sub(frame,speed));return;}}d2_client_251e0(p,h);}
 // 1.13c D2Client+0x25660

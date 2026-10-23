@@ -13,7 +13,7 @@ uint32_t (*env_3c6d0_GetRecord)(void) = nullptr;
 }
 
 extern "C" {
-// 1.13c D2Common+0x3C6D0: look up a room tile at (x/5, y/5); result discarded.
+// 1.13c D2Common+0x3c6d0: look up a room tile at (x/5, y/5); result discarded.
 EMSCRIPTEN_KEEPALIVE void D2Common_DoNothing916(uint32_t, int32_t nX, int32_t nY)
 {
 	const uint32_t pRec = env_3c6d0_GetRecord ? env_3c6d0_GetRecord() : 0;

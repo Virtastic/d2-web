@@ -212,3 +212,40 @@ void D2Common_84890_ScatterObjects(char** ctx, char* param2)
         }
     }
 }
+
+// 1.13c D2Common+0x3DB20: sweep the (w+1)x(h+1) grid column by column, bottom row up, with a 3x3 window kept
+// in locals (initial window from 3D810, then slid one row per step). Window bits (nb[4] centre first, MSB order
+// out[8],out[7],out[6],out[5],out[4]...) index a 256-entry flag table; a hit calls the callback at 0x6FDEB250.
+extern "C" {
+extern const uint8_t D2Common_DC4A0[256];   // 0x6FDDC4A0
+}
+struct B3DB20Ctx { char _0[0x20]; const B81Grid* grid; char _24[0x18]; int32_t w; int32_t h; };   // +0x20, +0x3c, +0x40
+void D2Common_3DB20_Sweep(const B3DB20Ctx* ctx)
+{
+    const B81Grid* g = ctx->grid;
+    for (int col = 1; col <= ctx->w + 1; ++col) {
+        int32_t n[9];   // n[k] = retail local_24 + 4*k : [0]=local_24 ... [8]=local_4
+        int row = ctx->h + 1;
+        D2Common_3D810_Read3x3(g, row, col, n);
+        for (; row > 0; --row) {
+            if (n[4] != 0) {
+                int m = (n[8] != 0);
+                m = m * 2 + (n[7] != 0);
+                m = m * 2 + (n[6] != 0);
+                m = m * 2 + (n[5] != 0);
+                m = m * 2 + (n[3] != 0);
+                m = m * 2 + (n[2] != 0);
+                m = m * 2 + (n[1] != 0);
+                m = m * 2 + (n[0] != 0);
+                if (m != 0 && D2Common_DC4A0[m]) D2Common_EB244[3]();
+            }
+            if (row > 1) {
+                const int32_t* d = g->data + g->rowOff[row - 2] + col;
+                int32_t c5 = d[0], c8 = d[1], c2 = d[-1];
+                n[0] = n[1]; n[1] = n[2]; n[2] = c2;
+                n[3] = n[4]; n[4] = n[5]; n[5] = c5;
+                n[6] = n[7]; n[7] = n[8]; n[8] = c8;
+            }
+        }
+    }
+}

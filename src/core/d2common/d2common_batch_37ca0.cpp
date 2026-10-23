@@ -63,14 +63,14 @@ extern "C"
 	int32_t g_d2common_dat_6fdf1424 = 0;
 }
 
-extern "C" int32_t d2_fn_d2common_26080(int32_t* pUnit);
+extern "C" int32_t D2Common_26080_ItemOpStatTotal(int32_t* pUnit);
 
 // 1.13c D2Common+0x37CA0 (#10337): reset one act record of a unit's path/game block.
 // unit+4 is the record. Fields +0x00 and +0x08 are cleared, +0x04 and +0x28 take retail globals,
 // +0x2C and +0x30 become 1, then the four 0x2D2C0/0x376F0/0x37170/0x371C0 helpers run with 0.
 // Null unit is fatal 0x547; we return.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_37ca0(uint32_t pUnit)
+EMSCRIPTEN_KEEPALIVE void D2Common_37CA0_ResetActRecord(uint32_t pUnit)
 {
 	uint8_t* unit = P(pUnit);
 	if (!unit)
@@ -100,7 +100,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_37ca0(uint32_t pUnit)
 // 1.13c D2Common+0x317C0 (#10338): true when the record's first dword is 1 and the this-side
 // query 0x1470(this, 0x0C) answers non-zero. The this argument is otherwise unused.
 extern "C"
-EMSCRIPTEN_KEEPALIVE bool d2_fn_d2common_317c0(void* pThis, int32_t* pRecord)
+EMSCRIPTEN_KEEPALIVE bool d2common_impl_317c0(void* pThis, int32_t* pRecord)
 {
 	if (pRecord && *pRecord == 1 && g_d2common_fn_51470)
 		return g_d2common_fn_51470(pThis, 0x0C) != 0;
@@ -114,19 +114,18 @@ EMSCRIPTEN_KEEPALIVE bool d2_fn_d2common_317c0(void* pThis, int32_t* pRecord)
 // when list+0x10 is negative and list+0x08 is zero, 0x38550. The callees are expected to change
 // the count; the pass repeats while the count stays positive. Null list is ignored.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3a650(uint32_t pList)
+EMSCRIPTEN_KEEPALIVE void D2Common_3A650_DropListEntries(uint32_t pList)
 {
 	uint8_t* list = P(pList);
 	if (!list)
 		return;
 
-	uint8_t* entries = P(W(list, 0x24));
-	if (!entries)
-		return;
-
 	int16_t nCount = RdI16(list, 0x28);
 	while (nCount > 0)
 	{
+		uint8_t* entries = P(W(list, 0x24)); // reloaded each pass: 0x381A0 may realloc the array
+		if (!entries)
+			return;
 		int32_t hi = nCount;
 		int32_t lo = 0;
 		if (hi <= 0)
@@ -170,7 +169,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3a650(uint32_t pList)
 // 1.13c D2Common+0x3BC10 (#10346): toggle bit 22 of the dword at *(unit+0x10)+0x28.
 // A non-zero second argument clears the bit, zero sets it.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3bc10(uint32_t pUnit, int32_t nClear)
+EMSCRIPTEN_KEEPALIVE void D2Common_sub_3BC10(uint32_t pUnit, int32_t nClear)
 {
 	uint8_t* unit = P(pUnit);
 	if (!unit)
@@ -193,7 +192,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3bc10(uint32_t pUnit, int32_t nClear)
 // quest-flag array for the first entry equal to 1 and writes 1<<index to set+0x2C; set+0x4C is 0.
 // A null set is fatal 0xF4F; we return.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30970(uint32_t pSet)
+EMSCRIPTEN_KEEPALIVE void D2Common_30970_QuestSetInit(uint32_t pSet)
 {
 	uint8_t* setPtr = P(pSet);
 	if (!setPtr)
@@ -247,7 +246,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30970(uint32_t pSet)
 // drives 0x2D2C0/0x376F0 and, with nFlag, 0x37170/0x371C0; nFlag lands at +0x30. When that value
 // is 0x78 the bytes at +0x18..+0x1A become F5 F0 FF. Null unit is fatal 0x547; we return.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_37920(uint32_t pUnit, uint32_t pOwner, int32_t nAct,
+EMSCRIPTEN_KEEPALIVE void D2Common_SetUnitActRecord_37920(uint32_t pUnit, uint32_t pOwner, int32_t nAct,
                                                int32_t nValue, int32_t nFlag)
 {
 	uint8_t* unit = P(pUnit);
@@ -284,7 +283,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_37920(uint32_t pUnit, uint32_t pOwner, 
 	const uint32_t nResult = g_d2common_fn_2D2C0 ? g_d2common_fn_2D2C0(nChain) : 0;
 	if (g_d2common_fn_376F0)
 		g_d2common_fn_376F0(nChain);
-	W(rec, 0x2C) = static_cast<uint32_t>(nFlag);
+	W(rec, 0x30) = static_cast<uint32_t>(nFlag);
 	if (nFlag != 0)
 	{
 		if (g_d2common_fn_37170)
@@ -308,8 +307,9 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_37920(uint32_t pUnit, uint32_t pOwner, 
 // set and a 0x23290 code other than 'leg ' ('gel ' little-endian word 0x2067656C) is rejected.
 // The remaining test chains 0x241A0, 0x24610 and 0x26080; the answer is whether 0x26080 returns
 // zero. The decompile's leftover EDX is modelled as 0.
+extern "C" uint32_t d2_fn_d2common_241a0(uint32_t);
 extern "C"
-EMSCRIPTEN_KEEPALIVE bool d2_fn_d2common_26ad0(int32_t* pUnit)
+EMSCRIPTEN_KEEPALIVE bool D2Common_26AD0_ItemAcceptable(int32_t* pUnit)
 {
 	if (!pUnit)
 		return false;
@@ -329,10 +329,10 @@ EMSCRIPTEN_KEEPALIVE bool d2_fn_d2common_26ad0(int32_t* pUnit)
 
 		const bool bNoOwnerFlag = pUnit[0] != 4 || !pFlags || (nFlags & 0x100u) == 0;
 		const bool bNoChainFlag = true;   // decompile's leftover EDX != 4; EDX is modelled as 0
-		if (bNoOwnerFlag && g_d2common_fn_241A0 && g_d2common_fn_241A0() == 0 && bNoChainFlag &&
+		if (bNoOwnerFlag && d2_fn_d2common_241a0(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pUnit))) == 0 && bNoChainFlag &&
 		    g_d2common_fn_24610 && static_cast<uint8_t>(g_d2common_fn_24610(pUnit)) != 0)
 		{
-			return d2_fn_d2common_26080(pUnit) == 0;
+			return D2Common_26080_ItemOpStatTotal(pUnit) == 0;
 		}
 	}
 	return false;
@@ -343,7 +343,7 @@ EMSCRIPTEN_KEEPALIVE bool d2_fn_d2common_26ad0(int32_t* pUnit)
 // more than 0xC2 records and its base is loaded, the answer is 0x38A80(record[0xC2]); otherwise 0.
 // Fatal paths return 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_26080(int32_t* pUnit)
+EMSCRIPTEN_KEEPALIVE int32_t D2Common_26080_ItemOpStatTotal(int32_t* pUnit)
 {
 	if (!pUnit)
 		return 0;
@@ -359,7 +359,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_26080(int32_t* pUnit)
 
 // 1.13c D2Common+0x4E150 (#10371): the dword at struct+0x10. Null is fatal 0xA24; we answer 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4e150(uint32_t pStruct)
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_4E150_GetDword10(uint32_t pStruct)
 {
 	uint8_t* s = P(pStruct);
 	return s ? W(s, 0x10) : 0;
@@ -449,7 +449,7 @@ namespace
 }
 
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_664b0(uint32_t pStruct)
+EMSCRIPTEN_KEEPALIVE void d2common_sub_664b0(uint32_t pStruct)
 {
 	uint8_t* s = P(pStruct);
 	if (!s)

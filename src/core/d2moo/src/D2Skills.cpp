@@ -669,6 +669,7 @@ int __stdcall SKILLS_Return1(int a1)
 }
 
 //D2Common.0x6FDAFCB0 (#10944)
+// 1.13c D2Common+0x4e430
 int __stdcall SKILLS_GetRange(D2SkillStrc* pSkill)
 {
 	if (pSkill && pSkill->pSkillsTxt)
@@ -889,7 +890,7 @@ void __fastcall D2COMMON_SKILLS_RemoveSkill_6FDAFFF0(D2UnitStrc* pUnit, int nSki
 	SKILLS_RefreshSkill(pUnit, nSkillId);
 }
 
-//D2Common.0x6FDB0270 (#10958)
+// 1.13c D2Common+0x4E300 (#10958)
 void* __stdcall D2Common_10958(D2UnitStrc* pUnit, void* a2)
 {
 	void* pResult = NULL;
@@ -1243,6 +1244,7 @@ BOOL __stdcall SKILLS_GetSkillInfo(D2SkillStrc* pSkill, D2UnitGUID* pOwnerGUID, 
 }
 
 //D2Common.0x6FDB0960 (#10956)
+// 1.13c D2Common+0x4E1F0
 BOOL __stdcall SKILLS_SetCharges(D2SkillStrc* pSkill, int nCharges)
 {
 	D2_ASSERT(pSkill);
@@ -1253,6 +1255,7 @@ BOOL __stdcall SKILLS_SetCharges(D2SkillStrc* pSkill, int nCharges)
 	}
 	else
 	{
+		pSkill->bChargesSet = 1;
 		pSkill->nCharges = nCharges;
 		return TRUE;
 	}
@@ -2049,6 +2052,7 @@ int __stdcall SKILLS_GetBonusSkillLevelFromSkillId(D2UnitStrc* pUnit, int nSkill
 }
 
 //D2Common.0x6FDB17A0 (#11030)
+// 1.13c D2Common+0x52d50
 void __stdcall D2Common_11030(D2UnitStrc* pUnit, int nSkillId, int a3)
 {
 	D2SkillStrc* pSkill = NULL;
@@ -2081,6 +2085,7 @@ void __stdcall D2Common_11030(D2UnitStrc* pUnit, int nSkillId, int a3)
 }
 
 //D2Common.0x6FDB1820 (#11031)
+// 1.13c D2Common+0x52ca0
 void __stdcall D2Common_11031(D2UnitStrc* pUnit, int nSkillId, int a3)
 {
 	D2SkillStrc* pSkill = SKILLS_GetSkill(pUnit, nSkillId, -1);
@@ -2104,7 +2109,7 @@ void __stdcall D2Common_11031(D2UnitStrc* pUnit, int nSkillId, int a3)
 	if (pSkill->nOwnerGUID == D2UnitInvalidGUID)
 	{
 		pSkill->nLevelBonus += a3;
-		if (pSkill->nLevelBonus < 0)
+		if ((int32_t)pSkill->nLevelBonus < 0)
 		{
 			pSkill->nLevelBonus = 0;
 		}
@@ -2166,6 +2171,7 @@ void __stdcall D2Common_10972(D2SkillStrc* pSkill, int nUnknown)
 }
 
 //D2Common.0x6FDB19B0 (#10973)
+// 1.13c D2Common+0x4E060
 void __stdcall D2Common_10973(D2SkillStrc* pSkill)
 {
 	D2_ASSERT(pSkill);
@@ -2831,6 +2837,7 @@ void __stdcall SKILLS_SetQuantity(D2SkillStrc* pSkill, int nQuantity)
 	pSkill->nQuantity = nQuantity;
 }
 
+// 1.13c D2Common+0x4F780
 //D2Common.0x6FDB2FA0 (#11014)
 int __stdcall D2Common_11014_ConvertShapeShiftedMode(int nArrayIndex, int nMonsterId)
 {
@@ -3223,6 +3230,7 @@ BOOL __stdcall D2Common_11026(int nX, int nY, D2UnitStrc* pUnit, uint16_t nColMa
 }
 
 //D2Common.0x6FDB3A10 (#11027)
+// 1.13c D2Common+0x4E6D0
 int __stdcall SKILLS_GetShiftedManaCosts(int nSkillId, int nLevel)
 {
 	int nMana = SKILLS_GetManaCosts(nSkillId, nLevel) >> 8;

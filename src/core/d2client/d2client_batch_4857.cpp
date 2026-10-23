@@ -71,20 +71,20 @@ struct D2ClientBatchB55Env {
     int32_t  (*filbuf)(void* stream);   // 0x80C5 __filbuf(FILE*)
 };
 
-// 1.13c D2Client+0x0593A: `push 1; call 0x47AB` -- release CRT lock 1 (the __getstream lock, 0x5821).
+// 1.13c D2Client+0x0593a: `push 1; call 0x47AB` -- release CRT lock 1 (the __getstream lock, 0x5821).
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_593a(void) {
     d2_client_47ab(1);
 }
 
-// 1.13c D2Client+0x072B5: `push 0xC; call 0x47AB` -- release CRT lock 12 (the ___updatetlocinfo
+// 1.13c D2Client+0x072b5: `push 0xC; call 0x47AB` -- release CRT lock 12 (the ___updatetlocinfo
 // lock, 0x7283).
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_72b5(void) {
     d2_client_47ab(0xC);
 }
 
-// 1.13c D2Client+0x072BE (9 B): the TlsAlloc thunk __mtinit (0x74DE) installs in the FlsAlloc slot.
+// 1.13c D2Client+0x072be (9 B): the TlsAlloc thunk __mtinit (0x74DE) installs in the FlsAlloc slot.
 // It has FlsAlloc's signature (one callback argument, `ret 4`), ignores the callback, and returns the
 // new TLS index; -1 on failure is what __mtinit tests. The index space is host state, hence the seam.
 extern "C"
@@ -111,6 +111,7 @@ struct D2cFileInc {
 #pragma pack(pop)
 static_assert(offsetof(D2cFileInc, cnt) == 0x04 + 1 * (sizeof(void*) - 4), "FILE._cnt");
 
+// 1.13c D2Client+0x061a6
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_client_61a6(D2cFileInc* f, const D2ClientBatchB55Env* env) {
     if (--f->cnt >= 0) return (uint8_t)*f->ptr++;

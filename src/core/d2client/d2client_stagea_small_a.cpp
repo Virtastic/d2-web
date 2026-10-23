@@ -109,7 +109,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_cc741(uint32_t a, uint32_t b,
     return sum < a || sum < b;
 }
 
-// 1.13c D2Client+0x0A71B
+// 1.13c D2Client+0x0a71b
 // Live __pioinfo table at DAT_6fbd39a0; its blocks keep the retail 0x24
 // byte file-record stride. Only the platform knows the opaque lock layout.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_a71b(int32_t file_handle, uint8_t* const* pioinfo_1239a0,

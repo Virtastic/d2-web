@@ -273,3 +273,21 @@ void storm_bnvec_sqr(StormBnVec* dst, StormBnVec* src, StormBnCtx* ctx) {
         ctx->depth--;
     }
 }
+
+// 1.13c Storm+0x2BBB0: v = src - w (scalar word subtract, borrow chain over src's words).
+void storm_bnvec_sub_word(StormBnVec* v, uint32_t w, const StormBnVec* src) {
+    uint32_t lo = 0u - w;
+    int32_t hi = w ? -1 : 0;
+    uint32_t i = 0;
+    while (src->base + i < src->size) {
+        uint32_t x = src->data[src->base + i];
+        uint32_t r = lo + x;
+        uint32_t nlo = (uint32_t)hi + (r < lo);
+        lo = nlo;
+        hi = nlo > 0x7fffffffu ? -1 : 0;
+        storm_bnvec_touch(v, v->base + i);
+        v->data[v->base + i] = r;
+        i++;
+    }
+    storm_bnvec_setsize(v, v->base + i);
+}

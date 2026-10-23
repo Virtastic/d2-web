@@ -118,11 +118,11 @@ extern "C" uint32_t D2Common_22880_ItemGemApplyType(uint32_t nItemId);
 // 1.13c D2Common+0x245D0: gem-apply type of the class id of a type-4 (item) unit.
 // A null unit is fatal 0xF3E and another unit type fatal 0xF3F; both are modelled as returns.
 extern "C"
-void D2Common_10519_GetUnitGemApplyType(const int32_t* pUnit)
+uint32_t D2Common_10519_GetUnitGemApplyType(const int32_t* pUnit)
 {
 	if (pUnit == nullptr || pUnit[0] != 4)
-		return;
-	D2Common_22880_ItemGemApplyType(static_cast<uint32_t>(pUnit[1]));
+		return 0;
+	return D2Common_22880_ItemGemApplyType(static_cast<uint32_t>(pUnit[1]));
 }
 
 // 0x243B0's callees: 0x23130 yields items.txt bytes +0x0A/+0x0B for a type-4 unit, 0x230F0

@@ -15,7 +15,7 @@ static uint32_t g_nfile = 64;
 // block[fh>>5][fh&0x1f] == flat[fh].
 static uint8_t g_ioinfo[0x400][0x24];
 
-// 1.13c D2Game+0x081FA
+// 1.13c D2Game+0x081fa
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_81fa(int32_t _FileHandle) {
     const uint32_t fh = (uint32_t)_FileHandle;          // the bound test is unsigned

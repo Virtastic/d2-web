@@ -159,6 +159,14 @@ int32_t d2_client_224f0(D2Client21d60Env* e, const void* object, int32_t classId
     }
     return 0;
 }
+// FN-probe entry: the same function with only the fields it reads supplied.
+int32_t d2_client_224f0_probe(const void* object, int32_t classId, uint32_t (*sel)(void*, const void*),
+                              const uint8_t* const* table, const int32_t* values) {
+    D2Client21d60Env e{};
+    e.select22490 = sel; e.selectionTable = table; e.classValues = values;
+    e.report = [](void*, uint32_t) {};
+    return d2_client_224f0(&e, object, classId);
+}
 // 1.13c D2Client+0x22570
 uint32_t d2_client_22570(D2Client21d60Env* e, const void* object, int32_t minimumClass, int32_t classId) {
     const uint32_t index = e->select22490(e->context, object);

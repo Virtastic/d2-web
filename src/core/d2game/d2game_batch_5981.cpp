@@ -32,7 +32,7 @@ struct D2GameFflushLkStream {
 };
 
 // 0x5924 __flush (src/core/d2game/d2game_batch_7de3.cpp).
-extern "C" int32_t d2_fn_d2game_5924(FILE* stream);
+extern "C" int32_t D2Game_CrtFlush(FILE* stream);
 
 // 1.13c D2Game+0x05981 (__fflush_lk): __flush(stream) first; any failure is -1. Otherwise a stream
 // flagged 0x4000 commits its descriptor (_file) through __commit (0x8B19). The seam carries the CRT
@@ -40,7 +40,7 @@ extern "C" int32_t d2_fn_d2game_5924(FILE* stream);
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_5981(D2GameFflushLkStream* stream,
                                                const D2GameCrtCommitSeams* commitSeams) {
-    if (d2_fn_d2game_5924(stream->hostStream) != 0) return -1;
+    if (D2Game_CrtFlush(stream->hostStream) != 0) return -1;
     if ((stream->retailFile->flag & 0x4000) != 0) {
         return d2_fn_d2game_8B19(stream->retailFile->file, commitSeams) != 0 ? -1 : 0;
     }

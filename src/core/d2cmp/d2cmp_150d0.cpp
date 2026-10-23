@@ -15,7 +15,7 @@ struct D2CMP150d0Env {
 
 // 1.13c D2CMP+0x150D0 (export #10047, 120 bytes): register the eight palette transforms.
 // No arguments and no return value; the whole body is the eight tail-ordered calls below.
-// 1.13c D2CMP+0x150D0
+// 1.13c D2CMP+0x150D0 (src/core/d2cmp/d2cmp_150d0.cpp:d2cmp_150d0)
 extern "C"
 void d2cmp_150d0(const D2CMP150d0Env* env) {
     env->registerTransform("grey", 1);

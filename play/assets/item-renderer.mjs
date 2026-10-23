@@ -11,10 +11,12 @@ export const itemStringKey = (code) => (code === 'dlg' ? 'gld' : code);
 
 // D2Client 0x6CC00 (sub_6CC00) buckets a ground item's STAT_GOLD (D2Common #10973(unit, 0x0E, 0))
 // into the draw class it hands the item blit: <100 -> 0, <500 -> 1, <5000 -> 2, else 3. flpgld.DC6
-// (gold's flippy) is the only 4-frame item flippy; those four frames are the four pile sizes.
-export function goldPileFrame(amount, frameCount) {
-  const bucket = amount < 100 ? 0 : amount < 500 ? 1 : amount < 5000 ? 2 : 3;
-  return Math.min(frameCount - 1, bucket);
+// (gold's flippy) is 4 directions x 17 frames (read from the d2exp DC6 header); the bucket is the
+// DIRECTION (the record's +0x34) and the frame within it is the unit's own precise frame >> 8.
+export function goldPileFrame(amount, frameCount, framePrecise = 0, directions = 4) {
+  const bucket = Math.min(directions - 1, amount < 100 ? 0 : amount < 500 ? 1 : amount < 5000 ? 2 : 3);
+  const perDir = Math.max(1, Math.floor(frameCount / directions));
+  return bucket * perDir + ((framePrecise >>> 8) % perDir);
 }
 
 function cstring(bytes, start, size) {
@@ -72,7 +74,7 @@ export function createItemRenderer(read, documentObject = globalThis.document) {
     if (!dc6) try { dc6 = decodeDc6(read(`data\\global\\items\\${name}.dc6`)); decoded.set(name, dc6); }
       catch { failures.add(name); return null; }
     const index = dc6.frames.length > 1 && Number.isFinite(item.goldAmount) && item.goldAmount >= 0
-      ? goldPileFrame(item.goldAmount, dc6.frames.length)
+      ? goldPileFrame(item.goldAmount, dc6.frames.length, item.framePrecise, dc6.directions)
       : Math.min(dc6.frames.length - 1, Math.max(0, (item.framePrecise >>> 8) % dc6.frames.length));
     return { name, dc6, index, frame: dc6.frames[index] };
   }

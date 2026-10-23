@@ -14,7 +14,7 @@
     std::abort(); // The retail exit call cannot return.
 }
 
-// 1.13c D2Client+0x0D520
+// 1.13c D2Client+0xd520
 // ESI=file, EDI=length, [entry ESP+4]=destination. All seven arguments
 // to Fog ordinal 10104 are visible in the disassembly, including three zeros.
 // Only that synchronous, zero-request subset is bound by this adapter.
@@ -44,8 +44,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_d610(
     return result;
 }
 
-// 1.13c D2Client+0x0D670
 // ECX=file; success tail-jumps to Fog ordinal 10103 and returns its EAX.
+// 1.13c D2Client+0x0d670
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_d670(
     void* file, const D2ClientFileServices* services) {
     if (!file) fileFailure(*services, 0x49);

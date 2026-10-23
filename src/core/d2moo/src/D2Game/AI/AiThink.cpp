@@ -4623,7 +4623,6 @@ void __fastcall AITHINK_Fn050_Mephisto(D2GameStrc* pGame, D2UnitStrc* pUnit, D2A
 
 #ifdef D2_VERSION_HAS_UBERS
 //1.14d: 0x005F7F10
-// 1.13c D2Game+0x251F0
 void __fastcall AITHINK_SpawnUberMephistoMinion(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget)
 {
 	// unused
@@ -7064,6 +7063,7 @@ enum D2C_HighPriestAIParams
 };
 
 //D2Game.0x6FCDED10
+// 1.13c D2Game+0x19080
 void __fastcall AITHINK_Fn085_HighPriest(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	const D2CoordStrc stru_6FD29444[4] =
@@ -7828,6 +7828,7 @@ enum D2C_SiegeBeastAIParams
 };
 
 //D2Game.0x6FCE0610
+// 1.13c D2Game+0x18730
 void __fastcall AITHINK_Fn115_SiegeBeast(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	D2UnitStrc* pOwner = SUNIT_GetOwner(pGame, pUnit);
@@ -8470,6 +8471,7 @@ void __fastcall D2GAME_AI_SpecialState16_6FCE1D30(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FCE1DC0
+// 1.13c D2Game+0x166D0 (Imp1/Imp2 = monstats 0x1ec/0x1ed in both builds; flow re-read against the decompile)
 void __fastcall D2GAME_AI_SpecialState16_6FCE1DC0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	D2UnitStrc* pOwner = SUNIT_GetOwner(pGame, pUnit);
@@ -8791,6 +8793,7 @@ void __fastcall AITHINK_Fn098_Smith(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTi
 }
 
 //D2Game.0x6FCE2960
+// 1.13c D2Game+0x1E3D0
 void __fastcall AITHINK_Fn067_NecroPet(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	//TODO: Names
@@ -8881,6 +8884,7 @@ void __fastcall AITHINK_Fn067_NecroPet(D2GameStrc* pGame, D2UnitStrc* pUnit, D2A
 }
 
 //D2Game.0x6FCE2BA0
+// 1.13c D2Game+0x1CAE0
 int32_t __fastcall D2GAME_AI_PetMove_6FCE2BA0(D2GameStrc* pGame, D2UnitStrc* pOwner, D2UnitStrc* pUnit, int32_t a4, int32_t bRun, int32_t nVelocity, int32_t a7)
 {
 	// TODO: Names
@@ -9550,6 +9554,7 @@ void __fastcall AITHINK_Fn061_Hireable(D2GameStrc* pGame, D2UnitStrc* pUnit, D2A
 }
 
 //D2Game.0x6FCE3EE0
+// 1.13c D2Game+0x1D3C0
 int32_t __fastcall D2GAME_PETAI_PetMove_6FCE3EE0(D2GameStrc* pGame, D2UnitStrc* pOwner, D2UnitStrc* pUnit, int32_t eMotionType, int32_t bRun, int32_t nSpeed, BYTE bSteps)
 {
 	// TODO: Names
@@ -9870,6 +9875,7 @@ void __fastcall sub_6FCE4610(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nClas
 }
 
 //D2Game.0x6FCE4830
+// 1.13c D2Game+0x1C4E0
 void __fastcall sub_6FCE4830(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMonsterId, int32_t nHirelingId, D2UnitStrc* pTarget, D2SeedStrc* pSeed)
 {
 	D2MonStatsTxt* pMonstatsTxtRecord = MONSTERMODE_GetMonStatsTxtRecord(nMonsterId);
@@ -10146,6 +10152,7 @@ enum D2C_SpecialState13AIParams
 };
 
 //D2Game.0x6FCE5080
+// 1.13c D2Game+0x16E30
 void __fastcall D2GAME_AI_SpecialState13_6FCE5080(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	if (!pAiTickParam->pMonstatsTxt)
@@ -10261,22 +10268,24 @@ void __fastcall D2GAME_AI_SpecialState13_6FCE5080(D2GameStrc* pGame, D2UnitStrc*
 	AITACTICS_IdleInNeutralMode(pGame, pUnit, AI_GetParamValue(pGame, pAiTickParam, SPECIALSTATE13_AI_PARAM_STALL_DURATION));
 }
 
+// 1.13c D2Game+0x15F90
 //D2Game.0x6FCE5520
 int32_t __fastcall sub_6FCE5520(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	D2MapAIStrc* pMapAi = pAiTickParam->pAiControl->pMapAi;
+	D2UnitStrc* pTarget = pAiTickParam->pTarget;
 
 	if (pMapAi && pAiTickParam->pAiControl->dwAiParam[0] < pMapAi->nPathNodes)
 	{
-		if (pUnit && pUnit->dwClassId >= 0 && pUnit->dwClassId < sgptDataTables->nMonStatsTxtRecordCount)
+		if (pTarget && pTarget->dwClassId >= 0 && pTarget->dwClassId < sgptDataTables->nMonStatsTxtRecordCount)
 		{
-			D2MonStatsTxt* pMonStatsTxtRecord = &sgptDataTables->pMonStatsTxt[pUnit->dwClassId];
+			D2MonStatsTxt* pMonStatsTxtRecord = &sgptDataTables->pMonStatsTxt[pTarget->dwClassId];
 			if (pMonStatsTxtRecord)
 			{
 				const int32_t nSkillId = pMonStatsTxtRecord->nSkill[0];
 				if (nSkillId >= 0 && nSkillId < sgptDataTables->nSkillsTxtRecordCount)
 				{
-					AITACTICS_UseSkill(pGame, pUnit, MONMODE_ATTACK1, nSkillId, 0, pMapAi->pPosition[pAiTickParam->pAiControl->dwAiParam[0]].nX, pMapAi->pPosition[pAiTickParam->pAiControl->dwAiParam[0]].nY);
+					AITACTICS_ChangeModeAndTargetUnit(pGame, pUnit, MONMODE_ATTACK1, pTarget);
 					++pAiTickParam->pAiControl->dwAiParam[0];
 					pAiTickParam->pAiControl->dwAiParam[1] = pGame->dwGameFrame;
 					return 1;
@@ -10307,6 +10316,7 @@ void __fastcall D2GAME_AI_Unk129_6FCE5610(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 bool __fastcall AITHINK_SelectGenericSpawn113(D2UnitStrc*, D2GameStrc*, int32_t*);
 
 //D2Game.0x6FCE5640
+// 1.13c D2Game+0x15E00
 void __fastcall AITHINK_Fn129_GenericSpawner(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	if (!pAiTickParam->pTarget)
@@ -11381,6 +11391,7 @@ void __fastcall AITHINK_Fn081_JarJar(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiT
 }
 
 //D2Game.0x6FCE73A0
+// 1.13c D2Game+0x1BF60
 void __fastcall AITHINK_Fn031_NpcOutOfTown(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	int32_t bDrehyaIced = 0;
@@ -15611,6 +15622,7 @@ void __fastcall AITHINK_Fn108_Fenris(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiT
 }
 
 //Inlined in D2Game.0x6FCED540
+// 1.13c D2Game+0x1E640
 void __fastcall AITHINK_Fn108_SpiritWolf(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	D2UnitStrc* pOwner = AIGENERAL_GetMinionOwner(pUnit);
@@ -16032,6 +16044,45 @@ enum D2C_CatapultSpotterbAIParams
 	CATAPULTSPOTTER_AI_PARAM_SHOTS_PER_KILL = 4,
 };
 
+// 1.13c D2Game+0xA3B50
+static int32_t __fastcall sub_A3B50(D2GameStrc* pGame, D2UnitStrc* pUnit)
+{
+	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
+	D2_ASSERT(pRoom);
+
+	D2DrlgCoordsStrc drlgCoords = {};
+	DUNGEON_GetRoomCoordinates(pRoom, &drlgCoords);
+
+	int32_t nX = drlgCoords.nSubtileX;
+	int32_t nY = drlgCoords.nSubtileY;
+
+	int32_t nXOffset = 0;
+	int32_t nYOffset = 0;
+	D2Common_11066(pUnit, &nXOffset, &nYOffset);
+
+	nXOffset = -nXOffset;
+	nYOffset = -nYOffset;
+
+	int32_t nClassId = -20;
+	if (pUnit)
+	{
+		nClassId = pUnit->dwClassId - 19;
+	}
+
+	for (int32_t i = 0; i < 3; ++i)
+	{
+		nX += nXOffset * drlgCoords.nSubtileWidth;
+		nY += nYOffset * drlgCoords.nSubtileHeight;
+
+		if (const int32_t bInside = SUNITINACTIVE_IsUnitInsideRoom(pGame, pRoom, nX, nY, nClassId))
+		{
+			return bInside;
+		}
+	}
+
+	return 0;
+}
+
 //D2Game.0x6FCEE6F0
 void __fastcall AITHINK_Fn126_CatapultSpotter(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
@@ -16042,38 +16093,10 @@ void __fastcall AITHINK_Fn126_CatapultSpotter(D2GameStrc* pGame, D2UnitStrc* pUn
 	// only below 3. Upstream had && (roll only on the first think, check only then): s232 frame 15.
 	if (!pAiTickParam->pAiControl->dwAiParam[2] || AI_RollPercentage(pUnit) < 3)
 	{
-		D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
-		D2_ASSERT(pRoom);
-
-		D2DrlgCoordsStrc drlgCoords = {};
-		DUNGEON_GetRoomCoordinates(pRoom, &drlgCoords);
-
-		int32_t nX = drlgCoords.nSubtileX;
-		int32_t nY = drlgCoords.nSubtileY;
-
-		int32_t nXOffset = 0;
-		int32_t nYOffset = 0;
-		D2Common_11066(pUnit, &nXOffset, &nYOffset);
-
-		nXOffset = -nXOffset;
-		nYOffset = -nYOffset;
-
-		int32_t nClassId = -20;
-		if (pUnit)
+		if (sub_A3B50(pGame, pUnit))
 		{
-			nClassId = pUnit->dwClassId - 19;
-		}
-
-		for (int32_t i = 0; i < 3; ++i)
-		{
-			nX += nXOffset * drlgCoords.nSubtileWidth;
-			nY += nYOffset * drlgCoords.nSubtileHeight;
-
-			if (SUNITINACTIVE_IsUnitInsideRoom(pGame, pRoom, nX, nY, nClassId))
-			{
-				AITACTICS_ChangeModeAndTargetUnit(pGame, pUnit, MONMODE_DEATH, pAiTickParam->pTarget);
-				return;
-			}
+			AITACTICS_ChangeModeAndTargetUnit(pGame, pUnit, MONMODE_DEATH, pAiTickParam->pTarget);
+			return;
 		}
 	}
 

@@ -22,7 +22,7 @@ W int32_t sub_32E10(uint32_t* u);                  // 0x32E10 (unit helper)
 [[noreturn]] static void fail(uint32_t c) { Ordinal_10024(DAT_6fdda728, Ordinal_10265(c)); __builtin_trap(); }
 
 // 1.13c D2Common+0x335F0 (#10595): per-type unit speed/anim setup.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_335f0(uint32_t* u) {
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_335F0_UnitSetupSpeeds(uint32_t* u) {
  if (!u) fail(0x951);
  *(uint8_t*)((uint8_t*)u + 0x4e) = 0;
  u[0x11] = (uint32_t)UNITS_GetFrameBonus((D2UnitStrc*)u) << 8;

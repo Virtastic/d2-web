@@ -32,13 +32,14 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4ad20(uint32_t pRoom, uint32_t pBeg
 	return COLLISION_RayTrace(reinterpret_cast<D2ActiveRoomStrc*>(pRoom), reinterpret_cast<D2CoordStrc*>(pBeginCoord), reinterpret_cast<D2CoordStrc*>(pEndCoord), static_cast<uint16_t>(nCollisionMask)) ? 1u : 0u;
 }
 
-// +0x24800: dword at +0xEC of the items.txt record named by the item's class id (+0x04). A null
-// unit, a non-item unit type (not 4) or a missing record is retail's fatal path; we answer 0.
+// +0x24800: a null unit or a unit type other than 4 is retail's fatal path (we answer 0). Otherwise
+// the dword at +0x04 is passed to +0x22B20, which reads +0xEC of that monstats.txt record.
+extern "C" uint32_t d2_fn_d2common_22b20(uint32_t nIndex);
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_24800(uint32_t pItem) {   // 1.13c D2Common+0x24800
 	if (!pItem || R(P(pItem), 0x00) != 4)
 		return 0;
-	return static_cast<uint32_t>(ITEMS_GetSpawnStack(reinterpret_cast<D2UnitStrc*>(pItem)));
+	return d2_fn_d2common_22b20(R(P(pItem), 0x04));
 }
 
 // +0x30340: precision X. Unit types 2 (object), 4 (item) and 5 (tile) take the static-path game

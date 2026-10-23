@@ -29,10 +29,10 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_1760(int32_t nMonsterId, int32_t nFlag) {
     return gdwBitMasks[nFlag & 7] & bits;
 }
 
-// 1.13c D2Client+0x017F0: EAX = skill id. The skills.txt row's wSkillDesc (+0x194, signed) indexes the
+// 1.13c D2Client+0x17F0 (d2client_batch_1760.cpp:d2_client_skilldesc_for_skill): EAX = skill id. The skills.txt row's wSkillDesc (+0x194, signed) indexes the
 // skilldesc.txt array (stride 0x120); out of range or a negative/zero record gives NULL.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void* d2_fn_17f0(int32_t nSkillId) {
+EMSCRIPTEN_KEEPALIVE void* d2_client_skilldesc_for_skill(int32_t nSkillId) {
     if (nSkillId < 0 || nSkillId >= sgptDataTables->nSkillsTxtRecordCount) return nullptr;
     const uint8_t* rec = reinterpret_cast<const uint8_t*>(sgptDataTables->pSkillsTxt) +
                          (size_t)nSkillId * sizeof(D2SkillsTxt);
@@ -46,7 +46,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_17f0(int32_t nSkillId) {
 
 // 1.13c D2Client+0x019B0: stdcall, [esp+4] = p. Zero the five dwords at +0x00..+0x10.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_19b0(uint32_t* p) {
+EMSCRIPTEN_KEEPALIVE void d2client_zero5_19b0(uint32_t* p) {
     p[0] = 0;
     p[1] = 0;
     p[2] = 0;

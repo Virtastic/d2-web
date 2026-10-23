@@ -562,6 +562,7 @@ D2LvlTypesTxt* __stdcall DATATBLS_GetLevelTypesTxtRecord(int nLevelType)
 }
 
 //D2Common.0x6FD614A0 (#11226)
+// 1.13c D2Common+0x6CAD0
 bool __stdcall DATATBLS_CheckActInLevelTypesTxt(int nLevelType, uint8_t nAct)
 {
 	D2LvlTypesTxt* pLevelTypesTxtRecord = NULL;
@@ -667,6 +668,7 @@ void __fastcall DATATBLS_LoadLvlPrestTxt(HD2ARCHIVE hArchive, int a2)
 }
 
 //D2Common.0x6FD61AD0
+// 1.13c D2Common+0x6C9C0
 void __fastcall DATATBLS_UnloadLvlPrestTxt()
 {
 	D2DrlgFileStrc** ppLvlPrestFiles = NULL;
@@ -935,6 +937,7 @@ void __fastcall DATATBLS_LoadLvlSubTxt(HD2ARCHIVE hArchive, int a2, int a3)
 }
 
 //D2Common.0x6FD62600
+// 1.13c D2Common+0x6C840
 void __fastcall DATATBLS_UnloadLvlSubTxt()
 {
 	D2DrlgFileStrc** ppFiles = sgptDataTables->ppLvlSubTypeFiles;

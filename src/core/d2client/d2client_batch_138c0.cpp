@@ -91,7 +91,7 @@ static_assert(offsetof(FloorDrawSub, height) == 4, "sub");
 // ---------------------------------------------------------------------------------------------------------
 // 0x138C0
 
-// 1.13c D2Client+0x138C0 (311 B): fill one 8 x 8 tile light block (64 cells of 12 bytes, row stride 0x60).
+// 1.13c D2Client+0x138c0 (311 B): fill one 8 x 8 tile light block (64 cells of 12 bytes, row stride 0x60).
 // ECX = block, EAX = mode, two stack words = tile x (arg1) and y (arg2).
 // mode != 0: solid act colours -- D2Common 10731 gives the intensity, 10189 the red/green/blue; the two stack
 // word slots are only scratch (retail reuses them as the colour out-params).

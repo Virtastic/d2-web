@@ -53,6 +53,7 @@ EMSCRIPTEN_KEEPALIVE void d2win_repeat_call(uint32_t count, uint32_t value, uint
 // end is the stack argument; walk [begin, end) in ascending dword order and call every non-NULL entry
 // with no arguments. Each entry is a retail initialiser address, hence the seam.
 extern "C"
+// 1.13c D2Win+0x010b9
 EMSCRIPTEN_KEEPALIVE void d2win_initterm(const uint32_t* begin, const uint32_t* end,
                                          const D2WinBatchTinyEnv* env) {
     if (env == nullptr) env = &g_d2win_batch_tiny_default;
@@ -87,7 +88,7 @@ static void d2win_doexit(uint32_t code, int32_t quick, int32_t retcaller,
     _exit((int)code);                                 // ___crtExitProcess(0x01077), never returns
 }
 
-// 1.13c D2Win+0x011FE (17 B, many callers): _exit(code) = doexit(code, quick=0, retcaller=0): run the
+// 1.13c D2Win+0x011fe (17 B, many callers): _exit(code) = doexit(code, quick=0, retcaller=0): run the
 // exit lists, then terminate the process with code.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2win_exit(uint32_t code) {

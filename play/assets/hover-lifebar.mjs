@@ -45,3 +45,10 @@ export function paintHoverPlate(c, boxes, palette, recordPrim) {
   for (const p of painted) recordPrim('box', p.x, p.y, p.x + p.width, p.y + p.height, p.colour, p.mode);
   return painted;
 }
+// 1.13c D2Client+0x58FB0 (showitems.cpp) queues the ground-item name through D2Win's popup-text plate:
+// the same layout as the NPC plate -- width+8 by 16, centred on x ((w+8)>>1 left of it), text 4px in
+// with its bottom row 3px above the plate bottom. `bottom` is the plate's bottom edge.
+export function groundLabelPlate(cx, bottom, textWidth) {
+  const width = textWidth + 8, left = cx - (width >> 1);
+  return { box: { x: left, y: bottom - 16, width, height: 16 }, textX: left + 4, anchorY: bottom - 3 };
+}

@@ -1,6 +1,7 @@
 // D2Lang batch b64: Unicode:: helpers. Hidden globals/registers become explicit params.
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <cctype>
 #include <cstdarg>
 #include <initializer_list>
@@ -187,4 +188,33 @@ void D2Lang_Unicode_sprintf(int cap, char16_t* out, const char16_t* fmt, ...)
         } while (*fmt != 0);
     }
     va_end(ap);
+}
+
+// 1.13c D2Lang+0x0A9D0 (Unicode::loadSysMap): parse a "KAMAP\n<name>\x1a" default.map image into the sysmap globals
+// (10a58 = range byte pairs, 10a54 = range count, 10a50 = N x {b0,b2} u16 pairs, 10a5c = N u16, 10a4c = N).
+// Returns 1 on success, 0 on bad header / name > 39 bytes / OOM (retail also reports via Ordinal_10043; not modelled).
+struct D2LangSysMap { uint8_t* ranges = nullptr; uint16_t* pairs = nullptr; uint16_t* map = nullptr; uint16_t n = 0; uint8_t nRanges = 0; };
+int D2Lang_Unicode_loadSysMap(const uint8_t* buf, D2LangSysMap& g)
+{
+    if (memcmp(buf, "KAMAP\n", 5) != 0) return 0;
+    int i = 0;
+    while (buf[6 + i] != 0x1a) if (++i > 0x27) return 0;
+    const uint8_t* p = buf + i + 11;                 // 4 bytes past the 0x1a terminator
+    uint16_t n = (uint16_t)(p[0] | p[1] << 8);
+    uint8_t r = p[2];
+    free(g.ranges);
+    g.ranges = (uint8_t*)malloc(r ? r * 2u : 1u);
+    if (!g.ranges) return 0;
+    memcpy(g.ranges, p + 3, r * 2u);
+    const uint8_t* q = p + 3 + r * 2u;
+    free(g.pairs);
+    g.pairs = (uint16_t*)malloc(n * 4u + 1u);
+    if (!g.pairs) return 0;
+    for (int k = 0; k < n; ++k, q += 4) { g.pairs[k * 2] = q[0]; g.pairs[k * 2 + 1] = q[2]; }
+    free(g.map);
+    g.map = (uint16_t*)malloc(n * 2u + 1u);
+    if (!g.map) return 0;
+    for (int k = 0; k < n; ++k, q += 2) g.map[k] = (uint16_t)(q[0] | q[1] << 8);
+    g.n = n; g.nRanges = r;
+    return 1;
 }

@@ -7,7 +7,7 @@ struct D2WinEDF0State {
     int32_t counter;       // DAT_6f921630
 };
 
-// 1.13c D2Win+0x0EDF0 (sub_EDF0)
+// 1.13c D2Win+0x0EDF0 d2win_sub_edf0.cpp:d2win_sub_edf0
 void d2win_sub_edf0(D2WinEDF0State& s, uint32_t (*getTick)(), void (*ord10061)()) {
     if (!s.active) return;
     if (s.timed) {

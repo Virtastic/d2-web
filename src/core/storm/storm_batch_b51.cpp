@@ -83,6 +83,11 @@ uint32_t Storm_Sub4310(uint32_t, uint32_t p2, uint32_t p3, uint32_t edi) {
     return Alloc4(p2, 0x50, ".?AUAUDIOSTREAM@@", p3, edi);
 }
 
+// 1.13c Storm+0x4EF0
+uint32_t Storm_Sub4EF0(uint32_t, uint32_t p2, uint32_t p3, uint32_t edi) {
+    return Alloc4(p2, 0x20, ".?AUMESSAGE@@", p3, edi);
+}
+
 // 1.13c Storm+0x4C60
 uint32_t Storm_Sub4C60(uint32_t, uint32_t p2, uint32_t p3, uint32_t edi) {
     return Alloc4(p2, 0x5c, ".?AUBITMAPREC@@", p3, edi);

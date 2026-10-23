@@ -19,7 +19,7 @@ static int32_t bad_fd() {
     return -1;
 }
 
-// 1.13c D2Client+0x05AFF (160 B, callers 0x3704, 0x4AE8, 0x5BAA): __write(fd, buf, count).
+// 1.13c D2Client+0x05aff (160 B, callers 0x3704, 0x4AE8, 0x5BAA): __write(fd, buf, count).
 // Reject fd >= _nfile or a descriptor whose ioinfo flag (+4) bit 0 (FOPEN) is clear with errno 9.
 // Otherwise lock the fd, re-test FOPEN under the lock (a close may have raced), call _write_lk, unlock.
 extern "C"
