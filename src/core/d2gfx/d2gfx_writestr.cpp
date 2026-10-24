@@ -12,7 +12,7 @@ static_assert(__builtin_offsetof(CrtStream32, base) == 0x8 && __builtin_offsetof
               sizeof(CrtStream32) == 32, "1.13c MSVC 2003 FILE layout");
 
 // 1.13c D2Gfx+0x01D9A (_write_char), defined in src/core/fn/crt_leaves_b19.cpp.
-void d2gfx_write_char(CrtStream32* f, uint8_t ch, int32_t* count);
+extern "C" void d2gfx_write_char(CrtStream32* f, uint8_t ch, int32_t* count);
 
 // 1.13c D2Gfx+0x01DF1 (_write_string): MSVC 2003 Release CRT output.c
 // `static void __cdecl write_string(FILE *f, const char *s, int len, int *pcount)` -- the decompile

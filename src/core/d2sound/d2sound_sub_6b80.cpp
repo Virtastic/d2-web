@@ -1,4 +1,4 @@
-// 1.13c D2sound+0x06B80 -- start a timed fade on a sound object (fastcall: ecx=obj, edx=target, stack=duration ms).
+// (alt copy; batch_67c0 carries the marker) D2sound 0x06B80 -- start a timed fade on a sound object (fastcall: ecx=obj, edx=target, stack=duration ms).
 #include <cstdint>
 struct D2soundEnv6B80 {
     int enabled;                       // DAT_6f9c658c

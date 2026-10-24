@@ -2,7 +2,7 @@
 // Prior art used: the decompile; sibling seams in storm_batch_tiny_1018.cpp.
 #include <cstdint>
 
-void* Storm_Sub1C580(uint32_t size, const char* tag, int32_t line, uint32_t flags);  // 0x1C580 (alloc)
+extern "C" void* Storm_Sub1C580(uint32_t size, const char* tag, int32_t line, uint32_t flags);  // 0x1C580 (alloc)
 void Storm_Sub4390(void* a, uint32_t* obj, int32_t src);                              // 0x4390
 
 // 1.13c Storm+0x4430

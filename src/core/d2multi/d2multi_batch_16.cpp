@@ -6,7 +6,7 @@
 extern "C" {
 void    Ordinal_10106(void);
 void    Ordinal_10043(int32_t, int32_t);  // Fog free
-void    Ordinal_10037(void);
+int32_t Ordinal_10037(void);
 int32_t Ordinal_10098(const void*);       // load/open by name
 void    Ordinal_10147(void);
 int32_t Ordinal_10054(void);

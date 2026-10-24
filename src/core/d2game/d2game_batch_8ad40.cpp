@@ -9,6 +9,7 @@
 #include <cstring>
 #include <unistd.h>
 #include <emscripten.h>
+#include "GAME/SCmd.h"
 
 struct D2GameBatch8AD40Env {
     void (*send8A3E0)(void* client, const void* buf, uint32_t len);                 // 0x8A3E0
@@ -32,10 +33,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8ad40(uint32_t ecxIn, uint32_t edxI
 }
 
 // 0x8B1F0: 6-byte packet 0x79.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8b1f0(void* client, const D2GameBatch8AD40Env* env) { // 1.13c D2Game+0x8B1F0
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8b1f0(D2ClientStrc* client) { // 1.13c D2Game+0x8B1F0
     uint8_t b[8] = {};
     b[0] = 0x79;
-    env->send8A3E0(client, b, 6);
+    D2GAME_PACKETS_SendPacket_6FC3C710(client, b, 6);
 }
 
 // 0x8B2F0: relays a 0x15-byte block (EAX) verbatim.
@@ -69,11 +70,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8c230(uint32_t ecxIn, uint32_t edxI
 }
 
 // 0x8C3B0: 6-byte packet: [1]=ecx low, [2..5]=edx.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8c3b0(uint32_t ecxIn, uint32_t edxIn, void* client, const D2GameBatch8AD40Env* env) { // 1.13c D2Game+0x8C3B0
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8c3b0(uint32_t ecxIn, uint32_t edxIn, D2ClientStrc* client) { // 1.13c D2Game+0x8C3B0
     uint8_t b[8] = {};
     b[1] = (uint8_t)ecxIn;
     w32(b, 2, edxIn);
-    env->send8A3E0(client, b, 6);
+    D2GAME_PACKETS_SendPacket_6FC3C710(client, b, 6);
 }
 
 // 0x8CFB0: 7-byte packet 0x8D to every unit via 0xDFC10: [1..4]=unit id (-1 if null), [5..6]=0x9BEB0(unit)

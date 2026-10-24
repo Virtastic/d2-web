@@ -18,11 +18,6 @@
 #include <cstdint>
 #include <emscripten.h>
 
-// Host seam for D2Game+0x340C0 (quest reward/GUID helper, pQuest in ESI, pQuestArg in EBX).
-struct D2GameBatchTiny1019kEnv {
-    void (*questRewardHelper)(void* pQuest, void* pQuestArg);
-};
-
 // 1.13c D2Game+0xB87C0
 // Exported constant-1 stub: six stack arguments, returns 1 unconditionally.
 extern "C"
@@ -30,36 +25,4 @@ EMSCRIPTEN_KEEPALIVE int32_t d2game_export10046(uint32_t, uint32_t, uint32_t,
                                                 uint32_t, uint32_t, uint32_t)
 {
     return 1;
-}
-
-// 1.13c D2Game+0xC2AF0
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_c2af0(void* pQuest, void* pQuestArg,
-                                             const D2GameBatchTiny1019kEnv* env)
-{
-    env->questRewardHelper(pQuest, pQuestArg);
-}
-
-// 1.13c D2Game+0xC2F00
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_c2f00(void* pQuest, void* pQuestArg,
-                                             const D2GameBatchTiny1019kEnv* env)
-{
-    env->questRewardHelper(pQuest, pQuestArg);
-}
-
-// 1.13c D2Game+0xC3620
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_c3620(void* pQuest, void* pQuestArg,
-                                             const D2GameBatchTiny1019kEnv* env)
-{
-    env->questRewardHelper(pQuest, pQuestArg);
-}
-
-// 1.13c D2Game+0xC3EB0
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_c3eb0(void* pQuest, void* pQuestArg,
-                                             const D2GameBatchTiny1019kEnv* env)
-{
-    env->questRewardHelper(pQuest, pQuestArg);
 }

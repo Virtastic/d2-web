@@ -40,12 +40,11 @@ uint32_t g_dword43130;            // 0x6FC43130  archive-open flags (set by 0x25
 constexpr const char* kSFileCpp = "..\\3rdParty\\STORM\\SOURCE\\SFILE.CPP";
 
 // ---- unmapped internal callees, retail argument order -----------------------------------------
-int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);        // SMemFree
+extern "C" int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);        // SMemFree
 void Storm_Sub3EF0(uint8_t* p);                                         // file-object destructor
 void Storm_Sub3FC0(uint8_t* p);                                         // handle-record destructor
 void Storm_Sub3E20(uint8_t* p);                                         // archive-object destructor
 void Storm_Sub4040(uint8_t* p);                                         // request-record destructor
-int32_t* Storm_Sub25DC0(uint8_t* node);                                 // node in ESI
 void Storm_Sub27EF0(int32_t a, int32_t b);
 int32_t Storm_Sub28960(void* a, uint32_t* b, uint8_t flags, uint32_t* d);
 void Storm_Sub2FB30(const char* type, const char* name);                // "handle never released"
@@ -53,6 +52,21 @@ void Storm_Sub2FB30(const char* type, const char* name);                // "hand
 uint32_t rd32(const void* p) { uint32_t v; std::memcpy(&v, p, 4); return v; }
 void wr32(void* p, uint32_t v) { std::memcpy(p, &v, 4); }
 uint8_t* at(uint32_t p, uintptr_t off) { return (uint8_t*)(uintptr_t)(p + off); }
+
+// 1.13c Storm+0x25DC0: node (retail ESI); iface = *(node+0x3c), GetCurrentPosition = vtable slot +0x10.
+// Returns iface, or 0xffffffff on a failed HRESULT; else stores the clamped play position at node+0x2C.
+int32_t* Storm_Sub25DC0(uint8_t* node) {
+    uint8_t* iface = (uint8_t*)(uintptr_t)rd32(node + 0x3c);
+    uint32_t a = 0, b = 0;
+    auto fn = (int32_t (*)(void*, uint32_t*, uint32_t*))(uintptr_t)rd32((uint8_t*)(uintptr_t)rd32(iface) + 0x10);
+    if (fn(iface, &a, &b) < 0) return (int32_t*)(uintptr_t)0xffffffffu;
+    int32_t d = (int32_t)(rd32(node + 0x30) % rd32(node + 0x40) - (uint32_t)(uintptr_t)iface);
+    if (d < 1) d += (int32_t)rd32(node + 0x40);
+    uint32_t v = rd32(node + 0x30) - (uint32_t)d;
+    if (rd32(node + 0x24) <= v) v = rd32(node + 0x24);
+    wr32(node + 0x2c, v);
+    return (int32_t*)iface;
+}
 
 // kernel32 seams (compat/Windows.h carries no thread, event or file-size API)
 void StormSetLastError(uint32_t e) { g_lastError = (int32_t)e; }

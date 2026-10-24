@@ -19,12 +19,12 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_5a8a0(int nCount)
 		int b = t[i].nBaseId;
 		if (b < 0 || b >= nCount) { t[i].nBaseId = int16_t(i); b = i; }
 		int w = int(DATATBLS_GetAnimDataRecord(0, b, MONMODE_WALK, UNIT_MONSTER, 0)->dwAnimSpeed);
-		if (b != i && t[b].nVelocity > 0) w = int(int64_t(w) * t[i].nVelocity / t[b].nVelocity);
+		if (b != i && t[b].nVelocity > 0) w = int(uint32_t(int(t[i].nVelocity) * uint32_t(w)) / uint32_t(int(t[b].nVelocity)));  // retail scales in unsigned 32-bit
 		w = w < 1 ? 0 : (w > 0x7ffe ? 0x7fff : w);
 		t[i].nWalkAnimSpeed = int16_t(w);
 		int r = i < 410 ? int(t[b].nWalkAnimSpeed) / 2
 		                : int(DATATBLS_GetAnimDataRecord(0, b, MONMODE_RUN, UNIT_MONSTER, 0)->dwAnimSpeed);
-		if (b != i && t[b].nRun > 0) r = int(int64_t(r) * t[i].nRun / t[b].nRun);
+		if (b != i && t[b].nRun > 0) r = int(uint32_t(int(t[i].nRun) * uint32_t(r)) / uint32_t(int(t[b].nRun)));
 		t[i].nRunAnimSpeed = int16_t(r < 1 ? 0 : (r > 0x7ffe ? 0x7fff : r));
 	}
 }

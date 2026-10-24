@@ -3,17 +3,10 @@
 #include <cstdint>
 #include <emscripten.h>
 
-struct D2SbhState {
-	uint32_t regions;   // DAT_6fdf14b0 region table base (0x14-byte records)
-	uint32_t count;     // DAT_6fdf14ac
-	uint32_t cursor;    // DAT_6fdf14b8
-	uint32_t cache;     // DAT_6fdf14a8
-	uint32_t cache_grp; // DAT_6fdf14c0
-};
-struct D2SbhEnv {
-	uint32_t (*new_region)();          // D2Common+0x8064
-	int32_t  (*new_group)(uint32_t r); // D2Common+0x811B
-};
+struct SbhHeap { uint32_t count, capacity; uint8_t* regions; void* heap; uint32_t cursor, cache, cache_grp; };
+extern "C" SbhHeap g_D2Common_sbh;
+extern "C" uint32_t* D2Common_8064_SbhAllocNewRegion();
+extern "C" int32_t D2Common_811B_SbhAllocNewGroup(uint32_t region);
 static inline uint32_t* W(uint32_t a) { return (uint32_t*)(uintptr_t)a; }
 
 // 1.13c D2Common+0x08500 (764 B): ___sbh_alloc_block(size). Round size+0x17 to 16, pick the first region
@@ -21,29 +14,30 @@ static inline uint32_t* W(uint32_t a) { return (uint32_t*)(uintptr_t)a; }
 // free group slot, else a new region; commit a new group when needed. Split the best free block, relink
 // the remainder into its bucket (maintaining the per-bucket counts at +4 and the bitmaps), mark the
 // allocation with size|1 at both ends, and return the payload (block+4); 0 on failure.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_sbh_alloc_block_8500(uint32_t size, D2SbhState* s, const D2SbhEnv* env) {
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_8500_SbhAllocBlock(uint32_t size) {
+	SbhHeap* s = &g_D2Common_sbh;
 	uint32_t uVar7 = (size + 0x17) & 0xfffffff0u;
 	int32_t iVar8 = ((int32_t)(size + 0x17) >> 4) - 1;
-	uint32_t end = s->regions + s->count * 20;
+	uint32_t end = (uint32_t)(uintptr_t)s->regions + s->count * 20;
 	uint32_t pr = s->cursor, uVar14, local_c;
 	if (iVar8 < 0x20) { uVar14 = 0xffffffffu >> (iVar8 & 0x1f); local_c = 0xffffffffu; }
 	else { uVar14 = 0; local_c = 0xffffffffu >> ((iVar8 - 0x20) & 0x1f); }
 	auto fits = [&](uint32_t p) { return (W(p)[1] & local_c) || (W(p)[0] & uVar14); };
 	while (pr < end && !fits(pr)) pr += 20;
 	if (pr == end) {
-		uint32_t q = s->regions;
+		uint32_t q = (uint32_t)(uintptr_t)s->regions;
 		while (q < s->cursor && !fits(q)) q += 20;
 		pr = q;
 		if (q == s->cursor) {
 			while (q < end && W(q)[2] == 0) q += 20;
-			uint32_t q2 = s->regions;
+			uint32_t q2 = (uint32_t)(uintptr_t)s->regions;
 			pr = q;
 			if (q == end) {
 				while (q2 < s->cursor && W(q2)[2] == 0) q2 += 20;
 				pr = q2;
-				if (q2 == s->cursor) { pr = env->new_region(); if (!pr) return 0; }
+				if (q2 == s->cursor) { pr = (uint32_t)(uintptr_t)D2Common_8064_SbhAllocNewRegion(); if (!pr) return 0; }
 			}
-			int32_t g = env->new_group(pr);
+			int32_t g = D2Common_811B_SbhAllocNewGroup(pr);
 			*W(W(pr)[4]) = (uint32_t)g;
 			if (*W(W(pr)[4]) == 0xffffffffu) return 0;
 		}

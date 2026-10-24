@@ -3,7 +3,11 @@
 // Fatal paths (retail: Ordinal_10265/10024 then _exit(-1)) throw.
 #include <cstdint>
 #include <stdexcept>
+#include <cstdlib>
+extern "C" uint32_t Fog_Ordinal_10265(uint32_t);
+extern "C" void Fog_Ordinal_10024(const void*, const void*, uint32_t);
 namespace d2client_avl_5f7a0 {
+[[noreturn]] static void fatal(uint32_t c) { static const char m[] = ""; Fog_Ordinal_10024(m, 0, Fog_Ordinal_10265(c)); std::_Exit(-1); }
 struct Node { int16_t balance; Node* a; Node* b; };  // balance @+0x0A, a @+0x0C, b @+0x10
 // 1.13c D2Client+0x5F7A0
 static void rotateA(Node** p) {
@@ -20,7 +24,7 @@ static void rotateB(Node** p) {
 // 1.13c D2Client+0x60750
 static void rebalanceB(Node** pp) {
  Node* n = *pp; Node* c = n->b;
- if (c->balance != -1 && c->balance != 1) throw std::runtime_error("60750 balance");
+ if (c->balance != -1 && c->balance != 1) fatal(0x294);
  if (c->balance == 1) { n->balance = 0; c->balance = 0; rotateB(&n); *pp = n; return; }
  Node* g = c->a;
  if (g->balance == -1) { n->balance = 0; c->balance = 1; }
@@ -32,7 +36,7 @@ static void rebalanceB(Node** pp) {
 // 1.13c D2Client+0x60810
 static void rebalanceA(Node** pp) {
  Node* n = *pp; Node* c = n->a;
- if (c->balance != -1 && c->balance != 1) throw std::runtime_error("60810 balance");
+ if (c->balance != -1 && c->balance != 1) fatal(0x259);
  if (c->balance == -1) { n->balance = 0; c->balance = 0; rotateA(&n); *pp = n; return; }
  Node* g = c->b;
  if (g->balance == -1) { n->balance = 1; c->balance = 0; }

@@ -46,6 +46,7 @@ void insert(HashBlock* h, uint8_t* e) {
     n->pRef = new Ref{ e, nullptr };
 }
 
+// 1.13c D2CMP+0x09720
 // 0x6fe19720: load-or-find by exact name
 HashBlock* loadLibrary(const char* name) {
     for (Record* r : g_records) if (r->name == name) return r->hash;

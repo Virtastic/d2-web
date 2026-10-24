@@ -11,11 +11,11 @@
 #include <cstdint>
 #include <cstring>
 
-int32_t Storm_Sub1B960(void* block, const char* source, int32_t line);   // 0x1B960 SMemFree
+extern "C" int32_t Storm_Sub1B960(void* block, const char* source, int32_t line);   // 0x1B960 SMemFree
 void* Storm_Onexit(void (*func)(void));                               // 0x58FF __onexit
 void Storm_Sub902A(int32_t lock);                                     // 0x902A __unlock(lock)
 void Storm_TypeInfoDtor(void* self);                                  // 0x595D ~type_info
-void Storm_Sub1050(void* p);                                          // 0x1050 SMemFree(p, "delete", -1)
+extern "C" void Storm_Sub1050(void* p);                                          // 0x1050 SMemFree(p, "delete", -1)
 void Storm_ArrayUnwind(void* ptr, uint32_t size, int32_t count, void (*dtor)(void*));   // 0x6000
 
 namespace {

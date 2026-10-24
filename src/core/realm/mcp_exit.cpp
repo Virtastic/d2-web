@@ -5,10 +5,11 @@
 #include <cstring>
 #include <emscripten.h>
 
-// 1.13c D2MCPClient+0x1187: the CRT's `_exit(code)` = doexit(code, quick=0,
+// D2MCPClient _exit: the CRT's `_exit(code)` = doexit(code, quick=0,
 // returning=0): run the registered onexit callbacks and the C tables, then terminate the process with `code`.
 // It never returns and touches no game state, so the stand-in is process termination with the same code, as the
 // project already does for retail's other fatal paths (src/core/d2common/exports.cpp).
+// 1.13c D2MCPClient+0x01187
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_exit(int code) {
     std::exit(code);
 }
@@ -57,9 +58,10 @@ extern "C" void d2_mcp_doexit_snapshot(uint32_t* s) {
     s[0] = g_C_Termination_Done; s[1] = g_C_Exit_Done; s[2] = g_exitflag;
 }
 
-// 1.13c D2MCPClient+0x011A9 (15 B, caller 0x011B8 __CRT_INIT@12): `__cexit` = doexit(0, quick=0,
+// D2MCPClient __cexit (15 B, caller 0x011B8 __CRT_INIT@12): `__cexit` = doexit(0, quick=0,
 // retcaller=1): run the onexit list and the C tables, then return instead of terminating. The onexit
 // table uses the same native callbacks as __onexit; the shipped __initterm tables are empty.
+// 1.13c D2MCPClient+0x011A9
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_mcp_cexit_11a9(void) {
     d2_mcp_doexit(0, 0, 1);

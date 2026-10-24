@@ -105,9 +105,9 @@ uint32_t sub_434E0(D2GameBatch43450Env& e, void* game, void* src, void* tgt, uin
     if (!(e.bitMask4 & r[5])) return 0;
     uint32_t p[0x17] = {};
     p[0] = 0x20; p[1] = (uint32_t)(uintptr_t)src; p[2] = (uint32_t)(uintptr_t)src;
-    p[3] = (uint32_t)m;                  // local_4c
-    p[5] = e.f21100(u); p[6] = e.f21130(u); // local_40, local_3c
-    p[0x11] = p4; p[0x12] = (uint32_t)p5;   // local_30, local_2c
+    p[4] = (uint32_t)m;                  // local_4c (frame 0x5c bytes, dword = (0x5c-off)/4)
+    p[7] = e.f21100(u); p[8] = e.f21130(u); // local_40, local_3c
+    p[11] = p4; p[12] = (uint32_t)p5;       // local_30, local_2c
     e.f8F930(game, p);
     return 1;
 }

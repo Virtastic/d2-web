@@ -22,12 +22,13 @@ struct Svc {
  virtual void f0b0()=0;                // FUN_6fada0b0
  virtual I o10392(I)=0;
  virtual void* o10392p(I)=0;
- virtual void o10168(I,I)=0; virtual void o10441(I,I)=0; virtual void o10558()=0; virtual void o10970()=0;
+ virtual void o10168(I,I)=0; virtual void o10441(void*,I)=0; virtual void o10558()=0; virtual void o10970()=0;
  virtual void o10243(Unit*,I)=0; virtual I f1380(Unit*)=0; virtual void o10936()=0; virtual void o10614()=0;
  virtual void o10595(Unit*)=0; virtual I o10826(I)=0; virtual void o10459(I)=0; virtual void f1660(Unit*)=0;
  virtual void f1630(Unit*)=0; virtual void f60450()=0; virtual I o10589(Unit*,I,I)=0; virtual I o10509(I)=0;
  virtual I o10075(Unit*,I,I)=0; virtual void o10565u(I)=0;
- virtual I f51540()=0; virtual I f5ff10(Unit*,I)=0;     // 0x57540 lookups; f5ff10 args: (unit,0x14f.. code,y,x,p2,p3)
+ virtual void* f51540()=0; virtual void* f5ff10(Unit*,I code,I y,I x,I p2,I p3)=0;  // 0x57540 lookups
+ virtual I* gfxBlock(void* obj)=0;     // obj null/+0x54 null/(+0x54)->+0x30 null -> nullptr, else that block
  virtual I o10630()=0; virtual I o10980(I)=0; virtual void f6c0()=0;
 };
 
@@ -73,7 +74,7 @@ I sub_56E10(Svc& s,Unit* u,I p2,I idx,const I* obj,I handle){
  I v=s.o10786(u,r->f138);
  if(v<1) v=*(const I*)(e+0x3c)-1+p2;
  if(v<2) v=1; else if(v>0xfe) v=0xff;
- s.o10168(handle,v); s.o10441(0,0); s.o10558(); s.o10970();
+ s.o10168(handle,v); s.o10441(nullptr,0); s.o10558(); s.o10970();
  return 1;
 }
 // 1.13c D2Client+0x56EE0  (handle = unit+0x2c)
@@ -109,17 +110,23 @@ I sub_57200(Svc& s,Unit* u,I idx,I sh,I handle,I nEnt){
  if(o && handle && s.o10075(u,o,a)){ s.f1660(u); s.f1630(u); s.o10565u(s.o10331r(u,0,0,1,0x1000)); return 1; }
  return 0;
 }
-static void clr(I* g,I a,I b,I c,bool pos){ if(!g) return; if(pos){g[1]=0;g[2]=0;g[3]=c;} else {g[4]=0;g[5]=0;g[6]=c;} (void)a;(void)b; }
-// 1.13c D2Client+0x57540  (p2,p3 REG?; zeros the 3-vector blocks at gfx+0x54->+0x30)
-I sub_57540(Svc& s,Unit* u,I** gfx[4],I* h[4]){
- // gfx[i] = pointer chain (obj+0x54)->+0x30 block for the units found with codes 0x14f,0x151,0x14e,0x14d;
- // h[0]=f51540 #1, h[1]=f51540 #2 (REG? caller supplies resolved blocks, nullptr if absent/zero)
- I* b14f=(I*)gfx[0]; I* b151=(I*)gfx[1]; I* b14e=(I*)gfx[2];
- if(b14f){ b14f[4]=0; b14f[5]=0; b14f[6]=0x7800; }
- if(b151){ b151[4]=0; b151[5]=0; b151[6]=0x7800; }
- for(int i=0;i<2;i++) if(h[i]){ h[i][1]=0; h[i][2]=0; h[i][3]=0xafc800; h[i][4]=0; h[i][5]=0; h[i][6]=(I)0xffff3800; }
- if(b14e){ s.o10441(0,0x80); s.o10441(0,0x80); }
- (void)u;(void)clr; return 1;
+// 1.13c D2Client+0x57540  (fastcall: ecx ignored, edx=p2, stack p3; the two unit-position reads are
+// x=unitX (path+0x10), y=unitY (path+0xc), repeated before each of the four lookups)
+I sub_57540(Svc& s,Unit* u,I p2,I p3){
+ void* a=s.f51540(); void* b=s.f51540();
+ void* o14f=s.f5ff10(u,0x14f,s.unitY(u),s.unitX(u),p2,p3);
+ void* o151=s.f5ff10(u,0x151,s.unitY(u),s.unitX(u),p2,p3);
+ void* o14e=s.f5ff10(u,0x14e,s.unitY(u),s.unitX(u),p2,p3);
+ void* o14d=s.f5ff10(u,0x14d,s.unitY(u),s.unitX(u),p2,p3);
+ void* hi[2]={o14f,o151};
+ for(void* o:hi) if(I* g=s.gfxBlock(o)){ g[4]=0; g[5]=0; g[6]=0x7800; }
+ void* lo[2]={a,b};
+ for(void* o:lo) if(o){
+  if(I* g=s.gfxBlock(o)){ g[1]=0; g[2]=0; g[3]=0xafc800; }
+  if(I* g=s.gfxBlock(o)){ g[4]=0; g[5]=0; g[6]=(I)0xffff3800; }
+ }
+ if(o14e){ s.o10441(o14d,0x80); s.o10441(o14e,0x80); }
+ return 1;
 }
 // 1.13c D2Client+0x57860  (unit esi-less: param_1 words 0x11/0x12 at +0x44/+0x48; flags at +0xc4 word 0x31)
 I sub_57860(Svc& s,Unit* u,I* w){

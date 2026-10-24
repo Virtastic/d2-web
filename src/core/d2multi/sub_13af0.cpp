@@ -12,7 +12,7 @@ void      Ordinal_10147(void);
 void      unicode2Win(char*, const uint16_t*, int32_t);  // Unicode::unicode2Win
 }
 
-// 1.13c D2Multi+0x13AF0
+// 1.13c D2MULTI+0x13AF0
 void d2_multi_sub_13af0(void) {
     char buf[256];
     uint16_t* u = Ordinal_10166();

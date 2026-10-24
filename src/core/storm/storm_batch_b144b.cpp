@@ -13,8 +13,8 @@
 #include <Windows.h>
 
 // ---- seams: callees owned by other rows -------------------------------------------------------
-void*   Storm_Sub1C580(uint32_t size, const char* tag, int32_t line, uint32_t flags);   // SMemAlloc
-int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);                        // SMemFree
+extern "C" void*   Storm_Sub1C580(uint32_t size, const char* tag, int32_t line, uint32_t flags);   // SMemAlloc
+extern "C" int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);                        // SMemFree
 int32_t Storm_Sub4040(void* p);                                                         // request-record dtor
 void    Storm_Sub4D60(void* node);                                                      // list unlink
 uint32_t Storm_Sub4250(void* listHead);                                                 // list next

@@ -17,7 +17,7 @@ __attribute__((weak)) uint32_t D2Common_66800(void* unit, uint32_t room);
 
 // 1.13c D2Common+0x36030: allocate the unit's dynamic path (unit+0x2C), seed position/room/size, pick the path type
 // defaults by unit type (0 player, 1 monster, 3 object-like), register in the room and derive the half extents.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_36030(int32_t y, uint32_t* unit, int32_t flag, int32_t x, uint32_t room)
+EMSCRIPTEN_KEEPALIVE void D2Common_36030_AllocPath(int32_t y, uint32_t* unit, int32_t flag, int32_t x, uint32_t room)
 {
 	uint32_t* p = static_cast<uint32_t*>(Fog_Alloc10045("..\\Source\\D2Common\\PATH\\Path.cpp", 0x453, 0));
 	if (!p) { Fog_Fatal10265_10024(0x870); return; }

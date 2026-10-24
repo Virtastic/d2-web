@@ -27,6 +27,7 @@ struct Svc {
  virtual void o10184()=0; virtual void o10028()=0; virtual void o10150(int32_t,int32_t,int32_t)=0;
  virtual void f59a20(uint32_t*,uint8_t*,uint8_t*,uint8_t*)=0; virtual void o10083(int32_t)=0; virtual int32_t f7acc4()=0;
  virtual void o10561(Unit*,uint32_t out[4])=0; virtual int16_t o10482(int32_t,int32_t,int32_t,int32_t)=0;
+ virtual int32_t rdPath(int32_t path,int32_t off)=0; virtual Unit* listHead(int32_t idx)=0; virtual Unit* nextNode(Unit*)=0; // path+off dword; DAT_6fbba808[idx]; node[0x39]
  virtual void f515c0()=0; virtual void f77b00()=0; virtual Unit* o10717(int32_t)=0;
 };
 static bool direct(int t){ return t==2||(t>3&&t<6); } // types read straight off the path block
@@ -51,17 +52,20 @@ void sub_52BD0(Svc& s,int32_t ecx,Unit* esi){
  if(!esi) return;
  int32_t y=0,x=0;
  // types 2,4,5 read path+0x10 / +0xc directly; REG? raw path block address is esi->path
- if(direct(esi->type)) y=/*[path+0x10]*/0; else if(esi->path) y=s.pathY(esi->path);
- if(direct(esi->type)) x=/*[path+0xc]*/0; else if(esi->path) x=s.pathX(esi->path);
+ if(direct(esi->type)) y=s.rdPath(esi->path,0x10); else if(esi->path) y=s.pathY(esi->path);
+ if(direct(esi->type)) x=s.rdPath(esi->path,0xc); else if(esi->path) x=s.pathX(esi->path);
  Unit* n=s.spawn(ecx,esi,0x25a,x,y,0,1); if(n) s.o10637(n,0x19);
 }
 // 1.13c D2Client+0x52D90
 void sub_52D90(Svc& s,G& g,const char* msg5a){
  int32_t t=s.o10055();
  if(g.cc2e8==0||t>=g.cc2e8) return;
- // list head DAT_6fbba808[a2134&0x7f], next at +0xe4 (idx 0x39); walk collapsed by the Svc seam below
- // ponytail: node walk (id==a2134, type!=1 => fatal, state!=0xc && t<cc2e8-0x46 => return) left to caller-supplied lookup
- (void)msg5a;
+ for(Unit* n=s.listHead(g.a2134&0x7f);n;n=s.nextNode(n)){
+  if(n->id12!=g.a2134) continue;
+  if(n->type!=1){ s.o10024(msg5a,s.o10265(0x5a)); s.exit_m1(); }
+  if(n->f10!=0xc&&t<g.cc2e8-0x46) return;
+  break;
+ }
  uint16_t buf[512]{}; s.fmt10003(g.cc2e8-t,buf);
  s.o10184(); s.o10028(); s.o10150(0x177,9,1); s.o10184();
 }

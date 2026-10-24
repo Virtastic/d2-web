@@ -83,6 +83,7 @@ void __stdcall TEXT_RemoveNodeFromTextList(D2TextHeaderStrc* pTextHeader, short 
 }
 
 //D2Common.0x6FDC37F0 (#10905)
+// 1.13c D2Common+0x3D190
 int __stdcall TEXT_GetMenuType2NodeCount(D2TextHeaderStrc* pTextHeader)
 {
 	int nNodes = 0;

@@ -30,10 +30,12 @@ static void d2cmp_leave_cs(uint32_t idx) {
     LeaveCriticalSection((LPCRITICAL_SECTION)(uintptr_t)g_d2cmp_lockTable_6fe32060[idx * 2]);
 }
 
+struct D2CmpListEnvT { D2CmpSmemFreeFn smemFree; };   // layout of D2CmpListEnv in d2cmp_batch_1120.cpp
+extern "C" void d2cmp_1580(uint32_t* self, const D2CmpListEnvT* e);   // 0x1580
+
 // Host seam for the callee the cached decompile names but src/ does not implement: 0x1580, the
 // UCELLIST in-place destructor body (walks two sub-lists at +0x2C, then 0x15D0).
 struct D2CmpTiny1018Env {
-    void (*releaseUcellist)(void* list);   // 0x1580
     D2CmpSmemFreeFn smemFree;              // Storm #403
 };
 
@@ -60,7 +62,8 @@ void d2cmp_1110(CRITICAL_SECTION* section) {
 // 1.13c D2CMP+0x12C0
 extern "C"
 void d2cmp_12c0(void* list, const D2CmpTiny1018Env* env) {
-    env->releaseUcellist(list);
+    D2CmpListEnvT le = {env->smemFree};
+    d2cmp_1580((uint32_t*)list, &le);
     env->smemFree(list, kUcellistType, -2, 0);
 }
 

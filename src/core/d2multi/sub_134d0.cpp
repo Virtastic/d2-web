@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0x134D0: character-class gate. EAX = ptr to a byte (an ASCII-digit-based code);
+// 1.13c D2MULTI+0x134D0: character-class gate. EAX = ptr to a byte (an ASCII-digit-based code);
 // reads the 16-bit word at DAT_6fa09f14+0x1eb (passed here as `flags`). Returns nonzero if allowed.
 #include <cstdint>
 extern "C" int32_t d2_multi_sub_134d0(const uint8_t* p, uint16_t flags) {

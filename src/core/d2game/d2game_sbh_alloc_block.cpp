@@ -6,11 +6,10 @@
 #include <bit>
 #include <emscripten.h>
 
-struct D2GameSbhAllocBlockEnv {
-    uint32_t* regions; uint32_t* count; uint32_t* last_region; uint32_t* entry; uint32_t* seq;
-    uint32_t (*new_region)();             // 0x08F60
-    int32_t  (*new_group)(uint32_t region);  // 0x09017
-};
+struct D2GameSbh { uint32_t count, capacity, regions, heap, last_region, entry, seq; };
+extern "C" D2GameSbh g_D2Game_sbh;  // defined in d2game_sbh_alloc_new_region.cpp
+extern "C" uint32_t d2game_sbh_alloc_new_region();
+extern "C" int32_t D2Game_9017_SbhAllocNewGroup(uint32_t region);
 static inline uint32_t* P32(uint32_t a) { return (uint32_t*)(uintptr_t)a; }
 static inline uint8_t*  P8(uint32_t a)  { return (uint8_t*)(uintptr_t)a; }
 
@@ -23,14 +22,15 @@ static inline uint8_t*  P8(uint32_t a)  { return (uint8_t*)(uintptr_t)a; }
 // tail word. The bucket count at the group descriptor is decremented; when it was the last block of
 // the region owning the last free, that cursor is cleared. Returns the user pointer (node+4) or 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2game_sbh_alloc_block(uint32_t size, const D2GameSbhAllocBlockEnv* env) {
+EMSCRIPTEN_KEEPALIVE uint32_t d2game_sbh_alloc_block(uint32_t size) {
+    D2GameSbh* env = &g_D2Game_sbh;
     uint32_t rounded = size + 0x17u;
     uint32_t req = rounded & 0xfffffff0u;
     // Retail converts the wrapped 32-bit sum back to signed before its arithmetic shift.
     int32_t firstBucket = (std::bit_cast<int32_t>(rounded) >> 4) - 1;
-    uint32_t end = (*env->regions) + (*env->count) * 0x14u;
+    uint32_t end = env->regions + env->count * 0x14u;
     uint8_t b8 = (uint8_t)firstBucket;
-    uint32_t region = (*env->last_region);
+    uint32_t region = env->last_region;
     uint32_t loMask, hiMask;
     if (firstBucket < 0x20) {
         loMask = 0xffffffffu >> (b8 & 31);
@@ -41,24 +41,24 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2game_sbh_alloc_block(uint32_t size, const D2Game
     }
     while (region < end && ((P32(region)[1] & hiMask) == 0 && (P32(region)[0] & loMask) == 0))
         region += 0x14;
-    uint32_t r2 = (*env->regions);
+    uint32_t r2 = env->regions;
     if (region == end) {
-        while (r2 < (*env->last_region) && ((P32(r2)[1] & hiMask) == 0 && (P32(r2)[0] & loMask) == 0))
+        while (r2 < env->last_region && ((P32(r2)[1] & hiMask) == 0 && (P32(r2)[0] & loMask) == 0))
             r2 += 0x14;
         region = r2;
-        if (r2 == (*env->last_region)) {
+        if (r2 == env->last_region) {
             while (r2 < end && P32(r2)[2] == 0) r2 += 0x14;
-            uint32_t r3 = (*env->regions);
+            uint32_t r3 = env->regions;
             region = r2;
             if (r2 == end) {
-                while (r3 < (*env->last_region) && P32(r3)[2] == 0) r3 += 0x14;
+                while (r3 < env->last_region && P32(r3)[2] == 0) r3 += 0x14;
                 region = r3;
-                if (r3 == (*env->last_region)) {
-                    region = env->new_region();
+                if (r3 == env->last_region) {
+                    region = d2game_sbh_alloc_new_region();
                     if (region == 0) return 0;
                 }
             }
-            int32_t gi = env->new_group(region);
+            int32_t gi = D2Game_9017_SbhAllocNewGroup(region);
             P32(P32(region + 0x10)[0])[0] = (uint32_t)gi;
             if (P32(P32(region + 0x10)[0])[0] == 0xffffffffu) return 0;
         }
@@ -91,7 +91,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2game_sbh_alloc_block(uint32_t size, const D2Game
     int32_t rem = (int32_t)P32(node)[0] - (int32_t)req;
     int32_t newBucket = (rem >> 4) - 1;
     if (newBucket > 0x3F) newBucket = 0x3F;
-    (*env->last_region) = region;
+    env->last_region = region;
     if (newBucket != bucket) {
         if (P32(node)[1] == P32(node)[2]) {
             uint8_t* tally = P8(control + (uint32_t)bucket + 4);
@@ -140,7 +140,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2game_sbh_alloc_block(uint32_t size, const D2Game
     *(uint32_t*)(uintptr_t)(node + req - 4) = req + 1;
     int32_t count = (int32_t)P32(bucketBase)[0];
     P32(bucketBase)[0] = (uint32_t)(count + 1);
-    if (count == 0 && region == (*env->entry) && group == (int32_t)(*env->seq)) (*env->entry) = 0;
+    if (count == 0 && region == env->entry && group == (int32_t)env->seq) env->entry = 0;
     P32(control)[0] = (uint32_t)group;
     return node + 4;
 }

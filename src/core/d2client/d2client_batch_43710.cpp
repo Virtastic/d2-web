@@ -44,8 +44,7 @@ void sub_4C7C0(Calls&c,const I*unit,U param_1,const uint8_t*dt_a78,I dt_a80){
   for(I j=n;j>0;--j)c.fb60450(param_1);
  }
 }
-// 1.13c D2Client+0x55B20 : tooltip line builder, 1004 bytes. Not transcribed beyond the entry
-// contract (ORD-heavy, 6 args, this=ECX): see fb05b20 callback; NAMED only.
+// tooltip line builder (rva 0x55B20) is transcribed in d2client_n86.cpp:sub_55B20.
 // 1.13c D2Client+0x55F10  (REG? unaff_EBX/ESI/retaddr passed through to 55B20)
 void sub_55F10(Calls&c,const uint8_t*dt_c18,I dt_c1c){
  if(c.ord10106()!=5) return; I q=c.ord10620();

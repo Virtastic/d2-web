@@ -16,7 +16,7 @@ struct StormNode { uint32_t link, tag; };  // retail 32-bit layout
 static_assert(offsetof(StormNode, tag) == 4, "tag at +4");
 // 1.13c Storm+0x4790: p[0]=p[1]=0
 void Storm_Sub4790(uint32_t* p) { p[0] = 0; p[1] = 0; }
-// 1.13c Storm+0x4C20: node {link,tag}; link!=0: *(tag<0 ? ~tag : node+(tag-link[1])) = link; link[1]=tag; clear node
+// also Storm 0x04C20: node {link,tag}; link!=0: *(tag<0 ? ~tag : node+(tag-link[1])) = link; link[1]=tag; clear node
 void Storm_Sub4C20(uint8_t* node) {
     auto read = [](const uint8_t* p) { uint32_t v; std::memcpy(&v, p, 4); return v; };
     const uint32_t link = read(node);

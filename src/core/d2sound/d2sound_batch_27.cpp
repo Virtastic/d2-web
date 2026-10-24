@@ -13,5 +13,5 @@ int64_t d2s_ftol(double x) { return (int64_t)x; }
 // 1.13c D2sound+0x260C  _FF_MSGBANNER-style runtime error writer (console write or MessageBox); no UI here
 void d2s_rterr_write(int) {}
 
-// 1.13c D2sound+0x1C27  _unlock(4)
+// (superseded by d2sound_n95.cpp) D2sound 0x1C27  _unlock(4)
 __attribute__((weak)) void d2s_unlock4() { d2s_unlock(4); }

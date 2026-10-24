@@ -9,7 +9,7 @@ struct B85990_Node { B85990_Def* pDef; int32_t nKind; int32_t pad[3]; B85990_Nod
 struct B85990_Data { uint8_t pad0[0x5C]; int32_t nW; int32_t nH; uint8_t pad1[0x264 - 0x64]; B85990_Node* pList; };
 struct B85990_Unit { uint8_t pad[0x14]; B85990_Data* pData; };
 
-void __fastcall D2Common_42A70(B85990_Unit* pUnit, int32_t a, int32_t b, int32_t c, int32_t d, int32_t e);
+extern "C" void D2Common_42A70(B85990_Unit* pUnit, int32_t a, int32_t b, int32_t c, int32_t d, int32_t e);
 
 void __fastcall D2Common_85990(B85990_Unit* pUnit)
 {

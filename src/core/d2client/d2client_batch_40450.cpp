@@ -2,6 +2,7 @@
 // Ordinals and unresolved callees are host callbacks; sgptDataTables is a pinned view.
 #include <cstdint>
 #include <cstring>
+#include "skill_gates_40450.h"
 namespace d2client_b40450 {
 using U=uint32_t; using I=int32_t; using P=void*;
 static U rd(const void* p,U n){U v;std::memcpy(&v,static_cast<const uint8_t*>(p)+n,4);return v;}
@@ -30,24 +31,9 @@ struct Calls {
 };
 static const uint8_t* rec(const Calls& c,I id){
  if(id<0||id>=c.dt.skillCount||!c.dt.skills)return nullptr; return c.dt.skills+id*0x23c; }
-// 1.13c D2Client+0x40550 (unit in param, skill id in EAX)
-I sub_40550(const Calls& c,P unit,I id){
- const uint8_t* r=rec(c,id); if(!r)return -1;
- if((r[4]&0x80)&&rs(r,0x80)>=0&&rs(r,0x80)<c.dt.c4&&rs(r,0x54)>=0&&rs(r,0x54)<c.dt.bd4){
-  P d=c.unitData(unit);
-  if(d){I l=c.skillLevel(d,rs(r,0x54),0); if(l>=2){if(l>2)l=3; return rs(r,0xe8+l*2);} }
- }
- return rs(r,0xea);
-}
-// 1.13c D2Client+0x40450 (skill id in EDI)
-U sub_40450(const Calls& c,I id){
- const uint8_t* r=rec(c,id); if(!r)return 0;
- if(r[4]&0x80){
-  if(rs(r,0x80)<0||rs(r,0x80)>=c.dt.c4)return c.fail();
-  if(rs(r,0x54)>=0&&rs(r,0x54)<c.dt.bd4){P d=c.unitData(nullptr); if(!d)return c.fail(); c.skillLevel(d,rs(r,0x54),0);}
- }
- return c.fail(); // every path ends in Ordinal_10786
-}
+// Seam wrappers over the real functions in skill_gates_40450.cpp (the Calls table is no longer consulted).
+I sub_40550(const Calls&,P unit,I id){ return d2_client_40550(static_cast<D2UnitStrc*>(unit),id); }
+U sub_40450(const Calls&,I id){ return U(d2_client_40450(id,nullptr,0,0)); }
 // 1.13c D2Client+0x40610
 U sub_40610(const Calls& c,P u){
  P d=c.resolve(rd(u,0x2c)); if(!d){c.fatal(u);return 0;}
@@ -85,18 +71,7 @@ bool sub_409B0(const Calls& c,P u){
 // 1.13c D2Client+0x40CA0: body is host-ordered Ordinal sequence; only the table gates are recovered here.
 // ponytail: tail (Ordinals 10871/11013/10630...) left to caller via host hooks, add when a vector pins it.
 bool sub_40CA0_gate(const Calls& c,I id){ return rec(c,id)!=nullptr; }
-// 1.13c D2Client+0x40DF0: n bursts, LCG seed in local_70 (uninitialised there; seeded by Ordinal_10614).
-void sub_40DF0(const Calls& c,I n,U p1,U p2,U p3,U p4,U p5,U p6,uint64_t seed){
- U s[23]={}; s[0]=3; s[1]=p1; s[5]=p2; s[6]=p3; s[4]=p6; s[15]=p4; s[16]=p5; // 0x58-0x68 layout
- uint64_t r=seed;
- for(;n>0;--n){
-  uint64_t a=(r&0xffffffff)*0x6ac690c5u+(r>>32); I x=I(U(a)%0x28)-0x14;
-  r=(a&0xffffffff)*0x6ac690c5u+(a>>32); I y=I(U(r)%0x28)-0x14;
-  if(x==0&&y==0)x=0x14; s[11]=U(x); s[12]=U(y);
-  P h=reinterpret_cast<P>(uintptr_t(c.spawn(s)));
-  if(h){c.setField(h,c.rand()); c.setPos(h,U(y)*0x10000u+(U(x)&0xffff));}
- }
-}
+void sub_40DF0(const Calls&,I n,U p1,U p2,U p3,U p4,U p5,U p6,uint64_t seed){ d2_client_40df0(n,p1,p2,p3,p4,p5,p6,U(seed)); }
 // 1.13c D2Client+0x40F00 and 0x41000: same loop over two 64-word tables (DAT_6fb862e0/e0 and 6fb86520/620)
 static void ring(const Calls& c,U p1,U p2,U p3,U p4,I id,I step,const U* ta,const U* tb){
  U s[23]={}; s[0]=3; s[1]=p1; s[3]=p2; s[4]=p3; s[5]=p4; // 0x5c-based layout
@@ -109,6 +84,6 @@ static void ring(const Calls& c,U p1,U p2,U p3,U p4,I id,I step,const U* ta,cons
 }
 // 1.13c D2Client+0x40F00
 void sub_40F00(const Calls& c,U p1,U p2,U p3,U p4,I id,I step,const U* t1,const U* t2){ ring(c,p1,p2,p3,p4,id,step,t1,t2); }
-// 1.13c D2Client+0x41000
+// dup of D2CLIENT+0x41000
 void sub_41000(const Calls& c,U p1,U p2,U p3,U p4,I id,I step,const U* t1,const U* t2){ ring(c,p1,p2,p3,p4,id,step,t1,t2); }
 }

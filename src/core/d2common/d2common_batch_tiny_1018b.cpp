@@ -102,6 +102,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_3624_Unlock12(void)
 // 17 callers, the whole stdio/errno family. __getptd (0x3475) is still an UNMAPPED row, so it is a
 // caller-supplied seam, as for the __unlock_fhandle fragments above.
 typedef void* (*D2CommonGetPtdFn)(void);  // 0x03475 __getptd
+extern "C" void* D2Common_3475_GetPtd(void);
 
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t* D2Common_44BC_Errno(D2CommonGetPtdFn get_ptd)
 {
@@ -112,11 +113,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t* D2Common_44BC_Errno(D2CommonGetPtdFn ge
 
 // 1.13c D2Common+0x44C5: the CRT `_doserrno` accessor -- `call 0x3475 __getptd; add eax, 0xC; ret`,
 // the address of _tdoserrno in the calling thread's _ptiddata (VS2003: _terrno at 8, _tdoserrno at
-// 0xC). 11 callers, the stdio/errno family. __getptd (0x3475) is still UNMAPPED, so it stays a
-// caller-supplied seam, exactly as for 0x44BC above.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t* D2Common_44C5_Doserrno(D2CommonGetPtdFn get_ptd)
+// 0xC). 11 callers, the stdio/errno family; calls __getptd (0x3475) directly.
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t* D2Common_44C5_Doserrno(void)
 {
-	return reinterpret_cast<int32_t*>(static_cast<uint8_t*>(get_ptd()) + 0xC);
+	return reinterpret_cast<int32_t*>(static_cast<uint8_t*>(D2Common_3475_GetPtd()) + 0xC);
 }
 
 // 1.13c D2Common+0x465A: nine-byte wrapper (caller 0x4541): _unlock(1).

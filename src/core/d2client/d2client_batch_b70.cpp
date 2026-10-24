@@ -18,7 +18,7 @@ W void FUN_6fb144f0(void);
 W void Ordinal_10041(void* cel, int32_t x, int32_t y, int32_t color, int32_t mode, void* pal);
 W void Ordinal_511(void* msg);
 W int32_t Ordinal_11017(int32_t);
-W int32_t Ordinal_10265(int32_t);
+W uint32_t Ordinal_10265(int32_t);
 W void Ordinal_10024(const void*, int32_t);
 W int32_t FUN_6fb3bd90(int32_t, int32_t);
 W void FUN_6fb4fd70(void);

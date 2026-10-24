@@ -137,36 +137,45 @@ void hirePanelTick(GlobalSvc& g){
  if(g.viewMode()==2){ clearFlags(g); return; }
  const uint8_t* v=g.viewedUnit(); int32_t id=v?rd<int32_t>(v,0xC):-1; bool own=false;
  for(const uint8_t* n=g.hireNode();n;n=rd<const uint8_t*>(n,0x30)) if(rd<int32_t>(n,0xC)==id){own=true;break;}
- bool hire=g.isHireling(id);
- auto closeSide=[&]{ g.expansion(); if(g.panelCount()!=0x26) g.fatal(0x139B);
-  bool done; panelSweep(g,0x4C,done); if(!done) return;
-  if(!v||(rd<int32_t>(v,0)==0&&!g.unitCheck())) g.openFlag()=1; else if(g.openFlag()==0) return;
-  g.fire(nullptr,true); };
- if((hire&&g.viewMode()!=1)||own){
-  const uint8_t* u=nullptr;
-  if(v) for(const uint8_t* n=g.hireNode();n;n=rd<const uint8_t*>(n,0x30))
-   if(rd<int32_t>(n,4)==7&&rd<int32_t>(n,0xC)==rd<int32_t>(v,0xC)&&rd<int32_t>(n,0x20)==0){
-    uint32_t sid=rd<uint32_t>(n,8); if(sid!=0xFFFFFFFFu) u=g.unitBySlot(sid&0x7F); break; }
-  uint32_t sid=0; (void)sid;
-  // walk the chain at +0xE4 for the matching id; unresolved or non-player chain clears and closes
-  bool ok=false;
-  for(;u;u=rd<const uint8_t*>(u,0xE4)) if(rd<uint32_t>(u,0xC)==(uint32_t)0){ ok=false; break; }
-  (void)ok; clearFlags(g); if(g.openFlag()==0) closeSide();
- } else {
+ bool hire=g.isHireling(id); bool wasOpen=g.openFlag()!=0;
+ if(!((hire&&g.viewMode()!=1)||own)){
   clearFlags(g);
-  if(g.openFlag()!=0){ g.expansion(); if(g.panelCount()!=0x26) g.fatal(0x139B); g.openFlag()=0; g.fire(nullptr,false); }
+  if(wasOpen){ g.expansion(); if(g.panelCount()!=0x26) g.fatal(0x139B); g.openFlag()=0; g.fire(nullptr,false); }
+  return;
  }
+ bool clr=true;   // flags are cleared unless the slot chain walk dead-ends on a null unit
+ if(v) for(const uint8_t* n=g.hireNode();n;n=rd<const uint8_t*>(n,0x30))
+  if(rd<int32_t>(n,4)==7&&rd<int32_t>(n,0xC)==rd<int32_t>(v,0xC)&&rd<int32_t>(n,0x20)==0){
+   uint32_t sid=rd<uint32_t>(n,8); if(sid==0xFFFFFFFFu) break;
+   const uint8_t* u=g.unitBySlot(sid&0x7F);
+   for(;;u=rd<const uint8_t*>(u,0xE4)){
+    if(!u){ clr=false; break; }
+    if(rd<uint32_t>(u,0xC)==sid){ if(rd<int32_t>(u,0)!=1) g.fatal(0x5A); clr=g.unitCheck(); break; }
+   }
+   break; }
+ if(clr) clearFlags(g);
+ if(g.openFlag()!=0) return;
+ g.expansion(); if(g.panelCount()!=0x26) g.fatal(0x139B);
+ bool done; panelSweep(g,0x4C,done); if(!done) return;
+ if(!v||(rd<int32_t>(v,0)==0&&!g.unitCheck())) g.openFlag()=1; else return;
+ g.fire(nullptr,true);
 }
-// 1.13c D2Client+0x5CD10 : decode a wave header; state at +0x86 must be 2
-struct Stream { uint8_t b[0x90]; };
-bool waveHeader(Services& s,uint8_t* st,const uint8_t* hdr,const void* data,uint32_t sz,int16_t fmt,int32_t rate,uint16_t bits,uint32_t packed){
- (void)s;(void)hdr;(void)sz;
- if(rd<int32_t>(st,0x86)!=2) s.fatal(0x5D);
- if(data&&bits==0x10&&rate==0x5622){ std::memcpy(st+0x74,&data,sizeof data); st[0x50]=((packed>>16)==2); (void)fmt; return true; }
+// 1.13c D2Client+0x5CD10 : decode a stream's wave header (ESI = stream; state at +0x86 must be 2)
+// decode = D2sound #10025 via thunk 0xD2C4: (stream+0x6c, &hdrPtr in/out, fmt out) -> data ptr or 0; fmt = 16-byte WAVEFORMATEX head
+using WaveDecode = uint32_t(*)(uint32_t src,uint32_t* hdrPtr,uint8_t* fmt);
+bool waveHeader(uint8_t* st,void(*fatal)(uint32_t),WaveDecode decode){
+ if(rd<int32_t>(st,0x86)!=2) fatal(0x5D);   // Fog #10265(0x5d) message then _exit(-1)
+ uint32_t hp=rd<uint32_t>(st,0x70); uint8_t fmt[16];
+ uint32_t d=decode(rd<uint32_t>(st,0x6C),&hp,fmt);
+ if(d&&rd<uint16_t>(fmt,14)==0x10&&rd<uint32_t>(fmt,4)==0x5622){
+  std::memcpy(st+0x74,&d,4); st[0x50]=(rd<uint16_t>(fmt,2)==2); std::memcpy(st+0x78,&hp,4); return true; }
  st[0x81]=1; return false;
 }
 // Sound slot table: 16 slots of 8 dwords at DAT_6fbc75c0; [0]=handle [1]=class [2]=record ptr
-struct SoundSlot { uint32_t handle,cls; const uint8_t* rec; uint32_t pad[5]; };
+// retail slots hold 32-bit pointers (stride 0x20); a native pointer would be 8 bytes on wasm64
+struct P32 { uint32_t v; operator uint8_t*() const { return (uint8_t*)(uintptr_t)v; } P32& operator=(const uint8_t* p) { v = (uint32_t)(uintptr_t)p; return *this; } };
+struct SoundSlot { uint32_t handle,cls; P32 rec; uint32_t pad[5]; };
+static_assert(sizeof(SoundSlot)==0x20&&offsetof(SoundSlot,rec)==8,"retail slot layout");
 struct SoundSvc {
  virtual ~SoundSvc()=default;
  virtual uint32_t stopHandle(uint32_t h)=0;   // Ordinal_10032
@@ -174,12 +183,14 @@ struct SoundSvc {
  virtual bool busy(SoundSlot&)=0;             // Ordinal_10044
  virtual bool stillPlaying(SoundSlot&)=0;     // Ordinal_10003/10044 variants
  virtual const uint8_t* soundRec(int32_t cls)=0; // DAT_6fbcc24c + cls*0x8e, 0x8e stride, null on range
+ virtual void releaseSlot(SoundSlot& sl); // 5CE30 (FN seam overrides it with the hooked callee)
 };
 // 1.13c D2Client+0x5CE30 : release one slot
 void slotRelease(SoundSvc& s,SoundSlot& sl){
- if(sl.handle){ if(sl.rec){ uint32_t v=s.stopHandle(sl.handle); std::memcpy((uint8_t*)const_cast<uint8_t*>(sl.rec)+0x41,&v,4);} s.release(sl); }
- if(sl.rec){ uint32_t two=2,zero=0; std::memcpy(const_cast<uint8_t*>(sl.rec)+0x30,&two,4); std::memcpy(const_cast<uint8_t*>(sl.rec)+0x2C,&zero,4); sl.rec=nullptr; }
+ if(sl.handle){ if(sl.rec){ uint32_t v=s.stopHandle(sl.handle); std::memcpy((uint8_t*)((uint8_t*)sl.rec)+0x41,&v,4);} s.release(sl); }
+ if(sl.rec){ uint32_t two=2,zero=0; std::memcpy(((uint8_t*)sl.rec)+0x30,&two,4); std::memcpy(((uint8_t*)sl.rec)+0x2C,&zero,4); sl.rec=nullptr; }
 }
+void SoundSvc::releaseSlot(SoundSlot& sl){ slotRelease(*this,sl); }
 // 1.13c D2Client+0x5CE70 : find or evict a slot for a new sound (record `rec`, class `cls`)
 SoundSlot* slotAcquire(SoundSvc& s,SoundSlot* t,const uint8_t* rec,uint32_t cls){
  for(int i=0;i<16;i++) if(t[i].rec==nullptr&&t[i].cls==cls&&!s.busy(t[i])) return &t[i];
@@ -204,7 +215,7 @@ SoundSlot* slotAcquire(SoundSvc& s,SoundSlot* t,const uint8_t* rec,uint32_t cls)
 // 1.13c D2Client+0x5CF90 : switch the active sound-bank id; closes the previous one when idle or unset
 void switchBank(uint32_t& cur,uint32_t next,int32_t curState,bool curOpen,void(*close)()){
  uint32_t keep=cur;
- if(next!=cur){ keep=cur; if(curState==2||next==0){ keep=next; if(curOpen) close(); } }
+ if(next!=cur){ keep=next; if((curState==2||next==0)&&curOpen) close(); } // every path assigns next
  cur=keep;
 }
 // 1.13c D2Client+0x5D080 : reap finished sound slots
@@ -213,8 +224,8 @@ void reapSlots(SoundSvc& s,SoundSlot* t){
   if(!t[i].rec) continue;
   const uint8_t* r=s.soundRec((int32_t)rd<uint32_t>(t[i].rec,4));
   if(r&&r[0x3E]) continue;
-  if(!s.busy(t[i])){ if(s.stillPlaying(t[i])) slotRelease(s,t[i]);
-   if(t[i].rec){ uint32_t two=2,zero=0; std::memcpy(const_cast<uint8_t*>(t[i].rec)+0x30,&two,4); std::memcpy(const_cast<uint8_t*>(t[i].rec)+0x2C,&zero,4); t[i].rec=nullptr; } }
+  if(!s.busy(t[i])){ if(s.stillPlaying(t[i])) s.releaseSlot(t[i]);
+   if(t[i].rec){ uint32_t two=2,zero=0; std::memcpy(((uint8_t*)t[i].rec)+0x30,&two,4); std::memcpy(((uint8_t*)t[i].rec)+0x2C,&zero,4); t[i].rec=nullptr; } }
  }
 }
 // 1.13c D2Client+0x5C7F0 : per-frame hireling HUD. Blocked states clear the two flags and return.
@@ -240,4 +251,32 @@ void hireHud(HudSvc& h){
  if(h.popupPending()) h.popupClear();
  if(h.tooltipReady()) h.tooltip();
 }
+}
+// 1.13c D2Client+0x5B530 FN seam: name = 0xA5D90's result, draw = 0x5AC70 (buffer, a, b, 0).
+typedef void (*d2c5b530_draw)(const uint16_t*, int32_t, int32_t, int32_t);
+extern "C" void d2_client_5b530(int32_t have, int32_t a, int32_t b, const void* name, d2c5b530_draw draw) {
+ struct S : d2client_batch_5b120::Services { const void* n; d2c5b530_draw d;
+  void drawNameU(const void* u,int32_t x,int32_t y,int32_t c) override { d((const uint16_t*)u,x,y,c); }
+  const void* playerName() override { return n; }
+  const uint8_t* hireRec(int32_t) override{return 0;} uint32_t bitMask14() override{return 0;} const uint8_t* hireNode() override{return 0;}
+  uint32_t loadSprite(const char*) override{return 0;} uint32_t loadSlotIcon(int32_t) override{return 0;} bool expansion() override{return 0;}
+  uint32_t* allocCache(unsigned) override{return 0;} uint32_t colour(int32_t,int32_t,int32_t) override{return 0;}
+  void fillRect(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t) override{} const uint8_t* findPlayerRec(int32_t,int32_t) override{return 0;}
+  uint32_t* iconSlots() override{return 0;} uint32_t* cache() override{return 0;} int32_t cacheCount() override{return 0;}
+  uint8_t* colourCache() override{return 0;} int32_t viewMode() override{return 0;} void drawName(const char*,int32_t,int32_t) override{}
+  void drawIcon(void*,int32_t,int32_t,int32_t,int32_t,int32_t) override{} [[noreturn]] void fatal(int32_t) override{for(;;);} } s;
+ s.n = name; s.d = draw; d2client_batch_5b120::hireName(s, have != 0, a, b);
+}
+// 1.13c D2Client+0x5D080 FN seam: table = DAT 0x1175C0 (16 slots), recs = DAT 0x11C24C (ptr) / 0x11C250 (count).
+struct d2c5d080_calls { bool (*busy)(uint32_t handle); bool (*playing)(uint32_t handle); void (*release)(); };
+extern "C" void d2_client_5d080(void* table, const uint8_t* recs, int32_t count, const d2c5d080_calls& c) {
+ struct S : d2client_batch_5b120::SoundSvc { const uint8_t* r; int32_t n; const d2c5d080_calls* c;
+  uint32_t stopHandle(uint32_t) override{return 0;}
+  void release(d2client_batch_5b120::SoundSlot&) override{}
+  void releaseSlot(d2client_batch_5b120::SoundSlot&) override{ c->release(); }
+  bool busy(d2client_batch_5b120::SoundSlot& s) override{ return c->busy(s.handle); }
+  bool stillPlaying(d2client_batch_5b120::SoundSlot& s) override{ return c->playing(s.handle); }
+  const uint8_t* soundRec(int32_t i) override{ return (r&&i>=0&&i<n)? r+i*0x8e : nullptr; } } s;
+ s.r=recs; s.n=count; s.c=&c;
+ d2client_batch_5b120::reapSlots(s,(d2client_batch_5b120::SoundSlot*)table);
 }

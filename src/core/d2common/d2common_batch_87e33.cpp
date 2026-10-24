@@ -5,7 +5,7 @@
 
 extern "C" {
 // Unwired callees (weak): _isdigit, __multtenpow12-style scaler +0x88745, digits->ld12 +0x87D4B (wired).
-__attribute__((weak)) int d2common_crt_isdigit_90f0(int c);
+__attribute__((weak)) int D2Common_90F0_Isdigit(int c);
 __attribute__((weak)) char d2common_dat_6fde9964[1];
 __attribute__((weak)) void D2Common_88745(uint32_t* ld12, int32_t exp10, int32_t p4);
 void D2Common_87D4B(const char* digits, int32_t count, uint32_t* out);
@@ -53,7 +53,7 @@ top:
   if (c == dp) goto L7ec2;
   break;
  case 3:
-  while (d2common_crt_isdigit_90f0(c) != 0) {
+  while (D2Common_90F0_Isdigit(c) != 0) {
    if (cnt < 0x19) { ++cnt; *pc++ = (char)(c - 0x30); } else ++drop;
    c = *q++;
   }
@@ -62,7 +62,7 @@ top:
  case 4:
   b3 = true;
   if (cnt == 0) while (c == 0x30) { --drop; c = *q++; }
-  while (d2common_crt_isdigit_90f0(c) != 0) {
+  while (D2Common_90F0_Isdigit(c) != 0) {
    if (cnt < 0x19) { ++cnt; *pc++ = (char)(c - 0x30); --drop; }
    c = *q++;
   }
@@ -70,7 +70,7 @@ top:
  case 5:
   b3 = true;
   s = save;
-  if (d2common_crt_isdigit_90f0(c) != 0) { st = 4; goto L80d2; }
+  if (D2Common_90F0_Isdigit(c) != 0) { st = 4; goto L80d2; }
   goto L808f;
  case 6:
   save = s - 1;
@@ -133,13 +133,13 @@ L8069: st = 8; s = q; goto top;
 L80d0: st = 9;
 L80d2: s = q - 1; goto top;
 L814e:
- if (d2common_crt_isdigit_90f0(c) == 0) goto L8171;
+ if (D2Common_90F0_Isdigit(c) == 0) goto L8171;
  exp = (int8_t)c - 0x30 + exp * 10;
  if (0x1450 < exp) { exp = 0x1451; goto L8171; }
  c = *q++;
  goto L814e;
 L8171:
- while (d2common_crt_isdigit_90f0(c) != 0) c = *q++;
+ while (D2Common_90F0_Isdigit(c) != 0) c = *q++;
  s = q - 1;
  goto L808f;
 L808b: s = q - 1;

@@ -8,7 +8,7 @@ test('Storm break-chain registration preserves list, mode, message identity and 
   try {
     const binary = join(dir, 'check');
     execFileSync('c++', ['-std=c++20', '-Wall', '-Wextra', '-Werror', '-pedantic',
-      'test/native/storm-event-3b1e0.cpp', '-o', binary]);
+      '-isystem', 'src/core/d2moo/compat', 'test/native/storm-event-3b1e0.cpp', 'src/core/storm/storm_349e0.cpp', '-o', binary]);
     execFileSync(binary);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

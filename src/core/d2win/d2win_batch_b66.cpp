@@ -8,6 +8,7 @@
 #include <initializer_list>
 #include <emscripten.h>
 
+extern "C" void Ordinal_10043(int32_t, int32_t);
 struct D2WinB66Env {
     void (*fatal)(int32_t id);                         // Ordinal_10265(id) -> Ordinal_10024("",s) -> _exit(-1)
     void* (*alloc)(int32_t size, int32_t line);        // Ordinal_10042(size,0)
@@ -180,29 +181,21 @@ int32_t d2win_b66_99F0(int32_t* w, const uint16_t* text, int32_t limit, int32_t 
     return 1;
 }
 
-// 1.13c D2Win+0x12350 -- build "DATA\LOCAL\<lang>\" + dirTag + fontName into dst. size=param_1,
-// fontIdx=EBX, dst=EDI (hidden). lang/ingame/tag selection is in env->fontName.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2win_b66_12350(int32_t size, int32_t fontIdx, char* dst, const char* lang, int32_t ingame,
-                     const char* tagDefault, const char* tagChat, const char* nameFor,
-                     const char* nameChat, const D2WinB66Env* e) {
-    char dir[260];
-    snprintf(dir, sizeof dir, "%s\\%s\\", "DATA\\LOCAL", lang);
-    int32_t n = 0; while (dir[n]) n++;
-    if (size <= n + 0x13) e->fatal(0x7b);   // (end - (buf+1)) + 0x14 == strlen + 0x13
-    const char* tag = tagDefault; const char* name = nameFor;
-    if (ingame && fontIdx == 0xd) { tag = tagChat; name = nameChat; }
-    snprintf(dst, size, "%s%s%s", dir, tag, name);
+// 1.13c D2Win+0x12B40 -- slot idx (EAX hidden): reset and re-create its entry in d2win_font_tab.
+struct D2WinFontEnt { void* s[5]; };
+extern "C" {
+extern D2WinFontEnt d2win_font_tab[32];
+void d2win_sub_12280(int32_t cap, int32_t fontIdx, char* dst);
+void* d2win_7c60(const char* name, uint32_t* size);
+EMSCRIPTEN_KEEPALIVE
+void d2win_12B40(int32_t idx) {
+    char path[260];
+    d2win_sub_12280(0x4f, idx, path);   // retail leaves EBX/EDI from the caller; only the size check matters
+    D2WinFontEnt& s = d2win_font_tab[idx];
+    if (s.s[0]) Ordinal_10043(0xb3, 0);
+    void* v = d2win_7c60(nullptr, nullptr);
+    s.s[0] = v; s.s[1] = v; s.s[2] = (uint8_t*)v + 0xc;
 }
-
-// 1.13c D2Win+0x12B40 -- slot idx (EAX hidden): reset and re-create its 3-int entry.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2win_b66_12B40(int32_t idx, const D2WinB66Env* e) {
-    e->sub_2280(0x4f);
-    int32_t* s = e->fontTbl + idx * 5;
-    if (s[0]) e->free_(0xb3);
-    int32_t v = e->sub_7C60(0, 0);
-    s[0] = v; s[1] = v; s[2] = v + 0xc;
 }
 
 // 1.13c D2Win+0x13ac0 -- edit-box scroll window [0x4c,0x50] recompute. ESI = edit widget (hidden).

@@ -23,7 +23,7 @@ int32_t DAT_6fa09f88; D2MultiChatNode* DAT_6fa0a0f0;
 void* DAT_6fa08e80[0x20]; uint32_t DAT_6fa09f24, DAT_6fa09f2c; void* DAT_6fa0a0e0;
 }
 
-// 1.13c D2Multi+0x9550
+// 1.13c D2MULTI+0x09550
 extern "C" void FUN_6f9d9550(void) {
     static const char* const n[] = {
         "UI\\FrontEnd\\PopUpLargest2","UI\\FrontEnd\\MediumButtonBlank2","UI\\BIGMENU\\bnet","UI\\BIGMENU\\waitingroombkgd",
@@ -48,7 +48,7 @@ extern "C" void FUN_6f9d9550(void) {
     if (d2win_setCelPair) d2win_setCelPair(d2multi_cel[51], d2multi_cel[52]);  // SquelchAura, SelectAura
 }
 
-// 1.13c D2Multi+0x9D60
+// 1.13c D2MULTI+0x09D60
 extern "C" void FUN_6f9d9d60(void) {
     uint16_t u[1024] = {0};
     if (!DAT_6fa09f88) return;
@@ -79,12 +79,12 @@ static void ctl3(const void* a, const void* b, const void* c, void* cb, bool tic
     if (tick) DAT_6fa09f2c = 0;  // retail: GetTickCount()
 }
 
-// 1.13c D2Multi+0xAA60
+// 1.13c D2MULTI+0x0AA60
 extern "C" void FUN_6f9daa60(void* cb) { ctl3((void*)0x6f9ea360, (void*)0x6f9ea3c0, (void*)0x6f9ea3f0, cb, true); }
-// 1.13c D2Multi+0xACB0
+// 1.13c D2MULTI+0x0ACB0
 extern "C" void FUN_6f9dacb0(void* cb) { ctl3((void*)0x6f9ea360, (void*)0x6f9ea390, (void*)0x6f9ea3f0, cb, false); }
 
-// 1.13c D2Multi+0xB160
+// 1.13c D2MULTI+0x0B160
 extern "C" void FUN_6f9db160(const void* ft, char* out, int cap) {
     (void)ft; (void)out; (void)cap;  // ponytail: FILETIME->localized long date (GetDateFormatA lcid 0x400) is host-locale; host shim supplies it
 }

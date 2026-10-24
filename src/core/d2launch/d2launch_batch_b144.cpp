@@ -74,10 +74,10 @@ B144_W extern uint8_t DAT_6fa60590[];
 void b144_cexit(void) { FUN_6fa41598(0, 0, 1); }
 
 // 1.13c D2Launch+0x36dc  __SEH_prolog (x86 frame push; no wasm equivalent)
-void b144_seh_prolog(void) {}
+extern "C" void b144_seh_prolog(void) {}
 
 // 1.13c D2Launch+0x3717  __SEH_epilog (x86 frame pop; no wasm equivalent)
-void b144_seh_epilog(void) {}
+extern "C" void b144_seh_epilog(void) {}
 
 // 1.13c D2Launch+0x46db
 void b144_tlsalloc(void) { FUN_6fa4_tlsalloc(); }

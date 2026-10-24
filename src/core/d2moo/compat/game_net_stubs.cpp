@@ -165,6 +165,7 @@ void __fastcall CLIENTS_SetGuildEmblem(D2ClientStrc* pClient, uint8_t nBackgroun
     pClient->tGuildInfo.nForegroundColor = nForegroundColor;
     pClient->tGuildInfo.nEmblemType = nEmblemType;
 }
+// 1.13c D2GAME+0x4AD10
 D2UnitStrc* CLIENTS_GetPlayerFromClient(D2ClientStrc* pClient, BOOL bIgnoreDeath) {
     // The headless sim has no socket clients, but targeted-AI fixtures attach a minimal client
     // carrying the player unit. This is the retail fast path when the client owns a live player.

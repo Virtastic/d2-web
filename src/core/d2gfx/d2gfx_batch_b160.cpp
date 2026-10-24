@@ -17,6 +17,7 @@ extern "C" uint32_t d2gfx_sub_b160(void* module, int32_t reason) {
     return 1;
 }
 
+// 1.13c D2Gfx+0x7FB0 (ordinal 10048): returns the window handle global [D2Gfx+0x11264].
 extern "C" uintptr_t d2gfx_window_handle() {
     return g_d2gfx_window_handle;
 }

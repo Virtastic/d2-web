@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <emscripten.h>
 
+#include "D2Items.h"
+
 extern "C" {
 const uint8_t* D2Common_45A40_ItemsRecord(const int32_t* pUnit, const int32_t* pRec);
 int32_t d2_fn_d2common_475e0(int32_t in_eax, void* p1, uint32_t p2, int32_t p3, int16_t p4,
@@ -12,7 +14,6 @@ uint8_t D2Common_ItemIsThrowable_24C30(uint32_t pItem);
 
 struct D2Common487C0Env {
  int32_t (*roll_465b0)(int32_t param_1, int32_t* pUnit);    // 0x465B0
- uint32_t (*is_type_24430)(int32_t* pUnit, int32_t type);   // 0x24430
 };
 
 // 1.13c D2Common+0x487C0: apply a stat-list adjustment (stats 0x15, 0x17, 0x9f) for item param_3,
@@ -32,7 +33,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_487c0(void* param_2, int32_t* param_
   if (b != 0 && (int32_t)(b + param_8) < 1) v = 1 - (int32_t)b;
   if (v != 0) d2_fn_d2common_475e0(param_4, param_2, (uint32_t)(uintptr_t)param_3, param_5, (int16_t)stat, 0, v, param_9, param_10, dt);
  };
- const bool ty = env->is_type_24430(param_3, 0x2d) != 0;
+ const bool ty = ITEMS_CheckItemTypeId(reinterpret_cast<const D2UnitStrc*>(param_3), 0x2d) != 0;
  if (!ty || row[0xfe] != 0 || row[0x102] == 0) apply(0xfe, 0x15);
  if (!ty || row[0x102] != 0 || row[0xfe] == 0) apply(0x102, 0x17);
  if (ty && D2Common_ItemIsThrowable_24C30((uint32_t)(uintptr_t)param_3) == 0) return param_8;

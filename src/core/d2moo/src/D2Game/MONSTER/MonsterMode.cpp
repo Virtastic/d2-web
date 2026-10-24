@@ -679,7 +679,6 @@ void __fastcall D2GAME_MONSTER_ApplyStatRegen_6FC63440(D2GameStrc* pGame, D2Unit
 }
 
 //D2Game.0x6FC63650
-// 1.13c D2Game+0x11D0
 D2MonStatsTxt* __fastcall MONSTERMODE_GetMonStatsTxtRecord(int32_t nMonsterId)
 {
     if (nMonsterId >= 0 && nMonsterId < sgptDataTables->nMonStatsTxtRecordCount)
@@ -1767,6 +1766,7 @@ void __fastcall D2GAME_MONSTERS_AiFunction02_6FC65150(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FC65220
+// 1.13c D2Game+0x75E10
 int32_t __stdcall D2GAME_ModeChange_6FC65220(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange, int32_t a3)
 {
     // TODO: v12, v13, v31, dwNewDist

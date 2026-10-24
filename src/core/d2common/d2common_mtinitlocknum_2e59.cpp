@@ -17,20 +17,20 @@ struct D2CommonMtLockEnv {
 // Allocate first; on failure set errno=12 and return 0. Under lock 10 re-check the slot (another thread
 // may have filled it): if still empty init the section with spin 4000 (failure: free, errno=12, unlock
 // via the SEH unwind, return 0) and store it; otherwise free the spare. Unlock 10, return 1.
-extern "C" int32_t D2Common_2E59_MtInitLockNum(uint32_t* slot, const D2CommonMtLockEnv* env)
+extern "C" int32_t D2Common_2E59_MtInitLockNum(void** slot, const D2CommonMtLockEnv* env)
 {
-    if (*slot != 0) return 1;
+    if (*slot != nullptr) return 1;
     void* cs = env->malloc_(0x18);
     if (!cs) { *env->errno_ptr() = 12; return 0; }
     env->lock10();
-    if (*slot == 0) {
+    if (*slot == nullptr) {
         if (env->init_cs_spin(cs, 4000) == 0) {
             env->free_(cs);
             *env->errno_ptr() = 12;
             env->unlock10();   // __local_unwind2 runs the __finally -> _unlock(10)
             return 0;
         }
-        *slot = (uint32_t)(uintptr_t)cs;
+        *slot = cs;
     } else {
         env->free_(cs);
     }

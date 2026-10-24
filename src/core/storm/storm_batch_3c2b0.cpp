@@ -18,18 +18,14 @@
 #include <cstdlib>
 #include <strings.h>
 #include <Windows.h>
+#include "storm_state.h"
+extern CRITICAL_SECTION g_stormErrLock;
 
 // ---- retail module state (all zero-initialised unless noted) -----------------------------------
 namespace {
 
-int32_t g_lastError;            // 0x6FC45388  last Storm error, mirrored to SetLastError
-int32_t g_lockInit;             // 0x6FC415F8  SErr critical-section lazy-init counter
-int32_t g_errLock;              // 0x6FC42FE0  SErr critical section (opaque here)
-uint32_t g_srcList;             // 0x6FC4537C  registered message-source list head
-uint32_t g_srcInit;             // 0x6FC45380  message sources registered once
 uint32_t g_fatalActive;         // 0x6FC45384  a fatal error has terminated the process
 uint32_t g_inError;             // 0x6FC42FF8  SErrDisplayError re-entry guard
-uint32_t g_mod;                 // 0x6FC45390  module whose STRINGTABLE supplies the dialog text
 uint32_t g_hwnd;                // 0x6FC42FD0  owner window for the error box
 uint32_t g_notifyList;          // 0x6FC45960  message-source notify list
 uint32_t g_debugMem;            // 0x6FC45A70  "Internal"/"Debug Memory" registry flag
@@ -43,8 +39,8 @@ uint32_t g_videoList;           // 0x6FC459F0  open video list head (next at +4)
 constexpr const char* kSvidCpp = "..\\3rdParty\\STORM\\SOURCE\\SVID.CPP";
 constexpr const char* kEmpty = "";
 
-void StormSetLastError(uint32_t e) { g_lastError = (int32_t)e; }
-void set_storm_error(uint32_t e) { g_lastError = (int32_t)e; StormSetLastError(e); }
+void StormSetLastError(uint32_t e) { g_stormLastError = (int32_t)e; }
+void set_storm_error(uint32_t e) { g_stormLastError = (int32_t)e; StormSetLastError(e); }
 void FreeLibrary(uint32_t) {}
 void CloseHandle(uint32_t) {}
 
@@ -82,7 +78,7 @@ struct StormBatch3c2b0Env {
     // string helpers
     uint32_t (*f_2afd0)(const char* s);                                    // 0x2AFD0 strlen
     uint32_t (*f_2b080)(char* dst, const char* src, uint32_t size);        // 0x2B080 bounded strcpy
-    char*    (*f_2b280)(const char* s, char c);                            // 0x2B280 last occurrence
+    char*    (*f_2b280)(const char* s, char c);                            // Storm+0x3B280 (Storm_Sub3B280) last occurrence
     int      (*f_2ba80)(char* dst, uint32_t size, const char* fmt, ...);   // 0x2BA80 bounded format
     int      (*f_wsprintf)(char* dst, const char* fmt, ...);               // wsprintfA
     int      (*f_2bf30_load)(uint32_t mod, uint32_t id, char* buf, uint32_t n); // LoadStringA
@@ -216,7 +212,7 @@ uint32_t Storm_SRegDeleteValue(StormBatch3c2b0Env& e, const char* key, const cha
 // 1.13c Storm+0x2F130: SErrSetLastError. Store the code at 0x6FC45388 and tail-call SetLastError.
 extern "C"
 void Storm_SErrSetLastError(uint32_t code) {
-    g_lastError = (int32_t)code;
+    g_stormLastError = (int32_t)code;
     StormSetLastError(code);
 }
 
@@ -224,17 +220,17 @@ void Storm_SErrSetLastError(uint32_t code) {
 // {u16 id; u16 pad; void* source at +4; node* next at +8}, push it on 0x6FC4537C. Always 1.
 extern "C"
 uint32_t Storm_SErrRegisterMessageSource(StormBatch3c2b0Env& e, uint16_t id, uint32_t source) {
-    if (InterlockedIncrement((long volatile*)&g_lockInit) == 0) {
+    if (InterlockedIncrement((long volatile*)&g_stormLockInit) == 0) {
         // InitializeCriticalSection(&g_errLock) -- the lock is opaque in this shim
     } else {
-        InterlockedDecrement((long volatile*)&g_lockInit);
+        InterlockedDecrement((long volatile*)&g_stormLockInit);
     }
-    uint8_t* node = (uint8_t*)e.heap_alloc(0xc);
-    std::memset(node, 0, 0xc);
-    std::memcpy(node, &id, 2);
-    wr32(node + 4, source);
-    wr32(node + 8, g_srcList);
-    g_srcList = (uint32_t)(uintptr_t)node;
+    auto* node = (StormSrcNode*)e.heap_alloc(sizeof(StormSrcNode));
+    std::memset(node, 0, sizeof *node);
+    node->id = id;
+    node->source = (void*)(uintptr_t)source;
+    node->next = g_stormSrcList;
+    g_stormSrcList = node;
     return 1;
 }
 
@@ -243,32 +239,8 @@ uint32_t Storm_SErrRegisterMessageSource(StormBatch3c2b0Env& e, uint16_t id, uin
 // (msgId >> 16) & 0xfff, then FormatMessageA with FROM_HMODULE (0x800) when a source matched and
 // FROM_SYSTEM (0x1000) otherwise. The buffer is cleared before the call either way.
 extern "C"
-uint32_t Storm_SErrGetErrorStr(StormBatch3c2b0Env& e, uint32_t msgId, char* buf, uint32_t count) {
-    if (buf == nullptr || count == 0) {
-        set_storm_error(0x57);
-        return 0;
-    }
-    e.f_2f180();
-    if (g_srcInit == 0) {
-        g_srcInit = 1;
-        e.f_2f200(0x510);
-        e.f_2f200(0x876);
-        e.f_2f200(0x878);
-    }
-    const void* source = nullptr;
-    uint32_t node = g_srcList;
-    while (node != 0) {
-        if (*(uint16_t*)(uintptr_t)node == (uint16_t)((msgId >> 16) & 0xfff)) {
-            source = (const void*)(uintptr_t)rd32(at(node, 4));
-            break;
-        }
-        node = rd32(at(node, 8));
-    }
-    // 0x2F590 leaves the lock; this row's decompile shows the same LeaveCriticalSection.
-    LeaveCriticalSection((LPCRITICAL_SECTION)&g_errLock);
-    *buf = '\0';
-    uint32_t flags = (source != nullptr) ? 0x800u : 0x1000u;
-    return e.format_message(flags, source, msgId, 0x400, buf, count) != 0 ? 1 : 0;
+uint32_t Storm_SErrGetErrorStr(StormBatch3c2b0Env&, uint32_t msgId, char* buf, uint32_t count) {
+    return Storm_SErrGetErrorStr_2F3F0(msgId, buf, count);  // real body: storm_serr.cpp
 }
 
 // 1.13c Storm+0x2FB30: SErrReportNamedResourceLeak. Read the debug-memory registry flag once; when
@@ -347,11 +319,11 @@ uint32_t Storm_SErrDisplayError(StormBatch3c2b0Env& e, uint32_t errorcode, const
 
     char body[0x408];
     char tmp[0x100];
-    int n = e.f_2bf30_load(g_mod, 0x5101, tmp, 0x100);
+    int n = e.f_2bf30_load(g_stormMod, 0x5101, tmp, 0x100);
     const char* fmt = n != 0 ? tmp : e.f_2f1c0(1);
     e.f_wsprintf(body, fmt, msg);
     p = body + e.f_2afd0(body);
-    n = e.f_2bf30_load(g_mod, 0x5102, tmp, 0x100);
+    n = e.f_2bf30_load(g_stormMod, 0x5102, tmp, 0x100);
     fmt = n != 0 ? tmp : e.f_2f1c0(2);
     e.f_wsprintf(p, fmt, modulePath);
     p += e.f_2afd0(p);
@@ -387,7 +359,7 @@ uint32_t Storm_SErrDisplayError(StormBatch3c2b0Env& e, uint32_t errorcode, const
     rc = e.message_box(hwnd, body, program,
                        (uint32_t)((recoverable != 0) * 2 + 1) | 0x52010);
 left_lock:
-    LeaveCriticalSection((LPCRITICAL_SECTION)&g_errLock);
+    LeaveCriticalSection(&g_stormErrLock);
     if (recoverable != 0 && rc == 7) {
         g_inError = 0;
         return 1;

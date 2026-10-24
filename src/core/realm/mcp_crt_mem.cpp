@@ -46,7 +46,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_mcp_memcpy_4230(void* dst, const void* src, uint32
     return d2_mcp_memmove_5260(dst, src, size);
 }
 
-// 1.13c D2MCPClient+0x2841 (size 111, caller 0x28BC __nh_malloc): the VC7.1 `__heap_alloc`. With the
+// 1.13c D2MCPClient+0x02841 (size 111, caller 0x28BC __nh_malloc): the VC7.1 `__heap_alloc`. With the
 // small-block heap active and the request within its threshold, take 0x3D23 under _lock(4)/_unlock(4)
 // and return that block if it succeeds. Otherwise HeapAlloc(handle, 0, bytes), where a zero request is
 // one byte and the size is rounded up to 16 unless the heap is in mode 1.

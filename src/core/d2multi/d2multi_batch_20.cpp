@@ -7,7 +7,7 @@
 
 extern "C" {
 int32_t  Ordinal_10003(void);
-int32_t  Ordinal_10265(int32_t);
+uint32_t Ordinal_10265(int32_t);
 void     Ordinal_10024(void*, int32_t);
 uint32_t Ordinal_10023(int32_t);
 int32_t  Ordinal_10132(uint8_t, uint32_t, uint32_t, int32_t);
@@ -16,7 +16,7 @@ void*    Ordinal_10042(int32_t, int32_t);
 void     Ordinal_10043(int32_t, int32_t);
 uint16_t Ordinal_10085(const void*);
 char*    Ordinal_571(const char*, int32_t);   // Storm SStrChr
-char*    Ordinal_501(char*, const char*, int32_t); // Storm SStrCopy
+void Ordinal_501(char*, const char*, int32_t); // Storm SStrCopy
 extern uint8_t* DAT_6fa09ef8;
 extern uint8_t* DAT_6fa09ef4;
 extern int32_t DAT_6fa09efc;

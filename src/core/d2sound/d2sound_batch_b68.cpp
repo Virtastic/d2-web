@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <initializer_list>
 
-extern "C" __attribute__((weak)) int Ordinal_10104(void);
+extern "C" __attribute__((weak)) uint32_t Ordinal_10104(void);
 extern "C" __attribute__((weak)) void Ordinal_276(void);
 extern "C" __attribute__((weak)) uint32_t Ordinal_10265(uint32_t);
 extern "C" __attribute__((weak)) void Ordinal_10024(const void*, uint32_t);

@@ -219,6 +219,13 @@ EMSCRIPTEN_KEEPALIVE void d2win_sub_170B0(void* rec, int32_t flag, const D2WinBa
     else           wr32(rec, 0x08, rd32(rec, 0x08) & env->invBitMask3);
 }
 
+// FN probe entry: Fog's gdwBitMasks[3] / gdwInvBitMasks[3] are 1<<3 and ~(1<<3).
+extern "C" void d2win_sub_170B0_fn(void* rec, int32_t flag) {
+    D2WinBatch93C0Env env = {};
+    env.bitMask3 = 8; env.invBitMask3 = ~8u;
+    d2win_sub_170B0(rec, flag, &env);
+}
+
 // 1.13c D2Win+0x17B30 (export #10006, 17 bytes): store the dword argument in the global at
 // 0x6F901494 (here d2win_g_6f901494) and return 1.
 // 1.13c D2Win+0x17B30

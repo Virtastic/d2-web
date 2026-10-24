@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include "d2common_crt_exit.h"
 
+#include "d2common_crt.h"
 #include <Windows.h>   // Enter/LeaveCriticalSection: host (kernel) state, a no-op under wasm
 
 // +0x9E9048 DAT_6fde9048: the CRT lock table, 8-byte CRITICAL_SECTION stride; each entry is the
@@ -70,7 +71,7 @@ extern "C" void D2Common_1B0D_Exit(int32_t nCode)
     D2Common_1A4A_DoExit(static_cast<uint32_t>(nCode), 0, 0);
 }
 
-// 1.13c D2Common+0x1B1E
+// (D2Common+0x1B1E; marker lives in d2common_n69.cpp)
 // __exit(code) = doexit(code, quick=1, returning=0): the quick branch skips the onexit walk, still
 // runs the terminator table, then terminates through the same module shutdown state.
 void D2Common_1B1E_QuickExit(int32_t nCode)
@@ -92,5 +93,5 @@ void D2Common_422D_LockFile2(int32_t nIndex, void* pFile)
 // 0x2D73 __amsg_exit on failure) then enter it. Our table is statically backed, so creation is a no-op.
 void D2Common_2EF9_Lock(uint32_t nIdx)
 {
-    enter_cs(nIdx);
+    d2common_lock_2ef9(static_cast<int32_t>(nIdx));
 }

@@ -1,7 +1,7 @@
 #include <cstdint>
 #include <cstdio>
 
-// 1.13c D2Gfx+0xB400: load the video back-end DLL for mode ESI. dllNames = table
+// 1.13c D2Gfx+0x0B400: load the video back-end DLL for mode ESI. dllNames = table
 // 0x6FA90C18. Host seam: load(name) -> module or 0; init(module) runs GetProcAddress(0x2710) and returns the
 // interface table (stored at +0x1126C by the caller); *-1 sentinel (init == nullptr) = proc missing.
 struct D2GfxB400Host {

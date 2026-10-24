@@ -25,6 +25,8 @@
 #include <UNIT/SUnitNpc.h>
 #include <AI/AiGeneral.h>
 
+namespace d2game_c85a { void goldDeathPenalty(D2GameStrc*, D2UnitStrc*, D2UnitStrc*); }
+
 namespace d2game_32df0 {
 // 1.13c D2Game+0x32DF0
 D2UnitStrc* populateRogues(D2GameStrc* game, D2ActiveRoomStrc* room,
@@ -134,12 +136,11 @@ void findHostilePlayer(D2GameStrc*, D2UnitStrc* player, void* argument)
 
 // 1.13c D2Game+0x383A0
 void deathPenalties(D2GameStrc* game /* EBX */, D2UnitStrc* defender /* ECX */,
-                    D2UnitStrc* attacker /* EAX */,
-                    void (*goldPenalty)(D2GameStrc*, D2UnitStrc*, D2UnitStrc*))
+                    D2UnitStrc* attacker /* EAX */)
 {
-    // 0x38180 is the gold-only retail callee. The old D2MOO implementation combines
-    // gold and experience, so invoking it here would charge experience twice.
-    goldPenalty(game, defender, attacker);
+    // 0x38180 is the gold-only retail callee (d2game_c85a.cpp); the old D2MOO
+    // PLAYER_ApplyDeathPenalty combines gold and experience.
+    d2game_c85a::goldDeathPenalty(game, defender, attacker);
     if (attacker) {
         if (attacker->dwUnitType == UNIT_PLAYER) return;
         if (attacker->dwUnitType == UNIT_MONSTER) {

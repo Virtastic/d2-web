@@ -3,7 +3,11 @@
 // args (EAX/ESI/EDI/EBX) are explicit parameters. Skipped: 0x35E0 (__chkstk, compiler), 0xC810,
 // 0xCBA0, 0x7B30 (Win32 drive scan), 0xC590, 0xD790 (unresolved register args).
 #include <cstdint>
+#include <cstdlib>
 #include <emscripten.h>
+#include "../fog/fog_file_service.h"
+extern "C" uint32_t Fog_Ordinal_10265(uint32_t);
+extern "C" void Fog_Ordinal_10024(const void*, const void*, uint32_t);
 
 struct D2WinB54aEnv {
     void (*fatal)(uint32_t stringId);      // Ordinal_10265 + Ordinal_10024("") then _exit(-1)
@@ -17,7 +21,21 @@ struct D2WinB54aEnv {
     void (*ustrcpy)(uint16_t* dst, const uint16_t* src); // Unicode::strcpy
 };
 
-// 1.13c D2Win+0x7A60 -- esiNull selects the fatal string (0x59 / 0x5F); returns if #10105 nonzero.
+// 1.13c D2Win+0x7A60 -- ESI=file, stack=size out. Null file -> fatal 0x59; zero size -> fatal 0x5F.
+// Retail's Ordinal_276 (file-name read) has no side effect and is omitted.
+extern "C" EMSCRIPTEN_KEEPALIVE
+uint32_t d2win_7a60(void* file, uint32_t* size) {
+    uint32_t id = 0x59;
+    if (file) {
+        uint32_t r = FOG_FGetFileSize(file, size);
+        if (r) return r;
+        id = 0x5f;
+    }
+    Fog_Ordinal_10024("", 0, Fog_Ordinal_10265(id));
+    std::_Exit(-1);
+}
+
+// (legacy seam wrapper) 1.13c D2Win+0x7A60 -- esiNull selects the fatal string (0x59 / 0x5F); returns if #10105 nonzero.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2win_sub_7a60(int32_t esi, const D2WinB54aEnv* e) {
     uint32_t id = 0x59;

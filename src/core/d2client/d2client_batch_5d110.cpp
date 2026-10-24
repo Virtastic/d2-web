@@ -7,58 +7,26 @@
 #include <cstring>
 #include <emscripten.h>
 
-struct D2cRes5d {
-    uint8_t*  recs;      // +0x10C24C DAT_6fbcc24c record array, stride 0x8E
-    int32_t   count;     // +0x10C250
-    int32_t   now;       // +0x10C268 tick stamp
-    void**    list;      // +0x10C264 list node: [0]=record index, [1]=next node
-    int32_t   used;      // +0x10C27C
-    int32_t   live;      // +0x10C274
-    int32_t   inited;    // +0x10C280
-    uint32_t  player;    // +0x10BBFC
-    struct Slot {        // +0x1175C0, 16 x 0x20; own layout, retail offsets noted
-        uint32_t h;      // +0x00
-        uint32_t mode;   // +0x04
-        uint8_t* rec;    // +0x08
-        uint8_t  pad[0x10];
-    } slot[16];
-};
-static_assert(sizeof(D2cRes5d::Slot) >= 0x18, "slot");
-
-struct D2cRes5dEnv {
-    int      (*ord10041)(void);
-    void     (*ord10061)(void);
-    uint32_t (*ord10032)(void);
-    void     (*ord10006)(void);
-    void     (*ord10049)(void);
-    uint32_t (*ord10065)(void);          // slot handle alloc, 0 = fail
-    int      (*ord10056)(void);
-    int      (*ord10046)(void);
-    int      (*ord10059)(void);
-    void     (*ord10066)(void);
-    uint32_t (*ord10094)(void);
-    uint32_t (*ord10095)(void);
-    void     (*ord10062)(void);
-    void     (*ord10018)(void);
-    void     (*ord10097)(void);
-    void     (*ord10043)(uint32_t a, uint32_t b);
-    uint32_t (*ord10331)(uint32_t);
-    uint32_t (*ord10826)(uint32_t);
-    uint32_t (*ord10014)(uint32_t);
-    void     (*fn5cf90)(void);
-    void     (*fn5cd10)(void);
-    int32_t* (*fn5cc10)(int32_t idx);    // 0x5CC10 pick lookup
-    void     (*fatal)(uint32_t code);    // Ordinal 10265+10024+_exit(-1); no return
-    const char* sufA;                    // DAT_6fb853e4 (6 bytes incl NUL)
-    const char* sufB;                    // DAT_6fb853ec (8 bytes incl NUL)
-    uint8_t  (*ord14byte)(uint32_t unit);// reads +0x21C of Ordinal_10014 result
-};
+#include "d2client_5d110.h"
 
 static uint8_t* rec(const D2cRes5d* s, int32_t i) {
     return (!s->recs || i < 0 || i >= s->count) ? nullptr : s->recs + (size_t)i * 0x8E;
 }
 template <class T> static T rd(const uint8_t* p, size_t o) { T v; memcpy(&v, p + o, sizeof v); return v; }
 template <class T> static void wr(uint8_t* p, size_t o, T v) { memcpy(p + o, &v, sizeof v); }
+
+// 1.13c D2Client+0x5CC10 (direct, state = s->slot / s->inited = DAT_6fbcc280): among slots whose object
+// (+0x08) has +0x04 == key, the one with the smallest object +0x34; NULL if none or module not inited.
+static D2cRes5d::Slot* pick5cc10(D2cRes5d* s, const D2cRes5dEnv* e, int32_t key) {
+    if (!s->inited) return nullptr;
+    D2cRes5d::Slot* best = nullptr;
+    for (auto& sl : s->slot) {
+        if (!e->ord10044() || !sl.rec) continue;
+        if (rd<int32_t>(sl.rec, 4) != key) continue;
+        if (!best || rd<uint32_t>(sl.rec, 0x34) < rd<uint32_t>(best->rec, 0x34)) best = &sl;
+    }
+    return best;
+}
 
 // 1.13c D2Client+0x5D110
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_5d110(D2cRes5d* s, const D2cRes5dEnv* e) {
@@ -144,7 +112,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_5db30(D2cRes5d* s, const D2cRes5d
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_5dd50(D2cRes5d* s, const D2cRes5dEnv* e, int32_t idx) {
     uint8_t* r = rec(s, idx);
     if (rd<int32_t>(r, 0x86) == 0) return;
-    if (e->fn5cc10(idx)) e->fatal(0x259);
+    if (pick5cc10(s, e, idx)) e->fatal(0x259);
     s->used -= rd<int32_t>(r, 0x70);
     e->ord10062();
     wr<int32_t>(r, 0x7c, 0);
@@ -192,7 +160,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_5ea90(D2cRes5d* s, const D2cR
                 uint8_t* r = rec(s, idx);
                 if ((pass == 0 && (rd<int32_t>(r, 0x8a) != 0 || r[0x4c] != 0)) ||
                     (honourAge && (uint32_t)(s->now - rd<int32_t>(r, 0x7c)) < 0x2ee) ||
-                    e->fn5cc10(idx)) {
+                    pick5cc10(s, e, idx)) {
                     n = (void**)n[1];
                     continue;
                 }

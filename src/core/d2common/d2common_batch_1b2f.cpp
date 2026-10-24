@@ -63,9 +63,10 @@ void* D2Common_2043_FSopen(const char* pName, const char* pMode)
 // 1.13c D2Common+0x219F
 // Ten-byte tail fragment of _fwrite (0x215D, its only caller): __unlock_file(*(FILE**)[EBP+0x14]).
 // Same shape as 0x2039 with the handle in a different frame slot; handed it directly.
-// ponytail: the release is a no-op until 0x4250 is implemented.
+extern "C" void D2Common_4250_UnlockFile(void* pFile);   // d2common_unlock_file_4250.cpp
+
 extern "C"
 void D2Common_219F_UnlockFile(void* pFile)
 {
-    (void)pFile;
+    D2Common_4250_UnlockFile(pFile);
 }

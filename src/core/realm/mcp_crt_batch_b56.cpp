@@ -284,7 +284,7 @@ EMSCRIPTEN_KEEPALIVE void d2_mcp_ioterm(const D2McpCrtEnv56* env) {
 // --- command line / environment ------------------------------------------------------------------
 static uint32_t g_mcp_mbctable_done;        // +0x325D4 DAT_6fa325d4
 static char*    g_mcp_environment;          // +0x2AA2C DAT_6fa2aa2c
-static char**   g_mcp_envp;                 // +0x2AA04 DAT_6fa2aa04
+static uint32_t* g_mcp_envp;                // +0x2AA04 DAT_6fa2aa04
 static int32_t  g_mcp_envp_ready;           // +0x325C8 _DAT_6fa325c8
 static uint8_t  g_mcp_mbctable[0x102];      // +0x32280 DAT_6fa32280, lead-byte class +1
 static uint32_t g_mcp_env_strings_kind;     // +0x2ACA8 DAT_6fa2aca8: 0 untried, 1 wide, 2 ANSI
@@ -311,7 +311,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_setenvp(const D2McpCrtEnv56* env) {
     int32_t count = 0;
     for (const char* p = g_mcp_environment; *p != 0; p += std::strlen(p) + 1)
         if (*p != '=') ++count;
-    char** out = (char**)e->malloc((uint32_t)count * 4 + 4);
+    uint32_t* out = (uint32_t*)e->malloc((uint32_t)count * 4 + 4);
     g_mcp_envp = out;
     if (out == nullptr) return -1;
 
@@ -319,14 +319,14 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_setenvp(const D2McpCrtEnv56* env) {
         if (*p == 0) {
             e->free(g_mcp_environment);
             g_mcp_environment = nullptr;
-            *out = nullptr;
+            *out = 0;
             g_mcp_envp_ready = 1;
             return 0;
         }
         size_t len = std::strlen(p);
         if (*p != '=') {
             char* copy = (char*)e->malloc((uint32_t)len + 1);
-            *out = copy;
+            *out = (uint32_t)(uintptr_t)copy;   // ponytail: 32-bit slots (retail layout), fine below 4 GiB
             if (copy == nullptr) {
                 e->free(g_mcp_envp);
                 g_mcp_envp = nullptr;
@@ -440,7 +440,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_setargv(const D2McpCrtEnv56* env) {
     if (cmd == nullptr || *cmd == 0) cmd = g_mcp_module_path;   // retail falls back to the module path
     int32_t slots = 0;
     int32_t chars = d2_mcp_parse_cmdline(nullptr, &slots, cmd, nullptr);
-    uint32_t* argv = (uint32_t*)e->malloc((uint32_t)chars + (uint32_t)slots * 4);   // ponytail: slots hold 32-bit addresses; fine below 4 GiB
+    uint32_t* argv = (uint32_t*)e->malloc((uint32_t)chars + (uint32_t)slots * 4);  
     if (argv == nullptr) return -1;
     d2_mcp_parse_cmdline(argv, &slots, cmd, (char*)(argv + slots));
     g_mcp_argc = (uint32_t)(slots - 1);
@@ -615,4 +615,14 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_setargv_cb(int32_t (*init_mbc)(vo
     e.init_mbctable = init_mbc; e.get_module_file_name = module_file;
     e.get_command_line = cmdline; e.malloc = alloc;
     return d2_mcp_setargv(&e);
+}
+
+// Probe entry for __setenvp (src/core/fn/d2mcpclient_1f46.cpp): the globals it reads/writes, and the seams in one call.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_setenvp_state(void** out) {
+    out[0] = &g_mcp_mbctable_done; out[1] = &g_mcp_environment; out[2] = &g_mcp_envp; out[3] = &g_mcp_envp_ready;
+}
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_setenvp_cb(int32_t (*init_mbc)(void), void* (*alloc)(uint32_t), void (*fr)(void*)) {
+    D2McpCrtEnv56 e = {};
+    e.init_mbctable = init_mbc; e.malloc = alloc; e.free = fr;
+    return d2_mcp_setenvp(&e);
 }

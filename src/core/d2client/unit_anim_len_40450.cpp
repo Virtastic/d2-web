@@ -1,5 +1,5 @@
 #include <cstdint>
-// 1.13c D2Client+0x40450 : index (EDI) -> record in sgptDataTables (+0xB98 base, +0xBA0 count, 0x23C stride).
+// (seam for D2Client 0x40450; real function: skill_gates_40450.cpp) index (EDI) -> record in sgptDataTables (+0xB98 base, +0xBA0 count, 0x23C stride).
 // Every valid path ends in Ordinal_10786 (register args unrecovered); the flagged branch's side calls
 // (10871, 10680) only select between identical tail calls, so they are injected and evaluated for order.
 struct Ca40450 { int32_t (*o10786)(); int32_t (*o10871)(); int32_t (*o10680)(int32_t,int32_t,int32_t); uint8_t bit8; };

@@ -167,3 +167,5 @@ extern "C" uint32_t d2gfx_sub_adf0(uint32_t edx, uint32_t a0, uint32_t a1, uint3
 // already declares unmodelled.
 extern "C" int32_t d2gfx_rInitialWindowRect[4];
 extern "C" const int32_t* d2gfx_rInitialWindowRect_get(void) { return d2gfx_rInitialWindowRect; }
+// 1.13c D2Gfx+0x0B9C0 (ordinal 10010): stdcall(a0..a5) -> slot +0xC0 (DrawLine), ecx = a0, edx = a1, a2..a5 on the stack; eax passes through.
+extern "C" uint32_t d2gfx_sub_b9c0(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5, D2GfxSlot4 slot) { return slot(a0, a1, a2, a3, a4, a5); }

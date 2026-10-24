@@ -287,16 +287,21 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1560(uint32_t* r) {
     r[4] = (uint32_t)(uintptr_t)p;
 }
 
-// 1.13c Storm+0x15E0: the same constructor for an AUWNDREC record.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_15e0(uint32_t* r) {
-    uint32_t* p = (uint32_t*)storm_mem_alloc(r[1] + 0xc);
+// 1.13c Storm+0x15E0: the same constructor for an AUWNDREC record. `mode` is retail's EDI
+// (insert mode for 0x4390).
+extern "C" uint32_t* Storm_Sub15E0(uint32_t* list, uint32_t size, uint32_t flags, uint32_t mode) {
+    (void)flags;
+    uint32_t* p = (uint32_t*)storm_mem_alloc(size + 0xc);
     if (p != nullptr) {
         p[0] = 0;
         p[1] = 0;
     }
-    if (r[3] != 0) storm_link((uint32_t*)(uintptr_t)r[0], p, r[3]);
-    r[4] = (uint32_t)(uintptr_t)p;
+    if (mode != 0) storm_link(list, p, mode);
+    return p;
+}
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_fn_storm_15e0(uint32_t* r) {
+    r[4] = (uint32_t)(uintptr_t)Storm_Sub15E0((uint32_t*)(uintptr_t)r[0], r[1], 0, r[3]);
 }
 
 // 1.13c Storm+0x1660: destroy the critical section at +0x50, then the base object (0x1990).

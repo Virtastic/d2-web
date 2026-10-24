@@ -7,7 +7,7 @@ __attribute__((weak)) uint32_t Ordinal_10265(uint32_t);
 __attribute__((weak)) void Ordinal_10024(const void*, uint32_t);
 void* Ordinal_401(uint32_t, const char*, int, int);
 void Ordinal_403(void*, const char*, int, int);
-int Ordinal_16(void* sock, void* buf, int len, int flags);
+int q_bnclient_batch_b67_Ordinal_16(void* sock, void* buf, int len, int flags);
 void bnclient_33a00(char* esi, uint8_t* data, uint32_t size, void* ebx, uint32_t a, uint32_t b);
 void bnclient_2d280(void);
 int bnclient_34050(const char* name, uint32_t* ftime, int** data, uint32_t* size);
@@ -37,7 +37,7 @@ uint32_t sub_DB70(uint8_t** out, void* sock, uint8_t flags, uint32_t size, char*
     while (got < size) {
         uint32_t n = size - got;
         if (n > 0x5b4) n = 0x5b4;
-        int r = Ordinal_16(sock, buf + got, (int)n, 0);
+        int r = q_bnclient_batch_b67_Ordinal_16(sock, buf + got, (int)n, 0);
         if (r == -1 || r < 1 || bn_dl_abort != 0) {
             Ordinal_403(*out, "..\\Source\\D2BNClient\\BnDownload.cpp", 0x391, 0);
             *out = nullptr;

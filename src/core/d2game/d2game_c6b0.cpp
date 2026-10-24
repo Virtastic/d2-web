@@ -12,7 +12,7 @@ struct D2GameC6B0Env {
     void     (*f0448E0)(void* unit, void* r, int skillId, uint32_t ebx); // 0x448E0
 };
 
-// 1.13c D2Game+0x0C6B0
+// see 1.13c D2Game+0x0C6B0
 void sub_C6B0(D2GameC6B0Env& e, void* unit, int skillId, uint32_t ebx) {
     uint32_t cnt, base, v;
     std::memcpy(&cnt, e.dataTables + 0xba0, 4);

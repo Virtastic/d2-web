@@ -51,28 +51,28 @@ extern "C" void storm_sub_14250() {}
 // All five below: provider table never initialised in ours (DAT 0x45834 == 0), so after the argument guards (0x57) the
 // outcome is retail's 0x4b4 branch: return 0, outputs as retail leaves them. Error global / last error not modelled.
 
-// 1.13c Storm+0x16D90: SNetEnumGamesEx-style (ordinal 105): arg0 null or *arg0==0x24, callback non-null, else 0x57. Then
+// also Storm 0x16D90: SNetEnumGamesEx-style (ordinal 105): arg0 null or *arg0==0x24, callback non-null, else 0x57. Then
 // walks the game list (RVA 0x55A50), empty in ours, and returns 1.
 extern "C" int storm_sub_16d90(const uint32_t* a0, const void* cb) {
     if (!cb || (a0 && *a0 != 0x24)) return 0;
     return 1;
 }
 
-// 1.13c Storm+0x10720: ordinal 107 (query by id 1..6). Zeroes the buffer and *outLen first; no provider -> 0 (0x4b4).
+// also Storm 0x10720: ordinal 107 (query by id 1..6). Zeroes the buffer and *outLen first; no provider -> 0 (0x4b4).
 extern "C" int storm_sub_10720(uint32_t, uint8_t* buf, uint32_t len, uint32_t* outLen) {
     if (buf) for (uint32_t i = 0; i < len; i++) buf[i] = 0;
     if (outLen) *outLen = 0;
     return 0;
 }
 
-// 1.13c Storm+0x10610: ordinal 108. 0x57 unless 1<=id<=4 and out non-null; then *out = 0 and 0 (0x4b4).
+// also Storm 0x10610: ordinal 108. 0x57 unless 1<=id<=4 and out non-null; then *out = 0 and 0 (0x4b4).
 extern "C" int storm_sub_10610(uint32_t id, uint32_t* out) {
     if (!out || id == 0 || id > 4) return 0;
     *out = 0;
     return 0;
 }
 
-// 1.13c Storm+0x104F0: ordinal 109. Out min/max preset to (session base - 1); base is 0 in ours, so 0xFFFFFFFF; count 0; returns 0.
+// also Storm 0x104F0: ordinal 109. Out min/max preset to (session base - 1); base is 0 in ours, so 0xFFFFFFFF; count 0; returns 0.
 extern "C" int storm_sub_104f0(uint32_t* lo, uint32_t* hi, int32_t* n) {
     if (lo) *lo = 0xFFFFFFFFu;
     if (hi) *hi = 0xFFFFFFFFu;
@@ -80,7 +80,7 @@ extern "C" int storm_sub_104f0(uint32_t* lo, uint32_t* hi, int32_t* n) {
     return 0;
 }
 
-// 1.13c Storm+0x16030: ordinal 110. Null out -> 0x57; else *out = 0 and 0 (0x4b4: no provider).
+// also Storm 0x16030: ordinal 110. Null out -> 0x57; else *out = 0 and 0 (0x4b4: no provider).
 extern "C" int storm_sub_16030(int32_t* out) {
     if (out) *out = 0;
     return 0;

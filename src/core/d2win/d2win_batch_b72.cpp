@@ -14,7 +14,7 @@ __attribute__((weak)) void Ordinal_10103(void);
 __attribute__((weak)) void* Ordinal_10042(int line, int zero);
 __attribute__((weak)) int32_t d2win_unicode2Win(char* dst, const uint16_t* src, int32_t n);
 __attribute__((weak)) void d2win_win2Unicode(uint16_t* dst, const char* src, int32_t n);
-__attribute__((weak)) uint8_t* (*d2win_glyph_lookup)(void);   // DAT_6f901508, returns glyph rec
+__attribute__((weak)) uint8_t* (*d2win_glyph_lookup)(uint16_t);   // DAT_6f901508, returns glyph rec
 __attribute__((weak)) uint32_t d2win_str_ellipsis;            // DAT_6f8fcedc (4 bytes)
 __attribute__((weak)) uint32_t d2win_tbl_a[25];               // DAT_6f8ffd48
 __attribute__((weak)) uint32_t d2win_tbl_b[64];               // DAT_6f8ffdb0
@@ -33,7 +33,7 @@ extern "C" int32_t sub_C590(uint16_t* text, int32_t width) {
   for (; i < len; i++) {
     int32_t w = 0, k = 0;
     for (const uint16_t* p = text; *p && k < i + 1; p++, k++)
-      if (*p != 10) w += d2win_glyph_lookup()[3];
+      if (*p != 10) w += d2win_glyph_lookup(*p)[3];
     if (width <= w) { hit = true; at = i; break; }
     at = i + 1;
   }

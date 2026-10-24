@@ -134,14 +134,16 @@ EMSCRIPTEN_KEEPALIVE void d2_mcp_security_check_cookie(uint32_t cookie) {
     d2_mcp_security_check_cookie_with(cookie, mcp_cookie_exit);
 }
 
-// 1.13c D2MCPClient+0x01030: the 9-byte CRT wrapper `push 8; call 0x15A3 (__lock); pop ecx; ret`,
+// D2MCPClient lock8: the 9-byte CRT wrapper `push 8; call 0x15A3 (__lock); pop ecx; ret`,
 // reached from 0x0167C __onexit. Taking exit lock 8 is the whole rule; the recursive host lock is shared
 // with the unlock wrappers (0x15A3's EnterCriticalSection, __lock itself is STALLED).
+// 1.13c D2MCPClient+0x01030
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_mcp_lock8_1030(void) { d2_mcp_host_lock(8); }
 
-// 1.13c D2MCPClient+0x01039: the mirror 9-byte wrapper at 0x1039 (`push 8; call 0x14EE (_unlock);
+// D2MCPClient unlock8: the mirror 9-byte wrapper at 0x1039 (`push 8; call 0x14EE (_unlock);
 // pop ecx; ret`), whose only caller is 0x016AE __onexit's failure path. Release exit lock 8.
+// 1.13c D2MCPClient+0x01039
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_mcp_unlock8_1039(void) {
     leave_cs(8);

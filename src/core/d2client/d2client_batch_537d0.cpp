@@ -49,7 +49,8 @@ void sub_537D0(Svc& s,G& g){
  if(g.remap2d8){ s.release(0x90); g.remap2d8=nullptr; }
 }
 // 1.13c D2Client+0x537A0 (callee of 53C30, already read): list lookup by id
-static Pal* find(G& g,int32_t id){ for(Pal* p=g.head608;p;p=p->next) if(p->id==id) return p; return nullptr; }
+extern "C" Pal* D2Client_537A0_find(Pal* head,int32_t id){ for(Pal* p=head;p;p=p->next) if(p->id==id) return p; return nullptr; }
+static Pal* find(G& g,int32_t id){ return D2Client_537A0_find(g.head608,id); }
 
 // 1.13c D2Client+0x539E0  (eax = rng state; seed lo at +0x20, hi at +0x24)
 int32_t sub_539E0(Svc& s,uint32_t* st){
@@ -77,21 +78,35 @@ uint8_t* sub_53A30(Svc& s,G& g,Unit* u){
 }
 
 // 1.13c D2Client+0x53B20  (eax = monster id, param_2 = Pal*)
-void sub_53B20(Svc& s,G& g,int32_t monId,Pal* d){
- if(monId<0||s.monPalType(monId)!=2) return;
+// monStats/palTypes: retail record arrays (strides 0x1a8/0x134), counts from sgptDataTables +0xa80/+0xa98.
+static void shift53B20(Pal* d,const uint8_t* remap){
  for(int i=0;i<0x800;i++) d->bank[0x800+i]=d->bank[i];
  uint8_t* dst=d->bank+0x800;
  for(int row=0;row<8;row++) for(int i=0;i<256;i++){
-  uint8_t c=g.remap2d8[d->bank[row*256+i]]; if(c) dst[row*256+i]=c;
+  uint8_t c=remap[d->bank[row*256+i]]; if(c) dst[row*256+i]=c;
  }
+}
+extern "C" void D2Client_53B20(int32_t monId,Pal* d,const uint8_t* remap,const uint8_t* monStats,int32_t monCount,const uint8_t* palTypes,int32_t palCount){
+ if(monId<0||monId>=monCount||!monStats||!palTypes) return;
+ int16_t t=(int16_t)(monStats[monId*0x1a8+0x18]|(monStats[monId*0x1a8+0x19]<<8));
+ if(t<0||t>=palCount||palTypes[t*0x134+0x11c]!=2) return;
+ shift53B20(d,remap);
+}
+void sub_53B20(Svc& s,G& g,int32_t monId,Pal* d){
+ if(monId<0||s.monPalType(monId)!=2) return;
+ shift53B20(d,g.remap2d8);
 }
 
 // 1.13c D2Client+0x53C30  (ecx = monster id)
 void sub_53C30(Svc& s,G& g,int32_t id){
  const char* rec=s.f1230();
  if(!rec||find(g,id)) return;
- // path "Data\Global\Monsters\" + code[2] + "...\Cof\palshift.dat" (suffix literal at 6fb85e27 not decoded here)
- char path[0x100]; path[0]=0; (void)path; (void)rec;
+ // "Data\Global\Monsters\" + code[0..1] (a ' ' ends the string) + "\Cof\palshift.dat"
+ char path[0x100]; int n=0;
+ for(const char* q="Data\\Global\\Monsters\\";*q;) path[n++]=*q++;
+ for(int k=0;k<2;k++){ char c=rec[0x10+k]; if(c==' ') c=0; if(!c) break; path[n++]=c; }
+ for(const char* q="\\Cof\\palshift.dat";*q;) path[n++]=*q++;
+ path[n]=0;
  if(!s.openPalshift(path)) return;
  Pal* p=s.allocPal();
  s.readPal(p);

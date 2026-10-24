@@ -183,29 +183,37 @@ void d2_fn_fog_1170(uint32_t* r)
 	fog_link_unlink(&root->link);
 }
 
-// 1.13c Fog+0x11F0: insert(r[2]) at r[1] (NULL = sentinel) in the root at r[0], mode r[3].
+// 1.13c Fog+0x11F0: insert `node` before/after `pos` in `root`; EAX = root, this = pos.
+extern "C" void FUN_6ff511f0(void* root, void* pos, void* node, int32_t mode)
+{
+	fog_link_insert((FogList*)root, (FogLink*)pos, (FogLink*)node, mode);
+}
+
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_fn_fog_11f0(uint32_t* r)
 {
-	fog_link_insert((FogList*)(uintptr_t)r[0], (FogLink*)(uintptr_t)r[1],
-	                (FogLink*)(uintptr_t)r[2], (int32_t)r[3]);
+	FUN_6ff511f0((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1], (void*)(uintptr_t)r[2], (int32_t)r[3]);
 }
 
-// 1.13c Fog+0x1290: LogManager::AUMessage::operator new(size, flags); mode r[3] non-zero inserts
-// the 0x24-byte header into the root at r[0]. Returns the block (r[4]).
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_fog_1290(uint32_t* r)
+// 1.13c Fog+0x1290: LogManager::AUMessage::operator new(root, size, flags) with EDI = mode; mode
+// non-zero inserts the 0x24-byte header into `root`. Returns the block.
+extern "C" void* FUN_6ff51290(void* root, int32_t size, uint32_t flags, int32_t mode)
 {
-	FogLink* node = (FogLink*)(uintptr_t)d2_fog_smem_alloc(
-		(int32_t)(r[1] + 0x24), ".?AUMessage@LogManager@@", -2, r[2] | 8);
+	FogLink* node = (FogLink*)d2_fog_smem_alloc(size + 0x24, ".?AUMessage@LogManager@@", -2, flags | 8);
 	if (node != 0)
 	{
 		node->pNext = 0;
 		node->nPrev = 0;
-		if ((int32_t)r[3] != 0)
-			fog_link_insert((FogList*)(uintptr_t)r[0], 0, node, (int32_t)r[3]);
 	}
-	r[4] = (uint32_t)(uintptr_t)node;
+	if (mode != 0)
+		fog_link_insert((FogList*)root, 0, node, mode);
+	return node;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE
+void d2_fn_fog_1290(uint32_t* r)
+{
+	r[4] = (uint32_t)(uintptr_t)FUN_6ff51290((void*)(uintptr_t)r[0], (int32_t)r[1], r[2], (int32_t)r[3]);
 }
 
 // 1.13c Fog+0x1310: unlink the pair in EAX (r[0] here).

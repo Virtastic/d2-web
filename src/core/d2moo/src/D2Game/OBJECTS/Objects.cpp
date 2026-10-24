@@ -727,6 +727,7 @@ void __fastcall OBJECTS_InitFunction58_Fissure(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FC710B0
+// 1.13c D2Game+0x33620
 void __fastcall OBJECTS_InitFunction59_VileDogAfterglow(D2ObjInitFnStrc* pOp)
 {
     if (pOp->pObject && pOp->pObject->dwAnimMode != OBJMODE_NEUTRAL)

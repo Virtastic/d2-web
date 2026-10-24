@@ -10,7 +10,6 @@ struct CrtFile { // MSVC 7.1 FILE layout (x86): ptr, cnt, base, flag
 }
 extern "C" {
 void d2gfx_fn_19bc(int32_t code);                          // D2Gfx+0x19BC
-uint32_t d2gfx_flsbuf(int32_t ch, void* file);             // __flsbuf
 void d2gfx_fn_360c(int32_t code);                          // D2Gfx+0x360C
 int32_t d2gfx_raise(int32_t sig);                          // _raise, D2Gfx+0xCA00
 void d2gfx_exit(int32_t code);                             // __exit
@@ -20,43 +19,6 @@ extern uint32_t d2gfx_security_cookie;                     // DAT_6fa906e0
 
 // 1.13c D2Gfx+0x13BD
 void d2gfx_sub_13BD() { d2gfx_fn_19bc(8); }
-
-// 1.13c D2Gfx+0x1D9A  (hidden regs: AL=ch, ECX=file, ESI=count)
-void d2gfx_write_char(uint8_t ch, CrtFile* file, int32_t* count) {
-    if ((file->flag & 0x40) == 0 || file->base != nullptr) {
-        uint32_t r;
-        if (--file->cnt < 0) {
-            r = d2gfx_flsbuf((char)ch, file);
-        } else {
-            *file->ptr++ = (char)ch;
-            r = ch;
-        }
-        if (r == 0xffffffffu) { *count = -1; return; }
-    }
-    ++*count;
-}
-
-// 1.13c D2Gfx+0x1DCD  (hidden regs: EAX=count, plus write_char's ch/file; ch is passed through)
-void d2gfx_write_multi_char(uint8_t ch, CrtFile* file, int32_t* count, int32_t n) {
-    while (n >= 1) {
-        --n;
-        d2gfx_write_char(ch, file, count);
-        if (*count == -1) return;
-    }
-}
-
-// 1.13c D2Gfx+0x1DF1  (hidden regs: EAX=count, EDI=file, plus ch/ptr per char; `s` is the string walked)
-void d2gfx_write_string(const char* s, CrtFile* file, int32_t* count, int32_t n) {
-    if ((file->flag & 0x40) == 0 || file->base != nullptr) {
-        while (n >= 1) {
-            --n;
-            d2gfx_write_char((uint8_t)*s++, file, count);
-            if (*count == -1) return;
-        }
-    } else {
-        *count += n;
-    }
-}
 
 // 1.13c D2Gfx+0x4150
 size_t d2gfx_strlen(const char* s) {

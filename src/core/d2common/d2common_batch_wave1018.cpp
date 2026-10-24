@@ -70,32 +70,33 @@ extern "C" void D2Common_3D250_ClearTextList(uint8_t* pTextOwner, void* pFirstNo
     *reinterpret_cast<uint16_t*>(pTextOwner + 4) = 0;
 }
 
-// 1.13c D2Common+0x66630: validates that the supplied unit's room lies inside the level bounds
-// and that the room is present in the level's linked room list. Invalid state reports retail's
-// corresponding fatal code and terminates through the supplied error seam.
-extern "C" int32_t D2Common_66630_ValidateRoomMembership(void* pLevel, void* pRoom, int32_t bCheckList,
-    int32_t nRoomType, int32_t nRoomX, int32_t nRoomY, const char* szContext,
-    int32_t (*pfnReadRoomBounds)(void*, RoomBounds*), int32_t (*pfnRoomListContains)(void*, void*),
-    uint32_t (*pfnMapFatalCode)(uint32_t), void (*pfnReportFatal)(const char*, uint32_t))
+// 1.13c D2Common+0x66630: usercall (ESI=pRoom, EDI=pUnit, stack bCheckList). Reads the unit's
+// tile (dynamic: pPath+0xC/+0x10 dwords; else pPath ? +2/+6 words), tests it against the room's
+// box (+0x4C x,+0x50 y,+0x54 w,+0x58 h); outside -> fatal 0x2e. Inside: walk room unit list
+// (+0x74, next at +0xE8); found -> 1 (or fatal 0x36 when bCheckList); absent -> 0 for !bCheckList.
+// The fatal path (ordinals 10265/10024 then _exit(-1)) is reported through pfnFatal.
+extern "C" int32_t D2Common_66630_ValidateRoomMembership(const uint8_t* pRoom, const uint8_t* pUnit,
+    int32_t bCheckList, void (*pfnFatal)(uint32_t))
 {
-    RoomBounds bounds{};
-    if (pLevel == nullptr || pRoom == nullptr || pfnReadRoomBounds == nullptr ||
-        !pfnReadRoomBounds(pLevel, &bounds))
-        return 0x2e;
-    const bool bInside = nRoomX >= bounds.x && nRoomY >= bounds.y &&
-        nRoomX < bounds.x + bounds.width && nRoomY < bounds.y + bounds.height;
-    uint32_t nCode = 0;
-    if (!bInside)
-        nCode = 0x2eu;
-    else if (pfnRoomListContains == nullptr || !pfnRoomListContains(pLevel, pRoom))
-        return 1;
-    else if (!bCheckList)
-        return 0;
-    else
-        nCode = (nRoomType == 2 || (nRoomType > 3 && nRoomType < 6)) ? 0x36u : 0x2eu;
-    const uint32_t nText = pfnMapFatalCode ? pfnMapFatalCode(nCode) : nCode;
-    if (pfnReportFatal != nullptr)
-        pfnReportFatal(szContext, nText);
+    const int32_t nType = *reinterpret_cast<const int32_t*>(pUnit);
+    const uint8_t* pPath = *reinterpret_cast<const uint8_t* const*>(pUnit + 0x2c);
+    const bool bDyn = nType == 2 || (nType > 3 && nType < 6);
+    int32_t x, y;
+    if (bDyn) { x = *reinterpret_cast<const int32_t*>(pPath + 0xc); y = *reinterpret_cast<const int32_t*>(pPath + 0x10); }
+    else { x = pPath ? *reinterpret_cast<const uint16_t*>(pPath + 2) : 0; y = pPath ? *reinterpret_cast<const uint16_t*>(pPath + 6) : 0; }
+    const int32_t* r = reinterpret_cast<const int32_t*>(pRoom);
+    uint32_t nCode = 0x2e;
+    if (pRoom && x >= r[0x4c / 4] && x < r[0x4c / 4] + r[0x54 / 4] && y >= r[0x50 / 4] && y < r[0x50 / 4] + r[0x58 / 4])
+    {
+        for (const uint8_t* u = *reinterpret_cast<const uint8_t* const*>(pRoom + 0x74); ; u = *reinterpret_cast<const uint8_t* const*>(u + 0xe8))
+        {
+            if (!u) return 1;
+            if (u == pUnit) break;
+        }
+        if (!bCheckList) return 0;
+        nCode = 0x36;
+    }
+    if (pfnFatal) pfnFatal(nCode);
     return -1;
 }
 

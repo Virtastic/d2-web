@@ -44,10 +44,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_d610(
     return result;
 }
 
+extern "C" uint32_t FOG_FCloseFile(void* file); // Fog+0x17E30 (#10103), real extern C
 // ECX=file; success tail-jumps to Fog ordinal 10103 and returns its EAX.
 // 1.13c D2Client+0x0d670
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_d670(
     void* file, const D2ClientFileServices* services) {
     if (!file) fileFailure(*services, 0x49);
-    return services->close(file);
+    (void)services->close; return FOG_FCloseFile(file);
 }

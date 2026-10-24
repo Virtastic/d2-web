@@ -4,7 +4,7 @@
 #include <cstdio>
 
 extern "C" {
-void     Ordinal_10140(int32_t, int32_t);
+int32_t Ordinal_10140(int32_t, int32_t);
 void     Ordinal_10194(int32_t, uint32_t);
 void     Ordinal_10106(void);
 void     Ordinal_10000(void);

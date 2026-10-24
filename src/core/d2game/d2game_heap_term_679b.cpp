@@ -19,7 +19,7 @@ struct D2GameHeapTermEnv {
     D2GameHeapRegion* regions;         // DAT_6FD39FBC, relocated region array
 };
 
-// 1.13c D2Game+0x0679B
+// see 1.13c D2Game+0x0679B
 // Small-block mode releases each reservation before its control block, then the
 // region array. Every mode destroys the heap. Retail ignores API failures and
 // leaves the module's handles/count untouched; the count is reread per iteration.

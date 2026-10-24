@@ -155,6 +155,18 @@ void d2win_sub_12280(int32_t cap, int32_t fontIdx, char* dst) {
     wsprintfA(dst, "%s%s%s.tbl", dir, mid, name);
 }
 
+// 1.13c D2Win+0x12350 -- as 0x12280 without the ".tbl" suffix; EBX = font index, EDI = dst.
+extern "C" EMSCRIPTEN_KEEPALIVE
+void d2win_sub_12350(int32_t cap, int32_t fontIdx, char* dst) {
+    char dir[260];
+    wsprintfA(dir, "%s\\%s\\", "DATA\\LOCAL", d2win_g_6f8fc8a8);
+    if (cap <= (int32_t)strlen(dir) + 0x14) d2win_fatal(0x7b);
+    const char* mid = d2win_g_6f9014f4;
+    const char* name = d2win_g_fontNames[fontIdx];
+    if (d2win_g_6f9a9d12 != 0 && fontIdx == 0xd) { mid = d2win_g_6f8fc884; name = d2win_g_FontInGameChat; }
+    wsprintfA(dst, "%s%s%s", dir, mid, name);
+}
+
 // 1.13c D2Win+0x0D790 -- this = key a, param_3 = key b; returns the cached object or 0 after a fill.
 extern "C" EMSCRIPTEN_KEEPALIVE
 int32_t d2win_sub_D790(uint32_t a, int32_t* tbl, int32_t, uint32_t b, uint32_t eax, uint8_t di,

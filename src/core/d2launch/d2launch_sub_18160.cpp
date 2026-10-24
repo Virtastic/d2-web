@@ -9,7 +9,7 @@ WK extern char DAT_6fa61040[], DAT_6fa61070[], DAT_6fa610a0[];
 
 WK extern char DAT_6fa60f80[], DAT_6fa60fb0[], DAT_6fa60fe0[];
 WK int32_t Ordinal_10227(); WK int32_t Ordinal_10003(); WK void Ordinal_10000(); WK void Ordinal_10149(...);
-WK void Ordinal_10035(void*); WK void* Ordinal_10045(const char*, int, int);
+WK void Ordinal_10035(void*); WK intptr_t Ordinal_10045(const char*, int, int);
 }
 static void d2l_fail() { uint32_t e = Ordinal_10265(0x624); Ordinal_10024("", e); _exit(-1); }
 static uint32_t d2l_slot(const void* name) { uint32_t h = Ordinal_10098(name); DAT_6fa652b8[DAT_6fa65e30++] = h; return h; }

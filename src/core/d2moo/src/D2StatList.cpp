@@ -1281,6 +1281,7 @@ void __stdcall STATLIST_SetStatIfListIsValid(D2StatListStrc* pStatList, int nSta
 }
 
 //D2Common.0x6FDB7930 (#11294)
+// 1.13c D2Common+0x3A1D0
 BOOL __stdcall STATLIST_SetBaseStat(D2StatListStrc* pStatList, int nStatId, int nValue, uint16_t nLayer, D2UnitStrc* pUnit)
 {
 	if (!pStatList)

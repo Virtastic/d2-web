@@ -13,8 +13,8 @@ static uint32_t d2l_slot(const void* name) { uint32_t h = Ordinal_10098(name); D
 extern "C" {
 WK extern int DAT_6fa656c4, DAT_6fa65ea4, DAT_6fa65eb0, DAT_6fa65abc, DAT_6fa65e6c;
 WK extern uint32_t DAT_6fa654fc, DAT_6fa6529c, DAT_6fa65518, DAT_6fa65504, DAT_6fa65e40;
-WK void Ordinal_10018(void); WK int32_t Ordinal_10003(); WK intptr_t Ordinal_10020(intptr_t); WK void Ordinal_10000(void); WK void Ordinal_10202(void); WK void Ordinal_10010(void); WK void Ordinal_10170(void);
-WK void Ordinal_10185(void); WK void Ordinal_10053(int32_t); WK void Ordinal_10146(void); WK int32_t Ordinal_10227(void); WK void Ordinal_10035(void*); WK void* Ordinal_10045(const char*, int, int); WK int Ordinal_422(...);
+WK void Ordinal_10018(void); WK int32_t Ordinal_10003(); WK intptr_t Ordinal_10020(intptr_t); WK void Ordinal_10000(void); WK intptr_t Ordinal_10202(...); WK int Ordinal_10010(int,uint32_t,int); WK void Ordinal_10170(void);
+WK void Ordinal_10185(void); WK void Ordinal_10053(int32_t); WK void Ordinal_10146(void); WK int32_t Ordinal_10227(void); WK void Ordinal_10035(void*); WK intptr_t Ordinal_10045(const char*, int, int); WK int Ordinal_422(...);
 WK void FUN_6fa57df0(); WK uint32_t FUN_6fa4ee10(); WK void FUN_6fa52b10(); WK void FUN_6fa522c0();
 WK void OutputDebugStringA(const char*);
 WK extern char DAT_6fa61310[], DAT_6fa61340[], DAT_6fa61400[], DAT_6fa61430[], DAT_6fa61520[], DAT_6fa61580[], DAT_6fa615b0[], DAT_6fa615e0[], DAT_6fa61610[], DAT_6fa61640[], DAT_6fa61670[];
@@ -42,9 +42,9 @@ build:
     if (Ordinal_10227() == 0) { FUN_6fa52b10(); Ordinal_10003(); Ordinal_10000(); }
     NEXT(DAT_6fa61520); Ordinal_10003(); Ordinal_10000();
     if (DAT_6fa65e30 >= 0x40) { d2l_fail(); return; }
-    DAT_6fa654fc = d2l_slot(DAT_6fa61580); Ordinal_10202(); Ordinal_10010(); Ordinal_10170();
+    DAT_6fa654fc = d2l_slot(DAT_6fa61580); Ordinal_10202(); Ordinal_10010(0,0,0); Ordinal_10170();
     if (DAT_6fa65e30 >= 0x40) { d2l_fail(); return; }
-    DAT_6fa6529c = d2l_slot(DAT_6fa615b0); Ordinal_10202(); Ordinal_10010(); Ordinal_10170();
+    DAT_6fa6529c = d2l_slot(DAT_6fa615b0); Ordinal_10202(); Ordinal_10010(0,0,0); Ordinal_10170();
     char last[0x400]; uint32_t sel = DAT_6fa654fc;
     if (Ordinal_422("Diablo II", "Last BNet", 0, last, 0x400) != 0) { Ordinal_10185(); sel = DAT_6fa6529c; }
     Ordinal_10053(sel); Ordinal_10146(); Ordinal_10146();

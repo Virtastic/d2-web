@@ -742,6 +742,7 @@ int32_t __fastcall MISSMODE_HandleMissileCollision(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FC56FA0
+// 1.13c D2Game+0x3D320
 D2UnitStrc* __fastcall MISSMODE_CreatePlagueJavelin_PoisonJavelin_PoisonTrapHitSubmissiles(D2GameStrc* pGame, D2UnitStrc* pOrigin, int32_t nMissileId, int32_t nRange, int32_t nLoops)
 {
     if (!D2Common_10234(pOrigin->pDynamicPath))
@@ -1352,6 +1353,7 @@ int32_t __fastcall MISSMODE_SrvDo17_CairnStones(D2GameStrc* pGame, D2UnitStrc* p
 }
 
 //D2Game.0x6FC585E0
+// 1.13c D2Game+0x408D0
 int32_t __fastcall MISSMODE_SrvDo18_TowerChestSpawner(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
     if (!pMissile)
@@ -1897,6 +1899,7 @@ int32_t __fastcall MISSMODE_SrvDo30_RabiesPlague(D2GameStrc* pGame, D2UnitStrc* 
 }
 
 //D2Game.0x6FC59B90
+// 1.13c D2Game+0x3F9F0
 int32_t __fastcall MISSMODE_SrvDo31_WakeOfDestructionMaker_BaalColdMaker(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
     if (!pMissile)
@@ -2693,6 +2696,7 @@ int32_t __fastcall MISSMODE_SrvHit13_GlacialSpike_HellMeteorDown(D2GameStrc* pGa
 }
 
 //D2Game.0x6FC5B4E0
+// 1.13c D2Game+0x3F220 (checked against decompile, no delta)
 int32_t __fastcall MISSMODE_SrvHit04_ExplodingArrow_FreezingArrow_RoyalStrikeMeteorCenter(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pMissile)
@@ -3078,6 +3082,7 @@ int32_t __fastcall MISSMODE_SrvHit19_FingerMageSpider(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FC5C0D0
+// 1.13c D2Game+0x3DD60 (checked against decompile, no delta)
 int32_t __fastcall MISSMODE_SrvHit20_LightningFury(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pMissile)
@@ -3137,6 +3142,7 @@ int32_t __fastcall MISSMODE_SrvHit20_LightningFury(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FC5C2D0
+// 1.13c D2Game+0x3CD00
 int32_t __fastcall MISSMODE_LightningFury_AuraCallback(D2AuraCallbackStrc* pAuraCallback, D2UnitStrc* pTarget)
 {
     D2HitFunc22ParamStrc* pParams = (D2HitFunc22ParamStrc*)pAuraCallback->pArgs;
@@ -3285,6 +3291,7 @@ int32_t __fastcall MISSMODE_SrvHit22_FistOfTheHeavensDelay(D2GameStrc* pGame, D2
 }
 
 //D2Game.0x6FC5C790
+// 1.13c D2Game+0x3CC30 (checked against decompile, no delta)
 int32_t __fastcall MISSMODE_FistOfTheHeavensDelay_AuraCallback(D2AuraCallbackStrc* pAuraCallback, D2UnitStrc* pTarget)
 {
     D2HitFunc22ParamStrc* pParams = (D2HitFunc22ParamStrc*)pAuraCallback->pArgs;
@@ -3459,6 +3466,7 @@ int32_t __fastcall MISSMODE_SrvHit28_GrimWardScare(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FC5CE10
+// 1.13c D2Game+0x3C850 (checked against decompile, no delta)
 int32_t __fastcall MISSMODE_SrvHit29_FrozenOrb(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pMissile)
@@ -3519,7 +3527,7 @@ int32_t __fastcall MISSMODE_SrvHit29_FrozenOrb(D2GameStrc* pGame, D2UnitStrc* pM
     return 3;
 }
 
-//D2Game.0x6FC5CF50
+// 1.13c D2Game+0x3C700 (0x6FC5CF50 in 1.10f)
 int32_t __fastcall MISSMODE_SrvHit05_Unused(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pMissile)
@@ -3529,6 +3537,12 @@ int32_t __fastcall MISSMODE_SrvHit05_Unused(D2GameStrc* pGame, D2UnitStrc* pMiss
 
     D2MissilesTxt* pMissilesTxtRecord = SKILLS_GetMissilesTxtRecord(pMissile->dwClassId);
     if (!pMissilesTxtRecord || pMissilesTxtRecord->wHitSubMissile[0] < 0)
+    {
+        return 1;
+    }
+
+    // 1.13c: requires the missile owner-info flag
+    if (!(pMissile->dwFlagEx & UNITFLAGEX_STOREOWNERINFO))
     {
         return 1;
     }
@@ -4285,6 +4299,7 @@ int32_t __fastcall MISSMODE_SrvHit58_BaalTauntLightningControl(D2GameStrc* pGame
 }
 
 //D2Game.0x6FC5E760
+// 1.13c D2Game+0x3DA60 (function list name is from RVA order; body is the PantherPotGreen-style handler, owner via flag bit 10 + guid at +0x98 == SUNIT_GetOwner)
 int32_t __fastcall MISSMODE_SrvHit59_BaalTauntPoisonControl(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pMissile)
@@ -4305,8 +4320,8 @@ int32_t __fastcall MISSMODE_SrvHit59_BaalTauntPoisonControl(D2GameStrc* pGame, D
     }
 
     const int32_t nHitPar = std::max(pMissilesTxtRecord->dwHitPar[0], 1u);
-    MISSMODE_CreatePoisonCloudHitSubmissiles(pGame, pOwner, pMissile, pMissilesTxtRecord->wHitSubMissile[0], MISSILE_GetSkill(pMissile), MISSILE_GetLevel(pMissile), nHitPar, 2, 0);
-    return 1;
+    MISSMODE_CreatePantherPotGreenSubmissiles(pGame, pOwner, pMissile, pMissilesTxtRecord->wHitSubMissile[0], MISSILE_GetSkill(pMissile), MISSILE_GetLevel(pMissile), nHitPar);
+    return 3;
 }
 
 //D2Game.0x6FC5E7F0
@@ -4772,6 +4787,7 @@ int32_t __fastcall MISSMODE_RadamentDeathAreaEffectCallbackFirstFrame(D2GameStrc
 }
 
 //D2Game.0x6FC5F800
+// 1.13c D2Game+0x3F670
 int32_t __fastcall MISSMODE_SrvDo36_BaalFxControl(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
     const int32_t nFrame = MISSILE_GetCurrentFrame(pMissile);

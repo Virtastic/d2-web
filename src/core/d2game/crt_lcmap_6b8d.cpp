@@ -22,10 +22,31 @@ struct D2gameLcmapStringAEnv {
                                        char* dst, int32_t cb_dst, const char* default_char,
                                        int32_t* used_default);                        // KERNEL32 WideCharToMultiByte
     uint32_t (*get_last_error)();                                                     // KERNEL32 GetLastError
-    int32_t (*locale_ansi_codepage)(uint32_t locale);                                 // D2Game+0x09824
-    char* (*multibyte_to_multibyte)(uint32_t cp_from, uint32_t cp_to, const char* src, uint32_t* pcb_src,
-                                    char* dst, int32_t cch_dst);                      // D2Game+0x0986B
+    int32_t (*get_locale_info_a)(uint32_t lcid, uint32_t type, char* buf, int32_t cch); // KERNEL32 GetLocaleInfoA
+    int32_t (*is_single_byte_cp)(uint32_t cp);                                        // GetCPInfo MaxCharSize == 1
+    int32_t (*wide_to_mb6)(uint32_t cp, uint32_t flags, const uint16_t* s, int32_t cw, char* o, int32_t n);
 };
+
+// Real D2Game callees (own rows): 0x9824 locale ANSI codepage, 0x986B codepage converter.
+struct D2GameLocaleCpEnv { int32_t (*getLocaleInfoA)(uint32_t, uint32_t, char*, int32_t); };
+struct D2GameConvertCpEnv {
+    int32_t (*is_single_byte_cp)(uint32_t cp);
+    int32_t (*mb_to_wide)(uint32_t, uint32_t, const char*, int32_t, uint16_t*, int32_t);
+    int32_t (*wide_to_mb)(uint32_t, uint32_t, const uint16_t*, int32_t, char*, int32_t);
+    void* (*calloc1)(uint32_t, uint32_t);
+    void (*free)(void*);
+};
+extern "C" int32_t d2_fn_d2game_9824(uint32_t locale, const D2GameLocaleCpEnv* env);
+extern "C" char* d2game_crt_convert_cp(uint32_t from, uint32_t to, const char* src, uint32_t* pcb, char* out,
+                                       int32_t outlen, const D2GameConvertCpEnv* env);
+static void* d2game_calloc1(uint32_t n, uint32_t sz) { return std::calloc(n, sz); }
+static void d2game_free1(void* p) { std::free(p); }
+static char* d2game_cvt(const D2gameLcmapStringAEnv* e, uint32_t from, uint32_t to, const char* src,
+                        uint32_t* pcb, char* out, int32_t outlen) {
+    D2GameConvertCpEnv ce = {e->is_single_byte_cp, e->multi_byte_to_wide_char, e->wide_to_mb6,
+                             d2game_calloc1, d2game_free1};
+    return d2game_crt_convert_cp(from, to, src, pcb, out, outlen, &ce);
+}
 
 static uint32_t g_d2game_lcmap_api;          // DAT_6FD30000: 0 undetected, 1 LCMapStringW works, 2 absent
 static uint32_t g_d2game_default_locale;     // DAT_6FD3003C
@@ -110,7 +131,8 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2game_lcmap_string_a(uint32_t locale, uint32_t fl
     uint32_t result = 0;
     if (locale == 0) locale = g_d2game_default_locale;
     if (codepage == 0) codepage = g_d2game_default_codepage;
-    int32_t ansi_cp = env->locale_ansi_codepage(locale);
+    D2GameLocaleCpEnv le = {env->get_locale_info_a};
+    int32_t ansi_cp = d2_fn_d2game_9824(locale, &le);
     if (ansi_cp == -1) return 0;
     if (static_cast<uint32_t>(ansi_cp) == codepage) {
         return static_cast<uint32_t>(env->lcmap_string_a(locale, flags, src,
@@ -118,7 +140,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2game_lcmap_string_a(uint32_t locale, uint32_t fl
     }
 
     uint32_t cb = cch_src;
-    converted = env->multibyte_to_multibyte(codepage, static_cast<uint32_t>(ansi_cp), src, &cb, nullptr, 0);
+    converted = d2game_cvt(env, codepage, static_cast<uint32_t>(ansi_cp), src, &cb, nullptr, 0);
     cch_src = cb;
     if (converted == nullptr) return 0;
 
@@ -132,7 +154,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2game_lcmap_string_a(uint32_t locale, uint32_t fl
                 locale, flags, converted, static_cast<int32_t>(cch_src), mapped, static_cast<int32_t>(n)));
             if (m != 0) {
                 uint32_t cb2 = m;
-                back = env->multibyte_to_multibyte(static_cast<uint32_t>(ansi_cp), codepage, mapped, &cb2,
+                back = d2game_cvt(env, static_cast<uint32_t>(ansi_cp), codepage, mapped, &cb2,
                                                    dst, cch_dst);
                 result = back != nullptr ? cb2 : 0;
             }

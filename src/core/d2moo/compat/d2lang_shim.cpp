@@ -122,6 +122,8 @@ short D2LANG_GetTblIndex(char* szReference, const Unicode** pUnicode) {
     if (pUnicode) *pUnicode = v ? (const Unicode*)v->c_str() : nullptr;
     return (short)idx;
 }
+// 1.13c D2Lang+0xA8A0 (#10011): GetTblIndex with the string out slot discarded.
+unsigned __fastcall D2LANG_GetTblIndexOnly(char* szReference) { const Unicode* u; return (unsigned short)D2LANG_GetTblIndex(szReference, &u); }
 // A missing key resolves to the key followed by D2Lang's placeholder; an empty key to "".
 const Unicode* D2LANG_GetStringByReferenceString(char* szReference) {
     static std::unordered_map<std::string, std::u16string> fallbacks;
@@ -300,7 +302,7 @@ static bool d2lang_lastCharIn(const uint16_t* w, const char* set) {
     return false;
 }
 
-// 1.13c D2Lang+0x0AC40 Unicode::unloadSysMap: delete[] the three sysmap tables (0x6fc10a58, 0a50, 0a5c), null each.
+// D2Lang+0x0AC40 (see batch_b64) Unicode::unloadSysMap: delete[] the three sysmap tables (0x6fc10a58, 0a50, 0a5c), null each.
 // Stateful, no-op here (the shim holds no sysmap tables).
 
 // 1.13c D2Lang+0x016E4 d2lang_strtok_16e4: CRT strtok (byte, 256-bit delimiter set, per-thread token pointer; one thread here).
@@ -335,3 +337,10 @@ unsigned char* d2lang_read_file_7ef0(const char* path, int* size_out) {
     if (size_out) *size_out = (int)n;
     return buf;
 }
+
+// Flat C exports of the real D2Lang functions, for D2Client/D2Win/D2Launch callers (flat Ordinal_N names
+// clash across DLLs with differing signatures, hence the d2lang_ prefix).
+// 1.13c D2Lang+0x9450 (#10003)
+extern "C" const char16_t* d2lang_Ordinal_10003(uint16_t index) { return (const char16_t*)D2LANG_GetStringFromTblIndex((short)index); }
+// 1.13c D2Lang+0xAFC0 (#10038): Unicode::strcpy
+extern "C" char16_t* d2lang_Ordinal_10038(char16_t* dest, const char16_t* src) { return (char16_t*)Unicode::strcpy((Unicode*)dest, (const Unicode*)src); }

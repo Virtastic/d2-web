@@ -193,14 +193,14 @@ EMSCRIPTEN_KEEPALIVE void d2c_47500() {
     F(0xA36F0, box, (U)O(10003), 0xf, 0, 1, A(0x6faf61d0), 1);
 }
 
-// 1.13c D2Client+0x47810
+// (env-seam copy; verified body: dialog_47810_4b420.cpp)
 EMSCRIPTEN_KEEPALIVE void d2c_47810() {
     destroyDialog();
     D32(0x6fbc9729) = 5;
     d2c_47500();
 }
 
-// 1.13c D2Client+0x47920
+// dup of D2CLIENT+0x47920
 EMSCRIPTEN_KEEPALIVE void d2c_47920() {
     if (D32(0x6fbc975f)) { F(0xA3D20); D32(0x6fbc975f) = 0; }
     D8(0x6fbc9663) = 3;

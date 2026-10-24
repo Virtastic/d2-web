@@ -79,7 +79,7 @@ constexpr const char* kSFileCpp = "..\\3rdParty\\STORM\\SOURCE\\SFILE.CPP";
 // ---- SFile internals, retail argument order (seams) -------------------------------------------
 void* Storm_Sub41D0(uint32_t* anchor, uint32_t, uint32_t);                 // 0x41D0 alloc open-file
 void* Storm_Sub40D0(uint32_t* anchor, uint32_t, uint32_t);                 // 0x40D0 alloc archive
-void* Storm_Sub1C580(uint32_t size, const char* tag, int32_t line, uint32_t flags); // 0x1C580 alloc
+extern "C" void* Storm_Sub1C580(uint32_t size, const char* tag, int32_t line, uint32_t flags); // 0x1C580 alloc
 void Storm_Sub17FC0(void);                                                 // 0x17FC0 init archive set
 void Storm_Sub16BD0(char* out, int32_t which);                             // 0x16BD0 install dir
 uint32_t Storm_Sub2B080(uint8_t* dst, const uint32_t* src, uint32_t n);    // 0x2B080 strncpy max

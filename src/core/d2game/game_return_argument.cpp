@@ -304,6 +304,7 @@ struct D2G4B500Seam
 struct D2G4B500Client { uint8_t nAct; uint32_t dwFlags; uint32_t nIronGolemItemGUID; };   // client +0x1AC, +0x3D4, +0x484
 struct D2G4B500Unit { uint32_t type, id, inventory; };                                  // unit +0, +0xC, +0x60
 
+// 1.13c D2GAME+0x4B500
 static void GAME_4B500(const D2G4B500Seam& s, D2G4B500Client* cl, uint32_t hClient, uint32_t hGame, uint32_t hUnit, const D2G4B500Unit& u, uint32_t room, uint32_t x, uint32_t y)
 {
     if (!hGame || !hUnit || !hClient) return;
@@ -680,7 +681,7 @@ template <class Send> static void GAME_8C380(uint8_t type, uint32_t value, void*
 {
     uint8_t b[5]; b[0] = type; memcpy(b + 1, &value, 4); send(client, b, 5);
 }
-// 1.13c D2Game+0x4AB70
+// 1.13c D2GAME+0x4AB70
 template <class Send> static void GAME_4AB70(const D2UnitStrc* unit, void* client, Send send)
 {
     uint32_t type = unit ? unit->dwUnitType : 6, id = unit ? unit->dwUnitId : 0xFFFFFFFFu;

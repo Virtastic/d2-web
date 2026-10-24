@@ -19,7 +19,7 @@ void Storm_Sub4B80(uint32_t obj);                                      // 0x4B80
 void Storm_Sub4D60(uint32_t node);                                     // 0x4D60 (list unlink)
 void Storm_Sub1D460(int32_t a, int32_t b);                             // 0x1D460
 void Storm_Sub36020(uint32_t tag, uint32_t wnd);                       // 0x36020
-uint32_t* Storm_Sub1C580(uint32_t pool, const char* name, int32_t k, uint32_t flags); // 0x1C580
+extern "C" uint32_t* Storm_Sub1C580(uint32_t pool, const char* name, int32_t k, uint32_t flags); // 0x1C580
 void Storm_Sub4390(void* z, uint32_t node, uint32_t edi);              // 0x4390
 void Storm_Sub2FB30(const char* a, const char* b);                     // 0x2FB30
 

@@ -1,8 +1,8 @@
 // Prior art: none (Storm SCOMP explode wrapper); body from the cached 1.13c decompile.
 #include <cstdint>
 extern "C++" {
-int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);                          // 0x1B960 SMemFree
-uint32_t* Storm_Sub1C580(uint32_t size, const char* file, int32_t line, uint32_t flags);  // 0x1C580 SMemAlloc
+extern "C" int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);                          // 0x1B960 SMemFree
+extern "C" uint32_t* Storm_Sub1C580(uint32_t size, const char* file, int32_t line, uint32_t flags);  // 0x1C580 SMemAlloc
 uint8_t Storm_Sub0EC20(const void* readCb, const void* writeCb, uint32_t* state, void* user); // 0xEC20
 extern const char Storm_Cb11C70[], Storm_Cb11C30[]; // code labels 0x11C70 / 0x11C30 (read/write callbacks)
 

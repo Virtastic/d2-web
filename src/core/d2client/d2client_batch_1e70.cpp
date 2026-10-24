@@ -99,6 +99,13 @@ EMSCRIPTEN_KEEPALIVE void* d2_client_5cc10(int32_t key, const D2ClientBatch1e70E
     return best;
 }
 
+// FN-probe seam (the retail capture tool/fn/d2client-5cc10.txt): load the pick table and the 0x11C280 gate.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_5cc10_pin(const uint8_t* tbl, uint32_t en) {
+    for (uint32_t i = 0; i < sizeof g_pickTable; ++i) g_pickTable[i] = tbl[i];
+    g_pickEnabled = en;
+}
+extern "C" EMSCRIPTEN_KEEPALIVE const uint8_t* d2_client_5cc10_base() { return g_pickTable; }
+
 // 1.13c D2Client+0xA5420: if the object's +0x64 list is non-empty, 0xA8630(pop everything) and clear
 // +0x64. Object in EDI, untouched otherwise.
 extern "C"

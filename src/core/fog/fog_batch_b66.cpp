@@ -8,9 +8,9 @@
 uint32_t g_fog_perf_ticks_per_usec;
 // 1.13c Fog+0x32F3C PERFORMANCE_FREQUENCY_TICKS_PER_MILLISEC
 uint32_t g_fog_perf_ticks_per_msec;
-// 1.13c Fog+0x32F40 PERFORMANCE_ACCUMULATOR
+// 1.13c FOG+0x32F40 PERFORMANCE_ACCUMULATOR
 uint64_t g_fog_perf_accumulator;
-// 1.13c Fog+0x56E7C PERFORMANCE_ACCUMULATOR_INDEX
+// 1.13c FOG+0x56E7C PERFORMANCE_ACCUMULATOR_INDEX
 uint32_t g_fog_perf_accumulator_index;
 
 // 1.13c Fog+0x0FDB0 -- hidden inputs: module_base (HMODULE, ebp; the caller resolves 0 to the exe),

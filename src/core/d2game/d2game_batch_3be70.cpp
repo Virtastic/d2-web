@@ -10,6 +10,15 @@
 #include <cstring>
 #include <unistd.h>
 #include <emscripten.h>
+#include "MISSILES/MissMode.h"
+#include "GAME/Event.h"
+#include "UNIT/SUnit.h"
+#include "D2StatList.h"
+#include "D2States.h"
+#include "D2Inventory.h"
+#include "D2Dungeon.h"
+#include "../fn/hookenv.h"
+BOOL D2Common_10057_DUNGEON_IsRoomInTown(D2ActiveRoomStrc* pRoom);   // 1.13c D2Common+0x3C390 (d2common_batch_31940.cpp)
 
 namespace {
 inline int32_t i32(const void* p, uint32_t o) { int32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
@@ -71,24 +80,60 @@ struct D2GameBatch3beEnv {
     int32_t  (*collide)(void* game, void* unit);                // 0x3F320 MISSMODE_HandleMissileCollision
 };
 
+// Default env: seams whose callee is a DEFINED typed function in src/ are direct calls (D2Common ordinal ->
+// ordinal column). Null seams are the documented gaps (no usable definition):
+//   createMissile 0x6F930 (template over a hook env only), f3bda0 (39e30 env-typed), f6cc26e0 (0xA26E0 env-typed), findTarget 0xA0F40
+//   (arg order unverified), statsRow/skillDuration/maxFrames/ord10786/10510 (probe or env-ABI definitions), roomCollide #11076,
+//   roomAux 0x1280, pathX/pathY #10867/#10750 (register-array probes), f21b10/f21ec0/f21bc0/f21a90 (probes), fd2120 0xB2120,
+//   isDead #10494 (probe), stat1/stat3 #10973 (2-arg row probe), fcbf340 0x9F340 (stack-arg thunk), r10614, r10513, cb58e60 (LAB_6fc58e60 has no row).
+// getClient is SUNIT_GetServerUnit(game, UNIT_PLAYER, id): the decompile drops the type register (player owner id, unit+0x98 / +0x26 dword).
+static const D2GameBatch3beEnv g3beDirect = [] {
+    D2GameBatch3beEnv e{};
+    e.unitClass = [](void* u) -> uint32_t { return (uint32_t)MISSILE_GetSkill((D2UnitStrc*)u); };
+    e.unitLevel = [](void* u) -> uint32_t { return MISSILE_GetLevel((D2UnitStrc*)u); };
+    e.unitGuid  = [](void* u) -> uint32_t { return (uint32_t)MISSILE_GetTargetX((D2UnitStrc*)u); };
+    e.getClient = [](void* g, uint32_t id) -> void* { return SUNIT_GetServerUnit((D2GameStrc*)g, UNIT_PLAYER, (int32_t)id); };
+    e.unitX = [](void* u) -> int32_t { return UNITS_GetXPosition((D2UnitStrc*)u); };
+    e.unitY = [](void* u) -> int32_t { return UNITS_GetYPosition((D2UnitStrc*)u); };
+    e.setLife = [](void* u, int32_t v) { MISSILE_SetTargetX((D2UnitStrc*)u, v); };
+    e.getRoom = [](void* u) -> void* { return UNITS_GetRoom((D2UnitStrc*)u); };
+    e.auxTest = [](void* r) -> int32_t { return D2Common_10057_DUNGEON_IsRoomInTown((D2ActiveRoomStrc*)r); };
+    e.createUnit = [](void* pool, int32_t t, uint32_t id, uint32_t a, uint32_t b) -> void* {
+        return STATLIST_AllocStatList(pool, (uint32_t)t, id, (int)a, (D2UnitGUID)b); };
+    e.f6caea80 = [](void* g, void* u, int32_t a, uint32_t b, int32_t c, int32_t d, int32_t x) {
+        D2GAME_InitTimer_6FC351D0((D2GameStrc*)g, (D2UnitStrc*)u, (D2C_EventTypes)a, (int32_t)b, (EventTimerCallback)(intptr_t)c, d, x); };
+    e.setMode = [](void* s, int32_t v) { STATLIST_SetState((D2StatListStrc*)s, v); };
+    e.setCallback = [](void* s, const void* cb) { STATLIST_SetStatRemoveCallback((D2StatListStrc*)s, (StatListRemoveCallback)cb); };
+    e.attach = [](void* u, void* s, int32_t v) { D2COMMON_10475_PostStatToStatList((D2UnitStrc*)u, (D2StatListStrc*)s, v); };
+    e.setFlag = [](void* u, int32_t st, int32_t v) { STATES_ToggleState((D2UnitStrc*)u, st, v); };
+    e.dist2 = [](int32_t a, int32_t b, int32_t c, int32_t d) -> int32_t { return PATH_ComputeSquaredDistance(a, b, c, d); };
+    e.unitMode = [](void* u) -> int32_t { return MISSILE_GetCurrentFrame((D2UnitStrc*)u); };
+    e.dir = [](void* u) -> int32_t { return MISSILE_GetRemainingFrames((D2UnitStrc*)u); };
+    e.dirPacked = [](void* u) -> int32_t { return MISSILE_GetTargetY((D2UnitStrc*)u); };
+    e.setDir = [](void* u, int32_t v) { MISSILE_SetTargetY((D2UnitStrc*)u, v); };
+    e.collide = [](void* g, void* u) -> int32_t { return MISSMODE_HandleMissileCollision((D2GameStrc*)g, (D2UnitStrc*)u); };
+    return e;
+}();
+
 namespace {
+const uint8_t* dtab(const D2GameBatch3beEnv* e) { return e->dt ? e->dt : (const uint8_t*)sgptDataTables; }
 // class table row (sgptDataTables+0xB64, count +0xB6C, stride 0x1A4) or null.
 const uint8_t* classRow(const D2GameBatch3beEnv* e, const int32_t* u) {
     int32_t i = u[1];
-    if (i < 0 || i >= i32(e->dt, 0xb6c)) return nullptr;
-    return (const uint8_t*)ptr(e->dt, 0xb64) + (size_t)i * 0x1a4;
+    if (i < 0 || i >= i32(dtab(e), 0xb6c)) return nullptr;
+    return (const uint8_t*)ptr(dtab(e), 0xb64) + (size_t)i * 0x1a4;
 }
 // skills table row (+0xB98, count +0xBA0, stride 0x23C) or null.
 const uint8_t* skillRow(const D2GameBatch3beEnv* e, int32_t i) {
-    if (i < 0 || i >= i32(e->dt, 0xba0)) return nullptr;
-    return (const uint8_t*)ptr(e->dt, 0xb98) + (size_t)i * 0x23c;
+    if (i < 0 || i >= i32(dtab(e), 0xba0)) return nullptr;
+    return (const uint8_t*)ptr(dtab(e), 0xb98) + (size_t)i * 0x23c;
 }
 bool isPlayerBit(const int32_t* u) { return ((uint32_t)u[0x32] >> 10 & 1) != 0; }
 bool hasPath(const int32_t* u) { int t = u[0]; return t != 2 && (t < 4 || t > 5) && u[0xb] != 0; }
 }
 
 // 1.13c D2Game+0x3BE70
-EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3be70(void* game, const int32_t* u, int32_t flag, const D2GameBatch3beEnv* e)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3be70(void* game, const int32_t* u, int32_t flag, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     if (u && classRow(e, u) && flag == 0 && e->unitGuid((void*)u) == 0)
         e->f3bda0(game);
@@ -97,7 +142,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3be70(void* game, const int32_t* u, int32_
 
 // 1.13c D2Game+0x3C5B0 -- `edi` is the hidden first argument of 0xCC26E0. The request struct the
 // decompile builds is never passed anywhere in this function and is omitted.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3c5b0(void* game, int32_t* u, void* edi, const D2GameBatch3beEnv* e)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3c5b0(void* game, int32_t* u, void* edi, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     if (!u) return 1;
     const uint8_t* row = classRow(e, u);
@@ -118,7 +163,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3c5b0(void* game, int32_t* u, void* edi, c
 }
 
 // 1.13c D2Game+0x3C990 -- the request's first argument is the game (Ghidra shows a stale register).
-EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3c990(void* game, int32_t* u, const uint8_t* urow, const D2GameBatch3beEnv* e)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3c990(void* game, int32_t* u, const uint8_t* urow, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     if (!u) return 1;
     const uint8_t* row = classRow(e, u);
@@ -144,7 +189,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3c990(void* game, int32_t* u, const uint8_
 }
 
 // 1.13c D2Game+0x3CDD0
-EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3cdd0(void* game, int32_t* u, const D2GameBatch3beEnv* e)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3cdd0(void* game, int32_t* u, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     if (!u) return 1;
     const uint8_t* row = classRow(e, u);
@@ -154,6 +199,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3cdd0(void* game, int32_t* u, const D2Game
     uint32_t req[23] = {};
     req[0] = 1; req[1] = (uint32_t)(uintptr_t)client;
     req[5] = e->unitX(u); req[6] = e->unitY(u);
+    e->unitClass(u);   // #10240 is called (retail 0x3CE5x) and its result overwritten by #11029
     req[10] = e->unitLevel(u);
     req[2] = (uint32_t)(int32_t)i16(row, 0x24);
     e->createMissile(game, req);
@@ -161,7 +207,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3cdd0(void* game, int32_t* u, const D2Game
 }
 
 // 1.13c D2Game+0x3D020 -- `ctx` is the hidden stack argument (its +0x0C feeds the target search).
-EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3d020(void* game, int32_t* u, int32_t flag, int32_t* ctx, uint32_t seed, const D2GameBatch3beEnv* e)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3d020(void* game, int32_t* u, int32_t flag, int32_t* ctx, uint32_t seed, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     if (!u) return 1;
     const uint8_t* row = classRow(e, u);
@@ -193,7 +239,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3d020(void* game, int32_t* u, int32_t flag
 }
 
 // 1.13c D2Game+0x3D450 -- `radius` and `game` are the hidden arguments (Ghidra's unaff_retaddr / uStack_8).
-EMSCRIPTEN_KEEPALIVE void d2_game_3d450(uint32_t p1, int32_t* u, int32_t radius, void* game, const D2GameBatch3beEnv* e)
+EMSCRIPTEN_KEEPALIVE void d2_game_3d450(uint32_t p1, int32_t* u, int32_t radius, void* game, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     if (!e->getRoom(u)) return;
     uint32_t req[25] = {};
@@ -227,7 +273,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_3d450(uint32_t p1, int32_t* u, int32_t radius,
 }
 
 // 1.13c D2Game+0x3E590 -- a null row (retail dereferences it) returns.
-EMSCRIPTEN_KEEPALIVE void d2_game_3e590(int32_t* u, int32_t* t, const D2GameBatch3beEnv* e)
+EMSCRIPTEN_KEEPALIVE void d2_game_3e590(int32_t* u, int32_t* t, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     const uint8_t* row = u ? classRow(e, u) : nullptr;
     if (!row) { if (!u) fatal(0xa2a); return; }
@@ -244,7 +290,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_3e590(int32_t* u, int32_t* t, const D2GameBatc
 }
 
 // 1.13c D2Game+0x3E740 -- t = stack argument, ecx/edi = hidden args of 0x21B10, esi of 0xCD2120.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3e740(void* game, int32_t* u, int32_t* t, uint32_t ecx, uint32_t edi, void* esi, const D2GameBatch3beEnv* e)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3e740(void* game, int32_t* u, int32_t* t, uint32_t ecx, uint32_t edi, void* esi, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     int32_t id = (int32_t)e->unitClass(u);
     e->unitLevel(u);
@@ -268,7 +314,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3e740(void* game, int32_t* u, int32_t* t, 
 }
 
 // 1.13c D2Game+0x3EAE0 -- t = stack argument, ecx = hidden argument of 0x21A90.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3eae0(void* game, int32_t* u, int32_t* t, uint32_t ecx, const D2GameBatch3beEnv* e)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3eae0(void* game, int32_t* u, int32_t* t, uint32_t ecx, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     int32_t id = (int32_t)e->unitClass(u);
     e->unitLevel(u);
@@ -278,7 +324,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3eae0(void* game, int32_t* u, int32_t* t, 
     if (!client) return 1;
     if (t && t[0] == 1) {
         int16_t s = i16(srow, 0x82);
-        if (s < 0 || s >= i32(e->dt, 0xc4)) return 1;
+        if (s < 0 || s >= i32(dtab(e), 0xc4)) return 1;
         if (e->isDead(t) == 0) {
             int32_t a = e->stat1(client);
             int32_t b = e->f21bc0();
@@ -293,7 +339,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3eae0(void* game, int32_t* u, int32_t* t, 
 }
 
 // 1.13c D2Game+0x3F6D0 -- the 10750/10867 results are discarded in the decompile (register inputs of 0xBF340).
-EMSCRIPTEN_KEEPALIVE void d2_game_3f6d0(void* game, int32_t* u, const D2GameBatch3beEnv* e)
+EMSCRIPTEN_KEEPALIVE void d2_game_3f6d0(void* game, int32_t* u, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     int32_t m = e->unitMode(u);
     if (m >= 2 && m <= 0x18) {
@@ -309,7 +355,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_3f6d0(void* game, int32_t* u, const D2GameBatc
 }
 
 // 1.13c D2Game+0x3F7D0 -- esi = game (frame counter at +0xA8).
-EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3f7d0(void* game, int32_t* u, int32_t flag, void* esi, const D2GameBatch3beEnv* e)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3f7d0(void* game, int32_t* u, int32_t flag, void* esi, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     if (!u || !isPlayerBit(u)) return 1;
     void* client = e->getClient(game, u[0x26]);
@@ -324,7 +370,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3f7d0(void* game, int32_t* u, int32_t flag
 }
 
 // 1.13c D2Game+0x3F890
-EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3f890(void* game, int32_t* u, const D2GameBatch3beEnv* e)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3f890(void* game, int32_t* u, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     const uint8_t* row = u ? classRow(e, u) : nullptr;
     if (!row) return 2;
@@ -352,4 +398,21 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3f890(void* game, int32_t* u, const D2Game
     e->setDir(u, sy * 0x10000 + (sx & 0xffff));
     // the decompile passes the unit where the first call passes the game (stale register); game is used.
     return (uint32_t)e->collide(game, u);
+}
+
+// function probe seam (src/core/fn/d2game_3cdd0.cpp): callees are HookEnv recorders; dt is the descriptor's data-table blob.
+// Retail calls E03A0 with eax = unit+0x94 (owner type), edx = unit+0x98; the vendored getClient fixes the type to player.
+static HookEnv* g3cH; static int32_t* g3cU;
+uint32_t D2Game_3CDD0_probe(void* game, int32_t* u, const uint8_t* dt, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); g3cH = &h; g3cU = u;
+    D2GameBatch3beEnv e = g3beDirect;
+    e.dt = dt;
+    e.getClient = [](void* g, uint32_t id) -> void* { return (void*)(uintptr_t)g3cH->h(0xE03A0, (uint32_t)g3cU[0x25], (uint32_t)(uintptr_t)g, id); };
+    e.unitX = [](void* u) -> int32_t { return (int32_t)g3cH->h(0x1100, 0, (uint32_t)(uintptr_t)u); };
+    e.unitY = [](void* u) -> int32_t { return (int32_t)g3cH->h(0x1130, 0, (uint32_t)(uintptr_t)u); };
+    e.unitClass = [](void* u) -> uint32_t { return g3cH->h(0xB26A, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
+    e.unitLevel = [](void* u) -> uint32_t { return g3cH->h(0xB0FC, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
+    e.createMissile = [](void* g, uint32_t* req) -> void* { return (void*)(uintptr_t)g3cH->h(0x6F930, 0, (uint32_t)(uintptr_t)g, g3cH->stk(req)); };
+    return d2_game_3cdd0(game, u, &e);
 }

@@ -3,7 +3,8 @@
 // D2Gfx module globals (retail image base 0x6FA80000); +0x10BDC is 0x100 at the capture point (D2Gfx+0x0B8D0 ran), +0x10BE4 is 1, the rest zero.
 static uint32_t g_bdc = 0x100, g_be0, g_be4 = 1, g_bf0, g_bf4;  // +0x10BDC, +0x10BE0, +0x10BE4, +0x10BF0, +0x10BF4
 
-extern "C" void d2gfx_sub_b1c0() { g_bf0 = 1; }                    // 1.13c D2Gfx+0x0B1C0
+extern "C" void d2gfx_sub_b1c0() { g_bf0 = 1; }
+extern "C" uint32_t d2gfx_get_bf0() { return g_bf0; }  // probe readback                    // 1.13c D2Gfx+0x0B1C0
 extern "C" uint32_t d2gfx_sub_b8d0(uint32_t edx, uint32_t (*slot)(uint32_t, uint32_t)) { g_bdc = 0x100; return slot(0x100, edx); }  // 1.13c D2Gfx+0x0B8D0: +0x10BDC = 0x100, ecx = 0x100, tail-jump to slot +0x54
 extern "C" uint32_t d2gfx_sub_b8f0() { return g_bdc; }             // 1.13c D2Gfx+0x0B8F0
 extern "C" uint32_t d2gfx_sub_b290() { return g_be4 ? g_be0 : 0; } // 1.13c D2Gfx+0x0B290

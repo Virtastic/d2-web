@@ -27,8 +27,8 @@ constexpr const char* kScode = "..\\3rdParty\\STORM\\SOURCE\\SCODE.CPP";
 constexpr const char* kAuinst = "..\\AUINST";            // s___AUINST___6fc415a4
 
 // unmapped Storm internals, retail argument order (seams; see src/core/storm/storm_batch_123b0.cpp)
-int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);                       // 0x1B960 SMemFree
-uint32_t* Storm_Sub1C580(uint32_t size, const char* file, int32_t line, uint32_t flags); // 0x1C580 SMemAlloc
+extern "C" int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);                       // 0x1B960 SMemFree
+extern "C" uint32_t* Storm_Sub1C580(uint32_t size, const char* file, int32_t line, uint32_t flags); // 0x1C580 SMemAlloc
 void Storm_Sub38EB0(uint32_t* p);                                                       // 0x38EB0
 void Storm_Sub37ED0(uint32_t a, uint8_t* out, uint32_t n, uint32_t d);                  // 0x37ED0
 void Storm_Sub3A330(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t d, uint32_t e, uint8_t* out); // 0x3A330
@@ -114,7 +114,7 @@ int32_t Storm_Sub1000(int32_t base, int32_t exp) {
 }
 
 // 0x1050: SMemFree(p, "delete", -1).
-void Storm_Sub1050(void* p) {
+extern "C" void Storm_Sub1050(void* p) {
     if (p != nullptr) Storm_Sub1B960(p, "delete", -1);
 }
 

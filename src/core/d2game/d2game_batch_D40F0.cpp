@@ -130,7 +130,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_376f0(uint32_t eaxPlayer, const D2GameBat
 // places the item lazily (0x383F0) or gives it durability/quantity stats (0x10887). The 1.10f form
 // is PLAYER_CreateStartItem_6FC7B800.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_38470(uint32_t param1, uint32_t param2, uint32_t param3,
+EMSCRIPTEN_KEEPALIVE void d2game_38470_impl(uint32_t param1, uint32_t param2, uint32_t param3,
                                              const uint32_t* param4, uint32_t esi,
                                              const D2GameBatchD40F0Env* env)
 {
@@ -444,4 +444,14 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d4550(uint32_t eaxUnit, uint32_t ediUnit,
     if (eaxUnit == 0) return;
     if ((rd32((void*)(uintptr_t)eaxUnit, 0xC4) & 1u) == 0) return;
     d2_fn_d2game_d40f0(ediUnit, ebxArg, env);
+}
+
+// Probe entry for 0x38470 (src/core/fn/d2game_38470.cpp): the env carries only the item-code lookup;
+// every other seam is null, so only the early-return paths (unknown code, nItemCount 0) are callable.
+extern "C" void d2game_38470_probe(uint32_t player, uint32_t game, const uint32_t* item,
+                                   int32_t (*lookup)(uint32_t, int32_t*))
+{
+    D2GameBatchD40F0Env env{};
+    env.ordinal10450 = lookup;
+    d2game_38470_impl(player, game, 0, item, 0, &env);
 }

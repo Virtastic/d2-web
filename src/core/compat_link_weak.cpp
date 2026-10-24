@@ -22,17 +22,17 @@ W void FUN_6ff5fc20() {}
 W void FUN_6ff60f30() {}
 W void FUN_6ff62020() {}
 W void FUN_6ff684a0() {}
-W void FUN_6ff6b560() {}
 W void FUN_6ff6cda0() {}
 W void Ordinal_116() {}
-W void Ordinal_501() {}
+void Fog_Ordinal_501_SStrCopy(char*, const char*, uint32_t);
+W void Ordinal_501(char* d, const char* s, uint32_t n) { Fog_Ordinal_501_SStrCopy(d, s, n); }
 W uint8_t DAT_6ff76690[0x100], DAT_6ff768ec[0x100];
 // Fog/Storm ordinal imports no merged row defines yet (link fix); signatures match the importers.
-W uint32_t Ordinal_10265(uint32_t) { return 0; }
-W void Ordinal_10024(const void*, uint32_t) {}
+extern uint32_t Fog_Ordinal_10265(uint32_t); extern void Fog_Ordinal_10024(const void*, const void*, uint32_t); extern void Fog_Ordinal_10043(int32_t, int32_t);
+W uint32_t Ordinal_10265(uint32_t a) { return Fog_Ordinal_10265(a); }
+W void Ordinal_10024(const void* m, uint32_t l) { Fog_Ordinal_10024(m, 0, l); }
 W int32_t Ordinal_10107(int32_t) { return 0; }
 W void Ordinal_10109(void) {}
-W void* Ordinal_10042(int32_t, int32_t) { return nullptr; }
-W void Ordinal_10043(int32_t, int32_t) {}
+W void Ordinal_10043(int32_t a, int32_t b) { Fog_Ordinal_10043(a, b); }
 W int wsprintfA(char*, const char*, ...) { return 0; }
 }

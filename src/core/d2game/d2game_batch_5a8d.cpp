@@ -157,10 +157,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_8284(char* mbch, uint16_t wch) {
 // 1.13c D2Game+0x082B0 (__aulldvrm): unsigned 128/64 -> 64-bit quotient. EDX:EAX is the dividend
 // (hi=param_2, lo=param_1), the divisor is param_4:param_3, and (as with 0x3E70) both decompile limbs
 // are the restored divide whose result is the plain 64-bit quotient.
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint64_t d2_fn_d2game_82b0(uint32_t lo, uint32_t hi, uint32_t dlo, uint32_t dhi) {
-    return ((uint64_t)hi << 32 | lo) / ((uint64_t)dhi << 32 | dlo);
-}
+// Implemented in src/core/fn/d2game_82b0.cpp (the FN probe).
 
 // 1.13c D2Game+0x09D61 (__fptrap): __amsg_exit(2), i.e. print the "floating point not loaded" runtime
 // message and terminate with exit code 0xFF. The message is the only side effect and is not modelled.

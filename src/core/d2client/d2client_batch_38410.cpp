@@ -72,16 +72,10 @@ bool sub_3A270(State& s,int32_t cmd,int32_t mod,int16_t key,uint16_t* out){
 static void dispatch(Services& api,bool nonnull,int32_t sel,int32_t id,int32_t e0,int32_t ec,int32_t base,int32_t special,int32_t fatalNull,int32_t fatalMain){
  if(nonnull){ switch(sel){ case 0: if(id!=0x111){api.ord(base+3);return;} api.fatal(fatalMain); case 1: api.ord(base);return; case 2: api.ord(base+2);return; case 3: api.ord(base+1);default:return; } }
  api.fatal(fatalNull); (void)e0;(void)ec;(void)special; }
-// 1.13c D2Client+0x3CA00  (nonnull=EAX, sel=ESI, id=param_1)
-void sub_3CA00(Services& api,bool nonnull,int32_t sel,int32_t id){ dispatch(api,nonnull,sel,id,0,0,512,0,0x157,0x15b); }
 // 1.13c D2Client+0x3CA80
 void sub_3CA80(Services& api,bool nonnull,int32_t sel,int32_t id){ dispatch(api,nonnull,sel,id,0,0,414,0,0x136,0x13a); }
 // 1.13c D2Client+0x3CBC0
 void sub_3CBC0(Services& api,uint32_t* p){ api.sendClose(reinterpret_cast<void*>(uintptr_t(p[0]))); p[6]=1; p[7]=0; }
-// 1.13c D2Client+0x3CC60  (count=EAX; sel is ESI inherited from caller -- low confidence)
-void sub_3CC60(Services& api,int32_t count,bool param1,const uint8_t* arr,int32_t sel){
- if(!param1)api.fatal(0x18c);
- for(const uint8_t* e=arr+4;count>0;--count,e+=12){ int32_t id; std::memcpy(&id,e,4); sub_3CA00(api,true,sel,id); } }
 // 1.13c D2Client+0x3CCC0  (count=EAX; sel is ESI inherited from caller)
 void sub_3CCC0(Services& api,int32_t count,bool param1,const uint8_t* arr,int32_t sel){
  if(!param1)api.fatal(0x179);

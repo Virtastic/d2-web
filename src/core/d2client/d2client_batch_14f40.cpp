@@ -49,6 +49,17 @@ void sub_43830(const Host& H,S43830& s){
  if(s.g3b8){ P u=s.gbbfc?(P)(intptr_t)H.opi(10331,s.gbbfc,0,0):nullptr; H.op(10358,s.g3b8,u,(P)5); return; }
  s.g400=1;
 }
+// 1.13c D2Client+0x440C0
+// 1.13c D2Client+0x440C0
+void sub_440C0(const Host& H,P g3b8,I g2e0){
+ for(P n=(P)(intptr_t)H.opi(10717,g3b8,0,0);n;n=H.ptr(n,0x7c)){
+  uint8_t* f=(uint8_t*)n+0x34;
+  if(*f&1) continue;
+  H.op(0x18370,n,0,0); H.op(0xA7D00,0,0,0);
+  if(H.opi(10826,n,0,0)==8&&g2e0) H.op(0x53550,n,0,0);
+  *f|=1;
+ }
+}
 // 1.13c D2Client+0x44110 (teardown; each step is a callee, order preserved)
 // 1.13c D2Client+0x44110
 void sub_44110(const Host& H,P* g3b8,P* g54e4,P* g3c4,U* g97e0 /*32 words*/,P g97e8){
@@ -78,7 +89,7 @@ static void sendMsg(const Host& H,P e,P gbbfc,U id){
  if(t==2||(t>3&&t<6)){ a=rd(u,0x10); b=rd(u,0xc); }
  else { a=u?U(H.opi(10750,u,0,0)):0; b=u?U(H.opi(10867,u,0,0)):0; }
  if(!gbbfc) return;
- U m[23]={}; m[0]=1; m[1]=U((uintptr_t)gbbfc); m[12]=0; m[11]=1; m[4]=id; m[5]=b; m[6]=a; // m[6] (uStack_44) = a: kept for the record layout
+ U m[23]={}; m[0]=1; m[1]=U((uintptr_t)gbbfc); m[11]=0; m[12]=1; m[4]=id; m[5]=b; m[6]=a; // m[6] (uStack_44) = a: kept for the record layout
  H.op(0xB30F0,m,0,0);
 }
 // 1.13c D2Client+0x526E0

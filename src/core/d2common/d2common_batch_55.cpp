@@ -133,32 +133,31 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_5dd80(int32_t* pCap, uint32_t* ppBuf
 	return off;
 }
 
-// 1.13c D2Common+0x874E6: MSVC CRT _cfltcvt dispatcher (decompile names are shifted: sizeInBytes is
-// the format char). 'e'/'E' -> 0x872D4(arg, buf, prec, caps); 'f' -> 0x873E0(arg, buf, prec) and its
-// result; anything else -> 0x87447(arg, buf, prec, caps).
-struct D2Common874E6Env
-{
-	int32_t (*fE)(const void* arg, char* buf, int32_t prec, int32_t caps); // 0x872D4
-	int32_t (*fF)(const void* arg, char* buf, int32_t prec);               // 0x873E0
-	int32_t (*fG)(const void* arg, char* buf, int32_t prec, int32_t caps); // 0x87447
-};
-
-extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_874e6(const void* arg, char* buf, int32_t fmt, int32_t prec,
-                                                   int32_t caps, const D2Common874E6Env* env)
-{
-	if (fmt == 0x65 || fmt == 0x45)
-		return env->fE(arg, buf, prec, caps);
-	if (fmt == 0x66)
-		return env->fF(arg, buf, prec);
-	return env->fG(arg, buf, prec, caps);
+extern "C" {
+int32_t d2common_872d4(uint32_t* param_1, int32_t param_2, int32_t param_3, int32_t param_4);  // 0x872D4
+void d2_fn_d2common_87447(const uint32_t* p1, char* p2, uint32_t p3, int32_t p4);             // 0x87447
+char* d2_fn_d2common_873e0(const uint32_t* p1, char* p2, uint32_t p3);                        // 0x873E0
 }
 
-// 1.13c D2Common+0x87549: CRT __ms_p5_test_fdiv (Pentium FDIV probe): 1 when a < b - (b/c)*c, else 0.
-// The three doubles are the retail constants at 6FDE6F48/50/58, passed in.
-// ponytail: uses double on purpose (CRT semantics); correct hardware yields 0.
+// 1.13c D2Common+0x874E6: MSVC CRT _cfltcvt dispatcher. fmt 'e'/'E' -> 0x872D4, 'f' -> 0x873E0
+// (its result is returned), anything else -> 0x87447.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_87549(double a, double b, double c)
+EMSCRIPTEN_KEEPALIVE int32_t d2common_cfltcvt_874e6(double* arg, char* buf, int32_t fmt, int32_t prec, int32_t caps)
 {
+	uint32_t* a = reinterpret_cast<uint32_t*>(arg);
+	if (fmt == 0x65 || fmt == 0x45)
+		return d2common_872d4(a, static_cast<int32_t>(reinterpret_cast<uintptr_t>(buf)), prec, caps);
+	if (fmt == 0x66)
+		return static_cast<int32_t>(reinterpret_cast<uintptr_t>(d2_fn_d2common_873e0(a, buf, static_cast<uint32_t>(prec))));
+	d2_fn_d2common_87447(a, buf, static_cast<uint32_t>(prec), caps);
+	return 0;
+}
+
+// 1.13c D2Common+0x87549: CRT __ms_p5_test_fdiv (Pentium FDIV probe). Constants at 6FDE6F48/50/58
+// are 1.0, 4195835.0, 3145727.0 (read from the 1.13c image).
+extern "C"
+EMSCRIPTEN_KEEPALIVE int32_t d2common_ms_p5_test_fdiv_87549(void)
+{
+	volatile double a = 1.0, b = 4195835.0, c = 3145727.0;
 	return a < b - (b / c) * c ? 1 : 0;
 }

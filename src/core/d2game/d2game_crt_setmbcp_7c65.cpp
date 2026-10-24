@@ -25,11 +25,11 @@ struct D2GameSetmbcpEnv {
     int32_t (*select_codepage)(uint32_t, uint32_t);
 };
 
-// 1.13c D2Game+0x07C65 (__setmbcp). CRT wrapper: resolve -2/-3/-4 through the
+// see 1.13c D2Game+0x07C65 (__setmbcp). CRT wrapper: resolve -2/-3/-4 through the
 // corresponding Windows codepage source, avoid reallocating an active snapshot,
 // ask the sibling selector at +0x7AD1 to rebuild multibyte tables, and preserve
 // the prior CRT fields in the 0x220-byte block when selection succeeds.
-// 1.13c D2Game+0x07C65
+// see 1.13c D2Game+0x07C65
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_game_setmbcp_7c65(
     int32_t codepage, D2GameSetmbcpState* state, const D2GameSetmbcpEnv* env) {
     int32_t result = -1;

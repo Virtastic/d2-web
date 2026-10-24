@@ -49,13 +49,15 @@ import { hudOrigin } from './assets/hud-origin.mjs';
 import { panelSides as panelViewSides, viewCentreX } from './assets/panel-view-shift.mjs';
 import { createFreeResArt, barParts, halfParts, stoneTiles, drawParts } from './assets/wide-hud.mjs';
 import { createBeltRenderer } from './assets/belt-renderer.mjs';
-import { createActMusicPlayer, createLevelMusicSync } from './assets/act-music.mjs';
+import { createActMusicPlayer, createLevelMusicSync, levelMusicDue } from './assets/act-music.mjs';
 import { createAudioVolume } from './assets/audio-volume.mjs';
 import { createNpcSpeechSetting, npcSpeechHasAudio, npcSpeechHasText } from './assets/npc-speech-setting.mjs';
 import { createVideoResolutionSettings } from './assets/video-resolution-settings.mjs';
 import { createUiClickSoundPlayer } from './assets/ui-click-sound.mjs';
 import { unitSoundNativeSpatial, unitSoundNativePanCode } from './assets/unit-sound-spatial.mjs';
 import { createUnitSoundPlayer } from './assets/unit-sound-player.mjs';
+import { createAmbientSound } from './assets/ambient-sound.mjs';
+import { createCombatSoundTrigger } from './assets/combat-sound-trigger.mjs';
 import { playNpcDialogueVoice, npcDialogueVoiceSource } from './assets/npc-dialogue-voice.mjs';
 import { createNpcSpeechScrollGate } from './assets/npc-speech-scroll-gate.mjs';
 import { createNpcSpeechClickGate } from './assets/npc-speech-click.mjs';
@@ -71,6 +73,7 @@ import { createCinematicsScreen, CINEMATICS } from './assets/cinematics-screen.m
 import { createScreenshotAction } from './assets/screenshot-action.mjs';
 import { sendCharacterPhrase } from './assets/chat-macros.mjs';
 import { createOtherMultiplayerScreen } from './assets/other-multiplayer.mjs';
+import { labelItemAt, nearestGroundItem, pickupNeedsWalk } from './item-pick.mjs';
 import { createSpeechBox } from './assets/speech-box.mjs';
 import { nativeObjectSpeechAcknowledgement } from './assets/object-speech-ack.mjs';
 import { dispatchObjectSpeechPointer } from './assets/object-speech-input.mjs';
@@ -602,7 +605,7 @@ function selectSkill(id, side) {
   const rc = Module.ccall('d2_session_command_select_skill', 'number', ['number', 'number'], [id, side === 'left' ? 1 : 0]);
   return rc;
 }
-let actMusic = null, musicError = '';
+let actMusic = null, musicError = '', musicSeenLevel = -1, musicLevelTick = 0;
 const levelMusicSync = createLevelMusicSync((levelId) => actMusic.playLevel(levelId));
 function syncAreaMusic(levelId, options) {
   if (!actMusic) return;
@@ -1147,7 +1150,7 @@ async function bootstrapSession() {
       syncAreaMusic(snapshot.level, { force: true });
     } catch (error) { actMusic = null; musicError = String(error); }
     try { audioVolume.attach('sound', createUiClickSoundPlayer(assetReader, canvas)); } catch (error) { musicError = String(error); }
-    try { unitSounds = createUnitSoundPlayer(assetReader); canvas.__d2UnitSound = unitSounds; audioVolume.attach('sound', unitSounds); } catch (error) { musicError = String(error); }
+    try { unitSounds = createUnitSoundPlayer(assetReader); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error))); canvas.__d2UnitSound = unitSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader)); } catch (error) { musicError = String(error); }
 
     if (TERRAIN_ENABLED) loadSessionTerrain(fixture.act0);
     // A picked character is not applied to anything: createFromSave above already made it, sections
@@ -1844,7 +1847,7 @@ function ensureCharCreate() {
 // their stock if a trade is open. All of it is engine state; the panel only draws it.
 // Retail plays an NPC's message list in order: each dismissal acks the message and shows the next (npcMsgSkip.n = how many were heard).
 let npcMsgSkip = { npcId: 0, n: 0 };
-let unitSounds = null, soundBuf = 0, npcVoiceKey = null, npcVoiceGeneration = 0;
+let ambient = null, ambientLevel = -1, unitSounds = null, combatSounds = null, soundBuf = 0, npcVoiceKey = null, npcVoiceGeneration = 0;
 const npcSpeechScrollGate = createNpcSpeechScrollGate();
 const npcSpeechClickGate = createNpcSpeechClickGate();
 let npcSpeechClickKey = null;
@@ -2128,6 +2131,11 @@ function chebyshev(ax, ay, bx, by) { return Math.max(Math.abs(ax - bx), Math.abs
 // the SAME cell -- a second click on the same thing is the SAME intent, and the walk keeps its patience.
 // An arm elsewhere is a new intent and starts fresh. Only the counters carry (not the previous goal's
 // callbacks: an arm always brings its own). Everything that sets a walkGoal arms through here.
+function clickPickup(item) {
+  if (!pickupNeedsWalk(session.pickup(item.id))) return;
+  armWalk({ x: item.x, y: item.y, within: 2, onArrive: () => { session.pickup(item.id); } });
+}
+
 function armWalk(goal) {
   // A click-walk target is expressed in its source level's subtile grid. Carrying it through a
   // seam replays that old coordinate in the destination level and can walk straight back across
@@ -2347,6 +2355,8 @@ function drainUnitSounds() {
   if (!unitSounds || !session || screen !== SCREEN.GAME || !Module._d2_session_take_sounds) return;
   const listener = session.playerCoords?.();
   unitSounds.updateSpatialGain(snapshot, listener);
+  if (snapshot?.player) snapshot.player.castSkillId = readSelectedSkills().right; // the cast skill is the selected right skill (left casts: ponytail, not distinguished)
+  combatSounds?.update(snapshot?.entities ?? [], snapshot);
   const cap = 32; if (!soundBuf) soundBuf = Number(Module.ccall('malloc', 'bigint', ['number'], [cap * 28]));
   const n = Module.ccall('d2_session_take_sounds', 'number', ['bigint', 'number'], [BigInt(soundBuf), cap * 7]);
   if (!n) return;
@@ -2500,6 +2510,7 @@ function update(forceTick = false) {
           const target = resolvePointerTarget(command.x, command.y);
           walkGoal = null;
           if (heldWorldAction(target) === 'strike') { swingLeftHand(target.unitId); continue; }
+          if (heldWorldAction(target) === 'pickup') { clickPickup(target.item); continue; }
           const { x: tx, y: ty } = target.at;
           const moved = session.move(tx, ty);
           if (!moved) armWalk({ x: tx, y: ty, within: 2 });
@@ -2529,7 +2540,7 @@ function update(forceTick = false) {
           const underTarget = resolved.unitId;
           const underItem = resolved.item;
           if (record) record.aim = { world: [tx, ty], unitId: underTarget || 0, itemId: underItem?.id ?? 0 };
-          if (underItem) { if (record) record.result = `pickup item ${underItem.id} at (${underItem.x},${underItem.y})`; session.pickup(underItem.id); continue; }
+          if (underItem) { if (record) record.result = `pickup item ${underItem.id} at (${underItem.x},${underItem.y})`; clickPickup(underItem); continue; }
           if (underTarget) {
             // The left hand's chosen skill (V9b): anything but the plain Attack runs through the
             // engine's own left skill; Attack keeps the primary path. Throw (2) must take the left
@@ -2572,7 +2583,7 @@ function update(forceTick = false) {
         // The fight sends hundreds of them, so the bucket hid the answer it was meant to give.
         const precord = command.x == null || command.held ? null : claimClick(command.x, command.y);
         if (precord) precord.aim = { world: [resolved.at.x, resolved.at.y], unitId: targetId || 0, itemId: ground?.id ?? 0 };
-        if (ground) { if (precord) precord.result = `pickup item ${ground.id} at (${ground.x},${ground.y})`; if (!command.held) session.pickup(ground.id); continue; }
+        if (ground) { if (precord) precord.result = `pickup item ${ground.id} at (${ground.x},${ground.y})`; if (!command.held) clickPickup(ground); continue; }
         const skill = command.secondary ? Math.max(0, readSelectedSkills().right) : 0;
         // Any other right-hand skill (Bash, Double Swing, ...) is the engine's selected right skill.
         const groundSkill = !targetId && command.secondary && skill > 2 && command.x != null;
@@ -2683,7 +2694,15 @@ function update(forceTick = false) {
     }
     catch (error) { sessionError = String(error); session = null; }
   }
-  if (session && actMusic && Number.isInteger(snapshot?.level) && snapshot.level !== levelMusicSync.activeLevel) {
+  // 1.13c FUN_6FAF5660: a level change stamps the tick; the new level's song is adopted only once
+  // more than 0x4a ticks have passed (or nothing is playing yet), so the old song carries across the seam.
+  if (session && Number.isInteger(snapshot?.level) && snapshot.level !== musicSeenLevel) { musicSeenLevel = snapshot.level; musicLevelTick = engineTicks; }
+  // Ambient loop/events (Levels.SoundEnv -> SoundEnviron -> Sounds.txt); the day/night source is unrecovered, so day.
+  if (session && ambient && Number.isInteger(snapshot?.level)) {
+    if (snapshot.level !== ambientLevel) { ambientLevel = snapshot.level; ambient.sync(ambientLevel, 0).catch((error) => { console.warn('Ambient sound', error); }); }
+    ambient.tick(1).catch(() => {});
+  }
+  if (session && actMusic && Number.isInteger(snapshot?.level) && levelMusicDue(snapshot.level, levelMusicSync.activeLevel, musicLevelTick, engineTicks)) {
     syncAreaMusic(snapshot.level);
   }
   // Write the character periodically, and immediately on an act change -- the two moments retail
@@ -2912,16 +2931,24 @@ function resolvePointerCandidates(x, y) {
 // decides every act's loot click, not only act IV's.
 function resolvePointerTarget(x, y) {
   const at = pointerWorldAt(x, y);
+  // Alt (show items): a drawn label is the item's click target (retail queues the label rect as a
+  // hit region); the last-drawn (topmost) label under the pointer wins over unit/ground tests.
+  if (heldShowItemsKeys.size) {
+    const item = labelItemAt(showItemsEvidence, snapshot.items, x, y);
+    if (item) return { at, unitId: 0, item };
+  }
   // This click/action approximation uses retail's measured screen-space unit box, not a subtile
   // disc. Its nearest-world-point/lower-id overlap choice is browser policy, not the retail F14
   // hover tie-break. F14's hover selector separately uses native signed priority and player-path
   // distance; candidate eligibility and stored-target behavior remain open.
   const unitId = selectPrimaryTarget(snapshot, at, Infinity, (entity) => unitBoxHit(entity, x, y));
   const distance2 = (candidate) => (candidate.x - at.x) ** 2 + (candidate.y - at.y) ** 2;
-  const ground = (snapshot.items || []).filter((candidate) => candidate.mode === 3 && candidate.invPage === 255)
-    .map((candidate) => ({ item: candidate, distance: distance2(candidate) }))
-    .filter((candidate) => candidate.distance <= 4)
-    .sort((a, b) => a.distance - b.distance || a.item.id - b.item.id)[0] ?? null;
+  // Retail's validator (0xA68E0) accepts the cursor anywhere in the item's padded sprite rect, the
+  // same test hover uses; the 2-subtile disc alone missed the drawn sprite, so clicks on it walked.
+  // A hostile within the old 2-subtile disc keeps the click: its sprite box can miss the cursor by a pixel.
+  const hostileNear = (snapshot.entities || []).some((e) => e.type === 1 && e.hostile && distance2(e) <= 4);
+  const drawn = new Set(hostileNear ? [] : groundItemsUnderPointer(x, y));
+  const ground = nearestGroundItem(snapshot.items, at, drawn);
   const unit = unitId ? (snapshot.entities || []).find((entity) => entity.id === unitId && entity.type === 1) : null;
   if (unit && ground?.distance === 0 && distance2(unit) > 0) return { at, unitId: 0, item: ground.item };
   return { at, unitId, item: unit ? null : (ground?.item ?? null) };
@@ -4638,7 +4665,7 @@ addEventListener('keydown', (e) => {
     e.preventDefault(); return;
   }
   if (configuredAction === 'Chat' && !e.repeat && !npcState && !gameMenu?.open) { chat = ''; e.preventDefault(); return; }
-  syncAreaMusic(snapshot.level);
+  if (levelMusicDue(snapshot.level, levelMusicSync.activeLevel, musicLevelTick, engineTicks)) syncAreaMusic(snapshot.level);
   if (configuredAction === 'Inventory Screen' && !e.repeat) { inventoryVisible = !inventoryVisible; if (inventoryVisible) hirelingVisible = false; e.preventDefault(); return; }
   if (configuredAction === 'Hireling Screen' && !e.repeat) { hirelingVisible = !hirelingVisible; if (hirelingVisible) { inventoryVisible = false; skillsVisible = false; } e.preventDefault(); return; }
   if (configuredAction === 'Character Screen' && !e.repeat) { characterVisible = !characterVisible; if (characterVisible) questVisible = false; e.preventDefault(); return; }
@@ -4857,7 +4884,7 @@ canvas.addEventListener('pointerdown', (e) => {
     frontendPointerStates.press(e.pointerId, frontendPointerControl(), tx, ty, canvas.width, canvas.height, e.button);
     canvas.focus(); e.preventDefault(); return;
   }
-  syncAreaMusic(snapshot.level);
+  if (levelMusicDue(snapshot.level, levelMusicSync.activeLevel, musicLevelTick, engineTicks)) syncAreaMusic(snapshot.level);
   // The amount box is modal, including outside its visible controls. Consume
   // its click before a skill socket or other HUD control can react behind it.
   if (modalOwner === MODAL_POINTER_OWNER.STASH_GOLD_DIALOG && stashGoldRenderer && session) {
@@ -6122,5 +6149,5 @@ Object.defineProperty(window.__d2Shell, 'audioVolume', { get: () => audioVolume.
 // knows when it has.
 installUnloadAutosave({ shouldSave: () => Boolean(session && chosenName), saveBytes: saveCurrentCharacterBytes, store: saveStore,
   onStored: () => { savesWritten++; lastSaveError = ''; }, onError: (error) => { lastSaveError = String(error); },
-  teardown: () => { if (session) destroyNativeSession(session, monsterRenderer); actMusic?.close(); bootMovieAudio?.close?.(); charCreateSounds?.close(); canvas.__d2UiClickSound?.close(); } });
+  teardown: () => { if (session) destroyNativeSession(session, monsterRenderer); actMusic?.close(); ambient?.close(); bootMovieAudio?.close?.(); charCreateSounds?.close(); canvas.__d2UiClickSound?.close(); } });
 requestAnimationFrame(frame);

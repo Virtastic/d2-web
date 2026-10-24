@@ -1524,6 +1524,7 @@ int __fastcall MISSILE_GetSpecialParamValueForSkillMissile(int nSkillId, int nPa
 }
 
 //D2Common.0x6FDBC170 (#11284)
+// 1.13c D2Common+0x6B2B0
 int __stdcall MISSILE_EvaluateMissileFormula(D2UnitStrc* pMissile, D2UnitStrc* pOwner, unsigned int nCalc, int nMissileId, int nLevel)
 {
 	D2MissileCalcStrc pMissileCalc = {};

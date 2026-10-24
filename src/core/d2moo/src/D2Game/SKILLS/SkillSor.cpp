@@ -335,6 +335,7 @@ void __fastcall SKILLS_CurseStateCallback_DefensiveBuff(D2UnitStrc* pUnit, int32
 }
 
 //D2Game.0x6FD160A0
+// 1.13c D2Game+0x428F0
 int32_t __fastcall SKILLS_SrvDo018_DefensiveBuff(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -493,6 +494,8 @@ int32_t __fastcall SKILLS_AuraCallback_StaticField(D2AuraCallbackStrc* pAuraCall
     return 1;
 }
 
+// 1.13c D2Game+0x431C0 (item branch: non-pickup types only play sound 0x13, no room delete; damage block
+// kept from 1.10f, 1.13c decompile shows no delta in the call order)
 //D2Game.0x6FD166A0
 int32_t __fastcall SKILLS_SrvDo021_Telekinesis(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
@@ -551,10 +554,6 @@ int32_t __fastcall SKILLS_SrvDo021_Telekinesis(D2GameStrc* pGame, D2UnitStrc* pU
         }
         else
         {
-            DUNGEON_AllocDrlgDelete(UNITS_GetRoom(pTarget), pTarget->dwUnitType, pTarget->dwUnitId);
-            ITEMS_SetInvPage(pTarget, 0xFFu);
-            pTarget->dwFlags |= UNITFLAG_SENDREFRESHMSG;
-            UNITS_ChangeAnimMode(pTarget, IMODE_ONGROUND);
             SUNIT_AttachSound(pUnit, 0x13u, pUnit);
         }
         break;
@@ -601,6 +600,7 @@ int32_t __fastcall SKILLS_SrvDo022_NovaAttack(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FD16A60
+// 1.13c D2Game+0x42730
 int32_t __fastcall SKILLS_SrvDo023_Blaze_EnergyShield_SpiderLay(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);

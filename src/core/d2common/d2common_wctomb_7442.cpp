@@ -4,6 +4,7 @@
 // retail arguments; _tfpecode's offset inside _ptiddata is a seam (Ghidra exposes only the name).
 #include <cstdint>
 #include <emscripten.h>
+#include "d2common_crt.h"
 
 struct D2CommonWctombEnv {
     void* (*getptd)(void);                 // 0x03475 __getptd
@@ -15,6 +16,23 @@ struct D2CommonWctombEnv {
     uint32_t ptlocinfo_offset;             // _tfpecode in _ptiddata
 };
 
+// 1.13c D2Common+0x073E2
+// real form: errno and WideCharToMultiByte come from module state / the Win32 boundary.
+extern "C" int32_t d2common_wctomb_mt_73e2(uint32_t locale, char* mbch, uint16_t wch) {
+    if (mbch == nullptr) return 0;
+    if (*(uint32_t*)(uintptr_t)(locale + 0x14) == 0) {
+        if (wch < 0x100) { *mbch = (char)wch; return 1; }
+    } else {
+        int32_t used_default = 0;
+        int32_t n = g_d2common_win32.WideCharToMultiByte(*(uint32_t*)(uintptr_t)(locale + 4), 0, &wch, 1, mbch,
+                                                         *(int32_t*)(uintptr_t)(locale + 0x28), nullptr, &used_default);
+        if (n != 0 && used_default == 0) return n;
+    }
+    *d2common_errno_44bc() = 0x2a;  // EILSEQ
+    return -1;
+}
+
+// Old seam form, kept for callers that pass an env.
 // 1.13c D2Common+0x073E2
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t D2Common_73E2_WctombMt(uint32_t locale, char* mbch, uint16_t wch,
                                                                const D2CommonWctombEnv* env) {

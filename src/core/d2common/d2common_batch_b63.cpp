@@ -14,7 +14,7 @@ extern "C++" {
 void sub_4A9B0(void* ecx); void sub_45550(); void sub_AB50(void* unit); void sub_2E1F0(void* p);
 void sub_4A670(); void sub_C940(void* unit);
 uint8_t sub_222B0(); void sub_27180(void*, uint32_t, int, int); void sub_25C10(void*);
-void Ordinal_10128(uint32_t, uint32_t, uint32_t); void Ordinal_10131(uint32_t); void Ordinal_10127(uint32_t);
+void q_d2common_batch_b63_Ordinal_10128(uint32_t, uint32_t, uint32_t); void Ordinal_10131(uint32_t); void Ordinal_10127(uint32_t);
 void* sub_44BD0(int); void sub_44F90(void*); void sub_44950(); int sub_EEC0(void*, void*);
 void sub_EB80(void*); void sub_E490(int); void* sub_F000(void*, int, int); void sub_10010();
 void* sub_7D9B0(void* p, int id); void* sub_10730(void*); void* sub_10A00(); void sub_44F20();
@@ -45,8 +45,8 @@ void sub_28D70(void* p1, uint32_t p2, int p3, int p4, int p5, int skip, int ebx,
     if (sub_222B0()) b = (a & 0xfff7ffff) | 0xa00000;
     if (p5) b = (b & 0xffbfffff) | 0x2000000;
     if (p3 == 0) { if (!(b & 0x10)) b &= 0xfffff7ff; }
-    else Ordinal_10128(p2, 0x4d4a, 0x10);
-    Ordinal_10128(p2, b, 0x20);
+    else q_d2common_batch_b63_Ordinal_10128(p2, 0x4d4a, 0x10);
+    q_d2common_batch_b63_Ordinal_10128(p2, b, 0x20);
     if (!(b & 0x200000)) sub_27180(p1, p2, p3, skip); else sub_25C10(p1);
     if (skip == 0 && ebx != 0) {
         void* q = PT(p1, 0x60);

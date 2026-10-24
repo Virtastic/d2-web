@@ -8,7 +8,7 @@ void    Ordinal_10000(void);
 void    d2_multi_sub_13af0(void);
 }
 
-// 1.13c D2Multi+0x13DE0
+// 1.13c D2MULTI+0x13DE0
 void d2_multi_sub_13de0(void) {
     int32_t k = Ordinal_10003() ? 4 : 5;
     for (int i = 0; i < 4; i++) Ordinal_10131();

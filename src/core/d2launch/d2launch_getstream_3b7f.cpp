@@ -1,4 +1,4 @@
-// 1.13c D2Launch+0x3B7F __getstream. Under CRT lock 1 scan the stream table for a free FILE (flag & 0x83 == 0),
+// D2Launch 0x3B7F __getstream. Under CRT lock 1 scan the stream table for a free FILE (flag & 0x83 == 0),
 // allocating a 0x38-byte record (FILE + CRITICAL_SECTION at +0x20) for the first empty slot; the claimed stream is
 // returned locked and reset (file = -1).
 #include <cstdint>
@@ -13,6 +13,7 @@ extern int32_t ___crtInitCritSecAndSpinCount(void* cs, uint32_t spin);
 extern GsFILE** g_streams;                   // DAT_6fa670a0
 extern int32_t g_nstream;                    // DAT_6fa680c0
 
+// 1.13c D2Launch+0x3B7F
 extern "C" GsFILE* d2launch_getstream_3b7f(void) {
   GsFILE* f = nullptr;
   __lock(1);

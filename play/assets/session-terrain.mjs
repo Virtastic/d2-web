@@ -906,9 +906,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       // FADED blend accumulated out of it so each is attributable on its own.
       const pWall = perfT0();
       let unitsMs = 0, fadeMs = 0;
-      const key = (o) => o.sprite
-        ? (o.sprite.wx === undefined ? [1e9, 0, 0, o.depth] : [Math.floor(o.sprite.wy / 5), Math.floor(o.sprite.wx / 5), 0, o.depth])
-        : [o.tile.worldY, o.tile.worldX, 1, o.ordinal];
+      const key = overlayKey;
       // Roofs (orientation 15) are retail's LAST terrain pass: every roof draw in arrival, the Den and the
       // Cold Plains captures follows every wall and unit (arrival.txt: the six tent roofs at the end,
       // rows then columns). Drawn in the overlay they sat under the tent's own walls.
@@ -1031,3 +1029,10 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     },
   };
 }
+
+// Draw-list order key: tile row, tile column, then unit 0 < wall 1 within the tile (ground items: see below), then arrival.
+// Retail draws every ground item in the shadow pass, before all walls and unit cels (pick-up-item.txt: item cel
+// at call 160, first wall 161, first unit cel 177, though two monsters' tiles precede the item's): class -1e9 first.
+export const overlayKey = (o) => o.sprite
+  ? (o.sprite.wx === undefined ? [1e9, 0, 0, o.depth] : o.sprite.pass === 'item' ? [-1e9, Math.floor(o.sprite.wy / 5), Math.floor(o.sprite.wx / 5), o.depth] : [Math.floor(o.sprite.wy / 5), Math.floor(o.sprite.wx / 5), 0, o.depth])
+  : [o.tile.worldY, o.tile.worldX, 1, o.ordinal];

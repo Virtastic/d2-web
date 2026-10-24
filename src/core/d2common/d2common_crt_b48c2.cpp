@@ -10,6 +10,25 @@ extern "C" uint32_t d2common_heap_select(uint32_t os_platform, uint32_t os_major
     return (os_platform == 2 && 4 < os_major) ? 1 : 3;
 }
 
+// --- D2Common __sbh_* state (CRT small-block heap), file-local ---
+static uint32_t g_sbh_entry;    // +0x1F4A8 DAT_6fdf14a8
+static uint32_t g_sbh_count;    // +0x1F4AC DAT_6fdf14ac
+static uint32_t g_sbh_regions;  // +0x1F4B0 DAT_6fdf14b0
+static uint32_t g_sbh_max;      // +0x1F4B4 DAT_6fdf14b4
+static uint32_t g_sbh_last;     // +0x1F4B8 DAT_6fdf14b8
+static uint32_t g_sbh_cap;      // +0x1F4BC DAT_6fdf14bc
+static uint32_t g_sbh_heap;     // +0x1F70C DAT_6fdf170c (Win32 heap handle)
+
+// 1.13c D2Common+0x07CD9 ___sbh_heap_init: take the 0x140-byte region table from the Win32 heap;
+// on failure return 0, else reset the sbh globals (max request = arg, capacity 0x10) and return 1.
+extern "C" int32_t d2common_sbh_heap_init(uint32_t maximum, uint32_t (*heap_alloc)(uint32_t, uint32_t, uint32_t)) {
+    uint32_t r = heap_alloc(g_sbh_heap, 0, 0x140);
+    g_sbh_regions = r;
+    if (r == 0) return 0;
+    g_sbh_entry = 0; g_sbh_count = 0; g_sbh_last = r; g_sbh_max = maximum; g_sbh_cap = 0x10;
+    return 1;
+}
+
 struct D2CommonHeapHost {
     void*    heap;        // DAT_6fdf170c
     uint32_t heap_mode;   // DAT_6fdf1710

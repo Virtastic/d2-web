@@ -14,8 +14,8 @@ inline int32_t RI32(const void* p, uint32_t o) { return int32_t(R32(p, o)); }
 // pCtx+0x14 -> tables; flags[(rowIdx[esi]+x)] & 0x200 and code in (0x392,0x39b) -> 0x42A70(code+0x10).
 struct D2Common411E0Env {
     void* (*resolve)(uint32_t address);                                   // retail token -> wasm address
-    void (*sub42A70)(void*, int32_t, int32_t, int32_t, int32_t, int32_t); // 0x42A70
 };
+extern "C" void D2Common_42A70(void*, int32_t, int32_t, int32_t, int32_t, int32_t);   // d2common_42a70.cpp
 extern "C" uint32_t d2common_sub_411e0(const D2Common411E0Env* e, void* pCtx, int32_t x, int32_t esi) {
     void* t = e->resolve(R32(pCtx, 0x14));
     const uint32_t* flags = static_cast<const uint32_t*>(e->resolve(R32(t, 0x2c)));
@@ -25,7 +25,7 @@ extern "C" uint32_t d2common_sub_411e0(const D2Common411E0Env* e, void* pCtx, in
     const int32_t* codeIdx = static_cast<const int32_t*>(e->resolve(R32(t, 8)));
     const int32_t code = codes[codeIdx[esi] + x];
     if (code > 0x392 && code < 0x39b) {
-        e->sub42A70(pCtx, x, esi, code + 0x10, -1, 0);
+        D2Common_42A70(pCtx, x, esi, code + 0x10, -1, 0);
         return 1;
     }
     return 0;

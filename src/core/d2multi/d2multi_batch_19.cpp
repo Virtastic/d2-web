@@ -8,7 +8,7 @@
 extern "C" {
 uint32_t Ordinal_10023(int32_t);
 void     Ordinal_10194(int32_t, uint32_t);
-int32_t  Ordinal_10265(int32_t);
+uint32_t Ordinal_10265(int32_t);
 void     Ordinal_10024(void*, int32_t);
 int32_t  Ordinal_10003(void);
 void     Ordinal_10060(uint32_t, int32_t*, int32_t*);
@@ -18,7 +18,7 @@ void     Ordinal_10109(void);
 int32_t  Ordinal_10002(uint32_t);
 void     Ordinal_10043(int, int);
 char*    Ordinal_571(const char*, int32_t);
-void     Ordinal_501(void);
+void     q_d2multi_batch_19_Ordinal_501(void);
 extern uint8_t* DAT_6fa09f08;
 extern int32_t DAT_6fa09f34, DAT_6f9e9bc0, DAT_6fa09178, DAT_6fa09184;
 extern char DAT_6fa09df0[], DAT_6f9e75d7[];
@@ -85,7 +85,7 @@ void d2_multi_sub_ec20(char* src, char* dst) {
         char* e = Ordinal_571(nullptr, 0);
         if (e) { size_t n = e - src; memcpy(dst, src, n); dst[n] = 0; return; }
     }
-    Ordinal_501();
+    q_d2multi_batch_19_Ordinal_501();
 }
 
 // 1.13c D2Multi+0xEC80

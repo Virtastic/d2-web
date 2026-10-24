@@ -9,10 +9,6 @@
 #include <Windows.h>
 
 struct D2CmpListEnv {
-    void (*f1840)(uint32_t* self);            // 0x1840 free chunk/cell lists of self
-    void (*f1880)(uint32_t* self, int arg);   // 0x1880
-    void (*f1920)(uint32_t* list);            // 0x1920
-    void (*f16c0)(uint32_t* list);            // 0x16C0
     void (*smemFree)(void* p, const char* file, int32_t line, uint32_t flags); // Storm #403
 };
 
@@ -31,7 +27,42 @@ static void unlink_link(uint32_t* lk) {
     lk[1] = 0;
 }
 
+extern "C" void d2cmp_1f30(uint32_t* obj);   // 0x1F30 (d2cmp_sub_1f30.cpp)
+extern "C" void d2cmp_b52_1ca0(uint32_t* self);   // 0x1CA0
+extern "C" void d2cmp_b52_1880(uint32_t* self, int32_t mode, void (*f1f30)(uint32_t*));   // 0x1880
+
+// 1.13c D2CMP+0x1920: drain 0x1F30, unlink the link pair at +4.
+static void c1920(uint32_t* self) { d2cmp_1f30(self); unlink_link(self + 1); }
+// 1.13c D2CMP+0x16C0: drain 0x1CA0, unlink the link pair at +4.
+static void c16c0(uint32_t* self) { d2cmp_b52_1ca0(self); unlink_link(self + 1); }
+static void c1880(uint32_t* self, int mode) { d2cmp_b52_1880(self, mode, d2cmp_1f30); }
+
 extern "C" {
+void d2cmp_1580(uint32_t* self, const D2CmpListEnv* e);
+// 1.13c D2CMP+0x1C10: per 0x38-byte cell 0x16C0 on +0x2C then 0x15D0, then free the array.
+static void c1c10(uint32_t* self, const D2CmpListEnv* e) {
+    for (uint32_t i = 0; i < self[1]; i++) {
+        uint32_t* c = (uint32_t*)(uintptr_t)(self[2] + i * 0x38);
+        c16c0(c + 0xb);
+        unlink_link(c + 3);
+        unlink_link(c + 1);
+    }
+    if (self[2]) e->smemFree((void*)(uintptr_t)self[2], "__AUCELLIST__", -2, 0);
+}
+// 1.13c D2CMP+0x1FC0: unlink the pair at +0x10, then 0x1C10.
+static void c1fc0(uint32_t* self, const D2CmpListEnv* e) { unlink_link(self + 4); c1c10(self, e); }
+// 1.13c D2CMP+0x1840: free every chunk (+0x40) then every cell (+0x30).
+static void c1840(uint32_t* self, const D2CmpListEnv* e) {
+    int32_t h;
+    while ((h = (int32_t)self[0x10]) > 0) {
+        c1fc0((uint32_t*)(uintptr_t)h, e);
+        e->smemFree((void*)(uintptr_t)h, "__AV__TSHashObjectChunk_UCELLIST__", -2, 0);
+    }
+    while ((h = (int32_t)self[0xc]) > 0) {
+        d2cmp_1580((uint32_t*)(uintptr_t)h, e);
+        e->smemFree((void*)(uintptr_t)h, "__AUCELLIST__", -2, 0);
+    }
+}
 
 // 1.13c D2CMP+0x01680 (EAX = link pair)
 void d2cmp_1680(uint32_t* link) { unlink_link(link); }
@@ -44,33 +75,33 @@ void d2cmp_15d0(uint32_t* self) {
 
 // 1.13c D2CMP+0x01580: 0x16C0 on +0x2C, then 0x15D0.
 void d2cmp_1580(uint32_t* self, const D2CmpListEnv* e) {
-    e->f16c0(self + 0xb);
+    c16c0(self + 0xb);
     d2cmp_15d0(self);
 }
 
 // 1.13c D2CMP+0x01490
-void d2cmp_1490(uint32_t* list, const D2CmpListEnv* e) { e->f1920(list); }
+void d2cmp_1490(uint32_t* list, const D2CmpListEnv* e) { c1920(list); }
 
 // 1.13c D2CMP+0x01500: run 0x1920 on each 12-byte cell, then free the array if present.
 void d2cmp_1500(uint32_t* self, const D2CmpListEnv* e) {
-    for (uint32_t i = 0; i < self[1]; i++) e->f1920((uint32_t*)(uintptr_t)(self[2] + i * 0xc));
+    for (uint32_t i = 0; i < self[1]; i++) c1920((uint32_t*)(uintptr_t)(self[2] + i * 0xc));
     if (self[2]) e->smemFree((void*)(uintptr_t)self[2], kTsList, (int32_t)0xfffffffe, 0);
 }
 
 // 1.13c D2CMP+0x013A0: base-class destructor body (vtable PTR_6fe2fe38).
 void d2cmp_13a0(uint32_t* self, const D2CmpListEnv* e) {
     self[0] = 0x6fe2fe38;
-    e->f1880(self, 1);
+    c1880(self, 1);
     d2cmp_1500(self + 5, e);
-    e->f1920(self + 1);
+    c1920(self + 1);
 }
 
 // 1.13c D2CMP+0x01300: derived destructor body (vtable PTR_6fe2fe08).
 void d2cmp_1300(uint32_t* self, const D2CmpListEnv* e) {
     self[0] = 0x6fe2fe08;
-    e->f1840(self);
-    e->f1920(self + 0xe);
-    e->f1920(self + 10);
+    c1840(self, e);
+    c1920(self + 0xe);
+    c1920(self + 10);
     d2cmp_13a0(self, e);
 }
 

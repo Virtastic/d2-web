@@ -1,6 +1,8 @@
 // 1.13c D2Common+0x42A70: stamp a table entry's footprint onto a tile grid. Callees are
 // unpinned function-pointer globals, so they are explicit seams here.
 #include <cstdint>
+#include <cstddef>
+#include "D2DataTbls.h"
 
 struct D2c42A70Seams {
     int32_t (*dataRowCount)();                      // sgptDataTables+0xC68
@@ -29,4 +31,31 @@ void D2Common_42A70_impl(const D2c42A70Seams& s, void* ctx, int32_t x0, int32_t 
             s.slotC(ctx);
         }
     s.slotC(ctx);
+}
+
+// Real function: callees bound to the retail globals, which the host wires (weak = unwired links).
+// rows = sgptDataTables->pLvlPrestTxt (0x1B0-byte rows); slotA/B/C = PTR_FUN_6fdeb258/6fdeb244/6fdeb250;
+// alloc = Ordinal_10045 (node allocator for 0x42920).
+#define D2C_W __attribute__((weak))
+void D2Common_42920(void* pCtx, int32_t id, const void* pRow, int32_t* (*alloc)());
+extern "C" {
+D2C_W void (*g_d2c_slotA)(void*, int32_t, int32_t);
+D2C_W void (*g_d2c_slotB)(void*, int32_t, int32_t);
+D2C_W void (*g_d2c_slotC)(void*);
+D2C_W int32_t* (*g_d2c_alloc10045)();
+}
+
+static int32_t sCount() { return sgptDataTables ? sgptDataTables->nLvlPrestTxtRecordCount : 0; }
+static const uint8_t* sRow(int32_t i) { return (const uint8_t*)sgptDataTables->pLvlPrestTxt + (std::size_t)i * 0x1B0; }
+static void sPrep(void* c, int32_t i) { D2Common_42920(c, i, sRow(i), g_d2c_alloc10045); }
+static void sA(void* c, int32_t x, int32_t y) { g_d2c_slotA(c, x, y); }
+static void sB(void* c, int32_t x, int32_t y) { g_d2c_slotB(c, x, y); }
+static void sC(void* c) { g_d2c_slotC(c); }
+
+// 1.13c D2Common+0x42A70
+extern "C" void D2Common_42A70(void* ctx, int32_t x0, int32_t y0, int32_t idx, int32_t flag, int32_t extra)
+{
+    if (!sgptDataTables || !sgptDataTables->pLvlPrestTxt || !g_d2c_slotA || !g_d2c_slotB || !g_d2c_slotC || !g_d2c_alloc10045) return; // unwired: no-op
+    static const D2c42A70Seams s = { sCount, sRow, sPrep, sA, sB, sC };
+    D2Common_42A70_impl(s, ctx, x0, y0, idx, flag, extra);
 }

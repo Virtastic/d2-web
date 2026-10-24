@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include <emscripten.h>
+void* d2_client_load_archive(const char*, uint32_t*);
 
 extern "C" {
 __attribute__((weak)) uint32_t Ordinal_10265(uint32_t);
@@ -89,7 +90,12 @@ int32_t d2win_sub_C180(int32_t param_1, const uint8_t* rec, const D2WinB67Env* e
     return (a == 1 && b == 1) ? 1 : 0;
 }
 
-// 1.13c D2Win+0x07c60 -- param_2 receives the 0x7A60 result; returns the Ordinal_10042(0xcf) block.
+// 1.13c D2Win+0x7C60 -- real: byte-identical to D2Client+0xD810 (open, size, alloc 0xcf, read, close),
+// so it routes to the native archive loader. name = param_1, *size = param_2.
+extern "C" EMSCRIPTEN_KEEPALIVE
+void* d2win_7c60(const char* name, uint32_t* size) { return d2_client_load_archive(name, size); }
+
+// (legacy seam wrapper) 1.13c D2Win+0x07c60 -- param_2 receives the 0x7A60 result; returns the Ordinal_10042(0xcf) block.
 // unaff_retaddr in retail is a stack slot compared to 0 after 0x7970; passed here as `check`.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void* d2win_sub_7C60(uint32_t* param_2, uint32_t check, const D2WinB67Env* env) {

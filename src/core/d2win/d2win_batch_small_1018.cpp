@@ -54,8 +54,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2win_addl(uint32_t a,uint32_t b,uint32
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2win_tolower(int32_t ch,const D2WinSmallEnv* e) {
     return e->tolowerMt(locale(e),ch);
 }
-// 1.13c D2Win+0x69DC -- descriptor blocks contain 32 records of 0x24 bytes.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2win_unlock_fhandle(int32_t fd,const D2WinSmallEnv* e) {
+// 1.13c D2Win+0x069DC -- descriptor blocks contain 32 records of 0x24 bytes.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_69DC(int32_t fd,const D2WinSmallEnv* e) {
     e->leaveCriticalSection(e->fileBlocks[fd>>5]+0xC+(uint32_t(fd)&31)*0x24);
 }
 // 1.13c D2Win+0x1AE1 -- EAX=count pointer, stack=(character, repeats, stream).

@@ -26,7 +26,7 @@ struct State { // globals, RVAs of the D2Client image
  int32_t d22f8, d22f9, d22fd, c2f8, c2f4;
  uint32_t g977f, g9783, g9787; uint16_t g978b; uint8_t g978d; int32_t g966b; int32_t clientPlayer; int32_t tab3e[5];
 };
-// 1.13c D2Client+0x4B420
+// (seam copy; verified body: dialog_47810_4b420.cpp)
 void sub_4B420(Seams& s, State& g) {
  if (g.g975f) { s.s53d20(); g.g975f = 0; }
  if (g.g9781 == 5) s.s0ac00();

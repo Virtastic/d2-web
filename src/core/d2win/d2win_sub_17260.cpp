@@ -10,7 +10,7 @@ __attribute__((weak)) int32_t Ordinal_10107(int32_t);
 __attribute__((weak)) void Ordinal_10109(void);
 __attribute__((weak)) void Ordinal_2(void*);
 __attribute__((weak)) void d2win_Ordinal_3_free(void*);
-__attribute__((weak)) void Ordinal_5(void*, int32_t);
+__attribute__((weak)) void Ordinal_5(uint32_t, void*) {} // host seam: Fog+Ordinal_5 has no wasm analogue; no-op unless a strong definition is linked
 extern int32_t DAT_6f8ffba4_screenshot_n;
 int32_t DAT_6f8ffba4_screenshot_n;
 EMSCRIPTEN_KEEPALIVE void d2win_sub_17260(int32_t frame, int32_t width) {  // 1.13c D2Win+0x17260
@@ -27,7 +27,7 @@ EMSCRIPTEN_KEEPALIVE void d2win_sub_17260(int32_t frame, int32_t width) {  // 1.
     if (Ordinal_2) Ordinal_2(st);
     st[0] = frame;
     st[3] = (int32_t)((((uint32_t)width * 3 + 3) & ~3u) - (uint32_t)width * 3);  // row pad to 4 bytes
-    if (Ordinal_5) Ordinal_5(hdr, 8);
+    if (Ordinal_5) Ordinal_5(8, hdr);
     if (d2win_Ordinal_3_free) d2win_Ordinal_3_free(hdr);
 }
 }

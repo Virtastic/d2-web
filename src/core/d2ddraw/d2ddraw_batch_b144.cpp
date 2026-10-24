@@ -41,7 +41,7 @@ W uint32_t FUN_6f8c5919(uint32_t lcid);
 W uint32_t ___isctype_mt(void* t, void* ptd, uint32_t c, int mask);
 W void ___crtMessageBoxA(const char* text, const char* caption, uint32_t flags);
 W void __exit(int);
-W void FUN_6f8c7690(void* hr, const char* msg);
+W void q_d2ddraw_batch_b144_FUN_6f8c7690(void* hr, const char* msg);
 W uint32_t Ordinal_10265(uint32_t); W void Ordinal_10024(const void*, uint32_t); W void Ordinal_10029(const char*, const char*);
 W void Ordinal_10060(uint32_t h, int32_t* a, int32_t* b);  // reg: also sets ESI/EDI (see 0x6E20)
 W void Ordinal_10000(void);
@@ -214,7 +214,7 @@ EMSCRIPTEN_KEEPALIVE int32_t FUN_6f8c85a0(int mode) {
   DAT_6f8d01ec = DAT_6f8d01c8;
   void* hr = slot(DAT_6f8d0210, 0x50)(DAT_6f8d0210, DAT_6f8cfdc4);
   const char* msg;
-  if (hr && hr != (void*)0x88760245) { FUN_6f8c7690(hr, "SetCooperativeLevel failed!"); return 0; }
+  if (hr && hr != (void*)0x88760245) { q_d2ddraw_batch_b144_FUN_6f8c7690(hr, "SetCooperativeLevel failed!"); return 0; }
   hr = slot(DAT_6f8d0210, 0x54)(DAT_6f8d0210, DAT_6f8d01d4, DAT_6f8d01cc);
   uint32_t d[27];
   uint32_t caps = 4;  // DDSCAPS_BACKBUFFER (guessed)
@@ -253,7 +253,7 @@ EMSCRIPTEN_KEEPALIVE int32_t FUN_6f8c85a0(int mode) {
   DAT_6f8d0204 = 1; DAT_6f8d0208 = 0;
   return 1;
 fail:
-  FUN_6f8c7690(hr, msg);
+  q_d2ddraw_batch_b144_FUN_6f8c7690(hr, msg);
   Ordinal_10029("Opening DirectDraw window failed!", "");
   return 0;
 }

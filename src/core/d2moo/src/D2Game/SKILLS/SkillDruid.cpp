@@ -1804,6 +1804,7 @@ int32_t __fastcall SKILLS_SrvDo131_OverseerWhip(D2GameStrc* pGame, D2UnitStrc* p
                 const int32_t nSummonId = D2GAME_GetSummonIdFromSkill_6FD15580(pUnit, 0, nSkillId, nSkillLevel, &nSpawnMode, 0, 0);
                 if (nSummonId >= 0)
                 {
+                    // 1.13c D2Game+0xD850 (the whip's reinitialize/mode-change/state tail, outlined by LTCG)
                     int32_t nChainId = 0;
                     DATATBLS_GetMonsterChainInfo(pTarget->dwClassId, 0, &nChainId);
                     const int32_t nClassId = sub_6FD017F0(nSummonId, nChainId);
@@ -2250,6 +2251,7 @@ int32_t __fastcall SKILLS_SrvDo139_BaalColdMissiles(D2GameStrc* pGame, D2UnitStr
 }
 
 //D2Game.0x6FD024A0
+// 1.13c D2Game+0xD170
 int32_t __fastcall SKILLS_SrvSt63_Corpse_VineCycler(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_MONSTER)
@@ -2331,6 +2333,7 @@ int32_t __fastcall D2GAME_SKILLS_BloodMana_6FD025E0(D2UnitStrc* pUnit, int32_t n
 }
 
 //D2Game.0x6FD026B0
+// 1.13c D2Game+0xCB30
 int32_t __fastcall SKILLS_SrvDo140_BaalTentacle(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (!pUnit)

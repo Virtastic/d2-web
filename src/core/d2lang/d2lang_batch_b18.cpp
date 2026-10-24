@@ -1,4 +1,4 @@
-// 1.13c D2Lang+0x8740 Unicode::Personalize
+// D2Lang 0x8740 Unicode::Personalize
 #include <cstdint>
 typedef uint16_t u16;
 static int wl(const u16* s) { int n = 0; if (s) while (s[n]) n++; return n; }

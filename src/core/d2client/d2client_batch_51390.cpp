@@ -43,18 +43,24 @@ P sub_51500(P unit,Calls& c,const Probe& t,U start,const uint8_t* st,U mask10,U 
  }
  return nullptr;
 }
-// 1.13c D2Client+0x51D10
-struct S51D10 { I mode,c414,b848,bc4c,b828,b824,c2fc,x0,y0,x1,y1,c2f8,a68,c2f4,c64c; };
-I sub_51D10(I* px,I* py,S51D10& g,I (*fn2c5c0)(),void (*fn1860)(),void (*fn10f0)(I*),U* d3afa){
+// 1.13c D2Client+0x51D10  (ECX=px out, EAX=py out; fn10f0 takes px and EBX=py)
+struct S51D10 { I mode,c414,b848,bc4c,b828,b824,c2fc,x0,y0,x1,y1,c2f8,a68,c2f4,c64c,c9638; U* c3c4; };
+I sub_51D10(I* px,I* py,S51D10& g,I (*fn2c5c0)(),void (*fn1860)(),void (*fn10f0)(I*,I*),U* d3afa,
+            P (*fn55b40)(I,I),P (*ord10331)(P,P),void (*ord10742)(P)){
  I m=g.c414;
  if(m!=3){ *px=g.b828; *py=g.b824;
   if(*py<=g.bc4c-0x31){
    if(!g.c2fc||*px<=g.x0||g.x1<=*px||*py<=g.y0||g.y1<=*py){
-    if(m==1){ if(*px<g.b848/2){fn10f0(px);return 0;} }
-    else if(m!=2||g.b848/2<=*px){fn10f0(px);return 0;}
+    if(m==1){ if(*px<g.b848/2){fn10f0(px,py);return 0;} }
+    else if(m!=2||g.b848/2<=*px){fn10f0(px,py);return 0;}
    }
    fn1860(); return 1; } }
- if(!g.c2f8){ if(g.a68&&!fn2c5c0()){*d3afa=0;return 1;} *d3afa=0; /* c2f4/c64c release tail needs unit lookup (55b40) */ g.c2f4=0; }
+ if(!g.c2f8){
+  if(g.a68&&!fn2c5c0()){*d3afa=0;return 1;}
+  *d3afa=0;
+  if(g.c2f4&&g.c64c==5){ P u=fn55b40(g.c9638,5);
+   if(u){ ord10742(ord10331(u,reinterpret_cast<P>(uintptr_t(rd(u,4))))); *g.c3c4|=1; } }
+  g.c2f4=0; }
  return 1;
 }
 // 1.13c D2Client+0x51E30
@@ -66,8 +72,8 @@ void sub_51E30(P esi,I (*f568e0)(P,I,I,I),void (*f1860)(),I& c2f4,I& c2f8){
 }
 // message builder shared shape: 23 zeroed words, dispatch via D2Client+0xB30F0
 static P send(Calls& c,U w0,U w1,U w2,U w3,U w4,U w5){U m[23]={};m[0]=w0;m[1]=w1;m[2]=w2;m[3]=w3;m[4]=w4;m[5]=w5;return c.node630f0(m);}
-// 1.13c D2Client+0x52230  m[1]=m[2]=p2, m[19]=0x133? (words: [0x4c]=0x133,[0x2c]=1)
-void sub_52230(U p2,Calls& c){U m[23]={};m[1]=p2;m[2]=p2;m[19]=0x133;m[11]=1;c.node630f0(m);}
+// 1.13c D2Client+0x52230  (word idx = byte offset from frame base / 4: [0x10]=0x133,[0x30]=1)
+void sub_52230(U p2,Calls& c){U m[23]={};m[1]=p2;m[2]=p2;m[4]=0x133;m[12]=1;c.node630f0(m);}
 // 1.13c D2Client+0x52270
 void sub_52270(Calls& c){U m[23]={};P p=c.node630f0(m);
  if(p){c.o10637(p,0x4b);c.o10019(p,0x4b);}
@@ -94,9 +100,9 @@ void sub_52570(P client,Calls& c){
 }
 // 1.13c D2Client+0x52620 / 526E0 / 527A0: unit event message (ids 0x16b / 0x161 / 0x15b)
 static void unitMsg(P unit,U client,U id,Calls& c){
- U y=uy(unit,c),x=ux(unit,c); (void)y;
+ U y=uy(unit,c),x=ux(unit,c);
  if(!client)return;
- U m[23]={};m[0]=1;m[1]=client;m[19]=id;m[18]=x;m[11]=1;m[12]=0;c.node630f0(m);
+ U m[23]={};m[0]=1;m[1]=client;m[4]=id;m[5]=x;m[6]=y;m[11]=0;m[12]=1;c.node630f0(m);
 }
 void sub_52620(P u,U cl,Calls& c){unitMsg(u,cl,0x16b,c);}
 void sub_526E0(P u,U cl,Calls& c){unitMsg(u,cl,0x161,c);}

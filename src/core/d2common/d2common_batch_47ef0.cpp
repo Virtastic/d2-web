@@ -4,12 +4,17 @@
 #include <cstdint>
 #include <emscripten.h>
 
+struct D2StatListStrc;
+uint32_t D2Common_3A330_AddStat(D2StatListStrc* pStatList, uint32_t nPackedStat, int32_t nDelta); // 0x3A330, d2common_batch_31d20.cpp
+static void add3a330(uint32_t pList, uint32_t nStat, int32_t nDelta) {
+ D2Common_3A330_AddStat(reinterpret_cast<D2StatListStrc*>(static_cast<uintptr_t>(pList)), nStat, nDelta);
+}
+
 extern "C" {
 void (*g_d2common_fn_47ef0_apply46e50)() = nullptr;                          // 0x46E50
 void (*g_d2common_fn_47ef0_shift45640)(int32_t* pValue) = nullptr;           // 0x45640 (selector in-register)
 uint32_t (*g_d2common_fn_47ef0_child47020)(uint32_t pOwner, uint32_t id, uint32_t flt) = nullptr; // 0x47020
 int32_t (*g_d2common_fn_47ef0_get39140)(uint32_t pList, uint32_t nStat) = nullptr;
-void (*g_d2common_fn_47ef0_add3a330)(uint32_t pList, uint32_t nStat, int32_t nDelta) = nullptr;
 void (*g_d2common_fn_47ef0_fatal)() = nullptr;
 
 // 1.13c D2Common+0x47EF0
@@ -25,10 +30,10 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_47ef0(int32_t p1, uint32_t pEax, ui
  }
  if (bRevoke) {
   const int32_t cur = g_d2common_fn_47ef0_get39140(child, nStat);
-  g_d2common_fn_47ef0_add3a330(child, nStat, -cur);
+  add3a330(child, nStat, -cur);
   return 1;
  }
- g_d2common_fn_47ef0_add3a330(child, nStat, nValue);
+ add3a330(child, nStat, nValue);
  return 1;
 }
 }

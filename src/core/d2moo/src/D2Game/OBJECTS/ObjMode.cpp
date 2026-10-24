@@ -3634,7 +3634,7 @@ int32_t __fastcall OBJMODE_MainObeliskHandler(D2GameStrc* pGame, int32_t nPlayer
 }
 
 //D2Game.0x6FC79B50
-// 1.13c D2Game+0x73D90
+// 1.13c D2Game+0x6F520
 void __fastcall sub_6FC79B50(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pObject)
 {
     if (pObject)

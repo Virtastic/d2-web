@@ -172,34 +172,73 @@ EMSCRIPTEN_KEEPALIVE i32* d2c_51AE0(const D2cE51AE0* e, D2cG51AE0* g, const i32*
     return in_EAX;
 }
 
-// 1.13c D2Client+0x51E80  (no register inputs; global/callee state injected)
-// Scan each unit list slot for the best hover candidate: priority table at DAT_6fba2190 (type-indexed).
-EMSCRIPTEN_KEEPALIVE void d2c_51E80(const i32* prio, i32 scanCount, i32** lists, i32 player,
-    i32 (*isBusy)(), i32 (*ok)(i32* u), i32 (*tieBreak)(i32* a, i32* b), i32 (*ord11020)(i32*),
-    i32 (*f55440)(), i32 (*ord10648)(i32*), i32 (*ord10494)(i32*, i32), i32 (*f512e0)(i32*), void (*commit)(i32* best)) {
-    if (isBusy()) return;
+// 1.13c D2Client+0x51E80  (no register inputs; every global and callee is an injected seam)
+// Hover resolver: direct pick via 0x51A80/0xA68E0, else walk the rooms around the head unit and keep the
+// best-priority selectable unit (priority table DAT_6fba2190, indexed by unit type), then commit via 0x51860.
+struct D2cE51E80 {
+    const i32* prio;                 // DAT_6fba2190
+    i32 g2f8, g2f0; i32* g347c; i32* g3480; i32* head;   // DAT_6fbcc2f8/2f0, 6fbd347c, 6fbd3480, 6fbcbbfc
+    i32 (*f51d10)(i32* px, i32* py);                     // ECX=px out, EAX=py out; nonzero = no pick
+    i32* (*f51a80)();
+    i32 (*fa68e0)(i32* u, i32 px, i32 py, i32 hit);
+    void (*f51860)(i32* best);                           // EAX=best
+    i32 (*ord10331)(i32* head);                          // head -> room
+    i32 (*f1630)(i32* head); i32 (*f1660)(i32* head);
+    void (*ord11087)(i32* x, i32* y);
+    void (*ord10383)(i32 room, i32*** rooms, u32* count);
+    i32 (*f51470)(i32* u, i32 x, i32* flag, i32* head, i32 y, i32 py, i32 px);
+    i32 (*f55440)(i32* u);
+    i32 (*ord10648)(i32* u); i32 (*ord10494)(i32* u, i32 v); i32 (*ord11020)(i32* u);
+    i32 (*f51230)(i32* esi_u, i32* best); i32 (*f512e0)(i32* esi_best, i32* u);
+    i32 (*f510b0)(i32* head, i32* u);
+    void (*fatal)();                                     // >30000 chain: D2Win error print + _exit(-1)
+};
+EMSCRIPTEN_KEEPALIVE void d2c_51E80(const D2cE51E80* e) {
+    if (e->g2f8) return;
+    i32 px = 0, py = 0;
+    if (e->f51d10(&px, &py)) return;
+    i32* p = e->f51a80();
+    if (p && e->fa68e0(p, px, py, 1) && (*p != 4 || !e->g2f0)) { e->f51860(p); return; }
+    i32* head = e->head;
+    if (!head) return;
+    i32 room = e->ord10331(head);
+    if (!room) return;
+    if (*e->g347c != room) *e->g3480 = 1;
+    *e->g347c = room;
+    i32 x = e->f1630(head), y = e->f1660(head);
+    e->ord11087(&x, &y);
+    i32** rooms = nullptr; u32 cnt = 0;
+    e->ord10383(room, &rooms, &cnt);
     i32* best = nullptr;
-    for (i32 s = 0; s < scanCount; s++) {
-        i32 n = 0;
-        for (i32* u = lists[s]; u; u = (i32*)(intptr_t)u[0x3a]) {
-            if (*u == 3) continue;
-            if (u == best || ++n > 30000) break;
-            if (u == (i32*)(intptr_t)player || !ok(u)) continue;
+    for (u32 r = 0; r < cnt; r++) {
+        i32* last = nullptr; i32 n = 0;
+        for (i32* u = (i32*)(intptr_t)rooms[r][0x74 / 4]; u; u = (i32*)(intptr_t)u[0x3a]) {
+            i32 tu = *u;
+            if (tu == 3) continue;
+            if (last == u) break;
+            last = u;
+            if (n++ > 30000) { e->fatal(); return; }
+            if (u == head) continue;
+            if (e->f51470(u, x, e->g3480, head, y, py, px)) continue;
+            if (tu == 4 && e->g2f0) continue;
+            if (!e->fa68e0(u, px, py, 1)) continue;
+            if (p == u && !e->f55440(u)) { best = u; break; }
             if (best) {
-                i32 pu = prio[*u], pb = prio[*best];
-                if (*u == 0 && f55440()) pu = 1;
-                else if (*u == 1) { if (ord10648(u)) pu = -8; if (ord10494(u, 0x8f)) continue; }
-                if (*best == 1 && ord10648(best)) pb = -8;
-                if (*u == 2 && *best != 2) { if (!ord11020(u) || tieBreak(u, best)) { if (pb < pu) continue; } else continue; }
-                else if (*best == 2 && *u != 2) {
-                    if (ord11020(best)) { if (!f512e0(u)) continue; goto take; }
-                    if (pb < pu) continue;
-                } else { if (pb == pu ? tieBreak(u, best) < 0 : pb < pu) continue; }
+                i32 pu = e->prio[tu], pb = e->prio[*best];
+                if (tu == 0) { if (e->f55440(u)) pu = 1; }
+                else if (tu == 1) { if (e->ord10648(u)) pu = -8; if (e->ord10494(u, 0x8f)) continue; }
+                if (*best == 1 && e->ord10648(best)) pb = -8;
+                bool take;
+                if (tu == 2 && *best != 2) take = !e->ord11020(u) ? pb < pu : e->f51230(u, best) != 0;
+                else if (tu != 2 && *best == 2) take = !e->ord11020(best) ? pb < pu : e->f512e0(best, u) != 0;
+                else if (pb != pu) take = pb < pu;
+                else take = e->f510b0(head, u) < e->f510b0(head, best);
+                if (!take) continue;
             }
-take:       best = u;
+            best = u;
         }
     }
-    commit(best);
+    e->f51860(best);
 }
 
 // 1.13c D2Client+0x5D7A0  (param_1 = effect request block)

@@ -1,9 +1,9 @@
 /** What a held left-button world aim does at its current target. Retail re-issues the left-hand
  *  action while the button is held, so a unit under the pointer is struck again on every engine
  *  advance (the engine's own ENDANIM gate decides when the next swing may start); bare ground
- *  walks. A ground item is only picked up on the press, not by holding over it. */
+ *  walks; a ground item under the pointer keeps walking to it and is picked up on arrival. */
 export function heldWorldAction(resolved) {
-  return resolved?.unitId ? 'strike' : 'walk';
+  return resolved?.unitId ? 'strike' : resolved?.item ? 'pickup' : 'walk';
 }
 
 /** Which engine command a left click on a unit runs. Retail's left button runs the selected

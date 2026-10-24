@@ -11,6 +11,7 @@
 #include <emscripten.h>
 
 #include "D2DataTbls.h"
+#include "D2StatList.h"
 
 namespace
 {
@@ -263,43 +264,39 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_26db0(uint32_t pItem, uint32_t pUnit
 	return 0;
 }
 
-// 1.13c D2Common+0x3A330 (#10245): add nDelta to a stat list entry.
-// The entry index comes from 0x382B0 (stat list and packed stat are register-only); a negative index or
-// a null computed entry goes through 0x38640 to insert one. The entry is 8 bytes {packed id, value};
-// the value at +4 is adjusted. A zero value removes the entry through 0x381A0 (first argument the list's
-// +0x00). 0x39F70(nDelta, 0) follows. When the list header's signed +0x10 is negative and +0x08 is zero,
-// 0x38550 runs. All five callees are env seams (their operands are register-only in retail).
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3a330(uint32_t pStatList, uint32_t nPackedStat, int32_t nDelta,
-	int32_t (*pfnFind382B0)(uint32_t, uint32_t),
-	uint32_t (*pfnInsert38640)(uint32_t),
-	void (*pfnRemove381A0)(uint32_t, uint32_t),
-	void (*pfn39F70)(int32_t, int32_t),
-	void (*pfn38550)(uint32_t))
+// 1.13c D2Common+0x3A330 (#10245): add nDelta to a base stat of a stat list (packed layer/stat id in EDI).
+// Find the entry in the list's base array (+0x24) with STATLIST_FindStatIndex (0x382B0); a missing entry is
+// inserted (0x38640 = STATLIST_InsertStatOrFail); the value is adjusted; zero removes it (0x381A0);
+// then sub_6FDB6C10 (0x39F70) with a null unit; list flags < 0 and owner type 0 end with 0x38550.
+// All five callees are the vendored D2StatList.cpp functions, called directly.
+uint32_t D2Common_3A330_AddStat(D2StatListStrc* pStatList, uint32_t nPackedStat, int32_t nDelta)
 {
-	uint8_t* pList = P(pStatList);
-	if (!pList || nDelta == 0)
-		return;
+	if (!pStatList || nDelta == 0)
+		return 0;
 
-	const int32_t nIndex = pfnFind382B0 ? pfnFind382B0(pStatList, nPackedStat) : -1;
-	uint32_t pEntry = 0;
-	if (nIndex >= 0)
-		pEntry = W(pList, 0x24) + static_cast<uint32_t>(nIndex) * 8;
-	if (nIndex < 0 || pEntry == 0)
-		pEntry = pfnInsert38640 ? pfnInsert38640(pStatList) : 0;
-	if (pEntry == 0)
-		return;
+	D2StatsArrayStrc* pArray = &pStatList->Stats;
+	const int nIndex = STATLIST_FindStatIndex_6FDB6300(pArray, nPackedStat);
+	D2StatStrc* pStat = nIndex >= 0 ? &pArray->pStat[nIndex] : nullptr;
+	if (!pStat)
+		pStat = STATLIST_InsertStatOrFail_6FDB6970(pStatList->pMemPool, pArray, nPackedStat);
+	if (!pStat)
+		return 0;
 
-	uint32_t& nValue = W(P(pEntry), 4);
-	nValue += static_cast<uint32_t>(nDelta);
-	if (nValue == 0 && pfnRemove381A0)
-		pfnRemove381A0(W(pList, 0), pEntry);
+	pStat->nValue = static_cast<int32_t>(static_cast<uint32_t>(pStat->nValue) + static_cast<uint32_t>(nDelta));
+	if (pStat->nValue == 0)
+		STATLIST_RemoveStat_6FDB6A30(pStatList->pMemPool, pArray, pStat);
 
-	if (pfn39F70)
-		pfn39F70(nDelta, 0);
+	sub_6FDB6C10(static_cast<D2StatListExStrc*>(pStatList), nPackedStat, nDelta, nullptr);
 
-	if (static_cast<int32_t>(W(pList, 0x10)) < 0 && W(pList, 0x08) == 0 && pfn38550)
-		pfn38550(pStatList);
+	if (static_cast<int32_t>(pStatList->dwFlags) < 0 && pStatList->dwOwnerType == 0)
+		STATLIST_InsertStatModOrFail_6FDB7690(pStatList, nPackedStat);
+	return 1;
+}
+
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3a330(uint32_t pStatList, uint32_t nPackedStat, int32_t nDelta)
+{
+	D2Common_3A330_AddStat(reinterpret_cast<D2StatListStrc*>(static_cast<uintptr_t>(pStatList)), nPackedStat, nDelta);
 }
 
 // 1.13c D2Common+0x30AC0 (#10246): the skills.txt record of skill nSkillId inside the unit's skill list.

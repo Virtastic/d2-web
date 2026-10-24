@@ -313,7 +313,7 @@ void Storm_Sub1A600() {
 // own lock. The allocator is fatal when the pool is not up; the request is retried through 0x1BDD0,
 // and 0x1A600 validates the tracked heap after the lock is dropped.
 extern "C"
-uint32_t* Storm_Sub1C580(uint32_t param_1, const char* param_2, int32_t param_3, uint32_t param_4,
+uint32_t* Storm_Sub1C580Env(uint32_t param_1, const char* param_2, int32_t param_3, uint32_t param_4,
                          const StormBatch19040Env* env) {
     (void)param_2;
     if (g_heapReady == 0) {
@@ -338,9 +338,9 @@ uint32_t* Storm_Sub1C580(uint32_t param_1, const char* param_2, int32_t param_3,
 
 // 1.13c Storm+0x35CD0: remove every bucket node of command param_3 (optionally only those whose
 // handler is param_4) from the group record's bucket array, freeing each node with 0x1050.
+extern "C" void Storm_Sub1050(void* p);   // 0x1050 SMemFree(p, "delete", -1)
 extern "C"
-uint32_t Storm_Sub35CD0(uint32_t param_1, uint32_t param_2, uint32_t param_3, uint32_t param_4,
-                        const StormBatch19040Env* env) {
+uint32_t Storm_Sub35CD0_Real(uint32_t param_1, uint32_t param_2, uint32_t param_3, uint32_t param_4) {
     uint32_t local_4 = 0;
     EnterCriticalSection(&g_evtLock);
     if (g_evtTable != 0 && g_evtSize != 0) {
@@ -356,7 +356,7 @@ uint32_t Storm_Sub35CD0(uint32_t param_1, uint32_t param_2, uint32_t param_3, ui
                     uint32_t* puVar4 = ptr<uint32_t>(uVar3);
                     if (puVar4[0] == param_3 && (param_4 == 0 || puVar4[2] == param_4)) {
                         *puVar2 = puVar4[3];
-                        env->f_1050(puVar4);
+                        Storm_Sub1050(puVar4);
                         g_evtDirty = 1;
                         local_4 = 1;
                         puVar3 = ptr<EvtGroup>(puVar1[3]);
@@ -371,6 +371,12 @@ uint32_t Storm_Sub35CD0(uint32_t param_1, uint32_t param_2, uint32_t param_3, ui
     }
     LeaveCriticalSection(&g_evtLock);
     return local_4;
+}
+// Env wrapper kept for existing callers; the body is the real extern "C" above.
+extern "C"
+uint32_t Storm_Sub35CD0(uint32_t param_1, uint32_t param_2, uint32_t param_3, uint32_t param_4,
+                        const StormBatch19040Env*) {
+    return Storm_Sub35CD0_Real(param_1, param_2, param_3, param_4);
 }
 
 // 1.13c Storm+0x35DD0: dispatch command param_3 for the group keyed by (param_1, param_2). Nodes of
@@ -555,7 +561,7 @@ uint32_t Storm_Sub36290(uint32_t param_1, uint32_t param_2, uint32_t param_3, ui
                     newSize = uVar8;
                 } while (uVar8 < target || uVar8 - target == 0);
             }
-            uint32_t* puVar5 = Storm_Sub1C580(newSize * 4, kSevt, 0x143, 8, env);
+            uint32_t* puVar5 = Storm_Sub1C580Env(newSize * 4, kSevt, 0x143, 8, env);
             uVar4 = newSize;
             table = puVar5;
             if (g_evtTable != 0) {
@@ -580,11 +586,11 @@ uint32_t Storm_Sub36290(uint32_t param_1, uint32_t param_2, uint32_t param_3, ui
         g_evtSize = uVar4;
         g_evtTable = val(table);
         uint32_t idx = (param_1 ^ param_2) & (g_evtSize - 1);
-        puVar3 = (EvtRecord*)Storm_Sub1C580(0x14, kSevt, 0x15d, 8, env);
+        puVar3 = (EvtRecord*)Storm_Sub1C580Env(0x14, kSevt, 0x15d, 8, env);
         std::memset(puVar3, 0, 0x14);
         puVar3->k1 = param_1;
         puVar3->k2 = param_2;
-        EvtGroup* puVar5g = (EvtGroup*)Storm_Sub1C580(0x10, kSevt, 0x160, 8, env);
+        EvtGroup* puVar5g = (EvtGroup*)Storm_Sub1C580Env(0x10, kSevt, 0x160, 8, env);
         std::memset(puVar5g, 0, 0x10);
         puVar3->group = val(puVar5g);
         table = ptr<uint32_t>(g_evtTable);
@@ -605,8 +611,8 @@ uint32_t Storm_Sub36290(uint32_t param_1, uint32_t param_2, uint32_t param_3, ui
                 newSize = uVar8;
             } while (uVar8 < target || uVar8 - target == 0);
         }
-        uint32_t* puVar5 = Storm_Sub1C580(newSize * 4, kSevt, 0x16e, 8, env);
-        uint32_t* puVar6 = Storm_Sub1C580(newSize * 4, kSevt, 0x16f, 8, env);
+        uint32_t* puVar5 = Storm_Sub1C580Env(newSize * 4, kSevt, 0x16e, 8, env);
+        uint32_t* puVar6 = Storm_Sub1C580Env(newSize * 4, kSevt, 0x16f, 8, env);
         for (uint32_t i = 0; i < newSize; i++) puVar6[i] = val(&puVar5[i]);
         if (puVar3g->buckets != 0 && puVar3g->size != 0) {
             for (uint32_t i = 0; i < puVar3g->size; i++) {
@@ -628,7 +634,7 @@ uint32_t Storm_Sub36290(uint32_t param_1, uint32_t param_2, uint32_t param_3, ui
     }
 
     uint32_t uVar8 = (puVar3g->size - 1) & param_3;
-    uint32_t* puVar5 = Storm_Sub1C580(0x10, kSevt, 0x18d, 8, env);
+    uint32_t* puVar5 = Storm_Sub1C580Env(0x10, kSevt, 0x18d, 8, env);
     puVar5[0] = param_3;
     uint32_t uVar4 = puVar3->seq;
     puVar3->seq = uVar4 + 1;
@@ -655,7 +661,7 @@ uint32_t Storm_Sub36680(uint32_t param_1, uint32_t param_2, const StormBatch1904
             puVar3 = ptr<uint32_t>(puVar3[4]);
         }
         if (puVar3 != nullptr) {
-            uint32_t* puVar1 = Storm_Sub1C580(0x10, "..\\3rdParty\\STORM\\SOURCE\\SEVT.CPP",
+            uint32_t* puVar1 = Storm_Sub1C580Env(0x10, "..\\3rdParty\\STORM\\SOURCE\\SEVT.CPP",
                                               0x11c, 0, env);
             env->f_365e0(puVar1, (void*)(uintptr_t)puVar3[3]);
             uVar2 = 1;

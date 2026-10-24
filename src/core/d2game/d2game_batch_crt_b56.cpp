@@ -315,3 +315,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_3A5E(const D2GameBatchB56Env* env) {
     }
     return b56_locale(rd32(ptd, 0x64));
 }
+
+// 1.13c D2Game+0x0405C __RTC_Initialize: the RTC init-table is empty (begin == end), so the loop never
+// runs. The function list callees 0x411F/0x40E4 are the injected SEH prolog/epilog, not calls in the body.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_405C() {}

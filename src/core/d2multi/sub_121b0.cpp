@@ -1,4 +1,4 @@
-// 1.13c D2Multi+0x121B0: pointer one past the NUL of the string in EAX; null input is fatal in retail
+// 1.13c D2MULTI+0x121B0: pointer one past the NUL of the string in EAX; null input is fatal in retail
 // (error-box string 0xad via Ordinal_10265/10024, then _exit(-1)).
 #include <cstdint>
 #include <cstdlib>

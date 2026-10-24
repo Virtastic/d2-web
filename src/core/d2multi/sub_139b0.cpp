@@ -10,7 +10,7 @@ bool d2_multi_sub_134d0(void);
 void d2_multi_sub_121b0(void);
 }
 
-// 1.13c D2Multi+0x139B0
+// 1.13c D2MULTI+0x139B0
 int32_t d2_multi_sub_139b0(uint8_t* ebx) {
     uint16_t w = *(uint16_t*)(DAT_6fa09f14 + 0x1eb);
     uint32_t a = 0, b = 0;

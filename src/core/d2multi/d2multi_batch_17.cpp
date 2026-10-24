@@ -9,7 +9,7 @@ void    Ordinal_10097(void);
 int32_t Ordinal_10098(const void*);
 intptr_t Ordinal_10020(intptr_t);  // signature shared with D2Game batch_b63 (wasm-ld rejects two import signatures)
 int32_t Ordinal_10003(void);
-int32_t Ordinal_10265(int32_t);
+uint32_t Ordinal_10265(int32_t);
 void    Ordinal_10024(const void*, int32_t);
 void d2_multi_sub_1a20(void); void d2_multi_sub_1da0(void); void d2_multi_sub_b900(void);
 void d2_multi_sub_8790(void); void d2_multi_sub_1510(void);

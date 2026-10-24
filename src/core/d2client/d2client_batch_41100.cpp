@@ -2,6 +2,7 @@
 // Imported DLL calls and register-passed args are Services; globals are named by RVA in comments.
 #include <cstdint>
 #include <cstring>
+extern "C" void d2client_scatter_41100(void* unit, int32_t seedLow, int32_t cx, int32_t cy, int32_t r, int32_t a5, int32_t a6);
 namespace d2client_batch_41100 {
 struct Svc {
  virtual ~Svc()=default;
@@ -23,27 +24,7 @@ struct Svc {
 };
 template<class T> static T rd(const uint8_t* p,unsigned o){T v;std::memcpy(&v,p+o,sizeof v);return v;}
 
-// 1.13c D2Client+0x41100 : scatter spawn, LCG 0x6AC690C5 (64-bit state, hi word carried)
-void scatter(Svc& s,int32_t x,int32_t y,int32_t r2,int32_t r,int32_t a5,int32_t a6){
- uint32_t hi=0; int32_t n=0; s.seed(hi,n);
- uint64_t st=((uint64_t)hi<<32)|(uint32_t)(r*r);
- uint32_t m=(uint32_t)r*2;
- auto draw=[&]()->int32_t{
-  uint32_t v=0;
-  if((int32_t)m>=1){
-   st=(st&0xffffffffu)*0x6ac690c5ull+(st>>32);
-   v=(m&(m-1))==0 ? ((m-1)&(uint32_t)st) : (uint32_t)((st&0xffffffffu)%m);
-  }
-  return r-(int32_t)v; };
- for(int32_t i=n;i>0;--i){
-  int32_t dx=draw(), dy=draw();
-  if(dy*dy+dx*dx<=n){
-   if(s.probe(dx+x,dy+y)){ uint32_t rec[24]={0}; rec[1]=1; rec[0]=0; (void)a5;(void)a6;(void)r2; s.spawn(rec);} 
-   r=r2;
-  }
- }
-}
-
+// 1.13c D2Client+0x41100 : see scatter_41100.cpp (real callees)
 // 1.13c D2Client+0x41290
 bool spawnEffect(Svc& s,uint32_t a,int32_t idx,int32_t b){
  const uint8_t* e=s.row(idx); if(!e) return false;
@@ -78,7 +59,7 @@ bool startAnim(Svc2& s,uint8_t* u,int32_t idx){
  return true;
 }
 
-// 1.13c D2Client+0x414F0
+// D2Client 0x414F0 (seam form; real: use_dispatch_414f0.cpp)
 bool dispatchC(Svc& s,void* u,int32_t idx,int32_t b){
  if(!s.row(idx)) return false;
  int32_t v=s.unitVariant(u); if(v<0) return false;
@@ -87,7 +68,7 @@ bool dispatchC(Svc& s,void* u,int32_t idx,int32_t b){
  s.drawC(u,xy[1],xy[0],idx,b,v); return true;
 }
 
-// 1.13c D2Client+0x415A0 / 0x41690 (identical but for the draw callee: 0x40F00 / 0x41000)
+// D2Client 0x415A0 / 0x41690 seam form (real 415A0: use_dispatch_414f0.cpp) (identical but for the draw callee: 0x40F00 / 0x41000)
 static bool viaPath(Svc& s,uint8_t* u,int32_t idx,int32_t b,bool second){
  const uint8_t* e=s.row(idx); if(!e) return false;
  int32_t v=s.unitVariant(u); if(v<0) return false;
@@ -114,7 +95,7 @@ bool scatterVia(Svc& s,uint8_t* u,int32_t idx,int32_t b,int32_t r){
  int32_t y2; void* p=s.o10392(h); int32_t xy[2];
  if(!p){ if(!s.coords(xy)) return false; y2=xy[0]; (void)len; }
  else { len=s.px(p); y2=s.py(p); }
- scatter(s,v,len,y2,r,idx,b); return true;
+ d2client_scatter_41100(u,len,len,y2,r,idx,b); (void)v; return true;
 }
 
 // 1.13c D2Client+0x41F40 : copy login fields out of a packet; ip string copied only if not "0"

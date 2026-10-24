@@ -2,6 +2,7 @@
 // compatibility boundary. D2MOO's LevelsTbls.cpp confirms that boundary, but
 // does not contain these MSVC CRT fragments; indices are from cached 1.13c RE.
 #include "d2common_crt_unlock_batch.h"
+#include "d2common_crt.h"
 
 extern "C" void D2Common_2E44_Unlock(uint32_t index);
 
@@ -20,7 +21,7 @@ extern "C" void D2Common_722E_Unlock13()
 // 1.13c D2Common+0x7B32
 extern "C" void D2Common_7B32_Unlock10()
 {
-    D2Common_2E44_Unlock(10);
+    d2common_unlock_7b32();
 }
 
 // 1.13c D2Common+0x7C36

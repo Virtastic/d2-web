@@ -55,7 +55,7 @@ static void fatal_exit(const FogB64Env* e, int line) {
 static const uint32_t POOL = 0x6ff9af94, POOL_FLAG = 0x6ff9af78, POOL_CS = 0x6ff9af7c;
 static const uint32_t POOL_USED = 0x6ffa6df4, POOL_FREELIST = 0x6ffa6df8, POOL_NFREE = 0x6ffa6e18;
 
-// 1.13c Fog+0x1AE90
+// (superseded by fog_d128a.cpp, was Fog 1AE90)
 // Create a pool system. out (guest addr, may be 0) receives the pool address; name copied (32 max).
 extern "C" uint32_t fog_sub_1ae90(const FogB64Env* e, uint32_t out, const char* name, int32_t size) {
     if (out == 0) {

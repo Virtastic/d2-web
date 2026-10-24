@@ -61,22 +61,20 @@ void sub_46640(Teardown& s, Services& sv) {
  static const int o[8] = {0,1,2,3,6,7,4,5}; relOrder(s.h, sv, o);
 }
 
-// 1.13c D2Client+0x46A20
-struct Reset46A20 { uint16_t v23e8; uint16_t v9662; int32_t count; uint8_t* rec; /* 0x16-byte records, flags at +0x0,+0x1 relative to 37b9 */ };
-void sub_46A20(Reset46A20& s, Teardown& t, Services& sv, void (*sub45EF0)()) {
- s.v23e8 = 0xffff; sub_46640(t, sv); sub45EF0(); s.v9662 = 0;
- for (int i = 0; i < s.count; ++i) { s.rec[i*0x16] = 0; s.rec[i*0x16+1] = 0; }
-}
-
 // 1.13c D2Client+0x47CD0
 struct Cb47 { int32_t f78e; char f781; int32_t f786; };
 bool sub_47CD0(const Cb47& s, int32_t p) { return s.f78e && s.f781 == 1 && p == s.f786; } // true => call FUN_6faf7ab0
 // 1.13c D2Client+0x47D00 (identical body, other caller)
 bool sub_47D00(const Cb47& s, int32_t p) { return sub_47CD0(s, p); }
 
-// 1.13c D2Client+0x46880 ; ebx/ebp/esi are caller-supplied registers
-bool sub_46880(bool havePlayer, int32_t ebx, int32_t ebp, int32_t* esi) {
- if (!havePlayer) return false;
+extern "C" uint32_t* d2_client_46150(uint8_t, uint32_t, const uintptr_t*, uint32_t* (*)(uintptr_t), void (*)());
+// 1.13c D2Client+0x46880 ; ebx/ebp/esi are caller-supplied registers. cur = DAT_6fbc9721/971d/ba808 + fatal
+// for 0x46150; ord10628 = Ordinal_10628(unit); the SetRect on the window record (DAT_6fbcc3c4) only fills a
+// dead stack RECT, so it is not reproduced.
+struct Cur46880 { uint8_t g9721; uint32_t g971d; const uintptr_t* hash; uint32_t* (*at)(uintptr_t); void (*fatal)(); void (*ord10628)(uint32_t*); };
+bool sub_46880(const Cur46880& c, int32_t ebx, int32_t ebp, int32_t* esi) {
+ if (!d2_client_46150(c.g9721, c.g971d, c.hash, c.at, c.fatal)) return false;
+ c.ord10628(d2_client_46150(c.g9721, c.g971d, c.hash, c.at, c.fatal));
  int32_t y = esi[1] + (-0x96 - ebx); esi[1] = y; esi[0] -= ebp;
  if (y < 0x14) esi[1] = 0x14;
  return true;
@@ -89,7 +87,7 @@ static uint32_t rnd(Rng& r, uint32_t n) {
  uint64_t v = (uint64_t)r.lo * 0x6ac690c5u + r.hi; r.lo = (uint32_t)v; r.hi = (uint32_t)(v >> 32);
  return (n & (n-1)) == 0 ? (n-1) & (uint32_t)v : (uint32_t)v % n;
 }
-// 1.13c D2Client+0x46910
+// dup of D2CLIENT+0x46910
 void sub_46910(uint8_t* tbl, bool isDefaultTbl, uint32_t count, uint32_t& pick, Rng& rng,
                int32_t curId, int32_t unit, int32_t unit2, Services& sv) {
  for (int left = 10; left; ) {
@@ -129,7 +127,7 @@ void sub_3FC20(Services& sv, int32_t ox, int32_t oy, const uint8_t* slots, uint3
  }
 }
 
-// 1.13c D2Client+0x46230 ; NPC-menu entry builder. Branch table preserved, imported calls are seams.
+// dup of D2CLIENT+0x46230 ; NPC-menu entry builder. Branch table preserved, imported calls are seams.
 struct NpcMenu {
  virtual ~NpcMenu() = default;
  virtual int32_t kind() = 0;                    // FUN_6faf6150()->[1], -1 if none

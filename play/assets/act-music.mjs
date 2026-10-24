@@ -101,6 +101,11 @@ export function nativeAmbienceEnabled(levelPredicateValue, suppressionGlobalValu
   return levelValue !== 0 && suppressionValue === 0;
 }
 
+/** 1.13c FUN_6FAF5660: a new level's song is adopted once more than 0x4a ticks have passed since the level changed (or nothing plays yet). */
+export function levelMusicDue(level, activeLevel, changedTick, tick) {
+  return level !== activeLevel && (activeLevel < 0 || tick - changedTick > 0x4a);
+}
+
 /** Coalesce level changes, retry failed selection, and invalidate stale in-flight requests. */
 export function createLevelMusicSync(playLevel, { now = Date.now, retryDelayMs = 1000 } = {}) {
   if (typeof playLevel !== 'function') throw new TypeError('level music player is required');

@@ -189,7 +189,7 @@ uint32_t Storm_Sub345D0(uint32_t param_1, const StormBatch34110Env* env) {
 // bit 0 validates the trailer and does the same; bit 3 switches to the alternate segment word.
 // The segment's heap lock (+8 in the segment header) is taken around 0x1B170.
 extern "C"
-uint32_t Storm_Sub1B960(void* param_1, uint8_t* param_2, int32_t param_3,
+uint32_t Storm_Sub1B960Env(void* param_1, uint8_t* param_2, int32_t param_3,
                         const StormBatch34110Env* env) {
     if (g_memReady == 0) {
         set_error(0x8510007D);
@@ -438,7 +438,7 @@ uint32_t Storm_Sub3A330(uint32_t* param_1, uint32_t* param_2, int32_t* param_3, 
         if (iVar3 == 0) {
             EnterCriticalSection((LPCRITICAL_SECTION)&g_streamLock);
             env->f_1090(puVar9);
-            Storm_Sub1B960(puVar9, (uint8_t*)"s___AUSTREAM___", -2, env);
+            Storm_Sub1B960Env(puVar9, (uint8_t*)"s___AUSTREAM___", -2, env);
             LeaveCriticalSection((LPCRITICAL_SECTION)&g_streamLock);
         } else {
             uint32_t palTotal = stride * (uint32_t)param_4 + palSize;

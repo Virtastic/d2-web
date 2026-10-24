@@ -1,56 +1,59 @@
-// src/core/d2gfx/d2gfx_sbh_alloc_new_region.cpp -- 1.13c D2Gfx.dll ___sbh_alloc_new_region,
-// reimplemented from build-wasm/ghidra-d2gfx/decomp/0x46EB.c (alpha lane). Image base 0x6FA80000;
-// every global is named at its retail RVA. Every kernel32 import is a host seam AFTER the retail
-// arguments, which keep their order (the d2gfx_sbh_alloc_block pattern).
 #include <cstdint>
-#include <emscripten.h>
 
-// --- D2Gfx __sbh_* state (the CRT small-block heap) -------------------------------------------
-// File-local: the alloc side of this heap owns its own state (the d2gfx_sbh_free_block pattern).
-static uint32_t g_sbh_count;    // +0x1D8E4 DAT_6fa9d8e4: region count
-static uint32_t g_sbh_regions;  // +0x1D8E8 DAT_6fa9d8e8: region-array base
-static uint32_t g_sbh_cap;      // +0x1D8F4 DAT_6fa9d8f4: region-array capacity (records)
-static uint32_t g_sbh_heap;     // +0x1E904 DAT_6fa9e904: Win32 heap handle
-
-static inline uint32_t* P32(uint32_t a) { return (uint32_t*)(uintptr_t)a; }
-
-struct D2GfxSbhNewRegionEnv {
-    uint32_t (*heap_realloc)(uint32_t heap, uint32_t flags, uint32_t block, uint32_t size); // IAT HeapReAlloc
-    uint32_t (*heap_alloc)(uint32_t heap, uint32_t flags, uint32_t size);                   // IAT HeapAlloc
-    uint32_t (*virtual_alloc)(uint32_t addr, uint32_t size, uint32_t type, uint32_t protect); // IAT VirtualAlloc
-    int32_t  (*heap_free)(uint32_t heap, uint32_t flags, uint32_t block);                   // IAT HeapFree
+// Prior art: none in D2MOO (linked MSVC 2003 CRT small-block heap).
+// ___sbh_alloc_new_region
+// Grow the region-descriptor array (HeapReAlloc, 0x10 more entries) when full, then fill the next
+// 20-byte descriptor: [4]=HeapAlloc(zeroed,0x41c4) header, [3]=VirtualAlloc(1MiB reserve), [2]=-1,
+// [0]=[1]=0; count++, header's first dword=-1. Failure frees the header and returns null.
+// Heap globals and Win32 calls are seams; pointers are 32-bit retail values.
+struct D2GfxSbhHeap {
+    uint32_t count;      // DAT_6fa9d8e4
+    uint32_t capacity;   // DAT_6fa9d8f4
+    uint8_t* regions;    // DAT_6fa9d8e8
+    void* heap;          // DAT_6fa9e904
+    uint32_t cursor;     // DAT_6fa9d8f0
+    uint32_t cache;      // DAT_6fa9d8e0
+    uint32_t cache_grp;  // DAT_6fa9d8f8
 };
+extern "C" { D2GfxSbhHeap g_D2Gfx_sbh; }
+#include <cstdlib>
+#include <cstring>
+// Win32 platform boundary only (libc-backed): HEAP_ZERO_MEMORY=8; MEM_RESERVE allocates the range,
+// MEM_COMMIT on an address inside it is a no-op returning that address.
+extern "C" void* D2Gfx_HeapReAlloc(void*, uint32_t, void* p, uint32_t n) { return realloc(p, n); }
+extern "C" void* D2Gfx_HeapAlloc(void*, uint32_t f, uint32_t n) { void* p = malloc(n); if (p && (f & 8)) memset(p, 0, n); return p; }
+extern "C" void D2Gfx_HeapFree(void*, uint32_t, void* p) { free(p); }
+extern "C" void* D2Gfx_VirtualAlloc(void* addr, uint32_t n, uint32_t, uint32_t) {
+    if (addr) return addr;
+    void* p = aligned_alloc(0x10000, n);
+    if (p) memset(p, 0, n);
+    return p;
+}
 
-// 183 B. ___sbh_alloc_new_region(void). Grow the region array by 16 records
-// when it is full ((cap*5+0x50)*4 bytes, cap += 0x10), take the next free record (base + count*0x14),
-// HeapAlloc a 0x41C4-byte control block for it (flags 8), commit a 1 MiB VirtualAlloc'd base
-// (0, 0x100000, MEM_COMMIT 0x2000, PAGE_READWRITE 4), then reset region state: subregion count -1,
-// the two bucket bitmaps 0, the control block's current-group field -1, count++. A failed VirtualAlloc
-// frees the control block; either failure returns 0 without advancing count. Returns the record.
 // 1.13c D2Gfx+0x046EB
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2gfx_46eb(const D2GfxSbhNewRegionEnv* env) {
-    if (g_sbh_count == g_sbh_cap) {
-        uint32_t p = env->heap_realloc(g_sbh_heap, 0, g_sbh_regions, (g_sbh_cap * 5u + 0x50u) * 4u);
-        if (p == 0) return 0;
-        g_sbh_cap += 0x10u;
-        g_sbh_regions = p;
+extern "C" uint32_t* D2Gfx_46EB_SbhAllocNewRegion()
+{
+    D2GfxSbhHeap& h = g_D2Gfx_sbh;
+    if (h.count == h.capacity) {
+        void* p = D2Gfx_HeapReAlloc(h.heap, 0, h.regions, (h.capacity * 5 + 0x50) * 4);
+        if (!p) return nullptr;
+        h.capacity += 0x10;
+        h.regions = (uint8_t*)p;
     }
-    uint32_t region = g_sbh_regions + g_sbh_count * 0x14u;
-    uint32_t control = env->heap_alloc(g_sbh_heap, 8, 0x41c4);
-    P32(region)[4] = control;
-    if (control != 0) {
-        uint32_t base = env->virtual_alloc(0, 0x100000, 0x2000, 4);
-        P32(region)[3] = base;
-        if (base != 0) {
-            P32(region)[2] = 0xffffffffu;
-            P32(region)[0] = 0;
-            P32(region)[1] = 0;
-            g_sbh_count++;
-            P32(control)[0] = 0xffffffffu;
-            return region;
-        }
-        env->heap_free(g_sbh_heap, 0, control);
+    uint32_t* r = (uint32_t*)(h.regions + h.count * 0x14);
+    void* hdr = D2Gfx_HeapAlloc(h.heap, 8, 0x41c4);
+    r[4] = (uint32_t)(uintptr_t)hdr;
+    if (!hdr) return nullptr;
+    void* mem = D2Gfx_VirtualAlloc(nullptr, 0x100000, 0x2000, 4);
+    r[3] = (uint32_t)(uintptr_t)mem;
+    if (!mem) {
+        D2Gfx_HeapFree(h.heap, 0, hdr);
+        return nullptr;
     }
-    return 0;
+    r[2] = 0xffffffffu;
+    r[0] = 0;
+    r[1] = 0;
+    h.count++;
+    *(uint32_t*)hdr = 0xffffffffu;
+    return r;
 }

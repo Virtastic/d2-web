@@ -20,7 +20,7 @@
 
 extern "C" void d2game_nmsg_write(int32_t code, const uint32_t* table);   // 0x69DC __NMSG_WRITE
 
-// 1.13c D2Game+0x078DE: map a Windows code page to its CRT locale identifier.
+// see 1.13c D2Game+0x078DE: map a Windows code page to its CRT locale identifier.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_78de(uint32_t codepage) {
     switch (codepage) {
         case 932: return 0x0411;  // Japanese
@@ -41,7 +41,7 @@ struct D2GameBatchTinyEnv {
     const uint32_t* nmsgTable;                                                   // 0x6FD1F7E8
 };
 
-// 1.13c D2Game+0x06730 (___heap_select): on NT5 and later -- the OS platform word at 0x6FD2FD24 == 2
+// see 1.13c D2Game+0x06730 (___heap_select): on NT5 and later -- the OS platform word at 0x6FD2FD24 == 2
 // (VER_PLATFORM_WIN32_NT) and the major version at 0x6FD2FD30 > 4 -- the CRT uses the OS heap (1);
 // anything else selects the small-block heap (3).
 extern "C"
@@ -49,7 +49,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_6730(uint32_t osPlatform, uint32_t win
     return (osPlatform == 2 && winMajor > 4) ? 1 : 3;
 }
 
-// 1.13c D2Game+0x077F0 (__global_unwind2): RtlUnwind(frame, 0x6FC27808, NULL, NULL). The target is
+// see 1.13c D2Game+0x077F0 (__global_unwind2): RtlUnwind(frame, 0x6FC27808, NULL, NULL). The target is
 // the instruction after the call (RVA 0x7808, stored as its retail VA); unwinding itself is a host
 // operation and the KERNEL32 import thunk (0xA26E) is the seam.
 extern "C"
@@ -60,7 +60,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_77f0(void* frame, const D2GameBatchTinyEn
 // +0x6FD1F9A0/A4/A8: the __NLG notifier's saved EAX, ECX argument and EBP.
 static uint32_t g_nlg_eax, g_nlg_param, g_nlg_ebp;
 
-// 1.13c D2Game+0x078BD (__NLG_Notify1): the fastcall sibling of __NLG_Notify -- store the ECX
+// see 1.13c D2Game+0x078BD (__NLG_Notify1): the fastcall sibling of __NLG_Notify -- store the ECX
 // argument at +0x6FD1F9A4, EAX at +0x6FD1F9A0 and EBP at +0x6FD1F9A8. ECX/EAX/EBP cannot ride a C
 // signature, so they are the seams after the retail argument.
 extern "C"
@@ -73,7 +73,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_78bd(uint32_t ecx, uint32_t eax, uint32_t
 // +0x6FD3B358: the multibyte-table initialised flag.
 static uint32_t g_mbctableDone;
 
-// 1.13c D2Game+0x07DB5 (___initmbctable): if the flag is clear, run __setmbcp(-3) (the host default
+// see 1.13c D2Game+0x07DB5 (___initmbctable): if the flag is clear, run __setmbcp(-3) (the host default
 // codepage setup, 0x7C65) and set it; always return 0.
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_7db5(const D2GameBatchTinyEnv* env) {
@@ -84,7 +84,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_7db5(const D2GameBatchTinyEnv* env) {
     return 0;
 }
 
-// 1.13c D2Game+0x096F8 (_abort): report message 10 (__RT_ABORT) through __NMSG_WRITE, raise SIGABRT
+// see 1.13c D2Game+0x096F8 (_abort): report message 10 (__RT_ABORT) through __NMSG_WRITE, raise SIGABRT
 // (0x16), then __exit(3). __exit = doexit(3, quick=1, retcaller=0), which terminates the process; on
 // the wasm host that is _exit(3).
 extern "C"
@@ -94,7 +94,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_96f8(const D2GameBatchTinyEnv* env) {
     _exit(3);
 }
 
-// 1.13c D2Game+0x09EAF _siglookup: table in EDX, signal in ESI, count DAT_6fd1f7e4; entries are
+// see 1.13c D2Game+0x09EAF _siglookup: table in EDX, signal in ESI, count DAT_6fd1f7e4; entries are
 // {exception, signal, action} (12 bytes). Returns the matching entry or null (retail's pointer is
 // only valid on a match; callers test the signal again). Same body as BNClient+0x183D2.
 extern "C" EMSCRIPTEN_KEEPALIVE const uint32_t* d2_fn_d2game_9eaf(const uint32_t* table, uint32_t count, int32_t signal) {
@@ -103,7 +103,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE const uint32_t* d2_fn_d2game_9eaf(const uint32_t
     return i < count && (int32_t)table[i * 3 + 1] == signal ? table + i * 3 : nullptr;
 }
 
-// 1.13c D2Game+0x09EDD _raise: host model. Retail globals are env fields: the handler slots for
+// see 1.13c D2Game+0x09EDD _raise: host model. Retail globals are env fields: the handler slots for
 // SIGINT(2)/SIGTERM(0xF)/SIGBREAK(0x15)/SIGABRT(0x16) at 0x6FD301C0/CC/C4/C8 (sig[0..3]), the FP
 // exception range start/count (0x6FD1F7D8/DC); the per-thread block's _initarg/_pxcptacttab/_initaddr
 // are ptd fields; __getptd, siglookup(0x9EAF), __lock(0)/sub_A018(0) (unlock) and __exit(3) are seams.

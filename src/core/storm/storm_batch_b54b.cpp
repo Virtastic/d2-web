@@ -4,15 +4,13 @@
 #include <cstdint>
 #include <cstring>
 #include <cstdlib>
+#include "storm_state.h"
 
 namespace {
 uint32_t g_lastError;        // 0x6FC45388
 int32_t g_errReport;         // 0x6FC44D58
 int32_t g_debugFill;         // 0x6FC45164
 int32_t g_listHead;          // 0x6FC459F0
-int32_t g_csInit;            // 0x6FC415F8
-void* g_stringModule;        // 0x6FC45390
-char g_stringBuf[0x100];     // 0x6FC45AA0
 const char* const g_defaultStrings[1] = {nullptr};  // 0x6FC35CB0 table
 
 void Storm_SetLastError(uint32_t);
@@ -121,23 +119,9 @@ uint32_t Storm_Sub22FA0(uint8_t* node) {
     }
 }
 
-// 1.13c Storm+0x2F180: take the global critical section, creating it on first use.
-void Storm_Sub2F180() {
-    if (Storm_InterlockedIncrement(&g_csInit) == 0) {
-        Storm_InitCriticalSection();
-        Storm_EnterCriticalSection();
-        return;
-    }
-    Storm_InterlockedDecrement(&g_csInit);
-    Storm_EnterCriticalSection();
-}
-
-// 1.13c Storm+0x2F1C0: load string resource (ESI = index) or fall back to the built-in table.
-const char* Storm_Sub2F1C0(int32_t idx) {
-    if (Storm_LoadString(g_stringModule, (uint32_t)idx + 0x5100, g_stringBuf, 0x100) == 0)
-        return g_defaultStrings[idx];
-    return g_stringBuf;
-}
+// also Storm 0x2F180 / 0x2F1C0: real bodies in storm_serr.cpp.
+void Storm_Sub2F180() { Storm_SErrLock_2F180(); }
+const char* Storm_Sub2F1C0(int32_t idx) { return Storm_SErrString_2F1C0(idx); }
 
 static void Storm_RegPath(char* path, uint32_t flags, const char* sub) {
     path[0] = 0;

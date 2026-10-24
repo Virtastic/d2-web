@@ -9,6 +9,10 @@
 #include <cstddef>
 #include <cstring>
 #include <emscripten.h>
+#include "../prng.h"
+uint8_t DRLG_GetActNoFromLevelId(int nLevelId); // D2Common 10459 (src/core/d2moo/src/DrlgDrlg.cpp)
+extern "C" struct D2ItemDataTbl* D2Common_10535_GetItemDataTables();
+extern "C" uint32_t D2Game_SEED_RollLimitedRandomNumber(d2::Seed*, int32_t);
 
 static inline uint32_t rd32(const void* p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
 static inline void     wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)p + o, &v, 4); }
@@ -222,21 +226,30 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_0DE20(void* eax, int32_t* ebx,
     e->subEA80(eax, ebx, 2, (int32_t)rd32(eax, 0xa8) + 0xd, 0, 0, 0);
 }
 
-// 1.13c D2Game+0x0F180 -- EAX level, stack arg, EBX class, EDI record, retaddr seed ptr.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_0F180(int32_t level, int32_t flag, int32_t ebx,
-                                                           const uint8_t* rec, void* seed,
-                                                           const D2GameBatch0CDC0Env* e)
+// 1.13c D2Game+0x0F180 -- EAX level, EBX class, EDI record, stack (seed*, flag), ret 8. The 0x11D0 limit (ESI)
+// is the local rec[0xfc] - act. Real callees: D2Common 10459 (via 0xA56E), D2Game 0x11D0.
+extern "C" uint32_t D2Game_sub_F180(int32_t level, int32_t flag, int32_t ebx, const uint8_t* rec,
+                                    d2::Seed* seed)
 {
     if (level < 1) level = 1;
     if (rec[0x133] && !rec[0x12a] && (int32_t)rec[0xfd] <= level) {
         if (flag == 0) {
-            uint32_t v = e->o10459(level) & 0xff;
-            if (rec[0xfc] != v && (int32_t)(rec[0xfc] - v) >= 0 && e->sub11D0(seed) != 0) return 0;
+            uint32_t v = DRLG_GetActNoFromLevelId(level) & 0xff;
+            int32_t limit = (int32_t)rec[0xfc] - (int32_t)v;
+            if (limit > 0 && D2Game_SEED_RollLimitedRandomNumber(seed, limit) != 0) return 0;
         }
         if (ebx != -1 && rd16s(rec, 0x11e) != ebx) return 0;
         return 1;
     }
     return 0;
+}
+
+// Probe wrapper (descriptor/harness entry).
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_0F180(int32_t level, int32_t flag, int32_t ebx,
+                                                           const uint8_t* rec, void* seed,
+                                                           const D2GameBatch0CDC0Env*)
+{
+    return D2Game_sub_F180(level, flag, ebx, rec, (d2::Seed*)seed);
 }
 
 // 1.13c D2Game+0x0F260 -- EBX unit, EDI pointer to int.
@@ -263,39 +276,62 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_0F2F0(int32_t* esi, const D
 }
 
 // Shared body of 0xF8F0 (range +8/+0x10) and 0xFA30 (range +0x10/+0x18): collect up to 0x3ff candidates
-// (0x1a8-byte records) accepted by 0xF180, pick one with the LCG 0x6AC690C5.
-static int32_t pickRec(int32_t base, uint32_t lo, uint32_t hi, int32_t* ctx, uint64_t* seed, int32_t level,
-                       int32_t flag, int32_t ebx, const D2GameBatch0CDC0Env* e)
+// (0x1a8-byte records) accepted by 0xF180, pick one with D2Game_SEED_RollLimitedRandomNumber (0x11D0).
+// Hidden input (disassembly): entry ECX is kept in EBX and forwarded to 0xF180 as ebx.
+static int32_t pickRec(int32_t base, uint32_t lo, uint32_t hi, d2::Seed* seed, int32_t level, int32_t flag,
+                       int32_t ebx)
 {
-    uint8_t* tbl = (uint8_t*)e->o10535();
+    uint8_t* tbl = (uint8_t*)D2Common_10535_GetItemDataTables();
     uint32_t rec = rd32(tbl, lo);
     int32_t off = (int32_t)(rec - rd32(tbl, 4));
     int32_t cnt = ((int32_t)rd32(tbl, hi) - (int32_t)rec) / 0x1a8;
     if (rec == 0) return -1;
-    int32_t idx[1024], ptr[1024]; uint32_t n = 0;
+    int32_t idx[1024]; uint32_t n = 0;
     for (int32_t i = 0; i < cnt; ++i, rec += 0x1a8) {
-        if (d2_fn_d2game_0F180(level, flag, ebx, (const uint8_t*)(uintptr_t)rec, seed, e) &&
+        if (D2Game_sub_F180(level, flag, ebx, (const uint8_t*)(uintptr_t)rec, seed) &&
             (rd32((void*)(intptr_t)base, 0x70) != 0 || (uint16_t)(rd16s((void*)(uintptr_t)rec, 0xf6)) < 100) &&
-            (int32_t)n < 0x3ff) {
-            idx[n] = i + off / 0x1a8; ptr[n] = (int32_t)rec; ++n;
-        }
+            (int32_t)n < 0x3ff)
+            idx[n++] = i + off / 0x1a8;
     }
     uint32_t pick = 0;
-    if ((int32_t)n > 0) {
-        uint32_t lo32 = (uint32_t)*seed, hi32 = (uint32_t)(*seed >> 32);
-        *seed = (uint64_t)lo32 * 0x6ac690c5u + hi32;
-        pick = (n & (n - 1)) == 0 ? ((n - 1) & (uint32_t)*seed) : (uint32_t)((*seed & 0xffffffffu) % n);
-    }
-    (void)ctx;
+    if ((int32_t)n > 0) pick = D2Game_SEED_RollLimitedRandomNumber(seed, (int32_t)n);
     return ((int32_t)pick <= (int32_t)n) ? idx[pick] : -1;
 }
 
-// 1.13c D2Game+0x0F8F0 -- ECX game(param_1 is stack), seed ptr, level, flag.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_0F8F0(int32_t param_1, uint64_t* seed, int32_t level,
-                                                          int32_t flag, int32_t ebx, const D2GameBatch0CDC0Env* e)
-{ return pickRec(param_1, 8, 0x10, nullptr, seed, level, flag, ebx, e); }
+// 1.13c D2Game+0x0F780 -- stack (game, seed*, level, class, flag, skipType28), ret 0x18. Scans the monster
+// table from +0x18 (same 0x1a8 records), skips +0x11e == 0x28 unless skipType28, F180 filter, LCG pick.
+extern "C" int32_t D2Game_sub_F780(int32_t game, d2::Seed* seed, int32_t level, int32_t ebx, int32_t flag,
+                                   int32_t skip28)
+{
+    uint8_t* tbl = (uint8_t*)D2Common_10535_GetItemDataTables();
+    uint32_t rec = rd32(tbl, 0x18);
+    int32_t off = (int32_t)(rec - rd32(tbl, 4));
+    int32_t cnt = ((int32_t)rd32(tbl, 0) * 0x1a8 - (int32_t)rec + (int32_t)rd32(tbl, 4)) / 0x1a8;
+    if (rec == 0) return -1;
+    int32_t idx[1024]; uint32_t n = 0;
+    for (int32_t i = 0; i < cnt; ++i, rec += 0x1a8) {
+        const uint8_t* r = (const uint8_t*)(uintptr_t)rec;
+        if ((skip28 != 0 || rd16s(r, 0x11e) != 0x28) && D2Game_sub_F180(level, flag, ebx, r, seed) &&
+            (rd32((void*)(intptr_t)game, 0x70) != 0 || (uint16_t)rd16s(r, 0xf6) < 100) && (int32_t)n < 0x3ff)
+            idx[n++] = i + off / 0x1a8;
+    }
+    uint32_t pick = 0;
+    if ((int32_t)n > 0) pick = D2Game_SEED_RollLimitedRandomNumber(seed, (int32_t)n);
+    return ((int32_t)pick <= (int32_t)n) ? idx[pick] : -1;
+}
 
-// 1.13c D2Game+0x0FA30
+// 1.13c D2Game+0x0F8F0 -- stack (game, seed*, level, flag), ret 0x10; entry ECX -> ebx.
+extern "C" int32_t D2Game_sub_F8F0(int32_t game, d2::Seed* seed, int32_t level, int32_t flag, int32_t ebx)
+{ return pickRec(game, 8, 0x10, seed, level, flag, ebx); }
+
+// 1.13c D2Game+0x0FA30 -- same shape, range +0x10/+0x18.
+extern "C" int32_t D2Game_sub_FA30(int32_t game, d2::Seed* seed, int32_t level, int32_t flag, int32_t ebx)
+{ return pickRec(game, 0x10, 0x18, seed, level, flag, ebx); }
+
+// Probe wrappers (old signature, env unused).
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_0F8F0(int32_t param_1, uint64_t* seed, int32_t level,
+                                                          int32_t flag, int32_t ebx, const D2GameBatch0CDC0Env*)
+{ return D2Game_sub_F8F0(param_1, (d2::Seed*)seed, level, flag, ebx); }
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_0FA30(int32_t param_1, uint64_t* seed, int32_t level,
-                                                          int32_t flag, int32_t ebx, const D2GameBatch0CDC0Env* e)
-{ return pickRec(param_1, 0x10, 0x18, nullptr, seed, level, flag, ebx, e); }
+                                                          int32_t flag, int32_t ebx, const D2GameBatch0CDC0Env*)
+{ return D2Game_sub_FA30(param_1, (d2::Seed*)seed, level, flag, ebx); }

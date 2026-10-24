@@ -1,4 +1,4 @@
-// 1.13c D2sound+0x08640 -- append a new {value,next} node (8 bytes, zeroed) at the tail of a singly linked list.
+// (alt copy; batch_67c0 carries the marker) D2sound 0x08640 -- append a new {value,next} node (8 bytes, zeroed) at the tail of a singly linked list.
 #include <cstdint>
 struct D2soundNode8640 { void* value; D2soundNode8640* next; };
 void D2sound_sub_8640(D2soundNode8640** head, void* value, D2soundNode8640* (*alloc8)()) {

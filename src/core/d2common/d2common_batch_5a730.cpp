@@ -134,6 +134,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_710f0(HD2ARCHIVE archive,
         if (ARCHIVE_GetLastError() != 2) FOG_Trace("Error opening file: %s", path);
         return 0;
     }
+    if (!file) std::exit(-1);  // retail: null handle after successful open is fatal
     ARCHIVE_CloseFile(archive, file);
     return 1;
 }

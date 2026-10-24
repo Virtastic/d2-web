@@ -746,6 +746,7 @@ void __stdcall D2Common_11055(uint8_t a1, int* a2, int* a3)
 }
 
 //D2Common.0x6FDA5670 (#11297)
+// 1.13c D2Common+0x1A6D0
 void __fastcall MONSTERS_SetMonsterNameInMonsterData(D2UnitStrc* pMonster, const Unicode* wszName)
 {
 	if (pMonster && pMonster->dwUnitType == UNIT_MONSTER && pMonster->pMonsterData)

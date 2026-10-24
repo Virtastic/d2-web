@@ -1231,6 +1231,7 @@ void __fastcall ACT2Q4_SetPortalMode(D2GameStrc* pGame, int32_t nLevelId)
 }
 
 //
+// 1.13c D2Game+0xC3620
 void __fastcall ACT2Q4_Callback10_PlayerLeavesGame(D2QuestDataStrc* pQuestData, D2QuestArgStrc* pQuestArg)
 {
 	QUESTS_RemovePlayerGUID(pQuestData, pQuestArg);

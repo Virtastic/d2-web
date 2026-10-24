@@ -18,9 +18,9 @@ struct D2McpCpInfo {
 static_assert(sizeof(D2McpCpInfo) == 0x14, "1.13c _cpinfo layout");
 
 // +0x32280 DAT_6fa32280: class bytes, indexed from 1 (byte 0 unused), 0x100 entries through +0x32380.
-static uint8_t g_mbctype_32280[0x101];
+uint8_t d2mcp305f_ctype[0x101];
 // +0x323A0 DAT_6fa323a0: 0x100 case-mapped characters.
-static uint8_t g_mbcharmap_323a0[0x100];
+uint8_t d2mcp305f_charmap[0x100];
 
 // 1.13c D2MCPClient+0x0305F (411 B, caller 0x031FA __setmbcp): `setMBCS`. Read the codepage
 // (DAT_6fa32384) and the locale id (DAT_6fa32268, itself codepage-to-locale mapped by 0x03007) from
@@ -56,28 +56,28 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_setmbcs_305f(uint32_t codepage, uint
         for (uint32_t i = 0; i < 0x100; ++i) {
             if ((ctype1[i] & 1) == 0) {
                 if ((ctype1[i] & 2) != 0) {
-                    g_mbctype_32280[i + 1] |= 0x20;
-                    g_mbcharmap_323a0[i] = (uint8_t)upper[i];
+                    d2mcp305f_ctype[i + 1] |= 0x20;
+                    d2mcp305f_charmap[i] = (uint8_t)upper[i];
                 } else {
-                    g_mbcharmap_323a0[i] = 0;
+                    d2mcp305f_charmap[i] = 0;
                 }
             } else {
-                g_mbctype_32280[i + 1] |= 0x10;
-                g_mbcharmap_323a0[i] = (uint8_t)lower[i];
+                d2mcp305f_ctype[i + 1] |= 0x10;
+                d2mcp305f_charmap[i] = (uint8_t)lower[i];
             }
         }
     } else {
         for (uint32_t i = 0; i < 0x100; ++i) {
             if (i < 0x41 || i > 0x5a) {
                 if (i > 0x60 && i < 0x7b) {
-                    g_mbctype_32280[i + 1] |= 0x20;
-                    g_mbcharmap_323a0[i] = (uint8_t)(i - 0x20);
+                    d2mcp305f_ctype[i + 1] |= 0x20;
+                    d2mcp305f_charmap[i] = (uint8_t)(i - 0x20);
                 } else {
-                    g_mbcharmap_323a0[i] = 0;
+                    d2mcp305f_charmap[i] = 0;
                 }
             } else {
-                g_mbctype_32280[i + 1] |= 0x10;
-                g_mbcharmap_323a0[i] = (uint8_t)(i + 0x20);
+                d2mcp305f_ctype[i + 1] |= 0x10;
+                d2mcp305f_charmap[i] = (uint8_t)(i + 0x20);
             }
         }
     }

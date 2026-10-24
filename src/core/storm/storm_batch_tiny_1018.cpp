@@ -17,7 +17,7 @@
 // Callees whose rows are not mapped yet stay seams, declared in retail argument order.
 #include <cstdint>
 
-int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);  // 0x1B960 SMemFree
+extern "C" int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);  // 0x1B960 SMemFree
 uint32_t Storm_Sub30B70(uint32_t* self, uint32_t param_2);        // 0x30B70 (UNMAPPED)
 
 // 1.13c Storm+0x1E90

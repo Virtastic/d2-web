@@ -1,11 +1,8 @@
 // D2Game 1.13c MSVC 2003 small-block heap group allocation.
 // Decompile matches the existing BNClient and D2MCPClient CRT helpers.
 #include <cstdint>
-#include <emscripten.h>
 
-struct D2GameSbhNewGroupEnv {
-    uint32_t (*virtual_alloc)(uint32_t addr, uint32_t size, uint32_t type, uint32_t protect);
-};
+extern "C" void* D2Game_VirtualAlloc(void* addr, uint32_t n, uint32_t type, uint32_t prot);
 
 static inline uint32_t* P32(uint32_t a) { return (uint32_t*)(uintptr_t)a; }
 static inline uint8_t*  P8(uint32_t a)  { return (uint8_t*)(uintptr_t)a; }
@@ -18,8 +15,7 @@ static inline uint8_t*  P8(uint32_t a)  { return (uint8_t*)(uintptr_t)a; }
 // bucket 0x3F. Finally clear the group's low-bucket bitmap, set its high-bucket bitmap to 1, bump the
 // committed-group count (setting region[1] bit 0 on the first group) and clear the bit in region[2].
 // Returns the group index, or -1 when the commit fails.
-extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2game_sbh_alloc_new_group(uint32_t region, const D2GameSbhNewGroupEnv* env) {
+extern "C" int32_t D2Game_9017_SbhAllocNewGroup(uint32_t region) {
     uint32_t control = P32(region + 0x10)[0];
     int32_t group = 0;
     uint32_t bits = P32(region + 8)[0];
@@ -32,7 +28,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2game_sbh_alloc_new_group(uint32_t region, const D
         it += 8;
     }
     uint32_t lpAddress = (uint32_t)group * 0x8000u + P32(region + 0xC)[0];
-    if (env->virtual_alloc(lpAddress, 0x8000, 0x1000, 4) == 0) return -1;
+    if (D2Game_VirtualAlloc((void*)(uintptr_t)lpAddress, 0x8000, 0x1000, 4) == nullptr) return -1;
     if (lpAddress <= lpAddress + 0x7000u) {
         uint32_t p = lpAddress + 0x10;
         uint32_t count = ((lpAddress + 0x7000u - lpAddress) >> 12) + 1;

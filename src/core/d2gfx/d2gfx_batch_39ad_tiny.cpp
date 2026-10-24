@@ -21,8 +21,7 @@ void d2_fn_d2gfx_39ad(uint32_t ecx, uint32_t eax, uint32_t ebp) {
 }
 
 // 1.13c D2Gfx+0x05867: release CRT lock 13 through _unlock (0x19BC).
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2gfx_5867(void (*unlock)(uint32_t)) {
+extern "C" void d2gfx_sub_5867(void (*unlock)(uint32_t)) {
     unlock(13);
 }
 

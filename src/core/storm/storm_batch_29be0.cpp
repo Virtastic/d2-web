@@ -33,7 +33,7 @@ uint32_t Storm_Sub295B0(uint32_t h, uint32_t* buf, uint32_t n, int32_t* read, in
                         uint32_t a, uint32_t b);                    // 0x295B0 read core
 bool Storm_Sub29C10(void* a, uint32_t* b, int32_t* outPtr, uint32_t* outSize, uint32_t extra,
                     uint32_t flags, int32_t param7, uint32_t param8);  // 0x29C10 load core
-int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);    // 0x1B960 SMemFree
+extern "C" int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);    // 0x1B960 SMemFree
 
 uint32_t rd32(const void* p) { uint32_t v; std::memcpy(&v, p, 4); return v; }
 void wr32(void* p, uint32_t v) { std::memcpy(p, &v, 4); }

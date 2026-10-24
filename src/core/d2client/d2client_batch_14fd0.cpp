@@ -123,7 +123,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_460a0(E460A0* e, uint8_t* in) {
     if (r) e->f56ef0((i32*)(intptr_t)(e->slotBase + r[0] * 0x80), r[3] & 0x7f, r[3], r[0]); }
   e->o11024(h); e->o10251(h); }
 
-// 1.13c D2Client+0x46A60
+// dup of D2CLIENT+0x46A60
 struct E46A60 { i32** bucket; /* DAT 0xBBA808[128] */ i32 g97ac, g97b0; i32** list; // DAT 0xBCBF30
   void (*f460a0)(); void (*fatal)(); void (*f38550)(i32*); };
 EMSCRIPTEN_KEEPALIVE void d2c_46a60(E46A60* e, u32 key) {

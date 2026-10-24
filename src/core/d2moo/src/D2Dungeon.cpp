@@ -255,6 +255,7 @@ BOOL __stdcall DUNGEON_DoRoomsTouchOrOverlap(D2ActiveRoomStrc* ptFirst, D2Active
 }
 
 //D2Common.0x6FD8BE30 (#10043)
+// 1.13c D2Common+0x3B910 (room tile rect is at +0x5C.. in retail; fields read by name here)
 BOOL __stdcall DUNGEON_AreTileCoordinatesInsideRoom(D2ActiveRoomStrc* pRoom, int nX, int nY)
 {
 	D2_ASSERT(pRoom);

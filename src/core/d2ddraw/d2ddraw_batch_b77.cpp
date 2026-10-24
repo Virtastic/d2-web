@@ -22,7 +22,7 @@ W int32_t DAT_6f8d0234;  // buffer mode
 W int32_t DAT_6f8d0240;  // palette dirty
 W int32_t DAT_6f8d01c8, DAT_6f8d01d8;  // width, height
 W uint8_t DAT_6f8cfdcc[1];  // palette entries
-W void FUN_6f8c7690(void* hr, const char* msg);
+W void q_d2ddraw_batch_b77_FUN_6f8c7690(void* hr, const char* msg);
 
 // 1.13c D2DDraw+0x082F0: blit render surface to the screen (BltFast), then flush a dirty palette.
 EMSCRIPTEN_KEEPALIVE int32_t b77_FUN_6f8c82f0(void) {
@@ -43,13 +43,13 @@ EMSCRIPTEN_KEEPALIVE int32_t b77_FUN_6f8c82f0(void) {
   if (DAT_6f8d0240 && DAT_6f8d0230) {
     DAT_6f8d0240 = 0;
     if ((hr = slot(DAT_6f8d0230, 0x18)(DAT_6f8d0230, 0, 1, 0xff, DAT_6f8cfdcc))) {
-      FUN_6f8c7690(hr, "SetEntries failed!");
+      q_d2ddraw_batch_b77_FUN_6f8c7690(hr, "SetEntries failed!");
       return 0;
     }
   }
   return 1;
 fail:
-  FUN_6f8c7690(hr, "BltFast failed!");
+  q_d2ddraw_batch_b77_FUN_6f8c7690(hr, "BltFast failed!");
   return 0;
 }
 

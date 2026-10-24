@@ -12,7 +12,7 @@ extern char DAT_6f9e75d7[];
 void d2_multi_sub_11f80(void);
 }
 
-// 1.13c D2Multi+0x13F20
+// 1.13c D2MULTI+0x13F20
 void d2_multi_sub_13f20(void) {
     uint16_t w = *(uint16_t*)(DAT_6fa09f14 + 0x1eb);
     uint32_t a = 0, b = 0;

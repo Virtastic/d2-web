@@ -92,7 +92,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_82e40(int32_t nOverlayId)
 // 1.13c D2Common+0x12D20: remember the last log file name and open it, or close logging when the name
 // is null. The two calls are 0x12C90 (open with mode "wt") and 0x12AA0 (close), both env seams.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_12d20(const char* szFile, const D2CommonBatch233B0Env* pEnv)
+EMSCRIPTEN_KEEPALIVE void D2Common_12D20_SetLogFile(const char* szFile, const D2CommonBatch233B0Env* pEnv)
 {
 	if (pEnv && pEnv->pLogFileName)
 		*pEnv->pLogFileName = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(szFile));

@@ -1,4 +1,4 @@
-// 1.13c D2sound+0x08100 -- for each of the 8 slots at 6f9c6560..6580: fatal if null or [0]==0; if [7]!=0 start fade (sub_6B80, 0, 200).
+// (alt copy; batch_67c0 carries the marker) D2sound 0x08100 -- for each of the 8 slots at 6f9c6560..6580: fatal if null or [0]==0; if [7]!=0 start fade (sub_6B80, 0, 200).
 #include <cstdint>
 void D2sound_sub_8100(int active, uint32_t* const slots[8], void (*fade6B80)(uint32_t*, uint32_t, int), void (*fatal)(int)) {
     if (!active) return;

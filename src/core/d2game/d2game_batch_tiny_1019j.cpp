@@ -15,6 +15,7 @@
 #include <cstring>
 #include <unistd.h>
 #include <emscripten.h>
+#include "GAME/SCmd.h"
 
 static inline uint32_t rd32(uint32_t a, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)(uintptr_t)a + o, 4); return v; }
 static inline void     wr32(uint32_t a, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)(uintptr_t)a + o, &v, 4); }
@@ -51,9 +52,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_6FFA0(uint32_t ctx, const D2Ga
 
 // 0x8AAC0: append the two-byte record { 0x61, AL } to the packet buffer of the stack argument.
 // AL at entry is explicit; ECX at the 0x8A3E0 call points at the record.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8AAC0(uint32_t ctx, uint8_t al, const D2GameBatch1019jEnv* env) {   // 1.13c D2Game+0x8AAC0
-    const uint8_t record[2] = { 0x61, al };
-    env->fn8A3E0(ctx, record, 2);
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8AAC0(D2ClientStrc* ctx, uint8_t al) {   // 1.13c D2Game+0x8AAC0
+    uint8_t record[2] = { 0x61, al };
+    D2GAME_PACKETS_SendPacket_6FC3C710(ctx, record, 2);
 }
 
 // 0x9E2E0: __fastcall (ECX = unit, EDX = arg). When D2Common #11157 accepts the unit, answer

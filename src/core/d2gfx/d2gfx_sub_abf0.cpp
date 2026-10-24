@@ -7,7 +7,7 @@ extern "C" void d2gfx_sub_a890(const uint8_t*, int32_t, int32_t, const uint8_t*,
 extern "C" void d2gfx_sub_8a40(const uint8_t*, uint8_t*, int32_t, int32_t, int32_t, int32_t, int32_t, uint8_t, const D2GfxLitState*);
 extern "C" void d2gfx_sub_9e90(const uint8_t*, int32_t, int32_t, uint8_t*, int32_t, int32_t, int32_t, int32_t, int32_t, uint8_t, const D2GfxLitState*);
 
-// 1.13c D2Gfx+0xABF0: tile draw dispatcher. lit = DAT_6fa9d660, noLight = DAT_6fa90be8,
+// 1.13c D2Gfx+0x0ABF0: tile draw dispatcher. lit = DAT_6fa9d660, noLight = DAT_6fa90be8,
 // r = the four-int light rect (param_4). Palette (ESI) explicit.
 extern "C" void d2gfx_sub_abf0(const uint8_t* src, int32_t x, int32_t y, const int32_t* r, int32_t lit, int32_t noLight,
                                const uint8_t* palette, const D2GfxBlitState* st, const D2GfxLitState* ls) {

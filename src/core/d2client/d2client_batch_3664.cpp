@@ -9,6 +9,7 @@
 // D2ClientBatch3664Env AFTER its retail arguments, which keep their order.
 #include <cstdint>
 #include <cstddef>
+#include <cstdlib>
 #include <emscripten.h>
 #include <Windows.h>   // LeaveCriticalSection: host (kernel) state, a no-op under wasm
 
@@ -68,3 +69,6 @@ extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_47ab(uint32_t idx) {
     leave_cs(idx);
 }
+
+// 1.13c D2Client+0x3664 (_exit), direct entry: doexit(code,0,0) then process exit; the process exit is the platform boundary.
+extern "C" [[noreturn]] void D2Client_exit_3664(int32_t code) { std::_Exit(code); }

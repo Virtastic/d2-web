@@ -53,7 +53,7 @@ int32_t d2gfx_flsbuf(int32_t ch, CrtStream32* f) {
 // 1.13c D2Gfx+0x01D9A _write_char: the format engine's single-character put. _IOSTRG with no base only
 // counts (writes nothing); otherwise --cnt and, when it goes negative, __flsbuf (0x1C81), else *ptr++ = ch.
 // A -1 result stores -1 into the caller's count and returns; any other result increments it.
-void d2gfx_write_char(CrtStream32* f, uint8_t ch, int32_t* count) {
+extern "C" void d2gfx_write_char(CrtStream32* f, uint8_t ch, int32_t* count) {
     if ((f->flag & 0x40) == 0 || f->base != 0) {
         int32_t rc;
         if (--f->cnt < 0) rc = d2gfx_flsbuf((int32_t)ch, f);

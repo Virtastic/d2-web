@@ -5,13 +5,7 @@
 #include <cstddef>
 
 // Native links and host handles are separate from retail's 32-bit ids/counts.
-struct StormLog3b1e0 {
-    uint32_t id;
-    StormLog3b1e0* next;
-    void* file;
-    uint32_t used, position, field14, field18;
-    uint8_t data[0x10000];
-};
+#include "storm_state.h"
 struct StormState3b1e0 {
     uint32_t lastError, nextLogId;
     StormLog3b1e0* logs[4];
@@ -70,13 +64,13 @@ extern "C" uint32_t Storm_Sub343D0(const void* messageData, const StormCalls3b1e
 extern "C" uint32_t Storm_BreakRetailMessageChain3b1e0(uint32_t token, const StormCalls3b1e0& c) {
     return Storm_Sub343D0(c.resolveMessageData(token), c);
 }
-// 1.13c Storm+0x34530
+// also Storm 0x34530
 extern "C" void Storm_Sub34530(uint32_t key, uint32_t a, uint32_t b, const StormCalls3b1e0& c) { c.event(0x534d5348,key,a,b); }
-// 1.13c Storm+0x34510
+// also Storm 0x34510
 extern "C" void Storm_Sub34510(uint32_t key, uint32_t a, uint32_t b, const StormCalls3b1e0& c) { c.event(0x534d5349,key,a,b); }
-// 1.13c Storm+0x344F0
+// also Storm 0x344F0
 extern "C" void Storm_Sub344F0(uint32_t key, uint32_t a, uint32_t b, const StormCalls3b1e0& c) { c.event(0x534d534a,key,a,b); }
-// 1.13c Storm+0x344D0
+// also Storm 0x344D0
 extern "C" void Storm_Sub344D0(uint32_t key, uint32_t a, uint32_t b, const StormCalls3b1e0& c) { c.event(0x534d5347,key,a,b); }
 // 1.13c Storm+0x30B70
 extern "C" void Storm_Sub30B70(uint32_t* out, uint32_t reserved, StormState3b1e0& s, const StormCalls3b1e0& c) {
@@ -152,14 +146,11 @@ extern "C" uint32_t Storm_Sub34AE0(const char* name, uint32_t /*unused*/, uint32
     c.leave(logLock(bucket)); return 1;
 }
 // 1.13c Storm+0x349E0
-extern "C" void Storm_Sub349E0(uint32_t scratch, StormState3b1e0& s, const StormCalls3b1e0& c) {
-    for (uint32_t bucket = 0; bucket < 4; ++bucket) {
-        c.enter(logLock(bucket));
-        for (auto* n = s.logs[bucket]; n; n = n->next) flushLog(*n,c,scratch);
-        c.leave(logLock(bucket));
-    }
+extern "C" void Storm_Sub349E0(uint32_t scratch, StormState3b1e0& s, const StormCalls3b1e0&) {
+    for (int i = 0; i < 4; ++i) g_stormLogs[i] = s.logs[i]; // caller-owned state mirrors the module's
+    Storm_FlushLogs_349E0(scratch);
 }
-// 1.13c Storm+0x34410: ensure a group node keyed ESI exists in the list at 0x458e0, then dispatch
+// also Storm 0x34410: ensure a group node keyed ESI exists in the list at 0x458e0, then dispatch
 // 0x35CD0(command, key, a, b). The list walk and 0x15E0 creation are seams (list identity 0x458e0).
 struct StormEvent34410Calls {
     bool (*hasGroup)(uint32_t list, uint32_t key);

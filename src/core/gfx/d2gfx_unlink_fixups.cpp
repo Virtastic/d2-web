@@ -65,11 +65,12 @@ bool unlink_pending(const D2GfxGuestMemory& mem, uint32_t owner) {
     }
 }
 
+extern "C" bool d2gfx_unlink_slot(D2GfxGuestMemory mem, uint32_t slot);
 extern "C" bool d2gfx_unlink_fixups_pending(D2GfxGuestMemory mem, uint32_t owner) { return unlink_pending(mem, owner); }
 // 1.13c D2Gfx+0x010E0: unlink the pending slot(s), then the owner's first
 // node.
 extern "C" EMSCRIPTEN_KEEPALIVE bool d2gfx_unlink_fixups(D2GfxGuestMemory mem, uint32_t owner) {
-    return unlink_pending(mem, owner) && unlink_slot(mem, owner + 4);
+    return d2gfx_unlink_fixups_pending(mem, owner) && d2gfx_unlink_slot(mem, owner + 4);
 }
 
 // 1.13c D2Gfx+0x01250: the same one-slot unlink, extracted by the compiler.

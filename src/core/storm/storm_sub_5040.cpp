@@ -2,7 +2,7 @@
 // Prior art used: the decompile; sibling storm_sub_4430.cpp.
 #include <cstdint>
 
-void* Storm_Sub1C580(uint32_t size, const char* tag, int32_t line, uint32_t flags);  // 0x1C580 (alloc)
+extern "C" void* Storm_Sub1C580(uint32_t size, const char* tag, int32_t line, uint32_t flags);  // 0x1C580 (alloc)
 uint32_t* Storm_Sub51F0(uint32_t* p);                                                // 0x51F0 (ctor)
 void Storm_Sub4390(void* a, uint32_t* obj, int32_t src);                              // 0x4390
 

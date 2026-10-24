@@ -1,6 +1,15 @@
 // Batch 41690: small D2Client helpers, derived from cached 1.13c decompile (D2MOO has no D2Client).
 // Globals live in G (RVA noted); external calls are hooks. Uncertain register inputs marked REG?.
 #include <cstdint>
+#include <cstring>
+#ifndef _WIN32
+// Win32 GetAsyncKeyState shim: wasm input-state backed; key down = bit15 set. Default 0 (all up).
+static uint8_t g_keyDown[256];
+extern "C" int16_t GetAsyncKeyState(int vk){ return (vk>=0&&vk<256&&g_keyDown[vk])?int16_t(-32768):int16_t(0); }
+extern "C" void d2_set_async_key(int vk,int down){ if(vk>=0&&vk<256) g_keyDown[vk]=down!=0; }
+#else
+extern "C" __declspec(dllimport) int16_t __stdcall GetAsyncKeyState(int);
+#endif
 namespace d2client_b41690 {
 using U=uint32_t; using I=int32_t; using P=void*;
 struct G {
@@ -12,7 +21,7 @@ struct G {
  I cc3cc,v9898,v9890,v988c,v46d4;
  U cc390; uint8_t* player; // 6fbcc390, 6fbcb980
  I cc394,cc3a8,cc3f0,cc3d4,cc3d8; U v9884,cc37c; I v9938;
- I (*sysMetrics)(I); I (*isKeyDef)(I,I); I (*asyncKey)(U); // GetSystemMetrics, FUN_6fae98c0, GetAsyncKeyState
+ I (*sysMetrics)(I); I (*isKeyDef)(I,I); // GetSystemMetrics, FUN_6fae98c0
  struct Bind{I key,a;I b;} ; // unused layout note
  uint8_t* keyTab;   // 6fbca2e4, 0x5a? entries of 10 bytes: u16 vk@0, i32 id@+2, i32 on@+6... id@-6 relative to +2 slot
  void (*cmd)(I,I); void (*hook4660)(U); void (*e350)(I,I); U (*tickNow)(); I (*ord10004)();
@@ -39,50 +48,38 @@ bool sub_420E0(G&g){ return g.sysMetrics(0x4b)!=0 && g.cc3cc!=0 && g.v9898==1 &&
 void sub_423A0(G&g){ if(U(g.tick-g.lastTick)>3000){ g.avgA=g.cntA/3; g.avgB=g.cntB/3; g.lastTick=g.tick; g.cntA=0; g.cntB=0; } }
 // 1.13c D2Client+0x42850 (REG?: ecx forwarded to 14660)
 void sub_42850(G&g,U ecx){ g.a8c9c=0; g.cc404=1; g.hook4660(ecx); g.cc3a4=1; }
-// 1.13c D2Client+0x429C0 ; emit(k) = Ordinal_10048 + FUN_6faecc60 with string k (0..3 = 4748,4754,476c,4784)
-void sub_429C0(G&g,void(*emit)(I)){
- bool m=g.sysMetrics(0x4b)!=0;
- if(m){
-  if(!g.cc3cc) goto tail;
-  if(g.v9898==1){ if(g.v9890) emit(0); }
-  else if(g.v9898==2&&(g.v988c==4||g.v988c==5)) emit(0);
- }
- if(g.cc3cc){
-  if(g.v9898==1||(g.v9898==2&&(g.v988c==4||g.v988c==5))) emit(1);
-  if(g.cc3cc&&g.v9898!=1&&g.v9898==2&&g.v988c!=4&&g.v988c==5) emit(2);
- }
- tail:
- if(g.sysMetrics(0x4b)!=0&&g.cc3cc&&g.v9898==1&&g.v9890==0&&g.v46d4!=0) emit(3);
-}
 // 1.13c D2Client+0x42BD0
 void sub_42BD0(G&g){ g.cc388=1; uint16_t*p=reinterpret_cast<uint16_t*>(g.player+0x1eb);
  *p=uint16_t(((g.cc390+1)*0x400)|(*p&0xe0ff)); }
 // 1.13c D2Client+0x42C10 (REG?: param_2 in edx/stack; param_1 unused). textW = width of Ordinal_10003 string via Ordinal_10028
 I sub_42C10(I param_2,I textWidth){ return param_2-textWidth/2; }
-// 1.13c D2Client+0x42C70 : builds name+title strings and calls Ordinal_10150 twice; pure UI text, ordinals as hooks.
-struct C42C70{ const char* (*o10205)(uint8_t,I,U,U); void (*show)(const char*,U,I,I); };
+// 1.13c D2CLIENT+0x42C70
+// Two text draws: name (player+0xb9) at (0xbb,4), then title (Ordinal_10205) + name at (0x115|0x165,4,0).
+struct C42C70{ const char* (*o10205)(uint8_t,I,U,U); void (*show)(const char*,I,I,I); };
 void sub_42C70(G&g,const uint8_t* uidata,uint8_t b991c,I v9854,C42C70& c){
  const uint8_t* p=g.player; U f=*reinterpret_cast<const uint16_t*>(p+0x1eb);
+ const char* nm=reinterpret_cast<const char*>(p+0xb9);
+ c.show(nm,0xbb,4,0);
  U a=f&4, fl=f&0x20; I k;
  if(g.cc390==0){k=4+(fl!=0); if(!a)a=0;}
  else if(g.cc390==1){k=8+(fl!=0)*2; if(!a)a=0;}
  else if(g.cc390==2){k=12+(fl?3:0); if(!a)a=0;}
  else return;
  const char* s=c.o10205(b991c,k,a,fl); if(!s) return;
- c.show(s,0,v9854?0x165:0x115,4); (void)uidata; // first call (0xbb) shows name at p+0xb9
+ char buf[128+72]; std::size_t n=strnlen(s,127); std::memcpy(buf,s,n); strncpy(buf+n,nm,71); buf[n+71]=0; // ponytail: concat src inferred = name copy
+ c.show(buf,v9854?0x165:0x115,4,0); (void)uidata;
 }
-// 1.13c D2Client+0x431B0 : server-thread loop; REG? none. Threading/critsec left to platform; not ported.
 // 1.13c D2Client+0x43310 (REG?: ecx = key id passed to fae98c0)
 void sub_43310(G&g,U ecx){
  // scan 10-byte binding table [0x6fbca2e4, 0x6fbca75a): {u16 vk; i32 id@+2 (0x24); i32 mode@+6}
  const I N=(0x6fbca75a-0x6fbca2e4)/10;
  if(g.isKeyDef(ecx,0x24)){
   for(I i=0;i<N;++i){ const uint8_t*e=g.keyTab+i*10; if(I(rdu(e+2))==0x24&&I(rdu(e+6))==1){
-   U vk=e[0]|e[1]<<8; if(vk!=0xffff&&g.asyncKey(vk)<0){g.cc3f0=1;return;} break; } }
+   U vk=e[0]|e[1]<<8; if(vk!=0xffff&&GetAsyncKeyState(I(vk))<0){g.cc3f0=1;return;} break; } }
  }
  if(g.isKeyDef(ecx,0x24)){
   for(I i=0;i<N;++i){ const uint8_t*e=g.keyTab+i*10; if(I(rdu(e+2))==0x24&&I(rdu(e+6))==0){
-   U vk=e[0]|e[1]<<8; if(vk!=0xffff&&g.asyncKey(vk)<0){g.cc3f0=1;return;} break; }
+   U vk=e[0]|e[1]<<8; if(vk!=0xffff&&GetAsyncKeyState(I(vk))<0){g.cc3f0=1;return;} break; }
    if(i==N-1){g.cc3f0=0;return;} }
  }
  g.cc3f0=0;

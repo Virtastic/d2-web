@@ -6,14 +6,16 @@
 #include <cstdint>
 #include <cstring>
 
+extern "C" {
+extern uint8_t* (*d2win_glyph_lookup)(uint16_t);
+uint8_t* d2win_glyph_121d0(uint16_t);
+uint8_t* d2win_glyph_12150(uint16_t);
+}
 struct D2WinInit13110Env {
     int32_t (*getLanguage)();                          // Ordinal 10009
     uint8_t* dirName;                                  // 0x6F9014F4, 8 bytes
     uint8_t* flagLatin;                                // 0x6F9A9D12
     uint32_t* fontIdx;                                 // 0x6F8FFD38, 3C, 40
-    void** glyphDraw;                                  // 0x6F901508
-    void* drawLatin;                                   // LAB_6F8F21D0
-    void* drawOther;                                   // LAB_6F8F2150
     void** mainFont;                                   // 0x6F901524
     void** monsterFont;                                // 0x6F901628
     void (*sub12350)(int32_t);                         // builds the font path in the caller's buffer
@@ -36,7 +38,7 @@ void d2win_init_13110(D2WinInit13110Env* e) {
     e->fontIdx[0] = 0x10; e->fontIdx[1] = 0x11; e->fontIdx[2] = 3;
     const char* dir = "Latin\\";
     bool latinDraw = false;
-    if (lang < 6) { *e->glyphDraw = e->drawLatin; e->fontIdx[1] = 0x10; latinDraw = true; }
+    if (lang < 6) { d2win_glyph_lookup = d2win_glyph_121d0; e->fontIdx[1] = 0x10; latinDraw = true; }
     else {
         switch (lang) {
         case 6: e->fontIdx[0] = 0xe; e->fontIdx[1] = 0xf; e->fontIdx[2] = 5; dir = "JPN\\"; break;
@@ -44,10 +46,10 @@ void d2win_init_13110(D2WinInit13110Env* e) {
         case 8: case 9: e->fontIdx[0] = 0xe; e->fontIdx[1] = 0xe; e->fontIdx[2] = 2; dir = "CHI\\"; break;
         case 10: e->fontIdx[0] = 0xd; e->fontIdx[1] = 0xd; dir = "LATIN2\\"; break;
         case 0xb: dir = "CYR\\"; break;
-        case 0xc: *e->flagLatin = 1; dir = "LATIN\\"; *e->glyphDraw = e->drawLatin; latinDraw = true; break;
+        case 0xc: *e->flagLatin = 1; dir = "LATIN\\"; d2win_glyph_lookup = d2win_glyph_121d0; latinDraw = true; break;
         default: break;
         }
-        if (!latinDraw) *e->glyphDraw = e->drawOther;
+        if (!latinDraw) d2win_glyph_lookup = d2win_glyph_12150;
     }
     std::memcpy(e->dirName, dir, std::strlen(dir) + 1);
     if (!*e->mainFont) {

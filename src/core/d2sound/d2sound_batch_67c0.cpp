@@ -8,6 +8,7 @@
 // 0x8790, 0x8830, 0xACCC) are host seams -- the src/core/d2client/cursor_init_166c0.cpp pattern:
 // a function that reaches one takes a D2SoundEnv* AFTER its retail arguments, which keep their order.
 #include <cstdint>
+#include <initializer_list>
 #include <cstring>
 #include <cmath>
 #include <cstdlib>
@@ -64,6 +65,8 @@ struct D2SoundEnv {
     uint16_t (*attenuate)(float a, float b, float c);                         // 0x8830
     uint64_t (*mixValue)(void);                                               // 0xACCC
     int32_t (*storm258)(uint32_t h, uint32_t* a, uint8_t* b);                 // Storm.dll#258 (0x5F4A thunk)
+    void* (*loadFile)(void* name, int32_t* outSize);                          // 0x6360 (name = 0: the pending file)
+    void (*shutdownWorker)(void);                                             // Ordinal_256 + SetEvent/Wait/CloseHandle of the worker thread (0x65D0/0x65D4)
 };
 
 // 1.13c D2Sound+0x67C0
@@ -276,12 +279,12 @@ void D2Sound_8640(D2SoundNode** list, uint32_t value) {
 }
 
 // 1.13c D2Sound+0x87D0
-// The distance/pan curve: 1.0f above the 0.0f bound, 0.0f below -10000.0f, and pow(x * 0.0005f, 10.0)
+// The distance/pan curve: 1.0f above the 0.0f bound, 0.0f below -10000.0f, and pow(10.0, x * 0.0005f)
 // (0x9CF0's x87 fyl2x path) in between. Both bounds are fcomps compares, so NaN takes the pow branch.
 double D2Sound_87D0(float x) {
     if (g_c0978 < x + g_c097C) return (double)g_c0974;
     if (x - g_c097C < g_c0970) return (double)g_c0978;
-    return std::pow((double)(x * g_c0964), g_c0968);
+    return std::pow(g_c0968, (double)(x * g_c0964));  // 10^(x*0.0005): -10000..0 hundredths-dB -> 1e-5..1
 }
 
 // 1.13c D2Sound+0x8980
@@ -661,4 +664,133 @@ done:
     if (rd32(s, 0x40) == 0 && rd32(s, 0x18) <= rd32(s, 0x24)) wr32(s, 0x2C, 1);
     LeaveCriticalSection(&g_lock);
     return 1;
+}
+
+// ---- the 12 formerly STALLED rows: closest faithful bodies; DirectSound/COM objects are the retail
+// vtable-called interfaces held in the stream records, the worker thread/Ordinal_256 teardown is a host seam.
+static float   g_mixF;                 // scratch for the x87 stack hand-off
+static void*   g_com[5];               // 0x6F9C64B8, 0x6F9C6524, 0x6F9C6528, 0x6F9C652C, 0x6F9C658C (IDirectSound)
+static uint32_t g_flag6588, g_cs65a0;  // 0x6F9C6588, 0x6F9C65A0 (g_lock initialised)
+struct D2SoundWav { char name[0x50]; void* data; uint32_t size; uint32_t stereo; D2SoundWav* next; };   // Fog #10042, 0x8A bytes
+static D2SoundWav* g_wavList;          // 0x6F9C65BC
+
+static void com_release(void*& o) {
+    if (!o) return;
+    void** vt = *(void***)o;
+    ((void (*)(void*))vt[2])(o);
+    o = nullptr;
+}
+
+// 1.13c D2Sound+0x6CE0
+// Store the pan/attenuation float at +0x3c; in DS3D mode 2 (or flag bit 2, or value == 0) push the 1-x curve
+// into property 7 of the interface at +0x10.
+void D2Sound_6CE0(void* obj, float v, const D2SoundEnv* env) {
+    if (!obj) d2sound_fatal(0x345);
+    void* iface = rdptr(obj, 0x10);
+    std::memcpy((uint8_t*)obj + 0x3C, &v, 4);
+    if (iface && g_ds3d == 2 && ((rd8(obj, 0x34) & 4) || v == g_c0978)) {
+        env->attenuate(0.0f, 1.0f, g_c0974 - v);
+        float p = (float)env->mixValue();
+        static const uint8_t k_guid[16] = {0};   // ponytail: DAT_6f9c0208 is the DS property-set GUID; the host seam ignores it
+        void** vt = *(void***)iface;
+        ((int32_t (*)(void*, const void*, uint32_t, uint32_t, uint32_t, void*, uint32_t))vt[0x10 / 4])(iface, k_guid, 7, 0, 0, &p, 4);
+    }
+}
+
+// 1.13c D2Sound+0x6FA0
+// Destroy a stream record: stop it (0x6980), release its three COM objects (+0x10, +0xC, +0), zero the
+// 0x60-byte record, and unlink + free its node from the global list.
+void D2Sound_6FA0(void* obj, const D2SoundEnv* env) {
+    if (!obj) d2sound_fatal(0x211);
+    EnterCriticalSection(&g_lock);
+    D2Sound_6980(obj, env);
+    for (uint32_t off : {0x10u, 0xCu, 0u}) {
+        void* c = rdptr(obj, off);
+        if (c) { void** vt = *(void***)c; ((void (*)(void*))vt[2])(c); std::memset((uint8_t*)obj + off, 0, sizeof(void*)); }
+    }
+    std::memset(obj, 0, 0x60);
+    D2SoundNode* prev = nullptr;
+    for (D2SoundNode* n = (D2SoundNode*)g_list; n; prev = n, n = n->next) {
+        if ((uintptr_t)n->value != (uintptr_t)obj) continue;
+        if (g_list == n) g_list = n->next;
+        if (prev) prev->next = n->next;
+        std::free(n);
+        break;
+    }
+    LeaveCriticalSection(&g_lock);
+}
+
+// 1.13c D2Sound+0x8020
+// Stop every one of the 8 global streams (release the backing handle, interface method +0x48, clear +0x1C).
+void D2Sound_8020(const D2SoundEnv* env) {
+    if (!g_initialized) return;
+    for (int i = 0; i < 8; ++i) {
+        void* p = g_streams[i];
+        if (!p || !rd32(p, 0)) d2sound_fatal(0x292);
+        EnterCriticalSection(&g_lock);
+        if (rd32(p, 0x48)) env->releaseStream(p);
+        void* iface = rdptr(p, 0);
+        void** vt = *(void***)iface;
+        ((void (*)(void*))vt[0x48 / 4])(iface);
+        wr32(p, 0x1C, 0);
+        LeaveCriticalSection(&g_lock);
+    }
+}
+
+// 1.13c D2Sound+0x8320
+// Register a 22050 Hz WAV (loaded by 0x6360, parsed by 0x8980) under `name` at the head of the wave list.
+// `esiFlags` is the caller's ESI (high word == 2 marks stereo); the decompile drops it.
+void D2Sound_8320(const char* name, uint32_t esiFlags, const D2SoundEnv* env) {
+    if (!g_initialized) return;
+    int32_t size = 0;
+    int32_t* wav = (int32_t*)env->loadFile(nullptr, &size);
+    if (!wav) return;
+    uint32_t len = (uint32_t)size;
+    uint16_t fmt[9];
+    D2Sound_8980(wav, &len, fmt, env);
+    int32_t rate; std::memcpy(&rate, (uint8_t*)fmt + 4, 4);
+    if (rate != 0x5622) return;
+    D2SoundWav* w = (D2SoundWav*)std::calloc(1, sizeof(D2SoundWav));
+    w->next = g_wavList; g_wavList = w;
+    w->data = wav; w->size = (uint32_t)size;
+    w->stereo = (uint16_t)(esiFlags >> 16) == 2;
+    std::strncpy(w->name, name, sizeof w->name - 1);
+}
+
+// 1.13c D2Sound+0x8B50
+// Distance + pan -> (left, right) 0..255 gains. d = |(x,y,z)|; d < 2 -> 0 dB gain index, else 6*log2(min(d,100)/2) dB
+// -> 255 / 10^(dB/20); right = 0.8*127*pan + 128.
+void D2Sound_8B50(int32_t* left, int32_t* right, float x, float y, float z) {
+    double d = std::sqrt((double)z * z + (double)y * y + (double)x * x);
+    float v;
+    if (d <= 100.0) { if (d < 2.0) v = 0.0f; else v = (float)(6.0 * std::log2(d * 0.5)); }
+    else v = (float)(6.0 * std::log2(100.0 * 0.5));
+    double g = 255.0 / std::pow(10.0, (double)(v * 0.05f));
+    int64_t l = std::llrint(g);
+    int32_t L = l < 1 ? 0 : l > 0xFE ? 0xFF : (int32_t)l;
+    int64_t r = std::llrint((double)(x * 127.0f * 0.8f + 128.0f));
+    *left = L;
+    *right = r > 0 ? (r > 0xFE ? 0xFF : (int32_t)r) : 0;
+}
+
+// 1.13c D2Sound+0x9230
+// Shutdown (ordinal 10031): drop master volume and re-apply every list entry's volume, destroy the primary
+// stream, join the worker thread, release the COM objects, delete the lock.
+void D2Sound_9230(const D2SoundEnv* env) {
+    g_flag6588 = 0;
+    if (g_com[4] && g_masterVolume) {
+        EnterCriticalSection(&g_lock);
+        g_masterVolume = 0;
+        for (D2SoundNode* n = (D2SoundNode*)g_list; n; n = n->next) {
+            void* p = (void*)(uintptr_t)n->value;
+            if (!p) d2sound_fatal(0x2E4);
+            env->setVolume(p, rd32(p, 0x38));
+        }
+        LeaveCriticalSection(&g_lock);
+    }
+    if (g_primary) { D2Sound_6FA0(g_primary, env); g_primary = nullptr; }
+    env->shutdownWorker();
+    for (int i = 0; i < 5; ++i) com_release(g_com[i]);
+    g_soundOn = 0;
+    if (g_cs65a0) { DeleteCriticalSection(&g_lock); g_cs65a0 = 0; }
 }

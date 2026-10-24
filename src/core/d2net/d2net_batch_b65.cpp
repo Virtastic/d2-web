@@ -80,6 +80,4 @@ bool crt_init_cs(Crt& c, void* cs, int spin) { return c.init_cs(cs, spin); }
 // 1.13c D2Net+0x292C  FUN_6fbf292c (runtime-error message writer; Win32 output is the hook)
 void rterr_write(Crt& c, int msg) { c.write_msg(msg); }
 
-// 1.13c D2Net+0x1A8C  __SEH_prolog: compiler SEH frame glue, no portable body.
-// 1.13c D2Net+0x1AC7  __SEH_epilog: likewise.
 }  // namespace d2net_b65

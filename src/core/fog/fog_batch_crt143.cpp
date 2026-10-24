@@ -41,6 +41,7 @@ extern "C" void fog_sub_bd61(const FogStrtodEnv* e, void* dbl, const uint8_t* s)
     e->sub_c2be(ld12, &t, s, 0, 0, 0, 0);
     e->ld12tod(ld12, dbl);
 }
+// 1.13c Fog+0xbda6
 extern "C" void fog_sub_bda6(const FogStrtodEnv* e, void* dbl, const uint8_t* s) { fog_sub_bd61(e, dbl, s); }
 
 // float formatters: bf1c = _fltout-style (fills strflt: sign at [0], decpt at [1]), fptostr, cftof2/cftoe2

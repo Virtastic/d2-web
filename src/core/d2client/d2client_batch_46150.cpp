@@ -13,14 +13,25 @@ struct Env {
  Unit* (*at)(uint32_t);  // address -> Unit
  void (*fatal)();        // Ordinal_10265(0x5a)+Ordinal_10024+_exit(-1)
 };
-// 1.13c D2Client+0x46150
-Unit* sub_46150(Env& e) {
- if (!e.g9721) return nullptr;
- for (uint32_t a = e.buckets[e.g971d & 0x7f]; a;) {
-  Unit* u = e.at(a);
-  if ((uint32_t)u->id == e.g971d) { if (u->type == 1) return u; e.fatal(); }
-  a = u->next;
+}
+// 1.13c D2Client+0x46150 ; globals are explicit params: g9721=DAT_6fbc9721, g971d=DAT_6fbc971d,
+// hash=DAT_6fbba808[128] (links), at=link->unit (null = links are raw pointers), fatal=no-return path.
+extern "C" uint32_t* d2_client_46150(uint8_t g9721, uint32_t g971d, const uintptr_t* hash,
+                                     uint32_t* (*at)(uintptr_t), void (*fatal)()) {
+ if (!g9721) return nullptr;
+ for (uintptr_t a = hash[g971d & 0x7f]; a;) {
+  uint32_t* u = at ? at(a) : reinterpret_cast<uint32_t*>(a);
+  if (u[3] == g971d) { if (u[0] == 1) return u; fatal(); }
+  a = u[0x39];
  }
  return nullptr;
+}
+namespace d2client_b46150 {
+// old seam wrapper
+Unit* sub_46150(Env& e) {
+ uintptr_t h[0x80]; for (int i = 0; i < 0x80; ++i) h[i] = e.buckets[i];
+ static Unit* (*sat)(uint32_t); sat = e.at;
+ return reinterpret_cast<Unit*>(d2_client_46150(e.g9721, e.g971d, h,
+   [](uintptr_t a) { return reinterpret_cast<uint32_t*>(sat((uint32_t)a)); }, e.fatal));
 }
 }

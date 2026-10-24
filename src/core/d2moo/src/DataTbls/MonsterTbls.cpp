@@ -969,6 +969,7 @@ int __fastcall DATATBLS_ApplyRatio(signed int nValue, signed int nMultiplier, si
 }
 
 //D2Common.0x6FD68DC0 (#10658)
+// 1.13c D2Common+0x53480
 D2TCExShortStrc* __stdcall DATATBLS_GetTreasureClassExRecordFromName(char* szText)
 {
 	int nId = FOG_GetRowFromTxt(sgptDataTables->pTreasureClassExLinker, szText, 0);

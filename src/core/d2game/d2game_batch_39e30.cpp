@@ -17,6 +17,24 @@
 // 1.10f crosswalk: D2MOO SKILLS/SkillItem.cpp potion handlers + MONSTER/MonsterSpawn (prior art).
 #include <cstdint>
 #include <cstring>
+#include "MISSILES/MissMode.h"
+#include "MONSTER/MonsterRegion.h"
+#include "D2Monsters.h"
+#include "D2StatList.h"
+#include "D2Inventory.h"
+
+void __fastcall MISSMODE_ResetGuidedFlight(D2UnitStrc* pMissile, D2UnitStrc* pTarget);   // 1.13c D2Game+0x397C0
+
+int32_t __stdcall STATLIST_GetTotalStatValue(D2StatListStrc* pStatList, int nStatId, uint16_t nLayer);   // 1.13c D2Common+0x38BD0
+
+// 1.13c D2Common+0x38B70 (#10973), stdcall (unit, stat, layer) -- ret 0xC (the cached decompile drops the layer; the disassembly
+// pushes the word at [esp+0x18] into the key). null unit / stat list -> 0; stat bounds + row + the total (FullStats when the list is
+// an Ex list, min-clamped) are STATLIST_GetTotalStatValue, which is the 0x38A80 body keyed (stat << 16) + layer.
+static int32_t D2Common_38B70_GetUnitStat(D2UnitStrc* pUnit, int32_t nStatId, uint16_t nLayer)
+{
+    if (!pUnit || !pUnit->pStatListEx) return 0;
+    return STATLIST_GetTotalStatValue(pUnit->pStatListEx, nStatId, nLayer);
+}
 
 static inline uint16_t rd16(const void* p, uint32_t o) { uint16_t v; std::memcpy(&v, (const uint8_t*)p + o, 2); return v; }
 static inline uint32_t rd32(const void* p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
@@ -67,8 +85,34 @@ struct D2GameBatchFEnv {
     void     (*spawnA24C0)(void* owner, void* pGame, void* r, int32_t val2, int32_t val1, void* arg2, int32_t z, int32_t k, int32_t one);
 };
 
-// Default env is inert (the alpha lane ships no vector): every seam is null.
-static const D2GameBatchFEnv g_batchFEnv{};
+// Default env: the seams whose callee is a DEFINED typed function in src/ are direct calls (D2Common ordinal ->
+// function list d2common.tsv ordinal column). Seams left null have no usable definition yet (gaps, per function):
+//   getUnit/getOwner 0xE03A0/0xE0A20 (no decompile of 0xE0A20 cached), randMod 0x11D0, mulDiv, rangedStat 0x39B40 (arg order),
+//   ord10567/10297/10533/10346/10689 (env/probe-ABI definitions),
+//   ord10494 (probe), ord10867/10750 (probes), spawnA0000/spawnA0F40/spawnA24C0, setDamageFlags (4-arg typed vs 5-arg seam), addToField.
+// UNITS_GetX/YPosition is the typed form of the 0x1100/0x1130 accessor.
+static const D2GameBatchFEnv g_batchFEnv = [] {
+    D2GameBatchFEnv e{};
+    e.dataTables = []() -> const void* { return sgptDataTables; };
+    e.unitX = [](void* u) -> uint32_t { return (uint32_t)UNITS_GetXPosition((D2UnitStrc*)u); };
+    e.unitY = [](void* u) -> uint32_t { return (uint32_t)UNITS_GetYPosition((D2UnitStrc*)u); };
+    e.getStat = [](void* u, int32_t s, int32_t l) -> int32_t { return D2Common_38B70_GetUnitStat((D2UnitStrc*)u, s, (uint16_t)l); };
+    e.setStat = [](void* u, int32_t s, int32_t v, int32_t l) { STATLIST_SetUnitStat((D2UnitStrc*)u, s, v, (uint16_t)l); };
+    e.maxHp = [](void* u) -> int32_t { return STATLIST_GetMaxLifeFromUnit((D2UnitStrc*)u); };
+    e.ord10240 = [](void* u) -> int32_t { return MISSILE_GetSkill((D2UnitStrc*)u); };
+    e.ord11029 = [](void* u) -> int32_t { return (int32_t)MISSILE_GetLevel((D2UnitStrc*)u); };
+    e.ord10331 = [](void* u) -> void* { return UNITS_GetRoom((D2UnitStrc*)u); };
+    e.ord11104 = [](void* u) -> int32_t { return MONSTERS_GetHirelingTypeId((D2UnitStrc*)u); };
+    e.ord10637 = [](void* m, int32_t v) { MISSILE_SetTargetX((D2UnitStrc*)m, v); };
+    e.ord10239 = [](void* u) -> int32_t { return MONSTERS_IsUndead((D2UnitStrc*)u); };
+    e.ord10255 = [](void* u) -> int32_t { return MONSTERS_IsDemon((D2UnitStrc*)u); };
+    e.ord10557 = [](uint32_t id) -> uint8_t { return MISSILE_GetElemTypeFromMissileId((int)id); };
+    e.ord11018 = [](void* u) -> uint32_t { return (uint32_t)MISSILE_GetTargetX((D2UnitStrc*)u); };
+    e.resetGuidedFlight = [](void* m, void* t) { MISSMODE_ResetGuidedFlight((D2UnitStrc*)m, (D2UnitStrc*)t); };
+    e.spawnPreset = [](void* room, int32_t cls, void* g, uint32_t x, uint32_t y, int32_t n) {
+        D2GAME_SpawnPresetMonster_6FC66560((D2GameStrc*)g, (D2ActiveRoomStrc*)room, cls, (int32_t)x, (int32_t)y, n); };
+    return e;
+}();
 
 // sgptDataTables record accessors: +0xB64/+0xB6C monsters (0x1A4), +0xB98/+0xBA0 (0x23C), +0xA80 count.
 static const void* MonRec(const D2GameBatchFEnv* e, int32_t i)
@@ -130,7 +174,7 @@ int32_t D2Game_39F70(void* pGame, void* unit, void* target, const D2GameBatchFEn
     return 2;
 }
 
-// 1.13c D2Game+0x3A1D0
+// 1.13c D2GAME+0x3A1D0
 // (ecx=pGame, ebx=unit) void
 void D2Game_3A1D0(void* pGame, void* unit, const D2GameBatchFEnv* e = &g_batchFEnv)
 {
@@ -338,4 +382,88 @@ int32_t D2Game_42AD0(void* pGame, void* unit, const D2Game42AD0Env* e)
     void* r = e->roomAt(room, x, y);
     if (!r) return 0;
     return e->roomBlocked(r) == 0;
+}
+
+// function probe seam (src/core/fn/d2game_3a280.cpp): the five callees replaced by recorders. cfg dwords: type, ranged, demon, undead, stat0..3
+// (stat returns consumed in call order, last repeats); lg is the hook log (count, then 10 words per call: rva, eax, ecx, edx, ebx, esi, s0..s3).
+static const uint32_t* g_p3a_cfg; static uint32_t* g_p3a_lg; static uint32_t g_p3a_n;
+static void p3a_log(uint32_t rva, uint32_t ecx, uint32_t eax, uint32_t s0, uint32_t s1, uint32_t s2)
+{
+    uint32_t* w = g_p3a_lg + 1 + g_p3a_lg[0]++ * 10;
+    w[0] = rva; w[1] = eax; w[2] = ecx; w[3] = w[4] = w[5] = 0; w[6] = s0; w[7] = s1; w[8] = s2; w[9] = 0;
+}
+int32_t D2Game_3A280_probe(void* rec, void* unit, void* target, const uint32_t* cfg, uint32_t* lg)
+{
+    g_p3a_cfg = cfg; g_p3a_lg = lg; g_p3a_n = 0; lg[0] = 0;
+    D2GameBatchFEnv e{};
+    e.ord10557 = [](uint32_t c) -> uint8_t { p3a_log(0xB25E, 0, 0, c, 0, 0); return (uint8_t)g_p3a_cfg[0]; };
+    e.ord10255 = [](void* p) -> int32_t { p3a_log(0xA814, 0, 0, (uint32_t)(uintptr_t)p, 0, 0); return (int32_t)g_p3a_cfg[2]; };
+    e.ord10239 = [](void* p) -> int32_t { p3a_log(0xA508, 0, 0, (uint32_t)(uintptr_t)p, 0, 0); return (int32_t)g_p3a_cfg[3]; };
+    e.getStat = [](void* u, int32_t s, int32_t l) -> int32_t {
+        p3a_log(0xA42A, 0, 0, (uint32_t)(uintptr_t)u, (uint32_t)s, (uint32_t)l);
+        return (int32_t)g_p3a_cfg[4 + (g_p3a_n < 3 ? g_p3a_n++ : 3)];
+    };
+    e.rangedStat = [](int32_t b, int32_t a, void* u, int32_t s) -> int32_t {
+        p3a_log(0x39B40, (uint32_t)b, (uint32_t)a, (uint32_t)(uintptr_t)u, (uint32_t)s, 0);
+        return (int32_t)g_p3a_cfg[1];
+    };
+    return D2Game_3A280(rec, unit, target, &e);
+}
+
+// function probe seam (src/core/fn/d2game_3bda0.cpp): the seven callees replaced by recorders. cfg dwords (unit+0x100): owner, v1 (#10750), v2 (#10867), room (#10331).
+// lg is the hook log: count, then 10 words per call (rva, eax, ecx, edx, ebx, esi, s0..s3).
+static const uint32_t* g_p3b_cfg; static uint32_t* g_p3b_lg; static void* g_p3b_game;
+static void p3b_log(uint32_t rva, uint32_t eax, uint32_t ecx, uint32_t edx, uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3)
+{
+    uint32_t* w = g_p3b_lg + 1 + g_p3b_lg[0]++ * 10;
+    w[0] = rva; w[1] = eax; w[2] = ecx; w[3] = edx; w[4] = w[5] = 0; w[6] = s0; w[7] = s1; w[8] = s2; w[9] = s3;
+}
+static inline uint32_t p32(const void* p) { return (uint32_t)(uintptr_t)p; }
+void D2Game_3BDA0_probe(void* unit, void* pGame, void* arg2, uint32_t* lg)
+{
+    g_p3b_cfg = (const uint32_t*)((uint8_t*)unit + 0x100); g_p3b_lg = lg; g_p3b_game = pGame; lg[0] = 0;
+    D2GameBatchFEnv e{};
+    e.ord10637 = [](void* u, int32_t v) { p3b_log(0xA50E, 0, 0, 0, p32(u), (uint32_t)v, 0, 0); };
+    e.getUnit = [](void* g, uint32_t guid, uint32_t type) -> void* {
+        p3b_log(0xE03A0, type, p32(g), guid, 0, 0, 0, 0); return (void*)(uintptr_t)g_p3b_cfg[0]; };
+    e.ord10750 = [](void* p) -> int32_t { p3b_log(0xA3B8, 0, 0, 0, p32(p), 0, 0, 0); return (int32_t)g_p3b_cfg[1]; };
+    e.ord10867 = [](void* p) -> int32_t { p3b_log(0xA454, 0, 0, 0, p32(p), 0, 0, 0); return (int32_t)g_p3b_cfg[2]; };
+    e.ord10331 = [](void* u) -> void* { p3b_log(0xA478, 0, 0, 0, p32(u), 0, 0, 0); return (void*)(uintptr_t)g_p3b_cfg[3]; };
+    e.spawnA24C0 = [](void* o, void* g, void* r, int32_t v2, int32_t v1, void*, int32_t, int32_t, int32_t) {
+        p3b_log(0xA24C0, p32(o), 0, 0, p32(g), p32(r), (uint32_t)v2, (uint32_t)v1); };
+    e.ord10346 = [](void* r, int32_t v) { p3b_log(0xA51A, 0, 0, 0, p32(r), (uint32_t)v, 0, 0); };
+    D2Game_3BDA0(unit, pGame, arg2, &e);
+}
+
+// function probe seam (src/core/fn/d2game_3aff0.cpp): the four callees replaced by recorders; lg as for 3A280. cfg: hireling id, then 2 stat returns in call order.
+static const uint32_t* g_p3f_cfg; static uint32_t g_p3f_n;
+int32_t D2Game_3AFF0_probe(void* eax, void* ebx, void* esi, void* ecx, void* edx, const uint32_t* cfg, uint32_t* lg)
+{
+    g_p3f_cfg = cfg; g_p3f_n = 0; g_p3a_lg = lg; lg[0] = 0;
+    D2GameBatchFEnv e{};
+    e.setDamageFlags = [](void* c, void* d, void* a, void* b, void* s) {
+        const uint32_t A = (uint32_t)(uintptr_t)a, B = (uint32_t)(uintptr_t)b, S = (uint32_t)(uintptr_t)s;
+        p3a_log(0x3AE10, (uint32_t)(uintptr_t)c, A, A, B, S);   // stack words = eax, ebx, esi
+        uint32_t* w = g_p3a_lg + 1 + (g_p3a_lg[0] - 1) * 10; w[3] = (uint32_t)(uintptr_t)d; w[4] = B; w[5] = S;
+    };
+    e.ord11104 = [](void* u) -> int32_t { p3a_log(0xA7F6, 0, 0, (uint32_t)(uintptr_t)u, 0, 0); return (int32_t)g_p3f_cfg[0]; };
+    e.getStat = [](void* u, int32_t s, int32_t l) -> int32_t { p3a_log(0xA42A, 0, 0, (uint32_t)(uintptr_t)u, (uint32_t)s, (uint32_t)l); return (int32_t)g_p3f_cfg[1 + (g_p3f_n < 1 ? g_p3f_n++ : 1)]; };
+    e.setStat = [](void* u, int32_t s, int32_t v, int32_t l) { p3a_log(0xA472, 0, 0, (uint32_t)(uintptr_t)u, (uint32_t)s, (uint32_t)v); (void)l; };
+    D2Game_3AFF0(ecx, edx, eax, ebx, esi, &e);
+    return 0;
+}
+
+// function probe seam (src/core/fn/d2game_3a1d0.cpp): the five callees replaced by recorders (p3b_log shape). cfg dwords (unit+0x40): owner, room.
+// #10750/#10867 return the descriptor's scripted values read back off the owner's record (+0x10 / +0xC), as the vector stores them there.
+void D2Game_3A1D0_probe(void* unit, void* pGame, uint32_t* lg)
+{
+    g_p3b_cfg = (const uint32_t*)((uint8_t*)unit + 0x40); g_p3b_lg = lg; lg[0] = 0;
+    D2GameBatchFEnv e{};
+    e.getUnit = [](void* g, uint32_t guid, uint32_t type) -> void* {
+        p3b_log(0xE03A0, type, p32(g), guid, 0, 0, 0, 0); return (void*)(uintptr_t)g_p3b_cfg[0]; };
+    e.ord10750 = [](void* p) -> int32_t { p3b_log(0xA3B8, 0, 0, 0, p32(p), 0, 0, 0); return (int32_t)rd32(p, 0x10); };
+    e.ord10867 = [](void* p) -> int32_t { p3b_log(0xA454, 0, 0, 0, p32(p), 0, 0, 0); return (int32_t)rd32(p, 0xC); };
+    e.ord10331 = [](void* u) -> void* { p3b_log(0xA478, 0, 0, 0, p32(u), 0, 0, 0); return (void*)(uintptr_t)g_p3b_cfg[1]; };
+    e.ord10533 = [](void* s, void* u, void* r, int32_t v2, int32_t) { p3b_log(0xA6CA, 0, 0, 0, p32(s), p32(u), p32(r), (uint32_t)v2); };
+    D2Game_3A1D0(pGame, unit, &e);
 }

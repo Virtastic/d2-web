@@ -24,8 +24,8 @@ void* g_45390;              // 0x6FC45390
 uint8_t g_45a3c[12], g_45a64[12]; // 0x6FC45A3C / 0x6FC45A64 lists, count at +8
 void* g_45a50; uint8_t g_45a4c[8], g_45a48[12]; // 0x6FC45A50/4C/48 provider list
 
-void* Storm_Sub1C580(uint32_t n, const char* f, int line, int fl) { (void)f; (void)line; (void)fl; return calloc(1, n); } // SMemAlloc
-void Storm_Sub1B960(void* p, const char* f, int line) { (void)f; (void)line; free(p); }                                   // SMemFree
+extern "C" void* Storm_Sub1C580(uint32_t n, const char* f, int line, uint32_t fl);
+extern "C" int32_t Storm_Sub1B960(void* p, const char* f, int line);
 void Storm_Sub4DA0(void* list);                                   // list clear
 void Storm_Sub11630();                                            // pop one entry of the list in EDX/ESI
 int32_t Storm_SubFEB0(int32_t idx);                               // slot lookup
