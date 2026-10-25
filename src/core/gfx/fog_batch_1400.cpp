@@ -345,9 +345,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_fog_17d0(uint32_t* r) {
 }
 
 // 1.13c Fog+0x184D
-EMSCRIPTEN_KEEPALIVE void d2_fn_fog_184d(uint32_t* r) {
-    r[4] = fog_tolower_mt(reinterpret_cast<const FogCrtLocale*>(static_cast<uintptr_t>(r[0])), r[1]);
-}
+EMSCRIPTEN_KEEPALIVE uint32_t d2_eng_fog_184d(const FogCrtLocale* l, uint32_t c) { return fog_tolower_mt(l, c); }
 
 // 1.13c Fog+0x1915
 EMSCRIPTEN_KEEPALIVE void d2_fn_fog_1915(uint32_t* r) {
@@ -355,9 +353,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_fog_1915(uint32_t* r) {
 }
 
 // 1.13c Fog+0x1937
-EMSCRIPTEN_KEEPALIVE void d2_fn_fog_1937(uint32_t* r) {
-    r[4] = fog_toupper_mt(reinterpret_cast<const FogCrtLocale*>(static_cast<uintptr_t>(r[0])), r[1]);
-}
+EMSCRIPTEN_KEEPALIVE uint32_t d2_eng_fog_1937(const FogCrtLocale* l, uint32_t c) { return fog_toupper_mt(l, c); }
 
 // 1.13c Fog+0x1A00
 EMSCRIPTEN_KEEPALIVE void d2_fn_fog_1a00(uint32_t* r) {

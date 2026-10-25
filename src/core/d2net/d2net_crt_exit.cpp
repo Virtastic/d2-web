@@ -9,10 +9,15 @@ struct D2NetExit {
     void (*termPre)();  void (*termPost)();  // initterm(6fbfa020), initterm(6fbfa028)
     void (*flush)();             // FUN_6fbf14b0
     void (*terminate)(unsigned); // TerminateProcess(self, code)
+    void (*corExit)(unsigned);   // CorExitProcess via GetModuleHandle/GetProcAddress, null if absent
     void (*exitProcess)(unsigned); // 1.13c D2Net+0x133D target
 };
-// 1.13c D2Net+0x133D: ___crtExitProcess(code) -> ExitProcess(code); no return.
-extern "C" void d2net_crt_exit_process_133d(unsigned code, void (*exitProcess)(unsigned)) { exitProcess(code); }
+// 1.13c D2Net+0x133D: ___crtExitProcess(code): if mscoree.dll is loaded and exports CorExitProcess, call it
+// (corExit == null models either missing); then ExitProcess(code); no return.
+extern "C" void d2net_crt_exit_process_133d(unsigned code, void (*exitProcess)(unsigned), void (*corExit)(unsigned) = nullptr) {
+    if (corExit) corExit(code);
+    exitProcess(code);
+}
 // 1.13c D2Net+0x1401: _doexit(code, quick, retain)
 extern "C" void d2net_doexit_1401(D2NetExit* s, unsigned code, int quick, int retain) {
     s->lock8();
@@ -24,7 +29,7 @@ extern "C" void d2net_doexit_1401(D2NetExit* s, unsigned code, int quick, int re
     s->flush();
     if (retain) return;
     s->exiting = 1;
-    d2net_crt_exit_process_133d(code, s->exitProcess);
+    d2net_crt_exit_process_133d(code, s->exitProcess, s->corExit);
 }
 // 1.13c D2Net+0x14C4: _exit(code) = _doexit(code, 0, 0)
 extern "C" void d2net_exit_14c4(D2NetExit* s, int code) { d2net_doexit_1401(s, (unsigned)code, 0, 0); }

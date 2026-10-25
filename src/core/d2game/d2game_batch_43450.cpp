@@ -66,6 +66,24 @@ struct D2GameBatch43450Env {
     void     (*fFDDE0)(int v, void* a, void* b);          // 0xDDDE0
     void     (*fFED30)(void* a, void* b, void* c);        // 0xDED30
     void     (*f648E0)(void* a, void* b, uint32_t cb, void* c); // 0x448E0
+    void     (*fCC11B0)(int skillId, void* game, void* unit, void* target, uint32_t* blk, int z); // 0xA11B0, seam: block is the 0x70-byte local
+    void     (*fFD450)(void* game, void* unit, void* target, uint32_t* blk, int z, uint8_t srcDam); // 0xDD450
+    void     (*f214D0)(int v, void* game);               // 0x14D0
+    // 0x45CE0 / 0x46560 seams (ordinals whose arg order is taken from the decompile)
+    uint32_t (*o10511)(void* unit);                       // used-skill frame / flags
+    int      (*o10601)();                                 // skill id from ambient skill reg
+    void     (*f21180)(void* p);                          // 0x1180 on unit+0x20
+    uint32_t (*f21c20)();                                 // 0x1C20
+    void     (*fAE900)(int v);                            // 0x8E900
+    void     (*o10188)(void* it, int stat, int val, int layer);
+    void     (*o10243)(int a, int b);
+    uint32_t (*o10786r)(void* unit, uint32_t calc, uint32_t a, uint32_t b); // formula eval, returns value
+    int      (*fBEE50)(int z, int* out, void* unit, int z2, int skillId, uint32_t lvl); // 0xFBEE50
+    int      (*fBFA30)(void* game, int* out);             // 0xBFA30
+    int*     (*fC3610)(void* game);                       // 0xC3610
+    void     (*fD0FE40)(void* game);                      // 0x10FE40
+    void     (*f6E2A0)(void* n, uint32_t calc, int* p, uint32_t q); // 0x6E2A0
+    void     (*f6F970)(uint32_t calc, void* unit, int* p, int id, uint32_t q); // 0x6F970
     uint32_t bitMask4;                                    // gdwBitMasks[4]
     // 0x4A030 globals
     int      clientsInit;                                 // DAT_6fd31c18
@@ -292,6 +310,68 @@ uint32_t sub_45EE0(D2GameBatch43450Env& e, uint8_t* game, uint32_t, int* unit, i
     return 1;
 }
 
+// 1.13c D2Game+0x45CE0   (ECX=game, EDX=unit, stack=skillId)
+uint32_t sub_45CE0(D2GameBatch43450Env& e, uint8_t* game, int* unit, int skillId) {
+    const uint8_t* t = e.dataTables;
+    if (skillId < 0 || skillId >= (int)rd32(t, 0xba0)) return 0;
+    const uint8_t* sk = (const uint8_t*)(uintptr_t)rd32(t, 0xb98) + (uint32_t)skillId * 0x23c;
+    if (!sk) return 0;
+    int16_t s = rds16(sk, 0x80);
+    if (s < 0 || s >= (int)rd32(t, 0xc4)) return 0;
+    uint32_t when = e.o10511(unit);
+    if (!when) return 0;
+    if (e.o10601() != skillId) return 0;
+    if (unit) unit[0x31] |= 0x40;
+    e.f21180(unit + 8);
+    uint32_t calc = rd32(sk, 0x60);
+    e.o10786(unit, calc, (uint32_t)skillId);  // result unused (decompile discards it)
+    void* it = e.o10871(unit, s);
+    if (!it) {
+        int id = unit ? unit[3] : -1, ty = unit ? unit[0] : 6;
+        it = e.o11013(rd32(game, 0x1c), 2, 0x48b, (uint32_t)ty, (uint32_t)id);
+        if (!it) return 0;
+        e.o10785(it, rds16(sk, 0x80));
+        e.o10911(it);
+        e.o10807(unit, it, 1);
+        e.o10945(unit, rds16(sk, 0x80), 1);
+    }
+    e.o11043(it, 0x48b);
+    e.fAEA80(game, unit, 0xc, when, 0, 0, 0);
+    e.f648E0(unit, it, 0x6fcbf7a0, (void*)"..\\Source\\D2Game\\SKILLS\\SkillDruid.cpp");
+    e.o10188(it, 0x15e, skillId, 0);
+    e.o10188(it, 0x15f, (int)calc, 0);
+    uint32_t base = e.f21c20() + rd32((uint8_t*)it, 0xa8);
+    e.fAE900(5);
+    e.fAEA80(it, unit, 5, base, 0, skillId, 0x48b);
+    e.o10243(skillId, 0x15e);
+    return 1;
+}
+
+// 1.13c D2Game+0x46560   (ECX=game, EDX=unit, stack=skillId, lvl)
+uint32_t sub_46560(D2GameBatch43450Env& e, uint8_t* game, int* unit, int skillId, uint32_t lvl) {
+    const uint8_t* t = e.dataTables;
+    if (skillId < 0 || skillId >= (int)rd32(t, 0xba0)) return 0;
+    const uint8_t* sk = (const uint8_t*)(uintptr_t)rd32(t, 0xb98) + (uint32_t)skillId * 0x23c;
+    if (!sk) return 0;
+    int out30[1], out2c[2];
+    int id = e.fBEE50(0, out30, unit, 0, skillId, lvl);
+    if (id < 0) return 0;
+    int8_t k = (int8_t)sk[0xbe];
+    if (k < 0 || k >= (int)rd32(t, 0xbf0)) return 0;
+    if (unit) unit[0x31] |= 0x40;
+    if (!e.fBFA30(game, out2c)) return 0;
+    uint32_t calc = rd32(sk, 0xc0);
+    e.o10786r(unit, calc, (uint32_t)skillId, lvl);
+    int* p = e.fC3610(game);
+    if (!p) return 0;
+    e.fD0FE40(game);
+    int n = (int)e.o10786r(unit, rd32(sk, 0x13c), 0, (uint32_t)k);
+    if (n < 1) n = 1;
+    e.f6E2A0((void*)(intptr_t)n, calc, p, (uint32_t)k);
+    e.f6F970(calc, unit, p, id, (uint32_t)k);
+    return 1;
+}
+
 // 1.13c D2Game+0x463A0   (EAX=unit, ESI=count, EDI=skillId)
 uint32_t sub_463A0(D2GameBatch43450Env& e, uint8_t* game, uint32_t* p2, int off, int* unit, int count, int skillId) {
     if (count < 1) return 0;
@@ -309,4 +389,54 @@ int CLIENTS_GetExpansionClientCount(D2GameBatch43450Env& e) {
             if (rd8(c, 10) & 0x20) ++n;
     e.leaveCS();
     return n;
+}
+
+// 1.13c D2Game+0x44ED0   (ECX=game, EDX=unit, param_3=skillId; FireClaws-style melee strike; returns 1 handled)
+int sub_44ED0(D2GameBatch43450Env& e, void* game, void* unit, int skillId) {
+    const uint8_t* t = e.dataTables;
+    if (skillId < 0 || skillId >= (int)rd32(t, 0xba0)) return 0;
+    const uint8_t* rec = (const uint8_t*)(uintptr_t)(rd32(t, 0xb98) + (uint32_t)skillId * 0x23c);
+    if (!rec) return 0;
+    e.fD007A0(game);
+    void* tgt = e.o10392(rd32(unit, 0x2c));
+    if (tgt == unit || !tgt) return 0;
+    uint32_t b[0x1c] = {};
+    e.fCC11B0(skillId, game, unit, tgt, b, 0);
+    if (b[1] & 1) {                       // byte at +4 of the block (local_70)
+        b[0] |= 2 | rd32(rec, 0x130);
+        if (rd32(rec, 0x134)) b[0x1c - 1 - 0] = rd32(rec, 0x134);
+        e.o10786(unit, rd32(rec, 0x138), 0);   // seam: Ordinal 10786 level arg ambient
+        e.fFD450(game, unit, tgt, b, 0, rd8(rec, 0x1a5));
+        e.fBF210();
+        e.fFDDE0(0x80, game, tgt);
+    }
+    return 1;
+}
+
+// 1.13c D2Game+0x45000   (ECX=game, EDX=unit, param_3=skillId; Hunger: strike + life/mana leech)
+int sub_45000(D2GameBatch43450Env& e, void* game, void* unit, int skillId) {
+    const uint8_t* t = e.dataTables;
+    if (skillId < 0 || skillId >= (int)rd32(t, 0xba0)) return 0;
+    const uint8_t* rec = (const uint8_t*)(uintptr_t)(rd32(t, 0xb98) + (uint32_t)skillId * 0x23c);
+    if (!rec) return 0;
+    e.fD007A0(game);
+    void* tgt = e.o10392(rd32(unit, 0x2c));
+    if (tgt == unit || !tgt) return 0;
+    wr32(unit, 0xc4, rd32(unit, 0xc4) | 0x40);
+    uint32_t b[0x1c] = {};
+    e.fCC11B0(skillId, game, unit, tgt, b, 0);
+    if (b[1] & 1) {
+        b[0] |= 2 | rd32(rec, 0x130);
+        b[1] = (b[1] & 0xffff0000u) | ((b[1] | rd32(rec, 0x12e)) & 0xffff);
+        if (rd32(rec, 0x134)) b[0x1c - 1 - 0] = rd32(rec, 0x134);
+        e.fFD450(game, unit, tgt, b, 0, rd8(rec, 0x1a5));
+        e.fBF210();
+        e.o10786(unit, rd32(rec, 0x138), 0);
+        e.f214D0(100, game);
+        e.o10786(unit, rd32(rec, 0x13c), 0);
+        e.o10786(unit, rd32(rec, 0x140), 0);
+        e.fFDDE0(0x80, game, unit);
+        e.fFED30(game, tgt, unit);
+    }
+    return 1;
 }

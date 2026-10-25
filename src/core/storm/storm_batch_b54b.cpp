@@ -42,7 +42,7 @@ unsigned long Storm_strtoul_6851(const char* s, char** end, int radix) {
     bool neg = *q == '-';
     unsigned long long v = strtoull(s, end, radix);
     unsigned long long m = neg ? 0 - v : v;
-    if (m > 0xFFFFFFFFull) return 0xFFFFFFFFul;
+    if (m > 0xFFFFFFFFull) return neg ? 1ul : 0xFFFFFFFFul;   // CRT: overflow -> ULONG_MAX, then negated
     return (uint32_t)v;
 }
 

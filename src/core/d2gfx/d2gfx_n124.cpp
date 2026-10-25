@@ -14,6 +14,7 @@ struct D2GfxTable {                       // renderer interface table; fastcall 
 static D2GfxTable* g_table;               // +0x11268 DAT_6fa91268
 static uint32_t g_hinst, g_wndproc, g_mode, g_arg4, g_pal_arg;  // +0x11250 +0x11254 +0x11258 +0x1125C +0x11260
 static uint32_t g_hasPalette;             // +0x1D66C DAT_6fa9d66c
+static uint32_t g_94778;                  // +0x14778 DAT_6fa94778, cleared by sub_B580
 static uint32_t g_be0, g_be4;             // +0x10BE0 +0x10BE4
 static uint8_t  g_pal78[1];               // +0x11278 palette block
 
@@ -63,6 +64,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2gfx_sub_b580(uint32_t hInst, uint32_t 
                         e->stockBrush(5), 0, 0x6fa90c38u };
     if (!e->registerClass(wc)) { e->sub_7aa0(e->getLastError()); return 0; }
     e->sub_9dc0();
+    g_94778 = 0;
     e->atexit_b360();
     g_mode = mode; g_arg4 = arg4;
     if (!e->sub_b400(mode)) return 0;

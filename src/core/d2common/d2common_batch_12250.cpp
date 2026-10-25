@@ -126,7 +126,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_7ba00(uint32_t text,
  return 1;
 }
 // 1.13c D2Common+0x241A0: item data signature and unit type gate.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_241a0(uint32_t unit) {
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_241A0_ItemDataGate(uint32_t unit) {
  if (!unit) return 0;
  uint32_t data=w(unit,0x60); return data && w(data,0)==0x1020304 && w(data,0xC) && w(w(data,0xC),0)==4;
 }

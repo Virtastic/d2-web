@@ -92,8 +92,8 @@ EMSCRIPTEN_KEEPALIVE void d2game_ff_msgbanner_6b54(const uint32_t* table) {
 
 // 1.13c D2Game+0x07460 (_strlen): the decompile's word-at-a-time scan is the C string length.
 extern "C"
-EMSCRIPTEN_KEEPALIVE size_t d2_fn_d2game_7460(const char* s) {
-    return std::strlen(s);
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_7460(uint32_t* r) {
+    r[4] = (uint32_t)std::strlen(reinterpret_cast<const char*>((uintptr_t)r[0]));
 }
 
 // 1.13c D2Game+0x0751c (__security_check_cookie): fastcall, the expected cookie in ECX. A mismatch

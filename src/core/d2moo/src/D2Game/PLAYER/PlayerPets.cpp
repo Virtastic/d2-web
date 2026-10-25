@@ -309,6 +309,7 @@ void __fastcall PLAYERPETS_RemovePetFromList(D2GameStrc* pGame, D2PetListStrc* p
 }
 
 //D2Game.0x6FC7D470
+// 1.13c D2Game+0x98120
 void __fastcall sub_6FC7D470(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pPet)
 {
     D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);

@@ -29,7 +29,7 @@ extern "C" void d2gfx_lock_8(N121Host* h) { h->lock(8); }
 // 1.13c D2GFX+0x014F7
 extern "C" void d2gfx_unlock(N121Host* h, int n);
 extern "C" void d2gfx_doexit_tail(N121Host* h, uint32_t retcaller) {
-    if (retcaller == 0) d2gfx_unlock(h, 8);   // retail: cmp [ebp+0x10],edi(0); je skip
+    if (retcaller != 0) d2gfx_unlock(h, 8);   // retail: cmp [ebp+0x10],edi(0); je skip
 }
 
 // 1.13c D2GFX+0x0166E

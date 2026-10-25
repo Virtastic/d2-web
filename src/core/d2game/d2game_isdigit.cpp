@@ -3,7 +3,8 @@
 #include <cstdint>
 
 // 1.13c D2Game+0xA056 (_isdigit)
-int d2_fn_d2game_a056(int c)
+int D2Game_IsDigit(int c)
 {
     return (c >= '0' && c <= '9') ? 4 : 0;
 }
+int d2_fn_d2game_a056(int c) { return D2Game_IsDigit(c); }

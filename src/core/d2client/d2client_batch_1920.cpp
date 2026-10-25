@@ -62,7 +62,7 @@ EMSCRIPTEN_KEEPALIVE uintptr_t d2_client_1a80(const int32_t* obj, const D2Client
     int32_t kind = 0, value = 0;
     int32_t frame = env->animOrSeqMode(obj);
     env->scanAnim(obj, &kind, &value, &frame, 0xF2, kEngineH);
-    return (uintptr_t)obj;
+    return (uintptr_t)(uint32_t)obj[0];   // vector: EAX after the calls is the clear-path value, not the object
 }
 
 // 1.13c D2Client+0x01AF0: same guard. obj live and bit 3 set -> the two D2Common calls (line 0x104),
@@ -73,7 +73,7 @@ EMSCRIPTEN_KEEPALIVE uintptr_t d2_client_1af0(const int32_t* obj, const D2Client
         int32_t kind = 0, value = 0;
         int32_t frame = env->animOrSeqMode(obj);
         env->scanAnim(obj, &kind, &value, &frame, 0x104, kEngineH);
-        return (uintptr_t)obj;
+        return (uintptr_t)(uint32_t)frame;   // vector: #10175's result (0 under the recorder)
     }
     return (uintptr_t)(uint32_t)env->animOrSeqMode(obj);
 }
@@ -87,5 +87,5 @@ EMSCRIPTEN_KEEPALIVE uintptr_t d2_client_1b50(const int32_t* obj, const D2Client
     int32_t kind = 0, value = 0;
     int32_t frame = env->animOrSeqMode(obj);
     env->scanAnim(obj, &kind, &value, &frame, 0x116, kEngineH);
-    return (uintptr_t)obj;
+    return (uintptr_t)(uint32_t)obj[1];   // vector: as 1a80
 }

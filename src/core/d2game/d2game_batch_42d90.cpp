@@ -18,7 +18,7 @@ struct D2Game42D90Env {
 };
 
 // param_1 = game, param_2 = unit, param_3 = missile id; stk8/stk4 = Ghidra's uStack_8/uStack_4
-// (caller registers copied into request words 0xF and 0xE).
+// (caller registers copied into request words 0xB and 0xC).
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_42D90(void* game, void* unit, int32_t id, uint32_t stk8, uint32_t stk4, const D2Game42D90Env* env) {   // 1.13c D2Game+0x42D90
     const uint8_t* dt = env->dataTables;
     if (id < 0 || id >= (int32_t)rd32(dt, 0xBA0)) return 0;
@@ -33,6 +33,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_42D90(void* game, void* un
     if (!target || env->ord10080(unit, 0, target) >= 0x65) return 0;
     uint32_t req[0x17] = {};
     req[0] = 1; req[1] = (uint32_t)(uintptr_t)unit; req[2] = (uint32_t)(uintptr_t)game;
-    req[6] = target; req[0xE] = stk8; req[0xF] = stk4;
+    req[6] = target; req[0xB] = stk8; req[0xC] = stk4;
     return env->fn6F930(0, req) ? 1 : 0;
 }

@@ -20,3 +20,4 @@ extern "C" uint32_t d2gfx_sub_b2e0(uint32_t v) { return g_be4 = 3 < g_renderer_m
 extern "C" uint32_t d2gfx_sub_b330() { return g_windowed; }        // 1.13c D2Gfx+0x0B330 (+0x1125C)
 extern "C" void d2gfx_save(uint32_t* s) { s[0] = g_be0; s[1] = g_be4; }  // probes restore shared state
 extern "C" void d2gfx_restore(const uint32_t* s) { g_be0 = s[0]; g_be4 = s[1]; }
+extern "C" uint32_t* d2gfx_flag_slot(int i) { return i ? &g_be0 : &g_bf4; }  // probe access: 0=+0x10BF4, 1=+0x10BE0

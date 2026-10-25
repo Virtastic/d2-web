@@ -3,7 +3,7 @@
 #include <cstdint>
 
 // 1.13c D2Lang+0x026E0 ___ascii_stricmp: ASCII case-fold compare, returns -1/0/1.
-extern "C" int d2_fn_d2lang_26e0(const char* a, const char* b)
+extern "C" int d2lang_26e0(const char* a, const char* b)
 {
 	for (;;)
 	{

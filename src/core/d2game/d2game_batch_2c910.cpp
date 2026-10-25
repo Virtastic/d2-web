@@ -455,8 +455,8 @@ int64_t d2game_alldiv(uint32_t dividendLow, uint32_t dividendHigh,
         for (;;) {
             const uint32_t nextD = d >> 1;
             c = (c >> 1) | (uint32_t)((d & 1) != 0) << 31;
-            b = (b >> 1) | (uint32_t)((a & 1) != 0) << 31;
-            a >>= 1;
+            a = (a >> 1) | (uint32_t)((b & 1) != 0) << 31;
+            b >>= 1;
             d = nextD;
             if (d == 0) break;
         }

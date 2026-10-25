@@ -307,7 +307,7 @@ EMSCRIPTEN_KEEPALIVE void D2Common_SetUnitActRecord_37920(uint32_t pUnit, uint32
 // set and a 0x23290 code other than 'leg ' ('gel ' little-endian word 0x2067656C) is rejected.
 // The remaining test chains 0x241A0, 0x24610 and 0x26080; the answer is whether 0x26080 returns
 // zero. The decompile's leftover EDX is modelled as 0.
-extern "C" uint32_t d2_fn_d2common_241a0(uint32_t);
+extern "C" uint32_t D2Common_241A0_ItemDataGate(uint32_t);
 extern "C"
 EMSCRIPTEN_KEEPALIVE bool D2Common_26AD0_ItemAcceptable(int32_t* pUnit)
 {
@@ -329,7 +329,7 @@ EMSCRIPTEN_KEEPALIVE bool D2Common_26AD0_ItemAcceptable(int32_t* pUnit)
 
 		const bool bNoOwnerFlag = pUnit[0] != 4 || !pFlags || (nFlags & 0x100u) == 0;
 		const bool bNoChainFlag = true;   // decompile's leftover EDX != 4; EDX is modelled as 0
-		if (bNoOwnerFlag && d2_fn_d2common_241a0(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pUnit))) == 0 && bNoChainFlag &&
+		if (bNoOwnerFlag && D2Common_241A0_ItemDataGate(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pUnit))) == 0 && bNoChainFlag &&
 		    g_d2common_fn_24610 && static_cast<uint8_t>(g_d2common_fn_24610(pUnit)) != 0)
 		{
 			return D2Common_26080_ItemOpStatTotal(pUnit) == 0;

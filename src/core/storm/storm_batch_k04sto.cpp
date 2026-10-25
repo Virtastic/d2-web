@@ -10,9 +10,9 @@ extern "C" {
 void     Storm_Sub1C30(void* rec);                                              // 0x1C30
 void     Storm_Sub1C20(void* arr);                                              // 0x2C20
 void     Storm_Sub2D80(void* rec);                                              // 0x2D80
-void     Storm_Sub1EB0(uint32_t a, uint32_t b);                                 // 0x1EB0
-void     Storm_Sub1F30(uint32_t a);                                             // 0x1F30
-void     Storm_Sub1FC0(void);                                                   // 0x1FC0
+void     Storm_Sub1EB0(uint32_t* a, uintptr_t count, const uint8_t* src);       // 0x1EB0
+void     Storm_Sub1F30(uint32_t* a, uint32_t count, const uint32_t* src);       // 0x1F30
+extern "C" void Storm_Sub1FC0(void) {}  // 1.13c Storm+0x1FC0: body not recovered yet (GUESS: no-op); the 3270 FN vector judges it
 void*    Storm_Sub1C580(uint32_t size, const char* src, int32_t line, uint32_t f);   // 0x1C580 SMemAlloc
 void*    Storm_Sub1C760(void* p, uint32_t size, const char* src, int32_t line, uint32_t f); // 0x1C760 SMemReAlloc
 int32_t  Storm_Sub1B960(void* p, const char* src, int32_t line);                // 0x1B960 SMemFree
@@ -103,15 +103,25 @@ extern "C" void* Storm_Sub30D0(uint8_t* d, uint8_t* s) {
 // 1.13c Storm+0x3190
 extern "C" void* Storm_Sub3190(uint32_t* p, uint8_t* src) {
     p[0] = 0; p[1] = 0; p[2] = 0;
-    Storm_Sub1EB0(*w(src, 4), *w(src, 8));
+    Storm_Sub1EB0(p, *w(src, 4), (const uint8_t*)(uintptr_t)*w(src, 8));
     p[3] = *w(src, 0xc);
     return p;
+}
+
+// 1.13c Storm+0x1F30: set a 0x10-byte-element (AURECTF) array {alloc,count,data} to `count` copies of src.
+extern "C" void Storm_Sub1F30(uint32_t* a, uint32_t count, const uint32_t* src) {
+    a[0] = count;
+    if (a[2] || count) {
+        a[2] = (uint32_t)(uintptr_t)Storm_Sub1C760((void*)(uintptr_t)a[2], count << 4, "AURECTF", -2, 0);
+        if (count) memcpy((void*)(uintptr_t)a[2], src, count << 4);
+    }
+    a[1] = count;
 }
 
 // 1.13c Storm+0x3200
 extern "C" void* Storm_Sub3200(uint32_t* p, uint8_t* src) {
     p[0] = 0; p[1] = 0; p[2] = 0;
-    Storm_Sub1F30(*w(src, 8));
+    Storm_Sub1F30(p, *w(src, 4), (const uint32_t*)(uintptr_t)*w(src, 8));
     p[3] = *w(src, 0xc);
     return p;
 }

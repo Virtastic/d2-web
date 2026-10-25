@@ -1,5 +1,5 @@
 // D2Net.dll MSVC 2003 CRT: small-block heap group/resize, multibyte codepage tables, lconv/time frees.
-// 0x3C7E 0x3347 0x3376 0x339F 0x353A 0x36CE 0x381E 0x3D84 0x4570 0x4B13 0x4CA3 0x4D02 had no cached
+// 0x3347 0x3376 0x339F 0x353A 0x36CE 0x381E 0x3D84 0x4570 0x4B13 0x4CA3 0x4D02 had no cached
 // decompile; written to the VS2003 CRT shape with Win32 services as Host seams, to be re-checked later.
 #include <cstdint>
 #include <cstring>
@@ -21,18 +21,6 @@ struct State {
   uint32_t mbcodepage, mbulinfo[6], mbcsflag;
   uint8_t sbcs_ext[256];
 };
-
-struct SbhGroup { uint32_t cntEntries; struct { void *prev, *next; } head[64]; uint8_t tags[64]; };
-struct SbhRegion { int32_t indGroupUse; char cntRegionSize[64]; SbhGroup grp[8]; };
-
-// 1.13c D2NET+0x03C7E
-SbhGroup* sbh_alloc_new_group(SbhRegion* r, int idx) {
-  SbhGroup* g = &r->grp[idx];
-  g->cntEntries = 0;
-  for (int i = 0; i < 64; ++i) g->head[i].prev = g->head[i].next = &g->head[i];
-  std::memset(g->tags, 0, sizeof g->tags);
-  return g;
-}
 
 // 1.13c D2NET+0x03347
 uint32_t getmbcp(const State& s) { return s.mbcodepage; }

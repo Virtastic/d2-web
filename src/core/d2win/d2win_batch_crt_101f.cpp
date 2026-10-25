@@ -39,5 +39,5 @@ EMSCRIPTEN_KEEPALIVE int d2win_sub_1694(const char* a, const char* b) {
         if (x >= 'A' && x <= 'Z') x += 32;
         if (y >= 'A' && y <= 'Z') y += 32;
     } while (x && x == y);
-    return x - y;
+    return x < y ? -1 : x > y;   // retail CRT returns -1/0/1
 }

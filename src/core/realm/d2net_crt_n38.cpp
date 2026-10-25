@@ -243,6 +243,7 @@ char* crt_get_environment_strings(const char* host_block) {
 
 // 1.13c D2Net+0x2679  ___heap_select
 int heap_select(const CrtState& s) { return (s.winplatform == 2 && s.winmajor > 4) ? 1 : 3; }
+int heap_select_probe(int platform, int major) { CrtState s; s.winplatform = platform; s.winmajor = major; return heap_select(s); }  // FN probe seam
 
 // 1.13c D2Net+0x2693  __heap_init: HeapCreate is the wasm allocator (always present); sbh seam picks mode
 int heap_init(CrtState& s, int (*sbh_heap_init)(int)) {

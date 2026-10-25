@@ -64,8 +64,8 @@ struct D2CommonBatch87080Env {
 // exactly one operand was negative. A zero divisor reaches integer division by zero in retail and
 // raises the processor's divide-error exception; preserve that trap in the wasm implementation.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint64_t d2_fn_d2common_87080(uint32_t nDividendLow, uint32_t nDividendHigh,
-                                                   uint32_t nDivisorLow, uint32_t nDivisorHigh)
+EMSCRIPTEN_KEEPALIVE uint64_t D2Common_87080_Alldiv(uint32_t nDividendLow, uint32_t nDividendHigh,
+                                                    uint32_t nDivisorLow, uint32_t nDivisorHigh)
 {
 	const uint64_t nDividend = (static_cast<uint64_t>(nDividendHigh) << 32) | nDividendLow;
 	const uint64_t nDivisor  = (static_cast<uint64_t>(nDivisorHigh) << 32) | nDivisorLow;

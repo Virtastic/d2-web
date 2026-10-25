@@ -21,7 +21,7 @@ static uint32_t d2game_atol_ascii_isctype(uint32_t c) {
 // 1.13c D2Game+0x09B28: obtain the current thread locale, skip bytes whose ctype entry has bit 8
 // (using ___isctype_mt for shared locale data), consume one optional sign, then wrap decimal
 // accumulation in the retail 32-bit long. Parsing stops at the first non-digit; no digits yields 0.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_9B28(const char* str, const D2GameAtolEnv* env) {
+extern "C" int32_t D2Game_Atol(const char* str, const D2GameAtolEnv* env) {
     const uint8_t* p = reinterpret_cast<const uint8_t*>(str);
     for (;;) {
         const uint32_t c = *p;
@@ -48,3 +48,4 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_9B28(const char* str, const
     if (negative) value = 0u - value;
     return static_cast<int32_t>(value);
 }
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_9B28(const char* str, const D2GameAtolEnv* env) { return D2Game_Atol(str, env); }

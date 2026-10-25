@@ -103,10 +103,6 @@ void* d2_client_21ed0(D2Client21d60Env* e, int32_t x, int32_t y, void* room) {
     }
     return nullptr;
 }
-// 1.13c D2Client+0x21FB0
-void d2_client_21fb0(D2Client21d60Env* e, void* object, uint32_t value) {
-    require(e, object, 0xcf2); write(object, 0x84, value);
-}
 // 1.13c D2Client+0x22010
 void d2_client_22010(D2Client21d60Env* e, void* object, uint32_t value) {
     require(e, object, 0xcdc); write(object, 0x80, value);
@@ -122,12 +118,6 @@ void d2_client_22070(D2Client21d60Env* e, void* object, uint32_t value) {
 // 1.13c D2Client+0x220A0
 uint32_t d2_client_220a0(D2Client21d60Env* e, const void* object) {
     require(e, object, 0xcbb); return read<uint32_t>(object, 0x7c);
-}
-// 1.13c D2Client+0x221C0
-uint32_t d2_client_221c0(D2Client21d60Env* e, const void* object, uint32_t mode) {
-    require(e, object, 0xc08);
-    mode &= 15;
-    return mode >= 1 && mode <= 9 ? 0x18e : (mode == 10 || mode == 11 ? 0x191 : 0);
 }
 // 1.13c D2Client+0x22280
 uint32_t d2_client_22280(D2Client21d60Env* e, const void* object, uint32_t mode) {

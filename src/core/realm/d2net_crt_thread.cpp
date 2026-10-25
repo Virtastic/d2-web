@@ -95,7 +95,7 @@ void d2net_freefls(uint32_t td, const D2NetFreeFlsEnv* e) {
         --*r;
         for (uint32_t o : {0x2Cu, 0x34u, 0x30u, 0x40u})
             if (uint32_t q = *(uint32_t*)vp(l + o)) --*(int32_t*)vp(q);
-        if (uint32_t q = *(uint32_t*)vp(l + 0x4C)) --*(int32_t*)vp(q + 0xB4);
+        --*(int32_t*)vp(*(uint32_t*)vp(l + 0x4C) + 0xB4);
         if (l != e->default_locale_b && l != e->static_locale && *r == 0) e->free_locale(l);
     }
     e->unlock(0xC);

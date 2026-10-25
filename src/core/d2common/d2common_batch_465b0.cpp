@@ -4,7 +4,7 @@
 #include <emscripten.h>
 
 extern "C" {
-void d2_fn_d2common_1180(uint32_t* r);
+void D2Common_1180_RollRange(uint32_t* r);
 
 // 1.13c D2Common+0x465B0: if EAX == param_1 return param_1. Otherwise roll nMin..nMax on a seed
 // chosen by param_2: kind 4 uses the seed at (param_2[5] + 4) (null link -> null seed, which
@@ -26,7 +26,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_465b0(uint32_t* r)
 	uint32_t a[5] = { pSeed, r[3], r[0], 0, 0 };
 	if (pSeed == 0)
 		__builtin_trap(); // retail faults on the null seed pointer
-	d2_fn_d2common_1180(a);
+	D2Common_1180_RollRange(a);
 	r[4] = a[4];
 }
 }

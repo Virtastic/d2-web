@@ -35,7 +35,7 @@ extern "C" void d2_fn_d2lang_11c6(uint32_t val, char* buf, uint32_t radix, int n
 }
 
 // 1.13c D2Lang+0x01204 _itoa: negative sign only for radix 10 and value < 0.
-extern "C" char* d2_fn_d2lang_1204(int32_t value, char* dest, int32_t radix)
+extern "C" char* d2lang_1204(int32_t value, char* dest, int32_t radix)
 {
 	d2_fn_d2lang_11c6(static_cast<uint32_t>(value), dest, static_cast<uint32_t>(radix), radix == 10 && value < 0);
 	return dest;

@@ -64,7 +64,7 @@ struct D2GameBatch17Env {
 // base without advancing the state; otherwise one LCG step (state = lo*0x6AC690C5 + hi, both halves
 // stored back) and the result is base plus lo % count, or base plus (count-1 & lo) when count is a
 // power of two.
-int32_t d2_fn_d2game_1480(uint32_t* seed, int32_t count, int32_t base)
+int32_t d2game_roll_1480(uint32_t* seed, int32_t count, int32_t base)
 {
     if (count < 1) return base;
     const uint64_t v = (uint64_t)seed[0] * 0x6AC690C5u + seed[1];

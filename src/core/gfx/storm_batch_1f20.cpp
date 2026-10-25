@@ -529,13 +529,13 @@ extern "C" void Storm_Sub1DF0(StormFixedArray* a) { if (a->data) StormFree(a->da
 extern "C" void Storm_Sub1E40(StormFixedArray* a) { if (a->data) StormFree(a->data); }
 
 // 1.13c Storm+0x1EB0: set a 0x1C-byte-element fixed array to `count` copies of src[0..count).
-extern "C" void Storm_Sub1EB0(StormFixedArray* a, uintptr_t count, const uint8_t* src) {
-    a->alloc = count;
-    if (a->data || count) {
-        a->data = StormRealloc(a->data, count * 0x1c);
-        if (count) std::memcpy(a->data, src, count * 0x1c);
+extern "C" void Storm_Sub1EB0(uint32_t* a, uintptr_t count, const uint8_t* src) {   // retail 32-bit words {alloc, count, data}, not StormFixedArray's native fields
+    a[0] = (uint32_t)count;
+    if (a[2] || count) {
+        a[2] = (uint32_t)(uintptr_t)StormRealloc((void*)(uintptr_t)a[2], count * 0x1c);
+        if (count) std::memcpy((void*)(uintptr_t)a[2], src, count * 0x1c);
     }
-    a->count = count;
+    a[1] = (uint32_t)count;
 }
 
 // 1.13c Storm+0x24B0: chunk dtor (SEH wrapper over 0x2740).

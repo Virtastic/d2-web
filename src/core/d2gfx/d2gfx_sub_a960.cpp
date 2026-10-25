@@ -18,7 +18,7 @@ struct D2GfxA960State {
 };
 
 struct D2GfxA960Ops {  // the four callees, injected; args as retail passes them
-    void (*plain)(uint8_t* dst);                                          // +0x9620
+    void (*plain)(uint8_t* dst, uint32_t sh);                            // +0x9620 (sh is its stack word)
     void (*lightFast)(uint8_t* dst, const uint8_t* cell);                 // +0x95C0
     void (*shade)(uint8_t* dst, const uint8_t* cell, int32_t x, int32_t y, uint32_t sh);  // +0xA760
     void (*gouraud)(int32_t y, const uint8_t* cell, int32_t x, uint8_t* dst);             // +0xA5D0
@@ -59,7 +59,7 @@ extern "C" void d2gfx_sub_a960(int32_t count, const uint8_t* cells, int32_t px, 
         if (outside) {
             if (shade) ops->shade(dst, c, x, y, sh);
             else ops->gouraud(y, c, x, dst);
-        } else if (shade) ops->plain(dst);
+        } else if (shade) ops->plain(dst, sh);
         else ops->lightFast(dst, c);
     }
 }

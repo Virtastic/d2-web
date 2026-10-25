@@ -31,6 +31,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_unlock8_cond_1173(int32_t frame_arg,
 
 // 1.13c D2MCPClient+0x01198
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_exit_1198(int code) { d2_mcp_doexit((uint32_t)code, 1, 0); }
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_exit_1198_seam(int code, void (*doexit)(uint32_t, uint32_t, uint32_t)) { doexit((uint32_t)code, 1, 0); }
 
 // 1.13c D2MCPClient+0x0141D
 // error_mode/app_type (0xAA34/0xAA38) and the banner/message writers are host seams; then __exit(0xFF).

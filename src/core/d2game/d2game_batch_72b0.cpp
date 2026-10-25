@@ -17,7 +17,7 @@ struct D2GameBatch72B0Env {
 // 0x7EFEFEFF trick says no zero byte is inside; once one is, store the 1/2/3/4 bytes it covers and stop.
 // 1.13c D2Game+0x072B0
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint8_t* d2_fn_d2game_72b0(uint8_t* dst, const uint8_t* src) {
+EMSCRIPTEN_KEEPALIVE uint8_t* d2game_strcpy_72b0(uint8_t* dst, const uint8_t* src) {
     uint8_t* d = dst;
     while (((uintptr_t)src & 3) != 0) {
         uint8_t b = *src++;

@@ -124,7 +124,7 @@ extern "C" void d2_fn_d2common_44b20(D2DrlgOrthStrc** head, D2DrlgOrthStrc* node
 struct D2CommonPlacement13c { int32_t x, y, width, height, direction; };
 static_assert(offsetof(D2CommonPlacement13c, direction) == 0x10);
 // 1.13c D2Common+0x13F30
-extern "C" void d2_fn_d2common_13f30(const int32_t* origin, int32_t direction,
+extern "C" void D2Common_13F30_Placement(const int32_t* origin, int32_t direction,
     D2CommonPlacement13c* out, int32_t width, int32_t height)
 {
     int32_t dx = 0, dy = 0;

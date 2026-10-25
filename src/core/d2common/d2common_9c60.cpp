@@ -19,6 +19,6 @@ void D2Common_9C60_SetPops(D2DrlgMapStrc* pMap, int32_t nCount)
 		p[2] = maxX - minX + 1;
 		p[3] = maxY - minY + 1;
 		const int32_t v = pMap->pPopsIndex[i];
-		pMap->pPopsIndex[i] = (v + ((v >> 31) & 3)) / 4 - 1;
+		pMap->pPopsIndex[i] = v / 4 - 1;   // signed divide, truncating (the decompile's (v + ((v>>31)&3)) >> 2 is that divide)
 	}
 }

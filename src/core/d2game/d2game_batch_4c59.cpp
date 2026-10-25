@@ -120,7 +120,8 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_37b10(void* self, void* pGame, uint32_t n
 // 1.13c D2Game+0x49DB0
 // Client act getter: the client arrives in EAX (explicit here); a null client is the 0x7CB fatal.
 // Returns the act byte the client is currently in (+0x1AC).
-EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2game_49db0(void* pClient)
+extern "C"
+EMSCRIPTEN_KEEPALIVE uint8_t d2game_49db0(void* pClient)
 {
     if (pClient == nullptr) d2game_fatal(0x7CB);
     return rd8(pClient, 0x1AC);

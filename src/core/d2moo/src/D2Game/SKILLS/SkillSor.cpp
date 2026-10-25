@@ -174,6 +174,7 @@ int32_t __fastcall SKILLS_StartInferno(D2GameStrc* pGame, D2UnitStrc* pUnit, int
 }
 
 //D2Game.0x6FD15AB0
+// 1.13c D2Game+0x44550
 int32_t __fastcall SKILLS_SrvSt11_Inferno_ArcticBlast(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -276,6 +277,7 @@ void __fastcall SKILLS_MissileInit_ChargedBolt(D2UnitStrc* pMissile, int32_t a2)
 }
 
 //D2Game.0x6FD15EB0
+// 1.13c D2Game+0x43B60
 int32_t __fastcall SKILLS_SrvDo017_ChargedBolt_BoltSentry(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (pUnit)
@@ -435,6 +437,7 @@ int32_t __fastcall SKILLS_SrvDo020_StaticField(D2GameStrc* pGame, D2UnitStrc* pU
 	return 1;
 }
 
+// 1.13c D2Game+0x42EC0 (delta vs 1.10f: the negative-resist damage rescale is gone; the first sub_6FD11E40 outputs are unused)
 //D2Game.0x6FD163E0
 int32_t __fastcall SKILLS_AuraCallback_StaticField(D2AuraCallbackStrc* pAuraCallback, D2UnitStrc* pDefender)
 {
@@ -471,15 +474,6 @@ int32_t __fastcall SKILLS_AuraCallback_StaticField(D2AuraCallbackStrc* pAuraCall
     int32_t nStatId = -1;
     int32_t nElementalType = pStaticFieldCallbackArg->nElementalType;
     sub_6FD11E40(pAuraCallback->pOwner, &damage, nElementalType, nDamage, pStaticFieldCallbackArg->nElementalLength, &nStatId, &nElementalType);
-
-    if (nStatId >= 0)
-    {
-        const int32_t nValue = STATLIST_UnitGetStatValue(pDefender, nStatId, 0);
-        if (nValue < 0)
-        {
-            nDamage = MONSTERUNIQUE_CalculatePercentage(100, nDamage, 100 - nValue);
-        }
-    }
 
     memset(&damage, 0, sizeof(damage));
     sub_6FD11E40(pAuraCallback->pOwner, &damage, nElementalType, nDamage, pStaticFieldCallbackArg->nElementalLength, nullptr, nullptr);
@@ -1222,7 +1216,7 @@ int32_t __fastcall SKILLS_EventFunc01_ChillingArmor(D2GameStrc* pGame, int32_t n
     return 1;
 }
 
-//D2Game.0x6FD180E0
+//D2Game.0x6FD180E0 -- 1.13c D2Game+0x42C70
 int32_t __fastcall SKILLS_EventFunc02_FrozenArmor(D2GameStrc* pGame, int32_t nEvent, D2UnitStrc* pAttacker, D2UnitStrc* pUnit, D2DamageStrc* pDamage, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (!pAttacker || !pUnit || (pUnit->dwUnitType != UNIT_PLAYER && pUnit->dwUnitType != UNIT_MONSTER) || (pDamage && pDamage->dwPhysDamage <= 0))
@@ -1255,6 +1249,7 @@ int32_t __fastcall SKILLS_EventFunc02_FrozenArmor(D2GameStrc* pGame, int32_t nEv
 }
 
 //D2Game.0x6FD18200
+// 1.13c D2Game+0x42B40 -- matches the 1.13c decompile: type gate (player/monster), skills record bounds, zeroed 0x70-byte damage, hit class |= 0xD, result flags 0x4021, events + missile damage, then overlay (record+0x110) if in range
 int32_t __fastcall SKILLS_EventFunc03_ShiverArmor(D2GameStrc* pGame, int32_t nEvent, D2UnitStrc* pAttacker, D2UnitStrc* pUnit, D2DamageStrc* pDamage, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (!pAttacker || !pUnit || (pUnit->dwUnitType != UNIT_PLAYER && pUnit->dwUnitType != UNIT_MONSTER))

@@ -103,7 +103,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2GAME_GetClientCreateTime(void* unit) {
 // 1.13c D2Game+0x49BF0
 // unit arrived in EAX. A null unit is a Fog assertion (id 0x8A4); otherwise the byte at +0x08.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2game_49bf0(void* unit) {
+EMSCRIPTEN_KEEPALIVE uint8_t d2game_49bf0(void* unit) {
     if (unit == nullptr) d2game_fatal(0x8A4);
     return rd8(unit, 0x08);
 }
@@ -323,8 +323,9 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_537d0(uint8_t* dest, void* pInventory,
 // destination inside [source, source+size) copies backwards), i.e. it is overlap-safe and returns the
 // destination. std::memmove is exactly that rule.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_5380(void* dst, const void* src, uint32_t size) {
-    return std::memmove(dst, src, (size_t)size);
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_5380(uint32_t* r) {
+    r[4] = (uint32_t)(uintptr_t)std::memmove(reinterpret_cast<void*>((uintptr_t)r[0]),
+                                            reinterpret_cast<const void*>((uintptr_t)r[1]), (size_t)r[2]);
 }
 
 // 1.13c D2Game+0x5924 (__flush): a writable stream (_flag & 3 == 2) with buffered bytes or a force flag

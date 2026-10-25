@@ -7,7 +7,7 @@
 // Retail takes the byte sign-extended (its char is signed); the fold keeps the accumulator at 28
 // bits. nMod is the table's hash-table size and is never 0 for a loaded table -- a 0 divides by
 // zero exactly as retail's idiv does. TODO(spec): caller contract for nMod = 0 (0x9360 caller).
-extern "C" uint32_t d2_fn_d2lang_8fe0(const char* pszString, uint32_t nMod)
+extern "C" uint32_t d2lang_8fe0(const char* pszString, uint32_t nMod)
 {
 	uint32_t nHash = 0;
 	while (*pszString != '\0')

@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 
-extern "C" uint32_t d2_fn_d2lang_8fe0(const char* s, uint32_t mod);
+extern "C" uint32_t d2lang_8fe0(const char* s, uint32_t mod);
 
 static uint16_t rd16(const uint8_t* p) { uint16_t v; memcpy(&v, p, 2); return v; }
 static uint32_t rd32(const uint8_t* p) { uint32_t v; memcpy(&v, p, 4); return v; }
@@ -28,7 +28,7 @@ extern "C" uint32_t d2lang_9050_lookup(const uint8_t* tbl, uint16_t id, const ui
 extern "C" uint32_t d2lang_9360_find(const uint8_t* tbl, const uint32_t* cache, const uint8_t* key, uint32_t* out)
 {
     const uint8_t* nodes = tbl + 0x15 + (uint32_t)rd16(tbl + 2) * 2;
-    uint32_t count = rd32(tbl + 4), used = rd32(tbl + 0xd), i = d2_fn_d2lang_8fe0((const char*)key, count);
+    uint32_t count = rd32(tbl + 4), used = rd32(tbl + 0xd), i = d2lang_8fe0((const char*)key, count);
     for (uint32_t n = 0; n < used; n++) {
         const uint8_t* nd = nodes + i * 0x11;
         if (*nd == 1) {

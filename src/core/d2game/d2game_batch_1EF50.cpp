@@ -259,7 +259,7 @@ level_lookup:
 // param_1's +0xC dword (or both are the -1 sentinel for a null param_1), it becomes +2 = 0, +1 = 1.
 // 1.13c D2Game+0xe3b00
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E3B00(uint32_t eaxUnit, uint32_t param1,
+EMSCRIPTEN_KEEPALIVE void D2Game_E3B00(uint32_t eaxUnit, uint32_t param1,
                                              const D2GameBatch1EF50Env* env)
 {
     (void)env;

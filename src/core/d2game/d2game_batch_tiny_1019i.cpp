@@ -54,7 +54,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_a018(int32_t lockNum, int32_t 
 // 0xE130: hyperbolic interpolation. ECX = a (below 0x6F returned unchanged), EDX = b, stack = c.
 // Retail multiplies with imul (wrapping) and divides with idiv, so the product wraps and a zero divisor
 // traps exactly as the retail instruction does.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_e130(int32_t a, int32_t b, int32_t c) {   // 1.13c D2Game+0xE130
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2game_e130(int32_t a, int32_t b, int32_t c) {   // 1.13c D2Game+0xE130
     if (a < 0x6F) return a;
     const int32_t d = a - 100;
     const int32_t product = (int32_t)((uint32_t)d * (uint32_t)c);

@@ -82,10 +82,10 @@ long crt_atol(const char* s) {
   return (long)(neg ? -v : v);
 }
 
-// 1.13c D2NET+0x04AD4 (shape)
+// 1.13c D2Net+0x04AD4 (41 B, caller 0x4B05): report code 1 via 0x55FC, then ExitProcess(3); hook = terminate(3)
 void report_failure() { g.terminate(3); }
 
-// 1.13c D2NET+0x04B05 (shape): cookie compare, mismatch reports
+// 1.13c D2Net+0x04B05 (shape): cookie compare, mismatch reports
 void security_check_cookie(uint32_t cookie, uint32_t expected) { if (cookie != expected) report_failure(); }
 
 // 1.13c D2NET+0x0383C (shape): 0x140-byte header list allocation, 1 = ok

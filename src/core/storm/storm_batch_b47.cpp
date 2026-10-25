@@ -9,7 +9,7 @@ extern "C" int Storm_stricmp_5C57(const char* a, const char* b) {
         int x = (uint8_t)*a++, y = (uint8_t)*b++;
         if (x >= 'A' && x <= 'Z') x += 32;
         if (y >= 'A' && y <= 'Z') y += 32;
-        if (x == 0 || x != y) return x - y;
+        if (x == 0 || x != y) return x < y ? -1 : x > y;   // retail returns -1/0/1
     }
 }
 

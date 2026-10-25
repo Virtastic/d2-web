@@ -88,6 +88,7 @@ int32_t Storm_357A0(uint8_t* out,int32_t capacity,const uint16_t* in,int32_t len
             if(static_cast<int64_t>(o)<capacity) out[o++]=0; else result=1;
             break;
         }
+        if(u>0x7fffffff) u=0xfffd; // retail replacement char (unreachable from UTF-16 input)
         uint32_t n=u<0x80?1:u<0x800?2:u<0x10000?3:u<0x200000?4:u<0x4000000?5:6;
         if(static_cast<int64_t>(o)+n>capacity) {result=static_cast<int32_t>(n);break;}
         for(uint32_t j=n-1;j>0;--j) {out[o+j]=static_cast<uint8_t>((u&63)|128);u>>=6;}

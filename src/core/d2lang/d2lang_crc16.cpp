@@ -5,7 +5,7 @@
 
 // 1.13c D2Lang+0x092F0: CRC-16/CCITT, initial 0xffff, over [first,last).
 // Retail reports the failed range assertion through Fog and exits with -1.
-extern "C" void d2_fn_d2lang_92f0(uint16_t* result, const uint8_t* bytes,
+extern "C" void d2lang_92f0(uint16_t* result, const uint8_t* bytes,
                                   uint32_t first, uint32_t last)
 {
     if (last <= first) std::exit(-1);

@@ -115,7 +115,7 @@ EMSCRIPTEN_KEEPALIVE __attribute__((weak)) void d2_fn_d2common_1100(uint32_t* r)
 // 1.13c D2Common+0x1180: r[0] = pSeed (ECX), r[1] = nMin (EDI), r[2] = nMax (EAX).
 // nMax <= nMin returns nMin without rolling; otherwise one LCG step gives nMin + roll over
 // (nMax - nMin + 1). The range is unsigned, so a wrapped count is rejected by its sign bit.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_1180(uint32_t* r)
+void D2Common_1180_RollRange(uint32_t* r)
 {
 	uint32_t* pSeed = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(r[0]));
 	const int32_t nMin = static_cast<int32_t>(r[1]);

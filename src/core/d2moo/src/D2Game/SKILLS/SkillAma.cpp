@@ -114,6 +114,7 @@ int32_t __fastcall SKILLS_SrvSt06_PowerStrike_ChargedStrike(D2GameStrc* pGame, D
 }
 
 //D2Game.0x6FCF3280
+// 1.13c D2Game+0x4C9E0 (inlined helper)
 int32_t __fastcall SKILLS_SrvSt07_Impale(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {    
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -255,6 +256,7 @@ int32_t __fastcall SKILLS_SrvSt08_Strafe(D2GameStrc* pGame, D2UnitStrc* pUnit, i
 }
 
 //D2Game.0x6FCF3690
+// 1.13c D2Game+0x4C600
 int32_t __fastcall SKILLS_SrvSt09_Fend(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     // TODO: v10, v11
@@ -301,6 +303,7 @@ int32_t __fastcall SKILLS_SrvSt09_Fend(D2GameStrc* pGame, D2UnitStrc* pUnit, int
 }
 
 //D2Game.0x6FCF37B0
+// 1.13c D2Game+0x4C4F0
 int32_t __fastcall SKILLS_SrvSt37_Zeal_Fury_BloodLordFrenzy(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);

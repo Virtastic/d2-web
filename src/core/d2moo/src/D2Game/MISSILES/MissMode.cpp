@@ -784,6 +784,7 @@ D2UnitStrc* __fastcall MISSMODE_CreatePlagueJavelin_PoisonJavelin_PoisonTrapHitS
 }
 
 //D2Game.0x6FC570B0
+// 1.13c D2Game+0x41B80 (checked against decompile, no delta)
 int32_t __fastcall MISSMODE_SrvDo02_PlagueJavelin_PoisonJavelin_PoisonTrap(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
     if (pMissile)
@@ -802,6 +803,7 @@ int32_t __fastcall MISSMODE_SrvDo02_PlagueJavelin_PoisonJavelin_PoisonTrap(D2Gam
 }
 
 //D2Game.0x6FC57140
+// 1.13c D2Game+0x41AE0 (checked against decompile, no delta)
 int32_t __fastcall MISSMODE_SrvDo03_PoisonCloud_Blizzard_ThunderStorm_HandOfGod(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
     if (!pMissile->pDynamicPath || !PATH_GetVelocity(pMissile->pDynamicPath))
@@ -993,6 +995,7 @@ D2UnitStrc* __fastcall MISSMODE_CreateMissileWithCollisionCheck(D2GameStrc* pGam
 }
 
 //D2Game.0x6FC57910
+// 1.13c D2Game+0x41520
 int32_t __fastcall MISSMODE_SrvDo09_BatLightningBolt(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
     if (!pMissile)
@@ -1235,7 +1238,7 @@ int32_t __fastcall MISSMODE_SrvDo14_GrimWard(D2GameStrc* pGame, D2UnitStrc* pMis
     return 2;
 }
 
-//D2Game.0x6FC581F0
+// 1.13c D2Game+0x40CA0 (0x6FC581F0 in 1.10f)
 int32_t __fastcall MISSMODE_SrvDo15_FrozenOrb(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
     constexpr int32_t xPositions[] =
@@ -1569,7 +1572,8 @@ int32_t __fastcall MISSMODE_SrvDo23_24_SuccFireBall_FirestormMaker(D2GameStrc* p
     return MISSMODE_HandleMissileCollision(pGame, pMissile);
 }
 
-//D2Game.0x6FC58E10
+//D2Game.0x6FC58E10 (1.10f)
+// 1.13c D2Game+0x404D0
 int32_t __fastcall MISSMODE_SrvDo25_EruptionCenter(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
     if (!pMissile)
@@ -1676,7 +1680,7 @@ int32_t __fastcall MISSMODE_SrvDo27_Tornado(D2GameStrc* pGame, D2UnitStrc* pMiss
     return MISSMODE_HandleMissileCollision(pGame, pMissile);
 }
 
-//D2Game.0x6FC591C0
+// 1.13c D2Game+0x40070 (checked against decompile, no delta)
 int32_t __fastcall MISSMODE_SrvDo28_Volcano(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
     if (!pMissile)
@@ -1944,6 +1948,7 @@ int32_t __fastcall MISSMODE_SrvDo31_WakeOfDestructionMaker_BaalColdMaker(D2GameS
 }
 
 //D2Game.0x6FC59CB0
+// 1.13c D2Game+0x41DE0
 int32_t __fastcall MISSMODE_SrvDo32_TigerFury(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
     if (!pMissile)
@@ -1973,6 +1978,7 @@ int32_t __fastcall MISSMODE_SrvDo32_TigerFury(D2GameStrc* pGame, D2UnitStrc* pMi
 }
 
 //D2Game.0x6FC59D80
+// 1.13c D2Game+0x41C30 (checked against decompile, no delta)
 int32_t __fastcall MISSMODE_SrvDo34_BaalTauntControl(D2GameStrc* pGame, D2UnitStrc* pMissile)
 {
     if (!pMissile)
@@ -2913,6 +2919,7 @@ int32_t __fastcall MISSMODE_SrvHit15_SpiderGooLay(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FC5BB80
+// 1.13c D2Game+0x3EC10 (checked against decompile, no delta)
 int32_t __fastcall MISSMODE_SrvHit16_SpiderGoo_VinesTrail_VinesWither(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     const int32_t nSkillId = MISSILE_GetSkill(pMissile);

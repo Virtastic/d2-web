@@ -45,7 +45,7 @@ void global_unwind2(const Host& h, void* frame, void* target) { h.rtl_unwind(fra
 struct ScopeEntry { int32_t prev; void (*filter)(); void (*handler)(); };
 struct Reg { void* next; void* handler; ScopeEntry* table; int32_t trylevel; };
 
-// 1.13c D2NET+0x02D12 (unwind helper: reload frame registers before a termination handler runs; seam is a no-op in wasm)
+// 1.13c D2Net+0x02D12 (unwind helper: reload frame registers before a termination handler runs; seam is a no-op in wasm)
 void local_unwind_restore_2d12() {}
 
 // 1.13c D2NET+0x02C7E
