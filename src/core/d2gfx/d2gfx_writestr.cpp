@@ -31,4 +31,4 @@ void d2gfx_write_string(int32_t* pcount, const uint8_t* s, CrtStream32* f, int32
     }
 }
 // r[0]=&count (EAX), r[1]=s (ECX), r[2]=the FILE blob (EDI), r[3]=len (stack); the blob and the count are compared.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2gfx_1df1(uint32_t* r) { d2gfx_write_string((int32_t*)(uintptr_t)r[0], (const uint8_t*)(uintptr_t)r[1], (CrtStream32*)(uintptr_t)r[2], (int32_t)r[3]); r[4] = 0; }
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2gfx_1df1(uint32_t* r) { d2gfx_write_string((int32_t*)(uintptr_t)r[0], (const uint8_t*)(uintptr_t)r[1], (CrtStream32*)(uintptr_t)r[2], (int32_t)r[3]); r[4] = r[3] > 0 ? *((const uint8_t*)(uintptr_t)r[1] + r[3] - 1) : 0; }   // eax = the last character _write_char returned (vectored paths always write all len)

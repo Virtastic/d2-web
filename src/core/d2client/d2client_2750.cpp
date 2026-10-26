@@ -27,7 +27,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_2750(void* self, const D2ClientBatch2750Env*
             slot = (uint32_t)(uintptr_t)(s + 0x10) +
                    (enc - *(const uint32_t*)(uintptr_t)(node + 4));
         *(uint32_t*)(uintptr_t)slot = node;
-        *(uint32_t*)(uintptr_t)(node + 4) = enc;
+        *(uint32_t*)(uintptr_t)(node + 4) = *(const uint32_t*)(s + 0x14);   // retail re-reads +0x14 after the slot store
         *(uint32_t*)(s + 0x10) = 0;
         *(uint32_t*)(s + 0x14) = 0;
     }

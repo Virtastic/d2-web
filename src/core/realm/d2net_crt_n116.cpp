@@ -107,6 +107,7 @@ fixup:
 }
 
 // ---- ___crtGetStringTypeA (D2Net+0x04F78) / __convertcp (0x05950) / ___ansicp (0x05909)
+void set_locale_hook(int (*f)(unsigned, unsigned, char*, int)) { g.GetLocaleInfoA = f; }  // probe seam
 // 1.13c D2NET+0x05909
 int ansicp(unsigned lcid) {
   char b[6]; b[5] = 0;

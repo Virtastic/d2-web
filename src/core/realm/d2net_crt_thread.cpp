@@ -43,7 +43,7 @@ void d2net_mtterm(int32_t* tls_index, int32_t (*tls_free)(int32_t), const D2NetL
 }
 
 // 1.13c D2Net+0x1C07 __initptd: seed _initaddr (+0x54) and _holdrand (+0x14).
-void d2net_initptd(uint8_t* ptd, uint32_t initaddr) {
+extern "C" void d2net_initptd(uint8_t* ptd, uint32_t initaddr) {
     *(uint32_t*)(ptd + 0x54) = initaddr;
     *(uint32_t*)(ptd + 0x14) = 1;
 }

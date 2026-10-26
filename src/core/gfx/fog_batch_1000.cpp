@@ -28,10 +28,12 @@
 #include <Windows.h>   // DeleteCriticalSection: a kernel object, a no-op under wasm
 
 // --- host seams ----------------------------------------------------------------------------------
+static void* g_fog_alloc_override; static bool g_fog_alloc_override_on;   // the function probe's allocator seam
 // Storm #401 SMemAlloc(amount, logfilename, logline, flags).
 extern "C" __attribute__((weak)) void* d2_fog_smem_alloc(int32_t amount, const char* logname,
                                                           int32_t logline, uint32_t flags) {
     (void)logname; (void)logline; (void)flags;
+    if (g_fog_alloc_override_on) return amount == 0x7ffffff0 + 0x24 ? nullptr : g_fog_alloc_override;   // 0x7ffffff0: the probe's failure marker
     return std::calloc(1, (size_t)(uint32_t)amount);
 }
 // Storm #403 SMemFree(location, logfilename, logline, flags).
@@ -78,7 +80,7 @@ namespace
 		if ((int32_t)tag < 0)
 			slot = (FogLink*)(uintptr_t)~tag;
 		else
-			slot = (FogLink*)((uint8_t*)node + (uint32_t)(tag - ((FogLink*)(uintptr_t)next)->nPrev));
+			slot = (FogLink*)(uintptr_t)(uint32_t)((uint32_t)(uintptr_t)node + (tag - ((FogLink*)(uintptr_t)next)->nPrev));   // 32-bit wrap, as retail
 		slot->pNext = next;
 		((FogLink*)(uintptr_t)next)->nPrev = tag;
 		node->pNext = 0;
@@ -143,12 +145,15 @@ extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_fn_fog_1030(uint32_t* r)
 {
 	DeleteCriticalSection((LPCRITICAL_SECTION)(uintptr_t)r[0]);
+	*(int32_t*)((uintptr_t)r[0] + 4) = -1;   // retail LockCount -1 after delete
+	r[4] = 0;   // void: the record's result is 0
 }
 
 // 1.13c Fog+0x1040: SEH-framed call of 0x1080; the frame setup has no observable side effect.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_fn_fog_1040(uint32_t* r)
 {
+	r[4] = 0;
 	fog_link_unlink((FogLink*)(uintptr_t)r[0]);
 	fog_link_unlink((FogLink*)(uintptr_t)r[0]);   // 0x1080's second pass; re-reads the cleared node
 }
@@ -159,7 +164,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_fn_fog_1080(uint32_t* r)
 {
 	fog_link_unlink((FogLink*)(uintptr_t)r[0]);
+	r[4] = r[0];   // EAX is untouched
 	fog_link_unlink((FogLink*)(uintptr_t)r[0]);
+	r[4] = r[0];   // EAX is untouched
 }
 
 // 1.13c Fog+0x1120: list-root constructor.
@@ -181,6 +188,7 @@ void d2_fn_fog_1170(uint32_t* r)
 	FogList* root = (FogList*)(uintptr_t)r[0];
 	fog_list_drain(root);
 	fog_link_unlink(&root->link);
+	r[4] = (uint32_t)(uintptr_t)&root->link;   // EAX at ret: lea root+4
 }
 
 // 1.13c Fog+0x11F0: insert `node` before/after `pos` in `root`; EAX = root, this = pos.
@@ -193,6 +201,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_fn_fog_11f0(uint32_t* r)
 {
 	FUN_6ff511f0((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1], (void*)(uintptr_t)r[2], (int32_t)r[3]);
+	r[4] = r[2] ? r[2] : r[0] + 4;   // EAX at ret: the node (sentinel when NULL)
 }
 
 // 1.13c Fog+0x1290: LogManager::AUMessage::operator new(root, size, flags) with EDI = mode; mode
@@ -213,7 +222,12 @@ extern "C" void* FUN_6ff51290(void* root, int32_t size, uint32_t flags, int32_t 
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_fn_fog_1290(uint32_t* r)
 {
-	r[4] = (uint32_t)(uintptr_t)FUN_6ff51290((void*)(uintptr_t)r[0], (int32_t)r[1], r[2], (int32_t)r[3]);
+	// FN ABI (regs edi; args 4 = edi, root, size, flags): r[0]=mode. The Storm #401 hook hands out blob N =
+	// probe-ABI blob 5 (r[24]); a zero allocator result (hook value 0) is the failure path.
+	g_fog_alloc_override = (void*)(uintptr_t)r[24];
+	g_fog_alloc_override_on = true;
+	r[4] = (uint32_t)(uintptr_t)FUN_6ff51290((void*)(uintptr_t)r[1], (int32_t)r[2], r[3], (int32_t)r[0]);
+	g_fog_alloc_override_on = false;
 }
 
 // 1.13c Fog+0x1310: unlink the pair in EAX (r[0] here).
@@ -221,6 +235,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_fn_fog_1310(uint32_t* r)
 {
 	fog_link_unlink((FogLink*)(uintptr_t)r[0]);
+	r[4] = r[0];   // EAX is untouched
 }
 
 // 1.13c Fog+0x1350: drain the root in EBX (r[0] here).
@@ -228,6 +243,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_fn_fog_1350(uint32_t* r)
 {
 	fog_list_drain((FogList*)(uintptr_t)r[0]);
+	r[4] = ((FogList*)(uintptr_t)r[0])->link.nPrev;   // EAX at ret: the last sentinel.prev read (<= 0)
 }
 
 // 1.13c Fog+0x1390: destructor -- store the vtable at +0, then release the block at +4.

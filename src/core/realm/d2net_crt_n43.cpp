@@ -102,6 +102,7 @@ int xcpt_filter(Heap& h, Ptd& p, uint32_t num, void* ptrs, void (*raise_fpe)(int
 int seh_filter(Heap& h, Ptd& p, int code, void* ptrs) {
   return code == -0x1f928c9d ? xcpt_filter(h, p, 0xe06d7363u, ptrs) : 0;
 }
+int seh_filter_probe(int code) { Heap h; Ptd p; return seh_filter(h, p, code, nullptr); }  // FN probe seam
 
 static bool console_or_gui(const Heap& h) { return h.mode_a == 1 || (h.mode_a == 0 && h.mode_b == 1); }
 

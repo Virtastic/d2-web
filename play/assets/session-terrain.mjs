@@ -499,12 +499,15 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   let litWallMemo = new WeakMap(), litWallMemoOld = new WeakMap();
   function litWall(path, dt1Tile, index, E, roof = false) {
     let m = litWallMemo.get(dt1Tile); if (!m) litWallMemo.set(dt1Tile, m = new Map());
-    const mk = `${index}:${roof}:${E.join(',')}`;
+    // Six light entries are bytes: pack them into one exact double (48 bits) + roof bit, and keep the
+    // index in the entry, instead of building a ~100-char string per wall per frame. Anything else keeps the string key.
+    let mk = roof ? 1 : 0;
+    for (let i = 0; i < E.length; i++) { const e = E[i]; if (!(e >= 0 && e < 256 && (e | 0) === e) || E.length !== 6) { mk = `${index}:${roof}:${E.join(',')}`; break; } mk = mk * 256 + e; }
     let hit = m.get(mk);
     if (hit === undefined) { hit = litWallMemoOld.get(dt1Tile)?.get(mk); if (hit !== undefined) m.set(mk, hit); }
-    if (hit !== undefined) return hit.v;
+    if (hit !== undefined && (typeof mk === 'string' || hit.index === index)) return hit.v;
     const v = litWallSlow(path, dt1Tile, index, E, roof);
-    m.set(mk, { v }); return v;
+    m.set(mk, { v, index }); return v;
   }
   function litWallSlow(path, dt1Tile, index, E, roof = false) {
     const key = `w${roof ? 'r' : ''}${path}:${index}:${E.join(',')}`;

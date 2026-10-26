@@ -349,3 +349,23 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_prestid_9c20_probe(uint32_t* r) {
     maze.nLevelPrest = (int32_t)r[0]; room.pMaze = &maze;
     r[1] = (uint32_t)DRLGPRESET_GetLevelPrestIdFromRoomEx(&room);
 }
+
+// s3263: D2Game 0xB510 = OBJRGN_GetTrapMonsterId; r = D2VecObjRgnB510 (level, cachedIn, nMons, mons[8] in; ret, cachedOut out). Synthetic game/object/room/level chain.
+#include <D2Game/OBJECTS/ObjRgn.h>
+#include <D2Game/OBJECTS/ObjMode.h>
+#include <D2Game/MONSTER/MonsterRegion.h>
+#include <D2Game/GAME/Game.h>
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_objrgn_b510_probe(int32_t* r) {
+    if (!d2::drlgLoadTables(d2::sharedVfs(), d2::sharedLang())) { r[11] = 0x7EADBEEF; return; }
+    static D2GameStrc game; static D2ObjectControlStrc ctl; static D2ObjectRegionStrc oreg; static D2MonsterRegionStrc mreg;
+    static D2UnitStrc obj; static D2DynamicPathStrc path; static D2ActiveRoomStrc room; static D2DrlgRoomStrc drlg; static D2DrlgLevelStrc lvl; static D2ObjOperateFnStrc op;
+    game = {}; ctl = {}; oreg = {}; mreg = {}; obj = {}; path = {}; room = {}; drlg = {}; lvl = {}; op = {};
+    const uint32_t L = (uint32_t)r[0];
+    game.pObjectControl = &ctl; ctl.pObjectRegion[L] = &oreg; game.pMonReg[L] = &mreg;
+    oreg.nTrapMonsterId = r[1];
+    mreg.nMonCount = (uint8_t)r[2]; for (int i = 0; i < r[2] && i < 8; i++) mreg.pMonData[i].nMonHcIdx = (uint16_t)r[3 + i];
+    obj.dwUnitType = UNIT_OBJECT; obj.pStaticPath = (D2StaticPathStrc*)&path; ((D2StaticPathStrc*)&path)->pRoom = &room;
+    room.pDrlgRoom = &drlg; drlg.pLevel = &lvl; lvl.nLevelId = (int)L;
+    op.pGame = &game; op.pObject = &obj;
+    r[11] = OBJRGN_GetTrapMonsterId(&op); r[12] = oreg.nTrapMonsterId;
+}

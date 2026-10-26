@@ -390,7 +390,7 @@ void bn_gateway_write_default_list(uint32_t self, const BnetGatewayHost& host) {
         host.display_halt(kGatewayMessageData, host.caller_return_address(0x1B8));
         host.terminate(-1);
     }
-    bn_gateway_update_from_ini(self, (const char*)buffer, host);
+    if (buffer != nullptr) bn_gateway_update_from_ini(self, (const char*)buffer, host);   // retail tests the out pointer's value
 }
 
 // 1.13c BNClient+0x155D0
@@ -561,7 +561,7 @@ void bn_gateway_update_from_ini(uint32_t self, const char* data, const BnetGatew
 }
 
 // 1.13c BNClient+0x0165A
-// Visual Studio 2003 __strnicmp: ASCII case-folded compare, at most max_count bytes.
+// Visual Studio 2003 __strnicmp: ASCII case-folded compare, at most max_count bytes, result -1/0/1 (retail).
 int32_t bn_strnicmp(const char* str1, const char* str2, uint32_t max_count) {
     if (max_count == 0) return 0;
     int32_t c1;
@@ -573,7 +573,7 @@ int32_t bn_strnicmp(const char* str1, const char* str2, uint32_t max_count) {
         c2 = (b >= 'A' && b <= 'Z') ? b + ('a' - 'A') : b;
         if (--max_count == 0 || c1 == 0) break;
     } while (c1 == c2);
-    return c1 - c2;
+    return c1 < c2 ? -1 : c1 > c2 ? 1 : 0;
 }
 
 // 1.13c BNClient+0x01898

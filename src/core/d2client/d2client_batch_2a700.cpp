@@ -332,25 +332,40 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_2c3d0(
     if (env->ordinal11038(item) && descriptor_c) { descriptor_c[0] = 1; descriptor_c[1] = 0; }
 }
 
-// 1.13c D2Client+0x2C4F0 (291 B): variant descriptor pass. Rejects a missing item/descriptor or a
-// failed descriptor lookup, initializes the output value, then applies base, percentage and flag stats.
-struct D2ClientBatchStatEnv {
-    int32_t (*base)(void*); int32_t (*percent)(void*,uint32_t);
-    int32_t (*flag)(void*,uint32_t,uint32_t); int32_t (*special)(void*);
-    uint8_t* mask; uint32_t mask_bit;
+// 1.13c D2Client+0x2C4F0 (291 B): stat pass over `unit` (ESI) with optional item (EAX). The decompile
+// loses register args, so the ordinal arguments are the item/unit as passed through env. Writes:
+// *value = base, *flags = 0 then 3 on the 10973 extra; *flags_b = 3 (10402); unit[0] = 1 (11038).
+struct D2ClientBatch2c4f0Env {
+    void* (*ordinal10858)(void);               // descriptor, +4 byte tested against bit_masks[0xC]
+    int32_t (*ordinal10621)(void);
+    void* (*ordinal10061)(uint32_t);
+    int32_t (*ordinal11088)(void*);
+    int32_t (*ordinal10804)(void);
+    int32_t (*ordinal10910)(void);
+    int32_t (*ordinal10653)(void);
+    int32_t (*ordinal10973)(void);
+    int32_t (*ordinal10402)(void);
+    int32_t (*ordinal11038)(void);
+    uint8_t* bit_masks;
 };
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_2c4f0(
-    void* item, void* descriptor, int32_t* value, uint32_t* flags,
-    int32_t enabled, D2ClientBatchStatEnv* env) {
-    *flags=0;
-    if (!descriptor || !enabled) return 0;
-    *value=env->base(item);
-    int32_t pct=env->percent(item,0x77)+env->percent(item,0xC0)+env->percent(item,0x106);
-    int32_t extra=env->flag(item,0x145,0);
-    if (extra && env->mask && (env->mask[0xC]&env->mask_bit)) pct+=extra;
-    *value += (*value*pct)/100;
-    if (env->special(item)) *flags |= 1u;
-    if (env->flag(item,0x11038,0)) *flags |= 2u;
+    int32_t* value, uint32_t* flags, uint32_t, int32_t enabled,
+    void* item, uint32_t* unit, uint32_t* flags_b, D2ClientBatch2c4f0Env* env) {
+    if (!unit || !enabled) return 0;
+    uint8_t* descriptor = static_cast<uint8_t*>(env->ordinal10858());
+    if (!descriptor) return 0;
+    *flags = 0;
+    *value = env->ordinal10621();
+    if (!item && unit[0x18]) item = env->ordinal10061(unit[0x18]);
+    if (item && env->ordinal11088(item) == 0x26) *value = 0;
+    int32_t pct = env->ordinal10804() + env->ordinal10910() + env->ordinal10653();
+    if (env->bit_masks[0xC] & descriptor[4]) {
+        int32_t extra = env->ordinal10973();
+        if (extra) { pct += extra; *flags = 3; }
+    }
+    *value = (*value * pct) / 100 + *value;
+    if (env->ordinal10402()) *flags_b = 3;
+    if (env->ordinal11038()) *unit = 1;
     return 1;
 }
 

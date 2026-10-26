@@ -18,6 +18,7 @@ struct D2ClientBatch1de0Env {
     void (*sub_2750)(void* self);         // 0x2750  releases one 0x40-list chunk in 0x2320
     void (*sub_30A0)(void);               // 0x30A0  first step of the 0x2360 teardown
     void (*vslot0)(void* self, int32_t value); // (**(code**)*self)(value), __thiscall ECX = self
+    void (*sub_22c0)(void* self);         // 0x22C0  optional seam for the 1F10 base-ctor call (the capture hooks it: its output is address-dependent)
 };
 
 // Intrusive-list unlink shared by 0x2210 and 0x2360 (the d2client_batch_8xx.cpp pattern). `node` is the
@@ -83,7 +84,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_1ed0(void* self, const D2ClientBatch1de0Env*
 // with RVA 0xD60D0, then initialises the critical section at this+0x50.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void* d2_client_1f10(void* self, const D2ClientBatch1de0Env* env) {
-    d2_client_22c0(self, env);
+    if (env->sub_22c0) env->sub_22c0(self); else d2_client_22c0(self, env);
     *(uint32_t*)self = 0xD60D0u;
     InitializeCriticalSection((LPCRITICAL_SECTION)((uint8_t*)self + 0x50));
     return self;

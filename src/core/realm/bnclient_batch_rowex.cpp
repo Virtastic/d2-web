@@ -245,7 +245,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t bn_strtoxl(const char* s, const char** endptr, uin
         if (bn_isdigit_tbl(c)) {
             digit = (uint32_t)c - '0';
         } else if (bn_isalpha_tbl(c)) {
-            digit = (uint32_t)(bn_ascii_lower(c) - '0' - 7);   // toupper(c) - 0x37
+            digit = (uint32_t)((c >= 'a' && c <= 'z' ? c - 0x20 : (int)c) - 0x37);   // toupper(c) - 0x37
         } else {
             break;
         }

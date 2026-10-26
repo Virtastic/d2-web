@@ -14,3 +14,11 @@ extern "C" void d2game_list_insert_tail_1e10(D2GameListNode* sentinel, D2GameLis
     last->next = node;
     sentinel->prev = node;
 }
+
+// 1.13c D2Game+0x01E50 (TASK_LinkList_Remove): unlink node (EAX); null is fatal 0x87 in retail, trap here.
+extern "C" void d2game_list_remove_1e50(D2GameListNode* node)
+{
+    if (!node) __builtin_trap();
+    node->prev->next = node->next;
+    node->next->prev = node->prev;
+}

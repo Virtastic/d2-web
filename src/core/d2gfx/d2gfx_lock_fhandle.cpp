@@ -39,7 +39,7 @@ static_assert(sizeof(D2GfxIoInfo) == 0x24, "entry stride `lea (x,x,8); shl 2`");
 static D2GfxIoInfo g_pioinfo[64 * 32];
 
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2gfx_5cd4(int32_t fh) {
+EMSCRIPTEN_KEEPALIVE int32_t d2gfx_lock_fhandle(int32_t fh) {
     D2GfxIoInfo* block = g_pioinfo + (fh >> 5) * 32;
     D2GfxIoInfo* io = block + (fh & 0x1f);
     if (io->lockinitflag == 0) {

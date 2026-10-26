@@ -297,6 +297,39 @@ EMSCRIPTEN_KEEPALIVE void d2win_sub_11760(uint32_t node, const D2WinBatch93C0Env
     }
 }
 
+// FN probe glue (checked against retail): hooklog writer. Layout: count, then 10 dwords per hooked call
+// (rva, eax, ecx, edx, ebx, esi, s0..s3). Pointers are replaced by the capture's blob / module tokens.
+static uint32_t* fnLg; static uint32_t fnTokAddr[4]; static uint32_t fnTokVal[4]; static uint32_t fnRet;
+static uint32_t fnTok(uint32_t a) { for (int i = 0; i < 4; ++i) if (fnTokAddr[i] && fnTokAddr[i] == a) return fnTokVal[i]; return a; }
+static void fnLog(uint32_t rva, uint32_t ecx, uint32_t edx, uint32_t s0) {
+    uint32_t* w = fnLg + 1 + fnLg[0]++ * 10;
+    w[0] = rva; w[1] = 0; w[2] = fnTok(ecx); w[3] = edx; w[4] = 0; w[5] = 0; w[6] = s0; w[7] = w[8] = w[9] = 0;
+}
+static void fnFree(void* p, const char* file, int32_t line, int32_t) {
+    fnLog(0x768A, (uint32_t)(uintptr_t)p, 0xB2000000u | (file == kFontCpp ? 0x1C854u : 0x1C52Cu), (uint32_t)line);
+}
+// tok: up to 4 (address, token) pairs.
+static void fnTokSet(const uint32_t* tok) { for (int i = 0; i < 4; ++i) { fnTokAddr[i] = tok[2 * i]; fnTokVal[i] = tok[2 * i + 1]; } }
+static void fn1450(void* t) { fnLog(0x11450, 0, 0, fnTok((uint32_t)(uintptr_t)t)); }
+static uint32_t fn7fc0(void* t) { fnLog(0x17FC0, (uint32_t)(uintptr_t)t, 0, 0); return fnRet; }
+// 116A0 / 16D70: tok as above, ret = the value the hooked 0x17FC0 returns.
+extern "C" uint32_t d2win_sub_116A0_fn(void* t, uint32_t* lg, const uint32_t* tok, uint32_t ret) {
+    fnLg = lg; lg[0] = 0; fnTokSet(tok); fnRet = ret;
+    D2WinBatch93C0Env env = {}; env.notify1450 = fn1450; env.release7fc0 = fn7fc0;
+    return d2win_sub_116A0(t, &env);
+}
+extern "C" uint32_t d2win_sub_16D70_fn(void* t, uint32_t* lg, const uint32_t* tok, uint32_t ret) {
+    fnLg = lg; lg[0] = 0; fnTokSet(tok); fnRet = ret;
+    D2WinBatch93C0Env env = {}; env.freeMemory = fnFree; env.release7fc0 = fn7fc0;
+    return d2win_sub_16D70(t, &env);
+}
+extern "C" void d2win_sub_11760_fn(uint32_t node, uint32_t* lg, const uint32_t* tok) {
+    fnLg = lg; lg[0] = 0;
+    fnTokSet(tok);
+    D2WinBatch93C0Env env = {}; env.freeMemory = fnFree;
+    d2win_sub_11760(node, &env);
+}
+
 // 1.13c D2Win+0x114A0 (export #10002, 124 bytes): install a type-9 control's video path. stdcall
 // (box, text, value), ret 0xC; type != 9 fatal 0x51. The text is copied (0x100 bytes) to box+0x40,
 // D2Gfx #10052 is called on box+0x140, D2Gfx #10000 gets ECX = box+0x40, EDX = box+0x140 and the

@@ -313,7 +313,7 @@ void d2_multi_sub_aa60(int32_t ebx) {
     DAT_6fa09f2c = (int32_t)d2_host_tick();
 }
 
-// 1.13c D2Multi+0xACB0
+// D2Multi+0xACB0 (source marker lives in d2multi_batch_b15.cpp)
 void d2_multi_sub_acb0(int32_t ebx) {
     d2_multi_sub_8790();
     if (DAT_6fa09f24 > 0x1f) { fatal13e8(); return; }
@@ -326,7 +326,7 @@ void d2_multi_sub_acb0(int32_t ebx) {
     DAT_6fa0a0e0 = ebx ? ebx : 0x6f9daa50;
 }
 
-// 1.13c D2Multi+0xB160
+// D2Multi+0xB160 (source marker lives in d2multi_batch_b15.cpp)
 void d2_multi_sub_b160(const void* filetime, char* out, int32_t n) {
     d2_host_date_format(filetime, out, n);
     uint16_t wide[512]; memset(wide, 0, sizeof wide);

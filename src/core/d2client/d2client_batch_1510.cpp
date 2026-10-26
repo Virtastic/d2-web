@@ -141,24 +141,24 @@ EMSCRIPTEN_KEEPALIVE void d2_client_1fb0(void* obj, const D2ClientBatch1510Env* 
     d2_client_2050(obj, env);
 }
 
-// 1.13c D2Client+0x2050 (0x02050): base destructor -- vtable slot 0xD60E0, 0x2360(this, 1), 0x2540(this), then
+// 1.13c D2Client+0x2050 (0x02050): base destructor -- vtable slot 0xD60E0, 0x2360(this, 1), 0x2540(this+0x14), then
 // tear down the member at this+4 through 0x2580.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_2050(void* obj, const D2ClientBatch1510Env* env) {
     *reinterpret_cast<uint32_t*>(obj) = 0xD60E0u;
     env->sub2360(obj, 1);
-    env->sub2540(obj);
+    env->sub2540(reinterpret_cast<uint8_t*>(obj) + 0x14);
     env->sub2580(reinterpret_cast<uint8_t*>(obj) + 4);
 }
 
-// 1.13c D2Client+0x020D0: state reset -- 0x2360(this, 1); this+0x10 = this+0x24 = 0; 0x2540(this);
+// 1.13c D2Client+0x020D0: state reset -- 0x2360(this, 1); this+0x10 = this+0x24 = 0; 0x2540(this+0x14);
 // this+0x14 = this+0x18 = this+0x1c = 0. No vtable store, no return value.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_20d0(void* obj, const D2ClientBatch1510Env* env) {
     env->sub2360(obj, 1);
     *reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(obj) + 0x10) = 0;
     *reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(obj) + 0x24) = 0;
-    env->sub2540(obj);
+    env->sub2540(reinterpret_cast<uint8_t*>(obj) + 0x14);
     *reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(obj) + 0x14) = 0;
     *reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(obj) + 0x18) = 0;
     *reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(obj) + 0x1c) = 0;

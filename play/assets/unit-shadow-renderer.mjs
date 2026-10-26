@@ -136,21 +136,37 @@ export function createUnitShadowRenderer(read) {
         // return value so zero-pixel calls cannot masquerade as visible shadows in pixel probes.
         return blit;
       }
-      const rectWidth = maxX - minX + 1;
-      const image = ctx.getImageData(minX, minY, rectWidth, maxY - minY + 1);
-      const data = image.data, iw = image.width, pal = table.pl2;
-      let pixels = 0, darkened = 0;
+      // PERF (a retail recording): the shadow is a thin diagonal, so its bounding rect is mostly untouched pixels and
+      // getImageData is linear in them. Read it in BANDS rows tall, each only as wide as its own rows' extent.
+      // Each pixel is still read, shadowed and written once, layers in the same order: identical output.
+      const BANDS = 4, rows = maxY - minY + 1, rowLo = new Int32Array(rows).fill(maxX + 1), rowHi = new Int32Array(rows).fill(minX - 1);
       for (const layer of layers) for (let i = 0; i < layer.mask.length; i += 2) {
         const px = layer.baseX + layer.mask[i], py = layer.baseY + layer.mask[i + 1];
         if (px < minX || py < minY || px > maxX || py > maxY) continue;
-        const p = ((py - minY) * iw + px - minX) * 4;
-        const out = table.shadow[table.index(data[p], data[p + 1], data[p + 2])];
-        const r = pal[out * 4], g = pal[out * 4 + 1], b = pal[out * 4 + 2];
-        if (r + g + b < data[p] + data[p + 1] + data[p + 2]) darkened++;
-        data[p] = r; data[p + 1] = g; data[p + 2] = b; data[p + 3] = 255;
-        pixels++;
+        const r = py - minY; if (px < rowLo[r]) rowLo[r] = px; if (px > rowHi[r]) rowHi[r] = px;
       }
-      ctx.putImageData(image, minX, minY);
+      const pal = table.pl2;
+      let pixels = 0, darkened = 0;
+      for (let band = 0; band < BANDS; band++) {
+        const r0 = Math.floor(rows * band / BANDS), r1 = Math.floor(rows * (band + 1) / BANDS) - 1;
+        let bx0 = maxX + 1, bx1 = minX - 1;
+        for (let r = r0; r <= r1; r++) { if (rowLo[r] < bx0) bx0 = rowLo[r]; if (rowHi[r] > bx1) bx1 = rowHi[r]; }
+        if (bx1 < bx0) continue;
+        const by0 = minY + r0, by1 = minY + r1;
+        const image = ctx.getImageData(bx0, by0, bx1 - bx0 + 1, by1 - by0 + 1);
+        const data = image.data, iw = image.width;
+        for (const layer of layers) for (let i = 0; i < layer.mask.length; i += 2) {
+          const px = layer.baseX + layer.mask[i], py = layer.baseY + layer.mask[i + 1];
+          if (px < bx0 || py < by0 || px > bx1 || py > by1) continue;
+          const p = ((py - by0) * iw + px - bx0) * 4;
+          const out = table.shadow[table.index(data[p], data[p + 1], data[p + 2])];
+          const r = pal[out * 4], g = pal[out * 4 + 1], b = pal[out * 4 + 2];
+          if (r + g + b < data[p] + data[p + 1] + data[p + 2]) darkened++;
+          data[p] = r; data[p + 1] = g; data[p + 2] = b; data[p + 3] = 255;
+          pixels++;
+        }
+        ctx.putImageData(image, bx0, by0);
+      }
       perfT('unit-shadow-total', pShadow);
       const blit = { ...identity, x: Math.round(x), y: Math.round(y), layers: layers.length, components: layers.map((l) => l.component), pixels, darkened,
         method: 'pl2-lightlevel-7', projection: 'x=-0.5h,y=-0.5h', act: act0Of(identity.act) + 1, rasterized: true,

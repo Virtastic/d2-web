@@ -122,8 +122,8 @@ short D2LANG_GetTblIndex(char* szReference, const Unicode** pUnicode) {
     if (pUnicode) *pUnicode = v ? (const Unicode*)v->c_str() : nullptr;
     return (short)idx;
 }
-// 1.13c D2Lang+0xA8A0 (#10011): GetTblIndex with the string out slot discarded.
-unsigned __fastcall D2LANG_GetTblIndexOnly(char* szReference) { const Unicode* u; return (unsigned short)D2LANG_GetTblIndex(szReference, &u); }
+// 1.13c D2Lang+0xA8A0 (#10011): returns the string out slot of A7B0 (the string pointer), not the index.
+unsigned __fastcall D2LANG_GetTblIndexOnly(char* szReference) { const Unicode* u = nullptr; D2LANG_GetTblIndex(szReference, &u); return (unsigned)(uintptr_t)u; }
 // A missing key resolves to the key followed by D2Lang's placeholder; an empty key to "".
 const Unicode* D2LANG_GetStringByReferenceString(char* szReference) {
     static std::unordered_map<std::string, std::u16string> fallbacks;

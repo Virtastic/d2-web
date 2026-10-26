@@ -100,7 +100,7 @@ void d2_fn_d2game_1670(void* unit, int32_t stat, int32_t delta, const D2GameBatc
 // ESI = unit. True only for an item (unit+0 type 4) of quality 7 (unique) with a non-negative
 // D2Common #10620 unique id whose UniqueItems row exists and has the bit at byte +0x2C that retail
 // tests with the byte at gdwBitMasks+8 (mask 0x04). #10620 is called twice, as in retail.
-uint32_t d2_fn_d2game_17e0(void* unit, const D2GameBatch17Env* env)
+uint32_t d2game_17e0_impl(void* unit, const D2GameBatch17Env* env)
 {
     if (!unit || rd32(unit, 0) != 4) return 0;
     if (env->getItemQuality(unit) != 7) return 0;
@@ -237,6 +237,18 @@ int32_t d2_fn_d2game_2813(const char* str1, const char* str2, const D2GameBatch1
         const int32_t b = env->tolowerMt(locinfo, (uint8_t)*str2++);
         if (a == 0 || a != b) return a - b;
     }
+}
+
+// FN-probe seam for 0x2813: C-locale tiddata (locinfo wlocale null) so the call forwards to 0x3940.
+int d2_fn_d2game_3940(const char*, const char*);
+int32_t d2game_stricmp_probe(const char* a, const char* b)
+{
+    static uint8_t locinfo[0x40];
+    D2GameBatch17Env env = {};
+    env.getptd = []() -> void* { static uint8_t ptd[0x80]; *(void**)(ptd + 0x64) = locinfo; return ptd; };
+    env.updateTlocinfo = []() -> void* { return locinfo; };
+    env.asciiStricmp = d2_fn_d2game_3940;
+    return d2_fn_d2game_2813(a, b, &env);
 }
 
 // 1.13c D2Game+0x28E5

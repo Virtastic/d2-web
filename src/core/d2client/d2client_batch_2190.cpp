@@ -52,7 +52,8 @@ static void orphan_relink(int32_t* link) {
                         : (int32_t*)((uint8_t*)link +
                                      (encoded - *(int32_t*)(uintptr_t)(uint32_t)(node + 4)));
     *slot = (int32_t)node;
-    *(int32_t*)(uintptr_t)(uint32_t)(node + 4) = (int32_t)encoded;
+    // retail reloads both link words after the slot store (the slot can alias link[1]): 1.13c 0x2254-0x2259
+    *(int32_t*)(uintptr_t)(uint32_t)((uint32_t)*link + 4) = link[1];
     *link = 0;
     link[1] = 0;
 }
@@ -85,7 +86,7 @@ extern "C"
 EMSCRIPTEN_KEEPALIVE void* d2_client_22c0(void* self, const D2ClientBatch2190Env* env) {
     d2_client_2670(self, env);
     uint32_t* s32 = (uint32_t*)self;
-    *(void**)s32 = env->vtable_22c0;
+    s32[0] = (uint32_t)(uintptr_t)env->vtable_22c0;   // 32-bit slot (retail layout)
     s32[0x12] = ~(uint32_t)(uintptr_t)self & 0x0fffffffu;
     s32[0x13] = 0;
     return self;
@@ -229,7 +230,7 @@ extern "C"
 EMSCRIPTEN_KEEPALIVE void* d2_client_2670(void* self, const D2ClientBatch2190Env* env) {
     uint8_t* s = (uint8_t*)self;
     env->f_27d0(self);
-    *(void**)s = env->vtable_2670;
+    *(uint32_t*)s = (uint32_t)(uintptr_t)env->vtable_2670;   // 32-bit slot (retail layout)
     env->f_28a0((int32_t*)(s + 0x28));
     env->f_2900((int32_t*)(s + 0x38));
     *(uint32_t*)(s + 0x34) = 0x10;

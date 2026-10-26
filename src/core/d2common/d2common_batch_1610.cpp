@@ -35,7 +35,7 @@ namespace
 		const D2SkillsTxt* pRow = SkillRow(nSkillId);
 		if (!pRow || nLevel <= 0) return 0;
 		const int32_t* pParam = pRow->dwParam;
-		return (nLevel - 1) * pParam[nHigh / sizeof(int32_t)] + pParam[nLow / sizeof(int32_t)];
+		return (nLevel - 1) * pParam[(nHigh - 0x148) / sizeof(int32_t)] + pParam[(nLow - 0x148) / sizeof(int32_t)]; // offsets are row-absolute; dwParam starts at 0x148
 	}
 }
 

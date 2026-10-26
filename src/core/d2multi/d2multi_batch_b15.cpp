@@ -82,9 +82,11 @@ static void ctl3(const void* a, const void* b, const void* c, void* cb, bool tic
 // 1.13c D2MULTI+0x0AA60
 extern "C" void FUN_6f9daa60(void* cb) { ctl3((void*)0x6f9ea360, (void*)0x6f9ea3c0, (void*)0x6f9ea3f0, cb, true); }
 // 1.13c D2MULTI+0x0ACB0
+// 1.13c D2Multi+0xACB0
 extern "C" void FUN_6f9dacb0(void* cb) { ctl3((void*)0x6f9ea360, (void*)0x6f9ea390, (void*)0x6f9ea3f0, cb, false); }
 
 // 1.13c D2MULTI+0x0B160
+// 1.13c D2Multi+0xB160
 extern "C" void FUN_6f9db160(const void* ft, char* out, int cap) {
     (void)ft; (void)out; (void)cap;  // ponytail: FILETIME->localized long date (GetDateFormatA lcid 0x400) is host-locale; host shim supplies it
 }

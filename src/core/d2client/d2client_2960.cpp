@@ -27,9 +27,13 @@ EMSCRIPTEN_KEEPALIVE void d2_client_2960(uint32_t* self, uint32_t new_size,
                                          const D2ClientBatch2960Env* env) {
     if (self[1] < new_size) {
         if (self[0] < new_size) {
-            uint32_t capacity = new_size;
-            if (self[3] == 0)
-                capacity = D2Client_ClampPow2(new_size, (uint8_t*)self);
+            // retail 0x2975-0x2991: step = flag +0xC, or the 0x2A40 clamp when the flag is 0;
+            // capacity = new_size rounded up to a multiple of step.
+            uint32_t step = self[3];
+            if (step == 0)
+                step = D2Client_ClampPow2(new_size, (uint8_t*)self);
+            uint32_t rem = new_size % step;
+            uint32_t capacity = rem ? new_size + step - rem : new_size;
             env->realloc_data(self, capacity);
         }
         for (uint32_t i = self[1]; i < new_size; ++i)
