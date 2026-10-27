@@ -40,7 +40,9 @@ struct D2ClientBatch057AEEnv {
 };
 
 // 1.13c D2Client+0x07283 (___updatetlocinfo): CRT lock 12 around ___updatetlocinfo_lk, released by
-// the _unlock(12) wrapper at 0x072B5.
+// the _unlock(12) wrapper at 0x072B5. Order is the contract: lock(12), _lk (its result is returned,
+// unchanged), unlock(12) -- the unlock runs after _lk and does not touch the result
+// (test/d2client-updatetlocinfo-7283.test.mjs).
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_client_7283(const D2ClientBatch057AEEnv* env) {
     d2_client_4860(0xC, env->lock);

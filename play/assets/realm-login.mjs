@@ -1,31 +1,48 @@
 // Browser frontend for the configured Battle.net-compatible realm path. The endpoint comes from
 // bnet-servers.json; these controls collect only player credentials and game/character choices.
+import { GATEWAY_LAYOUT as G } from './bnet-servers.mjs';
 const CLASSES = ['Amazon', 'Sorceress', 'Necromancer', 'Paladin', 'Barbarian', 'Druid', 'Assassin'];
 
-export function createRealmLoginDialog({ documentObject = globalThis.document, onAuthenticate, onJoin, onClose }) {
+// The login dialog reuses the retail gateway panel's measured rect (GWListBox, 340x339 at 237,217 of
+// 800x600) and its OK/CANCEL button rects (CancelButtonBlank, 96x32); all values are percent of the
+// 800x600 stage so they follow the viewport's scale. Art: `panelImage` / `buttonImage` are CSS urls.
+const pct = (v, n) => `${(v / n * 100).toFixed(4)}%`;
+export function realmLoginLayout() {
+  const p = G.panel, b = G.button;
+  const box = (x, y, w, h) => ({ left: pct(x, 800), top: pct(y, 600), width: pct(w, 800), height: pct(h, 600) });
+  return { panel: box(p.x, p.y, p.w, p.h), ok: box(b.ok.x, b.y, b.w, b.h), cancel: box(b.cancel.x, b.y, b.w, b.h),
+    heading: { left: pct(G.body.x, 800), top: pct(G.heading.y - 23, 600) }, fields: box(G.body.x, G.heading.y + 8, 300, 240) };
+}
+const rel = (r) => ({ left: pct(parseFloat(r.left) / 100 * 800 - G.panel.x, G.panel.w), top: pct(G.button.y - G.panel.y, G.panel.h), width: pct(G.button.w, G.panel.w), height: pct(G.button.h, G.panel.h) });
+const css = (o) => Object.entries(o).map(([k, v]) => `${k}:${v}`).join(';');
+
+export function createRealmLoginDialog({ documentObject = globalThis.document, onAuthenticate, onJoin, onClose, panelImage = '', buttonImage = '' }) {
+  const L = realmLoginLayout();
+  const btn = (o) => `position:absolute;${css(o)};padding:0;border:0;color:#c7b377;font:bold 13px Georgia,serif;cursor:pointer;background:${buttonImage ? `${buttonImage} center/100% 100% no-repeat` : '#2a2418'}`;
   const panel = documentObject.createElement('section');
   panel.id = 'realm-login-panel';
   panel.hidden = true;
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-modal', 'true');
   panel.setAttribute('aria-labelledby', 'realm-dialog-title');
-  panel.style.cssText = 'position:absolute;inset:0;z-index:20;display:none;place-items:center;background:#000b;color:#ddd;font:14px monospace';
-  panel.innerHTML = `<form style="width:min(420px,92%);padding:24px;background:#11110f;border:1px solid #8b7444;box-shadow:0 8px 40px #000">
-    <h2 id="realm-dialog-title" style="margin:0 0 16px;color:#c9ad68;font:22px Georgia,serif">BATTLE.NET LOGIN</h2>
-    <p id="realm-region" style="color:#aaa;margin:0 0 14px"></p>
+  panel.style.cssText = 'position:absolute;inset:0;z-index:20;display:none;place-items:center;background:#000b;color:#ddd;font:12px Georgia,serif';
+  panel.innerHTML = `<form style="position:absolute;${css(L.panel)};background:${panelImage ? `${panelImage} 0 0/100% 100% no-repeat` : '#11110f'}">
+    <h2 id="realm-dialog-title" style="position:absolute;left:${pct(G.body.x - G.panel.x, G.panel.w)};top:${pct(G.heading.y - 23 - G.panel.y, G.panel.h)};margin:0;color:#c9ad68;font:20px Georgia,serif">BATTLE.NET LOGIN</h2>
+    <div style="position:absolute;left:${pct(G.body.x - G.panel.x, G.panel.w)};top:${pct(G.heading.y + 8 - G.panel.y, G.panel.h)};width:${pct(300, G.panel.w)}">
+    <p id="realm-region" style="color:#aaa;margin:0 0 4px"></p>
     <div id="realm-login-fields">
-      <label style="display:block;margin:10px 0">Account<br><input id="realm-account" autocomplete="username" required maxlength="31" style="width:100%;padding:8px;background:#080808;color:#ddd;border:1px solid #493d27"></label>
-      <label style="display:block;margin:10px 0">Password<br><input id="realm-password" type="password" autocomplete="current-password" required style="width:100%;padding:8px;background:#080808;color:#ddd;border:1px solid #493d27"></label>
-      <button id="realm-login-submit" type="submit">LOG IN</button>
+      <label style="display:block;margin:10px 0">Account<br><input id="realm-account" autocomplete="username" required maxlength="31" style="width:100%;padding:8px;background:#080808;color:#ddd;border:1px solid #493d27;box-sizing:border-box"></label>
+      <label style="display:block;margin:10px 0">Password<br><input id="realm-password" type="password" autocomplete="current-password" required style="width:100%;padding:8px;background:#080808;color:#ddd;border:1px solid #493d27;box-sizing:border-box"></label>
+      <button id="realm-login-submit" type="submit" style="${btn(rel(L.ok))}">LOG IN</button>
     </div>
     <div id="realm-character-fields" hidden>
-      <label style="display:block;margin:10px 0">Character<br><select id="realm-character" required style="width:100%;padding:8px;background:#080808;color:#ddd;border:1px solid #493d27"></select></label>
-      <label style="display:block;margin:10px 0">Game name<br><input id="realm-game" required maxlength="15" style="width:100%;padding:8px;background:#080808;color:#ddd;border:1px solid #493d27"></label>
-      <label style="display:block;margin:10px 0">Game password (optional)<br><input id="realm-game-password" type="password" maxlength="15" style="width:100%;padding:8px;background:#080808;color:#ddd;border:1px solid #493d27"></label>
-      <button id="realm-join-submit" type="submit">CREATE AND JOIN GAME</button>
+      <label style="display:block;margin:10px 0">Character<br><select id="realm-character" required style="width:100%;padding:8px;background:#080808;color:#ddd;border:1px solid #493d27;box-sizing:border-box"></select></label>
+      <label style="display:block;margin:10px 0">Game name<br><input id="realm-game" required maxlength="15" style="width:100%;padding:8px;background:#080808;color:#ddd;border:1px solid #493d27;box-sizing:border-box"></label>
+      <label style="display:block;margin:10px 0">Game password (optional)<br><input id="realm-game-password" type="password" maxlength="15" style="width:100%;padding:8px;background:#080808;color:#ddd;border:1px solid #493d27;box-sizing:border-box"></label>
+      <button id="realm-join-submit" type="submit" style="${btn(rel(L.ok))}">JOIN</button>
     </div>
-    <p id="realm-status" role="status" aria-live="polite" style="min-height:2.8em;color:#b8a77e"></p>
-    <button id="realm-cancel" type="button">CANCEL</button>
+    <p id="realm-status" role="status" aria-live="polite" style="min-height:2.8em;color:#b8a77e"></p></div>
+    <button id="realm-cancel" type="button" style="${btn(rel(L.cancel))}">CANCEL</button>
   </form>`;
   const $ = (id) => panel.querySelector(`#${id}`);
   const form = panel.querySelector('form');

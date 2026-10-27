@@ -35,6 +35,8 @@
 
 import { click, tapKey, toCanvas, playerOnCanvas, stickTarget } from './input-common.mjs';
 
+// Overlay chrome face: the game's serif, not the browser's monospace (no web font ships).
+export const OVERLAY_FONT = 'Palatino Linotype, Palatino, Georgia, serif';
 export const STICK_TICK_MS = 150;      // how often a held stick re-aims the walk, as a mouse re-clicked
 export const STICK_RADIUS = 160;       // input-common.stickTarget's own default, named for the CSS geometry
 
@@ -58,7 +60,7 @@ function injectStyle(documentObject) {
   // (coarse pointer, or the first real touch -- "The overlay appears only on touch
   // devices... never over a mouse player's screen").
   style.textContent =
-    '#touch-overlay{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .15s;font:14px monospace}' +
+    '#touch-overlay{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .15s;font:14px ' + OVERLAY_FONT + '}' +
     '#touch-overlay.d2-touch-on{opacity:1}' +
     '#touch-overlay .d2-touch-hit{pointer-events:none}' +
     '#touch-overlay.d2-touch-on .d2-touch-hit{pointer-events:auto}' +
@@ -68,13 +70,13 @@ function injectStyle(documentObject) {
       'background:rgba(201,173,104,.55);transform:translate(-50%,-50%);pointer-events:none}' +
     '.d2-touch-bar{position:absolute;right:4%;bottom:7%;display:flex;gap:10px}' +
     '.d2-touch-btn{width:44px;height:44px;border-radius:8px;background:rgba(20,18,12,.65);' +
-      'border:2px solid rgba(201,173,104,.45);color:#c9ad68;font:15px monospace;touch-action:none;' +
+      'border:2px solid rgba(201,173,104,.45);color:#c9ad68;font:15px ' + OVERLAY_FONT + ';touch-action:none;' +
       'display:flex;align-items:center;justify-content:center;user-select:none}' +
     // The shift latch, armed: it must LOOK armed from across the screen -- a modifier the player
     // cannot see is one they leave on.
     '#touch-overlay .d2-touch-armed{background:rgba(201,173,104,.8);color:#1a170f;border-color:#e8d9ab}' +
     '#d2-touch-name{position:absolute;left:39.75%;top:82.2%;width:27.5%;height:5.2%;box-sizing:border-box;' +
-      'font:16px monospace;padding:2px 6px;background:#1a170f;color:#e8d9ab;border:1px solid #493d27;touch-action:none}' +
+      'font:16px ' + OVERLAY_FONT + ';padding:2px 6px;background:#1a170f;color:#e8d9ab;border:1px solid #493d27;touch-action:none}' +
     // A wide phone held sideways letterboxes the 4:3 game with black bars at both sides: the stick and
     // the key bar go there, off the orbs, belt and skill buttons they covered when drawn over the game.
     // (A 4:3 tablet has no bars; they stay over the game there.) Last, so it overrides the rules above.
@@ -494,4 +496,4 @@ export function installTouchInput({ documentObject = globalThis.document, window
   };
 }
 
-if (typeof window !== 'undefined') window.__d2TouchInput = installTouchInput();
+if (typeof window !== 'undefined' && typeof document !== 'undefined' && document.addEventListener) window.__d2TouchInput = installTouchInput();

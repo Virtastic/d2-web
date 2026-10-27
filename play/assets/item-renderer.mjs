@@ -13,11 +13,11 @@ export const itemStringKey = (code) => (code === 'dlg' ? 'gld' : code);
 // into the draw class it hands the item blit: <100 -> 0, <500 -> 1, <5000 -> 2, else 3. flpgld.DC6
 // (gold's flippy) is 4 directions x 17 frames (read from the d2exp DC6 header); the bucket is the
 // DIRECTION (the record's +0x34) and the frame within it is the unit's own precise frame >> 8.
-export function goldPileFrame(amount, frameCount, _framePrecise = 0, directions = 4) {
+export function goldPileFrame(amount, frameCount, framePrecise = 0x1000, directions = 4) {
   const bucket = Math.min(directions - 1, amount < 100 ? 0 : amount < 500 ? 1 : amount < 5000 ? 2 : 3);
   const perDir = Math.max(1, Math.floor(frameCount / directions));
-  // A resting ground item has finished its drop animation: the END frame of the direction.
-  return bucket * perDir + perDir - 1;
+  // The unit's own frame within the direction (a dropping pile animates; a landed one sits on the last).
+  return bucket * perDir + Math.min(perDir - 1, framePrecise >>> 8);
 }
 
 function cstring(bytes, start, size) {

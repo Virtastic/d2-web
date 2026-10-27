@@ -82,10 +82,16 @@ void D2Common_1B1E_QuickExit(int32_t nCode)
 // 1.13c D2Common+0x422D
 // __lock_file2(index, file): stream slots below 0x14 live in the static lock table, so take table lock
 // index+0x10 (0x2EF9 __lock, here enter_cs); otherwise the FILE carries its own critical section at +0x20.
+// pfnLock: seam for the FN probe (logs the __lock call); null = the real table lock.
+void d2common_lock_file2_422d(int32_t nIndex, void* pFile, void (*pfnLock)(int32_t))
+{
+    if (nIndex < 0x14) { if (pfnLock) pfnLock(nIndex + 0x10); else enter_cs((uint32_t)nIndex + 0x10); }
+    else EnterCriticalSection((LPCRITICAL_SECTION)((uint8_t*)pFile + 0x20));
+}
+
 void D2Common_422D_LockFile2(int32_t nIndex, void* pFile)
 {
-    if (nIndex < 0x14) enter_cs((uint32_t)nIndex + 0x10);
-    else EnterCriticalSection((LPCRITICAL_SECTION)((uint8_t*)pFile + 0x20));
+    d2common_lock_file2_422d(nIndex, pFile, nullptr);
 }
 
 // 1.13c D2Common+0x2EF9

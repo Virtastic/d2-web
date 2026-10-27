@@ -104,11 +104,8 @@ export function createNpcPanel({ read, decodeDc6, decodeDatPalette, documentObje
   // reports for that item (d2_session_vendor_presentations). A shop of names and prices is not a
   // shop; retail shows the goods.
   //
-  // NOT yet retail's layout: retail's trade window is an icon GRID, and which Inventory.txt row
-  // describes a shop tab is still open -- Charsi's stock spans three tabs with extents up to 10x8
-  // and no single row is that shape. Drawing a grid now
-  // would mean inventing the geometry, so the icons land in the existing rows and the grid stays
-  // declared as open.
+  // This panel is the non-shop NPC fallback only; a shop is drawn by vendor-panel.mjs, whose 10x10 grid
+  // comes from Inventory.txt "Monster" via the engine (vendorLayoutFromEngine) and never a names/prices list.
   const icons = new Map();
   const icon = (invFile) => {
     if (!invFile) return null;

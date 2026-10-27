@@ -34,7 +34,7 @@ static inline void     wr32(uint32_t a, uint32_t o, uint32_t v) { wr32((void*)(u
 
 // Defined elsewhere in src/core/d2game/ (marker there).
 extern "C" void     d2_fn_d2game_3b51(void);              // 0x3B51 __unlock(0xC)
-extern "C" void     d2_fn_d2game_3f76(int32_t lockNum);   // 0x3F76 __unlock
+extern "C" void     d2game_unlock_3f76(int32_t lockNum);   // 0x3F76 __unlock
 extern "C" int32_t* d2game_errno_ptr(void);              // 0x4E65 __getptd()->_terrno
 
 // ---- 0x74EB report_failure -----------------------------------------------------------------------
@@ -320,7 +320,7 @@ struct D2GameBatch4c88Env {
 // Index below 0x14 takes CRT lock index+0x10; any other stream enters the critical section at +0x20.
 // 1.13c D2Game+0x04c88
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_4c88(int32_t index, void* file,
+void lock_file2_4c88(int32_t index, void* file,
                                             const D2GameBatch4c88Env* env) {
     if (index < 0x14) {
         env->lock(index + 0x10);
@@ -332,9 +332,10 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_4c88(int32_t index, void* file,
 // Index below 0x14 releases CRT lock index+0x10; any other stream leaves the section at +0x20.
 // 1.13c D2Game+0x04CDA
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_4cda(int32_t index, void* file) {
+void unlock_file2_4cda(int32_t index, void* file,
+                                              const D2GameBatch4c88Env* env) {
     if (index < 0x14) {
-        d2_fn_d2game_3f76(index + 0x10);
+        env->lock(index + 0x10);   // here: 0x3F76 __unlock
         return;
     }
     LeaveCriticalSection((LPCRITICAL_SECTION)((uint8_t*)file + 0x20));
@@ -343,7 +344,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_4cda(int32_t index, void* file) {
 // 1.13c D2Game+0x05003: __unlock(1), the stream-table release.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_5003(void) {
-    d2_fn_d2game_3f76(1);
+    d2game_unlock_3f76(1);
 }
 
 // Frame-unwind cleanup: VC7.1's processing-throw counter is the dword at

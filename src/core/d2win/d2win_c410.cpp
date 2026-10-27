@@ -14,7 +14,7 @@ static void wr(uint8_t* p, uint32_t v) { std::memcpy(p, &v, 4); }
 // 1.13c D2Win+0x0C410
 int32_t D2Win_C410(uint8_t* w, uint32_t id, const D2WinC410Env& env, uint8_t* (*deref)(uint32_t)) {
     if (!w) { env.fatal(0x8B4); std::exit(-1); }
-    uint32_t node = rd(deref(rd(deref(rd(w + 0xB8)))));
+    uint32_t node = rd(deref(rd(w + 0xB8)));
     for (;;) {
         if (!node) return 0;
         if (rd(deref(rd(deref(node))) + 4) == id) break;

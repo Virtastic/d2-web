@@ -48,6 +48,9 @@ static_assert(offsetof(D2cFile, tmpfname) == 0x1C + 2 * (sizeof(void*) - 4), "FI
 uint32_t g_pioinfo[0x20];   // shared with the b56 fd-table rows (_write, __close_lk)
 // +0x0DB790  DAT_6fb8b790: the record used for the console handle -1 in __flsbuf.
 static uint8_t g_console_dev[0x24];
+// Scenario setup: the device-flag byte (+4) of the console record, so the fd -1 append branch is reachable.
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_client_console_dev_pin(uint8_t devflags) { g_console_dev[4] = devflags; }
 // +0x0DB218 / +0x0DB238  _iob[1] (stdout) and _iob[2] (stderr); __flsbuf asks __isatty about them.
 static uintptr_t g_std_files[2];
 

@@ -11,4 +11,11 @@ inline int pickupPathHasRemainingPoints(const DynamicPath* path) noexcept {
     return path && path->dwCurrentPointIdx < path->dwPathPoints ? 1 : 0;
 }
 
+// The pending session pickup is still this command's when the path names the pile OR the player's
+// interact data (what the ITEM case writes via UNITS_SetInteractData, type 4 = item) names it.
+// pTargetUnit alone is unreliable (see above), which left walked-to piles unpicked.
+inline bool pickupStillOurs(bool pathTargetsPile, int interactType, unsigned interactGuid, unsigned pileId) noexcept {
+    return pathTargetsPile || (interactType == 4 && interactGuid == pileId);
+}
+
 } // namespace d2::monspawn

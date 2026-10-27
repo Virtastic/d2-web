@@ -16,9 +16,23 @@ export const ITEM_TOOLTIP_ASSETS = {
 // colour rule: a magic (quality 4) name is D2Win blue 3, otherwise white; the engine's own
 // "\x01<digit>" markers colour each property line (1 red unmet requirement, 3 blue magical).
 export function itemTooltipSpec(h) {
-  const qc = h?.quality === 4 ? 3 : 0;
+  // D2Client+0x93450: quality 4..9 -> D2Win colour 3,2,9,4,8,10 (magic blue,
+  // set green, rare yellow, unique gold, crafted orange, tempered dark green); any other quality is grey (5)
+  // when socketed (0x800) or ethereal (0x400000), else white.
+  const q = h?.quality, f = h?.itemFlags | 0;
+  const qc = q >= 4 && q <= 9 ? [3, 2, 9, 4, 8, 10][q - 4] : (f & 0x800 || f & 0x400000) ? 5 : 0;
   return { lines: [h?.name || h?.code || '', ...(h?.props || [])].filter((line) => line !== ''),
     colours: [qc, ...(h?.propColours || [])] };
+}
+
+// Retail D2Client+0x945D0 (hover cell -> anchors 0x50EA8..0x50EB4) + 0x93450's tail + D2Win 10110 (0x133A0):
+// the box is centred on the item's cell rect, bottom 2 px below the item's top when it fits above
+// (item top > box height), else its top 2 px below the item's bottom; clamped to the 800x600 screen
+// (left >= 0, right <= 800, bottom within [h-5, 595]). It does not follow the pointer.
+export function placeItemTip(cell, w, h, W = 800, H = 600) {
+  const cx = cell.x + (cell.w >> 1), y = cell.y > h ? cell.y : cell.y + cell.h + h;
+  const bx = Math.min(W - w, Math.max(0, cx - (w >> 1))), bottom = Math.min(H - 5, Math.max(h - 5, y + 2));
+  return { bx, by: bottom - h };
 }
 
 export function createItemTooltip(read, documentObject = globalThis.document) {
@@ -41,13 +55,12 @@ export function createItemTooltip(read, documentObject = globalThis.document) {
     // Draws in 800x600 screen coordinates, on top of the panel. Retail centres the box on the
     // pointer, clamps it to the screen and puts its bottom 25 px above the cursor; lines are
     // centred, 16 px apart, top down (the shop tooltip's captured layout, vendor-panel.mjs).
-    draw(ctx, act, pointer, width, height, lines, colours) {
-      if (!lines.length || !pointer) return null;
+    draw(ctx, act, cell, width, height, lines, colours) {
+      if (!lines.length || !cell) return null;
       const f = forAct(act);
       const w = Math.max(...lines.map((l) => f.font.measure(l))) + 8, h = lines.length * 16;
       const scale = Math.min(1, width / 800, height / 600), ox = (width - 800 * scale) / 2, oy = (height - 600 * scale) / 2;
-      const bx = Math.max(0, Math.min(800 - w, Math.round(pointer.x / scale - ox / scale - w / 2)));
-      const by = Math.max(0, Math.min(600 - h, Math.round((pointer.y - oy) / scale) - 25 - h));
+      const { bx, by } = placeItemTip(cell, w, h);
       ctx.save(); ctx.translate(ox, oy); ctx.scale(scale, scale);
       ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(bx, by, w, h);
       lines.forEach((l, k) => {

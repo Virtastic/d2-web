@@ -7,13 +7,13 @@ struct D2Win12410Env {
   int32_t (*isLineBreak)(const uint16_t* s, uint32_t n);      // Unicode::isLineBreak
   bool (*isWhitespace)(const uint16_t* s);                    // Unicode::isWhitespace
 };
-struct D2Win12410Node { uint16_t* str; D2Win12410Node* next; };  // retail: 8 bytes (32-bit ptrs)
+struct D2Win12410Node { uint32_t str; uint32_t next; };  // retail layout: 8 bytes, 32-bit ptrs (heap addresses < 4 GiB)
 
 static D2Win12410Node* mk(D2Win12410Env& e, const uint16_t* src, int32_t n) {
   auto* nd = (D2Win12410Node*)e.alloc(0x588, 0);
-  nd->str = (uint16_t*)e.alloc(0x591, 0); nd->next = nullptr;
-  memcpy(nd->str, src, (size_t)n * 2);  // Unicode::strncpy (src is NUL-terminated within n in the first case)
-  nd->str[n] = 0;
+  uint16_t* str = (uint16_t*)e.alloc(0x591, 0); nd->str = (uint32_t)(uintptr_t)str; nd->next = 0;
+  memcpy(str, src, (size_t)n * 2);  // Unicode::strncpy (src is NUL-terminated within n in the first case)
+  str[n] = 0;
   return nd;
 }
 
@@ -32,7 +32,7 @@ D2Win12410Node* d2win_sub_12410(D2Win12410Env& e, const uint16_t* s, int32_t* co
     if (e.isWhitespace(p)) { p++; n--; }
     auto* nd = mk(e, p, n);
     ++*count;
-    if (tail) tail->next = nd; else head = nd;
+    if (tail) tail->next = (uint32_t)(uintptr_t)nd; else head = nd;
     tail = nd;
     st = x + 1;
   }

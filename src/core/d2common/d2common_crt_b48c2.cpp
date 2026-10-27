@@ -29,6 +29,12 @@ extern "C" int32_t d2common_sbh_heap_init(uint32_t maximum, uint32_t (*heap_allo
     return 1;
 }
 
+// Read-back of the sbh globals {entry,count,regions,max,last,cap} for the host test.
+extern "C" void d2common_sbh_state(uint32_t out[6]) {
+    out[0] = g_sbh_entry; out[1] = g_sbh_count; out[2] = g_sbh_regions;
+    out[3] = g_sbh_max;   out[4] = g_sbh_last;  out[5] = g_sbh_cap;
+}
+
 struct D2CommonHeapHost {
     void*    heap;        // DAT_6fdf170c
     uint32_t heap_mode;   // DAT_6fdf1710
@@ -259,4 +265,12 @@ extern "C" int d2common_xcpt_filter(D2CommonXcptHost* h, uint32_t num, void* ep)
         h->initarg = saved;
     }
     return -1;
+}
+
+// 1.13c D2Common+0x07D21 ___sbh_find_block: regions = DAT_6fdf14b0, count = DAT_6fdf14ac; 20-byte
+// entries, reserved base at +0xC. Returns the entry whose 1 MiB span holds p, else null.
+extern "C" uint8_t* d2common_sbh_find_block(uint8_t* regions, uint32_t count, uint32_t p) {
+    for (uint8_t* e = regions; e < regions + count * 0x14; e += 0x14)
+        if (p - *(uint32_t*)(e + 0xc) < 0x100000) return e;
+    return nullptr;
 }

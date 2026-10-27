@@ -5,6 +5,8 @@
 #define EMSCRIPTEN_KEEPALIVE
 #endif
 
+static_assert(2048 / 32 <= sizeof(d2game_crt::State::blocks) / sizeof(void*), "retail clamps count to 2048");
+
 namespace {
 void initializeBlock(d2game_crt::Descriptor* block) {
     for (uint32_t i = 0; i < 32; ++i) {

@@ -642,6 +642,13 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
     /** Whether the Battle.net config listed servers, and the region dialog's row centres if so. */
     gatewaysOpen() { return Boolean(gatewaySelector?.open); },
     key(code) { return gatewaySelector?.key(code) ?? false; },
+    // The retail gateway panel (4 GWListBox tiles) and a button blank, as CSS urls for the realm login dialog.
+    gatewayArt() {
+      const c = documentObject.createElement('canvas'); c.width = GATEWAY_LAYOUT.panel.w; c.height = GATEWAY_LAYOUT.panel.h;
+      const ctx = c.getContext('2d');
+      for (const t of GATEWAY_LAYOUT.panel.tiles) ctx.drawImage(frameCanvas(gatewayPanelDc6.frames[t.frame], skyPalette, documentObject), t.x, t.y);
+      return { panelImage: `url(${c.toDataURL()})`, buttonImage: `url(${gatewayButtonCanvas.toDataURL()})` };
+    },
     openGateways() { return gatewaySelector ? gatewaySelector.openDialog() : false; },
     gatewayTargets(width, height) { return gatewaySelector ? gatewaySelector.targets(width, height) : {}; },
     hover(x, y, width, height) {

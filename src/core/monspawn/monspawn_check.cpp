@@ -277,6 +277,8 @@ struct D2SessionObjectPresentation {
     uint32_t framePrecise, frameCountPrecise, componentMask;
     uint16_t animSpeed;
     uint8_t direction, selectable;   // selectable: Objects.txt Selectable<mode>, the client's hover test
+    uint8_t portalLevel, pad;        // town/perm portal: pObjectData->InteractType, the destination level id (else 0)
+    uint16_t pad2;
 };
 struct D2SessionItemPresentation {
     uint32_t id, classId, code, mode;
@@ -365,8 +367,8 @@ struct D2SessionUnitCoord {
 // D2SessionUnit ABI stable. The id makes its join to the unit list explicit.
 struct D2SessionUnitFacing {
     uint32_t id;
-    uint8_t direction, hasDynamicPath;
-    uint16_t reserved;
+    uint8_t direction, hasDynamicPath, lastHitClass, reserved; // lastHitClass: unit+0xB0, the 0x0D packet's hit-class byte
+    uint8_t typeFlags, pad; int16_t superUniqueId; // monster MonsterData nTypeFlag; SuperUniques row (wBossHcIdx) when superunique, else -1
 };
 struct D2SessionAttack {
     uint32_t version, size, gameFrame, state;
@@ -502,12 +504,12 @@ static_assert(sizeof(D2SessionSnapshot) == 68);
 static_assert(offsetof(D2SessionSnapshot, x) == 28 && offsetof(D2SessionSnapshot, y) == 32);
 static_assert(sizeof(D2SessionRoom) == 36);
 static_assert(sizeof(D2SessionUnit) == 44);
-static_assert(sizeof(D2SessionUnitFacing) == 8);
+static_assert(sizeof(D2SessionUnitFacing) == 12);
 static_assert(sizeof(D2SessionMonsterAnimation) == 96);
 static_assert(offsetof(D2SessionMonsterAnimation, animSpeed) == 88);
 static_assert(offsetof(D2SessionMonsterAnimation, baseWeaponClass) == 92);
 static_assert(sizeof(D2SessionMissileAnimation) == 24);
-static_assert(sizeof(D2SessionObjectPresentation) == 40);
+static_assert(sizeof(D2SessionObjectPresentation) == 44);
 static_assert(sizeof(D2SessionCoords) == 16);
 static_assert(sizeof(D2SessionItemPresentation) == 112);
 static_assert(sizeof(D2SessionItemState) == 40);
@@ -924,6 +926,27 @@ static void countSessionTilesSkipped() {
         if (level != g_lastLevel) countLevel(level);
 }
 
+// D2 Client D11: the server creates a monster-dropped item already in IMODE_ONGROUND (nSpawnType 3), so its
+// UNITS_ChangeAnimMode(ONGROUND) is a no-op and the clock stays 0/0 (frame 0 of a gold pile's bucket). Retail's
+// client builds its copy from the 0x9C packet (STORED -> ONGROUND), running UNITS_SetAnimStartFrame: 4096/4352.
+// The server unit is left alone (D2Game vectors compare it); only the client view is corrected.
+template <class P> static void clientLandedGroundClock(const D2UnitStrc* item, P& out) {
+    if (item->dwAnimMode == IMODE_ONGROUND && item->dwFrameCountPrecise == 0) { out.framePrecise = 4096; out.frameCountPrecise = 4352; }
+}
+// D25: retail's 0x9C "dropped to ground" builds the client item in IMODE_DROPPING and runs the flippy at
+// wAnimSpeed 256 (UNITS_SetAnimStartFrame, Units.cpp IMODE_DROPPING: 17 frames, one per game frame) before it
+// lands. The server creates the item already ONGROUND, so the client view replays that: an item first seen after
+// the session's first snapshot is presented as IMODE_DROPPING with the clock at (frames since first seen) << 8
+// for its first 17 frames. Server unit untouched. ponytail: "first seen after priming" stands in for the
+// packet's action byte (a ground item generated with its room would replay the flip once).
+template <class P> static void clientDropFlip(const D2UnitStrc* item, P& out) {
+    static const D2GameStrc* seenGame = nullptr; static uint32_t prime = 0; static std::unordered_map<uint32_t, uint32_t> first;
+    if (!g_game || item->dwAnimMode != IMODE_ONGROUND) return;
+    if (seenGame != g_game) { seenGame = g_game; first.clear(); prime = g_game->dwGameFrame; }
+    const uint32_t now = g_game->dwGameFrame, at = first.emplace(item->dwUnitId, now).first->second;
+    if (at <= prime || now - at >= 17) return;
+    out.mode = IMODE_DROPPING; out.framePrecise = (now - at) << 8; out.frameCountPrecise = 4352;
+}
 // The inventory graphic retail's panel draws for an item (F481). ItemsTxt.invfile is only the FIRST
 // candidate: a unique item (or a set item) whose quality-specific file is non-empty uses THAT, and an
 // item whose ItemTypes row carries variable inventory graphics -- the seven types with a non-zero
@@ -953,6 +976,8 @@ static void appendSessionItemPresentation(D2UnitStrc* item) {
     out.id = item->dwUnitId; out.classId = item->dwClassId; out.mode = item->dwAnimMode;
     out.quality = ITEMS_GetItemQuality(item); out.itemFlags = ITEMS_GetItemFlags(item);
     out.framePrecise = item->nSeqCurrentFramePrecise; out.frameCountPrecise = item->dwFrameCountPrecise;
+    clientLandedGroundClock(item, out);
+    clientDropFlip(item, out);
     if (item->pStaticPath) {
         out.x = item->pStaticPath->tGameCoords.nX; out.y = item->pStaticPath->tGameCoords.nY;
         out.gridX = (int16_t)item->pStaticPath->tGameCoords.nX;
@@ -1421,7 +1446,11 @@ static void updateSessionWorld() {
     countSessionTilesSkipped();
     if (!g_sessionLive || !g_lastLevel) return;
     uint32_t roomOrdinal = 0;
-    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext, ++roomOrdinal) {
+    // D14: a unit stays in its room (corpses included) after the player crosses into the next level, so the
+    // units of the seam levels' rooms are exported too; those rooms get seam ordinals and no D2SessionRoom.
+    D2DrlgLevelStrc* unitLevel = g_lastLevel;
+    for (; unitLevel; ) {
+    for (D2DrlgRoomStrc* roomEx = unitLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext, ++roomOrdinal) {
         D2ActiveRoomStrc* room = roomEx->pRoom;
         if (!room) continue;
         D2SessionRoom out = {};
@@ -1439,6 +1468,7 @@ static void updateSessionWorld() {
                 object.framePrecise = unit->nSeqCurrentFramePrecise; object.frameCountPrecise = unit->dwFrameCountPrecise;
                 object.animSpeed = unit->wAnimSpeed; object.direction = txt->nOrientation;
                 object.selectable = unit->dwAnimMode < 8 ? txt->nSelectable[unit->dwAnimMode] : 0;
+                if (txt->nSubClass & (OBJSUBCLASS_TOWNPORTAL | OBJSUBCLASS_PORTAL)) object.portalLevel = unit->pObjectData->InteractType;
                 const uint8_t* pieces = &txt->nHD;
                 for (uint32_t component = 0; component < 16; ++component) if (pieces[component]) object.componentMask |= 1u << component;
                 g_sessionObjectPresentations.push_back(object);
@@ -1471,6 +1501,12 @@ static void updateSessionWorld() {
                 const bool hasDynamicPath = (unit->dwUnitType == UNIT_PLAYER || unit->dwUnitType == UNIT_MONSTER || unit->dwUnitType == UNIT_MISSILE) && unit->pDynamicPath;
                 facing.hasDynamicPath = hasDynamicPath;
                 facing.direction = hasDynamicPath ? unit->pDynamicPath->nDirection : 0;
+                facing.lastHitClass = (uint8_t)unit->dwLastHitClass;
+                facing.superUniqueId = -1;
+                if (unit->dwUnitType == UNIT_MONSTER && unit->pMonsterData) {
+                    facing.typeFlags = (uint8_t)unit->pMonsterData->nTypeFlag;
+                    if (facing.typeFlags & MONTYPEFLAG_SUPERUNIQUE) facing.superUniqueId = (int16_t)unit->pMonsterData->wBossHcIdx;
+                }
                 g_sessionUnitFacings.push_back(facing);
             }
             if (unit->dwUnitType == UNIT_ITEM) appendSessionItemPresentation(unit);
@@ -1503,7 +1539,11 @@ static void updateSessionWorld() {
                 g_sessionMonsterAnimations.push_back(animation);
             }
         }
-        g_sessionRooms.push_back(out);
+        if (unitLevel == g_lastLevel) g_sessionRooms.push_back(out);
+    }
+    if (unitLevel == g_lastLevel) { roomOrdinal = 0x10000; unitLevel = g_lastLevel->pDrlg ? g_lastLevel->pDrlg->pLevel : nullptr; }
+    else unitLevel = unitLevel->pNextLevel;
+    if (unitLevel == g_lastLevel) unitLevel = unitLevel->pNextLevel;
     }
     if (g_targetPlayer && g_targetPlayer->pInventory) {
         for (D2UnitStrc* item = INVENTORY_GetFirstItem(g_targetPlayer->pInventory); item; item = INVENTORY_GetNextItem(item)) {
@@ -2286,6 +2326,90 @@ EMSCRIPTEN_KEEPALIVE int d2_aitarget_player_swing() {
         : D2GAME_PACKETCALLBACK_Rcv0x06_LeftSkillOnUnit_6FC83550(g_game, g_targetPlayer, packet, sizeof packet);
     --g_game->dwGameFrame;
     return (r << 16) | (int)(id & 0xFFFF);
+}
+// D18 skill probe: the attached fixture (class set by d2_aitarget_set_player_class) becomes level 30
+// with `skillId` at slvl 1 and 500 mana, selects it on the right hand and casts it at the nearest
+// monster (mode 0: unit packet 0x0D, 1: location packet 0x0C at the monster, 2: location at self),
+// then runs 60 frames. out[] (int32): 0 handler rc, 1 first mode after cast, 2 modes seen bitmask
+// (player modes 0..15), 3 largest one-frame mana drop (raw), 4 player hp delta, 5 summed monster hp delta, 6 missiles seen,
+// 7 new monsters, 8 player states gained, 9 monster states gained, 10 mode packets, 11 skill assigned, 12 Skills.txt flags[0], 13 srvdofunc | srvstartfunc << 16, 14 Skills.txt cost at slvl 1 (raw).
+extern "C" uint32_t g_d2webModePackets;
+EMSCRIPTEN_KEEPALIVE int d2_aiframe_advance(int frames);
+static int32_t g_skillProbe[15];
+static int skillProbeCountStates(D2UnitStrc* u, uint8_t* seen) {
+    int n = 0; for (int s = 1; s < 200; s++) if (STATES_CheckState(u, s) && !seen[s]) { seen[s] = 1; n++; } return n;
+}
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_skillprobe_cast(int skillId, int mode) {
+    memset(g_skillProbe, 0, sizeof g_skillProbe); g_skillProbe[0] = -99;
+    if (!g_game || !g_lastLevel || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return g_skillProbe;
+    D2UnitStrc* p = g_targetPlayer;
+    STATLIST_SetUnitStat(p, STAT_LEVEL, 30, 0);
+    STATLIST_SetUnitStat(p, STAT_HITPOINTS, 500 << 8, 0); STATLIST_SetUnitStat(p, STAT_MAXHP, 500 << 8, 0);
+    STATLIST_SetUnitStat(p, STAT_MANA, 500 << 8, 0); STATLIST_SetUnitStat(p, STAT_MAXMANA, 500 << 8, 0);
+    STATLIST_SetUnitStat(p, STAT_STRENGTH, 30, 0); STATLIST_SetUnitStat(p, STAT_DEXTERITY, 30, 0);
+    STATLIST_SetUnitStat(p, STAT_ENERGY, 30, 0); STATLIST_SetUnitStat(p, STAT_VITALITY, 30, 0);
+    SKILLS_AssignSkill(p, skillId, 1, 0, __FILE__, __LINE__);
+    g_skillProbe[11] = SKILLS_GetSkillById(p, skillId, -1) != nullptr;
+    if (D2SkillsTxt* t = DATATBLS_GetSkillsTxtRecord(skillId)) { g_skillProbe[12] = (int32_t)t->dwFlags[0]; g_skillProbe[13] = t->wSrvDoFunc | (t->wSrvStartFunc << 16);
+        // Skills.txt's own cost at slvl 1, read straight from the record (not through the engine's cost path): max(mana, minmana) << manashift, 1/256 mana units.
+        g_skillProbe[14] = std::max<int>(t->wMana, t->wMinMana) << t->nManaShift; }
+    uint8_t sel[9] = { 0x3C }; const uint32_t word = (uint32_t)skillId; const int32_t owner = -1; memcpy(sel + 1, &word, 4); memcpy(sel + 5, &owner, 4);
+    D2GAME_PACKETCALLBACK_Rcv0x3C_SelectSkill_6FC87050(g_game, p, sel, sizeof sel);
+    const int px = p->pDynamicPath->tGameCoords.wPosX, py = p->pDynamicPath->tGameCoords.wPosY;
+    D2UnitStrc* best = nullptr; int64_t bestD = INT64_MAX; int monsBefore = 0;
+    std::map<uint32_t, int> hp0; std::set<uint32_t> known;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
+        if (!roomEx->pRoom) continue;
+        for (D2UnitStrc* u = roomEx->pRoom->pUnitFirst; u; u = u->pRoomNext) {
+            if (u->dwUnitType != UNIT_MONSTER || !u->pDynamicPath) continue;
+            monsBefore++; known.insert(u->dwUnitId); hp0[u->dwUnitId] = STATLIST_UnitGetStatValue(u, STAT_HITPOINTS, 0);
+            if (u->dwAnimMode == MONMODE_DEAD || u->dwAnimMode == MONMODE_DEATH) continue;
+            const int64_t dx = u->pDynamicPath->tGameCoords.wPosX - px, dy = u->pDynamicPath->tGameCoords.wPosY - py, d = dx * dx + dy * dy;
+            if (d < bestD || (d == bestD && best && u->dwUnitId < best->dwUnitId)) { bestD = d; best = u; }
+        }
+    }
+    if (!best) { g_skillProbe[0] = -98; return g_skillProbe; }
+    uint8_t seenP[200] = {}, seenM[200] = {};
+    skillProbeCountStates(p, seenP);   // baseline: states present before the cast do not count
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext)
+        if (roomEx->pRoom) for (D2UnitStrc* u = roomEx->pRoom->pUnitFirst; u; u = u->pRoomNext) if (u->dwUnitType == UNIT_MONSTER) skillProbeCountStates(u, seenM);
+    const int mana0 = STATLIST_UnitGetStatValue(p, STAT_MANA, 0), hp = STATLIST_UnitGetStatValue(p, STAT_HITPOINTS, 0);
+    const uint32_t pk0 = g_d2webModePackets;
+    ++g_game->dwGameFrame;
+    int32_t rc;
+    if (mode == 0) {
+        uint8_t packet[9] = { 0x0D }; const uint32_t type = UNIT_MONSTER, id = best->dwUnitId; memcpy(packet + 1, &type, 4); memcpy(packet + 5, &id, 4);
+        rc = D2GAME_PACKETCALLBACK_Rcv0x0D_RightSkillOnUnit_6FC83F80(g_game, p, packet, sizeof packet);
+    } else {
+        uint8_t packet[5] = { 0x0C }; const uint16_t x = mode == 1 ? best->pDynamicPath->tGameCoords.wPosX : px, y = mode == 1 ? best->pDynamicPath->tGameCoords.wPosY : py;
+        memcpy(packet + 1, &x, 2); memcpy(packet + 3, &y, 2);
+        rc = D2GAME_PACKETCALLBACK_Rcv0x0C_RightSkill_6FC83EF0(g_game, p, packet, sizeof packet);
+    }
+    --g_game->dwGameFrame;
+    g_skillProbe[0] = rc; g_skillProbe[1] = (int32_t)p->dwAnimMode;
+    int manaNow = mana0 - STATLIST_UnitGetStatValue(p, STAT_MANA, 0), manaPrev = mana0 - manaNow;
+    std::set<uint32_t> missiles; int newMons = 0, msGain = 0;
+    for (int f = 0; f < 60; f++) {
+        d2_aiframe_advance(1);
+        { const int cur = STATLIST_UnitGetStatValue(p, STAT_MANA, 0); manaNow = std::max(manaNow, manaPrev - cur); manaPrev = cur; }   // retail takes the mana in the do frame, not at the packet; the largest one-frame drop is the cost less that frame's regen
+        g_skillProbe[2] |= 1 << (p->dwAnimMode & 15);
+        for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
+            if (!roomEx->pRoom) continue;
+            for (D2UnitStrc* u = roomEx->pRoom->pUnitFirst; u; u = u->pRoomNext) {
+                if (u->dwUnitType == UNIT_MISSILE) missiles.insert(u->dwUnitId);
+                else if (u->dwUnitType == UNIT_MONSTER) { if (known.insert(u->dwUnitId).second) newMons++; msGain += skillProbeCountStates(u, seenM); }
+            }
+        }
+    }
+    int dmg = 0;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext)
+        if (roomEx->pRoom) for (D2UnitStrc* u = roomEx->pRoom->pUnitFirst; u; u = u->pRoomNext)
+            if (u->dwUnitType == UNIT_MONSTER && hp0.count(u->dwUnitId)) dmg += hp0[u->dwUnitId] - STATLIST_UnitGetStatValue(u, STAT_HITPOINTS, 0);
+    g_skillProbe[3] = manaNow;   // raw 1/256 mana spent by the cast itself, before any regen frame
+    g_skillProbe[4] = (STATLIST_UnitGetStatValue(p, STAT_HITPOINTS, 0) - hp) >> 8;
+    g_skillProbe[5] = dmg >> 8; g_skillProbe[6] = (int32_t)missiles.size(); g_skillProbe[7] = newMons;
+    g_skillProbe[8] = skillProbeCountStates(p, seenP); g_skillProbe[9] = msGain; g_skillProbe[10] = (int32_t)(g_d2webModePackets - pk0);
+    return g_skillProbe;
 }
 EMSCRIPTEN_KEEPALIVE int d2_aitarget_attach_at(int x, int y) {
     g_attachAtX = x; g_attachAtY = y; g_fixtureOwnRoomOnly = true;
@@ -5325,6 +5449,7 @@ static void appendVendorPresentation(D2UnitStrc* item) {
     out.id = item->dwUnitId; out.classId = item->dwClassId; out.mode = item->dwAnimMode;
     out.quality = ITEMS_GetItemQuality(item); out.itemFlags = ITEMS_GetItemFlags(item);
     out.framePrecise = item->nSeqCurrentFramePrecise; out.frameCountPrecise = item->dwFrameCountPrecise;
+    clientLandedGroundClock(item, out);
     if (item->pStaticPath) {
         out.x = item->pStaticPath->tGameCoords.nX; out.y = item->pStaticPath->tGameCoords.nY;
         out.gridX = (int16_t)item->pStaticPath->tGameCoords.nX;
@@ -5612,14 +5737,6 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_session_item_quantity(uint32_t itemId) {
     D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId);
     return item ? STATLIST_UnitGetStatValue(item, STAT_QUANTITY, 0) : -1;
 }
-// ITEMS_GetItemFlags of a server item unit, live (never composing a save file the way
-// d2_session_save_d2s does) -- so a scenario can read the delivery flags a unit still carries
-// mid-frame, C3r's own evidence that the per-frame flush (not only the save boundary) clears them.
-EMSCRIPTEN_KEEPALIVE int32_t d2_session_item_flags(uint32_t itemId) {
-    if (!g_sessionLive || !g_game) return -1;
-    D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId);
-    return item ? (int32_t)ITEMS_GetItemFlags(item) : -1;
-}
 // ITEMS_IsQuestItem of a server item unit: Items.txt's own nQuest column, which is the level's data
 // and not a code list in the client. The shared player's "part with this" pick (lib/player.mjs
 // `disposable`) already says it keeps quest items -- its keep-list was codes and missed `ice`, so a
@@ -5786,6 +5903,11 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_fixture_quality_item(uint32_t code, uin
 EMSCRIPTEN_KEEPALIVE int d2_session_item_quality(uint32_t itemId) {
     D2UnitStrc* item = (g_sessionLive && g_game) ? SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId) : nullptr;
     return item && item->pItemData ? (int)item->pItemData->dwQualityNo : -1;
+}
+// Item flags for the client's ground label colour (D2Client 0x58FB0: ethereal 0x400000 / socketed 0x800 -> grey).
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_flags(uint32_t itemId) {
+    D2UnitStrc* item = (g_sessionLive && g_game) ? SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId) : nullptr;
+    return item && item->pItemData ? (uint32_t)item->pItemData->dwItemFlags : 0;
 }
 // F114: the SetItems.txt row index an item carries (ITEMS_GetFileIndex) -- for a SET item, which set
 // item the chooser (ItemsMagic sub_6FC542C0) picked. The set chooser and the file-index read are two
@@ -6331,6 +6453,9 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_left_skill(uint32_t targetUnitId);
 
 EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath || frames < 0) return 0;
+    // a retail recording: server->client packets a tick queues (NPC quest-marker 0x8A) are the tick's own stream.
+    D2WEB_ResetPacketStream();
+    struct StreamRefresh { ~StreamRefresh() { D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets); } } streamRefresh;
     for (int i = 0; i < frames; ++i) {
         // Advance the mirrored Fog pool lifetimes once per headless simulation frame. Native
         // D2Client updates these pools before its candidate pass, but this engine tick currently
@@ -6359,13 +6484,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         // pending move kept the last path stepping after a throw started (the glide: throw sequence
         // over a translating unit).
         if (g_sessionMovePending && !dying && !UNITS_IsInMovingMode(g_targetPlayer)) g_sessionMovePending = false;
-        // Deferred item interaction still relies on the headless session's legacy pre-event path
-        // step. Keep it until the missing retail interaction-completion callback is recovered.
-        if (g_sessionMovePending && !dying && !D2Common_10226(g_targetPlayer, 1024) && !(g_targetPlayer->pPlayerData && g_targetPlayer->pPlayerData->unk0xA8[42])) {   // not while a 0x13 approach is pending: the reset drops its interact (s396)
-            D2ActiveRoomStrc* room = g_targetPlayer->pDynamicPath->pRoom;
-            SUNIT_SetCombatMode(g_game, g_targetPlayer,
-                room && DUNGEON_IsRoomInTown(room) ? PLRMODE_TOWNNEUTRAL : PLRMODE_NEUTRAL);
-        }
+        // 1.13c: the mode handler steps the path once per frame; the legacy pre-event step also moved approach walks (item/object/monster) ~2.5x too fast (D21)
         if (!d2_aiframe_advance(1)) return 0;
         // F715: the walk a ground-pickup command started (sub_6FC828D0's ITEM branch) has no
         // completion here -- the hero reaches the pile and nothing picks it up (measured: at distance
@@ -6388,7 +6507,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             D2DynamicPathStrc* const ppath = g_targetPlayer->pDynamicPath;
             if (!pending || pending->dwAnimMode != IMODE_ONGROUND || !UNITS_GetRoom(pending)) {
                 g_sessionPendingPickup = 0;
-            } else if (!ppath || ppath->pTargetUnit != pending) {
+            } else if (!ppath || !d2::monspawn::pickupStillOurs(ppath->pTargetUnit == pending, sub_6FC7FB90(g_targetPlayer), (unsigned)sub_6FC7FBB0(g_targetPlayer), g_sessionPendingPickup)) {
                 // The path's own goal is not this pile (repointed by another interaction, or cleared
                 // by a plain move): the pickup this command started was superseded. Forget it.
                 g_sessionPendingPickup = 0;
@@ -8291,6 +8410,25 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_title(uint32_t itemId, char* buf, 
     if (!g_sessionLive || !g_game || !buf || !cap) return 0;
     D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId);
     D2ItemsTxt* t = item ? DATATBLS_GetItemsTxtRecord(item->dwClassId) : nullptr;
+    auto baseName = [&] { std::string code(t->szCode, 4); while (!code.empty() && (code.back() == ' ' || code.back() == 0)) code.pop_back();
+        std::string base; const std::u16string* v = d2::sharedLang().find(code.c_str()); if (v) appendNarrow(base, v->c_str()); return base; };
+    auto emit = [&](const std::string& out) { const uint32_t n = out.size() < cap - 1 ? (uint32_t)out.size() : cap - 1; memcpy(buf, out.data(), n); buf[n] = 0; return n; };
+    if (t && item->pItemData && d2::item_text::identified(item->pItemData->dwItemFlags) &&
+        (item->pItemData->dwQualityNo == ITEMQUAL_UNIQUE || item->pItemData->dwQualityNo == ITEMQUAL_SET || item->pItemData->dwQualityNo == ITEMQUAL_RARE)) {
+        // Identified unique/set/rare: the record's own tbl string (colour is the quality's), then the base name on a second line.
+        std::string nm;
+        if (item->pItemData->dwQualityNo == ITEMQUAL_UNIQUE) { const D2UniqueItemsTxt* u = ITEMS_GetUniqueItemsTxtRecord(item->pItemData->dwFileIndex); if (u) appendNarrow(nm, langIdx(u->wTblIndex)); }
+        else if (item->pItemData->dwQualityNo == ITEMQUAL_SET) { const D2SetItemsTxt* s = ITEMS_GetSetItemsTxtRecord(item->pItemData->dwFileIndex); if (s) appendNarrow(nm, langIdx(s->wStringId)); }
+        else {
+            // Rare: "<rare prefix> <rare suffix>" from rareprefix/raresuffix.txt (wStringId is the tbl index).
+            for (uint16_t id : { item->pItemData->wRarePrefix, item->pItemData->wRareSuffix }) {
+                const D2RareAffixTxt* r = id ? DATATBLS_GetRareAffixTxtRecord(id) : nullptr;
+                if (r) { if (!nm.empty()) nm += ' '; appendNarrow(nm, langIdx(r->wStringId)); }
+            }
+        }
+        if (nm.empty()) return 0;
+        return emit(nm + "\n" + baseName());
+    }
     if (!t || !item->pItemData || item->pItemData->dwQualityNo != ITEMQUAL_MAGIC ||
         !d2::item_text::identified(item->pItemData->dwItemFlags)) return 0;
     auto aff = [&](uint16_t id) { std::string x; const D2MagicAffixTxt* r = id ? DATATBLS_GetMagicAffixTxtRecord(id) : nullptr; if (r) appendNarrow(x, langIdx(r->wTblIndex)); return x; };
@@ -9006,6 +9144,12 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_monster_light_policy_probe() {
     if (!d2::monspawn::terminalDeathUnlinksLight(MONMODE_NEUTRAL, 1, true)) result |= 64u;
     if (!d2::monspawn::terminalDeathUnlinksLight(MONMODE_DEATH, 1, false)) result |= 128u;
     return result;
+}
+
+// The act's raw period of day (0 day, 1 dusk, 2 night, 3 dawn) -- D2Common #10396's value the D2Client ambience selector reads (1..3 = night variants).
+EMSCRIPTEN_KEEPALIVE int d2_session_period_of_day() {
+    if (!g_sessionLive || !g_game) return 0;
+    return ENVIRONMENT_GetPeriodOfDayFromAct(g_game->pAct[g_currentAct], 0);
 }
 
 EMSCRIPTEN_KEEPALIVE const D2SessionLightmap* d2_session_lightmap(int ambientOverride, int occludeUnits) {

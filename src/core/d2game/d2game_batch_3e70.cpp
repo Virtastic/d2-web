@@ -66,6 +66,7 @@ static D2GameCrtLock g_crtLockTable[0x24] = {
     {nullptr,1},{nullptr,1},{nullptr,1},{nullptr,0},{nullptr,1},{nullptr,1},{nullptr,1}
 };
 alignas(CRITICAL_SECTION) static uint8_t g_crtStaticLockSections[0x24 * 0x18];
+extern "C" void d2game_crt_lock_set(uint32_t index, void* p) { g_crtLockTable[index].section = p; }
 extern "C" void* d2game_crt_lock_section(uint32_t index) { return g_crtLockTable[index].section; }
 // 0x6FD2FD74 / 0x6FD2FD78: __error_mode / __app_type.
 static int32_t g_errorMode;
@@ -102,12 +103,15 @@ EMSCRIPTEN_KEEPALIVE uint64_t d2game_aulldiv(uint32_t lo, uint32_t hi, uint32_t 
     return ((uint64_t)hi << 32 | lo) / ((uint64_t)dhi << 32 | dlo);
 }
 
+// Probe seam for __unlock (0x3F76): the vector probe swaps this to log the section pointer.
+extern "C" void (*d2game_leave_cs_3f76)(LPCRITICAL_SECTION) = LeaveCriticalSection;
+
 // 1.13c D2Game+0x3F76: `mov eax,[esp+4]; mov eax,[0x6FD1F210 + eax*8]; push eax; call
 // LeaveCriticalSection` -- release lock number lockNum. The table slot holds the CRITICAL_SECTION
 // pointer; the compat build's critical sections are no-ops, so the table read and call are the rule.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3f76(int32_t lockNum) {
-    LeaveCriticalSection((LPCRITICAL_SECTION)g_crtLockTable[(uint32_t)lockNum].section);
+EMSCRIPTEN_KEEPALIVE void d2game_unlock_3f76(int32_t lockNum) {
+    d2game_leave_cs_3f76((LPCRITICAL_SECTION)g_crtLockTable[(uint32_t)lockNum].section);
 }
 
 // 1.13c D2Game+0x3F8B (__mtinitlocknum): create the critical section for lock lockNum. Returns 1 when
@@ -293,7 +297,7 @@ static int32_t d2game_fmt_state(int32_t klass, int32_t state) {
 // width, precision and padding rule is below. Fixed-size workspaces: 0x200 bytes of digit/char buffer
 // (retail's local_210 + local_1e4 + local_11) and the wide-character conversion scratch.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_43e0(CrtFileStrc* file, const uint8_t* format,
+EMSCRIPTEN_KEEPALIVE int32_t d2_game_43e0(CrtFileStrc* file, const uint8_t* format,
                                                const uint8_t* args, const D2GameBatch16Env* env) {
     int32_t count = 0;                  // running output count (-1 = write error)
     int32_t state = 0;                  // format state machine

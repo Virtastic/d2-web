@@ -21,6 +21,7 @@ import { characterCardHitBox, createCharacterSelectCardInput } from './charselec
 import { isButtonHeldOverTarget } from './frontend-pointer-states.mjs';
 import { decodeCof, decodeDcc } from './unit-formats.mjs';
 import { playerClassInfo, dccDirection } from './unit-renderer.mjs';
+import { tnFrame, drawsSince } from './charselect-anim.mjs';
 
 export const SELECT_ASSETS = {
   background: 'data\\global\\ui\\CharSelect\\characterselectscreenEXP.dc6',
@@ -201,7 +202,8 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
     c.getContext('2d').putImageData(new ImageData(rgba, frame.width, frame.height), 0, 0);
     return c;
   };
-  const portrait = (ch) => {
+  const dccCache = new Map();
+  const portrait = (ch, animated = null) => {
     const empty = { trace: [], drawable: [], missing: [], wclass: null, width: 0, height: 0, identity: null };
     try {
       const token = playerClassInfo(ch.playerClass).token, app = ch.appearance || [], appColours = ch.appearanceColours || [];
@@ -216,7 +218,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       // [LG,TR,LA,RA,S1,S2,HD,SH,RH]; priority[4][12] is a different permutation of the same nine.
       const cofDirection = Math.trunc(((0 % 64) + 64) % 64 * cof.directions / 64);
       const artDirection = dccDirection(0, cof.directions);
-      const frameIndex = Math.min(12, cof.framesPerDirection - 1);
+      const frameIndex = animated ? animated(cof) : Math.min(12, cof.framesPerDirection - 1);
       // The COF, not the files that happened to load, defines the composition: every layer record gets a
       // trace, so a DCC that failed to resolve is reported rather than silently dropped and a partial
       // portrait cannot pass for a complete one (s291 asserts on these traces).
@@ -238,7 +240,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
         if (!comp) { entry.error = `COF component ${layer.component} has no DCC directory`; continue; }
         entry.path = `data\\global\\CHARS\\${token}\\${comp}\\${token}${comp}${base}TN${entry.weaponClass}.DCC`;
         try {
-          const dcc = decodeDcc(read(entry.path), { directions: [artDirection] });
+          const dcc = dccCache.get(entry.path) ?? (dccCache.set(entry.path, decodeDcc(read(entry.path), { directions: [artDirection] })), dccCache.get(entry.path));
           if (artDirection >= dcc.directions || frameIndex >= dcc.framesPerDirection) throw new RangeError(`no direction ${artDirection} frame ${frameIndex}`);
           frames.set(layer.component, dcc.directionRecords[artDirection].frames[frameIndex]);
           if (transform) colourTransforms.set(layer.component, transform);
@@ -265,7 +267,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
         minX = Math.min(minX, left); minY = Math.min(minY, top);
         maxX = Math.max(maxX, left + frame.width); maxY = Math.max(maxY, top + frame.height);
       }
-      return { trace, drawable, missing, wclass, width: maxX > minX ? maxX - minX : 0, height: maxY > minY ? maxY - minY : 0,
+      return { anim: { count: cof.framesPerDirection, speed: cof.speed }, trace, drawable, missing, wclass, width: maxX > minX ? maxX - minX : 0, height: maxY > minY ? maxY - minY : 0,
         identity: { name: ch.name, playerClass: ch.playerClass, classToken: token,
           appearance: Array.from(app), appearanceColours: Array.from(ch.appearanceColours || []),
           wclass, direction: 0, dccDirection: artDirection, frame: frameIndex,
@@ -276,6 +278,18 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
   const list = characters.slice(0, 8);
   let portraits = list.map(portrait);
   let drawnPortraits = [];
+  // Select-screen animation: the TN loop runs on the shared tick, restarting when a card is selected.
+  let tick = 0, started = [];
+  const frames = new Map();
+  const portraitAt = (i) => {
+    const base = portraits[i];
+    if (!base?.anim) return base;
+    const f = tnFrame(drawsSince(tick, started[i] ?? 0), base.anim.speed, base.anim.count);
+    const key = `${list[i].name}:${f}`;
+    if (!frames.has(key)) frames.set(key, portrait(list[i], () => f));
+    return frames.get(key);
+  };
+  const select = (i) => { if (i !== selected) started[i] = tick; selected = i; };
   let selected = list.length ? 0 : -1;
   // The delete confirmation retail opens over the screen (character_select.go
   // toggleDeleteCharacterDialog): while it is open nothing behind it takes a click.
@@ -346,7 +360,9 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
         pointer,
       };
     },
-    selectByName(name) { const i = list.findIndex((ch) => ch.name === name); if (i >= 0) selected = i; return i; },
+    step() { tick++; },
+    get tick() { return tick; }, set tick(v) { tick = v; },
+    selectByName(name) { const i = list.findIndex((ch) => ch.name === name); if (i >= 0) select(i); return i; },
     play() {
       if (deleteFlow.blocked || selected < 0) return false;
       const character = list[selected];
@@ -363,7 +379,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
     hover(x, y, width, height) { const v = view(width, height), p = { x: (x - v.ox) / v.scale, y: (y - v.oy) / v.scale };
       pointer = [Math.trunc(p.x), Math.trunc(p.y)]; hot = hitControl(p); },
     /** The store's listing changed under us (a character was deleted): rebuild the portraits. */
-    setCharacters(next) { list.length = 0; list.push(...next.slice(0, 8)); portraits = list.map(portrait);
+    setCharacters(next) { frames.clear(); started = []; list.length = 0; list.push(...next.slice(0, 8)); portraits = list.map(portrait);
       selected = list.length ? Math.max(0, Math.min(selected, list.length - 1)) : -1; deleteFlow.cancel(); },
     /** Canvas-pixel centres of the SAME boxes click() tests. */
     targets(width, height) {
@@ -389,7 +405,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       if (inBox(p, buttonBox('exit'))) { onCancel?.(); return 'exit'; }
       if (inBox(p, buttonBox('convert'))) { if (convertDisabled()) return null; void onConvert?.(list[selected].name); return 'convert'; }
       if (inBox(p, buttonBox('delete'))) { if (selected >= 0 && deleteFlow.arm(selected)) return 'delete-arm'; return null; }
-      for (let i = 0; i < list.length; i++) if (inBox(p, cardBox(i))) { selected = i; return list[i].name; }
+      for (let i = 0; i < list.length; i++) if (inBox(p, cardBox(i))) { select(i); return list[i].name; }
       return null;
     },
     press(x, y, width, height) {
@@ -398,7 +414,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       if (pressed?.startsWith('card-') && !deleteFlow.blocked) {
         const index = Number(pressed.slice('card-'.length));
         const wasSelected = selected;
-        selected = index;
+        select(index);
         if (cardInput.down(index, wasSelected, globalThis.performance?.now?.() ?? Date.now()) && selected >= 0) {
           this.play();
         }
@@ -459,7 +475,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
           recordDc6(SELECT_ASSETS.box, 0, boxDc6.frames[0], box.x, box.y);
           if (boxParts[1]) recordDc6(SELECT_ASSETS.box, 1, boxDc6.frames[1], box.x + boxParts[0].width, box.y);
         }
-        const pt = portraits[i];
+        const pt = portraitAt(i);
         if (pt) {
           // One cel per layer, in the COF's priority order, each recorded at retail's own anchor for the
           // portrait so the draw list names the same nine files, in the same order, as retail's does.

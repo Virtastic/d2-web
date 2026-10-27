@@ -135,3 +135,9 @@ export function createDeathScreen({ read, decodeDc6, decodeDatPalette, string, d
     },
   };
 }
+
+/** D2Client 1.13c +0xBEE60: a player draws the screen in mode 0 (the death animation) as well as 17 (dead). */
+export const deathScreenShown = (mode) => mode === 0 || mode === 17;
+
+/** D2Game Rcv0x41 (resurrect) accepts only PLRMODE_DEAD (17): Esc during the death animation (mode 0) is refused server-side. */
+export const respawnAllowed = (mode) => mode === 17;

@@ -53,7 +53,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_4dc70(D2cHost h, D2c4dc70Env* E, 
             if (p1 == 0x14) { cl(h, O + 10168, 0, 0, iVar1, p3[5] & 0xff); cl(h, O + 11005, 0, 0, iVar1, p3[2] & 0xff); }
         }
         cl(h, O + 11103, 0, 0, (uint32_t)(uintptr_t)u, 0);
-        cl(h, 0x212F0, (uint32_t)(uintptr_t)u, 0, 0, 0);   // FUN_6fad12f0(u,0,0)
+        cl(h, 0x212F0, 0, 0, (uint32_t)(uintptr_t)u, 0, 0);   // FUN_6fad12f0(u,0,0): cdecl, all stack
     }
     int32_t t1 = (int32_t)u[1];
     if (t1 < 0) return;
@@ -75,7 +75,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_4dc70(D2cHost h, D2c4dc70Env* E, 
                 cl(h, O + 10819, 0, 0, U, mon, 0x945);
             }
         }
-        cl(h, 0x212F0, U, 0, 0, 1);                           // FUN_6fad12f0(u,0,1)
+        cl(h, 0x212F0, 0, 0, U, 0, 1);                         // FUN_6fad12f0(u,0,1)
         if (u[0] == 1 && u[5] && (*(uint8_t*)(uintptr_t)(u[5] + 0x28) & 1)) {
             if (u[4] != 1) tail();
             if (iVar1) cl(h, O + 10159, 0, 0, iVar1);
@@ -149,7 +149,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_4dc70(D2cHost h, D2c4dc70Env* E, 
             walk();
             if (b3) cl(h, 0x4C500, 0, 0, U);
             cl(h, 0xA4B60);
-            cl(h, 0x212F0, U, 0, 0, 3);
+            cl(h, 0x212F0, 0, 0, U, 0, 3);
         }
         break;
     case 7:
@@ -303,7 +303,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_4dc70(D2cHost h, D2c4dc70Env* E, 
         cl(h, 0xA4B60);
         cl(h, 0x2A590, 0, 0, 0xd, U);
         cl(h, 0x24490, 0, 0, 0xd, 1);
-        cl(h, 0x212F0, U, 0, 0, 3);
+        cl(h, 0x212F0, 0, 0, U, 0, 3);
         break;
     }
     case 0x14:

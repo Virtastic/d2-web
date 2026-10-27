@@ -57,6 +57,7 @@
 // (G13) -- are worked with the same buttons and the same grid mechanism: while one is up, the d-pad
 // moves the grid's highlight instead of the belt and A commits the highlighted cell, Y hides the grid
 // so the cursor reaches whatever is under it. See "The pad's two text fields" below.
+import { OVERLAY_FONT } from './input-touch.mjs';
 import { click, pointer, tapKey, playerOnCanvas, stickTarget } from './input-common.mjs';
 import { selectPrimaryTarget } from '../gameplay-model.mjs';
 import { modalPointerOwner } from './modal-pointer-priority.mjs';
@@ -337,7 +338,7 @@ function makeGrid(viewport, id, rows, cols, box) {
       cell.textContent = label;
       Object.assign(cell.style, {
         width: `${100 / cols}%`, boxSizing: 'border-box', textAlign: 'center', lineHeight: '1.35',
-        fontFamily: 'monospace', color: '#d8d8d8', background: 'rgba(0,0,0,0.65)',
+        fontFamily: OVERLAY_FONT, color: '#d8d8d8', background: 'rgba(0,0,0,0.65)',
         border: '1px solid #4a4a4a', borderRadius: '2px', overflow: 'hidden',
       });
       line.appendChild(cell);

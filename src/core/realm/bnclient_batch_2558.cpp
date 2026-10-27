@@ -48,13 +48,18 @@ static int* bn_ptd_errno(void)    { return (int*)((uint8_t*)bn_getptd() + 0x08);
 static int* bn_ptd_doserrno(void) { return (int*)((uint8_t*)bn_getptd() + 0x0C); }   // _tdoserrno
 static int** bn_ptd_tfpecode(void) { return (int**)((uint8_t*)bn_getptd() + 0x64); } // _tfpecode
 
+// Retail's tlocinfo fields are 4-byte pointers at +0x2C/+0x30/+0x34/+0x40/+0x4C; host pointers are wider, so
+// each field holds a 32-bit handle into this table (0 = null) and neighbouring fields never overlap.
+static void* g_bn_ptr_tab[16];
 static int* bn_load_ptr(const int* base, uint32_t off) {
-    int* p;
-    std::memcpy(&p, (const uint8_t*)base + off, sizeof p);
-    return p;
+    uint32_t h;
+    std::memcpy(&h, (const uint8_t*)base + off, sizeof h);
+    return h ? (int*)g_bn_ptr_tab[h] : nullptr;
 }
 static void bn_store_ptr(int* base, uint32_t off, int* p) {
-    std::memcpy((uint8_t*)base + off, &p, sizeof p);
+    uint32_t h = 0;
+    if (p) { h = 1; while (g_bn_ptr_tab[h] && g_bn_ptr_tab[h] != p) ++h; g_bn_ptr_tab[h] = p; }  // ponytail: 15 distinct pointers max
+    std::memcpy((uint8_t*)base + off, &h, sizeof h);
 }
 
 static void bn_prepare_default_locale(int* def) {
@@ -207,16 +212,16 @@ EMSCRIPTEN_KEEPALIVE int32_t bn_updatetlocinfo_lk(const BnCrt2558Env* env) {
     if (loc != def) {
         bn_prepare_default_locale(def);
         if (loc != nullptr) {
-            int* p = bn_load_ptr(loc, 0x0B);
+            int* p = bn_load_ptr(loc, 0x2C);
             --*loc;
             if (p != nullptr) --*p;
-            p = bn_load_ptr(loc, 0x0D);
+            p = bn_load_ptr(loc, 0x34);
             if (p != nullptr) --*p;
-            p = bn_load_ptr(loc, 0x0C);
+            p = bn_load_ptr(loc, 0x30);
             if (p != nullptr) --*p;
-            p = bn_load_ptr(loc, 0x10);
+            p = bn_load_ptr(loc, 0x40);
             if (p != nullptr) --*p;
-            p = bn_load_ptr(loc, 0x13);
+            p = bn_load_ptr(loc, 0x4C);
             if (p != nullptr) --*(int*)((uint8_t*)p + 0xB4);
         }
         *slot = def;

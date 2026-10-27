@@ -145,6 +145,14 @@ export function controlActionForKey(bindings, code) {
   return null;
 }
 
+/** The key name bound to each Use Belt 1-4 slot (primary, else secondary), null when unbound: the belt's hotkey labels. */
+export function beltKeyNames(bindings) {
+  return [1, 2, 3, 4].map((n) => {
+    const slot = CONFIGURE_CONTROLS_SLOTS.findIndex((e) => e && e[0] === `Use Belt ${n}`);
+    return bindings?.[slot]?.find((k) => k) || null;
+  });
+}
+
 const blank = () => CONFIGURE_CONTROLS_SLOTS.map((s) => (s ? [s[1], s[2]] : null));
 
 const keyCodes = [

@@ -30,6 +30,9 @@ void shortSort(char* lo, char* hi, size_t width, Compare cmp) {
 // 1.13c D2Common+0x01BB0
 // Both retail callers are the ItemsTbls loaders already using this native owner.
 // Cached 1.13c confirms pivot relocation, equal-key trimming and larger-side stack.
+// FN probe entry (src/core/fn/d2common_1b40.cpp): retail _shortsort(lo, width, cmp) with the high bound in EAX.
+extern "C" void d2web_msvc_shortsort(char* lo, char* hi, size_t width, Compare cmp) { shortSort(lo, hi, width, cmp); }
+
 extern "C" void d2web_msvc_qsort(void* base, size_t num, size_t width, Compare cmp) {
     if (num < 2 || width == 0) return;
     char* lostk[kStackSize]; char* histk[kStackSize]; int stkptr = 0;

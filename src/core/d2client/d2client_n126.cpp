@@ -186,7 +186,7 @@ void sub_93450(P arg1,I arg2,const G93450&g,const Fn93450&f){
  W*const all[]={b60,ba60,b860,b1460,b2060,b1260,b3e60,b3060,b4660,b3860,b2260,b1e60,b2660,b2a60,b2e60,b2860,b2460,b2c60,b1660,b1c60,b1860};
  const U sz[]={0x400,0x400,0x100,0x100,0x100,0x100,0x400,0x400,0x1000,0x200,0x100,0x100,0x100,0x100,0x100,0x100,0x100,0x100,0x100,0x100,0x200};
  for(int i=0;i<21;++i) std::memset(all[i],0,sz[i]*2);
- I F20=0,F24=0,F28=0,F2c=0,F34=0,F48=0;
+ I F20=0,F24=0,F28=0,F2c=0,F34=0,F48=0; F48=g.item?I(int8_t(rd(g.item,4))):-1; // decompile: (char)item[+4], -1 if no item
  const W*F18=f.str(0xf9e);
  P pl=arg1; if(arg2&&g.override_)pl=g.override_;
  P item=g.item;
@@ -210,8 +210,8 @@ void sub_93450(P arg1,I arg2,const G93450&g,const Fn93450&f){
    }
    if(f.isExpansion()&&g.expansion&&f.s3c150(my,mx)){
     wcpy(b1860,f.str(0x58c6));
-    if(f.s8e50(1,0x2c)!=(I)0xffff){ cat(b1860,f.str(0xf9d)); cat(b1860,f.s9f30(0x2c,1)); }
-    else if(f.s8e50(0,0x2c)!=(I)0xffff){ cat(b1860,f.str(0xf9d)); cat(b1860,f.s9f30(0x2c,0)); }
+    if((int16_t)f.s8e50(1,0x2c)!=-1){ cat(b1860,f.str(0xf9d)); cat(b1860,f.s9f30(0x2c,1)); }
+    else if((int16_t)f.s8e50(0,0x2c)!=-1){ cat(b1860,f.str(0xf9d)); cat(b1860,f.s9f30(0x2c,0)); }
     I x=g.xoff+(mx>g.xoff+0x1f4?0x258:0x170);
     f.draw(b1860,x,0x15-g.yoff,0,1);
    }

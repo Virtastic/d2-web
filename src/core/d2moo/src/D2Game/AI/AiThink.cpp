@@ -8912,7 +8912,7 @@ int32_t __fastcall D2GAME_AI_PetMove_6FCE2BA0(D2GameStrc* pGame, D2UnitStrc* pOw
 
 		const int32_t a4a = D2Common_10095(UNITS_GetRoom(pOwner), CLIENTS_GetUnitX(pOwner), CLIENTS_GetUnitY(pOwner));
 
-		for (int32_t i = 0; i < 7; ++i)
+		for (int32_t i = 0; i < 8; ++i)
 		{
 			int32_t nXOffset = 0;
 			int32_t nYOffset = 0;
@@ -9575,7 +9575,7 @@ int32_t __fastcall D2GAME_PETAI_PetMove_6FCE3EE0(D2GameStrc* pGame, D2UnitStrc* 
 
 		const int32_t a4 = D2Common_10095(UNITS_GetRoom(pOwner), CLIENTS_GetUnitX(pOwner), CLIENTS_GetUnitY(pOwner));
 
-		for (int32_t i = 0; i < 7; ++i)
+		for (int32_t i = 0; i < 8; ++i)
 		{
 			int32_t nXOffset = 0;
 			int32_t nYOffset = 0;
@@ -9604,7 +9604,7 @@ int32_t __fastcall D2GAME_PETAI_PetMove_6FCE3EE0(D2GameStrc* pGame, D2UnitStrc* 
 	{
 		if (pOwner->dwAnimMode == PLRMODE_WALK)
 		{
-			AITACTICS_SetVelocity(pUnit, 0, 0, 100);
+			AITACTICS_SetVelocity(pUnit, 0, 0, 77);
 			AITACTICS_WalkToTargetCoordinates(pGame, pUnit, v11, v12);
 			return 1;
 		}
@@ -9638,14 +9638,14 @@ int32_t __fastcall D2GAME_PETAI_PetMove_6FCE3EE0(D2GameStrc* pGame, D2UnitStrc* 
 			const int32_t nY = pPlayerData->unk0xA8[2 * v29 + 1];
 			if (AIUTIL_GetDistanceToCoordinates(pUnit, nX, nY) > 5)
 			{
-				AITACTICS_SetVelocity(pUnit, 0, nSpeed, 100);
+				AITACTICS_SetVelocity(pUnit, 0, nSpeed, 77);
 				if (AITACTICS_WalkToTargetCoordinatesDeleteAiEvent(pGame, pUnit, nX, nY))
 				{
 					return 1;
 				}
 
 				D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_AITHINK, 0);
-				AITACTICS_SetVelocity(pUnit, 15, nSpeed, 100);
+				AITACTICS_SetVelocity(pUnit, 15, nSpeed, 77);
 
 				if (bRun)
 				{
@@ -9668,7 +9668,7 @@ int32_t __fastcall D2GAME_PETAI_PetMove_6FCE3EE0(D2GameStrc* pGame, D2UnitStrc* 
 				{
 					bVelocityParamsSet = 1;
 
-					D2GAME_MONSTERMODE_SetVelocityParams_6FC62FC0(pAiParam, 1, nSpeed, 100);
+					D2GAME_MONSTERMODE_SetVelocityParams_6FC62FC0(pAiParam, 1, nSpeed, 77);
 
 					if (bRun)
 					{

@@ -36,7 +36,12 @@ struct D2ClientBatch04860Env {
     void     (*write_stderr)(const char* text, uint32_t len);                       // GetStdHandle(-12)+WriteFile
     uint32_t (*module_file_name)(char* buf, uint32_t size);                         // GetModuleFileNameA(NULL,..)
     void     (*message_box)(const char* text, const char* caption, uint32_t type);  // ___crtMessageBoxA
+    void     (*enter_cs)(uint32_t cs);                                              // KERNEL32!EnterCriticalSection (IAT 0xCEFBC); null = host call
 };
+static void enter_cs(const D2ClientBatch04860Env* env, uint32_t cs) {
+    if (env->enter_cs) env->enter_cs(cs); else EnterCriticalSection((LPCRITICAL_SECTION)(uintptr_t)cs);
+}
+extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* d2_client_4860_table() { return g_csTable; }   // FN probe pins the lock table
 
 // Each lock slot is an 8-byte record: [0] = the CRITICAL_SECTION pointer, [1] = debug word. Ghidra's
 // `(&DAT_6fb8b0c8)[i * 2]` dereferences the table, so the *value* stored in the slot is the pointer.
@@ -49,7 +54,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_4860(int32_t locknum, const D2ClientBatch048
     uint32_t* slot = lock_slot((uint32_t)locknum);
     if (slot[0] == 0 && env->mtinitlocknum(locknum) == 0)
         env->amsg_exit(0x11);
-    EnterCriticalSection((LPCRITICAL_SECTION)(uintptr_t)slot[0]);
+    enter_cs(env, slot[0]);
 }
 
 // 1.13c D2Client+0x055bf (FID_conflict:__lock_file2): a stream lock reached only from __fsopen ->

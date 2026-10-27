@@ -17,16 +17,19 @@ EMSCRIPTEN_KEEPALIVE void d2_client_initptd(uint8_t* ptd, void* locale) {
     *(uint32_t*)(ptd + 0x14) = 1u;         // _holdrand
 }
 
+// Test seam (FN probes): the _unlock callee, replaceable so a probe can record the lock number.
+extern "C" void (*d2_client_unlock_seam)(uint32_t) = d2_client_47ab;
+
 // 1.13c D2Client+0x0749a (9 B, caller 0x7368): release CRT lock 0xD.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_749a(void) {
-    d2_client_47ab(0xD);
+    d2_client_unlock_seam(0xD);
 }
 
 // 1.13c D2Client+0x074a6 (9 B, caller 0x7368): release CRT lock 0xC.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_74a6(void) {
-    d2_client_47ab(0xC);
+    d2_client_unlock_seam(0xC);
 }
 
 // 1.13c D2Client+0x08005 (9 B, caller 0x7E9D): release CRT lock 4.

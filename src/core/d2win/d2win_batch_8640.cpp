@@ -12,7 +12,7 @@
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2win_sub_8640(int32_t* list, int32_t pos) {
     if (!list) d2win_fatal(0x596);
     if (list[0] != 4) d2win_fatal(0x597);
-    int32_t* sb = (int32_t*)(intptr_t)list[0x24];   // wasm64 hosts must pass a resolved pointer
+    int32_t* sb = (int32_t*)(uintptr_t)(uint32_t)list[0x24];   // 32-bit retail pointer slot: zero-extend, never sign-extend
     if (sb[0] != 5) d2win_fatal(0x65);
     if (sb[0x12] < pos) pos = sb[0x12];
     sb[0x13] = pos;
@@ -21,21 +21,22 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2win_sub_8640(int32_t* list, int32_t po
 
 // 1.13c D2Win+0x7F40: set the colour word (+0x14) of list entry `index`, or of all entries for -1.
 // Entries are singly linked through +0x1C from the list head at control+0x48.
-struct D2WinListEntry { uint8_t pad[0x14]; uint32_t color; uint8_t pad2[4]; D2WinListEntry* next; };
-struct D2WinListCtl { int32_t type; uint8_t pad[0x44]; D2WinListEntry* head; D2WinListEntry* tail; uint32_t unk; int32_t count; };
+struct D2WinListEntry { uint8_t pad[0x14]; uint32_t color; uint8_t pad2[4]; uint32_t next; };   // 32-bit retail pointer slots
+struct D2WinListCtl { int32_t type; uint8_t pad[0x44]; uint32_t head; uint32_t tail; uint32_t unk; int32_t count; };
+static D2WinListEntry* d2win_ent(uint32_t p) { return (D2WinListEntry*)(uintptr_t)p; }
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2win_sub_7F40(D2WinListCtl* c, int32_t index, uint32_t color) {
     if (!c) d2win_fatal(0x368);
     if (c->type != 4) d2win_fatal(0x369);
     if (index == -1) {
-        for (D2WinListEntry* e = c->head; e; e = e->next) e->color = color;
+        for (D2WinListEntry* e = d2win_ent(c->head); e; e = d2win_ent(e->next)) e->color = color;
         return 1;
     }
     if (c->count < index) d2win_fatal(0x378);
     int32_t i = 0;
-    D2WinListEntry* e = c->head;
+    D2WinListEntry* e = d2win_ent(c->head);
     if (index > 0) {
         while (i < index) {
-            D2WinListEntry* n = e->next;   // e is non-null here: count >= index
+            D2WinListEntry* n = d2win_ent(e->next);   // e is non-null here: count >= index
             if (!n) break;
             ++i; e = n;
         }

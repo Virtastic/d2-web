@@ -366,7 +366,7 @@ EMSCRIPTEN_KEEPALIVE void d2win_sub_A340(void) {
         if (!b) continue;
         if (*b && Storm_Close252) Storm_Close252(*b);
         *b = 0;
-        if (Fog_Free10043) Fog_Free10043(nullptr, 0x26e, 0);
+        if (Fog_Free10043) Fog_Free10043(b, 0x26e, 0); // retail frees the box (ECX = box)
         *p = nullptr;
     }
 }

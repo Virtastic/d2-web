@@ -6,3 +6,10 @@ export function npcVendorIsOpen(state) {
   return Number.isInteger(npcId) && npcId > 0 && vendorNpcId === npcId &&
     (action === 1 || action === 2) && result === 1;
 }
+
+// The inventory X beside an open trade window closes the whole trade (retail's close-all-panels ends
+// the interaction with 0x30), not just the inventory; the vendor panel then goes with its state.
+export function closeInventoryPanel({ shopOpen, endNpc, hide }) {
+  if (shopOpen) endNpc();
+  hide();
+}

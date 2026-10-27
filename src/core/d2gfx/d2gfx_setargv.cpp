@@ -28,7 +28,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2gfx_setargv(D2GfxSetargvEnv* env) {
     env->wildcard = 0;
     env->get_module_file_name(env->module_path, 0x104);
     env->program_path = env->module_path;
-    const char* command_line = env->get_command_line();
+    const char* command_line = env->get_command_line();  // _acmdln; null or empty -> the module path
+    if (command_line == nullptr || *command_line == 0) command_line = env->module_path;
     int32_t slots = 0;
     const int32_t chars = env->parse_cmdline(nullptr, &slots, command_line, nullptr);
     void* block = env->allocate(static_cast<uint32_t>(chars) +

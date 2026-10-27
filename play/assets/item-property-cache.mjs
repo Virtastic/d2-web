@@ -29,3 +29,7 @@ export function createItemPropertyCache(limit = 512) {
     get size() { return entries.size; },
   };
 }
+
+// A magic/set/rare/unique item that reads back with no name is not identified yet (or the read raced
+// the engine): caching it would pin the base name and white colour after identification.
+export const itemPropsCacheable = (p) => p.lines.length > 0 && !(p.quality >= 4 && !p.title);

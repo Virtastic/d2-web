@@ -110,7 +110,11 @@ function packedPaletteColors(palette) {
     // Palette inputs are mutable typed arrays. Keep the public helper's behavior
     // correct if a caller edits one after its packed lookup has been cached.
     let same = true;
-    for (let i = 0; i < palette.length; i++) if (palette[i] !== entry.snapshot[i]) { same = false; break; }
+    // Word-compare (256 loads, not 1024) when the view is 4-byte aligned; same answer.
+    if (palette.byteOffset % 4 === 0) {
+      const now = new Uint32Array(palette.buffer, palette.byteOffset, 256), was = entry.words;
+      for (let i = 0; i < 256; i++) if (now[i] !== was[i]) { same = false; break; }
+    } else for (let i = 0; i < palette.length; i++) if (palette[i] !== entry.snapshot[i]) { same = false; break; }
     if (same) return entry.colors;
   }
   const colors = new Uint32Array(512);
@@ -120,7 +124,8 @@ function packedPaletteColors(palette) {
     colors[index] = rgb;
     colors[index + 256] = rgb | 0xff000000;
   }
-  packedPaletteCache.set(palette, { snapshot: palette.slice(), colors });
+  const snapshot = palette.slice();
+  packedPaletteCache.set(palette, { snapshot, words: new Uint32Array(snapshot.buffer), colors });
   return colors;
 }
 

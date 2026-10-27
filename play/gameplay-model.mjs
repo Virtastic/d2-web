@@ -52,6 +52,10 @@ export class CommandInput {
     this.queue = this.queue.filter((command) => command.type !== COMMAND.MOVE || command.directional);
   }
 
+  cancelHeldSecondary() {
+    this.queue = this.queue.filter((command) => !(command.secondary && command.held));
+  }
+
   drain() {
     let x = 0, y = 0;
     for (const code of this.keys) {
@@ -109,6 +113,9 @@ export function normalizeSnapshot(value) {
       // synthetic snapshot), never 0: 0 is a real engine word and means "not targetable".
       flags: e?.flags === undefined || e?.flags === null ? undefined : ((Math.max(0, Math.trunc(finite(e.flags))) >>> 0)),
       ...(Number.isInteger(e?.direction) && e.direction >= 0 && e.direction < 64 ? { direction: e.direction } : {}),
+      ...(Number.isInteger(e?.lastHitClass) ? { lastHitClass: e.lastHitClass } : {}),
+      ...(Number.isInteger(e?.typeFlags) ? { typeFlags: e.typeFlags & 0xFF } : {}),
+      ...(Number.isInteger(e?.superUniqueId) ? { superUniqueId: e.superUniqueId } : {}),
       ...(typeof e?.hasDynamicPath === 'boolean' ? { hasDynamicPath: e.hasDynamicPath } : {}),
       animation: e?.animation && typeof e.animation === 'object' ? e.animation : null,
       // F20: retain the engine's missile sequence/frame/facing/transparency record through the
@@ -309,6 +316,8 @@ export function selectUnitTypePickCandidate(candidates, {
   for (const candidate of candidates ?? []) {
     if (!accepted(candidate)) continue;
     const unitType = unitTypeOf(candidate);
+    // FUN_6fb01e80 walks every unit list but skips type 3 (missile): a missile is never a hover target.
+    if (unitType === 3) continue;
     // The scan skips type 1 when #10494(unit, 0x8f) succeeds. Its meaning is not inferred from
     // the ordinal; an unknown result leaves the browser-accepted candidate in this approximation.
     if (unitType === 1 && candidate?.ordinal10494_8f === true) continue;
@@ -332,10 +341,11 @@ export function selectUnitTypePickCandidate(candidates, {
 // The exact-cell item participates in hover arbitration; the nearby pickup-radius item is a
 // separate fallback and remains available only when no accepted hit candidate won. Click policy is
 // intentionally the pre-existing browser policy because the native click picker is distinct.
-export function selectPointerCandidate(candidates, { click = false, reference = null } = {}) {
-  const object = click ? candidates.object : (candidates.objectsUnderPointer == null
+export function selectPointerCandidate(candidates, { click = false, reference = null, prior = null } = {}) {
+  const object = click && !(candidates.units?.length || candidates.itemsOnCell?.length || candidates.objectsUnderPointer?.length) ? candidates.object : (candidates.objectsUnderPointer == null
     ? (candidates.hoverObject ?? candidates.object) : null);
-  if (click) {
+  // Overlap lists arbitrate by the same type-priority walk as hover, so a click picks what hover shows.
+  if (click && !(candidates.units?.length || candidates.itemsOnCell?.length || candidates.objectsUnderPointer?.length)) {
     if (candidates.itemOnCell && object) return { kind: 'object', target: object };
     if (candidates.itemOnCell) return { kind: 'item', target: candidates.itemOnCell };
     if (candidates.npc) return { kind: 'npc', target: candidates.npc };
@@ -354,10 +364,19 @@ export function selectPointerCandidate(candidates, { click = false, reference = 
       ? [{ ...(candidates.hoverNpc ?? candidates.npc), kind: 'npc',
         target: candidates.hoverNpc ?? candidates.npc, unitType: 1 }] : []),
   ];
-  const winner = selectUnitTypePickCandidate(rows, { reference });
+  // D2Client FUN_6FB01E80 first asks FUN_6FB01A80 for the previous hover target and keeps it while
+  // the validator still accepts it, so overlapping units/items/objects do not swap under the cursor.
+  const sticky = prior && rows.find((r) => r.target?.id === prior.id && r.kind === prior.kind);
+  const winner = sticky || selectUnitTypePickCandidate(rows, { reference });
   if (winner) return { kind: winner.kind, target: winner.target };
   if (candidates.item) return { kind: 'item', target: candidates.item };
   return null;
+}
+
+// Click on overlapping units follows the hover walk (D2Client 0x51E80): type priority, then squared
+// distance to the player, first seen on ties. Returns the winning unit (hostile or NPC) or null.
+export function selectHoverUnit(units, reference) {
+  return selectUnitTypePickCandidate(units, { reference });
 }
 
 export function isPrimaryTargetEligible(entity, accept = null) {
@@ -475,6 +494,23 @@ export function selectPrimaryTarget(snapshot, point = snapshot?.player, maxDista
     }
   }
   return selected?.id ?? 0;
+}
+
+// Retail click/hover unit pick (D2Client+0x51650 with D2Common ordinal 10080):
+// among eligible candidates in list order, score = floor((2*max(dx,dy)+min(dx,dy))/2) against the
+// pointer's subtile; replace only on a strictly smaller score, start bound 10 (score 10 excluded).
+export function retailPickScore(a, b) {
+  const dx = Math.abs(a.x - b.x), dy = Math.abs(a.y - b.y);
+  return Math.floor((2 * Math.max(dx, dy) + Math.min(dx, dy)) / 2);
+}
+export function selectRetailPickTarget(snapshot, point, accept = null) {
+  let best = null, bound = 10;
+  for (const entity of normalizeSnapshot(snapshot).entities) {
+    if (!isPrimaryTargetEligible(entity, accept)) continue;
+    const score = retailPickScore(entity, point);
+    if (score < bound) { best = entity; bound = score; }
+  }
+  return best?.id ?? 0;
 }
 
 export function hudLines(snapshot, connected, fps = 0) {

@@ -240,6 +240,9 @@ void __fastcall sub_6FC74AC0(D2GameStrc* pGame, D2UnitStrc* pObject)
         if (pObjectsTxtRecord->nMode[2])
         {
             pObject->dwAnimMode = 2;
+            // D19: retail's client starts the ON sequence itself; our presentation reads the server clock, which
+            // would keep the OPERATING record (a shrine's 21 frames) looping. Start ON's record, shrines only.
+            if (UNITS_IsShrine(pObject)) UNITS_SetAnimStartFrame(pObject);
             if (!pObjectsTxtRecord->nHasCollision[2])
             {
                 UNITS_FreeCollisionPath(pObject);

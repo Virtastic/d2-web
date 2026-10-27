@@ -115,7 +115,7 @@ struct D2GameBatchB64Env {
     void*    (*fnEDDB0)(int32_t n, void* pParam);
 
     // 0xEE7B0: quest-side callbacks and the retail a2q8 static table (see the function comment).
-    void     (*fn33F80)();                      // 0x33F80
+    uint32_t (*fn33F80)(void* pUnitEdi, void* pNodeEsi);  // 0x33F80: EDI=unit, ESI=found list node
     void     (*ord10973)(void* pUnit, int32_t a, int32_t b);
     void     (*ord10450)(uint32_t nEntry, void* pOut);
     void     (*fnCCFCE0)(void* pGame);
@@ -694,7 +694,7 @@ static void d2game_EE7B0_113c(void* pEaxUnit, void* pParam1, const D2GameBatchB6
                 return;
             }
             env.fn232B0(pParam1, 1);
-            if (batchFindUnitOfType(pGame, 6) != nullptr) env.fn33F80();
+            if (void* pN = batchFindUnitOfType(pGame, 6)) env.fn33F80(pParam1, pN);
             return;
         case 0xAF:
             env.unitY(pParam1);
@@ -705,11 +705,11 @@ static void d2game_EE7B0_113c(void* pEaxUnit, void* pParam1, const D2GameBatchB6
                 env.fn232B0(pParam1, 1); env.fn232B0(pParam1, 1);
                 return;
             }
-            if (batchFindUnitOfType(pGame, 0x0D) != nullptr) env.fn33F80();
-            if (batchFindUnitOfType(pGame, 9) != nullptr) env.fn33F80();
+            if (void* pN = batchFindUnitOfType(pGame, 0x0D)) env.fn33F80(pParam1, pN);
+            if (void* pN = batchFindUnitOfType(pGame, 9)) env.fn33F80(pParam1, pN);
             return;
         case 0xE5:
-            if (batchFindUnitOfType(pGame, 8) != nullptr) env.fn33F80();
+            if (void* pN = batchFindUnitOfType(pGame, 8)) env.fn33F80(pParam1, pN);
             return;
         case 0xF2:
             if (nClassId == 0x2C0) {
@@ -717,7 +717,7 @@ static void d2game_EE7B0_113c(void* pEaxUnit, void* pParam1, const D2GameBatchB6
                 env.fn232B0(pParam1, 1); env.fn232B0(pParam1, 1); env.fn232B0(pParam1, 1);
                 return;
             }
-            if (batchFindUnitOfType(pGame, 0x14) != nullptr) env.fn33F80();
+            if (void* pN = batchFindUnitOfType(pGame, 0x14)) env.fn33F80(pParam1, pN);
             env.fn232B0(pParam1, 1);
             return;
         case 0xF3:
@@ -727,10 +727,10 @@ static void d2game_EE7B0_113c(void* pEaxUnit, void* pParam1, const D2GameBatchB6
                 return;
             }
             env.fn232B0(pParam1, 1);
-            if (batchFindUnitOfType(pGame, 0x17) != nullptr) env.fn33F80();
+            if (void* pN = batchFindUnitOfType(pGame, 0x17)) env.fn33F80(pParam1, pN);
             return;
         case 0xFA:
-            if (batchFindUnitOfType(pGame, 0x0C) != nullptr) env.fn33F80();
+            if (void* pN = batchFindUnitOfType(pGame, 0x0C)) env.fn33F80(pParam1, pN);
             if (pParam1 == nullptr) return;
             wr32(pParam1, 0xC4, rd32(pParam1, 0xC4) | 0x800);
             if (rd32(pParam1, 0x00) != 1) return;
@@ -744,11 +744,11 @@ static void d2game_EE7B0_113c(void* pEaxUnit, void* pParam1, const D2GameBatchB6
                 return;
             }
             env.fn232B0(pParam1, 1);
-            if (batchFindUnitOfType(pGame, 0x16) != nullptr) env.fn33F80();
+            if (void* pN = batchFindUnitOfType(pGame, 0x16)) env.fn33F80(pParam1, pN);
             return;
         case 0x10B:
             env.fn232B0(pParam1, 1); env.fn232B0(pParam1, 1);
-            if (batchFindUnitOfType(pGame, 2) != nullptr) env.fn33F80();
+            if (void* pN = batchFindUnitOfType(pGame, 2)) env.fn33F80(pParam1, pN);
             // The decompiler shows a single argument on this #10945 call; the seam keeps the
             // three-slot retail signature and passes zeros for the rest.
             env.ord10945(pParam1, 0, 0);
@@ -780,7 +780,7 @@ static void d2game_EE7B0_113c(void* pEaxUnit, void* pParam1, const D2GameBatchB6
         if (pParam1 != nullptr) wr32(pParam1, 0xC4, rd32(pParam1, 0xC4) | 0x20000);
         return;
     case 0x16E:
-        if (batchFindUnitOfType(pGame, 0x13) != nullptr) env.fn33F80();
+        if (void* pN = batchFindUnitOfType(pGame, 0x13)) env.fn33F80(pParam1, pN);
         if (pParam1 != nullptr) {
             wr32(pParam1, 0xC4, rd32(pParam1, 0xC4) | 0x20000);
             env.fn232B0(pParam1, 1);
@@ -790,17 +790,17 @@ static void d2game_EE7B0_113c(void* pEaxUnit, void* pParam1, const D2GameBatchB6
     case 0x192:
         break;
     case 0x197:
-        if (batchFindUnitOfType(pGame, 0x11) != nullptr) env.fn33F80();
+        if (void* pN = batchFindUnitOfType(pGame, 0x11)) env.fn33F80(pParam1, pN);
         return;
     case 0x199:
-        if (batchFindUnitOfType(pGame, 0x18) != nullptr) env.fn33F80();
+        if (void* pN = batchFindUnitOfType(pGame, 0x18)) env.fn33F80(pParam1, pN);
         return;
     case 0x1B2:
-        if (batchFindUnitOfType(pGame, 0x20) != nullptr) env.fn33F80();
+        if (void* pN = batchFindUnitOfType(pGame, 0x20)) env.fn33F80(pParam1, pN);
         return;
     case 0x20E:
-        if (batchFindUnitOfType(pGame, 0x22) != nullptr) {
-            env.fn33F80();
+        if (void* pN = batchFindUnitOfType(pGame, 0x22)) {
+            env.fn33F80(pParam1, pN);
             env.fn232B0(pParam1, 1);
             return;
         }
@@ -834,8 +834,8 @@ static void d2game_EE7B0_113c(void* pEaxUnit, void* pParam1, const D2GameBatchB6
             env.fn232B0(pParam1, 1); env.fn232B0(pParam1, 1);
             return;
         }
-        if (batchFindUnitOfType(pGame, 0x24) != nullptr) {
-            env.fn33F80();
+        if (void* pN = batchFindUnitOfType(pGame, 0x24)) {
+            env.fn33F80(pParam1, pN);
             env.fn232B0(pParam1, 1);
             return;
         }

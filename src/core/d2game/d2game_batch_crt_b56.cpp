@@ -24,12 +24,13 @@ static inline uint8_t  rd8 (const void* p, uint32_t o) { return ((const uint8_t*
 static inline uint32_t rd32(const void* p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
 static inline void     wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)p + o, &v, 4); }
 // Host-model pointer fields (the locale block below is host memory, so the slots hold host pointers).
-static inline void*    ldptr(const void* p, uint32_t o) { void* v; std::memcpy(&v, (const uint8_t*)p + o, sizeof v); return v; }
+// 1.13c D2Game+0x03A5E: the locale record is the retail 32-bit layout (pointer fields 4 bytes apart), so fields read as 32 bits
+static inline void*    ldptr(const void* p, uint32_t o) { return (void*)(uintptr_t)rd32(p, o); }
 static inline void     stptr(void* p, uint32_t o, void* v) { std::memcpy((uint8_t*)p + o, &v, sizeof v); }
 
 [[noreturn]] static void d2game_fatal(uint32_t) { _exit(-1); }
 
-extern "C" void d2_fn_d2game_3f76(int32_t lockNum);   // 0x3F76 __unlock(lockNum)
+extern "C" void d2game_unlock_3f76(int32_t lockNum);   // 0x3F76 __unlock(lockNum)
 
 // Host seams for the callees and module state the cached decompiles name but src/ does not implement.
 // Offsets 0x6FD3A214 (_nfile), 0x6FD3A220 (_pioinfo), 0x6FD3A210 (heap mode), 0x6FD39FC0 (sbh
@@ -197,7 +198,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_897B(int32_t fileHandle, const D2GameBatc
 // Nine-byte thunk: __unlock(10).
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8972(void) {
-    d2_fn_d2game_3f76(10);
+    d2game_unlock_3f76(10);
 }
 
 // 1.13c D2Game+0x0889a
@@ -225,7 +226,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_5ED1(uint32_t size, const D2GameBatchB56
     if (env->heapMode == 3 && size <= env->sbhThreshold) {
         env->lock(4);
         void* p = env->sbhAllocBlock(size);
-        d2_fn_d2game_3f76(4);
+        d2game_unlock_3f76(4);
         if (p != nullptr) return p;
     }
     uint32_t bytes = size == 0 ? 1 : size;
@@ -316,6 +317,3 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_3A5E(const D2GameBatchB56Env* env) {
     return b56_locale(rd32(ptd, 0x64));
 }
 
-// 1.13c D2Game+0x0405C __RTC_Initialize: the RTC init-table is empty (begin == end), so the loop never
-// runs. The function list callees 0x411F/0x40E4 are the injected SEH prolog/epilog, not calls in the body.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_405C() {}

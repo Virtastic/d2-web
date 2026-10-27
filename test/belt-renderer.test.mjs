@@ -29,3 +29,26 @@ test('the fallback is a real four-column row when the engine has nothing', () =>
   assert.deepEqual(boxes.map((b) => b.left), [423, 454, 485, 516]);
   assert.ok(boxes.every((b) => b.bottom - b.top === 29));
 });
+
+test('hotkey labels are drawn only for belt slots that hold an item (drawBelt 0x28DC0)', async () => {
+  const { beltLabelSlots } = await import('../play/assets/belt-renderer.mjs');
+  const rects = beltBoxes(null);
+  const items = [{ mode: 2, gridX: 1, invFile: 'a' }, { mode: 2, gridX: 2, invFile: 'b' }, { mode: 2, gridX: 5, invFile: 'c' }];
+  assert.deepEqual(beltLabelSlots(items, rects), [1, 2]);
+  assert.deepEqual(beltLabelSlots([], rects), []);
+});
+
+test('a slot with a potion but an unbound hotkey draws no label (drawBelt 0x28DC0 binding lookup)', async () => {
+  const { beltLabelSlots } = await import('../play/assets/belt-renderer.mjs');
+  const items = [0, 1, 2, 3].map((g) => ({ mode: 2, gridX: g, invFile: 'p' }));
+  assert.deepEqual(beltLabelSlots(items, beltBoxes(null), ['1', '2', '3', null]), [0, 1, 2]);
+});
+
+test('belt hotkey labels follow the configured Use Belt bindings', async () => {
+  const { beltKeyNames, CONFIGURE_CONTROLS_SLOTS } = await import('../play/assets/configure-controls.mjs');
+  const blank = CONFIGURE_CONTROLS_SLOTS.map((s) => (s ? [s[1], s[2]] : null));
+  assert.deepEqual(beltKeyNames(blank), ['1', '2', '3', '4']);
+  blank[CONFIGURE_CONTROLS_SLOTS.findIndex((s) => s && s[0] === 'Use Belt 2')] = ['F9', null];
+  blank[CONFIGURE_CONTROLS_SLOTS.findIndex((s) => s && s[0] === 'Use Belt 4')] = [null, null];
+  assert.deepEqual(beltKeyNames(blank), ['1', 'F9', '3', null]);
+});

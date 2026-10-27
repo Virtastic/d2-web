@@ -124,3 +124,6 @@ export function drawObjectHoverLabel(ctx, target, font, projectStatic, recordPri
     nameSource: { table: 'objects', row: target.classId, field: 'wszName' },
     x, y: glyphY, box, placement: chest ? 'chest-title' : 'above-object', plateCompositing };
 }
+
+// D28: a town/perm portal's name is the Objects.txt "Portal to" followed by its destination level.
+export const objectPortalLabel = (name, levelName) => [name, levelName].filter(Boolean).join(' ');

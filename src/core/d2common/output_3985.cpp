@@ -45,6 +45,15 @@ struct Out {
 };
 }
 
+// Seam for the function replay of _write_string (retail regs: eax=&count, ecx=buf, edi=stream, [esp+4]=len).
+extern "C" void D2Common_394E_WriteString(D2CommonStringStream2814* s, const D2CommonOutputCalls3985* c,
+                                          int* count, const char* p, int n)
+{
+    Out o{s, c, *count};
+    o.str(p, n);
+    *count = o.count;
+}
+
 // 1.13c D2Common+0x03985
 extern "C" int D2Common_3985_Output(D2CommonStringStream2814* stream, const char* fmt,
                                     const D2CommonOutputArgs3985* a,

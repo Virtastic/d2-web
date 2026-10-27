@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createItemPropertyCache } from '../play/assets/item-property-cache.mjs';
+import { createItemPropertyCache, itemPropsCacheable } from '../play/assets/item-property-cache.mjs';
 
 test('item tooltip cache keeps the most recently used IDs within its bound', () => {
   const cache = createItemPropertyCache(3);
@@ -43,4 +43,11 @@ test('item tooltip cache re-reads a changed item under the same ID and keeps unc
 test('item tooltip cache validates a positive integer capacity', () => {
   assert.throws(() => createItemPropertyCache(0), /positive/);
   assert.throws(() => createItemPropertyCache(1.5), /positive/);
+});
+
+test('unnamed quality 4+ reads are not cached, so identification shows the unique/rare name', () => {
+  assert.equal(itemPropsCacheable({ lines: ['x'], title: '', quality: 7 }), false);
+  assert.equal(itemPropsCacheable({ lines: ['x'], title: 'Stormshield', quality: 7 }), true);
+  assert.equal(itemPropsCacheable({ lines: ['x'], title: '', quality: 2 }), true);
+  assert.equal(itemPropsCacheable({ lines: [], title: 'A', quality: 4 }), false);
 });

@@ -44,8 +44,7 @@ export const HUD_HELP_TEXT = 'Help (H)';
 export const HUD_HELP_ANCHOR = Object.freeze({ x: 714, y: 403 });   // screen 800x600, bottom row
 export const HUD_HELP_HITBOX = Object.freeze({ x: 725, y: 404, w: 36, h: 37 });
 
-// The button under the label: retail draws `Levelsocket.dc6` frame 0 at rest and frame 1 while
-// held (bottom row 440), then `Level.dc6` frame 0 (bottom row 436), straight after
+// The button under the label: retail draws `Levelsocket.dc6` frame 0 (its only frame; bottom row 440), then `Level.dc6` frame 0 at rest, frame 1 while held (bottom row 436), straight after
 // the label's glyphs. It appears in every capture that draws the label and no other (the retail captures:
 // 39+3 of 42 with both; the 7 without it are the controls overlay covering the spot). Not gated on
 // skill points: the fresh-character town-start frame has it. Retail's y is a bottom row, recordDc6
@@ -102,8 +101,10 @@ export function createHudHelp(read, documentObject = globalThis.document) {
       const font = fontFor(act);
       font.drawAnchored(ctx, HUD_HELP_TEXT, HUD_HELP_ANCHOR.x, HUD_HELP_ANCHOR.y);
       const hit = { ...HUD_HELP_HITBOX };
-      const socketFrameIndex = pressed ? 1 : 0;
-      const gemFrameIndex = 0;
+      // D2Client 0x37740: the socket (Levelsocket, one frame) is drawn at frame 0; the pressed flag
+      // (DAT_6fbcc450 != 0) is the frame of the second cel, Level.dc6 (the gem).
+      const socketFrameIndex = 0;
+      const gemFrameIndex = pressed ? 1 : 0;
       const canvases = buttonCanvas(socketFrameIndex, gemFrameIndex);
       const buttonRecords = button.map(({ path, x, top, frames }, i) => {
         const frameIndex = i === 0 ? socketFrameIndex : gemFrameIndex;

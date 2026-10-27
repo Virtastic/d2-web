@@ -90,6 +90,10 @@ const AX = 0, AY = -29, AY_CAVE = 1;   // full-map DC6 top relative to the retai
 export function automapCellTopY(centerY, cellWorldY, heroWorldY, scale, cave = false) {
   return Math.round(centerY + (cellWorldY - heroWorldY) * 8 * scale + (cave ? AY_CAVE : AY));
 }
+// 0x6fb119e0 rejects a unit whose projected point is outside the viewport before drawing its cross or name.
+export function automapNpcsInViewport(npcs, viewport) {
+  return (npcs || []).filter((n) => automapMarkerInViewport(Math.round(n.sx) + 8, Math.round(n.sy) - 7, viewport));
+}
 const HERO_COLOUR = 151, NPC_COLOUR = 32;
 function line(ctx, x0, y0, x1, y1) {   // Bresenham, 1 px, no antialiasing
   const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
@@ -425,7 +429,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
         // This client only has ordinary world-screen `sx/sy` here, so it cannot safely apply that gate
         // until the native automap projection is represented. Preserve the known NPC marker/name option
         // behavior while leaving viewport culling open (canvas bounds still clip naturally).
-        for (const n of view.npcs || []) {
+        for (const n of automapNpcsInViewport(view.npcs, viewport.viewport)) {
           const markerX = Math.round(n.sx) + 8, markerY = Math.round(n.sy) - 7;
           cross(markerX, markerY, NPC_COLOUR, 'npc');
           if (settings.names === 'yes' && n.label && view.font) { const at = [Math.round(n.sx) - 18 + 8, Math.round(n.sy) - 10 + 2 - 7]; view.font.draw(ctx, n.label, at[0], at[1]); nameplates.push({ text: n.label, at }); }

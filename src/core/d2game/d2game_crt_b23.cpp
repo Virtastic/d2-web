@@ -11,7 +11,7 @@
 #include <emscripten.h>
 
 // Defined in src/core/d2game/d2game_batch_3e70.cpp.
-extern "C" void d2_fn_d2game_3f76(int32_t lockNum);
+extern "C" void d2game_unlock_3f76(int32_t lockNum);
 extern "C" int32_t d2_game_3ed8(void);         // 0x3ED8 __mtinitlocks
 
 // __mtterm/__mtinit state: +0x0FF204 the TLS index (0xFFFFFFFF = TLS_OUT_OF_INDEXES, not allocated),
@@ -48,7 +48,7 @@ struct D2GameMtInitHost {
 // 1.13c D2Game+0x3B51: tail fragment into RVA 0x3F76 with lock number 0xC -- __unlock(12). Reached from
 // __updatetlocinfo (0x3B1F) when the locale it just installed is a new one.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3b51(void) { d2_fn_d2game_3f76(0xC); }
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3b51(uint32_t* r) { d2game_unlock_3f76(0xC); if (r) r[4] = 0; }  // r: FN probe, result word 0
 
 // 1.13c D2Game+0x3B5A: TlsAlloc(), result discarded. wasm has no TLS indices, and the index would leak
 // either way (retail never stores the result), so the rule is an empty statement.
@@ -79,12 +79,12 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3b80(uint8_t* ptd, void* locale) {
 // 1.13c D2Game+0x3D36: tail fragment into RVA 0x3F76 with lock number 0xD -- __unlock(13). One of the
 // two releases in __freefls (0x3C04).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3d36(void) { d2_fn_d2game_3f76(0xD); }
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3d36(void) { d2game_unlock_3f76(0xD); }
 
 // 1.13c D2Game+0x3D42: tail fragment into RVA 0x3F76 with lock number 0xC -- __unlock(12). The other
 // release in __freefls (0x3C04).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3d42(void) { d2_fn_d2game_3f76(0xC); }
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3d42(void) { d2game_unlock_3f76(0xC); }
 
 // 1.13c D2Game+0x3D7A (239 B, caller 0x35BB __CRT_INIT): `__mtinit`. Initialise the CRT lock table
 // (0x3ED8; failure -> __mtterm, return 0). With a kernel32 handle, resolve FlsAlloc/FlsGetValue/
@@ -95,7 +95,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3d42(void) { d2_fn_d2game_3f76(0xC); }
 // (_holdrand) = 1, +0x04 (_thandle) = -1, +0x00 (_tid) = the current thread id. Return 1; otherwise
 // __mtterm and return 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_3d7a(const D2GameMtInitHost* host) {
+EMSCRIPTEN_KEEPALIVE int32_t d2_game_3d7a(const D2GameMtInitHost* host) {
     if (d2_game_3ed8() == 0) {
         d2_fn_d2game_3b63();
         return 0;

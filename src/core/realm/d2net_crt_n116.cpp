@@ -25,6 +25,7 @@ struct Hooks {
   void (*MsgBox)(const char* text, const char* caption, unsigned fl) = nullptr;
   void (*Exit)(int) = nullptr;
   void (*Handler)(int, int) = nullptr;                                           // DAT_6fbfb16c
+  int lcmap_mode = 0;                                                             // DAT_6fbfb168
   int stype_mode = 0;                                                            // DAT_6fbfb140: 0 unknown 1 W 2 A
   unsigned lc_codepage = 0, lc_handle = 0;                                       // DAT_6fbfb138 / 128
   void* (*calloc_)(size_t, size_t) = nullptr;
@@ -179,30 +180,61 @@ int crtGetStringTypeA(unsigned type, const char* src, int cch, uint16_t* out, un
 // ---- __crtLCMapStringA (D2Net+0x051C0)
 // 1.13c D2NET+0x051C0
 int crtLCMapStringA(unsigned lcid, unsigned fl, const char* src, int cch, char* dst, int ndst, unsigned cp, int err) {
-  if (!cp) cp = g.lc_codepage;
-  int n = g.MBToWC(cp, err ? 9 : 1, src, cch, nullptr, 0);
-  if (!n) return 0;
-  uint16_t* w = (uint16_t*)g.calloc_(2, n);
-  if (!w) return 0;
-  int r = 0;
-  if (g.MBToWC(cp, 1, src, cch, w, n)) {
-    int m = g.LCMapW(lcid, fl, w, n, nullptr, 0);
-    if (m) {
-      if (fl & 0x400) {                                   // LCMAP_SORTKEY: bytes straight into dst
-        if (ndst && m <= ndst) r = g.LCMapW(lcid, fl, w, n, (uint16_t*)dst, ndst);
-        else if (!ndst) r = m;
-      } else {
-        uint16_t* w2 = (uint16_t*)g.calloc_(2, m);
-        if (w2) {
-          if (g.LCMapW(lcid, fl, w, n, w2, m))
-            r = ndst ? g.WCToMB(cp, 0, w2, m, dst, ndst, nullptr, nullptr)
-                     : g.WCToMB(cp, 0, w2, m, nullptr, 0, nullptr, nullptr);
-          g.free_(w2);
+  if (!g.lcmap_mode) {                                    // probe the wide API once
+    if (g.LCMapW(0, 0x100, (const uint16_t*)L"", 1, nullptr, 0)) g.lcmap_mode = 1;
+    else if (g.GetLastError() == 0x78) g.lcmap_mode = 2;  // ERROR_CALL_NOT_IMPLEMENTED
+  }
+  if (cch > 0) { int i = 0; while (i < cch && src[i]) i++; cch = i; }   // clamp at the first NUL
+  if (g.lcmap_mode == 1) {
+    if (!cp) cp = g.lc_codepage;
+    int n = g.MBToWC(cp, err ? 9 : 1, src, cch, nullptr, 0);
+    if (!n) return 0;
+    uint16_t* w = (uint16_t*)g.calloc_(2, n);
+    if (!w) return 0;
+    unsigned r = 0;
+    if (g.MBToWC(cp, 1, src, cch, w, n)) {
+      r = g.LCMapW(lcid, fl, w, n, nullptr, 0);
+      if (r) {
+        if (fl & 0x400) {                                 // LCMAP_SORTKEY: bytes straight into dst
+          if (ndst && (int)r <= ndst) g.LCMapW(lcid, fl, w, n, (uint16_t*)dst, ndst);
+        } else {
+          uint16_t* w2 = (uint16_t*)g.calloc_(2, r);
+          if (w2) {
+            if (g.LCMapW(lcid, fl, w, n, w2, r))
+              r = g.WCToMB(cp, 0, w2, r, ndst ? dst : nullptr, ndst, nullptr, nullptr);
+            g.free_(w2);
+          }
         }
       }
     }
+    g.free_(w);
+    return r;
   }
-  g.free_(w);
+  if (g.lcmap_mode != 2) return 0;
+  if (!lcid) lcid = g.lc_handle;
+  if (!cp) cp = g.lc_codepage;
+  int acp = ansicp(lcid);
+  if (acp == -1) return 0;
+  if ((unsigned)acp == cp) return g.LCMapA(lcid, fl, src, cch, dst, ndst);
+  int len = cch;
+  char* s = convertcp(cp, acp, src, &len, nullptr, 0);
+  if (!s) return 0;
+  int r = 0;
+  char* t = nullptr; char* conv = nullptr;
+  int m = g.LCMapA(lcid, fl, s, len, nullptr, 0);
+  if (m) {
+    t = (char*)g.calloc_(1, m);
+    if (t) {
+      m = g.LCMapA(lcid, fl, s, len, t, m);
+      if (m) {
+        conv = convertcp(acp, cp, t, &m, dst, ndst);
+        r = conv ? m : 0;
+      }
+    }
+  }
+  g.free_(t);
+  g.free_(s);
+  if (conv && conv != dst) g.free_(conv);
   return r;
 }
 

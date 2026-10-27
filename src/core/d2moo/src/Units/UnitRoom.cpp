@@ -125,7 +125,13 @@ void __stdcall UNITROOM_SortUnitListByTargetY(D2ActiveRoomStrc* pRoom)
 	}
 }
 
-// 1.13c D2Common+0x0D540
+// 1.13c D2Common+0x0D540 decompile offsets pinned (pointer-bearing fields are native-width on wasm64, so only the leading scalars) for the ResetDynamicPath body.
+#include <cstddef>
+static_assert(offsetof(D2DynamicPathStrc, tGameCoords.dwPrecisionX) == 0x00, "D540 [0]");
+static_assert(offsetof(D2DynamicPathStrc, tGameCoords.dwPrecisionY) == 0x04, "D540 [1]");
+static_assert(offsetof(D2DynamicPathStrc, dwClientCoordX) == 0x08, "D540 [2]");
+static_assert(offsetof(D2DynamicPathStrc, dwClientCoordY) == 0x0C, "D540 [3]");
+static_assert(PATH_CURRENT_ROOM_INVALID == 2, "D540 flag |2");
 // Retail passes the path in ESI; room and unit fields remain native pointers.
 static void UNITROOM_ResetDynamicPath(D2DynamicPathStrc* pPath)
 {

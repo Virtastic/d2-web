@@ -254,8 +254,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2win_sub_107C0(void* obj, const D2WinBatch10030Env
 
 // 1.13c D2Win+0x108A0 (95 bytes): advance the control's state word at +0x50. State 3 becomes 4, the
 // word at +0x4C is cleared, the tick count is stored at +0x48 and 1 is returned. State 2 or 4 returns
-// 0; any other state returns 1. A type other than 2 is fatal 0x5C.
-// 1.13c D2Win+0x108A0
+// 0; any other state returns 1. A type other than 2 is fatal 0x5C. Native check: tools/test/d2win_108A0.test.cpp.
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2win_sub_108A0(void* obj, const D2WinBatch10030Env* env) {
     if (rd32(obj, 0x00) != 2) d2win_fatal(0x5C);

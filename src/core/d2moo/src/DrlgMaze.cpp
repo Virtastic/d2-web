@@ -1622,7 +1622,8 @@ static int DRLGMAZE_ArcaneSanctuaryDirectionFromRoomIdx(int nBranchDirection, in
 	}
 }
 
-// 1.13c D2Common+0xF220
+// 1.13c D2Common+0xF220 (rc4: checked call by call against the 1.13c decompile and disassembly; direction
+// register per room idx = branch+{0,0,3,0,0,0,0,1,0,1,2,2,3,2,2}, parents skip idx 8/12, no delta)
 // Retail expands the same 4 x 15 branch walk below; indices 8 and 12 are
 // terminal offshoots omitted from the picked-file array. Seed draw precedes all
 // allocations, and the original central room receives file 4 after the walk.

@@ -363,3 +363,51 @@ uint32_t D2Common_3D0F0_GetTextListIdByIndex(uint32_t pList, int32_t nIndex)
 		nodeAddress = W(node, 8);
 	}
 }
+
+// 1.13c D2Common+0x3C460 (#10079): append a client pointer to a room's client array, in the
+// retail room layout (array +0x48, count +0x78, capacity +0x04). The vendored
+// DUNGEON_AddClientToRoom works on the 1.10f engine layout; this is the retail-layout form the
+// FN capture replays. Retail fatals (0x473/0x474/0x475/0x477) become silent returns. When
+// count == capacity the capacity grows by 4 (realloc, pool-less: ponytail, capture never grows).
+// Then 0x3BDD0 re-sorts the array ascending by pointer value (bubble passes, early-out).
+uint32_t D2Common_3C460_AddClientToRoom(uint32_t pRoom, uint32_t pClient)
+{
+	uint8_t* room = P(pRoom);
+	if (!room || !pClient)
+		return 0;
+	uint32_t n = W(room, 0x78);
+	uint32_t* a = reinterpret_cast<uint32_t*>(P(W(room, 0x48)));
+	for (uint32_t i = 0; i < n; ++i)
+		if (!a[i])
+			return 0;
+	if (n > W(room, 0x04))
+		return 0;
+	if (n == W(room, 0x04))
+	{
+		W(room, 0x04) = n + 4;
+		a = static_cast<uint32_t*>(std::realloc(a, (n + 4) * 4));
+		W(room, 0x48) = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(a));
+	}
+	a[n++] = pClient;
+	W(room, 0x78) = n;
+	// eax at return, as retail leaves it (the capture records it): &a[i] of the last compare,
+	// the array base after a swap, or the count when the passes run out (0x3BDD0's exits).
+	uint32_t eax = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(a));
+	for (int32_t k = static_cast<int32_t>(n) - 1; k > 0; --k)
+	{
+		bool swapped = false;
+		for (int32_t i = 0; i < k; ++i)
+		{
+			eax = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(a + i));
+			if (a[i] > a[i + 1])
+			{
+				uint32_t t = a[i]; a[i] = a[i + 1]; a[i + 1] = t;
+				swapped = true;
+				eax = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(a));
+			}
+		}
+		if (!swapped)
+			return eax;
+	}
+	return n;
+}

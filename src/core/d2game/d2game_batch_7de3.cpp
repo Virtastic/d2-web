@@ -33,7 +33,7 @@ static inline void     wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint
 [[noreturn]] static void d2game_fatal(uint32_t) { _exit(-1); }
 
 // Defined in src/core/d2game/d2game_batch_3e70.cpp (0x3F76 __unlock(lockNum)).
-extern "C" void d2_fn_d2game_3f76(int32_t lockNum);
+extern "C" void d2game_unlock_3f76(int32_t lockNum);
 // Defined below (0x7DE3); 0x4EEA initialises the stream section through it.
 extern "C" int32_t d2game_crt_init_crit_sec_and_spin_count(void* cs, uint32_t spin, const struct D2GameCrtInitCritSecEnv* env);
 
@@ -118,7 +118,7 @@ extern "C"
 EMSCRIPTEN_KEEPALIVE void D2Game_CrtUnlockFile(void* stream) {
     const uintptr_t p = (uintptr_t)stream;
     if (p >= 0x6FD1F338u && p <= 0x6FD1F598u) {
-        d2_fn_d2game_3f76((int32_t)((p - 0x6FD1F338u) >> 5) + 0x10);
+        d2game_unlock_3f76((int32_t)((p - 0x6FD1F338u) >> 5) + 0x10);
         return;
     }
     LeaveCriticalSection((LPCRITICAL_SECTION)((uint8_t*)stream + 0x20));
@@ -155,7 +155,7 @@ static void d2game_lock_file2(int32_t index, void* stream) {
 }
 // 0x4CDA __unlock_file2(index, stream).
 static void d2game_unlock_file2(int32_t index, void* stream) {
-    if (index < 0x14) d2_fn_d2game_3f76(index + 0x10);
+    if (index < 0x14) d2game_unlock_3f76(index + 0x10);
     else LeaveCriticalSection((LPCRITICAL_SECTION)((uint8_t*)stream + 0x20));
 }
 
@@ -204,7 +204,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_4eea(const D2GameCrtStreamEnv* env) {
         wr32(s, 0x10, 0xFFFFFFFFu);       // _file = -1
         wr32(s, 0x1C, 0);                 // _tmpfname
     }
-    d2_fn_d2game_3f76(1);                 // 0x5003: __unlock(1)
+    d2game_unlock_3f76(1);                 // 0x5003: __unlock(1)
     return result;
 }
 

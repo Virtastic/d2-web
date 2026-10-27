@@ -37,7 +37,7 @@ static int32_t  g_hasNewHandler = 0;
 // case returns null without allocating.
 // 1.13c D2Game+0x06018
 extern "C"
-EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_6018(uint32_t count, uint32_t size,
+EMSCRIPTEN_KEEPALIVE void* d2game_calloc_6018(uint32_t count, uint32_t size,
                                              const D2GameCrtCallocEnv* env) {
     if (count != 0 && size > 0xFFFFFFE0u / count) return nullptr;   // overflow
     const uint32_t bytes = count * size;

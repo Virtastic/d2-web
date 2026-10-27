@@ -1738,7 +1738,7 @@ void __fastcall sub_6FD82360(D2DrlgLevelStrc* pLevel, int nIteration, int* pRand
 }
 
 //D2Common.0x6FD823C0
-//TODO: v28 stuff
+// v28 is the seed product; validated against 1.13c D2Common+0x16E10
 // 1.13c D2Common+0x16E10
 void __fastcall sub_6FD823C0(D2DrlgStrc* pDrlg, D2DrlgLinkStrc* pDrlgLink, int(__fastcall* a3)(D2DrlgLevelLinkDataStrc*, int), void(__fastcall* a4)(D2DrlgLevelStrc*, int, int*))
 {
@@ -1765,7 +1765,7 @@ void __fastcall sub_6FD823C0(D2DrlgStrc* pDrlg, D2DrlgLinkStrc* pDrlgLink, int(_
 	pLevelLinkData.pSeed.nHighSeed = pDrlg->pSeed.nHighSeed;
 	pLevelLinkData.pLink = pDrlgLink;
 
-	for (int i = 0; i < 15 && pDrlgLink[i].nLevel; ++i)
+	for (int i = 0; pDrlgLink[i].nLevel; ++i)
 	{
 		pLevelDefBinRecord = DATATBLS_GetLevelDefRecord(pDrlgLink[i].nLevel);
 
@@ -1797,7 +1797,7 @@ void __fastcall sub_6FD823C0(D2DrlgStrc* pDrlg, D2DrlgLinkStrc* pDrlgLink, int(_
 		}
 	}
 
-	for (int i = 0; i < 15 && pDrlgLink[i].nLevel; ++i)
+	for (int i = 0; pDrlgLink[i].nLevel; ++i)
 	{
 		if (pDrlgLink[i].nLevelLink != -1)
 		{
@@ -1903,6 +1903,8 @@ void __fastcall sub_6FD826D0(D2DrlgStrc* pDrlg, int nStartId, int nEndId)
 
 //D2Common.0x6FD82750
 // 1.13c D2Common+0x17760
+// Validated vs 1.13c: for ids [start,end] of OUTDOOR type, each of the 8 vis slots that is set and
+// whose warp slot is -1 gets an orth link (direction from coords, preset flag = target is PRESET). No 1.10f delta.
 void __fastcall sub_6FD82750(D2DrlgStrc* pDrlg, int nStartId, int nEndId)
 {
 	D2DrlgLevelStrc* pWarpLevel = NULL;

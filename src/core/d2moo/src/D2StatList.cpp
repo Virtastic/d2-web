@@ -711,7 +711,7 @@ void __fastcall STATLIST_UpdateUnitStat_6FDB6AB0(D2StatListExStrc* pStatListEx, 
 // Retail's additive FullStats path differs from the general setter: dirty only
 // for positive results, and notify even when the additive delta is zero.
 // 1.13c D2Common+0x389E0
-static int STATLIST_AddFullStatValue(D2StatListExStrc* list,
+int STATLIST_AddFullStatValue(D2StatListExStrc* list,
     D2SLayerStatIdStrc::PackedType id, int delta,
     D2ItemStatCostTxt* cost, D2UnitStrc* unit)
 {

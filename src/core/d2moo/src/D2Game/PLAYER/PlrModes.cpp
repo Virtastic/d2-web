@@ -195,11 +195,12 @@ void __fastcall sub_6FC7F600(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nMo
     switch (nMode)
     {
     case PLRMODE_RUN:
-        if (!STATLIST_UnitGetStatValue(pPlayer, STAT_STAMINA, 0))
+        if (STATLIST_UnitGetStatValue(pPlayer, STAT_STAMINA, 0))
         {
-            nCombatMode = DUNGEON_IsRoomInTown(UNITS_GetRoom(pPlayer)) != 0 ? PLRMODE_TOWNWALK : PLRMODE_WALK;
+            break;
         }
-        break;
+        // 1.13c D2Game+0x78610: no stamina falls through to the walk case (town walk in town)
+        [[fallthrough]];
 
     case PLRMODE_WALK:
     case PLRMODE_TOWNWALK:

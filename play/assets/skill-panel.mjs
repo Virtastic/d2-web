@@ -13,6 +13,7 @@ import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { textColourPalette } from './frontend.mjs';
 import { BORDER_RIGHT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
 import { createFont, decodeFontTbl } from './frontend.mjs';
+import { TOOLTIP_FRAME, drawTooltipFrame } from './vendor-panel.mjs';
 import { PANEL_CLOSE_ART, panelCloseFrame, panelCloseLayout } from './panel-close.mjs';
 
 export const SESSION_SKILL_BYTES = 26;   // D2SessionSkill: thirteen uint16 (manaLine/manaCost are V19's)
@@ -69,17 +70,13 @@ const TAB_KEYS = {
   5: [['StrSklTree26'], ['StrSklTree27', 'StrSklTree28'], ['StrSklTree29']],
 };
 const TAB_MID = { 1: 436, 2: 330, 3: 222 };
-// The hover plate: its BOX is ours (padding, fill, placement) -- retail's tooltip frame exists since
-// 2026-09-27 (`retail/drawlists/skilltree-hover.bin`, a captured pointer parked on Bash's icon) but
-// our plate is not drawn from it. Its padding is this client's and is named here so the row can say
-// which part is retail's text and which part is our box around it.
-const PLATE_PAD = 4, PLATE_LINE = 16;
+// The hover plate is the item tooltip's retail frame (vendor-panel.mjs TOOLTIP_FRAME / drawTooltipFrame).
+const PLATE_PAD = TOOLTIP_FRAME.pad, PLATE_LINE = TOOLTIP_FRAME.line;
 
 /** The plate's box (see the comment where it is drawn); `cell` is the hovered icon's rect. */
 export function drawPlate(ctx, font, cell, lines) {
   const box = plateBox(cell, Math.max(...lines.map((l) => font.measure(l.text))), lines.length);
-  ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.75)'; // retail's `box color=0 mode=2`: destination x0.25 (measured on skilltree-hover vs skilltree)
-  ctx.fillRect(box.x, box.y, box.w, box.h); ctx.restore();
+  drawTooltipFrame(ctx, box.x, box.y, box.w, box.h, 'rgba(0,0,0,0.75)'); // retail-measured skill plate fill
   lines.forEach((l, i) => { l.x = Math.floor(box.x + box.w / 2 - font.measure(l.text) / 2); l.y = box.y + 13 + i * PLATE_LINE;
     if (l.text) font.drawAnchored(ctx, l.text, l.x, l.y); });
   return box;

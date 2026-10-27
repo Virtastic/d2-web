@@ -58,3 +58,11 @@ test('ground label plate: text centred in the box (4px each side), 16 high', () 
     assert.ok(Math.abs(p.box.x + p.box.width / 2 - cx) <= 0.5);
   }
 });
+
+import { groundLabelColour } from '../play/assets/hover-lifebar.mjs';
+test('ground label colour: ethereal or socketed plain items are grey, magic stays blue', () => {
+  assert.equal(groundLabelColour(3, 0x400000), 5);
+  assert.equal(groundLabelColour(2, 0x800), 5);
+  assert.equal(groundLabelColour(3, 0), 0);
+  assert.equal(groundLabelColour(4, 0x400000), 3);
+});

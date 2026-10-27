@@ -19,9 +19,8 @@ struct CrtFile32 {
 
 extern "C" void d2game_write_char(uint8_t ch, CrtFile32* f, int32_t* pCount);
 
-// 1.13c D2Game+0x04385
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_4385(uint8_t ch, int32_t num, CrtFile32* f, int32_t* pCount) {
+// (marker lives on the probe, src/core/fn/d2game_4385.cpp)
+extern "C" void d2game_write_multi_char(uint8_t ch, int32_t num, CrtFile32* f, int32_t* pCount) {
     do {
         if (num < 1) return;
         num--;

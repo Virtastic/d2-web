@@ -42,7 +42,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_bnclient_2544(size_t size, int32_t newmode, BnN
 // __flsbuf, otherwise store the byte at ptr and advance it. A -1 from __flsbuf stores -1 in the written
 // counter (EAX/ESI on retail) and returns; otherwise the counter advances by one.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_27c6(BnCrtStream* f, uint8_t ch, int32_t* written,
+EMSCRIPTEN_KEEPALIVE void d2_bn_write_char(BnCrtStream* f, uint8_t ch, int32_t* written,
                                               BnFlsbufFn flsbuf) {
     if ((f->flag & 0x40) == 0 || f->base != 0) {
         f->cnt -= 1;
@@ -65,12 +65,12 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_27c6(BnCrtStream* f, uint8_t ch, int32_
 // 1.13c BNClient+0x027F9 (36 B, caller 0x2854): _write_multi_char. Emit the same character count times,
 // stopping when the count runs out or the written counter becomes -1.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_27f9(BnCrtStream* f, uint8_t ch, int32_t count,
+EMSCRIPTEN_KEEPALIVE void d2_bn_write_multi_char(BnCrtStream* f, uint8_t ch, int32_t count,
                                               int32_t* written, BnFlsbufFn flsbuf) {
     for (;;) {
         if (count < 1) return;
         count -= 1;
-        d2_fn_bnclient_27c6(f, ch, written, flsbuf);
+        d2_bn_write_char(f, ch, written, flsbuf);
         if (*written == -1) return;
     }
 }
@@ -80,13 +80,13 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_27f9(BnCrtStream* f, uint8_t ch, int32_
 // The source pointer is the register the decompile does not recover (the character reaches write_char
 // through AL); it is explicit here.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_281d(BnCrtStream* f, const uint8_t* src, int32_t count,
+EMSCRIPTEN_KEEPALIVE void d2_bn_write_string(BnCrtStream* f, const uint8_t* src, int32_t count,
                                               int32_t* written, BnFlsbufFn flsbuf) {
     if ((f->flag & 0x40) == 0 || f->base != 0) {
         for (;;) {
             if (count < 1) return;
             count -= 1;
-            d2_fn_bnclient_27c6(f, *src, written, flsbuf);
+            d2_bn_write_char(f, *src, written, flsbuf);
             ++src;
             if (*written == -1) return;
         }
@@ -130,15 +130,6 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_3e29(uint32_t stack_cookie, uint32_t se
     report_failure();
 }
 
-// 1.13c BNClient+0x060A0 (139 B, callers 0x2854, 0x42D7, 0x72CA, 0x47FD, 0x6FA7): _strlen. Count bytes
-// up to the first NUL. Retail's alignment/dword scan produces the same length.
-extern "C"
-EMSCRIPTEN_KEEPALIVE size_t d2_fn_bnclient_60a0(const char* s) {
-    const char* p = s;
-    while (*p != '\0') ++p;
-    return (size_t)(p - s);
-}
-
 struct BnWctombEnv {
     BnGetPtdFn getptd;                       // 0x3255 __getptd
     BnUpdatetlocinfoFn updatetlocinfo;       // 0x3792 ___updatetlocinfo
@@ -152,7 +143,7 @@ struct BnWctombEnv {
 // convert through ___wctomb_mt. The offset of the pointer inside _ptiddata is a seam (Ghidra exposes
 // only the field name).
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_bnclient_618b(char* mb, uint16_t wch, const BnWctombEnv* env) {
+EMSCRIPTEN_KEEPALIVE int32_t bn_wctomb(char* mb, uint16_t wch, const BnWctombEnv* env) {
     void* ptlocinfo = *(void**)((uint8_t*)env->getptd() + env->ptlocinfo_offset);
     if (ptlocinfo != env->global_ptlocinfo) ptlocinfo = env->updatetlocinfo();
     return env->wctomb_mt(ptlocinfo, mb, wch);

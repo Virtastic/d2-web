@@ -89,15 +89,15 @@ EMSCRIPTEN_KEEPALIVE int32_t skillDataParam5(int32_t nSkill) {
     return reinterpret_cast<const int32_t*>(row + 0x148)[5];
 }
 
-// 1.13c D2Client+0x30E4: EDI = this. Type_info deleting destructor: publish the module vftable, free the
+// 1.13c D2Client+0x030E4: EDI = this. Type_info deleting destructor: publish the module vftable, free the
 // mangled name at this+4, then run the critical-section leave 0x3121. __lock(0xE) is dropped (the engine
 // is single-threaded here, as in the BNClient type_info destructor).
-static const void* g_d2client_typeinfo_vftable[1];
+extern "C" const void* g_d2client_typeinfo_vftable[1];
+const void* g_d2client_typeinfo_vftable[1];
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2client_30e4(void* self) {
+void d2_client_30e4(void* self) {   // retail object: two 32-bit fields (vftable, name)
     if (self == nullptr) return;
-    *reinterpret_cast<const void**>(self) = g_d2client_typeinfo_vftable;
-    void* name = *reinterpret_cast<void**>(static_cast<uint8_t*>(self) + 4);
-    if (name != nullptr) std::free(name);
-    d2_client_3121();
+    uint32_t* o = static_cast<uint32_t*>(self);
+    o[0] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(g_d2client_typeinfo_vftable));
+    if (o[1] != 0) std::free(reinterpret_cast<void*>(static_cast<uintptr_t>(o[1])));
 }

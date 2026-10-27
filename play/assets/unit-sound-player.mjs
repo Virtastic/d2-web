@@ -17,6 +17,7 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
   const out = gain ?? context.destination;
   let volume = 1, sliders = { sound: 1, music: 1 };
   const activeSources = new Map();
+  let monsterPlaying = 0; // retail FUN_6fb37bd0(0): Sounds.txt rows 0xB76..0x1230 currently playing
   const sourceGainFor = (row, spatialGainByte = 255) => {
     const master = sliderPercent(sliders.sound), music = sliderPercent(sliders.music);
     const channel = retailSoundChannelVolume(row?.volume ?? 255, master, music, row?.music === true);
@@ -111,8 +112,9 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
       const spatialGainEvent = tracksSpatialGain ? rec : null;
       const spatialPanEvent = tracksSourcePan ? rec : null;
       const node = connectSource(source, r, spatialGainByte, spatialGainEvent, spatialPanEvent);
-      source.onended = () => { source.disconnect(); disconnectSource(node); };
-      source.start(); started++; rec.started = true;
+      const mon = row >= 0xB76 && row <= 0x1230;
+      source.onended = () => { source.disconnect(); disconnectSource(node); if (mon) monsterPlaying--; };
+      source.start(); started++; rec.started = true; if (mon) monsterPlaying++;
     } catch (error) { rec.error = String(error); }
     return rec;
   }
@@ -189,7 +191,7 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
     } catch (error) { rec.error = String(error); finish(); }
     return rec;
   }
-  return { play, playRow, playDialogue, stopDialogue, whenDialogueDone: () => dialogueDone, updateSpatialGain, events, setVolume(v, nextSliders) { volume = Math.max(0, Math.min(1, Number(v) || 0)); if (nextSliders) sliders = { sound: nextSliders.sound, music: nextSliders.music }; else sliders = { sound: volume, music: 1 }; if (gain) gain.gain.value = volume; for (const [node, state] of activeSources) node.gain.value = sourceGainFor(state.row, state.spatialGainByte); },
+  return { monsterSoundBusy: () => monsterPlaying > 0, play, playRow, playDialogue, stopDialogue, whenDialogueDone: () => dialogueDone, updateSpatialGain, events, setVolume(v, nextSliders) { volume = Math.max(0, Math.min(1, Number(v) || 0)); if (nextSliders) sliders = { sound: nextSliders.sound, music: nextSliders.music }; else sliders = { sound: volume, music: 1 }; if (gain) gain.gain.value = volume; for (const [node, state] of activeSources) node.gain.value = sourceGainFor(state.row, state.spatialGainByte); },
     get volume() { return gain ? gain.gain.value : volume; },
     evidence: () => ({ started, dialogueActive: Boolean(dialogueSource), events: events.map((x) => ({ ...x })), state: context.state }), close: () => context.close?.() };
 }

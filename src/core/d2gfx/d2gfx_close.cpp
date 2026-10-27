@@ -12,7 +12,7 @@ struct D2GfxCloseEnv {
     uint32_t* (*doserrno_ptr)();        // 0x03861
 };
 
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2gfx_755d(
+extern "C" int32_t d2gfx_close(
     int32_t file_handle, const D2GfxCloseEnv* env) {
     const uint32_t fd = static_cast<uint32_t>(file_handle);
     if (fd < env->nhandle) {

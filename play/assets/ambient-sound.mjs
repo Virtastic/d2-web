@@ -16,6 +16,11 @@ export function soundByIndex(soundsTxt, id) {
   return rows[0][fx]?.trim() ? { id, file: rows[0][fx].trim(), volume: Number.isInteger(volume) ? volume : 255 } : null;
 }
 
+/** The engine's raw period of day (D2Common #10396 value: 0 day, 1..3 dusk/night/dawn = night ambience); 0 on an engine without the export. */
+export function ambientCycleOf(Module) {
+  return Module?._d2_session_period_of_day ? Module.ccall('d2_session_period_of_day', 'number', [], []) | 0 : 0;
+}
+
 /** 1.13c area-event cadence: E + R - floor(E/3), R in [0, 2*floor(E/3)]. */
 export function nextEventInterval(delay, rand) {
   const d = Math.floor(delay / 3);
@@ -25,8 +30,7 @@ export function nextEventInterval(delay, rand) {
 /**
  * Looping area ambience plus jittered one-shot events. One loop source at a time: the same ambience id
  * is a no-op, a different id (level or day/night change) stops the old loop first, so loops never stack.
- * `cycle` is the raw D2Common-10396 value (1..3 = night); the browser has no recovered source for it
- * and passes 0 (day) -- ponytail: wire the real source when recovered.
+ * `cycle` is the raw D2Common-10396 value (1..3 = night), read via ambientCycleOf(Module).
  */
 export function createAmbientSound(read, AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext, rand = Math.random) {
   if (typeof read !== 'function') throw new TypeError('retail asset reader is required');

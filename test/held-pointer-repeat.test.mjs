@@ -23,3 +23,10 @@ test('held world movement does not repeat when the pointer is owned by a panel',
   assert.equal(queueHeldPointerRepeat(input, true, true, 10, 20, () => false), false);
   assert.equal(calls, 0);
 });
+
+test('held right button repeats the 0x0F aim every simulation advance, like the left', () => {
+  const cmds = [];
+  const input = { pointer: (...a) => cmds.push(a) };
+  for (let i = 0; i < 3; i++) queueHeldPointerRepeat(input, true, true, 5, 6, () => true, 2);
+  assert.deepEqual(cmds, [[5, 6, 2, true], [5, 6, 2, true], [5, 6, 2, true]]);
+});

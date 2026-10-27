@@ -124,6 +124,73 @@ export function floorSubmissionVisible(submittedX, anchorY, width, height) {
     && anchorY < height - FLOOR_CULL_BOTTOM && anchorY + 80 >= 0;
 }
 
+const ISO_SKIP = [14, 12, 10, 8, 6, 4, 2, 0, 2, 4, 6, 8, 10, 12, 14], ISO_RUN = [4, 8, 12, 16, 20, 24, 28, 32, 28, 24, 20, 16, 12, 8, 4];
+const CLIP_LEFT = 0;   // see the F249 note at litFloor
+let litScratch = new Uint32Array(0), litImage = null;
+/**
+ * Light one floor tile: the pixels of `px` (indices/opaque, width/height/origin) with every DT1 block re-shaded from the
+ * 8x8 light `grid` through the PL2 level table `t`, written as packed ABGR words into `out`. Pure; see litFloor for
+ * the retail derivation. Output is byte-identical to the per-pixel form it replaced (test/lit-floor-pixels.test.mjs).
+ */
+const blockExtentCache = new WeakMap();
+export function blockExtents(blocks) {
+  let e = blockExtentCache.get(blocks);
+  if (!e) {
+    e = { minX: Infinity, minY1: Infinity };
+    for (const b of blocks) { if (b.x < e.minX) e.minX = b.x; if (b.format === 1 && b.y < e.minY1) e.minY1 = b.y; }
+    blockExtentCache.set(blocks, e);
+  }
+  return e;
+}
+// PERF: a roof's light grid is 64 copies of the ambient, so one frozen grid and its join(',') key are
+// memoised per ambient instead of allocating and joining 64 numbers per roof tile per frame.
+let flatRoof = null;
+export function flatRoofGrid(ambient) {
+  if (flatRoof?.ambient !== ambient) { const g = new Array(64).fill(ambient); g.key = g.join(','); flatRoof = { ambient, g }; }
+  return flatRoof.g;
+}
+// PERF (perf-deep2): pal[t[k]] for every k, built once per (level table, palette): the lit pass is then one load per pixel, not two.
+const litComposed = new WeakMap();
+function composedFor(t, pal) {
+  let c = litComposed.get(t);
+  if (!c || c.pal !== pal) { const tab = new Uint32Array(t.length); for (let k = 0; k < tab.length; k++) tab[k] = pal[t[k]]; litComposed.set(t, c = { pal, tab }); }
+  return c.tab;
+}
+export function litFloorPixels(px, blocks, grid, t, pal, tileX, tileY, out) {
+  const ltab = composedFor(t, pal);
+  // PERF (perf-deep2): writes the palette colour straight into `out` -- one full pass for the unlit base, then the
+  // blocks overwrite their lit pixels in the same order -- instead of an index copy, the blocks, and a second full pass.
+  const n = px.width * px.height, W = px.width, opq = px.opaque, ind = px.indices;
+  for (let q = 0; q < n; q++) out[q] = opq[q] ? pal[ind[q]] : 0;
+  const P = (i, j) => grid[Math.min(7, j) * 8 + Math.min(7, i)];
+  for (const b of blocks) {
+    const x0 = b.gridX, y0 = b.gridY;
+    const A = P(x0 + 1, y0 + 1), B = P(x0 + 2, y0 + 1), C = P(x0 + 1, y0 + 2), D = P(x0 + 2, y0 + 2);
+    const flat = Math.abs(B - A) + Math.abs(C - A) + Math.abs(D - B) < 10;
+    const E0 = (P(x0, y0 + 2) + C + A + P(x0, y0 + 1)) >> 2, E1 = (P(x0 + 2, y0) + B + P(x0 + 1, y0) + A) >> 2,
+      E2 = (P(x0 + 3, y0 + 2) + C + P(x0 + 3, y0 + 1) + B) >> 2, E3 = (P(x0 + 1, y0 + 3) + P(x0 + 2, y0 + 3) + D + C) >> 2;
+    const iso = b.format === 1, written = b.pixels.written, src = b.pixels.indices, flatBase = 1024 + (A >> 3) * 256;
+    for (let r = 0; r < 15; r++) {
+      // D2gfx 1.13c +0xA5D0 advances iso edges only for visible rows; RLE advances skipped rows too.
+      const topclip = iso && tileY !== undefined ? Math.max(0, -(tileY + b.y - px.originY)) : 0;
+      if (iso && r < topclip) continue;
+      const rowY = b.y + r - px.originY;
+      if (rowY >= px.height) continue;
+      const rr = r - topclip;
+      const L = ((E0 << 4) + rr * (E3 - E0)) >> 7, R = ((E1 << 4) + rr * (E2 - E1)) >> 7;
+      const skip = iso ? ISO_SKIP[r] : 0, run = iso ? ISO_RUN[r] : 32;
+      const leftclip = tileX === undefined ? 0 : Math.max(0, Math.min(run, CLIP_LEFT - (tileX + b.x - px.originX + skip)));
+      const q0 = rowY * W + (b.x + skip - px.originX), w0 = r * 32 + skip, dR = R - L;
+      if (flat) { for (let col = 0; col < run; col++) { if (!written[w0 + col]) continue; const q = q0 + col; out[q] = opq[q] ? ltab[flatBase + src[w0 + col]] : 0; } }
+      else for (let col = 0; col < run; col++) {
+        if (!written[w0 + col]) continue;
+        const q = q0 + col;
+        out[q] = opq[q] ? ltab[1024 + (L + ((dR * (col + skip - leftclip)) >> 5)) * 256 + src[w0 + col]] : 0;
+      }
+    }
+  }
+}
+
 /** Parse the engine's tile draw list. One record per placed tile; see D2SessionTile. */
 export function parseSessionTiles(heap, pointer, count) {
   const view = new DataView(heap.buffer, heap.byteOffset || 0, heap.byteLength);
@@ -222,8 +289,49 @@ export function readSessionTerrain(Module) {
   // these reads, so every value returned here is the one a loose read returned (F236).
   const hold = Boolean(Module._d2_session_hold_world);
   if (hold) Module.ccall('d2_session_hold_world', null, ['number'], [1]);
-  try { return readSessionTerrainHeld(Module); }
-  finally { if (hold) Module.ccall('d2_session_hold_world', null, ['number'], [0]); }
+  try {
+    // PERF (pf1): the engine's world advances at 25 Hz but the shell reads it at 60, so 3 frames in 5 re-parsed
+    // ~3,300 tile records into the same ~3,300 objects (~0.8 MB of garbage and ~1.7 ms a frame). When every raw
+    // byte the parse reads is unchanged the parse is a pure function of them, so the previous result is returned.
+    const raw = terrainBlocks(Module);
+    if (raw && terrainCache.Module === Module && terrainCache.result && blocksEqual(Module.HEAPU8, raw, terrainCache.raw)) return terrainCache.result;
+    const result = readSessionTerrainHeld(Module);
+    terrainCache = raw ? { Module, raw: snapshotBlocks(Module.HEAPU8, raw), result } : { Module: null, raw: null, result: null };
+    return result;
+  } finally { if (hold) Module.ccall('d2_session_hold_world', null, ['number'], [0]); }
+}
+
+let terrainCache = { Module: null, raw: null, result: null };
+// Every region of engine memory (and scalar) the held read parses from; null when the engine lacks the exports.
+function terrainBlocks(Module) {
+  if (!Module._d2_session_tile_entries || !Module._d2_session_player_coordlist) return null;
+  const c = (name) => Module.ccall(name, 'number', [], []);
+  const count = c('d2_session_tile_count');
+  const blocks = [[Number(c('d2_session_tiles')), count * SESSION_TILE_BYTES], [Number(c('d2_session_tile_entries')), count * 4],
+    [Module._d2_session_tile_coordlists ? Number(c('d2_session_tile_coordlists')) : 0, count * 20]];
+  let seamCount = 0;
+  if (Module._d2_session_seam_tiles) {
+    seamCount = c('d2_session_seam_tile_count');
+    blocks.push([Number(c('d2_session_seam_tiles')), seamCount * SESSION_TILE_BYTES], [Number(c('d2_session_seam_tile_entries')), seamCount * 4],
+      [Module._d2_session_seam_tile_coordlists ? Number(c('d2_session_seam_tile_coordlists')) : 0, seamCount * 20]);
+  }
+  for (const b of blocks) if (b[0] % 4 || b[1] % 4) return null;
+  return { blocks, scalars: [count, seamCount, c('d2_session_player_x'), c('d2_session_player_y'), c('d2_session_player_coordlist'),
+    readLevelTileFiles(Module).join('|'), seamCount ? readLevelTileFiles(Module, 4096, 'd2_session_seam_tile_files').join('|') : ''].join(',') };
+}
+function snapshotBlocks(heap, raw) {
+  return { scalars: raw.scalars, blocks: raw.blocks.map(([p, n]) => ({ p, n, copy: n > 0 && p > 0 ? heap.slice(p, p + n) : null })) };
+}
+function blocksEqual(heap, raw, prev) {
+  if (raw.scalars !== prev.scalars || raw.blocks.length !== prev.blocks.length) return false;
+  for (let i = 0; i < raw.blocks.length; i++) {
+    const [p, n] = raw.blocks[i], q = prev.blocks[i];
+    if (p !== q.p || n !== q.n) return false;
+    if (!q.copy) continue;
+    const a = new Uint32Array(heap.buffer, heap.byteOffset + p, n >> 2), b = new Uint32Array(q.copy.buffer, q.copy.byteOffset, n >> 2);
+    for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) return false;
+  }
+  return true;
 }
 
 function readSessionTerrainHeld(Module) {
@@ -395,16 +503,22 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   // in `litCache`, which also holds walls.
   let litFloorCache = new Map(), litFloorOld = new Map();
   let litFloorEntries = 0;
+  const floorPool = [];
   // PERF (s-perf-freezes): the cache is two generations, not one wipe. Clearing everything at 1500 entries
   // re-lit every visible floor and wall on the next frame (a 25-70 ms hitch every ~57 frames of walking, the
   // light moves so dead grid variants pile up). Now the full generation becomes `old`, a hit in `old` is
   // promoted, and only entries unused for a whole generation are dropped. Same canvases, same pixels.
   const litEvict = () => {
-    if (litCache.size + litFloorEntries > 1500) { litCacheOld = litCache; litCache = new Map(); litFloorOld = litFloorCache; litFloorCache = new Map(); litWallMemoOld = litWallMemo; litWallMemo = new WeakMap(); litFloorEntries = 0; }
+    if (litCache.size + litFloorEntries > 1500) {
+      // PERF (perf-stutter): floors dropped here (unused for a whole generation, not promoted into the surviving one) are recycled by litFloor
+      // instead of left for a ~70 MB major-GC burst; litFloor's putImageData overwrites every pixel, so a recycled canvas draws identically.
+      const keep = new Set();
+      for (const a of litFloorCache.values()) for (const b of a.values()) for (const c of b.values()) if (c) keep.add(c);
+      for (const a of litFloorOld.values()) for (const b of a.values()) for (const c of b.values()) if (c && !keep.has(c) && floorPool.length < 1500) floorPool.push(c);
+      litCacheOld = litCache; litCache = new Map(); litFloorOld = litFloorCache; litFloorCache = new Map(); litWallMemoOld = litWallMemo; litWallMemo = new WeakMap(); litFloorEntries = 0; }
   };
   const litCacheGet = (k) => { let v = litCache.get(k); if (v === undefined) { v = litCacheOld.get(k); if (v !== undefined) litCache.set(k, v); } return v; };
   const pal32 = new WeakMap();   // blend table -> 256 packed RGBA words (litFloor)
-  const ISO_SKIP = [14, 12, 10, 8, 6, 4, 2, 0, 2, 4, 6, 8, 10, 12, 14], ISO_RUN = [4, 8, 12, 16, 20, 24, 28, 32, 28, 24, 20, 16, 12, 8, 4];
   // A gouraud floor block the frame clips on the LEFT is shaded from the LEVEL TABLE one entry per DRAWN
   // pixel from the row's own start, not by the pixel's column in the block: retail's two clipped gouraud
   // drawers (D2gfx+0x9E90 RLE, +0xA5D0 iso) advance the table pointer once per pixel written while the
@@ -414,7 +528,6 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   // clip cuts into the row: clamp(canvasLeft - (blockScreenX + skip[r]), 0, run[r]). Unclipped blocks
   // (leftclip 0) are unchanged: `blockColumn`. Read 2026-09-30; measured on F96's band -- 348 of 348
   // misses, and 0 of them our old index, before the change (probe-f249-clip). F249.
-  const CLIP_LEFT = 0;
   function litFloor(path, dt1Tile, index, grid, tileX, tileY, gridKey = null) {
     const px = dt1Tile.pixels;
     // `gridKey` is `grid.join(',')`, precomputed by the caller's own per-tile grid memo (gridFor): the key
@@ -423,9 +536,10 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     const keyBase = gridKey === null ? grid.join(',') : gridKey;
     // Retail clips the left lookup and starts iso edge interpolation at the first visible row.
     // Tiles crossing either boundary therefore need a position-dependent cache key.
-    const positional = px && px.width && tileX !== undefined && tileX < CLIP_LEFT
-      && dt1Tile.blocks.some((b) => tileX + b.x - px.originX < CLIP_LEFT);
-    const topClipped = px && tileY !== undefined && dt1Tile.blocks.some((b) => b.format === 1 && tileY + b.y - px.originY < 0);
+    // PERF: `some` over the blocks is `tileX + min(b.x) - originX < CLIP_LEFT`; the per-tile minima are computed once.
+    const ext = px && blockExtents(dt1Tile.blocks);
+    const positional = px && px.width && tileX !== undefined && tileX < CLIP_LEFT && tileX + ext.minX - px.originX < CLIP_LEFT;
+    const topClipped = px && tileY !== undefined && tileY + ext.minY1 - px.originY < 0;
     let key = null, inner = null;
     if (positional || topClipped) {
       key = `${path}:${index}:${keyBase}` + (positional ? `@${tileX}` : '') + (topClipped ? `:${tileY}` : '');
@@ -442,47 +556,25 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     }
     const t = blendPl2();
     if (!t || !px || !px.width) { if (key !== null) litCache.set(key, null); else { inner.set(keyBase, null); litFloorEntries++; litEvict(); } return null; }
-    const idx = new Uint8Array(px.indices), opq = px.opaque;
-    // The light buffer is an 8x8 padded grid of 12-byte entries (intensity first); a block at
-    // (gridX, gridY) has its corners at (gridX+1..gridX+2, gridY+1..gridY+2). Read from D2gfx+0xA960.
-    const P = (i, j) => grid[Math.min(7, j) * 8 + Math.min(7, i)];
-    for (const b of dt1Tile.blocks) {
-      const x0 = b.gridX, y0 = b.gridY;
-      const A = P(x0 + 1, y0 + 1), B = P(x0 + 2, y0 + 1), C = P(x0 + 1, y0 + 2), D = P(x0 + 2, y0 + 2);
-      const c = { A, B, C, D };
-      const flat = Math.abs(B - A) + Math.abs(C - A) + Math.abs(D - B) < 10;
-      // Gouraud edges: each corner is the average of four entries around it, exactly as the code sums them.
-      const E = [(P(x0, y0 + 2) + C + A + P(x0, y0 + 1)) >> 2, (P(x0 + 2, y0) + B + P(x0 + 1, y0) + A) >> 2,
-        (P(x0 + 3, y0 + 2) + C + P(x0 + 3, y0 + 1) + B) >> 2, (P(x0 + 1, y0 + 3) + P(x0 + 2, y0 + 3) + D + C) >> 2];
-      // RLE blocks (flag 4) go through D2gfx+0x8E30 (flat: the same light table) or D2gfx+0x8A40
-      // (gouraud: 15 rows, edges stepped once per row, the level table indexed exactly as the iso path)
-      // -- read from the code. Both index the table by the pixel's column in the block, less
-      // the row's leftclip (see CLIP_LEFT above, F249).
-      const iso = b.format === 1, rows = 15;
-      for (let r = 0; r < rows; r++) {
-        // D2gfx 1.13c +0xA5D0 advances iso edges only for visible rows; RLE advances skipped rows too.
-        const topclip = iso && tileY !== undefined ? Math.max(0, -(tileY + b.y - px.originY)) : 0;
-        if (iso && r < topclip) continue;
-        const rr = r - topclip;
-        const L = ((E[0] << 4) + rr * (E[3] - E[0])) >> 7, R = ((E[1] << 4) + rr * (E[2] - E[1])) >> 7;
-        const skip = iso ? ISO_SKIP[r] : 0, run = iso ? ISO_RUN[r] : 32;
-        const leftclip = tileX === undefined ? 0 : Math.max(0, Math.min(run, CLIP_LEFT - (tileX + b.x - px.originX + skip)));
-        for (let col = 0; col < run; col++) {
-          const x = skip + col, q = (b.y + r - px.originY) * px.width + (b.x + x - px.originX);
-          // An RLE skip leaves earlier blocks intact: use this block's write mask and source.
-          if (b.y + r - px.originY >= px.height || !b.pixels.written[r * 32 + x]) continue;
-          const lvl = flat ? c.A >> 3 : L + (((R - L) * (x - leftclip)) >> 5);   // >> 5 is floor(/ 32) on these integers
-          idx[q] = t[1024 + lvl * 256 + b.pixels.indices[r * 32 + x]];
-        }
-      }
-    }
-    // One 32-bit store per pixel from a per-table palette (little-endian ABGR), not four byte stores.
     let pal = pal32.get(t); if (!pal) { pal = new Uint32Array(256); for (let i = 0; i < 256; i++) pal[i] = (0xff000000 | (t[i * 4 + 2] << 16) | (t[i * 4 + 1] << 8) | t[i * 4]) >>> 0; pal32.set(t, pal); }
-    const px32 = new Uint32Array(idx.length);
-    for (let q = 0; q < idx.length; q++) if (opq[q]) px32[q] = pal[idx[q]];
-    const rgba = new Uint8ClampedArray(px32.buffer);
-    const canvas = documentObject.createElement('canvas'); canvas.width = px.width; canvas.height = px.height;
-    canvas.getContext('2d').putImageData(new ImageData(rgba, px.width, px.height), 0, 0);
+    // PERF (pf1): scratch buffers reused across misses; the old code allocated an index copy, a Uint32Array and an
+    // ImageData per lit floor (~5 MB a frame of garbage while walking). putImageData copies, so reuse is safe.
+    const n = px.width * px.height;
+    if (litScratch.length < n) litScratch = new Uint32Array(n);
+    const px32 = litScratch.subarray(0, n);
+    perfSample('lit-floor-miss', 1);
+    const pLp = perfT0();
+    litFloorPixels(px, dt1Tile.blocks, grid, t, pal, tileX, tileY, px32);
+    perfT('lit-floor-pixels', pLp);
+    const rgba = new Uint8ClampedArray(px32.buffer, px32.byteOffset, n * 4);
+    const pPut = perfT0();
+    let canvas = null;
+    for (let i = floorPool.length - 1; i >= 0; i--) if (floorPool[i].width === px.width && floorPool[i].height === px.height) { canvas = floorPool[i]; floorPool[i] = floorPool[floorPool.length - 1]; floorPool.pop(); break; }
+    if (!canvas) { canvas = documentObject.createElement('canvas'); canvas.width = px.width; canvas.height = px.height; }
+    // PERF (perf-deep2): the 2d context is kept on the pooled canvas and the ImageData over the scratch is reused per size (it wraps litScratch, whose bytes are rewritten each miss).
+    if (litImage?.data.buffer !== px32.buffer || litImage.width !== px.width || litImage.height !== px.height) litImage = new ImageData(rgba, px.width, px.height);
+    (canvas.d2ctx ||= canvas.getContext('2d')).putImageData(litImage, 0, 0);
+    perfT('lit-floor-put', pPut);
     if (key !== null) litCache.set(key, canvas); else { inner.set(keyBase, canvas); litFloorEntries++; litEvict(); }
     return canvas;
   }
@@ -617,18 +709,21 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   const resolved_ = new Map();
   function resolveTile(tile, files) {
     const cacheable = tile.librarySlot >= 0 && tile.librarySlot < 64 && tile.orientation >= 0 && tile.orientation < 64 && tile.mainIndex >= 0 && tile.mainIndex < 4096
-      && tile.subIndex >= 0 && tile.subIndex < 4096 && tile.libraryIndex >= 0 && tile.libraryIndex < 65536 && tile.frameIndex >= 0 && tile.frameIndex < 65536
+      && tile.subIndex >= 0 && tile.subIndex < 4096 && tile.libraryIndex >= 0 && tile.libraryIndex < 65536 && tile.frameIndex >= 0 && tile.frameIndex < 16384
       && (tile.entry === undefined || (tile.entry >= 0 && tile.entry < 65535));
-    let k1, k2, inner;
+    let k1, k2, k3, inner, mid;
     // F96 throwaway probe hook: globalThis.__d2VariantOverride forces the DRAWN DT1 variant of one tile
     // (keyed `${a},${b},${layer},${identity}`, a,b = world subtiles) so a frame test can force each
     // same-rarity sibling and count the misses. It disables the resolve cache so a redraw re-picks.
     const vov = globalThis.__d2VariantOverride;
     if (cacheable && !vov) {
-      k1 = ((tile.librarySlot * 64 + tile.orientation) * 4096 + tile.mainIndex) * 4096 + tile.subIndex;
-      k2 = (tile.libraryIndex * 65536 + tile.frameIndex) * 65536 + (tile.entry === undefined ? 0 : tile.entry + 1);
-      inner = resolved_.get(k1);
-      const hit = inner && inner.get(k2);
+      // PERF (perf-stutter): three Smi-range keys (<2^31) in nested maps; the old two ~2^34/2^48 keys were heap numbers, boxed on every lookup (~100 KB/frame of garbage -> GC hitches).
+      k1 = (tile.librarySlot * 64 + tile.orientation) * 4096 + tile.mainIndex;
+      k2 = tile.subIndex * 65536 + tile.libraryIndex;
+      k3 = tile.frameIndex * 65536 + (tile.entry === undefined ? 0 : tile.entry + 1);
+      mid = resolved_.get(k1);
+      inner = mid && mid.get(k2);
+      const hit = inner && inner.get(k3);
       if (hit) return hit;
     }
     let searched = 0, ambiguous = 0, entryTiles = 0, entryExact = 0, entryDiffers = 0, rarityAmbiguous = 0, resolved = 0, wrongIdentity = 0;
@@ -702,7 +797,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       `${tile.orientation}:${tile.mainIndex}:${tile.subIndex}:v${variantNo}`);
     const rec = { lib, variants, foundSlot, dt1Tile, variantNo, bitmap, searched, ambiguous, entryTiles, entryExact, entryDiffers, rarityAmbiguous, resolved, wrongIdentity,
       want: `${tile.orientation}:${tile.mainIndex}:${tile.subIndex}`, got: dt1Tile ? `${dt1Tile.orientation}:${dt1Tile.mainIndex}:${dt1Tile.subIndex}` : '' };
-    if (cacheable) { if (!inner) resolved_.set(k1, inner = new Map()); inner.set(k2, rec); }
+    if (cacheable) { if (!mid) resolved_.set(k1, mid = new Map()); if (!inner) mid.set(k2, inner = new Map()); inner.set(k3, rec); }
     return rec;
   }
 
@@ -736,10 +831,9 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
      * Each entry is `{ depth, draw(ctx) }`; `depth` is the sprite's projected screen Y, the same
      * key the wall tiles sort on.
      *
-     * Ordering caveat, stated plainly: this sorts the whole wall+sprite set by screen Y (ties broken
-     * by the DRLG's own ordinal, so tile order stays stable). Retail instead walks rooms and then
-     * cells within a room, which can differ at room seams and for tall multi-cell walls. This is an
-     * approximation of that walk, not a port of it -- the room/cell draw order is not recovered yet.
+     * Order: NOT a screen-Y sort. Walls and sprites are keyed by overlayKey (tile row, tile column,
+     * wall before unit, arrival; and shadows/roofs are their own passes.
+     * Still approximate: retail's room-array order for units tied in one tile is not recovered.
      *
      * `afterFloors` runs between the floor pass and the wall pass, which is where retail draws its
      * weather: in the retail captures the frame's 96 floor draws are followed by the whole
@@ -903,7 +997,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       perfT('terrain-floor', pFloor);
 
       // Walls and sprites in retail's order: tile by tile, rows (world Y) then columns (world X); a unit belongs to the
-      // tile its subtile is in and is drawn BEFORE that tile's walls. A sprite with no world position
+      // tile its subtile is in and is drawn AFTER that tile's walls (D2Client+0x9EE90 draws a cell's wall list, then its unit list). A sprite with no world position
       // falls back to its screen Y.
       // One sample per frame for the wall/overlay/roof pass, with the unit draws and the hidden-wall
       // FADED blend accumulated out of it so each is attributable on its own.
@@ -957,7 +1051,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       for (const o of roofs) o.k = [o.tile.worldY, o.tile.worldX, 1, o.ordinal];
       roofs.sort((a, b) => (a.k[0] - b.k[0]) || (a.k[1] - b.k[1]) || (a.k[3] - b.k[3]));
       for (const o of overlay) o.k = key(o);
-      overlay.sort((a, b) => (a.k[0] - b.k[0]) || (a.k[1] - b.k[1]) || (a.k[2] - b.k[2]) || (a.k[3] - b.k[3]));
+      overlay.sort(overlayCompare);
       for (const o of shadows.concat(overlay).concat(roofs)) {
         // Every world sprite -- monster, object, item, missile, the player, an npc speech balloon --
         // is timed into the one `units` total; a sprite that names its own kind also splits its share
@@ -989,7 +1083,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
           // A roof (orientation 15) goes through retail's FLOOR entry (op 31) with a floor light grid
           // (768 bytes = 8x8 x 12) that is UNIFORM at the light map's ambient: every roof in arrival3 and
           // lit0..1 (133, 144, 146 -- each capture's map minimum), whatever light is under it.
-          const roofGrid = o.tile.orientation === 15 && lightAmbient != null && new Array(64).fill(lightAmbient);
+          const roofGrid = o.tile.orientation === 15 && lightAmbient != null && flatRoofGrid(lightAmbient);
           // The SIX light entries this wall is drawn with, and the light map cell each came from -- the
           // same override the floor path below takes, for the wall path (F117: which entry a wall's
           // 32-px block reads is the question the gate frame asks). Off unless __d2TraceWalls is an
@@ -1008,7 +1102,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
           if (globalThis.__d2TraceBlits && wallE) globalThis.__d2TraceBlits.push({ x: o.x, y: o.y, path: files[o.slot], want: o.want, variantNo: o.variantNo,
             dt1Tile: o.dt1Tile, orientation: o.tile.orientation, hidden: Boolean(o.tile.hidesPlayer), room: o.tile.room,
             ordinal: o.tile.ordinal, cells: sampledCells, E: wallE, a: A, b: B, wall: true });
-          const lit = roofGrid ? litFloor(files[o.slot], o.dt1Tile, o.want + ':v' + o.variantNo, roofGrid, o.x, o.y) : wallE && litWall(files[o.slot], o.dt1Tile, o.want + ':v' + o.variantNo, wallE, fade < 255);
+          const lit = roofGrid ? litFloor(files[o.slot], o.dt1Tile, o.want + ':v' + o.variantNo, roofGrid, o.x, o.y, roofGrid.key) : wallE && litWall(files[o.slot], o.dt1Tile, o.want + ':v' + o.variantNo, wallE, fade < 255);
           // F66b: a wall the client hides fades to retail's transparent entry's alpha (roof-fade.mjs); alpha 0 draws nothing.
           if (fade > 0 && !(globalThis.__d2SkipFaded && fade < 255)) {   // __d2SkipFaded: a probe drawing the frame WITHOUT the hidden walls (their blend needs the pixel under them)
             const pf = perfT0();
@@ -1033,9 +1127,13 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   };
 }
 
-// Draw-list order key: tile row, tile column, then unit 0 < wall 1 within the tile (ground items: see below), then arrival.
+// Units of one tile order by wx+wy (south-east draws later; D20: the player, pushed last, won every tie). ponytail: retail's room unit list order (pRoomNext +0xE8) is not recovered; this is the screen-depth approximation. Items tie on 0 (stable sort = snapshot order): FUN_6fb4ee90 walks a cell's unit list (cell+4, next @+0x10) in list order, not by screen Y.
+// Draw-list order key: tile row, tile column, then wall 0 < unit 1 within the tile (D2Client+0x9EE90: a cell's wall list, then its unit list) (ground items: see below), then arrival.
 // Retail draws every ground item in the shadow pass, before all walls and unit cels (pick-up-item.txt: item cel
-// at call 160, first wall 161, first unit cel 177, though two monsters' tiles precede the item's): class -1e9 first.
+// at call 160, first wall 161, first unit cel 177, though two monsters' tiles precede the item's): class -1e9 first. Within a tile the cell's unit list is walked in list order, so items tie on 0 (stable sort = snapshot order), not on screen Y.
 export const overlayKey = (o) => o.sprite
-  ? (o.sprite.wx === undefined ? [1e9, 0, 0, o.depth] : o.sprite.pass === 'item' ? [-1e9, Math.floor(o.sprite.wy / 5), Math.floor(o.sprite.wx / 5), o.depth] : [Math.floor(o.sprite.wy / 5), Math.floor(o.sprite.wx / 5), 0, o.depth])
-  : [o.tile.worldY, o.tile.worldX, 1, o.ordinal];
+  ? (o.sprite.wx === undefined ? [1e9, 0, 0, o.depth] : o.sprite.pass === 'item' ? [-1e9, Math.floor(o.sprite.wy / 5), Math.floor(o.sprite.wx / 5), 0] : [Math.floor(o.sprite.wy / 5), Math.floor(o.sprite.wx / 5), 1, o.sprite.wx + o.sprite.wy])
+  : [o.tile.worldY, o.tile.worldX, 0, o.ordinal];
+
+// The overlay pass's comparator over precomputed `.k` keys (tile row, column, wall-before-unit, arrival).
+export const overlayCompare = (a, b) => (a.k[0] - b.k[0]) || (a.k[1] - b.k[1]) || (a.k[2] - b.k[2]) || (a.k[3] - b.k[3]);

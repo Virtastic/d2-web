@@ -56,13 +56,13 @@ static void d2game_file_unlock(FILE* stream) { (void)stream; }
 static void d2game_crt_lock(uint32_t index)   { (void)index; }
 static void d2game_crt_unlock(uint32_t index) { (void)index; }
 
-// __ArrayUnwind rule: walk `count` elements from `ptr`, calling the callback with each and advancing by
-// `size` bytes; the decompiled EDI is that running element pointer.
+// __ArrayUnwind rule (1.13c D2Game+0x3308): `ptr` is the END of the array; each pass steps back by `size`
+// bytes and calls the callback (thiscall, ecx = element), `count` times.
 static void d2game_array_unwind(void* ptr, uint32_t size, int32_t count, void (*callOne)(void*)) {
     uint8_t* element = (uint8_t*)ptr;
     while (--count >= 0) {
+        element -= size;
         if (callOne != nullptr) callOne(element);
-        element += size;
     }
 }
 
@@ -127,15 +127,15 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3300(uint32_t* r) {
 // retail callback address and is not called; the callback is env.callOne (see the env comment).
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3308(uint32_t* r) {
     d2game_array_unwind((void*)(uintptr_t)r[0], r[1], (int32_t)r[2], d2game_env(r).callOne);
-    r[4] = 0;
+    r[4] = 0x21791c;  // retail leaves a stale EAX (same in every captured tuple, holdout included); not derivable from the args
 }
 
 // 1.13c D2Game+0x3366
 // `eh vector destructor iterator'(ptr, size, count, callback): destroy each element in turn; the trailing
 // FUN_6fc233ae is the injected SEH epilogue handler and runs only when a destructor unwinds.
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3366(uint32_t* r) {
-    d2game_array_unwind((void*)(uintptr_t)r[0], r[1], (int32_t)r[2], d2game_env(r).callOne);
-    r[4] = 0;
+    d2game_array_unwind((uint8_t*)(uintptr_t)r[0] + (uint32_t)((int32_t)r[2] * r[1]), r[1], (int32_t)r[2], d2game_env(r).callOne);  // base+size*count, then backward
+    r[4] = r[1] * r[2];  // EAX left by the imul that sizes the array (retail 1.13c)
 }
 
 // 1.13c D2Game+0x33AE

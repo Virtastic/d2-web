@@ -52,3 +52,33 @@ export function groundLabelPlate(cx, bottom, textWidth) {
   const width = textWidth + 8, left = cx - (width >> 1);
   return { box: { x: left, y: bottom - 16, width, height: 16 }, textX: left + 4, anchorY: bottom - 3 };
 }
+
+// Hover-plate name colour, D2Client+0xC0850: flag 0x08 (unique) -> gold (4), then flag 0x04 (champion) -> blue (3)
+// overrides it; a fixed list of monster classes is forced gold. Superunique (0x02) and minion (0x10) get no colour.
+const GOLD_CLASSES = new Set([0xf3, 0x14d, 0xf2, 0xd3, 0x220, 0x23a, 0xe5, 0x2c4, 0x2c3, 0x2c2, 0x2c1, 0x2c5, 0x2c0]);
+export function monsterNameColour(typeFlags, classId = -1) {
+  const f = typeFlags | 0;
+  return GOLD_CLASSES.has(classId) ? 4 : f & 4 ? 3 : f & 8 ? 4 : 0;
+}
+
+// 1.13c D2Client+0x58FB0 switch on D2Common ord 10106 (dwQualityNo 1 low,2 normal,3 superior,4 magic,5 set,6 rare,7 unique,8 crafted,9 tempered): 4->3, 5->2, 6->9, 7->4, 8->8, 9->10, else 0. Retail greys (5) only ethereal/socketed, not low quality; the snapshot carries no flags.
+// set green 2, rare yellow 9, unique gold 4, crafted orange 8). Textcolour indices as textColourPalette takes.
+export function groundLabelColour(quality, flags = 0) {
+  return { 4: 3, 5: 2, 6: 9, 7: 4, 8: 8, 9: 10 }[quality] ?? ((flags & 0x400800) ? 5 : 0); // ethereal 0x400000 / socketed 0x800 -> grey
+}
+
+// 1.13c D2Client+0x58FB0 (showitems.cpp): the label under the cursor gets fill colour D2Win #10190(0,0x40,0x80)
+// (a pal.dat index), draw mode 5 and white text (colour 0); every other label gets colour 0, mode 1.
+// #10190 is the palette entry nearest the RGB (first on ties).
+export const ALT_HOVER_RGB = Object.freeze([0, 0x40, 0x80]);
+export const ALT_HOVER_MODE = 5;
+export function nearestPaletteIndex(palette, r, g, b) {
+  let best = 0, bestD = Infinity;
+  for (let i = 0; i < 256; i++) {
+    const d = (palette[i * 4] - r) ** 2 + (palette[i * 4 + 1] - g) ** 2 + (palette[i * 4 + 2] - b) ** 2;
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+export const altHoverBox = (box, palette) =>
+  [[box.x, box.y, box.x + box.width, box.y + box.height, nearestPaletteIndex(palette, ...ALT_HOVER_RGB), ALT_HOVER_MODE]];

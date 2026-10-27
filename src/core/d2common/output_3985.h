@@ -23,5 +23,6 @@ struct D2CommonOutputCalls3985 {
     void (*forcdecpt)(char*);                                 // PTR___fptrap_6fde9a74
     void (*cropzeros)(char*);                                 // PTR___fptrap_6fde9a6c
 };
+extern "C" void D2Common_394E_WriteString(D2CommonStringStream2814*, const D2CommonOutputCalls3985*, int*, const char*, int);
 extern "C" int D2Common_3985_Output(D2CommonStringStream2814*, const char*,
                                     const D2CommonOutputArgs3985*, const D2CommonOutputCalls3985*);

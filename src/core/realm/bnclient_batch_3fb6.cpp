@@ -28,7 +28,7 @@ struct BnCallocEnv {
 // return it; otherwise HeapAlloc(handle, 8, bytes). On failure, if __newmode is set ask the new-handler
 // to free room (0x49AE returns 0 when it cannot) and repeat the whole attempt; otherwise return null.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void* d2_fn_bnclient_3fb6(uint32_t count, uint32_t size, const BnCallocEnv* env) {
+EMSCRIPTEN_KEEPALIVE void* bn_calloc_3fb6(uint32_t count, uint32_t size, const BnCallocEnv* env) {
     if (count != 0 && size > 0xffffffe0u / count) return nullptr;
     uint32_t product = count * size;
     uint32_t bytes = product == 0 ? 1 : product;

@@ -16,3 +16,10 @@ export function hudBarTooltip(w, h, mx, my, { experience, nextExperience, stamin
   }
   return null;
 }
+
+// Lit add-point button hover text: string.tbl 3986 "strlvlup" (New Stats, left button) and 3987 "strnewskl"
+// (New Skill, right). `box` is the drawn button record; null when the pointer is not on a lit one.
+// ponytail: plate anchored centred above the button; retail's exact anchor unrecovered.
+export function levelButtonTooltip(index, box, texts) {
+  return index < 0 || !box ? null : { bar: index ? 'skill' : 'stats', text: texts[index], x: box.left + (box.w >> 1), y: box.top - 4, color: 0 };
+}

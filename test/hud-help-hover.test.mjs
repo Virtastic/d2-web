@@ -1,62 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHudHelp, HUD_HELP_HITBOX, hudHelpButtonContains } from '../play/assets/hud-help.mjs';
+import { eventHost, fixtureRenderer } from './helpers/hud-help-fixture.mjs';
 import { bindHudHelpPointer } from '../play/assets/hud-help-pointer.mjs';
-
-function eventHost() {
-  const listeners = new Map(), captures = [];
-  return {
-    captures,
-    addEventListener(type, listener) { listeners.set(type, listener); },
-    setPointerCapture(pointerId) { captures.push(pointerId); },
-    dispatch(type, values = {}) {
-      const event = { button: 0, pointerId: 1, x: 725, y: 404, preventDefault() { this.defaultPrevented = true; }, ...values };
-      listeners.get(type)?.(event);
-      return event;
-    },
-  };
-}
-
-function dc6Fixture(frameIndices, width = 2, height = 2) {
-  const table = 24 + frameIndices.length * 4;
-  const encodedLength = height * (width + 2), stride = 32 + encodedLength + 3;
-  const bytes = new Uint8Array(table + stride * frameIndices.length);
-  const view = new DataView(bytes.buffer);
-  view.setInt32(0, 6, true); view.setUint32(16, 1, true); view.setUint32(20, frameIndices.length, true);
-  for (let i = 0; i < frameIndices.length; i++) {
-    const at = table + stride * i;
-    const frame = Uint8Array.from(Array.from({ length: height }, () => [width, ...Array(width).fill(frameIndices[i]), 0x80]).flat());
-    view.setUint32(24 + i * 4, at, true);
-    view.setUint32(at + 4, width, true); view.setUint32(at + 8, height, true);
-    view.setUint32(at + 28, frame.length, true); bytes.set(frame, at + 32);
-  }
-  return bytes;
-}
-
-function fontTable() {
-  const chars = [...new Set('Help (H)')], bytes = new Uint8Array(12 + chars.length * 14);
-  bytes.set(new TextEncoder().encode('Woo!')); bytes[10] = 2; bytes[11] = 2;
-  const view = new DataView(bytes.buffer);
-  chars.forEach((char, i) => {
-    const at = 12 + i * 14;
-    view.setUint16(at, char.charCodeAt(0), true); bytes[at + 3] = 2; bytes[at + 4] = 2;
-  });
-  return bytes;
-}
-
-function fixtureRenderer() {
-  const assets = {
-    'data\\local\\font\\latin\\font16.dc6': dc6Fixture([17]),
-    'data\\local\\font\\latin\\font16.tbl': fontTable(),
-    'data\\global\\ui\\PANEL\\levelsocket.dc6': dc6Fixture([21, 22], 35, 36),
-    'data\\global\\ui\\PANEL\\level.dc6': dc6Fixture([31, 41, 51], 30, 30),
-    'data\\global\\palette\\ACT1\\pal.dat': new Uint8Array(768),
-  };
-  const requests = [];
-  const read = (path) => { requests.push(path); if (!(path in assets)) throw new Error(`unexpected asset ${path}`); return assets[path]; };
-  const documentObject = { createElement() { return { width: 0, height: 0, getContext: () => ({ putImageData() {} }) }; } };
-  return { renderer: createHudHelp(read, documentObject), requests };
-}
 
 test('Help callback bounds preserve the native inclusive right and bottom edges', () => {
   const hit = HUD_HELP_HITBOX;
@@ -70,7 +16,7 @@ test('Help callback bounds preserve the native inclusive right and bottom edges'
   assert.equal(hudHelpButtonContains(NaN, 420, hit), false);
 });
 
-test('Help button uses socket frame 1 while held and keeps Level gem on frame 0', (t) => {
+test('Help button uses Level gem frame 1 while held and keeps the one-frame socket on frame 0', (t) => {
   const previousImageData = globalThis.ImageData;
   globalThis.ImageData = class ImageData { constructor(data, width, height) { Object.assign(this, { data, width, height }); } };
   t.after(() => { if (previousImageData === undefined) delete globalThis.ImageData; else globalThis.ImageData = previousImageData; });
@@ -83,8 +29,8 @@ test('Help button uses socket frame 1 while held and keeps Level gem on frame 0'
   assert.equal(rest.button[1].frame, 0);
   const pressed = renderer.draw(ctx, 1, { pressed: true });
   assert.equal(pressed.pressed, true);
-  assert.equal(pressed.button[0].frame, 1, 'the socket uses its native held frame');
-  assert.equal(pressed.button[1].frame, 0, 'the Help draw routine keeps the gem at frame zero');
+  assert.equal(pressed.button[0].frame, 0, 'D2Client 0x37740 draws the socket at frame 0');
+  assert.equal(pressed.button[1].frame, 1, 'the held frame is the second cel (Level.dc6), the pressed flag of 0x37740');
   assert.equal(draws.length, 20, 'each call paints eight glyphs and two button cels');
 });
 

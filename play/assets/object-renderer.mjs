@@ -28,12 +28,12 @@ function rememberFailure(failures, key, limit) {
 
 export function parseObjectPresentations(bytes, count) {
   const view = bytes instanceof DataView ? bytes : new DataView(bytes.buffer, bytes.byteOffset || 0, bytes.byteLength);
-  if (!Number.isInteger(count) || count < 0 || view.byteLength < count * 40) throw new RangeError('truncated object presentation records');
-  return Array.from({ length: count }, (_, row) => { const at = row * 40; return {
+  if (!Number.isInteger(count) || count < 0 || view.byteLength < count * 44) throw new RangeError('truncated object presentation records');
+  return Array.from({ length: count }, (_, row) => { const at = row * 44; return {
     id: view.getUint32(at, true), classId: view.getUint32(at + 4, true), token: fourcc(view.getUint32(at + 8, true)),
     mode: view.getUint32(at + 12, true), x: view.getInt32(at + 16, true), y: view.getInt32(at + 20, true),
     framePrecise: view.getUint32(at + 24, true), frameCountPrecise: view.getUint32(at + 28, true),
-    componentMask: view.getUint32(at + 32, true), animSpeed: view.getUint16(at + 36, true), direction: view.getUint8(at + 38), selectable: view.getUint8(at + 39) !== 0,
+    componentMask: view.getUint32(at + 32, true), animSpeed: view.getUint16(at + 36, true), direction: view.getUint8(at + 38), selectable: view.getUint8(at + 39) !== 0, portalLevel: view.getUint8(at + 40),
   }; });
 }
 
@@ -110,16 +110,17 @@ export function createObjectRenderer(read, documentObject = globalThis.document,
         const left = Math.round(x + one.xOffset), top = Math.round(y + one.yOffset);
         const requestedMode = layer?.transparent && (layer.drawEffect === 3 || layer.drawEffect === 4) ? layer.drawEffect : 5;
         // Evidence states what reached the canvas. A missing PL2 must never be reported as a blend.
-        const mode = highlight ? 7 : (requestedMode !== 5 && blend ? requestedMode : 5);
-        const oneLayer = { width: one.width, height: one.height, indices: one.indexed, opaque: one.opaque };
+        const mode = requestedMode !== 5 && blend ? requestedMode : 5;
+        const hi = highlight ? highlightIndices(act0) : null;   // D28: mode 7 remaps colours, the layer keeps its own trans blend
+        const oneLayer = { width: one.width, height: one.height, indices: hi ? one.indexed.map((i) => hi[i]) : one.indexed, opaque: one.opaque };
         drawObjectLayer(ctx, rasterCache, { key: `${base}:layer:${frame}:${componentId}:${act0}:${highlight ? 'highlight' : 'normal'}`,
           width: one.width, height: one.height,
           rgba: () => indexedToRgba(one.indexed, one.opaque, pal, highlight ? highlightIndices(act0) : null, false),
-          layer: oneLayer, left, top, mode, blend: highlight ? null : blend });
+          layer: oneLayer, left, top, mode, blend });
         const component = COMPONENT[componentId];
         const path = component && layer ? `objects\\${object.token}\\${component}\\${object.token}${component}lit${animation.mode}${layer.weaponClass}`.toLowerCase() : null;
-        layerEvidence.push({ component, path, mode, transparent: Boolean(layer?.transparent), drawEffect: layer?.drawEffect ?? 0, shadow: Boolean(layer?.shadow) });
-        if (Array.isArray(globalThis.__d2DrawList) && path) globalThis.__d2DrawList.push({ op: 'dcc', path, frame, x: Math.round(x), y: Math.round(y), mode });
+        layerEvidence.push({ component, path, mode: highlight ? 7 : mode, transparent: Boolean(layer?.transparent), drawEffect: layer?.drawEffect ?? 0, shadow: Boolean(layer?.shadow) });
+        if (Array.isArray(globalThis.__d2DrawList) && path) globalThis.__d2DrawList.push({ op: 'dcc', path, frame, x: Math.round(x), y: Math.round(y), mode: highlight ? 7 : mode });
       }
     } else if (composed.width && composed.height) {
       const key = `${base}:composed:${frame}:${act0}:${highlight ? 'highlight' : 'normal'}`;

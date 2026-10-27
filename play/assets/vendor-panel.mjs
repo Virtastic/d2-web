@@ -14,8 +14,9 @@
 //   * which tab an item is on, and where: the ENGINE's store (d2_session_vendor_presentations
 //     invPage = the tab, gridX/gridY) -- retail's server places the stock, the client only shows it;
 //   * tab names: strBSArmor / strBSWeapons / strBSMisc; a tab with no stock is not drawn.
-// TODO(client-parity P8c): no retail frame of a shop yet (level 2); the opening tab (Misc) is
-// riiablo's; buying is a left click on the item (P8d), which retail may bind differently.
+// The opening tab is captured (openingTab below: smith -> Weapons, else Misc), not riiablo's guess.
+// TODO(client-parity P8d): buying is a left click on the item, which retail may bind differently.
+import { placeItemTip } from './item-tooltip.mjs';
 import { createFont, decodeFontTbl, FRONTEND, textColourPalette } from './frontend.mjs';
 import { BORDER_LEFT, BORDER_RIGHT, createPanelChrome } from './panel-chrome.mjs';
 import { inventoryItemAsset } from './inventory-panel.mjs';
@@ -32,12 +33,21 @@ export const VENDOR_ASSETS = {
 // kept here so the panel can draw before the first read and so a mismatch is visible in review).
 export const VENDOR_LAYOUT = Object.freeze({ left: 80, top: 60, gridLeft: 96, gridTop: 123, columns: 10, rows: 10, cell: 29,
   tabStep: 80, buttonX: [195, 248, 300, 352], buttonFromBottom: 15 });   // buttonX: retail's draw list (vendor-akara), riiablo's 116..272 were off
+// The stock grid from d2_session_inventory_layout's twelve numbers (Inventory.txt "Monster", row 5);
+// VENDOR_LAYOUT's grid values are only the fallback when the engine read is unavailable.
+export const vendorLayoutFromEngine = (grid, base = VENDOR_LAYOUT) => (!grid || !(grid.length >= 12) || ![4, 5, 10].every((k) => grid[k] > 0) || ![6, 8].every((k) => grid[k] >= 0 && grid[k] < 800)
+  ? base : Object.freeze({ ...base, gridLeft: grid[6], gridTop: grid[8], columns: grid[4], rows: grid[5], cell: grid[10] }));
+// Opening tab: retail opens a smith on Weapons (1) when it has stock there, anyone else on Misc (3), else the
+// first tab with stock, else Misc (captured: vendor-akara, vendor-malah-act5, p8-smith-shop). Pure, so it is testable.
+export const openingTab = (stockTabs, smith = false) => smith && stockTabs.includes(1) ? 1 : stockTabs.includes(3) ? 3 : (stockTabs[0] ?? 3);
 const TAB_NAMES = ['strBSArmor', 'strBSWeapons', 'strBSWeapons', 'strBSMisc'];
 // Retail's own tab-label x per tab (y=80), read from every captured vendor's draw list -- p8-smith-shop
 // ('Armor' 97, 'Weapons' 168/248, 'Misc' 346), p8-ui2-shop-5000g, vendor-akara and vendor-malah-act5 all
 // agree. It is a fixed table, not a centring formula: retail rounds 16.5 up (Armor) but 8.5 down
 // (Weapons), which no single rounding of (79+4-measure)/2 reproduces. (s733 asserts our label band.)
 const TAB_LABEL_X = [97, 168, 248, 346];
+// Each buysellbtn cel is followed by its pressed (down) cel: Buy 2/3, Sell 4/5, Repair 6/7, Exit 10/11, Repair All 18/19.
+export const vendorButtonFrame = (name, pressed) => BUTTON_FRAMES[name] + (pressed && name !== 'blank' ? 1 : 0);
 const BUTTON_FRAMES = { blank: 0, buy: 2, sell: 4, repair: 6, exit: 10, repairAll: 18 };
 // The smiths (MonStats: Charsi, Fara, Hratli, Halbu, Larzuk) are the vendors D2GAME_NPC_Repair accepts;
 // their row is Buy / Sell / Repair / Repair All, every other vendor's Buy / Sell / (blank) / Exit
@@ -46,9 +56,15 @@ export const SMITH_CLASSES = new Set([154, 178, 253, 257, 511]);
 // The tooltip's lines and their D2Win colours (top down: Cost, name, then the engine's property lines). P8j: a magic item's
 // Cost and name are blue (shop-magic-*-r21; other qualities unmeasured, white); 'v' = label white, value blue.
 export function tooltipSpec(h) {
-  const qc = h.quality === 4 ? 3 : 0;
-  return { lines: [`${h.costLabel || 'Cost: '}${h.cost}`, h.name || h.code, ...(h.props || [])], colours: [qc, qc, ...(h.propColours || [])] };
+  // D2Win colours by quality: magic blue, set green, rare yellow, unique gold (only magic is measured; the rest follow the retail palette).
+  const qc = { 4: 3, 5: 2, 6: 9, 7: 4 }[h.quality] ?? 0;
+  // Unique/set/rare: the base item name sits on a second line in the same colour.
+  const base = h.baseName ? [h.baseName] : [];
+  return { lines: [`${h.costLabel || 'Cost: '}${h.cost}`, h.name || h.code, ...base, ...(h.props || [])], colours: [qc, qc, ...base.map(() => qc), ...(h.propColours || [])] };
 }
+// The retail tooltip frame shared by the item tooltip and the skill plates: 4 px side padding, 16 px lines, a mode-2 black box.
+export const TOOLTIP_FRAME = { pad: 4, line: 16, fill: 'rgba(0,0,0,0.65)' };
+export function drawTooltipFrame(ctx, x, y, w, h, fill = TOOLTIP_FRAME.fill) { ctx.save(); ctx.fillStyle = fill; ctx.fillRect(x, y, w, h); ctx.restore(); }
 export const vendorButtons = (npcClass) => (SMITH_CLASSES.has(npcClass) ? ['buy', 'sell', 'repair', 'repairAll'] : ['buy', 'sell', 'blank', 'exit']);
 // D2Client's standard 800x600 action-row hit table, converted from strict integer bounds.
 export const vendorButtonHitRect = (layout, slot) => ({ x: layout.buttonX[slot] + 2, y: 432, w: 44, h: 43 });
@@ -157,8 +173,13 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
     /** Show the tab retail opens a shop on, or the first one with stock. */
     // Retail opens Akara's and Malah's on Misc (frame 3 active) and Charsi's on Weapons (frame 1 active,
     // p8-smith-shop); a smith is told by `smith`, the rule behind it is not captured beyond those three.
-    reset(items = [], smith = false) { split = smith; const t = tabsWithStock(items); tab = smith && t.includes(1) ? 1 : t.includes(3) ? 3 : (t[0] ?? 3); },
+    reset(items = [], smith = false) { split = smith; const t = tabsWithStock(items); tab = openingTab(t, smith); },
     setTab(t) { tab = t; },
+    /** Retail: a click inside the panel's rectangle is never a world click, so never closes the store. */
+    contains(px, py, width, height) {
+      const [x, y] = toScreen(width, height, px, py);
+      return x >= L.left && x < L.left + cur.panel.width && y >= L.top + 1 && y < L.top + 1 + cur.panel.height;
+    },
     tabAt(px, py, width, height) {
       const [x, y] = toScreen(width, height, px, py);
       return lastTabs.find((t) => { const r = tabRect(t); return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h; }) ?? null;
@@ -244,7 +265,7 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
       // Retail's button row (vendor-akara: buysellbtn 2 / 4 / 0 / 10 at x 195/248/300/352, bottom row 477);
       // a smith's row is main's Buy / Sell / Repair / Repair All (not captured yet).
       const buttons = vendorButtons(state?.classId);
-      buttons.forEach((b, i) => { const c = buttonFrames[BUTTON_FRAMES[b]]; if (c) ctx.drawImage(c, L.buttonX[i], 477 - c.height + 1); });
+      buttons.forEach((b, i) => { const c = buttonFrames[vendorButtonFrame(b, state?.pressedButton === b)]; if (c) ctx.drawImage(c, L.buttonX[i], 477 - c.height + 1); });
       // The stash line (1.13 vendors take stash gold): string "stash" at (101, 434), the stash's gold
       // RIGHT-aligned so its last glyph starts at x 266. Retail's own per-glyph records hold the anchor:
       // `text '180000' x=218 y=434` (vendor-malah-act5) draws 1,8,0,0,0,0 at 218,223,230,242,254,266 --
@@ -252,24 +273,24 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
       // number is anchored by its END, and the start is 266 minus every advance but the last.
       font.drawAnchored(ctx, string('stash'), 101, 434);
       if (state?.stashGold >= 0) { const gold = String(state.stashGold); font.drawAnchored(ctx, gold, 266 - font.measure(gold.slice(0, -1)), 434); }
-      // Retail's tooltip (same captures): a mode-2 black box, 16 px per line, centred on the pointer and
-      // clamped to the screen, its bottom 25 px above the pointer; lines are centred, listed top down as
+      // Retail's tooltip (same captures): a mode-2 black box, 16 px per line, centred on the item cell (placeItemTip, D2Client+0x945D0) and
+      // clamped to the screen, above the cell (below if no room); lines are centred, listed top down as
       // retail draws them (Cost first, then the name). The property lines come from the engine's
       // d2_session_item_lines.
+      // The side borders are screen furniture: drawn before the tooltip so it is never covered (D16).
+      chrome.border(ctx, state?.act || 1, BORDER_LEFT); chrome.border(ctx, state?.act || 1, BORDER_RIGHT);
       let tooltip = null;
       if (hovered) {
         const { lines, colours } = tooltipSpec(hovered);
-        const w = Math.max(...lines.map((l) => font.measure(l))) + 8, h = lines.length * 16;
-        const bx = Math.max(0, Math.min(800 - w, Math.round(p.x / v.scale - v.ox / v.scale - w / 2))), bottom = Math.round((p.y - v.oy) / v.scale) - 25;
-        ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(bx, bottom - h, w, h);
+        const w = Math.max(...lines.map((l) => font.measure(l))) + TOOLTIP_FRAME.pad * 2, h = lines.length * TOOLTIP_FRAME.line;
+        const cell = { x: L.gridLeft + hovered.gridX * L.cell, y: L.gridTop + hovered.gridY * L.cell, w: (hovered.invWidth || 1) * L.cell, h: (hovered.invHeight || 1) * L.cell };
+        const { bx, by } = placeItemTip(cell, w, h), bottom = by + h;
+        drawTooltipFrame(ctx, bx, bottom - h, w, h);
         lines.forEach((l, k) => { const x = bx + Math.floor((w - font.measure(l)) / 2), y = bottom - h + 13 + 16 * k, c = colours[k];
           if (c === 'v') { const cut = l.indexOf(': ') + 2; font.drawAnchored(ctx, l.slice(0, cut), x, y); cur.tint(3).drawAnchored(ctx, l.slice(cut), x + font.measure(l.slice(0, cut)), y); }
           else (c ? cur.tint(c) : font).drawAnchored(ctx, l, x, y); });
         tooltip = { box: [bx, bottom - h, bx + w, bottom], lines, colours };
       }
-      ctx.restore();
-      ctx.save(); ctx.translate(v.ox, v.oy); ctx.scale(v.scale, v.scale);
-      chrome.border(ctx, state?.act || 1, BORDER_LEFT); chrome.border(ctx, state?.act || 1, BORDER_RIGHT);
       ctx.restore();
       return { box: { x: L.left, y: L.top, width: panel.width, height: panel.height }, tab, tabs: [...lastTabs], shown, total: items.length,
         drawnIcons, drawnItems, undrawnItems, hover: hovered ? { id: hovered.id, colour: 118, gridX: hovered.gridX, gridY: hovered.gridY, invWidth: hovered.invWidth || 1, invHeight: hovered.invHeight || 1 } : null, tooltip, scroll: 0, gold: state?.gold ?? -1, buttons };

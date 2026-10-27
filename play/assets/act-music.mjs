@@ -118,7 +118,7 @@ export function createLevelMusicSync(playLevel, { now = Date.now, retryDelayMs =
       entry.invoked = true;
       return playLevel(id);
     }).then((result) => {
-      if (request === serial) { activeLevel = id; pending = null; failedLevel = -1; }
+      if (request === serial) { pending = null; failedLevel = -1; if (result !== null) activeLevel = id; }
       return result;
     }, (error) => {
       if (request === serial) { pending = null; failedLevel = id; retryAt = now() + retryDelayMs; }
@@ -252,7 +252,7 @@ export function createActMusicPlayer(read, AudioContextClass = globalThis.AudioC
     let prepared;
     try { [prepared] = await Promise.all([preparedPromise, resumed]); }
     catch (error) { if (request !== requestSerial) return null; throw error; }
-    if (request !== requestSerial) return prepared;
+    if (request !== requestSerial) return null; // superseded: nothing started, so the level sync must not adopt it
     if (prepared.soundId === 0) {
       if (source) { source.stop(); source.disconnect(); source = null; }
       sourceVolume = 0; applyGain(); activeSoundId = 0; activeLevelId = prepared.levelId;

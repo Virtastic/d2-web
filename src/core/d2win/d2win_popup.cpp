@@ -12,3 +12,4 @@ extern "C" void d2win_SetPopUpUnicodeText(const uint16_t* text, uint32_t a, uint
 }
 extern "C" void d2win_popup_reset(int fill) { memset(&g_popup, fill, sizeof g_popup); }
 extern "C" const void* d2win_popup_state() { return &g_popup; }
+extern "C" void d2win_popup_set_tail(uint32_t v) { g_popup.zero = v; }   // D2Win+0xCA668 = 0x6f9aa668, the word SetPopUp zeroes

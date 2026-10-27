@@ -327,7 +327,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_605d(uint32_t fd, const D2ClientBatchB56E
     return -1;
 }
 
-// 1.13c D2Client+0x060E0
+// 1.13c D2Client+0x060E0  (test/d2client-60e0.test.mjs)
 // __close(fd): a descriptor outside _nfile or without the in-use bit (record +4 & 1) latches errno 9
 // and doserrno 0. Otherwise the fhandle lock is taken, the bit re-tested, __close_lk (0x605D) runs, and
 // the lock is released.
@@ -381,7 +381,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_client_707b(void* self, void* locale, int32_t c
     const uint8_t* table = (const uint8_t*)(uintptr_t)*(const uint32_t*)(loc + 0x48);
     uint16_t type;
     if ((uint32_t)(c + 1) < 0x101u) {
-        type = *(const uint16_t*)(table + (uint32_t)c * 2);
+        type = *(const uint16_t*)(table + (intptr_t)c * 2);
     } else {
         int32_t len;
         uint8_t src[2];
@@ -389,8 +389,8 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_client_707b(void* self, void* locale, int32_t c
             src[0] = (uint8_t)c;
             len = 1;
         } else {
-            src[0] = (uint8_t)c;
-            src[1] = (uint8_t)((uint32_t)c >> 8);
+            src[0] = (uint8_t)((uint32_t)c >> 8);  // CRT: lead byte first
+            src[1] = (uint8_t)c;
             len = 2;
         }
         type = 0;
@@ -438,6 +438,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_70f2(uint8_t* locale, const D2ClientBatchB56
 }
 
 // 1.13c D2Client+0x071C2
+// Pinned by test/d2client-71c2.test.mjs (decomp field indices 0xb/0xd/0xc/0x10 -> +0x2C/+0x34/+0x30/+0x40).
 // ___updatetlocinfo_lk: release the thread's current locale (refcounts of its lconv tables, the time
 // block's +0xB4 count) when it is not the default, install the default and bump its refcounts, then
 // deep-free the old block if it is now unreferenced and not the initial locale. Returns the installed

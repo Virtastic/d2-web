@@ -420,6 +420,18 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_56BD(uint32_t fd, const char* buf, uin
     return -1;
 }
 
+// FN-probe seam: builds the env with only the _write seams set (function replay of D2Game+0x56BD).
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_56BD_seams(uint32_t fd, const char* buf, uint32_t count,
+    uint32_t* pioinfo, int32_t (*lseek)(uint32_t, int32_t, int32_t, uint32_t),
+    int32_t (*wf)(uint32_t, const void*, uint32_t, uint32_t*, uint32_t), uint32_t (*gle)(void),
+    void (*dme)(uint32_t), int32_t* (*en)(void), uint32_t* (*de)(void))
+{
+    D2GameBatchC2150Env e{};
+    e.pioinfo = pioinfo; e.lseeki64lk = lseek; e.writeFile = wf; e.getLastError = gle;
+    e.dosmaperr = dme; e.errnoPtr = en; e.doserrnoPtr = de;
+    return d2_fn_d2game_56BD(fd, buf, count, &e);
+}
+
 // __lock_fhandle(fh): the ioinfo record is _pioinfo[fh >> 5] + (fh & 0x1F) * 0x24. Its +0x08 slot is
 // created under __lock(10) when zero: __crtInitCritSecAndSpinCount(record + 0xC, 4000) failure returns
 // 0 (__local_unwind2 to -1 runs the finally, so __unlock(10) still runs, without entering), otherwise

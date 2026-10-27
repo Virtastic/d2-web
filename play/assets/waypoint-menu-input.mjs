@@ -43,7 +43,7 @@ export function createWaypointMenuInput() {
   };
 
   return {
-    hitTest(px, py, width, height, rows, rowAt, completedActs = null) {
+    hitTest(px, py, width, height, rows, rowAt, completedActs = null, hereLevelId = null) {
       const point = menuPoint(px, py, width, height);
       if (contains(point, closeRect())) return { action: 'close' };
       for (let zone = 1; zone <= 5; zone++) {
@@ -63,8 +63,11 @@ export function createWaypointMenuInput() {
         // unavailable, fail closed rather than deriving progression from the rendered tab set.
         return null;
       }
+      // Outside: mouse down at x > 400 or y > 551 closes the panel.
+      if (point.x > 400 || point.y > 551) return { action: 'close' };
+      // FUN_6FB59F00 sets the row flag only for active waypoints other than the one the player stands at.
       const row = rowAt(px, py, width, height, rows);
-      return row ? { action: 'row', row } : null;
+      return row && row.active && row.levelId !== hereLevelId ? { action: 'row', row } : null;
     },
     targets(width, height, drawnTabs = []) {
       const acts = [...new Set(drawnTabs.filter((tab) => tab?.drawn && Number.isInteger(tab.act) && tab.act >= 1 && tab.act <= 5)

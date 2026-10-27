@@ -28,6 +28,7 @@ struct BnMtInitLockEnv {
     void     (*lock)(int32_t num);               // 0x6265 __lock
     void     (*unlock10)(void);                  // 0x315A the _unlock(10) wrapper
     int32_t  (*init_crit_sec)(void* pcs, uint32_t spin);  // ___crtInitCritSecAndSpinCount
+    void     (*set_errno)(int32_t value);        // *FUN_6ff237cd() = value (_errno)
 };
 // 1.13c BNClient+0x030C3 (151 B, callers 0x3163): the lock-table initialiser described above.
 extern "C"
@@ -35,13 +36,14 @@ EMSCRIPTEN_KEEPALIVE int32_t bn_mtinitlocknum(int32_t lock_num, const BnMtInitLo
     uint32_t* entry = env->lock_table + lock_num * 2;
     if (*entry != 0) return 1;
     void* pcs = env->malloc(0x18);
-    if (pcs == nullptr) return 0;                 // errno = ENOMEM
+    if (pcs == nullptr) { env->set_errno(0xC); return 0; }  // ENOMEM
     env->lock(10);
     if (*entry != 0) {
         env->free(pcs);                           // lost the race: drop the fresh section
     } else {
         if (env->init_crit_sec(pcs, 0xFA0) == 0) {
-            env->free(pcs);                       // errno = ENOMEM, then the finally unlocks
+            env->free(pcs);
+            env->set_errno(0xC);                  // ENOMEM, then the finally unlocks
             env->unlock10();
             return 0;
         }
@@ -64,9 +66,9 @@ struct BnFreeTlocinfoEnv {
     uint32_t  default_lc_time;                   // +0x1F94C  DAT_6ff3f94c
     uint32_t  lc_time_global;                    // +0x1C664  DAT_6ff3e664
     void     (*free)(void* p);                   // 0x3CF4 _free
-    void     (*free_lconv_mon)(uint32_t locinfo);  // 0x6975 ___free_lconv_mon
-    void     (*free_lconv_num)(uint32_t locinfo);  // 0x67E5 ___free_lconv_num
-    void     (*free_lc_time)(void* lc_time);       // 0x69D4 ___free_lc_time
+    void     (*free_lconv_mon)(uint32_t locinfo);  // 0x69D4 ___free_lconv_mon
+    void     (*free_lconv_num)(uint32_t locinfo);  // 0x6975 ___free_lconv_num
+    void     (*free_lc_time)(void* lc_time);       // 0x67E5 ___free_lc_time
 };
 // 1.13c BNClient+0x03601 (208 B, callers 0x32C6/0x36D1): the locale-info destructor described above.
 extern "C"
@@ -131,7 +133,7 @@ EMSCRIPTEN_KEEPALIVE void bn_chkstk(uint32_t size, uint8_t* esp, uint32_t retadd
 // +0x1D590 (code, text); a code that is not found writes nothing. In banner state (__error_mode == 1, or
 // 0 with __app_type == 1) the message text goes to stderr (STD_ERROR_HANDLE = -12) through WriteFile.
 // Otherwise, unless the code is 0xFC (_RT_CRT_NOTINIT), the program name (GetModuleFileNameA, or
-// "<program name unknown>"; truncated to its last three characters replaced by "..." when it would not
+// "<program name unknown>"; its last 59 characters with the first three replaced by "..." when it would not
 // fit in 60 bytes) is concatenated with the fixed "Runtime Error!\n\nProgram: " and "\n\n" text around the
 // message and shown via ___crtMessageBoxA (base from 0x6AB0/0x6AC0 are strcpy/strcat).
 struct BnNmsgWriteEnv {
@@ -159,7 +161,7 @@ EMSCRIPTEN_KEEPALIVE void bn_nmsg_write(int32_t code, const BnNmsgWriteEnv* env)
         const char* name = module;
         const size_t name_len = std::strlen(name);
         if (name_len + 1 > 0x3C) {                // keep room: the tail is replaced by "..."
-            name += name_len - 3;
+            name += name_len + 1 - 0x3C;      // decompile: buf + len + 1 - 0x3C, keeps the last 59 chars
             std::strncpy(const_cast<char*>(name), "...", 3);
         }
         const size_t msg_len = std::strlen(msg);
@@ -206,7 +208,7 @@ EMSCRIPTEN_KEEPALIVE int32_t bn_callnewh(uint32_t size, int32_t (*handler)(uint3
 // exists), take the head of the first non-empty bucket at or above the request's bucket, split off the
 // remainder (bucket clamped to 0x3F), stamp size+1 at the node and the tail word, bump the group's bucket
 // count and clear the region cursor when that was its last block. Returns the user pointer (node+4) or 0.
-// The two region/group allocators (0x4E0B, 0x4D54) and the six sbh globals are passed in.
+// The two region/group allocators (0x4D54, 0x4E0B) and the six sbh globals are passed in.
 struct BnSbhState {
     uint32_t regions;        // +0x20BCC  DAT_6ff40bcc
     uint32_t count;          // +0x20BC8  DAT_6ff40bc8
@@ -216,8 +218,8 @@ struct BnSbhState {
 };
 struct BnSbhAllocBlockEnv {
     BnSbhState* state;
-    uint32_t (*new_region)(void);              // 0x4E0B ___sbh_alloc_new_region
-    int32_t  (*new_group)(uint32_t region);    // 0x4D54 ___sbh_alloc_new_group
+    uint32_t (*new_region)(void);              // 0x4D54 ___sbh_alloc_new_region
+    int32_t  (*new_group)(uint32_t region);    // 0x4E0B ___sbh_alloc_new_group
 };
 static inline uint32_t* bn_p32(uint32_t a) { return (uint32_t*)(uintptr_t)a; }
 static inline uint8_t*  bn_p8(uint32_t a)  { return (uint8_t*)(uintptr_t)a; }
@@ -227,7 +229,7 @@ extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t bn_sbh_alloc_block(uint32_t size, const BnSbhAllocBlockEnv* env) {
     BnSbhState* s = env->state;
     uint32_t req = (size + 0x17u) & 0xfffffff0u;
-    int32_t first_bucket = (int32_t)((size + 0x17u) >> 4) - 1;
+    int32_t first_bucket = ((int32_t)(size + 0x17u) >> 4) - 1;  // retail: signed shift of the wrapped sum
     uint32_t end = s->regions + s->count * 0x14u;
     uint8_t b8 = (uint8_t)first_bucket;
     uint32_t region = s->last_region;

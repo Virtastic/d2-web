@@ -24,7 +24,7 @@
 #include "crt_security_cookie_9bb0.h"
 
 // Defined in src/core/d2game/d2game_batch_3e70.cpp.
-extern "C" void d2_fn_d2game_3f76(int32_t lockNum);
+extern "C" void d2game_unlock_3f76(int32_t lockNum);
 
 // ---- CRT module state (retail RVA in the comment) ------------------------------------------------
 static uint32_t g_stackCookie;              // 0x6FD1F980 __security_cookie
@@ -35,7 +35,7 @@ static void    (*g_pfnmsg)(void);            // 0x6FD2FFFC _pfnmsg
 // 1.13c D2Game+0x04022 (sub_4022): release critical-section number 10.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_4022(void) {
-    d2_fn_d2game_3f76(10);
+    d2game_unlock_3f76(10);
 }
 
 // 1.13c D2Game+0x04E65 (sub_4E65, __getptd()->_terrno): the thread's errno slot. The host models the
@@ -56,7 +56,9 @@ EMSCRIPTEN_KEEPALIVE void d2game_free_5a8d(void* mem) {
 // failure returns null (retail then calls the new handler, which the engine never installs).
 extern "C"
 EMSCRIPTEN_KEEPALIVE void* d2game_malloc(size_t size) {
-    return std::malloc(size);
+    // CRT: sizes above 0xFFFFFFE0 fail (32-bit heap limit); a zero size is rounded up to 1.
+    if (size > 0xFFFFFFE0u) return nullptr;
+    return std::malloc(size ? size : 1);
 }
 
 // 1.13c D2Game+0x069DC (__NMSG_WRITE): find the code in the 19-entry {code, text} table and return

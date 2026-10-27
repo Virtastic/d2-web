@@ -26,6 +26,11 @@ import { recordDc6, recordPrim } from './drawlist.mjs';
 import { questOfMessage } from './npc-topics.mjs';
 import { hudOrigin } from './hud-origin.mjs';
 
+/** Scroll thumb's pixel drop down the hire window's track (149..388) for `top` of `n` offers (7 rows show). */
+export function hireThumbOffset(top, n, thumb, rows = 7) {
+  const maxTop = n - rows;
+  return maxTop > 0 ? Math.round((388 - 149 - 12 * (thumb - 1)) * Math.min(top, maxTop) / maxTop) : 0;
+}
 const TALK = 'talk', TRADE = 'trade', GAMBLE = 'gamble', HIRE = 'hire', IDENTIFY = 'identify', OTHER = 'other';
 const S_INTRO = 3399, S_GOSSIP = 3395, S_TALK = 3381, S_TRADE = 3396, S_TRADE_REPAIR = 3334, S_GAMBLE = 3398, S_HIRE = 3397, S_IDENTIFY = 4020, S_CANCEL = 3400;
 const ACTION = { [S_TALK]: TALK, [S_TRADE]: TRADE, [S_TRADE_REPAIR]: TRADE, [S_GAMBLE]: GAMBLE, [S_HIRE]: HIRE, [S_IDENTIFY]: IDENTIFY };
@@ -45,6 +50,14 @@ export const NPC_MENU_TABLE = [
   [513, [S_TALK, S_TRADE]], [512, [S_TALK, S_TRADE, S_GAMBLE]], [514, [S_TALK, S_GAMBLE]], [515, [S_TALK]],
   [527, [S_TALK]], [537, [S_TALK]], [538, [S_TALK]], [539, [S_TALK]],
 ];
+
+/** After a speech the menu comes back only for the NPC it was opened on and one with entries (D2Client's menu state), else Esc ends the interaction. */
+// Retail keeps one menu-open flag (D2Client .data 0x6FBC9663, set by 0x4A270, cleared by the 0x4A3D0 teardown): the menu comes back
+// only while the NPC unit is still in the room (`alive`), else the interaction is over and the pending menu is dropped.
+export const menuReturnsAfterSpeech = (pending, npcId, alive = true) => !!pending && alive && pending.npcId === npcId && Array.isArray(pending.entries) && pending.entries.length > 0;
+
+/** The menu that returns after speech `spoken`: a quest topic just heard is gone from the engine's list (0x31 consumed it), so its row is not offered again. */
+export const entriesAfterSpeech = (entries, spoken) => entries.filter((e) => !(e.action === 'topic' && e.stringId === spoken));
 
 /** The retail entries for an NPC class (first matching record, as D2Client walks the table), or null. */
 // P7b: the Talk box (kashya-talk-r14: talk / introduction / gossip / Den of Evil / cancel). Introduction and Gossip are always there;
@@ -111,6 +124,11 @@ export function menuFramePieces(x1, y1, x2, y2) {
 }
 const GOLD = [0xc7, 0xb3, 0x77], BLUE = [0x69, 0x69, 0xff];
 
+/** A hire offer's header line; stat labels are string.tbl 3368 Lvl, 3366 Life, 3367 Def, 3369 Cost. */
+export function hireOfferLine(o, string) {
+  const t = (id, d) => string(id) || d;
+  return `${o.name} - ${t(3368, 'Lvl')}: ${String(o.level).padStart(2)}  ${t(3366, 'Life')}: ${String(o.life).padStart(2)}  ${t(3367, 'Def')}: ${String(o.def).padStart(2)}  ${t(3369, 'Cost')}: ${o.cost}`;
+}
 export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, documentObject = globalThis.document }) {
   const palette = decodeDatPalette(read(NPC_MENU_ASSETS.palette));
   const dc6 = decodeDc6(read(NPC_MENU_ASSETS.font)), tbl = decodeFontTbl(read(NPC_MENU_ASSETS.fontTbl));
@@ -263,13 +281,14 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
       cel(SLIDER, sliders, 8, HW.trackX, 388);
       shown.forEach((o, i) => {
         const on = hire.top + i === hire.selected, f = on ? blue : white, y = HW.firstBottom + i * HW.pitch;
-        f.drawAnchored(ctx, `${o.name} - Lvl: ${String(o.level).padStart(2)}  Life: ${String(o.life).padStart(2)}  Def: ${String(o.def).padStart(2)}  Cost: ${o.cost}`, HW.textX, y);
+        f.drawAnchored(ctx, hireOfferLine(o, string), HW.textX, y);
         f.drawAnchored(ctx, `  ${o.skill}`, HW.textX, y + 14);
       });
       const thumb = Math.max(3, Math.floor(21 * Math.min(1, HW.rows / Math.max(1, n))));
-      cel(SLIDER, sliders, 16, HW.trackX - 1, 149);
-      for (let k = 0; k < thumb - 2; k++) cel(SLIDER, sliders, 14, HW.trackX - 1, 161 + 12 * k);
-      cel(SLIDER, sliders, 15, HW.trackX - 1, 161 + 12 * (thumb - 2));
+      const ty = hireThumbOffset(hire.top, n, thumb);
+      cel(SLIDER, sliders, 16, HW.trackX - 1, 149 + ty);
+      for (let k = 0; k < thumb - 2; k++) cel(SLIDER, sliders, 14, HW.trackX - 1, 161 + ty + 12 * k);
+      cel(SLIDER, sliders, 15, HW.trackX - 1, 161 + ty + 12 * (thumb - 2));
       const head = `${string(3364).replace('%d', String(hire.gold))}`;
       const centred = (t) => HW.x1 + Math.ceil((HW.x2 - HW.x1 - white.measure(t)) / 2) + 1;   // the menu's own centring rule
       gold.drawAnchored(ctx, head, centred(head), HW.headerY);

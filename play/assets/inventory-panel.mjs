@@ -122,11 +122,21 @@ export function inventoryGridRect(item, layout = null) {
 // the one on top. Worn items are reached through the slot lookup, not here.
 export function inventoryItemAt(items, x, y, layout = null) {
   for (let i = (items?.length || 0) - 1; i >= 0; i--) {
-    const item = items[i], r = inventoryGridRect(item, layout);
-    if (item.invPage === 0 && item.mode === 0 && x >= r.left && x < r.left + r.width && y >= r.top && y < r.top + r.height)
+    const item = items[i];
+    if (item.invPage !== 0 || item.mode !== 0) continue;   // before the rect: a ground/belt item's grid cell can be out of range
+    const r = inventoryGridRect(item, layout);
+    if (x >= r.left && x < r.left + r.width && y >= r.top && y < r.top + r.height)
       return item;
   }
   return null;
+}
+
+// The item's cell rectangle the tooltip anchors on (D2Client+0x945D0): its grid cells, or, worn, its
+// cell box centred in the body slot (the same box the draw uses).
+export function inventoryTipCell(item, gridRect, slotRect) {
+  if (item.mode !== 1) { const r = gridRect(item); return { x: r.left, y: r.top, w: r.width, h: r.height }; }
+  const s = slotRect(item.bodyLoc), w = 29 * (item.invWidth || 1), h = 29 * (item.invHeight || 1);
+  return { x: s.left + Math.floor((s.width - w) / 2), y: s.top + Math.floor((s.height - h) / 2), w, h };
 }
 
 function frameCanvas(frame, palette, documentObject, item = null) {
@@ -257,6 +267,13 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     ctx.save(); ctx.translate(x, y); ctx.scale(v.scale, v.scale); ctx.drawImage(image, 0, 0); ctx.restore();
     return { id: item.id, invFile: item.invFile, x, y, width: image.width, height: image.height };
   },
+  // Retail's right-hand panel frame alone (invchar6, the hireling screen's backdrop), 800x600 anchored.
+  drawFrame(ctx, width, height, act = 1) {
+    const scale = Math.min(1, width / 800, height / 600);
+    ctx.save(); ctx.translate((width - 800 * scale) / 2, (height - 600 * scale) / 2); ctx.scale(scale, scale);
+    for (const [i, x, y] of INV_PANEL) chrome.cel(ctx, act, 'data\\global\\ui\\PANEL\\invchar6.DC6', i, x, y);
+    ctx.restore();
+  },
   draw(ctx, width, height, state, visible = true) {
     if (!visible) return null;
     const scale = Math.min(1, width / 800, height / 600);
@@ -327,10 +344,11 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     // The lines are the engine's (the shell passes `itemTip`, d2_session_item_title +
     // d2_session_item_lines, the same source the vendor tooltip reads).
     let tooltipEvidence = null;
-    const hovered = state?.pointer && state?.itemTip ? this.itemAt(state.pointer.x, state.pointer.y, width, height, state) : null;
+    const hovered = state?.pointer && state?.itemTip ? (this.itemAt(state.pointer.x, state.pointer.y, width, height, state) || this.slotAt(state.pointer.x, state.pointer.y, width, height, state)?.item) : null;
     if (hovered) {
-      const spec = itemTooltipSpec(state.itemTip(hovered));
-      const record = tooltip.draw(ctx, act, state.pointer, width, height, spec.lines, spec.colours);
+      const cell = inventoryTipCell(hovered, gridRect, slotRect);
+      const spec = itemTooltipSpec({ ...state.itemTip(hovered), itemFlags: hovered.itemFlags });
+      const record = tooltip.draw(ctx, act, cell, width, height, spec.lines, spec.colours);
       if (record) tooltipEvidence = { id: hovered.id, ...record };
     }
     return { x: baseX, y: baseY, scale, panelFrames: 4, tooltip: tooltipEvidence,

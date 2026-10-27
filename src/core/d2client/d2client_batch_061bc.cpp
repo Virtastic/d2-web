@@ -190,8 +190,8 @@ LAB_6fab6224:
                 sizeMod--;
             } else {
                 if (b1 == 0x6C) intSize++;    // 'l'
-                else if (b1 != 0x77) stop++;  // 'w' only bumps sizeMod
-                sizeMod++;
+                if (b1 == 0x6C || b1 == 0x77) sizeMod++;   // 'l', 'w'
+                else stop++;                  // conversion char: the retail goto 0x63b8 skips sizeMod
             }
         }
         fmt = cur;  // sits on the conversion character
@@ -569,7 +569,7 @@ LAB_6fab6796:
     if (ch == 0xFFFFFFFFu) goto LAB_6fab6b5a;
     if (conv != 0x63) {
         if (conv == 0x73) {
-            if (!((ch >= 9 && ch <= 0x0D) || ch == 0x20))
+            if ((ch >= 9 && ch <= 0x0D) || ch == 0x20)   // %s stops at whitespace
                 goto LAB_6fab6b5a;
         } else if (conv == 0x7B) {
             if ((((uint32_t)scanset[ch >> 3] ^ (uint32_t)invert) &

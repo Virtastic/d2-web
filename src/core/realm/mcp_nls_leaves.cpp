@@ -30,12 +30,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE char* d2_mcp_convert_5950(
         if (destination) {
             if (h->from_wide(to,0,wide,int32_t(wide_count),destination,capacity)) result=destination;
         } else {
+            // retail reuses local_40: after the sizing call it holds the BYTE count, and that is the wide length of the second convert
             uint32_t bytes = wide_count;
             if (!single) bytes=uint32_t(h->from_wide(to,0,wide,int32_t(wide_count),nullptr,0));
             if (single || bytes) {
                 result=static_cast<char*>(h->allocate(1,bytes));
                 if (result) {
-                    const uint32_t converted=uint32_t(h->from_wide(to,0,wide,int32_t(wide_count),result,int32_t(bytes)));
+                    const uint32_t converted=uint32_t(h->from_wide(to,0,wide,int32_t(bytes),result,int32_t(bytes)));
                     if (!converted) { h->release(result); result=nullptr; }
                     else if (original != UINT32_MAX) *count=converted;
                 }

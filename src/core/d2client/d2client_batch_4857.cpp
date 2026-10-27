@@ -29,15 +29,15 @@ static uint8_t  g_ptd[0x40];    // __getptd (0x72F7) per-thread block; _terrno s
 // 1.13c D2Client+0x04857: `push 0xA; call 0x47AB` -- release CRT lock 10. The critical section is kernel
 // (host) state, so the callee is the whole rule.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_client_4857(void) {
-    d2_client_47ab(10);
+EMSCRIPTEN_KEEPALIVE void d2_client_4857(void (*unlock)(uint32_t)) {   // unlock: callee seam (null = 0x47AB), for the FN probe
+    (unlock ? unlock : d2_client_47ab)(10);
 }
 
 // 1.13c D2Client+0x048E4: `push 4; call 0x47AB` -- release CRT lock 4. Same shape as 0x4857; the index
 // is the only difference.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_client_48e4(void) {
-    d2_client_47ab(4);
+EMSCRIPTEN_KEEPALIVE void d2_client_48e4(void (*unlock)(uint32_t)) {   // unlock: callee seam (null = 0x47AB)
+    (unlock ? unlock : d2_client_47ab)(4);
 }
 
 // 1.13c D2Client+0x0579C (_errno): `call __getptd (0x72F7); add eax, 8; ret`. The 1.13c CRT has no

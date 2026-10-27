@@ -1,3 +1,4 @@
+#include "../../../d2common/varinvgfx_index.h"
 #include "D2Items.h"
 #include <Units/Item.h>
 #include "D2BitManip.h"
@@ -768,31 +769,14 @@ uint8_t __stdcall ITEMS_GetVarInvGfxCount(D2UnitStrc* pItem)
 // 1.13c D2Common+0x24DA0
 char* __stdcall ITEMS_GetVarInvGfxString(D2UnitStrc* pItem, int nId)
 {
-	D2ItemTypesTxt* pItemTypesTxtRecord = NULL;
-	D2ItemsTxt* pItemsTxtRecord = NULL;
-
+	// 1.13c: type via ITEMS_GetItemType (0x230F0), no assert, signed-min clamp (see varinvgfx_index.h)
 	if (pItem && pItem->dwUnitType == UNIT_ITEM)
 	{
-		pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
-		D2_ASSERT(pItemsTxtRecord);
-
-		if (pItemsTxtRecord->wType[0] >= 0 && pItemsTxtRecord->wType[0] < sgptDataTables->nItemTypesTxtRecordCount)
+		const int32_t nType = (int32_t)ITEMS_GetItemType(pItem);
+		if (nType >= 0 && nType < sgptDataTables->nItemTypesTxtRecordCount)
 		{
-			pItemTypesTxtRecord = &sgptDataTables->pItemTypesTxt[pItemsTxtRecord->wType[0]];
-			if (pItemTypesTxtRecord)
-			{
-				if (nId < 0)
-				{
-					nId = 0;
-				}
-
-				if (nId >= pItemTypesTxtRecord->nVarInvGfx - 1)
-				{
-					nId = pItemTypesTxtRecord->nVarInvGfx - 1;
-				}
-
-				return pItemTypesTxtRecord->szInvGfx[nId];
-			}
+			D2ItemTypesTxt* pType = &sgptDataTables->pItemTypesTxt[nType];
+			return pType->szInvGfx[d2common_varinvgfx_index(nId, pType->nVarInvGfx)];
 		}
 	}
 
@@ -901,7 +885,8 @@ uint32_t __stdcall ITEMS_Get2HandWeaponClassCode(D2UnitStrc* pItem)
 }
 
 //D2Common.0x6FD99370 (#10746)
-// 1.13c D2Common+0x23290
+// 1.13c D2Common+0x23290 (1.13c reads items.txt +0x80 = dwCode; asserts null/non-item/no-record)
+static_assert(offsetof(D2ItemsTxt, dwCode) == 0x80, "1.13c sub_23290 reads +0x80");
 uint32_t __stdcall ITEMS_GetBaseCode(D2UnitStrc* pItem)
 {
 	D2_ASSERT(pItem);

@@ -38,7 +38,7 @@ extern "C" int32_t D2Game_CrtFlush(FILE* stream);
 // flagged 0x4000 commits its descriptor (_file) through __commit (0x8B19). The seam carries the CRT
 // handle table and explicit FlushFileBuffers/GetLastError callbacks used by that existing implementation.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_5981(D2GameFflushLkStream* stream,
+EMSCRIPTEN_KEEPALIVE int32_t D2Game_FflushLk(D2GameFflushLkStream* stream,
                                                const D2GameCrtCommitSeams* commitSeams) {
     if (D2Game_CrtFlush(stream->hostStream) != 0) return -1;
     if ((stream->retailFile->flag & 0x4000) != 0) {

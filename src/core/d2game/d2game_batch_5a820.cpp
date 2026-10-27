@@ -7,7 +7,7 @@ extern "C" {
 i32 o10920(i32*); i32 o10174(i32, i32, i32); void o10024(const void*, i32); i32 o10265(i32);
 void* o10045(const char*, i32, i32); void o10285(i32, int16_t);
 int16_t r_9BEB0(); void r_9C160(void*);
-i32 r_E660(u32); void r_DFCC0(i32*, i32); i32* r_EEF10(i32*); void r_33F80(); void r_5C690(i32*, i32);
+i32 r_E660(u32); void r_DFCC0(i32*, i32); i32* r_EEF10(i32*); void r_33F80(void* pUnitEdi, void* pNodeEsi); void r_5C690(i32*, i32);
 i32* r_47CF0(void*, i32, i32, i32);
 // callbacks (RVA of function / label)
 void r_58C90(); void r_57830(); void r_57D80(); void r_580A0(); void r_582E0(); void r_58640();
@@ -121,7 +121,7 @@ i32 D2GAME_5C2A0(i32 q, i32 p2, i32 p3)
                 *(i32*)(intptr_t)(rd(q, 0x18) + 0xb0 + n * 4 + p3 * 0x14) = u[3];
                 n++;
                 i32* l = (i32*)(intptr_t)rd(rd(q, 4), 0x10f4);
-                if (l) for (i32* p = (i32*)(intptr_t)*l; p; p = (i32*)(intptr_t)p[0x3d]) if (*p == 0x20) { r_33F80(); break; }
+                if (l) for (i32* p = (i32*)(intptr_t)*l; p; p = (i32*)(intptr_t)p[0x3d]) if (*p == 0x20) { r_33F80((void*)(intptr_t)q, p); break; }
                 if (n > 4) return n;
             }
         }

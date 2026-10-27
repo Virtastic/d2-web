@@ -45,8 +45,12 @@ test('F14: equal signed priorities use squared path distance to the player and k
   assert.equal(selected.target.id, closer.id,
     'the runtime hover selector forwards the explicit player-path reference');
   const clickedObject = { id: 54, type: 2 };
+  assert.equal(selectPointerCandidate({ object: clickedObject }, { click: true, reference }).target, clickedObject,
+    'a lone click candidate keeps the pre-existing click policy');
+  // Retail resolves a click through the same hover resolver (D2Client 0x51E80 type-priority walk):
+  // with overlapping lists the unit (priority 0) outranks the object (-6), tie broken by path distance.
   assert.equal(selectPointerCandidate({ object: clickedObject, units: [farther, closer] }, { click: true, reference }).target,
-    clickedObject, 'the separate click policy does not consume the hover tie-break');
+    closer, "overlapping click candidates follow the hover resolver's priority walk");
   assert.equal(selectNativeHoverWinner([farther, closer], null, reference), closer,
     'the standalone picker model follows the same path-distance branch');
 });
@@ -104,4 +108,28 @@ test('F14: hover arbitration spans accepted hit candidates and leaves the nearby
   const onlyFallback = selectPointerCandidate({ units: [], itemsOnCell: [], objectsUnderPointer: [], item: candidates.item });
   assert.deepEqual(onlyFallback, { kind: 'item', target: candidates.item },
     'the pickup-radius item remains a fallback and does not enter the hit-candidate ranking');
+});
+
+test('hover pick skips missiles (D2Client FUN_6fb01e80 type 3)', async () => {
+  const { selectUnitTypePickCandidate } = await import('../play/gameplay-model.mjs');
+  const m = { unitType: 3, id: 1, x: 0, y: 0 }, mon = { unitType: 1, id: 2, x: 5, y: 5 };
+  assert.equal(selectUnitTypePickCandidate([m, mon]), mon);
+  assert.equal(selectUnitTypePickCandidate([m]), null);
+});
+
+test('F14: a click in a crowd ties by squared distance to the player like hover (FUN_6FB01E80/6FB010B0)', () => {
+  const reference = { x: 0, y: 0 };
+  const far = { id: 60, x: 9, y: 9, npc: true };
+  const near = { id: 61, x: 1, y: 1, npc: true };
+  assert.equal(selectPointerCandidate({ units: [far, near], itemsOnCell: [], objectsUnderPointer: [], itemOnCell: null }, { click: true, reference }).target.id, 61);
+  assert.equal(selectPointerCandidate({ units: [near, far], itemsOnCell: [], objectsUnderPointer: [], itemOnCell: null }, { click: true, reference }).target.id, 61);
+});
+
+test('engine: click unit pick among box hits is nearest the player, not the cursor', async () => {
+  const { selectPrimaryTarget } = await import('../play/gameplay-model.mjs');
+  const mk = (id, x, y) => ({ id, type: 1, x, y, hp: 10, hpMax: 10, hostile: true, mode: 1 });
+  const snap = { player: { x: 0, y: 0 }, entities: [mk(9, 10, 0), mk(8, 4, 0)] };
+  const box = () => true;
+  assert.equal(selectPrimaryTarget(snap, { x: 10, y: 0 }, Infinity, box), 9);
+  assert.equal(selectPrimaryTarget(snap, snap.player, Infinity, box), 8);
 });

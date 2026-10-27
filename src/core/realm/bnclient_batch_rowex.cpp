@@ -87,6 +87,24 @@ EMSCRIPTEN_KEEPALIVE int bn_sprintf(char* dest, const char* fmt, ...) {
     return n;
 }
 
+// Seam form of the same function for the FN probe: env[?] _output (BNClient+0x2854) over the stack FILE
+// {_ptr @0, _cnt @4, _base @8, _flag @12}; args = address of the first variadic word.
+extern "C"
+EMSCRIPTEN_KEEPALIVE int32_t bn_sprintf_seam(char* dest, const uint8_t* fmt, const uint32_t* args,
+                                             int32_t (*output)(void*, const uint8_t*, const uint32_t*)) {
+    uint32_t f[8] = {};
+    f[0] = f[2] = (uint32_t)(uintptr_t)dest;
+    f[1] = 0x7FFFFFFF;
+    f[3] = 0x42;
+    int32_t n = output(f, fmt, args);
+    if (dest != nullptr) {
+        int32_t c = (int32_t)f[1] - 1;
+        f[1] = (uint32_t)c;
+        if (c >= 0) *(uint8_t*)(uintptr_t)f[0] = 0;   // c < 0 would __flsbuf(0): unreachable at 0x7FFFFFFF
+    }
+    return n;
+}
+
 // 1.13c BNClient+0x01C76 (___tolower_mt, 200 B): lowercase one character through the thread locale. The
 // shipped fast path (no multibyte code page, or c < 0x80) folds only 0x41..0x5A by +0x20 and returns every
 // other byte unchanged; the LCMapString path below it needs the CRT locale tables our port does not carry.

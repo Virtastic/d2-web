@@ -629,6 +629,15 @@ int __stdcall DUNGEON_GetLevelIdFromPopulatedRoom(D2ActiveRoomStrc* pRoom)
 	return 0;
 }
 
+// Layout note (function list 0x3BFB0): retail 1.13c reads room+0x10 (D2DrlgRoomStrc), +0x28 flags, +0x58 pLevel,
+// level+0x1D0 nLevelId. Those are retail 32-bit offsets of a reordered struct; this build keeps the 1.10f
+// D2MOO layouts, widened to native pointers, and every reader/writer of them uses the same headers, so the
+// fields are consistent among themselves. Pin the semantic facts the function relies on.
+static_assert(DRLGROOMFLAG_POPULATION_ZERO == 0x800000, "1.13c D2Common+0x3BFB0 tests flag 0x800000");
+static_assert(offsetof(D2DrlgRoomStrc, pLevel) == 0x00, "our D2DrlgRoomStrc.pLevel (retail +0x58)");
+static_assert(offsetof(D2DrlgRoomStrc, dwFlags) == sizeof(void*) + 0x10, "our D2DrlgRoomStrc.dwFlags (retail +0x28)");
+static_assert(offsetof(D2DrlgLevelStrc, nLevelId) == sizeof(void*), "our D2DrlgLevelStrc.nLevelId (retail +0x1D0)");
+
 //D2Common.0x6FD8C800 (#10060)
 BOOL __stdcall DUNGEON_HasWaypoint(D2ActiveRoomStrc* pRoom)
 {

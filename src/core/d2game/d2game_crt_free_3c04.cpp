@@ -97,6 +97,7 @@ struct D2GameFreeptdEnv {
     void*    (*tls_get_value)(uint32_t index);  // TlsGetValue
     int32_t  (*tls_set_value)(uint32_t index, void* value); // TlsSetValue
     D2GameFreeflsEnv freefls;                   // 0x3C04's callees
+    void (*freefls_fn)(void*);                  // probe-only: replaces the 0x3C04 call (null in production)
 };
 
 // 1.13c D2Game+0x03D4B
@@ -104,9 +105,9 @@ struct D2GameFreeptdEnv {
 // run __freefls@4 on it, then clear the slot with TlsSetValue(index, NULL). The slot is -1 when the CRT
 // never initialized, in which case nothing happens.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3d4b(void* ptd, const D2GameFreeptdEnv* env) {
+EMSCRIPTEN_KEEPALIVE void d2game_freeptd_3d4b(void* ptd, const D2GameFreeptdEnv* env) {
     if (env->tls_index == 0xFFFFFFFFu) return;
     if (ptd == nullptr) ptd = env->tls_get_value(env->tls_index);
-    d2_fn_d2game_3c04((uint8_t*)ptd, &env->freefls);
+    if (env->freefls_fn) env->freefls_fn(ptd); else d2_fn_d2game_3c04((uint8_t*)ptd, &env->freefls);
     env->tls_set_value(env->tls_index, nullptr);
 }

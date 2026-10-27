@@ -1,274 +1,325 @@
-// D2Client rva 0x99440: per-frame bottom-of-screen UI frame draw
-// (loading/menu panel quads, button row, status text, hover tooltip). Called from 0xC39E0.
-// Globals are a flat state struct, every callee is injected (env-seam style). Retail ctx for the
-// D2Win cell-draw ordinals is a zeroed 0x12-dword block: [0]=frame, [13]=cellfile; kept as such.
+// 1.13c D2Client+0x99440: per-frame bottom-of-screen panel / HUD draw. No arguments;
+// called from D2Client+0xC39E0. The globals are the state struct below (one dword per retail global, the RVA in the
+// comment: the retail capture tool/fn/d2client-99440.gen.py reads these comments to pin them). Every callee is one `hook` call
+// with the register / stack-word values retail passes it (rva, eax, ecx, edx, ebx, esi, s0..s3): a D2Win cell draw is
+// (rva, frame, cellfile, last | x, y, -1, mode). Pointers are opaque dwords: a local buffer is BUF, a module string is
+// MOD(rva), a blob / unit pointer is the handle the host gave. No float. The Unicode ctor loops over the local
+// buffers (IAT 0xCEB00) only clear stack words nothing reads back, so they are not modelled.
+#include <cstddef>
 #include <cstdint>
-#include <cstring>
-
-struct D2Client99440Btn { uint32_t cell, xa, xb, ya, yb; };  // draw at (xa+xb, ya+yb)
 
 struct D2Client99440State {
-    uint32_t state;            // 0x18BC34
-    uint32_t tickDeadline;     // 0x18BC4C
-    uint32_t c54;              // 0x18BC54
-    uint32_t c9721;            // 0x189721 (dword read)
-    uint32_t c971d;            // 0x18971D (dword read, unit id)
-    uint32_t bc48;             // 0x18BC48 (byte)
-    const void* plr;           // 0x18BBFC (host pointer, may be null)
-    uint32_t plr60;            // dword at plr+0x60 (read when plr != null)
-    uint32_t mouseX, mouseY;   // 0x18B828, 0x18B824
-    uint32_t c3a4;             // 0x18C3A4
-    uint32_t aade8;            // 0x16ADE8
-    uint32_t d5d0;             // 0x14D5D0 (must be 0x26)
-    uint32_t bd349c, bd3498;   // 0x193... flags
-    uint32_t c418, c414, c434; // 0x18C418, 0x18C414, 0x18C434
-    uint32_t a9e14, a9e18, c3c4;
-    uint32_t bc74, bc84, bc78; // cellfiles 0x18BC74, 0x18BC84, 0x18BC78
-    uint32_t c9854;            // 0x189854
-    uint32_t bc58, bc5c, bc60, bc64, bc70; // loading-spinner state
-    uint32_t be8c, be94, be84; // frame bases
-    uint32_t b9a0, b9a4;       // 0x18B9A0, 0x18B9A4 (screen origin)
-    uint32_t screenW, screenH; // 0x14BC48, 0x14BC4C
-    uint32_t a7c8;             // cellfile 0x16A7C8
-    uint32_t bc94;             // 0x18BC94
-    uint32_t bec8;             // cellfile
-    uint32_t bbb35c;           // cellfile 0x17B35C
-    uint32_t be60, be74, be5c, be64, be68, bedc;
-    uint32_t c77fc, c77ec;
-    uint16_t bfed8[0x17];      // unicode name string at 0x18FED8 (copied, 0x17 elems)
-    D2Client99440Btn btnEd0a, btnEd0b;  // c94 pair (frame 0 and 1)
-    struct { uint32_t id, frame; D2Client99440Btn b; } btn[8]; // test-id buttons
-    uint32_t aXa, aXb, aYa, aYb;   // block A  : (91160+bd04, 91164+bd10)
-    uint32_t bXa, bXb, bYa, bYb;   // block B  : (91158+bcf0, 9115c+bcfc)
+    uint32_t state;      // 0x11bc34
+    uint32_t mouseX;     // 0x11b828
+    uint32_t mouseY;     // 0x11b824
+    uint32_t a0;         // 0x11b9a0 screen origin x
+    uint32_t a4;         // 0x11b9a4 screen origin y
+    uint32_t W;          // 0xdbc48
+    uint32_t H;          // 0xdbc4c
+    uint32_t c9854;      // 0x119854
+    uint32_t c9721;      // 0x119721 (dword read at an odd address)
+    uint32_t c971d;      // 0x11971d (unit id)
+    uint32_t plr;        // 0x11bbfc player pointer (opaque handle)
+    uint32_t bc48;       // 0x11bc48 len 1
+    uint32_t bc4c;       // 0x11bc4c
+    uint32_t bc54;       // 0x11bc54
+    uint32_t bc58;       // 0x11bc58
+    uint32_t bc5c;       // 0x11bc5c
+    uint32_t bc60;       // 0x11bc60
+    uint32_t bc64;       // 0x11bc64
+    uint32_t bc70;       // 0x11bc70
+    uint32_t bc74;       // 0x11bc74
+    uint32_t bc78;       // 0x11bc78
+    uint32_t bc84;       // 0x11bc84
+    uint32_t bc94;       // 0x11bc94
+    uint32_t a7c8;       // 0x11a7c8
+    uint32_t b35c;       // 0x10b35c
+    uint32_t be5c;       // 0x11be5c
+    uint32_t be60;       // 0x11be60
+    uint32_t be64;       // 0x11be64
+    uint32_t be68;       // 0x11be68
+    uint32_t be74;       // 0x11be74
+    uint32_t be84;       // 0x11be84
+    uint32_t be8c;       // 0x11be8c
+    uint32_t be94;       // 0x11be94
+    uint32_t beb4;       // 0x11beb4
+    uint32_t beb8;       // 0x11beb8
+    uint32_t bebc;       // 0x11bebc
+    uint32_t bec0;       // 0x11bec0
+    uint32_t bec4;       // 0x11bec4
+    uint32_t bec8;       // 0x11bec8
+    uint32_t bed0;       // 0x11bed0
+    uint32_t bedc;       // 0x11bedc
+    uint32_t c3a4;       // 0x11c3a4
+    uint32_t c3c4;       // 0x11c3c4
+    uint32_t c414;       // 0x11c414
+    uint32_t c418;       // 0x11c418
+    uint32_t c434;       // 0x11c434
+    uint32_t aade8;      // 0xfade8
+    uint32_t d5d0;       // 0xdd5d0 (must be 0x26)
+    uint32_t a9e14;      // 0xf9e14
+    uint32_t a9e18;      // 0xf9e18
+    uint32_t d3498;      // 0x123498
+    uint32_t d349c;      // 0x12349c
+    uint32_t c77ec;      // 0x1177ec
+    uint32_t c77fc;      // 0x1177fc
+    uint32_t hud[24];    // 0xe1118 button origins (x,y pairs)
+    uint32_t bcb4;       // 0x11bcb4
+    uint32_t bcc0;       // 0x11bcc0
+    uint32_t bcc8;       // 0x11bcc8
+    uint32_t bcd4;       // 0x11bcd4
+    uint32_t bcdc;       // 0x11bcdc
+    uint32_t bce8;       // 0x11bce8
+    uint32_t bcf0;       // 0x11bcf0
+    uint32_t bcfc;       // 0x11bcfc
+    uint32_t bd04;       // 0x11bd04
+    uint32_t bd10;       // 0x11bd10
+    uint32_t bd18;       // 0x11bd18
+    uint32_t bd24;       // 0x11bd24
+    uint32_t bd2c;       // 0x11bd2c
+    uint32_t bd38;       // 0x11bd38
+    uint32_t bd40;       // 0x11bd40
+    uint32_t bd4c;       // 0x11bd4c
+    uint32_t bd54;       // 0x11bd54
+    uint32_t bd60;       // 0x11bd60
+    uint32_t bd68;       // 0x11bd68
+    uint32_t bd74;       // 0x11bd74
 };
+static_assert(sizeof(D2Client99440State) == (54 + 24 + 20) * 4, "state layout");
+static_assert(offsetof(D2Client99440State, hud) == 54 * 4, "hud table follows the scalar globals");
 
 struct D2Client99440Callees {
-    uint32_t (*tick)();
-    void (*c3f710)(uint32_t bc48);
-    void (*c45c60)();
-    void (*c3cfb0)(uint32_t);
-    void (*c458a0)(const void* plr);
-    void (*c453b0)();
-    void (*c3f260)();
-    void (*c43450)(const void* unitOrPlr, uint32_t flag);
-    uint32_t (*c6eaf0)();
-    int32_t (*c3beb0)();
-    int32_t (*c3bee0)();
-    int32_t (*c3b650)(int32_t x, int32_t y);
-    int32_t (*c3b600)(int32_t x, int32_t y);
-    void (*c408c0)();
-    void (*cadb360)();
-    int32_t (*ord10227)();
-    int32_t (*ord10051)(const void* plr, uint32_t plr60);       // == 2 test
-    int32_t (*testFlag)(uint32_t plr60, uint32_t n);            // Ordinal_11139
-    uint32_t (*levelId)(const void* plr);                       // Ordinal_11060 (0xC910)
-    const uint16_t* (*getString)(uint32_t id);                  // Ordinal_10003
-    int32_t (*textWidth)(const uint16_t*);                      // Ordinal_10028
-    void (*drawText)(const uint16_t*, int32_t x, int32_t y, uint32_t a, uint32_t b);   // Ordinal_10150
-    void (*drawText2)(const uint16_t*, int32_t x, int32_t y, uint32_t a, uint32_t b);  // Ordinal_10085
-    void (*setFont)(uint32_t);                                  // Ordinal_10184
-    void (*ord10006)(uint32_t);
-    void (*usprintf)(uint16_t* buf, uint32_t n, const uint16_t* fmt, uint32_t arg);
-    void (*csprintf)(char* buf, uint32_t n, uint32_t fmtVa, uint32_t arg);  // Ordinal_578
-    void (*win2Unicode)(uint16_t* dst, const char* src, uint32_t n);
-    const char* (*c4d850)();
-    // fn: 10041 or 10019
-    void (*drawCell)(uint32_t fn, const uint32_t* ctx, int32_t x, int32_t y, int32_t color, uint32_t mode, uint32_t last);
-    int32_t (*c54d40)();
-    void (*c3a4d0)(uint32_t ecx, uint32_t eax, uint32_t esi);
-    void (*c47840)();
-    uint32_t (*ord10048)(uint32_t strVa);
-    void (*ecc60)(uint32_t eax, uint32_t handle);
-    void (*eccc0)(uint32_t eax, uint32_t handle);
-    void (*c6e2e0)();
-    void (*c49a0)(uint32_t al, uint32_t ecx);
-    const void* (*findUnit)(uint32_t id, uint32_t* type);       // 0x1BA808[id&0x7f] chain by +0xE4
-    void (*fatal)(uint32_t code);
+    uint32_t (*hook)(uint32_t rva, uint32_t a, uint32_t c, uint32_t d, uint32_t b, uint32_t s,
+                     uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3);   // one retail callee, returns eax
+    uint32_t (*tick)();                                                       // GetTickCount
+    uint32_t (*rd32)(uint32_t handle, uint32_t off);                          // dword at handle+off ([plr+0x60], unit fields)
+    uint32_t (*hashHead)(uint32_t idx);                                       // unit hash table 0x10a808[idx]
+    void (*fatal)(uint32_t code);                                             // Fog 10265 + exit: not reached by a valid state
 };
 
-static void trim(const D2Client99440Callees& k, uint16_t* b, uint32_t len) {
-    if (k.textWidth(b) > 0x70) {
-        uint16_t* p = b + len;
-        do { *p = 0; --p; } while (k.textWidth(b) > 0x70);
-    }
+namespace {
+constexpr uint32_t BUF = 0xB3000000u;              // a local buffer (stack pointer)
+constexpr uint32_t MOD(uint32_t rva) { return 0xB2000000u | rva; }
 }
 
 // 1.13c D2Client+0x99440
 extern "C" void d2_client_99440(D2Client99440State& s, const D2Client99440Callees& k) {
-    const int32_t mx = (int32_t)s.mouseX, my = (int32_t)s.mouseY;
+    typedef uint32_t U;
+    auto H = [&](U rva, U a = 0, U c = 0, U d = 0, U b = 0, U esi = 0, U s0 = 0, U s1 = 0, U s2 = 0, U s3 = 0) -> U {
+        return k.hook(rva, a, c, d, b, esi, s0, s1, s2, s3); };
+    const int32_t mx = (int32_t)s.mouseX, my = (int32_t)s.mouseY;   // saved at entry
     if (s.state == 10) return;
-    if (s.state >= 1 && s.state <= 9) {
-        if (k.tick() > s.tickDeadline) s.tickDeadline = 0;
-        if (s.c54 == 1 && s.tickDeadline == 0 && s.c9721 != 0) { k.c3f710(s.bc48 & 0xff); s.c54 = 0; }
-        k.c45c60();
-        k.c3cfb0(2);
+    const U st = s.state;
+    if (st >= 1 && st <= 9) {
+        if (k.tick() > s.bc4c) s.bc4c = 0;
+        if (s.bc54 == 1 && s.bc4c == 0 && s.c9721 != 0) { H(0x8f710, 0, 0, 0, 0, 0, s.bc48 & 0xff); s.bc54 = 0; }
+        H(0x95c60);
+        H(0x8cfb0, 0, 0, 0, 0, 0, 2);
     }
-    uint32_t ctx[0x12] = {};
-    auto draw = [&](uint32_t frame, int32_t x, int32_t y, uint32_t mode = 5, uint32_t last = 0) {
-        ctx[0] = frame; k.drawCell(10041, ctx, x, y, -1, mode, last); };
-    auto draw19 = [&](uint32_t frame, int32_t x, int32_t y, uint32_t last) {
-        ctx[0] = frame; k.drawCell(10019, ctx, x, y, -1, 5, last); };
-    const int32_t a0 = (int32_t)s.b9a0, a4 = (int32_t)s.b9a4, W = (int32_t)s.screenW, H = (int32_t)s.screenH;
-    auto quad = [&](uint32_t cell) {  // 4 frames: TL TR BL BR of the 512x? panel
-        ctx[13] = cell;
-        draw(0, a0, a4 + H - 0xe0); draw(1, a0 + 0x100, a4 + H - 0xe0);
-        draw(2, a0, a4 + H - 0x30); draw(3, a0 + 0x100, a4 + H - 0x30);
+    U ctxFrame = 0, ctxCell = 0;
+    // D2Win cell draw: ordinal 10041 (RVA 0xd096) or 10019 (0xd0e4), ctx = {[0]=frame, [13]=cellfile}
+    auto cell = [&](U fn, U x, U y, U mode, U last) { H(fn, ctxFrame, ctxCell, last, 0, 0, x, y, 0xFFFFFFFFu, mode); };
+    auto draw = [&](U frame, U x, U y, U mode = 5, U last = 0) { ctxFrame = frame; cell(0xd096, x, y, mode, last); };
+    auto draw19 = [&](U frame, U x, U y, U last) { ctxFrame = frame; cell(0xd0e4, x, y, 5, last); };
+    const U a0 = s.a0, a4 = s.a4, W = s.W, Hh = s.H;
+    auto quad = [&](U c) {
+        ctxCell = c;
+        draw(0, a0, a4 + Hh - 0xe0); draw(1, a0 + 0x100, a4 + Hh - 0xe0);
+        draw(2, a0, a4 + Hh - 0x30); draw(3, a0 + 0x100, a4 + Hh - 0x30);
     };
-    auto withBc48 = [&](uint32_t v) { const uint32_t o = s.bc48; s.bc48 = v; k.c458a0(s.plr); s.bc48 = o; };
-    const uint32_t st = s.state;
-    auto labelAt = [&](uint32_t id, int32_t x, int32_t y) {  // centred-ish tooltip via 10085
-        (void)id; (void)x; (void)y; };
-    (void)labelAt;
-    bool skipRest = false;
-    if (st >= 0xc && st <= 0xd) {
-        if (s.bc74 != 0) quad(s.c9854 == 0 ? s.bc74 : s.bc84);
-        const uint32_t lvl = k.levelId(s.plr);
-        uint16_t buf[100] = {};
-        k.usprintf(buf, 100, k.getString(0xfd3), lvl);
-        k.drawText(buf, a0 + 0x4e, s.c9854 ? a4 + H - 0x19f : a4 + H - 0xdb, 0, 0);
+    auto withBc48 = [&](U v) { const U o = s.bc48 & 0xff; s.bc48 = v; H(0x958a0, 0, 0, 0, 0, 0, s.plr); s.bc48 = o; };
+    auto half = [](int32_t w) { return (U)((w - (w >> 31)) >> 1); };
+    auto getString = [&](U id) { return H(0xd1ec, 0, id); };
+    auto textWidth = [&](U str) { return (int32_t)H(0xd35a, 0, str); };
+    auto drawText = [&](U str, U x, U y) { H(0xd37e, 0, str, x, 0, 0, y, 0, 0); };
+    auto drawText2 = [&](U str, U x, U y) { H(0xd384, 0, str, x, 0, 0, y, 0, 0); };
+    auto setFont1 = [&]() { H(0xd3a8, 0, 1); };
+    if (st == 0xc || st == 0xd) {
+        if (s.bc74 != 0) quad(s.c9854 ? s.bc84 : s.bc74);
+        const U lvl = H(0xc910, 0, 0, 0, 0, 0, s.plr);
+        const U str = getString(0xfd3);
+        H(0xceab4, 0, 0, 0, 0, 0, 0x64, BUF, str, lvl);
+        drawText(BUF, a0 + 0x4e, s.c9854 ? a4 + Hh - 0x19f : a4 + Hh - 0xdb);
         withBc48(4);
-        ctx[13] = k.c6eaf0();
-        ctx[0] = s.be84 + 10;
-        k.drawCell(10041, ctx, a0 + (s.c9854 ? 0x110 : 0x113), k.c3beb0(), -1, 5, 0);
-        k.c3cfb0(0);
-        const int32_t lo = a0 + (s.c9854 ? 0x110 : 0x113);
-        if (!(mx < lo) && !(mx > k.c3bee0() + 0x28)) {
-            const int32_t yy = k.c3beb0();
-            if (!(my < yy - 0x23) && !(my > k.c3beb0() + 5)) {
-                const uint16_t* t = k.getString(0x1030);
-                k.drawText2(t, 0xc - (k.textWidth(t) - (k.textWidth(t) >> 31)) / 2 + k.c3bee0(), k.c3beb0() - 0x23, 0, 0);
+        ctxCell = H(0xbeaf0);
+        ctxFrame = s.be84 + 10;
+        const U bx = a0 + (s.c9854 ? 0x110 : 0x113);
+        cell(0xd096, bx, H(0x8beb0), 5, 0);
+        H(0x8cfb0, 0, 0, 0, 0, 0, 0);
+        const int32_t lo = (int32_t)(a0 + (s.c9854 ? 0x110 : 0x113));
+        if (!(mx < lo)) {
+            const int32_t r = (int32_t)H(0x8bee0);
+            if (!(mx > r + 0x28)) {
+                const int32_t y = (int32_t)H(0x8beb0);
+                if (!(my < y - 0x23)) {
+                    const int32_t y2 = (int32_t)H(0x8beb0);
+                    if (!(my > y2 + 5)) {
+                        const U t = getString(0x1030);
+                        const U ty = H(0x8beb0) - 0x23;
+                        const int32_t w = textWidth(t);
+                        drawText2(t, (0xc - half(w)) + H(0x8bee0), ty);
+                    }
+                }
             }
         }
     } else if (st == 0xe) {
-        if (s.c3a4 != 0 || k.c54d40() != 0) {
-            const uint32_t sv = s.aade8;
-            k.ord10227();
+        if (s.c3a4 != 0 || H(0xa4d40) != 0) {
+            const U sv = s.aade8;
+            H(0xbf8c);
             if (s.d5d0 != 0x26) { k.fatal(0x139b); return; }
             s.aade8 = 0;
             if (sv != 0) {
                 s.c418 = 0; s.c414 = 0;
-                k.ord10006(0);
-                k.c3a4d0(s.a9e14, s.a9e18, s.c3c4);
-                k.c47840();
-                k.ecc60(7, k.ord10048(0x6fb8be18));
-                k.c6e2e0();
+                H(0xd1b0, 0, 0);
+                H(0x8a4d0, s.a9e18, s.a9e14, 0, 0, s.c3c4, 0);
+                H(0x97840);
+                U h = H(0xd0b4, 0, 0, 0, 0, 0, MOD(0xdbe18));
+                H(0x3cc60, 7, 0, 0, 0, 0, h);
+                H(0xbe2e0);
                 s.c434 = 1;
-                if (s.bd349c == 0) {
-                    s.bd349c = 1;
-                    if (s.bd3498 != 0) { k.ecc60(2, k.ord10048(0x6fba51ec)); s.bd3498 = 0; }
-                    k.eccc0(4, k.ord10048(0x6fba51bc));
+                if (s.d349c == 0) {
+                    s.d349c = 1;
+                    if (s.d3498 != 0) {
+                        h = H(0xd0b4, 0, 0, 0, 0, 0, MOD(0xf51ec));
+                        H(0x3cc60, 2, 0, 0, 0, 0, h);
+                        s.d3498 = 0;
+                    }
+                    h = H(0xd0b4, 0, 0, 0, 0, 0, MOD(0xf51bc));
+                    H(0x3ccc0, 4, 0, 0, 0, 0, h);
                 }
             }
             s.c418 = 0; s.c414 = 0;
-            k.ord10006(0);
-            k.c3a4d0(s.a9e14, s.a9e18, s.c3c4);
-            k.c49a0(0x4f, 0x17);
+            H(0xd1b0, 0, 0);
+            H(0x8a4d0, s.a9e18, s.a9e14, 0, 0, s.c3c4, 0);
+            H(0x149a0, 0x4f, 0x17, 0, 0, 0, 0);
             return;
         }
         if (s.bc78 != 0) quad(s.bc78);
         if (s.bc58 == 0 || s.bc5c >= 0xe) withBc48(3);
-        ctx[13] = k.c6eaf0();
-        draw(s.be8c + 10, a0 + 0x113, a4 + H - 0x41);
-        ctx[13] = s.bc70;
-        draw(s.be94, a0 + 0x90, a4 + H - 0xbc);
+        ctxCell = H(0xbeaf0);
+        draw(s.be8c + 10, a0 + 0x113, a4 + Hh - 0x41);
+        ctxCell = s.bc70;
+        draw(s.be94, a0 + 0x90, a4 + Hh - 0xbc);
         if (s.bc58 != 0) {
-            const uint32_t t = k.tick();
+            const U t = k.tick();
             bool d = true;
             if (!(t - s.bc60 <= 0x46)) {
                 s.bc60 = t; s.bc5c++;
-                if (s.bc5c >= 0x1e) {
+                if (!(s.bc5c < 0x1e)) {
                     s.bc58 = 0;
-                    if (s.bc64 != 0) { k.cadb360(); s.bc64 = 0; }
+                    if (s.bc64 != 0) { H(0x2b360); s.bc64 = 0; }
                     d = false;
                 }
             }
             if (d) {
-                ctx[0] = s.bc5c; ctx[13] = s.bc64;
-                k.drawCell(10041, ctx, (W - (W >> 31)) >> 1, ((H - (H >> 31)) >> 1) - 1, -1, 3, 0);
+                ctxCell = s.bc64;
+                draw(s.bc5c, half((int32_t)W), half((int32_t)Hh) - 1, 3, 0);
             }
         }
-        k.setFont(1);
-        if (k.c3b650(mx, my)) {
-            const uint16_t* t = k.getString(0x1030);
-            k.drawText2(t, a0 - (k.textWidth(t) - (k.textWidth(t) >> 31)) / 2 + 0x121, a4 + H - 0x64, 0, 0);
-        } else if (k.c3b600(mx, my)) {
-            const uint16_t* t = k.getString(0xd0d);
-            k.drawText2(t, a0 - (k.textWidth(t) - (k.textWidth(t) >> 31)) / 2 + 0x9e, a4 + H - 0xdf, 0, 0);
+        setFont1();
+        if (H(0x8b650, s.mouseX, 0, s.mouseY)) {
+            const U t = getString(0x1030);
+            const int32_t w = textWidth(t);
+            drawText2(t, a0 - half(w) + 0x121, a4 + Hh - 0x64);
+        } else if (H(0x8b600, s.mouseX, 0, s.mouseY)) {
+            const U t = getString(0xd0d);
+            const int32_t w = textWidth(t);
+            drawText2(t, a0 - half(w) + 0x9e, a4 + Hh - 0xdf);
         }
     }
-    (void)skipRest;
-    // bottom bar quads, frames 4..7
-    ctx[13] = s.a7c8;
-    draw(4, W - a0 - 0x140, a4 + H - 0xe0); draw(5, W - a0 - 0x40, a4 + H - 0xe0);
-    draw(6, W - a0 - 0x140, a4 + H - 0x30); draw(7, W - a0 - 0x40, a4 + H - 0x30);
-    k.c408c0();
-    if (s.bc94 != 0 && k.ord10227() != 0 && s.c9854 != 0) {
-        ctx[13] = s.btnEd0a.cell; draw(0, s.btnEd0a.xa + s.btnEd0a.xb, s.btnEd0a.ya + s.btnEd0a.yb);
-        ctx[13] = s.btnEd0b.cell; draw(1, s.btnEd0b.xa + s.btnEd0b.xb, s.btnEd0b.ya + s.btnEd0b.yb);
+    // bottom-bar quad, frames 4..7
+    ctxCell = s.a7c8;
+    draw(4, W - a0 - 0x140, a4 + Hh - 0xe0); draw(5, W - a0 - 0x40, a4 + Hh - 0xe0);
+    draw(6, W - a0 - 0x140, a4 + Hh - 0x30); draw(7, W - a0 - 0x40, a4 + Hh - 0x30);
+    H(0x908c0);
+    const U plr = s.plr;
+    const U plr60 = k.rd32(plr, 0x60);
+    auto flag = [&](U id) { return H(0xc262, 0, 0, 0, 0, 0, plr60, id); };
+    if (s.bc94 != 0 && H(0xbf8c) != 0 && s.c9854 != 0) {
+        ctxCell = s.bed0;
+        draw(0, s.hud[22] + s.bd04, s.hud[23] + s.bd10);
+        draw(1, s.hud[20] + s.bcf0, s.hud[21] + s.bcfc);
     }
-    for (auto& b : s.btn)
-        if (!k.testFlag(s.plr60, b.id)) {
-            ctx[13] = b.b.cell; draw(b.frame, b.b.xa + b.b.xb, b.b.ya + b.b.yb);
-        }
-    int32_t ox = 0, oy = 0;
-    if (s.c9854 != 0 && s.bc94 != 0) { ox = 4; oy = -4; }
-    const int32_t r4 = k.testFlag(s.plr60, 4), r5 = k.testFlag(s.plr60, 5);
-    const bool two = k.ord10051(s.plr, s.plr60) == 2;
-    const int32_t Ax = s.aXa + s.aXb, Ay = s.aYa + s.aYb, Bx = s.bXa + s.bXb, By = s.bYa + s.bYb;
-    auto cellA = [&](int32_t dx, int32_t dy) { ctx[13] = s.bec8; draw(0, Ax + dx, Ay + dy); };
-    auto cellB = [&](int32_t dx, int32_t dy) { ctx[13] = s.bec8; draw(0, Bx + dx, By + dy); };
-    if (!k.testFlag(s.plr60, 5) && (r4 == 0 || !two)) cellA(ox, oy);
-    if (!k.testFlag(s.plr60, 4) && (r5 == 0 || !two)) cellB(ox, oy);
-    if (r4 == 0) { if (r5 != 0 && !k.testFlag(s.plr60, 5)) cellA(0, 0); }
-    else if (r5 == 0) { if (!k.testFlag(s.plr60, 4)) cellB(0, 0); }
+    struct Btn { U id, cell, frame, x, y; };
+    const Btn btn[8] = {
+        { 3, s.beb4, 0, s.hud[0] + s.bcdc, s.hud[1] + s.bce8 },
+        { 8, s.beb8, 0, s.hud[2] + s.bd40, s.hud[3] + s.bd4c },
+        { 9, s.bebc, 0, s.hud[4] + s.bd54, s.hud[5] + s.bd60 },
+        { 1, s.bec0, 1, s.hud[6] + s.bcb4, s.hud[7] + s.bcc0 },
+        { 0xa, s.bec0, 0, s.hud[8] + s.bd68, s.hud[9] + s.bd74 },
+        { 2, s.bec4, 0, s.hud[10] + s.bcc8, s.hud[11] + s.bcd4 },
+        { 6, s.bec4, 1, s.hud[14] + s.bd18, s.hud[15] + s.bd24 },
+        { 7, s.bec4, 1, s.hud[12] + s.bd2c, s.hud[13] + s.bd38 },
+    };
+    for (const Btn& b : btn)
+        if (flag(b.id) == 0) { ctxCell = b.cell; draw(b.frame, b.x, b.y); }
+    // flag block: two cells A (id 5) / B (id 4), offset (4,-4) when both c9854 and bc94
+    const U ox = (s.c9854 != 0 && s.bc94 != 0) ? 4u : 0u, oy = (s.c9854 != 0 && s.bc94 != 0) ? (U)-4 : 0u;
+    const U Ax = s.hud[18] + s.bd04, Ay = s.hud[19] + s.bd10, Bx = s.hud[16] + s.bcf0, By = s.hud[17] + s.bcfc;
+    auto cellA = [&](U dx, U dy) { ctxCell = s.bec8; draw(0, Ax + dx, Ay + dy); };
+    auto cellB = [&](U dx, U dy) { ctxCell = s.bec8; draw(0, Bx + dx, By + dy); };
+    const U r4 = flag(4), r5 = flag(5);
+    const bool two = H(0xc89e, 0, 0, 0, 0, 0, plr, plr60) == 2;
+    if (flag(5) == 0 && (r4 == 0 || !two)) cellA(ox, oy);
+    if (flag(4) == 0 && (r5 == 0 || !two)) cellB(ox, oy);
+    if (r4 == 0) { if (r5 != 0 && flag(5) == 0) cellA(0, 0); }
+    else if (r5 == 0) { if (flag(4) == 0) cellB(0, 0); }
     else if (!two) {
-        if (!k.testFlag(s.plr60, 5)) cellA(0, 0);
-        if (!k.testFlag(s.plr60, 4)) cellB(0, 0);
+        if (flag(5) == 0) cellA(0, 0);
+        if (flag(4) == 0) cellB(0, 0);
     }
-    if (s.state == 0xb && s.bbb35c != 0) {
-        quad(s.bbb35c);
-        ctx[13] = k.c6eaf0();
-        const int32_t px = a0 + 0x113, py = a4 + H - 0x116;
-        if (s.be60 == 0) draw(0x10, px, py); else draw19(0x11, px, py, 2);
-        const int32_t bx = a0 + 0xdf, by = a4 + H - 0x40;
-        if (s.be74 != 0) draw19(0x10, bx, by, 1);
-        else if (s.be5c == 0 && s.be64 == 0) draw(0x10, bx, by);
-        else draw19(0x11, bx, by, 2);
-        draw(s.be68 == 1 ? 0xb : 0xa, a0 + 0x113, a4 + H - 0x40);
+    if (st == 0xb && s.b35c != 0) {
+        quad(s.b35c);
+        ctxCell = H(0xbeaf0);
+        if (s.be60 != 0) draw19(0x11, a0 + 0x113, a4 + Hh - 0x116, 2);
+        else draw(0x10, a0 + 0x113, a4 + Hh - 0x116);
+        if (s.be74 != 0) draw19(0x10, a0 + 0xdf, a4 + Hh - 0x40, 1);
+        else if (s.be5c == 0 && s.be64 == 0) draw(0x10, a0 + 0xdf, a4 + Hh - 0x40);
+        else draw19(0x11, a0 + 0xdf, a4 + Hh - 0x40, 2);
+        draw(s.be68 == 1 ? 0xb : 0xa, a0 + 0x113, a4 + Hh - 0x40);
         withBc48(1); withBc48(2);
-        k.setFont(1);
-        uint16_t n1[0x17] = {}, n2[0x17 + 0x19] = {};
-        if (s.plr) { const char* p = k.c4d850(); if (p) k.win2Unicode(n1, p, 0x17); }
-        std::memcpy(n2, s.bfed8, sizeof(s.bfed8));
-        trim(k, n2, 0x17);
-        k.drawText(n2, a0 + 0x19, 0x1b - a4, 0, 0);
-        std::memset(n2, 0, sizeof(n2)); std::memcpy(n2, n1, sizeof(n1));
-        trim(k, n2, 0x17);
-        k.drawText(n2, a0 + 0x19, 0xf2 - a4, 0, 0);
-        char cb[0x10]; uint16_t nb[0xf] = {};
-        auto lab = [&](int32_t y, uint32_t val) {
-            const uint16_t* t = k.getString(0x8a7); const int32_t w = k.textWidth(t);
-            k.drawText(k.getString(0x8a7), a0 - ((w - (w >> 31)) >> 1) + 0xbb, y, 0, 0);
-            k.csprintf(cb, 0xf, 0x6fb8057c, val);
-            std::memset(nb, 0, sizeof(nb)); k.win2Unicode(nb, cb, 0xf);
-            k.drawText(nb, a0 - k.textWidth(nb) + 0x124, y, 0, 0);
+        setFont1();
+        if (plr != 0) { const U p = H(0x9d850); if (p != 0) H(0xceac0, 0, BUF, p, 0, 0, 0x17); }
+        // name lines: strcpy into A, trim until the width is <= 0x70 (the buffer bytes are never read back)
+        auto trim = [&]() {
+            U len = H(0xceab0, 0, BUF);
+            if (textWidth(BUF) > 0x70) { do { --len; } while (textWidth(BUF) > 0x70); }
         };
-        lab(0x1b - a4, s.c77fc);
-        lab(0xf2 - a4, s.c77ec);
+        H(0xceab8, 0, BUF, MOD(0x11fed8));
+        trim();
+        drawText(BUF, a0 + 0x19, 0x1b - a4);
+        H(0xceab8, 0, BUF, BUF);
+        trim();
+        drawText(BUF, a0 + 0x19, 0xf2 - a4);
+        auto label = [&](U y) {
+            const U t = getString(0x8a7);
+            const int32_t w = textWidth(t);
+            drawText(getString(0x8a7), a0 - half(w) + 0xbb, y);
+        };
+        auto value = [&](U y, U v) {
+            H(0xbea2, 0, 0, 0, 0, 0, BUF, 0xf, MOD(0xd057c), v);
+            H(0xceac0, 0, BUF, BUF, 0, 0, 0xf);
+            const int32_t w = textWidth(BUF);
+            drawText(BUF, a0 - (U)w + 0x124, y);
+        };
+        label(0x1b - a4);
+        value(0x1b - a4, s.c77fc);
+        label(0xf2 - a4);
+        value(0xf2 - a4, s.c77ec);
     }
     withBc48(0);
-    k.c453b0();
-    if (s.state >= 1 && s.state <= 9) k.c3f260();
-    k.c3cfb0(1);
-    ctx[13] = k.c6eaf0();
-    draw((s.bedc != 0) + 10, W - a0 - 0x12e, a4 + H - 0x40);
-    const void* tgt = s.plr; uint32_t flag = 0;
-    if (s.state >= 1 && s.state <= 9 && mx < ((W - (W >> 31)) >> 1) && s.c9721 != 0) {
-        uint32_t type = 0;
-        const void* u = k.findUnit(s.c971d, &type);
-        if (!u) { k.c43450(s.plr, 0); return; }
-        if (type != 1) { k.fatal(0x5a); return; }
-        tgt = u; flag = 1;
+    H(0x953b0);
+    if (st >= 1 && st <= 9) H(0x8f260);
+    H(0x8cfb0, 0, 0, 0, 0, 0, 1);
+    ctxCell = H(0xbeaf0);
+    draw((s.bedc != 0) + 10, W - a0 - 0x12e, a4 + Hh - 0x40);
+    if (st >= 1 && st <= 9 && mx < (int32_t)half((int32_t)W) && s.c9721 != 0) {
+        U n = k.hashHead(s.c971d & 0x7f);
+        while (n != 0 && k.rd32(n, 0xc) != s.c971d) n = k.rd32(n, 0xe4);
+        if (n == 0) { H(0x93450, 0, 0, 0, 0, 0, plr, 0); return; }
+        if (k.rd32(n, 0) != 1) { k.fatal(0x5a); return; }
+        H(0x93450, 0, 0, 0, 0, 0, n, 1);
+        return;
     }
-    k.c43450(tgt, flag);
+    H(0x93450, 0, 0, 0, 0, 0, plr, 0);
 }

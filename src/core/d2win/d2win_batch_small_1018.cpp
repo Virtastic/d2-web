@@ -39,12 +39,12 @@ static void* locale(const D2WinSmallEnv* e) {
     e->reportError("",e->errorText(line)); std::_Exit(-1);
 }
 extern "C" void d2win_SetPopUpUnicodeText(const uint16_t*,uint32_t,uint32_t,uint32_t,uint32_t);
-extern "C" { uint32_t d2win_g_6f9aa668; }
+extern "C" void d2win_popup_set_tail(uint32_t);
 
 // 1.13c D2Win+0x12730 -- popup call completes before the extra module word is changed.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_12730(const uint16_t* text,uint32_t a,
     uint32_t b,uint32_t c,uint32_t d,uint32_t extra) {
-    d2win_SetPopUpUnicodeText(text,a,b,c,d); d2win_g_6f9aa668=extra;
+    d2win_SetPopUpUnicodeText(text,a,b,c,d); d2win_popup_set_tail(extra);
 }
 // 1.13c D2Win+0x196B0 -- unsigned addition with carry, result written even on overflow.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2win_addl(uint32_t a,uint32_t b,uint32_t* out) {
@@ -99,8 +99,20 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2win_wctomb(char* out,uint16_t ch,const
     return e->wctombMt(locale(e),out,ch);
 }
 // 1.13c D2Win+0x159E0 -- null -> line 0x6E, non-type-1 -> line 0x70 (fatal); else 0x17FC0.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_159E0(void* p,const D2WinSmallEnv* e) {
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_159E0(void* p,const D2WinSmallEnv* e) {
     if(!p) fail(e,0x6E);
     if(read32(p,0)!=1) fail(e,0x70);
-    e->removeControl(p);
+    return e->removeControl(p);
+}
+// FN probe glue (checked against retail): hooked 0x17FC0 logs (rva, ecx=token) into lg and returns ret.
+static uint32_t* fn159Lg; static uint32_t fn159Ret, fn159Tok;
+static uint32_t fn159Remove(void*) {
+    uint32_t* w=fn159Lg+1+fn159Lg[0]++*10;
+    w[0]=0x17FC0; w[1]=0; w[2]=fn159Tok; for(int i=3;i<10;++i) w[i]=0;
+    return fn159Ret;
+}
+extern "C" uint32_t d2win_sub_159E0_fn(void* p,uint32_t* lg,uint32_t tok,uint32_t ret) {
+    fn159Lg=lg; lg[0]=0; fn159Tok=tok; fn159Ret=ret;
+    D2WinSmallEnv e={}; e.removeControl=fn159Remove;
+    return d2win_sub_159E0(p,&e);
 }

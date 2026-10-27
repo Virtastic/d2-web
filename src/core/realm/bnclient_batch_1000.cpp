@@ -54,24 +54,24 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_1000(uint32_t block, BnSmemFreeFn smem_
 // 1.13c BNClient+0x01070 (66 B, no callers in the image): initialise a 16-byte object -- four dwords
 // zeroed in order. Returns nothing.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_1070(uint32_t* object) {
+EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_1070(uint32_t* r) {   // r[0] = the object (function probe shape)
+    uint32_t* object = (uint32_t*)(uintptr_t)r[0];
     object[0] = 0;
     object[1] = 0;
     object[2] = 0;
     object[3] = 0;
+    r[4] = r[0];   // retail leaves the object pointer in EAX (vector result 0xB1000000 = blob 0)
 }
 
 // 1.13c BNClient+0x010C0 (71 B, no callers in the image): NewsTable destructor. Under the SEH frame
 // (0x6FF385D2) it releases this+8 through the shared rule. The frame is exception plumbing, not state.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_10c0(uint32_t self, BnSmemFreeFn smem_free) {
+void bn_news_table_dtor_10c0(uint32_t self, BnSmemFreeFn smem_free) {
     bn_news_table_release(self, smem_free);   // lab_6ff385d2 is the SEH continuation
 }
 
 // 1.13c BNClient+0x01110 (71 B, callers 0x185C0/0x185E8): the same destructor body as 0x10C0 under a
 // different SEH continuation (0x6FF385A8). Release this+8, do not clear it.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_1110(uint32_t self, BnSmemFreeFn smem_free) {
+void bn_news_table_dtor_1110(uint32_t self, BnSmemFreeFn smem_free) {
     bn_news_table_release(self, smem_free);   // lab_6ff385a8 is the SEH continuation
 }
 

@@ -16,7 +16,7 @@
 #include <cstring>
 #include <emscripten.h>
 
-extern "C" void d2_fn_d2game_3f76(int32_t lockNum);   // 0x3F76 LeaveCriticalSection on the CRT lock table
+extern "C" void d2game_unlock_3f76(int32_t lockNum);   // 0x3F76 LeaveCriticalSection on the CRT lock table
 
 struct D2GameBatchTiny1019iEnv;
 
@@ -48,7 +48,7 @@ struct D2GameBatchTiny1019iEnv {
 // number. Retail reads the caller's own local (the function has no prologue), so the word is a
 // parameter here. From _raise (0x9EDD) it is called as (ECX = 0, word = "handler was installed").
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_a018(int32_t lockNum, int32_t callerFrameWord) {   // 1.13c D2Game+0xA018
-    if (callerFrameWord != lockNum) d2_fn_d2game_3f76(lockNum);
+    if (callerFrameWord != lockNum) d2game_unlock_3f76(lockNum);
 }
 
 // 0xE130: hyperbolic interpolation. ECX = a (below 0x6F returned unchanged), EDX = b, stack = c.
