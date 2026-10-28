@@ -573,12 +573,7 @@ D2UnitStrc* __fastcall SUNIT_AllocUnitData(int32_t nUnitType, int32_t nClassId, 
         // move game state this band has no oracle for. The rate it gives up is at most
         // `FrameDelta / 16 + FrameDelta / 8` of 256, a phase difference inside the band `s351` checks.
         // What would settle it: a capture of an object's drawn rate at spawn against its FrameDelta.
-        if (pUnit->dwAnimMode < 8 && pUnit->pObjectData->pObjectTxt) {
-            const D2ObjectsTxt* pObjectsTxtRecord = pUnit->pObjectData->pObjectTxt;
-            pUnit->dwFrameCountPrecise = pObjectsTxtRecord->dwFrameCnt[pUnit->dwAnimMode];
-            pUnit->nSeqCurrentFramePrecise = (uint16_t)pObjectsTxtRecord->nStart[pUnit->dwAnimMode] << 8;
-            pUnit->wAnimSpeed = pObjectsTxtRecord->wFrameDelta[pUnit->dwAnimMode];
-        }
+        // D19: the server unit keeps retail's own clock (zero until a mode change); the client pass runs a shadow clock (g_clientObjectClock).
         UNITS_AllocStaticPath(pUnit);
         OBJECTS_InitHandler(pGame, pUnit, nUnitGUID, pRoom, nX, nY);
         break;

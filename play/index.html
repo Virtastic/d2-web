@@ -31,20 +31,8 @@
 // The decision is made ONCE, in this script, and published on `window.__d2Entry`: index.html's own
 // boot script and gameplay-shell.mjs's session gate both read that rather than re-parsing the query,
 // so there is one answer to "is the game's data mounted" and one to "is this the player's page".
-(() => {
-  const q = new URLSearchParams(location.search);
-  const retail = q.has('retail') ? q.get('retail') === '1' : true;
-  const player = retail && q.get('play') !== '1';
-  // Fill mode (): the player's page renders a game view of the WINDOW's aspect
-  // (gameplay-shell fitView) instead of a letterboxed 800x600; `?view=800` keeps retail's exact view.
-  // DEFAULT = strict retail 1.13c (800x600, PlugY and every enhancement off; ?parity=1 / ?view=800 are aliases). ?enhanced=1 (or ?view=fill) = D2GL widescreen fill; ?plugy=1 = PlugY stash pages.
-  const fill = q.get('view') !== '800' && q.get('parity') !== '1' && (q.get('enhanced') === '1' || q.get('view') === 'fill');
-  const parity = !fill;
-  window.__d2Entry = { retail, player, fill, parity, search: location.search };
-  if (fill) document.documentElement.classList.add('fill');
-  if (player) document.documentElement.classList.add('playing');
-})();
 </script>
+<script src="entry.js"></script>
 <style>
   :root{color-scheme:dark;--d2-vw:100dvw;--d2-vh:100dvh} *{box-sizing:border-box}
   body{background:#050505;color:#ccc;font:14px monospace;margin:0;min-height:100dvh;display:grid;place-items:center}
@@ -197,7 +185,7 @@ function showBootFailure(why) {
     //                             main thread this page never yields), which is what showBootFailure
     //                             below was written for.
     const { probeCapabilities, unsupportedMessage } = await import('./assets/platform-probe.mjs');
-    const force = /[?&]unsupported=([\w,]+)/.exec(location.search);
+    const force = /[?&]unsupported=([\w,]+)/.exec(window.__d2Entry.search);
     const forced = force ? (force[1] === '1' ? ['isolated', 'memory64'] : force[1].split(',')) : [];
     const real = force ? probeCapabilities() : null;
     const caps = force
@@ -275,9 +263,9 @@ function showBootFailure(why) {
     // minute. Failing at the deadline turns that into a named error, at the moment it is known, before
     // the engine can start. `?bootDeadline=<ms>` shortens it and `?bootUrl=<url>` points the first
     // request at another host, both test switches for wasm-build/scenarios/s329-browser-stalled-host.
-    const bootDeadlineParam = /[?&]bootDeadline=(\d+)/.exec(location.search);
+    const bootDeadlineParam = /[?&]bootDeadline=(\d+)/.exec(window.__d2Entry.search);
     const BOOT_DEADLINE_MS = Math.max(1, bootDeadlineParam ? Number(bootDeadlineParam[1]) : 15000);
-    const bootUrlParam = /[?&]bootUrl=([^&]+)/.exec(location.search);
+    const bootUrlParam = /[?&]bootUrl=([^&]+)/.exec(window.__d2Entry.search);
     const SMOKE_URL = bootUrlParam ? decodeURIComponent(bootUrlParam[1]) : 'smoke.mpq';
     async function fetchBounded(url, init, what) {
       const ac = new AbortController();
@@ -305,7 +293,7 @@ function showBootFailure(why) {
     // of the retail MPQs, which is the state a host that serves no game data leaves the page in --
     // measured for real against `play/serve.mjs` started with no D2_RETAIL_DIR this row also runs
     // against. It changes nothing else: same host, same engine, same page, one thing missing.
-    const noRetail = /[?&]noRetail=1/.test(location.search);
+    const noRetail = /[?&]noRetail=1/.test(window.__d2Entry.search);
     const retail = [];
     if (wantRetail && !noRetail) for (const f of RETAIL_ORDER) {
       const h = await fetchBounded('retail/' + f, { method: 'HEAD' }, 'retail/' + f);

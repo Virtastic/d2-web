@@ -203,6 +203,7 @@ int32_t __fastcall SUNITDMG_ApplyDamageBonuses(D2UnitStrc* pUnit, int32_t bGetSt
         nTotalMaxDamage = nTotalMinDamage + 256;
     }
 
+    int32_t nUnarmedMinPct = 0;
     int32_t nDamagePct = nDamagePercent + STATLIST_UnitGetStatValue(pUnit, STAT_DAMAGEPERCENT, 0);
 
     if (pItem)
@@ -223,14 +224,15 @@ int32_t __fastcall SUNITDMG_ApplyDamageBonuses(D2UnitStrc* pUnit, int32_t bGetSt
     }
     else if (bGetStats)
     {
-        nDamagePct += STATLIST_UnitGetStatValue(pUnit, STAT_STRENGTH, 0);
+        // a retail recording hypothesis: the unarmed strength bonus raises the minimum only
+        nUnarmedMinPct = STATLIST_UnitGetStatValue(pUnit, STAT_STRENGTH, 0);
     }
 
 	nDamagePct = std::max(nDamagePct, -90);
 
     if (nTotalMaxDamage > 0)
     {
-        nTotalMinDamage += MONSTERUNIQUE_CalculatePercentage(nTotalMinDamage, nDamagePct + STATLIST_UnitGetStatValue(pUnit, STAT_ITEM_MINDAMAGE_PERCENT, 0), 100);
+        nTotalMinDamage += MONSTERUNIQUE_CalculatePercentage(nTotalMinDamage, nDamagePct + nUnarmedMinPct + STATLIST_UnitGetStatValue(pUnit, STAT_ITEM_MINDAMAGE_PERCENT, 0), 100);
         nTotalMaxDamage += MONSTERUNIQUE_CalculatePercentage(nTotalMaxDamage, nDamagePct + STATLIST_UnitGetStatValue(pUnit, STAT_ITEM_MAXDAMAGE_PERCENT, 0), 100);
 
         nDamage += nTotalMinDamage;

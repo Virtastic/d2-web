@@ -97,6 +97,21 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_31d20(uint32_t pUnit, int32_t nScale
 	return nTotal < 0x4B ? nTotal : 0x4B;
 }
 
+// 1.13c D2Common+0x3BFB0 (#11025): room+0x10 -> data; data+0x28 flag 0x800000 clear -> level (data+0x58) +0x1D0.
+// Null room returns 0; a null data block is fatal in retail (0x26B) and returns 0 here.
+extern "C"
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_3BFB0(uint32_t pRoom)
+{
+	uint8_t* r = P(pRoom);
+	if (!r)
+		return 0;
+	uint8_t* d = P(W(r, 0x10));
+	if (!d || (W(d, 0x28) & 0x800000))
+		return 0;
+	uint8_t* lv = P(W(d, 0x58));
+	return lv ? W(lv, 0x1D0) : 0;
+}
+
 // 1.13c D2Common+0x3BF60 (#10233): unit+0x10 (the unit's data block) non-null and its dword +0x28
 // carries 0x30000. A null unit or a null data block is fatal in retail (0x363 / 0x276); both return 0.
 extern "C"

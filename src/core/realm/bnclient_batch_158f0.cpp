@@ -181,16 +181,21 @@ U32 validate(State& state, const Imports& io, Byte* buffer, U32 length) {
     return 0;
 }
 
-// 1.13c BNClient+0x160E0 -- ECX filename, EAX size output.
-Byte* load(State& state, const Imports& io, const char* path, U32* size) {
-    Byte* data=nullptr;
+// 1.13c BNClient+0x160E0 -- ECX filename, EAX size output. `data` starts as ECX (push ecx reserves
+// the slot), so a Storm load that writes nothing leaves data == path.
+template <class Valid>
+Byte* load_with(const Imports& io, const char* path, U32* size, Valid valid) {
+    Byte* data=reinterpret_cast<Byte*>(const_cast<char*>(path));
     *size=0x400;
     io.load(io.user,path,&data,size,1,0);
     if (data && *size) {
-        if (validate(state,io,data,*size)) return data;
+        if (valid(data,*size)) return data;
         io.release(io.user,data);
     }
     return nullptr;
+}
+Byte* load(State& state, const Imports& io, const char* path, U32* size) {
+    return load_with(io,path,size,[&](Byte* d,U32 n){ return validate(state,io,d,n); });
 }
 
 // 1.13c BNClient+0x162B0 -- initialize the .gid/.clh resource buffers.
@@ -274,3 +279,17 @@ void jump_to_continuation(ExceptionLink*& exception_list,
     std::abort();
 }
 } // namespace d2::bnclient::grid
+
+// FN-probe seam for BNClient+0x160E0: Storm load/release and the 0x16070 check are the caller's recorders.
+std::uint8_t* bn_load_160e0(const char* path, std::uint32_t* size,
+    void (*load)(const char*, std::uint8_t**, std::uint32_t*), void (*release)(std::uint8_t*),
+    bool (*valid)(std::uint8_t*, std::uint32_t)) {
+    using namespace d2::bnclient::grid;
+    static void (*l)(const char*, Byte**, U32*); static void (*r)(Byte*);
+    l=load; r=release;
+    Imports io{}; io.user=nullptr;
+    io.load=[](void*,const char* n,Byte** d,U32* z,U32,U32){ l(n,d,z); };
+    io.release=[](void*,Byte* d){ r(d); };
+    return load_with(io,path,size,valid);
+}
+

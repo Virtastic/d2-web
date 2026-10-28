@@ -61,3 +61,16 @@ test('accepted stash close still sends button 18 and refusal leaves paired panel
   assert.deepEqual(calls[1], [18, 0]);
   assert.equal(panelsOpen, true);
 });
+
+test('stash close: hit on the cel, press draws buysellbtn frame 11, release inside closes via button 18', async () => {
+  const { stashCloseAt } = await import('../play/assets/stash-close.mjs');
+  assert.equal(stashCloseAt(352, 445, 800, 600, true), true);
+  assert.equal(stashCloseAt(383, 476, 800, 600, true), true);
+  assert.equal(stashCloseAt(384, 460, 800, 600, true), false);
+  assert.equal(stashCloseAt(360, 460, 800, 600, false), false);
+  const press = beginInventoryClosePress(7, true, true);
+  assert.equal(inventoryCloseFrame(Boolean(press)), 11);
+  assert.equal(inventoryCloseFrame(Boolean(null)), 10);
+  assert.equal(finishInventoryClosePress(press, 7, true, true, true).activate, true);
+  assert.equal(finishInventoryClosePress(press, 7, true, true, false).activate, false);
+});

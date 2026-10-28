@@ -10,9 +10,12 @@
 // Warp.cs). The smallest box containing the pointer wins. `project` maps a world subtile to a canvas
 // pixel (the shell's own static-grid projection).
 export function warpAtPoint(warps, px, py, project, currentLevel) {
+  // Retail's cursor is an integer pixel; the shell hands over the pixel's centre (x+0.5), which fell past
+  // the inclusive right/bottom edge. Truncate to the pixel before the inclusive compare.
+  px = Math.floor(px); py = Math.floor(py);
   let best = null, bestArea = Infinity;
   for (const warp of warps || []) {
-    if (!warp.enabled || warp.located === false || !warp.select || warp.destinationLevel === currentLevel) continue;
+    if (!warp.enabled || warp.located === false || warp.unitTile === false || !warp.select || warp.destinationLevel === currentLevel) continue;
     const [ax, ay] = project(warp.originX, warp.originY), b = warp.select;
     // F6 MEASURED (retail, hover-select-f14-f6.json): edges are INCLUSIVE, the box is (DX+1)x(DY+1) px.
     if (px < ax + b.x || px > ax + b.x + b.dx || py < ay + b.y || py > ay + b.y + b.dy) continue;

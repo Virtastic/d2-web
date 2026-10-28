@@ -87,12 +87,21 @@ function selectRecord(index, levelType, tile) {
 // One retail marker: the 12 segments of its draw-list records as offsets from the glyph's centre.
 const CROSS = Object.freeze([[0, -2], [4, -4], [8, -2], [4, 0], [8, 2], [4, 4], [0, 2], [-4, 4], [-8, 2], [-4, 0], [-8, -2], [-4, -4], [0, -2]]);
 const AX = 0, AY = -29, AY_CAVE = 1;   // full-map DC6 top relative to the retail hero anchor; 890/890 saved cells match f5b
+// The map origin is the hero's screen point: the world pass draws the hero at viewCX() (panel-shifted), not width/2.
+export function automapOrigin(width, height, centre, heroX = width / 2) {
+  return { x: Math.round(heroX) - centre.x, y: Math.round(height / 2 + UNIT_CENTRE_Y) - centre.y };
+}
 export function automapCellTopY(centerY, cellWorldY, heroWorldY, scale, cave = false) {
   return Math.round(centerY + (cellWorldY - heroWorldY) * 8 * scale + (cave ? AY_CAVE : AY));
 }
 // 0x6fb119e0 rejects a unit whose projected point is outside the viewport before drawing its cross or name.
 export function automapNpcsInViewport(npcs, viewport) {
   return (npcs || []).filter((n) => automapMarkerInViewport(Math.round(n.sx) + 8, Math.round(n.sy) - 7, viewport));
+}
+// 0x6fb119e0 projects a unit in AUTOMAP space (Ordinal_10651/11142 / 0xA16B0, relative to the hero), the same lattice
+// as the cells: x = (dx-dy)*16*scale, y = (dx+dy)*8*scale from the hero cross at (cx,cy). Never world-screen coordinates (D32).
+export function automapUnitScreen(cx, cy, hero, wx, wy, scale) {
+  return { sx: cx + ((wx - wy) - (hero.x - hero.y)) * 16 * scale, sy: cy + ((wx + wy) - (hero.x + hero.y)) * 8 * scale };
 }
 const HERO_COLOUR = 151, NPC_COLOUR = 32;
 function line(ctx, x0, y0, x1, y1) {   // Bresenham, 1 px, no antialiasing
@@ -374,7 +383,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
       const viewport = automapViewport(width, height, { mode, left: settings.left !== 'no' });
       const centre = automapScrollOffset(width, height, { mode, center: settings.center,
         anchorX: viewport.anchorX, anchorY: viewport.anchorY });
-      const cx = Math.round(width / 2) - centre.x, cy = Math.round(height / 2 + UNIT_CENTRE_Y) - centre.y;
+      const { x: cx, y: cy } = automapOrigin(width, height, centre, view?.fadeTargetX);
       const hero = view?.camera || { x: snapshot.player.x + .5, y: snapshot.player.y + .5 };
       if (!layer.size) unresolved.push({ reason: 'this level has no revealed cell yet' });
       ctx.save(); ctx.imageSmoothingEnabled = false;
@@ -429,7 +438,8 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
         // This client only has ordinary world-screen `sx/sy` here, so it cannot safely apply that gate
         // until the native automap projection is represented. Preserve the known NPC marker/name option
         // behavior while leaving viewport culling open (canvas bounds still clip naturally).
-        for (const n of automapNpcsInViewport(view.npcs, viewport.viewport)) {
+        const npcs = (view.npcs || []).map((n) => ({ ...n, ...automapUnitScreen(cx, cy, hero, n.wx, n.wy, scale) }));
+        for (const n of automapNpcsInViewport(npcs, viewport.viewport)) {
           const markerX = Math.round(n.sx) + 8, markerY = Math.round(n.sy) - 7;
           cross(markerX, markerY, NPC_COLOUR, 'npc');
           if (settings.names === 'yes' && n.label && view.font) { const at = [Math.round(n.sx) - 18 + 8, Math.round(n.sy) - 10 + 2 - 7]; view.font.draw(ctx, n.label, at[0], at[1]); nameplates.push({ text: n.label, at }); }

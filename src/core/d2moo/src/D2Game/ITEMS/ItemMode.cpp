@@ -71,6 +71,7 @@ int32_t __fastcall D2GAME_Return1_6FC41900()
 }
 
 //D2Game.0x6FC41910
+extern "C" uint8_t g_d2webPacket22Pad;   // game_net_stubs.cpp
 // 1.13c D2Game+0xD9470 (checked against decompile)
 void __fastcall D2GAME_ITEMMODE_ServerStatlistCallback_6FC41910(D2GameStrc* pGame, D2UnitStrc* pOwner, D2UnitStrc* pOther, int32_t nLayer_StatId, int32_t nPreviousValue, int32_t nNewValue)
 {
@@ -450,7 +451,10 @@ int32_t __fastcall sub_6FC42120(D2UnitStrc* pUnit, D2UnitStrc* pItem, int32_t a3
         nUnitType = pUnit->dwUnitType;
     }
 
+    // D26: retail's 0x22 byte 0x0A is caller stack residue; this caller (D2Game+0xD43E0, scroll pickup) leaves 0xAC
+    g_d2webPacket22Pad = 0xAC;
     D2GAME_PACKETS_SendPacket0x22_6FC3DBE0(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), nUnitType, nUnitGUID, nSkillId, nQuantity);
+    g_d2webPacket22Pad = 0;
 
     if (!nQuantity)
     {

@@ -438,7 +438,7 @@ void __fastcall sub_6FC82830(D2UnitStrc* pUnit, D2ClientStrc* pClient)
         for (int32_t i = 0; i < std::size(dword_6FD307F8); ++i)
         {
             D2ClientStrc* pPlayerClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
-            D2_ASSERT(pPlayerClient);
+            if (!pPlayerClient) return;   // headless minimal client has no player mapping (a retail recording LEVEL_AddClient)
 
             sub_6FC3D830(pPlayerClient, 0x20u, pUnit ? pUnit->dwUnitId : -1, dword_6FD307F8[i], STATLIST_GetUnitBaseStat(pUnit, dword_6FD307F8[i], 0));
         }

@@ -240,9 +240,6 @@ void __fastcall sub_6FC74AC0(D2GameStrc* pGame, D2UnitStrc* pObject)
         if (pObjectsTxtRecord->nMode[2])
         {
             pObject->dwAnimMode = 2;
-            // D19: retail's client starts the ON sequence itself; our presentation reads the server clock, which
-            // would keep the OPERATING record (a shrine's 21 frames) looping. Start ON's record, shrines only.
-            if (UNITS_IsShrine(pObject)) UNITS_SetAnimStartFrame(pObject);
             if (!pObjectsTxtRecord->nHasCollision[2])
             {
                 UNITS_FreeCollisionPath(pObject);
@@ -2442,7 +2439,8 @@ int32_t __fastcall OBJECTS_OperateFunction02_Shrine(D2ObjOperateFnStrc* pOp, int
         D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pOp->nObjectIdx);
         if (!pObjectsTxtRecord->nCycleAnim[1] && pObjectsTxtRecord->nMode[2])
         {
-            EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
+            // D19: retail's shrine ENDANIM fires FrameCnt frames out (capture the retail captures: 21 for FrameCnt 0x1500), not FrameCnt/FrameDelta
+            EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
         }
     }
 

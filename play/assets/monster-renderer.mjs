@@ -60,7 +60,7 @@ export function parseMonsterAnimations(bytes, count) {
       mode: view.getUint32(at + 12, true), framePrecise: view.getUint32(at + 16, true), frameCountPrecise: view.getUint32(at + 20, true),
       components: Array.from({ length: 16 }, (_, i) => fourcc(view.getUint32(at + 24 + i * 4, true))),
       animSpeed: view.getUint16(at + 88, true), direction: view.getUint8(at + 90),
-      hasAnimSequence: (view.getUint8(at + 91) & 0x01) !== 0, supportsDeadMode: (view.getUint8(at + 91) & 0x02) !== 0,
+      hasAnimSequence: (view.getUint8(at + 91) & 0x01) !== 0, supportsDeadMode: (view.getUint8(at + 91) & 0x02) !== 0, inClientRoom: (view.getUint8(at + 91) & 0x04) !== 0, seqMode: view.getUint8(at + 91) >> 4,
       baseWeaponClass: fourcc(view.getUint32(at + 92, true)).toUpperCase() || null };
   });
 }
@@ -99,7 +99,7 @@ export function realmMonsterAnimationActor(monster, gameFrame) {
   return { id: monster.guid, classId: monster.classId, code: monster.code, mode: monster.mode,
     direction: monster.direction, components: monster.components, framePrecise: monster.framePrecise,
     frameCountPrecise: monster.frameCountPrecise, animSpeed: monster.animSpeed, gameFrame,
-    hasAnimSequence: (monster.animationFlags & 0x01) !== 0,
+    hasAnimSequence: (monster.animationFlags & 0x01) !== 0, seqMode: monster.animationFlags >> 4,
     supportsDeadMode: (monster.animationFlags & 0x02) !== 0,
     modeEvents: monster.modeEvents ?? [] };
 }
@@ -131,9 +131,11 @@ export function dc6AsDcc(bytes) {
 
 export function loadMonsterAnimation(read, actor) {
   if (!/^[\x21-\x7e]{2,4}$/.test(actor.code)) throw new Error(`invalid monster code ${actor.code}`);
-  const token = monsterModeToken(actor.mode);
+  // Mode 14 (SQ) is a MonSeq sequence: retail draws each step with the sequence's own mode (dwSeqMode), no SQ COF exists.
+  const mode = actor.mode === 14 && actor.hasAnimSequence ? actor.seqMode : actor.mode;
+  const token = monsterModeToken(mode);
   let cof, weaponClass;
-  const usesBaseWeaponClass = actor.mode === 4 || actor.mode === 5;
+  const usesBaseWeaponClass = mode === 4 || mode === 5;
   // Retail's monster asset list contains only DTHTH/DDHTH death COFs. Keep
   // death selection exact even when the live unit snapshot carries another
   // BaseW, and do not fall through to a non-death class if an asset is absent.
@@ -208,8 +210,8 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
       else izualGhostClocks.delete(actor.id);
       // Attack COFs depend on BaseW. Keep decoded assets, rasters and failed loads
       // separate when the same token/components arrive with another class.
-      const attackClass = actor.mode === 4 || actor.mode === 5 ? actor.baseWeaponClass ?? '' : '';
-      const baseKey = `${actor.code}:${actor.mode}:${actor.direction}:${actor.components.join(',')}:${attackClass}`;
+      const attackClass = actor.mode === 4 || actor.mode === 5 || actor.mode === 14 ? actor.baseWeaponClass ?? '' : '';
+      const baseKey = `${actor.code}:${actor.mode}:${actor.seqMode ?? ''}:${actor.direction}:${actor.components.join(',')}:${attackClass}`;
       if (failures.has(baseKey)) return null;
       let animation = animations.get(baseKey);
       if (!animation) { try { animation = loadMonsterAnimation(read, actor); animations.set(baseKey, animation); } catch { failures.add(baseKey); return null; } }
@@ -281,7 +283,7 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
         const comp = COMPONENT[layer.component], variant = actor.components[layer.component];
         if (!comp || !variant || !animation.components.has(layer.component)) continue;
         globalThis.__d2DrawList.push({ op: 'unit', path: `monsters\\${actor.code}\\${comp}\\${actor.code}${comp}${variant}${animation.token}${layer.weaponClass}`.toLowerCase(),
-          frame, frames: animation.cof.framesPerDirection, dir: actor.direction, token: animation.token,
+          frame, frames: animation.cof.framesPerDirection, uid: `1,${actor.id}`, dir: actor.direction, token: animation.token,
           x: Math.round(x), y: Math.round(y), mode: highlight ? 7 : 5 });
       }
       if (composed.pixelHash === undefined) { let h = 0x811c9dc5; for (const value of composed.indexed) { h ^= value; h = Math.imul(h, 0x01000193); } composed.pixelHash = h; composed.opaqueCount = composed.opaque.reduce((a, v) => a + v, 0); }

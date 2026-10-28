@@ -19,6 +19,7 @@
 import { placeItemTip } from './item-tooltip.mjs';
 import { createFont, decodeFontTbl, FRONTEND, textColourPalette } from './frontend.mjs';
 import { BORDER_LEFT, BORDER_RIGHT, createPanelChrome } from './panel-chrome.mjs';
+import { recordDc6 } from './drawlist.mjs';
 import { inventoryItemAsset } from './inventory-panel.mjs';
 
 export const VENDOR_ASSETS = {
@@ -65,6 +66,15 @@ export function tooltipSpec(h) {
 // The retail tooltip frame shared by the item tooltip and the skill plates: 4 px side padding, 16 px lines, a mode-2 black box.
 export const TOOLTIP_FRAME = { pad: 4, line: 16, fill: 'rgba(0,0,0,0.65)' };
 export function drawTooltipFrame(ctx, x, y, w, h, fill = TOOLTIP_FRAME.fill) { ctx.save(); ctx.fillStyle = fill; ctx.fillRect(x, y, w, h); ctx.restore(); }
+// Retail's button table (D2Client 0x95C60, `B btn` records of the retail captures): per slot enabled, state
+// (0 up; 1 for a held button is the pressed cel, not captured), the D2Lang string id of its hover hint, the buysellbtn
+// frame and x (panel-relative, the cel's draw x + 1). A blank slot is disabled, id 0, frame 0, and gives no hint.
+// Smith strings (Repair / Repair All) are not captured: id 0 until Charsi's panel is.
+const BUTTON_STR = { buy: 0xd07, sell: 0xd08, exit: 0x1030 };
+export const vendorButtonTable = (npcClass, pressed = null, layout = VENDOR_LAYOUT) => vendorButtons(npcClass).map((n, i) => ({
+  en: n === 'blank' ? 0 : 1, state: pressed === n ? 1 : 0, str: BUTTON_STR[n] ?? 0, frame: vendorButtonFrame(n, pressed === n), x: layout.buttonX[i] - layout.left + 1 }));
+// The hover hint (D2Client 0x8F260): the hovered enabled button's string, drawn left-aligned 25 px left of and 15 px above the pointer.
+export const vendorHint = (table, slot, pointer) => (slot >= 0 && table[slot]?.en && table[slot].str ? { id: table[slot].str, x: Math.floor(pointer.x) - 25, y: Math.floor(pointer.y) - 15 } : null);
 export const vendorButtons = (npcClass) => (SMITH_CLASSES.has(npcClass) ? ['buy', 'sell', 'repair', 'repairAll'] : ['buy', 'sell', 'blank', 'exit']);
 // D2Client's standard 800x600 action-row hit table, converted from strict integer bounds.
 export const vendorButtonHitRect = (layout, slot) => ({ x: layout.buttonX[slot] + 2, y: 432, w: 44, h: 43 });
@@ -96,7 +106,9 @@ function changedOutputPixels(ctx, transform, x, y, width, height, draw) {
   return changed;
 }
 
-export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, layout = VENDOR_LAYOUT, documentObject = globalThis.document }) {
+/** Panel rect in 800x600 screen space (top row is y 61). */
+export const vendorPanelContains = (L, w, h, x, y) => x >= L.left && x < L.left + w && y >= L.top + 1 && y < L.top + 1 + h;
+export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, stringByIndex, layout = VENDOR_LAYOUT, documentObject = globalThis.document }) {
   // Everything drawn through a palette is built per act (the session's act, as the skill tree and
   // npc-menu.mjs fontsFor(act)): pal.dat for the art, pal.pl2 for the gold text and the item box blend.
   const actPath = (act, f) => `data\\global\\palette\\ACT${Math.min(5, Math.max(1, act | 0))}\\${f}`;
@@ -178,7 +190,7 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
     /** Retail: a click inside the panel's rectangle is never a world click, so never closes the store. */
     contains(px, py, width, height) {
       const [x, y] = toScreen(width, height, px, py);
-      return x >= L.left && x < L.left + cur.panel.width && y >= L.top + 1 && y < L.top + 1 + cur.panel.height;
+      return vendorPanelContains(L, cur.panel.width, cur.panel.height, x, y);
     },
     tabAt(px, py, width, height) {
       const [x, y] = toScreen(width, height, px, py);
@@ -264,8 +276,8 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
       }
       // Retail's button row (vendor-akara: buysellbtn 2 / 4 / 0 / 10 at x 195/248/300/352, bottom row 477);
       // a smith's row is main's Buy / Sell / Repair / Repair All (not captured yet).
-      const buttons = vendorButtons(state?.classId);
-      buttons.forEach((b, i) => { const c = buttonFrames[vendorButtonFrame(b, state?.pressedButton === b)]; if (c) ctx.drawImage(c, L.buttonX[i], 477 - c.height + 1); });
+      const buttons = vendorButtons(state?.classId), table = vendorButtonTable(state?.classId, state?.pressedButton, L);
+      table.forEach((b, i) => { const c = buttonFrames[b.frame]; if (c) { ctx.drawImage(c, L.buttonX[i], 477 - c.height + 1); recordDc6('data\\global\\ui\\panel\\buysellbtn.dc6', b.frame, buttonDc6.frames[b.frame], L.buttonX[i], 477 - c.height + 1); } });
       // The stash line (1.13 vendors take stash gold): string "stash" at (101, 434), the stash's gold
       // RIGHT-aligned so its last glyph starts at x 266. Retail's own per-glyph records hold the anchor:
       // `text '180000' x=218 y=434` (vendor-malah-act5) draws 1,8,0,0,0,0 at 218,223,230,242,254,266 --
@@ -291,9 +303,16 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, l
           else (c ? cur.tint(c) : font).drawAnchored(ctx, l, x, y); });
         tooltip = { box: [bx, bottom - h, bx + w, bottom], lines, colours };
       }
+      // The button hint: its string by D2Lang index, over the item-tooltip box (16 px line, text 13 px below the box top; the box width is unmeasured).
+      let hint = null;
+      if (p && stringByIndex) {
+        const [hx, hy] = toScreen(width, height, p.x, p.y), slot = vendorButtons(state?.classId).indexOf(this.buttonAt(p.x, p.y, width, height, state?.classId));
+        const h = vendorHint(table, slot, { x: hx, y: hy });
+        if (h) { const text = stringByIndex(h.id); drawTooltipFrame(ctx, h.x - TOOLTIP_FRAME.pad, h.y - 13, font.measure(text) + TOOLTIP_FRAME.pad * 2, TOOLTIP_FRAME.line); font.drawAnchored(ctx, text, h.x, h.y); hint = { ...h, text }; }
+      }
       ctx.restore();
       return { box: { x: L.left, y: L.top, width: panel.width, height: panel.height }, tab, tabs: [...lastTabs], shown, total: items.length,
-        drawnIcons, drawnItems, undrawnItems, hover: hovered ? { id: hovered.id, colour: 118, gridX: hovered.gridX, gridY: hovered.gridY, invWidth: hovered.invWidth || 1, invHeight: hovered.invHeight || 1 } : null, tooltip, scroll: 0, gold: state?.gold ?? -1, buttons };
+        drawnIcons, drawnItems, undrawnItems, hover: hovered ? { id: hovered.id, colour: 118, gridX: hovered.gridX, gridY: hovered.gridY, invWidth: hovered.invWidth || 1, invHeight: hovered.invHeight || 1 } : null, tooltip, table, hint, scroll: 0, gold: state?.gold ?? -1, buttons };
     },
   };
 }

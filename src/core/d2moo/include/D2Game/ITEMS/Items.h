@@ -41,6 +41,14 @@ struct D2ItemDropStrc
 
 #pragma pack()
 
+// 1.13c D2Game+0x11490 callee seams (null in the game; the function probe fills them)
+struct D2CreateItemExSeam
+{
+    void *DATATBLS_GetItemsTxtRecord, *DATATBLS_GetItemDataTables, *SUNIT_AllocUnitData, *ITEMS_SetItemFlag, *ITEMS_SetItemFormat, *SEED_InitLowSeed, *ITEMS_SetItemStartSeed, *ITEMS_GetItemSeed, *ITEMS_SetItemLevel, *ITEMS_SetInvPage, *D2GAME_InitItemStats_6FC4E520, *SUNIT_RemoveUnit, *ITEMS_CheckIfFlagIsSet, *ITEMS_GetItemFormat, *ITEMS_CheckItemTypeId, *ITEMS_GetItemFlags, *ITEMS_GetMaxSockets, *ITEMS_AddSockets, *ITEMS_GetItemStartSeed, *ITEMS_GetItemType, *D2GAME_SetStatOrResetGold_6FC7CA70, *STATLIST_SetUnitStat, *ITEMS_SetEarName, *ITEMS_SetEarLevel, *UNITS_GetPlayerData, *STATLIST_UnitGetStatValue, *SUNIT_GetClientFromPlayer, *CLIENTS_CheckFlag, *sub_6FC512C0, *sub_6FC51310;
+};
+extern D2CreateItemExSeam g_d2CreateItemEx;
+
+
 //D2Game.0x6FC4D470
 D2UniqueItemsTxt* __fastcall ITEMS_GetUniqueItemsTxtRecord(int32_t nUniqueItemId);
 //D2Game.0x6FC4D4A0

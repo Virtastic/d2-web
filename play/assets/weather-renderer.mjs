@@ -77,7 +77,7 @@ export function createWeatherRenderer({ read }) {
   let prepared = false, levelRain = 0;
   let actN = 0, rgbaPal = null, rippleBlend = null;
   const cycle = createWeatherCycle(), clock = { tick: null };
-  const parity = new URLSearchParams(globalThis.location?.search ?? '').get('enhanced') !== '1' && new URLSearchParams(globalThis.location?.search ?? '').get('view') !== 'fill';
+  const parity = !globalThis.__d2Entry?.fill;
   let live = [];
   const streaks = { drops: [], w: 0, h: 0, tick: null, camX: null, camY: null, seed: 0x2545f491 };
 

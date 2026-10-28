@@ -2,6 +2,7 @@
 // save layer the vendored D2Game code calls. The headless session has one minimal client, so the
 // act/state/room accessors preserve their retail struct mutations; socket and packet calls remain
 // no-ops. Regenerate when a subsystem needs another real client-side behavior.
+#include <GAME/Level.h>
 #include <D2Common.h>
 #include <D2DataTbls.h>
 #include <D2StatList.h>
@@ -188,11 +189,15 @@ void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
     if (pClient->pRoom) DUNGEON_GetAdjacentRoomsListFromRoom(pClient->pRoom, &oldRooms, &oldCount);
     for (int32_t i = 0; i < nextCount; ++i) {
         int32_t j = 0; while (j < oldCount && nextRooms[i] != oldRooms[j]) ++j;
-        if (j >= oldCount) DUNGEON_AddClientToRoom(nextRooms[i], pClient);
+        if (j >= oldCount) LEVEL_AddClient(pClient->pGame, nextRooms[i], pClient);
     }
     for (int32_t i = 0; i < oldCount; ++i) {
         int32_t j = 0; while (j < nextCount && oldRooms[i] != nextRooms[j]) ++j;
-        if (j >= nextCount) DUNGEON_RemoveClientFromRoom(oldRooms[i], pClient);
+        if (j < nextCount) continue;
+        // g_fixtureOwnRoomOnly sessions attach the client to its own room only: skip rooms it was never added to.
+        // a retail recording: a room that streamed into the adjacent list after the client joined never had it added.
+        int32_t k = 0; while (k < oldRooms[i]->nNumClients && oldRooms[i]->ppClients[k] != pClient) ++k;
+        if (k < oldRooms[i]->nNumClients) LEVEL_RemoveClient(pClient->pGame, oldRooms[i], pClient);
     }
     pClient->pRoom = pRoom;
     if (pRoom && pClient->pPlayer) UNITS_SetPlayerPortalFlags(pClient->pPlayer,
@@ -262,6 +267,7 @@ void __fastcall CLIENTS_SetSkillHotKey(D2ClientStrc* pClient, int32_t nHotkeyId,
     pClient->HotkeySkills[nHotkeyId].nItemGUID = (uint32_t)nItemGUID;
 }
 
+extern "C" bool g_sessionClientStaysInRoom;
 // Recovered structural path from D2Game.0x6FC33670, normally called once per active client/frame.
 void __fastcall sub_6FC33670(D2GameStrc* pGame, D2ClientStrc* pClient) {
     if (!pGame || !pClient) return;
@@ -270,7 +276,7 @@ void __fastcall sub_6FC33670(D2GameStrc* pGame, D2ClientStrc* pClient) {
     D2ActiveRoomStrc* clientRoom = pClient->pRoom;
     D2ActiveRoomStrc* playerRoom = UNITS_GetRoom(player);
     ++pClient->unk0x1B0;
-    if (clientRoom != playerRoom) {
+    if (clientRoom != playerRoom && !g_sessionClientStaysInRoom) {
         const int32_t oldLevel = clientRoom ? DUNGEON_GetLevelIdFromRoom(clientRoom) : 0;
         const int32_t newLevel = playerRoom ? DUNGEON_GetLevelIdFromRoom(playerRoom) : 0;
         if (oldLevel != newLevel) {
@@ -347,8 +353,16 @@ void D2GAME_PACKETS_SendPacket0x07_6FC3D120(D2ClientStrc* pClient, uint8_t nArea
     packet.nHeader = 0x07; packet.nX = nTileX; packet.nY = nTileY; packet.nLevelId = nAreaId;
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
 }
+// a retail recording: LEVEL_RemoveClient's 0x08 (leave-room) seam; the headless client reads no packet stream for it.
+void D2GAME_PACKETS_SendPacket0x08_6FC3D160(D2ClientStrc* pClient, uint8_t nAreaId, uint16_t nTileX, uint16_t nTileY) {}
 void D2GAME_PACKETS_SendPacket0x09_6FC3D1A0(D2ClientStrc* pClient, BYTE a2, BYTE a3, DWORD a4, BYTE a5, WORD a6, WORD a7) {}
-void D2GAME_PACKETS_SendPacket0x0A_RemoveObject_6FC3D3A0(D2ClientStrc* pClient, char alw0x0A, char nUnitType, int32_t nUnitId) {}
+void D2GAME_PACKETS_SendPacket0x0A_RemoveObject_6FC3D3A0(D2ClientStrc* pClient, char alw0x0A, char nUnitType, int32_t nUnitId) {
+    // 1.13c D2Game+0x8C3A0 (SCmd.cpp 0x0A): {header, type, guid}, 6 bytes; missiles are never announced.
+    if (nUnitType == UNIT_MISSILE) return;
+    uint8_t packet[6] = { (uint8_t)alw0x0A, (uint8_t)nUnitType };  // D2PacketDef.h's struct is not packed here
+    std::memcpy(packet + 2, &nUnitId, 4);
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, packet, sizeof packet);
+}
 void D2GAME_PACKETS_SendPacket0x0D_6FC3C920(D2ClientStrc* pClient, char nPacketId, int32_t nUnitType, int32_t nUnitId, char a5, WORD nX, WORD nY, char a8, char nLife) {}
 // D18 skill probe: counts the unit-mode packets (0x0F coordinate, 0x10 unit target) a cast emits.
 extern "C" uint32_t g_d2webModePackets = 0;
@@ -359,11 +373,12 @@ void D2GAME_PACKETS_SendPacket0x21_UpdateSkills_6FC3DB50(D2ClientStrc* pClient, 
 // D2Game.0x6FC3DBE0 (1.13c D2Game+0x8D570 = 0x6FCAD570): item skill quantity update; bytes 2 and 0xA are never
 // written by retail's composer (stack residue on the wire), zero here.  Byte 0xB is 1 only when
 // the unit exists and has STATE_PLAYERBODY (1.13c disassembly; D2MOO's 1.10f reading inverts it).
+extern "C" uint8_t g_d2webPacket22Pad = 0;   // byte 0x0A of packet 0x22: caller stack residue, set by the caller that pins it
 void __fastcall D2GAME_PACKETS_SendPacket0x22_6FC3DBE0(D2ClientStrc* pClient, BYTE nUnitType, int32_t nUnitGUID, int16_t nSkillId, char a5) {
     D2UnitStrc* pUnit = SUNIT_GetServerUnit(CLIENTS_GetGame(pClient), nUnitType, nUnitGUID);
     D2GSPacketSrv22 packet = {};
     packet.nHeader = 0x22; packet.nUnitType = nUnitType; packet.nUnitGUID = nUnitGUID;
-    packet.nSkillId = nSkillId; packet.nQuantity = a5;
+    packet.nSkillId = nSkillId; packet.nQuantity = a5; packet.unk0x0A = g_d2webPacket22Pad;
     packet.bIsCorpse = pUnit && STATES_CheckState(pUnit, STATE_PLAYERBODY);
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
 }

@@ -87,6 +87,7 @@ export function createItemRenderer(read, documentObject = globalThis.document) {
       if (frame.width && frame.height) canvas.getContext('2d').putImageData(new ImageData(dc6FrameToRgba(frame, itemColourPalette(highlight ? highlightedPalette() : palette, colour)), frame.width, frame.height), 0, 0); rasters.set(key, canvas); }
     if (canvas.width && canvas.height) ctx.drawImage(canvas, Math.round(x + frame.offsetX), Math.round(y + frame.offsetY - frame.height));
     const { pixelHash, opaque } = spriteMetrics(frame, frame.indices, frame.opaque);
+    if (Array.isArray(globalThis.__d2DrawList)) globalThis.__d2DrawList.push({ op: 'item', path: `items\\${name}`, frame: frameIndex, dir: 0, uid: `4,${item.id}`, x: Math.round(x), y: Math.round(y), mode: highlight ? 7 : 5 });
     lastEvidence = { id: item.id, classId: item.classId, flippyFile: name, frame: frameIndex, width: frame.width, height: frame.height, opaque, pixelHash, mode: highlight ? 7 : 5 };
     return lastEvidence;
   },

@@ -105,6 +105,8 @@ int32_t __fastcall SKILLS_SrvSt29_Sacrifice(D2GameStrc* pGame, D2UnitStrc* pUnit
     return 0;
 }
 
+// D18 witness for SKILLS_SrvDo064_Sacrifice: [calls, then 6 words per call]
+int32_t gSacrificeTrace[25];
 //D2Game.0x6FD184B0
 // 1.13c D2Game+0x99290
 int32_t __fastcall SKILLS_SrvDo064_Sacrifice(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
@@ -131,9 +133,17 @@ int32_t __fastcall SKILLS_SrvDo064_Sacrifice(D2GameStrc* pGame, D2UnitStrc* pUni
                 const int32_t nDamage = MONSTERUNIQUE_CalculatePercentage(nBaseDamage, SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwCalc[1], nSkillId, nSkillLevel), 100);
                 damage.dwPhysDamage = nDamage;
                 damage.dwDmgTotal = nDamage;
+                const int32_t nHpBefore = STATLIST_UnitGetStatValue(pUnit, STAT_HITPOINTS, 0);
                 SUNITDMG_ExecuteEvents(pGame, pUnit, pUnit, 0, &damage);
                 SUNITDMG_ExecuteMissileDamage(pGame, pUnit, pUnit, &damage);
                 SUNITDMG_DrainItemDurability(pGame, pUnit, pTarget, 0);
+                // D18 witness: per call [self damage asked, caster hp before, caster hp after, hit damage, target hp, calc2 value]
+                if (gSacrificeTrace[0] < 4) {
+                    int32_t* w = &gSacrificeTrace[1 + gSacrificeTrace[0] * 6];
+                    w[0] = nDamage; w[1] = nHpBefore; w[2] = STATLIST_UnitGetStatValue(pUnit, STAT_HITPOINTS, 0);
+                    w[3] = pDamage->dwPhysDamage; w[4] = nHitpoints; w[5] = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwCalc[1], nSkillId, nSkillLevel);
+                }
+                gSacrificeTrace[0]++;
             }
 
             return 1;

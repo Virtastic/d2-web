@@ -36,8 +36,13 @@ LOCK_DIR="$(cd "$(git rev-parse --git-common-dir 2>/dev/null || echo .git)/.." &
 mkdir -p "$LOCK_DIR"
 # D2_BUILD_SLOTS parallel builds share this checkout (default 8).
 SLOTS="${D2_BUILD_SLOTS:-8}"; got=""; T0=$(date +%s)
+# Merge builds jump the queue: a merge-* tree (or D2_BUILD_PRIORITY=merge)
+# tries two slots ordinary builds never take before the shared pool.
+IDS=$(seq 0 $((SLOTS - 1)))
+case "$(basename "$PWD")" in merge-*) D2_BUILD_PRIORITY="${D2_BUILD_PRIORITY:-merge}";; esac
+[ "${D2_BUILD_PRIORITY:-}" = merge ] && IDS="m0 m1 $IDS"
 while [ -z "$got" ]; do
-  for i in $(seq 0 $((SLOTS - 1))); do
+  for i in $IDS; do
     exec 9>"$LOCK_DIR/.build.lock.$i"
     if flock -n 9; then got=$i; break; fi
     exec 9>&-
@@ -58,9 +63,10 @@ mkdir -p build-wasm
 # pwd -W: git-bash on Windows, where the daemon wants C:/... and MSYS would otherwise mangle
 # the "/c/...:/build" pair into a semicolon list. MSYS_NO_PATHCONV stops the second mangling.
 MOUNT="$(pwd -W 2>/dev/null || pwd)"
-# Optional: D2_COMPILER_CACHE=1 shares compiler results, never mutable build objects.
+# D2_COMPILER_CACHE (default on; =0 disables) shares compiler results across worktrees, never
+# mutable build objects, so a build recompiles only what changed.
 CACHE_ARGS=()
-if [ "${D2_COMPILER_CACHE:-0}" = 1 ]; then
+if [ "${D2_COMPILER_CACHE:-1}" = 1 ]; then
   mkdir -p "$LOCK_DIR/compiler-cache"
   CACHE_ARGS=(-v "$LOCK_DIR/compiler-cache:/d2-compiler-cache" -e D2_COMPILER_CACHE=1)
 fi

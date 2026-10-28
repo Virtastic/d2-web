@@ -601,11 +601,21 @@ int __fastcall DRLGROOM_ReorderNearRoomList(D2DrlgRoomStrc* pDrlgRoom, D2ActiveR
 	return nRooms;
 }
 
+// d2-web: retail's near-room gap is 6 tiles because retail's screen is a fixed 800x600. The shell sizes the
+// view to the window (play/gameplay-shell.mjs fitView), so the gap scales with it (d2_set_view_size, 6 at
+// 800x600) and every room the wider screen reaches is in the near list, hence active and drawn.
+static int g_nearRoomGap = 6;
+extern "C" void d2_set_view_size(int w, int h)
+{
+	const int g = (6 * (w * 3 > h * 4 ? w * 3 : h * 4) + 2399) / 2400; // 6 * max(w/800, h/600), rounded up
+	g_nearRoomGap = g < 6 ? 6 : g;
+}
+
 //1.10: D2Common.0x6FD77BB0
 //1.14d: 0x0066C370
 void __fastcall sub_6FD77BB0(void* pMemPool, D2DrlgRoomStrc* pDrlgRoom)
 {
-	D2DrlgRoomStrc* ppNearRooms[30] = {};
+	D2DrlgRoomStrc* ppNearRooms[128] = {};
 	D2DrlgLevelStrc* pLevel = NULL;
 	int* pDestinationVisArray = 0;
 	int* pSourceVisArray = 0;
@@ -640,7 +650,7 @@ void __fastcall sub_6FD77BB0(void* pMemPool, D2DrlgRoomStrc* pDrlgRoom)
 			nY = pCurrentRoomEx->nTileYPos - pDrlgRoom->nTileHeight - pDrlgRoom->nTileYPos;
 		}
 
-		if (nX < 6 && nY < 6)
+		if (nX < g_nearRoomGap && nY < g_nearRoomGap)
 		{
 			// d2-web: The 1.10 D2MOO mirror and archived source commit 9878347 both show this
 			// 30-slot temporary array with an unchecked append. Keep malformed or

@@ -66,7 +66,7 @@ void d2_client_2400(uintptr_t base, uintptr_t node_arg, uint32_t mode, uintptr_t
 }
 
 // 1.13c D2Client+0x2F00: native list construction; retail's +4 sentinel becomes one pointer word.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2client_2f00(uintptr_t* self) {
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_2f00(uintptr_t* self) {
     const uintptr_t head = reinterpret_cast<uintptr_t>(self + 1);
     self[0] = 0; self[1] = head; self[2] = ~head;
 }

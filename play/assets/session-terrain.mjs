@@ -1,4 +1,5 @@
 // The real map, drawn from the engine's own tile list.
+import { gUnit } from './drawlist.mjs';
 import { terrainDrawOp } from './terrain-draw-identity.mjs';
 import { wallHidesPlayer } from './roof-hide.mjs';
 import { createRoofFades } from './roof-fade.mjs';
@@ -1058,7 +1059,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         // into `units-<kind>` so a row can attribute the pass (F238: the item/missile/player/npc
         // renderers carry the same per-draw redundancy as the monster pass but are rare in a town and
         // invisible to `s2310`'s single total). perfSample is a no-op while the instrument is off.
-        if (o.sprite) { const u = perfT0();
+        if (o.sprite) { gUnit(o.sprite.u, o.sprite.wx, o.sprite.wy); const u = perfT0();
           // A unit is lit by the map cell under it (D2Client+0x9F120), not by its renderer: outside the
           // player's radius the cell is 0 and retail draws the unit black, so paint it at the cell's own
           // fraction instead of full brightness. The ground it stands on is shaded by the same map, so a
@@ -1127,12 +1128,14 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   };
 }
 
+// Ground items (a retail recording, D7): a settled item (mode 3) is drawn with the corpses, before every wall and unit cel; a dropping one (mode 5, the flip) stands in its tile's cell list
+// NEWEST FIRST, so it precedes the tile's live monsters (wx+wy still orders those) but follows a dying monster (mode 0), which retail re-links when it dies. ponytail: insertion order not recovered; this is what the trace shows.
 // Units of one tile order by wx+wy (south-east draws later; D20: the player, pushed last, won every tie). ponytail: retail's room unit list order (pRoomNext +0xE8) is not recovered; this is the screen-depth approximation. Items tie on 0 (stable sort = snapshot order): FUN_6fb4ee90 walks a cell's unit list (cell+4, next @+0x10) in list order, not by screen Y.
 // Draw-list order key: tile row, tile column, then wall 0 < unit 1 within the tile (D2Client+0x9EE90: a cell's wall list, then its unit list) (ground items: see below), then arrival.
 // Retail draws every ground item in the shadow pass, before all walls and unit cels (pick-up-item.txt: item cel
 // at call 160, first wall 161, first unit cel 177, though two monsters' tiles precede the item's): class -1e9 first. Within a tile the cell's unit list is walked in list order, so items tie on 0 (stable sort = snapshot order), not on screen Y.
 export const overlayKey = (o) => o.sprite
-  ? (o.sprite.wx === undefined ? [1e9, 0, 0, o.depth] : o.sprite.pass === 'item' ? [-1e9, Math.floor(o.sprite.wy / 5), Math.floor(o.sprite.wx / 5), 0] : [Math.floor(o.sprite.wy / 5), Math.floor(o.sprite.wx / 5), 1, o.sprite.wx + o.sprite.wy])
+  ? (o.sprite.wx === undefined ? [1e9, 0, 0, o.depth] : ((o.sprite.pass === 'item' && !o.sprite.dropping) || (o.sprite.u?.[0] === 1 && o.sprite.u[2] === 12)) ? [-1e9, Math.floor(o.sprite.wy / 5), Math.floor(o.sprite.wx / 5), o.sprite.wx * 1e5 - o.sprite.wy] : [Math.floor(o.sprite.wy / 5), Math.floor(o.sprite.wx / 5), 1, o.sprite.pass === 'item' ? -1e9 : (o.sprite.u?.[0] === 1 && o.sprite.u[2] === 0) ? -2e9 : o.sprite.wx + o.sprite.wy])
   : [o.tile.worldY, o.tile.worldX, 0, o.ordinal];
 
 // The overlay pass's comparator over precomputed `.k` keys (tile row, column, wall-before-unit, arrival).

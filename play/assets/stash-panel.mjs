@@ -13,6 +13,7 @@
 // trust it.
 
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
+import { inventoryCloseFrame } from './inventory-close-gesture.mjs';
 import { inventoryItemAsset } from './inventory-panel.mjs';
 import { BORDER_LEFT, BORDER_RIGHT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
 
@@ -146,7 +147,7 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
       const cx = Math.round((x - g.gridLeft) / g.boxW - w / 2), cy = Math.round((y - g.gridTop) / g.boxH - h / 2);
       return { x: Math.max(0, Math.min(g.columns - w, cx)), y: Math.max(0, Math.min(g.rows - h, cy)) };
     },
-    draw(ctx, width, height, geometry, items, open, act = 1) {
+    draw(ctx, width, height, geometry, items, open, act = 1, closePressed = false) {
       if (!open || !geometry) return null;
       const a = forAct(act), frames = a.frames, o = origin(width, height);
       ctx.save(); ctx.translate(o.x, o.y); ctx.scale(o.scale, o.scale);
@@ -187,7 +188,7 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
         ctx.strokeStyle = '#8a7a52'; ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
         chrome.text(ctx, act, transmute, b.x + 8, b.y + 18);
       }
-      chrome.cel(ctx, act, CHROME_ART.close, 10, 352, 476);
+      chrome.cel(ctx, act, CHROME_ART.close, inventoryCloseFrame(closePressed), 352, 476);
       // The stash opens with the inventory; retail frames both after both panels, left then right.
       chrome.border(ctx, act, BORDER_LEFT); chrome.border(ctx, act, BORDER_RIGHT);
       ctx.restore();

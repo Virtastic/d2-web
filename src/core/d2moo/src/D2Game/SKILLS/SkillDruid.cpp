@@ -358,6 +358,7 @@ int32_t __fastcall sub_6FCFE4C0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nS
 }
 
 //D2Game.0x6FCFE5F0
+// 1.13c D2Game+0x456B0: guard confirmed against the 1.13c decompile (nParam <= 0 returns 0; sub_6FCFE4C0 inlined)
 int32_t __fastcall SKILLS_SrvDo117_Firestorm(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -378,7 +379,7 @@ int32_t __fastcall SKILLS_SrvDo117_Firestorm(D2GameStrc* pGame, D2UnitStrc* pUni
     }
 
     const int32_t nParam = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwCalc[0], nSkillId, nSkillLevel);
-    if (nParam >= 0)
+    if (nParam <= 0)
     {
         return 0;
     }

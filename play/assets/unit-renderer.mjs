@@ -293,7 +293,7 @@ export function createPlayerRenderer(read, documentObject = globalThis.document,
         primaryWeaponId: composition.primaryWeaponId,
         handAssignments: composition.handAssignments.map((assignment) => ({ ...assignment })),
         drawn };
-      if (Array.isArray(globalThis.__d2DrawList)) for (const layer of drawn) globalThis.__d2DrawList.push({ op: 'unit', ...layer, frame: selected.frame, x: Math.round(x), y: Math.round(y), mode: 5 });
+      if (Array.isArray(globalThis.__d2DrawList)) for (const layer of [...drawn].sort((a, b) => selected.layerDrawOrder.indexOf(a.componentId) - selected.layerDrawOrder.indexOf(b.componentId))) globalThis.__d2DrawList.push({ op: 'unit', ...layer, dir: state.direction, frame: selected.frame, x: Math.round(x), y: Math.round(y), mode: 5 });
       return lastEvidence;
     },
     get decodedModes() { return animations.size; },

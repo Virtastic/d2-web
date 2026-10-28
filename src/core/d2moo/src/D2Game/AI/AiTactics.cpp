@@ -288,7 +288,7 @@ void __fastcall sub_6FCD0150(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nFram
 }
 
 //D2Game.0x6FCD01B0
-// 1.13c D2Game+0x1560
+// 1.13c D2Game+0xF1A20
 void __fastcall AITACTICS_SetVelocity(D2UnitStrc* pUnit, int32_t a2, int32_t nVel, uint8_t a4)
 {
 	D2_ASSERT((nVel >= -126) && (nVel <= 126));

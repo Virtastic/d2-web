@@ -32,6 +32,20 @@ export function drawPath(path) {
   return String(path).replace(/\//g, '\\').toLowerCase().replace(/^data\\/, '').replace(/\.(dc6|dcc)$/, '');
 }
 
+/** G emitter: one retail-format D2Gfx call line `<tick> G <ordinal> <ecx>,<edx>[,<arg>...]` (hex; values >= 0x100000 are pointers, masked `*`)
+ *  into `globalThis.__d2G` when it is an array. The tick is `globalThis.__d2GTick`. Compared with the retail captures */
+export function gCall(ord, ecx, edx, ...args) {
+  const g = globalThis.__d2G;
+  if (Array.isArray(g)) g.push(`${globalThis.__d2GTick ?? 0} G ${ord} ${[ecx, edx, ...args].map((v) => (v >>> 0 < 0x100000 ? (v >>> 0).toString(16) : '*')).join(',')}`);
+}
+
+/** G emitter for a unit draw (player/monster/object/missile/item sprite), at its place in the draw order: a retail G 10041 line's `u=<type>:<class>:<mode>`
+ *  (hex) without the cel fields, which a unit's layers repeat. One line per unit, not per layer; compare with the retail trace collapsed the same way. */
+export function gUnit(u, wx, wy) {
+  const g = globalThis.__d2G;
+  if (u && Array.isArray(g)) g.push(`${globalThis.__d2GTick ?? 0} G 10041 unit u=${u.map((v) => (v >>> 0).toString(16)).join(':')} at=${Math.round(wx)},${Math.round(wy)}`);
+}
+
 export function drawListActive() { return Array.isArray(globalThis.__d2DrawList); }
 
 /**
@@ -52,6 +66,7 @@ export function recordDc6(path, index, frame, left, top, { op = 'cel', mode = 5,
     mode, extra, w: frame.width, h: frame.height, hash: dc6FrameHash(frame),
   };
   if (Array.isArray(list)) list.push(record);
+  gCall(10041, 0, 0, 1 << 20, record.x, record.y, 1 << 20, mode, 0);   // DrawCelContext: cel*, x, y, palette*, mode, 0
   return record;
 }
 

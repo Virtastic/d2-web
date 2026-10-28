@@ -623,7 +623,8 @@ static void refresh_monster_motion_view(D2RealmClientMonster& monster) {
     monster.view.animSpeed = static_cast<uint16_t>(monster.motionUnit->wAnimSpeed);
     D2MonStats2Txt* stats2 = UNITS_GetMonStats2TxtRecordFromMonsterId(static_cast<int>(monster.view.classId));
     monster.view.reserved = (monster.motionUnit->pAnimSeq ? 0x01u : 0u) |
-        (stats2 && (stats2->dwModeFlags & MONSTATS2MODEFLAG_DD) ? 0x02u : 0u);
+        (stats2 && (stats2->dwModeFlags & MONSTATS2MODEFLAG_DD) ? 0x02u : 0u) |
+        (monster.motionUnit->pAnimSeq ? ((monster.motionUnit->dwSeqMode & 0xFu) << 4) : 0u);   // bits 4-7: the sequence's current mode (SQ draws as it)
     if (!monster.motionUnit->pDynamicPath) return;
     monster.view.x = static_cast<uint32_t>(PATH_GetXPosition(monster.motionUnit->pDynamicPath));
     monster.view.y = static_cast<uint32_t>(PATH_GetYPosition(monster.motionUnit->pDynamicPath));

@@ -2362,7 +2362,7 @@ int32_t __fastcall sub_6FC6EE90(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t* a
     return 0;
 }
 
-//D2Game.0x6FC6F160
+//D2Game.0x6FC6F160 // 1.13c D2Game+0x1560
 uint32_t __fastcall MONSTERUNIQUE_CheckMonModeFlag(int32_t nMonsterId, int32_t nFlag)
 {
     D2MonStats2Txt* pMonStats2TxtRecord = MONSTERREGION_GetMonStats2TxtRecord(nMonsterId);

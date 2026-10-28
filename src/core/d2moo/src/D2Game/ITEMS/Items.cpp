@@ -849,19 +849,23 @@ D2UnitStrc* __fastcall sub_6FC4EC10(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, 
 }
 
 //D2Game.0x6FC4ED80
+// 1.13c D2Game+0x11490 callee seams: each member overrides the like-named callee; all null in the game
+#define CIS(f) (g_d2CreateItemEx.f ? (decltype(&f))g_d2CreateItemEx.f : &f)
+D2CreateItemExSeam g_d2CreateItemEx = {};
+
 // 1.13c D2Game+0x11490
 D2UnitStrc* __fastcall D2GAME_CreateItemEx_6FC4ED80(D2GameStrc* pGame, D2ItemDropStrc* pItemDrop, int32_t bUseSeed)
 {    
     if (!pGame->bExpansion)
     {
-        D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItemDrop->nId);
+        D2ItemsTxt* pItemsTxtRecord = CIS(DATATBLS_GetItemsTxtRecord)(pItemDrop->nId);
         if (!pItemsTxtRecord || pItemsTxtRecord->wVersion >= 100u)
         {
             return nullptr;
         }
     }
     
-    D2ItemDataTbl* pItemDataTbl = DATATBLS_GetItemDataTables();
+    D2ItemDataTbl* pItemDataTbl = CIS(DATATBLS_GetItemDataTables)();
     D2_ASSERT(pItemDataTbl);
 
     const int32_t nItemId = pItemDrop->nId;
@@ -870,135 +874,127 @@ D2UnitStrc* __fastcall D2GAME_CreateItemEx_6FC4ED80(D2GameStrc* pGame, D2ItemDro
         return nullptr;
     }
 
-    D2UnitStrc* pItem = SUNIT_AllocUnitData(UNIT_ITEM, nItemId, pItemDrop->nX, pItemDrop->nY, pItemDrop->pGame, pItemDrop->pRoom, pItemDrop->wUnitInitFlags, pItemDrop->nSpawnType, 0);
+    D2UnitStrc* pItem = CIS(SUNIT_AllocUnitData)(UNIT_ITEM, nItemId, pItemDrop->nX, pItemDrop->nY, pItemDrop->pGame, pItemDrop->pRoom, pItemDrop->wUnitInitFlags, pItemDrop->nSpawnType, 0);
     D2_ASSERT(pItem);
 
-    ITEMS_SetItemFlag(pItem, IFLAG_INIT, 1);
+    CIS(ITEMS_SetItemFlag)(pItem, IFLAG_INIT, 1);
 
-    ITEMS_SetItemFormat(pItem, pItemDrop->wItemFormat);
+    CIS(ITEMS_SetItemFormat)(pItem, pItemDrop->wItemFormat);
 
     if (bUseSeed || pItemDrop->bForce)
     {
         pItem->dwInitSeed = pItemDrop->dwSeed;
-        SEED_InitLowSeed(&pItem->pSeed, pItemDrop->dwSeed);
-        ITEMS_SetItemStartSeed(pItem, pItemDrop->dwItemSeed);
-        SEED_InitLowSeed(ITEMS_GetItemSeed(pItem), pItemDrop->dwItemSeed);
+        CIS(SEED_InitLowSeed)(&pItem->pSeed, pItemDrop->dwSeed);
+        CIS(ITEMS_SetItemStartSeed)(pItem, pItemDrop->dwItemSeed);
+        CIS(SEED_InitLowSeed)(CIS(ITEMS_GetItemSeed)(pItem), pItemDrop->dwItemSeed);
     }
 
     if (pItemDrop->nItemLvl <= 0)
     {
         pItemDrop->nItemLvl = 1;
     }
-    ITEMS_SetItemLevel(pItem, pItemDrop->nItemLvl);
+    CIS(ITEMS_SetItemLevel)(pItem, pItemDrop->nItemLvl);
 
     if (!pItemDrop->bForce)
     {
-        ITEMS_SetItemFlag(pItem, IFLAG_INSTORE, 1);
+        CIS(ITEMS_SetItemFlag)(pItem, IFLAG_INSTORE, 1);
     }
 
-    ITEMS_SetInvPage(pItem, INVPAGE_NULL);
+    CIS(ITEMS_SetInvPage)(pItem, INVPAGE_NULL);
 
-    if (!D2GAME_InitItemStats_6FC4E520(pGame, &pItem, pItemDrop, 1))
+    if (!CIS(D2GAME_InitItemStats_6FC4E520)(pGame, &pItem, pItemDrop, 1))
     {
-        SUNIT_RemoveUnit(pGame, pItem);
+        CIS(SUNIT_RemoveUnit)(pGame, pItem);
         return nullptr;
     }
 
     if (pItemDrop->bForce)
     {
-        ITEMS_SetItemFlag(pItem, IFLAG_IDENTIFIED, ITEMS_CheckIfFlagIsSet(pItemDrop->dwFlags1, IFLAG_IDENTIFIED));
-        ITEMS_SetItemFlag(pItem, IFLAG_NOSELL, ITEMS_CheckIfFlagIsSet(pItemDrop->dwFlags1, IFLAG_NOSELL));
+        CIS(ITEMS_SetItemFlag)(pItem, IFLAG_IDENTIFIED, CIS(ITEMS_CheckIfFlagIsSet)(pItemDrop->dwFlags1, IFLAG_IDENTIFIED));
+        CIS(ITEMS_SetItemFlag)(pItem, IFLAG_NOSELL, CIS(ITEMS_CheckIfFlagIsSet)(pItemDrop->dwFlags1, IFLAG_NOSELL));
 
-        if (!ITEMS_GetItemFormat(pItem) && !ITEMS_CheckItemTypeId(pItem, ITEMTYPE_ARMOR) && ITEMS_CheckIfFlagIsSet(pItemDrop->dwFlags1, IFLAG_SOCKETED) && !ITEMS_CheckIfFlagIsSet(ITEMS_GetItemFlags(pItem), IFLAG_SOCKETED))
+        if (!CIS(ITEMS_GetItemFormat)(pItem) && !CIS(ITEMS_CheckItemTypeId)(pItem, ITEMTYPE_ARMOR) && CIS(ITEMS_CheckIfFlagIsSet)(pItemDrop->dwFlags1, IFLAG_SOCKETED) && !CIS(ITEMS_CheckIfFlagIsSet)(CIS(ITEMS_GetItemFlags)(pItem), IFLAG_SOCKETED))
         {
-            if (ITEMS_GetMaxSockets(pItem))
+            if (CIS(ITEMS_GetMaxSockets)(pItem))
             {
-                ITEMS_AddSockets(pItem, ITEMS_GetItemStartSeed(pItem) % ITEMS_GetMaxSockets(pItem) + 1);
+                const uint32_t nMaxSockets = CIS(ITEMS_GetMaxSockets)(pItem);
+                CIS(ITEMS_AddSockets)(pItem, CIS(ITEMS_GetItemStartSeed)(pItem) % nMaxSockets + 1);
             }
             else
             {
-                ITEMS_SetItemFlag(pItem, IFLAG_SOCKETED, 0);
+                CIS(ITEMS_SetItemFlag)(pItem, IFLAG_SOCKETED, 0);
             }
         }
 
-        ITEMS_SetItemFlag(pItem, IFLAG_SOCKETED, ITEMS_CheckIfFlagIsSet(pItemDrop->dwFlags1, IFLAG_SOCKETED));
-        ITEMS_SetItemFlag(pItem, IFLAG_BROKEN, ITEMS_CheckIfFlagIsSet(pItemDrop->dwFlags1, IFLAG_BROKEN));
-        ITEMS_SetItemFlag(pItem, IFLAG_STARTITEM, ITEMS_CheckIfFlagIsSet(pItemDrop->dwFlags1, IFLAG_STARTITEM));
+        CIS(ITEMS_SetItemFlag)(pItem, IFLAG_SOCKETED, CIS(ITEMS_CheckIfFlagIsSet)(pItemDrop->dwFlags1, IFLAG_SOCKETED));
+        CIS(ITEMS_SetItemFlag)(pItem, IFLAG_BROKEN, CIS(ITEMS_CheckIfFlagIsSet)(pItemDrop->dwFlags1, IFLAG_BROKEN));
+        CIS(ITEMS_SetItemFlag)(pItem, IFLAG_STARTITEM, CIS(ITEMS_CheckIfFlagIsSet)(pItemDrop->dwFlags1, IFLAG_STARTITEM));
 
-        if (ITEMS_GetItemType(pItem) == ITEMTYPE_GOLD)
+        if (CIS(ITEMS_GetItemType)(pItem) == ITEMTYPE_GOLD)
         {
-            D2GAME_SetStatOrResetGold_6FC7CA70(pItem, STAT_GOLD, pItemDrop->nQuantity);
+            CIS(D2GAME_SetStatOrResetGold_6FC7CA70)(pItem, STAT_GOLD, pItemDrop->nQuantity);
         }
         else
         {
-            STATLIST_SetUnitStat(pItem, STAT_QUANTITY, pItemDrop->nQuantity, 0);
+            CIS(STATLIST_SetUnitStat)(pItem, STAT_QUANTITY, pItemDrop->nQuantity, 0);
         }
 
         pItemDrop->nMaxDur = std::min(pItemDrop->nMaxDur, 255);
         pItemDrop->nMinDur = std::min(pItemDrop->nMinDur, pItemDrop->nMaxDur);
-        STATLIST_SetUnitStat(pItem, STAT_DURABILITY, pItemDrop->nMinDur, 0);
-        STATLIST_SetUnitStat(pItem, STAT_MAXDURABILITY, pItemDrop->nMaxDur, 0);
+        CIS(STATLIST_SetUnitStat)(pItem, STAT_DURABILITY, pItemDrop->nMinDur, 0);
+        CIS(STATLIST_SetUnitStat)(pItem, STAT_MAXDURABILITY, pItemDrop->nMaxDur, 0);
     }
 
-    if (ITEMS_GetItemType(pItem) == ITEMTYPE_PLAYER_BODY_PART)
+    if (CIS(ITEMS_GetItemType)(pItem) == ITEMTYPE_PLAYER_BODY_PART)
     {
         if (pItemDrop->bForce)
         {
-            ITEMS_SetEarName(pItem, pItemDrop->szName);
-            ITEMS_SetEarLevel(pItem, pItemDrop->eEarLvl);
-            ITEMS_SetItemFlag(pItem, IFLAG_NAMED, ITEMS_CheckIfFlagIsSet(pItemDrop->dwFlags1, IFLAG_NAMED));
+            CIS(ITEMS_SetEarName)(pItem, pItemDrop->szName);
+            CIS(ITEMS_SetEarLevel)(pItem, pItemDrop->eEarLvl);
+            CIS(ITEMS_SetItemFlag)(pItem, IFLAG_NAMED, CIS(ITEMS_CheckIfFlagIsSet)(pItemDrop->dwFlags1, IFLAG_NAMED));
         }
         else
         {
             if (!pItemDrop->pUnit || pItemDrop->pUnit->dwUnitType != UNIT_PLAYER)
             {
-                SUNIT_RemoveUnit(pGame, pItem);
+                CIS(SUNIT_RemoveUnit)(pGame, pItem);
                 return nullptr;
             }
 
-            D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pItemDrop->pUnit);
+            D2PlayerDataStrc* pPlayerData = CIS(UNITS_GetPlayerData)(pItemDrop->pUnit);
             if (!pPlayerData)
             {
-                SUNIT_RemoveUnit(pGame, pItem);
+                CIS(SUNIT_RemoveUnit)(pGame, pItem);
                 return nullptr;
             }
 
-            ITEMS_SetEarName(pItem, pPlayerData->szName);
-            ITEMS_SetEarLevel(pItem, STATLIST_UnitGetStatValue(pItemDrop->pUnit, STAT_LEVEL, 0));
+            CIS(ITEMS_SetEarName)(pItem, pPlayerData->szName);
+            CIS(ITEMS_SetEarLevel)(pItem, CIS(STATLIST_UnitGetStatValue)(pItemDrop->pUnit, STAT_LEVEL, 0));
 
-            D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pItemDrop->pUnit, __FILE__, __LINE__);
+            D2ClientStrc* pClient = CIS(SUNIT_GetClientFromPlayer)(pItemDrop->pUnit, __FILE__, __LINE__);
             if (pClient)
             {
-                ITEMS_SetItemFlag(pItem, IFLAG_NAMED, CLIENTS_CheckFlag(pClient, CLIENTSAVEFLAG_HARDCORE));
+                CIS(ITEMS_SetItemFlag)(pItem, IFLAG_NAMED, CIS(CLIENTS_CheckFlag)(pClient, CLIENTSAVEFLAG_HARDCORE));
             }
         }
     }
 
-    if (ITEMS_CheckIfFlagIsSet(ITEMS_GetItemFlags(pItem), IFLAG_PERSONALIZED))
+    if (CIS(ITEMS_CheckIfFlagIsSet)(CIS(ITEMS_GetItemFlags)(pItem), IFLAG_PERSONALIZED))
     {
         if (pItemDrop->bForce)
         {
-            ITEMS_SetEarName(pItem, pItemDrop->szName);
+            CIS(ITEMS_SetEarName)(pItem, pItemDrop->szName);
         }
         else
         {
-            D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pItemDrop->pUnit);
+            D2PlayerDataStrc* pPlayerData = CIS(UNITS_GetPlayerData)(pItemDrop->pUnit);
             D2_ASSERT(pPlayerData);
-            ITEMS_SetEarName(pItem, pPlayerData->szName);
+            CIS(ITEMS_SetEarName)(pItem, pPlayerData->szName);
         }
     }
 
-    const int32_t nReplenishDurability = STATLIST_UnitGetStatValue(pItem, STAT_ITEM_REPLENISH_DURABILITY, 0);
-    if (nReplenishDurability && !EVENT_GetEventFrame(pGame, pItem, EVENTTYPE_STATREGEN))
-    {
-        EVENT_SetEvent(pGame, pItem, EVENTTYPE_STATREGEN, 2500 / nReplenishDurability + pGame->dwGameFrame + 1, 0, 0);
-    }
-
-    const int32_t nReplenishQuantity = STATLIST_UnitGetStatValue(pItem, STAT_ITEM_REPLENISH_QUANTITY, 0);
-    if (nReplenishQuantity && !EVENT_GetEventFrame(pGame, pItem, EVENTTYPE_STATREGEN))
-    {
-        EVENT_SetEvent(pGame, pItem, EVENTTYPE_STATREGEN, 2500 / nReplenishQuantity + pGame->dwGameFrame + 1, 0, 0);
-    }
+    CIS(sub_6FC512C0)(pGame, pItem);
+    CIS(sub_6FC51310)(pGame, pItem);
 
     return pItem;
 }
@@ -1659,28 +1655,30 @@ D2UnitStrc* __fastcall ITEMS_FindQuestItem(D2GameStrc* pGame, D2UnitStrc* pUnit,
 // 1.13c D2Game+0xE5D0
 int32_t __fastcall ITEMS_GetItemLevelForNewItem(D2UnitStrc* pUnit, int32_t nLevelId)
 {
-    if (pUnit)
+    if (!pUnit)
     {
-        int32_t nLevel = 0;
-        if (pUnit->dwUnitType == UNIT_MONSTER)
-        {
-            nLevel = STATLIST_UnitGetStatValue(pUnit, STAT_LEVEL, 0);
-        }
-        else if (pUnit->dwUnitType == UNIT_PLAYER)
-        {
-            nLevel = STATLIST_GetUnitBaseStat(pUnit, STAT_LEVEL, 0);
-        }
-
-        return std::max(nLevel, 1);
-    }
-
-    if (!nLevelId)
-    {
+        // 1.13c: a null unit with a level id is fatal (assert + _exit), otherwise level 1
+        D2_ASSERT(!nLevelId);
         return 1;
     }
 
-    D2GameStrc* pGame = SUNIT_GetGameFromUnit(pUnit);
-    return std::max(DATATBLS_GetMonsterLevelInArea(nLevelId, pGame->nDifficulty, pGame->bExpansion), 1);
+    int32_t nLevel;
+    if (pUnit->dwUnitType == UNIT_MONSTER)
+    {
+        nLevel = STATLIST_UnitGetStatValue(pUnit, STAT_LEVEL, 0);
+    }
+    else if (pUnit->dwUnitType == UNIT_PLAYER)
+    {
+        nLevel = STATLIST_GetUnitBaseStat(pUnit, STAT_LEVEL, 0);
+    }
+    else
+    {
+        // 1.13c: any other unit uses the monster level of the area of its room
+        D2GameStrc* pGame = SUNIT_GetGameFromUnit(pUnit);
+        nLevel = DATATBLS_GetMonsterLevelInArea(DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(pUnit)), pGame->nDifficulty, pGame->bExpansion);
+    }
+
+    return std::max(nLevel, 1);
 }
 
 //D2Game.0x6FC50560

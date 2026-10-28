@@ -133,7 +133,8 @@ static_assert(offsetof(D2DynamicPathStrc, dwClientCoordX) == 0x08, "D540 [2]");
 static_assert(offsetof(D2DynamicPathStrc, dwClientCoordY) == 0x0C, "D540 [3]");
 static_assert(PATH_CURRENT_ROOM_INVALID == 2, "D540 flag |2");
 // Retail passes the path in ESI; room and unit fields remain native pointers.
-static void UNITROOM_ResetDynamicPath(D2DynamicPathStrc* pPath)
+// Not static: the function probe (src/core/fn/d2common_d540.cpp) calls it.
+void UNITROOM_ResetDynamicPath(D2DynamicPathStrc* pPath)
 {
 	pPath->tGameCoords.dwPrecisionX = dword_6FDDD458;
 	pPath->tGameCoords.dwPrecisionY = dword_6FDDD45C;

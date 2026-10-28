@@ -21,8 +21,9 @@ export const PLAYER_VOICE = Object.freeze([
 const ANY_UNIT = { 0x0a: 2673, 0x0d: 2634, 0x0e: 2635, 0x5a: 4379, 0x5d: 2553 };
 // Events keyed on the unit's class: class 271 (the Act I rogue hireling) takes the first row, others the second.
 const BY_CLASS_271 = { 0x54: [4615, 4625], 0x55: [4612, 4616], 0x56: [4613, 4619], 0x57: [4614, 4622] };
+// Event 1 (item to cursor, row 235) is NOT here: retail submits it once with no unit (a retail recording Q 240), played by event-sounds.mjs when the item leaves the ground.
 // Player (unitType 0) events that reach 6fad3200 when 6fad3f20 has no case of its own: fixed rows.
-const PLAYER_FIXED = { 1: 235, 2: 7, 3: 10, 4: 11, 5: 12, 6: 13, 7: 2230, 8: 2231, 9: 9, 11: 228 };
+const PLAYER_FIXED = { 2: 7, 3: 10, 4: 11, 5: 12, 6: 13, 7: 2230, 8: 2231, 9: 9, 11: 228 };
 // Player events whose row is a field of the class voice table.
 const PLAYER_FIELD = { 0x13: 0x08, 0x14: 0x18, 0x15: 0x0c, 0x16: 0x10, 0x17: 0x14, 0x18: 0x1c };
 

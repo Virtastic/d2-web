@@ -13,7 +13,13 @@ extern "C" uint32_t d2gfx_D2FillArea(uint32_t eaxIn, int32_t left, int32_t top, 
     return slot((uint32_t)left, (uint32_t)top, (uint32_t)right, (uint32_t)bottom, c, x);
 }
 // 1.13c D2Gfx+0xB080 (DrawCelContext): six words, slot +0x84 gets ecx = a0, edx = a1, a2..a5 on the stack.
-extern "C" uint32_t d2gfx_sub_b080(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5, D2GfxSlot4 slot) { return slot(a0, a1, a2, a3, a4, a5); }
+// G recorder: when a sink is set, one `10041 *,*,<a2>,<a3>,...` line per DrawCelContext call; ecx/edx written as `*`.
+// Nothing in the play path calls this yet (the draw pass is JS), so the sink stays null there. ponytail: cel ordinal only, add the other ordinals as their shims go live.
+extern "C" void (*d2gfx_g_sink)(uint32_t ordinal, const uint32_t* args, int n) = nullptr;
+extern "C" uint32_t d2gfx_sub_b080(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5, D2GfxSlot4 slot) {
+    if (d2gfx_g_sink) { const uint32_t a[6] = {a0, a1, a2, a3, a4, a5}; d2gfx_g_sink(10041, a, 6); }
+    return slot(a0, a1, a2, a3, a4, a5);
+}
 // 1.13c D2Gfx+0xADC0: the one word goes to slot +0x28 in ecx, nothing on the stack; eax passes through.
 extern "C" uint32_t d2gfx_sub_adc0(uint32_t a0, uint32_t (*slot)(uint32_t ecx)) { return slot(a0); }
 // 1.13c D2Gfx+0xAE10 (retail: eax = source): the DLL's table copy (+0x14788, 0x120 bytes), its self pointer (+0x148A8), and 49 x 0x100 bytes

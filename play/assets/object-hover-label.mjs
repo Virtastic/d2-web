@@ -99,7 +99,7 @@ export function drawObjectHoverLabel(ctx, target, font, projectStatic, recordPri
     geometryError: `Objects.txt NameOffset missing for class ${target.classId}` };
   // The ordinary cy chest's localized row name is replaced by retail's uppercase title. The
   // native offset and all plate geometry still come from its Objects.txt row and D2Win path.
-  const chest = target.classId === 240 && String(target.token).toLowerCase() === 'cy';
+  const chest = !target.locked && target.classId === 240 && String(target.token).toLowerCase() === 'cy';
   const label = chest ? 'CHEST' : target.label;
   const width = font.measure(label), [sx, sy] = projectStatic(target.x, target.y);
   const x = Math.round(sx), anchorY = Math.round(sy), boxWidth = width + 8;
@@ -126,4 +126,8 @@ export function drawObjectHoverLabel(ctx, target, font, projectStatic, recordPri
 }
 
 // D28: a town/perm portal's name is the Objects.txt "Portal to" followed by its destination level.
+// D2Client+0xA5D90: a Lockable object whose InteractType sign bit is set is named by string 3262
+// ("Locked Chest"), not by its Objects.txt name; the server's key check (ObjMode chest, 0x80) is the same bit.
+export const STR_LOCKED_CHEST = 3262;
+export const objectNameFor = (object, name, lockedName) => (object.locked ? lockedName : name);
 export const objectPortalLabel = (name, levelName) => [name, levelName].filter(Boolean).join(' ');

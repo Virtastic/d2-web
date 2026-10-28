@@ -21,7 +21,8 @@ export function itemTooltipSpec(h) {
   // when socketed (0x800) or ethereal (0x400000), else white.
   const q = h?.quality, f = h?.itemFlags | 0;
   const qc = q >= 4 && q <= 9 ? [3, 2, 9, 4, 8, 10][q - 4] : (f & 0x800 || f & 0x400000) ? 5 : 0;
-  return { lines: [h?.name || h?.code || '', ...(h?.props || [])].filter((line) => line !== ''),
+  const sell = h?.sell >= 0 ? [`${h.sellLabel}${h.sell}`] : [];   // D2Client+0x46230: "Sell value: N", last line
+  return { lines: [h?.name || h?.code || '', ...(h?.props || [])].filter((line) => line !== '').concat(sell),
     colours: [qc, ...(h?.propColours || [])] };
 }
 

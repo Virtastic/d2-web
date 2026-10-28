@@ -9,7 +9,7 @@
 const PLAYER_HIT_DEATH = [[2878, 2883], [2910, 2915], [2894, 2899], [2886, 2891], [2902, 2907], [2926, 2931], [2918, 2923]];
 const PLAYER_WEAPON = [0, 251, 262, 268, 274, 280, 286, 292, 268, 298, 0, 0, 0, 0]; // by hit class index
 const HIT_CLASS = ['', 'hth', '1hss', '1hsl', '2hss', '2hsl', '1ht', '2ht', 'club', 'staf'];
-const MON_HIT = new Set([3, 13]), MON_DEATH = new Set([0, 12]), MON_ATTACK = { 4: [1, 3, 7], 5: [4, 6, 10] }, MON_SKILL = { 8: 17, 9: 18, 10: 19, 11: 20 }; // MonSounds dwords: [sound, prob, weapon]; S1-S4 words (D2MOO D2MonSoundsTxt)
+const MON_HIT = new Set([3, 13]), MON_DEATH = new Set([0, 12]), MON_ATTACK = { 4: [1, 3, 6], 5: [7, 9, 12] }, MON_SKILL = { 8: 17, 9: 18, 10: 19, 11: 20 }; // MonSounds dwords: [sound, prob, weapon]; S1-S4 words (D2MOO D2MonSoundsTxt)
 const PLAYER_CAST = new Set([10, 13, 14, 15, 16]); // SC, S1-S4: the skill's Skills.txt `stsound` fires on entry
 const PLAYER_HIT = new Set([4, 0x13]), PLAYER_DEATH = new Set([0, 17]), PLAYER_ATTACK = new Set([7, 8]);
 
@@ -18,7 +18,8 @@ const PLAYER_HIT = new Set([4, 0x13]), PLAYER_DEATH = new Set([0, 17]), PLAYER_A
 const IMPACT = [0, 0x141, 0x155, 0x155, 0x155, 0x155, 0x14F, 0x14F, 0x149, 0x149, 0x15B, 0x15B, 0x145];
 // Block entry (player mode 9 BL, monster mode 6 BL): Sounds.txt block_weapon_1..3 (index 398, group of 3).
 const BLOCK_BASE = 398;
-export function blockSound(type, mode) { return (type === 0 && mode === 9) || (type === 1 && mode === 6) ? BLOCK_BASE : 0; }
+// D10: retail (a retail recording, 16 player blocks) plays NO sound on a player block, so only the monster branch stays.
+export function blockSound(type, mode) { return (type === 1 && mode === 6) ? BLOCK_BASE : 0; }
 
 // D2Client 0x5EE70: group of `size` rows from `base`; LCG state s' = lo32(s)*0x6AC690C5 + hi32(s) (64-bit), draw = pow2 ? (size-1)&lo : lo%size;
 // redraw while the pick equals one of the last min(size-1,2) picks of this base (history at +100/+0x68). The size<4 gate on 0x59640 is assumed passing.
@@ -64,7 +65,7 @@ export function createCombatSoundTrigger(read, play, busy = () => false) {
   for (const l of text('data\\global\\excel\\Sounds.txt').split(/\r?\n/).slice(1)) { const c = l.split('\t'); if (c[0]) soundIndex.set(c[0], Number(c[1])); }
   { const rows = text('data\\global\\excel\\skills.txt').split(/\r?\n/).map((l) => l.split('\t')), h = rows[0], id = h.indexOf('Id'), st = h.indexOf('stsound');
     for (const c of rows.slice(1)) if (c[st] && soundIndex.has(c[st])) skillSound.set(Number(c[id]), soundIndex.get(c[st])); }
-  const prev = new Map(), frames = new Map(), hist = new Map(), rng = { s: 1n };
+  const prev = new Map(), hpPrev = new Map(), frames = new Map(), hist = new Map(), rng = { s: 1n };
   let tick = 0, lastRoll = -99, seed = 1;
   const profile = (classId, typeFlags = 0, superUniqueId = -1) => {
     if (classId < 0 || 4 + (classId + 1) * 424 > sv.byteLength) return null;
@@ -79,7 +80,7 @@ export function createCombatSoundTrigger(read, play, busy = () => false) {
   const fire = (base, e, kind) => { if (base > 0) play(row(base), { unitType: e.type, unitId: e.id, classId: e.classId, kind, mode: e.mode, baseRow: base }); };
   const weaponHitClass = (player, items) => {
     const w = (items || []).find((i) => i.mode === 1 && (Number(i.id) >>> 0) === (Number(player?.primaryWeaponId) >>> 0));
-    if (!w) return 1;
+    if (!w) return 0; // unarmed: retail's CVT (#10862) selector is 0 -> table[0] = 0, the 0x88A70 submit is rejected (a retail recording Q 0 at each swing); no fist swing sound
     const code = typeof w.code === 'string' ? w.code : String.fromCharCode(...[0, 8, 16, 24].map((s) => (Number(w.code) >>> s) & 255));
     return Math.max(1, HIT_CLASS.indexOf(weapons.get(code.replace(/\0/g, '').trim()) ?? ''));
   };
@@ -88,15 +89,20 @@ export function createCombatSoundTrigger(read, play, busy = () => false) {
     update(entities, snapshot) {
       tick++;
       const seen = new Set();
-      for (const e of entities) {
-        if (e.type > 1) continue;
-        const key = `${e.type}:${e.id}`; seen.add(key);
-        const fp = e.animation?.framePrecise, hitMode = e.type === 1 ? MON_HIT.has(e.mode) : e.type === 0 && PLAYER_HIT.has(e.mode), restart = (((e.type === 1 && MON_ATTACK[e.mode]) || (e.id === snapshot?.playerId && (PLAYER_CAST.has(e.mode) || PLAYER_ATTACK.has(e.mode)))) && fp < frames.get(key)) || (hitMode && fp <= frames.get(key)); // D23: a unit struck again while still in GH re-runs SetMode(GH) (retail 0x23630 each time); GH frames only advance, so a non-advancing clock is a re-entry // same attack mode re-entered back to back: SetMode ran again, the frame clock rewound
+      for (const e0 of entities) {
+        if (e0.type > 1) continue;
+        const key = `${e0.type}:${e0.id}`; seen.add(key);
+        // a retail recording Q records: retail submits the hit sounds when the unit TAKES DAMAGE, whatever its mode (a hero swinging, a zombie
+        // mid-attack keep their mode); a hit that does not change the mode is a virtual GH entry, a killing hit submits the impact only.
+        const ph = hpPrev.get(key); hpPrev.set(key, e0.hp);
+        const dmg = ph !== undefined && e0.hp < ph && e0.lastHitClass !== undefined && !e0.critter;
+        const e = dmg && e0.hp > 0 && !(e0.type === 1 ? MON_HIT : PLAYER_HIT).has(e0.mode) ? { ...e0, mode: e0.type === 1 ? 3 : 4 } : e0;
+        const fp = e.animation?.framePrecise, hitMode = e.type === 1 ? MON_HIT.has(e.mode) : e.type === 0 && PLAYER_HIT.has(e.mode), restart = (((e.type === 1 && MON_ATTACK[e.mode]) || (e.id === snapshot?.playerId && (PLAYER_CAST.has(e.mode) || PLAYER_ATTACK.has(e.mode)))) && fp < frames.get(key)) || (hitMode && (dmg || (e0.hp === undefined && fp <= frames.get(key)))); // D23: a unit struck again while still in GH re-runs SetMode(GH) (retail 0x23630 each time): a damage tick is the re-entry (a retail recording Q, not the frame clock) // same attack mode re-entered back to back: SetMode ran again, the frame clock rewound
         if (fp !== undefined) frames.set(key, fp);
-        const old = prev.get(key); prev.set(key, e.mode);
+        const old = prev.get(key); prev.set(key, e0.mode);
         if (old === undefined || (old === e.mode && !restart)) continue; // a mode CHANGE only (or an attack mode re-entered); first sight is not an entry
         if ((e.type === 1 ? e.mode === 12 : e.mode === 17) && old === 0) continue; // DT -> DD (corpse settles): the death cue already fired on entering DT
-        if ((e.type === 1 ? MON_HIT.has(e.mode) : e.type === 0 && PLAYER_HIT.has(e.mode)) && e.lastHitClass !== undefined)
+        if (((e.type === 1 ? MON_HIT.has(e.mode) : e.type === 0 && PLAYER_HIT.has(e.mode)) || dmg) && e.lastHitClass !== undefined)
           for (const r of hitSounds(e.lastHitClass, e.type, e.mode, e.critter)) play(r, { unitType: e.type, unitId: e.id, classId: e.classId, kind: 'impact', mode: e.mode, baseRow: r });
         if ((e.lastHitClass & 0xF0) === 0xA0 && (e.type === 1 ? MON_HIT.has(e.mode) || MON_DEATH.has(e.mode) : PLAYER_HIT.has(e.mode) || PLAYER_DEATH.has(e.mode))) continue; // 0x23630: body class 0xA0 returns before the profile hit/death cue
         if (blockSound(e.type, e.mode)) fire(blockSound(e.type, e.mode), e, 'block');
@@ -119,7 +125,7 @@ export function createCombatSoundTrigger(read, play, busy = () => false) {
           else if (PLAYER_DEATH.has(e.mode)) { fire(t[1], e, 'death'); lastRoll = tick; }
         }
       }
-      for (const k of prev.keys()) if (!seen.has(k)) { prev.delete(k); frames.delete(k); }
+      for (const k of prev.keys()) if (!seen.has(k)) { hpPrev.delete(k); prev.delete(k); frames.delete(k); }
     },
   };
 }

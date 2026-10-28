@@ -1342,23 +1342,36 @@ void __stdcall STATLIST_SetBaseStat2(D2StatListStrc* pStatList, int nStatId, int
 
 // 1.13c D2Common+0x3A740
 //D2Common.0x6FDB7AB0 (#10517)
+// FN-capture traces of the 0x3A280 / 0x38550 calls (checked against retail); null in the game.
+BOOL (*gpfnStatListSetUnitStatSetTrace)(D2StatListStrc*, int, int, uint16_t) = nullptr;
+void (*gpfnStatListSetUnitStatModTrace)(D2StatListStrc*, D2SLayerStatIdStrc::PackedType) = nullptr;
+
 void __stdcall STATLIST_SetUnitStat(D2UnitStrc* pUnit, int nStatId, int nValue, uint16_t nLayer)
 {
-	if (STATLIST_SetStat(pUnit->pStatListEx, nStatId, nValue, nLayer))
+	const BOOL bSet = gpfnStatListSetUnitStatSetTrace ? gpfnStatListSetUnitStatSetTrace((D2StatListStrc*)pUnit->pStatListEx, nStatId, nValue, nLayer) : STATLIST_SetStat(pUnit->pStatListEx, nStatId, nValue, nLayer);
+	if (bSet)
 	{
 		if (pUnit->dwUnitType == UNIT_PLAYER)
 		{
-			STATLIST_InsertStatModOrFail_6FDB7690(pUnit->pStatListEx, D2SLayerStatIdStrc::Make(nLayer, nStatId).nPackedValue);
+			if (gpfnStatListSetUnitStatModTrace)
+				gpfnStatListSetUnitStatModTrace((D2StatListStrc*)pUnit->pStatListEx, D2SLayerStatIdStrc::Make(nLayer, nStatId).nPackedValue);
+			else
+				STATLIST_InsertStatModOrFail_6FDB7690(pUnit->pStatListEx, D2SLayerStatIdStrc::Make(nLayer, nStatId).nPackedValue);
 		}
 	}
 }
 
 // 1.13c D2Common+0x3A710
 //D2Common.0x6FDB7B00 (#10518)
+// FN-capture trace of the 0x3A330 call (checked against retail); null in the game.
+void (*gpfnStatListAddUnitStatTrace)(D2StatListStrc*, int, int, uint16_t) = nullptr;
+
 void __stdcall STATLIST_AddUnitStat(D2UnitStrc* pUnit, int nStatId, int nValue, uint16_t nLayer)
 {
 	if (nValue)
 	{
+		if (gpfnStatListAddUnitStatTrace)
+			gpfnStatListAddUnitStatTrace(pUnit->pStatListEx, nStatId, nValue, nLayer);
 		STATLIST_AddStat(pUnit->pStatListEx, nStatId, nValue, nLayer);
 	}
 }

@@ -142,7 +142,7 @@ export function normalizeSnapshot(value) {
       x: finite(warp?.x), y: finite(warp?.y),
       select: warp?.select ? { x: finite(warp.select.x), y: finite(warp.select.y), dx: finite(warp.select.dx), dy: finite(warp.select.dy) } : null,
       originX: finite(warp?.originX, finite(warp?.x)), originY: finite(warp?.originY, finite(warp?.y)),
-      located: warp?.located,
+      located: warp?.located, unitTile: warp?.unitTile,
     })),
   };
 }
@@ -231,6 +231,8 @@ export function parseSessionWarps(bytes, count, origins = null) {
     // room is UINT32_MAX while no room tile to the destination is generated: the exit is listed (and
     // the warp command can still take it) but its point is not known -- x,y read (0,0).
     located: view.getUint32(o + 4, true) !== 0xFFFFFFFF,
+    // enabled === 2: borrowed point of a sibling tile (this warp id has no generated UNIT_TILE): not pickable (D28)
+    unitTile: view.getUint32(o + 20, true) === 1,
     // LvlWarp's screen-space select box (px, y down) and its anchor in subtiles (Diablerie Warp.cs).
     select: { x: view.getInt32(o + 36, true), y: view.getInt32(o + 40, true), dx: view.getInt32(o + 44, true), dy: view.getInt32(o + 48, true) },
     originX: origins ? origins[2 * i] : view.getInt32(o + 28, true), originY: origins ? origins[2 * i + 1] : view.getInt32(o + 32, true),
