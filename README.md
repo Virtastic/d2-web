@@ -7,6 +7,17 @@ An unofficial reimplementation of the Diablo II: Lord of Destruction **1.13c** e
 > areas, combat, items, vendors, waypoints and saves. It is not a complete game yet, and you will
 > hit bugs, missing screens and wrong behaviour. Please report them.
 
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Title screen](docs/screenshots/title.png) | ![Hero class selection](docs/screenshots/class-select.png) |
+
+![A Barbarian in the Blood Moor, Act 1](docs/screenshots/act1.png)
+
+*Screenshots are rendered from the player's own game files; the art is Blizzard's.*
+
 ## You need your own copy of the game
 
 d2-web ships **no Blizzard assets**: no MPQs, art, sound, text or binaries. It reads them from your
