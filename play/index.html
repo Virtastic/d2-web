@@ -295,7 +295,13 @@ function showBootFailure(why) {
     // against. It changes nothing else: same host, same engine, same page, one thing missing.
     const noRetail = /[?&]noRetail=1/.test(window.__d2Entry.search);
     const retail = [];
-    if (wantRetail && !noRetail) for (const f of RETAIL_ORDER) {
+    // Bring-your-own-files hosts (play/site-config.json {"assets":"byo"}) serve no game data: the player gives
+    // the archives at a front door, they stay in the browser, and StreamFS mounts them as Blobs under the
+    // same /retail/<name> paths, so nothing below the mount knows the difference.
+    const siteCfg = wantRetail && !noRetail ? await fetchBounded('site-config.json', {}, 'site-config.json').then((r) => (r.ok ? r.json() : {})).catch(() => ({})) : {};
+    const byo = (window.__d2Entry.assets || siteCfg.assets) === 'byo' && wantRetail && !noRetail;
+    if (byo) retail.push(...await (await import('./assets/byo-door.mjs')).frontDoor());
+    else if (wantRetail && !noRetail) for (const f of RETAIL_ORDER) {
       const h = await fetchBounded('retail/' + f, { method: 'HEAD' }, 'retail/' + f);
       if (h.ok) retail.push({ f, size: Number(h.headers.get('content-length')) });
     }
@@ -304,7 +310,7 @@ function showBootFailure(why) {
     // task. preRun holds the runtime until they are in, 5 s at most. Not under the test runner: its boot stays as it was.
     // The title screen's art too, from the archive that wins each name (RETAIL_ORDER): its first build read
     // it synchronously on the first tick after ready, 13 sync misses (288 ms).
-    const tablesIn = navigator.webdriver ? null : Promise.all([import('./assets/mpq-index.mjs'), import('./assets/frontend.mjs')]).then(async ([{ mpqTables, openMpqIndex }, { FRONTEND }]) => {
+    const tablesIn = navigator.webdriver || byo ? null : Promise.all([import('./assets/mpq-index.mjs'), import('./assets/frontend.mjs')]).then(async ([{ mpqTables, openMpqIndex }, { FRONTEND }]) => {
       StreamFS.register('/smoke.mpq', SMOKE_URL, size);
       const smoke = StreamFS.fetched('/smoke.mpq', 0, size);
       const archives = await Promise.all(retail.map(async (r) => {
@@ -329,7 +335,7 @@ function showBootFailure(why) {
         StreamFS.mount('/smoke.mpq', SMOKE_URL, size);
         log('streamfs: mounted /smoke.mpq (' + size + ' bytes)');
         if (retail.length) FS.mkdir('/retail');   // makeNode needs the parent dir to exist
-        for (const r of retail) StreamFS.mount('/retail/' + r.f, 'retail/' + r.f, r.size);
+        for (const r of retail) r.blob ? StreamFS.mountBlob('/retail/' + r.f, r.blob, r.size) : StreamFS.mount('/retail/' + r.f, 'retail/' + r.f, r.size);
         if (retail.length) log('streamfs: mounted ' + retail.length + ' retail MPQs');
         if (tablesIn && typeof addRunDependency === 'function') {
           addRunDependency('d2-tables');

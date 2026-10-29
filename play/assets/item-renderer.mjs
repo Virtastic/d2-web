@@ -1,6 +1,6 @@
 import { dc6FrameToRgba, decodeDatPalette, decodeDc6 } from './d2-formats.mjs';
 import { spriteMetrics } from './sprite-metrics.mjs';
-import RETAIL_MIX_HEX from './retail-mixpalette.mjs';
+import { mixTable } from './mix-palette.mjs';
 import { highlightMap } from './unit-highlight.mjs';
 
 const RECORD_SIZE = 112;
@@ -43,11 +43,11 @@ export function parseItemPresentations(bytes, count) {
 
 // D2Client draws a ground flippy through the item's own ITEMS_GetColor remap (the engine exports its
 // component colour byte per item, 0xFF = none): entry k of the palette becomes entry table[k].
-// Retail's 126 captured MixPalette tables are keyed by that byte; an unknown byte stays unmapped.
-export function itemColourPalette(palette, colourByte) {
-  const hex = RETAIL_MIX_HEX[colourByte]; if (!hex) return palette;
+// The byte selects a D2CMP_MixPalette table (mix-palette.mjs); an unknown byte stays unmapped.
+export function itemColourPalette(palette, colourByte, read) {
+  const table = mixTable(read, colourByte); if (!table) return palette;
   const out = new Uint8Array(1024);
-  for (let k = 0; k < 256; k++) { const t = parseInt(hex.substr(k * 2, 2), 16); out.set(palette.subarray(t * 4, t * 4 + 4), k * 4); }
+  for (let k = 0; k < 256; k++) { const t = table[k]; out.set(palette.subarray(t * 4, t * 4 + 4), k * 4); }
   return out;
 }
 
@@ -84,7 +84,7 @@ export function createItemRenderer(read, documentObject = globalThis.document) {
     const name = resolved.name, frameIndex = resolved.index, frame = resolved.frame;
     const colour = item.colourByte ?? 0xFF, key = `${name}:${frameIndex}:${colour}${highlight ? ':hl' : ''}`; let canvas = rasters.get(key);
     if (!canvas) { canvas = documentObject.createElement('canvas'); canvas.width = frame.width; canvas.height = frame.height;
-      if (frame.width && frame.height) canvas.getContext('2d').putImageData(new ImageData(dc6FrameToRgba(frame, itemColourPalette(highlight ? highlightedPalette() : palette, colour)), frame.width, frame.height), 0, 0); rasters.set(key, canvas); }
+      if (frame.width && frame.height) canvas.getContext('2d').putImageData(new ImageData(dc6FrameToRgba(frame, itemColourPalette(highlight ? highlightedPalette() : palette, colour, read)), frame.width, frame.height), 0, 0); rasters.set(key, canvas); }
     if (canvas.width && canvas.height) ctx.drawImage(canvas, Math.round(x + frame.offsetX), Math.round(y + frame.offsetY - frame.height));
     const { pixelHash, opaque } = spriteMetrics(frame, frame.indices, frame.opaque);
     if (Array.isArray(globalThis.__d2DrawList)) globalThis.__d2DrawList.push({ op: 'item', path: `items\\${name}`, frame: frameIndex, dir: 0, uid: `4,${item.id}`, x: Math.round(x), y: Math.round(y), mode: highlight ? 7 : 5 });

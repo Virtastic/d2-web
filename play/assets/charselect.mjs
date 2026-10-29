@@ -230,7 +230,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
         const v = app[layer.component], it = item(layer.component);
         const base = it ? it.code : (v >= 1 && v <= 3 ? ['lit', 'med', 'hvy'][v - 1] : 'lit');
         const colourByte = appColours[layer.component];
-        const transform = componentColourTransform(pl2, colourByte);
+        const transform = componentColourTransform(pl2, colourByte, read);
         const entry = { component: layer.component, appearance: v ?? null, token: base,
           weaponClass: layer.weaponClass.toUpperCase(), required: required.has(layer.component),
           // C3o: the byte this layer's colour slot carries and whether a transform was applied --

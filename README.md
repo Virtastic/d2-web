@@ -20,7 +20,7 @@ own legally owned install of Diablo II + Lord of Destruction, patched to **1.13c
 Requirements: Linux, macOS or Windows with WSL2; Docker; Node.js 24+; git.
 
 ```sh
-git clone https://github.com/<owner>/d2-web.git
+git clone https://github.com/Virtastic/d2-web.git
 cd d2-web
 git clone https://github.com/ladislav-zezula/StormLib third_party/StormLib
 bash ci/build.sh

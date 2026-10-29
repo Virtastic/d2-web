@@ -13,7 +13,7 @@
 import { recordDc6 } from './drawlist.mjs';
 import { drawBg, present } from './widebg.mjs';
 import { isButtonHeldOverTarget } from './frontend-pointer-states.mjs';
-import RETAIL_MIX_HEX from './retail-mixpalette.mjs';
+import { mixTable } from './mix-palette.mjs';
 import { createGatewaySelector, DEFAULT_GATEWAY_LABEL, GATEWAY_LAYOUT } from './bnet-servers.mjs';
 
 /** 12-byte header, then one 14-byte record per code point. Layout per riiablo's FontTBL. */
@@ -72,37 +72,16 @@ export const PL2_TEXT_SHIFTS = 1024 + 8192 + 4096 + 256 + 5 * 65536 + 111 * 256 
 export const PL2_MAX_COMPONENT_BLEND = PL2_TEXT_SHIFTS - 65536 - 256 - 39;
 
 /**
- * C3o: retail's dyed-component transform is NOT a
- * PL2 slice at all. Ghidra on `D2CMP.dll` ordinal 10098 (`D2CMP_MixPalette`, found by byte-pattern --
- * the 1.10f .def's own ordinal number does not hold across patches, confirmed by disassembling it in
- * the 1.13c binary and finding a one-argument getter with the wrong shape): `nTrans in {1,2,5,6,7,8}`
- * (3 and 4 are explicitly rejected), `nColor in [0,20]`, `index = nTrans*105 + nColor`,
- * `table = base + index*256` -- D2CMP's OWN internal array (`imul edi,edi,0x6900` in the populating
- * routine confirms the 105-slot-per-nTrans stride), not a per-screen palette file. The base is BSS
- * (`.data` VirtualSize 0xe2fb8 vs a 0x3000 raw size -- the array is populated by an init routine this
- * project has not yet ported, not baked into the DLL image), which is why the earlier hash-only and
- * raw-bytes captures found the live pointers outside every mapped module's static data: they are heap
- * memory this same routine filled at runtime, exactly as `D2WinPalette.cpp`'s single-buffer-per-screen
- * shape hinted but could not itself explain. `combined = (colourField & 31) + 32*nTransform` is the
- * SAME value `ITEMS_GetColor` computes at save time (`Items.cpp`); the header byte is `combined + 1`.
- *
- * The two combined values this project has retail ground truth for (character-select's own captured
- * table, byte-exact, `the retail captures`, FNV-1a-verified against the
- * hash-only capture that preceded it) are embedded here directly -- real retail bytes, not a
- * synthesised guess at the populating routine's own hue/shade math (`D2CMP.dll` calls at
- * `0x10008ef0`/`0x10009040`/`0x10009070` from the init dispatcher at `0x10014f20`, unresolved). Any
- * OTHER colour byte falls back to the previous (known-wrong) PL2 slice, so a byte with no captured
- * table still draws SOMETHING rather than nothing -- `s611` only exercises the two captured values and
- * gates on them; the fallback path is not itself asserted anywhere.
+ * Client-parity C3o: retail's dyed-component transform is D2CMP_MixPalette, not a PL2 slice: the
+ * colour byte selects nTrans in {1,2,5,6,7,8} and nColor in [0,20], and the table is row nColor of the
+ * matching data\global\items\palette\*.dat file (mix-palette.mjs). A byte with no table falls back to
+ * the PL2 MaxComponentBlend slice so the layer still draws.
  */
-const hexBytes = (hex) => { const out = new Uint8Array(hex.length / 2); for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16); return out; };
-// All 126 retail tables (tools/gen-mixpalette.mjs from the retail captures).
-const RETAIL_MIX_PALETTE = new Map(Object.entries(RETAIL_MIX_HEX).map(([byte, hex]) => [+byte, hexBytes(hex)]));
 /** The 256-entry palette-index remap a saved component colour byte selects, or null for 0xFF/absent. */
-export function componentColourTransform(pl2, colourByte) {
+export function componentColourTransform(pl2, colourByte, read) {
   if (colourByte === undefined || colourByte === null || colourByte === 0xFF) return null;
-  const retail = RETAIL_MIX_PALETTE.get(colourByte);
-  if (retail) return retail;
+  const mixed = mixTable(read, colourByte);
+  if (mixed) return mixed;
   const offset = PL2_MAX_COMPONENT_BLEND + (colourByte - 1) * 256;
   return pl2.subarray(offset, offset + 256);
 }

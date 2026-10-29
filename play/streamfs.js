@@ -146,8 +146,7 @@
       ST.misses++; ST.stallMs += ms; ST.lastReadMs = ms; ST.lastReadUrl = url;
       throw new Error('streamfs: ' + url + ' did not answer within ' + ms + 'ms -- the host accepted ' +
         'the request and then stalled. This browser reads URL sources synchronously, and a synchronous XHR ' +
-        'cannot take a timeout, so the browser\'s own network timeout is the only bound ' +
-        '', { cause: err });
+        'cannot take a timeout, so the browser\'s own network timeout is the only bound.', { cause: err });
     }
     ST.lastReadMs = Math.round(performance.now() - t0); ST.lastReadUrl = url;
     if (xhr.status !== 206 && xhr.status !== 200) throw new Error('streamfs: HTTP ' + xhr.status + ' ' + url);

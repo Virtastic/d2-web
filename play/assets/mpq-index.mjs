@@ -21,7 +21,7 @@ export function hashString(s, type) {
   }
   return s1;
 }
-function decrypt(u32, key) {
+export function decrypt(u32, key) {
   let s1 = key >>> 0, s2 = 0xEEEEEEEE;
   for (let i = 0; i < u32.length; i++) {
     s2 = (s2 + CRYPT[0x400 + (s1 & 0xFF)]) >>> 0;
