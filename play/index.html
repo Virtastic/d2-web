@@ -299,6 +299,21 @@ function showBootFailure(why) {
       const h = await fetchBounded('retail/' + f, { method: 'HEAD' }, 'retail/' + f);
       if (h.ok) retail.push({ f, size: Number(h.headers.get('content-length')) });
     }
+    // Each archive's header, hash/block tables, (listfile) and (attributes), fetched while d2.js loads and
+    // compiles: d2_vfs_mount read them synchronously in onRuntimeInitialized, 27 sync misses (1187 ms) in one
+    // task. preRun holds the runtime until they are in, 5 s at most. Not under the test runner: its boot stays as it was.
+    const tablesIn = navigator.webdriver ? null : import('./assets/mpq-index.mjs').then(({ mpqTables, openMpqIndex }) => {
+      StreamFS.register('/smoke.mpq', SMOKE_URL, size);
+      return Promise.all([StreamFS.fetched('/smoke.mpq', 0, size), ...retail.map(async (r) => {
+        const path = '/retail/' + r.f, readAt = (p, l) => StreamFS.readAt(path, p, l);
+        StreamFS.register(path, 'retail/' + r.f, r.size);
+        await StreamFS.fetched(path, 0, 32);
+        const t = mpqTables(readAt(0, 32)); if (!t) return;
+        await Promise.all(t.map(([pos, n]) => StreamFS.fetched(path, pos, n * 16)));
+        const find = openMpqIndex(readAt);
+        await Promise.all(['(listfile)', '(attributes)'].map((n) => { const hit = find && find(n); return hit && StreamFS.fetched(path, hit.pos, hit.size); }));
+      })]);
+    }).catch(() => {});
     window.Module = {
       locateFile: (p) => ENGINE_DIR + p,
       print: log, printErr: log,
@@ -308,6 +323,10 @@ function showBootFailure(why) {
         if (retail.length) FS.mkdir('/retail');   // makeNode needs the parent dir to exist
         for (const r of retail) StreamFS.mount('/retail/' + r.f, 'retail/' + r.f, r.size);
         if (retail.length) log('streamfs: mounted ' + retail.length + ' retail MPQs');
+        if (tablesIn && typeof addRunDependency === 'function') {
+          addRunDependency('d2-tables');
+          Promise.race([tablesIn, new Promise((res) => setTimeout(res, 5000))]).then(() => removeRunDependency('d2-tables'));
+        }
       }],
       onRuntimeInitialized() {
         const r = Module.ccall('d2_smoke_mpq', 'string', ['string', 'string'], ['/smoke.mpq', 'smoke.txt']);

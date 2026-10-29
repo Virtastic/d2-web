@@ -27,7 +27,7 @@ __forceinline int32_t EVENT_MapUnitTypeToIndex(int32_t nUnitType)
 
 
 //D2Game.0x6FC34840
-// 1.13c D2Game+0x8E6F0
+// 1.13c D2Game+0x8E900
 void __fastcall D2GAME_EVENTS_Delete_6FC34840(D2GameStrc* pGame, D2UnitStrc* pUnit, D2C_EventTypes nEventType, int32_t nEventCustomId)
 {
     D2EventTimerStrc* pEventTimer = SUNIT_GetTimerFromUnit(pUnit);
@@ -44,6 +44,7 @@ void __fastcall D2GAME_EVENTS_Delete_6FC34840(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FC34890
+// 1.13c D2Game+0x8E6F0
 void __fastcall sub_6FC34890(D2GameStrc* pGame, D2EventTimerStrc* pTimer)
 {
     if (pTimer->nFlags & EVENTFLAG_0x1)

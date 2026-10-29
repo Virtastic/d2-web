@@ -1822,6 +1822,7 @@ void __fastcall ITEMS_FillItemDrop(D2GameStrc* pGame, D2ItemDropStrc* pItemDrop,
 }
 
 //D2Game.0x6FC509F0
+// 1.13c D2Game+0x12B90
 void __fastcall ITEMS_DropGoldPile(D2GameStrc* pGame, D2UnitStrc* pUnit, uint32_t nValue)
 {
     int32_t nGoldItemId = 0;

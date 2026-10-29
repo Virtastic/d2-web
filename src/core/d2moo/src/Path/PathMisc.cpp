@@ -1419,8 +1419,21 @@ void __fastcall PATH_RecacheRoom(D2DynamicPathStrc* pDynamicPath, D2ActiveRoomSt
 		return;
 	}
 
+	// 1.13c D2Common+0xD760: lookup order changed for a teleport into another level.
+	// A teleport into another level (a waypoint across acts) searches the hint room first. The previous
+	// room's neighbours can hold a room of the old level that covers the same subtile (Lut Gholein's
+	// neighbours cover Harrogath's spawn subtile), which would keep the unit in the wrong level.
+	D2ActiveRoomStrc* pRoomAtLocation = nullptr;
+	if (pHintRoom && pDynamicPath->pRoom && DUNGEON_GetLevelIdFromRoom(pHintRoom) != DUNGEON_GetLevelIdFromRoom(pDynamicPath->pRoom))
+	{
+		pRoomAtLocation = DUNGEON_GetRoomAtPosition(pHintRoom, pDynamicPath->tGameCoords.wPosX, pDynamicPath->tGameCoords.wPosY);
+	}
+
 	// Try to find room using previous path room
-	D2ActiveRoomStrc* pRoomAtLocation = DUNGEON_GetRoomAtPosition(pDynamicPath->pRoom, pDynamicPath->tGameCoords.wPosX, pDynamicPath->tGameCoords.wPosY);
+	if (!pRoomAtLocation)
+	{
+		pRoomAtLocation = DUNGEON_GetRoomAtPosition(pDynamicPath->pRoom, pDynamicPath->tGameCoords.wPosX, pDynamicPath->tGameCoords.wPosY);
+	}
 	if (!pRoomAtLocation)
 	{
 		// Try looking for the room using the hint room

@@ -2,6 +2,7 @@
 // Globals are retail VAs (image base 0x6fb50000) read/written through Env; unrecovered callees and imported
 // ordinals are Env function pointers (names positional: fNNNN = D2Client RVA, oNNNNN = ordinal).
 #include <cstdint>
+#include <emscripten.h>
 namespace d2client_batch_c0450 {
 using P = uintptr_t;
 struct Env {
@@ -25,7 +26,7 @@ struct Env {
  void (*f4b00)(); int32_t (*o10085)(int32_t, int32_t, int32_t);
  void (*f71580)(); uint8_t (*o10190)(int32_t, int32_t, int32_t); void (*o10014)(int32_t, int32_t, int32_t, int32_t, uint32_t, int32_t);
  int32_t (*o10086)(uint32_t); void (*o10041)(const int32_t*, int32_t, int32_t, uint32_t, int32_t, int32_t); void (*o10040)();
- P (*fdb420)(int32_t);
+ P (*fdb420)(const char*, int32_t);
  uint32_t (*ustrlen)(P); P (*f1a80)(); int32_t (*o10083)(); void (*f6f370)(int32_t, int32_t, uint32_t);
  void (*o10227)(); void (*f72790)(int32_t, int32_t, int32_t); void (*faf7b20)(); int32_t (*f55440)();
  void (*feccc0)(int32_t, P); void (*fecc60)(int32_t, P); int32_t (*o10048)(); int32_t (*o423)(const char*, const char*, int32_t, P);
@@ -35,6 +36,8 @@ struct Env {
  void (*f0afa0)(); void (*ff6640)(); void (*f11440)(); void (*f5a380)(); void (*f5a190)(); void (*f09740)(int32_t);
  void (*f6f720)(); void (*f3bf10)(); void (*f4fa90)(); void (*fccad0)(); void (*f3b840)(); void (*f53ad0)(); void (*f13d90)();
  void (*o10897)(int32_t, uint32_t);
+ // C14F0 register/stack-exact seams (disasm): Fog#10043 free(ecx=blk, edx=file, 0x7a, 0); D2Win#10065 via thunk D39C takes cl; D2CMP#10024 one stack word; f31750 takes eax
+ void (*freeFile)(P, P, int32_t, int32_t); void (*o10065cl)(uint8_t); void (*o10024w)(uint32_t); void (*f31750a)(uint32_t);
 };
 // ---- D2Client+0xC0450 ----
 // 1.13c D2Client+0xC0450  (this=param, out=in_EAX; edx result taken as this->0xc id)
@@ -123,22 +126,23 @@ void sub_C14F0(const Env& e) {
  uint32_t h = e.rd32(0x6fbcb9d0);
  if (h) {
   e.o10065(h);
-  e.o10043(0x7a, 0);
+  e.freeFile(h, 0x6fb86ab0, 0x7a, 0);
   e.wr32(0x6fbcb9d0, 0);
-  e.o10065(0);
-  e.o10024(e.rd32(0x6fbcb9d4), 0);
-  e.f0f090(); e.f6e860(); e.f31750();
+  e.o10065cl((uint8_t)e.rd32(0x6fbcb9d4));
+  e.o10024w(e.rd32(0x6fbcb9d4));
+  e.f0f090(); e.f6e860(); e.f31750a(e.rd32(0x6fbcc3c0));
   uint32_t t = e.getTick();
   if (e.rd32(0x6fbc981c) < t + 2000) e.wr32(0x6fbc981c, t + 2000);
  }
  e.wr32(0x6fbcb9cc, 0); e.wr32(0x6fbcb9d0, 0); e.wr32(0x6fbcb9b0, 0);
 }
-// 1.13c D2Client+0xC1580  (the sprintf'd path is dead in the decompile: fdb420(0) takes only 0)
+// 1.13c D2Client+0xC1580
 void sub_C1580(const Env& e) {
  sub_C14F0(e);
  e.f6e020();
- e.o10009(); // selects "DATA\\LOCAL" vs "DATA\\GLOBAL" format; result unused downstream
- e.wr32(0x6fbcb9d0, (uint32_t)e.fdb420(0));
+ // ordinal 10009 selects the format: 0 -> the GLOBAL path, else LOCAL
+ const char* path = e.o10009() ? "DATA\\LOCAL\\UI\\LoadingScreen" : "DATA\\GLOBAL\\UI\\Loading\\Loadingscreen";
+ e.wr32(0x6fbcb9d0, (uint32_t)e.fdb420(path, 0));
  e.wr32(0x6fbcbbb4, 0); e.wr32(0x6fbcb9b0, 1); e.wr32(0x6fbcc4f8, 0);
  e.wr32(0x6fbaad78, e.rd32(0x6fbcc3a8));
 }
@@ -267,4 +271,93 @@ void sub_C2F40(const Env& e) {
  if (old == 0) { if (cur) e.feccc0(e.o10048(), e.tbl_fb80864); }
  else if (!cur) e.fecc60(e.o10048(), e.tbl_fb80864);
 }
+
+// ---- G-trace seam for the loading-screen frame (D2Client+0xC1760), a retail recording-g tick 1 ----
+// Runs sub_C1760 over a small simulated global table and records the D2Gfx calls it makes as retail-format G lines
+// (`<ord> <ecx>,<edx>[,<arg>...]`, hex, >=0x100000 masked `*`). ecx/edx are the register leftovers: the entry pair is the
+// caller's (0x6D010 -- whatever D2Common's thunks left, not modelled: passed in), the 10041/10040 pair is the frame index
+// and 0 (`mov ecx,[0x6FBCBBB4]`, `cdq` of the positive screen width). D2Win #10062 and #10128 are D2Win's (unrecovered):
+// the D2Gfx #10061/#10022 they make are emitted as seen in the retail trace (10062 once, 10128 on the first load).
+}  // namespace d2client_batch_c0450
+#include <string>
+#include <cstdio>
+namespace d2client_batch_c0450 {
+static struct { std::string out; uint32_t ecx, edx; bool pal; uint32_t mem[16]; P key[16]; int n; int32_t frames; } L;
+static uint32_t* slot(P a) { for (int i = 0; i < L.n; i++) if (L.key[i] == a) return &L.mem[i]; L.key[L.n] = a; L.mem[L.n] = 0; return &L.mem[L.n++]; }
+static void rec(int ord, uint32_t ecx, uint32_t edx, std::initializer_list<uint32_t> a) {
+ char b[24]; std::snprintf(b, sizeof b, "%d %x,%x", ord, ecx, edx); L.out += b;
+ for (uint32_t v : a) { if (v >= 0x100000u) L.out += ",*"; else { std::snprintf(b, sizeof b, ",%x", v); L.out += b; } }
+ L.out += '\n';
+}
+}
+extern "C" const char* d2_client_loading_g(int32_t first, uint32_t ecx, uint32_t edx, int32_t w, int32_t h, int32_t frames) {
+ using namespace d2client_batch_c0450;
+ if (first) { L.n = 0; L.pal = false; }
+ L.out.clear(); L.ecx = ecx; L.edx = edx; L.frames = frames;
+ *slot(0x6fb8bc48) = (uint32_t)w; *slot(0x6fb8bc4c) = (uint32_t)h;
+ Env e{};
+ e.rd32 = [](P a) { return *slot(a); }; e.wr32 = [](P a, uint32_t v) { *slot(a) = v; };
+ e.getTick = []() -> uint32_t { return 1; };
+ e.f4b00 = []() {};   // heartbeat: no D2Gfx call
+ e.o10043z = []() -> int32_t { rec(10043, L.ecx, L.edx, {}); return 0; };
+ e.o10021z = [](int32_t a) { rec(10021, L.ecx, L.edx, {(uint32_t)a}); };
+ e.o10062z = []() { if (!L.pal) { L.pal = true; rec(10061, L.ecx, L.edx, {0x7fffffffu}); } };
+ e.o10085 = [](int32_t a, int32_t b, int32_t c) -> int32_t { rec(10085, L.ecx, L.edx, {(uint32_t)a, (uint32_t)b, (uint32_t)c, 0}); return 1; };
+ e.f6e020 = []() { rec(10022, L.ecx, L.edx, {0x7fffffffu}); rec(10061, L.ecx, L.edx, {0x7fffffffu}); };
+ e.o10009 = []() -> uint32_t { return 0; };
+ e.fdb420 = [](const char*, int32_t) -> P { return 1; };
+ e.o10086 = [](uint32_t) -> int32_t { return L.frames; };
+ e.o10041 = [](const int32_t* c, int32_t x, int32_t y, uint32_t pal, int32_t m, int32_t z) {
+  L.ecx = (uint32_t)*c; L.edx = 0; rec(10041, L.ecx, L.edx, {0x7fffffffu, (uint32_t)x, (uint32_t)y, pal, (uint32_t)m, (uint32_t)z}); };
+ e.o10040 = []() { rec(10040, L.ecx, L.edx, {}); };
+ sub_C1760(e, 1);
+ return L.out.c_str();
+}
+// a retail recording replay of the retail captures (kind 3480): stub the seven callees, log {id,eax,ecx,edx,s0,s1}.
+#include <emscripten.h>
+namespace d2client_batch_c0450 {
+static struct { uint32_t g[0x10000 / 4]; uint32_t tick, n, call[8][6]; } C;
+static uint32_t* cg(P a) { return &C.g[(a & 0xffff) >> 2]; }
+static void clog(uint32_t id, uint32_t ecx, uint32_t edx, uint32_t s0, uint32_t s1, uint32_t eax = 0) {
+ if (C.n < 8) { uint32_t* c = C.call[C.n]; c[0] = id; c[1] = eax; c[2] = ecx; c[3] = edx; c[4] = s0; c[5] = s1; } C.n++;
+}
+}
+// out = word k of the record's outputs (7 hOut, 8 v9CC, 9 v9B0, 10 deadline, 11 n, 12.. call[8][6]).
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_c14f0(uint32_t h, uint32_t b, uint32_t t, uint32_t dl, uint32_t tick,
+                                                      uint32_t v9cc, uint32_t v9b0, uint32_t k) {
+ using namespace d2client_batch_c0450;
+ C.n = 0; C.tick = tick; for (auto& c : C.call) for (auto& w : c) w = 0;
+ *cg(0x6fbcb9d0) = h; *cg(0x6fbcb9d4) = b; *cg(0x6fbcc3c0) = t; *cg(0x6fbc981c) = dl;
+ *cg(0x6fbcb9cc) = v9cc; *cg(0x6fbcb9b0) = v9b0;
+ Env e{};
+ e.rd32 = [](P a) { return *cg(a); }; e.wr32 = [](P a, uint32_t v) { *cg(a) = v; };
+ e.getTick = []() -> uint32_t { return C.tick; };
+ e.o10065 = [](uint32_t a) { clog(1, 0, 0, a, 0); };
+ e.freeFile = [](P ecx, P edx, int32_t a, int32_t b) { clog(2, (uint32_t)ecx, (uint32_t)edx, (uint32_t)a, (uint32_t)b); };
+ e.o10065cl = [](uint8_t cl) { clog(3, cl, 0, 0, 0); };
+ e.o10024w = [](uint32_t a) { clog(4, 0, 0, a, 0); };
+ e.f0f090 = []() { clog(5, 0, 0, 0, 0); };
+ e.f6e860 = []() { clog(6, 0, 0, 0, 0); };
+ e.f31750a = [](uint32_t a) { clog(7, 0, 0, 0, 0, a); };
+ sub_C14F0(e);
+ switch (k) {
+  case 7: return *cg(0x6fbcb9d0); case 8: return *cg(0x6fbcb9cc); case 9: return *cg(0x6fbcb9b0);
+  case 10: return *cg(0x6fbc981c); case 11: return C.n;
+  default: return C.call[(k - 12) / 6][(k - 12) % 6];
+ }
+}
+// Replay of the retail captures (kind 3480): in = {g3a8,h,b,t,deadline,r10009,loader}, out = {arg,n,h,bb4,b9b0,c4f8,ad78} + path (260 bytes)
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_c1580(const uint32_t* in, uint32_t* out, char* buf) {
+ using namespace d2client_batch_c0450;
+ static uint32_t r, ld, n, arg; static char* pb;
+ L.n = 0; r = in[5]; ld = in[6]; n = 0; arg = 0xA5A5A5A5; pb = buf;
+ *slot(0x6fbcc3a8) = in[0]; *slot(0x6fbcb9d0) = in[1]; *slot(0x6fbcb9d4) = in[2]; *slot(0x6fbcc3c0) = in[3]; *slot(0x6fbc981c) = in[4];
+ for (uint32_t a : {0x6fbcbbb4u, 0x6fbcb9b0u, 0x6fbcc4f8u, 0x6fbaad78u}) *slot(a) = 0x5A5A5A5Au;
+ Env e{};
+ e.rd32 = [](P a) { return *slot(a); }; e.wr32 = [](P a, uint32_t v) { *slot(a) = v; };
+ e.f6e020 = []() {};
+ e.o10009 = []() -> uint32_t { return r; };
+ e.fdb420 = [](const char* p, int32_t a) -> P { n++; arg = (uint32_t)a; unsigned i = 0; for (; i < 259 && p[i]; i++) pb[i] = p[i]; pb[i] = 0; return ld; };
+ sub_C1580(e);
+ out[0] = arg; out[1] = n; out[2] = *slot(0x6fbcb9d0); out[3] = *slot(0x6fbcbbb4); out[4] = *slot(0x6fbcb9b0); out[5] = *slot(0x6fbcc4f8); out[6] = *slot(0x6fbaad78);
 }

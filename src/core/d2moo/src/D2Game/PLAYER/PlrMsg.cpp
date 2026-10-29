@@ -947,6 +947,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x06_LeftSkillOnUnit_6FC83550(D2Game
     return 3;
 }
 
+// 1.13c D2Game+0x536D0: AttackNoMana test uses SKILLSFLAGINDEX_ATTACKNOMANA (28), not the literal bit 27 (TargetItem)
 //D2Game.0x6FC836D0
 int32_t __fastcall sub_6FC836D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStrc* pSkill, int32_t nUnitType, int32_t nUnitGUID, int32_t a6)
 {
@@ -970,7 +971,7 @@ int32_t __fastcall sub_6FC836D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStr
     int32_t nUseState = SKILLS_GetUseState(pUnit, pUsedSkill);
     if (nUseState > 0)
     {
-        if ((nUseState <= 2 || nUseState == 4) && pSkillsTxtRecord->dwFlags[0] &gdwBitMasks[27])
+        if ((nUseState <= 2 || nUseState == 4) && pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_ATTACKNOMANA])
         {
             pSkill = SKILLS_GetSkillById(pUnit, 0, -1);
             nUseState = SKILLS_GetUseState(pUnit, pSkill);
@@ -989,7 +990,7 @@ int32_t __fastcall sub_6FC836D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStr
         return 2;
     }
 
-    if (!(pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[27]) && (nUnitType < 0 || nUnitType > 1 && nUnitType != 3))
+    if (!(pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_ATTACKNOMANA]) && (nUnitType < 0 || nUnitType > 1 && nUnitType != 3))
     {
         return 2;
     }

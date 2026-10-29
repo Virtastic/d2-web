@@ -47,6 +47,7 @@ constexpr uint32_t dword_6FD3F464 = 2;
 
 
 static void __fastcall SUNITINACTIVE_RestoreInactiveRest(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, uint8_t nAct, D2DrlgCoordsStrc* pCoords);
+static void __fastcall SUNITINACTIVE_UnlinkInactiveList(D2GameStrc* pGame, uint8_t nAct, const D2DrlgCoordsStrc& pDrlgCoords, D2InactiveItemNodeStrc** ppItems, D2InactiveUnitNodeStrc** ppUnits);
 
 // 1.13c D2Game+0x1FB90: the monster half of 1.10f's RestoreInactiveUnits; 1.13c's
 // RestoreInactiveUnits (D2Game+0x200E0) calls it first. Delta: a node with INACTIVEMONSTERFLAG_NODEINDEXUNEQUAL11 and a
@@ -285,16 +286,12 @@ void __fastcall SUNITINACTIVE_RestoreInactiveMonsters(D2GameStrc* pGame, D2Activ
 	}
 }
 
-// 1.13c D2Game+0x200E0
-static void __fastcall SUNITINACTIVE_RestoreInactiveRest(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, uint8_t nAct, D2DrlgCoordsStrc* pCoords)
+// 1.13c D2Game+0x1EA40: unlink the (x,y) list node, return item+unit lists, free node
+static void __fastcall SUNITINACTIVE_UnlinkInactiveList(D2GameStrc* pGame, uint8_t nAct, const D2DrlgCoordsStrc& pDrlgCoords, D2InactiveItemNodeStrc** ppItems, D2InactiveUnitNodeStrc** ppUnits)
 {
-	D2DrlgCoordsStrc& pDrlgCoords = *pCoords;
-	DUNGEON_GetRoomCoordinates(pRoom, &pDrlgCoords);
-
 	D2InactiveUnitListStrc* pPreviousList = nullptr;
-	D2InactiveItemNodeStrc* pInactiveItemNode = nullptr;
-	D2InactiveUnitNodeStrc* pInactiveUnitNode = nullptr;
-	// 1.13c D2Game+0x1EA40 (inlined here in 1.10f; separate in 1.13c: unlink the (x,y) list node, return item+unit lists, free node)
+	*ppItems = nullptr;
+	*ppUnits = nullptr;
 	D2InactiveUnitListStrc* pInactiveUnitList = nullptr;
 	pInactiveUnitList = pGame->pInactiveUnitList[nAct];
 	while (pInactiveUnitList)
@@ -315,8 +312,8 @@ static void __fastcall SUNITINACTIVE_RestoreInactiveRest(D2GameStrc* pGame, D2Ac
 				pGame->pInactiveUnitList[nAct] = pInactiveUnitList->pNext;
 			}
 
-			pInactiveItemNode = pInactiveUnitList->pInactiveItems;
-			pInactiveUnitNode = pInactiveUnitList->pInactiveUnits;
+			*ppItems = pInactiveUnitList->pInactiveItems;
+			*ppUnits = pInactiveUnitList->pInactiveUnits;
 
 			D2_FREE_POOL(pGame->pMemoryPool, pInactiveUnitList);
 			break;
@@ -325,6 +322,16 @@ static void __fastcall SUNITINACTIVE_RestoreInactiveRest(D2GameStrc* pGame, D2Ac
 		pPreviousList = pInactiveUnitList;
 		pInactiveUnitList = pInactiveUnitList->pNext;
 	}
+
+}
+
+// 1.13c D2Game+0x200E0: coords, 0x1EA40, item restore loop, unit-node loop
+static void __fastcall SUNITINACTIVE_RestoreInactiveRest(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, uint8_t nAct, D2DrlgCoordsStrc* pCoords)
+{
+	DUNGEON_GetRoomCoordinates(pRoom, pCoords);
+	D2InactiveItemNodeStrc* pInactiveItemNode = nullptr;
+	D2InactiveUnitNodeStrc* pInactiveUnitNode = nullptr;
+	SUNITINACTIVE_UnlinkInactiveList(pGame, nAct, *pCoords, &pInactiveItemNode, &pInactiveUnitNode);
 
 	while (pInactiveItemNode)
 	{
@@ -482,7 +489,6 @@ static void __fastcall SUNITINACTIVE_RestoreInactiveRest(D2GameStrc* pGame, D2Ac
 }
 
 //D2Game.0x6FCC40D0
-// 1.13c D2Game+0x9D230
 D2AiControlStrc* __fastcall AIGENERAL_GetAiControlFromUnit(D2UnitStrc* pUnit)
 {
 	if (pUnit && pUnit->dwUnitType == UNIT_MONSTER && pUnit->pMonsterData)

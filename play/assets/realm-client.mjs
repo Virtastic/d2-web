@@ -544,12 +544,13 @@ export function bindEngineProtocol(Module, scratch = 65536) {
     d2gsClientPlayerMotionAt: (index) => {
       const ptr = call('d2_realm_client_player_motion_at', 'bigint', ['number'], [index]);
       if (!ptr) return null;
-      const view = new DataView(Module.HEAPU8.buffer, Number(ptr), 40);
-      if (view.getUint32(0, true) !== 1 || view.getUint32(4, true) !== 40) return null;
+      const view = new DataView(Module.HEAPU8.buffer, Number(ptr), 48);
+      if (view.getUint32(0, true) !== 1 || view.getUint32(4, true) !== 48) return null;
       return { active: Boolean(view.getUint32(8, true)), mode: view.getUint32(12, true),
         direction: view.getUint32(16, true), framePrecise: view.getUint32(20, true),
         frameCountPrecise: view.getUint32(24, true), animSpeed: view.getUint32(28, true),
         positionHintX: view.getUint32(32, true), positionHintY: view.getUint32(36, true),
+        seqMode: view.getUint32(40, true), seqFrame: view.getUint32(44, true),
         usedSkill: call('d2_realm_client_player_used_skill_at', 'number', ['number'], [index]) };
     },
     d2gsClientPlayers: () => {

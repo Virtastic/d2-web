@@ -127,6 +127,7 @@ static bool IsPathCircling(int32_t nAnimMode, D2DynamicPathStrc* pDynamicPath)
     return false;
 }
 
+extern "C" void d2_client_walk_order(uint32_t, int32_t, int32_t, int32_t, int32_t, const D2PathPointStrc*);
 //D2Game.0x6FC65C70
 // 1.13c D2Game+0xF35C0
 void __fastcall sub_6FC65C70(D2GameStrc* pGame, D2UnitStrc* pMonster, D2ClientStrc* pClient)
@@ -311,6 +312,7 @@ void __fastcall sub_6FC65C70(D2GameStrc* pGame, D2UnitStrc* pMonster, D2ClientSt
 
     if (v5->unk0x08)
     {
+        d2_client_walk_order(pMonster->dwUnitId, CLIENTS_GetUnitX(pMonster), CLIENTS_GetUnitY(pMonster), pDynamicPath->dwVelocity, pDynamicPath->dwPathPoints, pDynamicPath->PathPoints);  // a retail recording: the client walks this order (src/core/d2client/client_walk_path.cpp)
         if (nHeader == 0x68)
         {
             D2GAME_PACKETS_SendPacket0x68_6FC3CA90(pClient, 0x68u, pMonster->dwUnitId, a4, v8, v9, a7);

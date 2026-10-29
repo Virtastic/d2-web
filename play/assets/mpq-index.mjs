@@ -31,11 +31,15 @@ function decrypt(u32, key) {
     s2 = (plain + s2 + (s2 << 5) + 3) >>> 0;
   }
 }
+/** From the 32-byte header: [[hashPos, hashN], [blockPos, blockN]], or null when it is not a plain v0 MPQ. */
+export function mpqTables(h) {
+  const hv = new DataView(h.buffer, h.byteOffset, 32);
+  return hv.getUint32(0, true) === 0x1a51504d ? [[hv.getUint32(16, true), hv.getUint32(24, true)], [hv.getUint32(20, true), hv.getUint32(28, true)]] : null;
+}
 /** Returns lookup(name) -> {pos, size} | null, or null when the archive is not a plain v0 MPQ. */
 export function openMpqIndex(readAt) {
-  const h = readAt(0, 32), hv = new DataView(h.buffer, h.byteOffset, 32);
-  if (hv.getUint32(0, true) !== 0x1a51504d) return null;
-  const hashPos = hv.getUint32(16, true), blockPos = hv.getUint32(20, true), hashN = hv.getUint32(24, true), blockN = hv.getUint32(28, true);
+  const t = mpqTables(readAt(0, 32)); if (!t) return null;
+  const [[hashPos, hashN], [blockPos, blockN]] = t;
   const tab = (pos, n, name) => { const b = readAt(pos, n * 16), u = new Uint32Array(n * 4); new Uint8Array(u.buffer).set(b.subarray(0, n * 16)); decrypt(u, hashString(name, 3)); return u; };
   const hash = tab(hashPos, hashN, '(hash table)'), block = tab(blockPos, blockN, '(block table)');
   return (name) => {

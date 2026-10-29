@@ -27,7 +27,15 @@ const DIR16 = [4,4,8,8,8,8,0,0,0,0,9,9,9,9,5,5,5,5,10,10,10,10,1,1,1,1,11,11,11,
 const DIR32 = [4,16,16,8,8,17,17,0,0,18,18,9,9,19,19,5,5,20,20,10,10,21,21,1,1,22,22,11,11,23,23,6,6,24,24,12,12,25,25,2,2,26,26,13,13,27,27,7,7,28,28,14,14,29,29,3,3,30,30,15,15,31,31,4];
 const DIR64 = [4,32,16,33,8,34,17,35,0,36,18,37,9,38,19,39,5,40,20,41,10,42,21,43,1,44,22,45,11,46,23,47,6,48,24,49,12,50,25,51,2,52,26,53,13,54,27,55,7,56,28,57,14,58,29,59,3,60,30,61,15,62,31,63];
 
-export function playerModeToken(mode) { return MODE[Number(mode)] || 'NU'; }
+// D2Common+0x43C30: PLRMODE_SEQUENCE (18) and PLRMODE_KNOCKBACK (19) resolve with the GH token.
+export function playerModeToken(mode) { return Number(mode) === 18 || Number(mode) === 19 ? 'GH' : MODE[Number(mode)] || 'NU'; }
+
+// A PLRMODE_SEQUENCE (18) unit draws the mode its current sequence frame names (the record's nMode) at that
+// frame's index (nFrame), not the GH stand-in. Without a published seqMode the unit keeps the stand-in.
+export function drawnPlayerState(state = {}) {
+  if (Number(state.mode) !== 18 || !Number.isInteger(state.seqMode)) return state;
+  return { ...state, mode: state.seqMode, framePrecise: state.seqFrame * 256 };
+}
 
 /** Attach the current frame's provenance and DCC metadata to each loaded draw layer. */
 export function playerDrawnEvidence(layers, source, directions, components, frame) {
@@ -246,7 +254,8 @@ export function createPlayerRenderer(read, documentObject = globalThis.document,
     return { act0, value };
   }
   return {
-    draw(ctx, x, y, state = {}) {
+    draw(ctx, x, y, input = {}) {
+      const state = drawnPlayerState(input);
       // DT/DD use the native unarmed COF even when a corpse record carries no live weapon class.
       // Resolve that mode before composition validation, as loadPlayerAnimation does below.
       const token = playerModeToken(state.mode);

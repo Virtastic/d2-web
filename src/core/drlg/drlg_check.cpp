@@ -374,6 +374,47 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_drlg_client_room_status_cells(int levelId
     return g_clientStatusCells.data();
 }
 
+// Feeder for the D2Client room walk (src/core/d2client/draw_grid_7a9f0.cpp): the client level's rooms in
+// pFirstRoomEx order, walls = list A, roofs = list B. Units are not staged (skipUnits stays the caller's).
+extern "C" uint32_t d2_dg_stage_unit(uint32_t, int32_t, int32_t, int32_t, uint32_t, uint32_t, uint32_t);
+struct FeedUnit { int32_t type, cls, sx, sy; uint32_t flags, flagsEx; };
+static std::vector<FeedUnit> g_feedUnits;   // the caller's per-tick client units (JS has no game logic: raw fields only)
+EMSCRIPTEN_KEEPALIVE void d2_dg_feed_unit(int type, int cls, int sx, int sy, uint32_t flags, uint32_t flagsEx) {
+    if (type < 0) g_feedUnits.clear(); else g_feedUnits.push_back({type, cls, sx, sy, flags, flagsEx});
+}
+extern "C" void d2_dg_stage_reset();
+extern "C" uint32_t d2_dg_stage_tile(uint32_t, uint32_t, int32_t, int32_t, int32_t, int32_t);
+extern "C" void d2_dg_stage_room(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+extern "C" uint32_t d2_dg_frame(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, uint32_t, uint32_t);
+static uint32_t stageTiles(const D2DrlgTileDataStrc* t, int n, uint32_t& cnt) {
+    uint32_t first = 0; cnt = 0;
+    for (int i = 0; t && i < n; ++i) {
+        if (!t[i].pTile) continue;
+        uint32_t k = d2_dg_stage_tile((uint32_t)t[i].nTileType, t[i].dwFlags, t[i].nPosX, t[i].nPosY, t[i].pTile->nTotalHeight, t[i].pTile->nRoofHeight);
+        if (!cnt++) first = k;
+    }
+    return first;
+}
+EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_feed(int level, int l, int t, int r, int b, int ox, int oy, int n, uint32_t now) {
+    d2_dg_stage_reset();
+    D2DrlgLevelStrc* lv = g_act && g_act->pDrlg ? DRLG_GetLevel(g_act->pDrlg, level) : nullptr;
+    for (D2DrlgRoomStrc* room = lv ? lv->pFirstRoomEx : nullptr; room; room = room->pDrlgRoomNext) {
+        D2ActiveRoomStrc* a = room->pRoom;
+        if (!a || !a->pRoomTiles) continue;
+        uint32_t nA, nB;
+        uint32_t a0 = stageTiles(a->pRoomTiles->pWallTiles, a->pRoomTiles->nWalls, nA), b0 = stageTiles(a->pRoomTiles->pRoofTiles, a->pRoomTiles->nRoofs, nB);
+        // subX/subY = room origin in subtiles (5 per tile): unverified, no retail trace carries it.
+        uint32_t u0 = 0, nU = 0;
+        for (const FeedUnit& u : g_feedUnits) {
+            int tx = u.sx / 5, ty = u.sy / 5;
+            if (tx < room->nTileXPos || ty < room->nTileYPos || tx >= room->nTileXPos + room->nTileWidth || ty >= room->nTileYPos + room->nTileHeight) continue;
+            uint32_t k = d2_dg_stage_unit((uint32_t)u.cls, u.type, u.sx, u.sy, 0, (u.flags >> 20) & 1, 1);
+            if (!nU++) u0 = k;
+        }
+        d2_dg_stage_room(room->nTileXPos, room->nTileYPos, room->nTileWidth, room->nTileHeight, room->nTileXPos * 5, room->nTileYPos * 5, nA, a0, nB, b0, nU, u0);
+    }
+    return d2_dg_frame(l, t, r, b, ox, oy, n, 0, now);
+}
 EMSCRIPTEN_KEEPALIVE const D2DrlgClientTile* d2_drlg_client_tiles() { return g_clientTiles.data(); }
 EMSCRIPTEN_KEEPALIVE int d2_drlg_client_tile_count() { return (int)g_clientTiles.size(); }
 EMSCRIPTEN_KEEPALIVE const uint32_t* d2_drlg_client_tile_entries() { return g_clientTileEntries.data(); }

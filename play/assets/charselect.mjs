@@ -14,6 +14,7 @@
 // Everything about which characters exist comes from the store: real .d2s files the engine wrote.
 
 import { createFont, decodeFontTbl, FRONTEND, TITLE_COLUMNS, composeTiled, createBlender, textColourPalette, componentColourTransform } from './frontend.mjs';
+import { drawBg, present } from './widebg.mjs';
 import { drawPath, fnv1a, recordDc6, recordDcc } from './drawlist.mjs';
 import { CLASS_NAMES } from './save-store.mjs';
 import { createDeleteConfirmFlow } from './delete-confirm-flow.mjs';
@@ -276,7 +277,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
     } catch (error) { portraitError.push(`${ch.name}: ${error && error.message || error}`); return empty; }
   };
   const list = characters.slice(0, 8);
-  let portraits = list.map(portrait);
+  let portraits = list.map((ch) => portrait(ch));
   let drawnPortraits = [];
   // Select-screen animation: the TN loop runs on the shared tick, restarting when a card is selected.
   let tick = 0, started = [];
@@ -379,7 +380,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
     hover(x, y, width, height) { const v = view(width, height), p = { x: (x - v.ox) / v.scale, y: (y - v.oy) / v.scale };
       pointer = [Math.trunc(p.x), Math.trunc(p.y)]; hot = hitControl(p); },
     /** The store's listing changed under us (a character was deleted): rebuild the portraits. */
-    setCharacters(next) { frames.clear(); started = []; list.length = 0; list.push(...next.slice(0, 8)); portraits = list.map(portrait);
+    setCharacters(next) { frames.clear(); started = []; list.length = 0; list.push(...next.slice(0, 8)); portraits = list.map((ch) => portrait(ch));
       selected = list.length ? Math.max(0, Math.min(selected, list.length - 1)) : -1; deleteFlow.cancel(); },
     /** Canvas-pixel centres of the SAME boxes click() tests. */
     targets(width, height) {
@@ -405,7 +406,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       if (inBox(p, buttonBox('exit'))) { onCancel?.(); return 'exit'; }
       if (inBox(p, buttonBox('convert'))) { if (convertDisabled()) return null; void onConvert?.(list[selected].name); return 'convert'; }
       if (inBox(p, buttonBox('delete'))) { if (selected >= 0 && deleteFlow.arm(selected)) return 'delete-arm'; return null; }
-      for (let i = 0; i < list.length; i++) if (inBox(p, cardBox(i))) { select(i); return list[i].name; }
+      for (let i = 0; i < list.length; i++) if (inBox(p, characterCardHitBox(i))) { select(i); return list[i].name; }
       return null;
     },
     press(x, y, width, height) {
@@ -435,7 +436,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       const g = sceneCtx;
       drawnPortraits = [];
       g.globalAlpha = 1; g.fillStyle = '#000'; g.fillRect(0, 0, SCREEN.width, SCREEN.height);
-      g.drawImage(background.canvas, 0, 0);
+      drawBg(g, SELECT_ASSETS.background, background.canvas);
       for (const p of background.placements) recordDc6(SELECT_ASSETS.background, p.i, p.frame, p.left, p.top);
       // Buttons, then their labels (exocet10, mode 4): a tall button's two lines anchored 28 and 12
       // rows above its bottom, a medium button's one line 8 above (retail's anchors).
@@ -471,7 +472,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
         // frame 1 is the 16-wide right edge at x=293 -- and BOTH are recorded, or the draw list reports a
         // card edge retail draws and we do not.
         if (i === selected) {
-          g.drawImage(boxParts[0], box.x, box.y); if (boxParts[1]) g.drawImage(boxParts[1], box.x + boxParts[0].width, box.y);
+          { g.drawImage(boxParts[0], box.x, box.y); if (boxParts[1]) g.drawImage(boxParts[1], box.x + boxParts[0].width, box.y); }
           recordDc6(SELECT_ASSETS.box, 0, boxDc6.frames[0], box.x, box.y);
           if (boxParts[1]) recordDc6(SELECT_ASSETS.box, 1, boxDc6.frames[1], box.x + boxParts[0].width, box.y);
         }
@@ -487,7 +488,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
         dialogDraws = [];
         g.fillStyle = HALF_BLACK; g.fillRect(0, 0, SCREEN.width, SCREEN.height);
         const db = DELETE_DIALOG.box;
-        g.drawImage(popupParts[0], db.x, db.top); if (popupParts[1]) g.drawImage(popupParts[1], db.x + popupParts[0].width, db.top);
+        { g.drawImage(popupParts[0], db.x, db.top); if (popupParts[1]) g.drawImage(popupParts[1], db.x + popupParts[0].width, db.top); }
         dialogDraw('popup', SELECT_ASSETS.popup, popupSource, SELECT_ASSETS.popupPalette, popupPaletteSource, recordDc6(SELECT_ASSETS.popup, 0, popupDc6.frames[0], db.x, db.top));
         // Retail's draw-list hook records PopUpOKCancel as its composed cel.  Keep its second canvas
         // segment out of that retail-facing list, but retain it in the independent source evidence.
@@ -511,8 +512,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
       }
       ctx.fillStyle = '#000'; ctx.fillRect(0, 0, width, height);
       const v = view(width, height);
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(scene, v.ox, v.oy, SCREEN.width * v.scale, SCREEN.height * v.scale);
+      present(ctx, scene, v, SELECT_ASSETS.background);
       return { characters: list.length, selected, cursor };
     },
   };

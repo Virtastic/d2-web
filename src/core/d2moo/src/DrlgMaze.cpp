@@ -109,6 +109,7 @@ D2DrlgRoomStrc* __fastcall DRLGMAZE_GetFreeLocationForRoomSouth(D2DrlgLevelStrc*
 }
 
 //D2Common.0x6FD78F70
+// 1.13c D2Common+0x0E490
 //Named sSetChamberPreset in the original code ?
 void __fastcall DRLGMAZE_PickRoomPreset(D2DrlgRoomStrc* pDrlgRoom, BOOL bResetFlag)
 {
@@ -3172,6 +3173,7 @@ void __fastcall DRLGMAZE_PlaceAct5IceStuff(D2DrlgLevelStrc* pLevel)
 }
 
 //D2Common.0x6FD7CEA0
+// 1.13c D2Common+0xe700
 void __fastcall DRLGMAZE_RollAct_1_2_3_BasicPresets(D2DrlgLevelStrc* pLevel)
 {
 	int pOffsets[15] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };

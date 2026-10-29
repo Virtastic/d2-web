@@ -3,6 +3,7 @@
 // act/state/room accessors preserve their retail struct mutations; socket and packet calls remain
 // no-ops. Regenerate when a subsystem needs another real client-side behavior.
 #include <GAME/Level.h>
+#include <GAME/Arena.h>
 #include <D2Common.h>
 #include <D2DataTbls.h>
 #include <D2StatList.h>
@@ -27,12 +28,14 @@
 #include <D2Items.h>
 #include <D2Inventory.h>
 #include <Units/Units.h>
+#include <PLAYER/PlayerList.h>
+#include <PLAYER/PlrMsg.h>
 #include <cstring>
 
 // Every packet the headless server queues for the session client, in order, so a retail
 // capture's client packet-data block (the retail capture tool reads it back from D2ClientStrc+0x1BC)
 // can be compared byte for byte.  Bounded like retail's 512-byte block.
-static uint8_t g_d2webPacketStream[512];
+static uint8_t g_d2webPacketStream[4096];
 static uint32_t g_d2webPacketStreamLength = 0;
 static uint32_t g_d2webPacketStreamPackets = 0;
 // Retail server->client 0x61 is "play movie <index>": payload byte 1 selects one of D2Client's own
@@ -179,7 +182,11 @@ void CLIENTS_SetClientState(D2ClientStrc* pClient, D2ClientState nClientState) {
 void CLIENTS_SetExperienceLoss(D2ClientStrc* pClient, int32_t nExpLoss) {}
 // Recovered structural path from D2Game.0x6FC33020. Client room changes are also the DRLG
 // room-status and adjacent-room streaming boundary, rather than a pointer assignment.
+extern "C" bool g_sessionClientStaysInRoom;
 void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
+    // Recorded sessions (s39xx) run retail's LEVEL_AddClient/RemoveClient; the s08 aitrace fixture's capture hangs
+    // the client with DUNGEON_AddClientToRoom and wakes monsters itself, so a second AI-event arm there fires early.
+    const bool lvl = g_sessionClientStaysInRoom;
     if (!pClient || !pClient->pGame || pClient->pRoom == pRoom) return;
     DUNGEON_ChangeClientRoom(pClient->pRoom, pRoom);
     D2Common_10077(pClient->pRoom, pRoom);
@@ -189,7 +196,7 @@ void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
     if (pClient->pRoom) DUNGEON_GetAdjacentRoomsListFromRoom(pClient->pRoom, &oldRooms, &oldCount);
     for (int32_t i = 0; i < nextCount; ++i) {
         int32_t j = 0; while (j < oldCount && nextRooms[i] != oldRooms[j]) ++j;
-        if (j >= oldCount) LEVEL_AddClient(pClient->pGame, nextRooms[i], pClient);
+        if (j >= oldCount) { if (lvl) LEVEL_AddClient(pClient->pGame, nextRooms[i], pClient); else DUNGEON_AddClientToRoom(nextRooms[i], pClient); }
     }
     for (int32_t i = 0; i < oldCount; ++i) {
         int32_t j = 0; while (j < nextCount && oldRooms[i] != nextRooms[j]) ++j;
@@ -197,7 +204,7 @@ void __fastcall sub_6FC33020(D2ClientStrc* pClient, D2ActiveRoomStrc* pRoom) {
         // g_fixtureOwnRoomOnly sessions attach the client to its own room only: skip rooms it was never added to.
         // a retail recording: a room that streamed into the adjacent list after the client joined never had it added.
         int32_t k = 0; while (k < oldRooms[i]->nNumClients && oldRooms[i]->ppClients[k] != pClient) ++k;
-        if (k < oldRooms[i]->nNumClients) LEVEL_RemoveClient(pClient->pGame, oldRooms[i], pClient);
+        if (k < oldRooms[i]->nNumClients) { if (lvl) LEVEL_RemoveClient(pClient->pGame, oldRooms[i], pClient); else DUNGEON_RemoveClientFromRoom(oldRooms[i], pClient); }
     }
     pClient->pRoom = pRoom;
     if (pRoom && pClient->pPlayer) UNITS_SetPlayerPortalFlags(pClient->pPlayer,
@@ -275,6 +282,23 @@ void __fastcall sub_6FC33670(D2GameStrc* pGame, D2ClientStrc* pClient) {
     if (!player) return;
     D2ActiveRoomStrc* clientRoom = pClient->pRoom;
     D2ActiveRoomStrc* playerRoom = UNITS_GetRoom(player);
+    // D24 (1.13c D2Game+0x9DCD0 order): the client's room walk sends the changed units (0x69/0x47/0x48/0x2C) and the
+    // statlist diff (0x1D/E/F) before any room change; retail runs these first in sub_6FC33670.
+    // Narrowest key: only the frame a level-up lands (the first frame just records the level), so sessions that never level
+    // keep main's order and send nothing here.  ponytail: 8 clients, upgrade to a D2ClientStrc field if more are needed.
+    static D2ClientStrc* seenClient[8]; static int32_t seenLevel[8];
+    const int32_t level = STATLIST_UnitGetStatValue(player, STAT_LEVEL, 0);
+    int slot = 0; while (slot < 7 && seenClient[slot] && seenClient[slot] != pClient) ++slot;
+    const bool levelUp = seenClient[slot] == pClient && level != seenLevel[slot];
+    seenClient[slot] = pClient; seenLevel[slot] = level;
+    // D48: the walk runs every frame, as retail's does (its 0x0E/0x9C reach the session client); the level-up window only adds the stat-diff.
+    if (clientRoom) {
+        if (levelUp) LEVEL_RemoveUnitsExceptClientPlayer(clientRoom, pClient);
+        LEVEL_UpdateUnitsInAdjacentRooms(pGame, clientRoom, pClient);
+    }
+    if (levelUp) {
+        D2Common_10513(player, player, (void(__fastcall*)(D2UnitStrc*, int32_t, int32_t, D2UnitStrc*))D2GAME_UpdateAttribute_6FC822D0);
+    }
     ++pClient->unk0x1B0;
     if (clientRoom != playerRoom && !g_sessionClientStaysInRoom) {
         const int32_t oldLevel = clientRoom ? DUNGEON_GetLevelIdFromRoom(clientRoom) : 0;
@@ -285,6 +309,7 @@ void __fastcall sub_6FC33670(D2GameStrc* pGame, D2ClientStrc* pClient) {
         }
         sub_6FC33020(pClient, playerRoom);
     }
+    ARENA_SynchronizeWithClients(pGame, pClient); // 0x65 score, retail's step between the room change and the refresh
     if (UNITS_GetRoom(player)) UNITROOM_RefreshUnit(player);
     // The level's roof POPS, once per client frame from the player's own room and position: D2Common
     // #10012 DUNGEON_UpdatePops -> DRLGPRESET_UpdatePops, which hides the roof the preset's pop region
@@ -368,7 +393,16 @@ void D2GAME_PACKETS_SendPacket0x0D_6FC3C920(D2ClientStrc* pClient, char nPacketI
 extern "C" uint32_t g_d2webModePackets = 0;
 void D2GAME_PACKETS_SendPacket0x0F_6FC3CA00(D2ClientStrc* pClient, char nHeader, uint8_t bTOU, int32_t a4, char a5, int16_t a6, int16_t a7, char a8, int16_t a9, int16_t a10) { ++g_d2webModePackets; }
 void D2GAME_PACKETS_SendPacket0x10_6FC3C9A0(D2ClientStrc* pClient, char nHeader, char a3, int32_t a4, char a5, char a6, int32_t a7, int16_t a8, int16_t a9) { ++g_d2webModePackets; }
-void D2GAME_PACKETS_SendPacket0x1D_E_F_6FC3D480(D2ClientStrc* pClient, uint16_t nStatId, uint32_t nValue) {}
+// 1.13c D2Game+0x8D410 (SCmd.cpp 0x1D/0x1E/0x1F): one stat to the client, in the narrowest of byte (0x1D),
+// word (0x1E) and dword (0x1F) forms; byte arrays because D2PacketDef.h's stat struct is not the wire layout.
+void D2GAME_PACKETS_SendPacket0x1D_E_F_6FC3D480(D2ClientStrc* pClient, uint16_t nStatId, uint32_t nValue) {
+    uint8_t p[6] = { 0x1D, (uint8_t)nStatId };
+    uint32_t n = 3;
+    if (nValue >= 0xFFFFu) { p[0] = 0x1F; std::memcpy(p + 2, &nValue, 4); n = 6; }
+    else if (nValue >= 0xFFu) { p[0] = 0x1E; std::memcpy(p + 2, &nValue, 2); n = 4; }
+    else p[2] = (uint8_t)nValue;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, p, (int32_t)n);
+}
 void D2GAME_PACKETS_SendPacket0x21_UpdateSkills_6FC3DB50(D2ClientStrc* pClient, D2UnitStrc* pUnit, WORD nSkillId, BYTE nSkillLevel, BYTE a4) {}
 // D2Game.0x6FC3DBE0 (1.13c D2Game+0x8D570 = 0x6FCAD570): item skill quantity update; bytes 2 and 0xA are never
 // written by retail's composer (stack residue on the wire), zero here.  Byte 0xB is 1 only when
@@ -565,6 +599,18 @@ void __fastcall D2GAME_SendPacket0x28_6FC3F2F0(D2ClientStrc* pClient, BYTE nHead
     QUESTRECORD_CopyRecordToBuffer(a5, packet.pData, sizeof packet.pData, 0);
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
 }
+// 1.13c D2Game+0x8AE00 (SCmd.cpp 0x47): {header, type, 0, guid, 0}, 11 bytes.
+void __fastcall D2GAME_SendPacket0x47_6FC3EEE0(D2ClientStrc* pClient, D2UnitStrc* pUnit) {
+    uint8_t packet[11] = {0x47, (uint8_t)(pUnit ? pUnit->dwUnitType : 6)};
+    const int32_t guid = pUnit ? (int32_t)pUnit->dwUnitId : -1;
+    std::memcpy(packet + 3, &guid, 4);
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, packet, sizeof packet);
+}
+// SCmd.cpp 0x65: {header, unit id, kill count}, 7 bytes.
+void __fastcall D2GAME_PACKETS_SendPacket0x65_6FC3F5E0(D2ClientStrc* pClient, DWORD dwPlayerId, WORD nCount) {
+    D2GSPacketSrv65 p = {}; p.nHeader = 0x65; p.dwUnitId = dwPlayerId; p.unk0x05 = nCount;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &p, sizeof p);
+}
 // 1.13c D2Game+0x8ae60
 void D2GAME_SendPacket0x48_6FC3EF40(D2ClientStrc* pClient, D2UnitStrc* pUnit, BYTE a3) {
     uint8_t packet[11] = {0x48, 6, a3};
@@ -683,7 +729,52 @@ void D2Game_10034_Return(int a1) {}
 // retail D2Game 0x29820 (NOT implemented, empty stub; unverified), 
 void GAME_ForEachIngameClient(D2GameStrc* pGame, GAME_ForEachIngameClientCallbackPtr pFn, void* pContext) {}
 D2CharStatsTxt* PLRSAVE2_GetCharStatsTxtRecord(int32_t nClass) { return UNITS_GetCharStatsTxtRecord(nClass); }
-void SCMD_Send0x75_PartyRosterUpdate(D2UnitStrc* pLocalPlayer, D2UnitStrc* pOtherPlayer) {}
+void SCMD_Send0x75_PartyRosterUpdate(D2UnitStrc* pLocalPlayer, D2UnitStrc* pOtherPlayer) {
+    D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pLocalPlayer, __FILE__, __LINE__);
+    D2GSPacketSrv75 p = {};
+    p.nHeader = 0x75u;
+    p.nUnitGUID = pOtherPlayer ? pOtherPlayer->dwUnitId : (uint32_t)-1;
+    p.nPartyId = SUNIT_GetPartyId(pOtherPlayer);
+    p.nLevel = STATLIST_UnitGetStatValue(pOtherPlayer, STAT_LEVEL, 0);
+    p.nFlags = PLAYERLIST_GetFlags(pLocalPlayer, pOtherPlayer);
+    p.unk0x0B = sub_6FCBA9D0(pLocalPlayer, pOtherPlayer);
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &p, sizeof p);
+}
+// D24: linked in by the retail room walk (LEVEL_UpdateUnitsInAdjacentRooms -> sub_6FC81650 -> SUnitMsg/InvMode); not part of the level-up window, so empty until their own rows (0x0C/0x0E/0x11/0xA7/0xA9/0x9C/0x9D).
+void __fastcall D2GAME_PACKETS_SendPacket0x0C_6FC3C8A0(D2ClientStrc* a0, char a1, D2C_UnitTypes a2, int a3, char a4, char a5, char a6) {}
+// 0x0E object state (12 bytes: header, unit type, guid, 3, targetable, mode dword); a retail recording retail 0e0204000000030001000000.
+void __fastcall D2GAME_PACKETS_SendPacket0x0E_6FC3C8E0(D2ClientStrc* a0, char a1, char a2, int a3, char a4, char a5, int a6) {
+    uint8_t b[12] = { (uint8_t)a1, (uint8_t)a2 }; memcpy(b + 2, &a3, 4); b[6] = (uint8_t)a4; b[7] = a5 ? 1 : 0; memcpy(b + 8, &a6, 4);
+    D2GAME_PACKETS_SendPacket_6FC3C710(a0, b, sizeof b);
+}
+void __fastcall D2GAME_PACKETS_SendPacket0x11_6FC3F4A0(D2ClientStrc* a0, unsigned char a1, unsigned int a2, unsigned short a3) {}
+// 0xA7 state on / 0xA9 state off (7 bytes: opcode, unit type, guid dword, state byte); a retail recording retail a7010e00000069 / a901010000000b.
+void __fastcall D2GAME_PACKETS_SendPacket0xA7_StateOn_6FC3FC20(D2ClientStrc* a0, unsigned char a1, unsigned int a2, unsigned short a3) {
+    uint8_t b[7] = { 0xA7, a1, 0, 0, 0, 0, (uint8_t)a3 }; memcpy(b + 2, &a2, 4);
+    D2GAME_PACKETS_SendPacket_6FC3C710(a0, b, sizeof b);
+}
+void __fastcall D2GAME_PACKETS_SendPacket0xA9_StateOff_6FC3FC50(D2ClientStrc* a0, unsigned char a1, unsigned int a2, unsigned short a3) {
+    uint8_t b[7] = { 0xA9, a1, 0, 0, 0, 0, (uint8_t)a3 }; memcpy(b + 2, &a2, 4);
+    D2GAME_PACKETS_SendPacket_6FC3C710(a0, b, sizeof b);
+}
+void __fastcall D2GAME_SendP0x9C_ItemAction_AddOrRemoveFromShop_6FC3F260(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, char a3) {}
+void __fastcall D2GAME_SendP0x9C_ItemAction_AddQuantity_6FC3EAF0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
+void __fastcall D2GAME_SendP0x9C_ItemAction_GroundToCursor_6FC3E870(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
+void __fastcall D2GAME_SendP0x9C_ItemAction_SwapInBelt_6FC3EC00(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
+void __fastcall D2GAME_SendP0x9C_ItemAction_SwapInContainer_6FC3EB40(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
+void __fastcall D2GAME_SendP0x9C_ItemAction_ToCursor_6FC3EEA0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2) {}
+void __fastcall D2GAME_SendP0x9D_ItemAction_AutoUnequip_6FC3EE20(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
+void __fastcall D2GAME_SendP0x9D_ItemAction_IndirectlySwapBodyItem_6FC3EA70(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
+void __fastcall D2GAME_SendP0x9D_ItemAction_SwapBodyItem_6FC3EAB0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
+void __fastcall D2GAME_SendP0x9D_ItemAction_Unequip_6FC3EA90(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
+void __fastcall D2GAME_SendP0x9D_ItemAction_Unknown0x14_6FC3EEC0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
+void __fastcall D2GAME_SendP0x9D_ItemAction_Unknown0x16_6FC3F040(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
+void __fastcall D2GAME_SendP0x9D_ItemAction_UpdateStats_6FC3EFA0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
+void __fastcall D2GAME_SendP0x9D_ItemAction_WeaponSwitch_6FC3EAD0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, unsigned int a3) {}
+void __fastcall sub_6FC3EFC0(D2ClientStrc* a0, D2UnitStrc* a1, D2UnitStrc* a2, int a3, int a4) {}
+void __fastcall sub_6FC3F4D0(D2ClientStrc* a0, int a1, char a2, short a3, short a4, short a5, short a6) {}
+// 1.13c D2Game+0x93C10 (D2MOO Clients.cpp): the arena-related client flag.
+uint32_t __fastcall sub_6FC33C10(D2ClientStrc* pClient) { return pClient ? (pClient->dwFlags & CLIENTFLAGEX_ARENA_RELATED) : 0; }
 void sub_6FC37B10(D2GameStrc* pGame) {}
 void sub_6FC3D1F0(D2ClientStrc* pClient, int32_t nUnitGUID, uint8_t nClassId, const char* szName, int16_t nX, int16_t nY) {}
 void sub_6FC3D830(D2ClientStrc* pClient, BYTE nHeader, int32_t nUnitGUID, WORD nStatId, int32_t nValue) {}
@@ -691,7 +782,7 @@ void sub_6FC3E200(D2ClientStrc* pClient, D2UnitStrc* pUnit) {}
 void sub_6FC3F060(D2ClientStrc* pClient, uint8_t a2, int32_t a3, uint16_t a4, uint16_t a5, int32_t a6, uint16_t a7, uint8_t a8, int32_t a9) {}
 void sub_6FC3F0C0(D2ClientStrc* pClient, uint8_t a2, int32_t a3, uint8_t nUnitType, int32_t nUnitGUID, uint16_t a6, uint16_t a7, uint8_t a8, int32_t a9) {}
 void sub_6FC3F340(D2ClientStrc* pClient, BYTE nHeader, BYTE nUnitType, int32_t nUnitId, int32_t a5) {}
-void sub_6FC3F3F0(D2ClientStrc* pClient, D2GSPacketSrv2C* pPacket) {}
+void sub_6FC3F3F0(D2ClientStrc* pClient, D2GSPacketSrv2C* pPacket) { D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof *pPacket); }
 void sub_6FC3F550(D2ClientStrc* pClient, D2UnitStrc* pUnit) {}
 void sub_6FC3F610(D2ClientStrc* pClient, D2GSPacketSrv73* pPacket) {}
 void sub_6FC3FAF0(D2ClientStrc* pClient, uint32_t a2, uint16_t a3) {}

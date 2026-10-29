@@ -1,12 +1,16 @@
 import { parseSessionTiles, readSessionTerrain, readSessionLightmap, worldToScreen, screenDeltaToWorld, UNIT_CENTRE_Y } from './assets/session-terrain.mjs';
 import { inventoryOwnsClick } from './assets/shop-click-owner.mjs';
 import { readSessionActiveNearFeed } from './assets/session-active-near-feed.mjs';
+import { createFrameSnapshots, fromSnapshot } from './frame-snapshot.mjs';
 import { perfSync, perfEnabled, perfT0, perfT, perfSample, perfCountFrame, perfReset, perfReport } from './assets/frame-perf.mjs';
 import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, groundItemsUnderPointerAt, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, isPrimaryTargetEligible, nativeObjectHoverContains, nativeHoverSpecialGate, selectPointerCandidate, selectPrimaryTarget, selectHoverUnit, selectRetailPickTarget, viewportToWorld } from './gameplay-model.mjs';
 import { altSync } from './item-pick.mjs';
 import { createMpqAssetReader } from './assets/mpq-assets.mjs';
 import { createAreaPrefetch } from './assets/area-prefetch.mjs';
-import { recordPrim, gUnit } from './assets/drawlist.mjs';
+import { createGlPresenter } from './assets/gl-present.mjs';
+import { recordPrim, gFrame, gUnit, gCall, gLines, gLoadingWalk } from './assets/drawlist.mjs';
+import { createRenderWire, renderMode } from './render-wire.mjs';
+import { hudState } from './render-worker-hud.mjs';
 import { loadLiveLevelTerrain, loadRealmClientTerrain, actPalettePath } from './assets/live-level-terrain.mjs';
 import { decodeDatPalette } from './assets/d2-formats.mjs';
 import { createPlayerRenderer, playerClassInfo } from './assets/unit-renderer.mjs';
@@ -82,8 +86,8 @@ import { hoveredLabel, labelItemAt, nearestGroundItem, pickupNeedsWalk } from '.
 import { createSpeechBox } from './assets/speech-box.mjs';
 import { nativeObjectSpeechAcknowledgement } from './assets/object-speech-ack.mjs';
 import { dispatchObjectSpeechPointer } from './assets/object-speech-input.mjs';
-import { createCharacterCreate } from './assets/charcreate.mjs';
-import { createCharacterSelect } from './assets/charselect.mjs';
+import { createCharacterCreate, CREATE_ASSETS, CLASSES } from './assets/charcreate.mjs';
+import { createCharacterSelect, SELECT_ASSETS } from './assets/charselect.mjs';
 import { deleteAndRefreshCharacter } from './assets/character-delete-store.mjs';
 import { createSaveStore, CLASS_NAMES } from './assets/save-store.mjs';
 import { singlePlayerDestination, createCharacterEntryReader } from './assets/title-single-player-route.mjs';
@@ -104,6 +108,7 @@ import { createWeatherRenderer } from './assets/weather-renderer.mjs';
 import { weatherWaterAnchors } from './assets/weather-water-anchors.mjs';
 import { createSkillFx } from './assets/skill-fx.mjs';
 import { createStateFx } from './assets/state-fx.mjs';
+import { createUnitOverlayFx } from './assets/unit-overlay-fx.mjs';
 import { createMissileRenderer, parseMissileAnimations, isHoveredMissile } from './assets/missile-renderer.mjs';
 import { createNpcSpeechAlertRenderer } from './assets/npc-speech-alert.mjs';
 import { npcVendorIsOpen, closeInventoryPanel } from './assets/npc-vendor-state.mjs';
@@ -133,6 +138,7 @@ import { closeStashFromInventory, stashCloseAt } from './assets/stash-close.mjs'
 import { createFrontendPointerStates } from './assets/frontend-pointer-states.mjs';
 import { altHoverBox, hoverLife, monsterNameColour, plateBoxes, paintHoverPlate, groundLabelPlate, groundLabelColour } from './assets/hover-lifebar.mjs';
 import { weaponClassTokenForMode } from './assets/player-weapon-class.mjs';
+import { installWorkerGuard, workerMode } from './worker-guard.mjs';
 
 const canvas = document.querySelector('#game');
 const screenshotAction = createScreenshotAction();
@@ -144,6 +150,7 @@ let requestedDisplayResolution = videoResolutionSettings.selected ? videoResolut
 // S keeps the world scale near retail's (game height ~600-1200): floor(deviceH/600), rounded on touch screens.
 // D2GL keeps a game size and a viewport offset/scale for mouse mapping; here the canvas rect is that mapping.
 // ?view=800 (and the dev page) keeps retail's fixed 800x600.
+let renderWireResize = null;   // set once RENDER_WIRE exists (it is declared after the first fitView call)
 function fitView() {
   if (!window.__d2Entry?.fill) return;
   if (requestedDisplayResolution) {
@@ -151,6 +158,7 @@ function fitView() {
     if (canvas.width !== requestedDisplayResolution.width) canvas.width = requestedDisplayResolution.width;
     if (canvas.height !== requestedDisplayResolution.height) canvas.height = requestedDisplayResolution.height;
     window.Module?._d2_set_view_size?.(canvas.width, canvas.height);
+    renderWireResize?.(canvas);
     return;
   }
   const dpr = devicePixelRatio || 1, dw = Math.round(innerWidth * dpr), dh = Math.round(innerHeight * dpr);
@@ -160,6 +168,7 @@ function fitView() {
   if (canvas.width !== w) canvas.width = w;
   if (canvas.height !== h) canvas.height = h;
   window.Module?._d2_set_view_size?.(w, h);
+  renderWireResize?.(canvas);
 }
 fitView(); addEventListener('resize', fitView);
 installScrollSafeCanvasFocus(canvas);
@@ -168,7 +177,7 @@ const frontdoorError = document.querySelector('#frontdoor-error');
 const status = document.querySelector('#session-status');
 const classSelect = document.querySelector('#class-select');
 const sessionBar = document.querySelector('#session-bar');
-const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
+const ctx = canvas.getContext('2d', { alpha: renderMode(location.search) === 'w', willReadFrequently: true })   // ?render=w: transparent, the worker's world canvas sits under it;
 const input = new CommandInput();
 const frontendPointerStates = createFrontendPointerStates();
 // The front-end screen that owns a pointer gesture, with TITLE's trademark phase exempt: it owns
@@ -193,7 +202,16 @@ const frontendPointerControl = () => {
   return null;
 };
 let snapshot = normalizeSnapshot(null);
-let last = performance.now(), frames = 0, fps = 0, fpsAt = last;
+// PERF: a live frame re-reads the snapshot only when the world may have changed: an engine tick, a
+// command, or an engine write (markWorldWrites). Set back to false by the read.
+let worldDirty = true;
+const WORLD_WRITES = /^d2_(session_(command_|tick$|create|destroy$|stash_(insert|clear)$|hotkey_assign$|toggle_run$|weapon_switch$|set_|configure_|convert_|client_packet$|client_map_start$)|drlg_init$)/;
+function markWorldWrites() {
+  const ccall = Module.ccall;
+  Module.ccall = function (name, ...rest) { if (!worldDirty && WORLD_WRITES.test(name)) worldDirty = true; return ccall.call(this, name, ...rest); };
+  Module.ccall.marksWorld = true;
+}
+let last = performance.now(), lastDrawn = last, frames = 0, fps = 0, fpsAt = last;
 const clock = createGameClock();
 // Retail's game clock is ONE 25 Hz timer: the player, the monsters, the
 // AI and the per-frame animation pass all advance 25 times a second, and nothing in the engine
@@ -230,10 +248,10 @@ const MAP_SEED_OVERRIDE = (() => {
 })();
 let terrain = null, terrainFiles = null, terrainStats = null, terrainError = '', terrainLevel = -1, terrainAct = -1;
 let playerRenderer = null, playerRenderError = '', motion = {};
-let corpseRenderer = null, corpseEvidence = null, lastCorpseRecovery = null, missileRenderer = null, missileEvidence = [], skillFx = null, stateFx = null, overlayRenderer = null, heroFx = [];
+let corpseRenderer = null, corpseEvidence = null, lastCorpseRecovery = null, missileRenderer = null, missileEvidence = [], skillFx = null, stateFx = null, unitOverlayFx = null, overlayRenderer = null, heroFx = [];
 // Retail's weather (client-parity F11b): the rain, and the identity of every rain blit it drew this
 // frame -- `{ rain, blits }`, the record shape retail's own draw lists use.
-let weatherRenderer = null, weatherEvidence = { rain: -1, blits: [] };
+let wireWeather, weatherRenderer = null, weatherEvidence = { rain: -1, blits: [] };
 let frameError = '', frameErrors = 0;
 let npcCount = 0;
 // Monster class -> localized string-table name is stable for this loaded client. The automap asks
@@ -663,7 +681,9 @@ if (!PLAY_MODE) {
   // browser gesture. The engine's native selector needs the active player's room, so the MPQ reader
   // is intentionally deferred until a session has been created below.
   try {
-    actMusic = createActMusicPlayer((path) => createMpqAssetReader(window.Module)(path));
+    const titleRead = (path) => createMpqAssetReader(window.Module)(path);
+    titleRead.sliced = (path) => createMpqAssetReader(window.Module).sliced(path);
+    actMusic = createActMusicPlayer(titleRead, undefined, undefined, soundFetched);
     audioVolume.attach('music', actMusic);
   } catch (error) { musicError = String(error); }
 }
@@ -854,7 +874,8 @@ function sessionAdapter() {
       interact() { return Module.ccall('d2_session_command_nearest_warp', 'number', ['number'], [6]); },
       respawn() { return Module.ccall('d2_session_command_respawn', 'number', [], []); },
       tick(n) {
-        const result = Module.ccall('d2_session_tick', 'number', ['number'], [n]);
+        worldDirty = true;   // the worker's tick does not pass through Module.ccall
+        const result = W ? W.tick(n) : Module.ccall('d2_session_tick', 'number', ['number'], [n]);
         invalidateWornItemProps(); return result;
       },
       // The player's path position at the engine's own 16.16 precision (d2_session_player_coords),
@@ -872,10 +893,10 @@ function sessionAdapter() {
         if (!Module._d2_session_motion) return {};
         const p = Number(Module.ccall('d2_session_motion', 'number', [], []));
         if (!p) return {};
-        const view = new DataView(Module.HEAPU8.buffer, p, 52);
-        if (view.getUint32(0, true) !== 1 || view.getUint32(4, true) !== 52) return {};
+        const view = new DataView(Module.HEAPU8.buffer, p, 54);
+        if (view.getUint32(0, true) !== 1 || view.getUint32(4, true) !== 54) return {};
         return { framePrecise: view.getUint32(40, true), frameCountPrecise: view.getUint32(44, true),
-          direction: view.getUint8(50), moving: view.getUint8(51) !== 0 };
+          direction: view.getUint8(50), moving: view.getUint8(51) !== 0, seqMode: view.getUint8(52), seqFrame: view.getUint8(53) };
       },
       snapshot() {
         // One world rebuild for the dozen reads below (d2_session_hold_world), not one per read.
@@ -942,6 +963,23 @@ function sessionAdapter() {
             entities[i].typeFlags = facings.getUint8(offset + 8);
             entities[i].superUniqueId = facings.getInt16(offset + 10, true);
           }
+        }
+        // Unit hit overlays (UNITS_SetOverlay's stat, exported per unit), joined by type:id and played once per unit.
+        if (Module._d2_session_unit_overlays && unitOverlayFx) {
+          const n = Module.ccall('d2_session_unit_overlay_count', 'number', [], []), p = Number(Module.ccall('d2_session_unit_overlays', 'number', [], []));
+          const v = new DataView(Module.HEAPU8.buffer, p, n * 12), hits = [];
+          for (let i = 0; i < n; i++) hits.push({ id: v.getUint32(i * 12, true), type: v.getUint32(i * 12 + 4, true), overlayId: v.getUint32(i * 12 + 8, true) });
+          const fxByUnit = new Map(unitOverlayFx.update(base.tick, hits).map((f) => [`${f.type}:${f.id}`, f]));
+          for (const entity of entities) entity.overlay = fxByUnit.get(`${entity.type}:${entity.id}`);
+        }
+        // Monster state overlays (States.txt overlay1-4 of each active state, exported per monster), each unit keeping its own gain/loss edges.
+        if (Module._d2_session_unit_states && stateFx) {
+          const n = Module.ccall('d2_session_unit_state_count', 'number', [], []), p = Number(Module.ccall('d2_session_unit_states', 'number', [], []));
+          const v = new DataView(Module.HEAPU8.buffer, p, n * 12), byUnit = new Map();
+          for (let i = 0; i < n; i++) { const k = `${v.getUint32(i * 12 + 4, true)}:${v.getUint32(i * 12, true)}`; if (!byUnit.has(k)) byUnit.set(k, new Set()); byUnit.get(k).add(v.getUint32(i * 12 + 8, true)); }
+          const live = new Set();
+          for (const entity of entities) if (entity.type === 1) { const k = `1:${entity.id}`; live.add(k); entity.stateOverlays = stateFx.update((id) => byUnit.get(k)?.has(id) ?? false, k, base.tick, (id) => Module.ccall('d2_session_state_set_seq', 'number', ['number', 'number', 'number'], [1, entity.id, id])); }
+          stateFx.retain(live);
         }
         if (Module._d2_session_monster_animations) {
           const animationCount = Module.ccall('d2_session_monster_animation_count', 'number', [], []);
@@ -1116,8 +1154,8 @@ async function bootstrapSession() {
     // In the world a unit casts its shadow (F8); the corpse renderer below does not, and retail's own
     // draw lists carry no `shadow dcc:` for a DD-mode sprite.
     playerRenderer = createPlayerRenderer(assetReader, document, { shadow: true }); playerRenderError = '';
-    missileRenderer = createMissileRenderer(assetReader, document, (cls) => Module._d2_missile_celfile ? Module.ccall('d2_missile_celfile', 'string', ['number'], [cls]) : '');
-    try { skillFx = createSkillFx(assetReader); stateFx = createStateFx(assetReader); overlayRenderer = createMissileRenderer(assetReader, document, (f) => f, 'overlays'); } catch (error) { console.warn('Skill fx', error); }
+    missileRenderer = createMissileRenderer(assetReader, document, missileCelFile);
+    try { skillFx = createSkillFx(assetReader); stateFx = createStateFx(assetReader); unitOverlayFx = createUnitOverlayFx(assetReader); overlayRenderer = createMissileRenderer(assetReader, document, (f) => f, 'overlays'); } catch (error) { console.warn('Skill fx', error); }
     weatherRenderer = createWeatherRenderer({ read: createMpqAssetReader(Module), documentObject: document });
     corpseRenderer = createPlayerRenderer(assetReader);   // its own instance: the player's draw evidence stays the player's
     monsterRenderer = createMonsterRenderer(createMpqAssetReader(Module), document, { shadow: true });
@@ -1158,7 +1196,7 @@ async function bootstrapSession() {
     } catch (error) { sessionError = String(error); }
     try { skillSelectRenderer = createSkillSelectRenderer(createMpqAssetReader(Module)); } catch (error) { skillSelectError = String(error); }
     try {
-      actMusic ??= createActMusicPlayer(assetReader);
+      actMusic ??= createActMusicPlayer(assetReader, undefined, undefined, soundFetched);
       audioVolume.attach('music', actMusic);
       // FUN_6FAF5660 selects from the active player's current room. Start that selected loop as soon
       // as the newly created session exposes its level instead of waiting for a later world input.
@@ -1168,7 +1206,7 @@ async function bootstrapSession() {
       syncAreaMusic(snapshot.level, { force: true });
     } catch (error) { actMusic = null; musicError = String(error); }
     try { audioVolume.attach('sound', createUiClickSoundPlayer(assetReader, canvas)); } catch (error) { musicError = String(error); }
-    try { unitSounds = createUnitSoundPlayer(assetReader); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), () => unitSounds.monsterSoundBusy()); eventSounds = createEventSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Event sound', error)), (...a) => Number(Module._d2_client_monster_footstep_row(...a))); missileSounds = createMissileSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Missile sound', error))); canvas.__d2UnitSound = unitSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader)); } catch (error) { musicError = String(error); }
+    try { unitSounds = createUnitSoundPlayer(assetReader, undefined, undefined, soundFetched); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), () => unitSounds.monsterSoundBusy()); eventSounds = createEventSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Event sound', error)), (...a) => Number(Module._d2_client_monster_footstep_row(...a))); missileSounds = createMissileSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Missile sound', error))); canvas.__d2UnitSound = unitSounds; canvas.__d2EventSound = eventSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader, undefined, undefined, soundFetched)); } catch (error) { musicError = String(error); }
 
     if (TERRAIN_ENABLED) loadSessionTerrain(fixture.act0);
     // A picked character is not applied to anything: createFromSave above already made it, sections
@@ -1279,7 +1317,27 @@ function ensureTitleScreen(entryPhase = null) {
       ],
     });
     if (entryPhase) setTitlePhase(entryPhase);
+    warmCharacterScreens();
   } catch (error) { titleError = String(error); }
+}
+
+// SINGLE PLAYER builds char select (or create) synchronously in the save list's IDB completion, reading
+// every DC6 whole: on a cold stream cache that task spun ~730 ms on range misses. Warm their archive
+// chunks while the title is up. Cache only: no byte read changes.
+function warmCharacterScreens() {
+  const fetched = prefetcher()?.fetched;
+  if (!fetched) return;
+  const ui = 'data\\global\\ui\\FrontEnd\\';
+  const heroes = CLASSES.flatMap((c) => ['NU1', 'NU2', 'NU3', 'FW', 'BW'].map((a) => `${ui}${c.dir}\\${c.code}${a}.DC6`));
+  for (const name of [...Object.values(SELECT_ASSETS), ...Object.values(CREATE_ASSETS), ...heroes]) fetched([name]);
+}
+
+// The town a character enters, by the save's act (a new one starts in the Rogue Encampment), warmed while the
+// player is still on the character screens. Not under the test runner: it reads the level tables earlier than before.
+const TOWNS = [1, 40, 75, 103, 109];
+function warmTowns(chars) {
+  if (navigator.webdriver) return;
+  prefetcher()?.warm?.([...new Set((chars.length ? chars.slice(0, 3) : [{ act0: 0 }]).map((c) => TOWNS[c.act0 | 0] ?? 1))]);
 }
 
 function ensureCinematicsScreen() {
@@ -1697,6 +1755,7 @@ async function enterSavedCharacterScreen(singlePlayer) {
       savedCharacters = profile.characters; savedCharacterFilesExist = profile.hasSaveFiles;
       const destination = singlePlayer
         ? singlePlayerDestination({ hasSaveFiles: savedCharacterFilesExist, error }) : 'select';
+      warmTowns(destination === 'create' ? [] : savedCharacters);
       if (destination === 'create') { screen = SCREEN.CREATE; ensureCharCreate(); return; }
       screen = SCREEN.SELECT; ensureCharSelect();
     },
@@ -1748,7 +1807,7 @@ function ensureCharSelect() {
       onPlayRefused: ({ stringId }) => {
         charSelectError = Module.ccall('d2_lang_string_by_index', 'string', ['number'], [stringId]) || 'This Hardcore character is dead.';
       },
-      onCreate: () => { screen = SCREEN.CREATE; ensureCharCreate(); },
+      onCreate: () => { screen = SCREEN.CREATE; warmTowns([]); ensureCharCreate(); },
       onCancel: () => { screen = SCREEN.TITLE; },
       onDelete: deleteSavedCharacter,
       onConvert: convertSavedCharacter,
@@ -1872,7 +1931,7 @@ function ensureCharCreate() {
 // their stock if a trade is open. All of it is engine state; the panel only draws it.
 // Retail plays an NPC's message list in order: each dismissal acks the message and shows the next (npcMsgSkip.n = how many were heard).
 let npcMsgSkip = { npcId: 0, n: 0 };
-let ambient = null, ambientLevel = -1, ambientCycle = 0, unitSounds = null, combatSounds = null, eventSounds = null, missileSounds = null, soundBuf = 0, npcVoiceKey = null, npcVoiceGeneration = 0;
+let ambient = null, ambientLevel = -1, ambientCycle = 0, unitSounds = null, combatSounds = null, eventSounds = null, missileSounds = null, soundBuf = 0, ambBuf = 0, npcVoiceKey = null, npcVoiceGeneration = 0;
 const npcSpeechScrollGate = createNpcSpeechScrollGate();
 const npcSpeechClickGate = createNpcSpeechClickGate();
 let npcSpeechClickKey = null;
@@ -2384,19 +2443,30 @@ function dismissObjectSpeech() {
   if (acknowledgement) Module.ccall('d2_session_command_npc_response_packet', 'number', ['number', 'number'], [acknowledgement.guid, acknowledgement.stringId]);
 }
 let castHand = 'right', needSkillAt = -1e9;
+// 1.13c D2Client+0x4F860 (the engine ticks it): its Sounds-row submits. Kind 0/1 are the area loop and the weather handle (the ambient loop plays them); kind 2 is a one-shot.
+function drainAmbientSounds() {
+  if (!Module._d2_ambient_take) return;
+  const b = ambBuf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [64 * 8]));
+  const n = Module.ccall('d2_ambient_take', 'number', ['bigint', 'number'], [BigInt(b), 64]);
+  const v = new Int32Array(Module.HEAPU8.buffer.slice(b, b + n * 8));
+  for (let i = 0; i < n; i++) { if (v[i * 2 + 1] === 2) unitSounds.playRow(v[i * 2], { source: 'ambient' }).catch(() => {}); else unitSounds.events.push({ row: v[i * 2], kind: 'table-row', source: 'ambient', held: true }); }
+}
 function drainUnitSounds() {
   pollObjectSpeech();
   if (!unitSounds || !session || screen !== SCREEN.GAME || !Module._d2_session_take_sounds) return;
   const listener = session.playerCoords?.();
   unitSounds.updateSpatialGain(snapshot, listener);
   if (snapshot?.player) snapshot.player.castSkillId = readSelectedSkills()[castHand]; // the cast skill is the selected skill of the hand that last issued a command
+  if (snapshot?.player && Module._d2_session_cast_refused_seq) { snapshot.player.castRefusedSeq = Module._d2_session_cast_refused_seq(); snapshot.player.castRefusedSkill = Module._d2_session_cast_refused_skill(); }
+  { const la = Module.ccall('d2_client_take_local_action', 'number', [], []); if (la === 2) eventSounds?.localWalk(snapshot?.entities?.find((e) => e.id === snapshot.playerId && e.type === 0)?.classId); }
   combatSounds?.update(snapshot?.entities ?? [], snapshot);
-  { const hero = snapshot?.entities?.find((e) => e.id === snapshot.playerId && e.type === 0); heroFx = skillFx && hero ? skillFx.update({ ...hero, hp: snapshot.player?.hp }, snapshot.player?.castSkillId) : [];
-    if (stateFx && hero) heroFx = heroFx.concat(stateFx.update((id) => Module.ccall('d2_session_player_has_state', 'number', ['number'], [id]))); }
-  missileSounds?.update(snapshot?.entities ?? []);
+  { const hero = snapshot?.entities?.find((e) => e.id === snapshot.playerId && e.type === 0); heroFx = skillFx && hero ? skillFx.update({ ...hero, hp: snapshot.player?.hp }, snapshot.player?.castSkillId, engineTicks) : [];
+    if (stateFx && hero) heroFx = heroFx.concat(stateFx.update((id) => Module.ccall('d2_session_player_has_state', 'number', ['number'], [id]), undefined, undefined, (id) => Module.ccall('d2_session_state_set_seq', 'number', ['number', 'number', 'number'], [0, snapshot.playerId, id]))); }
+  missileSounds?.update(snapshot?.entities ?? [], engineTicks);
   // D35: client-side event sounds (pickup, gold, drop, footstep) run every tick, not only on ticks the engine queued a sound.
   if (snapshot?.player) { const m = session.motion(); Object.assign(snapshot.player, { mode: snapshot.mode, framePrecise: m.framePrecise, frameCountPrecise: m.frameCountPrecise }); } // D1: footstep reads mode+frame
   eventSounds?.update(snapshot, readAdvancement()?.level);
+  drainAmbientSounds();
   const cap = 32; if (!soundBuf) soundBuf = Number(Module.ccall('malloc', 'bigint', ['number'], [cap * 28]));
   const n = Module.ccall('d2_session_take_sounds', 'number', ['bigint', 'number'], [BigInt(soundBuf), cap * 7]);
   if (!n) return;
@@ -2406,15 +2476,15 @@ function drainUnitSounds() {
     const event = { unitType: v[i * 7], unitId: v[i * 7 + 1], classId: v[i * 7 + 2], soundEvent: v[i * 7 + 3], updateUnitType: v[i * 7 + 4], updateUnitId: v[i * 7 + 5], nativeSelectedRow: v[i * 7 + 6] };
     if (event.soundEvent === 0x10) event.monsterTaunt = event.nativeSelectedRow;
     if (event.soundEvent === 0x0c) event.skillStartSoundRow = event.nativeSelectedRow;
+    if (event.soundEvent === 0x100) { unitSounds.playRow(event.nativeSelectedRow, { source: 'monster-init', unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x23170: MonSounds Init
     const spatial = unitSoundNativeSpatial(event, snapshot, listener);
     event.nativeSpatialGainByte = spatial?.gainByte ?? null;
     event.nativeSpatialPanCode = spatial?.panCode ?? unitSoundNativePanCode(event, snapshot, listener);
     unitSounds.play(event, local);
     if (event.soundEvent === 2 && event.updateUnitId === local) eventSounds?.noteServerLevelUp();
-    if (event.soundEvent === 1 && event.updateUnitId === local) eventSounds?.noteServerPickup();
   }
 }
-function update(forceTick = false) {
+function update(forceTick = false, live = false) {
   drainUnitSounds();
   // The engine advances every tick, so last tick's advancement record is stale by definition.
   advancement = null; classSkills = null;
@@ -2442,7 +2512,9 @@ function update(forceTick = false) {
   pollMovieRequest();
   if (screen !== SCREEN.GAME) return;
   if (gameMenu?.open) { gameMenu.step(); controlsPanel?.step(); input.drain(); return; }   // single player pauses under the menu
+  if (window.Module?.ccall && !Module.ccall.marksWorld) markWorldWrites();
   const commands = input.drain();
+  if (commands.length) worldDirty = true;
   if (realmTransport.state === 'session-open') {
     const latestPointerMove = commands.findLast((command) => command.type === COMMAND.MOVE && !command.directional);
     for (const command of commands) {
@@ -2458,17 +2530,21 @@ function update(forceTick = false) {
         });
         const monsterTarget = monsterHits[0] ?? null;
         castHand = 'right';
+        // A monster the native hover test refuses (1.13c D2Client 0x1B7F0 a5440: MONMODE_DEATH/DEAD) is no unit target:
+        // the refused prediction sends nothing and the cast falls through to the ground branch at the cursor subtile.
         if (monsterTarget) {
           const result = sendRealmRightSkillOnMonster(realmFlow?.protocol, realmFlow?.d2gs,
             realmSceneActive && Boolean(realmPlayerView?.active), monsterTarget.guid,
             Boolean(command.held), realmMoveDuplicateState, performance.now(),
             realmFireballMonsterPredictor(realmFlow?.protocol));
-          result.held = Boolean(command.held); result.playerGuid = realmPlayerView?.guid ?? null;
-          result.targetType = 1; result.targetCode = monsterTarget.code;
-          realmSkillEvidence.attempts++;
-          if (result.sent) realmSkillEvidence.sent++;
-          realmSkillEvidence.last = result;
-          continue;
+          if (result.reason !== 'prediction-refused') {
+            result.held = Boolean(command.held); result.playerGuid = realmPlayerView?.guid ?? null;
+            result.targetType = 1; result.targetCode = monsterTarget.code;
+            realmSkillEvidence.attempts++;
+            if (result.sent) realmSkillEvidence.sent++;
+            realmSkillEvidence.last = result;
+            continue;
+          }
         }
         const destination = pointerWorldAt(command.x, command.y);
         const realmProtocol = realmFlow?.protocol;
@@ -2515,6 +2591,7 @@ function update(forceTick = false) {
       }
     }
   }
+  let engineAdvanced = false;
   if (session) {
     // One left-hand action for both a fresh click and every held repeat: the selected left skill
     // when it is not the plain Attack, else the primary attack. Returns the engine's result (1
@@ -2687,13 +2764,35 @@ function update(forceTick = false) {
         }
       }
     }
+
+    // 1.13c 0x4F860 has its SoundEnviron row before the level's first 0x5F020 tick: record it ahead of the advance (the post-advance block below sees it already set).
+    // The level is read from the session itself: the cached snapshot is the previous step's, one level behind when a session is swapped in under the shell (a retail recording).
+    const preLevel = session && ambient ? session.snapshot()?.level : null;
+    if (session && ambient && Number.isInteger(preLevel) && preLevel !== ambientLevel) { const { day, night } = ambient.environment(preLevel); Module._d2_ambient_record(day.environmentId, night.ambienceId, day.ambienceId, night.eventId, day.eventId, day.eventDelay); Module._d2_ambient_area(day.environmentId); }
+    try { engineAdvanced = advanceEngine(forceTick) > 0; }
+    catch (error) { sessionError = String(error); session = null; }
+  }
+  updateAfterAdvance(engineAdvanced, live);
+}
+
+// H3: the part of update() after the engine advanced (pure move, same order). Mode 2 runs it after the worker parks.
+function updateAfterAdvance(engineAdvanced, live = false) {
+  W?.park();
+  if (session) {
     try {
-      const engineAdvanced = advanceEngine(forceTick) > 0;
       // Native D2Client retries a held action from its message-pump callback without a 240 ms
       // timer. The browser queues the current pointer once per simulation advance; pointer moves
       // still retarget immediately, and a stationary screen point follows the current camera.
       queueHeldPointerRepeat(input, worldPointerHeld, engineAdvanced, pointer.x, pointer.y, heldPointerCanRetargetWorld);
       queueHeldPointerRepeat(input, worldRightPointerHeld, engineAdvanced, pointer.x, pointer.y, heldPointerCanRetargetWorld, 2);
+      // PERF: 3 of 5 live updates advance nothing (25 Hz engine, 60 Hz shell); with no command or engine
+      // write since the last read, the ~2.5 ms read would return the same world, so the snapshot and its
+      // npc/hostile/speech flags are kept. The npc state still reads (it follows the shell's own state).
+      // Records never see this: the test runner drives update() without `live`.
+      if (live && !engineAdvanced && !worldDirty) { npcState = npcMenu?.open ? null : npcState?.own ? npcState : readNpcState(); }
+      else {
+      worldDirty = false;   // before the read: a walkStep command during it marks the next update dirty again
+      const pRead = perfT0();
       // One world rebuild per frame, not two: the snapshot and the npc/kind reads share one hold
       // (a rebuild costs ~1 ms, as much as the tick). walkStep can issue a command, so a frame with a
       // walk in progress releases the hold around it and rebuilds after it, as before.
@@ -2728,6 +2827,8 @@ function update(forceTick = false) {
         snapshot.entities[i].speechPending = alerts[i] !== 0;
         if (alerts[i]) speechAlertCount++;
       }
+      perfT('snapshotRead', pRead);
+      }
     }
     catch (error) { sessionError = String(error); session = null; }
   }
@@ -2737,8 +2838,8 @@ function update(forceTick = false) {
   // Ambient loop/events (Levels.SoundEnv -> SoundEnviron -> Sounds.txt); cycle = the engine period of day (dusk/night/dawn pick the night variants).
   if (session && ambient && Number.isInteger(snapshot?.level)) {
     const cycle = ambientCycleOf(Module);
+    if (snapshot.level !== ambientLevel) { const { day, night } = ambient.environment(snapshot.level); Module._d2_ambient_record(day.environmentId, night.ambienceId, day.ambienceId, night.eventId, day.eventId, day.eventDelay); Module._d2_ambient_area(day.environmentId); } // 1.13c 0x4F860 reads the SoundEnviron row of Levels.SoundEnv
     if (snapshot.level !== ambientLevel || cycle !== ambientCycle) { ambientLevel = snapshot.level; ambientCycle = cycle; ambient.sync(ambientLevel, cycle).catch((error) => { console.warn('Ambient sound', error); }); }
-    ambient.tick(1).catch(() => {});
   }
   if (session && actMusic && Number.isInteger(snapshot?.level) && levelMusicDue(snapshot.level, levelMusicSync.activeLevel, musicLevelTick, engineTicks)) {
     syncAreaMusic(snapshot.level);
@@ -2850,7 +2951,7 @@ function drawPlayer(c) {
   const source = selectedPlayerSource();
   if (source.source === 'none') return;
   if (playerRenderer) {
-    const drawFx = (pre) => { try { for (const fx of heroFx) if (!!fx.predraw === pre) (fx.kind === 'overlay' ? overlayRenderer : missileRenderer)?.draw(c, viewCX(), (h / 2 + UNIT_CENTRE_Y), { classId: fx.kind === 'overlay' ? fx.file : fx.classId }, 0, 0, fx.age, fx.trans === 3 ? 1 : 0, 1); } catch { /* an effect that fails to draw is not fatal */ } };
+    const drawFx = (pre) => { try { for (const fx of heroFx) if (!!fx.predraw === pre) (fx.kind === 'overlay' ? overlayRenderer : missileRenderer)?.draw(c, ...(fx.wx === undefined ? [viewCX(), (h / 2 + UNIT_CENTRE_Y)] : projectStatic(fx.wx, fx.wy)), { classId: fx.kind === 'overlay' ? fx.file : fx.classId }, 0, 0, fx.age, fx.trans === 3 ? 1 : 0, snapshot?.act ?? 1); } catch { /* an effect that fails to draw is not fatal */ } };
     drawFx(true);
     try { playerRenderer.draw(c, viewCX(), (h / 2 + UNIT_CENTRE_Y), source.renderState); playerRenderError = ''; }
     // One animation that fails to draw is reported, not fatal: the next mode may draw fine.
@@ -3004,12 +3105,14 @@ function sessionHp(id) {
   return { hpPct: Math.trunc(((hp >> 8) * 100) / (maxHp >> 8)), hp, maxHp };   // stats are life<<8; the fallback reads the raw stat 6 / maxhp
 }
 
-let hoverPrior = null;
+// PERF: hoverPick is this live frame's selection (reset by render()), reused by gameCursorContext.
+let hoverPrior = null, hoverPick = null;
 function hoverTarget() {
   if (!session || screen !== SCREEN.GAME) return null;
   const candidates = resolvePointerCandidates(pointer.x, pointer.y);
   const selected = selectPointerCandidate(candidates, { reference: snapshot.player, prior: hoverPrior });
   hoverPrior = selected ? { id: selected.target.id, kind: selected.kind } : null;
+  if (liveFrame) hoverPick = { selected };
   if (selected?.kind === 'unit') {
     const unit = selected.target;
     const stringIndex = Module.ccall('d2_monster_name_str', 'number', ['number'], [unit.classId]);
@@ -3048,8 +3151,10 @@ function hoverTarget() {
 // talk path consumes. This asks them; it never keeps a second hover model of its own.
 function gameCursorContext() {
   if (!session || screen !== SCREEN.GAME) return null;
-  const candidates = resolvePointerCandidates(pointer.x, pointer.y);
-  const selected = selectPointerCandidate(candidates, { reference: snapshot.player, prior: hoverPrior });
+  // PERF: a live frame reuses the selection hoverTarget made earlier in the same render (same pointer and
+  // snapshot, and the prior it would pass is that selection). The harness's renderNow recomputes.
+  const selected = liveFrame && hoverPick ? hoverPick.selected
+    : selectPointerCandidate(resolvePointerCandidates(pointer.x, pointer.y), { reference: snapshot.player, prior: hoverPrior });
   if (selected?.kind === 'unit') return { kind: 'attack', target: { id: selected.target.id, type: 1 } };
   if (selected?.kind === 'npc') return { kind: 'talk', target: { id: selected.target.id, type: 1 } };
   return { kind: 'hand' };
@@ -3131,13 +3236,20 @@ function drawHoverLabel(c, target, projectUnit, projectStatic) {
 // the catacombs kept the town's tile set, and on first load the engine has not resolved a level
 // yet, so the file list came back empty and the map never appeared at all. Doing it here means any
 // route into a level -- fixture, waypoint, warp, act travel -- is covered by one rule.
-let areaPrefetch = null, areaPrefetchFrame = 0;
+let areaPrefetch = null, areaPrefetchFrame = 0, areaPrefetchLevel = -1;
+// The sound players' first read of a WAV waits on this (unit-sound-player.mjs, ambient-sound.mjs); before the first prefetch tick it is a plain read.
+// Built on first use, so the title track's first read waits on it too, long before any level exists.
+function prefetcher() {
+  if (!areaPrefetch && window.StreamFS?.warm && Module?.HEAPU8) areaPrefetch = createAreaPrefetch({ read: createMpqAssetReader(Module), StreamFS: window.StreamFS, preload: (n) => terrain?.preload?.(n) });
+  return areaPrefetch;
+}
+function soundFetched(names) { return prefetcher()?.fetched(names); }
 function ensureTerrain() {
   if (!TERRAIN_ENABLED || !session) return;
   // Warm the neighbouring levels' DT1 chunks in the background (assets/area-prefetch.mjs): once a second,
   // and only where streamfs is a network source (window.StreamFS exists).
-  if (++areaPrefetchFrame % 25 === 1 && window.StreamFS?.warm && Module?.HEAPU8) {
-    areaPrefetch ??= createAreaPrefetch({ read: createMpqAssetReader(Module), StreamFS: window.StreamFS });
+  if ((++areaPrefetchFrame % 25 === 1 || snapshot.level !== areaPrefetchLevel) && prefetcher()) {
+    areaPrefetchLevel = snapshot.level;   // a new level warms its neighbours at once, not up to a second later (D49)
     areaPrefetch(snapshot.level, (snapshot.warps || []).filter((w) => w.enabled).map((w) => w.destinationLevel));
   }
   // A new LEVEL of the same act needs no new terrain object: its libraries and bitmaps are keyed by
@@ -3205,8 +3317,8 @@ const RAMP16 = (() => {
   for (let x = 0; x < 65536; x++) { lo[x] = DISPLAY_RAMP[x & 0xff] | (DISPLAY_RAMP[(x >> 8) & 0xff] << 8); hi[x] = DISPLAY_RAMP[x & 0xff] | (x & 0xff00); }
   return { lo, hi };
 })();
-function applyDisplayRamp(w, h) {
-  const img = ctx.getImageData(0, 0, w, h), d = img.data;
+function applyDisplayRamp(w, h, g = ctx) {
+  const img = g.getImageData(0, 0, w, h), d = img.data;
   if (RAMP16 && d.byteOffset === 0 && (d.length & 3) === 0) {
     // PERF (a retail recording): the length is read into a local once, not tested through the view every pixel.
     // Measured on a throwaway 800x600 probe: 1.20 -> 0.84 ms per frame for the loop, same output
@@ -3214,10 +3326,122 @@ function applyDisplayRamp(w, h) {
     const { lo, hi } = RAMP16, d32 = new Uint32Array(d.buffer, 0, d.length >>> 2), n = d32.length;
     for (let i = 0; i < n; i++) { const p = d32[i]; d32[i] = lo[p & 0xffff] | (hi[p >>> 16] << 16); }
   } else for (let i = 0; i < d.length; i += 4) { d[i] = DISPLAY_RAMP[d[i]]; d[i + 1] = DISPLAY_RAMP[d[i + 1]]; d[i + 2] = DISPLAY_RAMP[d[i + 2]]; }
-  ctx.putImageData(img, 0, 0);
+  g.putImageData(img, 0, 0);
 }
+// PERF (stutter): at 1080p the pass above is ~6.5 ms of main thread and 8 MB of garbage per frame
+// (measured in Chrome on a throwaway probe). A live rAF frame instead leaves the canvas unramped and the
+// compositor applies the same table as an SVG filter on the element: a discrete 256-entry table per
+// channel, each entry (r+0.5)/255 because Chrome truncates. As ctx.filter it agreed with the pass above
+// on all 2^24 colours. Chromium only, and never under automation (navigator.webdriver): every harness
+// read, renderNow(), event-handler render and screenshot still gets the ramped bytes in the canvas.
+const CSS_RAMP = !!globalThis.navigator?.userAgentData?.brands?.some((b) => b.brand === 'Chromium') && !navigator.webdriver && !!globalThis.document?.body;
+if (CSS_RAMP) {
+  const tv = Array.from(DISPLAY_RAMP, (r) => ((r + 0.5) / 255).toFixed(8)).join(' ');
+  document.body.insertAdjacentHTML('beforeend', `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="d2-display-ramp" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncR type="discrete" tableValues="${tv}"/><feFuncG type="discrete" tableValues="${tv}"/><feFuncB type="discrete" tableValues="${tv}"/></feComponentTransfer></filter></svg>`);
+}
+let liveFrame = false, cssRampOn = false, glRampOn = false;
+// The Screen Shot key saves what the player sees, so with the filter or the GL layer on it saves a copy
+// ramped by the same CPU pass.
+const rampedCopy = () => { const c = document.createElement('canvas'); c.width = canvas.width; c.height = canvas.height; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(canvas, 0, 0); applyDisplayRamp(c.width, c.height, x); return c; };
 
-function render() {
+// FrameSnapshot (render-worker Stage 2): the engine reads render() needs, taken once, just before the draw.
+const frameSnaps = createFrameSnapshots();
+let frameSnap = null;   // always frameSnaps.front(): the draw reads only the front buffer
+function frameGates() {
+  const live = Boolean(session) && typeof Module !== 'undefined' && !realmSceneActive;
+  const hud = live && Boolean(controlPanelRenderer) && !clearScreen;
+  return { session: live, hud,
+    pointerLayer: live && Boolean(pointerLayer) && screen === SCREEN.GAME,
+    world: live && Boolean(terrain),
+    weather: Boolean(weatherRenderer),
+    death: live && deathScreenShown(snapshot.mode),
+    inventory: live && Boolean(inventoryPanelRenderer) && Boolean(inventoryVisible),
+    skills: live && Boolean(skillPanelRenderer) && Boolean(skillsVisible),
+    belt: live && Boolean(beltRenderer),
+    skillSelect: live && Boolean(skillSelectRenderer) && !clearScreen,
+    // Stage 3 follow-up gates: each mirrors the condition of the draw that reads the value.
+    hover: live && Boolean(terrain) && screen === SCREEN.GAME,
+    inventoryLayout: live && Boolean(inventoryPanelRenderer) && (!inventoryPanelRenderer.layout || inventoryLayoutKey !== `${snapshot.playerClass}/${snapshot.playerId}/${snapshot.seed}`),
+    hireling: live && Boolean(hirelingVisible) && !clearScreen,
+    stash: live && Boolean(stashPanelRenderer) && Boolean(stashOpen),
+    cube: live && Boolean(cubePanelRenderer) && Boolean(cubeOpen),
+    waypoint: live && Boolean(waypointPanelRenderer) && Boolean(waypointMenu),
+    quest: live && Boolean(questLogRenderer) && panelShown(questVisible) && !clearScreen,
+    shop: live && shopOpen() && !globalThis.__d2HideShop,
+    entryBanner: live && Boolean(entryBannerRenderer) && entryBannerLevel > 0 && !clearScreen && engineTicks - entryBannerAt < ENTRY_BANNER.frames ? entryBannerLevel : 0,
+    skillTips: live && (Boolean(skillPanelRenderer) && Boolean(skillsVisible) || Boolean(skillSelectRenderer) && !clearScreen) };
+}
+// Keys the draw looked up last frame / is looking up this frame (see collectFrameSnapshot's `seen`).
+const SEEN_KEYS = ['langStr', 'langIdx', 'missileCel', 'skillDesc', 'skillMana', 'skillStrings'];
+const newSeen = () => Object.fromEntries(SEEN_KEYS.map((k) => [k, new Set()]));
+let seenPrev = newSeen(), seenNow = newSeen();
+function seenLive(map, key, live) {
+  if (frameSnap?.[map]?.has(key)) return frameSnap[map].get(key);
+  seenNow[map].add(key); return live();
+}
+const langStr = (key) => seenLive('langStr', key, () => Module.ccall('d2_lang_string', 'string', ['string'], [key]));
+const langIdx = (i) => seenLive('langIdx', i, () => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]));
+const missileCelFile = (cls) => seenLive('missileCel', cls, () => Module._d2_missile_celfile ? Module.ccall('d2_missile_celfile', 'string', ['number'], [cls]) : '');
+const skillDescSnap = (id, level) => seenLive('skillDesc', `${id}:${level}`, () => readSkillDesc(id, level));
+const skillManaSnap = (id, level) => seenLive('skillMana', `${id}:${level}`, () => Module.ccall('d2_session_skill_mana', 'number', ['number', 'number'], [id, level]));
+const skillStringsSnap = (id) => seenLive('skillStrings', id, () => readSkillStrings(id));
+function fillFrameSnapshot() {
+  const ready = typeof Module !== 'undefined' && window.__d2?.ready;
+  seenPrev = seenNow; seenNow = newSeen();
+  frameSnaps.fill(ready ? { Module, gates: frameGates(), readers: {
+    advancement: readAdvancement, characterScreen: readCharacterScreen, runToggle: readRunToggle, classSkills: readClassSkills,
+    beltHudBoxes: readBeltHudBoxes, beltIndex: readBeltIndex, beltBoxes: readBeltBoxes, skillChoices: readSkillChoices, selectedSkills: readSelectedSkills,
+    hoverTarget, inventoryLayout: readInventoryLayout, hirelingRoster: readHirelingRoster, stashLayout: readStashLayout,
+    bankGold: () => stashGoldStat(STASH_GOLD.bank), cubeLayout: readCubeLayout, waypointTable: readWaypointTable, questWords: readQuestWords,
+    vendorStashGold: () => Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [0]) : -1,
+    entryFile: (level) => Module.ccall('d2_level_entry_file', 'string', ['number'], [level]),
+    skillDesc: readSkillDesc, skillStrings: readSkillStrings, seen: seenPrev } } : null);
+  frameSnaps.swap(); frameSnap = frameSnaps.front();
+}
+const snapOr = (key, live) => fromSnapshot(frameSnap, key, live);
+const hudLang = (i) => (frameSnap?.lang?.has(i) ? frameSnap.lang.get(i) : Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]));
+
+// Render worker: `w` by default (Stage 6, ), `?render=0` the old path, `t` the selftest.
+let renderReader = null;
+const RENDER_WIRE = createRenderWire({ mode: renderMode(location.search), canvas, ctxOptions: { alpha: false, willReadFrequently: true }, readFile: (path) => { try { return (renderReader ??= createMpqAssetReader(Module))(path); } catch { return null; } } });
+renderWireResize = (c) => RENDER_WIRE?.resize?.(c.width, c.height, c);
+// PERF: where the compositor filter is not available (Firefox, Safari) a live frame is shown through a
+// WebGL2 layer that applies the ramp on the GPU (assets/gl-present.mjs): 1080p 12.5 -> 5.3 ms of main
+// thread in Chrome, 0 diffs against the CPU pass on all 2^24 colours. Player page only, never under
+// automation, never with the render worker's layer: the canvas and every read of it are unchanged.
+const glPresenter = !CSS_RAMP && !navigator.webdriver && window.__d2Entry?.player && !RENDER_WIRE ? createGlPresenter(canvas, DISPLAY_RAMP) : null;
+function clientMonsters() {   // the capture's join box (the retail capture tool/main.cpp D2CAPTURE_SESSION_A2, g_sessRadius=40): a 0xAC assign per monster with |dx|<=40 and |dy|<=40 of the start (inclusive); retail's LEVEL_AddClient has no distance test, retail's loading walk issues one D2Gfx 10043 per assign
+  const up = Number(Module.ccall('d2_session_units', 'number', [], [])) >> 2, nu = Module.ccall('d2_session_unit_count', 'number', [], []), H = Module.HEAP32, U = Module.HEAPU32;
+  let hero = -1, n = 0; for (let i = 0; i < nu; ++i) if (U[up + i * 11 + 1] === 0) { hero = up + i * 11; break; }
+  if (hero < 0) return 0;
+  const mons = [];
+  for (let i = 0; i < nu; ++i) { const q = up + i * 11; if (U[q + 1] === 1 && Math.max(Math.abs(H[q + 4] - H[hero + 4]), Math.abs(H[q + 5] - H[hero + 5])) <= 40) { ++n; mons.push(H[q + 2], H[q + 4], H[q + 5]); } }
+  // the entry ecx/edx of the loading walk's eight C1760 calls (D2Client+0x6C3F0's register leftovers, src/core/d2client/loading_pairs_6c3f0.cpp)
+  const rp = Module._malloc(144), mp = Module._malloc(Math.max(12, mons.length * 4));
+  Module.HEAP32.set(mons, mp >> 2);
+  const nr = Module.ccall('d2_session_hero_near_rooms', 'number', ['bigint'], [BigInt(rp)]);
+  const pairs = Module.ccall('d2_client_loading_pairs', 'string', ['bigint', 'number', 'bigint', 'number', 'number', 'number'], [BigInt(mp), n, BigInt(rp), nr, H[hero + 4], H[hero + 5]]);
+  Module._free(rp); Module._free(mp);
+  return { n, pairs: pairs.split(' ').map((t) => t.split(':').map((h) => parseInt(h, 16))) };
+}
+// PERF: while the rAF loop is drawing (a visible player tab), a redraw asked for by an input handler or
+// timer is folded into the next frame instead of drawing the whole frame twice inside one vsync (a click
+// cost a full extra frame, 100-336 ms measured on char select). A test page (webdriver) and a tab whose
+// rAF has stopped draw at once, exactly as before; renderNow() always does.
+const FOLD_RENDER = !globalThis.navigator?.webdriver;
+let rafAt = -Infinity, renderOwed = false;
+function render(now = false) {
+  if (FOLD_RENDER && !now && !liveFrame && performance.now() - rafAt < 100) { renderOwed = true; return; }
+  renderOwed = false;
+  W?.park();
+  hoverPick = null;
+  fillFrameSnapshot();
+  const renderTok = RENDER_WIRE?.begin();
+  // First frame of a G trace: retail's loading screen (D2Client+0xC1760, 640x480, entry ecx/edx leftovers not modelled); else the frame's first call.
+  const first = globalThis.__d2G?.length === 0 && Module._d2_client_loading_g;
+  globalThis.__d2GLoading = !!first;   // retail's room walk draws no unit while D2Client+0xC1760's loading screen runs (gUnit is silent)
+  if (first) { const cm = clientMonsters(); gLoadingWalk((e, d, f) => Module.ccall('d2_client_loading_g', 'string', ['number','number','number','number','number','number'], [f, e, d, 640, 480, 0x7fffffff]), cm.n, cm.pairs); }
+  if (Array.isArray(globalThis.__d2G)) gFrame(Module, 0, first ? 0x273c : 0);   // D2Client+0x44230 up to the room walk
   setFrontdoorError(frontdoorError, !realmSceneActive && screen === SCREEN.SELECT ? charSelectError : '');
   // The frame-cost instrument (assets/frame-perf.mjs) is refreshed per frame and, while off, every
   // perfT0()/perfT() below is a no-op: the shipped frame draws byte-identically.
@@ -3225,6 +3449,21 @@ function render() {
   const pRender = perfT0();
   const pWorld = perfT0();
   if (realmSceneActive) drawRealmFrame(); else drawFrame();
+  if (RENDER_WIRE) RENDER_WIRE.end(renderTok, { ready: !!(typeof Module !== 'undefined' && window.__d2?.ready && terrain && !realmSceneActive), frameSnap, entities: snapshot?.entities, objects: snapshot?.objects,
+    meta: { playerId: snapshot?.playerId, act: snapshot?.act, tick: snapshot?.tick,
+      missileCels: Object.fromEntries((snapshot?.entities ?? []).filter((e) => e.kind === 'missile').map((e) => [e.classId, missileCelFile(e.classId)])), player: { ...snapshot?.player, ...cameraCentre() }, width: canvas.width, height: canvas.height, viewCX: viewCX(), palettePath: actPalettePath(terrainAct + 1),
+      items: RENDER_WIRE.ownsWorld ? (snapshot?.items ?? []).filter((i) => i.mode === 3 && i.invPage === 255).map((i) => ({ id: i.id, classId: i.classId, x: i.x, y: i.y,
+        flippyFile: i.flippyFile, goldAmount: i.goldAmount, framePrecise: i.framePrecise, colourByte: i.colourByte })) : undefined,
+      hover: RENDER_WIRE.ownsWorld ? (() => { const hv = snapOr('hoverTarget', hoverTarget); return hv ? { kind: hv.kind, id: hv.id } : null; })() : undefined,
+      speechIds: RENDER_WIRE.ownsWorld ? (snapshot?.entities ?? []).filter((e) => e.speechPending === true).map((e) => e.id) : undefined,
+      heroFx: RENDER_WIRE.ownsWorld ? heroFx.map((f) => ({ kind: f.kind, file: f.file, classId: f.classId, age: f.age, trans: f.trans, predraw: !!f.predraw, wx: f.wx, wy: f.wy,
+        cel: f.kind === 'missile' ? missileCelFile(f.classId) : undefined })) : undefined,
+      weather: RENDER_WIRE.ownsWorld ? wireWeather : undefined,
+      localPlayer: (() => { const s = selectedPlayerSource(); return s.source !== 'none' && s.renderState ? { renderState: s.renderState, x: s.x, y: s.y } : null; })(),
+      hud: hudState({ w: canvas.width, h: canvas.height, snapshot, advancement: snapOr('advancement', readAdvancement), screen: snapOr('characterScreen', readCharacterScreen),
+        left: Boolean(characterVisible || questVisible || stashOpen || waypointMenu || shopOpen()), right: Boolean(skillsVisible || inventoryVisible || hirelingVisible),
+        iconRow: hudIconRow, runToggle: snapOr('runToggle', readRunToggle), miniDown, beltBoxes: snapOr('beltHudBoxes', readBeltHudBoxes),
+        beltKeys: beltKeyNames(controlsPanel?.bindings ?? bootControlBindings), clearScreen: clearScreen || !controlPanelRenderer || screen !== SCREEN.GAME }) } });
   perfT('world', pWorld);
   if (!realmSceneActive && screen === SCREEN.GAME && gameMenu?.open && !controlsPanel?.open) { const p = perfT0(); gameMenu.draw(ctx, canvas.width, canvas.height); perfT('menu', p); }
   if (!realmSceneActive && screen === SCREEN.GAME && controlsPanel?.open) { const p = perfT0(); controlsPanel.draw(ctx, canvas.width, canvas.height); perfT('controls', p); }   // F218
@@ -3235,7 +3474,7 @@ function render() {
     const p = perfT0();
     const drawn = pointerLayer.draw(ctx, canvas, { session, items: snapshot.items, pointerX: pointer.x, pointerY: pointer.y,
       context: gameCursorContext(),
-      cursorId: Module._d2_session_cursor_item ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0 });
+      cursorId: frameSnap?.cursorItemId !== undefined ? frameSnap.cursorItemId : (Module._d2_session_cursor_item ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0) });
     cursorItemEvidence = drawn.item; gameCursorEvidence = drawn.game;
     perfT('pointer', p);
   }
@@ -3243,9 +3482,15 @@ function render() {
   // pixels are blitted straight to the primary surface. Measured -- retail's own capture of a movie
   // frame matches our unramped decode to 0.14% RMSE and the same frame ramped to 2.6% (assets/
   // cinematics.mjs), so the ramp must stay off while a movie is up.
-  if (!(screen === SCREEN.TITLE && bootMovieSpec(titlePhase)) && !(screen === SCREEN.CINEMATICS && cinematicsScreen?.evidence.playing != null)) {
+  const movie = (screen === SCREEN.TITLE && bootMovieSpec(titlePhase)) || (screen === SCREEN.CINEMATICS && cinematicsScreen?.evidence.playing != null);
+  const css = !movie && liveFrame && CSS_RAMP && !RENDER_WIRE;
+  if (css !== cssRampOn) canvas.style.filter = (cssRampOn = css) ? 'url(#d2-display-ramp)' : '';
+  glRampOn = !movie && liveFrame && !!glPresenter?.ok;
+  if (!movie && !css && !glRampOn) {
     const p = perfT0(); applyDisplayRamp(canvas.width, canvas.height); perfT('ramp', p);
   }
+  if (glPresenter?.ok) { const p = perfT0(); glPresenter.present(glRampOn); perfT('present', p); }   // a non-live frame is already ramped
+  if (Array.isArray(globalThis.__d2G)) gFrame(Module, 1);   // D2Client+0x44230 after the room walk
   perfT('render', pRender);
   perfCountFrame();
 }
@@ -3370,7 +3615,7 @@ async function syncRealmScene() {
   try {
     if (!playerRenderer) playerRenderer = createPlayerRenderer(createMpqAssetReader(Module), document, { shadow: true });
     if (!monsterRenderer) monsterRenderer = createMonsterRenderer(createMpqAssetReader(Module), document, { shadow: true });
-    if (!missileRenderer) missileRenderer = createMissileRenderer(createMpqAssetReader(Module), document, (cls) => Module.ccall('d2_missile_celfile', 'string', ['number'], [cls]));
+    if (!missileRenderer) missileRenderer = createMissileRenderer(createMpqAssetReader(Module), document, missileCelFile);
     const loaded = loadRealmClientTerrain(Module, realmWorldView.act);
     if (!loaded.terrain) throw new Error(loaded.error || 'client DRLG has no drawable terrain');
     terrain = loaded.terrain; terrainFiles = loaded.files; terrainError = '';
@@ -3462,7 +3707,8 @@ function drawFrame() {
   ensureTerrain();
   // Retail leaves unpainted world pixels black. A tinted near-black field survives the display
   // ramp as RGB(12,15,12), creating visible green islands in terrain holes (F38, s260).
-  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
+  if (RENDER_WIRE?.ownsWorld) ctx.clearRect(0, 0, w, h);   // ?render=w: the worker's canvas under this one paints the world
+  else { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h); }
   // The real map: one draw per placed tile, floors then walls, positioned by the engine's own
   // isometric screen coordinates. Falls back to the old act atlas only if terrain failed to load.
   // Diablo II is isometric. Everything world-anchored projects through the SAME transform the
@@ -3472,7 +3718,7 @@ function drawFrame() {
   const proj = (wx, wy) => { const p = worldToScreen(wx, wy); return [p.x - camera.x + viewCX(), p.y - camera.y + (h / 2 + UNIT_CENTRE_Y)]; };
   // Objects and ground items are static: on the integer grid under the half-subtile camera (8 px higher).
   const projStatic = (wx, wy) => proj(wx - 0.5, wy - 0.5);
-  const hovered = hoverTarget();
+  const hovered = snapOr('hoverTarget', hoverTarget);
 
   // Sprites are handed to the terrain pass rather than painted after it, so a wall in front of a
   // monster covers the monster. `depth` is the projected screen Y -- the same key the walls sort on.
@@ -3575,7 +3821,7 @@ function drawFrame() {
       const waypoint = waypointPadAnchor(Module, object, drawn, sx, sy); if (waypoint) waypointPadEvidence.push(waypoint);
     } });
   }
-  for (const item of snapshot.items) if ((item.mode === 3 || item.mode === 5) && item.invPage === 255) {
+  if (!RENDER_WIRE?.ownsWorld) for (const item of snapshot.items) if ((item.mode === 3 || item.mode === 5) && item.invPage === 255) {
     const [sx, sy] = projStatic(item.x, item.y);
     // The hovered ground item is drawn in retail's DrawMode 7, like a hovered object/unit (V5).
     const isHovered = hovered?.kind === 'item' && hovered.id === item.id;
@@ -3595,31 +3841,33 @@ function drawFrame() {
       // their own): read it with the tiles that index it, never from an earlier frame. The tiles of
       // the neighbouring levels' active rooms come with it (across a seam retail draws them, F24).
       const pRead = perfT0();
-      const { tiles, files } = readSessionTerrain(Module);
+      const { tiles, files } = frameSnap?.tiles !== undefined ? { tiles: frameSnap.tiles, files: frameSnap.files } : readSessionTerrain(Module);
       terrainTiles = tiles;
       if (tiles.length) {
         terrainFiles = files;
         // Floors are lit from the engine's light map, as D2Client lights them.
-        const lightmap = readSessionLightmap(Module);
+        const lightmap = snapOr('lightmap', () => readSessionLightmap(Module));
         terrain.setLightGrid(lightmap ? (a, b) => lightmap.grid(a, b) : null, lightmap?.at, lightmap?.ambient, lightmap);
         // Retail's weather (F11b): the level's own Levels.txt `Rain` byte decides, and the rain draws
         // between the floors and the walls, where retail's own frame puts it (session-terrain.mjs).
-        const rain = weatherRenderer && Module._d2_session_level_rain ? Module.ccall('d2_session_level_rain', 'number', [], []) : -1;
+        const rain = snapOr('rain', () => weatherRenderer && Module._d2_session_level_rain ? Module.ccall('d2_session_level_rain', 'number', [], []) : -1);
         weatherRenderer?.setLevel(rain);
         weatherRenderer?.advance(engineTicks);
         weatherEvidence = { rain, blits: [] };
+        wireWeather = RENDER_WIRE?.ownsWorld ? { rain, ticks: engineTicks, nearFeed: snapOr('activeNearFeed', () => readSessionActiveNearFeed(Module)), wcam: { x: 0, y: 0 }, cam: { x: 0, y: 0 } } : undefined;
         // Retail's camera is the player's PRECISE position, a subtile's centre (x + 0.5, y + 0.5): the
         // static world (floors, walls, objects, ground items) sits on the integer grid under it, while
         // units stand at their centres too.
         const wcam = worldToScreen(cameraGrid().x, cameraGrid().y);
+        if (wireWeather) { wireWeather.wcam = { x: wcam.x, y: wcam.y }; const cm = worldToScreen(cameraGrid().x, cameraGrid().y); wireWeather.cam = { x: cm.x, y: cm.y }; }
         perfT('worldRead', pRead);
         const pTerrain = perfT0();
-        terrainStats = terrain.draw(ctx, tiles, terrainFiles, { ...snapshot.player, ...cameraCentre() }, w, h, sprites,
+        terrainStats = RENDER_WIRE?.ownsWorld ? (RENDER_WIRE.evidence?.terrainStats ?? null) : terrain.draw(ctx, tiles, terrainFiles, { ...snapshot.player, ...cameraCentre() }, w, h, sprites,
           // A broken weather must not take the world down with it: the terrain pass catches nothing, and
           // the error is reported on the evidence a row reads rather than swallowed.
-          weatherRenderer ? (c, floors, viewport) => {
+          weatherRenderer && !RENDER_WIRE?.ownsWorld ? (c, floors, viewport) => {
             try {
-              const activeNearFeed = readSessionActiveNearFeed(Module);
+              const activeNearFeed = snapOr('activeNearFeed', () => readSessionActiveNearFeed(Module));
               // PERF (a retail recording): the feed's audit is NOT computed here. It was, once per frame, into a
               // weatherEvidence field the public getter below never returns -- 0.25 ms of Maps, Sets and
               // key strings per frame reachable by nothing. `auditSessionActiveNearFeed` itself stays
@@ -3634,9 +3882,9 @@ function drawFrame() {
     } catch (error) { terrainError = String(error); terrain = null; }
   }
   // Without terrain there is no wall pass to interleave into, so the sprites still need painting.
-  if (!terrainStats?.drawn) for (const sprite of sprites) { gUnit(sprite.u, sprite.wx, sprite.wy); sprite.draw(ctx); }
+  if (!terrainStats?.drawn && !RENDER_WIRE?.ownsWorld) for (const sprite of sprites) { gUnit(sprite.u, sprite.wx, sprite.wy); sprite.draw(ctx); }
   // Retail's falling rain drops are line primitives drawn after the whole world, before the HUD (F11b).
-  if (weatherRenderer && terrain && weatherEvidence.rain > 0) {
+  if (weatherRenderer && terrain && weatherEvidence.rain > 0 && !RENDER_WIRE?.ownsWorld) {
     const pWeather = perfT0();
     try { const cam = worldToScreen(cameraGrid().x, cameraGrid().y); weatherEvidence.lines = weatherRenderer.drawStreaks(ctx, w, h, engineTicks, cam.x, cam.y); weatherEvidence.cycle = { ...weatherRenderer.cycle.state, intensity: weatherRenderer.cycle.intensity }; }
     catch (error) { weatherEvidence.streakError = String(error); }
@@ -3714,10 +3962,10 @@ function drawFrame() {
   // PLAYER_ApplyDeathPenalty) sets; retail draws its string only when it is non-zero.
   if (session && deathScreenShown(snapshot.mode) && ensureDeathScreen()) {
     const clientFlags = Module._d2_session_client_flags
-      ? Module.ccall('d2_session_client_flags', 'number', [], []) : 0;
+      ? snapOr('clientFlags', () => Module.ccall('d2_session_client_flags', 'number', [], [])) : 0;
     deathScreenEvidence = deathScreen.draw(ctx, w, h, { hardcore: Boolean(clientFlags & 0x04),
       difficulty: snapshot.difficulty ?? 0, act: snapshot.act,
-      goldLost: Module.ccall('d2_session_player_stat', 'number', ['number', 'number'], [175, 0]) });
+      goldLost: snapOr('goldLost', () => Module.ccall('d2_session_player_stat', 'number', ['number', 'number'], [175, 0])) });
   } else deathScreenEvidence = null;
   // The NPC's menu hangs over their head until an entry is picked.
   npcMenuEvidence = null;
@@ -3747,7 +3995,7 @@ function drawFrame() {
     if (!shopOpen() && ensureSpeechBox() && npcSpeechScrollGate.ready)
       pendingSpeech = { text: npcState.greeting, messageInstance: npcVoiceGeneration, scrolling: true };
   } else if (shopOpen() && !globalThis.__d2HideShop && ensureVendorPanel()) {
-    try { npcPanelEvidence = vendorPanel.draw(ctx, w, h, { ...npcState, pointer, pressedButton: vendorButtonGesture.token && vendorButtonGesture.token === vendorPanel.buttonAt(pointer.x, pointer.y, w, h, npcState.classId) ? vendorButtonGesture.token : null, act: snapshot?.act, stashGold: Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [0]) : -1 }); npcPanelError = ''; }
+    try { npcPanelEvidence = vendorPanel.draw(ctx, w, h, { ...npcState, pointer, pressedButton: vendorButtonGesture.token && vendorButtonGesture.token === vendorPanel.buttonAt(pointer.x, pointer.y, w, h, npcState.classId) ? vendorButtonGesture.token : null, act: snapshot?.act, stashGold: snapOr('vendorStashGold', () => Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [0]) : -1) }); npcPanelError = ''; }
     catch (error) { npcPanelError = String(error); npcPanelEvidence = null; }
   } else if (npcState && npcSpeechHasText(npcSpeechSetting.mode) && ensureSpeechBox()) {
     // Plain talk, no shop, no active speech message: still the speech box (
@@ -3764,8 +4012,8 @@ function drawFrame() {
   // session, a loaded save, another class), not only when none is cached.
   const layoutKey = session ? `${snapshot.playerClass}/${snapshot.playerId}/${snapshot.seed}` : '';
   if (inventoryPanelRenderer && session && (!inventoryPanelRenderer.layout || inventoryLayoutKey !== layoutKey)) {
-    inventoryPanelRenderer.setLayout(readInventoryLayout()); inventoryLayoutKey = layoutKey; }
-  if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && session ? { ...snapshot, pointer, itemTip: (item) => tipFields(item.id, item.code), gold: Module.ccall('d2_session_player_gold', 'number', [], []), inventoryGoldPressed: Boolean(inventoryGoldPress), inventoryClosePressed: Boolean(inventoryClosePress) } : snapshot, panelShown(inventoryVisible));
+    inventoryPanelRenderer.setLayout(snapOr('inventoryLayout', readInventoryLayout)); inventoryLayoutKey = layoutKey; }
+  if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && session ? { ...snapshot, pointer, itemTip: (item) => tipFields(item.id, item.code), gold: snapOr('playerGold', () => Module.ccall('d2_session_player_gold', 'number', [], [])), inventoryGoldPressed: Boolean(inventoryGoldPress), inventoryClosePressed: Boolean(inventoryClosePress) } : snapshot, panelShown(inventoryVisible));
   // O / the configurable Hireling Screen binding reads the engine's canonical pet roster. The
   // window exposes only values the roster's live unit supplies; a nearby monster is never treated
   // as this player's mercenary. Frame is the retail invchar panel, text is the retail bitmap font
@@ -3774,7 +4022,7 @@ function drawFrame() {
   if (hirelingVisible && session && !clearScreen) {
     const scale = Math.min(1, w / 800, h / 600), ox = (w - 800 * scale) / 2, oy = (h - 600 * scale) / 2;
     const x = ox + 400 * scale, y = oy + 60 * scale, pw = 320 * scale, ph = 441 * scale;
-    const roster = readHirelingRoster();
+    const roster = snapOr('hirelingRoster', readHirelingRoster);
     const rows = roster.map((pet) => ({ guid: pet.guid, classId: pet.classId, name: pet.name || '', level: pet.level,
       life: Math.max(0, pet.life >> 8), maxLife: Math.max(0, pet.maxLife >> 8), dead: Boolean(pet.flags & 1), unitPresent: pet.unitPresent }));
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -3786,13 +4034,13 @@ function drawFrame() {
   pollUiEvents();
   if (stashPanelRenderer) {
     if (stashPanelRenderer?.plugy.on) { stashPanelRenderer.plugy.pageName = `${plugyStash.showShared ? 'Shared' : 'Personal'} Page n\u00b0${plugyStash.page + 1}`; stashPanelRenderer.plugy.nameColour = plugyStash.showShared ? 1 : 0; }
-    try { stashEvidence = stashPanelRenderer.draw(ctx, w, h, stashOpen ? readStashLayout() : null, snapshot.items, stashOpen, snapshot.act, Boolean(stashClosePress)); stashPanelError = ''; }
+    try { stashEvidence = stashPanelRenderer.draw(ctx, w, h, stashOpen ? snapOr('stashLayout', readStashLayout) : null, snapshot.items, stashOpen, snapshot.act, Boolean(stashClosePress)); stashPanelError = ''; }
     catch (error) { stashPanelError = String(error); stashEvidence = null; }
     plugyStash.text = stashPanelRenderer.text; plugyStash.pointer(pointer.x, pointer.y, w, h);
-    plugyEvidence = plugyStash.draw(ctx, w, h, stashOpen ? readStashLayout() : null, stashOpen, snapshot.act || 1);
+    plugyEvidence = plugyStash.draw(ctx, w, h, stashOpen ? snapOr('stashLayout', readStashLayout) : null, stashOpen, snapshot.act || 1);
   }
   if (cubePanelRenderer) {
-    try { cubeEvidence = cubePanelRenderer.draw(ctx, w, h, cubeOpen ? readCubeLayout() : null, snapshot.items, cubeOpen, snapshot.act); }
+    try { cubeEvidence = cubePanelRenderer.draw(ctx, w, h, cubeOpen ? snapOr('cubeLayout', readCubeLayout) : null, snapshot.items, cubeOpen, snapshot.act); }
     catch (error) { stashPanelError = 'cube: ' + error; cubeEvidence = null; }
   }
   if (stashGoldRenderer) {
@@ -3801,54 +4049,54 @@ function drawFrame() {
         const step = stashGoldSpinnerRepeat.onRender(globalThis.performance?.now?.() ?? Date.now());
         if (step) changeStashGoldAmount(stashGoldPress.action === 'increase' ? step : -step);
       }
-      stashGoldEvidence = stashGoldRenderer.draw(ctx, w, h, stashOpen ? readStashLayout() : null, stashOpen,
-        { ...(stashGoldDialog || {}), bank: stashGoldStat(STASH_GOLD.bank) }); stashGoldError = ''; }
+      stashGoldEvidence = stashGoldRenderer.draw(ctx, w, h, stashOpen ? snapOr('stashLayout', readStashLayout) : null, stashOpen,
+        { ...(stashGoldDialog || {}), bank: snapOr('bankGold', () => stashGoldStat(STASH_GOLD.bank)) }); stashGoldError = ''; }
     catch (error) { stashGoldError = String(error); stashGoldEvidence = null; }
   }
   if (waypointPanelRenderer) {
     try {
-      const wp = waypointMenu ? readWaypointTable() : null;
+      const wp = waypointMenu ? snapOr('waypointTable', readWaypointTable) : null;
       waypointEvidence = waypointPanelRenderer.draw(ctx, w, h, wp ? wp.rows(waypointMenu.act) : [], waypointMenu?.act ?? snapshot.act, Boolean(waypointMenu), snapshot.level, snapshot.act, wp?.tabs ?? null);
       waypointPanelError = '';
     }
     catch (error) { waypointPanelError = String(error); waypointEvidence = null; }
   }
   if (characterPanelRenderer) {
-    const adv = readAdvancement();
+    const adv = snapOr('advancement', readAdvancement);
     // Life and mana are the snapshot's, not the advancement record's: the panel shows what the
     // player has right now, and the engine is the only thing that decides that.
     characterPanelEvidence = characterPanelRenderer.draw(ctx, w, h, adv && {
-      ...adv, name: chosenName || '', className: Module.ccall('d2_lang_string', 'string', ['string'], [CLASS_NAMES[snapshot.playerClass] || '']) || CLASS_NAMES[snapshot.playerClass] || '',
+      ...adv, name: chosenName || '', className: langStr(CLASS_NAMES[snapshot.playerClass] || '') || CLASS_NAMES[snapshot.playerClass] || '',
       // Retail stores life and mana as 8.8 fixed point (50 life is 12800) and displays the whole
       // part. Drawing the raw stat put "14848" in the Life slot.
       life: (snapshot.player?.hp ?? 0) >> 8, lifeMax: (snapshot.player?.hpMax ?? 0) >> 8,
       mana: (snapshot.player?.mana ?? 0) >> 8, manaMax: (snapshot.player?.manaMax ?? 0) >> 8, act: snapshot.act,
-      screen: characterVisible ? readCharacterScreen() : null,
+      screen: characterVisible ? snapOr('characterScreen', readCharacterScreen) : null,
       closePressed: characterPanelCloseGesture.pressed,
-      string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]),
+      string: langStr,
     }, panelShown(characterVisible));
   }
   questEvidence = null;
   if (questLogRenderer && panelShown(questVisible) && session && !clearScreen) {
-    const words = readQuestWords(), act = questAct || (questAct = snapshot.act || 1, questSelected = questFirst(words, questAct), questAct);
+    const words = snapOr('questWords', readQuestWords), act = questAct || (questAct = snapshot.act || 1, questSelected = questFirst(words, questAct), questAct);
     questEvidence = questLogRenderer.draw(ctx, w, h, { act, tabs: questTabs(words, snapshot.act || 1), words, selected: questSelected, descrOn: questDescrOn,
       pressed: questCloseGesture.pressed ? 'close' : null,
       anim: { quests: questAnim, tick: engineTicks - questOpenedAt },
-      string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]) }, true, snapshot.act || 1);
+      string: langStr }, true, snapshot.act || 1);
   }
   if (skillPanelRenderer) {
-    const adv = readAdvancement();
+    const adv = snapOr('advancement', readAdvancement);
     skillPanelEvidence = skillPanelRenderer.draw(ctx, w, h, skillsVisible ? {
       // The class is the snapshot's top-level field (player.playerClass does not exist: the tree was the Amazon's for everyone).
       playerClass: snapshot.playerClass ?? 0, level: adv?.level ?? 1, act: snapshot.act,
-      string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]),
-      skillPoints: adv?.skillPoints ?? 0, skills: readClassSkills() || [],
+      string: langStr,
+      skillPoints: adv?.skillPoints ?? 0, skills: snapOr('classSkills', readClassSkills) || [],
       // The close control's held state: down arms it and draws buysellbtn 11, up fires the close
       // (native FUN_6FB296F0 / FUN_6FB28FC0, proven through the shared widget below).
       closePressed: gameUiButtonGesture.token === 'panel-close:skills',
       // SkillDesc's wStrName/wStrLong/wStrMana are .tbl indices, so the hover plate's name,
       // description and mana line are retail's own strings, not a table this client keeps.
-      line: (index) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index]), skillDesc: readSkillDesc, skillMana: (id, level) => Module.ccall('d2_session_skill_mana', 'number', ['number', 'number'], [id, level]) } : null, panelShown(skillsVisible));
+      line: langIdx, skillDesc: skillDescSnap, skillMana: skillManaSnap } : null, panelShown(skillsVisible));
   }
   // s693: retail's level-ENTRY banner -- the arriving level's own `EntryFile` art, drawn for 120 game
   // frames from the arrival. It goes here, before the HUD chrome, because that is where retail's own
@@ -3862,7 +4110,7 @@ function drawFrame() {
     if (!clearScreen && engineTicks - entryBannerAt < ENTRY_BANNER.frames) {
       try {
         entryBannerEvidence = entryBannerRenderer.draw(ctx, w, h, { levelId: entryBannerLevel, act: snapshot.act,
-          entryFile: Module.ccall('d2_level_entry_file', 'string', ['number'], [entryBannerLevel]) });
+          entryFile: frameSnap?.entryFileLevel === entryBannerLevel ? frameSnap.entryFile : Module.ccall('d2_level_entry_file', 'string', ['number'], [entryBannerLevel]) });
       } catch (error) { entryBannerEvidence = null; entryBannerError = String(error); }
     }
   } else if (!session) entryBannerLevel = -1;
@@ -3880,13 +4128,13 @@ function drawFrame() {
   if (helpRenderer && helpVisible) helpRenderer.dim(ctx, w, h);   // retail: the world is dimmed, then the chrome and the screen are drawn over it
   if (controlPanelRenderer && clearScreen) controlPanelEvidence = null;
   if (controlPanelRenderer && !clearScreen) {
-    const screen = readCharacterScreen();
+    const screen = snapOr('characterScreen', readCharacterScreen);
     // Ordinary NPC speech is screen-centred and does not consume the left half.
     // Only the actual vendor panel participates in the retail side-panel layout.
     const left = characterVisible || questVisible || stashOpen || waypointMenu || shopOpen();
     const right = skillsVisible || inventoryVisible || hirelingVisible;
     const shift = HUD_LAYOUT.miniPanelShift;
-    controlPanelEvidence = controlPanelRenderer.draw(ctx, w, h, snapshot, readAdvancement(),
+    controlPanelEvidence = RENDER_WIRE?.ownsWorld ? (RENDER_WIRE.evidence?.controlPanel ?? controlPanelEvidence) : controlPanelRenderer.draw(ctx, w, h, snapshot, snapOr('advancement', readAdvancement),
       { iconRow: hudIconRow && !(left && right), offsetX: left && !right ? shift.left : right && !left ? shift.right : 0,
         // The ARROW's own toggle, which is a different state from the row being hidden: retail
         // keeps menubutton frame 2 while the row is gone (stash-town.txt), so only the arrow's own
@@ -3895,7 +4143,7 @@ function drawFrame() {
         // The run/walk toggle is the ENGINE's, like every other HUD state here: the same flag that
         // decides whether d2_session_command_move sends retail's 0x01 Walk or its 0x03 Run packet
         // is what picks the run button's cel. The client never keeps its own copy of it.
-        runToggle: readRunToggle(), miniPressed: miniDown,
+        runToggle: snapOr('runToggle', readRunToggle), miniPressed: miniDown,
         // The ornate bar strips between the skill buttons and the console (wide views only; fitView's `fill`).
         strips: w > 800 && ensureFreeRes()?.ready ? (c) => { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); drawParts(c, freeResArt, barParts(w, h)); c.restore(); } : null,
         stamina: screen ? { value: screen[4], maximum: screen[5] } : null });
@@ -3903,12 +4151,12 @@ function drawFrame() {
   // Retail D2Client+0x26970/+0x278B0: XP / stamina bar hover text,
   // a centred Font16 plate (D2Win #10085: box = text + 8, bottom = y + 2, glyphs 3 above the bottom).
   if (controlPanelRenderer && !clearScreen && hoverFont) {
-    const adv = readAdvancement(), scr = readCharacterScreen();
+    const adv = snapOr('advancement', readAdvancement), scr = snapOr('characterScreen', readCharacterScreen);
     const lvIndex = controlPanelRenderer.hitLevelButton(controlPanelEvidence, pointer.x, pointer.y, w, h);
     const tip = (adv && scr && hudBarTooltip(w, h, pointer.x, pointer.y, { experience: adv.experience, nextExperience: adv.nextExperience,
-      stamina: scr[4], staminaMax: scr[5], fmtExp: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [4163]),
-      fmtStamina: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [4164]) })) ||
-      levelButtonTooltip(lvIndex, controlPanelEvidence?.hud?.levelButtons?.[lvIndex], [3986, 3987].map((i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i])));
+      stamina: scr[4], staminaMax: scr[5], fmtExp: hudLang(4163),
+      fmtStamina: hudLang(4164) })) ||
+      levelButtonTooltip(lvIndex, w, h, [3986, 3987].map(hudLang));
     if (tip) {
       const bw = hoverFont.measure(tip.text) + 8, left = Math.min(Math.max(tip.x - (bw >> 1), 0), w - bw), bottom = tip.y + 2;
       ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(left, bottom - 16, bw, 16); ctx.restore();
@@ -3955,7 +4203,7 @@ function drawFrame() {
   // own state (`H`), never from a panel's.
   messageEvidence = null;
   if (messageLogRenderer && messageVisible && !clearScreen) {
-    const str = (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]);
+    const str = langStr;
     messageEvidence = messageLogRenderer.draw(ctx, w, h, { title: str('strMsgLog'), close: str('strClose'), lines: messageLines, scroll: messageScroll }, true, snapshot.act || 1);
   }
   if (messageLogRenderer && chat !== null && !clearScreen) {
@@ -3969,20 +4217,21 @@ function drawFrame() {
   // `record`/`recordBoxes` carry which Belts.txt row the engine read and how many boxes it has, so a
   // row can tell a 16-box Girdle from the four-box record a bare character has, and `boxes` is what
   // was actually laid out.
-  if (beltRenderer) { const bo = hudOrigin(w, h, 'bottom');   // belt boxes are retail 800x600 coordinates; bottom-centre anchored
+  if (beltRenderer && !RENDER_WIRE?.ownsWorld) { const bo = hudOrigin(w, h, 'bottom');   // belt boxes are retail 800x600 coordinates; bottom-centre anchored
     ctx.save(); ctx.translate(bo.x, bo.y);
-    beltEvidence = { ...beltRenderer.draw(ctx, snapshot.items, readBeltHudBoxes(), true, beltKeyNames(controlsPanel?.bindings ?? bootControlBindings)),
-      record: readBeltIndex(), recordBoxes: readBeltBoxes()?.length ?? 0, origin: { x: bo.x, y: bo.y } };
+    beltEvidence = { ...beltRenderer.draw(ctx, snapshot.items, snapOr('beltHudBoxes', readBeltHudBoxes), true, beltKeyNames(controlsPanel?.bindings ?? bootControlBindings)),
+      record: snapOr('beltIndex', readBeltIndex), recordBoxes: snapOr('beltBoxCount', () => readBeltBoxes()?.length ?? 0), origin: { x: bo.x, y: bo.y } };
     ctx.restore(); }
   else if (clearScreen) beltEvidence = null;
+  else if (RENDER_WIRE?.ownsWorld && RENDER_WIRE.evidence?.belt) beltEvidence = { ...RENDER_WIRE.evidence.belt, record: snapOr('beltIndex', readBeltIndex), recordBoxes: snapOr('beltBoxCount', () => readBeltBoxes()?.length ?? 0) };
   // The item on the cursor and the world cel are drawn by the pointer layer in render(), after the
   // Esc menu -- the last draw of the frame, which is where retail's own pointer goes.
-  if (skillSelectRenderer && session && !clearScreen) { try { skillSelectEvidence = skillSelectRenderer.draw(ctx, w, h, readSkillChoices(), readSelectedSkills(),
-    { act: snapshot.act, hotkeys: Array.from({ length: 8 }, (_, i) => ({ skill: Number(Module.ccall('d2_session_hotkey_skill', 'number', ['number'], [i])), left: Boolean(Module.ccall('d2_session_hotkey_hand', 'number', ['number'], [i])) })), skillStrings: readSkillStrings, plateState: skillPlateState(), line: (i) => (i ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) : '') }); } catch (error) { skillSelectError = String(error); } }
+  if (skillSelectRenderer && session && !clearScreen) { try { skillSelectEvidence = skillSelectRenderer.draw(ctx, w, h, snapOr('skillChoices', readSkillChoices), snapOr('selectedSkills', readSelectedSkills),
+    { act: snapshot.act, hotkeys: snapOr('hotkeys', () => Array.from({ length: 8 }, (_, i) => ({ skill: Number(Module.ccall('d2_session_hotkey_skill', 'number', ['number'], [i])), left: Boolean(Module.ccall('d2_session_hotkey_hand', 'number', ['number'], [i])) }))), skillStrings: skillStringsSnap, plateState: skillPlateState(), line: (i) => (i ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) : '') }); } catch (error) { skillSelectError = String(error); } }
   else if (clearScreen) { skillSelectEvidence = null; skillSelectError = ''; }
   orbReadoutEvidence = !clearScreen && session && hoverFont
     ? drawOrbReadouts(ctx, hoverFont, snapshot, w, h, pointer, orbPins,
-      index => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [index])) : [];
+      langIdx) : [];
   // Retail draws the Help screen over the finished HUD chrome (belt, skill sockets): after them, not before.
   helpEvidence = null;
   if (helpRenderer && helpVisible) {
@@ -4027,24 +4276,167 @@ setInterval(() => {
   else if (!bootstrapStarted && PLAY_MODE && window.__d2Entry.retail && sessionAdapter()) bootstrapSession();   // same one answer as above
 }, 200);
 
+// --- worker mode ---
+// ?worker= : absent is 0 (default-on reverted 2026-10-27, see test/defaults-on.test.mjs); 1, 2 and t as asked.
+// Gates, all required, else W stays null: ?play=1, a Chrome UA (test copied from play/streamfs.js, not imported),
+// crossOriginIsolated, a non-zero handle from d2_web_worker_start.
+const WORKER_MODE = workerMode(location.search);
+const workerCounters = { callWhileOwned: 0, mainTick: 0, staleView: 0, readMismatch: 0 };
+const startWorker = () => {
+  if (WORKER_MODE === '0' || !PLAY_MODE) return null;
+  const IS_FIREFOX = typeof navigator !== 'undefined' && /Firefox\//.test(navigator.userAgent || '');
+  const IS_WEBKIT = typeof navigator !== 'undefined' &&
+    /Version\/.*Safari\//.test(navigator.userAgent || '') && !/Chrome\//.test(navigator.userAgent || '');
+  if (IS_FIREFOX || IS_WEBKIT || !/Chrome\//.test(navigator.userAgent || '')) return null;
+  if (typeof crossOriginIsolated === 'undefined' || crossOriginIsolated !== true) return null;
+  if (typeof Module === 'undefined' || typeof Module._d2_web_worker_start !== 'function') return null;
+  let h = 0;
+  try { h = Module.ccall('d2_web_worker_start', 'number', ['number'], [1024]); } catch (e) { return null; }
+  if (!h) return null;
+  const refreshViews = () => {
+    if (Module.HEAPU8.length !== Module._d2_web_worker_heap_bytes()) {
+      workerCounters.staleView++;
+      Module.ccall('d2_web_worker_selftest', 'number', ['number', 'number', 'string'], [h, 0, 'v']);
+    }
+  };
+  const waitReady = async () => {
+    const t0 = performance.now();
+    while (!Module._d2_web_worker_ready(h)) {
+      if (performance.now() - t0 > 10000) throw new Error('worker not ready');
+      await new Promise((r) => setTimeout(r, 5));
+    }
+  };
+  let pending = false, parking = false, last = 0, dead = false;
+  const shutdown = () => { if (dead) return; dead = true; try { Module._d2_web_worker_park(h); } catch (e) { /* already parked */ } };
+  const fail = (e) => { shutdown(); W = null; console.warn('worker path off:', e); };
+  window.addEventListener('pagehide', shutdown);
+  window.addEventListener('unload', shutdown);
+  const run = (kind, arg) => Module.ccall('d2_web_worker_selftest', 'number', ['number', 'number', 'string'], [h, kind, arg]);
+  const api = {
+    handle: h,
+    owned: () => pending && !dead,
+    pending: () => pending && !dead,
+    parking: () => parking,
+    tick(n) {
+      // Before the worker is ready, ticks run on main (plan 6.5 thread rule) and are counted.
+      if (!Module._d2_web_worker_ready(h)) { workerCounters.mainTick++; return Module.ccall('d2_session_tick', 'number', ['number'], [n]); }
+      try {
+        Module._d2_web_worker_post(h, n);
+        pending = true;
+        if (WORKER_MODE === '1') return this.park();
+        return last;
+      } catch (e) { fail(e); return Module.ccall('d2_session_tick', 'number', ['number'], [n]); }
+    },
+    park() {
+      if (parking || !pending) return last;
+      pending = false;
+      parking = true;
+      try {
+        last = Module._d2_web_worker_wait(h);
+        if (Module.HEAPU8.length !== Module._d2_web_worker_heap_bytes()) {
+          Module.ccall('d2_web_worker_selftest', 'number', ['number', 'number', 'string'], [h, 0, 'v']);
+        }
+      } catch (e) { fail(e); } finally { parking = false; }
+      return last;
+    },
+    async selftest(kind) {
+      await waitReady();
+      if (kind === 0 || kind === 3) return run(kind, 'v') === 1;
+      if (kind === 2) {
+        Module.FS.writeFile('/tmp/wsel', new Uint8Array([1, 2, 3, 4]));
+        return run(2, '/tmp/wsel') === 1;
+      }
+      if (kind === 1) {
+        const old = Module._d2_web_worker_heap_bytes();
+        const r = run(1, 'v');
+        refreshViews();
+        const u8 = Module.HEAPU8;
+        let ok = r === 1;
+        for (let i = 0; i < 16; i++) if (u8[old + i] !== ((i * 37 + 11) & 255)) { ok = false; workerCounters.readMismatch++; }
+        for (let i = 0; i < 16; i++) u8[old + i] = 0;
+        return ok;
+      }
+      return false;
+    },
+  };
+  if (WORKER_MODE === '1' || WORKER_MODE === '2') installWorkerGuard(Module, api, workerCounters, Number(WORKER_MODE));
+  return api;
+};
+// Started once the runtime is up (window.__d2.ready, set in index.html onRuntimeInitialized): this module
+// evaluates before that, when Module._d2_web_worker_start does not exist yet.
+let W = null;
+if (WORKER_MODE !== '0' && PLAY_MODE) {
+  const wPoll = setInterval(() => { if (!window.__d2?.ready) return; clearInterval(wPoll); W = startWorker(); }, 50);
+}
+window.__d2Worker = Object.freeze({
+  get counters() { return { ...workerCounters }; },
+  get callWhileOwned() { return workerCounters.callWhileOwned; },
+  get mainTick() { return workerCounters.mainTick; },
+  get staleView() { return workerCounters.staleView; },
+  get readMismatch() { return workerCounters.readMismatch; },
+  get active() { return !!W; },
+  park: () => W ? W.park() : 0,
+  tick: (n) => W ? W.tick(n) : 0,
+  selftest: (kind) => W ? W.selftest(kind) : Promise.resolve(false),
+});
+// --- end worker mode ---
+
+// HITCHES, always on (three timestamps a drawn frame): a frame whose own work took >= HITCH_MS, or
+// that came >= 2x late, is kept in window.__d2Hitches with what it did -- shell updates, engine
+// ticks, update and draw ms, and the streamfs misses that spun the main thread inside it (each a
+// synchronous network read). A browser long animation frame from OUTSIDE frame() (an input or
+// message handler, GC) lands there too, attributed to its scripts. A freeze a player reports then
+// names its cause. Records never see this: rAF never fires in the test runner tab.
+const HITCH_MS = 50, hitches = window.__d2Hitches = [];
+function noteHitch(h) {
+  hitches.push(h); if (hitches.length > 200) hitches.shift();
+  if ((h.work ?? h.loaf) >= 100) console.warn('d2 hitch', JSON.stringify(h));
+}
+try {
+  // Each script names its handler's function and source position; the streamfs misses that started inside the
+  // frame say whether it was a synchronous network read (a pthread's file read runs in a main-thread Worker.onmessage).
+  new PerformanceObserver((list) => { for (const e of list.getEntries()) if (e.duration >= 100) {
+    const reads = (window.StreamFS?.stats().recent || []).filter(([t]) => t >= e.startTime && t < e.startTime + e.duration);
+    noteHitch({ at: Math.round(e.startTime), loaf: Math.round(e.duration),
+      scripts: (e.scripts || []).slice(0, 3).map((s) => `${s.invoker || '?'} ${Math.round(s.duration)}ms ${s.sourceFunctionName || '?'}@${(s.sourceURL || '').split('/').pop()}:${s.sourceCharPosition}`),
+      ...(reads.length ? { misses: reads.length, stallMs: reads.reduce((a, r) => a + r[1], 0), reads: reads.slice(0, 3).map((r) => `${r[2]} ${r[1]}ms`) } : {}) });
+  } }).observe({ type: 'long-animation-frame' });
+} catch { /* no LoAF (Firefox, Safari): the frame() records below still land */ }
 function frame(now) {
+  W?.park();
   perfSync();
-  // The rAF interval is the honest frame time in a real browser (a visible tab): what the player
-  // feels, vsync and all. It is recorded before `last` moves; in the test runner's background tab rAF
-  // never fires, so this pass is absent there and the per-frame samples are the engine's own cost.
-  if (perfEnabled()) perfSample('frameInterval', now - last);
-  const owed = clock.updatesFor(now - last); last = now;
-  try {
-    const pUpdate = perfT0();
-    for (let k = 0; k < owed; k++) update();
-    perfT('update', pUpdate);
-    render();
-    frameError = '';
-  } catch (error) {
-    frameError = String(error?.stack || error);
-    frameErrors++;
+  // The interval between drawn frames is the honest frame time in a real browser (a visible tab): what
+  // the player feels, vsync and all. In the test runner's background tab rAF never fires, so this pass is
+  // absent there and the per-frame samples are the engine's own cost.
+  const owed = clock.updatesFor(now - last); last = now; rafAt = performance.now();
+  // PERF: a callback that owes no 60 Hz update (a 120/144 Hz display, or rAF jitter) would draw the
+  // same state again, so it draws nothing. Records never see this: rAF never fires in the test runner tab.
+  if (owed || renderOwed) {
+    if (perfEnabled()) perfSample('frameInterval', now - lastDrawn);
+    const gap = now - lastDrawn, t0 = performance.now(), ticks0 = engineTicks, sf0 = window.StreamFS?.stats();
+    let t1 = t0;
+    lastDrawn = now;
+    try {
+      const pUpdate = perfT0();
+      for (let k = 0; k < owed; k++) update(false, true);
+      perfT('update', pUpdate);
+      t1 = performance.now();
+      liveFrame = true;
+      try { render(); } finally { liveFrame = false; }
+      frameError = '';
+    } catch (error) {
+      frameError = String(error?.stack || error);
+      frameErrors++;
+    }
+    const t2 = performance.now();
+    if (t2 - t0 >= HITCH_MS || (gap >= 2 * HITCH_MS && gap < 5000)) {
+      const sf = window.StreamFS?.stats();
+      noteHitch({ at: Math.round(t0), work: Math.round(t2 - t0), gap: Math.round(gap), updates: owed, ticks: engineTicks - ticks0,
+        updateMs: Math.round(t1 - t0), drawMs: Math.round(t2 - t1),
+        ...(sf && sf.misses > sf0.misses ? { misses: sf.misses - sf0.misses, stallMs: Math.round(sf.stallMs - sf0.stallMs), lastRead: sf.lastReadUrl } : {}) });
+    }
+    frames++;
   }
-  frames++;
   if (now - fpsAt >= 500) { fps = frames * 1000 / (now - fpsAt); frames = 0; fpsAt = now; }
   requestAnimationFrame(frame);
 }
@@ -4450,9 +4842,17 @@ function dismissSpeech() {
   }
   return false;
 }
+function initEntityChat(npcId) {
+  const p = Module._malloc(9), v = new DataView(Module.HEAPU8.buffer, Number(p), 9);
+  v.setUint8(0, 0x2F); v.setUint32(1, 1, true); v.setUint32(5, npcId >>> 0, true);
+  try { return Module.ccall('d2_session_client_packet', 'number', ['bigint', 'number'], [BigInt(p), 9]); } finally { Module._free(p); }
+}
 function talkToNpc(npcId, started) {
   try {
     if (!started && !Module.ccall('d2_session_command_npc', 'number', ['number'], [npcId])) return false;
+    // Retail's client then tells the server it is talking (0x2F InitEntityChat): the interaction goes 0 -> 1, and
+    // only then may the server lift an item off the grid while the shop is open (D2Game 0x19 -> sub_6FC7C3A0).
+    initEntityChat(npcId);
     // Retail's client answers the interaction with the NPC's MENU (D2Client's own table,
     // play/assets/npc-menu.mjs); what happens next is the entry the player picks.
     const npc = snapshot.entities.find((u) => u.id === npcId && u.type === 1);
@@ -4706,7 +5106,7 @@ addEventListener('keydown', (e) => {
   }
   // D2Win's VK_SNAPSHOT handler captures the client backbuffer and rate-limits screenshots to one
   // per second. The browser's canvas is that rendered client surface; its download is a PNG.
-  if (configuredAction === 'Screen Shot' && !e.repeat) { screenshotAction(canvas); e.preventDefault(); return; }
+  if (configuredAction === 'Screen Shot' && !e.repeat) { screenshotAction(cssRampOn || glRampOn ? rampedCopy() : canvas); e.preventDefault(); return; }
   // Retail's ClearScreen (`CfgClearScreen`; OpenDiablo2's key_map.go ties it to KeySpace): hide the
   // HUD, and the same key restores it. The chrome's hit tests are gated with the flag below, so a
   // click where a hidden control used to be reaches the world instead of the invisible control (F3c).
@@ -5116,12 +5516,14 @@ canvas.addEventListener('pointerdown', (e) => {
     // and they are bought. Sending the buy for a gamble offer asks the NPC for an item it never
     // listed, so the click has to name the command the counter means.
     const item = vendorPanel.itemAt(x, y, canvas.width, canvas.height, npcState);
+    const cur = Module._d2_session_cursor_item ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0;
+    const onPanel = !mine && vendorPanel.contains(x, y, canvas.width, canvas.height);
+    const panelAct = onPanel ? vendorClickAction('panel', cur, Boolean(item)) : null;
+    if (panelAct === 'sell-cursor') { click.spent = 'vendorSell'; sellToVendor(cur); canvas.focus(); e.preventDefault(); return; }
     if (item) { const gamble = npcState.action === 2; click.spent = gamble ? 'vendorGamble' : 'vendorBuy';
       (gamble ? gambleAtVendor : buyFromVendor)(item.id); canvas.focus(); e.preventDefault(); return; }
-    const cur = Module._d2_session_cursor_item ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0;
     if (mine && vendorClickAction('mine', cur) === 'sell') { click.spent = 'vendorSell'; sellToVendor(mine.id); canvas.focus(); e.preventDefault(); return; }
-    if (!mine && vendorPanel.contains(x, y, canvas.width, canvas.height) && vendorClickAction('panel', cur) === 'sell-cursor') { click.spent = 'vendorSell'; sellToVendor(cur); canvas.focus(); e.preventDefault(); return; }
-    if (!mine && vendorPanel.contains(x, y, canvas.width, canvas.height)) { click.spent = 'panel:vendor'; canvas.focus(); e.preventDefault(); return; }
+    if (onPanel) { click.spent = 'panel:vendor'; canvas.focus(); e.preventDefault(); return; }
   }
   // The item cursor (retail's inventory handling, the engine's packet handlers deciding): over the
   // open inventory, a click lifts a carried item (0x19) or a worn one (0x1C) onto the cursor, and
@@ -5670,7 +6072,7 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
   // Force one frame. requestAnimationFrame is throttled hard in a headless/background tab, so a
   // caller that drives the shell with step() and then reads PIXELS can otherwise be looking at a
   // frame from before its own input -- which reads exactly like "the screen never changed".
-  renderNow() { render(); },
+  renderNow() { render(true); },
   // Re-read the engine's snapshot/motion without ticking: a caller that ticks the session itself (a retail recording) then renders that tick.
   refreshView() { snapshot = session.snapshot(); motion = session.motion(); },
   // The title's animation clock (60 Hz updates; logo frame = floor(tick * 25 / 60) mod 29). A draw-list row pins it to the

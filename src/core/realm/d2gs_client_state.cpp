@@ -131,7 +131,7 @@ struct D2RealmClientPlayerEntry {
     uint8_t motionDirection = 0;
     struct MotionView {
         uint32_t version = 1;
-        uint32_t size = 40;
+        uint32_t size = 48;
         uint32_t active = 0;
         uint32_t mode = 0;
         uint32_t direction = 0;
@@ -140,9 +140,11 @@ struct D2RealmClientPlayerEntry {
         uint32_t animSpeed = 0;
         uint32_t positionHintX = 0;
         uint32_t positionHintY = 0;
+        uint32_t seqMode = 0;   // PLRMODE_SEQUENCE: the current frame's mode (dwSeqMode), else 0
+        uint32_t seqFrame = 0;  // PLRMODE_SEQUENCE: the current frame index (nSeqCurrentFramePrecise >> 8), else 0
     } motionView{};
 };
-static_assert(sizeof(D2RealmClientPlayerEntry::MotionView) == 40);
+static_assert(sizeof(D2RealmClientPlayerEntry::MotionView) == 48);
 
 // The 0x03 packet's final dword is retained raw until its meaning is fully resolved for 1.13c.
 struct D2RealmClientWorldState {
@@ -1305,6 +1307,10 @@ static int apply_state_packet(const uint8_t* packet, int length) {
 struct RealmClientMissile { D2UnitStrc* unit; uint32_t level; };
 static std::vector<RealmClientMissile> g_clientMissiles;
 static uint32_t g_nextClientMissileId = 1;
+// 1.13c D2Client+0xDE834 (0x6FB8E834): the client unit-creation counter, incremented by the CUnit constructor wrapper
+// (D2Client+0xA7BF0) and stored as the new unit's id. A session's earlier creations (tile/object/item units the test runner
+// does not model) have already advanced it; the caller pins the value it read, the next missile takes counter+1.
+EMSCRIPTEN_KEEPALIVE void d2_realm_client_unit_counter_set(uint32_t counter) { g_nextClientMissileId = counter + 1; }
 
 static void clear_target_relations_to(D2UnitStrc* target) {
     if (!target) return;
@@ -1387,7 +1393,11 @@ static D2UnitStrc* create_client_missile(const D2MissileStrc* params) {
     auto* txt = DATATBLS_GetMissilesTxtRecord(missileId);
     if (!txt || txt->wCltDoFunc != 1) return nullptr;
     if (params->dwFlags == 0x201u) {
-        if (missileId != 265 || params->nSkill != 62) return nullptr;
+        // 1.13c D2Client+0xB1420: Fire Ball spawns its hit children (265) and its
+        // Missiles.txt +0x16 ExplosionMissile through the same create path.
+        const auto* fireball = DATATBLS_GetMissilesTxtRecord(62);
+        if (params->nSkill != 62 || !fireball ||
+            (missileId != 265 && missileId != static_cast<int>(fireball->wExplosionMissile))) return nullptr;
     } else {
         const auto* skill = DATATBLS_GetSkillsTxtRecord(params->nSkill);
         if (!skill || !is_natural_client_projectile(params->nSkill) || skill->wCltMissile != missileId) return nullptr;
@@ -1517,6 +1527,28 @@ static bool create_fireball_hit_child(D2UnitStrc* source,
     if (created) record_client_missile_event(9, created, UNIT_MISSILE, source->dwUnitId);
     return created != nullptr;
 }
+// 1.13c D2Client+0xB1420: after the callback-table hit children, a Fire Ball that
+// collided (or expired with AlwaysExplode) spawns Missiles.txt +0x16 at its own
+// position. Negative +0x16 (signed) means no explosion, as in the native guard.
+static void spawn_fireball_explosion(D2UnitStrc* missile) {
+    const auto* fireball = DATATBLS_GetMissilesTxtRecord(62);
+    if (!fireball || static_cast<int16_t>(fireball->wExplosionMissile) < 0) return;
+    D2UnitStrc* owner = nullptr;
+    for (auto& player : g_players) if (MISSILE_CheckUnitIfOwner(missile, player.motionUnit)) {
+        owner = player.motionUnit; break;
+    }
+    if (!owner) return;
+    D2MissileStrc params{};
+    params.dwFlags = 0x201;
+    params.pOwner = owner;
+    params.nMissile = fireball->wExplosionMissile;
+    params.nX = UNITS_GetXPosition(missile); params.nY = UNITS_GetYPosition(missile);
+    params.nSkill = 62;
+    params.nSkillLevel = static_cast<int>(MISSILE_GetLevel(missile));
+    params.nFrame = 0;
+    auto* created = create_client_missile(&params);
+    if (created) record_client_missile_event(9, created, UNIT_MISSILE, missile->dwUnitId);
+}
 // Native 6FB55440 is applied to the first query result, not inside the query's
 // callback: skipping it there would search a different occupant of the same cell.
 static bool client_collision_target_dead(const D2UnitStrc* unit) {
@@ -1576,6 +1608,7 @@ static void advance_client_missiles() {
                 static_cast<size_t>(g_selectedPlayer) < g_players.size()) {
                 d2::realm::createFireballHitChildren(unit, g_players[g_selectedPlayer].motionUnit,
                     create_fireball_hit_child, nullptr);
+                spawn_fireball_explosion(unit);
             }
             const auto found = std::find_if(g_clientMissiles.begin(), g_clientMissiles.end(),
                 [unit](const auto& missile) { return missile.unit == unit; });
@@ -1692,6 +1725,8 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_predict_right_cast_on_monster(ui
     if (!unit || !unit->pDynamicPath || !UNITS_GetRoom(unit) || targetIt == g_monsters.end() ||
         !targetIt->motionUnit || !UNITS_GetRoom(targetIt->motionUnit)) return 0;
     auto* target = targetIt->motionUnit;
+    // 1.13c D2Client+0x1B7F0 a5440: a hover monster in MONMODE_DEATH/DEAD is not a unit target; the cast falls to the ground branch.
+    if (target->dwAnimMode == MONMODE_DEATH || target->dwAnimMode == MONMODE_DEAD) return 0;
     auto* skill = UNITS_GetRightSkill(unit);
     if (!skill || !is_natural_client_projectile(SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__)) ||
         skill->nOwnerGUID != -1) return -1;
@@ -2460,9 +2495,11 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_realm_client_skill_choices(uint32_t guid, D2Rea
         row.listRow = desc ? static_cast<int8_t>(desc->nListRow) : -1;
         row.charClass = txt->nCharClass;
         row.iconCel = desc ? desc->nIconCel : 0;
+        // bit 4 as d2_session_skill_choices: every non-usable state is red except an aura (retail D2Client+0x3DA60 gives it a non-red class).
+        const int useState = SKILLS_GetUseState(unit, skill);
         row.flags = (txt->dwFlags[0] & SKILLSFLAG_PASSIVE ? 1 : 0) |
             (txt->dwFlags[0] & SKILLSFLAG_LEFTSKILL ? 2 : 0) |
-            (SKILLS_GetUseState(unit, skill) != SKILLUSTATE_USABLE ? 4 : 0) |
+            (useState != SKILLUSTATE_USABLE && useState != SKILLUSTATE_AURA ? 4 : 0) |
             (inTown && !(txt->dwFlags[0] & SKFLAG_INTOWN) ? 8 : 0);
         row.level = static_cast<uint8_t>(SKILLS_GetSkillLevel(unit, skill, TRUE));
     }
@@ -2490,6 +2527,7 @@ EMSCRIPTEN_KEEPALIVE const D2RealmClientPlayerEntry::MotionView* d2_realm_client
     out.active = 0;
     out.mode = out.direction = out.framePrecise = out.frameCountPrecise = out.animSpeed = 0;
     out.positionHintX = out.positionHintY = 0;
+    out.seqMode = out.seqFrame = 0;
     const D2UnitStrc* unit = entry.motionUnit;
     if (!unit || !unit->pDynamicPath) return &out;
     out.active = 1;
@@ -2500,6 +2538,10 @@ EMSCRIPTEN_KEEPALIVE const D2RealmClientPlayerEntry::MotionView* d2_realm_client
     out.animSpeed = static_cast<uint32_t>(unit->wAnimSpeed);
     out.positionHintX = unit->nLastClickX;
     out.positionHintY = unit->nLastClickY;
+    if (unit->dwAnimMode == PLRMODE_SEQUENCE) {
+        out.seqMode = unit->dwSeqMode;
+        out.seqFrame = static_cast<uint32_t>(unit->nSeqCurrentFramePrecise >> 8);
+    }
     return &out;
 }
 EMSCRIPTEN_KEEPALIVE const D2RealmClientWorldState* d2_realm_client_world_state() { return &g_world; }

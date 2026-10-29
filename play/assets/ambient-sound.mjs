@@ -32,7 +32,7 @@ export function nextEventInterval(delay, rand) {
  * is a no-op, a different id (level or day/night change) stops the old loop first, so loops never stack.
  * `cycle` is the raw D2Common-10396 value (1..3 = night), read via ambientCycleOf(Module).
  */
-export function createAmbientSound(read, AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext, rand = Math.random) {
+export function createAmbientSound(read, AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext, rand = Math.random, fetched = null) {
   if (typeof read !== 'function') throw new TypeError('retail asset reader is required');
   if (!AudioContextClass) throw new Error('Web Audio is unavailable');
   const context = new AudioContextClass(), buffers = new Map();
@@ -45,8 +45,9 @@ export function createAmbientSound(read, AudioContextClass = globalThis.AudioCon
   const load = async (snd) => {
     let b = buffers.get(snd.file);
     if (b) return b;
+    if (fetched) await fetched(ROOTS.map((r) => r + snd.file));   // PERF: the bytes arrive in the background, not in a sync stall
     let bytes, err;
-    for (const r of ROOTS) { try { bytes = read(r + snd.file); break; } catch (e) { err = e; } }
+    for (const r of ROOTS) { try { bytes = await (read.sliced ?? read)(r + snd.file); break; } catch (e) { err = e; } }
     if (!bytes) throw err;
     decodeWav(bytes);
     b = await context.decodeAudioData(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
@@ -83,6 +84,8 @@ export function createAmbientSound(read, AudioContextClass = globalThis.AudioCon
       } catch (e) { error = String(e); key = ''; throw e; }
       return sel;
     },
+    /** SoundEnviron row of the level for the engine's ambient updater (0x4F860): day and night selections. */
+    environment(levelId) { const [lv, se] = read_(); return { day: resolveLevelSoundEnvironment(levelId, 0, lv, se), night: resolveLevelSoundEnvironment(levelId, 1, lv, se) }; },
     /** Advance the event countdown by `n` engine ticks. */
     async tick(n = 1) {
       if (!env?.snd || !loop) return;

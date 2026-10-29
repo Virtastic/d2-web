@@ -11,3 +11,6 @@ test('sell mode sells on click, toggles off', () => {
 test('drop on the shop panel sells the cursor item only', () => {
   resetSellMode(); assert.equal(act('panel', 7), 'sell-cursor'); assert.equal(act('panel', 0), 'none');
 });
+test('a held item dropped on a stocked cell sells, it does not buy the stock under it', () => {
+  resetSellMode(); assert.equal(act('panel', 7, true), 'sell-cursor'); assert.equal(act('panel', 0, true), 'buy'); assert.equal(act('panel', 0, false), 'none');
+});

@@ -12,7 +12,21 @@ const MODE = ['DT','NU','WL','GH','A1','A2','BL','SC','S1','S2','S3','S4','DD','
 const PALETTE = ['ACT1','ACT2','ACT3','ACT4','ACT5'];
 const MONSTER_LAYER_RASTER_ENTRIES = 256;
 const MONSTER_LAYER_RASTER_BYTES = 16 * 1024 * 1024;
+const MONSTER_RASTER_ENTRIES = 1024, MONSTER_RASTER_BYTES = 64 * 1024 * 1024;
+const MONSTER_FILE_ENTRIES = 512, MONSTER_FILE_BYTES = 48 * 1024 * 1024, MONSTER_ANIMATION_ENTRIES = 1024;
 const cofLayerBlendCache = new WeakMap();
+
+// PERF: a monster's 64 facings land on the 8-32 directions its DCCs carry, and every facing of a mode
+// shares one COF. Decoded once per file bytes -- the renderer's file cache hands back the same bytes --
+// so a monster turning re-reads and re-decodes nothing, and composeCofFrame's memo hits across facings.
+const decodedByBytes = new WeakMap();
+function decodeOnce(bytes, key, decode) {
+  let byKey = decodedByBytes.get(bytes);
+  if (!byKey) decodedByBytes.set(bytes, byKey = new Map());
+  let value = byKey.get(key);
+  if (value === undefined) byKey.set(key, value = decode(bytes));
+  return value;
+}
 
 // A monster reuses its decoded COF across every frame. Whether that COF needs the per-layer blend
 // path is immutable animation metadata, so classify it once instead of scanning layerRecords for
@@ -104,7 +118,8 @@ export function realmMonsterAnimationActor(monster, gameFrame) {
     modeEvents: monster.modeEvents ?? [] };
 }
 
-export function monsterModeToken(mode) { return MODE[Math.trunc(Number(mode))] || 'NU'; }
+// 1.13c D2Common+0x43C30 (D2Common_10884_COMPOSIT_unk): a monster in MONMODE_KNOCKBACK (13) resolves its COF with the GH token -- no KB COF exists.
+export function monsterModeToken(mode) { const m = Math.trunc(Number(mode)); return m === 13 ? 'GH' : MODE[m] || 'NU'; }
 
 // Retail ships some monster components as a DC6 cel and not a DCC.  The disc list (`d2.lst`) holds
 // `Data\Global\Monsters\TY\TR\TYTRLITNUHTH.DC6` where TY's own LA and RA are `.dcc` -- and TY, TX,
@@ -145,7 +160,7 @@ export function loadMonsterAnimation(read, actor) {
   const candidates = deathMode ? ['HTH']
     : exactWeaponClass ? [exactWeaponClass] : ['HTH', '1HS', '1HT', '2HS', '2HT'];
   for (const candidate of candidates) {
-    try { cof = decodeCof(read(`data\\global\\MONSTERS\\${actor.code}\\COF\\${actor.code}${token}${candidate}.COF`)); weaponClass = candidate; break; }
+    try { cof = decodeOnce(read(`data\\global\\MONSTERS\\${actor.code}\\COF\\${actor.code}${token}${candidate}.COF`), 'cof', decodeCof); weaponClass = candidate; break; }
     catch {}
   }
   if (!cof) throw new Error(`no retail COF for monster ${actor.code} ${token}`);
@@ -161,10 +176,10 @@ export function loadMonsterAnimation(read, actor) {
     try {
       const bytes = read(path);
       layerDirection = dccDirection(actor.direction, bytes[2]);
-      cel = decodeDcc(bytes, { directions: [layerDirection] }); container = 'DCC';
+      cel = decodeOnce(bytes, layerDirection, (b) => decodeDcc(b, { directions: [layerDirection] })); container = 'DCC';
     } catch {}
     if (!cel) { try {
-      cel = dc6AsDcc(read(path.replace(/\.DCC$/, '.DC6')));
+      cel = decodeOnce(read(path.replace(/\.DCC$/, '.DC6')), 'dc6', dc6AsDcc);
       layerDirection = dccDirection(actor.direction, cel.directions);
       container = 'DC6';
     } catch {} }
@@ -184,7 +199,15 @@ export function loadMonsterAnimation(read, actor) {
 /** `shadow: true` draws the unit's shadow under its sprite first, as retail's draw list orders it. */
 export function createMonsterRenderer(read, documentObject = globalThis.document, { shadow = false,
   layerRasterLimit = MONSTER_LAYER_RASTER_ENTRIES, layerRasterByteLimit = MONSTER_LAYER_RASTER_BYTES } = {}) {
-  const animations = new Map(), failures = new Set(), palettes = new Map(), rasters = new Map(), composedFrames = new Map(), blenders = new Map(), highlights = new Map();
+  const failures = new Set(), palettes = new Map(), blenders = new Map(), highlights = new Map();
+  // PERF: bounded, and a raster is keyed by its composed plane, which facings of one DCC direction
+  // share -- not by the 0..63 facing, which kept a canvas per facing per frame for the whole session.
+  const animations = createRenderCache(MONSTER_ANIMATION_ENTRIES);
+  const files = createRenderCache(MONSTER_FILE_ENTRIES, MONSTER_FILE_BYTES, (bytes) => bytes?.byteLength ?? 0);
+  const animationRead = (path) => files.get(path) ?? files.set(path, read(path));
+  const rasters = createRenderCache(MONSTER_RASTER_ENTRIES, MONSTER_RASTER_BYTES, (canvas) => canvas.width * canvas.height * 4);
+  const composedIds = new WeakMap();
+  let nextComposedId = 1;
   // Per-layer fallback rasters are immutable for a decoded animation frame and palette. Reuse
   // them across actors and redraws, with a finite budget for long sessions.
   const layerRasters = createRenderCache(layerRasterLimit, layerRasterByteLimit,
@@ -214,7 +237,7 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
       const baseKey = `${actor.code}:${actor.mode}:${actor.seqMode ?? ''}:${actor.direction}:${actor.components.join(',')}:${attackClass}`;
       if (failures.has(baseKey)) return null;
       let animation = animations.get(baseKey);
-      if (!animation) { try { animation = loadMonsterAnimation(read, actor); animations.set(baseKey, animation); } catch { failures.add(baseKey); return null; } }
+      if (!animation) { try { animation = loadMonsterAnimation(animationRead, actor); animations.set(baseKey, animation); } catch { failures.add(baseKey); return null; } }
       const count = animation.cof.framesPerDirection;
       const deadClock = advanceMonsterDeadClock(actor, deadMonsterClocks.get(actor.id));
       if (deadClock) deadMonsterClocks.set(actor.id, deadClock);
@@ -225,11 +248,11 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
       let composed;
       // PERF (F198): a composed frame is a pure function of the (cached) animation and the frame; composed once, its identity hash and opaque count with it.
       const componentDirectionKey = animation.componentDirectionKey ?? monsterComponentDirectionKey(animation.componentDirections);
-      const composeKey = `${baseKey}:${animation.cofDirection}:${componentDirectionKey}:${frame}`;
-      try { composed = composedFrames.get(composeKey); if (!composed) { composed = composeCofFrame(animation.cof, animation.cofDirection, frame,
-        animation.components, animation.componentDirections, componentDirectionKey); composedFrames.set(composeKey, composed); } }
+      try { composed = composeCofFrame(animation.cof, animation.cofDirection, frame, animation.components, animation.componentDirections, componentDirectionKey); }
       catch (e) { failures.add(baseKey); console.warn(`monster ${actor.code} mode ${actor.mode} dir ${actor.direction} frame ${frame}: ${e.message}`); return null; }   // a COF/DCC frame-count mismatch must not stop the frame loop
-      const [act0, pal] = palette(act), key = `${baseKey}:${frame}:${act0}${highlight ? ':hl' : ''}`;
+      let composedId = composedIds.get(composed);
+      if (!composedId) composedIds.set(composed, composedId = nextComposedId++);
+      const [act0, pal] = palette(act), key = `${composedId}:${act0}${highlight ? ':hl' : ''}`;
       if (highlight && !highlights.has(act0)) highlights.set(act0, highlightMap(read(`data\\global\\palette\\${PALETTE[act0]}\\pal.dat`)));
       const hmap = highlight ? highlights.get(act0) : null;
       let canvas = rasters.get(key);
@@ -253,7 +276,7 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
         for (const component of animation.cof.priority[animation.cofDirection][frame]) {
           const dcc = animation.components.get(component); if (!dcc) continue;
           const layer = cofLayerRecord(animation.cof, component);
-          const one = composeCofFrame(animation.cof, animation.cofDirection, frame, new Map([[component, dcc]]), animation.componentDirections);
+          const one = composeCofFrame(animation.cof, animation.cofDirection, frame, new Map([[component, dcc]]), animation.componentDirections, componentDirectionKey);
           if (!one.width || !one.height) continue;
           const left = Math.round(x + one.xOffset), top = Math.round(y + one.yOffset);
           if (layer && layer.transparent && (layer.drawEffect === 3 || layer.drawEffect === 4) && blend)

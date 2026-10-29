@@ -2012,8 +2012,8 @@ struct D2GSPacketSrvA8		//Variable Size
 	uint8_t nUnitType;			//0x01
 	int32_t nUnitId;			//0x02
 	uint8_t nSize;				//0x06
-	uint16_t nState;			//0x07 - originally a uint8_t
-	uint8_t pStream[512];		//0x09
+	uint8_t nState;				//0x07 - one byte in retail (D2Game 0x7A5E0 writes 0xA8, type, id, size, state, stream)
+	uint8_t pStream[512];		//0x08
 };
 
 //struct D2GSPacketSrvA7	//size of 0x07

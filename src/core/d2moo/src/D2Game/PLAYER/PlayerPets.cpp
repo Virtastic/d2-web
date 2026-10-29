@@ -723,6 +723,7 @@ D2PetInfoStrc* __fastcall PLAYERPETS_GetPetInfoFromPetGUID(D2UnitStrc* pUnit, in
 }
 
 //D2Game.0x6FC7DF40
+// 1.13c D2Game+0x96FA0 (checked against decompile; counters are indexed type-1 there, same slots)
 void __fastcall sub_6FC7DF40(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
     if (!pPlayer || pPlayer->dwUnitType != UNIT_PLAYER)

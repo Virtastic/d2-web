@@ -11,6 +11,7 @@
 // comes out monospaced and wrong.
 
 import { recordDc6 } from './drawlist.mjs';
+import { drawBg, present } from './widebg.mjs';
 import { isButtonHeldOverTarget } from './frontend-pointer-states.mjs';
 import RETAIL_MIX_HEX from './retail-mixpalette.mjs';
 import { createGatewaySelector, DEFAULT_GATEWAY_LABEL, GATEWAY_LAYOUT } from './bnet-servers.mjs';
@@ -136,6 +137,11 @@ export function createBlender(pl2, palette) {
     }
     index.set(key, best); return best;
   };
+  // PERF: the Map.get above ran once per blended pixel (campfire, torches, rain, blended monster layers). A
+  // direct-mapped cache in front of it (as session-terrain's indexOf32), keyed by the pixel's low 24 bits as a
+  // little-endian Uint32 reads them, returns paletteIndex's own answer: a key's index never changes once set.
+  const ck = new Int32Array(4096).fill(-1), cj = new Uint8Array(4096);
+  const rgba = Uint32Array.from({ length: 256 }, (_, j) => palette[j * 4] | (palette[j * 4 + 1] << 8) | (palette[j * 4 + 2] << 16) | 0xff000000);
   return (ctx, frame, left, top, mode) => {
     const table = tables[mode];
     if (!frame.width || !frame.height) return;
@@ -144,12 +150,15 @@ export function createBlender(pl2, palette) {
     // objects (torches, the waypoint) are blended at anchors far off the 800x600 frame.
     const canvas = ctx.canvas;
     if (canvas && (left >= canvas.width || top >= canvas.height || left + frame.width <= 0 || top + frame.height <= 0)) return;
-    const img = ctx.getImageData(left, top, frame.width, frame.height), d = img.data;
+    const img = ctx.getImageData(left, top, frame.width, frame.height);
+    const d = new Uint32Array(img.data.buffer, img.data.byteOffset, img.data.length >>> 2);
     for (let k = 0; k < frame.indices.length; k++) {
       if (!frame.opaque[k]) continue;
-      const under = paletteIndex(d[k * 4], d[k * 4 + 1], d[k * 4 + 2]);
-      const c = table[under * 256 + frame.indices[k]];
-      d[k * 4] = palette[c * 4]; d[k * 4 + 1] = palette[c * 4 + 1]; d[k * 4 + 2] = palette[c * 4 + 2]; d[k * 4 + 3] = 255;
+      const key = d[k] & 0xffffff, h = Math.imul(key, 0x9E3779B1) >>> 20;
+      let under;
+      if (ck[h] === key) under = cj[h];
+      else { under = paletteIndex(key & 0xff, (key >>> 8) & 0xff, key >>> 16); ck[h] = key; cj[h] = under; }
+      d[k] = rgba[table[under * 256 + frame.indices[k]]];
     }
     ctx.putImageData(img, left, top);
   };
@@ -689,7 +698,7 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
       const ctx = sceneCtx;
       ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 800, 600);
       const art = phase === 'trademark' ? trademarkBackground : background;
-      ctx.drawImage(art.canvas, 0, 0);
+      drawBg(ctx, art.path, art.canvas);
       recordTiled(art.path, art, 0, 0);
       drawLogos(ctx, tick);
       if (phase === 'trademark') {
@@ -702,9 +711,7 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
           trademarkFont.drawAnchored(ctx, line.text, line.x, line.y);
           glyphs += glyphCount(line.text);
         }
-        outCtx.save(); outCtx.imageSmoothingEnabled = false;
-        outCtx.drawImage(scene, v.ox, v.oy, 800 * v.scale, 600 * v.scale);
-        outCtx.restore();
+        present(outCtx, scene, v, art.path);
         return { phase, buttons: 0, glyphs, hot: -1 };
       }
       // The region dialog is a MODAL SCREEN, not an overlay on the menu: the menu entries are not drawn
@@ -740,9 +747,7 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
         ctx.drawImage(cursorCanvas, left, top);
         recordDc6(FRONTEND.cursor, 0, f, left, top);
       }
-      outCtx.save(); outCtx.imageSmoothingEnabled = false;
-      outCtx.drawImage(scene, v.ox, v.oy, 800 * v.scale, 600 * v.scale);
-      outCtx.restore();
+      present(outCtx, scene, v, art.path);
       return { phase, buttons: gatewaySelector?.open ? 0 : boxes.length, hot };
     },
   };

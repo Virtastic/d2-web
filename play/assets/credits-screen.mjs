@@ -1,5 +1,6 @@
 // Retail credits: background and text paths follow OpenDiablo2's recovered credits screen.
 import { createFont, decodeFontTbl, composeTiled, textColourPalette, TITLE_COLUMNS, createBlender, LABEL_TINT } from './frontend.mjs';
+import { drawBg, present } from './widebg.mjs';
 import { recordDc6 } from './drawlist.mjs';
 
 export const CREDITS_ASSETS = {
@@ -141,7 +142,7 @@ export function createCreditsScreen({ read, decodeDc6, decodeDatPalette, onExit 
     },
     cancel() { exitPressed = false; },
     draw(ctx, width, height, tick) {
-      sceneCtx.fillStyle = '#000'; sceneCtx.fillRect(0, 0, SCREEN.width, SCREEN.height); sceneCtx.drawImage(background.canvas, 0, 0);
+      sceneCtx.fillStyle = '#000'; sceneCtx.fillRect(0, 0, SCREEN.width, SCREEN.height); drawBg(sceneCtx, CREDITS_ASSETS.background, background.canvas);
       lastTick = tick; glyphBlits = []; labelBlits = [];
       const scroll = Math.floor(tick / TICKS_PER_PIXEL);
       for (const event of schedule) {
@@ -162,7 +163,7 @@ export function createCreditsScreen({ read, decodeDc6, decodeDatPalette, onExit 
       sceneCtx.drawImage(exitFrame.canvas, exitRect.x, exitRect.y);
       recordDc6(exitFrame.path, exitFrameIndex, exitFrame.frame, exitRect.x, exitRect.y);
       exitFont.drawAnchored(sceneCtx, exitLabel, exitRect.x + Math.max(Math.trunc((exitRect.width - exitFont.measure(exitLabel)) / 2), 0), exitRect.y + exitRect.height - 9);
-      const v = view(width, height); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, width, height); ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(scene, v.ox, v.oy, SCREEN.width * v.scale, SCREEN.height * v.scale); ctx.restore();
+      const v = view(width, height); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, width, height); present(ctx, scene, v, CREDITS_ASSETS.background);
     },
   };
 }

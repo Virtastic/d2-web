@@ -157,12 +157,17 @@ function composedFor(t, pal) {
   if (!c || c.pal !== pal) { const tab = new Uint32Array(t.length); for (let k = 0; k < tab.length; k++) tab[k] = pal[t[k]]; litComposed.set(t, c = { pal, tab }); }
   return c.tab;
 }
+const litBase = new WeakMap();
 export function litFloorPixels(px, blocks, grid, t, pal, tileX, tileY, out) {
   const ltab = composedFor(t, pal);
   // PERF (perf-deep2): writes the palette colour straight into `out` -- one full pass for the unlit base, then the
   // blocks overwrite their lit pixels in the same order -- instead of an index copy, the blocks, and a second full pass.
   const n = px.width * px.height, W = px.width, opq = px.opaque, ind = px.indices;
-  for (let q = 0; q < n; q++) out[q] = opq[q] ? pal[ind[q]] : 0;
+  // PERF (D49): that unlit base depends only on (tile pixels, palette): built once, then one memcpy per miss.
+  let bc = litBase.get(px);
+  if (!bc || bc.pal !== pal || bc.base.length !== n) { const base = new Uint32Array(n); for (let q = 0; q < n; q++) base[q] = opq[q] ? pal[ind[q]] : 0; litBase.set(px, bc = { pal, base }); }
+  out.set(bc.base);
+  // PERF (D49): the base is 0 exactly where !opaque (every palette entry has alpha 0xff), so `out[q]` replaces the opq load.
   const P = (i, j) => grid[Math.min(7, j) * 8 + Math.min(7, i)];
   for (const b of blocks) {
     const x0 = b.gridX, y0 = b.gridY;
@@ -182,11 +187,11 @@ export function litFloorPixels(px, blocks, grid, t, pal, tileX, tileY, out) {
       const skip = iso ? ISO_SKIP[r] : 0, run = iso ? ISO_RUN[r] : 32;
       const leftclip = tileX === undefined ? 0 : Math.max(0, Math.min(run, CLIP_LEFT - (tileX + b.x - px.originX + skip)));
       const q0 = rowY * W + (b.x + skip - px.originX), w0 = r * 32 + skip, dR = R - L;
-      if (flat) { for (let col = 0; col < run; col++) { if (!written[w0 + col]) continue; const q = q0 + col; out[q] = opq[q] ? ltab[flatBase + src[w0 + col]] : 0; } }
+      if (flat) { for (let col = 0; col < run; col++) { if (!written[w0 + col]) continue; const q = q0 + col; if (out[q]) out[q] = ltab[flatBase + src[w0 + col]]; } }
       else for (let col = 0; col < run; col++) {
         if (!written[w0 + col]) continue;
         const q = q0 + col;
-        out[q] = opq[q] ? ltab[1024 + (L + ((dR * (col + skip - leftclip)) >> 5)) * 256 + src[w0 + col]] : 0;
+        if (out[q]) out[q] = ltab[1024 + (L + ((dR * (col + skip - leftclip)) >> 5)) * 256 + src[w0 + col]];
       }
     }
   }
@@ -434,14 +439,31 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     if (j === undefined) { let bd = Infinity; for (let q = 0; q < 256; q++) { const dr = pl2[q * 4] - r, dg = pl2[q * 4 + 1] - g, db = pl2[q * 4 + 2] - b, dd = dr * dr + dg * dg + db * db; if (dd < bd) { bd = dd; j = q; } } pl2Index.set(key, j); }
     return j;
   };
+  // PERF (stutter): the Map.get above, once per blended pixel, was most of a shadow tile's cost, and a town frame
+  // blends dozens of tiles. A direct-mapped cache in front of it, keyed by the pixel's low 24 bits as a
+  // little-endian Uint32 reads them (cv() assumes the same), returns indexOf's own answer: a key's index never
+  // changes once set. The blend writes the PL2 colour as one Uint32, keeping the destination's alpha byte.
+  const ck = new Int32Array(4096).fill(-1), cj = new Uint8Array(4096);
+  const indexOf32 = (p) => {
+    const key = p & 0xffffff, h = Math.imul(key, 0x9E3779B1) >>> 20;
+    if (ck[h] === key) return cj[h];
+    const j = indexOf(key & 0xff, (key >>> 8) & 0xff, key >>> 16); ck[h] = key; cj[h] = j; return j;
+  };
+  let pl2Rgb = null;
+  const blendRgb = () => (pl2Rgb ??= Uint32Array.from({ length: 256 }, (_, j) => pl2[j * 4] | (pl2[j * 4 + 1] << 8) | (pl2[j * 4 + 2] << 16)));
+  const pixels32 = (img) => new Uint32Array(img.data.buffer, img.data.byteOffset, img.data.length >>> 2);
   const shadowSources = new WeakMap();   // bitmap -> { idx: Uint8Array, alpha: Uint8Array }
   const shadowSource = (bitmap) => {
     let v = shadowSources.get(bitmap);
     if (!v) {
-      const d = bitmap.getContext('2d').getImageData(0, 0, bitmap.width, bitmap.height).data;
+      const d = cv(bitmap).getContext('2d').getImageData(0, 0, bitmap.width, bitmap.height).data;
       const idx = new Uint8Array(bitmap.width * bitmap.height), alpha = new Uint8Array(idx.length);
       for (let q = 0; q < idx.length; q++) { alpha[q] = d[q * 4 + 3]; if (alpha[q]) idx[q] = indexOf(d[q * 4], d[q * 4 + 1], d[q * 4 + 2]); }
-      v = { idx, alpha }; shadowSources.set(bitmap, v);
+      // PERF: the bounding box of the pixels that blend (a shadow cel is mostly transparent): drawShadow reads back,
+      // loops and writes only that box, so the pixels it touches are the same ones as before.
+      const bw = bitmap.width, bh = bitmap.height; let bx0 = bw, bx1 = 0, by0 = bh, by1 = 0;
+      for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) if (alpha[y * bw + x]) { if (x < bx0) bx0 = x; if (x >= bx1) bx1 = x + 1; if (y < by0) by0 = y; by1 = y + 1; }
+      v = { idx, alpha, bx0, bx1, by0, by1 }; shadowSources.set(bitmap, v);
     }
     return v;
   };
@@ -451,23 +473,22 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   // from the running game and compared byte for byte, s191).
   const drawShadow = (ctx, o) => {
     const t = blendPl2(); if (!t) return false;
-    const { idx, alpha } = shadowSource(o.bitmap);
-    const w = o.bitmap.width, h = o.bitmap.height, x0 = Math.max(0, o.x), y0 = Math.max(0, o.y);
-    const x1 = Math.min(ctx.canvas.width, o.x + w), y1 = Math.min(ctx.canvas.height, o.y + h);
+    const { idx, alpha, bx0, bx1, by0, by1 } = shadowSource(o.bitmap);
+    const w = o.bitmap.width, x0 = Math.max(0, o.x + bx0), y0 = Math.max(0, o.y + by0);
+    const x1 = Math.min(ctx.canvas.width, o.x + bx1), y1 = Math.min(ctx.canvas.height, o.y + by1);
     if (x1 <= x0 || y1 <= y0) return true;
-    const img = ctx.getImageData(x0, y0, x1 - x0, y1 - y0), d = img.data, A = 1024 + 49 * 256;
-    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
-      const q = (y - o.y) * w + (x - o.x); if (!alpha[q]) continue;
-      const i = ((y - y0) * (x1 - x0) + (x - x0)) * 4;
-      const o2 = t[A + indexOf(d[i], d[i + 1], d[i + 2]) * 256 + idx[q]];
-      d[i] = t[o2 * 4]; d[i + 1] = t[o2 * 4 + 1]; d[i + 2] = t[o2 * 4 + 2];
+    const img = ctx.getImageData(x0, y0, x1 - x0, y1 - y0), d = pixels32(img), rgb = blendRgb(), rw = x1 - x0, A = 1024 + 49 * 256;
+    for (let y = y0; y < y1; y++) for (let x = x0, q = (y - o.y) * w + (x0 - o.x), i = (y - y0) * rw; x < x1; x++, q++, i++) {
+      if (alpha[q]) d[i] = (d[i] & 0xff000000) | rgb[t[A + indexOf32(d[i]) * 256 + idx[q]]];
     }
     ctx.putImageData(img, x0, y0); return true;
   };
 
   function library(slot, files) {
     const path = files[slot];
-    if (libraries.has(path ?? '')) return libraries.get(path ?? '');
+    // MPQ names are case- and slash-insensitive: key the decoded library so a prefetch spelling and the engine's spelling share it.
+    const lkey = String(path ?? '').toLowerCase().replace(/\//g, '\\');
+    if (libraries.has(lkey)) return libraries.get(lkey);
     let entry = { byKey: new Map(), byIndex: [], error: path ? '' : 'empty slot' };
     if (path) {
       try {
@@ -485,7 +506,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         }
       } catch (error) { entry.error = String(error); errors.push(`${path}: ${error}`); }
     }
-    libraries.set(path ?? '', entry);
+    libraries.set(lkey, entry);
     return entry;
   }
 
@@ -642,12 +663,10 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     const idx = lit.paletteIdx, opq = lit.paletteOpaque, w = lit.width, h = lit.height;
     const x0 = Math.max(0, o.x), y0 = Math.max(0, o.y), x1 = Math.min(ctx.canvas.width, o.x + w), y1 = Math.min(ctx.canvas.height, o.y + h);
     if (x1 <= x0 || y1 <= y0) return true;
-    const img = ctx.getImageData(x0, y0, x1 - x0, y1 - y0), d = img.data, A = 1024 + 49 * 256 + (alpha >= 0xC0 ? 0 : alpha >= 0x80 ? 1 : 2) * 65536;
-    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
-      const q = (y - o.y) * w + (x - o.x); if (!opq[q]) continue;
-      const i = ((y - y0) * (x1 - x0) + (x - x0)) * 4;
-      const r = t[A + idx[q] * 256 + indexOf(d[i], d[i + 1], d[i + 2])];
-      d[i] = t[r * 4]; d[i + 1] = t[r * 4 + 1]; d[i + 2] = t[r * 4 + 2];
+    const img = ctx.getImageData(x0, y0, x1 - x0, y1 - y0), d = pixels32(img), rgb = blendRgb(), rw = x1 - x0;
+    const A = 1024 + 49 * 256 + (alpha >= 0xC0 ? 0 : alpha >= 0x80 ? 1 : 2) * 65536;
+    for (let y = y0; y < y1; y++) for (let x = x0, q = (y - o.y) * w + (x0 - o.x), i = (y - y0) * rw; x < x1; x++, q++, i++) {
+      if (opq[q]) d[i] = (d[i] & 0xff000000) | rgb[t[A + idx[q] * 256 + indexOf32(d[i])]];
     }
     ctx.putImageData(img, x0, y0); return true;
   };
@@ -679,26 +698,28 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     return e;
   }
 
+  let pal32Of = null;
+  function cv(b) {
+    if (b.canvas) return b.canvas;
+    const px = b.px, pBitmap = perfT0(), pal = paletteBytes();
+    const pal32 = (pal32Of ??= new Uint32Array(pal.buffer, pal.byteOffset, 256));
+    const rgba = new Uint8ClampedArray(px.indices.length * 4), out32 = new Uint32Array(rgba.buffer);
+    for (let i = 0; i < px.indices.length; i++) if (px.opaque[i]) out32[i] = pal32[px.indices[i]];
+    const canvas = documentObject.createElement('canvas');
+    canvas.width = px.width; canvas.height = px.height;
+    canvas.getContext('2d').putImageData(new ImageData(rgba, px.width, px.height), 0, 0);
+    perfT('terrain-bitmap', pBitmap);
+    return b.canvas = canvas;
+  }
   function bitmapFor(path, tile, index) {
     const key = `${path}:${index}`;
     const cached = bitmaps.get(key);
     if (cached !== undefined) return cached;
+    // PERF (D49): a lit tile is drawn from its lit canvas, so the raw tile canvas is only needed by the unlit / shadow paths:
+    // return a stub with the canvas' size and build the canvas (cv) on first real use. Same pixels, same draws.
     let canvas = null;
     const px = tile?.pixels;
-    if (px && px.width > 0 && px.height > 0) {
-      const pBitmap = perfT0();
-      const pal = paletteBytes();
-      const rgba = new Uint8ClampedArray(px.indices.length * 4);
-      for (let i = 0; i < px.indices.length; i++) {
-        if (!px.opaque[i]) continue;
-        const s = px.indices[i] * 4;
-        rgba.set(pal.subarray(s, s + 4), i * 4);
-      }
-      canvas = documentObject.createElement('canvas');
-      canvas.width = px.width; canvas.height = px.height;
-      canvas.getContext('2d').putImageData(new ImageData(rgba, px.width, px.height), 0, 0);
-      perfT('terrain-bitmap', pBitmap);
-    }
+    if (px && px.width > 0 && px.height > 0) canvas = { width: px.width, height: px.height, px, canvas: null };
     bitmaps.set(key, canvas);
     return canvas;
   }
@@ -794,9 +815,10 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
     }
     // Keyed by the DRAWN variant (its position among the identity's variants), never the asked index.
     const variantNo = variants ? variants.indexOf(dt1Tile) : -1;
-    const bitmap = dt1Tile && bitmapFor(files[foundSlot], dt1Tile,
-      `${tile.orientation}:${tile.mainIndex}:${tile.subIndex}:v${variantNo}`);
-    const rec = { lib, variants, foundSlot, dt1Tile, variantNo, bitmap, searched, ambiguous, entryTiles, entryExact, entryDiffers, rarityAmbiguous, resolved, wrongIdentity,
+    // The canvas is built lazily, on the first tile that is not culled (bitmapFor): `hasBitmap` is what bitmapFor's null test would say.
+    const bmPath = files[foundSlot], bmIndex = `${tile.orientation}:${tile.mainIndex}:${tile.subIndex}:v${variantNo}`;
+    const hasBitmap = Boolean(dt1Tile && dt1Tile.pixels && dt1Tile.pixels.width > 0 && dt1Tile.pixels.height > 0);
+    const rec = { lib, variants, foundSlot, dt1Tile, variantNo, bitmap: undefined, hasBitmap, bmPath, bmIndex, searched, ambiguous, entryTiles, entryExact, entryDiffers, rarityAmbiguous, resolved, wrongIdentity,
       want: `${tile.orientation}:${tile.mainIndex}:${tile.subIndex}`, got: dt1Tile ? `${dt1Tile.orientation}:${dt1Tile.mainIndex}:${dt1Tile.subIndex}` : '' };
     if (cacheable) { if (!mid) resolved_.set(k1, mid = new Map()); if (!inner) mid.set(k2, inner = new Map()); inner.set(k3, rec); }
     return rec;
@@ -804,6 +826,9 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
 
   return {
     errors,
+    // Decode one DT1 library ahead of the level that wants it (area-prefetch, one per tick): library() is keyed by path and
+    // pure, so the later level finds the identical entry already built instead of decoding it inside its first frame.
+    preload(path) { library(0, [path]); },
     /**
      * Light floors from a grid source: fn(a, b) -> 36 intensities or null.
      * `source` is readSessionLightmap's result when fn is that map's own grid; it is compared
@@ -879,7 +904,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         if (tile.pop === 1) { popHidden++; continue; }
         requested++;
         const rec = resolveTile(tile, files);
-        const { lib, variants, foundSlot, dt1Tile, variantNo, bitmap } = rec;
+        const { lib, variants, foundSlot, dt1Tile, variantNo, hasBitmap: bitmap } = rec;
         searched += rec.searched; ambiguous += rec.ambiguous; entryTiles += rec.entryTiles; entryExact += rec.entryExact; entryDiffers += rec.entryDiffers;
         rarityAmbiguous += rec.rarityAmbiguous; resolved += rec.resolved; wrongIdentity += rec.wrongIdentity;
         // A tile the DT1 holds with no blocks at all (some shadow entries: Trees.dt1 13/1/n) is
@@ -933,11 +958,12 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
           const submittedX = Math.round(x), ay = y + FLOOR_DY + kindDy;
           const culled = !floorSubmissionVisible(submittedX, ay, width, height);
           if (culled) continue;
-        } else if (drawX + bitmap.width <= 0 || drawX >= width || drawY + bitmap.height <= 0 || drawY >= height) continue;
+        } else if (drawX + px.width <= 0 || drawX >= width || drawY + px.height <= 0 || drawY >= height) continue;
         // Carry the identity asked for AND the identity drawn, so a scenario can prove they match.
         // Every floor tile once drew unrelated art while "0 unresolved" passed; only comparing these
         // two would have caught it.
-        const entry = { variantNo, bitmap, x: Math.round(drawX), y: Math.round(drawY), depth: y, ordinal: tile.ordinal, tile, dt1Tile, slot: foundSlot,
+        const bm = rec.bitmap ??= bitmapFor(rec.bmPath, dt1Tile, rec.bmIndex);
+        const entry = { variantNo, bitmap: bm, x: Math.round(drawX), y: Math.round(drawY), depth: y, ordinal: tile.ordinal, tile, dt1Tile, slot: foundSlot,
           want: rec.want,
           got: rec.got, file: files[foundSlot] ?? "", variant: tile.libraryIndex, wall: tile.layer !== 0,
           seam: Boolean(tile.seam) };
@@ -977,7 +1003,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         if (globalThis.__d2TraceLower && E) globalThis.__d2TraceLower.push({ x: l.x, y: l.y, path: files[l.slot], want: l.want, variantNo: l.variantNo,
           dt1Tile: l.dt1Tile, o: l.tile.orientation, E, a: l.tile.worldX * 5, b: l.tile.worldY * 5, lower: true });
         const lit = E && litWall(files[l.slot], l.dt1Tile, l.want + ':v' + l.variantNo, E);
-        ctx.drawImage(lit || l.bitmap, l.x, l.y); drawn++; recordTile(l, files);
+        ctx.drawImage(lit || cv(l.bitmap), l.x, l.y); drawn++; recordTile(l, files);
       }
       for (const f of floors) {
         // gridFor returns this frame's grid for the tile's own world subtile: unchanged intensities stay
@@ -992,7 +1018,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         // and the 8x8 light grid it was lit from, so a row can recompute the LEVEL litFloor gave a
         // pixel (F96: our floor level is 1-2 above retail's on the frame's left edge). s448 reads it.
         if (globalThis.__d2TraceBlits) globalThis.__d2TraceBlits.push({ x: f.x, y: f.y, path: files[f.slot], want: f.want, variantNo: f.variantNo, dt1Tile: f.dt1Tile, grid, a, b, seam: Boolean(f.tile.seam) });
-        ctx.drawImage(lit || f.bitmap, f.x, f.y); drawn++; recordTile(f, files);
+        ctx.drawImage(lit || cv(f.bitmap), f.x, f.y); drawn++; recordTile(f, files);
       }
       if (afterFloors) afterFloors(ctx, floors, { width, height, offsetX, offsetY });
       perfT('terrain-floor', pFloor);
@@ -1017,8 +1043,10 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       // so the tree's own opaque wall (drawn after us) never covered the shadow's blend and it darkened
       // the tree canopy by 27% (SHADOW_KEEP) instead of nothing (F117, s699: 469 -> 0 of 2,503 traced
       // pixels of this one wall with only the draw ORDER corrected, litWall's level unchanged).
-      const shadows = walls.filter((e) => !isLower(e) && isShadow(e));
-      const overlay = walls.filter((e) => !isLower(e) && !isRoof(e) && !isShadow(e)).concat(sprites.map((s) => ({ sprite: s, depth: s.depth, ordinal: -1 })));
+      // PERF: one pass splits the non-lower walls three ways (isLower's split once per wall, not three times); order kept.
+      const shadows = [], overlay = [], roofsAll = [];
+      for (const e of walls) if (!isLower(e)) (isShadow(e) ? shadows : isRoof(e) ? roofsAll : overlay).push(e);
+      for (const s of sprites) overlay.push({ sprite: s, depth: s.depth, ordinal: -1 });
       for (const o of shadows) o.k = [o.tile.worldY, o.tile.worldX, 1, o.ordinal];
       shadows.sort((a, b) => (a.k[0] - b.k[0]) || (a.k[1] - b.k[1]) || (a.k[3] - b.k[3]));
       // A roof plane is one contiguous building; retail hides the WHOLE plane when the player stands
@@ -1029,26 +1057,24 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       // tiles (8-neighbour on the DRLG grid) and cull a whole cluster when the player's subtile
       // position falls inside its tile-grid bounding box; per-tile culling does not reproduce the
       // measured all-or-nothing counts.
-      const roofsAll = walls.filter((e) => !isLower(e) && isRoof(e));
       const parent = roofsAll.map((_, i) => i);
       const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
       const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; };
-      for (let i = 0; i < roofsAll.length; i++) {
-        for (let j = i + 1; j < roofsAll.length; j++) {
-          if (Math.abs(roofsAll[i].tile.worldX - roofsAll[j].tile.worldX) <= 1 &&
-              Math.abs(roofsAll[i].tile.worldY - roofsAll[j].tile.worldY) <= 1) union(i, j);
+      // PERF: the same 8-neighbour components from a cell map (one lookup per neighbour cell) instead of
+      // an O(n^2) scan of every roof pair. Tiles sharing a cell are joined to the cell's first tile.
+      const roofCell = new Map(), cellKey = (x, y) => x * 4194304 + y;
+      roofsAll.forEach((e, i) => { const k = cellKey(e.tile.worldX, e.tile.worldY), f = roofCell.get(k); if (f === undefined) roofCell.set(k, i); else union(i, f); });
+      roofsAll.forEach((e, i) => {
+        for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+          const f = (dx || dy) ? roofCell.get(cellKey(e.tile.worldX + dx, e.tile.worldY + dy)) : undefined;
+          if (f !== undefined) union(i, f);
         }
-      }
-      const clusters = new Map();
-      roofsAll.forEach((e, i) => { const r = find(i); if (!clusters.has(r)) clusters.set(r, []); clusters.get(r).push(e); });
-      const culledRoof = new Set();
-      for (const members of clusters.values()) {
-        const minX = Math.min(...members.map((e) => e.tile.worldX)), maxX = Math.max(...members.map((e) => e.tile.worldX));
-        const minY = Math.min(...members.map((e) => e.tile.worldY)), maxY = Math.max(...members.map((e) => e.tile.worldY));
-        const inside = player.x >= minX * 5 && player.x < (maxX + 1) * 5 && player.y >= minY * 5 && player.y < (maxY + 1) * 5;
-        if (inside) for (const e of members) culledRoof.add(e);
-      }
-      const roofs = roofsAll.filter((e) => !culledRoof.has(e));
+      });
+      const box = new Map();   // cluster root -> [minX, maxX, minY, maxY]
+      roofsAll.forEach((e, i) => { const r = find(i), x = e.tile.worldX, y = e.tile.worldY, b = box.get(r);
+        if (!b) box.set(r, [x, x, y, y]); else { if (x < b[0]) b[0] = x; if (x > b[1]) b[1] = x; if (y < b[2]) b[2] = y; if (y > b[3]) b[3] = y; } });
+      const roofs = roofsAll.filter((e, i) => { const b = box.get(find(i));
+        return !(player.x >= b[0] * 5 && player.x < (b[1] + 1) * 5 && player.y >= b[2] * 5 && player.y < (b[3] + 1) * 5); });
       for (const o of roofs) o.k = [o.tile.worldY, o.tile.worldX, 1, o.ordinal];
       roofs.sort((a, b) => (a.k[0] - b.k[0]) || (a.k[1] - b.k[1]) || (a.k[3] - b.k[3]));
       for (const o of overlay) o.k = key(o);
@@ -1074,10 +1100,10 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
           // blit that painted it has to see this pass too (same guarded trace, __d2TraceWalls).
           if (globalThis.__d2TraceWalls) globalThis.__d2TraceWalls.push({ x: o.x, y: o.y, path: files[o.slot], want: o.want, o: 13, dt1Tile: o.dt1Tile, shadow: true });
           // A shadow tile blends into what is under it through PL2 AlphaBlend[0] (drawShadow; T8).
-          if (globalThis.__d2ShadowOpaque) ctx.drawImage(o.bitmap, o.x, o.y);   // a row reading the tiles' own pixels (s191)
+          if (globalThis.__d2ShadowOpaque) ctx.drawImage(cv(o.bitmap), o.x, o.y);   // a row reading the tiles' own pixels (s191)
           else if (!drawShadow(ctx, o)) {   // no PL2: the measured stand-in
             const prev = ctx.globalAlpha; ctx.globalAlpha = 1 - SHADOW_KEEP;
-            ctx.drawImage(silhouette(o.bitmap), o.x, o.y); ctx.globalAlpha = prev;
+            ctx.drawImage(silhouette(cv(o.bitmap)), o.x, o.y); ctx.globalAlpha = prev;
           }
         } else {
           const at = lightCell, A = o.tile.worldX * 5, B = o.tile.worldY * 5;
@@ -1108,7 +1134,7 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
           if (fade > 0 && !(globalThis.__d2SkipFaded && fade < 255)) {   // __d2SkipFaded: a probe drawing the frame WITHOUT the hidden walls (their blend needs the pixel under them)
             const pf = perfT0();
             if (fade < 255 && !globalThis.__d2CanvasAlphaFade && drawFaded(ctx, o, lit, fade)) { /* per-pixel PL2 blend, like retail's entry 40 */ }
-            else { const prev = ctx.globalAlpha; ctx.globalAlpha = prev * fade / 255; ctx.drawImage(lit || o.bitmap, o.x, o.y); ctx.globalAlpha = prev; }   // no PL2 / unlit: the canvas-alpha stand-in
+            else { const prev = ctx.globalAlpha; ctx.globalAlpha = prev * fade / 255; ctx.drawImage(lit || cv(o.bitmap), o.x, o.y); ctx.globalAlpha = prev; }   // no PL2 / unlit: the canvas-alpha stand-in
             fadeMs += perfT0() - pf;
           }
         }

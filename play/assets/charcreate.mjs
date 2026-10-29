@@ -17,6 +17,7 @@
 // which is a wrong picture rather than an error.
 
 import { composeTiled, createBlender, createFont, decodeFontTbl, FRONTEND, recordTiled, textColourPalette, TITLE_COLUMNS } from './frontend.mjs';
+import { drawBg, present } from './widebg.mjs';
 import { createCharacterCreateCheckboxes, createCharacterCreateCheckboxInput } from './charcreate-checkboxes.mjs';
 import { createCharacterNameRenderer, NAME_FIELD } from './charcreate-name.mjs';
 import { isRetailEditBoxCharacter } from './charcreate-name-input.mjs';
@@ -564,7 +565,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
       ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 800, 600);
       // D2Win's background placement, shared with the title (frontend.mjs tiledPlacements): rows
       // anchored at y 256 and 512 and the last at 599, so row 0 is black and rows 2/3 overlap one line.
-      ctx.drawImage(background.canvas, 0, 0);
+      drawBg(ctx, CREATE_ASSETS.background, background.canvas);
       recordTiled(CREATE_ASSETS.background, background, 0, 0);
 
       const centred = (text, x, y) => font.draw(ctx, text, x - font.measure(text) / 2, y);
@@ -695,9 +696,7 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
         recordDc6(FRONTEND.cursor, 0, f, left, top);
         drawnCursor = { path: FRONTEND.cursor, frame: 0, anchor: [pointer[0], pointer[1] - 1], left, top, width: f.width, height: f.height };
       }
-      outCtx.save(); outCtx.imageSmoothingEnabled = false;
-      outCtx.drawImage(scene, v.ox, v.oy, 800 * v.scale, 600 * v.scale);
-      outCtx.restore();
+      present(outCtx, scene, v, CREATE_ASSETS.background);
       return { chosen: chosen >= 0 ? heroes[chosen].key : null, hovered: hovered >= 0 ? heroes[hovered].key : null };
     },
   };

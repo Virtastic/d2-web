@@ -38,6 +38,21 @@ const ACT_PALETTE = ['ACT1', 'ACT2', 'ACT3', 'ACT4', 'ACT5'];
 // SelectedUnitShift(1) and the blend tables (OpenDiablo2-pl2 pkg/decode.go).
 const LIGHT_LEVEL_7 = 1024 + 7 * 256;
 
+// PERF: the single-layer plane is a pure function of (cof, direction, frame, component, dcc, that component's DCC
+// direction); composeCofFrame already memoises it, but only after a per-call Map and template-string key. A numeric
+// key skips both every frame; the plane object (and so its mask layout) is the very same one.
+const planeMemo = new WeakMap();
+export function singlePlane(cof, direction, frame, component, dcc, dccDirection) {
+  const req = dccDirection instanceof Map ? dccDirection.get(component) ?? 0 : dccDirection;
+  if (!Number.isInteger(req) || req < 0 || req >= 64 || frame >= 4096 || direction >= 1024 || typeof dcc !== 'object') return composeCofFrame(cof, direction, frame, new Map([[component, dcc]]), dccDirection);
+  let byDcc = planeMemo.get(cof); if (!byDcc) planeMemo.set(cof, byDcc = new WeakMap());
+  let byKey = byDcc.get(dcc); if (!byKey) byDcc.set(dcc, byKey = new Map());
+  const key = ((component * 1024 + direction) * 64 + req) * 4096 + frame;
+  let plane = byKey.get(key);
+  if (!plane) byKey.set(key, plane = composeCofFrame(cof, direction, frame, new Map([[component, dcc]]), dccDirection));
+  return plane;
+}
+
 export function createUnitShadowRenderer(read) {
   const acts = new Map();
   const act0Of = (act) => Math.min(4, Math.max(0, Math.trunc(Number(act) || 1) - 1));
@@ -92,7 +107,7 @@ export function createUnitShadowRenderer(read) {
         const layer = cofLayerRecord(cof, component);
         if (layer && (!layer.shadow || (layer.transparent && layer.drawEffect === 0))) continue;
         let plane;
-        try { plane = composeCofFrame(cof, direction, frame, new Map([[component, dcc]]), dccDirection); } catch { continue; }
+        try { plane = singlePlane(cof, direction, frame, component, dcc, dccDirection); } catch { continue; }
         if (!plane.width || !plane.height) continue;
         eligibleComponents.push(component);
         // Retail's rasteriser: emit height >> 1 rows, walking the

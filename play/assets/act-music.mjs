@@ -199,7 +199,9 @@ function unlockOnGesture(context, target = globalThis.window) {
   for (const type of ['pointerdown', 'keydown', 'touchstart', 'gamepadconnected']) target.addEventListener(type, unlock, opts);
 }
 
-export function createActMusicPlayer(read, AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext, gestureTarget = globalThis.window) {
+// fetched(names) -> Promise (optional): resolves once a file is in the stream cache, so the whole-WAV read below does not
+// spin the main thread on the network (the title track is ~13 range misses of d2music.mpq on first play).
+export function createActMusicPlayer(read, AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext, gestureTarget = globalThis.window, fetched = null) {
   if (typeof read !== 'function') throw new TypeError('retail asset reader is required');
   if (!AudioContextClass) throw new Error('Web Audio is unavailable');
   const context = new AudioContextClass(), buffers = new Map();
@@ -214,6 +216,8 @@ export function createActMusicPlayer(read, AudioContextClass = globalThis.AudioC
   let levelsTxt = null, soundEnvironTxt = null, soundsTxt = null;
   const applyGain = () => { if (gain) gain.gain.value = retailMusicChannelGain(sourceVolume, sliders.music, sliders.sound); };
   let source = null, activeSoundId = -1, activeLevelId = -1, titlePreparation = null, requestSerial = 0;
+  // A track is 6 MB of sectors StormLib decompresses on the main thread: read in parts when the reader can.
+  const readTrack = (path) => (read.sliced ?? read)(path);
   async function prepare(levelId) {
     if (levelsTxt === null) levelsTxt = new TextDecoder('latin1').decode(read('data\\global\\excel\\Levels.txt'));
     if (soundEnvironTxt === null) soundEnvironTxt = new TextDecoder('latin1').decode(read('data\\global\\excel\\SoundEnviron.txt'));
@@ -223,7 +227,8 @@ export function createActMusicPlayer(read, AudioContextClass = globalThis.AudioC
     sourceVolume = selection.volume; applyGain();
     let buffer = buffers.get(selection.soundId);
     if (!buffer) {
-      const bytes = read(`data\\global\\music\\${selection.path}`);
+      await fetched?.([`data\\global\\music\\${selection.path}`]);
+      const bytes = await readTrack(`data\\global\\music\\${selection.path}`);
       decodeWav(bytes);
       const copy = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
       buffer = await context.decodeAudioData(copy); buffers.set(selection.soundId, buffer);
@@ -236,7 +241,8 @@ export function createActMusicPlayer(read, AudioContextClass = globalThis.AudioC
     titlePreparation = (async () => {
       let buffer = buffers.get(key);
       if (!buffer) {
-        const bytes = read(`data\\global\\music\\${TITLE_MUSIC}`);
+        await fetched?.([`data\\global\\music\\${TITLE_MUSIC}`]);
+        const bytes = await readTrack(`data\\global\\music\\${TITLE_MUSIC}`);
         decodeWav(bytes);
         const copy = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
         buffer = await context.decodeAudioData(copy); buffers.set(key, buffer);

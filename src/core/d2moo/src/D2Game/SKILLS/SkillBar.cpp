@@ -817,7 +817,8 @@ int32_t __fastcall SKILLS_SrvSt38_Whirlwind(D2GameStrc* pGame, D2UnitStrc* pUnit
     }
 
     PATH_SetVelocity(pUnit->pDynamicPath, sub_6FD15500(pUnit), __FILE__, __LINE__);
-    PATH_SetMoveTestCollisionMask(pUnit->pDynamicPath, COLLIDE_WALL | COLLIDE_MISSILE_BARRIER | COLLIDE_BLANK | COLLIDE_NO_PATH);
+    // 1.13c D2Game+0x28290: PATH_SetMoveTestCollisionMask(0x401) = WALL | OBJECT, after the velocity set
+    PATH_SetMoveTestCollisionMask(pUnit->pDynamicPath, COLLIDE_WALL | COLLIDE_OBJECT);
 
     D2PathPointStrc* ppPathPoints = nullptr;
     const int32_t nPathPoints = PATH_GetPathPoints(pUnit->pDynamicPath, &ppPathPoints);

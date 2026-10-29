@@ -33,7 +33,7 @@ export function parseObjectPresentations(bytes, count) {
     id: view.getUint32(at, true), classId: view.getUint32(at + 4, true), token: fourcc(view.getUint32(at + 8, true)),
     mode: view.getUint32(at + 12, true), x: view.getInt32(at + 16, true), y: view.getInt32(at + 20, true),
     framePrecise: view.getUint32(at + 24, true), frameCountPrecise: view.getUint32(at + 28, true),
-    componentMask: view.getUint32(at + 32, true), animSpeed: view.getUint16(at + 36, true), direction: view.getUint8(at + 38), selectable: view.getUint8(at + 39) !== 0, portalLevel: view.getUint8(at + 40), locked: view.getUint8(at + 41) !== 0,
+    componentMask: view.getUint32(at + 32, true), animSpeed: view.getUint16(at + 36, true), direction: view.getUint8(at + 38), selectable: view.getUint8(at + 39) !== 0, portalLevel: view.getUint8(at + 40), locked: view.getUint8(at + 41) !== 0, inClientRoom: view.getUint16(at + 42, true) !== 0,
   }; });
 }
 
@@ -87,7 +87,7 @@ export function createObjectRenderer(read, documentObject = globalThis.document,
       // This selector depends only on the decoded COF. Keep it with the cached animation so static
       // objects do not rescan the same layer records on every rendered frame.
       const hasBlend = cof.layerRecords.some((layer) => layer.transparent && (layer.drawEffect === 3 || layer.drawEffect === 4));
-      animation = { cof, direction, components, mode, hasBlend }; rememberBounded(animations, base, animation, animationLimit);
+      animation = { cof, direction, components, mode, hasBlend, layerPlanes: new Map() }; rememberBounded(animations, base, animation, animationLimit);
     } catch { rememberFailure(failures, base, failureLimit); return null; }
     const frame = (object.framePrecise >>> 8) % animation.cof.framesPerDirection;
     // The shadow goes under the sprite, at the object's own anchor, one blit per COF layer whose Shadow
@@ -104,21 +104,27 @@ export function createObjectRenderer(read, documentObject = globalThis.document,
       const blend = blender(act0, pal);
       for (const componentId of animation.cof.priority[animation.direction][frame]) {
         const dcc = animation.components.get(componentId); if (!dcc) continue;
-        const layer = cofLayerRecord(animation.cof, componentId);
-        const one = composeCofFrame(animation.cof, animation.direction, frame, new Map([[componentId, dcc]]));
+        // Pure function of the cached animation: look it up once per (frame, component), not per render.
+        const lk = frame * 32 + componentId;
+        let lp = animation.layerPlanes.get(lk);
+        if (!lp) { const l = cofLayerRecord(animation.cof, componentId), o = composeCofFrame(animation.cof, animation.direction, frame, new Map([[componentId, dcc]]));
+          const comp = COMPONENT[componentId];
+          lp = { layer: l, one: o, plain: { width: o.width, height: o.height, indices: o.indexed, opaque: o.opaque },
+            path: comp && l ? `objects\\${object.token}\\${comp}\\${object.token}${comp}lit${animation.mode}${l.weaponClass}`.toLowerCase() : null };
+          animation.layerPlanes.set(lk, lp); }
+        const { layer, one } = lp;
         if (!one.width || !one.height) continue;
         const left = Math.round(x + one.xOffset), top = Math.round(y + one.yOffset);
         const requestedMode = layer?.transparent && (layer.drawEffect === 3 || layer.drawEffect === 4) ? layer.drawEffect : 5;
         // Evidence states what reached the canvas. A missing PL2 must never be reported as a blend.
         const mode = requestedMode !== 5 && blend ? requestedMode : 5;
         const hi = highlight ? highlightIndices(act0) : null;   // D28: mode 7 remaps colours, the layer keeps its own trans blend
-        const oneLayer = { width: one.width, height: one.height, indices: hi ? one.indexed.map((i) => hi[i]) : one.indexed, opaque: one.opaque };
+        const oneLayer = hi ? { width: one.width, height: one.height, indices: one.indexed.map((i) => hi[i]), opaque: one.opaque } : lp.plain;
         drawObjectLayer(ctx, rasterCache, { key: `${base}:layer:${frame}:${componentId}:${act0}:${highlight ? 'highlight' : 'normal'}`,
           width: one.width, height: one.height,
           rgba: () => indexedToRgba(one.indexed, one.opaque, pal, highlight ? highlightIndices(act0) : null, false),
           layer: oneLayer, left, top, mode, blend });
-        const component = COMPONENT[componentId];
-        const path = component && layer ? `objects\\${object.token}\\${component}\\${object.token}${component}lit${animation.mode}${layer.weaponClass}`.toLowerCase() : null;
+        const component = COMPONENT[componentId], path = lp.path;
         layerEvidence.push({ component, path, mode: highlight ? 7 : mode, transparent: Boolean(layer?.transparent), drawEffect: layer?.drawEffect ?? 0, shadow: Boolean(layer?.shadow) });
         if (Array.isArray(globalThis.__d2DrawList) && path) globalThis.__d2DrawList.push({ op: 'dcc', path, frame, x: Math.round(x), y: Math.round(y), mode: highlight ? 7 : mode });
       }

@@ -39,11 +39,36 @@ export function gCall(ord, ecx, edx, ...args) {
   if (Array.isArray(g)) g.push(`${globalThis.__d2GTick ?? 0} G ${ord} ${[ecx, edx, ...args].map((v) => (v >>> 0 < 0x100000 ? (v >>> 0).toString(16) : '*')).join(',')}`);
 }
 
+/** G lines from the C++ side (`<ord> <ecx>,<edx>,...`, already retail-format), tick-prefixed here. */
+export function gLines(text) {
+  const g = globalThis.__d2G;
+  if (Array.isArray(g)) for (const l of String(text).split('\n')) if (l) g.push(`${globalThis.__d2GTick ?? 0} G ${l}`);
+}
+
 /** G emitter for a unit draw (player/monster/object/missile/item sprite), at its place in the draw order: a retail G 10041 line's `u=<type>:<class>:<mode>`
  *  (hex) without the cel fields, which a unit's layers repeat. One line per unit, not per layer; compare with the retail trace collapsed the same way. */
+/** Tick 1 of a G trace: the loading-screen walk of D2Client+0x6D010 (a retail recording-g records 0-105): frame 0, the player's 6C490 restore
+ *  (D2Gfx 10083 arg 1), one D2Gfx 10043 (ecx/edx 1,1) per monster the client holds (`monsters`: 4 main / 14 holdout, = the tick's 0xAC assigns; NOT C1760
+ *  skips), then frames 1..8 = the 8 C1760(1) calls of the walk's 9-room list (D2Client+0x6D010 gate: ebp&0x1f != 0, ebp from 0 per walk, so rooms 1..8; the second
+ *  walk runs with edi=1 and D2Client+0x11C054 clear, so it calls none). `frame(ecx, edx, first)` is d2_client_loading_g; the entry ecx/edx of each frame are
+ *  D2Common-thunk leftovers read off the retail trace (not modelled). */
+export function gLoadingWalk(frame, monsters, pairs) {
+  gLines(frame(0, 0, 1));
+  gCall(10083, 0, 9, 1); for (let i = 0; i < monsters; i++) gCall(10043, 1, 1);
+  for (const [e, d] of pairs) gLines(frame(e, d, 0));   // D2Client+0x6C3F0's register leftovers per room slot (d2_client_loading_pairs)
+  gLines('10022 0,0,*\n10061 0,0,*\n10061 0,0,*');   // loading ends: palette reload (D2Gfx 10022, 10061 x2)
+}
+
+/** D2Client+0x44230's D2Gfx calls (`d2_client_frame_g`, src/core/d2client/frame_44230_g.cpp): phase 0 up to the room walk, phase 1 after it.
+ *  The register leftovers (a D2Common thunk's ecx/edx) are not recoverable from the decompile and are the retail values: 8B110's 0x164c0,
+ *  A8800's 0x22/0x1720, 14050's 8; the 2A9F0 10013 pair varies per tick and is left 0. */
+export function gFrame(Module, phase, gateEcx = 0) {
+  gLines(Module.ccall('d2_client_frame_g', 'string', Array(12).fill('number'), [phase, 1, 0, 1, 0xff, 0, 0, 0x164c0, 0x22, 0x1720, 8, gateEcx]));
+}
+
 export function gUnit(u, wx, wy) {
   const g = globalThis.__d2G;
-  if (u && Array.isArray(g)) g.push(`${globalThis.__d2GTick ?? 0} G 10041 unit u=${u.map((v) => (v >>> 0).toString(16)).join(':')} at=${Math.round(wx)},${Math.round(wy)}`);
+  if (u && !globalThis.__d2GLoading && Array.isArray(g)) g.push(`${globalThis.__d2GTick ?? 0} G 10041 unit u=${u.map((v) => (v >>> 0).toString(16)).join(':')} at=${Math.round(wx)},${Math.round(wy)}`);
 }
 
 export function drawListActive() { return Array.isArray(globalThis.__d2DrawList); }

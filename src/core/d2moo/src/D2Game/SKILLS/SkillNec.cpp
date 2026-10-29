@@ -1674,7 +1674,9 @@ int32_t __fastcall SKILLS_SrvDo060_BoneWall(D2GameStrc* pGame, D2UnitStrc* pUnit
     summonArg.dwFlags = 9;
     summonArg.pOwner = pUnit;
     summonArg.nHcIdx = nSummonId;
-    summonArg.nPetMax = SKILLS_EvaluateSkillFormula(pUnit, pSkillsTxtRecord->dwPetMax, nSkillId, nSkillLevel);
+    // 1.13c D2Game+0x50FE0: the retail Bone Wall spawns through its own summon (0xA3610) and applies no pet cap,
+    // so older walls survive; PetMax is not consulted.
+    summonArg.nPetMax = INT32_MAX;
 
     D2UnitStrc* pPet = D2GAME_SummonPet_6FD14430(pGame, &summonArg);
     if (!pPet)

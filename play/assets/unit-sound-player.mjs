@@ -7,7 +7,8 @@ import { unitSoundNativeSpatial, unitSoundNativePanCode, nativeSoundPanBalance }
 // The engine decides the event, D2Client's resolver picks the row, Sounds.txt names the WAV; nothing is invented.
 const ROOTS = ['data\\global\\sfx\\', 'data\\local\\sfx\\']; // voices/speech live under the local tree
 
-export function createUnitSoundPlayer(read, AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext, gestureTarget = globalThis.window) {
+// `fetched(names)`, optional: resolves once the first of those archive paths that exists can be read without a network stall.
+export function createUnitSoundPlayer(read, AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext, gestureTarget = globalThis.window, fetched = null) {
   if (typeof read !== 'function') throw new TypeError('retail asset reader is required');
   if (!AudioContextClass) throw new Error('Web Audio is unavailable');
   const context = new AudioContextClass(), buffers = new Map(), events = [];
@@ -89,11 +90,17 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
   let soundsTxt = null, started = 0, dialogueGeneration = 0, dialogueSource = null;
   let dialogueDone = Promise.resolve(), finishDialogue = null;
   const table = () => soundsTxt ??= new TextDecoder('latin1').decode(read('data\\global\\excel\\Sounds.txt'));
-  const buffer = (path, rec) => {
+  // PERF (freeze): the first play of a WAV waits for its bytes to arrive in the background before the synchronous
+  // read, instead of spinning the main thread on the fetch. Callers already await the decode.
+  const load = async (path) => {
+    if (fetched) await fetched(ROOTS.map((root) => root + path));
+    let bytes, at, err; for (const root of ROOTS) { try { bytes = read(root + path); at = root + path; break; } catch (e) { err = e; } } if (!bytes) throw err; decodeWav(bytes);
+    return { at, audio: await context.decodeAudioData(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)) };
+  };
+  const buffer = async (path, rec) => {
     let b = buffers.get(path);
-    if (b) rec.path = b.path;
-    if (!b) { let bytes, err; for (const root of ROOTS) { try { bytes = read(root + path); rec.path = root + path; break; } catch (e) { err = e; } } if (!bytes) throw err; decodeWav(bytes); b = context.decodeAudioData(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)); b.path = rec.path; buffers.set(path, b); }
-    return b;
+    if (!b) { buffers.set(path, b = load(path)); b.catch(() => buffers.delete(path)); }
+    const { at, audio } = await b; rec.path = at; return audio;
   };
   async function playTableRow(row, rec, { spatial = true } = {}) {
     try {

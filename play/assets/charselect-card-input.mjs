@@ -6,7 +6,7 @@ const elapsed32 = (now, then) => ((Math.trunc(now) & TICK_MASK) - then) >>> 0;
 export function characterCardHitBox(index) {
   return {
     x: 37 + (index % 2) * 272,
-    y: 178 + Math.floor(index / 2) * 93,
+    y: 178 - 92 + Math.floor(index / 2) * 93,   // the descriptor's y (178) is the control's bottom edge; the card is drawn from y=86
     w: 200,
     h: 92,
   };

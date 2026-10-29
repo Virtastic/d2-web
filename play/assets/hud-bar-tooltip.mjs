@@ -18,8 +18,8 @@ export function hudBarTooltip(w, h, mx, my, { experience, nextExperience, stamin
 }
 
 // Lit add-point button hover text: string.tbl 3986 "strlvlup" (New Stats, left button) and 3987 "strnewskl"
-// (New Skill, right). `box` is the drawn button record; null when the pointer is not on a lit one.
-// ponytail: plate anchored centred above the button; retail's exact anchor unrecovered.
-export function levelButtonTooltip(index, box, texts) {
-  return index < 0 || !box ? null : { bar: index ? 'skill' : 'stats', text: texts[index], x: box.left + (box.w >> 1), y: box.top - 4, color: 0 };
+// (New Skill, right). Retail D2Client+0x50430 / +0x501F0 (800x600 mode, which the widescreen client keeps): SetPopUpUnicodeText
+// at x = W/2 -179 / +178, y = H-50, centred; W/H are the screen size, so the plate follows the screen centre, never the 800 panel.
+export function levelButtonTooltip(index, w, h, texts) {
+  return index < 0 ? null : { bar: index ? 'skill' : 'stats', text: texts[index], x: Math.trunc(w / 2) + (index ? 178 : -179), y: h - 50, color: 0 };
 }

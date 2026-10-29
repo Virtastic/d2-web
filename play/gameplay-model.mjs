@@ -516,11 +516,14 @@ export function selectRetailPickTarget(snapshot, point, accept = null) {
 }
 
 export function hudLines(snapshot, connected, fps = 0) {
-  const s = normalizeSnapshot(snapshot);
+  // PERF: only the header scalars and the entity COUNT are shown, so the lists (entities, rooms, objects,
+  // items, warps: thousands of rebuilt objects a frame in a crowded town) are not normalised here.
+  const n = Array.isArray(snapshot?.entities) ? Math.min(snapshot.entities.length, 2048) : 0;
+  const s = normalizeSnapshot(snapshot && typeof snapshot === 'object' ? { ...snapshot, entities: undefined, rooms: undefined, objects: undefined, items: undefined, warps: undefined } : snapshot);
   return [
     connected ? 'SESSION CONNECTED' : 'WAITING FOR d2_session_*',
     `Act ${s.act} · ${s.area}`,
-    `tick ${s.tick} · ${Math.round(fps)} fps · entities ${s.entities.length}`,
+    `tick ${s.tick} · ${Math.round(fps)} fps · entities ${n}`,
     `life ${s.player.hp}/${s.player.hpMax} · mana ${s.player.mana}/${s.player.manaMax}`,
   ];
 }

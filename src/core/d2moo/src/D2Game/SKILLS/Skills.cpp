@@ -3802,7 +3802,7 @@ void __fastcall sub_6FD14C30(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FD14C60
-// 1.13c D2Game+0x96FA0
+// (no 1.13c RVA assigned: the 0x96FA0 mark was wrong, that is sub_6FC7DF40)
 void __fastcall D2GAME_SetSkills_6FD14C60(D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, int32_t bRemove)
 {
     if (nSkillId >= 0 && nSkillId < sgptDataTables->nSkillsTxtRecordCount)

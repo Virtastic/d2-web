@@ -1189,6 +1189,8 @@ int32_t __fastcall MISSMODE_SrvDo13_BoneWallMaker(D2GameStrc* pGame, D2UnitStrc*
         summonArg.pPosition.nX = CLIENTS_GetUnitX(pMissile);
         summonArg.pPosition.nY = CLIENTS_GetUnitY(pMissile);
         summonArg.nPetType = nPetType;
+        // Walls are not pet-capped: retail keeps several alive at once (a retail recording skill-78 trace).
+        summonArg.nPetMax = INT32_MAX;
 
         D2UnitStrc* pPet = D2GAME_SummonPet_6FD14430(pGame, &summonArg);
         if (pPet)

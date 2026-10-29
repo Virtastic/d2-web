@@ -46,7 +46,7 @@ test('litFloorPixels is byte-identical to the per-pixel reference on random floo
       pixels: { written: Uint8Array.from({ length: 480 }, () => rnd(5) ? 1 : 0), indices: Uint8Array.from({ length: 480 }, () => rnd(256)) } }));
     const grid = Array.from({ length: 64 }, () => (n % 2 ? 20 + rnd(6) : rnd(64)) & 0x3f);   // flat-ish and gouraud grids
     for (const [tx, ty] of [[undefined, undefined], [100, 100], [-20, 50], [50, -6]]) {
-      const out = new Uint32Array(width * height);
+      const out = new Uint32Array(width * height).fill(0x12345678);   // dirty, as the reused litScratch is
       litFloorPixels(px, blocks, grid, t, pal, tx, ty, out);
       assert.deepEqual(out, reference(px, blocks, grid, t, pal, tx, ty), `case ${n} at ${tx},${ty}`);
     }

@@ -26,12 +26,18 @@ export function experienceBarRatio(exp, next, levelStart) {
 // fill.  This renderer is local to the 104px-high panel, hence y = 561 - 496 = 65.
 // `d2_session_advancement` owns both values; this module only projects their ratio.
 export const CONTROL_LAYOUT = Object.freeze({ healthX: 0, centerX: 165, manaX: 683, orbY: 0, height: 104,
-  experienceX: 256, experienceY: 65, experienceWidth: 120, experienceHeight: 2 });
+  experienceX: 256, experienceY: 66, experienceWidth: 119, experienceHeight: 2 });
 
 // The panel's TOP ROW on the 800x600 screen. Retail draws 800CtrlPnl7 frame 0 with its bottom row
 // at y=599 and it is 104 tall, so its top row is 496 -- the same y this renderer's `y0` lands on,
 // which is what lets the HUD pieces below be positioned by retail's own screen coordinates.
 export const PANEL_SCREEN_TOP = 496;
+// The panel's left edge on the canvas, in whole pixels. A half-pixel origin (an odd width) makes
+// drawImage resample every panel cel, and the stamina blend reads those cels back: the resampled
+// pixels match no palette entry, so the blend left them as the panel's dark art (the speckle).
+export const panelOriginX = (width, scale) => Math.round((width - 800 * scale) / 2);
+// The lit add-point buttons ride the orbs out to the screen edges in widescreen: left button x-edge, right x+edge (retail 40 / W-73).
+export const levelButtonX = (x, i, edge) => (i ? x + edge : x - edge);
 
 // RETAIL 1.13c'S OWN HUD GEOMETRY, read out of its draw lists (the retail captures,
 // a2-town.txt, town-lit.txt; identical in every captured scene that reaches a town or the
@@ -95,7 +101,10 @@ export const HUD_LAYOUT = Object.freeze({
   // them. The lit frame at 206/563 is therefore unmeasured too and is NOT
   // invented: the panel draws retail's own measured cel.
   levelButtons: { path: 'data\\global\\ui\\PANEL\\level.DC6', disabledFrame: 2, litFrame: 0,
-    xs: [206, 563], y: 563, w: 30, h: 30 },
+    xs: [206, 563], y: 563, w: 30, h: 30,
+    // D2Client+0x50480: a pending point DRAWS (in addition to the disabled pair) Levelsocket then Level frame 0 at
+    // (40, H-105) / (W-73, H-105) -> socket y 495, cel y 491 at 800x600; the 640x480 anchors (40,375)/(567,375) fit the same rule.
+    socketPath: 'data\\global\\ui\\PANEL\\levelsocket.DC6', litXs: [40, 727], socketTop: 460, litTop: 462 },
 });
 
 // PERF (F198): the panel's button cels were re-expanded into a fresh canvas on every frame (seven per frame); a frame object is decoded once
@@ -124,6 +133,12 @@ function createStaminaBlend(read, palette) {
   const pl2 = read('data\\global\\palette\\ACT1\\pal.pl2');
   const index = new Map();
   for (let k = 255; k >= 0; k--) index.set((palette[k * 4] << 16) | (palette[k * 4 + 1] << 8) | palette[k * 4 + 2], k);
+  // A readback colour no palette entry matches (a resampled panel, below 800 px wide) takes the
+  // nearest entry, memoised in `index`: the blend is then total, so no pixel keeps the panel's art.
+  const nearest = (r, g, b) => { let best = 0, bestD = Infinity;
+    for (let k = 0; k < 256; k++) { const dr = palette[k * 4] - r, dg = palette[k * 4 + 1] - g, db = palette[k * 4 + 2] - b, d = dr * dr + dg * dg + db * db;
+      if (d < bestD) { bestD = d; best = k; } }
+    return best; };
   return { index, pl2,
     colour: [palette[109 * 4], palette[109 * 4 + 1], palette[109 * 4 + 2]],
     apply(ctx, x, y, width, height) {
@@ -134,8 +149,9 @@ function createStaminaBlend(read, palette) {
       ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
       const image = ctx.getImageData(X, Y, W, H), d = image.data, base = HUD_LAYOUT.stamina.pl2Base, seen = new Set();
       for (let i = 0; i < d.length; i += 4) {
-        const under = index.get((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]);
-        if (under === undefined) continue;
+        const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
+        let under = index.get(key);
+        if (under === undefined) index.set(key, under = nearest(d[i], d[i + 1], d[i + 2]));
         const mapped = pl2[base + under * 256 + HUD_LAYOUT.stamina.index];
         if (mapped === undefined) continue;
         seen.add((palette[mapped * 4] << 16) | (palette[mapped * 4 + 1] << 8) | palette[mapped * 4 + 2]);
@@ -161,6 +177,7 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
   const menuButtonDc6 = decodeDc6(read(HUD_LAYOUT.menuButton.path));
   const runButtonDc6 = decodeDc6(read(HUD_LAYOUT.runButton.path));
   const levelButtonDc6 = decodeDc6(read(HUD_LAYOUT.levelButtons.path));
+  const socketDc6 = decodeDc6(read(HUD_LAYOUT.levelButtons.socketPath));
   if (!miniPanelDc6.frames.length || miniButtonDc6.frames.length < 15 || menuButtonDc6.frames.length < 3 ||
       runButtonDc6.frames.length <= HUD_LAYOUT.runButton.runFrame ||
       levelButtonDc6.frames.length <= HUD_LAYOUT.levelButtons.disabledFrame)
@@ -180,7 +197,7 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
   const hitControlBox = (box, x, y, width, height) => {
     if (!box) return false;
     const scale = Math.min(1, width / 800); // the SAME scale draw() uses, or a short window hits off the drawn box
-    const x0 = (width - 800 * scale) / 2, y0 = height - CONTROL_LAYOUT.height * scale;
+    const x0 = panelOriginX(width, scale), y0 = height - CONTROL_LAYOUT.height * scale;
     const left = x0 + box.left * scale, top = y0 + (box.top - PANEL_SCREEN_TOP) * scale;
     return x >= left && x < left + box.w * scale && y >= top && y < top + box.h * scale;
   };
@@ -192,7 +209,7 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     .findIndex((b) => hitControlBox(b, x, y, width, height));
   const hitRunButton = (evidence, x, y, width, height) => hitControlBox(evidence?.hud?.runButton, x, y, width, height);
   function draw(ctx, width, height, snapshot, advancement, hud = {}) {
-    const scale = Math.min(1, width / 800), panelWidth = 800 * scale, x0 = (width - panelWidth) / 2, y0 = height - CONTROL_LAYOUT.height * scale;
+    const scale = Math.min(1, width / 800), x0 = panelOriginX(width, scale), y0 = height - CONTROL_LAYOUT.height * scale;
     ctx.save(); ctx.translate(x0, y0); ctx.scale(scale, scale);
     // SGD2FreeRes: the orbs sit at the screen edges; `edge` is how far each moves out, 0 at 800x600.
     const edge = x0 / scale;
@@ -270,11 +287,19 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     // LIT (frame 0, same anchors) while the engine holds points to spend: retail's charpanel-points /
     // skilltree-points frames (s192) show both red at 206/563 at level 2; left = stat points, right =
     // skill points (OpenDiablo2's two add-point buttons; only "both pending" is measured).
-    const levelButtons = HUD_LAYOUT.levelButtons.xs.map((bx, i) => {
-      const spec = HUD_LAYOUT.levelButtons, pending = Number(i ? advancement?.skillPoints : advancement?.statPoints) > 0,
-        index = pending ? spec.litFrame : spec.disabledFrame, f = levelButtonDc6.frames[index];
+    const spec = HUD_LAYOUT.levelButtons;
+    const pending = [advancement?.statPoints, advancement?.skillPoints].map((n) => Number(n) > 0);
+    const lit = spec.xs.map((bx, i) => {
+      if (!pending[i]) return null;
+      const f = levelButtonDc6.frames[spec.litFrame]; // lit cel replaces the grey one in the panel slot, not over the orbs
       ctx.drawImage(frameCanvas(f, palette, documentObject), bx, spec.y - PANEL_SCREEN_TOP);
-      return { ...record(spec, index, f, bx, spec.y), left: bx, top: spec.y, w: f.width, h: f.height };
+      return { ...record(spec, spec.litFrame, f, bx, spec.y), left: bx, top: spec.y, w: f.width, h: f.height };
+    });
+    const levelButtons = spec.xs.map((bx, i) => {
+      if (lit[i]) return lit[i];   // the grey cel drawn AFTER the lit one covered it (retail draws the lit over the grey)
+      const f = levelButtonDc6.frames[spec.disabledFrame];
+      ctx.drawImage(frameCanvas(f, palette, documentObject), bx, spec.y - PANEL_SCREEN_TOP);
+      return { ...record(spec, spec.disabledFrame, f, bx, spec.y), left: bx, top: spec.y, w: f.width, h: f.height };
     });
     let mini = null;
     if (hud.iconRow !== false) {
@@ -297,7 +322,7 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     const nextExperience = Number(advancement?.nextExperience);
     const experienceRatio = experienceBarRatio(experience, nextExperience, advancement?.prevExperience);
     // D2's renderer truncates the float width to an integer before its DrawRect call.
-    const experiencePixels = Math.floor(experienceRatio * CONTROL_LAYOUT.experienceWidth);
+    const experiencePixels = Math.floor(experienceRatio * CONTROL_LAYOUT.experienceWidth); // D2Client+0x26970: into*119/span, rows H-38,H-37
     if (experiencePixels > 0) {
       ctx.fillStyle = '#fff';
       ctx.fillRect(CONTROL_LAYOUT.experienceX, CONTROL_LAYOUT.experienceY,

@@ -813,10 +813,14 @@ void DRLGPRESET_SpawnRiver(D2DrlgMapStrc* pMazeMap, const D2DrlgCoordStrc& tDrlg
 	DRLGPRESET_AddPresetRiverObjects(pMazeMap, pDrlgMemPool, nOffsetX, pDrlgGrid);
 }
 
+// d2-web: retail builds the river sound objects (bSpawned, never spawned by the server) on the CLIENT DRLG only; with this set the session's
+// server DRLG also records them in its preset lists so the shell can export them as client-only objects (no server unit, no id, no hash).
+int g_d2ClientSoundObjects = 0;
+
 // 1.13c D2Common+0xBD60 (river branch; BF70 calls it)
 static void DRLGPRESET_SpawnRiverBranch(D2DrlgRoomStrc* pDrlgRoom, D2DrlgMapStrc* pMazeMap, void* pDrlgMemPool)
 {
-	if (pDrlgRoom->dwFlags & DRLGROOMFLAG_AUTOMAP_REVEAL)
+	if ((pDrlgRoom->dwFlags & DRLGROOMFLAG_AUTOMAP_REVEAL) || g_d2ClientSoundObjects)
 	{
 		D2DrlgCoordStrc tDrlgCoord = {};
 		tDrlgCoord.nPosX = 0;
@@ -1302,6 +1306,9 @@ void __fastcall DRLGPRESET_AddPresetRoomMapTiles(D2DrlgRoomStrc* pDrlgRoom)
 	DRLGPRESET_CollectTombStoneTiles(pDrlgRoom);
 }
 
+// replay seam (src/core/fn/d2common_c690.cpp): non-null replaces BuildPresetArea, which the capture hooks out (its state is not pinned by the FN descriptor)
+void (*g_pfnBuildPresetAreaSeam)(D2DrlgLevelStrc*, D2DrlgGridStrc*, int, D2DrlgMapStrc*, BOOL) = nullptr;
+
 // 1.13c D2Common+0xC690
 // Delta: the per-cell room's pMazeGrid argument is the map's own info grid entry at (nGridX,nGridY), not the preset cell flags.
 //D2Common.0x6FD87560
@@ -1315,7 +1322,7 @@ D2DrlgRoomStrc* __fastcall DRLGPRESET_BuildArea(D2DrlgLevelStrc* pLevel, D2DrlgM
 	int nCellFlags[256];
 	D2DrlgGridStrc tDrlgGrid;
 	DRLGGRID_FillGrid(&tDrlgGrid, pDrlgMap->pDrlgCoord.nWidth / 8 + 1, pDrlgMap->pDrlgCoord.nHeight / 8 + 1, nCellPos, nCellFlags);
-	DRLGPRESET_BuildPresetArea(pLevel, &tDrlgGrid, nFlags, pDrlgMap, bSingleRoom);
+	if (g_pfnBuildPresetAreaSeam) g_pfnBuildPresetAreaSeam(pLevel, &tDrlgGrid, nFlags, pDrlgMap, bSingleRoom); else DRLGPRESET_BuildPresetArea(pLevel, &tDrlgGrid, nFlags, pDrlgMap, bSingleRoom);
 
 	D2DrlgRoomStrc* pDrlgRoom = nullptr;
 	if (bSingleRoom)

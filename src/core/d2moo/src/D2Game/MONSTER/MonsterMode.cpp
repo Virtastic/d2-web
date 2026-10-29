@@ -1,3 +1,6 @@
+#include <unordered_map>
+#include <cstdlib>
+#include <unordered_set>
 #include "MONSTER/MonsterMode.h"
 
 #include <algorithm>

@@ -2,7 +2,7 @@
 // tick. Not an exact port: the sound queue (0x88A70), the layer-probability roll (0x89640) and the terrain
 // category (0x226A0) stay with the caller.
 //   cur = unit+0x44 (frame, 8.8), total = +0x48, step = +0x4C (frame advance per tick), last = +0x84 (tick of the
-//   previous footfall, 0 for a new unit), now = D2Client+0x1C97F8 (client tick).
+//   previous footfall, 0 for a new unit), now = D2Client+0x1197F8 (client tick).
 //   n/off: player 2/0; monster from its MonSounds record (+0x5C FsCnt, +0x60 FsOff << 8).
 // Rule: a footfall is one period total/n of the animation. When n>1, none within 2/3 of a period (in ticks,
 // total/(n*step)) of the last. Due when cur is the nearest of cur-step, cur, cur+step to a footfall phase,
@@ -41,8 +41,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_monster_footstep_row(int32_t 
     bool gate = mode == 2 || mode == 0xF;
     if (classId == 0xF) gate = gate || mode == 1; else if (classId == 0x6E) gate = mode == 8;
     const D2MonSoundsTxt* r = gate ? DATATBLS_GetMonSoundsTxtRecordFromMonsterId(classId) : nullptr;
-    if (cur == step) return 0;   // first tick in the mode: retail submits one tick after the unit enters it (a retail recording 2744 at 250)
-    cur = cur >= step ? cur - step : cur + total - step;   // retail runs 0x23C00 before this tick's advance; the snapshot is after it
-    if (!r || !r->dwFsCnt || !r->dwFootstep || !d2_client_footstep_due(cur, total, step, r->dwFsCnt, r->dwFsOff, now, last)) return 0;
+    if (!r || !r->dwFsCnt || !(r->dwFootstep || r->dwFootstepLayer) || !d2_client_footstep_due(cur, total, step, r->dwFsCnt, r->dwFsOff, now, last)) return 0;
+    if (!r->dwFootstep) return r->dwFootstepLayer;   // a retail recording: a crow has only the layer row (hawk_wing_1, 1155), submitted on its own footfall (layer roll FsPrb 100 not modeled)
     return r->dwFootstep + (mode == 0xF ? 24 : 0);
 }

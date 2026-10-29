@@ -17,10 +17,11 @@ assert.equal(run([{ level: 1 }, { level: 2, server: true }, { level: 3, server: 
 // no level change -> silence
 assert.equal(run([{ level: 5 }, { level: 5 }]).length, 0);
 // buttons: lit button -> tooltip text; not hovering -> none
-const box = { left: 206, top: 563, w: 30, h: 30 }, texts = ['New Stats', 'New Skill'];
-assert.equal(levelButtonTooltip(0, box, texts).text, 'New Stats');
-assert.equal(levelButtonTooltip(1, box, texts).text, 'New Skill');
-assert.equal(levelButtonTooltip(-1, box, texts), null);
+const texts = ['New Stats', 'New Skill'];
+assert.deepEqual(levelButtonTooltip(0, 800, 600, texts), { bar: 'stats', text: 'New Stats', x: 221, y: 550, color: 0 });   // D2Client+0x50430: W/2-179, H-50
+assert.deepEqual(levelButtonTooltip(1, 800, 600, texts), { bar: 'skill', text: 'New Skill', x: 578, y: 550, color: 0 });   // D2Client+0x501F0: W/2+178
+assert.deepEqual(levelButtonTooltip(0, 1920, 1080, texts), { bar: 'stats', text: 'New Stats', x: 781, y: 1030, color: 0 }); // widescreen: follows W/2, not 800
+assert.equal(levelButtonTooltip(-1, 800, 600, texts), null);
 // deliberate-failure control: the assertion machinery rejects a wrong expectation
 assert.throws(() => assert.equal(run([{ level: 1 }, { level: 2 }]).length, 0));
 console.log('ok');

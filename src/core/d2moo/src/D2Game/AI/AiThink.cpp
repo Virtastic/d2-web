@@ -3815,9 +3815,10 @@ enum D2C_FoulCrowNestAIParams
 };
 
 //D2Game.0x6FCD8E30
+// 1.13c D2Game+0x7CFD0: range 25 (not 20), Y coordinate really Y, spawn frame stamped on success only
 void __fastcall AITHINK_Fn043_FoulCrowNest(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
-	if (pAiTickParam->nTargetDistance > 20)
+	if (pAiTickParam->nTargetDistance > 25)
 	{
 		AITACTICS_IdleInNeutralMode(pGame, pUnit, 25);
 		return;
@@ -3833,10 +3834,9 @@ void __fastcall AITHINK_Fn043_FoulCrowNest(D2GameStrc* pGame, D2UnitStrc* pUnit,
 			return;
 		}
 
-		pAiTickParam->pAiControl->dwAiParam[0] = pGame->dwGameFrame;
-
-		if (sub_6FC68350(MONSTER_CROWNEST1, UNITS_GetRoom(pUnit), CLIENTS_GetUnitX(pUnit), CLIENTS_GetUnitX(pUnit), 0))
+		if (sub_6FC68350(MONSTER_CROWNEST1, UNITS_GetRoom(pUnit), CLIENTS_GetUnitX(pUnit), CLIENTS_GetUnitY(pUnit), 0))
 		{
+			pAiTickParam->pAiControl->dwAiParam[0] = pGame->dwGameFrame;
 			++pAiTickParam->pAiControl->dwAiParam[1];
 			AITACTICS_UseSkill(pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkillMode[0], pAiTickParam->pMonstatsTxt->nSkill[0], pAiTickParam->pTarget, 0, 0);
 			return;
@@ -17298,6 +17298,7 @@ const D2AiTableStrc* __fastcall AITHINK_GetAiTableRecord(D2UnitStrc* pUnit, D2C_
 }
 
 //D2Game.0x6FCF07D0
+// 1.13c D2Game+0x9D230
 void __fastcall AITHINK_ExecuteAiFn(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiControlStrc* pAiControl, D2C_AiSpecialState nAiSpecialState)
 {
 	if (STATES_CheckState(pUnit, STATE_UNINTERRUPTABLE))

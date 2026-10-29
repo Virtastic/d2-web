@@ -8,7 +8,7 @@ test('object presentation records retain retail token, mode, frame, and componen
   v.setInt32(16, -3, true); v.setInt32(20, 8, true); v.setUint32(24, 0x300, true); v.setUint32(28, 0x800, true);
   v.setUint32(32, 0x102, true); v.setUint16(36, 128, true); v.setUint8(38, 4); v.setUint8(39, 1);
   assert.deepEqual(parseObjectPresentations(bytes, 1)[0], { id: 9, classId: 12, token: '1y5', mode: 2, x: -3, y: 8,
-    framePrecise: 0x300, frameCountPrecise: 0x800, componentMask: 0x102, animSpeed: 128, direction: 4, selectable: true, portalLevel: 0, locked: false });
+    framePrecise: 0x300, frameCountPrecise: 0x800, componentMask: 0x102, animSpeed: 128, direction: 4, selectable: true, portalLevel: 0, locked: false, inClientRoom: false });
   assert.throws(() => parseObjectPresentations(bytes.subarray(1), 1), /truncated/);
 });
 
@@ -106,6 +106,25 @@ test('object blend eligibility is scanned when its animation is decoded, not on 
     assert.equal(scans, scansAfterDecode, 'a cached animation does not rescan its COF layer list per draw');
   } finally {
     Array.prototype.some = oldSome;
+    if (oldImageData === undefined) delete globalThis.ImageData;
+    else globalThis.ImageData = oldImageData;
+  }
+});
+
+test('blended object layers are composed once per frame and component, not per render', () => {
+  const oldImageData = globalThis.ImageData, OldMap = globalThis.Map;
+  const harness = rendererHarness({ blended: true });
+  let maps = 0;
+  try {
+    const { renderer, ctx, object } = harness;
+    const first = renderer.draw(ctx, 10, 20, object, 1);
+    globalThis.Map = class extends OldMap { constructor(...a) { super(...a); maps++; } };
+    const second = renderer.draw(ctx, 10, 20, object, 1), third = renderer.draw(ctx, 10, 20, object, 1);
+    assert.equal(maps, 0, 'repeat frames build no per-layer component map');
+    assert.deepEqual(second.layers, first.layers);
+    assert.deepEqual(third, second);
+  } finally {
+    globalThis.Map = OldMap;
     if (oldImageData === undefined) delete globalThis.ImageData;
     else globalThis.ImageData = oldImageData;
   }

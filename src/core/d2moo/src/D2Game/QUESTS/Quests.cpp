@@ -242,7 +242,7 @@ void __fastcall QUESTS_AttachLevelChainRecord(D2GameStrc* pGame, D2UnitStrc* pUn
 	}
 
 	const int32_t nQuestId = DATATBLS_GetLevelsTxtRecord(nLevelId)->nQuest;
-	// 1.13c D2Game+0x248A0
+	// 1.13c D2Game+0x35890: signed rejection precedes quest lookup (not 0x248A0).
 	if (!nQuestId || QUESTS_CreateChainRecord(pGame, pUnit, nQuestId) != (bDebug == 0) || !dword_6FD4DC34)
 	{
 		return;

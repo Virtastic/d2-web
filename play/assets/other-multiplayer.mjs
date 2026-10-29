@@ -12,6 +12,7 @@
 import { composeTiled, createBlender, createFont, decodeFontTbl, recordTiled, textColourPalette,
   LABEL_TINT, FRONTEND, TITLE_COLUMNS } from './frontend.mjs';
 import { recordDc6 } from './drawlist.mjs';
+import { drawBg, present } from './widebg.mjs';
 
 const P = 'data\\global\\ui\\FrontEnd\\';
 export const OTHER_ASSETS = {
@@ -155,7 +156,7 @@ export function createOtherMultiplayerScreen({ read, decodeDc6, decodeDatPalette
       out.fillStyle = '#000'; out.fillRect(0, 0, w, h); out.imageSmoothingEnabled = false;
       sctx.fillStyle = '#000'; sctx.fillRect(0, 0, 800, 600);
       const bg = sub === 'menu' ? menuBg : tcpipBg;
-      sctx.drawImage(bg.canvas, 0, 0); recordTiled(bg.path, bg, 0, 0);
+      drawBg(sctx, bg.path, bg.canvas); recordTiled(bg.path, bg, 0, 0);
       if (sub === 'menu') {
         drawLogos(sctx);
         for (const b of OTHER_LAYOUT.menu.buttons) {
@@ -182,7 +183,7 @@ export function createOtherMultiplayerScreen({ read, decodeDc6, decodeDatPalette
       const left = pointer[0] + f.offsetX, top = pointer[1] - 1 + f.offsetY - f.height + 1;
       sctx.drawImage(frameCanvas(f), left, top);
       recordDc6(FRONTEND.cursor, 0, f, left, top);
-      out.drawImage(scene, v.ox, v.oy, 800 * v.scale, 600 * v.scale);
+      present(out, scene, v, bg.path);
     },
   };
 }

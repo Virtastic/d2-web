@@ -1872,6 +1872,12 @@ void __stdcall STATLIST_RemoveAllStatsFromOverlay(D2UnitStrc* pUnit)
 	}
 }
 
+// Count of state sets (bit 0 -> 1) per (unit type, id, state): retail's client re-runs the state's overlays on each set packet, which a
+// re-set (old stat list freed, new one added in one tick) leaves invisible to a has() poll.
+#include <map>
+static std::map<uint64_t, uint32_t> g_stateSetSeq;
+extern "C" uint32_t D2StatList_StateSetSeq(uint32_t type, uint32_t id, uint32_t state) { auto it = g_stateSetSeq.find(((uint64_t)type << 40) | ((uint64_t)id << 8) | state); return it == g_stateSetSeq.end() ? 0 : it->second; }
+
 //D2Common.0x6FDB8900
 void __stdcall D2Common_STATES_ToggleState_6FDB8900(D2UnitStrc* pUnit, int nState, BOOL bSet)
 {
@@ -1884,6 +1890,7 @@ void __stdcall D2Common_STATES_ToggleState_6FDB8900(D2UnitStrc* pUnit, int nStat
 		{
 			return;
 		}
+		if (bSet) ++g_stateSetSeq[((uint64_t)pUnit->dwUnitType << 40) | ((uint64_t)pUnit->dwUnitId << 8) | (uint32_t)nState];
 		const size_t states2Offset = (sgptDataTables->nStatesTxtRecordCount + 31) / 32;
 		pUnit->pStatListEx->StatFlags[nState / 32 + states2Offset] |= dwStateBitMask;
 

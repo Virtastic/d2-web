@@ -37,7 +37,7 @@ fi
 echo "==> stage build-wasm/site"
 mkdir -p build-wasm/site
 find build-wasm/site -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-cp play/index.html play/manifest.webmanifest play/streamfs.js play/entry.js play/gameplay-model.mjs play/gameplay-shell.mjs play/item-pick.mjs play/serve.mjs play/br-check.mjs play/smoke.mpq play/smoke.json play/d2.js play/d2.wasm build-wasm/site/
+cp play/index.html play/manifest.webmanifest play/streamfs.js play/entry.js play/gameplay-model.mjs play/gameplay-shell.mjs play/item-pick.mjs play/worker-guard.mjs play/frame-pack.mjs play/frame-snapshot.mjs play/render-host.mjs play/render-wire.mjs play/render-worker.mjs play/render-worker-draws.mjs play/render-worker-hud.mjs play/serve.mjs play/br-check.mjs play/smoke.mpq play/smoke.json play/d2.js play/d2.wasm build-wasm/site/
 # A .br is staged only when it IS that file's brotli (play/br-check.mjs -- content, not mtime). Staging
 # a stale one puts one build's bytes behind the other build's e/<ver>/ URL, and nothing else catches it:
 # that URL is served immutable and the page boots without error -- on the engine the .br holds. Dropping
@@ -56,6 +56,9 @@ cp -r play/assets build-wasm/site/assets
 [ -d vectors ] && mkdir -p build-wasm/site/vectors && cp -ru vectors/. build-wasm/site/vectors/
 FR="${D2_FREERES_DIR:-third-party/sgd2freeres}"
 [ -d "$FR" ] && mkdir -p build-wasm/site/freeres && cp "$FR"/*.dc6 build-wasm/site/freeres/ || true
+# Local widescreen frontend backgrounds (retail-derived, gitignored): the MAIN checkout's .widebg/, served as /widebg/.
+WB="${D2_WIDEBG_DIR:-$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")/.widebg}"
+[ -f "$WB/manifest.json" ] && cp -r "$WB" build-wasm/site/widebg
 [ -d build-wasm/diag ] && cp -r build-wasm/diag build-wasm/site/diag   # diagnosis captures (D2_ITEMGEN_FILE=diag/...), never committed
 
 # with the disc MPQs and the 1.13c core's patch. Symlinks, not copies (2.3 GB).

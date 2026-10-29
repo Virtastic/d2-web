@@ -66,7 +66,7 @@
 
   // cache is a Map used as an LRU: insertion order IS the recency order (delete+set moves to end),
   // so eviction pops the first (oldest) key. No separate order array → O(1) hit path, no linear scan.
-  const S = { worker: null, ctrl: null, data: null, cache: new Map(), nextId: 1, urlSrcs: new Map(), mounts: new Map(), warming: new Set() };
+  const S = { worker: null, ctrl: null, data: null, cache: new Map(), nextId: 1, urlSrcs: new Map(), mounts: new Map(), warming: new Set(), waiters: [] };
 
   // d2-web divergence: MEASURED 2026-09-25 -- in Firefox 156 the worker+Atomics round trip below
   // never completes. The Range fetch's own headers resolve in milliseconds (confirmed by a
@@ -163,7 +163,9 @@
   // lastReadMs/lastReadUrl: the most recent Firefox synchronous read and what it cost. A read
   // that stalls is the one fact a report of a frozen tab needs, and it is gone by the time the error
   // is caught unless it is kept here.
-  const ST = { hits: 0, misses: 0, stallMs: 0, evictions: 0, bytes: 0, lastReadMs: 0, lastReadUrl: '', warmed: 0 };
+  const ST = { hits: 0, misses: 0, stallMs: 0, evictions: 0, bytes: 0, lastReadMs: 0, lastReadUrl: '', warmed: 0, recent: [] };
+  // The last 64 misses as [startMs, ms, url@pos]: a long frame the shell records lists the ones inside it.
+  function noteMiss(t0, at) { ST.recent.push([Math.round(t0), Math.round(performance.now() - t0), at]); if (ST.recent.length > 64) ST.recent.shift(); }
 
   function workerSource() {
     return `
@@ -171,6 +173,14 @@
       const handles = new Map();   // id -> FileSystemFileHandle
       const files = new Map();     // id -> File (cached getFile() result)
       let prefetch = null;         // {ckey, done}: the one outstanding sequential prefetch (backlog 389)
+      // url#start -> Promise<Uint8Array|null>: a WARM in flight, kept until its cache put lands. A
+      // synchronous read of the same chunk awaits it instead of fetching the 2MB a second time while
+      // the main thread spins (a hero outrunning area-prefetch.mjs's warm was paying both fetches).
+      const warming = new Map();
+      // d2-web divergence: the chunk store opened once, not per read: every sync miss paid an open
+      // while the main thread spun. A Cache API that is missing stays a rejection, as before.
+      let chunkStore = null;
+      const chunkCache = () => (chunkStore ??= Promise.resolve().then(() => caches.open('mwdata-chunks-v1')));
       // d2-web divergence: Chrome can reject a local range fetch transiently. Retry only
       // transport errors, with a bound; missing files and exhausted reads must still fail.
       async function readRange(url, start, end) {
@@ -195,16 +205,20 @@
         // WARM (s-perf-streaming): fetch a chunk with no one waiting and hand it to the main thread's
         // in-memory cache, so the later synchronous read is a hit instead of a stalled round trip.
         if (m.warm) {
-          try {
-            let buf = null;
+          const wkey = m.url + '#' + m.start;
+          let put = null;
+          const p = (async () => {
             const ckey = m.pkey ? 'https://sfs.chunk/' + encodeURIComponent(m.pkey) + '/' + m.start : null;
-            if (ckey) { try { const hit = await (await caches.open('mwdata-chunks-v1')).match(ckey); if (hit) buf = new Uint8Array(await hit.arrayBuffer()); } catch (e) {} }
-            if (!buf) {
-              buf = await readRange(m.url, m.start, m.end);
-              if (ckey) caches.open('mwdata-chunks-v1').then((c) => c.put(ckey, new Response(buf.slice()))).catch(() => {});
-            }
-            postMessage({ warmed: m.key, buf }, [buf.buffer]);
-          } catch (e) { postMessage({ warmed: m.key, buf: null }); }
+            if (ckey) { try { const hit = await (await chunkCache()).match(ckey); if (hit) return new Uint8Array(await hit.arrayBuffer()); } catch (e) {} }
+            const buf = await readRange(m.url, m.start, m.end);
+            if (ckey) put = chunkCache().then((c) => c.put(ckey, new Response(buf.slice())));
+            return buf;
+          })().catch(() => null);
+          warming.set(wkey, p);
+          const buf = await p;
+          Promise.resolve(put).catch(() => {}).finally(() => { if (warming.get(wkey) === p) warming.delete(wkey); });
+          // A copy, not a transfer: a synchronous read awaiting p may still be reading buf.
+          postMessage({ warmed: m.key, buf });
           return;
         }
         // m: {url|id, start, end, gen}
@@ -221,12 +235,14 @@
             // still hits, and a re-uploaded file of a new size misses. pkey is null for URLs
             // that should not persist (cross-origin or query-carrying, i.e. presigned S3).
             const ckey = m.pkey ? 'https://sfs.chunk/' + encodeURIComponent(m.pkey) + '/' + m.start : null;
-            if (ckey) {
+            const w = warming.get(m.url + '#' + m.start);
+            if (w) buf = await w;
+            if (!buf && ckey) {
               try {
                 // A prefetch of exactly this chunk may be in flight (backlog 389): wait for it
                 // rather than fetching the same bytes twice.
                 if (prefetch && prefetch.ckey === ckey) await prefetch.done;
-                const hit = await (await caches.open('mwdata-chunks-v1')).match(ckey);
+                const hit = await (await chunkCache()).match(ckey);
                 if (hit) buf = new Uint8Array(await hit.arrayBuffer());
               } catch (e) { /* Cache API unavailable: fall through to the network */ }
             }
@@ -235,7 +251,7 @@
               if (ckey) {
                 // Not awaited: the copy into the shared buffer below reads buf, the put keeps
                 // its own reference, and nothing mutates buf afterwards.
-                caches.open('mwdata-chunks-v1').then((c) => c.put(ckey, new Response(buf))).catch(() => {});
+                chunkCache().then((c) => c.put(ckey, new Response(buf))).catch(() => {});
               }
             }
           }
@@ -254,7 +270,7 @@
             const nkey = 'https://sfs.chunk/' + encodeURIComponent(m.pkey) + '/' + m.next.start;
             prefetch = { ckey: nkey, done: (async () => {
               try {
-                const c = await caches.open('mwdata-chunks-v1');
+                const c = await chunkCache();
                 if (await c.match(nkey)) return;
                 const r = await fetch(m.url, { headers: { Range: 'bytes=' + m.next.start + '-' + (m.next.end - 1) } });
                 if (r.ok || r.status === 206) await c.put(nkey, new Response(await r.arrayBuffer()));
@@ -288,7 +304,7 @@
     if (NEEDS_SYNC_XHR && src.url) {
       const t0f = performance.now();
       const chunk = fetchRangeSyncXHR(src, src.url, start, end);
-      ST.misses++; ST.stallMs += performance.now() - t0f; ST.bytes += chunk.length;
+      ST.misses++; ST.stallMs += performance.now() - t0f; ST.bytes += chunk.length; noteMiss(t0f, src.url + '@' + start);
       S.cache.set(cacheKey, chunk);
       if (S.cache.size > LRU_MAX) { S.cache.delete(S.cache.keys().next().value); ST.evictions++; }
       return chunk;
@@ -313,6 +329,7 @@
       if (performance.now() - t0 > 30000) throw new Error('streamfs: read timeout ' + cacheKey + '@' + start);
     }
     ST.misses++; ST.stallMs += performance.now() - t0;
+    ST.lastReadMs = Math.round(performance.now() - t0); ST.lastReadUrl = (src.url || '') + '@' + start; noteMiss(t0, ST.lastReadUrl);
     const n = S.ctrl[1];
     if (n < 0) throw new Error('streamfs: read failed ' + cacheKey + '@' + start);
     const chunk = new Uint8Array(n);
@@ -410,6 +427,7 @@
             if (S.cache.size > LRU_MAX) { S.cache.delete(S.cache.keys().next().value); ST.evictions++; }
           }
           pumpWarm();
+          S.waiters = S.waiters.filter((w) => w.pending() || (w.res(), false));
         }
       }; });
       S.worker.postMessage({ init: 1, ctrl: ctrlBuf, data: dataBuf });
@@ -428,6 +446,16 @@
       pumpWarm();
     },
 
+    // d2-web divergence: warm() and resolve once those chunks are cached or their background fetch ended, so a
+    // synchronous read after it does not spin on the network. Resolves at once where warm() cannot run.
+    fetched(path, pos, len) {
+      this.warm(path, pos, len);
+      const m = S.mounts.get(path), keys = [];
+      if (m) for (let cs = Math.floor(pos / CHUNK) * CHUNK; cs < pos + len && cs < m.size; cs += CHUNK) keys.push(m.abs + ':' + cs);
+      const pending = () => keys.some((k) => !S.cache.has(k) && (S.warming.has(k) || warmQ.some((w) => w.key === k)));
+      return pending() ? new Promise((res) => S.waiters.push({ pending, res })) : Promise.resolve();
+    },
+
     // Synchronous read of [pos, pos+len) of a mounted file (through the same cache the engine uses).
     readAt(path, pos, len) {
       const m = S.mounts.get(path); const out = new Uint8Array(len);
@@ -441,6 +469,15 @@
     // `mtime` (ms, from the manifest's `m`) joins the persistent cache key when given: a
     // re-installed mod file of identical size otherwise served the old chunks forever.
     mount(path, url, size, mtime) {
+      const { src, abs } = this.register(path, url, size, mtime);
+      return makeNode(path, size, function (buffer, offset, length, position) {
+        return readSync(src, abs, size, buffer, offset, length, position);
+      });
+    },
+
+    // d2-web divergence: the source alone, with no FS node, so warm()/fetched() can run on it before the
+    // engine (and its FS) exists. mount() registers again with the same keys.
+    register(path, url, size, mtime) {
       const abs = new URL(url, location.href).href;
       const u = new URL(abs);
       // Persist chunks only for plain same-origin files (server-hosted mwdata). A URL with a
@@ -455,10 +492,9 @@
       // Registered so the URL can be refreshed later (presigned locker URLs expire): the cache
       // key stays `abs` (stable across renewals — the bytes are the same file), only src.url
       // changes, so a re-signed URL is used for future Range fetches without dropping the cache.
-      S.urlSrcs.set(path, src); S.mounts.set(path, { src, abs, size });
-      return makeNode(path, size, function (buffer, offset, length, position) {
-        return readSync(src, abs, size, buffer, offset, length, position);
-      });
+      const m = { src, abs, size };
+      S.urlSrcs.set(path, src); S.mounts.set(path, m);
+      return m;
     },
 
     // Swap in a freshly-signed URL for an already-mounted path. The read path is synchronous

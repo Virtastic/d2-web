@@ -19,7 +19,7 @@ export function selectPlayerRenderSource(snapshot, motion, realmSessionOpen, rea
       classId: realmPlayer.classId, reassignments: realmPlayer.reassignments,
       renderState: { playerClass: realmPlayer.classId, mode: live?.mode ?? realmPlayer.initialMode ?? 5,
         direction: live?.direction ?? realmPlayer.initialDirection ?? 0, framePrecise: live?.framePrecise,
-        frameCountPrecise: live?.frameCountPrecise, animSpeed: live?.animSpeed,
+        frameCountPrecise: live?.frameCountPrecise, animSpeed: live?.animSpeed, seqMode: live?.seqMode, seqFrame: live?.seqFrame,
         tick: snapshot?.tick ?? 0, act: realmAct ?? snapshot?.act ?? 0,
         weaponClass: 'hth', items: [] },
     };

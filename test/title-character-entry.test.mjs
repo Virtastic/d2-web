@@ -19,7 +19,7 @@ function shell() {
     characterEntryReader: createCharacterEntryReader(), singlePlayerDestination,
     savedCharacterReadError: (error) => String(error),
     saveStore: { listProfile() { const read = deferred(); reads.push(read); return read.promise; } },
-    ensureCharCreate() {}, ensureCharSelect() {},
+    ensureCharCreate() {}, ensureCharSelect() {}, warmTowns() {},
   };
   vm.createContext(state); vm.runInContext(entryCode, state);
   return { state, reads };

@@ -2608,7 +2608,8 @@ int32_t __fastcall OBJECTS_OperateFunction14_Corpse(D2ObjOperateFnStrc* pOp, int
         UNITS_ChangeAnimMode(pObject, OBJMODE_OPERATING);
 
         D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pOp->nObjectIdx);
-        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
+        // D50: retail corpse operate (fn 14) ends mode 1 after FrameCnt1>>8 ticks, not ceil(cnt/delta): the retail captures (9 ticks for 9 cels @128, 1 for 1 @128)
+        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
 
         pObject->dwFlags &= ~(UNITFLAG_TARGETABLE);
 
@@ -3341,6 +3342,8 @@ int32_t __fastcall OBJECTS_OperateFunction43_DurielPortal(D2ObjOperateFnStrc* pO
 }
 
 //D2Game.0x6FC79490
+// 1.13c D2Game+0x6CF90 (D45): ENDANIM fires (FrameCnt[1] >> 8) + 1 ticks out, not OBJECTS_GetOperatingTicks (that figure is the
+// INIT path's, F60); 1.13c has no 10 s hostile-delay gate / speech 0x13 before the 0x63 send.
 int32_t __fastcall OBJECTS_OperateFunction23_Waypoint(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
     if (!pOp || !pOp->pObject)
@@ -3364,19 +3367,12 @@ int32_t __fastcall OBJECTS_OperateFunction23_Waypoint(D2ObjOperateFnStrc* pOp, i
         UNITS_ChangeAnimMode(pObject, OBJMODE_OPERATING);
 
         D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pOp->nObjectIdx);
-        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
+        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
     }
     else if (pObject->dwAnimMode == OBJMODE_OPENED || pObject->dwAnimMode == OBJMODE_OPERATING)
     {
         if (!PLAYER_IsBusy(pOp->pPlayer))
         {
-            const uint32_t nFrame = PLAYERLIST_GetHostileDelay(pOp->pPlayer, 0) + 10000;
-            if (nFrame > GetTickCount())
-            {
-                SUNIT_AttachSound(pOp->pPlayer, 0x13, pOp->pPlayer);
-                return 0;
-            }
-
             D2GSPacketSrv63 packet63 = {};
             packet63.nHeader = 0x63;
             packet63.dwUnitId = pObject->dwUnitId;

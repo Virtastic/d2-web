@@ -796,7 +796,12 @@ BOOL __fastcall sub_6FD77F00(void* pMemPool, D2DrlgRoomStrc* pDrlgRoom1, uint8_t
 
 	while (pDrlgRoom2)
 	{
-		if (((1 << (nWarpFlag + 4)) & pDrlgRoom2->dwFlags))
+		// d2-web (D46): on a widened view the ring also takes the neighbour level's rooms past its edge strip (retail's
+		// 6-tile ring reaches only the flagged strip); a room already in the list is not added twice.
+		const bool bWide = nDirection == -1 && g_nearRoomGap > 6;
+		bool bListed = false;
+		if (bWide) for (int k = 0; k < pDrlgRoom1->nRoomsNear; ++k) if (pDrlgRoom1->ppRoomsNear[k] == pDrlgRoom2) bListed = true;
+		if (!bListed && (bWide || ((1 << (nWarpFlag + 4)) & pDrlgRoom2->dwFlags)))
 		{
 			if (nDirection == -1)
 			{
@@ -818,7 +823,7 @@ BOOL __fastcall sub_6FD77F00(void* pMemPool, D2DrlgRoomStrc* pDrlgRoom1, uint8_t
 					nY = pDrlgRoom2->nTileYPos - pDrlgRoom1->nTileHeight - pDrlgRoom1->nTileYPos;
 				}
 
-				if (nX < 6 && nY < 6)
+				if (nX < g_nearRoomGap && nY < g_nearRoomGap) // d2-web: the cross-level ring widens with the view too (D46)
 				{
 					++pDrlgRoom1->nRoomsNear;
 					pDrlgRoom1->ppRoomsNear = (D2DrlgRoomStrc**)D2_REALLOC_POOL(pMemPool, pDrlgRoom1->ppRoomsNear, sizeof(D2DrlgRoomStrc*) * pDrlgRoom1->nRoomsNear);

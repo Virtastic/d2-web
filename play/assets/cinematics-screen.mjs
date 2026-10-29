@@ -6,6 +6,7 @@
 // Row i plays the i-th cinematic retail's D2Launch.dll names; the first, d2intro, is labelled
 // "THE SISTER'S LAMENT". Whether a progressed save unlocks more rows is not captured (F89b).
 import { createFont, createBlender, decodeFontTbl, composeTiled, recordTiled, textColourPalette, LABEL_TINT, FRONTEND, TITLE_COLUMNS } from './frontend.mjs';
+import { drawBg, present } from './widebg.mjs';
 import { recordDc6 } from './drawlist.mjs';
 import { openMovie } from './cinematics.mjs';
 import { createCinematicPlayback } from './cinematic-playback.mjs';
@@ -116,7 +117,7 @@ export function createCinematicsScreen({ read, decodeDc6, decodeDatPalette, onEx
         if (movie) { movie.draw(strip.getContext('2d'), 640, 292); out.drawImage(strip, v.ox, v.oy + Math.round((600 - 365) / 2 * v.scale), 800 * v.scale, 365 * v.scale); }
         return;
       }
-      sctx.fillStyle = '#000'; sctx.fillRect(0, 0, 800, 600); sctx.drawImage(bg.canvas, 0, 0); recordTiled(FRONTEND.background, bg, 0, 0);
+      sctx.fillStyle = '#000'; sctx.fillRect(0, 0, 800, 600); drawBg(sctx, FRONTEND.background, bg.canvas); recordTiled(FRONTEND.background, bg, 0, 0);
       dialog.forEach((c, i) => drawCel(c, CINEMATICS_ASSETS.dialog, i, ...L.dialogAt[i]));
       heading.drawAnchored(sctx, 'SELECT CINEMATICS', L.headingX, L.headingY);
       L.rowY.forEach((y, i) => {
@@ -128,7 +129,7 @@ export function createCinematicsScreen({ read, decodeDc6, decodeDatPalette, onEx
       text(label, string('strCancel') || 'CANCEL', L.cancel.x, L.cancel.y - 8, cancel[0].frame.width);
       const f = cursor.frame; sctx.drawImage(cursor.canvas, pointer[0] + f.offsetX, pointer[1] - 1 + f.offsetY - f.height + 1);
       recordDc6(FRONTEND.cursor, 0, f, pointer[0] + f.offsetX, pointer[1] - 1 + f.offsetY - f.height + 1);
-      out.drawImage(scene, v.ox, v.oy, 800 * v.scale, 600 * v.scale);
+      present(out, scene, v, FRONTEND.background);
     },
   };
 }
