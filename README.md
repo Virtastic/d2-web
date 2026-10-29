@@ -1,20 +1,40 @@
 # d2-web
 
+**Play Diablo II: Lord of Destruction in your browser.** The 1.13c engine, reimplemented and compiled to WebAssembly, by [Virtastic](https://virtastic.app).
+
+<p align="center">
+  <a href="https://diablo2.virtastic.app"><img src="docs/screenshots/act1.png" alt="A Barbarian on a path through the Blood Moor in Act 1, running in a browser tab at diablo2.virtastic.app" width="850"></a>
+</p>
+
+<p>
+  <a href="https://diablo2.virtastic.app"><b>▶ Play now at diablo2.virtastic.app</b></a> ·
+  <a href="https://virtastic.app">Website</a> ·
+  <a href="https://discord.gg/PzFfDkbSue">Discord</a> ·
+  <a href="https://www.youtube.com/@Virtastic-Apps">YouTube</a> ·
+  <a href="https://github.com/Virtastic/d2-web/issues">Issues</a>
+</p>
+
+[![Discord](https://img.shields.io/badge/Discord-join%20the%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/PzFfDkbSue)
+[![Support on Patreon](https://img.shields.io/badge/Patreon-support-F96854?logo=patreon&logoColor=white)](https://www.patreon.com/virtastic)
+[![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-buy%20us%20a%20coffee-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/virtastic)
+[![YouTube](https://img.shields.io/badge/YouTube-Virtastic-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/@Virtastic-Apps)
+[![Reddit](https://img.shields.io/badge/Reddit-r%2Fvirtastic-FF4500?logo=reddit&logoColor=white)](https://www.reddit.com/r/virtastic)
+![License: MIT](https://img.shields.io/badge/license-MIT-blue)
+![Platform: Chrome desktop](https://img.shields.io/badge/browser-Chrome%20%2F%20Chromium-brightgreen)
+
 An unofficial reimplementation of the Diablo II: Lord of Destruction **1.13c** engine, compiled to
-**WebAssembly** and played in the browser.
+**WebAssembly** and played in the browser. No game data is included: you bring your own legally
+owned copy.
 
 > **Status: early alpha.** Act 1 runs: character creation, Rogue Encampment, the first wilderness
 > areas, combat, items, vendors, waypoints and saves. It is not a complete game yet, and you will
 > hit bugs, missing screens and wrong behaviour. Please report them.
-
 
 ## Screenshots
 
 | | |
 |---|---|
 | ![Title screen](docs/screenshots/title.png) | ![Hero class selection](docs/screenshots/class-select.png) |
-
-![A Barbarian in the Blood Moor, Act 1](docs/screenshots/act1.png)
 
 *Screenshots are rendered from the player's own game files; the art is Blizzard's.*
 
