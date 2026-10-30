@@ -59,7 +59,7 @@ SHIM_SRC="${D2_PATCH_SHIM_SRC:-retail/D2/patch_d2.mpq}"
 if [ -f "$SHIM_SRC" ] && [ -n "$HAVE_NODE" ]; then "$NODE_BIN" tools/patch-shim.mjs "$SHIM_SRC" build-wasm/site/assets/patch-113c.patch
 else echo "WARNING: no $SHIM_SRC -- BYO players run on their own Patch_D2.mpq" >&2; fi
 # Committed ground truth, served so scenarios can fetch it into the page.
-[ -d vectors ] && mkdir -p build-wasm/site/vectors && cp -ru vectors/. build-wasm/site/vectors/
+[ -d vectors ] && mkdir -p build-wasm/site/vectors && cp -rLu vectors/. build-wasm/site/vectors/
 FR="${D2_FREERES_DIR:-third-party/sgd2freeres}"
 [ -d "$FR" ] && mkdir -p build-wasm/site/freeres && cp "$FR"/*.dc6 build-wasm/site/freeres/ || true
 # Local widescreen frontend backgrounds (retail-derived, gitignored): the MAIN checkout's .widebg/, served as /widebg/.
