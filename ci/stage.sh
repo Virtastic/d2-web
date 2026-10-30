@@ -64,7 +64,7 @@ FR="${D2_FREERES_DIR:-third-party/sgd2freeres}"
 [ -d "$FR" ] && mkdir -p build-wasm/site/freeres && cp "$FR"/*.dc6 build-wasm/site/freeres/ || true
 # Local widescreen frontend backgrounds (retail-derived, gitignored): the MAIN checkout's .widebg/, served as /widebg/.
 WB="${D2_WIDEBG_DIR:-$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")/.widebg}"
-[ -f "$WB/manifest.json" ] && cp -r "$WB" build-wasm/site/widebg
+[ -f "$WB/manifest.json" ] && cp -rL "$WB" build-wasm/site/widebg
 [ -d build-wasm/diag ] && cp -r build-wasm/diag build-wasm/site/diag   # diagnosis captures (D2_ITEMGEN_FILE=diag/...), never committed
 
 # with the disc MPQs and the 1.13c core's patch. Symlinks, not copies (2.3 GB).
