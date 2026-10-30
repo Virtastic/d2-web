@@ -84,3 +84,10 @@ test('retail: every archive gets its own role and 1.13c is verified', { skip: !r
   assert.equal(c.patch.level, 'verified');
   assert.equal(new Set(infos.map((x) => x.role)).size, infos.length);
 });
+
+test('a game archive whose tables were repacked is taken by its name', async () => {
+  const i = await inspect(file([Buffer.from(buildMpq([{ name: 'data\\global\\chars\\x', data: Buffer.from('x') }]))], 'D2Char.mpq'));
+  assert.equal(i.role, 'd2char');
+  assert.equal(i.byName, true);
+  assert.equal((await inspect(file([Buffer.from(buildMpq([{ name: 'x', data: Buffer.from('x') }]))], 'mod.mpq'))).role, undefined);
+});

@@ -100,6 +100,12 @@ export async function inspect(file) {
   for (const [role, r] of Object.entries(ROLES)) {
     if (r.hashN === hashN && (r.blockN === null || r.blockN === blockN)) { m.role = role; break; }
   }
+  // Not every release's archives carry the measured table sizes (other installers repack them): a plain
+  // MPQ named like one of the game's archives is taken by its name.
+  if (!m.role && base === 0) {
+    const byName = Object.entries(ROLES).find(([, r]) => r.file === name.toLowerCase());
+    if (byName) { m.role = byName[0]; m.byName = true; }
+  }
   if (m.role === 'patch_d2') {
     // hashN 512 alone could be a mod; a real patch carries the game's tables.
     const looksLikeD2 = ['data\\global\\excel\\Levels.txt', 'data\\global\\excel\\Skills.txt', 'data\\local\\lng\\eng\\patchstring.tbl']
