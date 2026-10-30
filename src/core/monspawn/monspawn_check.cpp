@@ -7699,7 +7699,8 @@ static int sessionCommandHandSkill(uint32_t targetUnitId, bool left) {
     // No animation started (the skill-do accepted the command but the player never left neutral, e.g.
     // hit mid-click): nothing will end it, so the attack is not in flight. Left at state 1 it refused
     // every later command, across death and respawn, while the pack killed the player (s000b, Sewers).
-    if (!g_sessionAttackEndFrame) { g_sessionAttack.state = 0; g_rightSkillRefusal = 6; g_castRefusedSkill = skillId; ++g_castRefusedSeq; return 0; }   // the client still casts: stsound at entry, the client do-function sound at its do-frame
+    // A refused melee cast (Skills.txt range h2h) plays no client start sound.
+    if (!g_sessionAttackEndFrame) { g_sessionAttack.state = 0; g_rightSkillRefusal = 6; if (!txt || txt->nRange != 1) { g_castRefusedSkill = skillId; ++g_castRefusedSeq; } return 0; }   // the client still casts: stsound at entry, the client do-function sound at its do-frame
     g_rightSkillRefusal = 0;
     return 1;
 }
