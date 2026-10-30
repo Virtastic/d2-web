@@ -11,6 +11,7 @@
 //
 // Nothing here invents an item, a name or a price.
 
+import { gridCelAt } from './item-cel-place.mjs';
 import { createFont, decodeFontTbl, FRONTEND } from './frontend.mjs';
 import { inventoryItemAsset } from './inventory-panel.mjs';
 
@@ -188,7 +189,6 @@ export function createNpcPanel({ read, decodeDc6, decodeDatPalette, documentObje
         placed++;
         // Absolute canvas coordinates: the grid offsets are panel-relative, and the panel is not at
         // the origin. Leaving them relative drew the whole stock up in the top-left of the screen.
-        const cx = x + L.gridX + gx * L.cell, cy = y + L.gridY + gy * L.cell;
         const affordable = !(state.gold >= 0) || item.cost <= state.gold;
         ctx.globalAlpha = affordable ? 1 : 0.45;
         const sprite = icon(item.invFile);
@@ -196,7 +196,8 @@ export function createNpcPanel({ read, decodeDc6, decodeDatPalette, documentObje
           // An item's art spans the cells it OCCUPIES and anchors at its top-left cell -- a spear is
           // 116px of sprite over four cells. Centring it on one 29px cell offsets it 43px upward,
           // which floated the whole stock above the panel.
-          ctx.drawImage(sprite, cx, cy);
+          const at = gridCelAt(x + L.gridX, y + L.gridY, L.cell, L.cell, gx, gy);
+          ctx.drawImage(sprite, at.left, at.top);
           drawnIcons++;
         }
         ctx.globalAlpha = 1;
@@ -211,7 +212,8 @@ export function createNpcPanel({ read, decodeDc6, decodeDatPalette, documentObje
         if (gx < 0 || gx >= L.columns || gy < 0 || gy >= L.rows) continue;
         const sprite = icon(item.invFile);
         if (!sprite) continue;
-        ctx.drawImage(sprite, x + L.gridX + gx * L.cell, y + L.playerGridY + gy * L.cell);
+        const at = gridCelAt(x + L.gridX, y + L.playerGridY, L.cell, L.cell, gx, gy);
+        ctx.drawImage(sprite, at.left, at.top);
         playerDrawn++;
       }
 

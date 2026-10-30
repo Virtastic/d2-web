@@ -220,14 +220,18 @@ export function frameCanvas(frame, palette, documentObject) {
 
 
 /** A lazily-decoded DC6 animation: frames painted on demand, drawn at their own offsets. */
+// PERF: read + decode on first use, not at construction. The screen builds ~40 of these (seven classes'
+// idle, hover, chosen, walk and overlay cels) and drew only the seven idles plus the campfire on its
+// first frame, so the eager decode was ~250 ms inside the SINGLE PLAYER click. Same bytes, same frames.
 function animation(read, decodeDc6, path, palette, documentObject) {
-  const dc6 = decodeDc6(read(path));
-  const canvases = new Array(dc6.frames.length).fill(null);
+  let decoded = null, canvases = null;
+  const load = () => { if (!decoded) { decoded = decodeDc6(read(path)); canvases = new Array(decoded.frames.length).fill(null); } return decoded; };
   return {
-    path, count: dc6.frames.length,
+    path, get count() { return load().frames.length; },
     /** Draw frame `index`; returns the frame index it actually drew, so a caller can record the
      * drawn identity rather than the requested one (the two differ whenever `index` wraps). */
     draw(ctx, index, anchorX, anchorY) {
+      const dc6 = load();
       const i = ((index % dc6.frames.length) + dc6.frames.length) % dc6.frames.length;
       const frame = dc6.frames[i];
       if (!frame || !frame.width || !frame.height) return i;
@@ -244,6 +248,7 @@ function animation(read, decodeDc6, path, palette, documentObject) {
     },
     /** Draw frame `index` through a blended draw mode (frontend.mjs createBlender). */
     drawBlended(ctx, index, anchorX, anchorY, blend, mode) {
+      const dc6 = load();
       const i = ((index % dc6.frames.length) + dc6.frames.length) % dc6.frames.length;
       const frame = dc6.frames[i];
       if (!frame) return;

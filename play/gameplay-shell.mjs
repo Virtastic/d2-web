@@ -104,7 +104,7 @@ import { createGameMenu } from './assets/game-menu.mjs';
 import { saveBeforeExit } from './assets/save-exit.mjs';
 import { MODAL_POINTER_OWNER, modalPointerOwner } from './assets/modal-pointer-priority.mjs';
 import { heldPointerWorldAllowed } from './assets/held-pointer-world.mjs';
-import { createGameClock, GAME_STEP, STEP, MAX_CATCHUP_UPDATES } from './assets/game-clock.mjs';
+import { createGameClock, GAME_STEP, STEP, MAX_CATCHUP_UPDATES, rafStarved } from './assets/game-clock.mjs';
 import { queueHeldPointerRepeat } from './assets/held-pointer-repeat.mjs';
 import { heldWorldAction, leftHandCommand } from './assets/world-click-dispatch.mjs';
 import { createDeathScreen, deathScreenShown, respawnAllowed } from './assets/death-screen.mjs';
@@ -123,8 +123,10 @@ import { createEntryBanner, ENTRY_BANNER } from './assets/level-entry-banner.mjs
 import { hudBarTooltip, levelButtonTooltip } from './assets/hud-bar-tooltip.mjs';
 import { hirelingTextRows } from './assets/hireling-panel.mjs';
 import { createVendorPanel, vendorLayoutFromEngine, SMITH_CLASSES, tooltipSpec } from './assets/vendor-panel.mjs';
+import { createRepairConfirm, createRepairConfirmRenderer } from './assets/vendor-repair-confirm.mjs';
 import { handleVendorRepairClick, disarmVendorRepair, vendorRepairArmed, repairCursorContext } from './assets/vendor-repair-control.mjs';
-import { toggleSellMode, resetSellMode, vendorClickAction } from './assets/vendor-sell-mode.mjs';
+import { toggleSellMode, resetSellMode, vendorClickAction, sellModeArmed } from './assets/vendor-sell-mode.mjs';
+import { inventoryClickAction, shopModeOf } from './assets/inventory-click-route.mjs';
 import { decodeDc6 } from './assets/d2-formats.mjs';
 import { createGameCursor } from './assets/game-cursor.mjs';
 import { createItemTargeting } from './assets/item-targeting.mjs';
@@ -613,6 +615,12 @@ let plugyEvidence = null;
 // PY3: PlugY's own art (StashBtns, SharedGoldBtns, TradeStash), fetched from the dev server's /retail/PlugY/ (never hosted; absent = the plain control and retail's panel stay).
 if (plugyStash.enabled) (async () => {
   try {
+    // A player's page waits for the archives to be known: a bring-your-own-files host serves nothing under /retail/,
+    // so the fetch was a certain 404 in the player's console. The test runner fetches at once, as before.
+    if (!navigator.webdriver) {
+      while (!window.__d2?.ready) { if (window.__d2?.error) return; await new Promise((r) => setTimeout(r, 250)); }
+      if (window.__d2.byo) { plugyStash.enabled = false; plugyError = 'PlugY art is never in a bring-your-own-files host, stash stays retail'; return; }
+    }
     const get = async (n) => { const r = await fetch('/retail/PlugY/' + n + '.dc6'); const b = new Uint8Array(await r.arrayBuffer()); if (!r.ok || !isDc6(b)) throw new Error(n + '.dc6 not served'); return b; };
     let btns, gold, trade;
     // No PlugY art, no PlugY: the page buttons, the 10x10 grid and the sidecars are one feature, switched off together before a game starts (retail's stash stays).
@@ -629,6 +637,9 @@ if (plugyStash.enabled) (async () => {
     plugyStash.setArt({ stash: canv(btns), gold: canv(gold) });
   } catch (e) { plugyError = `PlugY art: ${e}`; }
 })();
+let repairConfirmRenderer = null;
+const repairConfirm = createRepairConfirm((id) => repairAtVendor(id),
+  (id) => !Module._d2_session_item_needs_repair || Boolean(Module.ccall('d2_session_item_needs_repair', 'number', ['number'], [id >>> 0])));
 let stashGoldRenderer = null, stashGoldEvidence = null, stashGoldError = '', stashGoldDialog = null, stashGoldPress = null;
 const stashGoldSpinnerRepeat = createStashSpinnerRepeat();
 // The waypoint menu is open because the engine sent 0x63; waypointMenu holds that waypoint's unit id.
@@ -1287,6 +1298,7 @@ async function bootstrapSession() {
       stashGold: (limit) => (plugyStash.showShared && !limit) ? plugyGold : Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [limit]) : 0 }); } catch (error) { stashPanelError = String(error); }
     try { cubePanelRenderer = createStashPanelRenderer(createMpqAssetReader(Module), document, { page: INVPAGE_CUBE, string: null,
       transmute: Module.ccall('d2_lang_string', 'string', ['string'], ['Transmute']) || 'Transmute' }); } catch (error) { stashPanelError += ' cube: ' + error; }
+    try { repairConfirmRenderer = createRepairConfirmRenderer(createMpqAssetReader(Module), document, { string: (n) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [n]) }); } catch (error) { stashGoldError = String(error); }
     try { stashGoldRenderer = createStashGoldRenderer(createMpqAssetReader(Module), document, { string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]) }); } catch (error) { stashGoldError = String(error); }
     try { waypointPanelRenderer = createWaypointPanelRenderer(createMpqAssetReader(Module), document, { string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) }); } catch (error) { waypointPanelError = String(error); }
     if (!navigator.webdriver) await entryYield();
@@ -1460,6 +1472,20 @@ function warmCharacterScreens() {
   const ui = 'data\\global\\ui\\FrontEnd\\';
   const heroes = CLASSES.flatMap((c) => ['NU1', 'NU2', 'NU3', 'FW', 'BW'].map((a) => `${ui}${c.dir}\\${c.code}${a}.DC6`));
   for (const name of [...Object.values(SELECT_ASSETS), ...Object.values(CREATE_ASSETS), ...heroes]) fetched([name]);
+  // A returning player's SINGLE PLAYER click builds every saved hero's portrait inside the save list's
+  // IDB completion; each COF/DCC not yet fetched is a synchronous read there. Fetch the bare-handed
+  // COF and the armour-tier layers the save header names now, while the title is up. Item layers need
+  // the item tables and are left to the click. Players only: listProfile writes the unload journal.
+  if (navigator.webdriver) return;
+  const COMP = ['HD', 'TR', 'LG', 'RA', 'LA', 'RH', 'LH', 'SH', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8'];
+  saveStore.listProfile().then(({ characters = [] } = {}) => {
+    for (const ch of characters.slice(0, 8)) {
+      const token = playerClassInfo(ch.playerClass)?.token; if (!token) continue;
+      const root = `data\\global\\CHARS\\${token}\\`, app = ch.appearance || [];
+      fetched([`${root}COF\\${token}TNHTH.COF`]);
+      COMP.forEach((comp, i) => { const v = app[i]; if (v === undefined || v === 0 || v === 0xFF || (v >= 1 && v <= 3)) fetched([`${root}${comp}\\${token}${comp}${v >= 1 && v <= 3 ? ['lit', 'med', 'hvy'][v - 1] : 'lit'}TNHTH.DCC`]); });
+    }
+  }).catch(() => {});
 }
 
 // The town a character enters, by the save's act (a new one starts in the Rogue Encampment), warmed while the
@@ -2542,8 +2568,8 @@ function readUnitKinds(count) {
 }
 
 // F22: which units carry retail's NPC speech alert, one byte per unit in snapshot.entities order.
-// The engine answers it from its own per-player NPC-intro flags (the buffer it syncs to the client
-// in server packet 0x91 and clears on client packet 0x4D). No answer -> no alert: an engine without
+// The engine answers it from the server packets the client has seen: an NPC alert packet (0x8A)
+// sets it for that NPC, and opening any NPC interaction (0x28) clears it. No answer -> no alert: an engine without
 // the export must not have the client invent one, the same contract the renderer's `pending` has.
 function readNpcSpeechAlerts(count) {
   if (!count) return null;
@@ -4261,6 +4287,8 @@ function drawFrame() {
     try { cubeEvidence = cubePanelRenderer.draw(ctx, w, h, cubeOpen ? snapOr('cubeLayout', readCubeLayout) : null, snapshot.items, cubeOpen, snapshot.act); }
     catch (error) { stashPanelError = 'cube: ' + error; cubeEvidence = null; }
   }
+  if (repairConfirm.open && !npcState) repairConfirm.no();
+  if (repairConfirm.open && repairConfirmRenderer) repairConfirmRenderer.draw(ctx, w, h);
   if (stashGoldRenderer) {
     try {
       if (stashGoldDialog && (stashGoldPress?.action === 'increase' || stashGoldPress?.action === 'decrease')) {
@@ -4635,6 +4663,15 @@ try {
       ...(reads.length ? { misses: reads.length, stallMs: reads.reduce((a, r) => a + r[1], 0), reads: reads.slice(0, 3).map((r) => `${r[2]} ${r[1]}ms`) } : {}) });
   } }).observe({ type: 'long-animation-frame' });
 } catch { /* no LoAF (Firefox, Safari): the frame() records below still land */ }
+// rAF starved on a visible page (game-clock.mjs rafStarved): a 40 ms timer runs the updates it owes and leaves the
+// draw to the next frame. Never before the first frame (boot). Off in the test runner (webdriver), where records never see a timer-driven update.
+if (FOLD_RENDER) setInterval(() => {
+  const now = performance.now();
+  if (sessionEntering || rafAt === -Infinity || !rafStarved(now, rafAt, document.visibilityState === 'visible')) return;
+  const owed = clock.updatesFor(Math.max(0, now - last)); last = now;
+  try { for (let k = 0; k < owed; k++) update(false, true); } catch (error) { frameError = String(error?.stack || error); frameErrors++; }
+  if (owed) renderOwed = true;
+}, GAME_STEP);
 function frame(now) {
   if (sessionEntering) { last = now; requestAnimationFrame(frame); return; }
   W?.park();
@@ -4642,7 +4679,7 @@ function frame(now) {
   // The interval between drawn frames is the honest frame time in a real browser (a visible tab): what
   // the player feels, vsync and all. In the test runner's background tab rAF never fires, so this pass is
   // absent there and the per-frame samples are the engine's own cost.
-  const owed = clock.updatesFor(now - last); last = now; rafAt = performance.now();
+  const owed = clock.updatesFor(Math.max(0, now - last)); last = now; rafAt = performance.now();
   // PERF: a callback that owes no 60 Hz update (a 120/144 Hz display, or rAF jitter) would draw the
   // same state again, so it draws nothing. Records never see this: rAF never fires in the test runner tab.
   if (owed || renderOwed) {
@@ -5319,6 +5356,10 @@ addEventListener('keydown', (e) => {
   if (screen === SCREEN.CREATE) { if (charCreate?.typeKey(e.code, e.key)) e.preventDefault(); return; }
   // The amount box is modal. It gets Esc/Enter and numeric typing before the
   // global bindings, so Esc does not accidentally close the stash behind it.
+  if (screen === SCREEN.GAME && repairConfirm.open) {
+    if (e.code === 'Enter') repairConfirm.yes(); else if (e.code === 'Escape') repairConfirm.no(); else return;
+    e.preventDefault(); render(); return;
+  }
   if (screen === SCREEN.GAME && stashGoldDialog?.open) {
     if (e.code === 'Escape') closeStashGold();
     else if (e.code === 'Enter') submitStashGold();
@@ -5590,6 +5631,12 @@ canvas.addEventListener('pointerdown', (e) => {
   if (levelMusicDue(snapshot.level, levelMusicSync.activeLevel, musicLevelTick, engineTicks)) syncAreaMusic(snapshot.level);
   // The amount box is modal, including outside its visible controls. Consume
   // its click before a skill socket or other HUD control can react behind it.
+  if (screen === SCREEN.GAME && repairConfirm.open && repairConfirmRenderer) {
+    click.spent = 'repairConfirm';
+    const hit = e.button === 0 ? repairConfirmRenderer.hitAt(x, y, canvas.width, canvas.height) : null;
+    if (hit === 'yes') repairConfirm.yes(); else if (hit === 'no') repairConfirm.no();
+    snapshot = session.snapshot(); render(); canvas.focus(); e.preventDefault(); return;
+  }
   if (modalOwner === MODAL_POINTER_OWNER.STASH_GOLD_DIALOG && stashGoldRenderer && session) {
     click.spent = 'stashGoldDialog';
     const hit = stashGoldRenderer.hitAt(x, y, canvas.width, canvas.height, readStashLayout(), true);
@@ -5820,8 +5867,6 @@ canvas.addEventListener('pointerdown', (e) => {
     // window: action 2 is a gambler's inventory and its offers are spent, action 1 is trade stock
     // and they are bought. Sending the buy for a gamble offer asks the NPC for an item it never
     // listed, so the click has to name the command the counter means.
-    // Repair mode (armed by the Repair button) takes the next carried item click before the lift.
-    if (mine && handleVendorRepairClick(null, mine.id, repairAtVendor)) { click.spent = 'vendorRepair'; canvas.focus(); e.preventDefault(); return; }
     const item = vendorPanel.itemAt(x, y, canvas.width, canvas.height, npcState);
     const cur = Module._d2_session_cursor_item ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0;
     const onPanel = !mine && vendorPanel.contains(x, y, canvas.width, canvas.height);
@@ -5829,7 +5874,6 @@ canvas.addEventListener('pointerdown', (e) => {
     if (panelAct === 'sell-cursor') { click.spent = 'vendorSell'; sellToVendor(cur); canvas.focus(); e.preventDefault(); return; }
     if (item) { const gamble = npcState.action === 2; click.spent = gamble ? 'vendorGamble' : 'vendorBuy';
       (gamble ? gambleAtVendor : buyFromVendor)(item.id); canvas.focus(); e.preventDefault(); return; }
-    if (mine && vendorClickAction('mine', cur) === 'sell') { click.spent = 'vendorSell'; sellToVendor(mine.id); canvas.focus(); e.preventDefault(); return; }
     if (onPanel) { click.spent = 'panel:vendor'; canvas.focus(); e.preventDefault(); return; }
   }
   // The item cursor (retail's inventory handling, the engine's packet handlers deciding): over the
@@ -5880,8 +5924,15 @@ canvas.addEventListener('pointerdown', (e) => {
         snapshot = session.snapshot(); canvas.focus(); e.preventDefault(); return;
       }
       if (!cursorId) {
-        const item = inventoryPanelRenderer.itemAt(x, y, W, H, snapshot);
-        if (itemTargeting.armed && (item || slot?.item) && itemTargeting.leftClick(item ? item.id : slot.item.id)) { /* the identify cursor's click: the engine identified it */ }
+        const item = inventoryPanelRenderer.itemAt(x, y, W, H, snapshot), target = item || slot?.item;
+        // Grid and body slots alike: identify cursor first, then the shop mode (Sell sells, Repair repairs), else the lift (D2Client +0x95FE0/+0x96AA0).
+        const route = (...a) => Module._d2_client_inv_click_route ? Module.ccall('d2_client_inv_click_route', 'number', ['number', 'number', 'number', 'number', 'number', 'number'], a) : (a[3] ? 1 : 0);
+        const at = { itemId: target?.id, bodyLoc: item ? 0 : slot?.bodyLoc, mode: shopModeOf({ shopOpen: shopOpen(), sell: sellModeArmed(), repair: vendorRepairArmed() }), ctrl: e.ctrlKey, npcOpen: shopOpen() };
+        let act = inventoryClickAction(route, { ...at, targeting: itemTargeting.armed });
+        if (act === 'identify' && !itemTargeting.leftClick(target.id)) act = inventoryClickAction(route, at);
+        if (act === 'repair') { if (repairConfirm.request(target.id)) disarmVendorRepair(); click.spent = 'vendorRepair'; }
+        else if (act === 'sell' || act === 'sell-direct') { if (sellToVendor(target.id) && act === 'sell') resetSellMode(); click.spent = 'vendorSell'; }
+        else if (act !== 'pickup') { /* identified, or nothing under the click */ }
         else if (item && e.shiftKey && !npcState) lastGridToBelt = { itemId: item.id, result: gridToBelt(item.id) };
         else if (item) itemCommand('lift', item.id);
         else if (slot?.item) itemCommand('unequip', slot.bodyLoc);
@@ -5891,7 +5942,7 @@ canvas.addEventListener('pointerdown', (e) => {
         if (slot) itemCommand(slot.item ? 'swap' : 'equip', cursorId, slot.bodyLoc);
         else if (cell) gridDrop(cursorId, 0, cell);
       }
-      click.spent = 'inventoryPanel';
+      if (click.spent !== 'vendorRepair' && click.spent !== 'vendorSell') click.spent = 'inventoryPanel';
       snapshot = session.snapshot(); canvas.focus(); e.preventDefault(); return;
     }
     // Retail drops a held item only on a click in the world: an open panel takes its own clicks first
@@ -6319,6 +6370,7 @@ canvas.addEventListener('pointerup', (e) => {
       else if (hit === 'exit') { Module.ccall('d2_session_command_end_npc', 'number', ['number'], [npcState.npcId]); npcState = readNpcState(); }
       else {
         const inv = inventoryVisible && inventoryPanelRenderer ? inventoryPanelRenderer.itemAt(x, y, canvas.width, canvas.height, snapshot) : null;
+        if (hit === 'repair') resetSellMode(); // one shop mode at a time (retail's DAT_6fbcbc34)
         handleVendorRepairClick(hit, inv?.id, repairAtVendor);
       }
     } else vendorButtonGesture.cancel(e.pointerId);

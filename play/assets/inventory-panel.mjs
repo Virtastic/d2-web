@@ -1,3 +1,4 @@
+import { celAt, slotCelAt, cursorCelAt } from './item-cel-place.mjs';
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { BORDER_RIGHT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
 import { fnv1a32, paperdollIdentity } from './paperdoll-identity.mjs';
@@ -291,7 +292,9 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     // not a blit retail can make: the Canvas API resamples it, so the cursor is blurry and its pixels
     // sit half a pixel away from the rect this returns. At scale 1 that is every pixel of the item,
     // and s383 measures the canvas against this rect.
-    const x = Math.round(pointerX - image.width * v.scale / 2), y = Math.round(pointerY - image.height * v.scale / 2);
+    // Retail's rule in 800x600 pixels (item-cel-place.mjs cursorCelAt), carried to the canvas scale.
+    const at = cursorCelAt(0, 0, image.width, image.height);
+    const x = Math.round(pointerX + at.left * v.scale), y = Math.round(pointerY + at.top * v.scale);
     ctx.save(); ctx.translate(x, y); ctx.scale(v.scale, v.scale); ctx.drawImage(image, 0, 0); ctx.restore();
     return { id: item.id, invFile: item.invFile, x, y, width: image.width, height: image.height };
   },
@@ -341,12 +344,13 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
           itemBackground(ctx, act, ox + x * scale, oy + y * scale, BOX_PX * scale, BOX_PX * scale, boxColour);
           boxRects.push({ x, y, width: BOX_PX, height: BOX_PX, colour: boxColour });
         }
-        ctx.drawImage(image, r.left - sx, r.top - sy + 1); itemPixels += image.width * image.height;
+        const at = celAt(r.left, r.top);
+        ctx.drawImage(image, at.left - sx, at.top - sy); itemPixels += image.width * image.height;
         // `top` stays the CELL's top (s202 asserts the item landed in the cell it was put in);
         // `blitTop` is where the ART actually landed -- one row lower, and the anchor retail's own
         // `cel ?` record carries. An identity row must read `blitTop`, or it compares the cell.
         drawn.push({ id: item.id, where: 'grid', gridX: item.gridX, gridY: item.gridY, invFile: item.invFile, frame: 0,
-          celHash: fnv1a32(iconAt(item.invFile, act).frame.encoded), left: r.left, top: r.top, blitTop: r.top + 1,
+          celHash: fnv1a32(iconAt(item.invFile, act).frame.encoded), left: r.left, top: r.top, blitTop: at.top,
           width: image.width, height: image.height,
           ox: iconAt(item.invFile, act).frame.offsetX, oy: iconAt(item.invFile, act).frame.offsetY,
           boxColour, boxRects }); }
@@ -354,10 +358,10 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
         // On the body the item's CELL box (29 px per Items.txt cell -- retail multiplies the grid's
         // own box size by the item's invWidth/invHeight) is centred in the slot rounding down, the
         // art one row lower, and then retail's per-body-location constant is added (WORN_ANCHOR_OFFSET).
-        const bw = 29 * (item.invWidth || Math.ceil(image.width / 29)), bh = 29 * (item.invHeight || Math.ceil(image.height / 29));
+        const iw = item.invWidth || Math.ceil(image.width / 29), ih = item.invHeight || Math.ceil(image.height / 29);
         const [bx, by] = WORN_ANCHOR_OFFSET[item.bodyLoc] || [0, 0];
-        const [ax, ay] = weaponSetArmShift(state?.weaponSet, item.bodyLoc), dx = bx + ax, dy = by + ay;
-        const left = slot.left + Math.floor((slot.width - bw) / 2) + dx, top = slot.top + Math.floor((slot.height - bh) / 2) + 1 + dy;
+        const [ax, ay] = weaponSetArmShift(state?.weaponSet, item.bodyLoc);
+        const { left, top } = slotCelAt(slot, iw, ih, 29, 29, [bx + ax, by + ay]);
         ctx.drawImage(image, left - sx, top - sy);
         equippedItemPixels += image.width * image.height; equippedItemCount++;
         drawn.push({ ...paperdollIdentity(item, iconAt(item.invFile, act).frame, left, top, slot), width: image.width, height: image.height, blitTop: top,

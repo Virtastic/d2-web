@@ -12,6 +12,7 @@
 // when it carries four), and the composition is REPORTED so a scenario can check it rather than
 // trust it.
 
+import { gridCelAt } from './item-cel-place.mjs';
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { inventoryCloseFrame } from './inventory-close-gesture.mjs';
 import { inventoryItemAsset } from './inventory-panel.mjs';
@@ -169,7 +170,8 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
       for (const item of items || []) {
         if (item.invPage !== page || !item.invFile) continue;
         const c = icon(a, item.invFile);
-        const x = geometry.gridLeft + item.gridX * geometry.boxW, y = geometry.gridTop + item.gridY * geometry.boxH;
+        // The art lands one row below the cell's top, like every other grid (item-cel-place.mjs).
+        const { left: x, top: y } = gridCelAt(geometry.gridLeft, geometry.gridTop, geometry.boxW, geometry.boxH, item.gridX, item.gridY);
         ctx.drawImage(c, x, y);
         drawn.push({ id: item.id, invFile: item.invFile, cell: [item.gridX, item.gridY], at: [x, y] });
       }

@@ -25,3 +25,10 @@ export function createGameClock() {
     reset() { gameClock = 0; },
   };
 }
+
+// requestAnimationFrame can slow to ~1 Hz on a page that is still visible (an occluded or power-saved window).
+// Each such frame owed 1000 ms but the cap above paid 250 ms, so the game ran at a quarter speed. Retail's
+// loop keeps its 25 Hz ticks whatever the window does: past this gap a timer pays the updates rAF did not.
+// Below the 250 ms cap, so the timer's first payment (the gap plus up to one 40 ms timer period) is never clipped.
+export const RAF_STARVED_MS = 200;
+export const rafStarved = (now, rafAt, visible) => visible && now - rafAt >= RAF_STARVED_MS;

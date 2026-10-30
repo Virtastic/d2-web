@@ -205,6 +205,19 @@
         // WARM (s-perf-streaming): fetch a chunk with no one waiting and hand it to the main thread's
         // in-memory cache, so the later synchronous read is a hit instead of a stalled round trip.
         if (m.warm) {
+          // d2-web divergence: a Blob or file-handle mount (a bring-your-own-files host) warms by slicing
+          // it here, exactly as the synchronous read below does; it was URL-only, so those hosts read
+          // every byte as a main-thread miss.
+          if (m.id !== undefined) {
+            let buf = null;
+            try {
+              let f = files.get(m.id);
+              if (!f) { f = await handles.get(m.id).getFile(); files.set(m.id, f); }
+              buf = new Uint8Array(await f.slice(m.start, m.end).arrayBuffer());
+            } catch (e) {}
+            postMessage({ warmed: m.key, buf });
+            return;
+          }
           const wkey = m.url + '#' + m.start;
           let put = null;
           const p = (async () => {
@@ -437,11 +450,11 @@
     // Ask for the chunks covering [pos, pos+len) of the file mounted at `path` to be fetched in the
     // background into the in-memory cache. Fire and forget; a read that beats it just misses as before.
     warm(path, pos, len) {
-      const m = S.mounts.get(path); if (!m || !S.worker || !m.src.url || NEEDS_SYNC_XHR) return;   // Firefox: a worker fetch stalls behind the spin
+      const m = S.mounts.get(path); if (!m || !S.worker || (m.src.url ? NEEDS_SYNC_XHR : m.src.id === undefined)) return;   // Firefox: a worker fetch stalls behind the spin
       for (let cs = Math.floor(pos / CHUNK) * CHUNK; cs < pos + len && cs < m.size; cs += CHUNK) {
         const key = m.abs + ':' + cs;
         if (S.cache.has(key) || S.warming.has(key) || warmQ.some((w) => w.key === key)) continue;
-        warmQ.push({ warm: 1, key, url: m.src.url, pkey: m.src.pkey, start: cs, end: Math.min(cs + CHUNK, m.size) });
+        warmQ.push(Object.assign({ warm: 1, key, start: cs, end: Math.min(cs + CHUNK, m.size) }, m.src));
       }
       pumpWarm();
     },
@@ -512,6 +525,7 @@
       const id = S.nextId++;
       S.worker.postMessage({ mountLocal: { id, handle } });
       const src = { id };
+      S.mounts.set(path, { src, abs: 'id' + id, size });   // d2-web divergence: warm()/fetched()/readAt() reach it
       return makeNode(path, size, function (buffer, offset, length, position) {
         return readSync(src, 'id' + id, size, buffer, offset, length, position);
       });
@@ -521,12 +535,23 @@
     // bytes from the Blob on demand — a LOCAL read (disk-backed Cache blob), so no network and
     // no main-thread stall, unlike streaming from S3. The Blob is posted to the worker once.
     mountBlob(path, blob, size) {
+      const { src, abs } = this.registerBlob(path, blob, size);
+      return makeNode(path, size, function (buffer, offset, length, position) {
+        return readSync(src, abs, size, buffer, offset, length, position);
+      });
+    },
+
+    // d2-web divergence: register()'s Blob twin. The Blob is posted to the worker once and the source is
+    // warmable before the engine (and its FS) exists; mountBlob() of the same Blob reuses it, so chunks
+    // warmed before the mount are the ones the engine's reads hit.
+    registerBlob(path, blob, size) {
+      const had = S.mounts.get(path);
+      if (had && had.blob === blob) return had;
       const id = S.nextId++;
       S.worker.postMessage({ mountBlob: { id, blob } });
-      const src = { id };
-      return makeNode(path, size, function (buffer, offset, length, position) {
-        return readSync(src, 'id' + id, size, buffer, offset, length, position);
-      });
+      const m = { src: { id }, abs: 'id' + id, size, blob };
+      S.mounts.set(path, m);
+      return m;
     },
   };
 })();

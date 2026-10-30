@@ -5,6 +5,7 @@
 let sellMode = false;
 export const toggleSellMode = () => (sellMode = !sellMode);
 export const resetSellMode = () => { sellMode = false; };
+export const sellModeArmed = () => sellMode;
 /** What a left click does with a shop open. where: 'mine' (carried item) | 'panel' (shop window).
  *  A held item dropped on the shop is a sale on ANY cell, stocked or not: the stock hit must not win. */
 export function vendorClickAction(where, cursorId, stockHit = false) {

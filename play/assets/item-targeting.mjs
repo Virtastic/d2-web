@@ -1,14 +1,13 @@
 // Retail's item-spell targeting, the client half. A right click on a usable inventory item sends 0x20 and
 // the ENGINE decides what the item does (D2Game Rcv0x20 -> sub_6FC47D30). An Identify scroll or tome runs
 // SKILLITEM_pSpell01_Initializer, which sets IFLAG_TARGETING (0x4) on the item and sends 0x3F: from then
-// the pointer is the identify ring (buysell.dc6 frame 8) and the next left click on an unidentified item
+// the pointer is the identify icon (buysell.dc6 frame 0, game-cursor.mjs) and the next left click on an unidentified item
 // sends 0x27 {target, use} -- the engine identifies it, spends the tome charge / scroll, and clears the flag.
 // The same id twice (or no target) in 0x27 is the cancel (sub_6FC47470 clears every IFLAG_TARGETING item and
 // sends 0x3F back); any other item action does the same server-side, so the armed state is READ from the
 // engine's flag every time it is asked, never trusted from here.
 export const IFLAG_TARGETING = 0x4;
 export const IFLAG_IDENTIFIED = 0x10;
-export const IDENTIFY_CURSOR_FRAME = 8;
 
 /**
  * io.use(id) -> true if the engine accepted the 0x20; io.flags(id) -> the item's dwItemFlags (0 if gone);

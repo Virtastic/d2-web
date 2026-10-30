@@ -8,7 +8,7 @@ export const GAME_CURSOR = Object.freeze({
   hand: 'data\\global\\ui\\CURSOR\\ohand.dc6',
   attack: 'data\\global\\ui\\CURSOR\\protate.dc6',
   talk: 'data\\global\\ui\\CURSOR\\orotate.dc6',
-  // Retail's repair cursor: the buysell.dc6 frame 1 (the hammer; frame 8 is the identify ring, 7 a flask, 0/2/6 arrows).
+  // The icon cursors (identify, repair, buy, sell) are all buysell.dc6; ICON_CURSOR_FRAME picks the frame.
   repair: 'data\\global\\ui\\CURSOR\\buysell.dc6',
   palette: 'data\\global\\palette\\Units\\pal.dat',
 });
@@ -21,8 +21,27 @@ function canvasFor(frame, palette, documentObject) {
   return canvas;
 }
 
-export const REPAIR_CURSOR_FRAME = 1;
-export const IDENTIFY_CURSOR_FRAME = 8;   // buysell.dc6: the ring the 0x3F item-spell cursor shows
+// Retail's icon cursor is one table entry (buysell, not animated) whose frame is a number set when the
+// mode is entered, drawn as is. The vendor buttons store theirs: Buy 3, Sell 4, Repair 1. An item spell
+// takes it from the 0x3F packet, which the server fills from the item's spell icon: Books.txt SpellIcon,
+// 0 for the Identify scroll and tome (Town Portal's is -1, so it never shows an icon cursor).
+export const ICON_CURSOR_FRAME = Object.freeze({ identify: 0, repair: 1, buy: 3, sell: 4 });
+export const REPAIR_CURSOR_FRAME = ICON_CURSOR_FRAME.repair;
+export const IDENTIFY_CURSOR_FRAME = ICON_CURSOR_FRAME.identify;
+// The icon cel is drawn 33 rows below the pointer anchor and never clamped; every other cursor cel is
+// drawn at the anchor clamped into the screen. Neither moves the pointer itself.
+export const ICON_CURSOR_DROP = 33;
+const ICON_KINDS = new Set(Object.keys(ICON_CURSOR_FRAME));
+
+/** Where a cursor frame lands for a pointer at (x, y) on a w x h screen: the anchor handed to the cel
+ *  draw and the frame's top-left. The pointer's own coordinates are inputs only. */
+export function cursorPlacement(kind, frame, x, y, w, h) {
+  const px = Math.round(x), py = Math.round(y) - 1;
+  const icon = ICON_KINDS.has(kind);
+  const anchorX = icon ? px : Math.min(Math.max(px, 0), w - 1);
+  const anchorY = icon ? py + ICON_CURSOR_DROP : Math.min(Math.max(py, 0), h - 1);
+  return { anchorX, anchorY, left: anchorX + frame.offsetX, top: anchorY + frame.offsetY - frame.height + 1 };
+}
 export const NATIVE_CURSOR_IDLE_MS = 5000;
 
 // Static 1.13c RE recovers the event timeout and table cadence. The `protate` LCG predicate is
@@ -36,7 +55,7 @@ export function createGameCursorClock({ now = () => globalThis.performance?.now?
   return {
     noteInput() { lastInputMs = now(); phase = 'spin'; handDraws = 0; rotateDraws = 0; },
     next(context) {
-      const kind = context?.kind === 'attack' || context?.kind === 'talk' || context?.kind === 'repair' || context?.kind === 'identify' ? context.kind : 'hand';
+      const kind = context?.kind === 'attack' || context?.kind === 'talk' || ICON_KINDS.has(context?.kind) ? context.kind : 'hand';
       if (kind !== contextKind) { contextKind = kind; contextDraws = 0; }
       const elapsedMs = Math.max(0, now() - lastInputMs);
       if (kind === 'talk') {
@@ -45,9 +64,8 @@ export function createGameCursorClock({ now = () => globalThis.performance?.now?
         contextDraws++;
         return draw;
       }
-      // ponytail: static first cel; retail's cycling for cursor state 7 is not recovered. Add when cel cycling is pinned.
-      if (kind === 'repair') return { file: 'buysell', frame: REPAIR_CURSOR_FRAME, framesPerCel: null, since: contextDraws, elapsedMs, state: 'repair' };
-      if (kind === 'identify') return { file: 'buysell', frame: IDENTIFY_CURSOR_FRAME, framesPerCel: null, since: contextDraws, elapsedMs, state: 'identify' };
+      // The icon cursor is not animated: its frame stays what entering the mode set.
+      if (ICON_KINDS.has(kind)) return { file: 'buysell', frame: ICON_CURSOR_FRAME[kind], framesPerCel: null, since: contextDraws, elapsedMs, state: kind };
       if (kind === 'attack') {
         const draw = { file: 'protate', frame: 0, framesPerCel: null,
           since: contextDraws, elapsedMs, state: 'attack-rate-unresolved' };
@@ -93,11 +111,10 @@ export function createGameCursor({ read, decodeDc6, documentObject = globalThis.
     draw(ctx, canvas, x, y, context) {
       const timing = clock.next(context);
       const { file, frame: frameIndex, framesPerCel: perCel } = timing;
-      const kind = context?.kind === 'attack' || context?.kind === 'talk' ? context.kind : 'hand';
+      const kind = context?.kind === 'attack' || context?.kind === 'talk' || ICON_KINDS.has(context?.kind) ? context.kind : 'hand';
       const asset = assets[fileOf[file]];
       const frame = asset.dc6.frames[frameIndex], image = asset.canvases[frameIndex];
-      const left = Math.round(x) + frame.offsetX;
-      const top = Math.round(y) - 1 + frame.offsetY - frame.height + 1;
+      const { left, top } = cursorPlacement(kind, frame, x, y, canvas.width, canvas.height);
       const requested = { path: drawPath(asset.path), frame: frameIndex, palette: drawPath(GAME_CURSOR.palette) };
       // Retail clips a cel at the viewport and paints the part that fits; nothing is suppressed here.
       // (The corner the frame fixtures park on draws a one-column sliver, and retail's own capture of

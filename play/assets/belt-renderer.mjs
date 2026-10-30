@@ -1,3 +1,4 @@
+import { beltCelAt } from './item-cel-place.mjs';
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { POPUP_BG, popupBgPosition } from './belt-popup.mjs';
 import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
@@ -76,14 +77,14 @@ export function createBeltRenderer(read, documentObject = globalThis.document) {
       for (const item of items || []) {
         if (item.mode !== 2 || item.gridX < 0 || item.gridX >= rects.length || !item.invFile) continue;
         const b = rects[item.gridX], c = icon(item.invFile);
-        const w = b.right - b.left, h = b.bottom - b.top;
         // The cel is 28x28 in a 29x29 Belts.txt box and sits one row BELOW the box's top row: retail
         // draws the HUD belt poticon with its bottom row on the box's bottom row (cel ? 28x28 at
         // y=590 against a box of 562..591), which is the same +1
         // the inventory places a 28x28 cel in a 29x29 cell with (play/assets/inventory-panel.mjs:229
         // grid, :234 body). Measured: F228/s813 reads our canvas 1 px up and finds 889 of 948 belt
         // pixels wrong; at the +1 they are retail's.
-        ctx.drawImage(c, b.left + Math.floor((w - c.width) / 2), b.top + Math.floor((h - c.height) / 2) + 1);
+        const at = beltCelAt(b);
+        ctx.drawImage(c, at.left, at.top);
         count++; pixels += c.width * c.height;
       }
       if (labels) numbers(ctx, rects, items, keys);

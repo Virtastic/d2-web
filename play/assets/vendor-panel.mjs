@@ -16,6 +16,7 @@
 //   * tab names: strBSArmor / strBSWeapons / strBSMisc; a tab with no stock is not drawn.
 // The opening tab is captured (openingTab below: smith -> Weapons, else Misc), not riiablo's guess.
 // TODO(client-parity P8d): buying is a left click on the item, which retail may bind differently.
+import { gridCelAt } from './item-cel-place.mjs';
 import { placeItemTip } from './item-tooltip.mjs';
 import { createFont, decodeFontTbl, FRONTEND, textColourPalette } from './frontend.mjs';
 import { BORDER_LEFT, BORDER_RIGHT, createPanelChrome } from './panel-chrome.mjs';
@@ -257,15 +258,15 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, s
         if (!belongsToTab(it, tab) || it.gridX < 0 || it.gridY < 0) continue;
         shown++;
         const img = icon(it.invFile);
-        const x = L.gridLeft + it.gridX * L.cell, y = L.gridTop + it.gridY * L.cell;
+        const x = L.gridLeft + it.gridX * L.cell, y = L.gridTop + it.gridY * L.cell, at = gridCelAt(L.gridLeft, L.gridTop, L.cell, L.cell, it.gridX, it.gridY);
         if (img) {
           const t = ctx.getTransform();
           itemBackground(ctx, t.e + x * t.a, t.f + y * t.d, Math.ceil(img.width / L.cell) * L.cell * t.a, Math.ceil(img.height / L.cell) * L.cell * t.d, (cur.boxes ||= boxIndices(cur.palette))[boxSlot(it, hovered && hovered.id === it.id)]);
           let visiblePixels = visibleBlits.get(img);
           if (visiblePixels === undefined) {
-            visiblePixels = changedOutputPixels(ctx, t, x, y + 1, img.width, img.height, () => ctx.drawImage(img, x, y + 1));
+            visiblePixels = changedOutputPixels(ctx, t, at.left, at.top, img.width, img.height, () => ctx.drawImage(img, at.left, at.top));
             visibleBlits.set(img, visiblePixels);
-          } else ctx.drawImage(img, x, y + 1);
+          } else ctx.drawImage(img, at.left, at.top);
           // Identity is evidence of a successful visible blit, never of an intended one.
           if (visiblePixels > 0) {
             drawnIcons++;
