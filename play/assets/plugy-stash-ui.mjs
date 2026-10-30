@@ -3,7 +3,7 @@
 // (defaults for the 10x10 BigStash at 800x600: x = WindowStartX + v, y = the sprite's BOTTOM edge = 600 - 60 - v; WindowStartX = 80 measured
 // against retail/frames/plugy-stash-r29.png, s869). The panel behind them is PlugY's TradeStash.dc6 (stash-panel.mjs setArt); until the art loads
 // the plain canvas control stays. The shell swaps a page in/out of the engine stash via d2_session_stash_export/clear/insert (JM bytes).
-// Only previous/next page are live; the index, shared-toggle and shared-gold buttons are drawn as PlugY draws them but inert (PY3 blockers).
+// Prev/next, the index jumps and the personal/shared toggle are live; the shared-gold buttons call onGold("put" | "take") (PlugY: all the gold that fits).
 export const PLUGY_GRID = { columns: 10, rows: 10, gridLeft: 96, gridTop: 143 };   // BigStash.cpp gridLeft 16 / gridTop 82 on the panel at (80,61)
 const POPUP_TEXT_UP = 3;   // the text baseline sits 3 px above the box bottom (calibrated on plugy-rb-hover-toggle)
 const POPUP_DY = 1;   // popup baseline = button top - 32 + POPUP_DY (calibrated on the capture)
@@ -14,7 +14,18 @@ const BTN = {
   putGold: { f: 0, gold: true, x: WSX + 0x1C, y: BOTTOM - 0x1A8 - 32 }, takeGold: { f: 2, gold: true, x: WSX + 0x105, y: BOTTOM - 0x1A8 - 32 },
 };
 export const PLUGY_NAME_AT = { x: WSX + 0x4A + 4, y: BOTTOM - 0x19A - 6 };
-const LIVE = ['prev', 'next', 'shared'];
+const LIVE = ['prev', 'next', 'shared', 'prevIndex', 'nextIndex', 'putGold', 'takeGold'];
+export const MAX_PAGE = 999;   // last page index of a set (the sidecar caps a set at 1000 pages)
+// Page a button leads to, from `page`. No wrap (PlugY): prev stops at 0, next grows the set on demand. Index buttons land on the
+// previous / next page whose number is a multiple of 10 (100 with shift); shift+prev is the first page, shift+next the last non-empty.
+export function pageTarget(name, page, shift = false, lastUsed = 0) {
+  const step = shift ? 100 : 10;
+  if (name === 'prev') return shift ? 0 : Math.max(0, page - 1);
+  if (name === 'next') return shift ? Math.max(page, lastUsed) : Math.min(MAX_PAGE, page + 1);
+  let q = page + (name === 'nextIndex' ? 1 : -1);
+  while (q > 0 && q < MAX_PAGE && (q + 1) % step) q += name === 'nextIndex' ? 1 : -1;
+  return Math.max(0, Math.min(MAX_PAGE, q));
+}
 // The bottom-right button is the panel's Close (TradeStash art, frame from StashBtns per the capture) -- a hit rect only, drawn by the panel art.
 BTN.close = { hit: true, popDy: -3, x: WSX + 0x110, y: BOTTOM - 0x40 - 32 };
 // Hover popups (PlugY D2PrintPopup: Font16 text centred on the button's top-centre, retail frames plugy-rb-hover-*.png, F176). Strings are the captured ones.
@@ -26,8 +37,9 @@ const POPUP = {
   putGold: () => 'Put Gold', takeGold: () => 'Take Gold', close: () => 'Close',
 };
 const POPUP_LEFT = { prevIndex: 196 };
-export function createPlugyStash({ enabled = false, pages = 2, onPage = null } = {}) {
-  const s = { enabled, pages, page: 0, showShared: false, hover: null, text: null };
+// onPage(fromPage, toPage, fromShared, toShared) === false refuses the turn. lastUsed(shared) = index of the last non-empty page.
+export function createPlugyStash({ enabled = false, pages = 1, onPage = null, onGold = null, lastUsed = () => 0 } = {}) {
+  const s = { enabled, pages, page: 0, showShared: false, hover: null, text: null, mem: { false: 0, true: 0 } };
   const rect = (g) => ({ x: g.left + 96, y: g.top + 8, w: 96, h: 18 });
   s.art = null;   // { stash: canvas[], gold: canvas[] } once StashBtns.dc6 / SharedGoldBtns.dc6 are decoded (setArt)
   s.down = null;
@@ -67,23 +79,29 @@ export function createPlugyStash({ enabled = false, pages = 2, onPage = null } =
       ctx.restore();
       return { ...r, page: s.page, pages: s.pages };
     },
-    /** Returns true when the click hit the control (and pages it). */
-    click(px, py, w, h, g, open) {
+    /** Move to (page, shared); false when onPage refused (the state stays). Each set remembers its own page. */
+    go(page, shared = s.showShared) {
+      const was = { page: s.page, shared: s.showShared };
+      if (page === was.page && shared === was.shared) return true;
+      const memWas = s.mem[was.shared];
+      s.page = page; s.showShared = shared; s.pages = Math.max(s.pages, page + 1); s.mem[was.shared] = was.page;   // before onPage: its save reads the personal page last shown
+      if (onPage && onPage(was.page, page, was.shared, shared) === false) { s.page = was.page; s.showShared = was.shared; s.mem[was.shared] = memWas; return false; }
+      return true;
+    },
+    /** Returns true when the click hit the control (and pages it). shift = PlugY's first / last / by-100 variants. */
+    click(px, py, w, h, g, open, shift = false) {
       if (!s.enabled || !open || !g) return false;
       const r = rect(g), o = scaleOf(w, h), x = (px - o.x) / o.k, y = (py - o.y) / o.k;
       if (ready()) {
         const hit = LIVE.find((n) => x >= BTN[n].x && x < BTN[n].x + 32 && y >= BTN[n].y && y < BTN[n].y + 32);
         if (!hit) return false;
-        if (hit === 'shared') { s.showShared = !s.showShared; return true; }   // PY3: the toggle shows the measured shared state (header red, popup); separate shared/personal page sets are PART
-        const was = s.page;
-        s.page = (s.page + (hit === 'next' ? 1 : s.pages - 1)) % s.pages;
-        if (s.page !== was && onPage && onPage(was, s.page) === false) s.page = was;
+        if (hit === 'putGold' || hit === 'takeGold') { if (onGold) onGold(hit === 'putGold' ? 'put' : 'take'); }
+        else if (hit === 'shared') s.go(s.mem[!s.showShared], !s.showShared);
+        else s.go(pageTarget(hit, s.page, shift, lastUsed(s.showShared)));
         return true;
       }
       if (x < r.x || x >= r.x + r.w || y < r.y || y >= r.y + r.h) return false;
-      const was = s.page;
-      if (x < r.x + 32) s.page = (s.page + s.pages - 1) % s.pages; else if (x >= r.x + 64) s.page = (s.page + 1) % s.pages;
-      if (s.page !== was && onPage && onPage(was, s.page) === false) s.page = was;   // a refused swap (engine insert failed, nothing lost) stays on the page
+      if (x < r.x + 32) s.go(pageTarget('prev', s.page)); else if (x >= r.x + 64) s.go(pageTarget('next', s.page));
       return true;
     },
   });

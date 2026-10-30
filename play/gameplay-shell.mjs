@@ -6,6 +6,7 @@ import { perfSync, perfEnabled, perfT0, perfT, perfSample, perfCountFrame, perfR
 import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, groundItemsUnderPointerAt, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, isPrimaryTargetEligible, nativeObjectHoverContains, nativeHoverSpecialGate, selectPointerCandidate, selectPrimaryTarget, selectHoverUnit, selectRetailPickTarget, viewportToWorld } from './gameplay-model.mjs';
 import { altSync } from './item-pick.mjs';
 import { createMpqAssetReader } from './assets/mpq-assets.mjs';
+import { itemTables, itemSizer } from './assets/d2-item-size.mjs';
 import { createAreaPrefetch } from './assets/area-prefetch.mjs';
 import { createGlPresenter } from './assets/gl-present.mjs';
 import { recordPrim, gFrame, gUnit, gCall, gLines, gLoadingWalk } from './assets/drawlist.mjs';
@@ -132,7 +133,7 @@ import { characterPanelCloseAt, createCharacterPanelCloseGesture } from './asset
 import { beginInventoryClosePress, cancelInventoryClosePress, finishInventoryClosePress, inventoryCloseAt } from './assets/inventory-close-gesture.mjs';
 import { installScrollSafeCanvasFocus } from './assets/canvas-focus.mjs';
 import { createPlugyStash, PLUGY_GRID, PLUGY_NAME_AT } from './assets/plugy-stash-ui.mjs';
-import { pagesToSss, sssToPages } from './assets/plugy-stash.mjs';
+import { pagesToSss, sssToPages, pagesToD2x, d2xToPages } from './assets/plugy-stash.mjs';
 import { plugyStashMode } from './assets/plugy-stash-mode.mjs';
 import { closeStashFromInventory, stashCloseAt } from './assets/stash-close.mjs';
 import { createFrontendPointerStates } from './assets/frontend-pointer-states.mjs';
@@ -480,55 +481,113 @@ const toggleMessage = () => { messageVisible = !messageVisible; if (messageVisib
 // its items live on invPage 3 and the Transmute button is TRADEBTN_TRANSMUTE (24).
 let cubePanelRenderer = null, cubeOpen = false, cubeLayout = null, cubeEvidence = null;
 let stashPanelRenderer = null, stashPanelError = '', stashEvidence = null, stashOpen = false, stashLayout = null;
-// PlugY shared-stash page control: OPT-IN (?plugy=1; default is strict retail). Off = nothing here runs, nothing is
-// read from or written to the PlugY side store.
+// Stash pages and the shared stash (PlugY-style, always on). Sidecars: the character's .d2x and the shared .sss; the .d2s stays retail.
+// Page 0 of a fresh character is the engine's own stash, so a player who never turns a page sees only the larger grid.
 // PY1 pages: page 0 is the engine's stash; every other page is a stored "JM" item section (opaque bytes,
 // the engine stays the only game state). A page turn exports the live stash, clears it, inserts the target.
-let plugyPages = [], plugyReady = false, plugyFail = { export: false, insert: false };   // plugyFail: test hooks (crash simulation)
+// Two page sets: personal (the character's .d2x sidecar) and shared (_LOD_SharedStashSave.sss, every character). The engine
+// stash holds one live page, plugyLive = { shared, page }; plugySets[shared][page] is its stored copy (stale while live).
+let plugySets = { false: [], true: [] }, plugyLive = { shared: false, page: 0 }, plugyReady = false, plugySharedDirty = false;
+let plugyMeta = { false: [], true: [] }, plugyGold = 0, plugyItemSize = null, plugyHeld = false;   // per-page { flags, name } of a PlugY file; the shared gold (.sss only)
+let plugyFail = { export: false, insert: false };   // plugyFail: test hooks (crash simulation)
 const plugyBuf = (n, f) => { const b = Number(Module.ccall('malloc', 'bigint', ['number'], [n])); try { return f(b); } finally { Module.ccall('free', null, ['bigint'], [BigInt(b)]); } };
 const plugyExport = () => plugyFail.export ? null : plugyBuf(0x4000, (b) => { const n = Module.ccall('d2_session_stash_export', 'number', ['bigint', 'number'], [BigInt(b), 0x4000]); return n > 3 ? Module.HEAPU8.slice(b, b + n) : null; });
 const plugyCount = (sec) => sec[2] | (sec[3] << 8);
 const plugyInsert = (sec) => plugyBuf(sec.length, (b) => { Module.HEAPU8.set(sec, b); return plugyFail.insert ? -99 : Module.ccall('d2_session_stash_insert', 'number', ['bigint', 'number'], [BigInt(b), sec.length]); });
-const plugyKey = () => `_LOD_${chosenName}.sss`;
+// The item decoder the PlugY page form needs, built from the mounted tables; null until the MPQ answers (retried, never cached as a failure).
+function plugySizer() {
+  if (plugyItemSize) return plugyItemSize;
+  try { const rd = createMpqAssetReader(Module), t = (n) => new TextDecoder('latin1').decode(rd('data\\global\\excel\\' + n + '.txt'));
+    plugyItemSize = itemSizer(itemTables(t('ItemStatCost'), t('Armor'), t('Weapons'), t('Misc'))); } catch { plugyItemSize = null; }
+  return plugyItemSize;
+}
+const plugyMetaOf = (shared) => plugySetOf(shared).map((_, i) => plugyMeta[shared][i]);
+const PLUGY_SHARED_KEY = '_LOD_SharedStashSave.sss';
+const plugyKey = () => `_LOD_${chosenName}.d2x`;
 let plugyLast = Promise.resolve(), plugyError = '';
-// Write every page (the live one re-exported) as the character's .sss blob; false = nothing written.
-function plugyPersist(cur = plugyStash.page) {
+const plugyUsed = (shared) => { const set = plugySets[shared]; let last = 0; set.forEach((p, i) => { if (p && p.length > 4 && plugyCount(p) > 0) last = i; });
+  if (plugyLive.shared === shared) { const e = plugyExport(); if (e && plugyCount(e) > 0) last = Math.max(last, plugyLive.page); } return last; };
+const plugySetOf = (shared) => Array.from({ length: Math.max(1, plugySets[shared].length, plugyLive.shared === shared ? plugyLive.page + 1 : 0) }, (_, i) => plugySets[shared][i]);
+// Write the sidecars (the live page re-exported first); false = nothing written. The shared file only once a shared page was touched.
+function plugyPersist() {
   if (!plugyStash.enabled || !plugyReady || !chosenName) return Promise.resolve(false);
-  const live = plugyExport(); if (live) plugyPages[cur] = live;
-  const blob = pagesToSss(Array.from({ length: Math.max(plugyPages.length, plugyStash.pages) }, (_, i) => plugyPages[i]), cur);
-  return plugyLast = saveStore.putAux(plugyKey(), blob).then(() => true, (e) => { plugyError = String(e); return false; });
+  const live = plugyExport(); if (live) plugySets[plugyLive.shared][plugyLive.page] = live;
+  const itemSize = plugySizer();
+  const marker = plugyLive.shared ? { ...plugyLive, personal: plugyStash.mem[false] } : plugyLive;   // shared showing: the .d2s holds the personal page
+  const writes = [saveStore.putAux(plugyKey(), pagesToD2x(plugySetOf(false), marker, { meta: plugyMetaOf(false), itemSize }))];
+  if (plugySharedDirty) writes.push(saveStore.putAux(PLUGY_SHARED_KEY, pagesToSss(plugySetOf(true), { gold: plugyGold, meta: plugyMetaOf(true), itemSize })));
+  return plugyLast = Promise.all(writes).then(() => true, (e) => { plugyError = String(e); return false; });
 }
 // A page turn never loses an item: the new pages are stored BEFORE the engine stash is cleared; the insert is
 // verified (item count == the section's) and any failure puts the old page back and refuses the turn.
-function plugySwap(from, to) {
+function plugySwap(from, to, fromShared = false, toShared = false) {
   if (!plugyReady) { plugyError = 'swap before load finished'; return false; }
   const E = plugyExport(); if (!E) { plugyError = 'stash export failed'; return false; }
-  plugyPages[from] = E;
-  plugyPersist(from);   // stored bytes (still cur=from, all pages) reach IndexedDB before the clear below
-  const T = plugyPages[to];
+  plugySets[fromShared][from] = E;
+  if (fromShared || toShared) plugySharedDirty = true;
+  plugyPersist();   // stored bytes reach IndexedDB before the clear below
+  const T = plugySets[toShared][to];
   const put = (sec) => { const cr = Module.ccall('d2_session_stash_clear', 'number', [], []); plugyError = 'clear rc ' + cr; if (cr < 0) return false; if (!sec || sec.length <= 4) return true;
     const rc = plugyInsert(sec), back = plugyExport(); return rc === 0 && back && plugyCount(back) === plugyCount(sec); };
   if (!put(T)) { plugyFail = { export: false, insert: false }; const ok = put(E); plugyError = ok ? 'insert failed; page restored' : 'insert failed; restore failed'; return false; }
-  plugyPersist(to); persistCurrentCharacter();   // blob + .d2s now agree on which page the engine holds
+  plugyLive = { shared: toShared, page: to };
+  plugyPersist(); persistCurrentCharacter();   // sidecars + .d2s now agree on which page the engine holds
   return true;
 }
-// On entering a game: read this character's blob. Absent/corrupt -> empty pages (the engine stash is untouched).
-// The engine's stash is the page the .d2s was saved on: if it equals a stored page's bytes, that page is current.
+// On entering a game: read the shared file and this character's sidecar (else the older per-character .sss). Absent/corrupt ->
+// empty pages (the engine stash is untouched). The sidecar's live marker says which page the .d2s's stash section is; when that
+// was a shared page the engine is switched to personal page 0 (the shared copy is already stored).
 async function plugyLoad(name) {
-  plugyReady = false; plugyPages = []; plugyStash.page = 0;
-  let raw = null, st = null;
-  try { raw = await saveStore.getAux(`_LOD_${name}.sss`); if (raw) st = sssToPages(raw); }
-  catch (e) { plugyError = 'blob unreadable: ' + e; if (raw) saveStore.putAux(`_LOD_${name}.sss.bad`, raw).catch(() => {}); }
+  plugyReady = false; plugySets = { false: [], true: [] }; plugyMeta = { false: [], true: [] }; plugyGold = 0; plugyHeld = false; plugyLive = { shared: false, page: 0 }; plugySharedDirty = false;
+  Object.assign(plugyStash, { page: 0, showShared: false, pages: 1, mem: { false: 0, true: 0 } });
+  const read = async (key, parse) => { let raw = null; try { raw = await saveStore.getAux(key); return raw ? parse(raw) : null; }
+    catch (e) { plugyError = key + ' unreadable: ' + e; if (/item decoder/.test(String(e))) plugyHeld = true; else if (raw) saveStore.putAux(key + '.bad', raw).catch(() => {}); return null; } };
+  for (let t = 0; !plugySizer() && t < 40; t++) await new Promise((r) => setTimeout(r, 250));   // the tables mount after boot
+  const sz = plugySizer();
+  const shared = await read(PLUGY_SHARED_KEY, (r) => sssToPages(r, sz));
+  let own = await read(`_LOD_${name}.d2x`, (r) => d2xToPages(r, sz)), legacy = false;
+  if (!own) { const old = await read(`_LOD_${name}.sss`, (r) => sssToPages(r, sz)); if (old) { own = { pages: old.pages, live: null }; legacy = true; } }
+  if (plugyHeld) { plugyError = 'item tables unavailable; stash files left untouched'; return; }   // stays not ready: nothing is written over a file we could not read
+  if (shared) { plugySets[true] = shared.pages; plugyMeta[true] = shared.meta; plugyGold = shared.gold; }
   const E = plugyExport();
-  if (st && E) {
-    const eq = (p) => p.length === E.length && p.every((v, k) => v === E[k]);
-    let cur = st.cur; if (!eq(st.pages[cur])) { const i = st.pages.findIndex(eq); if (i >= 0) cur = i; }
-    plugyPages = st.pages; plugyPages[cur] = E; plugyStash.page = cur;
+  if (own && E) {
+    plugySets[false] = own.pages; plugyMeta[false] = own.meta || [];
+    let lv = own.live;
+    if (!lv) { const i = own.pages.findIndex((p) => p.length === E.length && p.every((v, k) => v === E[k])); lv = { page: Math.max(0, i), shared: false }; }
+    if (lv.shared && lv.personal != null) {   // the .d2s holds personal page lv.personal; bring the shared page that was showing back
+      plugySets[false][lv.personal] = E;
+      const T = plugySets[true][lv.page], clr = () => Module.ccall('d2_session_stash_clear', 'number', [], []) >= 0;
+      const ok = clr() && (!T || T.length <= 4 || (plugyInsert(T) === 0 && plugyCount(plugyExport() || [0, 0, 255, 255]) === plugyCount(T)));
+      if (ok) { plugyLive = { shared: true, page: lv.page }; Object.assign(plugyStash, { showShared: true, page: lv.page, pages: Math.max(1, plugySets[true].length, lv.page + 1), mem: { false: lv.personal, true: lv.page } }); plugyReady = true; return; }
+      if (!(clr() && (E.length <= 4 || plugyInsert(E) === 0))) { plugyError = 'shared page could not be restored; personal page lost from the engine'; return; }
+      plugyError = 'shared page could not be restored; personal page kept'; lv = { page: lv.personal, shared: false };
+      plugySets[false][lv.page] = E;
+    } else if (lv.shared) {
+      const P0 = own.pages[0], ok = Module.ccall('d2_session_stash_clear', 'number', [], []) >= 0 && (!P0 || P0.length <= 4 || plugyInsert(P0) === 0);
+      if (!ok) { plugyError = 'shared page was live; personal page 0 could not be restored'; return; }   // stays not ready: nothing is persisted over it
+      plugySets[true][lv.page] = E; lv = { page: 0, shared: false };
+    } else plugySets[false][lv.page] = E;
+    plugyLive = lv; plugyStash.page = lv.page; plugyStash.pages = Math.max(1, plugySets[false].length);
+    if (legacy) plugySharedDirty = false;
   }
   plugyReady = true;
 }
 const plugyQuery = new URLSearchParams(window.__d2Entry.search);
-const plugyStash = createPlugyStash({ enabled: plugyQuery.get('plugy') === '1', onPage: plugySwap });
+// PlugY's shared-gold buttons (Commands.cpp putGold / takeGold with amount 0 = all): put moves what fits under the 32-bit cap
+// from the character into the shared file; take moves what fits under the character's carried-gold limit (10000 per level).
+function plugyMoveGold(kind) {
+  if (!plugyStash.enabled || !plugyReady || !session) return false;
+  const have = Module.ccall('d2_session_player_gold', 'number', [], []) >>> 0;
+  const cap = Math.max(0, Module.ccall('d2_session_player_stat', 'number', ['number', 'number'], [12, 0])) * 10000;
+  const n = kind === 'put' ? Math.min(0xFFFFFFFF - plugyGold, have) : Math.min(Math.max(0, cap - have), plugyGold);
+  if (!(n > 0)) return false;
+  if (!Module.ccall('d2_session_set_stat', 'number', ['number', 'number'], [14, kind === 'put' ? have - n : have + n])) return false;
+  plugyGold += kind === 'put' ? n : -n; plugySharedDirty = true;
+  try { snapshot = session.snapshot(); } catch {}
+  plugyPersist();
+  return true;
+}
+const plugyStash = createPlugyStash({ enabled: true, onPage: plugySwap, onGold: plugyMoveGold, lastUsed: plugyUsed });
 let plugyEvidence = null;
 // PY3: PlugY's own art (StashBtns, SharedGoldBtns, TradeStash), fetched from the dev server's /retail/PlugY/ (never hosted; absent = the plain control and retail's panel stay).
 if (plugyStash.enabled) (async () => {
@@ -1091,10 +1150,12 @@ async function bootstrapSession() {
     // bootstrap. The API restores the captured retail rows when disabled.
     const stashGridMode = plugyStashMode({ enabled: plugyStash.enabled, screen,
       gameScreen: SCREEN.GAME, realmState: realmTransport.state, realmSceneActive });
-    if (!Module.ccall('d2_session_configure_plugy_stash_grid', 'number', ['number', 'number'],
-      [stashGridMode.activeBigStash ? 1 : 0, stashGridMode.singlePlayer ? 1 : 0])) {
-      throw new Error('unable to configure PlugY stash grid');
-    }
+    // The engine's InventoryTxt rows exist only once its data tables load, and those load inside the first
+    // session create. Before that a single-player configure is refused (0): that is not a boot failure, so it
+    // is retried after the create below, and a page that still refuses keeps retail's rows and says so.
+    const configureStashGrid = () => Boolean(Module.ccall('d2_session_configure_plugy_stash_grid', 'number', ['number', 'number'],
+      [stashGridMode.activeBigStash ? 1 : 0, stashGridMode.singlePlayer ? 1 : 0]));
+    let stashGridSet = configureStashGrid();
     const api = sessionAdapter();
     let fixture;
     if (pendingLoad) {
@@ -1121,6 +1182,7 @@ async function bootstrapSession() {
       resetConfiguredHolds();
     }
     currentFixture = fixture;
+    if (!stashGridSet && !(stashGridSet = configureStashGrid())) plugyError = 'PlugY stash grid not configured; retail rows kept';
     if (plugyStash.enabled) plugyLoad(chosenName).catch((e) => { plugyError = 'load: ' + e; plugyReady = true; });
     motion = api.motion();
     clearScreen = false;   // a new game starts with its HUD on screen, whatever the last one hid
@@ -1179,7 +1241,7 @@ async function bootstrapSession() {
     if (!navigator.webdriver) await entryYield();
     try { questLogRenderer = createQuestLogRenderer(createMpqAssetReader(Module), document); messageLogRenderer = createMessageLogRenderer(createMpqAssetReader(Module), document); } catch (error) { sessionError = String(error); }
     try { stashPanelRenderer = createStashPanelRenderer(createMpqAssetReader(Module), document, { string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]),
-      stashGold: (limit) => Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [limit]) : 0 }); } catch (error) { stashPanelError = String(error); }
+      stashGold: (limit) => (plugyStash.showShared && !limit) ? plugyGold : Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [limit]) : 0 }); } catch (error) { stashPanelError = String(error); }
     try { cubePanelRenderer = createStashPanelRenderer(createMpqAssetReader(Module), document, { page: INVPAGE_CUBE, string: null,
       transmute: Module.ccall('d2_lang_string', 'string', ['string'], ['Transmute']) || 'Transmute' }); } catch (error) { stashPanelError += ' cube: ' + error; }
     try { stashGoldRenderer = createStashGoldRenderer(createMpqAssetReader(Module), document, { string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]) }); } catch (error) { stashGoldError = String(error); }
@@ -1215,7 +1277,7 @@ async function bootstrapSession() {
     } catch (error) { actMusic = null; musicError = String(error); }
     if (!navigator.webdriver) await entryYield();
     try { audioVolume.attach('sound', createUiClickSoundPlayer(assetReader, canvas)); } catch (error) { musicError = String(error); }
-    try { unitSounds = createUnitSoundPlayer(assetReader, undefined, undefined, soundFetched); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), () => unitSounds.monsterSoundBusy()); eventSounds = createEventSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Event sound', error)), (...a) => Number(Module._d2_client_monster_footstep_row(...a)), (c) => Number(Module._d2_client_monster_footstep_layer(c))); missileSounds = createMissileSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Missile sound', error))); canvas.__d2UnitSound = unitSounds; canvas.__d2EventSound = eventSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader, undefined, undefined, soundFetched)); } catch (error) { musicError = String(error); }
+    try { unitSounds = createUnitSoundPlayer(assetReader, undefined, undefined, soundFetched); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), () => unitSounds.monsterSoundBusy()); eventSounds = createEventSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Event sound', error)), (...a) => Number(Module._d2_client_monster_footstep_row(...a)), (c) => Number(Module._d2_client_monster_footstep_layer(c))); missileSounds = createMissileSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Missile sound', error)), (id) => !Module._d2_session_missile_on_client || Module._d2_session_missile_on_client(id) !== 0); canvas.__d2UnitSound = unitSounds; canvas.__d2EventSound = eventSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader, undefined, undefined, soundFetched)); } catch (error) { musicError = String(error); }
 
     // The player build hands the browser a frame between the entry phases (the sounds above, the terrain,
     // the first save) so town entry is three shorter tasks, not one 300 ms one; off under webdriver.
@@ -1876,8 +1938,19 @@ async function persistAutomap(name) {
 
 // Saving the engine-owned session is synchronous; only browser storage is asynchronous. Keeping
 // this boundary explicit lets beforeunload take an exact final .d2s before the session is destroyed.
+// The .d2s always carries a personal page: with a shared page showing, the personal page last shown stands in for the save
+// (the shared page goes back right after), and the .d2x marker says which shared page to bring back at load.
 function saveCurrentCharacterBytes() {
   if (!session) return null;
+  if (!plugyReady || !plugyLive.shared) return saveCharacterBytesRaw();
+  const E = plugyExport(), P = plugySets[false][plugyStash.mem[false]];
+  const put = (sec) => Module.ccall('d2_session_stash_clear', 'number', [], []) >= 0 && (!sec || sec.length <= 4 || plugyInsert(sec) === 0);
+  if (!E) { plugyError = 'stash export failed; save skipped'; return null; }
+  plugySets[true][plugyLive.page] = E;
+  if (!put(P)) { put(E); plugyError = 'personal page could not be staged; save skipped'; return null; }
+  try { return saveCharacterBytesRaw(); } finally { if (!put(E)) plugyError = 'shared page not restored after save'; }
+}
+function saveCharacterBytesRaw() {
   const cap = 16384, p = Module._malloc(cap);
   try {
     const n = Module.ccall('d2_session_save_d2s', 'number', ['bigint', 'number'], [BigInt(p), cap]);
@@ -5623,7 +5696,7 @@ canvas.addEventListener('pointerdown', (e) => {
     }
     const geometry = stashOpen ? readStashLayout() : null;
     if (geometry && stashPanelRenderer && stashPanelRenderer.contains(x, y, canvas.width, canvas.height, geometry)) {
-      if (plugyStash.click(x, y, canvas.width, canvas.height, geometry, stashOpen)) { click.spent = 'stashPanel'; canvas.focus(); e.preventDefault(); return; }
+      if (plugyStash.click(x, y, canvas.width, canvas.height, geometry, stashOpen, e.shiftKey)) { click.spent = 'stashPanel'; canvas.focus(); e.preventDefault(); return; }
       if (!cursorId) { const item = stashPanelRenderer.itemAt(x, y, canvas.width, canvas.height, geometry, snapshot.items); if (item) itemCommand('lift', item.id); }
       else {
         const held = snapshot.items.find((i) => i.id === cursorId) || { id: cursorId };
@@ -6225,7 +6298,7 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
     drawn: waypointEvidence && JSON.parse(JSON.stringify(waypointEvidence)), art: waypointPanelRenderer?.evidence ?? null,
     lastTravel: lastWaypointTravel }; },
   waypointTargets() { return waypointMenu ? waypointMenuInput.targets(canvas.width, canvas.height, waypointEvidence?.tabs ?? []) : null; },
-  get plugyStash() { return { fail: plugyFail, ready: plugyReady, error: plugyError, settle: () => plugyLast, pages: plugyPages, artReady: Boolean(plugyStash.art), enabled: plugyStash.enabled, set enabled(v) { plugyStash.enabled = v; }, page: plugyStash.page, drawn: plugyEvidence }; },
+  get plugyStash() { return { fail: plugyFail, ready: plugyReady, error: plugyError, settle: () => plugyLast, pages: plugySets, live: plugyLive, gold: plugyGold, meta: plugyMeta, moveGold: plugyMoveGold, artReady: Boolean(plugyStash.art), enabled: plugyStash.enabled, set enabled(v) { plugyStash.enabled = v; }, page: plugyStash.page, drawn: plugyEvidence }; },
   get stashEvidence() { return { open: stashOpen, error: stashPanelError, drawn: stashEvidence && JSON.parse(JSON.stringify(stashEvidence)),
     art: stashPanelRenderer?.evidence ?? null, gold: { error: stashGoldError, drawn: stashGoldEvidence && JSON.parse(JSON.stringify(stashGoldEvidence)),
       art: stashGoldRenderer?.evidence ?? null } }; },
@@ -6481,7 +6554,7 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
     return { screen, session: Boolean(session), error: sessionError };
   },
   get cameraCentreEvidence() { return cameraCentre(); },
-  plugySwapTo(n) { const was = plugyStash.page; plugyStash.page = n; const ok = plugySwap(was, n); if (!ok) plugyStash.page = was; return ok; },   // sets the page first, as the click handler does   // scenario surface: the page control's swap without a click
+  plugySwapTo(n, shared = plugyStash.showShared) { return plugyStash.go(n, shared); },   // the page control's turn, as the click handler makes it   // scenario surface: the page control's swap without a click
   putAuxRaw(key, bytes) { return saveStore.putAux(key, bytes); },
   getAuxRaw(key) { return saveStore.getAux(key); },
   selectCharacter(name) { return charSelect ? charSelect.selectByName(name) : -1; },

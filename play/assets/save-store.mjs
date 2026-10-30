@@ -187,7 +187,7 @@ export function createSaveStore({ indexedDBObject = globalThis.indexedDB, storag
     async list() { return (await this.listProfile()).characters; },
     // Deleting a character deletes everything it owns: its .d2s, its PlugY side blob and its saved
     // automap layer (F268, the `<character>.ma0` written beside it at Save and Exit).
-    async remove(name) { journal.invalidate(name); await run(await db(), 'readwrite', (store) => { store.delete(`_LOD_${name}.sss`); store.delete(`_LOD_${name}.ma0`); return store.delete(name); }); },
+    async remove(name) { journal.invalidate(name); await run(await db(), 'readwrite', (store) => { store.delete(`_LOD_${name}.sss`); store.delete(`_LOD_${name}.d2x`); store.delete(`_LOD_${name}.ma0`); return store.delete(name); }); },
     async clear() { journal.invalidate(); await run(await db(), 'readwrite', (store) => store.clear()); },
   };
 }

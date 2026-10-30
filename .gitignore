@@ -127,6 +127,8 @@ wasm-build/*
 !wasm-build/make_br.sh
 !wasm-build/version-engine.sh
 test/*
+!test/plugy-stash-sidecar.test.mjs
+!test/plugy-stash-ui.test.mjs
 !test/act-music-volume.test.mjs
 !test/alt-label-hover.test.mjs
 !test/area-hover-label.test.mjs

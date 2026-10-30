@@ -48,7 +48,7 @@ function single(b, start, T) {
   return { len: Math.ceil((pos - start * 8) / 8), nsock: simple ? 0 : nsock };
 }
 
-/** itemSize(bytes, off) for readSss: the item and its socketed children. */
+/** itemSize(bytes, off) for plugy-stash.mjs: the item and its socketed children. */
 export const itemSizer = (T) => (b, off) => {
   const it = single(b, off, T); let len = it.len;
   for (let i = 0; i < it.nsock; i++) len += single(b, off + len, T).len;
