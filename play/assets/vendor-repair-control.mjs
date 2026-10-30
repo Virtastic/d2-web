@@ -25,3 +25,10 @@ export function disarmVendorRepair() { armed = false; }
 
 /** True while Repair mode waits for an item click; the pointer shows the repair cel meanwhile. */
 export function vendorRepairArmed() { return armed; }
+
+/** The pointer context Repair mode wants: the repair cel while the shop is open; closing the shop (any way) ends the mode. */
+export function repairCursorContext(shopIsOpen) {
+  if (!armed) return null;
+  if (!shopIsOpen) { armed = false; return null; }
+  return { kind: 'repair' };
+}

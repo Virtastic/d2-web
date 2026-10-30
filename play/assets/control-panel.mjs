@@ -101,6 +101,9 @@ export const HUD_LAYOUT = Object.freeze({
   // them. The lit frame at 206/563 is therefore unmeasured too and is NOT
   // invented: the panel draws retail's own measured cel.
   levelButtons: { path: 'data\\global\\ui\\PANEL\\level.DC6', disabledFrame: 2, litFrame: 0,
+    // Frame 1 is the held (sunken) gem: 841 opaque pixels against frame 0's 870 in the same 30x30 cel. No draw list
+    // carries it because retail draws it only while the button is held, so the frame is measured from the art alone.
+    pressedFrame: 1,
     xs: [206, 563], y: 563, w: 30, h: 30,
     // D2Client+0x50480: a pending point DRAWS (in addition to the disabled pair) Levelsocket then Level frame 0 at
     // (40, H-105) / (W-73, H-105) -> socket y 495, cel y 491 at 800x600; the 640x480 anchors (40,375)/(567,375) fit the same rule.
@@ -162,6 +165,11 @@ function createStaminaBlend(read, palette) {
     } };
 }
 
+// The cel a lit add-point button draws: its held frame while the pointer holds it (hud.levelPressed names the index).
+export function levelButtonFrame(index, pressed) {
+  return Number(pressed) === index ? HUD_LAYOUT.levelButtons.pressedFrame : HUD_LAYOUT.levelButtons.litFrame;
+}
+
 export function createControlPanelRenderer(read, documentObject = globalThis.document) {
   const palette = decodeDatPalette(read('data\\global\\palette\\ACT1\\pal.dat'));
   const panel = decodeDc6(read('data\\global\\ui\\PANEL\\800ctrlpnl7.dc6'));
@@ -180,7 +188,7 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
   const socketDc6 = decodeDc6(read(HUD_LAYOUT.levelButtons.socketPath));
   if (!miniPanelDc6.frames.length || miniButtonDc6.frames.length < 15 || menuButtonDc6.frames.length < 3 ||
       runButtonDc6.frames.length <= HUD_LAYOUT.runButton.runFrame ||
-      levelButtonDc6.frames.length <= HUD_LAYOUT.levelButtons.disabledFrame)
+      levelButtonDc6.frames.length <= HUD_LAYOUT.levelButtons.pressedFrame)
     throw new Error('unexpected retail mini-panel frame set');
   const miniPanel = frameCanvas(miniPanelDc6.frames[HUD_LAYOUT.miniPanel.frame], palette, documentObject);
   // The draw list records EVERY draw, so the HUD is recorded only where a row is comparing: the
@@ -291,9 +299,10 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     const pending = [advancement?.statPoints, advancement?.skillPoints].map((n) => Number(n) > 0);
     const lit = spec.xs.map((bx, i) => {
       if (!pending[i]) return null;
-      const f = levelButtonDc6.frames[spec.litFrame]; // lit cel replaces the grey one in the panel slot, not over the orbs
+      const index = levelButtonFrame(i, hud.levelPressed);
+      const f = levelButtonDc6.frames[index]; // lit cel replaces the grey one in the panel slot, not over the orbs
       ctx.drawImage(frameCanvas(f, palette, documentObject), bx, spec.y - PANEL_SCREEN_TOP);
-      return { ...record(spec, spec.litFrame, f, bx, spec.y), left: bx, top: spec.y, w: f.width, h: f.height };
+      return { ...record(spec, index, f, bx, spec.y), left: bx, top: spec.y, w: f.width, h: f.height };
     });
     const levelButtons = spec.xs.map((bx, i) => {
       if (lit[i]) return lit[i];   // the grey cel drawn AFTER the lit one covered it (retail draws the lit over the grey)
@@ -343,6 +352,7 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
   // (frame 0: the engine holds points to spend): 0 = stat points (left), 1 = skill points (right), else -1.
   // A disabled button (frame 2) is decoration and its click belongs to the world.
   const hitLevelButton = (evidence, x, y, width, height) => (evidence?.hud?.levelButtons || [])
-    .findIndex((b) => b.frame === HUD_LAYOUT.levelButtons.litFrame && hitControlBox(b, x, y, width, height));
+    .findIndex((b) => (b.frame === HUD_LAYOUT.levelButtons.litFrame || b.frame === HUD_LAYOUT.levelButtons.pressedFrame)
+      && hitControlBox(b, x, y, width, height));
   return { draw, hitMenuButton, hitRunButton, hitMiniButton, hitLevelButton };
 }

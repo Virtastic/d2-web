@@ -81,7 +81,10 @@ export function npcMenuEntries(classId) {
 
 /** Retail invokes an NPC menu callback on release over the row currently selected by the menu. */
 export function npcMenuChoiceOnRelease({ entryAtRelease, selectedEntry }) {
-  if (!entryAtRelease || entryAtRelease !== selectedEntry || !entryAtRelease.action) return null;
+  // draw() rebuilds the row objects every frame, so a redraw between press and release must not break the match: compare the row, not the object.
+  const same = entryAtRelease && selectedEntry && (entryAtRelease === selectedEntry ||
+    (entryAtRelease.action === selectedEntry.action && entryAtRelease.stringId === selectedEntry.stringId));
+  if (!same || !entryAtRelease.action) return null;
   return entryAtRelease;
 }
 

@@ -117,7 +117,7 @@ import { createEntryBanner, ENTRY_BANNER } from './assets/level-entry-banner.mjs
 import { hudBarTooltip, levelButtonTooltip } from './assets/hud-bar-tooltip.mjs';
 import { hirelingTextRows } from './assets/hireling-panel.mjs';
 import { createVendorPanel, vendorLayoutFromEngine, SMITH_CLASSES, tooltipSpec } from './assets/vendor-panel.mjs';
-import { handleVendorRepairClick, disarmVendorRepair, vendorRepairArmed } from './assets/vendor-repair-control.mjs';
+import { handleVendorRepairClick, disarmVendorRepair, vendorRepairArmed, repairCursorContext } from './assets/vendor-repair-control.mjs';
 import { toggleSellMode, resetSellMode, vendorClickAction } from './assets/vendor-sell-mode.mjs';
 import { decodeDc6 } from './assets/d2-formats.mjs';
 import { createGameCursor } from './assets/game-cursor.mjs';
@@ -2465,6 +2465,7 @@ function drainUnitSounds() {
   if (snapshot?.player) snapshot.player.castSkillId = readSelectedSkills()[castHand]; // the cast skill is the selected skill of the hand that last issued a command
   if (snapshot?.player && Module._d2_session_cast_refused_seq) { snapshot.player.castRefusedSeq = Module._d2_session_cast_refused_seq(); snapshot.player.castRefusedSkill = Module._d2_session_cast_refused_skill(); }
   { const la = Module.ccall('d2_client_take_local_action', 'number', [], []); if (la === 2) eventSounds?.localWalk(snapshot?.entities?.find((e) => e.id === snapshot.playerId && e.type === 0)?.classId); }
+  if (snapshot?.player) { const m = session.motion(); Object.assign(snapshot.player, { mode: snapshot.mode, explicitMove: Module._d2_client_explicit_move(), framePrecise: m.framePrecise, frameCountPrecise: m.frameCountPrecise }); } // D1: footstep reads mode+frame
   combatSounds?.update(snapshot?.entities ?? [], snapshot);
   { const hero = snapshot?.entities?.find((e) => e.id === snapshot.playerId && e.type === 0); heroFx = skillFx && hero ? skillFx.update({ ...hero, hp: snapshot.player?.hp }, snapshot.player?.castSkillId, engineTicks) : [];
     if (stateFx && hero) heroFx = heroFx.concat(stateFx.update((id) => Module.ccall('d2_session_player_has_state', 'number', ['number'], [id]), undefined, undefined, (id) => Module.ccall('d2_session_state_set_seq', 'number', ['number', 'number', 'number'], [0, snapshot.playerId, id]))); }
@@ -2472,7 +2473,6 @@ function drainUnitSounds() {
   if (Module._d2_realm_client_take_missile_sounds) { const b = missileImpactBuf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [32 * 24])); const k = Module.ccall('d2_realm_client_take_missile_sounds', 'number', ['bigint', 'number'], [BigInt(b), 32]); const w = new Int32Array(Module.HEAPU8.buffer.slice(b, b + k * 24)); for (let i = 0; i < k; i++) unitSounds.playRow(w[i * 6 + 5], { kind: 'missile-impact', missileId: w[i * 6 + 2] }).catch(() => {}); }
   missileSounds?.update(snapshot?.entities ?? [], engineTicks);
   // D35: client-side event sounds (pickup, gold, drop, footstep) run every tick, not only on ticks the engine queued a sound.
-  if (snapshot?.player) { const m = session.motion(); Object.assign(snapshot.player, { mode: snapshot.mode, explicitMove: Module._d2_client_explicit_move(), framePrecise: m.framePrecise, frameCountPrecise: m.frameCountPrecise }); } // D1: footstep reads mode+frame
   eventSounds?.update(snapshot, readAdvancement()?.level);
   drainAmbientSounds();
   const cap = 32; if (!soundBuf) soundBuf = Number(Module.ccall('malloc', 'bigint', ['number'], [cap * 28]));
@@ -3160,7 +3160,8 @@ function hoverTarget() {
 // talk path consumes. This asks them; it never keeps a second hover model of its own.
 function gameCursorContext() {
   if (!session || screen !== SCREEN.GAME) return null;
-  if (vendorRepairArmed() && shopOpen()) return { kind: 'repair' };
+  const repairContext = repairCursorContext(shopOpen());
+  if (repairContext) return repairContext;
   // PERF: a live frame reuses the selection hoverTarget made earlier in the same render (same pointer and
   // snapshot, and the prior it would pass is that selection). The harness's renderNow recomputes.
   const selected = liveFrame && hoverPick ? hoverPick.selected
@@ -4166,6 +4167,7 @@ function drawFrame() {
         // decides whether d2_session_command_move sends retail's 0x01 Walk or its 0x03 Run packet
         // is what picks the run button's cel. The client never keeps its own copy of it.
         runToggle: snapOr('runToggle', readRunToggle), miniPressed: miniDown,
+        levelPressed: gameUiButtonDown?.token?.startsWith('level:') ? Number(gameUiButtonDown.token.slice(6)) : -1,
         // The ornate bar strips between the skill buttons and the console (wide views only; fitView's `fill`).
         strips: w > 800 && ensureFreeRes()?.ready ? (c) => { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); drawParts(c, freeResArt, barParts(w, h)); c.restore(); } : null,
         stamina: screen ? { value: screen[4], maximum: screen[5] } : null });
@@ -5450,9 +5452,15 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   // F10: the lit add-point buttons either side of the belt open the panel that spends the points
   // (left: character, right: skill tree), exactly as the mini-panel's icons / C and T do.
+  // Retail's add-point buttons are momentary: the press draws the held (sunken) frame and the release
+  // still over the same button activates it (the gesture controller, as for the skill-tree tokens).
   { const lv = !clearScreen && e.button === 0 ? (controlPanelRenderer?.hitLevelButton(controlPanelEvidence, x, y, canvas.width, canvas.height) ?? -1) : -1;
-    if (lv === 0) { characterVisible = !characterVisible; if (characterVisible) questVisible = false; render(); canvas.focus(); e.preventDefault(); return; }
-    if (lv === 1) { skillsVisible = !skillsVisible; render(); canvas.focus(); e.preventDefault(); return; } }
+    if (lv >= 0) {
+      gameUiButtonDown = { pointerId: e.pointerId, token: `level:${lv}` };
+      gameUiButtonGesture.press(e.pointerId, gameUiButtonDown.token);
+      try { canvas.setPointerCapture(e.pointerId); } catch {}
+      render(); canvas.focus(); e.preventDefault(); return;
+    } }
   // Retail's run/walk toggle: the click flips the ENGINE's flag (d2_session_toggle_run) -- the same
   // one that chooses the move packet and the hero's mode -- and the button's cel follows the engine
   // on the next frame, so the drawn state cannot disagree with the state the hero moves in.
@@ -5915,6 +5923,9 @@ globalThis.addEventListener('pointerup', (e) => {
       // Native release-side bounds: the close fires only if the release is still inside the rect
       // (the down already proved the press; FUN_6FB28FC0 re-tests the same point).
       releasedToken = down.token;
+    } else if (e.button === 0 && down.token?.startsWith('level:')
+        && controlPanelRenderer?.hitLevelButton(controlPanelEvidence, x, y, canvas.width, canvas.height) === Number(down.token.slice(6))) {
+      releasedToken = down.token;
     } else if (e.button === 0 && down.token?.startsWith('skill-tree:') && skillsVisible && skillPanelRenderer && session) {
       const hit = skillPanelRenderer.skillAt(x, y, canvas.width, canvas.height, { skills: readClassSkills() || [] });
       const id = Number(down.token.slice('skill-tree:'.length));
@@ -5922,6 +5933,10 @@ globalThis.addEventListener('pointerup', (e) => {
     }
     const activated = gameUiButtonGesture.release(e.pointerId, releasedToken);
     if (activated === 'help-close') helpVisible = false;
+    else if (activated?.startsWith('level:')) {
+      if (Number(activated.slice(6)) === 0) { characterVisible = !characterVisible; if (characterVisible) questVisible = false; }
+      else skillsVisible = !skillsVisible;
+    }
     else if (activated === 'panel-close:skills') skillsVisible = false;
     else if (activated?.startsWith('skill-tree:')) {
       const id = Number(activated.slice('skill-tree:'.length));

@@ -24,7 +24,7 @@ import { isRetailEditBoxCharacter } from './charcreate-name-input.mjs';
 import { recordDc6 } from './drawlist.mjs';
 import { createHeroStances, HERO_STANCE } from './charcreate-stances.mjs';
 import { d2winHeldFrame } from './d2win-button-frame.mjs';
-import { isButtonHeldOverTarget } from './frontend-pointer-states.mjs';
+import { isControlHeld } from './frontend-pointer-states.mjs';
 
 /**
  * Per-class layout, from OpenDiablo2's select_hero_class.go.
@@ -413,7 +413,8 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
     if (token.startsWith('class-')) return inBox(p, heroes.find((h) => h.key === token.slice('class-'.length))?.hit || {});
     return false;
   };
-  const isButtonHeld = (token) => isButtonHeldOverTarget(token,
+  // Down cel only for the control the press armed (`pressed`) while the pointer is still over it.
+  const isButtonHeld = (token) => isControlHeld(pressed, token,
     pointer ? hitControl({ x: pointer[0], y: pointer[1] }) : null);
 
   const canCreate = () => chosen >= 0 && name.trim().length >= 2;
@@ -503,7 +504,6 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
       const p = toScreen(x, y, width, height);
       pointer = [Math.trunc(p.x), Math.trunc(p.y)];
       const next = heroes.findIndex((h) => inBox(p, h.hit));
-      if (next !== hovered && next >= 0) sound(next, 'hover');
       if (hovered >= 0 && hovered !== next) stances.unhover(hovered, tick);
       if (next >= 0) stances.hover(next, tick);
       hovered = next;

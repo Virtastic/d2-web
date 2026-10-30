@@ -8,7 +8,7 @@ export const GAME_CURSOR = Object.freeze({
   hand: 'data\\global\\ui\\CURSOR\\ohand.dc6',
   attack: 'data\\global\\ui\\CURSOR\\protate.dc6',
   talk: 'data\\global\\ui\\CURSOR\\orotate.dc6',
-  // Retail's repair cursor: the buysell cursor table slot (index 6) that cursor state 7 selects.
+  // Retail's repair cursor: the buysell.dc6 frame 1 (the hammer; frame 8 is the identify ring, 7 a flask, 0/2/6 arrows).
   repair: 'data\\global\\ui\\CURSOR\\buysell.dc6',
   palette: 'data\\global\\palette\\Units\\pal.dat',
 });
@@ -21,6 +21,7 @@ function canvasFor(frame, palette, documentObject) {
   return canvas;
 }
 
+export const REPAIR_CURSOR_FRAME = 1;
 export const NATIVE_CURSOR_IDLE_MS = 5000;
 
 // Static 1.13c RE recovers the event timeout and table cadence. The `protate` LCG predicate is
@@ -44,7 +45,7 @@ export function createGameCursorClock({ now = () => globalThis.performance?.now?
         return draw;
       }
       // ponytail: static first cel; retail's cycling for cursor state 7 is not recovered. Add when cel cycling is pinned.
-      if (kind === 'repair') return { file: 'buysell', frame: 0, framesPerCel: null, since: contextDraws, elapsedMs, state: 'repair' };
+      if (kind === 'repair') return { file: 'buysell', frame: REPAIR_CURSOR_FRAME, framesPerCel: null, since: contextDraws, elapsedMs, state: 'repair' };
       if (kind === 'attack') {
         const draw = { file: 'protate', frame: 0, framesPerCel: null,
           since: contextDraws, elapsedMs, state: 'attack-rate-unresolved' };

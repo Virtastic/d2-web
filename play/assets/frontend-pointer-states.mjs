@@ -62,3 +62,11 @@ export function createFrontendPointerStates() {
 export function isButtonHeldOverTarget(armed, hovered) {
   return armed != null && armed === hovered;
 }
+
+/**
+ * Whether the control `token` draws its down cel: it must be the control the pointer ARMED on press
+ * (`pressed`), and the pointer must still be over it. A pointer that merely hovers it is not holding it.
+ */
+export function isControlHeld(pressed, token, hovered) {
+  return pressed === token && isButtonHeldOverTarget(pressed, hovered);
+}
