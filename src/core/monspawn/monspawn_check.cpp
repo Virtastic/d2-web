@@ -149,6 +149,7 @@ extern "C" void d2_drlg_act_end();
 extern "C" void D2WEB_ResetPacketStream();
 extern "C" const uint8_t* D2WEB_PacketStream(uint32_t* pLength, uint32_t* pPackets);
 extern "C" uint32_t D2WEB_TakeMovieRequests(uint8_t* out, uint32_t cap);
+extern "C" uint32_t d2_client_local_cast_refused();
 static uint32_t g_sessionPacketStreamLength, g_sessionPacketStreamPackets;
 
 static std::string g_err;
@@ -9092,6 +9093,14 @@ EMSCRIPTEN_KEEPALIVE const D2SessionMissileAnimation* d2_session_missile_animati
 }
 EMSCRIPTEN_KEEPALIVE int d2_session_missile_animation_count() {
     updateSessionSnapshot(); return (int)g_sessionMissileAnimations.size();
+}
+// Whether the client holds a missile of its own for engine missile `id`. Retail's client never mirrors the local
+// player's server missiles: it creates its own when its own cast starts, and D2Client+0x18F90 refuses that cast for
+// a use-state other than 0/5 (no client missile, no TravelSound). Every other owner's missile reaches the client.
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_missile_on_client(uint32_t id) {
+    D2UnitStrc* m = g_game ? SUNIT_GetServerUnit(g_game, UNIT_MISSILE, (int32_t)id) : nullptr;
+    if (!m || !g_targetPlayer || m->dwOwnerType != UNIT_PLAYER || m->dwOwnerGUID != g_targetPlayer->dwUnitId) return 1;
+    return d2_client_local_cast_refused() ? 0 : 1;
 }
 EMSCRIPTEN_KEEPALIVE const D2SessionObjectPresentation* d2_session_object_presentations() {
     updateSessionSnapshot(); return g_sessionObjectPresentations.data();
