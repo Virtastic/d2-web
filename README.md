@@ -50,7 +50,6 @@ own legally owned install of Diablo II + Lord of Destruction, patched to **1.13c
 
 The release image `ghcr.io/virtastic/d2-web` holds the engine and the client, and **no game data**. Your own copy of Diablo II: Lord of Destruction supplies the files: the disc MPQs (`d2data.mpq`, `d2exp.mpq`, `d2char.mpq`, `d2sfx.mpq`, `d2music.mpq`, `d2xmusic.mpq`, `d2speech.mpq`, `d2xtalk.mpq`, `d2video.mpq`, `d2xvideo.mpq`) and the 1.13c `patch_d2.mpq`. `D2_ASSETS` decides where those files come from.
 
-The package is private, so log in first:
 **Bring your own files (default, `D2_ASSETS=byo`).** The server holds no game data. Each player opens the page and chooses their own D2 folder or MPQs, and the files stay in their browser.
 
 ```bash
