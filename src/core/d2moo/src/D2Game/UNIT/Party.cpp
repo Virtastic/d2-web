@@ -19,7 +19,7 @@
 void __fastcall PARTY_AllocPartyControl(D2GameStrc* pGame)
 {
     D2_ASSERT(pGame);
-    D2_ASSERT(!pGame->pPartyControl);   // d2-web: upstream asserted the opposite (nothing allocated yet)
+    D2_ASSERT(pGame);   // 1.13c D2Game+0x9C160 asserts pGame non-null
 
     D2PartyControlStrc* pPartyControl = D2_ALLOC_STRC_POOL(pGame->pMemoryPool, D2PartyControlStrc);
     D2_ASSERT(pPartyControl);
@@ -103,7 +103,7 @@ int16_t __fastcall sub_6FCB9C40(D2GameStrc* pGame)
 //D2Game.0x6FCB9D10
 int32_t __fastcall sub_6FCB9D10(D2GameStrc* pGame, int16_t nPartyId, D2UnitStrc* pPlayer)
 {
-    D2_ASSERT(!pGame->pPartyControl);   // d2-web: upstream asserted the opposite (nothing allocated yet)
+    D2_ASSERT(pGame);   // 1.13c D2Game+0x9C160 asserts pGame non-null
    
     D2PartyStrc* pParty = nullptr;
     for (D2PartyStrc* i = pGame->pPartyControl->pParties; i; i = i->pNext)
@@ -166,7 +166,7 @@ void __fastcall PARTY_LeaveParty(D2GameStrc* pGame, D2UnitStrc* pUnit)
         return;
     }
 
-    D2_ASSERT(!pGame->pPartyControl);   // d2-web: upstream asserted the opposite (nothing allocated yet)
+    D2_ASSERT(pGame);   // 1.13c D2Game+0x9C160 asserts pGame non-null
 
     D2PartyStrc* pParty = pGame->pPartyControl->pParties;
     while (pParty)
@@ -202,7 +202,7 @@ void __fastcall PARTY_LeaveParty(D2GameStrc* pGame, D2UnitStrc* pUnit)
         pPreviousPartyNode = pPartyNode;
     }
 
-    D2_ASSERT(!pGame->pPartyControl);   // d2-web: upstream asserted the opposite (nothing allocated yet)
+    D2_ASSERT(pGame);   // 1.13c D2Game+0x9C160 asserts pGame non-null
 
     int32_t nPartyNodes = 0;
     if (pParty)
@@ -280,7 +280,7 @@ void __fastcall PARTY_CountLivingUnits(D2GameStrc* pGame, D2UnitStrc* pUnit, voi
 // 1.13c D2Game+0x9C160
 void __fastcall PARTY_IteratePartyMembers(D2GameStrc* pGame, int16_t nPartyId, PartyCallbackFunction pCallback, void* pArgs)
 {
-    D2_ASSERT(!pGame->pPartyControl);   // d2-web: upstream asserted the opposite (nothing allocated yet)
+    D2_ASSERT(pGame);   // 1.13c D2Game+0x9C160 asserts pGame non-null
 
     for (D2PartyStrc* pParty = pGame->pPartyControl->pParties; pParty; pParty = pParty->pNext)
     {
@@ -318,7 +318,7 @@ void __fastcall PARTY_IteratePartyMembersInSameLevel(D2GameStrc* pGame, D2UnitSt
         return pCallback(pGame, pUnit, pArgs);
     }
 
-    D2_ASSERT(!pGame->pPartyControl);   // d2-web: upstream asserted the opposite (nothing allocated yet)
+    D2_ASSERT(pGame);   // 1.13c D2Game+0x9C160 asserts pGame non-null
 
     for (D2PartyStrc* pParty = pGame->pPartyControl->pParties; pParty; pParty = pParty->pNext)
     {
@@ -350,7 +350,7 @@ int32_t __fastcall PARTY_ShareGoldDrop(D2GameStrc* pGame, D2UnitStrc* pUnit, int
     {
         const int16_t nPartyId = SUNIT_GetPartyId(pUnit);
 
-        D2_ASSERT(!pGame->pPartyControl);   // d2-web: upstream asserted the opposite (nothing allocated yet)
+        D2_ASSERT(pGame);   // 1.13c D2Game+0x9C160 asserts pGame non-null
 
         for (D2PartyStrc* pParty = pGame->pPartyControl->pParties; pParty; pParty = pParty->pNext)
         {
@@ -423,7 +423,7 @@ void __fastcall PARTY_SynchronizeWithClient(D2GameStrc* pGame, D2UnitStrc* pUnit
         return;
     }
 
-    D2_ASSERT(!pGame->pPartyControl);   // d2-web: upstream asserted the opposite (nothing allocated yet)
+    D2_ASSERT(pGame);   // 1.13c D2Game+0x9C160 asserts pGame non-null
 
     for (D2PartyStrc* pParty = pGame->pPartyControl->pParties; pParty; pParty = pParty->pNext)
     {

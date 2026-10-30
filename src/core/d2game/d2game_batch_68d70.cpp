@@ -90,7 +90,7 @@ void D2GAME_68F00_Tail(void* cb /*ebx*/, int* unit /*edi*/)
     FUN_6fcaea80(at<void*>(cb, 4), unit, 7, at<int>(at<void*>(cb, 4), 0xa8) + 0x19, 0, 0, 0);
 }
 
-// 1.13c D2Game+0x69200  (a1q5 quest init; function-table slots at +0xa0..; callbacks are D2Game RVAs)
+// (retail D2Game+0x69200 seam; the live init is ACT1Q5_InitQuestData in A1Q5.cpp)
 void D2GAME_69200_A1Q5Init(void* q)
 {
     for (int i = 0; i < 15; i++) at<int>(q, 0xa0 + i * 4) = 0;

@@ -1262,6 +1262,7 @@ void __fastcall OBJECTS_InitFunction78_LastLastPortal(D2ObjInitFnStrc* pOp)
 // 1.13c D2Game+0xBB550
 int32_t __fastcall OBJECTS_OperateFunction73_LastLastPortal(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
+	// 1.13c D2Game+0xBB550: every exit path returns 0 (the 1.10f sources returned 1 on the early outs and the warp).
 	if (!pOp || !pOp->pGame)
 	{
 		return 0;
@@ -1269,7 +1270,7 @@ int32_t __fastcall OBJECTS_OperateFunction73_LastLastPortal(D2ObjOperateFnStrc* 
 
 	if (!pOp->pGame->bExpansion)
 	{
-		return 1;
+		return 0;
 	}
 
 	D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pOp->pPlayer);
@@ -1283,13 +1284,13 @@ int32_t __fastcall OBJECTS_OperateFunction73_LastLastPortal(D2ObjOperateFnStrc* 
 	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pOp->pPlayer);
 	if (!pRoom)
 	{
-		return 1;
+		return 0;
 	}
 
 	const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(pRoom);
 	if (DRLG_GetActNoFromLevelId(nLevelId) != ACT_IV)
 	{
-		return 1;
+		return 0;
 	}
 
 	if (!QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A4COMPLETED, QFLAG_REWARDGRANTED))
@@ -1325,5 +1326,5 @@ int32_t __fastcall OBJECTS_OperateFunction73_LastLastPortal(D2ObjOperateFnStrc* 
 		WAYPOINTS_ActivateWaypoint(pPlayerData->pWaypointData[pOp->pGame->nDifficulty], nWpNo);
 	}
 
-	return 1;
+	return 0;
 }

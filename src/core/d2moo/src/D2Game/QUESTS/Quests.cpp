@@ -947,7 +947,7 @@ int32_t __fastcall QUESTS_DebugOutput(D2GameStrc* pGame, const char* szMessage, 
 }
 
 //D2Game.0x6FC94A50
-// 1.13c D2Game+0x35E90
+// 1.13c D2Game+0x366A0
 void __fastcall QUESTS_DeleteItem(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint32_t dwItemCode)
 {
 	D2UnitStrc* pItem = ITEMS_FindQuestItem(pGame, pPlayer, dwItemCode);
@@ -2559,6 +2559,7 @@ void __fastcall QUESTS_GUIDUpdate(D2GameStrc* pGame, D2QuestGUIDStrc* pQuestGUID
 }
 
 //D2Game.0x6FC96E20
+// 1.13c D2Game+0x34B80
 void __fastcall QUESTS_SendScrollMessage(D2UnitStrc* pPlayer, D2UnitStrc* pUnit, uint16_t nMessage)
 {
 	D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
@@ -2575,7 +2576,7 @@ void __fastcall QUESTS_SendScrollMessage(D2UnitStrc* pPlayer, D2UnitStrc* pUnit,
 }
 
 //D2Game.0x6FC96E80
-// 1.13c D2Game+0x1020
+// 1.13c D2Game+0x35E90
 void __fastcall QUESTS_TriggerFX(D2GameStrc* pGame, uint8_t a2)
 {
 	pGame->pQuestControl->unk0x20 = a2;

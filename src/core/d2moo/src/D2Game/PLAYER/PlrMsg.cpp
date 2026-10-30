@@ -4017,6 +4017,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x61_DropPickupMercItem_6FC88930(D2G
 }
 
 //D2Game.0x6FC88D10
+// 1.13c D2Game+0xCFBC0
 int32_t __fastcall D2GAME_MERCS_EquipItem_6FC88D10(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pMerc, D2UnitStrc* pItem)
 {
     if (!pGame->bExpansion)
@@ -4085,6 +4086,9 @@ int32_t __fastcall D2GAME_MERCS_EquipItem_6FC88D10(D2GameStrc* pGame, D2UnitStrc
 
     D2UnitStrc* pDupeItem = ITEMS_Duplicate(pGame, pItem, pMerc, 1);
     UNITS_ChangeAnimMode(pDupeItem, IMODE_ONCURSOR);
+
+    // 1.13c D2Game+0xCFBC0: the merc's periodic-stats timers are dropped before the item is moved in (not in 1.10f).
+    D2GAME_EVENTS_Delete_6FC34840(pGame, pMerc, EVENTTYPE_PERIODICSTATS, 0);
 
     int32_t nUnused = 0;
     sub_6FC45060(pGame, pMerc, pDupeItem ? pDupeItem->dwUnitId : -1, nTargetBodyLoc, 1, &nUnused);

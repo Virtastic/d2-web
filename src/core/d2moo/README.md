@@ -11,3 +11,5 @@ D2MOO describes the 1.10f binaries; this copy is built as 1.13c through `../comp
 kept diffable against upstream: every local change is a `// d2-web:` comment on the changed line or
 a `// 1.13c <DLL>+0x<offset>` marker naming the 1.13c function the code corresponds to, where its
 behaviour differs from 1.10f.
+
+- D2Game+0x9C160 PARTY_IteratePartyMembers: asserts pGame non-null (1.10f copy asserted the inverse on pPartyControl).

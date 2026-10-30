@@ -281,6 +281,7 @@ void __fastcall ACT1Q5_SpawnTowerChestMissiles(D2QuestDataStrc* pQuestData, D2Ac
 }
 
 //D2Game.0x6FC9D2E0
+// 1.13c D2Game+0x69200
 void __fastcall ACT1Q5_InitQuestData(D2QuestDataStrc* pQuestData)
 {
 	memset(pQuestData->pfCallback, 0x00, sizeof(pQuestData->pfCallback));

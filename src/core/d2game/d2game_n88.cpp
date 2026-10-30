@@ -293,7 +293,7 @@ void QUESTS_PlayerDroppedWithQuestItem_34760(void* q, void* game)
     }
 }
 
-// 1.13c D2GAME+0x366A0
+// (retail D2Game+0x366A0 body; the vendored equivalent is QUESTS_DeleteItem)
 // EAX = unit, ESI = this, param1 = arg: if 0x2E660(unit) then 0x365E0(this, arg).
 void (*g_f365E0)(void*, int);
 int (*g_f2E660)(int);
