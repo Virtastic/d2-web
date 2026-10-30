@@ -4230,6 +4230,7 @@ function drawFrame() {
   // the speech box over Akara's own shop forever once Trade was picked. A shop that is actually open
   // (her stock fetched -- shopOpen()) cannot happen in retail before its greeting is already gone.
   let pendingSpeech = null, vendorState = null;
+  const gridBoxHover = () => { const id = Module._d2_session_cursor_item ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0; return { pointer, cursorItem: id ? snapshot?.items?.find((i) => i.id === id) || null : null, itemBoxState: Module._d2_session_item_box_state ? (n) => Module._d2_session_item_box_state(n) : null }; };   // grid-highlight.mjs
   if (npcState?.spoken != null) {
     // Ordinary dialogue uses retail's viewport-centred dialog origin, regardless of side panels.
     // Defer the draw until after those panels so they cannot paint over the text. Retail sets the
@@ -4237,7 +4238,7 @@ function drawFrame() {
     if (!shopOpen() && ensureSpeechBox() && npcSpeechScrollGate.ready)
       pendingSpeech = { text: npcState.greeting, messageInstance: npcVoiceGeneration, scrolling: true };
   } else if (shopOpen() && !globalThis.__d2HideShop && ensureVendorPanel()) {
-    try { vendorState = { ...npcState, pointer, pressedButton: vendorButtonGesture.token && vendorButtonGesture.token === vendorPanel.buttonAt(pointer.x, pointer.y, w, h, npcState.classId) ? vendorButtonGesture.token : null, act: snapshot?.act, stashGold: snapOr('vendorStashGold', () => Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [0]) : -1) }; npcPanelEvidence = vendorPanel.draw(ctx, w, h, vendorState); npcPanelError = ''; }
+    try { vendorState = { ...npcState, ...gridBoxHover(), pressedButton: vendorButtonGesture.token && vendorButtonGesture.token === vendorPanel.buttonAt(pointer.x, pointer.y, w, h, npcState.classId) ? vendorButtonGesture.token : null, act: snapshot?.act, stashGold: snapOr('vendorStashGold', () => Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [0]) : -1) }; npcPanelEvidence = vendorPanel.draw(ctx, w, h, vendorState); npcPanelError = ''; }
     catch (error) { npcPanelError = String(error); npcPanelEvidence = null; }
   } else if (npcState && npcSpeechHasText(npcSpeechSetting.mode) && ensureSpeechBox()) {
     // Plain talk, no shop, no active speech message: still the speech box (
@@ -4255,7 +4256,7 @@ function drawFrame() {
   const layoutKey = session ? `${snapshot.playerClass}/${snapshot.playerId}/${snapshot.seed}` : '';
   if (inventoryPanelRenderer && session && (!inventoryPanelRenderer.layout || inventoryLayoutKey !== layoutKey)) {
     inventoryPanelRenderer.setLayout(snapOr('inventoryLayout', readInventoryLayout)); inventoryLayoutKey = layoutKey; }
-  if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && session ? { ...snapshot, weaponSet: Module._d2_session_weapon_switch ? Module.ccall('d2_session_weapon_switch', 'number', [], []) : 0, pointer, itemTip: (item) => tipFields(item.id, item.code), gold: snapOr('playerGold', () => Module.ccall('d2_session_player_gold', 'number', [], [])), inventoryGoldPressed: Boolean(inventoryGoldPress), inventoryClosePressed: Boolean(inventoryClosePress) } : snapshot, panelShown(inventoryVisible));
+  if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && session ? { ...snapshot, ...gridBoxHover(), weaponSet: Module._d2_session_weapon_switch ? Module.ccall('d2_session_weapon_switch', 'number', [], []) : 0, pointer, itemTip: (item) => tipFields(item.id, item.code), gold: snapOr('playerGold', () => Module.ccall('d2_session_player_gold', 'number', [], [])), inventoryGoldPressed: Boolean(inventoryGoldPress), inventoryClosePressed: Boolean(inventoryClosePress) } : snapshot, panelShown(inventoryVisible));
   // The shop's tooltip and button hint go over the inventory panel, as retail draws them last (vendor-panel.mjs drawOverlay).
   if (vendorState && npcPanelEvidence) Object.assign(npcPanelEvidence, vendorPanel.drawOverlay(ctx, w, h, vendorState));
   // O / the configurable Hireling Screen binding reads the engine's canonical pet roster. The
@@ -4278,13 +4279,13 @@ function drawFrame() {
   pollUiEvents();
   if (stashPanelRenderer) {
     if (stashPanelRenderer?.plugy.on) { stashPanelRenderer.plugy.pageName = `${plugyStash.showShared ? 'Shared' : 'Personal'} Page n\u00b0${plugyStash.page + 1}`; stashPanelRenderer.plugy.nameColour = plugyStash.showShared ? 1 : 0; }
-    try { stashEvidence = stashPanelRenderer.draw(ctx, w, h, stashOpen ? snapOr('stashLayout', readStashLayout) : null, snapshot.items, stashOpen, snapshot.act, Boolean(stashClosePress)); stashPanelError = ''; }
+    try { stashEvidence = stashPanelRenderer.draw(ctx, w, h, stashOpen ? snapOr('stashLayout', readStashLayout) : null, snapshot.items, stashOpen, snapshot.act, Boolean(stashClosePress), gridBoxHover()); stashPanelError = ''; }
     catch (error) { stashPanelError = String(error); stashEvidence = null; }
     plugyStash.text = stashPanelRenderer.text; plugyStash.pointer(pointer.x, pointer.y, w, h);
     plugyEvidence = plugyStash.draw(ctx, w, h, stashOpen ? snapOr('stashLayout', readStashLayout) : null, stashOpen, snapshot.act || 1);
   }
   if (cubePanelRenderer) {
-    try { cubeEvidence = cubePanelRenderer.draw(ctx, w, h, cubeOpen ? snapOr('cubeLayout', readCubeLayout) : null, snapshot.items, cubeOpen, snapshot.act); }
+    try { cubeEvidence = cubePanelRenderer.draw(ctx, w, h, cubeOpen ? snapOr('cubeLayout', readCubeLayout) : null, snapshot.items, cubeOpen, snapshot.act, false, gridBoxHover()); }
     catch (error) { stashPanelError = 'cube: ' + error; cubeEvidence = null; }
   }
   if (repairConfirm.open && !npcState) repairConfirm.no();

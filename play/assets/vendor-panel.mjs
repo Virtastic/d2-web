@@ -22,7 +22,7 @@ import { createFont, decodeFontTbl, FRONTEND, textColourPalette } from './fronte
 import { BORDER_LEFT, BORDER_RIGHT, createPanelChrome } from './panel-chrome.mjs';
 import { recordDc6, recordPrim } from './drawlist.mjs';
 import { inventoryItemAsset } from './inventory-panel.mjs';
-import { boxIndices, boxSlot } from './item-box-colour.mjs';
+import { BOX_GREEN, boxTables, itemBoxState, paintBoxes, placedItemBoxes } from './grid-highlight.mjs';
 
 export const VENDOR_ASSETS = {
   palette: 'data\\global\\palette\\ACT1\\pal.dat',
@@ -144,17 +144,9 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, s
   // A decoded icon's first successful blit is sufficient evidence for its asset.  Retain that
   // readback result so opening or redrawing a shop does not turn the renderer into a readback loop.
   const visibleBlits = new WeakMap();
-  // A stock item sits on retail's box, colour 234 in draw mode 0 (AlphaBlend[2][under][234]), as in the
-  // inventory (s197/s250), read back from the canvas as palette indices.
-  const itemBackground = (ctx, x, y, w, h, colour) => {
-    const { pl2, index, palette } = cur;
-    const X = Math.round(x), Y = Math.round(y), W = Math.round(w), H = Math.round(h);
-    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
-    const img = ctx.getImageData(X, Y, W, H), d = img.data, base = 13568 + 2 * 65536;
-    for (let i = 0; i < d.length; i += 4) { const u = index.get((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]); if (u === undefined) continue;
-      const c = pl2[base + u * 256 + colour]; d[i] = palette[c * 4]; d[i + 1] = palette[c * 4 + 1]; d[i + 2] = palette[c * 4 + 2]; }
-    ctx.putImageData(img, X, Y); ctx.restore();
-  };
+  // A stock item sits on retail's boxes, one per cell of its footprint, in draw mode 0 -- the same
+  // rule and painter as every grid (grid-highlight.mjs).
+  const tablesFor = (c) => (c.boxTables ||= boxTables(c.palette, c.pl2));
   const icon = (invFile) => {
     if (!invFile) return null;
     const icons = cur.icons;
@@ -250,7 +242,7 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, s
       // mark on the grid (P8d), so the hover is the only variation and it never reads the purse.
       const p = state?.pointer;
       const hovered = p ? this.itemAt(p.x, p.y, width, height, state) : null;
-      let shown = 0, drawnIcons = 0;
+      let shown = 0, drawnIcons = 0; const boxes = [];
       // The exact engine presentation identity carried into the visible panel. This makes the
       // top-left cell and its whole ItemsTxt footprint observable to browser rows.
       const drawnItems = [], undrawnItems = [];
@@ -261,7 +253,7 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, s
         const x = L.gridLeft + it.gridX * L.cell, y = L.gridTop + it.gridY * L.cell, at = gridCelAt(L.gridLeft, L.gridTop, L.cell, L.cell, it.gridX, it.gridY);
         if (img) {
           const t = ctx.getTransform();
-          itemBackground(ctx, t.e + x * t.a, t.f + y * t.d, Math.ceil(img.width / L.cell) * L.cell * t.a, Math.ceil(img.height / L.cell) * L.cell * t.d, (cur.boxes ||= boxIndices(cur.palette))[boxSlot(it, hovered && hovered.id === it.id)]);
+          boxes.push(...paintBoxes(ctx, tablesFor(cur), placedItemBoxes({ left: L.gridLeft, top: L.gridTop, cw: L.cell, ch: L.cell }, { gridX: it.gridX, gridY: it.gridY, invWidth: it.invWidth || Math.ceil(img.width / L.cell), invHeight: it.invHeight || Math.ceil(img.height / L.cell) }, itemBoxState(it, state?.itemBoxState), hovered?.id === it.id, state?.cursorMode || 0)).map((b) => ({ ...b, id: it.id })));
           let visiblePixels = visibleBlits.get(img);
           if (visiblePixels === undefined) {
             visiblePixels = changedOutputPixels(ctx, t, at.left, at.top, img.width, img.height, () => ctx.drawImage(img, at.left, at.top));
@@ -291,7 +283,7 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, s
       chrome.border(ctx, state?.act || 1, BORDER_LEFT); chrome.border(ctx, state?.act || 1, BORDER_RIGHT);
       ctx.restore();
       return { box: { x: L.left, y: L.top, width: panel.width, height: panel.height }, tab, tabs: [...lastTabs], shown, total: items.length,
-        drawnIcons, drawnItems, undrawnItems, hover: hovered ? { id: hovered.id, colour: cur.boxes?.[1] ?? 118, gridX: hovered.gridX, gridY: hovered.gridY, invWidth: hovered.invWidth || 1, invHeight: hovered.invHeight || 1 } : null, tooltip: null, table, hint: null, scroll: 0, gold: state?.gold ?? -1, buttons };
+        drawnIcons, drawnItems, undrawnItems, boxes, hover: hovered ? { id: hovered.id, colour: tablesFor(cur).colours[BOX_GREEN], gridX: hovered.gridX, gridY: hovered.gridY, invWidth: hovered.invWidth || 1, invHeight: hovered.invHeight || 1 } : null, tooltip: null, table, hint: null, scroll: 0, gold: state?.gold ?? -1, buttons };
     },
     // Retail draws the hovered item's tooltip and the button hint LAST, over the inventory panel: in
     // the retail captures the InvChar cels at x 400 come before the tooltip box. The shell calls

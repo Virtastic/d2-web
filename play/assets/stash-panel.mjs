@@ -17,6 +17,7 @@ import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { inventoryCloseFrame } from './inventory-close-gesture.mjs';
 import { inventoryItemAsset } from './inventory-panel.mjs';
 import { BORDER_LEFT, BORDER_RIGHT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
+import { boxTables, heldItemBoxes, itemBoxState, paintBoxes, placedItemBoxes } from './grid-highlight.mjs';
 
 export const STASH_ART = 'data\\global\\ui\\PANEL\\TradeStash.dc6';
 export const INVPAGE_STASH = 4;
@@ -148,9 +149,14 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
       const cx = Math.round((x - g.gridLeft) / g.boxW - w / 2), cy = Math.round((y - g.gridTop) / g.boxH - h / 2);
       return { x: Math.max(0, Math.min(g.columns - w, cx)), y: Math.max(0, Math.min(g.rows - h, cy)) };
     },
-    draw(ctx, width, height, geometry, items, open, act = 1, closePressed = false) {
+    // `hover` = { pointer, cursorItem, itemBoxState, cursorMode }: the item boxes (grid-highlight.mjs).
+    draw(ctx, width, height, geometry, items, open, act = 1, closePressed = false, hover = null) {
       if (!open || !geometry) return null;
       const a = forAct(act), frames = a.frames, o = origin(width, height);
+      const tables = (a.boxTables ||= boxTables(a.palette, read(actPalette(act).replace(/pal\.dat$/i, 'pal.pl2'))));
+      const grid = { left: geometry.gridLeft, top: geometry.gridTop, cw: geometry.boxW, ch: geometry.boxH }, boxes = [];
+      const p = hover?.pointer, held = hover?.cursorItem || null;
+      const hoverItem = p && !held ? this.itemAt(p.x, p.y, width, height, geometry, items) : null;
       ctx.save(); ctx.translate(o.x, o.y); ctx.scale(o.scale, o.scale);
       // Panel art at the left-panel origin (see LEFT_PANEL_TOP).
       let composed = { width: 0, height: 0 };
@@ -169,12 +175,16 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
       const drawn = [];
       for (const item of items || []) {
         if (item.invPage !== page || !item.invFile) continue;
+        boxes.push(...paintBoxes(ctx, tables, placedItemBoxes(grid, item, itemBoxState(item, hover?.itemBoxState), hoverItem?.id === item.id, hover?.cursorMode || 0)).map((b) => ({ ...b, id: item.id })));
         const c = icon(a, item.invFile);
         // The art lands one row below the cell's top, like every other grid (item-cel-place.mjs).
         const { left: x, top: y } = gridCelAt(geometry.gridLeft, geometry.gridTop, geometry.boxW, geometry.boxH, item.gridX, item.gridY);
         ctx.drawImage(c, x, y);
         drawn.push({ id: item.id, invFile: item.invFile, cell: [item.gridX, item.gridY], at: [x, y] });
       }
+      // The held item over the grid: its boxes go over the placed items.
+      const heldCell = held && p ? this.cellAt(p.x, p.y, width, height, geometry, held) : null;
+      if (heldCell) boxes.push(...paintBoxes(ctx, tables, heldItemBoxes(grid, items, page, heldCell.x, heldCell.y, held)).map((b) => ({ ...b, id: held.id })));
       // Gold in the stash beside the coin button, the limit below it (string 4051 "Gold Max: %d"), the close
       // button, and the left border -- retail's anchors.
       if (stashGold) {
@@ -195,7 +205,7 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
       chrome.border(ctx, act, BORDER_LEFT); chrome.border(ctx, act, BORDER_RIGHT);
       ctx.restore();
       return { page, anchor: [geometry.left, geometry.top], recordTop: geometry.recordTop, palette: actPalette(act), open: true, composed, frames: frames.length, grid: { columns: geometry.columns, rows: geometry.rows,
-        left: geometry.gridLeft, top: geometry.gridTop, box: [geometry.boxW, geometry.boxH] }, drawn };
+        left: geometry.gridLeft, top: geometry.gridTop, box: [geometry.boxW, geometry.boxH] }, drawn, boxes };
     },
   };
 }

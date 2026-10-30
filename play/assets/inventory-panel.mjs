@@ -4,7 +4,7 @@ import { BORDER_RIGHT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs'
 import { fnv1a32, paperdollIdentity } from './paperdoll-identity.mjs';
 import { PANEL_CLOSE_ART, panelCloseLayout } from './panel-close.mjs';
 import { inventoryCloseFrame } from './inventory-close-gesture.mjs';
-import { inventoryBoxColour } from './inventory-box-colour.mjs';
+import { boxTables, cellBoxes, gridBoxSlot, heldItemBoxes, itemBoxState, paintBoxes, slotBoxSlot } from './grid-highlight.mjs';
 import { inventoryItemColourIndex, inventoryItemColourKey } from './inventory-item-colour.mjs';
 import { createItemTooltip, itemTooltipSpec } from './item-tooltip.mjs';
 
@@ -204,27 +204,15 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
   // The table is AlphaBlend's THIRD (base 13568 + 2*65536), not the first -- solved against retail's
   // frame buffer, not guessed, after the source byte below was: a throwaway probe read the panel
   // cel's own palette index under every un-art'd box pixel of the Malah frame and counted hits per
-  // (table, src): (2, 138) 1081/1225, the next best 689.
-  const BOX_PL2_BASE = 13568 + 2 * 65536;
-  // The box is half-open at the far corner (D2's own `x1..x2-1`), measured: 30 px wide scores worse
-  // than 29 (s256 7,167 -> 6,985), and 29 leaves retail's box1/box2 exactly contiguous.
-  const BOX_PX = 29;
+  // (table, src): (2, 138) 1081/1225, the next best 689. The colour, the cells and the painter are
+  // grid-highlight.mjs, shared with every other grid; the box is one 29 px cell wide (half-open at the
+  // far corner, D2's own `x1..x2-1`: s256 scored 30 px worse than 29).
   const blendByAct = new Map();
   function boxTransform(act) {
     let t = blendByAct.get(act);
-    if (!t) { const pal = decodeDatPalette(read(actPal(act))), pl2 = read(actPal(act).replace(/pal\.dat$/i, 'pal.pl2')), index = new Map();
-      for (let k = 255; k >= 0; k--) index.set((pal[k * 4] << 16) | (pal[k * 4 + 1] << 8) | pal[k * 4 + 2], k);
-      t = { pal, pl2, index }; blendByAct.set(act, t); }
+    if (!t) { const pal = decodeDatPalette(read(actPal(act))), pl2 = read(actPal(act).replace(/pal\.dat$/i, 'pal.pl2'));
+      t = boxTables(pal, pl2); blendByAct.set(act, t); }
     return t;
-  }
-  function itemBackground(ctx, act, x, y, w, h, colour) {
-    const t = boxTransform(act);
-    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
-    const X = Math.round(x), Y = Math.round(y), W = Math.round(w), H = Math.round(h);
-    const img = ctx.getImageData(X, Y, W, H), d = img.data, base = BOX_PL2_BASE;
-    for (let i = 0; i < d.length; i += 4) { const u = t.index.get((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]); if (u === undefined) continue;
-      const c = t.pl2[base + u * 256 + colour]; d[i] = t.pal[c * 4]; d[i + 1] = t.pal[c * 4 + 1]; d[i + 2] = t.pal[c * 4 + 2]; }
-    ctx.putImageData(img, X, Y); ctx.restore();
   }
   // Engine geometry (inventoryLayoutFromEngine) once the shell has it; until then the Amazon2
   // constants above, which draw exactly as before.
@@ -330,6 +318,14 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     // Which item went where, in 800x600 screen pixels: the identity a row checks against the engine.
     const drawn = [];
     const sx = AMAZON2_INVENTORY_LAYOUT.screenX, sy = AMAZON2_INVENTORY_LAYOUT.screenY;
+    // The item under the pointer (none while an item is held) and the body-slot boxes, which sit
+    // behind the worn cels (grid-highlight.mjs: one box over the whole slot, none when identified and usable).
+    const p = state?.pointer, held = state?.cursorItem || null, cursorMode = state?.cursorMode || 0;
+    const hoverItem = p && !held ? (this.itemAt(p.x, p.y, width, height, state) || this.slotAt(p.x, p.y, width, height, state)?.item || null) : null;
+    const boxState = (item) => itemBoxState(item, state?.itemBoxState), tables = boxTransform(act), boxes = [];
+    for (const item of state?.items || []) { const slot = item.mode === 1 && item.invFile ? slotRect(item.bodyLoc) : null; if (!slot) continue;
+      const k = slotBoxSlot(boxState(item), hoverItem?.id === item.id, cursorMode), [ax, ay] = weaponSetArmShift(state?.weaponSet, item.bodyLoc);
+      if (k !== null) boxes.push(...paintBoxes(ctx, tables, [{ x: slot.left + ax, y: slot.top + ay, w: slot.width, h: slot.height, slot: k, order: 'behind' }], -sx, -sy).map((b) => ({ ...b, id: item.id, bodyLoc: item.bodyLoc }))); }
     for (const item of state?.items || []) {
       if (!item.invFile) continue;
       const image = icon(item.invFile, act, item);
@@ -338,12 +334,10 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
       if (item.invPage === 0 && item.mode === 0) { const r = gridRect(item);
         // One box per CELL of the item, at the cell's own corner (retail's `box` records).
         const cellW = r.width / Math.max(1, item.invWidth || 1), cellH = r.height / Math.max(1, item.invHeight || 1);
-        const boxColour = inventoryBoxColour(item, act), boxRects = [];
-        for (let cy = 0; cy < (item.invHeight || 1); cy++) for (let cx = 0; cx < (item.invWidth || 1); cx++) {
-          const x = r.left + cx * cellW, y = r.top + cy * cellH;
-          itemBackground(ctx, act, ox + x * scale, oy + y * scale, BOX_PX * scale, BOX_PX * scale, boxColour);
-          boxRects.push({ x, y, width: BOX_PX, height: BOX_PX, colour: boxColour });
-        }
+        const k = gridBoxSlot(boxState(item), hoverItem?.id === item.id, cursorMode), boxColour = tables.colours[k];
+        const cells = paintBoxes(ctx, tables, cellBoxes(r.left, r.top, cellW, cellH, 0, 0, item.invWidth || 1, item.invHeight || 1, k), -sx, -sy);
+        boxes.push(...cells.map((b) => ({ ...b, id: item.id })));
+        const boxRects = cells.map((b) => ({ x: b.x, y: b.y, width: b.w, height: b.h, colour: b.paletteIndex }));
         const at = celAt(r.left, r.top);
         ctx.drawImage(image, at.left - sx, at.top - sy); itemPixels += image.width * image.height;
         // `top` stays the CELL's top (s202 asserts the item landed in the cell it was put in);
@@ -367,6 +361,10 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
         drawn.push({ ...paperdollIdentity(item, iconAt(item.invFile, act).frame, left, top, slot), width: image.width, height: image.height, blitTop: top,
           ox: iconAt(item.invFile, act).frame.offsetX, oy: iconAt(item.invFile, act).frame.offsetY }); }
     }
+    // The held item over the grid: its boxes go over the placed items.
+    const heldCell = held && p ? this.cellAt(p.x, p.y, width, height, held) : null;
+    if (heldCell) { const origin = gridRect({ gridX: 0, gridY: 0, invWidth: 1, invHeight: 1 });
+      boxes.push(...paintBoxes(ctx, tables, heldItemBoxes({ left: origin.left, top: origin.top, cw: origin.width, ch: origin.height }, state.items, 0, heldCell.x, heldCell.y, held), -sx, -sy).map((b) => ({ ...b, id: held.id }))); }
     ctx.restore();
     // Gold, the gold button, the close button and the right-hand border (retail's anchors, s197).
     ctx.save(); ctx.translate(ox, oy); ctx.scale(scale, scale);
@@ -394,7 +392,7 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     return { x: baseX, y: baseY, scale, panelFrames: 4, tooltip: tooltipEvidence,
       panelPixels: [4, 5, 6, 7].reduce((sum, i) => sum + dc6.frames[i].width * dc6.frames[i].height, 0),
       itemCount: (state?.items || []).filter((item) => item.invPage === 0).length, itemPixels,
-      equippedItemCount, equippedItemPixels, drawn, weaponSet: set2 ? 1 : 0, tabs, silhouettes, layout: layout ? 'engine' : 'amazon2',
+      equippedItemCount, equippedItemPixels, drawn, boxes, weaponSet: set2 ? 1 : 0, tabs, silhouettes, layout: layout ? 'engine' : 'amazon2',
       gold: { path: CHROME_ART.gold, frame: goldFrame, blit: goldBlit },
       close: { ...close, path: PANEL_CLOSE_ART.path, frame: closeFrame, blit: closeBlit } };
   } };
