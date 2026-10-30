@@ -16,7 +16,7 @@ struct D2CommonBatch44A30Env {
     void (*f445A0)(P room);                                               // sub_445A0
     void (*f69950)(P a, int b);                                           // sub_69950
     uint32_t (*f6C5D0)(uint32_t ecx, int c);                              // sub_6C5D0
-    void (*f6FD0)(P);                                                     // sub_67FD0 (0x84220)
+    void (*f6FD0)();                                                      // sub_67FD0 (0x84220), no arguments
     uint32_t (*f68B90)(P ctx, int n);                                     // sub_68B90
     void (*f68CD0)(P ctx, int x, P z, int y, uint32_t v);                // sub_68CD0
     void (*f83630)(P a, uint32_t b, P c);                                 // sub_83630
@@ -77,7 +77,7 @@ void D2Common_84220(const D2CommonBatch44A30Env& e, uint32_t p1, int p2, int p3,
     int layers = rd(rp(p6, 0x50), 0x14);
     P ctx = rp(p4, 0);
     int x0 = rd(p5, 0) + p7;
-    e.f6FD0(0);   // guess: sub_67FD0 takes no args in decompile
+    e.f6FD0();    // sub_67FD0 takes no arguments (1.13c call site)
     for (int j = 0; j < rd(p5, 12); j++)
         for (int i = 0; i < rd(p5, 8); i++) {
             int rowOff = (rd(p5, 4) + j) * 4;
