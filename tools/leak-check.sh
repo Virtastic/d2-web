@@ -37,7 +37,7 @@ case "$mode" in
 esac
 [ -z "$files" ] && exit 0
 
-DENY='(^|/)(\.claude|\.private|scenarios|harness-out|coverage|vectors|reference|ghidra|retail|shots|iso)(/|$)|^docs/(re|agents)/|^tools/(re|capture|progress|showcase)(/|$)|(^|/)(CLAUDE|AGENTS|HANDOFF|OBJECTIVE|GOAL|goal-[a-z0-9-]+)\.md$|\.(dll|exe|mpq|iso|cab|gpr|gzf|rep|dc6|dcc|dt1|ds1|cof|wav|log|tsv)$|^tools/(plane|spawn-plan|ledger|defects|claims-reap)\.|^src/core/realm/bnclient_(key26|batch_10080)\.'
+DENY='(^|/)(\.claude|\.private|desktop|tests|third-party|scenarios|harness-out|coverage|vectors|reference|ghidra|retail|shots|iso)(/|$)|^docs/(re|agents)/|^tools/(re|capture|progress|showcase)(/|$)|(^|/)(CLAUDE|AGENTS|HANDOFF|OBJECTIVE|GOAL|README-BUILD|goal-[a-z0-9-]+)\.md$|\.(dll|exe|mpq|iso|cab|gpr|gzf|rep|dc6|dcc|dt1|ds1|cof|wav|log|tsv)$|^tools/(plane|spawn-plan|ledger|defects|claims-reap)\.|^src/core/realm/bnclient_(key26|batch_10080)\.'
 h=$(printf '%s\n' "$files" | grep -E "$DENY" | grep -vE '^docs/screenshots/'); [ -n "$h" ] && say "private path" <<< "$h"
 h=$(printf '%s\n' "$files" | grep -iE '\.(png|jpg)$' | grep -vE '^docs/screenshots/'); [ -n "$h" ] && say "image outside docs/screenshots" <<< "$h"
 
