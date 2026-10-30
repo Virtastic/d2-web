@@ -734,8 +734,9 @@ void __fastcall DATATBLS_UnloadCubeMainTxt()
 //D2Common.0x6FD54260 (#11232)
 D2CubeMainTxt* __stdcall DATATBLS_GetCubemainTxtRecord(int nIndex)
 {
-	D2_ASSERT(sgptDataTables->pCubeMainTxt);
-	D2_ASSERT(nIndex < sgptDataTables->nCubeMainTxtRecordCount);
+	// retail reports fatal 0x34E (table not loaded) / 0x34F (index at or past the count, signed compare) and exits
+	D2_ASSERTM(sgptDataTables->pCubeMainTxt, "D2Common fatal 0x34E: cubemain table not loaded");
+	D2_ASSERTM(nIndex < sgptDataTables->nCubeMainTxtRecordCount, "D2Common fatal 0x34F: cubemain index out of range");
 
 	return &sgptDataTables->pCubeMainTxt[nIndex];
 }

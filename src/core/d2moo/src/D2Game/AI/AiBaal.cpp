@@ -467,6 +467,8 @@ D2UnitStrc* __fastcall AIBAAL_GetTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, in
 		}
 	}
 
+	pTargetNode = pGame->pTargetNodes[8]; // 1.13c D2Game+0xB7090: list 8 starts the act walk
+
 	while (pTargetNode)
 	{
 		if (pUnit->nAct == pTargetNode->pUnit->nAct)

@@ -478,6 +478,7 @@ int __fastcall STATLIST_GetBaseStat_6FDB6340(D2StatListStrc* pStatList, D2SLayer
 }
 
 //D2Common.0x6FDB63E0
+// 1.13c D2Common+0x38A80 (list in EBX, packed id in EDI, ItemStatCost row on the stack)
 int __fastcall STATLIST_GetTotalStat_6FDB63E0(D2StatListStrc* pStatList, D2SLayerStatIdStrc::PackedType nLayer_StatId, D2ItemStatCostTxt* pItemStatCostTxtRecord)
 {
 	D2_VERIFY(pStatList != nullptr);

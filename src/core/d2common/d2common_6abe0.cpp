@@ -6,14 +6,15 @@
 // skipped), else stat 0x3C into +0x3C and stat 0x147 into +0x40; then 0x3D->+0x44, 0x3F->+0x4C,
 // 0x13D->+0x60, 0x13E->+0x64, 0x13C->+0x68. A stat reads as 0 unless the unit has a stat list
 // (+0x5C), the stat id is below the table count (sgptDataTables+0xBD4) and its row
-// (table +0xBCC, stride 0x144) exists. Each stat read is the separate row 0x38A80 (env seam).
+// (table +0xBCC, stride 0x144) exists. Each stat read is the inlined body of 0x38B70: 0x38A80 called with
+// the unit's stat list (+0x5C) in EBX, the packed id (stat id << 16, layer 0) in EDI and the row on the stack.
 #include <cstdint>
 #include <emscripten.h>
 
 struct D2Common6ABE0Env
 {
 	uint32_t pDataTables;                        // *sgptDataTables
-	int32_t (*get_total_stat)(uint32_t pStatRow); // 0x38A80
+	int32_t (*get_total_stat)(uint32_t pStatList, uint32_t nPackedId, uint32_t pStatRow); // 0x38A80 (EBX, EDI, stack)
 };
 
 extern "C"
@@ -27,7 +28,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_6abe0(uint32_t pUnit, uint32_t nShift, 
 	auto stat = [&](uint32_t id) -> int32_t {
 		if (!has || static_cast<int32_t>(rd(t + 0xBD4)) <= static_cast<int32_t>(id) || !(rd(t + 0xBCC) + id * 0x144))
 			return 0;
-		return env->get_total_stat(rd(t + 0xBCC) + id * 0x144);
+		return env->get_total_stat(rd(pUnit + 0x5C), id << 16, rd(t + 0xBCC) + id * 0x144);
 	};
 	auto add = [&](uint32_t off, int32_t v) {
 		*reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(pDmg + off)) += static_cast<uint32_t>(v);

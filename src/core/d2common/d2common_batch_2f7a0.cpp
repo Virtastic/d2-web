@@ -280,8 +280,8 @@ EMSCRIPTEN_KEEPALIVE uint8_t D2Common_22380_ItemHitClass(uint32_t pUnit)
 // is retail's fatal 0x107F. The +0x5C stat list is only read when it exists: with at least 20
 // ItemStatCost rows the to-hit total (stat 19) is read, with at least 3 the dexterity total (stat 2).
 // The class id (+0x04) then adds charstats[].dwToHitFactor (+0x3C) when it is in range. The totals go
-// through the vendored STATLIST_GetTotalStat, the body of the 1.13c 0x38A80 (list in its register
-// operand, packed layer-0 id in its other).
+// through the vendored STATLIST_GetTotalStat, the body of the 1.13c 0x38A80 (list in EBX, packed
+// layer-0 id = stat id << 16 in EDI, ItemStatCost row on the stack).
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t D2Common_PlayerAttackRating(uint32_t pUnit)
 {

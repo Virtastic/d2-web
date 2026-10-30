@@ -6827,6 +6827,42 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_cursor_item() {
     D2UnitStrc* item = (g_sessionLive && g_targetPlayer && g_targetPlayer->pInventory) ? INVENTORY_GetCursorItem(g_targetPlayer->pInventory) : nullptr;
     return item ? item->dwUnitId : 0;
 }
+// The tests the item-box colour is chosen from, one bit each (play/assets/grid-highlight.mjs picks
+// the colour; docs: the grid and body-slot box rules). 0 when the item is not found.
+//   0x001 requirements not met for the player     0x002 item flag 0x4
+//   0x004 a stat list carrying flag 2             0x008 the player is in state 54
+//   0x010 the item cannot be equipped             0x020 a quest item not yet usable (ass/xyz/tr2)
+//   0x040 shoots or quiver item with nothing in the other hand (body slots 4/5 only)
+//   0x080 identified (flag 0x10)                  0x100 Items.txt transmogrify set
+//   0x200 found
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_box_state(uint32_t itemId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return 0;
+    D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId);
+    D2ItemsTxt* t = item ? DATATBLS_GetItemsTxtRecord(item->dwClassId) : nullptr;
+    if (!t) return 0;
+    uint32_t out = 0x200;
+    if (!ITEMS_CheckRequirements(item, g_targetPlayer, 0, nullptr, nullptr, nullptr)) out |= 0x001;
+    if (ITEMS_CheckItemFlag(item, 0x4, __LINE__, __FILE__)) out |= 0x002;
+    if (STATLIST_GetStatListFromUnitAndFlag(item, 2)) out |= 0x004;
+    if (STATES_CheckState(g_targetPlayer, 54)) out |= 0x008;
+    if (!ITEMS_CanBeEquipped(item)) out |= 0x010;
+    if (t->nQuest) {
+        D2BitBufferStrc* q = UNITS_GetPlayerData(g_targetPlayer)->pQuestData[g_game->nDifficulty];
+        const uint32_t c = (uint32_t)(uint8_t)t->szCode[0] | (uint32_t)(uint8_t)t->szCode[1] << 8 | (uint32_t)(uint8_t)t->szCode[2] << 16 | (uint32_t)(uint8_t)t->szCode[3] << 24;
+        bool red = false;
+        if (q && c == ' ssa') red = !QUESTRECORD_GetQuestState(q, 9, 5);
+        else if (q && c == ' zyx') red = !QUESTRECORD_GetQuestState(q, 20, 5);
+        else if (q && c == ' 2rt') red = !QUESTRECORD_GetQuestState(q, 37, 8) || QUESTRECORD_GetQuestState(q, 37, 7);
+        if (red) out |= 0x020;
+    }
+    const uint8_t loc = ITEMS_GetBodyLocation(item);
+    D2UnitStrc* pair = (loc == BODYLOC_RARM || loc == BODYLOC_LARM) && g_targetPlayer->pInventory
+        ? INVENTORY_GetItemFromBodyLoc(g_targetPlayer->pInventory, loc == BODYLOC_RARM ? BODYLOC_LARM : BODYLOC_RARM) : nullptr;
+    if (!pair) { D2ItemTypesTxt* ty = DATATBLS_GetItemTypesTxtRecord((int)ITEMS_GetItemType(item)); if (ty && (ty->wShoots || ty->wQuiver)) out |= 0x040; }
+    if (ITEMS_CheckItemFlag(item, 0x10, __LINE__, __FILE__)) out |= 0x080;
+    if (t->nTransmogrify) out |= 0x100;
+    return out;
+}
 // Fixture: the waypoint of a level activated, as touching it earlier in the playthrough left it.
 EMSCRIPTEN_KEEPALIVE int d2_session_fixture_waypoint(int32_t levelId) {
     if (!g_sessionLive || !g_game || !g_targetPlayer) return 0;
