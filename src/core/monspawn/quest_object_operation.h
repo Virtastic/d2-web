@@ -10,6 +10,9 @@ namespace d2::monspawn {
 inline bool acceptedObjectOperation(uint32_t classId, uint32_t operateFn,
                                     int32_t callbackResult, bool modeChanged) {
     if (callbackResult != 0) return true;
+    // The well (OperateFn 22, 1.13c D2Game+0x6CEE0) always returns 0, refilled or dry; accepted as it was
+    // while ours returned 1.
+    if (operateFn == 22) return true;
     const bool zeroReturningQuestObject = (classId == 404 && operateFn == 53) ||
                                          (classId == 405 && operateFn == 57) ||
                                          (classId == 406 && operateFn == 59) ||

@@ -1,4 +1,4 @@
-// Batch 9c4f0: 12 D2Game 1.13c functions from the cached decompile.
+// Batch 9c4f0: 11 D2Game 1.13c functions from the cached decompile.
 // Guessed inputs (register-only args): in_EAX / unaffected EDI/ESI/EBX are explicit parameters.
 // 1.13c structs hold 32-bit retail pointers; they are NOT ported as host pointers. Offsets are
 // read from a byte base with 32-bit pointer fields kept as uint32_t. Callees that are UNMAPPED or
@@ -8,21 +8,6 @@
 
 template <class T> static T rd(const uint8_t* b, uint32_t o) { T v; memcpy(&v, b + o, sizeof v); return v; }
 template <class T> static void wr(uint8_t* b, uint32_t o, T v) { memcpy(b + o, &v, sizeof v); }
-
-// 1.13c D2Game+0x9C4F0 (party add; allocation/_exit paths and list walk bound by caller)
-// ponytail: only the decision tree (0xFE/0xFF fatals, already-member return 1) is expressed.
-int D2GAME_9C4F0_PartyAdd(const uint8_t* partyHead, const uint8_t* unit, bool (*isMember)(int id),
-                          int (*onNew)(int id), int* fatalCode)
-{
-    int id = unit ? rd<int>(unit, 12) : -1;
-    if (!partyHead) { *fatalCode = 0xfe; return 0; }
-    if (unit && rd<int>(unit, 0) == 0) {
-        if (isMember(id)) return 1;
-        return onNew(id);
-    }
-    *fatalCode = 0xff;
-    return 0;
-}
 
 // 1.13c D2Game+0x9CA00 (in_ECX/param_1 unused)
 int D2GAME_9CA00(const uint8_t* a, uint8_t* b, int (*getRoom)(const uint8_t*), int (*isFlagged)(uint8_t*),

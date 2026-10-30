@@ -1730,6 +1730,7 @@ int32_t __fastcall D2GAME_NPC_Repair_6FCC95B0(D2GameStrc* pGame, D2UnitStrc* pUn
 }
 
 //D2Game.0x6FCC9C90
+// 1.13c D2Game+0xBDB10: the code-3 reply is sent once after the loop, not per item.
 void __fastcall D2GAME_NPC_IdentifyAllItems_6FCC9C90(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nNpcGUID)
 {
     if (!pPlayer)
@@ -1808,10 +1809,10 @@ void __fastcall D2GAME_NPC_IdentifyAllItems_6FCC9C90(D2GameStrc* pGame, D2UnitSt
 					break;
                 }
             }
-
-            D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
-            D2GAME_SendPacket0x2A_6FC3F3B0(pClient, 0x2A, 3, STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), -1, 0);
         }
+
+        D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);
+        D2GAME_SendPacket0x2A_6FC3F3B0(pClient, 0x2A, 3, STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), -1, 0);
         break;
     }
 	default:

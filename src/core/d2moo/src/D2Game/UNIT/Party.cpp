@@ -101,9 +101,12 @@ int16_t __fastcall sub_6FCB9C40(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FCB9D10
+// 1.13c D2Game+0x9C4F0
+// The party lookup is the 1.13c helper 0x9BD00, which asserts the party control (not pGame); then the party
+// (0xFE), the player (0xFF), membership via 0x9BCB0 (returns 1), node prepend, and the hostility removal.
 int32_t __fastcall sub_6FCB9D10(D2GameStrc* pGame, int16_t nPartyId, D2UnitStrc* pPlayer)
 {
-    D2_ASSERT(pGame);   // 1.13c D2Game+0x9C160 asserts pGame non-null
+    D2_ASSERT(pGame->pPartyControl);
    
     D2PartyStrc* pParty = nullptr;
     for (D2PartyStrc* i = pGame->pPartyControl->pParties; i; i = i->pNext)

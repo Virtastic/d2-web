@@ -407,7 +407,18 @@ void D2GAME_PACKETS_SendPacket0x0A_RemoveObject_6FC3D3A0(D2ClientStrc* pClient, 
     std::memcpy(packet + 2, &nUnitId, 4);
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, packet, sizeof packet);
 }
-void D2GAME_PACKETS_SendPacket0x0D_6FC3C920(D2ClientStrc* pClient, char nPacketId, int32_t nUnitType, int32_t nUnitId, char a5, WORD nX, WORD nY, char a8, char nLife) {}
+// 1.13c D2Game+0x8C280 (SCmd.cpp): {header, type, guid, a5, x, y, a8, life}, 13 bytes; asserts type < 6.
+void D2GAME_PACKETS_SendPacket0x0D_6FC3C920(D2ClientStrc* pClient, char nPacketId, int32_t nUnitType, int32_t nUnitId, char a5, WORD nX, WORD nY, char a8, char nLife) {
+    D2_ASSERT((uint8_t)nUnitType < 6);
+    uint8_t packet[13] = { (uint8_t)nPacketId, (uint8_t)nUnitType };
+    std::memcpy(packet + 2, &nUnitId, 4);
+    packet[6] = (uint8_t)a5;
+    std::memcpy(packet + 7, &nX, 2);
+    std::memcpy(packet + 9, &nY, 2);
+    packet[11] = (uint8_t)a8;
+    packet[12] = (uint8_t)nLife;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, packet, sizeof packet);
+}
 // D18 skill probe: counts the unit-mode packets (0x0F coordinate, 0x10 unit target) a cast emits.
 extern "C" uint32_t g_d2webModePackets = 0;
 void D2GAME_PACKETS_SendPacket0x0F_6FC3CA00(D2ClientStrc* pClient, char nHeader, uint8_t bTOU, int32_t a4, char a5, int16_t a6, int16_t a7, char a8, int16_t a9, int16_t a10) { ++g_d2webModePackets; }

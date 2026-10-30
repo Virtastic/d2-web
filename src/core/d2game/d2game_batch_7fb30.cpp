@@ -68,23 +68,6 @@ void D2GAME_83AC0_AiThink(D2GameStrc* g, D2UnitStrc* u, D2AiTickParamStrc* t)
     AITACTICS_IdleInNeutralMode(g, u, P(g, t, 1));
 }
 
-// 1.13c D2Game+0x838B0
-void D2GAME_838B0_AiThink(D2GameStrc* g, D2UnitStrc* u, D2AiTickParamStrc* t)
-{
-    if (t->bCombat) {
-        Attack1Or2(g, u, t, Pct(u));
-        return;
-    }
-    if (sub_6FCF2E70(u)
-        || (t->nTargetDistance < P(g, t, 1) && Pct(u) < (uint32_t)P(g, t, 0))
-        || DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(u)) == LEVEL_BURIALGROUNDS) {
-        AITACTICS_SetVelocity(u, 0, 100, 0);
-        AITACTICS_RunToTargetUnit(g, u, t->pTarget);
-    } else {
-        AITACTICS_WalkCloseToUnit(g, u, 3);
-    }
-}
-
 // 1.13c D2Game+0x81F50
 void D2GAME_81F50_AiThink(D2GameStrc* g, D2UnitStrc* u, D2AiTickParamStrc* t)
 {

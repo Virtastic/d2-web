@@ -219,6 +219,8 @@ void __fastcall sub_6FC79C00(D2GameStrc* pGame, D2UnitStrc* pObject);
 void __fastcall sub_6FC79C30(D2GameStrc* pGame, int32_t nUnused, int32_t nPortalGUID, int32_t nDestLevel);
 //D2Game.0x6FC79D90
 int32_t __fastcall OBJECTS_OperateFunction22_Well(D2ObjOperateFnStrc* pOp, int32_t nOperate);
+// 1.13c D2Game+0x6A560: the well refill split out of the operate
+int32_t __fastcall OBJMODE_WellHeal(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2ObjectsTxt* pObjectsTxtRecord);
 //D2Game.0x6FC7A000
 void __fastcall OBJMODE_PetIterate_Heal(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pUnit2, void* pUnitHealed);
 //D2Game.0x6FC7A070

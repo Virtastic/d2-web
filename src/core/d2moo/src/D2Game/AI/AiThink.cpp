@@ -335,26 +335,29 @@ enum D2C_ZombieAIParams
 };
 
 //D2Game.0x6FCD1880
+// 1.13c D2Game+0x838B0
+// As 1.13c: the rolls are compared signed against the parameter, the run sets the AI velocity to 100 directly
+// and moves with MoveToTarget(MONMODE_RUN, 0, 0, step 1, flags 0).
 void __fastcall AITHINK_Fn003_Zombie(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	if (pAiTickParam->bCombat)
 	{
-		AITACTICS_ChangeModeAndTargetUnitToAttack1Or2(pGame, pUnit, pAiTickParam, ZOMBIE_AI_PARAM_ATTACK_1_OR_2_CHANCE_PCT);
+		const int32_t nRoll = (int32_t)AI_RollPercentage(pUnit);
+		AITACTICS_ChangeModeAndTargetUnit(pGame, pUnit, nRoll < AI_GetParamValue(pGame, pAiTickParam, ZOMBIE_AI_PARAM_ATTACK_1_OR_2_CHANCE_PCT) ? MONMODE_ATTACK1 : MONMODE_ATTACK2, pAiTickParam->pTarget);
+		return;
 	}
-	else
+
+	if (!sub_6FCF2E70(pUnit)
+		&& (pAiTickParam->nTargetDistance >= AI_GetParamValue(pGame, pAiTickParam, ZOMBIE_AI_PARAM_AWARE_DISTANCE)
+			|| (int32_t)AI_RollPercentage(pUnit) >= AI_GetParamValue(pGame, pAiTickParam, ZOMBIE_AI_PARAM_APPROACH_CHANCE_PCT))
+		&& DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(pUnit)) != LEVEL_BURIALGROUNDS)
 	{
-		if (sub_6FCF2E70(pUnit)
-			|| pAiTickParam->nTargetDistance < AI_GetParamValue(pGame, pAiTickParam, ZOMBIE_AI_PARAM_AWARE_DISTANCE) && AIRollChanceParam(pGame, pUnit, pAiTickParam, ZOMBIE_AI_PARAM_APPROACH_CHANCE_PCT)
-			|| DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(pUnit)) == LEVEL_BURIALGROUNDS)
-		{
-			AITACTICS_SetVelocity(pUnit, 0, 100, 0);
-			AITACTICS_RunToTargetUnit(pGame, pUnit, pAiTickParam->pTarget);
-		}
-		else
-		{
-			AITACTICS_WalkCloseToUnit(pGame, pUnit, 3u);
-		}
+		AITACTICS_WalkCloseToUnit(pGame, pUnit, 3u);
+		return;
 	}
+
+	pUnit->pMonsterData->pAiParam->nVelocity = 100;
+	AITACTICS_MoveToTarget(pGame, pUnit, pAiTickParam->pTarget, MONMODE_RUN, 0, 0, 1u, 0);
 }
 
 enum D2C_BigHeadAIParams

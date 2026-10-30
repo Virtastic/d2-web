@@ -3716,104 +3716,110 @@ void __fastcall sub_6FC79C30(D2GameStrc* pGame, int32_t nUnused, int32_t nPortal
     UNITS_SetObjectPortalFlags(pOtherPortal, UNITS_GetObjectPortalFlags(pOtherPortal) | 3);
 }
 
-//D2Game.0x6FC79D90
 // 1.13c D2Game+0x6A560
+// The well's refill, split out of the operate as in 1.13c: tops up life (Parm3 bit 2), mana (Parm3 bit 1) and
+// stamina by Parm1/256 of the maximum, lifts poison and freeze, then heals the pets. Returns whether anything
+// happened. The comparisons and the shift are unsigned, as retail's.
+int32_t __fastcall OBJMODE_WellHeal(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2ObjectsTxt* pObjectsTxtRecord)
+{
+    int32_t bUsed = 0;
+
+    const uint32_t nMaxLife = STATLIST_GetMaxLifeFromUnit(pPlayer);
+    const uint32_t nLife = STATLIST_UnitGetStatValue(pPlayer, STAT_HITPOINTS, 0);
+    const uint32_t nFlags = pObjectsTxtRecord->dwParm[3];
+    if (nLife < nMaxLife && (nFlags & 2))
+    {
+        uint32_t nNewLife = nLife + ((uint32_t)(nMaxLife * pObjectsTxtRecord->dwParm[1]) >> 8);
+        if (nNewLife > nMaxLife)
+        {
+            nNewLife = nMaxLife;
+        }
+        STATLIST_SetUnitStat(pPlayer, STAT_HITPOINTS, nNewLife, 0);
+        D2GAME_UpdateAttribute_6FC822D0(pPlayer, STAT_HITPOINTS, nNewLife, pPlayer);
+        bUsed = 1;
+    }
+
+    const uint32_t nMaxMana = STATLIST_GetMaxManaFromUnit(pPlayer);
+    const uint32_t nMana = STATLIST_UnitGetStatValue(pPlayer, STAT_MANA, 0);
+    if (nMana < nMaxMana && (nFlags & 1))
+    {
+        uint32_t nNewMana = nMana + ((uint32_t)(nMaxMana * pObjectsTxtRecord->dwParm[1]) >> 8);
+        if (nNewMana > nMaxMana)
+        {
+            nNewMana = nMaxMana;
+        }
+        STATLIST_SetUnitStat(pPlayer, STAT_MANA, nNewMana, 0);
+        D2GAME_UpdateAttribute_6FC822D0(pPlayer, STAT_MANA, nNewMana, pPlayer);
+        bUsed = 1;
+    }
+
+    const uint32_t nMaxStamina = STATLIST_GetMaxStaminaFromUnit(pPlayer);
+    const uint32_t nStamina = STATLIST_UnitGetStatValue(pPlayer, STAT_STAMINA, 0);
+    if (nStamina < nMaxStamina)
+    {
+        uint32_t nNewStamina = nStamina + ((uint32_t)(nMaxStamina * pObjectsTxtRecord->dwParm[1]) >> 8);
+        if (nNewStamina > nMaxStamina)
+        {
+            nNewStamina = nMaxStamina;
+        }
+        STATLIST_SetUnitStat(pPlayer, STAT_STAMINA, nNewStamina, 0);
+        D2GAME_UpdateAttribute_6FC822D0(pPlayer, STAT_STAMINA, nNewStamina, pPlayer);
+        bUsed = 1;
+    }
+
+    D2StatListStrc* pStatList = STATLIST_GetStatListFromUnitAndState(pPlayer, STATE_POISON);
+    if (pStatList)
+    {
+        D2Common_10474(pPlayer, pStatList);
+        STATLIST_FreeStatList(pStatList);
+        bUsed = 1;
+    }
+
+    pStatList = STATLIST_GetStatListFromUnitAndState(pPlayer, STATE_FREEZE);
+    if (pStatList)
+    {
+        D2Common_10474(pPlayer, pStatList);
+        STATLIST_FreeStatList(pStatList);
+        bUsed = 1;
+    }
+
+    if (D2GAME_NPC_RemoveStates_6FCCAF30(pPlayer))
+    {
+        bUsed = 1;
+    }
+    PLAYERPETS_IteratePets(pGame, pPlayer, OBJMODE_PetIterate_Heal, &bUsed);
+    return bUsed;
+}
+
+//D2Game.0x6FC79D90
+// 1.13c D2Game+0x6CEE0
+// 1.13c has no null checks and always returns 0. The charge test is byte arithmetic on Parm2: the charge is
+// compared with (uint8_t)(2 * Parm2) and divided by that byte halved; the mode step divides by the whole Parm2.
 int32_t __fastcall OBJECTS_OperateFunction22_Well(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
-    if (!pOp || !pOp->pObject || !pOp->pPlayer)
+    D2UnitStrc* pObject = pOp->pObject;
+    D2ObjectsTxt* pObjectsTxtRecord = UNITS_GetObjectTxtRecordFromObject(pObject);
+
+    uint8_t nType = pObject->pObjectData->InteractType;
+    if (!nType)
     {
         return 0;
     }
 
-    D2UnitStrc* pObject = pOp->pObject;
-    D2UnitStrc* pPlayer = pOp->pPlayer;
-
-    D2ObjectsTxt* pObjectsTxtRecord = UNITS_GetObjectTxtRecordFromObject(pObject);
-
-    uint8_t nType = pObject->pObjectData->InteractType;
-
-    if (nType)
+    if (OBJMODE_WellHeal(pOp->pGame, pOp->pPlayer, pObjectsTxtRecord))
     {
-        int32_t bUsed = 0;
-
-        const int32_t nMaxLife = STATLIST_GetMaxLifeFromUnit(pPlayer);
-        const int32_t nLife = STATLIST_UnitGetStatValue(pPlayer, STAT_HITPOINTS, 0);
-        if (nLife < nMaxLife && pObjectsTxtRecord->dwParm[3] & 2)
+        --nType;
+        const uint8_t nTwice = (uint8_t)(2 * (uint8_t)pObjectsTxtRecord->dwParm[2]);
+        if (nType <= nTwice && !((int32_t)nType % (int32_t)(nTwice >> 1)))
         {
-            int32_t nNewLife = nLife + (nMaxLife * pObjectsTxtRecord->dwParm[1] >> 8);
-            if (nNewLife > nMaxLife)
-            {
-                nNewLife = nMaxLife;
-            }
-            STATLIST_SetUnitStat(pPlayer, STAT_HITPOINTS, nNewLife, 0);
-            D2GAME_UpdateAttribute_6FC822D0(pPlayer, STAT_HITPOINTS, nNewLife, pPlayer);
-            bUsed = 1;
+            UNITS_ChangeAnimMode(pObject, 2 - (int32_t)nType / (int32_t)pObjectsTxtRecord->dwParm[2]);
         }
 
-        const int32_t nMaxMana = STATLIST_GetMaxManaFromUnit(pPlayer);
-        const int32_t nMana = STATLIST_UnitGetStatValue(pPlayer, STAT_MANA, 0);
-        if (nMana < nMaxMana && pObjectsTxtRecord->dwParm[3] & 1)
-        {
-            int32_t nNewMana = nMana + (nMaxMana * pObjectsTxtRecord->dwParm[1] >> 8);
-            if (nNewMana > nMaxMana)
-            {
-                nNewMana = nMaxMana;
-            }
-            STATLIST_SetUnitStat(pPlayer, STAT_MANA, nNewMana, 0);
-            D2GAME_UpdateAttribute_6FC822D0(pPlayer, STAT_MANA, nNewMana, pPlayer);
-            bUsed = 1;
-        }
-
-        const int32_t nMaxStamina = STATLIST_GetMaxStaminaFromUnit(pPlayer);
-        const int32_t nStamina = STATLIST_UnitGetStatValue(pPlayer, STAT_STAMINA, 0);
-        if (nStamina < nMaxStamina)
-        {
-            int32_t nNewStamina = nStamina + (nMaxStamina * pObjectsTxtRecord->dwParm[1] >> 8);
-            if (nNewStamina > nMaxStamina)
-            {
-                nNewStamina = nMaxStamina;
-            }
-            STATLIST_SetUnitStat(pPlayer, STAT_STAMINA, nNewStamina, 0);
-            D2GAME_UpdateAttribute_6FC822D0(pPlayer, STAT_STAMINA, nNewStamina, pPlayer);
-            bUsed = 1;
-        }
-
-        D2StatListStrc* pStatList = STATLIST_GetStatListFromUnitAndState(pPlayer, STATE_POISON);
-        if (pStatList)
-        {
-            D2Common_10474(pPlayer, pStatList);
-            STATLIST_FreeStatList(pStatList);
-            bUsed = 1;
-        }
-
-        pStatList = STATLIST_GetStatListFromUnitAndState(pPlayer, STATE_FREEZE);
-        if (pStatList)
-        {
-            D2Common_10474(pPlayer, pStatList);
-            STATLIST_FreeStatList(pStatList);
-            bUsed = 1;
-        }
-
-        if (D2GAME_NPC_RemoveStates_6FCCAF30(pPlayer))
-        {
-            bUsed = 1;
-        }
-        PLAYERPETS_IteratePets(pOp->pGame, pPlayer, OBJMODE_PetIterate_Heal, &bUsed);
-
-        if (bUsed)
-        {
-            --nType;
-            if (nType <= 2 * pObjectsTxtRecord->dwParm[2] && !(nType % pObjectsTxtRecord->dwParm[2]))
-            {
-                UNITS_ChangeAnimMode(pObject, 2 - nType / pObjectsTxtRecord->dwParm[2]);
-            }
-
-            pObject->pObjectData->InteractType = nType;
-            EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_AITHINK, pOp->pGame->dwGameFrame + pObjectsTxtRecord->dwParm[0] + 1, 0, 0);
-        }
+        pObject->pObjectData->InteractType = nType;
+        EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_AITHINK, pOp->pGame->dwGameFrame + pObjectsTxtRecord->dwParm[0] + 1, 0, 0);
     }
 
-    return 1;
+    return 0;
 }
 
 //D2Game.0x6FC7A000

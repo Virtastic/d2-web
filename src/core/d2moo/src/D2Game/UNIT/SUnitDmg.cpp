@@ -1855,6 +1855,7 @@ void __fastcall SUNITDMG_KillMonster(D2GameStrc* pGame, D2UnitStrc* pDefender, D
 	{
 		sub_6FC62780(pAttacker, pDefender, pGame);
 		ARENA_ProcessKillEvent(pGame, pAttacker, pDefender);
+		// 1.13c then calls a D2Common ordinal that is a 3-byte no-op stub; nothing to port.
 	}
 
 	if (pDefender->dwUnitType == UNIT_MONSTER)

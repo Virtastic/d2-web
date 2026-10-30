@@ -741,7 +741,6 @@ int32_t __fastcall OBJECTS_OperateFunction44_SewerStairs(D2ObjOperateFnStrc* pOp
 }
 
 //D2Game.0x6FCA8810
-// 1.13c D2Game+0xBDB10
 int32_t __fastcall OBJECTS_OperateFunction45_SewerLever(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
 	if (!pOp || !pOp->pObject)

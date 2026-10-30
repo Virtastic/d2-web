@@ -1006,7 +1006,6 @@ void __fastcall ACT5Q5_OnPortalOpened(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCB7B40
-// 1.13c D2Game+0x8C280
 void __fastcall ACT5Q5_OnPortalClosed(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
