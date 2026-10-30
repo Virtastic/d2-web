@@ -123,6 +123,9 @@ void D2Sound_6B80(void* obj, uint32_t arg, int32_t ms) {
     LeaveCriticalSection(&g_lock);
 }
 
+// Test hook: sets the sound-on flag (0x6F9C658C) that the fade-start function tests.
+void D2Sound_fnSetSoundOn(uint32_t v) { g_soundOn = v; }
+
 // The interface method behind +0x10 is IKsPropertySet::Set(this, guid, id, inst, instLen, data, len).
 static void d2sound_setProp(void* iface, const void* guid, uint32_t id, const void* data, uint32_t len) {
     void** vt = *(void***)iface;
