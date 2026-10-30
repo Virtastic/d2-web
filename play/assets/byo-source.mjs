@@ -105,13 +105,9 @@ export function createCollection() {
     const infos = entries.map((e) => e.info).sort((a, b) => verified(b) - verified(a));
     Object.assign(state, classify(infos, k));
     state.files = Object.fromEntries(Object.entries(state.slots).filter(([, s]) => s.have).map(([r, s]) => [r, entries.find((e) => e.info === s.file).file]));
-    const p = await patchShim();
-    if (p) {
-      state.files.patch_d2 = p;
-      state.slots.patch_d2.have = true;
-      state.missing = state.missing.filter((r) => r !== 'patch_d2');
-      state.ready = state.missing.length === 0;
-    }
+    // The player must still give their own Patch_D2.mpq; once they have, the 1.13c shim mounts in its place.
+    const p = state.slots.patch_d2?.have ? await patchShim() : null;
+    if (p) state.files.patch_d2 = p;
   }
   return {
     state,
