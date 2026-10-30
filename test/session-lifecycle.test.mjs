@@ -70,3 +70,24 @@ test('beforeunload saves before caller teardown resets renderer and destroys ses
   }
   assert.deepEqual(events, ['save', 'store-during-unload', 'reset', 'destroy']);
 });
+
+import { leaveNativeSession } from '../play/assets/session-lifecycle.mjs';
+
+test('Save and Exit destroys the session and lets the next pick start a new game', () => {
+  const calls = [];
+  const session = { destroy: () => calls.push('destroy') };
+  const renderer = { resetSession: () => calls.push('reset') };
+  const left = leaveNativeSession(session, renderer);
+  assert.deepEqual(calls, ['reset', 'destroy']);
+  assert.equal(left.session, null);
+  assert.equal(left.bootstrapStarted, false);   // startGame() gates on this; true re-entered the old game
+  assert.equal(left.currentFixture, null);
+  assert.deepEqual(leaveNativeSession(null, renderer).session, null);
+  assert.deepEqual(calls, ['reset', 'destroy']);
+});
+
+test('the Save and Exit menu choice leaves the game before entering character select', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const src = await readFile(new URL('../play/gameplay-shell.mjs', import.meta.url), 'utf8');
+  assert.match(src, /gameMenu\.close\(\);\s*leaveGame\(\);\s*await enterCharacterSelect\(\);/);
+});

@@ -90,12 +90,14 @@ import { createSpeechBox } from './assets/speech-box.mjs';
 import { nativeObjectSpeechAcknowledgement } from './assets/object-speech-ack.mjs';
 import { dispatchObjectSpeechPointer } from './assets/object-speech-input.mjs';
 import { createCharacterCreate, CREATE_ASSETS, CLASSES } from './assets/charcreate.mjs';
+import { keepWhileOpen } from './assets/charcreate-lifetime.mjs';
 import { createCharacterSelect, SELECT_ASSETS } from './assets/charselect.mjs';
 import { deleteAndRefreshCharacter } from './assets/character-delete-store.mjs';
 import { createSaveStore, CLASS_NAMES } from './assets/save-store.mjs';
+import { importCharacterFiles } from './assets/character-import.mjs';
 import { singlePlayerDestination, createCharacterEntryReader } from './assets/title-single-player-route.mjs';
 import { installUnloadAutosave } from './assets/unload-autosave.mjs';
-import { destroyNativeSession, replaceNativeSession } from './assets/session-lifecycle.mjs';
+import { destroyNativeSession, leaveNativeSession, replaceNativeSession } from './assets/session-lifecycle.mjs';
 import { createNpcPanel } from './assets/npc-panel.mjs';
 import { createGameMenu } from './assets/game-menu.mjs';
 import { saveBeforeExit } from './assets/save-exit.mjs';
@@ -847,6 +849,7 @@ function ensureGameMenu() {
         // confirms the character has been written.
         void saveBeforeExit(persistCurrentCharacter, async () => {
           gameMenu.close();
+          leaveGame();
           await enterCharacterSelect();
         }).catch((error) => { gameMenuError = String(error); });
       }
@@ -1841,6 +1844,17 @@ function startGame() {
   if (!bootstrapStarted && window.__d2?.ready && !window.__d2.error && sessionAdapter()) bootstrapSession();
 }
 
+// Save and Exit: end the game the way retail does (the game is freed, nothing of it carries into the
+// next one). The next pick builds a new session through bootstrapSession.
+function leaveGame() {
+  ({ session, bootstrapStarted, currentFixture } = leaveNativeSession(session, monsterRenderer));
+  snapshot = normalizeSnapshot(null); motion = {};
+  window.__d2.session = null;
+  pendingLoad = null; sessionError = ''; npcState = null;
+  inventoryVisible = false; hirelingVisible = false; characterVisible = false; skillsVisible = false;
+  helpVisible = false; clearScreen = false;
+}
+
 // Read and publish the profile together with its destination; a superseded storage request
 // cannot replace the current screen or its character rows.
 async function enterSavedCharacterScreen(singlePlayer) {
@@ -1893,6 +1907,29 @@ async function convertSavedCharacter(name) {
     savedCharacters = await saveStore.list();
     charSelect?.setCharacters(savedCharacters);
   } catch (error) { charSelectError = String(error); }
+}
+
+// IMPORT CHARACTER (platform): a .d2s dropped on character select, or chosen with Ctrl+O. The
+// substance is assets/character-import.mjs; this only reads the files and refreshes the list.
+async function importDroppedFiles(fileList) {
+  if (screen !== SCREEN.SELECT) return;
+  try {
+    const files = await Promise.all([...fileList].map(async (f) => ({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) })));
+    const r = await importCharacterFiles(files, { store: saveStore, confirmOverwrite: (n) => confirm(`A character named ${n} already exists. Overwrite it?`) });
+    if (r.status === 'error') { charSelectError = r.error; return; }
+    charSelectError = '';
+    if (r.status !== 'imported') return;
+    savedCharacters = await saveStore.list();
+    charSelect?.setCharacters(savedCharacters);
+  } catch (error) { charSelectError = String(error?.message || error); }
+}
+addEventListener('dragover', (e) => { if (screen === SCREEN.SELECT && e.dataTransfer?.types?.includes('Files')) e.preventDefault(); });
+addEventListener('drop', (e) => { if (screen !== SCREEN.SELECT) return; e.preventDefault(); importDroppedFiles(e.dataTransfer?.files || []); });
+function pickCharacterFile() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.multiple = true; input.accept = '.d2s,.d2x,.sss';
+  input.onchange = () => importDroppedFiles(input.files);
+  input.click();
 }
 
 function ensureCharSelect() {
@@ -2023,10 +2060,10 @@ function ensureCharCreate() {
       onCreate: ({ playerClass, name, checkboxes }) => {
         chosenClass = playerClass; chosenName = name;
         applyClientSaveFlags(checkboxes);
-        screen = SCREEN.GAME;
+        screen = SCREEN.GAME; charCreate = null;
         startGame();
       },
-      onCancel: () => { screen = SCREEN.TITLE; },
+      onCancel: () => { screen = SCREEN.TITLE; charCreate = null; },
       onSound: ({ key, trigger }) => {
         charCreateSounds?.play(key, trigger).catch((error) => { charCreateSoundError = String(error); });
       },
@@ -2601,6 +2638,7 @@ function drainUnitSounds() {
   }
 }
 function update(forceTick = false, live = false) {
+  charCreate = keepWhileOpen(screen === SCREEN.CREATE, charCreate);   // the create screen is rebuilt fresh each open
   drainUnitSounds();
   // The engine advances every tick, so last tick's advancement record is stale by definition.
   advancement = null; classSkills = null;
@@ -4024,19 +4062,27 @@ function drawFrame() {
   const pHover = perfT0();
   showItemsEvidence = [];
   if (!clearScreen && heldShowItemsKeys.size && hoverFont) {
-    for (const item of snapshot.items || []) {
-      if (item.mode !== 3 || item.invPage !== 255) continue;
+    // Retail's pass (D2Client label walk): ground items nearest the hero first, each plate clamped and slid clear of
+    // the earlier ones by the engine's placer; the shell measures text and paints the rects it returns.
+    const [panelLeft, panelRight] = panelSides(), ui = panelRight ? 1 : panelLeft ? 2 : 0;
+    const hero = snapshot.player || {}, key = (it) => Module._d2_showitems_order_key(Math.trunc(it.x), Math.trunc(it.y), Math.trunc(hero.x), Math.trunc(hero.y));
+    const ground = (snapshot.items || []).filter((it) => it.mode === 3 && it.invPage === 255).sort((a, b) => key(a) - key(b) || a.id - b.id);
+    const hoverId = resolvePointerTarget(pointer.x, pointer.y).item?.id || 0;
+    const runs = Module._d2_showitems_begin(canvas.width, canvas.height, ui, Math.trunc(pointer.x), Math.trunc(pointer.y), hoverId);
+    for (const item of runs ? ground : []) {
       const code = itemCode(item), fields = tipFields(item.id, itemStringKey(code));
-      const plate = drawHoverLabel(ctx, { kind: 'item', id: item.id, classId: item.classId, code, label: fields.name, quality: fields.quality, flags: fields.flags, x: item.x, y: item.y }, null, projStatic);
-      if (plate) showItemsEvidence.push({ id: item.id, code, label: plate.requested, box: plate.box,
-        glyphs: plate.glyphs.map((glyph) => ({ ...glyph })) });
+      const lines = (fields.baseName ? `${fields.baseName}\n${fields.name}` : String(fields.name)).split('\n'), colour0 = groundLabelColour(fields.quality, fields.flags);
+      const [worldX, foot] = projStatic(item.x, item.y);
+      const textW = Math.max(...lines.map((line) => groundLabelFont(colour0).measure(line)));
+      const slot = Module._d2_showitems_add(item.id, Math.round(worldX), Math.round(foot - 20), textW, lines.length, fields.quality | 0, colour0 === 5 ? 1 : 0, 0);
+      if (slot < 0) continue;
+      const g = (f) => Module._d2_showitems_slot(slot, f), hot = g(4) === 5;
+      const box = { x: g(0), y: g(1), width: g(2) - g(0), height: g(3) - g(1) + 4 }, colour = hot ? 0 : colour0, labelFont = groundLabelFont(colour), glyphs = [];
+      if (hot) paintHoverPlate(ctx, altHoverBox(box, hoverPlatePalette), hoverPlatePalette, recordPrim);
+      else { ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(box.x, box.y, box.width, box.height); ctx.restore(); }
+      lines.forEach((line, i) => { if (hoverGlyphPainting) labelFont.drawAnchored(ctx, line, box.x + 4, box.y + 16 * i + 13, (glyph) => glyphs.push(glyph)); });
+      showItemsEvidence.push({ id: item.id, code, label: lines.join('\n'), box, glyphs });
     }
-  }
-  // The highlighted label is the click's own pick (label rect or the item's sprite), retail's colour.
-  const hotLabel = showItemsEvidence.length && hoverPlatePalette ? hoveredLabel(showItemsEvidence, resolvePointerTarget(pointer.x, pointer.y).item) : null;
-  if (hotLabel) {
-    const item = snapshot.items.find((it) => it.id === hotLabel.id), fields = tipFields(item.id, itemStringKey(hotLabel.code));
-    drawHoverLabel(ctx, { kind: 'item', hot: true, id: item.id, classId: item.classId, code: hotLabel.code, label: fields.name, quality: fields.quality, flags: fields.flags, x: item.x, y: item.y }, null, projStatic);
   }
   hoverEvidence = clearScreen ? null : drawHoverLabel(ctx,
     heldShowItemsKeys.size && hovered?.kind === 'item' ? null : hovered, proj, projStatic);
@@ -5202,6 +5248,7 @@ hudHelpPointer = bindHudHelpPointer(canvas, {
   changed: () => render(),
 });
 addEventListener('keydown', (e) => {
+  if (screen === SCREEN.SELECT && e.ctrlKey && e.code === 'KeyO' && !e.repeat) { e.preventDefault(); pickCharacterFile(); return; }
   // Escape skips a boot movie, exactly as a click does (retail aborts the logo films on a key too).
   if (screen === SCREEN.TITLE && bootMovieSpec(titlePhase) && e.code === 'Escape' && !e.repeat) { titleAdvance(); e.preventDefault(); return; }
   if (screen === SCREEN.CREDITS && e.code === 'Escape' && !e.repeat) { exitToTitle(); e.preventDefault(); return; }
@@ -6612,6 +6659,8 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
     return header;
   },
   enterCharacterSelect() { return enterCharacterSelect(); },
+  leaveGame() { leaveGame(); },
+  get gameStarted() { return bootstrapStarted; },
   async startLocalGameForScenario() {
     screen = SCREEN.GAME;
     await bootstrapSession();
