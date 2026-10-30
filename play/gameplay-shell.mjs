@@ -98,7 +98,7 @@ import { createGameMenu } from './assets/game-menu.mjs';
 import { saveBeforeExit } from './assets/save-exit.mjs';
 import { MODAL_POINTER_OWNER, modalPointerOwner } from './assets/modal-pointer-priority.mjs';
 import { heldPointerWorldAllowed } from './assets/held-pointer-world.mjs';
-import { createGameClock, GAME_STEP } from './assets/game-clock.mjs';
+import { createGameClock, GAME_STEP, STEP, MAX_CATCHUP_UPDATES } from './assets/game-clock.mjs';
 import { queueHeldPointerRepeat } from './assets/held-pointer-repeat.mjs';
 import { heldWorldAction, leftHandCommand } from './assets/world-click-dispatch.mjs';
 import { createDeathScreen, deathScreenShown, respawnAllowed } from './assets/death-screen.mjs';
@@ -221,7 +221,7 @@ const clock = createGameClock();
 // once per shell update, which ran the whole game 2.4x fast.
 let engineTicks = 0;
 let realmGameClock = 0, realmAnimationFrame = 0;
-let session = null, bootstrapStarted = false, sessionError = '', inventoryLayoutKey = '';
+let session = null, bootstrapStarted = false, sessionEntering = false, sessionError = '', inventoryLayoutKey = '';
 let currentFixture = null, fixtures = [], actSelect = null;
 // A picked save starts in the town of the act its header says it is in (save-store nTown); retail's
 // town level per act is DUNGEON_GetTownLevelIdFromActNo: Rogue Encampment, Lut Gholein, Kurast
@@ -1064,6 +1064,9 @@ function resetFixtureFromSelect() {
 async function bootstrapSession() {
   fitView();
   bootstrapStarted = true;
+  // While the session is being entered the frame loop neither updates nor draws (the player build yields
+  // between the entry phases below, and a frame there would tick or draw a half-built game).
+  sessionEntering = true;
   try {
     fixtures = DEFAULT_SESSION_FIXTURES;
     if (!fixtures.length) throw new Error('monspawn vectors contain no playable fixtures');
@@ -1122,6 +1125,7 @@ async function bootstrapSession() {
     motion = api.motion();
     clearScreen = false;   // a new game starts with its HUD on screen, whatever the last one hid
     helpVisible = false;   // ... and with no panel of the last game's still up
+    if (!navigator.webdriver) await entryYield();   // the engine's load, then the renderers: two tasks
     const assetReader = createMpqAssetReader(Module);
     // The client already uses Units for the retail font renderer in its front end and NPC menus;
     // Font16's glyphs therefore remain on a loaded, 8-bit retail palette in the browser.
@@ -1167,10 +1171,12 @@ async function bootstrapSession() {
     // retail draws `shadow dcc:objects\...` immediately before the matching `cel dcc:` of the same
     // path, frame and anchor.
     objectRenderer = createObjectRenderer(createMpqAssetReader(Module), document, { shadow: true, mayLoad: mayLoadSprite });
+    if (!navigator.webdriver) await entryYield();
     itemRenderer = createItemRenderer(createMpqAssetReader(Module));
     inventoryPanelRenderer = createInventoryPanelRenderer(createMpqAssetReader(Module));
     characterPanelRenderer = createCharacterPanelRenderer(createMpqAssetReader(Module));
     skillPanelRenderer = createSkillPanelRenderer(createMpqAssetReader(Module), document, createSkillPointOverlay());
+    if (!navigator.webdriver) await entryYield();
     try { questLogRenderer = createQuestLogRenderer(createMpqAssetReader(Module), document); messageLogRenderer = createMessageLogRenderer(createMpqAssetReader(Module), document); } catch (error) { sessionError = String(error); }
     try { stashPanelRenderer = createStashPanelRenderer(createMpqAssetReader(Module), document, { string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]),
       stashGold: (limit) => Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [limit]) : 0 }); } catch (error) { stashPanelError = String(error); }
@@ -1178,6 +1184,7 @@ async function bootstrapSession() {
       transmute: Module.ccall('d2_lang_string', 'string', ['string'], ['Transmute']) || 'Transmute' }); } catch (error) { stashPanelError += ' cube: ' + error; }
     try { stashGoldRenderer = createStashGoldRenderer(createMpqAssetReader(Module), document, { string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]) }); } catch (error) { stashGoldError = String(error); }
     try { waypointPanelRenderer = createWaypointPanelRenderer(createMpqAssetReader(Module), document, { string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) }); } catch (error) { waypointPanelError = String(error); }
+    if (!navigator.webdriver) await entryYield();
     beltRenderer = createBeltRenderer(createMpqAssetReader(Module));
     controlPanelRenderer = createControlPanelRenderer(assetReader);
     try { hudHelp = createHudHelp(createMpqAssetReader(Module)); } catch (error) { hudHelp = null; hudHelpError = String(error); }
@@ -1185,6 +1192,7 @@ async function bootstrapSession() {
     // assets name it (Strhelp1..StrHelp22, strClose, strlvlup, strnewskl).
     try { helpRenderer = createHelpOverlayRenderer(createMpqAssetReader(Module), (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key])); helpError = ''; }
     catch (error) { helpRenderer = null; helpError = String(error); }
+    if (!navigator.webdriver) await entryYield();
     try { automapOverlay = createAutomapOverlay({ read: assetReader, Module }); } catch (error) { sessionError = String(error); }
     // The character's saved automap (F186/F268). ?ma0=<url> is the dev shortcut that seeds a layer from
     // a file the page can fetch; otherwise a picked character reads the `<character>.ma0` the save store
@@ -1205,6 +1213,7 @@ async function bootstrapSession() {
       levelMusicSync.reset();
       syncAreaMusic(snapshot.level, { force: true });
     } catch (error) { actMusic = null; musicError = String(error); }
+    if (!navigator.webdriver) await entryYield();
     try { audioVolume.attach('sound', createUiClickSoundPlayer(assetReader, canvas)); } catch (error) { musicError = String(error); }
     try { unitSounds = createUnitSoundPlayer(assetReader, undefined, undefined, soundFetched); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), () => unitSounds.monsterSoundBusy()); eventSounds = createEventSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Event sound', error)), (...a) => Number(Module._d2_client_monster_footstep_row(...a)), (c) => Number(Module._d2_client_monster_footstep_layer(c))); missileSounds = createMissileSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Missile sound', error))); canvas.__d2UnitSound = unitSounds; canvas.__d2EventSound = eventSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader, undefined, undefined, soundFetched)); } catch (error) { musicError = String(error); }
 
@@ -1212,6 +1221,11 @@ async function bootstrapSession() {
     // the first save) so town entry is three shorter tasks, not one 300 ms one; off under webdriver.
     if (!navigator.webdriver) await entryYield();
     if (TERRAIN_ENABLED) loadSessionTerrain(fixture.act0);
+    // The player build decodes the level's DT1 libraries here, one task each with its bytes fetched first,
+    // instead of inside the first frame (library() is keyed by path and pure: the frame finds the same entry).
+    if (TERRAIN_ENABLED && terrain?.preload && terrainFiles && !navigator.webdriver) {
+      for (const path of new Set(terrainFiles.filter(Boolean))) { await soundFetched([path]); terrain?.preload(path); await entryYield(); }
+    }
     // A picked character is not applied to anything: createFromSave above already made it, sections
     // and all, in the act and at the map seed its own header names.
     window.__d2.session = { fixture, snapshot: () => session.snapshot(), move: (x, y) => session.move(x, y), attack: (targetId) => session.attack(targetId), throwSkill: (targetId) => session.throwSkill(targetId), kick: (targetId) => session.kick(targetId), pickup: (itemId) => session.pickup(itemId), drop: (itemId) => session.drop(itemId), useBelt: (slot) => session.useBelt(slot), operate: (objectId) => session.operate(objectId), talk: (npcId) => session.talk(npcId), travelNearest: () => session.travelNearest(), respawn: () => session.respawn(),
@@ -1222,6 +1236,7 @@ async function bootstrapSession() {
     autosaveAt = 0; autosaveAct = snapshot.act; autosaveInFlight = false;
     if (chosenName) { if (!navigator.webdriver) await entryYield(); persistCurrentCharacter(); }
   } catch (error) { sessionError = String(error?.stack || error); }
+  finally { sessionEntering = false; }
 }
 
 function entryYield() { return new Promise((resolve) => setTimeout(resolve, 0)); }
@@ -4411,10 +4426,17 @@ window.__d2Worker = Object.freeze({
 // synchronous network read). A browser long animation frame from OUTSIDE frame() (an input or
 // message handler, GC) lands there too, attributed to its scripts. A freeze a player reports then
 // names its cause. Records never see this: rAF never fires in the test runner tab.
-const HITCH_MS = 50, hitches = window.__d2Hitches = [];
+// The console line is rate-limited (one per HITCH_LOG_MS, naming how many it held back): a run of slow
+// frames printed a warning, with its stack, every frame, and with DevTools open that printing is itself work.
+const HITCH_MS = 50, HITCH_LOG_MS = 5000, hitches = window.__d2Hitches = [];
+let hitchLoggedAt = -Infinity, hitchesHeld = 0;
 function noteHitch(h) {
   hitches.push(h); if (hitches.length > 200) hitches.shift();
-  if ((h.work ?? h.loaf) >= 100) console.warn('d2 hitch', JSON.stringify(h));
+  if ((h.work ?? h.loaf) < 100 && !h.throttled) return;
+  const now = performance.now();
+  if (now - hitchLoggedAt < HITCH_LOG_MS) { hitchesHeld++; return; }
+  console.warn('d2 hitch', JSON.stringify(hitchesHeld ? { ...h, held: hitchesHeld } : h));
+  hitchLoggedAt = now; hitchesHeld = 0;
 }
 try {
   // Each script names its handler's function and source position; the streamfs misses that started inside the
@@ -4432,6 +4454,7 @@ try {
   } }).observe({ type: 'long-animation-frame' });
 } catch { /* no LoAF (Firefox, Safari): the frame() records below still land */ }
 function frame(now) {
+  if (sessionEntering) { last = now; requestAnimationFrame(frame); return; }
   W?.park();
   if (perfSync()) perfFrameStart();
   // The interval between drawn frames is the honest frame time in a real browser (a visible tab): what
@@ -4460,7 +4483,12 @@ function frame(now) {
     const t2 = performance.now();
     if (t2 - t0 >= HITCH_MS || (gap >= 2 * HITCH_MS && gap < 5000)) {
       const sf = window.StreamFS?.stats();
+      // throttled: the browser delivered this frame late (gap past the catch-up cap) while the frame's own
+      // work was a small part of the gap -- a hidden, occluded or power-saving tab, not a catch-up spiral.
+      // A spiral would show work >= gap at the 15-update cap (250 ms of game time per frame).
+      const throttled = gap >= STEP * MAX_CATCHUP_UPDATES && t2 - t0 < gap / 2;
       noteHitch({ at: Math.round(t0), work: Math.round(t2 - t0), gap: Math.round(gap), updates: owed, ticks: engineTicks - ticks0,
+        ...(throttled ? { throttled: true, hidden: document.visibilityState !== 'visible' } : {}),
         updateMs: Math.round(t1 - t0), drawMs: Math.round(t2 - t1), ...(perfEnabled() ? { passes: perfFrameTop() } : {}),
         ...(sf && sf.misses > sf0.misses ? { misses: sf.misses - sf0.misses, stallMs: Math.round(sf.stallMs - sf0.stallMs), lastRead: sf.lastReadUrl } : {}) });
     }
