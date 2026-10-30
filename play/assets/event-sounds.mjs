@@ -3,6 +3,7 @@
 //: base + 4*(terrain-1) [+24 run]. Limits: terrain is retail's fallback
 // category 1 (tile-flag lookup FUN_6FAD26A0 is not exported), the footfall cadence is two per walk cycle
 // (the callback's due predicate is unrecovered) and no 4-row variant is drawn (combat-sound-trigger.mjs).
+const CVT_ROWS = [0, 251, 262, 268, 274, 280, 286, 292]; // D2Client+0xF5538 pair table, first of each pair, by hit class
 const GAIT_BASE = [2768, 2720, 2720, 2768, 2816, 2720, 2720]; // Ama Sor Nec Pal Bar Dru Asn
 import { OBJECT_MODE_SOUNDS, OBJECT_SELECT_SOUNDS, SHARED_ROW_CLASSES } from './object-mode-sounds.mjs';
 export function createEventSounds(read, play, monsterStep = null, monsterLayer = null) {
@@ -31,6 +32,8 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
   const footDue = (c) => circ(c) < circ((c + STEP) % PER) && circ(c) < circ((c - STEP + PER) % PER);
   return {
     /** D2Client 2A750's local action 2 (cast on the ground): 1C150 -> 23C00 plays the walk group's first footfall at once. */
+    /** 2A750's local action 7 (cast on a unit): 24490 -> 242B0 plays the weapon-class row of the client unit; k is the hit class of its weapon, 1 with none. */
+    localAttack(k = 1) { const r = CVT_ROWS[k & 15] ?? 0; if (r > 0) play(r, { kind: 'weapon', unitType: 0, baseRow: r }); },
     localWalk(cls) { play(GAIT_BASE[cls] ?? 2768, { kind: 'footstep', unitType: 0, classId: cls }); },
     /** The engine's own level-up event (soundEvent 2 -> row 7) was played; the level poll below must not repeat it. */
     /** A new session replaced the world: forget the objects seen in the old one (first sight is per session). */
