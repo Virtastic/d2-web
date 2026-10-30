@@ -21,6 +21,7 @@ function rememberBounded(collection, key, value, limit) {
   while (collection.size > limit) collection.delete(collection.keys().next().value);
 }
 
+const STAND_IN = { yy: 'wp', '8y': '5a' };
 function rememberFailure(failures, key, limit) {
   failures.add(key);
   while (failures.size > limit) failures.delete(failures.values().next().value);
@@ -84,7 +85,13 @@ export function createObjectRenderer(read, documentObject = globalThis.document,
       for (const layer of cof.layerRecords) if (object.componentMask & (1 << layer.component)) {
         const component = COMPONENT[layer.component]; if (!component) continue;
         const path = `data\\global\\OBJECTS\\${object.token}\\${component}\\${object.token}${component}LIT${mode}${layer.weaponClass.toUpperCase()}.DCC`;
-        try { components.set(layer.component, decodeDcc(read(path), { directions: [direction] })); } catch {}
+        try { components.set(layer.component, decodeDcc(read(path), { directions: [direction] })); }
+        catch {
+          // The Harrogath and Crystalline Passage waypoints' own art ships zero-filled in d2exp.mpq, so it never decodes and the object
+          // has no sprite to pick. Draw another waypoint's art with the same frame count instead.
+          const alt = STAND_IN[object.token];
+          if (alt) try { components.set(layer.component, decodeDcc(read(path.split(object.token).join(alt)), { directions: [direction] })); } catch {}
+        }
       }
       if (!components.size) throw new Error('no DCC components');
       // This selector depends only on the decoded COF. Keep it with the cached animation so static
