@@ -16,7 +16,7 @@ struct Services {
  virtual void* load(void* table)=0;                     // +0x69970
  virtual int32_t canonId(int32_t)=0;                    // +0x69090
  virtual bool lookupName(void*,int32_t)=0;              // +0x69010
- virtual void a69850(int32_t)=0; virtual void a69830(int32_t)=0; virtual void a69770(int32_t)=0;
+ virtual void a69850(void* unit,int32_t)=0; virtual void a69830(void* unit,int32_t)=0; virtual void a69770(void* unit,int32_t)=0;  // unit in EDX
  virtual void* allocLink()=0;
  virtual bool pending(int32_t)=0; virtual void flush()=0;
  // used by 0x69CC0
@@ -68,9 +68,9 @@ void* loadCache(Services& s, void* table, const char* name, int32_t maxCount, ui
  return n;
 }
 // 1.13c D2Client+0x69A90
-void dispatchByMode(Services& s, int32_t slot, int32_t arg) {
+void dispatchByMode(Services& s, void* unit, int32_t slot, int32_t arg) {  // unit = entry ECX, passed on as EDX
  if (slot > 0xf) return;
- switch (s.mode()) { case 0: s.a69850(arg); return; case 1: s.a69830(arg); return; case 2: s.a69770(arg); return; }
+ switch (s.mode()) { case 0: s.a69850(unit,arg); return; case 1: s.a69830(unit,arg); return; case 2: s.a69770(unit,arg); return; }
  s.fatal(0xd3e);
 }
 // 1.13c D2Client+0x69B40 (GUESS: unit* via eax, link out via param_1)

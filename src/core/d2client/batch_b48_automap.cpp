@@ -147,7 +147,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_5fb50(D2cHost h, D2cAutomapG* g) {
     for (int i = 0; i < 4; i++) {
         if (i == 3 && !small && ord(h, 10227) == 0) { *g->cel[3] = 0; *g->celH[3] = 0; return; }
         snprintf(p, sizeof p, "%s\\UI\\AutoMap\\%s%s", "DATA\\GLOBAL", nm[i], small ? "S" : "");
-        *g->cel[i] = (i32)go(h, 0x2B420, P(p), P(p), P(p), 0);
+        *g->cel[i] = (i32)go(h, 0x2B420, P(p), 0, 0);   // path in EAX, one stack arg = 0
         *g->celH[i] = (i32)ord(h, 10086, (u32)*g->cel[i]);
     }
 }

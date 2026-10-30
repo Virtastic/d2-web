@@ -18,7 +18,7 @@
 namespace {
 D2cHost g_h;
 // Module globals, each with its retail RVA (VA - 0x6FAB0000).
-uint32_t g_imeOn;          // +0x112038 DAT_6fbcc038
+uint32_t g_imeOn;          // +0x11C038 DAT_6fbcc038
 uint32_t g_imeMode;        // +0x112030 DAT_6fbcc030
 uint32_t g_imeFlag64;      // +0x113F64 DAT_6fbc3f64 (byte)
 uint32_t g_gameType;       // +0x113F60 DAT_6fbc3f60
@@ -30,7 +30,8 @@ uint32_t g_textColA, g_textColB, g_textColC;  // +0x112004 / +0x112008 / +0x1120
 uint32_t g_panelX, g_panelY;                  // +0x11B9A0 / +0x11B9A4 DAT_6fbcb9a0/a4
 uint32_t g_nopickup;       // +0x1122F0 DAT_6fbcc2f0
 uint32_t g_fpsShown;       // +0x1122C8 DAT_6fbcc2c8
-uint32_t g_fpsMode;        // +0x1122C0 DAT_6fbcc2c0
+uint32_t g_fpsMode;        // +0x11C2C0 DAT_6fbcc2c0
+uint32_t g_fpsSaved;       // +0xFAD94 DAT_6fbaad94 (the /fps and /framerate save word)
 uint32_t g_gameMode;       // +0x1123A4 gate / 0x112394 DAT_6fbcc394 below
 uint32_t g_netMode;        // +0x112394 DAT_6fbcc394
 uint32_t g_clientNet;      // DAT_6fbcb980 (+0x221 vtable ptr): host-resolved, see chatVt()
@@ -40,6 +41,12 @@ inline uint32_t call(uint32_t rva, uint32_t eax = 0, uint32_t ecx = 0, uint32_t 
     D2cCall c = {};
     c.rva = rva; c.eax = eax; c.ecx = ecx; c.edx = edx;
     c.s[0] = s0; c.s[1] = s1; c.s[2] = s2; c.s[3] = s3;
+    return g_h(&c);
+}
+// Same seam with ESI set (packet-pointer callees such as 0x147A0).
+inline uint32_t callEsi(uint32_t rva, uint32_t esi) {
+    D2cCall c = {};
+    c.rva = rva; c.esi = esi;
     return g_h(&c);
 }
 inline uint32_t ord(uint32_t n, uint32_t eax = 0, uint32_t ecx = 0, uint32_t edx = 0, uint32_t s0 = 0,
@@ -266,11 +273,14 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2c_70700(char* line, const char* cmd) {
 // FUN_6fb1ec30 parse are seam; "/players" confirmation text goes through Ordinal_10049.
 EMSCRIPTEN_KEEPALIVE void d2c_707F0(char* text) {
     if (!strcasecmp(text, "/fps") || !strcasecmp(text, "/framerate")) {
-        if (text[1] == 'f' && text[2] == 'p' && text[3] == 's') { if (g_fpsShown || !g_fpsMode) call(0x5A5E0); g_fpsShown = 1; }
+        if (!strcasecmp(text, "/fps")) { if (g_fpsShown || !g_fpsMode) call(0x5A5E0); g_fpsShown = 1; }
         else call(0x5A5E0);
-        ord(10227);
+        uint32_t saved = g_fpsSaved;   // DAT_6fbaad94 read before Ordinal_10227
+        ord(10227);                    // DAT_6fb8d5d0 != 0x26 error exit not modelled
+        g_fpsSaved = 0;
+        if (saved == 0) return;
         call(0x6F4A0);
-        return;
+        return;                        // retail falls through to the tail block (DAT_6fbaadb0.. gates) -- not modelled
     }
     if (!strncasecmp(text, "/players", 8) && (g_netMode == 0 || g_netMode == 1 || g_netMode == 6 || g_netMode == 8)) {
         long n = atol(text + 8); n = n < 2 ? 1 : n > 7 ? 8 : n;
@@ -279,15 +289,24 @@ EMSCRIPTEN_KEEPALIVE void d2c_707F0(char* text) {
     if (!strcasecmp(text, "/nopickup")) g_nopickup = !g_nopickup;
     else if (!strcasecmp(text, "soundchaosdebug")) call(0x88D00);
     else {
-        uint8_t kind = 1;
-        if (!g_imeOn || (uint8_t)call(0x6EC00)) { if (call(0x6EC30, 0, uptr(text), uptr(&kind)) && kind == 0) { /* packet 0x14 */ } }
-        else if (kind == 3) {
+        uint8_t kind = 1, op = 0x15;   // cStack_11f, uStack_120
+        uint32_t p = uptr(text);       // local_124: FUN_6fb1ec30 may advance it
+        uint8_t scratch[25] = {};      // auStack_1d
+        if ((!g_imeOn || (uint8_t)call(0x6EC00)) && call(0x6EC30, 0, uptr(&p), uptr(&kind), uptr(scratch)) && kind == 0) op = 0x14;
+        else if (kind == 3 && (!g_imeOn || (uint8_t)call(0x6EC00))) {
             if (!call(0x70500, 0, 1) && !call(0x70500, 0, 1) && !call(0x70500, 0, 1) && !call(0x70500, 0, 1) &&
                 !call(0x70700) && !call(0x70700)) chatVt(0x14);
             call(0xC2790, 0, 5, 1);
             return;
         }
-        call(0x147A0, 0, uptr(text));  // FUN_6fac47a0: send chat packet
+        const char* s = (const char*)(uintptr_t)p;
+        if (strlen(s) > 0) {           // packet: [0]=op [1]=kind [2]=game type, text at +3 (cap 0x100), NUL at +0x103
+            uint8_t pkt[0x104] = {};
+            size_t n = strlen(s);
+            pkt[0] = op; pkt[1] = kind; pkt[2] = (uint8_t)g_gameType;
+            std::memcpy(pkt + 3, s, n < 0x100 ? n : 0x100);
+            callEsi(0x147A0, uptr(pkt));   // FUN_6fac47a0 reads the packet through ESI
+        }
     }
     call(0xC2790, 0, 5, 1);
 }

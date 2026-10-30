@@ -14,8 +14,8 @@ struct Services {
  virtual void drawText(int32_t x,int32_t y,const char* s)=0; // Ordinal_10050 (already formatted)
  virtual uint32_t tick()=0; virtual uint32_t videoMode()=0;
  virtual void memStatus(uint32_t& tp,uint32_t& ap,uint32_t& tf,uint32_t& af)=0;
- virtual int32_t gfxMem()=0; virtual int32_t spriteCacheUsed()=0; virtual int32_t spriteCacheMax()=0;
- virtual int32_t asyncFiles()=0; virtual int32_t celCacheUsed()=0; virtual int32_t celCacheMax()=0;
+ virtual int32_t gfxMem()=0; virtual int32_t spriteCacheStat()=0; // Ordinal_10032(Ordinal_10058())
+ virtual int32_t asyncFiles()=0; virtual int32_t celCacheStat()=0; // Ordinal_10082(Ordinal_10010())
  virtual int32_t textWidth(const uint16_t* s)=0;   // Ordinal_10028 (current font)
  virtual void showText(const uint16_t* s,int32_t a,int32_t b,int32_t c)=0; // Ordinal_10150
  virtual void saveFont()=0; virtual void restoreFont()=0;                 // Ordinal_10184 pair
@@ -72,9 +72,10 @@ void frameOverlay(Services& s,State& st){
  if(st.detail==0){
   emit(s,10,0x78,"GFX Memory->%i",s.gfxMem());
   emit(s,10,0x84,"COF Memory->%i of %i",st.cacheHandles[0],st.cacheHandles[1]);
-  emit(s,10,0x90,"Sprite Cache Memory->%i of %i",s.spriteCacheUsed(),s.spriteCacheMax());
+  // one vararg is passed in 1.13c; the second %i has no argument in the decompile (passed as 0 here)
+  emit(s,10,0x90,"Sprite Cache Memory->%i of %i",s.spriteCacheStat(),0);
   emit(s,10,0x9c,"Async Files->%i",s.asyncFiles());
-  emit(s,10,0xa8,"CelData Cache Memory->%i of %i",s.celCacheUsed(),s.celCacheMax());
+  emit(s,10,0xa8,"CelData Cache Memory->%i of %i",s.celCacheStat(),0);
   cacheOverlay(s);
  }
 }

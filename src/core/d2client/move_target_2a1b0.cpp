@@ -17,8 +17,8 @@ struct Calls {
 struct Globals { P player; U g9804; U cc3b8; };  // DAT_6fbcbbfc, DAT_6fbc9804, DAT_6fbcc3b8
 // 1.13c D2Client+0x2A1B0
 void sub_2A1B0(P esi,U x,U y,U mode,U p2,U p3,const Globals& g,Calls& c){
- x&=0xffff; y&=0xffff; mode&=0xffff; // (short)param_1 tested, == compared as int
- if(!x||!(mode&0xffff)) return;
+ x&=0xffff; y&=0xffff; // mode stays full 32-bit: retail compares param_1 as int; only the store and the nonzero gate use (short)
+ if(!x||!static_cast<int16_t>(mode)) return;
  if(rd(esi,0xc4)&0x10000) return;
  U t=rd(esi,0x10), k=rd(esi,0);
  if(k==0){ if(t==0||t==0x11) return; }

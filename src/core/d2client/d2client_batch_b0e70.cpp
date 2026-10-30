@@ -22,7 +22,8 @@ struct D2cEnvB0e70 {
     D2cFn o10998, o10178, o10043, f69700, o10505, o11016, o10692;           // B0E70
     D2cFn f1380, o11029, o10240, f60450;                                    // B1080
     D2cFn o11018, f560d0, f1660, f1630, f51860, f602e0;                     // B1270
-    D2cFn f25d0, f38c20, o10398, f585f0, f56ef0;                            // B1720
+    D2cFn f25d0, f38c20, o10398, f585f0;                                    // B1720
+    void (*f56ef0)(U tab, U lo7, U id, U kind);                              // FUN_6fb56ef0 (0x56EF0), 4 args
     D2cFn f60df0, o10331, o10750, o10867, f1400, o10057;                    // B1AF0
     D2cFn o10818, f617c0;                                                   // B1CC0
     D2cFn o10985, o10441;                                                   // B24A0
@@ -102,8 +103,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_b1720(D2cEnvB0e70* e, U esi) {
     }
     if (E.o10398(0,0,0)) E.f585f0(0,0,0);
     uint32_t type = E.ld32(esi, 0), id = E.ld32(esi, 0xc);
-    if ((E.ld32(esi, 0xc4) >> 0x15) & 1) E.f56ef0(E.tabB9A08 + (U)type * 0x200, id & 0x7f, id);
-    else                                  E.f56ef0(E.tabBA608 + (U)type * 0x80,  id & 0x7f, id);
+    if ((E.ld32(esi, 0xc4) >> 0x15) & 1) E.f56ef0(E.tabB9A08 + (U)type * 0x200, id & 0x7f, id, type);
+    else                                  E.f56ef0(E.tabBA608 + (U)type * 0x80,  id & 0x7f, id, type);
 }
 
 // 1.13c D2Client+0xB1AF0 (eax = unit): mode dispatch through the 0x6FB8D8A0 handler table.

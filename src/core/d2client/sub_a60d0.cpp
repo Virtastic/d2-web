@@ -6,7 +6,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_a60d0(D2cHost h, const uint32
     if (!u) return 0xFFFFFFFFu;
     if (!((u[200 / 4] >> 10) & 1)) return 0;
     const uint32_t mode = u[0x94 / 4];
-    const uint32_t tab = mode == 3 ? 0x10A008u : 0x10A608u + mode * 0x200u;   // 0x6FBBA008 / 0x6FBBA608 + mode*0x80 dwords, as RVAs
-    D2cCall k = { 0xA4E20, mode, u[0x98 / 4], 0xB2000000u | tab, 0, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } };   // register assignment unverified
+    const uint32_t key = u[0x98 / 4];
+    const uint32_t tab = mode == 3 ? 0x10A008u : 0x10A608u + mode * 0x200u;   // RVA 0x10A008 (mode 3) / 0x10A608 + mode*0x200 bytes
+    // EAX = key & 0x7F, ECX = key, EDX = table, stack arg = mode (disassembly: shl edx,9; and eax,0x7f; push mode).
+    D2cCall k = { 0xA4E20, key & 0x7Fu, key, 0xB2000000u | tab, 0, 0, { mode, 0, 0, 0 }, { 0, 0, 0, 0 } };
     return h(&k);
 }

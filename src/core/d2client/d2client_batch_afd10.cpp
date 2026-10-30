@@ -13,7 +13,7 @@ struct Env {
  void (*o10034)(uint32_t); void (*f3cb00)();
  int32_t (*o10985)(); int32_t (*o10191)(P); uint32_t (*o11029)(P); void (*o10240)(P, uint32_t);
  int32_t (*o10973)(P); void (*o10887)(P, int32_t, int32_t, int32_t);
- P (*f560d0)(uint32_t); P (*f630f0)(uint32_t kind, P unit);
+ P (*f560d0)(uint32_t); P (*f630f0)(const uint32_t* block);  // B30F0 takes one 0x17-dword block
  uint32_t (*o10042)(uint32_t, uint32_t); void (*o10706)(uint32_t, uint32_t);
  int32_t (*o10867)(P); int32_t (*o10750)(P); uint32_t (*o10818)(P);
  void (*o10286)(P, int32_t, int32_t); void (*o10558)(P, int32_t); void (*o10970)(P);
@@ -92,7 +92,9 @@ P sub_B0450(const Env& e, uint32_t p1, P u) {
  if (!u) return 0;
  int32_t t = (int32_t)e.rd32(u);
  if (t != 0 && t != 1) { u = e.f560d0(p1); if (!u) return 0; }
- return e.f630f0(0x20, u);
+ uint32_t b[0x17] = {};  // zeroed block as the decompile does, then block[0]=0x20, block[1]=unit
+ b[0] = 0x20; b[1] = (uint32_t)u;
+ return e.f630f0(b);
 }
 // 1.13c D2Client+0xB0870
 uint32_t sub_B0870(const Env& e, P u) {

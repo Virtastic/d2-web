@@ -25,6 +25,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE
 int32_t d2_client_88a70(const D2cSndSubmitEnv* E, int32_t id, uint32_t unit, int32_t off, int32_t p3, int32_t p4) {
     if (!E->enabled || id < 1) return 0;
     const uint8_t* row = (E->recs && id < E->count) ? E->recs + (size_t)id * 0x8E : nullptr;
+    if (!row) return 0;
     if (rd<uint8_t>(row, 0x3C) == 0) return 0;
     uint8_t* e = nullptr;
     if (rd<int16_t>(row, 0x45) != 0) e = E->find87fe0(0);
