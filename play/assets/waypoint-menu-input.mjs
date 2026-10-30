@@ -78,3 +78,10 @@ export function createWaypointMenuInput() {
     },
   };
 }
+
+// Retail's row buttons are momentary (FUN_6FB5A4E0 stores the pressed row, FUN_6FB5A740 travels only when
+// the release hits that same row; any other release just clears it). `hit` is hitTest's result at the
+// release point; the return is the level to travel to, or null.
+export function waypointRowRelease(pressedLevelId, hit) {
+  return pressedLevelId !== null && hit?.action === 'row' && hit.row.active && hit.row.levelId === pressedLevelId ? pressedLevelId : null;
+}

@@ -3,6 +3,8 @@
 // matched against D2MOO StringIds.h. Quest entries are re-derived from StringIds names
 // and included only when their exact 1.13c handle exists. ID 68 is a listfile-confirmed
 // alternate WAV without a Sounds.txt row and is handled by the direct-file override below.
+import { NPC_TOWN_VOICE } from './npc-town-voices.mjs';
+
 const VOICE_BY_MESSAGE = Object.freeze({
   0: 'warriv_act1_intro',
   1: 'warriv_act1_intro_pal',
@@ -609,7 +611,7 @@ const VOICE_BY_MESSAGE = Object.freeze({
 });
 
 export function npcDialogueVoiceHandle(messageId) {
-  return VOICE_BY_MESSAGE[Number(messageId)] ?? null;
+  return VOICE_BY_MESSAGE[Number(messageId)] ?? NPC_TOWN_VOICE[Number(messageId)] ?? null;
 }
 
 // This Charsi alternate exists in the retail listfile but has no Sounds.txt row.

@@ -21,6 +21,7 @@ import { createFont, decodeFontTbl, FRONTEND, textColourPalette } from './fronte
 import { BORDER_LEFT, BORDER_RIGHT, createPanelChrome } from './panel-chrome.mjs';
 import { recordDc6, recordPrim } from './drawlist.mjs';
 import { inventoryItemAsset } from './inventory-panel.mjs';
+import { boxIndices, boxSlot } from './item-box-colour.mjs';
 
 export const VENDOR_ASSETS = {
   palette: 'data\\global\\palette\\ACT1\\pal.dat',
@@ -144,7 +145,7 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, s
   const visibleBlits = new WeakMap();
   // A stock item sits on retail's box, colour 234 in draw mode 0 (AlphaBlend[2][under][234]), as in the
   // inventory (s197/s250), read back from the canvas as palette indices.
-  const itemBackground = (ctx, x, y, w, h, colour = 234) => {
+  const itemBackground = (ctx, x, y, w, h, colour) => {
     const { pl2, index, palette } = cur;
     const X = Math.round(x), Y = Math.round(y), W = Math.round(w), H = Math.round(h);
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -259,7 +260,7 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, s
         const x = L.gridLeft + it.gridX * L.cell, y = L.gridTop + it.gridY * L.cell;
         if (img) {
           const t = ctx.getTransform();
-          itemBackground(ctx, t.e + x * t.a, t.f + y * t.d, Math.ceil(img.width / L.cell) * L.cell * t.a, Math.ceil(img.height / L.cell) * L.cell * t.d, hovered && hovered.id === it.id ? 118 : 234);
+          itemBackground(ctx, t.e + x * t.a, t.f + y * t.d, Math.ceil(img.width / L.cell) * L.cell * t.a, Math.ceil(img.height / L.cell) * L.cell * t.d, (cur.boxes ||= boxIndices(cur.palette))[boxSlot(it, hovered && hovered.id === it.id)]);
           let visiblePixels = visibleBlits.get(img);
           if (visiblePixels === undefined) {
             visiblePixels = changedOutputPixels(ctx, t, x, y + 1, img.width, img.height, () => ctx.drawImage(img, x, y + 1));
@@ -289,7 +290,7 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, s
       chrome.border(ctx, state?.act || 1, BORDER_LEFT); chrome.border(ctx, state?.act || 1, BORDER_RIGHT);
       ctx.restore();
       return { box: { x: L.left, y: L.top, width: panel.width, height: panel.height }, tab, tabs: [...lastTabs], shown, total: items.length,
-        drawnIcons, drawnItems, undrawnItems, hover: hovered ? { id: hovered.id, colour: 118, gridX: hovered.gridX, gridY: hovered.gridY, invWidth: hovered.invWidth || 1, invHeight: hovered.invHeight || 1 } : null, tooltip: null, table, hint: null, scroll: 0, gold: state?.gold ?? -1, buttons };
+        drawnIcons, drawnItems, undrawnItems, hover: hovered ? { id: hovered.id, colour: cur.boxes?.[1] ?? 118, gridX: hovered.gridX, gridY: hovered.gridY, invWidth: hovered.invWidth || 1, invHeight: hovered.invHeight || 1 } : null, tooltip: null, table, hint: null, scroll: 0, gold: state?.gold ?? -1, buttons };
     },
     // Retail draws the hovered item's tooltip and the button hint LAST, over the inventory panel: in
     // the retail captures the InvChar cels at x 400 come before the tooltip box. The shell calls

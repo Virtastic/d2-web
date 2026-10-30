@@ -1,5 +1,6 @@
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
-import { createBlender } from './frontend.mjs';
+import { createBlender, createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
+import { objectRetailName } from './object-hover-label.mjs';
 import { UNIT_CENTRE_Y } from './session-terrain.mjs';
 import { MA0_K } from './ma0.mjs';
 import { createAutomapRecordIndex, selectIndexedAutomapRecord } from './automap-record-index.mjs';
@@ -103,7 +104,61 @@ export function automapNpcsInViewport(npcs, viewport) {
 export function automapUnitScreen(cx, cy, hero, wx, wy, scale) {
   return { sx: cx + ((wx - wy) - (hero.x - hero.y)) * 16 * scale, sy: cy + ((wx + wy) - (hero.x + hero.y)) * 8 * scale };
 }
-const HERO_COLOUR = 151, NPC_COLOUR = 32;
+const HERO_COLOUR = 151, NPC_COLOUR = 32, NAME_COLOUR = 4, OBJECT_NAME_COLOUR = 0;
+// D2Client 0x6fb119e0's name rule (cov-a4-automap: Tyrael's cross centred 400,244 -> 'Tyrael' at 383,234): the
+// Font6 string is centred on the cross by its measured width and its bottom row sits 10 px above the cross centre.
+export function automapNameAt(crossX, crossY, width) { return [crossX - Math.trunc(width / 2), crossY - 10]; }
+
+// The town picture callback D2Client 0x62760 (D2Common DRLGPRESET_GenerateLevel calls it INSTEAD of the per-room
+// pfAutomap for Lut Gholein, the Pandemonium Fortress and Harrogath). X/Y are the level centre in tiles
+// (nPosX + nWidth/2, integer). It lays the family's frames row-major from (x0,y0) in full-map automap pixels
+// (Ordinal 10375 then /10: AX=(X-Y)*8, AY=(X+Y)*4), frame++ every column, skipping Act2Map's listed frames.
+const ACT2_SKIP = Object.freeze([0, 10, 15, 16, 19, 20, 25, 30, 35, 36, 39]);   // 0x6fb82db8, -1 terminated
+export const TOWN_PICTURES = Object.freeze({
+  40: { family: 'act2', cols: 5, rows: 4, w: 160, h: 100, dx: -453, dy: -119 },
+  103: { family: 'act4', cols: 2, rows: 2, w: 136, h: 90, dx: -133, dy: -40 },
+  109: { family: 'extn', cols: 3, rows: 2, w: 180, h: 170, dx: -250, dy: -15 },
+});
+export const TOWN_PICTURE_PATHS = Object.freeze({
+  act2: { full: 'data\\global\\ui\\automap\\act2map.dc6', mini: 'data\\global\\ui\\automap\\act2maps.dc6' },
+  act4: { full: 'data\\global\\ui\\automap\\act4map.dc6', mini: 'data\\global\\ui\\automap\\act4maps.dc6' },
+  extn: { full: 'data\\global\\ui\\automap\\extnmap.dc6', mini: 'data\\global\\ui\\automap\\extnmaps.dc6' },
+});
+// `rect` is d2_session_level_rect's subtile [x, y, w, h] (nPos*5, nSize*5). `pickedFile` only matters for level 40
+// (start frame 20 unless the picked DS1 is 1); null there means "not known", and no cells are produced.
+export function townPictureCells(levelId, rect, pickedFile = null) {
+  const g = TOWN_PICTURES[levelId];
+  if (!g || !rect || !(rect[2] > 0 && rect[3] > 0)) return null;
+  if (levelId === 40 && !Number.isInteger(pickedFile)) return null;
+  const X = Math.trunc(rect[0] / 5) + Math.trunc(Math.trunc(rect[2] / 5) / 2), Y = Math.trunc(rect[1] / 5) + Math.trunc(Math.trunc(rect[3] / 5) / 2);
+  const ax = Math.trunc((X - Y) * 80 / 10), ay = Math.trunc((X + Y) * 40 / 10);
+  const cells = [];
+  let frame = levelId === 40 && pickedFile !== 1 ? 20 : 0;
+  for (let r = 0; r < g.rows; r++) for (let c = 0; c < g.cols; c++, frame++) {
+    if (levelId === 40 && ACT2_SKIP.includes(frame)) continue;
+    cells.push({ frame, x: ax + g.dx + c * g.w, y: ay + g.dy + r * g.h });
+  }
+  return { family: g.family, cells };
+}
+// D2Client 0x61D00 -> 0x61780: an object with a non-zero objects.txt AutoMap cell adds that MaxiMap frame at
+// (trunc(px/10)+1, trunc(py/10)-3), px/py its world pixel point (Ordinals 10651/11142). The bank (0x10B) only in
+// acts 3/4 (act index 2,3), 0x16E only in mode 2, 0x192 only on level 74.
+export function automapObjectCell(object, cellNo, actIndex, levelId) {
+  if (!cellNo) return null;
+  if (object.classId === 0x10B && actIndex !== 2 && actIndex !== 3) return null;
+  if (object.classId === 0x16E && object.mode !== 2) return null;
+  if (object.classId === 0x192 && levelId !== 74) return null;
+  return { frame: cellNo, x: Math.trunc((object.x - object.y) * 16 / 10) + 1, y: Math.trunc((object.x + object.y) * 8 / 10) - 3 };
+}
+// D2Client 0x138c0 sets a tile's 0x20000 as the world pass submits it, and RevealAutomapRoom (0x62580) on the
+// per-frame path (clipFlag 0) only takes tiles carrying it. The browser's world pass does not run 0x138c0, so the
+// submitted set is taken as the tiles whose floor diamond (160x80, top corner at the tile origin) meets the screen.
+export function automapTileOnScreen(tile, hero, cx, cy, width, height) {
+  const sx = cx + ((tile.worldX - tile.worldY) * 5 - (hero.x - hero.y)) * 16, sy = cy + ((tile.worldX + tile.worldY) * 5 - (hero.x + hero.y)) * 8;
+  return sx + 80 > 0 && sx - 80 < width && sy + 80 > 0 && sy < height;
+}
+// LvlPrest AutoMap=1 levels that take pfAutomap at generation: every room revealed with clipFlag 1.
+const ENTRY_REVEAL_LEVELS = new Set([1, 75]);
 function line(ctx, x0, y0, x1, y1) {   // Bresenham, 1 px, no antialiasing
   const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
   let err = dx + dy;
@@ -148,7 +203,7 @@ export function getAutomapLayer(layers, levelLayers, levelId, seed = () => {}) {
   return layers.get(layerNo);
 }
 export function getAutomapRevealState(revealed, levelId) {
-  if (!revealed.has(levelId)) revealed.set(levelId, { rooms: new Set(), hero: null });
+  if (!revealed.has(levelId)) revealed.set(levelId, { rooms: new Set(), entryRooms: new Set(), hero: null, pictures: false });
   return revealed.get(levelId);
 }
 // Retail's automap layer is drawn as typed lists. The browser keeps one Map, so the visible pass
@@ -182,6 +237,7 @@ export function serializeAutomapLayers(layers, saved) {
   for (const [layerNo, layer] of layers) {
     covered.add(layerNo);
     for (const cell of layer.values()) {
+      if (cell.kind) continue;   // pObjects/pExtras: a .ma0 chunk saves floors and walls only (its object/extra sizes are 0)
       const px = cell.saved || [Math.round((cell.world[0] - cell.world[1]) * 1.6 + MA0_K.x), Math.round((cell.world[0] + cell.world[1]) * 0.8 + MA0_K.y)];
       push(layerNo, cell.frame, px[0], px[1], cell.layer ? 1 : 0);
     }
@@ -222,23 +278,62 @@ const tileReadSignature = (tiles) => {
 export function createAutomapOverlay({ read, Module, documentObject = globalThis.document }) {
   const rows = rowsFromTxt(read('data\\global\\excel\\automap.txt'));
   const recordIndex = createAutomapRecordIndex(rows);
-  const palette = decodeDatPalette(read('data\\global\\palette\\act1\\pal.dat'));
-  // D2Client's mini-map Fade=No path sends each ordinary cell through DrawMode 1 (PL2
-  // AlphaBlend[1]); the town palette is the current measured automap palette.
-  const blend = createBlender(read('data\\global\\palette\\act1\\pal.pl2'), palette);
+  // The map is drawn through the CURRENT act's palette, as every in-game D2Gfx draw is: act 1's pal.dat
+  // differs from acts 2-5 in ~90 entries, which recoloured the Act 4 cells. D2Client's mini-map Fade=No path
+  // sends each ordinary cell through DrawMode 1 (that act's PL2 AlphaBlend[1]).
+  const actPalettes = new Map();
+  const actPalette = (act) => {
+    const a = Math.min(5, Math.max(1, act | 0));
+    if (!actPalettes.has(a)) {
+      const dir = `data\\global\\palette\\act${a}\\`, palette = decodeDatPalette(read(`${dir}pal.dat`)), pl2 = read(`${dir}pal.pl2`);
+      actPalettes.set(a, { act: a, palette, pl2, blend: createBlender(pl2, palette), fonts: new Map() });
+    }
+    return actPalettes.get(a);
+  };
+  let pal = actPalette(1), palette = pal.palette, blend = pal.blend;
+  // Retail's per-unit pass prints names in Font6 through a D2Win colour (NPCs 4, the stash 0).
+  const fontFor = (colour) => {
+    if (!pal.fonts.has(colour)) {
+      let font = null;
+      try {
+        font = createFont({ dc6: decodeDc6(read('data\\local\\font\\latin\\font6.dc6')), tbl: decodeFontTbl(read('data\\local\\font\\latin\\font6.tbl')),
+          palette: textColourPalette(pal.pl2, palette, colour), documentObject, path: 'data\\local\\font\\latin\\font6.dc6', drawAs: { op: 'celcolor', mode: 5 } });
+      } catch { font = null; }
+      pal.fonts.set(colour, font);
+    }
+    return pal.fonts.get(colour);
+  };
+  // objects.txt AutoMap (the 0x61D00 walk's row+0x1BC), by class id; read once, on first use.
+  let objectCells = null;
+  const objectCell = (classId) => {
+    if (!objectCells) {
+      objectCells = new Map();
+      try {
+        const lines = decodeText(read('data\\global\\excel\\objects.txt')).replace(/\r/g, '').split('\n');
+        const h = lines[0].split('\t').map((x) => x.trim().toLowerCase()), id = h.indexOf('id'), am = h.indexOf('automap');
+        for (const line of lines.slice(1)) { const f = line.split('\t'), c = number(f[id]), v = number(f[am]); if (c >= 0 && v > 0) objectCells.set(c, v); }
+      } catch { /* no objects.txt: no object cells */ }
+    }
+    return objectCells.get(classId) || 0;
+  };
   // F234: the two art families, built on first use. `divisor` is retail's `nAutoMapZoomDivisor`
   // (0x6fba16b0): the loader writes 10 for the full map and 20 when mode == 1 (0x6fb1476b/0x6fb14777),
   // and the world->map scale is 1/divisor. `step` is read off the sheet rather than declared (a cell is
   // one world tile, so the sheet's widest frame box is the tile's footprint on the map); it is kept for
   // evidence and confirmation, the divisor is what the RE'd rule fixes the scale to.
-  const buildFamily = (mode) => {
-    const key = nativeAutomapMode(mode) === 1 ? 'mini' : 'full', path = AUTOMAP_PATHS[key], dc6 = decodeDc6(read(path));
+  const buildFamily = (mode, paths = AUTOMAP_PATHS) => {
+    const key = nativeAutomapMode(mode) === 1 ? 'mini' : 'full', path = paths[key], dc6 = decodeDc6(read(path));
     return { key, path, divisor: key === 'mini' ? 20 : 10, step: Math.max(...dc6.frames.map((frame) => frame.width)),
       rawFrames: dc6.frames, samples: dc6.frames.map((frame) => frame.opaque.findIndex((value) => value !== 0)),
       frames: dc6.frames.map((frame) => makeFrameCanvas(frame, palette, documentObject)) };
   };
-  const families = new Map([['full', buildFamily('full')]]);
-  const family = (mode) => { const key = nativeAutomapMode(mode) === 1 ? 'mini' : 'full'; if (!families.has(key)) families.set(key, buildFamily(key)); return families.get(key); };
+  // Keyed by sheet AND act: a frame canvas carries its palette.
+  const families = new Map([['maxi:full:1', buildFamily('full')]]);
+  const family = (mode, picture = null) => {
+    const key = nativeAutomapMode(mode) === 1 ? 'mini' : 'full', k = `${picture || 'maxi'}:${key}:${pal.act}`;
+    if (!families.has(k)) families.set(k, buildFamily(key, picture ? TOWN_PICTURE_PATHS[picture] : AUTOMAP_PATHS));
+    return families.get(k);
+  };
   // F234's five options, exactly as the Automap Options page holds them (game-menu.mjs AUTOMAP_DEFAULTS).
   // Default `full` is retail's page default and the layout this overlay drew before the options existed.
   let settings = { mode: 'full', fade: 'off', center: 'yes', party: 'yes', names: 'yes', left: 'yes' };
@@ -296,6 +391,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
       // art family follows the mode, so the active sheet and the layout move with it, BEFORE the layer
       // seeding below reads `frames`.
       if (nextSettings) settings = { ...settings, ...nextSettings };
+      pal = actPalette(snapshot.act || 1); palette = pal.palette; blend = pal.blend;
       frames = family(settings.mode).frames;
       layout = Object.freeze(makeLayout(width, height));
       const fam = family(settings.mode), mode = fam.key, nativeMode = nativeAutomapMode(settings.mode);
@@ -315,7 +411,7 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
           // Layer creation (amap5: 35 RevealAutomapRoom calls, ret 6FB12AD4) reveals every room built at game entry; later Room1 changes reveal the near set.
           const entry = rv.hero === null && rv.rooms.size === 0;
           rv.hero = `${heroRoom.x},${heroRoom.y}`;
-          if (entry && levelId === 1) for (const r of rooms) rv.rooms.add(`${r.x},${r.y}`);
+          if (entry && ENTRY_REVEAL_LEVELS.has(levelId)) for (const r of rooms) { rv.rooms.add(`${r.x},${r.y}`); rv.entryRooms.add(`${r.x},${r.y}`); }
           else for (const r of rooms) if (Math.abs(r.x - heroRoom.x) <= heroRoom.w && Math.abs(r.y - heroRoom.y) <= heroRoom.h) rv.rooms.add(`${r.x},${r.y}`);
         }
         // WHAT IS REVEALED IS THE ENGINE'S ANSWER, and this frame's own terrain read already carries
@@ -329,7 +425,11 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
         // level's layer, when that level is the one being played.
         // The revealed set only ever GROWS (every rv.rooms.add above), so its size is its whole state:
         // same size and same tile read means every tile's outcome below is the one already stored.
-        const absorbKey = `${levelId}|${levelType}|${rv.rooms.size}|${tileReadSignature(tiles)}`;
+        // A per-frame (clipFlag 0) room only gives the tiles the world pass has submitted, so the hero's tile is
+        // part of the key: walking brings new tiles on screen.
+        const heroTile = `${Math.floor(hp.x / 5)},${Math.floor(hp.y / 5)}`;
+        const absorbKey = `${levelId}|${levelType}|${rv.rooms.size}|${heroTile}|${tileReadSignature(tiles)}`;
+        const wcx = view?.fadeTargetX ?? width / 2, wcy = height / 2 + UNIT_CENTRE_Y;
         if (absorbKey === absorbed.key) {
           live = absorbed.live;
         } else {
@@ -339,11 +439,15 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
           for (const tile of tiles) {
             if (tile.seam) continue;
             const key = cellKey(tile); live.add(key);
+            if (tile.flags & 0x8) continue;   // 0x62580: a MAPTILE_HIDDEN tile never gives a cell
             // A cell is absorbed once, on the frame its tile first exists: re-selecting it every frame
             // would walk AutoMap.txt per tile per frame for a record the engine's own tile cannot change.
             if (layer.has(key)) continue;
+            const onScreen = automapTileOnScreen(tile, hp, wcx, wcy, width, height);
+            if (!onScreen && !rv.entryRooms.size) continue;
             const room = rooms.find((r) => inRoom(r, tile.worldX * 5, tile.worldY * 5));
             if (!room || !rv.rooms.has(`${room.x},${room.y}`)) continue;
+            if (!onScreen && !rv.entryRooms.has(`${room.x},${room.y}`)) continue;
             const selected = selectRecord(recordIndex, levelType, tile);
             if (!selected || !frames[selected.record.frames[0]]) { unnamed.add(key); continue; }
             // Retail rolls its private automap seed (gpAutomapSeed, low seed 0) per GetAutomapCellId call, in
@@ -361,6 +465,27 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
           perfT('automap-absorb', pAbsorb);
           absorbed = { key: absorbKey, live };
         }
+        // pObjects: the 0x61D00 walk over a revealed room's units. Keyed by its map point, so a unit rebuilt with
+        // a new id is the same cell (retail marks the unit, bit 29, so it is added once).
+        let added = false;
+        for (const o of snapshot.objects || []) {
+          const c = automapObjectCell(o, objectCell(o.classId), (snapshot.act || 1) - 1, levelId);
+          if (!c || layer.has(`o:${c.x},${c.y},${c.frame}`) || !frames[c.frame]) continue;
+          const room = rooms.find((r) => inRoom(r, o.x, o.y));
+          if (!room || !rv.rooms.has(`${room.x},${room.y}`)) continue;
+          layer.set(`o:${c.x},${c.y},${c.frame}`, { kind: 'object', frame: c.frame, requestedFrames: [c.frame], levelName: 'objects.txt', tileName: 'AutoMap',
+            style: -1, startSequence: -1, endSequence: -1, orientation: -1, mainIndex: -1, subIndex: -1, layer: 3, world: [o.x, o.y], map: [c.x, c.y], classId: o.classId });
+          added = true;
+        }
+        if (added) orderedCells.invalidate(layer);
+      }
+      // pExtras: the town picture, laid once when the level is generated (0x62760).
+      if (!rv.pictures && TOWN_PICTURES[levelId]) {
+        rv.pictures = true;
+        const pic = townPictureCells(levelId, levelRect(Module, levelId));
+        for (const c of pic?.cells || []) layer.set(`p:${levelId},${c.frame}`, { kind: 'picture', family: pic.family, frame: c.frame, requestedFrames: [c.frame],
+          levelName: pic.family, tileName: 'picture', style: -1, startSequence: -1, endSequence: -1, orientation: -1, mainIndex: -1, subIndex: -1, layer: 4, world: null, map: [c.x, c.y] });
+        if (pic) orderedCells.invalidate(layer);
       }
       if (!visible) return (evidence = { open: false, drawn: [], unresolved: [], layout, error: null });
       const levelType = Module.ccall('d2_session_level_type', 'number', [], []);
@@ -400,9 +525,20 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
         // D2Common chooses one Cel from this selected row. The browser has no access to that
         // private Automap RNG stream, so it deterministically uses the row's first valid Cel;
         // evidence retains every permitted Cel rather than claiming the retail random choice.
-        const bitmap = frames[cell.frame];
-        const x = Math.round(cx + ((cell.world[0] - cell.world[1]) - (hero.x - hero.y)) * 16 * scale + AX);
-        const y = automapCellTopY(cy, cell.world[0] + cell.world[1], hero.x + hero.y, scale, LEVEL_NAMES[levelType] === '1 Cave');   // '1 Cave' MEASURED +1 (Den, s960/s961: 81/81 and 82/82 cells at one shift); other dungeon types unmeasured
+        const cf = cell.kind === 'picture' ? family(settings.mode, cell.family) : fam;
+        const bitmap = cf.frames[cell.frame];
+        if (!bitmap) continue;
+        let x, y;
+        if (cell.map) {
+          // Object and picture cells hold full-map automap pixels; the cell's DC6 anchor (bottom row) lands at
+          // (cellX - scrollX, cellY - scrollY), the hero's own map point being (cx, cy + 1) (cov-a4-automap:
+          // hero cross 408,285 = that point + (8,-8)).
+          x = Math.round(cx + (cell.map[0] - (hero.x - hero.y) * 1.6) * 10 * scale);
+          y = Math.round(cy + 1 + (cell.map[1] - (hero.x + hero.y) * 0.8) * 10 * scale) - bitmap.height + 1;
+        } else {
+          x = Math.round(cx + ((cell.world[0] - cell.world[1]) - (hero.x - hero.y)) * 16 * scale + AX);
+          y = automapCellTopY(cy, cell.world[0] + cell.world[1], hero.x + hero.y, scale, LEVEL_NAMES[levelType] === '1 Cave');   // '1 Cave' MEASURED +1 (Den, s960/s961: 81/81 and 82/82 cells at one shift); other dungeon types unmeasured
+        }
         // Retail lists only what is on screen, and it culls on the cell's ANCHOR row (its DC6 anchor is
         // bottom-left, "the art fills the bottom of the box"), not the box top: f5b's lowest listing is y=592
         // of 600 and the next lattice row (596) is culled. Culling on the box top kept every cell whose
@@ -412,13 +548,13 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
         // full-map mode 0 uses the native distance ramp for default MaxiMap cells.
         const drawMode = mode === 'mini'
           ? (settings.fade === 'off' ? 1 : 5)
-          : fullMapFadeDrawMode({ mode: nativeMode, fade: settings.fade, source: fam.path, x, y, width, height,
+          : fullMapFadeDrawMode({ mode: nativeMode, fade: settings.fade, source: cf.path, x, y, width, height,
             targetX: view?.fadeTargetX ?? width / 2 });
-        if (drawMode >= 0 && drawMode <= 2) blend(ctx, fam.rawFrames[cell.frame], x, y, drawMode);
+        if (drawMode >= 0 && drawMode <= 2) blend(ctx, cf.rawFrames[cell.frame], x, y, drawMode);
         else ctx.drawImage(bitmap, x, y);
-        const rawFrame = fam.rawFrames[cell.frame], firstOpaque = fam.samples[cell.frame];
+        const rawFrame = cf.rawFrames[cell.frame], firstOpaque = cf.samples[cell.frame];
         const sample = firstOpaque < 0 ? null : [x + firstOpaque % rawFrame.width, y + Math.floor(firstOpaque / rawFrame.width)];
-        drawn.push({ source: fam.path, frame: cell.frame, requestedFrames: [...cell.requestedFrames], levelName: cell.levelName,
+        drawn.push({ source: cf.path, frame: cell.frame, requestedFrames: [...cell.requestedFrames], levelName: cell.levelName,
           tileName: cell.tileName, style: cell.style, startSequence: cell.startSequence, endSequence: cell.endSequence,
           tile: { orientation: cell.orientation, style: cell.mainIndex, sequence: cell.subIndex, layer: cell.layer, world: cell.world },
           at: [x, y], size: [bitmap.width, bitmap.height], drawMode, sample, order: drawn.length, remembered: !live.has(key) });
@@ -428,6 +564,14 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
       // 12-segment 16x8 glyph centred 8 right / 7 up of the unit's feet, palette index 151 for the hero and
       // 32 for a town NPC (the draw list's colour is index + 256*k), plus the NPC's name beside it.
       const markers = [], nameplates = [];
+      const label = (text, crossX, crossY, colour) => {
+        if (settings.names !== 'yes' || !text) return;
+        const font = fontFor(colour) || view.font;
+        if (!font) return;
+        const at = automapNameAt(crossX, crossY, font.measure(text));
+        font.drawAnchored(ctx, text, at[0], at[1]);
+        nameplates.push({ text, at, colour });
+      };
       const cross = (x, y, index, kind) => {
         const r = palette[index * 4], g = palette[index * 4 + 1], b = palette[index * 4 + 2]; ctx.fillStyle = `rgb(${r},${g},${b})`;
         for (let i = 0; i < CROSS.length - 1; i++) line(ctx, x + CROSS[i][0], y + CROSS[i][1], x + CROSS[i + 1][0], y + CROSS[i + 1][1]);
@@ -442,7 +586,13 @@ export function createAutomapOverlay({ read, Module, documentObject = globalThis
         for (const n of automapNpcsInViewport(npcs, viewport.viewport)) {
           const markerX = Math.round(n.sx) + 8, markerY = Math.round(n.sy) - 7;
           cross(markerX, markerY, NPC_COLOUR, 'npc');
-          if (settings.names === 'yes' && n.label && view.font) { const at = [Math.round(n.sx) - 18 + 8, Math.round(n.sy) - 10 + 2 - 7]; view.font.draw(ctx, n.label, at[0], at[1]); nameplates.push({ text: n.label, at }); }
+          label(n.label, markerX, markerY, NAME_COLOUR);
+        }
+        // The bank (0x10B) with names on is a text-only entry, colour 0, at the same centred point; no cross.
+        for (const o of snapshot.objects || []) {
+          if (o.classId !== 0x10B || settings.names !== 'yes' || !automapObjectCell(o, objectCell(o.classId), (snapshot.act || 1) - 1, levelId)) continue;
+          const p = automapUnitScreen(cx, cy, hero, o.x, o.y, scale), mx = Math.round(p.sx) + 8, my = Math.round(p.sy) - 7;
+          if (automapMarkerInViewport(mx, my, viewport.viewport)) label(objectRetailName(Module, o.classId), mx, my, OBJECT_NAME_COLOUR);
         }
         cross(Math.round(cx) + 8, Math.round(cy) - 7, HERO_COLOUR, 'hero');
       }

@@ -22,6 +22,7 @@ function canvasFor(frame, palette, documentObject) {
 }
 
 export const REPAIR_CURSOR_FRAME = 1;
+export const IDENTIFY_CURSOR_FRAME = 8;   // buysell.dc6: the ring the 0x3F item-spell cursor shows
 export const NATIVE_CURSOR_IDLE_MS = 5000;
 
 // Static 1.13c RE recovers the event timeout and table cadence. The `protate` LCG predicate is
@@ -35,7 +36,7 @@ export function createGameCursorClock({ now = () => globalThis.performance?.now?
   return {
     noteInput() { lastInputMs = now(); phase = 'spin'; handDraws = 0; rotateDraws = 0; },
     next(context) {
-      const kind = context?.kind === 'attack' || context?.kind === 'talk' || context?.kind === 'repair' ? context.kind : 'hand';
+      const kind = context?.kind === 'attack' || context?.kind === 'talk' || context?.kind === 'repair' || context?.kind === 'identify' ? context.kind : 'hand';
       if (kind !== contextKind) { contextKind = kind; contextDraws = 0; }
       const elapsedMs = Math.max(0, now() - lastInputMs);
       if (kind === 'talk') {
@@ -46,6 +47,7 @@ export function createGameCursorClock({ now = () => globalThis.performance?.now?
       }
       // ponytail: static first cel; retail's cycling for cursor state 7 is not recovered. Add when cel cycling is pinned.
       if (kind === 'repair') return { file: 'buysell', frame: REPAIR_CURSOR_FRAME, framesPerCel: null, since: contextDraws, elapsedMs, state: 'repair' };
+      if (kind === 'identify') return { file: 'buysell', frame: IDENTIFY_CURSOR_FRAME, framesPerCel: null, since: contextDraws, elapsedMs, state: 'identify' };
       if (kind === 'attack') {
         const draw = { file: 'protate', frame: 0, framesPerCel: null,
           since: contextDraws, elapsedMs, state: 'attack-rate-unresolved' };

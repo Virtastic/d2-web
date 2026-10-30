@@ -11,6 +11,7 @@
 
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { textColourPalette } from './frontend.mjs';
+import { formatDescLine } from './skill-desc-lines.mjs';
 import { BORDER_RIGHT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
 import { createFont, decodeFontTbl } from './frontend.mjs';
 import { TOOLTIP_FRAME, drawTooltipFrame } from './vendor-panel.mjs';
@@ -99,7 +100,8 @@ export function plateBox(cell, textWidth, lines) {
  */
 export function formatManaCost(cost) {
   const whole = Math.floor(cost / 256), fraction = cost % 256;
-  return fraction ? `${whole}.${Math.trunc(fraction * 10 / 256)}` : String(whole);
+  // 0x314D0: above 0x1900 (25.0) the cost prints as a whole number (Hydra 12: 6528/256 = 25.5 shows "25").
+  return fraction && cost <= 0x1900 ? `${whole}.${Math.trunc(fraction * 10 / 256)}` : String(whole);
 }
 
 export function parseClassSkills(bytes, count) {
@@ -150,48 +152,40 @@ export function buildSkillPlate(hovered, state, compact = false) {
   // SkillDesc's line types this client formats, each measured on a retail frame: 2 = "A +calc B",
   // 4 = "A +calc", 12 = "A calc seconds", 52 = "A calc B"; a zero value is not drawn (Frenzy's dsc2line2).
   // Other types are reported in plate.unmodelled, never drawn as a guess.
-  const sign = (n) => (n >= 0 ? '+' : '') + n;
-  const stat = (e) => {
-    const a = e.a ? line(e.a) : '', b = e.b ? line(e.b) : '';
-    if (e.type === 2) return a + sign(e.calcA) + b;
-    if (e.type === 4) return a + sign(e.calcA);
-    if (e.type === 12) return a + e.calcA / 25 + key('StrSkill16');   // frames at 25 per second (Frenzy 150 -> 6)
-    if (e.type === 52 || e.type === 3) return a + e.calcA + b;   // 3: Stun's `Attack: 40 percent` (v9b-popup-iconhover-r29)
-    return null;
-  };
-  const stats = (from, to) => {
+  const ctx = { line, level };
+  const stat = (e) => formatDescLine(e.type, e.a, e.b, e.calcA, e.calcB, ctx);
+  // The mana line is a slot like any other (type 1: 0x314D0 over skills.txt mana/minmana/lvlmana/manashift; Frenzy's type 5 prints its
+  // own calc), drawn where its slot falls (Fire Bolt keeps it in dsc2line1, above the damage lines).
+  const isMana = (e) => e.type === 1 || (e.type === 5 && e.a === hovered.manaStr);
+  const stats = (from, to, cost = hovered.manaCost, omitZero = compact, dl = d) => {
     const out = [];
     for (let i = to - 1; i >= from; i--) {
-      const e = d[i];
-      if (!e || !e.type || e.type === 1 || e.type === 5) continue;
+      const e = dl[i];
+      if (!e || !e.type) continue;
+      if (isMana(e)) {
+        const template = hovered.manaStr ? line(hovered.manaStr) : '';
+        const shown = e.type === 5 ? e.calcA : formatManaCost(cost);
+        if (hovered.manaLine && template && !(omitZero && Number(shown) === 0)) out.push({ kind: 'mana', index: hovered.manaStr, text: template + shown, cost });
+        continue;
+      }
       const text = stat(e);
-      if (text === null) unmodelled.push({ index: i, type: e.type }); else if (e.calcA !== 0) out.push({ kind: 'stat', text });
+      if (text === undefined) unmodelled.push({ index: i, type: e.type }); else if (text) out.push({ kind: 'stat', text, colour: 5 });
     }
     return out;
   };
   const dsc2 = stats(6, 10);
   // The popup plate carries the dsc2 lines inside the level block, straight after its header, with no spacer around them.
   if (dsc2.length && !compact) { plateLines.push(...dsc2); blank(); }
-  // One level block (header, SkillDesc's stat lines bottom-up, the mana line); a learned skill draws
-  // it twice, "Current Skill Level: N" then retail's "Next Level" at N+1 (skilltree-hover-bash5-r20).
+  // One level block (header, SkillDesc's stat lines bottom-up); a learned skill draws it twice,
+  // "Current Skill Level: N" then retail's "Next Level" at N+1 (skilltree-hover-bash5-r20). Retail's Next Level block draws no
+  // mana line when the printed cost is 0 (Double Swing 5 -> 6, skilltree-hover-dswing5-r29).
   const levelBlock = (header, lvl, cost, omitZeroMana) => {
     const dl = lvl === level ? d : (state.skillDesc ? state.skillDesc(hovered.id, lvl) : []);
     plateLines.push({ kind: 'header', text: header });
     if (compact) plateLines.push(...dsc2);
-    const saved = d; d = dl; plateLines.push(...stats(1, 6)); d = saved;
-    if (hovered.manaLine) {
-      // The mana line: SkillDesc's `str mana` template (the SAME index for passives and attacks --
-      // the table decides who gets a line, not this file) and the cost the engine hands over. A
-      // template that resolves to nothing leaves the line out, as every other unresolvable index is.
-      const template = hovered.manaStr ? line(hovered.manaStr) : '';
-      // Type 5 (Frenzy: `usmc/128`) prints its own evaluated calc (3 where SKILLS_GetManaCosts says 1.5); type 1 the engine's cost.
-      const five = dl.slice(0, 6).find((e) => e.type === 5);
-      // Retail's Next Level block draws no mana line when the printed cost is 0 (Double Swing 5 -> 6, skilltree-hover-dswing5-r29).
-      const shown = five ? five.calcA : formatManaCost(cost);
-      if (template && !(omitZeroMana && Number(shown) === 0)) plateLines.push({ kind: 'mana', index: hovered.manaStr, text: template + shown, cost });
-    }
+    plateLines.push(...stats(0, 6, cost, omitZeroMana, dl));
   };
-  levelBlock(hovered.baseLevel ? key('StrSkill2') + hovered.baseLevel : key('StrSkill17'), level, hovered.manaCost);
+  levelBlock(hovered.baseLevel ? key('StrSkill2') + hovered.baseLevel : key('StrSkill17'), level, hovered.manaCost, compact);
   // The skill-select popup's plate is the Current block only: no Next Level, no synergy (v9b-popup-iconhover-r29, Stun 1).
   if (hovered.baseLevel && state.skillMana && !compact) { blank(); levelBlock(key('StrSkill1'), level + 1, state.skillMana(hovered.id, level + 1), true); }
   // The synergy block: type 40 header ("%s Receives Bonuses From:" with the skill's name) and

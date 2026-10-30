@@ -16,6 +16,7 @@
 import { createFont, decodeFontTbl, FRONTEND, TITLE_COLUMNS, composeTiled, createBlender, textColourPalette, componentColourTransform } from './frontend.mjs';
 import { drawBg, present } from './widebg.mjs';
 import { drawPath, fnv1a, recordDc6, recordDcc } from './drawlist.mjs';
+import { DELETE_LAYOUT, layoutLines } from './delete-dialog-layout.mjs';
 import { CLASS_NAMES } from './save-store.mjs';
 import { createDeleteConfirmFlow } from './delete-confirm-flow.mjs';
 import { characterCardHitBox, createCharacterSelectCardInput } from './charselect-card-input.mjs';
@@ -42,9 +43,8 @@ export const SELECT_ASSETS = {
   popupPalette: 'data\\global\\palette\\fechar\\pal.dat',
 };
 
-// Retail's delete-confirm box (OpenDiablo2 character_select.go): PopUpOkCancel at (270,175), the label
-// centred at (400,185), the two buttons' TOP-LEFT corners at (282,308) and (422,308).
-const DELETE_DIALOG = { box: { x: 270, top: 175 }, label: { x: 400, anchor: 185 }, no: { x: 282, top: 308 }, yes: { x: 422, top: 308 } };
+// Retail's delete-confirm box (D2Launch): see delete-dialog-layout.mjs.
+const DELETE_DIALOG = DELETE_LAYOUT;
 const HALF_BLACK = 'rgba(0, 0, 0, 0.5)';
 
 // Retail's placements (draw list anchors are bottom rows, inclusive; top = anchor - h + 1).
@@ -142,26 +142,15 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
   // the question in the wrong face. OpenDiablo2: `loadDeleteCharConfirm` builds the label with
   // d2resource.Font16 (`/data/local/FONT/<lang>/font16`, the face this file already carries as
   // FRONTEND.versionFont), while `ButtonTypeOkCancel` -- the YES / NO button -- carries FontRediculous
-  // (d2ui/button.go). Wrap is `SplitIntoLinesWithMaxWidth(..., 29)`.
+  // (d2ui/button.go).
   const confirmFontSource = source(FRONTEND.versionFont);
   const confirmFont = createFont({ dc6: decodeDc6(confirmFontSource.bytes), tbl: decodeFontTbl(read(FRONTEND.versionFontTbl)), palette: units, documentObject, path: FRONTEND.versionFont, drawAs: { op: 'celcolor', mode: 5 },
     onGlyph: (record) => dialogDraw('question-glyph', FRONTEND.versionFont, confirmFontSource, 'data\\global\\palette\\Units\\pal.dat', unitsPaletteSource, record) });
   const confirmText = (() => { const t = string ? string(DELETE_STRINGS.confirm) : ''; return t || 'Delete this character?'; })();
   const yesText = (string && string(DELETE_STRINGS.yes)) || 'YES';
   const noText = (string && string(DELETE_STRINGS.no)) || 'NO';
-  // Retail wraps the confirmation to 29 columns. This is OpenDiablo2's `SplitIntoLinesWithMaxWidth`
-  // (d2common/d2util/stringutils.go) ported line for line: the running length carries a separator for
-  // the first word too, so a line holds at most 28 visible characters -- a `line.length > 29` test
-  // breaks later and drew five words where retail breaks after four.
-  const wrap = (text, maxChars) => { const lines = []; let line = '', total = 0;
-    for (const word of String(text).split(' ')) {
-      total += 1 + word.length;
-      if (total > maxChars) { total = word.length; lines.push(line); line = ''; } else if (line) line += ' ';
-      line += word;
-    }
-    if (line.length) lines.push(line);
-    return lines; };
-  const confirmLines = wrap(confirmText, 29);
+  // Retail's D2Win text box wraps by pixel width (delete-dialog-layout.mjs), line pitch font height + 4.
+  const confirmLines = layoutLines(confirmText, (t) => confirmFont.measure(t), confirmFont.lineHeight);
   // The OK/Cancel button's own face (d2ui/button.go ButtonTypeOkCancel -> FontRediculous), the same
   // one the front end's other small buttons use.
   const okCancelFontSource = source(FRONTEND.smallFont);
@@ -347,7 +336,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
           drawn: p.drawable.map((l) => l.path), missing: p.missing }),
         drawnPortraits: drawnPortraits.map((p) => ({ ...p, layers: p.layers.map((layer) => ({ ...layer })) })),
         portraitError,
-        deleteDialog: deleteFlow.armed >= 0 ? { character: list[deleteFlow.armed].name, box: dialogBox(), lines: confirmLines,
+        deleteDialog: deleteFlow.armed >= 0 ? { character: list[deleteFlow.armed].name, box: dialogBox(), lines: confirmLines.map((l) => l.text),
           yes: { ...dialogButtonBox('yes'), label: yesText }, no: { ...dialogButtonBox('no'), label: noText }, text: confirmText,
           // The two faces the confirmation blits with -- the label's (frontend.mjs FRONTEND.versionFont,
           // OpenD2's Font16) and the buttons' (FRONTEND.smallFont, ButtonTypeOkCancel's FontRediculous)
@@ -356,7 +345,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
           // The anchor row each confirmation line is drawn on. The card's own labels are Font16 too
           // (SELECT_ASSETS.card), so a row decoding glyphs by face alone would read the card text as
           // part of the question; these name the dialog's own rows and nothing else.
-          labelAnchors: confirmLines.map((_, n) => DELETE_DIALOG.label.anchor + n * confirmFont.lineHeight),
+          labelAnchors: confirmLines.map((l) => l.anchor),
           state: deleteFlow.state, error: deleteFlow.error, draws: dialogDraws.map((draw) => JSON.parse(JSON.stringify(draw))) } : null,
         pointer,
       };
@@ -493,7 +482,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
         // Retail's draw-list hook records PopUpOKCancel as its composed cel.  Keep its second canvas
         // segment out of that retail-facing list, but retain it in the independent source evidence.
         if (popupParts[1]) dialogDraw('popup', SELECT_ASSETS.popup, popupSource, SELECT_ASSETS.popupPalette, popupPaletteSource);
-        confirmLines.forEach((line, n) => confirmFont.drawAnchored(g, line, Math.trunc(DELETE_DIALOG.label.x - confirmFont.measure(line) / 2), DELETE_DIALOG.label.anchor + n * confirmFont.lineHeight));
+        confirmLines.forEach((l) => confirmFont.drawAnchored(g, l.text, l.x, l.anchor));
         for (const [id, text] of [['no', noText], ['yes', yesText]]) {
           const b = dialogButtonBox(id);
           const token = `delete-${id}`, state = isButtonHeldOverTarget(pressed, hot) && pressed === token ? 1 : 0, face = okCancel.states[state] || okCancel.states[0];

@@ -115,6 +115,7 @@ export function normalizeSnapshot(value) {
       ...(Number.isInteger(e?.direction) && e.direction >= 0 && e.direction < 64 ? { direction: e.direction } : {}),
       ...(Number.isInteger(e?.lastHitClass) ? { lastHitClass: e.lastHitClass } : {}),
       ...(e?.states instanceof Set ? { states: e.states } : {}),
+      ...(e?.hitPacket ? { hitPacket: true } : {}), // the engine's 0x0C hit packet this tick (combat-sound-trigger)
       ...(Number.isInteger(e?.typeFlags) ? { typeFlags: e.typeFlags & 0xFF } : {}),
       ...(Number.isInteger(e?.superUniqueId) ? { superUniqueId: e.superUniqueId } : {}),
       ...(Number.isInteger(e?.usedSkill) ? { usedSkill: e.usedSkill, animEvent: e.animEvent | 0 } : {}), // a monster's used skill id (-1 none) and its client animation event, for its stsound and dosound

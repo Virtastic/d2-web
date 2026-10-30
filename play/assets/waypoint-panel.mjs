@@ -48,6 +48,9 @@ export const WAYPOINT_LAYOUT = Object.freeze({ left: 80, top: 61, tabX: 85, tabY
 // The acts whose tab retail draws: the ones the engine reports at least one ACTIVE waypoint in (its
 // captures draw one, two and four). Read by the caller from d2_session_waypoints and handed to draw()
 // as `tabActs`, so the panel keeps no second source of truth about which waypoints exist.
+// waygateicons frame for a row's square (FUN_6FB5AEC0): 0 for the waypoint the player stands at, 3 for
+// another active one, and 4 while that row is held (retail's pressed-row index equals the row; here+held is 1).
+export const rowIconFrame = (here, held) => (here ? 0 : 3) + (held ? 1 : 0);
 export const tabActsOf = (rowsByAct) => [...rowsByAct.keys()].filter((act) => (rowsByAct.get(act) || []).some((row) => row.active)).sort((a, b) => a - b);
 // The title is retail's string 3990 (waypointsheader, "Choose your destination").
 export const TITLE_STRING_INDEX = 3990;
@@ -123,7 +126,7 @@ export function createWaypointPanelRenderer(read, documentObject = globalThis.do
     /** `rows` are the engine's waypoints for `shownAct`; `paletteAct` is the player's current act;
      *  `tabActs` are the acts retail draws a tab for (the caller reads them from the engine's own
      *  table -- tabActsOf). Absent, only the shown act's tab is drawn, which is a one-act menu. */
-    draw(ctx, width, height, rows, shownAct, open, hereLevelId = null, paletteAct = shownAct, tabActs = null, closePressed = false) {
+    draw(ctx, width, height, rows, shownAct, open, hereLevelId = null, paletteAct = shownAct, tabActs = null, closePressed = false, pressedLevelId = null) {
       if (!open) return null;
       const a = art(paletteAct), o = origin(width, height), fonts = fontsFor(paletteAct);
       ctx.save(); ctx.translate(o.x, o.y); ctx.scale(o.scale, o.scale);
@@ -154,8 +157,9 @@ export function createWaypointPanelRenderer(read, documentObject = globalThis.do
       const drawn = [];
       (rows || []).forEach((row, i) => {
         const here = row.levelId === hereLevelId;
-        if (row.active) cel(ctx, 'icons', a.icons, here ? 0 : 3, L.iconX, L.iconY + i * 36);
-        (here ? fonts.blue : row.active ? fonts.white : fonts.grey).drawAnchored(ctx, row.name, L.textX, L.textY + i * L.rowHeight);
+        const held = row.active && pressedLevelId !== null && row.levelId === pressedLevelId;
+        if (row.active) cel(ctx, 'icons', a.icons, rowIconFrame(here, held), L.iconX, L.iconY + i * 36);
+        (here || held ? fonts.blue : row.active ? fonts.white : fonts.grey).drawAnchored(ctx, row.name, L.textX, L.textY + i * L.rowHeight);
         const r = rowRect(i);
         drawn.push({ levelId: row.levelId, name: row.name, active: row.active, at: [r.x, r.y] });
       });

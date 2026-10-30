@@ -1,4 +1,5 @@
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
+import { POPUP_BG, popupBgPosition } from './belt-popup.mjs';
 import { createFont, decodeFontTbl, textColourPalette } from './frontend.mjs';
 
 // The belt's boxes are TABLE DATA, not a layout this file gets to choose. Retail computes them in
@@ -44,6 +45,7 @@ export function createBeltRenderer(read, documentObject = globalThis.document) {
   const icon = name => { let c = cache.get(name); if (!c) { const d = decodeDc6(read(`data\\global\\items\\${name}.dc6`)); c = raster(d.frames[0], palette, documentObject); cache.set(name, c); } return c; };
   // Retail labels the belt's four columns '1'..'4': `text '1' x=425 y=589 color=4` = Font16, gold shift
   // (extra=4), 2 px in from each column's left and 27 px below its top.
+  let bg;
   const FONT = 'data\\local\\font\\latin\\font16';
   let numFont = null;
   const numbers = (ctx, rects, items, keys) => {
@@ -58,9 +60,19 @@ export function createBeltRenderer(read, documentObject = globalThis.document) {
       if (slot < 0) return null;
       return (items || []).find(item => item.mode === 2 && item.gridX === slot) || null;
     },
-    draw(ctx, items, boxes, labels = false, keys) {   // labels: the HUD passes true; item-pixel rows count the sprites alone
+    // popup: { rows } -- the background cels of the rows above the HUD row, drawn before the potions (drawBelt 0x28DC0).
+    draw(ctx, items, boxes, labels = false, keys, popup = null) {   // labels: the HUD passes true; item-pixel rows count the sprites alone
       const rects = beltBoxes(boxes);
       let count = 0, pixels = 0;
+      const bgCalls = [];
+      if (popup?.rows > 0) {
+        bg ??= (() => { try { const d = decodeDc6(read(POPUP_BG + '.dc6')); return raster(d.frames[0], palette, documentObject); } catch { return null; } })();
+        for (let i = 0; i < popup.rows; i++) {
+          const p = popupBgPosition(i, popup.width ?? 800, popup.height ?? 600);
+          bgCalls.push(p);
+          if (bg) ctx.drawImage(bg, p.x, p.y - bg.height);   // DC6 cels are placed by their bottom-left
+        }
+      }
       for (const item of items || []) {
         if (item.mode !== 2 || item.gridX < 0 || item.gridX >= rects.length || !item.invFile) continue;
         const b = rects[item.gridX], c = icon(item.invFile);
@@ -75,7 +87,7 @@ export function createBeltRenderer(read, documentObject = globalThis.document) {
         count++; pixels += c.width * c.height;
       }
       if (labels) numbers(ctx, rects, items, keys);
-      return { count, pixels, boxes: rects.length, cell: rects.length ? rects[0].right - rects[0].left : 0 };
+      return { count, pixels, bg: bgCalls, boxes: rects.length, cell: rects.length ? rects[0].right - rects[0].left : 0 };
     },
   };
 }

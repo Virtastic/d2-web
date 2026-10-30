@@ -94,7 +94,7 @@ export function createCombatSoundTrigger(read, play, busy = () => false, roll = 
     // 0x242B0: prob < 100 -> the 15-tick delay gate and the busy gate apply; prob >= 100 plays unconditionally.
     // The LCG advances only when the gate passes.
     const gated = p[b] < 100, pass = !!p[s] && (!gated || (tick - lastRoll >= 15 && !busy()));
-    if (pass) { lcgStep(); const r = roll?.() ?? Number(rng.s & 0xFFFFFFFFn) % 100; if (r < p[b]) { lastRoll = tick; stamp?.(e.id); playRaw(p[s], e, 'attack'); } }
+    if (pass) { lcgStep(); const t = roll?.(e.id), r = t >= 0 ? t : Number(rng.s & 0xFFFFFFFFn) % 100; if (r < p[b]) { lastRoll = tick; stamp?.(e.id); playRaw(p[s], e, 'attack'); } }
     playRaw(p[w], e, 'weapon');
   };
   return {
@@ -114,11 +114,12 @@ export function createCombatSoundTrigger(read, play, busy = () => false, roll = 
         // Sacrifice (96) charges the caster's own HP in its do frame, mid-swing: no SUCCESSFULHIT, lastHitClass stays stale, retail plays no impact (a retail recording)
         const sac = e0.id === snapshot?.playerId && snapshot.player?.castSkillId === 96 && PLAYER_ATTACK.has(e0.mode) && prev.get(key) === e0.mode;
         const castHit = e0.type === 0 && PLAYER_CAST.has(e0.mode) && e0.mode !== 18; // a retail recording: a zombie claw landing on a player in a cast mode (Shiver Armor) plays no impact or hit cue, and the client got no life update for it; unit-level cause not traced
-        const dmgRaw = !sac && !castHit && ph !== undefined && e0.hp < ph && e0.lastHitClass !== undefined && !e0.critter, dot = dmgRaw && dmgPrev.has(key) && e0.lastHitClass === 93 && !(e0.type === 1 ? MON_HIT : PLAYER_HIT).has(e0.mode); // poison ticks (hit class 93) after the first: no new hit, retail plays it once
+        const dmgRaw = !snapshot?.directHpLoss && !sac && !castHit && ph !== undefined && e0.hp < ph && e0.lastHitClass !== undefined && !e0.critter, dot = dmgRaw && dmgPrev.has(key) && e0.lastHitClass === 93 && !(e0.type === 1 ? MON_HIT : PLAYER_HIT).has(e0.mode); // poison ticks (hit class 93) after the first: no new hit, retail plays it once
         dmgRaw ? dmgPrev.add(key) : dmgPrev.delete(key);
-        const dmg = dmgRaw && !dot;
+        // the engine's 0x0C hit packet (message 19) on a monster runs 0x23630 even when its life byte did not move (a retail recording: Frozen Orb, 0c..130d7f, cue 2209)
+        const dmg = dmgRaw ? !dot : (e0.type === 1 && !!e0.hitPacket && e0.lastHitClass !== undefined && !e0.critter);
         const e = dmg && e0.hp > 0 && !(e0.type === 1 ? MON_HIT : PLAYER_HIT).has(e0.mode) ? { ...e0, mode: e0.type === 1 ? 3 : 4 } : e0;
-        const fp = e.animation?.framePrecise ?? (e.id === snapshot?.playerId && e.type === 0 ? snapshot.player?.framePrecise : undefined), hitMode = e.type === 1 ? MON_HIT.has(e.mode) : e.type === 0 && PLAYER_HIT.has(e.mode), restart = (((e.id === snapshot?.playerId && (PLAYER_CAST.has(e.mode) || PLAYER_ATTACK.has(e.mode)))) && fp < frames.get(key)) || (hitMode && ((e0.hp === undefined && fp <= frames.get(key)))); // D23: a unit struck again while still in GH re-runs SetMode(GH) (retail 0x23630 each time): a damage tick is the re-entry (a retail recording Q, not the frame clock) // same attack mode re-entered back to back: SetMode ran again, the frame clock rewound
+        const fp = e.animation?.framePrecise ?? (e.id === snapshot?.playerId && e.type === 0 ? snapshot.player?.framePrecise : undefined), hitMode = e.type === 1 ? MON_HIT.has(e.mode) : e.type === 0 && PLAYER_HIT.has(e.mode), restart = (((e.id === snapshot?.playerId && (PLAYER_CAST.has(e.mode) || PLAYER_ATTACK.has(e.mode)))) && fp < frames.get(key)) || (hitMode && ((e0.hp === undefined && fp <= frames.get(key)) || (dmg && !dmgRaw))); // D23: a unit struck again while still in GH re-runs SetMode(GH) (retail 0x23630 each time): a damage tick is the re-entry (a retail recording Q, not the frame clock) // same attack mode re-entered back to back: SetMode ran again, the frame clock rewound
         if (fp !== undefined) frames.set(key, fp);
         const old = prev.get(key); prev.set(key, e0.mode);
         // 0xA1B10, at the client animation's event frame: a monster's skill with a client do-function submits its dosound each time that returns nonzero

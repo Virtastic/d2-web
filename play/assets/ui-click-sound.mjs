@@ -12,7 +12,7 @@ export const UI_BUTTON_CLICK = Object.freeze({
 // The shell consumes world clicks too; they issue a walk, attack or interaction
 // and are not button activations. The source metadata is attached by the shell's
 // earlier pointer listener so this player can distinguish the actual target.
-const WORLD_ACTIONS = new Set(['world', 'corpse', 'warp', 'npc', 'object']);
+const WORLD_ACTIONS = new Set(['world', 'corpse', 'warp', 'npc', 'object', 'weaponTab']); // weaponTab: D2Client +0x90F60 plays cursor_pass itself, not the button click
 export function isUiButtonClick(event) {
   return event?.button === 0 && event.defaultPrevented && !WORLD_ACTIONS.has(event.__d2ClickRecord?.spent);
 }

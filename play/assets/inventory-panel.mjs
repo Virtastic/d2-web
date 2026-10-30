@@ -47,6 +47,7 @@ export function inventoryLayoutFromEngine(grid, components) {
 export const EMPTY_SLOT_ART = Object.freeze({
   3: ['inv_armor', 0, 535, 217], 8: ['inv_belt', 0, 536, 263], 9: ['inv_boots', 0, 651, 290],
   1: ['inv_helm_glove', 1, 535, 118], 10: ['inv_helm_glove', 0, 420, 292],
+  4: ['inv_weapons', 0, 420, 217], 5: ['inv_weapons', 0, 651, 217],
   2: ['inv_ring_amulet', 0, 609, 118], 6: ['inv_ring_amulet', 1, 495, 263], 7: ['inv_ring_amulet', 1, 609, 263],
 });
 // The per-body-location constant D2Client adds after centring a WORN item's cell box in its
@@ -62,6 +63,28 @@ export const WORN_ANCHOR_OFFSET = Object.freeze({
 });
 
 // Retail's own anchors for InvChar6 frames 4..7 (left x, bottom y).
+export const WEAPON_TAB_ART = 'data\\global\\ui\\panel\\invchar6tab.dc6';
+// D2Client 1.13c: the set-II overlay (frame 0 over bodyLoc 5, 1 over bodyLoc 4) at left-5 / bottom+4 of
+// the hand slot, drawn only while the weapon-set flag is set; the arms then shift (+4,-4).
+export function weaponSetTabs(weaponSet, slotRect) {
+  if (weaponSet !== 1) return [];
+  return [[0, 5], [1, 4]].map(([frame, loc]) => { const s = slotRect(loc); return { frame, x: s.left - 5, y: s.top + s.height + 4 }; });
+}
+// D2Client 1.13c +0x8C150 (the tab hit test, called by the button-down handler +0x98DC0 and the hover
+// tip +0x93450): x in [left, right] of the hand slot, y in [top-24, top) -- the 24 px strip above it, the
+// bottom of the 141-tall invchar6tab frame -- for the right hand (bodyLoc 4, left of the screen) and the
+// left hand (bodyLoc 5). Either strip is the same button: +0x90F60 plays Sounds.txt row 1 (cursor_pass),
+// sends client packet 0x60 and marks both hand items pending; it never looks at which tab is active, and
+// the server's 0x97 reply flips the flag. Returns { bodyLoc, frame } or null.
+export const WEAPON_TAB_HEIGHT = 24, WEAPON_TAB_SOUND_ROW = 1;
+export function weaponTabHit(x, y, slotRect) {
+  for (const [bodyLoc, frame] of [[5, 0], [4, 1]]) {
+    const s = slotRect(bodyLoc);
+    if (s && x >= s.left && x <= s.left + s.width && y >= s.top - WEAPON_TAB_HEIGHT && y < s.top) return { bodyLoc, frame };
+  }
+  return null;
+}
+export const weaponSetArmShift = (weaponSet, bodyLoc) => (weaponSet === 1 && (bodyLoc === 4 || bodyLoc === 5) ? [4, -4] : [0, 0]);
 const INV_PANEL = [[4, 400, 316], [5, 656, 316], [6, 400, 492], [7, 656, 492]];
 
 export const ITEM_PRESENTATION_BYTES = 112;
@@ -225,6 +248,11 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     const [x, y] = toScreen(width, height, screenX, screenY);
     return inventoryItemAt(state?.items, x, y, layout);
   },
+  // The weapon-set tab strip under the pointer (see weaponTabHit); null elsewhere.
+  weaponTabAt(screenX, screenY, width, height) {
+    const [x, y] = toScreen(width, height, screenX, screenY);
+    return weaponTabHit(x, y, slotRect);
+  },
   // The worn item under the pointer, or the empty slot: { bodyLoc, item }.
   slotAt(screenX, screenY, width, height, state) {
     const [x, y] = toScreen(width, height, screenX, screenY);
@@ -283,9 +311,16 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     // The panel and the empty-slot silhouettes at retail's screen anchors, act palette (s197).
     ctx.save(); ctx.translate(ox, oy); ctx.scale(scale, scale);
     for (const [i, x, y] of INV_PANEL) chrome.cel(ctx, act, 'data\\global\\ui\\PANEL\\invchar6.DC6', i, x, y);
+    // D2Client 1.13c draws invchar6tab (frame 0 over the right hand, 1 over the left) only while the
+    // weapon-set flag is set (set II), at the hand slot's left-5 / bottom+4; set II also moves the
+    // arm silhouettes and worn arm items by (+4,-4).
+    const set2 = state?.weaponSet === 1, tabs = [];
+    for (const t of weaponSetTabs(state?.weaponSet, slotRect)) tabs.push({ frame: t.frame, blit: chrome.cel(ctx, act, WEAPON_TAB_ART, t.frame, t.x, t.y) });
     const worn = new Set((state?.items || []).filter((item) => item.mode === 1).map((item) => item.bodyLoc));
+    const silhouettes = [];
     for (const [loc, [file, frame, x, y]] of Object.entries(EMPTY_SLOT_ART))
-      if (!worn.has(Number(loc))) chrome.cel(ctx, act, `data\\global\\ui\\PANEL\\${file}.dc6`, frame, x, y);
+      if (!worn.has(Number(loc))) { const [ax, ay] = weaponSetArmShift(state?.weaponSet, Number(loc));
+        silhouettes.push({ loc: Number(loc), blit: chrome.cel(ctx, act, `data\\global\\ui\\PANEL\\${file}.dc6`, frame, x + ax, y + ay) }); }
     ctx.restore();
     ctx.save(); ctx.translate(baseX, baseY); ctx.scale(scale, scale);
     let itemPixels = 0, equippedItemPixels = 0, equippedItemCount = 0;
@@ -320,7 +355,8 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
         // own box size by the item's invWidth/invHeight) is centred in the slot rounding down, the
         // art one row lower, and then retail's per-body-location constant is added (WORN_ANCHOR_OFFSET).
         const bw = 29 * (item.invWidth || Math.ceil(image.width / 29)), bh = 29 * (item.invHeight || Math.ceil(image.height / 29));
-        const [dx, dy] = WORN_ANCHOR_OFFSET[item.bodyLoc] || [0, 0];
+        const [bx, by] = WORN_ANCHOR_OFFSET[item.bodyLoc] || [0, 0];
+        const [ax, ay] = weaponSetArmShift(state?.weaponSet, item.bodyLoc), dx = bx + ax, dy = by + ay;
         const left = slot.left + Math.floor((slot.width - bw) / 2) + dx, top = slot.top + Math.floor((slot.height - bh) / 2) + 1 + dy;
         ctx.drawImage(image, left - sx, top - sy);
         equippedItemPixels += image.width * image.height; equippedItemCount++;
@@ -354,7 +390,7 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     return { x: baseX, y: baseY, scale, panelFrames: 4, tooltip: tooltipEvidence,
       panelPixels: [4, 5, 6, 7].reduce((sum, i) => sum + dc6.frames[i].width * dc6.frames[i].height, 0),
       itemCount: (state?.items || []).filter((item) => item.invPage === 0).length, itemPixels,
-      equippedItemCount, equippedItemPixels, drawn, layout: layout ? 'engine' : 'amazon2',
+      equippedItemCount, equippedItemPixels, drawn, weaponSet: set2 ? 1 : 0, tabs, silhouettes, layout: layout ? 'engine' : 'amazon2',
       gold: { path: CHROME_ART.gold, frame: goldFrame, blit: goldBlit },
       close: { ...close, path: PANEL_CLOSE_ART.path, frame: closeFrame, blit: closeBlit } };
   } };
