@@ -1406,7 +1406,9 @@ function ensureTitleScreen(entryPhase = null) {
         // select as retail does; the host/join TRANSPORT (and the join dialog behind JOIN GAME) is
         // the realm backend's work, so JOIN is handed to the shell and is a gap.
         { label: 'BATTLE.NET', action: () => { characterEntryReader.cancel(); titleScreen?.openGateways(); } },
-        { label: 'OTHER MULTIPLAYER', action: () => { characterEntryReader.cancel(); screen = SCREEN.OTHER_MULTIPLAYER; ensureOtherMultiplayerScreen(); } },
+        // Multiplayer is not working yet, so for players OTHER MULTIPLAYER is clickable but does nothing,
+        // like BATTLE.NET. Automated runs (navigator.webdriver) still open the screen so its tests keep running.
+        { label: 'OTHER MULTIPLAYER', action: () => { if (!navigator.webdriver) return; characterEntryReader.cancel(); screen = SCREEN.OTHER_MULTIPLAYER; ensureOtherMultiplayerScreen(); } },
         { label: 'CREDITS', action: () => { characterEntryReader.cancel(); creditsTick = 0; screen = SCREEN.CREDITS; ensureCreditsScreen(); } },
         { label: 'CINEMATICS', action: () => { characterEntryReader.cancel(); screen = SCREEN.CINEMATICS; ensureCinematicsScreen(); } },
         { label: 'EXIT DIABLO II', action: () => { beginExit(); } },
