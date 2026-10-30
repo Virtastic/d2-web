@@ -6,7 +6,7 @@
 const CVT_ROWS = [0, 251, 262, 268, 274, 280, 286, 292]; // D2Client+0xF5538 pair table, first of each pair, by hit class
 const GAIT_BASE = [2768, 2720, 2720, 2768, 2816, 2720, 2720]; // Ama Sor Nec Pal Bar Dru Asn
 import { OBJECT_MODE_SOUNDS, OBJECT_SELECT_SOUNDS, SHARED_ROW_CLASSES } from './object-mode-sounds.mjs';
-export function createEventSounds(read, play, monsterStep = null, monsterLayer = null) {
+export function createEventSounds(read, play, monsterStep = null, monsterLayer = null, monsterIdle = null) {
   const rows = (p) => new TextDecoder('latin1').decode(read(p)).split(/\r?\n/).map((l) => l.split('\t'));
   const idx = new Map(rows('data\\global\\excel\\Sounds.txt').slice(1).filter((c) => c[0]).map((c) => [c[0], Number(c[1])]));
   const drop = new Map();
@@ -65,6 +65,9 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
         const row = monsterStep(a.classId, cut ? 2 : a.mode, prev[1], cut ? prev[6] : a.frameCountPrecise, cut ? prev[7] : a.animSpeed, tick, lastStep.get(e.id) ?? 0);
         if (row) { lastStep.set(e.id, tick); play(row, { kind: 'footstep', id: e.id, unitType: 1, classId: a.classId }); const layer = monsterLayer?.(a.classId); if (layer) play(layer, { kind: 'footstep', id: e.id, unitType: 1, classId: a.classId }); /* retail 0x88A70 submits the layer row on the same footfall (FsPrb 100) */ }
       }
+      // D2Client 0x4F4A0 -> 0x237E0 (the idle/neutral sound) per client monster, in the unit table's order (bucket id & 0x7F, newest first); mode is 0x223D0's.
+      if (monsterIdle) for (const e of (snapshot?.entities ?? []).filter((x) => x.type === 1 && x.animation?.inClientRoom).sort((p, q) => (p.id & 127) - (q.id & 127) || q.id - p.id)) {
+        const row = monsterIdle(e.id, e.classId, e.mode === 14 && e.animation?.hasAnimSequence ? e.animation.seqMode : e.mode); if (row) play(row, { kind: 'idle', id: e.id, unitType: 1, classId: e.classId }); }
       // A monster that dies frozen/shattered (States.txt shatter column: 1, 107, 184) throws its drops with no flip delay: the class dropsound plays on the arrival tick (a retail recording Q).
       let shatterNow = false; const deadNow = new Set();
       for (const m of snapshot?.entities ?? []) if (m.type === 1 && m.mode === 0) { deadNow.add(m.id); if (!deadSeen.has(m.id) && (m.states?.has(1) || m.states?.has(107) || m.states?.has(184))) shatterNow = true; }

@@ -44,7 +44,7 @@ export function selectProfileId(isSuper, isUniqueOrMinion, superId, uniqueId, cl
 }
 
 // busy: optional () => bool, retail FUN_6fb37bd0(0): a monster-range sound (rows 0xB76..0x1230) is still playing.
-export function createCombatSoundTrigger(read, play, busy = () => false, roll = null) {
+export function createCombatSoundTrigger(read, play, busy = () => false, roll = null, stamp = null) {
   const text = (p) => new TextDecoder('latin1').decode(read(p));
   let superUniques = null; try { superUniques = read('data\\global\\excel\\superuniques.bin'); } catch { /* optional */ }
   const monStats = read('data\\global\\excel\\monstats.bin'), monSounds = read('data\\global\\excel\\MonSounds.bin');
@@ -112,7 +112,7 @@ export function createCombatSoundTrigger(read, play, busy = () => false, roll = 
         if (old === undefined || (old === e.mode && !restart)) continue; // a mode CHANGE only (or an attack mode re-entered); first sight is not an entry
         if ((e.type === 1 ? e.mode === 12 : e.mode === 17) && old === 0) continue; // DT -> DD (corpse settles): the death cue already fired on entering DT
         // A monster dying while frozen/shattered (States.txt shatter column: 1, 107, 184) shatters: impact_shatter replaces the hit impact and the death cue.
-        if (e.type === 1 && e.mode === 0 && (e.states?.has(1) || e.states?.has(107) || e.states?.has(184))) { play(385, { unitType: 1, unitId: e.id, classId: e.classId, kind: 'shatter', mode: e.mode, baseRow: 385 }); lastRoll = tick; continue; }
+        if (e.type === 1 && e.mode === 0 && (e.states?.has(1) || e.states?.has(107) || e.states?.has(184))) { play(385, { unitType: 1, unitId: e.id, classId: e.classId, kind: 'shatter', mode: e.mode, baseRow: 385 }); lastRoll = tick; stamp?.(e.id); continue; }
         if (((e.type === 1 ? MON_HIT.has(e.mode) : e.type === 0 && PLAYER_HIT.has(e.mode)) || dmg) && e.lastHitClass !== undefined)
           for (const r of hitSounds(e.lastHitClass, e.type, e.mode, e.critter)) play(r, { unitType: e.type, unitId: e.id, classId: e.classId, kind: 'impact', mode: e.mode, baseRow: r });
         if ((e.lastHitClass & 0xF0) === 0xA0 && (e.type === 1 ? MON_HIT.has(e.mode) || MON_DEATH.has(e.mode) : PLAYER_HIT.has(e.mode) || PLAYER_DEATH.has(e.mode))) continue; // 0x23630: body class 0xA0 returns before the profile hit/death cue
@@ -124,10 +124,10 @@ export function createCombatSoundTrigger(read, play, busy = () => false, roll = 
             // 0x242B0: prob < 100 -> the 15-tick delay gate and the busy gate apply; prob >= 100 plays unconditionally.
             // The LCG advances only when the gate passes.
             const gated = p[b] < 100, pass = !!p[s] && (!gated || (tick - lastRoll >= 15 && !busy()));
-            if (pass) { lcgStep(); const r = roll?.() ?? Number(rng.s & 0xFFFFFFFFn) % 100; if (r < p[b]) { lastRoll = tick; playRaw(p[s], e, 'attack'); } }
+            if (pass) { lcgStep(); const r = roll?.() ?? Number(rng.s & 0xFFFFFFFFn) % 100; if (r < p[b]) { lastRoll = tick; stamp?.(e.id); playRaw(p[s], e, 'attack'); } }
             playRaw(p[w], e, 'weapon');
-          } else if (MON_SKILL[e.mode]) fire(p[MON_SKILL[e.mode]], e, 'skill'); else if (MON_HIT.has(e.mode)) { if (!busy()) { fire(p[13], e, 'hit'); if (p[13] === 0x2e9) { play(0x6a, { unitType: 1, unitId: e.id, classId: e.classId, kind: 'hit', mode: e.mode, baseRow: 0x6a }); play(0xc1, { unitType: 1, unitId: e.id, classId: e.classId, kind: 'hit', mode: e.mode, baseRow: 0xc1 }); } } lastRoll = tick; } // 0x23630 stamps the delay clock
-          else if (MON_DEATH.has(e.mode)) { fire(p[15], e, 'death'); lastRoll = tick; }
+          } else if (MON_SKILL[e.mode]) fire(p[MON_SKILL[e.mode]], e, 'skill'); else if (MON_HIT.has(e.mode)) { if (!busy()) { fire(p[13], e, 'hit'); if (p[13] === 0x2e9) { play(0x6a, { unitType: 1, unitId: e.id, classId: e.classId, kind: 'hit', mode: e.mode, baseRow: 0x6a }); play(0xc1, { unitType: 1, unitId: e.id, classId: e.classId, kind: 'hit', mode: e.mode, baseRow: 0xc1 }); } } lastRoll = tick; stamp?.(e.id); } // 0x23630 stamps the delay clock and the unit's +0x7C
+          else if (MON_DEATH.has(e.mode)) { fire(p[15], e, 'death'); lastRoll = tick; stamp?.(e.id); }
         } else if (e.classId >= 0 && e.classId < 7) {
           const t = PLAYER_HIT_DEATH[e.classId];
           if (PLAYER_CAST.has(e.mode)) { if (e.id === snapshot?.playerId) fire(skillSound.get(snapshot.player?.castSkillId) ?? 0, e, 'cast'); }

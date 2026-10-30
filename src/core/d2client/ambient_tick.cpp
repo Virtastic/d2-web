@@ -92,6 +92,8 @@ EMSCRIPTEN_KEEPALIVE void d2_ambient_record(int idx, int nightAmb, int dayAmb, i
     r[1] = nightAmb; r[2] = dayAmb; r[3] = nightEvt; r[4] = dayEvt; r[5] = delay;
     if (U(idx + 1) > A.nrec) A.nrec = idx + 1;
 }
+// DAT_6fbc97f8 as the unit pass reads it: the frame about to run (0x4F860 is called with it, then it advances).
+EMSCRIPTEN_KEEPALIVE uint32_t d2_ambient_now() { return Now; }
 // Drain the queued submits: pairs {Sounds row, kind} (kind 0 area loop, 1 weather handle, 2 one-shot). Returns the pair count.
 EMSCRIPTEN_KEEPALIVE int d2_ambient_take(int32_t* out, int cap) {
     int n = A.qn < cap ? A.qn : cap;

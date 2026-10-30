@@ -220,6 +220,7 @@ static uint32_t g_sessionClientMapEventsDropped = 0;
 // The offline browser client owns an independent local-player CUnit seed stream. It must never
 // borrow g_targetPlayer->pSeed, which belongs to the D2Game/server unit.
 namespace d2client_ambient { void reset(); void tick(uint32_t* seed, uint32_t period, bool weatherLevel); uint32_t* fallbackSeed(); }
+extern "C" void d2_client_monster_idle_reset();   // 1.13c D2Client+0x237E0 monster branch state (unit_sound_trigger_237e0.cpp)
 namespace d2client_hurricane { void reset(); void tick(D2UnitStrc* u, uint32_t* seed); }
 namespace d2client_vine { void reset(); void tick(D2UnitStrc* hero); }
 namespace d2client_clmissile { void reset(); void cast(int32_t skillId, int32_t level, D2UnitStrc* target, int32_t tx, int32_t ty); void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)); }   // 1.13c D2Client+0x15DA0 (cltdofunc 17), +0xB17C0 / +0xB1420 (client missiles)
@@ -1108,7 +1109,7 @@ static void syncSessionClientMapFromPlayer();
 static void resetSessionClientMapMirror() {
     if (g_sessionClientPlayerUnit) UNITS_FreeUnit(g_sessionClientPlayerUnit);
     g_sessionClientPlayerUnit = nullptr;
-    d2client::weather::reset(); d2client_ambient::reset(); d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset(); d2client_blizzard::reset();
+    d2client::weather::reset(); d2client_ambient::reset(); d2_client_monster_idle_reset(); d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset(); d2client_blizzard::reset();
     if (g_sessionClientActOwned) d2_drlg_act_end();
     g_sessionClientActOwned = false;
     g_sessionClientMapStarted = false;
@@ -4080,11 +4081,27 @@ EMSCRIPTEN_KEEPALIVE const D2SeedStrc* d2_session_client_player_seed() {
 }
 
 // 1.13c D2Client+0x242B0: the monster attack-sound roll steps the control unit's seed (+0x20/+0x24): p = lo*0x6AC690C5 + hi, r = lo32(p) % 100.
-EMSCRIPTEN_KEEPALIVE int d2_client_attack_roll() {
-    if (!g_sessionClientPlayerUnit) return -1;
-    D2SeedStrc& s = g_sessionClientPlayerUnit->pSeed;
-    s.lSeed = (uint64_t)s.nLowSeed * 0x6ac690c5u + s.nHighSeed;
-    return (int)(s.nLowSeed % 100);
+
+// 1.13c D2Client+0x89640 rand(n) on the client hero seed (+0x20/+0x24): v = lo*0x6AC690C5 + hi; a power of two masks, otherwise lo32 % n.
+extern "C" uint32_t d2_session_client_rand(uint32_t n) {
+    uint32_t* s = g_sessionClientPlayerUnit ? reinterpret_cast<uint32_t*>(&g_sessionClientPlayerUnit->pSeed) : d2client_ambient::fallbackSeed();
+    if (!n) return 0;
+    const uint64_t v = uint64_t(s[0]) * 0x6ac690c5ull + s[1];
+    s[0] = uint32_t(v); s[1] = uint32_t(v >> 32);
+    return (n & (n - 1)) ? uint32_t(v) % n : ((n - 1) & uint32_t(v));
+}
+EMSCRIPTEN_KEEPALIVE int d2_client_attack_roll() { return g_sessionClientPlayerUnit ? (int)d2_session_client_rand(100) : -1; }
+// The monster's client-side facts 0x237E0 reads: #10331/#10057 (room in town) and 0x881B0 (in range of the hero, client coords #10628).
+// The client holds the previous frame's server state; the shell calls this before the frame's tick. Returns 0 when the unit is gone.
+extern "C" int d2_session_monster_idle_facts(uint32_t id, int32_t* town, int32_t* near) {
+    D2UnitStrc* u = g_game ? SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)id) : nullptr;
+    if (!u || !u->pDynamicPath || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return 0;
+    D2ActiveRoomStrc* room = UNITS_GetRoom(u);
+    *town = room && DUNGEON_IsRoomInTown(room) ? 1 : 0;
+    const int64_t dx = int64_t(u->pDynamicPath->dwClientCoordX) - g_targetPlayer->pDynamicPath->dwClientCoordX;
+    const int64_t dy = (int64_t(u->pDynamicPath->dwClientCoordY) - g_targetPlayer->pDynamicPath->dwClientCoordY) * 2;
+    *near = dx * dx + dy * dy <= 490000 ? 1 : 0;   // 0x881B0: the float limit at D2Client+0xD7570 (490000.0f)
+    return 1;
 }
 
 // PROBE (F52, lands with the measurement it justifies): where a level's exit data actually lives,

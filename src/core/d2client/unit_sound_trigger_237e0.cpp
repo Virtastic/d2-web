@@ -81,3 +81,50 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_237e0(uint8_t* u, const D2c237Env
     e->set22010(u, now);
     *e->nextDelay = e->rand39640(0x3d) + 0x1e;
 }
+
+// ---- The play path: 0x237E0 itself, its seams backed by the session. ----
+// A handle stands for the client unit: its per-unit timers (+0x7C dwSfxTicks, +0x80 dwSfxAsyncTicks) live in g_idle by unit id.
+// DAT_6fbc97f8 is the frame counter the shell passes; DAT_6fbcc4c0/c8 are g_idleLast/g_idleDelay. All start at 0 per session.
+#include <unordered_map>
+#include <cstddef>
+#include <D2DataTbls.h>
+extern "C" uint32_t d2_session_client_rand(uint32_t n);
+extern "C" int d2_session_monster_idle_facts(uint32_t id, int32_t* town, int32_t* near);
+static_assert(offsetof(D2MonSoundsTxt, dwNeutral) == 0x68 && offsetof(D2MonSoundsTxt, dwNeuTime) == 0x6c, "0x237E0 reads MonSounds +0x68/+0x6C");
+namespace {
+struct IdleUnit { uint32_t u7c = 0, u80 = 0; };
+std::unordered_map<uint32_t, IdleUnit> g_idle;
+uint32_t g_idleNow = 0, g_idleLast = 0, g_idleDelay = 0;
+struct IdleCall { int32_t cls; uint32_t mode; int32_t town, near; IdleUnit* st; const D2MonSoundsTxt* snd; uint32_t row; };
+IdleCall* C(void* u) { return static_cast<IdleCall*>(u); }
+}
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_monster_idle_reset() { g_idle.clear(); g_idleNow = g_idleLast = g_idleDelay = 0; }
+// 0x22070 / the inline stores beside DAT_6fbcc4c4 (0x23630 hit/death, 0x242B0 attack): a monster sound stamps the unit's +0x7C.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_monster_sfx_stamp(uint32_t id, uint32_t now) { g_idle[id].u7c = now; }
+// One 0x4F4A0 -> 0x237E0 call for a client monster (class, 0x223D0 mode) at frame `now`; returns the Sounds row 0x88A70 submits, or 0.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_monster_idle(uint32_t id, int32_t cls, uint32_t mode, uint32_t now) {
+    IdleCall c{cls, mode, 0, 0, &g_idle[id], DATATBLS_GetMonSoundsTxtRecordFromMonsterId(cls), 0};
+    if (!d2_session_monster_idle_facts(id, &c.town, &c.near)) return 0;
+    g_idleNow = now;
+    D2c237Env e{};
+    e.mode223d0 = [](void* u) { return C(u)->mode; };
+    e.type22430 = [](void*) { return int32_t(1); };
+    e.ord1700 = [](void* u) { const D2MonStatsTxt* r = DATATBLS_GetMonStatsTxtRecord(C(u)->cls); return r ? int32_t(r->nBaseId) : C(u)->cls; };
+    e.monstatsCount = 0x7fffffff;
+    e.monSound2a70 = [](void* u) { return reinterpret_cast<uint8_t*>(const_cast<D2MonSoundsTxt*>(C(u)->snd)); };
+    e.has225d0 = [](void*, int32_t) { return int32_t(0); };   // ponytail: the unit's playing-sound list (+0x78) is not mirrored; NeuTime outlasts the row
+    e.get220a0 = [](void* u) { return C(u)->st->u7c; };
+    e.get22040 = [](void* u) { return C(u)->st->u80; };
+    e.set22010 = [](void* u, uint32_t v) { C(u)->st->u80 = v; };
+    e.ord10331 = [](void*) { return int32_t(1); };
+    e.rand39640 = [](uint32_t n) { return d2_session_client_rand(n); };
+    e.play38a70 = [](void* u, int, int, int) { C(u)->row = C(u)->snd->dwNeutral; };
+    e.now = &g_idleNow; e.lastPlay = &g_idleLast; e.nextDelay = &g_idleDelay;
+    e.fatal = [](uint32_t) {};
+    // the room/town and range seams read the call's facts; the env seams take no unit, so they go through a file-scope pointer
+    static IdleCall* cur; cur = &c;
+    e.ord10057 = [](int32_t) { return cur->town; };
+    e.near881b0 = [] { return cur->near; };
+    d2_client_237e0(reinterpret_cast<uint8_t*>(&c), &e);
+    return c.row;
+}
