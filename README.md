@@ -100,7 +100,7 @@ finished site to `build-wasm/site/`. The first run takes a while; later runs are
 D2_RETAIL_DIR="/path/to/Diablo II" node play/serve.mjs 8920 build-wasm/site
 ```
 
-Open <http://localhost:8920/?retail=1>.
+Open <http://localhost:8920/>.
 
 `play/serve.mjs` is a small Node server with no dependencies. It serves the site, serves your MPQs
 under `/retail/`, and sets the cross-origin isolation headers (COOP/COEP) the wasm threads need.
@@ -115,11 +115,10 @@ The same server can listen on your network:
 | `D2_BIND=0.0.0.0` | listen on every interface (default `127.0.0.1` only) |
 | `D2_TLS_DIR=<dir>` | serve HTTPS using `<dir>/key.pem` and `<dir>/cert.pem` |
 | `D2_RETAIL_DIR=<dir>` | the folder holding your `.mpq` files |
-| `D2_RETAIL_REDIRECT=1` | a bare page load goes straight to `?retail=1` |
 | `PORT` | port, if not given as the first argument |
 
 ```sh
-D2_BIND=0.0.0.0 D2_TLS_DIR=~/certs D2_RETAIL_DIR="/path/to/Diablo II" D2_RETAIL_REDIRECT=1 \
+D2_BIND=0.0.0.0 D2_TLS_DIR=~/certs D2_RETAIL_DIR="/path/to/Diablo II" \
   node play/serve.mjs 8443 build-wasm/site
 ```
 
@@ -136,7 +135,6 @@ Saves live in the browser's own storage on each device.
 
 | URL flag | effect |
 |---|---|
-| `?retail=1` | load your MPQs from the server |
 | `?enhanced=1` | quality-of-life options (wider view and similar) |
 | `?plugy=1` | PlugY-style extended stash |
 | `&debug=1` | debug overlay |
