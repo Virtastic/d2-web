@@ -300,7 +300,7 @@ function showBootFailure(why) {
     // same /retail/<name> paths, so nothing below the mount knows the difference.
     const siteCfg = wantRetail && !noRetail ? await fetchBounded('site-config.json', {}, 'site-config.json').then((r) => (r.ok ? r.json() : {})).catch(() => ({})) : {};
     const byo = (window.__d2Entry.assets || siteCfg.assets) === 'byo' && wantRetail && !noRetail;
-    if (byo) retail.push(...await (await import('./assets/byo-door.mjs')).frontDoor());
+    if (byo) retail.push(...await (await import('./assets/byo-door.mjs?v=' + VER)).frontDoor());
     else if (wantRetail && !noRetail) for (const f of RETAIL_ORDER) {
       const h = await fetchBounded('retail/' + f, { method: 'HEAD' }, 'retail/' + f);
       if (h.ok) retail.push({ f, size: Number(h.headers.get('content-length')) });
