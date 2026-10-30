@@ -161,11 +161,13 @@ void __stdcall ITEMS_AssignPrefix(D2UnitStrc* pItem, uint16_t nPrefix, int nPref
 }
 
 //D2Common.0x6FD98600 (#10697)
-uint16_t __stdcall ITEMS_GetAutoAffix(D2UnitStrc* pItem)
+// 1.13c D2Common+0x23A90 (#11098) returns a dword. Its low word is the affix; the high word is the upper
+// half of the item-data pointer in retail's 32-bit space, which has no 64-bit counterpart, so it stays 0.
+uint32_t __stdcall ITEMS_GetAutoAffix(D2UnitStrc* pItem)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
 	{
-		return pItemData->wAutoAffix;
+		return pItemData->wAutoAffix; // d2-web: dword return, high word 0
 	}
 
 	return 0;
@@ -1222,13 +1224,25 @@ BOOL __stdcall ITEMS_GetQuest(D2UnitStrc* pItem)
 	return ITEMS_GetQuestFromItemId(pItem->dwClassId);
 }
 
+// Retail fatal: Ordinal_10024(&DAT_6fdda728, Ordinal_10265(code)); _exit(-1). Seams are weak, as in d2common_batch_1a330.
+__attribute__((weak)) uint32_t Ordinal_10265(uint32_t);
+__attribute__((weak)) void Ordinal_10024(const void*, uint32_t);
+__attribute__((weak)) char DAT_6fdda728[1];
+[[noreturn]] static void ITEMS_FatalCode(uint32_t code)
+{
+	if (Ordinal_10265 && Ordinal_10024)
+		Ordinal_10024(DAT_6fdda728, Ordinal_10265(code));
+	__builtin_trap();
+}
+
 //D2Common.0x6FD99D40 (#10743)
 // 1.13c D2Common+0x22FF0
 uint32_t __stdcall ITEMS_GetNormalCode(D2UnitStrc* pItem)
 {
-
-	D2_ASSERT(pItem);
-	D2_ASSERT(pItem->dwUnitType == UNIT_ITEM);
+	if (pItem == nullptr)
+		ITEMS_FatalCode(0x798);
+	if (pItem->dwUnitType != UNIT_ITEM)
+		ITEMS_FatalCode(0x799);
 
 	const D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
 	if (pItemsTxtRecord->dwNormCode)

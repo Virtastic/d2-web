@@ -243,7 +243,7 @@ D2COMMON_DLL_DECL uint16_t __stdcall ITEMS_GetPrefixId(D2UnitStrc* pItem, int nP
 //D2Common.0x6FD985D0 (#10700)
 D2COMMON_DLL_DECL void __stdcall ITEMS_AssignPrefix(D2UnitStrc* pItem, uint16_t nPrefix, int nPrefixNo);
 //D2Common.0x6FD98600 (#10697)
-D2COMMON_DLL_DECL uint16_t __stdcall ITEMS_GetAutoAffix(D2UnitStrc* pItem);
+D2COMMON_DLL_DECL uint32_t __stdcall ITEMS_GetAutoAffix(D2UnitStrc* pItem);
 //D2Common.0x6FD98630 (#10698)
 D2COMMON_DLL_DECL void __stdcall ITEMS_SetAutoAffix(D2UnitStrc* pItem, uint16_t nAffix);
 //D2Common.0x6FD98650 (#10701)

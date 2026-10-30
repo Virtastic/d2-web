@@ -3393,6 +3393,17 @@ void __stdcall UNITS_GetLeftSkillData(D2UnitStrc* pUnit, int* pLeftSkillId, int*
 	}
 }
 
+// Retail fatal: Ordinal_10024(&DAT_6fdda728, Ordinal_10265(code)); _exit(-1). Seams are weak, as in d2common_batch_1a330.
+__attribute__((weak)) uint32_t Ordinal_10265(uint32_t);
+__attribute__((weak)) void Ordinal_10024(const void*, uint32_t);
+__attribute__((weak)) char DAT_6fdda728[1];
+[[noreturn]] static void UNITS_FatalCode(uint32_t code)
+{
+	if (Ordinal_10265 && Ordinal_10024)
+		Ordinal_10024(DAT_6fdda728, Ordinal_10265(code));
+	__builtin_trap();
+}
+
 //D2Common.0x6FDC22B0 (#10449)
 void __stdcall UNITS_GetSwitchRightSkillDataResetRightSkill(D2UnitStrc* pUnit, int* pSwitchRightSkillId, int* pSwitchRightSkillFlags)
 {
@@ -3443,7 +3454,8 @@ void __stdcall UNITS_GetSwitchLeftSkillData(D2UnitStrc* pUnit, int* pSwitchLeftS
 {
 	if (pUnit && pUnit->dwUnitType == UNIT_PLAYER)
 	{
-		D2_ASSERT(pUnit->pPlayerData);
+		if (pUnit->pPlayerData == nullptr)
+			UNITS_FatalCode(0x1487);
 
 		*pSwitchLeftSkillId = pUnit->pPlayerData->nSwitchLeftSkillId;
 		*pSwitchLeftSkillFlags = pUnit->pPlayerData->nSwitchLeftSkillFlags;
@@ -3461,7 +3473,8 @@ void __stdcall UNITS_GetSwitchRightSkillData(D2UnitStrc* pUnit, int* pSwitchRigh
 {
 	if (pUnit && pUnit->dwUnitType == UNIT_PLAYER)
 	{
-		D2_ASSERT(pUnit->pPlayerData);
+		if (pUnit->pPlayerData == nullptr)
+			UNITS_FatalCode(0x1499);
 
 		*pSwitchRightSkillId = pUnit->pPlayerData->nSwitchRightSkillId;
 		*pSwitchRightSkillFlags = pUnit->pPlayerData->nSwitchRightSkillFlags;
