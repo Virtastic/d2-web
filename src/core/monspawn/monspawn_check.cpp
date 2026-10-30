@@ -221,6 +221,7 @@ static uint32_t g_sessionClientMapEventsDropped = 0;
 namespace d2client_ambient { void reset(); void tick(uint32_t* seed, uint32_t period, bool weatherLevel); uint32_t* fallbackSeed(); }
 namespace d2client_hurricane { void reset(); void tick(D2UnitStrc* u, uint32_t* seed); }
 namespace d2client_vine { void reset(); void tick(D2UnitStrc* hero); }
+namespace d2client_clmissile { void reset(); void cast(int32_t skillId, int32_t level, D2UnitStrc* target, int32_t tx, int32_t ty); void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)); }   // 1.13c D2Client+0x15DA0 (cltdofunc 17), +0xB17C0 / +0xB1420 (client missiles)
 namespace d2client_nova { void reset(); void selectSkill(int32_t skillId); int32_t selectedSkill(); void cast(int32_t skillId, bool presentation); void tick(); }   // 1.13c D2Client+0x73CB0 (cltdofunc 25, Poison Nova), +0x73D70 (cltdofunc 29, Frozen Orb)
 static D2UnitStrc* g_sessionClientPlayerUnit = nullptr;
 static uint32_t g_sessionClientPlayerInitSeed = 0;
@@ -281,6 +282,7 @@ struct D2SessionMissileAnimation {
     uint8_t direction;   // pDynamicPath->nDirection, 0..63 (the client resolves it to the DCC index)
     uint8_t trans;       // Missiles.txt nTrans, forwarded for the client's non-hovered base draw mode
                          // (F20). The hovered-unit mode-7 override and pixel parity remain open.
+    int32_t remaining;   // MISSILE_GetRemainingFrames: lets the sound layer predict when the missile ends
 };
 struct D2SessionObjectPresentation {
     uint32_t id, classId, token, mode;
@@ -532,7 +534,7 @@ static_assert(sizeof(D2SessionUnitState) == 12);
 static_assert(sizeof(D2SessionMonsterAnimation) == 96);
 static_assert(offsetof(D2SessionMonsterAnimation, animSpeed) == 88);
 static_assert(offsetof(D2SessionMonsterAnimation, baseWeaponClass) == 92);
-static_assert(sizeof(D2SessionMissileAnimation) == 24);
+static_assert(sizeof(D2SessionMissileAnimation) == 28);
 static_assert(sizeof(D2SessionObjectPresentation) == 44);
 static_assert(sizeof(D2SessionCoords) == 16);
 static_assert(sizeof(D2SessionItemPresentation) == 112);
@@ -814,6 +816,14 @@ static std::unordered_set<uint64_t> g_prevOnsoundStates; // 1.13c D2Client+0x737
 static bool g_sessionResumeAttack;
 extern int32_t g_playerSkillDoIds[8];
 extern int32_t g_playerSkillDoCount;
+static int32_t g_refusedDoSkill = 0, g_refusedDoWait = 0;   // a refused cast's client do sound, due in g_refusedDoWait drains
+static int32_t g_cltMissileRow = 0;
+// A player skill's client missile (Skills.txt cltmissile) plays its TravelSound at creation even when the server made no missile of its own.
+void D2WEB_ClientMissileTravelSound(int32_t nCltMissile) {
+    if (nCltMissile <= 0 || nCltMissile >= sgptDataTables->nMissilesTxtRecordCount || nCltMissile == 261) return;   // 0: a skill with no cltmissile column (missile 0 is the arrow, which plays no birth sound)
+    const D2MissilesTxt* m = DATATBLS_GetMissilesTxtRecord(nCltMissile);
+    if (m && m->wTravelSound > 0 && m->wTravelSound != 0xFFFF) g_cltMissileRow = m->wTravelSound;   // reaches the client one drain later, as the player's do sound does
+}
 static std::vector<std::array<int32_t, 7>> g_pendingSkillDo; // 1.13c D2Client+0xA2C90 wDoSound events, emitted one drain after the do
 // s2420 watches one unit so its scheduled timer can be paired with proof that the event dispatcher
 // actually invoked that unit's AITHINK callback. This is diagnostic only and does not change timing.
@@ -1096,7 +1106,7 @@ static void syncSessionClientMapFromPlayer();
 static void resetSessionClientMapMirror() {
     if (g_sessionClientPlayerUnit) UNITS_FreeUnit(g_sessionClientPlayerUnit);
     g_sessionClientPlayerUnit = nullptr;
-    d2client::weather::reset(); d2client_ambient::reset(); d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset();
+    d2client::weather::reset(); d2client_ambient::reset(); d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset();
     if (g_sessionClientActOwned) d2_drlg_act_end();
     g_sessionClientActOwned = false;
     g_sessionClientMapStarted = false;
@@ -1718,6 +1728,7 @@ static void updateSessionWorld() {
                 missile.direction = unit->pDynamicPath ? unit->pDynamicPath->nDirection : 0;
                 const D2MissilesTxt* txt = DATATBLS_GetMissilesTxtRecord(unit->dwClassId);
                 missile.trans = txt ? txt->nTrans : 0;
+                missile.remaining = MISSILE_GetRemainingFrames(unit);
                 g_sessionMissileAnimations.push_back(missile);
             }
             if (unit->dwUnitType == UNIT_MONSTER && unit->pMonsterData) {
@@ -5892,11 +5903,14 @@ EMSCRIPTEN_KEEPALIVE int d2_session_take_sounds(int32_t* out, int cap) {
         // The player's do reaches the client one drain later, as the state packet does.
         for (const auto& e : g_pendingSkillDo) { if (n + 7 > cap) break; for (int32_t v : e) out[n++] = v; }
         g_pendingSkillDo.clear();
+        if (g_refusedDoWait > 0 && --g_refusedDoWait == 0 && g_playerSkillDoCount < 8) g_playerSkillDoIds[g_playerSkillDoCount++] = g_refusedDoSkill;
         for (int32_t i = 0; i < g_playerSkillDoCount; i++) {
             D2SkillsTxt* t = DATATBLS_GetSkillsTxtRecord(g_playerSkillDoIds[i]);
             if (t && t->wCltDoFunc == 0 && t->wDoSound > 0 && g_targetPlayer)
                 g_pendingSkillDo.push_back({0, (int32_t)g_targetPlayer->dwUnitId, (int32_t)g_targetPlayer->dwClassId, 0x102, -1, 0, (int32_t)t->wDoSound});
         }
+        if (g_cltMissileRow > 0 && g_targetPlayer) g_pendingSkillDo.push_back({0, (int32_t)g_targetPlayer->dwUnitId, (int32_t)g_targetPlayer->dwClassId, 0x102, -1, 0, g_cltMissileRow});
+        g_cltMissileRow = 0;
         g_playerSkillDoCount = 0;
     }
     return n / 7;
@@ -7013,6 +7027,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
     struct HeldStep { ~HeldStep() { sessionHeldStep(); } } heldStep;   // the tick's near-list diff
     struct StreamRefresh { ~StreamRefresh() { D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets); } } streamRefresh;
     for (int i = 0; i < frames; ++i) {
+        // the client sees the previous frame's server state (a death this frame reaches it by packet next tick)
+        d2client_clmissile::tick(g_targetPlayer, [](int32_t type, uint32_t id) { return SUNIT_GetServerUnit(g_game, type, (int32_t)id); });   // 1.13c D2Client+0xB17C0 (client missiles)
         // Advance the mirrored Fog pool lifetimes once per headless simulation frame. Native
         // D2Client updates these pools before its candidate pass, but this engine tick currently
         // has no corresponding weather candidate pass. Entries are world anchored here; camera
@@ -7642,6 +7658,7 @@ static int sessionCommandHandSkill(uint32_t targetUnitId, bool left) {
     g_rightSkillRefusal = 3;
     if (!target || !target->pDynamicPath || !skill) return 0;
     d2client_nova::cast(SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__), false);   // the client casts whether or not the server accepts the use (Frozen Orb, cltdofunc 29)
+    d2client_clmissile::cast(SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__), SKILLS_GetSkillLevel(g_targetPlayer, skill, TRUE), target, 0, 0);   // 1.13c D2Client+0x15DA0 (cltdofunc 17, Teeth)
     g_rightSkillRefusal = 10 + SKILLS_GetUseState(g_targetPlayer, skill);   // 10 + SKILLUSTATE_* (not usable: mana, weapon, ...)
     // Retail's on-unit helper sub_6FC836D0 swaps an AttackNoMana skill (no mana, quantity or shape) for plain Attack,
     // as the 0x0C path does; the gate must let those through (Feral Rage, a retail recording: shape restricted, retail hits).
@@ -7682,7 +7699,7 @@ static int sessionCommandHandSkill(uint32_t targetUnitId, bool left) {
     // No animation started (the skill-do accepted the command but the player never left neutral, e.g.
     // hit mid-click): nothing will end it, so the attack is not in flight. Left at state 1 it refused
     // every later command, across death and respawn, while the pack killed the player (s000b, Sewers).
-    if (!g_sessionAttackEndFrame) { g_sessionAttack.state = 0; g_rightSkillRefusal = 6; return 0; }
+    if (!g_sessionAttackEndFrame) { g_sessionAttack.state = 0; g_rightSkillRefusal = 6; g_castRefusedSkill = skillId; ++g_castRefusedSeq; return 0; }   // the client still casts: stsound at entry, the client do-function sound at its do-frame
     g_rightSkillRefusal = 0;
     return 1;
 }

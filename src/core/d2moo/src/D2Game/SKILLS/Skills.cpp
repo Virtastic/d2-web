@@ -2460,6 +2460,7 @@ int32_t __fastcall sub_6FD12950(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nS
     return nResult;
 }
 
+void D2WEB_ClientMissileTravelSound(int32_t nCltMissile);
 // Player skill dos of this step, read by the session sound drain (client do-function sound, D2Client+0xA2C90).
 int32_t g_playerSkillDoIds[8];
 int32_t g_playerSkillDoCount;
@@ -2570,7 +2571,12 @@ int32_t __fastcall D2GAME_SKILLS_Handler_6FD12BA0(D2GameStrc* pGame, D2UnitStrc*
         }
         else
         {
-            sub_6FD11420(pGame, pSkillsTxtRecord->wSrvMissile, pUnit, nSkillId, nSkillLevel, nX, nY, nTargetX, nTargetY, 0);
+            // The client creates its own cltmissile at the cast (its target is the mouse), so its TravelSound plays even when the
+            // server missile is not made (a corpse target, no destination).
+            if (!sub_6FD11420(pGame, pSkillsTxtRecord->wSrvMissile, pUnit, nSkillId, nSkillLevel, nX, nY, nTargetX, nTargetY, 0) && pUnit->dwUnitType == UNIT_PLAYER)
+            {
+                D2WEB_ClientMissileTravelSound(pSkillsTxtRecord->wCltMissile);
+            }
         }
 
         nResult = 1;
