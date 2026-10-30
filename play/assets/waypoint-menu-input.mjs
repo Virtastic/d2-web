@@ -69,6 +69,7 @@ export function createWaypointMenuInput() {
       const row = rowAt(px, py, width, height, rows);
       return row && row.active && row.levelId !== hereLevelId ? { action: 'row', row } : null;
     },
+    inCloseRect(px, py, width, height) { return contains(menuPoint(px, py, width, height), closeRect()); },
     targets(width, height, drawnTabs = []) {
       const acts = [...new Set(drawnTabs.filter((tab) => tab?.drawn && Number.isInteger(tab.act) && tab.act >= 1 && tab.act <= 5)
         .map((tab) => tab.act))].sort((a, b) => a - b);

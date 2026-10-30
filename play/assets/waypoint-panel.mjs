@@ -123,7 +123,7 @@ export function createWaypointPanelRenderer(read, documentObject = globalThis.do
     /** `rows` are the engine's waypoints for `shownAct`; `paletteAct` is the player's current act;
      *  `tabActs` are the acts retail draws a tab for (the caller reads them from the engine's own
      *  table -- tabActsOf). Absent, only the shown act's tab is drawn, which is a one-act menu. */
-    draw(ctx, width, height, rows, shownAct, open, hereLevelId = null, paletteAct = shownAct, tabActs = null) {
+    draw(ctx, width, height, rows, shownAct, open, hereLevelId = null, paletteAct = shownAct, tabActs = null, closePressed = false) {
       if (!open) return null;
       const a = art(paletteAct), o = origin(width, height), fonts = fontsFor(paletteAct);
       ctx.save(); ctx.translate(o.x, o.y); ctx.scale(o.scale, o.scale);
@@ -150,7 +150,7 @@ export function createWaypointPanelRenderer(read, documentObject = globalThis.do
         tabs.push({ act, selected: act === shownAct, frame, drawn: Boolean(cel_), cel: cel_ });
       }
       tabs.sort((x, y) => Number(y.selected) - Number(x.selected));
-      cel(ctx, 'close', a.close, 10, L.closeX, L.closeY);
+      cel(ctx, 'close', a.close, closePressed ? 11 : 10, L.closeX, L.closeY);
       const drawn = [];
       (rows || []).forEach((row, i) => {
         const here = row.levelId === hereLevelId;

@@ -9,3 +9,22 @@ export const NPC_SPEECH = { 150: { intro: 24, gossip: 30 }, 148: { intro: 11, go
 export const npcSpeech = (classId) => NPC_SPEECH[classId] || null;
 // F21: native D2Client speech timing is implemented in speech-box.mjs from the numeric D2Lang
 // header and FUN_6FB2BB40's fixed-point tick formula; vectors still supply the captured text identity.
+// Introduction / Gossip lines for the NPCs whose classes retail captured nothing for, keyed by the NPC's English display name (lowercase)
+// and, where one name serves several acts, the act. Ids are D2MOO StringIds.h's own <NPC>IntroGossip1 and <NPC>Gossip5: the two NPCs measured
+// (Kashya, Akara) both speak their fifth Gossip line, so the rest follow it (the last line where an NPC has fewer). UNMEASURED for these NPCs:
+// a retail capture of their Gossip click would settle which line it is. The engine's own first-click message still wins for Introduction.
+const A = (intro, gossip) => ({ intro, gossip });
+const CAIN = { 1: A(null, 58), 2: A(null, 301), 3: A(458, 463), 4: A(666, 667), 5: A(20003, 20008) };
+export const NPC_SPEECH_BY_NAME = Object.freeze({
+  warriv: { 1: A(0, 6), 2: A(215, 220) }, akara: A(11, 17), kashya: A(24, 30), charsi: A(36, 42), gheed: A(45, 51),
+  cain: CAIN, 'deckard cain': CAIN,
+  greiz: A(190, 195), elzix: A(203, 209), atma: A(221, 226), geglash: A(230, 236), jerhyn: A(255, 260), fara: A(263, 269),
+  lysander: A(274, 279), drognan: A(285, 291), meshif: { 2: A(241, 247), 3: A(478, 484) }, natalya: A(453, 457),
+  hratli: A(465, 471), asheara: A(490, 496), alkor: A(501, 507), ormus: A(514, 520), tyrael: { 2: A(null, 302), 4: A(664, 665) },
+  anya: A(20014, 20019), larzuk: A(20025, 20031), malah: A(20037, 20044), nihlathak: A(20053, 20060), 'nihlathak town': A(20053, 20060), 'qual-kehk': A(20065, 20072),
+});
+export function npcSpeechByName(name, act) {
+  const row = NPC_SPEECH_BY_NAME[String(name || '').trim().toLowerCase()];
+  if (!row) return null;
+  return 'gossip' in row ? row : row[act] || null;
+}

@@ -63,6 +63,7 @@ export const CHARACTER_SLOTS = Object.freeze({
 export const STAT_PLUS_ART = 'data\\global\\ui\\PANEL\\level.DC6';
 export const STAT_PLUS_SOCKET_ART = 'data\\global\\ui\\PANEL\\levelsocket.dc6';
 export const STAT_PLUS_FRAME = 0;              // retail's enabled frame: a point is waiting
+export const STAT_PLUS_PRESSED_FRAME = 1;      // level.dc6's held (sunken) gem, the frame after the lit one
 export const STAT_PLUS_DISABLED_FRAME = 2;     // OpenDiablo2's DisabledFrame, recorded for the day a
                                                // capture shows retail drawing the unlit state
 export const STAT_PLUS_SOCKET_OFFSET = Object.freeze({ x: -3, y: -2 });
@@ -266,7 +267,7 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
       if (state?.statPoints > 0) for (const stat of Object.keys(STAT_BUTTON_RECTS).map(Number)) { const r = buttonRect(stat);
         const socket = chrome.cel(ctx, act, STAT_PLUS_SOCKET_ART, STAT_PLUS_FRAME,
           r.x + STAT_PLUS_SOCKET_OFFSET.x, r.y + STAT_PLUS_SOCKET_OFFSET.y + 36 - 1);
-        const plus = chrome.cel(ctx, act, STAT_PLUS_ART, STAT_PLUS_FRAME, r.x, r.y + 30 - 1);
+        const plus = chrome.cel(ctx, act, STAT_PLUS_ART, state?.statPressed === stat ? STAT_PLUS_PRESSED_FRAME : STAT_PLUS_FRAME, r.x, r.y + 30 - 1);
         buttons.push({ stat, slot: STAT_BUTTON_RECTS[stat].slot, rect: { ...r }, socket, plus }); }
       texts.push(...drawStatPoints(statPointFonts[6], statPointFonts[16], ctx, state?.statPoints, S));
       chrome.border(ctx, state?.act || 1, BORDER_LEFT);

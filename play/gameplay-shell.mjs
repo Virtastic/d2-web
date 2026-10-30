@@ -3,6 +3,7 @@ import { inventoryOwnsClick } from './assets/shop-click-owner.mjs';
 import { readSessionActiveNearFeed } from './assets/session-active-near-feed.mjs';
 import { createFrameSnapshots, fromSnapshot } from './frame-snapshot.mjs';
 import { perfSync, perfEnabled, perfT0, perfT, perfSample, perfCountFrame, perfReset, perfReport, perfFrameStart, perfFrameTop } from './assets/frame-perf.mjs';
+import { gameInitSeed, clockInputs } from './assets/game-seed.mjs';
 import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, groundItemsUnderPointerAt, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, isPrimaryTargetEligible, nativeObjectHoverContains, nativeHoverSpecialGate, selectPointerCandidate, selectPrimaryTarget, selectHoverUnit, selectRetailPickTarget, viewportToWorld } from './gameplay-model.mjs';
 import { altSync } from './item-pick.mjs';
 import { createMpqAssetReader } from './assets/mpq-assets.mjs';
@@ -83,6 +84,7 @@ import { createCinematicsScreen, CINEMATICS } from './assets/cinematics-screen.m
 import { createScreenshotAction } from './assets/screenshot-action.mjs';
 import { sendCharacterPhrase } from './assets/chat-macros.mjs';
 import { createOtherMultiplayerScreen } from './assets/other-multiplayer.mjs';
+import { goldLabel } from './assets/gold-label.mjs';
 import { hoveredLabel, labelItemAt, nearestGroundItem, pickupNeedsWalk } from './item-pick.mjs';
 import { createSpeechBox } from './assets/speech-box.mjs';
 import { nativeObjectSpeechAcknowledgement } from './assets/object-speech-ack.mjs';
@@ -103,8 +105,8 @@ import { createGameClock, GAME_STEP, STEP, MAX_CATCHUP_UPDATES } from './assets/
 import { queueHeldPointerRepeat } from './assets/held-pointer-repeat.mjs';
 import { heldWorldAction, leftHandCommand } from './assets/world-click-dispatch.mjs';
 import { createDeathScreen, deathScreenShown, respawnAllowed } from './assets/death-screen.mjs';
-import { createNpcMenu, npcMenuChoiceOnRelease, npcMenuInputCoolingDown, npcMenuEntries, talkEntries, menuReturnsAfterSpeech, entriesAfterSpeech } from './assets/npc-menu.mjs';
-import { npcSpeech } from './assets/npc-topics.mjs';
+import { createNpcMenu, npcMenuChoiceOnRelease, npcMenuInputCoolingDown, npcMenuEntries, withTravelRow, withHireRow, deadHireling, resurrectPacket, talkEntries, menuReturnsAfterSpeech, entriesAfterSpeech } from './assets/npc-menu.mjs';
+import { npcSpeech, npcSpeechByName } from './assets/npc-topics.mjs';
 import { createWeatherRenderer } from './assets/weather-renderer.mjs';
 import { weatherWaterAnchors } from './assets/weather-water-anchors.mjs';
 import { createSkillFx } from './assets/skill-fx.mjs';
@@ -642,6 +644,17 @@ function cancelHelpClosePress(pointerId = null) {
   gameUiButtonDown = null;
   return true;
 }
+// The momentary HUD buttons (run, menu arrow, add-point) draw their down cel while armed AND the pointer is still over
+// them (D2Win FUN_6F8EFA80); `hudHeld` names the armed one for the control panel. The release acts only over the same button.
+function hudHeld(pointer) {
+  const t = gameUiButtonDown?.token;
+  if (!t || !controlPanelEvidence) return { levelPressed: -1, hudPressed: null };
+  const cp = controlPanelRenderer, at = (fn) => fn(controlPanelEvidence, pointer.x, pointer.y, canvas.width, canvas.height);
+  return {
+    levelPressed: t.startsWith('level:') && at(cp.hitLevelButton) === Number(t.slice(6)) ? Number(t.slice(6)) : -1,
+    hudPressed: t === 'hud:run' && at(cp.hitRunButton) ? 'run' : t === 'hud:menu' && at(cp.hitMenuButton) ? 'menu' : null,
+  };
+}
 let automapOverlay = null;
 // Retail's Space (CfgClearScreen) closes open panels and hides no chrome (F3c, retail's frames), so this flag is never set;
 // the chrome gates below stay as no-ops.
@@ -929,7 +942,7 @@ function sessionAdapter() {
       objectClick(objectId) { return Module.ccall('d2_session_command_object_packet', 'number', ['number'], [objectId]); },
       talk(npcId) { return Module.ccall('d2_session_command_npc', 'number', ['number'], [npcId]); },
       talkNearest() { return Module.ccall('d2_session_command_nearest_npc', 'number', ['number'], [6]); },
-      travelNearest() { const npc = Module._d2_session_nearest_travel_npc ? Module.ccall('d2_session_nearest_travel_npc', 'number', ['number'], [6]) : 0; return npc ? Module.ccall('d2_session_command_travel', 'number', ['number'], [npc]) : 0; },
+      travelNearest(clicked) { const npc = clicked ? clicked : Module._d2_session_nearest_travel_npc ? Module.ccall('d2_session_nearest_travel_npc', 'number', ['number'], [6]) : 0; return npc ? Module.ccall('d2_session_command_travel', 'number', ['number'], [npc]) : 0; },
       interact() { return Module.ccall('d2_session_command_nearest_warp', 'number', ['number'], [6]); },
       respawn() { return Module.ccall('d2_session_command_respawn', 'number', [], []); },
       tick(n) {
@@ -1021,6 +1034,7 @@ function sessionAdapter() {
             entities[i].lastHitClass = facings.getUint8(offset + 6);
             entities[i].typeFlags = facings.getUint8(offset + 8);
             entities[i].superUniqueId = facings.getInt16(offset + 10, true);
+            entities[i].usedSkill = (facings.getUint8(offset + 9) | ((facings.getUint8(offset + 7) & 0x7f) << 8)) - 1; entities[i].animEvent = facings.getUint8(offset + 7) >> 7; // a monster's used skill (-1 none); its client animation event this frame
           }
         }
         // Unit hit overlays (UNITS_SetOverlay's stat, exported per unit), joined by type:id and played once per unit.
@@ -1174,8 +1188,8 @@ async function bootstrapSession() {
       classSelect.value = String(snapshot.playerClass);   // the dropdown shows the class the file chose
     } else {
       // ?seed= pins the map the new character generates at the capture's own seed; without it the
-      // fixture's seed 1 is used, exactly as before.
-      fixture = MAP_SEED_OVERRIDE != null ? Object.freeze({ ...fixtures[0], seed: MAP_SEED_OVERRIDE }) : fixtures[0];
+      // game gets a fresh seed from the clock, as retail's game create does (assets/game-seed.mjs).
+      fixture = Object.freeze({ ...fixtures[0], seed: MAP_SEED_OVERRIDE != null ? MAP_SEED_OVERRIDE : gameInitSeed(clockInputs()) });
       if (!api?.create(fixture, Number(classSelect.value))) throw new Error('d2_session_create failed');
       propCache.clear(); tooltipPlayerRequirements = null;
       session = api; snapshot = api.snapshot(); clock.reset();   // a new game starts its own 25 Hz clock
@@ -1277,7 +1291,7 @@ async function bootstrapSession() {
     } catch (error) { actMusic = null; musicError = String(error); }
     if (!navigator.webdriver) await entryYield();
     try { audioVolume.attach('sound', createUiClickSoundPlayer(assetReader, canvas)); } catch (error) { musicError = String(error); }
-    try { unitSounds = createUnitSoundPlayer(assetReader, undefined, undefined, soundFetched); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), () => unitSounds.monsterSoundBusy()); eventSounds = createEventSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Event sound', error)), (...a) => Number(Module._d2_client_monster_footstep_row(...a)), (c) => Number(Module._d2_client_monster_footstep_layer(c))); missileSounds = createMissileSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Missile sound', error)), (id) => !Module._d2_session_missile_on_client || Module._d2_session_missile_on_client(id) !== 0); canvas.__d2UnitSound = unitSounds; canvas.__d2EventSound = eventSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader, undefined, undefined, soundFetched)); } catch (error) { musicError = String(error); }
+    try { unitSounds = createUnitSoundPlayer(assetReader, undefined, undefined, soundFetched); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), () => unitSounds.monsterSoundBusy()); eventSounds = createEventSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Event sound', error)), (...a) => Number(Module._d2_client_monster_footstep_row(...a)), (c) => Number(Module._d2_client_monster_footstep_layer(c))); missileSounds = createMissileSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Missile sound', error)), (id) => !Module._d2_session_missile_on_client || Module._d2_session_missile_on_client(id) !== 0, (id) => (Module._d2_session_client_unit_roll ? Number(Module._d2_session_client_unit_roll(id)) >>> 0 : 0), (id) => { const f = Module._d2_session_missile_bolt_seed, lo = f ? Number(f(id, 0)) >>> 0 : 0, hi = f ? Number(f(id, 1)) >>> 0 : 0; return lo || hi ? [lo, hi] : null; }); canvas.__d2UnitSound = unitSounds; canvas.__d2EventSound = eventSounds; canvas.__d2MissileSound = missileSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader, undefined, undefined, soundFetched)); } catch (error) { musicError = String(error); }
 
     // The player build hands the browser a frame between the entry phases (the sounds above, the terrain,
     // the first save) so town entry is three shorter tasks, not one 300 ms one; off under webdriver.
@@ -1723,7 +1737,8 @@ function tipFields(id, code) {
     : code;
   const p = itemProps(id);
   const [title, baseName] = (p.title || '').split('\n');
-  return { name: title || Module.ccall('d2_lang_string', 'string', ['string'], [codeText]) || codeText, baseName, quality: p.quality, flags: p.flags, props: p.lines, propColours: p.colours,
+  const plain = title || Module.ccall('d2_lang_string', 'string', ['string'], [codeText]) || codeText;
+  return { name: (codeText === 'gld' || codeText === 'dlg') ? goldLabel(plain, Module.ccall('d2_session_unit_stat', 'number', ['number', 'number', 'number', 'number'], [4, id, 0x0E, 0])) : plain, baseName, quality: p.quality, flags: p.flags, props: p.lines, propColours: p.colours,
     costLabel: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [3329]),
     // D2Client+0x46230: an item you carry, with a vendor open, ends its tooltip with string 3331 + the engine's sell price.
     sellLabel: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [3331]), sell: Module.ccall('d2_session_item_sell_value', 'number', ['number'], [id]) };
@@ -2536,7 +2551,7 @@ function dismissObjectSpeech() {
   const acknowledgement = nativeObjectSpeechAcknowledgement(m);
   if (acknowledgement) Module.ccall('d2_session_command_npc_response_packet', 'number', ['number', 'number'], [acknowledgement.guid, acknowledgement.stringId]);
 }
-let castHand = 'right', needSkillAt = -1e9;
+let missileBirthBuf = 0, castHand = 'right', needSkillAt = -1e9;
 // 1.13c D2Client+0x4F860 (the engine ticks it): its Sounds-row submits. Kind 0/1 are the area loop and the weather handle (the ambient loop plays them); kind 2 is a one-shot.
 function drainAmbientSounds() {
   if (!Module._d2_ambient_take) return;
@@ -2559,7 +2574,8 @@ function drainUnitSounds() {
     if (stateFx && hero) heroFx = heroFx.concat(stateFx.update((id) => Module.ccall('d2_session_player_has_state', 'number', ['number'], [id]), undefined, undefined, (id) => Module.ccall('d2_session_state_set_seq', 'number', ['number', 'number', 'number'], [0, snapshot.playerId, id]))); }
   // Native client missiles (D2Client-side Fire Ball): the impact row at the native terminal tick.
   if (Module._d2_realm_client_take_missile_sounds) { const b = missileImpactBuf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [32 * 24])); const k = Module.ccall('d2_realm_client_take_missile_sounds', 'number', ['bigint', 'number'], [BigInt(b), 32]); const w = new Int32Array(Module.HEAPU8.buffer.slice(b, b + k * 24)); for (let i = 0; i < k; i++) unitSounds.playRow(w[i * 6 + 5], { kind: 'missile-impact', missileId: w[i * 6 + 2] }).catch(() => {}); }
-  missileSounds?.update(snapshot?.entities ?? [], engineTicks);
+  { let born = []; if (Module._d2_session_missile_births) { const cb = missileBirthBuf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [8])); const bp = Number(Module.ccall('d2_session_missile_births', 'bigint', ['bigint'], [BigInt(cb)])), bn = Module.HEAP32[cb >> 2]; for (let i = 0; i < bn; i++) born.push([Module.HEAP32[(bp >> 2) + 2 * i], Module.HEAP32[(bp >> 2) + 2 * i + 1]]); }
+    missileSounds?.update(snapshot?.entities ?? [], engineTicks, born); }
   // D35: client-side event sounds (pickup, gold, drop, footstep) run every tick, not only on ticks the engine queued a sound.
   eventSounds?.update(snapshot, readAdvancement()?.level);
   drainAmbientSounds();
@@ -2852,7 +2868,7 @@ function update(forceTick = false, live = false) {
         // The caravan: Warriv, Meshif, Tyrael (and Cain's portal) carry the player into the next
         // act's town; the recovered server handler needs that act's quest reward.
         const previousAct = snapshot.act;
-        if (session.travelNearest()) {
+        if (session.travelNearest(command.npcId)) {
           snapshot = session.snapshot(); motion = session.motion();
           if (TERRAIN_ENABLED && snapshot.act !== previousAct) loadSessionTerrain(snapshot.act - 1);
         }
@@ -3572,7 +3588,7 @@ function render(now = false) {
       localPlayer: (() => { const s = selectedPlayerSource(); return s.source !== 'none' && s.renderState ? { renderState: s.renderState, x: s.x, y: s.y } : null; })(),
       hud: hudState({ w: canvas.width, h: canvas.height, snapshot, advancement: snapOr('advancement', readAdvancement), screen: snapOr('characterScreen', readCharacterScreen),
         left: Boolean(characterVisible || questVisible || stashOpen || waypointMenu || shopOpen()), right: Boolean(skillsVisible || inventoryVisible || hirelingVisible),
-        iconRow: hudIconRow, runToggle: snapOr('runToggle', readRunToggle), miniDown, beltBoxes: snapOr('beltHudBoxes', readBeltHudBoxes),
+        iconRow: hudIconRow, runToggle: snapOr('runToggle', readRunToggle), miniDown, ...hudHeld(pointer), beltBoxes: snapOr('beltHudBoxes', readBeltHudBoxes),
         beltKeys: beltKeyNames(controlsPanel?.bindings ?? bootControlBindings), clearScreen: clearScreen || !controlPanelRenderer || screen !== SCREEN.GAME }) } });
   perfT('world', pWorld);
   if (!realmSceneActive && screen === SCREEN.GAME && gameMenu?.open && !controlsPanel?.open) { const p = perfT0(); gameMenu.draw(ctx, canvas.width, canvas.height); perfT('menu', p); }
@@ -4168,7 +4184,7 @@ function drawFrame() {
   if (waypointPanelRenderer) {
     try {
       const wp = waypointMenu ? snapOr('waypointTable', readWaypointTable) : null;
-      waypointEvidence = waypointPanelRenderer.draw(ctx, w, h, wp ? wp.rows(waypointMenu.act) : [], waypointMenu?.act ?? snapshot.act, Boolean(waypointMenu), snapshot.level, snapshot.act, wp?.tabs ?? null);
+      waypointEvidence = waypointPanelRenderer.draw(ctx, w, h, wp ? wp.rows(waypointMenu.act) : [], waypointMenu?.act ?? snapshot.act, Boolean(waypointMenu), snapshot.level, snapshot.act, wp?.tabs ?? null, gameUiButtonDown?.token === 'waypoint-close' && waypointMenuInput.inCloseRect(pointer.x, pointer.y, w, h));
       waypointPanelError = '';
     }
     catch (error) { waypointPanelError = String(error); waypointEvidence = null; }
@@ -4185,6 +4201,7 @@ function drawFrame() {
       mana: (snapshot.player?.mana ?? 0) >> 8, manaMax: (snapshot.player?.manaMax ?? 0) >> 8, act: snapshot.act,
       screen: characterVisible ? snapOr('characterScreen', readCharacterScreen) : null,
       closePressed: characterPanelCloseGesture.pressed,
+      statPressed: (() => { const t = gameUiButtonDown?.token; if (!t?.startsWith('stat:')) return -1; const n = Number(t.slice(5)); return characterPanelRenderer.buttonAt(pointer.x, pointer.y, w, h, readAdvancement()) === n ? n : -1; })(),
       string: langStr,
     }, panelShown(characterVisible));
   }
@@ -4256,7 +4273,7 @@ function drawFrame() {
         // decides whether d2_session_command_move sends retail's 0x01 Walk or its 0x03 Run packet
         // is what picks the run button's cel. The client never keeps its own copy of it.
         runToggle: snapOr('runToggle', readRunToggle), miniPressed: miniDown,
-        levelPressed: gameUiButtonDown?.token?.startsWith('level:') ? Number(gameUiButtonDown.token.slice(6)) : -1,
+        ...hudHeld(pointer),
         // The ornate bar strips between the skill buttons and the console (wide views only; fitView's `fill`).
         strips: w > 800 && ensureFreeRes()?.ready ? (c) => { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); drawParts(c, freeResArt, barParts(w, h)); c.restore(); } : null,
         stamina: screen ? { value: screen[4], maximum: screen[5] } : null });
@@ -4922,11 +4939,10 @@ function npcUnderPointer(px, py) {
 const hasUnidentifiedItem = () => Module.ccall('d2_session_unidentified_count', 'number', [], []) > 0;
 // Kashya lists Hire only once A1Q2 (Sisters' Burial Grounds) is done, the Den alone gives Talk / Cancel
 //.
-const KASHYA = 150, S_HIRE = 3397;
 const menuEntriesFor = (npc) => {
-  const entries = npcMenuEntries(npc.classId)?.filter((e) => e.action !== 'identify' || hasUnidentifiedItem()) ?? null;
-  if (entries && npc.classId === KASHYA && questStatus(readQuestWords(), 1, 2) === 'done') entries.splice(1, 0, { stringId: S_HIRE, action: 'hire' });
-  return entries;
+  const done = (act, quest) => questStatus(readQuestWords(), act, quest) === 'done';
+  return withHireRow(withTravelRow(npcMenuEntries(npc.classId)?.filter((e) => e.action !== 'identify' || hasUnidentifiedItem()) ?? null,
+    npc.classId, done), npc.classId, done);
 };
 
 // The engine's 0x27 message list for the open interaction: [{ stringId, menu }] (D2SessionNpcDialog: u16 ids at +36, menus at +52).
@@ -4940,6 +4956,10 @@ function readDialogMessages() {
     .sort((a, b) => a.stringId - b.stringId);
 }
 // P7b: Talk opens retail's topic box (Introduction / Gossip / one line per quest the NPC has a topic for / Cancel) over the same NPC.
+const npcDisplayName = (npcId) => {
+  const npc = snapshot.entities.find((u) => u.id === npcId && u.type === 1), idx = npc ? Module.ccall('d2_monster_name_str', 'number', ['number'], [npc.classId]) : -1;
+  return idx >= 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [idx]) : '';
+};
 function openTalkBox(npcId, menuState) {
   // Hearing a message changes the NPC's list (the server answers 0x31 with a fresh 0x27): ask the engine for the current one.
   Module.ccall('d2_session_command_npc', 'number', ['number'], [npcId]);
@@ -5041,9 +5061,9 @@ function chooseNpcMenu(entry) {
   if (entry.action === 'topic' || entry.action === 'intro' || entry.action === 'gossip') {
     const inList = readDialogMessages(), plain = inList.find((m) => m.menu === 0);
     // Introduction = the NPC's self-introduction (the first-click greeting, replayed identically); Gossip = its one fixed line.
-    const said = npcIntroHeard.get(menuState.classId), sp = npcSpeech(menuState.classId);
+    const said = npcIntroHeard.get(menuState.classId), sp = npcSpeech(menuState.classId) || npcSpeechByName(npcDisplayName(npcId), snapshot.act);
     const id = entry.action === 'topic' ? entry.stringId : entry.action === 'intro' ? (plain?.stringId || said || sp?.intro) : sp?.gossip;
-    if (!id) { npcMenu.show(npcId, menuState.classId, menuState.name, menuState.entries); return; }
+    if (id == null) { npcMenu.show(npcId, menuState.classId, menuState.name, menuState.entries); return; }
     menuAfterSpeech = menuState;
     npcState = { ...(readNpcState() || { npcId, classId: menuState.classId, items: [], gold: 0 }), npcId, spoken: id,
       greeting: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [id]),
@@ -5065,7 +5085,19 @@ function chooseNpcMenu(entry) {
     return;
   }
   else if (entry.action === 'gamble') Module.ccall('d2_session_command_npc_vendor', 'number', ['number', 'number'], [npcId, 2]);
-  else if (entry.action === 'hire') { openHireWindow(npcId); return; }
+  else if (entry.action === 'hire') {
+    // A dead mercenary is raised by the hirer (0x62, the server charges the cost and answers 0x2A); the menu stays up for the next pick.
+    if (deadHireling(readHirelingRoster())) {
+      const raw = Module._malloc(5), at = Number(raw); Module.HEAPU8.set(resurrectPacket(npcId), at);
+      try { Module.ccall('d2_session_client_packet', 'number', ['bigint', 'number'], [BigInt(at), 5]); } finally { Module._free(raw); }
+      snapshot = session.snapshot();
+      npcMenu.show(npcId, menuState.classId, menuState.name, menuState.entries);
+      return;
+    }
+    openHireWindow(npcId); return;
+  }
+  // Warriv / Meshif's boat entries (3382..3385, Go East / Go West): retail sends the travel 0x38 for the NPC that was clicked.
+  else if (entry.action === 'other' && entry.stringId >= 3382 && entry.stringId <= 3385) { input.queue.push({ type: COMMAND.TRAVEL, npcId }); npcState = null; return; }
   npcState = readNpcState();
 }
 
@@ -5535,7 +5567,10 @@ canvas.addEventListener('pointerdown', (e) => {
   // its click belongs to the world (F3c). `controlPanelEvidence` is null while hidden and these
   // hit tests already fail closed on a null box, but the gate is stated once and explicitly.
   if (e.button === 0 && !clearScreen && controlPanelRenderer?.hitMenuButton(controlPanelEvidence, x, y, canvas.width, canvas.height)) {
-    hudIconRow = !hudIconRow; render(); canvas.focus(); e.preventDefault(); return;
+    gameUiButtonDown = { pointerId: e.pointerId, token: 'hud:menu' };
+    gameUiButtonGesture.press(e.pointerId, 'hud:menu');
+    try { canvas.setPointerCapture(e.pointerId); } catch {}
+    render(); canvas.focus(); e.preventDefault(); return;
   }
   // Native #11017 reads pCursorItem: MiniPanel down/up callbacks decline input while an
   // item is held, leaving that click to the inventory/world item route.
@@ -5567,8 +5602,9 @@ canvas.addEventListener('pointerdown', (e) => {
   // one that chooses the move packet and the hero's mode -- and the button's cel follows the engine
   // on the next frame, so the drawn state cannot disagree with the state the hero moves in.
   if (e.button === 0 && !clearScreen && controlPanelRenderer?.hitRunButton(controlPanelEvidence, x, y, canvas.width, canvas.height)) {
-    const from = readRunToggle();
-    lastRunToggle = { at: [x, y], from, to: toggleRunLock() };
+    gameUiButtonDown = { pointerId: e.pointerId, token: 'hud:run' };
+    gameUiButtonGesture.press(e.pointerId, 'hud:run');
+    try { canvas.setPointerCapture(e.pointerId); } catch {}
     render(); canvas.focus(); e.preventDefault(); return;
   }
   // Only a socket or an icon the renderer drew consumes the click; world input falls through.
@@ -5632,7 +5668,15 @@ canvas.addEventListener('pointerdown', (e) => {
       readWaypointActCompletion(), snapshot.level);
     click.spent = 'waypointMenu';
     if (hit?.action === 'tab') waypointMenu.act = hit.act;
-    else if (hit?.action === 'close') takeWaypoint(0);
+    else if (hit?.action === 'close') {
+      // The close box is momentary (FUN_6FB5A4E0 arms it, FUN_6FB5A740 closes on a release inside it); the outside-click close stays on down.
+      if (waypointMenuInput.inCloseRect(x, y, canvas.width, canvas.height)) {
+        gameUiButtonDown = { pointerId: e.pointerId, token: 'waypoint-close' };
+        gameUiButtonGesture.press(e.pointerId, 'waypoint-close');
+        try { canvas.setPointerCapture(e.pointerId); } catch {}
+        render();
+      } else takeWaypoint(0);
+    }
     else if (hit?.action === 'row' && hit.row.active) takeWaypoint(hit.row.levelId);
     canvas.focus(); e.preventDefault(); return;
   }
@@ -5938,9 +5982,12 @@ canvas.addEventListener('pointerdown', (e) => {
       ? characterPanelRenderer.buttonAt(x, y, canvas.width, canvas.height, readAdvancement()) : null;
     if (statHit !== null && statHit !== undefined) {
       click.spent = 'statPanel';
-      Module.ccall('d2_session_command_add_stat', 'number', ['number', 'number'], [statHit, 1]);
-      propCache.clear();
-      advancement = null;
+      if (e.button === 0) {
+        gameUiButtonDown = { pointerId: e.pointerId, token: `stat:${statHit}` };
+        gameUiButtonGesture.press(e.pointerId, gameUiButtonDown.token);
+        try { canvas.setPointerCapture(e.pointerId); } catch {}
+        render();
+      }
       canvas.focus(); e.preventDefault(); return;
     }
     const carried = inventoryVisible && inventoryPanelRenderer
@@ -6028,6 +6075,15 @@ globalThis.addEventListener('pointerup', (e) => {
     } else if (e.button === 0 && down.token?.startsWith('level:')
         && controlPanelRenderer?.hitLevelButton(controlPanelEvidence, x, y, canvas.width, canvas.height) === Number(down.token.slice(6))) {
       releasedToken = down.token;
+    } else if (e.button === 0 && down.token === 'hud:menu' && controlPanelRenderer?.hitMenuButton(controlPanelEvidence, x, y, canvas.width, canvas.height)) {
+      releasedToken = down.token;
+    } else if (e.button === 0 && down.token === 'hud:run' && controlPanelRenderer?.hitRunButton(controlPanelEvidence, x, y, canvas.width, canvas.height)) {
+      releasedToken = down.token;
+    } else if (e.button === 0 && down.token?.startsWith('stat:') && characterVisible && characterPanelRenderer && session
+        && characterPanelRenderer.buttonAt(x, y, canvas.width, canvas.height, readAdvancement()) === Number(down.token.slice(5))) {
+      releasedToken = down.token;
+    } else if (e.button === 0 && down.token === 'waypoint-close' && waypointMenu && waypointMenuInput.inCloseRect(x, y, canvas.width, canvas.height)) {
+      releasedToken = down.token;
     } else if (e.button === 0 && down.token?.startsWith('skill-tree:') && skillsVisible && skillPanelRenderer && session) {
       const hit = skillPanelRenderer.skillAt(x, y, canvas.width, canvas.height, { skills: readClassSkills() || [] });
       const id = Number(down.token.slice('skill-tree:'.length));
@@ -6035,6 +6091,13 @@ globalThis.addEventListener('pointerup', (e) => {
     }
     const activated = gameUiButtonGesture.release(e.pointerId, releasedToken);
     if (activated === 'help-close') helpVisible = false;
+    else if (activated === 'hud:menu') hudIconRow = !hudIconRow;
+    else if (activated === 'hud:run') { const from = readRunToggle(); lastRunToggle = { at: [x, y], from, to: toggleRunLock() }; }
+    else if (activated?.startsWith('stat:')) {
+      Module.ccall('d2_session_command_add_stat', 'number', ['number', 'number'], [Number(activated.slice(5)), 1]);
+      propCache.clear(); advancement = null;
+    }
+    else if (activated === 'waypoint-close') takeWaypoint(0);
     else if (activated?.startsWith('level:')) {
       if (Number(activated.slice(6)) === 0) { characterVisible = !characterVisible; if (characterVisible) questVisible = false; }
       else skillsVisible = !skillsVisible;

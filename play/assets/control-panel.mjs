@@ -256,7 +256,7 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     // The run button's cel follows the engine's own run/walk toggle (hud.runToggle), never a click
     // this module saw: the toggle's action goes to the engine and this reads the engine back.
     const running = hud.runToggle === true;
-    const run = (() => { const spec = HUD_LAYOUT.runButton, at = local(spec), index = running ? spec.runFrame : spec.frame;
+    const run = (() => { const spec = HUD_LAYOUT.runButton, at = local(spec), index = (running ? spec.runFrame : spec.frame) + (hud.hudPressed === 'run' && runButtonDc6.frames.length > (running ? spec.runFrame : spec.frame) + 1 ? 1 : 0);
       const f = runButtonDc6.frames[index];
       ctx.drawImage(frameCanvas(f, palette, documentObject), at.x, at.y);
       return { ...record(spec, index, f, spec.x, spec.y), pixels: 1, running,
@@ -285,7 +285,7 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
     // a minipanel record), so only a click on the arrow may show frame 0 -- and no capture of a
     // collapsed row exists, so frame 0 is still the inference the module comment declares. Reading
     // the ROW's visibility here instead is what s391 measures: it drew frame 0 in the stash state.
-    const menu = (() => { const spec = HUD_LAYOUT.menuButton, at = local(spec), index = hud.arrowOpen === false ? spec.closedFrame : spec.openFrame;
+    const menu = (() => { const spec = HUD_LAYOUT.menuButton, at = local(spec), base = hud.arrowOpen === false ? spec.closedFrame : spec.openFrame, index = base + (hud.hudPressed === 'menu' && menuButtonDc6.frames.length > base + 1 ? 1 : 0);
       const f = menuButtonDc6.frames[index];
       ctx.drawImage(frameCanvas(f, palette, documentObject), at.x, at.y);
       return { ...record(spec, index, f, spec.x, spec.y), collapsed: hud.arrowOpen === false,

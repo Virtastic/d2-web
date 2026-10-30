@@ -73,6 +73,30 @@ export function talkEntries(messages, questName) {
   }
   return [{ stringId: S_INTRO, action: 'intro' }, { stringId: S_GOSSIP, action: 'gossip' }, ...topics, { stringId: S_CANCEL, action: 'cancel' }];
 }
+/**
+ * The boat row the table cannot hold: Warriv (Act I) offers Go East (3382) and Meshif (Act II) Sail East (3384) only once the act's
+ * last quest (Andariel, Duriel) is done; Warriv (Act II, 3383) and Meshif (Act III, 3385) always carry theirs in the table.
+ * `questDone(act, quest)` answers from the hero's quest words.
+ */
+export const TRAVEL_ROWS = { 155: [3382, 1, 6], 210: [3384, 2, 6] };
+export function withTravelRow(entries, classId, questDone) {
+  const row = TRAVEL_ROWS[classId];
+  if (!entries || !row || !questDone(row[1], row[2])) return entries;
+  return [...entries.slice(0, -1), { stringId: row[0], action: OTHER }, entries[entries.length - 1]];
+}
+/**
+ * Hire is a dynamic row for the two mercenary NPCs whose table record is Talk alone: Kashya lists it once Sisters' Burial Grounds (A1Q2)
+ * is done, Qual-Kehk once Siege on Harrogath (A5Q1) is. The other hirers (Greiz, Asheara) have it in the table.
+ */
+export const HIRE_ROWS = { 150: [1, 2], 515: [5, 1] };
+export function withHireRow(entries, classId, questDone) {
+  const row = HIRE_ROWS[classId];
+  if (!entries || !row || !questDone(row[0], row[1]) || entries.some((e) => e.action === HIRE)) return entries;
+  return [entries[0], { stringId: S_HIRE, action: HIRE }, ...entries.slice(1)];
+}
+/** Picking Hire while the hero's mercenary is dead raises it (retail's resurrect, packet 0x62 {npc id}) instead of opening the offers. Pet flag bit 0 = dead. */
+export const deadHireling = (roster) => roster.find((h) => h && (h.flags & 1)) ?? null;
+export const resurrectPacket = (npcId) => new Uint8Array([0x62, npcId & 255, (npcId >>> 8) & 255, (npcId >>> 16) & 255, (npcId >>> 24) & 255]);
 export function npcMenuEntries(classId) {
   const row = NPC_MENU_TABLE.find(([cls]) => cls === classId);
   if (!row) return null;

@@ -117,6 +117,7 @@ export function normalizeSnapshot(value) {
       ...(e?.states instanceof Set ? { states: e.states } : {}),
       ...(Number.isInteger(e?.typeFlags) ? { typeFlags: e.typeFlags & 0xFF } : {}),
       ...(Number.isInteger(e?.superUniqueId) ? { superUniqueId: e.superUniqueId } : {}),
+      ...(Number.isInteger(e?.usedSkill) ? { usedSkill: e.usedSkill, animEvent: e.animEvent | 0 } : {}), // a monster's used skill id (-1 none) and its client animation event, for its stsound and dosound
       ...(typeof e?.hasDynamicPath === 'boolean' ? { hasDynamicPath: e.hasDynamicPath } : {}),
       animation: e?.animation && typeof e.animation === 'object' ? e.animation : null,
       // F20: retain the engine's missile sequence/frame/facing/transparency record through the
