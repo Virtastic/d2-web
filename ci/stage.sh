@@ -61,7 +61,7 @@ else echo "WARNING: no $SHIM_SRC -- BYO players run on their own Patch_D2.mpq" >
 # Committed ground truth, served so scenarios can fetch it into the page.
 [ -d vectors ] && mkdir -p build-wasm/site/vectors && cp -rLu vectors/. build-wasm/site/vectors/
 FR="${D2_FREERES_DIR:-third-party/sgd2freeres}"
-[ -d "$FR" ] && mkdir -p build-wasm/site/freeres && cp "$FR"/*.dc6 build-wasm/site/freeres/ || true
+[ -d "$FR" ] && mkdir -p build-wasm/site/freeres && cp "$FR"/*.dc6 "$FR"/LICENSE.md build-wasm/site/freeres/ || true
 # Local widescreen frontend backgrounds (retail-derived, gitignored): the MAIN checkout's .widebg/, served as /widebg/.
 WB="${D2_WIDEBG_DIR:-$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")/.widebg}"
 [ -f "$WB/manifest.json" ] && cp -rL "$WB" build-wasm/site/widebg
