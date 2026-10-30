@@ -38,6 +38,7 @@ src/core/fn/*
 !src/core/fn/d2common_19810.cpp
 !src/core/fn/d2common_bf70.cpp
 !src/core/fn/d2common_unit_getters.cpp
+!src/core/fn/d2game_21880.cpp
 !src/core/fn/d2game_33620.cpp
 !src/core/fn/d2game_33740.cpp
 !src/core/fn/d2game_3cb00.cpp
