@@ -29,17 +29,15 @@ import { brMayAnswer } from './br-check.mjs';
 
 const ROOT = process.argv[3] ? resolve(process.argv[3]) + sep : fileURLToPath(new URL('.', import.meta.url));
 const PORT = Number(process.argv[2] || process.env.PORT || 8920);
-const RETAIL = process.env.D2_RETAIL_DIR ? resolve(process.env.D2_RETAIL_DIR) + sep : null;
+// A bring-your-own-files site (site-config.json {"assets":"byo"}) serves no game data, whatever D2_RETAIL_DIR says.
+const BYO = (() => { try { return JSON.parse(readFileSync(join(ROOT, 'site-config.json'), 'utf8')).assets === 'byo'; } catch { return false; } })();
+const RETAIL = process.env.D2_RETAIL_DIR && !BYO ? resolve(process.env.D2_RETAIL_DIR) + sep : null;
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.wasm': 'application/wasm',
   '.json': 'application/json', '.mpq': 'application/octet-stream', '.txt': 'text/plain',
   '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png' };
 
 createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
-  // D2_RETAIL_REDIRECT=1: a bare page load gets ?retail=1, else it mounts no retail data and reports a missing .bik.
-  if (RETAIL && process.env.D2_RETAIL_REDIRECT === '1' && (url.pathname === '/' || url.pathname === '/index.html') && ![...url.searchParams.keys()].some(k => k === 'retail' || k === 'play')) {
-    url.searchParams.set('retail', '1'); res.writeHead(302, { Location: '/index.html' + url.search }); res.end(); return;
-  }
   // Which site this server is serving. A harness reuses a server already on its port only when it
   // serves THAT test runner's staged site; two worktrees that stage the same engine build have
   // byte-identical index.html (version-engine.sh hashes only wasm/loader/streamfs), so comparing

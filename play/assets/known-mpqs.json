@@ -1,0 +1,6 @@
+{
+  "patch_d2": [
+    { "label": "1.13c", "compat": "verified", "size": 8229959, "blockN": 167, "sha256": "64de515bc6d2685852b50924b5b8d875116621b1bc9a70242d63729653b9b1ce" },
+    { "label": "older patch", "compat": "unknown", "size": 4288753, "blockN": 209, "sha256": "45f6e94cbdf54e652f8c4b95615087b3164a59ba63dc37591727e47e40cde874" }
+  ]
+}
