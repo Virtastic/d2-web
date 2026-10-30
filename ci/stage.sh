@@ -85,7 +85,14 @@ if [ -f retail/D2/d2data.mpq ]; then
   for f in retail/D2/*.mpq; do ln -s "$(pwd)/$f" "build-wasm/retail/$(basename "$f")"; done
   # retail/D2/patch_d2.mpq (the same core patch, copied there for the retail capture tool) already links it
   [ -e build-wasm/retail/patch_d2.mpq ] || ln -s "$(pwd)/retail/D2/D2SE/CORES/1.13c/Patch_D2.mpq" build-wasm/retail/patch_d2.mpq
-  [ -f retail/D2/PlugY/StashBtns.dc6 ] && ln -s "$(pwd)/retail/D2/PlugY" build-wasm/retail/PlugY   # PY3: PlugY button art, served under /retail/PlugY/
+  # PY3: PlugY's StashBtns / SharedGoldBtns / TradeStash art, served (never committed) under /retail/PlugY/: D2_PLUGY_ART, retail/D2/PlugY,
+  # or the PlugY checkout's installer folder beside the main checkout. Absent = the shell leaves the stash retail.
+  MAINROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")"
+  for d in "${D2_PLUGY_ART:-}" retail/D2/PlugY "$MAINROOT/reference/PlugY/PlugYInstaller/PlugY"; do
+    if [ -n "$d" ] && [ -f "$d/StashBtns.dc6" ] && [ -f "$d/SharedGoldBtns.dc6" ] && [ -f "$d/TradeStash.dc6" ]; then
+      ln -s "$(cd "$d" && pwd)" build-wasm/retail/PlugY; echo "==> PlugY art: $d"; break
+    fi
+  done
   echo "==> retail: $(ls build-wasm/retail | wc -l) MPQs linked for the test runner"
 fi
 PLAY=build-wasm/site sh wasm-build/version-engine.sh
