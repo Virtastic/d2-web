@@ -146,6 +146,7 @@ test/*
 !test/automap-origin.test.mjs
 !test/automap-record-index.test.mjs
 !test/automap-viewport.test.mjs
+!test/automap-town-picture.test.mjs
 !test/belt-renderer.test.mjs
 !test/blender-cache.test.mjs
 !test/block-extents.test.mjs

@@ -43,3 +43,10 @@ test('index buckets retain first-match order when tile rows are interleaved', ()
   assert.equal(selectIndexedAutomapRecord(index, '1 Town', 'fl', { mainIndex: 3, subIndex: 7 })?.id,
     'wildcard-later');
 });
+
+test('EndSequence -1 is the unsigned byte 255 (open-ended)', () => {
+  const rows = [{ id: 'wl', levelName: '1 Wilderness', tileName: 'wl', style: 0, startSequence: 2, endSequence: -1 }];
+  assert.equal(selectAutomapRecord(rows, '1 Wilderness', 'wl', { mainIndex: 0, subIndex: 2 })?.id, 'wl');
+  assert.equal(selectAutomapRecord(rows, '1 Wilderness', 'wl', { mainIndex: 0, subIndex: 200 })?.id, 'wl');
+  assert.equal(selectAutomapRecord(rows, '1 Wilderness', 'wl', { mainIndex: 0, subIndex: 1 }), null);
+});
