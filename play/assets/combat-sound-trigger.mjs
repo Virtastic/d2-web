@@ -111,6 +111,8 @@ export function createCombatSoundTrigger(read, play, busy = () => false, roll = 
         const old = prev.get(key); prev.set(key, e0.mode);
         if (old === undefined || (old === e.mode && !restart)) continue; // a mode CHANGE only (or an attack mode re-entered); first sight is not an entry
         if ((e.type === 1 ? e.mode === 12 : e.mode === 17) && old === 0) continue; // DT -> DD (corpse settles): the death cue already fired on entering DT
+        // A monster dying while frozen/shattered (States.txt shatter column: 1, 107, 184) shatters: impact_shatter replaces the hit impact and the death cue.
+        if (e.type === 1 && e.mode === 0 && (e.states?.has(1) || e.states?.has(107) || e.states?.has(184))) { play(385, { unitType: 1, unitId: e.id, classId: e.classId, kind: 'shatter', mode: e.mode, baseRow: 385 }); lastRoll = tick; continue; }
         if (((e.type === 1 ? MON_HIT.has(e.mode) : e.type === 0 && PLAYER_HIT.has(e.mode)) || dmg) && e.lastHitClass !== undefined)
           for (const r of hitSounds(e.lastHitClass, e.type, e.mode, e.critter)) play(r, { unitType: e.type, unitId: e.id, classId: e.classId, kind: 'impact', mode: e.mode, baseRow: r });
         if ((e.lastHitClass & 0xF0) === 0xA0 && (e.type === 1 ? MON_HIT.has(e.mode) || MON_DEATH.has(e.mode) : PLAYER_HIT.has(e.mode) || PLAYER_DEATH.has(e.mode))) continue; // 0x23630: body class 0xA0 returns before the profile hit/death cue

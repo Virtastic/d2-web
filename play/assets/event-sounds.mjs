@@ -24,7 +24,7 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
   // Retail's client-side player step for a run (fit to a retail recording/a retail recording/a retail recording Q rows): the walk step 320 over a 3072 cycle (213.33/2048, the exact 4.8-tick footfall period a retail recording gaps need; 213 drifted a tick per 24; D2Common 0x2FB10 walk base,
   // not the run base 101 the server unit carries) over a 2048 cycle; footfalls two per cycle by the 0x23C00 due rule (nearest of cur-step, cur, cur+step
   // to phase 0, circular mod 1536), none within 2/3 of a period of the last. Phase 1207 after the run footfall gives the traced 6,5,4,5,5,5,5,4 gaps.
-  let itemsSeen = false;
+  let itemsSeen = false, deadSeen = new Set();
   // A run a cast started (no explicit move command) keeps the client unit in run mode 3 (a retail recording retail F rows: step 0x97 over a 2048 cycle, footfalls
   // mod 1024, every one the run group, gaps 7,7,6,7); an explicit move flips it to walk/town-walk after the first tick (step 0xD5, the model above).
   let STEP = 320, PER = 1536, MINT = 2, RUNG = 0; const circ = (a) => Math.min(a, PER - a);
@@ -62,6 +62,10 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
         const row = monsterStep(a.classId, cut ? 2 : a.mode, prev[1], cut ? prev[6] : a.frameCountPrecise, cut ? prev[7] : a.animSpeed, tick, lastStep.get(e.id) ?? 0);
         if (row) { lastStep.set(e.id, tick); play(row, { kind: 'footstep', id: e.id, unitType: 1, classId: a.classId }); const layer = monsterLayer?.(a.classId); if (layer) play(layer, { kind: 'footstep', id: e.id, unitType: 1, classId: a.classId }); /* retail 0x88A70 submits the layer row on the same footfall (FsPrb 100) */ }
       }
+      // A monster that dies frozen/shattered (States.txt shatter column: 1, 107, 184) throws its drops with no flip delay: the class dropsound plays on the arrival tick (a retail recording Q).
+      let shatterNow = false; const deadNow = new Set();
+      for (const m of snapshot?.entities ?? []) if (m.type === 1 && m.mode === 0) { deadNow.add(m.id); if (!deadSeen.has(m.id) && (m.states?.has(1) || m.states?.has(107) || m.states?.has(184))) shatterNow = true; }
+      deadSeen = deadNow;
       const now = new Map(), sawItems = itemsSeen; // items list seen on an earlier update: the first one is the world as found, not arrivals
       if (Array.isArray(snapshot?.items)) itemsSeen = true;
       for (const it of snapshot?.items ?? []) {
@@ -69,11 +73,12 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
         // Retail: a dropping item (mode 5) plays Items.txt dropsound when its flip reaches dropsfxframe; any other
         // arrival on the ground (cursor drop) plays it at once. Once per item.
         let played = old?.played ?? false;
+        // A monster's drop appearing on the ground submits the class dropsound at once, its delay field = dropsfxframe (a retail Hurricane kill: Q at the entering tick, delay 12).
         // Retail (a retail recording/a retail recording/a retail recording/a retail recording Q records, D2Client+0x88A70): an item entering the world in drop mode submits item_flippy (row 216) at once, whatever its class; the class dropsound follows at dropsfxframe.
         const unit = { unitType: 4, classId: it.classId }, arrived = !old && sawItems && ground; // an item first seen on the ground mid-session was dropped (the server reports mode 3, not the client's flip mode 5)
         if (!old && ((it.mode === 5 && it.invPage === 255) || arrived)) play(idx.get('item_flippy'), { kind: 'drop-flip', ...unit });
         // Retail Q records (D2Client+0x88A70, 57 drop submits in the traces): the class dropsound is submitted on the flip tick itself, with the row's dropsfxframe as its delay; the audio starts that many ticks later (unit-sound-player playRow).
-        if (d && !played && ((it.mode === 5 && it.invPage === 255) || arrived || (old && old.drop) || (old && !old.ground && !old.flip && ground))) { play(d.row, { kind: 'drop', delay: d.frame, ...unit }); played = true; }
+        if (d && !played && ((it.mode === 5 && it.invPage === 255) || arrived || (old && old.drop) || (old && !old.ground && !old.flip && ground))) { play(d.row, { kind: 'drop', delay: shatterNow && !old ? 0 : d.frame, ...unit }); played = true; }
         now.set(it.id, { ground, code, drop: !played && (!!old?.drop || (!old && ((it.mode === 5 && it.invPage === 255) || arrived))), flip: !!old?.flip || it.mode === 5, played: (ground || it.mode === 5) && played });
       }
       for (const [id, old] of seen) if (old.ground && !(now.get(id)?.ground)) { if (serverPickups > 0) serverPickups--; else play(idx.get(old.code === 'gld' ? 'item_gold' : 'item_pickup'), { kind: old.code === 'gld' ? 'gold' : 'pickup', unitType: 0, classId: cls }); }

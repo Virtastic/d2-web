@@ -114,6 +114,7 @@ export function normalizeSnapshot(value) {
       flags: e?.flags === undefined || e?.flags === null ? undefined : ((Math.max(0, Math.trunc(finite(e.flags))) >>> 0)),
       ...(Number.isInteger(e?.direction) && e.direction >= 0 && e.direction < 64 ? { direction: e.direction } : {}),
       ...(Number.isInteger(e?.lastHitClass) ? { lastHitClass: e.lastHitClass } : {}),
+      ...(e?.states instanceof Set ? { states: e.states } : {}),
       ...(Number.isInteger(e?.typeFlags) ? { typeFlags: e.typeFlags & 0xFF } : {}),
       ...(Number.isInteger(e?.superUniqueId) ? { superUniqueId: e.superUniqueId } : {}),
       ...(typeof e?.hasDynamicPath === 'boolean' ? { hasDynamicPath: e.hasDynamicPath } : {}),

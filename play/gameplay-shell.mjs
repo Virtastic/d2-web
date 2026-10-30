@@ -978,7 +978,7 @@ function sessionAdapter() {
           const v = new DataView(Module.HEAPU8.buffer, p, n * 12), byUnit = new Map();
           for (let i = 0; i < n; i++) { const k = `${v.getUint32(i * 12 + 4, true)}:${v.getUint32(i * 12, true)}`; if (!byUnit.has(k)) byUnit.set(k, new Set()); byUnit.get(k).add(v.getUint32(i * 12 + 8, true)); }
           const live = new Set();
-          for (const entity of entities) if (entity.type === 1) { const k = `1:${entity.id}`; live.add(k); entity.stateOverlays = stateFx.update((id) => byUnit.get(k)?.has(id) ?? false, k, base.tick, (id) => Module.ccall('d2_session_state_set_seq', 'number', ['number', 'number', 'number'], [1, entity.id, id])); }
+          for (const entity of entities) if (entity.type === 1) { const k = `1:${entity.id}`; live.add(k); entity.states = byUnit.get(k); entity.stateOverlays = stateFx.update((id) => byUnit.get(k)?.has(id) ?? false, k, base.tick, (id) => Module.ccall('d2_session_state_set_seq', 'number', ['number', 'number', 'number'], [1, entity.id, id])); }
           stateFx.retain(live);
         }
         if (Module._d2_session_monster_animations) {
@@ -993,7 +993,7 @@ function sessionAdapter() {
         if (Module._d2_session_missile_animations) {
           const count = Module.ccall('d2_session_missile_animation_count', 'number', [], []);
           const ptr = Number(Module.ccall('d2_session_missile_animations', 'number', [], []));
-          const byId = new Map(parseMissileAnimations(Module.HEAPU8.subarray(ptr, ptr + count * 24), count).map((a) => [a.id, a]));
+          const byId = new Map(parseMissileAnimations(Module.HEAPU8.subarray(ptr, ptr + count * 28), count).map((a) => [a.id, a]));
           for (const entity of entities) if (entity.kind === 'missile') entity.missile = byId.get(entity.id);
         }
         let objects = [];
@@ -2470,7 +2470,7 @@ function drainAmbientSounds() {
   const b = ambBuf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [64 * 8]));
   const n = Module.ccall('d2_ambient_take', 'number', ['bigint', 'number'], [BigInt(b), 64]);
   const v = new Int32Array(Module.HEAPU8.buffer.slice(b, b + n * 8));
-  for (let i = 0; i < n; i++) { if (v[i * 2 + 1] === 2) unitSounds.playRow(v[i * 2], { source: 'ambient' }).catch(() => {}); else unitSounds.events.push({ row: v[i * 2], kind: 'table-row', source: 'ambient', held: true }); }
+  for (let i = 0; i < n; i++) { if (v[i * 2 + 1] === 3) unitSounds.events.push({ row: v[i * 2], kind: 'table-row', source: 'ambient', rejected: true }); /* the mixer had no free record: submitted, nothing plays */ else if (v[i * 2 + 1] === 2) unitSounds.playRow(v[i * 2], { source: 'ambient' }).catch(() => {}); else unitSounds.events.push({ row: v[i * 2], kind: 'table-row', source: 'ambient', held: true }); }
 }
 function drainUnitSounds() {
   pollObjectSpeech();

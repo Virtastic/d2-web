@@ -27,12 +27,12 @@ function decodedMissileBytes(dcc, sourceBytes) {
 // CelFile is drawn in the state the ENGINE has it in rather than one guessed from the shell's tick.
 export function parseMissileAnimations(bytes, count) {
   const view = bytes instanceof DataView ? bytes : new DataView(bytes.buffer, bytes.byteOffset || 0, bytes.byteLength);
-  if (!Number.isInteger(count) || count < 0 || view.byteLength < count * 24) throw new RangeError('truncated missile animation records');
+  if (!Number.isInteger(count) || count < 0 || view.byteLength < count * 28) throw new RangeError('truncated missile animation records');
   return Array.from({ length: count }, (_, row) => {
-    const at = row * 24;
+    const at = row * 28;
     return { id: view.getUint32(at, true), classId: view.getUint32(at + 4, true), mode: view.getUint32(at + 8, true),
       framePrecise: view.getUint32(at + 12, true), frameCountPrecise: view.getUint32(at + 16, true),
-      animSpeed: view.getUint16(at + 20, true), direction: view.getUint8(at + 22), trans: view.getUint8(at + 23) };
+      animSpeed: view.getUint16(at + 20, true), direction: view.getUint8(at + 22), trans: view.getUint8(at + 23), remaining: view.getInt32(at + 24, true) };
   });
 }
 
