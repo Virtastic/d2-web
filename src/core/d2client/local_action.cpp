@@ -22,3 +22,18 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_take_local_action() {
 static int32_t g_explicitMove = 0;
 extern "C" void d2_client_note_move_cmd(int32_t explicitMove) { g_explicitMove = explicitMove; }
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_explicit_move() { return g_explicitMove; }
+
+// 1.13c D2Client+0x1B700 -> 0x1B1D0 -> 0x18880 (the cast-on-unit tail of 0x1B7F0, after 0x18F90 accepted the use): a target
+// out of melee reach (0xC6E2 false) for a skill whose Skills.txt srvdofunc (record +0x2E) is 0x13 (Inferno, Arctic Blast) is
+// range-checked by 0x18880: range = the skill's aurarangecalc (record +0x64) at its level, distance = D2Common's unit distance;
+// distance <= range casts (0x1A060), else 0x1B1D0 walks the client unit toward the target (0x1A010 -> 0x2A7C0) and the client
+// starts no skill, so it creates none of the skill's client missiles (a retail call trace: 0x1A060 never runs; the walk's first
+// footfall plays and no Inferno blast does). Returns 1 when the client walks.
+static int32_t g_castWalked = 0;
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_cast_walks(uint32_t srvDoFunc, int32_t inMelee, int32_t distance, int32_t range) {
+    g_castWalked = srvDoFunc == 0x13 && !inMelee && distance > range;
+    return g_castWalked;
+}
+// 1 while the local player's last cast on a unit walked instead of casting (no client skill, no client missile).
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_cast_walked() { return g_castWalked; }
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_cast_walk_reset() { g_castWalked = 0; }

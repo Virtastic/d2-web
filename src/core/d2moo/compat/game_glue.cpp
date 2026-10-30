@@ -135,6 +135,9 @@ void d2_note_popzero(D2DrlgActStrc* pAct, int32_t nLevelId) {
     }
 }
 int32_t g_d2SpawnPath = 0; int32_t g_d2SpawnLog[6 * 8192]; int32_t g_d2SpawnCount = 0;
+// Engine missiles made since the shell last drained them: {unit id, class}. A missile that lives less than a tick (a Thunder Storm bolt) is never in a snapshot; the client still sounds its creation.
+int32_t g_d2MissileBirths[2 * 1024]; int32_t g_d2MissileBirthCount = 0;
+void d2_note_missile_birth(D2UnitStrc* pMissile) { if (g_d2MissileBirthCount < 1024) { g_d2MissileBirths[2 * g_d2MissileBirthCount] = (int32_t)pMissile->dwUnitId; g_d2MissileBirths[2 * g_d2MissileBirthCount + 1] = (int32_t)pMissile->dwClassId; ++g_d2MissileBirthCount; } }
 void d2_note_monster_spawn(D2GameStrc* pGame, D2UnitStrc* pMonster, int32_t nClass, int32_t nX, int32_t nY) {
     if (g_d2SpawnCount >= 8192) return;
     int32_t* e = &g_d2SpawnLog[6 * g_d2SpawnCount++];

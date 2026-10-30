@@ -150,6 +150,7 @@ extern "C" void D2WEB_ResetPacketStream();
 extern "C" const uint8_t* D2WEB_PacketStream(uint32_t* pLength, uint32_t* pPackets);
 extern "C" uint32_t D2WEB_TakeMovieRequests(uint8_t* out, uint32_t cap);
 extern "C" uint32_t d2_client_local_cast_refused();
+extern "C" int32_t d2_client_cast_walked();
 static uint32_t g_sessionPacketStreamLength, g_sessionPacketStreamPackets;
 
 static std::string g_err;
@@ -384,8 +385,9 @@ struct D2SessionUnitCoord {
 // D2SessionUnit ABI stable. The id makes its join to the unit list explicit.
 struct D2SessionUnitFacing {
     uint32_t id;
-    uint8_t direction, hasDynamicPath, lastHitClass, reserved; // lastHitClass: unit+0xB0, the 0x0D packet's hit-class byte
-    uint8_t typeFlags, pad; int16_t superUniqueId; // monster MonsterData nTypeFlag; SuperUniques row (wBossHcIdx) when superunique, else -1
+    uint8_t direction, hasDynamicPath, lastHitClass, usedSkillHi; // lastHitClass: unit+0xB0, the 0x0D packet's hit-class byte
+    uint8_t typeFlags, usedSkillLo; int16_t superUniqueId; // typeFlags: MonsterData nTypeFlag; superUniqueId: SuperUniques row (wBossHcIdx), else -1
+    // usedSkill ((Hi&0x7F)<<8|Lo) is a monster's used skill id + 1, 0 when none (the skill its 0x4C/0x4D names); Hi bit 7: the client's animation event this frame
 };
 // A unit's live overlay (stat STAT_UNIT_DOOVERLAY, set by UNITS_SetOverlay): one id per unit, 0 is absent.
 // Exported only when nonzero, so consumers see the hit overlays a server set on a unit (Overlay.txt row index).
@@ -1583,6 +1585,33 @@ static D2DrlgLevelStrc* g_townLevelForClient() {
     }
     return near ? DRLG_GetLevel(g_lastLevel->pDrlg, 1) : nullptr;
 }
+// The client's own copy of a monster's animation, stepped once a frame as D2Common #10373 steps a unit with no
+// sequence: from the frame it is on (the next one at full speed and above) through the frame it reaches, any
+// AnimData frame flag is the unit's event. A slow animation covers its event frame on two frames running, and the
+// client runs the skill's client do-function (and its dosound) on each. The mode starts at frame 0, unstepped until
+// the client has it.
+// The world is rebuilt more than once a frame: the step runs once per game frame and the frame's event is kept.
+struct D2MonClientAnim { const D2UnitStrc* unit; uint32_t mode, frame; int32_t precise; bool event, held; };
+static std::unordered_map<uint32_t, D2MonClientAnim> g_monClientAnim;
+static bool clientAnimEvent(const D2UnitStrc* unit) {
+    D2MonClientAnim& a = g_monClientAnim[(uint32_t)unit->dwUnitId];
+    const uint32_t now = g_game ? g_game->dwGameFrame : 0;
+    if (a.unit == unit && a.mode == unit->dwAnimMode && a.frame == now) return a.event;
+    if (a.unit != unit || a.mode != unit->dwAnimMode) { a = {unit, unit->dwAnimMode, now, 0, false, true}; return false; }
+    a.frame = now; a.event = false;
+    if (a.held) { a.held = false; return false; }   // the client takes the mode from the server's packet a frame later
+    if (!unit->pAnimData || unit->pAnimSeq || unit->wAnimSpeed <= 0 || unit->dwFrameCountPrecise <= 0) return false;
+    bool& event = a.event;
+    const auto flag = [&](int32_t f) { if (f >= 0 && f < 144 && unit->pAnimData->pFrameFlags[f]) event = true; };
+    int32_t frame = (a.precise >> 8) + (unit->wAnimSpeed >= 256 ? 1 : 0);
+    a.precise += unit->wAnimSpeed;
+    while (a.precise >= unit->dwFrameCountPrecise) {
+        for (int32_t i = frame; i < (unit->dwFrameCountPrecise >> 8); ++i) flag(i);
+        frame = 0; a.precise -= unit->dwFrameCountPrecise;
+    }
+    for (; frame <= (a.precise >> 8); ++frame) flag(frame);
+    return event;
+}
 static void updateSessionWorld() {
     if (g_worldHold && g_worldHoldBuilt) return;
     if (g_worldHold) g_worldHoldBuilt = true;
@@ -1712,6 +1741,8 @@ static void updateSessionWorld() {
                 if (unit->dwUnitType == UNIT_MONSTER && unit->pMonsterData) {
                     facing.typeFlags = (uint8_t)unit->pMonsterData->nTypeFlag;
                     if (facing.typeFlags & MONTYPEFLAG_SUPERUNIQUE) facing.superUniqueId = (int16_t)unit->pMonsterData->wBossHcIdx;
+                    if (D2SkillStrc* used = UNITS_GetUsedSkill(unit)) { const int v = SKILLS_GetSkillIdFromSkill(used, __FILE__, __LINE__) + 1; facing.usedSkillLo = (uint8_t)v; facing.usedSkillHi = (uint8_t)(v >> 8); }
+                    if (clientAnimEvent(unit)) facing.usedSkillHi |= 0x80;
                 }
                 g_sessionUnitFacings.push_back(facing);
             }
@@ -6600,6 +6631,9 @@ extern int32_t g_d2ObjectPopTraceEnabled; extern int32_t g_d2ObjectPopTraceRoomO
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_room_sequence(int32_t* count) { if (count) *count = g_d2SeqCount; return g_d2SeqLog; }
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_popzero_log(int32_t* count) { if (count) *count = g_d2PopZeroCount; return g_d2PopZeroLog; }
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_room_create_log(int32_t* count) { if (count) *count = g_d2CreateCount; return g_d2CreateLog; }
+extern int32_t g_d2MissileBirths[]; extern int32_t g_d2MissileBirthCount;
+// Engine missiles made since the last call: {unit id, class} pairs; the count is returned and the log cleared.
+EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_missile_births(int32_t* count) { *count = g_d2MissileBirthCount; g_d2MissileBirthCount = 0; return g_d2MissileBirths; }
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_spawn_log(int32_t* count) { if (count) *count = g_d2SpawnCount; return g_d2SpawnLog; }
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_activation_log(int32_t* count) { if (count) *count = g_d2ActivationCount; return g_d2ActivationLog; }
 // Opt-in/resettable room-boundary trace, one row per class-125 object (or one sentinel row when absent).
@@ -7037,6 +7071,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_primary_attack(uint32_t targetUnitId
 EMSCRIPTEN_KEEPALIVE int d2_session_command_right_skill(uint32_t targetUnitId);
 EMSCRIPTEN_KEEPALIVE int d2_session_command_left_skill(uint32_t targetUnitId);
 
+extern "C" int d2_client_monster_turn_held(const D2UnitStrc* unit);
 EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath || frames < 0) return 0;
     // a retail recording: server->client packets a tick queues (NPC quest-marker 0x8A) are the tick's own stream.
@@ -7047,6 +7082,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
     struct StreamRefresh { ~StreamRefresh() { D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets); } } streamRefresh;
     for (int i = 0; i < frames; ++i) {
         // the client sees the previous frame's server state (a death this frame reaches it by packet next tick)
+        { extern void d2client_unitseed_flush(); extern void d2_client_monster_order_face_flush(); d2client_unitseed_flush(); d2_client_monster_order_face_flush(); }   // the previous frame's unit adds and orders, in send order
         d2client_clmissile::tick(g_targetPlayer, [](int32_t type, uint32_t id) { return SUNIT_GetServerUnit(g_game, type, (int32_t)id); });   // 1.13c D2Client+0xB17C0 (client missiles)
         // Advance the mirrored Fog pool lifetimes once per headless simulation frame. Native
         // D2Client updates these pools before its candidate pass, but this engine tick currently
@@ -7241,7 +7277,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
                     // MISSILE write `nDirection` directly and leave `nNewDirection` alone, so
                     // adjusting one would rotate a parked object toward a stale zero), and the two
                     // `PATH_CheckCollisionsToNextPosition` asserts on.
-                    if (animUnit->dwUnitType == UNIT_PLAYER || animUnit->dwUnitType == UNIT_MONSTER)
+                    if (animUnit->dwUnitType == UNIT_PLAYER || (animUnit->dwUnitType == UNIT_MONSTER && !d2_client_monster_turn_held(animUnit)))   // a walk order's turn starts when the client gets it
                         D2COMMON_10193_PATH_AdjustDirection(animUnit->pDynamicPath);
                     // 1.13c D2Client monster pass: DT (mode 0) clamps to its last cel and DD (12) holds at
                     // the end (policy rows 0x6FBA2268); a plain wrap would replay the death.
@@ -7663,7 +7699,10 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_cast_refused_seq() { return g_castRefus
 EMSCRIPTEN_KEEPALIVE int32_t d2_session_cast_refused_skill() { return g_castRefusedSkill; }
 EMSCRIPTEN_KEEPALIVE int d2_session_right_skill_refusal() { return g_rightSkillRefusal; }
 extern "C" void d2_client_note_local_action(int32_t mode);
+extern "C" int32_t d2_client_cast_walks(uint32_t srvDoFunc, int32_t inMelee, int32_t distance, int32_t range);
+extern "C" void d2_client_cast_walk_reset();
 static int sessionCommandHandSkill(uint32_t targetUnitId, bool left) {
+    d2_client_cast_walk_reset();
     g_sessionApproachKind = 0; g_sessionApproachTarget = 0;   // this command supersedes any pending approach walk
     // The same refusal reasons as the left click (d2_session_attack_reason), so a stalled right-hand
     // fight names why instead of showing the last left click's reason.
@@ -7689,6 +7728,9 @@ static int sessionCommandHandSkill(uint32_t targetUnitId, bool left) {
         const bool swapsToAttack = swapTxt && (swapTxt->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_ATTACKNOMANA]) &&
             (useState == SKILLUSTATE_NOMANA || useState == SKILLUSTATE_NOQUANTITY || useState == SKILLUSTATE_SHAPERESTRICT);
         if (!swapsToAttack) { g_castRefusedSkill = SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__); ++g_castRefusedSeq; return 0; }   // refused, but the stsound still plays
+        // a shape-restricted skill: the client swaps too, its local action is Attack's A1 (2A750 on a unit, mode 7), whose weapon-class row
+        // plays at the cast (Feral Rage unshifted, a retail recording: 251); Smite with no shield plays none (a retail recording)
+        if (useState == SKILLUSTATE_SHAPERESTRICT) d2_client_note_local_action(7);
     }
     // Retail 0x0D (D2GAME_PACKETCALLBACK_Rcv0x0D_RightSkillOnUnit_6FC83F80) checks no corpse or TARGETABLE
     // flag: the server-unit lookup, the 50-subtile range and the skill's use state are the whole gate. A dead
@@ -7696,6 +7738,12 @@ static int sessionCommandHandSkill(uint32_t targetUnitId, bool left) {
     g_rightSkillRefusal = 5;
     const int skillId = SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__);
     D2SkillsTxt* txt = SKILLS_GetSkillsTxtRecordFromSkill(skill);
+    // The client's own side of the cast (D2Client 0x1B700 -> 0x1B1D0 / 0x18880, local_action.cpp): a srvdofunc 0x13 skill on a
+    // target beyond its aurarangecalc range walks the client unit (its first footfall, local action 2) and starts no client skill.
+    if (txt && d2_client_cast_walks(txt->wSrvDoFunc, UNITS_IsInMeleeRange(g_targetPlayer, target, 0),
+            UNITS_GetDistanceToOtherUnit(g_targetPlayer, target),
+            SKILLS_EvaluateSkillFormula(g_targetPlayer, txt->dwAuraRangeCalc, skillId, SKILLS_GetSkillLevel(g_targetPlayer, skill, TRUE))))
+        d2_client_note_local_action(2);
     // A melee skill (Skills.txt range "h2h") out of reach: walk to the target first, as the left click does.
     if (txt && txt->nRange == 1 && !UNITS_IsInMeleeRange(g_targetPlayer, target, 1)) {
         PLRMODE_StartID_WalkRunKnockback(g_game, g_targetPlayer, g_sessionRunToggle ? PLRMODE_RUN : PLRMODE_WALK, target);   // D33
@@ -7730,6 +7778,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_right_skill(uint32_t targetUnitId) {
 // as the command path: the held callback owns the native 50-subtile range check and out-of-range
 // position-correction timer before it delegates to 0x0C.
 static int sessionCommandRightSkillAt(int32_t x, int32_t y, bool held) {
+    d2_client_cast_walk_reset();
     g_rightSkillRefusal = 1;
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath ||
         g_targetPlayer->dwAnimMode == PLRMODE_DEAD || g_targetPlayer->dwAnimMode == PLRMODE_DEATH) return 0;
@@ -9121,7 +9170,22 @@ EMSCRIPTEN_KEEPALIVE int d2_session_missile_animation_count() {
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_missile_on_client(uint32_t id) {
     D2UnitStrc* m = g_game ? SUNIT_GetServerUnit(g_game, UNIT_MISSILE, (int32_t)id) : nullptr;
     if (!m || !g_targetPlayer || m->dwOwnerType != UNIT_PLAYER || m->dwOwnerGUID != g_targetPlayer->dwUnitId) return 1;
-    return d2_client_local_cast_refused() ? 0 : 1;
+    return d2_client_local_cast_refused() || d2_client_cast_walked() ? 0 : 1;
+}
+// A client unit the client creates in engine missile `id`'s room (D2Client+0xA7400): rolls that client room's seed and
+// returns the roll, the new unit's init seed (its seed is {init, 666}); 0 when there is no such missile or room.
+extern "C++" { namespace d2client_unitseed { uint32_t roll(const D2ActiveRoomStrc* r); } }
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_client_unit_roll(uint32_t id) {
+    D2UnitStrc* m = g_game ? SUNIT_GetServerUnit(g_game, UNIT_MISSILE, (int32_t)id) : nullptr;
+    return m ? d2client_unitseed::roll(UNITS_GetRoom(m)) : 0;
+}
+// A charged-bolt-path missile (SKILLS_MissileInit_ChargedBolt, D2Game+0x43B60; its client mirror D2Client+0x73B60 runs on the
+// same inputs) reseeds itself {first path point X + index, 666} and its path takes rolls of that seed: the client missile's
+// seed is then engine missile `id`'s. Returns word `hi` (0 low, 1 high) of it, 0 when `id` is no such missile.
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_missile_bolt_seed(uint32_t id, uint32_t hi) {
+    D2UnitStrc* m = g_game ? SUNIT_GetServerUnit(g_game, UNIT_MISSILE, (int32_t)id) : nullptr;
+    if (!m || !m->pDynamicPath || PATH_GetType(m->pDynamicPath) != PATHTYPE_CHARGEDBOLT) return 0;
+    return hi ? m->pSeed.nHighSeed : m->pSeed.nLowSeed;
 }
 EMSCRIPTEN_KEEPALIVE const D2SessionObjectPresentation* d2_session_object_presentations() {
     updateSessionSnapshot(); return g_sessionObjectPresentations.data();

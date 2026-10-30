@@ -128,6 +128,7 @@ static bool IsPathCircling(int32_t nAnimMode, D2DynamicPathStrc* pDynamicPath)
 }
 
 extern "C" void d2_client_walk_order(uint32_t, int32_t, int32_t, int32_t, int32_t, const D2PathPointStrc*);
+extern "C" void d2_client_monster_order_face(D2UnitStrc*, int32_t, int32_t, int32_t, D2UnitStrc*);
 //D2Game.0x6FC65C70
 // 1.13c D2Game+0xF35C0
 void __fastcall sub_6FC65C70(D2GameStrc* pGame, D2UnitStrc* pMonster, D2ClientStrc* pClient)
@@ -175,10 +176,12 @@ void __fastcall sub_6FC65C70(D2GameStrc* pGame, D2UnitStrc* pMonster, D2ClientSt
             const int32_t nSkillLevel = SKILLS_GetSkillLevel(pMonster, pSkill, 1);
             if (pTarget && CLIENTS_IsInUnitsRoom(pTarget, pClient))
             {
+                d2_client_monster_order_face(pMonster, 0x16, 0, 0, pTarget);  // the client turn of the unit-target skill action
                 sub_6FC3F0C0(pClient, 1u, pMonster->dwUnitId, pTarget->dwUnitType, pTarget->dwUnitId, nSkillId, 0, nSkillLevel, 0);
             }
             else
             {
+                d2_client_monster_order_face(pMonster, 0x15, D2COMMON_10175_PathGetFirstPointX(pMonster->pDynamicPath), D2COMMON_10176_PathGetFirstPointY(pMonster->pDynamicPath), nullptr);  // the client turn of the coordinate skill action
                 sub_6FC3F060(pClient, 1u, pMonster->dwUnitId, D2COMMON_10175_PathGetFirstPointX(pMonster->pDynamicPath), D2COMMON_10176_PathGetFirstPointY(pMonster->pDynamicPath), nSkillId, 0, nSkillLevel, 0);
             }
         }
@@ -198,7 +201,9 @@ void __fastcall sub_6FC65C70(D2GameStrc* pGame, D2UnitStrc* pMonster, D2ClientSt
 
     if (pTarget)
     {
-        if (IsPathCircling(nAnimMode,pDynamicPath))
+        // 1.13c D2Game+0xF35C0: a target sends the unit form (0x68 family, unk14) unless a WALK/RUN path is
+        // circling, which sends the coordinate form (0x67, unk10); 1.10f had the two the other way round.
+        if (!IsPathCircling(nAnimMode,pDynamicPath))
         {
             nHeader = 0x68u;
             a4 = v5->unk0x14;
@@ -290,6 +295,7 @@ void __fastcall sub_6FC65C70(D2GameStrc* pGame, D2UnitStrc* pMonster, D2ClientSt
         if (nAnimMode == MONMODE_NEUTRAL)
         {
             D2GAME_PACKETS_SendPacket0x6D_6FC3D080(pClient, pMonster->dwUnitId, CLIENTS_GetUnitX(pMonster), CLIENTS_GetUnitY(pMonster), sub_6FC62F50(pMonster));
+            d2_client_monster_order_face(pMonster, 7, CLIENTS_GetUnitX(pMonster), CLIENTS_GetUnitY(pMonster), nullptr);  // the client's turn on the neutral update
             STATLIST_SetUnitStat(pMonster, STAT_PIERCE_IDX, STATLIST_GetUnitBaseStat(pMonster, STAT_PIERCE_IDX, 0) + 1, 0);
             return;
         }
@@ -310,6 +316,7 @@ void __fastcall sub_6FC65C70(D2GameStrc* pGame, D2UnitStrc* pMonster, D2ClientSt
     }
     }
 
+    d2_client_monster_order_face(pMonster, a4, v8, v9, nHeader == 0x68 ? pTarget : nullptr);  // the client's turn on this order (src/core/d2client/monster_face.cpp)
     if (v5->unk0x08)
     {
         d2_client_walk_order(pMonster->dwUnitId, CLIENTS_GetUnitX(pMonster), CLIENTS_GetUnitY(pMonster), pDynamicPath->dwVelocity, pDynamicPath->dwPathPoints, pDynamicPath->PathPoints);  // a retail recording: the client walks this order (src/core/d2client/client_walk_path.cpp)

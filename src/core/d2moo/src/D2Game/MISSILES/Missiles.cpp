@@ -352,6 +352,7 @@ D2UnitStrc* __fastcall MISSILES_CreateMissileFromParams(D2GameStrc* pGame, D2Mis
     sub_6FC6E8B0(pGame, missileParams->pOwner, pMissile);
     STATLIST_SetUnitStat(pMissile, STAT_DAMAGE_FRAMERATE, pMissilesTxtRecord->dwDamageRate, 0);
 
+    { extern void d2_note_missile_birth(D2UnitStrc*); d2_note_missile_birth(pMissile); }
     return pMissile;
 }
 

@@ -5,8 +5,15 @@
 // Session mode: the missiles move through the server act (the units they hit are the server's) without entering its room
 // lists. Not simulated: the pGfx terminal (no gfx), CltSrcTown (0 for the classes cast here), CltHitFunc (0), the
 // ExplosionMissile child (teethexplode: no sound, no collision) and the stat 0x57 velocity term.
+// Fire Wall (skill 51): cltdofunc 26 0x74770 makes two makers (cltmissilea, firewallmaker) walking out both ways from the
+// target, perpendicular to the cast, and one segment (the maker's SubMissile1, firewall) on the target; each maker (pCltDoFunc 6
+// 0xB92B0) drops a segment where it stands whenever its path entered a new subtile on the last step (D2Common #10203, path
+// flags & 8). The client target is the hovered unit even when it is dead (the server clears it and refuses the cast). Not
+// simulated: the 0x51410 caster gate and the town test (#10057), both pass in the recorded sessions.
 #include <cstdint>
 #include <vector>
+#include <D2Collision.h>
+#include <D2Monsters.h>
 #include <D2DataTbls.h>
 #include <D2Skills.h>
 #include <D2StatList.h>
@@ -15,6 +22,7 @@
 #include <DataTbls/SkillsTbls.h>
 #include <Path/Path.h>
 #include <Path/PathMisc.h>
+#include <Path/Step.h>
 #include <Units/Missile.h>
 #include <Units/Units.h>
 
@@ -24,11 +32,15 @@ namespace d2client_clmissile {
 namespace {
 constexpr int32_t kTeeth = 67;            // Skills.txt id, cltdofunc 17
 constexpr int32_t kActionDelay = 9;       // the cast's action frame (the Poison Nova constant, nova_73cb0.cpp: retail TravelSound at cast+8)
+constexpr int32_t kFireWall = 51;         // Skills.txt id, cltdofunc 26
+constexpr int32_t kFireWallDelay = 8;     // retail's first segment TravelSound lands at cast+7
 constexpr int32_t kStepRate = 1024;       // 1.13c D2Client+0x119824 (DAT_6fbc9824), the D2Common_10226 rate
 struct Pending { int64_t due; int32_t skillId, level, targetType; uint32_t targetId; int32_t tx, ty; };
 struct NextHit { int32_t type; uint32_t id; int64_t until; };
 std::vector<Pending> pending;
 std::vector<D2UnitStrc*> missiles;        // creation order (consecutive client ids: ascending hash buckets)
+std::vector<D2UnitStrc*> born;            // created by a missile's own do function this frame, updated from the next
+bool inUpdate = false;
 std::vector<NextHit> nextHits;            // the client's state 0x56 (Missiles.txt NextHit), held per target
 int64_t frame = 0;
 uint32_t nextId = 1;
@@ -88,12 +100,13 @@ bool terminal(D2UnitStrc* unit, D2UnitStrc* owner, bool wall, D2UnitStrc* target
     return true;
 }
 
-// 1.13c D2Client+0xB30F0, request flags 0x820 (target point, activate override): origin = the owner's position.
-void create(D2UnitStrc* owner, int32_t missileId, int32_t skillId, int32_t level, int32_t tx, int32_t ty, int32_t activateBack) {
+// 1.13c D2Client+0xB30F0: origin (x, y) (the owner's position for flags 0x820, the request's point for flag 1), target
+// point (tx, ty) (flag 0x20; the origin otherwise).
+void create(D2UnitStrc* owner, int32_t missileId, int32_t skillId, int32_t level, int32_t x, int32_t y, int32_t tx, int32_t ty, int32_t activateBack) {
     const D2MissilesTxt* txt = DATATBLS_GetMissilesTxtRecord(missileId);
     D2ActiveRoomStrc* room = UNITS_GetRoom(owner);
     if (!txt || !room || !owner->pDynamicPath) return;
-    const int32_t x = UNITS_GetXPosition(owner), y = UNITS_GetYPosition(owner);
+    if (D2ActiveRoomStrc* at = COLLISION_GetRoomBySubTileCoordinates(room, x, y)) room = at;
     const int32_t velocity = ((txt->nVelLev * level) / 8 + txt->nVel) * 256 * 75 / 100;
     if (velocity && (tx - x > 99 || x - tx > 99 || ty - y > 99 || y - ty > 99)) return;
     D2UnitStrc* unit = UNITS_AllocUnit(nullptr, UNIT_MISSILE);
@@ -127,7 +140,7 @@ void create(D2UnitStrc* owner, int32_t missileId, int32_t skillId, int32_t level
     PATH_SetMaxVelocity(unit->pDynamicPath, static_cast<int>(txt->nMaxVel) << 8);
     MISSILE_SetSkill(unit, skillId);
     MISSILE_SetLevel(unit, static_cast<uint16_t>(level));
-    missiles.push_back(unit);
+    (inUpdate ? born : missiles).push_back(unit);
     if (static_cast<int16_t>(txt->wTravelSound) >= 0) d2client_ambient::submit(static_cast<int16_t>(txt->wTravelSound));
 }
 
@@ -147,13 +160,43 @@ void spread(D2UnitStrc* owner, const Pending& p, int32_t tx, int32_t ty) {
     dx = s; dy = c;
     int32_t x = tx - (dx * n) / 2, y = ty - (dy * n) / 2;
     const int32_t activateBack = SKILLS_EvaluateSkillFormula(owner, skill->dwCalc[1], p.skillId, p.level);
-    for (int32_t i = 0; i < n; ++i) { create(owner, missile, p.skillId, p.level, x, y, activateBack); x += dx; y += dy; }
+    const int32_t ox = UNITS_GetXPosition(owner), oy = UNITS_GetYPosition(owner);
+    for (int32_t i = 0; i < n; ++i) { create(owner, missile, p.skillId, p.level, ox, oy, x, y, activateBack); x += dx; y += dy; }
+}
+
+// 1.13c D2Client+0x74770 (cltdofunc 26): makers to both sides of the target (request flags 0x21), the segment on it (flag 1).
+void fireWall(D2UnitStrc* owner, const Pending& p, int32_t tx, int32_t ty) {
+    const D2SkillsTxt* skill = DATATBLS_GetSkillsTxtRecord(p.skillId);
+    if (!skill) return;
+    const int32_t maker = static_cast<int16_t>(skill->wCltMissileA);
+    const D2MissilesTxt* makerTxt = maker >= 0 ? DATATBLS_GetMissilesTxtRecord(maker) : nullptr;
+    if (!makerTxt) return;
+    const int32_t segment = static_cast<int16_t>(makerTxt->wSubMissile[0]);
+    const D2MissilesTxt* segmentTxt = segment >= 0 ? DATATBLS_GetMissilesTxtRecord(segment) : nullptr;
+    if (!segmentTxt || !tx || !ty) return;
+    const int32_t ox = UNITS_GetXPosition(owner), oy = UNITS_GetYPosition(owner);
+    create(owner, maker, p.skillId, p.level, tx, ty, tx - (oy - ty), ty + (ox - tx), makerTxt->nActivate);
+    create(owner, maker, p.skillId, p.level, tx, ty, tx + (oy - ty), ty - (ox - tx), makerTxt->nActivate);
+    create(owner, segment, p.skillId, p.level, tx, ty, tx, ty, segmentTxt->nActivate);
+}
+
+// 1.13c D2Client+0xB92B0 (pCltDoFunc 6) ahead of the update: a segment (CltSubMissile1) where the maker stands when its
+// last step entered a new subtile.
+void makerDrop(D2UnitStrc* unit, D2UnitStrc* owner) {
+    const D2MissilesTxt* txt = row(unit);
+    if (!txt || !owner || !D2Common_10234(unit->pDynamicPath)) return;
+    const int32_t sub = static_cast<int16_t>(txt->wCltSubMissile[0]);
+    const D2MissilesTxt* subTxt = sub >= 0 ? DATATBLS_GetMissilesTxtRecord(sub) : nullptr;
+    if (!subTxt) return;
+    const int32_t x = UNITS_GetXPosition(unit), y = UNITS_GetYPosition(unit);
+    create(owner, sub, MISSILE_GetSkill(unit), MISSILE_GetLevel(unit), x, y, x, y, subTxt->nActivate);
 }
 
 // 1.13c D2Client+0xB17C0, one missile; returns false once it is freed.
 bool update(D2UnitStrc* unit, D2UnitStrc* owner) {
     const D2MissilesTxt* txt = row(unit);
     if (!txt) { freeMissile(unit); return false; }
+    if (txt->wCltDoFunc == 6) makerDrop(unit, owner);
     for (int32_t pass = 0; pass < 2; ++pass) {
         D2DynamicPathStrc* path = unit->pDynamicPath;
         const bool waiting = MISSILE_GetActivateFrame(unit) < MISSILE_GetCurrentFrame(unit);
@@ -188,26 +231,39 @@ bool update(D2UnitStrc* unit, D2UnitStrc* owner) {
 
 void reset() {
     for (D2UnitStrc* unit : missiles) freeMissile(unit);
-    missiles.clear(); pending.clear(); nextHits.clear(); frame = 0; nextId = 1;
+    for (D2UnitStrc* unit : born) freeMissile(unit);
+    missiles.clear(); born.clear(); pending.clear(); nextHits.clear(); frame = 0; nextId = 1;
 }
 
 // The client's cast of skillId at a unit target (its path target) or a point; the action runs kActionDelay frames later.
 void cast(int32_t skillId, int32_t level, D2UnitStrc* target, int32_t tx, int32_t ty) {
-    if (skillId != kTeeth) return;
-    pending.push_back({frame + kActionDelay, skillId, level, target ? static_cast<int32_t>(target->dwUnitType) : -1,
+    if (skillId != kTeeth && skillId != kFireWall) return;
+    pending.push_back({frame + (skillId == kFireWall ? kFireWallDelay : kActionDelay), skillId, level, target ? static_cast<int32_t>(target->dwUnitType) : -1,
         target ? target->dwUnitId : 0u, target ? UNITS_GetXPosition(target) : tx, target ? UNITS_GetYPosition(target) : ty});
 }
 
 // Once per session frame. find resolves the cast's target unit at the action frame.
 void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)) {
     ++frame;
+    inUpdate = true;
     for (size_t i = 0; i < missiles.size();) { if (update(missiles[i], owner)) ++i; else missiles.erase(missiles.begin() + i); }
+    inUpdate = false;
+    missiles.insert(missiles.end(), born.begin(), born.end()); born.clear();
     for (size_t i = 0; i < pending.size();) {
         if (pending[i].due != frame) { ++i; continue; }
         const Pending p = pending[i];
         pending.erase(pending.begin() + i);
         D2UnitStrc* target = p.targetType >= 0 && find ? find(p.targetType, p.targetId) : nullptr;
-        if (owner) spread(owner, p, target ? UNITS_GetXPosition(target) : p.tx, target ? UNITS_GetYPosition(target) : p.ty);
+        if (owner && p.skillId == kFireWall) {
+            // 1.13c D2Client+0x51340: the path's target unit (a dead one is not held), else the path target point, else
+            // 0x50B30: two subtiles off the owner by its direction / 8. The client player's path holds no point here.
+            static constexpr int8_t kDx[8] = {0, -1, -2, -1, 0, 1, 2, 1}, kDy[8] = {2, 1, 0, -1, -2, -1, 0, 1};
+            if (target && target->dwUnitType == UNIT_MONSTER && (target->dwAnimMode == MONMODE_DEATH || target->dwAnimMode == MONMODE_DEAD)) target = nullptr;
+            const int32_t d = owner->pDynamicPath ? PATH_GetDirection(owner->pDynamicPath) >> 3 : 0;
+            fireWall(owner, p, target ? UNITS_GetXPosition(target) : UNITS_GetXPosition(owner) + kDx[d & 7],
+                target ? UNITS_GetYPosition(target) : UNITS_GetYPosition(owner) + kDy[d & 7]);
+        }
+        else if (owner) spread(owner, p, target ? UNITS_GetXPosition(target) : p.tx, target ? UNITS_GetYPosition(target) : p.ty);
     }
 }
 }

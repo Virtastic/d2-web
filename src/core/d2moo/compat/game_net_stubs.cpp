@@ -176,7 +176,13 @@ D2UnitStrc* CLIENTS_GetPlayerFromClient(D2ClientStrc* pClient, BOOL bIgnoreDeath
     return pClient ? pClient->pPlayer : nullptr;
 }
 D2GameStrc* __fastcall CLIENTS_GetGame(D2ClientStrc* pClient) { return pClient ? pClient->pGame : nullptr; }
-int32_t CLIENTS_IsInUnitsRoom(D2UnitStrc* pUnit, D2ClientStrc* pClient) { return {}; }
+// 1.13c D2Game+0x49A50: the client is one of the clients listed on the unit's active room.
+int32_t CLIENTS_IsInUnitsRoom(D2UnitStrc* pUnit, D2ClientStrc* pClient) {
+    D2ActiveRoomStrc* pRoom = pUnit ? UNITS_GetRoom(pUnit) : nullptr;
+    if (!pRoom) return 0;
+    for (int32_t i = 0; i < pRoom->nNumClients; ++i) if (pRoom->ppClients[i] == pClient) return 1;
+    return 0;
+}
 void CLIENTS_SetActNo(D2ClientStrc* pClient, uint8_t nAct) { if (pClient) pClient->nAct = nAct; }
 void CLIENTS_SetClientState(D2ClientStrc* pClient, D2ClientState nClientState) { if (pClient) pClient->dwClientState = nClientState; }
 void CLIENTS_SetExperienceLoss(D2ClientStrc* pClient, int32_t nExpLoss) {}
