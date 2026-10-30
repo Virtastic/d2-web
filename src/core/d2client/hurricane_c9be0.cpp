@@ -15,7 +15,7 @@
 #include "../d2moo/include/D2States.h"
 #include "../d2moo/include/Units/Units.h"
 
-namespace d2client_ambient { void submit(int32_t row); }
+namespace d2client_ambient { void submit(int32_t row); void submitHeld(int32_t row, int32_t life); void releaseHeld(); }
 
 namespace {
 constexpr int32_t kSkill = 250, kState = 144;
@@ -40,8 +40,7 @@ void spawn(D2UnitStrc* u, uint32_t* seed, const uint8_t* row, int32_t level, int
         if (s16(row, 0xee) < 0) { if (!(step(seed) & 1)) idx = s16(row, 0xec); }
         else { uint32_t m = step(seed) % 3; if (m == 0) idx = s16(row, 0xec); else if (m == 1) idx = s16(row, 0xee); }
     }
-    (void)idx;
-    if (sound > 0) d2client_ambient::submit(sound);   // missile create submits its Sounds row
+    if (sound > 0) d2client_ambient::submitHeld(sound, 1 << 30);   // missile create submits its Sounds row; its mixer record stays taken until the state ends (the pool then runs dry: 200 records)
     int32_t n = SKILLS_EvaluateSkillFormula(u, u32(row, 0x118), kSkill, level);
     if (n > 0) { if (n & (n - 1)) { uint64_t v = uint64_t(seed[0]) * 0x6ac690c5ull + seed[1]; seed[0] = uint32_t(v); seed[1] = uint32_t(v >> 32); } else step(seed); }
 }
@@ -53,6 +52,7 @@ void reset() { On = false; }
 void tick(D2UnitStrc* u, uint32_t* seed) {
     const bool now = u && STATES_CheckState(u, kState);
     const bool was = On; On = now;
+    if (was && !now) d2client_ambient::releaseHeld();   // the mixer records the missile sounds held come free once the state ends
     const uint8_t* row = skillRow();
     if (!now || !row) return;
     const int32_t sound = s16(row, 0x10e);

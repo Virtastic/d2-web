@@ -12,6 +12,7 @@
 namespace {
 using namespace d2client_4f860;
 constexpr U kTbl = 0x1000, kRec = 0x58, kMaxRec = 64, kUD = 0x100000;
+U Now = 0;
 struct Amb final : Services {
     uint8_t tbl[kMaxRec * kRec] = {};
     U key = 0, period = 0, nrec = 0, nextHandle = 1;
@@ -19,6 +20,11 @@ struct Amb final : Services {
     int32_t vol = 0;
     uint32_t* seed = nullptr;   // {lo, hi}
     int32_t q[256 * 2]; int qn = 0;
+    // The mixer's slot pool (D2Client+0x87D80: 200 records of 0x59 bytes). A submit finds no free record -> 0x88A70 returns 0
+    // and the caller retries. Only sounds that a missile owns are held here (until the Hurricane state ends); other one-shots finish at once.
+    static constexpr int kPool = 200;
+    U held[kPool] = {}; int nheld = 0; U holdNow = 0; U holdFor = 0;
+    int live() { int k = 0; for (int i = 0; i < nheld; ++i) if (held[i] > holdNow) held[k++] = held[i]; return nheld = k; }
     U rd32(U a) override {
         if (a == kUD + 0x21c) return key;
         if (a >= kTbl && a + 4 <= kTbl + sizeof tbl) { U v; memcpy(&v, tbl + (a - kTbl), 4); return v; }
@@ -34,7 +40,11 @@ struct Amb final : Services {
     void f88770(U, U) override {}
     void f88230(U, U, U, U, U) override {}
     U f88a70(U row, U kind) override {
-        if (qn < 256) { q[qn * 2] = int32_t(row); q[qn * 2 + 1] = int32_t(kind); ++qn; }
+        holdNow = Now;
+        const bool full = kind == 2 && live() >= kPool;   // a one-shot needs a record and the pool has none left
+        if (qn < 256) { q[qn * 2] = int32_t(row); q[qn * 2 + 1] = full ? 3 : int32_t(kind); ++qn; }   // 3 = recorded, rejected
+        if (full) return 0;
+        if (holdFor && kind == 2 && nheld < kPool) held[nheld++] = holdNow + holdFor;
         return nextHandle++;
     }
     void f87ed0(U, U v) override { vol = int32_t(v); }
@@ -53,19 +63,21 @@ struct Amb final : Services {
 };
 Amb A;
 Env E{};
-U Now = 0;
 }
 
 namespace d2client_ambient {
 uint32_t Fb[2] = {0x00b63052u, 0x50f180c0u};
 uint32_t* fallbackSeed() { return Fb; }
-void reset() { Fb[0] = 0x00b63052u; Fb[1] = 0x50f180c0u; E = Env{}; Now = 0; A.qn = 0; A.nextHandle = 1; A.vol = 0; }
+void reset() { Fb[0] = 0x00b63052u; Fb[1] = 0x50f180c0u; E = Env{}; Now = 0; A.qn = 0; A.nextHandle = 1; A.vol = 0; A.nheld = 0; }
 void setArea(U key) { A.key = key; }
 // A sound-engine submit from another client handler (0x88A70): a one-shot, drained with the ambient pairs.
 void submit(int32_t row) { A.f88a70(U(row), 2); }
+void releaseHeld() { A.nheld = 0; }
+// The same, for a sound a missile owns for `life` ticks (its pool record stays taken until then).
+void submitHeld(int32_t row, int32_t life) { A.holdFor = U(life > 0 ? life : 0); A.f88a70(U(row), 2); A.holdFor = 0; }
 // One 0x5F020 call. period = D2Common #10396; seed = the client hero seed.
 void tick(uint32_t* seed, U period, bool weatherLevel) {
-    A.seed = seed; A.period = period; A.weatherLevel = weatherLevel;
+    A.holdNow = Now; A.seed = seed; A.period = period; A.weatherLevel = weatherLevel;
     E.bbfc = 1; E.c280 = 1; E.c3b8 = period; E.c254 = kTbl; E.c258 = A.nrec;
     sub_4F860(Now++, E, A);
 }
