@@ -9,7 +9,7 @@ body.door #viewport,body.door #session-bar,body.door .controls,body.door #log,bo
 body.door #door{display:flex}
 #door .card{width:100%;max-width:440px;padding:32px 32px 24px;background:#0b0c09;border:1px solid #493d27;border-radius:4px;text-align:left;transition:border-color .15s}
 #door .card.over{border-color:#c9ad68}
-#door h1{margin:0 0 6px;font:400 28px Georgia,serif;color:#c9ad68;letter-spacing:.02em}
+body.door #door .card h1{display:block;margin:0 0 6px;font:400 28px Georgia,serif;color:#c9ad68;letter-spacing:.02em}
 #door .sub{margin:0 0 24px;color:#8a8069;font-size:13px;line-height:1.5}
 #door ul{list-style:none;margin:0 0 6px;padding:0}
 #door li{display:flex;align-items:center;gap:12px;padding:7px 0;color:#a89c80;font-size:14px}
