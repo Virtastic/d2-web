@@ -122,20 +122,22 @@ void d2_client_9d990(uint32_t ecx, uint32_t unit_bbfc, Find4D630 sub_4d630, Fata
     if (!sub_4d630(ecx, unit_bbfc ? rd32(unit_bbfc + 0xc) : 0xFFFFFFFFu)) fatal(0x72);
 }
 
-// 1.13c D2Client+0x9DA70 (87 B): s = rec[+0x22] of 9D630(ecx, cur id) or -1; then 9D910, 9D440, 9CFC0(s),
-// 9CF60, 9D100, and 9CF10 when s == -1.
+// 1.13c D2Client+0x9DA70 (87 B): cur = unit id or -1 (ESI); rec = 9D630(ecx, cur); s = rec[+0x22] or -1.
+// Then 9D910, 9D440, 9CFC0(s) with EBX = cur, 9CF60, 9D100, and 9CF10 with ESI = cur when s == -1.
+// The callees read cur from EBX (9CFC0) and ESI (9CF10) and ignore ECX, so the key is passed explicitly.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_9da70(uint32_t ecx, uint32_t unit_bbfc, Find4D630 sub_4d630, void (*sub_4d910)(void),
-                     void (*sub_4d440)(void), void (*sub_4cfc0)(uint32_t, int16_t), void (*sub_4cf60)(void),
-                     void (*sub_4d100)(void), void (*sub_4cf10)(void)) {
-    uint32_t rec = sub_4d630(ecx, unit_bbfc ? rd32(unit_bbfc + 0xc) : 0xFFFFFFFFu);
+                     void (*sub_4d440)(void), void (*sub_4cfc0)(uint32_t ecx, int16_t s, uint32_t key),
+                     void (*sub_4cf60)(void), void (*sub_4d100)(void), void (*sub_4cf10)(uint32_t key)) {
+    uint32_t cur = unit_bbfc ? rd32(unit_bbfc + 0xc) : 0xFFFFFFFFu;
+    uint32_t rec = sub_4d630(ecx, cur);
     int16_t s = rec ? rd16(rec + 0x22) : (int16_t)-1;
     sub_4d910();
     sub_4d440();
-    sub_4cfc0(ecx, s);
+    sub_4cfc0(ecx, s, cur);
     sub_4cf60();
     sub_4d100();
-    if (s == -1) sub_4cf10();
+    if (s == -1) sub_4cf10(cur);
 }
 
 // 1.13c D2Client+0x9DB90 (150 B): 1 if some node of 11CBC14 has id (+0x10, != -1) found (as node id or in a

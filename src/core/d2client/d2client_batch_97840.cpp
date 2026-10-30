@@ -41,7 +41,7 @@ static int32_t  g_ui_yoff;            // +0x0DBC4C DAT_6fb8bc4c
 struct D2cClientEnv {
     void (*sub_97770)();                                 // 0x97770
     void (*ord10065)(uint32_t);                          // D2Gfx/Win ordinal 10065
-    void (*ord10043)(uint32_t, uint32_t);                // free (0x7A hud handle / 0x22C group node)
+    void (*ord10043)(uint32_t, uint32_t);                // free(line, zero): 0x7A hud handle at 0x97840 (node-less, see free10043)
     uint32_t (*ord10227)();                              // client-ready query
     uint32_t (*ord10265)(uint32_t);                      // string table lookup
     void (*ord10024)(const void*, uint32_t);             // fatal message
@@ -60,6 +60,8 @@ struct D2cClientEnv {
     void (*sub_408c0)();  void (*sub_40eb0)();  void (*sub_3c8b0)();  void (*sub_3ea20)();
     void (*sub_3b2f0)(uint32_t);  void (*sub_452a0)();  void (*sub_3e8e0)();
     void (*sub_43450)(uint32_t, uint32_t);  uint32_t (*sub_6eaf0)();
+    // Fog ordinal 10043 as retail calls it: ecx = allocation, edx = source file (RVA), stack = line, zero.
+    void (*free10043)(uint32_t allocation, uint32_t file_rva, uint32_t line, uint32_t zero);
 };
 
 // 1.13c D2Client+0x97840
@@ -274,10 +276,16 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9d0a0(uint32_t grp) {
     }
 }
 
-// 1.13c D2Client+0x9D100: free the group chain (ord 10043 with 0x22C per node)
+// 1.13c D2Client+0x9D100 (void(void); 54 B to the ret, Ghidra size 51): free the group chain. Each node's next
+// (+8) is read first, then the node is freed through Fog 10043 as ecx = node, edx = Roster.cpp (RVA 0xD4580),
+// stack = line 0x22C and zero 0. The head DAT_6fbcbc1c (= g_group_head, RVA 0x11BC1C) is zeroed last.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9d100(const D2cClientEnv* e) {
     uint32_t g = g_group_head;
-    while (g != 0) { g = P32(g)[2]; e->ord10043(0x22C, 0); }
+    while (g != 0) {
+        uint32_t next = P32(g)[2];
+        e->free10043(g, 0xD4580, 0x22C, 0);
+        g = next;
+    }
     g_group_head = 0;
 }
 

@@ -126,10 +126,15 @@ void d2_client_8b2f0(int32_t p1, const int32_t* pos /* x,y pairs: 91118,9111c 91
     else if (!b) draw(0, h_bec8, 3);
 }
 
-// 1.13c D2Client+0x8B600 (71 B)
+// 1.13c D2Client+0x8B600 (71 B). x in EAX, y in EDX, ECX clobbered, EDX kept.
+// Globals: px = [0x6FBCB9A0] (RVA 0x11B9A0), py = [0x6FBCB9A4] (RVA 0x11B9A4), off = [0x6FB8BC4C] (RVA 0xDBC4C).
+// Four signed 32-bit compares (jle/jge) against 32-bit wrapped sums, so the bounds are computed unsigned.
 extern "C" EMSCRIPTEN_KEEPALIVE
 uint32_t d2_client_8b600(int32_t x, int32_t y, int32_t px_b9a0, int32_t py_b9a4, int32_t off_bc4c) {
-    return px_b9a0 + 0x90 < x && x < px_b9a0 + 0xb8 && py_b9a4 - 0xdf + off_bc4c < y && y < py_b9a4 - 0xb7 + off_bc4c;
+    const int32_t x0 = (int32_t)((uint32_t)px_b9a0 + 0x90u), x1 = (int32_t)((uint32_t)px_b9a0 + 0xb8u);
+    const int32_t y0 = (int32_t)((uint32_t)py_b9a4 + (uint32_t)off_bc4c - 0xdfu);
+    const int32_t y1 = (int32_t)((uint32_t)py_b9a4 + (uint32_t)off_bc4c - 0xb7u);
+    return x0 < x && x < x1 && y0 < y && y < y1;
 }
 
 // 1.13c D2Client+0x8B650 (65 B)
@@ -145,9 +150,10 @@ void d2_client_8b900(uint32_t id_eax, const uint16_t* ids4, uint32_t* flags4) {
 }
 
 // 1.13c D2Client+0x8BB20 (51 B)
+// fatal(0x1E90) stands for retail's Ordinal_10265(0x1e90) + Ordinal_10024 + _exit(-1); the caller never returns from it.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_8bb20(uint32_t* state_cbc34, void (*fatal)()) {
-    if (*state_cbc34 != 5) { fatal(); return; }  // Ordinal_10265(0x1e90); Ordinal_10024; _exit(-1)
+void d2_client_8bb20(uint32_t* state_cbc34, void (*fatal)(uint32_t msgId)) {
+    if (*state_cbc34 != 5) { fatal(0x1E90); return; }
     *state_cbc34 = 6;
 }
 
