@@ -43,7 +43,7 @@ export function frontDoor({ onReady } = {}) {
   const style = el('style'); style.textContent = CSS; document.head.appendChild(style);
   const root = el('main'); root.id = 'door';
   const card = el('div', 'card');
-  card.append(el('h1', '', 'Diablo II'), el('p', 'sub', 'Play in your browser with your own copy of the game. Your files stay on this device — nothing is uploaded.'));
+  card.append(el('h1', '', 'D2-Web'), el('p', 'sub', 'Play Diablo II in your browser with your own copy of the game. Your files stay on this device. Nothing is uploaded.'));
   const list = el('ul'), opt = el('p', 'more'), notes = el('div'), row = el('div', 'row');
   const pick = el('button', '', 'Choose files'), go = el('button', 'go', 'Play');
   go.disabled = true;
@@ -53,7 +53,7 @@ export function frontDoor({ onReady } = {}) {
   const discord = el('a', 'discord'); discord.href = DISCORD; discord.target = '_blank'; discord.rel = 'noopener';
   discord.innerHTML = '<svg viewBox="0 0 127 96" aria-hidden="true"><path d="M107.7 8.1A105 105 0 0 0 81.5 0a72 72 0 0 0-3.4 6.8 97.7 97.7 0 0 0-29.1 0A72 72 0 0 0 45.6 0a105.9 105.9 0 0 0-26.3 8.1C2.8 32.7-1.7 56.6.5 80.2A105.7 105.7 0 0 0 32.7 96a77.7 77.7 0 0 0 6.9-11.1 68.4 68.4 0 0 1-10.8-5.2l2.7-2.1a75.6 75.6 0 0 0 64.3 0l2.7 2.1a68.7 68.7 0 0 1-10.9 5.2 77 77 0 0 0 6.9 11.1 105.3 105.3 0 0 0 32.2-15.8c2.6-27.3-4.5-51-18.9-72.1ZM42.5 65.7c-6.3 0-11.5-5.7-11.5-12.8S36 40.1 42.5 40.1 54 45.9 53.9 52.9s-5 12.8-11.4 12.8Zm42.4 0c-6.3 0-11.5-5.7-11.5-12.8s5-12.8 11.5-12.8S96.4 45.9 96.3 52.9s-5 12.8-11.4 12.8Z"/></svg>';
   discord.append('Join our Discord');
-  card.append(list, opt, hint, notes, row, discord, el('p', 'discord-sub', 'Help, bug reports and news — come say hi.'), el('p', 'legal', 'Unofficial fan project, not affiliated with or endorsed by Blizzard Entertainment. You need to own Diablo II: Lord of Destruction (1.13c).'));
+  card.append(list, opt, hint, notes, row, discord, el('p', 'discord-sub', 'Help, bug reports and news. Come say hi!'), el('p', 'legal', 'Unofficial fan project, not affiliated with or endorsed by Blizzard Entertainment. You need to own Diablo II: Lord of Destruction (1.13c).'));
   root.append(card);
   document.body.append(root);
   document.body.classList.add('door');
@@ -71,7 +71,7 @@ export function frontDoor({ onReady } = {}) {
     for (const [role, li] of Object.entries(rows)) li.classList.toggle('have', !!s.slots[role]?.have);
     const extras = Object.entries(ROLES).filter(([, r]) => !r.required);
     const got = extras.filter(([r]) => s.slots[r]?.have).length;
-    opt.textContent = `Optional: speech, music and videos ${got ? `(${got} of ${extras.length} found)` : '— the game runs without them'}.`;
+    opt.textContent = `Optional: speech, music and videos ${got ? `(${got} of ${extras.length} found)` : '(the game runs without them)'}.`;
     notes.replaceChildren();
     for (const i of s.issues) {
       const n = el('p', 'note' + (i.code === 'casc' || i.code === 'truncated' ? ' bad' : ''), i.text);

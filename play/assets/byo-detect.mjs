@@ -141,7 +141,7 @@ export function classify(infos, known = { patch_d2: [] }) {
       if (f.kind === 'mpq') issues.push({ code: 'unknown-mpq', file: f.name, text: `${f.name} is an MPQ, but not one Diablo II uses.` });
       continue;
     }
-    if (f.truncated) { slots[f.role].problem = 'incomplete'; issues.push({ code: 'truncated', file: f.name, text: `${f.name} looks incomplete — copy it again.` }); continue; }
+    if (f.truncated) { slots[f.role].problem = 'incomplete'; issues.push({ code: 'truncated', file: f.name, text: `${f.name} looks incomplete. Copy it again.` }); continue; }
     const s = slots[f.role];
     if (s.have) continue;
     Object.assign(s, { have: true, file: f });
