@@ -9,14 +9,14 @@ struct D2cCofEnv {
     u32 (*rd32)(u32 addr);
     void (*wr32)(u32 addr, u32 v);
     i32 (*ord10227)();                                   // 0x6fabbf8c
-    u32 (*f1510)(u32 a, u32 b);                          // 0x61510 (eax,edx)
+    u32 (*f1510)(u32 a, u32 b);                          // D2Client+0x1510 (eax,edx)
     u32 (*f19130)(u32 unit, u32 sel);                    // 0x69130
     void (*f19660)(u32 sel);                             // 0x69660 (edx)
-    u32 (*alloc)(u32 size, u32 z);                       // Ordinal_10042 (0xc48,0)
+    u32 (*alloc)(u32 size, u32 line);                    // Fog alloc (ECX = 0xa8 bytes; 0xc48 is the source line)
     u32 (*f1e9c0)(u32 z, u32 node, u32 unit);            // 0x6E9C0
     i32 (*ord10172)(u32 unit);
-    u32 (*f1380)(u32 seedPtr, u32 mul);                  // 0x61380 (ecx,esi)
-    u32 (*f58c20)(u32 a, u32 b, u32 c, u32 d, u32 e);
+    u32 (*f1380)(u32 seedPtr, u32 mul);                  // D2Client+0x1380 (ecx,esi)
+    u32 (*f58c20)(u32 unit, u32 one, u32 a, u32 b, u32 c, u32 d, u32 e); // 0x58C20 (EDI = unit, EBX = 1, 5 stack)
     void (*f58be0)(u32 v);
     void (*f18ae0)(u32 node);
     void (*fatal)(i32 line);                             // does not return in retail
@@ -39,7 +39,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_6b300(const D2cCofEnv* e, u32 sel, u32 unit, u32 t
     }
     if (type == 8 && e->f19130(unit, sel)) return;
     if ((i32)sel < 0x8c || (sel > 0x8e && sel != 0x9e)) e->f19660(sel);
-    u32 n = e->alloc(0xc48, 0);
+    u32 n = e->alloc(0xa8, 0xc48);
     if (!n) { e->fatal(0xc49); return; }
     for (u32 i = 0; i < 0xa8; i += 4) e->wr32(n + i, 0);
     e->wr32(n, type); e->wr32(n + 4, sel);
@@ -60,7 +60,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_6b300(const D2cCofEnv* e, u32 sel, u32 unit, u32 t
     }
     e->wr32(n + 0x24, y);
     if (e->rd32(row + 0x74)) {
-        u32 r = e->f58c20(e->rd32(row + 0x70), 0xff, e->rd32(row + 0x7d) & 0xff, e->rd32(row + 0x7e) & 0xff,
+        u32 r = e->f58c20(unit, 1, e->rd32(row + 0x70), 0xff, e->rd32(row + 0x7d) & 0xff, e->rd32(row + 0x7e) & 0xff,
                           e->rd32(row + 0x7f) & 0xff);
         e->wr32(n + 0x40, r);
         if (e->rd32(row + 0x74) != e->rd32(row + 0x70)) e->f58be0(r);

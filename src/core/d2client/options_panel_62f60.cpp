@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include <cstdio>
+void D2Lang_Unicode_sprintf(int cap, char16_t* out, const char16_t* fmt, ...);
 namespace d2client_optpanel {
 using U=uint32_t; using I=int32_t; using B=uint8_t;
 static U rd32(const void*p,U o){U v;std::memcpy(&v,(const B*)p+o,4);return v;}
@@ -31,30 +32,59 @@ void entriesFree_63270(const Imp&f,I*cnt,B*tbl){
  }
 }
 
-// 1.13c D2Client+0x63520  (ECX = obj). saveShadow = FUN_6fb0f970 (0x5F970)
-void autoMapFade_63520(const Imp&f,B*o,void(*f5f970)()){ if(rd32(o,0x124)>4) wr32(o,0x124,0); f5f970(); f.ini("Diablo II","AutoMapFade",0,rd32(o,0x124)); }
+// 1.13c D2Client+0x63520  (ECX = obj). f5f970 = D2Client+0x5F970, called with EAX = the clamped fade value
+void autoMapFade_63520(const Imp&f,B*o,void(*f5f970)(U)){ if(rd32(o,0x124)>4) wr32(o,0x124,0); f5f970(rd32(o,0x124)); f.ini("Diablo II","AutoMapFade",0,rd32(o,0x124)); }
 
 // 1.13c D2Client+0x635B0  (ECX = obj). o10033 = Ordinal_10033(setBlendedShadows)
 void blendedShadows_635b0(const Imp&f,B*o,void(*o10033)(U)){ f.ini("Diablo II","Blended Shadows",0,rd32(o,0x124)); o10033(rd32(o,0x124)); }
 
-// 1.13c D2Client+0x63940  (EAX = which 0..7; param_2 = anchor). Builds a 400-char name line then Ordinal_10085(anchor-0x1a,0,1).
-struct Imp63940 { const uint16_t*(*o10003)(U); I(*f38e50)(U); U(*f391e0)(U); void(*o10085)(I,U,U); };
-// ukey: the two Ordinal_10003 string ids are not visible in the decompile (args lost in registers): GUESS 0 and 0.
-void nameLine_63940(U which,I anchor,const Imp63940&f,uint16_t*line400){
- bool b=false; I k=0x39;
- switch(which){case 0:b=1;k=0;break;case 1:b=1;k=1;break;case 2:b=1;k=0xc;break;case 3:b=1;k=2;break;
-  case 4:b=1;k=7;break;case 5:b=1;k=3;break;case 6:b=1;k=4;break;case 7:break;default:return;}
- std::memset(line400,0,800);
- const uint16_t*s=f.o10003(0); /* GUESS arg */ size_t n=0; while(s[n]&&n<399){line400[n]=s[n];n++;}
- (void)b;(void)k;(void)f.f38e50;(void)f.f391e0; // ponytail: per-hand sprintf/strcat of 0x38e50/0x391e0 results needs Unicode::sprintf (not in tree); host does it
- f.o10085(anchor-0x1a,0,1);
+// 1.13c D2Client+0x63940  (EAX = which 0..7; stack x, y; ret 8). One help line: the command's name (D2Lang string
+// 0x1049+which, 0x1050 for 7) followed, for cases 0..6, by " %s" (string 0x1052) per bound key, slot 1 first then
+// slot 0; drawn by D2Win#10085(line, x-3, y-0x1a, color 0, centered 1).
+struct Imp63940 {
+ const char16_t*(*getString)(U);                 // D2Lang#10003 (ECX = id)
+ I(*keyOf)(U cmd,U slot);                        // D2Client+0x38E50 (ESI = cmd, EDX = slot); 0xFFFF = unbound
+ const char16_t*(*keyName)(U cmd,U slot);        // D2Client+0x391E0
+ void(*drawText)(const char16_t*,I x,I y,U color,U centered); // D2Win#10085
+};
+static void u16cpy(char16_t*d,const char16_t*s){ while((*d++=*s++)!=0){} }
+static void u16cat(char16_t*d,const char16_t*s){ while(*d) d++; u16cpy(d,s); }
+void nameLine_63940(U which,I x,I y,const Imp63940&f){
+ static const U kCmd[7]={0,1,0xc,2,7,3,4};
+ if(which>7) return;
+ char16_t line[400]; std::memset(line,0,sizeof line);
+ u16cpy(line,f.getString(which==7?0x1050u:0x1049u+which));
+ if(which<7){
+  U k=kCmd[which];
+  for(I slot=1;slot>=0;slot--){
+   if((int16_t)f.keyOf(k,U(slot))==-1) continue;
+   char16_t buf[30]; std::memset(buf,0,sizeof buf);
+   D2Lang_Unicode_sprintf(0x1e,buf,f.getString(0x1052),(uintptr_t)f.keyName(k,U(slot)));
+   u16cat(line,buf);
+  }
+ }
+ f.drawText(line,x-3,y-0x1a,0,1);
 }
 
-// 1.13c D2Client+0x63BF0  (ECX = x0; p1 = obj with flag @+0x128; p3 = tall flag). Pure layout: returns the three rects fed to Ordinal_10014.
-struct Rect63bf0 { I x0,x1,y0,y1; U a,b; };
-Rect63bf0 layout_63bf0(I x0,const B*p1,I p3,I panelX,I screenW,I fontH){
- I half=screenW/2, x=panelX+x0, xl=x-0x1e, base=p3?half-0x90:half-0x3b, y=base+(0xc-fontH);
- return Rect63bf0{xl,x,y,y+0x121-(0xc-fontH),U(rd32(p1,0x128)==0)+1,U(rd32(p1,0x128)!=0)}; // GUESS: field mapping of Ordinal_10014 args
+// 1.13c D2Client+0x63BF0  (__thiscall ECX = y; stack obj, mode, tall; ret 0xc). A slider: two rects split at the
+// knob, the caption cel, then the knob cel. hdrY = DAT_6fbcc05c[+0x10], screenW = DAT_6fb8bc48,
+// cels = DAT_6fbcc070 (off) / DAT_6fbcc074 (on) / DAT_6fbcc078 (knob). obj: +0x120 steps, +0x124 value, +0x128 on.
+// The retail x87 r = trunc((value/(steps-1)) * -265.0f) equals -(265*value/(steps-1)) for every steps <= 256.
+struct Imp63bf0 {
+ void(*drawRect)(I x0,I y0,I x1,I y1,U color,U mode);           // D2gfx#10014
+ void(*drawCel)(U cel,I x,I y,U frame,U mode,I pal);             // D2Win#10138 (ECX = cel, EDX = x)
+ void(*drawCtx)(B*ctx48,I x,I y,I a,U mode,U b);                 // D2gfx#10041
+};
+void layout_63bf0(I y0,const B*o,U mode,I tall,I hdrY,I screenW,U celOff,U celOn,U celKnob,const Imp63bf0&f){
+ I y=y0+hdrY, half=screenW/2;
+ U steps=rd32(o,0x120)-1, v=rd32(o,0x124), on=rd32(o,0x128);
+ I r=-I((265u*v)/steps);
+ I base=tall?half-0x90:half-0x3b, split=base+12-r;
+ f.drawRect(base,y-0x1e,split,y,0,U(on==0)+1);
+ f.drawRect(split,y-0x1e,base+0x121,y,0,U(on!=0));
+ f.drawCel(on?celOn:celOff,tall?half:half+0xe6,y,tall?1u:2u,mode,-1);
+ B ctx[0x48]; std::memset(ctx,0,sizeof ctx); wr32(ctx,0x34,celKnob);
+ f.drawCtx(ctx,(tall?half-0x91:half-0x3c)-r,y-I(on==0)-1,-1,mode,0);
 }
 
 // 1.13c D2Client+0x63D90  tbls = {95570,93ac8,92ac0,(10227?9a550:98008),(10227?9efe0:9cfe8)}; handles DAT_6fbcc070/74/78
@@ -64,27 +94,30 @@ void panelsFree_63d90(const Imp&f,U*cur0,U*cur1,B*const t[5],I*const cnt[5],U*h7
  rel(f,h70);rel(f,h74);rel(f,h78);
 }
 
-// 1.13c D2Client+0x63E90  (param_1 = &count, param_2 = table). Loads art paths "%s\\UI\\%s\\%s" ("DATA\\LOCAL", dir) per entry.
-struct Imp63e90 { U(*o10227)(); void(*o10004)(char*,U); U(*load)(const char*); void(*fatal)(U); };
-void entriesLoad_63e90(const Imp63e90&f,const I*cnt,B*tbl,const char*dir,U*handlesBase,U*frameBase){
- if(!cnt){ f.fatal(0); return; } // GUESS: code lost in register (Ordinal_10265 arg)
+// 1.13c D2Client+0x63E90  (param_1 = &count, param_2 = table). Loads "DATA\\LOCAL\\UI\\<lang>\\<name>" per entry;
+// lang is the 4-byte code D2Lang#10004 writes. Sub-cels land in the entry's own slots p[0x108+k].
+struct Imp63e90 { U(*o10227)(); void(*o10004)(char*,U); U(*load)(const char*,U); void(*fatal)(U); };
+void entriesLoad_63e90(const Imp63e90&f,const I*cnt,B*tbl){
+ if(!cnt){ f.fatal(0x524); return; }
  if(!tbl){ f.fatal(0x525); return; }
- char path[0x108]; std::memset(path,0,sizeof path); f.o10004(path,0);
- U*p=(U*)(tbl+0x120); (void)frameBase;
+ char lang[4]={0,0,0,0}; f.o10004(lang,0);
+ char path[0x108];
+ U*p=(U*)(tbl+0x120);
  for(I i=0;i<*cnt;i++,p+=0x154){
   if(p[-0x47]==0||f.o10227()!=0){
-   if((char)p[-0x45]){
-    std::snprintf(path,sizeof path,"%s\\UI\\%s\\%s","DATA\\LOCAL",dir,(const char*)(p-0x45));
-    p[0x107]=f.load(path);
+   if(*(const char*)(p-0x45)){
+    std::memset(path,0,sizeof path);
+    std::snprintf(path,sizeof path,"%s\\UI\\%s\\%s","DATA\\LOCAL",lang,(const char*)(p-0x45));
+    p[0x107]=f.load(path,0);
     if(p[-0x48]==1){
      U n=*p; if(n==0||n>4){ f.fatal(0x561); return; }
      for(U k=0;k<n;k++){ const char*nm=(const char*)(p+3+k*0x41);
       if(!nm[0]){ f.fatal(0x564); return; }
-      std::snprintf(path,sizeof path,"%s\\UI\\%s\\%s","DATA\\LOCAL",dir,nm);
-      handlesBase[0x150+i*0x154+k]=f.load(path); } // GUESS: dest = caller frame array indexed (0x150+i*0x154+k)
+      std::snprintf(path,sizeof path,"%s\\UI\\%s\\%s","DATA\\LOCAL",lang,nm);
+      p[0x108+k]=f.load(path,0); }
     }
    }
-   typedef void(*Cb)(); Cb c=(Cb)(uintptr_t)p[-2]; if(c) c();
+   typedef void(*Cb)(B*entry,U); Cb c=(Cb)(uintptr_t)p[-2]; if(c) c((B*)(p-0x48),0);
   }
  }
 }
@@ -100,8 +133,11 @@ I hitTest_64080(I mx,I scrH,const I*hdr,const B*ents,I(*pred)(const B*e)){
  return -1;
 }
 
-// 1.13c D2Client+0x64110  contrast = FUN_6fb13620() (0x63620); 10068 = apply, 10034(0) = refresh
-void contrast_64110(const Imp&f,I contrast,void(*o10068)(),void(*o10034)(U)){ f.ini("Diablo II","Contrast",0,(U)contrast); o10068(); o10034(0); }
+// 1.13c D2Client+0x64110  (ECX = obj). scale = D2Client+0x13620(EAX=100, ECX=0, EDX=obj) (x87; caller-supplied);
+// then D2gfx#10068(ECX=0xb, EDX=obj[0x124]) and D2gfx#10034(0).
+void contrast_64110(const Imp&f,const B*o,U(*f13620)(U,U,const B*),void(*o10068)(U,U),void(*o10034)(U)){
+ f.ini("Diablo II","Contrast",0,f13620(100,0,o)); o10068(0xb,rd32(o,0x124)); o10034(0);
+}
 
 // 1.13c D2Client+0x641E0  (ECX = obj; qual = DAT_6fb8d854). o10062 = Ordinal_10062(lightFlag)
 void lightQuality_641e0(const Imp&f,const B*o,U*qual,void(*o10062)(U)){

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
+#include <cstdio>
 namespace d2client_batch_8d940 {
 typedef uint16_t wc;
 struct Env {
@@ -19,68 +20,103 @@ struct Env {
 static void ucpy(wc* d,const wc* s){ while((*d++=*s++)); }
 static void ucat(wc* d,const wc* s){ while(*d) ++d; ucpy(d,s); }
 static void w2u(wc* d,const char* s,int32_t n){ while(n-- >0 && *s) *d++=(uint8_t)*s++; *d=0; }
-// "<label><colour><number><colour>[...]" shared by the 8DCC0/8DD80/8DE40/8DEE0 builders.
-static void labelNum(Env& e,wc* out,int32_t v){
- char b[12]; wc n[20]; const wc* c0=e.str(1); const wc* c1=e.str(2); const wc* lab=e.str(0);
- ucpy(out,lab); e.fmt(b,10,v); w2u(n,b,9); ucat(out,c0); ucat(out,n); ucat(out,c1);
+// Builders 0x8D940..0x8DEE0 share one shape: fetch the two colour codes (D2Lang strings 0xf9b, 0xf9e), Unicode::strcpy
+// a label string, Storm#578 _snprintf(10, "%i") the number, Unicode::win2Unicode(n, 9), Unicode::strcat colour/number/colour.
+// e.str(id) is D2Lang#10003 with the real string id; e.q(10973, unit, stat) is D2Common#10973 (layer 0).
+static void w2u9(wc* d,const char* s){ int i=0; for(;i<9&&s[i];i++) d[i]=(uint8_t)s[i]; if(s[i]) d[i-1]=0; else d[i]=0; }
+static void num(char* b,const char* f,int32_t v,wc* n){ (void)f; std::snprintf(b,10,"%d",(int)v); w2u9(n,b); } // "%i" / "%ld" print alike
+static void labelNum(Env& e,wc* out,int32_t label,int32_t v,const wc* c0,const wc* c1){
+ char b[12]; wc n[10]; ucpy(out,e.str(label)); num(b,"%i",v,n); ucat(out,c0); ucat(out,n); ucat(out,c1);
 }
 static int32_t rd16(const void* p,unsigned o){ uint16_t v; std::memcpy(&v,(const uint8_t*)p+o,2); return v; }
 
-// 1.13c D2Client+0x8D940
-void tooltipRequirement(Env& e,int32_t unit,const uint8_t* data,wc* out){
- char b[12]; wc n[20]; const wc* c0=e.str(1); (void)e.str(2);
- int32_t v=data[0xff]; int32_t w=0;
- if(!e.q(10744,unit,0x33)){ if(!e.q(10744,unit,0xf)) return; }
- else {
-  int32_t it=e.q(10630,0,0);
-  if(it && e.q(10494,e.g(0xBCBBFC),0x65)){
-   int32_t t=e.q(10306,it,1);
-   v+=e.q(10567,t,0x75)>>8; w+=e.q(10297,t,0x75)>>8;
+// 1.13c D2Client+0x8D940  (EDI = out; stdcall unit, data; ret 8). "<label> <c0>lo<c0><0xd88><c0>hi<c1>":
+// label 0xd8c when D2Common#10744(unit,0x33), else 0x5516 when #10744(unit,0xf), else nothing is written.
+// lo/hi start at data[0xfe]/data[0xff]; for 0x33 the player's (DAT_6fbcbbfc) #10630(player,0x75) skill, if present and
+// #10494(player,0x65), adds #10567(player,0x75,t,1)>>8 and #10297(player,0x75,t,1)>>8 with t = #10306(player,skill,1).
+struct Imp8d940 { int32_t(*o10630)(int32_t,int32_t); int32_t(*o10306)(int32_t,int32_t,int32_t);
+ int32_t(*o10567)(int32_t,int32_t,int32_t,int32_t); int32_t(*o10297)(int32_t,int32_t,int32_t,int32_t); };
+void tooltipRequirement(Env& e,const Imp8d940& f,int32_t player,int32_t unit,const uint8_t* data,wc* out){
+ const wc* c0=e.str(0xf9b); const wc* c1=e.str(0xf9e);
+ int32_t lo=data[0xfe], hi=data[0xff], label;
+ if(e.q(10744,unit,0x33)){
+  label=0xd8c;
+  int32_t sk=f.o10630(player,0x75);
+  if(sk && e.q(10494,player,0x65)){
+   int32_t t=f.o10306(player,sk,1);
+   lo+=f.o10567(player,0x75,t,1)>>8; hi+=f.o10297(player,0x75,t,1)>>8;
   }
- }
- ucpy(out,e.str(3)); e.fmt(b,10,v); w2u(n,b,9);
- ucat(out,c0); ucat(out,n); ucat(out,c0);
- ucat(out,e.str(4)); e.fmt(b,10,w); w2u(n,b,9);
- ucat(out,c0); ucat(out,n); ucat(out,e.str(5));
+ } else if(e.q(10744,unit,0xf)) label=0x5516; else return;
+ char b[12]; wc n[10];
+ ucpy(out,e.str(label)); num(b,"%i",lo,n); ucat(out,c0); ucat(out,n); ucat(out,c0);
+ ucat(out,e.str(0xd88)); num(b,"%i",hi,n); ucat(out,c0); ucat(out,n); ucat(out,c1);
 }
 
-// 1.13c D2Client+0x8DAD0
-void damageRange(Env& e,int32_t* flagA,int32_t* outMin,int32_t* flagB,int32_t* flagC){
- // ponytail: param shuffling in the decompile is lost; follows the visible control flow only.
- *flagA=1; *flagB=2;
- int32_t unit=e.q(11160,0,0); if(!unit) return;
- int32_t lo=e.q(10973,unit,0), hi=e.q(10973,unit,1);
- int32_t a=e.q(10587,unit,0), b=e.q(10587,unit,1);
- if(a<hi||b<lo) *flagA=1;
- if(lo<=hi) lo=hi;
- int32_t it=e.q(10973,unit,2);
- if(it && e.g(0xBD4)>0x110){
-  int32_t d=e.q(10449,it,0); lo+=d; if(d) *flagC=1;
+// 1.13c D2Client+0x14A0  ( EAX = a, EDX = b, ECX = c): a*b/c with the D2 overflow guards.
+static int32_t ratio(int32_t a,int32_t b,int32_t c){
+ if(!c) return 0;
+ if(b>0x100000){ if(c<=(b>>4)) return (b/c)*a; return (int32_t)(((int64_t)b*a)/c); }
+ if(a>0x10000){ if(c<=(a>>4)) return (a/c)*b; return (int32_t)(((int64_t)b*a)/c); }
+ return (b*a)/c;
+}
+// 1.13c D2Client+0x8DAD0  (EAX = item; stdcall unit, statMin, statMax, outMin, outMax, outFlag; ret 0x18).
+// *outMin = 1 and *outMax = 2 up front; nothing else when unit or item is null. The item is re-parented for the read:
+// r = #11160(DAT_6fbcbc38, &slot); owner = r if r and r != unit; #10164(owner,item,1); read min/max by #10973; then
+// #11127(owner,item) when r was null, else #10164(owner,item,slot). *outFlag = 1 when the #10587 base values exceed
+// the current ones; max = max(max,min). Stat 0x110 (when the stat table has > 0x110 rows) adds
+// #10449(stat, #11044(owner[0x1c],&k), k, 0,0,0) to max; stat 0x111 (> 0x111 rows) adds ratio(v, max, 100).
+struct Imp8dad0 {
+ int32_t(*o11160)(int32_t,int32_t*); void(*o10164)(int32_t,int32_t,int32_t); void(*o11127)(int32_t,int32_t);
+ int32_t(*o10587)(int32_t,int32_t,int32_t); int32_t(*o11044)(int32_t,int32_t*);
+ int32_t(*o10449)(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
+ int32_t(*statRows)(); int32_t(*statBase)(); int32_t(*rd32)(int32_t);   // sgptDataTables +0xbd4 / +0xbcc
+};
+void damageRange(Env& e,const Imp8dad0& f,int32_t gBC38,int32_t item,int32_t unit,int32_t sMin,int32_t sMax,
+                 int32_t* outMin,int32_t* outMax,int32_t* outFlag){
+ *outMin=1; *outMax=2;
+ if(!unit||!item) return;
+ int32_t slot=0;
+ int32_t r=f.o11160(gBC38,&slot);
+ int32_t owner=(r && r!=unit)?r:unit;
+ f.o10164(owner,item,1);
+ int32_t lo=e.q(10973,item,sMin), hi=e.q(10973,item,sMax);
+ if(!r) f.o11127(owner,item); else f.o10164(owner,item,slot);
+ int32_t bLo=f.o10587(item,sMin,0), bHi=f.o10587(item,sMax,0);
+ if(bLo<lo || bHi<hi) *outFlag=1;
+ if(hi<=lo) hi=lo;
+ int32_t st=e.q(10973,item,0x110);
+ if(st && f.statRows()>0x110 && f.statBase()+0x15840 && f.rd32(owner+0x1c)){
+  int32_t k=0; int32_t t=f.o11044(f.rd32(owner+0x1c),&k);
+  int32_t v=f.o10449(st,t,k,0,0,0); hi+=v; if(v) *outFlag=1;
  }
- it=e.q(10973,unit,3);
- if(it && e.g(0xBD4)>0x111){
-  int32_t d=e.q(10449,it,0); lo+=e.q(0x14A0,100,lo); if(d) *flagC=1;
+ st=e.q(10973,item,0x111);
+ if(st && f.statRows()>0x111 && f.statBase()+0x15984 && f.rd32(owner+0x1c)){
+  int32_t k=0; int32_t t=f.o11044(f.rd32(owner+0x1c),&k);
+  int32_t v=f.o10449(st,t,k,0,0,0); hi+=ratio(v,hi,100); if(v) *outFlag=1;
  }
- *flagB=0x110; *outMin=lo;
+ *outMin=lo; *outMax=hi;
 }
 
-// 1.13c D2Client+0x8DCC0
+// 1.13c D2Client+0x8DCC0  (EDI = out; stdcall data, add; ret 8): label 0xd83, value data u16 +0x10c + add; empty if < 1.
 void tooltipField10c(Env& e,const uint8_t* data,int32_t add,wc* out){
- int32_t v=rd16(data,0x10c)+add; if(v<1){ out[0]=0; return; } labelNum(e,out,v);
+ const wc* c0=e.str(0xf9b); const wc* c1=e.str(0xf9e);
+ int32_t v=rd16(data,0x10c)+add; if(v<1){ out[0]=0; return; } labelNum(e,out,0xd83,v,c0,c1);
 }
-// 1.13c D2Client+0x8DD80
+// 1.13c D2Client+0x8DD80  (EDI = out; stdcall data, add; ret 8): label 0xd82, value data u16 +0x10a + add.
 void tooltipField10a(Env& e,const uint8_t* data,int32_t add,wc* out){
- int32_t v=rd16(data,0x10a)+add; if(v<1){ out[0]=0; return; } labelNum(e,out,v);
+ const wc* c0=e.str(0xf9b); const wc* c1=e.str(0xf9e);
+ int32_t v=rd16(data,0x10a)+add; if(v<1){ out[0]=0; return; } labelNum(e,out,0xd82,v,c0,c1);
 }
-// 1.13c D2Client+0x8DE40
-void tooltipNumber(Env& e,int32_t v,wc* out){ labelNum(e,out,v); }
+// 1.13c D2Client+0x8DE40  (ESI = out; stdcall v; ret 4): label 0xd8d.
+void tooltipNumber(Env& e,int32_t v,wc* out){ const wc* c0=e.str(0xf9b); const wc* c1=e.str(0xf9e); labelNum(e,out,0xd8d,v,c0,c1); }
 
-// 1.13c D2Client+0x8DEE0
-void tooltipStat46(Env& e,int32_t unit,wc* out){
- const wc* c0=e.str(1); const wc* c1=e.str(2);
+// 1.13c D2Client+0x8DEE0  (ESI = out; stdcall unit, rec; ret 8): when stat 0x46 > 0, label 0xd86, the stat as "%ld",
+// then the string whose id is rec u16 +0xf4. Otherwise out is untouched.
+void tooltipStat46(Env& e,int32_t unit,const uint8_t* rec,wc* out){
+ const wc* c0=e.str(0xf9b); const wc* c1=e.str(0xf9e);
  if(e.q(10973,unit,0x46)>0){
-  ucpy(out,e.str(0)); char b[12]; wc n[20]; e.fmt(b,10,e.q(10973,unit,0x46));
-  w2u(n,b,9); ucat(out,c0); ucat(out,n); ucat(out,c1); ucat(out,e.str(3));
+  ucpy(out,e.str(0xd86)); char b[12]; wc n[10]; num(b,"%ld",e.q(10973,unit,0x46),n);
+  ucat(out,c0); ucat(out,n); ucat(out,c1); ucat(out,e.str(rd16(rec,0xf4)));
  }
 }
 

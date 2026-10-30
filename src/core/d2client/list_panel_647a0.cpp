@@ -20,29 +20,30 @@ void automap_mode_647a0(B*obj,AutomapGlobals&g,void(*rebuild)(),void(*refresh)(I
  saveIni(rd32(obj,0x124)); // Ordinal_426("Diablo II","AutoMapMode",0,mode)
 }
 
-// 1.13c D2Client+0x66620  (ESI = e; cur = DAT_6fbcbbfc). Returns 1/0; sets/clears e[0x32]&0x80.
-struct Imp66620 { U(*o10331)(U); U(*o10826)(U); I(*o10855)(U); I(*o10839)(U); };
-I flag_66620(U*e,U cur,const Imp66620&f){
+// 1.13c D2Client+0x66620  (ESI = e; cur = DAT_6fbcbbfc, a unit pointer). Returns 1/0; sets/clears e[0x32]&0x80.
+struct Imp66620 { void*(*o10331)(void*); U(*o10826)(void*); I(*o10855)(U); I(*o10839)(void*,U*,U); };
+I flag_66620(U*e,void*cur,const Imp66620&f){
  if(!e) return 1;
  bool chk=false;
  switch(e[0]){
-  case 0: chk = cur!=U(reinterpret_cast<uintptr_t>(e)) && e[4]!=0 && e[4]!=0x11; break; // GUESS: ptr compare as 32-bit handle
+  case 0: chk = cur!=(void*)e && e[4]!=0 && e[4]!=0x11; break;
   case 1: chk = e[4]!=0 && e[4]!=0xc; break;
   case 3: case 4: chk=true; break;
  }
  if(chk && cur){
-  U r=f.o10331(cur);
-  if(r){ if(f.o10855(f.o10826(r))==0){ e[0x32]|=0x80; return 1; } }
-  if(f.o10839(cur)){ e[0x32]&=0xffffff7f; return 0; }
+  void*r=f.o10331(cur);
+  if(r && f.o10855(f.o10826(r))==0){ e[0x32]|=0x80; return 1; }
+  if(f.o10839(cur,e,2)){ e[0x32]&=0xffffff7f; return 0; }
  }
  e[0x32]|=0x80; return 1;
 }
 
-// 1.13c D2Client+0x66950  (ESI = e). getter = FUN_68990, pre = FUN_6a220; fatal(code) does not return.
-void bind_66950(U*e,U(*getter)(),void(*pre)(),void(*fatal)(U)){
+// 1.13c D2Client+0x66950  (ESI = e). getter = D2Client+0x68990 (no args), pre = D2Client+0x6A220(EAX = e, push mode):
+// mode 0 for kinds 0 and 2, 1 for kind 1; fatal(code) does not return.
+void bind_66950(U*e,U(*getter)(),void(*pre)(U*,U),void(*fatal)(U)){
  U p=getter(); e[0x15]=p;
  if(!p){ fatal(0x16); return; }
- switch(e[0]){ case 0: case 1: case 2: pre(); return; case 3: case 4: return; default: fatal(0x28); }
+ switch(e[0]){ case 0: case 2: pre(e,0); return; case 1: pre(e,1); return; case 3: case 4: return; default: fatal(0x28); }
 }
 
 // 1.13c D2Client+0x66B80  (ECX = o). vt* are the two vtable addresses; delChild calls (*child)->vt[0](1).

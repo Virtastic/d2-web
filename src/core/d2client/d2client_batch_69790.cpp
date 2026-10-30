@@ -19,6 +19,14 @@ struct Services {
  virtual void a69850(int32_t)=0; virtual void a69830(int32_t)=0; virtual void a69770(int32_t)=0;
  virtual void* allocLink()=0;
  virtual bool pending(int32_t)=0; virtual void flush()=0;
+ // used by 0x69CC0
+ virtual void* root44c8()=0;                                        // &DAT_6fbc44c8, the component cache root
+ virtual void nameOf(int32_t hdr0,int32_t* out,int32_t a1,char* name)=0;   // 0x69410 (EAX = hdr0, EDI = out; stack a1, name)
+ virtual void* loadNamed(const char* name,void* table)=0;          // 0x69970 (EAX = name; stack table)
+ virtual const uint8_t* compOrder(const uint8_t* list,int32_t a,int32_t b)=0;  // 0x6D6D0 (EAX = list)
+ virtual int32_t fillRec(int32_t key,void* node,uint32_t sub,uint32_t* rec,int32_t a1,int16_t* hdr,void* a0)=0; // 0x6DD30 (EAX, ECX, EDX, ESI)
+ virtual int32_t cmpLoad(uint32_t* rec,int32_t a,int32_t b)=0;     // D2CMP#10005
+ virtual void cmpRelease(uint32_t* rec)=0;                         // D2CMP#10103
 };
 // 1.13c D2Client+0x69790
 void clearHolder(Services& s, int32_t n, Unit* u) {
@@ -78,8 +86,38 @@ int32_t addLink(Services& s, Unit* u, int32_t id, Link** out) {
  (void)out;
  return s.canonId(id);
 }
-// 1.13c D2Client+0x69CC0 (GUESS: iterates the cache's byte list, spawns one draw record per sub-index, mode param_4)
-void spawnRecords(Services& s, void*, int32_t, int16_t*, int32_t) { (void)s; /* body depends on imports 0x6D6D0/0x6DD30/Ord10005 */ }
+// 1.13c D2Client+0x69CC0  (stdcall a0, a1, hdr, mode; ret 0x10). Resolves the cache node named by 0x69410 (found,
+// else loaded; fatal 0xec3), takes its component list node+0x14 (fatal 0xec9) and the draw order 0x6D6D0(list,0,0)
+// (fatal 0xed0). For each of list[0] slots: component = order[i] (fatal 0xed7 if >= 16); for each sub index
+// 0..hdr byte 3 - 1 (once, sub 0, when that byte is 0) a zeroed 0x48-byte record with byte 5 = component is filled by
+// 0x6DD30 and, if it accepts, loaded by D2CMP#10005 (mode 0: (0,0); else (1,1), released by #10103 on failure).
+void spawnRecords(Services& s, void* a0, int32_t a1, int16_t* hdr, int32_t mode) {
+ char name[0x104]; std::memset(name, 0, sizeof name);
+ int32_t key = 0;
+ s.nameOf(hdr[0], &key, a1, name);
+ void* root = s.root44c8();
+ void* node = s.find(name, root);
+ if (!node && !(node = s.loadNamed(name, root))) s.fatal(0xec3);
+ const uint8_t* list = *reinterpret_cast<const uint8_t* const*>(static_cast<const uint8_t*>(node) + 0x14);
+ if (!list) s.fatal(0xec9);
+ const uint8_t* order = s.compOrder(list, 0, 0);
+ if (!order) s.fatal(0xed0);
+ const uint8_t* subs = reinterpret_cast<const uint8_t*>(hdr) + 3;
+ for (int32_t i = 0; i < (int32_t)list[0]; i++) {
+  uint8_t c = order[i];
+  if (c >= 0x10) s.fatal(0xed7);
+  uint32_t sub = 0;
+  do {
+   uint32_t rec[18] = {0};
+   reinterpret_cast<uint8_t*>(rec)[5] = c;
+   if (s.fillRec(key, node, sub, rec, a1, hdr, a0)) {
+    if (!mode) s.cmpLoad(rec, 0, 0);
+    else if (!s.cmpLoad(rec, 1, 1)) { rec[13] = 0; s.cmpRelease(rec); }
+   }
+   sub++;
+  } while (sub < *subs);
+ }
+}
 // 1.13c D2Client+0x69F20 (GUESS)
 int32_t ensureLinkMode2(Services& s, Unit* u, int32_t id) {
  if (u && u->flags54 && u->flags54[id * 2]) return 0;
