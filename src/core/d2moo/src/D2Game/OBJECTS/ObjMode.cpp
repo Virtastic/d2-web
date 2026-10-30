@@ -1860,6 +1860,7 @@ int32_t __fastcall sub_6FC76A60(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t 
 }
 
 //D2Game.0x6FC76BC0
+// 1.13c D2Game+0x6C900: dwArg0 is unsigned in D2ShrinesTxt, so the percent product must be cast to signed before the divide by -100 (unsigned: quotient 0, no damage).
 void __fastcall D2GAME_SHRINES_Storm_6FC76BC0(D2ObjOperateFnStrc* pOp, D2ShrinesTxt* pShrinesTxtRecord)
 {
     const int32_t nX = CLIENTS_GetUnitX(pOp->pObject);
@@ -1881,7 +1882,7 @@ void __fastcall D2GAME_SHRINES_Storm_6FC76BC0(D2ObjOperateFnStrc* pOp, D2Shrines
         if (pFoundUnit && (pFoundUnit->dwUnitType == UNIT_MONSTER || pFoundUnit->dwUnitType == UNIT_PLAYER) && !SUNIT_IsDead(unitFindData.pUnitsArray[i]))
         {
             const int32_t nHitpoints = STATLIST_UnitGetStatValue(pFoundUnit, STAT_HITPOINTS, 0);
-            STATLIST_AddUnitStat(pFoundUnit, STAT_HITPOINTS, ((nHitpoints >> 8) * pShrinesTxtRecord->dwArg0) / -100 << 8, 0);
+            STATLIST_AddUnitStat(pFoundUnit, STAT_HITPOINTS, ((nHitpoints >> 8) * (int32_t)pShrinesTxtRecord->dwArg0) / -100 << 8, 0);
         }
     }
 

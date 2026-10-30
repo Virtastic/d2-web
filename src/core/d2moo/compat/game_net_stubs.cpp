@@ -314,9 +314,11 @@ void __fastcall sub_6FC33670(D2GameStrc* pGame, D2ClientStrc* pClient) {
             SUNITPROXY_UpdateNpcsOnActChange(pGame, player, oldLevel, newLevel);
         }
         sub_6FC33020(pClient, playerRoom);
+        // the player joins the queued-unit flush only on a room change; an unconditional refresh every frame made the flush
+        // reset STAT_LASTEXP (0x1d) the frame an experience gain set it, where retail keeps it until the next gain
+        if (UNITS_GetRoom(player)) UNITROOM_RefreshUnit(player);
     }
     ARENA_SynchronizeWithClients(pGame, pClient); // 0x65 score, retail's step between the room change and the refresh
-    if (UNITS_GetRoom(player)) UNITROOM_RefreshUnit(player);
     // The level's roof POPS, once per client frame from the player's own room and position: D2Common
     // #10012 DUNGEON_UpdatePops -> DRLGPRESET_UpdatePops, which hides the roof the preset's pop region
     // names while the player stands inside that region (and reveals it again on the way out). Its only

@@ -5772,6 +5772,47 @@ EMSCRIPTEN_KEEPALIVE int d2_session_fixture_unidentify(uint32_t itemId) {
     ITEMS_SetItemFlag(item, IFLAG_IDENTIFIED, 0);
     return 1;
 }
+// Ground items in the order a client label pass meets them: the player's room and its adjacent rooms, each room's unit chain.
+// Item `which` of that walk: field 0 its unit id, 1 its room index; 0xFFFFFFFF past the end.
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_ground_item_order(int which, int field) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return 0xFFFFFFFFu;
+    D2ActiveRoomStrc** rooms = nullptr; int32_t count = 0; int n = 0;
+    DUNGEON_GetAdjacentRoomsListFromRoom(UNITS_GetRoom(g_targetPlayer), &rooms, &count);
+    for (int32_t i = 0; rooms && i < count; ++i)
+        for (D2UnitStrc* u = rooms[i] ? rooms[i]->pUnitFirst : nullptr; u; u = u->pRoomNext)
+            if (u->dwUnitType == UNIT_ITEM && n++ == which) return field ? (uint32_t)i : u->dwUnitId;
+    return 0xFFFFFFFFu;
+}
+// Fixture: set or clear one item flag (ethereal 0x400000, socketed 0x800) on a specific item, for rows that need an item the
+// loot tables did not roll that way.
+EMSCRIPTEN_KEEPALIVE int d2_session_fixture_item_flag(uint32_t itemId, uint32_t flag, int on) {
+    D2UnitStrc* item = (g_sessionLive && g_game) ? SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId) : nullptr;
+    if (!item || !item->pItemData) return 0;
+    ITEMS_SetItemFlag(item, flag, on ? 1 : 0);
+    updateSessionSnapshot();
+    return 1;
+}
+// Fixture: give an item the name ids a recorded item packet carries (0x9C's quality block): unique or set row (a), rare
+// prefix and suffix (a, b), magic prefix and suffix (a, b). A row that replays retail's items needs the same names, and the
+// game's own rolls draw them from a seed that differs from retail's. Properties stay as rolled.
+EMSCRIPTEN_KEEPALIVE int d2_session_fixture_item_names(uint32_t itemId, uint32_t a, uint32_t b) {
+    D2UnitStrc* item = (g_sessionLive && g_game) ? SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId) : nullptr;
+    if (!item || !item->pItemData) return 0;
+    switch (item->pItemData->dwQualityNo) {
+        case ITEMQUAL_UNIQUE: case ITEMQUAL_SET: ITEMS_SetFileIndex(item, a); break;
+        case ITEMQUAL_RARE: case ITEMQUAL_CRAFT: ITEMS_AssignRarePrefix(item, (uint16_t)a); ITEMS_AssignRareSuffix(item, (uint16_t)b); break;
+        case ITEMQUAL_MAGIC: {
+            // The packet's prefix is a MagicPrefix row; ours indexes the combined affix table (the serializer's own offset).
+            const D2MagicAffixDataTbl& tb = sgptDataTables->pMagicAffixDataTables;
+            ITEMS_AssignPrefix(item, (uint16_t)(a ? a + (uint32_t)(tb.pMagicPrefix - tb.pMagicAffixTxt) : 0), 0);
+            ITEMS_AssignSuffix(item, (uint16_t)b, 0);
+            break;
+        }
+        default: return 0;
+    }
+    updateSessionSnapshot();
+    return 1;
+}
 // How many items the hero carries that Cain would identify (ITEMS_GetNoOfUnidItems, the very count
 // D2GAME_NPC_IdentifyAllItems tests): the client lists "Identify Items" in his menu only when it is > 0.
 EMSCRIPTEN_KEEPALIVE int d2_session_unidentified_count() {
@@ -6494,6 +6535,13 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_fixture_quest_item(uint32_t code) {
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_fixture_quality_item(uint32_t code, uint32_t quality) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || quality > 8) return 0;
     D2UnitStrc* item = QUESTS_CreateItem(g_game, g_targetPlayer, code, 0, (uint8_t)quality, 0);
+    updateSessionSnapshot();
+    return item ? item->dwUnitId : 0;
+}
+// The same at a named item level (the recorded fixture's ILVL): the level decides which uniques and sets can roll at all.
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_fixture_quality_item_level(uint32_t code, uint32_t quality, int32_t ilvl) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || quality > 8) return 0;
+    D2UnitStrc* item = QUESTS_CreateItem(g_game, g_targetPlayer, code, ilvl, (uint8_t)quality, 0);
     updateSessionSnapshot();
     return item ? item->dwUnitId : 0;
 }
@@ -8988,6 +9036,15 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick_gate() {
 // (`sub_6FD01010`, through the imp's own "Imp Teleport" skill) restores both. So a live, full-hit-point
 // unit that cannot be attacked is only a DEFECT when these say it is NOT attached and owns nothing.
 static int32_t g_unitInfo[17];
+// TEST ONLY (shrines1 scenario): make object `id` the shrine of shrines.txt row `row`, as the capture driver's
+// D2CAPTURE_SESSION_SHRINE does on retail (InteractType + pShrineTxt), so one fixed level can operate every type.
+EMSCRIPTEN_KEEPALIVE int d2_session_fixture_set_shrine(uint32_t id, int row) {
+    D2UnitStrc* u = g_game ? SUNIT_GetServerUnit(g_game, UNIT_OBJECT, (int32_t)id) : nullptr;
+    if (!u || !u->pObjectData) return 0;
+    u->pObjectData->InteractType = (uint8_t)row;
+    u->pObjectData->pShrineTxt = DATATBLS_GetShrinesTxtRecord(row);
+    return 1;
+}
 EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_unit_info(int type, uint32_t id) {
     memset(g_unitInfo, 0, sizeof g_unitInfo);
     D2UnitStrc* u = g_game ? SUNIT_GetServerUnit(g_game, type, (int32_t)id) : nullptr;
@@ -9356,7 +9413,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_fixture_affixes(uint32_t itemId, const char*
     return 1;
 }
 // P8j: a magic item's hover name as retail draws it: "<prefix> <base> <suffix>" (measured "Jagged Spear " and
-// "Septic Hand Axe of Quality": an absent affix leaves its separator). Empty for other qualities (not ported).
+// "Septic Hand Axe of Quality": an absent affix leaves its separator); superior "Superior <base>". Empty for other qualities (not ported).
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_title(uint32_t itemId, char* buf, uint32_t cap) {
     if (!g_sessionLive || !g_game || !buf || !cap) return 0;
     D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId);
@@ -9379,6 +9436,12 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_title(uint32_t itemId, char* buf, 
         }
         if (nm.empty()) return 0;
         return emit(nm + "\n" + baseName());
+    }
+    if (t && item->pItemData && item->pItemData->dwQualityNo == ITEMQUAL_SUPERIOR) {
+        // Superior: the tbl string "Hiquality" before the base name (measured "Superior Hand Axe").
+        std::string sup; const std::u16string* v = d2::sharedLang().find("Hiquality"); if (v) appendNarrow(sup, v->c_str());
+        if (sup.empty()) return 0;
+        return emit(sup + " " + baseName());
     }
     if (!t || !item->pItemData || item->pItemData->dwQualityNo != ITEMQUAL_MAGIC ||
         !d2::item_text::identified(item->pItemData->dwItemFlags)) return 0;
