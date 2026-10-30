@@ -633,7 +633,6 @@ void* __stdcall DATATBLS_CompileTxt(HD2ARCHIVE hArchive, const char* szName, D2B
 		D2_ASSERT(pData);
 
 		pBinFile = FOG_CreateBinFile(pData, dwDataSize);
-		if (!pBinFile) { char m[96]; snprintf(m, sizeof m, "txt compile: %s size %u", szName, (unsigned)dwDataSize); FOG_DisplayHalt(m, __FILE__, __LINE__); }
 		nRecordCount = FOG_GetRecordCountFromBinFile(pBinFile);
 		pTxt = D2_CALLOC_POOL(nullptr, dwSize * nRecordCount);
 		FOG_10207(pBinFile, pTbl, pTxt, nRecordCount, dwSize);
@@ -668,20 +667,6 @@ void* __stdcall DATATBLS_CompileTxt(HD2ARCHIVE hArchive, const char* szName, D2B
 
 	pData = ARCHIVE_ALLOC_BUFFER_AND_READ_FILE_TO_IT(hArchive, szFilePath, &dwDataSize);
 	bool bFromBin = DATATBLS_LoadFromBin != 0;
-	if (bFromBin)
-	{
-		// A 1.14 patch ships .txt only, each behind a 24-byte header; the .bin the base archives still hold is from an older build, so the patch's text wins.
-		char szTxtPath[MAX_PATH];
-		wsprintfA(szTxtPath, "%s\\%s%s", "DATA\\GLOBAL\\EXCEL", _strcmpi(szName, "leveldefs") ? szName : "levels", ".txt");
-		size_t dwTxtSize = 0;
-		void* pTxtData = ARCHIVE_ALLOC_BUFFER_AND_READ_FILE_TO_IT(hArchive, szTxtPath, &dwTxtSize);
-		if (pTxtData && dwTxtSize > 24 && ((uint8_t*)pTxtData)[0] == 0x18 && ((uint8_t*)pTxtData)[2] == 4)
-		{
-			pData = pTxtData;
-			dwDataSize = dwTxtSize;
-			bFromBin = false;
-		}
-	}
 	if (!pData && bFromBin)
 	{
 		// A patch that ships no compiled .bin for this table (an older Patch_D2.mpq): compile its .txt instead.

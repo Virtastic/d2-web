@@ -59,14 +59,13 @@ int FOG_GetStringFromLinkIndex(void* p, int nIndex, char* szString) {
 }
 
 // A table is either a compiled .bin (4-byte record count, then the records) or the tab-separated .txt
-// it was compiled from (header row, then one row per record). A patch from before the .bin tables, or a
-// later one whose .bin is a delta, ships the text; FOG_10207 compiles it against the field table.
+// it was compiled from (header row, then one row per record). A patch that ships the text without the .bin
+// gets it compiled here; FOG_10207 compiles it against the field table.
 namespace {
 struct TextTable { std::vector<std::string> head; std::vector<std::vector<std::string>> rows; };
 const int kTextTable = -1;   // D2BinFileStrc::nCellCount marks a parsed text table; pDataBuffer holds the TextTable
 
 bool looksLikeText(const uint8_t* p, size_t n) {
-    if (n > 24 && p[0] == 0x18 && p[2] == 4) return true;   // the 1.14 text header
     // A compiled .bin is a record count and packed fields; a text table is mostly printable with a tab-separated header.
     size_t m = n < 512 ? n : 512, ok = 0; bool tab = false;
     for (size_t i = 0; i < m; i++) { uint8_t c = p[i]; if (c == '\t') tab = true; if (c >= 0x20 || c == '\t' || c == '\r' || c == '\n') ok++; }
@@ -79,7 +78,6 @@ std::vector<std::string> splitCells(const char* b, const char* e) {
 }
 TextTable* parseText(const uint8_t* d, size_t n) {
     TextTable* t = new TextTable();
-    if (n > 24 && d[0] < 0x20 && d[0] != 9 && d[0] != 10 && d[0] != 13) { d += 24; n -= 24; }   // a 1.14 patch's .txt carries a 24-byte header ahead of the text
     const char* p = (const char*)d; const char* end = p + n; bool first = true;
     while (p < end) {
         const char* nl = (const char*)memchr(p, '\n', end - p); const char* le = nl ? nl : end;
