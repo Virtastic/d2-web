@@ -11,24 +11,26 @@ const files = {
 const fx = createStateFx((p) => files[p]);
 let on = false; const has = () => on;
 assert.equal(fx.update(has).length, 0);
-on = true; let a = fx.update(has);
-assert.deepEqual(a.map((e) => [e.file, e.predraw, e.trans]).sort(), [['Cast', false, 0], ['Ring', true, 3]]);
+on = true; let a = fx.update(has);   // gain tick: the loop plays; the once cast starts on the next tick (retail OV: create, then pos 0)
+assert.deepEqual(a.map((e) => [e.file, e.predraw, e.trans]), [['Ring', true, 3]]);
 on = false; a = fx.update(has);
-assert.deepEqual(a.map((e) => e.file), ['Cast', 'Rem']);
-a = fx.update(has); a = fx.update(has);
-assert.deepEqual(a.map((e) => e.file), []);
+assert.deepEqual(a.map((e) => e.file), ['Cast']);
+a = fx.update(has); assert.deepEqual(a.map((e) => e.file), ['Cast', 'Rem']);
+a = fx.update(has); assert.deepEqual(a.map((e) => e.file), ['Rem']);
+a = fx.update(has); assert.deepEqual(a.map((e) => e.file), []);
 // Monster state overlays: a monster under Inner Sight (state 17, overlay1 = innersight) exports exactly that loop;
 // another monster and the hero do not inherit it; a monster that leaves the view and returns starts clean.
+// Phase is gain-relative: the loop starts at pos 0 on its gain tick (retail OV: hero 0:1 loop pos = (t-gain)*0x80).
 const inner = createStateFx((p) => ({
   'data\\global\\excel\\Overlay.txt': enc('overlay\tFilename\tFrames\tPreDraw\tAnimRate\tTrans\ninnersight\tInnerSight\t16\t0\t16\t3\n'),
   'data\\global\\excel\\states.txt': enc('state\tid\toverlay1\tcastoverlay\tremoverlay\ninnersight\t17\tinnersight\t\t\n'),
 })[p]);
 const sees = (k) => (id) => k === '1:77' && id === 17;
-assert.deepEqual(inner.update(sees('1:77'), '1:77', 500).map((e) => [e.file, e.kind, e.trans, e.age]), [['InnerSight', 'overlay', 3, 500 % 16]]);
+assert.deepEqual(inner.update(sees('1:77'), '1:77', 500).map((e) => [e.file, e.kind, e.trans, e.age]), [['InnerSight', 'overlay', 3, 0]]);
 assert.deepEqual(inner.update(sees('1:78'), '1:78', 500), [], 'another monster does not inherit it');
 assert.deepEqual(inner.update(() => false), [], 'the hero does not inherit it');
 inner.retain(new Set(['1:78']));
-assert.deepEqual(inner.update(sees('1:77'), '1:77', 501).map((e) => e.age), [501 % 16], 'a monster that left the view restarts (no stale gain edge)');
+assert.deepEqual(inner.update(sees('1:77'), '1:77', 501).map((e) => e.age), [0], 'a monster that left the view restarts (no stale gain edge)');
 
 // real tables: every state overlay / skill castoverlay names an Overlay.txt row; its dcc exists when MPQ extract is present
 const dir = '/srv/games/d2/tables-1.13c/';
@@ -47,5 +49,5 @@ if (existsSync(dir + 'states.txt')) {
 console.log('state-fx ok');
 // A re-set while the state holds (seq moves) restarts the loop at pos 0, as retail's fresh 0x6B300 node does.
 { let s = 0; const f = (t) => inner.update((id) => id === 17, 'r', t, () => s).map((e) => e.age)[0];
-  assert.deepEqual([f(500), f(501)], [500 % 16, 501 % 16]); s = 1;
+  assert.deepEqual([f(500), f(501)], [0, 1]); s = 1;
   assert.deepEqual([f(502), f(503)], [0, 1], 'restart at the re-set tick'); }

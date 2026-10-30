@@ -203,3 +203,23 @@ test('object renderer bounds failed animation retention with FIFO eviction', () 
     else globalThis.ImageData = oldImageData;
   }
 });
+
+test('mayLoad defers a new object first decode, never one already on screen', () => {
+  const oldImageData = globalThis.ImageData;
+  let allow = false;
+  const harness = rendererHarness({ blended: false, rendererOptions: { mayLoad: () => allow } });
+  try {
+    const { renderer, ctx, object, cofReads } = harness;
+    const shown = { ...object, id: 7 };
+    assert.equal(renderer.draw(ctx, 0, 0, shown, 1), null, 'over budget: the first decode waits');
+    assert.equal(cofReads.get('TST') ?? 0, 0);
+    allow = true;
+    assert.ok(renderer.draw(ctx, 0, 0, shown, 1), 'the next frame decodes it');
+    allow = false;
+    assert.ok(renderer.draw(ctx, 0, 0, { ...shown, mode: 1 }, 1), 'a new mode of a shown object never waits');
+    assert.equal(cofReads.get('TST'), 2);
+  } finally {
+    if (oldImageData === undefined) delete globalThis.ImageData;
+    else globalThis.ImageData = oldImageData;
+  }
+});

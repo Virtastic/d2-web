@@ -71,21 +71,30 @@ export const STAT_PLUS_SOCKET_OFFSET = Object.freeze({ x: -3, y: -2 });
 // beside a separate Font16 count. Its positions are top-left coordinates; drawAnchored uses an
 // inclusive bottom-row anchor, so drawStatPoints converts with each decoded font's actual cell height.
 export const STAT_POINTS_LAYOUT = Object.freeze({
-  labelX: 92, labelRows: Object.freeze([411, 418]), countX: 188, countY: 411,
+  labelX: Object.freeze([100, 103]), labelRows: Object.freeze([405, 413]), countX: 190, countY: 405,
   palette: 'data\\global\\palette\\SKY\\pal.dat',
   pl2: 'data\\global\\palette\\SKY\\pal.pl2',
   labelColour: 1,
 });
 
+// Retail prints experience as an unsigned 32-bit value.
+const u32 = (v) => (v === undefined || v === null ? v : v >>> 0);
+// Retail groups the thousands of a 32-bit experience value with commas ("3,500,000,000").
+const grouped = (v) => (v === undefined || v === null ? v : String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ','));
+// retail T2 x,y is screen minus (80,60) (CHARACTER_LAYOUT.screenY), not the frame-0 origin (80,61).
+const T2_OFFSET = Object.freeze({ x: 80, y: 60 });
+// Draws the stat-points block and returns its three strings as T2 records (screen minus (80,60)).
 export function drawStatPoints(font6, font16, ctx, points, string) {
-  if (!(points > 0)) return false;
+  if (!(points > 0)) return [];
   const labelAnchor = (top) => top + font6.cellHeight - 1;
   const redFont = font6.red || font6;
-  redFont.drawAnchored(ctx, string('strchrstat'), STAT_POINTS_LAYOUT.labelX, labelAnchor(STAT_POINTS_LAYOUT.labelRows[0]));
-  redFont.drawAnchored(ctx, string('strchrrema'), STAT_POINTS_LAYOUT.labelX, labelAnchor(STAT_POINTS_LAYOUT.labelRows[1]));
-  const count = String(points);
-  font16.drawAnchored(ctx, count, STAT_POINTS_LAYOUT.countX - Math.trunc(font16.measure(count) / 2), STAT_POINTS_LAYOUT.countY + font16.cellHeight - 1);
-  return true;
+  const labels = [[string('strchrstat'), STAT_POINTS_LAYOUT.labelRows[0], STAT_POINTS_LAYOUT.labelX[0]], [string('strchrrema'), STAT_POINTS_LAYOUT.labelRows[1], STAT_POINTS_LAYOUT.labelX[1]]];
+  const out = [];
+  for (const [text, top, left] of labels) { redFont.drawAnchored(ctx, text, left, labelAnchor(top)); out.push({ text, x: left - T2_OFFSET.x, y: labelAnchor(top) - T2_OFFSET.y, c: STAT_POINTS_LAYOUT.labelColour }); }
+  const count = String(points), cx = STAT_POINTS_LAYOUT.countX - Math.trunc(font16.measure(count) / 2), cy = STAT_POINTS_LAYOUT.countY + font16.cellHeight - 1;
+  font16.drawAnchored(ctx, count, cx, cy);
+  out.push({ text: count, x: cx - T2_OFFSET.x, y: cy - T2_OFFSET.y, c: 0 });
+  return out;
 }
 
 // Where the button goes, from the panel's own two independent readings: the attribute frames are the
@@ -170,9 +179,20 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
   };
   const faces = new Map();
   const facesFor = (act) => { let f = faces.get(act); if (!f) { const palette = decodeDatPalette(read(`data\\global\\palette\\ACT${Math.min(5, Math.max(1, act | 0))}\\pal.dat`));
-    f = { 6: createFont({ ...f6, palette, documentObject }), 16: createFont({ ...f16, palette, documentObject }) }; faces.set(act, f); } return f; };
+    f = { 6: createFont({ ...f6, palette, documentObject }), 16: createFont({ ...f16, palette, documentObject }), c3: createFont({ ...f16, palette: textColourPalette(statPl2, palette, 3), documentObject }) }; faces.set(act, f); } return f; };
   const font6 = facesFor(1)[6], font16 = facesFor(1)[16];
   const F = { 6: font6, 16: font16 };
+  // Value-box centres: the intersection of every retail charpanel capture's x = floor(centre - w/2)
+  // over all digit counts (a single sample leaves the half-pixel open and was off by one at other widths).
+  const CENTRE = { name: 167, level: 113.5, experience: 211, nextExperience: 332, strength: 175, dexterity: 176, vitality: 175, energy: 175,
+    defense: 370.5, stamina: 330, staminaMax: 371, life: 330, lifeMax: 371, mana: 330, manaMax: 371,
+    fireRes: 370.5, coldRes: 370.5, lightRes: 370.5, poisonRes: 370.5, dmgA: 365.5, dmgB: 365.5,
+    // The attack rating is the one value column whose centre differs from defense's (retail's "7485" sits 2 px right of ours at 370.5).
+    arA: 372.5, arB: 372.5 };
+  // Value boxes retail LEFT-aligns at a fixed x (stamina, life and mana: the 4-digit values sit at T2 x 236/277 for
+  // every digit count, where a centred box would move them 2-5 px). Screen x, measured from retail's T2 records.
+  // The damage value (retail T2 x 268 for both rows, "13-26") is LEFT-aligned too: screen x 348 = 268 + T2_OFFSET.x.
+  const LEFT = { stamina: 316, staminaMax: 357, life: 316, lifeMax: 357, mana: 316, manaMax: 357, dmgA: 348, dmgB: 348 };
   const FIELDS = [
     ['lvlLabel', 6, 'Level', 98, 104], ['expLabel', 6, 'Experience', 175, 104], ['nextLabel', 6, 'Next Level', 303, 104],
     ['strLabel', 6, 'Strength', 99, 157], ['dexLabel', 6, 'Dexterity', 96, 220], ['defLabel', 6, 'Defense', 280, 267],
@@ -184,13 +204,13 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
     ['arA1', 6, 'ATTACK', 277, 216], ['arA2', 6, 'Rating', 279, 224], ['arA', 16, '85', 362, 220],
     ['dmgB1', 6, 'ATTACK', 271, 177], ['dmgB2', 6, 'Damage', 270, 185], ['dmgB', 16, '3-7', 355, 182],
     ['arB1', 6, 'ATTACK', 277, 240], ['arB2', 6, 'Rating', 279, 248], ['arB', 16, '85', 362, 244],
-    ['className', 16, 'Barbarian', 294, 85], ['name', 16, 'Oracle', 141, 85],
+    ['className', 16, 'Barbarian', 294, 85], ['name', 16, 'Oracle', 167, 85],
     ['level', 16, '1', 111, 119], ['experience', 16, '0', 198, 119], ['nextExperience', 16, '500', 315, 119],
     ['strength', 16, '30', 165, 159], ['dexterity', 16, '20', 164, 221], ['defense', 16, '10', 362, 269], ['vitality', 16, '25', 166, 307],
     ['stamina', 16, '92', 321, 306], ['staminaMax', 16, '92', 362, 306], ['life', 16, '55', 321, 330], ['lifeMax', 16, '55', 362, 330],
     ['energy', 16, '10', 166, 368], ['mana', 16, '10', 321, 368], ['manaMax', 16, '10', 362, 368],
     ['fireRes', 16, '0', 364, 408], ['coldRes', 16, '0', 364, 432], ['lightRes', 16, '0', 364, 456], ['poisonRes', 16, '0', 364, 480],
-  ].map(([key, f, sample, x, y]) => ({ key, size: f, centre: x + F[f].measure(sample) / 2, y }));
+  ].map(([key, f, sample, x, y]) => ({ key, size: f, centre: CENTRE[key] ?? x + F[f].measure(sample) / 2, y }));
   const chrome = createPanelChrome(read, documentObject);
   const view = (width, height) => { const scale = Math.min(1, width / 800, height / 600); return { scale, ox: (width - 800 * scale) / 2, oy: (height - 600 * scale) / 2 }; };
   const buttonRect = (stat) => STAT_BUTTON_RECTS[stat];
@@ -225,15 +245,19 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
         dmgA1: attack, dmgA2: S('strchrskm'), dmgA: dmg, arA1: attack, arA2: (S('strchrrat').split(/[}\n]/)[1] || ''), arA: ar,
         dmgB1: attack, dmgB2: S('strchrskm'), dmgB: dmg, arB1: attack, arB2: (S('strchrrat').split(/[}\n]/)[1] || ''), arB: ar,
         className: state?.className ?? '', name: state?.name ?? '',
-        level: state?.level, experience: state?.experience, nextExperience: sc.length > 10 ? sc[10] : state?.nextExperience,
+        level: state?.level, experience: grouped(u32(state?.experience)), nextExperience: grouped(u32(sc.length > 10 ? sc[10] : state?.nextExperience)),
         strength: state?.strength, dexterity: state?.dexterity, defense: sc[0], vitality: state?.vitality,
-        stamina: sc[4], staminaMax: sc[5], life: sc.length > 11 ? sc[11] : state?.life, lifeMax: sc.length > 12 ? sc[12] : state?.lifeMax, energy: state?.energy,
+        stamina: sc[4], staminaMax: sc[16] ?? sc[5], life: sc.length > 11 ? sc[11] : state?.life, lifeMax: sc.length > 12 ? sc[12] : state?.lifeMax, energy: state?.energy,
         mana: sc.length > 13 ? sc[13] : state?.mana, manaMax: sc.length > 14 ? sc[14] : state?.manaMax,
         fireRes: sc[6], coldRes: sc[7], lightRes: sc[8], poisonRes: sc[9],
       };
       const face = facesFor(state?.act || 1);
-      for (const f of FIELDS) { const t = text[f.key]; if (t === undefined || t === null || t === '') continue;
-        const str = String(t), font = face[f.size]; font.drawAnchored(ctx, str, Math.floor(f.centre - font.measure(str) / 2), f.y); }
+      // Every string drawn, as retail T2 records it: left x and anchor y, in the T2 frame (screen - (80,60)),
+      // colour 0, uncentred. The list is the evidence a retail recording-text diffs.
+      const texts = [];
+      for (const f of FIELDS) { const t = text[f.key]; if (t === undefined || t === null) continue;
+        const over = f.key === 'stamina' && text.stamina > text.staminaMax, str = String(t), font = over ? face.c3 : face[f.size], left = LEFT[f.key] ?? Math.floor(f.centre - font.measure(str) / 2);
+        font.drawAnchored(ctx, str, left, f.y); texts.push({ text: str, x: left - T2_OFFSET.x, y: f.y - T2_OFFSET.y, c: over ? 3 : 0 }); }
       chrome.cel(ctx, state?.act || 1, CHROME_ART.close, characterPanelCloseFrame(state?.closePressed), 208, 480);
       // The "+" is retail art, blitted as retail blits the pair (socket first, then the button on
       // top), and every blit is carried out to the evidence by the cel's own requested/drawn record.
@@ -244,11 +268,11 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
           r.x + STAT_PLUS_SOCKET_OFFSET.x, r.y + STAT_PLUS_SOCKET_OFFSET.y + 36 - 1);
         const plus = chrome.cel(ctx, act, STAT_PLUS_ART, STAT_PLUS_FRAME, r.x, r.y + 30 - 1);
         buttons.push({ stat, slot: STAT_BUTTON_RECTS[stat].slot, rect: { ...r }, socket, plus }); }
-      drawStatPoints(statPointFonts[6], statPointFonts[16], ctx, state?.statPoints, S);
+      texts.push(...drawStatPoints(statPointFonts[6], statPointFonts[16], ctx, state?.statPoints, S));
       chrome.border(ctx, state?.act || 1, BORDER_LEFT);
       ctx.restore();
       return { x: v.ox, y: v.oy, scale: v.scale, buttons, statPoints: state?.statPoints ?? 0, skillPoints: state?.skillPoints ?? 0,
-        shown: FIELDS.filter((f) => !/Label|1$|2$/.test(f.key)).map((f) => ({ key: f.key, value: text[f.key] ?? null })) };
+        texts, shown: FIELDS.filter((f) => !/Label|1$|2$/.test(f.key)).map((f) => ({ key: f.key, value: text[f.key] ?? null })) };
     },
   };
 }

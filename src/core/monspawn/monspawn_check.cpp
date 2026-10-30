@@ -16,6 +16,7 @@
 #include <string>
 #include <strings.h>
 #include <vector>
+#include <array>
 #include <unordered_map>
 #include <D2Common.h>
 #include <D2CMP.h>
@@ -218,6 +219,9 @@ static uint32_t g_sessionClientMapEventsDropped = 0;
 // The offline browser client owns an independent local-player CUnit seed stream. It must never
 // borrow g_targetPlayer->pSeed, which belongs to the D2Game/server unit.
 namespace d2client_ambient { void reset(); void tick(uint32_t* seed, uint32_t period, bool weatherLevel); uint32_t* fallbackSeed(); }
+namespace d2client_hurricane { void reset(); void tick(D2UnitStrc* u, uint32_t* seed); }
+namespace d2client_vine { void reset(); void tick(D2UnitStrc* hero); }
+namespace d2client_nova { void reset(); void selectSkill(int32_t skillId); int32_t selectedSkill(); void cast(int32_t skillId, bool presentation); void tick(); }   // 1.13c D2Client+0x73CB0 (cltdofunc 25, Poison Nova), +0x73D70 (cltdofunc 29, Frozen Orb)
 static D2UnitStrc* g_sessionClientPlayerUnit = nullptr;
 static uint32_t g_sessionClientPlayerInitSeed = 0;
 // Session construction is class-selectable.  The older vector/AI attachment surface retains
@@ -805,6 +809,8 @@ static uint32_t g_sessionWorldHash;
 static uint32_t g_sessionTerrainHash;
 static bool g_sessionLive, g_sessionMovePending;
 static std::unordered_set<uint32_t> g_monInitPlayed; // 1.13c D2Client+0x23170: the per-unit played flag (client unit+0x80)
+static std::vector<std::array<int32_t, 7>> g_pendingOnsound; // state-on events found by the last drain, emitted by the next one
+static std::unordered_set<uint64_t> g_prevOnsoundStates; // 1.13c D2Client+0x73760: state bits seen at the last sound drain (type<<40 | id<<8 | state)
 static bool g_sessionResumeAttack;
 // s2420 watches one unit so its scheduled timer can be paired with proof that the event dispatcher
 // actually invoked that unit's AITHINK callback. This is diagnostic only and does not change timing.
@@ -1087,7 +1093,7 @@ static void syncSessionClientMapFromPlayer();
 static void resetSessionClientMapMirror() {
     if (g_sessionClientPlayerUnit) UNITS_FreeUnit(g_sessionClientPlayerUnit);
     g_sessionClientPlayerUnit = nullptr;
-    d2client::weather::reset(); d2client_ambient::reset();
+    d2client::weather::reset(); d2client_ambient::reset(); d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset();
     if (g_sessionClientActOwned) d2_drlg_act_end();
     g_sessionClientActOwned = false;
     g_sessionClientMapStarted = false;
@@ -1511,10 +1517,15 @@ static void sessionPreSightCrossLevelExits(D2DrlgActStrc* act, D2DrlgLevelStrc* 
 // hold; a command between two reads needs a release first.
 static int g_worldHold = 0; static bool g_worldHoldBuilt = false;
 static bool inStartLattice(const D2DrlgRoomStrc* r);
+// Rooms the capture-style level join (d2_session_client_join_level) listed the client in: a server roster entry only.
+// Retail's D2Client still holds just the units the sync sent (a retail recording: no torch first-sight sounds from those rooms), so
+// the client-hold tests below do not count that entry.
+static std::set<D2ActiveRoomStrc*> g_sessionJoinRooms;
+static int32_t clientHeldCount(D2ActiveRoomStrc* room) { return room->nNumClients - (g_sessionJoinRooms.count(room) ? 1 : 0); }
 
 // Client-side table: retail's client holds every room near its own room even where the headless server attached the own room only (a retail recording).
 static bool sessionClientHoldsRoom(D2ActiveRoomStrc* room) {
-    if (room->nNumClients > 0) return true;
+    if (clientHeldCount(room) > 0) return true;
     // retail's server adds the client to the Room2 near list of the hero's room (the 0xAC creates of a retail recording fall in those rooms)
     D2ActiveRoomStrc* here = g_targetPlayer ? UNITS_GetRoom(g_targetPlayer) : nullptr;
     if (here == room) return true;
@@ -1524,17 +1535,19 @@ static bool sessionClientHoldsRoom(D2ActiveRoomStrc* room) {
 }
 // a retail recording: which monsters retail's client holds. The capture's join announces the monsters within 40 subtiles (box) of the start (0xAC, D2CAPTURE_SESSION_RADIUS);
 // afterwards 0x4B1D0 diffs the hero room's near list: units of a room that enters it reach the client (0x9DC10 -> 0x7B0A0), those of a room that leaves it are removed.
-static std::set<uint32_t> g_heldMonsters; static std::set<D2DrlgRoomStrc*> g_heldNear; static D2UnitStrc* g_heldFor = nullptr; static int g_heldX0, g_heldY0;
+static std::set<uint32_t> g_heldMonsters, g_heldSeen; static std::set<D2DrlgRoomStrc*> g_heldNear; static D2UnitStrc* g_heldFor = nullptr; static int g_heldX0, g_heldY0;
 static void sessionHeldStep() {
     D2ActiveRoomStrc* here = g_targetPlayer ? UNITS_GetRoom(g_targetPlayer) : nullptr;
     if (!here || !here->pDrlgRoom) return;
     D2DrlgRoomStrc* h = here->pDrlgRoom; std::set<D2DrlgRoomStrc*> cur;
     for (int32_t i = 0; i < h->nRoomsNear; ++i) if (h->ppRoomsNear[i] && h->ppRoomsNear[i]->pRoom) cur.insert(h->ppRoomsNear[i]);   // an inactive room is not announced yet
     const bool first = g_heldFor != g_targetPlayer;
-    if (first) { g_heldMonsters.clear(); g_heldNear.clear(); g_heldFor = g_targetPlayer; D2CoordStrc c = {}; UNITS_GetCoords(g_targetPlayer, &c); g_heldX0 = c.nX; g_heldY0 = c.nY; }
+    if (first) { g_heldMonsters.clear(); g_heldSeen.clear(); g_heldNear.clear(); g_heldFor = g_targetPlayer; D2CoordStrc c = {}; UNITS_GetCoords(g_targetPlayer, &c); g_heldX0 = c.nX; g_heldY0 = c.nY; }
     auto each = [](D2DrlgRoomStrc* r, auto f) { if (r->pRoom) for (D2UnitStrc* u = r->pRoom->pUnitFirst; u; u = u->pRoomNext) if (u->dwUnitType == UNIT_MONSTER) f(u); };
     for (D2DrlgRoomStrc* r : cur) if (!g_heldNear.count(r)) each(r, [&](D2UnitStrc* u) { D2CoordStrc c = {}; UNITS_GetCoords(u, &c); if (!first || (abs(c.nX - g_heldX0) <= 40 && abs(c.nY - g_heldY0) <= 40)) g_heldMonsters.insert(u->dwUnitId); });
     for (D2DrlgRoomStrc* r : g_heldNear) if (!cur.count(r)) each(r, [&](D2UnitStrc* u) { g_heldMonsters.erase(u->dwUnitId); });
+    // A monster that appears in a room the client already holds (a summoned golem) is announced to it with a 0xAC: held from that tick.
+    for (D2DrlgRoomStrc* r : cur) each(r, [&](D2UnitStrc* u) { if (g_heldSeen.insert(u->dwUnitId).second && g_heldNear.count(r)) g_heldMonsters.insert(u->dwUnitId); });
     g_heldNear = cur;
 }
 // a retail recording: retail's client holds the town's river rooms while the hero's level lies within two Levels.txt vis links of the town (Blood Moor 2 at one;
@@ -1638,7 +1651,7 @@ static void updateSessionWorld() {
                 if (unit->pStaticPath) { object.x = unit->pStaticPath->tGameCoords.nX; object.y = unit->pStaticPath->tGameCoords.nY; }
                 { const ClientObjectClock& c = clientObjectClock(unit); object.framePrecise = c.clock; object.frameCountPrecise = c.count; object.animSpeed = c.speed; } object.direction = txt->nOrientation;
                 object.selectable = unit->dwAnimMode < 8 ? txt->nSelectable[unit->dwAnimMode] : 0;
-                object.inClientRoom = (room->nNumClients > 0 || inStartLattice(roomEx));
+                object.inClientRoom = (clientHeldCount(room) > 0 || inStartLattice(roomEx));
                 object.locked = txt->nLockable && (unit->pObjectData->InteractType & 0x80);
                 if (txt->nSubClass & (OBJSUBCLASS_TOWNPORTAL | OBJSUBCLASS_PORTAL)) object.portalLevel = unit->pObjectData->InteractType;
                 const uint8_t* pieces = &txt->nHD;
@@ -2028,6 +2041,8 @@ static void detachTargetFixture() {
     // (0x81 pet assignments iterate the living players) reaches freed memory.
     if (g_targetPlayer && UNITS_GetPlayerData(g_targetPlayer)) UNITS_GetPlayerData(g_targetPlayer)->pClient = nullptr;
     if (g_targetRoom) { g_targetRoom->ppClients = nullptr; g_targetRoom->nNumClients = 0; g_targetRoom->nMaxClients = 0; }
+    for (D2ActiveRoomStrc* r : g_sessionJoinRooms) { r->ppClients = nullptr; r->nNumClients = 0; r->nMaxClients = 0; }   // the level join's rosters too
+    g_sessionJoinRooms.clear();
     free(g_targetClient); g_targetClient = nullptr; g_targetRoom = nullptr; g_targetPlayer = nullptr; g_targetMonster = nullptr;
     g_clientCastClockActive = false; g_clientCastFramePrecise = 0; g_clientCastAnimSpeed = 0;
 }
@@ -2351,7 +2366,13 @@ EMSCRIPTEN_KEEPALIVE const D2VecAiUnit* d2_aispawn_units(int* count) { *count = 
 // d2_aitarget_attach so a level with no monster at all can still be entered: the anchor search
 // below is what the AI oracle rows need, not what a player needs.
 bool g_sessionClientStaysInRoom = false; // read by sub_6FC33670
+static bool g_sessionClientAdjCount = false; // d2_session_client_feed(2), see below
 static bool g_fixtureOwnRoomOnly = false;
+// The capture's D2CAPTURE_SESSION_CLIENT join (the retail capture tool/main.cpp "capture-client") lists the client in its own room and
+// then in every built room of the level through D2Common #10879 (0x3C460) directly -- no LEVEL_AddClient, so no unit sends.
+// a retail recording sets it: retail's monster b sits in a room only that join reaches, and AI scans client rooms only (D2Game+0xB0CE0).
+static bool g_sessionJoinLevelRooms = false;
+EMSCRIPTEN_KEEPALIVE void d2_session_client_join_level(int on) { g_sessionJoinLevelRooms = on != 0; }
 static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStrc* anchor) {
     D2UnitStrc* player = SUNIT_AllocUnitData(UNIT_PLAYER, g_sessionPlayerClass, x, y, g_game, room, 1, PLRMODE_NEUTRAL, 0);
     if (!player) return 0;
@@ -2395,7 +2416,17 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
     // clients (retail 0x6FCD0D57), so the aitrace replays (d2_aitarget_attach_at) register as the capture
     // does: retail's frame-15 probe read nNumClients 0 in the room beside the fixture (s232).
     if (g_fixtureOwnRoomOnly) { DUNGEON_AddClientToRoom(room, g_targetClient); g_targetClient->pRoom = room; }
-    else sub_6FC33020(g_targetClient, room);
+    g_sessionJoinRooms.clear();
+    if (g_fixtureOwnRoomOnly && g_sessionClientAdjCount) {   // a retail recording (feed 2): the adjacent rooms' client arrays only
+        D2ActiveRoomStrc** adj = nullptr; int32_t nAdj = 0; DUNGEON_GetAdjacentRoomsListFromRoom(room, &adj, &nAdj);
+        for (int32_t i = 0; i < nAdj; ++i) if (adj[i] != room) DUNGEON_AddClientToRoom(adj[i], g_targetClient);
+    }
+    // Braces: the else used to bind to the inner `if` in the loop, so the join never ran outside the level-join arm.
+    // Retail's join walk (1.13c 0x4B1D0 -> LEVEL_AddClient 0x9DC10 on adjacent rooms) runs for a real client.
+    if (g_fixtureOwnRoomOnly && g_sessionJoinLevelRooms && g_lastLevel) {
+        for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext)
+            if (roomEx->pRoom && roomEx->pRoom != room) { DUNGEON_AddClientToRoom(roomEx->pRoom, g_targetClient); g_sessionJoinRooms.insert(roomEx->pRoom); }
+    } else sub_6FC33020(g_targetClient, room);
     // D48: retail's join walk sends the room's units before the first recorded tick; do it now and drop the bytes so tick 1 starts clean.
     { LEVEL_UpdateUnitsInAdjacentRooms(g_game, room, g_targetClient); D2WEB_ResetPacketStream(); }
     for (D2UnitStrc* u = room->pUnitFirst; u; u = u->pRoomNext) {
@@ -2412,7 +2443,9 @@ static int g_attachAtX = -1, g_attachAtY = -1;
 // Retail's fed session (D2CAPTURE_SESSION_CLIENT) joins the client to every adjacent room (sub_6FC33020), so a town NPC's
 // 6FCF1E80 client scan finds it (Akara's walk to the player, the 0x8A mark); unfed baselines (a retail recording) keep the own-room fixture.
 static bool g_sessionClientFeed = false;
-EMSCRIPTEN_KEEPALIVE void d2_session_client_feed(int on) { g_sessionClientFeed = on != 0; }
+// on == 2 (a retail recording): retail's real client is in every adjacent room (0x07 for 79 rooms at tick 1) so pets and monsters scan them,
+// but its first-client wake events do not fire early; join the adjacent rooms' client arrays only (no events, no packets).
+EMSCRIPTEN_KEEPALIVE void d2_session_client_feed(int on) { g_sessionClientFeed = on == 1; g_sessionClientAdjCount = on == 2; }
 static int g_sessionAttachAtX = -1, g_sessionAttachAtY = -1;
 EMSCRIPTEN_KEEPALIVE int d2_aitarget_attach() {
     if (!g_game || !g_lastLevel || g_targetPlayer) return 0;
@@ -3117,7 +3150,7 @@ static int d2_session_create_for_class(uint32_t seed, int difficulty, int act, i
     }
     g_sessionInitialExperience = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_EXPERIENCE, 0);
     g_townSpawnX = g_targetPlayer ? UNITS_GetXPosition(g_targetPlayer) : -1; g_townSpawnY = g_targetPlayer ? UNITS_GetYPosition(g_targetPlayer) : -1;   // the hero's arrival room is the lattice centre
-    g_monInitPlayed.clear(); g_sessionLive = true; updateSessionSnapshot(); return 1;
+    g_monInitPlayed.clear(); g_prevOnsoundStates.clear(); g_pendingOnsound.clear(); g_sessionLive = true; updateSessionSnapshot(); return 1;
 }
 
 EMSCRIPTEN_KEEPALIVE int d2_session_create(uint32_t seed, int difficulty, int act, int levelId) {
@@ -3398,7 +3431,9 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_session_run_probe(int32_t drain) {
     return probe;
 }
 
+extern "C" void d2_client_note_move_cmd(int32_t explicitMove);
 EMSCRIPTEN_KEEPALIVE int d2_session_command_move(int targetX, int targetY) {
+    d2_client_note_move_cmd(1);
     memset(&g_d2webWalkProbe, 0, sizeof g_d2webWalkProbe);
     g_d2webWalkProbe.sequence = ++g_d2webWalkSequence;
     g_d2webWalkProbe.commandX = targetX; g_d2webWalkProbe.commandY = targetY;
@@ -5291,6 +5326,15 @@ EMSCRIPTEN_KEEPALIVE int d2_session_character_screen(int32_t* out) {
     D2UnitStrc* w = p->pInventory ? INVENTORY_GetItemFromBodyLoc(p->pInventory, BODYLOC_RARM) : nullptr;
     const int bonus = w ? str * ITEMS_GetStrengthBonus(w) / 100 + dex * ITEMS_GetDexBonus(w) / 100 : 0;
     out[2] = STATLIST_GetMinDamageFromUnit(p, 0) * (100 + bonus) / 100; out[3] = STATLIST_GetMaxDamageFromUnit(p, 0) * (100 + bonus) / 100;
+    if (!w) {
+        // 1.13c D2Client+0x31220 unarmed branch: base (stat 21 + 1, stat 22 + 2), percent = stat 25 + strength
+        // (floored at -90), min = (stat 18 + pct + 100) * min / 100, max = (stat 17 + pct + 100) * max / 100; 0x30E30 then forces min >= 1, max >= min + 1.
+        int pct = STATLIST_UnitGetStatValue(p, STAT_DAMAGEPERCENT, 0) + str;
+        if (pct < -90) pct = -90;
+        out[2] = (STATLIST_UnitGetStatValue(p, STAT_ITEM_MINDAMAGE_PERCENT, 0) + pct + 100) * (STATLIST_UnitGetStatValue(p, STAT_MINDAMAGE, 0) + 1) / 100;
+        out[3] = (STATLIST_UnitGetStatValue(p, STAT_ITEM_MAXDAMAGE_PERCENT, 0) + pct + 100) * (STATLIST_UnitGetStatValue(p, STAT_MAXDAMAGE, 0) + 2) / 100;
+        if (out[3] > 0) { if (out[2] < 1) out[2] = 1; if (out[3] < out[2] + 1) out[3] = out[2] + 1; }
+    }
     out[4] = STATLIST_UnitGetStatValue(p, STAT_STAMINA, 0) >> 8; out[5] = STATLIST_UnitGetStatValue(p, STAT_MAXSTAMINA, 0) >> 8;
     const int ids[4] = { STAT_FIRERESIST, STAT_COLDRESIST, STAT_LIGHTRESIST, STAT_POISONRESIST };
     const int maxIds[4] = { STAT_MAXFIRERESIST, STAT_MAXCOLDRESIST, STAT_MAXLIGHTRESIST, STAT_MAXPOISONRESIST };
@@ -5317,12 +5361,15 @@ EMSCRIPTEN_KEEPALIVE int d2_session_character_screen(int32_t* out) {
     // out[10] the Next Level figure (the experience table's threshold for the next level, 500 at 1),
     // out[11..16] life, max life, mana, max mana (whole points), class id.
     const int level = STATLIST_UnitGetStatValue(p, STAT_LEVEL, 0);
-    out[10] = (int32_t)DATATBLS_GetLevelThreshold((int)p->dwClassId, (uint32_t)level);
+    out[10] = level < DATATBLS_GetMaxLevel((int)p->dwClassId) ? (int32_t)DATATBLS_GetLevelThreshold((int)p->dwClassId, (uint32_t)level) : 0;
     out[11] = STATLIST_UnitGetStatValue(p, STAT_HITPOINTS, 0) >> 8; out[12] = STATLIST_UnitGetStatValue(p, STAT_MAXHP, 0) >> 8;
     out[13] = STATLIST_UnitGetStatValue(p, STAT_MANA, 0) >> 8; out[14] = STATLIST_UnitGetStatValue(p, STAT_MAXMANA, 0) >> 8;
     out[15] = (int32_t)p->dwClassId;
     return 1;
 }
+// The character screen's stamina maximum is the BASE stat (retail panel: 1200 beside a current of 1560 while the
+// Increased Stamina passive's 30% is in the total; the HUD bar reads the total, out[5]).
+EMSCRIPTEN_KEEPALIVE int d2_session_character_stamina_base() { return g_targetPlayer ? STATLIST_GetUnitBaseStat(g_targetPlayer, STAT_MAXSTAMINA, 0) >> 8 : 0; }
 EMSCRIPTEN_KEEPALIVE int d2_session_player_gold() { return g_targetPlayer ? STATLIST_UnitGetStatValue(g_targetPlayer, STAT_GOLD, 0) : -1; }
 // The stash panel's two numbers: gold in the stash (STAT_GOLDBANK) and its limit (UNITS_GetStashGoldLimit).
 EMSCRIPTEN_KEEPALIVE int d2_session_stash_gold(int limit) { return !g_targetPlayer ? -1 : limit ? (int)UNITS_GetStashGoldLimit(g_targetPlayer) : STATLIST_UnitGetStatValue(g_targetPlayer, STAT_GOLDBANK, 0); }
@@ -5783,11 +5830,56 @@ EMSCRIPTEN_KEEPALIVE int d2_session_take_sounds(int32_t* out, int cap) {
                 (monster->nTypeFlag & (MONTYPEFLAG_UNIQUE | MONTYPEFLAG_MINION)) != 0, superProfile,
                 static_cast<int32_t>(stats->wUMonSound), static_cast<int32_t>(stats->wMonSound));
             D2MonSoundsTxt* sounds = profileId >= 0 ? DATATBLS_GetMonSoundsTxtRecordFromSoundId(profileId) : nullptr;
+            if (sounds && !sounds->dwInit && unit->dwAnimMode == 8 && sounds->dwSkill[0] && sounds->dwSkill[0] != 0xA84 && sounds->dwSkill[0] <= INT32_MAX && g_heldMonsters.count(unit->dwUnitId)) {
+                // 23170 with Init == 0 on a client-created unit in mode 8 (SK1): the 0x223D0 == 8 arm runs 0x22CA0 slot 8, which submits MonSounds Skill1 (+0x44).
+                g_monInitPlayed.insert(unit->dwUnitId);
+                out[n++] = (int32_t)unit->dwUnitType; out[n++] = (int32_t)unit->dwUnitId; out[n++] = unit->dwClassId;
+                out[n++] = 0x100; out[n++] = -1; out[n++] = 0; out[n++] = (int32_t)sounds->dwSkill[0];
+                continue;
+            }
             if (!sounds || !sounds->dwInit || sounds->dwInit > INT32_MAX) continue;
             g_monInitPlayed.insert(unit->dwUnitId);
             out[n++] = (int32_t)unit->dwUnitType; out[n++] = (int32_t)unit->dwUnitId; out[n++] = unit->dwClassId;
             out[n++] = 0x100; out[n++] = -1; out[n++] = 0; out[n++] = (int32_t)sounds->dwInit;
+            // 1.13c D2Client+0x24490 (mode 8 -> 0x22CA0 slot 8) runs on the same create as 0x23170's Init arm, so a unit
+            // born in SK1 also plays its MonSounds Skill1 (a retail recording skill 94: golemfire 2574 Init, then 1077 spawnfire at the same tick).
+            if (unit->dwAnimMode == 8 && sounds->dwSkill[0] && sounds->dwSkill[0] != 0xA84 && sounds->dwSkill[0] <= INT32_MAX && g_heldMonsters.count(unit->dwUnitId) && n + 7 <= cap) {
+                out[n++] = (int32_t)unit->dwUnitType; out[n++] = (int32_t)unit->dwUnitId; out[n++] = unit->dwClassId;
+                out[n++] = 0x100; out[n++] = -1; out[n++] = 0; out[n++] = (int32_t)sounds->dwSkill[0];
+            }
         }
+    }
+    {   // 1.13c D2Client+0x73760 (state-on, reached from the 0xA8 packet handler 0xADD70): a state that was not
+        // set on the unit yet plays its States.txt onsound row (+0x26, int16, >= 0) once; an already-set state
+        // is silent (the ord10494 gate). Emitted as soundEvent 0x101 with the row in the last field.
+        std::unordered_set<uint64_t> cur;
+        std::vector<std::array<int32_t, 7>> found;
+        for (D2DrlgRoomStrc* roomEx = g_lastLevel->pFirstRoomEx; roomEx; roomEx = roomEx->pDrlgRoomNext) {
+            D2ActiveRoomStrc* room = roomEx->pRoom;
+            if (!room) continue;
+            for (D2UnitStrc* unit = room->pUnitFirst; unit; unit = unit->pRoomNext) {
+                for (int32_t s = 0; s <= STATE_UBERMINION; s++) {
+                    if (!STATES_CheckState(unit, s)) continue;
+                    const uint64_t key = ((uint64_t)unit->dwUnitType << 40) | ((uint64_t)unit->dwUnitId << 8) | (uint64_t)s;
+                    cur.insert(key);
+                    if (g_prevOnsoundStates.count(key)) continue;
+                    D2StatesTxt* st = DATATBLS_GetStatesTxtRecord(s);
+                    if (!st || (int16_t)st->wOnSound < 0) continue;
+                    found.push_back({(int32_t)unit->dwUnitType, (int32_t)unit->dwUnitId, (int32_t)unit->dwClassId, 0x101, -1, 0, (int32_t)(int16_t)st->wOnSound});
+                }
+            }
+        }
+        g_prevOnsoundStates.swap(cur);
+        // One drain of latency: a state set in step N is recorded at tick N, as retail's client plays it on the packet's tick.
+        // Measured (a retail recording auras vs a retail recording curses): a state on the player plays one drain later, a monster's at once.
+        std::vector<std::array<int32_t, 7>> later, now = g_pendingOnsound;
+        for (const auto& e : found) (e[0] == 0 ? later : now).push_back(e);
+        // Entries that did not fit under cap stay queued ahead of this drain's new player entries, so none is lost.
+        size_t emitted = 0;
+        for (; emitted < now.size() && n + 7 <= cap; emitted++)
+            for (int32_t v : now[emitted]) out[n++] = v;
+        later.insert(later.begin(), now.begin() + emitted, now.end());
+        g_pendingOnsound.swap(later);
     }
     return n / 7;
 }
@@ -6077,7 +6169,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_vendor_repair(uint32_t npcId, uint32
     out.maxQuantity = ITEMS_GetTotalMaxStack(item);
     out.ownedBefore = ITEMS_IsInPlayersInventory(g_targetPlayer, item, 0) == 1;
     uint8_t packet[17] = { 0x35 };
-    const int32_t npcGuid = (int32_t)npcId, itemGuid = (int32_t)itemId, individual = 0;
+    // Retail D2Client+0x46EE0 sends Ordinal_10973(item, 0x48) here: the item's durability (stat 72).
+    const int32_t npcGuid = (int32_t)npcId, itemGuid = (int32_t)itemId, individual = out.durabilityBefore;
     memcpy(packet + 1, &npcGuid, sizeof npcGuid); memcpy(packet + 5, &itemGuid, sizeof itemGuid);
     memcpy(packet + 13, &individual, sizeof individual);
     if (!sessionDispatchGate(0x35)) return -2;
@@ -6419,12 +6512,12 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_packet(const uint8_t* bytes, int len)
     // interaction from 0 to 1 (sub_6FC61AB0), which D2GAME 0x19/0x1A item lifts need while a vendor is open.
     case 0x2F: if (len != 9) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x2F_InitEntityChat_6FC868C0; break;
     case 0x34: if (len != 5) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x34_IdentifyItemsWithNpc_6FC86BA0; break;
+    case 0x3C: if (len >= 5) { uint32_t w; std::memcpy(&w, packet.data() + 1, 4); d2client_nova::selectSkill(static_cast<int32_t>(w)); } handler = D2GAME_PACKETCALLBACK_Rcv0x3C_SelectSkill_6FC87050; break;   // the client's selection (1.13c D2Client+0x73CB0 reads it)
     case 0x24: if (len != 5) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x24_ItemFromBelt_6FC85F50; break;
     case 0x58: handler = D2GAME_PACKETCALLBACK_Rcv0x58_QuestCompleted_6FC883B0; break;
     // a retail recording session replay: 0x0D right skill on unit, 0x3B add skill point, 0x3C select skill (recovered handlers).
     case 0x0D: handler = D2GAME_PACKETCALLBACK_Rcv0x0D_RightSkillOnUnit_6FC83F80; break;
     case 0x3B: handler = D2GAME_PACKETCALLBACK_Rcv0x3B_AddSkillPoint_6FC86EF0; break;
-    case 0x3C: handler = D2GAME_PACKETCALLBACK_Rcv0x3C_SelectSkill_6FC87050; break;
     case 0x61: if (len != 3) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x61_DropPickupMercItem_6FC88930; break;
     // Retail's own resurrect-a-dead-mercenary packet: 0x62 {int32 npcGUID}, five bytes, handled by
     // D2GAME_PACKETCALLBACK_Rcv0x62_ResurrectMerc_6FC86C00 -> D2GAME_NPC_ResurrectMerc_6FCC9350,
@@ -7219,6 +7312,10 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             else if (wasMoving) syncSessionLevelFromPlayer();
         }
         syncSessionClientMapFromPlayer();
+        // 1.13c D2Client+0xC9BE0 / 0x72C20: the client sees the Hurricane state the server set this frame.
+        d2client_hurricane::tick(g_targetPlayer, g_sessionClientPlayerUnit ? reinterpret_cast<uint32_t*>(&g_sessionClientPlayerUnit->pSeed) : d2client_ambient::fallbackSeed());
+        d2client_vine::tick(g_targetPlayer);   // 1.13c D2Client+0xC50F0 (cltactivefunc 89, state vine_beast)
+        d2client_nova::tick();   // 1.13c D2Client+0x73CB0 (cltdofunc 25, Poison Nova action frame)
     }
     updateSessionSnapshot(); return 1;
 }
@@ -7526,6 +7623,7 @@ static int sessionCommandHandSkill(uint32_t targetUnitId, bool left) {
     D2SkillStrc* skill = left ? UNITS_GetLeftSkill(g_targetPlayer) : UNITS_GetRightSkill(g_targetPlayer);
     g_rightSkillRefusal = 3;
     if (!target || !target->pDynamicPath || !skill) return 0;
+    d2client_nova::cast(SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__), false);   // the client casts whether or not the server accepts the use (Frozen Orb, cltdofunc 29)
     g_rightSkillRefusal = 10 + SKILLS_GetUseState(g_targetPlayer, skill);   // 10 + SKILLUSTATE_* (not usable: mana, weapon, ...)
     // Retail's on-unit helper sub_6FC836D0 swaps an AttackNoMana skill (no mana, quantity or shape) for plain Attack,
     // as the 0x0C path does; the gate must let those through (Feral Rage, a retail recording: shape restricted, retail hits).
@@ -7566,11 +7664,11 @@ static int sessionCommandHandSkill(uint32_t targetUnitId, bool left) {
     // No animation started (the skill-do accepted the command but the player never left neutral, e.g.
     // hit mid-click): nothing will end it, so the attack is not in flight. Left at state 1 it refused
     // every later command, across death and respawn, while the pack killed the player (s000b, Sewers).
-    if (!g_sessionAttackEndFrame) { g_sessionAttack.state = 0; g_rightSkillRefusal = 6; g_castRefusedSkill = skillId; ++g_castRefusedSeq; return 0; }
+    if (!g_sessionAttackEndFrame) { g_sessionAttack.state = 0; g_rightSkillRefusal = 6; return 0; }
     g_rightSkillRefusal = 0;
     return 1;
 }
-EMSCRIPTEN_KEEPALIVE int d2_session_command_right_skill(uint32_t targetUnitId) { return sessionCommandHandSkill(targetUnitId, false); }
+EMSCRIPTEN_KEEPALIVE int d2_session_command_right_skill(uint32_t targetUnitId) { d2_client_note_move_cmd(0); return sessionCommandHandSkill(targetUnitId, false); }
 // Right-click world targets use packet 0x0C on press and 0x0F while held. Keep the packet callbacks
 // as the command path: the held callback owns the native 50-subtile range check and out-of-range
 // position-correction timer before it delegates to 0x0C.
@@ -7585,10 +7683,12 @@ static int sessionCommandRightSkillAt(int32_t x, int32_t y, bool held) {
     // refreshes the stale-coordinate timer; 0x0C press retains the session's existing usability gate.
     if (!held) {
         D2SkillStrc* skill = UNITS_GetRightSkill(g_targetPlayer);
+        // The client casts its own selected skill (0x3C) when the server has not granted it: the server keeps Attack in the right hand.
+        if (d2client_nova::selectedSkill() == 92 && (!skill || SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__) != 92)) d2client_nova::cast(92, true);
         g_rightSkillRefusal = 3;
-        if (!skill) return 0;
         const int32_t useState = SKILLS_GetUseState(g_targetPlayer, skill);
         g_rightSkillRefusal = 10 + useState;
+        d2client_nova::cast(SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__), false);   // the client casts whether or not the server accepts the use; the refusal path plays the stsound
         // Retail's 0x0C callback (sub_6FC83340) swaps a skill that cannot be used (no mana, quantity or shape) for
         // plain Attack when its Skills.txt AttackNoMana flag is set (Double Swing, Frenzy unarmed: retail mode 7).
         D2SkillsTxt* txt = SKILLS_GetSkillsTxtRecordFromSkill(skill);
@@ -7618,7 +7718,8 @@ static int sessionCommandRightSkillAt(int32_t x, int32_t y, bool held) {
         PATH_ToFP16Center(static_cast<uint16_t>(x)), PATH_ToFP16Center(static_cast<uint16_t>(y))));
     D2COMMON_10160_PathUpdateDirection(path, castDirection);
     g_rightSkillRefusal = 0;
-    d2_client_note_local_action(2);   // 2A750 on the ground: mode 2 (WL), 23C00's first footfall
+    d2_client_note_move_cmd(0);
+//    d2_client_note_local_action(2);   // 2A750 on the ground: mode 2 (WL), 23C00's first footfall
     updateSessionSnapshot();
     return 1;
 }
@@ -7680,6 +7781,16 @@ EMSCRIPTEN_KEEPALIVE int d2_session_fixture_level(uint32_t level) {
     if (target > experience) SUNITDMG_AddExperienceForPlayer(g_game, g_targetPlayer, current, target - experience);
     updateSessionSnapshot();
     return STATLIST_UnitGetStatValue(g_targetPlayer, STAT_LEVEL, 0) == (int32_t)level;
+}
+
+// a retail recording: one skill's base level on the session hero, set the way the stream's `cskill` directive sets it
+// (D2Common AddSkill, then the base level at skill+0x28 = nSkillLevel). The skill tree's numbers are these.
+EMSCRIPTEN_KEEPALIVE int d2_session_fixture_skill_level(uint32_t skillId, uint32_t level) {
+    if (!g_sessionLive || !g_targetPlayer || skillId > UINT16_MAX) return 0;
+    D2SkillStrc* skill = SKILLS_AddSkill(g_targetPlayer, (int)skillId);
+    if (!skill) return 0;
+    skill->nSkillLevel = (int32_t)level;
+    return 1;
 }
 
 EMSCRIPTEN_KEEPALIVE int d2_session_command_add_stat(uint32_t statId, uint32_t count) {

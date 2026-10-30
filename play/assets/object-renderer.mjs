@@ -45,11 +45,11 @@ export function parseObjectPresentations(bytes, count) {
  * rogue's campfire. The gate is the layer's own COF Shadow byte and not its transparency byte; the
  * counts and the negative control are
  */
-export function createObjectRenderer(read, documentObject = globalThis.document, { shadow = false, rasterLimit = 256, rasterByteLimit = 64 * 1024 * 1024,
+export function createObjectRenderer(read, documentObject = globalThis.document, { shadow = false, mayLoad = null, rasterLimit = 256, rasterByteLimit = 64 * 1024 * 1024,
   animationLimit = 256, failureLimit = 256 } = {}) {
   checkCacheLimit('object animation cache limit', animationLimit);
   checkCacheLimit('object failure cache limit', failureLimit);
-  const animations = new Map(), failures = new Set(), palettes = new Map(), blenders = new Map(), highlights = new Map();
+  const animations = new Map(), failures = new Set(), palettes = new Map(), blenders = new Map(), highlights = new Map(), shown = new Set();
   const rasterCache = createObjectLayerRasterCache(documentObject, { limit: rasterLimit, byteLimit: rasterByteLimit });
   const shadows = shadow ? createUnitShadowRenderer(read) : null;
   const shadowPolicy = shadow ? createObjectShadowPolicy(read) : null;
@@ -75,6 +75,9 @@ export function createObjectRenderer(read, documentObject = globalThis.document,
     const mode = MODE[object.mode] || 'NU', base = `${object.token}:${mode}:${object.direction}:${object.componentMask}`;
     if (!object.token || failures.has(base)) return null;
     let animation = animations.get(base);
+    // A new object's first decode may wait for a later frame; one already on screen never does (createMonsterRenderer).
+    if (!animation && mayLoad && !measuring && !shown.has(object.id) && !mayLoad()) return null;
+    if (mayLoad) { if (shown.size >= 4096) shown.clear(); shown.add(object.id); }
     if (!animation) try {
       const cof = decodeCof(read(`data\\global\\OBJECTS\\${object.token}\\COF\\${object.token}${mode}HTH.COF`));
       const direction = dccDirection(object.direction, cof.directions), components = new Map();

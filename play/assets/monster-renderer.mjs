@@ -196,8 +196,10 @@ export function loadMonsterAnimation(read, actor) {
     componentDirectionKey: monsterComponentDirectionKey(componentDirections), animBox, direction, cofDirection: cofFacing, token };
 }
 
-/** `shadow: true` draws the unit's shadow under its sprite first, as retail's draw list orders it. */
-export function createMonsterRenderer(read, documentObject = globalThis.document, { shadow = false,
+/** `shadow: true` draws the unit's shadow under its sprite first, as retail's draw list orders it.
+ * `mayLoad()`, when given, is asked before a unit's first decode: false skips the draw (`deferred`) so
+ * a town's worth of new units decodes over several frames instead of in one. */
+export function createMonsterRenderer(read, documentObject = globalThis.document, { shadow = false, mayLoad = null,
   layerRasterLimit = MONSTER_LAYER_RASTER_ENTRIES, layerRasterByteLimit = MONSTER_LAYER_RASTER_BYTES } = {}) {
   const failures = new Set(), palettes = new Map(), blenders = new Map(), highlights = new Map();
   // PERF: bounded, and a raster is keyed by its composed plane, which facings of one DCC direction
@@ -216,7 +218,9 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
   const deadMonsterClocks = new Map();
   const shadows = shadow ? createUnitShadowRenderer(read) : null;
   const blenderFor = (act0) => { if (!blenders.has(act0)) { let b = null; try { b = createBlender(read(`data\\global\\palette\\${PALETTE[act0]}\\pal.pl2`), palettes.get(act0)); } catch {} blenders.set(act0, b); } return blenders.get(act0); };
-  let lastEvidence = null;
+  // `shown`: units already on screen, whose new mode or direction never waits on `mayLoad` (no flicker).
+  let lastEvidence = null, deferred = false;
+  const shown = new Set();
   const palette = (act) => {
     const act0 = Math.min(4, Math.max(0, Math.trunc(Number(act) || 1) - 1));
     if (!palettes.has(act0)) palettes.set(act0, decodeDatPalette(read(`data\\global\\palette\\${PALETTE[act0]}\\pal.dat`)));
@@ -224,7 +228,7 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
   };
   return {
     // Session teardown can reuse actor IDs; their client-local clocks belong to the old session.
-    resetSession() { resetIzualGhostS1Clock(izualGhostClocks); deadMonsterClocks.clear(); },
+    resetSession() { resetIzualGhostS1Clock(izualGhostClocks); deadMonsterClocks.clear(); shown.clear(); },
     // `highlight`: retail's DrawMode 7, the hovered unit (V5, unit-highlight.mjs) -- the cel's colours through the measured rule.
     draw(ctx, x, y, actor, act, highlight = false) {
       // Izual's S1 uses its own CUnit clock; the server frame epoch is not a cel index.
@@ -235,9 +239,12 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
       // separate when the same token/components arrive with another class.
       const attackClass = actor.mode === 4 || actor.mode === 5 || actor.mode === 14 ? actor.baseWeaponClass ?? '' : '';
       const baseKey = `${actor.code}:${actor.mode}:${actor.seqMode ?? ''}:${actor.direction}:${actor.components.join(',')}:${attackClass}`;
+      deferred = false;
       if (failures.has(baseKey)) return null;
       let animation = animations.get(baseKey);
+      if (!animation && mayLoad && !shown.has(actor.id) && !mayLoad()) { deferred = true; return null; }
       if (!animation) { try { animation = loadMonsterAnimation(animationRead, actor); animations.set(baseKey, animation); } catch { failures.add(baseKey); return null; } }
+      if (mayLoad) { if (shown.size >= 4096) shown.clear(); shown.add(actor.id); }
       const count = animation.cof.framesPerDirection;
       const deadClock = advanceMonsterDeadClock(actor, deadMonsterClocks.get(actor.id));
       if (deadClock) deadMonsterClocks.set(actor.id, deadClock);
@@ -337,7 +344,7 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
         height: composed.height, opaque: composed.opaqueCount, pixelHash: pixelHash >>> 0, mode: highlight ? 7 : 5 };
       return lastEvidence;
     },
-    get lastEvidence() { return lastEvidence && { ...lastEvidence }; },
+    get lastEvidence() { return lastEvidence && { ...lastEvidence }; }, get deferred() { return deferred; },
     get decodedAnimations() { return animations.size; }, get failures() { return failures.size; },
     get rasterizedLayers() { return layerRasters.size; }, get rasterizedLayerBytes() { return layerRasters.retainedBytes; },
   };

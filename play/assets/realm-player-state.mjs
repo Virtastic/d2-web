@@ -55,9 +55,11 @@ export function realmDirectionalAim(player, x, y) {
   return { x: player.x + Math.sign(x), y: player.y + Math.sign(y) };
 }
 
-export function sendRealmGroundWalk(protocol, transport, sessionOpen, x, y, duplicateState = null, now = 0) {
-  return sendRealmCoordinateCommand(protocol?.d2gsMoveTo && (() => protocol.d2gsMoveTo(1,x,y)),
-    transport, sessionOpen, x, y, 1, 200, duplicateState, now);
+// Retail's ground move: 0x01 Walk to location, 0x03 Run to location, chosen by the engine's run/walk toggle.
+export function sendRealmGroundWalk(protocol, transport, sessionOpen, x, y, duplicateState = null, now = 0, run = false) {
+  const opcode = run ? 3 : 1;
+  return sendRealmCoordinateCommand(protocol?.d2gsMoveTo && (() => protocol.d2gsMoveTo(opcode,x,y)),
+    transport, sessionOpen, x, y, opcode, 200, duplicateState, now);
 }
 
 export function sendRealmRightSkillAt(protocol, transport, sessionOpen, x, y, held = false, duplicateState = null, now = 0, predictLocal = null) {

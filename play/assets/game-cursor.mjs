@@ -8,6 +8,8 @@ export const GAME_CURSOR = Object.freeze({
   hand: 'data\\global\\ui\\CURSOR\\ohand.dc6',
   attack: 'data\\global\\ui\\CURSOR\\protate.dc6',
   talk: 'data\\global\\ui\\CURSOR\\orotate.dc6',
+  // Retail's repair cursor: the buysell cursor table slot (index 6) that cursor state 7 selects.
+  repair: 'data\\global\\ui\\CURSOR\\buysell.dc6',
   palette: 'data\\global\\palette\\Units\\pal.dat',
 });
 
@@ -32,7 +34,7 @@ export function createGameCursorClock({ now = () => globalThis.performance?.now?
   return {
     noteInput() { lastInputMs = now(); phase = 'spin'; handDraws = 0; rotateDraws = 0; },
     next(context) {
-      const kind = context?.kind === 'attack' || context?.kind === 'talk' ? context.kind : 'hand';
+      const kind = context?.kind === 'attack' || context?.kind === 'talk' || context?.kind === 'repair' ? context.kind : 'hand';
       if (kind !== contextKind) { contextKind = kind; contextDraws = 0; }
       const elapsedMs = Math.max(0, now() - lastInputMs);
       if (kind === 'talk') {
@@ -41,6 +43,8 @@ export function createGameCursorClock({ now = () => globalThis.performance?.now?
         contextDraws++;
         return draw;
       }
+      // ponytail: static first cel; retail's cycling for cursor state 7 is not recovered. Add when cel cycling is pinned.
+      if (kind === 'repair') return { file: 'buysell', frame: 0, framesPerCel: null, since: contextDraws, elapsedMs, state: 'repair' };
       if (kind === 'attack') {
         const draw = { file: 'protate', frame: 0, framesPerCel: null,
           since: contextDraws, elapsedMs, state: 'attack-rate-unresolved' };
@@ -78,8 +82,8 @@ export function createGameCursor({ read, decodeDc6, documentObject = globalThis.
     return { path, bytesHash: `0x${fnv1a(bytes).toString(16).padStart(8, '0')}`,
       dc6, canvases: dc6.frames.map((frame) => canvasFor(frame, palette, documentObject)) };
   };
-  const assets = Object.freeze({ hand: source(GAME_CURSOR.hand), attack: source(GAME_CURSOR.attack), talk: source(GAME_CURSOR.talk) });
-  const fileOf = { ohand: 'hand', protate: 'attack', orotate: 'talk' };
+  const assets = Object.freeze({ hand: source(GAME_CURSOR.hand), attack: source(GAME_CURSOR.attack), talk: source(GAME_CURSOR.talk), repair: source(GAME_CURSOR.repair) });
+  const fileOf = { ohand: 'hand', protate: 'attack', orotate: 'talk', buysell: 'repair' };
   const clock = createGameCursorClock({ now });
   return {
     noteInput() { clock.noteInput(); },

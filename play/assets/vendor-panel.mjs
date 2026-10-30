@@ -19,7 +19,7 @@
 import { placeItemTip } from './item-tooltip.mjs';
 import { createFont, decodeFontTbl, FRONTEND, textColourPalette } from './frontend.mjs';
 import { BORDER_LEFT, BORDER_RIGHT, createPanelChrome } from './panel-chrome.mjs';
-import { recordDc6 } from './drawlist.mjs';
+import { recordDc6, recordPrim } from './drawlist.mjs';
 import { inventoryItemAsset } from './inventory-panel.mjs';
 
 export const VENDOR_ASSETS = {
@@ -285,12 +285,24 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, s
       // number is anchored by its END, and the start is 266 minus every advance but the last.
       font.drawAnchored(ctx, string('stash'), 101, 434);
       if (state?.stashGold >= 0) { const gold = String(state.stashGold); font.drawAnchored(ctx, gold, 266 - font.measure(gold.slice(0, -1)), 434); }
+      // The side borders are screen furniture: drawn before the tooltip so it is never covered (D16).
+      chrome.border(ctx, state?.act || 1, BORDER_LEFT); chrome.border(ctx, state?.act || 1, BORDER_RIGHT);
+      ctx.restore();
+      return { box: { x: L.left, y: L.top, width: panel.width, height: panel.height }, tab, tabs: [...lastTabs], shown, total: items.length,
+        drawnIcons, drawnItems, undrawnItems, hover: hovered ? { id: hovered.id, colour: 118, gridX: hovered.gridX, gridY: hovered.gridY, invWidth: hovered.invWidth || 1, invHeight: hovered.invHeight || 1 } : null, tooltip: null, table, hint: null, scroll: 0, gold: state?.gold ?? -1, buttons };
+    },
+    // Retail draws the hovered item's tooltip and the button hint LAST, over the inventory panel: in
+    // the retail captures the InvChar cels at x 400 come before the tooltip box. The shell calls
+    // this after the inventory draw (with the same state as draw), and assigns the result to draw's evidence.
+    drawOverlay(ctx, width, height, state) {
+      const { font } = cur, p = state?.pointer, v = view(width, height);
+      const hovered = p ? this.itemAt(p.x, p.y, width, height, state) : null;
+      const table = vendorButtonTable(state?.classId, state?.pressedButton, L);
+      ctx.save(); ctx.translate(v.ox, v.oy); ctx.scale(v.scale, v.scale);
       // Retail's tooltip (same captures): a mode-2 black box, 16 px per line, centred on the item cell (placeItemTip, D2Client+0x945D0) and
       // clamped to the screen, above the cell (below if no room); lines are centred, listed top down as
       // retail draws them (Cost first, then the name). The property lines come from the engine's
       // d2_session_item_lines.
-      // The side borders are screen furniture: drawn before the tooltip so it is never covered (D16).
-      chrome.border(ctx, state?.act || 1, BORDER_LEFT); chrome.border(ctx, state?.act || 1, BORDER_RIGHT);
       let tooltip = null;
       if (hovered) {
         const { lines, colours } = tooltipSpec(hovered);
@@ -298,6 +310,7 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, s
         const cell = { x: L.gridLeft + hovered.gridX * L.cell, y: L.gridTop + hovered.gridY * L.cell, w: (hovered.invWidth || 1) * L.cell, h: (hovered.invHeight || 1) * L.cell };
         const { bx, by } = placeItemTip(cell, w, h), bottom = by + h;
         drawTooltipFrame(ctx, bx, bottom - h, w, h);
+        recordPrim('box', bx, bottom - h, bx + w, bottom, 0, 2);
         lines.forEach((l, k) => { const x = bx + Math.floor((w - font.measure(l)) / 2), y = bottom - h + 13 + 16 * k, c = colours[k];
           if (c === 'v') { const cut = l.indexOf(': ') + 2; font.drawAnchored(ctx, l.slice(0, cut), x, y); cur.tint(3).drawAnchored(ctx, l.slice(cut), x + font.measure(l.slice(0, cut)), y); }
           else (c ? cur.tint(c) : font).drawAnchored(ctx, l, x, y); });
@@ -311,8 +324,7 @@ export function createVendorPanel({ read, decodeDc6, decodeDatPalette, string, s
         if (h) { const text = stringByIndex(h.id); drawTooltipFrame(ctx, h.x - TOOLTIP_FRAME.pad, h.y - 13, font.measure(text) + TOOLTIP_FRAME.pad * 2, TOOLTIP_FRAME.line); font.drawAnchored(ctx, text, h.x, h.y); hint = { ...h, text }; }
       }
       ctx.restore();
-      return { box: { x: L.left, y: L.top, width: panel.width, height: panel.height }, tab, tabs: [...lastTabs], shown, total: items.length,
-        drawnIcons, drawnItems, undrawnItems, hover: hovered ? { id: hovered.id, colour: 118, gridX: hovered.gridX, gridY: hovered.gridY, invWidth: hovered.invWidth || 1, invHeight: hovered.invHeight || 1 } : null, tooltip, table, hint, scroll: 0, gold: state?.gold ?? -1, buttons };
+      return { tooltip, hint };
     },
   };
 }

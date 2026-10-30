@@ -2,7 +2,7 @@ import { parseSessionTiles, readSessionTerrain, readSessionLightmap, worldToScre
 import { inventoryOwnsClick } from './assets/shop-click-owner.mjs';
 import { readSessionActiveNearFeed } from './assets/session-active-near-feed.mjs';
 import { createFrameSnapshots, fromSnapshot } from './frame-snapshot.mjs';
-import { perfSync, perfEnabled, perfT0, perfT, perfSample, perfCountFrame, perfReset, perfReport } from './assets/frame-perf.mjs';
+import { perfSync, perfEnabled, perfT0, perfT, perfSample, perfCountFrame, perfReset, perfReport, perfFrameStart, perfFrameTop } from './assets/frame-perf.mjs';
 import { COMMAND, CommandInput, DEFAULT_SESSION_FIXTURES, groundItemsUnderPointerAt, hudLines, normalizeSnapshot, parseSessionRooms, parseSessionSnapshot, parseSessionUnits, parseSessionWarps, inUnitHoverBox, isPrimaryTargetEligible, nativeObjectHoverContains, nativeHoverSpecialGate, selectPointerCandidate, selectPrimaryTarget, selectHoverUnit, selectRetailPickTarget, viewportToWorld } from './gameplay-model.mjs';
 import { altSync } from './item-pick.mjs';
 import { createMpqAssetReader } from './assets/mpq-assets.mjs';
@@ -117,7 +117,7 @@ import { createEntryBanner, ENTRY_BANNER } from './assets/level-entry-banner.mjs
 import { hudBarTooltip, levelButtonTooltip } from './assets/hud-bar-tooltip.mjs';
 import { hirelingTextRows } from './assets/hireling-panel.mjs';
 import { createVendorPanel, vendorLayoutFromEngine, SMITH_CLASSES, tooltipSpec } from './assets/vendor-panel.mjs';
-import { handleVendorRepairClick } from './assets/vendor-repair-control.mjs';
+import { handleVendorRepairClick, disarmVendorRepair, vendorRepairArmed } from './assets/vendor-repair-control.mjs';
 import { toggleSellMode, resetSellMode, vendorClickAction } from './assets/vendor-sell-mode.mjs';
 import { decodeDc6 } from './assets/d2-formats.mjs';
 import { createGameCursor } from './assets/game-cursor.mjs';
@@ -177,7 +177,7 @@ const frontdoorError = document.querySelector('#frontdoor-error');
 const status = document.querySelector('#session-status');
 const classSelect = document.querySelector('#class-select');
 const sessionBar = document.querySelector('#session-bar');
-const ctx = canvas.getContext('2d', { alpha: renderMode(location.search) === 'w', willReadFrequently: true })   // ?render=w: transparent, the worker's world canvas sits under it;
+const ctx = canvas.getContext('2d', { alpha: renderMode(window.__d2Entry.search) === 'w', willReadFrequently: true })   // ?render=w: transparent, the worker's world canvas sits under it;
 const input = new CommandInput();
 const frontendPointerStates = createFrontendPointerStates();
 // The front-end screen that owns a pointer gesture, with TITLE's trademark phase exempt: it owns
@@ -1158,7 +1158,7 @@ async function bootstrapSession() {
     try { skillFx = createSkillFx(assetReader); stateFx = createStateFx(assetReader); unitOverlayFx = createUnitOverlayFx(assetReader); overlayRenderer = createMissileRenderer(assetReader, document, (f) => f, 'overlays'); } catch (error) { console.warn('Skill fx', error); }
     weatherRenderer = createWeatherRenderer({ read: createMpqAssetReader(Module), documentObject: document });
     corpseRenderer = createPlayerRenderer(assetReader);   // its own instance: the player's draw evidence stays the player's
-    monsterRenderer = createMonsterRenderer(createMpqAssetReader(Module), document, { shadow: true });
+    monsterRenderer = createMonsterRenderer(createMpqAssetReader(Module), document, { shadow: true, mayLoad: mayLoadSprite });
     npcSpeechAlertRenderer = createNpcSpeechAlertRenderer(assetReader);
     areaNameRenderer = createAreaNameBlockRenderer(assetReader, document);
     entryBannerRenderer = createEntryBanner({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette, documentObject: document });
@@ -1166,7 +1166,7 @@ async function bootstrapSession() {
     // Objects cast their shadow the same way a unit does, from their own COF layers (V3's second half):
     // retail draws `shadow dcc:objects\...` immediately before the matching `cel dcc:` of the same
     // path, frame and anchor.
-    objectRenderer = createObjectRenderer(createMpqAssetReader(Module), document, { shadow: true });
+    objectRenderer = createObjectRenderer(createMpqAssetReader(Module), document, { shadow: true, mayLoad: mayLoadSprite });
     itemRenderer = createItemRenderer(createMpqAssetReader(Module));
     inventoryPanelRenderer = createInventoryPanelRenderer(createMpqAssetReader(Module));
     characterPanelRenderer = createCharacterPanelRenderer(createMpqAssetReader(Module));
@@ -1206,8 +1206,11 @@ async function bootstrapSession() {
       syncAreaMusic(snapshot.level, { force: true });
     } catch (error) { actMusic = null; musicError = String(error); }
     try { audioVolume.attach('sound', createUiClickSoundPlayer(assetReader, canvas)); } catch (error) { musicError = String(error); }
-    try { unitSounds = createUnitSoundPlayer(assetReader, undefined, undefined, soundFetched); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), () => unitSounds.monsterSoundBusy()); eventSounds = createEventSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Event sound', error)), (...a) => Number(Module._d2_client_monster_footstep_row(...a))); missileSounds = createMissileSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Missile sound', error))); canvas.__d2UnitSound = unitSounds; canvas.__d2EventSound = eventSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader, undefined, undefined, soundFetched)); } catch (error) { musicError = String(error); }
+    try { unitSounds = createUnitSoundPlayer(assetReader, undefined, undefined, soundFetched); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), () => unitSounds.monsterSoundBusy()); eventSounds = createEventSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Event sound', error)), (...a) => Number(Module._d2_client_monster_footstep_row(...a)), (c) => Number(Module._d2_client_monster_footstep_layer(c))); missileSounds = createMissileSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Missile sound', error))); canvas.__d2UnitSound = unitSounds; canvas.__d2EventSound = eventSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader, undefined, undefined, soundFetched)); } catch (error) { musicError = String(error); }
 
+    // The player build hands the browser a frame between the entry phases (the sounds above, the terrain,
+    // the first save) so town entry is three shorter tasks, not one 300 ms one; off under webdriver.
+    if (!navigator.webdriver) await entryYield();
     if (TERRAIN_ENABLED) loadSessionTerrain(fixture.act0);
     // A picked character is not applied to anything: createFromSave above already made it, sections
     // and all, in the act and at the map seed its own header names.
@@ -1217,9 +1220,11 @@ async function bootstrapSession() {
     // A newly created character is written straight away, so it is in the list the moment it
     // exists rather than only after some later autosave the player never triggers.
     autosaveAt = 0; autosaveAct = snapshot.act; autosaveInFlight = false;
-    if (chosenName) persistCurrentCharacter();
+    if (chosenName) { if (!navigator.webdriver) await entryYield(); persistCurrentCharacter(); }
   } catch (error) { sessionError = String(error?.stack || error); }
 }
+
+function entryYield() { return new Promise((resolve) => setTimeout(resolve, 0)); }
 
 classSelect.addEventListener('change', () => {
   if (!session) return;
@@ -1931,6 +1936,7 @@ function ensureCharCreate() {
 // their stock if a trade is open. All of it is engine state; the panel only draws it.
 // Retail plays an NPC's message list in order: each dismissal acks the message and shows the next (npcMsgSkip.n = how many were heard).
 let npcMsgSkip = { npcId: 0, n: 0 };
+let missileImpactBuf = 0;
 let ambient = null, ambientLevel = -1, ambientCycle = 0, unitSounds = null, combatSounds = null, eventSounds = null, missileSounds = null, soundBuf = 0, ambBuf = 0, npcVoiceKey = null, npcVoiceGeneration = 0;
 const npcSpeechScrollGate = createNpcSpeechScrollGate();
 const npcSpeechClickGate = createNpcSpeechClickGate();
@@ -2462,9 +2468,11 @@ function drainUnitSounds() {
   combatSounds?.update(snapshot?.entities ?? [], snapshot);
   { const hero = snapshot?.entities?.find((e) => e.id === snapshot.playerId && e.type === 0); heroFx = skillFx && hero ? skillFx.update({ ...hero, hp: snapshot.player?.hp }, snapshot.player?.castSkillId, engineTicks) : [];
     if (stateFx && hero) heroFx = heroFx.concat(stateFx.update((id) => Module.ccall('d2_session_player_has_state', 'number', ['number'], [id]), undefined, undefined, (id) => Module.ccall('d2_session_state_set_seq', 'number', ['number', 'number', 'number'], [0, snapshot.playerId, id]))); }
+  // Native client missiles (D2Client-side Fire Ball): the impact row at the native terminal tick.
+  if (Module._d2_realm_client_take_missile_sounds) { const b = missileImpactBuf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [32 * 24])); const k = Module.ccall('d2_realm_client_take_missile_sounds', 'number', ['bigint', 'number'], [BigInt(b), 32]); const w = new Int32Array(Module.HEAPU8.buffer.slice(b, b + k * 24)); for (let i = 0; i < k; i++) unitSounds.playRow(w[i * 6 + 5], { kind: 'missile-impact', missileId: w[i * 6 + 2] }).catch(() => {}); }
   missileSounds?.update(snapshot?.entities ?? [], engineTicks);
   // D35: client-side event sounds (pickup, gold, drop, footstep) run every tick, not only on ticks the engine queued a sound.
-  if (snapshot?.player) { const m = session.motion(); Object.assign(snapshot.player, { mode: snapshot.mode, framePrecise: m.framePrecise, frameCountPrecise: m.frameCountPrecise }); } // D1: footstep reads mode+frame
+  if (snapshot?.player) { const m = session.motion(); Object.assign(snapshot.player, { mode: snapshot.mode, explicitMove: Module._d2_client_explicit_move(), framePrecise: m.framePrecise, frameCountPrecise: m.frameCountPrecise }); } // D1: footstep reads mode+frame
   eventSounds?.update(snapshot, readAdvancement()?.level);
   drainAmbientSounds();
   const cap = 32; if (!soundBuf) soundBuf = Number(Module.ccall('malloc', 'bigint', ['number'], [cap * 28]));
@@ -2477,6 +2485,7 @@ function drainUnitSounds() {
     if (event.soundEvent === 0x10) event.monsterTaunt = event.nativeSelectedRow;
     if (event.soundEvent === 0x0c) event.skillStartSoundRow = event.nativeSelectedRow;
     if (event.soundEvent === 0x100) { unitSounds.playRow(event.nativeSelectedRow, { source: 'monster-init', unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x23170: MonSounds Init
+    if (event.soundEvent === 0x101) { unitSounds.playRow(event.nativeSelectedRow, { source: 'state-onsound', unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x73760: States.txt onsound on a new state set
     const spatial = unitSoundNativeSpatial(event, snapshot, listener);
     event.nativeSpatialGainByte = spatial?.gainByte ?? null;
     event.nativeSpatialPanCode = spatial?.panCode ?? unitSoundNativePanCode(event, snapshot, listener);
@@ -2571,7 +2580,7 @@ function update(forceTick = false, live = false) {
       if (!destination) continue;
       const result = sendRealmGroundWalk(realmFlow?.protocol, realmFlow?.d2gs,
         realmSceneActive && Boolean(realmPlayerView?.active), destination.x, destination.y,
-        realmMoveDuplicateState, performance.now());
+        realmMoveDuplicateState, performance.now(), readRunToggle());
       result.directional = !!command.directional; result.held = !!command.held;
       result.playerGuid = realmPlayerView?.guid ?? null;
       realmMoveEvidence.attempts++;
@@ -3151,6 +3160,7 @@ function hoverTarget() {
 // talk path consumes. This asks them; it never keeps a second hover model of its own.
 function gameCursorContext() {
   if (!session || screen !== SCREEN.GAME) return null;
+  if (vendorRepairArmed() && shopOpen()) return { kind: 'repair' };
   // PERF: a live frame reuses the selection hoverTarget made earlier in the same render (same pointer and
   // snapshot, and the prior it would pass is that selection). The harness's renderNow recomputes.
   const selected = liveFrame && hoverPick ? hoverPick.selected
@@ -3339,7 +3349,17 @@ if (CSS_RAMP) {
   const tv = Array.from(DISPLAY_RAMP, (r) => ((r + 0.5) / 255).toFixed(8)).join(' ');
   document.body.insertAdjacentHTML('beforeend', `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="d2-display-ramp" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncR type="discrete" tableValues="${tv}"/><feFuncG type="discrete" tableValues="${tv}"/><feFuncB type="discrete" tableValues="${tv}"/></feComponentTransfer></filter></svg>`);
 }
-let liveFrame = false, cssRampOn = false, glRampOn = false;
+let liveFrame = false, cssRampOn = false, glRampOn = false, spriteLoadUntil = 0;
+// PERF: a unit or object seen for the first time decodes its COF and DCCs, and a town's NPCs at once
+// cost 142 ms in one frame. A live frame spends at most SPRITE_LOAD_MS on first decodes (the first one
+// always runs) and the rest draw a frame later. Never in the test runner or outside a live frame.
+const SPRITE_LOAD_MS = 8;
+function mayLoadSprite() {
+  if (!liveFrame || navigator.webdriver) return true;
+  const now = performance.now();
+  if (!spriteLoadUntil) spriteLoadUntil = now + SPRITE_LOAD_MS;
+  return now < spriteLoadUntil;
+}
 // The Screen Shot key saves what the player sees, so with the filter or the GL layer on it saves a copy
 // ramped by the same CPU pass.
 const rampedCopy = () => { const c = document.createElement('canvas'); c.width = canvas.width; c.height = canvas.height; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(canvas, 0, 0); applyDisplayRamp(c.width, c.height, x); return c; };
@@ -3403,7 +3423,7 @@ const hudLang = (i) => (frameSnap?.lang?.has(i) ? frameSnap.lang.get(i) : Module
 
 // Render worker: `w` by default (Stage 6, ), `?render=0` the old path, `t` the selftest.
 let renderReader = null;
-const RENDER_WIRE = createRenderWire({ mode: renderMode(location.search), canvas, ctxOptions: { alpha: false, willReadFrequently: true }, readFile: (path) => { try { return (renderReader ??= createMpqAssetReader(Module))(path); } catch { return null; } } });
+const RENDER_WIRE = createRenderWire({ mode: renderMode(window.__d2Entry.search), canvas, ctxOptions: { alpha: false, willReadFrequently: true }, readFile: (path) => { try { return (renderReader ??= createMpqAssetReader(Module))(path); } catch { return null; } } });
 renderWireResize = (c) => RENDER_WIRE?.resize?.(c.width, c.height, c);
 // PERF: where the compositor filter is not available (Firefox, Safari) a live frame is shown through a
 // WebGL2 layer that applies the ramp on the GPU (assets/gl-present.mjs): 1080p 12.5 -> 5.3 ms of main
@@ -3804,7 +3824,7 @@ function drawFrame() {
         celWidth: being?.width ?? null, celHeight: being?.height ?? null, celXOffset: being?.xOffset ?? null, celYOffset: being?.yOffset ?? null,
         animBox: being?.animBox ?? null,
         drawn, x: Math.round(sx), y: Math.round(sy) });
-      if (drawn) return;
+      if (drawn || monsterRenderer?.deferred) return;   // deferred: its first decode is next frame's
       c.fillStyle = entity.hostile ? '#b33b2e' : '#958968';
       c.beginPath(); c.arc(sx, sy, 5, 0, Math.PI * 2); c.fill();
     } });
@@ -3987,7 +4007,7 @@ function drawFrame() {
   // ack tells the server it was heard, it does not clear our copy), so "spoken" alone would redraw
   // the speech box over Akara's own shop forever once Trade was picked. A shop that is actually open
   // (her stock fetched -- shopOpen()) cannot happen in retail before its greeting is already gone.
-  let pendingSpeech = null;
+  let pendingSpeech = null, vendorState = null;
   if (npcState?.spoken != null) {
     // Ordinary dialogue uses retail's viewport-centred dialog origin, regardless of side panels.
     // Defer the draw until after those panels so they cannot paint over the text. Retail sets the
@@ -3995,7 +4015,7 @@ function drawFrame() {
     if (!shopOpen() && ensureSpeechBox() && npcSpeechScrollGate.ready)
       pendingSpeech = { text: npcState.greeting, messageInstance: npcVoiceGeneration, scrolling: true };
   } else if (shopOpen() && !globalThis.__d2HideShop && ensureVendorPanel()) {
-    try { npcPanelEvidence = vendorPanel.draw(ctx, w, h, { ...npcState, pointer, pressedButton: vendorButtonGesture.token && vendorButtonGesture.token === vendorPanel.buttonAt(pointer.x, pointer.y, w, h, npcState.classId) ? vendorButtonGesture.token : null, act: snapshot?.act, stashGold: snapOr('vendorStashGold', () => Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [0]) : -1) }); npcPanelError = ''; }
+    try { vendorState = { ...npcState, pointer, pressedButton: vendorButtonGesture.token && vendorButtonGesture.token === vendorPanel.buttonAt(pointer.x, pointer.y, w, h, npcState.classId) ? vendorButtonGesture.token : null, act: snapshot?.act, stashGold: snapOr('vendorStashGold', () => Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [0]) : -1) }; npcPanelEvidence = vendorPanel.draw(ctx, w, h, vendorState); npcPanelError = ''; }
     catch (error) { npcPanelError = String(error); npcPanelEvidence = null; }
   } else if (npcState && npcSpeechHasText(npcSpeechSetting.mode) && ensureSpeechBox()) {
     // Plain talk, no shop, no active speech message: still the speech box (
@@ -4014,6 +4034,8 @@ function drawFrame() {
   if (inventoryPanelRenderer && session && (!inventoryPanelRenderer.layout || inventoryLayoutKey !== layoutKey)) {
     inventoryPanelRenderer.setLayout(snapOr('inventoryLayout', readInventoryLayout)); inventoryLayoutKey = layoutKey; }
   if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && session ? { ...snapshot, pointer, itemTip: (item) => tipFields(item.id, item.code), gold: snapOr('playerGold', () => Module.ccall('d2_session_player_gold', 'number', [], [])), inventoryGoldPressed: Boolean(inventoryGoldPress), inventoryClosePressed: Boolean(inventoryClosePress) } : snapshot, panelShown(inventoryVisible));
+  // The shop's tooltip and button hint go over the inventory panel, as retail draws them last (vendor-panel.mjs drawOverlay).
+  if (vendorState && npcPanelEvidence) Object.assign(npcPanelEvidence, vendorPanel.drawOverlay(ctx, w, h, vendorState));
   // O / the configurable Hireling Screen binding reads the engine's canonical pet roster. The
   // window exposes only values the roster's live unit supplies; a nearby monster is never treated
   // as this player's mercenary. Frame is the retail invchar panel, text is the retail bitmap font
@@ -4280,7 +4302,7 @@ setInterval(() => {
 // ?worker= : absent is 0 (default-on reverted 2026-10-27, see test/defaults-on.test.mjs); 1, 2 and t as asked.
 // Gates, all required, else W stays null: ?play=1, a Chrome UA (test copied from play/streamfs.js, not imported),
 // crossOriginIsolated, a non-zero handle from d2_web_worker_start.
-const WORKER_MODE = workerMode(location.search);
+const WORKER_MODE = workerMode(window.__d2Entry.search);
 const workerCounters = { callWhileOwned: 0, mainTick: 0, staleView: 0, readMismatch: 0 };
 const startWorker = () => {
   if (WORKER_MODE === '0' || !PLAY_MODE) return null;
@@ -4397,14 +4419,19 @@ try {
   // frame say whether it was a synchronous network read (a pthread's file read runs in a main-thread Worker.onmessage).
   new PerformanceObserver((list) => { for (const e of list.getEntries()) if (e.duration >= 100) {
     const reads = (window.StreamFS?.stats().recent || []).filter(([t]) => t >= e.startTime && t < e.startTime + e.duration);
+    // script / render / layout split the frame: a long frame with little script is the browser painting
+    // (render from renderStart, layout from styleAndLayoutStart, both to the frame end).
+    const end = e.startTime + e.duration;
     noteHitch({ at: Math.round(e.startTime), loaf: Math.round(e.duration),
+      script: Math.round((e.scripts || []).reduce((t, x) => t + x.duration, 0)), ...(e.renderStart ? { render: Math.round(end - e.renderStart) } : {}),
+      ...(e.styleAndLayoutStart ? { layout: Math.round(end - e.styleAndLayoutStart) } : {}), blocking: Math.round(e.blockingDuration || 0),
       scripts: (e.scripts || []).slice(0, 3).map((s) => `${s.invoker || '?'} ${Math.round(s.duration)}ms ${s.sourceFunctionName || '?'}@${(s.sourceURL || '').split('/').pop()}:${s.sourceCharPosition}`),
       ...(reads.length ? { misses: reads.length, stallMs: reads.reduce((a, r) => a + r[1], 0), reads: reads.slice(0, 3).map((r) => `${r[2]} ${r[1]}ms`) } : {}) });
   } }).observe({ type: 'long-animation-frame' });
 } catch { /* no LoAF (Firefox, Safari): the frame() records below still land */ }
 function frame(now) {
   W?.park();
-  perfSync();
+  if (perfSync()) perfFrameStart();
   // The interval between drawn frames is the honest frame time in a real browser (a visible tab): what
   // the player feels, vsync and all. In the test runner's background tab rAF never fires, so this pass is
   // absent there and the per-frame samples are the engine's own cost.
@@ -4421,7 +4448,7 @@ function frame(now) {
       for (let k = 0; k < owed; k++) update(false, true);
       perfT('update', pUpdate);
       t1 = performance.now();
-      liveFrame = true;
+      liveFrame = true; spriteLoadUntil = 0;
       try { render(); } finally { liveFrame = false; }
       frameError = '';
     } catch (error) {
@@ -4432,7 +4459,7 @@ function frame(now) {
     if (t2 - t0 >= HITCH_MS || (gap >= 2 * HITCH_MS && gap < 5000)) {
       const sf = window.StreamFS?.stats();
       noteHitch({ at: Math.round(t0), work: Math.round(t2 - t0), gap: Math.round(gap), updates: owed, ticks: engineTicks - ticks0,
-        updateMs: Math.round(t1 - t0), drawMs: Math.round(t2 - t1),
+        updateMs: Math.round(t1 - t0), drawMs: Math.round(t2 - t1), ...(perfEnabled() ? { passes: perfFrameTop() } : {}),
         ...(sf && sf.misses > sf0.misses ? { misses: sf.misses - sf0.misses, stallMs: Math.round(sf.stallMs - sf0.stallMs), lastRead: sf.lastReadUrl } : {}) });
     }
     frames++;
@@ -4641,14 +4668,15 @@ let lastWarpTaken = null;
 function readCharacterScreen() {
   if (!session || !Module._d2_session_character_screen) return null;
   const p = Module._malloc(64);
-  try { if (!Module.ccall('d2_session_character_screen', 'number', ['bigint'], [BigInt(p)])) return null; return Array.from(new Int32Array(Module.HEAPU8.buffer.slice(Number(p), Number(p) + 64))); }
+  try { if (!Module.ccall('d2_session_character_screen', 'number', ['bigint'], [BigInt(p)])) return null; const sc = Array.from(new Int32Array(Module.HEAPU8.buffer.slice(Number(p), Number(p) + 64))); sc[16] = Module.ccall('d2_session_character_stamina_base', 'number', [], []); return sc; }
   finally { Module._free(p); }
 }
 // Retail's run/walk toggle (`d2_session_run_state`): the engine's own flag, which is also what picks
 // the move packet (0x03 Run / 0x01 Walk) and therefore the mode and the stamina drain. The client
 // reads it; it never keeps a second copy that could disagree with the hero's actual mode.
+// The engine's flag is one global (it survives a realm scene, where `session` is null); reading it needs no session.
 function readRunToggle() {
-  return Boolean(session && Module._d2_session_run_state && Module.ccall('d2_session_run_state', 'number', [], []) === 1);
+  return Boolean(Module._d2_session_run_state && Module.ccall('d2_session_run_state', 'number', [], []) === 1);
 }
 function setRunToggle(on) {
   if (!Module._d2_session_toggle_run) return false;
@@ -5500,6 +5528,7 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   // An open shop: a tab switches the stock shown, an item in the grid is bought, and an item in the
   // player's own inventory (retail's inventory panel beside the shop) is sold.
+  if (shopOpen() && e.button === 2) disarmVendorRepair();
   if (shopOpen() && vendorPanel && e.button === 0) {
     const t = vendorPanel.tabAt(x, y, canvas.width, canvas.height);
     if (t !== null) { click.spent = 'vendorTab'; vendorPanel.setTab(t); canvas.focus(); e.preventDefault(); return; }
@@ -5507,6 +5536,7 @@ canvas.addEventListener('pointerdown', (e) => {
     const mine = inventoryVisible && inventoryPanelRenderer ? inventoryPanelRenderer.itemAt(x, y, canvas.width, canvas.height, snapshot) : null;
     // Retail buttons act on release over the button that was pressed; until then the pressed cel shows.
     if (button) {
+      if (button !== 'repair') disarmVendorRepair();
       vendorButtonGesture.press(e.pointerId, button);
       try { canvas.setPointerCapture(e.pointerId); } catch {}
       click.spent = 'vendorButton'; render(); canvas.focus(); e.preventDefault(); return;
@@ -5515,6 +5545,8 @@ canvas.addEventListener('pointerdown', (e) => {
     // window: action 2 is a gambler's inventory and its offers are spent, action 1 is trade stock
     // and they are bought. Sending the buy for a gamble offer asks the NPC for an item it never
     // listed, so the click has to name the command the counter means.
+    // Repair mode (armed by the Repair button) takes the next carried item click before the lift.
+    if (mine && handleVendorRepairClick(null, mine.id, repairAtVendor)) { click.spent = 'vendorRepair'; canvas.focus(); e.preventDefault(); return; }
     const item = vendorPanel.itemAt(x, y, canvas.width, canvas.height, npcState);
     const cur = Module._d2_session_cursor_item ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0;
     const onPanel = !mine && vendorPanel.contains(x, y, canvas.width, canvas.height);
@@ -6255,6 +6287,7 @@ window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, 
   buyVendorItem(itemId) { return buyFromVendor(itemId); },
   sellVendorItem(itemId) { return sellToVendor(itemId); },
   repairAtVendor(itemId) { return repairAtVendor(itemId); },
+  vendorRepairArmed() { return vendorRepairArmed(); },
   // Gambling is a different counter, not a different button: the vendor must be opened with
   // action 2, and the stock then read is the NPC's GAMBLE inventory rather than its trade stock.
   openGambleWindow(npcId) {

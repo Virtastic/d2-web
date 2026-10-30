@@ -302,17 +302,25 @@ function showBootFailure(why) {
     // Each archive's header, hash/block tables, (listfile) and (attributes), fetched while d2.js loads and
     // compiles: d2_vfs_mount read them synchronously in onRuntimeInitialized, 27 sync misses (1187 ms) in one
     // task. preRun holds the runtime until they are in, 5 s at most. Not under the test runner: its boot stays as it was.
-    const tablesIn = navigator.webdriver ? null : import('./assets/mpq-index.mjs').then(({ mpqTables, openMpqIndex }) => {
+    // The title screen's art too, from the archive that wins each name (RETAIL_ORDER): its first build read
+    // it synchronously on the first tick after ready, 13 sync misses (288 ms).
+    const tablesIn = navigator.webdriver ? null : Promise.all([import('./assets/mpq-index.mjs'), import('./assets/frontend.mjs')]).then(async ([{ mpqTables, openMpqIndex }, { FRONTEND }]) => {
       StreamFS.register('/smoke.mpq', SMOKE_URL, size);
-      return Promise.all([StreamFS.fetched('/smoke.mpq', 0, size), ...retail.map(async (r) => {
+      const smoke = StreamFS.fetched('/smoke.mpq', 0, size);
+      const archives = await Promise.all(retail.map(async (r) => {
         const path = '/retail/' + r.f, readAt = (p, l) => StreamFS.readAt(path, p, l);
         StreamFS.register(path, 'retail/' + r.f, r.size);
         await StreamFS.fetched(path, 0, 32);
-        const t = mpqTables(readAt(0, 32)); if (!t) return;
+        const t = mpqTables(readAt(0, 32)); if (!t) return null;
         await Promise.all(t.map(([pos, n]) => StreamFS.fetched(path, pos, n * 16)));
         const find = openMpqIndex(readAt);
         await Promise.all(['(listfile)', '(attributes)'].map((n) => { const hit = find && find(n); return hit && StreamFS.fetched(path, hit.pos, hit.size); }));
-      })]);
+        return find && { path, find };
+      }));
+      const title = [...Object.values(FRONTEND).flat(), 'data\\global\\palette\\Sky\\pal.pl2'].map((name) => {
+        for (const a of archives) { const hit = a && a.find(name); if (hit) return StreamFS.fetched(a.path, hit.pos, hit.size); }
+      });
+      return Promise.all([smoke, ...title]);
     }).catch(() => {});
     window.Module = {
       locateFile: (p) => ENGINE_DIR + p,

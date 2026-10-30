@@ -346,7 +346,8 @@ export function createSkillPanelRenderer(read, documentObject = globalThis.docum
         // No "+" over a learnable icon: retail's skilltree-points frame (one unspent point, Bash learnable) has no level.dc6 over the tree (V20 struck).
         // The skill's level in Font16 anchored at the icon's right edge, 12 rows below its bottom
         // (retail's act-V tree, skilltree-act5: '2' at 532,134 for the icon at 484..531 x 75..122).
-        if (skill.baseLevel > 0) { const dy = r.y + r.h - 1 + 12; font.drawAnchored(ctx, String(skill.baseLevel), r.x + r.w, dy); digits.push({ text: String(skill.baseLevel), x: r.x + r.w, y: dy, iconCel: skill.iconCel }); }
+        // retail's base level is drawn 4 px left of the icon's right edge (measured on the two-digit levels of charpanel-skilltree tick 21; one-digit unverified)
+        if (skill.baseLevel > 0) { const dx = r.x + r.w - 4, dy = r.y + r.h - 1 + 12; font.drawAnchored(ctx, String(skill.baseLevel), dx, dy); digits.push({ text: String(skill.baseLevel), x: dx, y: dy, iconCel: skill.iconCel }); }
         // Identity, not coverage: the cel DRAWN is named (its sheet and its SkillDesc iconCel), so a
         // row can compare the blit against retail's own draw list rather than counting icons.
         drawn.push({ id: skill.id, x: r.x, y: r.y, baseLevel: skill.baseLevel, available,

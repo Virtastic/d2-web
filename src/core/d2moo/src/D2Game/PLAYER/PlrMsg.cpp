@@ -990,7 +990,7 @@ int32_t __fastcall sub_6FC836D0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStr
         return 2;
     }
 
-    if (!(pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_ATTACKNOMANA]) && (nUnitType < 0 || nUnitType > 1 && nUnitType != 3))
+    if (!(pSkillsTxtRecord->dwFlags[0] & gdwBitMasks[SKILLSFLAGINDEX_TARGETITEM]) && (nUnitType < 0 || nUnitType > 1 && nUnitType != 3))
     {
         return 2;
     }

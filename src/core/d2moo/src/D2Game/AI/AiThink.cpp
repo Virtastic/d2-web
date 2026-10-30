@@ -8864,7 +8864,8 @@ void __fastcall AITHINK_Fn067_NecroPet(D2GameStrc* pGame, D2UnitStrc* pUnit, D2A
 
 	if (!pTarget || DUNGEON_IsRoomInTown(UNITS_GetRoom(pUnit)))
 	{
-		AITACTICS_WanderToTarget(pGame, pUnit, pOwner, 4u);
+		// 1.13c D2Game+0x1E3D0: D2Game+0xF29B0 (walk close to the pet itself), not a wander around the owner
+		AITACTICS_WalkCloseToUnit(pGame, pUnit, 4);
 		return;
 	}
 
@@ -8956,7 +8957,8 @@ int32_t __fastcall D2GAME_AI_PetMove_6FCE2BA0(D2GameStrc* pGame, D2UnitStrc* pOw
 
 		D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_AITHINK, 0);
 
-		if (AITACTICS_WanderToTarget(pGame, pUnit, pOwner, 4u) || bRun && AITACTICS_RunToTargetCoordinatesDeleteAiEvent(pGame, pUnit, (nUnitX + nOwnerX) / 2, (nUnitY + nOwnerY) / 2) || AITACTICS_WalkToTargetCoordinatesDeleteAiEvent(pGame, pUnit, (nOwnerX + nUnitX) / 2, (nUnitY + nOwnerY) / 2))
+		// 1.13c D2Game+0x1CAE0: case 0 falls back to D2Game+0xF29B0 (walk close to the pet itself), not a wander around the owner
+		if (AITACTICS_WalkCloseToUnit(pGame, pUnit, 4) || bRun && AITACTICS_RunToTargetCoordinatesDeleteAiEvent(pGame, pUnit, (nUnitX + nOwnerX) / 2, (nUnitY + nOwnerY) / 2) || AITACTICS_WalkToTargetCoordinatesDeleteAiEvent(pGame, pUnit, (nOwnerX + nUnitX) / 2, (nUnitY + nOwnerY) / 2))
 		{
 			return 1;
 		}
@@ -9072,7 +9074,7 @@ int32_t __fastcall D2GAME_AI_PetMove_6FCE2BA0(D2GameStrc* pGame, D2UnitStrc* pOw
 
 		AITACTICS_SetVelocity(pUnit, 0, 15, 0);
 
-		if (AITACTICS_WanderToTarget(pGame, pUnit, pOwner, nDistance))
+		if (AITACTICS_WalkCloseToUnit(pGame, pUnit, nDistance))
 		{
 			return 1;
 		}
@@ -9087,7 +9089,7 @@ int32_t __fastcall D2GAME_AI_PetMove_6FCE2BA0(D2GameStrc* pGame, D2UnitStrc* pOw
 			return 1;
 		}
 
-		if (AITACTICS_WanderToTarget(pGame, pUnit, pOwner, ITEMS_RollRandomNumber(&pUnit->pSeed) % 3 + 3))
+		if (AITACTICS_WalkCloseToUnit(pGame, pUnit, ITEMS_RollRandomNumber(&pUnit->pSeed) % 3 + 3))
 		{
 			return 1;
 		}
@@ -9144,7 +9146,7 @@ int32_t __fastcall D2GAME_AI_PetMove_6FCE2BA0(D2GameStrc* pGame, D2UnitStrc* pOw
 		{
 			D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_AITHINK, 0);
 
-			if (!AITACTICS_WanderToTarget(pGame, pUnit, pOwner, a7))
+			if (!AITACTICS_WalkCloseToUnit(pGame, pUnit, a7))
 			{
 				AITACTICS_IdleInNeutralMode(pGame, pUnit, 15);
 			}
@@ -9375,7 +9377,7 @@ void __fastcall sub_6FCE3740(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParam
 
 	if (!pTarget || DUNGEON_IsRoomInTown(UNITS_GetRoom(pUnit)))
 	{
-		AITACTICS_WanderToTarget(pGame, pUnit, pOwner, 4u);
+		AITACTICS_WalkCloseToUnit(pGame, pUnit, 4u);
 		return;
 	}
 
@@ -9555,6 +9557,7 @@ void __fastcall AITHINK_Fn061_Hireable(D2GameStrc* pGame, D2UnitStrc* pUnit, D2A
 
 //D2Game.0x6FCE3EE0
 // 1.13c D2Game+0x1D3C0
+// 1.13c D2Game+0x1D3C0: wander fallbacks are D2Game+0xF29B0 (= WalkCloseToUnit body), not WanderToTarget(owner)
 int32_t __fastcall D2GAME_PETAI_PetMove_6FCE3EE0(D2GameStrc* pGame, D2UnitStrc* pOwner, D2UnitStrc* pUnit, int32_t eMotionType, int32_t bRun, int32_t nSpeed, BYTE bSteps)
 {
 	// TODO: Names
@@ -9597,7 +9600,7 @@ int32_t __fastcall D2GAME_PETAI_PetMove_6FCE3EE0(D2GameStrc* pGame, D2UnitStrc* 
 		}
 
 		D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_AITHINK, 0);
-		AITACTICS_WanderToTarget(pGame, pUnit, pOwner, 4u);
+		AITACTICS_WalkCloseToUnit(pGame, pUnit, 4u);
 		return 1;
 	}
 	case 1:
@@ -9697,7 +9700,7 @@ int32_t __fastcall D2GAME_PETAI_PetMove_6FCE3EE0(D2GameStrc* pGame, D2UnitStrc* 
 		}
 
 		AITACTICS_SetVelocity(pUnit, 0, 15, 0);
-		AITACTICS_WanderToTarget(pGame, pUnit, pOwner, nDistance);
+		AITACTICS_WalkCloseToUnit(pGame, pUnit, nDistance);
 		return 1;
 	}
 	case 2:
@@ -9708,7 +9711,7 @@ int32_t __fastcall D2GAME_PETAI_PetMove_6FCE3EE0(D2GameStrc* pGame, D2UnitStrc* 
 		}
 		else
 		{
-			if (!AITACTICS_WanderToTarget(pGame, pUnit, pOwner, ITEMS_RollRandomNumber(&pUnit->pSeed) % 3 + 3))
+			if (!AITACTICS_WalkCloseToUnit(pGame, pUnit, ITEMS_RollRandomNumber(&pUnit->pSeed) % 3 + 3))
 			{
 				D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_AITHINK, 0);
 				AITACTICS_SetVelocity(pUnit, 0, 0, 40);
@@ -9758,7 +9761,7 @@ int32_t __fastcall D2GAME_PETAI_PetMove_6FCE3EE0(D2GameStrc* pGame, D2UnitStrc* 
 			if (!D2GAME_AICORE_Escape_6FCD0560(pGame, pUnit, pOwner, bSteps, 1))
 			{
 				D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_AITHINK, 0);
-				AITACTICS_WanderToTarget(pGame, pUnit, pOwner, bSteps);
+				AITACTICS_WalkCloseToUnit(pGame, pUnit, bSteps);
 			}
 		}
 		return 1;
@@ -14455,7 +14458,8 @@ void __fastcall AITHINK_Fn106_143_ShadowMaster(D2GameStrc* pGame, D2UnitStrc* pU
 			}
 		}
 
-		if (AITHINK_GetSquaredDistance(pUnit, pOwner) >= 144 && sub_6FCE34E0(pGame, pUnit, pTarget, pOwner, pAiTickParam->bCombat, pAiTickParam, 0, 6))
+		// 1.13c D2Game+0xAB91C: cmp eax,0x90; jg skip -- fires when dist <= 144 (1.10f: >= 144)
+		if (AITHINK_GetSquaredDistance(pUnit, pOwner) <= 144 && sub_6FCE34E0(pGame, pUnit, pTarget, pOwner, pAiTickParam->bCombat, pAiTickParam, 0, 6))
 		{
 			return;
 		}
@@ -14926,7 +14930,8 @@ void __fastcall AITHINK_Fn106_143_ShadowMaster(D2GameStrc* pGame, D2UnitStrc* pU
 					break;
 				}
 
-				if (nCurrentValue > shadowMasterSkills[nCounter].nChance)
+				// 1.13c D2Game+0xAC25C: compares against the last appended record (ascending chain), not the empty slot
+				if (nCurrentValue > shadowMasterSkills[nCounter - 1].nChance)
 				{
 					shadowMasterSkills[nCounter].pTarget = pSkillTarget;
 					shadowMasterSkills[nCounter].nSkillId = nSkillId;

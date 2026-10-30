@@ -14,7 +14,8 @@ void sub_2A590(U kind,P obj,Calls& c){
  U f; std::memcpy(&f,static_cast<uint8_t*>(obj)+0xb0,4);
  U hi=f&0xf0;
  if(hi==0||(f&0xf)==0) return;
- // retail compares hi to 0x20,0x30,0x40,0x10,0x70,0x80,0x90, each calling the same thing
- if(hi==0x10||hi==0x20||hi==0x30||hi==0x40||hi==0x70||hi==0x80||hi==0x90) c.f6b300(obj,2,0,0,0);
+ // each hi nibble loads its own Overlay.txt row into EAX before the call (the row is the 6B300 seam's third argument here)
+ static const struct { U hi, row; } kRow[] = {{0x10,0x36},{0x20,0x51},{0x30,0x24},{0x40,0x01},{0x70,0x93},{0x80,0x15},{0x90,0x71}};
+ for(const auto& r:kRow) if(hi==r.hi){ c.f6b300(obj,2,r.row,0,0); return; }
 }
 }

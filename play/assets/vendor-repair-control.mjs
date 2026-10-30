@@ -19,3 +19,9 @@ export function handleVendorRepairClick(button, itemId, repair) {
   }
   return true;
 }
+
+/** Leave Repair mode: another shop button or a right-click ends it. */
+export function disarmVendorRepair() { armed = false; }
+
+/** True while Repair mode waits for an item click; the pointer shows the repair cel meanwhile. */
+export function vendorRepairArmed() { return armed; }

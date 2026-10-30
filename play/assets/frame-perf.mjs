@@ -21,7 +21,7 @@
 
 const MAX_SAMPLES = 4000;
 
-export const perfState = { on: false, passes: Object.create(null), frames: 0, resets: 0 };
+export const perfState = { on: false, passes: Object.create(null), frame: Object.create(null), frames: 0, resets: 0 };
 
 // Refresh `on` from the global. Called once per frame by the shell (and once per draw by the terrain
 // pass), so a page can turn the instrument on AFTER boot -- a scenario sets `window.__d2Perf = true`
@@ -47,6 +47,14 @@ export function perfSample(name, ms) {
   let a = perfState.passes[name];
   if (!a) a = perfState.passes[name] = [];
   if (a.length < MAX_SAMPLES) a.push(ms);
+  perfState.frame[name] = (perfState.frame[name] || 0) + ms;
+}
+
+// This frame's totals per pass (the sample cap fills in seconds for a per-sprite pass, so a slow
+// frame is read here): perfFrameStart() clears them, perfFrameTop() names the heaviest, in whole ms.
+export function perfFrameStart() { perfState.frame = Object.create(null); }
+export function perfFrameTop(n = 5) {
+  return Object.fromEntries(Object.entries(perfState.frame).sort((x, y) => y[1] - x[1]).slice(0, n).map(([k, ms]) => [k, Math.round(ms)]));
 }
 
 export function perfCountFrame() { if (perfState.on) perfState.frames++; }

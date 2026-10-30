@@ -595,6 +595,8 @@ static bool create_monster_motion(D2RealmClientMonster& monster) {
         else unit->dwFlags &= ~UNITFLAG_CANBEATTACKED;
         if (sgptDataTables && sgptDataTables->nStatesTxtRecordCount > 0)
             STATLIST_AllocStatListEx(unit, 0, nullptr, nullptr);
+        // the monster's base walk speed, as D2Game's monster init sets it (Monster.cpp STAT_VELOCITYPERCENT 75); the client unit needs it to walk at the server's pace
+        STATLIST_SetUnitStat(unit, STAT_VELOCITYPERCENT, 75, 0);
         if (!d2_realm_client_unit_resources_init(unit)) {
             d2_realm_client_unit_resources_destroy(unit);
             UNITS_FreeUnit(unit);
@@ -1456,6 +1458,8 @@ static D2UnitStrc* create_client_missile(const D2MissileStrc* params) {
     MISSILE_SetLevel(unit, static_cast<uint16_t>(levelValue));
     g_clientMissiles.push_back({unit, level});
     record_client_missile_event(1, unit);
+    if ((unit->dwClassId == 62 || unit->dwClassId == 42) && txt->wTravelSound < 0x8000) // D2Client create: TravelSound row on the first client tick
+        g_clientMissileSoundEvents.push_back({1, g_clientMissileTick, unit->dwUnitId, static_cast<uint32_t>(unit->dwClassId), 1u, txt->wTravelSound});
     return unit;
 }
 
@@ -1603,7 +1607,8 @@ static void advance_client_missiles() {
             const uint32_t terminalEvent = expired ? 4 : (hitGuid != 0xffffffffu ? 3 : 2);
             record_client_missile_event(terminalEvent, unit,
                 hitGuid != 0xffffffffu ? UNIT_MONSTER : 0xffffffffu, hitGuid);
-            record_client_missile_impact_sound(terminalEvent, unit, txt);
+            // Lifetime expiry runs the hit callback only with AlwaysExplode; Fire Ball has none (a retail recording expiry, no impact row).
+            if (collided || (txt && txt->nAlwaysExplode)) record_client_missile_impact_sound(terminalEvent, unit, txt);
             if (unit->dwClassId == 62 && (collided || (txt && txt->nAlwaysExplode)) && g_selectedPlayer >= 0 &&
                 static_cast<size_t>(g_selectedPlayer) < g_players.size()) {
                 d2::realm::createFireballHitChildren(unit, g_players[g_selectedPlayer].motionUnit,

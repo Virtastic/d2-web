@@ -401,9 +401,11 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
   const trademarkBackground = { ...composeTiled(decodeDc6(read(FRONTEND.trademark)), skyPalette,
     TITLE_COLUMNS, documentObject), path: FRONTEND.trademark };
   // Retail's order: black left, fire left, black right, fire right (title draw list).
+  // A frame's canvas is painted the first time it draws: the fire halves blend from the frame itself and
+  // never need one, and painting all 120 up front was most of the title build's first task.
   const logos = [FRONTEND.logoBlack[0], FRONTEND.logoFire[0], FRONTEND.logoBlack[1], FRONTEND.logoFire[1]].map((path) => {
-    const dc6 = decodeDc6(read(path));
-    return { path, dc6, canvases: dc6.frames.map((f) => frameCanvas(f, palette, documentObject)) };
+    const dc6 = decodeDc6(read(path)), canvases = [];
+    return { path, dc6, canvas: (i) => canvases[i] ??= frameCanvas(dc6.frames[i], palette, documentObject) };
   });
   // A button DC6 holds its states in order; a wide state is two frames side by side (256px body +
   // 16px tail), a short state one frame.
@@ -591,15 +593,14 @@ export function createTitleScreen({ read, decodeDc6, decodeDatPalette, items, st
   // consecutive frames; the creation loops' rule). A frame's anchor is its bottom row.
   const drawLogos = (ctx, tick) => {
     for (const logo of logos) {
-      const n = logo.canvases.length;
+      const n = logo.dc6.frames.length;
       const frameIndex = Math.floor(tick * 25 / 60) % (n - 1);
       const frame = logo.dc6.frames[frameIndex];
-      const canvas = logo.canvases[frameIndex];
-      if (!frame || !canvas.width) continue;
+      if (!frame) continue;
       const fire = logo.path.toLowerCase().includes('fire');
       const left = 400 + frame.offsetX, top = 120 + frame.offsetY - frame.height + 1;
       if (fire) logoBlend(ctx, frame, left, top, 3);
-      else ctx.drawImage(canvas, left, top);
+      else ctx.drawImage(logo.canvas(frameIndex), left, top);
       recordDc6(logo.path, frameIndex, frame, left, top, { op: 'cel', mode: fire ? 3 : 5 });
     }
   };

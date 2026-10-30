@@ -12,6 +12,6 @@ const rows = [];
 const t = createCombatSoundTrigger((p) => { if (!files[p]) throw new Error(p); return files[p]; }, (r, i) => rows.push([r, i.kind]));
 const snap = { playerId: 1, player: { castSkillId: 96 }, items: [] };
 const ent = (mode, fp) => [{ type: 0, id: 1, classId: 3, mode, animation: { framePrecise: fp } }];
-t.update(ent(1, 0), snap); t.update(ent(7, 0), snap); t.update(ent(7, 2560), snap); t.update(ent(7, 0), snap);
+t.update(ent(1, 0), snap); t.update(ent(13, 0), snap); t.update(ent(13, 2560), snap); t.update(ent(13, 0), snap);
 assert.equal(rows.filter(([, k]) => k === 'cast').length, 2, JSON.stringify(rows));
 console.log('combat-sound-trigger-cast ok');

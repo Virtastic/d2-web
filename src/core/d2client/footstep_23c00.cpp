@@ -45,3 +45,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_monster_footstep_row(int32_t 
     if (!r->dwFootstep) return r->dwFootstepLayer;   // a retail recording: a crow has only the layer row (hawk_wing_1, 1155), submitted on its own footfall (layer roll FsPrb 100 not modeled)
     return r->dwFootstep + (mode == 0xF ? 24 : 0);
 }
+// The layer row rides on the same footfall: 1.13c 0x23DF2 submits row+0x58 (base 0) when rand(100) < row+0x64 (FsPrb).
+// Only FsPrb >= 100 is modelled: rand(100) < 100 always holds, so no seed is needed. Below 100 the roll reads the client
+// seed (unit +0x20/+0x24), which the JS does not hold: ponytail: layer roll below FsPrb 100 unplayed, add when the seed is exported.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_monster_footstep_layer(int32_t classId) {
+    const D2MonSoundsTxt* r = DATATBLS_GetMonSoundsTxtRecordFromMonsterId(classId);
+    return r && r->dwFootstep && r->dwFootstepLayer && r->dwFsPrb >= 100 ? r->dwFootstepLayer : 0;
+}

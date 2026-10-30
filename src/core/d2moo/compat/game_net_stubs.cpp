@@ -440,8 +440,17 @@ void D2GAME_PACKETS_SendPacket0x61_6FC3F590(D2ClientStrc* pClient, BYTE unk) {
     D2GSPacketSrv61 packet = {}; packet.nHeader = 0x61; packet.unk0x001 = unk;
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
 }
-void D2GAME_PACKETS_SendPacket0x67_6FC3CBC0(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int16_t nX, int16_t nY, int8_t a7) {}
-void D2GAME_PACKETS_SendPacket0x67_6FC3CDE0(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int16_t nX, int16_t nY, int8_t a7, int8_t a8, int8_t a9) {}
+// The 0x67 monster move {header, guid, action, x, y, ...} (16 bytes): the realm client reads guid, action and destination (apply_monster_move);
+// the tail bytes are the senders' own arguments. Without it a walking monster never moves on the client (a retail recording: Fire Ball misses it).
+void D2GAME_PACKETS_SendPacket0x67_6FC3CBC0(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int16_t nX, int16_t nY, int8_t a7) {
+    D2GSPacketSrv67 packet = {}; packet.nHeader = nHeader; packet.nUnitGUID = nUnitGUID; packet.unk0x05 = a4; packet.nX = nX; packet.nY = nY; packet.unk0x0A = a7;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+}
+void D2GAME_PACKETS_SendPacket0x67_6FC3CDE0(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int16_t nX, int16_t nY, int8_t a7, int8_t a8, int8_t a9) {
+    D2GSPacketSrv67 packet = {}; packet.nHeader = nHeader; packet.nUnitGUID = nUnitGUID; packet.unk0x05 = a4; packet.nX = nX; packet.nY = nY;
+    packet.unk0x0A = a7; packet.unk0x0B = a8; packet.nPathType = a9;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+}
 void D2GAME_PACKETS_SendPacket0x68_6FC3CA90(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int8_t a5, int32_t a6, int8_t a7) {}
 void D2GAME_PACKETS_SendPacket0x68_6FC3CCB0(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int8_t a5, int32_t a6, int8_t a7, int8_t a8, int8_t a9) {}
 // 1.13c D2Game+0x8C100: the 0x67/0x69-family monster mode packet
@@ -462,7 +471,15 @@ void D2GAME_PACKETS_SendPacket0x6A_6FC3CEE0(D2ClientStrc* pClient, char a2, int3
     packet.nTargetUnitType = a5; packet.nTargetUnitGuid = a6; packet.nDirection = nDirection;
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
 }
-void D2GAME_PACKETS_SendPacket0x6B_6FC3D000(D2ClientStrc* pClient, char a2, int32_t a3, char a4, int16_t a5, int16_t a6, char a7, char a8, int16_t a9, int16_t a10) {}
+// 1.13c D2Game+0x8C010: 0x6B monster mode packet, 16 bytes. Byte 5 is the
+// state (e.g. 0x0C for a golem's SKILL1 mode), which the client keys its monster sound on: without it the
+// Clay Golem's summon sounds never play (a retail recording skill 75, sound-Q rows at ticks 19/87/157).
+void D2GAME_PACKETS_SendPacket0x6B_6FC3D000(D2ClientStrc* pClient, char a2, int32_t a3, char a4, int16_t a5, int16_t a6, char a7, char a8, int16_t a9, int16_t a10) {
+    D2GSPacketSrv6B packet = {};
+    packet.nHeader = a2; packet.unk0x01 = a3; packet.unk0x05 = a4; packet.unk0x06 = a5; packet.unk0x08 = a6;
+    packet.unk0x0A = a7; packet.unk0x0B = a8; packet.unk0x0C = a9; packet.unk0x0E = a10;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+}
 // 1.13c D2Game+0x8C090: 0x6C {header, unitId, b5, b6, dword7, b11, w12, w14}, 16 bytes.
 void D2GAME_PACKETS_SendPacket0x6C_6FC3CF90(D2ClientStrc* pClient, char a2, int32_t a3, char a4, char a5, int32_t a6, char a7, int16_t a8, int16_t a9) {
     D2GSPacketSrv6C packet = {};
@@ -741,7 +758,11 @@ void SCMD_Send0x75_PartyRosterUpdate(D2UnitStrc* pLocalPlayer, D2UnitStrc* pOthe
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &p, sizeof p);
 }
 // D24: linked in by the retail room walk (LEVEL_UpdateUnitsInAdjacentRooms -> sub_6FC81650 -> SUnitMsg/InvMode); not part of the level-up window, so empty until their own rows (0x0C/0x0E/0x11/0xA7/0xA9/0x9C/0x9D).
-void __fastcall D2GAME_PACKETS_SendPacket0x0C_6FC3C8A0(D2ClientStrc* a0, char a1, D2C_UnitTypes a2, int a3, char a4, char a5, char a6) {}
+// 0x0C unit life update (9 bytes: header, unit type, guid, message, hit class, life%); a retail recording retail 0c0101000000 13 3d <pct>.
+void __fastcall D2GAME_PACKETS_SendPacket0x0C_6FC3C8A0(D2ClientStrc* a0, char a1, D2C_UnitTypes a2, int a3, char a4, char a5, char a6) {
+    uint8_t b[9] = { (uint8_t)a1, (uint8_t)a2 }; memcpy(b + 2, &a3, 4); b[6] = (uint8_t)a4; b[7] = (uint8_t)a5; b[8] = (uint8_t)a6;
+    D2GAME_PACKETS_SendPacket_6FC3C710(a0, b, sizeof b);
+}
 // 0x0E object state (12 bytes: header, unit type, guid, 3, targetable, mode dword); a retail recording retail 0e0204000000030001000000.
 void __fastcall D2GAME_PACKETS_SendPacket0x0E_6FC3C8E0(D2ClientStrc* a0, char a1, char a2, int a3, char a4, char a5, int a6) {
     uint8_t b[12] = { (uint8_t)a1, (uint8_t)a2 }; memcpy(b + 2, &a3, 4); b[6] = (uint8_t)a4; b[7] = a5 ? 1 : 0; memcpy(b + 8, &a6, 4);

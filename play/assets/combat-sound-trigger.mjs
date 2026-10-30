@@ -54,12 +54,14 @@ export function createCombatSoundTrigger(read, play, busy = () => false, roll = 
   for (const l of text('data\\global\\excel\\Sounds.txt').split(/\r?\n/).slice(1)) { const c = l.split('\t'); if (c[0]) soundIndex.set(c[0], Number(c[1])); }
   // D2Client 0x14F40 runs as cltdofunc 16 (table entry 16 at 0xDEA88); for a player unit (+0 type 0) it submits Skills.txt `dosound a` (+0x102)
   const doSound = new Map(); // skill id -> dosound A row, only for cltdofunc 16 (Jab)
-  { const rows = text('data\\global\\excel\\skills.txt').split(/\r?\n/).map((l) => l.split('\t')), h = rows[0], id = h.indexOf('Id'), st = h.indexOf('stsound'), fn = h.indexOf('cltdofunc'), da = h.indexOf('dosound a');
+  // a retail recording: retail never submits an Assassin skill's stsound (assassin_* rows, 0 of the 51 a retail recording traces; the cast tick plays 2720 or 251),
+  // so Skills.txt charclass 'ass' is left out. ponytail: class gate, the cause in the 0xA1CF0 chain is not traced; drop it when that is.
+  { const rows = text('data\\global\\excel\\skills.txt').split(/\r?\n/).map((l) => l.split('\t')), h = rows[0], id = h.indexOf('Id'), st = h.indexOf('stsound'), fn = h.indexOf('cltdofunc'), da = h.indexOf('dosound a'), cc = h.indexOf('charclass');
     for (const c of rows.slice(1)) {
-      if (c[st] && soundIndex.has(c[st])) skillSound.set(Number(c[id]), soundIndex.get(c[st]));
+      if (c[st] && soundIndex.has(c[st]) && c[cc] !== 'ass') skillSound.set(Number(c[id]), soundIndex.get(c[st]));
       if (Number(c[fn]) === 16 && soundIndex.has(c[da])) doSound.set(Number(c[id]), soundIndex.get(c[da])); } }
-  const prev = new Map(), hpPrev = new Map(), frames = new Map();
-  let refusedSeq, pendingRefused = 0, tick = 0, lastRoll = -99, seed = 1;
+  const dmgPrev = new Set(), prev = new Map(), hpPrev = new Map(), frames = new Map(), hist = new Map(), rng = { s: 1n };
+  let refusedSeq, pendingRefused = 0, tick = 0, lastRoll = -99;
   const profile = (classId, typeFlags = 0, superUniqueId = -1) => {
     if (classId < 0 || 4 + (classId + 1) * 424 > sv.byteLength) return null;
     const flags = typeFlags | 0, base = 4 + classId * 424;
@@ -69,7 +71,12 @@ export function createCombatSoundTrigger(read, play, busy = () => false, roll = 
     const id = selectProfileId((flags & 2) !== 0, (flags & 0x18) !== 0, superId, sv.getUint16(base + 0x16, true), sv.getUint16(base + 0x14, true));
     return id >= 0 && id < mv.getUint32(0, true) ? Array.from({ length: 37 }, (_, i) => mv.getUint32(4 + id * 148 + i * 4, true)) : null;
   };
-  const fire = (base, e, kind) => { if (base > 0) play(base, { unitType: e.type, unitId: e.id, classId: e.classId, kind, mode: e.mode, baseRow: base }); };
+  const row = (base) => pickVariant(base);
+  const fire = (base, e, kind) => { if (base > 0) play(row(base), { unitType: e.type, unitId: e.id, classId: e.classId, kind, mode: e.mode, baseRow: base }); };
+  // 0x242B0: the attack and weapon rows are submitted raw (SNDPLAY with the table id, no 0x5EE70 pick); the roll advances the player's
+  // LCG (the same state the variant picks draw from), so one rng object serves both.
+  const lcgStep = () => { rng.s = ((rng.s & 0xFFFFFFFFn) * 0x6AC690C5n + (rng.s >> 32n)) & 0xFFFFFFFFFFFFFFFFn; };
+  const playRaw = (base, e, kind) => { if (base > 0) play(base, { unitType: e.type, unitId: e.id, classId: e.classId, kind, mode: e.mode, baseRow: base }); };
   const weaponHitClass = (player, items) => {
     const w = (items || []).find((i) => i.mode === 1 && (Number(i.id) >>> 0) === (Number(player?.primaryWeaponId) >>> 0));
     if (!w) return 0; // unarmed: retail's CVT (#10862) selector is 0 -> table[0] = 0, the 0x88A70 submit is rejected (a retail recording Q 0 at each swing); no fist swing sound
@@ -90,7 +97,11 @@ export function createCombatSoundTrigger(read, play, busy = () => false, roll = 
         // a retail recording Q records: retail submits the hit sounds when the unit TAKES DAMAGE, whatever its mode (a hero swinging, a zombie
         // mid-attack keep their mode); a hit that does not change the mode is a virtual GH entry, a killing hit submits the impact only.
         const ph = hpPrev.get(key); hpPrev.set(key, e0.hp);
-        const dmg = ph !== undefined && e0.hp < ph && e0.lastHitClass !== undefined && !e0.critter;
+        // Sacrifice (96) charges the caster's own HP in its do frame, mid-swing: no SUCCESSFULHIT, lastHitClass stays stale, retail plays no impact (a retail recording)
+        const sac = e0.id === snapshot?.playerId && snapshot.player?.castSkillId === 96 && PLAYER_ATTACK.has(e0.mode) && prev.get(key) === e0.mode;
+        const dmgRaw = !sac && ph !== undefined && e0.hp < ph && e0.lastHitClass !== undefined && !e0.critter, dot = dmgRaw && dmgPrev.has(key) && e0.lastHitClass === 93 && !(e0.type === 1 ? MON_HIT : PLAYER_HIT).has(e0.mode); // poison ticks (hit class 93) after the first: no new hit, retail plays it once
+        dmgRaw ? dmgPrev.add(key) : dmgPrev.delete(key);
+        const dmg = dmgRaw && !dot;
         const e = dmg && e0.hp > 0 && !(e0.type === 1 ? MON_HIT : PLAYER_HIT).has(e0.mode) ? { ...e0, mode: e0.type === 1 ? 3 : 4 } : e0;
         const fp = e.animation?.framePrecise, hitMode = e.type === 1 ? MON_HIT.has(e.mode) : e.type === 0 && PLAYER_HIT.has(e.mode), restart = (((e.id === snapshot?.playerId && (PLAYER_CAST.has(e.mode) || PLAYER_ATTACK.has(e.mode)))) && fp < frames.get(key)) || (hitMode && (dmg || (e0.hp === undefined && fp <= frames.get(key)))); // D23: a unit struck again while still in GH re-runs SetMode(GH) (retail 0x23630 each time): a damage tick is the re-entry (a retail recording Q, not the frame clock) // same attack mode re-entered back to back: SetMode ran again, the frame clock rewound
         if (fp !== undefined) frames.set(key, fp);
@@ -108,14 +119,14 @@ export function createCombatSoundTrigger(read, play, busy = () => false, roll = 
             // 0x242B0: prob < 100 -> the 15-tick delay gate and the busy gate apply; prob >= 100 plays unconditionally.
             // The LCG advances only when the gate passes.
             const gated = p[b] < 100, pass = !!p[s] && (!gated || (tick - lastRoll >= 15 && !busy()));
-            if (pass) { let r = roll?.() ?? -1; if (r < 0) { seed = (seed * 0x6ac690c5 + 1) >>> 0; r = seed % 100; } if (r < p[b]) { lastRoll = tick; fire(p[s], e, 'attack'); } }
-            fire(p[w], e, 'weapon');
+            if (pass) { lcgStep(); const r = roll?.() ?? Number(rng.s & 0xFFFFFFFFn) % 100; if (r < p[b]) { lastRoll = tick; playRaw(p[s], e, 'attack'); } }
+            playRaw(p[w], e, 'weapon');
           } else if (MON_SKILL[e.mode]) fire(p[MON_SKILL[e.mode]], e, 'skill'); else if (MON_HIT.has(e.mode)) { if (!busy()) { fire(p[13], e, 'hit'); if (p[13] === 0x2e9) { play(0x6a, { unitType: 1, unitId: e.id, classId: e.classId, kind: 'hit', mode: e.mode, baseRow: 0x6a }); play(0xc1, { unitType: 1, unitId: e.id, classId: e.classId, kind: 'hit', mode: e.mode, baseRow: 0xc1 }); } } lastRoll = tick; } // 0x23630 stamps the delay clock
           else if (MON_DEATH.has(e.mode)) { fire(p[15], e, 'death'); lastRoll = tick; }
         } else if (e.classId >= 0 && e.classId < 7) {
           const t = PLAYER_HIT_DEATH[e.classId];
           if (PLAYER_CAST.has(e.mode)) { if (e.id === snapshot?.playerId) fire(skillSound.get(snapshot.player?.castSkillId) ?? 0, e, 'cast'); }
-          else if (PLAYER_ATTACK.has(e.mode)) { if (e.id === snapshot?.playerId) { fire(skillSound.get(snapshot.player?.castSkillId) ?? 0, e, 'cast'); fire(doSound.get(snapshot.player?.castSkillId) ?? 0, e, 'dosound'); } /* A1 skills (Sacrifice, Zeal): stsound fires on skill start */ fire(PLAYER_WEAPON[weaponHitClass(e.id === snapshot?.playerId ? snapshot.player : null, snapshot?.items)] ?? 0, e, 'swing'); }
+          else if (PLAYER_ATTACK.has(e.mode)) { if (e.id === snapshot?.playerId) { fire(doSound.get(snapshot.player?.castSkillId) ?? 0, e, 'dosound'); } /* melee dispatch (Sacrifice, Smite): retail never enters the cast path (no 1A060/A1CF0 at the cast tick, no stsound: a retail recording pinned runs), so no stsound here */ fire(PLAYER_WEAPON[weaponHitClass(e.id === snapshot?.playerId ? snapshot.player : null, snapshot?.items)] ?? 0, e, 'swing'); }
           else if (PLAYER_HIT.has(e.mode)) { if (!busy()) fire(t[0], e, 'hit'); lastRoll = tick; }
           else if (PLAYER_DEATH.has(e.mode)) { fire(t[1], e, 'death'); lastRoll = tick; }
         }

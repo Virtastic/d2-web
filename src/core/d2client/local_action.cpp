@@ -9,3 +9,9 @@ static int32_t g_localAction = 0;
 
 extern "C" void d2_client_note_local_action(int32_t mode) { g_localAction = mode; }
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_take_local_action() { int32_t m = g_localAction; g_localAction = 0; return m; }
+// Who started the player's current run: an explicit move command (the client predicts the move and its unit drops to the walk/town-walk
+// mode after the first tick, a retail recording/a retail recording F rows) or a cast that walks the player (the client unit follows the server and stays in run mode 3,
+// a retail recording ama-10 ticks 12-44: every footfall the run group). 23C00 reads that mode at 0x23C18.
+static int32_t g_explicitMove = 0;
+extern "C" void d2_client_note_move_cmd(int32_t explicitMove) { g_explicitMove = explicitMove; }
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_explicit_move() { return g_explicitMove; }

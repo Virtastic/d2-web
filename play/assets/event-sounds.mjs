@@ -5,7 +5,7 @@
 // (the callback's due predicate is unrecovered) and no 4-row variant is drawn (combat-sound-trigger.mjs).
 const GAIT_BASE = [2768, 2720, 2720, 2768, 2816, 2720, 2720]; // Ama Sor Nec Pal Bar Dru Asn
 import { OBJECT_MODE_SOUNDS, OBJECT_SELECT_SOUNDS, SHARED_ROW_CLASSES } from './object-mode-sounds.mjs';
-export function createEventSounds(read, play, monsterStep = null) {
+export function createEventSounds(read, play, monsterStep = null, monsterLayer = null) {
   const rows = (p) => new TextDecoder('latin1').decode(read(p)).split(/\r?\n/).map((l) => l.split('\t'));
   const idx = new Map(rows('data\\global\\excel\\Sounds.txt').slice(1).filter((c) => c[0]).map((c) => [c[0], Number(c[1])]));
   const drop = new Map();
@@ -25,7 +25,9 @@ export function createEventSounds(read, play, monsterStep = null) {
   // not the run base 101 the server unit carries) over a 2048 cycle; footfalls two per cycle by the 0x23C00 due rule (nearest of cur-step, cur, cur+step
   // to phase 0, circular mod 1536), none within 2/3 of a period of the last. Phase 1207 after the run footfall gives the traced 6,5,4,5,5,5,5,4 gaps.
   let itemsSeen = false;
-  const STEP = 320, PER = 1536, circ = (a) => Math.min(a, PER - a);
+  // A run a cast started (no explicit move command) keeps the client unit in run mode 3 (a retail recording retail F rows: step 0x97 over a 2048 cycle, footfalls
+  // mod 1024, every one the run group, gaps 7,7,6,7); an explicit move flips it to walk/town-walk after the first tick (step 0xD5, the model above).
+  let STEP = 320, PER = 1536, MINT = 2, RUNG = 0; const circ = (a) => Math.min(a, PER - a);
   const footDue = (c) => circ(c) < circ((c + STEP) % PER) && circ(c) < circ((c - STEP + PER) % PER);
   return {
     /** D2Client 2A750's local action 2 (cast on the ground): 1C150 -> 23C00 plays the walk group's first footfall at once. */
@@ -42,10 +44,10 @@ export function createEventSounds(read, play, monsterStep = null) {
       if (m && (m.mode === 2 || m.mode === 3 || m.mode === 6)) { // 6 = town walk (a retail recording: base row, no run footfall)
         // Retail (D2Client+0x23C00, traced against a retail recording): the run's first footfall plays the run group at once,
         // the rest follow the walk-step model above, all in the walk group.
-        if (stepT === -2) stepT = -1; // armed: retail submits one tick after the unit enters the mode
-        else if (stepT === -1) { play((GAIT_BASE[cls] ?? 2768) + (m.mode === 6 ? 0 : 24), { kind: 'footstep', unitType: 0, classId: cls }); stepT = 0; cur = m.mode === 6 ? 1527 : 1207; }
-        else { cur = (cur + STEP) % PER; if (++stepT >= 2 && footDue(cur)) { play(GAIT_BASE[cls] ?? 2768, { kind: 'footstep', unitType: 0, classId: cls }); stepT = 0; } }
-      } else { if (stepT === -1) play((GAIT_BASE[cls] ?? 2768) + 24, { kind: 'footstep', unitType: 0, classId: cls }); else if (stepT >= 0) { cur = (cur + STEP) % PER; if (++stepT >= 2 && footDue(cur)) play(GAIT_BASE[cls] ?? 2768, { kind: 'footstep', unitType: 0, classId: cls }); } stepT = -2; } // the exit tick still runs the callback in the old mode (a retail recording) // a one-tick run (a retail recording) still submits its armed footfall
+        if (stepT === -2) { stepT = -1; const field = m.mode === 3 && !p.explicitMove; [STEP, PER, MINT, RUNG] = field ? [151, 1024, 4, 24] : [320, 1536, 2, 0]; } // armed: retail submits one tick after the unit enters the mode
+        else if (stepT === -1) { play((GAIT_BASE[cls] ?? 2768) + (m.mode === 6 ? 0 : 24), { kind: 'footstep', unitType: 0, classId: cls }); stepT = 0; cur = m.mode === 6 ? 1527 : RUNG ? 0 : 1207; }
+        else { cur = (cur + STEP) % PER; if (++stepT >= MINT && footDue(cur)) { play((GAIT_BASE[cls] ?? 2768) + RUNG, { kind: 'footstep', unitType: 0, classId: cls }); stepT = 0; } }
+      } else { if (stepT === -1) play((GAIT_BASE[cls] ?? 2768) + 24, { kind: 'footstep', unitType: 0, classId: cls }); else if (stepT >= 0) { cur = (cur + STEP) % PER; if (++stepT >= MINT && footDue(cur)) play((GAIT_BASE[cls] ?? 2768) + RUNG, { kind: 'footstep', unitType: 0, classId: cls }); } stepT = -2; } // the exit tick still runs the callback in the old mode (a retail recording) // a one-tick run (a retail recording) still submits its armed footfall
       ++tick;
       for (const e of monsterStep ? snapshot?.entities ?? [] : []) {
         const a = e.type === 1 && e.animation;
@@ -58,7 +60,7 @@ export function createEventSounds(read, play, monsterStep = null) {
         const cut = prev && prev[0] === 2 && (a.mode === 5 || a.mode === 6) && moved > prev[5];
         if (!prev || (prev[0] !== a.mode && !cut) || prev[2] !== tick - 1) continue;
         const row = monsterStep(a.classId, cut ? 2 : a.mode, prev[1], cut ? prev[6] : a.frameCountPrecise, cut ? prev[7] : a.animSpeed, tick, lastStep.get(e.id) ?? 0);
-        if (row) { lastStep.set(e.id, tick); play(row, { kind: 'footstep', id: e.id, unitType: 1, classId: a.classId }); }
+        if (row) { lastStep.set(e.id, tick); play(row, { kind: 'footstep', id: e.id, unitType: 1, classId: a.classId }); const layer = monsterLayer?.(a.classId); if (layer) play(layer, { kind: 'footstep', id: e.id, unitType: 1, classId: a.classId }); /* retail 0x88A70 submits the layer row on the same footfall (FsPrb 100) */ }
       }
       const now = new Map(), sawItems = itemsSeen; // items list seen on an earlier update: the first one is the world as found, not arrivals
       if (Array.isArray(snapshot?.items)) itemsSeen = true;

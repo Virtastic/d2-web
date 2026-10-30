@@ -61,6 +61,8 @@ uint32_t Fb[2] = {0x00b63052u, 0x50f180c0u};
 uint32_t* fallbackSeed() { return Fb; }
 void reset() { Fb[0] = 0x00b63052u; Fb[1] = 0x50f180c0u; E = Env{}; Now = 0; A.qn = 0; A.nextHandle = 1; A.vol = 0; }
 void setArea(U key) { A.key = key; }
+// A sound-engine submit from another client handler (0x88A70): a one-shot, drained with the ambient pairs.
+void submit(int32_t row) { A.f88a70(U(row), 2); }
 // One 0x5F020 call. period = D2Common #10396; seed = the client hero seed.
 void tick(uint32_t* seed, U period, bool weatherLevel) {
     A.seed = seed; A.period = period; A.weatherLevel = weatherLevel;
