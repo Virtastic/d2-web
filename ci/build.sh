@@ -76,7 +76,7 @@ TOOLCHAIN_ID=$(docker image inspect "$IMAGE" --format '{{.Id}}')
 export BUILDER_IMAGE="$TOOLCHAIN_ID"
 MSYS_NO_PATHCONV=1 docker run --rm "${CACHE_ARGS[@]}" \
   -e D2_TOOLCHAIN_ID="$TOOLCHAIN_ID" -e HOME=/tmp -e D2_CXXFLAGS="${D2_CXXFLAGS:-}" -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" \
-  -v "$MOUNT:/build" "$TOOLCHAIN_ID" bash wasm-build/link-d2.sh
+  -v "$MOUNT:/build" -v "$MOUNT:$MOUNT:ro" "$TOOLCHAIN_ID" bash wasm-build/link-d2.sh
 
 echo "==> synthetic smoke.mpq"
 NODE_BIN="$(command -v node || command -v node.exe || true)"
@@ -85,7 +85,7 @@ NODE_BIN="$(command -v node || command -v node.exe || true)"
 
 echo "==> precompress engine (in $IMAGE)"
 MSYS_NO_PATHCONV=1 docker run --rm \
-  -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" -v "$MOUNT:/build" "$TOOLCHAIN_ID" \
+  -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" -v "$MOUNT:/build" -v "$MOUNT:$MOUNT:ro" "$TOOLCHAIN_ID" \
   bash -c 'bash wasm-build/make_br.sh && chown "$D2_OUTPUT_OWNER" play/d2.js.br play/d2.wasm.br'
 
 flock -u 9; exec 9>&-
