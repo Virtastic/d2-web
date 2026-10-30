@@ -752,10 +752,19 @@ void __fastcall sub_6FC80440(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
 }
 
 //D2Game.0x6FC805B0
+// 1.13c D2Game+0x79E40
 void __fastcall PLRMODE_StartID_Death(D2GameStrc* pGame, D2UnitStrc* pDefender, int32_t a3, D2UnitStrc* pAttacker)
 {
-    if (SKILLS_RemoveTransformStatesFromShapeshiftedUnit(pDefender))
+    // 1.13c: the transform states are stripped for any unit, but only a druid
+    // goes back through the mode-1 start; with an item on the cursor it returns without doing so.
+    const bool bDruid = pDefender && pDefender->dwUnitType == UNIT_PLAYER && pDefender->dwClassId == PCLASS_DRUID;
+    if (SKILLS_RemoveTransformStatesFromShapeshiftedUnit(pDefender) && bDruid)
     {
+        D2_ASSERT(pGame);
+        if (pDefender->pInventory && pDefender->pInventory->pCursorItem)
+        {
+            return;
+        }
         sub_6FC817D0(pGame, pDefender, nullptr, 1, 0, 0, 1);
         return;
     }

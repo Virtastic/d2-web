@@ -92,6 +92,17 @@ extern "C" int D2WEB_TakeObjectMessage(int32_t* pGuid, uint32_t* pStringId) {
     --g_d2webObjectMessageCount;
     return 1;
 }
+// OPEND2-18462: retail's NPC "!" (overlay 0x48) is client state driven by two server packets.
+// 0x8A {type 1, guid} -- QUESTS_ActiveCycler on an act quest's pfActiveFilter, or Wussie's AI --
+// attaches it to that NPC; a type-1 0x28 (the NPC-interact quest record, D2Client 0x6FAF6770)
+// clears it from every NPC. Latched here so the page draws exactly the units retail's client would.
+static int32_t g_d2webNpcAlertGuids[64];
+static int g_d2webNpcAlertCount = 0;
+extern "C" void D2WEB_ResetNpcAlerts() { g_d2webNpcAlertCount = 0; }
+extern "C" int D2WEB_NpcAlertActive(int32_t guid) {
+    for (int i = 0; i < g_d2webNpcAlertCount; ++i) if (g_d2webNpcAlertGuids[i] == guid) return 1;
+    return 0;
+}
 static D2GSPacketSrv27 g_d2webLastDialogPacket = {};
 static bool g_d2webHasDialogPacket = false;
 
@@ -622,6 +633,14 @@ void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, in
             g_d2webObjectMessages[g_d2webObjectMessageCount++] = { (int32_t)p27->dwUnitGUID, p27->pMessageList.pMessages[0].nStringId };
         }
     }
+    if (pClient && pPacket && nPacketSize == (int32_t)sizeof(D2GSPacketSrv8A) &&
+        static_cast<D2GSPacketSrv8A*>(pPacket)->nHeader == 0x8A && static_cast<D2GSPacketSrv8A*>(pPacket)->nUnitType == UNIT_MONSTER) {
+        const int32_t guid = (int32_t)static_cast<D2GSPacketSrv8A*>(pPacket)->dwUnitGUID;
+        if (!D2WEB_NpcAlertActive(guid) && g_d2webNpcAlertCount < 64) g_d2webNpcAlertGuids[g_d2webNpcAlertCount++] = guid;
+    }
+    if (pClient && pPacket && nPacketSize == (int32_t)sizeof(D2GSPacketSrv28) &&
+        static_cast<D2GSPacketSrv28*>(pPacket)->nHeader == 0x28 && static_cast<D2GSPacketSrv28*>(pPacket)->unk0x01 == UNIT_MONSTER)
+        g_d2webNpcAlertCount = 0;
     if (pClient && pPacket && nPacketSize == (int32_t)sizeof(D2GSPacketSrv5D) &&
         static_cast<D2GSPacketSrv5D*>(pPacket)->nHeader == 0x5D) {
         g_d2webLastQuestStatusPacket = *static_cast<D2GSPacketSrv5D*>(pPacket);

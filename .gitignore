@@ -131,6 +131,9 @@ wasm-build/*
 test/*
 !test/plugy-stash-sidecar.test.mjs
 !test/plugy-stash-ui.test.mjs
+!test/inventory-click-route.test.mjs
+!test/repair-packet-mode.test.mjs
+!test/vendor-repair-confirm.test.mjs
 !test/act-music-volume.test.mjs
 !test/alt-label-hover.test.mjs
 !test/area-hover-label.test.mjs
@@ -190,6 +193,7 @@ test/*
 !test/frontdoor-error.test.mjs
 !test/frontend-pointer-states.test.mjs
 !test/game-cursor-clock.test.mjs
+!test/game-cursor-modes.test.mjs
 !test/game-menu-input.test.mjs
 !test/gateway-key-input.test.mjs
 !test/gl-present.test.mjs
@@ -214,6 +218,7 @@ test/*
 !test/inventory-gold-gesture.test.mjs
 !test/inventory-hover-desc.test.mjs
 !test/inventory-panel.test.mjs
+!test/item-cel-place.test.mjs
 !test/item-ground-colour.test.mjs
 !test/item-pick.test.mjs
 !test/item-property-cache.test.mjs

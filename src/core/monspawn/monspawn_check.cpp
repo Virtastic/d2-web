@@ -885,6 +885,9 @@ static int32_t g_sessionTargetX, g_sessionTargetY;
 static bool g_sessionRunToggle = false;
 
 extern "C" void D2WEB_ResetLastDialogPacket();
+// OPEND2-18462: the NPC "!" latch the send shim keeps from 0x8A / type-1 0x28 (game_net_stubs.cpp).
+extern "C" void D2WEB_ResetNpcAlerts();
+extern "C" int D2WEB_NpcAlertActive(int32_t guid);
 extern "C" int D2WEB_CopyLastDialogPacket(D2GSPacketSrv27* pPacket);
 extern "C" int D2WEB_TakeObjectMessage(int32_t* pGuid, uint32_t* pStringId);
 extern "C" void D2WEB_ResetLastQuestStatusPacket();
@@ -1707,8 +1710,9 @@ static void updateSessionWorld() {
                 object.inClientRoom = (clientHeldCount(room) > 0 || inStartLattice(roomEx));
                 object.locked = txt->nLockable && (unit->pObjectData->InteractType & 0x80);
                 if (txt->nSubClass & (OBJSUBCLASS_TOWNPORTAL | OBJSUBCLASS_PORTAL)) object.portalLevel = unit->pObjectData->InteractType;
-                const uint8_t* pieces = &txt->nHD;
-                for (uint32_t component = 0; component < 16; ++component) if (pieces[component]) object.componentMask |= 1u << component;
+                // The COF names the layers an object draws; the table's piece flags are not consulted
+                // (the Act 4 red portal row lists TR only, and drew as its black base oval).
+                object.componentMask = 0xFFFFu;
                 g_sessionObjectPresentations.push_back(object);
             }
             if (unit->dwUnitType != UNIT_PLAYER && unit->dwUnitType != UNIT_MONSTER && unit->dwUnitType != UNIT_ITEM && unit->dwUnitType != UNIT_MISSILE) continue;
@@ -3143,7 +3147,7 @@ static int d2_session_create_for_class(uint32_t seed, int difficulty, int act, i
     g_sessionPendingObject = 0;
     g_sessionApproachKind = 0; g_sessionApproachTarget = 0;
     memset(&g_sessionNpcInteraction, 0, sizeof g_sessionNpcInteraction);
-    memset(&g_sessionNpcDialog, 0, sizeof g_sessionNpcDialog); D2WEB_ResetLastDialogPacket();
+    memset(&g_sessionNpcDialog, 0, sizeof g_sessionNpcDialog); D2WEB_ResetLastDialogPacket(); D2WEB_ResetNpcAlerts();
     memset(&g_sessionNpcResponse, 0, sizeof g_sessionNpcResponse);
     memset(&g_sessionVendor, 0, sizeof g_sessionVendor);
     g_sessionVendorItems.clear(); memset(&g_sessionVendorTransaction, 0, sizeof g_sessionVendorTransaction);
@@ -5556,23 +5560,13 @@ EMSCRIPTEN_KEEPALIVE int d2_session_unit_kinds(uint8_t* out, int cap) {
 // Whether each unit carries retail's NPC speech alert (`npcalert`, the gold "!", F22): one byte per
 // unit in d2_session_units order, 1 when the alert is pending, else 0.
 //
-// The state is the engine's own, not a client guess about who has news: the NPC's QUEST intro flag,
-// which every per-act Intro quest callback reads as "this NPC still has an intro speech to deliver"
-// (ACT1Intro_ActiveFilterCallback 0x6FC97770 and its act II/III/V siblings). It is SET when that
-// speech is acknowledged -- PLRINTRO_SetQuestIntroFlag, from the act's Intro scroll-message callback
-// (ACT1Intro_Callback11_ScrollMessage 0x6FC97640), which runs on the player's own message pick
-// (client packet 0x31, the acknowledgement d2_session_command_npc_response drives), and a fresh
-// player's flags are zero, which is retail's own state in the start-of-Act-I capture w0.png.
-//
-// The OTHER intro buffer, pNpcIntroFlags, is NOT this state and was measured out: PLRINTRO_MaskNpcIntroFlag
-// (packet 0x4D PlayNpcMessage) CLEARS a bit that a fresh player has already clear -- the packet
-// returns success and the per-unit alert does not move -- so it cannot be what the balloon clears on.
-//
-// PLRINTRO_HasNpcIntro narrows it to the classes retail's own intro table names, because
-// PLRINTRO_GetQuestIntroFlag answers bit 0 -- the "any intro delivered" bit, set unconditionally for
-// any NPC -- for a class outside the table, which would otherwise clear the alert over every talkable
-// monster the first time any NPC's intro was delivered. The INTERACT flag and pMonInteract are the
-// same talkable-NPC test d2_session_unit_kinds and d2_session_command_nearest_npc already use.
+// The state is retail's client overlay 0x48, fed only by server packets. Town-NPC AI (sub_6FCCFDE0,
+// within 15) calls QUESTS_ActiveCycler (1.13c D2Game+0x34EA0), which asks the current act's quest
+// pfActiveFilter callbacks and sends 0x8A {1, guid} on the first true one (Wussie's AI sends one
+// too); D2Client 0x6FAF7970 attaches the "!". The type-1 0x28 the server sends when an NPC
+// interaction opens clears the overlay from every loaded NPC (D2Client 0x6FAF6770). Both sends are
+// latched in game_net_stubs.cpp. The act filters name Akara, Cain, Tyrael, Izual, Malah, Hadriel
+// and the like (Act II's intro filter is constant false; Act IV has no intro quest), never Halbu.
 //
 // Emitted beside D2SessionUnit for the same reason unit_kinds is: that record's 44-byte stride is
 // hardcoded in a dozen scenarios.
@@ -5584,12 +5578,9 @@ EMSCRIPTEN_KEEPALIVE int d2_session_npc_speech_alerts(uint8_t* out, int cap) {
         if (written >= cap) break;
         uint8_t pending = 0;
         if (unit.type == UNIT_MONSTER) {
-            D2UnitStrc* npc = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)unit.id);
-            D2MonStatsTxt* stats = npc ? MONSTERMODE_GetMonStatsTxtRecord(npc->dwClassId) : nullptr;
-            if (stats && npc->pMonsterData && npc->pMonsterData->pMonInteract &&
-                (stats->dwMonStatsFlags & gdwBitMasks[MONSTATSFLAGINDEX_INTERACT]) &&
-                PLRINTRO_HasNpcIntro(npc->dwClassId) &&
-                !PLRINTRO_GetQuestIntroFlag(g_targetPlayer, g_game, npc->dwClassId)) pending = 1;
+            // OPEND2-18462: retail draws "!" from the 0x8A the server sent (QUESTS_ActiveCycler's
+            // act-quest filters), not from the NPC-intro flags; Halbu and the rest of Act 4 have none.
+            pending = (uint8_t)D2WEB_NpcAlertActive((int32_t)unit.id);
         }
         out[written++] = pending;
     }
@@ -6301,6 +6292,17 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_vendor_gamble(uint32_t npcId, uint32
     updateSessionVendorItems(npc);
     return (out.flags & 23) == 23;
 }
+// 1.13c D2Client+0x45B40 (the needs-repair predicate the shop gates a repair click on): durability
+// below its maximum, or a throwing weapon's quantity below its stack maximum. The third clause
+// (D2Common #10607 with a zero out value) is not traced and is not applied.
+EMSCRIPTEN_KEEPALIVE int d2_session_item_needs_repair(uint32_t itemId) {
+    if (!g_sessionLive || !g_game) return 0;
+    D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId);
+    if (!item) return 0;
+    const int32_t maxDur = STATLIST_GetMaxDurabilityFromUnit(item);
+    if (maxDur && STATLIST_UnitGetStatValue(item, STAT_DURABILITY, 0) < maxDur) return 1;
+    return ITEMS_CheckIfThrowable(item) && STATLIST_UnitGetStatValue(item, STAT_QUANTITY, 0) < ITEMS_GetTotalMaxStack(item) ? 1 : 0;
+}
 EMSCRIPTEN_KEEPALIVE int d2_session_command_vendor_repair(uint32_t npcId, uint32_t itemId) {
     memset(&g_sessionRepair, 0, sizeof g_sessionRepair);
     D2SessionRepair& out = g_sessionRepair;
@@ -6327,6 +6329,9 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_vendor_repair(uint32_t npcId, uint32
     // Retail D2Client+0x46EE0 sends Ordinal_10973(item, 0x48) here: the item's durability (stat 72).
     const int32_t npcGuid = (int32_t)npcId, itemGuid = (int32_t)itemId, individual = out.durabilityBefore;
     memcpy(packet + 1, &npcGuid, sizeof npcGuid); memcpy(packet + 5, &itemGuid, sizeof itemGuid);
+    // Bytes 9-12: the item's dwMode low word, zero-extended (retail D2Client+0x46EE0).
+    const uint32_t itemMode = (uint16_t)item->dwAnimMode;
+    memcpy(packet + 9, &itemMode, sizeof itemMode);
     memcpy(packet + 13, &individual, sizeof individual);
     if (!sessionDispatchGate(0x35)) return -2;
     out.handlerResult = D2GAME_PACKETCALLBACK_Rcv0x35_Repair_6FC86B70(g_game, g_targetPlayer, packet, sizeof packet);
@@ -10787,7 +10792,7 @@ EMSCRIPTEN_KEEPALIVE void d2_session_destroy() {
     g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionUnitFacings.clear(); g_sessionUnitOverlays.clear(); g_sessionUnitStates.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionItemColours.clear(); g_sessionTiles.clear(); g_sessionSeamTiles.clear(); g_sessionTileRolls.clear(); g_sessionTileLibraries.clear(); g_sessionWarps.clear(); g_sessionWarpOrigins.clear(); g_sessionMissileAnimations.clear();
     memset(&g_sessionItemState, 0, sizeof g_sessionItemState);
     memset(&g_sessionNpcInteraction, 0, sizeof g_sessionNpcInteraction);
-    memset(&g_sessionNpcDialog, 0, sizeof g_sessionNpcDialog); D2WEB_ResetLastDialogPacket();
+    memset(&g_sessionNpcDialog, 0, sizeof g_sessionNpcDialog); D2WEB_ResetLastDialogPacket(); D2WEB_ResetNpcAlerts();
     memset(&g_sessionNpcResponse, 0, sizeof g_sessionNpcResponse);
     memset(&g_sessionVendor, 0, sizeof g_sessionVendor);
     g_sessionVendorItems.clear(); memset(&g_sessionVendorTransaction, 0, sizeof g_sessionVendorTransaction);

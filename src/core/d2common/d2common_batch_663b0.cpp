@@ -14,6 +14,13 @@
 #include "DataTbls/ItemsTbls.h"
 #include "DataTbls/SkillsTbls.h"
 #include "Units/Units.h"
+#include "Units/Missile.h"
+#include "D2StatList.h"
+#include "DataTbls/MonsterTbls.h"
+#include "DataTbls/MissilesTbls.h"
+#include "D2DataTbls.h"
+
+extern "C" uint32_t D2Common_4E480_FindSkillNode(uint32_t unit, int32_t skillId);   // 1.13c D2Common+0x4E480
 
 namespace
 {
@@ -133,14 +140,14 @@ bool D2Common_24D00_ItemIsBaseVariantNotQuest(uint32_t nItemId)
 
 // 1.13c D2Common+0x51070 (#10147): skills.txt field/stat dispatcher.
 // nSkillId indexes skills.txt (row stride 0x23C); nSelector picks the field or formula below.
-// The damage/mana values are the skills.txt fixed-point formulas: wLevelMana (+0x18C) per level
-// above the first, plus wMana (+0x18A), shifted left by nManaShift (+0x188) & 0x1F, then >> 8
-// for selectors 0x15/0x16. Selector 0x07 is the D2Common_11033 interpolation over dwParam[6]/[7].
-// ponytail: the selectors not listed here dispatch to still-UNMAPPED rows 0x1670, 0x4E680,
-// 0x16B0, 0x4E630, 0x16F0, 0x4E5E0, 0x1730, 0x1500, 0x1550, 0x1580, 0x15B0, 0x15E0, 0x1610,
-// 0x1640, 0x4E900, 0x4E7A0, 0x38B70 and 0x4E480, so they answer 0. The raw-field cases are
-// followed in retail by an indirection through the table at sgptDataTables+0x40 (Ordinal_10253);
-// that table/ordinal is not modelled, so they return the raw dword.
+//  0x00-0x06: dwParam pairs. Even selectors (0,2,4,6) are (lvl-1)*high+low (0 for lvl<=0, thunks
+//             0x1670/0x16B0/0x16F0/0x1730); odd 1,3,5 interpolate the pair with D2Common_11033
+//             (0x4E680/0x4E630/0x4E5E0, lvl>0 only). 0x07 interpolates pair 6/7 with no level check.
+//  0x08-0x0F: raw dwParam[0..7] (thunks 0x1550..0x1640). 0x10 = level.
+//  0x13/0x33: elemental length (0x4E900). 0x17-0x19: passive mastery calc (0x4E7A0).
+//  0x1A-0x22, 0x2B-0x30: skilldesc missile (index (sel-base)/3) damage/length; 0x23-0x25 range (missile index sel-0x23).
+//  0x28: unit stat 12 (level); 0x29: highest-level own skill node level, clamped to [0, max].
+//  0x36-0x48: a raw skills.txt calc offset evaluated over the skills code blob (0x51BF0 body).
 uint32_t D2Common_51070_GetSkillStat(uint32_t pUnit, uint8_t nSelector, int32_t nSkillId, uint32_t nLevel)
 {
 	static_assert(offsetof(D2SkillsTxt, dwAuraLenCalc) == 0x60, "skills.txt dwAuraLenCalc");
@@ -151,9 +158,11 @@ uint32_t D2Common_51070_GetSkillStat(uint32_t pUnit, uint8_t nSelector, int32_t 
 	static_assert(offsetof(D2SkillsTxt, dwCalc) == 0x138, "skills.txt dwCalc");
 	static_assert(offsetof(D2SkillsTxt, dwParam) == 0x148, "skills.txt dwParam");
 	static_assert(offsetof(D2SkillsTxt, dwSkPoints) == 0x170, "skills.txt dwSkPoints");
+	static_assert(offsetof(D2SkillsTxt, wSkillDesc) == 0x194, "skills.txt wSkillDesc");
 	static_assert(offsetof(D2SkillsTxt, nManaShift) == 0x188, "skills.txt nManaShift");
 	static_assert(offsetof(D2SkillsTxt, wMana) == 0x18A, "skills.txt wMana");
 	static_assert(offsetof(D2SkillsTxt, wLevelMana) == 0x18C, "skills.txt wLevelMana");
+	static_assert(offsetof(D2SkillDescTxt, wDescMissile) == 0x3C, "skilldesc.txt wDescMissile");
 	static_assert(sizeof(D2SkillsTxt) == 0x23C, "skills.txt row size");
 
 	const D2SkillsTxt* row = DATATBLS_GetSkillsTxtRecord(nSkillId);
@@ -163,18 +172,72 @@ uint32_t D2Common_51070_GetSkillStat(uint32_t pUnit, uint8_t nSelector, int32_t 
 	const int32_t nLvl = static_cast<int32_t>(nLevel);
 	D2UnitStrc* pSkillUnit = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit));
 	const uint32_t nShift = row->nManaShift & 0x1Fu;
+	const auto eval = [&](uint32_t nCalc) -> uint32_t {
+		return static_cast<uint32_t>(SKILLS_EvaluateSkillFormula(pSkillUnit, nCalc, nSkillId, nLvl));
+	};
+
+	// skilldesc missile id for the damage/length selectors; -1 when any of the three lookups fails.
+	const auto descMissile = [&](int32_t nIndex) -> int32_t {
+		const D2SkillDescTxt* desc = DATATBLS_GetSkillDescTxtRecord(row->wSkillDesc);
+		if (!desc)
+			return -1;
+		const int32_t nMissile = static_cast<int16_t>(desc->wDescMissile[nIndex]);
+		return DATATBLS_GetMissilesTxtRecord(nMissile) ? nMissile : -1;
+	};
 
 	switch (nSelector)
 	{
+	case 0x00: return nLvl > 0 ? static_cast<uint32_t>((nLvl - 1) * static_cast<int32_t>(row->dwParam[1]) + static_cast<int32_t>(row->dwParam[0])) : 0;
+	case 0x01: return nLvl > 0 ? static_cast<uint32_t>(D2Common_11033(nLvl, row->dwParam[0], row->dwParam[1])) : 0;
+	case 0x02: return nLvl > 0 ? static_cast<uint32_t>((nLvl - 1) * static_cast<int32_t>(row->dwParam[3]) + static_cast<int32_t>(row->dwParam[2])) : 0;
+	case 0x03: return nLvl > 0 ? static_cast<uint32_t>(D2Common_11033(nLvl, row->dwParam[2], row->dwParam[3])) : 0;
+	case 0x04: return nLvl > 0 ? static_cast<uint32_t>((nLvl - 1) * static_cast<int32_t>(row->dwParam[5]) + static_cast<int32_t>(row->dwParam[4])) : 0;
+	case 0x05: return nLvl > 0 ? static_cast<uint32_t>(D2Common_11033(nLvl, row->dwParam[4], row->dwParam[5])) : 0;
+	case 0x06: return nLvl > 0 ? static_cast<uint32_t>((nLvl - 1) * static_cast<int32_t>(row->dwParam[7]) + static_cast<int32_t>(row->dwParam[6])) : 0;
 	case 0x07:
 		return static_cast<uint32_t>(D2Common_11033(nLvl, row->dwParam[6], row->dwParam[7]));
 
+	case 0x08: return static_cast<uint32_t>(row->dwParam[0]);
+	case 0x09: return static_cast<uint32_t>(row->dwParam[1]);
+	case 0x0A: return static_cast<uint32_t>(row->dwParam[2]);
+	case 0x0B: return static_cast<uint32_t>(row->dwParam[3]);
+	case 0x0C: return static_cast<uint32_t>(row->dwParam[4]);
+	case 0x0D: return static_cast<uint32_t>(row->dwParam[5]);
 	case 0x0E: return static_cast<uint32_t>(row->dwParam[6]);
 	case 0x0F: return static_cast<uint32_t>(row->dwParam[7]);
 	case 0x10: return nLevel;
 
-	case 0x11: return static_cast<uint32_t>(SKILLS_GetMinElemDamage(pSkillUnit, nSkillId, nLvl, 0)) >> 8;
-	case 0x12: return static_cast<uint32_t>(SKILLS_GetMaxElemDamage(pSkillUnit, nSkillId, nLvl, 0)) >> 8;
+	case 0x11: return static_cast<uint32_t>(SKILLS_GetMinElemDamage(pSkillUnit, nSkillId, nLvl, 0) >> 8);
+	case 0x12: return static_cast<uint32_t>(SKILLS_GetMaxElemDamage(pSkillUnit, nSkillId, nLvl, 0) >> 8);
+	case 0x13:
+	case 0x33:
+	{
+		// 0x4E900: levels 1..8 add dwELevLen[0] each, 9..16 dwELevLen[1], 17+ dwELevLen[2]; a calc
+		// percentage (when set and inside the blob) is added on top through DATATBLS_ApplyRatio.
+		if (nLvl <= 0)
+			return 0;
+		int32_t nOffset;
+		if (nLvl < 0x11)
+		{
+			if (nLvl < 9)
+				nOffset = (nLvl - 1) * static_cast<int32_t>(row->dwELevLen[0]);
+			else
+				nOffset = (nLvl - 8) * static_cast<int32_t>(row->dwELevLen[1]) + static_cast<int32_t>(row->dwELevLen[0]) * 7;
+		}
+		else
+		{
+			nOffset = (nLvl - 0x10) * static_cast<int32_t>(row->dwELevLen[2]) +
+			          static_cast<int32_t>(row->dwELevLen[1]) * 8 + static_cast<int32_t>(row->dwELevLen[0]) * 7;
+		}
+		int32_t nValue = static_cast<int32_t>(row->dwELen) + nOffset;
+		if (row->dwELenSymPerCalc != 0xFFFFFFFFu)
+		{
+			const int32_t nPercent = static_cast<int32_t>(eval(row->dwELenSymPerCalc));
+			if (nPercent != 0)
+				nValue += DATATBLS_ApplyRatio(nValue, nPercent, 100);
+		}
+		return static_cast<uint32_t>(nValue);
+	}
 	case 0x14: return static_cast<uint32_t>(SKILLS_GetToHitFactor(pSkillUnit, nSkillId, nLvl));
 
 	case 0x15:
@@ -192,32 +255,89 @@ uint32_t D2Common_51070_GetSkillStat(uint32_t pUnit, uint8_t nSelector, int32_t 
 		return static_cast<uint32_t>(static_cast<int32_t>(nShifted) >> 8);
 	}
 
+	case 0x17: return static_cast<uint32_t>(D2Common_11032(pSkillUnit, nSkillId, nLvl, 0));
+	case 0x18: return static_cast<uint32_t>(D2Common_11032(pSkillUnit, nSkillId, nLvl, 1));
+	case 0x19: return static_cast<uint32_t>(D2Common_11032(pSkillUnit, nSkillId, nLvl, 2));
+
+	case 0x1A: case 0x1D: case 0x20:
+	case 0x1B: case 0x1E: case 0x21:
+	case 0x1C: case 0x1F: case 0x22:
+	case 0x2B: case 0x2D: case 0x2F:
+	case 0x2C: case 0x2E: case 0x30:
+	{
+		if (nLvl < 1)
+			return 0;
+		const bool bFirst = nSelector < 0x23;
+		const int32_t nBase = bFirst ? (0x1A + (nSelector - 0x1A) % 3) : (0x2B + (nSelector - 0x2B) % 2);
+		const int32_t nMissile = descMissile((nSelector - nBase) / 3);
+		if (nMissile < 0)
+			return 0;
+		const int32_t nKind = bFirst ? (nSelector - 0x1A) % 3 : (nSelector - 0x2B) % 2;
+		if (nKind == 0)
+		{
+			const int32_t v = MISSILE_GetMinElemDamage(nullptr, pSkillUnit, nMissile, nLvl);
+			return static_cast<uint32_t>(bFirst ? (v >> 8) : v);
+		}
+		if (nKind == 1)
+		{
+			const int32_t v = MISSILE_GetMaxElemDamage(nullptr, pSkillUnit, nMissile, nLvl);
+			return static_cast<uint32_t>(bFirst ? (v >> 8) : v);
+		}
+		return static_cast<uint32_t>(MISSILE_GetElementalLength(0, pSkillUnit, nMissile, nLvl));
+	}
+
+	case 0x23: case 0x24: case 0x25:
+	{
+		// no level check in retail; the missile id is skilldesc wDescMissile[sel - 0x23]
+		const int32_t nMissile = descMissile(nSelector - 0x23);
+		if (nMissile < 0)
+			return 0;
+		const D2MissilesTxt* miss = DATATBLS_GetMissilesTxtRecord(nMissile);
+		return static_cast<uint32_t>(static_cast<int32_t>(static_cast<int16_t>(miss->wLevRange)) * nLvl + static_cast<int32_t>(static_cast<int16_t>(miss->wRange)));
+	}
+
 	case 0x26: return static_cast<uint32_t>(SKILLS_GetMinElemDamage(pSkillUnit, nSkillId, nLvl, 0));
 	case 0x27: return static_cast<uint32_t>(SKILLS_GetMaxElemDamage(pSkillUnit, nSkillId, nLvl, 0));
-	case 0x31: return static_cast<uint32_t>(SKILLS_GetMinElemDamage(pSkillUnit, nSkillId, nLvl, 1)) >> 8;
-	case 0x32: return static_cast<uint32_t>(SKILLS_GetMaxElemDamage(pSkillUnit, nSkillId, nLvl, 1)) >> 8;
+	case 0x28:
+		return pSkillUnit ? static_cast<uint32_t>(STATLIST_UnitGetStatValue(pSkillUnit, STAT_LEVEL, 0)) : 0;
+	case 0x29:
+	{
+		if (!pSkillUnit)
+			return 0;
+		const uint32_t node = D2Common_4E480_FindSkillNode(pUnit, nSkillId);
+		if (!node)
+			return 0;
+		int32_t nValue = static_cast<int32_t>(W(P(node), 0x28));
+		if (nValue < 0)
+			nValue = 0;
+		const int32_t nMax = DATATBLS_GetMaxLevel(0);
+		return static_cast<uint32_t>(nMax <= nValue ? nMax : nValue);
+	}
+
+	case 0x31: return static_cast<uint32_t>(SKILLS_GetMinElemDamage(pSkillUnit, nSkillId, nLvl, 1) >> 8);
+	case 0x32: return static_cast<uint32_t>(SKILLS_GetMaxElemDamage(pSkillUnit, nSkillId, nLvl, 1) >> 8);
 	case 0x34: return static_cast<uint32_t>(SKILLS_GetMinElemDamage(pSkillUnit, nSkillId, nLvl, 1));
 	case 0x35: return static_cast<uint32_t>(SKILLS_GetMaxElemDamage(pSkillUnit, nSkillId, nLvl, 1));
 
-	case 0x36: return row->dwAuraLenCalc;
-	case 0x37: return row->dwAuraRangeCalc;
-	case 0x38: return row->dwCalc[0];
-	case 0x39: return row->dwCalc[1];
-	case 0x3A: return row->dwCalc[2];
-	case 0x3B: return row->dwCalc[3];
-	case 0x3C: return static_cast<uint32_t>(row->dwAuraStatCalc[0]);
-	case 0x3D: return static_cast<uint32_t>(row->dwAuraStatCalc[1]);
-	case 0x3E: return static_cast<uint32_t>(row->dwAuraStatCalc[2]);
-	case 0x3F: return static_cast<uint32_t>(row->dwAuraStatCalc[3]);
-	case 0x40: return static_cast<uint32_t>(row->dwAuraStatCalc[4]);
-	case 0x41: return static_cast<uint32_t>(row->dwAuraStatCalc[5]);
-	case 0x42: return row->dwPassiveCalc[0];
-	case 0x43: return row->dwPassiveCalc[1];
-	case 0x44: return row->dwPassiveCalc[2];
-	case 0x45: return row->dwPassiveCalc[3];
-	case 0x46: return row->dwPassiveCalc[4];
-	case 0x47: return row->dwPetMax;
-	case 0x48: return row->dwSkPoints;
+	case 0x36: return eval(row->dwAuraLenCalc);
+	case 0x37: return eval(row->dwCalc[0]);
+	case 0x38: return eval(row->dwCalc[1]);
+	case 0x39: return eval(row->dwCalc[2]);
+	case 0x3A: return eval(row->dwCalc[3]);
+	case 0x3B: return eval(row->dwAuraRangeCalc);
+	case 0x3C: return eval(row->dwAuraStatCalc[0]);
+	case 0x3D: return eval(row->dwAuraStatCalc[1]);
+	case 0x3E: return eval(row->dwAuraStatCalc[2]);
+	case 0x3F: return eval(row->dwAuraStatCalc[3]);
+	case 0x40: return eval(row->dwAuraStatCalc[4]);
+	case 0x41: return eval(row->dwAuraStatCalc[5]);
+	case 0x42: return eval(row->dwPassiveCalc[0]);
+	case 0x43: return eval(row->dwPassiveCalc[1]);
+	case 0x44: return eval(row->dwPassiveCalc[2]);
+	case 0x45: return eval(row->dwPassiveCalc[3]);
+	case 0x46: return eval(row->dwPassiveCalc[4]);
+	case 0x47: return eval(row->dwPetMax);
+	case 0x48: return eval(row->dwSkPoints);
 
 	default: return 0;
 	}

@@ -14,7 +14,8 @@ EXT(Ordinal_10973); EXT(Ordinal_10045); EXT(Ordinal_10158);
 EXT(Ordinal_10498); EXT(Ordinal_10494); EXT(Ordinal_11103); EXT(FUN_6fc21560); extern "C" __attribute__((weak, import_module("env"), import_name("FUN_6fcaea80"))) void* b72_FUN_6fcaea80(void*, void*, int, int, int, int, int); EXT(FUN_6fc95e10);
 EXT(FUN_6fc21130); EXT(FUN_6fc21100); EXT(FUN_6fc21220); EXT(FUN_6fc95680); EXT(FUN_6fcc28f0); EXT(FUN_6fc95a40);
 
-// 1.13c D2Game+0x75900 (edi = struct whose +4 is the unit)
+// 1.13c D2Game+0x75900 (edi = struct whose +4 is the unit; param_1 = the one stack argument)
+// FUN_6fc21220 takes the unit's class id in EAX; FUN_6fc95680 takes (param_1, unit, 0, edi).
 extern "C" void b72_sub_75900(i32 edi, i32 param_1) {
   i32 unit = W(edi, 4), err;
   if (!unit) err = 0x1ed;
@@ -22,15 +23,15 @@ extern "C" void b72_sub_75900(i32 edi, i32 param_1) {
     if ((W(unit, 0xc4) >> 0x11) & 1) return;
     if (W(unit, 4) == 0x158) err = 0x1f8;
     else {
-      i32 a = (i32)FUN_6fc21130(unit), b = (i32)FUN_6fc21100(unit);
-      a = (i32)Ordinal_10331(unit, b, a, 0x801);
-      if ((int16_t)Ordinal_10482(a) != 0) return;
+      i32 y = (i32)FUN_6fc21130(unit), x = (i32)FUN_6fc21100(unit);
+      i32 room = (i32)Ordinal_10331(unit);
+      if ((int16_t)Ordinal_10482(room, x, y, 0x801) != 0) return;
       if ((i32)Ordinal_10331(unit) == 0) err = 0x1ff;
-      else if ((i32)FUN_6fc21220() != 0) { FUN_6fc95680(param_1, unit); return; }
+      else if ((i32)FUN_6fc21220(W(unit, 4)) != 0) { FUN_6fc95680(param_1, unit, 0, edi); return; }
       else err = 0x204;
     }
   }
-  Ordinal_10024((const void*)0, Ordinal_10265(err));
+  Ordinal_10024((const void*)0 /* DAT_6fd19ff9: the assert file string, no address in this seam */, Ordinal_10265(err));
   std::abort();
 }
 

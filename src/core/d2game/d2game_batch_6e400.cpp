@@ -22,14 +22,15 @@ struct D2GameBatch6E400Env {
     A dataTables;                  // *sgptDataTables_exref
     const uint32_t* bitMasks;      // gdwBitMasks
     const char* assertFile;        // DAT_6FD19FF9
+    const char* itemsFile;         // the __FILE__ string at 0x6FD1BD3C (ITEMS_CheckItemFlag in 0x70010)
     A handlerTable27BB8;           // 0x6FD27BB8: dword per +0x1B3 byte
     A fn8CF90;                     // &FUN_6fc8cf90
     // D2Common / Fog ordinals
     A    (*o10331)(A);  A (*o10265)(A);  void (*o10024)(const char*, A);  void (*o10920)(A);
     void (*o11090)(A, A);  A (*o10695)(A);  A (*o10688)(A);  A (*o10296)(A);  A (*o10826)(A);
     A    (*o10436)(A);  A (*o10373)(A);  A (*o10416)(A);  A (*o10459)(A, A, A, A, A);
-    A    (*o10942)(A);  void (*o10141)(A);  A (*o11088)(A);  void (*o10083)(A);  void (*o10782)(A);
-    void (*o10588)(A);  void (*o10467)(A);  void (*o10977)(A);  A (*o10202)(A);  A (*o10460)(A);
+    A    (*o10942)(A);  void (*o10141)(A);  A (*o11088)(A);  A (*o10083)(A);  void (*o10782)(A, A);
+    A (*o10588)(A);  void (*o10467)(A, A);  void (*o10977)(A, A, A);  A (*o10202)(A, A, A, A);  A (*o10460)(A);
     A    (*o11147)(A);  A (*o10464)(A);  A (*o10020)(A);  A (*o10494)(A, A);  A (*o10871)(A);
     A    (*o10680)(A, A, A);  void (*o501)(A);  A (*o10802)(A);  A (*o10744)(A, A);  A (*o10106)(A);
     A    (*o10620)(A);  A (*o10366)(A);  A (*o10225)(A);  A (*o10838)(A);  A (*o10973)(A, A, A);
@@ -173,15 +174,21 @@ void d2_fn_d2game_6E930(uint32_t eax, A ebx, A esi, A edi, uint16_t retaddr, int
     (void)edi;
 }
 
-// 1.13c D2Game+0x70010
+// 1.13c D2Game+0x70010: copy the ear / personalised-name data of a source item onto its duplicate.
+// dst = ESI (the duplicate), src = EDI (the original), bSet = the one stack argument (the hardcore flag of
+// the owning client). o11088 = ITEMS_GetItemType, o10083/o10782 = ITEMS_Get/SetEarName, o10588/o10467 =
+// ITEMS_Get/SetEarLevel, o10977 = ITEMS_SetItemFlag, o10202 = ITEMS_CheckItemFlag(item, flag, line, file).
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2game_70010(const D2GameBatch6E400Env* e)
+void d2_fn_d2game_70010(A dst, A src, A bSet, const D2GameBatch6E400Env* e)
 {
-    if (e->o11088(0) == 7) {                            // REG? unit
-        e->o10083(0); e->o10782(0); e->o10588(0); e->o10467(0); e->o10977(0);
+    if (e->o11088(dst) == 7) {                          // ITEMTYPE_PLAYER_BODY_PART
+        e->o10782(dst, e->o10083(src));
+        e->o10467(dst, e->o10588(src));
+        e->o10977(dst, 0x8000, bSet);                   // IFLAG_NAMED
         return;
     }
-    if (e->o10202(0) != 0) { e->o10083(0); e->o10782(0); }
+    if (e->o10202(dst, 0x1000000, 0x9aa, (A)e->itemsFile) != 0)   // IFLAG_PERSONALIZED
+        e->o10782(dst, e->o10083(src));
 }
 
 // 1.13c D2Game+0x70190
