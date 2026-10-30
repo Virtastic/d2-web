@@ -5,8 +5,9 @@
 const CAST = new Set([10, 13, 14, 15, 16, 18]), ATTACK = new Set([7, 8]);
 // Cast entry: D2Client 0xA2C90 spawns the skill's cltmissile (skill +0xE8) first; then cltdofunc 23 (0x74AC0), 25 (0x73CB0) and 27 (0x73E80) spawn cltmissilea (+0xEA). Ponytail: one missile; 23 spawns N bolts and 27 is target-gated, neither modelled.
 const CAST_SPAWN = new Set([23, 25, 27]);
-const spawn = (m, hero, tick) => { const len = Number(m.AnimLen) || 9;
-  return { kind: 'missile', classId: Number(m.Id), frames: Number(m.Range) || len, animLen: len, rate: Number(m.animrate) || 256, trans: 0, predraw: true, start: tick, wx: hero.x, wy: hero.y }; };
+// `hold`: the non-looping Sacrifice missile keeps its last frame (see update); every other effect ends after Range frames.
+const spawn = (m, hero, tick, hold = false) => { const len = Number(m.AnimLen) || 9;
+  return { kind: 'missile', classId: Number(m.Id), frames: Number(m.Range) || len, animLen: len, hold, loop: m.LoopAnim === '1', rate: Number(m.animrate) || 256, trans: 0, predraw: true, start: tick, wx: hero.x, wy: hero.y }; };
 // Overlay.txt AnimRate -> the node's per-update step in 1/256 frame units (D2Client 0x6B300: `AnimRate << 4`). Every overlay (castoverlay, state overlay, unit hit) uses it.
 export const overlayStep = (row) => (Number(row.AnimRate) || 16) << 4;
 export const table = (read, p) => { const r = new TextDecoder('latin1').decode(read(p)).split(/\r?\n/).map((l) => l.split('\t')), h = r[0];
@@ -26,16 +27,17 @@ export function createSkillFx(read) {
         const o = overlays.get(s.castoverlay);
         if ((CAST.has(hero.mode) || ATTACK.has(hero.mode)) && o) active.push({ kind: 'overlay', file: o.Filename, frames: Number(o.Frames) || 1, rate: overlayStep(o), trans: Number(o.Trans) || 0, start: tick });
         const cm = CAST.has(hero.mode) && (s.cltmissile || (CAST_SPAWN.has(Number(s.cltdofunc)) && s.cltmissilea));
-        if (cm && missiles.has(cm)) active.push(spawn(missiles.get(cm), hero, tick));
+        // a flying missile (Vel > 0: Fire Bolt) is the engine's own missile unit, drawn where it is; a static copy at the hero never ends
+        if (cm && missiles.has(cm) && !(Number(missiles.get(cm).Vel) > 0)) active.push(spawn(missiles.get(cm), hero, tick));
       }
       const cur = hero?.hp;
       if (hero && ATTACK.has(hero.mode) && s?.cltmissilea && missiles.has(s.cltmissilea) && hp !== undefined && cur < hp) {
         // D2Client 0xB17C0: a non-looping client missile holds its last AnimLen frame; a retail recording shows retail still drawing it at tick 400 (Range 128 from 19), so no expiry here (ponytail: freed with the area/session; add a room-unload free if casts pile up).
-        active.push(spawn(missiles.get(s.cltmissilea), hero, tick));
+        active.push(spawn(missiles.get(s.cltmissilea), hero, tick, true));
       }
       mode = hero?.mode; frame = fp; hp = cur;
-      active = active.filter((a) => a.animLen ? true : (tick - a.start) * a.rate / 256 < a.frames);
-      return active.map((a) => ({ ...a, age: Math.min(Math.floor((tick - a.start) * a.rate / 256), (a.animLen ?? Infinity) - 1) }));
+      active = active.filter((a) => a.hold || (a.kind === 'missile' ? tick - a.start : (tick - a.start) * a.rate / 256) < a.frames)  // a missile lives Range ticks;
+      return active.map((a) => ({ ...a, age: a.loop ? Math.floor((tick - a.start) * a.rate / 256) % a.animLen : Math.min(Math.floor((tick - a.start) * a.rate / 256), (a.animLen ?? Infinity) - 1) }));
     },
   };
 }
