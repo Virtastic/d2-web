@@ -16,6 +16,7 @@ PATS=(
   "person|\\bMike\\b|mstavridis|Stavridis"
   "agent-loop|\\b(CLAUDE\\.md|AGENTS\\.md|HANDOFF\\.md|OBJECTIVE\\.md|GOAL\\.md|plane\\.mjs|spawn-plan|ledger\\.mjs|re-d2(common|game|client)|merge-runner|vector-capture|subagent|coordinator)\\b|docs/(re|agents)/|tools/capture|d2-web-private"
   "secret|(ghp_[A-Za-z0-9]{20,}|github_pat_|sk-ant-|sk-[A-Za-z0-9]{32,}|AKIA[0-9A-Z]{16}|BEGIN [A-Z ]*PRIVATE KEY|xox[bp]-)"
+  "repo-map|\\b(redivivus|d2decomped|psi29a)\\b"
   "jargon|\\b(ledger|s39[0-9]{2}|coord-merge)\\b"
 )
 MSG_PATS=( "ai-trailer|^(Co-Authored-By|Claude-Session|Generated with)|claude\\.ai/code|@anthropic\\.com" "identity|@gmail\\.com" )
