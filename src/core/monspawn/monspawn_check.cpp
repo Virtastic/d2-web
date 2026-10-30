@@ -224,6 +224,7 @@ namespace d2client_hurricane { void reset(); void tick(D2UnitStrc* u, uint32_t* 
 namespace d2client_vine { void reset(); void tick(D2UnitStrc* hero); }
 namespace d2client_clmissile { void reset(); void cast(int32_t skillId, int32_t level, D2UnitStrc* target, int32_t tx, int32_t ty); void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)); }   // 1.13c D2Client+0x15DA0 (cltdofunc 17), +0xB17C0 / +0xB1420 (client missiles)
 namespace d2client_nova { void reset(); void selectSkill(int32_t skillId); int32_t selectedSkill(); void cast(int32_t skillId, bool presentation); void tick(); }   // 1.13c D2Client+0x73CB0 (cltdofunc 25, Poison Nova), +0x73D70 (cltdofunc 29, Frozen Orb)
+namespace d2client_blizzard { void reset(); void cast(int32_t skillId); void tick(); }   // 1.13c D2Client+0xBBC10 (cltdofunc 13, Blizzard center)
 static D2UnitStrc* g_sessionClientPlayerUnit = nullptr;
 static uint32_t g_sessionClientPlayerInitSeed = 0;
 // Session construction is class-selectable.  The older vector/AI attachment surface retains
@@ -1107,7 +1108,7 @@ static void syncSessionClientMapFromPlayer();
 static void resetSessionClientMapMirror() {
     if (g_sessionClientPlayerUnit) UNITS_FreeUnit(g_sessionClientPlayerUnit);
     g_sessionClientPlayerUnit = nullptr;
-    d2client::weather::reset(); d2client_ambient::reset(); d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset();
+    d2client::weather::reset(); d2client_ambient::reset(); d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset(); d2client_blizzard::reset();
     if (g_sessionClientActOwned) d2_drlg_act_end();
     g_sessionClientActOwned = false;
     g_sessionClientMapStarted = false;
@@ -5907,7 +5908,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_take_sounds(int32_t* out, int cap) {
         if (g_refusedDoWait > 0 && --g_refusedDoWait == 0 && g_playerSkillDoCount < 8) g_playerSkillDoIds[g_playerSkillDoCount++] = g_refusedDoSkill;
         for (int32_t i = 0; i < g_playerSkillDoCount; i++) {
             D2SkillsTxt* t = DATATBLS_GetSkillsTxtRecord(g_playerSkillDoIds[i]);
-            if (t && t->wCltDoFunc == 0 && t->wDoSound > 0 && g_targetPlayer)
+            if (t && (t->wCltDoFunc == 0 || t->wCltDoFunc == 28) && t->wDoSound > 0 && g_targetPlayer) // 28: Meteor's launch sound is its wDoSound too
                 g_pendingSkillDo.push_back({0, (int32_t)g_targetPlayer->dwUnitId, (int32_t)g_targetPlayer->dwClassId, 0x102, -1, 0, (int32_t)t->wDoSound});
         }
         if (g_cltMissileRow > 0 && g_targetPlayer) g_pendingSkillDo.push_back({0, (int32_t)g_targetPlayer->dwUnitId, (int32_t)g_targetPlayer->dwClassId, 0x102, -1, 0, g_cltMissileRow});
@@ -7350,6 +7351,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         // 1.13c D2Client+0xC9BE0 / 0x72C20: the client sees the Hurricane state the server set this frame.
         d2client_hurricane::tick(g_targetPlayer, g_sessionClientPlayerUnit ? reinterpret_cast<uint32_t*>(&g_sessionClientPlayerUnit->pSeed) : d2client_ambient::fallbackSeed());
         d2client_vine::tick(g_targetPlayer);   // 1.13c D2Client+0xC50F0 (cltactivefunc 89, state vine_beast)
+        d2client_blizzard::tick();
         d2client_nova::tick();   // 1.13c D2Client+0x73CB0 (cltdofunc 25, Poison Nova action frame)
     }
     updateSessionSnapshot(); return 1;
@@ -7658,6 +7660,7 @@ static int sessionCommandHandSkill(uint32_t targetUnitId, bool left) {
     D2SkillStrc* skill = left ? UNITS_GetLeftSkill(g_targetPlayer) : UNITS_GetRightSkill(g_targetPlayer);
     g_rightSkillRefusal = 3;
     if (!target || !target->pDynamicPath || !skill) return 0;
+    d2client_blizzard::cast(SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__));
     d2client_nova::cast(SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__), false);   // the client casts whether or not the server accepts the use (Frozen Orb, cltdofunc 29)
     d2client_clmissile::cast(SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__), SKILLS_GetSkillLevel(g_targetPlayer, skill, TRUE), target, 0, 0);   // 1.13c D2Client+0x15DA0 (cltdofunc 17, Teeth)
     g_rightSkillRefusal = 10 + SKILLS_GetUseState(g_targetPlayer, skill);   // 10 + SKILLUSTATE_* (not usable: mana, weapon, ...)
@@ -7725,6 +7728,7 @@ static int sessionCommandRightSkillAt(int32_t x, int32_t y, bool held) {
         g_rightSkillRefusal = 3;
         const int32_t useState = SKILLS_GetUseState(g_targetPlayer, skill);
         g_rightSkillRefusal = 10 + useState;
+        d2client_blizzard::cast(SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__));
         d2client_nova::cast(SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__), false);   // the client casts whether or not the server accepts the use; the refusal path plays the stsound
         // Retail's 0x0C callback (sub_6FC83340) swaps a skill that cannot be used (no mana, quantity or shape) for
         // plain Attack when its Skills.txt AttackNoMana flag is set (Double Swing, Frenzy unarmed: retail mode 7).
