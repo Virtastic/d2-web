@@ -544,6 +544,7 @@ void __fastcall DRLG_CreateRoomForRoomEx(D2DrlgStrc* pDrlg, D2DrlgRoomStrc* pDrl
 		// d2-web diagnosis (not retail): the order rooms are created in, and the seed each active room gets.
 		{ extern void d2_note_room_create(int, int, int, int); d2_note_room_create(pDrlgRoom->pLevel ? pDrlgRoom->pLevel->nLevelId : -1, pDrlgRoom->nTileXPos * 5, pDrlgRoom->nTileYPos * 5, nD2webRoomSeed); }
 		pDrlgRoom->pRoom = DUNGEON_AllocRoom(pDrlg->pAct, pDrlgRoom, &pDrlgCoords, &pDrlgRoom->pTileGrid->pTiles, nD2webRoomSeed, dwFlags);
+		{ extern void d2client_unitseed_room(const D2ActiveRoomStrc*, uint32_t); d2client_unitseed_room(pDrlgRoom->pRoom, (uint32_t)nD2webRoomSeed); }   // d2-web: the client room's seed
 	}
 }
 

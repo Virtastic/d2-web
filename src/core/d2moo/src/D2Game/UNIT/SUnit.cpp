@@ -623,6 +623,7 @@ D2UnitStrc* __fastcall SUNIT_AllocUnitData(int32_t nUnitType, int32_t nClassId, 
     if (a7 & 1)
     {
         SUNIT_Add(pUnit, nX, nY, pGame, pRoom, 1);
+        { extern void d2client_unitseed_created(D2UnitStrc*); d2client_unitseed_created(pUnit); }   // d2-web: the client builds it from its unit-add packet
 
         if (nUnitType == UNIT_PLAYER)
         {

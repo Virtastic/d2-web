@@ -1617,11 +1617,12 @@ void __fastcall SUNITDMG_ApplyColdState(D2UnitStrc* pAttacker, D2UnitStrc* pDefe
 		UNITS_UpdateAnimRateAndVelocity(pDefender, __FILE__, __LINE__);
 	}
 
-	if ((ITEMS_RollRandomNumber(&pDefender->pSeed) % 100) >= 20 && pDefender && pDefender->dwUnitType == UNIT_MONSTER)
+	// 1.13c D2Game+0xDC780: shatter on a 20% roll (rand % 100 < 20) for a monster whose MonStats2 DEADCOL bit is clear
+	if ((ITEMS_RollRandomNumber(&pDefender->pSeed) % 100) < 20 && pDefender && pDefender->dwUnitType == UNIT_MONSTER)
 	{
 		D2MonStats2Txt* pMonStats2TxtRecord = MONSTERREGION_GetMonStats2TxtRecord(pDefender->dwClassId);
 
-		if (pMonStats2TxtRecord->dwFlags & gdwBitMasks[MONSTATS2FLAGINDEX_DEADCOL])
+		if (!pMonStats2TxtRecord || !(pMonStats2TxtRecord->dwFlags & gdwBitMasks[MONSTATS2FLAGINDEX_DEADCOL]))
 		{
 			STATES_ToggleState(pDefender, STATE_SHATTER, 1);
 			return;
