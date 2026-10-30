@@ -1375,7 +1375,10 @@ function stepBootMovie() {
 // clock its frames are paced against, set when the decode is actually ready.
 function ensureBootMovie() {
   const spec = bootMovieSpec(titlePhase);
-  if (!spec || bootMovie || bootMovieOpening || bootMovieError) return bootMovie;
+  if (!spec || bootMovie || bootMovieOpening) return bootMovie;
+  // Without d2video.mpq every logo film is missing: the first one's error is kept for evidence, and
+  // each later film is skipped the same way instead of holding its phase on black.
+  if (bootMovieError) { advanceTitlePhase(); return null; }
   // The engine failed: there is no movie to be had, so the phase would sit black forever. Move on --
   // the trademark screen reports the same failure in its own evidence.
   if (window.__d2?.ready && window.__d2.error) { advanceTitlePhase(); return null; }
