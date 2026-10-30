@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Public repo: no names, hosts, private-store references or AI trailers in a commit message.
+exec "$(git rev-parse --show-toplevel)/tools/leak-check.sh" --msg "$1"

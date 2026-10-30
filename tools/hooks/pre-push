@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Public repo push gate: only main, no merge commits, a small squashed batch, the public identity, and
+# every pushed commit's files and message pass tools/leak-check.sh (catches --no-verify commits).
+# Pushes are batched: at most one every D2_PUSH_GAP_MIN minutes (120); D2_PUSH_NOW=1 for a player fix.
+root="$(git rev-parse --show-toplevel)"; L="$root/tools/leak-check.sh"; z=0000000000000000000000000000000000000000
+max="${D2_PUSH_MAX_COMMITS:-10}"; gap="${D2_PUSH_GAP_MIN:-120}"
+die() { echo "pre-push: $*" >&2; exit 1; }
+while read -r _ lsha rref rsha; do
+  [ "$lsha" = "$z" ] && die "refusing to delete $rref on the public remote"
+  [ "$rref" = refs/heads/main ] || die "only main is pushed (got $rref); work branches stay local"
+  [ "$rsha" = "$z" ] && range="$lsha --not --remotes" || range="$rsha..$lsha"
+  commits=$(git rev-list $range); [ -z "$commits" ] && continue
+  [ -n "$(git rev-list --merges $range)" ] && die "merge commits in the push; rebase or squash onto main"
+  n=$(wc -l <<< "$commits"); [ "$n" -gt "$max" ] && die "$n commits; squash to one per area (max $max, D2_PUSH_MAX_COMMITS)"
+  if [ "$rsha" != "$z" ] && [ "${D2_PUSH_NOW:-0}" != 1 ]; then
+    last=$(git log -1 --format=%ct "$rsha" 2>/dev/null || echo 0); age=$(( ($(date +%s) - last) / 60 ))
+    [ "$age" -lt "$gap" ] && die "main was pushed ${age}m ago; batch for ${gap}m (D2_PUSH_NOW=1 for a player fix)"
+  fi
+  for c in $commits; do
+    who=$(git log -1 --format='%an <%ae> %cn <%ce>' "$c")
+    "$L" --msg <(echo "$who") >/dev/null 2>&1 || die "commit $c has a private author/committer identity: $who"
+    (cd "$root" && "$L" --commit "$c" && "$L" --msg <(git log -1 --format=%B "$c")) || die "commit $c leaks"
+  done
+done
+exit 0

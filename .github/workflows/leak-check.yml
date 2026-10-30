@@ -1,0 +1,22 @@
+name: leak-check
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  leak-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: tree
+        run: tools/leak-check.sh --all
+      - name: pushed commits (files and messages)
+        env:
+          BEFORE: ${{ github.event.before || github.event.pull_request.base.sha }}
+        run: |
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = 0000000000000000000000000000000000000000 ]; then range=HEAD~1..HEAD; else range="$BEFORE..HEAD"; fi
+          for c in $(git rev-list --no-merges "$range"); do
+            tools/leak-check.sh --commit "$c"
+            tools/leak-check.sh --msg <(git log -1 --format=%B "$c")
+          done

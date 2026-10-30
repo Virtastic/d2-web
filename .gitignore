@@ -116,6 +116,8 @@ tools/*
 !tools/mpq-fingerprint.mjs
 !tools/realmd
 !tools/vectorfmt
+!tools/leak-check.sh
+!tools/hooks
 ci/*
 !ci/build.sh
 !ci/stage.sh
@@ -287,3 +289,9 @@ test/*
 !test/weather-mode3.test.mjs
 !test/wide-hud.test.mjs
 !test/xp-bar-ratio.test.mjs
+
+# The loop's private store: RE notes, ledger, captures, scenarios, agent briefs and the rule files
+# (GOAL/OBJECTIVE/AGENTS/CLAUDE) live in a separate private checkout linked here, never in this repo.
+.private/
+goal-*.md
+*.tsv
