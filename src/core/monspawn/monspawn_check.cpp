@@ -5958,6 +5958,11 @@ EMSCRIPTEN_KEEPALIVE int d2_session_take_sounds(int32_t* out, int cap) {
             D2SkillsTxt* t = DATATBLS_GetSkillsTxtRecord(g_playerSkillDoIds[i]);
             if (t && (t->wCltDoFunc == 0 || t->wCltDoFunc == 28) && t->wDoSound > 0 && g_targetPlayer) // 28: Meteor's launch sound is its wDoSound too
                 g_pendingSkillDo.push_back({0, (int32_t)g_targetPlayer->dwUnitId, (int32_t)g_targetPlayer->dwClassId, 0x102, -1, 0, (int32_t)t->wDoSound});
+            // A2C90 spawns the skill's cltmissile (+0xE8) at the do; with no server missile of its own (Blaze) the client missile's TravelSound is the do's only sound.
+            // cltdofunc 27 (Chain Lightning) spawns its cltmissilea at the do: that client bolt sounds once per cast; the server's bolts are not on the client (d2_session_missile_on_client).
+            if (t && (t->wCltDoFunc == 0 && t->wSrvMissile <= 0 || t->wCltDoFunc == 27) && g_targetPlayer) { const int32_t c = (int16_t)(t->wCltDoFunc == 27 ? t->wCltMissileA : t->wCltMissile);
+                const D2MissilesTxt* m = c > 0 && c < (int32_t)sgptDataTables->nMissilesTxtRecordCount ? DATATBLS_GetMissilesTxtRecord(c) : nullptr;
+                if (m && m->wTravelSound > 0 && m->wTravelSound != 0xFFFF) g_pendingSkillDo.push_back({0, (int32_t)g_targetPlayer->dwUnitId, (int32_t)g_targetPlayer->dwClassId, 0x102, -1, 0, (int32_t)m->wTravelSound}); }
         }
         if (g_cltMissileRow > 0 && g_targetPlayer) g_pendingSkillDo.push_back({0, (int32_t)g_targetPlayer->dwUnitId, (int32_t)g_targetPlayer->dwClassId, 0x102, -1, 0, g_cltMissileRow});
         g_cltMissileRow = 0;
@@ -7769,7 +7774,7 @@ static int sessionCommandHandSkill(uint32_t targetUnitId, bool left) {
     // hit mid-click): nothing will end it, so the attack is not in flight. Left at state 1 it refused
     // every later command, across death and respawn, while the pack killed the player (s000b, Sewers).
     // A refused melee cast (Skills.txt range h2h) plays no client start sound.
-    if (!g_sessionAttackEndFrame) { g_sessionAttack.state = 0; g_rightSkillRefusal = 6; if (!txt || txt->nRange != 1) { g_castRefusedSkill = skillId; ++g_castRefusedSeq; } return 0; }   // the client still casts: stsound at entry, the client do-function sound at its do-frame
+    if (!g_sessionAttackEndFrame) { g_sessionAttack.state = 0; g_rightSkillRefusal = 6; if (!txt || txt->nRange != 1) { g_castRefusedSkill = skillId; ++g_castRefusedSeq; g_refusedDoSkill = skillId; g_refusedDoWait = 8; } return 0; }   // the client still casts: stsound at entry, the client do-function sound at its do-frame
     g_rightSkillRefusal = 0;
     return 1;
 }
@@ -9167,9 +9172,12 @@ EMSCRIPTEN_KEEPALIVE int d2_session_missile_animation_count() {
 // Whether the client holds a missile of its own for engine missile `id`. Retail's client never mirrors the local
 // player's server missiles: it creates its own when its own cast starts, and D2Client+0x18F90 refuses that cast for
 // a use-state other than 0/5 (no client missile, no TravelSound). Every other owner's missile reaches the client.
+extern "C" int d2_realm_client_player_count();
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_missile_on_client(uint32_t id) {
     D2UnitStrc* m = g_game ? SUNIT_GetServerUnit(g_game, UNIT_MISSILE, (int32_t)id) : nullptr;
     if (!m || !g_targetPlayer || m->dwOwnerType != UNIT_PLAYER || m->dwOwnerGUID != g_targetPlayer->dwUnitId) return 1;
+    if (m->dwClassId == 62 && d2_realm_client_player_count() > 0) return 0;   // the realm client flies the player's own fireball and sounds it (d2_realm_client_take_missile_sounds)
+    { const D2SkillsTxt* t = DATATBLS_GetSkillsTxtRecord(MISSILE_GetSkill(m)); if (t && t->wCltDoFunc == 27 && (int32_t)m->dwClassId == (int16_t)t->wCltMissileA) return 0; }   // the client's own cltdofunc 27 bolt (sounded at the do)
     return d2_client_local_cast_refused() || d2_client_cast_walked() ? 0 : 1;
 }
 // A client unit the client creates in engine missile `id`'s room (D2Client+0xA7400): rolls that client room's seed and
