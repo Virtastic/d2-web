@@ -10,8 +10,8 @@ export function createMissileSounds(read, play, onClient = () => true) {
   // A class skill's own client missile (Skills.txt cltmissile of a charclass skill, e.g. Fire Bolt's firebolt) is a pCltDoFunc 1
   // missile whose impact the session plays at removal; the other pCltDoFunc 1 missiles (Hydra's 247 is HydraMissile 337's, no charclass) stay silent.
   const skills = table(read, 'data\\global\\excel\\Skills.txt'), castMissiles = new Set(skills.filter((k) => k.charclass && k.cltmissile).map((k) => k.cltmissile)),
-    // Arctic Blast (cltdofunc 24): the client spawns one blast every Param2 ticks from the cast's first server missile, for as long as the server keeps making them (a last one lands a period after the final), and sounds each as it spawns, not with the server's per-tick missiles.
-    blasts = new Map(skills.filter((k) => k.cltdofunc === '24' && k.cltmissilea).map((k) => [k.cltmissilea, Number(k.Param2) || 2])), runs = new Map();
+    // Arctic Blast and Inferno (cltdofunc 24): the client spawns one blast every 2 ticks from the cast's first server missile, for as long as the server keeps making them (a last one lands a period after the final), and sounds each as it spawns, not with the server's per-tick missiles. The period is 2 for both: Param2 is 2 for Arctic Blast but a level range (3) for Inferno, and retail's Inferno sounds every 2 ticks.
+    blasts = new Map(skills.filter((k) => k.cltdofunc === '24' && k.cltmissilea).map((k) => [k.cltmissilea, 2])), runs = new Map();
   // Molten Boulder: the client emerge's hit (pCltHitFunc 53) creates the client boulder, whose travel sound plays on that tick (not a tick
   // after the server boulder appears); the server's trail missiles (SubMissile1 of a pCltDoFunc 47 missile) are the client's own, not
   // sounded from the server. The boulder ends two ticks short of its Range, with its hit submissiles (explode x1, rocks x10, firepath x18).
