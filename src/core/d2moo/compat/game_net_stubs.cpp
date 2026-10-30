@@ -53,6 +53,17 @@ extern "C" const uint8_t* D2WEB_PacketStream(uint32_t* pLength, uint32_t* pPacke
     return g_d2webPacketStream;
 }
 
+namespace d2client_blizzard { void shatter(); }
+// The tick's 0x0C unit hit/life updates {unit type, guid, message, hit class, life}: the client's
+// 0x0C handler runs the struck unit's hit sound (D2Client 0x23630) on each, whether or not its life
+// byte moved. Kept whole, like 0x27, so the browser plays the cue because the engine sent the packet.
+struct D2WebHitPacket { uint32_t type, guid; uint8_t message, hitClass, life, pad; };
+static_assert(sizeof(D2WebHitPacket) == 12, "D2WebHitPacket is 12 bytes");
+static D2WebHitPacket g_d2webHitPackets[32];
+static uint32_t g_d2webHitPacketCount = 0;
+extern "C" void D2WEB_ResetHitPackets() { g_d2webHitPacketCount = 0; }
+extern "C" const void* D2WEB_HitPackets(uint32_t* pCount) { if (pCount) *pCount = g_d2webHitPacketCount; return g_d2webHitPackets; }
+
 // Drains the queued movie indices, oldest first. Returns how many bytes were written.
 extern "C" uint32_t D2WEB_TakeMovieRequests(uint8_t* out, uint32_t cap) {
     const uint32_t n = g_d2webMovieRequestCount < cap ? g_d2webMovieRequestCount : cap;
@@ -425,7 +436,16 @@ void __fastcall D2GAME_PACKETS_SendPacket0x22_6FC3DBE0(D2ClientStrc* pClient, BY
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
 }
 void D2GAME_PACKETS_SendPacket0x23_6FC3DC60(D2ClientStrc* pClient, BYTE nUnitType, int32_t nUnitGUID, BYTE a4, WORD a5, int32_t a6) {}
-void D2GAME_PACKETS_SendPacket0x26_ServerMessage_6FC3DDF0(D2ClientStrc* pClient, D2GSPacketSrv26* pMsg) {}
+// 1.13c D2Game+0x3DDF0: variable-length chat/overhead message; byte 9 (name colour) is sent as built.
+void D2GAME_PACKETS_SendPacket0x26_ServerMessage_6FC3DDF0(D2ClientStrc* pClient, D2GSPacketSrv26* pMsg) {
+    if (!pClient || !pMsg) return;
+    uint8_t b[11 + 16 + 256 + 2];
+    memcpy(b, pMsg, 10);
+    size_t n = 10, nl = strnlen(pMsg->szName, 15), ml = strnlen(pMsg->szMessage, 255);
+    memcpy(b + n, pMsg->szName, nl); n += nl; b[n++] = 0;
+    memcpy(b + n, pMsg->szMessage, ml); n += ml; b[n++] = 0;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, (int)n);
+}
 void __fastcall D2GAME_PACKETS_SendPacket0x27_6FC3DF20(D2ClientStrc* pClient, D2GSPacketSrv27* pPacket) {
     if (pClient && pPacket) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof(*pPacket));
 }
@@ -769,6 +789,7 @@ void SCMD_Send0x75_PartyRosterUpdate(D2UnitStrc* pLocalPlayer, D2UnitStrc* pOthe
 // 0x0C unit life update (9 bytes: header, unit type, guid, message, hit class, life%); a retail recording retail 0c0101000000 13 3d <pct>.
 void __fastcall D2GAME_PACKETS_SendPacket0x0C_6FC3C8A0(D2ClientStrc* a0, char a1, D2C_UnitTypes a2, int a3, char a4, char a5, char a6) {
     uint8_t b[9] = { (uint8_t)a1, (uint8_t)a2 }; memcpy(b + 2, &a3, 4); b[6] = (uint8_t)a4; b[7] = (uint8_t)a5; b[8] = (uint8_t)a6;
+    if (a0 && g_d2webHitPacketCount < 32) g_d2webHitPackets[g_d2webHitPacketCount++] = { (uint32_t)(uint8_t)a2, (uint32_t)a3, (uint8_t)a4, (uint8_t)a5, (uint8_t)a6, 0 };
     D2GAME_PACKETS_SendPacket_6FC3C710(a0, b, sizeof b);
 }
 // 0x0E object state (12 bytes: header, unit type, guid, 3, targetable, mode dword); a retail recording retail 0e0204000000030001000000.
@@ -779,6 +800,7 @@ void __fastcall D2GAME_PACKETS_SendPacket0x0E_6FC3C8E0(D2ClientStrc* a0, char a1
 void __fastcall D2GAME_PACKETS_SendPacket0x11_6FC3F4A0(D2ClientStrc* a0, unsigned char a1, unsigned int a2, unsigned short a3) {}
 // 0xA7 state on / 0xA9 state off (7 bytes: opcode, unit type, guid dword, state byte); a retail recording retail a7010e00000069 / a901010000000b.
 void __fastcall D2GAME_PACKETS_SendPacket0xA7_StateOn_6FC3FC20(D2ClientStrc* a0, unsigned char a1, unsigned int a2, unsigned short a3) {
+    if (a0 && a1 == 1 && a3 == 107) d2client_blizzard::shatter();   // the client's shatter: icebreak missiles take client ids
     uint8_t b[7] = { 0xA7, a1, 0, 0, 0, 0, (uint8_t)a3 }; memcpy(b + 2, &a2, 4);
     D2GAME_PACKETS_SendPacket_6FC3C710(a0, b, sizeof b);
 }
@@ -808,7 +830,33 @@ void sub_6FC37B10(D2GameStrc* pGame) {}
 void sub_6FC3D1F0(D2ClientStrc* pClient, int32_t nUnitGUID, uint8_t nClassId, const char* szName, int16_t nX, int16_t nY) {}
 void sub_6FC3D830(D2ClientStrc* pClient, BYTE nHeader, int32_t nUnitGUID, WORD nStatId, int32_t nValue) {}
 void sub_6FC3E200(D2ClientStrc* pClient, D2UnitStrc* pUnit) {}
-void sub_6FC3F060(D2ClientStrc* pClient, uint8_t a2, int32_t a3, uint16_t a4, uint16_t a5, int32_t a6, uint16_t a7, uint8_t a8, int32_t a9) {}
+// 1.13c D2Client+0x24A70 (reached from the 0x4D handler 0xAF160 via 0x24B90): the shrine state sound is the Sounds
+// row at D2Client+0xD2F70 + type*0x14, type = the packet's shrine code (a8), played on the operating player.
+static const int16_t kShrineStateSound[23] = {0, 2673, 2673, 2672, 2666, 2666, 2664, 2665, 2675, 2674, 2676, 2677,
+    2679, 2672, 2672, 2667, 2678, 2671, 2669, 2680, 2671, 2668, 2670};
+static int32_t g_shrineUse[64][2]; static int g_shrineUseN = 0;
+// Shrine effects (Storm D2Game 0x76BC0, the fire/exploding ones) subtract hit points directly: no hit, so the client's hit cues do not play for that loss.
+extern "C" int d2_shrine_direct_hp_loss(void) { return g_shrineUseN > 0; }
+extern "C" int d2_shrine_use_take(int32_t* out2) {
+    if (g_shrineUseN <= 0) return 0;
+    out2[0] = g_shrineUse[0][0]; out2[1] = g_shrineUse[0][1];
+    for (int i = 1; i < g_shrineUseN; i++) { g_shrineUse[i-1][0] = g_shrineUse[i][0]; g_shrineUse[i-1][1] = g_shrineUse[i][1]; }
+    g_shrineUseN--; return 1;
+}
+// 1.13c D2Game+0x3F060: packet 0x4D (size 0x11).
+void sub_6FC3F060(D2ClientStrc* pClient, uint8_t a2, int32_t a3, uint16_t a4, uint16_t a5, int32_t a6, uint16_t a7, uint8_t a8, int32_t a9) {
+    if (a2 == 2 && a8 >= 1 && a8 <= 22 && g_shrineUseN < 40) {
+        g_shrineUse[g_shrineUseN][0] = a6; g_shrineUse[g_shrineUseN][1] = kShrineStateSound[a8]; g_shrineUseN++;
+        // 1.13c D2Client+0x26060 / 0x25F10 / 0x25DC0 (types 19, 21, 22): the client creates 16 / 6 / 6 missiles of class 62 / 45 / 48 at
+        // the use; each plays that class's TravelSound at its start.
+        const int cls = a8 == 19 ? 62 : a8 == 21 ? 45 : a8 == 22 ? 48 : 0, cnt = a8 == 19 ? 16 : 6;
+        if (cls) { const D2MissilesTxt* m = DATATBLS_GetMissilesTxtRecord(cls); if (m && m->wTravelSound > 0 && m->wTravelSound != 0xFFFF) for (int i = 0; i < cnt; i++) { g_shrineUse[g_shrineUseN][0] = a6; g_shrineUse[g_shrineUseN][1] = m->wTravelSound; g_shrineUseN++; } }
+    }
+    uint8_t b[17] = {0x4D, a2};
+    memcpy(b + 2, &a3, 4); memcpy(b + 6, &a6, 4); b[10] = a8;
+    memcpy(b + 11, &a4, 2); memcpy(b + 13, &a5, 2); memcpy(b + 15, &a7, 2);
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, sizeof b);
+}
 void sub_6FC3F0C0(D2ClientStrc* pClient, uint8_t a2, int32_t a3, uint8_t nUnitType, int32_t nUnitGUID, uint16_t a6, uint16_t a7, uint8_t a8, int32_t a9) {}
 void sub_6FC3F340(D2ClientStrc* pClient, BYTE nHeader, BYTE nUnitType, int32_t nUnitId, int32_t a5) {}
 void sub_6FC3F3F0(D2ClientStrc* pClient, D2GSPacketSrv2C* pPacket) { D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof *pPacket); }

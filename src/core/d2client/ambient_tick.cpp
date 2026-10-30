@@ -35,7 +35,8 @@ struct Amb final : Services {
     U act(U) override { return period; }
     U unitData(U) override { return kUD; }
     bool f80450() override { return weatherLevel; }
-    bool weather(int32_t* scaled) override { *scaled = int32_t(double(weatherLevel ? d2client::weather::intensity() : 0.0f) * 1000.0); return true; }
+    // 0x4F860: fmuls 255.0f (D2Client+0xD759C), then _ftol: one particle (1/256) scales to 0, so the rain sound waits for two.
+    bool weather(int32_t* scaled) override { *scaled = int32_t(double(weatherLevel ? d2client::weather::intensity() : 0.0f) * 255.0); return true; }
     void f88810(U, U) override {}
     void f88770(U, U) override {}
     void f88230(U, U, U, U, U) override {}

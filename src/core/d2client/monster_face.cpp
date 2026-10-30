@@ -20,6 +20,8 @@
 #include "../d2moo/include/Units/Units.h"
 #include "../d2moo/include/Path/Path.h"
 #include "../d2moo/include/D2Game/UNIT/SUnit.h"
+#include "../d2moo/include/D2DataTbls.h"
+#include "../d2moo/include/Units/Monster.h"
 
 namespace { std::unordered_map<uint64_t, uint64_t> g_target; uint64_t key(uint32_t t, uint32_t id) { return uint64_t(t) << 32 | id; } }
 static void face(D2UnitStrc* unit, int32_t selector, int32_t x, int32_t y, D2UnitStrc* target) {
@@ -56,16 +58,78 @@ static void face(D2UnitStrc* unit, int32_t selector, int32_t x, int32_t y, D2Uni
     }
 }
 
+// The monster attack-sound roll: the order handler (0x4DC70) sets the client unit's mode and calls 0x24490, which
+// for a monster remaps the mode through the MonSounds CvtMo slots and sends A1/A2 (4/5) to 0x242B0. 0x242B0 draws
+// one value from the client hero seed (r = lo32 % 100) when the attack sound is set, gated for Prb < 100 by the
+// 15-tick last-roll stamp (D2Client+0x11C4C4) and the busy test. The draw happens as the order arrives, in the
+// frame the server sent it and before that frame's weather pass. The shell plays the sound; it reads r here per unit.
+// ponytail: 0x87BD0 (BUSY, a monster sound still playing) is the sound engine's state, not held here: read as idle.
+extern "C" uint32_t d2_session_client_rand(uint32_t n);
+extern "C" void d2_client_monster_sfx_stamp(uint32_t id, uint32_t now);
 namespace {
-struct Order { D2GameStrc* game; uint32_t type, id; int32_t selector, x, y; uint32_t ttype, tid; bool hasTarget; };
+uint32_t g_frame = 0, g_lastRoll = 0xFFFFFF00u;
+struct Roll { uint32_t id, frame; int32_t r; };
+std::vector<Roll> g_rolls;
+// 1.13c D2Client+0x22A70: the unit's MonSounds record.
+const D2MonSoundsTxt* monSounds(D2UnitStrc* u) {
+    D2MonsterDataStrc* md = u->pMonsterData;
+    D2MonStatsTxt* ms = DATATBLS_GetMonStatsTxtRecord(int32_t(u->dwClassId));
+    if (!ms) return nullptr;
+    if (md && (md->nTypeFlag & 0x02)) {
+        D2SuperUniquesTxt* su = DATATBLS_GetSuperUniquesTxtRecord(int16_t(md->wBossHcIdx));
+        if (su && int32_t(su->dwMonSound) > 0) return DATATBLS_GetMonSoundsTxtRecordFromSoundId(int32_t(su->dwMonSound));
+    }
+    if (md && (md->nTypeFlag & 0x18) && int16_t(ms->wUMonSound) > 0) return DATATBLS_GetMonSoundsTxtRecordFromSoundId(ms->wUMonSound);
+    return DATATBLS_GetMonSoundsTxtRecordFromMonsterId(int32_t(u->dwClassId));
+}
+// 1.13c D2Client+0x24490 (monster branch, modes 4/5) -> D2Client+0x242B0 (the roll).
+void attackEntry(D2UnitStrc* u, int32_t mode) {
+    if (u->dwUnitType != UNIT_MONSTER) return;
+    const D2MonSoundsTxt* p = monSounds(u);
+    if (!p) return;
+    const uint8_t* b = reinterpret_cast<const uint8_t*>(p);
+    for (int k = 0; k < 3; ++k)
+        if (mode == b[0x7C + 8 * k] && *reinterpret_cast<const int32_t*>(b + 0x80 + 8 * k) < 0) mode = b[0x7D + 8 * k];
+    if (mode != 4 && mode != 5) return;
+    const uint32_t* r = reinterpret_cast<const uint32_t*>(b);
+    const uint32_t a = mode == 4 ? r[1] : r[7], chance = mode == 4 ? r[3] : r[9];
+    if (!a || (chance < 100 && g_frame - g_lastRoll < 15)) return;
+    const int32_t v = int32_t(d2_session_client_rand(100));
+    if (v < int32_t(chance)) { g_lastRoll = g_frame; d2_client_monster_sfx_stamp(u->dwUnitId, g_frame); }   // a played attack sound stamps the unit, which holds off its idle sound
+    g_rolls.push_back({ u->dwUnitId, g_frame, v });
+}
+}
+// The struck-unit sound (a client mode change into GetHit/knockback or death): its normal path
+// stamps the unit's sound tick and the shared last-roll tick with the frame the change arrives in.
+extern "C" void d2_client_monster_hit_stamp(uint32_t id, uint32_t frame) { g_lastRoll = frame; d2_client_monster_sfx_stamp(id, frame); }
+extern "C" void d2_client_attack_roll_reset() { g_frame = 0; g_lastRoll = 0xFFFFFF00u; g_rolls.clear(); }
+// The roll 0x242B0 drew for this monster's latest attack entry, oldest first; -1 when none is pending.
+extern "C" __attribute__((used, visibility("default"))) int d2_client_attack_roll_take(uint32_t id) {
+    for (size_t i = 0; i < g_rolls.size(); ++i)
+        if (g_rolls[i].id == id) { const int32_t r = g_rolls[i].r; g_rolls.erase(g_rolls.begin() + i); return r; }
+    return -1;
+}
+
+namespace {
+struct Order { D2GameStrc* game; uint32_t type, id; int32_t selector, x, y; uint32_t ttype, tid; bool hasTarget; int32_t mode; bool rolled; };
 std::vector<Order> g_orders;
 }
 extern "C" void d2_client_monster_order_face(D2UnitStrc* unit, int32_t selector, int32_t x, int32_t y, D2UnitStrc* target) {
     if (!unit || !unit->pGame) return;
     g_orders.push_back({ unit->pGame, unit->dwUnitType, unit->dwUnitId, selector, x, y,
-                         target ? target->dwUnitType : 0u, target ? target->dwUnitId : 0u, target != nullptr });
+                         target ? target->dwUnitType : 0u, target ? target->dwUnitId : 0u, target != nullptr, int32_t(unit->dwAnimMode), false });
 }
 // The previous frame's orders, in arrival order.
+// This frame's orders, at the client frame's tail: the attack-sound roll as each arrives (before the frame's weather).
+extern "C" void d2_client_monster_order_roll() {
+    ++g_frame;
+    while (!g_rolls.empty() && g_frame - g_rolls.front().frame > 4) g_rolls.erase(g_rolls.begin());
+    for (Order& o : g_orders) {
+        if (o.rolled) continue;
+        o.rolled = true;
+        if (D2UnitStrc* u = SUNIT_GetServerUnit(o.game, int32_t(o.type), int32_t(o.id))) attackEntry(u, o.mode);
+    }
+}
 extern "C" void d2_client_monster_order_face_flush() {
     std::vector<Order> q;
     q.swap(g_orders);

@@ -2151,9 +2151,13 @@ int __stdcall UNITS_GetDirectionToCoords(D2UnitStrc* pUnit, int nNewX, int nNewY
 	return PATH_ComputeDirection(pCoords.nX, pCoords.nY, nNewX, nNewY);
 }
 
+// d2-web: the session client observes the overlay the server sets (its packet 0x11).
+void (*g_d2webOverlayHook)(D2UnitStrc* pUnit, int nOverlay) = nullptr;
+
 //D2Common.0x6FDC0160 (#10437)
 void __stdcall UNITS_SetOverlay(D2UnitStrc* pUnit, int nOverlay, int nUnused)
 {
+	if (g_d2webOverlayHook) g_d2webOverlayHook(pUnit, nOverlay);
 	D2StatListStrc* pStatList = NULL;
 
 	if (nOverlay >= 0 && nOverlay < sgptDataTables->nOverlayTxtRecordCount)

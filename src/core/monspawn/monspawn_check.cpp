@@ -72,6 +72,7 @@
 #include "plugy_stash_grid.h"
 #include "path_attempt_trace.h"
 #include "item_text_visibility.h"
+#include "drop_flip.h"
 #include <D2Environment.h>
 #include <DataTbls/ObjectsTbls.h>
 #include <DataTbls/ObjectsIds.h>
@@ -147,6 +148,7 @@ extern "C" int d2_session_client_cunit_seed_init(D2SeedStrc* clientSeed,
 extern "C" void d2_drlg_act_end();
 
 extern "C" void D2WEB_ResetPacketStream();
+extern "C" void D2WEB_ResetHitPackets();
 extern "C" const uint8_t* D2WEB_PacketStream(uint32_t* pLength, uint32_t* pPackets);
 extern "C" uint32_t D2WEB_TakeMovieRequests(uint8_t* out, uint32_t cap);
 extern "C" uint32_t d2_client_local_cast_refused();
@@ -222,11 +224,12 @@ static uint32_t g_sessionClientMapEventsDropped = 0;
 // borrow g_targetPlayer->pSeed, which belongs to the D2Game/server unit.
 namespace d2client_ambient { void reset(); void tick(uint32_t* seed, uint32_t period, bool weatherLevel); uint32_t* fallbackSeed(); }
 extern "C" void d2_client_monster_idle_reset();   // 1.13c D2Client+0x237E0 monster branch state (unit_sound_trigger_237e0.cpp)
+extern "C" void d2_client_attack_roll_reset();   // 1.13c D2Client+0x242B0 attack-roll state (monster_face.cpp)
 namespace d2client_hurricane { void reset(); void tick(D2UnitStrc* u, uint32_t* seed); }
 namespace d2client_vine { void reset(); void tick(D2UnitStrc* hero); }
 namespace d2client_clmissile { void reset(); void cast(int32_t skillId, int32_t level, D2UnitStrc* target, int32_t tx, int32_t ty); void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)); }   // 1.13c D2Client+0x15DA0 (cltdofunc 17), +0xB17C0 / +0xB1420 (client missiles)
 namespace d2client_nova { void reset(); void selectSkill(int32_t skillId); int32_t selectedSkill(); void cast(int32_t skillId, bool presentation); void tick(); }   // 1.13c D2Client+0x73CB0 (cltdofunc 25, Poison Nova), +0x73D70 (cltdofunc 29, Frozen Orb)
-namespace d2client_blizzard { void reset(); void cast(int32_t skillId); void tick(); }   // 1.13c D2Client+0xBBC10 (cltdofunc 13, Blizzard center)
+namespace d2client_blizzard { void reset(); void cast(int32_t skillId, D2UnitStrc* target, int32_t tx, int32_t ty); void tick(D2UnitStrc* owner, D2UnitStrc* (*find)(int32_t type, uint32_t id)); }   // 1.13c D2Client+0xBBC10 (cltdofunc 13, Blizzard center)
 static D2UnitStrc* g_sessionClientPlayerUnit = nullptr;
 static uint32_t g_sessionClientPlayerInitSeed = 0;
 // Session construction is class-selectable.  The older vector/AI attachment surface retains
@@ -816,6 +819,7 @@ static uint32_t g_sessionWorldHash;
 static uint32_t g_sessionTerrainHash;
 static bool g_sessionLive, g_sessionMovePending;
 static std::unordered_set<uint32_t> g_monInitPlayed; // 1.13c D2Client+0x23170: the per-unit played flag (client unit+0x80)
+static std::vector<std::array<int32_t, 7>> g_pendingOverlaySounds;
 static std::vector<std::array<int32_t, 7>> g_pendingOnsound; // state-on events found by the last drain, emitted by the next one
 static std::unordered_set<uint64_t> g_prevOnsoundStates; // 1.13c D2Client+0x73760: state bits seen at the last sound drain (type<<40 | id<<8 | state)
 static bool g_sessionResumeAttack;
@@ -1037,14 +1041,13 @@ template <class P> static void clientLandedGroundClock(const D2UnitStrc* item, P
 // packet's action byte (a ground item generated with its room would replay the flip once).
 static bool g_sessionInTick = false;
 template <class P> static void clientDropFlip(const D2UnitStrc* item, P& out) {
-    static const D2GameStrc* seenGame = nullptr; static uint32_t prime = 0; static std::unordered_map<uint32_t, uint32_t> first;
+    static const D2GameStrc* seenGame = nullptr; static d2::drop_flip::Clock flipClock;
     if (!g_game) return;
-    if (seenGame != g_game) { seenGame = g_game; first.clear(); prime = g_game->dwGameFrame; }   // primed by the first item of any mode, so an equipped item later dropped is "new"
-    if (item->dwAnimMode != IMODE_ONGROUND) return;
+    if (seenGame != g_game) { seenGame = g_game; flipClock.reset(g_game->dwGameFrame); }   // primed by the first item of any mode, so an equipped item later dropped is "new"
     // A command's snapshot precedes the frame the client sees it in (the tick that follows); an item the tick itself creates (a monster's gold) is seen a frame after its packet.
-    const uint32_t now = g_game->dwGameFrame, at = first.emplace(item->dwUnitId, g_sessionInTick ? now - 1 : now).first->second;
-    if (at <= prime || now - at >= 17) return;
-    out.mode = IMODE_DROPPING; out.framePrecise = (now - at) << 8; out.frameCountPrecise = 4352;
+    uint32_t precise = 0;
+    if (!flipClock.step(item->dwUnitId, item->dwAnimMode == IMODE_ONGROUND, g_game->dwGameFrame, g_sessionInTick, precise)) return;
+    out.mode = IMODE_DROPPING; out.framePrecise = precise; out.frameCountPrecise = d2::drop_flip::kFrameCountPrecise;
 }
 // The inventory graphic retail's panel draws for an item (F481). ItemsTxt.invfile is only the FIRST
 // candidate: a unique item (or a set item) whose quality-specific file is non-empty uses THAT, and an
@@ -1107,11 +1110,14 @@ static void syncSessionLevelFromPlayer() {
 }
 
 static void syncSessionClientMapFromPlayer();
+static std::unordered_set<D2DrlgRoomStrc*> g_sessionClientRoomsSeen;   // D2Client+0x440C0's seen bit
+static void sessionClientMonsterModeReset();
+static uint32_t g_sessionClientFrame = 0;   // the client frames run since the session began (the frame tail counts them)
 
 static void resetSessionClientMapMirror() {
     if (g_sessionClientPlayerUnit) UNITS_FreeUnit(g_sessionClientPlayerUnit);
     g_sessionClientPlayerUnit = nullptr;
-    d2client::weather::reset(); d2client_ambient::reset(); d2_client_monster_idle_reset(); d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset(); d2client_blizzard::reset();
+    d2client::weather::reset(); d2client_ambient::reset(); d2_client_monster_idle_reset(); sessionClientMonsterModeReset(); d2_client_attack_roll_reset(); g_sessionClientRoomsSeen.clear(); g_sessionClientFrame = 0; d2client_hurricane::reset(); d2client_vine::reset(); d2client_nova::reset(); d2client_clmissile::reset(); d2client_blizzard::reset();
     if (g_sessionClientActOwned) d2_drlg_act_end();
     g_sessionClientActOwned = false;
     g_sessionClientMapStarted = false;
@@ -1565,7 +1571,9 @@ static void sessionHeldStep() {
     for (D2DrlgRoomStrc* r : cur) if (!g_heldNear.count(r)) each(r, [&](D2UnitStrc* u) { D2CoordStrc c = {}; UNITS_GetCoords(u, &c); if (!first || (abs(c.nX - g_heldX0) <= 40 && abs(c.nY - g_heldY0) <= 40)) g_heldMonsters.insert(u->dwUnitId); });
     for (D2DrlgRoomStrc* r : g_heldNear) if (!cur.count(r)) each(r, [&](D2UnitStrc* u) { g_heldMonsters.erase(u->dwUnitId); });
     // A monster that appears in a room the client already holds (a summoned golem) is announced to it with a 0xAC: held from that tick.
+    // One that walks in from a room outside the near list is not new: retail sends it no 0xAC (a retail recording: Fallen walking in, 0x67/0x6D only), so the client never holds it.
     for (D2DrlgRoomStrc* r : cur) each(r, [&](D2UnitStrc* u) { if (g_heldSeen.insert(u->dwUnitId).second && g_heldNear.count(r)) g_heldMonsters.insert(u->dwUnitId); });
+    for (D2DrlgRoomStrc* r = h->pLevel ? h->pLevel->pFirstRoomEx : nullptr; r; r = r->pDrlgRoomNext) if (!cur.count(r)) each(r, [&](D2UnitStrc* u) { g_heldSeen.insert(u->dwUnitId); });
     g_heldNear = cur;
 }
 // a retail recording: retail's client holds the town's river rooms while the hero's level lies within two Levels.txt vis links of the town (Blood Moor 2 at one;
@@ -3025,6 +3033,16 @@ EMSCRIPTEN_KEEPALIVE int d2_aitarget_snapshot() {
     g_aiTargetAlways = true; const int ok = d2_aiframe_advance(0); g_aiTargetAlways = false; return ok;
 }
 EMSCRIPTEN_KEEPALIVE int d2_aiframe_advance(int frames);
+// 1.13c D2Client+0xADAA0 (packet 0x11, set overlay): overlay 0x97 plays Sounds row 0x18C, overlay 0x98 row 0x18D.
+// The server sets those overlays on a life/mana-stealing attacker (UNITS_SetOverlay); the session client hears the
+// target player's and its held monsters'.
+extern void (*g_d2webOverlayHook)(D2UnitStrc* pUnit, int nOverlay);
+static void sessionOverlayHook(D2UnitStrc* unit, int overlay) {
+    if (!g_sessionLive || !unit || (overlay != 0x97 && overlay != 0x98)) return;
+    if (unit != g_targetPlayer && !(unit->dwUnitType == UNIT_MONSTER && g_heldMonsters.count(unit->dwUnitId))) return;
+    g_pendingOverlaySounds.push_back({(int32_t)unit->dwUnitType, (int32_t)unit->dwUnitId, unit->dwClassId, 0x100, -1, 0, overlay == 0x97 ? 0x18C : 0x18D});
+}
+
 EMSCRIPTEN_KEEPALIVE int d2_aiframe_advance(int frames) {
     if (!g_game || !g_lastLevel || frames < 0) return 0;
     for (int i = 0; i < frames; i++) {
@@ -3198,7 +3216,7 @@ static int d2_session_create_for_class(uint32_t seed, int difficulty, int act, i
     }
     g_sessionInitialExperience = STATLIST_UnitGetStatValue(g_targetPlayer, STAT_EXPERIENCE, 0);
     g_townSpawnX = g_targetPlayer ? UNITS_GetXPosition(g_targetPlayer) : -1; g_townSpawnY = g_targetPlayer ? UNITS_GetYPosition(g_targetPlayer) : -1;   // the hero's arrival room is the lattice centre
-    g_monInitPlayed.clear(); g_prevOnsoundStates.clear(); g_pendingOnsound.clear(); g_sessionLive = true; updateSessionSnapshot(); return 1;
+    g_monInitPlayed.clear(); g_prevOnsoundStates.clear(); g_pendingOnsound.clear(); g_pendingOverlaySounds.clear(); g_d2webOverlayHook = sessionOverlayHook; g_sessionLive = true; updateSessionSnapshot(); return 1;
 }
 
 EMSCRIPTEN_KEEPALIVE int d2_session_create(uint32_t seed, int difficulty, int act, int levelId) {
@@ -4111,7 +4129,6 @@ EMSCRIPTEN_KEEPALIVE const D2SeedStrc* d2_session_client_player_seed() {
     return g_sessionClientPlayerUnit ? &g_sessionClientPlayerUnit->pSeed : nullptr;
 }
 
-// 1.13c D2Client+0x242B0: the monster attack-sound roll steps the control unit's seed (+0x20/+0x24): p = lo*0x6AC690C5 + hi, r = lo32(p) % 100.
 
 // 1.13c D2Client+0x89640 rand(n) on the client hero seed (+0x20/+0x24): v = lo*0x6AC690C5 + hi; a power of two masks, otherwise lo32 % n.
 extern "C" uint32_t d2_session_client_rand(uint32_t n) {
@@ -4121,7 +4138,6 @@ extern "C" uint32_t d2_session_client_rand(uint32_t n) {
     s[0] = uint32_t(v); s[1] = uint32_t(v >> 32);
     return (n & (n - 1)) ? uint32_t(v) % n : ((n - 1) & uint32_t(v));
 }
-EMSCRIPTEN_KEEPALIVE int d2_client_attack_roll() { return g_sessionClientPlayerUnit ? (int)d2_session_client_rand(100) : -1; }
 // The monster's client-side facts 0x237E0 reads: #10331/#10057 (room in town) and 0x881B0 (in range of the hero, client coords #10628).
 // The client holds the previous frame's server state; the shell calls this before the frame's tick. Returns 0 when the unit is gone.
 extern "C" int d2_session_monster_idle_facts(uint32_t id, int32_t* town, int32_t* near) {
@@ -5866,6 +5882,9 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_take_ui_events(uint8_t* out, uint32_t c
 // tables, and nothing in reference/ carries D2Client (D2MOO stops at D2Gfx/D2Win). For events 0x10 and
 // 0x0C, the drain also carries the row selected by the client's table lookup; it does not change the
 // attached event. Event 0x11 remains client-tick gated. 
+extern "C" int d2_shrine_use_take(int32_t*);
+extern "C" int d2_shrine_direct_hp_loss(void);
+EMSCRIPTEN_KEEPALIVE int d2_session_shrine_hp_loss() { return d2_shrine_direct_hp_loss(); }
 EMSCRIPTEN_KEEPALIVE int d2_session_take_sounds(int32_t* out, int cap) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_lastLevel || !out || cap < 7) return 0;
     int n = 0;
@@ -5990,10 +6009,18 @@ EMSCRIPTEN_KEEPALIVE int d2_session_take_sounds(int32_t* out, int cap) {
         later.insert(later.begin(), now.begin() + emitted, now.end());
         g_pendingOnsound.swap(later);
     }
+    {   // 1.13c D2Client+0x24A70: the shrine state sound (see game_net_stubs.cpp) on the operating player.
+        int32_t su[2];
+        while (n + 7 <= cap && g_targetPlayer && d2_shrine_use_take(su)) {
+            out[n++] = 0; out[n++] = su[0]; out[n++] = (int32_t)g_targetPlayer->dwClassId; out[n++] = 0x103; out[n++] = -1; out[n++] = 0; out[n++] = su[1];
+        }
+    }
     {   // 1.13c D2Client+0xA2C90: a skill whose client do-function slot is empty (index 0) plays its wDoSound (+0x100).
         // The player's do reaches the client one drain later, as the state packet does.
         for (const auto& e : g_pendingSkillDo) { if (n + 7 > cap) break; for (int32_t v : e) out[n++] = v; }
         g_pendingSkillDo.clear();
+        for (const auto& e : g_pendingOverlaySounds) { if (n + 7 > cap) break; for (int32_t v : e) out[n++] = v; }
+        g_pendingOverlaySounds.clear();
         if (g_refusedDoWait > 0 && --g_refusedDoWait == 0 && g_playerSkillDoCount < 8) g_playerSkillDoIds[g_playerSkillDoCount++] = g_refusedDoSkill;
         for (int32_t i = 0; i < g_playerSkillDoCount; i++) {
             D2SkillsTxt* t = DATATBLS_GetSkillsTxtRecord(g_playerSkillDoIds[i]);
@@ -6649,6 +6676,9 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_packet(const uint8_t* bytes, int len)
     case 0x34: if (len != 5) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x34_IdentifyItemsWithNpc_6FC86BA0; break;
     case 0x3C: if (len >= 5) { uint32_t w; std::memcpy(&w, packet.data() + 1, 4); d2client_nova::selectSkill(static_cast<int32_t>(w)); } handler = D2GAME_PACKETCALLBACK_Rcv0x3C_SelectSkill_6FC87050; break;   // the client's selection (1.13c D2Client+0x73CB0 reads it)
     case 0x24: if (len != 5) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x24_ItemFromBelt_6FC85F50; break;
+    // 0x1F {cursorGUID, gridItemGUID, x, y}: the held item goes to x,y and the stored one it overlapped comes onto the cursor (page 1/2 refused by the handler).
+    case 0x1F: if (len != 17) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x1F_SwapCursorBufferItems_6FC857C0; break;
+    case 0x25: if (len != 9) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x25_SwitchBeltItem_6FC86040; break;   // cursor item <-> belt item
     case 0x58: handler = D2GAME_PACKETCALLBACK_Rcv0x58_QuestCompleted_6FC883B0; break;
     // a retail recording session replay: 0x0D right skill on unit, 0x3B add skill point, 0x3C select skill (recovered handlers).
     case 0x0D: handler = D2GAME_PACKETCALLBACK_Rcv0x0D_RightSkillOnUnit_6FC83F80; break;
@@ -7125,14 +7155,94 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_right_skill(uint32_t targetUnitId);
 EMSCRIPTEN_KEEPALIVE int d2_session_command_left_skill(uint32_t targetUnitId);
 
 extern "C" int d2_client_monster_turn_held(const D2UnitStrc* unit);
+// 1.13c D2Client+0x440C0 (from the frame tail 0x44A80): each client room the pass has not seen yet is marked seen;
+// a Den of Evil room (level 8) gets 0x53550's light spots: up to 25 tries of a random subtile in the room
+// (#10561 room coords, two hero-seed draws), each free one (#10482 mask 5 clear) sent, until 3 are free.
+// The spots themselves (0xB30F0, a client-only unit) are not made here; only their draws are.
+// The session has no client Act: the client's rooms are the server Act's active rooms, plus the rooms of another
+// level the client's activation ring reaches through a warp (the server leaves those untiled). Retail's client builds
+// one of those per 7 frames from its 7th frame. Unbuilt here, their collision is
+// not held, so every spot in one reads as blocked (retail: 25 tries, 50 draws).
+static void sessionClientRoomSpots(D2DrlgRoomStrc* room, D2ActiveRoomStrc* active) {
+    D2DrlgCoordsStrc c{};
+    if (active) DUNGEON_GetRoomCoordinates(active, &c);
+    else { c.nSubtileX = room->nTileXPos * 5; c.nSubtileY = room->nTileYPos * 5; c.nSubtileWidth = room->nTileWidth * 5; c.nSubtileHeight = room->nTileHeight * 5; }
+    auto rnd = [](int32_t n) { return n < 1 ? 0u : d2_session_client_rand(uint32_t(n)); };
+    for (int i = 0, ok = 0; i <= 0x18 && ok < 3; ++i) {
+        const int32_t x = int32_t(rnd(c.nSubtileWidth)) + c.nSubtileX;
+        const int32_t y = c.nSubtileY + int32_t(rnd(c.nSubtileHeight));
+        if (active && COLLISION_CheckMask(active, x, y, 5) == 0) ++ok;
+    }
+}
+static void sessionClientRoomPass() {
+    D2DrlgActStrc* act = g_sessionClientActOwned ? d2_drlg_client_act() : (g_game && g_currentAct >= 0 ? g_game->pAct[g_currentAct] : nullptr);
+    if (!act) return;
+    D2DrlgRoomStrc* warpRoom = nullptr;
+    std::unordered_set<D2DrlgLevelStrc*> activeLevels;   // a level with an active room is reached by adjacency, not a warp
+    for (D2ActiveRoomStrc* room = DUNGEON_GetRoomFromAct(act); room; room = room->pRoomNext)
+        if (room->pDrlgRoom) activeLevels.insert(room->pDrlgRoom->pLevel);
+    for (D2ActiveRoomStrc* room = DUNGEON_GetRoomFromAct(act); room; room = room->pRoomNext) {
+        D2DrlgRoomStrc* dr = room->pDrlgRoom;
+        if (!dr || !dr->pLevel) continue;
+        if (!g_sessionClientActOwned && !warpRoom)
+            for (int q = 0; q < dr->nRoomsNear; ++q) {
+                D2DrlgRoomStrc* nr = dr->ppRoomsNear[q];
+                if (nr && nr->pLevel && nr->fRoomStatus == ROOMSTATUS_UNTILE && !activeLevels.count(nr->pLevel) && !nr->pRoom && !g_sessionClientRoomsSeen.count(nr)) { warpRoom = nr; break; }
+            }
+        if (!g_sessionClientRoomsSeen.insert(dr).second) continue;
+        if (dr->pLevel->nLevelId == 8) sessionClientRoomSpots(dr, room);
+    }
+    if (warpRoom && g_sessionClientFrame >= 7 && g_sessionClientFrame % 7 == 0) {
+        g_sessionClientRoomsSeen.insert(warpRoom);
+        if (warpRoom->pLevel->nLevelId == 8) sessionClientRoomSpots(warpRoom, nullptr);
+    }
+}
+// The client frame's pass over the monsters it holds, in its unit table's order
+// (bucket id & 0x7F, newest first), after the room pass; the idle sound draws from the client hero seed here, so it
+// runs in the frame, not in the shell. The shell takes each unit's row to play it.
+extern "C" uint32_t d2_client_monster_idle(uint32_t id, int32_t cls, uint32_t mode, uint32_t now);
+static std::unordered_map<uint32_t, uint32_t> g_sessionIdleRows, g_sessionIdleRowsReady;
+// The held monsters' modes as the client last saw them: a change into GetHit/knockback (3, 13) or death (0, 12)
+// reaches the struck-unit sound, which stamps the unit before the frame's attack rolls.
+extern "C" void d2_client_monster_hit_stamp(uint32_t id, uint32_t frame);
+static std::unordered_map<uint32_t, uint32_t> g_sessionClientMonsterMode;
+static void sessionClientMonsterModeReset() { g_sessionClientMonsterMode.clear(); g_sessionIdleRows.clear(); g_sessionIdleRowsReady.clear(); }
+static void sessionClientMonsterHitPass(uint32_t frame) {
+    std::unordered_map<uint32_t, uint32_t> now;
+    for (uint32_t id : g_heldMonsters) {
+        D2UnitStrc* u = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)id);
+        if (!u) continue;
+        const uint32_t m = u->dwAnimMode;
+        now[id] = m;
+        auto it = g_sessionClientMonsterMode.find(id);
+        if (it != g_sessionClientMonsterMode.end() && it->second != m && (m == 3 || m == 13 || m == 0 || m == 12)) d2_client_monster_hit_stamp(id, frame);
+    }
+    g_sessionClientMonsterMode.swap(now);
+}
+static void sessionClientMonsterIdlePass() {
+    std::vector<uint32_t> ids(g_heldMonsters.begin(), g_heldMonsters.end());
+    std::sort(ids.begin(), ids.end(), [](uint32_t a, uint32_t b) { return (a & 127) != (b & 127) ? (a & 127) < (b & 127) : a > b; });
+    for (uint32_t id : ids) {
+        D2UnitStrc* u = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)id);
+        if (!u) continue;
+        const uint32_t mode = u->dwAnimMode == 14 && u->pAnimSeq ? (u->dwSeqMode & 0xF) : u->dwAnimMode;
+        if (const uint32_t row = d2_client_monster_idle(id, (int32_t)u->dwClassId, mode, g_sessionClientFrame)) g_sessionIdleRows[id] = row;
+    }
+}
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_monster_idle_take(uint32_t id) {
+    auto it = g_sessionIdleRowsReady.find(id);
+    if (it == g_sessionIdleRowsReady.end()) return 0;
+    const uint32_t row = it->second; g_sessionIdleRowsReady.erase(it); return row;
+}
 EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath || frames < 0) return 0;
     // a retail recording: server->client packets a tick queues (NPC quest-marker 0x8A) are the tick's own stream.
-    D2WEB_ResetPacketStream();
+    D2WEB_ResetPacketStream(); D2WEB_ResetHitPackets();
     struct InTick { InTick() { g_sessionInTick = true; } ~InTick() { g_sessionInTick = false; } } inTick;
     if (g_heldFor != g_targetPlayer) sessionHeldStep();   // a retail recording: the start set, before the first move
     struct HeldStep { ~HeldStep() { sessionHeldStep(); } } heldStep;   // the tick's near-list diff
     struct StreamRefresh { ~StreamRefresh() { D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets); } } streamRefresh;
+    g_sessionIdleRowsReady.swap(g_sessionIdleRows); g_sessionIdleRows.clear();   // a row drawn at a frame's end is the next tick's sound
     for (int i = 0; i < frames; ++i) {
         // the client sees the previous frame's server state (a death this frame reaches it by packet next tick)
         { extern void d2client_unitseed_flush(); extern void d2_client_monster_order_face_flush(); d2client_unitseed_flush(); d2_client_monster_order_face_flush(); }   // the previous frame's unit adds and orders, in send order
@@ -7142,18 +7252,6 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         // has no corresponding weather candidate pass. Entries are world anchored here; camera
         // projection remains the renderer's responsibility.
         d2::weather::tick();
-        if (g_currentLevel >= 0) {
-            // 1.13c D2Client+0x81340: the weather pass draws from the client hero seed. A session that never mirrored the client map has no
-            // client unit: its seed is the one retail's first 0x4F860 call reads (a retail recording capture; the derivation is not recovered).
-            uint32_t* heroSeed = g_sessionClientPlayerUnit ? reinterpret_cast<uint32_t*>(&g_sessionClientPlayerUnit->pSeed) : d2client_ambient::fallbackSeed();
-            d2client::weather::Env env{};
-            env.levelId = g_currentLevel; env.act = g_currentAct;
-            env.weatherLevel = DATATBLS_GetRainFromLevelsTxt(g_currentLevel) != 0;
-            env.cellW = 640; env.cellH = 480;
-            // 1.13c D2Client+0x5F020 runs 0x4F860 first, before the frame's weather pass; same hero seed.
-            d2client_ambient::tick(heroSeed, (uint32_t)ENVIRONMENT_GetPeriodOfDayFromAct(g_game->pAct[g_currentAct], 0), env.weatherLevel);
-            d2client::weather::tick(*reinterpret_cast<d2client::weather::Seed*>(heroSeed), env);
-        }
         updateSessionPendingRooms();
         const bool wasMoving = g_sessionMovePending;
         // Death is not interrupted: the session's own mode resets below (an attack that has run its
@@ -7457,8 +7555,29 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         // 1.13c D2Client+0xC9BE0 / 0x72C20: the client sees the Hurricane state the server set this frame.
         d2client_hurricane::tick(g_targetPlayer, g_sessionClientPlayerUnit ? reinterpret_cast<uint32_t*>(&g_sessionClientPlayerUnit->pSeed) : d2client_ambient::fallbackSeed());
         d2client_vine::tick(g_targetPlayer);   // 1.13c D2Client+0xC50F0 (cltactivefunc 89, state vine_beast)
-        d2client_blizzard::tick();
+        d2client_blizzard::tick(g_targetPlayer, [](int32_t type, uint32_t id) { return SUNIT_GetServerUnit(g_game, type, (int32_t)id); });
         d2client_nova::tick();   // 1.13c D2Client+0x73CB0 (cltdofunc 25, Poison Nova action frame)
+        // The client frame's tail, after this frame's packets: the attack-sound rolls of the orders the
+        // server sent this frame (0x4DC70 -> 0x242B0), the room pass (0x44A80 -> 0x440C0), then ambient and weather.
+        sessionClientMonsterHitPass(g_sessionClientFrame + 1);
+        { extern void d2_client_monster_order_roll(); d2_client_monster_order_roll(); }
+        ++g_sessionClientFrame;
+        sessionClientRoomPass();
+        if (g_currentLevel >= 0) {
+            // 1.13c D2Client+0x81340: the weather pass draws from the client hero seed. A session that never mirrored the client map has no
+            // client unit: its seed is the one retail's first 0x4F860 call reads (a retail recording capture; the derivation is not recovered).
+            uint32_t* heroSeed = g_sessionClientPlayerUnit ? reinterpret_cast<uint32_t*>(&g_sessionClientPlayerUnit->pSeed) : d2client_ambient::fallbackSeed();
+            d2client::weather::Env env{};
+            env.levelId = g_currentLevel; env.act = g_currentAct;
+            env.weatherLevel = DATATBLS_GetRainFromLevelsTxt(g_currentLevel) != 0;
+            // D2Client+0x8BC48/0x8BC4C as the headless retail rig holds them: 640x480 until its 13th client frame, then
+            // 800x600 (the spawn bound range turns 513 then). Not the window: the rig has none.
+            env.cellW = g_sessionClientFrame >= 13 ? 800 : 640; env.cellH = g_sessionClientFrame >= 13 ? 600 : 480;
+            // 1.13c D2Client+0x5F020 runs 0x4F860 first, before the frame's weather pass; same hero seed.
+            d2client_ambient::tick(heroSeed, (uint32_t)ENVIRONMENT_GetPeriodOfDayFromAct(g_game->pAct[g_currentAct], 0), env.weatherLevel);
+            d2client::weather::tick(*reinterpret_cast<d2client::weather::Seed*>(heroSeed), env);
+        }
+        sessionClientMonsterIdlePass();
     }
     updateSessionSnapshot(); return 1;
 }
@@ -7769,7 +7888,7 @@ static int sessionCommandHandSkill(uint32_t targetUnitId, bool left) {
     D2SkillStrc* skill = left ? UNITS_GetLeftSkill(g_targetPlayer) : UNITS_GetRightSkill(g_targetPlayer);
     g_rightSkillRefusal = 3;
     if (!target || !target->pDynamicPath || !skill) return 0;
-    d2client_blizzard::cast(SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__));
+    d2client_blizzard::cast(SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__), target, 0, 0);
     d2client_nova::cast(SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__), false);   // the client casts whether or not the server accepts the use (Frozen Orb, cltdofunc 29)
     d2client_clmissile::cast(SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__), SKILLS_GetSkillLevel(g_targetPlayer, skill, TRUE), target, 0, 0);   // 1.13c D2Client+0x15DA0 (cltdofunc 17, Teeth)
     g_rightSkillRefusal = 10 + SKILLS_GetUseState(g_targetPlayer, skill);   // 10 + SKILLUSTATE_* (not usable: mana, weapon, ...)
@@ -7847,7 +7966,7 @@ static int sessionCommandRightSkillAt(int32_t x, int32_t y, bool held) {
         g_rightSkillRefusal = 3;
         const int32_t useState = SKILLS_GetUseState(g_targetPlayer, skill);
         g_rightSkillRefusal = 10 + useState;
-        d2client_blizzard::cast(SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__));
+        d2client_blizzard::cast(SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__), nullptr, x, y);
         d2client_nova::cast(SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__), false);   // the client casts whether or not the server accepts the use; the refusal path plays the stsound
         // Retail's 0x0C callback (sub_6FC83340) swaps a skill that cannot be used (no mana, quantity or shape) for
         // plain Attack when its Skills.txt AttackNoMana flag is set (Double Swing, Frenzy unarmed: retail mode 7).
@@ -8041,6 +8160,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_class_skills(D2SessionSkill* out, uint3
         for (int i = 0; i < 17 && !manaLine; ++i) manaLine = desc->nDescLine[i] == 1 || desc->nDescLine[i] == 5;
         int cost = SKILLS_GetManaCosts(id, level > 0 ? level : 1);
         if (cost < 0) cost = 0;
+        if (cost < (int)skill->wMinMana << 8) cost = (int)skill->wMinMana << 8;  // display clamp, as d2_session_skill_mana
         row.manaLine = manaLine ? 1 : 0;
         row.manaCost = (uint16_t)(cost > 0xFFFF ? 0xFFFF : cost);
         row.canLearn = sessionSkillCanLearn(g_targetPlayer, id, skill) ? 1 : 0;
@@ -8070,7 +8190,10 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_skill_desc(uint32_t skillId, uint32_t l
 // V19: SKILLS_GetManaCosts (1/256 units) for any skill at any level -- the tooltip's Next Level block prices level+1.
 EMSCRIPTEN_KEEPALIVE int d2_session_skill_mana(uint32_t skillId, uint32_t level) {
     if (!g_sessionLive || !sgptDataTables) return 0;
-    const int c = SKILLS_GetManaCosts((int)skillId, (int)level);
+    int c = SKILLS_GetManaCosts((int)skillId, (int)level);
+    // The tooltip's display clamps with minmana << 8 (retail Guided Arrow L30 shows 1, not 0.75); 0 hides the line.
+    D2SkillsTxt* sk = DATATBLS_GetSkillsTxtRecord((int)skillId);
+    if (sk && c < (int)sk->wMinMana << 8) c = (int)sk->wMinMana << 8;
     return c < 0 ? 0 : c;
 }
 
@@ -8316,7 +8439,10 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_dropgold(uint32_t amount) {
     return 1;
 }
 
+// slot bit 0x100: use it on the mercenary (retail's 0x26 packet carries bUseOnMerc; D2Client+0x29990 sends the
+// shift-held flag there for a right click on a belt box).
 EMSCRIPTEN_KEEPALIVE int d2_session_command_use_belt(uint32_t slot) {
+    const int32_t onMerc = (slot & 0x100) ? 1 : 0; slot &= 0xFF;
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pInventory || slot >= 16) return 0;
     D2UnitStrc* item = INVENTORY_GetItemFromBeltSlot(g_targetPlayer->pInventory, (int32_t)slot);
     if (!item || item->dwAnimMode != IMODE_INBELT ||
@@ -8324,7 +8450,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_use_belt(uint32_t slot) {
     if (!sessionDispatchGate(0x26)) return 0;   // using a belt item is client packet 0x26
     int32_t error = 0;
     const int32_t id = item->dwUnitId;
-    if (!sub_6FC49220(g_game, g_targetPlayer, id, CLIENTS_GetUnitX(g_targetPlayer), CLIENTS_GetUnitY(g_targetPlayer), &error, 0)) return 0;
+    if (!sub_6FC49220(g_game, g_targetPlayer, id, CLIENTS_GetUnitX(g_targetPlayer), CLIENTS_GetUnitY(g_targetPlayer), &error, onMerc)) return 0;
     updateSessionSnapshot();
     return SUNIT_GetServerUnit(g_game, UNIT_ITEM, id) ? 0 : 1;
 }
@@ -8339,6 +8465,21 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_use_item(uint32_t itemUnitId) {
     memcpy(packet + 1, &id, 4); memcpy(packet + 5, &x, 4); memcpy(packet + 9, &y, 4);
     if (!sessionDispatchGate(0x20)) return 0;
     const int32_t result = D2GAME_PACKETCALLBACK_Rcv0x20_UseGridItem_6FC85990(g_game, g_targetPlayer, packet, sizeof packet);
+    updateSessionSnapshot();
+    return result == 0 ? 1 : 0;
+}
+
+// The client's second half of an item spell: 0x27 UseItemAction {target item, use item}. Identify's scroll or
+// tome arms targeting on the 0x20 above (IFLAG_TARGETING); the next left click on an item sends this, and the
+// same id twice (or no target) is the client cancelling. D2Game+0x6FC85B50 -> sub_6FC47470 decide everything:
+// the identify, the tome charge or scroll consumed, and clearing the flag. 1 if the handler accepted.
+EMSCRIPTEN_KEEPALIVE int d2_session_command_use_item_action(uint32_t targetItemId, uint32_t useItemId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return 0;
+    uint8_t packet[9] = { 0x27 };
+    const int32_t target = (int32_t)targetItemId, use = (int32_t)useItemId;
+    memcpy(packet + 1, &target, 4); memcpy(packet + 5, &use, 4);
+    if (!sessionDispatchGate(0x27)) return 0;
+    const int32_t result = D2GAME_PACKETCALLBACK_Rcv0x27_UseItemAction_6FC85B50(g_game, g_targetPlayer, packet, sizeof packet);
     updateSessionSnapshot();
     return result == 0 ? 1 : 0;
 }
@@ -9202,6 +9343,10 @@ EMSCRIPTEN_KEEPALIVE const D2SessionUnitFacing* d2_session_unit_facings() {
 EMSCRIPTEN_KEEPALIVE int d2_session_unit_facing_count() {
     updateSessionSnapshot(); return (int)g_sessionUnitFacings.size();
 }
+// The last tick's 0x0C hit packets, 12 bytes each: type u32, guid u32, message, hit class, life byte, 0.
+extern "C" const void* D2WEB_HitPackets(uint32_t* pCount);
+EMSCRIPTEN_KEEPALIVE const void* d2_session_hit_packets() { return D2WEB_HitPackets(nullptr); }
+EMSCRIPTEN_KEEPALIVE int d2_session_hit_packet_count() { uint32_t n = 0; D2WEB_HitPackets(&n); return (int)n; }
 EMSCRIPTEN_KEEPALIVE const D2SessionUnitOverlay* d2_session_unit_overlays() {
     updateSessionSnapshot(); return g_sessionUnitOverlays.data();
 }
@@ -9233,6 +9378,7 @@ extern "C" int d2_realm_client_player_count();
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_missile_on_client(uint32_t id) {
     D2UnitStrc* m = g_game ? SUNIT_GetServerUnit(g_game, UNIT_MISSILE, (int32_t)id) : nullptr;
     if (!m || !g_targetPlayer || m->dwOwnerType != UNIT_PLAYER || m->dwOwnerGUID != g_targetPlayer->dwUnitId) return 1;
+    if ((m->dwClassId == 62 || m->dwClassId == 45 || m->dwClassId == 48) && MISSILE_GetSkill(m) == 0) return 0;   // the shrines' missiles (no skill): the client made its own at the use packet (D2Client+0x26060, 0x25F10, 0x25DC0)
     if (m->dwClassId == 62 && d2_realm_client_player_count() > 0) return 0;   // the realm client flies the player's own fireball and sounds it (d2_realm_client_take_missile_sounds)
     { const D2SkillsTxt* t = DATATBLS_GetSkillsTxtRecord(MISSILE_GetSkill(m)); if (t && t->wCltDoFunc == 27 && (int32_t)m->dwClassId == (int16_t)t->wCltMissileA) return 0; }   // the client's own cltdofunc 27 bolt (sounded at the do)
     return d2_client_local_cast_refused() || d2_client_cast_walked() ? 0 : 1;

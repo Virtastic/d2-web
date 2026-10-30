@@ -289,9 +289,6 @@ void setup(Seed& s, const Env& e) {
     if (e.act == 4) g.tabB[2] *= 3;
     g.tabA[0] = 0x1d4c; g.tabA[1] = 0xfa; g.tabA[2] = 3000; g.tabA[3] = 0x32;
     g.f38f4 = 0.0f;
-    // Retail's first tick makes 5 further hero-seed draws before 0x811F0 that no recovered caller
-    // accounts for (a retail recording trace places the phase-1 duration roll at draw 11, not 6).
-    for (int i = 0; i < 5; ++i) step(s);
 }
 
 } // namespace
