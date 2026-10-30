@@ -38,7 +38,8 @@ esac
 [ -z "$files" ] && exit 0
 
 DENY='(^|/)(\.claude|\.private|desktop|tests|third-party|scenarios|harness-out|coverage|vectors|reference|ghidra|retail|shots|iso)(/|$)|^docs/(re|agents)/|^tools/(re|capture|progress|showcase)(/|$)|(^|/)(CLAUDE|AGENTS|HANDOFF|OBJECTIVE|GOAL|README-BUILD|goal-[a-z0-9-]+)\.md$|\.(dll|exe|mpq|iso|cab|gpr|gzf|rep|dc6|dcc|dt1|ds1|cof|wav|log|tsv)$|^tools/(plane|spawn-plan|ledger|defects|claims-reap)\.|^src/core/realm/bnclient_(key26|batch_10080)\.|(^|/)patch-113c\.patch$'
-h=$(printf '%s\n' "$files" | grep -E "$DENY" | grep -vE '^docs/screenshots/'); [ -n "$h" ] && say "private path" <<< "$h"
+# the SGD2FreeRes widescreen HUD art (third-party mod, redistributable under its AGPLv3) is the one .dc6 allowed in git
+h=$(printf '%s\n' "$files" | grep -E "$DENY" | grep -vE '^docs/screenshots/|^play/freeres/(D2MR|NeoD2MR)[A-Za-z]+\.dc6$'); [ -n "$h" ] && say "private path" <<< "$h"
 h=$(printf '%s\n' "$files" | grep -iE '\.(png|jpg)$' | grep -vE '^docs/screenshots/'); [ -n "$h" ] && say "image outside docs/screenshots" <<< "$h"
 
 # one git grep per pattern over all files at once (-I skips binaries); the checker and .gitignore name

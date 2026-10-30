@@ -60,8 +60,19 @@ if [ -f "$SHIM_SRC" ] && [ -n "$HAVE_NODE" ]; then "$NODE_BIN" tools/patch-shim.
 else echo "WARNING: no $SHIM_SRC -- BYO players run on their own Patch_D2.mpq" >&2; fi
 # Committed ground truth, served so scenarios can fetch it into the page.
 [ -d vectors ] && mkdir -p build-wasm/site/vectors && cp -rLu vectors/. build-wasm/site/vectors/
-FR="${D2_FREERES_DIR:-third-party/sgd2freeres}"
-[ -d "$FR" ] && mkdir -p build-wasm/site/freeres && cp "$FR"/*.dc6 "$FR"/LICENSE.md build-wasm/site/freeres/ || true
+# The widescreen HUD art: SGD2FreeRes's DC6 panels (the list play/assets/wide-hud.mjs names) and its licence,
+# tracked in play/freeres/. Never optional: without them the bottom bar draws only the 800 px centre panel, so
+# a missing file is a FATAL stage error (D2_FREERES_DIR overrides the source directory, for a test).
+FR="${D2_FREERES_DIR:-play/freeres}"
+FREERES_LIST=$("$NODE_BIN" --input-type=module -e "import { FREERES_FILES } from './play/assets/wide-hud.mjs'; console.log(FREERES_FILES.join('\n'))") \
+  || { echo "FATAL: cannot read the widescreen HUD art list from play/assets/wide-hud.mjs (node: $NODE_BIN)" >&2; exit 1; }
+mkdir -p build-wasm/site/freeres
+for n in $FREERES_LIST; do
+  [ -f "$FR/$n.dc6" ] || { echo "FATAL: widescreen HUD art $FR/$n.dc6 is missing -- restore it from git (play/freeres/)" >&2; exit 1; }
+  cp "$FR/$n.dc6" build-wasm/site/freeres/
+done
+[ -f "$FR/LICENSE.md" ] && [ -f "$FR/README.md" ] || { echo "FATAL: $FR/LICENSE.md or README.md is missing -- the art ships with its licence" >&2; exit 1; }
+cp "$FR/LICENSE.md" "$FR/README.md" build-wasm/site/freeres/
 # Local widescreen frontend backgrounds (retail-derived, gitignored): the MAIN checkout's .widebg/, served as /widebg/.
 WB="${D2_WIDEBG_DIR:-$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")/.widebg}"
 [ -f "$WB/manifest.json" ] && cp -rL "$WB" build-wasm/site/widebg

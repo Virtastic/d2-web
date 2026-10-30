@@ -1,10 +1,11 @@
 // The widescreen HUD and open-panel background, laid out as SGD2FreeRes + D2GL draw them (measured against
 // D2GL PrintScreens at 1280x720 / 1920x1080 / 2560x1080: the retail captures).
 // The geometry here is PURE (no art needed) so a row can compare every anchor to the measurement; the art is
-// SGD2FreeRes's own DC6 files (not retail, never in git), staged as /freeres/*.dc6 by ci/stage.sh.
+// SGD2FreeRes's own DC6 files (a third-party mod's art, not Blizzard's), tracked in play/freeres/ and staged as
+// /freeres/*.dc6 by ci/stage.sh. test/wide-hud-art.test.mjs holds every file to the SIZE table.
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 
-const SIZE = { // [width, height] per frame, from the DC6 headers
+export const SIZE = { // [width, height] per frame, from the DC6 headers
   D2MRStoneBack: [[256, 256], [256, 256], [256, 256], [256, 256]],
   D2MRFancyVerticalBar: [[60, 256], [60, 256], [60, 35]],
   D2MRFancyHorizontalBar: [[256, 60], [256, 60], [35, 60]],

@@ -92,6 +92,8 @@ shots/
 *.log
 *.png
 !docs/screenshots/*.png
+# SGD2FreeRes widescreen HUD art (third-party mod, AGPLv3 + additional permissions): tracked, see play/freeres/README.md
+!play/freeres/*.dc6
 src/core/realm/bnclient_key26.*
 src/core/realm/bnclient_batch_10080.*
 test/native/bnclient_key26*
@@ -291,6 +293,7 @@ test/*
 !test/weather-line-raster.test.mjs
 !test/weather-mode3.test.mjs
 !test/wide-hud.test.mjs
+!test/wide-hud-art.test.mjs
 !test/xp-bar-ratio.test.mjs
 
 # The loop's private store: RE notes, ledger, captures, scenarios, agent briefs and the rule files

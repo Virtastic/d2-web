@@ -8,7 +8,7 @@ IMAGE="${D2_IMAGE:-ghcr.io/virtastic/d2-web}"
 [ -f build-wasm/site/assets/patch-113c.patch ] || { echo "FATAL: no patch shim staged -- stage with retail/D2/patch_d2.mpq or D2_PATCH_SHIM_SRC" >&2; exit 1; }
 [ -f "build-wasm/site/e/$(cat build-wasm/site/engine-version.txt 2>/dev/null)/d2.wasm" ] && [ -f build-wasm/site/serve.mjs ] || { echo "FATAL: no staged site -- run ci/build.sh" >&2; exit 1; }
 [ -f build-wasm/site/widebg/manifest.json ] && [ ! -L build-wasm/site/widebg/manifest.json ] || { echo "FATAL: no widescreen frontend staged (widebg/) -- the image would open 4:3; stage with .widebg or D2_WIDEBG_DIR" >&2; exit 1; }
-[ -f build-wasm/site/freeres/NeoD2MRFancyBorderCornerTopRight.dc6 ] || { echo "FATAL: no widescreen HUD art staged (freeres/) -- the wide bar would not draw; stage with third-party/sgd2freeres or D2_FREERES_DIR" >&2; exit 1; }
+[ "$(ls build-wasm/site/freeres/*.dc6 2>/dev/null | wc -l)" -eq 16 ] && [ -f build-wasm/site/freeres/LICENSE.md ] || { echo "FATAL: no widescreen HUD art staged (freeres/: 16 DC6 + LICENSE.md) -- the wide bar would not draw; run ci/stage.sh (art is tracked in play/freeres/)" >&2; exit 1; }
 CTX=$(mktemp -d); trap 'rm -rf "$CTX"' EXIT
 # The image ships the widescreen frontend (widebg/, the default view) and the 1.13c patch shim; vectors/, diag/ and any retail link stay out. -h copies files, never links.
 tar -h -C build-wasm/site --exclude=./vectors --exclude=./diag --exclude=./retail --exclude=./assets/combat-sound-queue.mjs --exclude=./assets/item-cursor-art.mjs --exclude=./assets/waypoint-arrival-evidence.mjs --exclude=./assets/weather-evidence.mjs -cf - . | tar -C "$CTX" -xf -
