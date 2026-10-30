@@ -7,7 +7,8 @@
 // Mode 1 (neutral): missile row+0xF0; mode 2 (walk): missile row+0xEE + rand(2) on the unit's client seed (unit+0x20); other modes: nothing.
 // On fire (missile id > 0): param1 = 0, param2/3 = x/y, then the missile create, which submits the missile's TravelSound.
 // Not simulated: the missile objects and mode 1's cleanup of the previous missile (0x61420); only the sound submit is kept.
-// ponytail: client unit seed {0x29A, unitId} and the one-frame mode lag are fitted to a retail recording trace (3 rand bits), not read from code.
+// The unit's client seed is {init, 666}, init its client room's seed roll at creation (client_unit_seed.cpp); the missile create rolls that room's seed too.
+// ponytail: the one-frame mode lag is fitted to a retail recording trace, not read from code.
 #include <cstdint>
 #include <cstring>
 #include <cstdlib>
@@ -20,6 +21,7 @@
 #include "../d2moo/include/Units/Units.h"
 
 namespace d2client_ambient { void submit(int32_t row); }
+namespace d2client_unitseed { uint32_t roll(const D2ActiveRoomStrc* r); uint32_t init(uint32_t type, uint32_t id); }
 
 namespace {
 constexpr int32_t kVineAttack = 294;
@@ -37,7 +39,7 @@ void unit(D2UnitStrc* u) {
     const uint8_t* row = reinterpret_cast<const uint8_t*>(sgptDataTables->pSkillsTxt) + uint32_t(kVineAttack) * 0x23c;
     auto ins = T.try_emplace(u->dwUnitId);
     Ticker& t = ins.first->second;
-    if (ins.second) { t.seed[0] = 0x29a; t.seed[1] = u->dwUnitId; }
+    if (ins.second) { t.seed[0] = d2client_unitseed::init(u->dwUnitType, u->dwUnitId); t.seed[1] = 666; }
     const int32_t n = t.p1; t.p1 = n + 1;
     const int32_t x = u->pDynamicPath->tGameCoords.wPosX, y = u->pDynamicPath->tGameCoords.wPosY;
     const int32_t calc = SKILLS_EvaluateSkillFormula(u, u32(row, 0x118), kVineAttack, 1);
@@ -53,6 +55,7 @@ void unit(D2UnitStrc* u) {
     } else return;
     if (!fire || v <= 0 || v >= sgptDataTables->nMissilesTxtRecordCount) return;
     t.p1 = 0; t.p2 = x; t.p3 = y;
+    d2client_unitseed::roll(UNITS_GetRoom(u));   // the client missile is a client unit created in the room
     const int32_t snd = sgptDataTables->pMissilesTxt[v].wTravelSound;
     if (snd > 0) d2client_ambient::submit(snd);
 }
