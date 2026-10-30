@@ -5,10 +5,17 @@
 #include <cstdint>
 #include <emscripten.h>
 
-static int32_t g_localAction = 0;
+// The mode is taken one tick after the cast, as the walk footfalls are (the client submits the sound one tick after
+// the unit enters the mode).
+static int32_t g_localAction = 0, g_localActionNext = 0;
 
-extern "C" void d2_client_note_local_action(int32_t mode) { g_localAction = mode; }
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_take_local_action() { int32_t m = g_localAction; g_localAction = 0; return m; }
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_note_local_action(int32_t mode) { g_localActionNext = mode; }
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_take_local_action() {
+    int32_t m = g_localAction;
+    g_localAction = g_localActionNext;
+    g_localActionNext = 0;
+    return m;
+}
 // Who started the player's current run: an explicit move command (the client predicts the move and its unit drops to the walk/town-walk
 // mode after the first tick, a retail recording/a retail recording F rows) or a cast that walks the player (the client unit follows the server and stays in run mode 3,
 // a retail recording ama-10 ticks 12-44: every footfall the run group). 23C00 reads that mode at 0x23C18.
