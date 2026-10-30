@@ -56,9 +56,11 @@ export function createCombatSoundTrigger(read, play, busy = () => false, roll = 
   const doSound = new Map(); // skill id -> dosound A row, only for cltdofunc 16 (Jab)
   // a retail recording: retail never submits an Assassin skill's stsound (assassin_* rows, 0 of the 51 a retail recording traces; the cast tick plays 2720 or 251),
   // so Skills.txt charclass 'ass' is left out. ponytail: class gate, the cause in the 0xA1CF0 chain is not traced; drop it when that is.
-  { const rows = text('data\\global\\excel\\skills.txt').split(/\r?\n/).map((l) => l.split('\t')), h = rows[0], id = h.indexOf('Id'), st = h.indexOf('stsound'), fn = h.indexOf('cltdofunc'), da = h.indexOf('dosound a'), cc = h.indexOf('charclass');
+  { const rows = text('data\\global\\excel\\skills.txt').split(/\r?\n/).map((l) => l.split('\t')), h = rows[0], id = h.indexOf('Id'), st = h.indexOf('stsound'), pg = h.indexOf('prgsound'), fn = h.indexOf('cltdofunc'), da = h.indexOf('dosound a'), cc = h.indexOf('charclass');
     for (const c of rows.slice(1)) {
-      if (c[st] && soundIndex.has(c[st]) && c[cc] !== 'ass') skillSound.set(Number(c[id]), soundIndex.get(c[st]));
+      // prgsound is the cast sound when stsound is empty (Arctic Blast: druid_windcast, Sounds row 2352)
+      const cast = soundIndex.has(c[st]) ? c[st] : c[pg];
+      if (cast && soundIndex.has(cast) && c[cc] !== 'ass') skillSound.set(Number(c[id]), soundIndex.get(cast));
       if (Number(c[fn]) === 16 && soundIndex.has(c[da])) doSound.set(Number(c[id]), soundIndex.get(c[da])); } }
   const dmgPrev = new Set(), prev = new Map(), hpPrev = new Map(), frames = new Map(), hist = new Map(), rng = { s: 1n };
   let refusedSeq, pendingRefused = 0, tick = 0, lastRoll = -99;
