@@ -23,12 +23,10 @@ test('no params: enhanced (fill), retail mounted, player page', () => {
   const e = run('', false);
   assert.equal(e.fill, true); assert.equal(e.parity, false); assert.equal(e.retail, true); assert.equal(e.player, true);
 });
-test('player URL params are ignored: ?parity=1 ?view=800 ?plugy=1 ?retail=0', () => {
-  const e = run('?parity=1&view=800&plugy=1&retail=0&play=1', false);
-  assert.equal(e.fill, true); assert.equal(e.retail, true); assert.equal(e.search, '');
-});
-test('test path (webdriver): bare page stays 800x600 parity; ?enhanced=1 opts in', () => {
-  assert.equal(run('', true).fill, false);
-  assert.equal(run('?enhanced=1', true).fill, true);
-  assert.equal(run('?play=1&parity=1', true).fill, false);
+test('URL params are never read, by a player or the test runner', () => {
+  for (const wd of [false, true]) {
+    const e = run('?parity=1&view=800&plugy=1&retail=0&play=1&enhanced=1&assets=byo', wd);
+    assert.equal(e.retail, true); assert.equal(e.player, true); assert.equal(e.search, ''); assert.equal(e.assets, '');
+  }
+  assert.equal(run('?enhanced=1', true).fill, false);   // the test runner always gets the 800x600 parity view
 });
