@@ -19,12 +19,12 @@ export const ROLES = {
   d2exp:    { file: 'd2exp.mpq',    hashN: 65536, blockN: 9888,  required: true,  label: 'Expansion data',   note: 'd2exp.mpq' },
   d2sfx:    { file: 'd2sfx.mpq',    hashN: 8192,  blockN: 2329,  required: true,  label: 'Sound effects',    note: 'd2sfx.mpq' },
   patch_d2: { file: 'patch_d2.mpq', hashN: 512,   blockN: null,  required: true,  label: 'Patch',            note: 'Patch_D2.mpq' },
-  d2speech: { file: 'd2speech.mpq', hashN: 8192,  blockN: 1566,  required: false, label: 'Speech',           note: 'd2speech.mpq' },
-  d2music:  { file: 'd2music.mpq',  hashN: 8192,  blockN: 45,    required: false, label: 'Music',            note: 'd2music.mpq' },
-  d2xmusic: { file: 'd2xmusic.mpq', hashN: 8192,  blockN: 12,    required: false, label: 'Expansion music',  note: 'd2xmusic.mpq' },
-  d2xtalk:  { file: 'd2xtalk.mpq',  hashN: 8192,  blockN: 478,   required: false, label: 'Expansion speech', note: 'd2xtalk.mpq' },
-  d2video:  { file: 'd2video.mpq',  hashN: 8192,  blockN: 17,    required: false, label: 'Videos',           note: 'd2video.mpq' },
-  d2xvideo: { file: 'd2xvideo.mpq', hashN: 256,   blockN: 6,     required: false, label: 'Expansion videos', note: 'd2xvideo.mpq' },
+  d2speech: { file: 'd2speech.mpq', hashN: 8192,  blockN: 1566,  required: true , label: 'Speech',           note: 'd2speech.mpq' },
+  d2music:  { file: 'd2music.mpq',  hashN: 8192,  blockN: 45,    required: true , label: 'Music',            note: 'd2music.mpq' },
+  d2xmusic: { file: 'd2xmusic.mpq', hashN: 8192,  blockN: 12,    required: true , label: 'Expansion music',  note: 'd2xmusic.mpq' },
+  d2xtalk:  { file: 'd2xtalk.mpq',  hashN: 8192,  blockN: 478,   required: true , label: 'Expansion speech', note: 'd2xtalk.mpq' },
+  d2video:  { file: 'd2video.mpq',  hashN: 8192,  blockN: 17,    required: true , label: 'Videos',           note: 'd2video.mpq' },
+  d2xvideo: { file: 'd2xvideo.mpq', hashN: 256,   blockN: 6,     required: true , label: 'Expansion videos', note: 'd2xvideo.mpq' },
 };
 // The engine mounts in this order (play/index.html RETAIL_ORDER): later archives lose to earlier ones.
 export const ORDER = ['patch_d2', 'd2exp', 'd2xmusic', 'd2xtalk', 'd2xvideo', 'd2data', 'd2char', 'd2music', 'd2sfx', 'd2speech', 'd2video'];

@@ -70,6 +70,7 @@ export function frontDoor({ onReady } = {}) {
     for (const [role, li] of Object.entries(rows)) li.classList.toggle('have', !!s.slots[role]?.have);
     const extras = Object.entries(ROLES).filter(([, r]) => !r.required);
     const got = extras.filter(([r]) => s.slots[r]?.have).length;
+    opt.hidden = !extras.length;
     opt.textContent = `Optional: speech, music and videos ${got ? `(${got} of ${extras.length} found)` : '(the game runs without them)'}.`;
     notes.replaceChildren();
     for (const i of s.issues) {
