@@ -142,6 +142,8 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
     const rec = { ...event, kind: 'table-row', row, handle: null, path: null, started: false, error: '' };
     events.push(rec);
     if (!Number.isInteger(row) || row < 0) { rec.error = `invalid Sounds.txt row ${row}`; return rec; }
+    // A delayed submit (event.delay, in 25 Hz game ticks, as retail's submit offset) is recorded now and starts its audio later.
+    if (event.delay > 0) { setTimeout(() => playTableRow(row, rec, { spatial: false }), event.delay * 40); return rec; }
     return playTableRow(row, rec, { spatial: false });
   }
   function stopDialogue() {

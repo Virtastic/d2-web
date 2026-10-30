@@ -101,7 +101,8 @@ export function createCombatSoundTrigger(read, play, busy = () => false, roll = 
         const ph = hpPrev.get(key); hpPrev.set(key, e0.hp);
         // Sacrifice (96) charges the caster's own HP in its do frame, mid-swing: no SUCCESSFULHIT, lastHitClass stays stale, retail plays no impact (a retail recording)
         const sac = e0.id === snapshot?.playerId && snapshot.player?.castSkillId === 96 && PLAYER_ATTACK.has(e0.mode) && prev.get(key) === e0.mode;
-        const dmgRaw = !sac && ph !== undefined && e0.hp < ph && e0.lastHitClass !== undefined && !e0.critter, dot = dmgRaw && dmgPrev.has(key) && e0.lastHitClass === 93 && !(e0.type === 1 ? MON_HIT : PLAYER_HIT).has(e0.mode); // poison ticks (hit class 93) after the first: no new hit, retail plays it once
+        const castHit = e0.type === 0 && PLAYER_CAST.has(e0.mode); // a retail recording: a zombie claw landing on a player in a cast mode (Shiver Armor) plays no impact or hit cue, and the client got no life update for it; unit-level cause not traced
+        const dmgRaw = !sac && !castHit && ph !== undefined && e0.hp < ph && e0.lastHitClass !== undefined && !e0.critter, dot = dmgRaw && dmgPrev.has(key) && e0.lastHitClass === 93 && !(e0.type === 1 ? MON_HIT : PLAYER_HIT).has(e0.mode); // poison ticks (hit class 93) after the first: no new hit, retail plays it once
         dmgRaw ? dmgPrev.add(key) : dmgPrev.delete(key);
         const dmg = dmgRaw && !dot;
         const e = dmg && e0.hp > 0 && !(e0.type === 1 ? MON_HIT : PLAYER_HIT).has(e0.mode) ? { ...e0, mode: e0.type === 1 ? 3 : 4 } : e0;

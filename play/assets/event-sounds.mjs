@@ -72,9 +72,9 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
         // Retail (a retail recording/a retail recording/a retail recording/a retail recording Q records, D2Client+0x88A70): an item entering the world in drop mode submits item_flippy (row 216) at once, whatever its class; the class dropsound follows at dropsfxframe.
         const unit = { unitType: 4, classId: it.classId }, arrived = !old && sawItems && ground; // an item first seen on the ground mid-session was dropped (the server reports mode 3, not the client's flip mode 5)
         if (!old && ((it.mode === 5 && it.invPage === 255) || arrived)) play(idx.get('item_flippy'), { kind: 'drop-flip', ...unit });
-        const born = old?.born ?? tick; // retail Q record: the class dropsound is submitted with a delay of dropsfxframe ticks from the item entering the world (a retail recording +0xe, a retail recording +0xe)
-        if (d && !played && (((it.mode === 5 && it.invPage === 255) || arrived || (old && old.drop)) && tick - born >= d.frame || (old && !old.ground && !old.flip && ground))) { play(d.row, { kind: 'drop', delay: d.frame, ...unit }); played = true; }
-        now.set(it.id, { ground, code, born, drop: !played && (!!old?.drop || (!old && ((it.mode === 5 && it.invPage === 255) || arrived))), flip: !!old?.flip || it.mode === 5, played: (ground || it.mode === 5) && played });
+        // Retail Q records (D2Client+0x88A70, 57 drop submits in the traces): the class dropsound is submitted on the flip tick itself, with the row's dropsfxframe as its delay; the audio starts that many ticks later (unit-sound-player playRow).
+        if (d && !played && ((it.mode === 5 && it.invPage === 255) || arrived || (old && old.drop) || (old && !old.ground && !old.flip && ground))) { play(d.row, { kind: 'drop', delay: d.frame, ...unit }); played = true; }
+        now.set(it.id, { ground, code, drop: !played && (!!old?.drop || (!old && ((it.mode === 5 && it.invPage === 255) || arrived))), flip: !!old?.flip || it.mode === 5, played: (ground || it.mode === 5) && played });
       }
       for (const [id, old] of seen) if (old.ground && !(now.get(id)?.ground)) { if (serverPickups > 0) serverPickups--; else play(idx.get(old.code === 'gld' ? 'item_gold' : 'item_pickup'), { kind: old.code === 'gld' ? 'gold' : 'pickup', unitType: 0, classId: cls }); }
       seen.clear(); for (const [k, v] of now) seen.set(k, v);

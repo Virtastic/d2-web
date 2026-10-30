@@ -21,7 +21,7 @@ export function createMissileSounds(read, play) {
       pend = pend.filter((p) => p.at > tick);
       const seen = new Map();
       for (const e of entities) if (e.kind === 'missile') seen.set(e.id, e.classId);
-      for (const [id, cls] of seen) if (!live.has(id)) { born.set(id, tick); const r = row(byId.get(cls)?.TravelSound); if (r && cls !== 62 && cls !== 261) pend.push({ at: tick + 1, r, ev: { kind: 'missile-travel', unitId: id, classId: cls } }); }   // 261 frozenorbbolt: the client orb owns it (cltdofunc 29, nova_73cb0.cpp), flown whether or not the server orb exists
+      for (const [id, cls] of seen) if (!live.has(id)) { born.set(id, tick); const r = row(byId.get(cls)?.TravelSound); if (r && cls !== 261) pend.push({ at: tick + 1, r, ev: { kind: 'missile-travel', unitId: id, classId: cls } }); }   // 261 frozenorbbolt: the client orb owns it (cltdofunc 29, nova_73cb0.cpp), flown whether or not the server orb exists
       for (const [id, cls] of live) if (!seen.has(id)) {
         const m = byId.get(cls), r = row(m?.HitSound) || row(byName.get(m?.ExplosionMissile)?.TravelSound);
         const steps = tick - born.get(id) - 1, d = m?.ClientCol === '1' ? Math.floor(steps / 0.75) - steps - 1 : 0; born.delete(id);

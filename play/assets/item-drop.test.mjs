@@ -19,16 +19,16 @@ const files = {
 };
 const item = (code, mode, frame) => ({ id: 1, code: codeNum(code), mode, invPage: 255, framePrecise: frame << 8 });
 function run(frames, expectedSound = true) {
-  const got = [], s = createEventSounds((p) => files[p], (row, e) => got.push([row, e.kind, current]));
+  const got = [], s = createEventSounds((p) => files[p], (row, e) => got.push([row, e.kind, current, e.delay]));
   let current = -1;
   frames.forEach((it, i) => { current = i; s.update({ items: [it] }, 0); });
   return got.filter((g) => g[1] === 'drop');
 }
 const flip = (code, last) => [...Array.from({ length: 17 }, (_, f) => item(code, 5, f)), item(code, 3, 16), item(code, 3, 16)];
 
-test('drop sound plays once, at dropsfxframe, not before and not at landing', () => {
+test('drop sound is submitted on the first dropping frame, with dropsfxframe as its delay, not at landing', () => {
   const got = run(flip('cap'));
-  assert.deepEqual(got.map((g) => [g[0], g[2]]), [[10, 5]]); // frame index 5 == dropsfxframe
+  assert.deepEqual(got.map((g) => [g[0], g[2], g[3]]), [[10, 0, 5]]); // retail submits on the flip tick (Q 244,c at the flip); delay 5 == dropsfxframe
 });
 test('dropsfxframe 0 plays on the first dropping frame', () => {
   assert.deepEqual(run(flip('hax')).map((g) => [g[0], g[2]]), [[11, 0]]);
