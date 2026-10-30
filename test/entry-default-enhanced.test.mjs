@@ -26,7 +26,7 @@ test('no params: enhanced (fill), retail mounted, player page', () => {
 test('URL params are never read, by a player or the test runner', () => {
   for (const wd of [false, true]) {
     const e = run('?parity=1&view=800&plugy=1&retail=0&play=1&enhanced=1&assets=byo', wd);
-    assert.equal(e.retail, true); assert.equal(e.player, true); assert.equal(e.search, ''); assert.equal(e.assets, '');
+    assert.equal(e.retail, true); assert.equal(e.player, true); assert.equal(e.search, wd ? '?parity=1&view=800&plugy=1&retail=0&play=1&enhanced=1&assets=byo' : ''); assert.equal(e.assets, '');
   }
   assert.equal(run('?enhanced=1', true).fill, false);   // the test runner always gets the 800x600 parity view
 });

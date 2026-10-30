@@ -1,10 +1,12 @@
-// Entry decision, made once, before anything else reads the page. The page never reads the URL: there are no
-// URL options. Retail data mounted, player page; the enhanced (full-screen/widescreen) view, except under the
-// test runner (navigator.webdriver), which gets the 800x600 parity view the harness compares against retail.
+// Entry decision, made once, before anything else reads the page. Retail data mounted, player page; the
+// enhanced (full-screen/widescreen) view, except under the test runner (navigator.webdriver), which gets the
+// 800x600 parity view the harness compares against retail. Public visits never read the URL: `search` is
+// empty for them. The test runner keeps its URL options (play=1, seed, debug...) that every scenario uses.
 (() => {
   const test = !!navigator.webdriver;
   const fill = !test;
-  globalThis.__d2Entry = { retail: true, player: true, fill, parity: !fill, search: '', test, assets: '' };
+  const search = test ? location.search : '';
+  globalThis.__d2Entry = { retail: true, player: true, fill, parity: !fill, search, test, assets: '' };
   if (typeof document !== 'undefined' && document.documentElement) {
     if (fill) document.documentElement.classList.add('fill');
     document.documentElement.classList.add('playing');
