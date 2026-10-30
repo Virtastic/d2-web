@@ -812,6 +812,9 @@ static std::unordered_set<uint32_t> g_monInitPlayed; // 1.13c D2Client+0x23170: 
 static std::vector<std::array<int32_t, 7>> g_pendingOnsound; // state-on events found by the last drain, emitted by the next one
 static std::unordered_set<uint64_t> g_prevOnsoundStates; // 1.13c D2Client+0x73760: state bits seen at the last sound drain (type<<40 | id<<8 | state)
 static bool g_sessionResumeAttack;
+extern int32_t g_playerSkillDoIds[8];
+extern int32_t g_playerSkillDoCount;
+static std::vector<std::array<int32_t, 7>> g_pendingSkillDo; // 1.13c D2Client+0xA2C90 wDoSound events, emitted one drain after the do
 // s2420 watches one unit so its scheduled timer can be paired with proof that the event dispatcher
 // actually invoked that unit's AITHINK callback. This is diagnostic only and does not change timing.
 static uint32_t g_sessionAiThinkWatchUnit = UINT32_MAX;
@@ -5872,14 +5875,29 @@ EMSCRIPTEN_KEEPALIVE int d2_session_take_sounds(int32_t* out, int cap) {
         g_prevOnsoundStates.swap(cur);
         // One drain of latency: a state set in step N is recorded at tick N, as retail's client plays it on the packet's tick.
         // Measured (a retail recording auras vs a retail recording curses): a state on the player plays one drain later, a monster's at once.
+        // The shapeshift states (Werewolf/Werebear, set by the self-cast do-frame) are the exception: a retail recording
+        // (skills 223, 228) plays their row on the tick the state is set, not one drain later.
+        const D2StatesTxt* wolf = DATATBLS_GetStatesTxtRecord(STATE_WOLF); const D2StatesTxt* bear = DATATBLS_GetStatesTxtRecord(STATE_BEAR);
+        const int32_t wolfRow = wolf ? (int32_t)(int16_t)wolf->wOnSound : -2, bearRow = bear ? (int32_t)(int16_t)bear->wOnSound : -2;
         std::vector<std::array<int32_t, 7>> later, now = g_pendingOnsound;
-        for (const auto& e : found) (e[0] == 0 ? later : now).push_back(e);
+        for (const auto& e : found) (e[0] == 0 && e[6] != wolfRow && e[6] != bearRow ? later : now).push_back(e);
         // Entries that did not fit under cap stay queued ahead of this drain's new player entries, so none is lost.
         size_t emitted = 0;
         for (; emitted < now.size() && n + 7 <= cap; emitted++)
             for (int32_t v : now[emitted]) out[n++] = v;
         later.insert(later.begin(), now.begin() + emitted, now.end());
         g_pendingOnsound.swap(later);
+    }
+    {   // 1.13c D2Client+0xA2C90: a skill whose client do-function slot is empty (index 0) plays its wDoSound (+0x100).
+        // The player's do reaches the client one drain later, as the state packet does.
+        for (const auto& e : g_pendingSkillDo) { if (n + 7 > cap) break; for (int32_t v : e) out[n++] = v; }
+        g_pendingSkillDo.clear();
+        for (int32_t i = 0; i < g_playerSkillDoCount; i++) {
+            D2SkillsTxt* t = DATATBLS_GetSkillsTxtRecord(g_playerSkillDoIds[i]);
+            if (t && t->wCltDoFunc == 0 && t->wDoSound > 0 && g_targetPlayer)
+                g_pendingSkillDo.push_back({0, (int32_t)g_targetPlayer->dwUnitId, (int32_t)g_targetPlayer->dwClassId, 0x102, -1, 0, (int32_t)t->wDoSound});
+        }
+        g_playerSkillDoCount = 0;
     }
     return n / 7;
 }

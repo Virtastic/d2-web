@@ -2460,6 +2460,10 @@ int32_t __fastcall sub_6FD12950(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nS
     return nResult;
 }
 
+// Player skill dos of this step, read by the session sound drain (client do-function sound, D2Client+0xA2C90).
+int32_t g_playerSkillDoIds[8];
+int32_t g_playerSkillDoCount;
+
 //D2Game.0x6FD12BA0
 // 1.13c D2Game+0xA19A0 (rule: globals instead of the pGame tables, register convention)
 int32_t __fastcall D2GAME_SKILLS_Handler_6FD12BA0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, int32_t a5, int32_t a6, int32_t a7)
@@ -2522,6 +2526,7 @@ int32_t __fastcall D2GAME_SKILLS_Handler_6FD12BA0(D2GameStrc* pGame, D2UnitStrc*
     if (pDoFunc)
     {
         nResult = pDoFunc(pGame, pUnit, nSkillId, nSkillLevel);
+        if (pUnit->dwUnitType == UNIT_PLAYER && g_playerSkillDoCount < 8) g_playerSkillDoIds[g_playerSkillDoCount++] = nSkillId;
     }
 
     const int32_t nSrvMissile = pSkillsTxtRecord->wSrvMissile;
