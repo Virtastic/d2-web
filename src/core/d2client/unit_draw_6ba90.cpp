@@ -1,117 +1,135 @@
-// D2Client+0x6BA90: per-unit draw (unit in EAX). Env-seam port in the b56a style: callees injected.
-// Unnamed ordinals keep their number; opaque helpers are named by RVA.
+// D2Client+0x6BA90: per-unit draw (unit in EAX). Env-seam port: every call site of the 1.13c routine is one
+// Env::call(id, words, outs), numbered as in the FUNCTION-mode capture (record kind 3481):
+//  1 GetStat(unit,0x92)  2 0x6AA30  3 #10036  4 #10013  5 0x1A80  6 #10083(0)  7 #10013  8 #11080  9 #11168  10 #10012
+//  11 #10023  12 #10651  13 #11142  14 #10688  15 0x6A3D0  16 #10175  17 #10350  18 #10569  19 GetState(unit,0x25)
+//  20 0xA60D0  21 #10431  22 0x69910  23 0x6A2F0  24 0x69090  25 #10663  26 0x6DCA0  27 0x6D6D0  28 0x6EA50
+//  29 0x6D740  30 0x6E2C0  31 #10011  32 fatal(line)  33/34/35 #10083(#10036 result)
+// w[] holds the register/stack arguments the capture logs; o[] receives the
+// callee's out-parameters (ids 11, 17, 18, 21, 26, 28). Pointers returned by 14, 20, 24, 27 are opaque to the port.
 #include <cstdint>
 #include <emscripten.h>
 typedef int32_t i32; typedef uint32_t u32;
 
 struct D2cUnitDrawEnv {
     u32 (*rd32)(u32 addr);
-    uint8_t (*rd8)(u32 addr);
-    i32 (*ord10494)(u32 unit, i32 code); i32 (*ord10036)(); i32 (*ord10013)(); i32 (*ord10012)(i32 x, i32 y);
-    void (*ord10083)(u32 handle);                      // takes the Ordinal_10036 result (or the f1a80 result 0), never the unit
-    u32 (*f1a80)();
-    void (*f6aa30)(u32 unit);
-    i32 (*ord10651)(u32 unit); i32 (*ord11142)(u32 unit);
-    i32 (*ord11080)(u32 unit); i32 (*ord11168)(u32 unit);
-    void (*ord10023)(i32 x, i32 y, i32 z, i32* ox, i32* oy);  // Ordinal_10023 (0xD084); result unused
-    u32 (*ord10688)(u32 id);
-    i32 (*f6a3d0)(u32 unit, i32 x, i32 y, i32 one);   // 0x6A3D0 (EAX = unit)
-    i32 (*ord10175)(u32 unit);                         // D2Common: the unit's mode
-    void (*ord10350)(u32 unit, u32* type, u32* id, i32* mode, u32 line);  // D2Common (file, line 0x926)
-    void (*ord10569)(u32 unit, u32* a, u32* b);        // D2Common: the two outputs feed the cel lookups
-    i32 (*ord10866)(u32 unit, i32 state);              // D2Common: state 0x25 test
-    u32 (*f560d0)(u32 unit);                           // 0x560D0 (EAX = unit): the unit whose +0x60 is used
-    u32 (*ord10431)(u32 unit, u32 p60, u32* out, i32 mode, i32 z);
-    u32 (*f19910)(u32 unit, i32 m1);                   // 0x69910 (EAX = unit, ECX = -1)
-    u32 (*f1a2f0)(u32 unit, u32 tok, i32 m1);          // 0x6A2F0 (EDX = unit, ECX = tok, EAX = -1)
-    u32 (*f19090)(u32 unit, i32 mode);                 // 0x69090 (EAX = unit, ECX = mode)
-    u32 (*ord10663)(u32 unit);
-    void (*f1dca0)(u32 unit, u32 type, u32 id, i32 mode, i32* cls, i32* o2, i32* o3, u32 b2, u32 one);
-    u32 (*f1d6d0)(u32 map, i32 a, u32 b);              // 0x6D6D0 (EAX = map)
-    i32 (*f1ea50)(u32 unit, u32 map, u32 buf, i32* cnt, i32 cls, u32 b);  // 0x6EA50 (EBX = unit)
-    i32 (*f1d740)(u32 map, u32 comp);                  // 0x6D740 (ECX = map, EDI = component)
-    i32 (*f1e2c0)(u32 unit, u32* rec, u32* out, i32 m1);  // 0x6E2C0 (EAX = -1)
-    void (*ord10011)(const u32* rec, i32 x, i32 y);    // D2gfx: draw the component
-    void (*fatal)(i32 line);                           // Ordinal_10265/10024 + _exit(-1)
+    u32 (*rd8)(u32 addr);
+    u32 (*call)(u32 id, const u32* w, u32* o);
 };
 
 extern "C" {
-// 1.13c D2Client+0x6BA90
-EMSCRIPTEN_KEEPALIVE i32 d2c_6ba90(const D2cUnitDrawEnv* e, u32 unit, u32 gBBFC, i32 g9960, i32 gcc418,
-                                   i32 g995c, i32 gcc414, i32 g8bc48) {
-    auto R = [&](u32 a, u32 off) -> i32 { return a ? (i32)e->rd32(a + off) : 0; };
+// 1.13c D2Client+0x6BA90; returns EAX (0 or 1; 0 when the fatal site is reached).
+EMSCRIPTEN_KEEPALIVE u32 d2c_6ba90(const D2cUnitDrawEnv* e, u32 unit, u32 gBBFC, u32 g9960, u32 gC418, u32 g995c,
+                                   u32 gC414, u32 g8bc48) {
+    u32 w[6], o[3];
+    auto C = [&](u32 id, u32 a = 0, u32 b = 0, u32 c = 0, u32 d = 0, u32 f = 0, u32 g = 0) {
+        w[0] = a; w[1] = b; w[2] = c; w[3] = d; w[4] = f; w[5] = g; o[0] = o[1] = o[2] = 0;
+        return e->call(id, w, o);
+    };
     if (unit && ((e->rd32(unit + 0xc4) >> 5) & 1)) return 0;
-    if (e->ord10494(unit, 0x92)) return 0;
+    if (C(1, unit, 0x92)) return 0;
     i32 type = unit ? (i32)e->rd32(unit) : -1;
-    if (!unit || type < 0 || type > 2) { e->f6aa30(unit); return 1; }
-    i32 v36 = e->ord10036();
-    i32 fA = 0;                                        // "pushed" flag: set only by this block, undone by ord10083(v36)
-    if (v36 && e->ord10013() && unit == gBBFC) {
-        u32 r = e->f1a80();
-        if (!r) { e->ord10083(r); fA = 1; }
-    }
-    i32 c13 = e->ord10013();
+    if (!unit || type < 0 || type > 2) { C(2, unit); return 1; }
+    u32 hb = 0;                                   // [esp+0x10]: #10083 owed on exit
+    u32 v24 = C(3);
+    if (v24 && C(4) && unit == gBBFC && !C(5, unit)) { C(6, 0); hb = 1; }
+    u32 v0c = C(7);
     u32 info = e->rd32(unit + 0x54);
     u32 ext = info ? e->rd32(info + 0x30) : 0;
-    i32 x, y;
-    if (!c13) {
-        i32 half = (ext ? R(ext, 0x3c) : 0) / 2;
-        x = e->ord10651(unit) + half;
-        y = e->ord11142(unit) + half;
+    auto X = [&](u32 off) { return ext ? e->rd32(ext + off) : 0u; };
+    u32 xc, yc;
+    if (v0c) {
+        i32 v = (i32)X(0xc); u32 half = (u32)((v + (v < 0 ? 1 : 0)) >> 1);
+        u32 x = C(8, unit) - half;
+        u32 y = C(9, unit) - half;
+        if (!C(10, x, y)) { if (hb) C(33, v24); return 0; }
+        C(11, x, y, 0);
+        xc = o[0] + (g9960 - gC418);
+        yc = o[1] + g995c + 8;
     } else {
-        i32 half = (ext ? R(ext, 0xc) : 0) / 2;
-        i32 X = e->ord11080(unit) - half, Y = e->ord11168(unit) - half;
-        if (!e->ord10012(X, Y)) { if (fA) e->ord10083((u32)v36); return 0; }
-        e->ord10023(X, Y, 0, &x, &y);
-        x += g9960 - gcc418;
-        y += 8 + g995c;
+        i32 v = (i32)X(0x3c); u32 half = (u32)(v / 2);
+        xc = C(12, unit) + half;
+        yc = C(13, unit) + half;
     }
-    if (fA) y -= 8;
-    x += ext ? R(ext, 0x34) : 0;
-    y += ext ? R(ext, 0x38) : 0;
-    i32 sx = (gcc418 - g9960) - 2 + x;
-    i32 sy = (y - g995c) + 8;
-    if (type == 2) { u32 t = e->ord10688(e->rd32(unit + 4)); sx += R(t, 0x148); sy += R(t, 0x14c); }
-    i32 dx = sx;
-    if (c13) {
-        i32 q = (g8bc48 + ((g8bc48 >> 31) & 3)) >> 2;
-        if (gcc414 == 1) dx = sx - q; else if (gcc414 == 2) dx = sx + q;
+    if (hb) yc -= 8;
+    xc += X(0x34);
+    yc += X(0x38);
+    u32 sx = (gC418 - g9960) + xc - 2;
+    u32 sy = yc - g995c + 8;
+    if (type == 2) {
+        u32 t = C(14, e->rd32(unit + 4));
+        sx += e->rd32(t + 0x148); sy += e->rd32(t + 0x14c);
     }
-    auto bail = [&]() -> i32 { if (fA) e->ord10083((u32)v36); return 0; };
-    if (!e->f6a3d0(unit, dx, sy, 1)) return bail();
-    u32 ty = (u32)type, id = e->rd32(unit + 4);
-    i32 mode = e->ord10175(unit);
-    e->ord10350(unit, &ty, &id, &mode, 0x926);
-    u32 l40 = 0, l44 = 0;
-    e->ord10569(unit, &l40, &l44);
-    i32 st = (i32)((e->rd32(unit + 0xc8) >> 3) & 1);
+    if (v0c) {
+        i32 g = (i32)g8bc48; u32 q = (u32)((g + ((g >> 31) & 3)) >> 2);
+        if (gC414 == 1) sx -= q; else if (gC414 == 2) sx += q;
+    }
+    if (!C(15, unit, sx, sy, 1)) { if (hb) C(34, v24); return 0; }
+    u32 tp = (u32)type, id = e->rd32(unit + 4), r175 = C(16, unit);
+    C(17, unit, tp, id, r175, 0x926); tp = o[0]; id = o[1]; r175 = o[2];   // w1..w3 are the pre-call locals
+    C(18, unit); u32 o1 = o[0];
     u32 p60 = e->rd32(unit + 0x60);
-    if (st && e->ord10866(unit, 0x25)) { u32 o = e->f560d0(unit); if (o) p60 = e->rd32(o + 0x60); }
-    u32 l4c = 0;
-    u32 tok = e->ord10431(unit, p60, &l4c, mode, 0);
-    if (!e->f19910(unit, -1) && !e->f1a2f0(unit, tok, -1)) return 0;
-    u32 map = e->f19090(unit, mode);
+    if (((e->rd32(unit + 0xc8) >> 3) & 1) && C(19, unit, 0x25)) { u32 ow = C(20, unit); if (ow) p60 = e->rd32(ow + 0x60); }
+    u32 tok = C(21, unit, p60, r175, 0);
+    if (!C(22, unit, 0xFFFFFFFFu) && !C(23, 0xFFFFFFFFu, tok, unit)) return 0;
+    u32 map = C(24, unit, r175);
     if (!map) return 0;
-    i32 cls = (i32)(e->ord10663(unit) & 0xff);
-    i32 o2 = c13, o3 = st;                             // retail reuses these two stack slots as out-params
-    e->f1dca0(unit, ty, id, mode, &cls, &o2, &o3, e->rd8(map + 2), 1);
-    u32 buf = e->f1d6d0(map, o2, l40);
-    if (!buf) { e->fatal(0x94e); return 0; }
-    i32 cnt = 0;
-    if (e->f1ea50(unit, map, buf, &cnt, cls, l40) <= 0) return bail();
-    for (u32 i = 0; i < e->rd8(map); i++) {
-        uint8_t b = e->rd8(buf + i);
-        if (b >= 0x10) { e->fatal(0x960); return 0; }
-        if (e->f1d740(map, b)) {
-            u32 rec[18] = {0};
-            rec[0] = l40;
-            ((uint8_t*)rec)[5] = b;
-            rec[16] = (u32)cls;
-            u32 l48 = 0;
-            if (e->f1e2c0(unit, rec, &l48, -1)) e->ord10011(rec, dx, sy);
+    u32 cls = C(25, unit) & 0xff;
+    C(26, unit, tp, id, r175, cls, e->rd8(map + 2)); cls = o[0]; u32 o2 = o[1];
+    u32 buf = C(27, map, o2, o1);
+    if (!buf) { C(32, 0x94e); return 0; }
+    if ((i32)C(28, unit, map, buf, cls, o1) <= 0) { if (hb) C(34, v24); return 0; }
+    for (u32 i = 0; e->rd8(map) && i < e->rd8(map); i++) {
+        u32 b = e->rd8(buf + i);
+        if (b >= 0x10) { C(32, 0x960); return 0; }
+        if (C(29, map, b)) {
+            u32 rec1 = b << 8;
+            if (C(30, 0xFFFFFFFFu, unit, o1, rec1, cls)) C(31, o1, rec1, cls, sx, sy);
         }
     }
-    if (fA) e->ord10083((u32)v36);
+    if (hb) C(35, v24);
     return 1;
 }
+}
+
+// Replay probe for the retail captures (kind 3481, D2VecClient6BA90, 512 words): rec = one record; out = {result, fatal, n, log[48][7]}.
+// The fixture block is rebuilt exactly as the capture does (canonical base 0xF1000000); callees answer from the record's script.
+namespace {
+struct P6 { const u32* r; uint8_t fx[0x1000]; u32 n, fatal, iterA, iterB; u32* log; };
+P6 g6;
+u32 rd32_6(u32 a) { u32 o = a - 0xF1000000u; return o < 0xFFD ? *(u32*)(g6.fx + o) : 0; }
+u32 rd8_6(u32 a) { u32 o = a - 0xF1000000u; return o < 0x1000 ? g6.fx[o] : 0; }
+u32 call6(u32 id, const u32* w, u32* o) {
+    if (g6.n < 48) { u32* l = g6.log + g6.n * 7; l[0] = id; for (int i = 0; i < 6; i++) l[1 + i] = w[i]; }
+    g6.n++;
+    const u32* r = g6.r; u32 ret = r[29 + id];
+    const u32* os = r + 65 + id * 3;
+    switch (id) {
+    case 11: o[0] = os[0]; o[1] = os[1]; break;
+    case 17: case 26: o[0] = os[0]; o[1] = os[1]; o[2] = os[2]; break;
+    case 18: o[0] = os[0]; o[1] = os[1]; break;
+    case 21: case 28: o[0] = os[0]; break;
+    case 14: ret = 0xF1000280u; break;
+    case 20: ret = ret ? 0xF1000180u : 0; break;
+    case 24: ret = ret ? 0xF1000400u : 0; break;
+    case 27: ret = ret ? 0xF1000480u : 0; break;
+    case 29: ret = g6.iterA < 32 ? (r[22] >> g6.iterA) & 1 : 0; g6.iterA++; break;
+    case 30: ret = g6.iterB < 32 ? (r[23] >> g6.iterB) & 1 : 0; g6.iterB++; break;
+    case 32: g6.fatal = w[0]; break;
+    default: break;
+    }
+    return ret;
+}
+}
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_6ba90(const u32* r, u32* out) {
+    for (auto& b : g6.fx) b = 0;
+    auto W = [&](u32 off, u32 v) { *(u32*)(g6.fx + off) = v; };
+    W(0x00, r[1]); W(0x04, r[2]); W(0x60, r[3]); W(0xC4, r[4]); W(0xC8, r[5]);
+    if (r[6]) { W(0x54, 0xF1000100u); if (r[6] > 1) { W(0x100 + 0x30, 0xF1000140u); W(0x140 + 0xC, r[7]); W(0x140 + 0x34, r[8]); W(0x140 + 0x38, r[9]); W(0x140 + 0x3C, r[10]); } }
+    W(0x180 + 0x60, r[19]); W(0x280 + 0x148, r[20]); W(0x280 + 0x14C, r[21]);
+    g6.fx[0x400] = (uint8_t)r[17]; g6.fx[0x402] = (uint8_t)r[18]; for (int i = 0; i < 16; i++) g6.fx[0x480 + i] = ((const uint8_t*)(r + 25))[i];
+    g6.r = r; g6.n = g6.fatal = g6.iterA = g6.iterB = 0; g6.log = out + 3;
+    for (int i = 0; i < 3 + 48 * 7; i++) out[i] = 0;
+    D2cUnitDrawEnv e{ rd32_6, rd8_6, call6 };
+    u32 res = d2c_6ba90(&e, r[0] ? 0xF1000000u : 0u, r[11] ? 0xF1000000u : 0xC0DE0001u, r[12], r[13], r[14], r[15], r[16]);
+    out[0] = res; out[1] = g6.fatal; out[2] = g6.n;
 }
