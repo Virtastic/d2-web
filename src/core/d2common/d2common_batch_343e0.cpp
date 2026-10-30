@@ -161,7 +161,8 @@ EMSCRIPTEN_KEEPALIVE int32_t D2SetStatWithNoTest(uint32_t pUnit,
 // (+0x10 -> +0x58 -> +0x1D0) yields a value tested against the retail 6-dword threshold table; the
 // first index with value < threshold is passed to 0x371C0. 0x376F0 and 0x371C0 are env seams (the
 // latter takes the data tables as its hidden ECX), and the three retail tables are seam data pointers.
-// A null param_1 (retail fatal 0x547) returns.
+// A null param_1 is retail's fatal 0x547: _exit(-1).
+extern "C" void D2Common_1B0D_Exit(int32_t);
 extern "C"
 EMSCRIPTEN_KEEPALIVE void D2Common_37A20_AdvanceEnvState(uint32_t pUnit, uint32_t pOther,
 	const int32_t* pTable0, const int32_t* pTable1, const int32_t* pThresholds,
@@ -170,7 +171,7 @@ EMSCRIPTEN_KEEPALIVE void D2Common_37A20_AdvanceEnvState(uint32_t pUnit, uint32_
 {
 	uint8_t* u = P(pUnit);
 	if (!u)
-		return;
+		D2Common_1B0D_Exit(-1);
 	const uint32_t pState = W(u, 0x04);
 	if (!pState)
 		return;

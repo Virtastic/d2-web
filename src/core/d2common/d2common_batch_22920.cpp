@@ -17,11 +17,12 @@ static_assert(offsetof(D2DrlgEnvironmentStrc, nBlue) == 0x1A, "environment nBlue
 // i.e. the 1.13c D2DrlgActStrc order (eLevelIdFirst, pEnvironment). Our engine allocates the vendored
 // 1.10f D2DrlgActStrc (DUNGEON_AllocAct), so the member is used and the RGB offsets are pinned above.
 // Prior art: D2MOO 1.10f ENVIRONMENT_GetLightColorFromAct (ordinal 10927), same body.
+extern "C" void D2Common_1B0D_Exit(int32_t);
 void D2Common_37520_GetLightColorFromAct(D2DrlgActStrc* pAct, uint8_t* pRed, uint8_t* pGreen, uint8_t* pBlue)
 {
     if (!pAct)
     {
-        return;
+        D2Common_1B0D_Exit(-1); // retail: fatal 0x547, _exit(-1)
     }
 
     D2DrlgEnvironmentStrc* pEnvironment = pAct->pEnvironment;

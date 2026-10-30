@@ -63,11 +63,12 @@ bool D2Common_22EC0_CheckWeaponClassByItemId(uint32_t nItemId, int32_t nWeapClas
 // ---------------------------------------------------------------------------------------------
 // 0x22B70: items.txt dwMaxStack of nItemId. Out-of-range is retail's fatal assert (0x1ef/0xd50).
 // 1.13c D2Common+0x22B70 (#10743)
+extern "C" void D2Common_1B0D_Exit(int32_t);
 uint32_t D2Common_22B70_GetMaxStack(uint32_t nItemId)
 {
 	const D2ItemsTxt* pRow = DATATBLS_GetItemsTxtRecord(static_cast<int32_t>(nItemId));
 	if (!pRow)
-		return 0;
+		D2Common_1B0D_Exit(-1);
 	return pRow->dwMaxStack;
 }
 

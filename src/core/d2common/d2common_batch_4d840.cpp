@@ -190,17 +190,18 @@ struct D2Common_10531_Env
 // 1.13c D2Common+0x66800: links the unit at the head of the room's unit list (room+0x74, unit
 // next at +0xE8), refreshes it, and counts it in room+0x28 when it is a plain unit or a
 // type-1 unit with alignment 2. Null unit/room (fatal 0x42/0x43) and a failed validation
-// (fatal 0x4C, answer 0) yield 0.
+// (fatal 0x4C) are retail's _exit(-1).
+extern "C" void D2Common_1B0D_Exit(int32_t);
 extern "C"
 uint32_t D2Common_10531_AddUnitToRoom(int32_t* pUnit, int32_t* pRoom,
                                       const D2Common_10531_Env* pEnv)
 {
 	if (pUnit == nullptr || pRoom == nullptr)
-		return 0;
+		D2Common_1B0D_Exit(-1);
 	if (pEnv == nullptr || pEnv->pValidateRoomUnit == nullptr)
 		return 0;
 	if (pEnv->pValidateRoomUnit(pRoom, pUnit, 1) == 0)
-		return 0;
+		D2Common_1B0D_Exit(-1);
 
 	pUnit[0x3a] = pRoom[0x1d];
 	pRoom[0x1d] = static_cast<int32_t>(A(pUnit));
