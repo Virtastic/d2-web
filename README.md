@@ -46,6 +46,41 @@ own legally owned install of Diablo II + Lord of Destruction, patched to **1.13c
 `d2music.mpq`, `d2speech.mpq`, `d2video.mpq`, `d2xmusic.mpq`, `d2xtalk.mpq`, `d2xvideo.mpq` and
 `patch_d2.mpq`). Without them no game starts.
 
+## Quick start with Docker
+
+The release image `ghcr.io/virtastic/d2-web` holds the engine and the client, and **no game data**. Your own copy of Diablo II: Lord of Destruction supplies the files: the disc MPQs (`d2data.mpq`, `d2exp.mpq`, `d2char.mpq`, `d2sfx.mpq`, `d2music.mpq`, `d2xmusic.mpq`, `d2speech.mpq`, `d2xtalk.mpq`, `d2video.mpq`, `d2xvideo.mpq`) and the 1.13c `patch_d2.mpq`. `D2_ASSETS` decides where those files come from.
+
+The package is private, so log in first:
+**Bring your own files (default, `D2_ASSETS=byo`).** The server holds no game data. Each player opens the page and chooses their own D2 folder or MPQs, and the files stay in their browser.
+
+```bash
+docker run -d --name d2-web --restart unless-stopped -p 8080:8080 ghcr.io/virtastic/d2-web:latest
+```
+
+**Hosted files (`D2_ASSETS=hosted`).** The server serves the MPQs from a folder you mount at `/retail`, and players just open the page. Use this only for players who own the game, for example behind a login such as Cloudflare Access.
+
+```bash
+docker run -d --name d2-web --restart unless-stopped -p 8080:8080 \
+  -e D2_ASSETS=hosted -v /path/to/Diablo2:/retail:ro ghcr.io/virtastic/d2-web:latest
+```
+
+With Compose:
+
+```yaml
+services:
+  d2-web:
+    image: ghcr.io/virtastic/d2-web:latest
+    restart: unless-stopped
+    ports: ["8080:8080"]
+    environment:
+      D2_ASSETS: hosted                         # or byo, and drop the volume
+    volumes: ["/path/to/Diablo2:/retail:ro"]
+```
+
+Then open `http://localhost:8080/`. Anywhere other than localhost, put HTTPS in front of the container (Caddy, nginx, Cloudflare Tunnel), because the engine needs `SharedArrayBuffer`, which browsers grant only on HTTPS or localhost.
+
+Cut a release with `bash ci/build.sh && tools/docker-release.sh v0.1.1`. The script builds the image from `build-wasm/site`, leaves out `vectors/` and `widebg/` (retail-derived), and pushes `<tag>` and `latest`.
+
 ## 1. Build
 
 Requirements: Linux, macOS or Windows with WSL2; Docker; Node.js 24+; git.
