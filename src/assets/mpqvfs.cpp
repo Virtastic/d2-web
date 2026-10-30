@@ -75,7 +75,10 @@ bool MpqVfs::fileName(void* file, char* out, uint32_t capacity) const {
 
 bool MpqVfs::mount(const char* path) {
     HANDLE h = nullptr;
-    if (!SFileOpenArchive(path, 0, MPQ_OPEN_READ_ONLY, &h)) return false;
+    // No (listfile): every read here is by name, which is a hash lookup, and an opened file keeps the
+    // name it was opened with (what retail Storm's SFileGetFileName answers). Parsing the eleven
+    // listfiles cost ~1 s native, ~3 s in the browser, in the boot task that mounts the archives.
+    if (!SFileOpenArchive(path, 0, MPQ_OPEN_READ_ONLY | MPQ_OPEN_NO_LISTFILE, &h)) return false;
     archives_.push_back(h);
     return true;
 }
