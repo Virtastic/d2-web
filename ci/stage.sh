@@ -52,8 +52,12 @@ for f in play/d2.js play/d2.wasm; do
   else echo "WARNING: $f.br does not decompress to $f -- NOT staged (a browser would have run the engine it holds, not this one). Rebuild it: bash wasm-build/make_br.sh" >&2; fi
 done
 cp -r play/assets build-wasm/site/assets
-# BYO front door: D2_ASSETS=byo stages a site that hosts no Blizzard bytes (the page reads site-config.json).
+# BYO front door: D2_ASSETS=byo stages a site that hosts no base archives (the page reads site-config.json).
 if [ "${D2_ASSETS:-}" = "byo" ]; then echo '{"assets":"byo"}' > build-wasm/site/site-config.json; else cp play/site-config.json build-wasm/site/; fi
+# The 1.13c patch shim the BYO page mounts over the player's own patch (tools/patch-shim.mjs; never committed).
+SHIM_SRC="${D2_PATCH_SHIM_SRC:-retail/D2/patch_d2.mpq}"
+if [ -f "$SHIM_SRC" ] && [ -n "$HAVE_NODE" ]; then "$NODE_BIN" tools/patch-shim.mjs "$SHIM_SRC" build-wasm/site/assets/patch-113c.patch
+else echo "WARNING: no $SHIM_SRC -- BYO players run on their own Patch_D2.mpq" >&2; fi
 # Committed ground truth, served so scenarios can fetch it into the page.
 [ -d vectors ] && mkdir -p build-wasm/site/vectors && cp -ru vectors/. build-wasm/site/vectors/
 FR="${D2_FREERES_DIR:-third-party/sgd2freeres}"

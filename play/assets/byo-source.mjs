@@ -23,6 +23,18 @@ export const forget = () => idb('readwrite', (s) => s.delete(KEY)).catch(() => {
 let known = null;
 export const knownMpqs = () => known || (known = fetch('assets/known-mpqs.json').then((r) => r.json()).catch(() => ({ patch_d2: [] })));
 
+// The 1.13c Patch_D2.mpq the host serves base64-encoded (tools/patch-shim.mjs). It mounts over whatever
+// patch the player gave, so the engine always reads 1.13c data; null when the host serves none.
+let shim = null;
+export const patchShim = () => shim || (shim = fetch('assets/patch-113c.patch')
+  .then((r) => (r.ok ? r.text() : null))
+  .then((t) => {
+    if (!t) return null;
+    const b = Uint8Array.fromBase64 ? Uint8Array.fromBase64(t) : Uint8Array.from(atob(t), (c) => c.charCodeAt(0));
+    return new File([b], 'Patch_D2.mpq', { type: 'application/octet-stream' });
+  })
+  .catch(() => null));
+
 const WANT = /\.(mpq|exe)$/i;
 
 /** Walk a directory handle (two levels is enough for an install folder with D2SE/CORES inside). */
@@ -93,6 +105,13 @@ export function createCollection() {
     const infos = entries.map((e) => e.info).sort((a, b) => verified(b) - verified(a));
     Object.assign(state, classify(infos, k));
     state.files = Object.fromEntries(Object.entries(state.slots).filter(([, s]) => s.have).map(([r, s]) => [r, entries.find((e) => e.info === s.file).file]));
+    const p = await patchShim();
+    if (p) {
+      state.files.patch_d2 = p;
+      state.slots.patch_d2.have = true;
+      state.missing = state.missing.filter((r) => r !== 'patch_d2');
+      state.ready = state.missing.length === 0;
+    }
   }
   return {
     state,

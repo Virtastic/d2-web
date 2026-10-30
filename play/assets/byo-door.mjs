@@ -56,6 +56,7 @@ export function frontDoor({ onReady } = {}) {
     list.append(li); rows[role] = li;
   }
   const col = createCollection();
+  add({});   // the host's 1.13c patch shim ticks the Patch row before any file is given
 
   function paint() {
     const s = col.state;

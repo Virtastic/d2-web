@@ -114,6 +114,7 @@ tools/*
 !tools/mkmpq.mjs
 !tools/mksmoke.mjs
 !tools/mpq-fingerprint.mjs
+!tools/patch-shim.mjs
 !tools/realmd
 !tools/vectorfmt
 !tools/leak-check.sh
@@ -338,3 +339,6 @@ test/native/save-chunk-append.cpp
 test/native/storm-batch-25220.cpp
 test/native/sub-23290.cpp
 test/stub/Windows.h
+
+# The BYO 1.13c patch shim (tools/patch-shim.mjs): Blizzard bytes, generated at stage time, never committed
+patch-113c.patch
