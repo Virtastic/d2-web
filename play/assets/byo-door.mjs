@@ -29,9 +29,14 @@ body.door #door{display:flex}
 #door .note{margin:18px 0 0;padding:10px 12px;border-left:2px solid #c9ad68;background:#12130e;color:#b9ad8e;font-size:13px;line-height:1.5}
 #door .note.bad{border-color:#a4452f}
 #door .note a,#door .link{color:#c9ad68;background:none;border:0;padding:0;font-size:inherit;text-decoration:underline;cursor:pointer}
+#door a.discord{display:flex;align-items:center;justify-content:center;gap:10px;margin:14px 0 0;padding:11px 16px;border-radius:3px;background:#5865f2;color:#fff;font-size:14px;font-weight:600;text-decoration:none}
+#door a.discord:hover{background:#4752c4}
+#door a.discord svg{flex:none;width:20px;height:16px;fill:currentColor}
+#door .discord-sub{margin:6px 0 0;color:#8a8069;font-size:12px;text-align:center}
 #door .legal{margin:22px 0 0;color:#5a5340;font-size:11px;line-height:1.5}
 `;
 
+const DISCORD = 'https://discord.gg/PzFfDkbSue';
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 export function frontDoor({ onReady } = {}) {
@@ -45,7 +50,10 @@ export function frontDoor({ onReady } = {}) {
   const folder = el('button', 'link', 'or choose a folder');
   row.append(pick, go);
   const hint = el('p', 'more'); hint.append('Drop your Diablo II files here, ', folder, '.');
-  card.append(list, opt, hint, notes, row, el('p', 'legal', 'Unofficial fan project, not affiliated with or endorsed by Blizzard Entertainment. You need to own Diablo II: Lord of Destruction (1.13c).'));
+  const discord = el('a', 'discord'); discord.href = DISCORD; discord.target = '_blank'; discord.rel = 'noopener';
+  discord.innerHTML = '<svg viewBox="0 0 127 96" aria-hidden="true"><path d="M107.7 8.1A105 105 0 0 0 81.5 0a72 72 0 0 0-3.4 6.8 97.7 97.7 0 0 0-29.1 0A72 72 0 0 0 45.6 0a105.9 105.9 0 0 0-26.3 8.1C2.8 32.7-1.7 56.6.5 80.2A105.7 105.7 0 0 0 32.7 96a77.7 77.7 0 0 0 6.9-11.1 68.4 68.4 0 0 1-10.8-5.2l2.7-2.1a75.6 75.6 0 0 0 64.3 0l2.7 2.1a68.7 68.7 0 0 1-10.9 5.2 77 77 0 0 0 6.9 11.1 105.3 105.3 0 0 0 32.2-15.8c2.6-27.3-4.5-51-18.9-72.1ZM42.5 65.7c-6.3 0-11.5-5.7-11.5-12.8S36 40.1 42.5 40.1 54 45.9 53.9 52.9s-5 12.8-11.4 12.8Zm42.4 0c-6.3 0-11.5-5.7-11.5-12.8s5-12.8 11.5-12.8S96.4 45.9 96.3 52.9s-5 12.8-11.4 12.8Z"/></svg>';
+  discord.append('Join our Discord');
+  card.append(list, opt, hint, notes, row, discord, el('p', 'discord-sub', 'Help, bug reports and news — come say hi.'), el('p', 'legal', 'Unofficial fan project, not affiliated with or endorsed by Blizzard Entertainment. You need to own Diablo II: Lord of Destruction (1.13c).'));
   root.append(card);
   document.body.append(root);
   document.body.classList.add('door');
