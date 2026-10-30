@@ -2500,6 +2500,7 @@ function drainUnitSounds() {
     if (event.soundEvent === 0x10) event.monsterTaunt = event.nativeSelectedRow;
     if (event.soundEvent === 0x0c) event.skillStartSoundRow = event.nativeSelectedRow;
     if (event.soundEvent === 0x100) { unitSounds.playRow(event.nativeSelectedRow, { source: 'monster-init', unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x23170: MonSounds Init
+    if (event.soundEvent === 0x102) { unitSounds.playRow(event.nativeSelectedRow, { source: 'skill-dosound', unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0xA2C90: wDoSound
     if (event.soundEvent === 0x101) { unitSounds.playRow(event.nativeSelectedRow, { source: 'state-onsound', unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x73760: States.txt onsound on a new state set
     const spatial = unitSoundNativeSpatial(event, snapshot, listener);
     event.nativeSpatialGainByte = spatial?.gainByte ?? null;
