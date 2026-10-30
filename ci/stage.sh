@@ -52,6 +52,8 @@ for f in play/d2.js play/d2.wasm; do
   else echo "WARNING: $f.br does not decompress to $f -- NOT staged (a browser would have run the engine it holds, not this one). Rebuild it: bash wasm-build/make_br.sh" >&2; fi
 done
 cp -r play/assets build-wasm/site/assets
+# BYO front door: D2_ASSETS=byo stages a site that hosts no Blizzard bytes (the page reads site-config.json).
+if [ "${D2_ASSETS:-}" = "byo" ]; then echo '{"assets":"byo"}' > build-wasm/site/site-config.json; else cp play/site-config.json build-wasm/site/; fi
 # Committed ground truth, served so scenarios can fetch it into the page.
 [ -d vectors ] && mkdir -p build-wasm/site/vectors && cp -ru vectors/. build-wasm/site/vectors/
 FR="${D2_FREERES_DIR:-third-party/sgd2freeres}"
