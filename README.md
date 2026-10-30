@@ -131,14 +131,6 @@ it to the internet.
 
 Saves live in the browser's own storage on each device.
 
-## Options
-
-| URL flag | effect |
-|---|---|
-| `?enhanced=1` | quality-of-life options (wider view and similar) |
-| `?plugy=1` | PlugY-style extended stash |
-| `&debug=1` | debug overlay |
-
 Battle.net is off. d2-web does not run or connect to any official service.
 
 ## Troubleshooting

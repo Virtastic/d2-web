@@ -2867,7 +2867,7 @@ function updateAfterAdvance(engineAdvanced, live = false) {
   status.title = [terrainError, musicError].filter(Boolean).join('\n');
   status.textContent = session
     ? `retail-backed simulation connected · ${terrainStats?.drawn ? 'retail level terrain drawn' : !TERRAIN_ENABLED || terrainError ? 'terrain unavailable (no mock fallback)' : 'loading retail level terrain…'} · ${musicError ? 'audio unavailable' : 'retail music ready'}`
-    : sessionError || (PLAY_MODE ? 'engine loaded; creating simulation…' : 'open ?play=1 to create a gameplay session');
+    : sessionError || (PLAY_MODE ? 'engine loaded; creating simulation…' : 'creating simulation…');
 }
 
 // The camera, which is the player's own position: the hero is drawn at the viewport centre and the

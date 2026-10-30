@@ -36,7 +36,7 @@
   //
   // Tunable at runtime for A/B without a rebuild: ?chunk=<KB>&lru=<slots>.
   // The page's query only through entry.js (the player page has none); a context without it keeps its own.
-  const _q = globalThis.__d2Entry ? globalThis.__d2Entry.search : ((typeof location !== 'undefined' && location.search) || '');
+  const _q = globalThis.__d2Entry ? globalThis.__d2Entry.search : '';
   const _n = (re, dflt) => { const m = re.exec(_q); return m ? (parseInt(m[1], 10) || dflt) : dflt; };
   // CHUNK AND LRU MUST BE TUNED TOGETHER -- measured 2026-08-28, Balmora boot, at a constant
   // ~384MB cache budget so the comparison is memory-neutral:
