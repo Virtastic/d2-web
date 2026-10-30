@@ -51,7 +51,7 @@ for f in play/d2.js play/d2.wasm; do
   if "$NODE_BIN" play/br-check.mjs "$f" "$f.br"; then cp "$f.br" build-wasm/site/
   else echo "WARNING: $f.br does not decompress to $f -- NOT staged (a browser would have run the engine it holds, not this one). Rebuild it: bash wasm-build/make_br.sh" >&2; fi
 done
-cp -r play/assets build-wasm/site/assets
+cp -rL play/assets build-wasm/site/assets
 # BYO front door: D2_ASSETS=byo stages a site that hosts no base archives (the page reads site-config.json).
 if [ "${D2_ASSETS:-}" = "byo" ]; then echo '{"assets":"byo"}' > build-wasm/site/site-config.json; else cp play/site-config.json build-wasm/site/; fi
 # The 1.13c patch shim the BYO page mounts over the player's own patch (tools/patch-shim.mjs; never committed).
@@ -65,7 +65,7 @@ FR="${D2_FREERES_DIR:-third-party/sgd2freeres}"
 # Local widescreen frontend backgrounds (retail-derived, gitignored): the MAIN checkout's .widebg/, served as /widebg/.
 WB="${D2_WIDEBG_DIR:-$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")/.widebg}"
 [ -f "$WB/manifest.json" ] && cp -rL "$WB" build-wasm/site/widebg
-[ -d build-wasm/diag ] && cp -r build-wasm/diag build-wasm/site/diag   # diagnosis captures (D2_ITEMGEN_FILE=diag/...), never committed
+[ -d build-wasm/diag ] && cp -rL build-wasm/diag build-wasm/site/diag   # diagnosis captures (D2_ITEMGEN_FILE=diag/...), never committed
 
 # with the disc MPQs and the 1.13c core's patch. Symlinks, not copies (2.3 GB).
 if [ -f retail/D2/d2data.mpq ]; then
