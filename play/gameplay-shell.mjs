@@ -1065,7 +1065,7 @@ function sessionAdapter() {
             entities[i].usedSkill = (facings.getUint8(offset + 9) | ((facings.getUint8(offset + 7) & 0x7f) << 8)) - 1; entities[i].animEvent = facings.getUint8(offset + 7) >> 7; // a monster's used skill (-1 none); its client animation event this frame
           }
         }
-        if (Module._d2_session_hit_packets) { const n = Module.ccall('d2_session_hit_packet_count', 'number', [], []), v = new DataView(Module.HEAPU8.buffer, Number(Module.ccall('d2_session_hit_packets', 'number', [], [])), n * 12), hit = new Set(); for (let i = 0; i < n; i++) if (v.getUint8(i * 12 + 8) === 19) hit.add(`${v.getUint32(i * 12, true)}:${v.getUint32(i * 12 + 4, true)}`); for (const e of entities) if (hit.has(`${e.type}:${e.id}`)) e.hitPacket = true; } // the engine's 0x0C hit packets (message 19): the client's hit-sound trigger
+        if (Module._d2_session_hit_packets) { const n = Module.ccall('d2_session_hit_packet_count', 'number', [], []), ptr = Number(Module.ccall('d2_session_hit_packets', 'number', [], [])), v = new DataView(Module.HEAPU8.buffer, ptr, n * 12), hit = new Set(); for (let i = 0; i < n; i++) if (v.getUint8(i * 12 + 8) === 19) hit.add(`${v.getUint32(i * 12, true)}:${v.getUint32(i * 12 + 4, true)}`); for (const e of entities) if (hit.has(`${e.type}:${e.id}`)) e.hitPacket = true; } // the engine's 0x0C hit packets (message 19): the client's hit-sound trigger
         // Unit hit overlays (UNITS_SetOverlay's stat, exported per unit), joined by type:id and played once per unit.
         if (Module._d2_session_unit_overlays && unitOverlayFx) {
           const n = Module.ccall('d2_session_unit_overlay_count', 'number', [], []), p = Number(Module.ccall('d2_session_unit_overlays', 'number', [], []));
@@ -5756,8 +5756,9 @@ canvas.addEventListener('pointerdown', (e) => {
   // {cursor, belt}); the RIGHT button uses it (0x26), on the mercenary with shift held.
   const bo = hudOrigin(canvas.width, canvas.height, 'bottom'), beltBoxesNow = clearScreen ? null : beltShownBoxes();
   const beltSlot = clearScreen || !beltRenderer ? -1 : beltBoxesNow?.findIndex((b) => x - bo.x >= b.left && x - bo.x < b.right && y - bo.y >= b.top && y - bo.y < b.bottom) ?? -1;
+  const beltItem = clearScreen ? null : snapshot.items.find((it) => it.mode === 2 && it.gridX === beltSlot) || null;
   if (beltSlot >= 0) {
-    const act = beltClickAction({ button: e.button, shift: e.shiftKey, slot: beltSlot, beltItem: snapshot.items.find((it) => it.mode === 2 && it.gridX === beltSlot) || null,
+    const act = beltClickAction({ button: e.button, shift: e.shiftKey, slot: beltSlot, beltItem,
       cursorItem: Module.ccall('d2_session_cursor_item', 'number', [], []) || 0 });
     if (act) {
       let result = 0;
@@ -5869,7 +5870,7 @@ canvas.addEventListener('pointerdown', (e) => {
     }
     if (inventoryVisible && inventoryPanelRenderer.contains(x, y, canvas.width, canvas.height)) {
       const W = canvas.width, H = canvas.height, slot = inventoryPanelRenderer.slotAt(x, y, W, H, snapshot);
-      // D2Client +0x98DC0 -> +0x90F60: a press on either weapon-set tab plays cursor_pass and swaps sets through the same engine call as W.
+      // D2Client +0x98DC0 -> +0x90F60: a press on either weapon-set tab plays cursor_pass and swaps sets through the same engine call as the key.
       if (inventoryPanelRenderer.weaponTabAt(x, y, W, H)) {
         unitSounds?.playRow(WEAPON_TAB_SOUND_ROW, { kind: 'ui', source: 'weapon-tab' }).catch(() => {});
         session.swapWeapons?.(); click.spent = 'weaponTab';

@@ -23,4 +23,6 @@ for (const [first, stem, intros, gossips, plain] of ROWS) {
 // Jerhyn's run does not line up one-to-one (3 introduction strings, 2 introduction sounds): 255 is left silent.
 Object.assign(NPC_TOWN_VOICE, { 253: 'jerhyn_act2_intro', 254: 'jerhyn_act2_intro_more' });
 for (let n = 1; n <= 7; n++) NPC_TOWN_VOICE[255 + n] = `jerhyn_act2_gossip_${n}`;
+// Retail omits Alkor's fourth gossip string (507): it has no selector entry.
+delete NPC_TOWN_VOICE[507];
 Object.freeze(NPC_TOWN_VOICE);
