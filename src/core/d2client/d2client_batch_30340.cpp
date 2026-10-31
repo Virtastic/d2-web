@@ -3,41 +3,9 @@
 // The skill-description damage-range builders (min/max, mode word, then sink 2F0A0).
 // Callees stay behind Ops; Ops names follow the Ordinal numbers / RVAs in the decompile.
 // sub_316C0 (5107 bytes) is deliberately not here.
-#include <cstdint>
+#include "d2client_batch_30340.h"
 #include <cstring>
 namespace d2client_batch_30340 {
-using U=uint32_t; using I=int32_t; using P=void*; using C16=char16_t;
-struct Ops {
- I (*stat)(P,I,I);                      // Ordinal_10973(unit,stat,layer)
- I (*dmgMin)(P,I,I,I); I (*dmgMax)(P,I,I,I); // Ordinal_10567 / 10297 (unit,skill,lvl,flag)
- I (*skMin)(P,I,I,I);  I (*skMax)(P,I,I,I);  // Ordinal_10121 / 11091
- I (*bonusTotal)();                     // D2Client+0x2FB50
- I (*rec2CD0)(I,I); I (*rec15E0)(I,I);  // eax=skill, edx=level
- void (*calc10323)(P,I*,I*,I*);
- void (*bonus2F980)(P,I*,I*,I*);
- void (*emit)(I eax,I ecx,I s0,I s1,I s2,I s3); // D2Client+0x2F0A0
- void (*fade190)(P rec,P unit,I*,I*,I*);        // D2Client+0x2E190
- I (*o10037)(P,I);
- I (*o10854)(P,P*); const uint8_t* (*o10695)(I);
- P (*o10708)(P,I,I); I (*hasSkill)(P,I); /*10494*/ I (*o10306)(P,P,I);
- int16_t (*o10213)(P); int16_t (*o10120)(P);
- const uint8_t* (*o17F0)(I);            // skill-desc record, +0x18/+0x1c/+0x20.. fields
- I (*o2C830)(uint8_t); I (*o10601)(I,const char*,I,I); I (*o10435)(P,I,I);
- P (*o10061)(P); I (*o10711)(P); I (*o10804)(P,P,I,I);
- void (*o2D6E0)(uint8_t,I*,I*);
- void (*o2D500)(P eax,I,I,I,I,I,I,I,I,I,I);     // ten stack args, first-listed = first param
- void (*o2E140)(I eax,I ecx,C16* buf,I s);
- void (*o2D3C0)(C16*,C16*,I,I,I,I,I);
- I (*o10747)(P); void (*o2C4F0)(P sk,I*,I*,I,I);
- I (*o10263)(P); I (*o10975)(P);
- I (*o10051)(P,P); I (*o10597)(P,P,I); I (*o10910)(P,I,I);
- I (*o10744)(P,I); I (*o11006)(P); I (*o11160)(P,I);
- void (*o10164)(P,P,I); P (*o11139)(P,I); I (*o10417)(P); I (*o10786)(P,I,I,I);
- I (*o2D810)(P eax,I edi);
- I (*o2F7D0)(I ebx,I,I,I,I); I (*o2F870)(I ebx,I,I,I,I,I); I (*o2DCA0)(I ebx,I,I,I);
- P (*owner)(P unit);                    // unit+0x60
-};
-struct Tables { I colors[4]; I rows[4][3]; uint8_t mask0c; bool modeFlag9854; };
 static U r8(const void* p,U n){return static_cast<const uint8_t*>(p)[n];}
 static I r16s(const void* p,U n){int16_t v;std::memcpy(&v,static_cast<const uint8_t*>(p)+n,2);return v;}
 static I mulDiv(I pct,I v,I d){ // D2Client+0x14A0 (eax=pct, edx=v, ecx=d)
@@ -53,7 +21,7 @@ static I pctOf(I v,I pct){
 }
 // 1.13c D2Client+0x30340
 void sub_30340(const Ops& o,P unit,I flag,const int16_t* sk,I lvl,I a2,I a3,I a4){
- if(!flag||!sk)return; I skill=*sk, mode=1;
+ if(!flag||!sk)return; I skill=*sk, mode=0;
  I A=o.dmgMin(unit,skill,lvl,1)>>8, B=o.dmgMax(unit,skill,lvl,1)>>8;
  I bonus=o.bonusTotal()+o.rec2CD0(skill,lvl); I pct=bonus; if(bonus)mode=3;
  I x=0,y=0; o.calc10323(unit,&x,&y,&pct);

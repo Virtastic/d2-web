@@ -74,7 +74,7 @@ static void dispatch(Services& api,bool nonnull,int32_t sel,int32_t id,int32_t e
  api.fatal(fatalNull); (void)e0;(void)ec;(void)special; }
 // 1.13c D2Client+0x3CA80
 void sub_3CA80(Services& api,bool nonnull,int32_t sel,int32_t id){ dispatch(api,nonnull,sel,id,0,0,414,0,0x136,0x13a); }
-// 1.13c D2Client+0x3CBC0
+// dup of D2Client+0x3CBC0
 void sub_3CBC0(Services& api,uint32_t* p){ api.sendClose(reinterpret_cast<void*>(uintptr_t(p[0]))); p[6]=1; p[7]=0; }
 // 1.13c D2Client+0x3CCC0  (count=EAX; sel is ESI inherited from caller)
 void sub_3CCC0(Services& api,int32_t count,bool param1,const uint8_t* arr,int32_t sel){

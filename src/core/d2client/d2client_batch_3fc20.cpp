@@ -51,7 +51,7 @@ static void relOrder(Handles& s, Services& sv, const int* ord) {
 // 1.13c D2Client+0x467C0
 void sub_467C0(Handles& s, Services& sv) { static const int o[8] = {4,5,3,7,0,1,2,6}; relOrder(s, sv, o); }
 
-// 1.13c D2Client+0x46640
+// dup of D2Client+0x46640
 struct Teardown { int32_t u73b, u73f, cel7c0, cel7c4; void** obj77b; Handles h; };
 void sub_46640(Teardown& s, Services& sv) {
  sv.freeUnit(0, s.u73b); sv.freeUnit(0, s.u73f); s.u73b = s.u73f = 0;

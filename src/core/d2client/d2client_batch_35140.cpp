@@ -3,31 +3,9 @@
 // 0x359B0/0x35DF0/0x361D0/0x362E0: Ordinal_10041 takes a pointer to a stack record; only word 0 (index) and,
 // for the first call, word 13 (+0x34, panel handle) are recovered. Later records alias stale argument
 // slots in retail; w[0]=0xffffffff marks that unrecovered state (low confidence).
-#include <cstdint>
-#include <cstdlib>
-#include <string>
+#include "d2client_batch_35140.h"
 namespace d2client_batch_35140 {
-struct Rec { uint32_t w[18]; };
-struct Services {
- virtual ~Services()=default;
- virtual void ord10041(const Rec&,int32_t,int32_t,int32_t,int32_t,int32_t)=0;
- virtual void ord10010(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t)=0;
- // 35140/35270 helper chain (FUN_2C830, 34D70, 2F0A0 and ordinals 10567/10297/10510/10121/11091)
- virtual void sub_2C830()=0; virtual void ord10567(void*,int32_t,uint32_t,int32_t)=0;
- virtual int32_t ord10297(void*,int32_t,uint32_t,int32_t)=0; virtual void sub_34D70(void*,int32_t*,int32_t*)=0;
- virtual void ord10510(void*,int32_t)=0; virtual int32_t ord10121(void*,int32_t,int32_t,int32_t)=0;
- virtual void ord11091(void*,int32_t,int32_t,int32_t)=0; virtual void sub_2F0A0(void*,int32_t,int32_t,int32_t)=0;
- virtual void sub_C2790(int32_t,int32_t,int32_t)=0;          // FUN_6fb72790
- virtual void ord10065(uint32_t)=0; virtual void ord10043(int32_t,int32_t)=0;
- virtual void copyString10003()=0; virtual int32_t ord10028()=0; // 36580: current string, then its width
- virtual uint32_t ord10190(int32_t,int32_t,int32_t)=0;
- virtual void ord10014(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t)=0;
- virtual int32_t ord10031()=0; virtual uint32_t sub_BF6C0()=0;  // FUN_6fb6f6c0
-};
-struct State {
- Services& api; int32_t height{}, width{};          // DAT_6fb8bc4c, DAT_6fb8bc48
- uint32_t h438{},h43c{},h440{}, g44c{}, g444{}, g_bff8{};
-};
+static void release(State& s,uint32_t& h){ if(h){ s.api.ord10065(h); s.api.ord10043(h,0xD6AB0,0x7a,0); h=0; } }
 
 // 1.13c D2Client+0x35140 (low confidence: stack/ESI arguments of the ordinals are partly unrecovered)
 void sub_35140(State& s,void* p1,int32_t p2,int16_t* p3,uint32_t p4) {
@@ -141,20 +119,19 @@ void sub_35DF0(State& s,uint32_t handle) {
  s.api.ord10010(586,365,586,411,255,255);
 }
 
-// 1.13c D2Client+0x358E0
+// dup of D2Client+0x358E0
 void sub_358E0(State& s) { if(s.g44c){ s.api.sub_C2790(0x15,1,0); s.g44c=0; } }
-static void release(State& s,uint32_t& h){ if(h){ s.api.ord10065(h); s.api.ord10043(0x7a,0); h=0; } }
 // 1.13c D2Client+0x35920
 void sub_35920(State& s) { release(s,s.h438); release(s,s.h43c); release(s,s.h440); }
 // 1.13c D2Client+0x36580
-int32_t sub_36580(State& s,int32_t, int32_t p2) { s.api.copyString10003(); return p2 - s.api.ord10028()/2; }
+int32_t sub_36580(State& s,int32_t p1, int32_t p2) { s.api.copyString10003(p1); return p2 - s.api.ord10028()/2; }
 // 1.13c D2Client+0x36620
-void sub_36620(State& s) { s.g_bff8=s.api.ord10190(0,0,0); s.api.ord10014(0,0,s.width,s.height-0x31,int32_t(s.g444),1); }
+void sub_36620(State& s) { s.g_bff8=uint8_t(s.api.ord10190(0,0,0)); s.api.ord10014(0,0,s.width,s.height-0x31,int32_t(uint8_t(s.g444)),1); }
 // 1.13c D2Client+0x37310
 void sub_37310(State& s) {
- s.api.ord10031(); // both retail branches release h438 identically
+ const uint32_t esi=s.api.ord10031()==2?0xD697C:0xD696C; (void)esi; // esi is only live at the BF6C0 call below
  release(s,s.h438);
- s.h438=s.api.sub_BF6C0(); if(!s.h43c)s.h43c=s.api.sub_BF6C0(); if(!s.h440)s.h440=s.api.sub_BF6C0();
+ s.h438=s.api.sub_BF6C0(esi); if(!s.h43c)s.h43c=s.api.sub_BF6C0(0xD6954); if(!s.h440)s.h440=s.api.sub_BF6C0(0xD693C);
 }
 // 1.13c D2Client+0x38310 -- text=*(p+0x28) (UTF-16), max=*(int*)(p+0x30), n=*(u16*)(p+0x34)
 uint32_t sub_38310(const char16_t* text,int32_t max,uint16_t n) {

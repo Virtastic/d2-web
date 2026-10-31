@@ -51,9 +51,9 @@ void sub_42850(G&g,U ecx){ g.a8c9c=0; g.cc404=1; g.hook4660(ecx); g.cc3a4=1; }
 // 1.13c D2Client+0x42BD0
 void sub_42BD0(G&g){ g.cc388=1; uint16_t*p=reinterpret_cast<uint16_t*>(g.player+0x1eb);
  *p=uint16_t(((g.cc390+1)*0x400)|(*p&0xe0ff)); }
-// 1.13c D2Client+0x42C10 (REG?: param_2 in edx/stack; param_1 unused). textW = width of Ordinal_10003 string via Ordinal_10028
+// dup of D2Client+0x42C10 (REG?: param_2 in edx/stack; param_1 unused). textW = width of Ordinal_10003 string via Ordinal_10028
 I sub_42C10(I param_2,I textWidth){ return param_2-textWidth/2; }
-// 1.13c D2CLIENT+0x42C70
+// dup of D2Client+0x42C70
 // Two text draws: name (player+0xb9) at (0xbb,4), then title (Ordinal_10205) + name at (0x115|0x165,4,0).
 struct C42C70{ const char* (*o10205)(uint8_t,I,U,U); void (*show)(const char*,I,I,I); };
 void sub_42C70(G&g,const uint8_t* uidata,uint8_t b991c,I v9854,C42C70& c){

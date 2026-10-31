@@ -19,7 +19,7 @@ struct D2ClientBatch04860Env;    // d2client_batch_04860.cpp
 extern "C" void d2_client_46da(int32_t code, const D2ClientBatch04860Env* env);   // 0x046DA
 
 static uint8_t g_mbctableInit;   // 0x124AD8 DAT_6fbd4ad8: ___initmbctable's one-shot latch
-static uint8_t g_byte_11c390;    // 0x11C390 DAT_6fbcc390: the byte 0x2E330 passes to D2Common!#10237
+uint8_t g_byte_11c390;    // 0x11C390 DAT_6fbcc390: the byte 0x2E330 passes to D2Common!#10237
 
 struct D2ClientBatch1019iEnv {
     // 0xB4D7 __setmbcp: retail sets the multibyte code-page tables; the observable here is the latch.
@@ -64,12 +64,12 @@ EMSCRIPTEN_KEEPALIVE void d2_client_14940(uint8_t al, uint32_t ecx, const D2Clie
 }
 
 // 1.13c D2Client+0x2B360: close the current cel file (D2CMP!#10065), then -- only when ESI, the
-// caller's buffer, is non-null -- release it through Fog!#10043 with the file string at 0x0DB0B0 and
+// caller's buffer, is non-null -- release it through Fog!#10043 with the file string at 0x0D6AB0 and
 // line 0x7A.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_2b360(uint32_t esi, const D2ClientBatch1019iEnv* env) {
     env->close_cel_file();
-    if (esi != 0) env->fog_mem_dealloc(esi, 0x0DB0B0u, 0x7Au, 0);
+    if (esi != 0) env->fog_mem_dealloc(esi, 0x0D6AB0u, 0x7Au, 0);
 }
 
 // 1.13c D2Client+0x2E330: look up the record D2Common!#10237 returns for the byte at 0x11C390 and

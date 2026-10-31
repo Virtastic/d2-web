@@ -115,7 +115,7 @@ uint32_t d2_client_22040(D2Client21d60Env* e, const void* object) {
 void d2_client_22070(D2Client21d60Env* e, void* object, uint32_t value) {
     require(e, object, 0xcc6); write(object, 0x7c, value);
 }
-// 1.13c D2Client+0x220A0
+// dup of D2Client+0x220A0
 uint32_t d2_client_220a0(D2Client21d60Env* e, const void* object) {
     require(e, object, 0xcbb); return read<uint32_t>(object, 0x7c);
 }

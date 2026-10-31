@@ -16,7 +16,7 @@ template<class T> void wr(void* p, unsigned o, T v) { std::memcpy(static_cast<ui
 template<class T> T* rdp(const void* p, unsigned o) { return rd<T*>(p, o); }
 [[noreturn]] static void fatal(Env& e, W id) { W s = e.call(10265, {id}); e.call(10024, {(W)0, s}); e.call(W_Exit, {-1}); __builtin_unreachable(); }
 
-// 1.13c D2CLIENT+0x431B0
+// dup of D2Client+0x431B0
 struct ServerLoopG { int32_t stop, run, thrFlag, sel; uint8_t* sess; };
 int32_t sub_431B0(Env& e, ServerLoopG& g) {
  int32_t last = 0, busy = 0;

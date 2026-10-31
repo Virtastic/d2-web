@@ -236,7 +236,7 @@ void validatePathTarget(const Host& h,Address unit) {
         if(target!=h.call(0xc2da,{path})) h.call(0xc364,{path,0});
     }
 }
-// 1.13c D2Client+0x2A180
+// dup of D2Client+0x2A180
 void clearInteraction(const Host& h,Address unit,uint32_t argument) {
     if(unit) h.word(unit+0xc4,h.word(unit+0xc4)&~64u);
     if(h.call(0xc43c,{unit,argument})) h.call(0x6a220,{unit,0});

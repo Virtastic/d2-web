@@ -11,7 +11,7 @@ struct Env {
   void (*fnACE20)(int32_t);                       // 0xACE20
   int32_t* g_c39c;                                // DAT_6fbcc39c
 };
-// 1.13c D2Client+0x43920
+// dup of D2Client+0x43920
 void sub_43920(Env& e) {
   uint8_t buf[512]; int32_t r;
   do {

@@ -47,7 +47,7 @@ void sub_1BE90(State& s, Unit* edi) {
  uint32_t active=s.api.active(u); if(s.active!=active && !active)s.api.deactivate();
  s.active=active; s.value=s.api.unitValue(u); s.api.update();
 }
-// 1.13c D2Client+0x1c740
+// D2Client 1c740 (the raw-layout port is d2client_1c740.cpp)
 void sub_1C740(State& s,const uint8_t* p) { if(read<uint16_t>(p,1)==1)for(unsigned i=0;i<3;++i)s.packetValues[i]=read<uint16_t>(p,3+2*i); }
 // 1.13c D2Client+0x1C940
 void sub_1C940(State& s,int32_t command) { for(auto& b:s.bindings)if(b.command==command){s.slots[b.slot]=b.value;return;} }
@@ -91,9 +91,9 @@ bool sub_1D840(State& s,int32_t x,int32_t y) {
  auto index=sub_1C980(s,s.viewportMode);auto r=s.rects[index];int32_t dx=s.viewportMode==2?add(s.width,-640)/2:0;
  int32_t dy=add(s.height,-480);return add(r.left,dx)<x && x<add(r.right,dx) && add(r.top,dy)<y && y<add(r.bottom,dy);
 }
-// 1.13c D2Client+0x1d8f0
+// D2Client 1d8f0 (the raw-layout port is d2client_1d8f0.cpp)
 void sub_1D8F0(State& s,uint32_t incoming){if(s.closeMode<5)sub_1CA00(s,incoming);s.closeValue=0;s.flag=0;s.flag2=0;sub_1CAD0(s);}
-// 1.13c D2Client+0x1FD00
+// dup of D2Client+0x1FD00
 bool sub_1FD00(Unit* u,uint16_t mask){return u && u->type==1 && u->data && (read<uint16_t>(u->data,0x16)&mask);}
 // 1.13c D2Client+0x1FFC0
 void sub_1FFC0(State& s,Unit* u) {

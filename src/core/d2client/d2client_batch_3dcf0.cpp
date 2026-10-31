@@ -43,7 +43,7 @@ void sub_3E490(const G& g,P self,const int16_t* p1,I stk,I eax,const H& h,I* tab
  h.sub_3D3C0(self,stk);
 }
 
-// 1.13c D2Client+0x3F590 ; eax=x. rect {x-ox-16, y-oy2-?...} as decompiled
+// dup of D2Client+0x3F590 ; eax=x. rect {x-ox-16, y-oy2-?...} as decompiled
 void sub_3F590(const G& g,I y,I x,void (*ord10070)(I*,I),I arg){
  I r[4]; r[0]=(x-g.originX)-0x10; r[2]=(x-g.originX)+0x10; r[1]=y-g.originY; r[3]=r[1]+0x10; ord10070(r,arg);
 }

@@ -107,7 +107,7 @@ void clearEvents(State& s, uint32_t unit) {
     }
     write(s, unit + 0x90, 0);
 }
-// 1.13c D2Client+0x21580
+// dup of D2Client+0x21580
 uint32_t percent(State& s, int32_t id) { uint32_t p = find(s, id); return p ? association(s, p).percent : 0; }
 // 1.13c D2Client+0x215B0
 void removeOtherTypeSeven(State& s, int32_t id) {

@@ -53,7 +53,7 @@ EMSCRIPTEN_KEEPALIVE u32 d2c_45c50(i32 v) {
   case 0x17a: case 0xfb: case 0x179: case 0x14b: case 0x196: case 0x198: return (u32)v & ~0xffu | 1; }
   return (u32)v >> 8 << 8; }
 
-// 1.13c D2Client+0x45CC0  (tbl = this, 20-byte entries, count = EAX)
+// dup of D2Client+0x45CC0  (tbl = this, 20-byte entries, count = EAX)
 EMSCRIPTEN_KEEPALIVE u32 d2c_45cc0(i32* tbl, i32 count, i32 key, i32 p2, i32 (*o10174)(i32,i32,i32)) {
   u32 r = 1;
   for (i32* p = tbl + 2; count > 0; count--, p += 5) {
@@ -69,7 +69,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_45dd0(uint8_t* recs, i32 n, i32 limit, const uint1
     if ((i32)id < limit && n > 0)
       for (i32 i = 0; i < n; i++) if (*(u32*)(recs + i * 0x16) == id) recs[i * 0x16 + 0x12] = 1; } }
 
-// 1.13c D2Client+0x45E50
+// dup of D2Client+0x45E50
 struct E45E50 { int16_t* tab; int16_t* tabEnd; i32 flag284; i32 flag29c;
   void (*f72790)(i32, i32, i32); i32 (*ord423)(const char*, const char*, i32, i32*); };
 EMSCRIPTEN_KEEPALIVE void d2c_45e50(E45E50* e, i32 v) {
@@ -95,7 +95,7 @@ struct E45FB0 { uint8_t g978e; i32 g971d; void (*f43e0)(const char*); };
 EMSCRIPTEN_KEEPALIVE void d2c_45fb0(E45FB0* e) {
   uint8_t b[10] = {'8'}; e->g978e = 0; *(i32*)(b + 5) = e->g971d; e->f43e0((char*)b); }
 
-// 1.13c D2Client+0x45FF0  (bx = wanted id)
+// dup of D2Client+0x45FF0  (bx = wanted id)
 struct E45FF0 { int16_t (*tab)[4]; i32 tabN; i32 unit; i32 (*o10778)(i32, i32);
   int16_t* skip; uint16_t skipN; };
 EMSCRIPTEN_KEEPALIVE i32 d2c_45ff0(E45FF0* e, int16_t bx) {

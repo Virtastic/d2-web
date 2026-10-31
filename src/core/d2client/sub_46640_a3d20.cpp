@@ -45,7 +45,7 @@ void d2client_FUN_6fb53d20(void) {
   _Exit(-1);
 }
 
-// 1.13c D2Client+0x46640
+// dup of D2Client+0x46640
 void d2client_FUN_6faf6640(void) {
   Ordinal_10901(0, DAT_6fbc973b);
   Ordinal_10901(0, DAT_6fbc973f);
@@ -86,7 +86,7 @@ void d2client_FUN_6faf5ef0(void) {
   DAT_6fbd2305 = 0; DAT_6fbd22f8 = 0; for (int i = 0; i < 4; i++) DAT_6fbd2309[i] = 0; DAT_6fbd2301 = 0;
 }
 
-// 1.13c D2Client+0x46A20
+// dup of D2Client+0x46A20
 void d2client_FUN_6faf6a20(void) {
   DAT_6fba23e8 = 0xffff;
   d2client_FUN_6faf6640();

@@ -20,7 +20,7 @@ struct D2ClientTiny1019jEnv {
 // 0x17F0 (src/core/d2client/d2client_batch_1760.cpp) is the skills.txt -> skilldesc.txt lookup.
 extern "C" void* d2_client_skilldesc_for_skill(int32_t nSkillId);
 
-// 1.13c D2Client+0x2FD10
+// dup of D2Client+0x2FD10
 // stdcall, one stack word = skilldesc column; EAX = skill id (the ABI the caller 0x54E10 uses: `push 0;
 // call`). The 0x17F0 lookup gives the skilldesc row; a null lookup returns the 0x1506 sentinel, else the
 // little-endian word at row + 8 + index * 2. The index is not range-checked in retail.
