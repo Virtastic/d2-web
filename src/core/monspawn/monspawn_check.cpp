@@ -8502,6 +8502,45 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_add_skill(uint32_t skillId) {
     return result;
 }
 
+// A refused ground pickup, read back: the pickup handler's return and, at phase 0 right after the click,
+// the hero's attached sound event and its audience, the item through D2GAME_SUNITMSG_FirstFn (1.13c
+// 0x7B0A0, the 0x9C refresh) and the hero through D2GAME_UpdateUnit (1.13c 0x7AC50, the 0x2C sound),
+// both to the session client. phase N > 0, after each later tick: the item's mode:room and flags &
+// 0x1401, the hero's event.
+static int g_d57PickupRet;
+extern "C" void D2WEB_ResetPacketStream();
+extern "C" const uint8_t* D2WEB_PacketStream(uint32_t*, uint32_t*);
+EMSCRIPTEN_KEEPALIVE int d2_session_d57_record(uint32_t itemId, int phase, char* out, int cap) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !out || cap < 512) return 0;
+    D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId);
+    D2UnitStrc* hero = g_targetPlayer;
+    auto who = [](D2UnitStrc* u, char* b, size_t n) { if (u) snprintf(b, n, "%u:%u", u->dwUnitType, u->dwUnitId); else snprintf(b, n, "-"); };
+    int len = 0;
+    if (phase == 0) {
+        char aud[32]; who(hero->pUpdateUnit, aud, sizeof aud);
+        len += (hero->dwFlags & UNITFLAG_HASEVENTSOUND)
+            ? snprintf(out + len, cap - len, "ret %d\nD57 sound hero %u audience %s\n", g_d57PickupRet, (unsigned)hero->nUpdateType, aud)
+            : snprintf(out + len, cap - len, "ret %d\nD57 sound hero none\n", g_d57PickupRet);
+        auto grab = [&](const char* tag, auto send) {
+            D2WEB_ResetPacketStream(); send();
+            uint32_t n = 0; const uint8_t* p = D2WEB_PacketStream(&n, nullptr);
+            len += snprintf(out + len, cap - len, "D57 %s ", tag);
+            for (uint32_t i = 0; i < n && len + 4 < cap; ++i) len += snprintf(out + len, cap - len, "%02x", p[i]);
+            len += snprintf(out + len, cap - len, "\n");
+        };
+        if (item) grab("refresh", [&] { D2GAME_SUNITMSG_FirstFn_6FCC5520(g_game, item, g_targetClient); });
+        else len += snprintf(out + len, cap - len, "D57 refresh gone\n");
+        grab("voice", [&] { D2GAME_UpdateUnit_6FCC6080(hero, g_targetClient); });
+        D2WEB_ResetPacketStream();
+        return len;
+    }
+    char hs[48] = "-";
+    if (hero->dwFlags & UNITFLAG_HASEVENTSOUND) { D2UnitStrc* a = hero->pUpdateUnit; snprintf(hs, sizeof hs, "%u,%d:%d", (unsigned)hero->nUpdateType, a ? (int)a->dwUnitType : -1, a ? (int)a->dwUnitId : -1); }
+    if (!item) return snprintf(out, cap, "D57 +%d item gone hero %s\n", phase - 1, hs);
+    return snprintf(out, cap, "D57 +%d item %u:%d flags %x hero %s\n", phase - 1, item->dwAnimMode,
+        UNITS_GetRoom(item) ? 1 : 0, item->dwFlags & 0x1401, hs);
+}
+
 EMSCRIPTEN_KEEPALIVE int d2_session_command_pickup(uint32_t itemUnitId) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pInventory) return 0;
     D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemUnitId);
@@ -8509,7 +8548,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_pickup(uint32_t itemUnitId) {
     if (!sessionDispatchGate(0x16)) return 0;   // a ground pickup is client packet 0x16
     g_sessionItemState.commandTarget = itemUnitId;
     D2WEB_ResetPacketStream();   // D26: publish what the pickup queued (the 0x22 sound) to d2_session_packet_stream, as the 0x13 command does
-    sub_6FC828D0(g_targetPlayer, UNIT_ITEM, (int32_t)itemUnitId, 0, g_game);
+    g_d57PickupRet = sub_6FC828D0(g_targetPlayer, UNIT_ITEM, (int32_t)itemUnitId, 0, g_game);
     D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets);
     // D57: a stack merge frees the ground item (the unit is gone); do not read it again
     if (!SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemUnitId)) {
