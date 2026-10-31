@@ -19,6 +19,7 @@ __forceinline BOOL __fastcall STATES_CheckStateMaskByStateId(int nState, int nSt
 
 
 //D2Common.0x6FDB4560 (#10486)
+// 1.13c D2Common+0x34510
 void __stdcall STATES_ToggleState(D2UnitStrc* pUnit, int nState, BOOL bSet)
 {
 	if (nState >= 0 && nState < sgptDataTables->nStatesTxtRecordCount)

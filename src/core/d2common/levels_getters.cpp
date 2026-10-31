@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x2D810 / +0x2D850 / +0x2D970 / +0x6CC60 / +0x6CC30: single-field readers over the levels tables
+// D2Common 0x2D810 / +0x2D850 / +0x2D970 / +0x6CC60 / +0x6CC30: single-field readers over the levels tables
 //
 #include <cstddef>
 #include <cstdint>
@@ -16,8 +16,11 @@ static const D2LevelDefBin* LevelDef(int32_t id)
 {
     return (id >= 0 && id < sgptDataTables->nLevelsTxtRecordCount) ? &sgptDataTables->pLevelDefBin[id] : nullptr;
 }
+// 1.13c D2Common+0x2D810
 uint32_t D2Common_2D810_LevelDefLOSDraw(int32_t id) { const D2LevelDefBin* d = LevelDef(id); return d ? d->dwLOSDraw : 0; }
+// 1.13c D2Common+0x2D850
 uint32_t D2Common_2D850_LevelDefSaveMonsters(int32_t id) { const D2LevelDefBin* d = LevelDef(id); return d ? d->dwSaveMonsters : 0; }
+// 1.13c D2Common+0x2D970
 uint32_t D2Common_2D970_LevelDefLevelType(int32_t id) { const D2LevelDefBin* d = LevelDef(id); return d ? d->dwLevelType : 0; }
 // levels.txt byte at +7 / +6 for id in (0, count); EAX bits 8..31 keep the imul leftover, else id & 0xFFFFFF00 (as sub_6CC90).
 static uint32_t LevelsByte(uint32_t id, bool noPer)
@@ -28,5 +31,7 @@ static uint32_t LevelsByte(uint32_t id, bool noPer)
     }
     return id & 0xFFFFFF00u;
 }
+// 1.13c D2Common+0x6CC60
 uint32_t D2Common_6CC60_LevelNoPer(uint32_t id) { return LevelsByte(id, true); }
+// 1.13c D2Common+0x6CC30
 uint32_t D2Common_6CC30_LevelMud(uint32_t id) { return LevelsByte(id, false); }

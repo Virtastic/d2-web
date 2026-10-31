@@ -16,7 +16,7 @@ template <class T> void wr(void* p, int o, T v) { std::memcpy((B*)p + o, &v, siz
 int32_t at32(const void* base, int32_t idx) { return rd<int32_t>(base, idx * 4); }
 }
 
-// 1.13c D2Common+0x7ECC0: for each of n entries, two (tile,flag) lookups -> a mapped value, sent to
+// D2Common 0x7ECC0: for each of n entries, two (tile,flag) lookups -> a mapped value, sent to
 // the 0x42A70 setter with ids 0x1a / 0x1b. tbl = 8-byte-stride table at 0x6FDDACA0.
 static int32_t Map7ECC0(int32_t kind, uint32_t flags, const int32_t* tbl, int lane)
 {
@@ -24,6 +24,7 @@ static int32_t Map7ECC0(int32_t kind, uint32_t flags, const int32_t* tbl, int la
     if (kind == 7 && (flags & 0xf0000) == 0x30000) return 3;
     return tbl[kind * 2 + lane];
 }
+// 1.13c D2Common+0x7ECC0
 void D2Common_7ECC0(void* pObj, int32_t base, const int32_t* tbl,
                     void (*set42A70)(void*, int32_t, int32_t, int32_t, int32_t, int32_t),
                     void (*call7EB40)())

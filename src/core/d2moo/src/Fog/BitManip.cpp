@@ -129,7 +129,7 @@ int __stdcall BITMANIP_ReadSigned(D2BitBufferStrc* pBuffer, int nBits)
 {
 	int nResult = BITMANIP_Read(pBuffer, nBits);
 
-	// 1.13c Fog+0x140C0: shift counts are masked to 5 bits, as the retail shl is; (nBits - 1) & 31 and
+	// Fog 0x140C0 (1.13c): shift counts are masked to 5 bits, as the retail shl is; (nBits - 1) & 31 and
 	// nBits & 31 agree with retail's (byte) cast for every width the callers pass.
 	if (nBits < 32)
 	{

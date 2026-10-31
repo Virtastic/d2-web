@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x217F0 (#10405)
+// D2Common 0x217F0 (#10405)
 #include <cstddef>
 #include <cstdint>
 // Operates on retail's 32-bit images (guest pointers are 4 bytes), reached through the low 32 bits of a wasm address;
@@ -10,6 +10,7 @@ inline uint32_t& W(uint8_t* b, int o) { return *(uint32_t*)(b + o); }
 // Append pItem (a type-4 unit) to the tail of pInv's item list. Returns 0 for a bad inventory/unit/item data, else 1.
 // ponytail: the INVENTORY_RemoveItem step (0x21640, own row) is modelled only for an item whose parent-inventory link (item data +0x5c) is 0,
 // which it leaves untouched; a linked item is outside this function's corpus.
+// 1.13c D2Common+0x217F0
 uint32_t D2Common_217F0_AppendItem(uint32_t pInv, uint32_t pItem)
 {
     uint8_t* inv = P(pInv);

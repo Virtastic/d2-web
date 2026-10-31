@@ -34,7 +34,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_84110(uintptr_t a1, uintptr_t ebx,
 	}
 }
 
-// 1.13c D2Common+0x17B70: advance node n (EAX) one step (cursor +0x18, dir +0x1c, count +0x14); on the
+// D2Common 0x17B70: advance node n (EAX) one step (cursor +0x18, dir +0x1c, count +0x14); on the
 // count reaching 3 climb parents (+0x20) until the root (*ctx, EDI), advancing each. Returns the node.
 EMSCRIPTEN_KEEPALIVE uintptr_t d2_fn_d2common_17b70(uintptr_t n, const uint32_t* ctx) {
 	auto adv = [](uintptr_t a) {
@@ -191,7 +191,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_69090(uintptr_t self, int32_t x, in
 }
 }
 
-// 1.13c D2Common+0x68340: find the sound-table row for (levelType key, packed id). Group table A (retail
+// D2Common 0x68340: find the sound-table row for (levelType key, packed id). Group table A (retail
 // 6fddbd68, 38 rows of {key, first, last} dwords) is scanned for key == a; inside [first,last] the row
 // of table B (retail 6fddbf28, stride 0x1c) matches when its dword 0 == (id>>20 & 0x3f), dword 1 ==
 // (id>>8 & 0xff) and dword 2 == c (the caller's EBX). Returns the row index or -1.

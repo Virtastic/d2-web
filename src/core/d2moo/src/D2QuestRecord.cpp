@@ -86,6 +86,7 @@ void __stdcall QUESTRECORD_CopyBufferToRecord(D2BitBufferStrc* pQuestRecord, uin
 }
 
 //D2Common.0x6FDAEA40 (#11114)
+// 1.13c D2Common+0x2CF40
 void __stdcall QUESTRECORD_CopyRecordToBuffer(D2BitBufferStrc* pQuestRecord, uint8_t* pBuffer, uint16_t nBufferSize, int nUnused)
 {
 	D2_MAYBE_UNUSED(nUnused);

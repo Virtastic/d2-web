@@ -27,6 +27,7 @@
 #include <D2QuestRecord.h>
 #include <D2States.h>
 #include <D2Items.h>
+#include "core/d2game/fn_rules.h"  // rules shared with the FN probes
 #include <D2Inventory.h>
 #include <Units/Units.h>
 #include <PLAYER/PlayerList.h>
@@ -502,7 +503,15 @@ void D2GAME_PACKETS_SendPacket0x3E_6FC3EC20(D2ClientStrc* pClient, D2UnitStrc* p
     pk.nSize = (uint8_t)(BITMANIP_GetSize(&bb) + 2);
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &pk, sizeof(pk));
 }
-void D2GAME_PACKETS_SendPacket0x3F_6FC3EDC0(D2ClientStrc* pClient, D2UnitStrc* pUnit, char a3, int32_t a4, int32_t a5, int16_t a6) {}
+// 1.13c D2Game+0x8AFB0: the cursor/item packet, 8 bytes {0x3F, cursor (0xFF when the clear flag is set), item guid, skill id}.
+void D2GAME_PACKETS_SendPacket0x3F_6FC3EDC0(D2ClientStrc* pClient, D2UnitStrc* pUnit, char a3, int32_t a4, int32_t a5, int16_t a6) {
+    D2GSPacketSrv3F pk = {};
+    pk.nHeader = 0x3F;
+    pk.nCursor = a4 ? 0xFF : (uint8_t)a3;
+    pk.dwItemId = pUnit ? pUnit->dwUnitId : 0;
+    pk.nSkill = (uint16_t)a6;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &pk, sizeof(pk));
+}
 void D2GAME_PACKETS_SendPacket0x42_6FC3EE40(D2ClientStrc* pClient, D2UnitStrc* pUnit) {}
 void D2GAME_PACKETS_SendPacket0x51_6FC3D300(D2ClientStrc* pClient, char nHeader, uint8_t nUnitType, int32_t nUnitGUID, int16_t nObjectId, int16_t nX, int16_t nY, char a8, char a9) {}
 void D2GAME_PACKETS_SendPacket0x5A_6FC3DEC0(D2ClientStrc* pClient, D2GSPacketSrv5A* pPacket) {}
@@ -766,14 +775,19 @@ void D2GAME_SetClientDead_6FC33830(D2ClientStrc* pClient, void* pAlwaysNull) {}
 // with an inventory, 0 otherwise; the 8 flag is set on a caller-local copy of dwFlag per child.
 // 1.13c D2Game+0x8C890
 int32_t __fastcall D2GAME_SendItemSocketPackets_6FCAC890(D2ClientStrc* pClient, D2UnitStrc* pItem, DWORD dwFlag) {
-    int32_t nFlags = (int32_t)dwFlag;
-    if (!ITEMS_CheckIfSocketable(pItem) || ITEMS_CheckIfFlagIsSet(nFlags, IFLAG_QUANTITY) || !pItem->pInventory)
-        return 0;
-    for (D2UnitStrc* i = INVENTORY_GetFirstItem(pItem->pInventory); i; i = INVENTORY_GetNextItem(i)) {
-        ITEMS_SetOrRemoveFlag(&nFlags, IFLAG_DELETED, 1);
-        D2GAME_SendPacket0x9D_6FC3E6F0(pClient, pItem, INVENTORY_UnitIsItem(i), ITEMACTION_ITEMINSOCKET, (DWORD)nFlags, 0);
-    }
-    return 1;
+    struct Ops {  // the rule's callees on real units (core/d2game/fn_rules.h)
+        bool socketable(D2UnitStrc* p) { return ITEMS_CheckIfSocketable(p); }
+        bool flagSet(int32_t f, uint32_t bit) { return ITEMS_CheckIfFlagIsSet(f, bit); }
+        D2InventoryStrc* inventory(D2UnitStrc* p) { return p->pInventory; }
+        D2UnitStrc* first(D2UnitStrc*, D2InventoryStrc* inv) { return INVENTORY_GetFirstItem(inv); }
+        D2UnitStrc* asItem(D2UnitStrc* i) { return INVENTORY_UnitIsItem(i); }
+        void setDeleted(int32_t& f) { ITEMS_SetOrRemoveFlag(&f, IFLAG_DELETED, 1); }
+        D2UnitStrc* next(D2UnitStrc* i) { return INVENTORY_GetNextItem(i); }
+        void send(D2ClientStrc* c, D2UnitStrc* item, D2UnitStrc* child, uint32_t f) {
+            D2GAME_SendPacket0x9D_6FC3E6F0(c, item, child, ITEMACTION_ITEMINSOCKET, f, 0);
+        }
+    } ops;
+    return SendItemSocketPacketsRule(ops, pClient, pItem, dwFlag);
 }
 // 1.13c D2Game+0x8D3D0: the 0x9C composer.  pClient->dwFlags bit 0 keeps the cached player,
 // else it is re-resolved through SUNIT_GetServerUnit (and cleared when the unit is gone).  A NULL
@@ -807,21 +821,22 @@ void __fastcall D2GAME_SendPacket0x9C_6FC3E570(D2ClientStrc* pClient, D2UnitStrc
 }
 // 1.13c D2Game+0x8B0F0: the 0x9D composer (action code + owning unit + item bitstream).
 void __fastcall D2GAME_SendPacket0x9D_6FC3E6F0(D2ClientStrc* pClient, D2UnitStrc* pUnit, D2UnitStrc* pItem, char nAction, DWORD dwFlag, int32_t bGamble) {
-    D2GSPacketSrv9D packet = {};
-    packet.nHeader = 0x9D; packet.nAction = nAction;
-    packet.nComponent = UNITS_GetItemComponentId(pUnit, pItem);
-    packet.nItemId = pItem ? (int32_t)pItem->dwUnitId : -1;
-    if (pUnit) { packet.nUnitType = (uint8_t)pUnit->dwUnitType; packet.nUnitId = pUnit->dwUnitId; }
-    else { packet.nUnitType = 6; packet.nUnitId = -1; }
-    const uint32_t nOldItemFlags = ITEMS_GetItemFlags(pItem);
-    ITEMS_SetItemFlag(pItem, dwFlag, 1);
-    const uint32_t nLength = (uint32_t)(pItem ? ITEMS_SerializeItemToBitstream(pItem, packet.pBitstream, 0xF4u, 0, 0, bGamble) : 0) + 13;
-    if (nLength > 0xFC) return;                 // retail: Fog assert 0x7B4 + exit
-    ITEMS_SetItemFlag(pItem, 0xFFFFFFFFu, 0);
-    ITEMS_SetItemFlag(pItem, nOldItemFlags, 1);
-    packet.nPacketSize = (uint8_t)nLength;
-    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, (int32_t)nLength);
-    D2GAME_SendItemSocketPackets_6FCAC890(pClient, pItem, dwFlag);
+    struct Ops {  // the rule's callees on real units (core/d2game/fn_rules.h)
+        D2GSPacketSrv9D packet = {};
+        uint8_t component(D2UnitStrc* u, D2UnitStrc* i) { return UNITS_GetItemComponentId(u, i); }
+        void header(char action, uint8_t comp, D2UnitStrc* u, D2UnitStrc* i) {
+            packet.nHeader = 0x9D; packet.nAction = action; packet.nComponent = comp;
+            packet.nItemId = i ? (int32_t)i->dwUnitId : -1;
+            if (u) { packet.nUnitType = (uint8_t)u->dwUnitType; packet.nUnitId = u->dwUnitId; }
+            else { packet.nUnitType = 6; packet.nUnitId = -1; }
+        }
+        uint32_t getFlags(D2UnitStrc* i) { return ITEMS_GetItemFlags(i); }
+        void setFlag(D2UnitStrc* i, uint32_t f, int32_t on) { ITEMS_SetItemFlag(i, f, on); }
+        uint32_t serialize(D2UnitStrc* i, int32_t gamble) { return (uint32_t)(i ? ITEMS_SerializeItemToBitstream(i, packet.pBitstream, 0xF4u, 0, 0, gamble) : 0); }
+        void emit(D2ClientStrc* c, uint32_t len) { packet.nPacketSize = (uint8_t)len; D2GAME_PACKETS_SendPacket_6FC3C710(c, &packet, (int32_t)len); }
+        void sockets(D2ClientStrc* c, D2UnitStrc* i, uint32_t f) { D2GAME_SendItemSocketPackets_6FCAC890(c, i, f); }
+    } ops;
+    SendPacket0x9DRule(ops, pClient, pUnit, pItem, nAction, dwFlag, bGamble);
 }
 void __fastcall D2GAME_SendP0x9C_ItemAction_AddToGround_6FC3E850(D2ClientStrc* pClient, D2UnitStrc* pItem, DWORD dwFlag) {
     D2GAME_SendPacket0x9C_6FC3E570(pClient, pItem, ITEMACTION_ADDTOGROUND, dwFlag, 0);

@@ -1,4 +1,4 @@
-// 1.13c D2Common+0xBF70 sub_BF70: room blob in r[0] (retail 32-bit image).
+// FN probe of D2Common 0xBF70 sub_BF70: room blob in r[0] (retail 32-bit image).
 // Our structs are wider, so build them from the image and write back the two observed fields:
 // room flags (+0x28) and map bInited (+0x3c). pFile is always set; river/navi callees are not reached.
 #include <emscripten.h>

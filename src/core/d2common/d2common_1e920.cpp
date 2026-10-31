@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x1E920: build the 255-slot (item code, item type) composite table once.
+// D2Common 0x1E920: build the 255-slot (item code, item type) composite table once.
 #include <cstdint>
 #include <cstring>
 #include "d2common_1e920.h"

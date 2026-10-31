@@ -37,7 +37,7 @@ void D2Common_3E310_TargetPoint(D2PathPointStrc* out, D2DynamicPathStrc* path)
     }
 }
 
-// 1.13c D2Common+0x38220
+// D2Common 0x38220
 int D2Common_38220_LowerBound(D2StatsArrayStrc* stats, uint32_t key)
 {
     int first = 0, last = static_cast<int16_t>(stats->nStatCount);

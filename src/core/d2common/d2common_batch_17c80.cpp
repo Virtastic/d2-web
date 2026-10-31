@@ -3,7 +3,7 @@
 // List node: +0xC x, +0x10 y, +0x20 next.
 #include <cstdint>
 
-// 1.13c D2Common+0x17C80
+// D2Common 0x17C80
 extern "C" int d2_fn_d2common_17c80(const int32_t* pt, const uint8_t* list, int32_t x, int32_t y, const uint8_t* param1)
 {
     if (x == pt[0] && y == pt[1]) return 1;

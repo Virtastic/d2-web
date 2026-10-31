@@ -1202,6 +1202,7 @@ void __fastcall DRLGMAZE_InitBasicMazeLayout(D2DrlgLevelStrc* pLevel, int nRooms
 }
 
 //D2Common.0x6FD7A340
+// 1.13c D2Common+0x0EEC0
 BOOL __fastcall DRLGMAZE_LinkMazeRooms(D2DrlgRoomStrc* pDrlgRoom1, D2DrlgRoomStrc* pDrlgRoom2, int nDirection)
 {
 	switch (nDirection)

@@ -34,7 +34,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_69360(uintptr_t self, uintptr_t a1, uin
 	uintptr_t (*w69950)(uintptr_t, uint32_t), int32_t (*w69090)(uintptr_t, int32_t, int32_t, uintptr_t),
 	void (*w68800)(uintptr_t, uintptr_t), uint32_t (*w68b90)(uintptr_t, uintptr_t),
 	uintptr_t (*w68f00)(uintptr_t, uintptr_t, int32_t, int32_t, uint32_t, uint32_t, uintptr_t),
-	void (*fatal)(uint32_t) /* ordinals 10265 + 10024 + _exit(-1); seam, may return under test */) {
+	void (*fatal)(uint32_t) /* ordinals 10265 + 10024 + _exit(-1), seam, may return under test */) {
 	uintptr_t n = w(edi, 0x4c);
 	uintptr_t tbl = w69950(self, w(w(edi, 0x58), 0x1d0));
 	for (;;) {

@@ -32,8 +32,7 @@ extern "C" int32_t d2common_wctomb_mt_73e2(uint32_t locale, char* mbch, uint16_t
     return -1;
 }
 
-// Old seam form, kept for callers that pass an env.
-// 1.13c D2Common+0x073E2
+// Old seam form of 0x073E2 (marked on d2common_wctomb_mt_73e2 above), kept for callers that pass an env.
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t D2Common_73E2_WctombMt(uint32_t locale, char* mbch, uint16_t wch,
                                                                const D2CommonWctombEnv* env) {
     if (mbch == nullptr) return 0;

@@ -44,19 +44,19 @@ void D2Common_306D0(uint32_t pu) {
     *(int32_t*)(pd + 0x70) = rec ? (int32_t)*(const int16_t*)P(*(const uint32_t*)rec) : 0;
     if (rec) *(uint32_t*)(pd + 0x78) = *(const uint32_t*)(rec + 0x34);
 }
-// 1.13c D2Common+0x23740
+// D2Common 0x23740
 uint32_t D2Common_23740(uint32_t u) {
     const uint8_t* it = nullptr;
     if (u && *(uint32_t*)P(u) == 4) it = P(*(uint32_t*)(P(u) + 0x14));
     return it ? it[0x47] : 0xFF;
 }
-// 1.13c D2Common+0x2c990
+// D2Common 0x2c990
 uint32_t D2Common_2C990(uint32_t a, uint32_t b) { return (a + 1) * a * a * b; }
-// 1.13c D2Common+0x346d0
+// D2Common 0x346d0
 void D2Common_346D0(uint32_t p) { *(uint16_t*)(P(p) + 0x14) = 0; *(uint16_t*)(P(p) + 0x16) = 0; }
-// 1.13c D2Common+0x34c10
+// D2Common 0x34c10
 uint32_t D2Common_34C10(uint32_t p) { return p ? P(p)[0x64] : 0; }
-// 1.13c D2Common+0x37e00
+// D2Common 0x37e00
 void D2Common_37E00(uint32_t u) {
     if (u && *(uint32_t*)(P(u) + 0x5c)) *(uint32_t*)(P(*(uint32_t*)(P(u) + 0x5c)) + 0x10) |= 0x100;
 }

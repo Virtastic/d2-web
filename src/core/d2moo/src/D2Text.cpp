@@ -178,6 +178,7 @@ short __stdcall TEXT_GetStringIdOfMenuType0Or2Node(D2TextHeaderStrc* pTextHeader
 }
 
 //D2Common.0x6FDC38C0 (#10909)
+// 1.13c D2Common+0x3D060
 void __stdcall TEXT_CreateMessageListFromTextHeader(D2TextHeaderStrc* pTextHeader, D2MessageListStrc* pMsgList)
 {
 	D2_ASSERT(pTextHeader != nullptr);

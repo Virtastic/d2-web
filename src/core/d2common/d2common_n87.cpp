@@ -61,7 +61,7 @@ extern "C" uint32_t D2Common_1E880(const N87Env* e, uint32_t v, uint32_t pInv)
 	return 0;
 }
 
-// 1.13c D2COMMON+0x21C50
+// D2Common 0x21C50
 extern "C" void D2Common_21C50(const N87Env* e, uint32_t arg)
 {
 	static const char* f = "..\\Source\\D2Common\\INVENTORY\\Inventory.cpp";
@@ -105,7 +105,7 @@ extern "C" void D2Common_2E360(const N87Env* e, uint32_t unit)
 	e->f7D420(unit); e->f7DC90();
 }
 
-// 1.13c D2COMMON+0x36030
+// D2Common 0x36030
 extern "C" void D2Common_36030(const N87Env* e, int y, uint32_t unit, int force, int x, uint32_t flag7)
 {
 	uint32_t g = e->alloc("..\\Source\\D2Common\\PATH\\Path.cpp", 0x453, 0);
@@ -174,7 +174,7 @@ extern "C" bool D2Common_37AF0(const N87Env* e, uint32_t a, uint32_t b)
 	return old != (int32_t)p[1];
 }
 
-// 1.13c D2COMMON+0x3A1D0
+// D2Common 0x3A1D0
 extern "C" uint32_t D2Common_3A1D0(const N87Env* e, uint32_t o, uint32_t, int v, uint32_t, uint32_t arg)
 {
 	if (!o) return 0;
@@ -205,7 +205,7 @@ extern "C" void D2Common_3CCA0(const N87Env* e, int a, void* b, int c, int d)
 	e->f7C300(b, c, d);
 }
 
-// 1.13c D2COMMON+0x4CF40
+// D2Common 0x4CF40
 extern "C" uint32_t D2Common_4CF40(const N87Env* e, uint32_t a, int x, int y, uint32_t mode, uint32_t flags)
 {
 	switch (mode)

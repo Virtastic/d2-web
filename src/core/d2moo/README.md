@@ -20,6 +20,9 @@ behaviour differs from 1.10f.
 - D2Game+0x9C4F0 sub_6FCB9D10: asserts pPartyControl.
 - D2Game+0x9C4F0 party add (`sub_6FCB9D10`): the hostility helper is called member-first, then player-first, as retail does.
 - D2Game+0xB7090 (AI/AiBaal.cpp, AIBAAL_GetTarget): the act walk over list 8 starts from pGame->pTargetNodes[8], not the node left over from the lists 0-7 pass.
+- D2Game+0x83130 (AI/AiThink.cpp, AITHINK_Fn006_Fallen): the neutral-mode test after the corpse scan uses the mode read at entry; the minion command buffer is zero-filled (retail leaves all but param 0 uninitialised).
+- D2Game+0xA4610 (AI/AiThink.cpp, AITHINK_GetTargetForBoss): the act walk over list 8 starts from pGame->pTargetNodes[8], as in AIBAAL_GetTarget.
+- D2Game+0xD0060 (PLAYER/PlrMsg.cpp, D2GAME_PACKETCALLBACK_Rcv0x36_HireMerc_6FC86BD0): matches the 1.13c disassembly; no change.
 - D2Game+0xBDB10 D2GAME_NPC_IdentifyAllItems_6FCC9C90: the code-3 reply is sent once, after the loop.
 - D2Game+0xDEEE0 SUNITDMG_KillMonster: matches; the trailing D2Common ordinal is a no-op in 1.13c.
 - D2Game+0x212F0 AIGENERAL_AllocCommandsForMinions: minion loop skips a null allocation (1.10f dereferenced it); no pCurrentCmd write; monster guards on caller and owner; the new command pointer goes to the minion game block +0x20.
@@ -37,7 +40,7 @@ behaviour differs from 1.10f.
 - D2Common+0x25810 and D2Common+0x25970 (charged-skill and item-skill costs): arithmetic matches; the stat copy they rely on, STATLIST_CopyStats, now returns 0 for a unit with no stat list instead of dereferencing a null pointer.
 - D2Common+0x26BA0 ITEMS_GetRunesTxtRecordFromItem: returns NULL unless the socketed inventory's signature is 0x1020304 (1.13c check added).
 - D2Common+0x28850 ITEMS_CalculateAdditionalCostsForBonusStats: all encode cases match the 1.13c arithmetic; no change.
-- D2Common+0x2C910 ITEMS_UpdateSets: body matches; the call routing (0x2C7C0, 0x2C630) is not wired, so the row is STALLED.
+- D2Common+0x2C910 ITEMS_UpdateSets: body matches; the 1.13c routing through 0x2C7C0 and 0x2C630 is ported in src/core/d2common/d2common_2c910.cpp (d2_fn_d2common_2c910); the play path still calls this 1.10f-routed copy.
 - D2Game+0x68D70 OBJECTS_OperateFunction06_TowerTome (QUESTS/ACT1/A1Q5.cpp): returns 0 on every path (1.10f returned 1 after activating the tome); validated against the vector.
 - D2Game+0xC6070 ACT2Q1_UnitIterate_SetPrimaryGoalDoneForPartyMembers: matches the 1.13c decompile; validated against the vector (in-room path).
 - `src/D2Game/GAME/Game.cpp` `GAME_UpdateGamesProgress` (`// 1.13c D2Game+0x2E1E0`): the elapsed-time compare against the target frame time is signed (retail casts both sides to int); 1.10f compared unsigned.
@@ -46,3 +49,4 @@ behaviour differs from 1.10f.
 - D2Common+0x31B40 UNITS_GetEquippedWeaponFromMonster: the candidate is the 1.13c 0x20700 rule (right hand cell 4 unless it is an item with flags 0x100/0x4000, else left hand cell 5 if equippable; weapon type 0x2D), not INVENTORY_GetEquippedWeapon. The global DAT_6FDED378 is gBodyLocInventoryGridInfo = {13,1}; the 0x20700 port now checks the grid dimensions against it and the cell-4 gate is applied as retail does.
 - D2Game+0xEF6B0 MONSTERSPAWN_SpawnRandomMonsterForLevel (MONSTER/MonsterSpawn.cpp): the no-normal-monsters path and the no-spawn-flag path assert (lines 0x4F0 and 0x507) where 1.10f warned and returned 0.
 - SKILLITEM_HandleItemEffectSkill (D2Game+0xF14F0): returns 0 when nSkillId is 0 (retail tests the id before the record lookup).
+- 1.13c out-of-line helpers split from 1.10f bodies, one marker each: SKILLS_ValidateUsedSkillTarget (D2Game+0x9FC00, from the used-skill prologue), NPC_RefillHirelingListIfExhausted (D2Game+0xBD160), ACT3Q3_SpawnFetishBoss (D2Game+0xE8780), ITEMMODE_ReturnItemToGround (D2Game+0xD2840, the five-line drop-back that the pickup paths repeated) and ITEMMODE_UnpackDroppedCube (D2Game+0xD78C0, the cube tail of sub_6FC44030). D2GAME_RemoveItemIfOnCursor (D2Game+0xD2C70) sends the cursor clear with no client for a holder that is not a player.

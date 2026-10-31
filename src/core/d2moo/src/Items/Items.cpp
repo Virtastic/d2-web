@@ -402,6 +402,7 @@ void __stdcall ITEMS_SetCellOverlap(D2UnitStrc* pItem, int nCellOverlap)
 }
 
 //D2Common.0x6FD98960 (#10853)
+// 1.13c D2Common+0x23740
 uint8_t __stdcall ITEMS_GetItemCell(D2UnitStrc* pItem)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -3186,7 +3187,7 @@ const D2RunesTxt* __stdcall ITEMS_GetRunesTxtRecordFromItem(const D2UnitStrc* pI
 
 		D2_ASSERT(pItem->dwUnitType == UNIT_ITEM);
 
-		// 1.13c D2Common+0x26ba0: the socket count is compared through a byte mask (retail `& 0xff`)
+		// retail D2Common 0x26BA0: the socket count is compared through a byte mask (retail `& 0xff`)
 		const int nSockets = STATLIST_UnitGetStatValue(pItem, STAT_ITEM_NUMSOCKETS, 0) & 0xFF;
 
 		if (nSockets != nSocketedItems)
@@ -4325,6 +4326,7 @@ int __stdcall D2COMMON_11079_Return0(int a1, int a2)
 }
 
 //D2Common.0x6FD9FB50 (#10836)
+// 1.13c D2Common+0x23F90
 uint32_t __stdcall ITEMS_GetSetItemsMask(D2UnitStrc* pPlayer, D2UnitStrc* pSetItem, BOOL bDontIgnoreInputItem)
 {
 	if (!pPlayer || !pPlayer->pInventory || ITEMS_GetItemQuality(pSetItem) != ITEMQUAL_SET)
@@ -7522,7 +7524,7 @@ BOOL __fastcall sub_6FDA4490(D2UnitStrc* pUnit, D2UnitStrc* pItem, int a3)
 }
 
 //D2Common.0x6FDA4640 (#10866)
-// 1.13c D2Common+0x2C910
+// 1.10f routing of 1.13c D2Common 0x2C910; the 1.13c port is src/core/d2common/d2common_2c910.cpp
 BOOL __stdcall ITEMS_UpdateSets(D2UnitStrc* pUnit, D2UnitStrc* pItem, int a3, int a4)
 {
 	unsigned int nSetItemMask = 0;

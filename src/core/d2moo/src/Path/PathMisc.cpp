@@ -1101,6 +1101,7 @@ int __stdcall PATH_ComputeDirectionFromPreciseCoords_6FDAC760(DWORD dwStartPreci
 //1.00:  D2Common.0x1005E9C0
 //1.10f: D2Common.0x6FDAC790
 //1.13c: D2Common.0x6FD5D240
+// 1.13c D2Common+0x0D240
 BOOL __fastcall PATH_ComputeVelocityAndDirectionVectorsToNextPoint(D2DynamicPathStrc* pPath, BOOL bNormalizeDirectionIfSamePos, BOOL bForceDirectionNormalization)
 {
 	const DWORD dwPrecisionX = pPath->tGameCoords.dwPrecisionX;
@@ -1305,6 +1306,7 @@ BOOL sub_6FD5DB70(D2DynamicPathStrc* pDynamicPath)
 //1.00:  D2Common.0x1005EEB0 (#10223)
 //1.10f: D2Common.0x6FDAC9A0 (#10226)
 //1.13c: D2Common.0x6FD5E230 (#10342)
+// 1.13c D2Common+0x0E230
 BOOL __stdcall D2Common_10226(D2UnitStrc* pUnit, signed int a2)
 {
 	if (pUnit->dwUnitType == UNIT_PLAYER)

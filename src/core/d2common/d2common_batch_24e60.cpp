@@ -74,7 +74,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_37e70(uint32_t pUnit, ui
 }
 
 // Build the set-item quality mask by walking inventory items and resolving their set records.
-// 1.13c D2Common+0x23F90
+// D2Common 0x23F90
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_23f90(uint32_t pUnit, uint32_t pItem, uint32_t nIncludeCurrent) {
 	return ITEMS_GetSetItemsMask(reinterpret_cast<D2UnitStrc*>(P(pUnit)), reinterpret_cast<D2UnitStrc*>(P(pItem)), nIncludeCurrent); // vendored D2MOO body, validated in the spec
 }

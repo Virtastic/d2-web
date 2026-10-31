@@ -2034,7 +2034,7 @@ D2RuneDataTbl* __fastcall DATATBLS_GetRuneDataTables()
 	return &sgptDataTables->pRuneDataTables;
 }
 
-// 1.13c D2Common+0x70FF0 (#10621)
+// D2Common 0x70FF0 (#10621)
 // D2MOO.0x6FD5E9F0. The body matches the 1.13c decompile line for line; it lives in
 // src/core/d2common/runes_tbl.cpp so the s3004 shallow probe can pin the record array, its count and the
 // realloc-pool call to its own blobs.

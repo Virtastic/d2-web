@@ -1212,6 +1212,7 @@ D2UnitGUID __stdcall SKILLS_GetOwnerGUIDFromSkill(D2SkillStrc* pSkill)
 }
 
 //D2Common.0x6FDB08F0 (#10955)
+// 1.13c D2Common+0x4E240
 BOOL __stdcall SKILLS_GetSkillInfo(D2SkillStrc* pSkill, D2UnitGUID* pOwnerGUID, int* pSkillId, int* pSkillLevel, int* pCharges)
 {
 	D2_ASSERT(pSkill);
@@ -2029,6 +2030,7 @@ int __stdcall SKILLS_GetSkillLevel(D2UnitStrc* pUnit, D2SkillStrc* pSkill, BOOL 
 }
 
 //D2Common.0x6FDB1750 (#11029)
+// 1.13c D2Common+0x50560
 int __stdcall SKILLS_GetBonusSkillLevelFromSkillId(D2UnitStrc* pUnit, int nSkillId)
 {
 	D2SkillStrc* pSkill = NULL;

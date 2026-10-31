@@ -369,7 +369,7 @@ uint32_t D2Common_1EEE0_InventoryHasPotion(uint32_t pInventory, uint32_t pItem)
 	return 0;
 }
 
-// 1.13c D2Common+0x3D2B0 (#10151): sort a text list's entries.
+// D2Common 0x3D2B0 (#10151): sort a text list's entries.
 // The list head is the dword at +8 and the entry count is the u16 at +4; a null list fatals
 // 0x165. With a count of 0 or 1 retail does nothing. Otherwise it copies every node (u16 id at
 // +0, dword value at +4, next at +8) into a scratch array, sorts it with 0x3CF30 and the
@@ -383,6 +383,7 @@ static int32_t TextCompare_3D040(uintptr_t a, uintptr_t b)
 	return x > y ? 1 : (x < y ? -1 : 0);
 }
 
+// 1.13c D2Common+0x3D2B0
 void D2Common_3D2B0_SortTextList(uint32_t pList)
 {
 	uint8_t* list = P(pList);

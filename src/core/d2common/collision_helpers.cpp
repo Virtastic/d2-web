@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x4B8F0 and +0x4B970: the two small collision-mask helpers D2MOO inlines.
+// D2Common 0x4B8F0 and +0x4B970: the two small collision-mask helpers D2MOO inlines.
 #include <cstdint>
 #include "D2Collision.h"
 #include "D2Dungeon.h"
@@ -17,7 +17,7 @@ void D2Common_4B970_SetMaskCross(D2ActiveRoomStrc* pRoom, int nX, int nY, uint16
 	COLLISION_SetCollisionMask(pRoom, nX, nY - 1, nMask);
 	COLLISION_SetCollisionMask(pRoom, nX, nY + 1, nMask);
 }
-// 1.13c D2Common+0x4B560 / +0x4B5F0 / +0x4B6B0: 5x5 stamps straight into a room's collision mask (grid-relative indices, no room walk,
+// D2Common 0x4B560 / +0x4B5F0 / +0x4B6B0: 5x5 stamps straight into a room's collision mask (grid-relative indices, no room walk,
 // no upper clamp; negative x/y clamp to 0 on the low side).
 #include <D2CMP.h>
 template <class F> static void stamp5x5(D2RoomCollisionGridStrc* g, int nX, int nY, F f)

@@ -114,7 +114,7 @@ extern "C" int32_t D2Common_2A210_InventoryRepairCount(const D2Common2A210Env* e
     return nSum;
 }
 
-// 1.13c D2Common+0x22880 (#10081): items.txt row nItemId, byte +0x13E (nGemApplyType).
+// D2Common 0x22880 (#10081): items.txt row nItemId, byte +0x13E (nGemApplyType).
 // Out of range is fatal in retail (_exit).
 uint32_t D2Common_22880_ItemGemApplyType(uint32_t nItemId)
 {

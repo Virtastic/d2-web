@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <emscripten.h>
 
-// 1.13c D2Common+0x68800: ESI = node (null -> fatal 0x273); node+0x10 = entry pointer (null ->
+// D2Common 0x68800: ESI = node (null -> fatal 0x273); node+0x10 = entry pointer (null ->
 // fatal 0x274). Entry byte +0x2c: unless it is 'b', re-resolve it to entry 0x6c (0x72 when a1 == 0xb)
 // via sub_6C5D0 when it differs, and store the result at node+0x10. fatal never returns in retail.
 extern "C"

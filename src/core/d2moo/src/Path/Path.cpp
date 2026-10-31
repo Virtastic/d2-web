@@ -1117,6 +1117,7 @@ int __stdcall D2Common_10155(D2DynamicPathStrc* pDynamicPath)
 }
 
 //D2Common.0x6FDA9BD0 (#10157)
+// 1.13c D2Common+0x34C30
 int __stdcall PATH_GetPathPoints(D2DynamicPathStrc* pDynamicPath, D2PathPointStrc** ppPathPoints)
 {
 	*ppPathPoints = pDynamicPath->PathPoints;
@@ -1124,6 +1125,7 @@ int __stdcall PATH_GetPathPoints(D2DynamicPathStrc* pDynamicPath, D2PathPointStr
 }
 
 //D2Common.0x6FDA9BF0 (#10158)
+// 1.13c D2Common+0x34C10
 uint8_t __stdcall PATH_GetDirection(D2DynamicPathStrc* pDynamicPath)
 {
 	if (pDynamicPath)
@@ -1630,6 +1632,7 @@ void __stdcall D2COMMON_10203_PATH_SetRotateFlag(D2DynamicPathStrc* pDynamicPath
 
 //D2Common.0x6FDAA460 (#10204)
 //TODO: Check name
+// 1.13c D2Common+0x346D0
 void __stdcall D2COMMON_10204_PATH_ClearPoint2(D2DynamicPathStrc* pDynamicPath)
 {
 	pDynamicPath->tPrevTargetCoord.X = 0;

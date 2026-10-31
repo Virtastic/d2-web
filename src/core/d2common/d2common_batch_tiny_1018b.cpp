@@ -97,7 +97,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_3624_Unlock12(void)
 	D2Common_2E44_Unlock(0xC);
 }
 
-// 1.13c D2Common+0x44BC: the CRT `_errno` accessor -- `call 0x3475 __getptd; add eax, 8; ret`, the
+// D2Common 0x44BC: the CRT `_errno` accessor -- `call 0x3475 __getptd; add eax, 8; ret`, the
 // address of _terrno in the calling thread's _ptiddata (VS2003 offset 8; _tdoserrno follows at 0xC).
 // 17 callers, the whole stdio/errno family. __getptd (0x3475) is still an UNMAPPED row, so it is a
 // caller-supplied seam, as for the __unlock_fhandle fragments above.
@@ -349,7 +349,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_4D970_CoordPair(int32_t nA, int32_
     *pOutSum = int32_t(uint32_t(*pOutSum) + 0x10u);
 }
 
-// 1.13c D2Common+0x85CF0: hand the two identifiers 0x18C and 0x18D to 0x85A80 as a two-entry table
+// D2Common 0x85CF0: hand the two identifiers 0x18C and 0x18D to 0x85A80 as a two-entry table
 // with a zero payload. 0x85A80 is UNMAPPED, so it arrives as a seam.
 typedef void (*D2CommonProcessIdPairFn)(const uint32_t* pIds, int32_t nCount, int32_t nPayload);
 
@@ -359,7 +359,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_85CF0_ProcessTwoIds(D2CommonProces
 	fnProcess(aIds, 2, 0);
 }
 
-// 1.13c D2Common+0x85DF0: apply value 0x16C to the three indices 2, 1, 3 in that order. 0x43100 is
+// D2Common 0x85DF0: apply value 0x16C to the three indices 2, 1, 3 in that order. 0x43100 is
 // UNMAPPED, so it arrives as a seam.
 typedef void (*D2CommonApplyIndexValueFn)(int32_t nIndex, int32_t nValue);
 

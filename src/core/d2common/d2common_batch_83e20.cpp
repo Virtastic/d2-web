@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x83E20: substitution placement. Visits every cell of the window in seed-shuffled
+// D2Common 0x83E20: substitution placement. Visits every cell of the window in seed-shuffled
 // order, tests each with the 0x83B30 worker, applies the first hit with the 0x83990 worker.
 #include <cstdint>
 #include <emscripten.h>

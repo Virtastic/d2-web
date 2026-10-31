@@ -8,7 +8,7 @@
 #include "Drlg/D2DrlgMaze.h"
 #include "Drlg/D2DrlgPreset.h"
 
-// 1.13c D2Common+0x0C690 (BuildArea; level in EAX, map/flags/single-room on the stack)
+// D2Common 0x0C690 (BuildArea; level in EAX, map/flags/single-room on the stack)
 extern "C" D2DrlgRoomStrc* d2common_c690_build(D2DrlgLevelStrc* level, D2DrlgMapStrc* map, int32_t flags, int32_t single)
 {
     return DRLGPRESET_BuildArea(level, map, flags, single);

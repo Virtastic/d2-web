@@ -98,7 +98,7 @@ D2COMMON_DLL_DECL int __stdcall DRLGPRESET_GetObjectIndexFromObjPreset(uint8_t n
 void __fastcall DRLGPRESET_ParseDS1File(D2DrlgFileStrc* pDrlgFile, HD2ARCHIVE hArchive, const char* szFileName);
 //D2Common.0x6FD86050
 void __fastcall DRLGPRESET_LoadDrlgFile(D2DrlgFileStrc** ppDrlgFile, HD2ARCHIVE hArchive, const char* szFile);
-//1.13c D2Common+0x9FA0: the .ds1 file body's teardown, which 1.13c keeps as its own function and D2MOO
+// D2Common 0x9FA0: the .ds1 file body's teardown, which 1.13c keeps as its own function and D2MOO
 //1.10f inlines into DRLGPRESET_FreeDrlgFile below. Exported for the FN vector (src/core/fn/d2common_9fa0.cpp).
 void __fastcall DRLGPRESET_FreeDrlgFileStruct(D2DrlgFileStrc* pDrlgFile);
 //D2Common.0x6FD86190

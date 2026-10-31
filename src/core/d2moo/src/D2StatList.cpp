@@ -1000,6 +1000,7 @@ void __stdcall STATLIST_AllocStatListEx(D2UnitStrc* pUnit, char nFlags, StatList
 }
 
 //D2Common.0x6FDB7260 (#10471)
+// 1.13c D2Common+0x380E0
 int __stdcall STATLIST_GetOwnerType(D2StatListStrc* pStatList)
 {
 	if (pStatList)
@@ -1333,6 +1334,7 @@ BOOL __stdcall STATLIST_SetBaseStat(D2StatListStrc* pStatList, int nStatId, int 
 }
 
 //D2Common.0x6FDB7A90 (#11295)
+// 1.13c D2Common+0x3A790
 void __stdcall STATLIST_SetBaseStat2(D2StatListStrc* pStatList, int nStatId, int nValue, uint16_t nLayer, D2UnitStrc* pUnit)
 {
 	if (pStatList)
@@ -1825,6 +1827,7 @@ int __stdcall STATLIST_GetUnitAlignment(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDB8750 (#10534)
+// 1.13c D2Common+0x37E00
 void __stdcall D2Common_10534(D2UnitStrc* pUnit)
 {
 	if (pUnit && pUnit->pStatListEx)
@@ -2102,6 +2105,7 @@ void __stdcall STATLIST_ClampStaminaManaHP(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FDB8EB0 (#10574)
+// 1.13c D2Common+0x3AAB0
 BOOL __stdcall D2Common_10574(D2UnitStrc* pUnit, int nStateId, BOOL bSet)
 {
 
@@ -2437,13 +2441,13 @@ BOOL __stdcall D2Common_11274_11275_Impl(D2UnitStrc* pTarget, D2UnitStrc* pUnit,
 
 //D2Common.0x6FDB9D90 (#11274)
 // 1.13c D2Common+0x3A100
-// 1.13c D2Common+0x3a030 (subtract direction, addOrSubstract=false, via D2Common_11275)
 BOOL __stdcall D2Common_11274(D2UnitStrc* pTarget, D2UnitStrc* pUnit)
 {
 	return D2Common_11274_11275_Impl(pTarget, pUnit, true);
 }
 
 //D2Common.0x6FDB9E60 (#11275)
+// 1.13c D2Common+0x3A030 (subtract direction, addOrSubstract=false)
 BOOL __stdcall D2Common_11275(D2UnitStrc* pTarget, D2UnitStrc* pUnit)
 {
 	return D2Common_11274_11275_Impl(pTarget, pUnit, false);

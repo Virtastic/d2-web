@@ -328,6 +328,7 @@ D2ActiveRoomStrc* __stdcall DUNGEON_GetAdjacentRoomByTileCoordinates(D2ActiveRoo
 }
 
 //D2Common.0x6FD8BFF0 (#10049)
+// 1.13c D2Common+0x3B7D0
 void __stdcall DUNGEON_CallRoomCallback(D2ActiveRoomStrc* pRoom, ROOMCALLBACKFN pfnRoomCallback, void* pArgs)
 {
 	D2_ASSERT(pRoom);
@@ -611,7 +612,7 @@ int __stdcall DUNGEON_GetWarpDestinationLevel(D2ActiveRoomStrc* pRoom, int nSour
 }
 
 //D2Common.0x6FD8C7E0 (#10059)
-// 1.13c D2Common+0x3BFB0
+// D2Common 0x3BFB0
 // Cached retail inlines the populated-room check and aborts on a missing
 // room-ex. Keep the 0x800000 flag and level field through native pointers.
 int __stdcall DUNGEON_GetLevelIdFromPopulatedRoom(D2ActiveRoomStrc* pRoom)
@@ -779,7 +780,7 @@ void __stdcall D2Common_10075(D2ActiveRoomStrc* pRoom, BOOL bSet)
 }
 
 //D2Common.0x6FD8CB60 (#10079)
-// 1.13c D2Common+0x3C460
+// D2Common 0x3C460
 void __stdcall DUNGEON_AddClientToRoom(D2ActiveRoomStrc* pRoom, D2ClientStrc* pClient)
 {
 	D2_ASSERT(pRoom);
@@ -1074,6 +1075,7 @@ int __stdcall D2Common_10084(D2ActiveRoomStrc* pRoom)
 }
 
 //D2Common.0x6FD8D140 (#10085)
+// 1.13c D2Common+0x3B1E0
 int __stdcall DUNGEON_GetTownLevelIdFromActNo(uint8_t nAct)
 {
 	static const int gnTownLevelIds[] = { LEVEL_ROGUEENCAMPMENT, LEVEL_LUTGHOLEIN, LEVEL_KURASTDOCKTOWN, LEVEL_THEPANDEMONIUMFORTRESS, LEVEL_HARROGATH };
@@ -1123,6 +1125,7 @@ void __stdcall DUNGEON_UpdateWarpRoomDeselect(D2ActiveRoomStrc* pRoom, int nLeve
 }
 
 //D2Common.0x6FD8D2A0 (#10093)
+// 1.13c D2Common+0x3C2F0
 void __stdcall DUNGEON_UpdatePops(D2ActiveRoomStrc* pRoom, int nX, int nY, BOOL bOtherRoom)
 {
 	D2_ASSERT(pRoom);

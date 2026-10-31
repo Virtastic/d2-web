@@ -843,6 +843,7 @@ BOOL __stdcall UNITS_ChangeAnimMode(D2UnitStrc* pUnit, int nMode)
 
 //D2Common.0x6FDBEAD0 (#10355)
 //TODO: Find a name
+// 1.13c D2Common+0x2FCC0
 int __stdcall UNITS_IsCurrentRoomInvalid(D2UnitStrc* pUnit)
 {
 	D2_ASSERT(pUnit);

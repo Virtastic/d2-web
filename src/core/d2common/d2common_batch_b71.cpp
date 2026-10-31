@@ -17,7 +17,7 @@ struct Cb {  // 44bd0 AllocRoomEx, 0eec0 LinkMazeRooms (kind in EAX, e in ECX, t
   void (*release)(uint32_t);
 };
 
-// 1.13c D2Common+0x44950 on retail-layout blobs (ESI = owner, EAX = room, stack = direction): add a
+// D2Common 0x44950 on retail-layout blobs (ESI = owner, EAX = room, stack = direction): add a
 // link node (0x18 bytes: room +0, direction +4, init +0xC, box +0x10 = room+0x34, next +0x14) to the
 // owner's list unless the room is already in it. The wasm64 d2_fn_d2common_44950 takes native structs;
 // these blobs cannot be passed to it.

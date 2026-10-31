@@ -25,7 +25,7 @@ static int32_t mt_initcs(void* cs, uint32_t) {
 }
 static void mt_exit(int32_t c) { std::_Exit(c); }
 
-// 1.13c D2Common+0x2EF9: __lock(n). Entry n of the lock table (DAT_6fde9048) empty: create it through
+// D2Common 0x2EF9: __lock(n). Entry n of the lock table (DAT_6fde9048) empty: create it through
 // __mtinitlocknum (0x2E59), fatal __amsg_exit(0x11) on failure; then EnterCriticalSection.
 extern "C" void d2common_lock_2ef9(int32_t n)
 {

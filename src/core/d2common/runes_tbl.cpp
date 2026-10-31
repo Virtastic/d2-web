@@ -4,6 +4,7 @@
 #include "runes_tbl.h"
 #include <cstring>
 
+// 1.13c D2Common+0x70FF0
 void D2Common_70FF0_AddOrChangeRunesTxtRecord(const RunesTblEnv& e, int32_t nRecordId, const uint8_t* rec)
 {
     constexpr uint32_t kStride = 0x120;   // sizeof(D2RunesTxt) in the image

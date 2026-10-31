@@ -32,7 +32,7 @@ extern "C" void D2Common_11170(uint8_t* ctx, const uint8_t* tab6188, const uint8
 		fn(0, (const int32_t*)(tab61C8 + local * 0x10), ctx, &local); // ecx here is an extraout (leftover) register
 }
 
-// 1.13c D2Common+0x116B0 (esi = ctx). Sub-calls 0xF000/0x10A00/0x10820/0xE490 go through env; the
+// D2Common 0x116B0 (esi = ctx). Sub-calls 0xF000/0x10A00/0x10820/0xE490 go through env; the
 // DRLG-room builders' ECX/EAX hidden inputs are not modelled (extraout ECX forwarded as 0).
 struct B68Env116B0
 {
@@ -51,6 +51,7 @@ static void b68Tag(int32_t* p, uint32_t id)
 	r[0] = id; r[1] = 0; r[3] |= 2;
 }
 
+// 1.13c D2Common+0x116B0
 extern "C" void D2Common_116B0(uint8_t* ctx, const B68Env116B0* e)
 {
 	uint32_t local4 = ((b68Step(ctx) & 1) << 1) | 1;

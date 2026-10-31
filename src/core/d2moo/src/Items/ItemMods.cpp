@@ -4436,6 +4436,7 @@ static int __fastcall ITEMMODS_GetCalcParamValue_Return0(int, void*)
 }
 
 //D2Common.0x6FD98300 (#11300)
+// 1.13c D2Common+0x23CE0
 int __stdcall ITEMMODS_EvaluateItemFormula(D2UnitStrc* pUnit, D2UnitStrc* pItem, unsigned int nCalc)
 {
 	D2ItemCalcStrc pItemCalc = {};

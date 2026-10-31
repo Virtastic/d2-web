@@ -395,6 +395,7 @@ int __fastcall MONSTERS_GetActFromHirelingTxt(BOOL bExpansion, int nClassId, uin
 }
 
 //D2Common.0x6FDA5200 (#11084)
+// 1.13c D2Common+0x2C990
 int __stdcall MONSTERS_GetHirelingExpForNextLevel(int nLevel, int nExpPerLevel)
 {
 	return nExpPerLevel * nLevel * nLevel * (nLevel + 1);
@@ -1164,6 +1165,7 @@ uint8_t __stdcall MONSTERS_GetMaximalLightRadius(D2UnitStrc* pMonster)
 }
 
 //D2Common.0x6FDA64B0 (#11063)
+// 1.13c D2Common+0x1A770
 int __stdcall D2Common_11063(D2ActiveRoomStrc* pRoom, int nMonsterId)
 {
 	D2MonStatsTxt* pMonStatsTxtRecord = NULL;
@@ -1220,6 +1222,7 @@ int __stdcall D2Common_11063(D2ActiveRoomStrc* pRoom, int nMonsterId)
 }
 
 //D2Common.0x6FDA6620 (#11065)
+// 1.13c D2Common+0x1A720
 BOOL __stdcall MONSTERS_IsPrimeEvil(D2UnitStrc* pMonster)
 {
 	D2MonStatsTxt* pMonStatsTxtRecord = NULL;

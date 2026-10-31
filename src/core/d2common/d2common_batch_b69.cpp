@@ -38,7 +38,7 @@ int sub_68780(int32_t* p1, int p2, int p3, int p4, int32_t* out) {
     return 0;
 }
 
-// 1.13c D2Common+0x69360 (thiscall; hidden input: edi = `edi`, explicit leading param)
+// D2Common 0x69360 (thiscall; hidden input: edi = `edi`, explicit leading param)
 void sub_69360(void* thisp, void* edi, char* p1, uint32_t p2, void* p3) {
     int32_t* ent = static_cast<int32_t*>(gp(edi, 0x4c));
     int32_t* tbl = sub_69950(thisp, rd(gp(edi, 0x58), 0x1d0));

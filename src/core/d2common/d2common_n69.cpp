@@ -14,7 +14,7 @@ struct D2N69OnExit { void* (*pLock)(void); void* (*pOnExitLk)(void*); void (*pUn
 // 1.13c D2COMMON+0x01B1E
 int D2N69_Exit(const D2N69Host* h, int code) { return h->pDoExit(code, 1, 0); }
 
-// 1.13c D2COMMON+0x01B0D
+// D2Common 0x01B0D
 int D2N69__Exit(const D2N69Host* h, int code) { return h->pDoExit(code, 0, 0); }
 
 // (D2COMMON+0x02FD2; marker lives in d2common_onexit_2fd2.cpp)
@@ -25,7 +25,7 @@ void* D2N69_OnExit(const D2N69OnExit* s, void* func) {
     return r;
 }
 
-// 1.13c D2COMMON+0x12000
+// D2Common 0x12000
 void D2N69_UNITFINDS_FreeUnitFindData(const D2N69Host* h, uint8_t* p) {
     if (p && *(void**)(p + 4)) {
         h->pFree(*(void**)(p + 4), "..\\Source\\D2Common\\UNITS\\UnitFinds.cpp", 0xff, 0);
@@ -39,7 +39,7 @@ void D2N69_CHAT_FreeHoverMsg(const D2N69Host* h, void* unused, void* pMsg) {
     if (pMsg) h->pFree(pMsg, "..\\Source\\D2Common\\Chat\\Chat.cpp", 0x44, 0);
 }
 
-// 1.13c D2COMMON+0x1A6D0
+// D2Common 0x1A6D0
 void D2N69_MONSTERS_SetMonsterNameInMonsterData(const D2N69Host* h, int32_t* pUnit, const uint16_t* wszName) {
     if (pUnit && pUnit[0] == 1 && pUnit[5] && wszName) {
         size_t n = 0; while (wszName[n]) ++n;

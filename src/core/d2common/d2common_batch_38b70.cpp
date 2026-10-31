@@ -7,7 +7,7 @@
 #include "D2StatList.h"
 #include "Units/Units.h"
 
-int32_t __stdcall STATLIST_GetTotalStatValue(D2StatListStrc* pStatList, int nStatId, uint16_t nLayer);   // 1.13c D2Common+0x38BD0
+int32_t __stdcall STATLIST_GetTotalStatValue(D2StatListStrc* pStatList, int nStatId, uint16_t nLayer);   // D2Common 0x38BD0
 
 extern "C" {
 

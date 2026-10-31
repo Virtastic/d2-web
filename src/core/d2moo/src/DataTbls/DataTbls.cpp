@@ -400,7 +400,8 @@ void __fastcall DATATBLS_LoadStatesTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD4F4A0
-void __fastcall DATATBLS_UnloadStatesTxt() // 1.13c D2Common+0x5D8B0
+// 1.13c D2Common+0x5D8B0
+void __fastcall DATATBLS_UnloadStatesTxt()
 {
 	if (sgptDataTables->pStateMasks)
 	{

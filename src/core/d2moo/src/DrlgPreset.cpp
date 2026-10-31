@@ -613,7 +613,7 @@ void __fastcall DRLGPRESET_FreeDrlgFile(D2DrlgFileStrc** ppDrlgFile)
 				LeaveCriticalSection(gpLvlSubTypeFilesCriticalSection);
 			}
 
-			// 1.13c D2Common+0x9FA0: retail's own function, split out above; it frees the file struct too
+			// retail D2Common 0x9FA0: retail's own function, split out above; it frees the file struct too
 			DRLGPRESET_FreeDrlgFileStruct(*ppDrlgFile);
 			D2_FREE_POOL(nullptr, pCurrent);
 			*ppDrlgFile = nullptr;

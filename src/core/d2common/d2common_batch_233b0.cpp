@@ -132,7 +132,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3b470(uint32_t pUnit)
 	return W(u, 0x18);
 }
 
-// 1.13c D2Common+0x3a030 (community name D2SetAnim): merge/remove a unit's damage-related stats. The
+// D2Common 0x3a030 (community name D2SetAnim): merge/remove a unit's damage-related stats. The
 // body is the subtract direction of the 1.10f twin shared by D2Common_11274 (0x3A100) and
 // D2Common_11275, including the stat-list merge, the extended-list requirement and the -value removal
 // for stats whose ItemStatCostTxt flags carry gdwBitMasks[DAMAGERELATED]. A null target or source unit

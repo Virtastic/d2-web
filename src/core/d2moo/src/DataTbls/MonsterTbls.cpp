@@ -436,7 +436,7 @@ void __fastcall DATATBLS_LoadMonStatsTxt(HD2ARCHIVE hArchive)
 		nCounter = 0;
 		do
 		{
-			// 1.13c D2Common+0x538E0 (separate function in 1.13c; inlined here, chain-length/chain-id walk)
+			// retail D2Common 0x538E0 (separate function in 1.13c; inlined here, chain-length/chain-id walk)
 			bFoundInChain = false;
 
 			nChainId = 0;
@@ -1014,6 +1014,7 @@ D2TCExShortStrc* __stdcall DATATBLS_GetTreasureClassExRecordFromIdAndLevel(uint1
 }
 
 //D2Common.0x6FD68E50 (#10660)
+// 1.13c D2Common+0x543C0
 D2TCExShortStrc* __stdcall DATATBLS_GetTreasureClassExRecordFromActAndDifficulty(int nDifficulty, int nAct, int nIndex)
 {
 	if (nDifficulty > 0)
@@ -1830,6 +1831,7 @@ D2HirelingTxt* __stdcall DATATBLS_GetNextHirelingTxtRecordFromClassId(BOOL bExpa
 }
 
 //D2Common.0x6FD6B3A0 (#10587)
+// 1.13c D2Common+0x530F0
 D2HirelingTxt* __stdcall DATATBLS_GetNextHirelingTxtRecordFromVendorIdAndDifficulty(BOOL bExpansion, int nVendorId, int nDifficulty, D2HirelingTxt* pOldRecord)
 {
 	D2HirelingTxt* pHirelingTxtRecord = NULL;

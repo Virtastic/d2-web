@@ -417,6 +417,7 @@ int __fastcall COLLISION_AdaptBoundingBoxToGrid(D2ActiveRoomStrc* pRoom, D2Bound
 
 //D2Common.0x6FD41CA0
 // 1.13c D2Common+0x4B3F0
+// 1.13c D2Common+0x4C530
 uint16_t __fastcall COLLISION_CheckCollisionMaskForBoundingBoxRecursively(D2ActiveRoomStrc* pRoom, D2BoundingBoxStrc* pBoundingBox, uint16_t nMask)
 {
 	pRoom = COLLISION_GetRoomBySubTileCoordinates(pRoom, pBoundingBox->nLeft, pBoundingBox->nBottom);

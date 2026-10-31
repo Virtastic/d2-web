@@ -69,7 +69,7 @@ void D2Common_32820_InitializeSequence(D2UnitStrc* pUnit)
     pUnit->dwFlags |= UNITFLAG_SQGFXCHANGE;
 }
 
-// 1.13c D2Common+0x20700 (#10101): the equipped-hand candidate of an inventory. Four arguments in
+// D2Common 0x20700 (#10101): the equipped-hand candidate of an inventory. Four arguments in
 // retail: pInv, pOutUnit, pOutBodyLoc, pOutIsHeld. The current item is 0x20320 of the same inventory,
 // taken here by its own rule (Current320 below) rather than passed in.
 // The body-loc grid is 0x1E1B0 index 0 of the inventory's grid table (the table pointer is the
@@ -104,6 +104,7 @@ uint8_t* Current320(uint8_t* inv)
 }
 }
 
+// 1.13c D2Common+0x20700
 uint32_t D2Common_20700_EquippedHandCandidate(uint32_t pInv, uint32_t* pOutUnit, uint32_t* pOutBodyLoc, uint32_t* pOutIsHeld)
 {
     uint8_t* inv = P(pInv);
