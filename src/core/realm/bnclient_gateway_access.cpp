@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 
+
 namespace {
 
 // Retail BNClient is x86-32. Keep its pointer-shaped slots as uint32_t values so this
@@ -301,8 +302,8 @@ void bn_set_cur_gateway(uint32_t self, int32_t index) {
 }
 
 // 1.13c BNClient+0x14D20
-// BNGatewayAccess::GetSystemTimeZone: the host UTC bias in minutes, or 0x1E0 for the Japanese
-// and Korean locale pairs (LANGID low word 9, high word 0xC00).
+// BNGatewayAccess::GetSystemTimeZone: the host UTC bias in minutes, or 0x1E0 for LANGID 0x0C09
+// (primary English 9, sublanguage 3), per the decompile's masks.
 int32_t bn_get_system_time_zone(const BnetGatewayHost& host) {
     TimeZoneInformation tz;
     // The retail instruction stream seeds these before the zero/OS calls; TIME_ZONE_INFORMATION
@@ -405,7 +406,7 @@ void bn_gateway_load(uint32_t self, const BnetGatewayHost& host) {
     access->gateway_buffer_ptr_10 = 0;
     access->gateway_buffer_bytes_14 = 0;
     access->gateway_list_value_18 = 0;
-    access->opaque_00 = 0;
+    *(uint8_t*)&access->opaque_00 = 0;   // retail stores one byte at +0
     int32_t size = 0;
     if (host.sfile_load_file("Data\\Global\\Realms.bin", (void**)&access->realms_buffer_ptr_20,
                              &size, 0, 0) == 0) {
@@ -448,7 +449,8 @@ void bn_gateway_load(uint32_t self, const BnetGatewayHost& host) {
         }
         int32_t length = (int32_t)host.sstr_len(data);
         char* end = nullptr;
-        uint32_t current = (uint32_t)std::strtoul(data + 1 + length, &end, 10);
+        unsigned long parsed = std::strtoul(data + 1 + length, &end, 10);
+        uint32_t current = parsed > 0xFFFFFFFFul ? 0xFFFFFFFFu : (uint32_t)parsed;   // retail _strtoul: 32-bit, clamps to 0xFFFFFFFF
         access->gateway_count_08 = (uint32_t)((records - 1) / 3);
         access->current_gateway_0c = current;
         access->selection_changed_04 = 0;
