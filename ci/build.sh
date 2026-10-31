@@ -21,19 +21,30 @@ fi
 
 [ -f third_party/StormLib/CMakeLists.txt ] || { echo "FATAL: submodules not checked out (git submodule update --init)" >&2; exit 1; }
 
+LOCK_DIR="$(cd "$(git rev-parse --git-common-dir 2>/dev/null || echo .git)/.." && pwd)/build-wasm"
+mkdir -p "$LOCK_DIR"
 # Rebuild the builder only when its recipe changed: the image records the Dockerfile's hash.
-want=$(sha256sum Dockerfile.builder64 | cut -c1-12)
-have=$(docker image inspect "$IMAGE" --format '{{index .Config.Labels "d2.dockerfile"}}' 2>/dev/null || true)
-if [ "$want" != "$have" ]; then
-  echo "==> building $IMAGE (Dockerfile.builder64 $want)"
-  docker build --label "d2.dockerfile=$want" -t "$IMAGE" -f Dockerfile.builder64 .
-fi
+# The check, the rebuild and the ID read happen under one shared lock, so a parallel build never
+# retags the image between another build's check and its use. Builds themselves stay parallel.
+TOOLCHAIN_ID=$(
+  flock 8
+  want=$(sha256sum Dockerfile.builder64 | cut -c1-12)
+  # Content-addressed tag: worktrees with different recipes never retag each other's image.
+  IMAGE="${IMAGE%%:*}:$want"
+  have=$(docker image inspect "$IMAGE" --format '{{index .Config.Labels "d2.dockerfile"}}' 2>/dev/null || true)
+  if [ "$want" != "$have" ]; then
+    echo "==> building $IMAGE (Dockerfile.builder64 $want)" >&2
+    docker build --label "d2.dockerfile=$want" -t "$IMAGE" -f Dockerfile.builder64 . >&2
+  fi
+  docker image inspect "$IMAGE" --format '{{.Id}}'
+) 8>"$LOCK_DIR/.builder-image.lock"
+[[ "$TOOLCHAIN_ID" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "FATAL: invalid builder image ID" >&2; exit 1; }
+# Pin every step, including stage/cache keys, to this one immutable ID, resolved once.
+export BUILDER_IMAGE="$TOOLCHAIN_ID"
 
 # Engine builds are rationed on this box: every worktree
 # queues on the same slot pool in the main checkout. The worktree artifact lock
 # also spans compilation, staging and cache publication; separate trees still build in parallel.
-LOCK_DIR="$(cd "$(git rev-parse --git-common-dir 2>/dev/null || echo .git)/.." && pwd)/build-wasm"
-mkdir -p "$LOCK_DIR"
 # D2_BUILD_SLOTS parallel builds share this checkout (default 8).
 SLOTS="${D2_BUILD_SLOTS:-8}"; got=""; T0=$(date +%s)
 # Merge builds jump the queue: a merge-* tree (or D2_BUILD_PRIORITY=merge)
@@ -52,7 +63,7 @@ done
 echo "==> build slot $got of $SLOTS"
 WAIT=$(( $(date +%s) - T0 ))
 
-echo "==> link (in $IMAGE)"
+echo "==> link (in $TOOLCHAIN_ID)"
 # Create the output parent as the invoking user; otherwise the root container creates it
 # and a fresh Linux checkout cannot stage build-wasm/site after compilation.
 mkdir -p build-wasm
@@ -70,10 +81,6 @@ if [ "${D2_COMPILER_CACHE:-1}" = 1 ]; then
   mkdir -p "$LOCK_DIR/compiler-cache"
   CACHE_ARGS=(-v "$LOCK_DIR/compiler-cache:/d2-compiler-cache" -e D2_COMPILER_CACHE=1)
 fi
-TOOLCHAIN_ID=$(docker image inspect "$IMAGE" --format '{{.Id}}')
-[[ "$TOOLCHAIN_ID" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "FATAL: invalid builder image ID" >&2; exit 1; }
-# Pin every consumer, including stage/cache keys, to the image actually executed.
-export BUILDER_IMAGE="$TOOLCHAIN_ID"
 MSYS_NO_PATHCONV=1 docker run --rm "${CACHE_ARGS[@]}" \
   -e D2_TOOLCHAIN_ID="$TOOLCHAIN_ID" -e HOME=/tmp -e D2_CXXFLAGS="${D2_CXXFLAGS:-}" -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" \
   -v "$MOUNT:/build" -v "$MOUNT:$MOUNT:ro" "$TOOLCHAIN_ID" bash wasm-build/link-d2.sh
@@ -83,7 +90,7 @@ NODE_BIN="$(command -v node || command -v node.exe || true)"
 [ -n "$NODE_BIN" ] || { echo "FATAL: node/node.exe not found" >&2; exit 1; }
 "$NODE_BIN" tools/mksmoke.mjs
 
-echo "==> precompress engine (in $IMAGE)"
+echo "==> precompress engine (in $TOOLCHAIN_ID)"
 MSYS_NO_PATHCONV=1 docker run --rm \
   -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" -v "$MOUNT:/build" -v "$MOUNT:$MOUNT:ro" "$TOOLCHAIN_ID" \
   bash -c 'bash wasm-build/make_br.sh && chown "$D2_OUTPUT_OWNER" play/d2.js.br play/d2.wasm.br'
