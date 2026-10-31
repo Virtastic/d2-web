@@ -87,6 +87,7 @@ dependency_digest() {
     tr '\n' ' ' | xargs sha256sum | sha256sum | cut -d' ' -f1
 }
 OBJS=""
+STALE=()
 for f in $SRCS; do
   o="$OBJDIR/$(echo "$f" | tr '/' '_' | sed 's/\.cpp$/.o/')"
   d="$o.d"
@@ -98,11 +99,23 @@ for f in $SRCS; do
     current=$(dependency_digest "$d" 2>/dev/null || true)
   fi
   if [ -z "$current" ] || [ "$current" != "$(cat "$digest" 2>/dev/null)" ]; then
-    em++ $CXXFLAGS -MMD -MP -MF "$d" -MT "$o" -c "$f" -o "$o" || exit 1
-    dependency_digest "$d" > "$digest"
+    STALE+=("$f|$o")
   fi
   OBJS="$OBJS $o"
 done
+# Stale objects compile in parallel (D2_COMPILE_JOBS,
+# default half the cores (two builds can run at once), at least 4. A failure stops the build.
+if [ "${#STALE[@]}" -gt 0 ]; then
+  JOBS="${D2_COMPILE_JOBS:-$(( $(nproc) / 2 > 4 ? $(nproc) / 2 : 4 ))}"
+  echo "==> compiling ${#STALE[@]} stale objects, $JOBS at a time"
+  compile_one() {
+    local f="${1%%|*}" o="${1##*|}"
+    em++ $CXXFLAGS -MMD -MP -MF "$o.d" -MT "$o" -c "$f" -o "$o" || return 1
+    dependency_digest "$o.d" > "$o.inputs"
+  }
+  export -f compile_one dependency_digest; export CXXFLAGS
+  printf '%s\0' "${STALE[@]}" | xargs -0 -n1 -P "$JOBS" bash -c 'compile_one "$1"' _ || exit 1
+fi
 em++ -m64 -O2 -pthread ${D2_CXXFLAGS:-} $OBJS "$STORM_BUILD/libstorm.a" \
   -sPTHREAD_POOL_SIZE=2 -sALLOW_MEMORY_GROWTH=1 -sMAXIMUM_MEMORY=4294967296 \
   -sEXPORTED_RUNTIME_METHODS=FS,ccall,cwrap,UTF8ToString,HEAPU32,HEAPU8,HEAPU16,HEAP32 \

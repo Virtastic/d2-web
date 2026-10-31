@@ -56,7 +56,7 @@ if [ -z "${D2_CXXFLAGS:-}" ] && [ "${D2_BUILD_FORCE:-0}" != 1 ] && bash tools/en
 fi
 source "$SRC/ci/build-slot.sh"
 d2_build_slot_acquire "$LOCK_DIR"
-got=$D2_BUILD_SLOT; SLOTS="${D2_MAX_BUILDS:-2}"
+got=$D2_BUILD_SLOT; SLOTS="${D2_MAX_BUILDS:-4}"
 echo "==> build slot $got of $SLOTS"
 WAIT=$(( $(date +%s) - T0 ))
 
