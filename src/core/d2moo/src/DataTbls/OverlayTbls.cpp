@@ -171,7 +171,8 @@ int __stdcall DATATBLS_GetDirFromOverlayTxt(int nOverlayId)
 //Inlined at various places
 D2OverlayTxt* __fastcall DATATBLS_GetOverlayTxtRecord(int nOverlay)
 {
-	if (nOverlay >= 0 && nOverlay < sgptDataTables->nOverlayTxtRecordCount)
+	// 1.13c D2Common+0x82d20/0x82d60/0x82f00 test the table pointer as well as the index (no table: zero result).
+	if (nOverlay >= 0 && nOverlay < sgptDataTables->nOverlayTxtRecordCount && sgptDataTables->pOverlayTxt)
 	{
 		return &sgptDataTables->pOverlayTxt[nOverlay];
 	}

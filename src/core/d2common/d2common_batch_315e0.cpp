@@ -12,10 +12,11 @@
 
 // 1.13c D2Common+0x315E0: null unit or null room -> FALSE; otherwise the unit's coordinates and
 // size are tested against the point (nX, nY) with size 2 in the unit's room, using nFlags.
+// Retail passes the mask as a ushort (0x30730 takes a ushort), so only the low 16 bits reach the test.
 extern "C"
 BOOL __stdcall D2Common_10686_UNITS_TestCollisionByCoordinates(D2UnitStrc* pUnit, int nX, int nY, int nFlags)
 {
-    return UNITS_TestCollisionByCoordinates(pUnit, nX, nY, nFlags);
+    return UNITS_TestCollisionByCoordinates(pUnit, nX, nY, (uint16_t)nFlags);
 }
 
 // 1.13c D2Common+0x32C10: stores an overlay id in the unit's overlay stat list (filter 0x80).

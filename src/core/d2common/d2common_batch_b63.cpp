@@ -56,7 +56,8 @@ void sub_28D70(void* p1, uint32_t p2, int p3, int p4, int p5, int skip, int ebx,
             for (;;) {
                 int t = I(q, 0);
                 Ordinal_10131(p2);
-                sub_28D70((t != 4) ? nullptr : q, p2, ebp, ebx, 0, 0, 0, 0);
+                // Retail recurses as a real call, so its return address (unaff_retaddr) is nonzero: skip = 1 here.
+                sub_28D70((t != 4) ? nullptr : q, p2, ebp, ebx, 0, 1, 0, 0);
                 if (I(q, 0) != 4) break;
                 int s = I(q, 0x14);
                 if (s == 0 || s == -0x5c || !(q = PT((P)(intptr_t)s, 100))) break;
