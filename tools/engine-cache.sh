@@ -19,6 +19,6 @@ case "$cmd" in
   put) [ -f "$WT/play/d2.wasm" ] || exit 1; mkdir -p "$C"; for f in d2.js d2.wasm d2.js.br d2.wasm.br; do [ -f "$WT/play/$f" ] && cp -f "$WT/play/$f" "$C/$f"; done
        echo "$KEY" > "$WT/play/.engine-key"; echo "engine-cache: stored $KEY";;
   has) [ -f "$C/d2.wasm" ];;
-  get) [ -f "$C/d2.wasm" ] || exit 1; mkdir -p "$WT/play"; for f in d2.js d2.wasm d2.js.br d2.wasm.br; do [ -f "$C/$f" ] && cp -f "$C/$f" "$WT/play/$f"; done
+  get) [ -f "$C/d2.wasm" ] || exit 1; mkdir -p "$WT/play"; for f in d2.js d2.wasm d2.js.br d2.wasm.br; do [ -f "$C/$f" ] && cp -f --reflink=auto "$C/$f" "$WT/play/$f"; done
        echo "$KEY" > "$WT/play/.engine-key"; echo "engine-cache: $KEY -> play/ (cache hit)";;
 esac
