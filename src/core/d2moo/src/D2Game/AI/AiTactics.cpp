@@ -244,13 +244,17 @@ int32_t __fastcall AITACTICS_UseSkill(D2GameStrc* pGame, D2UnitStrc* pUnit, uint
 }
 
 //D2Game.0x6FCD00A0
-// 1.13c D2Game+0xF22C0
+// 1.13c D2Game+0xF22C0 (the mode-change record is built inline, not through MONSTERMODE_GetModeChangeInfo:
+// the used skill is cleared, the byte at +0x15 is always 100 and no per-mode 101 lookup runs)
 void __fastcall AITACTICS_IdleInNeutralMode(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nFrames)
 {
 	if (!pUnit || pUnit->dwAnimMode != MONMODE_NEUTRAL)
 	{
+		UNITS_SetUsedSkill(pUnit, nullptr);
 		D2ModeChangeStrc modeChange = {};
-		MONSTERMODE_GetModeChangeInfo(pUnit, MONMODE_NEUTRAL, &modeChange);
+		modeChange.unk0x14[1] = 100;
+		modeChange.nMode = MONMODE_NEUTRAL;
+		modeChange.pUnit = pUnit;
 		modeChange.pTargetUnit = pUnit;
 		D2GAME_ModeChange_6FC65220(pGame, &modeChange, 1);
 	}

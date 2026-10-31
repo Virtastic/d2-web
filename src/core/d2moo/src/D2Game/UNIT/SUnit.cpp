@@ -1296,6 +1296,7 @@ void __fastcall sub_6FCBC7E0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 
 //D2Game.0x6FCBC900
 // 1.13c D2Game+0xE0BD0
+// 1.13c D2Game+0xE0BD0
 D2UnitStrc* __stdcall SUNIT_GetTargetUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     sub_6FCBC7E0(pGame, pUnit);
@@ -1325,6 +1326,7 @@ int32_t __fastcall sub_6FCBC930(D2GameStrc* pGame, D2UnitStrc* pMissile)
 }
 
 //D2Game.0x6FCBC9A0
+// 1.13c D2Game+0xDF980
 void __fastcall SUNIT_SetCombatMode(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMode)
 {
     SUNITDMG_FreeAttackerCombatList(pGame, pUnit);

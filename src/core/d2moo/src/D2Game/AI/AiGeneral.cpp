@@ -259,6 +259,7 @@ void __fastcall AIGENERAL_AllocCommandsForMinions(D2GameStrc* pGame, D2UnitStrc*
 
 //D2Game.0x6FCCF050
 // 1.13c D2Game+0x21290
+// 1.13c D2Game+0x21290
 D2AiCmdStrc* __fastcall AIGENERAL_CopyAiCommand(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiCmdStrc* pAiCmd)
 {
 	D2AiCmdStrc* pCopy = AIGENERAL_AllocAiCommand(pGame, pUnit);

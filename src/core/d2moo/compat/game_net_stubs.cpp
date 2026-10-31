@@ -764,6 +764,7 @@ void D2GAME_SetClientDead_6FC33830(D2ClientStrc* pClient, void* pAlwaysNull) {}
 // 1.13c D2Game+0x8C890: the socketed children of pItem, each sent
 // as a 0x9D ITEMINSOCKET packet whose owning unit is pItem.  Returns 1 when the item is socketable
 // with an inventory, 0 otherwise; the 8 flag is set on a caller-local copy of dwFlag per child.
+// 1.13c D2Game+0x8C890
 int32_t __fastcall D2GAME_SendItemSocketPackets_6FCAC890(D2ClientStrc* pClient, D2UnitStrc* pItem, DWORD dwFlag) {
     int32_t nFlags = (int32_t)dwFlag;
     if (!ITEMS_CheckIfSocketable(pItem) || ITEMS_CheckIfFlagIsSet(nFlags, IFLAG_QUANTITY) || !pItem->pInventory)
