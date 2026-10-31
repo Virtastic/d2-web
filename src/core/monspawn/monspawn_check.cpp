@@ -91,6 +91,7 @@
 #include <GAME/Clients.h>
 #include <AI/AiGeneral.h>
 #include <MONSTER/MonsterUnique.h>
+#include <MONSTER/MonsterSpawn.h>   // D2GAME_SpawnMonster_6FC69F10
 #include <UNIT/SUnit.h>
 #include <UNIT/SUnitMsg.h>
 #include <AI/AiUtil.h>
@@ -722,6 +723,7 @@ static uint32_t g_sessionPendingPickup = 0;
 // UNITS_ChangeAnimMode(OBJMODE_OPERATING) for chests/corpses/barrels and the shrine callback
 // (gpShrineTable_6FD28D18) that applies the boon. `d2_session_tick` completes it.
 static uint32_t g_sessionPendingObject = 0;
+static int32_t g_sessionPendingObjectGoalX = 0, g_sessionPendingObjectGoalY = 0;  // the click's path goal
 // #9: a unit-target command whose melee approach walk is still running. Retail's Rcv0x0D records the
 // same intent (UNITS_SetInteractData) and the walk mode's per-frame handler sub_6FC7F780 re-issues it
 // when the approach path completes (PlrModes.cpp: when the path ends it reads the saved skill and
@@ -4967,6 +4969,19 @@ EMSCRIPTEN_KEEPALIVE int d2_session_fixture_place_monster(uint32_t unitId, int32
     updateSessionSnapshot();
     return 1;
 }
+// Fixture (a dense-combat perf scene): spawn a monster of class `monsterId` at a subtile through
+// retail's own spawn call (D2GAME_SpawnMonster, the one the Baal minions, the Cain rescue and the trapped
+// souls use), in the room that covers the subtile. Returns the new unit's id, or 0 when no room covers it.
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_fixture_spawn_monster(int32_t monsterId, int32_t x, int32_t y) {
+    if (!g_sessionLive || !g_game) return 0;
+    D2ActiveRoomStrc* dest = nullptr;
+    for (D2DrlgRoomStrc* roomEx = g_lastLevel ? g_lastLevel->pFirstRoomEx : nullptr; roomEx; roomEx = roomEx->pDrlgRoomNext)
+        if (roomEx->pRoom) { D2ActiveRoomStrc* r = COLLISION_GetRoomBySubTileCoordinates(roomEx->pRoom, x, y); if (r) { dest = r; break; } }
+    if (!dest) return 0;
+    D2UnitStrc* unit = D2GAME_SpawnMonster_6FC69F10(g_game, dest, x, y, monsterId, MONMODE_NEUTRAL, -1, 0);
+    updateSessionSnapshot();
+    return unit ? unit->dwUnitId : 0;
+}
 EMSCRIPTEN_KEEPALIVE int d2_session_command_npc_packet(uint32_t npcId) {
     if (!g_sessionLive || !g_game || !g_targetPlayer) return -1;
     D2WEB_ResetPacketStream();
@@ -5012,8 +5027,12 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_object_packet(uint32_t objectId) {
     // branch, player mode 3 with the object as the path target). Remember it for the tick to
     // complete; an in-range click has already operated, and clears any older pending walk.
     D2DynamicPathStrc* clickedPath = g_targetPlayer->pDynamicPath;
-    g_sessionPendingObject = clickedObject && clickedPath && clickedPath->pTargetUnit == clickedObject &&
+    g_sessionPendingObject = clickedObject && clickedPath &&
         clickedPath->dwPathPoints > clickedPath->dwCurrentPointIdx ? objectId : 0;
+    if (g_sessionPendingObject) {
+        g_sessionPendingObjectGoalX = clickedPath->tFinalTargetCoord.X;
+        g_sessionPendingObjectGoalY = clickedPath->tFinalTargetCoord.Y;
+    }
     D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets);
     const int32_t newLevel = DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(g_targetPlayer));
     if (newLevel != oldLevel) adoptSessionLevelChange(oldLevel, newLevel);
@@ -7401,11 +7420,23 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
             const uint32_t pendingObject = g_sessionPendingObject;
             D2UnitStrc* pending = SUNIT_GetServerUnit(g_game, UNIT_OBJECT, (int32_t)pendingObject);
             D2DynamicPathStrc* ppath = g_targetPlayer->pDynamicPath;
-            if (!d2::monspawn::objectInteractionIsPendingOn(ppath, pending)) {
+            const bool goalKept = ppath && ppath->tFinalTargetCoord.X == g_sessionPendingObjectGoalX &&
+                ppath->tFinalTargetCoord.Y == g_sessionPendingObjectGoalY;
+            if (!d2::monspawn::objectInteractionIsPendingOn(ppath, pending, goalKept)) {
                 g_sessionPendingObject = 0;   // superseded by another move/interaction, or object gone
-            } else if (d2::monspawn::objectInteractionShouldComplete(ppath, pending, dying)) {
+            } else if (d2::monspawn::objectInteractionShouldComplete(ppath, pending, dying, goalKept,
+                       UNITS_IsObjectInInteractRange(g_targetPlayer, pending) && !UNITS_TestCollisionBetweenInteractingUnits(g_targetPlayer, pending, COLLIDE_MASK_PLAYER_FLYING))) {
                 g_sessionPendingObject = 0;
                 sub_6FC828D0(g_targetPlayer, UNIT_OBJECT, (int32_t)pendingObject, 0, g_game);
+                // Out of range at arrival the dispatcher starts a fresh approach walk from where the hero
+                // stands (retail re-enters it from the walk handler until the object is in reach): keep
+                // following that walk. A walk that yields no path points ends the retry.
+                D2DynamicPathStrc* const again = g_targetPlayer->pDynamicPath;
+                if (again && again->dwPathPoints > again->dwCurrentPointIdx) {
+                    g_sessionPendingObject = pendingObject;
+                    g_sessionPendingObjectGoalX = again->tFinalTargetCoord.X;
+                    g_sessionPendingObjectGoalY = again->tFinalTargetCoord.Y;
+                }
             }
         }
         sub_6FC33670(g_game, g_targetClient);
@@ -8527,6 +8558,22 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_dropgold(uint32_t amount) {
     return 1;
 }
 
+// Retail's drop-gold OK (D2Client+0xBFDF0 -> packet builder D2Client+0x14910): the 9-byte 0x50 packet
+// [0x50][player guid][amount], answered by the server's own handler (D2Game+0x37F80 deducts the gold and
+// creates the pile beside the hero). `out`, when non-null, receives the 9 packet bytes. An amount of 0 sends
+// nothing, as the client's OK callback does. Returns 1 when the server accepted it.
+EMSCRIPTEN_KEEPALIVE int d2_session_command_drop_gold_packet(uint32_t amount, uint8_t* out) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || amount == 0) return 0;
+    uint8_t packet[9] = { 0x50 };
+    const int32_t guid = (int32_t)g_targetPlayer->dwUnitId, value = (int32_t)amount;
+    memcpy(packet + 1, &guid, 4); memcpy(packet + 5, &value, 4);
+    if (out) memcpy(out, packet, sizeof packet);
+    if (!sessionDispatchGate(0x50)) return -2;
+    const bool ok = D2GAME_PACKETCALLBACK_Rcv0x50_DropGold_6FC88210(g_game, g_targetPlayer, packet, sizeof packet) == 0;
+    updateSessionSnapshot();
+    return ok;
+}
+
 // slot bit 0x100: use it on the mercenary (retail's 0x26 packet carries bUseOnMerc; D2Client+0x29990 sends the
 // shift-held flag there for a right click on a belt box).
 EMSCRIPTEN_KEEPALIVE int d2_session_command_use_belt(uint32_t slot) {
@@ -9345,6 +9392,12 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_client_view() {
     return g_clientView.c_str();
 }
 EMSCRIPTEN_KEEPALIVE void d2_session_hold_world(int hold) { g_worldHold = hold != 0; g_worldHoldBuilt = false; }
+// The snapshot's level word (D2SessionSnapshot.level) without rebuilding the world lists: the shell's
+// pre-advance ambient check wants this one number every update. 0 exactly when the snapshot would be empty.
+EMSCRIPTEN_KEEPALIVE int32_t d2_session_snapshot_level() {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return 0;
+    return (uint16_t)g_currentLevel;
+}
 EMSCRIPTEN_KEEPALIVE const D2SessionSnapshot* d2_session_snapshot() {
     updateSessionSnapshot(); return &g_sessionSnapshot;
 }
