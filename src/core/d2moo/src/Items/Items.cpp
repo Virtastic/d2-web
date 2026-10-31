@@ -1867,10 +1867,10 @@ int __fastcall ITEMS_CalculateAdditionalCostsForChargedSkills(D2UnitStrc* pUnit,
 				pSkillsTxtRecord = DATATBLS_GetSkillsTxtRecord(nSkillId);
 				if (pSkillsTxtRecord)
 				{
-					nBase = nBaseCost * ((pStat[nCounter].nLayer & sgptDataTables->nShiftedStuff) + 2 * pSkillsTxtRecord->wReqLevel / 6 + 2);
+					nBase = nBaseCost * ((pStat[nCounter].nLayer & sgptDataTables->nShiftedStuff) + ((int32_t)(int16_t)pSkillsTxtRecord->wReqLevel / 6) * 2 + 2);	// 1.13c: (req level / 6) * 2, not 2 * level / 6
 					if (nBase > 65535 && pSkillsTxtRecord->nCostMult)
 					{
-						nAdd = pSkillsTxtRecord->nCostMult * nBase / 1024;
+						nAdd = nBase / 1024 * pSkillsTxtRecord->nCostMult;	// 1.13c: divide first for large operands
 					}
 					else
 					{
@@ -1891,6 +1891,7 @@ int __fastcall ITEMS_CalculateAdditionalCostsForChargedSkills(D2UnitStrc* pUnit,
 }
 
 //D2Common.0x6FD9ACE0
+// 1.13c D2Common+0x28850: with the operand over 0xFFFF the quotient is taken first and then scaled by the multiplier
 void __fastcall ITEMS_CalculateAdditionalCostsForBonusStats(D2UnitStrc* pItem, int* pSellCost, int* pBuyCost, int* pRepCost, unsigned int nDivisor)
 {
 	D2ItemStatCostTxt* pItemStatCostTxtRecord = NULL;
@@ -1934,9 +1935,9 @@ void __fastcall ITEMS_CalculateAdditionalCostsForBonusStats(D2UnitStrc* pItem, i
 					{
 						if (nBonusValue * *pSellCost > 65535 && pSkillsTxtRecord->nCostMult)
 						{
-							nSell += pSkillsTxtRecord->nCostAdd + pSkillsTxtRecord->nCostMult * nBonusValue * *pSellCost / 1024;
-							nBuy += pSkillsTxtRecord->nCostAdd + pSkillsTxtRecord->nCostMult * nBonusValue * *pBuyCost / 4096;
-							nRep += pSkillsTxtRecord->nCostAdd + pSkillsTxtRecord->nCostMult * nBonusValue * *pRepCost / 1024;
+							nSell += pSkillsTxtRecord->nCostAdd + nBonusValue * *pSellCost / 1024 * pSkillsTxtRecord->nCostMult;
+							nBuy += pSkillsTxtRecord->nCostAdd + nBonusValue * *pBuyCost / 4096 * pSkillsTxtRecord->nCostMult;
+							nRep += pSkillsTxtRecord->nCostAdd + nBonusValue * *pRepCost / 1024 * pSkillsTxtRecord->nCostMult;
 						}
 						else
 						{
@@ -1955,9 +1956,9 @@ void __fastcall ITEMS_CalculateAdditionalCostsForBonusStats(D2UnitStrc* pItem, i
 
 					if (nValue * *pSellCost > 65535 && pSkillsTxtRecord->nCostMult)
 					{
-						nSell += pSkillsTxtRecord->nCostAdd + pSkillsTxtRecord->nCostMult * nValue * *pSellCost / 1024;
-						nBuy += pSkillsTxtRecord->nCostAdd + pSkillsTxtRecord->nCostMult * nValue * *pBuyCost / 4096;
-						nRep += pSkillsTxtRecord->nCostAdd + pSkillsTxtRecord->nCostMult * nValue * *pRepCost / 1024;
+						nSell += pSkillsTxtRecord->nCostAdd + nValue * *pSellCost / 1024 * pSkillsTxtRecord->nCostMult;
+						nBuy += pSkillsTxtRecord->nCostAdd + nValue * *pBuyCost / 4096 * pSkillsTxtRecord->nCostMult;
+						nRep += pSkillsTxtRecord->nCostAdd + nValue * *pRepCost / 1024 * pSkillsTxtRecord->nCostMult;
 					}
 					else
 					{
@@ -1973,9 +1974,9 @@ void __fastcall ITEMS_CalculateAdditionalCostsForBonusStats(D2UnitStrc* pItem, i
 
 					if (nValue * *pSellCost > 65535 && pItemStatCostTxtRecord->dwMultiply)
 					{
-						nSell += pItemStatCostTxtRecord->dwAdd + pItemStatCostTxtRecord->dwMultiply * nValue * *pSellCost / 1024;
-						nBuy += pItemStatCostTxtRecord->dwAdd + pItemStatCostTxtRecord->dwMultiply * nValue * *pBuyCost / 1024;
-						nRep += pItemStatCostTxtRecord->dwAdd + pItemStatCostTxtRecord->dwMultiply * nValue * *pRepCost / 1024;
+						nSell += pItemStatCostTxtRecord->dwAdd + nValue * *pSellCost / 1024 * pItemStatCostTxtRecord->dwMultiply;
+						nBuy += pItemStatCostTxtRecord->dwAdd + nValue * *pBuyCost / 1024 * pItemStatCostTxtRecord->dwMultiply;
+						nRep += pItemStatCostTxtRecord->dwAdd + nValue * *pRepCost / 1024 * pItemStatCostTxtRecord->dwMultiply;
 					}
 					else
 					{
@@ -1987,9 +1988,9 @@ void __fastcall ITEMS_CalculateAdditionalCostsForBonusStats(D2UnitStrc* pItem, i
 				default:
 					if (nBonusValue * *pSellCost > 65535 && pItemStatCostTxtRecord->dwMultiply)
 					{
-						nSell += pItemStatCostTxtRecord->dwAdd + pItemStatCostTxtRecord->dwMultiply * nBonusValue * *pSellCost / 1024;
-						nBuy += pItemStatCostTxtRecord->dwAdd + pItemStatCostTxtRecord->dwMultiply * nBonusValue * *pBuyCost / 1024;
-						nRep += pItemStatCostTxtRecord->dwAdd + pItemStatCostTxtRecord->dwMultiply * nBonusValue * *pRepCost / 1024;
+						nSell += pItemStatCostTxtRecord->dwAdd + nBonusValue * *pSellCost / 1024 * pItemStatCostTxtRecord->dwMultiply;
+						nBuy += pItemStatCostTxtRecord->dwAdd + nBonusValue * *pBuyCost / 1024 * pItemStatCostTxtRecord->dwMultiply;
+						nRep += pItemStatCostTxtRecord->dwAdd + nBonusValue * *pRepCost / 1024 * pItemStatCostTxtRecord->dwMultiply;
 					}
 					else
 					{
@@ -2492,6 +2493,7 @@ int __fastcall ITEMS_CalculateTransactionCost(D2UnitStrc* pPlayer, D2UnitStrc* p
 }
 
 //D2Common.0x6FD9CB50
+// 1.13c D2Common+0x25970
 void __fastcall ITEMS_CalculateAdditionalCostsForItemSkill(D2UnitStrc* pItem, int* pSellCost, int* pBuyCost, int* pRepCost, unsigned int nDivisor)
 {
 	D2ItemTypesTxt* pItemTypesTxtRecord = NULL;
@@ -2521,10 +2523,10 @@ void __fastcall ITEMS_CalculateAdditionalCostsForItemSkill(D2UnitStrc* pItem, in
 					if (pSkillsTxtRecord)
 					{
 						if (*pSellCost > 65535 && pSkillsTxtRecord->nCostMult)
-						{
-							nSell += (2 * pStat[nStatId].nValue - 1) * (pSkillsTxtRecord->nCostAdd + *pSellCost * pSkillsTxtRecord->nCostMult / 1024);
-							nBuy += (2 * pStat[nStatId].nValue - 1) * (pSkillsTxtRecord->nCostAdd + *pBuyCost * pSkillsTxtRecord->nCostMult / 4096);
-							nRep += (2 * pStat[nStatId].nValue - 1) * (pSkillsTxtRecord->nCostAdd + *pRepCost * pSkillsTxtRecord->nCostMult / 1024);
+						{	// 1.13c: the multiplier is divided first for large operands
+							nSell += (2 * pStat[nStatId].nValue - 1) * (pSkillsTxtRecord->nCostAdd + pSkillsTxtRecord->nCostMult / 1024 * *pSellCost);
+							nBuy += (2 * pStat[nStatId].nValue - 1) * (pSkillsTxtRecord->nCostAdd + pSkillsTxtRecord->nCostMult / 4096 * *pBuyCost);
+							nRep += (2 * pStat[nStatId].nValue - 1) * (pSkillsTxtRecord->nCostAdd + pSkillsTxtRecord->nCostMult / 1024 * *pRepCost);
 						}
 						else
 						{

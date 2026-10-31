@@ -1901,6 +1901,7 @@ int __stdcall UNITS_GetEventFrameInfo(D2UnitStrc* pUnit, int nFrame)
 	return nEvent;
 }
 
+// 1.13c D2Common+0x2EDE0
 //D2Common.0x6FDBFB40 (#10410)
 BOOL __stdcall UNITS_HasCollision(D2UnitStrc* pUnit)
 {
@@ -2685,6 +2686,7 @@ D2UnitStrc* __stdcall D2Common_10434(D2UnitStrc* pUnit, BOOL a2)
 }
 
 //D2Common.0x6FDC0F70 (#10435)
+// 1.13c D2Common+0x31B40
 D2UnitStrc* __stdcall UNITS_GetEquippedWeaponFromMonster(D2UnitStrc* pMonster)
 {
 	D2UnitStrc* pItem = NULL;
