@@ -22,3 +22,4 @@ behaviour differs from 1.10f.
 - D2Game+0xB7090 (AI/AiBaal.cpp, AIBAAL_GetTarget): the act walk over list 8 starts from pGame->pTargetNodes[8], not the node left over from the lists 0-7 pass.
 - D2Game+0xBDB10 D2GAME_NPC_IdentifyAllItems_6FCC9C90: the code-3 reply is sent once, after the loop.
 - D2Game+0xDEEE0 SUNITDMG_KillMonster: matches; the trailing D2Common ordinal is a no-op in 1.13c.
+- D2Game+0x212F0 AIGENERAL_AllocCommandsForMinions: minion loop skips a null allocation (1.10f dereferenced it); no pCurrentCmd write; monster guards on caller and owner; the new command pointer goes to the minion game block +0x20.

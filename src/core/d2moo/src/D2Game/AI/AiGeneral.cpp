@@ -219,23 +219,40 @@ D2AiCmdStrc* __fastcall AIGENERAL_GetAiCommandFromParam(D2UnitStrc* pUnit, int32
 void __fastcall AIGENERAL_AllocCommandsForMinions(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiCmdStrc* pAiCmd)
 {
 	D2AiControlStrc* pAiControl = AIGENERAL_GetAiControlFromUnit(pUnit);
-	if (!pAiControl || !pAiControl->pGame)
+	if (!pAiControl || !pAiControl->pGame || pUnit->dwUnitType != UNIT_MONSTER)
 	{
 		return;
 	}
 
-	D2AiControlStrc* pOwnerAiControl = AIGENERAL_GetAiControlFromUnit(SUNIT_GetServerUnit(pAiControl->pGame, pAiControl->dwOwnerTypeEx, pAiControl->dwOwnerGUIDEx));
-	if (!pOwnerAiControl)
+	D2UnitStrc* pOwner = SUNIT_GetServerUnit(pAiControl->pGame, pAiControl->dwOwnerTypeEx, pAiControl->dwOwnerGUIDEx);
+	D2AiControlStrc* pOwnerAiControl = AIGENERAL_GetAiControlFromUnit(pOwner);
+	if (!pOwnerAiControl || pOwner->dwUnitType != UNIT_MONSTER)
 	{
 		return;
 	}
 
 	for (D2MinionListStrc* pMinionList = pOwnerAiControl->pMinionList; pMinionList; pMinionList = pMinionList->pNext)
 	{
+		D2_ASSERT(pOwnerAiControl->pGame);
 		D2UnitStrc* pMinion = SUNIT_GetServerUnit(pOwnerAiControl->pGame, UNIT_MONSTER, pMinionList->dwMinionGUID);
-		if (pMinion)
+		if (!pMinion)
 		{
-			AIGENERAL_CopyAiCommand(pGame, pMinion, pAiCmd);
+			continue;
+		}
+
+		// A minion with no command slot is skipped; retail does not dereference the allocation.
+		D2AiCmdStrc* pCopy = AIGENERAL_AllocAiCommand(pGame, pMinion);
+		if (!pCopy)
+		{
+			continue;
+		}
+		memcpy(pCopy->nCmdParam, pAiCmd->nCmdParam, sizeof(pCopy->nCmdParam));
+
+		// Retail stores the new command pointer in the minion's game block (+0x20), not in its control block.
+		D2AiControlStrc* pMinionAiControl = AIGENERAL_GetAiControlFromUnit(pMinion);
+		if (pMinion->dwUnitType == UNIT_MONSTER && pMinionAiControl && pMinionAiControl->pGame)
+		{
+			pMinionAiControl->pGame->nGameData = (uint32_t)(uintptr_t)pCopy;
 		}
 	}
 }
