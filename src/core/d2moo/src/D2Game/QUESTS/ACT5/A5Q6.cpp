@@ -905,6 +905,7 @@ int32_t __fastcall ACT5Q6_UnitIterate_SendZooMonsterIdToClient(D2GameStrc* pGame
 }
 
 //D2Game.0x6FCB9520
+// 1.13c D2Game+0x5C1F0 (checked against decompile)
 void __fastcall ACT5Q6_SpawnTyrael(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2UnitStrc* pUnit)
 {
 	D2CoordStrc coord = {};

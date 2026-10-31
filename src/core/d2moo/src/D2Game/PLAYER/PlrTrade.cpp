@@ -2266,6 +2266,21 @@ void __fastcall sub_6FC92EE0(D2GameStrc* pGame, D2UnitStrc* pUnit)
     PLRTRADE_StopAllPlayerInteractions(pGame, pUnit);
 }
 
+// 1.13c D2Game+0x6FFC0
+// Records an (original item, duplicate item) pair at the head of the player's trade list.
+static void PLRTRADE_AddItemTradePair(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nItemGUID1, int32_t nItemGUID2)
+{
+    D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pPlayer);
+    if (pPlayerData && pPlayerData->pTrade)
+    {
+        D2ItemTradeStrc* pItemTrade = D2_ALLOC_STRC_POOL(pGame->pMemoryPool, D2ItemTradeStrc);
+        pItemTrade->nItemGUID1 = nItemGUID1;
+        pItemTrade->nItemGUID2 = nItemGUID2;
+        pItemTrade->pNext = pPlayerData->pTrade->pItemTrade;
+        pPlayerData->pTrade->pItemTrade = pItemTrade;
+    }
+}
+
 //D2Game.0x6FC92EF0
 // 1.13c D2Game+0x71270
 void __fastcall sub_6FC92EF0(D2GameStrc* pGame, D2UnitStrc* pUnit)
@@ -2307,14 +2322,7 @@ void __fastcall sub_6FC92F10(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
             sub_6FC4B310(pGame, pOtherPlayer, pItem, pDupeItem, 1u);
         }
 
-        if (pPlayerData1 && pPlayerData1->pTrade)
-        {
-            D2ItemTradeStrc* pItemTrade = D2_ALLOC_STRC_POOL(pGame->pMemoryPool, D2ItemTradeStrc);
-            pItemTrade->nItemGUID1 = pItem->dwUnitId;
-            pItemTrade->nItemGUID2 = nItemGUID;
-            pItemTrade->pNext = pPlayerData1->pTrade->pItemTrade;
-            pPlayerData1->pTrade->pItemTrade = pItemTrade;
-        }
+        PLRTRADE_AddItemTradePair(pGame, pPlayer, pItem->dwUnitId, nItemGUID);
 
         if (pPlayerData1->dwTradeState == 4 || pPlayerData2->dwTradeState == 4)
         {

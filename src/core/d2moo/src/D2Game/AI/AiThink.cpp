@@ -859,6 +859,7 @@ enum D2C_CorruptRogueAIParams
 };
 
 //D2Game.0x6FCD2850
+// 1.13c D2Game+0x82EC0 (checked against decompile)
 void __fastcall AITHINK_Fn010_CorruptRogue(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	D2PlayerCountBonusStrc playerCountBonus = {};
@@ -1364,6 +1365,7 @@ enum D2C_ClawViperAIParams
 };
 
 //D2Game.0x6FCD3900
+// 1.13c D2Game+0x88D80 (checked against decompile)
 void __fastcall AITHINK_Fn016_ClawViper(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	const int nChargeColor = AI_GetParamValue(pGame, pAiTickParam, CLAWVIPER_AI_PARAM_CHARGE_COLOR);
@@ -1421,6 +1423,7 @@ enum D2C_ClawViperExAIParams
 };
 
 //D2Game.0x6FCD3B90
+// 1.13c D2Game+0x88A70 (checked against decompile)
 void __fastcall AITHINK_Fn142_ClawViperEx(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	const int nChargeColor = AI_GetParamValue(pGame, pAiTickParam, CLAWVIPER_AI_PARAM_CHARGE_COLOR);
@@ -1495,6 +1498,7 @@ enum D2C_SandLeaperAIParams
 };
 
 //D2Game.0x6FCD3E70
+// 1.13c D2Game+0x88810 (checked against decompile)
 void __fastcall AITHINK_Fn017_SandLeaper(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	if (pAiTickParam->pMonstatsTxt->nSkill[0] >= 0 && pAiTickParam->nTargetDistance < 5
@@ -1798,6 +1802,7 @@ enum D2C_GreatMummyAIParams
 };
 
 //D2Game.0x6FCD48B0
+// 1.13c D2Game+0x88380 (checked against decompile)
 void __fastcall AITHINK_Fn022_GreaterMummy(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	if (pAiTickParam->bCombat && AIRollChanceParam(pGame, pUnit, pAiTickParam, GREATMUMMY_AI_PARAM_MELEE_BREATHE_CHANCE_PCT))
@@ -3957,6 +3962,7 @@ enum D2C_ElementalBeastAIParams
 };
 
 //D2Game.0x6FCD93A0
+// 1.13c D2Game+0x7F5A0 (checked against decompile)
 void __fastcall AITHINK_Fn046_ElementalBeast(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	switch (pAiTickParam->pAiControl->dwAiParam[0])
@@ -6602,6 +6608,7 @@ enum D2C_QuillMotherAIParams
 };
 
 //D2Game.0x6FCDE150
+// 1.13c D2Game+0x7D910 (checked against decompile)
 void __fastcall AITHINK_Fn075_QuillMother(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	if (sub_6FCF2E70(pUnit))
@@ -7529,7 +7536,8 @@ void __fastcall AITHINK_Fn095_PantherJavelin(D2GameStrc* pGame, D2UnitStrc* pUni
 
 		if (arg.pTarget && arg.nDistance > AI_GetParamValue(pGame, pAiTickParam, PANTHERJAVELIN_AI_PARAM_GROUP_DISTANCE))
 		{
-			AITACTICS_WalkToTargetUnitWithFlags(pGame, pUnit, arg.pTarget, 7);
+			// 1.13c D2Game+0x1B780 walks with flags 0 (FUN_6fd12540(..., 2, 0, 0, 1))
+			AITACTICS_WalkToTargetUnitWithFlags(pGame, pUnit, arg.pTarget, 0);
 			return;
 		}
 

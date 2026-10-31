@@ -266,6 +266,27 @@ void __fastcall ACT1Q3_UnitIterate_CheckForMalus(D2GameStrc* pGame, D2UnitStrc* 
 	}
 }
 
+// 1.13c D2Game+0x64B60
+// True when the player, or any party member, carries the Horadric Malus.
+static bool ACT1Q3_PlayerOrPartyHasMalus(D2QuestDataStrc* pQuest, D2UnitStrc* pPlayer)
+{
+	if (ITEMS_FindQuestItem(pPlayer->pGame, pPlayer, ' mdh'))
+	{
+		return true;
+	}
+
+	const int16_t nPartyId = SUNIT_GetPartyId(pPlayer);
+	if (nPartyId != -1)
+	{
+		D2Act1Quest3Strc* pQuestDataEx = (D2Act1Quest3Strc*)pQuest->pQuestDataEx;
+		pQuestDataEx->bMalusAcquired = 0;
+		PARTY_IteratePartyMembers(pQuest->pGame, nPartyId, ACT1Q3_UnitIterate_CheckForMalus, 0);
+		return pQuestDataEx->bMalusAcquired != 0;
+	}
+
+	return false;
+}
+
 //D2Game.0x6FC992F0
 bool __fastcall ACT1Q3_StatusFilterCallback(D2QuestDataStrc* pQuest, D2UnitStrc* pPlayer, D2BitBufferStrc* pGlobalFlags, D2BitBufferStrc* pFlags, uint8_t* pStatus)
 {
@@ -277,7 +298,7 @@ bool __fastcall ACT1Q3_StatusFilterCallback(D2QuestDataStrc* pQuest, D2UnitStrc*
 		return true;
 	}
 
-	if (ITEMS_FindQuestItem(pPlayer->pGame, pPlayer, ' mdh'))
+	if (ACT1Q3_PlayerOrPartyHasMalus(pQuest, pPlayer))
 	{
 		if (!QUESTRECORD_GetQuestState(pFlags, QUESTSTATEFLAG_A1Q3, QFLAG_REWARDGRANTED))
 		{
@@ -285,24 +306,6 @@ bool __fastcall ACT1Q3_StatusFilterCallback(D2QuestDataStrc* pQuest, D2UnitStrc*
 		}
 
 		return true;
-	}
-
-	const int16_t nPartyId = SUNIT_GetPartyId(pPlayer);
-	if (nPartyId != -1)
-	{
-		D2Act1Quest3Strc* pQuestDataEx = (D2Act1Quest3Strc*)pQuest->pQuestDataEx;
-		pQuestDataEx->bMalusAcquired = 0;
-		PARTY_IteratePartyMembers(pQuest->pGame, nPartyId, ACT1Q3_UnitIterate_CheckForMalus, 0);
-
-		if (pQuestDataEx->bMalusAcquired)
-		{
-			if (!QUESTRECORD_GetQuestState(pFlags, QUESTSTATEFLAG_A1Q3, QFLAG_REWARDGRANTED))
-			{
-				*pStatus = 2;
-			}
-
-			return true;
-		}
 	}
 
 	if (!pQuest->bNotIntro)
