@@ -11,7 +11,7 @@
 struct HookEnv {
     uint32_t* L; const uint32_t* sc;
     uint32_t tbl = 0, dtPtr = 0, fileStr = 0, bmSlot = 0;     // module globals (addresses of the pinned blobs / scrubbed module words)
-    static constexpr uint32_t kLogMax = 64;   // ponytail: a descriptor `blob lg` must hold 4 + 40 * calls bytes; 0x6F930 logs up to 45 calls (blob 2600)
+    static constexpr uint32_t kLogMax = 128;   // ponytail: a descriptor `blob lg` must hold 4 + 40 * calls bytes; 0x6F930 logs up to 45 calls (blob 2600)
     uint32_t seen[48][2]; int nseen = 0;
     HookEnv(uint32_t* log, const uint32_t* seq) : L(log), sc(seq) { L[0] = 0; }
     static uint32_t rd32(uint32_t a) { uint32_t v; memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }

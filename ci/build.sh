@@ -98,6 +98,7 @@ flock -u 9; exec 9>&-
 # compiling or linking already fails above; this catches one the glob skipped).
 for f in src/core/fn/*.cpp; do
   s=$(basename "$f" .cpp)
+  grep -qxF "$s" build-wasm/probe-skip.txt 2>/dev/null && continue # skipped by link-d2.sh (PROBE-SKIP)
   find build-wasm/obj -name "src_core_fn_$s.o" -print -quit | grep -q . || { echo "FATAL: probe $f has no compiled object" >&2; exit 1; }
 done
 bash ci/stage.sh

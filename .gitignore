@@ -130,11 +130,14 @@ ci/*
 !ci/stage.sh
 wasm-build/*
 !wasm-build/link-d2.sh
+!wasm-build/probe-skip.sh
 !wasm-build/make_br.sh
 !wasm-build/version-engine.sh
 test/*
+!test/probe-skip.test.mjs
 !test/plugy-stash-sidecar.test.mjs
 !test/plugy-stash-ui.test.mjs
+!test/plugy-stash-wiring.test.mjs
 !test/inventory-click-route.test.mjs
 !test/repair-packet-mode.test.mjs
 !test/vendor-repair-confirm.test.mjs
