@@ -56,7 +56,7 @@ const retry = (steps, objs) => {
     link_engine() {
       calls=$((calls+1)); local step; step=$(echo $STEPS | cut -d' ' -f$calls)
       case "$step" in ok) return 0;; engine) echo 'wasm-ld: error: undefined symbol: e'; echo '>>> referenced by o/src_core_a.o:(f)'; return 1;;
-        *) echo 'wasm-ld: error: undefined symbol: s'; echo ">>> referenced by o/$step:(f)"; return 1;; esac
+        *) echo "wasm-ld: error: o/$step: undefined symbol: s"; echo ">>> referenced by o/$step:(f)"; return 1;; esac
     }
     probe_link_retry 2>/dev/null && rc=0 || rc=1
     echo "rc=$rc calls=$calls objs=$(echo $OBJS | tr ' ' ',') skipped=$(tr '\\n' ',' < $SKIPPED_FILE)"
