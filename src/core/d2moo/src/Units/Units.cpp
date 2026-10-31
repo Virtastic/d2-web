@@ -2686,7 +2686,6 @@ D2UnitStrc* __stdcall D2Common_10434(D2UnitStrc* pUnit, BOOL a2)
 }
 
 //D2Common.0x6FDC0F70 (#10435)
-// 1.13c D2Common+0x31B40
 D2UnitStrc* __stdcall UNITS_GetEquippedWeaponFromMonster(D2UnitStrc* pMonster)
 {
 	D2UnitStrc* pItem = NULL;
