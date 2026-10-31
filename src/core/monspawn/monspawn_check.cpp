@@ -127,6 +127,7 @@
 #include "../tables/shared.h"
 #include "weather_runtime.h"
 #include "../d2client/weather_sim.h"
+#include "../d2client/inv_sockets_95140.h"
 #include "hellforge_diagnostic.h"
 #include "../../../tools/vectorfmt/vectorfmt.h"
 
@@ -310,6 +311,16 @@ struct D2SessionItemPresentation {
     uint8_t invPage, bodyLoc;
     uint8_t invWidth, invHeight;   // ItemsTxt nInvWidth/nInvHeight: the cells the item covers
 };
+// D2Client+0x95140's inputs for one item: sockets are drawn on an identified, socketed item with
+// sockets, under the pointer (the caller's hover test). off[n] is where socket n sits relative to the
+// item's drawing anchor; gem[n] is the inventory file of the gem in it (empty: the empty socket cel).
+struct D2SessionItemSockets {
+    uint32_t id;
+    uint8_t count, gems, pad[2];
+    int16_t off[6][2];
+    char gem[6][32];
+};
+static_assert(sizeof(D2SessionItemSockets) == 224);
 struct D2SessionItemState {
     uint32_t version, size, commandTarget, result;
     uint32_t groundCount, inventoryCount, cursorItemId, inventoryHash;
@@ -688,6 +699,7 @@ static std::vector<D2SessionItemPresentation> g_sessionItemPresentations;
 // component colour byte the save header carries. A monster's drop is magic/rare/unique/set: its ground
 // flippy is drawn through that item's MixPalette remap, a normal item's is not.
 static std::vector<uint8_t> g_sessionItemColours;
+static std::vector<D2SessionItemSockets> g_sessionItemSockets;
 // The shop's stock as PRESENTATION records, parallel to the existing vendor list rather than bolted
 // onto it. D2SessionVendorItem is 32 bytes with a hash over its own fields, and proven rows read it
 // at that stride (s50, s54) -- widening it would move their hashes for no reason. Retail's trade
@@ -1075,6 +1087,23 @@ static const char* sessionItemInventoryFile(D2UnitStrc* item, const D2ItemsTxt* 
     return txt->szInvFile;
 }
 
+// 1.13c D2Client+0x95140: the gates (identified, socketed flag, an inventory, sockets > 0) and the
+// footprint placement; the gem in socket n is the n-th item of the item's own inventory.
+static void appendSessionItemSockets(D2UnitStrc* item, const D2SessionItemPresentation& pres) {
+    if (!item->pInventory || !ITEMS_CheckItemFlag(item, IFLAG_IDENTIFIED, __LINE__, __FILE__) ||
+        !ITEMS_CheckItemFlag(item, IFLAG_SOCKETED, __LINE__, __FILE__)) return;
+    const int sockets = ITEMS_GetSockets(item);
+    D2SessionItemSockets rec = {};
+    if (!d2client_sockets::layout(sockets, pres.invWidth, pres.invHeight, rec.off)) return;
+    rec.id = item->dwUnitId; rec.count = (uint8_t)sockets;
+    for (D2UnitStrc* gem = INVENTORY_GetFirstItem(item->pInventory); gem && rec.gems < sockets; gem = INVENTORY_GetNextItem(gem)) {
+        D2ItemsTxt* txt = DATATBLS_GetItemsTxtRecord(gem->dwClassId);
+        if (txt) memcpy(rec.gem[rec.gems], sessionItemInventoryFile(gem, txt), sizeof rec.gem[0]);
+        rec.gems++;
+    }
+    g_sessionItemSockets.push_back(rec);
+}
+
 static void appendSessionItemPresentation(D2UnitStrc* item) {
     if (!item || item->dwUnitType != UNIT_ITEM) return;
     D2SessionItemPresentation out = {};
@@ -1096,6 +1125,7 @@ static void appendSessionItemPresentation(D2UnitStrc* item) {
         out.invWidth = txt->nInvWidth; out.invHeight = txt->nInvHeight;
     }
     g_sessionItemPresentations.push_back(out);
+    appendSessionItemSockets(item, out);
     uint8_t colour = 0;
     g_sessionItemColours.push_back(ITEMS_GetColor(nullptr, item, &colour, 0) ? (uint8_t)(colour + 1) : 0xFF);
 }
@@ -1626,7 +1656,7 @@ static bool clientAnimEvent(const D2UnitStrc* unit) {
 static void updateSessionWorld() {
     if (g_worldHold && g_worldHoldBuilt) return;
     if (g_worldHold) g_worldHoldBuilt = true;
-    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionUnitFacings.clear(); g_sessionUnitOverlays.clear(); g_sessionUnitStates.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionItemColours.clear(); g_sessionWarps.clear(); g_sessionWarpOrigins.clear(); g_sessionMissileAnimations.clear();
+    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionUnitFacings.clear(); g_sessionUnitOverlays.clear(); g_sessionUnitStates.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionItemColours.clear(); g_sessionItemSockets.clear(); g_sessionWarps.clear(); g_sessionWarpOrigins.clear(); g_sessionMissileAnimations.clear();
     g_sessionWorldHash = D2VEC_FNV_INIT;
     g_sessionNavigationHash = D2VEC_FNV_INIT;
     // The tile lists are built from this world only when a tile export asks (ensureSessionTiles):
@@ -7276,6 +7306,15 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_monster_idle_take(uint32_t id) {
     if (it == g_sessionIdleRowsReady.end()) return 0;
     const uint32_t row = it->second; g_sessionIdleRowsReady.erase(it); return row;
 }
+// Retail holds a right-skill click made while the unit is mid attack/cast/throw and casts it when the mode ends; the
+// stsound plays only when the cast mode starts, so a click the unit cannot act on yet plays nothing (D60).
+struct PendingRightSkill { bool set; int32_t x, y; };
+static PendingRightSkill g_pendingRightSkill = {};
+static int sessionCommandRightSkillAt(int32_t x, int32_t y, bool held);
+static bool sessionPlayerInActionMode() {
+    const uint32_t m = g_targetPlayer ? g_targetPlayer->dwAnimMode : 0;
+    return m == PLRMODE_ATTACK1 || m == PLRMODE_ATTACK2 || m == PLRMODE_CAST || m == PLRMODE_THROW;
+}
 EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath || frames < 0) return 0;
     // a retail recording: server->client packets a tick queues (NPC quest-marker 0x8A) are the tick's own stream.
@@ -7286,6 +7325,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
     struct StreamRefresh { ~StreamRefresh() { D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets); } } streamRefresh;
     g_sessionIdleRowsReady.swap(g_sessionIdleRows); g_sessionIdleRows.clear();   // a row drawn at a frame's end is the next tick's sound
     for (int i = 0; i < frames; ++i) {
+        if (g_pendingRightSkill.set && !sessionPlayerInActionMode()) { const PendingRightSkill q = g_pendingRightSkill; g_pendingRightSkill.set = false; sessionCommandRightSkillAt(q.x, q.y, false); }
         // the client sees the previous frame's server state (a death this frame reaches it by packet next tick)
         { extern void d2client_unitseed_flush(); extern void d2_client_monster_order_face_flush(); d2client_unitseed_flush(); d2_client_monster_order_face_flush(); }   // the previous frame's unit adds and orders, in send order
         d2client_clmissile::tick(g_targetPlayer, [](int32_t type, uint32_t id) { return SUNIT_GetServerUnit(g_game, type, (int32_t)id); });   // 1.13c D2Client+0xB17C0 (client missiles)
@@ -7991,6 +8031,9 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_right_skill(uint32_t targetUnitId) {
 // Right-click world targets use packet 0x0C on press and 0x0F while held. Keep the packet callbacks
 // as the command path: the held callback owns the native 50-subtile range check and out-of-range
 // position-correction timer before it delegates to 0x0C.
+// Fast-cast instrument: right-skill packets that reached the 0x0C/0x0F server callback, and player skill-do executions (casts).
+static uint32_t g_rightSkillPackets = 0;
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_right_skill_packets() { return g_rightSkillPackets; }
 static int sessionCommandRightSkillAt(int32_t x, int32_t y, bool held) {
     d2_client_cast_walk_reset();
     g_rightSkillRefusal = 1;
@@ -7998,6 +8041,8 @@ static int sessionCommandRightSkillAt(int32_t x, int32_t y, bool held) {
         g_targetPlayer->dwAnimMode == PLRMODE_DEAD || g_targetPlayer->dwAnimMode == PLRMODE_DEATH) return 0;
     g_rightSkillRefusal = 2;
     if (g_sessionAttack.state == 1 || g_sessionAttack.state == 2) return 0;
+    if (!held && !g_sessionInTick && sessionPlayerInActionMode()) { g_pendingRightSkill = { true, x, y }; return 0; }
+    g_pendingRightSkill.set = false;
     // Retail 0x0F parses the coordinate before checking for a selected right skill or asking
     // whether that skill can cast. Let its callback own those checks so an in-range held aim always
     // refreshes the stale-coordinate timer; 0x0C press retains the session's existing usability gate.
@@ -8022,6 +8067,7 @@ static int sessionCommandRightSkillAt(int32_t x, int32_t y, bool held) {
     memcpy(packet + 1, &targetX, sizeof targetX);
     memcpy(packet + 3, &targetY, sizeof targetY);
     if (held) D2WEB_ResetPacketStream();
+    ++g_rightSkillPackets;
     const int32_t result = held
         ? D2GAME_PACKETCALLBACK_Rcv0x0F_RightSkillHold_6FC84280(g_game, g_targetPlayer, packet, sizeof packet)
         : D2GAME_PACKETCALLBACK_Rcv0x0C_RightSkill_6FC83EF0(g_game, g_targetPlayer, packet, sizeof packet);
@@ -9449,6 +9495,12 @@ EMSCRIPTEN_KEEPALIVE const D2SessionItemPresentation* d2_session_item_presentati
 EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_item_colours() {
     updateSessionSnapshot(); return g_sessionItemColours.data();
 }
+EMSCRIPTEN_KEEPALIVE const D2SessionItemSockets* d2_session_item_sockets() {
+    updateSessionSnapshot(); return g_sessionItemSockets.data();
+}
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_socket_count() {
+    updateSessionSnapshot(); return (uint32_t)g_sessionItemSockets.size();
+}
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_presentation_count() {
     updateSessionSnapshot(); return (uint32_t)g_sessionItemPresentations.size();
 }
@@ -10826,7 +10878,7 @@ EMSCRIPTEN_KEEPALIVE void d2_session_destroy() {
     g_sessionAttackTarget = nullptr; g_sessionAttackSkill = nullptr;
     g_sessionApproachKind = 0; g_sessionApproachTarget = 0;
     g_sessionPendingObject = 0;
-    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionUnitFacings.clear(); g_sessionUnitOverlays.clear(); g_sessionUnitStates.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionItemColours.clear(); g_sessionTiles.clear(); g_sessionSeamTiles.clear(); g_sessionTileRolls.clear(); g_sessionTileLibraries.clear(); g_sessionWarps.clear(); g_sessionWarpOrigins.clear(); g_sessionMissileAnimations.clear();
+    g_sessionRooms.clear(); g_sessionUnits.clear(); g_sessionUnitCoords.clear(); g_sessionUnitFacings.clear(); g_sessionUnitOverlays.clear(); g_sessionUnitStates.clear(); g_sessionMonsterAnimations.clear(); g_sessionObjectPresentations.clear(); g_sessionItemPresentations.clear(); g_sessionItemColours.clear(); g_sessionItemSockets.clear(); g_sessionTiles.clear(); g_sessionSeamTiles.clear(); g_sessionTileRolls.clear(); g_sessionTileLibraries.clear(); g_sessionWarps.clear(); g_sessionWarpOrigins.clear(); g_sessionMissileAnimations.clear();
     memset(&g_sessionItemState, 0, sizeof g_sessionItemState);
     memset(&g_sessionNpcInteraction, 0, sizeof g_sessionNpcInteraction);
     memset(&g_sessionNpcDialog, 0, sizeof g_sessionNpcDialog); D2WEB_ResetLastDialogPacket(); D2WEB_ResetNpcAlerts();
