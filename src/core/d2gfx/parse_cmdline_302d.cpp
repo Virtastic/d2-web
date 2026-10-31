@@ -9,7 +9,7 @@ namespace {
 uint8_t mbctype[257]{};
 } // namespace
 
-// 1.13c D2Gfx+0x302D
+// D2Gfx 0x302D (1.13c)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2gfx_parse_cmdline(
     const char* source, char* args, int32_t* byte_count, char** argv, int32_t* argc) {
     auto is_lead_byte = [](uint8_t byte) { return (mbctype[static_cast<uint16_t>(byte) + 1] & 4u) != 0; };

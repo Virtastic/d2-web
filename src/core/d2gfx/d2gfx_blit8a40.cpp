@@ -1,4 +1,4 @@
-// 1.13c D2Gfx+0x8A40 and +0x9E90: light-shade blits of a run-length sprite, one row per
+// D2Gfx 0x8A40 and 0x9E90 (1.13c): light-shade blits of a run-length sprite, one row per
 // end marker. dst[i] = tab[src[i] + lmap[cell + i] * 256]; the cell advances per row from two fixed-point coordinates.
 #include <cstdint>
 #include "d2gfx_blit.h"
@@ -8,7 +8,7 @@ static inline const uint8_t* cell(const D2GfxLitState* st, int32_t a, int32_t b,
 }
 
 // eax = src; stack: dst, a, aStep, b, bStep, rows, sh (ret 0x1c). A run of more than 32 pixels is skipped, not drawn.
-extern "C" void d2gfx_sub_8a40(const uint8_t* src, uint8_t* dst, int32_t a, int32_t aStep, int32_t b, int32_t bStep, int32_t rows, uint8_t sh, const D2GfxLitState* st) {
+extern "C" void d2gfx_sub_8a40(const uint8_t* src, uint8_t* dst, int32_t a, int32_t aStep, int32_t b, int32_t bStep, int32_t rows, uint8_t sh, const D2GfxLitState* st) {  // 1.13c D2Gfx+0x8A40
     const uint8_t* m = cell(st, a, b, sh); uint8_t* row = dst;
     for (;;) {
         if (rows == 0) return;
@@ -22,7 +22,7 @@ extern "C" void d2gfx_sub_8a40(const uint8_t* src, uint8_t* dst, int32_t a, int3
 
 // eax = src; stack: x0, y, dst, a, aStep, b, bStep, rows, sh (ret 0x24). Rows from y; a run is clipped to columns [c2Left,c2Right) relative to
 // x0 once y >= c2Top, and the whole sprite ends at y >= c2Bottom. Retail does not advance the light map by the left clip.
-extern "C" void d2gfx_sub_9e90(const uint8_t* src, int32_t x0, int32_t y, uint8_t* dst, int32_t a, int32_t aStep, int32_t b, int32_t bStep, int32_t rows, uint8_t sh, const D2GfxLitState* st) {
+extern "C" void d2gfx_sub_9e90(const uint8_t* src, int32_t x0, int32_t y, uint8_t* dst, int32_t a, int32_t aStep, int32_t b, int32_t bStep, int32_t rows, uint8_t sh, const D2GfxLitState* st) {  // 1.13c D2Gfx+0x9E90
     if (rows <= 0) return;
     const uint8_t* m = cell(st, a, b, sh); uint8_t* row = dst; int32_t done = 0;
     do {

@@ -18,7 +18,7 @@ struct D2GfxGetptdHost {
 extern "C" uint32_t d2gfx_ptd_tls_index;
 uint32_t d2gfx_ptd_tls_index;   // DAT_6fa90170 (RVA 0x10170), the TlsAlloc index
 
-// 1.13c D2Gfx+0x028FE __getptd (113 bytes): _ptiddata __cdecl __getptd(void).
+// D2Gfx 0x028FE (1.13c) __getptd (113 bytes): _ptiddata __cdecl __getptd(void).
 // GetLastError is saved, TlsGetValue(DAT_6fa90170) returns the calling thread's block or NULL. On a miss,
 // calloc(1, 0x8C) allocates the ptd and TlsSetValue stores it; on store success the block is seeded with
 // _initaddr +0x54 = &DAT_6fa901a0 (RVA 0x101A0, the port's module-relative form), _holdrand +0x14 = 1,

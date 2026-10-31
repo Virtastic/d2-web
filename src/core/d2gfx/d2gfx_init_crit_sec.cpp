@@ -24,7 +24,7 @@ struct D2GfxInitCritSecEnv {
     D2GfxInitCritSecFn (*get_proc_address)(uint32_t mod, const char* name); // IAT GetProcAddress
 };
 
-// 1.13c D2Gfx+0x037CD (103 B): resolve InitializeCriticalSectionAndSpinCount once. On NT (platform
+// D2Gfx 0x037CD (1.13c) (103 B): resolve InitializeCriticalSectionAndSpinCount once. On NT (platform
 // word 1) retail never asks kernel32; otherwise a null GetModuleHandleA or GetProcAddress leaves the
 // no-spin thunk 0x37BD in the slot. Then call the slot with (cs, spin).
 // 1.13c D2Gfx+0x037CD

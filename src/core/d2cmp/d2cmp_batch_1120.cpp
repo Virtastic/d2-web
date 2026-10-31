@@ -33,13 +33,13 @@ extern "C" void d2cmp_b52_1880(uint32_t* self, int32_t mode, void (*f1f30)(uint3
 
 // 1.13c D2CMP+0x1920: drain 0x1F30, unlink the link pair at +4.
 static void c1920(uint32_t* self) { d2cmp_1f30(self); unlink_link(self + 1); }
-// 1.13c D2CMP+0x16C0: drain 0x1CA0, unlink the link pair at +4.
+// D2CMP 0x16C0 (1.13c): drain 0x1CA0, unlink the link pair at +4.
 static void c16c0(uint32_t* self) { d2cmp_b52_1ca0(self); unlink_link(self + 1); }
 static void c1880(uint32_t* self, int mode) { d2cmp_b52_1880(self, mode, d2cmp_1f30); }
 
 extern "C" {
 void d2cmp_1580(uint32_t* self, const D2CmpListEnv* e);
-// 1.13c D2CMP+0x1C10: per 0x38-byte cell 0x16C0 on +0x2C then 0x15D0, then free the array.
+// D2CMP 0x1C10 (1.13c): per 0x38-byte cell 0x16C0 on +0x2C then 0x15D0, then free the array.
 static void c1c10(uint32_t* self, const D2CmpListEnv* e) {
     for (uint32_t i = 0; i < self[1]; i++) {
         uint32_t* c = (uint32_t*)(uintptr_t)(self[2] + i * 0x38);

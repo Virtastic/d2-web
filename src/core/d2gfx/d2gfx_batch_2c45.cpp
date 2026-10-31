@@ -22,7 +22,7 @@ struct D2GfxCallocEnv {
     int32_t  (*callnewh)(uint32_t size);                             // 0x04345 __callnewh
 };
 
-// 1.13c D2Gfx+0x02C45 (203 B): `void * __cdecl calloc(size_t count, size_t size)`.
+// D2Gfx 0x02C45 (1.13c) (203 B): `void * __cdecl calloc(size_t count, size_t size)`.
 // Reject an overflowing product (count != 0 && size > 0xFFFFFFE0 / count) and answer NULL; a zero product
 // asks for one byte. While the request stays below 0xFFFFFFE1: when the heap selector is 3 the request is
 // rounded up to 16 bytes first, and a request at or below the small-block threshold takes the small-block

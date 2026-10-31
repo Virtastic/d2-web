@@ -139,9 +139,9 @@ EMSCRIPTEN_KEEPALIVE void FUN_6f8c560c(int kind) {
   __exit(3);
 }
 
-// 1.13c D2DDraw+0x5b74: ___tolower_mt. `t` = _ptiddata/locale struct (retail 32-bit layout, byte offsets).
+// D2DDraw 0x5b74 (1.13c): ___tolower_mt. `t` = _ptiddata/locale struct (retail 32-bit layout, byte offsets).
 static inline int32_t L(const uint8_t* t, int off) { int32_t v; memcpy(&v, t + off, 4); return v; }
-EMSCRIPTEN_KEEPALIVE uint32_t b144_FUN_6f8c5b74(void* thisp, const uint8_t* t, uint32_t c) {
+EMSCRIPTEN_KEEPALIVE uint32_t b144_FUN_6f8c5b74(void* thisp, const uint8_t* t, uint32_t c) {  // 1.13c D2DDraw+0x5b74
   if (L(t, 0x14) == 0 || (L(t, 0x24) != 0 && c < 0x80)) {
     if ((int32_t)c > 0x40 && (int32_t)c < 0x5b) return c + 0x20;
     return c;

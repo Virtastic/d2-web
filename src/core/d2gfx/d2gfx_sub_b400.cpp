@@ -1,22 +1,26 @@
 #include <cstdint>
-#include <cstdio>
 
-// 1.13c D2Gfx+0x0B400: load the video back-end DLL for mode ESI. dllNames = table
-// 0x6FA90C18. Host seam: load(name) -> module or 0; init(module) runs GetProcAddress(0x2710) and returns the
-// interface table (stored at +0x1126C by the caller); *-1 sentinel (init == nullptr) = proc missing.
+// 1.13c D2Gfx+0x0B400: load the video back-end DLL for mode ESI. dllNames = table 0x6FA90C18; *outModule is
+// +0x1126C, *outTable +0x11268. Host seams: load = LoadLibraryA, initMgr = Fog 10233, getProc = GetProcAddress(mod,
+// 0x2710) (nullptr when the export is missing), lastError = GetLastError, log = Fog 10029 / the wsprintfA into a
+// 64-byte local that is never shown. The export's return is stored unchecked: a null table still returns 1.
+typedef void* (*D2GfxB400Proc)();
 struct D2GfxB400Host {
     void* (*load)(const char*);
-    void  (*initMgr)();                       // Ordinal_10233 (Fog)
-    void* (*getTable)(void* mod);             // GetProcAddress(mod, 0x2710)() ; nullptr when the export is missing
-    void  (*log)(const char*, long);          // Ordinal_10029 / wsprintfA messages, never raised to the user
+    void  (*initMgr)();
+    D2GfxB400Proc (*getProc)(void* mod);
+    uint32_t (*lastError)();
+    void  (*logMode)(const char* fmt, int32_t mode);
+    void  (*logName)(const char* fmt, const char* name);
+    void  (*logError)(const char* fmt, uint32_t err);
 };
-extern "C" int d2gfx_sub_b400(int mode, const char* const* dllNames, void** outModule, void** outTable, const D2GfxB400Host* h) {
-    if (!dllNames[mode]) { h->log("Unsupported video mode - %d", mode); return 0; }
+extern "C" int d2gfx_sub_b400(int32_t mode, const char* const* dllNames, void** outModule, void** outTable, const D2GfxB400Host* h) {
+    if (!dllNames[mode]) { h->logMode("Unsupported video mode - %d", mode); return 0; }
     *outModule = h->load(dllNames[mode]);
-    if (!*outModule) { h->log("Can't find DLL: %s", (long)dllNames[mode]); return 0; }
+    if (!*outModule) { h->logName("Can't find DLL: %s", dllNames[mode]); return 0; }
     h->initMgr();
-    void* t = h->getTable(*outModule);
-    if (!t) { h->log("Error interfacing with Gfx DLL #%i", 0); return 0; }
-    *outTable = t;
+    D2GfxB400Proc p = h->getProc(*outModule);
+    if (!p) { h->logError("Error interfacing with Gfx DLL #%i", h->lastError()); return 0; }
+    *outTable = p();
     return 1;
 }

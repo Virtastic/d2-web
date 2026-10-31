@@ -13,7 +13,7 @@ struct D2GfxFreeptdEnv {
     void     (*freefls)(void* ptd);            // 0x296F __freefls@4, the FLS destructor
 };
 
-// 1.13c D2Gfx+0x02AB6 (47 B, caller 0x1686 __CRT_INIT@12): with a live key, fetch the calling thread's
+// D2Gfx 0x02AB6 (1.13c) (47 B, caller 0x1686 __CRT_INIT@12): with a live key, fetch the calling thread's
 // _tiddata when none was passed, run the freefls destructor on it, and set the key's slot back to null.
 // TODO(spec): freefls (0x296F __freefls@4) body not read; it stays a seam like the two resolved Fls*/Tls*
 // slots, which mtinit installs.

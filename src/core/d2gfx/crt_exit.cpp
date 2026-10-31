@@ -57,7 +57,7 @@ extern "C" void d2gfx_initterm(const uint32_t* begin, const uint32_t* end) {
     }
 }
 
-// 1.13c D2Gfx+0x163C -- MSVC 2003 Release CRT _onexit. Contract: _lock(8)
+// D2Gfx 0x163C (1.13c) -- MSVC 2003 Release CRT _onexit. Contract: _lock(8)
 // 0x13B4; retval = __onexit_lk(func) 0x1594; _unlock(8) 0x166E; return retval. __onexit_lk appends func
 // to the atexit table ___onexitinit 0x1614 (malloc(0x80) at load, 32 slots, grown by realloc) and returns
 // func; it returns 0 -- the failed realloc's eax -- only when the table cannot grow. There is no NULL
@@ -79,7 +79,7 @@ extern "C" int32_t d2gfx_onexitinit() {
     return 0;
 }
 
-extern "C" uint32_t d2gfx_onexit(uint32_t func) {
+extern "C" uint32_t d2gfx_onexit(uint32_t func) {  // 1.13c D2Gfx+0x163C (_onexit, contract above)
     if (g_atexit_begin == nullptr) return 0;
     const size_t used = static_cast<size_t>(g_atexit_end - g_atexit_begin);
     if (g_atexit_bytes < used * 4 + 4) {

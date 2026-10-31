@@ -1,4 +1,4 @@
-// 1.13c D2CMP+0x1A153 -- CRT __strgtold12: decimal string -> 12-byte x87 extended value.
+// D2CMP 0x1A153 (1.13c) -- CRT __strgtold12: decimal string -> 12-byte x87 extended value.
 // Scanner is a line-for-line port of the retail state machine. ponytail: value is formed by
 // host strtold then repacked to x87 layout (retail multiplies by 10^n tables, may differ in
 // the last guard bits); upgrade by porting 0x1A9D6/0x1AC0C + the power tables.
@@ -10,7 +10,7 @@
 static inline bool dig(int c) { return c >= '0' && c <= '9'; }
 
 // out: 12 bytes = {u16 guard, u64 mantissa(explicit int bit), u16 sign|exp}.
-extern "C" int d2cmp_crt_1a153(uint16_t* out, const uint8_t** endp, const uint8_t* s, int p4, int p5, int p6, int p7) {
+extern "C" int d2cmp_crt_1a153(uint16_t* out, const uint8_t** endp, const uint8_t* s, int p4, int p5, int p6, int p7) {  // 1.13c D2CMP+0x1A153
   (void)p4;
   int st = 0, sign = 1, ret = 0;
   uint16_t sb = 0;

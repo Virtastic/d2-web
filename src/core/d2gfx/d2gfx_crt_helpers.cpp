@@ -26,7 +26,7 @@ struct D2GfxLseekLkHost {
     void     (*dosmaperr)(uint32_t err);
 };
 
-// 1.13c D2Gfx+0x03BF7 __lseek_lk (116 bytes): DWORD __cdecl __lseek_lk(uint fh, LONG offset, DWORD origin).
+// D2Gfx 0x03BF7 (1.13c) __lseek_lk (116 bytes): DWORD __cdecl __lseek_lk(uint fh, LONG offset, DWORD origin).
 // hFile = __get_osfhandle(fh); INVALID_HANDLE_VALUE sets errno = EBADF (9) and returns -1, with no
 // _doserrno write and no pioinfo access. Otherwise SetFilePointer(hFile, offset, NULL, origin): on
 // success (or on INVALID_SET_FILE_POINTER with GetLastError() == NO_ERROR) the FEOFLAG bit (bit 1) of the
@@ -52,7 +52,7 @@ int32_t d2gfx_lseek_lk(int32_t fh, int32_t offset, int32_t origin, const D2GfxLs
     return result;
 }
 
-// 1.13c D2Gfx+0x05D96 __lseeki64_lk (131 bytes): long long __cdecl __lseeki64_lk(uint fh, LONG low,
+// D2Gfx 0x05D96 (1.13c) __lseeki64_lk (131 bytes): long long __cdecl __lseeki64_lk(uint fh, LONG low,
 // LONG high, DWORD origin), the 64-bit sibling of 0x3BF7 and the tail of __lseeki64 (caller 0x3D16 seeks
 // to EOF through it). hFile = __get_osfhandle(fh); INVALID_HANDLE_VALUE sets errno = EBADF (9) and returns
 // -1. Otherwise SetFilePointer(hFile, low, &high, origin), where `high` is in/out; a returned low of
@@ -115,12 +115,12 @@ extern "C" int32_t d2gfx_close_lk(uint32_t fh, const D2GfxCloseLkHost* host) {
     return 0;
 }
 
-// 1.13c D2Gfx+0x05C93 __get_osfhandle (65 bytes): intptr_t __cdecl __get_osfhandle(int fh). An
+// D2Gfx 0x05C93 (1.13c) __get_osfhandle (65 bytes): intptr_t __cdecl __get_osfhandle(int fh). An
 // out-of-range handle (`cmp [nfile], eax; jae` -- unsigned, so a negative int is out of range) or a
 // closed one (ioinfo osfile FOPEN bit clear) sets errno = EBADF (9) and _doserrno = 0 and returns -1;
 // the block table is not indexed on that path. Otherwise it returns the handle's osfhnd dword (record
 // offset 0). No locking, no other state touched.
-// 1.13c D2Gfx+0x05C93 core of __get_osfhandle(fh): a descriptor below _nfile (unsigned compare, so a negative fh
+// D2Gfx 0x05C93 (1.13c) core of __get_osfhandle(fh): a descriptor below _nfile (unsigned compare, so a negative fh
 // is invalid) whose ioinfo record (block fh>>5, slot fh&31, stride 0x24) has FOPEN (osfile +4, bit 0)
 // returns the record's osfhnd dword (+0). Anything else sets _terrno = EBADF (9) and _tdoserrno = 0 and
 // returns -1; the block table is not indexed on that path. `blocks` is _pioinfo, `nfile` is _nfile.

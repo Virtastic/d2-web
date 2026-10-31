@@ -56,7 +56,7 @@ void d2cmp_1110(CRITICAL_SECTION* section) {
     DeleteCriticalSection(section);
 }
 
-// 1.13c D2CMP+0x12C0 (30 B, no callers in the image): UCELLIST destructor teardown. Run the
+// D2CMP 0x12C0 (1.13c) (30 B, no callers in the image): UCELLIST destructor teardown. Run the
 // in-place destructor body 0x1580, then SMemFree(list, ".?AUCELLIST@@", -2, 0). The pointer is not
 // cleared.
 // 1.13c D2CMP+0x12C0

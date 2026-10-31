@@ -6,4 +6,4 @@ extern "C" void d2gfx_sub_8290(uint32_t windowed, uint32_t mode, uint32_t hide, 
 }
 // 1.13c D2Gfx+0x8070 (show) / +0x80A0 (hide): flag-gated ShowCursor loops; flag = +0x10CF8.
 extern "C" void d2gfx_sub_8070(uint32_t* shown) { if (!*shown) *shown = 1; }
-extern "C" void d2gfx_sub_80A0(uint32_t* shown) { if (*shown) *shown = 0; }
+extern "C" void d2gfx_sub_80A0(uint32_t* shown) { if (*shown) *shown = 0; }  // 1.13c D2Gfx+0x80A0

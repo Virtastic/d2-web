@@ -3,7 +3,7 @@
 // there, shifting the rest of the string (incl. NUL) one byte right. dp = retail DAT_6FE32AB4.
 #include <cctype>
 extern "C"
-void d2cmp_crt_18a1b(char* p, char dp) {   // 1.13c D2CMP+0x18A1B
+void d2cmp_crt_18a1b(char* p, char dp) {   // D2CMP 0x18A1B (1.13c)
     if (tolower((unsigned char)*p) != 'e') {
         do { ++p; } while (isdigit((unsigned char)*p));
     }

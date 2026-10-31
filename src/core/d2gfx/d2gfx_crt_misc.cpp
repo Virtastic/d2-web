@@ -1,7 +1,7 @@
 #include <cstdint>
 #include <cstdlib>
 
-// 1.13c D2Gfx+0x042B0 -- MSVC 2003 Release CRT __aulldvrm, the unsigned 64/64 divide used by _output's
+// D2Gfx 0x042B0 (1.13c) -- MSVC 2003 Release CRT __aulldvrm, the unsigned 64/64 divide used by _output's
 // digit loop. Dividend EDX:EAX (hi=param_2, lo=param_1), divisor ECX:EBX (hi=param_4, lo=param_3);
 // quotient returned EDX:EAX, remainder ECX:EBX. The decompile's two branches (divisor-high==0 splits the
 // quotient into a 64/32 word plus the overflow word; else it normalises the divisor by shifts and

@@ -5,9 +5,9 @@
 typedef uint32_t (*D2GfxSlot4)(uint32_t ecx, uint32_t edx, uint32_t, uint32_t, uint32_t, uint32_t);
 typedef uint32_t (*D2GfxSlot5)(uint32_t ecx, uint32_t edx, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
 extern "C" uint32_t d2gfx_sub_b050(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5, D2GfxSlot4 slot) { return slot(a0, a1, a2, a3, a4, a5); }
-extern "C" uint32_t d2gfx_sub_b0b0(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5, uint32_t a6, D2GfxSlot5 slot) { return slot(a0, a1, a2, a3, a4, a5, a6); }
+extern "C" uint32_t d2gfx_sub_b0b0(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5, uint32_t a6, D2GfxSlot5 slot) { return slot(a0, a1, a2, a3, a4, a5, a6); }  // 1.13c D2Gfx+0xB0B0
 // D2FillArea: signed right < left or bottom < top forwards nothing; eax is not written on the first reject (entered value), is the bottom on the second.
-extern "C" uint32_t d2gfx_D2FillArea(uint32_t eaxIn, int32_t left, int32_t top, int32_t right, int32_t bottom, uint32_t c, uint32_t x, D2GfxSlot4 slot) {
+extern "C" uint32_t d2gfx_D2FillArea(uint32_t eaxIn, int32_t left, int32_t top, int32_t right, int32_t bottom, uint32_t c, uint32_t x, D2GfxSlot4 slot) {  // 1.13c D2Gfx+0xBA30
     if (right < left) return eaxIn;
     if (bottom < top) return (uint32_t)bottom;
     return slot((uint32_t)left, (uint32_t)top, (uint32_t)right, (uint32_t)bottom, c, x);
@@ -56,24 +56,27 @@ extern "C" uint32_t d2gfx_sub_b1e0(uint32_t a0, uint32_t* stored, uint32_t (*slo
 // 1.13c D2Gfx+0x7E90 (D2GetWindowHandle, slot +0x38) / +0x7E20 (WINDOW_DecodeSmacker, slot +0x40): stdcall(a0, a1, a2); non-null table -> slot(ecx = a0, edx = a1, a2). (Null table: log + _exit, not modelled.)
 typedef uint32_t (*D2GfxSlot1)(uint32_t ecx, uint32_t edx, uint32_t);
 extern "C" uint32_t d2gfx_sub_7e90(uint32_t a0, uint32_t a1, uint32_t a2, D2GfxSlot1 slot) { return slot(a0, a1, a2); }
-extern "C" uint32_t d2gfx_sub_7e20(uint32_t a0, uint32_t a1, uint32_t a2, D2GfxSlot1 slot) { return slot(a0, a1, a2); }
+extern "C" uint32_t d2gfx_sub_7e20(uint32_t a0, uint32_t a1, uint32_t a2, D2GfxSlot1 slot) { return slot(a0, a1, a2); }  // 1.13c D2Gfx+0x7E20
 // 1.13c D2Gfx+0xBB20 (slot +0xA0, six words) and +0xBB50 (slot +0x9C, five words): ecx = a0, edx = a1, the rest on the stack.
 typedef uint32_t (*D2GfxSlot3)(uint32_t ecx, uint32_t edx, uint32_t, uint32_t, uint32_t);
 extern "C" uint32_t d2gfx_sub_bb20(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5, D2GfxSlot4 slot) { return slot(a0, a1, a2, a3, a4, a5); }
-extern "C" uint32_t d2gfx_sub_bb50(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, D2GfxSlot3 slot) { return slot(a0, a1, a2, a3, a4); }
+extern "C" uint32_t d2gfx_sub_bb50(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, D2GfxSlot3 slot) { return slot(a0, a1, a2, a3, a4); }  // 1.13c D2Gfx+0xBB50
 extern "C" uint32_t d2gfx_sub_aff0(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, D2GfxSlot3 slot) { return slot(a0, a1, a2, a3, a4); }  // 1.13c D2Gfx+0xAFF0, slot +0x98
 // 1.13c D2Gfx+0x0B7A0 (D2CreateMainWindow, slot +0x64): stdcall(a0..a4); mode >= 4 and +0x10BE0 != 0 -> slot(ecx = a0, edx = a1, a2, a3, a4). (Else log + _exit, not modelled.)
 extern "C" uint32_t d2gfx_sub_b7a0(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, D2GfxSlot3 slot) { return slot(a0, a1, a2, a3, a4); }
 // 1.13c D2Gfx+0x7ED0 (D2PrintImage): tail-jump to slot +0x34, ecx and edx untouched.
 extern "C" uint32_t d2gfx_sub_7ed0(uint32_t ecx, uint32_t edx, uint32_t (*slot)(uint32_t, uint32_t)) { return slot(ecx, edx); }
-// 1.13c D2Gfx+0xBA90 (slot +0xB0) / +0xBAB0 (+0xAC) / +0xBAD0 (+0xA8) / +0xAF90 (+0xD0): stdcall(a0, a1); slot(ecx = a0, dl = low byte of a1), no stack word; eax passes through.
+// 1.13c D2Gfx+0xBAB0 (slot +0xAC): the same body as +0xBA90 below.
+// 1.13c D2Gfx+0xBAD0 (slot +0xA8): the same body as +0xBA90 below.
+// 1.13c D2Gfx+0xAF90 (slot +0xD0): the same body as +0xBA90 below.
+// 1.13c D2Gfx+0xBA90 (slot +0xB0): stdcall(a0, a1); slot(ecx = a0, dl = low byte of a1), no stack word; eax passes through.
 typedef uint32_t (*D2GfxSlotCD)(uint32_t ecx, uint8_t dl);
 extern "C" uint32_t d2gfx_slot_cd(uint32_t a0, uint32_t a1, D2GfxSlotCD slot) { return slot(a0, (uint8_t)a1); }
 // 1.13c D2Gfx+0xB220: the word at +0x10BE8 becomes 1 if it was 0, else 0.
 extern "C" void d2gfx_sub_b220(uint32_t* w) { *w = (*w == 0); }
 // 1.13c D2Gfx+0x7DA0 (slot +0x48) / +0x7DE0 (slot +0x44): stdcall(a0); slot(ecx = a0).
 extern "C" uint32_t d2gfx_sub_7da0(uint32_t a0, uint32_t (*slot)(uint32_t ecx)) { return slot(a0); }
-extern "C" uint32_t d2gfx_sub_7de0(uint32_t a0, uint32_t (*slot)(uint32_t ecx)) { return slot(a0); }
+extern "C" uint32_t d2gfx_sub_7de0(uint32_t a0, uint32_t (*slot)(uint32_t ecx)) { return slot(a0); }  // 1.13c D2Gfx+0x7DE0
 // 1.13c D2Gfx+0x7E60 (D2GetResolution): tail-jump to slot +0x3C, ecx and edx untouched.
 extern "C" uint32_t d2gfx_sub_7e60(uint32_t ecx, uint32_t edx, uint32_t (*slot)(uint32_t, uint32_t)) { return slot(ecx, edx); }
 // 1.13c D2Gfx+0x7F70: stdcall(a0, a1); slot +0x50 (ecx = a0, edx = a1), no stack word.
@@ -171,7 +174,7 @@ extern "C" uint32_t d2gfx_sub_adf0(uint32_t edx, uint32_t a0, uint32_t a1, uint3
 // own centring routine (store at D2Win RVA 0x17625 through the IAT slot at D2Win RVA 0x1B0C8). No 1.13c code
 // reads it. A browser has no OS window, so it is session state here; the writers' branch is the one
 // already declares unmodelled.
-extern "C" int32_t d2gfx_rInitialWindowRect[4];
+extern "C" int32_t d2gfx_rInitialWindowRect[4] = {0, 0, 0, 0};   // the 16 zero-fill .data bytes (no file image past 0x11000)
 extern "C" const int32_t* d2gfx_rInitialWindowRect_get(void) { return d2gfx_rInitialWindowRect; }
-// 1.13c D2Gfx+0x0B9C0 (ordinal 10010): stdcall(a0..a5) -> slot +0xC0 (DrawLine), ecx = a0, edx = a1, a2..a5 on the stack; eax passes through.
+// D2Gfx 0x0B9C0 (1.13c, ordinal 10010; marked on sub_B9C0 in d2gfx_n125.cpp): stdcall(a0..a5) -> slot +0xC0 (DrawLine), ecx = a0, edx = a1, a2..a5 on the stack; eax passes through.
 extern "C" uint32_t d2gfx_sub_b9c0(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5, D2GfxSlot4 slot) { return slot(a0, a1, a2, a3, a4, a5); }

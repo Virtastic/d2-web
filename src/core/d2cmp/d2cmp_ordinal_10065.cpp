@@ -1,4 +1,4 @@
-// 1.13c D2CMP+0x11520 ordinal 10065 CloseCelFile: real extern "C" entry for importers (D2Client+0xC18A thunk).
+// D2CMP 0x11520 (1.13c) ordinal 10065 CloseCelFile: real extern "C" entry for importers (D2Client+0xC18A thunk).
 #include <cstdint>
 struct D2CMPCelFileOwner; struct D2CMPCelCloseOps { void (**releaseFrame)(void*); void (*releaseFile)(void*, uint32_t, uint32_t); };
 extern "C" uint32_t d2cmp_11520(D2CMPCelFileOwner* file, const D2CMPCelCloseOps& ops);

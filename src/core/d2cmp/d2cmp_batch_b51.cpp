@@ -69,9 +69,9 @@ uint32_t* d2cmp_5209(const D2CmpEnvB51* e) {
     return nullptr;
 }
 
-// 1.13c D2CMP+0x52C0  ___sbh_alloc_new_group  (32-bit-layout words addressed through uintptr_t)
+// D2CMP 0x52C0 (1.13c)  ___sbh_alloc_new_group  (32-bit-layout words addressed through uintptr_t)
 static inline uint32_t& W(uintptr_t a) { return *(uint32_t*)a; }
-int32_t d2cmp_52c0(const D2CmpEnvB51* e, uint32_t* region) {
+int32_t d2cmp_52c0(const D2CmpEnvB51* e, uint32_t* region) {  // 1.13c D2CMP+0x52C0
     uintptr_t hdr = region[4];
     int32_t idx = 0;
     for (int32_t m = (int32_t)region[2]; m > -1; m <<= 1) idx++;

@@ -2,7 +2,7 @@
 #include <emscripten.h>
 #include "../d2gfx/d2gfx_cinit.h"
 
-// 1.13c D2Gfx+0x013DE -- MSVC 2003 Release CRT __cinit, the module's
+// D2Gfx 0x013DE (1.13c) -- MSVC 2003 Release CRT __cinit, the module's
 // C/C++ initializer dispatcher, called once by __CRT_INIT@12 0x1686 with init = 0. Retail base
 // 0x6FA80000; body 0x13DE..0x1447, 106 bytes. If the dynamic-initializer hook at +0x1EA38 is non-NULL
 // it is called with the argument (the slot sits in unbacked .data, so the shipped image has NULL).

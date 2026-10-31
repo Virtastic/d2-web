@@ -37,8 +37,8 @@ void d2gfx_sub_2c27(void) { d2gfx_unlock(4); }
 
 extern "C"
 // 1.13c D2Gfx+0x274C
-void d2gfx_sub_274c_h(void (*unlock)(int32_t)) { unlock(4); }   // probe seam: the callee as a callback
-extern "C" void d2gfx_sub_274c(void) { d2gfx_unlock(4); }
+void d2gfx_sub_274c(void) { d2gfx_unlock(4); }
+extern "C" void d2gfx_sub_274c_h(void (*unlock)(int32_t)) { unlock(4); }   // probe seam: the callee as a callback
 
 extern "C"
 // 1.13c D2Gfx+0x2803

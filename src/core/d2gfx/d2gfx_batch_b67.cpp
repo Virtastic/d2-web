@@ -17,17 +17,17 @@ void d2gfx_report_failure();                               // D2Gfx+0x4262
 extern uint32_t d2gfx_security_cookie;                     // DAT_6fa906e0
 }
 
-// 1.13c D2Gfx+0x13BD
+// D2Gfx 0x13BD (1.13c)
 void d2gfx_sub_13BD() { d2gfx_fn_19bc(8); }
 
-// 1.13c D2Gfx+0x4150
+// D2Gfx 0x4150 (1.13c)
 size_t d2gfx_strlen(const char* s) {
     size_t n = 0;
     while (s[n]) ++n;
     return n;
 }
 
-// 1.13c D2Gfx+0x4293  (__fastcall: ECX=cookie)
+// D2Gfx 0x4293 (1.13c)  (__fastcall: ECX=cookie)
 void d2gfx_security_check_cookie(uint32_t cookie) {
     if (cookie == d2gfx_security_cookie) return;
     d2gfx_report_failure();

@@ -14,9 +14,9 @@ struct D2CmpB52Env {
     void (*smemFree)(void* p, const char* tag, int32_t line, uint32_t flags);  // Storm #403
 };
 
-static const char kChunk[]  = "__AV__TSHashObjectChunk_UCELLIST__";  // tag at 0x6FE34108
-static const char kCell[]   = "__AUCELLIST__";                       // tag at 0x6FE3417C
-static const char kExpl[]   = "__AV__TSExplicitList_UCELLIST__";     // tag at 0x6FE34144
+static const char kChunk[]  = ".?AV?$TSHashObjectChunk@UCELLIST@@VHASHKEY_NONE@@@@";  // tag at 0x6FE34108
+static const char kCell[]   = ".?AUCELLIST@@";                       // tag at 0x6FE3417C
+static const char kExpl[]   = ".?AV?$TSExplicitList@UCELLIST@@$0?CCCCCCCD@@@";  // tag at 0x6FE34144
 
 // Unlink link pair {first, prev-or-~head} at lk.
 static void unlink_pair(uint32_t* lk) {
@@ -87,16 +87,17 @@ void d2cmp_b52_1840(uint32_t* self, void (*f1fc0)(uint32_t*), const D2CmpB52Env*
     }
 }
 
-// 1.13c D2CMP+0x1880 (EBX = object): drain 0x1F30, then walk the 12-byte bucket table at +0x1C.
-// mode 0: call vtable[0](node) per entry; else unlink each node in place.
+// 1.13c D2CMP+0x1880 (EBX = object): drain the list at +4 (0x1F30, EDI = self+4), then walk the 12-byte
+// bucket table at +0x1C. mode 0: thiscall vtable[0](self, off) per entry; else unlink each node in place.
 void d2cmp_b52_1880(uint32_t* self, int32_t mode, void (*f1f30)(uint32_t*)) {
     self[4] = 0;
-    f1f30(self);
+    f1f30(self + 1);
     for (uint32_t i = 0; i < self[6]; i++) {
-        uint32_t* b = (uint32_t*)(uintptr_t)(self[7] + i * 0xc);
-        for (int32_t off; (off = (int32_t)b[2]) > 0;) {
+        // retail re-reads the table pointer (+0x1C) on every pass; the callback may move it
+        for (int32_t off; (off = (int32_t)((uint32_t*)(uintptr_t)(self[7] + i * 0xc))[2]) > 0;) {
+            uint32_t* b = (uint32_t*)(uintptr_t)(self[7] + i * 0xc);
             if (mode == 0) {
-                (*(void (**)(int32_t))(uintptr_t)*(uint32_t*)(uintptr_t)self[0])(off);
+                (*(void (**)(uint32_t*, int32_t))(uintptr_t)self[0])(self, off);
             } else {
                 uint32_t* n = (uint32_t*)(uintptr_t)(b[0] + off);
                 if (n[0]) unlink_pair(n);

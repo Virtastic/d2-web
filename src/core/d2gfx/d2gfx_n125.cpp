@@ -19,7 +19,7 @@ struct Env {
  void (*callHook)(P fn, P, P, P, P, P, int32_t, P, uint8_t);
  void (*unlink)(P eax);             // D2Gfx+0x1250
 };
-// D2Gfx 0x0B9C0 (export 10010; probe-proven copy in d2gfx_disp.cpp): DrawLine, six args forwarded to the renderer table slot +0xC0.
+// 1.13c D2Gfx+0x0B9C0 (export 10010; same body as d2gfx_sub_b9c0 in d2gfx_disp.cpp): DrawLine, six args forwarded to the renderer table slot +0xC0.
 void sub_B9C0(const Env& e, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t f, uint32_t g) { e.slot(a, b, c, d, f, g); }
 // 1.13c D2Gfx+0x0BBBE
 void JumpToContinuation(const Env& e, P target) {
