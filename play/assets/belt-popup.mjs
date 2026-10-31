@@ -4,8 +4,8 @@
 //   - the Show Belt key toggles 0xFADFC (D2Client+0x26300 sets 0x11C46C)
 //   - drawBelt (D2Client+0x28DC0): popup stays open only while (0xFADFC || 0x11C470) and not 0xFADA4
 //   - open + pointer outside the popup box (D2Client+0x26320): hover ends, and so does the popup unless the key holds it.
-// Rows above the bottom, by Belts.txt record (the jump table in drawBelt): 2 none, 1 and 4 one, 0 and 5 two, 3 three.
-export const POPUP_ROWS = Object.freeze({ 0: 2, 1: 1, 2: 0, 3: 3, 4: 1, 5: 2 });
+// Rows above the bottom, by Belts.txt record (the jump table in drawBelt): 2 none, 1 and 4 one, 0 and 5 two, 3 three, default (6 uber belt) three.
+export const POPUP_ROWS = Object.freeze({ 0: 2, 1: 1, 2: 0, 3: 3, 4: 1, 5: 2, 6: 3 });
 export const POPUP_BG = 'data\\global\\ui\\Panel\\ctrlpnl_popbelt';
 export const popupRows = (record, boxCount = 16) => Math.min(POPUP_ROWS[record] ?? 0, Math.max(0, Math.floor(boxCount / 4) - 1));
 // Background cel i (0 = nearest the HUD row): bottom-left at (w/2+21, h-i*32-41), 800x600 HUD coordinates -> (421, 559-32i).

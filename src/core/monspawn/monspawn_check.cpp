@@ -6680,6 +6680,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_packet(const uint8_t* bytes, int len)
     case 0x2F: if (len != 9) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x2F_InitEntityChat_6FC868C0; break;
     case 0x34: if (len != 5) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x34_IdentifyItemsWithNpc_6FC86BA0; break;
     case 0x3C: if (len >= 5) { uint32_t w; std::memcpy(&w, packet.data() + 1, 4); d2client_nova::selectSkill(static_cast<int32_t>(w)); } handler = D2GAME_PACKETCALLBACK_Rcv0x3C_SelectSkill_6FC87050; break;   // the client's selection (1.13c D2Client+0x73CB0 reads it)
+    case 0x23: if (len != 9) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x23_ItemToBelt_6FC85E70; break;   // cursor item -> belt slot (checks IMODE_ONCURSOR and cursor ownership)
     case 0x24: if (len != 5) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x24_ItemFromBelt_6FC85F50; break;
     // 0x1F {cursorGUID, gridItemGUID, x, y}: the held item goes to x,y and the stored one it overlapped comes onto the cursor (page 1/2 refused by the handler).
     case 0x1F: if (len != 17) return -1; handler = D2GAME_PACKETCALLBACK_Rcv0x1F_SwapCursorBufferItems_6FC857C0; break;
