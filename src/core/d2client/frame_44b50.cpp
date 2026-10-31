@@ -1,6 +1,6 @@
 // D2Client+0x44B50: the per-frame pump (frame pacing, update, render, present). Callees go through D2cHost in retail order.
 // Unported/import callees are tagged by RVA or ordinal; tags 0x97E4 = indirect [DAT_6fbc97e4](), 0xBF4C = vtbl call on [C+0xC] slot 3.
-// ponytail: 0x42400's EDX (extraout_EDX) is read from out[0] of that call -- unverified, weak-guarded.
+// 0x42400 leaves EDX untouched (disassembled), so the decompile's extraout_EDX is the v9808 it was given in EDX.
 #include <emscripten.h>
 #include <cstdint>
 #include "client_host.h"
@@ -22,7 +22,8 @@ struct D2c44B50G {
     uint32_t bf4c;      // CBF4C
     uint32_t h9920;     // C9920
 };
-static uint32_t cl(D2cHost h, uint32_t rva, uint32_t a = 0, uint32_t b = 0) { D2cCall c = { rva, 0, a, b, 0, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } }; return h(&c); }
+// cl: a call with stack words s0,s1 (ordinals and 0x2B090/0xBE350 take stdcall stack args) and optional ECX/EDX.
+static uint32_t cl(D2cHost h, uint32_t rva, uint32_t s0 = 0, uint32_t s1 = 0, uint32_t ecx = 0, uint32_t edx = 0) { D2cCall c = { rva, 0, ecx, edx, 0, 0, { s0, s1, 0, 0 }, { 0, 0, 0, 0 } }; return h(&c); }
 // 1.13c D2Client+0x44B50
 // now[0..1]: GetTickCount results in order (mainline: C97FC check, then C97EC; early path uses now[0]). Returns 0, or 1 on quit.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_44b50(D2cHost h, D2c44B50G* g, const uint32_t* now) {
@@ -75,14 +76,14 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_44b50(D2cHost h, D2c44B50G* g
             }
         } else if (b1) {
             cl(h, 0x44A80); g->last += g->frameMs - el; b2 = true;
-            D2cCall c = { 0x42400, 0, el / g->frameMs, g->v9808, 0, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } };
-            int32_t v = (int32_t)(int8_t)h(&c);
-            if (0x1c < (int32_t)c.out[0]) v = 0; // extraout_EDX: from out[0], unverified
+            D2cCall c = { 0x42400, 0, el / g->frameMs, g->v9808, 0, 0, { 0, 0, 0, 0 }, { g->v9808, 0, 0, 0 } };
+            int32_t v = (int32_t)h(&c);
+            if (0x1c < c.out[0]) v = 0;  // EDX after the call: 0x42400 leaves it as passed (v9808)
             if (v < (int32_t)g->skip) g->skip = 0;
         } else if (0x16 < g->v9808) g->skip = 0;
         if (g->c3a0) {
             g->c4d8 = 0; cl(h, 0x51E80);
-            if (cl(h, 10057)) { cl(h, 10023); cl(h, 10014); cl(h, 10061); }
+            if (cl(h, 10057)) { cl(h, 10023, 0, 0, 0xb4); cl(h, 10014); cl(h, 10061, 0, 0, 0xff); }
             if (g->skip == 0) {
                 if (g->obj && cl(h, 10331, g->obj)) { cl(h, 0x97E4); g->v97F4++; g->v980C++; }
             } else if (b1) g->v9814++;
