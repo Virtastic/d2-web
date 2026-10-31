@@ -88,9 +88,10 @@ if [ -f retail/D2/d2data.mpq ]; then
   # PY3: PlugY's StashBtns / SharedGoldBtns / TradeStash art, served (never committed) under /retail/PlugY/: D2_PLUGY_ART, retail/D2/PlugY,
   # or the PlugY checkout's installer folder beside the main checkout. Absent = the shell leaves the stash retail.
   MAINROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")"
-  for d in "${D2_PLUGY_ART:-}" retail/D2/PlugY "$MAINROOT/reference/PlugY/PlugYInstaller/PlugY"; do
+  for d in "${D2_PLUGY_ART:-}" retail/D2/D2SE/PlugY retail/D2/PlugY "$MAINROOT/reference/PlugY/PlugYInstaller/PlugY"; do
     if [ -n "$d" ] && [ -f "$d/StashBtns.dc6" ] && [ -f "$d/SharedGoldBtns.dc6" ] && [ -f "$d/TradeStash.dc6" ]; then
-      ln -s "$(cd "$d" && pwd)" build-wasm/retail/PlugY; echo "==> PlugY art: $d"; break
+      ln -s "$(cd "$d" && pwd)" build-wasm/retail/PlugY; echo "==> PlugY art: $d"
+      for i in "$d/../PlugY.ini" "$d/PlugY.ini"; do [ -f "$i" ] && ln -s "$(cd "$(dirname "$i")" && pwd)/PlugY.ini" build-wasm/retail/PlugY.ini && break; done; break
     fi
   done
   echo "==> retail: $(ls build-wasm/retail | wc -l) MPQs linked for the test runner"
