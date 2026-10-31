@@ -5,6 +5,7 @@
 #include <GAME/Level.h>
 #include <GAME/Arena.h>
 #include <D2Common.h>
+#include <D2BitManip.h>
 #include <D2DataTbls.h>
 #include <D2StatList.h>
 #include <D2Text.h>
@@ -481,7 +482,26 @@ void __fastcall D2GAME_SendPacket0x2A_6FC3F3B0(D2ClientStrc* pClient, char nHead
     packet.unk0x07 = itemId; packet.unk0x0B = gold;
     if (pClient) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
 }
-void D2GAME_PACKETS_SendPacket0x3E_6FC3EC20(D2ClientStrc* pClient, D2UnitStrc* pItem, uint8_t a3, int32_t nStatId, uint32_t nValue, uint16_t a6) {}
+// 1.13c D2Game+0x8B010 (D57): the item stat update, retail's bytes: {0x3E, size, 32-byte bit payload}; guid, flag, 9-bit stat,
+// value, layer, each width-prefixed (8/16/32 bits for the guid and value, 8/16 for the layer). A stack merge sends one.
+void D2GAME_PACKETS_SendPacket0x3E_6FC3EC20(D2ClientStrc* pClient, D2UnitStrc* pItem, uint8_t a3, int32_t nStatId, uint32_t nValue, uint16_t a6) {
+    if (!pClient) return;
+    D2BitBufferStrc bb = {};
+    D2GSPacketSrv3E pk = {};
+    pk.nHeader = 0x3E;
+    BITMANIP_Initialize(&bb, pk.pBuffer, sizeof(pk.pBuffer));
+    auto var = [&](uint32_t v) {
+        if (v >= 0x100) { BITMANIP_Write(&bb, 1, 1); if (v >= 0x10000) { BITMANIP_Write(&bb, 1, 1); BITMANIP_Write(&bb, v, 32); } else { BITMANIP_Write(&bb, 0, 1); BITMANIP_Write(&bb, v, 16); } }
+        else { BITMANIP_Write(&bb, 0, 1); BITMANIP_Write(&bb, v, 8); }
+    };
+    var(pItem ? pItem->dwUnitId : 0xFFFFFFFFu);
+    BITMANIP_Write(&bb, a3 != 0, 1);
+    BITMANIP_Write(&bb, nStatId, 9);
+    var(nValue);
+    if (a6 >= 0x100) { BITMANIP_Write(&bb, 1, 1); BITMANIP_Write(&bb, a6, 16); } else { BITMANIP_Write(&bb, 0, 1); BITMANIP_Write(&bb, a6, 8); }
+    pk.nSize = (uint8_t)(BITMANIP_GetSize(&bb) + 2);
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &pk, sizeof(pk));
+}
 void D2GAME_PACKETS_SendPacket0x3F_6FC3EDC0(D2ClientStrc* pClient, D2UnitStrc* pUnit, char a3, int32_t a4, int32_t a5, int16_t a6) {}
 void D2GAME_PACKETS_SendPacket0x42_6FC3EE40(D2ClientStrc* pClient, D2UnitStrc* pUnit) {}
 void D2GAME_PACKETS_SendPacket0x51_6FC3D300(D2ClientStrc* pClient, char nHeader, uint8_t nUnitType, int32_t nUnitGUID, int16_t nObjectId, int16_t nX, int16_t nY, char a8, char a9) {}
@@ -490,19 +510,53 @@ void D2GAME_PACKETS_SendPacket0x61_6FC3F590(D2ClientStrc* pClient, BYTE unk) {
     D2GSPacketSrv61 packet = {}; packet.nHeader = 0x61; packet.unk0x001 = unk;
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
 }
-// The 0x67 monster move {header, guid, action, x, y, ...} (16 bytes): the realm client reads guid, action and destination (apply_monster_move);
-// the tail bytes are the senders' own arguments. Without it a walking monster never moves on the client (a retail recording: Fire Ball misses it).
+// The 0x67 / 0x68 monster move and attack-start packets (D2MOO SCmd.cpp bodies; retail D55 capture checks the 16/21 bytes):
+// {header, guid, message, x, y | target type, target guid} then {life, hit class, path type, velocity (i16), max distance}.
+// Path type 5/6 is sent as 1 with the path's last point, 8 as 11; velocity is the clamped STAT_VELOCITYPERCENT.
+static uint8_t d2webPathTail(D2UnitStrc* pMonster, uint8_t* pathType, int16_t* vel, uint8_t* maxDist) {
+    int32_t t = PATH_GetType(pMonster->pDynamicPath);
+    *pathType = (uint8_t)t;
+    int32_t v = STATLIST_UnitGetStatValue(pMonster, STAT_VELOCITYPERCENT, 0);
+    *vel = (int16_t)(v < -32768 ? -32768 : v >= 32767 ? 32767 : v);
+    *maxDist = PATH_GetMaxDistance(pMonster->pDynamicPath);
+    return 0;
+}
+static void d2webSend67(D2ClientStrc* pClient, uint8_t nHeader, int32_t guid, int8_t msg, int16_t x, int16_t y, int8_t life, int8_t hit, bool full) {
+    D2UnitStrc* pMonster = SUNIT_GetServerUnit(CLIENTS_GetGame(pClient), UNIT_MONSTER, guid);
+    if (!pMonster) return;
+    uint8_t path, maxDist; int16_t vel; d2webPathTail(pMonster, &path, &vel, &maxDist);
+    if (path >= 5u) {
+        if (path <= 6u) { path = 1; x = (int16_t)D2COMMON_10177_PATH_GetLastPointX(pMonster->pDynamicPath); y = (int16_t)D2COMMON_10178_PATH_GetLastPointY(pMonster->pDynamicPath); }
+        else if (path == 8) path = full ? 11 : 0xB;
+    }
+    uint8_t b[16] = {}; b[0] = nHeader; std::memcpy(b + 1, &guid, 4); b[5] = (uint8_t)msg; std::memcpy(b + 6, &x, 2); std::memcpy(b + 8, &y, 2);
+    b[10] = (uint8_t)life; b[11] = full ? (uint8_t)hit : 0; b[12] = path; std::memcpy(b + 13, &vel, 2); b[15] = maxDist;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, sizeof b);
+}
+static void d2webSend68(D2ClientStrc* pClient, int32_t guid, int8_t msg, int8_t tType, int32_t tGuid, int8_t life, int8_t hit, int8_t maxDistArg, bool full) {
+    D2UnitStrc* pMonster = SUNIT_GetServerUnit(CLIENTS_GetGame(pClient), UNIT_MONSTER, guid);
+    if (!pMonster) return;
+    uint8_t path, maxDist; int16_t vel; d2webPathTail(pMonster, &path, &vel, &maxDist);
+    if (full) { if (path == 8) path = 11; maxDist = (uint8_t)maxDistArg; }
+    else if (path >= 5u) { if (path <= 6u) path = 2; else if (path == 8) path = 11; }
+    int16_t x = (int16_t)CLIENTS_GetUnitX(pMonster), y = (int16_t)CLIENTS_GetUnitY(pMonster);
+    uint8_t b[21] = {}; b[0] = 0x68; std::memcpy(b + 1, &guid, 4); b[5] = (uint8_t)msg; std::memcpy(b + 6, &x, 2); std::memcpy(b + 8, &y, 2);
+    b[10] = (uint8_t)tType; std::memcpy(b + 11, &tGuid, 4); b[15] = (uint8_t)life; b[16] = full ? (uint8_t)hit : 0; b[17] = path; std::memcpy(b + 18, &vel, 2); b[20] = maxDist;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, sizeof b);
+}
+// 1.13c D2Game+0x8BC20 / 0x8D860 family: D2MOO SCmd.cpp 0x6FC3CBC0, 0x6FC3CDE0, 0x6FC3CA90, 0x6FC3CCB0
 void D2GAME_PACKETS_SendPacket0x67_6FC3CBC0(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int16_t nX, int16_t nY, int8_t a7) {
-    D2GSPacketSrv67 packet = {}; packet.nHeader = nHeader; packet.nUnitGUID = nUnitGUID; packet.unk0x05 = a4; packet.nX = nX; packet.nY = nY; packet.unk0x0A = a7;
-    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+    d2webSend67(pClient, nHeader, nUnitGUID, a4, nX, nY, a7, 0, false);
 }
 void D2GAME_PACKETS_SendPacket0x67_6FC3CDE0(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int16_t nX, int16_t nY, int8_t a7, int8_t a8, int8_t a9) {
-    D2GSPacketSrv67 packet = {}; packet.nHeader = nHeader; packet.nUnitGUID = nUnitGUID; packet.unk0x05 = a4; packet.nX = nX; packet.nY = nY;
-    packet.unk0x0A = a7; packet.unk0x0B = a8; packet.nPathType = a9;
-    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+    (void)a8; d2webSend67(pClient, nHeader, nUnitGUID, a4, nX, nY, a7, a9, true);
 }
-void D2GAME_PACKETS_SendPacket0x68_6FC3CA90(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int8_t a5, int32_t a6, int8_t a7) {}
-void D2GAME_PACKETS_SendPacket0x68_6FC3CCB0(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int8_t a5, int32_t a6, int8_t a7, int8_t a8, int8_t a9) {}
+void D2GAME_PACKETS_SendPacket0x68_6FC3CA90(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int8_t a5, int32_t a6, int8_t a7) {
+    (void)nHeader; d2webSend68(pClient, nUnitGUID, a4, a5, a6, a7, 0, 0, false);
+}
+void D2GAME_PACKETS_SendPacket0x68_6FC3CCB0(D2ClientStrc* pClient, uint8_t nHeader, int32_t nUnitGUID, int8_t a4, int8_t a5, int32_t a6, int8_t a7, int8_t a8, int8_t a9) {
+    (void)nHeader; d2webSend68(pClient, nUnitGUID, a4, a5, a6, a7, a9, a8, true);
+}
 // 1.13c D2Game+0x8C100: the 0x67/0x69-family monster mode packet
 // {header, unitId, state, x, y, lifeByte, lastHitClass}. Byte 5 is the animation state the client
 // keys on -- 6 is GETHIT, which is how a landed monster hit reaches the client at all -- and byte

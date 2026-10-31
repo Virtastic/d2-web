@@ -1156,6 +1156,7 @@ BOOL __fastcall PATH_ComputeVelocityAndDirectionVectorsToNextPoint(D2DynamicPath
 
 //1.10f: D2Common.0x6FDAC8F0 (#10236)
 //1.13c: D2Common.0x6FD5D820 (#10831)
+// 1.13c D2Common+0x0D820 -- decompile checked line by line: no delta.
 //TODO: Find a name
 int __stdcall D2Common_10236(D2UnitStrc* pUnit, int a2)
 {

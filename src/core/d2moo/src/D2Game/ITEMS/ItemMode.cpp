@@ -1303,10 +1303,11 @@ int32_t __fastcall sub_6FC437F0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
 
         if (ITEMS_GetAutoStack(pItem))
         {
-            pStackItem = INVENTORY_FindEquippedItemForStack(pUnit->pInventory, pItem, pStackItem);
-            if (ITEMS_GetQuiverType(pItem) && !pStackItem)
+            // 1.13c D2Game+0xD3CB0 (D57): a quiver-type stackable looks at the equipped quiver first, anything else
+            // (keys in the pack) goes straight to the backpack search; 1.10f searched equipped for every autostack item
+            if (!ITEMS_GetQuiverType(pItem) || !(pStackItem = INVENTORY_FindEquippedItemForStack(pUnit->pInventory, pItem, pStackItem)))
             {
-                pStackItem = INVENTORY_FindBackPackItemForStack(pUnit->pInventory, pItem, nullptr);
+                pStackItem = INVENTORY_FindBackPackItemForStack(pUnit->pInventory, pItem, pStackItem);
             }
         }
 

@@ -275,6 +275,12 @@ static bool ACT1Q3_PlayerOrPartyHasMalus(D2QuestDataStrc* pQuest, D2UnitStrc* pP
 		return true;
 	}
 
+	// 1.13c: the party walk only runs for a player unit that is attached to a game
+	if (!pPlayer->pGame || pPlayer->dwUnitType != UNIT_PLAYER)
+	{
+		return false;
+	}
+
 	const int16_t nPartyId = SUNIT_GetPartyId(pPlayer);
 	if (nPartyId != -1)
 	{

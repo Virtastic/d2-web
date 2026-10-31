@@ -23,8 +23,18 @@ behaviour differs from 1.10f.
 - D2Game+0xBDB10 D2GAME_NPC_IdentifyAllItems_6FCC9C90: the code-3 reply is sent once, after the loop.
 - D2Game+0xDEEE0 SUNITDMG_KillMonster: matches; the trailing D2Common ordinal is a no-op in 1.13c.
 - D2Game+0x212F0 AIGENERAL_AllocCommandsForMinions: minion loop skips a null allocation (1.10f dereferenced it); no pCurrentCmd write; monster guards on caller and owner; the new command pointer goes to the minion game block +0x20.
+- D2Common+0x1BA60 (DataTbls/HoradricCube.cpp, DATATBLS_CubeMainOutputParser): a set-item hit returns FALSE after filling its fields, without parsing output modifiers.
 - D2Common+0x25810 ITEMS_CalculateAdditionalCostsForChargedSkills: the base multiplier is (req level / 6) * 2 + layer bits + 2; a large operand is divided by 1024 before the cost multiplier.
 - D2Common+0x25970 ITEMS_CalculateAdditionalCostsForItemSkill: for a large sell cost the multiplier is divided by 1024 (4096 for buy) before it scales the cost.
 - D2Common+0x28850 ITEMS_CalculateAdditionalCostsForBonusStats: for a large operand the cost times value is divided first, then multiplied by the row multiplier.
-- D2Common+0x1BA60 (DataTbls/HoradricCube.cpp, DATATBLS_CubeMainOutputParser): a set-item hit returns FALSE after filling its fields, without parsing output modifiers.
 - D2Common+0x267F0 ITEMS_GetWeaponAttackSpeed: matches the 1.13c decompile; the public wrapper passes includeItemFasterAttackRate=TRUE and the Impl helper is unchanged; validated against the vector.
+- D2Game+0x64B60 ACT1Q3_PlayerOrPartyHasMalus: the party walk only runs for a player unit attached to a game (pGame set, unit type player).
+
+- D2Game SCmd 0x6FC3CBC0/CDE0/CA90/CCB0 (monster move and attack-start packets, compat/game_net_stubs.cpp): write the full 16/21-byte packet with the path type remap, clamped velocity and max distance.
+- D2Game+0xD3CB0 (stack search, ItemMode.cpp sub_6FC437F0): 1.13c searches the backpack directly for non-quiver stackables; quiver-type items search equipped first, then backpack (D57).
+- D2Game+0x8B010 (packet 0x3E item stat update, game_net_stubs.cpp): bit-packed writer replaces the empty stub.
+- D2Common+0x24B20 ITEMS_CheckIfAutoBeltable: matches the 1.13c decompile; no change.
+- D2Common+0x25810 and D2Common+0x25970 (charged-skill and item-skill costs): arithmetic matches; the stat copy they rely on, STATLIST_CopyStats, now returns 0 for a unit with no stat list instead of dereferencing a null pointer.
+- D2Common+0x26BA0 ITEMS_GetRunesTxtRecordFromItem: returns NULL unless the socketed inventory's signature is 0x1020304 (1.13c check added).
+- D2Common+0x28850 ITEMS_CalculateAdditionalCostsForBonusStats: all encode cases match the 1.13c arithmetic; no change.
+- D2Common+0x2C910 ITEMS_UpdateSets: body matches; the call routing (0x2C7C0, 0x2C630) is not wired, so the row is STALLED.

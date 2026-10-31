@@ -3168,7 +3168,8 @@ const D2RunesTxt* __stdcall ITEMS_GetRunesTxtRecordFromItem(const D2UnitStrc* pI
 		return nullptr;
 	}
 
-	if (!DATATBLS_GetItemsTxtRecord(pItem->dwClassId)->nQuest && pItem->pInventory)
+	// 1.13c delta: retail also requires the socketed inventory's signature (0x1020304) to be intact.
+	if (!DATATBLS_GetItemsTxtRecord(pItem->dwClassId)->nQuest && pItem->pInventory && pItem->pInventory->dwSignature == D2C_InventoryHeader)
 	{
 		int nSocketableIds[6] = {};
 		int nSocketedItems = 0;

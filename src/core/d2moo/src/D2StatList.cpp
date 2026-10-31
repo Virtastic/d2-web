@@ -2370,6 +2370,11 @@ int __fastcall D2Common_CopyStats_6FDB9C50(D2StatListStrc* pStatList, int nStatI
 //D2Common.0x6FDB9D20 (#11270)
 int __stdcall STATLIST_CopyStats(D2UnitStrc* pUnit, int nStatId, D2StatStrc* pBuffer, int nBufferSize)
 {
+	// 1.13c delta: a unit with no stat list (pStatListEx == NULL) copies nothing and returns 0.
+	if (!pUnit->pStatListEx)
+	{
+		return 0;
+	}
 	if (D2StatListExStrc* pStatListEx = STATLIST_StatListExCast(pUnit->pStatListEx))
 	{
 		return D2Common_CopyStats_6FDB9C50(pStatListEx, nStatId, pBuffer, nBufferSize);
