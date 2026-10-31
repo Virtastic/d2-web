@@ -1,5 +1,5 @@
 // D2Common 1.13c batch. Retail passes the path-state struct in EBX; tables and callees are
-// env pointers: dirTab = DAT_6fddc320 (12-byte rows), stepTab = DAT_6fddc2e0 (int16 dx,dy pairs),
+// env pointers: dirTab = DAT_6fddc320 (12-byte rows), stepTab = DAT_6fddc2e0 (8-byte rows: int16 x at +0, y at +4),
 // f3e190 = FUN_6fd8e190, f671b0 = FUN_6fdb71b0.
 #include <cstdint>
 #include <emscripten.h>
@@ -28,8 +28,8 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_674c0(uint32_t* s, const int32_t* dirTa
    c[1] = (dirTab[r + 1] + base) & 7;
    c[2] = (dirTab[r + 2] + base) & 7;
    if (f671b0(cur, c, &dir) == 0 || ((dir - 4) & 7) == last) goto fin;
-   cur = (static_cast<uint32_t>(static_cast<uint16_t>(static_cast<int16_t>(cur >> 16) + stepTab[dir * 2 + 1])) << 16) |
-         static_cast<uint16_t>(static_cast<int16_t>(cur) + stepTab[dir * 2]);
+   cur = (static_cast<uint32_t>(static_cast<uint16_t>(static_cast<int16_t>(cur >> 16) + stepTab[dir * 4 + 2])) << 16) |
+         static_cast<uint16_t>(static_cast<int16_t>(cur) + stepTab[dir * 4]);
    changed = dir != last;
    if (changed) { *out++ = prev; ++n; }
    ++i;

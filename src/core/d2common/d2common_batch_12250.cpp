@@ -86,7 +86,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_4f870(uint32_t unit, int32_t categor
  uint32_t tableCount, uint32_t tableRow, uint32_t (*hasStat)(uint32_t,int32_t),
  uint32_t (*hasTableStat)(uint32_t), int32_t (*applyRatio)(int32_t,int32_t)) {
  if (category==4 || category==12) {
-  if (!unit || !w(unit,0x5C) || tableCount<0x14C || !tableRow || !hasTableStat ||
+  if (!unit || !w(unit,0x5C) || tableCount<0x14C || tableRow+0x1A2EC==0 || !hasTableStat ||
       !hasTableStat(tableRow+0x1A2EC)) return 0;
  } else {
   int32_t stat=category==1 ? 0x149 : category==2 ? 0x14A : category==5 ? 0x14C : -1;
