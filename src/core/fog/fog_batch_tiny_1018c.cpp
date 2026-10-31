@@ -24,8 +24,11 @@ extern "C" __attribute__((weak)) int32_t d2_fog_smem_free(void* location, const 
 namespace {
 
 // +0x2E210 DAT_6ff7e210: the CRT lock table, one 8-byte CRITICAL_SECTION per index (the decompile
-// indexes it as dwords, hence `param_1 * 2`).
+// indexes it as dwords, hence `param_1 * 2`). External linkage: fog_batch_2000.cpp and
+// fog_batch_tiny_1018b.cpp share this one table, as retail does.
+}  // namespace
 uint8_t g_fog_csTable[0x400];
+namespace {
 
 // Fog+0x3C3F: _unlock(index) -- LeaveCriticalSection on lock-table entry `index`.
 void fog_unlock(int32_t index) {

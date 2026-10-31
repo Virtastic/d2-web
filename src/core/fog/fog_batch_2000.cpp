@@ -12,7 +12,7 @@
 
 // +0x2E210 DAT_6ff7e210: the CRT lock table, 8-byte CRITICAL_SECTION stride (the decompile indexes
 // it as dwords, hence `param_1 * 2`).
-static uint8_t g_fog_csTable[0x400];
+extern uint8_t g_fog_csTable[0x400];  // one lock table for the DLL (Fog+0x2E210), defined in fog_batch_tiny_1018c.cpp
 
 static void fog_unlock4(void) {
     LeaveCriticalSection((LPCRITICAL_SECTION)(g_fog_csTable + (size_t)4 * 8));

@@ -13,11 +13,12 @@ StormSrcNode* g_stormSrcList;
 uint32_t g_stormSrcInit;
 CRITICAL_SECTION g_stormErrLock;  // 0x6FC42FE0
 
-// 0x6FC35CB0 default strings (retail table)
-static const char* const kDefaultStrings[8] = {
+// 0x6FC35CB0 default strings (retail table, read from the 1.13c image; index 12 is unused here)
+static const char* const kDefaultStrings[12] = {
     "ERROR #%u (0x%08x)", "This application has encountered a critical error:\n\n%s\n",
     "Program:\t%s\n", "File:\t%s\nLine:\t%d\n", "Function:\t%s\n", "Object:\t%s\n", "Handle:\t%s\n",
-    "Expr:\t%s\n\n"};
+    "Expr:\t%s\n\n", "\n%s\n\n", "Press OK to terminate the application.",
+    "Do you wish to terminate the application?", "File:\t%s\n"};
 
 // 1.13c Storm+0x2F180
 extern "C" void Storm_SErrLock_2F180() {

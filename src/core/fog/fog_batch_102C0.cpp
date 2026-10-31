@@ -110,12 +110,12 @@ void fog_error_report(int32_t type, const char* file, uint32_t line, const char*
     std::fputc('\n', stderr);
 }
 
-// Fog+0xFC70: the %s the assert path prints for a source path.
+// Fog+0xFC70: the %s the assert path prints for a source path. Retail does not search for a separator:
+// the offset is strlen("..\\Source\\Fog\\Src\\ErrorManager.cpp") - strlen("Fog\\Src\\ErrorManager.cpp") = 34 - 24 = 10
+// (computed once into DAT_6FFA6ED0), and the result is path + 10 when strlen(path) > 10, else path.
 const char* fog_basename(const char* path) {
-    const char* name = path;
-    for (const char* p = path; *p != '\0'; ++p)
-        if (*p == '\\' || *p == '/') name = p + 1;
-    return name;
+    const size_t offset = 10;
+    return std::strlen(path) > offset ? path + offset : path;
 }
 
 // Fog+0x1BA9 (Storm _exit) and the reporter's MessageBoxA tail.

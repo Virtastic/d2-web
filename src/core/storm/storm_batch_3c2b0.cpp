@@ -221,16 +221,18 @@ void Storm_SErrSetLastError(uint32_t code) {
 extern "C"
 uint32_t Storm_SErrRegisterMessageSource(StormBatch3c2b0Env& e, uint16_t id, uint32_t source) {
     if (InterlockedIncrement((long volatile*)&g_stormLockInit) == 0) {
-        // InitializeCriticalSection(&g_errLock) -- the lock is opaque in this shim
+        InitializeCriticalSection(&g_stormErrLock);
     } else {
         InterlockedDecrement((long volatile*)&g_stormLockInit);
     }
+    EnterCriticalSection(&g_stormErrLock);
     auto* node = (StormSrcNode*)e.heap_alloc(sizeof(StormSrcNode));
     std::memset(node, 0, sizeof *node);
     node->id = id;
     node->source = (void*)(uintptr_t)source;
     node->next = g_stormSrcList;
     g_stormSrcList = node;
+    LeaveCriticalSection(&g_stormErrLock);
     return 1;
 }
 
@@ -327,23 +329,24 @@ uint32_t Storm_SErrDisplayError(StormBatch3c2b0Env& e, uint32_t errorcode, const
     fmt = n != 0 ? tmp : e.f_2f1c0(2);
     e.f_wsprintf(p, fmt, modulePath);
     p += e.f_2afd0(p);
+    // Index per the 1.13c jump table at 0x2F9F0 and the mov-esi sites: -4->11, -3->6, -2->5, -1->4
+    // (one argument each), any other line->3 ("File:\t%s\nLine:\t%d\n", two arguments).
     if (fileArg != nullptr && *fileArg != '\0') {
         switch (linenumber) {
-        case -4:
-        case -3:
-        case -2:
-        case -1:
-            e.f_wsprintf(p, e.f_2f1c0(3), fileArg);
-            break;
-        default:
-            e.f_wsprintf(p, e.f_2f1c0(4), fileArg, linenumber);
+        case -4: e.f_wsprintf(p, e.f_2f1c0(11), fileArg); break;
+        case -3: e.f_wsprintf(p, e.f_2f1c0(6), fileArg); break;
+        case -2: e.f_wsprintf(p, e.f_2f1c0(5), fileArg); break;
+        case -1: e.f_wsprintf(p, e.f_2f1c0(4), fileArg); break;
+        default: e.f_wsprintf(p, e.f_2f1c0(3), fileArg, linenumber);
         }
         p += e.f_2afd0(p);
     }
+    // Description label: 7 for the 0x85100000 code, 8 otherwise (1.13c 0x2F875..0x2F89F).
     const char* desc = description != nullptr ? description : empty_str();
-    e.f_wsprintf(p, e.f_2f1c0(5), desc);
+    e.f_wsprintf(p, e.f_2f1c0(errorcode == 0x85100000u ? 7 : 8), desc);
     p += e.f_2afd0(p);
-    e.f_2b080(p, e.f_2f1c0(6), 0x7fffffff);
+    // Trailer copied, not formatted: 10 when recoverable, else 9 (1.13c 0x2F8B9..0x2F8D1).
+    e.f_2b080(p, e.f_2f1c0(recoverable != 0 ? 10 : 9), 0x7fffffff);
 
     int rc = 7;
     void* hwnd = (void*)(uintptr_t)g_hwnd;

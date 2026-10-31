@@ -13,7 +13,7 @@
 // +0x2E210 DAT_6ff7e210: the CRT lock table, 8-byte CRITICAL_SECTION stride (the decompile indexes it
 // as dwords, hence `param_1 * 2`), as modelled in fog_batch_2000.cpp. Under the compat shim the entry
 // address is not observable; the index is the whole rule.
-static uint8_t g_fog_csTable[0x400];
+extern uint8_t g_fog_csTable[0x400];  // one lock table for the DLL (Fog+0x2E210), defined in fog_batch_tiny_1018c.cpp
 
 // 1.13c Fog+0x272F
 // Ten-byte tail fragment (caller +0x26DB, _fwprintf): __unlock_file(*(FILE**)[EBP-0x20]) -- the
