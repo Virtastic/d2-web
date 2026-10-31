@@ -49,37 +49,6 @@ void sub_43830(const Host& H,S43830& s){
  if(s.g3b8){ P u=s.gbbfc?(P)(intptr_t)H.opi(10331,s.gbbfc,0,0):nullptr; H.op(10358,s.g3b8,u,(P)5); return; }
  s.g400=1;
 }
-// 1.13c D2Client+0x440C0
-// 1.13c D2Client+0x440C0
-void sub_440C0(const Host& H,P g3b8,I g2e0){
- for(P n=(P)(intptr_t)H.opi(10717,g3b8,0,0);n;n=H.ptr(n,0x7c)){
-  uint8_t* f=(uint8_t*)n+0x34;
-  if(*f&1) continue;
-  H.op(0x18370,n,0,0); H.op(0xA7D00,0,0,0);
-  if(H.opi(10826,n,0,0)==8&&g2e0) H.op(0x53550,n,0,0);
-  *f|=1;
- }
-}
-// 1.13c D2Client+0x44110 (teardown; each step is a callee, order preserved)
-// 1.13c D2Client+0x44110
-void sub_44110(const Host& H,P* g3b8,P* g54e4,P* g3c4,U* g97e0 /*32 words*/,P g97e8){
- H.op(0x30220,0,0,0); H.op(0x037D0+0x00000,0,0,0); H.op(0x57000,0,0,0);
- if(*g3b8) H.op(10868,*g3b8,0,0);
- *g3b8=nullptr;
- H.op(10076,0,0,0); H.op(10078,0,0,0); H.op(10089,0,0,0); H.op(10104,0,0,0);
- H.op(0x18C30,0,0,0); H.op(0x18BE0,0,0,0);
- if(*g54e4){ H.op(10046,(P)"..\\Source\\D2Client\\ENGINE\\Gfx.cpp",(P)0x7f9,0); *g54e4=nullptr; }
- P c=*g3c4;
- if(ri(c,0xeaa8)) H.op(10043,(P)0x55,0,0);
- wr(c,0xeaa8,0); wr(c,0xeab0,0); wr(c,0xea9c,0); wr(c,0x38,0);
- H.op(10043,(P)0x141,0,0);
- *g3c4=nullptr;
- H.op(0x72D10,0,0,0); H.op(0x582B0,0,0,0);
- H.op(10061,0,0,0); H.op(10061,0,0,0); H.op(10061,0,0,0);
- H.op(10143,g97e8,0,0);
- std::memset(g97e0,0,32*4);
- H.op(10043,(P)0x592,0,0);
-}
 // 1.13c D2Client+0x526E0 / +0x527A0 (message id 0x161 / 0x15b)
 // 1.13c D2Client+0x526E0
 // 1.13c D2Client+0x527A0

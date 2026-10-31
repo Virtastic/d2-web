@@ -108,7 +108,7 @@ EMSCRIPTEN_KEEPALIVE i32 d2c_45ff0(E45FF0* e, int16_t bx) {
     if (k >= e->skipN) return s; } }
 
 // 1.13c D2Client+0x46070
-struct E46070 { uint8_t g9721; i32 g971d, g9725; };
+struct E46070 { uint32_t g9721; i32 g971d, g9725; }; // 0x119721 is stored as a dword (mov dword [0x6FBC9721], 0|1)
 EMSCRIPTEN_KEEPALIVE void d2c_46070(E46070* e, const i32* p) {
   if (!p) { e->g9721 = 0; return; } e->g9721 = 1; e->g971d = p[3]; e->g9725 = p[1]; }
 

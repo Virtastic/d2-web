@@ -33,5 +33,5 @@ extern "C" uint32_t d2_client_148e0_build(uint8_t*, uint32_t, uint32_t, uint32_t
 // 1.13c D2Client+0x148E0: [op, ecx32, edx32, c32], 13 bytes (r[3]=c)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2client_148e0(uint32_t* r) { uint8_t b[13] = {}; r[4] = fold(d2_client_148e0_build(b, r[0], r[1], r[2], r[3]), b); }
 
-// 1.13c D2Client+0x45FB0: clears DAT_6fbc978e, sends [0x38, 0x00000000, DAT_6fbc971d(32)] (9 bytes). v = DAT_6fbc971d.
-extern "C" uint32_t d2_client_45fb0(uint32_t v, uint8_t* o) { return pk(0x38, 0, v, 9, 4, 4, 5, o); }
+// 1.13c D2Client+0x45FB0: clears the dword at 0x11978E, sends [0x38, 0x00000000, key = [0x11971D] (32), ECX (32)] (13 bytes, EBX = 0xD).
+extern "C" uint32_t d2_client_45fb0(uint32_t* g978e, uint32_t key, uint32_t ecx, uint8_t* o) { *g978e = 0; pk(0x38, 0, key, 13, 4, 4, 5, o); put(o, 9, ecx, 4); return 13; }

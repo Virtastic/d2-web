@@ -54,25 +54,4 @@ EMSCRIPTEN_KEEPALIVE i32 d2c_43830(D2cHost h, u32 g3b8, u32 player) {
     return -1;
 }
 
-// 1.13c D2Client+0x43920  (returns new DAT_6fbcc39c: -1 unchanged, else 0/1)
-EMSCRIPTEN_KEEPALIVE i32 d2c_43920(D2cHost h, uint8_t* buf /*512*/) {
-    i32 flag = -1;
-    for (;;) {
-        i32 n = (i32)ord(h, 10020, (u32)(uintptr_t)buf, 0x200);
-        if (n != -1) switch (buf[0]) {
-            case 0xaf: flag = 1; break;
-            case 0xb0: flag = 0; break;
-            case 0xb3: go(h, 0xACD70); break;
-            case 0xb4: go(h, 0xACBF0); break;
-        }
-        go(h, 0x80000000u | 0);  // Sleep(0) placeholder: host yield
-        if (n == -1) break;
-    }
-    for (;;) {
-        i32 n = (i32)ord(h, 10008, (u32)(uintptr_t)buf, 0x200);
-        go(h, 0xACE20, (u32)n);
-        if (n == -1) break;
-    }
-    return flag;
-}
 }

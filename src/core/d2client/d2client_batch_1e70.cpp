@@ -111,7 +111,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE const uint8_t* d2_client_5cc10_base() { return g
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_a5420(void* obj, const D2ClientBatch1e70Env* env) {
     if (*(int32_t*)((uint8_t*)obj + 100) != 0) {
-        env->removeAll(obj);
+        env->removeAll((void*)(uintptr_t)*(uint32_t*)((uint8_t*)obj + 100));   // ESI = [EDI+0x64]
         *(int32_t*)((uint8_t*)obj + 100) = 0;
     }
 }
@@ -121,15 +121,15 @@ EMSCRIPTEN_KEEPALIVE void d2_client_a5420(void* obj, const D2ClientBatch1e70Env*
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_a5b00(uint32_t row, uint32_t value,
                                                      const D2ClientBatch1e70Env* env) {
-    env->insert((uint8_t*)g_slots10A608 + (size_t)row * 0x80, value & 0x7F, value, row);
+    env->insert((uint8_t*)g_slots10A608 + (size_t)row * 0x200, value & 0x7F, value, row);
 }
 
-// 1.13c D2Client+0xA5B40: __fastcall(key /*ECX*/, slot /*EDX*/, EAX = slot again):
-// 0xA4E20(key, 0x10A608 + slot*0x200, slot). The found node is discarded (0xA4E20 exits on mismatch).
+// 1.13c D2Client+0xA5B40: __fastcall(key /*ECX*/, slot /*EDX*/): 0xA4E20(ECX = key,
+// EDX = 0x10A608 + slot*0x200, EAX = key & 0x7F, stack slot). The found node is discarded (0xA4E20 exits on mismatch).
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_a5b40(uint32_t key, uint32_t slot,
                                                      const D2ClientBatch1e70Env* env) {
-    env->find(key, (uint8_t*)g_slots10A608 + (size_t)slot * 0x80, slot);
+    env->find(key, (uint8_t*)g_slots10A608 + (size_t)slot * 0x200, key & 0x7F, slot);
 }
 
 // 1.13c D2Client+0xA7340: __fastcall(row /*ECX*/, value /*EDX*/): 0xA6EF0(0x109A08 + row*0x200,
@@ -139,6 +139,10 @@ EMSCRIPTEN_KEEPALIVE void d2_client_a7340(uint32_t row, uint32_t value,
                                                      const D2ClientBatch1e70Env* env) {
     env->insert((uint8_t*)g_slots109A08 + (size_t)row * 0x200, value & 0x7F, value, row);
 }
+
+// Row-table bases, for the FN replay probes (they log the base as a module-image address).
+extern "C" uintptr_t d2_client_slots_10a608() { return (uintptr_t)g_slots10A608; }
+extern "C" uintptr_t d2_client_slots_109a08() { return (uintptr_t)g_slots109A08; }
 
 // 1.13c D2Client+0xBE2E0: while 0x0DD5D4 is set, arm 0x0FAD50 to GetTickCount() + 100.
 extern "C"

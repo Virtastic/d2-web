@@ -1,4 +1,4 @@
-// D2Client 0x3CA00 / 0x3CC60 / 0x429C0, real extern "C" bodies over the real Storm senders and Fog fatal path.
+// D2Client 0x3CA00 / 0x3CC60, real extern "C" bodies over the real Storm senders and Fog fatal path.
 // Register args are explicit: 0x3CA00 takes EAX/ECX/EDX/ESI, 0x3CC60 takes EAX (count) plus two stack args.
 #include <cstdint>
 #include <emscripten.h>
@@ -47,23 +47,4 @@ void FUN_6faecc60(uint32_t count, uint32_t handle, const uint32_t* table) {
     for (; count != 0; --count, table += 3) FUN_6faeca00(handle, table[1], table[2], table[0]);
 }
 
-static bool modeAB() { return DAT_6fbc9898 == 1 || (DAT_6fbc9898 == 2 && (DAT_6fbc988c == 4 || DAT_6fbc988c == 5)); }
-
-// 1.13c D2Client+0x429C0
-EMSCRIPTEN_KEEPALIVE void FUN_6faf29c0() {
-    if (d2_win32_GetSystemMetrics(0x4b) != 0) {
-        if (DAT_6fbcc3cc == 0) goto tail;
-        if (DAT_6fbc9898 == 1 ? DAT_6fbc9890 != 0 : (DAT_6fbc9898 == 2 && (DAT_6fbc988c == 4 || DAT_6fbc988c == 5)))
-            FUN_6faecc60(1, d2_client_window_handle(), DAT_6fba4748);
-    }
-    if (DAT_6fbcc3cc != 0) {
-        if (modeAB()) FUN_6faecc60(2, d2_client_window_handle(), DAT_6fba4754);
-        if (DAT_6fbc9898 == 2 && DAT_6fbc988c != 4 && DAT_6fbc988c == 5)
-            FUN_6faecc60(2, d2_client_window_handle(), DAT_6fba476c);
-    }
-tail:
-    if (d2_win32_GetSystemMetrics(0x4b) != 0 && DAT_6fbcc3cc != 0 && DAT_6fbc9898 == 1 && DAT_6fbc9890 == 0 &&
-        DAT_6fba46d4 != 0)
-        FUN_6faecc60(1, d2_client_window_handle(), DAT_6fba4784);
-}
 }  // extern "C"
