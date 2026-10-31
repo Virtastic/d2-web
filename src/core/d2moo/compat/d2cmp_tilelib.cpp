@@ -147,34 +147,38 @@ const uint8_t* D2CMP_17020_CacheFind(const uint8_t* pTable, const uint8_t* pKey,
     return nullptr;
 }
 
-// 1.13c D2CMP+0xc0b0 -- sprite-cache init (SpriteCache.cpp): 0x1400 doubly linked 0x1c-byte nodes
-// (next at +0x14, prev at +0x18), head/tail kept at [9]/[10], critical section created once.
+// 1.13c D2CMP+0xc0b0 -- sprite-cache init (SpriteCache.cpp): 0x1400 zeroed nodes chained next/prev,
+// head/tail kept at [9]/[10], critical section created once.
 // Stateful, register args (ecx,eax,edx -> param1,eax,param2): no FN vector; mapped from the decompile.
-// Slots are named by retail's dword index ([n]); integer slots keep their 32-bit width, pointer slots are
-// wasm-width, so byte offsets past [3] differ from retail but every slot holds the same value.
+// Slots are named by retail's dword index ([n]). Retail's node is 0x1c bytes with 32-bit links at +0x14
+// (next) and +0x18 (prev); here the links are native pointers, so the node is wasm-width and its byte
+// layout differs, while the chain (node i -> i+1, node 0 prev null, node 0x13ff next null), the zeroed
+// fields and every slot value are the same. Node pool and lock are host-allocated (zeroed), as Fog #10045.
+struct D2SpriteNode {
+    uint32_t z[5];               // +0x00..+0x13 zero (retail +0,+4,+8,+0xC,+0x10)
+    D2SpriteNode* next;          // retail +0x14
+    D2SpriteNode* prev;          // retail +0x18
+};
 struct D2SpriteCache {
     uint32_t s0;                 // [0]  param_1 (ECX)
     uint32_t s1;                 // [1]  in_EAX
     uint32_t s2, s3;             // [2],[3] 0
-    uint8_t* pNodes;             // [4]  node array
+    D2SpriteNode* pNodes;        // [4]  node array
     uint32_t s5_8[4];            // [5..8] 0
-    uint8_t* pHead;              // [9]
-    uint8_t* pTail;              // [10]
+    D2SpriteNode* pHead;         // [9]
+    D2SpriteNode* pTail;         // [10]
     uint32_t s11;                // [11] param_2 (EDX)
     void* pLock;                 // [12] CRITICAL_SECTION stand-in, created once
     uint32_t s13_14[2];          // [13],[14] 0
 };
 void D2CMP_SpriteCacheInit(D2SpriteCache* p, uint32_t param1, uint32_t eax, uint32_t param2) {
     p->s0 = param1; p->s1 = eax; p->s2 = p->s3 = 0; p->s11 = param2;
-    p->pNodes = (uint8_t*)calloc(0x1400, 0x1c);   // retail: Fog #10045 zeroed, same contents
-    // Links are 32-bit node handles (index+1, 0 = null) so the node keeps retail's 0x1c stride; a wasm64
-    // pointer would overrun the node (next at +0x14, prev at +0x18 would overlap).
+    p->pNodes = (D2SpriteNode*)calloc(0x1400, sizeof(D2SpriteNode));   // retail: Fog #10045, zeroed
     for (uint32_t i = 0; i < 0x1400; i++) {
-        uint8_t* n = p->pNodes + i * 0x1c;
-        *(uint32_t*)(n + 0x14) = i < 0x13ff ? i + 2 : 0;   // next = node i+1
-        *(uint32_t*)(n + 0x18) = i > 0 ? i : 0;            // prev = node i-1
+        p->pNodes[i].next = i < 0x13ff ? &p->pNodes[i + 1] : nullptr;
+        p->pNodes[i].prev = i > 0 ? &p->pNodes[i - 1] : nullptr;
     }
-    p->pHead = p->pNodes; p->pTail = p->pNodes + 0x13ff * 0x1c;
+    p->pHead = p->pNodes; p->pTail = &p->pNodes[0x13ff];
     p->s5_8[0] = p->s5_8[1] = p->s5_8[2] = p->s5_8[3] = 0;
     p->s13_14[0] = p->s13_14[1] = 0;
     if (!p->pLock) p->pLock = calloc(1, 0x18);   // retail: Fog #10042 + InitializeCriticalSection
