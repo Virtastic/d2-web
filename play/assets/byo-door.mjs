@@ -95,7 +95,8 @@ export function frontDoor({ onReady } = {}) {
       back = { ...e, sy: e.sy ?? e.s, img: await createImageBitmap(await (await fetch(new URL(e.file, base))).blob()), at: performance.now() };
     } catch { /* black */ }
   })();
-  Promise.all([staged, Promise.race([backdrop, new Promise((r) => setTimeout(r, 10000))])]).then(() => { shownAt = performance.now(); });   // a slow backdrop fades in on its own
+  const cap = (p, ms) => Promise.race([p, new Promise((r) => setTimeout(r, ms))]);
+  Promise.all([cap(staged, 10000), cap(backdrop, 10000)]).then(() => { shownAt = performance.now(); });   // a slow backdrop fades in on its own
 
   // ---- text ----
   function measure(name, s) {
@@ -229,6 +230,7 @@ export function frontDoor({ onReady } = {}) {
   }
   function frame(t) {
     if (done) return;
+    if (loading && !shownAt) shownAt = t;   // entering always shows the loading screen, so it can close
     const dpr = devicePixelRatio || 1, W = Math.round(innerWidth * dpr), H = Math.round(innerHeight * dpr);
     const s = Math.min(W / 460, H / 600);   // narrow screens crop the sides; everything drawn sits in x 170..630
     view = { s, x: (W - 800 * s) / 2, y: (H - 600 * s) / 2 };
