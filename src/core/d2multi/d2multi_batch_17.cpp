@@ -14,7 +14,7 @@ void    Ordinal_10024(const void*, int32_t);
 void d2_multi_sub_1a20(void); void d2_multi_sub_1da0(void); void d2_multi_sub_b900(void);
 void d2_multi_sub_8790(void); void d2_multi_sub_1510(void);
 void d2_multi_sub_b160(void*, int32_t); void d2_multi_sub_b2a0(void);
-void d2_multi_sub_acb0(void); uint8_t d2_multi_sub_9000(const char*, const char*, uint8_t*, int32_t);
+void d2_multi_sub_acb0(void); bool d2_multi_sub_9000(const char*, const char*, uint8_t*, uint32_t*, uint32_t);
 void d2_multi_exit(int32_t);
 extern uint8_t DAT_6fa0a0d8[], DAT_6fa0a0cc[], DAT_6fa09dbc[], DAT_6fa09db0[], DAT_6fa09db4[], DAT_6fa09db8[];
 extern int32_t DAT_6fa0a03c, DAT_6fa09dc0, DAT_6fa09160, DAT_6fa09f20, DAT_6fa09f88, DAT_6fa0a0e0;

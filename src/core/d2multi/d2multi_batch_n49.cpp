@@ -10,7 +10,7 @@ extern void q_d2multi_batch_n49_Ordinal_10185(int) W; extern int Ordinal_10030()
 extern int Ordinal_10054() W; extern int Ordinal_10087() W; extern int Ordinal_10186(int, int) W; extern int Ordinal_10079() W;
 extern void q_d2multi_batch_n49_Ordinal_10022(int, const char*) W; extern int Ordinal_10003() W;
 extern int d2multi_unicode2Win(char* dst, const void* src, int n) W;
-extern bool d2multi_9000(const char* key, const char* val, uint8_t* out, int n) W;       // registry read
+bool d2_multi_sub_9000(const char* key, const char* val, uint8_t* out, uint32_t* size, uint32_t cap);   // registry read (n37)
 extern const char* d2multi_urlArg() W;                                                   // (*(DAT_6fa0917c+0xa4))()
 extern void d2multi_hostLaunch(const char* cmd) W;                                       // CreateProcessA seam
 extern void d2multi_acb0() W; extern void d2multi_onDone() W;                            // FUN_ACB0, (*(DAT_6fa0917c+0x6c))()
@@ -32,9 +32,10 @@ uint32_t d2multi_BC00(void) {
     uint8_t cls[0x400] = {0}, cmd[0x400 + 2] = {0};
     char key[0x400];
     snprintf(key, sizeof key, "%s\\.html", "SOFTWARE\\Classes");
-    if (d2multi_9000(key, nullptr, cls, 0x400)) {
+    uint32_t rn = 0;
+    if (d2_multi_sub_9000(key, nullptr, cls, &rn, 0x400)) {
         snprintf(key, sizeof key, "%s\\%s\\shell\\open\\command", "SOFTWARE\\Classes", (char*)cls);
-        if (d2multi_9000(key, nullptr, cmd, 0x400)) {
+        if (d2_multi_sub_9000(key, nullptr, cmd, &rn, 0x400)) {
             size_t n = strlen((char*)cmd);
             memcpy(cmd + n, DAT_6f9e74d8, 2);          // separator word, then the URL
             n = strlen((char*)cmd);
