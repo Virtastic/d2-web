@@ -159,7 +159,7 @@ uint8_t D2Common_325C0_MeleeRange(void* unit,
             if (range != 0xff) return range;
             void* value = unit;
             weaponClass(unit, retailPointer(unit, 0x60, resolve), &value, -1, 1);
-            return value == reinterpret_cast<void*>(6) ? 0 : 2;
+            return value == reinterpret_cast<void*>(6) ? 2 : 0;
         }
     }
     return 0;
