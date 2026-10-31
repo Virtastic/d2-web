@@ -94,6 +94,12 @@ MSYS_NO_PATHCONV=1 docker run --rm \
 
 flock -u 9; exec 9>&-
 
+# Guard: every src/core/fn probe must have compiled into this build (link-d2.sh globs src/, so a probe that stops
+# compiling or linking already fails above; this catches one the glob skipped).
+for f in src/core/fn/*.cpp; do
+  s=$(basename "$f" .cpp)
+  find build-wasm/obj -name "src_core_fn_$s.o" -print -quit | grep -q . || { echo "FATAL: probe $f has no compiled object" >&2; exit 1; }
+done
 bash ci/stage.sh
 if [ -z "${D2_CXXFLAGS:-}" ]; then bash tools/engine-cache.sh put . || true; else rm -f play/.engine-key; fi # custom builds never publish as normal engines
 # Custom engines keep their own compiler configuration and never seed release worktrees.

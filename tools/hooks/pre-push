@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Public repo push gate: only main, no merge commits, a small squashed batch, the public identity, and
 # every pushed commit's files and message pass tools/leak-check.sh (catches --no-verify commits).
-# Pushes are batched: at most one every D2_PUSH_GAP_MIN minutes (120); D2_PUSH_NOW=1 for a player fix.
+# Pushes are batched: at most one every D2_PUSH_GAP_MIN minutes (60); D2_PUSH_NOW=1 for a player fix.
 root="$(git rev-parse --show-toplevel)"; L="$root/tools/leak-check.sh"; z=0000000000000000000000000000000000000000
-max="${D2_PUSH_MAX_COMMITS:-10}"; gap="${D2_PUSH_GAP_MIN:-120}"
+max="${D2_PUSH_MAX_COMMITS:-10}"; gap="${D2_PUSH_GAP_MIN:-60}"
 die() { echo "pre-push: $*" >&2; exit 1; }
 while read -r _ lsha rref rsha; do
   [ "$lsha" = "$z" ] && die "refusing to delete $rref on the public remote"
