@@ -2689,6 +2689,7 @@ D2UnitStrc* __stdcall D2Common_10434(D2UnitStrc* pUnit, BOOL a2)
 }
 
 //D2Common.0x6FDC0F70 (#10435)
+// 1.13c D2Common+0x31B40
 // 1.13c body: the monster must be UNIT_MONSTER with an inventory whose signature is valid; the candidate is
 // the 1.13c equipped-hand rule of D2Common+0x20700 (not INVENTORY_GetEquippedWeapon): body-loc cell 4 (right
 // hand) when it is not an item or its item flags have neither 0x100 nor 0x4000, and it is a weapon (0x2D);
