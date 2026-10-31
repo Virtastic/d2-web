@@ -17,12 +17,12 @@ struct Env {
  P flagsHalfL[8];                       // ADF4 ADD8 AD88 ADBC AE10 AE14 ADD0 (+pad) -> *out0 = w/2
  P flagsHalfR[2];                       // AD84 AD90 -> out2 = w/2
  // BEAF0 / BEB90 / BF370 / BF990
- P (*f2b420)(P); void (*f143e0)(const uint8_t*); P (*f4d630)(P, uint32_t); int32_t (*f4d670)(P, uint32_t);
+ P (*f2b420)(const char* path, P); void (*f143e0)(const uint8_t*); P (*f4d630)(P, uint32_t); int32_t (*f4d670)(P, uint32_t);
  bool (*f4dc60)(P, uint32_t, uint32_t); void (*toUnicode)(W*, P, uint32_t);
  bool (*f98c0)(P, uint32_t); uint32_t (*f8e50)(P, uint32_t);
  // ordinals
  P (*o10331)(P); int32_t (*o10826)(); uint8_t (*o10190)(uint32_t, uint32_t, uint32_t); void (*o10065)(P); void (*o10043)(uint32_t, uint32_t);
- int32_t (*o10014)(int32_t); uint32_t (*o10459)(int32_t); void (*o10004)(char*, uint32_t); void (*o10138)(int32_t, uint32_t, uint32_t, uint32_t);
+ P (*o10014)(int32_t); uint32_t (*o10459)(int32_t); void (*o10004)(char*, uint32_t); void (*o10138)(P handle, int32_t x, int32_t y, uint32_t, uint32_t, uint32_t);
  uint32_t (*o10265)(uint32_t); void (*o10024)(uint32_t, uint32_t);
  void (*o10184)(); void (*o10028)(); void (*o10150)(const W*, uint32_t, uint32_t, uint32_t);
  const W* (*o10003)(); int32_t (*o10973)(P, uint32_t, uint32_t); int32_t (*o10227)();
@@ -32,7 +32,9 @@ struct Env {
  void (*f24d80)(); void (*faed470)(); void (*faf6a20)(); void (*fb09740)(uint32_t); void (*fb2beb0)(P);
  int32_t (*spr)(char*, const char*, int32_t);  // _sprintf one %d
  void (*fatal)(uint32_t, const char*);
+ void (*exitProc)(int32_t);  // CRT exit(-1) after a fatal message
 };
+static void scat(char* d, const char* s) { while (*d) d++; while ((*d++ = *s++)) {} }
 static uint32_t wlen(const W* s) { uint32_t n = 0; while (s[n]) n++; return n; }
 static void wcpy(W* d, const W* s) { while ((*d++ = *s++)) {} }
 static void wcat(W* d, const W* s) { wcpy(d + wlen(d), s); }
@@ -50,7 +52,7 @@ bool sub_BEA10(const Env& e, int32_t* o) {
 }
 // 1.13c D2Client+0xBEAF0
 void sub_BEAF0(const Env& e) {
- if (e.rd32(e.gB9C4) == 0) e.wr32(e.gB9C4, (uint32_t)e.f2b420(0));  // path "DATA\\GLOBAL\\ui\\panel\\buysellbtn" built, passed implicitly
+ if (e.rd32(e.gB9C4) == 0) e.wr32(e.gB9C4, (uint32_t)e.f2b420("DATA\\GLOBAL\\ui\\panel\\buysellbtn", 0));
 }
 // 1.13c D2Client+0xBEB90
 void sub_BEB90(const Env& e) {
@@ -79,21 +81,33 @@ void sub_BF0D0(const Env& e) {
  }
  if ((int32_t)e.rd32(e.gD340C) < 0x78) {
   e.wr32(e.gD340C, e.rd32(e.gD340C) + 1);
-  int32_t k = e.o10014(id);
-  char act[16], mid[16];
-  if (id < 0x6d) { char t[8]; (void)t; e.spr(act, "ACT%d", (int32_t)(e.o10459(id) & 0xff) + 1); }
-  e.o10004(mid, 0);
-  (void)k; // path "%s\\UI\\%s\\%s\\%s" built; consumed implicitly by FUN_6fadb420 below
+  P k = e.o10014(id);
+  char act[16], lang[260], path[260];
+  if (id < 0x6d) e.spr(act, "ACT%d", (int32_t)(e.o10459(id) & 0xff) + 1);
+  else { act[0] = 0; scat(act, "EXPANSION"); }
+  e.o10004(lang, 0);
+  char nm2[64]; int32_t j = 0;
+  for (; j < 63 && (nm2[j] = (char)e.rd8(k + 0x145 + j)); j++) {}
+  nm2[j] = 0;
+  // "%s\UI\%s\%s\%s": DATA\LOCAL, language, act folder, the level's panel name
+  path[0] = 0; scat(path, "DATA\\LOCAL"); scat(path, "\\UI\\"); scat(path, lang); scat(path, "\\"); scat(path, act);
+  scat(path, "\\"); scat(path, nm2);
   int32_t n = (int32_t)e.rd32(e.gBEA0);
-  P rec = e.gBE88;  // 13-byte records {id@-4 .. } indexed from gBE88-4
+  P rec = e.gBE88;  // 13-byte records {id, idx, name[5]}; rec points at idx
   for (int32_t i = 0; i < n; i++, rec += 0xd) {
    if (id != (int32_t)e.rd32(rec - 4)) continue;
-   if (e.rd32(e.gC0A0) == 0) { e.o10024(0, e.o10265(0x60)); return; }
-   if ((int32_t)e.rd32(rec) > 0x24) { e.o10024(0, e.o10265(0x65)); return; }
-   if (e.rd8(e.gC5590 + e.rd32(rec)) != 0) break;  // ACT1 override path
+   uint32_t code = 0;
+   if (e.rd32(e.gC0A0) == 0) code = 0x60;
+   else if ((int32_t)e.rd32(rec) > 0x24) code = 0x65;
+   if (code) { e.o10024(0x6fb8359f, e.o10265(code)); e.exitProc(-1); return; }
+   if (e.rd8(e.gC5590 + e.rd32(rec)) != 0) {  // quest flag set: the ACT1 override "%s\UI\%s\ACT1\%s"
+    char rn[6]; for (int32_t q = 0; q < 5; q++) rn[q] = (char)e.rd8(rec + 4 + q); rn[5] = 0;
+    path[0] = 0; scat(path, "DATA\\LOCAL"); scat(path, "\\UI\\"); scat(path, lang); scat(path, "\\ACT1\\"); scat(path, rn);
+    break;
+   }
   }
-  if (!e.rd32(e.gAD54)) e.wr32(e.gAD54, (uint32_t)e.f2b420(0));
-  e.o10138((int32_t)e.rd32(e.gBC4C) / 2 - 0x8c, 1, 5, 1);
+  if (!e.rd32(e.gAD54)) e.wr32(e.gAD54, (uint32_t)e.f2b420(path, 0));
+  e.o10138(e.rd32(e.gAD54), (int32_t)e.rd32(e.gBC48) / 2, (int32_t)e.rd32(e.gBC4C) / 2 - 0x8c, 1, 5, 1);
  } else {
   P s = e.rd32(e.gAD54);
   if (s) { freeBlk(e, s); e.wr32(e.gAD54, 0); }

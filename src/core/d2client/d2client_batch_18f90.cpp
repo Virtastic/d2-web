@@ -28,19 +28,16 @@ uint32_t d2_client_18f90(uint32_t unit, uint32_t local_cbbfc, uint32_t* ebx, int
     return 0;
 }
 
-// 1.13c D2Client+0x1BC0 (75 B): EDI = unit, ESI = optional out flag. unit && (*(u32*)(unit+200)>>3 & 1):
-// Ordinal_10866() != 0 -> p = FUN_6fb560d0(ECX); p != null -> *ESI = 1, return p[0x18].
-// Else *ESI = 0, return *(u32*)(unit+0x60).
+// 1.13c D2Client+0x1BC0 (75 B): EDI = unit, ESI = optional out flag. unit && (*(u32*)(unit+0xC8)>>3 & 1)
+// && Ordinal_10866(unit, 0x25) != 0 && (p = 0xA60D0(EAX = unit)) != null -> *ESI = 1, return p[0x18].
+// Else *ESI = 0, return *(u32*)(unit+0x60) (retail reads it even for a null unit).
 extern "C" EMSCRIPTEN_KEEPALIVE
-int32_t d2_client_1bc0(uintptr_t unit, uint32_t* esi, uint32_t ecx,
-                       int32_t (*ord10866)(void), int32_t* (*f560d0)(uint32_t)) {
-    if (unit && ((*(const uint32_t*)(unit + 200) >> 3) & 1)) {
-        if (ord10866() != 0) {
-            int32_t* p = f560d0(ecx);
-            if (p) {
-                if (esi) *esi = 1;
-                return p[0x18];
-            }
+int32_t d2_client_1bc0(uintptr_t unit, uint32_t* esi,
+                       int32_t (*ord10866)(uintptr_t, int32_t), int32_t* (*fa60d0)(uintptr_t)) {
+    if (unit && ((*(const uint32_t*)(unit + 0xC8) >> 3) & 1) && ord10866(unit, 0x25) != 0) {
+        if (int32_t* p = fa60d0(unit)) {
+            if (esi) *esi = 1;
+            return p[0x18];
         }
     }
     if (esi) *esi = 0;

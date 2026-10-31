@@ -23,7 +23,7 @@ struct Env {
  uint32_t (*getTick)(); void (*o10065)(uint32_t); int32_t (*o10043)(int32_t, int32_t);
  P (*o10331)(P, uint32_t); int32_t (*o10031)(); int32_t (*o10494)(P, int32_t); int32_t (*o10871)(P, int32_t);
  P (*f12b0)(); int32_t (*o10973)(P, int32_t, int32_t); void (*f1b190)(P, int32_t, int32_t, int32_t);
- void (*f4b00)(); int32_t (*o10085)(int32_t, int32_t, int32_t);
+ void (*f4b00)(); int32_t (*o10085)(int32_t, int32_t, int32_t, int32_t);
  void (*f71580)(); uint8_t (*o10190)(int32_t, int32_t, int32_t); void (*o10014)(int32_t, int32_t, int32_t, int32_t, uint32_t, int32_t);
  int32_t (*o10086)(uint32_t); void (*o10041)(const int32_t*, int32_t, int32_t, uint32_t, int32_t, int32_t); void (*o10040)();
  P (*fdb420)(const char*, int32_t);
@@ -178,7 +178,7 @@ void sub_C1760(const Env& e, int32_t p) {
  if (e.rd32(0x6fbc97fc) < t) { e.f4b00(); e.wr32(0x6fbc97fc, t + 5000); e.wr32(0x6fbc9800, t); }
  if (e.o10043z() == 0) {
   e.o10062z();
-  if (e.o10085(1, 0, 0)) {
+  if (e.o10085(1, 0, 0, 0)) {
    if (!e.rd32(0x6fbcb9d0)) {
     sub_C1580(e);
     if (!e.rd32(0x6fbcb9d0)) { uint32_t c = e.o10265(0x19c6); e.o10024(e.str_c8359f, c); e.exit_(-1); return; }
@@ -195,8 +195,10 @@ void sub_C1760(const Env& e, int32_t p) {
    }
    int32_t n = e.o10086(e.rd32(0x6fbcb9d0));
    if (n <= (int32_t)e.rd32(0x6fbcbbb4)) e.wr32(0x6fbcbbb4, (uint32_t)(n - 1));
-   int32_t fr = (int32_t)e.rd32(0x6fbcbbb4);
-   e.o10041(&fr, W / 2 - 0x80, H / 2 + 0x80, 0xffffffffu, 5, 0);
+   // D2Gfx 10041 takes a stack CellContext: [0] = frame, +0x34 = the loading-screen cel handle, +0x40 = 0.
+   int32_t ctx[18] = {};
+   ctx[0] = (int32_t)e.rd32(0x6fbcbbb4); ctx[13] = (int32_t)e.rd32(0x6fbcb9d0); ctx[16] = 0;
+   e.o10041(ctx, W / 2 - 0x80, H / 2 + 0x80, 0xffffffffu, 5, 0);
    e.o10040();
    e.wr32(0x6fbcc3dc, 0); e.wr32(0x6fbcc3e0, 0); e.wr32(0x6fbcc3f8, 0); e.wr32(0x6fbcc3fc, 0);
   }
@@ -302,7 +304,7 @@ extern "C" const char* d2_client_loading_g(int32_t first, uint32_t ecx, uint32_t
  e.o10043z = []() -> int32_t { rec(10043, L.ecx, L.edx, {}); return 0; };
  e.o10021z = [](int32_t a) { rec(10021, L.ecx, L.edx, {(uint32_t)a}); };
  e.o10062z = []() { if (!L.pal) { L.pal = true; rec(10061, L.ecx, L.edx, {0x7fffffffu}); } };
- e.o10085 = [](int32_t a, int32_t b, int32_t c) -> int32_t { rec(10085, L.ecx, L.edx, {(uint32_t)a, (uint32_t)b, (uint32_t)c, 0}); return 1; };
+ e.o10085 = [](int32_t a, int32_t b, int32_t c, int32_t d) -> int32_t { rec(10085, L.ecx, L.edx, {(uint32_t)a, (uint32_t)b, (uint32_t)c, (uint32_t)d}); return 1; };
  e.f6e020 = []() { rec(10022, L.ecx, L.edx, {0x7fffffffu}); rec(10061, L.ecx, L.edx, {0x7fffffffu}); };
  e.o10009 = []() -> uint32_t { return 0; };
  e.fdb420 = [](const char*, int32_t) -> P { return 1; };

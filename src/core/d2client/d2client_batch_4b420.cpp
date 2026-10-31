@@ -115,27 +115,44 @@ bool sub_4C430(Seams& s, Unit* u) {
   return !(s.sc0b0(u) != 0);
  return false;
 }
-// LCG seed step shared by sub_4C500: hi' = lo*0x6AC690C5 + hi (64-bit).
-static uint32_t step(Unit* u) { uint64_t v = (uint64_t)u->seedLo * 0x6ac690c5ull + u->seedHi; u->seedLo = (uint32_t)v; u->seedHi = (uint32_t)(v >> 32); return (uint32_t)v; }
-struct Spawn { virtual ~Spawn()=default; virtual uint32_t count(Unit*)=0; virtual bool eligible(Unit*)=0; virtual bool isPlayerLike(Unit*)=0;
- virtual uint32_t ord10663(Unit*)=0; virtual int32_t room(Unit*)=0; virtual int32_t ux(Unit*)=0; virtual int32_t uy(Unit*)=0;
- virtual bool blocked(int32_t room,int32_t x,int32_t y)=0; virtual void place(uint32_t)=0; virtual uint8_t spawnRate(Unit*)=0; };
+// LCG seed step: (lo,hi) = lo*0x6AC690C5 + hi as a 64-bit value; the draw is its low word.
+static uint32_t step(uint32_t* seed) { uint64_t v = (uint64_t)seed[0] * 0x6ac690c5ull + seed[1]; seed[0] = (uint32_t)v; seed[1] = (uint32_t)(v >> 32); return (uint32_t)v; }
+// Callee seams of the spawn-trail step; each is one call of the original, in the original's order.
+struct Spawn {
+ void* ctx;
+ uint32_t (*count)(void*);                 // spawn count for the unit
+ uint32_t (*rate)(void*, uint32_t* ret);   // spawn rate of the unit's class row; 0 when the lookup fails or the rate is 0, with the value the original returns there in *ret
+ int32_t (*playerLike)(void*);
+ uint32_t (*ord10663)(void*);
+ uint32_t (*room)(void*);
+ int32_t (*pathX)(void*, int32_t direct);  // direct: read the path record, else the path accessor
+ int32_t (*pathY)(void*, int32_t direct);
+ int32_t (*blocked)(void*, uint32_t room, int32_t x, int32_t y);
+ void (*place)(void*, uint32_t);
+};
+// Unit spawn-trail / scatter step   (flag, ecx = unit: type, mode, seed, hasPath)
 // 1.13c D2Client+0x4C500
-uint32_t sub_4C500(Spawn& s, Unit* u, int32_t flag, const int32_t dx[8], const int32_t dy[8]) {
- if (flag) { uint32_t r = step(u); if (r % 0x19) return r / 0x19; }
- if (u && u->type == 1 && u->classId == 3) { uint32_t r = step(u); if (r % 3) return r / 3; }
- uint32_t n = s.count(u), ret = n;
- if (!s.eligible(u) || (int32_t)n <= 0) return ret;
- uint8_t rate = s.spawnRate(u);
+uint32_t spawnTrail(const Spawn& s, uint32_t* seed, int32_t type, int32_t mode, int32_t hasPath, int32_t flag, const int32_t dx[8], const int32_t dy[8]) {
+ if (flag) { uint32_t r = step(seed); if (r % 25) return r / 25; }
+ if (type == 1 && mode == 3) { uint32_t r = step(seed); if (r % 3) return r / 3; }
+ uint32_t n = s.count(s.ctx), ret = n, fail = 0;
+ uint32_t rate = s.rate(s.ctx, &fail);
+ if (!rate) return fail;
+ if ((int32_t)n <= 0) return ret;
+ const int32_t direct = type == 2 || (type > 3 && type < 6);
  for (int32_t i = 0; i < (int32_t)n; ++i) {
   uint32_t d;
-  if (!s.isPlayerLike(u)) d = step(u);
-  else { uint32_t a = s.ord10663(u); d = (step(u) % 7) - 3 + ((a & 0xff) >> 3); }
-  d &= 7; uint32_t stop = (d - 1) & 7; int32_t rm = s.room(u);
+  if (!s.playerLike(s.ctx)) d = step(seed);
+  else { uint32_t a = s.ord10663(s.ctx); d = (step(seed) % 7) - 3 + ((a & 0xff) >> 3); }
+  d &= 7; uint32_t rm = s.room(s.ctx), stop = (d - 1) & 7;
   if (d == stop) return stop;
-  while (s.blocked(rm, dx[d] + s.ux(u), dy[d] + s.uy(u))) { d = (d + 1) & 7; if (d == stop) return stop; }
-  if (rate) step(u);
-  s.place((uint32_t)rate * 2);
+  for (;;) {
+   int32_t x = direct ? s.pathX(s.ctx, 1) : hasPath ? s.pathX(s.ctx, 0) : 0;
+   int32_t y = direct ? s.pathY(s.ctx, 1) : hasPath ? s.pathY(s.ctx, 0) : 0;
+   if (!s.blocked(s.ctx, rm, dx[d] + x, dy[d] + y)) break;
+   d = (d + 1) & 7; if (d == stop) return stop;
+  }
+  s.place(s.ctx, step(seed) % (rate * 2) + 0x12);
   ret = (uint32_t)i + 1;
  }
  return ret;

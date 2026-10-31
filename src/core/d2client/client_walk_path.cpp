@@ -1,3 +1,4 @@
+// 1.13c D2Client+0x4DC70 (case 1, the monster walk-path step)
 // Client-side walk path of a monster (1.13c D2Client 0xAF3F0 / 0x4DC70 case 1; the retail captures).
 // The client unit walks its own D2Common path after a 0x67/0x68 order: it is placed on the order's tile (+0x8000),
 // then once per client tick, BEFORE that tick's packets, moves dwVelocity*16 (16.16) toward the current point and

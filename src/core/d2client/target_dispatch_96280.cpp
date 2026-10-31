@@ -1,4 +1,4 @@
-// 1.13c D2Client+0x96280  target_dispatch: the left-hand body-slot press (slot 5 of the per-slot table at 0xE0EC4,
+// D2Client 1.13c rva 0x96280  target_dispatch: the left-hand body-slot press (slot 5 of the per-slot table at 0xE0EC4,
 // reached from the inventory press dispatcher 0x98DC0 with the body location on the stack; the caller drops eax).
 // Convention: EDX = inventory, ECX = player unit, one stack word = body location, ret 4. The frame is balanced:
 // sub esp,8; four register pushes (ebx ebp esi edi) and four pops; the "fifth push" is the argument of the C202 thunk.
@@ -47,6 +47,7 @@ void sound(const D2cTdEnv* e, uint32_t esi) {
 }  // namespace
 
 extern "C" {
+// 1.13c D2Client+0x96280
 EMSCRIPTEN_KEEPALIVE uint32_t d2c_target_dispatch_96280(const D2cTdEnv* e, uint32_t inv, uint32_t player,
                                                         uint32_t bodyLoc) {
     uint32_t ebx = 0;

@@ -101,12 +101,12 @@ void sub_A3580(Seams& s, uintptr_t m, int32_t scrW, int32_t scrH) {
  at<int32_t>(m, 0x34) = w; at<int32_t>(m, 0x38) = h;
  for (int32_t i = 0; i < n; ++i) sub_A32D0(s, i, m);
 }
-// 1.13c D2Client+0xA3A20   (ecx = a, edx = b); tab = 0x6fbca2e4 records of 10 bytes {u16 val; i32 key; i32 flag}, 0x6fbca2e4..0x6fbca75a
+// 1.13c D2Client+0xA3A20   (ecx = a, edx = b); tab = 0x6fbca2e4 (the value word); records of 10 bytes {i32 key @-4; u16 val @0; i32 flag @+2}, 114 records
 void sub_A3A20(Seams& s, uint32_t a, int32_t key0, int32_t key1, const uint8_t* tab, uint32_t& g85c, uint32_t& g868) {
- const uint32_t N = (0x6fbca75a - 0x6fbca2e6) / 10 + 1;
+ const uint32_t N = (0x6fbca75a - 0x6fbca2e6 + 9) / 10;
  auto val = [&](uint32_t i){ return *(const uint16_t*)(tab + i*10); };
- auto key = [&](uint32_t i){ return *(const int32_t*)(tab + i*10 + 2); };
- auto flg = [&](uint32_t i){ return *(const int32_t*)(tab + i*10 + 6); };
+ auto key = [&](uint32_t i){ return *(const int32_t*)(tab + i*10 - 4); };
+ auto flg = [&](uint32_t i){ return *(const int32_t*)(tab + i*10 + 2); };
  if (s.s98c0(a, 0x26))
   for (uint32_t i = 0; i < N; ++i)
    if (key(i) == key0 && flg(i) == 1) { if (val(i) != 0xffff && val(i) < 0xe0) g85c = val(i); break; }

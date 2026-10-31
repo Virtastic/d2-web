@@ -1,4 +1,4 @@
-// 1.13c D2Client+0x4DC70: unit mode-change handler. fastcall(param_1 = mode, unit, p3 = packet words).
+// D2Client 1.13c rva 0x4DC70: unit mode-change handler. fastcall(param_1 = mode, unit, p3 = packet words).
 // Every callee goes through D2cHost in retail order; ordinals are 0x10000+ordinal. Memory the retail code reaches through
 // globals or foreign pointers comes in via Env (pre-resolved) -- see the spec for each field.
 #include "client_host.h"
@@ -28,6 +28,7 @@ static void fatal(D2cHost h, uint32_t line, uint32_t tok) {
     cl(h, 0x3664, 0, 0, 0xFFFFFFFFu);   // _exit(-1)
 }
 
+// 1.13c D2Client+0x4DC70
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_4dc70(D2cHost h, D2c4dc70Env* E, uint32_t p1, uint32_t* u, uint32_t* p3) {
     const uint32_t mon = 0x6FB8359Fu;                  // error-string token (DAT_6fb8359f)
     uint32_t iVar1 = u[0xb];

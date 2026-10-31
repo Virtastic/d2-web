@@ -1,4 +1,4 @@
-// Monster facing on a mode order (1.13c D2Client+0x4DC70, the 0x69/0x6A/0x6B/0x6C handler).
+// Monster facing on a mode order (D2Client 0x4DC70, the 0x69/0x6A/0x6B/0x6C handler).
 // Retail never takes a direction from the packet; the client turns its unit by the selector:
 //   x,y selectors (4, 11, 12, 14, 17, 26, 28): when (x, y) is not (0, 0) and not the unit's own tile,
 //     Common #10434 (+0x317F0) -> #10739 (+0x352F0, D2Common_10216)(path, x, y, 0).

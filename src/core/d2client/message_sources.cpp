@@ -48,7 +48,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_dd20() {
         std::lock_guard<std::recursive_mutex> guard(d2_client_message_sources_mutex);
         while (static_cast<intptr_t>(d2_client_message_sources[2]) > 0) {
             auto* node = reinterpret_cast<uintptr_t*>(d2_client_message_sources[2]);
-            d2_fn_d2client_2ff0(node);
+            d2_client_2ff0(node);
             std::free(node);
         }
     }

@@ -8,54 +8,28 @@
 #include <cstring>
 #include <emscripten.h>
 
-// Intrusive-list unlink shared by 0x1030, 0x10B0, 0x1150 and 0x11F0. A node is two words:
-//   [0] successor pointer (0 = not linked), [1] encoded predecessor. A non-negative encoding is
-//   relative: node + enc - successor[1]; a negative one is ~target. The successor's back-link is
-//   written from the reloaded node words (the store to *target can alias the node itself).
-static void d2c_unlink(uint32_t node) {
-    uint32_t succ = *(const uint32_t*)(uintptr_t)node;
-    if (succ == 0) return;
-    uint32_t enc = *(const uint32_t*)(uintptr_t)(node + 4);
-    uint32_t target;
-    if ((int32_t)enc < 0) {
-        target = ~enc;
-    } else {
-        target = (uint32_t)(node + (enc - *(const uint32_t*)(uintptr_t)(succ + 4)));
-    }
-    *(uint32_t*)(uintptr_t)target = succ;
-    uint32_t s = *(const uint32_t*)(uintptr_t)node;
-    uint32_t e = *(const uint32_t*)(uintptr_t)(node + 4);
-    *(uint32_t*)(uintptr_t)(s + 4) = e;
-    *(uint32_t*)(uintptr_t)node = 0;
-    *(uint32_t*)(uintptr_t)(node + 4) = 0;
+#include "storm_link.h"
+
+// 1.13c D2Client+0x011F0 (63 B): EBX = list; drain it (d2c_link::drain11f0, retail's 32-bit words).
+extern "C" EMSCRIPTEN_KEEPALIVE
+void d2_client_11f0(uint32_t base) { d2c_link::drain11f0<uint32_t>(base); }
+
+// 1.13c D2Client+0x01030 (120 B): destructor body -- drain the list, then unlink its terminator at
+// base+4. The SEH frame is an injected check only. Returns base+4 (retail's EAX).
+extern "C" EMSCRIPTEN_KEEPALIVE
+uint32_t d2_client_1030(uint32_t base) {
+    d2c_link::drain11f0<uint32_t>(base);
+    d2c_link::unlink<uint32_t>(base + 4);
+    return base + 4;
 }
 
-// 1.13c D2Client+0x011F0 (63 B): drain a list whose head word lives at base + 8. The head is read
-// again every pass; a value <= 0 (signed) ends the loop, a node with a zero successor is skipped.
-// Each listed node is unlinked from its two-word ownership chain.
+// 1.13c D2Client+0x01150 (160 B): unlink the given link twice (the second pass is a no-op once the
+// node's previous word is cleared). Returns the node (retail's EAX).
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_11f0(uint32_t base) {
-    for (;;) {
-        uint32_t node = *(const uint32_t*)(uintptr_t)(base + 8);
-        if ((int32_t)node <= 0) return;
-        d2c_unlink(node);
-    }
-}
-
-// 1.13c D2Client+0x01030 (120 B): destructor body -- drain the base+8 list, then unlink the embedded
-// node at base+4 (entry base+4, encoding base+8). The SEH frame is an injected check only.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_1030(uint32_t base) {
-    d2_client_11f0(base);
-    d2c_unlink(base + 4);
-}
-
-// 1.13c D2Client+0x01150 (160 B): unlink the given node twice (the second pass is a no-op once the
-// node's successor is cleared).
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_1150(uint32_t node) {
-    d2c_unlink(node);
-    d2c_unlink(node);
+uint32_t d2_client_1150(uint32_t node) {
+    d2c_link::unlink<uint32_t>(node);
+    d2c_link::unlink<uint32_t>(node);
+    return node;
 }
 
 // 1.13c D2Client+0x012E0 (31 B): call fn(count) times over an array. ABI: EAX = count, EBX = callee,

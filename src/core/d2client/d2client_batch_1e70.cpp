@@ -19,7 +19,7 @@ static uint32_t g_tickDeadline;         // +0x0FAD50  DAT_6fbaad50
 static uint32_t g_seh8dc;               // +0x0DB8DC  DAT_6fb8b8dc
 static uint32_t g_seh8e0;               // +0x0DB8E0  DAT_6fb8b8e0
 static uint32_t g_seh8e4;               // +0x0DB8E4  DAT_6fb8b8e4
-static uint32_t g_slots10A608[8 * 0x20]; // +0x10A608  slot lists, row stride 0x80 (0xA5B00/0xA5B40)
+static uint32_t g_slots10A608[8 * 0x80]; // +0x10A608  slot lists, row stride 0x200 (0xA5B00/0xA5B40)
 static uint32_t g_slots109A08[4 * 0x80]; // +0x109A08  slot lists, row stride 0x200 (0xA7340)
 
 
@@ -116,7 +116,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_a5420(void* obj, const D2ClientBatch1e70Env*
     }
 }
 
-// 1.13c D2Client+0xA5B00: __fastcall(row /*ECX*/, value /*EDX*/): 0xA6EF0(0x10A608 + row*0x80,
+// 1.13c D2Client+0xA5B00: __fastcall(row /*ECX*/, value /*EDX*/): 0xA6EF0(0x10A608 + row*0x200,
 // value & 0x7F, value, row).
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_a5b00(uint32_t row, uint32_t value,
@@ -125,7 +125,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_a5b00(uint32_t row, uint32_t value,
 }
 
 // 1.13c D2Client+0xA5B40: __fastcall(key /*ECX*/, slot /*EDX*/, EAX = slot again):
-// 0xA4E20(key, 0x10A608 + slot*0x80, slot). The found node is discarded (0xA4E20 exits on mismatch).
+// 0xA4E20(key, 0x10A608 + slot*0x200, slot). The found node is discarded (0xA4E20 exits on mismatch).
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_a5b40(uint32_t key, uint32_t slot,
                                                      const D2ClientBatch1e70Env* env) {

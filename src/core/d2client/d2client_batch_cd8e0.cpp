@@ -9,7 +9,9 @@ struct Env {
  void (*f1e70)();          // FUN_6fab1e70
  void (*f2ec0)(uint32_t);  // FUN_6fab2ec0
  void (*f2190)();          // FUN_6fab2190
- void (*f12e0)();          // FUN_6fab12e0
+ void (*f12e0)(int32_t count, void (*fn)(uint32_t), uint32_t obj, int32_t stride);  // FUN_6fab12e0
+ void (*unicodeCtor)(uint32_t);  // IAT 0xCEB00, D2Lang Unicode::Unicode
+ uint32_t table;                 // 0x6FBCFF0C
 };
 // 1.13c D2Client+0xCD8E0
 void Unwind_CD8E0(const Env& e, P ebp) { e.f1fb0(e.rd32(ebp + 4)); }
@@ -32,5 +34,5 @@ void Unwind_CD990(const Env& e, P ebp) { e.f1ed0(e.rd32(ebp + 4)); }
 // 1.13c D2Client+0xCD99A
 void Unwind_CD99A(const Env& e) { e.f1e70(); }
 // 1.13c D2Client+0xCDBB0
-void Fn_CDBB0(const Env& e) { for (int i = 0x20; i; --i) e.f12e0(); }
+void Fn_CDBB0(const Env& e) { for (uint32_t i = 0; i < 0x20; ++i) e.f12e0(0x80, e.unicodeCtor, e.table + i * 0x120, 2); }
 }

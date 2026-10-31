@@ -5,13 +5,16 @@
 #include <initializer_list>
 #include <emscripten.h>
 
-// 1.13c D2Client+0x87F30 (173 B): out = {dx, 2*dy, 640}. dx/dy are the already-differenced
-// results of the two Ordinal_10628 / 0xCACC4 reads (retail subtracts in registers).
+// 1.13c D2Client+0x87F30 (173 B): out = {dx, 2*dy, 640}. x1/x0 and y1/y0 are the two coordinate pairs
+// fetched through Ordinal_10628; when the fetched type (local_8) is 0xA27 both x1 and y1 come from two
+// calls to ftol (0xCACC4, x first) instead.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_87f30(float* out, int32_t dx, int32_t dy) {
+void d2_client_87f30(float* out, int32_t x1, int32_t x0, int32_t y1, int32_t y0, int32_t type,
+                     int32_t (*ftol)(void)) {
+    if (type == 0xa27) { x1 = ftol(); y1 = ftol(); }
     out[2] = 640.0f;
-    out[0] = (float)dx;
-    out[1] = (float)dy + (float)dy;
+    out[0] = (float)(x1 - x0);
+    out[1] = (float)(y1 - y0) + (float)(y1 - y0);
 }
 
 // 1.13c D2Client+0x88440 (132 B): picks between two float constants ([0x6FB87568] / [0x6FB87578]).
@@ -45,7 +48,7 @@ uint32_t d2_client_88440(int32_t idx, uint32_t tab_24c, int32_t cnt_250, uint32_
 }
 
 // 1.13c D2Client+0x8A4D0 (105 B): set rect1 = {l,t,r,b}; rect2 = {-0x50,-0x50,w+0x50,h-0x2f};
-// widened (top-0x1e, bottom+0x1e, left-0x2d) when `wide`; flags |= 1. s = uint32_t[9]: flags, rect1[4], rect2[4].
+// widened (left-0x2d, top-0x1e, right+0x1e) when `wide`; flags |= 1. s = uint32_t[9]: flags, rect1[4], rect2[4].
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_8a4d0(uint32_t* s, int32_t l, int32_t t, int32_t r, int32_t b,
                      int32_t scr_w, int32_t scr_h, uint32_t wide) {
@@ -54,7 +57,7 @@ void d2_client_8a4d0(uint32_t* s, int32_t l, int32_t t, int32_t r, int32_t b,
     int32_t* r2 = (int32_t*)(s + 5);
     r1[0] = l; r1[1] = t; r1[2] = r; r1[3] = b;
     r2[0] = -0x50; r2[1] = -0x50; r2[2] = scr_w + 0x50; r2[3] = scr_h - 0x2f;
-    if (wide) { r2[0] -= 0x2d; r2[1] -= 0x1e; r2[3] += 0x1e; }
+    if (wide) { r2[0] -= 0x2d; r2[1] -= 0x1e; r2[2] += 0x1e; }
     s[0] |= 1;
 }
 

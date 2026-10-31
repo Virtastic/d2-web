@@ -218,7 +218,8 @@ uint32_t allowMode(const Host& h,Address other) {
     }
     return 1;
 }
-// 1.13c D2Client+0x2A070
+// 1.13c D2Client+0x2A070 (EBX = unit, ECX = id, EDX = type): target = 0xA4E20(EAX = id & 0x7F,
+// EDX = the type's 0x200-byte table at 0x10A608, stack type); 10336(path, target); target ? 10334(path, unit, 0) : 0.
 uint32_t setPathTarget(const Host& h,uint32_t id,uint32_t type,Address unit) {
     Address path=h.word(unit+0x2c);
     auto target=h.call(0xa4e20,{id&127,base+0x10a608+(type<<9),type});
@@ -257,3 +258,8 @@ void moveTo(const Host& h,Address unit,uint32_t x,uint32_t y,uint32_t send) {
     } else h.call(0xc670,{h.word(unit+0x2c),0});
 }
 } // namespace d2client_28bc0
+
+extern "C" __attribute__((used, visibility("default")))
+uint32_t d2_client_2a070(const d2client_28bc0::Host* h, uint32_t id, uint32_t type, uint32_t unit) {
+    return d2client_28bc0::setPathTarget(*h, id, type, unit);
+}

@@ -23,9 +23,9 @@ struct D2c237Env {
     int32_t  (*ord1700)(void*);              // EAX unit -> monster base id
     int32_t  monstatsCount;                  // *(sgptDataTables+0xa80)
     uint8_t* (*monSound2a70)(void*);         // EAX unit -> MonSounds row (+0x68 cat, +0x6c cooldown) or null
-    int32_t  (*near881b0)(void);             // 1 when in range
+    int32_t  (*near881b0)(void*);            // push unit -> 1 when in range
     uint32_t (*rand39640)(uint32_t);         // ESI = n
-    void     (*play38a70)(void*, int, int, int);
+    void     (*play38a70)(void*, uint32_t, int, int, int); // push unit, 0, 0, 0; EBX = Sounds row
     uint32_t* now;                           // DAT_6fbc97f8
     uint32_t* lastPlay;                      // DAT_6fbcc4c0
     uint32_t* nextDelay;                     // DAT_6fbcc4c8
@@ -43,23 +43,23 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_237e0(uint8_t* u, const D2c237Env
     const int32_t kind = e->type22430(u);
     if (kind == 2) {
         if (e->class22490(u) == 0x1a && m == 0 && e->get22040(u) == 0 && e->count10522(u, e->bbfc) < 0x14) {
-            e->play38a70(u, 0, 0, 0);
+            e->play38a70(u, 0xe57, 0, 0, 0);
             e->set22010(u, *e->now);
         }
         if (!u) { e->fatal(0xc8f); std::abort(); }
         if (rd8(u, 0x70) && m == rd32(u, 0x74)) return;
         const int32_t sel = e->sel224f0(u);
         if (!sel) e->remove23070(u);
-        else if (!e->has225d0(u, sel)) e->play38a70(u, 0, 0, 0);
+        else if (!e->has225d0(u, sel)) e->play38a70(u, uint32_t(sel), 0, 0, 0);
         const bool alt = e->class22490(u) == 0x3b;
         if (rd8(u, 0x70) || alt) {
-            if (e->sel22570(u, rd32(u, 0x74))) e->play38a70(u, 0, 0, 0);
+            if (const int32_t row = e->sel22570(u, rd32(u, 0x74))) e->play38a70(u, uint32_t(row), 0, 0, 0);
         }
         u[0x70] = 1;
         wr32(u, 0x74, m);
         return;
     }
-    if (kind != 1) return;
+    if (e->type22430(u) != 1) return;   // retail calls 0x22430 again
     int32_t id = e->ord1700(u);
     if (id < 0 || id >= e->monstatsCount) id = -1;
     const bool a = m == 1 || m == 2 || m == 0xf;
@@ -75,8 +75,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_237e0(uint8_t* u, const D2c237Env
     if (uint32_t(now - e->get22040(u)) < cool) return;
     const int32_t o = e->ord10331(u);
     if (o && e->ord10057(o)) return;
-    if (!e->near881b0() || e->rand39640(0xf)) return;
-    e->play38a70(u, 0, 0, 0);
+    if (!e->near881b0(u) || e->rand39640(0xf)) return;
+    e->play38a70(u, uint32_t(cat), 0, 0, 0);
     *e->lastPlay = now;
     e->set22010(u, now);
     *e->nextDelay = e->rand39640(0x3d) + 0x1e;
@@ -118,13 +118,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_monster_idle(uint32_t id, int
     e.set22010 = [](void* u, uint32_t v) { C(u)->st->u80 = v; };
     e.ord10331 = [](void*) { return int32_t(1); };
     e.rand39640 = [](uint32_t n) { return d2_session_client_rand(n); };
-    e.play38a70 = [](void* u, int, int, int) { C(u)->row = C(u)->snd->dwNeutral; };
+    e.play38a70 = [](void* u, uint32_t row, int, int, int) { C(u)->row = row; };
     e.now = &g_idleNow; e.lastPlay = &g_idleLast; e.nextDelay = &g_idleDelay;
     e.fatal = [](uint32_t) {};
     // the room/town and range seams read the call's facts; the env seams take no unit, so they go through a file-scope pointer
     static IdleCall* cur; cur = &c;
     e.ord10057 = [](int32_t) { return cur->town; };
-    e.near881b0 = [] { return cur->near; };
+    e.near881b0 = [](void*) { return cur->near; };
     d2_client_237e0(reinterpret_cast<uint8_t*>(&c), &e);
     return c.row;
 }

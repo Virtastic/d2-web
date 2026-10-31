@@ -145,3 +145,9 @@ void lightQuality_641e0(const Imp&f,const B*o,U*qual,void(*o10062)(U)){
  if(v==0){ o10062(1); *qual=0; } else if(v==1){ o10062(0); *qual=0; } else if(v==2){ o10062(0); *qual=1; }
 }
 }
+// FN probe entry: plain C callbacks, the three globals by value / pointer.
+extern "C" void d2_client_62f60(uint32_t g1, uint32_t* h0, uint32_t* h1, void (*ini)(const char*, const char*, uint32_t, uint32_t),
+                                void (*release)(uint32_t), void (*afterRel)(uint32_t, uint32_t)) {
+    d2client_optpanel::Imp f{release, afterRel, ini, nullptr};
+    d2client_optpanel::miniPanelFree_62f60(f, g1, h0, h1);
+}
