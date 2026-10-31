@@ -75,6 +75,9 @@
   #unsupported .detail{color:#8a8069;font-size:12px;margin:.4em 0 0}
   body.unsupported #viewport,body.unsupported #session-bar,body.unsupported .controls,body.unsupported #log{display:none}
   body.unsupported #unsupported{display:block}
+  body.phone main{width:auto;padding:16px}
+  body.phone h1{display:block}
+  #unsupported button{margin-top:10px;padding:8px 16px;background:#100f0c;color:#c9ad68;border:1px solid #80622f;font:15px Georgia,serif}
 </style>
 <main>
   <h1>DIABLO II · WEB</h1>
@@ -128,6 +131,23 @@ function showUnsupported(info) {
   // issue 16's player layout drops the heading and the padding; this screen is prose and needs them.
   document.documentElement.classList.remove('playing');
   document.body.classList.add('unsupported');
+}
+// Phones are not supported yet: say so before anything heavy loads, with the page's link to send to a desktop.
+function showPhone(msg) {
+  const box = document.querySelector('#unsupported');
+  box.querySelector('h2').textContent = msg.title;
+  box.querySelector('[data-field=summary]').textContent = msg.summary;
+  box.querySelector('[data-field=advice]').textContent = msg.advice;
+  for (const el of box.querySelectorAll('.detail')) el.style.display = 'none';
+  const copy = document.createElement('button');
+  copy.type = 'button'; copy.textContent = 'Copy this link';
+  copy.onclick = async () => {
+    try { await navigator.clipboard.writeText(location.href); copy.textContent = 'Link copied'; }
+    catch { copy.textContent = location.href; }
+  };
+  box.append(copy);
+  document.documentElement.classList.remove('playing', 'fill');
+  document.body.classList.add('unsupported', 'phone');
 }
 // A boot that does not complete says so ON THE SCREEN (issue 3: "never a crash or
 // a blank page"). Two measured ways a player met a page that never finished instead:
@@ -185,7 +205,17 @@ function showBootFailure(why) {
     //                             streamfs read (the issue 9 Firefox mechanism -- a worker's fetch needs a
     //                             main thread this page never yields), which is what showBootFailure
     //                             below was written for.
-    const { probeCapabilities, unsupportedMessage } = await import('./assets/platform-probe.mjs');
+    const { probeCapabilities, unsupportedMessage, isPhone, PHONE_MESSAGE } = await import('./assets/platform-probe.mjs');
+    // A phone gets the "not yet" screen (`?unsupported=phone` forces it under the test runner, whose
+    // phone-emulating rows otherwise keep running the client).
+    const forcePhone = /[?&]unsupported=phone\b/.test(window.__d2Entry.search);
+    if (forcePhone || (!window.__d2Entry.test && isPhone())) {
+      showPhone(PHONE_MESSAGE);
+      window.__d2Platform = { phone: true };
+      window.__d2 = { ready: true, smoke: null, error: null };
+      log('unsupported: phone');
+      return;
+    }
     const force = /[?&]unsupported=([\w,]+)/.exec(window.__d2Entry.search);
     const forced = force ? (force[1] === '1' ? ['isolated', 'memory64'] : force[1].split(',')) : [];
     const real = force ? probeCapabilities() : null;

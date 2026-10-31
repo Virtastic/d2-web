@@ -76,24 +76,26 @@ export function frontDoor({ onReady } = {}) {
   root.append(cv, el('p', 'legal', 'Unofficial fan project, not affiliated with or endorsed by Blizzard Entertainment. You need to own Diablo II: Lord of Destruction.'));
   document.body.append(root);
   document.body.classList.add('door');
-  const g = cv.getContext('2d');
+  const g0 = cv.getContext('2d');
+  let g = g0;   // the drawing helpers paint into g: the window, or a cached layer while it is rebuilt
   const col = createCollection();
 
   let art = null, artTried = false, back = null, offerAgain = false;
-  let msg = null, msgUntil = 0, down = null, hover = null, loading = null, done = false;
-  let view = { s: 1, x: 0, y: 0 };
+  let msg = null, msgUntil = 0, down = null, hover = null, mouse = null, loading = null, done = false;
+  let view = { s: 1, x: 0, y: 0 }, shownAt = 0;   // black until the art and backdrop are in (or have failed), then a fade in
 
   // The staged retail art; failing that it is cut from the player's archives once the core three are given.
-  loadStagedArt().then((a) => { art ??= a; }).catch(() => {});
+  const staged = loadStagedArt().then((a) => { art ??= a; }).catch(() => {});
 
   // The game-select backdrop, registered to the 800x600 frame (served with the site; not retail-extracted at runtime).
-  (async () => {
+  const backdrop = (async () => {
     try {
       const base = new URL('../widebg/', import.meta.url);
       const e = (await (await fetch(new URL('manifest.json', base))).json()).gameselectscreenexp;
-      back = { ...e, sy: e.sy ?? e.s, img: await createImageBitmap(await (await fetch(new URL(e.file, base))).blob()) };
+      back = { ...e, sy: e.sy ?? e.s, img: await createImageBitmap(await (await fetch(new URL(e.file, base))).blob()), at: performance.now() };
     } catch { /* black */ }
   })();
+  Promise.all([staged, Promise.race([backdrop, new Promise((r) => setTimeout(r, 10000))])]).then(() => { shownAt = performance.now(); });   // a slow backdrop fades in on its own
 
   // ---- text ----
   function measure(name, s) {
@@ -170,8 +172,7 @@ export function frontDoor({ onReady } = {}) {
     while (words.length && measure('font16', a + words[0] + ' ') <= max) a += words.shift() + ' ';
     return [a.trim(), words.join(' ')];
   }
-  function scene(t) {
-    logo(t);
+  function scene() {   // everything but the logo, drawn into the overlay layer only when it changes
     const sh = g.createRadialGradient(400, 350, 40, 400, 350, 300); sh.addColorStop(0, 'rgba(0,0,0,0.78)'); sh.addColorStop(1, 'rgba(0,0,0,0)');
     g.save(); g.translate(400, 350); g.scale(1, 0.6); g.translate(-400, -350); g.fillStyle = sh; g.fillRect(0, 0, 800, 700); g.restore();
     centre('font30', 'gold', 'Your Diablo II Files', 400, 236);
@@ -209,19 +210,70 @@ export function frontDoor({ onReady } = {}) {
   }
 
   // ---- the window: the backdrop fills it; the 800x600 frame sits centred, scaled to fit ----
+  // Two cached layers at window resolution: the backdrop, scaled once per size, and the overlay (shade, text,
+  // buttons, tooltip), rebuilt only when what it shows changes. A frame blits them around the logo and the
+  // hand, and is skipped outright when the logo's 25 fps frame, the pointer and the fades have not moved.
+  const bgC = el('canvas'), ovC = el('canvas');
+  let bgKey = '', ovKey = '', drawnFull = '', drawnPart = '', curBox = null, logoBox = null;
+  function logoArea() {   // the union of every logo cel, in 800x600 coordinates
+    if (logoBox || !art) return logoBox;
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (const k of ['blackL', 'fireL', 'blackR', 'fireR']) for (const [, w, h, ox, oy] of art.meta['logo_' + k]) {
+      const x = 400 + ox, y = 102 + oy - h + 1; x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + w); y1 = Math.max(y1, y + h);
+    }
+    return (logoBox = [x0, y0, x1 - x0, y1 - y0]);
+  }
+  function layer(c, w, h) {
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    const x = c.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, w, h); return x;
+  }
   function frame(t) {
     if (done) return;
     const dpr = devicePixelRatio || 1, W = Math.round(innerWidth * dpr), H = Math.round(innerHeight * dpr);
-    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
     const s = Math.min(W / 460, H / 600);   // narrow screens crop the sides; everything drawn sits in x 170..630
     view = { s, x: (W - 800 * s) / 2, y: (H - 600 * s) / 2 };
-    g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over';
+    const smooth = Math.abs(s - Math.round(s)) > 0.01;   // crisp at whole multiples, smooth between
+    const fade = (t0) => Math.max(0, Math.min(1, (t - t0) / 400));
+    const aBack = back ? fade(Math.max(shownAt, back.at)) : 0, aFront = fade(shownAt);
+    let key = '';
+    if (shownAt && !loading) {
+      if (back && bgKey !== `${W}x${H}`) {
+        const b = layer(bgC, W, H), kx = s / back.s, ky = s / back.sy; b.imageSmoothingEnabled = true; b.imageSmoothingQuality = 'high';
+        b.drawImage(back.img, view.x - back.ox * kx, view.y - back.oy * ky, back.w * kx, back.h * ky); bgKey = `${W}x${H}`;
+      }
+      key = JSON.stringify([W, H, !!art, hover?.f ?? hover, down, ready(), FILES.map(have).join(), status(), offerAgain]);
+      if (key !== ovKey) {
+        g = layer(ovC, W, H); g.setTransform(s, 0, 0, s, view.x, view.y); g.imageSmoothingEnabled = smooth;
+        scene(); g = g0; ovKey = key;
+      }
+    }
+    // A frame where only the logo's flames and the hand moved repaints just their rectangles.
+    const full = [W, H, shownAt > 0, key, loading || aBack < 1 || aFront < 1 ? t : 0].join('|');
+    const part = [Math.floor(t * 25 / 1000), mouse && Math.round(mouse.x), mouse && Math.round(mouse.y)].join('|');
+    if (full === drawnFull && part === drawnPart) { requestAnimationFrame(frame); return; }
+    const partial = full === drawnFull && shownAt && !loading;
+    drawnFull = full; drawnPart = part;
+    const cur = art?.meta.cursor && mouse ? [Math.round(mouse.x) + art.meta.cursor[2], Math.round(mouse.y) + art.meta.cursor[3] - art.meta.cursor[1], art.meta.cursor[0], art.meta.cursor[1]] : null;
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+    g.save();
+    if (partial) {
+      g.beginPath();
+      for (const r of [logoArea(), curBox, cur]) if (r) g.rect(Math.floor(r[0] * s + view.x) - 2, Math.floor(r[1] * s + view.y) - 2, Math.ceil(r[2] * s) + 4, Math.ceil(r[3] * s) + 4);
+      g.clip();
+    }
+    curBox = cur;
     g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
-    if (!loading && back) { const kx = s / back.s, ky = s / back.sy; g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
-      g.drawImage(back.img, view.x - back.ox * kx, view.y - back.oy * ky, back.w * kx, back.h * ky); }
-    g.setTransform(s, 0, 0, s, view.x, view.y);
-    g.imageSmoothingEnabled = Math.abs(s - Math.round(s)) > 0.01;   // crisp at whole multiples, smooth between
-    if (loading) loadingScreen(t); else scene(t);
+    if (shownAt) {
+      if (!loading && back) { g.globalAlpha = aBack; g.drawImage(bgC, 0, 0); }
+      g.globalAlpha = aFront;
+      g.setTransform(s, 0, 0, s, view.x, view.y);
+      g.imageSmoothingEnabled = smooth;
+      if (loading) loadingScreen(t);
+      else { logo(t); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(ovC, 0, 0); g.setTransform(s, 0, 0, s, view.x, view.y); }
+      if (cur) g.drawImage(art.img.cursor, cur[0], cur[1], cur[2], cur[3]);   // retail draws the hand last, its cel anchored one pixel above the pointer
+    }
+    g.restore();
     if (!done) requestAnimationFrame(frame);
   }
 
@@ -246,7 +298,8 @@ export function frontDoor({ onReady } = {}) {
       loadArchiveArt(col).then((a) => { art ??= a; }).catch((e) => console.warn('front door art:', e.message));
     }
   }
-  function paint() { cv.style.cursor = ''; }   // the canvas repaints every frame; kept for the test hook
+  const sysCursor = (h) => art?.meta.cursor ? 'none' : h ? 'pointer' : '';   // the game's hand replaces the system pointer once the art is in
+  function paint() { cv.style.cursor = sysCursor(); }   // the canvas repaints every frame; kept for the test hook
   async function act(h) {
     if (h === 'discord') window.open(DISCORD, '_blank', 'noopener');
     if (h === 'dir') add(await pickFolder());
@@ -260,15 +313,15 @@ export function frontDoor({ onReady } = {}) {
       else enter();
     }
   }
-  const onMove = (e) => { const p = at(e), h = hit(p);
+  const onMove = (e) => { const p = at(e), h = hit(p); mouse = p;
     hover = loading ? null : h === 'again' ? 'again' : FILES.find((x) => inside(p, entryBox(x))) || null;
-    cv.style.cursor = h ? 'pointer' : ''; };
+    cv.style.cursor = sysCursor(h); };
   const onUp = (e) => { const h = hit(at(e)); if (h && h === down) act(h); down = null; };
   const onOver = (e) => e.preventDefault();
   const onDrop = async (e) => { e.preventDefault(); if (!loading) add(await fromDrop(e.dataTransfer)); };
   const onKey = (e) => { if (e.key === 'Enter' && !loading && e.target === document.body) act('enter'); };
   cv.addEventListener('pointermove', onMove);
-  cv.addEventListener('pointerleave', () => { hover = null; });
+  cv.addEventListener('pointerleave', () => { hover = null; mouse = null; });
   cv.addEventListener('pointerdown', (e) => { down = hit(at(e)); });
   addEventListener('pointerup', onUp);
   addEventListener('dragover', onOver);
@@ -286,7 +339,7 @@ export function frontDoor({ onReady } = {}) {
   function enter() {
     removeEventListener('pointerup', onUp); removeEventListener('dragover', onOver);
     removeEventListener('drop', onDrop); removeEventListener('keydown', onKey);
-    hover = null; down = null; cv.style.cursor = '';
+    hover = null; down = null; cv.style.cursor = sysCursor();
     const t = performance.now();
     loading = { t0: t, last: t, p: 0.1, full: 0, readyAt: 0 };
     root.classList.add('loading');

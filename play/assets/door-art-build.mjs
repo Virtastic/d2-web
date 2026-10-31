@@ -1,4 +1,4 @@
-// The BYO front door's art, cut from the 1.13c archives: the burning logo, the wide button, the join-game
+// The BYO front door's art, cut from the 1.13c archives: the burning logo, the wide button, the hand cursor, the join-game
 // loading screen and three bitmap fonts in five colours. One builder for both callers: tools/door-art.mjs
 // writes the result as PNGs at stage time, and the door rebuilds it in the browser from the player's own
 // archives when the staged copy is missing. `rd(name)` returns a file's bytes (first archive wins) or throws.
@@ -8,7 +8,7 @@ import { decodeFontTbl, textColourPalette } from './frontend.mjs';
 const FE = 'data\\global\\ui\\FrontEnd\\', PAL = 'data\\global\\palette\\', FONT = 'data\\local\\font\\latin\\';
 const COL = { white: 0, red: 1, gold: 4, grey: 5, tan: 7 };
 export const DOOR_FONTS = [['font16', ['white', 'red', 'gold', 'grey', 'tan'], 'act1'], ['font30', ['gold'], 'act1'], ['fontexocet10', ['white'], 'sky']];
-export const DOOR_IMAGES = ['logo_blackL', 'logo_fireL', 'logo_blackR', 'logo_fireR', 'wide', 'loading',
+export const DOOR_IMAGES = ['logo_blackL', 'logo_fireL', 'logo_blackR', 'logo_fireR', 'wide', 'loading', 'cursor',
   ...DOOR_FONTS.flatMap(([n, cols]) => cols.map((c) => `f_${n}_${c}`))];
 
 const surf = (w, h) => ({ w, h, px: new Uint8ClampedArray(w * h * 4) });
@@ -38,6 +38,9 @@ export async function buildDoorArt(rd) {
   { const fr = (await dc6(FE + 'WideButtonBlank.dc6')).frames, s = surf(272, 70);
     for (const st of [0, 1]) { blit(s, fr[st * 2], pal.sky, 0, st * 35); blit(s, fr[st * 2 + 1], pal.sky, fr[st * 2].width, st * 35); }
     images.wide = s; }
+  // The hand cursor (ohand), frame 0 in the title screen's palette, with [w, h, offsetX, offsetY].
+  { const f = (await dc6('data\\global\\ui\\CURSOR\\ohand.DC6')).frames[0], s = surf(f.width, f.height);
+    blit(s, f, pal.sky, 0, 0); images.cursor = s; meta.cursor = [f.width, f.height, f.offsetX, f.offsetY]; }
   // The join-game loading screen: its frames in a strip of 256x256 cells.
   { const fr = (await dc6('data\\global\\ui\\Loading\\loadingscreen.dc6')).frames, s = surf(256 * fr.length, 256);
     fr.forEach((f, i) => blit(s, f, pal.loading, i * 256, 0)); images.loading = s; meta.loading = fr.length; }

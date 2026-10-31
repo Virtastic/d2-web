@@ -157,3 +157,18 @@ export function unsupportedMessage(caps, ua = (typeof navigator !== 'undefined' 
     text: [summary, advice, listLine].filter(Boolean).join(' '),
   };
 }
+
+// Phones are not supported yet: the client is built for a mouse and keyboard on a desktop-sized screen.
+// A touch device whose screen is phone-sized in both directions is a phone; a tablet or a touch laptop
+// is not (the same test openmw-web uses).
+export function isPhone(g = globalThis) {
+  const touch = !!(g.matchMedia?.('(pointer: coarse)').matches || g.navigator?.maxTouchPoints > 0);
+  const w = g.innerWidth || 0, h = g.innerHeight || 0;
+  return touch && Math.min(w, h) < 820 && Math.max(w, h) < 1100;
+}
+
+export const PHONE_MESSAGE = {
+  title: 'Not on mobile browsers yet',
+  summary: "Diablo II Web doesn't support mobile browsers yet.",
+  advice: 'It runs in Chrome or Edge on a desktop or laptop. Open this page there.',
+};
