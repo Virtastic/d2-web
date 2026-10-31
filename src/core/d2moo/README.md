@@ -23,3 +23,7 @@ behaviour differs from 1.10f.
 - D2Game+0xBDB10 D2GAME_NPC_IdentifyAllItems_6FCC9C90: the code-3 reply is sent once, after the loop.
 - D2Game+0xDEEE0 SUNITDMG_KillMonster: matches; the trailing D2Common ordinal is a no-op in 1.13c.
 - D2Game+0x212F0 AIGENERAL_AllocCommandsForMinions: minion loop skips a null allocation (1.10f dereferenced it); no pCurrentCmd write; monster guards on caller and owner; the new command pointer goes to the minion game block +0x20.
+- D2Common+0x25810 ITEMS_CalculateAdditionalCostsForChargedSkills: the base multiplier is (req level / 6) * 2 + layer bits + 2; a large operand is divided by 1024 before the cost multiplier.
+- D2Common+0x25970 ITEMS_CalculateAdditionalCostsForItemSkill: for a large sell cost the multiplier is divided by 1024 (4096 for buy) before it scales the cost.
+- D2Common+0x28850 ITEMS_CalculateAdditionalCostsForBonusStats: for a large operand the cost times value is divided first, then multiplied by the row multiplier.
+- D2Common+0x1BA60 (DataTbls/HoradricCube.cpp, DATATBLS_CubeMainOutputParser): a set-item hit returns FALSE after filling its fields, without parsing output modifiers.
