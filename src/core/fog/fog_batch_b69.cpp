@@ -13,7 +13,7 @@ void FUN_6ff684a0(void);
 int Ordinal_502(const char*, int, int);
 void* FUN_6ff6b560(int*);
 void FUN_6ff6b0c0(void**);
-void* FUN_6ff6cda0(int, void*, int, const char*, int);
+intptr_t FUN_6ff6cda0(...);
 int Ordinal_508(const char*, const char*, int);
 void* Ordinal_491(void*, const void*, size_t);
 void Ordinal_501(void*, const void*, int);
