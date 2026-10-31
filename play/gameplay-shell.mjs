@@ -1120,6 +1120,15 @@ function sessionAdapter() {
           const count = Module.ccall('d2_session_item_presentation_count', 'number', [], []);
           const ptr = Number(Module.ccall('d2_session_item_presentations', 'number', [], []));
           items = parseItemPresentations(Module.HEAPU8.subarray(ptr, ptr + count * 112), count);
+          // D2Client+0x95140's socket placement (engine-side): per item, offsets and the gem art in each.
+          if (Module._d2_session_item_sockets) {
+            const sc = Module.ccall('d2_session_item_socket_count', 'number', [], []), sp = Number(Module.ccall('d2_session_item_sockets', 'number', [], []));
+            for (let i = 0; i < sc; i++) { const o = sp + i * 224, v = new DataView(Module.HEAPU8.buffer, o, 224), id = v.getUint32(0, true), n = Module.HEAPU8[o + 4];
+              const target = items.find((it) => it.id === id); if (!target) continue;
+              const off = [], gem = [];
+              for (let k = 0; k < n; k++) { off.push([v.getInt16(8 + k * 4, true), v.getInt16(10 + k * 4, true)]);
+                let f = ''; for (let c = 0; c < 32 && Module.HEAPU8[o + 32 + k * 32 + c]; c++) f += String.fromCharCode(Module.HEAPU8[o + 32 + k * 32 + c]); gem.push(f); }
+              target.sockets = { off, gem }; } }
           const cp = Number(Module.ccall('d2_session_item_colours', 'number', [], []));
           items.forEach((it, i) => { it.colourByte = Module.HEAPU8[cp + i];
             // A gold pile's pile-size frame comes from STAT_GOLD (D2Client 0x6CC00's own bucket).
@@ -4256,7 +4265,7 @@ function drawFrame() {
   const layoutKey = session ? `${snapshot.playerClass}/${snapshot.playerId}/${snapshot.seed}` : '';
   if (inventoryPanelRenderer && session && (!inventoryPanelRenderer.layout || inventoryLayoutKey !== layoutKey)) {
     inventoryPanelRenderer.setLayout(snapOr('inventoryLayout', readInventoryLayout)); inventoryLayoutKey = layoutKey; }
-  if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && session ? { ...snapshot, ...gridBoxHover(), weaponSet: Module._d2_session_weapon_switch ? Module.ccall('d2_session_weapon_switch', 'number', [], []) : 0, pointer, itemTip: (item) => tipFields(item.id, item.code), gold: snapOr('playerGold', () => Module.ccall('d2_session_player_gold', 'number', [], [])), inventoryGoldPressed: Boolean(inventoryGoldPress), inventoryClosePressed: Boolean(inventoryClosePress) } : snapshot, panelShown(inventoryVisible));
+  if (inventoryPanelRenderer) inventoryPanelEvidence = inventoryPanelRenderer.draw(ctx, w, h, inventoryVisible && session ? { ...snapshot, ...gridBoxHover(), deferTooltip: true, weaponSet: Module._d2_session_weapon_switch ? Module.ccall('d2_session_weapon_switch', 'number', [], []) : 0, pointer, itemTip: (item) => tipFields(item.id, item.code), gold: snapOr('playerGold', () => Module.ccall('d2_session_player_gold', 'number', [], [])), inventoryGoldPressed: Boolean(inventoryGoldPress), inventoryClosePressed: Boolean(inventoryClosePress) } : snapshot, panelShown(inventoryVisible));
   // The shop's tooltip and button hint go over the inventory panel, as retail draws them last (vendor-panel.mjs drawOverlay).
   if (vendorState && npcPanelEvidence) Object.assign(npcPanelEvidence, vendorPanel.drawOverlay(ctx, w, h, vendorState));
   // O / the configurable Hireling Screen binding reads the engine's canonical pet roster. The
@@ -4413,6 +4422,8 @@ function drawFrame() {
       hoverFont.drawAnchored(ctx, tip.text, left + 4, bottom - 3);
     }
   }
+  // The inventory item hover text goes over every panel (stash, cube, waypoint, ...) and the HUD, uncut at the seam between panels.
+  if (inventoryPanelEvidence?.tooltipDraw) { try { inventoryPanelEvidence.tooltip = inventoryPanelEvidence.tooltipDraw(ctx); } catch (error) { inventoryPanelEvidence.tooltip = null; } }
   // FUN_6FB739E0 draws ordinary speech after the main gameplay/panel passes. Match that late
   // overlay order so inventory and quest art cannot cover the viewport-centred text.
   if (pendingSpeech) {
@@ -6433,7 +6444,7 @@ canvas.addEventListener('contextmenu', (e) => { if (session && inventoryVisible 
     if (itemTargeting.rightClick(item ? item.id : 0)) { snapshot = session.snapshot(); pollUiEvents(); render(); }
   } else if (session && itemTargeting.armed) { itemTargeting.cancel(); snapshot = session.snapshot(); render(); }
   e.preventDefault(); });
-window.__d2Shell = { tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, ...tipFields(id, code) }), input, warpAt: (x, y) => warpUnderPointer(x, y), npcAt: (x, y) => npcUnderPointer(x, y)?.id ?? 0, get snapshot() { return snapshot; },
+window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, tooltipSpec: (id, cost, code) => tooltipSpec({ cost, code, ...tipFields(id, code) }), input, warpAt: (x, y) => warpUnderPointer(x, y), npcAt: (x, y) => npcUnderPointer(x, y)?.id ?? 0, get snapshot() { return snapshot; },
   // The ramp this shell actually blits every finished frame through (C1d), so a row can assert the
   // transform that reaches the canvas is retail's own rather than re-deriving the constant.
   displayRamp: DISPLAY_RAMP,

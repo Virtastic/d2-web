@@ -89,6 +89,7 @@ export const weaponSetArmShift = (weaponSet, bodyLoc) => (weaponSet === 1 && (bo
 const INV_PANEL = [[4, 400, 316], [5, 656, 316], [6, 400, 492], [7, 656, 492]];
 
 export const ITEM_PRESENTATION_BYTES = 112;
+export const SOCKET_ART = 'data\\global\\ui\\panel\\gemsocket.dc6';
 
 // Where the panel draws the carried-gold coin (F162): goldcoinbtn.dc6 frame 0, anchored x left /
 // y = the cel's BOTTOM row, as retail's own draw list records it -- the retail captures
@@ -316,7 +317,7 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     ctx.save(); ctx.translate(baseX, baseY); ctx.scale(scale, scale);
     let itemPixels = 0, equippedItemPixels = 0, equippedItemCount = 0;
     // Which item went where, in 800x600 screen pixels: the identity a row checks against the engine.
-    const drawn = [];
+    const drawn = [], socketAnchors = [];
     const sx = AMAZON2_INVENTORY_LAYOUT.screenX, sy = AMAZON2_INVENTORY_LAYOUT.screenY;
     // The item under the pointer (none while an item is held) and the body-slot boxes, which sit
     // behind the worn cels (grid-highlight.mjs: one box over the whole slot, none when identified and usable).
@@ -339,6 +340,7 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
         boxes.push(...cells.map((b) => ({ ...b, id: item.id })));
         const boxRects = cells.map((b) => ({ x: b.x, y: b.y, width: b.w, height: b.h, colour: b.paletteIndex }));
         const at = celAt(r.left, r.top);
+        if (item.sockets && hoverItem?.id === item.id) socketAnchors.push({ item, x: r.left, y: r.top });
         ctx.drawImage(image, at.left - sx, at.top - sy); itemPixels += image.width * image.height;
         // `top` stays the CELL's top (s202 asserts the item landed in the cell it was put in);
         // `blitTop` is where the ART actually landed -- one row lower, and the anchor retail's own
@@ -356,6 +358,7 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
         const [bx, by] = WORN_ANCHOR_OFFSET[item.bodyLoc] || [0, 0];
         const [ax, ay] = weaponSetArmShift(state?.weaponSet, item.bodyLoc);
         const { left, top } = slotCelAt(slot, iw, ih, 29, 29, [bx + ax, by + ay]);
+        if (item.sockets && hoverItem?.id === item.id) socketAnchors.push({ item, x: left, y: top - 1 });
         ctx.drawImage(image, left - sx, top - sy);
         equippedItemPixels += image.width * image.height; equippedItemCount++;
         drawn.push({ ...paperdollIdentity(item, iconAt(item.invFile, act).frame, left, top, slot), width: image.width, height: image.height, blitTop: top,
@@ -368,6 +371,16 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     ctx.restore();
     // Gold, the gold button, the close button and the right-hand border (retail's anchors, s197).
     ctx.save(); ctx.translate(ox, oy); ctx.scale(scale, scale);
+    // D2Client+0x95140: the hovered item's sockets, over its art -- the empty-socket cel at the engine's
+    // footprint offset (x - 1), and a filled socket's gem art one cell above it.
+    const sockets = [];
+    for (const { item, x, y } of socketAnchors) item.sockets.off.forEach(([ox2, oy2], n) => {
+      const px = x + ox2, py = y + oy2, gem = item.sockets.gem[n];
+      const blit = chrome.cel(ctx, act, SOCKET_ART, 0, px - 1, py);
+      let gemAt = null;
+      if (gem) { const g = icon(gem, act), at = celAt(px, py - 29); ctx.drawImage(g, at.left, at.top); gemAt = { invFile: gem, x: at.left, y: at.top }; }
+      sockets.push({ id: item.id, n, blit, gem: gemAt });
+    });
     chrome.text(ctx, act, String(state?.gold ?? 0), 508, 468);
     const goldFrame = state?.inventoryGoldPressed ? 1 : 0;
     const goldBlit = chrome.cel(ctx, act, CHROME_ART.gold, goldFrame, INVENTORY_GOLD_ANCHOR.x, INVENTORY_GOLD_ANCHOR.bottom);
@@ -381,17 +394,21 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     // The hovered item's tooltip, last so it is on top of the panel, its gold and its close button.
     // The lines are the engine's (the shell passes `itemTip`, d2_session_item_title +
     // d2_session_item_lines, the same source the vendor tooltip reads).
-    let tooltipEvidence = null;
+    let tooltipEvidence = null, tooltipDraw = null;
     const hovered = state?.pointer && state?.itemTip ? (this.itemAt(state.pointer.x, state.pointer.y, width, height, state) || this.slotAt(state.pointer.x, state.pointer.y, width, height, state)?.item) : null;
     if (hovered) {
       const cell = inventoryTipCell(hovered, gridRect, slotRect);
       const spec = itemTooltipSpec({ ...state.itemTip(hovered), itemFlags: hovered.itemFlags });
-      const record = tooltip.draw(ctx, act, cell, width, height, spec.lines, spec.colours);
-      if (record) tooltipEvidence = { id: hovered.id, ...record };
+      // A panel drawn after this one (the stash beside it, the cube, ...) would paint over a box that
+      // crosses the seam, and retail draws hover text after every panel, so the shell asks for it last.
+      if (state.deferTooltip) tooltipDraw = (c) => { const record = tooltip.draw(c, act, cell, width, height, spec.lines, spec.colours);
+        return record ? { id: hovered.id, ...record } : null; };
+      else { const record = tooltip.draw(ctx, act, cell, width, height, spec.lines, spec.colours);
+        if (record) tooltipEvidence = { id: hovered.id, ...record }; }
     }
-    return { x: baseX, y: baseY, scale, panelFrames: 4, tooltip: tooltipEvidence,
+    return { x: baseX, y: baseY, scale, panelFrames: 4, tooltip: tooltipEvidence, tooltipDraw,
       panelPixels: [4, 5, 6, 7].reduce((sum, i) => sum + dc6.frames[i].width * dc6.frames[i].height, 0),
-      itemCount: (state?.items || []).filter((item) => item.invPage === 0).length, itemPixels,
+      sockets, itemCount: (state?.items || []).filter((item) => item.invPage === 0).length, itemPixels,
       equippedItemCount, equippedItemPixels, drawn, boxes, weaponSet: set2 ? 1 : 0, tabs, silhouettes, layout: layout ? 'engine' : 'amazon2',
       gold: { path: CHROME_ART.gold, frame: goldFrame, blit: goldBlit },
       close: { ...close, path: PANEL_CLOSE_ART.path, frame: closeFrame, blit: closeBlit } };
