@@ -6,7 +6,6 @@
 #include "D2Items.h"
 #include "Units/Units.h"
 #include "DataTbls/SequenceTbls.h"
-#include "DataTbls/InvTbls.h"
 
 namespace {
 inline uint8_t* P(uint32_t a) { return (uint8_t*)(uintptr_t)a; }
@@ -19,16 +18,11 @@ static_assert(offsetof(Inv32, pGrids) == 0x14 && offsetof(Inv32, nGridCount) == 
 static_assert(offsetof(Grid32, ppItems) == 0x0C, "0x1FD40/0x20700 grid cells");
 static_assert(offsetof(Node32, nKind) == 4 && offsetof(Node32, pNext) == 8, "0x3D160 list node");
 // Grid 0 (INVGRID_BODYLOC); the same grid 0x20320 and 0x20700 read through 0x1E1B0 (verified layout in inv_place.cpp).
-// 1.13c DAT_6FDED378 (static {13,1}, read-only: 41 push sites, no writes) is gBodyLocInventoryGridInfo; 0x1E1B0
-// returns no grid when an existing grid 0 has other dimensions.
-extern D2InventoryGridInfoStrc gBodyLocInventoryGridInfo;
 uint8_t* BodyLocGrid(uint32_t pInv)
 {
     uint8_t* inv = P(pInv);
     if (!inv || W(inv, 0x18) < 1) return nullptr;
-    uint8_t* g = P(W(inv, 0x14));
-    if (g[8] != gBodyLocInventoryGridInfo.nGridX || g[9] != gBodyLocInventoryGridInfo.nGridY) return nullptr;
-    return g;
+    return P(W(inv, 0x14));
 }
 uint8_t* GridCell(uint8_t* grid, int n)
 {
@@ -75,42 +69,64 @@ void D2Common_32820_InitializeSequence(D2UnitStrc* pUnit)
     pUnit->dwFlags |= UNITFLAG_SQGFXCHANGE;
 }
 
-// 1.13c D2Common+0x20700 (#10101)
-// Equipped-hand candidate of an inventory: right-hand cell 4 of the body-loc grid, else left-hand cell 5.
-// Cell 4 must be a type-4 unit whose item data (+0x14) is absent or has neither 0x100 nor 0x4000 set at
-// item data +0x18, and must be of item type 0x2D (0x24430); cell 5 must pass 0x23EF0 (CanBeEquipped) and
-// type 0x2D. On a hit *pOutUnit is the unit and *pOutBodyLoc 4/5; *pOutIsHeld is set (and stays 0
-// otherwise) when the candidate is pCurrent, the item 0x20320 already reports for this inventory (own row,
-// passed in). On no hit *pOutUnit is 0. Retail dereferences the grid only after the 0x1020304 signature.
-// ponytail: a null cell skips the 0x23EF0 call, which retail makes; a null item only loses that call.
-uint32_t D2Common_20700_EquippedHandCandidate(uint32_t pInv, uint32_t pCurrent, uint32_t* pOutUnit, uint32_t* pOutBodyLoc, uint32_t* pOutIsHeld)
+// 1.13c D2Common+0x20700 (#10101): the equipped-hand candidate of an inventory. Four arguments in
+// retail: pInv, pOutUnit, pOutBodyLoc, pOutIsHeld. The current item is 0x20320 of the same inventory,
+// taken here by its own rule (Current320 below) rather than passed in.
+// The body-loc grid is 0x1E1B0 index 0 of the inventory's grid table (the table pointer is the
+// inventory itself, inv+0x14 array, inv+0x18 count). Cell 4 (right hand) is taken when it passes
+// 0x23EF0 (a non-type-4 unit, or a type-4 unit whose item data has neither 0x100 nor 0x4000 at +0x18)
+// and is item type 0x2D; else cell 5 (left hand) when it passes the same 0x23EF0 test and is type 0x2D.
+// *pOutBodyLoc is 4 or 5 and *pOutUnit is the unit; *pOutIsHeld is set only when the unit is the current
+// item. On no hit *pOutUnit is 0. A null pInv returns 0 without writing the outputs.
+// Retail reads the grid only after the 0x1020304 signature (a mismatched signature gives no cells).
+namespace {
+// 0x23EF0: a non-null unit whose item data is absent or carries neither flag (only for type 4).
+bool Pass23EF0(uint8_t* c)
+{
+    if (!c) return false;
+    if (W(c, 0) != 4) return true;
+    uint8_t* idata = P(W(c, 0x14));
+    if (!idata) return true;
+    return !(W(idata, 0x18) & 0x100) && !(W(idata, 0x18) & 0x4000);
+}
+// 0x20320: the current item of the inventory: cell 5, else cell 4, when it is type 0x2D and its owner
+// (+0x0C) equals the inventory's owner (inv+0x1C). Null when the signature fails or the owner is -1.
+uint8_t* Current320(uint8_t* inv)
+{
+    if (!inv || W(inv, 0) != 0x01020304u || W(inv, 0x1C) == 0xFFFFFFFFu) return nullptr;
+    uint8_t* grid = BodyLocGrid((uint32_t)(uintptr_t)inv);
+    if (!grid) return nullptr;
+    uint8_t* c5 = GridCell(grid, 5);
+    if (c5 && ITEMS_CheckItemTypeId((D2UnitStrc*)c5, 0x2D) && W(c5, 0x0C) == W(inv, 0x1C)) return c5;
+    uint8_t* c4 = GridCell(grid, 4);
+    if (c4 && ITEMS_CheckItemTypeId((D2UnitStrc*)c4, 0x2D) && W(c4, 0x0C) == W(inv, 0x1C)) return c4;
+    return nullptr;
+}
+}
+
+uint32_t D2Common_20700_EquippedHandCandidate(uint32_t pInv, uint32_t* pOutUnit, uint32_t* pOutBodyLoc, uint32_t* pOutIsHeld)
 {
     uint8_t* inv = P(pInv);
     if (!inv) return 0;
     *pOutIsHeld = 0;
-    uint8_t* cur = P(pCurrent);
-    uint8_t* cand = nullptr;
+    uint8_t* cur = Current320(inv);
     if (W(inv, 0) == 0x01020304u) {
         uint8_t* grid = BodyLocGrid(pInv);
-        cand = grid ? GridCell(grid, 4) : nullptr;
-        if (cand) {
-            uint8_t* idata = P(W(cand, 0x14));
-            bool bFlags = W(cand, 0) != 4 || (!(idata && (W(idata, 0x18) & 0x100)) && !(idata && (W(idata, 0x18) & 0x4000)));
-            if (bFlags && ITEMS_CheckItemTypeId((D2UnitStrc*)cand, 0x2D)) {
-                *pOutUnit = (uint32_t)(uintptr_t)cand;
-                *pOutBodyLoc = 4;
-                if (cand != cur) return 1;
-                *pOutIsHeld = 1;
-                return 1;
-            }
+        uint8_t* c4 = grid ? GridCell(grid, 4) : nullptr;
+        if (Pass23EF0(c4) && ITEMS_CheckItemTypeId((D2UnitStrc*)c4, 0x2D)) {
+            *pOutUnit = (uint32_t)(uintptr_t)c4;
+            *pOutBodyLoc = 4;
+            if (c4 != cur) return 1;
+            *pOutIsHeld = 1;
+            return 1;
         }
-        grid = BodyLocGrid(pInv);
-        cand = grid ? GridCell(grid, 5) : nullptr;
     }
-    if (cand && ITEMS_CanBeEquipped((D2UnitStrc*)cand) && ITEMS_CheckItemTypeId((D2UnitStrc*)cand, 0x2D)) {
-        *pOutUnit = (uint32_t)(uintptr_t)cand;
+    uint8_t* grid = W(inv, 0) == 0x01020304u ? BodyLocGrid(pInv) : nullptr;
+    uint8_t* c5 = grid ? GridCell(grid, 5) : nullptr;
+    if (Pass23EF0(c5) && ITEMS_CheckItemTypeId((D2UnitStrc*)c5, 0x2D)) {
+        *pOutUnit = (uint32_t)(uintptr_t)c5;
         *pOutBodyLoc = 5;
-        if (cand != cur) return 1;
+        if (c5 != cur) return 1;
         *pOutIsHeld = 1;
         return 1;
     }

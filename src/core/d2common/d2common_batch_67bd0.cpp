@@ -83,50 +83,53 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_4f0e0(int32_t nSkillId)
 	return nPassiveState > 0 ? nPassiveState : 0;
 }
 
-// 0x121D0 is the room unit-array filter 0x12330 calls. Its decompile loses two register arguments
-// (the search rectangle's centre and half-extent), leaving only the box comparisons; with no
-// recoverable extent the filter is modelled as accepting every candidate. partial.
-static int32_t Batch26_UnitInSearchBox(D2UnitStrc* pUnit, int32_t nParam2)
+// 1.13c D2Common+0x121D0 (sub_121D0): does the room's subtile box lie within the search margin m around
+// (x, y)? 1.13c reads the box from the room's coordinate block (0x8BA60 copies 8 dwords from room +0x4C;
+// the first four are subtile x, y, width, height), which the vendored D2ActiveRoomStrc holds as tCoords.
+// The 1.13c register contract is ecx = room, edx = x, eax = y, edi = margin.
+static bool Batch26_RoomInSearchBox(const D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t nMargin)
 {
-	(void)pUnit;
-	(void)nParam2;
-	return 1;
+	const int32_t c0 = pRoom->tCoords.nSubtileX;
+	const int32_t c1 = pRoom->tCoords.nSubtileY;
+	const int32_t c2 = pRoom->tCoords.nSubtileWidth;
+	const int32_t c3 = pRoom->tCoords.nSubtileHeight;
+	const bool bYOk = (nY + nMargin >= c1) || (nY - nMargin <= c3 + c1);
+	if (nX + nMargin < c0)
+		return (nX - nMargin <= c2 + c0) && bYOk;
+	return bYOk;
 }
 
-// 1.13c D2Common+0x12330 (#10314) walks the unit array of the unit's room, filters each candidate
-// through 0x121D0, then walks its per-room list and keeps the nearest unit (0x7F5E0 distance) that
-// is below both the caller's range (0, meaning 0x10000) and the best so far and that the filter
-// callback accepts. A null room is fatal in retail (message 0x90); we return null.
-// partial: room +0x00 (unit array) and +0x24 (count) are the 1.13c image's fields; the vendored
-// 1.10f D2ActiveRoomStrc has no array there, and 0x121D0's hidden arguments are unrecovered.
+// 1.13c D2Common+0x12330 (#10314) walks the rooms near the unit's room, keeps those that pass 0x121D0
+// (margin = range, or 0x10000 when range is 0), then walks each one's unit list and keeps the nearest unit
+// (0x7F5E0 distance) below both the range and the best so far that the callback accepts. The callback is
+// fastcall in retail: ecx = candidate unit, edx = the source unit (the first argument), so it is modelled
+// as (candidate, source). A null room is fatal in retail (message 0x90) and a null callback is fatal too
+// (message 0x9F); both return null here. Layout delta: the 1.13c near-room array (+0x00, count +0x24) and
+// the unit list head (+0x74) are the vendored ppRoomList/nNumRooms and pUnitFirst; units chain by
+// pRoomNext (+0xE8 in both).
 extern "C"
 EMSCRIPTEN_KEEPALIVE void* d2_fn_d2common_12330(D2UnitStrc* pUnit, int32_t nX, int32_t nY,
-	int32_t nRange, int32_t (*pfnFilter)())
+	int32_t nRange, int32_t (*pfnFilter)(D2UnitStrc*, D2UnitStrc*))
 {
 	if (!pUnit || !pfnFilter) return nullptr;
 
 	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
 	if (!pRoom) return nullptr;
 
-	const uint32_t* pUnitArray = *(const uint32_t* const*)((const uint8_t*)pRoom + 0x00);
-	const int32_t nCount = *(const int32_t*)((const uint8_t*)pRoom + 0x24);
 	const int32_t nThreshold = nRange == 0 ? 0x10000 : nRange;
 
 	void* pBest = nullptr;
 	int32_t nBestDistance = 0xFFFF;
 
-	for (int32_t i = 0; i < nCount; ++i)
+	for (int32_t i = 0; i < pRoom->nNumRooms; ++i)
 	{
-		// element i is a room (not a unit): 0x121D0 tests its bounds, +0x74 heads its unit list
-		// and +0xE8 (dword 0x3A) links the units.
-		const uint8_t* pNear = (const uint8_t*)(uintptr_t)pUnitArray[i];
-		if (!pNear || !Batch26_UnitInSearchBox((D2UnitStrc*)pNear, nX)) continue;
+		D2ActiveRoomStrc* pNear = pRoom->ppRoomList[i];
+		if (!pNear || !Batch26_RoomInSearchBox(pNear, nX, nY, nThreshold)) continue;
 
-		for (D2UnitStrc* p = *(D2UnitStrc* const*)(pNear + 0x74); p;
-		     p = *(D2UnitStrc* const*)((const uint8_t*)p + 0xE8))
+		for (D2UnitStrc* p = pNear->pUnitFirst; p; p = p->pRoomNext)
 		{
 			const int32_t nDistance = (int32_t)UNITS_GetDistanceToCoordinates(p, nX, nY);
-			if (nDistance < nThreshold && nDistance < nBestDistance && pfnFilter() != 0)
+			if (nDistance < nThreshold && nDistance < nBestDistance && pfnFilter(p, pUnit) != 0)
 			{
 				nBestDistance = nDistance;
 				pBest = p;
