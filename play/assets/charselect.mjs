@@ -118,6 +118,7 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
   const popupPaletteSource = source(SELECT_ASSETS.popupPalette);
   const popupSource = source(SELECT_ASSETS.popup);
   const unitsPaletteSource = source('data\\global\\palette\\Units\\pal.dat');
+  const skyPaletteSource = source(SELECT_ASSETS.palette);
   const popupPalette = decodeDatPalette(popupPaletteSource.bytes);
   const units = decodeDatPalette(unitsPaletteSource.bytes);
   // The portrait's own colour transform bank (client-parity C3o): retail ships NO
@@ -154,8 +155,8 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
   // The OK/Cancel button's own face (d2ui/button.go ButtonTypeOkCancel -> FontRediculous), the same
   // one the front end's other small buttons use.
   const okCancelFontSource = source(FRONTEND.smallFont);
-  const okCancelFont = createFont({ dc6: decodeDc6(okCancelFontSource.bytes), tbl: decodeFontTbl(read(FRONTEND.smallFontTbl)), palette: units, documentObject, path: FRONTEND.smallFont, drawAs: { op: 'celcolor', mode: 5 },
-    onGlyph: (record) => dialogDraw('button-glyph', FRONTEND.smallFont, okCancelFontSource, 'data\\global\\palette\\Units\\pal.dat', unitsPaletteSource, record) });
+  const okCancelFont = createFont({ dc6: decodeDc6(okCancelFontSource.bytes), tbl: decodeFontTbl(read(FRONTEND.smallFontTbl)), palette, documentObject, path: FRONTEND.smallFont, drawAs: { op: 'celcolor', mode: 4, blend },
+    onGlyph: (record) => dialogDraw('button-glyph', FRONTEND.smallFont, okCancelFontSource, SELECT_ASSETS.palette, skyPaletteSource, record) });
   const cursorDc6 = decodeDc6(read(FRONTEND.cursor));
   const cursorCanvas = frameCanvas(cursorDc6.frames[0], palette, documentObject);
   const labelFont = createFont({ dc6: decodeDc6(read(FRONTEND.font)), tbl: decodeFontTbl(read(FRONTEND.fontTbl)), palette, documentObject, path: FRONTEND.font, drawAs: { op: 'celcolor', mode: 4, blend } });
@@ -479,15 +480,15 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
         const db = DELETE_DIALOG.box;
         { g.drawImage(popupParts[0], db.x, db.top); if (popupParts[1]) g.drawImage(popupParts[1], db.x + popupParts[0].width, db.top); }
         dialogDraw('popup', SELECT_ASSETS.popup, popupSource, SELECT_ASSETS.popupPalette, popupPaletteSource, recordDc6(SELECT_ASSETS.popup, 0, popupDc6.frames[0], db.x, db.top));
-        // Retail's draw-list hook records PopUpOKCancel as its composed cel.  Keep its second canvas
-        // segment out of that retail-facing list, but retain it in the independent source evidence.
-        if (popupParts[1]) dialogDraw('popup', SELECT_ASSETS.popup, popupSource, SELECT_ASSETS.popupPalette, popupPaletteSource);
+        // Retail draws PopUpOKCancel as two cels (trace d56 tick 2: frame 0 at 268,350 and frame 1 at 524,350).
+        if (popupParts[1]) {
+          dialogDraw('popup', SELECT_ASSETS.popup, popupSource, SELECT_ASSETS.popupPalette, popupPaletteSource, recordDc6(SELECT_ASSETS.popup, 1, popupDc6.frames[1], db.x + popupParts[0].width, db.top)); }
         for (const [id, text] of [['no', noText], ['yes', yesText]]) {
           const b = dialogButtonBox(id);
           const token = `delete-${id}`, state = isButtonHeldOverTarget(pressed, hot) && pressed === token ? 1 : 0, face = okCancel.states[state] || okCancel.states[0];
           g.drawImage(face.canvas, b.x, b.y);
           dialogDraw('button', SELECT_ASSETS.okCancel, okCancelSource, 'data\\global\\palette\\Units\\pal.dat', unitsPaletteSource, recordDc6(okCancel.path, state < okCancel.states.length ? state : 0, face.frame, b.x, b.y));
-          okCancelFont.drawAnchored(g, text, b.x + Math.trunc((b.w - okCancelFont.measure(text)) / 2), b.y + b.h - 9);
+          okCancelFont.drawAnchored(g, text, b.x + Math.trunc((b.w - okCancelFont.measure(text)) / 2), b.y + b.h - 10);
         }
         // Retail draws the question after both buttons (trace d56 tick 2).
         confirmLines.forEach((l) => confirmFont.drawAnchored(g, l.text, l.x, l.anchor));
