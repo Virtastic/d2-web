@@ -140,7 +140,7 @@ import { panelCloseAt } from './assets/panel-close.mjs';
 import { characterPanelCloseAt, createCharacterPanelCloseGesture } from './assets/character-panel-close.mjs';
 import { beginInventoryClosePress, cancelInventoryClosePress, finishInventoryClosePress, inventoryCloseAt } from './assets/inventory-close-gesture.mjs';
 import { installScrollSafeCanvasFocus } from './assets/canvas-focus.mjs';
-import { createPlugyStash, isDc6, parsePlugyIni, pageLabel, PLUGY_INI_DEFAULT, PLUGY_GRID, PLUGY_NAME_AT } from './assets/plugy-stash-ui.mjs';
+import { createPlugyStash, createPlugyPanelArt, createStashLayoutReader, isDc6, parsePlugyIni, pageLabel, PLUGY_INI_DEFAULT } from './assets/plugy-stash-ui.mjs';
 import { pagesToSss, sssToPages, pagesToD2x, d2xToPages } from './assets/plugy-stash.mjs';
 import { plugyStashMode } from './assets/plugy-stash-mode.mjs';
 import { closeStashFromInventory, stashCloseAt } from './assets/stash-close.mjs';
@@ -612,6 +612,7 @@ function plugyMoveGold(kind) {
 }
 const plugyStash = createPlugyStash({ enabled: true, onPage: plugySwap, onGold: plugyMoveGold, lastUsed: plugyUsed });
 let plugyEvidence = null, plugyIni = PLUGY_INI_DEFAULT;
+const plugyPanelArt = createPlugyPanelArt();   // PlugY's TradeStash.dc6, bound to every stash renderer the shell builds
 // PY3: PlugY's own art (StashBtns, SharedGoldBtns, TradeStash), fetched from the dev server's /retail/PlugY/ (never hosted; absent = the plain control and retail's panel stay).
 if (plugyStash.enabled) (async () => {
   try {
@@ -635,9 +636,8 @@ if (plugyStash.enabled) (async () => {
       const rgba = new Uint8ClampedArray(f.width * f.height * 4);
       for (let i = 0; i < f.indices.length; i++) if (f.opaque[i]) rgba.set(pal.subarray(f.indices[i] * 4, f.indices[i] * 4 + 4), i * 4);
       c.getContext('2d').putImageData(new ImageData(rgba, f.width, f.height), 0, 0); return c; });
-    for (let t = 0; !stashPanelRenderer && t < 600; t++) await new Promise((r) => setTimeout(r, 500));
-    stashPanelRenderer.setArt(trade); stashPanelRenderer.plugy.on = true; stashPanelRenderer.plugy.nameX = PLUGY_NAME_AT.x; stashPanelRenderer.plugy.nameY = PLUGY_NAME_AT.y;
     plugyStash.setArt({ stash: canv(btns), gold: canv(gold) });
+    plugyPanelArt.setTrade(trade); plugyPanelArt.apply(stashPanelRenderer);   // no wait on a renderer: the draw path binds each one
   } catch (e) { plugyError = `PlugY art: ${e}`; }
 })();
 let repairConfirmRenderer = null;
@@ -1921,6 +1921,7 @@ function leaveGame() {
   ({ session, bootstrapStarted, currentFixture } = leaveNativeSession(session, monsterRenderer));
   snapshot = normalizeSnapshot(null); motion = {};
   window.__d2.session = null;
+  stashLayoutReader.reset();   // the next game configures its own InventoryBIN rows (PlugY or retail)
   pendingLoad = null; sessionError = ''; npcState = null;
   inventoryVisible = false; hirelingVisible = false; characterVisible = false; skillsVisible = false;
   helpVisible = false; clearScreen = false;
@@ -3665,7 +3666,7 @@ function clientMonsters() {   // the capture's join box (the retail capture tool
   let hero = -1, n = 0; for (let i = 0; i < nu; ++i) if (U[up + i * 11 + 1] === 0) { hero = up + i * 11; break; }
   if (hero < 0) return 0;
   const mons = [];
-  for (let i = 0; i < nu; ++i) { const q = up + i * 11; if (U[q + 1] === 1 && Math.max(Math.abs(H[q + 4] - H[hero + 4]), Math.abs(H[q + 5] - H[hero + 5])) <= 40) { ++n; mons.push(H[q + 2], H[q + 4], H[q + 5]); } }
+  for (let i = 0; i < nu; ++i) { const q = up + i * 11; if (U[q + 1] === 1 && Math.max(Math.abs(H[q + 4] - H[hero + 4]), Math.abs(H[q + 5] - H[hero + 5])) <= (globalThis.__d2GJoinRadius ?? 40)) { ++n; mons.push(H[q + 2], H[q + 4], H[q + 5]); } }
   // the entry ecx/edx of the loading walk's eight C1760 calls (D2Client+0x6C3F0's register leftovers, src/core/d2client/loading_pairs_6c3f0.cpp)
   const rp = Module._malloc(144), mp = Module._malloc(Math.max(12, mons.length * 4));
   Module.HEAP32.set(mons, mp >> 2);
@@ -4298,6 +4299,7 @@ function drawFrame() {
   }
   pollUiEvents();
   if (stashPanelRenderer) {
+    if (plugyStash.enabled) plugyPanelArt.apply(stashPanelRenderer);
     if (stashPanelRenderer?.plugy.on) { const lb = pageLabel(plugyStash.showShared, plugyStash.page, plugyIni); stashPanelRenderer.plugy.pageName = lb.text; stashPanelRenderer.plugy.nameColour = lb.colour; }
     try { stashEvidence = stashPanelRenderer.draw(ctx, w, h, stashOpen ? snapOr('stashLayout', readStashLayout) : null, snapshot.items, stashOpen, snapshot.act, Boolean(stashClosePress), gridBoxHover()); stashPanelError = ''; }
     catch (error) { stashPanelError = String(error); stashEvidence = null; }
@@ -4893,15 +4895,15 @@ function readCubeLayout() {
   } finally { Module._free(p); }
   return cubeLayout;
 }
-function readStashLayout() {
-  if (stashLayout) return stashLayout;
+// PY3: PlugY's 10x10 BigStash grid over the engine's record, on every read (createStashLayoutReader).
+const stashLayoutReader = createStashLayoutReader(() => {
   const p = Module._malloc(48);
   try {
     const ok = Module.ccall('d2_session_inventory_layout', 'number', ['number', 'number', 'bigint', 'number'], [BIG_BANK_PAGE_1, 1, BigInt(p), 12]);
-    stashLayout = ok ? stashGeometry(Array.from(new Int32Array(Module.HEAPU8.buffer.slice(p, p + 48)))) : null;
+    return ok ? stashGeometry(Array.from(new Int32Array(Module.HEAPU8.buffer.slice(p, p + 48)))) : null;
   } finally { Module._free(p); }
-  return stashLayout && plugyStash.enabled && stashPanelRenderer?.plugy.on ? { ...stashLayout, ...PLUGY_GRID } : stashLayout;   // PY3: PlugY's 10x10 BigStash grid (the engine keeps its own 6x8 rows)
-}
+}, () => plugyStash.enabled && plugyPanelArt.apply(stashPanelRenderer));
+function readStashLayout() { return (stashLayout = stashLayoutReader.read()); }
 // Both figures are read from retail's stat list on every use. The dialog owns
 // no balance and never predicts a capped transfer; button 19/20 decides that.
 function stashGoldStat(which) {

@@ -132,3 +132,30 @@ export function pageLabel(shared, page, cfg = PLUGY_INI_DEFAULT) {
   const id = page + 1, kind = id % cfg.nbPagesPerIndex2 === 0 ? 'Main' : id % cfg.nbPagesPerIndex === 0 ? 'Index' : 'Normal';
   return { text: `${shared ? 'Shared' : 'Personal'} Page ${id}`, colour: cfg.colours[(shared ? 'shared' : 'personal') + kind] };
 }
+
+// PlugY's panel art (its TradeStash.dc6) belongs to the FEATURE, not to one panel renderer: the shell builds a fresh stash
+// renderer on every game start, so the art is held here and bound to whichever renderer the frame draws with. apply() is
+// idempotent (setArt once per renderer) and is called on the draw path, so a renderer built before or after the art
+// arrives, or a second game in the same tab, all get the PlugY panel, its page-name anchor and the 10x10 grid.
+export function createPlugyPanelArt() {
+  let trade = null;
+  return {
+    get ready() { return Boolean(trade); },
+    setTrade(bytes) { trade = bytes; },
+    apply(renderer) {
+      if (!renderer?.plugy || !trade) return false;
+      if (renderer.plugy.art !== trade) { renderer.setArt(trade); renderer.plugy.art = trade; }
+      renderer.plugy.on = true; renderer.plugy.nameX = PLUGY_NAME_AT.x; renderer.plugy.nameY = PLUGY_NAME_AT.y;
+      return true;
+    },
+  };
+}
+// The stash geometry the panel draws and hit-tests with. The engine record (BIG_BANK_PAGE_1 at 800x600) is read once and
+// cached; PlugY's 10x10 grid is laid over it on EVERY read while the mode is active, never only on the read that filled the cache.
+export function createStashLayoutReader(readRecord, plugyActive) {
+  let record = null;
+  return {
+    read() { if (!record) record = readRecord(); return record && plugyActive() ? { ...record, ...PLUGY_GRID } : record; },
+    reset() { record = null; },
+  };
+}
