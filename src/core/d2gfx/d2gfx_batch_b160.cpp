@@ -73,7 +73,11 @@ extern "C" void* d2gfx_adjust_pointer(void* object, const D2GfxPmd* pmd,
 }
 
 // 1.13c D2Gfx+0x0C96A (28 B, callers 0x0C2FC/0x0C59D): return the inverse
-// of IsBadReadPtr for the requested byte span.
+// of IsBadReadPtr for the requested byte span. Retail contract: a zero-length span is always readable; NULL, and any span that leaves the 2 GiB user range
+// (0x80000000 and up, wrapping sums included), is not.
 extern "C" uint32_t d2gfx_validate_read(const void* pointer, uint32_t size) {
+    if (size == 0) return 1;
+    const uint64_t p = (uint64_t)(uintptr_t)pointer;
+    if (pointer == nullptr || p >= 0x80000000ull || p + size > 0x80000000ull) return 0;
     return IsBadReadPtr(pointer, size) == 0;
 }
