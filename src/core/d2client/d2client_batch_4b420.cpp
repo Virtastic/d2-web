@@ -115,12 +115,12 @@ bool sub_4C430(Seams& s, Unit* u) {
   return !(s.sc0b0(u) != 0);
  return false;
 }
-// 1.13c D2Client+0x4C500: LCG seed step is hi' = lo*0x6AC690C5 + hi (64-bit); only the
-// seed advance and the entry gates are reproduced; the placement loop is seam-driven (unverified).
+// LCG seed step shared by sub_4C500: hi' = lo*0x6AC690C5 + hi (64-bit).
 static uint32_t step(Unit* u) { uint64_t v = (uint64_t)u->seedLo * 0x6ac690c5ull + u->seedHi; u->seedLo = (uint32_t)v; u->seedHi = (uint32_t)(v >> 32); return (uint32_t)v; }
 struct Spawn { virtual ~Spawn()=default; virtual uint32_t count(Unit*)=0; virtual bool eligible(Unit*)=0; virtual bool isPlayerLike(Unit*)=0;
  virtual uint32_t ord10663(Unit*)=0; virtual int32_t room(Unit*)=0; virtual int32_t ux(Unit*)=0; virtual int32_t uy(Unit*)=0;
  virtual bool blocked(int32_t room,int32_t x,int32_t y)=0; virtual void place(uint32_t)=0; virtual uint8_t spawnRate(Unit*)=0; };
+// 1.13c D2Client+0x4C500
 uint32_t sub_4C500(Spawn& s, Unit* u, int32_t flag, const int32_t dx[8], const int32_t dy[8]) {
  if (flag) { uint32_t r = step(u); if (r % 0x19) return r / 0x19; }
  if (u && u->type == 1 && u->classId == 3) { uint32_t r = step(u); if (r % 3) return r / 3; }
