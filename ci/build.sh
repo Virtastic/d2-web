@@ -45,7 +45,8 @@ export BUILDER_IMAGE="$TOOLCHAIN_ID"
 
 # Engine builds are rationed: every worktree queues on the same slot pool in the main checkout. The worktree artifact lock
 # also spans compilation, staging and cache publication; separate trees still build in parallel.
-# At most D2_MAX_BUILDS (default 2) heavy builds run at once; ci/build-slot.sh is the counting semaphore.
+# At most D2_MAX_BUILDS (default 8) heavy builds run at once; ci/build-slot.sh is the counting semaphore.
+# Each takes nproc/D2_MAX_BUILDS compile jobs (at least 4), so a full pool fills the cores without oversubscribing them.
 T0=$(date +%s)
 # An unchanged engine needs no link: a cached build for this tree's source key is staged instead
 # (D2_BUILD_FORCE=1 links anyway; custom compiler flags never use the cache).
@@ -56,8 +57,9 @@ if [ -z "${D2_CXXFLAGS:-}" ] && [ "${D2_BUILD_FORCE:-0}" != 1 ] && bash tools/en
 fi
 source "$SRC/ci/build-slot.sh"
 d2_build_slot_acquire "$LOCK_DIR"
-got=$D2_BUILD_SLOT; SLOTS="${D2_MAX_BUILDS:-4}"
-echo "==> build slot $got of $SLOTS"
+got=$D2_BUILD_SLOT; SLOTS="${D2_MAX_BUILDS:-8}"
+JOBS="${D2_COMPILE_JOBS:-$(( $(nproc) / SLOTS > 4 ? $(nproc) / SLOTS : 4 ))}"
+echo "==> build slot $got of $SLOTS, $JOBS compile jobs"
 WAIT=$(( $(date +%s) - T0 ))
 
 echo "==> link (in $TOOLCHAIN_ID)"
@@ -79,7 +81,7 @@ if [ "${D2_COMPILER_CACHE:-1}" = 1 ]; then
   CACHE_ARGS=(-v "$LOCK_DIR/compiler-cache:/d2-compiler-cache" -e D2_COMPILER_CACHE=1)
 fi
 MSYS_NO_PATHCONV=1 docker run --rm "${CACHE_ARGS[@]}" \
-  -e D2_TOOLCHAIN_ID="$TOOLCHAIN_ID" -e HOME=/tmp -e D2_CXXFLAGS="${D2_CXXFLAGS:-}" -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" \
+  -e D2_TOOLCHAIN_ID="$TOOLCHAIN_ID" -e D2_COMPILE_JOBS="$JOBS" -e HOME=/tmp -e D2_CXXFLAGS="${D2_CXXFLAGS:-}" -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" \
   -v "$MOUNT:/build" -v "$MOUNT:$MOUNT:ro" "$TOOLCHAIN_ID" bash wasm-build/link-d2.sh
 
 echo "==> synthetic smoke.mpq"
