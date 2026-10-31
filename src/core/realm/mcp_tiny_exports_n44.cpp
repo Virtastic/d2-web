@@ -9,9 +9,9 @@ uint32_t d2_mcp_req_7480(const char* s, uint32_t cls, uint16_t flags, uint8_t* o
 }
 
 static uint32_t g_b1c8;          // [0xb1c8]
-static uint32_t g_b22c, g_b230;  // [0xb22c], [0xb230]
-static uint32_t g_b030[99];      // [0xb030], 0x18c bytes
-static uint16_t g_aea8;          // [0xaea8]
+uint32_t g_mcp_b22c, g_mcp_b230;  // [0xb22c], [0xb230]
+uint16_t g_mcp_aea8;              // [0xaea8]
+extern "C" void* d2_realm_mcp_client_storage();   // the 99-dword table at [0xb030] (mcp.cpp)
 
 // 1.13c D2MCPClient+0x06AA0: thunk (12 B) into sub_7410 (CHARLOGON); returns the frame length, caller sends it.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_mcp_6aa0(const char* s, uint8_t* out) { return d2_mcp_req_7410(s, out); }
@@ -25,13 +25,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_mcp_6ab0(const char* s, uint32_t cls
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_mcp_6db0(uint8_t* out) { g_b1c8 = 0; out[0] = 0x0F; return 1; }
 
 // 1.13c D2MCPClient+0x05E50 (ordinal 10046, fastcall): store the two register arguments at [0xb22c], [0xb230].
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_5e50(uint32_t a, uint32_t b) { g_b22c = a; g_b230 = b; }
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_5e50(uint32_t a, uint32_t b) { g_mcp_b22c = a; g_mcp_b230 = b; }
 
 // 1.13c D2MCPClient+0x067D0 (ordinal 10017): zero 99 dwords at [0xb030].
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_67d0() { memset(g_b030, 0, sizeof g_b030); }
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_67d0() { memset(d2_realm_mcp_client_storage(), 0, 99 * 4); }
 
 // 1.13c D2MCPClient+0x06970 (ordinal 10027): return the word at [0xaea8].
-extern "C" EMSCRIPTEN_KEEPALIVE uint16_t d2_mcp_6970() { return g_aea8; }
+extern "C" EMSCRIPTEN_KEEPALIVE uint16_t d2_mcp_6970() { return g_mcp_aea8; }
 
 // 1.13c D2MCPClient+0x0456D ___crtMessageBoxA. user32 is the host: api is the resolved import set (null = absent),
 // osver/winver are [0xa9e4]/[0xa9f0]. winsta_flags = GetUserObjectInformation flags byte, or -1 when the station
