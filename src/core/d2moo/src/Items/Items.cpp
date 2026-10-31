@@ -3186,7 +3186,8 @@ const D2RunesTxt* __stdcall ITEMS_GetRunesTxtRecordFromItem(const D2UnitStrc* pI
 
 		D2_ASSERT(pItem->dwUnitType == UNIT_ITEM);
 
-		const int nSockets = STATLIST_UnitGetStatValue(pItem, STAT_ITEM_NUMSOCKETS, 0);
+		// 1.13c D2Common+0x26ba0: the socket count is compared through a byte mask (retail `& 0xff`)
+		const int nSockets = STATLIST_UnitGetStatValue(pItem, STAT_ITEM_NUMSOCKETS, 0) & 0xFF;
 
 		if (nSockets != nSocketedItems)
 		{
