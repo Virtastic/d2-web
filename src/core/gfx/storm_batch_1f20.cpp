@@ -307,7 +307,7 @@ void StormHashTableClear(StormHashTable* h, uint32_t warn) {
     }
 }
 
-// 1.13c Storm+0x1A70: hash base dtor.
+// Storm 0x1A70 (1.13c): hash base dtor.
 void StormHashTableBaseDestroy(StormHashTable* h) {
     h->vtable = (void*)kStormVtblHashBase;
     StormHashTableClear(h, 1);
@@ -406,7 +406,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1fa0(uint32_t* r) {
     r[4] = 0;
 }
 
-// 1.13c Storm+0x1FC0: TSFixedArray<_FOUNDPARAM>::Set(edi=this, esi=count, eax=src)
+// Storm 0x1FC0 (1.13c, probe entry for StormFixedArraySetFoundParam): TSFixedArray<_FOUNDPARAM>::Set(edi=this, esi=count, eax=src)
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1fc0(uint32_t* r) {
     StormFixedArraySetFoundParam(P(StormFixedArray*, 0), (uintptr_t)r[1], P(const void*, 2));
@@ -452,21 +452,21 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_2210(uint32_t* r) {
     r[4] = (uint32_t)(uintptr_t)p;
 }
 
-// 1.13c Storm+0x2290: TSGrowableArray<TSList> dtor(eax=array)
+// Storm 0x2290 (1.13c): TSGrowableArray<TSList> dtor(eax=array)
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_storm_2290(uint32_t* r) {
     StormListArrayDestroy(P(StormGrowableArray*, 0));
     r[4] = 0;
 }
 
-// 1.13c Storm+0x22D0: TSList dtor([esp+4]=this)
+// Storm 0x22D0 (1.13c): TSList dtor([esp+4]=this)
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_storm_22d0(uint32_t* r) {
     StormListDestroy(P(StormList*, 0));
     r[4] = 0;
 }
 
-// 1.13c Storm+0x2350: chunk NewNode(esi=location, [esp+4]=list, [esp+8]=extrabytes, [esp+12]=flags)
+// Storm 0x2350 (1.13c): chunk NewNode(esi=location, [esp+4]=list, [esp+8]=extrabytes, [esp+12]=flags)
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_storm_2350(uint32_t* r) {
     void* p = StormHashTableChunkNew(P(StormHashTable*, 1), (uintptr_t)r[0], (uintptr_t)r[2], (uint32_t)r[3]);
@@ -519,7 +519,7 @@ extern "C" void* Storm_Sub1BC0(void* self, uint8_t flags) {
 }
 // 1.13c Storm+0x1BF0: TSGrowableArray<TSList> dtor (SEH wrapper over 0x2290).
 extern "C" void Storm_Sub1BF0(StormGrowableArray* a) { StormListArrayDestroy(a); }
-// 1.13c Storm+0x1C30
+// Storm 0x1C30 (1.13c)
 extern "C" void Storm_Sub1C30(StormElement* e) { StormElementDestroy(e); }
 // 1.13c Storm+0x1DA0: free the SOURCE array storage (data at +8).
 extern "C" void Storm_Sub1DA0(StormFixedArray* a) { if (a->data) StormFree(a->data); }

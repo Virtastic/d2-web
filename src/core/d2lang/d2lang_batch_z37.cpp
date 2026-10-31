@@ -18,12 +18,12 @@ extern "C" uint32_t z37_g_ready;     // DAT_6fc10a64
 extern "C" uint32_t z37_g_tbl;       // DAT_6fc10a68
 extern "C" int16_t z37_g_key[4];     // DAT_6fc10558..64
 
-// 1.13c D2Lang+0x01540
+// D2Lang 0x01540 (1.13c)
 extern "C" [[noreturn]] void z37_exit(int32_t nCode) { exit(nCode); }
 
 static void z37_die(uint32_t nId) { z37_report("%s", z37_string(nId)); z37_exit(-1); }
 
-// 1.13c D2Lang+0x09050 (base arrives in EAX; guessed return: slot value of the id's node)
+// D2Lang 0x09050 (1.13c) (base arrives in EAX; guessed return: slot value of the id's node)
 extern "C" uint32_t z37_nodeSlot(uint8_t* pBase, uint16_t nId, uint32_t* pSlots)
 {
 	uint32_t i = nId;
@@ -53,7 +53,7 @@ extern "C" uint8_t* z37_openTbl(uint32_t nPath, int32_t* pOut)
 	return z37_ptr(nPath);
 }
 
-// 1.13c D2Lang+0x0122E (__ultoa)
+// D2Lang 0x0122E (1.13c) (__ultoa)
 extern "C" char* z37_ultoa(unsigned long v, char* d, int r)
 {
 	char t[34]; int n = 0;
@@ -63,7 +63,7 @@ extern "C" char* z37_ultoa(unsigned long v, char* d, int r)
 	return d;
 }
 
-// 1.13c D2Lang+0x012E6 (__ui64toa)
+// D2Lang 0x012E6 (1.13c) (__ui64toa)
 extern "C" char* z37_ui64toa(uint64_t v, char* d, int r)
 {
 	char t[66]; int n = 0;
@@ -73,7 +73,7 @@ extern "C" char* z37_ui64toa(uint64_t v, char* d, int r)
 	return d;
 }
 
-// 1.13c D2Lang+0x015C0 (_strncpy: copy, zero-pad to count)
+// D2Lang 0x015C0 (1.13c) (_strncpy: copy, zero-pad to count)
 extern "C" char* z37_strncpy(char* d, const char* s, size_t n)
 {
 	size_t i = 0;
@@ -82,7 +82,7 @@ extern "C" char* z37_strncpy(char* d, const char* s, size_t n)
 	return d;
 }
 
-// 1.13c D2Lang+0x0182F (__stricmp, "C" locale branch)
+// D2Lang 0x0182F (1.13c) (__stricmp, "C" locale branch)
 extern "C" int z37_stricmp(const char* a, const char* b)
 {
 	int x, y;
@@ -94,7 +94,7 @@ extern "C" int z37_stricmp(const char* a, const char* b)
 	return x - y;
 }
 
-// 1.13c D2Lang+0x01898 (_sprintf)
+// D2Lang 0x01898 (1.13c) (_sprintf)
 extern "C" int z37_sprintf(char* d, const char* f, ...)
 {
 	va_list a; va_start(a, f);
@@ -103,7 +103,7 @@ extern "C" int z37_sprintf(char* d, const char* f, ...)
 	return n;
 }
 
-// 1.13c D2Lang+0x08370 (Unicode::utf8ToUnicode; guessed from a messy decompile: convert strlen+1 bytes, copy up to count)
+// D2Lang 0x08370 (1.13c) (Unicode::utf8ToUnicode; guessed from a messy decompile: convert strlen+1 bytes, copy up to count)
 extern "C" uint16_t* z37_utf8ToUnicode(uint16_t* pDst, const char* pSrc, int32_t nMax)
 {
 	uint16_t buf[0x400];
@@ -116,7 +116,7 @@ extern "C" uint16_t* z37_utf8ToUnicode(uint16_t* pDst, const char* pSrc, int32_t
 	return pDst;
 }
 
-// 1.13c D2Lang+0x094E0
+// D2Lang 0x094E0 (1.13c)
 extern "C" uint16_t* z37_loadValidated(void)
 {
 	uint8_t* p = z37_openTbl(z37_g_tblPath, nullptr);
@@ -132,7 +132,7 @@ extern "C" uint16_t* z37_loadValidated(void)
 	return (uint16_t*)p;
 }
 
-// 1.13c D2Lang+0x09590
+// D2Lang 0x09590 (1.13c)
 extern "C" void z37_loadKeys(void)
 {
 	static const uint16_t ids[4] = {0x14d0, 0x14d1, 0x14d2, 0x14d3};
@@ -147,7 +147,7 @@ extern "C" void z37_loadKeys(void)
 	}
 }
 
-// 1.13c D2Lang+0x09360 (returns hi:lo; lo = node u16 at +1, 0xffff if not found; *pOut = slot value)
+// D2Lang 0x09360 (1.13c) (returns hi:lo; lo = node u16 at +1, 0xffff if not found; *pOut = slot value)
 extern "C" uint32_t z37_findByName(uint8_t* pBase, uint32_t* pSlots, const uint8_t* pKey, int32_t* pOut)
 {
 	uint8_t* nodes = pBase + 0x15 + *(uint16_t*)(pBase + 2) * 2;

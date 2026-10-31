@@ -23,7 +23,7 @@ extern "C" uint32_t z33_g_dbcsMap;    // DAT_6fc10a5c
 
 static z33_wchar z33_up(z33_wchar c) { return c < 0x100 ? z33_toUpperTable[c] : c; }
 
-// 1.13c D2Lang+0x0B0B0 (#10040)
+// D2Lang 0x0B0B0 (1.13c) (#10040)
 extern "C" int32_t z33_strlen(const z33_wchar* p)
 {
 	int32_t n = 0;
@@ -32,7 +32,7 @@ extern "C" int32_t z33_strlen(const z33_wchar* p)
 	return n;
 }
 
-// 1.13c D2Lang+0x0B170 (#10035)
+// D2Lang 0x0B170 (1.13c) (#10035)
 extern "C" z33_wchar* z33_strchr(const z33_wchar* p, z33_wchar c)
 {
 	for (; *p; ++p)
@@ -60,7 +60,7 @@ extern "C" int32_t z33_stricmp(const z33_wchar* a, const z33_wchar* b)
 	}
 }
 
-// 1.13c D2Lang+0x0B120 (#10041)
+// D2Lang 0x0B120 (1.13c) (#10041)
 extern "C" z33_wchar* z33_strncat(z33_wchar* d, const z33_wchar* s, int32_t n)
 {
 	z33_wchar* r = d;
@@ -70,7 +70,7 @@ extern "C" z33_wchar* z33_strncat(z33_wchar* d, const z33_wchar* s, int32_t n)
 	return r;
 }
 
-// 1.13c D2Lang+0x0B1B0 (#10042)
+// D2Lang 0x0B1B0 (1.13c) (#10042)
 extern "C" int32_t z33_strncmp(const z33_wchar* a, const z33_wchar* b, uint32_t n)
 {
 	while (*a && *b && n)
@@ -96,7 +96,7 @@ extern "C" int32_t z33_strnicmp(const z33_wchar* a, const z33_wchar* b, uint32_t
 	return y <= x ? (y < x) : -1;
 }
 
-// 1.13c D2Lang+0x0B250 (#10033): args = the caller's variadic stack words (ints or 32-bit links).
+// D2Lang 0x0B250 (1.13c) (#10033): args = the caller's variadic stack words (ints or 32-bit links).
 extern "C" void z33_sprintf(int32_t nMax, z33_wchar* d, const z33_wchar* f, const uint32_t* args)
 {
 	if (!f) return;
@@ -155,7 +155,7 @@ extern "C" void z33_sprintf(int32_t nMax, z33_wchar* d, const z33_wchar* f, cons
 	}
 }
 
-// 1.13c D2Lang+0x08E80 (#10053)
+// D2Lang 0x08E80 (1.13c) (#10053)
 extern "C" char* z33_toUtf(char* d, const z33_wchar* s, int32_t nMax)
 {
 	int32_t n = 0;
@@ -169,7 +169,7 @@ extern "C" char* z33_toUtf(char* d, const z33_wchar* s, int32_t nMax)
 	return d;
 }
 
-// 1.13c D2Lang+0x0ACF0 (#10056)
+// D2Lang 0x0ACF0 (1.13c) (#10056)
 extern "C" uint32_t z33_unicodeWidth(const char* p, int32_t nMax)
 {
 	if (z33_g_dbcsMap == 0) return (uint32_t)strlen(p);
@@ -196,7 +196,7 @@ extern "C" uint32_t z33_unicodeWidth(const char* p, int32_t nMax)
 	return w;
 }
 
-// 1.13c D2Lang+0x08D70 (#10057)
+// D2Lang 0x08D70 (1.13c) (#10057)
 extern "C" uint32_t z33_unicodenwidth(const char* p, int32_t nMax)
 {
 	uint32_t w = 0;
@@ -219,7 +219,7 @@ extern "C" uint32_t z33_unicodenwidth(const char* p, int32_t nMax)
 	return w;
 }
 
-// 1.13c D2Lang+0x0AC40 (#10058)
+// D2Lang 0x0AC40 (1.13c) (#10058)
 extern "C" void z33_unloadSysMap()
 {
 	if (z33_g_ranges_link) { z33_free(z33_g_ranges_link); z33_g_ranges_link = 0; }

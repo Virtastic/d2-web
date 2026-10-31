@@ -12,7 +12,7 @@ void     Storm_Sub1C20(void* arr);                                              
 void     Storm_Sub2D80(void* rec);                                              // 0x2D80
 void     Storm_Sub1EB0(uint32_t* a, uintptr_t count, const uint8_t* src);       // 0x1EB0
 void     Storm_Sub1F30(uint32_t* a, uint32_t count, const uint32_t* src);       // 0x1F30
-extern "C" void Storm_Sub1FC0(void) {}  // 1.13c Storm+0x1FC0: body not recovered yet (GUESS: no-op); the 3270 FN vector judges it
+extern "C" void Storm_Sub1FC0(void) {}  // Storm 0x1FC0 (1.13c) is TSFixedArray<_FOUNDPARAM>::Set, ported as StormFixedArraySetFoundParam in gfx/storm_batch_1f20.cpp; this empty placeholder is not it
 void*    Storm_Sub1C580(uint32_t size, const char* src, int32_t line, uint32_t f);   // 0x1C580 SMemAlloc
 void*    Storm_Sub1C760(void* p, uint32_t size, const char* src, int32_t line, uint32_t f); // 0x1C760 SMemReAlloc
 int32_t  Storm_Sub1B960(void* p, const char* src, int32_t line);                // 0x1B960 SMemFree

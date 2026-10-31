@@ -6,7 +6,7 @@
 
 typedef char16_t z27_wc;
 
-// 1.13c D2Lang+0x1204 (__itoa; xtoa body inlined)
+// D2Lang 0x1204 (1.13c) (__itoa; xtoa body inlined)
 extern "C++" char* z27_itoa(int32_t v, char* dst, int32_t radix) {
     bool neg = radix == 10 && v < 0;
     uint32_t u = neg ? 0u - (uint32_t)v : (uint32_t)v;
@@ -17,7 +17,7 @@ extern "C++" char* z27_itoa(int32_t v, char* dst, int32_t radix) {
     *p = 0; return dst;
 }
 
-// 1.13c D2Lang+0x26E0 (___ascii_stricmp)
+// D2Lang 0x26E0 (1.13c) (___ascii_stricmp)
 extern "C++" int32_t z27_ascii_stricmp(const char* a, const char* b) {
     for (;;) {
         uint8_t x = (uint8_t)*a++, y = (uint8_t)*b++;
@@ -88,7 +88,7 @@ extern "C++" uint32_t z27_lookup_index(z27_LangState* s, const uint8_t* key) {
     uint32_t o = 0; z27_lookup_key(s, key, &o); return o;
 }
 
-// 1.13c D2Lang+0x9790 (ordinal 10007, u64 with thousands separators and K/M/.. suffix)
+// D2Lang 0x9790 (1.13c) (ordinal 10007, u64 with thousands separators and K/M/.. suffix)
 struct z27_FmtSeam {
     z27_wc suffix[5];                // DAT_6fc10558..64 for cases 1..4; [0] unused (case 0 = none)
     void (*fatal)(int32_t msgId);
@@ -112,7 +112,7 @@ extern "C++" void z27_format_u64(const z27_FmtSeam* sm, z27_wc* out, uint64_t va
     }
 }
 
-// 1.13c D2Lang+0x8630 (Unicode::isLineBreak); cls = FUN_6fc09290 (language class) via seam
+// D2Lang 0x8630 (1.13c) (Unicode::isLineBreak); cls = FUN_6fc09290 (language class) via seam
 extern "C++" int32_t z27_is_linebreak(const z27_wc* s, uint32_t i, int32_t (*cls)()) {
     if (!i) return 1;
     auto sp = [](z27_wc c) { return c < 0x100 && (c == ' ' || (c >= 9 && c <= 13)); };
@@ -130,7 +130,7 @@ extern "C++" int32_t z27_is_linebreak(const z27_wc* s, uint32_t i, int32_t (*cls
     return 0;
 }
 
-// 1.13c D2Lang+0x8740 (Unicode::Personalize, ordinal 10018)
+// D2Lang 0x8740 (1.13c) (Unicode::Personalize, ordinal 10018)
 struct z27_PersSeam {
     bool (*pred)(const char* tbl);                   // FUN_6fc08520
     bool (*hasVowel)(const char* v, const z27_wc* w); // FUN_6fc08420

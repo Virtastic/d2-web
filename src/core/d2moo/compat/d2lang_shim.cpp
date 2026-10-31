@@ -41,8 +41,8 @@ Unicode Unicode::toLower() const { return ch >= 0x100 ? *this : Unicode(ch >= 'A
 BOOL Unicode::compare(Unicode o) const { return toUpper().ch == o.toUpper().ch; }
 BOOL __fastcall Unicode::compare(Unicode l, Unicode r) { return l.toUpper().ch == r.toUpper().ch; }
 BOOL Unicode::isWhitespace() const { return ch == 32 || (ch >= 9 && ch <= 13); }
-Unicode* Unicode::strcpy(Unicode* dest, const Unicode* src) { Unicode* d = dest; while ((*d++ = *src++).ch) {} return dest; }
-Unicode* Unicode::strcat(Unicode* dest, const Unicode* src) { Unicode* d = dest; while (d->ch) d++; strcpy(d, src); return dest; }
+Unicode* Unicode::strcpy(Unicode* dest, const Unicode* src) { Unicode* d = dest; while ((*d++ = *src++).ch) {} return dest; }  // 1.13c D2Lang+0xAFC0
+Unicode* Unicode::strcat(Unicode* dest, const Unicode* src) { Unicode* d = dest; while (d->ch) d++; strcpy(d, src); return dest; }  // 1.13c D2Lang+0xAFE0
 // 1.13c D2Lang+0xB020 (#10046): first occurrence of substr in str; NULL for a NULL arg, an empty substr, or no match.
 Unicode* Unicode::strstr(const Unicode* str, const Unicode* substr) {
     if (!str || !substr || !substr->ch) return nullptr;
@@ -105,7 +105,7 @@ Unicode* __fastcall Unicode::strncat(Unicode* dest, const Unicode* src, int coun
     d->ch = 0;
     return dest;
 }
-Unicode* Unicode::toUnicode(Unicode* dest, const char* src, int count) {
+Unicode* Unicode::toUnicode(Unicode* dest, const char* src, int count) {  // 1.13c D2Lang+0x8CD0
     std::u16string u = d2::utf8ToU16(src ? src : "");
     int n = (int)u.size(); if (n > count - 1) n = count - 1; if (n < 0) n = 0;
     for (int i = 0; i < n; i++) dest[i] = Unicode((unsigned short)u[i]);
@@ -290,7 +290,7 @@ Unicode* __fastcall Unicode::win2Unicode(Unicode* dst, const char* src, int n) {
     if (src[i]) d[i - 1] = 0; else d[i] = 0;
     return dst;
 }
-// 1.13c D2Lang+0x8520 (ESI=wide str, stack=narrow set; caller Personalize): true when the wide string's last unit
+// D2Lang 0x8520 (1.13c) (ESI=wide str, stack=narrow set; caller Personalize): true when the wide string's last unit
 // equals any of the first 19 narrow chars. Custom register convention: NAMED, no vector.
 static bool d2lang_lastCharIn(const uint16_t* w, const char* set) {
     int n = 0;
@@ -340,7 +340,7 @@ unsigned char* d2lang_read_file_7ef0(const char* path, int* size_out) {
 
 // Flat C exports of the real D2Lang functions, for D2Client/D2Win/D2Launch callers (flat Ordinal_N names
 // clash across DLLs with differing signatures, hence the d2lang_ prefix).
-// 1.13c D2Lang+0x9450 (#10003)
+// D2Lang 0x9450 (1.13c) (#10003)
 extern "C" const char16_t* d2lang_Ordinal_10003(uint16_t index) { return (const char16_t*)D2LANG_GetStringFromTblIndex((short)index); }
-// 1.13c D2Lang+0xAFC0 (#10038): Unicode::strcpy
+// D2Lang 0xAFC0 (1.13c, #10038): Unicode::strcpy, marked on its definition
 extern "C" char16_t* d2lang_Ordinal_10038(char16_t* dest, const char16_t* src) { return (char16_t*)Unicode::strcpy((Unicode*)dest, (const Unicode*)src); }

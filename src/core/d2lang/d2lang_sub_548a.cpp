@@ -1,4 +1,4 @@
-// 1.13c D2Lang+0x0548A: __security_error_handler(int code). No Win32 in wasm: the
+// D2Lang 0x0548A (1.13c): __security_error_handler(int code). No Win32 in wasm: the
 // handler hook and the message-box sink are reached through the env struct.
 #include <cstdint>
 #include <cstring>
@@ -13,6 +13,7 @@ struct d2lang_548a_env
 static d2lang_548a_env d2lang_548a_env_g;
 extern "C" d2lang_548a_env* d2lang_548a_getEnv() { return &d2lang_548a_env_g; }
 
+// 1.13c D2Lang+0x0548A
 extern "C" void d2lang_548a_security_error_handler(int code)
 {
 	d2lang_548a_env& e = d2lang_548a_env_g;

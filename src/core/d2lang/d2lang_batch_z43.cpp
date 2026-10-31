@@ -8,7 +8,7 @@ struct z43_Node { uint32_t val; uint32_t key; uint32_t next; };   // 32-bit link
 struct z43_Utf8 { uint16_t cmask, cval, shift, pad; int32_t lmask, lmin; };   // DAT_6fc102e8 rows, 16 bytes
 }
 
-// 1.13c D2Lang+0x9FB0 -- find (or intern) the converted string for key; list head is *head (handle).
+// D2Lang 0x9FB0 (1.13c) -- find (or intern) the converted string for key; list head is *head (handle).
 // seams: res(h) handle->node, alloc(size,tag) handle, toUnicode(key) -> handle of the u16 string.
 extern "C++" uint32_t z43_9fb0(uint32_t* head, const char* key, void* (*res)(uint32_t), uint32_t (*alloc)(uint32_t),
                                uint32_t (*toUnicode)(const char*)) {

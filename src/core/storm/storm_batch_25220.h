@@ -22,6 +22,7 @@ struct State {
 
 uint32_t length(State&, const char*);
 uint32_t copy(State&, char*, const char*, uint32_t);
+uint32_t providerPathCopy(State&, const uint8_t*, char*, uint32_t);
 uint32_t append(State&, char*, const char*, uint32_t);
 void fill(void*, uint32_t, uint8_t);
 int32_t compare(State&, const char*, const char*, uint32_t);

@@ -56,7 +56,7 @@ extern "C" void fog_sub_223F(void);
 // if it belongs to the small-block heap, free it there, then __unlock(4) (0x2000) and return. A block
 // outside that heap (or a miss) falls through to HeapFree(heap, 0, mem); the lookup must not have
 // freed anything in that case, exactly as the decompile orders it.
-extern "C" EMSCRIPTEN_KEEPALIVE void fog_free(void* mem, const FogHeapEnv* env) {  // 1.13c Fog+0x1FAD
+extern "C" EMSCRIPTEN_KEEPALIVE void fog_free(void* mem, const FogHeapEnv* env) {  // Fog 0x1FAD (1.13c)
     if (mem == nullptr) return;
     if (env->heap_mode == 3) {
         env->lock(4);
@@ -73,7 +73,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void fog_free(void* mem, const FogHeapEnv* env) 
 // heap active goes to ___sbh_alloc_block under __lock(4), then __unlock(4) (0x2090); a hit returns
 // it. Otherwise a zero request becomes 1, anything but heap_mode 1 is rounded up to a 16-byte
 // multiple, and the block comes from HeapAlloc.
-extern "C" EMSCRIPTEN_KEEPALIVE void* fog_heap_alloc(size_t size, const FogHeapEnv* env) {  // 1.13c Fog+0x201E
+extern "C" EMSCRIPTEN_KEEPALIVE void* fog_heap_alloc(size_t size, const FogHeapEnv* env) {  // Fog 0x201E (1.13c)
     if (env->heap_mode == 3 && size <= env->sbh_threshold) {
         env->lock(4);
         void* const block = env->sbh_alloc_block((uint32_t)size);
@@ -89,7 +89,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void* fog_heap_alloc(size_t size, const FogHeapE
 // __nh_malloc(size, nh_flag): requests at or above 0xFFFFFFE1 return NULL without trying. Each
 // attempt is __heap_alloc; a NULL result ends the call when nh_flag is 0, otherwise __callnewh(size)
 // decides whether to retry.
-extern "C" EMSCRIPTEN_KEEPALIVE void* fog_nh_malloc(size_t size, int nh_flag, const FogHeapEnv* env) {  // 1.13c Fog+0x2099
+extern "C" EMSCRIPTEN_KEEPALIVE void* fog_nh_malloc(size_t size, int nh_flag, const FogHeapEnv* env) {  // Fog 0x2099 (1.13c)
     if (size < 0xFFFFFFE1u) {
         for (;;) {
             void* const block = fog_heap_alloc(size, env);
@@ -103,7 +103,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void* fog_nh_malloc(size_t size, int nh_flag, co
 
 // 1.13c Fog+0x20C5
 // _malloc(size): __nh_malloc(size, _newmode).
-extern "C" EMSCRIPTEN_KEEPALIVE void* fog_malloc(size_t size, const FogHeapEnv* env) {  // 1.13c Fog+0x20C5
+extern "C" EMSCRIPTEN_KEEPALIVE void* fog_malloc(size_t size, const FogHeapEnv* env) {  // Fog 0x20C5 (1.13c)
     return fog_nh_malloc(size, (int)env->newmode, env);
 }
 
@@ -115,7 +115,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void* fog_malloc(size_t size, const FogHeapEnv* 
 // old one; an unresized block moves to a rounded HeapAlloc block the same way. A block outside that
 // heap goes straight to a rounded HeapReAlloc. __unlock(4) (0x223F) then runs. A null result ends the
 // call when _newmode is 0, otherwise retries only while __callnewh reports a handler ran.
-extern "C" EMSCRIPTEN_KEEPALIVE void* fog_realloc(void* mem, uint32_t size, const FogHeapEnv* env) {  // 1.13c Fog+0x20D7
+extern "C" EMSCRIPTEN_KEEPALIVE void* fog_realloc(void* mem, uint32_t size, const FogHeapEnv* env) {  // Fog 0x20D7 (1.13c)
     if (mem == nullptr) return fog_malloc(size, env);
     if (size == 0) {
         fog_free(mem, env);

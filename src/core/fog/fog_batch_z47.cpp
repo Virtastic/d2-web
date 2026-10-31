@@ -40,7 +40,7 @@ void fog_z47_1350(uint32_t list) { drain_1350(list); }
 
 void fog_z47_1170(uint32_t self) { drain_1350(self); unlink_node(self + 4); }  // 1.13c FOG+0x01170
 
-// 1.13c FOG+0x011F0: this=anchor (0 -> list+4), node=param_1 (0 -> list+4), mode 1 = insert before anchor
+// FOG 0x011F0 (1.13c, marked on FUN_6ff511f0 in gfx/fog_batch_1000.cpp): this=anchor (0 -> list+4), node=param_1 (0 -> list+4), mode 1 = insert before anchor
 // else after. PARTIAL: node==0 case uses `list` (in_EAX) as retail's register arg.
 void fog_z47_11F0(uint32_t list, uint32_t self, uint32_t node, int32_t mode) {
     uint32_t n = node ? node : list + 4;
@@ -58,7 +58,7 @@ void fog_z47_11F0(uint32_t list, uint32_t self, uint32_t node, int32_t mode) {
     W(u + e) = n; W(self + 4) = node;
 }
 
-// 1.13c FOG+0x01290: alloc node (size param_2+0x24, tag "AUMessage LogManager", flags|8), zero links,
+// FOG 0x01290 (1.13c, marked on FUN_6ff51290 in gfx/fog_batch_1000.cpp): alloc node (size param_2+0x24, tag "AUMessage LogManager", flags|8), zero links,
 // insert via 11F0 if EDI(anchor, guessed = param `mode`) nonzero. PARTIAL: EDI/ECX are undeclared regs.
 uint32_t fog_z47_1290(uint32_t list, uint32_t self, uint32_t size, uint32_t flags, int32_t mode) {
     if (!fog_z47_alloc) return 0;

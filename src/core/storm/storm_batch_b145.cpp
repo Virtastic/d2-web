@@ -5,6 +5,9 @@
 #include <cstring>
 #include <cstdio>
 #include <cctype>
+#include <Windows.h>
+
+extern CRITICAL_SECTION g_stormLogLocks[4];  // storm_349e0.cpp, 0x6FC42F60
 
 static uint8_t g_regCode[16];          // DAT_6fc35554 (reg id -> modrm bits)
 static uint8_t g_regCode2[32];         // DAT_6fc3555f (indexed [reg*2+sub])
@@ -29,16 +32,19 @@ void (*Storm_Hook_1FAB0)() = nullptr;                  // FUN_6fc1fab0
 int (*Storm_Hook_CrtStartup)(uint32_t, int, int) = nullptr; // __DllMainCRTStartup@12
 static uint32_t g_listHead[4];         // DAT_6fc42fc0 (pointers to nodes whose first dword is arg of 24BA0)
 
-// 1.13c Storm+0x35170: shutdown; drain 4 handle lists (critical sections are no-ops, single thread)
+// 1.13c Storm+0x35170: shutdown; drain 4 handle lists under their bucket locks, then delete the locks.
 extern "C" void Storm_Sub35170(uint32_t ecx) {
   if (Storm_Hook_249E0) Storm_Hook_249E0(ecx);
-  for (int i = 0; i < 4; i++)
+  for (int i = 0; i < 4; i++) {
+    EnterCriticalSection(&g_stormLogLocks[i]);
     while (g_listHead[i]) {
       uint32_t node = g_listHead[i];
-      if (Storm_Hook_24BA0) Storm_Hook_24BA0(node);  // retail reads *node; node table is 32-bit guest memory
+      if (Storm_Hook_24BA0) Storm_Hook_24BA0(*(uint32_t*)(uintptr_t)node);  // retail passes the node's first dword (id)
       if (Storm_Hook_1FB30) Storm_Hook_1FB30("HSLOG", nullptr);
-      if (g_listHead[i] == node) break;  // ponytail: retail relies on 24BA0 unlinking; avoid spin when unhooked
     }
+    LeaveCriticalSection(&g_stormLogLocks[i]);
+  }
+  for (int i = 0; i < 4; i++) DeleteCriticalSection(&g_stormLogLocks[i]);
 }
 
 // 1.13c Storm+0x38220: p[0]=blk (out of 2A330), p[1]=data, p[2]=end; truncation: ints are retail 32-bit

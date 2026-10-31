@@ -1,4 +1,4 @@
-// 1.13c D2Lang+0x8520 / +0x9FB0
+// D2Lang 0x8520 (1.13c) / +0x9FB0
 #include <cstdint>
 #include <cstring>
 #include <cstdlib>

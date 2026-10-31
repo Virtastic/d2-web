@@ -285,7 +285,7 @@ void Storm_Sub316D0(int32_t a, float* r, uint32_t b, int32_t mode) {
   uint32_t* c = Storm_Sub2690(0, 0x6fc458f0);
   if (c) {
     if (mode == 2 || mode == 6) {
-      if (r[0] < r[2] && r[1] < r[3]) { uint32_t id = c[0x16]++; Storm_Sub20A90(b, id + 1, mode != 6 ? 0x10000 : 0); }
+      if (r[0] < r[2] && r[1] < r[3]) { uint32_t id = c[0x16]++; Storm_Sub20A90(b, id + 1, mode == 6 ? 0x10000 : 0); }
     } else {
       if (Storm_Sub1FD50(r) == 0) { uint32_t id = c[0x16]++; Storm_Sub20C90(c + 6, 0, c[7], 0, r, b, id + 1); }
       Storm_Sub1FEA0(mode);

@@ -96,7 +96,7 @@ void copyClamped(uint8_t* dst, const uint32_t* src, uint32_t cap) {
 }
 }  // namespace
 
-// 1.13c Storm+0x5110
+// Storm 0x5110 (1.13c)
 // Grow the 128-byte-entry table obj (EAX) towards n (ESI), then record n as the high-water mark.
 void Storm_Sub5110(uint32_t* obj, uint32_t n) {
     if (obj[1] < n && obj[0] < n) {
@@ -235,7 +235,7 @@ int32_t Storm_Sub11F10(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d, uint3
     return Storm_Sub11F10Full(nullptr, scratch, a, b, c, d, e, f);
 }
 
-// 1.13c Storm+0x12690
+// Storm 0x12690 (1.13c)
 // The local peer record: created on first use from the 0x5040 allocator, with its counters reset.
 int32_t* Storm_Sub12690(void) {
     uint32_t p = g_a3c[2];
@@ -428,7 +428,7 @@ void Storm_Sub14F20(void) {
     }
 }
 
-// 1.13c Storm+0x161E0
+// Storm 0x161E0 (1.13c)
 // Lazily create the worker event and thread. Host seam: no Win32 threads on wasm, so the two handles
 // are non-null tokens (the worker's work is done inline by the engine); *out gets the event token.
 int32_t Storm_Sub161E0Out(uint32_t* out) {
@@ -438,5 +438,5 @@ int32_t Storm_Sub161E0Out(uint32_t* out) {
     return (g_4584c != 0 && g_45854 != 0) ? 1 : 0;
 }
 
-// 1.13c Storm+0x161E0
+// Storm 0x161E0 (1.13c)
 int32_t Storm_Sub161E0(void) { return Storm_Sub161E0Out(nullptr); }

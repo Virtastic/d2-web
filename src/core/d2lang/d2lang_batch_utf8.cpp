@@ -56,7 +56,7 @@ extern "C" int d2lang_utf8_check(const uint8_t* p, int nLen)
 	return (int32_t)(r->last & v) >= r->first ? n : -1;
 }
 
-// 1.13c D2Lang+0x08C40: decode one UTF-8 sequence to a UCS-2 unit; returns its length or -1.
+// D2Lang 0x08C40 (1.13c): decode one UTF-8 sequence to a UCS-2 unit; returns its length or -1.
 extern "C" int d2lang_utf8_decode(const uint8_t* p, int nLen, uint16_t* pOut)
 {
 	if (nLen < 1)

@@ -96,11 +96,10 @@ void Storm_Sub319C0(const StormZ10Env& E, int h, const float* r, uint32_t* n, ui
                 for (uint32_t i = 0; i < c; i++, s += 2) out[i] = *s;
                 E.leave(E.csList); return;
             }
-            *n = 0; E.leave(E.csList); return;
+            *n = cnt; E.leave(E.csList); return;
         }
         E.leave(E.csList);
     }
-    *n = 0;
 }
 // 1.13c Storm+0x31AC0
 void Storm_Sub31AC0(const StormZ10Env& E, int h, const int* r, uint32_t b, int c) {
@@ -293,7 +292,8 @@ int Storm_Sub33EA0(const StormZ10Env& E, const char* name, int pal, uint8_t* pix
 // 1.13c Storm+0x340B0
 uint32_t Storm_Sub340B0(uint32_t* g42fd0, uint32_t v) { *g42fd0 = v; return 1; }
 // 1.13c Storm+0x34370
-void* Storm_Sub34370(const StormZ10Env& E, int a, void* fn24300) {
+intptr_t Storm_Sub34300(void* hwnd, uint32_t msg, uint32_t wp, intptr_t lp);
+void* Storm_Sub34370(const StormZ10Env& E, int a) {
     if (a != 0) { Z10Err(E); return nullptr; }
-    return fn24300;
+    return (void*)&Storm_Sub34300;
 }

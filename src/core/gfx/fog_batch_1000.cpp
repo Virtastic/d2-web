@@ -87,7 +87,7 @@ namespace
 		node->nPrev = 0;
 	}
 
-	// 1.13c Fog+0x11F0: insert `node` before `pos` (mode 1) or after it (mode != 1); NULL means
+	// Fog 0x11F0 (1.13c): insert `node` before `pos` (mode 1) or after it (mode != 1); NULL means
 	// the sentinel. `node` is unlinked first.
 	void fog_link_insert(FogList* root, FogLink* pos, FogLink* node, int32_t mode)
 	{

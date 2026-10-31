@@ -575,9 +575,10 @@ uint32_t Storm_Sub29200(void) {
 uint32_t Storm_Sub2FAB0(void) {
     while ((int32_t)g_45960 > 0) {
         void* h = N(g_45960);
+        uint32_t nx = *(uint32_t*)h;  // node[0] = successor; 4B80 makes it the new head
         Storm_Sub4D60(h);
         Storm_Sub1B960(h, "__AUHANDLER__", -2);
-        g_45960 = 0;  // seam: the 4D60 unlink rewrites 45960 in retail (head pointer); not modelled
+        g_45960 = nx;  // retail head = successor (unlink writes it through ~tag into 45960)
     }
     g_45380 = 0;
     for (uint8_t* b = N(g_4537c); b;) { uint8_t* nx = N(U(b, 8)); free(b); b = nx; }  // HeapFree(GetProcessHeap())

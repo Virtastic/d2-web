@@ -1,4 +1,4 @@
-// 1.13c D2Lang+0x1580
+// D2Lang 0x1580 (1.13c)
 #include <emscripten.h>
 #include <cstdint>
 extern "C" int d2lang_strncmp(const char*, const char*, size_t);

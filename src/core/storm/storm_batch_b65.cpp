@@ -201,8 +201,8 @@ uint32_t sub_29F60(const AttrEnv& e, void* self, uint8_t* entries, uint32_t coun
         if (flags & 2) want += count * 8;
         if (size == want) {
             const uint8_t* s = buf + 8;
-            if ((flags & 1) && count) for (uint32_t i = 0; i < count; ++i, s += 4) wr(entries, 0x60 + i * 0x1c, rd(s, 0));
-            if ((flags & 2) && count) for (uint32_t i = 0; i < count; ++i, s += 8) { wr(entries, 0x40 + i * 0x1c, rd(s, 0)); wr(entries, 0x44 + i * 0x1c, rd(s, 4)); }
+            if ((flags & 1) && count) for (uint32_t i = 0; i < count; ++i, s += 4) wr(entries, 0x18 + i * 0x1c, rd(s, 0));
+            if ((flags & 2) && count) for (uint32_t i = 0; i < count; ++i, s += 8) { wr(entries, 0x10 + i * 0x1c, rd(s, 0)); wr(entries, 0x14 + i * 0x1c, rd(s, 4)); }
             ok = 1;
         }
     }

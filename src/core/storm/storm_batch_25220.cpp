@@ -26,6 +26,14 @@ uint32_t copy(State& s,char* dst,const char* src,uint32_t capacity) {
     uint32_t n=0; while(n+1<capacity && src[n]) { dst[n]=src[n]; ++n; }
     dst[n]=0; return n;
 }
+// 1.13c Storm+0x26430 ProviderPathCopy: record+8 is the path string. A null dst sets error 0x57 and
+// returns 0; otherwise dst[0]=0 and the bounded copy runs. Retail's critical section is not modelled (single-threaded wasm).
+uint32_t providerPathCopy(State& s,const uint8_t* record,char* dst,uint32_t capacity) {
+    if(!dst) { error(s,0x57); return 0; }
+    dst[0]=0;
+    copy(s,dst,reinterpret_cast<const char*>(record+8),capacity);
+    return 1;
+}
 // 1.13c Storm+0x3AE00
 uint32_t append(State& s,char* dst,const char* src,uint32_t capacity) {
     if(!dst || !src) { error(s,0x57); return 0; }

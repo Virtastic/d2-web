@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
+#include <Windows.h>
+#include "storm_image_leaves.h"
 
 namespace {
 
@@ -93,7 +95,9 @@ uint32_t Storm_sub_28E80(File* f, uint32_t off, uint8_t* dst, uint32_t len) {
 // 1.13c Storm+0x361C0  frees the global hash-bucket table; g_buckets = 0x6FC45370, count 0x6FC45374
 namespace { struct Node { void* a; void* b; void* c; Node* items; Node* next; }; }
 Node** g_stormBuckets; uint32_t g_stormBucketCount, g_stormBucketUsed, g_stormBucketsInit;
-uint32_t Storm_sub_361C0(void (*releaseItem)(Node*)) {   // releaseItem = 0x25FC0 (item = node->items)
+static CRITICAL_SECTION g_sevtLock;                    // 0x6FC458C8 (SEVT table lock; shim no-op)
+uint32_t Storm_sub_361C0(void (*releaseItem)(Node*)) {   // releaseItem = 0x35FC0 (SEVT item-group free; item = node->items)
+    EnterCriticalSection(&g_sevtLock);
     for (uint32_t i = 0; i < g_stormBucketCount; ++i) {
         while (Node* n = g_stormBuckets[i]) {
             while (Node* it = n->items) { n->items = it->items; releaseItem(it); }  // item link at +0xC
@@ -103,6 +107,7 @@ uint32_t Storm_sub_361C0(void (*releaseItem)(Node*)) {   // releaseItem = 0x25FC
     }
     if (g_stormBuckets) SeamFree1B960(g_stormBuckets, "delete", -1);
     g_stormBuckets = nullptr; g_stormBucketCount = 0; g_stormBucketUsed = 0; g_stormBucketsInit = 1;
+    LeaveCriticalSection(&g_sevtLock);
     return 1;
 }
 
@@ -113,7 +118,6 @@ void Put(Sink* s, const void* p, size_t n) {
     if (s->len + n <= s->cap) std::memcpy(s->buf + s->len, p, n);
     s->len += n;
 }
-void Rows21F60(uint8_t*&, const uint8_t*, int32_t) {}    // 0x21F60 PCX row RLE (unmapped)
 void Rows21FF0(uint8_t* dst, const uint8_t* src, uint32_t, uint32_t pitch, uint32_t w) {  // 0x21FF0 row copy
     (void)dst; (void)src; (void)pitch; (void)w;
 }
@@ -131,7 +135,8 @@ uint32_t Storm_sub_32C00(int32_t height, Sink* file, const uint8_t* pal, const u
     Put(file, hdr, sizeof hdr);
     auto* buf = (uint8_t*)SeamAlloc1C580((uint32_t)(width * height * 2), "..\\3rdParty\\STORM\\SOURCE\\SBMP.CPP", 0x4eb, 0);
     uint8_t* out = buf;
-    for (int32_t y = 0; y < height; ++y) Rows21F60(out, pixels, width);
+    const uint8_t* src = pixels;
+    for (int32_t y = 0; y < height; ++y) Storm_Sub31F60((uint32_t)width, &src, &out);  // 1.13c 0x31F60 row RLE
     Put(file, buf, (size_t)(out - buf));
     SeamFree1B960(buf, "..\\3rdParty\\STORM\\SOURCE\\SBMP.CPP", 0x4f2);
     uint8_t tail[0x301]; tail[0] = 0x0c;

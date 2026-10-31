@@ -77,6 +77,12 @@ uint32_t GetFileSize(uint32_t, uint32_t* hi) { if (hi) *hi = 0; return 0; }
 
 }  // namespace
 
+// The lock, the 0x6FC459CC list head and the error store, for per-function files that share them
+// (storm_26500.cpp).
+CRITICAL_SECTION* Storm_Lock45988() { return &g_lock; }
+uint32_t Storm_List459CC() { return g_list459CC; }
+void Storm_SetError45388(uint32_t e) { g_lastError = (int32_t)e; StormSetLastError(e); }
+
 // 1.13c Storm+0x26E20: unlink the node (or the 0x6FC45968 fallback), drop its +0x140 refcount and
 // destroy it through 0x3EF0/SMemFree when that reaches zero; always returns 1.
 extern "C"

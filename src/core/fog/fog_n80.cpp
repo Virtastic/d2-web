@@ -94,14 +94,14 @@ void fogLog(const char* fmt, ...) {
   va_end(ap);
 }
 
-// 1.13c FOG+0x1CD50 ordinal 10045 -- pool alloc (pool ignored when pooling is off); failure reports type 2.
+// FOG 0x1CD50 (1.13c) ordinal 10045 -- pool alloc (pool ignored when pooling is off); failure reports type 2.
 void* poolAllocChecked(void* pool, const char* file, int line) {
   void* p = g.h.poolAlloc(g.poolEnabled ? pool : nullptr);
   if (!p) fogError(2, file, line, "");
   return p;
 }
 
-// 1.13c FOG+0x1D7F0 ordinal 10090 -- close every slot event, free the table, disable async.
+// FOG 0x1D7F0 (1.13c) ordinal 10090 -- close every slot event, free the table, disable async.
 void asyncShutdown() {
   if (g.table) {
     for (uint32_t i = 0; i < g.tableCount; i++)
@@ -112,7 +112,7 @@ void asyncShutdown() {
   g.enabled = 0;
 }
 
-// 1.13c FOG+0x1DB40 ordinal 10099 -- set request priority (<=0); deferred while deferCount>0.
+// FOG 0x1DB40 (1.13c) ordinal 10099 -- set request priority (<=0); deferred while deferCount>0.
 void asyncSetPriority(Req* r, int32_t prio) {
   if (!r) fatal(0x1df);
   if ((r->flags & kMask) != kMagic) fatal(0x1e0);
@@ -124,7 +124,7 @@ void asyncSetPriority(Req* r, int32_t prio) {
   } else if (r->prio < prio) r->prio = prio;
 }
 
-// 1.13c FOG+0x1DCC0 ordinal 10091 -- open+start an async read. size<1 = whole file; buf null = pool-allocated;
+// FOG 0x1DCC0 (1.13c) ordinal 10091 -- open+start an async read. size<1 = whole file; buf null = pool-allocated;
 // cb = 7-dword callback block or null; async/offset are the register/stack tail args (EBX, caller slot).
 Req* asyncOpen(void* pool, const char* name, int32_t size, void* buf, const uint32_t* cb, void* ud,
                int async, uint32_t offset) {
@@ -158,7 +158,7 @@ Req* asyncOpen(void* pool, const char* name, int32_t size, void* buf, const uint
   return r;
 }
 
-// 1.13c FOG+0x1DF00 ordinal 10089 -- enable async: set Storm budgets, create 256 manual-reset slot events.
+// FOG 0x1DF00 (1.13c) ordinal 10089 -- enable async: set Storm budgets, create 256 manual-reset slot events.
 void asyncInit(int enable) {
   if (g.enabled) fatal(0x7b);
   g.h.sBudget(284, 0x40000); g.h.sBudget(285, 0x4000);
@@ -169,7 +169,7 @@ void asyncInit(int enable) {
   g.tableCount = 0x100; g.enabled = 1;
 }
 
-// 1.13c FOG+0x1E010 ordinal 10097 -- cancel/wait/free a request.
+// FOG 0x1E010 (1.13c) ordinal 10097 -- cancel/wait/free a request.
 void asyncFree(Req* r) {
   if (!r) fatal(0x295);
   if ((r->flags & kMask) != kMagic) fatal(0x296);

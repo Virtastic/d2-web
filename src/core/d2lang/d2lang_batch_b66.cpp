@@ -13,7 +13,7 @@ extern "C" void d2lang_crt_amsg_exit(int code);
 struct LangCacheNode { Unicode* wide; char* key; LangCacheNode* next; };
 static LangCacheNode* g_langCache;  // D2Lang+0x10A60
 
-// 1.13c D2Lang+0x9fb0: EAX=key (hidden register) -> explicit leading param. `suffix` is the
+// D2Lang 0x9fb0 (1.13c): EAX=key (hidden register) -> explicit leading param. `suffix` is the
 // string at D2Lang+0x10568 appended to the key before conversion.
 Unicode* d2lang_cacheLookup(const char* key, const char* suffix)
 {

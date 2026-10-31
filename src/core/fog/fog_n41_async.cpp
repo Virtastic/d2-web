@@ -58,14 +58,14 @@ struct FogAsyncApi {
 static u32 fa_ld(const u8* p) { return *(const u32*)p; }
 static void fa_st(u8* p, u32 v) { *(u32*)p = v; }
 
-// 1.13c Fog+0x1CD50
+// Fog 0x1CD50 (1.13c)
 void* fog_sub_1cd50(const FogAsyncApi* a, void* thisp, bool flag, const char* file, int line) {
     void* r = a->alloc(flag ? thisp : nullptr);   // -(DAT_6ff7f350 != 0) & this
     if (!r) a->logAlloc(2, file, line, "");
     return r;
 }
 
-// 1.13c Fog+0x1D7F0
+// Fog 0x1D7F0 (1.13c)
 void fog_sub_1d7f0(const FogAsyncApi* a, FogAsyncState* s) {
     if (s->table) {
         for (u32 i = 0; i < s->count; i++) {
@@ -79,7 +79,7 @@ void fog_sub_1d7f0(const FogAsyncApi* a, FogAsyncState* s) {
     s->initialized = 0;
 }
 
-// 1.13c Fog+0x1DB40
+// Fog 0x1DB40 (1.13c)
 void fog_sub_1db40(const FogAsyncApi* a, FogAsyncState* s, u8* obj, int v) {
     if (!obj) { fog_n41_die(&a->die, 0x1df); return; }
     const u32 f = fa_ld(obj + 0x48);
@@ -103,7 +103,7 @@ void fog_sub_1db40(const FogAsyncApi* a, FogAsyncState* s, u8* obj, int v) {
     if ((int)fa_ld(obj + 0x44) < v) fa_st(obj + 0x44, (u32)v);
 }
 
-// 1.13c Fog+0x1DF00
+// Fog 0x1DF00 (1.13c)
 void fog_sub_1df00(const FogAsyncApi* a, FogAsyncState* s, int enable) {
     if (s->initialized) { fog_n41_die(&a->die, 0x7b); return; }
     a->setLimit(0x40000);   // Ordinal_284
