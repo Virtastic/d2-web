@@ -1333,14 +1333,12 @@ int32_t __fastcall sub_6FC6A8C0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nM
 int32_t __fastcall MONSTERSPAWN_SpawnRandomMonsterForLevel(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY)
 {
     D2LevelsTxt* pLevelsTxtRecord = DATATBLS_GetLevelsTxtRecord(DUNGEON_GetLevelIdFromRoom(pRoom));
-    if (!pLevelsTxtRecord->nNumNormalMonsters)
-    {
-        FOG_DisplayWarning("ptLevelData->bMonTot", __FILE__, __LINE__);
-        return 0;
-    }
+    // 1.13c D2Game+0xEF6B0: retail asserts here (source line 0x4F0) where 1.10f warned and returned 0.
+    D2_ASSERTM(pLevelsTxtRecord->nNumNormalMonsters, "ptLevelData->bMonTot");
 
     int32_t nIndex = ITEMS_RollLimitedRandomNumber(pRoom ? &pRoom->pSeed : nullptr, pLevelsTxtRecord->nNumNormalMonsters);
 
+    bool bFound = false;
     for (int32_t i = 0; i < pLevelsTxtRecord->nNumNormalMonsters; ++i)
     {
         ++nIndex;
@@ -1358,9 +1356,12 @@ int32_t __fastcall MONSTERSPAWN_SpawnRandomMonsterForLevel(D2GameStrc* pGame, D2
             {
                 return D2GAME_SpawnMonster_6FC69F10(pGame, pRoom, nX, nY, nMonsterId, MONMODE_NEUTRAL, 5, 0) != nullptr;
             }
+            bFound = true;
             break;
         }
     }
 
+    // 1.13c D2Game+0xEF6B0: retail asserts (source line 0x507) when no list entry carries the spawn flag.
+    D2_ASSERT(bFound);
     return 0;
 }
