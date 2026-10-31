@@ -12,7 +12,7 @@ struct Env {
  virtual uintptr_t alloc(int32_t line,uint32_t size)=0;     // Ordinal_10042(line,0)
  virtual void freeP(uintptr_t p,int32_t line)=0;            // Ordinal_10043(line,0)
  virtual void fatal(int32_t msgId)=0;                       // Ordinal_10265 + Ordinal_10024 + _exit(-1)
- virtual uintptr_t loadCel(const char* path)=0;             // FUN_6fadb420
+ virtual uintptr_t loadCel(const char* path)=0;             // FUN_6fadb420(0): the implementation must pass the constant 0 stack arg (D2Client+0x2B420)
  virtual int32_t q(int32_t ordinal,int32_t a,int32_t b)=0;  // Ordinal_10227 / 10033
  virtual uintptr_t fopenR(const char* name)=0;              // CreateFileA read-only
  virtual void fread(uintptr_t h,void* dst,uint32_t n)=0;    // ReadFile

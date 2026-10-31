@@ -112,22 +112,22 @@ struct MapSvc {
  virtual ~MapSvc()=default;
  virtual void o10115()=0; virtual void o578(char*)=0; virtual void o10114()=0;
  virtual int32_t o10107(int32_t a,int32_t b,int32_t c,int32_t d,int32_t e)=0; virtual void o501()=0;
- virtual void o10110(int32_t n,int32_t* out3)=0; virtual void o10108()=0; virtual void o10109()=0;
+ virtual void o10110(int32_t n,int32_t* blk)=0; virtual void o10108()=0; virtual void o10109()=0; // Fog 10110 = ReadFile(hFile, blk+1, n, &blk[0], 0)
  virtual void o10112(int32_t,int32_t)=0; virtual void o10111(int32_t,int32_t*,int32_t)=0;
  virtual void fmtMap(char* out)=0; virtual void fmtMa(char* out,int32_t n)=0; // "%s%s.map" / "%s%s.ma%d"
 };
 int32_t sub_5F3E0(MapSvc& s,G& g){
- char b[264]{},c[264]{},ma[24]{}; int32_t slot[4]{}; int32_t got0=0,got1=0; int32_t idx=0;
+ char b[264]{},c[264]{},ma[24]{}; int32_t blk[7]{}; int32_t idx=0;
  s.o10115();
  bool direct=true;
  if(g.c9860!=0){ s.o578(c); s.o10114(); s.o578(b); if(s.o10107(0,0,0,0,0)!=-1){ direct=false; s.o501(); } }
  if(direct){ s.fmtMap(b); if(s.o10107(0,4,0x80,0,0)==-1) return -1; }
- s.o10110(0x18,slot); // 0x18-byte header read, 0xc-byte guard (got0/got1 REG? results)
- if(got0==0x18&&got1==0xc){
-  int i=0; for(;i<4;i++) if(slot[i]==g.cc3bc) break;
-  if(i==4){ slot[idx]=g.cc3bc; s.fmtMa(ma,idx); s.o10108(); s.o10112(0,0); s.o10111(0x18,slot,0); }
+ s.o10110(0x18,blk); // blk[0]=bytes read, blk[1..6]=0x18-byte header; retail tests blk[0]==0x18 and blk[1]==0xc
+ if(blk[0]==0x18&&blk[1]==0xc){
+  int i=0; for(;i<4;i++) if(blk[i]==g.cc3bc) break;
+  if(i==4){ blk[idx]=g.cc3bc; s.fmtMa(ma,idx); s.o10108(); s.o10112(0,0); s.o10111(0x18,blk,0); }
   else idx=i;
- } else { for(int i=0;i<4;i++){ s.fmtMa(ma,i); s.o10108(); } idx=0; s.o10112(0,0); s.o10111(0x18,slot,0); }
+ } else { for(int i=0;i<4;i++){ s.fmtMa(ma,i); s.o10108(); } idx=0; s.o10112(0,0); s.o10111(0x18,blk,0); }
  s.o10109(); s.fmtMa(ma,idx);
  return s.o10107(0,0,4,0x80,0);
 }

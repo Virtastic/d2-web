@@ -87,12 +87,12 @@ void damageRange(Env& e,const Imp8dad0& f,int32_t gBC38,int32_t item,int32_t uni
  int32_t st=e.q(10973,item,0x110);
  if(st && f.statRows()>0x110 && f.statBase()+0x15840 && f.rd32(owner+0x1c)){
   int32_t k=0; int32_t t=f.o11044(f.rd32(owner+0x1c),&k);
-  int32_t v=f.o10449(st,t,k,0,0,0); hi+=v; if(v) *outFlag=1;
+  int32_t v=f.o10449(st,t,0,0,0,0); hi+=v; if(v) *outFlag=1;
  }
  st=e.q(10973,item,0x111);
  if(st && f.statRows()>0x111 && f.statBase()+0x15984 && f.rd32(owner+0x1c)){
   int32_t k=0; int32_t t=f.o11044(f.rd32(owner+0x1c),&k);
-  int32_t v=f.o10449(st,t,k,0,0,0); hi+=ratio(v,hi,100); if(v) *outFlag=1;
+  int32_t v=f.o10449(st,t,0,0,0,0); hi+=ratio(v,hi,100); if(v) *outFlag=1;
  }
  *outMin=lo; *outMax=hi;
 }

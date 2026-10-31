@@ -47,7 +47,9 @@ static_assert(offsetof(B81ZState, raw) == 0x0C && offsetof(B81ZState, blocks) ==
 struct B81ZBlocks {                                  // only the fields these four functions touch
     uint32_t mode;                                   // 0x00: 4/5 = trees built, 6 = codes built
     uint32_t sub;                                    // 0x04: first union word (the trees/codes allocation)
-    uint8_t  pad0[0x14];                             // 0x08..0x1B
+    uint8_t  pad0[4];                                // 0x08..0x0B
+    uint32_t trees;                                  // 0x0C: modes 4/5 free this pointer (retail passes +0x0C)
+    uint8_t  pad0b[0x0C];                            // 0x10..0x1B
     uint32_t bitk;                                   // 0x1C
     uint32_t bitb;                                   // 0x20
     uint8_t  pad1[4];                                // 0x24..0x27
@@ -96,8 +98,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_10110(B81ZStream* z) {
     st->mode = st->raw != 0 ? 7u : 0u;
     B81ZBlocks* b = (B81ZBlocks*)(uintptr_t)st->blocks;
     if (b == nullptr) return 0;                                // retail dereferences; init always awards blocks
+    // Retail (0x6FAC0146/0x6FAC0154): modes 4/5 free blocks+0x0C, mode 6 frees blocks+0x04.
     if (b->mode == 4 || b->mode == 5 || b->mode == 6) {
-        if (z->zfree) ((void (*)(uint32_t, void*))(uintptr_t)z->zfree)(z->opaque, (void*)(uintptr_t)b->sub);
+        const uint32_t p = (b->mode == 6) ? b->sub : b->trees;
+        if (z->zfree) ((void (*)(uint32_t, void*))(uintptr_t)z->zfree)(z->opaque, (void*)(uintptr_t)p);
     }
     b->read = b->window;
     b->write = b->window;
