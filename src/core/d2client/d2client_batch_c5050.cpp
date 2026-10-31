@@ -21,9 +21,9 @@ struct Env {
  P (*fcc00)(P, P);
  // imported ordinals
  uint32_t (*o10630)(); void (*o10302)(P, uint32_t, uint32_t, uint32_t, const char*, uint32_t);
- int32_t (*o10601)(uint32_t, const char*, uint32_t); void (*o10306)(P, uint32_t, uint32_t);
- int32_t (*o10980)(uint32_t); void (*o10243)(uint32_t, int32_t); void (*o10649)(); void (*o10179)(uint32_t);
- int32_t (*o10786)(P, uint32_t, int32_t, int32_t); int32_t (*o10080)(P, int32_t, int32_t);
+ int32_t (*o10601)(uint32_t, const char*, uint32_t); int32_t (*o10306)(P, uint32_t, uint32_t);
+ int32_t (*o10980)(uint32_t); void (*o10243)(uint32_t, int32_t); int32_t (*o10649)(uint32_t); int32_t (*o10179)(uint32_t);
+ int32_t (*o10786)(P, uint32_t, int32_t, int32_t); int32_t (*o10080)(P, int32_t, int32_t);   // 10080(unit, p2, p3)
  P (*o10331)(P); P (*o10331a)(P, uint32_t, uint32_t, P, uint32_t, uint32_t); P (*o10389)(P);
  void (*o10554)(uint32_t, uint32_t); void (*o10748)(uint32_t, uint32_t);
  void (*o10065)(); void (*o11087)(int32_t*, int32_t*);
@@ -60,14 +60,16 @@ uint32_t sub_C50F0(const Env& e, P u, uint32_t a2) {
  uint32_t h = e.o10630();
  if (!h) { e.o10302(u, 0x126, 1, 0, "..\\Source\\D2Client\\SKILLS\\SkillsEMon.cpp", 0x35c); h = e.o10630(); if (!h) return 0; }
  int32_t cls = e.o10601(h, "..\\Source\\D2Client\\SKILLS\\SkillsEMon.cpp", 0x364);
- e.o10306(u, h, 1);
+ int32_t r306 = e.o10306(u, h, 1);                 // its return is the 4th argument of both 10786 calls (not param1)
  int32_t n = e.o10980(h);
- e.o10243(h, n + 1); e.o10649(); e.o10179(h);
+ e.o10243(h, n + 1);
+ int32_t p2 = e.o10649(h), p3 = e.o10179(h);
  P r = clsRow(e, cls);
  if (!r) return 0;
- e.o10786(u, e.rd32(r + 0x118), cls, n);
- int32_t flag = e.o10786(u, e.rd32(r + 0x118), cls, n);
- if (cls <= e.o10080(u, n, cls)) flag = 1;
+ int32_t flag = 0;
+ if (n >= e.o10786(u, e.rd32(r + 0x118), cls, r306)) flag = 1;       // 0xC5 :751e6 jl skip
+ int32_t calc2 = e.o10786(u, e.rd32(r + 0x118), cls, r306);          // second call, same arguments
+ if (e.o10080(u, p2, p3) >= calc2) flag = 1;                         // :7521b jl skip
  int32_t v;
  if (e.rd32(u + 0x10) == 1) {
   if (flag) {

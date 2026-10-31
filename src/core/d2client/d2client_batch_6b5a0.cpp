@@ -18,6 +18,11 @@ struct Host {
  U* list1;       // DAT_6fb928b0
  const uint8_t* bitMasks; // gdwBitMasks, stride 4 bytes
  I clipR, clipB; // DAT_6fb8bc48 / DAT_6fb8bc4c
+ const uint8_t* dataTables; // *sgptDataTables (D2Client+0xCE474 import slot); +0xA80 = entry count
+ I (*unitInfo)(U unit, I* type, I* id, I* sub); // D2Common#10350
+ U flagB9B0;     // DAT_6fbcb9b0
+ const uint8_t* (*dtTable)(U off); // the table pointer stored at *sgptDataTables+off (0xA78 MonStats, 0xA90 MonStats2)
+ void (*cell6C020)(U cell,U unit,U arg); // 0x6C020 (esi=cell, edi=unit, stack=arg)
 };
 
 static U& dw(uint8_t* base,U idx){ return *reinterpret_cast<U*>(base+idx*4); }
@@ -74,23 +79,42 @@ void sub_6C020(Host& h,U cell,I grp,I groupCount){
  }
 }
 
-// 1.13c D2Client+0x6C3F0 : walk the per-class bit table. rec = class record (+0xf0 bitmap) or null
-void sub_6C3F0(Host& h,const uint8_t* rec,I grp,I groupCount){
- if(!rec) return;
+// 1.13c D2Client+0x6C3F0 (eax = unit, stack = arg forwarded to every 6C020; ret 4). Class = 0x1B50(unit);
+// MonStats row (dataTables+0xA78, stride 0x1A8, count +0xA80) -> short +0x18 -> MonStats2 row (+0xA90, stride 0x134,
+// count +0xA98); for each entry b of the static list (count DAT 0x6FB928EC), if gdwBitMasks[b&7] & row[0xF0+(b>>3)]
+// then 6C020(esi=b, edi=unit, stack=arg). The count is re-read after every call, as retail does.
+void sub_6C3F0(Host& h,U unit,U arg){
+ I cls=h.lookup(0x1B50,I(unit),0,0);
+ if(cls<0) return;
+ if(cls>=*reinterpret_cast<const I*>(h.dataTables+0xa80)) return;
+ I m2=*reinterpret_cast<const int16_t*>(h.dtTable(0xa78)+U(cls)*0x1a8+0x18);
+ if(m2<0) return;
+ if(m2>=*reinterpret_cast<const I*>(h.dataTables+0xa98)) return;
+ const uint8_t* row=h.dtTable(0xa90)+U(m2)*0x134;
+ if(!row) return;
  for(U i=0;i<h.count1;++i){
   U b=h.list1[i];
-  if(h.bitMasks[(b&7)*4] & rec[(b>>3)+0xf0]) sub_6C020(h,0,grp,groupCount);
+  if(h.bitMasks[(b&7)*4] & row[(b>>3)+0xf0]) h.cell6C020(b,unit,arg);
  }
 }
 
-// 1.13c D2Client+0x6CB30 : ebx-style mode==0x11 gate
-void sub_6CB30(Host& h,I mode,U grp,I groupCount,const uint8_t* rec){
- h.ord(10175,0,0,0,0); h.ord(10350,0,0,0,0);
- if(mode==0x11 && I(grp)<groupCount){
-  dw(h.tbl,grp*0x28+9)=0; dw(h.tbl,grp*0x28+9+0x14)=0;
-  if(h.ord(10331,0,0,0,0)) h.ord(10043,0,0,0,0);
-  sub_6C3F0(h,rec,I(grp),groupCount);
- }
+// 1.13c D2Client+0x6CB30 (esi = unit, may be null). Retail: type = unit?unit[0]:6, id = unit?unit[1]:-1, sub = D2Common#10175(unit);
+// D2Common#10350(unit,&type,&id,&sub,...) rewrites all three; for type==1 (monster) and id < *(sgptDataTables+0xA80) both
+// parallel cells tbl[(id*0x28+sub)] and +0x50 are cleared; then edi = D2Common#10331(unit) && !D2gfx#10043() && !DAT_6fbcb9b0, and
+// 0x6C3F0(eax=unit, stack=edi) runs. The entry count is read from the table here, as retail does.
+void sub_6CB30(Host& h,const U* unit,U unitAddr){
+ I type = unit ? I(unit[0]) : 6;
+ I id   = unit ? I(unit[1]) : -1;
+ I sub  = h.ord(10175,I(unitAddr),0,0,0);
+ h.unitInfo(unitAddr,&type,&id,&sub);
+ if(type!=1) return;
+ if(id >= *reinterpret_cast<const I*>(h.dataTables+0xa80)) return;
+ dw(h.tbl,U(id)*0x28+U(sub))=0;
+ dw(h.tbl,U(id)*0x28+U(sub)+0x14)=0;
+ U edi=1;
+ if(!h.ord(10331,I(unitAddr),0,0,0)) edi=0;
+ else if(h.ord(10043,0,0,0,0) || h.flagB9B0) edi=0;
+ sub_6C3F0(h,unitAddr,edi);
 }
 
 // 1.13c D2Client+0x6B5A0 : size/alloc-tier select (ord 11088==4, ord 10973 value), returns 0/1
@@ -126,8 +150,8 @@ void sub_6C130(Host& h,Anim* a){
 }
 
 // 1.13c D2Client+0x6D010 : per-frame group pump
-void sub_6D010(Host& h,I n,const uint8_t* rec,I grp,I groupCount){
- for(I i=0;i<n;++i){ sub_6C3B0(h); sub_6C3F0(h,rec,grp,groupCount); }
+void sub_6D010(Host& h,I n,U unit,U arg){
+ for(I i=0;i<n;++i){ sub_6C3B0(h); sub_6C3F0(h,unit,arg); }
 }
 
 } // namespace
