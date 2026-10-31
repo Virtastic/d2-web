@@ -19,7 +19,7 @@ set -euo pipefail
 cd "${1:-.}"
 # Resolve the actual image, not its mutable tag or only its Dockerfile recipe.
 # Failure is a cache miss: an unavailable/unknown toolchain must never reuse an engine.
-image_id=$(docker image inspect "${BUILDER_IMAGE:-d2-builder64:1}" --format '{{.Id}}')
+image_id=$(docker image inspect "${BUILDER_IMAGE:-d2-builder64:$(sha256sum Dockerfile.builder64 | cut -c1-12)}" --format '{{.Id}}')
 [[ "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'engine-key: invalid builder image ID' >&2; exit 1; }
 k=$({ printf '%s\n' "$image_id"; git rev-parse HEAD:src HEAD:wasm-build/link-d2.sh HEAD:third_party HEAD:ci/build.sh HEAD:Dockerfile.builder64 HEAD:tools/compiler-cache.sh 2>/dev/null; } | sha256sum | cut -c1-12)
 # The source key covers WHAT was compiled; D2_CXXFLAGS covers HOW, and link-d2.sh ties both the

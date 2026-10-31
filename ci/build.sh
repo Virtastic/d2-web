@@ -10,7 +10,8 @@
 #      e/<hash>/; doing that to the tracked play/ dirties the checkout on every build.
 set -euo pipefail
 SRC="${SRC:-$(cd "$(dirname "$0")/.." && pwd)}"
-IMAGE="${BUILDER_IMAGE:-d2-builder64:1}"
+# One tag per recipe: worktrees on different Dockerfile versions never retag each other's image.
+IMAGE="${BUILDER_IMAGE:-d2-builder64:$(sha256sum "$SRC/Dockerfile.builder64" | cut -c1-12)}"
 cd "$SRC"
 source "$(dirname "${BASH_SOURCE[0]}")/../tools/artifact-lock.sh"
 d2_artifact_lock "$SRC"
