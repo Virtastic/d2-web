@@ -45,6 +45,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_amsg_exit_141d(int errnum, int error
 // 1.13c D2MCPClient+0x014EE
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_unlock_14ee(uint32_t idx) { d2_mcp_host_unlock(idx); }
 
-// 1.13c D2MCPClient+0x0159A
+// D2MCPClient 0x0159A (1.13c)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_unlock10_159a_seam(void (*unlock)(uint32_t)) { unlock(10); }
+// 1.13c D2MCPClient+0x159A
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_unlock10_159a(void) { d2_mcp_unlock10_159a_seam(d2_mcp_unlock_14ee); }

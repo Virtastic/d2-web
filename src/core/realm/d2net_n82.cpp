@@ -32,7 +32,7 @@ struct N82Crt {
     int (*dllMain)(void*, int);  // 0x6AA0
 };
 
-// 1.13c D2NET+0x0133D
+// D2NET 0x0133D (1.13c)
 void n82_crtExitProcess(N82Crt* c, int code) {
     void* h = c->getModuleHandle("mscoree.dll");
     if (h) {
@@ -126,7 +126,7 @@ int n82_CRT_INIT(N82Crt* c, void* inst, int reason) {
     return 0;
 }
 
-// 1.13c D2NET+0x01676
+// D2NET 0x01676 (1.13c)
 int n82_entry(N82Crt* c, void* inst, int reason, void* reserved) {
     int rc = 1;
     if (reason == 0 && c->initCount == 0) return 0;

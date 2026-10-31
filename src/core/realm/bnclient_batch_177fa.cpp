@@ -32,14 +32,16 @@ int abnormal_termination(const SehRegistration& registration, const void* finall
 }
 // 1.13c BNClient+0x18244 -- x86 SEH filter returns 1: handler faults fall
 // through to abort. Native C++ exceptions use the corresponding catch boundary.
-[[noreturn]] void terminate(ThreadState& thread, void (*abort_import)()) {
+[[noreturn]]
+void terminate(ThreadState& thread, void (*abort_import)()) {
     try { if (thread.terminate_handler) thread.terminate_handler(); } catch (...) {}
     abort_import();
     std::abort(); // imported retail abort never returns
 }
 // 1.13c BNClient+0x18279 -- the inconsistency hook is distinct from the thread handler.
-[[noreturn]] void inconsistency(ThreadState& thread, void (*inconsistency_handler)(),
-                               void (*abort_import)()) {
+[[noreturn]]
+void inconsistency(ThreadState& thread, void (*inconsistency_handler)(),
+                   void (*abort_import)()) {
     try { if (inconsistency_handler) inconsistency_handler(); } catch (...) {}
     terminate(thread,abort_import);
 }
@@ -89,4 +91,17 @@ U32 send_start_advertisement(U32 value,U32 flag,SendPacket send_eb00) {
     const U32 payload[2]={value,flag!=0 ? 1u:0u};
     send_eb00(8,0x16,payload); return 1;
 }
+// The three VS2003 pointer validators. Each is `return IsBad*Ptr(...) == 0`; the Kernel32 import is a host
+// seam (null = every pointer is good, as a wasm64 heap has no guard pages).
+using BadPtr=int(*)(const void*,U32);
+using BadCode=int(*)(const void*);
+BadPtr g_is_bad_read_ptr=nullptr;   // IAT IsBadReadPtr
+BadPtr g_is_bad_write_ptr=nullptr;  // IAT IsBadWritePtr
+BadCode g_is_bad_code_ptr=nullptr;  // IAT IsBadCodePtr
+// 1.13c BNClient+0x1836A -- _ValidateRead(p, n)
+int validate_read(const void* p,U32 n) { return g_is_bad_read_ptr ? g_is_bad_read_ptr(p,n)==0 : 1; }
+// 1.13c BNClient+0x18386 -- _ValidateWrite(p, n)
+int validate_write(void* p,U32 n) { return g_is_bad_write_ptr ? g_is_bad_write_ptr(p,n)==0 : 1; }
+// 1.13c BNClient+0x183A2 -- _ValidateExecute(fn)
+int validate_execute(const void* fn) { return g_is_bad_code_ptr ? g_is_bad_code_ptr(fn)==0 : 1; }
 } // namespace d2::bnclient::leaves

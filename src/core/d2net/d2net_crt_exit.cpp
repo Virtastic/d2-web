@@ -10,7 +10,7 @@ struct D2NetExit {
     void (*flush)();             // FUN_6fbf14b0
     void (*terminate)(unsigned); // TerminateProcess(self, code)
     void (*corExit)(unsigned);   // CorExitProcess via GetModuleHandle/GetProcAddress, null if absent
-    void (*exitProcess)(unsigned); // 1.13c D2Net+0x133D target
+    void (*exitProcess)(unsigned); // D2Net 0x133D (1.13c) target
 };
 // 1.13c D2Net+0x133D: ___crtExitProcess(code): if mscoree.dll is loaded and exports CorExitProcess, call it
 // (corExit == null models either missing); then ExitProcess(code); no return.

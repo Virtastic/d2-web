@@ -112,7 +112,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE size_t d2_mcp_strlen(const char* s) {
     }
 }
 
-// 1.13c D2MCPClient+0x0105A
+// D2MCPClient 0x0105A (1.13c)
 // (size 106, caller 0x11B8 __CRT_INIT@12): the MSVC 2003 Release CRT `__cinit(param)`. Retail (base
 // 0x6FA20000): if the C dynamic-initializer hook at +0x125D8 (DAT_6fa325d8, unbacked .data = NULL) is
 // set, call it with `param`. Then walk the C-initializer table +0xA00C..+0xA018 -- 3 slots, read from
@@ -137,6 +137,7 @@ static void (*g_mcp_xc[2])(void) = {nullptr, d2_mcp_security_init_cookie};      
 static void mcp_cinit_exit_thunk_170a(void) {}
 extern "C" int32_t d2_mcp_atexit_16b4(void* func);
 
+// 1.13c D2MCPClient+0x105A
 extern "C"
 EMSCRIPTEN_KEEPALIVE int d2_mcp_cinit(int param) {
     if (g_mcp_cinit_dyn_init != nullptr) g_mcp_cinit_dyn_init(param);

@@ -46,7 +46,7 @@ static bool bn_n08_enqueue(BnN08State& s, const BnN08Host& h, void* n, uint32_t 
 }
 
 // ponytail: `src` is the caller's string (retail reads it from the return-address slot); copies 0x120 bytes.
-// 1.13c BNClient+0x0FE00 -- queue a NUL-terminated string (<= 0x120 bytes with the NUL) as node id 0x5f.
+// BNClient 0x0FE00 (1.13c) -- queue a NUL-terminated string (<= 0x120 bytes with the NUL) as node id 0x5f.
 bool bn_queue_string(BnN08State& s, const BnN08Host& h, const char* src) {
     void* n = h.alloc(0x5f, 0);
     char* d = (char*)n + 4; memcpy(d, src, 0x120);
@@ -55,7 +55,7 @@ bool bn_queue_string(BnN08State& s, const BnN08Host& h, const char* src) {
 }
 
 // but keeps the stored length, which then fails the bound and takes the fatal tail (code 0x47).
-// 1.13c BNClient+0x0FEC0 -- queue `len` raw bytes as node id `id` (EBX); len > 0x120 clamps the copy to 0x120
+// BNClient 0x0FEC0 (1.13c) -- queue `len` raw bytes as node id `id` (EBX); len > 0x120 clamps the copy to 0x120
 bool bn_queue_bytes(BnN08State& s, const BnN08Host& h, uint32_t len, const void* src, uint32_t id) {
     void* n = h.alloc(0x3a, 0);
     uint32_t c = len;
@@ -67,7 +67,7 @@ bool bn_queue_bytes(BnN08State& s, const BnN08Host& h, uint32_t len, const void*
 }
 
 // finish or for done_f660 to be set, polling every 10 ms.
-// 1.13c BNClient+0x0F240 -- start the worker (entry FUN_6ff2f0a0, `entry`) on {buf, p1} and wait for it to
+// BNClient 0x0F240 (1.13c) -- start the worker (entry FUN_6ff2f0a0, `entry`) on {buf, p1} and wait for it to
 void bn_start_worker(BnN08State& s, const BnN08Host& h, uint8_t* buf, uint32_t p1, void* entry) {
     s.flag_f1f8 = 1;
     h.sleep_ms(10);
@@ -82,7 +82,7 @@ struct BnN08GwHost {
     void (*load)(void); const char* (*nth)(void); void (*copy)(char* dst, const char* src);
     const char* (*reg)(void);
 };
-// 1.13c BNClient+0x0F3C0 -- ESI = out buffer. Seams: load = BNGatewayAccess::Load, nth = Nth(&gw, current),
+// BNClient 0x0F3C0 (1.13c) -- ESI = out buffer. Seams: load = BNGatewayAccess::Load, nth = Nth(&gw, current),
 void bn_pick_gateway_string(char* out, const BnN08GwHost& g) {
     *out = 0;
     g.load();
@@ -91,7 +91,7 @@ void bn_pick_gateway_string(char* out, const BnN08GwHost& g) {
 }
 
 // at DAT_6ff3ecb8; on success copy 0x14 bytes of DAT_6ff3ed40 to a local and call FUN_6ff2eb00(0x14,0x54).
-// 1.13c BNClient+0x12000 -- __fastcall(param_1): r = FUN_6ff2b3a0(&DAT_6ff3f8e4, param_1); zero the 0x20 bytes
+// BNClient 0x12000 (1.13c) -- __fastcall(param_1): r = FUN_6ff2b3a0(&DAT_6ff3f8e4, param_1); zero the 0x20 bytes
 uint32_t bn_sub_12000(void* param_1, int (*f2b3a0)(void*, void*), void* f8e4, void* ecb8, const void* ed40,
                       void (*feb00)(const void*, uint32_t, uint32_t)) {
     int r = f2b3a0(f8e4, param_1);
@@ -115,7 +115,7 @@ struct BnN08VerHost {
     void (*unlock_d280)(void);
     void (*inc_f66c)(void);
 };
-// 1.13c BNClient+0x0E120 -- spawn the version-check worker unless the file time already matches.
+// BNClient 0x0E120 (1.13c) -- spawn the version-check worker unless the file time already matches.
 void bn_version_check(const BnN08VerHost& h, uint8_t flags, const uint32_t cur_ft[2], const char* path,
                       const char* extra) {
     if (!path || !*path) return;
@@ -150,7 +150,7 @@ void bn_version_check(const BnN08VerHost& h, uint8_t flags, const uint32_t cur_f
 // timeout, 0 if the file never resolved, else CheckRevision's return. All loader work is the `cr` seam.
 struct BnN08CheckRev { const char* (*pending_path)(void); int (*resolve)(const char* path); 
                        void* (*run)(uint32_t* o1, uint32_t* o2, uint8_t* o3); void (*cleanup)(const char* path); };
-// 1.13c BNClient+0x0D320 -- poll (10 ms, <= 20001 ms) for the CheckRevision temp DLL path in DAT_6ff3f510, then
+// BNClient 0x0D320 (1.13c) -- poll (10 ms, <= 20001 ms) for the CheckRevision temp DLL path in DAT_6ff3f510, then
 void* bn_check_revision(uint32_t* o1, uint32_t* o2, uint8_t* o3, const BnN08Host& h, const BnN08CheckRev& c) {
     if (o1) *o1 = 0;
     if (o2) *o2 = 0;

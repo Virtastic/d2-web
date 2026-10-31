@@ -35,7 +35,7 @@ struct State {
   int newh_set = 0;                // DAT_6fbfb0d8
 };
 
-// 1.13c D2NET+0x02C28
+// D2NET 0x02C28 (1.13c)
 void* crt_malloc(State& s, const Host& h, size_t n) { return h.nh_malloc(n, s.newh_set); }
 
 // 1.13c D2NET+0x02C3C
@@ -48,7 +48,7 @@ struct Reg { void* next; void* handler; ScopeEntry* table; int32_t trylevel; };
 // 1.13c D2Net+0x02D12 (unwind helper: reload frame registers before a termination handler runs; seam is a no-op in wasm)
 void local_unwind_restore_2d12() {}
 
-// 1.13c D2NET+0x02C7E
+// D2NET 0x02C7E (1.13c)
 void local_unwind2(Reg* r, int32_t stop) {
   for (;;) {
     ScopeEntry* t = r->table;

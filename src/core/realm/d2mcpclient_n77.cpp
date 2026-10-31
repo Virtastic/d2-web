@@ -24,7 +24,7 @@ struct N77Locks {                       // 0x14EE _unlock / 0x15A3 __lock
 };
 
 // ---- the 9-byte `push N; call 0x14EE; pop ecx; ret` thunks --------------------------------------------
-// 1.13c D2MCPCLIENT+0x0159A
+// D2MCPCLIENT 0x0159A (1.13c)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_n77_159a(const N77Locks* l) { l->unlock(10); }
 // 1.13c D2MCPCLIENT+0x01CEB
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_n77_1ceb(const N77Locks* l) { l->unlock(4); }
@@ -319,7 +319,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_n77_393e(const N77SbhState*, cons
     return g;
 }
 
-// 1.13c D2MCPCLIENT+0x03D23
+// D2MCPCLIENT 0x03D23 (1.13c)
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_mcp_n77_3d23(N77SbhState* s, const N77SbhEnv* e, uint32_t req) {
     const N77Mem& m = e->mem;
     auto R = [&](uint32_t a) { return m.r32(a); };

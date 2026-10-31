@@ -14,7 +14,7 @@
 struct D2McpLockSlot { uintptr_t cs; uint32_t init; uint32_t pad; };
 extern D2McpLockSlot g_lockTable[0x24];
 
-// 1.13c D2MCPClient+0x01499 (__mtdeletelocks): two walks of the lock table. First, every slot holding a
+// D2MCPClient 0x01499 (1.13c) (__mtdeletelocks): two walks of the lock table. First, every slot holding a
 // heap lock (pointer set, flag != 1) is deleted, freed and its pointer cleared. Second, every slot
 // holding a static lock (pointer set, flag == 1) is deleted only -- its storage is not heap.
 // 1.13c D2MCPClient+0x01499

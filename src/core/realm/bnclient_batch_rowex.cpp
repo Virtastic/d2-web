@@ -73,7 +73,7 @@ EMSCRIPTEN_KEEPALIVE int bn_bnet_log_control(int action, uint32_t arg) {
 
 // --- CRT leaves -----------------------------------------------------------------------------------
 
-// 1.13c BNClient+0x0159A (_sprintf, 88 B): VS2003 unbounded formatted print. The FILE is fixed at
+// BNClient 0x0159A (1.13c) (_sprintf, 88 B): VS2003 unbounded formatted print. The FILE is fixed at
 // {_cnt = 0x7FFFFFFF, _flag = 0x42, _base = _ptr = dest}, the format engine writes and counts, then the
 // caller-side terminator runs: _cnt -= 1; if negative __flsbuf(0, &file) else *ptr = 0. Destination NULL
 // skips the terminator. Returns the engine's count (chars, NUL excluded). The host formatter stands in for
@@ -89,6 +89,7 @@ EMSCRIPTEN_KEEPALIVE int bn_sprintf(char* dest, const char* fmt, ...) {
 
 // Seam form of the same function for the FN probe: env[?] _output (BNClient+0x2854) over the stack FILE
 // {_ptr @0, _cnt @4, _base @8, _flag @12}; args = address of the first variadic word.
+// 1.13c BNClient+0x159A
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t bn_sprintf_seam(char* dest, const uint8_t* fmt, const uint32_t* args,
                                              int32_t (*output)(void*, const uint8_t*, const uint32_t*)) {

@@ -29,12 +29,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_host_unlock(uint32_t idx) { g_hostLo
 
 static void leave_cs(uint32_t idx) { d2_mcp_host_unlock(idx); }
 
-// 1.13c D2MCPClient+0x01C07: `push 4; call 0x14EE; pop ecx; ret` -- the 9-byte CRT wrapper releasing
+// D2MCPClient 0x01C07 (1.13c): `push 4; call 0x14EE; pop ecx; ret` -- the 9-byte CRT wrapper releasing
 // lock 4.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_mcp_unlock4_1c07_seam(void (*unlock)(uint32_t)) {
     unlock(4);
 }
+// 1.13c D2MCPClient+0x1C07
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_mcp_unlock4_1c07(void) {
     d2_mcp_unlock4_1c07_seam(leave_cs);
@@ -47,12 +48,13 @@ EMSCRIPTEN_KEEPALIVE void d2_mcp_unlock4_1ceb(void) {
     leave_cs(4);
 }
 
-// 1.13c D2MCPClient+0x028B3: the same 9-byte wrapper (`push 4; call 0x14EE; pop ecx; ret`) reached from
+// D2MCPClient 0x028B3 (1.13c): the same 9-byte wrapper (`push 4; call 0x14EE; pop ecx; ret`) reached from
 // the small-block allocator 0x2841; releasing lock 4 is the whole rule.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_mcp_unlock4_28b3_seam(void (*unlock)(uint32_t)) {
     unlock(4);
 }
+// 1.13c D2MCPClient+0x28B3
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_mcp_unlock4_28b3(void) {
     d2_mcp_unlock4_28b3_seam(leave_cs);
@@ -118,7 +120,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_mcp_security_init_cookie(void) {
     g_stackCookie = d2_mcp_security_cookie_from_entropy(words);
 }
 
-// 1.13c D2MCPClient+0x047C5 (__security_check_cookie): fastcall, the expected cookie arrives in ECX.
+// D2MCPClient 0x047C5 (1.13c) (__security_check_cookie): fastcall, the expected cookie arrives in ECX.
 // `cmp ecx, __security_cookie; jne report_failure; ret` -- equal returns; unequal tail-jumps to 0x4794
 // report_failure, which never returns (ExitProcess(3) on its final path). The compare is the rule; the
 // terminating branch is the engine's process-exit stand-in, src/core/realm/mcp_exit.cpp.
@@ -129,6 +131,7 @@ EMSCRIPTEN_KEEPALIVE void d2_mcp_security_check_cookie_with(uint32_t cookie, voi
     if (cookie != g_stackCookie) fail();   // retail: jne 0x4794 report_failure
 }
 static void mcp_cookie_exit() { std::exit(3); }
+// 1.13c D2MCPClient+0x47C5
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_mcp_security_check_cookie(uint32_t cookie) {
     d2_mcp_security_check_cookie_with(cookie, mcp_cookie_exit);
@@ -149,19 +152,20 @@ EMSCRIPTEN_KEEPALIVE void d2_mcp_unlock8_1039(void) {
     leave_cs(8);
 }
 
-// 1.13c D2MCPClient+0x016B4 (18 B, caller 0x0105A, callee 0x0167C __onexit): the VC7.1 `_atexit`.
+// D2MCPClient 0x016B4 (1.13c) (18 B, caller 0x0105A, callee 0x0167C __onexit): the VC7.1 `_atexit`.
 // `p = __onexit(func); return (p != 0) - 1` -- 0 when the registration succeeded, -1 when __onexit
 // answered null. The callee shares the native callback table with init and shutdown.
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_atexit_16b4_seam(void* func, void* (*onexit)(void*)) {
     return (onexit(func) != nullptr) - 1;
 }
+// 1.13c D2MCPClient+0x16B4
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t d2_mcp_atexit_16b4(void* func) {
     return d2_mcp_atexit_16b4_seam(func, d2_mcp_onexit_167c);
 }
 
-// 1.13c D2MCPClient+0x0167C: lock exit table 8, append, unlock, return the callback or NULL.
+// D2MCPClient 0x0167C (1.13c): lock exit table 8, append, unlock, return the callback or NULL.
 // Native unwinding releases the lock if the allocator seam throws, matching the SEH cleanup.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void* d2_mcp_onexit_167c_seam(void* func, void (*lock)(), void* (*append)(void*), void (*unlock)()) {
@@ -170,6 +174,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_mcp_onexit_167c_seam(void* func, void (*lock)(), v
     return append(func);
 }
 static void* onexit_append(void* f) { return d2_mcp_onexit_lk(f, &g_mcp_onexit); }
+// 1.13c D2MCPClient+0x167C
 extern "C"
 EMSCRIPTEN_KEEPALIVE void* d2_mcp_onexit_167c(void* func) {
     return d2_mcp_onexit_167c_seam(func, d2_mcp_lock8_1030, onexit_append, d2_mcp_unlock8_1039);
@@ -217,4 +222,13 @@ EMSCRIPTEN_KEEPALIVE void d2_mcp_unlock_c_2ffe(void) {
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_mcp_unlock_d_34d5(void) {
     leave_cs(0xd);
+}
+
+// 1.13c D2MCPClient+0x40A0 (strcpy, 7 B): `push edi; mov edi,[esp+8]; jmp 0x4115` into the shared word-at-a-time
+// copy loop, which returns dst. Byte-for-byte the same result as a bytewise copy through the NUL.
+extern "C"
+EMSCRIPTEN_KEEPALIVE char* d2_mcp_strcpy_40a0(char* dst, const char* src) {
+    char* o = dst;
+    while ((*dst++ = *src++) != 0) {}
+    return o;
 }

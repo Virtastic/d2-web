@@ -1,4 +1,4 @@
-// 1.13c D2Net+0x137F D2Net+0x14B0 D2Net+0x18E0 D2Net+0x1A8C D2Net+0x1AC7: MSVC CRT stubs linked into D2Net.
+// D2Net 0x137F (1.13c) D2Net+0x14B0 D2Net+0x18E0 D2Net+0x1A8C D2Net+0x1AC7: MSVC CRT stubs linked into D2Net.
 // SEH prolog/epilog and the 14B0 fragment are register/frame-bound: no C form.
 #include <cstdint>
 

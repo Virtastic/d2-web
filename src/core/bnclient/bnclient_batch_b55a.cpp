@@ -57,9 +57,9 @@ extern "C" uint32_t bnb55_set_error(const BnB55Env* e, BnB55State* s, uint32_t c
     if (s->err_code == 0) {
         s->err_code = code;
         size_t n = 0;
-        while (n < 0x80 && text[n]) n++;
+        while (n < 0x7f && text[n]) n++;        // Ordinal_501(f158, text, 0x80): at most 0x7f characters
         std::memcpy(s->err_text_buf, text, n);
-        if (n < 0x80) s->err_text_buf[n] = 0;   // Ordinal_501: bounded copy, NUL-terminated if room
+        s->err_text_buf[n] = 0;                 // Ordinal_501 always writes the NUL
     }
     e->leave_cs();
     return 1;
@@ -126,9 +126,9 @@ extern "C" uint32_t bnb55_handle_file_info(const BnB55Env* e, BnB55State* s, con
     s->ver_b = p[0];
     size_t l = std::strlen(str);
     size_t n = 0;
-    while (n < 0x104 && str[l + 1 + n]) n++;
+    while (n < 0x103 && str[l + 1 + n]) n++;   // Ordinal_501(f770, s, 0x104): at most 0x103 characters
     std::memcpy(s->file_name, str + l + 1, n);
-    if (n < 0x104) s->file_name[n] = 0;
+    s->file_name[n] = 0;                        // Ordinal_501 always writes the NUL
     s->file_aux[0] = 0;
     e->notify(0x80000001u, 3, 0, 0, str, nullptr);
     return 1;

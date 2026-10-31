@@ -32,9 +32,12 @@ extern "C" void d2net_sub_6130(uint32_t server, uint32_t a, void (*imp)(uint32_t
 extern "C" void d2net_sub_6270(uint32_t a, uint32_t, void (*imp)(uint32_t)) { imp(a); }
 // 1.13c D2Net+0x61B0: (a, b) -> import at IAT +0x8064 (thunk +0x5EC4), pushed as (server, 0, a, b)
 extern "C" void d2net_sub_61b0(uint32_t server, uint32_t a, uint32_t b, void (*imp)(uint32_t, uint32_t, uint32_t, uint32_t)) { imp(server, 0, a, b); }
-// 1.13c D2Net+0x60B0 / 0x60F0 / 0x60D0 (ords 10025 / 10027 / 10029): (a, b, c) -> import at IAT +0x8060 / +0x8004 / +0x8014, result returned
+// D2Net 0x60B0 / 0x60F0 / 0x60D0 (1.13c, ords 10025 / 10027 / 10029): (a, b, c) -> import at IAT +0x8060 / +0x8004 / +0x8014, result returned
+// 1.13c D2Net+0x60B0
 extern "C" uint32_t d2net_sub_60b0(uint32_t server, uint32_t a, uint32_t b, uint32_t c, FogImp4 imp) { return imp(server, a, b, c); }
+// 1.13c D2Net+0x60F0
 extern "C" uint32_t d2net_sub_60f0(uint32_t server, uint32_t a, uint32_t b, uint32_t c, FogImp4 imp) { return imp(server, a, b, c); }
+// 1.13c D2Net+0x60D0
 extern "C" uint32_t d2net_sub_60d0(uint32_t server, uint32_t a, uint32_t b, uint32_t c, FogImp4 imp) { return imp(server, a, b, c); }
 // 1.13c D2Net+0x6020 (ord 10021): a == 0 -> 0 with no call; else (server, a, b) -> import at IAT +0x801C, result returned
 extern "C" uint32_t d2net_sub_6020(uint32_t server, uint32_t a, uint32_t b, FogImp3 imp) { return a ? imp(server, a, b) : 0; }
@@ -46,7 +49,12 @@ typedef uint32_t (*FogImp8)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, ui
 extern "C" uint32_t d2net_sub_6590(uint32_t a, uint32_t b, const uint32_t cb[4], FogImp8 imp) { return imp(a, 3, 4000, b, cb[0], cb[1], cb[2], cb[3]); }
 // 1.13c D2Net+0x7200 (dequeue, under the CS): node = *headSlot (DAT_6fbfb3fc); none -> -1. Mode 2 (DAT_6fbfb418) and a node younger than 500 ms (tick - node+0x208) -> -1.
 // Else copy min(len, 0x204) bytes of the node to dst, *headSlot := node+0x20c, free the node (release = the Fog free import), return node+0x204. The CS imports are not modelled.
+extern "C" uint32_t d2net_sub_6ac0(uint8_t* dst, uint32_t len, uint32_t* headSlot, uint32_t mode, uint32_t (*tick)(), void (*release)(uint8_t*));
 extern "C" uint32_t d2net_sub_7200(uint8_t* dst, uint32_t len, uint32_t* headSlot, uint32_t mode, uint32_t (*tick)(), void (*release)(uint8_t*)) {
+    return d2net_sub_6ac0(dst, len, headSlot, mode, tick, release);
+}
+// 1.13c D2Net+0x6AC0 (stdcall(cs, headSlot, dst), eax = len): the same dequeue over a caller-given head slot; sub_7200 is this with head DAT_6fbfb3fc.
+extern "C" uint32_t d2net_sub_6ac0(uint8_t* dst, uint32_t len, uint32_t* headSlot, uint32_t mode, uint32_t (*tick)(), void (*release)(uint8_t*)) {
     uint8_t* node = (uint8_t*)(uintptr_t)*headSlot;
     if (!node || (mode == 2 && tick() - *(uint32_t*)(node + 0x208) < 0x1f4)) return 0xFFFFFFFFu;
     const uint32_t n = len < 0x204 ? len : 0x204, size = *(uint32_t*)(node + 0x204);

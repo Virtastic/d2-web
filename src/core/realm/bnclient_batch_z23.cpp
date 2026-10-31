@@ -54,16 +54,16 @@ char* z23_FindKey(z23_Gw*, const char*, const char*);
 char* z23_SkipToEOL(z23_Gw*, const char*, const char*);
 }
 
-// 1.13c BNClient+0x01569 (_exit): doexit(code, 0, 0).
+// BNClient 0x01569 (1.13c) (_exit): doexit(code, 0, 0).
 extern "C" void z23_exit_1569(int code) { z23_doexit(code, 0, 0); }
 
-// 1.13c BNClient+0x01898 (_strtol): strtoxl(str, end, radix, 0).
+// BNClient 0x01898 (1.13c) (_strtol): strtoxl(str, end, radix, 0).
 extern "C" long z23_strtol(const char* s, char** e, int radix) { return (long)z23_strtoxl(s, e, radix, 0); }
 
-// 1.13c BNClient+0x018AF (_strtoul): strtoxl(str, end, radix, 1).
+// BNClient 0x018AF (1.13c) (_strtoul): strtoxl(str, end, radix, 1).
 extern "C" unsigned long z23_strtoul(const char* s, char** e, int radix) { return z23_strtoxl(s, e, radix, 1); }
 
-// 1.13c BNClient+0x0165A (__strnicmp): ASCII path when the thread locale's name is null; else lowercase
+// BNClient 0x0165A (1.13c) (__strnicmp): ASCII path when the thread locale's name is null; else lowercase
 // both through the locale and stop at count, a NUL in the first, or a mismatch.
 extern "C" int z23_strnicmp(const char* a, const char* b, uint32_t n) {
     void* loc = ((void**)z23_getptd())[0x14 / 4 * 0 + 0];  // ponytail: PTD slot (_tfpecode) via seam
@@ -88,7 +88,7 @@ extern "C" int z23_GetSystemTimeZone(z23_Gw*) {
     return 0x1e0;
 }
 
-// 1.13c BNClient+0x14CC0 (Nth): the 1-based gateway's first string (entry n starts at string 3n-1... i.e.
+// BNClient 0x14CC0 (1.13c) (Nth): the 1-based gateway's first string (entry n starts at string 3n-1... i.e.
 // skip 3n-2 strings from the list head); out of range or overrun returns `this` itself.
 extern "C" char* z23_Nth(z23_Gw* g, int n) {
     char* p = (char*)z23_ptr(g->list);
@@ -103,7 +103,7 @@ extern "C" char* z23_Nth(z23_Gw* g, int n) {
     return (off < (int)g->listLen && i <= target) ? p : (char*)g;
 }
 
-// 1.13c BNClient+0x15130 (PickClosestZone): pick the gateway whose zone*60 is nearest the minute bias
+// BNClient 0x15130 (1.13c) (PickClosestZone): pick the gateway whose zone*60 is nearest the minute bias
 // (initial best distance 0x564 = 1380), record it, mark dirty.
 extern "C" void z23_PickClosestZoneImpl(z23_Gw* g, int bias) {
     z23_LogIndent(2, 4);
@@ -131,7 +131,7 @@ extern "C" void z23_PickClosestZoneImpl(z23_Gw* g, int bias) {
     }
 }
 
-// 1.13c BNClient+0x14FC0 (Realm): find the gateway name in the realms list (name\0 realm\0 pairs); return
+// BNClient 0x14FC0 (1.13c) (Realm): find the gateway name in the realms list (name\0 realm\0 pairs); return
 // the paired string, or "" when absent.
 extern "C" const char* z23_Realm(z23_Gw* g, int n) {
     char* key = z23_Nth(g, n);
@@ -145,7 +145,7 @@ extern "C" const char* z23_Realm(z23_Gw* g, int n) {
     return "";
 }
 
-// 1.13c BNClient+0x15030 (SaveAndUnload): write back the selection (two ASCII digits after the second
+// BNClient 0x15030 (1.13c) (SaveAndUnload): write back the selection (two ASCII digits after the second
 // string) to the Configuration key, then free the list and realms buffers.
 extern "C" void z23_SaveAndUnloadImpl(z23_Gw* g) {
     if (g->dirty && g->list) {

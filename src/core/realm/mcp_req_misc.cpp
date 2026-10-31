@@ -43,6 +43,7 @@ static uint32_t op_word_str(uint8_t op, const char* s, uint16_t w, uint8_t* out)
 // 1.13c D2MCPClient+0x70B0 (op 9) and +0x71D0 (op 6)
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_mcp_req_70b0(const char* s, uint16_t w, uint8_t* out) { return op_word_str(9, s, w, out); }
 // ponytail: 71D0 has no 0xFFFF check; unreachable after the 0x400 bound, so identical.
+// 1.13c D2MCPClient+0x71D0
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_mcp_req_71d0(const char* s, uint16_t w, uint8_t* out) { return op_word_str(6, s, w, out); }
 // 1.13c D2MCPClient+0x6E10: { 0x18, strz }; SStrCopy(buf+1, s, 0x400) truncates to 1023 chars, send(len = SStrLen + 2); zeroes [0xb1c8]. No word.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_mcp_req_6e10(const char* s, uint8_t* out) {

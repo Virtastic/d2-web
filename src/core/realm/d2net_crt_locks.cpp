@@ -24,7 +24,7 @@ int d2_realm_net_mtinitlocknum(int n) { g_crtLockMade[n] = true; return 1; }
 // 1.13c D2Net+0x18D7
 void d2_realm_net_unlock_10() { d2_realm_net_unlock(10); }
 
-// 1.13c D2Net+0x18E0
+// D2Net 0x18E0 (1.13c)
 void d2_realm_net_lock_n(int n) {
     if (!g_crtLockMade[n] && !d2_realm_net_mtinitlocknum(n)) d2_realm_net_amsg_exit(0x11);
     ++g_crtLockDepth[n];

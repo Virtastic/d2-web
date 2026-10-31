@@ -1,4 +1,4 @@
-// 1.13c D2Net+0x6190 D2Net+0x61D0 D2Net+0x6000 D2Net+0x6170 D2Net+0x6070 D2Net+0x6250 D2Net+0x5F10: thunks onto the Fog queue at D2Net+0xB424.
+// D2Net 0x6190 (1.13c) D2Net+0x61D0 D2Net+0x6000 D2Net+0x6170 D2Net+0x6070 D2Net+0x6250 D2Net+0x5F10: thunks onto the Fog queue at D2Net+0xB424.
 // Specs: and siblings. Model = the fresh-init, empty queue the retail captures was taken on.
 #include <cstdint>
 #include <cstring>
@@ -9,6 +9,7 @@ namespace { int32_t g_word884 = 1; }
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_realm_net_queue_reset() { g_word884 = 1; }
 
 // Returns the thunk's eax; buf16 = the 0xA5-filled buffer; st = queue +0x86C/+0x87C/+0x884 after the call.
+// 1.13c D2Net+0x6190
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_realm_net_queue(uint32_t fn, uint32_t a, uint8_t* buf16, uint32_t* st) {
     int32_t ret = 0;
     switch (fn) {

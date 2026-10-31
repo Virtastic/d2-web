@@ -11,8 +11,8 @@ int q_bnclient_batch_b67_Ordinal_16(void* sock, void* buf, int len, int flags);
 void bnclient_33a00(char* esi, uint8_t* data, uint32_t size, void* ebx, uint32_t a, uint32_t b);
 void bnclient_2d280(void);
 int bnclient_34050(const char* name, uint32_t* ftime, int** data, uint32_t* size);
-void bnclient_211c0(void);
-void bnclient_21180(void* tbl);
+void bnclient_211c0(uint32_t want, uint32_t* cap);  // EAX = want, EBX = &cap
+uint32_t bnclient_21180(uint32_t index, uint32_t* cap);  // EAX = index, &cap pushed; returns the step
 void bnclient_inconsistency(void);
 extern uint32_t bn_dl_abort;      // DAT_6ff3f614
 extern uint32_t bn_dl_percent;    // DAT_6ff3f508
@@ -104,8 +104,8 @@ void sub_125E0(const uint16_t* key, uint16_t* out) {
         o[5] = p[1];
         o[4] = p[0];
         o[3] = idea_inv(p[5]);
-        o[2] = (uint16_t)-p[4];
-        o[1] = (uint16_t)-p[3];
+        o[2] = (uint16_t)-p[3];
+        o[1] = (uint16_t)-p[4];
         o[0] = idea_inv(p[2]);
     }
     t[5] = p[1];
@@ -128,12 +128,18 @@ uint32_t sub_12A70(void) {
         const uint8_t* p = (const uint8_t*)(data + 2);
         if (n < 0x101) {
             bn_news_i = 0;
-            if (bn_news_cap < n) bnclient_211c0();
+            if (bn_news_cap < n) bnclient_211c0(n, &bn_news_cap);
             bn_news_flag = 0;
             uint32_t prev = 0, k = 0;
             bool bad = false;
             while (k < n) {
-                if (bn_news_cap < bn_news_i + 1) bnclient_211c0();
+                uint32_t idx = bn_news_i + 1;
+                if (idx > bn_news_cap) {
+                    uint32_t step = bn_news_count ? bn_news_count : bnclient_21180(idx, &bn_news_cap);
+                    uint32_t rem = idx % step;
+                    if (rem) idx += step - rem;
+                    bnclient_211c0(idx, &bn_news_cap);
+                }
                 uint8_t* e = (uint8_t*)(uintptr_t)(bn_news_i * 0x408 + bn_news_stride_base);
                 bn_news_i++;
                 *(uint32_t*)e = 0;
@@ -152,7 +158,11 @@ uint32_t sub_12A70(void) {
             ok = (k == n);
         }
     }
-    if (!ok) { bn_news_cap = bn_news_i = bn_news_flag = bn_news_hdr = 0; }
+    if (!ok) {
+        // retail frees the table (line -2) and zeroes cap, index, table, flag and header; count is kept
+        if (bn_news_stride_base) Ordinal_403((void*)(uintptr_t)bn_news_stride_base, "AUItem NewsTable", -2, 0);
+        bn_news_cap = bn_news_i = bn_news_stride_base = bn_news_flag = bn_news_hdr = 0;
+    }
     if (data) Ordinal_403(data, "..\\Source\\D2BNClient\\BNNews.cpp", 299, 0);
     return ok;
 }

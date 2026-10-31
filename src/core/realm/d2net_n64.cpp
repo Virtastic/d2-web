@@ -27,12 +27,12 @@ struct CrtState {
     void (*exit_fn)(CrtState*, const CrtHost*, unsigned); // PTR___exit_6fbfa030
 };
 
-// 1.13c D2NET+0x0137F
+// D2NET 0x0137F (1.13c)
 static void n64_initterm(CrtFn* cur, CrtFn* end) {
     for (; cur < end; ++cur) if (*cur) (*cur)();
 }
 
-// 1.13c D2NET+0x0182B
+// D2NET 0x0182B (1.13c)
 static void n64_unlock(CrtState* s, const CrtHost* h, int n) { h->leave_cs(s->locks[n]); }
 
 // 1.13c D2NET+0x018D7
@@ -53,7 +53,7 @@ static void n64_amsg_exit(CrtState* s, const CrtHost* h, int rtc) {
     s->exit_fn(s, h, 0xff);
 }
 
-// 1.13c D2NET+0x01840
+// D2NET 0x01840 (1.13c)
 static int n64_mtinitlocknum(CrtState* s, const CrtHost* h, int n) {
     void** slot = &s->locks[n];
     if (*slot) return 1;
@@ -73,13 +73,13 @@ static int n64_mtinitlocknum(CrtState* s, const CrtHost* h, int n) {
     return 1;
 }
 
-// 1.13c D2NET+0x018E0
+// D2NET 0x018E0 (1.13c)
 static void n64_lock(CrtState* s, const CrtHost* h, int n) {
     if (!s->locks[n] && !n64_mtinitlocknum(s, h, n)) n64_amsg_exit(s, h, 0x11);
     h->enter_cs(s->locks[n]);
 }
 
-// 1.13c D2NET+0x01401
+// D2NET 0x01401 (1.13c)
 static void n64_doexit(CrtState* s, const CrtHost* h, unsigned code, int p2, int p3) {
     n64_lock(s, h, 8);
     if (s->exit_started == 1) h->terminate_process(code);
@@ -98,13 +98,13 @@ static void n64_doexit(CrtState* s, const CrtHost* h, unsigned code, int p2, int
     h->exit_process(code);
 }
 
-// 1.13c D2NET+0x014C4
+// D2NET 0x014C4 (1.13c)
 void n64_exit(CrtState* s, const CrtHost* h, int code) { n64_doexit(s, h, code, 0, 0); }
 
 // 1.13c D2NET+0x014D5
 void n64___exit(CrtState* s, const CrtHost* h, unsigned code) { n64_doexit(s, h, code, 1, 0); }
 
-// 1.13c D2NET+0x014E6
+// D2NET 0x014E6 (1.13c)
 void n64_cexit(CrtState* s, const CrtHost* h) { n64_doexit(s, h, 0, 0, 1); }
 
 // 1.13c D2NET+0x019F1

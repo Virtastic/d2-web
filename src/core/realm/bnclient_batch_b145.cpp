@@ -3,13 +3,23 @@
 #include <cstdint>
 
 // 1.13c BNClient+0x11780
-// Patch-status reply: status 0 or >3 aside, 1=download (copy name under CS, clear flag), 2=latest (flag=1), 3/else=reinstall/unknown (flag=0). Always 1.
+// Patch-status reply. Order as retail: onBadStatus for 1..3, then #424("Patch","Patches",0x82,"",1) unconditionally,
+// then the status switch. Status 1: lock-copy the payload into f670, f508=0, #424 write of the payload, E120, log,
+// eef4=0. Status 2: eef4=1, log. Else: fail(1), log, eef4=0.
 extern "C" uint32_t d2_bnclient_11780(const uint32_t* p, int len, uint32_t* patchFlag,
-                                      void (*onBadStatus)(), void (*download)(const uint32_t*, int), void (*fail)(int), void (*log)(const char*)) {
+                                      void (*onBadStatus)(), void (*patch424)(const char*, int),
+                                      void (*download)(const uint32_t*, int), void (*e120)(const char*, int),
+                                      void (*fail)(int), void (*log)(const char*)) {
     uint32_t st = p[0];
     if (st != 0 && st < 4) onBadStatus();
+    patch424("", 1);
     const char* msg;
-    if (st == 1) { download(p + 1, len - 4); msg = "downloading upgrade"; *patchFlag = 0; }
+    if (st == 1) {
+        download(p + 1, len - 4);
+        patch424((const char*)(p + 1), len - 4);
+        e120((const char*)(p + 1), len - 4);
+        msg = "downloading upgrade"; *patchFlag = 0;
+    }
     else if (st == 2) { *patchFlag = 1; msg = "user has latest version"; }
     else { fail(1); msg = st == 3 ? "User must reinstall and patch" : "user has unknown version"; *patchFlag = 0; }
     log(msg);

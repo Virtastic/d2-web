@@ -174,7 +174,7 @@ struct D2McpSbhAllocEnv {
     int32_t  (*new_group)(uint32_t region);   // 0x393E ___sbh_alloc_new_group
 };
 
-// 1.13c D2MCPClient+0x03D23 (764 B, callers 0x1C25 calloc, 0x2841 __heap_alloc, 0x29EA _realloc):
+// D2MCPClient 0x03D23 (1.13c) (764 B, callers 0x1C25 calloc, 0x2841 __heap_alloc, 0x29EA _realloc):
 // ___sbh_alloc_block(size). `uVar7 = (size + 0x17) & ~0xF` is the rounded block size (header included),
 // `b = ((size + 0x17) >> 4) - 1` the wanted bucket. Each region's two 32-bit bucket bitmaps (region[0]
 // for buckets 0..0x1F, region[1] for 0x20..0x3F, bit `0x80000000 >> (bucket & 0x1F)`) select the buckets

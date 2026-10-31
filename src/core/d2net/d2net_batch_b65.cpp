@@ -23,13 +23,13 @@ struct Crt {
 
 static bool console_or_gui(const Crt& c) { return c.mode_a == 1 || (c.mode_a == 0 && c.mode_b == 1); }
 
-// 1.13c D2Net+0x182B  (leave lock id)
+// D2Net 0x182B (1.13c)  (leave lock id)
 void leave_lock(Crt& c, int id) { c.leave(c.lock[id]); }
 
 // 1.13c D2Net+0x18D7  (unlock the lock-table lock, id 10)
 void unlock_10(Crt& c) { leave_lock(c, 10); }
 
-// 1.13c D2Net+0x1840  __mtinitlocknum
+// D2Net 0x1840 (1.13c)  __mtinitlocknum
 int mtinitlocknum(Crt& c, int id) {
   if (c.lock[id]) return 1;
   void* m = std::malloc(0x18);
@@ -61,7 +61,7 @@ void amsg_exit(Crt& c, int msg) {
   c.exit_fn(0xff);
 }
 
-// 1.13c D2Net+0x18E0  __lock
+// D2Net 0x18E0 (1.13c)  __lock
 void lock(Crt& c, int id) {
   if (!c.lock[id] && !mtinitlocknum(c, id)) amsg_exit(c, 0x11);
   c.enter(c.lock[id]);
@@ -74,7 +74,7 @@ void crt_free(Crt& c, void* p) {
   std::free(p);
 }
 
-// 1.13c D2Net+0x2AED  ___crtInitCritSecAndSpinCount
+// D2Net 0x2AED (1.13c)  ___crtInitCritSecAndSpinCount
 bool crt_init_cs(Crt& c, void* cs, int spin) { return c.init_cs(cs, spin); }
 
 // 1.13c D2Net+0x292C  FUN_6fbf292c (runtime-error message writer; Win32 output is the hook)

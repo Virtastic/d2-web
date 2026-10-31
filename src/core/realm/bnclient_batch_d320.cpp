@@ -63,15 +63,15 @@ void bn_enqueue(BnEnv* env, BnGlobals* g, BnMsg* m) {
 }
 }  // namespace
 
-// 1.13c BNCLIENT+0x0FE00: queue a text message (type 0x5f): copy up to 0x120 bytes of the string, length
-// includes the NUL, over-long is fatal (code 0x65).
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_bnclient_fe00(BnEnv* env, BnGlobals* g, const char* text) {
+// 1.13c BNCLIENT+0x0FE00: queue a text message. type is the first stack argument (0xE2E0 passes 1). The copy is
+// SStrCopy-bounded to 0x120 (0x11F chars plus NUL); length = strlen(copy)+1; over 0x120 is fatal (code 0x65).
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_bnclient_fe00(BnEnv* env, BnGlobals* g, uint32_t type, const char* text) {
     BnMsg* m = (BnMsg*)env->alloc(sizeof(BnMsg));
     uint32_t n = 0;
-    while (n < 0x120 && text[n]) { m->data[n] = (uint8_t)text[n]; ++n; }
+    while (n < 0x11f && text[n]) { m->data[n] = (uint8_t)text[n]; ++n; }
     m->data[n] = 0;
-    uint32_t len = (uint32_t)strlen(text) + 1;
-    m->type = 0x5f;
+    uint32_t len = (uint32_t)strlen((const char*)m->data) + 1;
+    m->type = type;
     m->length = len;
     m->next = nullptr;
     if (len < 0x121) {
@@ -82,23 +82,20 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_bnclient_fe00(BnEnv* env, BnGlobal
     return 0;
 }
 
-// 1.13c BNCLIENT+0x0FEC0: queue a binary message of the given type (0x3a at the call site in 0xE2E0): size
-// is clamped to 0x120 for the copy, zero size stores an empty string, and a size over 0x120 is fatal (0x47).
+// 1.13c BNCLIENT+0x0FEC0: queue a binary message. type is the first stack argument (0xE2E0 passes 3). The size is
+// clamped to 0x120 before the copy and before the stored length, so the fatal 0x47 test after it never fires.
+// Zero size stores an empty string.
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_bnclient_fec0(BnEnv* env, BnGlobals* g, uint32_t type,
                                                             const void* data, uint32_t size) {
     BnMsg* m = (BnMsg*)env->alloc(sizeof(BnMsg));
     uint32_t n = size;
     if (n > 0x120) n = 0x120;
-    if (size == 0) m->data[0] = 0; else memcpy(m->data, data, n);
+    if (n == 0) m->data[0] = 0; else memcpy(m->data, data, n);
     m->length = n;
     m->type = type;
     m->next = nullptr;
-    if (size < 0x121) {
-        bn_enqueue(env, g, m);
-        return 1;
-    }
-    env->fatal(0x47);
-    return 0;
+    bn_enqueue(env, g, m);
+    return 1;
 }
 
 // 1.13c BNCLIENT+0x0F240: set phase 1, start the gateway-ping thread (FUN_6ff2f0a0) on {buf, arg} and wait
@@ -233,8 +230,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_e2e0(BnEnv* env, BnGlobals* 
         env->call(0xC340, n, u, d, (void*)(uintptr_t)data_len);  // store the ad
         char text[0x120];
         snprintf(text, sizeof text, "<Received Ad: %s, %s>\n", n ? n : "", u ? u : "");
-        d2_fn_bnclient_fe00(env, g, text);
-        d2_fn_bnclient_fec0(env, g, 0x3a, text, (uint32_t)strlen(text) + 1);
+        d2_fn_bnclient_fe00(env, g, 1, text);
+        d2_fn_bnclient_fec0(env, g, 3, text, (uint32_t)strlen(text) + 1);
         return;
     }
     case 0x80000004: {

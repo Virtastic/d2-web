@@ -32,7 +32,7 @@ struct N12Crt {
     int (*dllMain)(void*, int);  // 0x6AA0
 };
 
-// 1.13c D2Net+0x133D
+// D2Net 0x133D (1.13c)
 void n12_crtExitProcess(N12Crt* c, int code) {
     void* h = c->getModuleHandle("mscoree.dll");
     if (h) {
@@ -49,7 +49,7 @@ void n12_lock8(N12Crt* c) { c->lock(8); }
 // 1.13c D2Net+0x1376
 void n12_unlock8(N12Crt* c) { c->unlock(8); }
 
-// 1.13c D2Net+0x137F
+// D2Net 0x137F (1.13c)
 void n12_initterm(void (**b)(), void (**e)()) {
     for (; b < e; ++b)
         if (*b) (*b)();
@@ -76,7 +76,7 @@ void n12_doexit_unlock(N12Crt* c, int retain) {
     if (retain != 0) c->unlock(8);
 }
 
-// 1.13c D2Net+0x1401
+// D2Net 0x1401 (1.13c)
 void n12_doexit(N12Crt* c, unsigned code, int quick, int retain) {
     c->lock(8);
     if (c->exiting == 1) c->terminateSelf(code);
@@ -96,13 +96,14 @@ void n12_doexit(N12Crt* c, unsigned code, int quick, int retain) {
     n12_crtExitProcess(c, (int)code);
 }
 
-// 1.13c D2Net+0x14C4
+// D2Net 0x14C4 (1.13c)
 void n12_exit(N12Crt* c, unsigned code) { n12_doexit(c, code, 0, 0); }
 
 // 1.13c D2Net+0x14D5
 void n12__exit(N12Crt* c, unsigned code) { n12_doexit(c, code, 1, 0); }
 
 // (dup of n64) 1.13c D2NET+0x014E6
+// 1.13c D2Net+0x14E6
 void n12_cexit(N12Crt* c) { n12_doexit(c, 0, 0, 1); }
 
 // 1.13c D2Net+0x14F5

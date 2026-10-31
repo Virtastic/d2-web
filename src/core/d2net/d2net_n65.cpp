@@ -18,14 +18,14 @@ struct N65Ops {
   void (*setSendOnly)(uint32_t); void (*sendFwd)(void* cs, uint8_t** head, void* out);
   void (*initFwd)(); void* workerFn; void* workerFn2;
 };
-// 1.13c D2NET+0x07650
+// D2NET 0x07650 (1.13c)
 extern "C" uint32_t d2net_n65_7650(N65St* s, const N65Ops* o, uint16_t len, const void* p) {
   if (!s->sendOn) return 0;
   if (s->mode != 1 && s->mode != 2) return o->directSend(p);
   if (len > 0x204) o->fatal(0x1c5);
   return o->qpush(s->sendQ, p, len) != 0;
 }
-// 1.13c D2NET+0x075E0
+// D2NET 0x075E0 (1.13c)
 extern "C" uint32_t d2net_n65_75e0(N65St* s, const N65Ops* o) {
   if (s->mode != 1 && s->mode != 2) {
     if (o->waitObj(s->startEvt, 100) != 0) return 1;
@@ -36,7 +36,7 @@ extern "C" uint32_t d2net_n65_75e0(N65St* s, const N65Ops* o) {
   }
   return 2;
 }
-// 1.13c D2NET+0x07540
+// D2NET 0x07540 (1.13c)
 extern "C" void* d2net_n65_7540(N65St* s, const N65Ops* o, int mode, void* arg) {
   s->headA = s->headB = nullptr;
   o->initCs();
@@ -46,9 +46,9 @@ extern "C" void* d2net_n65_7540(N65St* s, const N65Ops* o, int mode, void* arg) 
   o->initFwd();
   return (void*)1;
 }
-// 1.13c D2NET+0x071E0
+// D2NET 0x071E0 (1.13c)
 extern "C" void d2net_n65_71e0(N65St* s, const N65Ops* o, void* out) { o->sendFwd(nullptr, &s->headB, out); }
-// 1.13c D2NET+0x06EF0
+// D2NET 0x06EF0 (1.13c)
 extern "C" void d2net_n65_6ef0(N65St* s, const N65Ops* o) {
   o->lock();
   if (s->sendBuf) o->freeNode(s->sendBuf);
@@ -84,7 +84,7 @@ extern "C" void d2net_n65_6bd0(N65St* s, const N65Ops* o, const uint8_t* p, int 
     n -= sz; p += sz;
   }
 }
-// 1.13c D2NET+0x043E0
+// D2NET 0x043E0 (1.13c)
 extern "C" char* d2net_n65_43e0(char* d, const char* s) { return strcpy(d, s); }
-// 1.13c D2NET+0x043F0
+// D2NET 0x043F0 (1.13c)
 extern "C" char* d2net_n65_43f0(char* d, const char* s) { return strcat(d, s); }
