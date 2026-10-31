@@ -44,7 +44,7 @@ struct D2GameBatch17Env {
     void     (*setUnitStat)(void* unit, int32_t stat, int32_t value, int32_t layer); // 0xA472 D2Common #10887
     int32_t  (*getInventoryGoldLimit)(void* unit);                                 // 0xA45A D2Common #10049
     int32_t  (*getStashGoldLimit)(void* unit);                                     // 0xA4A8 D2Common #11060
-    void     (*setFinalStat)(void* unit, int32_t stat, int32_t value, int32_t layer); // 0xA4D2 D2Common #10551
+    void     (*setFinalStat)(void* unit, int32_t stat, int32_t delta, int32_t layer); // 0xA4D2 D2Common #10551 (adds)
     int32_t  (*getItemQuality)(void* unit);                                        // 0xA898 D2Common #10106
     int32_t  (*getItemUniqueId)(void* unit);                                       // 0xA874 D2Common #10620
     void*    (*uniqueItemsRow)(int32_t uniqueId);                                  // 0x16F0 (eax = id)
@@ -80,7 +80,8 @@ int32_t d2game_roll_1480(uint32_t* seed, int32_t count, int32_t base)
 // Add delta to a stat. ESI = unit, EBX = stat, stack = delta. A null unit is ignored. The result is
 // the current value (D2Common #10973) plus delta; a negative result stores 0. For a player
 // (unit+0 type 0), stat 0xE (gold) and 0xF (stash gold) additionally store 0 when the result exceeds
-// the matching gold limit; every other path writes the result through D2Common #10551.
+// the matching gold limit; every other path adds delta (not the sum) through D2Common #10551
+// (STATLIST_AddUnitStat: retail pushes unit, stat, the stack delta, 0).
 void d2_fn_d2game_1670(void* unit, int32_t stat, int32_t delta, const D2GameBatch17Env* env)
 {
     if (!unit) return;
@@ -93,7 +94,18 @@ void d2_fn_d2game_1670(void* unit, int32_t stat, int32_t delta, const D2GameBatc
             if (env->getStashGoldLimit(unit) < value) { env->setUnitStat(unit, stat, 0, 0); return; }
         }
     }
-    env->setFinalStat(unit, stat, value, 0);
+    env->setFinalStat(unit, stat, delta, 0);               // #10551 adds: delta, not value
+}
+
+// Probe seam for 0x1670: the five D2Common seams bound, nothing else.
+extern "C" void d2game_1670_probe(void* unit, int32_t stat, int32_t delta,
+    int32_t (*getStat)(void*, int32_t, int32_t), void (*setStat)(void*, int32_t, int32_t, int32_t),
+    int32_t (*invLimit)(void*), int32_t (*stashLimit)(void*), void (*addStat)(void*, int32_t, int32_t, int32_t))
+{
+    D2GameBatch17Env env = {};
+    env.getUnitStat = getStat; env.setUnitStat = setStat; env.getInventoryGoldLimit = invLimit;
+    env.getStashGoldLimit = stashLimit; env.setFinalStat = addStat;
+    d2_fn_d2game_1670(unit, stat, delta, &env);
 }
 
 // 1.13c D2Game+0x17E0
@@ -264,4 +276,26 @@ int32_t d2game_stricmp_probe(const char* a, const char* b)
 void d2_fn_d2game_28e5(const D2GameBatch17Env* env)
 {
     env->lock(8);
+}
+
+// 1.13c D2Game+0x1020: EAX = player, [esp+4] = game (ret 4). The quest
+// record pointer for the game's difficulty: D2Common #10920 (player data) +0x10 + 4 * game->nDifficulty
+// (byte at +0x6D). 1.10f inlines this expression at every quest call site.
+extern "C" uint32_t d2game_1020_probe(void* player, const void* game, void* (*getPlayerData)(void*))
+{
+    const void* pd = getPlayerData(player);
+    return rd32(pd, 0x10 + 4u * rd8(game, 0x6D));
+}
+
+// 1.13c D2Game+0x69C60: ECX = unit (fastcall, plain ret). 1 when the
+// unit is a living monster (D2Common #10648 says not dead) or a player whose mode (+0x10) is neither
+// 0 (death) nor 0x11 (dead); 0 for a null unit and every other unit type.
+extern "C" int32_t d2game_69c60_probe(const void* unit, int32_t (*monsterIsDead)(const void*))
+{
+    if (!unit) return 0;
+    const uint32_t type = rd32(unit, 0);
+    if (type == 1) return monsterIsDead(unit) ? 0 : 1;
+    if (type != 0) return 0;
+    const uint32_t mode = rd32(unit, 0x10);
+    return (mode == 0 || mode == 0x11) ? 0 : 1;
 }

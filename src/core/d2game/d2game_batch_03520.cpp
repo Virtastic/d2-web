@@ -66,7 +66,8 @@ struct D2GameBatchSeams {
     void  (*fn10021)(void);                             // Ordinal_10021
     void  (*sendPacket)(const void* packet);            // D2Net Ordinal_10002, frame in a register
     int   (*strCopy)(void* dst, const void* src, int max); // Storm Ordinal_501
-    void  (*fn2250)(void);                              // 0x2250
+    void  (*fn2250)(void* list);                        // 0x2250, list in EAX
+    void  (*vcall0)(void* object, void* list);          // (*object->vtbl[0]) thiscall
     void  (*initterm)(void* table);                     // __initterm (0x40E4 / 0x411F)
     void  (*crtExitLocked)(void);                       // 0x2A28
     void  (*crtExitProcess)(uint32_t code);             // ___crtExitProcess
@@ -130,14 +131,23 @@ void D2Task_LinkList_Remove(D2TaskLink* entry)
 // ---- GAME.cpp object release (caller 0x2CE20 closeGame) -----------------------------------------
 // EAX = object whose first dword is its vtable; the return-address slot doubles as the "unlock" flag.
 // 1.13c D2Game+0x1F30
-void GAME_1F30(void* object, bool leaveLock, const D2GameBatchSeams& s)
+void GAME_1F30(void* object, void* list, bool leaveLock, const D2GameBatchSeams& s)
 {
-    s.fn2250();                                          // 0x2250
-    (*(void (**)(void))rdptr(object, 0))();              // (**(code **)*object)()
+    // EAX = object, EDI = list, [esp+4] = leaveLock, ret 4.
+    s.fn2250(list);                                      // 0x2250 with EAX = list
+    s.vcall0(object, list);                              // thiscall object->vtbl[0](list)
     if (leaveLock) {
-        // LeaveCriticalSection((LPCRITICAL_SECTION)(object + 0x14 words)): compat critical section is a no-op.
+        // LeaveCriticalSection(object + 0x50): compat critical section is a no-op.
         (void)object;
     }
+}
+
+extern "C" void d2game_1f30_probe(void* object, void* list, int32_t leaveLock,
+    void (*fn2250)(void*), void (*vcall0)(void*, void*))
+{
+    D2GameBatchSeams s{};
+    s.fn2250 = fn2250; s.vcall0 = vcall0;
+    GAME_1F30(object, list, leaveLock != 0, s);
 }
 
 // ---- CRT exit path ------------------------------------------------------------------------------

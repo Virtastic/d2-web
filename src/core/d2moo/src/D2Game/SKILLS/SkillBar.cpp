@@ -1498,7 +1498,7 @@ int32_t __fastcall SKILLS_Leap(D2GameStrc* pGame, D2UnitStrc* pUnit, D2SkillStrc
         }
     }
 
-    if (nBaseId < 0 || nBaseId > sgptDataTables->nMonStatsTxtRecordCount)
+    if (nBaseId < 0 || nBaseId >= sgptDataTables->nMonStatsTxtRecordCount)
     {
         nBaseId = -1;
     }

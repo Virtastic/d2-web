@@ -142,7 +142,6 @@ void __fastcall PLAYERPETS_PlayerIterate_SynchronizeWithClient(D2GameStrc* pGame
 }
 
 //D2Game.0x6FC7CF50
-// 1.13c D2Game+0xD6C80
 void __fastcall sub_6FC7CF50(D2GameStrc* pGame, int32_t nPetGUID)
 {
     D2UnitStrc* pPet = SUNIT_GetServerUnit(pGame, UNIT_MONSTER, nPetGUID);
@@ -416,9 +415,9 @@ void __fastcall PLAYERPETS_PlayerIterate_UpdateClient(D2GameStrc* pGame, D2UnitS
     }
 }
 
-//D2Game.0x6FC7D7A0
+// Dismisses the pets of the other pet types sharing this type's group.
 // 1.13c D2Game+0x97C20
-void __fastcall sub_6FC7D7A0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pPet, int32_t nPetType, int32_t nPetMax)
+static void PLAYERPETS_DismissGroupPets(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nPetType)
 {
     if (!pPlayer || pPlayer->dwUnitType != UNIT_PLAYER)
     {
@@ -443,6 +442,17 @@ void __fastcall sub_6FC7D7A0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
             }
         }
     }
+}
+
+//D2Game.0x6FC7D7A0
+void __fastcall sub_6FC7D7A0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pPet, int32_t nPetType, int32_t nPetMax)
+{
+    if (!pPlayer || pPlayer->dwUnitType != UNIT_PLAYER)
+    {
+        return;
+    }
+
+    PLAYERPETS_DismissGroupPets(pGame, pPlayer, nPetType);
 
     sub_6FC7D150(pGame, pPlayer, nPetType, nPetMax);
 

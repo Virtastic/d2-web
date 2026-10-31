@@ -206,7 +206,7 @@ D2UnitStrc* __fastcall OBJECTS_SpawnSpecialChest(D2GameStrc* pGame, D2ActiveRoom
 }
 
 //D2Game.0x6FC70520
-// 1.13c D2Game+0x32110
+// 1.13c D2Game+0x32110 (checked against decompile, no delta; preset-table slot 8, the object id is the Duriel quest's arcane-thing pick, 0xC1BA0)
 D2UnitStrc* __fastcall OBJECTS_SpawnArcaneSymbol(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nClassId, int32_t nX, int32_t nY, int32_t nMode)
 {
     const int32_t nObjectId = ACT2Q6_GetObjectIdForArcaneThing(pGame);

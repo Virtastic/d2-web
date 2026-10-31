@@ -320,6 +320,7 @@ int32_t __fastcall AITACTICS_WalkToTargetUnitWithFlags(D2GameStrc* pGame, D2Unit
 }
 
 //D2Game.0x6FCD0240
+// 1.13c D2Game+0xF2540 (decrepify reset of the velocity fields and the AI-think event sweep are inline)
 int32_t __fastcall AITACTICS_MoveToTarget(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t nMode, int32_t nX, int32_t nY, uint8_t bStep, uint8_t nFlags)
 {
 	int32_t nNewMode = nMode;
@@ -594,6 +595,7 @@ int32_t __fastcall D2GAME_AICORE_WalkToOwner_6FCD0B60(D2GameStrc* pGame, D2UnitS
 }
 
 //D2Game.0x6FCD0D00
+// 1.13c D2Game+0xF2750
 int32_t __fastcall AITACTICS_RunCloseToTargetUnit(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pTarget, int32_t nMaxDistance)
 {
 	int32_t nOffsetX = 0;

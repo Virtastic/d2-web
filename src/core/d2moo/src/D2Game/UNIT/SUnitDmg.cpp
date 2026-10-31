@@ -2293,6 +2293,7 @@ int32_t __fastcall SUNITDMG_GetHitClass(D2DamageStrc* pDamage, uint32_t nBaseHit
 }
 
 //D2Game.0x6FCC1AC0
+// 1.13c D2Game+0xDED30
 void __fastcall SUNITDMG_DrainItemDurability(D2GameStrc* pGame, D2UnitStrc* pAttacker, D2UnitStrc* pDefender, int32_t nUnused)
 {
 	constexpr D2DurabilityLossStrc sgDurabilityLossWeights[7] =

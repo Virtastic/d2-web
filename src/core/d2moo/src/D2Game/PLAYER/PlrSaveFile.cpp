@@ -11,6 +11,7 @@
 // d2s-format description calls the file's prefix "765 bytes". Those agree exactly --
 // 335 (header) + 298 (quests) + 81 (waypoints) + 51 (NPC intro) = 765 -- which is two independent
 // descriptions of the same layout landing on the same number.
+#include <vector>
 #include <D2Common.h>
 #include <D2Constants.h>
 #include <D2DataTbls.h>
@@ -346,86 +347,108 @@ int32_t __fastcall PLRSAVE2_CreateSaveFile(D2GameStrc* pGame, D2UnitStrc* pPlaye
         ++ppSection;
     }
 
-    // The items section is sub_6FC8A0F0, already vendored: it returns the byte count it wrote, or
-    // a negative value on failure.
-    const int32_t nItemsSize = sub_6FC8A0F0(pGame, pPlayer, ppSection, (int32_t)(pEnd - ppSection), a6, a7);
-    if (nItemsSize < 0)
+    // Items, corpses and the expansion tail run twice, as in retail: once into a scratch buffer, then
+    // into the real image (the writers have side effects on the units, so the pass is not skipped).
+    auto writeLateSections = [&](uint8_t*& pCursor, const uint8_t* pLimit) -> int32_t
     {
-        return PLRSAVE2ERROR_BAD_ITEMS;
-    }
-    ppSection += nItemsSize;
+        // The items section is sub_6FC8A0F0, already vendored: it returns the byte count it wrote, or
+        // a negative value on failure.
+        const int32_t nItemsSize = sub_6FC8A0F0(pGame, pPlayer, pCursor, (int32_t)(pLimit - pCursor), a6, a7);
+        if (nItemsSize < 0)
+        {
+            return PLRSAVE2ERROR_BAD_ITEMS;
+        }
+        pCursor += nItemsSize;
 
-    nResult = PLRSAVE2_WriteCorpsesSection(pGame, pPlayer, &ppSection, pEnd, a7);
+        nResult = PLRSAVE2_WriteCorpsesSection(pGame, pPlayer, &pCursor, pLimit, a7);
+        if (nResult)
+        {
+            return nResult;
+        }
+
+        // Expansion tail: the mercenary's item block, then the iron golem's. Both markers are present in
+        // every expansion save even when their block is empty, which is why they are written
+        // unconditionally here.
+        if (pGame->bExpansion)
+        {
+            if (pCursor + 3 > pLimit)
+            {
+                return PLRSAVE2ERROR_INVALID_SIZE;
+            }
+            pCursor[0] = 'j';
+            pCursor[1] = 'f';
+            pCursor += 2;
+
+            // The hireling's items are written by the SAME writer the player's own section uses
+            // (PLRSAVE_WriteItems, retail's sub_6FC8A0F0: a 'JM' marker, a 16-bit count, then one
+            // byte-aligned serialized item each), applied to the pet's inventory. A pet that does not
+            // exist gets no block -- the marker then stands alone and 'k f' follows it directly, which
+            // is what every save we hold does. Writing the marker with nothing behind it unconditionally
+            // (which is what this did) dropped every hired mercenary's gear (client-parity C3d).
+            D2UnitStrc* pPet = sub_6FC7E8B0(pGame, pPlayer, PETTYPE_HIREABLE, 1);
+            if (pPet)
+            {
+                const int32_t nPetSectionSize = sub_6FC8A0F0(pGame, pPet, pCursor, (int32_t)(pLimit - pCursor), 0, a7);
+                if (nPetSectionSize < 0)
+                {
+                    return PLRSAVE2ERROR_BAD_PET;
+                }
+                pCursor += nPetSectionSize;
+            }
+
+            // PLRSAVE2_WriteIronGolemSection (D2Game.0x6FC8D880): the marker, a present flag, and the
+            // golem's own item when there is one. The engine summons no iron golem on any path a row
+            // drives, so this arm is unasserted -- but the flag is now the golem's state rather than the
+            // constant 0 the marker used to carry.
+            pCursor[0] = 'k';
+            pCursor[1] = 'f';
+            uint8_t bHasIronGolem = 0;
+            D2UnitStrc* pIronGolemItem = nullptr;
+            D2UnitStrc* pIronGolem = sub_6FC7E8B0(pGame, pPlayer, PETTYPE_GOLEM, 1);
+            if (pIronGolem && pIronGolem->dwClassId == MONSTER_IRONGOLEM &&
+                SKILLS_GetSkillById(pPlayer, SKILL_IRONGOLEM, (D2UnitGUID)-1) && pIronGolem->pInventory)
+            {
+                pIronGolemItem = INVENTORY_UnitIsItem(INVENTORY_GetFirstItem(pIronGolem->pInventory));
+                if (pIronGolemItem)
+                {
+                    bHasIronGolem = 1;
+                }
+            }
+            pCursor[2] = bHasIronGolem;
+            pCursor += 3;
+            if (bHasIronGolem)
+            {
+                const int32_t nGolemItemSize = D2GAME_SAVE_SerializeItem_6FC89AD0(pIronGolemItem, pCursor,
+                    (uint32_t)(pLimit - pCursor), 0, a7);
+                // Retail clears the present flag rather than advancing by a failed length; a serializer
+                // that wrote nothing leaves the section at its three bytes.
+                if (nGolemItemSize <= 0)
+                {
+                    pCursor[-1] = 0;
+                }
+                else
+                {
+                    pCursor += nGolemItemSize;
+                }
+            }
+        }
+        return PLRSAVE2ERROR_SUCCESS;
+    };
+
+    {
+        std::vector<uint8_t> scratch((size_t)(pEnd - ppSection));
+        uint8_t* pScratch = scratch.data();
+        nResult = writeLateSections(pScratch, scratch.data() + scratch.size());
+        if (nResult)
+        {
+            return nResult;
+        }
+    }
+
+    nResult = writeLateSections(ppSection, pEnd);
     if (nResult)
     {
         return nResult;
-    }
-
-    // Expansion tail: the mercenary's item block, then the iron golem's. Both markers are present in
-    // every expansion save even when their block is empty, which is why they are written
-    // unconditionally here.
-    if (pGame->bExpansion)
-    {
-        if (ppSection + 3 > pEnd)
-        {
-            return PLRSAVE2ERROR_INVALID_SIZE;
-        }
-        ppSection[0] = 'j';
-        ppSection[1] = 'f';
-        ppSection += 2;
-
-        // The hireling's items are written by the SAME writer the player's own section uses
-        // (PLRSAVE_WriteItems, retail's sub_6FC8A0F0: a 'JM' marker, a 16-bit count, then one
-        // byte-aligned serialized item each), applied to the pet's inventory. A pet that does not
-        // exist gets no block -- the marker then stands alone and 'k f' follows it directly, which
-        // is what every save we hold does. Writing the marker with nothing behind it unconditionally
-        // (which is what this did) dropped every hired mercenary's gear (client-parity C3d).
-        D2UnitStrc* pPet = sub_6FC7E8B0(pGame, pPlayer, PETTYPE_HIREABLE, 1);
-        if (pPet)
-        {
-            const int32_t nPetSectionSize = sub_6FC8A0F0(pGame, pPet, ppSection, (int32_t)(pEnd - ppSection), 0, a7);
-            if (nPetSectionSize < 0)
-            {
-                return PLRSAVE2ERROR_BAD_PET;
-            }
-            ppSection += nPetSectionSize;
-        }
-
-        // PLRSAVE2_WriteIronGolemSection (D2Game.0x6FC8D880): the marker, a present flag, and the
-        // golem's own item when there is one. The engine summons no iron golem on any path a row
-        // drives, so this arm is unasserted -- but the flag is now the golem's state rather than the
-        // constant 0 the marker used to carry.
-        ppSection[0] = 'k';
-        ppSection[1] = 'f';
-        uint8_t bHasIronGolem = 0;
-        D2UnitStrc* pIronGolemItem = nullptr;
-        D2UnitStrc* pIronGolem = sub_6FC7E8B0(pGame, pPlayer, PETTYPE_GOLEM, 1);
-        if (pIronGolem && pIronGolem->dwClassId == MONSTER_IRONGOLEM &&
-            SKILLS_GetSkillById(pPlayer, SKILL_IRONGOLEM, (D2UnitGUID)-1) && pIronGolem->pInventory)
-        {
-            pIronGolemItem = INVENTORY_UnitIsItem(INVENTORY_GetFirstItem(pIronGolem->pInventory));
-            if (pIronGolemItem)
-            {
-                bHasIronGolem = 1;
-            }
-        }
-        ppSection[2] = bHasIronGolem;
-        ppSection += 3;
-        if (bHasIronGolem)
-        {
-            const int32_t nGolemItemSize = D2GAME_SAVE_SerializeItem_6FC89AD0(pIronGolemItem, ppSection,
-                (uint32_t)(pEnd - ppSection), 0, a7);
-            // Retail clears the present flag rather than advancing by a failed length; a serializer
-            // that wrote nothing leaves the section at its three bytes.
-            if (nGolemItemSize <= 0)
-            {
-                ppSection[-1] = 0;
-            }
-            else
-            {
-                ppSection += nGolemItemSize;
-            }
-        }
     }
 
     const uint32_t nFileSize = (uint32_t)(ppSection - pStart);

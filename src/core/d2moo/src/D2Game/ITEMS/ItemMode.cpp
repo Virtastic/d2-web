@@ -809,6 +809,21 @@ int32_t __fastcall sub_6FC428F0(D2UnitStrc* pItem, D2ItemsTxt* pItemsTxtRecordAr
     return 0;
 }
 
+// Out of line in 1.13c: put an item back on the ground in its room and give the unit the event sound.
+// A null item takes type 6 / id -1 for the delete record.
+// 1.13c D2Game+0xD2840
+static void ITEMMODE_ReturnItemToGround(D2UnitStrc* pUnit, D2UnitStrc* pItem, int32_t nSound)
+{
+    DUNGEON_AllocDrlgDelete(UNITS_GetRoom(pItem), pItem ? pItem->dwUnitType : 6, pItem ? pItem->dwUnitId : -1);
+    ITEMS_SetInvPage(pItem, 0xFFu);
+    if (pItem)
+    {
+        pItem->dwFlags |= UNITFLAG_SENDREFRESHMSG;
+    }
+    UNITS_ChangeAnimMode(pItem, IMODE_ONGROUND);
+    SUNIT_AttachSound(pUnit, nSound, pUnit);
+}
+
 //D2Game.0x6FC42B80
 void __fastcall D2GAME_PickupItemEx_6FC42B80(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nItemGUID, int32_t* a4)
 {
@@ -874,11 +889,7 @@ void __fastcall D2GAME_PickupItemEx_6FC42B80(D2GameStrc* pGame, D2UnitStrc* pUni
         }
         else
         {
-            DUNGEON_AllocDrlgDelete(UNITS_GetRoom(pItem), pItem->dwUnitType, pItem->dwUnitId);
-            ITEMS_SetInvPage(pItem, 0xFFu);
-            pItem->dwFlags |= UNITFLAG_SENDREFRESHMSG;
-            UNITS_ChangeAnimMode(pItem, IMODE_ONGROUND);
-            SUNIT_AttachSound(pUnit, 0x13u, pUnit); // 1.13c D2Game+0xD2840 pushes 0x13 (the 3 beside it is the item anim mode)
+            ITEMMODE_ReturnItemToGround(pUnit, pItem, 0x13);
         }
     }
     else
@@ -888,6 +899,7 @@ void __fastcall D2GAME_PickupItemEx_6FC42B80(D2GameStrc* pGame, D2UnitStrc* pUni
 }
 
 //D2Game.0x6FC42DD0
+// 1.13c D2Game+0xD6C80
 void __fastcall D2GAME_PickupGold_6FC42DD0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pGoldPile)
 {
     const uint32_t nInventoryLimit = UNITS_GetInventoryGoldLimit(pUnit);
@@ -1164,11 +1176,7 @@ int32_t __fastcall D2GAME_PickupItem_6FC43340(D2GameStrc* pGame, D2UnitStrc* pUn
 
     if (!sub_6FC425F0(pGame, pUnit, pItem))
     {
-        DUNGEON_AllocDrlgDelete(UNITS_GetRoom(pItem), pItem->dwUnitType, pItem->dwUnitId);
-        ITEMS_SetInvPage(pItem, 0xFFu);
-        pItem->dwFlags |= UNITFLAG_SENDREFRESHMSG;
-        UNITS_ChangeAnimMode(pItem, IMODE_ONGROUND);
-        SUNIT_AttachSound(pUnit, 0x13u, pUnit); // 1.13c D2Game+0xD2840 pushes 0x13
+        ITEMMODE_ReturnItemToGround(pUnit, pItem, 0x13);
         return 0;
     }
 
@@ -1235,17 +1243,12 @@ int32_t __fastcall D2GAME_PickupItem_6FC43340(D2GameStrc* pGame, D2UnitStrc* pUn
 
     if (!ITEMS_CheckIfBeltable(pItem) || !ITEMS_CheckIfAutoBeltable(pUnit->pInventory, pItem) || !INVENTORY_PlaceItemInFreeBeltSlot(pUnit->pInventory, pItem))
     {
-        // belt-full fallback: D2Game+0xD6590 is the 1.13c counterpart, this line is not its marker
         if (sub_6FC43E60(pGame, pUnit, pItem, 1, 0, __FILE__, __LINE__))
         {
             return 1;
         }
 
-        DUNGEON_AllocDrlgDelete(UNITS_GetRoom(pItem), pItem->dwUnitType, pItem->dwUnitId);
-        ITEMS_SetInvPage(pItem, 0xFFu);
-        pItem->dwFlags |= UNITFLAG_SENDREFRESHMSG;
-        UNITS_ChangeAnimMode(pItem, IMODE_ONGROUND);
-        SUNIT_AttachSound(pUnit, 0x17u, pUnit); // 1.13c D2Game+0xD2840 via 0xD6E30 pushes 0x17
+        ITEMMODE_ReturnItemToGround(pUnit, pItem, 0x17);
         return 0;
     }
 
@@ -1512,6 +1515,7 @@ int32_t __fastcall sub_6FC43BF0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
 }
 
 //D2Game.0x6FC43E60
+// 1.13c D2Game+0xD6590 (unit in ecx, item in eax; the player-only inventory-flag step and its asserts are out of line)
 int32_t __fastcall sub_6FC43E60(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pItem, int32_t bRemove, int32_t nPage, const char* szFile, int32_t nLine)
 {
     D2_ASSERT(pGame);
@@ -1581,6 +1585,59 @@ int32_t __fastcall sub_6FC43E60(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc
     return 1;
 }
 
+// Out of line in 1.13c: after a cube is dropped, move its contents back into the owner's inventory, or
+// onto the ground beside the owner where they do not fit (the place call is inline there).
+// 1.13c D2Game+0xD78C0
+static void ITEMMODE_UnpackDroppedCube(D2GameStrc* pGame, D2UnitStrc* pUnit, D2UnitStrc* pItem)
+{
+    D2CoordStrc returnCoords = {};
+    D2CoordStrc coords = {};
+    D2ActiveRoomStrc* pRoom = nullptr;
+
+    D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
+    D2_ASSERT(pItemsTxtRecord);
+
+    if (pItemsTxtRecord->dwCode != ' xob')
+    {
+        return;
+    }
+
+    D2UnitStrc* pInvItem = INVENTORY_GetFirstItem(pUnit->pInventory);
+    while (pInvItem)
+    {
+        D2UnitStrc* pNext = INVENTORY_GetNextItem(pInvItem);
+        if (INVENTORY_UnitIsItem(pInvItem) && ITEMS_GetInvPage(pInvItem) == INVPAGE_CUBE)
+        {
+            ITEMS_SetItemCell(pItem, 3);
+            D2GAME_UpdateClientItem_6FC3E9D0(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), pUnit, pInvItem, 0x20);
+            
+            D2UnitStrc* pRemove = INVENTORY_RemoveItemFromInventory(pUnit->pInventory, pInvItem);
+            D2_ASSERT(pRemove);
+            D2_ASSERT(pInvItem == pRemove);
+
+            //const uint8_t nInvPage = ITEMS_GetInvPage(pInvItem);
+            //INVENTORY_Return(__FILE__, __LINE__, pUnit->pInventory, CLIENTS_GetUnitX(pInvItem), CLIENTS_GetUnitY(pInvItem), UNITS_GetInventoryRecordId(pUnit, nInvPage, pGame->bExpansion), 0, nInvPage);
+
+            UNITS_ChangeAnimMode(pRemove, IMODE_ONCURSOR);
+            ITEMS_SetInvPage(pInvItem, INVPAGE_INVENTORY);
+
+            if (!D2GAME_PlaceItem_6FC44410(__FILE__, __LINE__, pGame, pUnit, pInvItem->dwUnitId, 0, 0, 1, 1, 0))
+            {
+                ITEMS_SetInvPage(pInvItem, INVPAGE_NULL);
+                UNITS_GetCoords(pUnit, &coords);
+                
+                pRoom = D2GAME_GetFreeSpaceEx_6FC4BF00(UNITS_GetRoom(pUnit), &coords, &returnCoords, 1);
+                if (pRoom)
+                {
+                    D2GAME_DropItem_6FC52260(pGame, pUnit, pInvItem, pRoom, returnCoords.nX, returnCoords.nY);
+                }
+            }
+        }
+
+        pInvItem = pNext;
+    }
+}
+
 //D2Game.0x6FC44030
 void __fastcall sub_6FC44030(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nItemGUID)
 {
@@ -1631,48 +1688,7 @@ void __fastcall sub_6FC44030(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nItem
         ITEMS_SetItemFlag(pItem, IFLAG_NOEQUIP, 0);
     }
 
-    D2ItemsTxt* pItemsTxtRecord = DATATBLS_GetItemsTxtRecord(pItem->dwClassId);
-    D2_ASSERT(pItemsTxtRecord);
-
-    if (pItemsTxtRecord->dwCode != ' xob')
-    {
-        return;
-    }
-
-    D2UnitStrc* pInvItem = INVENTORY_GetFirstItem(pUnit->pInventory);
-    while (pInvItem)
-    {
-        D2UnitStrc* pNext = INVENTORY_GetNextItem(pInvItem);
-        if (INVENTORY_UnitIsItem(pInvItem) && ITEMS_GetInvPage(pInvItem) == INVPAGE_CUBE)
-        {
-            ITEMS_SetItemCell(pItem, 3);
-            D2GAME_UpdateClientItem_6FC3E9D0(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), pUnit, pInvItem, 0x20);
-            
-            D2UnitStrc* pRemove = INVENTORY_RemoveItemFromInventory(pUnit->pInventory, pInvItem);
-            D2_ASSERT(pRemove);
-            D2_ASSERT(pInvItem == pRemove);
-
-            //const uint8_t nInvPage = ITEMS_GetInvPage(pInvItem);
-            //INVENTORY_Return(__FILE__, __LINE__, pUnit->pInventory, CLIENTS_GetUnitX(pInvItem), CLIENTS_GetUnitY(pInvItem), UNITS_GetInventoryRecordId(pUnit, nInvPage, pGame->bExpansion), 0, nInvPage);
-
-            UNITS_ChangeAnimMode(pRemove, IMODE_ONCURSOR);
-            ITEMS_SetInvPage(pInvItem, INVPAGE_INVENTORY);
-
-            if (!D2GAME_PlaceItem_6FC44410(__FILE__, __LINE__, pGame, pUnit, pInvItem->dwUnitId, 0, 0, 1, 1, 0))
-            {
-                ITEMS_SetInvPage(pInvItem, INVPAGE_NULL);
-                UNITS_GetCoords(pUnit, &coords);
-                
-                pRoom = D2GAME_GetFreeSpaceEx_6FC4BF00(UNITS_GetRoom(pUnit), &coords, &returnCoords, 1);
-                if (pRoom)
-                {
-                    D2GAME_DropItem_6FC52260(pGame, pUnit, pInvItem, pRoom, returnCoords.nX, returnCoords.nY);
-                }
-            }
-        }
-
-        pInvItem = pNext;
-    }
+    ITEMMODE_UnpackDroppedCube(pGame, pUnit, pItem);
 }
 
 //D2Game.0x6FC44410
@@ -4589,6 +4605,7 @@ void __fastcall D2GAME_ITEMS_Identify_6FC49670(D2GameStrc* pGame, D2UnitStrc* pP
 }
 
 //D2Game.0x6FC49760
+// 1.13c D2Game+0xD2C70 (a non-player holder sends the cursor clear with no client instead of asserting)
 int32_t __fastcall D2GAME_RemoveItemIfOnCursor_6FC49760(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pItem)
 {
     if (!pItem || INVENTORY_GetCursorItem(pPlayer->pInventory) != pItem)

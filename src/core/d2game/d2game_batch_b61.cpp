@@ -16,7 +16,7 @@ static inline void b61_w32(uint8_t* p, uint32_t v) { std::memcpy(p, &v, 4); }
 struct D2GameB61Env {
     // Fog seams
     void*    (*ord10920)(void* arg);                                  // Fog #10920
-    uint32_t (*ord10174)(uint32_t a, uint32_t b);                     // Fog #10174
+    uint32_t (*ord10174)(uint32_t a, uint32_t b, uint32_t c);                   // Fog #10174
     void     (*ord10158)(void* unit);                                 // Fog #10158
     void*    (*alloc)(const char* file, uint32_t line, uint32_t zero);// Fog #10045
     void     (*fatal)(uint32_t line);                                 // #10265 + #10024 (caller _exits)
@@ -75,9 +75,9 @@ void d2_fn_d2game_9d3b0(void* param_1, int32_t* param_2, const D2GameB61Env* env
 extern "C" EMSCRIPTEN_KEEPALIVE
 uint32_t d2_fn_d2game_b9b00(uint8_t* param_1, int32_t* param_2, const D2GameB61Env* env)
 {
-    uint8_t* tbl = (uint8_t*)env->ord10920(nullptr);
+    uint8_t* tbl = (uint8_t*)env->ord10920(param_2);
     uint32_t ent = b61_u32(tbl + 0x10 + (uint32_t)param_1[0x6D] * 4);
-    if (env->ord10174(ent, 0x1A) != 0) {
+    if (env->ord10174(ent, 0x1A, 0xD) != 0) {
         if (param_2 != nullptr && *param_2 == 0) env->ord10920(param_2);
         uint8_t pkt[6] = {0x5D, 0x17, 0x02, 0x00, 0x00, 0x00};
         env->sub8a3e0(pkt, 6);

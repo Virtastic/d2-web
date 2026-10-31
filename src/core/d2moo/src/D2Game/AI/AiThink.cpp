@@ -228,7 +228,6 @@ static uint32_t AI_RollPercentage(D2UnitStrc* pUnit)
 }
 
 // Inlined helper function
-// 1.13c D2Game+0xF2540
 static bool AIRollChanceParam(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam, int32_t nParamId)
 {
 	return AI_RollPercentage(pUnit) < AI_GetParamValue(pGame, pAiTickParam, nParamId);
@@ -511,12 +510,16 @@ enum D2C_FallenAIParams
 };
 
 //D2Game.0x6FCD1D50
+// 1.13c D2Game+0x83130
 void __fastcall AITHINK_Fn006_Fallen(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	if (!pUnit || pUnit->dwAnimMode == MONMODE_DEATH || pUnit->dwAnimMode == MONMODE_DEAD)
 	{
 		return;
 	}
+
+	// 1.13c D2Game+0x83130: the neutral-mode test after the corpse scan reads the mode cached here, at entry
+	const uint32_t nEntryMode = pUnit->dwAnimMode;
 
 	D2GAME_EVENTS_Delete_6FC34840(pGame, pUnit, EVENTTYPE_AITHINK, 0);
 
@@ -566,7 +569,7 @@ void __fastcall AITHINK_Fn006_Fallen(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiT
 		}
 	}
 
-	if (pUnit->dwAnimMode != MONMODE_NEUTRAL)
+	if (nEntryMode != MONMODE_NEUTRAL)
 	{
 		AITACTICS_IdleInNeutralMode(pGame, pUnit, 10);
 		return;
@@ -3136,6 +3139,7 @@ enum D2C_BatDemonAIParams
 };
 
 //D2Game.0x6FCD7760
+// 1.13c D2Game+0x80450
 void __fastcall AITHINK_Fn029_BatDemon(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	const int32_t nLifePercentage = UNITS_GetCurrentLifePercentage(pUnit);
@@ -5577,6 +5581,9 @@ void __fastcall AITHINK_Fn057_TentacleHead(D2GameStrc* pGame, D2UnitStrc* pUnit,
 			AITACTICS_ChangeModeAndTargetUnit(pGame, pUnit, MONMODE_ATTACK1, pTarget);
 			return;
 		}
+
+		AITACTICS_IdleInNeutralMode(pGame, pUnit, AI_GetParamValue(pGame, pAiTickParam, TENTACLE_AI_PARAM_STALL_DURATION));
+		return;
 	}
 
 	AITACTICS_Idle(pGame, pUnit, AI_GetParamValue(pGame, pAiTickParam, TENTACLE_AI_PARAM_STALL_DURATION));
@@ -11844,7 +11851,6 @@ void __fastcall D2GAME_AI_SpecialState11_6FCE7E20(D2GameStrc* pGame, D2UnitStrc*
 }
 
 //D2Game.0x6FCE7E80
-// 1.13c D2Game+0x80450
 void __fastcall D2GAME_AI_SpecialState11_6FCE7E80(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	if (!STATES_CheckState(pUnit, STATE_TERROR))
@@ -12074,6 +12080,7 @@ int32_t __fastcall AITHINK_GetTargetScore(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 //D2Game.0x6FCE86C0
+// 1.13c D2Game+0xA4610 (stdcall, ret 0x18; pfCull is __fastcall(unit, candidate))
 D2UnitStrc* __fastcall AITHINK_GetTargetForBoss(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t* a3, int32_t* pCounter, D2AiCmdStrc* pAiCmd, int32_t(__fastcall* pfCull)(D2UnitStrc*, D2UnitStrc*))
 {
 	D2_ASSERT(pfCull);
@@ -12125,6 +12132,8 @@ D2UnitStrc* __fastcall AITHINK_GetTargetForBoss(D2GameStrc* pGame, D2UnitStrc* p
 			}
 		}
 	}
+
+	pTargetNode = pGame->pTargetNodes[8]; // 1.13c D2Game+0xA4610: list 8 starts the act walk
 
 	while (pTargetNode)
 	{

@@ -223,7 +223,7 @@ template <class E> u32 ReturnToTownIdleOnMode2(E& e, u32 p1)
     return 1;
 }
 
-// 1.13c D2Game+0x6FFC0
+// D2Game 0x6FFC0 template form (the bound 1.13c definition is PlrTrade.cpp)
 // Push a trade node on the player's trade list (+0x08 of the trade record at +0x5C). Register inputs: ESI (the
 // item), EAX (the owner); the node is allocated with the PlrTrade.cpp tag and line 0xC58. Node: [0]=esi,
 // [1]=eax, [2]=old head.

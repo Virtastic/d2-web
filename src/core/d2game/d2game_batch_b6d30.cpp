@@ -27,7 +27,7 @@ struct D2GameBatchB6D30Env {
     uint32_t (*ord10174)(uint32_t a, uint32_t b, uint32_t c);
     uint32_t (*ord10186)(uint32_t unit);
     uint32_t (*ord10913)(uint32_t unit);
-    uint32_t (*ord10522)(uint32_t unit);
+    uint32_t (*ord10522)(uint32_t unit, uint32_t target);
     uint32_t (*ord10331)(uint32_t unit, uint32_t a, uint32_t b);
     void     (*ord10302)(uint32_t unit, uint32_t a, uint32_t b, uint32_t c, const char* file, uint32_t line);
     void     (*sBD230)(uint32_t a, uint32_t b);               // 0x9D230
@@ -170,16 +170,15 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_B8070(uint32_t rec, uint32_t m
         e->sF2380(rec); return;
     case 0xe:
         if (target) {
-            int32_t x = (int32_t)e->s1100(rec); e->s1130(rec);
-            int32_t lx = (int32_t)e->s1100(target); uint32_t ly = e->s1130(target);
-            int32_t d = (int32_t)e->ord10522(rec);
+            int32_t x = (int32_t)e->s1100(rec), y = (int32_t)e->s1130(rec);
+            int32_t tx = (int32_t)e->s1100(target), ty = (int32_t)e->s1130(target);
+            int32_t d = (int32_t)e->ord10522(rec, target);
             if (d == 0) d = 1;
-            int32_t loc[4] = {(x - ebp) * 0x19 / d + x, 0, 0, 0};
-            (void)lx; (void)ly;
+            int32_t x2 = (x - tx) * 0x19 / d + x, y2 = (y - ty) * 0x19 / d + y;
             if (e->r32(rec + 4) == 0x2c5) { e->sF2380(rec); return; }
             uint32_t pv = e->ord10331(rec, 0, e->r32(rec + 4));
-            // unrecovered stack args of 0x47450: loc buffer (not addressable as a retail pointer) is passed by value.
-            if (e->s47450(p3, pv, (uint32_t)loc[0], 0, 0, rec, target)) { e->sF2380(rec); return; }
+            // 47450 args (game, pv, &x2, &y2, 0): x2/y2 passed by value through the seam.
+            if (e->s47450(p3, pv, (uint32_t)x2, (uint32_t)y2, 0, rec, target)) { e->sF2380(rec); return; }
         }
         break;
     case 0xf: e->sB7D30(p3); e->sF22C0(5); return;

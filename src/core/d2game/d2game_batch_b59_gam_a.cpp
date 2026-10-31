@@ -80,15 +80,20 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_b99d0(uint8_t* game, void* unit, cons
     uint32_t pd = O(10920, unit, 0, 0, 0, 0);
     uint32_t u = rd32(P(pd), 0x10 + game[0x6D] * 4);
     bool a = O(10174, u, 0x1A, 0, 0, 0) != 0 || O(10174, u, 0x1A, 0xF, 0, 0) != 0;
-    if (a && O(10174, u, 0x1A, 0xD, 0, 0) == 0 && O(10174, u, 0x1A, 0xE, 0, 0) == 0) {
-        env->sub354F0(unit, game);
-    }
+    if (a && O(10174, u, 0x1A, 0xD, 0, 0) == 0 && O(10174, u, 0x1A, 0xE, 0, 0) == 0) return 0;
+    env->sub354F0(unit, game);
     return 0;
 }
 
 // 1.13c D2Game+0xB9A30  (game = unaff_EBX)
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_b9a30(uint8_t* unit, uint8_t* game, const D2GameBatchB59Env* env) {
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_b9a30(uint8_t* unit, uint8_t* game, uint32_t qh, const D2GameBatchB59Env* env) {
+    // qh = EAX at entry: the quest handle the callers (b9f20) hold in EBP.
+    O(10003, qh, 0x1A, 0xD, 0, 0);
+    O(10003, qh, 0x1A, 0, 0, 0);
+    O(10495, qh, 0x1A, 0, 0, 0);
     if (rd32(game, 0x70) == 0) {
+        O(10003, qh, 0x1A, 6, 0, 0);
+        O(10003, qh, 0x1A, 7, 0, 0);
         uint32_t pd = 0;
         if (unit && rd32(unit, 0) == 0) pd = O(10920, unit, 0, 0, 0, 0);
         uint32_t it = pd ? rd32(P(pd), 0x9C) : 0;
@@ -102,7 +107,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_b9a30(uint8_t* unit, uint8_t* game, const
 
 // 1.13c D2Game+0xB9F20
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_b9f20(uint8_t* game, void* unit, const D2GameBatchB59Env* env,
-                                                 void (*b9a30)(void*)) {
+                                                 void (*b9a30)(void*, uint32_t)) {
     uint32_t pd = O(10920, unit, 0, 0, 0, 0);
     uint32_t u = rd32(P(pd), 0x10 + game[0x6D] * 4);
     uint32_t t = O(10174, u, 0x1A, 0, 0, 0);
@@ -117,7 +122,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_b9f20(uint8_t* game, void* unit, cons
         O(10383, w, &arr, &n, 0, 0);
         for (uint32_t i = 0; i < n && !hit; i++) hit = arr[i] == rd32(P(q), 0x3C);
     }
-    if (O(10174, u, 0x1A, 0, 0, 0) == 0 && O(10174, u, 0x1A, 1, 0, 0) == 0 && hit) b9a30(unit);
+    if (O(10174, u, 0x1A, 0, 0, 0) == 0 && O(10174, u, 0x1A, 1, 0, 0) == 0 && hit) b9a30(unit, u);
     return 0;
 }
 

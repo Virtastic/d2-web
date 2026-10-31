@@ -25,9 +25,9 @@
 
 void __fastcall MISSMODE_ResetGuidedFlight(D2UnitStrc* pMissile, D2UnitStrc* pTarget);   // 1.13c D2Game+0x397C0
 
-int32_t __stdcall STATLIST_GetTotalStatValue(D2StatListStrc* pStatList, int nStatId, uint16_t nLayer);   // 1.13c D2Common+0x38BD0
+int32_t __stdcall STATLIST_GetTotalStatValue(D2StatListStrc* pStatList, int nStatId, uint16_t nLayer);   // D2Common 0x38BD0
 
-// 1.13c D2Common+0x38B70 (#10973), stdcall (unit, stat, layer) -- ret 0xC (the cached decompile drops the layer; the disassembly
+// D2Common 0x38B70 (#10973), stdcall (unit, stat, layer) -- ret 0xC (the cached decompile drops the layer; the disassembly
 // pushes the word at [esp+0x18] into the key). null unit / stat list -> 0; stat bounds + row + the total (FullStats when the list is
 // an Ex list, min-clamped) are STATLIST_GetTotalStatValue, which is the 0x38A80 body keyed (stat << 16) + layer.
 static int32_t D2Common_38B70_GetUnitStat(D2UnitStrc* pUnit, int32_t nStatId, uint16_t nLayer)

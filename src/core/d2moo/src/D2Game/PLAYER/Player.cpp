@@ -358,47 +358,52 @@ void __fastcall PLAYER_StopInteractions(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     int32_t nUnitType = 0;
     int32_t nUnitGUID = 0;
-    if (!SUNIT_GetInteractInfo(pUnit, &nUnitType, &nUnitGUID))
+    D2UnitStrc* pInteractUnit = nullptr;
+    if (SUNIT_GetInteractInfo(pUnit, &nUnitType, &nUnitGUID))
     {
-        return ACT5Q5_OnPlayerDied(pGame, pUnit);
+        pInteractUnit = SUNIT_GetServerUnit(pGame, nUnitType, nUnitGUID);
     }
 
-    D2UnitStrc* pInteractUnit = SUNIT_GetServerUnit(pGame, nUnitType, nUnitGUID);
-    if (!pInteractUnit)
+    if (pInteractUnit)
     {
-        return ACT5Q5_OnPlayerDied(pGame, pUnit);
-    }
-
-    switch (nUnitType)
-    {
-    case UNIT_PLAYER:
-    {
-        sub_6FC92EE0(pGame, pUnit);
-        break;
-    }
-    case UNIT_MONSTER:
-    {
-        D2GAME_NPC_ResetInteract_6FCCB4D0(pGame, pUnit, pInteractUnit);
-        break;
-    }
-    case UNIT_OBJECT:
-    {
-        sub_6FC79B50(pGame, pUnit, pInteractUnit);
-        break;
-    }
-    case UNIT_ITEM:
-    {
-        if (DATATBLS_GetItemsTxtRecord(pInteractUnit->dwClassId)->dwCode == ' xob')
+        switch (nUnitType)
         {
-            sub_6FC92EF0(pGame, pUnit);
+        case UNIT_PLAYER:
+        {
+            sub_6FC91250(pGame, pUnit, 6, 0);
+            return;
         }
-        break;
-    }
-    default:
-        break;
+        case UNIT_MONSTER:
+        {
+            D2GAME_NPC_ResetInteract_6FCCB4D0(pGame, pUnit, pInteractUnit);
+            D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__);
+            sub_6FC3F340(pClient, 0x62u, UNIT_MONSTER, pInteractUnit->dwUnitId, 0);
+            return;
+        }
+        case UNIT_OBJECT:
+        {
+            sub_6FC79B50(pGame, pUnit, pInteractUnit);
+            D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__);
+            sub_6FC3F340(pClient, 0x62u, UNIT_OBJECT, pInteractUnit->dwUnitId, 0);
+            return;
+        }
+        case UNIT_ITEM:
+        {
+            if (DATATBLS_GetItemsTxtRecord(pInteractUnit->dwClassId)->dwCode == ' xob')
+            {
+                sub_6FC92EF0(pGame, pUnit);
+                D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__);
+                sub_6FC3F340(pClient, 0x62u, UNIT_ITEM, pInteractUnit->dwUnitId, 0);
+            }
+            return;
+        }
+        default:
+            break;
+        }
     }
 
-    return ACT5Q5_OnPlayerDied(pGame, pUnit);
+    D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__);
+    sub_6FC3F340(pClient, 0x62u, 6, 0, 0);
 }
 
 //D2Game.0x6FC7BEC0
@@ -493,6 +498,7 @@ void __fastcall sub_6FC7BFC0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t
 }
 
 //D2Game.0x6FC7C0C0
+// 1.13c D2Game+0x37480
 void __fastcall PLAYER_SetUniqueIdInPlayerData(D2UnitStrc* pPlayer, int32_t nUnitGUID)
 {
     D2_ASSERT(pPlayer);

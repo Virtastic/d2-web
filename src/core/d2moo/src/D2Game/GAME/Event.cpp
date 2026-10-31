@@ -358,7 +358,7 @@ int32_t __fastcall EVENT_GetEventFrame(D2GameStrc* pGame, D2UnitStrc* pUnit, int
 // dead mode is reported with the call site that armed it (g_d2webRegenSite, set just before the call).
 const char* g_d2webRegenSite = "";
 void (*g_d2webOnDeadRegen)(D2UnitStrc* pUnit, const char* szSite) = nullptr;
-// 1.13c D2Game+0x5E790
+// (1.13c 0x5E790 is not this function: that is the quest-0x22 helper in src/core/d2game/d2game_5e790.cpp)
 void __fastcall EVENT_SetEvent(D2GameStrc* pGame, D2UnitStrc* pUnit, D2C_EventTypes nEventType, int32_t nExpireFrame, int32_t dwEventCustomId, int32_t dwEventCustomParam)
 {
     if (nEventType == EVENTTYPE_STATREGEN && pUnit && pUnit->dwUnitType == UNIT_MONSTER && g_d2webOnDeadRegen &&

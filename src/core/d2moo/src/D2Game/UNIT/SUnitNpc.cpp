@@ -317,7 +317,6 @@ void __fastcall sub_6FCC6F10(D2UnitStrc* pNpc, D2UnitStrc* pItem, D2GameStrc* pG
 }
 
 //D2Game.0x6FCC6FF0
-// 1.13c D2Game+0xBD160
 void __fastcall D2GAME_NPC_BuildHirelingList_6FCC6FF0(D2GameStrc* pGame, D2ClientStrc* pClient, D2UnitStrc* pUnit, int32_t a4)
 {
     if (!pUnit)
@@ -927,6 +926,29 @@ void __fastcall sub_6FCC7E20(D2GameStrc* pGame, D2UnitStrc* pNpc, D2UnitStrc* pI
     return;
 }
 
+// 1.13c D2Game+0xBD160 (split out of the hire handler: once no offered hireling is left unhired the
+// list is freed and rebuilt)
+static void NPC_RefillHirelingListIfExhausted(D2GameStrc* pGame, int32_t nVendorId, D2NpcRecordStrc* pNpcRecord)
+{
+    D2HirelingTxt* pHirelingTxtRecord = DATATBLS_GetNextHirelingTxtRecordFromVendorIdAndDifficulty(pGame->bExpansion, nVendorId, 0, 0);
+    D2_ASSERT(pHirelingTxtRecord);
+
+    for (int32_t i = 0; i < pHirelingTxtRecord->wNameLast - pHirelingTxtRecord->wNameFirst + 1; ++i)
+    {
+        if (pNpcRecord->pMercData[i].bAvailable && !pNpcRecord->pMercData[i].bHired)
+        {
+            return;
+        }
+    }
+
+    D2_FREE_POOL(pGame->pMemoryPool, pNpcRecord->pMercData);
+
+    pNpcRecord->npcTrade.bHireInit = 0;
+    pNpcRecord->pMercData = nullptr;
+
+    D2GAME_NPC_FirstFn_6FCC67D0(pGame, nVendorId, pNpcRecord);
+}
+
 //D2Game.0x6FCC7FA0
 void __fastcall sub_6FCC7FA0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pNpc, uint16_t wName)
 {
@@ -1035,23 +1057,7 @@ void __fastcall sub_6FCC7FA0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
     D2GAME_NPC_BuildHirelingList_6FCC6FF0(pGame, SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), pNpc, MONSTERAI_GetInteractUnitCount(pMonInteract) <= 1);
     D2GAME_SendPacket0x2A_6FC3F3B0(SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__), 0x2Au, 5, STATLIST_UnitGetStatValue(pPlayer, STAT_GOLD, 0), pMerc ? pMerc->dwUnitId : -1, 0);
 
-    pHirelingTxtRecord = DATATBLS_GetNextHirelingTxtRecordFromVendorIdAndDifficulty(pGame->bExpansion, nVendorId, 0, 0);
-    D2_ASSERT(pHirelingTxtRecord);
-
-    for (int32_t i = 0; i < pHirelingTxtRecord->wNameLast - pHirelingTxtRecord->wNameFirst + 1; ++i)
-    {
-        if (pNpcRecord->pMercData[i].bAvailable && !pNpcRecord->pMercData[i].bHired)
-        {
-            return;
-        }
-    }
-
-    D2_FREE_POOL(pGame->pMemoryPool, pNpcRecord->pMercData);
-
-    pNpcRecord->npcTrade.bHireInit = 0;
-    pNpcRecord->pMercData = nullptr;
-
-    D2GAME_NPC_FirstFn_6FCC67D0(pGame, nVendorId, pNpcRecord);
+    NPC_RefillHirelingListIfExhausted(pGame, nVendorId, pNpcRecord);
 }
 
 //D2Game.0x6FCC8430

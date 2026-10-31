@@ -624,6 +624,7 @@ int32_t __fastcall AIBAAL_CullPotentialTargets(D2UnitStrc* pBaal, D2UnitStrc* pT
 }
 
 //D2Game.0x6FCCDC80
+// 1.13c D2Game+0xB79B0 (the melee and colliding tables are split out; the open-path table is D2Game+0xB7380)
 int32_t __fastcall AIBAAL_RollRandomAiParam(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiControlStrc* pAiControl, D2UnitStrc* pTarget, int32_t nMax, int32_t nCount, D2AiCmdStrc* pAiCmd)
 {
 	if (pAiControl->dwAiParam[0])
@@ -1160,6 +1161,7 @@ void __fastcall AIBAAL_MainSkillHandler(D2GameStrc* pGame, D2UnitStrc* pUnit, D2
 }
 
 //D2Game.0x6FCCEB70
+// 1.13c D2Game+0xB8460
 void __fastcall AITHINK_Fn140_BaalCrabClone(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	D2UnitStrc* pOwner = AIGENERAL_GetMinionOwner(pUnit);

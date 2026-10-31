@@ -747,7 +747,8 @@ static int32_t sub_46CD0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom)
 
 int32_t D2GAME_Gate46CD0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom) { return sub_46CD0(pGame, pRoom); }   // replay entry (kind 3451, s3253)
 
-// 1.13c D2Game+0x479B0: champion group (unit, its 1-3 minions)
+// 1.13c D2Game+0x479B0: champion group (unit, its 1-3 minions). Retail inlines sub_6FC6E8D0 (0x24950 spawn,
+// 0x23CA0 umods, 0x248A0 minions 1/3/6) and calls 0x47880 for the champion-minion loop below.
 static int32_t sub_479B0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, int32_t nChampionId)
 {
     D2UnitStrc* pChampion = sub_6FC6E8D0(pGame, pRoom, pRoomCoordList, nChampionId, 1, 0, 0, 1);

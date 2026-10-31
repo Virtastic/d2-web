@@ -349,7 +349,7 @@ void D2GAME_717E0(u32 in_eax, i32 param_1, i32 param_2, i32 param_4, int16_t op)
 }
 
 // 1.13c D2Game+0xBAFF0  EAX=in_eax (pointer to {game, ?, unit}); Ordinal args hidden in regs.
-void D2GAME_BAFF0(i32* in_eax)
+void D2GAME_BAFF0(i32* in_eax, i32 arg)
 {
     i32 pos[2] = {0, 0};
     Ordinal_10141(in_eax[2], P(pos));
@@ -381,7 +381,7 @@ void D2GAME_BAFF0(i32* in_eax)
     Ordinal_10445(P(m));
     FUN_6fc4f300();
     FUN_6fd00f40(res, P(m), u, g);
-    // uRam000000a8/a9 = 0/1 in the decompile is a Ghidra artefact (null-based store); omitted.
+    *(uint8_t*)(intptr_t)(arg + 0x44) = 0; *(uint8_t*)(intptr_t)(arg + 0x45) = 1;   // stack arg (ret 4)
     m[0x31] |= 0x3000000;
 }
 

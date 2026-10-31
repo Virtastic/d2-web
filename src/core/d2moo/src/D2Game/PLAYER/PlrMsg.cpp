@@ -2831,6 +2831,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x34_IdentifyItemsWithNpc_6FC86BA0(D
 }
 
 //D2Game.0x6FC86BD0
+// 1.13c D2Game+0xD0060 (client packet 0x36; table slot 0x6FD1A228)
 int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x36_HireMerc_6FC86BD0(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pPacket, int32_t nSize)
 {
     if (nSize == 9)

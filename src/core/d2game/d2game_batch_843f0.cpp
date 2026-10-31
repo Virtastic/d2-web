@@ -29,7 +29,11 @@ struct Env {
     void (*Special)(P target, P unit, P game, uint8_t); // FUN_FD12F30
     int  (*FindTarget)(void* res, P game, P unit, P cb); // FUN_FCD17B0
     int  (*TargetDist)(P game, uint32_t* res);        // FUN_FCD1BC0
-    int  (*TryCast)(P unit);                          // FUN_FC9C6E0
+    int  (*TryCast)(P unit, P other, P game, P rec);  // FUN_FC9C6E0: ECX=unit, EAX=other, stack (game, rec)
+    void (*Ord10035)(int id, int a, int b);           // Ordinal_10035 (result unused)
+    void (*Attack6)(P game, P unit, P target, int, int, int, int, int); // FUN_FD12540 with its sixth stack arg
+    P    (*SkillById)(int id);                        // FUN_6fc21d30 (skill lookup by id)
+    int  (*DataRows)();                               // sgptDataTables+0xA80 row count
     P    (*GetMissileSkill)();                        // FUN_F21280
     P    (*Missile)(int, int, P game, P skill, int, P, int, int); // FUN_FD0F650
     void (*GetXYZ)(P unit, int*, int*, int*, P*, int*, int, int); // Ordinal_10751
@@ -53,40 +57,41 @@ static P mdata(P u) { return (u && rd<int32_t>(u, 0) == 1 && rd<P>(u, 0x14)) ? r
 static void setAnim(P u, int dir, int mode)
 { P m = mdata(u); if (dir) wr<int32_t>(m, 0x18, dir); wr<uint8_t>(m, 0x20, (uint8_t)mode); }
 static int coin(P u) { int d = (rnd(u) & 0xff) < 0x80 ? 5 : 6; return d == 1 ? 7 : d; }
-static void sendFlags(Env& e, P game, P unit, uint32_t type, uint32_t maskIdx, uint32_t byteOff, bool low)
+static void sendFlags(Env& e, P game, P unit, uint32_t type, uint32_t maskIdx, uint32_t byteOff, bool low, uint32_t target = 0)
 {
-    Pkt p{}; p.type = type; p.unit = unit;
+    Pkt p{}; p.type = type; p.unit = unit; p.a = target;
     uint8_t v = 100;
     if (unit) { P c = e.GetClientData(unit); if (c && (rd<uint8_t>(c, byteOff) & rd<uint32_t>(e.gdwBitMasks, maskIdx * 4))) v = 0x65; }
-    (void)low;
-    p.c = (p.c & ~0xff00u) | ((uint32_t)v << 8);
+    if (low) p.d = (p.d & ~0xff00u) | ((uint32_t)v << 8);   // flags byte at packet offset 0x15
+    else p.c = (p.c & ~0xff00u) | ((uint32_t)v << 8);
     e.SendPkt(game, &p);
 }
 
-// 1.13c D2Game+0x843F0  (ebx=unaff_EBX flag, esi=counter struct; both lost register args)
-void sub_843F0(Env& e, P game, P unit, P aiTick, int unaffEBX, P ctr)
+// 1.13c D2Game+0x843F0  (ECX = game, EDX = unit, stack = AI tick)
+void sub_843F0(Env& e, P game, P unit, P aiTick)
 {
-    P tbl = rd<P>(aiTick, 0x1c);
-    P target = rd<P>(aiTick, 0x18);
-    e.SetMode(unit, 0);
+    P ctr = rd<P>(aiTick, 0), target = rd<P>(aiTick, 8), tbl = rd<P>(aiTick, 0x1c);
+    int32_t flag = rd<int32_t>(aiTick, 0x18);
+    e.Ord10035(unit ? rd<int32_t>(unit, 4) : -1, 0, 0);
+    P skill = e.SkillById(((0x12d < e.DataRows()) - 1 & 0xfffffed2) + 0x12d);
     if (rd<int32_t>(ctr, 0x14) < row(tbl, 0x56, game)) {
         if (!e.IsBoss(unit) && (int)(rnd(unit) % 100) < row(tbl, 0x62, game)) {
-            struct { P t; int32_t best; } r{ target, 0 };
-            e.FindTarget(&r, game, unit, 0);
-            if (r.best < row(tbl, 0x5c, game) && e.TryCast(unit)) { wr<int32_t>(ctr, 0x14, rd<int32_t>(ctr, 0x14) + 1); return; }
+            int32_t r[6] = { (int32_t)skill, 0x19, 0, 0, 0, 0 };   // {skill, 0x19, result...}
+            e.FindTarget(r, game, unit, 0);
+            if (r[2] < row(tbl, 0x5c, game) && e.TryCast(unit, target, game, tbl)) { wr<int32_t>(ctr, 0x14, rd<int32_t>(ctr, 0x14) + 1); return; }
         }
     }
-    if (unaffEBX) {
-        if ((int)(rnd(unit) % 100) < row(tbl, 0x68, game)) { e.SetMode(unit, 0); sendFlags(e, game, unit, 0, 4, 0x104, false); return; }
+    if (flag) {
+        if ((int)(rnd(unit) % 100) < row(tbl, 0x68, game)) { e.SetMode(unit, 0); sendFlags(e, game, unit, 4, 4, 0x104, true, (uint32_t)target); return; }
         e.Wait(row(tbl, 0x7a, game));
         return;
     }
     if (rd<int32_t>(ctr, 0x14) < row(tbl, 0x56, game) && row(tbl, 0x6e, game) <= (int)(rnd(unit) % 100)) {
-        if ((int)(rnd(unit) % 100) < row(tbl, 0x74, game)) { setAnim(unit, coin(unit), 4); e.Attack(game, unit, target, 2, 0, 0, 1); return; }
+        if ((int)(rnd(unit) % 100) < row(tbl, 0x74, game)) { setAnim(unit, coin(unit), 4); e.Attack6(game, unit, target, 2, 0, 0, 1, 0); return; }
         e.Wait(0xf);
         return;
     }
-    e.Attack(game, unit, target, 2, 0, 0, 1);
+    e.Attack6(game, unit, target, 2, 0, 0, 1, 7);
 }
 
 // 1.13c D2Game+0x84800

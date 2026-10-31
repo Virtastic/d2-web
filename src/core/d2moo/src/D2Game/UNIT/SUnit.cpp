@@ -67,6 +67,7 @@ static void SUNIT_StorePackedPointer(T** pSlot, T* value)
 #include "UNIT/SUnitEvent.h"
 #include "UNIT/SUnitMsg.h"
 #include "UNIT/SUnitProxy.h"
+#include "core/d2game/fn_rules.h"  // rules shared with the FN probes
 
 
 #pragma warning(disable: 28159)
@@ -684,6 +685,7 @@ D2UnitStrc* __fastcall SUNIT_GetServerUnit(D2GameStrc* pGame, int32_t nUnitType,
 }
 
 //D2Game.0x6FCBBB70
+// 1.13c D2Game+0xE0A20
 D2UnitStrc* __fastcall SUNIT_GetOwner(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (!pUnit || !(pUnit->dwFlagEx & UNITFLAGEX_STOREOWNERINFO))
@@ -1300,13 +1302,7 @@ void __fastcall sub_6FCBC7E0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 D2UnitStrc* __stdcall SUNIT_GetTargetUnit(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     sub_6FCBC7E0(pGame, pUnit);
-    D2UnitStrc* pTargetUnit = PATH_GetTargetUnit(pUnit->pDynamicPath);
-    if (pTargetUnit != pUnit)
-    {
-        return pTargetUnit;
-    }
-
-    return nullptr;
+    return SUNIT_TargetOrNull(pUnit, PATH_GetTargetUnit(pUnit->pDynamicPath));
 }
 
 //D2Game.0x6FCBC930
@@ -1329,8 +1325,7 @@ int32_t __fastcall sub_6FCBC930(D2GameStrc* pGame, D2UnitStrc* pMissile)
 // 1.13c D2Game+0xDF980
 void __fastcall SUNIT_SetCombatMode(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMode)
 {
-    SUNITDMG_FreeAttackerCombatList(pGame, pUnit);
-    UNITS_ChangeAnimMode(pUnit, nMode);
+    SUNIT_SetCombatModeSteps([&] { SUNITDMG_FreeAttackerCombatList(pGame, pUnit); }, [&] { UNITS_ChangeAnimMode(pUnit, nMode); });
 }
 
 //D2Game.0x6FCBC9C0
@@ -1365,7 +1360,6 @@ void __fastcall sub_6FCBC9C0(D2UnitStrc* pFirst, D2UnitStrc* pSecond)
 }
 
 //D2Game.0x6FCBCB30
-// 1.13c D2Game+0x8CA20
 D2UnitStrc* __fastcall SUNIT_GetPortalOwner(D2GameStrc* pGame, D2UnitStrc* pPortal)
 {
     D2_ASSERT(pPortal);

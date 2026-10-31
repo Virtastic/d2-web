@@ -119,8 +119,8 @@ static bool nameFits15(const char* name)
 // succeeds, walk the game's client list (game+0x88, next +0x4A8). Per client the save unit is
 // flag(+0x3D4) bit 0 ? +0x174 : (+0x174 == 0 ? none : E03A0(+0x1A8, +0x170), a failed lookup
 // clears +0x174). With a unit: save it (0x54320, name +0x0D, 0) unless it is `client`; then, when
-// the callback table slot +0x28 and game+0x74 are set, b = stat(unit,12,0, stat(unit,13,0)), call
-// callback(name, unit+4, b) as in 0x2C830.
+// the callback table slot +0x28 and game+0x74 are set, call it with (name, unit class, level,
+// experience, 0, client word +0x0A, client +0x190).
 void GAME_TriggerClientSave_113c(void* client, void* game, const Batch5Env* env)
 {
     if (client == nullptr) return;
@@ -138,11 +138,13 @@ void GAME_TriggerClientSave_113c(void* client, void* game, const Batch5Env* env)
         if (unit == nullptr) continue;
         if (i != client) env->saveWriteFile(game, unit, (const char*)i + 0x0D, 0);
         if (env->callbackTable != nullptr && env->callbackTable[10] != nullptr && rd32(game, 0x74) != 0) {
-            const int32_t a = env->unitGetBaseStat(unit, 0x0D, 0);
-            const int32_t b = env->unitGetBaseStat(unit, 0x0C, 0);
-            (void)a;
-            typedef int32_t (*LadderFn)(const char*, int32_t, int32_t);
-            ((LadderFn)env->callbackTable[10])((const char*)i + 0x0D, (int32_t)rd32(unit, 0x04), b);
+            // ECX = name, EDX = unit class (+0x04); stack: level, experience, 0, client word +0x0A,
+            // client +0x190 (the #10587 calls interleave their pushes with the callback's).
+            const int32_t exp = env->unitGetBaseStat(unit, 0x0D, 0);
+            const int32_t lvl = env->unitGetBaseStat(unit, 0x0C, 0);
+            typedef void (*LadderFn)(const char*, int32_t, int32_t, int32_t, int32_t, uint32_t, void*);
+            ((LadderFn)env->callbackTable[10])((const char*)i + 0x0D, (int32_t)rd32(unit, 0x04), lvl, exp, 0,
+                rd16(i, 0x0A), (uint8_t*)i + 0x190);
         }
     }
 }

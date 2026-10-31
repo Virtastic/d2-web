@@ -2,7 +2,7 @@
 
 namespace d2::monspawn {
 
-// 1.13c D2Game+0xD01D0 (sub_6FC828D0, the interaction dispatcher the click reaches)
+// D2Game 0xD01D0 (sub_6FC828D0, the interaction dispatcher the click reaches)
 // Retail's walk-mode per-frame handler sub_6FC7F780 completes an interaction started by an
 // out-of-range click: once its own path run ends (`v44 == 2`) it re-enters sub_6FC828D0 with the
 // interact target stored by UNITS_SetInteractData, and that call operates the unit when it is now

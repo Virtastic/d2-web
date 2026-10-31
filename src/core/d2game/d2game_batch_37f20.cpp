@@ -37,7 +37,7 @@ static inline void*    rdptr(uint32_t a, uint32_t o) { return rdptr((const void*
 struct D2GameBatch37F20Env {
     // sgptDataTables: pPetTypeTxt at +0xBE8, nPetTypeTxtRecordCount at +0xBF0 (D2DataTbls.h).
     uint32_t pDataTables;
-    // 1.13c D2Game+0x96EA0. In EAX it also reads the pet type (the decompile lost that register).
+    // D2Game 0x96EA0 (1.13c). In EAX it also reads the pet type (the decompile lost that register).
     void (*sub96EA0)(void* pGame, int32_t nPetType);
     // D2Common #10920, 1.10f UNITS_GetPlayerData(pUnit).
     uint32_t (*unitsGetPlayerData)(void* pUnit);

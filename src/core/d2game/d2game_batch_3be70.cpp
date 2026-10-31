@@ -18,7 +18,7 @@
 #include "D2Inventory.h"
 #include "D2Dungeon.h"
 #include "../fn/hookenv.h"
-BOOL D2Common_10057_DUNGEON_IsRoomInTown(D2ActiveRoomStrc* pRoom);   // 1.13c D2Common+0x3C390 (d2common_batch_31940.cpp)
+BOOL D2Common_10057_DUNGEON_IsRoomInTown(D2ActiveRoomStrc* pRoom);   // D2Common 0x3C390 (d2common_batch_31940.cpp)
 
 namespace {
 inline int32_t i32(const void* p, uint32_t o) { int32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }

@@ -2475,7 +2475,7 @@ void __fastcall QUESTS_GetFreePosition(D2ActiveRoomStrc* pRoom, D2CoordStrc* pCo
 					nX = x + nCenterX;
 
 					D2ActiveRoomStrc* pRoom2 = pRoom1;
-					if (nX < drlgCoords.nSubtileX || nX /*TODO: was nY instead, but most likely wrong*/ >= drlgCoords.nSubtileX + drlgCoords.nSubtileWidth)
+					if (nX < drlgCoords.nSubtileX || nY >= drlgCoords.nSubtileX + drlgCoords.nSubtileWidth)
 					{
 						pRoom2 = D2GAME_GetRoom_6FC52070(pRoom1, nX, nY);
 					}

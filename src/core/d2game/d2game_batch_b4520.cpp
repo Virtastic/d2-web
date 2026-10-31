@@ -102,66 +102,71 @@ extern "C" EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_B4870(void* unit, const D2Gam
     return (void*)(uintptr_t)SUB(0x6F930, 0, U((uintptr_t)&d), 0, 0, 0, 0, 0);
 }
 
-// Missile direction step used by B4DE0: (dx,dy) -> unit step (sx,sy), in the decompile's sign ladder.
+// Missile direction step used by B4DE0: (dx,dy) -> (x step, y step), the ladder of the 1.13c body.
 static void dirStep(i32 dx, i32 dy, i32* a, i32* b)
 {
     i32 sa = 0, sb = 0;
-    if (dx < 0 && dy < 0) { sa = 2; sb = -2; }
-    else if (dx == 0) { sa = dy < 0 ? 2 : (dy > 0 ? -2 : 0); sb = -2; }
-    else if (dx > 0) { sb = 2; sa = dy < 0 ? 2 : (dy == 0 ? 0 : -2); }
-    else if (dy > 0) { sa = -2; sb = -2; }
-    else if (dy != 0) { sa = 0; sb = 0; }
-    else { sa = 0; sb = -2; }
+    if (dx < 0) { sb = -2; sa = dy < 0 ? 2 : (dy > 0 ? -2 : 0); }
+    else if (dx == 0) { sa = dy < 0 ? 2 : (dy > 0 ? -2 : 0); }
+    else { sb = 2; sa = dy < 0 ? 2 : (dy > 0 ? -2 : 0); }
     *a = sa; *b = sb;
 }
 
-// 1.13c D2Game+0xB4DE0  (__fastcall ECX = game; EBX/EDI = step words; param_4 = target)
+// 1.13c D2Game+0xB4DE0  (__fastcall ECX = game, EDX = unit; stack: skill id, p4)
 extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B4DE0(void* game, void* unit, i32 skillId, u32 p4,
-                                                       i32 ebx, i32 edi, const D2GameBatchB4520Env* env)
+                                                       const D2GameBatchB4520Env* env)
 {
     const uint8_t* s = skillRec(env, skillId);
     if (!s || !missileIdOk(env, s)) return 0;
+    i32 mi = rd16s(s, 0x48);
     if (unit) wr32(unit, 0xc4, rd32(unit, 0xc4) | 0x40);
-    i32 tgt[2];
-    if (!SUB(0x9FA30, U((uintptr_t)game), U((uintptr_t)tgt), 0, 0, 0, 0, 0)) return 0;
+    i32 tx, ty;   // 9FA30: ECX = game, EAX = unit, EBX = &tx, stack = &ty
+    if (!SUB(0x9FA30, U((uintptr_t)game), U((uintptr_t)unit), U((uintptr_t)&tx), U((uintptr_t)&ty), 0, 0, 0)) return 0;
     i32 ux = SUB(0x1100, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0), uy = SUB(0x1130, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0);
-    i32 dx = tgt[0] - ux, dy = tgt[1] - uy;
+    i32 dx = tx - ux, dy = ty - uy;
     if (!dx && !dy) return 0;
-    i32 sa, sb; dirStep(dx, dy, &sa, &sb);   // ponytail: ladder reconstructed; sa/sb feed iStack_54 / iVar4
+    i32 xs, ys; dirStep(dx, dy, &xs, &ys);
     i32 n = ORD(10786, U((uintptr_t)unit), rd32(s, 0x138), U(skillId), p4);
-    dx -= (n / 2) * edi; dy -= (n / 2) * sb;
+    dx -= (n / 2) * xs; dy -= (n / 2) * ys;
     Desc d{}; d.w[0] = 3;
     for (; n > 0; --n) {
         d.w[1] = U((uintptr_t)unit);
-        d.w[2] = U(dx / 6 + ebx); d.w[3] = U(dx / 6 + sa);
-        d.w[4] = U(dx); d.w[5] = U(dy);
-        SUB(0x6F930, U(tgt[1]), U((uintptr_t)&d), 0, 0, 0, 0, 0);
-        dx += edi; dy += sb;
+        d.w[4] = U(mi);
+        d.w[5] = U(dx / 6 + ux); d.w[6] = U(dx / 6 + uy);
+        d.w[7] = U(dx); d.w[8] = U(dy);
+        d.w[0xC] = p4;
+        SUB(0x6F930, U((uintptr_t)game), U((uintptr_t)&d), 0, 0, 0, 0, 0);
+        dx += xs; dy += ys;
     }
     return 1;
 }
 
-// 1.13c D2Game+0xB4FF0  (EBP = game, as in B4DE0)
+// 1.13c D2Game+0xB4FF0  (ECX = game, EDX = unit; stack: skill id, p4 = skill level). The descriptor is a
+// D2MissileStrc-shaped block: +0x10 missile, +0x14/+0x18 position, +0x1C/+0x20 target (written by 9FA30),
+// +0x30 level, +0x54 callback, +0x58 shot index.
 extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B4FF0(void* game, void* unit, i32 skillId, u32 p4, const D2GameBatchB4520Env* env)
 {
     const uint8_t* s = skillRec(env, skillId);
     if (!s || !missileIdOk(env, s)) return 0;
+    i32 mi = rd16s(s, 0x48);
     if (unit) wr32(unit, 0xc4, rd32(unit, 0xc4) | 0x40);
     i32 n = ORD(10786, U((uintptr_t)unit), rd32(s, 0x138), U(skillId), p4);
     Desc d{};
-    SUB(0x1100, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0);
-    SUB(0x1130, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0);
-    i32 tgt[4];
-    if (!SUB(0x9FA30, U((uintptr_t)game), U((uintptr_t)tgt), 0, 0, 0, 0, 0)) return 0;
-    d.w[0] = 3; d.w[0xF] = p4;   // ponytail: descriptor field slots from the stack layout
+    d.w[0] = 0x21; d.w[1] = U((uintptr_t)unit);
+    d.w[5] = U(SUB(0x1100, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0));
+    d.w[6] = U(SUB(0x1130, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0));
+    d.w[0xC] = p4; d.w[4] = U(mi);
+    d.w[0x15] = 0x6FCD31D0;   // retail callback address (LAB_6fcd31d0)
+    // 9FA30: ECX = game, EAX = unit, EBX = &w[7], stack = &w[8]
+    if (!SUB(0x9FA30, U((uintptr_t)game), U((uintptr_t)unit), U((uintptr_t)&d.w[7]), U((uintptr_t)&d.w[8]), 0, 0, 0)) return 0;
     for (i32 i = 0; i < n; ++i) {
-        d.w[0x12] = U(i);
+        d.w[0x16] = U(i);
         SUB(0x6F930, U((uintptr_t)game), U((uintptr_t)&d), 0, 0, 0, 0, 0);
     }
     return 1;
 }
 
-// 1.13c D2Game+0xB5110  (EDI = game)
+// 1.13c D2Game+0xB5110  (ECX = game, EDX = unit; stack: skill id, p4 = skill level)
 extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B5110(void* game, void* unit, i32 skillId, u32 p4, const D2GameBatchB4520Env* env)
 {
     const uint8_t* s = skillRec(env, skillId);
@@ -169,34 +174,39 @@ extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B5110(void* game, void* unit, i
     i32 mi = rd16s(s, 0x48);
     if (!(rd32(env->dt, 0xb64) + (u32)mi * 0x1a4)) return 0;
     if (unit) wr32(unit, 0xc4, rd32(unit, 0xc4) | 0x40);
-    Desc d{}; d.w[0] = 3; d.w[1] = d.w[2] = U((uintptr_t)unit); d.w[0xF] = U(mi);
-    d.w[0x10] = U(SUB(0x1100, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0));
-    d.w[0x11] = U(SUB(0x1130, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0));
-    d.w[0x15] = U(skillId); d.w[0x16] = p4;
-    d.w[0x13] = U(ORD(10786, U((uintptr_t)unit), rd32(s, 0x138), U(skillId), p4));
-    SUB(0xE07A0, U((uintptr_t)game), 0, 0, 0, 0, 0, 0);
+    Desc d{}; d.w[0] = 3; d.w[1] = d.w[2] = U((uintptr_t)unit); d.w[4] = U(mi);
+    i32 ux = SUB(0x1100, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0);
+    i32 uy = SUB(0x1130, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0);
+    d.w[5] = U(ux); d.w[6] = U(uy);
+    d.w[0xB] = U(skillId); d.w[0xC] = p4;
+    d.w[0xD] = U(ORD(10786, U((uintptr_t)unit), rd32(s, 0x138), U(skillId), p4));
+    SUB(0xE07A0, U((uintptr_t)game), U((uintptr_t)unit), 0, 0, 0, 0, 0);
     u32 room = rd32(unit, 0x2c);
     void* t = (void*)(uintptr_t)ORD(10392, room, 0, 0, 0);
+    i32 ex, ey;
     if (t == unit || !t) {
         i32 v = ORD(10983, room, 0, 0, 0);
-        d.w[1] = U(v - SUB(0x1100, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0));
-        ORD(10764, room, 0, 0, 0);
+        ex = v - ux;
+        ey = ORD(10764, room, 0, 0, 0) - uy;
     } else {
-        u32 ty = U(SUB(0x1130, U((uintptr_t)t), 0, 0, 0, 0, 0, 0)), tx = U(SUB(0x1100, U((uintptr_t)t), 0, 0, 0, 0, 0, 0));
-        ORD(10739, room, tx, ty, 0);
+        i32 ty = SUB(0x1130, U((uintptr_t)t), 0, 0, 0, 0, 0, 0), tx = SUB(0x1100, U((uintptr_t)t), 0, 0, 0, 0, 0, 0);
+        ORD(10739, room, U(tx), U(ty), 0);
+        ex = SUB(0x1100, U((uintptr_t)t), 0, 0, 0, 0, 0, 0) - ux;
+        ey = SUB(0x1130, U((uintptr_t)t), 0, 0, 0, 0, 0, 0) - uy;
     }
+    d.w[7] = U(ex); d.w[8] = U(ey);
     SUB(0x6F930, U((uintptr_t)game), U((uintptr_t)&d), 0, 0, 0, 0, 0);
     return 1;
 }
 
-// 1.13c D2Game+0xB5450  (ECX = game)
-extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B5450(void* game, void* unit, i32 skillId, const D2GameBatchB4520Env* env)
+// 1.13c D2Game+0xB5450  (ECX = game, EDX = unit; stack: skill id, p4 = skill level)
+extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B5450(void* game, void* unit, i32 skillId, u32 p4, const D2GameBatchB4520Env* env)
 {
     const uint8_t* s = skillRec(env, skillId);
     if (!s || !missileIdOk(env, s)) return 0;
     i32 mi = rd16s(s, 0x48);
     if (unit) wr32(unit, 0xc4, rd32(unit, 0xc4) | 0x40);
-    SUB(0xE07A0, U((uintptr_t)game), 0, 0, 0, 0, 0, 0);
+    SUB(0xE07A0, U((uintptr_t)game), U((uintptr_t)unit), 0, 0, 0, 0, 0);
     u32 room = rd32(unit, 0x2c);
     void* t = (void*)(uintptr_t)ORD(10392, room, 0, 0, 0);
     if (t == unit || !t) return 0;
@@ -204,15 +214,16 @@ extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B5450(void* game, void* unit, i
     i32 ux = SUB(0x1100, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0), uy = SUB(0x1130, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0);
     i32 ax = tx - ux; if (ax < 0) ax = -ax;
     i32 ay = ty - uy; if (ay < 0) ay = -ay;
-    i32 px = ux, py = uy;
+    i32 px, py;
     if (ax < ay) { px = ux; for (int k = 0; k < 4; ++k) px += tx < px ? -1 : (px < tx ? 1 : 0); py = ty; }
     else { py = uy; for (int k = 0; k < 4; ++k) py += ty < py ? -1 : (py < ty ? 1 : 0); px = tx; }
-    Desc d{}; d.w[0] = 3; d.w[1] = U((uintptr_t)unit);
+    Desc d{};
     i32 ex = px - ux, ey = py - uy;
-    d.w[3] = U(ex / 6 - 1 + ux); d.w[4] = U(ey / 6 - 1 + uy);
-    d.w[5] = U(ey); d.w[6] = U(ex);   // ponytail: slot order from the stack layout
-    d.w[0x15] = U(skillId);
-    SUB(0x6F930, U(mi), U((uintptr_t)&d), 0, 0, 0, 0, 0);
+    d.w[0] = 3; d.w[1] = U((uintptr_t)unit); d.w[4] = U(mi);
+    d.w[5] = U(ex / 6 - 1 + ux); d.w[6] = U(ey / 6 - 1 + uy);
+    d.w[7] = U(ex); d.w[8] = U(ey);
+    d.w[0xB] = U(skillId); d.w[0xC] = p4;
+    SUB(0x6F930, U((uintptr_t)game), U((uintptr_t)&d), 0, 0, 0, 0, 0);
     return 1;
 }
 
@@ -239,70 +250,72 @@ extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B56C0(void* game, void* unit, i
     return 1;
 }
 
-// 1.13c D2Game+0xB6720  (EAX = game ctx, EBX = unit): common tail of B6840/B6A60.
-extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B6720(void* ctx, void* unit, const D2GameBatchB4520Env* env)
+// 1.13c D2Game+0xB6720  (EAX = game, EBX = unit): common tail of B6840/B6A60. ae6f0 takes EAX = node, EDI = game.
+extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B6720(void* game, void* unit, const D2GameBatchB4520Env* env)
 {
     u32 n = 0xb;
     if (unit) {
         if (rd32(unit, 0) == 1) {
-            i32 p = SUB(0x1320, 0, 0, 0, 0, 0, 0, 0);
+            i32 p = SUB(0x1320, rd32(unit, 4), 0, 0, 0, 0, 0, 0);
             if (p) n = *((const uint8_t*)(uintptr_t)p + 0x108);
         }
         for (u32 q = rd32(unit, 0xdc); q; ) {
+            u32 cur = q;
             uint8_t c = *(const uint8_t*)(uintptr_t)q; q = rd32((const void*)(uintptr_t)q, 0x24);
-            if (c == 0) SUB(0x8E6F0, 0, 0, 0, 0, 0, 0, 0);
+            if (c == 0) SUB(0x8E6F0, cur, U((uintptr_t)game), 0, 0, 0, 0, 0);
         }
     }
-    SUB(0x8EA80, U((uintptr_t)ctx), U((uintptr_t)unit), 1, rd32(ctx, 0xa8) + n, 0, 0, 0);
+    SUB(0x8EA80, U((uintptr_t)game), U((uintptr_t)unit), 1, rd32(game, 0xa8) + n, 0, 0, 0);
     return 1;
 }
 
-static u32 b6840(void* game, void* unit, i32 skillId, void* ctx, const D2GameBatchB4520Env* env)
+// ECX = game, EDX = unit; stack: skill id, p4 = skill level. The game pointer doubles as the context (+0xA8 tick).
+static u32 b6840(void* game, void* unit, i32 skillId, u32 p4, const D2GameBatchB4520Env* env)
 {
     const uint8_t* s = skillRec(env, skillId);
     i32 h;
     if (!s || !(h = ORD(10511, U((uintptr_t)unit), 0, 0, 0))) return 0;
     i32 mi = rd16s(s, 0x48);
     if (mi < 0 || mi >= (i32)rd32(env->dt, 0xb6c)) return 0;
-    const uint8_t* r = (const uint8_t*)(uintptr_t)SUB(0x1250, 0, 0, 0, 0, 0, 0, 0);
+    const uint8_t* r = (const uint8_t*)(uintptr_t)SUB(0x1250, U(mi), 0, 0, 0, 0, 0, 0);
     Desc d{}; d.w[0] = 0x25; d.w[1] = U((uintptr_t)unit);
-    d.w[4] = U(SUB(0x1100, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0));
-    d.w[5] = U(SUB(0x1130, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0));
-    i32 m = (i32)(r[0x9b] * (u32)skillId);
-    d.w[0x12 - 0x0] = 0;  // keep layout zero
-    d.w[0x0e] = U(((m + ((m >> 31) & 7)) >> 3) + r[0x9a]);
-    d.w[0x0c] = U(skillId); d.w[8] = U(mi);
-    i32 pos[2];
-    if (SUB(0x9FA30, U((uintptr_t)game), U((uintptr_t)pos), 0, 0, 0, 0, 0) &&
+    d.w[5] = U(SUB(0x1100, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0));
+    d.w[6] = U(SUB(0x1130, U((uintptr_t)unit), 0, 0, 0, 0, 0, 0));
+    i32 m = (i32)(r[0x9b] * p4);
+    d.w[0xA] = U(((m + ((m >> 31) & 7)) >> 3) + r[0x9a]);
+    d.w[0xC] = p4; d.w[4] = U(mi);
+    // 9FA30: ECX = game, EAX = unit, EBX = &w[7], stack = &w[8]
+    if (SUB(0x9FA30, U((uintptr_t)game), U((uintptr_t)unit), U((uintptr_t)&d.w[7]), U((uintptr_t)&d.w[8]), 0, 0, 0) &&
         SUB(0x6F930, U((uintptr_t)game), U((uintptr_t)&d), 0, 0, 0, 0, 0)) {
-        SUB(0xB32E0, U((uintptr_t)unit), U(skillId), 0, 0, 0, 0, 0);
-        SUB(0xB3270, rd32(s, 0), 0, 0, 0, 0, 0, 0);
-        i32 now = ORD(10980, 0, 0, 0, 0);
-        if ((i32)rd32(ctx, 0xa8) < now && ORD(10494, U((uintptr_t)unit), 0xc, 0, 0)) {
-            i32 n = ORD(10786, U((uintptr_t)unit), rd32(s, 0x140), 0, U(skillId));
+        SUB(0xB32E0, U(skillId), U((uintptr_t)unit), p4, 0, 0, 0, 0);   // EAX = skill id
+        SUB(0xB3270, U((uintptr_t)s), 0, 0, 0, 0, 0, 0);
+        i32 now = ORD(10980, U(h), 0, 0, 0);
+        if ((i32)rd32(game, 0xa8) < now && ORD(10494, U((uintptr_t)unit), 0xc, 0, 0)) {
+            i32 n = ORD(10786, U((uintptr_t)unit), rd32(s, 0x140), U(skillId), p4);
             if (n < 1) n = 1;
             if (unit) {
                 for (int pass = 1; pass >= 0; --pass)
                     for (u32 q = rd32(unit, 0xdc); q; ) {
+                        u32 cur = q;
                         uint8_t c = *(const uint8_t*)(uintptr_t)q; q = rd32((const void*)(uintptr_t)q, 0x24);
-                        if (c == pass) SUB(0x8E6F0, 0, 0, 0, 0, 0, 0, 0);
+                        if (c == pass) SUB(0x8E6F0, cur, U((uintptr_t)game), 0, 0, 0, 0, 0);
                     }
             }
-            SUB(0x8EA80, U((uintptr_t)ctx), U((uintptr_t)unit), 0, rd32(ctx, 0xa8) + U(n), 0, 0, 0);
+            SUB(0x8EA80, U((uintptr_t)game), U((uintptr_t)unit), 0, rd32(game, 0xa8) + U(n), 0, 0, 0);
             return 1;
         }
-        d2_fn_d2game_B6720(ctx, unit, env);
+        d2_fn_d2game_B6720(game, unit, env);
         return 1;
     }
-    d2_fn_d2game_B6720(ctx, unit, env);
+    d2_fn_d2game_B6720(game, unit, env);
     return 0;
 }
-// 1.13c D2Game+0xB6840  (ESI = game ctx; the two bodies are byte-identical)
-extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B6840(void* game, void* unit, i32 skillId, void* ctx, const D2GameBatchB4520Env* env)
-{ return b6840(game, unit, skillId, ctx, env); }
+// 1.13c D2Game+0xB6840  (the two bodies are byte-identical)
+extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B6840(void* game, void* unit, i32 skillId, u32 p4, const D2GameBatchB4520Env* env)
+{ return b6840(game, unit, skillId, p4, env); }
 // 1.13c D2Game+0xB6A60
-extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B6A60(void* game, void* unit, i32 skillId, void* ctx, const D2GameBatchB4520Env* env)
-{ return b6840(game, unit, skillId, ctx, env); }
+extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B6A60(void* game, void* unit, i32 skillId, u32 p4, const D2GameBatchB4520Env* env)
+{ return b6840(game, unit, skillId, p4, env); }
 
 // 1.13c D2Game+0xB6C90  (ESI = unit)
 extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B6C90(void* unit, const D2GameBatchB4520Env* env)

@@ -1561,7 +1561,6 @@ void __fastcall ITEMS_RemoveAll(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC50320
-// 1.13c D2Game+0xD2C70
 void __fastcall ITEMS_RemoveFromAllPlayers(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     SUNIT_IterateLivingPlayers(pGame, ITEMS_PlayerIterateCallback_RemoveItem, pUnit);
@@ -2100,6 +2099,7 @@ D2ItemTypesTxt* __fastcall ITEMS_GetItemTypesTxtRecord(int32_t nItemType)
 void (*g_d2webOnDropTC)(D2UnitStrc* pMonster, D2TCExShortStrc* pTC, int32_t nQuality, int32_t nLvl) = nullptr;
 
 //D2Game.0x6FC51360
+// 1.13c D2Game+0x12380
 void __fastcall D2GAME_DropTC_6FC51360(D2GameStrc* pGame, D2UnitStrc* pMonster, D2UnitStrc* pPlayer, D2TCExShortStrc* pTCTxtRecord, int32_t nQuality, int32_t nLvl, int32_t a7, D2UnitStrc** ppItems, int32_t* pnItemsDropped, int32_t nMaxItems)
 {
     D2_ASSERT(pTCTxtRecord);

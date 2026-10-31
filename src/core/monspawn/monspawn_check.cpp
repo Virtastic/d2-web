@@ -7442,7 +7442,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
                 g_sessionPendingPickup = 0;
             }
         }
-        // 1.13c D2Game+0xD01D0 (sub_6FC828D0, re-entered on arrival)
+        // D2Game 0xD01D0 (sub_6FC828D0, re-entered on arrival)
         // The object a live 0x13 click walked to. Retail's walk-mode handler (sub_6FC7F780)
         // re-enters sub_6FC828D0 with the stored interact target once the path ends; the session
         // completes the same interaction here, so the object operates (open animation, shrine

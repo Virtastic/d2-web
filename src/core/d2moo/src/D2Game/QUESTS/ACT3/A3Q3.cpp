@@ -850,6 +850,20 @@ int32_t __fastcall OBJECTS_OperateFunction31_GidbinnDecoy(D2ObjOperateFnStrc* pO
 	return 0;
 }
 
+// 1.13c D2Game+0xE8780 (split out of the boss-spawn check; the unique spawn helper is inlined in retail)
+static void ACT3Q3_SpawnFetishBoss(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2Act3Quest3Strc* pQuestDataEx)
+{
+	pQuestDataEx->bBossIsSpawning = 1;
+	D2UnitStrc* pFetishBoss = sub_6FC6E8D0(pGame, pRoom, 0, MONSTER_FETISH11, 1, 0, 0, 1);
+	if (pFetishBoss)
+	{
+		pQuestDataEx->bGidbinnObjectActivated = 0;
+		pQuestDataEx->bBossHasSpawned = 1;
+		pQuestDataEx->nFetishBossGUID = pFetishBoss->dwUnitId;
+	}
+	pQuestDataEx->bBossIsSpawning = 0;
+}
+
 //D2Game.0x6FCA9D50
 bool __fastcall ACT3Q3_SpawnGidbinnBoss(D2GameStrc* pGame, D2QuestDataStrc* pQuestData)
 {
@@ -894,15 +908,7 @@ bool __fastcall ACT3Q3_SpawnGidbinnBoss(D2GameStrc* pGame, D2QuestDataStrc* pQue
 					}
 				}
 
-				pQuestDataEx->bBossIsSpawning = 1;
-				pFetishBoss = sub_6FC6E8D0(pGame, pRoom, 0, MONSTER_FETISH11, 1, 0, 0, 1);
-				if (pFetishBoss)
-				{
-					pQuestDataEx->bGidbinnObjectActivated = 0;
-					pQuestDataEx->bBossHasSpawned = 1;
-					pQuestDataEx->nFetishBossGUID = pFetishBoss->dwUnitId;
-				}
-				pQuestDataEx->bBossIsSpawning = 0;
+				ACT3Q3_SpawnFetishBoss(pGame, pRoom, pQuestDataEx);
 				pQuestData->pfCallback[QUESTEVENT_MONSTERKILLED] = ACT3Q3_Callback08_MonsterKilled;
 			}
 		}

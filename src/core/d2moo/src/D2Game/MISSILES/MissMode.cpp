@@ -960,6 +960,7 @@ int32_t __fastcall MISSMODE_SrvDo08_MonBlizzCenter(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FC576F0
+// 1.13c D2Game+0x3D1E0 (EAX = nFrames, EBX = missile, stack game/range/missile/mask; SUNIT_GetOwner inlined)
 D2UnitStrc* __fastcall MISSMODE_CreateMissileWithCollisionCheck(D2GameStrc* pGame, D2UnitStrc* pMissile, int32_t nRange, int32_t nFrames, int32_t nMissileId, uint16_t nCollisionMask)
 {
     if (!nFrames || (MISSILE_GetRemainingFrames(pMissile) % nFrames) != 0)

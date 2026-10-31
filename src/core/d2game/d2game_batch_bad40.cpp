@@ -160,7 +160,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_BBCE0(uint8_t* game, int32
     uint32_t q = rd32(pd, 0x10 + game[0x6d] * 4);
     if (e->ord(10174, q, 0x1a, 0xd) != 0) { e->subB4F0(); return 0; }
     if (unit && *unit == 0) e->unitData((uint32_t)(uintptr_t)unit);
-    uint8_t msg[6] = {0x50, 0x17, 0x00, 0x00, 0, 0};   // CONCAT13(0,0x1750); remaining stack bytes unnamed
+    uint8_t msg[0xf] = {0x50, 0x17, 0x00};   // 0xF-byte packet: 0x50, word 0x17, rest unset stack in retail (zero here)
     e->sub8A3E0(msg, 0xf);
     return 0;
 }
@@ -186,15 +186,12 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_BC6B0(uint8_t* self, uint32
     it = e->ord(10836, inv, 0, 0);
     for (;;) {
         if (!it) { *ebx = total; return 0; }
-        int32_t prev = 0;
         if (e->ord(11102, 0, 0, 0)) {
-            prev = e->ord(10973, it, 0x46, 0);
+            int32_t prev = e->ord(10973, it, 0x46, 0);
             total = e->ord(10463, it, 0, 0);
             if (prev < total) { *ebx = total - prev; return it; }
-            prev = 0;
         }
-        inv = (uint32_t)prev;   // decompile feeds the (zeroed) value back as the next argument
-        it = e->ord(10836, (uint32_t)prev, 0, 0);
+        it = e->ord(10836, inv, 0, it);   // next from the same container, continuing after it
     }
 }
 
