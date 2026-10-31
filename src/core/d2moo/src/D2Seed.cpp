@@ -10,9 +10,15 @@ void __stdcall SEED_Return()
 }
 
 //D2Common.0x6FDAEA80 (#10920)
+// 1.13c D2Common+0x36760: three steps of the 0x19660D / 0x3C6EF35F LCG over (time32 + tick + arg), masked to 31 bits.
+// d2-web: the 1.10f single-step form is replaced; time is truncated to 32 bits as retail's time32 is.
 int __fastcall SEED_GetRandomValue(int nValue)
 {
-	return (0x2F490A95 * (time(NULL) + nValue + GetTickCount()) - 0x2E330917) & 0x7FFFFFFF;
+	uint32_t nState = (uint32_t)time(NULL) + (uint32_t)GetTickCount() + (uint32_t)nValue;
+	nState = nState * 0x19660D + 0x3C6EF35F;
+	nState = nState * 0x19660D + 0x3C6EF35F;
+	nState = nState * 0x19660D + 0x3C6EF35F;
+	return (int)(nState & 0x7FFFFFFF);
 }
 
 //D2Common.0x6FDAEAB0 (#10912)

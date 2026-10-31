@@ -1029,7 +1029,7 @@ int __stdcall STATLIST_GetBaseStatsCount(D2StatListStrc* pStatList)
 {
 	if (pStatList)
 	{
-		return pStatList->Stats.nStatCount;
+		return (int16_t)pStatList->Stats.nStatCount; // d2-web: 1.13c reads the count as a signed short
 	}
 
 	return 0;
@@ -1538,7 +1538,7 @@ void __stdcall STATLIST_DeactivateTemporaryStates(D2UnitStrc* pUnit)
 // 1.13c D2Common+0x37FD0 (ordinal 10307 in 1.13c)
 int __stdcall D2Common_10467(D2StatListStrc* pStatList, int nStat)
 {
-	if (pStatList && nStat < pStatList->Stats.nStatCount)
+	if (pStatList && nStat < (int16_t)pStatList->Stats.nStatCount) // d2-web: signed short count, as 1.13c
 	{
 		return pStatList->Stats.pStat[nStat].nValue;
 	}
