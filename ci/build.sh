@@ -43,24 +43,20 @@ TOOLCHAIN_ID=$(
 # Pin every step, including stage/cache keys, to this one immutable ID, resolved once.
 export BUILDER_IMAGE="$TOOLCHAIN_ID"
 
-# Engine builds are rationed on this box: every worktree
-# queues on the same slot pool in the main checkout. The worktree artifact lock
+# Engine builds are rationed: every worktree queues on the same slot pool in the main checkout. The worktree artifact lock
 # also spans compilation, staging and cache publication; separate trees still build in parallel.
-# D2_BUILD_SLOTS parallel builds share this checkout (default 8).
-SLOTS="${D2_BUILD_SLOTS:-8}"; got=""; T0=$(date +%s)
-# Merge builds jump the queue: a merge-* tree (or D2_BUILD_PRIORITY=merge)
-# tries two slots ordinary builds never take before the shared pool.
-IDS=$(seq 0 $((SLOTS - 1)))
-case "$(basename "$PWD")" in merge-*) D2_BUILD_PRIORITY="${D2_BUILD_PRIORITY:-merge}";; esac
-[ "${D2_BUILD_PRIORITY:-}" = merge ] && IDS="m0 m1 $IDS"
-while [ -z "$got" ]; do
-  for i in $IDS; do
-    exec 9>"$LOCK_DIR/.build.lock.$i"
-    if flock -n 9; then got=$i; break; fi
-    exec 9>&-
-  done
-  [ -n "$got" ] || { [ -n "${waited:-}" ] || echo "==> waiting for a build slot ($SLOTS busy, $LOCK_DIR/.build.lock.*)"; waited=1; sleep 5; }
-done
+# At most D2_MAX_BUILDS (default 2) heavy builds run at once; ci/build-slot.sh is the counting semaphore.
+T0=$(date +%s)
+# An unchanged engine needs no link: a cached build for this tree's source key is staged instead
+# (D2_BUILD_FORCE=1 links anyway; custom compiler flags never use the cache).
+if [ -z "${D2_CXXFLAGS:-}" ] && [ "${D2_BUILD_FORCE:-0}" != 1 ] && bash tools/engine-cache.sh get . >/dev/null 2>&1; then
+  echo "==> engine unchanged: staging the cached build $(cat play/.engine-key)"
+  bash ci/stage.sh
+  exit $?
+fi
+source "$SRC/ci/build-slot.sh"
+d2_build_slot_acquire "$LOCK_DIR"
+got=$D2_BUILD_SLOT; SLOTS="${D2_MAX_BUILDS:-2}"
 echo "==> build slot $got of $SLOTS"
 WAIT=$(( $(date +%s) - T0 ))
 

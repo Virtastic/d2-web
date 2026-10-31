@@ -124,6 +124,7 @@ tools/*
 !tools/hooks
 ci/*
 !ci/build.sh
+!ci/build-slot.sh
 !ci/stage.sh
 wasm-build/*
 !wasm-build/link-d2.sh
