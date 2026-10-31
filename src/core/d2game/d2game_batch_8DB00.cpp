@@ -441,7 +441,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_78dd0(uint32_t eaxUnit, uint32_t ebxUnit,
 // EAX = index. Indices below 9 read the nine-entry table at DAT_6FD1B614; everything above is
 // (index - 2) * 0x32.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_af5f0(uint32_t eaxIndex,
+EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_af5f0_port(uint32_t eaxIndex,
                                                 const D2GameBatch8DB00Env* env)
 {
     if (eaxIndex < 9) return env->modeTable[eaxIndex];
