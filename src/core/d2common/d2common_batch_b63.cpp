@@ -2,6 +2,8 @@
 // callees are declared extern by RVA name. Hidden register inputs are explicit leading parameters.
 #include <cstdint>
 #include <initializer_list>
+#include <cstdlib>
+extern "C" void d2_fn_d2common_e490(uint32_t* r);
 
 typedef uint8_t* P;
 template <class T> static inline T& F(void* p, int off) { return *(T*)((P)p + off); }
@@ -15,8 +17,8 @@ void sub_4A9B0(void* ecx); void sub_45550(); void sub_AB50(void* unit); void sub
 void sub_4A670(); void sub_C940(void* unit);
 uint8_t sub_222B0(); void sub_27180(void*, uint32_t, int, int); void sub_25C10(void*);
 void q_d2common_batch_b63_Ordinal_10128(uint32_t, uint32_t, uint32_t); void Ordinal_10131(uint32_t); void Ordinal_10127(uint32_t);
-void* sub_44BD0(int); void sub_44F90(void*); void sub_44950(); int sub_EEC0(void*, void*);
-void sub_EB80(void*); void sub_E490(int); void* sub_F000(void*, int, int); void sub_10010();
+void* sub_44BD0(int); void sub_44F90(void*); void sub_44950(); int sub_EEC0(int dir, void*, void*);
+void sub_EB80(void*); void sub_E490(int); void* sub_F000(void*, int, int); void sub_10010(void* game, int a, int b);
 void* sub_7D9B0(void* p, int id); void* sub_10730(void*); void* sub_10A00(); void sub_44F20();
 void sub_106B0(uint32_t, const int32_t* tbl, void* ctx, uint32_t* out); void sub_2D3C0(int, int*, void*);
 extern const int32_t DAT_6fde5f98[], DAT_6fde5fd8[], DAT_6fde6018[], DAT_6fde6058[], DAT_6fde6098[], DAT_6fde60d8[];
@@ -64,26 +66,40 @@ void sub_28D70(void* p1, uint32_t p2, int p3, int p4, int p5, int skip, int ebx,
     Ordinal_10127(p2);
 }
 
-// 1.13c D2Common+0x102F0  (in_EAX = ctx; param_1 = count)
+// 0x44950 on blobs: add an orth node (room, dir) to owner's list head unless present.
+static void link44950(void* owner, void* room, int dir) {
+    for (void* n = PT(owner, 0); n; n = PT(n, 0x14))
+        if (U(n, 0) == (uint32_t)(uintptr_t)room) return;
+    uint32_t* nd = (uint32_t*)std::calloc(0x18, 1);
+    uint32_t nn = (uint32_t)(uintptr_t)nd;
+    nd[5] = U(owner, 0); U(owner, 0) = nn;
+    nd[0] = (uint32_t)(uintptr_t)room; nd[1] = dir; nd[3] = 1; nd[4] = (uint32_t)(uintptr_t)room + 0x34;
+}
+static void pick(void* room) { uint32_t r[5] = {(uint32_t)(uintptr_t)room, 1, 0, 0, 0}; d2_fn_d2common_e490(r); }
+
+// 1.13c D2Common+0x102F0  (in_EAX = ctx; param_1 = count). Pass k links prev->n with dirs
+// (1,3),(0,2),(3,1),(2,0); EEC0 takes the pass direction in EAX.
 void sub_102F0(void* ctx, int count) {
-    void* cur = PT(ctx, 0x10);
-    auto step = [&](void*& prev) {
-        void* n = sub_44BD0(2);
-        void* d = PT(PT(n, 0x16 * 4), 0x14);
-        I(n, 0xf * 4) = I(d, 0x10); I(n, 0x10 * 4) = I(d, 0x14);
-        if (sub_EEC0(prev, n) == 0) { sub_44F90(n); n = nullptr; }
-        else {
-            sub_44950(); sub_44950(); sub_EB80(n);
-            void* e = PT(prev, 0x16 * 4);
-            I(n, 9 * 4) = I(e, 0x10); F<uint32_t>(e, 0x10) = (uint32_t)(uintptr_t)n; I(e, 8) += 1;
-            sub_E490(1); sub_E490(1);
+    void* first = PT(ctx, 0x10);
+    void* cur = first;
+    static const int dA[4] = {1, 0, 3, 2}, dB[4] = {3, 2, 1, 0};
+    for (int pass = 0; pass < 4; pass++) {
+        int n_steps = pass < 3 ? count - 1 : count - 2;
+        for (int i = n_steps; i > 0; i--) {
+            void* n = sub_44BD0(2);
+            void* d = PT(PT(n, 0x16 * 4), 0x14);
+            I(n, 0xf * 4) = I(d, 0x10); I(n, 0x10 * 4) = I(d, 0x14);
+            if (sub_EEC0(dA[pass], cur, n) == 0) { sub_44F90(n); n = nullptr; }
+            else {
+                link44950(cur, n, dA[pass]); link44950(n, cur, dB[pass]); sub_EB80(n);
+                void* e = PT(cur, 0x16 * 4);
+                I(n, 9 * 4) = I(e, 0x10); F<uint32_t>(e, 0x10) = (uint32_t)(uintptr_t)n; I(e, 8) += 1;
+                pick(cur); pick(n);
+            }
+            cur = n;
         }
-        prev = n;
-    };
-    for (int pass = 0; pass < 3; pass++)
-        for (int i = count - 1; i > 0; i--) step(cur);
-    for (int i = count - 2; i > 0; i--) step(cur);
-    sub_44950(); sub_44950(); sub_E490(1); sub_E490(1);
+    }
+    link44950(cur, first, 2); link44950(first, cur, 0); pick(cur); pick(first);
 }
 
 // 1.13c D2Common+0x10AF0
@@ -96,12 +112,12 @@ void sub_10AF0(void* game) {
     const int32_t* e = DAT_6fde6ce8 + k * 6;
     int32_t a = e[0], b = e[2], c = e[4], d = e[1];
     void* n = sub_F000(r, e[1 - 0 + 0] * 0 + d, 0);
-    if (n) { sub_E490(1); void* q = PT(n, 0x20); I(q, 0) = a; I(q, 4) = b; I(q, 12) |= 2; }
+    if (n) { pick(r); void* q = PT(n, 0x20); I(q, 0) = a; I(q, 4) = b; I(q, 12) |= 2; }
     int32_t x = e[5], y = e[3];
     n = sub_F000(r, e[4], 0);
-    if (n) { sub_E490(1); void* q = PT(n, 0x20); I(q, 0) = y; I(q, 4) = x; I(q, 12) |= 2; }
+    if (n) { pick(r); void* q = PT(n, 0x20); I(q, 0) = y; I(q, 4) = x; I(q, 12) |= 2; }
     (void)c;
-    sub_10010();
+    sub_10010(game, 0x344, 0);
 }
 
 // 1.13c D2Common+0x10BE0  (unaff_ESI = ctx)
@@ -143,7 +159,7 @@ void sub_10CA0(void* g) {
     v += U(g, 0x1c8);
     F<uint64_t>(g, 0x1c4) = v;
     sub_106B0((uint32_t)(v >> 32), DAT_6fde60d8 + ((uint32_t)v & 1) * 4, g, nullptr);
-    sub_10010();
+    sub_10010(g, 0x344, 0);  // retail passes the last placed room (ESI) as the 2nd stack arg: unresolved
     for (void* r = PT(g, 0x10); r; r = PT(r, 0x24)) {
         I(r, 0x34) += (b * 2 - e) + a;
         I(r, 0x38) += (c - d) + f;

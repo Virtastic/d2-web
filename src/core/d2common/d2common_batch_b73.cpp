@@ -18,17 +18,18 @@ uint32_t sub_D580(void* pPathESI, int32_t dx, int32_t dy, int32_t* out, uint32_t
 {
     char* p = (char*)pPathESI;
     wr<uint32_t>(p, 0x1D4, 0);
-    sub_6FDAB810(&dx, &dy); // EAX = &dx, ECX = &dy
+    int32_t sx = dx, sy = dy;
+    sub_6FDAB810(&sx, &sy); // EAX = &sx, ECX = &sy; retail keeps the unscaled dx, dy (EBP / stack) for the end point
     uint32_t x = rd<uint32_t>(p, 0), y = rd<uint32_t>(p, 4);
     const uint32_t flags = rd<uint32_t>(p, 0x34);
-    const int32_t endX = (int32_t)(x + dx), endY = (int32_t)(y + dy);
+    const int32_t endX = (int32_t)(x + dx), endY = (int32_t)(y + dy);  // unscaled
     uint32_t prev = (x >> 16 & 0xffff) | (y >> 16) << 16;
     uint16_t cx = (uint16_t)(x >> 16);
     int32_t ny = (int32_t)y;
     for (;;) {
         if (cx == (uint16_t)((uint32_t)endX >> 16) && (uint16_t)(prev >> 16) == (uint16_t)((uint32_t)endY >> 16)) break;
-        uint32_t nyU = (uint32_t)dy + (uint32_t)ny;
-        uint16_t nx = (uint16_t)((uint32_t)dx + x >> 16), nyh = (uint16_t)(nyU >> 16);
+        uint32_t nyU = (uint32_t)sy + (uint32_t)ny;
+        uint16_t nx = (uint16_t)((uint32_t)sx + x >> 16), nyh = (uint16_t)(nyU >> 16);
         uint32_t cur = nx | (uint32_t)nyh << 16;
         if (cx != nx || (uint16_t)(prev >> 16) != nyh) {
             if (!D2Common_D420_PathMoveCollision((D2DynamicPathStrc*)p, cur, prev)) {
@@ -42,7 +43,7 @@ uint32_t sub_D580(void* pPathESI, int32_t dx, int32_t dy, int32_t* out, uint32_t
             wr<uint32_t>(p, 0x1D4, n + 1);
             if ((int32_t)(n + 1) > 9) break;
         }
-        cx = nx; prev = cur; ny = (int32_t)nyU; x = (uint32_t)dx + x;
+        cx = nx; prev = cur; ny = (int32_t)nyU; x = (uint32_t)sx + x;
     }
     if (rd<uint32_t>(p, 0x1D4)) wr<uint32_t>(p, 0x34, rd<uint32_t>(p, 0x34) | 8);
     out[0] = endX; out[1] = endY;

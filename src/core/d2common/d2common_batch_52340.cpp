@@ -30,7 +30,7 @@ EMSCRIPTEN_KEEPALIVE int32_t sub_52340(int32_t* param_1, int32_t* param_2) {
   __builtin_trap(); // retail: _exit(-1)
  }
  const uint8_t* rec = reinterpret_cast<const uint8_t*>(static_cast<intptr_t>(static_cast<uint32_t>(param_2[0])));
- if (!rec || (gdwBitMasks_exref[8] & rec[5] & 0xff) == 0) return 3;
+ if (!rec || (gdwBitMasks_exref[2] & rec[5] & 0xff) == 0) return 3;
  if (!param_1) return 7;
  int32_t lvl = param_2[10];
  if (param_2[0xd] == -1) lvl += sub_4FCB0(reinterpret_cast<intptr_t>(param_1), reinterpret_cast<intptr_t>(param_2));
@@ -38,8 +38,8 @@ EMSCRIPTEN_KEEPALIVE int32_t sub_52340(int32_t* param_1, int32_t* param_2) {
  int32_t cap = *DAT_6fdf0b50;
  if (lvl < cap) cap = lvl;
  if (cap == 0) return 7;
- if (gdwBitMasks_exref[0x14] & rec[4]) return 6;
- if (gdwBitMasks_exref[0x10] & rec[4]) return 5;
+ if (gdwBitMasks_exref[5] & rec[4]) return 6; // retail indexes the table by byte offset (0x14 = dword 5)
+ if (gdwBitMasks_exref[4] & rec[4]) return 5;
  const intptr_t u = reinterpret_cast<intptr_t>(param_1), s = reinterpret_cast<intptr_t>(param_2);
  if (sub_50930(s, u) == 0 || !sub_50F00(u)) return 2;
  if (sub_50AF0(u)) {
