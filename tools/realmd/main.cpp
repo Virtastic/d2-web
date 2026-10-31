@@ -35,6 +35,7 @@ int d2_realm_mcp_session_feed(const uint8_t* in, int len, uint8_t* out, int outC
 void d2_realm_d2gs_session_reset(uint32_t unitId, uint8_t charClass, uint8_t act, uint16_t level,
                                   uint16_t gameToken, uint32_t gameHash);
 void d2_realm_d2gs_session_disconnect_client(uint32_t clientId);
+void d2_realm_d2gs_session_pin_seed(uint32_t seed);
 #if defined(D2_REALMD_TEST_FIXTURE)
 void d2_realm_d2gs_session_fixture_reassign_on_keepalive(int enabled);
 void d2_realm_d2gs_session_fixture_reassign_on_walk(int enabled);
@@ -222,6 +223,8 @@ void resetFor(Proto proto) {
 
 int main(int argc, char** argv) {
     uint16_t ports[kProtoCount] = { 6112, 6113, 4000 };
+    // Each game rolls a fresh map seed unless the harness pins one (D2_REALMD_FIXED_SEED=1 for seed 1).
+    if (const char* pin = getenv("D2_REALMD_FIXED_SEED")) d2_realm_d2gs_session_pin_seed((uint32_t)strtoul(pin, nullptr, 0));
 #if defined(D2_REALMD_TEST_FIXTURE)
     int fixtureReassignOnKeepalive = 0;
     int fixtureReassignOnWalk = 0;

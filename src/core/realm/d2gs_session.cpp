@@ -13,7 +13,9 @@
 // is 1.13c's, read out of that build's own D2Net (libd2 net.cs_versions.packet_size_113c), NOT
 // transcribed from 1.14d: against 1.14d every gameplay opcode 0x00-0x63 matches, but the join and
 // handshake range 0x64-0x6F differs, so a neighbour's table desyncs exactly where it matters.
+#include <chrono>
 #include <cstdint>
+#include <ctime>
 #include <emscripten.h>
 
 extern "C" {
@@ -59,6 +61,7 @@ struct D2gsSession {
     uint8_t act;
     uint16_t level;
     uint32_t gameHash;
+    uint32_t mapSeed;
     uint16_t gameToken;
     int error;
     int joined;
@@ -131,6 +134,31 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_cs_packet_len(const uint8_t* buf, int len
     return len < n ? -1 : n;
 }
 
+// A new game's map seed, the way retail's game create rolls dwInitSeed from the clock (the same
+// derivation as play/assets/game-seed.mjs). A runtime pin (d2_realm_d2gs_session_pin_seed; realmd reads
+// D2_REALMD_FIXED_SEED) fixes it for the harness: the scenarios and the seed-1 Act I town coordinates
+// below depend on seed 1. The in-process wasm session is the harness build and stays pinned to 1; a
+// native host is unpinned unless told otherwise, so it rolls a fresh seed per game.
+#if defined(__EMSCRIPTEN__)
+static uint32_t g_pinnedSeed = 1;
+#else
+static uint32_t g_pinnedSeed = 0;
+#endif
+EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_pin_seed(uint32_t seed) { g_pinnedSeed = seed; }
+
+static uint32_t seedRandom(uint32_t n, uint32_t timeSec, uint32_t tickMs) {
+    return (0x2F490A95u * (timeSec + n + tickMs) - 0x2E330917u) & 0x7FFFFFFFu;
+}
+static uint32_t newGameMapSeed() {
+    if (g_pinnedSeed) return g_pinnedSeed;
+    using namespace std::chrono;
+    const uint32_t us = (uint32_t)duration_cast<microseconds>(steady_clock::now().time_since_epoch()).count();
+    const uint32_t ms = (uint32_t)duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+    const uint32_t sec = (uint32_t)std::time(nullptr);
+    const uint32_t low = seedRandom(us, sec, ms);
+    return seedRandom(0x6AC690C5u * low + 666u, sec, ms);
+}
+
 EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_reset(uint32_t unitId, uint8_t charClass, uint8_t act, uint16_t level,
                                                        uint16_t gameToken, uint32_t gameHash) {
     g_g.rxLen = 0;
@@ -141,6 +169,7 @@ EMSCRIPTEN_KEEPALIVE void d2_realm_d2gs_session_reset(uint32_t unitId, uint8_t c
     g_g.level = level;
     g_g.gameToken = gameToken;
     g_g.gameHash = gameHash;
+    g_g.mapSeed = newGameMapSeed();
     g_g.error = 0;
     g_g.joined = 0;
 #if defined(D2_REALMD_TEST_FIXTURE)
@@ -242,14 +271,16 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_d2gs_session_feed(const uint8_t* in, int len, 
             // a first client room at (1168,1176); emit MapReveal before PlayerAssign to exercise
             // the native null-current-room branch, then LoadComplete after the player exists.
             int n = 0;
-            n += d2_realm_d2gs_act_load(g_g.act, 1, 1, 0, burst + n);
+            n += d2_realm_d2gs_act_load(g_g.act, g_g.mapSeed, 1, 0, burst + n);
 #if defined(D2_REALMD_TEST_FIXTURE)
+            if (g_g.mapSeed == 1) { // the MapReveal anchor below is the seed-1 town's
             burst[n++] = 0x07;
             burst[n++] = 0x90; burst[n++] = 0x04; // x=1168, little endian
             burst[n++] = 0x98; burst[n++] = 0x04; // y=1176, little endian
             burst[n++] = 1;                       // eLevel=Act I town
             // D2GS player coordinates are subtiles; MapReveal's room anchor is in tiles.
             n += d2_realm_d2gs_player_assign(g_g.unitId, g_g.charClass, kCharName, 1168 * 5, 1176 * 5, burst + n);
+            } else n += d2_realm_d2gs_player_assign(g_g.unitId, g_g.charClass, kCharName, 0, 0, burst + n);
 #else
             n += d2_realm_d2gs_player_assign(g_g.unitId, g_g.charClass, kCharName, 0, 0, burst + n);
 #endif

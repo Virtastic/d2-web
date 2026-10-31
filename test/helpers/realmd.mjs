@@ -28,7 +28,8 @@ export async function startRealmd(ports, tag = 'test', extraArgs = []) {
   }
   if (!existsSync(BIN)) throw new Error(`realmd build succeeded but did not create ${BIN}`);
   const proc = spawn(BIN, ['--bncs', String(ports.bncs), '--mcp', String(ports.mcp), '--d2gs', String(ports.d2gs), ...extraArgs],
-    { stdio: ['ignore', 'pipe', 'pipe'] });
+    // The harness pins seed 1 (the fixture's town coordinates depend on it); realmd's default is a fresh seed per game.
+    { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, D2_REALMD_FIXED_SEED: process.env.D2_REALMD_FIXED_SEED ?? '1' } });
   // realmd announces readiness on stdout, so wait for that rather than sleeping. A premature
   // exit or timeout is an unexpected server failure, not an unavailable prerequisite.
   let stdout = '';
