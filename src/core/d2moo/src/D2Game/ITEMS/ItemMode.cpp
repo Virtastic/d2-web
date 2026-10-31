@@ -878,7 +878,7 @@ void __fastcall D2GAME_PickupItemEx_6FC42B80(D2GameStrc* pGame, D2UnitStrc* pUni
             ITEMS_SetInvPage(pItem, 0xFFu);
             pItem->dwFlags |= UNITFLAG_SENDREFRESHMSG;
             UNITS_ChangeAnimMode(pItem, IMODE_ONGROUND);
-            SUNIT_AttachSound(pUnit, 3u, pUnit); // 1.13c D2Game+0xD2840 (1.10f: 0x13)
+            SUNIT_AttachSound(pUnit, 0x13u, pUnit); // 1.13c D2Game+0xD2840 pushes 0x13 (the 3 beside it is the item anim mode)
         }
     }
     else
@@ -1168,7 +1168,7 @@ int32_t __fastcall D2GAME_PickupItem_6FC43340(D2GameStrc* pGame, D2UnitStrc* pUn
         ITEMS_SetInvPage(pItem, 0xFFu);
         pItem->dwFlags |= UNITFLAG_SENDREFRESHMSG;
         UNITS_ChangeAnimMode(pItem, IMODE_ONGROUND);
-        SUNIT_AttachSound(pUnit, 3u, pUnit); // 1.13c D2Game+0xD2840 (1.10f: 0x13)
+        SUNIT_AttachSound(pUnit, 0x13u, pUnit); // 1.13c D2Game+0xD2840 pushes 0x13
         return 0;
     }
 
@@ -1245,7 +1245,7 @@ int32_t __fastcall D2GAME_PickupItem_6FC43340(D2GameStrc* pGame, D2UnitStrc* pUn
         ITEMS_SetInvPage(pItem, 0xFFu);
         pItem->dwFlags |= UNITFLAG_SENDREFRESHMSG;
         UNITS_ChangeAnimMode(pItem, IMODE_ONGROUND);
-        SUNIT_AttachSound(pUnit, 3u, pUnit); // 1.13c D2Game+0xD2840 via 0xD6E30 (1.10f: 0x17)
+        SUNIT_AttachSound(pUnit, 0x17u, pUnit); // 1.13c D2Game+0xD2840 via 0xD6E30 pushes 0x17
         return 0;
     }
 
