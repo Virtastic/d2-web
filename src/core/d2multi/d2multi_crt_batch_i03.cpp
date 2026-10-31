@@ -331,7 +331,7 @@ extern "C" int32_t __XcptFilter(uint32_t num, void* ptrs) {
   return -1;
 }
 
-// 1.13c D2Multi+0x1EF5
+// D2Multi 0x1EF5 (1.13c)
 extern "C" int32_t __CRT_INIT_12(void* inst, int32_t reason) {
   if (reason == 1) {
     uint32_t v[37] = {0x94};

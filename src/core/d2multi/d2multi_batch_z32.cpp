@@ -42,7 +42,7 @@ void z32_freeptd(void* p) {
   }
 }
 
-// 1.13c D2Multi+0x2FE8
+// D2Multi 0x2FE8 (1.13c)
 int z32_mtinit(void) {
   extern int z32_mtinitlocks(void);
   extern void z32_mtinit_resolve_fls(void); // GetProcAddress fill of the four Fls* slots, TLS fallback
@@ -102,7 +102,7 @@ void z32_mtdeletelocks(void) {
     if (z32_lock_tab[i * 2] && z32_lock_tab[i * 2 + 1] == 1) z32_delete_cs(z32_lock_tab[i * 2]);
 }
 
-// 1.13c D2Multi+0x3206
+// D2Multi 0x3206 (1.13c)
 int z32_mtinitlocknum(int n) {
   uint32_t* slot = &z32_lock_tab[n * 2];
   if (*slot) return 1;

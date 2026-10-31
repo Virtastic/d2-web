@@ -22,7 +22,7 @@ extern float g_970, g_974, g_978, g_97c;
 uint32_t* z30_music_ent(int set, int idx); // {name, played}; set!=0 -> introedit table @5950 else @5908
 z30_ch z30_chan_at(uint32_t link); // 32-bit link -> channel
 
-// 1.13c D2sound+0x06980
+// D2sound 0x06980 (1.13c)
 void z30_6980(z30_ch c) {
     if (!c || !c[0]) z30_fatal(0x292);
     z30_lock();
@@ -31,7 +31,7 @@ void z30_6980(z30_ch c) {
     c[7] = 0;
     z30_unlock();
 }
-// 1.13c D2sound+0x08020
+// D2sound 0x08020 (1.13c)
 void z30_8020() {
     if (!g_65b8) return;
     for (int i = 0; i < 8; i++) {
@@ -44,11 +44,11 @@ void z30_8020() {
         z30_unlock();
     }
 }
-// 1.13c D2sound+0x067C0
+// D2sound 0x067C0 (1.13c)
 bool z30_67c0(z30_ch c) { if (!c) z30_fatal(0x37a); return c[0x12] != 0; }
 // 1.13c D2sound+0x06920
 uint32_t z30_6920(z30_ch c) { if (!c) z30_fatal(0x2e4); return c[0xe]; }
-// 1.13c D2sound+0x06E20
+// D2sound 0x06E20 (1.13c)
 void z30_6e20(z30_ch c, int v) {
     if (!c || !c[0]) z30_fatal(0x2cb);
     int t = (int)g_5994 * v;
@@ -57,7 +57,7 @@ void z30_6e20(z30_ch c, int v) {
     if (!(c[0xd] & 4) || g_6598 != 2) t = z30_baccc((float)t);
     z30_ds_call(c, 0x3c, (uint32_t)z30_baccc(z30_8830(0.0f, 255.0f, (float)t)), 0);
 }
-// 1.13c D2sound+0x07650
+// D2sound 0x07650 (1.13c)
 void z30_7650(z30_ch c) {
     if (!c || !c[0]) z30_fatal(0x226);
     if (c[0x12]) z30_fatal(0x227);
@@ -71,19 +71,19 @@ void z30_7650(z30_ch c) {
     z30_6e20(c, 0xff);
     z30_unlock();
 }
-// 1.13c D2sound+0x087D0
+// D2sound 0x087D0 (1.13c)
 float z30_87d0(float p) {
     if (g_978 < p + g_97c) return g_974;
     if (p - g_97c < g_970) return g_978;
     return z30_9cf0(p);
 }
-// 1.13c D2sound+0x09A10
+// D2sound 0x09A10 (1.13c)
 uint32_t z30_9a10(uint32_t v) { z30_reg_set("Diablo II", "Options Music", 0, v); g_64b4 = v; return v; }
-// 1.13c D2sound+0x07FE0
+// D2sound 0x07FE0 (1.13c)
 void z30_7fe0() {
     if (g_6580) { g_65c0 = 0; if (g_6580[0x12]) z30_6980(g_6580); }
 }
-// 1.13c D2sound+0x06B80
+// D2sound 0x06B80 (1.13c)
 void z30_6b80(z30_ch c, uint32_t target, int ms) {
     if (!c) z30_fatal(0x39e);
     if (!g_658c) return;
@@ -92,7 +92,7 @@ void z30_6b80(z30_ch c, uint32_t target, int ms) {
     uint32_t t = z30_tick(); c[0x16] = t; c[0x17] = t + ms;
     z30_unlock();
 }
-// 1.13c D2sound+0x08160
+// D2sound 0x08160 (1.13c)
 void z30_8160() {
     if (!g_65b8) return;
     z30_enter_b();
@@ -108,7 +108,7 @@ void z30_8160() {
     g_65b8 = 0;
     z30_delete_b();
 }
-// 1.13c D2sound+0x07D30
+// D2sound 0x07D30 (1.13c)
 static void z30_pick_check(uint32_t cnt, int idx) {
     if (cnt != g_5990) z30_fatal(0x52);
     if (idx >= (int)cnt) z30_fatal(0x53);

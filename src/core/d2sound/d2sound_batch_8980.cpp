@@ -1,4 +1,4 @@
-// 1.13c D2sound+0x8980 -- WAV container parse. Hidden regs of 0x8790 (data, tag) made explicit.
+// D2sound 0x8980 (1.13c) -- WAV container parse. Hidden regs of 0x8790 (data, tag) made explicit.
 #include <cstdint>
 #include <cstring>
 int32_t* D2sound_8790(uint32_t* size, int32_t* data, int32_t tag, uint32_t* outLen);

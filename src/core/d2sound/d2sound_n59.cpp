@@ -384,7 +384,7 @@ int n59_ld12_digits(u32 lo, u32 mid, u16 se, int ndigits, uint8_t flags, uint8_t
     return 1;
 }
 
-// 1.13c D2SOUND+0x0B0FD  __cfltcvt dispatch: 'e'/'E' -> 0xAEEB, 'f' -> 0xAFF7, else -> 0xB05E (host seams)
+// D2SOUND 0x0B0FD (1.13c)  __cfltcvt dispatch: 'e'/'E' -> 0xAEEB, 'f' -> 0xAFF7, else -> 0xB05E (host seams)
 int n59_cfltcvt(int fmtch, void* arg, char* buf, int fmt, int prec,
                 int (*efmt)(void*, char*, int, int), char* (*ffmt)(void*, char*, int), int (*gfmt)(void*, char*, int, int)) {
     if (fmtch == 0x65 || fmtch == 0x45) return efmt(arg, buf, fmt, prec);

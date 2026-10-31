@@ -97,7 +97,7 @@ intptr_t z35_get_osfhandle(int fh) {
     return -1;
 }
 
-// 1.13c D2Launch+0x9B60  (QueryInterface, ordinal 1) -- returns address of static table
+// D2Launch 0x9B60 (1.13c)  (QueryInterface, ordinal 1) -- returns address of static table
 void* z35_QueryInterface() { return z35_QueryInterface_tbl; }
 
 // 1.13c D2Launch+0x1000  (register-arg: ESI = wchar buffer, EDI = count; byte-swap each u16)
@@ -105,7 +105,7 @@ void z35_swap16_array(uint16_t* buf, uint32_t count) {
     for (uint32_t i = 0; i < count; i++) buf[i] = (uint16_t)((buf[i] << 8) | (buf[i] >> 8));
 }
 
-// 1.13c D2Launch+0x101B  (sprintf; va_list passed as pointer to variadic args)
+// D2Launch 0x101B (1.13c)  (sprintf; va_list passed as pointer to variadic args)
 int z35_sprintf(char* dest, const char* fmt, void* va) {
     Z35File f = {};
     f.cnt = 0x7fffffff; f.flag = 0x42; f.base = dest; f.ptr = dest;
@@ -116,7 +116,7 @@ int z35_sprintf(char* dest, const char* fmt, void* va) {
     return r;
 }
 
-// 1.13c D2Launch+0x1073  (sscanf)
+// D2Launch 0x1073 (1.13c)  (sscanf)
 int z35_sscanf(const char* src, const char* fmt, void* va) {
     Z35File f = {};
     f.flag = 0x49; f.base = (char*)src; f.ptr = (char*)src;

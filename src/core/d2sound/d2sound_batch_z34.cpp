@@ -32,7 +32,7 @@ struct Z34G {  // DAT_6f9c.. globals
     uint32_t cs6530, cs6548;
 };
 
-// 1.13c D2sound+0x8640
+// D2sound 0x8640 (1.13c)
 void z34_8640(const Z34Seams& s, uint32_t head, uint32_t data) {
     uint32_t n = s.alloc(0x11f);
     s.wr32(n, 0); s.wr32(n + 4, 0); s.wr32(n, data);
@@ -42,7 +42,7 @@ void z34_8640(const Z34Seams& s, uint32_t head, uint32_t data) {
     s.wr32(c + 4, n);
 }
 
-// 1.13c D2sound+0x8100
+// D2sound 0x8100 (1.13c)
 void z34_8100(const Z34Seams& s, Z34G& g) {
     if (!g.d65b8) return;
     for (int i = 0; i < 8; i++) {
@@ -58,7 +58,7 @@ void z34_68D0(const Z34Seams& s, uint32_t self, uint32_t a, uint32_t b, uint32_t
     if (s.rd32(self + 0x34) & 2) s.com(s.rd32(self + 0xc), 0x4c, a, b, c, 0, 0);
 }
 
-// 1.13c D2sound+0x83C0
+// D2sound 0x83C0 (1.13c)
 void z34_83C0(const Z34Seams& s, Z34G& g) {
     if (!g.d658c || g.d65b8) return;
     s.initCs(g.cs6548); s.lock(g.cs6548);
@@ -77,13 +77,13 @@ void z34_83C0(const Z34Seams& s, Z34G& g) {
     s.unlock(g.cs6548);
 }
 
-// 1.13c D2sound+0x9A70
+// D2sound 0x9A70 (1.13c)
 uint32_t z34_9A70(const Z34Seams& s, Z34G& g, uint32_t v) {
     s.regWrite("Diablo II", "Positional Bias", 0, v);
     return g.d64ac = v;
 }
 
-// 1.13c D2sound+0x7510
+// D2sound 0x7510 (1.13c)
 void z34_7510(const Z34Seams& s, Z34G& g, int32_t p) {
     if (!g.d658c) return;
     if (p < 1) s.fatal(0x387);
@@ -96,7 +96,7 @@ void z34_7510(const Z34Seams& s, Z34G& g, int32_t p) {
     }
 }
 
-// 1.13c D2sound+0x7FB0
+// D2sound 0x7FB0 (1.13c)
 void z34_7FB0(const Z34Seams& s, Z34G& g) {
     if (g.d6580) {
         g.d65c0 = 0;
@@ -104,7 +104,7 @@ void z34_7FB0(const Z34Seams& s, Z34G& g) {
     }
 }
 
-// 1.13c D2sound+0x8980
+// D2sound 0x8980 (1.13c)
 // buf: RIFF header (12 bytes) then chunks; *len in/out. fmt (out) is 9 u16 = WAVEFORMATEX-ish. Returns data chunk ptr or 0.
 const uint8_t* z34_8980(const Z34Seams& s, const uint8_t* buf, uint32_t* len, uint16_t* fmt) {
     auto r32 = [](const uint8_t* p) { return (uint32_t)p[0] | p[1] << 8 | p[2] << 16 | (uint32_t)p[3] << 24; };
@@ -128,7 +128,7 @@ const uint8_t* z34_8980(const Z34Seams& s, const uint8_t* buf, uint32_t* len, ui
     return nullptr;
 }
 
-// 1.13c D2sound+0x6C00
+// D2sound 0x6C00 (1.13c)
 void z34_6C00(const Z34Seams& s, Z34G& g, uint32_t self, float v) {
     if (!self) s.fatal(0);
     if (g.d659c) v = 0.0f;
@@ -142,7 +142,7 @@ void z34_6C00(const Z34Seams& s, Z34G& g, uint32_t self, float v) {
     s.com(b, 0x10, 0, 4, 0, 0, 0);  // second call with (&DAT_6f9c0208,4,0,0,&r,4): GUESSED
 }
 
-// 1.13c D2sound+0x6D80
+// D2sound 0x6D80 (1.13c)
 void z34_6D80(const Z34Seams& s, uint32_t* self, int32_t p) {
     if (!self) s.fatal(0x2ef);
     uint32_t obj = *self;
@@ -151,13 +151,13 @@ void z34_6D80(const Z34Seams& s, uint32_t* self, int32_t p) {
     s.com(obj, 0x40, 0, 0, 0, 0, 0);
 }
 
-// 1.13c D2sound+0x9AD0
+// D2sound 0x9AD0 (1.13c)
 uint32_t z34_9AD0(const Z34Seams& s, Z34G& g, uint32_t v) {
     s.regWrite("Diablo II", "Master Volume", 0, v);
     return g.d64a4 = v;
 }
 
-// 1.13c D2sound+0x9230
+// D2sound 0x9230 (1.13c)
 void z34_9230(const Z34Seams& s, Z34G& g) {
     g.d6588 = 0;
     if (g.d658c && g.d5994) {

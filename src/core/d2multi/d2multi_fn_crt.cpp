@@ -1,5 +1,5 @@
 // D2Multi MSVC CRT locale/stdio (FN-path ours): 32-bit x86 record layouts, retail callees as seams.
-// 1.13c D2Multi+0x2BFC: VC7.1 CRT ___freetlocinfo. Retail globals and callees are explicit seams.
+// D2Multi 0x2BFC (1.13c): VC7.1 CRT ___freetlocinfo. Retail globals and callees are explicit seams.
 #include <cstdint>
 
 struct D2MultiFreeTlocinfoEnv {
@@ -62,7 +62,7 @@ struct D2MultiUpdatetlocinfoLkHost {
     uint32_t static_tlocinfo;    // DAT_6f9e9058 (RVA 0x19058), static locale, never freed
 };
 
-// 1.13c D2Multi+0x2CCC ___updatetlocinfo_lk (193 bytes): int __cdecl ___updatetlocinfo_lk(void).
+// D2Multi 0x2CCC (1.13c) ___updatetlocinfo_lk (193 bytes): int __cdecl ___updatetlocinfo_lk(void).
 // ptd = __getptd(); old = ptd->ptlocinfo (+0x64). When old is not the process default, release it: its
 // own refcount and the refcounts of its non-null sub-records at +0x2C/+0x34/+0x30/+0x40, then the
 // lconv at +0x4C/+0xB4 (unconditional -- the image has no null check there). Install the default, bump
@@ -102,14 +102,14 @@ uint32_t d2multi_updatetlocinfo_lk_env(const D2MultiUpdatetlocinfoLkHost* host) 
 }
 
 struct D2MultiUpdatetlocinfoHost { void (*lock)(int32_t); uint32_t (*updatetlocinfo_lk)(void); void (*unlock)(int32_t); };
-// 1.13c D2Multi+0x2D8D ___updatetlocinfo: lock 0xC, ___updatetlocinfo_lk (0x2CCC), unlock (0x2DBF).
+// D2Multi 0x2D8D (1.13c) ___updatetlocinfo: lock 0xC, ___updatetlocinfo_lk (0x2CCC), unlock (0x2DBF).
 // 1.13c D2Multi+0x2D8D
 extern "C" uint32_t d2multi_updatetlocinfo_env(const D2MultiUpdatetlocinfoHost* h) {
     h->lock(0xC); uint32_t r = h->updatetlocinfo_lk(); h->unlock(0xC); return r;
 }
 
 struct D2MultiStream32 { uint32_t ptr; int32_t cnt; uint32_t base; uint32_t flag; int32_t file; uint32_t charbuf; int32_t bufsiz; uint32_t tmpfname; };
-// 1.13c D2Multi+0x218D __flsbuf (same MSVC 2003 body as D2Gfx+0x1C81; __write/__getbuf are wasm-less: __write accepts the whole buffer).
+// D2Multi 0x218D (1.13c) __flsbuf (same MSVC 2003 body as D2Gfx+0x1C81; __write/__getbuf are wasm-less: __write accepts the whole buffer).
 // 1.13c D2Multi+0x218D
 extern "C" int32_t d2multi_flsbuf_env(int32_t ch, D2MultiStream32* f) {
     uint32_t flag = f->flag;

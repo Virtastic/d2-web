@@ -48,6 +48,6 @@ uint32_t d2multi_strtoxl(const uint8_t* s, const uint8_t** end, uint32_t base, u
     return (flags & 2) ? (uint32_t)-(int32_t)val : val;
 }
 
-// 1.13c D2Multi+0x2AF0  __aulldvrm: unsigned 64-bit divide; retail returns quotient in edx:eax, remainder in ebx:ecx
+// D2Multi 0x2AF0 (1.13c, marked in d2multi_aulldvrm_2af0.cpp)  __aulldvrm: unsigned 64-bit divide; retail returns quotient in edx:eax, remainder in ebx:ecx
 struct D2MultiDivRem { uint64_t quot, rem; };
 D2MultiDivRem d2multi_aulldvrm(uint64_t n, uint64_t d) { return { n / d, n % d }; }

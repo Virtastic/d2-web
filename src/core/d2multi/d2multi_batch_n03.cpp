@@ -68,7 +68,7 @@ inline u32* A(uintptr_t a) { return (u32*)a; }
 inline u8* A8(uintptr_t a) { return (u8*)a; }
 }
 
-// 1.13c D2Multi+0x599E
+// D2Multi 0x599E (1.13c)
 static u32 d2_multi_sub_599e(u32 cp) {
   switch (cp) { case 0x3a4: return 0x411; case 0x3a8: return 0x804; case 0x3b5: return 0x412; case 0x3b6: return 0x404; }
   return 0;

@@ -238,14 +238,14 @@ void FUN_6fa4fc40(State& s, Host& h, const std::function<int32_t(int)>& mkCtl, c
   FUN_6fa4f800(s, h);
 }
 
-// 1.13c D2Launch+0x110C0  (screenMode = Ordinal_10009(); tbl = the 16 layout words in retail order)
+// D2Launch 0x110C0 (1.13c)  (screenMode = Ordinal_10009(); tbl = the 16 layout words in retail order)
 void FUN_6fa510c0(int screenMode, int32_t* const tbl[16]) {
   static const int32_t v[16] = {0x9b,0x14e,0x184,0x1ba,0xf0,0x158,0x9c,0x1fa,0x22b,0x23f,0x22b,0x22b,0x23f,0x253,0x46,0xee};
   if (screenMode != 9) return;
   for (int i = 0; i < 16; i++) *tbl[i] = v[i];
 }
 
-// 1.13c D2Launch+0x11AA0
+// D2Launch 0x11AA0 (1.13c)
 void FUN_6fa51aa0(State& s, char m) {
   uint8_t* c = s.ctx; c[0x1ea] = m;
   for (int o = 0x81; o <= 0x87; o++) c[o] = 0;

@@ -74,7 +74,7 @@ extern "C" int z26_flsbuf_6f9d218d(int ch, void* fp) {
     f->flag |= 0x20; return -1;
 }
 
-// 1.13c D2Multi+0x22A6  write_char  (AL=ch, ECX=FILE*, ESI=&charsout)
+// D2Multi 0x22A6 (1.13c)  write_char  (AL=ch, ECX=FILE*, ESI=&charsout)
 extern "C" void z26_write_char_6f9d22a6(uint8_t ch, void* fp, int* charsout) {
     z26_FILE* f = (z26_FILE*)fp;
     if (!(f->flag & 0x40) || f->base != 0) {
@@ -86,12 +86,12 @@ extern "C" void z26_write_char_6f9d22a6(uint8_t ch, void* fp, int* charsout) {
     ++*charsout;
 }
 
-// 1.13c D2Multi+0x22D9  write_multi_char  (EAX=&charsout, param_2=count; ch/FILE in regs)
+// D2Multi 0x22D9 (1.13c)  write_multi_char  (EAX=&charsout, param_2=count; ch/FILE in regs)
 extern "C" void z26_write_multi_char_6f9d22d9(uint8_t ch, int n, void* fp, int* charsout) {
     do { if (n < 1) return; --n; z26_write_char_6f9d22a6(ch, fp, charsout); } while (*charsout != -1);
 }
 
-// 1.13c D2Multi+0x22FD  write_string  (EAX=&charsout, EDI=FILE*, ESI=ptr to chars)
+// D2Multi 0x22FD (1.13c)  write_string  (EAX=&charsout, EDI=FILE*, ESI=ptr to chars)
 extern "C" void z26_write_string_6f9d22fd(int n, const uint8_t* s, void* fp, int* charsout) {
     z26_FILE* f = (z26_FILE*)fp;
     if (!(f->flag & 0x40) || f->base != 0) {
@@ -99,7 +99,7 @@ extern "C" void z26_write_string_6f9d22fd(int n, const uint8_t* s, void* fp, int
     } else *charsout += n;
 }
 
-// 1.13c D2Multi+0x2B85  ___isctype_mt  (this=char, param_1=locinfo, param_2=c, param_3=mask)
+// D2Multi 0x2B85 (1.13c)  ___isctype_mt  (this=char, param_1=locinfo, param_2=c, param_3=mask)
 extern "C" uint32_t z26_isctype_mt_6f9d2b85(uint32_t thisv, void* li, int c, uint32_t mask) {
     uint16_t t;
     uint8_t* ctype = (uint8_t*)z26_p(W(li, 0x48));

@@ -67,7 +67,7 @@ int32_t d2_multi_flsbuf(int32_t ch, CrtFile* f) {
     return -1;
 }
 
-// 1.13c D2Multi+0x22A6  write_char (AL=ch, ECX=FILE, ESI=&count)
+// D2Multi 0x22A6 (1.13c)  write_char (AL=ch, ECX=FILE, ESI=&count)
 void d2_multi_write_char(uint8_t ch, CrtFile* f, int32_t* count) {
     if (!(f->flag & 0x40) || f->base) {
         int32_t r;
@@ -78,19 +78,19 @@ void d2_multi_write_char(uint8_t ch, CrtFile* f, int32_t* count) {
     ++*count;
 }
 
-// 1.13c D2Multi+0x22D9  write_multi_char (EAX=&count; ch/FILE carried in regs)
+// D2Multi 0x22D9 (1.13c)  write_multi_char (EAX=&count; ch/FILE carried in regs)
 void d2_multi_write_multi_char(uint8_t ch, int32_t n, CrtFile* f, int32_t* count) {
     while (n-- > 0) { d2_multi_write_char(ch, f, count); if (*count == -1) return; }
 }
 
-// 1.13c D2Multi+0x22FD  write_string (EAX=&count, EDI=FILE; chars from ESI cursor)
+// D2Multi 0x22FD (1.13c)  write_string (EAX=&count, EDI=FILE; chars from ESI cursor)
 void d2_multi_write_string(int32_t n, CrtFile* f, int32_t* count, const uint8_t* s) {
     if (!(f->flag & 0x40) || f->base) {
         while (n-- > 0) { d2_multi_write_char(*s++, f, count); if (*count == -1) return; }
     } else *count += n;
 }
 
-// 1.13c D2Multi+0x2B85  ___isctype_mt (param_1 = threadlocinfo link)
+// D2Multi 0x2B85 (1.13c)  ___isctype_mt (param_1 = threadlocinfo link)
 uint32_t d2_multi_isctype_mt(uint32_t pl, int32_t c, uint32_t mask) {
     uint16_t t;
     if ((uint32_t)(c + 1) < 0x101) {

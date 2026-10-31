@@ -25,7 +25,7 @@ static inline uint32_t& z40_w(void* o, int off) { return *(uint32_t*)((uint8_t*)
 struct Z40Opts { uint32_t mixer, master, music, bias, npc, optMusic; };
 struct Z40Globals { uint32_t* chan[8]; uint32_t cnt65b8, h65c0, f65c4; };  // 6f9c6560.., 65b8, 65c0, 65c4
 
-// 1.13c D2sound+0x6850
+// D2sound 0x6850 (1.13c)
 uint32_t z40_6850(const Z40Seams& s, void* o) {
     if (!o) s.fatal(0x310);
     s.enter();
@@ -35,14 +35,14 @@ uint32_t z40_6850(const Z40Seams& s, void* o) {
     return 0;
 }
 
-// 1.13c D2sound+0x8690  (singly linked list length, next at +4)
+// D2sound 0x8690 (1.13c)  (singly linked list length, next at +4)
 int z40_8690(const uint8_t* const* base, const uint8_t* (*next)(const uint8_t*), const uint8_t* n) {
     (void)base; int c = 0;
     for (; n; n = next(n)) c++;
     return c;
 }
 
-// 1.13c D2sound+0x8710  (push new 0xd4 node {data=param_2, next=old head})
+// D2sound 0x8710 (1.13c)  (push new 0xd4 node {data=param_2, next=old head})
 void z40_8710(const Z40Seams& s, uint32_t* head, uint32_t data) {
     uint32_t n = s.alloc(0xd4, 0);
     uint32_t* p = (uint32_t*)(uintptr_t)n;
@@ -50,7 +50,7 @@ void z40_8710(const Z40Seams& s, uint32_t* head, uint32_t data) {
     uint32_t old = *head; p[0] = data; p[1] = old; *head = n;
 }
 
-// 1.13c D2sound+0x80A0  (any of the 8 channels in use; fatal if a slot is null / has no handle)
+// D2sound 0x80A0 (1.13c)  (any of the 8 channels in use; fatal if a slot is null / has no handle)
 int z40_80A0(const Z40Seams& s, const Z40Globals& g) {
     if (!g.cnt65b8) return 0;
     for (int i = 0; i < 8; i++) {
@@ -61,7 +61,7 @@ int z40_80A0(const Z40Seams& s, const Z40Globals& g) {
     return 0;
 }
 
-// 1.13c D2sound+0x6F30
+// D2sound 0x6F30 (1.13c)
 int z40_6F30(const Z40Seams& s, uint32_t* o) {
     if (!o) s.fatal(0x279);
     s.enter();
@@ -71,13 +71,13 @@ int z40_6F30(const Z40Seams& s, uint32_t* o) {
     return 1;
 }
 
-// 1.13c D2sound+0x6820
+// D2sound 0x6820 (1.13c)
 void z40_6820(const Z40Seams& s, uint8_t* o, uint32_t v) {
     if (!o) s.fatal(0x32f);
     z40_w(o, 0x40) = v;
 }
 
-// 1.13c D2sound+0x66F0  (__thiscall this, a=param_1, b=param_2)
+// D2sound 0x66F0 (1.13c)  (__thiscall this, a=param_1, b=param_2)
 int z40_66F0(const Z40Seams& s, void* self, int a, int b) {
     if (!self) s.fatal(0x3db);
     if (!s.ord10102()) return 0;
@@ -93,7 +93,7 @@ int z40_66F0(const Z40Seams& s, void* self, int a, int b) {
     return 0;
 }
 
-// 1.13c D2sound+0x6680
+// D2sound 0x6680 (1.13c)
 void z40_6680(const Z40Seams& s, uint32_t* o) {
     if (!o || !o[0]) s.fatal(0x400);
     s.enter();
@@ -106,13 +106,13 @@ void z40_6680(const Z40Seams& s, uint32_t* o) {
     s.leave();
 }
 
-// 1.13c D2sound+0x6950
+// D2sound 0x6950 (1.13c)
 uint32_t z40_6950(const Z40Seams& s, const uint32_t* o) {
     if (!o || !o[0]) s.fatal(0x2a5);
     return o[7];
 }
 
-// 1.13c D2sound+0x7D00
+// D2sound 0x7D00 (1.13c)
 void z40_7D00(const Z40Seams& s, Z40Globals& g, uint32_t v) {
     if (v && !g.h65c0) { s.sub7BC0(); g.f65c4 = 1; }
     g.h65c0 = v;

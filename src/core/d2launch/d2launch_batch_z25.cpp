@@ -33,21 +33,21 @@ uint32_t* z25_doserrno_ptr() { return &z25_getptd()->_tdoserrno; }
 void z25_unlock1() { z25_unlock(1); }
 // 1.13c D2Launch+0x440B
 void z25_unlock4a() { z25_unlock(4); }
-// 1.13c D2Launch+0x45CF
+// D2Launch 0x45CF (1.13c)
 int z25_flushall_one(Z25File* f) {
     if (z25_flush(f) != 0) return -1;
     if (f->_flag & 0x4000) return -(z25_commit(f->_file) != 0);
     return 0;
 }
-// 1.13c D2Launch+0x46DB
+// D2Launch 0x46DB (1.13c)
 void z25_tlsalloc() { z25_tls_alloc(); }
-// 1.13c D2Launch+0x48B7
+// D2Launch 0x48B7 (1.13c)
 void z25_unlock13() { z25_unlock(0xd); }
-// 1.13c D2Launch+0x48C3
+// D2Launch 0x48C3 (1.13c)
 void z25_unlock12() { z25_unlock(0xc); }
-// 1.13c D2Launch+0x4AB0
+// D2Launch 0x4AB0 (1.13c)
 void z25_unlock4b() { z25_unlock(4); }
-// 1.13c D2Launch+0x4F3E
+// D2Launch 0x4F3E (1.13c)
 int z25_setargv() {
     int local8 = 0;  // in_ECX: uninitialised register arg in decompile; GUESSED 0
     if (z25_mbctable_init == 0) z25_initmbctable();

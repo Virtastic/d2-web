@@ -8,16 +8,16 @@ static int d2s_addl(uint32_t a, uint32_t b, uint32_t* out) {
     return (s < a || s < b) ? 1 : 0;
 }
 
-// 1.13c D2sound+0x0B14E
+// D2sound 0x0B14E (1.13c)
 void d2s_setdefaultprecision(void (*controlfp)(uint32_t, uint32_t)) { controlfp(0x10000, 0x30000); }
 
-// 1.13c D2sound+0x0B160
+// D2sound 0x0B160 (1.13c)
 int d2s_ms_p5_test_fdiv(double a, double b, double c) {
     // a=_DAT_9c0990 divisor-check constants (4195835/3145727 family)
     return (a < b - (b / c) * c) ? 1 : 0;
 }
 
-// 1.13c D2sound+0x0B1A0
+// D2sound 0x0B1A0 (1.13c)
 void d2s_ms_p5_mp_test_fdiv(int (*isProcessorFeaturePresent)(int), int (*p5test)(void)) {
     if (isProcessorFeaturePresent) { isProcessorFeaturePresent(0); return; }
     p5test();
@@ -34,7 +34,7 @@ int d2s_ZeroTail(const uint32_t* man, int bits) {
     }
 }
 
-// 1.13c D2sound+0x0C5EE
+// D2sound 0x0C5EE (1.13c)
 void d2s_IncMan(uint32_t* man, int bits) {
     uint32_t* p = man + bits / 32;
     int carry = d2s_addl(*p, 1u << ((0x1f - (bits % 32)) & 0x1f), p);
@@ -44,7 +44,7 @@ void d2s_IncMan(uint32_t* man, int bits) {
     }
 }
 
-// 1.13c D2sound+0x0C63B
+// D2sound 0x0C63B (1.13c)
 int d2s_RoundMan(uint32_t* man, int bits) {
     int ret = 0, w = bits / 32;
     unsigned sh = (0x1f - (bits % 32)) & 0x1f;
@@ -54,7 +54,7 @@ int d2s_RoundMan(uint32_t* man, int bits) {
     return ret;
 }
 
-// 1.13c D2sound+0x0C6E1
+// D2sound 0x0C6E1 (1.13c)
 void d2s_ShrMan(uint32_t* man, int bits) {
     unsigned b = bits % 32;
     uint32_t carry = 0;

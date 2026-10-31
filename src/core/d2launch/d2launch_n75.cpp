@@ -63,7 +63,7 @@ void getbuf_58e3(H* h, RFile* f) {
     f->_ptr = f->_base;
 }
 
-// 1.13c D2LAUNCH+0x12020  qsort-style compare of two char** slots by C string
+// D2LAUNCH 0x12020 (1.13c)  qsort-style compare of two char** slots by C string
 int strcmp_slots_12020(void* const* a, void* const* b) {
     const uint8_t* p = *(const uint8_t* const*)*a;
     const uint8_t* q = *(const uint8_t* const*)*b;
@@ -73,7 +73,7 @@ int strcmp_slots_12020(void* const* a, void* const* b) {
     }
 }
 
-// 1.13c D2LAUNCH+0x12140  put v in the first free slot of the table at DAT_65e74 (count DAT_65e78)
+// D2LAUNCH 0x12140 (1.13c)  put v in the first free slot of the table at DAT_65e74 (count DAT_65e78)
 int slot_add_12140(H* h, void* v) {
     void** tbl = (void**)P(0x65e74);
     if (!tbl) fatal(h, 0x1106);
@@ -210,7 +210,7 @@ static uint32_t pool_add(H* h, intptr_t rec) {
     return v;
 }
 #define REC(rva) ((intptr_t)h->dat(0x6fa00000u | (rva)))
-// 1.13c D2LAUNCH+0x12B10 shape: pool_add(&DAT_60f20[idx*0x30]); returns the handle
+// D2LAUNCH 0x12B10 (1.13c) shape: pool_add(&DAT_60f20[idx*0x30]); returns the handle
 static uint32_t pool_idx(H* h, int idx) { return pool_add(h, (intptr_t)((uint8_t*)h->dat(0x6fa60f20u) + idx * 0x30)); }
 
 // 1.13c D2LAUNCH+0x15090  two-button popup (p3 selects the pair); pool DAT_653c0 / count DAT_65e34

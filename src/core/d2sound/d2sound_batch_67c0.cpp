@@ -290,7 +290,7 @@ double D2Sound_87D0(float x) {
     return std::pow(g_c0968, (double)(x * g_c0964));  // 10^(x*0.0005): -10000..0 hundredths-dB -> 1e-5..1
 }
 
-// 1.13c D2Sound+0x8980
+// D2Sound 0x8980 (1.13c)
 // Parse a RIFF/WAVE header in place: 'RIFF' + 'WAVE', the 'fmt ' chunk (>= 16 bytes) is copied into the
 // 18-byte WAVEFORMATEX-ish out record, then the 'data' chunk is located. *size is consumed as the
 // chunks are walked; on success it ends as the data chunk's length and the data payload is returned.
@@ -522,10 +522,10 @@ uint32_t D2Sound_6EC0(void* obj) {
 // 1.13c D2sound+0x07B10 (Ordinal 10057)
 uint32_t D2Sound_7B10(void) { return g_primary && rd32(g_primary, 0x48) ? 1u : 0u; }
 
-// 1.13c D2sound+0x06B60 (Ordinal 10064)
+// D2sound 0x06B60 (1.13c) (Ordinal 10064)
 uint32_t D2Sound_6B60(void) { return g_soundOn ? g_masterVolume : 0u; }
 
-// 1.13c D2sound+0x086C0 (Ordinal 10062)
+// D2sound 0x086C0 (1.13c) (Ordinal 10062)
 // Unlink the first node holding `value` and free it.
 void D2Sound_86C0(D2SoundNode** list, uint32_t value) {
     D2SoundNode *prev = nullptr, *n = *list;
@@ -538,7 +538,7 @@ void D2Sound_86C0(D2SoundNode** list, uint32_t value) {
     }
 }
 
-// 1.13c D2sound+0x08920 (Ordinal 10063)
+// D2sound 0x08920 (1.13c) (Ordinal 10063)
 // Free every node (retail re-walks from the head for the head's value each pass).
 void D2Sound_8920(D2SoundNode** list) {
     while (*list) { D2SoundNode* h = *list; D2Sound_86C0(list, h->value); }
@@ -559,7 +559,7 @@ void D2Sound_7480(uint32_t v, const D2SoundEnv* env) {
     LeaveCriticalSection(&g_lock);
 }
 
-// 1.13c D2sound+0x07740 (Ordinal 10065)
+// D2sound 0x07740 (1.13c) (Ordinal 10065)
 // Allocate a zeroed 0x60-byte stream, run 0x7090 on it, and push it on the global list.
 void* D2Sound_7740(uint32_t flags, uint32_t tag, const D2SoundEnvB* e) {
     g_tag6584 = tag;
@@ -575,7 +575,7 @@ void* D2Sound_7740(uint32_t flags, uint32_t tag, const D2SoundEnvB* e) {
     return s;
 }
 
-// 1.13c D2sound+0x07C60 (Ordinal 10068)
+// D2sound 0x07C60 (1.13c) (Ordinal 10068)
 // Restart the primary stream from 0 at volume 0x6E when it is idle; 1 on success.
 uint32_t D2Sound_7C60(int32_t enable, int32_t loop, const D2SoundEnvB* e) {
     if (g_primary && g_soundOn && g_masterVolume && rd32(g_primary, 0x48) == 0 && enable) {

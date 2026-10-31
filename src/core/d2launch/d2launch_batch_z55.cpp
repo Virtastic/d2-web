@@ -29,10 +29,10 @@ static inline uint32_t& F(uint32_t f, int o) { return *(uint32_t*)(uintptr_t)(f 
 // 1.13c D2LAUNCH+0x167D  (__cexit)
 void FUN_6fa4167d(void) { CRT_doexit(0, 0, 1); }
 
-// 1.13c D2LAUNCH+0x16DE  (fsopen unlock thunk; FILE* in caller frame at ebp-0x1c)
+// D2LAUNCH 0x16DE (1.13c)  (fsopen unlock thunk; FILE* in caller frame at ebp-0x1c)
 void FUN_6fa416de(uint32_t file) { CRT_unlock_file(file); }
 
-// 1.13c D2LAUNCH+0x168C  (__fsopen)
+// D2LAUNCH 0x168C (1.13c)  (__fsopen)
 uint32_t FUN_6fa4168c(uint32_t name, uint32_t mode, int shflag) {
   uint32_t f = FUN_getstream();
   if (!f) { *FUN_errno() = 0x18; return 0; }
@@ -41,10 +41,10 @@ uint32_t FUN_6fa4168c(uint32_t name, uint32_t mode, int shflag) {
   return f;
 }
 
-// 1.13c D2LAUNCH+0x16E8  (_fopen)
+// D2LAUNCH 0x16E8 (1.13c)  (_fopen)
 uint32_t FUN_6fa416e8(uint32_t name, uint32_t mode) { return FUN_6fa4168c(name, mode, 0x40); }
 
-// 1.13c D2LAUNCH+0x16FB  (__fread_lk)
+// D2LAUNCH 0x16FB (1.13c)  (__fread_lk)
 uint32_t FUN_6fa416fb(uint8_t* dst, uint32_t size, uint32_t count, uint32_t fp) {
   uint32_t total = size * count, left, bufsz;
   if (!total) return 0;
@@ -75,10 +75,10 @@ uint32_t FUN_6fa416fb(uint8_t* dst, uint32_t size, uint32_t count, uint32_t fp) 
   return count;
 }
 
-// 1.13c D2LAUNCH+0x1826  (fread unlock thunk)
+// D2LAUNCH 0x1826 (1.13c)  (fread unlock thunk)
 void FUN_6fa41826(uint32_t file) { CRT_unlock_file(file); }
 
-// 1.13c D2LAUNCH+0x17E4  (_fread)
+// D2LAUNCH 0x17E4 (1.13c)  (_fread)
 uint32_t FUN_6fa417e4(void* dst, uint32_t size, uint32_t count, uint32_t fp) {
   CRT_lock_file(fp);
   uint32_t r = FUN_6fa416fb((uint8_t*)dst, size, count, fp);
@@ -86,7 +86,7 @@ uint32_t FUN_6fa417e4(void* dst, uint32_t size, uint32_t count, uint32_t fp) {
   return r;
 }
 
-// 1.13c D2LAUNCH+0x1830  (_time)
+// D2LAUNCH 0x1830 (1.13c)  (_time)
 int32_t FUN_6fa41830(int32_t* out) {
   uint32_t ft[2];
   CRT_GetSystemTimeAsFileTime(ft);
@@ -95,7 +95,7 @@ int32_t FUN_6fa41830(int32_t* out) {
   return (int32_t)q;
 }
 
-// 1.13c D2LAUNCH+0x1869  (__fclose_lk)
+// D2LAUNCH 0x1869 (1.13c)  (__fclose_lk)
 int FUN_6fa41869(uint32_t fp) {
   int r = -1;
   if (F(fp, 0xC) & 0x83) {
@@ -108,7 +108,7 @@ int FUN_6fa41869(uint32_t fp) {
   return r;
 }
 
-// 1.13c D2LAUNCH+0x18B5  (_fclose; 0x18FE unlock thunk = CRT_unlock_file)
+// D2LAUNCH 0x18B5 (1.13c)  (_fclose; 0x18FE unlock thunk = CRT_unlock_file)
 int FUN_6fa418b5(uint32_t fp) {
   if (F(fp, 0xC) & 0x40) { F(fp, 0xC) = 0; return -1; }
   CRT_lock_file(fp);
@@ -117,11 +117,11 @@ int FUN_6fa418b5(uint32_t fp) {
   return r;
 }
 
-// 1.13c D2LAUNCH+0x1906  (__CRT_INIT@12) PARTIAL: the per-reason CRT bring-up/teardown
+// D2LAUNCH 0x1906 (1.13c)  (__CRT_INIT@12) PARTIAL: the per-reason CRT bring-up/teardown
 // (GetVersionEx globals, heap/mtinit/ioinit/setargv/setenvp/cinit, TLS ptd alloc) is one seam.
 uint32_t FUN_6fa41906(uint32_t hinst, int reason) { return CRT_cinit_all(hinst, reason); }
 
-// 1.13c D2LAUNCH+0x1A87  (DLL entry)
+// D2LAUNCH 0x1A87 (1.13c)  (DLL entry)
 int FUN_6fa41a87(uint32_t hinst, int reason, uint32_t reserved) {
   int r = 1;
   if (reason == 0 && DAT_6fa64e28 == 0) return 0;

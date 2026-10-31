@@ -20,10 +20,10 @@ struct Z24Env {
     uint32_t (*getModuleHandle)(const char*);
 };
 
-// 1.13c D2sound+0x2450 -- __chkstk: stack-probe helper, no portable body.
+// D2sound 0x2450 (1.13c) -- __chkstk: stack-probe helper, no portable body.
 void z24_chkstk() {}
 
-// 1.13c D2sound+0x458d -- ___crtMessageBoxA. Globals: 633c MessageBoxA, 6340 GetActiveWindow,
+// D2sound 0x458d (1.13c) -- ___crtMessageBoxA. Globals: 633c MessageBoxA, 6340 GetActiveWindow,
 // 6344 GetLastActivePopup, 6348 GetProcessWindowStation, 634c GetUserObjectInformationA,
 // 6004 platform id, 6010 OS major version.
 int z24_crtMessageBoxA(const Z24Env* e, uint32_t text, uint32_t caption, uint32_t type) {
@@ -64,7 +64,7 @@ int z24_crtMessageBoxA(const Z24Env* e, uint32_t text, uint32_t caption, uint32_
     return (int)e->callProc(e->rd(0x6f9c633c), a, 4);
 }
 
-// 1.13c D2sound+0x38a7 -- ___sbh_alloc_new_region; entries 0x14 bytes; 0 on failure.
+// D2sound 0x38a7 (1.13c) -- ___sbh_alloc_new_region; entries 0x14 bytes; 0 on failure.
 uint32_t z24_sbh_alloc_new_region(const Z24Env* e) {
     uint32_t cnt = e->rd(0x6f9c6618), cap = e->rd(0x6f9c6628), arr = e->rd(0x6f9c661c);
     if (cnt == cap) {

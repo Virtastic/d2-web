@@ -23,7 +23,7 @@ extern void z36_call(uint32_t fn) W;
 
 static uint32_t* P(uint32_t a) { return z36_mem32(a); }
 
-// 1.13c D2Multi+0x32D7  (__onexit_lk; edi = function pointer)
+// D2Multi 0x32D7 (1.13c)  (__onexit_lk; edi = function pointer)
 void d2multi_32D7(uint32_t edi) {
     uint32_t sz = z36_msize(DAT_6fa0b4b0);
     if (sz < DAT_6fa0b4ac + (4 - DAT_6fa0b4b0)) {
@@ -40,7 +40,7 @@ void d2multi_32D7(uint32_t edi) {
     DAT_6fa0b4ac += 4;
 }
 
-// 1.13c D2Multi+0x3357  (___onexitinit)
+// D2Multi 0x3357 (1.13c)  (___onexitinit)
 uint32_t d2multi_3357(void) {
     DAT_6fa0b4b0 = z36_malloc(0x80);
     if (!DAT_6fa0b4b0) return 0x18;
@@ -49,7 +49,7 @@ uint32_t d2multi_3357(void) {
     return 0;
 }
 
-// 1.13c D2Multi+0x337F  (__onexit)
+// D2Multi 0x337F (1.13c)  (__onexit)
 uint32_t d2multi_337F(uint32_t func) {
     z36_lock1363();
     d2multi_32D7(func);
@@ -57,27 +57,27 @@ uint32_t d2multi_337F(uint32_t func) {
     return func;   // __onexit_lk leaves the function in edi/eax path; retail returns its eax
 }
 
-// 1.13c D2Multi+0x33B7  (_atexit)
+// D2Multi 0x33B7 (1.13c)  (_atexit)
 int32_t d2multi_33B7(uint32_t func) { return (d2multi_337F(func) != 0) - 1; }
 
-// 1.13c D2Multi+0x33C9  (__RTC_Initialize; table is empty in retail so the loop never runs)
+// D2Multi 0x33C9 (1.13c)  (__RTC_Initialize; table is empty in retail so the loop never runs)
 void d2multi_33C9(void) {
     for (uint32_t* p = DAT_6f9e81bc; p < DAT_6f9e81bc; ++p) if (*p) z36_call(*p);
 }
 
-// 1.13c D2Multi+0x3454  (__SEH_prolog, inlined helper: saves regs below the frame, links ExceptionList)
+// D2Multi 0x3454 (1.13c)  (__SEH_prolog, inlined helper: saves regs below the frame, links ExceptionList)
 void d2multi_3454(uint32_t param_1, int32_t param_2) {
     (void)param_1; (void)param_2;   // frame-building is register/stack level; seam z36_stackSave holds ebx,esi,edi,retaddr
     z36_ExceptionList = 0;          // retail: ExceptionList = &local_8 (guessed: frame address has no linear-memory meaning)
 }
 
-// 1.13c D2Multi+0x348F  (__SEH_epilog)
+// D2Multi 0x348F (1.13c)  (__SEH_epilog)
 void d2multi_348F(void) {
     z36_ExceptionList = P((uint32_t)(uintptr_t)z36_ebp)[-4];
     *z36_ebp = z36_retaddr;
 }
 
-// 1.13c D2Multi+0x35B0  (___ascii_stricmp)
+// D2Multi 0x35B0 (1.13c)  (___ascii_stricmp)
 int32_t d2multi_35B0(const uint8_t* a, const uint8_t* b) {
     uint8_t c3 = 0xff;
     for (;;) {
@@ -93,10 +93,10 @@ int32_t d2multi_35B0(const uint8_t* a, const uint8_t* b) {
     }
 }
 
-// 1.13c D2Multi+0x39D4  (&_errno)
+// D2Multi 0x39D4 (1.13c)  (&_errno)
 int32_t* d2multi_39D4(void) { return &z36_getptd()[2]; }
 
-// 1.13c D2Multi+0x39DD  (&__doserrno)
+// D2Multi 0x39DD (1.13c)  (&__doserrno)
 uint32_t* d2multi_39DD(void) { return (uint32_t*)&z36_getptd()[3]; }
 
 // 1.13c D2Multi+0x39E6  (__dosmaperr)
@@ -110,7 +110,7 @@ void d2multi_39E6(uint32_t e) {
     z36_getptd()[2] = r;
 }
 
-// 1.13c D2Multi+0x3A59  (_free)
+// D2Multi 0x3A59 (1.13c)  (_free)
 void d2multi_3A59(uint32_t mem) {
     if (!mem) return;
     if (DAT_6fa0b388 == 3) {

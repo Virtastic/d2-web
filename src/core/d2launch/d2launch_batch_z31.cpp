@@ -53,7 +53,7 @@ uint32_t z31_heap_select() {
     return 3;
 }
 
-// 1.13c D2Launch+0x511C
+// D2Launch 0x511C (1.13c)
 int z31_heap_init(int isMT /* stack arg */) {
     z31_heap = z31_HeapCreate(isMT == 0, 0x1000, 0);
     if (!z31_heap) return 0;
@@ -62,7 +62,7 @@ int z31_heap_init(int isMT /* stack arg */) {
     return 1;
 }
 
-// 1.13c D2Launch+0x516D
+// D2Launch 0x516D (1.13c)
 void z31_heap_term() {
     if (z31_heap_type == 3) {
         uint32_t* p = (uint32_t*)(z31_sbh_regions + 0xc);
@@ -76,7 +76,7 @@ void z31_heap_term() {
     z31_HeapDestroy(z31_heap);
 }
 
-// 1.13c D2Launch+0x53AC  (__NMSG_WRITE)
+// D2Launch 0x53AC (1.13c)  (__NMSG_WRITE)
 void z31_nmsg_write(int rterrnum) {
     uint32_t i = 0;
     do { if (rterrnum == z31_rterrs[i].code) break; i++; } while (i < 0x13);
@@ -102,7 +102,7 @@ void z31_nmsg_write(int rterrnum) {
     }
 }
 
-// 1.13c D2Launch+0x5524  (__FF_MSGBANNER)
+// D2Launch 0x5524 (1.13c)  (__FF_MSGBANNER)
 void z31_ff_msgbanner() {
     if (z31_app_type == 1 || (z31_app_type == 0 && z31_app_type2 == 1)) {
         z31_nmsg_write(0xfc);
@@ -113,7 +113,7 @@ void z31_ff_msgbanner() {
 
 static inline uint8_t* z31_pio(uint32_t fh) { return z31_pioinfo[(int32_t)fh >> 5] + (fh & 0x1f) * 0x24; }
 
-// 1.13c D2Launch+0x555D  (__lseek_lk)
+// D2Launch 0x555D (1.13c)  (__lseek_lk)
 uint32_t z31_lseek_lk(uint32_t fh, int32_t off, uint32_t origin) {
     uint32_t h = z31_get_osfhandle(fh);
     if (h == 0xffffffffu) { *z31_errno_ptr() = 9; return 0xffffffffu; }
@@ -124,7 +124,7 @@ uint32_t z31_lseek_lk(uint32_t fh, int32_t off, uint32_t origin) {
     return 0xffffffffu;
 }
 
-// 1.13c D2Launch+0x55D1  (_lseek)
+// D2Launch 0x55D1 (1.13c)  (_lseek)
 long z31_lseek(int fh, long off, int origin) {
     if ((uint32_t)fh < z31_nhandle && (z31_pio(fh)[4] & 1)) {
         z31_lock_fhandle(fh);
@@ -138,7 +138,7 @@ long z31_lseek(int fh, long off, int origin) {
     return -1;
 }
 
-// 1.13c D2Launch+0x567C  (_write_lk)
+// D2Launch 0x567C (1.13c)  (_write_lk)
 int z31_write_lk(uint32_t fh, const char* buf, uint32_t count) {
     if (count == 0) return 0;
     int crs = 0; uint32_t written = 0, werr = 0, n;
@@ -172,7 +172,7 @@ int z31_write_lk(uint32_t fh, const char* buf, uint32_t count) {
     return -1;
 }
 
-// 1.13c D2Launch+0x5838  (_write)
+// D2Launch 0x5838 (1.13c)  (_write)
 int z31_write(int fh, void* buf, uint32_t count) {
     if ((uint32_t)fh < z31_nhandle && (z31_pio(fh)[4] & 1)) {
         z31_lock_fhandle(fh);
@@ -186,7 +186,7 @@ int z31_write(int fh, void* buf, uint32_t count) {
     return -1;
 }
 
-// 1.13c D2Launch+0x5927  (_isatty)
+// D2Launch 0x5927 (1.13c)  (_isatty)
 int z31_isatty(int fh) {
     if (z31_nhandle <= (uint32_t)fh) return 0;
     return (int)(int8_t)z31_pio(fh)[4] & 0x40;

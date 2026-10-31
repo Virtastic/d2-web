@@ -13,10 +13,12 @@ struct D2SndBatch25Host {
     uint64_t (*mixValue)(void);                                                     // 0xACCC
     void (*setPan)(void* dsBuf, int32_t v);                                         // vtbl +0x40
     void (*fatal)(void);                                                            // #10265/#10024 + _exit(-1)
+    void (*critEnter)(void);                                                        // EnterCriticalSection(0x16548)
+    void (*critDelete)(void);                                                       // DeleteCriticalSection(0x16548)
 };
 static D2SndBatch25Host g_h;
 static uint32_t g_positionalBias, g_masterVolume;
-static uint32_t g_initFlag, g_critSec;  // 0x165B8 / 0x16548 (CS elided: single-threaded wasm)
+static uint32_t g_initFlag;             // 0x165B8 (CS 0x16548 is entered/deleted through the host seams)
 static void* g_slots[8];                // 0x16560..0x1657F
 static uint8_t* g_chain;                // 0x165BC, node: +0x50 flag, +0x5C next
 void D2Sound_Batch25SetHost(const D2SndBatch25Host& h) { g_h = h; }
@@ -46,6 +48,7 @@ void D2Sound_SetPan(void* buf, int32_t p) {
 // 1.13c D2sound+0x8160 ordinal 10017: shutdown; no-op unless initialised.
 void D2Sound_Shutdown(void) {
     if (!g_initFlag) return;
+    g_h.critEnter();
     g_h.stopAll();
     for (int i = 0; i < 8; i++) { g_h.freeSlot(g_slots[i]); g_slots[i] = 0; }
     while (g_chain) {
@@ -55,4 +58,5 @@ void D2Sound_Shutdown(void) {
         g_chain = next;
     }
     g_initFlag = 0;
+    g_h.critDelete();
 }

@@ -79,7 +79,7 @@ int D2sound_395E(D2SndSbh& s, u32 region) {
     return g;
 }
 
-// 1.13c D2sound+0x3D43 -- returns the 32-bit arena address of the block, 0 on failure
+// D2sound 0x3D43 (1.13c) -- returns the 32-bit arena address of the block, 0 on failure
 u32 D2sound_3D43(D2SndSbh& s, u32 size) {
     u32 sz = (size + 0x17) & ~0xfu;
     int32_t bi = ((int32_t)(size + 0x17) >> 4) - 1;

@@ -30,13 +30,13 @@ struct D2LCharSelEnv {
   int32_t visible, scrollpos, basey, realm, realmflag, pumpctl;  // 64dbc 65ed4 65710 65ad4 65eb8 65edc
 };
 
-// 1.13c D2Launch+0x9E40  (EAX = selector, ESI = dst)
+// D2Launch 0x9E40 (1.13c)  (EAX = selector, ESI = dst)
 void d2launch_sub_9E40(const D2LCharSelEnv* h, uint32_t sel, void* dst) {
   static const int32_t ids[7] = {0xfab, 0xfaa, 0xfa9, 0xfa8, 0xfa7, 0x2771, 0x2772};
   h->ustrcpy(dst, h->getstr(sel > 6 ? 0x1507 : ids[sel]));
 }
 
-// 1.13c D2Launch+0xAF00
+// D2Launch 0xAF00 (1.13c)
 void d2launch_sub_AF00(const D2LCharSelEnv* h) {
   int32_t y = h->basey - 13, x = 0x25, idx = 0;
   for (int32_t i = 0; i < h->visible; i++) {

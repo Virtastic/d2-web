@@ -42,10 +42,10 @@ static u32 pushS(u32 dat) {
 }
 
 extern "C" {
-// 1.13c D2Launch+0x141F0
+// D2Launch 0x141F0 (1.13c)
 u32 FUN_6fa541f0(u32* p) { if (!Ordinal_10227()) return 0; FUN_6fa521b0(p[3], 0); return 1; }
 
-// 1.13c D2Launch+0x14290
+// D2Launch 0x14290 (1.13c)
 u32 FUN_6fa54290(u32* p) {
   int32_t mode = (int32_t)Ordinal_10151();
   int n = Ordinal_10227() ? 7 : 5; // slots 0x6fa654dc..<0x6fa654f8 / <0x6fa654f0
