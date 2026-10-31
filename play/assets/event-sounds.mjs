@@ -25,7 +25,7 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
   // Retail's client-side player step for a run (fit to a retail recording/a retail recording/a retail recording Q rows): the walk step 320 over a 3072 cycle (213.33/2048, the exact 4.8-tick footfall period a retail recording gaps need; 213 drifted a tick per 24; D2Common 0x2FB10 walk base,
   // not the run base 101 the server unit carries) over a 2048 cycle; footfalls two per cycle by the 0x23C00 due rule (nearest of cur-step, cur, cur+step
   // to phase 0, circular mod 1536), none within 2/3 of a period of the last. Phase 1207 after the run footfall gives the traced 6,5,4,5,5,5,5,4 gaps.
-  let itemsSeen = false, deadSeen = new Set();
+  let itemLevel = null, itemsSeen = false, deadSeen = new Set();
   // A run a cast started (no explicit move command) keeps the client unit in run mode 3 (a retail recording retail F rows: step 0x97 over a 2048 cycle, footfalls
   // mod 1024, every one the run group, gaps 7,7,6,7); an explicit move flips it to walk/town-walk after the first tick (step 0xD5, the model above).
   let STEP = 320, PER = 1536, MINT = 2, RUNG = 0; const circ = (a) => Math.min(a, PER - a);
@@ -75,6 +75,8 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
       let shatterNow = false; const deadNow = new Set();
       for (const m of snapshot?.entities ?? []) if (m.type === 1 && m.mode === 0) { deadNow.add(m.id); if (!deadSeen.has(m.id) && (m.states?.has(1) || m.states?.has(107) || m.states?.has(184))) shatterNow = true; }
       deadSeen = deadNow;
+      // A level change (waypoint, stairs) swaps the whole item set: the new area's ground items are the world as found, not drops (a gold pile there is not a gold drop).
+      if (Number.isInteger(snapshot?.level)) { if (itemLevel !== null && snapshot.level !== itemLevel) { seen.clear(); itemsSeen = false; } itemLevel = snapshot.level; }
       const now = new Map(), sawItems = itemsSeen; // items list seen on an earlier update: the first one is the world as found, not arrivals
       if (Array.isArray(snapshot?.items)) itemsSeen = true;
       for (const it of snapshot?.items ?? []) {

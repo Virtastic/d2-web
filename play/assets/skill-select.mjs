@@ -42,8 +42,19 @@ export function parseSkillChoices(bytes, count) {
   for (let i = 0; i < count; i++) {
     const o = i * SESSION_SKILL_CHOICE_BYTES, flags = v.getUint8(o + 6);
     out.push({ id: v.getUint16(o, true), listRow: v.getInt8(o + 2), charClass: v.getInt8(o + 3), iconCel: v.getUint16(o + 4, true),
-      passive: Boolean(flags & 1), leftSkill: Boolean(flags & 2), usable: !(flags & 4), townBlocked: Boolean(flags & 8), level: v.getUint8(o + 7) });
+      passive: Boolean(flags & 1), leftSkill: Boolean(flags & 2), usable: !(flags & 4), townBlocked: Boolean(flags & 8), aura: Boolean(flags & 16), level: v.getUint8(o + 7) });
   }
+  return out;
+}
+
+/** The colour shift (the `extra` of retail's `celcolor`) an icon is drawn with (D2Client+0x3DA60: use state 6 = aura -> 4; else 1 = red when the unit cannot use it now, on a hand BUTTON also a town-blocked skill; else 0). */
+export const skillIconExtra = (s, where = 'popup') => s.aura ? 4 : (s.usable === false || (where.endsWith('Button') && s.townBlocked)) ? 1 : 0;
+
+/** What the open popup draws, one record per icon (the emitter `draw` blits from): sheet, cel (frame), screen x / top y in 800x600 coordinates, colour shift. */
+export function popupIconDraws(choices, side) {
+  const out = [];
+  for (const row of skillSelectRows(choices, side))
+    for (const s of row.skills) out.push({ id: s.id, sheet: skillSheetAsset(s.charClass), cel: s.iconCel, x: s.x, y: s.y, extra: skillIconExtra(s, 'popup') });
   return out;
 }
 
@@ -51,8 +62,8 @@ export function parseSkillChoices(bytes, count) {
 export function skillSelectRows(choices, side) {
   const L = SKILL_SELECT_LAYOUT, rows = [];
   for (let r = 0; r < L.rows; r++) {
-    const skills = choices.filter((s) => s.listRow === r && !s.passive && s.level > 0 && (side === 'right' || s.leftSkill))
-      .sort((a, b) => side === 'left' ? a.id - b.id : b.id - a.id);
+    const skills = choices.filter((s) => s.listRow === r && !s.passive && s.level > 0 && (side === 'right' || s.leftSkill));
+    if (side === 'right') skills.reverse();   // D2Client+0x3E7F0 walks the hero's skill list in list order, x stepping +0x30 (left popup) or -0x30 (right): the right row is the list reversed
     if (!skills.length) continue;
     const width = skills.length * L.icon, top = L.firstRowTop - rows.length * L.icon;
     const x = side === 'left' ? L.leftStartX : L.rightEndX - width;
@@ -118,7 +129,7 @@ export function createSkillSelectRenderer(read, documentObject = globalThis.docu
       // icon as `Skillicon.dc6` frame 2 at the anchor (117|635, 600)), and a record is what lets a
       // row compare OUR anchor against RETAIL's instead of trusting the layout constant below.
       const icon = (s, x, y, where, side) => {
-        const tint = s.usable === false || (where.endsWith('Button') && s.townBlocked), sh = sheet(s.charClass, tint), f = sh.frames[s.iconCel], c = sh.canvases[s.iconCel];
+        const tint = skillIconExtra(s, where) === 1, sh = sheet(s.charClass, tint), f = sh.frames[s.iconCel], c = sh.canvases[s.iconCel];
         if (!f || !c) { drawn.push({ where, id: s.id, sheet: sh.key, cel: s.iconCel, missing: true }); return; }
         const o = origin(width, height, side); ctx.save(); ctx.translate(o.x, o.y); ctx.scale(o.scale, o.scale);
         ctx.drawImage(c, x, y); ctx.restore();

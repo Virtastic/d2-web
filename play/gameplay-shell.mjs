@@ -109,7 +109,7 @@ import { queueHeldPointerRepeat } from './assets/held-pointer-repeat.mjs';
 import { heldWorldAction, leftHandCommand } from './assets/world-click-dispatch.mjs';
 import { createDeathScreen, deathScreenShown, respawnAllowed } from './assets/death-screen.mjs';
 import { createNpcMenu, npcMenuChoiceOnRelease, npcMenuInputCoolingDown, npcMenuEntries, withTravelRow, withHireRow, deadHireling, resurrectPacket, talkEntries, menuReturnsAfterSpeech, entriesAfterSpeech } from './assets/npc-menu.mjs';
-import { npcSpeech, npcSpeechByName } from './assets/npc-topics.mjs';
+import { npcSpeech, npcSpeechByName, talkSpeechId } from './assets/npc-topics.mjs';
 import { createWeatherRenderer } from './assets/weather-renderer.mjs';
 import { weatherWaterAnchors } from './assets/weather-water-anchors.mjs';
 import { createSkillFx } from './assets/skill-fx.mjs';
@@ -4031,6 +4031,7 @@ function drawFrame() {
       const pBody = perfT0();
       const being = entity.animation ? monsterRenderer?.draw(c, sx, sy, entity.animation, snapshot.act, hovered?.kind === 'unit' && hovered.id === entity.id) : null;
       perfT('units-monster', pBody);
+      if (being) monsterRenderer.warm(entity.animation);
       const drawn = Boolean(being);
       // F22: the alert's pending state is the ENGINE's per-unit bit (d2_session_npc_speech_alerts,
       // read into entity.speechPending above), never a client quest guess. The renderer's own record
@@ -5232,8 +5233,9 @@ function chooseNpcMenu(entry) {
     const inList = readDialogMessages(), plain = inList.find((m) => m.menu === 0);
     // Introduction = the NPC's self-introduction (the first-click greeting, replayed identically); Gossip = its one fixed line.
     const said = npcIntroHeard.get(menuState.classId), sp = npcSpeech(menuState.classId) || npcSpeechByName(npcDisplayName(npcId), snapshot.act);
-    const id = entry.action === 'topic' ? entry.stringId : entry.action === 'intro' ? (plain?.stringId || said || sp?.intro) : sp?.gossip;
-    if (id == null) { npcMenu.show(npcId, menuState.classId, menuState.name, menuState.entries); return; }
+    const id = talkSpeechId(entry.action, { stringId: entry.stringId, plain: plain?.stringId || null, said, sp });
+    // No line for this NPC: end the talk (0x30 clears the "!" and the interaction) instead of leaving the menu up as if nothing happened.
+    if (id == null) { Module.ccall('d2_session_command_end_npc', 'number', ['number'], [npcId]); npcState = readNpcState(); return; }
     menuAfterSpeech = menuState;
     npcState = { ...(readNpcState() || { npcId, classId: menuState.classId, items: [], gold: 0 }), npcId, spoken: id,
       greeting: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [id]),

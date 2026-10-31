@@ -28,3 +28,8 @@ export function npcSpeechByName(name, act) {
   if (!row) return null;
   return 'gossip' in row ? row : row[act] || null;
 }
+
+// The string id a Talk-box row speaks: a topic its own message; Introduction the engine's plain message, else the one heard on
+// the first click, else the NPC's table intro; Gossip the table line. null = this NPC has no such line (the caller ends the talk).
+export const talkSpeechId = (action, { stringId, plain, said, sp }) =>
+  (action === 'topic' ? stringId : action === 'intro' ? (plain ?? said ?? sp?.intro) : sp?.gossip) ?? null;

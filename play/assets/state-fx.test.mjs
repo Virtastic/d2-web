@@ -15,8 +15,8 @@ on = true; let a = fx.update(has);   // gain tick: the loop plays; the once cast
 assert.deepEqual(a.map((e) => [e.file, e.predraw, e.trans]), [['Ring', true, 3]]);
 on = false; a = fx.update(has);
 assert.deepEqual(a.map((e) => e.file), ['Cast']);
-a = fx.update(has); assert.deepEqual(a.map((e) => e.file), ['Cast', 'Rem']);
-a = fx.update(has); assert.deepEqual(a.map((e) => e.file), ['Rem']);
+a = fx.update(has); assert.deepEqual(a.map((e) => e.file), ['Rem']);   // a 2-frame once node draws cel 1 only, then is skipped (cel 2 >= frames)
+a = fx.update(has); assert.deepEqual(a.map((e) => e.file), []);
 a = fx.update(has); assert.deepEqual(a.map((e) => e.file), []);
 // Monster state overlays: a monster under Inner Sight (state 17, overlay1 = innersight) exports exactly that loop;
 // another monster and the hero do not inherit it; a monster that leaves the view and returns starts clean.
@@ -26,11 +26,11 @@ const inner = createStateFx((p) => ({
   'data\\global\\excel\\states.txt': enc('state\tid\toverlay1\tcastoverlay\tremoverlay\ninnersight\t17\tinnersight\t\t\n'),
 })[p]);
 const sees = (k) => (id) => k === '1:77' && id === 17;
-assert.deepEqual(inner.update(sees('1:77'), '1:77', 500).map((e) => [e.file, e.kind, e.trans, e.age]), [['InnerSight', 'overlay', 3, 0]]);
+assert.deepEqual(inner.update(sees('1:77'), '1:77', 500).map((e) => [e.file, e.kind, e.trans, e.age]), [['InnerSight', 'overlay', 3, 1]]);
 assert.deepEqual(inner.update(sees('1:78'), '1:78', 500), [], 'another monster does not inherit it');
 assert.deepEqual(inner.update(() => false), [], 'the hero does not inherit it');
 inner.retain(new Set(['1:78']));
-assert.deepEqual(inner.update(sees('1:77'), '1:77', 501).map((e) => e.age), [0], 'a monster that left the view restarts (no stale gain edge)');
+assert.deepEqual(inner.update(sees('1:77'), '1:77', 501).map((e) => e.age), [1], 'a monster that left the view restarts (no stale gain edge)');
 
 // real tables: every state overlay / skill castoverlay names an Overlay.txt row; its dcc exists when MPQ extract is present
 const dir = '/srv/games/d2/tables-1.13c/';
@@ -49,5 +49,5 @@ if (existsSync(dir + 'states.txt')) {
 console.log('state-fx ok');
 // A re-set while the state holds (seq moves) restarts the loop at pos 0, as retail's fresh 0x6B300 node does.
 { let s = 0; const f = (t) => inner.update((id) => id === 17, 'r', t, () => s).map((e) => e.age)[0];
-  assert.deepEqual([f(500), f(501)], [0, 1]); s = 1;
-  assert.deepEqual([f(502), f(503)], [0, 1], 'restart at the re-set tick'); }
+  assert.deepEqual([f(500), f(501)], [1, 2]); s = 1;
+  assert.deepEqual([f(502), f(503)], [1, 2], 'restart at the re-set tick'); }

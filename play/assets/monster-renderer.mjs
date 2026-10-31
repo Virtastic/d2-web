@@ -233,9 +233,31 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
     if (!palettes.has(act0)) palettes.set(act0, decodeDatPalette(read(`data\\global\\palette\\${PALETTE[act0]}\\pal.dat`)));
     return [act0, palettes.get(act0)];
   };
+  // PERF: a unit that turns to a facing it has not shown yet decodes that DCC direction inside the frame (8-20 ms). Decode the two
+  // neighbouring facings of a drawn unit on idle time instead. Only fills decodedByBytes through the same loadMonsterAnimation the
+  // draw calls (a pure function of actor + files), so every later draw finds the same decoded cels and records are unchanged.
+  const warmSeen = new Map(), warmQueue = [];
+  let warmScheduled = false;
+  const warmRun = (deadline) => {
+    warmScheduled = false;
+    while (warmQueue.length && (!deadline || deadline.timeRemaining() > 3)) {
+      const actor = warmQueue.shift();
+      for (const turn of [4, 60]) { try { loadMonsterAnimation(animationRead, { ...actor, direction: (actor.direction + turn) & 63 }); } catch {} }
+    }
+    if (warmQueue.length) warmSchedule();
+  };
+  const warmSchedule = () => { if (!warmScheduled) { warmScheduled = true; requestIdleCallback(warmRun, { timeout: 500 }); } };
   return {
+    warm(actor) {
+      if (typeof requestIdleCallback !== 'function' || (globalThis.navigator?.webdriver && globalThis.__d2Perf !== true)) return;
+      const key = actor.direction + ':' + actor.mode + ':' + actor.seqMode;
+      if (warmSeen.get(actor.id) === key) return;
+      if (warmSeen.size >= 4096) warmSeen.clear();
+      warmSeen.set(actor.id, key);
+      if (warmQueue.length < 64) { warmQueue.push(actor); warmSchedule(); }
+    },
     // Session teardown can reuse actor IDs; their client-local clocks belong to the old session.
-    resetSession() { resetIzualGhostS1Clock(izualGhostClocks); deadMonsterClocks.clear(); shown.clear(); },
+    resetSession() { resetIzualGhostS1Clock(izualGhostClocks); deadMonsterClocks.clear(); shown.clear(); warmSeen.clear(); warmQueue.length = 0; },
     // `highlight`: retail's DrawMode 7, the hovered unit (V5, unit-highlight.mjs) -- the cel's colours through the measured rule.
     draw(ctx, x, y, actor, act, highlight = false) {
       // Izual's S1 uses its own CUnit clock; the server frame epoch is not a cel index.

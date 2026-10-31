@@ -51,11 +51,11 @@ export function createStateFx(read) {
         // a re-set (the engine's set counter moved while the state held) makes retail create a fresh loop node at pos 0
         // The set counter only matters while the state holds (a gain stamps t0 itself), so read it only then: asking the engine about every state of every monster was ~180 wasm calls a monster a tick.
         if (on) { const q = seq ? seq(id) : 0; if (u.seq.has(id) && u.seq.get(id) !== q) u.t0.set(id, t); u.seq.set(id, q); }
-        if (on) for (const k of ['overlay1', 'overlay2', 'overlay3', 'overlay4']) { const e = fx(s[k]); if (e) { const n = t - (u.t0.get(id) ?? 0); out.push({ ...e, age: Math.floor(n * e.rate / 256) % e.frames }); this.ov?.push(`${tag} ${node(8, s[k], n % 51, (n * e.rate) % (e.frames << 8))}`); } }
+        if (on) for (const k of ['overlay1', 'overlay2', 'overlay3', 'overlay4']) { const e = fx(s[k]); if (e) { const n = t - (u.t0.get(id) ?? 0); out.push({ ...e, age: (Math.floor(n * e.rate / 256) + 1) % e.frames }); this.ov?.push(`${tag} ${node(8, s[k], n % 51, (n * e.rate) % (e.frames << 8))}`); } }
       }
       for (const e of u.once) if (t > e.start) this.ov?.push(`${tag} ${(t - e.start - 1) * e.rate / 256 < e.frames ? node(2, e.name, 1, (t - e.start - 1) * e.rate) : node(2, e.name, 0, e.frames * 256)}`);   // the last record is the node's end (live 0, pos = frames)
       u.once = u.once.filter((e) => (t - e.start - 1) * e.rate / 256 < e.frames);
-      return out.concat(u.once.filter((e) => t > e.start).map((e) => ({ ...e, age: Math.floor((t - e.start - 1) * e.rate / 256) })));   // retail's first frame is the tick after the create (OV pos 0)
+      return out.concat(u.once.filter((e) => t > e.start && Math.floor((t - e.start - 1) * e.rate / 256) + 1 < e.frames).map((e) => ({ ...e, age: Math.floor((t - e.start - 1) * e.rate / 256) + 1 })));   // retail's first frame is the tick after the create (OV pos 0)
     },
     /** Forget every monster not in `keys` (one that left the view restarts its states when it returns). */
     retain(keys) { for (const k of units.keys()) if (k !== 'hero' && !keys.has(k)) units.delete(k); },

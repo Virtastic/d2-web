@@ -7,8 +7,8 @@ test('skill choices parse from the engine record', () => {
   v.setUint16(0, 126, true); v.setInt8(2, 1); v.setInt8(3, 4); v.setUint16(4, 3, true); v.setUint8(6, 2); v.setUint8(7, 5);
   v.setUint16(8, 127, true); v.setInt8(10, 2); v.setInt8(11, 4); v.setUint16(12, 7, true); v.setUint8(14, 1); v.setUint8(15, 5);
   assert.deepEqual(parseSkillChoices(b, 2), [
-    { id: 126, listRow: 1, charClass: 4, iconCel: 3, passive: false, leftSkill: true, usable: true, townBlocked: false, level: 5 },
-    { id: 127, listRow: 2, charClass: 4, iconCel: 7, passive: true, leftSkill: false, usable: true, townBlocked: false, level: 5 }]);
+    { id: 126, listRow: 1, charClass: 4, iconCel: 3, passive: false, leftSkill: true, usable: true, townBlocked: false, aura: false, level: 5 },
+    { id: 127, listRow: 2, charClass: 4, iconCel: 7, passive: true, leftSkill: false, usable: true, townBlocked: false, aura: false, level: 5 }]);
 });
 
 test('popup rows follow OpenDiablo2 skill_select_panel.go: bottom-up, empty rows skipped, passives out', () => {

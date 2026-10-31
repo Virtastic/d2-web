@@ -25,7 +25,7 @@ test('realm selected skill wrapper reads engine state and sends requests without
   const p=bindEngineProtocol(Module);
   assert.deepEqual(p.d2gsSelectedSkills(),{left:0,right:47,leftOwner:-1,rightOwner:-1});
   assert.deepEqual(parseSkillChoices(p.d2gsSkillChoices(0x12345678),1),[
-    {id:47,listRow:2,charClass:1,iconCel:12,passive:false,leftSkill:true,usable:true,townBlocked:true,level:3},
+    {id:47,listRow:2,charClass:1,iconCel:12,passive:false,leftSkill:true,usable:true,townBlocked:true,aura:false,level:3},
   ]);
   assert.deepEqual([...p.d2gsSkillChoices(0x87654321)],[],'unknown roster GUID has no skills');
   assert.throws(()=>p.d2gsSkillChoices(0x12345678,129),RangeError);

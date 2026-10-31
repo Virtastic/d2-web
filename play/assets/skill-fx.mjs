@@ -44,7 +44,8 @@ export function createSkillFx(read) {
       // retail's cast node: live 1 at pos (t - start) * step while it runs; the tick it expires (start + Frames) it reads live 0 at Frames << 8
       if (this.ov) for (const a of active) if (a.kind === 'overlay' && tick >= a.start) this.ov.push(`${tick} OV 0:1 ${(tick - a.start) * a.rate < (a.frames << 8) ? node(a.name, 1, (tick - a.start) * a.rate) : node(a.name, 0, a.frames << 8)}`);
       active = active.filter((a) => a.hold || (a.kind === 'missile' ? tick - a.start : (tick - a.start) * a.rate / 256) < a.frames)  // a missile lives Range ticks;
-      return active.map((a) => ({ ...a, age: a.loop ? Math.floor((tick - a.start) * a.rate / 256) % a.animLen : Math.min(Math.floor((tick - a.start) * a.rate / 256), (a.animLen ?? Infinity) - 1) }));
+      // an overlay draws cel (pos >> 8) + 1 and skips a node whose cel is at or past the frame count
+      return active.filter((a) => a.kind !== 'overlay' || Math.floor((tick - a.start) * a.rate / 256) + 1 < a.frames).map((a) => a.kind === 'overlay' ? ({ ...a, age: Math.floor((tick - a.start) * a.rate / 256) + 1 }) : ({ ...a, age: a.loop ? Math.floor((tick - a.start) * a.rate / 256) % a.animLen : Math.min(Math.floor((tick - a.start) * a.rate / 256), (a.animLen ?? Infinity) - 1) }));
     },
   };
 }

@@ -39,16 +39,16 @@ assert.deepEqual(sq.update(h(18, 0, 100), 53).map((e) => [e.kind, e.file]), [['o
 const retail = createSkillFx((p) => files[p]); retail.update(h(1, 0, 100), 47);
 const fages = [];
 for (let i = 0; i < 12; i++) { const e = retail.update(h(10, 0, 100), 47).find((x) => x.file === 'FireCast2'); fages.push(e.age); }
-assert.deepEqual(fages, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], 'FireCast2 advances 1 frame per game frame');
+assert.deepEqual(fages, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], 'FireCast2 advances 1 frame per game frame, cel = (pos >> 8) + 1');
 files['data\\global\\excel\\Overlay.txt'] = enc('overlay\tFilename\tFrames\tTrans\tAnimRate\ncast_undead\tHolyBoltCloud\t16\t3\t8\n');
 const slow = createSkillFx((p) => files[p]); slow.update(h(1, 0, 100), 101);
 let n = slow.update(h(10, 0, 100), 101).length, t = 0; while (n && t < 100) { t++; n = slow.update(h(10, 256 * t, 100), 101).length; }
-assert.equal(t, 32, 'half rate lives twice as long');
+assert.equal(t, 30, 'half rate lives twice as long (the last cel is not drawn)');
 // Shiver Armor (skills.txt castoverlay ice_cast_2 = Overlay.txt 15 frames, AnimRate 16): one frame per tick, gone after 15 (D2Client 0x6B300 AnimRate<<4).
 const ice = { 'data\\global\\excel\\Overlay.txt': enc('overlay\tFilename\tFrames\tTrans\tAnimRate\nice_cast_2\tIceCastNew02\t15\t3\t16\n'), 'data\\global\\excel\\Missiles.txt': files['data\\global\\excel\\Missiles.txt'], 'data\\global\\excel\\skills.txt': enc('skill\tId\tcastoverlay\nShiverArmor\t50\tice_cast_2\n') };
 const shiver = createSkillFx((p) => ice[p]); shiver.update(h(1, 0, 100), 50);
 const ages = []; for (let t = 0; t < 20; t++) ages.push(shiver.update(h(10, 0, 100), 50).map((e) => e.age).join(','));
-assert.deepEqual(ages, [...Array.from({ length: 15 }, (_, i) => String(i)), '', '', '', '', ''], 'ice_cast_2 record stream: age = tick, dropped at 15');
+assert.deepEqual(ages, [...Array.from({ length: 14 }, (_, i) => String(i + 1)), '', '', '', '', '', ''], 'ice_cast_2 record stream: cel = tick + 1, the 15th is not drawn');
 console.log('skill-fx shiver ok');
 
 // Telekinesis (skills.txt Id 43, castoverlay light_cast_2 = Overlay.txt AnimRate 16, Trans 3): the overlay's frame is a
@@ -74,7 +74,7 @@ console.log('skill-fx shiver ok');
   const one = record(1), many = record(3);
   assert.deepEqual(many, one, 'render frames inside one engine tick must not advance the overlay');
   for (let t = 10; t <= 200; t++) {
-    const want = t - 10 < 10 ? String(t - 10) : ''; // AnimRate*16/256 = 1 frame per engine tick (was /16 under the old AnimRate/256 rule)
+    const want = t - 10 < 9 ? String(t - 10 + 1) : ''; // AnimRate*16/256 = 1 frame per engine tick (was /16 under the old AnimRate/256 rule)
     assert.equal(one[t - 1], want, `tick ${t}`);
   }
 }
