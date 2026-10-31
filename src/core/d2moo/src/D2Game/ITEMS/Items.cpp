@@ -82,7 +82,7 @@ uint32_t __fastcall ITEMS_HasUniqueBeenDroppedAlready(D2GameStrc* pGame, int32_t
 }
 
 // 1.13c D2Game+0x0E800
-// ESI = game, EDI = item. Retail returns 0 unless the item's quality is unique; then it
+// EAX = item, EDI = game (retail registers). Retail returns 0 unless the item's quality is unique; then it
 // returns whether that item's unique-file-index bit is set in the game's 4097-bit unique mask.
 // An out-of-range id returns 1, and a null game returns 0.
 int32_t __fastcall sub_E800(D2GameStrc* pGame, D2UnitStrc* pItem)

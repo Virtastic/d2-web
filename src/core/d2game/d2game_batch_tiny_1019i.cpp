@@ -28,10 +28,8 @@ static inline uint32_t rd32(uint32_t a, uint32_t o) { return rd32((const void*)(
 static const D2GameBatchTiny1019iEnv* g_activeEnv;
 
 struct D2GameBatchTiny1019iEnv {
-    // D2Common #10460 first-item getter. The 1.13c thunk takes no pushed argument; the 8F470 row's
-    // disassembly shows the inventory in EAX, while these call sites leave EAX = the remove-callback's
-    // pArg and ECX = game. Both are forwarded so a probe can pin the real convention.
-    uint32_t (*fn10460)(uint32_t eaxArg, uint32_t ecxArg);
+    // D2Common #10460 first-item getter; 0xE1C0 pushes the inventory (EDI) as its one stack argument.
+    uint32_t (*fn10460)(uint32_t inventory);
     uint32_t (*fn10464)(uint32_t node);                          // D2Common #10464 next-item getter
     uint32_t (*fn11147)(uint32_t node);                          // D2Common #11147 INVENTORY_UnitIsItem
     uint32_t (*fn11017)(uint32_t arg);                           // D2Common #11017 (one stack arg)
@@ -61,12 +59,12 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2game_e130(int32_t a, int32_t b, int32_
     return product / (d + b) + 100;
 }
 
-// 0xE1C0: purge one unit from an inventory. Walk the item list starting at #10460; when an item node is
-// the unit (#11147), remove it from the inventory (#10646) and stop. Otherwise, if #11017(inventory)
-// answers the same unit, clear the inventory's cursor item (#10466(inv, 0)). EAX and ECX arrive from the
-// caller's callback dispatch; the body reads neither directly.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_e1c0(uint32_t eaxArg, uint32_t ecxGame, uint32_t inventory, uint32_t unit, const D2GameBatchTiny1019iEnv* env) {   // 1.13c D2Game+0xE1C0
-    uint32_t node = env->fn10460(eaxArg, ecxGame);
+// 0xE1C0: purge one unit from an inventory. EBX = the unit, EDI = the inventory (both register arguments;
+// EAX/ECX are not read). Walk the item list starting at #10460(inventory); when an item node is the unit
+// (#11147), remove it from the inventory (#10646) and stop. Otherwise, if #11017(inventory) answers the
+// same unit, clear the inventory's cursor item (#10466(inv, 0)).
+extern "C" EMSCRIPTEN_KEEPALIVE void d2game_e1c0(uint32_t unit, uint32_t inventory, const D2GameBatchTiny1019iEnv* env) {   // 1.13c D2Game+0xE1C0
+    uint32_t node = env->fn10460(inventory);
     while (node) {
         if (env->fn11147(node) == unit) {
             env->fn10646(inventory, unit);
@@ -74,19 +72,18 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_e1c0(uint32_t eaxArg, uint32_t
         }
         node = env->fn10464(node);
     }
-    if (env->fn11017(inventory) == unit) env->fn10466(inventory, 0);
+    const uint32_t cursor = env->fn11017(inventory);
+    if (cursor && cursor == unit) env->fn10466(inventory, 0);
 }
 
 // 0xE7E0: per-player callback of 0xEE70's walk. EDX = player, the pushed argument (read at 0x8(%esp))
-// = the unit to purge, ECX = game. EDI = player+0x60 (inventory); the body then runs 0xE1C0 with EAX =
-// the pushed argument (the iterate helper sets EAX to pArg before the indirect call).
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_e7e0(uint32_t game, uint32_t player, uint32_t unit, const D2GameBatchTiny1019iEnv* env) {   // 1.13c D2Game+0xE7E0
-    const uint32_t inventory = rd32(player, 0x60);
-    d2_fn_d2game_e1c0(unit, game, inventory, unit, env);
+// = the unit to purge. EDI = player+0x60 (inventory), EBX = the unit; the body then runs 0xE1C0.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2game_e7e0(uint32_t player, uint32_t unit, const D2GameBatchTiny1019iEnv* env) {   // 1.13c D2Game+0xE7E0
+    d2game_e1c0(unit, rd32(player, 0x60), env);
 }
 
 static void d2game_tiny_1019i_e7e0_callback(uint32_t game, uint32_t player, void* arg) {
-    d2_fn_d2game_e7e0(game, player, (uint32_t)(uintptr_t)arg, g_activeEnv);
+    d2game_e7e0(player, (uint32_t)(uintptr_t)arg, g_activeEnv);
 }
 
 // 0xEE70: walk the living players purging the unit from each inventory (callback 0xE7E0, argument =

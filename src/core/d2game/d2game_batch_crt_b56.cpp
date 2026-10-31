@@ -97,17 +97,22 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_5AFE(int32_t fileHandle, const D2GameB
 // 1.13c D2Game+0x0e860
 // FUN_6fc2e860(unit in EDI): take the dword at unit+4 (or -1 for a null unit) through D2Common #10695; a
 // null result is the retail 0x1DB fatal. Then for each set byte of the result -- 0xFF, 0xFE, 0x102, 0x103
-// and 0x101 -- call D2Common #10887 (0x101 twice). The decompile shows that call without arguments.
+// and 0x101 -- call D2Common #10887(unit, stat, byte, 0) with stats 0x16, 0x15, 0x17, 0x18 and 0x9F/0xA0
+// (the pair takes bytes 0x100 and 0x101). The register-argument decompile hid these arguments.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E860(uint32_t unit, const D2GameBatchB56Env* env) {
+EMSCRIPTEN_KEEPALIVE void d2game_e860_port(uint32_t unit, const D2GameBatchB56Env* env) {
     const uint32_t value = unit != 0 ? rd32((const void*)(uintptr_t)unit, 4) : 0xFFFFFFFFu;
     void* pRecord = env->ordinal10695(value);
     if (pRecord == nullptr) d2game_fatal(0x1DB);
-    if (rd8(pRecord, 0xFF)  != 0) env->ordinal10887();
-    if (rd8(pRecord, 0xFE)  != 0) env->ordinal10887();
-    if (rd8(pRecord, 0x102) != 0) env->ordinal10887();
-    if (rd8(pRecord, 0x103) != 0) env->ordinal10887();
-    if (rd8(pRecord, 0x101) != 0) { env->ordinal10887(); env->ordinal10887(); }
+    void* u = (void*)(uintptr_t)unit;
+    if (rd8(pRecord, 0xFF)  != 0) env->ordinal10887Stat(u, 0x16, rd8(pRecord, 0xFF), 0);
+    if (rd8(pRecord, 0xFE)  != 0) env->ordinal10887Stat(u, 0x15, rd8(pRecord, 0xFE), 0);
+    if (rd8(pRecord, 0x102) != 0) env->ordinal10887Stat(u, 0x17, rd8(pRecord, 0x102), 0);
+    if (rd8(pRecord, 0x103) != 0) env->ordinal10887Stat(u, 0x18, rd8(pRecord, 0x103), 0);
+    if (rd8(pRecord, 0x101) != 0) {
+        env->ordinal10887Stat(u, 0x9F, rd8(pRecord, 0x100), 0);
+        env->ordinal10887Stat(u, 0xA0, rd8(pRecord, 0x101), 0);
+    }
 }
 
 // 1.13c D2Game+0x0F700

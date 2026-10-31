@@ -66,3 +66,4 @@ behaviour differs from 1.10f.
 
 - D2Common+0x5D8B0 DATATBLS_UnloadStatesTxt (DataTbls/DataTbls.cpp): no NULL store back to pStatesTxt or pStatesLinker after the free, as retail (PRIORART batch). The -4 pool adjustment is kept as a host adaptation (FOG_FreePool is free()).
 - D2Common+0x82D20, +0x82D60 and +0x82F00 (overlay accessors, DataTbls/OverlayTbls.cpp DATATBLS_GetOverlayTxtRecord): the table pointer is tested as well as the index; with no table the result is zero (1.13c).
+- D2Game+0xE800 (`sub_E800`, ITEMS/Items.cpp): arguments documented as retail registers (EAX = item, EDI = game); logic unchanged, measured by an FN probe.

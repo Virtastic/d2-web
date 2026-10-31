@@ -23,25 +23,25 @@ struct D2GameBatchEC90Env {
     uint32_t (*getStartSeed)(void*);                     // #10193
     void     (*addSockets)(void*, uint32_t);             // #10992
 };
-static const D2GameBatchEC90Env g_batchEC90Env{};
-
 // 1.13c D2Game+0xEC90
 static void RollSockets(void* pItem, void* pGame, void* pDrop, const D2GameBatchEC90Env* env)
 {
     if (env->getItemQuality(pItem) < 2 || !env->checkSocketable(pItem) || env->checkStackable(pItem)) return;
 
+    // The max-socket getter runs twice in retail: once as the gate, once for the value that is clamped by difficulty.
+    if (env->getMaxSockets(pItem) == 0) return;
     uint32_t nMax = env->getMaxSockets(pItem);
-    if (nMax == 0) return;
     const uint8_t diff = rd8(pGame, 0x6D);
     const uint32_t cap = diff == 0 ? 3 : diff == 1 ? 4 : diff == 2 ? 6 : nMax;
     if (nMax > cap) nMax = cap;
+    if (nMax == 0) return;
 
     if (env->getItemFormat(pItem) >= 100 || !env->checkItemTypeId(pItem, 3 /* ITEMTYPE_ARMOR */)) {
-        uint32_t nChance = env->rollRandom(env->getItemSeed(pItem)) % 100;
+        int32_t nChance = (int32_t)env->rollRandom(env->getItemSeed(pItem));   // 0x1180 (EAX = 100, ECX = seed) returns the roll itself
         const uint32_t f2 = rd32(pDrop, 0x80);
         if (f2 & 8) return;                                  // NOSOCKETS
         if (f2 & 0x10) nChance = 0;                          // ALWAYSSOCKETS
-        if ((rd32(pDrop, 0x44) & 0x800) == 0 && nChance >= 33) return;
+        if ((rd32(pDrop, 0x44) & 0x800) == 0 && nChance >= 0x21) return;
         env->setItemFlag(pItem, 0x800, 1);                   // IFLAG_SOCKETED
         if (env->getItemFormat(pItem) != 0) {
             env->addSockets(pItem, env->getStartSeed(pItem) % nMax + 1);
@@ -53,10 +53,9 @@ static void RollSockets(void* pItem, void* pGame, void* pDrop, const D2GameBatch
     }
 }
 
-// r[0]=item r[1]=game(EDI) r[2]=drop(EBX)
+// EDI = item, EBX = drop, stack word = game (ret 4)
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_ec90(uint32_t* r)
+EMSCRIPTEN_KEEPALIVE void d2game_ec90_port(uint32_t pItem, uint32_t pDrop, uint32_t pGame, const D2GameBatchEC90Env* env)
 {
-    RollSockets((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1], (void*)(uintptr_t)r[2], &g_batchEC90Env);
-    r[4] = 0;
+    RollSockets((void*)(uintptr_t)pItem, (void*)(uintptr_t)pGame, (void*)(uintptr_t)pDrop, env);
 }

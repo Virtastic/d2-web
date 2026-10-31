@@ -11,7 +11,7 @@
 #include <emscripten.h>
 
 struct D2GameE390Env {
-    void*    (*getCtx)();                      // Ordinal_10331
+    void*    (*getCtx)(const uint8_t* unit);   // Ordinal_10331 (stdcall, the unit)
     uint32_t (*ctxToKey)(void* ctx);           // Ordinal_10826
     uint8_t  (*keyToIndex)(uint32_t key);      // Ordinal_10459
     uint32_t (*errString)(uint32_t code);      // Ordinal_10265
@@ -23,10 +23,10 @@ struct D2GameE390Env {
 
 // 1.13c D2Game+0x0E390
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_e390(const uint8_t* pUnit, const D2GameE390Env* env)
+EMSCRIPTEN_KEEPALIVE uint32_t d2game_e390_port(const uint8_t* pUnit, const D2GameE390Env* env)
 {
     uint32_t code;
-    void* ctx = env->getCtx();
+    void* ctx = env->getCtx(pUnit);
     if (!ctx) {
         code = 0xd41;
     } else {

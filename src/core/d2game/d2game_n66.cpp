@@ -52,18 +52,6 @@ void OBJRGN_FreeObjectControl(N66Host* h, P game)
     h->mem_free(c, F, 0xec, 0);
 }
 
-// 1.13c D2GAME+0x0C6B0
-void sub_C6B0(N66Host* h, int a, int idx, int ebx)
-{
-    P dt = (P)(intptr_t)h->dataTablesRoot;
-    if (idx < 0 || idx >= I(dt, 0xba0)) return;
-    P row = (P)(intptr_t)I(dt, 0xb98) + idx * 0x23c;
-    if (!row) return;
-    h->set_string(a, I(row, 0x60));
-    P r = h->lookup();
-    if (r) h->apply(a, r, idx, ebx);
-}
-
 // 1.13c D2GAME+0x0FB70
 void ITEMS_DeleteInactiveItems(N66Host* h, P game, int slot, int frame)
 {
