@@ -831,6 +831,7 @@ static bool sessionWarpPointFromDs1(const D2DrlgRoomStrc* room, int32_t warpId, 
 static std::vector<D2SessionWarpPreset> g_sessionWarpPresets;
 static uint32_t g_sessionWorldHash;
 static uint32_t g_sessionTerrainHash;
+static bool g_sessionTerrainHashPending = false;   // the hash over g_sessionTiles is computed when read, not at every rebuild
 static bool g_sessionLive, g_sessionMovePending;
 static std::unordered_set<uint32_t> g_monInitPlayed; // 1.13c D2Client+0x23170: the per-unit played flag (client unit+0x80)
 static std::vector<std::array<int32_t, 7>> g_pendingOverlaySounds;
@@ -1937,7 +1938,7 @@ static void ensureSessionTiles() {
     if (!g_sessionTilesStale) return;
     g_sessionTilesStale = false;
     g_sessionTiles.clear(); g_sessionTileEntry.clear(); g_sessionTileCoord.clear(); g_sessionTileRolls.clear(); g_sessionTileLibraries.clear();
-    g_sessionTerrainHash = D2VEC_FNV_INIT;
+    g_sessionTerrainHash = D2VEC_FNV_INIT; g_sessionTerrainHashPending = false;
     if (!g_sessionLive || !g_lastLevel) return;
     const bool rollTraceNow = g_d2webRollTraceEnabled; g_d2webRollTraceEnabled = g_sessionTilesRollTrace;
     g_sessionTilesCounting = false;
@@ -1968,10 +1969,19 @@ static void ensureSessionTiles() {
         std::swap(g_sessionTiles, g_sessionSeamTiles); std::swap(g_sessionTileEntry, g_sessionSeamTileEntry); std::swap(g_sessionTileCoord, g_sessionSeamTileCoord); std::swap(g_sessionTileLibraries, g_sessionSeamLibraries);
     }
     g_sessionTilesCounting = true; g_d2webRollTraceEnabled = rollTraceNow;
-    for (const D2SessionTile& tile : g_sessionTiles) {
-        const uint8_t* bytes = reinterpret_cast<const uint8_t*>(&tile);
-        for (size_t i = 0; i < 76 /* pre-F66 bytes: entryHint (+0x4C) is not terrain identity, keeps pinned hashes */; ++i) { g_sessionTerrainHash ^= bytes[i]; g_sessionTerrainHash *= 16777619u; }
+    g_sessionTerrainHashPending = true;
+}
+
+static uint32_t sessionTerrainHash() {
+    if (g_sessionTerrainHashPending) {
+        g_sessionTerrainHashPending = false;
+        g_sessionTerrainHash = D2VEC_FNV_INIT;
+        for (const D2SessionTile& tile : g_sessionTiles) {
+            const uint8_t* bytes = reinterpret_cast<const uint8_t*>(&tile);
+            for (size_t i = 0; i < 76 /* pre-F66 bytes: entryHint (+0x4C) is not terrain identity, keeps pinned hashes */; ++i) { g_sessionTerrainHash ^= bytes[i]; g_sessionTerrainHash *= 16777619u; }
+        }
     }
+    return g_sessionTerrainHash;
 }
 
 // Native D2Client 1.13c weather traversal starts at the client's current Room1 and consumes its
@@ -6609,6 +6619,27 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_fixture_quest_item(uint32_t code) {
     return item ? item->dwUnitId : 0;
 }
 
+// Fixture: a quest item put on the floor at the player's own tile (retail's inventory-to-floor path: the item
+// leaves the pack (INVENTORY_RemoveItemFromInventory), its invpage is cleared, then D2GAME_DropItem_6FC52260 at
+// the free space D2GAME_GetFreeSpaceEx_6FC4BF00 returns, as ItemMode.cpp does for a cursor item it cannot place).
+// Returns the item's unit id or 0. Call it before the pack is filled: the item is created in the pack first.
+EMSCRIPTEN_KEEPALIVE uint32_t d2_session_fixture_ground_item(uint32_t code) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return 0;
+    D2UnitStrc* item = QUESTS_CreateItem(g_game, g_targetPlayer, code, 0, ITEMQUAL_NORMAL, 0);
+    if (!item) return 0;
+    D2UnitStrc* removed = INVENTORY_RemoveItemFromInventory(g_targetPlayer->pInventory, item);
+    if (!removed) return 0;
+    UNITS_ChangeAnimMode(item, IMODE_ONCURSOR);
+    ITEMS_SetInvPage(item, INVPAGE_NULL);
+    D2CoordStrc coords = {}, returnCoords = {};
+    UNITS_GetCoords(g_targetPlayer, &coords);
+    D2ActiveRoomStrc* room = D2GAME_GetFreeSpaceEx_6FC4BF00(UNITS_GetRoom(g_targetPlayer), &coords, &returnCoords, 1);
+    if (!room) return 0;
+    D2GAME_DropItem_6FC52260(g_game, g_targetPlayer, item, room, returnCoords.nX, returnCoords.nY);
+    updateSessionSnapshot();
+    return item->dwUnitId;
+}
+
 // Fixture: an item of a given quality (ITEMQUAL_*: 4 magic, 5 set, 6 rare, 7 unique) at the player's
 // item level, rolled by retail's own item creation (QUESTS_CreateItem -> D2GAME_CreateItemEx), in the
 // pack. The quality it came out as is d2_session_item_quality: retail may fall back (a base with no
@@ -7966,7 +7997,8 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_skill_choices(D2SessionSkillChoice* out
         const int useState = SKILLS_GetUseState(g_targetPlayer, sk);
         row.flags = (txt->dwFlags[0] & SKILLSFLAG_PASSIVE ? 1 : 0) | (txt->dwFlags[0] & SKILLSFLAG_LEFTSKILL ? 2 : 0) |
             (useState != SKILLUSTATE_USABLE && useState != SKILLUSTATE_AURA ? 4 : 0) |
-            ((DUNGEON_IsTownLevelId(g_currentLevel) && !(txt->dwFlags[0] & SKFLAG_INTOWN)) ? 8 : 0);   // bit 8 = Skills.txt InTown is 0 and we are in a town: retail reds only the hand BUTTON for it (Act IV town r29: Attack button extra=1, popup Attack extra=0)
+            ((DUNGEON_IsTownLevelId(g_currentLevel) && !(txt->dwFlags[0] & SKFLAG_INTOWN)) ? 8 : 0) |
+            (useState == SKILLUSTATE_AURA ? 16 : 0);   // bit 16 = aura: retail's classifier D2Client+0x3DA60 returns 4, the icon is drawn with colour shift 4. bit 8 = Skills.txt InTown is 0 and we are in a town: retail reds only the hand BUTTON for it (Act IV town r29: Attack button extra=1, popup Attack extra=0)
         row.level = (uint8_t)SKILLS_GetSkillLevel(g_targetPlayer, sk, TRUE);
     }
     return n;
@@ -8479,6 +8511,13 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_pickup(uint32_t itemUnitId) {
     D2WEB_ResetPacketStream();   // D26: publish what the pickup queued (the 0x22 sound) to d2_session_packet_stream, as the 0x13 command does
     sub_6FC828D0(g_targetPlayer, UNIT_ITEM, (int32_t)itemUnitId, 0, g_game);
     D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets);
+    // D57: a stack merge frees the ground item (the unit is gone); do not read it again
+    if (!SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemUnitId)) {
+        g_sessionItemState.result = 0;
+        g_sessionPendingPickup = 0;
+        updateSessionSnapshot();
+        return 0;
+    }
     if (INVENTORY_IsItemInInventory(g_targetPlayer->pInventory, item)) {
         g_sessionItemState.result = 1;
         g_sessionPendingPickup = 0;
@@ -10557,7 +10596,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_lightmap_offmap_unresolved() { return g_ligh
 EMSCRIPTEN_KEEPALIVE int d2_session_lightmap_offmap_unresolved_player() { return g_lightOffMapUnresolvedPlayer; }
 
 EMSCRIPTEN_KEEPALIVE uint32_t d2_session_terrain_hash() {
-    updateSessionSnapshot(); ensureSessionTiles(); return g_sessionTerrainHash;
+    updateSessionSnapshot(); ensureSessionTiles(); return sessionTerrainHash();
 }
 
 // The DT1 tile libraries the current level's rooms actually loaded.
@@ -10938,7 +10977,7 @@ EMSCRIPTEN_KEEPALIVE void d2_session_destroy() {
     memset(&g_sessionNpcResponse, 0, sizeof g_sessionNpcResponse);
     memset(&g_sessionVendor, 0, sizeof g_sessionVendor);
     g_sessionVendorItems.clear(); memset(&g_sessionVendorTransaction, 0, sizeof g_sessionVendorTransaction);
-    g_sessionWorldHash = D2VEC_FNV_INIT; g_sessionTerrainHash = D2VEC_FNV_INIT;
+    g_sessionWorldHash = D2VEC_FNV_INIT; g_sessionTerrainHash = D2VEC_FNV_INIT; g_sessionTerrainHashPending = false;
     g_sessionNavigationHash = D2VEC_FNV_INIT;
     // ... and back to the creation screen's defaults, so the next character's flags are its own.
     g_sessionClientSaveFlags = CLIENTSAVEFLAG_EXPANSION;

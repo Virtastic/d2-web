@@ -485,7 +485,7 @@ void bn_gateway_update_from_ini(uint32_t self, const char* data, const BnetGatew
             host.log_printf("Parsing new gateway list (version %d)", version);
             int32_t gmt = access->gateway_buffer_ptr_10 == 0
                               ? bn_get_system_time_zone(host)
-                              : bn_gateway_gmt(self, (int32_t)access->current_gateway_0c, host);
+                              : bn_gateway_gmt(self, (int32_t)access->current_gateway_0c, host) * 60;  // retail imul $0x3c at the call site
             access->selection_changed_04 = 0;
             bn_gateway_save_and_unload(self, host);
             access->override_list_1c = 0;
@@ -510,8 +510,8 @@ void bn_gateway_update_from_ini(uint32_t self, const char* data, const BnetGatew
                 const char* name_value = key;
                 uint32_t name_length = (uint32_t)(name_end - key);
                 const char* subsection = bn_find_section(data, cursor);
-                cursor += name_length + 1;
                 if (subsection != nullptr) {
+                    cursor += name_length + 1;
                     const char* zone = bn_find_key(subsection, "ZONE");
                     if (zone == nullptr) {
                         host.sstr_copy(cursor, "0", 2);
@@ -537,7 +537,7 @@ void bn_gateway_update_from_ini(uint32_t self, const char* data, const BnetGatew
             }
             *cursor = '\0';
             uint32_t size = (uint32_t)(cursor - buffer) + 1;
-            if (size <= allocation) {
+            if (size < allocation) {
                 if (buffer[size - 1] == '\0' && buffer[size - 2] == '\0') {
                     access->gateway_buffer_ptr_10 = (uint32_t)(uintptr_t)buffer;
                     access->gateway_buffer_bytes_14 = size;

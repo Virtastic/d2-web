@@ -2505,7 +2505,8 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_realm_client_skill_choices(uint32_t guid, D2Rea
         row.flags = (txt->dwFlags[0] & SKILLSFLAG_PASSIVE ? 1 : 0) |
             (txt->dwFlags[0] & SKILLSFLAG_LEFTSKILL ? 2 : 0) |
             (useState != SKILLUSTATE_USABLE && useState != SKILLUSTATE_AURA ? 4 : 0) |
-            (inTown && !(txt->dwFlags[0] & SKFLAG_INTOWN) ? 8 : 0);
+            (inTown && !(txt->dwFlags[0] & SKFLAG_INTOWN) ? 8 : 0) |
+            (useState == SKILLUSTATE_AURA ? 16 : 0);   // bit 16 = aura, drawn with colour shift 4 (D2Client+0x3DA60)
         row.level = static_cast<uint8_t>(SKILLS_GetSkillLevel(unit, skill, TRUE));
     }
     return n;
