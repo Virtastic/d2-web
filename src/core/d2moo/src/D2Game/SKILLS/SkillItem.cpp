@@ -1900,7 +1900,7 @@ int32_t __fastcall SKILLITEM_FindTargetPosition(D2GameStrc* pGame, D2UnitStrc* p
 int32_t __fastcall SKILLITEM_HandleItemEffectSkill(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel, D2UnitStrc* pTargetUnit, int32_t nX, int32_t nY, int32_t* pUnitType, int32_t* pUnitGUID, int32_t* pX, int32_t* pY, int32_t a7)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
-    if (!pSkillsTxtRecord || !pSkillsTxtRecord->wItemEffect)
+    if (!nSkillId || !pSkillsTxtRecord || !pSkillsTxtRecord->wItemEffect)
     {
         return 0;
     }
