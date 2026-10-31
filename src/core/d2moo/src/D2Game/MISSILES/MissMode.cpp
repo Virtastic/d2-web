@@ -2778,6 +2778,7 @@ int32_t __fastcall MISSMODE_SrvHit11_Unused(D2GameStrc* pGame, D2UnitStrc* pMiss
 }
 
 //D2Game.0x6FC5B6A0
+// 1.13c D2Game+0x3DEF0 (HitPar clamp signed: cmp/jge, was unsigned)
 int32_t __fastcall MISSMODE_SrvHit14_MeteorCenter_CatapultMeteor_RoyalStrikeMeteor(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pMissile)
@@ -2835,7 +2836,7 @@ int32_t __fastcall MISSMODE_SrvHit14_MeteorCenter_CatapultMeteor_RoyalStrikeMete
             nMissileRange = pSkillsTxtRecord->dwParam[2] + (nLevel - 1) * pSkillsTxtRecord->dwParam[3];
         }
 
-        const int32_t nParam = std::max(pMissilesTxtRecord->dwHitPar[1], 1u);
+        const int32_t nParam = std::max(int32_t(pMissilesTxtRecord->dwHitPar[1]), 1);
         MISSMODE_CreateMeteor_MoltenBoulderSubmissiles(pGame, pMissile, nHitSubMissile, nMissileRange, nParam);
     }
 
@@ -3365,6 +3366,7 @@ int32_t __fastcall MISSMODE_CreatePantherPotGreenSubmissiles(D2GameStrc* pGame, 
 }
 
 //D2Game.0x6FC5C990
+// 1.13c D2Game+0x3DA60 (HitPar clamp signed: cmp/jge, was unsigned)
 int32_t __fastcall MISSMODE_SrvHit25_PantherPotGreen(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pMissile)
@@ -3390,7 +3392,7 @@ int32_t __fastcall MISSMODE_SrvHit25_PantherPotGreen(D2GameStrc* pGame, D2UnitSt
         pOrigin = pMissile;
     }
 
-    const int32_t nHitPar = std::max(pMissilesTxtRecord->dwHitPar[0], 1u);
+    const int32_t nHitPar = std::max(int32_t(pMissilesTxtRecord->dwHitPar[0]), 1);
     MISSMODE_CreatePantherPotGreenSubmissiles(pGame, pOwner, pOrigin, pMissilesTxtRecord->wHitSubMissile[0], MISSILE_GetSkill(pMissile), MISSILE_GetLevel(pMissile), nHitPar);
     return 3;
 }
@@ -3932,6 +3934,7 @@ int32_t __fastcall MISSMODE_SrvHit45_LightningTrailingJavelin(D2GameStrc* pGame,
 }
 
 //D2Game.0x6FC5DA80
+// 1.13c D2Game+0x3D8C0 (HitPar clamp signed: cmp/jge, was unsigned)
 int32_t __fastcall MISSMODE_SrvHit47_MoltenBoulder(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pMissile)
@@ -3992,7 +3995,7 @@ int32_t __fastcall MISSMODE_SrvHit47_MoltenBoulder(D2GameStrc* pGame, D2UnitStrc
         nResult = 3;
     }
 
-    const int32_t nParam = std::max(pMissilesTxtRecord->dwHitPar[1], 1u);
+    const int32_t nParam = std::max(int32_t(pMissilesTxtRecord->dwHitPar[1]), 1);
     MISSMODE_CreateMeteor_MoltenBoulderSubmissiles(pGame, pMissile, pMissilesTxtRecord->wHitSubMissile[0], nRange, nParam);
     return nResult;
 }
@@ -4090,6 +4093,7 @@ int32_t __fastcall MISSMODE_SrvHit51_VolcanoDebris(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FC5DFC0
+// 1.13c D2Game+0x3C030 (HitPar clamp signed: cmp/jge, was unsigned)
 int32_t __fastcall MISSMODE_SrvHit52_BladeFury(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pMissile)
@@ -4116,7 +4120,7 @@ int32_t __fastcall MISSMODE_SrvHit52_BladeFury(D2GameStrc* pGame, D2UnitStrc* pM
     missileParams.nSkill = MISSILE_GetSkill(pMissile);
     missileParams.nSkillLevel = MISSILE_GetLevel(pMissile);
 
-    const int32_t nParam = std::max(pMissilesTxtRecord->dwHitPar[0], 1u);
+    const int32_t nParam = std::max(int32_t(pMissilesTxtRecord->dwHitPar[0]), 1);
 
     const int32_t xOffsets[] =
     {
@@ -4269,6 +4273,7 @@ int32_t __fastcall MISSMODE_SrvHit56_ArmageddonControl(D2GameStrc* pGame, D2Unit
 }
 
 //D2Game.0x6FC5E530
+// 1.13c D2Game+0x3BED0 (HitPar clamp signed: cmp/jge, was unsigned)
 int32_t __fastcall MISSMODE_SrvHit58_BaalTauntLightningControl(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pMissile)
@@ -4289,7 +4294,7 @@ int32_t __fastcall MISSMODE_SrvHit58_BaalTauntLightningControl(D2GameStrc* pGame
     }
 
     SEED_InitLowSeed(&pMissile->pSeed, CLIENTS_GetUnitX(pMissile));
-    const int32_t nParam = std::max(pMissilesTxtRecord->dwHitPar[0], 1u);
+    const int32_t nParam = std::max(int32_t(pMissilesTxtRecord->dwHitPar[0]), 1);
 
     D2MissileStrc missileParams = {};
     missileParams.dwFlags = 32;

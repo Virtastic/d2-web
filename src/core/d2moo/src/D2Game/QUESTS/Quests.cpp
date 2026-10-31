@@ -947,7 +947,7 @@ int32_t __fastcall QUESTS_DebugOutput(D2GameStrc* pGame, const char* szMessage, 
 }
 
 //D2Game.0x6FC94A50
-// 1.13c D2Game+0x366A0
+// 1.13c D2Game+0x366A0 (no standalone body; the find+delete is inlined at call sites)
 void __fastcall QUESTS_DeleteItem(D2GameStrc* pGame, D2UnitStrc* pPlayer, uint32_t dwItemCode)
 {
 	D2UnitStrc* pItem = ITEMS_FindQuestItem(pGame, pPlayer, dwItemCode);
@@ -2576,7 +2576,7 @@ void __fastcall QUESTS_SendScrollMessage(D2UnitStrc* pPlayer, D2UnitStrc* pUnit,
 }
 
 //D2Game.0x6FC96E80
-// 1.13c D2Game+0x35E90
+// 1.13c D2Game+0x35E90 (unk0x20 = code, then SUNIT_IterateUnitsOfType(type 0) via 0xDFCC0; 0x1020 is a different helper)
 void __fastcall QUESTS_TriggerFX(D2GameStrc* pGame, uint8_t a2)
 {
 	pGame->pQuestControl->unk0x20 = a2;

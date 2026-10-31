@@ -159,6 +159,14 @@ void d2_fn_d2game_1cd0(void* buffer, uint32_t value, const D2GameBatch17Env* env
     }
 }
 
+// Probe seam for the 0x1CD0 bit writer: 0x1CD0 with only the Fog #10128 seam bound.
+extern "C" void d2game_1cd0_probe(void* buffer, uint32_t value, void (*bitWrite)(void*, uint32_t, uint32_t))
+{
+    D2GameBatch17Env env = {};
+    env.bitWrite = bitWrite;
+    d2_fn_d2game_1cd0(buffer, value, &env);
+}
+
 // 1.13c D2Game+0x01d30
 // Walk the MonStats nNextInClass chain: ECX = starting class id, EBX = step limit. Returns -1 when
 // the start is negative, out of range or its row address is null. Otherwise it starts at the row's

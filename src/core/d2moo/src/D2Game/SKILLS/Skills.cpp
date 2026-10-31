@@ -3974,7 +3974,8 @@ int32_t __fastcall sub_6FD15190(D2UnitStrc* pUnit, D2C_AiSpecialState nAiSpecial
         }
     }
 
-    if (nClassId == MONSTER_IMP1 && STATES_CheckState(pUnit, STATE_ATTACHED))
+    // 1.13c D2Game+0x9F120: compares against the literal 0x1EC (not IMP1) and range-checks first, so with stock monstats it never fires
+    if (nClassId >= 0 && nClassId < sgptDataTables->nMonStatsTxtRecordCount && nClassId == 0x1EC && STATES_CheckState(pUnit, STATE_ATTACHED))
     {
         return 0;
     }
