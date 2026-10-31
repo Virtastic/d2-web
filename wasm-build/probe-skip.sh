@@ -24,7 +24,7 @@ probe_link_retry() {
     keep=""
     for o in $OBJS; do
       if echo "$bad" | grep -qxF "$(basename "$o")"; then
-        echo "PROBE-SKIP $o: $(grep -m1 -E 'undefined symbol|duplicate symbol' "$LINKLOG" | cut -c1-160) (link)"
+        echo "PROBE-SKIP $o: $(grep -F "$(basename "$o")" "$LINKLOG" | grep -m1 -E 'undefined symbol|duplicate symbol' | cut -c1-160) (link)"
         basename "$o" .o | sed 's/^src_core_fn_//' >> "$SKIPPED_FILE"
       else keep="$keep $o"; fi
     done
