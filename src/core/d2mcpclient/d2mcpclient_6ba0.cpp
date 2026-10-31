@@ -14,7 +14,7 @@ struct D2Mcp6ba0Inputs {
 struct D2Mcp6ba0Env {
     uint32_t (*resolve)(uint32_t address);                                   // Fog#10014 (ECX)
     void* (*open)(uint32_t addr, uint32_t port, const char* name);           // Fog#10068
-    void (*set_buffer)(void* socket, uint32_t size, uint32_t flags);         // Fog#10077
+    void (*set_callback)(void* socket, uint32_t callback, uint32_t flags);   // Fog#10077 (5E28 thunk)
     void (*start)(void* socket);                                             // Fog#10073
     void* (*connector)(void* socket);                                        // Fog#10079
     void (*connect)(void* connector, uint32_t* failed, uint32_t* aux);       // Fog#10016 (ECX, EDX, stack)
@@ -24,7 +24,7 @@ struct D2Mcp6ba0Env {
 };
 
 // 1.13c D2MCPClient+0x06BA0 (thread body, no arguments). result (+0xB1C8) is cleared, the socket is
-// opened with a 0x5E80-byte buffer and started. No connector, or a nonzero failure flag from the
+// opened, given receive callback 1.13c+0x5E80 (an address, not a size), and started. No connector, or a nonzero failure flag from the
 // connect, sets result 2 and returns 0. If the module socket (+0xB028) was replaced meanwhile, this
 // socket is closed and 0 returned. Otherwise the protocol byte 1 is sent, the startup exchange runs,
 // and the thread returns 1 exactly when result is still 0.
@@ -35,7 +35,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2mcpclient_conn_thread_6ba0(const D2Mc
     st.result = 0;
     void* h = e->open(addr, in->port, "clt->mcp");
     st.socket = h;
-    e->set_buffer(h, 0x5E80, 0);
+    e->set_callback(h, 0x5E80, 0);
     e->start(h);
     uint32_t failed = 0, aux = 0;
     void* c = e->connector(h);

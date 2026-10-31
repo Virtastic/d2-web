@@ -4,7 +4,12 @@
 // for the first call, word 13 (+0x34, panel handle) are recovered. Later records alias stale argument
 // slots in retail; w[0]=0xffffffff marks that unrecovered state (low confidence).
 #include "d2client_batch_35140.h"
+struct Utf8Row { int16_t cmask, cval, shift, pad; int32_t lmask; int32_t lval; };
+char* D2Lang_Unicode_toUtf(char* out, const uint16_t* in, int cap, const Utf8Row* tab);
+extern "C" int32_t d2_client_393c(const char* s);
 namespace d2client_batch_35140 {
+// D2Lang+0x102E8 UTF-8 encode table
+static const Utf8Row kUtf8Tab[4]={{(int16_t)0x80,0,0,0,0x7f,0},{(int16_t)0xe0,(int16_t)0xc0,6,0,0x7ff,0x80},{(int16_t)0xf0,(int16_t)0xe0,12,0,0xffff,0x800},{0,0,0,0,0,0}};
 static void release(State& s,uint32_t& h){ if(h){ s.api.ord10065(h); s.api.ord10043(h,0xD6AB0,0x7a,0); h=0; } }
 
 // 1.13c D2Client+0x35140 (low confidence: stack/ESI arguments of the ordinals are partly unrecovered)
@@ -135,10 +140,11 @@ void sub_37310(State& s) {
 }
 // 1.13c D2Client+0x38310 -- text=*(p+0x28) (UTF-16), max=*(int*)(p+0x30), n=*(u16*)(p+0x34)
 uint32_t sub_38310(const char16_t* text,int32_t max,uint16_t n) {
+ // Unicode::strlen(text)==0 -> 0; Unicode::toUtf(buf,text,n) with n the byte capacity; CRT atol; v&((v>max)-1)
  if(!text||!*text)return 0;
- std::string u; for(uint16_t i=0;i<n&&text[i];++i){ uint32_t c=text[i];
-  if(c<0x80)u+=char(c); else if(c<0x800){u+=char(0xc0|c>>6);u+=char(0x80|(c&63));}
-  else{u+=char(0xe0|c>>12);u+=char(0x80|((c>>6)&63));u+=char(0x80|(c&63));} }
- uint32_t v=uint32_t(int32_t(std::atol(u.c_str()))); return max<int32_t(v)?0:v;
+ static char buf[0x10000];
+ D2Lang_Unicode_toUtf(buf,reinterpret_cast<const uint16_t*>(text),n,kUtf8Tab);
+ int32_t v=d2_client_393c(buf);
+ return uint32_t(v)&(uint32_t(v>max)-1u);
 }
 }

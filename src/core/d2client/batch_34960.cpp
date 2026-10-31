@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
+#include "batch_34960.h"
+extern "C" int32_t d2_client_14a0(int32_t a, int32_t b, int32_t d);
 
 namespace d2client_batch_34960 {
 using Address = uint32_t;
@@ -22,71 +24,78 @@ constexpr uint32_t ord(uint32_t n) { return 0x10000000u + n; }
 static uintptr_t u(int32_t v) { return static_cast<uintptr_t>(static_cast<uint32_t>(v)); }
 static int32_t div128(int32_t x) { return (x + ((x >> 31) & 0x7f)) >> 7; } // signed x/128 as the compiler emits it
 
-// 1.13c D2Client+0x34960 (129 B): when p2,p3 set and 0x2C230 succeeds, fetch p1's pair (0x32F30), 0x2C190, emit first of pair.
-void sub_34960(const Host& h, Address p1, int p2, int p3, int, uintptr_t p5, uintptr_t p6) {
-    if (!p2 || !p3) return;
-    h.write<int32_t>(h.scratch, 0); h.write<int32_t>(h.scratch + 4, 0);
-    if (!h.call(0x2C230)) return;
-    h.call(0x32F30, {p1, h.scratch, h.scratch + 4});
-    h.call(0x2C190);
-    h.call(0x2F0A0, {h.read<uint32_t>(h.scratch), 0, p5, p6});
+static uint32_t rd32(const uint8_t* p, uint32_t off) { uint32_t v; std::memcpy(&v, p + off, 4); return v; }
+
+// 1.13c D2Client+0x34960 (ecx=p1, edx=p2, 5 stack words, ret 0x14): the pair from 0x32F30 (gated by 0x2C230) goes to
+// 0x2F0A0 with the a0 slot reused as the third out word. eax0 is the caller's eax, left as the result on the first exit.
+uint32_t sub_34960(Ops& o, uint32_t eax0, uint32_t p1, uint32_t p2, uint32_t a0, uint32_t, uint32_t a2, uint32_t a3, uint32_t a4) {
+    if (!p2) return eax0;
+    if (!a0) return 0;
+    int32_t la = 0, lb = 0, a = 0;
+    uint32_t r = o.c2C230();
+    if (!r) return 0;
+    o.c32F30(p1, &la, &lb, &a, 0, 0, p2, 0, r);
+    o.c2C190();
+    return o.c2F0A0(uint32_t(lb), uint32_t(la), uint32_t(a), uint32_t(a), a2, a3, a4);
 }
 
-// 1.13c D2Client+0x349F0 (182 B): as 0x34960 but pair is scaled by byte p3+0x1a5 /128 and 0x2E190(p1) replaces 0x2C190.
-void sub_349F0(const Host& h, Address p1, int p2, Address p3, int, uintptr_t p5, uintptr_t p6) {
-    if (!p2 || !p3) return;
-    int32_t b = h.read<uint8_t>(p3 + 0x1a5);
-    h.call(0x32F30, {p1, h.scratch, h.scratch + 4});
-    int32_t a = div128(h.read<int32_t>(h.scratch) * b);
-    h.write<int32_t>(h.scratch, a);
-    h.write<int32_t>(h.scratch + 4, div128(h.read<int32_t>(h.scratch + 4) * b));
-    h.call(0x2E190, {p1});
-    h.call(0x2F0A0, {u(a), 0, p5, p6});
+// 1.13c D2Client+0x349F0 (ecx=p1, edx=p2, 5 stack words, ret 0x14): as 0x34960 without the gate; the pair is scaled by the
+// byte at unit+0x1a5 over 128, then 0x2E190 (eax=unit, ebx=a1) adjusts all three words before 0x2F0A0.
+uint32_t sub_349F0(Ops& o, uint32_t eax0, uint32_t p1, uint32_t p2, const uint8_t* unit, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
+    if (!p2 || !unit) return eax0;
+    int32_t b = unit[0x1a5];
+    int32_t la = 0, lb = 0, a = 0;
+    o.c32F30(p1, &la, &lb, &a, 0, 0, p2, 0, 0);
+    la = div128(la * b);
+    lb = div128(lb * b);
+    o.c2E190(unit, a1, p1, &la, &lb, &a);
+    return o.c2F0A0(uint32_t(lb), uint32_t(la), uint32_t(a), uint32_t(a), a2, a3, a4);
 }
 
-// 1.13c D2Client+0x34AB0 (327 B): looks up the skill record (0x17F0); if #10747(p1) is set lays out via 0x30B40
-// with callback 0x33240, else computes the pair (0x33240) and emits it through 0x2F0A0.
-// ponytail: the decompile's stack-built argument lists are ambiguous; arg order follows the visible pushes.
-void sub_34AB0(const Host& h, Address p1, Address p2, int p3) {
-    if (!p2 || !p3) return;
-    uint32_t rec = static_cast<uint32_t>(h.call(0x17F0));
-    if (!rec) return;
-    bool alt = h.call(ord(10747), {p1}) != 0;
-    uintptr_t s = h.call(ord(10601), {0xa02u + (alt ? 0 : 0xa), 0, u(p3)}); // line 0xa02/0xa0c
-    uintptr_t d = h.call(ord(10435), {p1, h.read<uint32_t>(rec + 0x18)});
-    uintptr_t t = h.call(ord(10601), {p2, 0xa03u + (alt ? 0 : 0xa), u(p3)});
-    uintptr_t v = h.call(ord(10435), {p1, h.read<uint32_t>(rec + 0x1c), t});
-    if (alt) {
-        h.call(0x30B40, {p2, p1, u(p3), 0x33240, h.read<uint32_t>(rec + 0x18), v, s, 1});
-        (void)d;
-        return;
+// 1.13c D2Client+0x34AB0 (ecx=p1, edx=p2, 5 stack words, ret 0x14): skill record from 0x17F0(*(int16*)a0); its +0x18/+0x1c
+// values are resolved through #10601(p2, file, line) (lines 0xa02/0xa03, or 0xa0c/0xa0d) and #10435(p1, v, that, a1). With #10747(p1) set the pair goes to
+// 0x30B40 with the 0x33240 callback; otherwise 0x33240 fills the pair and 0x2F0A0 emits it.
+uint32_t sub_34AB0(Ops& o, uint32_t eax0, uint32_t p1, uint32_t p2, const uint8_t* a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
+    if (!p2) return eax0;
+    if (!a0) return 0;
+    int16_t id; std::memcpy(&id, a0, 2);
+    const uint8_t* rec = o.c17F0(id);
+    if (!rec) return 0;
+    if (o.c10747(p1)) {
+        uint32_t r1 = o.c10435(p1, rd32(rec, 0x18), o.c10601(p2, o.srcFile, 0xa02), a1);
+        uint32_t r2 = o.c10435(p1, rd32(rec, 0x1c), o.c10601(p2, o.srcFile, 0xa03), a1);
+        return o.c30B40(a0, p2, a2, p1, a1, o.pairCb, r1, r2, a2, a3, a4, 1);
     }
-    h.call(0x33240, {p1, h.scratch, h.scratch + 4, h.scratch + 8});
-    h.call(0x2F0A0, {h.read<uint32_t>(h.scratch), h.read<uint32_t>(h.scratch + 8), s, p2});
+    int32_t la = 0, lb = 0, a = 0;
+    uint32_t r1 = o.c10435(p1, rd32(rec, 0x18), o.c10601(p2, o.srcFile, 0xa0c), a1);
+    uint32_t r2 = o.c10435(p1, rd32(rec, 0x1c), o.c10601(p2, o.srcFile, 0xa0d), a1);
+    o.c33240(p1, &la, &lb, &a, r1, r2, p2, 0, 0);
+    return o.c2F0A0(uint32_t(lb), uint32_t(la), a2, uint32_t(a), a2, a3, a4);
 }
 
-// 1.13c D2Client+0x34C00 (356 B): skill icon line; pair from 0x33240 is rescaled (0x14A0, x/128) when p3+0x1a5 != 0x80,
-// then #10567/#10121/#11091 (>>8) of skill *p3 are added and emitted via 0x2F0A0.
-void sub_34C00(const Host& h, Address p1, int p2, Address p3, int p4) {
-    if (!p2 || !p3) return;
-    if (!h.call(0x17F0)) return;
-    h.call(ord(10601), {u(p2), 0x98c, u(p4)});
-    h.call(ord(10435), {p1});
-    h.call(ord(10601), {u(p2), 0x98d, u(p4)});
-    h.call(ord(10435), {p1});
-    h.call(0x33240, {p1, h.scratch, h.scratch + 4, h.scratch + 8});
-    int32_t x = h.read<int32_t>(h.scratch), y = h.read<int32_t>(h.scratch + 4);
-    uint8_t sc = h.read<uint8_t>(p3 + 0x1a5);
-    if (sc != 0x80) {
-        x = static_cast<int32_t>(h.call(0x14A0, {0x80, u(x)}));
-        y = static_cast<int32_t>(h.call(0x14A0, {0x80, u(y)}));
+// 1.13c D2Client+0x34C00 (ecx=p1, edx=p2, 5 stack words, ret 0x14): as the plain branch of 0x34AB0 (lines 0x98c/0x98d) but
+// 0x33240 gets (r1, r2, p2, 0x80, 0) and fills x (edx), the a0 slot and a local z. Unless the unit's byte +0x1a5 is 0x80 both x
+// and the a0 word are rescaled by 0x14A0(eax=byte, ecx=0x80, edx=v). Then #10567/#10121 (>>8) add to x and #10297/#11091 to
+// the a0 word, all with (p1, skill, a1, 0/1); 0x2F0A0 gets eax=a0 word, ecx=x, edx=z and stack (z, a2, a3, a4).
+uint32_t sub_34C00(Ops& o, uint32_t eax0, uint32_t p1, uint32_t p2, const uint8_t* a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
+    if (!p2 || !a0) return eax0;
+    int16_t skill; std::memcpy(&skill, a0, 2);
+    const uint8_t* rec = o.c17F0(skill);
+    if (!rec) return 0;
+    int32_t x = 0, w = 0, z = 0;
+    uint32_t r1 = o.c10435(p1, rd32(rec, 0x18), o.c10601(p2, o.srcFile, 0x98c), a1);
+    uint32_t r2 = o.c10435(p1, rd32(rec, 0x1c), o.c10601(p2, o.srcFile, 0x98d), a1);
+    o.c33240(p1, &x, &w, &z, r1, r2, p2, 0x80, 0);
+    uint8_t b = a0[0x1a5];
+    if (b != 0x80) {
+        x = d2_client_14a0(b, x, 0x80);
+        w = d2_client_14a0(b, w, 0x80);
     }
-    int16_t sk = h.read<int16_t>(p3);
-    int32_t a = static_cast<int32_t>(h.call(ord(10567), {p1, u(sk), u(p4), 0}));
-    h.call(ord(10297), {p1, u(sk)});
-    int32_t b = static_cast<int32_t>(h.call(ord(10121), {p1, u(sk), u(p4), 1}));
-    h.call(ord(11091), {p1, u(sk), u(p4), 1});
-    h.call(0x2F0A0, {u(x + (b >> 8) + (a >> 8)), u(p4), u(p4), 0});
+    x += o.c10567(p1, skill, a1, 0) >> 8;
+    w += o.c10297(p1, skill, a1, 0) >> 8;
+    x += o.c10121(p1, skill, a1, 1) >> 8;
+    w += o.c11091(p1, skill, a1, 1) >> 8;
+    return o.c2F0A0(uint32_t(w), uint32_t(x), uint32_t(z), uint32_t(z), a2, a3, a4);
 }
 
 // 1.13c D2Client+0x34D70 (134 B): register-arg helper (ESI = scale). With scale != 0, 0x31220(p1) then 0x30E30 fill a pair;

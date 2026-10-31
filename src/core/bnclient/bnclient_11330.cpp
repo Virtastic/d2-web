@@ -55,9 +55,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t bnclient_sid_auth_check_11330(const uin
         uint32_t len = 0x5DC;
         if (e->build_5d(reply, &len)) e->send_frame(len, 0x5D, reply);
     }
-    e->reg_write(e->reg_section, e->reg_key, 0x82, "", 1);
     s->info[0] = 0;
     s->auth_ok = 0;
+    e->reg_write(e->reg_section, e->reg_key, 0x82, "", 1);
     switch (r) {
     case 0:
         s->auth_ok = 1;
