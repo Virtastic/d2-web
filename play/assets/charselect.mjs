@@ -482,13 +482,15 @@ export function createCharacterSelect({ read, decodeDc6, decodeDatPalette, chara
         // Retail's draw-list hook records PopUpOKCancel as its composed cel.  Keep its second canvas
         // segment out of that retail-facing list, but retain it in the independent source evidence.
         if (popupParts[1]) dialogDraw('popup', SELECT_ASSETS.popup, popupSource, SELECT_ASSETS.popupPalette, popupPaletteSource);
-        confirmLines.forEach((l) => confirmFont.drawAnchored(g, l.text, l.x, l.anchor));
         for (const [id, text] of [['no', noText], ['yes', yesText]]) {
           const b = dialogButtonBox(id);
           const token = `delete-${id}`, state = isButtonHeldOverTarget(pressed, hot) && pressed === token ? 1 : 0, face = okCancel.states[state] || okCancel.states[0];
           g.drawImage(face.canvas, b.x, b.y);
           dialogDraw('button', SELECT_ASSETS.okCancel, okCancelSource, 'data\\global\\palette\\Units\\pal.dat', unitsPaletteSource, recordDc6(okCancel.path, state < okCancel.states.length ? state : 0, face.frame, b.x, b.y));
-          okCancelFont.drawAnchored(g, text, b.x + Math.trunc((b.w - okCancelFont.measure(text)) / 2), b.y + Math.trunc((b.h + okCancelFont.cellHeight) / 2) - 1);        }
+          okCancelFont.drawAnchored(g, text, b.x + Math.trunc((b.w - okCancelFont.measure(text)) / 2), b.y + b.h - 9);
+        }
+        // Retail draws the question after both buttons (trace d56 tick 2).
+        confirmLines.forEach((l) => confirmFont.drawAnchored(g, l.text, l.x, l.anchor));
       }
       // Retail's pointer last, an ohand cel at (mouse x, mouse y - 1) with the DC6's own offsets
       // (D2MOO D2WinMain.cpp; the title draws it the same way, and the retail captures
