@@ -2,9 +2,9 @@
 #include <cstdint>
 using i32 = int32_t; using u32 = uint32_t;
 extern "C" {
-void r_E07A0(i32); i32 o10392(i32); i32 o11133(void*);
-void r_273C0(i32, i32*, i32); void r_DED30(i32, i32*, i32*);
-void r_A0C70(void*, void*, i32, i32, i32, const char*);
+intptr_t r_E07A0(...); intptr_t o10392(...); i32 o11133(void*);
+void r_273C0(i32, i32*, i32); intptr_t r_DED30(...);
+intptr_t r_A0C70(...);  // variadic: the batch 452c0b call passes more stack arguments (same wasm signature)
 }
 
 // 1.13c D2Game+0x27B90

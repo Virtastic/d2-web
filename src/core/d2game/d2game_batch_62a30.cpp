@@ -7,8 +7,8 @@
 #include <cstring>
 using i32 = int32_t; using u32 = uint32_t; using u8 = uint8_t; using u16 = uint16_t;
 extern "C" {
-i32 o10920(void*); i32 o10174(i32, i32, i32); void o10003(i32, i32, i32); i32 o10265(i32); void o10024(const void*, i32);
-i32 o10158(i32); i32 o10331(i32); void o10383(i32, i32*, i32*);
+intptr_t o10920(...); i32 o10174(i32, i32, i32); void o10003(i32, i32, i32); intptr_t o10265(...); intptr_t o10024(...);
+i32 o10158(i32); intptr_t o10331(...); void o10383(i32, i32*, i32*);
 void r_8A3E0(void*, i32); void r_354F0(void*, i32); void r_34AA0(i32); void r_34C00(); void r_DFCC0(void*, i32);
 void r_8B470(void*); i32 r_9BEB0(); void r_9C160(void*);
 }

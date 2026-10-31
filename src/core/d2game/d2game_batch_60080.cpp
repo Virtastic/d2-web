@@ -6,7 +6,7 @@
 using i32 = int32_t; using u8 = uint8_t;
 #define W __attribute__((weak))
 extern "C" {
-W void* o10045(const char*, i32, i32); W i32 o10621(i32*); W i32 o10265(i32); W void o10024(const char*, i32);
+intptr_t o10045(...); W i32 o10621(i32*); intptr_t o10265(...); intptr_t o10024(...);
 W i32 o10061(i32); W i32 o11088(i32); W i32 o10804(i32*, i32, i32); W i32 o10910(i32, i32, i32); W i32 o10858();
 W void r_77000(); W void r_76FC0(); W void r_7A9B0(); W void r_7FE30(); W void r_7D920(); W void r_77270();
 W void r_78930(); W void r_76EB0(); W void r_76EF0(); W void r_79930(); W char r_DAT_10D1C0[1];

@@ -4,8 +4,8 @@
 #include <cstdlib>
 using i32 = int32_t; using u32 = uint32_t; using u8 = uint8_t;
 extern "C" {
-i32 o10920(i32*); i32 o10174(i32, i32, i32); void o10024(const void*, i32); i32 o10265(i32);
-void* o10045(const char*, i32, i32); void o10285(i32, int16_t);
+intptr_t o10920(...); i32 o10174(i32, i32, i32); intptr_t o10024(...); intptr_t o10265(...);
+intptr_t o10045(...); void o10285(i32, int16_t);
 int16_t r_9BEB0(); void r_9C160(void*);
 i32 r_E660(u32); void r_DFCC0(i32*, i32); i32* r_EEF10(i32*); void r_33F80(void* pUnitEdi, void* pNodeEsi); void r_5C690(i32*, i32);
 i32* r_47CF0(void*, i32, i32, i32);

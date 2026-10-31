@@ -7,23 +7,23 @@ struct U; // opaque unit/room/game; fields touched by raw offset as in the decom
 using i32 = int32_t; using u32 = uint32_t;
 #define F(o, ...) extern "C" i32 o(__VA_ARGS__)
 extern "C" {
-void r_E0460(); void r_EFC60(); i32 o10945(i32, i32, i32); i32 o10265(i32); void o10024(const void*, i32);
-i32 r_DFA90(); i32 r_9F120(); u32 r_13B0(i32, i32); i32 o10444();
-void r_E07A0(i32); i32 o10392(i32); i32 o11064(i32); i32 o10202(void*, i32, i32, const char*); i32 o11160(void*, i32);
-i32 o10830(i32*); u32 r_E0A60(void*, void*); i32 o10331(i32); i32 o10057(i32);
-i32 o10910(i32, i32, i32); bool r_22A80(i32); i32 r_A00B0(); void o10261(i32, i32, i32, i32); void o10819(void*, const char*, i32);
-void r_DE0C0(i32*, i32*, i32, u32*); void r_DCF20(i32, i32*, i32); i32 o10750(i32); i32 o10867(i32); void o10769(i32, i32, i32, i32);
-void o10913(); u32 r_DE5A0(i32, i32, i32); i32 o10653(i32, i32, i32, i32); void o10786(i32, i32, i32, i32); void r_9F210(); void r_DDDE0(u32, i32*, i32*);
+void r_E0460(); void r_EFC60(); intptr_t o10945(...); intptr_t o10265(...); intptr_t o10024(...);
+intptr_t r_DFA90(...); intptr_t r_9F120(...); intptr_t r_13B0(...); intptr_t o10444(...);
+intptr_t r_E07A0(...); intptr_t o10392(...); i32 o11064(i32); i32 o10202(void*, i32, i32, const char*); i32 o11160(void*, i32);
+intptr_t o10830(...); intptr_t r_E0A60(...); intptr_t o10331(...); i32 o10057(i32);
+i32 o10910(i32, i32, i32); bool r_22A80(i32); intptr_t r_A00B0(...); void o10261(i32, i32, i32, i32); intptr_t o10819(...);
+void r_DE0C0(i32*, i32*, i32, u32*); void r_DCF20(i32, i32*, i32); intptr_t o10750(...); intptr_t o10867(...); void o10769(i32, i32, i32, i32);
+intptr_t o10913(...); intptr_t r_DE5A0(...); intptr_t o10653(...); intptr_t o10786(...); intptr_t r_9F210(...); intptr_t r_DDDE0(...);
 void r_9D230(i32, i32*); void r_57110(i32, i32); void r_9F7A0(i32*, i32);
-void* o10045(const char*, i32, i32); void o10188(i32, i32, i32, i32); i32 r_4E230(); bool r_215D0(i32, u32); void r_8EA80(i32, i32*, i32, i32, i32, i32, i32);
-i32 r_A3610(i32); void r_4F970(i32, i32, i32*, i32, i32*); void r_232B0(i32*, i32); void r_EFDB0(i32*); i32 r_9EE50(i32, i32**, i32*, i32, i32, i32); i32 r_21280();
+intptr_t o10045(...); intptr_t o10188(...); intptr_t r_4E230(...); bool r_215D0(i32, u32); intptr_t r_8EA80(...);
+intptr_t r_A3610(...); intptr_t r_4F970(...); void r_232B0(i32*, i32); void r_EFDB0(i32*); intptr_t r_9EE50(...); i32 r_21280();
 }
 extern i32** sgptDataTables_exref;
 static inline i32 sdt(i32 off) { return *(i32*)(*(i32*)sgptDataTables_exref + off); }
 static const char* NEC = "..\\Source\\D2Game\\SKILLS\\SkillNec.cpp";
 
 // 1.13c D2Game+0x4EBE0
-void D2GAME_4EBE0(i32 a, i32 b)
+void D2GAME_4EBE0(void* a, i32 b)
 {
     r_E0460();
     o10945(a, b, 0);
@@ -73,11 +73,11 @@ u32 D2GAME_4EF70(i32 p1, i32* p2)
     return 1;
 }
 
-static i32 unitArg(i32* u, int off, i32 (*f)(i32))
+static i32 unitArg(i32* u, int off, intptr_t (*f)(...))
 {
     i32 t = *u;
     if (t == 2 || (t > 3 && t < 6)) return *(i32*)(u[0xb] + off);
-    return u[0xb] ? f(u[0xb]) : 0;
+    return u[0xb] ? (i32)f((intptr_t)(u32)u[0xb]) : 0;
 }
 
 // 1.13c D2Game+0x4F370 (edi = pair)

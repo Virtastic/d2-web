@@ -3,7 +3,7 @@
 #include <cstdint>
 using i32 = int32_t; using u8 = uint8_t;
 extern "C" {
-void* o10045(const char*, i32, i32); i32 o10331(i32); i32 o10826(i32);
+intptr_t o10045(...); intptr_t o10331(...); i32 o10826(i32);
 void r_587C0(); void r_5B380(); void r_5A720(); void r_5BDB0(); void r_5B4F0(); void r_59450();
 void r_587A0(); void r_56E00(); void r_56D80(); void r_56D10(); extern char r_DAT_10ACB8[];
 void r_9E170(void*);

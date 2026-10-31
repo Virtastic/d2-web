@@ -3,7 +3,7 @@
 #include <cstdlib>
 using i32 = int32_t; using u32 = uint32_t;
 extern "C" {
-i32 o10920(i32*); i32 o10331(i32); i32 o10826(i32); void r_386F0(); i32 o10265(i32); void o10024(const void*, i32);
+intptr_t o10920(...); intptr_t o10331(...); i32 o10826(i32); void r_386F0(); intptr_t o10265(...); intptr_t o10024(...);
 }
 
 // 1.13c D2Game+0x5CFF0

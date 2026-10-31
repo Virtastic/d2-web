@@ -7,12 +7,12 @@
 #include <cstdlib>
 using i32 = int32_t; using u32 = uint32_t;
 extern "C" {
-i32 o10331(i32); i32 o10826(i32); char o10459(i32); i32 o10750(i32); i32 o10867(i32); i32 o10265(i32);
-void o10024(const void*, i32); i32 r_21280(); i32* r_E1D90(i32, i32, uint8_t, i32, i32);
+intptr_t o10331(...); i32 o10826(i32); char o10459(i32); intptr_t o10750(...); intptr_t o10867(...); intptr_t o10265(...);
+intptr_t o10024(...); i32 r_21280(); intptr_t r_E1D90(...);
 void o11090(i32*, i32); i32* r_A22E0(i32, i32*, i32*); uint8_t o10258(i32*); void o10111(i32*); void o10346(i32, i32);
 }
-static i32 unitX(i32* u) { return (*u == 2 || (*u > 3 && *u < 6)) ? *(i32*)(intptr_t)(u[0xb] + 0x10) : (u[0xb] ? o10750(u[0xb]) : 0); }
-static i32 unitY(i32* u) { return (*u == 2 || (*u > 3 && *u < 6)) ? *(i32*)(intptr_t)(u[0xb] + 0xc) : (u[0xb] ? o10867(u[0xb]) : 0); }
+static i32 unitX(i32* u) { return (*u == 2 || (*u > 3 && *u < 6)) ? *(i32*)(intptr_t)(u[0xb] + 0x10) : (u[0xb] ? (i32)o10750((intptr_t)(u32)u[0xb]) : 0); }
+static i32 unitY(i32* u) { return (*u == 2 || (*u > 3 && *u < 6)) ? *(i32*)(intptr_t)(u[0xb] + 0xc) : (u[0xb] ? (i32)o10867((intptr_t)(u32)u[0xb]) : 0); }
 [[noreturn]] static void die(i32 line) { o10024((void*)0, o10265(line)); std::_Exit(-1); }
 
 // shared tail: spawn 0x79 at (x+5,y+10) in room, link it, return false if creation failed
@@ -26,7 +26,7 @@ static bool spawn79(i32* unit, i32 room, uint8_t* st, bool full)
     if (a != b) die(0xe5c);
     i32 h = r_21280();
     if (!h) return false;
-    i32* o = r_E1D90(2, 0x3c, (uint8_t)(y + 10), x + 5, room);
+    i32* o = (i32*)r_E1D90(2, 0x3c, (uint8_t)(y + 10), x + 5, room);
     o11090(o, 1);
     o = r_A22E0(room, o, (i32*)(intptr_t)0x79);
     if (!o) return false;

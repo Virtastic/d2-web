@@ -6,7 +6,7 @@ extern "C" {
 i32 r_21100(i32 unit); i32 r_21130(i32 unit);
 i32 r_56A00(i32 unit); i32 r_60400(i32 unit); i32 r_663A0(i32 unit); i32 r_5CC30(i32 unit);
 void r_21290(i32 unit, void* cmd); void r_F21E0(i32 game, i32 x, i32 y); void r_F22C0(i32 v);
-void o10887();
+intptr_t o10887(...);
 }
 // Find AI-command node of type 3 in unit->info(+0x14)->(+0x28)->list(+0x20); circular list, null if absent.
 static i32* findCmd3(i32* unit)
