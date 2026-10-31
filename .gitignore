@@ -109,6 +109,8 @@ docs/*
 !docs/plans
 !docs/screenshots
 tools/*
+tools/manifest-add.mjs
+tools/manifest_lock.py
 !tools/artifact-lock.sh
 !tools/compiler-cache.sh
 !tools/docker-release.sh
