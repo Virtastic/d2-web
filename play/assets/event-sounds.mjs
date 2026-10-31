@@ -93,7 +93,7 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
         if (d && !played && ((it.mode === 5 && it.invPage === 255) || arrived || (old && old.drop) || (old && !old.ground && !old.flip && ground))) { play(d.row, { kind: 'drop', delay: shatterNow && !old ? 0 : d.frame, ...unit }); played = true; }
         now.set(it.id, { ground, code, born, drop: !played && (!!old?.drop || (!old && ((it.mode === 5 && it.invPage === 255) || arrived))), flip: !!old?.flip || it.mode === 5, played: (ground || it.mode === 5) && played });
       }
-      for (const [id, old] of seen) if (old.ground && !(now.get(id)?.ground)) { if (serverPickups > 0) serverPickups--; else play(idx.get(old.code === 'gld' ? 'item_gold' : 'item_pickup'), { kind: old.code === 'gld' ? 'gold' : 'pickup', unitType: 0, classId: cls }); }
+      for (const [id, old] of seen) if (old.ground && !(now.get(id)?.ground)) { if (serverPickups > 0) serverPickups--; else play(idx.get('item_pickup'), { kind: 'pickup', unitType: 0, classId: cls }); } // gold too: retail queues the pickup row at a gold pickup, the gold row is the pile's drop announce
       seen.clear(); for (const [k, v] of now) seen.set(k, v);
       // D2Client+0x237E0 object branch: a seen object entering mode m plays row[m] of its class record (table
       // D2Client+0xF6C58, play/assets/object-mode-sounds.mjs). The shared row (0xF6988) plays only if previous <= m.
