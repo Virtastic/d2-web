@@ -185,17 +185,17 @@ LAB_9672:
         wr32((void*)(uintptr_t)rd32(box, 0x90), 0x48, diff < 1 ? 0 : (uint32_t)diff);
         if (advanced) {
             if (rd32((void*)(uintptr_t)rd32(box, 0x90), 0x00) != 5) d2win_fatal(0x65);
-            uint32_t v = rd32(box, 0x58);
-            if (rd32((void*)(uintptr_t)rd32(box, 0x90), 0x48) < v)
-                v = rd32((void*)(uintptr_t)rd32(box, 0x90), 0x48);
-            wr32((void*)(uintptr_t)rd32(box, 0x90), 0x4C, v);
+            int32_t v = (int32_t)rd32(box, 0x58);
+            if ((int32_t)rd32((void*)(uintptr_t)rd32(box, 0x90), 0x48) < v)
+                v = (int32_t)rd32((void*)(uintptr_t)rd32(box, 0x90), 0x48);
+            wr32((void*)(uintptr_t)rd32(box, 0x90), 0x4C, (uint32_t)v);
             return 1;
         }
         if (rd32((void*)(uintptr_t)rd32(box, 0x90), 0x00) != 5) d2win_fatal(0x65);
-        uint32_t v = oldStep;
-        if (rd32((void*)(uintptr_t)rd32(box, 0x90), 0x48) < v)
-            v = rd32((void*)(uintptr_t)rd32(box, 0x90), 0x48);
-        wr32((void*)(uintptr_t)rd32(box, 0x90), 0x4C, v);
+        int32_t v = (int32_t)oldStep;
+        if ((int32_t)rd32((void*)(uintptr_t)rd32(box, 0x90), 0x48) < v)
+            v = (int32_t)rd32((void*)(uintptr_t)rd32(box, 0x90), 0x48);
+        wr32((void*)(uintptr_t)rd32(box, 0x90), 0x4C, (uint32_t)v);
         return 1;
     }
 }
@@ -332,8 +332,8 @@ extern "C" void d2win_sub_11760_fn(uint32_t node, uint32_t* lg, const uint32_t* 
 
 // 1.13c D2Win+0x114A0 (export #10002, 124 bytes): install a type-9 control's video path. stdcall
 // (box, text, value), ret 0xC; type != 9 fatal 0x51. The text is copied (0x100 bytes) to box+0x40,
-// D2Gfx #10052 is called on box+0x140, D2Gfx #10000 gets ECX = box+0x40, EDX = box+0x140 and the
-// text on the stack, and the module globals at 0x6F9A9D18 (0x104-byte copy) and 0x6F9A9E1C (low
+// D2Gfx #10052 is called on box+0x140, D2Gfx #10000 gets (box+0x40, box+0x140, value) on the stack
+// (retail pushes EBX = the third argument, not the text), and the module globals at 0x6F9A9D18 (0x104-byte copy) and 0x6F9A9E1C (low
 // byte of value) are written. Returns 1.
 // 1.13c D2Win+0x114A0
 extern "C"
@@ -344,7 +344,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_114A0(void* box, const char* text, uint3
     env->d2gfx10052((uint32_t)(uintptr_t)((uint8_t*)box + 0x140));
     env->d2gfx10000((uint32_t)(uintptr_t)((uint8_t*)box + 0x40),
                     (uint32_t)(uintptr_t)((uint8_t*)box + 0x140),
-                    (uint32_t)(uintptr_t)text);
+                    value);
     std::strncpy(d2win_g_6f9a9d18, text, 0x104);
     d2win_g_6f9a9e1c = (uint8_t)value;
     return 1;

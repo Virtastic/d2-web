@@ -1,4 +1,4 @@
-// 1.13c D2Win+0x0F4E0 -- control activate/toggle handler, from the cached Ghidra decompile.
+// D2Win 0x0F4E0 (1.13c) -- control activate/toggle handler, from the cached Ghidra decompile.
 #include <cstdint>
 #include <unistd.h>
 
@@ -15,7 +15,7 @@ static void f4e0Fatal(const D2WinF4E0Env* e, uint32_t id) { if (e->fatal) e->fat
 // param_1[0] = control (type 6). Dwords: [2] flags, [0xd] callback, [0x10] style (2 toggle, 4 no-notify),
 // [0x11]/[0x12] state pair. Returns 0 if disabled, 1 otherwise. Wrong type fatal 0x1fd, callback with
 // dat14a8<1 fatal 0x221. ponytail: 32-bit retail-layout callback pointer must fit 32 bits.
-extern "C" uint32_t d2win_sub_F4E0(int32_t* param_1, const D2WinF4E0Env* env) {
+extern "C" uint32_t d2win_sub_F4E0(int32_t* param_1, const D2WinF4E0Env* env) {  // 1.13c D2Win+0xF4E0
     int32_t* c = (int32_t*)(intptr_t)param_1[0];
     if (c[0] != 6) f4e0Fatal(env, 0x1fd);
     if (!(env->bitMasks[2] & (uint32_t)c[2]) || !(env->bitMasks[0] & (uint32_t)c[2])) return 0;

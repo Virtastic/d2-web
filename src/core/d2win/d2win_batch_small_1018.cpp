@@ -50,7 +50,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_12730(const uint16_t* text,uint32
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2win_addl(uint32_t a,uint32_t b,uint32_t* out) {
     const uint32_t sum=a+b; *out=sum; return sum<a || sum<b;
 }
-// 1.13c D2Win+0x2815 -- synchronize per-thread locale before case conversion.
+// D2Win 0x2815 (1.13c) -- synchronize per-thread locale before case conversion.
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2win_tolower(int32_t ch,const D2WinSmallEnv* e) {
     return e->tolowerMt(locale(e),ch);
 }

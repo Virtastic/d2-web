@@ -1,4 +1,4 @@
-// 1.13c D2Win+0xF2D0 (sub_F2D0, ordinal 10065): load act 1..5's palette
+// D2Win 0xF2D0 (1.13c) (sub_F2D0, ordinal 10065): load act 1..5's palette
 // bank -- the transform tables of DATA\GLOBAL\palette\act<n>\pal.pl2 -- into the D2Win globals and
 // hand the rgba palette to the renderer.
 #include <cstdint>

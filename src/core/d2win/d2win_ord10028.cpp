@@ -3,7 +3,7 @@
 #include <cstring>
 extern "C" {
 uint8_t* (*d2win_glyph_lookup)(uint16_t);  // DAT_6f901508 (b72 declares it weak); retail passes the char in CX
-// 1.13c D2Win+0x12080 (#10055)
+// D2Win 0x12080 (1.13c) (#10055)
 int32_t d2win_Ordinal_10055(const int16_t* s, int32_t n) {
   int32_t w = 0;
   for (int32_t i = 0; *s != 0 && i < n; ++i, ++s)

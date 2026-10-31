@@ -113,13 +113,13 @@ uint32_t* d2win_sub_E3C0(const uint8_t* cols, const char* tx) {
     w[0x2e] = (uint32_t)(uintptr_t)s;
     E.initWidgetTail();
     w[7] = 0xc65; w[9] = 1; w[8] = 0;
+    uint32_t v = w[0] | E.bitMasks[0]; v |= E.bitMasks[1]; w[0] = v | E.bitMasks[2];
     for (uint32_t i = 0; i < 16; i++) {
         w[0xe + 0x10 + i] = 1;
         uint8_t c = cols[i];
         if (c == 0 || (int32_t)c >= E.palCount || c == 0xff) w[0xe + i] = 0;
         else { E.lookupColor(c); w[0xe + i] = E.palTable[c * 3]; w[0xe + 0x10 + i] = E.palTable[c * 3 + 2]; }
     }
-    uint32_t v = w[0] | E.bitMasks[0]; v |= E.bitMasks[1]; w[0] = v | E.bitMasks[2];
     char* p = (char*)w + 0x28;
     for (int i = 0; i < 16; i++) { char c = tx[i]; p[i] = (c != -1) ? (char)(c - 1) : c; }
     if (E.fn_dff0() != 0 && E.fn_c410(w, 0) == 0) return nullptr;
@@ -191,7 +191,6 @@ void d2win_sub_E240(uint32_t* w, uint32_t p2, uint32_t p3, const uint8_t* cols, 
     if (p2 < 7) { w[9] = E.fn_c180(p2); if (!w[9]) return; }
     else w[9] = 1;
     w[8] = p3;
-    uint32_t v = w[0] | E.bitMasks[0]; v |= E.bitMasks[1]; w[0] = v | E.bitMasks[2];
     for (uint32_t i = 0; i < 16; i++) {
         w[0xe + 0x10 + i] = 1;
         if (cols[i] == 0 || cols[i] == 0xff) w[0xe + i] = 0;

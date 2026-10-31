@@ -5,13 +5,13 @@
 // 1.13c D2Win+0x14DF0 (control SetText; ctl type 1 = textbox)
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_14df0(
     int32_t* ctl, const uint16_t* text, int32_t (*ustrlen)(const uint16_t*),
-    void (*ustrcpy)(uint16_t*, const uint16_t*), void (*refresh)(), void (*fatal)(uint32_t code)) {
+    void (*ustrcpy)(uint16_t*, const uint16_t*), void (*refresh)(int32_t* ctl), void (*fatal)(uint32_t code)) {
     if (!ctl) { fatal(0x45e); return 0; }
     if (ctl[0] != 1) { fatal(0x460); return 0; }
     int32_t n = ustrlen(text);
     if (n == 0) *(uint16_t*)(ctl + 0x17) = 0; else ustrcpy((uint16_t*)(ctl + 0x17), text);
     ctl[0x97] = n;
-    refresh();
+    refresh(ctl);  // 0x13AC0 re-lays the box out; retail passes ctl in ESI
     typedef void (*cb_t)(int32_t);
     cb_t cb = (cb_t)(uintptr_t)(uint32_t)ctl[0x9b];
     if (cb) cb(0);

@@ -1,4 +1,4 @@
-// 1.13c D2Win+0x13DA0 -- textbox mouse handler: msg->[0] is the control record (type 1, flags
+// D2Win 0x13DA0 (1.13c) -- textbox mouse handler: msg->[0] is the control record (type 1, flags
 // gate bitmasks[0] and [2]); map the mouse point (x,y) to a character index through the wrapped
 // text lines and move the caret (+0x25C) / selection (+0x54,+0x58); then forward to the control's
 // callback (+0x34). Null / wrong-type record is fatal (strings 0x74E/0x74F -> Fog 10024, _exit).
@@ -24,7 +24,7 @@ struct D2WinTbEnv {
 static int32_t rd(const uint8_t* p, int o) { int32_t v; std::memcpy(&v, p + o, 4); return v; }
 static void wr(uint8_t* p, int o, int32_t v) { std::memcpy(p + o, &v, 4); }
 
-uint32_t d2win_sub_13da0(uint8_t* c, uint32_t msgType, void* msg, int32_t x, int32_t y, const D2WinTbEnv& e) {
+uint32_t d2win_sub_13da0(uint8_t* c, uint32_t msgType, void* msg, int32_t x, int32_t y, const D2WinTbEnv& e) {  // 1.13c D2Win+0x13DA0
     if (!c || rd(c, 0) != 1) d2win_exit((uint32_t)-1);
     uint32_t flags = (uint32_t)rd(c, 8);
     if (!(e.mask2 & flags) || !(e.mask0 & flags)) return 0;

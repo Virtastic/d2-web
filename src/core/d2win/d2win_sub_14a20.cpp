@@ -1,4 +1,4 @@
-// 1.13c D2Win+0x14A20 (sub_14A20): edit-box draw (background, text, password mask, selection, blinking caret).
+// D2Win 0x14A20 (1.13c) (sub_14A20): edit-box draw (background, text, password mask, selection, blinking caret).
 // Stateful (globals, GetTickCount, draw seams); callees are seams in the env, as d2win_sub_14140.
 #include <cstdint>
 
@@ -22,7 +22,7 @@ struct D2Win14A20Env {
 
 static int32_t ulen(const uint16_t* s) { int32_t n = 0; while (s[n]) n++; return n; }
 
-uint32_t d2win_sub_14a20(int32_t* b, D2Win14A20Env& e) {
+uint32_t d2win_sub_14a20(int32_t* b, D2Win14A20Env& e) {  // 1.13c D2Win+0x14A20
     if (!b) { e.assertFail(0x49c); return 0; }
     if (b[0] != 1) { e.assertFail(0x49e); return 0; }
     if (!(e.bitMask8 & (uint32_t)b[2]) || !(e.bitMask0 & (uint32_t)b[2])) return 1;

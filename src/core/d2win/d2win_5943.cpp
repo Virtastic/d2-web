@@ -1,4 +1,4 @@
-// 1.13c D2Win+0x5943 (CRT _setmbcp worker): build the MBCS ctype table for a code page. Returns 0, or -1 if the
+// D2Win 0x5943 (1.13c) (CRT _setmbcp worker): build the MBCS ctype table for a code page. Returns 0, or -1 if the
 // code page is unknown to both the built-in table and GetCPInfo (and no SBCS fallback is allowed).
 #include <cstdint>
 #include <cstring>
@@ -23,7 +23,7 @@ static uint32_t cp_lcid(uint32_t cp) {
     return cp == 0x3a4 ? 0x411 : cp == 0x3a8 ? 0x804 : cp == 0x3b5 ? 0x412 : cp == 0x3b6 ? 0x404 : 0;
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2win_sub_5943(uint32_t cp) {
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2win_sub_5943(uint32_t cp) {  // 1.13c D2Win+0x5943
     if (cp) {
         for (int i = 0; i < 5; i++) {
             if (d2win_g_cptab[i].cp != cp) continue;

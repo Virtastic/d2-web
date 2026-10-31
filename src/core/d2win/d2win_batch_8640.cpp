@@ -19,12 +19,12 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2win_sub_8640(int32_t* list, int32_t po
     return 1;
 }
 
-// 1.13c D2Win+0x7F40: set the colour word (+0x14) of list entry `index`, or of all entries for -1.
+// D2Win 0x7F40 (1.13c): set the colour word (+0x14) of list entry `index`, or of all entries for -1.
 // Entries are singly linked through +0x1C from the list head at control+0x48.
 struct D2WinListEntry { uint8_t pad[0x14]; uint32_t color; uint8_t pad2[4]; uint32_t next; };   // 32-bit retail pointer slots
 struct D2WinListCtl { int32_t type; uint8_t pad[0x44]; uint32_t head; uint32_t tail; uint32_t unk; int32_t count; };
 static D2WinListEntry* d2win_ent(uint32_t p) { return (D2WinListEntry*)(uintptr_t)p; }
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2win_sub_7F40(D2WinListCtl* c, int32_t index, uint32_t color) {
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2win_sub_7F40(D2WinListCtl* c, int32_t index, uint32_t color) {  // 1.13c D2Win+0x7F40
     if (!c) d2win_fatal(0x368);
     if (c->type != 4) d2win_fatal(0x369);
     if (index == -1) {
