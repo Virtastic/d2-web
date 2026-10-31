@@ -6582,7 +6582,7 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
     drawn: waypointEvidence && JSON.parse(JSON.stringify(waypointEvidence)), art: waypointPanelRenderer?.evidence ?? null,
     lastTravel: lastWaypointTravel }; },
   waypointTargets() { return waypointMenu ? waypointMenuInput.targets(canvas.width, canvas.height, waypointEvidence?.tabs ?? []) : null; },
-  get plugyStash() { return { fail: plugyFail, ready: plugyReady, error: plugyError, settle: () => plugyLast, pages: plugySets, live: plugyLive, gold: plugyGold, meta: plugyMeta, moveGold: plugyMoveGold, artReady: Boolean(plugyStash.art), enabled: plugyStash.enabled, set enabled(v) { plugyStash.enabled = v; }, page: plugyStash.page, drawn: plugyEvidence }; },
+  get plugyStash() { return { fail: plugyFail, ready: plugyReady, error: plugyError, settle: () => plugyLast, pages: plugySets, live: plugyLive, gold: plugyGold, meta: plugyMeta, moveGold: plugyMoveGold, artReady: Boolean(plugyStash.art), get enabled() { return plugyStash.enabled; }, set enabled(v) { plugyStash.enabled = v; }, page: plugyStash.page, drawn: plugyEvidence }; },
   get stashEvidence() { return { open: stashOpen, error: stashPanelError, drawn: stashEvidence && JSON.parse(JSON.stringify(stashEvidence)),
     art: stashPanelRenderer?.evidence ?? null, gold: { error: stashGoldError, drawn: stashGoldEvidence && JSON.parse(JSON.stringify(stashGoldEvidence)),
       art: stashGoldRenderer?.evidence ?? null } }; },
@@ -6843,6 +6843,7 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
   plugySwapTo(n, shared = plugyStash.showShared) { return plugyStash.go(n, shared); },   // the page control's turn, as the click handler makes it   // scenario surface: the page control's swap without a click
   putAuxRaw(key, bytes) { return saveStore.putAux(key, bytes); },
   getAuxRaw(key) { return saveStore.getAux(key); },
+  getSavedRaw(name) { return saveStore.get(name); },   // read-only: the stored .d2s bytes, for scenarios
   selectCharacter(name) { return charSelect ? charSelect.selectByName(name) : -1; },
   playSelectedCharacter() { charSelect?.play(); },
   get charCreateEvidence() { return charCreate ? { ...charCreate.evidence, error: charCreateError } : { error: charCreateError || 'not built' }; },
