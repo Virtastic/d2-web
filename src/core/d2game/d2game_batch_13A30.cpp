@@ -150,53 +150,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_13A30(void* item, const D2G
     return 1;
 }
 
-// 0x13C20: weighted drop-table roll. Per row: drop level (row+0x22) >= 100 requires the item format
-// word; the signed level cap (row+0x30) must not exceed the item level (#10086); row+0x28 is the item
-// id; a row whose +0x2C word is 0x1D requires client +0x80 bit 0; and client+0x40-1 picks the row
-// outright (that is the "already chosen" index). Otherwise the row weight (row+0x34, 0 becomes 1) is
-// accumulated and the item seed rolls the weighted pick. The pick sets +0x28, clears bit 0x10 and runs
-// the item update; an empty table answers 0.
-// 1.13c D2Game+0x13C20
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_13C20(void* item, void* client, const D2GameBatchB87Env* env) {
-    void*   rec = env->ordinal10695(item ? rd32(item, 4) : 0xFFFFFFFFu);
-    if (!rec) return 0;
-    uint32_t exp   = env->ordinal10718(item);
-    uint32_t level = env->ordinal10086(item);
-    void*    base  = env->dataTableBase;
-    uint8_t* table = (uint8_t*)rdptr(base, 0xC18);
-    uint32_t rows  = rd32(base, 0xC1C);
-    int32_t  chosen = -1;
-    uint32_t idxs[0x200], wts[0x200], n = 0, total = 0;
-    for (int32_t i = 0; i < (int32_t)rows; i++) {
-        uint8_t* row = table + (size_t)i * 0x1B8;
-        if (rd16(row, 0x22) >= 100 && (uint16_t)exp < 100) continue;
-        if ((int32_t)(int16_t)rd16(row, 0x30) > (int32_t)level) continue;
-        if (rd32(row, 0x28) != rd32(rec, 0x80)) continue;
-        if (rd16(row, 0x2C) == 0x1D && !(rd8(client, 0x80) & 1)) continue;
-        if (rd32(client, 0x40) != 0 && rd32(client, 0x40) - 1 == (uint32_t)i) chosen = i;
-        uint32_t w = rd32(row, 0x34);
-        idxs[n] = (uint32_t)i;
-        wts[n] = w ? w : 1;
-        total += wts[n];
-        n++;
-    }
-    if (chosen < 0) {
-        if (!total) return 0;
-        uint32_t roll = d2_b87_roll(env->ordinal10411(item), total);
-        uint32_t k = 0;
-        for (; k < n; k++) {
-            if (roll < wts[k]) break;
-            roll -= wts[k];
-        }
-        if (k >= n) return 0;
-        chosen = (int32_t)idxs[k];
-    }
-    env->ordinal10536(item, (uint32_t)chosen);
-    env->ordinal10977(item, 0x10, 0);
-    env->ordinal10996(4, 0, item, 0, 0, 0);
-    return 1;
-}
-
 // 0x137F0: the level prefix / stat roll. The fixed #10926 table's first dword caps the roll that is
 // written to item +0x28. With #10865 set, the data record's +0x112 byte / 3 (minimum 1) becomes the
 // prefix value and its half is added to a second roll on the item's own seed (+0x20), written to stat
@@ -246,57 +199,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_137F0(void* item, const D2G
         return 1;
     }
     return 0;
-}
-
-// 0x14210 / 0x14370: identical bodies, the only difference is the caller-selected cursor semantics.
-// #10220 returns a fixed struct: +0 a count, +4 the 0x48-byte element array, +8 and +0xC two cursors.
-// The flag selects which cursor starts the walk and how many elements are scanned; every element
-// #10110 accepts is collected as {position, element} up to 0x1FF. The item seed then picks one and the
-// answer is position + 1 (0 when the projection is empty or the roll is out of range).
-static uint32_t d2_b87_pick(void* unit, uint32_t flag, const D2GameBatchB87Env* env) {
-    void* p = env->ordinal10220();
-    if (!p) return 0;
-    uint32_t base = rd32(p, 4);
-    uint32_t cur;
-    int32_t n, idxBase;
-    if (flag) {
-        cur = rd32(p, 0xC);
-        if (!cur) return 0;
-        idxBase = (int32_t)(cur - base) / 0x48;
-        n = (int32_t)(rd32(p, 0) * 0x48u - cur + base) / 0x48;
-    } else {
-        cur = rd32(p, 8);
-        if (!cur) return 0;
-        idxBase = (int32_t)(cur - base) / 0x48;
-        n = (int32_t)(rd32(p, 0xC) - cur) / 0x48;
-    }
-    uint32_t pos[0x1FF];
-    uint8_t* ent[0x1FF];
-    uint32_t got = 0;
-    uint8_t* e = (uint8_t*)(uintptr_t)cur;
-    for (int32_t j = 0; j < n; j++) {
-        if (env->ordinal10110(unit, e) && got < 0x1FF) {
-            pos[got] = (uint32_t)idxBase + (uint32_t)j;
-            ent[got] = e;
-            got++;
-        }
-        e += 0x48;
-    }
-    if (!got) return 0;
-    uint32_t roll = d2_b87_roll(env->ordinal10411(unit), got);
-    if ((int32_t)roll >= (int32_t)got) return 0;
-    (void)ent;
-    return (uint32_t)pos[roll] + 1;
-}
-
-// 1.13c D2Game+0x14210
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_14210(void* unit, uint32_t flag, const D2GameBatchB87Env* env) {
-    return d2_b87_pick(unit, flag, env);
-}
-
-// 1.13c D2Game+0x14370
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_14370(void* unit, uint32_t flag, const D2GameBatchB87Env* env) {
-    return d2_b87_pick(unit, flag, env);
 }
 
 // 0xE73C0: monster state transition driven by the game's 0x10F4 list (node type 0x13). Requires the
@@ -466,51 +368,3 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8DFD0(void* unit, void* client
     env->sub8D3D0(client, item, 3, dwFlag, 0);
 }
 
-// 0x13E60: the 137F0 sibling for the second item layout. Same roll/prefix/type-0x2D/0x32 flow, but the
-// prefix value is data+0x112 * 33 / 100 (min 1) and the type-0x2D stats are scaled to 75% only
-// (0x9F/0xA0 via 0x13230 floors 2/1). Every path, matched or not, ends in 0x13DE0(item, arg) and answers
-// 1 when the prefix pass or a type matched, else 0. Seam sub13DE0 is the unmapped 0x13DE0 (EAX=item).
-// 1.13c D2Game+0x13E60
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_13E60(void* item, uint32_t arg,
-        void (*sub13DE0)(void* item, uint32_t arg), const D2GameBatchB87Env* env) {
-    void* g   = env->ordinal10926();
-    void* rec = env->ordinal10695(item ? rd32(item, 4) : 0xFFFFFFFFu);
-    if (!g || !rec) return 0;
-    env->ordinal10536(item, d2_b87_roll(env->ordinal10411(item), rd32(g, 0)));
-    int32_t ret = 0;
-    if (env->ordinal10865(item)) {
-        void* rec2 = env->ordinal10695(item ? rd32(item, 4) : 0xFFFFFFFFu);
-        if (rec2) {
-            int32_t v = (int32_t)(rd8(rec2, 0x112) * 0x21u) / 100;
-            if (v < 1) v = 1;
-            int32_t half  = (int32_t)((uint32_t)v >> 1);
-            int32_t extra = (int32_t)d2_b87_roll((uint8_t*)item + 0x20, (uint32_t)half) + half;
-            if (extra == 0) extra = 1;
-            env->ordinal10887(item, 0x48, (uint32_t)extra, 0);
-            env->ordinal10887(item, 0x49, (uint32_t)v, 0);
-        }
-    }
-    if (env->ordinal10744(item, 0x2D)) {
-        static const uint32_t stat[4] = { 0x16, 0x15, 0x18, 0x17 };
-        static const int32_t floorv[4] = { 2, 1, 2, 1 };
-        for (int i = 0; i < 4; i++) {
-            int32_t q = d2_b87_pct((int32_t)env->ordinal10587(item, stat[i], 0));
-            if (q < floorv[i]) q = floorv[i];
-            env->ordinal10887(item, stat[i], (uint32_t)q, 0);
-        }
-        if (env->ordinal10711(item)) {
-            env->ordinal10887(item, 0x9F,
-                (uint32_t)GAME_PercentOfWithFloor((int32_t)env->ordinal10910(item, 0x9F, 0), 2, 0x4B), 0);
-            env->ordinal10887(item, 0xA0,
-                (uint32_t)GAME_PercentOfWithFloor((int32_t)env->ordinal10910(item, 0xA0, 0), 1, 0x4B), 0);
-        }
-        ret = 1;
-    } else if (env->ordinal10744(item, 0x32)) {
-        int32_t q = d2_b87_pct((int32_t)env->ordinal10587(item, 0x1F, 0));
-        if (q <= 0) q = 1;
-        env->ordinal10887(item, 0x1F, (uint32_t)q, 0);
-        ret = 1;
-    }
-    sub13DE0(item, arg);
-    return ret;
-}

@@ -495,71 +495,6 @@ static void d2game_EE480_113c(void* pEaxUnit, void* pParam1, const D2GameBatchB6
     }
 }
 
-// 1.13c D2Game+0x140B0
-// Random item-type selection for a vendor/cube action. param_1 is the unit; #10295 gives the table
-// of item-type slots and #10695(param_1 ? param_1[1] : -1) the candidate record. Ghidra left two
-// stack slots unnamed; from the frame they are the second and third stack arguments, taken here as
-// param_2 (passed to #10536/#10996 and re-assigned over param_1 in 1.13c) and param_3 (masked with
-// 0xffff0000 for #11094). The item-type count is *table, forced to 4 when #10711(param_1) is
-// non-zero or record+0x113 is set. A random index (power-of-two mask when possible, else modulo) is
-// drawn from #10411's RNG state (seed*0x6AC690C5 + high word); visited indices are retried, #11007
-// maps index -> item type, and #11094 must accept it before #10536/#10996 commit the choice and
-// 0x13DE0 runs. Returns 0 when every index has been exhausted.
-static uint32_t d2game_140B0_113c(uint32_t nParam1, uint32_t nParam2, uint32_t nParam3, void* pEdi,
-                                  const D2GameBatchB64Env& env)
-{
-    uint32_t* pSlots = env.ord10295();
-    const int32_t nKey = nParam1 ? (int32_t)rd32((void*)(uintptr_t)nParam1, 0x04) : -1;
-    void* pRecord = env.ord10695(nKey);
-    if (pSlots == nullptr || pRecord == nullptr) return 0;
-
-    uint32_t nCount = *pSlots;
-    uint32_t nMasked = nParam3 & 0xFFFF0000u;
-    if (env.ord10711((void*)(uintptr_t)nParam1) != 0 || rd8(pRecord, 0x113) != 0) nCount = 4;
-
-    // The retail stack array is bounded by the item-type count; 1024 covers the 1.13c table.
-    uint8_t visited[1024] = { 0 };
-
-    for (;;) {
-        uint32_t nIndex;
-        do {
-            uint64_t* pRng = (uint64_t*)env.ord10411((void*)(uintptr_t)nParam1);
-            if ((int32_t)nCount < 1) {
-                nIndex = 0;
-            } else {
-                const uint32_t* p = (const uint32_t*)pRng;
-                uint64_t u = (uint64_t)p[0] * 0x6AC690C5ull + (uint64_t)p[1];
-                *pRng = u;
-                if ((nCount & (nCount - 1)) == 0) {
-                    nIndex = (nCount - 1) & (uint32_t)u;
-                } else {
-                    nIndex = (uint32_t)(u % (uint64_t)nCount);
-                }
-            }
-        } while (nIndex < sizeof visited && visited[nIndex] != 0);
-
-        int32_t nItemType = env.ord11007(nIndex);
-        if (nItemType == 0) break;
-        if (env.ord11094(nMasked, nItemType) != 0) {
-            env.ord10536(nParam2, nIndex);
-            env.ord10996(1, 0, nParam2, nItemType, 0, 0);
-            env.fn13DE0(pEdi);
-            return 1;
-        }
-        if (nIndex < sizeof visited) visited[nIndex] = 1;
-
-        int32_t nScan = 0;
-        if ((int32_t)nCount < 1) return 0;
-        for (;;) {
-            nParam1 = nParam2;  // retail's loop condition reloads param_1 from the second stack arg
-            if (!(nScan < (int32_t)sizeof visited && visited[nScan] != 0)) break;
-            nScan = nScan + 1;
-            if ((int32_t)nCount <= nScan) return 0;
-        }
-    }
-    return 0;
-}
-
 // 1.13c D2Game+0x9e330
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9e330(uint32_t* r)
@@ -639,13 +574,6 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_ee480(uint32_t* r)
 {
     d2game_EE480_113c((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1], batchEnv(r));
     r[4] = 0;
-}
-
-// 1.13c D2Game+0x140B0 (r[0]=param_1, r[1]=param_2, r[2]=param_3, r[3]=EDI, r[4]=result)
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_140b0(uint32_t* r)
-{
-    r[4] = d2game_140B0_113c(r[0], r[1], r[2], (void*)(uintptr_t)r[3], batchEnv(r));
 }
 
 // 1.13c D2Game+0xee7b0

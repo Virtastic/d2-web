@@ -74,35 +74,7 @@ struct D2GameBatch141E0Env {
     void     (*fog10046)(void* pool, void* mem, const char* file, uint32_t line, uint32_t zero);
 };
 
-// Format dispatch: a non-zero ITEMS_GetItemFormat picks 0x13C20(item, arg), otherwise the format-0
-// tail 0x13A30 runs with the item still in EDI. Answer is the callee's.
-// 1.13c D2Game+0x141E0
-extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_141E0(void* item, uint32_t arg,
-                                                           const D2GameBatch141E0Env* env)
-{
-    if (env->ordinal10718((uint32_t)(uintptr_t)item) != 0) {
-        env->sub13C20(item, arg);
-        return 0;
-    }
-    env->sub13A30(item);
-    return 0;
-}
 
-// The same dispatch for the second item layout: non-zero format -> 0x13E60(item EDI, arg), zero ->
-// 0x137F0 with the item in EDI.
-// 1.13c D2Game+0x14AF0
-extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_14AF0(void* item, uint32_t arg,
-                                                           const D2GameBatch141E0Env* env)
-{
-    if (env->ordinal10718((uint32_t)(uintptr_t)item) != 0) {
-        env->sub13E60(item, arg);
-        return 0;
-    }
-    env->sub137F0(item);
-    return 0;
-}
 
 // Four stack arguments, item in ESI, EBX and EDI carried into the creation call. Format non-zero ->
 // 0x344D0(item, arg1, arg2, arg3, ebx, edi, arg4); format zero -> 0x348A0(item, arg1, arg2, arg3,
@@ -233,17 +205,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_14BF0(void* item, void* record,
     }
 }
 
-// Class probe gate: ordinal 11036 must be non-zero, then ITEMS_GetItemFormat picks 0x15240 (non-zero)
-// or 0x14F20 (zero), both with the item in ESI.
-// 1.13c D2Game+0x154F0
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_154F0(void* item,
-                                                        const D2GameBatch141E0Env* env)
-{
-    if (env->ordinal11036((uint32_t)(uintptr_t)item) == 0) return;
-    if (env->ordinal10718((uint32_t)(uintptr_t)item) != 0) env->sub15240(item);
-    else                                                  env->sub14F20(item);
-}
 
 // Room-class probe: UNITS_GetRoom(item) feeds ordinal 10826; below 0x6C the item goes to 0xE73C0
 // (item in ECX). ESI is the item, the only stack argument is unused by the rule.

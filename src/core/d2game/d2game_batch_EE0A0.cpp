@@ -149,7 +149,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_EE0A0(uint32_t param1, int
 // Act spawn follow-up: act in 0..6 with a positive #11120 count, #10044 fetches the act record, +0xc its
 // owner word. #10718 == 0 runs 0x135E0; otherwise 0x13320(owner, record, #10718 == 0 ? 0 : owner) where
 // bit 0x20 of the record's byte +0x80 selects the owner word instead of zero.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_13DE0(int32_t param1, const D2GameBatchEE0A0Env* env) { // 1.13c D2Game+0x13DE0
+static void legacy13DE0(int32_t param1, const D2GameBatchEE0A0Env* env) { // superseded by d2game_13de0.cpp; kept for the 0x14F20/0x15240 tails
     const int32_t iVar3 = env->ordinal10957();
     if (iVar3 < 0 || iVar3 >= 7) return;
     const int32_t iVar4 = env->ordinal11120(iVar3);
@@ -458,7 +458,7 @@ loopEnd:
                 if (env->ordinal10248(env->ordinal10257()) != 0) env->ordinal10996(0, 0, 0, nullptr, 0, 0);
                 if (env->ordinal10248(env->ordinal11028()) != 0) env->ordinal10996(0, 0, 0, nullptr, 0, 0);
             }
-            d2_fn_d2game_13DE0(0, env);
+            legacy13DE0(0, env);
             return 1;
         }
     }
@@ -547,7 +547,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_15240(uint32_t unaff_ESI, 
                 if (env->ordinal10248(env->ordinal10257()) != 0) env->ordinal10996(0, 0, 0, nullptr, 0, 0);
                 if (env->ordinal10248(env->ordinal11028()) != 0) env->ordinal10996(0, 0, 0, nullptr, 0, 0);
             }
-            d2_fn_d2game_13DE0(iVar7, env);
+            legacy13DE0(iVar7, env);
             return 1;
         }
     }
