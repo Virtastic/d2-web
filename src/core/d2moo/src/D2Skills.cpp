@@ -2978,17 +2978,17 @@ void __stdcall D2Common_11015(D2UnitStrc* pUnit, int a2, int nSkillId)
 }
 
 //D2Common.0x6FDB3340 (#11016)
-int __stdcall D2Common_11016(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
+// The rule with its two callee answers as parameters (the FN probe drives it with the capture's hooked answers).
+// 1.13c reads the range byte sign-extended (a byte >= 0x80 comes back negative).
+int D2Common_11016_Rule(D2UnitStrc* pUnit, D2SkillStrc* pSkill, BOOL(*pfIsBowOrXBow)(D2UnitStrc*), BOOL(*pfMeleeOnly)(D2UnitStrc*))
 {
-	int nRange = 0;
-
 	if (pSkill && pSkill->pSkillsTxt)
 	{
-		nRange = pSkill->pSkillsTxt->nRange;
+		int nRange = (int8_t)pSkill->pSkillsTxt->nRange;
 		if (nRange == 3)
 		{
-			nRange = (COMPOSIT_IsWeaponBowOrXBow(pUnit) != 0) + 1;
-			if (pUnit && pUnit->dwUnitType == UNIT_PLAYER && nRange != 1 && STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_MELEEONLY))
+			nRange = (pfIsBowOrXBow(pUnit) != 0) + 1;
+			if (pUnit && pUnit->dwUnitType == UNIT_PLAYER && nRange != 1 && pfMeleeOnly(pUnit))
 			{
 				return 1;
 			}
@@ -2998,6 +2998,17 @@ int __stdcall D2Common_11016(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 	}
 
 	return 0;
+}
+
+static BOOL D2Common_11016_MeleeOnly(D2UnitStrc* pUnit)
+{
+	return STATES_CheckStateMaskOnUnit(pUnit, STATEMASK_MELEEONLY);
+}
+
+// 1.13c D2Common+0x51000 (#10002)
+int __stdcall D2Common_11016(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
+{
+	return D2Common_11016_Rule(pUnit, pSkill, COMPOSIT_IsWeaponBowOrXBow, D2Common_11016_MeleeOnly);
 }
 
 //D2Common.0x6FDB33A0 (#11017)

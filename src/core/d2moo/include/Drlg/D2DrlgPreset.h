@@ -119,6 +119,8 @@ void __fastcall DRLGPRESET_AddPresetUnitToDrlgMap(void* pMemPool, D2DrlgMapStrc*
 void __fastcall DRLGPRESET_SpawnHardcodedPresetUnits(D2DrlgRoomStrc* pDrlgRoom);
 //D2Common.0x6FD86AC0
 void __fastcall DRLGPRESET_AddPresetRiverObjects(D2DrlgMapStrc* pDrlgMap, void* pMemPool, int nOffsetX, D2DrlgGridStrc* pDrlgGrid);
+// EAX/ECX/EDI column loop of the river branch (one invisible sound object per 8 tiles); exported for its FN probe.
+void DRLGPRESET_SpawnRiverSoundColumn(D2DrlgMapStrc* pMazeMap, void* pDrlgMemPool, int nTileX, int nTileY);
 //D2Common.0x6FD86C80
 void __fastcall DRLGPRESET_FreePresetRoomData(D2DrlgRoomStrc* pDrlgRoom);
 //D2Common.0x6FD86CE0

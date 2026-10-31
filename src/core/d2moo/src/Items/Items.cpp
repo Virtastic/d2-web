@@ -4366,6 +4366,7 @@ uint32_t __stdcall ITEMS_GetSetItemsMask(D2UnitStrc* pPlayer, D2UnitStrc* pSetIt
 }
 
 //D2Common.0x6FD9FD80 (#10838)
+// 1.13c D2Common+0x23F40 (#10218)
 D2SetItemsTxt* __stdcall ITEMS_GetSetItemsTxtRecordFromItem(D2UnitStrc* pItem)
 {
 	if (D2ItemDataStrc * pItemData = ITEMS_GetItemData(pItem))
@@ -7437,9 +7438,14 @@ BOOL __fastcall sub_6FDA4380(D2UnitStrc* pItem, unsigned int nSetItemMask)
 			return TRUE;
 		}
 
-		for(int i = nBonuses - 1; i < 6; ++i)
+		// 1.13c (D2Common+0x2C7C0): the switch-on walk stops before the sixth set state, and a zero mask starts it one slot
+		// early on a zero state id, which toggles nothing.
+		for(int i = nBonuses - 1; i < 5; ++i)
 		{
-			D2Common_10574(pItem, gnItemSetStates[i], TRUE);
+			if (i >= 0)
+			{
+				D2Common_10574(pItem, gnItemSetStates[i], TRUE);
+			}
 		}
 	}
 

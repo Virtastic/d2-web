@@ -14,6 +14,8 @@ behaviour differs from 1.10f.
 
 - D2Game+0x6A560 OBJMODE_WellHeal: split out of the well operate; refills life/mana/stamina by parm[1]/256 of max, clears poison and freeze, heals pets, returns 1 when anything was used else 0.
 - D2Game+0x6CEE0 OBJECTS_OperateFunction22_Well: no null checks; anim step uses the byte-truncated 2*parm[2]; always returns 0.
+- D2Game+0x6D960 OBJECTS_OperateFunction33_WirtsBody: ENDANIM fires (FrameCnt[1] >> 8) + 1 ticks out (not OBJECTS_GetOperatingTicks); no null checks.
+- D2Game+0x6DA00 OBJECTS_OperateFunction02_Shrine: a null shrine-table handler (code 0) falls back to Refill instead of asserting; no null checks on pOp/pObject/pPlayer.
 - D2Game+0x838B0 AITHINK_Fn003_Zombie: out of combat, a failed walk roll runs MoveToTarget in mode 0xF at velocity 100.
 - D2Game+0x8C280 D2GAME_PACKETS_SendPacket0x0D_6FC3C920: 13-byte packet, asserts unit type < 6.
 - D2Game+0x9C160 PARTY_IteratePartyMembers: asserts pGame non-null (1.10f copy asserted the inverse on pPartyControl).
@@ -54,3 +56,11 @@ behaviour differs from 1.10f.
 - SKILLITEM_HandleItemEffectSkill (D2Game+0xF14F0): returns 0 when nSkillId is 0 (retail tests the id before the record lookup).
 - 1.13c out-of-line helpers split from 1.10f bodies, one marker each: SKILLS_ValidateUsedSkillTarget (D2Game+0x9FC00, from the used-skill prologue), NPC_RefillHirelingListIfExhausted (D2Game+0xBD160), ACT3Q3_SpawnFetishBoss (D2Game+0xE8780), ITEMMODE_ReturnItemToGround (D2Game+0xD2840, the five-line drop-back that the pickup paths repeated) and ITEMMODE_UnpackDroppedCube (D2Game+0xD78C0, the cube tail of sub_6FC44030). D2GAME_RemoveItemIfOnCursor (D2Game+0xD2C70) sends the cursor clear with no client for a holder that is not a player.
 - D2Common+0x2D660 DRLG_UpdateRoomExCoordinates (`sub_2D660`, DrlgDrlg.cpp): the four asserts now `return;` after the warning, as retail exits there (the warning helper only prints). Valid input is unchanged; the FN probe (`src/core/fn/d2common_2d660.cpp`) copies the 1.13c blobs into the 1.10f structs.
+- D2Common+0xB290 (DrlgPreset.cpp `DRLGPRESET_SpawnRiverSoundColumn`): the river-sound column loop is its own function as in 1.13c, so the row is measured on its own.
+- D2Common+0x19950 DRLGWARP_GetWarpIdArrayFromLevelId (DrlgDrlgWarp.cpp): a zero level in the warp override chain asserts and exits as retail does (1.10f warned and went on).
+- D2Common+0x2C7C0 (Items.cpp `sub_6FDA4380`, the set-bonus walk under ITEMS_UpdateSets): the switch-on walk stops before the sixth set state (1.10f went to six), and a start index below zero toggles nothing.
+- D2Common+0x51000 D2Common_11016 (D2Skills.cpp): the skill range byte is read sign-extended (1.13c movsx), so a byte >= 0x80 is negative.
+- D2Common+0x4D140 COLLISION_GetFreeCoordinatesImpl (D2Collision.cpp): matches 1.10f: each lookup that finds a room makes it the base of the next (retail writes it over the room argument).
+- D2Common+0x54430 (core/d2common/d2common_batch_53780.cpp): DATATBLS_LoadTreasureClassExTxt calls the 1.13c item parser per slot; the 1.10f inline parser matched argument keys by prefix and stopped on an empty value.
+
+

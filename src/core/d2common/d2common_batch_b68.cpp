@@ -102,26 +102,4 @@ extern "C" void D2Common_116B0(uint8_t* ctx, const B68Env116B0* e)
 extern "C" __attribute__((weak)) uint32_t Ordinal_10265(uint32_t);
 extern "C" __attribute__((weak)) void Ordinal_10024(const void*, uint32_t);
 
-// 1.13c D2Common+0x19950 (eax = unit/owner whose +0x90 heads a chain; ecx unused; edx = param_2 id).
-// Chain node: [0]=id, [9..]=payload (returned as node+9 dwords), [0x11]=next. pBase/count: DAT_6fdf0b38 table, sgptDataTables+0xC5C.
-extern "C" int32_t* D2Common_19950(uint8_t* eax, int32_t id, uint8_t* pTable, int32_t tableCount, const void* pAssertMsg)
-{
-	int32_t* n = (int32_t*)(uintptr_t) * (uint32_t*)(eax + 0x90);
-	for (;;)
-	{
-		if (!n)
-		{
-			if (id >= 0 && id < tableCount)
-				return (int32_t*)(pTable + id * 0x9c + 0x68);
-			return (int32_t*)0x68;
-		}
-		if (*n == 0)
-		{
-			Ordinal_10024(pAssertMsg, Ordinal_10265(0x1a2));
-			__builtin_trap(); // retail: _exit(-1)
-		}
-		if (id == *n) break;
-		n = (int32_t*)(uintptr_t)(uint32_t)n[0x11];
-	}
-	return n + 9;
-}
+// D2Common 0x19950 (warp ids of a level, per-drlg overrides first) is DRLGWARP_GetWarpIdArrayFromLevelId in DrlgDrlgWarp.cpp.

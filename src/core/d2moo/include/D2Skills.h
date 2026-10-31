@@ -331,6 +331,8 @@ D2COMMON_DLL_DECL void __stdcall D2COMMON_11013_ConvertMode(D2UnitStrc* pUnit, i
 D2COMMON_DLL_DECL void __stdcall D2Common_11015(D2UnitStrc* pUnit, int a2, int nSkillId);
 //D2Common.0x6FDB3340 (#11016)
 D2COMMON_DLL_DECL int __stdcall D2Common_11016(D2UnitStrc* pUnit, D2SkillStrc* pSkill);
+// D2Common_11016 with the bow test and the melee-only state test passed in (FN probe seam).
+int D2Common_11016_Rule(D2UnitStrc* pUnit, D2SkillStrc* pSkill, BOOL(*pfIsBowOrXBow)(D2UnitStrc*), BOOL(*pfMeleeOnly)(D2UnitStrc*));
 //D2Common.0x6FDB33A0 (#11017)
 D2COMMON_DLL_DECL BOOL __stdcall D2COMMON_11017_CheckUnitIfConsumeable(D2UnitStrc* pUnit, int a2);
 //D2Common.0x6FDB3480 (#11020)

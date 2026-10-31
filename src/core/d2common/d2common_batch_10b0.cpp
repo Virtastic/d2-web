@@ -6,6 +6,7 @@
 // the 1.13c bodies at these RVAs are the same arithmetic over the same D2DataTablesStrc layout.
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <emscripten.h>
 
 #include "D2BitManip.h"
@@ -149,10 +150,13 @@ void D2Common_1180_RollRange(uint32_t* r)
 	}
 }
 
-// 1.13c D2Common+0x1280: empty body (`return;`), no result.
+// 1.13c D2Common+0x1280: monstats id check, id in EAX: the id itself when 0 <= id < the monstats row count
+// (tables +0xA80), else -1. (The decompiler shows an empty body; the disassembly has the compare.)
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_1280(uint32_t* r)
 {
-	(void)r;
+	if (!TablesLoaded()) { r[4] = 0x7EADBEEF; return; }
+	const int32_t nId = static_cast<int32_t>(r[0]);
+	r[4] = (nId >= 0 && nId < sgptDataTables->nMonStatsTxtRecordCount) ? static_cast<uint32_t>(nId) : 0xFFFFFFFFu;
 }
 
 // 1.13c D2Common+0x12D0: charstats row nClassId (0xC4 each) as a byte offset from the table base.
@@ -193,7 +197,24 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_1500(uint32_t* r)
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_1550(uint32_t* r)
 {
 	if (!TablesLoaded()) { r[4] = 0x7EADBEEF; return; }
+	// The record pins sgptDataTables to blob 1: its +0xB98 holds the
+	// address of the skills rows (blob 0, retail stride 0x23C = ours), +0xBA0 the count. Run the rule on that
+	// table, then put the loaded one back.
+	D2SkillsTxt* pSaved = sgptDataTables->pSkillsTxt;
+	const int32_t nSavedCount = sgptDataTables->nSkillsTxtRecordCount;
+	if (r[13] >= 2)
+	{
+		const uint8_t* pDt = reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(r[16]));
+		uint32_t nRows = 0;
+		int32_t nCount = 0;
+		std::memcpy(&nRows, pDt + 0xB98, 4);
+		std::memcpy(&nCount, pDt + 0xBA0, 4);
+		sgptDataTables->pSkillsTxt = reinterpret_cast<D2SkillsTxt*>(static_cast<uintptr_t>(nRows));
+		sgptDataTables->nSkillsTxtRecordCount = nCount;
+	}
 	r[4] = static_cast<uint32_t>(SkillParam(static_cast<int32_t>(r[0]), 0));
+	sgptDataTables->pSkillsTxt = pSaved;
+	sgptDataTables->nSkillsTxtRecordCount = nSavedCount;
 }
 
 // 1.13c D2Common+0x1580: skills.txt dwParam[1] (+0x14C) of nSkillId.

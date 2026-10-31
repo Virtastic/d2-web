@@ -85,14 +85,19 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_2f100(uint32_t unit, uint32_t targe
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_4f870(uint32_t unit, int32_t category, int32_t ratio,
  uint32_t tableCount, uint32_t tableRow, uint32_t (*hasStat)(uint32_t,int32_t),
  uint32_t (*hasTableStat)(uint32_t), int32_t (*applyRatio)(int32_t,int32_t)) {
+ // retail: EAX = stat value from the getter (0x38B70 / 0x38A80), ESI = base; the result is
+ // FUN_6fd511e0(100, base) with EAX as multiplier, i.e. base * statValue / 100 (applyRatio(base, value)).
+ uint32_t value=0;
  if (category==4 || category==12) {
-  if (!unit || !w(unit,0x5C) || tableCount<0x14C || tableRow+0x1A2EC==0 || !hasTableStat ||
-      !hasTableStat(tableRow+0x1A2EC)) return 0;
+  if (!unit || !w(unit,0x5C) || tableCount<0x14C || tableRow+0x1A2EC==0 || !hasTableStat) return 0;
+  value=hasTableStat(tableRow+0x1A2EC);
  } else {
   int32_t stat=category==1 ? 0x149 : category==2 ? 0x14A : category==5 ? 0x14C : -1;
-  if (stat<0 || !hasStat || !hasStat(unit,stat)) return 0;
+  if (stat<0 || !hasStat) return 0;
+  value=hasStat(unit,stat);
  }
- return applyRatio ? applyRatio(100,ratio) : 0;
+ if (!value) return 0;
+ return applyRatio ? applyRatio(ratio,(int32_t)value) : 0;
 }
 // 1.13c D2Common+0x3B3A0: validate the room's counted unit-id array.
 extern "C" uint32_t D2Common_3B3A0_ValidateUnitIds(uint32_t room) {

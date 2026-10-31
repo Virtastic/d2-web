@@ -1175,6 +1175,9 @@ D2AnimSeqTxt* __stdcall DATATBLS_GetMonSeqTxtRecordFromUnit(D2UnitStrc* pUnit)
 }
 
 //D2Common.0x6FD727C0
+// 1.13c D2Common+0x2E840 (unit in EAX): validated, no delta. Retail inlines the used-skill read (unit +0xA8, list +0x10)
+// and the weapon-class index walk (0x2E790: seq/anim mode, shape-shift ConvertMode, 0x43860, 14-entry map); the monster
+// branch is 0x12A0 (monstats row of the class id, EAX), not 0x512A0.
 D2AnimSeqRecordStrc* __fastcall DATATBLS_GetSeqRecordFromUnit(D2UnitStrc* pUnit)
 {
 	if (D2SkillStrc* pSkill = UNITS_GetUsedSkill(pUnit))

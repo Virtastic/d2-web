@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x4D140: spiral search for a free spot near (*pPos) in a level (FieldTbls.cpp).
+// Env-driven copy of the free-spot search (engine version: COLLISION_GetFreeCoordinatesImpl, D2Collision.cpp), kept for the 4D7E0/4D870 forwards.
 // Callees go through an env of function pointers (no direct engine/Win32 deps). FUN_6fd51330 takes
 // level in EAX, x in EBX, y in EDI: modelled as getRoom(level,x,y), level = param_1 (otherwise unused).
 #include <cstdint>
@@ -31,6 +31,7 @@ extern "C" int* D2Common_4D140_FindFreeSpot(const D2Common4D140Env* e, void* pLe
 		return r && e->checkSpot(r, x, y, p4, p5) == 0 && (!pUnit || e->testUnit(pU, r, x, y, p6) == 0);
 	};
 	void* r = e->getRoom(pLevel, x0, y0);
+	pLevel = r;	// retail stores every lookup that finds a room over its room argument: the next lookup starts from it
 	if (ok(r, x0, y0))
 	{
 		if (pU) e->freeUnit(pU);
@@ -54,6 +55,7 @@ extern "C" int* D2Common_4D140_FindFreeSpot(const D2Common4D140Env* e, void* pLe
 						do
 						{
 							void* rr = e->getRoom(pLevel, x, y);
+							if (rr) pLevel = rr;
 							if (ok(rr, x, y))
 							{
 								int i7 = d < 0 ? a3c : d;
@@ -77,6 +79,7 @@ extern "C" int* D2Common_4D140_FindFreeSpot(const D2Common4D140Env* e, void* pLe
 						do
 						{
 							void* rr = e->getRoom(pLevel, x, y);
+							if (rr) pLevel = rr;
 							if (ok(rr, x, y))
 							{
 								int i12 = a38 < 0 ? a3c : a38;

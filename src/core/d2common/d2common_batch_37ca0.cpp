@@ -166,23 +166,7 @@ EMSCRIPTEN_KEEPALIVE void D2Common_3A650_DropListEntries(uint32_t pList)
 	}
 }
 
-// 1.13c D2Common+0x3BC10 (#10346): toggle bit 22 of the dword at *(unit+0x10)+0x28.
-// A non-zero second argument clears the bit, zero sets it.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void D2Common_sub_3BC10(uint32_t pUnit, int32_t nClear)
-{
-	uint8_t* unit = P(pUnit);
-	if (!unit)
-		return;
-	uint8_t* inner = P(W(unit, 0x10));
-	if (!inner)
-		return;
-
-	if (nClear)
-		W(inner, 0x28) &= ~0x00400000u;
-	else
-		W(inner, 0x28) |= 0x00400000u;
-}
+// D2Common #10346 (toggle the room has-portal flag) is DUNGEON_ToggleHasPortalFlag in D2Dungeon.cpp.
 
 // 1.13c D2Common+0x30970 (#10356): allocate the three-difficulty quest record set.
 // set+0x14 must be null (otherwise fatal 0xF51); the 0x16C-byte set is zeroed. Three times it
@@ -306,7 +290,8 @@ EMSCRIPTEN_KEEPALIVE void D2Common_SetUnitActRecord_37920(uint32_t pUnit, uint32
 // Then, unless the item-data flags at unit[5]+0x18 carry 0x1000, an items.txt record with nQuest
 // set and a 0x23290 code other than 'leg ' ('gel ' little-endian word 0x2067656C) is rejected.
 // The remaining test chains 0x241A0, 0x24610 and 0x26080; the answer is whether 0x26080 returns
-// zero. The decompile's leftover EDX is modelled as 0.
+// zero. 0x241A0 leaves EDX alone (disassembly), so the decompile's leftover EDX is the unit type
+// loaded from unit[0] before the call; the 0x800 test below uses it.
 extern "C" uint32_t D2Common_241A0_ItemDataGate(uint32_t);
 extern "C"
 EMSCRIPTEN_KEEPALIVE bool D2Common_26AD0_ItemAcceptable(int32_t* pUnit)
@@ -328,7 +313,7 @@ EMSCRIPTEN_KEEPALIVE bool D2Common_26AD0_ItemAcceptable(int32_t* pUnit)
 			return false;
 
 		const bool bNoOwnerFlag = pUnit[0] != 4 || !pFlags || (nFlags & 0x100u) == 0;
-		const bool bNoChainFlag = true;   // decompile's leftover EDX != 4; EDX is modelled as 0
+		const bool bNoChainFlag = pUnit[0] != 4 || !pFlags || (nFlags & 0x800u) == 0;
 		if (bNoOwnerFlag && D2Common_241A0_ItemDataGate(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pUnit))) == 0 && bNoChainFlag &&
 		    g_d2common_fn_24610 && static_cast<uint8_t>(g_d2common_fn_24610(pUnit)) != 0)
 		{
@@ -433,8 +418,8 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_39b60(uint16_t* pUnit, uint32_t pParam)
 // 1.13c D2Common+0x664B0 (#10384): insertion-sort a unit's linked list by effect key.
 // struct+0x74 is the head; every node's next is at +0xE8 and its payload pointer at +0x2C. The key
 // is payload+0x08 for node types 2 and 4..5 and payload+0x0C otherwise. The list is walked with a
-// trailing pointer, swapping a node ahead of a lower-keyed predecessor until a full pass changes
-// nothing. Null struct is fatal 0x286 and a broken chain fatal 0x78A; both return.
+// trailing pointer, swapping a node ahead of a lower-keyed predecessor. The walk runs to the tail;
+// the outer pass then finds no next node and returns, so one pass is made (retail's outer loop too). Null struct is fatal 0x286 and a broken chain fatal 0x78A; both return.
 namespace
 {
 	int32_t Batch37ca0_NodeKey(uint8_t* pNode)

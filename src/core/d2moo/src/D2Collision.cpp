@@ -1598,8 +1598,8 @@ D2ActiveRoomStrc* __stdcall COLLISION_GetFreeCoordinatesWithMaxDistance(D2Active
 }
 
 //1.10f: D2Common.0x6FD45A00
-//1.13c: D2Common.0x6FD9D140
-// TODO: Names, vars
+// 1.13c D2Common+0x4D140 (stdcall, ret 0x24)
+// 1.13c: as 1.10f, every lookup that finds a room stores it as the base of the next one (start cell, both scans, final).
 D2ActiveRoomStrc* __fastcall COLLISION_GetFreeCoordinatesImpl(D2ActiveRoomStrc* pRoom, D2CoordStrc* ptSpawnPoint, D2CoordStrc* pFieldCoord, int nUnitSize, unsigned int nMask, unsigned int nFieldMask, BOOL bAllowNeighborRooms, int nMaxDistance, int nPosIncrementValue)
 {
 	D2FieldStrc* pField = NULL;
@@ -1698,7 +1698,7 @@ D2ActiveRoomStrc* __fastcall COLLISION_GetFreeCoordinatesImpl(D2ActiveRoomStrc* 
 
 								if (pTemp)
 								{
-									v10 = pTemp;
+									v10 = pTemp;	// 1.13c too: each room found becomes the base of the next lookup
 
 									if (!COLLISION_CheckMaskWithSize(pTemp, v17, v15, nUnitSize, nMask) && (!pFieldCoord || !D2Common_11099(pField, pTemp, v17, v15, nFieldMask)))
 									{
@@ -1765,7 +1765,7 @@ D2ActiveRoomStrc* __fastcall COLLISION_GetFreeCoordinatesImpl(D2ActiveRoomStrc* 
 
 								if (pTemp)
 								{
-									v10 = pTemp;
+									v10 = pTemp;	// 1.13c too: each room found becomes the base of the next lookup
 
 									if (!COLLISION_CheckMaskWithSize(pTemp, v37, v39, nUnitSize, nMask) && (!pFieldCoord || !D2Common_11099(pField, pTemp, v37, v39, nFieldMask)))
 									{

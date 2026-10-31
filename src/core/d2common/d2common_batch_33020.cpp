@@ -35,7 +35,7 @@ EMSCRIPTEN_KEEPALIVE BOOL D2Common_10217_ITEMS_CheckBodyLocation(D2UnitStrc* pIt
 	return nBodyLoc <= 0xFFu ? ITEMS_CheckBodyLocation(pItem, uint8_t(nBodyLoc)) : FALSE;
 }
 
-// 1.13c D2Common+0x23F40 (#10218): ITEMS_GetSetItemsTxtRecordFromItem. Only for an item
+// Export #10218 forwards to ITEMS_GetSetItemsTxtRecordFromItem (Items.cpp, the 1.13c body). Only for an item
 // (unit+0x00 == 4) with item data (unit+0x14) whose quality (+0x00) is set (5); returns
 // SetItemsTxt[pItemData->dwFileIndex (+0x28)] when the index is in range, else null.
 EMSCRIPTEN_KEEPALIVE D2SetItemsTxt* D2Common_10218_ITEMS_GetSetItemsTxtRecordFromItem(D2UnitStrc* pItem)

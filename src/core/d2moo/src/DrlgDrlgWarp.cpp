@@ -368,14 +368,13 @@ D2DrlgRoomStrc* __fastcall DRLGWARP_GetWaypointRoomExFromLevel(D2DrlgLevelStrc* 
 }
 
 //D2Common.0x6FD78CC0
+// 1.13c D2Common+0x19950 (EAX = drlg, EDX = level id): a zero level in the override chain is fatal in 1.13c
+// (assert then exit), not the 1.10f warning; an out-of-range id still yields the null record's warp field.
 int* __fastcall DRLGWARP_GetWarpIdArrayFromLevelId(D2DrlgStrc* pDrlg, int nLevelId)
 {
 	for (D2DrlgWarpStrc* pDrlgWarp = pDrlg->pWarp; pDrlgWarp; pDrlgWarp = pDrlgWarp->pNext)
 	{
-		if (!pDrlgWarp->nLevel)
-		{
-			FOG_DisplayWarning("ptVisInfo->eLevelId != LEVEL_ID_NONE", __FILE__, __LINE__);
-		}
+		D2_ASSERT(pDrlgWarp->nLevel != 0);
 
 		if (nLevelId == pDrlgWarp->nLevel)
 		{

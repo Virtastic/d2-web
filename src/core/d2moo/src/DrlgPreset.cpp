@@ -791,25 +791,23 @@ void __fastcall DRLGPRESET_AddPresetUnitToDrlgMap(void* pMemPool, D2DrlgMapStrc*
 
 static const int nRiverBlockSizeInTilesX = 5;
 static const int nRiverBlockSizeInTilesY = 4;
-// 1.13c D2Common+0xB290 (sound-object column loop of SpawnRiver; retail inlines it)
+// 1.13c D2Common+0xB290 (EAX = column tile X, ECX = first tile Y, EDI = map, stack = pool; ret 4)
+// One invisible river-sound object per 8-tile step down the column, from tile Y to Y + file height, each pushed onto the map's
+// preset list with its spawned bit set. X and Y are game tiles; the objects sit at subtile (x*5, y*5 + 40k).
+void DRLGPRESET_SpawnRiverSoundColumn(D2DrlgMapStrc* pMazeMap, void* pDrlgMemPool, int nTileX, int nTileY)
+{
+	const int nSubtileX = nTileX * 5;
+	const int nEndSubtileY = (pMazeMap->pFile->nHeight + nTileY) * 5;
+	for (int nSubtileY = nTileY * 5; nSubtileY < nEndSubtileY; nSubtileY += DRLGROOMTILE_SUBTILES_SIZE)
+	{
+		DRLGPRESET_AllocateAndAddPresetUnitToMap(nullptr, pDrlgMemPool, UNIT_OBJECT, OBJECT_INVISIBLE_RIVER_SOUND1, OBJMODE_NEUTRAL, nSubtileX, nSubtileY, pMazeMap, true);
+	}
+}
+
 // Helper function
 void DRLGPRESET_SpawnRiver(D2DrlgMapStrc* pMazeMap, const D2DrlgCoordStrc& tDrlgCoord,void* pDrlgMemPool, D2DrlgGridStrc* pDrlgGrid, int nOffsetX)
 {
-	int nSubtileX = tDrlgCoord.nPosX + nOffsetX + 1;
-	int nSubtileY = tDrlgCoord.nPosY;
-	int nEndSubtileX = 0;
-	int nEndSubtileY = tDrlgCoord.nPosY + pMazeMap->pFile->nHeight;
-
-	DUNGEON_GameTileToSubtileCoords(&nSubtileX, &nSubtileY);
-	DUNGEON_GameTileToSubtileCoords(&nEndSubtileX, &nEndSubtileY);
-
-	while (nSubtileY < nEndSubtileY)
-	{
-		DRLGPRESET_AllocateAndAddPresetUnitToMap(nullptr, pDrlgMemPool, UNIT_OBJECT, OBJECT_INVISIBLE_RIVER_SOUND1, OBJMODE_NEUTRAL, nSubtileX, nSubtileY, pMazeMap, true);
-
-		nSubtileY += DRLGROOMTILE_SUBTILES_SIZE;
-	}
-
+	DRLGPRESET_SpawnRiverSoundColumn(pMazeMap, pDrlgMemPool, tDrlgCoord.nPosX + nOffsetX + 1, tDrlgCoord.nPosY);
 	DRLGPRESET_AddPresetRiverObjects(pMazeMap, pDrlgMemPool, nOffsetX, pDrlgGrid);
 }
 

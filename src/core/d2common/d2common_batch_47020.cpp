@@ -20,7 +20,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_47020(uint32_t pThis, uint32_t pEax
  const uint32_t list = pThis ? pThis : pEax;
  const uint32_t par = g_d2common_fn_47020_mem(list + 0x5c);
  if (par && (int32_t)g_d2common_fn_47020_mem(par + 0x10) < 0) {
-  const uint32_t r = id ? g_d2common_fn_47020_find_id(par, id) : g_d2common_fn_47020_find_flt(par, flt);
+  const uint32_t r = id ? g_d2common_fn_47020_find_id(par, id) : g_d2common_fn_47020_find_flt(pEax, flt);
   if (r) return r;
  }
  const uint32_t n = g_d2common_fn_47020_alloc(g_d2common_fn_47020_mem(list + 8), flt);

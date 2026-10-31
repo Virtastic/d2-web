@@ -2366,6 +2366,8 @@ void __fastcall sub_6FC77C10(D2UnitStrc* pUnit, int32_t nState, D2StatListStrc* 
 }
 
 //D2Game.0x6FC77C30
+// 1.13c D2Game+0x6DA00: a null table handler (code 0) falls back to the Refill shrine; only a non-null handler that fails
+// IsBadCodePtr hits the assert. (1.13c has no null checks on pOp/pObject/pPlayer; ours returns 0 for them.)
 int32_t __fastcall OBJECTS_OperateFunction02_Shrine(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
     if (!pOp)
@@ -2417,13 +2419,20 @@ int32_t __fastcall OBJECTS_OperateFunction02_Shrine(D2ObjOperateFnStrc* pOp, int
     if (nId >= 0 && nId < 24)
     {
         ObjShrineFunction pfCallback = gpShrineTable_6FD28D18[nId].pfShrineCallback;
-        if (!pfCallback || IsBadCodePtr((FARPROC)pfCallback))
+        if (!pfCallback)
         {
-            FOG_DisplayAssert("sgcptShrineChart[idx].pfnHandler", __FILE__, __LINE__);
-            exit(-1);
+            D2GAME_SHRINES_Refill_6FC76730(pOp, pShrinesTxtRecord);
         }
+        else
+        {
+            if (IsBadCodePtr((FARPROC)pfCallback))
+            {
+                FOG_DisplayAssert("sgcptShrineChart[idx].pfnHandler", __FILE__, __LINE__);
+                exit(-1);
+            }
 
-        pfCallback(pOp, pShrinesTxtRecord);
+            pfCallback(pOp, pShrinesTxtRecord);
+        }
     }
     else
     {
@@ -2532,6 +2541,7 @@ int32_t __fastcall OBJECTS_OperateFunction68_EvilUrn(D2ObjOperateFnStrc* pOp, in
 }
 
 //D2Game.0x6FC78120
+// 1.13c D2Game+0x6D960: ENDANIM fires (FrameCnt[1] >> 8) + 1 ticks out, not OBJECTS_GetOperatingTicks (same as the waypoint, 0x6CF90).
 int32_t __fastcall OBJECTS_OperateFunction33_WirtsBody(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
     if (!pOp || !pOp->pObject)
@@ -2551,7 +2561,7 @@ int32_t __fastcall OBJECTS_OperateFunction33_WirtsBody(D2ObjOperateFnStrc* pOp, 
             UNITS_ChangeAnimMode(pObject, OBJMODE_OPERATING);
 
             D2ObjectsTxt* pObjectsTxtRecord = DATATBLS_GetObjectsTxtRecord(pOp->nObjectIdx);
-            EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, OBJECTS_GetOperatingTicks(pObjectsTxtRecord) + pOp->pGame->dwGameFrame + 1, 0, 0);
+            EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_ENDANIM, (pObjectsTxtRecord->dwFrameCnt[1] >> 8) + pOp->pGame->dwGameFrame + 1, 0, 0);
             EVENT_SetEvent(pOp->pGame, pObject, EVENTTYPE_QUESTFN, pOp->pGame->dwGameFrame + 10, 0, 0);
         }
     }

@@ -154,13 +154,19 @@ uint32_t D2Common_5A850_GetRolledString(uint32_t pUnit, uint32_t nTableCount, ui
 // list (+0x5C) present, row 70 above 0 gives 1; else row 125 non-zero writes stat 0x46 = 0 through 0x3A740
 // and gives 1; else the unit's D2SetStatWithNoTest (0x260F0) result below 1 gives 1. 0x38A80's stat-list
 // operand and the 0x260F0 result are register-only in retail, so they are passed in resolved.
-uint32_t D2Common_2A170_StatListGate(uint32_t pUnit, int32_t nRow70Total, int32_t nRow125Total, int32_t nSetStatResult)
+// The row-125 branch also sets stat 0x46 to 0 on the unit (0x3A740, decompile FUN_6fd8a740(unit,0x46,0));
+// the caller supplies that setter as pSetStat (null: skipped), since the unit blob is not native here.
+uint32_t D2Common_2A170_StatListGate(uint32_t pUnit, int32_t nRow70Total, int32_t nRow125Total, int32_t nSetStatResult,
+    void (*pSetStat)(uint32_t pUnit, uint32_t nStat, int32_t nValue))
 {
     uint8_t* u = P(pUnit);
     if (u) {
         if (W(u, 0x5C)) {
             if (nRow70Total > 0) return 1;
-            if (nRow125Total != 0) return 1;
+            if (nRow125Total != 0) {
+                if (pSetStat) pSetStat(pUnit, 0x46, 0);
+                return 1;
+            }
         }
         if (nSetStatResult < 1) return 1;
     }

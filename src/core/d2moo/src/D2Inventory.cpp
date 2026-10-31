@@ -1587,7 +1587,8 @@ D2UnitStrc* __stdcall INVENTORY_GetCursorItem(D2InventoryStrc* pInventory)
 	return nullptr;
 }
 
-// 1.13c D2Common+0x210b0
+// 1.13c D2Common+0x210b0: validated, no delta (grid from 0x1E1B0 with the player grid info, 0x26930 equality,
+// quantity read inline from the stat list, 0x260F0 total max stack; the next-grid-item walk stops on a non-item).
 //D2Common.0x6FD8FFA0 (#10263)
 D2UnitStrc* __stdcall INVENTORY_FindBackPackItemForStack(D2InventoryStrc* pInventory, D2UnitStrc* pStackable, D2UnitStrc* pCheckItem)
 {

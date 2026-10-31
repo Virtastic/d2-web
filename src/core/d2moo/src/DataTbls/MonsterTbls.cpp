@@ -1333,6 +1333,8 @@ void DATATBLS_ParseTreasureClassItem(D2TCExShortStrc* pTCExTxtRecord, D2Treasure
 	}
 }
 
+int D2Common_54430_ParseTreasureClassItem(D2TCExShortStrc* pTC, char* szText, int nProb); // d2common_batch_53780.cpp
+
 //D2Common.0x6FD68EC0
 // 1.13c D2Common+0x5A030
 void __fastcall DATATBLS_LoadTreasureClassExTxt(HD2ARCHIVE hArchive)
@@ -1416,7 +1418,8 @@ void __fastcall DATATBLS_LoadTreasureClassExTxt(HD2ARCHIVE hArchive)
 					break;
 				}
 
-				DATATBLS_ParseTreasureClassItem(pTCExTxtRecord, pTreasureClassExTxt, i, nItem);
+				// 1.13c: the loader calls its own parser (exact key names, no empty-value stop), result ignored.
+				D2Common_54430_ParseTreasureClassItem(pTCExTxtRecord, pTreasureClassExTxt[i].szItem[nItem], pTreasureClassExTxt[i].nProb[nItem]);
 			}
 		}
 	}

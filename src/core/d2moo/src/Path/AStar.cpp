@@ -58,7 +58,9 @@ BOOL PATH_AStar_TargetLocationHasEnoughRoom(D2PathInfoStrc* pPathInfo)
 }
 
 // Helper function
-static D2PathFoWallNodeStrc* PATH_IdaStar_FindSortedByFScoreInsertionPoint(D2PathFoWallContextStrc* pContext, uint16_t nFScore)
+// The 1.13c MakeCandidate body inlines this walk with a signed 16-bit compare (movsx both sides): a negative score
+// sorts first. The 1.10f helper took the score unsigned, so a negative score never found its place.
+static D2PathFoWallNodeStrc* PATH_IdaStar_FindSortedByFScoreInsertionPoint(D2PathFoWallContextStrc* pContext, int16_t nFScore)
 {
 	D2PathFoWallNodeStrc* pInsertionPoint = nullptr;
 	for (D2PathFoWallNodeStrc* pCurrent = pContext->pSortedListByFScore;
@@ -293,7 +295,7 @@ D2PathFoWallNodeStrc* __fastcall PATH_AStar_GetNodeFromPendingCache(D2PathFoWall
 
 //1.00:  D2Common.0x10057A10
 //1.10f: D2Common.0x6FDA72D0
-//1.13c: D2Common.0x6FDCAED0
+// 1.13c D2Common+0x7AED0
 D2PathFoWallNodeStrc* __fastcall PATH_AStar_FindPointInVisitedCache(D2PathFoWallContextStrc* pContext, D2PathPointStrc tPathPoint)
 {
 	const uint8_t nHash = uint8_t((gaIdaStar_PointCacheHashMaskX[tPathPoint.X & 0x7F] + gaIdaStar_PointCacheHashMaskY[tPathPoint.Y & 0x7F]) & 0x7F);
@@ -310,7 +312,7 @@ D2PathFoWallNodeStrc* __fastcall PATH_AStar_FindPointInVisitedCache(D2PathFoWall
 }
 
 //1.10f: D2Common.0x6FDA7320
-//1.13c: D2Common.0x6FDCAE20
+// 1.13c D2Common+0x7AE20 (node in ESI, context in EDI)
 void __fastcall PATH_AStar_MakeCandidate(D2PathFoWallContextStrc* pContext, D2PathFoWallNodeStrc* pNode)
 {
 	const uint8_t nHash = (gaIdaStar_PointCacheHashMaskX[pNode->tPoint.X & 0x7F] + gaIdaStar_PointCacheHashMaskY[pNode->tPoint.Y & 0x7F]) & 0x7F;

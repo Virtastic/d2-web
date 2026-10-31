@@ -1253,6 +1253,7 @@ int __stdcall DUNGEON_GetHoradricStaffTombLevelId(D2DrlgActStrc* pAct)
 }
 
 //D2Common.0x6FD8D540 (#10102)
+// 1.13c D2Common+0x3BC10 (#10346): room +0x10 is the drlg room, its flags +0x28; no null test on the drlg room.
 void __stdcall DUNGEON_ToggleHasPortalFlag(D2ActiveRoomStrc* pRoom, BOOL bReset)
 {
 	if (pRoom)
