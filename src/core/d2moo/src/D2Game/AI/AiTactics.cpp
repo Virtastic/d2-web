@@ -244,6 +244,7 @@ int32_t __fastcall AITACTICS_UseSkill(D2GameStrc* pGame, D2UnitStrc* pUnit, uint
 }
 
 //D2Game.0x6FCD00A0
+// 1.13c D2Game+0xF22C0
 void __fastcall AITACTICS_IdleInNeutralMode(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nFrames)
 {
 	if (!pUnit || pUnit->dwAnimMode != MONMODE_NEUTRAL)

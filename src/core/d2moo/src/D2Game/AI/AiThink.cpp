@@ -217,7 +217,6 @@ struct D2PetMoveStrc
 
 
 // Inlined helper function
-// 1.13c D2Game+0xF22C0
 static int16_t AI_GetParamValue(D2GameStrc* pGame, D2AiTickParamStrc* pAiTickParam, int32_t nParamId)
 {
 	return pAiTickParam->pMonstatsTxt->wAiParam[nParamId][pGame->nDifficulty];
@@ -1319,7 +1318,8 @@ void __fastcall AITHINK_Fn015_SandMaggot(D2GameStrc* pGame, D2UnitStrc* pUnit, D
 
 	if (pAiTickParam->bCombat && AIRollChanceParam(pGame, pUnit, pAiTickParam, SANDMAGGOT_AI_PARAM_MELEE_CHANCE_PCT))
 	{
-		AITACTICS_ChangeModeAndTargetUnit(pGame, pUnit, MONMODE_ATTACK1, pAiTickParam->pTarget);
+		// 1.13c: the melee mode change carries no target unit
+		AITACTICS_ChangeModeAndTargetUnit(pGame, pUnit, MONMODE_ATTACK1, nullptr);
 		return;
 	}
 
