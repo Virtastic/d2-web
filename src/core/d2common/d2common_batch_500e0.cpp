@@ -6,6 +6,7 @@
 #include "D2Items.h"
 #include "Units/Units.h"
 #include "DataTbls/SequenceTbls.h"
+#include "DataTbls/InvTbls.h"
 
 namespace {
 inline uint8_t* P(uint32_t a) { return (uint8_t*)(uintptr_t)a; }
@@ -18,11 +19,16 @@ static_assert(offsetof(Inv32, pGrids) == 0x14 && offsetof(Inv32, nGridCount) == 
 static_assert(offsetof(Grid32, ppItems) == 0x0C, "0x1FD40/0x20700 grid cells");
 static_assert(offsetof(Node32, nKind) == 4 && offsetof(Node32, pNext) == 8, "0x3D160 list node");
 // Grid 0 (INVGRID_BODYLOC); the same grid 0x20320 and 0x20700 read through 0x1E1B0 (verified layout in inv_place.cpp).
+// 1.13c DAT_6FDED378 (static {13,1}, read-only: 41 push sites, no writes) is gBodyLocInventoryGridInfo; 0x1E1B0
+// returns no grid when an existing grid 0 has other dimensions.
+extern D2InventoryGridInfoStrc gBodyLocInventoryGridInfo;
 uint8_t* BodyLocGrid(uint32_t pInv)
 {
     uint8_t* inv = P(pInv);
     if (!inv || W(inv, 0x18) < 1) return nullptr;
-    return P(W(inv, 0x14));
+    uint8_t* g = P(W(inv, 0x14));
+    if (g[8] != gBodyLocInventoryGridInfo.nGridX || g[9] != gBodyLocInventoryGridInfo.nGridY) return nullptr;
+    return g;
 }
 uint8_t* GridCell(uint8_t* grid, int n)
 {
@@ -89,9 +95,8 @@ uint32_t D2Common_20700_EquippedHandCandidate(uint32_t pInv, uint32_t pCurrent, 
         cand = grid ? GridCell(grid, 4) : nullptr;
         if (cand) {
             uint8_t* idata = P(W(cand, 0x14));
-            bool bItem = W(cand, 0) == 4;
-            bool bFlags = !(idata && (W(idata, 0x18) & 0x100)) && !(idata && (W(idata, 0x18) & 0x4000));
-            if (bItem && bFlags && ITEMS_CheckItemTypeId((D2UnitStrc*)cand, 0x2D)) {
+            bool bFlags = W(cand, 0) != 4 || (!(idata && (W(idata, 0x18) & 0x100)) && !(idata && (W(idata, 0x18) & 0x4000)));
+            if (bFlags && ITEMS_CheckItemTypeId((D2UnitStrc*)cand, 0x2D)) {
                 *pOutUnit = (uint32_t)(uintptr_t)cand;
                 *pOutBodyLoc = 4;
                 if (cand != cur) return 1;

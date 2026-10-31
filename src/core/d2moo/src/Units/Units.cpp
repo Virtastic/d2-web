@@ -26,6 +26,8 @@
 #include <limits>
 #include <cstddef>
 
+extern D2InventoryGridInfoStrc gBodyLocInventoryGridInfo;   // D2Inventory.cpp; 1.13c DAT_6FDED378 = {13,1}
+
 //D2Common.0x6FDBD520 (#10457)
 // 1.13c D2Common+0x304E0
 uint8_t __stdcall UNITS_GetDirection(D2UnitStrc* pUnit)
@@ -2686,18 +2688,45 @@ D2UnitStrc* __stdcall D2Common_10434(D2UnitStrc* pUnit, BOOL a2)
 }
 
 //D2Common.0x6FDC0F70 (#10435)
+// 1.13c body: the monster must be UNIT_MONSTER with an inventory whose signature is valid; the candidate is
+// the 1.13c equipped-hand rule of D2Common+0x20700 (not INVENTORY_GetEquippedWeapon): body-loc cell 4 (right
+// hand) when it is not an item or its item flags have neither 0x100 nor 0x4000, and it is a weapon (0x2D);
+// else cell 5 (left hand) when it can be equipped and is a weapon. The body-loc grid is the one 1.13c reads
+// through 0x1E1B0 with the static size pair DAT_6FDED378 = {13,1}, which is gBodyLocInventoryGridInfo here.
 D2UnitStrc* __stdcall UNITS_GetEquippedWeaponFromMonster(D2UnitStrc* pMonster)
 {
-	D2UnitStrc* pItem = NULL;
-	BOOL bIsLeftHandItem = FALSE;
-	int nBodyLoc = 0;
-
-	if (pMonster && pMonster->dwUnitType == UNIT_MONSTER && pMonster->pInventory)
+	if (!pMonster || pMonster->dwUnitType != UNIT_MONSTER || !pMonster->pInventory)
 	{
-		if (INVENTORY_GetEquippedWeapon(pMonster->pInventory, &pItem, &nBodyLoc, &bIsLeftHandItem))
+		return NULL;
+	}
+
+	if (!INVENTORY_GetPtrIfValid(pMonster->pInventory))
+	{
+		return NULL;
+	}
+
+	D2InventoryGridStrc* pInventoryGrid = INVENTORY_GetGrid(pMonster->pInventory, INVGRID_BODYLOC, &gBodyLocInventoryGridInfo);
+	if (!pInventoryGrid)
+	{
+		return NULL;
+	}
+
+	D2UnitStrc* pRightHand = pInventoryGrid->ppItems[BODYLOC_RARM];
+	if (pRightHand)
+	{
+		// Item flags are read from the item data only for an item unit (0x100 and 0x4000 are the 1.13c masks).
+		D2ItemDataStrc* pItemData = ITEMS_GetItemData(pRightHand);
+		BOOL bFlagsClear = !pItemData || (!(pItemData->dwItemFlags & 0x100) && !(pItemData->dwItemFlags & 0x4000));
+		if ((pRightHand->dwUnitType != UNIT_ITEM || bFlagsClear) && ITEMS_CheckItemTypeId(pRightHand, ITEMTYPE_WEAPON))
 		{
-			return pItem;
+			return pRightHand;
 		}
+	}
+
+	D2UnitStrc* pLeftHand = pInventoryGrid->ppItems[BODYLOC_LARM];
+	if (pLeftHand && ITEMS_CanBeEquipped(pLeftHand) && ITEMS_CheckItemTypeId(pLeftHand, ITEMTYPE_WEAPON))
+	{
+		return pLeftHand;
 	}
 
 	return NULL;
