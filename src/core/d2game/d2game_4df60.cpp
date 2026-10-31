@@ -1,17 +1,22 @@
-// D2Game+0x4DF60 -- divide a value by a record's divisor.
-// al = record id, esi = value. r = #a7ba(id); if r and its dword +0x1c are non-zero, value / r[+0x1c] (signed), else value.
+// D2Game+0x4DF60 -- divide a value by the difficulty record's divisor.
+// al = difficulty, esi = value. r = difficulty record; if r and its dword +0x1c are non-zero, value / r[+0x1c] (signed), else value.
 #include <cstdint>
 #include <cstring>
-#include <emscripten.h>
-
-struct D2Game4DF60Env { uint32_t (*a7ba)(uint32_t id); };
+#include "../tables/shared.h"
+#include "../d2moo/compat/datatbls_bridge.h"
+#include "D2DataTbls.h"
 
 // 1.13c D2Game+0x4DF60
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_4df60(uint8_t id, int32_t value, const D2Game4DF60Env* env)
+extern "C" int32_t d2game_4df60_impl(uint8_t difficulty, int32_t value)
 {
-    const uint32_t r = env->a7ba(id);
-    if (r == 0) return value;
-    int32_t d; std::memcpy(&d, (const void*)(uintptr_t)(r + 0x1c), 4);
+    const uint8_t* r = (const uint8_t*)DATATBLS_GetDifficultyLevelsTxtRecord(difficulty);
+    if (r == nullptr) return value;
+    int32_t d; std::memcpy(&d, r + 0x1c, 4);
     if (d == 0) return value;
     return value / d;
+}
+
+extern "C" int d2game_4df60_tables()
+{
+    return d2::drlgLoadTables(d2::sharedVfs(), d2::sharedLang()) ? 1 : 0;
 }

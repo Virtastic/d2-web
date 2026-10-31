@@ -22,13 +22,14 @@ struct D2GameBatch8AD40Env {
 static inline void w32(uint8_t* p, uint32_t o, uint32_t v) { std::memcpy(p + o, &v, 4); }
 static inline void w16(uint8_t* p, uint32_t o, uint16_t v) { std::memcpy(p + o, &v, 2); }
 
-// 0x8AD40: 0x67-byte packet: [0]=ecx low, [1..4]=edx, [5]=param5, [6..0x66]=quest record bytes (0x60).
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8ad40(uint32_t ecxIn, uint32_t edxIn, void* client, void* record, uint8_t param5, const D2GameBatch8AD40Env* env) { // 1.13c D2Game+0x8AD40
+// 0x8AD40: 0x67-byte packet: [0]=AL, [1]=CL, [2..5]=EDX, [6]=flag (stack arg 2), [7..0x66]=quest record bytes (0x60).
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8ad40(uint32_t eaxIn, uint32_t ecxIn, uint32_t edxIn, void* client, void* record, uint8_t param5, const D2GameBatch8AD40Env* env) { // 1.13c D2Game+0x8AD40
     uint8_t b[0x67] = {};
-    b[0] = (uint8_t)ecxIn;
-    w32(b, 1, edxIn);
-    b[5] = param5;
-    env->copyQuestRecord(record, b + 6, 0x60, 0);
+    b[0] = (uint8_t)eaxIn;
+    b[1] = (uint8_t)ecxIn;
+    w32(b, 2, edxIn);
+    b[6] = param5;
+    env->copyQuestRecord(record, b + 7, 0x60, 0);
     env->send8A3E0(client, b, 0x67);
 }
 

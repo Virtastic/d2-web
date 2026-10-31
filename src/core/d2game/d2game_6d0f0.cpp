@@ -61,7 +61,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_6d0f0(uint32_t S, const D2
     uint32_t pl = rd32(S + 8);
     if (pl != 0 && rd32(pl) == 0) {
         if (rd8(pl + 0x6c) != 0) return 0;
-        if (env->a6a6(pl + 0x60) != 0) return 0;
+        if (env->a6a6(rd32(pl + 0x60)) != 0) return 0;
         if (rd32(env->a4c0(pl) + 0x4c) != 0) return 0;
     }
     if (env->sub37AC0(pl, game) != 0) {
@@ -96,7 +96,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_6d0f0(uint32_t S, const D2
 
     if (env->a478(portal) != 0) {
         const uint32_t ebp = env->sub1020(pl, game);
-        const uint32_t esi = ebp ? env->b144(rd8(rd32(portal + 0x14)) + 4) : 0;
+        const uint32_t esi = ebp ? env->b144(rd8(rd32(portal + 0x14) + 4)) : 0;
         if (ebp == 0 || esi == 0) { env->subDFFD0(pl, 0x13, pl); return 0; }
         if (rd32(S + 0x10) == 0x3b) {
             const uint32_t a = env->sub37440(pl);
@@ -120,13 +120,21 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_6d0f0(uint32_t S, const D2
         room = env->aba4(rd32(game + 0xbc + act * 4u), lvl, 0,
                          (uint32_t)(uintptr_t)&pt[0], (uint32_t)(uintptr_t)&pt[1], 3);
     }
-    // retail keeps stale stack bits above the low byte; only the low byte is defined
-    env->aec8(portal, (uint8_t)(env->aee0(portal) | 5));
-    const int32_t x = pt[0], y = pt[1];
-    if (env->a808(env->a478(pl)) != 0)
-        env->sub34860(game, env->a556(room), env->a556(env->a478(pl)), pl);
-    const uint32_t room2 = env->a694(room, (uint32_t)(uintptr_t)pt, env->a71e(pl), 0x1c09, 0);
+    // The flag byte is stored into a stack slot and the whole dword is passed: on the warp-point path that slot
+    // holds the x the lookup wrote, so its upper bytes ride along; on the paired path they are stale stack.
+    {
+        const uint32_t f = (uint8_t)(env->aee0(portal) | 5);
+        env->aec8(portal, pair != 0 ? f : (((uint32_t)pt[0] & 0xffffff00u) | f));
+    }
+    if (env->a808(env->a478(pl)) != 0) {
+        const uint32_t a = env->a556(room);
+        const uint32_t b = env->a556(env->a478(pl));
+        env->sub34860(game, a, b, pl);
+    }
+    const uint32_t from = env->a71e(pl);
+    const uint32_t room2 = env->a694(room, (uint32_t)(uintptr_t)pt, from, 0x1c09, 0);
     if (room2 == 0) return 0;
+    const int32_t x = pt[0], y = pt[1];   // read after the placement, which may move the point
     if (env->subE19C0((uint32_t)x, (uint32_t)y, room2, game, game, pl, 0, 0) == 0) { env->fatal(0xf52); return 0; }
     const uint32_t client = (rd32(pl) == 0) ? rd32(env->a4c0(pl) + 0x9c) : 0;
     env->subDFFD0(pl, 8, 0);

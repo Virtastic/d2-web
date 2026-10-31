@@ -111,24 +111,6 @@ struct D2GameBatch10160Env {
     int32_t  (*ordinal10463)(void);                   // Ordinal_10463
 };
 
-// 0x10160: detach the unit -- stamp it with EAX, clear flag 0x8 and set bit 1 of +0xC4, run the two
-// global updates, and if the owner record's +0x12A is set run 0x55890. Then release the unit's +0xDC
-// object and clear the slot.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_10160(void* unit, uint32_t eax, const D2GameBatch10160Env* env) {  // 1.13c D2Game+0x10160
-    if (unit != nullptr) {
-        wr32(unit, 0x0C, eax);
-        wr32(unit, 0xC4, (rd32(unit, 0xC4) & 0xFFFFFFF7u) | 2u);
-    }
-    env->ordinal10977_v(unit);
-    env->ordinal11166();
-    const int32_t rec = env->ordinal10695(unit != nullptr ? rd32(unit, 4) : 0xFFFFFFFFu);
-    if (rd8((const void*)(intptr_t)rec, 0x12A) != 0) env->sub55890();
-    if (unit != nullptr) {
-        if (rd32(unit, 0xDC) != 0) env->subAE880(unit);
-        wr32(unit, 0xDC, 0);
-    }
-}
-
 // 0x10240: emit one of two server->client status packets depending on the client's +0x68 / +0x74
 // counters, then refresh the client. When both packets came back empty the module dies with 0x372.
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_10240(void* client, void* unit, uint32_t ebx, const D2GameBatch10160Env* env) {  // 1.13c D2Game+0x10240

@@ -28,11 +28,12 @@ void D2Game_8A810_PacketSend88(D2GSend send, void* client, const char* name, uin
     send(client, b.data(), (uint32_t)len + 11);
 }
 
-// 1.13c D2Game+0x8A890 (EAX unused, p2 = source, p3 unused, p4 = count): opcode 0x84, then p4 bytes from byte 2. Sends p4 + 2.
-void D2Game_8A890_PacketSend84(D2GSend send, void* client, const void* src, uint16_t count)
+// 1.13c D2Game+0x8A890 (AL = byte 1, EDX = source, count = stack word): opcode 0x84, AL, then count bytes from byte 2. Sends count + 2.
+void D2Game_8A890_PacketSend84(D2GSend send, void* client, uint8_t b1, const void* src, uint16_t count)
 {
     std::vector<uint8_t> b((size_t)count + 2, 0);
     b[0] = 0x84;
+    b[1] = b1;
     if (count) memcpy(b.data() + 2, src, count);
     send(client, b.data(), (uint32_t)count + 2);
 }
@@ -66,11 +67,11 @@ void D2Game_8AA40_PacketSend65(D2GSend send, void* client)
     send(client, b, 7);
 }
 
-// 1.13c D2Game+0x8AB50 (p1 byte, p2, p4, p5, p6 words; p3 unused): opcode 0x57, p1 at 5, words at 6, 8, 10, 12. Fourteen bytes.
-void D2Game_8AB50_PacketSend57(D2GSend send, void* client, uint32_t p1, uint16_t p2, uint32_t p3, uint16_t p4, uint16_t p5, uint16_t p6)
+// 1.13c D2Game+0x8AB50 (EAX = dword at 1, CL = byte at 5, DX = word at 6, then stack words at 8, 10, 12): opcode 0x57. Fourteen bytes.
+void D2Game_8AB50_PacketSend57(D2GSend send, void* client, uint32_t p1, uint16_t p2, uint32_t eaxIn, uint16_t p4, uint16_t p5, uint16_t p6)
 {
-    (void)p3;
     uint8_t b[14] = { 0x57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    pk_w32(b, 1, eaxIn);
     b[5] = (uint8_t)p1;
     pk_w16(b, 6, p2);
     pk_w16(b, 8, p4);
