@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createPlugyStash, pageTarget, isDc6, PLUGY_GRID, MAX_PAGE } from '../play/assets/plugy-stash-ui.mjs';
+import { createPlugyStash, pageTarget, isDc6, parsePlugyIni, pageLabel, PLUGY_GRID, MAX_PAGE } from '../play/assets/plugy-stash-ui.mjs';
 
 test('prev stops at the first page, next grows without wrapping', () => {
   assert.equal(pageTarget('prev', 0), 0);
@@ -109,4 +109,70 @@ test('isDc6 accepts a DC6 header and refuses a page served for a missing file', 
   assert.equal(isDc6(dc6), true);
   assert.equal(isDc6(new TextEncoder().encode('<!doctype html><html>..................')), false);
   assert.equal(isDc6(null), false);
+});
+
+test('page label: "<Personal|Shared> Page N", coloured by page kind from PlugY.ini', () => {
+  const ini = '/../reference/PlugY/PlugYInstaller/PlugY.ini';
+  const path = new URL('..' + ini, import.meta.url);
+  const cfg = existsSync(path) ? parsePlugyIni(readFileSync(path, 'utf8')) : parsePlugyIni('');
+  assert.deepEqual([cfg.nbPagesPerIndex, cfg.nbPagesPerIndex2, cfg.sharedGold, cfg.sharedStash], [10, 100, true, true]);
+  const l = (sh, p) => { const r = pageLabel(sh, p, cfg); return [r.text, r.colour]; };
+  assert.deepEqual(l(false, 0), ['Personal Page 1', 0]);
+  assert.deepEqual(l(false, 8), ['Personal Page 9', 0]);
+  assert.deepEqual(l(false, 9), ['Personal Page 10', 12]);     // index page
+  assert.deepEqual(l(false, 99), ['Personal Page 100', 9]);    // main index page
+  assert.deepEqual(l(true, 0), ['Shared Page 1', 4]);
+  assert.deepEqual(l(true, 19), ['Shared Page 20', 8]);
+  assert.deepEqual(l(true, 99), ['Shared Page 100', 1]);
+  const c = parsePlugyIni('[STASH]\r\nNbPagesPerIndex=5\r\nSharedNormalPageColor=17\r\nActiveSharedGold=0\r\n');
+  assert.deepEqual([c.nbPagesPerIndex, c.colours.sharedNormal, c.sharedGold], [5, 0, false]);
+});
+
+test('page switching moves items between pages: each (set, page) keeps its own items', () => {
+  const store = { false: [], true: [] }; let live = ['a1', 'a2'];   // the engine stash holds the live page
+  const s = createPlugyStash({ enabled: true, onPage: (from, to, fs, ts) => { store[fs][from] = live; live = store[ts][to] || []; return true; } });
+  assert.equal(s.go(1), true); assert.deepEqual(live, []);
+  live = ['b1']; s.go(2); assert.deepEqual(live, []);
+  s.go(0); assert.deepEqual(live, ['a1', 'a2']);
+  s.go(1); assert.deepEqual(live, ['b1']);
+  s.go(0, true); assert.deepEqual(live, []);                 // shared set page 0 is separate from personal page 0
+  live = ['s1']; s.go(1, false); assert.deepEqual(live, ['b1']);   // back to the personal page last shown in that set
+  s.go(0, true); assert.deepEqual(live, ['s1']);
+  assert.deepEqual([s.page, s.showShared, s.pages], [0, true, 3]);
+});
+
+test('real PlugY cels (retail/D2/D2SE/PlugY, else the PlugY checkout): frame counts, sizes, draw list and the 10x10 grid inside TradeStash', async (t) => {
+  const { decodeDc6 } = await import('../play/assets/d2-formats.mjs');
+  const dirs = ['../retail/D2/D2SE/PlugY/', '../reference/PlugY/PlugYInstaller/PlugY/'].map((d) => new URL(d, import.meta.url)).filter((d) => existsSync(new URL('StashBtns.dc6', d)));
+  if (!dirs.length) return t.skip('no PlugY art on this machine');
+  const load = (n) => decodeDc6(readFileSync(new URL(n + '.dc6', dirs[0]))).frames;
+  const sb = load('StashBtns'), sg = load('SharedGoldBtns'), ts = load('TradeStash');
+  assert.deepEqual([sb.length, sg.length, ts.length], [12, 4, 4]);
+  assert.ok(sb.every((f) => f.width === 32 && f.height === 32) && sg.every((f) => f.width === 32 && f.height === 32));
+  assert.deepEqual(ts.map((f) => [f.width, f.height]), [[256, 256], [64, 256], [256, 176], [64, 176]]);   // 320 x 432 panel
+  const s = createPlugyStash({ enabled: true }), calls = [];
+  const ctx = { save() {}, restore() {}, translate() {}, scale() {}, fillRect() {}, drawImage: (img, x, y) => calls.push([img.f, img.w, x, y]) };
+  s.setArt({ stash: sb.map((f, i) => ({ f: 'StashBtns#' + i, w: f.width })), gold: sg.map((f, i) => ({ f: 'SharedGoldBtns#' + i, w: f.width })) });
+  s.draw(ctx, 800, 600, { left: 80, top: 61 }, true);
+  assert.equal(calls.length, 7);
+  assert.ok(calls.every(([, w, x, y]) => w === 32 && x >= 80 && x + 32 <= 80 + 320 && y >= 61 && y + 32 <= 61 + 432));   // every button lies on the panel
+  assert.deepEqual(calls.map((c) => c[0]), ['StashBtns#0', 'StashBtns#2', 'StashBtns#4', 'StashBtns#8', 'StashBtns#10', 'SharedGoldBtns#0', 'SharedGoldBtns#2']);
+  assert.ok(PLUGY_GRID.gridLeft + PLUGY_GRID.columns * 29 <= 80 + 320 && PLUGY_GRID.gridTop + PLUGY_GRID.rows * 29 <= 61 + 432);
+});
+
+test('ActiveSharedStash / ActiveSharedGold off: those buttons are neither drawn nor clickable', () => {
+  const calls = [], ctx = { save() {}, restore() {}, translate() {}, scale() {}, fillRect() {}, drawImage: (img) => calls.push(img.id) };
+  const golds = []; const s = createPlugyStash({ enabled: true, onGold: (k) => golds.push(k) });
+  s.setArt({ stash: Array.from({ length: 12 }, (_, i) => ({ id: 'S' + i })), gold: Array.from({ length: 4 }, (_, i) => ({ id: 'G' + i })) });
+  const g = { left: 80, top: 61 };
+  s.cfg = parsePlugyIni('[STASH]\nActiveSharedGold=0\nActiveSharedStash=0\n');
+  s.draw(ctx, 800, 600, g, true);
+  assert.deepEqual(calls, ['S0', 'S2', 'S8', 'S10']);   // prev, next, prevIndex, nextIndex only
+  const b = s.BTN;
+  assert.equal(s.click(b.putGold.x + 4, b.putGold.y + 4, 800, 600, g, true), false);
+  assert.equal(s.click(b.shared.x + 4, b.shared.y + 4, 800, 600, g, true), false);
+  assert.deepEqual(golds, []);
+  s.cfg = parsePlugyIni('');
+  assert.equal(s.click(b.putGold.x + 4, b.putGold.y + 4, 800, 600, g, true), true);
+  assert.deepEqual(golds, ['put']);
 });

@@ -42,6 +42,8 @@ const POPUP_LEFT = { prevIndex: 196 };
 // onPage(fromPage, toPage, fromShared, toShared) === false refuses the turn. lastUsed(shared) = index of the last non-empty page.
 export function createPlugyStash({ enabled = false, pages = 1, onPage = null, onGold = null, lastUsed = () => 0 } = {}) {
   const s = { enabled, pages, page: 0, showShared: false, hover: null, text: null, mem: { false: 0, true: 0 } };
+  s.cfg = { sharedGold: true, sharedStash: true };   // PlugY.ini ActiveSharedGold / ActiveSharedStash (the shell sets it once the ini is read)
+  const off = (n) => (n === 'shared' && !s.cfg.sharedStash) || ((n === 'putGold' || n === 'takeGold') && !s.cfg.sharedGold);
   s.art = null;   // { stash: canvas[], gold: canvas[] } once StashBtns.dc6 / SharedGoldBtns.dc6 are decoded (setArt)
   s.down = null;
   const scaleOf = (w, h) => { const k = Math.min(1, w / 800, h / 600); return { k, x: (w - 800 * k) / 2, y: (h - 600 * k) / 2 }; };
@@ -59,12 +61,12 @@ export function createPlugyStash({ enabled = false, pages = 1, onPage = null, on
       if (ready()) {
         const drawn = [];
         for (const [name, b] of Object.entries(BTN)) {
-          if (b.hit) continue;
+          if (b.hit || off(name)) continue;
           const frame = b.f + (s.down === name ? 1 : 0) + (name === 'shared' && s.showShared ? 2 : 0);
           ctx.drawImage((b.gold ? s.art.gold : s.art.stash)[frame], b.x, b.y);
           drawn.push({ name, art: b.gold ? 'SharedGoldBtns.dc6' : 'StashBtns.dc6', frame, x: b.x, y: b.y, w: 32, h: 32, live: LIVE.includes(name) });
         }
-        const popup = s.text && s.hover ? Object.entries(BTN).find(([, b]) => s.hover.x >= b.x && s.hover.x < b.x + 32 && s.hover.y >= b.y && s.hover.y < b.y + 32) : null;
+        const popup = s.text && s.hover ? Object.entries(BTN).find(([n, b]) => !off(n) && s.hover.x >= b.x && s.hover.x < b.x + 32 && s.hover.y >= b.y && s.hover.y < b.y + 32) : null;
         let shown = null;
         if (popup) {
           const [name, b] = popup, str = POPUP[name](s), tw = s.text.measure(act, str), x = POPUP_LEFT[name] ?? b.x + 16 - Math.trunc(tw / 2), y = b.y + POPUP_DY + (b.popDy || 0);
@@ -91,7 +93,7 @@ export function createPlugyStash({ enabled = false, pages = 1, onPage = null, on
       if (!s.enabled || !open || !g) return false;
       const o = scaleOf(w, h), x = (px - o.x) / o.k, y = (py - o.y) / o.k;
       if (ready()) {
-        const hit = LIVE.find((n) => x >= BTN[n].x && x < BTN[n].x + 32 && y >= BTN[n].y && y < BTN[n].y + 32);
+        const hit = LIVE.find((n) => !off(n) && x >= BTN[n].x && x < BTN[n].x + 32 && y >= BTN[n].y && y < BTN[n].y + 32);
         if (!hit) return false;
         if (hit === 'putGold' || hit === 'takeGold') { if (onGold) onGold(hit === 'putGold' ? 'put' : 'take'); }
         else if (hit === 'shared') s.go(s.mem[!s.showShared], !s.showShared);
@@ -101,4 +103,32 @@ export function createPlugyStash({ enabled = false, pages = 1, onPage = null, on
       return false;
     },
   });
+}
+
+// PlugY.ini [STASH] as D2SE ships it (reference/PlugY PlugYInstaller/PlugY.ini; Parameters.cpp init_Stash). Missing file or key = that key's default there.
+export const PLUGY_INI_DEFAULT = Object.freeze({ nbPagesPerIndex: 10, nbPagesPerIndex2: 100, sharedGold: true, sharedStash: true,
+  colours: Object.freeze({ personalNormal: 0, personalIndex: 12, personalMain: 9, sharedNormal: 4, sharedIndex: 8, sharedMain: 1 }) });
+const colourOf = (v) => { const n = parseInt(v, 10); return !(n >= 1 && n <= 19) || n === 17 ? 0 : n; };   // Parameters.cpp getColor
+export function parsePlugyIni(text) {
+  const cfg = { ...PLUGY_INI_DEFAULT, colours: { ...PLUGY_INI_DEFAULT.colours } };
+  let sec = '';
+  for (const raw of String(text || '').split(/\r?\n/)) {
+    const line = raw.trim(); if (!line || line[0] === ';') continue;
+    const h = /^\[(.*)\]$/.exec(line); if (h) { sec = h[1].toUpperCase(); continue; }
+    if (sec !== 'STASH') continue;
+    const m = /^([^=]+)=(.*)$/.exec(line); if (!m) continue;
+    const k = m[1].trim(), v = m[2].trim();
+    if (k === 'NbPagesPerIndex') cfg.nbPagesPerIndex = Math.max(1, parseInt(v, 10) || 10);
+    else if (k === 'NbPagesPerIndex2') cfg.nbPagesPerIndex2 = Math.max(1, parseInt(v, 10) || 100);
+    else if (k === 'ActiveSharedGold') cfg.sharedGold = parseInt(v, 10) !== 0;
+    else if (k === 'ActiveSharedStash') cfg.sharedStash = parseInt(v, 10) !== 0;
+    else if (/^(Personal|Shared)(Normal|Index|MainIndex)PageColor$/.test(k)) cfg.colours[k.replace(/PageColor$/, '').replace(/^(.)/, (c) => c.toLowerCase()).replace('MainIndex', 'Main')] = colourOf(v);
+  }
+  return cfg;
+}
+// Interface_Stash.cpp printPageNumber: "<Personal|Shared> Page #" (LocalizedStrings.ini, ENG) with # = page number, drawn in the
+// colour of the page kind: every NbPagesPerIndex-th page is an index page, every NbPagesPerIndex2-th the main index. `page` is 0-based.
+export function pageLabel(shared, page, cfg = PLUGY_INI_DEFAULT) {
+  const id = page + 1, kind = id % cfg.nbPagesPerIndex2 === 0 ? 'Main' : id % cfg.nbPagesPerIndex === 0 ? 'Index' : 'Normal';
+  return { text: `${shared ? 'Shared' : 'Personal'} Page ${id}`, colour: cfg.colours[(shared ? 'shared' : 'personal') + kind] };
 }
