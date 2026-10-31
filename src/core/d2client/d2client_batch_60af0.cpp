@@ -278,7 +278,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE
 uint32_t d2_client_62cf0(char* path_c0a8, uint32_t* lng_c1ac, uint32_t* accel_c0a4,
                          uint32_t (*load_lib)(const char*), int (*reg_read_422)(char*), void (*reg_write_425)(const char*),
                          void (*msgbox)(void), uint32_t (*load_accel)(uint32_t, uint32_t),
-                         void (*ord464)(uint32_t, uint32_t, uint32_t), void (*sub_dxxx)(void)) {
+                         void (*ord464)(uint32_t, uint32_t, uint32_t),
+                         void (*df00)(int32_t (*)(uint32_t, char*, uint32_t)), int32_t (*cb_62c30)(uint32_t, char*, uint32_t)) {
     if (path_c0a8[0]) { *lng_c1ac = load_lib(path_c0a8); reg_write_425(path_c0a8); }
     if (!*lng_c1ac) {
         if (reg_read_422(path_c0a8)) *lng_c1ac = load_lib(path_c0a8);
@@ -286,7 +287,7 @@ uint32_t d2_client_62cf0(char* path_c0a8, uint32_t* lng_c1ac, uint32_t* accel_c0
     }
     *accel_c0a4 = load_accel(*lng_c1ac, 0x64);
     ord464(0xfff, *lng_c1ac, 0);
-    sub_dxxx();   // 0xDF00 with &LAB_6fb12c30 (callback address is the host's)
+    df00(cb_62c30);   // 0xDF00 with the 0x62C30 message source, passed by the host as its native address
     return 1;
 }
 

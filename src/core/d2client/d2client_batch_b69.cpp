@@ -177,12 +177,12 @@ EMSCRIPTEN_KEEPALIVE int32_t d2c_814f0(const D2cB69Env* e) {
 }
 
 // 1.13c D2Client+0x81750
-EMSCRIPTEN_KEEPALIVE void d2c_81750(const D2cB69Env* e) {
+EMSCRIPTEN_KEEPALIVE void d2c_81750(const D2cB69Env* e, int32_t act) {  // act = entry EAX, pushed to both 10459 calls
     d2c_814f0(e);
     if (*e->g_d3444 == 0) { e->f80be0(); *e->g_d3444 = 1; }
     *e->g_c38c4 = 0x1d4c; *e->g_c38c8 = 0xfa; *e->g_c38cc = 3000; *e->g_c38d0 = 0x7d;
-    if (e->ord10459(0) == 2) *e->g_c38cc *= 3;
-    if (e->ord10459(0) == 4) *e->g_c38cc *= 3;
+    if (e->ord10459(act) == 2) *e->g_c38cc *= 3;
+    if (e->ord10459(act) == 4) *e->g_c38cc *= 3;
     *e->g_c38b4 = 3000; *e->g_c38ac = 0x1d4c; *e->g_c38b0 = 0xfa; *e->g_c38b8 = 0x32;
     int32_t i7 = 0, i9 = 0, i6 = 0, i8 = 0;
     do {
