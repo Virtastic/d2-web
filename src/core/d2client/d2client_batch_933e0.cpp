@@ -128,7 +128,7 @@ void sub_952A0(Env& e, Globals& g, Unit* owner, const int32_t* slotTab /*0xBCD80
   int32_t x = (int32_t(reinterpret_cast<const uint8_t*>(r)[16]) - w * cell) / 2 + r[0];
   int32_t y = (int32_t(reinterpret_cast<const uint8_t*>(r)[17]) - h * cell) / 2 + r[2];
   e.drawMark(x, y);
-  if (g.hover == it && e.isUnidentified(it) && e.isIdentified(it) && e.flag800(it)) sub_95140(e, it, A, x, y);
+  if (g.hover == it && e.isIdentified(it) && e.flag800(it)) sub_95140(e, it, A, x, y);
  }
 }
 // 1.13c D2Client+0x95F80  (ECX=unit, EDX=x, stack: y, EAX/ESI contextual)
@@ -160,7 +160,7 @@ void sub_958A0(Env& e, Globals& g, Unit* panelUnit, int32_t panelKind, const Are
   int32_t px = A->cellW * gx + A->left, py = A->cellH * gy + A->top;
   // GUESS: colour/state arg of FUN_3C600 (0/1/2/4) depends on 10244/10202/11006 results; only the
   // hovered-item path (draw + sub_95140) is reproduced.
-  if (it == g.hover && g.g_BCC28) { e.drawMark(px, py); if (e.isUnidentified(it) && e.isIdentified(it) && e.flag800(it)) sub_95140(e, it, A, px, py); }
+  if (it == g.hover && g.g_BCC28) { e.drawMark(px, py); if (e.isIdentified(it) && e.flag800(it)) sub_95140(e, it, A, px, py); }
   else e.drawMark(px, py);
  }
  (void)own;
