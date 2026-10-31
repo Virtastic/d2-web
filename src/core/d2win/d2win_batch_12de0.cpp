@@ -205,11 +205,16 @@ void d2win_sub_12940(int32_t x, const uint16_t* text, int32_t y, int32_t centerW
 // caption path). Width is the widest line. x is pulled left so the text fits the screen; y is
 // y0+2, clamped to screenH-31, then doubled if the text would start above the top (retail's own
 // rule). The fill spans fontHeight above y; the text itself is drawn at y-2, centered on the
-// measured width.
+// measured width. Retail is fastcall(ecx = text, edx = x; y0, fill colour, fill gamma, palette shift),
+// ret 0x10; the width (0x11FB0, text in EAX) and the text draw (0x12940, x in EAX) are calls the caller
+// supplies (d2win_sub_11fb0 / d2win_sub_12940 bound to the same env), so each is a seam of its own row.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2win_sub_12de0(int32_t x, const uint16_t* text, int32_t y0, int32_t fillColor,
-                     int32_t fillGamma, int32_t paletteShift, const D2WinBatch12DE0Env* env) {
-    int32_t width = d2win_sub_11fb0(text, env);
+                     int32_t fillGamma, int32_t paletteShift, const D2WinBatch12DE0Env* env,
+                     int32_t (*measure)(const uint16_t* text),
+                     void (*draw)(int32_t x, const uint16_t* text, int32_t y, int32_t centerWidth,
+                                  int32_t paletteShift, int32_t centered)) {
+    int32_t width = measure(text);
     int32_t height = font_height(env);
     int32_t screenW = 0, screenH = 0;
     env->getDimensions(&screenW, &screenH);
@@ -218,5 +223,5 @@ void d2win_sub_12de0(int32_t x, const uint16_t* text, int32_t y0, int32_t fillCo
     if (y > screenH - 31) y = screenH - 31;
     if (y - height < 0) y = y * 2;
     env->fillArea(x, y - height, x + width, y, fillColor, fillGamma);
-    d2win_sub_12940(x, text, y - 2, width, paletteShift, 1, env);
+    draw(x, text, y - 2, width, paletteShift, 1);
 }

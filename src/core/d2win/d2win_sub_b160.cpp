@@ -1,32 +1,21 @@
-// src/core/d2win/d2win_sub_b160.cpp -- 1.13c D2Win scrollbar (type 5) constructor, from the cached decompile.
+// src/core/d2win/d2win_sub_b160.cpp -- 1.13c D2Win+0xB160: the type-5 (scrollbar) widget constructor.
+// fastcall(ecx, edx) + four stack words (ret 0x10). Nodes keep the retail 0x60-byte layout with 32-bit links (+0x3c next).
 #include <cstdint>
-#include <emscripten.h>
 
-struct D2WinB160Env {
-    void* (*alloc)(int32_t size, int32_t line);  // Ordinal_10042(0x1c,0)
-    const uint32_t* bitMasks;                    // gdwBitMasks
-    int32_t cb_af40, cb_ad60, cb_ab50;           // 0xAF40, 0xAD60, 0xAB50 callbacks
-    int32_t* listHead;                           // DAT_6f9014a0 (widget list head, 32-bit handle)
-    int32_t (*h)(const void* p);                 // pointer -> handle
-    int32_t* (*p)(int32_t handle);               // handle -> pointer
-};
-
-// 1.13c D2Win+0x0B160
-// a=ECX, b=EDX, c,d stack, ebx=EBX at entry, stk=slot at the return address (as the comments reads it).
-// Allocs 0x1c bytes (as retail) but clears 0x18 dwords, sets type 5, appends to the widget list tail (link at +0x3c).
-extern "C" EMSCRIPTEN_KEEPALIVE
-int32_t* d2win_sub_B160(int32_t a, int32_t b, int32_t c, int32_t d, int32_t ebx, int32_t stk, D2WinB160Env* e) {
-    int32_t* w = (int32_t*)e->alloc(0x1c, 0);
-    for (int i = 0; i < 0x18; i++) w[i] = 0;
-    w[0] = 5;
-    w[2] = e->bitMasks[0] | e->bitMasks[2];
-    w[1] = c; w[6] = stk; w[5] = ebx; w[3] = a; w[4] = b;
-    w[7] = e->cb_af40; w[9] = e->cb_ad60; w[10] = e->cb_ab50;
-    w[0xb] = 0; w[0xc] = 0; w[0xd] = d;
-    w[0xf] = w[0x10] = w[0x11] = w[0x12] = w[0x13] = w[0x14] = w[0x15] = w[0x17] = 0;
-    if (!*e->listHead) { *e->listHead = e->h(w); return w; }
-    int32_t* t = e->p(*e->listHead);
-    while (t[0xf]) t = e->p(t[0xf]);
-    t[0xf] = e->h(w);
-    return w;
+// alloc: the Fog allocator (thunk 0x7678); head: the widget list head DAT 0x214A0; h: the module's handlers 0xAF40, 0xAD60, 0xAB50.
+// 1.13c D2Win+0xB160
+extern "C" uint32_t* d2win_sub_B160(uint32_t a1, uint32_t a2, uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3,
+                                    uint32_t* (*alloc)(uint32_t size, uint32_t line), uint32_t* head, const uint32_t h[3]) {
+    uint32_t* n = alloc(0x60, 0x1c);
+    for (int i = 0; i < 0x18; ++i) n[i] = 0;
+    n[0] = 5;
+    n[2] |= 1u << 0;                 // gdwBitMasks[0]
+    n[2] |= 1u << 2;                 // gdwBitMasks[2]
+    n[1] = s2; n[6] = s1; n[5] = s0; n[3] = a1; n[4] = a2;
+    n[7] = h[0]; n[9] = h[1]; n[10] = h[2]; n[0xd] = s3;
+    if (!*head) { *head = (uint32_t)(uintptr_t)n; return n; }
+    uint32_t* p = (uint32_t*)(uintptr_t)*head;
+    while (p[0xf]) p = (uint32_t*)(uintptr_t)p[0xf];
+    p[0xf] = (uint32_t)(uintptr_t)n;
+    return n;
 }
