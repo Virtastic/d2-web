@@ -7277,7 +7277,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_right_skill(uint32_t targetUnitId);
 EMSCRIPTEN_KEEPALIVE int d2_session_command_left_skill(uint32_t targetUnitId);
 
 extern "C" int d2_client_monster_turn_held(const D2UnitStrc* unit);
-// 1.13c D2Client+0x440C0 (from the frame tail 0x44A80): each client room the pass has not seen yet is marked seen;
+// dup of D2Client+0x440C0 (from the frame tail 0x44A80): each client room the pass has not seen yet is marked seen;
 // a Den of Evil room (level 8) gets 0x53550's light spots: up to 25 tries of a random subtile in the room
 // (#10561 room coords, two hero-seed draws), each free one (#10482 mask 5 clear) sent, until 3 are free.
 // The spots themselves (0xB30F0, a client-only unit) are not made here; only their draws are.
