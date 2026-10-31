@@ -1235,7 +1235,7 @@ int32_t __fastcall D2GAME_PickupItem_6FC43340(D2GameStrc* pGame, D2UnitStrc* pUn
 
     if (!ITEMS_CheckIfBeltable(pItem) || !ITEMS_CheckIfAutoBeltable(pUnit->pInventory, pItem) || !INVENTORY_PlaceItemInFreeBeltSlot(pUnit->pInventory, pItem))
     {
-        // 1.13c D2Game+0xD6590
+        // belt-full fallback: D2Game+0xD6590 is the 1.13c counterpart, this line is not its marker
         if (sub_6FC43E60(pGame, pUnit, pItem, 1, 0, __FILE__, __LINE__))
         {
             return 1;

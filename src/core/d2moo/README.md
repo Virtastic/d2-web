@@ -27,3 +27,4 @@ behaviour differs from 1.10f.
 - D2Common+0x25970 ITEMS_CalculateAdditionalCostsForItemSkill: for a large sell cost the multiplier is divided by 1024 (4096 for buy) before it scales the cost.
 - D2Common+0x28850 ITEMS_CalculateAdditionalCostsForBonusStats: for a large operand the cost times value is divided first, then multiplied by the row multiplier.
 - D2Common+0x1BA60 (DataTbls/HoradricCube.cpp, DATATBLS_CubeMainOutputParser): a set-item hit returns FALSE after filling its fields, without parsing output modifiers.
+- D2Common+0x267F0 ITEMS_GetWeaponAttackSpeed: matches the 1.13c decompile; the public wrapper passes includeItemFasterAttackRate=TRUE and the Impl helper is unchanged; validated against the vector.

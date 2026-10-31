@@ -4559,6 +4559,7 @@ static int ITEMS_GetWeaponAttackSpeedImpl(D2UnitStrc* pUnit, D2UnitStrc* pWeapon
 	return 45;
 }
 
+// 1.13c D2Common+0x267F0
 int __stdcall ITEMS_GetWeaponAttackSpeed(D2UnitStrc* pUnit, D2UnitStrc* pWeapon)
 {
 	return ITEMS_GetWeaponAttackSpeedImpl(pUnit, pWeapon, TRUE);
