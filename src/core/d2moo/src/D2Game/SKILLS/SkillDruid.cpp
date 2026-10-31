@@ -1888,6 +1888,10 @@ int32_t __fastcall sub_6FD017F0(int32_t nMonsterId, int32_t nNoInChain)
     return nClassId;
 }
 
+// d2-web: 1.13c D2Game+0xD530 callee seam for the replay harness (the chain lookup writes through its out-parameter and the
+// missile spawn needs a live game); null in the game
+D2SrvDo132Seam g_d2SrvDo132;
+
 //D2Game.0x6FD01860
 // 1.13c D2Game+0xD530
 int32_t __fastcall SKILLS_SrvDo132_ImpFireMissile(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
@@ -1906,6 +1910,12 @@ int32_t __fastcall SKILLS_SrvDo132_ImpFireMissile(D2GameStrc* pGame, D2UnitStrc*
     }
 
     int32_t nChainId = 0;
+    if (g_d2SrvDo132.cast)
+    {
+        g_d2SrvDo132.chain(nClassId, &nChainId);
+        g_d2SrvDo132.cast(pGame, nChainId + pSkillsTxtRecord->wSrvMissileA, pUnit, nSkillId, nSkillLevel);
+        return 1;
+    }
     DATATBLS_GetMonsterChainInfo(nClassId, 0, &nChainId);
     sub_6FD11420(pGame, nChainId + pSkillsTxtRecord->wSrvMissileA, pUnit, nSkillId, nSkillLevel, 0, 0, 0, 0, 0);
     return 1;

@@ -2050,7 +2050,6 @@ int32_t __fastcall PLRTRADE_AllocPlayerTrade(D2GameStrc* pGame, D2UnitStrc* pPla
 }
 
 //D2Game.0x6FC92890
-// 1.13c D2Game+0x8AC90
 void __fastcall PLRTRADE_AddGold(D2UnitStrc* pUnit, int32_t nStat, int32_t nValue)
 {
     if (!pUnit)
@@ -2089,6 +2088,7 @@ void __fastcall PLRTRADE_AddGold(D2UnitStrc* pUnit, int32_t nStat, int32_t nValu
 }
 
 //D2Game.0x6FC92920
+// 1.13c D2Game+0x73BA0 (registers: esi = player 1, edi = player 2; checked against the disassembly, no delta)
 void __fastcall sub_6FC92920(D2GameStrc* pGame, D2UnitStrc* pPlayer1, D2UnitStrc* pPlayer2, D2PlayerDataStrc* pPlayerData1, D2PlayerDataStrc* pPlayerData2)
 {
     sub_6FC4B830(pGame, pPlayer1);

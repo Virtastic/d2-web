@@ -81,6 +81,13 @@ int32_t __fastcall SKILLS_SrvDo131_OverseerWhip(D2GameStrc* pGame, D2UnitStrc* p
 int32_t __fastcall sub_6FD017F0(int32_t nMonsterId, int32_t nNoInChain);
 //D2Game.0x6FD01860
 int32_t __fastcall SKILLS_SrvDo132_ImpFireMissile(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel);
+// d2-web: 1.13c D2Game+0xD530 callee seam (D2Common #10035 and sub_6FD11420); all null in the game
+struct D2SrvDo132Seam
+{
+    void (*chain)(int32_t nClassId, int32_t* pChainId);
+    void (*cast)(D2GameStrc*, int32_t nMissileId, D2UnitStrc*, int32_t nSkillId, int32_t nSkillLevel);
+};
+extern D2SrvDo132Seam g_d2SrvDo132;
 //D2Game.0x6FD01910
 int32_t __fastcall sub_6FD01910(D2UnitStrc* pUnit, D2UnitStrc* pTarget);
 //D2Game.0x6FD019B0

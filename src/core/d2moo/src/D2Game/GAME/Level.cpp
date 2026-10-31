@@ -325,7 +325,7 @@ void __fastcall LEVEL_ChangeAct(D2GameStrc* pGame, D2ClientStrc* pClient, int32_
 }
 
 //D2Game.0x6FC3C410
-// 1.13c D2Game+0x9E170
+// 1.13c D2Game+0x9E170 (registers: ebp = game, eax = player, edi = destination level; the +0x1ac test is the client act compare; checked against the disassembly, no delta)
 void __fastcall LEVEL_WarpUnit(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nDestinationLevelId, int32_t nTileCalc)
 {
     D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pPlayer, __FILE__, __LINE__);

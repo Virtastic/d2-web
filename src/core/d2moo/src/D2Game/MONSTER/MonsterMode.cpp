@@ -1596,6 +1596,7 @@ int32_t __fastcall sub_6FC64E60(D2GameStrc* pGame, D2ModeChangeStrc* pModeChange
 }
 
 //D2Game.0x6FC64E90
+// 1.13c D2Game+0x76F20 (whole function, including the tail taken when the cycle has not ended)
 int32_t __fastcall sub_6FC64E90(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     if (UNITS_IsAtEndOfFrameCycle(pUnit))

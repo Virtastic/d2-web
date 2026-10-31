@@ -413,6 +413,7 @@ void __fastcall SUNITPROXY_ClearNpcRecordData(D2GameStrc* pGame, D2NpcRecordStrc
 }
 
 //D2Game.0x6FCCC2E0
+// 1.13c D2Game+0x90C60 (checked against the disassembly, no delta)
 void __fastcall SUNITPROXY_UpdateNpcsOnActChange(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nCurrentLevelId, int32_t nDestLevelId)
 {
     D2UnitProxyArgStrc unitProxyArg = {};

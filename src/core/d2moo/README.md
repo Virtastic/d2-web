@@ -19,6 +19,9 @@ behaviour differs from 1.10f.
 - D2Game+0x9C160 PARTY_IteratePartyMembers: asserts pGame non-null (1.10f copy asserted the inverse on pPartyControl).
 - D2Game+0x9C4F0 sub_6FCB9D10: asserts pPartyControl.
 - D2Game+0x9C4F0 party add (`sub_6FCB9D10`): the hostility helper is called member-first, then player-first, as retail does.
+- D2Game+0x922A0 sub_6FCF5680 and D2Game+0x91E30 sub_6FCF5870: the skill record is read only when the skill id is above 0.
+- D2Game+0x92770 SKILLS_SrvDo033_PsychicHammer: no lower clamp of the skill level to 1 (the retail clamp reduces to the level itself).
+- D2Game+0x92ED0 sub_6FCF9580: a monequip row with no valid location is skipped without a roll.
 - D2Game+0xB7090 (AI/AiBaal.cpp, AIBAAL_GetTarget): the act walk over list 8 starts from pGame->pTargetNodes[8], not the node left over from the lists 0-7 pass.
 - D2Game+0x83130 (AI/AiThink.cpp, AITHINK_Fn006_Fallen): the neutral-mode test after the corpse scan uses the mode read at entry; the minion command buffer is zero-filled (retail leaves all but param 0 uninitialised).
 - D2Game+0xA4610 (AI/AiThink.cpp, AITHINK_GetTargetForBoss): the act walk over list 8 starts from pGame->pTargetNodes[8], as in AIBAAL_GetTarget.
@@ -50,3 +53,4 @@ behaviour differs from 1.10f.
 - D2Game+0xEF6B0 MONSTERSPAWN_SpawnRandomMonsterForLevel (MONSTER/MonsterSpawn.cpp): the no-normal-monsters path and the no-spawn-flag path assert (lines 0x4F0 and 0x507) where 1.10f warned and returned 0.
 - SKILLITEM_HandleItemEffectSkill (D2Game+0xF14F0): returns 0 when nSkillId is 0 (retail tests the id before the record lookup).
 - 1.13c out-of-line helpers split from 1.10f bodies, one marker each: SKILLS_ValidateUsedSkillTarget (D2Game+0x9FC00, from the used-skill prologue), NPC_RefillHirelingListIfExhausted (D2Game+0xBD160), ACT3Q3_SpawnFetishBoss (D2Game+0xE8780), ITEMMODE_ReturnItemToGround (D2Game+0xD2840, the five-line drop-back that the pickup paths repeated) and ITEMMODE_UnpackDroppedCube (D2Game+0xD78C0, the cube tail of sub_6FC44030). D2GAME_RemoveItemIfOnCursor (D2Game+0xD2C70) sends the cursor clear with no client for a holder that is not a player.
+- D2Common+0x2D660 DRLG_UpdateRoomExCoordinates (`sub_2D660`, DrlgDrlg.cpp): the four asserts now `return;` after the warning, as retail exits there (the warning helper only prints). Valid input is unchanged; the FN probe (`src/core/fn/d2common_2d660.cpp`) copies the 1.13c blobs into the 1.10f structs.

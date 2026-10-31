@@ -699,11 +699,13 @@ void __fastcall DRLG_UpdateRoomExCoordinates(D2DrlgLevelStrc* pLevel)
 	if (!pLevel)
 	{
 		FOG_DisplayWarning("ptDrlgLevel", __FILE__, __LINE__);
+		return;
 	}
 
 	if (!pLevel->pFirstRoomEx)
 	{
 		FOG_DisplayWarning("ptDrlgLevel->ptRoomFirst", __FILE__, __LINE__);
+		return;
 	}
 
 	DRLG_GetMinAndMaxCoordinatesFromLevel(pLevel, &nTileMinX, &nTileMinY, &nTileMaxX, &nTileMaxY);
@@ -711,11 +713,13 @@ void __fastcall DRLG_UpdateRoomExCoordinates(D2DrlgLevelStrc* pLevel)
 	if (pLevel->nWidth < nTileMaxX - nTileMinX)
 	{
 		FOG_DisplayWarning("ptCoordsLevel->nSizeTileX >= nTileMaxX - nTileMinX", __FILE__, __LINE__);
+		return;
 	}
 
 	if (pLevel->nHeight < nTileMaxY - nTileMinY)
 	{
 		FOG_DisplayWarning("ptCoordsLevel->nSizeTileY >= nTileMaxY - nTileMinY", __FILE__, __LINE__);
+		return;
 	}
 
 	pDrlgRoom = pLevel->pFirstRoomEx;
