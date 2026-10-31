@@ -3897,6 +3897,7 @@ function drawFrame() {
     const cursorStyle = (screen === SCREEN.TITLE || screen === SCREEN.CINEMATICS || screen === SCREEN.OTHER_MULTIPLAYER || screen === SCREEN.SELECT || screen === SCREEN.CREATE) ? 'none' : '';
     if (canvas.style.cursor !== cursorStyle) canvas.style.cursor = cursorStyle;
   }
+  if (screen !== SCREEN.TITLE) window.__d2Shown = true;
   if (screen === SCREEN.TITLE) {
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
     // A boot movie owns the whole screen while it runs, and the screen is BLACK until it opens --
@@ -3913,6 +3914,8 @@ function drawFrame() {
     }
     // F91: the exit fade, then the notice, are painted over the finished menu (assets/exit-sequence.mjs).
     exitSeq?.draw(ctx, w, h);
+    // The front door's loading screen lifts on the first frame that shows the game (byo-door.mjs).
+    if (bootMovie || titleScreen) window.__d2Shown = true;
     return;
   }
   if (screen === SCREEN.CINEMATICS) {

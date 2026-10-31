@@ -58,6 +58,10 @@ if [ "${D2_ASSETS:-}" = "byo" ]; then echo '{"assets":"byo"}' > build-wasm/site/
 SHIM_SRC="${D2_PATCH_SHIM_SRC:-retail/D2/patch_d2.mpq}"
 if [ -f "$SHIM_SRC" ] && [ -n "$HAVE_NODE" ]; then "$NODE_BIN" tools/patch-shim.mjs "$SHIM_SRC" build-wasm/site/assets/patch-113c.patch
 else echo "WARNING: no $SHIM_SRC -- BYO players run on their own Patch_D2.mpq" >&2; fi
+# The BYO front door's title-screen art (logo, buttons, fonts, loading screen), cut from the archives beside the patch.
+DA_SRC="$(dirname "$SHIM_SRC")"
+if [ -f "$DA_SRC/d2data.mpq" ] && [ -n "$HAVE_NODE" ]; then "$NODE_BIN" tools/door-art.mjs "$DA_SRC" build-wasm/site/door-art || echo "WARNING: door art failed -- the BYO door draws plain until the player's files arrive" >&2
+else echo "WARNING: no $DA_SRC/d2data.mpq -- the BYO door draws plain until the player's files arrive" >&2; fi
 # Committed ground truth, served so scenarios can fetch it into the page.
 [ -d vectors ] && mkdir -p build-wasm/site/vectors && cp -rLu vectors/. build-wasm/site/vectors/
 # The widescreen HUD art: SGD2FreeRes's DC6 panels (the list play/assets/wide-hud.mjs names) and its licence,
