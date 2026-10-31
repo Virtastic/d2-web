@@ -109,18 +109,6 @@ done
 if [ "${#STALE[@]}" -gt 0 ]; then
   JOBS="${D2_COMPILE_JOBS:-$(( $(nproc) / 2 > 4 ? $(nproc) / 2 : 4 ))}"
   echo "==> compiling ${#STALE[@]} stale objects, $JOBS at a time"
-  compile_one() {
-    local f="${1%%|*}" o="${1##*|}"
-    case "$f" in
-      src/core/fn/*) # an FN probe is optional: drop it with one line, never fail the build
-        local log="$o.log"
-        if ! em++ $CXXFLAGS -MMD -MP -MF "$o.d" -MT "$o" -c "$f" -o "$o" >"$log" 2>&1; then
-          probe_skip_line "$f" "$log"; rm -f "$o" "$o.d" "$o.inputs"; return 0
-        fi ;;
-      *) em++ $CXXFLAGS -MMD -MP -MF "$o.d" -MT "$o" -c "$f" -o "$o" || return 1 ;;
-    esac
-    dependency_digest "$o.d" > "$o.inputs"
-  }
   export -f compile_one dependency_digest probe_skip_line; export CXXFLAGS
   printf '%s\0' "${STALE[@]}" | xargs -0 -n1 -P "$JOBS" bash -c 'compile_one "$1"' _ || exit 1
 fi
@@ -140,20 +128,7 @@ em++ -m64 -O2 -pthread ${D2_CXXFLAGS:-} $OBJS "$STORM_BUILD/libstorm.a" \
   -o "$BUILD/d2.js"
 }
 LINKLOG="$BUILD/link.log"
-if ! link_engine >"$LINKLOG" 2>&1; then
-  # Drop the probes wasm-ld names as referencing an undefined symbol, relink once. Engine errors still fail.
-  BAD=$(probe_objs_from_link_log "$LINKLOG")
-  if [ -z "$BAD" ]; then tail -40 "$LINKLOG" >&2; exit 1; fi
-  KEEP=""
-  for o in $OBJS; do
-    if echo "$BAD" | grep -qxF "$(basename "$o")"; then
-      echo "PROBE-SKIP $o: $(grep -m1 -E 'undefined symbol' "$LINKLOG" | cut -c1-160) (link)"
-      basename "$o" .o | sed 's/^src_core_fn_//' >> "$SKIPPED_FILE"
-    else KEEP="$KEEP $o"; fi
-  done
-  OBJS="$KEEP"
-  link_engine >"$LINKLOG" 2>&1 || { tail -40 "$LINKLOG" >&2; exit 1; }
-fi
+probe_link_retry || exit 1
 tail -5 "$LINKLOG"
 
 mkdir -p play
