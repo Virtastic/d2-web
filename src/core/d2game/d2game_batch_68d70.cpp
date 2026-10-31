@@ -35,7 +35,7 @@ typedef uint8_t u8;
 template <class T> static inline T& at(void* p, int off) { return *(T*)((u8*)p + off); }
 [[noreturn]] static void assertFail(int line) { Ordinal_10024("D2Game", Ordinal_10265(line)); exit(-1); }
 
-// 1.13c D2Game+0x68D70  (REG: param is ecx; ctx = {game, unit, ?, ?, unitType})
+// retail D2Game 0x68D70 (dead glue; the live body is OBJECTS_OperateFunction06_TowerTome, marked in A1Q5.cpp) (REG: param is ecx; ctx = {game, unit, ?, ?, unitType})
 int D2GAME_68D70_Quest(int* ctx)
 {
     void* unit = (void*)ctx[1];

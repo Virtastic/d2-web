@@ -2651,7 +2651,7 @@ int32_t __fastcall QUESTS_PortalCheck(D2GameStrc* pGame, D2CoordStrc* pCoord, in
 }
 
 //D2Game.0x6FC97040
-// 1.13c D2Game+0x36B90 (checked against decompile)
+// 1.13c D2Game+0x36B90 (checked against decompile; final flag clear is null-guarded)
 int32_t __fastcall QUESTS_SetObjectSelection(D2ObjOperateFnStrc* pOp)
 {
 	D2UnitStrc* pObject = pOp->pObject;
@@ -2674,7 +2674,10 @@ int32_t __fastcall QUESTS_SetObjectSelection(D2ObjOperateFnStrc* pOp)
 		EVENT_SetEvent(pOp->pGame, pOp->pObject, EVENTTYPE_ENDANIM, pOp->pGame->dwGameFrame + OBJECTS_GetOperatingTicks(pObjectsTxtRecord), 0, 0);
 	}
 
-	pObject->dwFlags &= ~UNITFLAG_TARGETABLE;
+	if (pObject)
+	{
+		pObject->dwFlags &= ~UNITFLAG_TARGETABLE;
+	}
 
 	return 1;
 }

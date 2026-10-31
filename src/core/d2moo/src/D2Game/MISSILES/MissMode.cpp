@@ -742,7 +742,7 @@ int32_t __fastcall MISSMODE_HandleMissileCollision(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FC56FA0
-// 1.13c D2Game+0x3D320
+// 1.13c D2Game+0x3D320 (checked against decompile+disassembly, no delta)
 D2UnitStrc* __fastcall MISSMODE_CreatePlagueJavelin_PoisonJavelin_PoisonTrapHitSubmissiles(D2GameStrc* pGame, D2UnitStrc* pOrigin, int32_t nMissileId, int32_t nRange, int32_t nLoops)
 {
     if (!D2Common_10234(pOrigin->pDynamicPath))
@@ -3151,7 +3151,7 @@ int32_t __fastcall MISSMODE_SrvHit20_LightningFury(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FC5C2D0
-// 1.13c D2Game+0x3CD00
+// 1.13c D2Game+0x3CD00 (checked against decompile, no delta)
 int32_t __fastcall MISSMODE_LightningFury_AuraCallback(D2AuraCallbackStrc* pAuraCallback, D2UnitStrc* pTarget)
 {
     D2HitFunc22ParamStrc* pParams = (D2HitFunc22ParamStrc*)pAuraCallback->pArgs;
@@ -3475,7 +3475,7 @@ int32_t __fastcall MISSMODE_SrvHit28_GrimWardScare(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FC5CE10
-// 1.13c D2Game+0x3C850 (checked against decompile, no delta)
+// 1.13c D2Game+0x3C850 (checked against decompile; nParam clamp is signed, was unsigned)
 int32_t __fastcall MISSMODE_SrvHit29_FrozenOrb(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pMissile)
@@ -3508,7 +3508,7 @@ int32_t __fastcall MISSMODE_SrvHit29_FrozenOrb(D2GameStrc* pGame, D2UnitStrc* pM
     missileParams.nSkillLevel = MISSILE_GetLevel(pMissile);
     missileParams.nMissile = pMissilesTxtRecord->wHitSubMissile[0];
 
-    const int32_t nParam = std::max(pMissilesTxtRecord->dwHitPar[0], 1u);
+    const int32_t nParam = std::max(int32_t(pMissilesTxtRecord->dwHitPar[0]), 1);
 
     const int32_t xOffsets[64] =
     {
@@ -3536,7 +3536,7 @@ int32_t __fastcall MISSMODE_SrvHit29_FrozenOrb(D2GameStrc* pGame, D2UnitStrc* pM
     return 3;
 }
 
-// 1.13c D2Game+0x3C700 (0x6FC5CF50 in 1.10f)
+// 1.13c D2Game+0x3C700 (0x6FC5CF50 in 1.10f); nParam clamp is signed (cmp/jge) -- checked against decompile
 int32_t __fastcall MISSMODE_SrvHit05_Unused(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pMissile)
@@ -3570,7 +3570,7 @@ int32_t __fastcall MISSMODE_SrvHit05_Unused(D2GameStrc* pGame, D2UnitStrc* pMiss
     missileParams.nSkillLevel = MISSILE_GetLevel(pMissile);
     missileParams.nMissile = pMissilesTxtRecord->wHitSubMissile[0];
 
-    const int32_t nParam = std::max(pMissilesTxtRecord->dwHitPar[0], 1u);
+    const int32_t nParam = std::max(int32_t(pMissilesTxtRecord->dwHitPar[0]), 1);
 
     const int32_t xOffsets[64] =
     {
@@ -4184,7 +4184,7 @@ int32_t __fastcall MISSMODE_SrvHit54_BaalSpawnMonsters(D2GameStrc* pGame, D2Unit
 }
 
 //D2Game.0x6FC5E220
-// 1.13c D2Game+0x396E0
+// 1.13c D2Game+0x396E0 (checked against disassembly, no delta)
 int32_t __fastcall MISSMODE_SrvHit55_Baalnferno(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pUnit || pUnit->dwUnitType != UNIT_PLAYER)
@@ -4308,7 +4308,7 @@ int32_t __fastcall MISSMODE_SrvHit58_BaalTauntLightningControl(D2GameStrc* pGame
 }
 
 //D2Game.0x6FC5E760
-// 1.13c D2Game+0x3DA60 (function list name is from RVA order; body is the PantherPotGreen-style handler, owner via flag bit 10 + guid at +0x98 == SUNIT_GetOwner)
+// 1.13c D2Game+0x3DA60 (nParam clamp signed; function list name is from RVA order; body is the PantherPotGreen-style handler, owner via flag bit 10 + guid at +0x98 == SUNIT_GetOwner)
 int32_t __fastcall MISSMODE_SrvHit59_BaalTauntPoisonControl(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit)
 {
     if (!pMissile)
@@ -4328,7 +4328,7 @@ int32_t __fastcall MISSMODE_SrvHit59_BaalTauntPoisonControl(D2GameStrc* pGame, D
         return 1;
     }
 
-    const int32_t nHitPar = std::max(pMissilesTxtRecord->dwHitPar[0], 1u);
+    const int32_t nHitPar = std::max(int32_t(pMissilesTxtRecord->dwHitPar[0]), 1);
     MISSMODE_CreatePantherPotGreenSubmissiles(pGame, pOwner, pMissile, pMissilesTxtRecord->wHitSubMissile[0], MISSILE_GetSkill(pMissile), MISSILE_GetLevel(pMissile), nHitPar);
     return 3;
 }
@@ -4616,7 +4616,7 @@ void __fastcall MISSMODE_SrvDmg13_BlessedHammerEx(D2GameStrc* pGame, D2UnitStrc*
 }
 
 // Prior art: D2MOO MoltenBoulder damage callback; retail uses the flag helper.
-// 1.13c D2Game+0x39A40
+// 1.13c D2Game+0x39A40 (checked against decompile, no delta)
 void __fastcall MISSMODE_SrvDmg14_MoltenBoulder(D2GameStrc* pGame, D2UnitStrc* pMissile, D2UnitStrc* pUnit, D2DamageStrc* pDamage)
 {
     if (!pMissile || pMissile->dwUnitType != UNIT_MISSILE)

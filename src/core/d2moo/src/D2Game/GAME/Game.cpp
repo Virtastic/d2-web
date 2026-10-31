@@ -2157,7 +2157,8 @@ int32_t __stdcall GAME_UpdateGamesProgress(int32_t a1)
         dword_6FD45844 = nSysTimeMs;
     }
 
-    if (nSysTimeMs - dword_6FD45844 < gnTargetMsPerFrame_6FD457F8)
+    // 1.13c: signed compare of the elapsed time (retail casts both sides to int)
+    if ((int32_t)(nSysTimeMs - dword_6FD45844) < gnTargetMsPerFrame_6FD457F8)
     {
         return 0;
     }

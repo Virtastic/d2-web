@@ -504,7 +504,7 @@ void __fastcall PLAYER_SetUniqueIdInPlayerData(D2UnitStrc* pPlayer, int32_t nUni
 }
 
 //D2Game.0x6FC7C120
-// 1.13c D2Game+0x37440
+// 1.13c D2Game+0x37440 (checked against decompile, no delta)
 int32_t __fastcall PLAYER_GetUniqueIdFromPlayerData(D2UnitStrc* pPlayer)
 {
     D2_ASSERT(pPlayer);

@@ -87,7 +87,7 @@ void D2Game_2B840(uint16_t* out, uint32_t n, const int32_t* slots /*1024*/)
     }
 }
 
-// 1.13c D2GAME+0x2C2D0
+// 1.13c D2Game+0x2C2D0
 // Game creation body: needs the whole game-table/alloc stack; ported as an ordered seam script over
 // the offsets it writes. ponytail: callee bodies live behind Seams2; null seam = skipped.
 struct CreateSeams {
@@ -100,6 +100,7 @@ struct CreateSeams {
     uint32_t (*f2b9a0)(void*); void (*fafbe0)(void*); void (*f548a0)(void*);
     void (*f4a2d0)(int, uint16_t); void (*f4ac60)();
     uint32_t (*ord10055)(); void (*f72390)(void*, int, int); void (*faa3e0)(void*, int);
+    void (*d2net10021)();                     // D2Net#10021 (thunk 0xA38E), called between 0x6A9B0 and 0x69580
     uint32_t cbPresent, cbHas8; uint8_t gameType;
 };
 CreateSeams g_cs;
@@ -127,6 +128,7 @@ void D2Game_2C2D0(uint32_t flags, uint8_t a6a, uint8_t a6b, uint8_t a6d)
     F<uint32_t>(b, 0x8c) = 0; F<uint32_t>(b, 0x88) = 0;
     if (s.cbPresent && s.cb34) F<uint32_t>(b, 0x20) = s.cb34();
     uint8_t* p = (uint8_t*)s.f6a9b0(b);
+    if (s.d2net10021) s.d2net10021();
     if (b[0x6a] == 1) s.f69580();
     s.fbbe40(); s.feacc0();
     F<uint32_t>(b, 0x80) = s.f2b9a0(b);

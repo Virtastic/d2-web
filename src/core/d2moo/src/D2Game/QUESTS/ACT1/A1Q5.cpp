@@ -77,6 +77,7 @@ D2NPCMessageTableStrc gpAct1Q5NpcMessages[] =
 };
 
 //D2Game.0x6FC9CD00
+// 1.13c D2Game+0x68D70: every exit path returns 0 (1.10f returned 1 on all of them)
 int32_t __fastcall OBJECTS_OperateFunction06_TowerTome(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
 	if (!pOp || !pOp->pObject)
@@ -97,14 +98,14 @@ int32_t __fastcall OBJECTS_OperateFunction06_TowerTome(D2ObjOperateFnStrc* pOp, 
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pOp->pGame, QUEST_A1Q5_COUNTESS);
 	if (!pQuestData || !pQuestData->bNotIntro)
 	{
-		return 1;
+		return 0;
 	}
 
 	QUESTS_SendScrollMessage(pOp->pPlayer, pObject, 127);
 
 	if (pQuestData->fState > 1)
 	{
-		return 1;
+		return 0;
 	}
 
 	QUESTS_StateDebug(pQuestData, 2, "..\\D2Game/Quests/a1q5.cpp", 514);
@@ -113,7 +114,7 @@ int32_t __fastcall OBJECTS_OperateFunction06_TowerTome(D2ObjOperateFnStrc* pOp, 
 		((D2Act1Quest5Strc*)pQuestData->pQuestDataEx)->bTowerTomeActivated = 1;
 	}
 
-	return 1;
+	return 0;
 }
 
 //D2Game.0x6FC9CDA0

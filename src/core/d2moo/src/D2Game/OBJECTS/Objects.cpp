@@ -442,6 +442,7 @@ void __fastcall OBJECTS_InitHandler(D2GameStrc* pGame, D2UnitStrc* pObject, int3
 }
 
 //D2Game.0x6FC70850
+// 1.13c D2Game+0x33740
 void __fastcall OBJECTS_InitFunction10_Unused(D2ObjInitFnStrc* pOp)
 {
     if (DUNGEON_GetLevelIdFromRoom(pOp->pRoom) == LEVEL_ROGUEENCAMPMENT)
@@ -2220,6 +2221,7 @@ void __fastcall OBJECTS_FreeHoverMessage(D2GameStrc* pGame, D2UnitStrc* pObject)
 }
 
 //D2Game.0x6FC74520
+// 1.13c D2Game+0x33290
 void __fastcall OBJECTS_RemoveAll(D2GameStrc* pGame)
 {
     for (int32_t i = 0; i < 128; ++i)
