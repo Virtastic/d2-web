@@ -2313,6 +2313,7 @@ BOOL __fastcall sub_6FC6EC10(D2UnitStrc* pUnit, D2MonUModTxt* pMonUModTxtRecord,
 }
 
 //D2Game.0x6FC6EE90
+// 1.13c D2Game+0x23AE0 (no delta)
 int32_t __fastcall sub_6FC6EE90(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t* a3)
 {
     if (!pGame || pGame->nDifficulty >= 3u)

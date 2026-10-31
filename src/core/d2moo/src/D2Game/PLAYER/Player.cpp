@@ -50,6 +50,7 @@ int32_t gnVirtualPlayerCount_6FD4DC1C;
 
 
 //D2Game.0x6FC7B550
+// 1.13c D2Game+0x38620 (PLAYER_Create; differs: flags OR 0xE, unit+0xDC freed and cleared, no sub_6FCBDD30 call)
 void __fastcall PLAYER_Create(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nPlayerGUID)
 {
     D2_ASSERT(pPlayer);
@@ -165,6 +166,7 @@ void __fastcall sub_6FC7B7A0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nX, i
 }
 
 //D2Game.0x6FC7B800
+// 1.13c D2Game+0x38090 (item-create helper takes the level from a separate call; no other delta)
 void __fastcall PLAYER_CreateStartItem(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2CharStatsTxt* pCharStatsTxt, int32_t nCount, D2CharItemStrc* pCharItem)
 {
     int32_t nItemId = 0;
@@ -514,6 +516,7 @@ int32_t __fastcall PLAYER_GetUniqueIdFromPlayerData(D2UnitStrc* pPlayer)
 }
 
 //D2Game.0x6FC7C170
+// 1.13c D2Game+0x386F0 (unit hash lookup inlined; fatal ids 0x259/0x25C/0x2D3 for null args)
 void __fastcall sub_6FC7C170(D2GameStrc* pGame, D2UnitStrc* pPlayer)
 {
     D2_ASSERT(pPlayer);
@@ -840,6 +843,7 @@ void __fastcall sub_6FC7C790(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pArgs)
 }
 
 //D2Game.0x6FC7C7B0
+// 1.13c D2Game+0x372C0 (no delta beyond the register convention)
 D2UnitStrc* __fastcall sub_6FC7C7B0(D2UnitStrc* pUnit)
 {
     if (!pUnit || !pUnit->pInventory)
@@ -922,6 +926,7 @@ D2UnitStrc* __fastcall sub_6FC7C7B0(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC7C900
+// 1.13c D2Game+0x37540 (no delta beyond the register convention)
 void __fastcall sub_6FC7C900(D2UnitStrc* pAttacker, int32_t a2)
 {
     if (a2)
@@ -1009,6 +1014,7 @@ void __fastcall sub_6FC7CA10(D2UnitStrc* pTarget, int32_t a2)
 }
 
 //D2Game.0x6FC7CA70
+// 1.13c D2Game+0x1040 (register args EBX=stat ESI=unit EDI=value; stat 0xE/0xF limits read through D2Common ordinals 10049/11060; no delta)
 void __fastcall D2GAME_SetStatOrResetGold_6FC7CA70(D2UnitStrc* pUnit, int32_t nStat, int32_t nValue)
 {
     if (!pUnit)
