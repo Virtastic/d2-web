@@ -140,7 +140,7 @@ import { panelCloseAt } from './assets/panel-close.mjs';
 import { characterPanelCloseAt, createCharacterPanelCloseGesture } from './assets/character-panel-close.mjs';
 import { beginInventoryClosePress, cancelInventoryClosePress, finishInventoryClosePress, inventoryCloseAt } from './assets/inventory-close-gesture.mjs';
 import { installScrollSafeCanvasFocus } from './assets/canvas-focus.mjs';
-import { createPlugyStash, isDc6, PLUGY_GRID, PLUGY_NAME_AT } from './assets/plugy-stash-ui.mjs';
+import { createPlugyStash, isDc6, parsePlugyIni, pageLabel, PLUGY_INI_DEFAULT, PLUGY_GRID, PLUGY_NAME_AT } from './assets/plugy-stash-ui.mjs';
 import { pagesToSss, sssToPages, pagesToD2x, d2xToPages } from './assets/plugy-stash.mjs';
 import { plugyStashMode } from './assets/plugy-stash-mode.mjs';
 import { closeStashFromInventory, stashCloseAt } from './assets/stash-close.mjs';
@@ -611,7 +611,7 @@ function plugyMoveGold(kind) {
   return true;
 }
 const plugyStash = createPlugyStash({ enabled: true, onPage: plugySwap, onGold: plugyMoveGold, lastUsed: plugyUsed });
-let plugyEvidence = null;
+let plugyEvidence = null, plugyIni = PLUGY_INI_DEFAULT;
 // PY3: PlugY's own art (StashBtns, SharedGoldBtns, TradeStash), fetched from the dev server's /retail/PlugY/ (never hosted; absent = the plain control and retail's panel stay).
 if (plugyStash.enabled) (async () => {
   try {
@@ -621,7 +621,10 @@ if (plugyStash.enabled) (async () => {
       while (!window.__d2?.ready) { if (window.__d2?.error) return; await new Promise((r) => setTimeout(r, 250)); }
       if (window.__d2.byo) { plugyStash.enabled = false; plugyError = 'PlugY art is never in a bring-your-own-files host, stash stays retail'; return; }
     }
-    const get = async (n) => { const r = await fetch('/retail/PlugY/' + n + '.dc6'); const b = new Uint8Array(await r.arrayBuffer()); if (!r.ok || !isDc6(b)) throw new Error(n + '.dc6 not served'); return b; };
+    // D2SE keeps PlugY.ini and the PlugY folder beside its core; a plain PlugY install keeps them at the game root.
+    const ROOTS = ['/retail/D2SE/', '/retail/'];
+    try { for (const r of ROOTS) { const t = await fetch(r + 'PlugY.ini'); if (t.ok) { const txt = await t.text(); if (/\[STASH\]/i.test(txt)) { plugyIni = parsePlugyIni(txt); plugyStash.cfg = plugyIni; break; } } } } catch {}
+    const get = async (n) => { for (const r of ROOTS) { const res = await fetch(r + 'PlugY/' + n + '.dc6'); const b = new Uint8Array(await res.arrayBuffer()); if (res.ok && isDc6(b)) return b; } throw new Error(n + '.dc6 not served'); };
     let btns, gold, trade;
     // No PlugY art, no PlugY: the page buttons, the 10x10 grid and the sidecars are one feature, switched off together before a game starts (retail's stash stays).
     try { [btns, gold, trade] = [await get('StashBtns'), await get('SharedGoldBtns'), await get('TradeStash')]; }
@@ -1014,6 +1017,10 @@ function sessionAdapter() {
         const hold = Boolean(Module._d2_session_hold_world);
         if (hold) Module.ccall('d2_session_hold_world', null, ['number'], [1]);
         try { return this.readSnapshot(); } finally { if (hold) Module.ccall('d2_session_hold_world', null, ['number'], [0]); }
+      },
+      // The snapshot's level word alone (no world rebuild, no parse): the pre-advance ambient check reads one number.
+      level() {
+        return Module._d2_session_snapshot_level ? Module.ccall('d2_session_snapshot_level', 'number', [], []) : this.readSnapshot().level;
       },
       readSnapshot() {
         const p = Number(Module.ccall('d2_session_snapshot', 'number', [], []));
@@ -2684,7 +2691,7 @@ function drainUnitSounds() {
   if (snapshot) snapshot.directHpLoss = Module._d2_session_shrine_hp_loss?.() === 1; // Storm shrine: hit points removed with no hit
   combatSounds?.update(snapshot?.entities ?? [], snapshot);
   { const hero = snapshot?.entities?.find((e) => e.id === snapshot.playerId && e.type === 0); heroFx = skillFx && hero ? skillFx.update({ ...hero, hp: snapshot.player?.hp }, snapshot.player?.castSkillId, engineTicks) : [];
-    if (stateFx && hero) heroFx = heroFx.concat(stateFx.update((id) => Module.ccall('d2_session_player_has_state', 'number', ['number'], [id]), undefined, undefined, (id) => Module.ccall('d2_session_state_set_seq', 'number', ['number', 'number', 'number'], [0, snapshot.playerId, id]))); }
+    if (stateFx && hero) heroFx = heroFx.concat(stateFx.update((id) => Module.ccall('d2_session_player_has_state', 'number', ['number'], [id]), undefined, engineTicks, (id) => Module.ccall('d2_session_state_set_seq', 'number', ['number', 'number', 'number'], [0, snapshot.playerId, id]))); }
   // Native client missiles (D2Client-side Fire Ball): the impact row at the native terminal tick.
   if (Module._d2_realm_client_take_missile_sounds) { const b = missileImpactBuf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [32 * 24])); const k = Module.ccall('d2_realm_client_take_missile_sounds', 'number', ['bigint', 'number'], [BigInt(b), 32]); const w = new Int32Array(Module.HEAPU8.buffer.slice(b, b + k * 24)); for (let i = 0; i < k; i++) unitSounds.playRow(w[i * 6 + 5], { kind: 'missile-impact', missileId: w[i * 6 + 2] }).catch(() => {}); }
   { let born = []; if (Module._d2_session_missile_births) { const cb = missileBirthBuf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [8])); const bp = Number(Module.ccall('d2_session_missile_births', 'bigint', ['bigint'], [BigInt(cb)])), bn = Module.HEAP32[cb >> 2]; for (let i = 0; i < bn; i++) born.push([Module.HEAP32[(bp >> 2) + 2 * i], Module.HEAP32[(bp >> 2) + 2 * i + 1]]); }
@@ -2996,7 +3003,7 @@ function update(forceTick = false, live = false) {
 
     // 1.13c 0x4F860 has its SoundEnviron row before the level's first 0x5F020 tick: record it ahead of the advance (the post-advance block below sees it already set).
     // The level is read from the session itself: the cached snapshot is the previous step's, one level behind when a session is swapped in under the shell (a retail recording).
-    const preLevel = session && ambient ? session.snapshot()?.level : null;
+    const preLevel = session && ambient ? (session.level ? session.level() : session.snapshot()?.level) : null;
     if (session && ambient && Number.isInteger(preLevel) && preLevel !== ambientLevel) { const { day, night } = ambient.environment(preLevel); Module._d2_ambient_record(day.environmentId, night.ambienceId, day.ambienceId, night.eventId, day.eventId, day.eventDelay); Module._d2_ambient_area(day.environmentId); }
     try { engineAdvanced = advanceEngine(forceTick) > 0; }
     catch (error) { sessionError = String(error); session = null; }
@@ -4287,7 +4294,7 @@ function drawFrame() {
   }
   pollUiEvents();
   if (stashPanelRenderer) {
-    if (stashPanelRenderer?.plugy.on) { stashPanelRenderer.plugy.pageName = `${plugyStash.showShared ? 'Shared' : 'Personal'} Page n\u00b0${plugyStash.page + 1}`; stashPanelRenderer.plugy.nameColour = plugyStash.showShared ? 1 : 0; }
+    if (stashPanelRenderer?.plugy.on) { const lb = pageLabel(plugyStash.showShared, plugyStash.page, plugyIni); stashPanelRenderer.plugy.pageName = lb.text; stashPanelRenderer.plugy.nameColour = lb.colour; }
     try { stashEvidence = stashPanelRenderer.draw(ctx, w, h, stashOpen ? snapOr('stashLayout', readStashLayout) : null, snapshot.items, stashOpen, snapshot.act, Boolean(stashClosePress), gridBoxHover()); stashPanelError = ''; }
     catch (error) { stashPanelError = String(error); stashEvidence = null; }
     plugyStash.text = stashPanelRenderer.text; plugyStash.pointer(pointer.x, pointer.y, w, h);
@@ -4898,11 +4905,12 @@ function stashGoldStat(which) {
 }
 function openStashGold(mode) {
   const available = stashGoldStat(mode === 'withdraw' ? STASH_GOLD.bank : STASH_GOLD.carried);
+  // 'drop' is D2Client+0xC30E0 mode 1 (stash closed): like withdraw it opens on an empty field.
   // Retail opens the deposit box on ALL the carried gold and the withdraw box on nothing (both measured,
   // the retail captures and stash-gold-withdraw.txt).
   stashGoldPress = null;
   stashGoldSpinnerRepeat.release();
-  stashGoldDialog = { open: true, mode, available, amount: mode === 'withdraw' ? 0 : available, pressedControl: null };
+  stashGoldDialog = { open: true, mode, available, amount: mode === 'withdraw' || mode === 'drop' ? 0 : available, pressedControl: null };
 }
 function clearStashGoldPress(pointerId = null) {
   if (!stashGoldPress || (pointerId !== null && stashGoldPress.pointerId !== pointerId)) return false;
@@ -4919,7 +4927,14 @@ function changeStashGoldAmount(delta) {
 function submitStashGold() {
   // The engine may have closed the stash since the dialog was drawn. Do not
   // turn a stale amount into a retail button command after that event.
-  if (!stashOpen || !stashGoldDialog) return 0;
+  if (!stashGoldDialog || (!stashOpen && stashGoldDialog.mode !== 'drop')) return 0;
+  if (stashGoldDialog.mode === 'drop') {
+    // D2Client+0xBFDF0: OK sends the 0x50 drop-gold packet (nothing for 0), then closes the dialog.
+    const dropAmount = Math.max(0, Math.min(stashGoldDialog.available, stashGoldDialog.amount | 0));
+    const sent = dropAmount ? Module.ccall('d2_session_command_drop_gold_packet', 'number', ['number', 'bigint'], [dropAmount, 0n]) : 0;
+    snapshot = session.snapshot(); closeStashGold();
+    return sent;
+  }
   const button = stashGoldDialog.mode === 'withdraw' ? STASH_GOLD.withdraw : STASH_GOLD.deposit;
   const amount = Math.max(0, Math.min(stashGoldDialog.available, stashGoldDialog.amount | 0));
   const result = Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [button, amount]);
@@ -5785,8 +5800,8 @@ canvas.addEventListener('pointerdown', (e) => {
   // F162: the two gold coins open the two retail dialogs their own captures show. The stash panel's
   // coin (155,100) opens WITHDRAW; the inventory panel's coin beside the carried gold (484,469) opens
   // DEPOSIT. Each submit sends retail 0x4F with the dialog's own button (19 withdraw, 20 deposit).
-  if (stashOpen && stashGoldRenderer && session) {
-    const hit = stashGoldRenderer.hitAt(x, y, canvas.width, canvas.height, readStashLayout(), Boolean(stashGoldDialog));
+  if ((stashOpen || inventoryVisible) && stashGoldRenderer && session) {
+    const hit = stashGoldRenderer.hitAt(x, y, canvas.width, canvas.height, stashOpen ? readStashLayout() : null, Boolean(stashGoldDialog));
     if (hit) {
       click.spent = 'stashGold';
       if (hit.action === 'withdraw') openStashGold('withdraw');
@@ -6313,12 +6328,12 @@ globalThis.addEventListener('pointerup', (e) => {
   if (inventoryGoldPress?.pointerId === e.pointerId) {
     const press = inventoryGoldPress; inventoryGoldPress = null;
     let releasedOverCoin = false;
-    if (inventoryVisible && stashOpen && !stashGoldDialog && stashGoldRenderer && inventoryPanelEvidence?.gold?.blit) {
+    if (inventoryVisible && !stashGoldDialog && stashGoldRenderer && inventoryPanelEvidence?.gold?.blit) {
       const [x, y] = canvasPoint(e);
-      releasedOverCoin = stashGoldRenderer.hitAt(x, y, canvas.width, canvas.height, readStashLayout(), false)?.action === 'deposit';
+      releasedOverCoin = stashGoldRenderer.hitAt(x, y, canvas.width, canvas.height, stashOpen ? readStashLayout() : null, false)?.action === 'deposit';
     }
-    const enabled = Boolean(inventoryVisible && stashOpen && !stashGoldDialog && inventoryPanelEvidence?.gold?.blit);
-    if (finishInventoryGoldPress(press, e.pointerId, e.button === 0, enabled, releasedOverCoin).activate) openStashGold('deposit');
+    const enabled = Boolean(inventoryVisible && !stashGoldDialog && inventoryPanelEvidence?.gold?.blit);
+    if (finishInventoryGoldPress(press, e.pointerId, e.button === 0, enabled, releasedOverCoin).activate) openStashGold(stashOpen ? 'deposit' : 'drop');
     render(); canvas.focus(); if (e.cancelable) e.preventDefault(); return;
   }
   if (stashGoldPress?.pointerId === e.pointerId) {

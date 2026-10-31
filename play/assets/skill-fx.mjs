@@ -17,7 +17,12 @@ export function createSkillFx(read) {
   const missiles = new Map(table(read, 'data\\global\\excel\\Missiles.txt').map((m) => [m.Missile, m]));
   const skills = new Map(table(read, 'data\\global\\excel\\skills.txt').map((s) => [Number(s.Id), s]));
   let mode, frame, hp, tick = 0, active = [];
+  // harness record of retail's OV node format (vectors/session/overlay): the Overlay.txt data-row index, step, total
+  const rowOf = new Map(new TextDecoder('latin1').decode(read('data\\global\\excel\\Overlay.txt')).split(/\r?\n/).slice(1).map((l, i) => [l.split('\t')[0], i]));
+  const node = (name, live, pos) => { const o = overlays.get(name); return `2,${rowOf.get(name).toString(16)},${live},${pos.toString(16)},${overlayStep(o).toString(16)},${((Number(o.Frames) || 1) << 8).toString(16)}`; };
   return {
+    /** Harness only: an array update() appends retail-format OV node records to, one per live castoverlay per tick (null in play). */
+    ov: null,
     /** Per render frame, `now` = the engine tick (25/s). Returns the effects now alive: {kind:'overlay',file,frames,trans,age} | {kind:'missile',classId,age}. */
     update(hero, skillId, now) {
       tick = now ?? tick + 1;
@@ -25,7 +30,7 @@ export function createSkillFx(read) {
       const s = skills.get(skillId);
       if (hero && entry && s) {
         const o = overlays.get(s.castoverlay);
-        if ((CAST.has(hero.mode) || ATTACK.has(hero.mode)) && o) active.push({ kind: 'overlay', file: o.Filename, frames: Number(o.Frames) || 1, rate: overlayStep(o), trans: Number(o.Trans) || 0, start: tick });
+        if ((CAST.has(hero.mode) || ATTACK.has(hero.mode)) && o) active.push({ kind: 'overlay', name: s.castoverlay, file: o.Filename, frames: Number(o.Frames) || 1, rate: overlayStep(o), trans: Number(o.Trans) || 0, start: tick });
         const cm = CAST.has(hero.mode) && (s.cltmissile || (CAST_SPAWN.has(Number(s.cltdofunc)) && s.cltmissilea));
         // a flying missile (Vel > 0: Fire Bolt) is the engine's own missile unit, drawn where it is; a static copy at the hero never ends
         if (cm && missiles.has(cm) && !(Number(missiles.get(cm).Vel) > 0)) active.push(spawn(missiles.get(cm), hero, tick));
@@ -36,6 +41,8 @@ export function createSkillFx(read) {
         active.push(spawn(missiles.get(s.cltmissilea), hero, tick, true));
       }
       mode = hero?.mode; frame = fp; hp = cur;
+      // retail's cast node: live 1 at pos (t - start) * step while it runs; the tick it expires (start + Frames) it reads live 0 at Frames << 8
+      if (this.ov) for (const a of active) if (a.kind === 'overlay' && tick >= a.start) this.ov.push(`${tick} OV 0:1 ${(tick - a.start) * a.rate < (a.frames << 8) ? node(a.name, 1, (tick - a.start) * a.rate) : node(a.name, 0, a.frames << 8)}`);
       active = active.filter((a) => a.hold || (a.kind === 'missile' ? tick - a.start : (tick - a.start) * a.rate / 256) < a.frames)  // a missile lives Range ticks;
       return active.map((a) => ({ ...a, age: a.loop ? Math.floor((tick - a.start) * a.rate / 256) % a.animLen : Math.min(Math.floor((tick - a.start) * a.rate / 256), (a.animLen ?? Infinity) - 1) }));
     },

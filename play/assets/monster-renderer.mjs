@@ -55,10 +55,17 @@ export function monsterAnimationBox(components, componentDirections) {
   return box;
 }
 
+// A monster-animation read decodes 16 component words per monster every engine step; the words repeat
+// (a handful of distinct codes), so the decoded string is memoised by its word. Same string out, no per-call build.
+const fourccCache = new Map();
 export function fourcc(value) {
+  const key = value >>> 0, hit = fourccCache.get(key);
+  if (hit !== undefined) return hit;
   let text = '';
-  for (let i = 0; i < 4; i++) { const c = (value >>> (i * 8)) & 0xff; if (c) text += String.fromCharCode(c); }
-  return text.trim();
+  for (let i = 0; i < 4; i++) { const c = (key >>> (i * 8)) & 0xff; if (c) text += String.fromCharCode(c); }
+  text = text.trim();
+  if (fourccCache.size < 4096) fourccCache.set(key, text);
+  return text;
 }
 
 export function monsterComponentDirectionKey(componentDirections) {
