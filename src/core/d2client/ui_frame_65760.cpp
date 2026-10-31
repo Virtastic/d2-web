@@ -7,12 +7,12 @@ struct D2cUiFrameEnv {
     u32 base;                                   // D2Client image base (0x6FAB0000 in retail)
     u32 (*rd32)(u32 addr); void (*wr32)(u32 addr, u32 v);
     u32 (*rd8)(u32 addr);  void (*wr8)(u32 addr, u32 v);
-    i32 (*ord10227)(); void (*ord10006)(); u32 (*ord10048)();
-    i32 (*f71a80)(); void (*f721f0)(); void (*f3bbf0)(); void (*f11f80)();
-    void (*f3a4d0)(i32 a, i32 b, i32 c);        // D2Client+0x8A4D0
+    i32 (*ord10227)(); void (*ord10006)(i32 ecx); u32 (*ord10048)(u32 guestAddr);
+    i32 (*f71a80)(i32 eax); void (*f721f0)(u32 eax); void (*f3bbf0)(); void (*f11f80)();   // eax = 1 / panel index
+    void (*f3a4d0)(i32 ecx, i32 edx, i32 stk, u32 eax, u32 esi);   // D2Client+0x8A4D0; eax = DAT_6fba9e18, esi = DAT_6fbcc3c4
     void (*f72790)(u32 i, i32 a, i32 b);
-    void (*f47b20)(); i32 (*f55440)(); void (*fa6210)(); void (*f14a30)(); void (*f14660)();
-    void (*f3ccc0)(u32 ord10048, u32 guestAddr); void (*f3cc60)(u32 ord10048, u32 guestAddr);
+    void (*f47b20)(u32 edi); i32 (*f55440)(); void (*fa6210)(u32 esi); void (*f14a30)(i32 al); void (*f14660)();   // edi = DAT_6fbc971d; esi = player; al = 0x41
+    void (*f3ccc0)(u32 eax, u32 h); void (*f3cc60)(u32 eax, u32 h);   // eax = 7, h = Ordinal_10048(guest 0x6FB80680)
     u32 (*tick)();
     void (*fatal)(i32 line);                    // Ordinal_10265/10024 + _exit(-1)
 };
@@ -32,25 +32,25 @@ EMSCRIPTEN_KEEPALIVE void d2c_65760(const D2cUiFrameEnv* e, i32 doLoop, i32 mode
             i32 old = (i32)G(ARR + 4 * i);
             if (old == 0) continue;
             bool a = e->ord10227() == 0 || G(0x119854) == 0;
-            if ((a && (off == 0x1a4 || off == 0x1b0 || off == 0x1bc)) || e->f71a80() == 0) continue;
+            if ((a && (off == 0x1a4 || off == 0x1b0 || off == 0x1bc)) || e->f71a80(1) == 0) continue;
             S(ARR + 4 * i, 0);
-            e->f721f0();
+            e->f721f0(i);
             i32 x = 0, y = 0;
             auto q = [](i32 v) { return (v + ((v >> 31) & 3)) >> 2; };
-            auto flat = [&]() { S(0x11c418, 0); S(0x11c414, 0); e->ord10006(); y = 0; x = (i32)G(0xf9e14); };
+            auto flat = [&]() { S(0x11c418, 0); S(0x11c414, 0); e->ord10006(0); y = 0; x = (i32)G(0xf9e14); };
             switch (i) {
             case 1: e->f3bbf0(); /* fallthrough */
             case 4:
                 if (!G(ARR + 8) && !G(ARR + 0x50) && !G(ARR + 0x3c) && !G(ARR + 0x40) && !G(ARR + 0x90) &&
                     !G(ARR + 0x94) && !G(ARR + 0x58)) flat();
                 else {
-                    S(0x11c418, q((i32)G(0xdbc48))); S(0x11c414, 2); e->ord10006();
+                    S(0x11c418, q((i32)G(0xdbc48))); S(0x11c414, 2); e->ord10006(q((i32)G(0xdbc48)));
                     y = q((i32)G(0xf9e14)); x = (i32)G(0xf9e14) + y;
                 }
                 break;
             case 2: case 0xf: case 0x10: case 0x14: case 0x16: case 0x24: case 0x25:
                 if (!G(ARR + 4) && !G(ARR + 0x10)) { flat(); break; }
-                S(0x11c418, (u32)-q((i32)G(0xdbc48))); S(0x11c414, 1); e->ord10006();
+                S(0x11c418, (u32)-q((i32)G(0xdbc48))); S(0x11c414, 1); e->ord10006(-q((i32)G(0xdbc48)));
                 y = q((i32)G(0xf9e14)); x = (i32)G(0xf9e14) - y; y = -y;
                 break;
             case 0xb: e->f11f80(); continue;
@@ -58,7 +58,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_65760(const D2cUiFrameEnv* e, i32 doLoop, i32 mode
                 flat(); break;
             default: continue;
             }
-            e->f3a4d0(x, 0, y);
+            e->f3a4d0(x, 0, y, G(0xF9E18), G(0x11C3C4));
         }
     }
     i32 prev = (i32)G(0xfada4);
@@ -68,7 +68,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_65760(const D2cUiFrameEnv* e, i32 doLoop, i32 mode
     u32 t = e->tick(), pp = G(0x11bbfc);
     if (G(0xfad50) <= t && pp) {
         if (e->rd32(pp) == 0 && e->rd32(pp + 16) == 0x11) {
-            e->fa6210(); e->f14a30();
+            e->fa6210(pp); e->f14a30(0x41);
             u32 f = G(0x11b980) + 0x1eb;
             if (e->rd8(f) & 4) {
                 e->f14660(); e->wr8(f, e->rd8(f) | 8);
@@ -81,7 +81,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_65760(const D2cUiFrameEnv* e, i32 doLoop, i32 mode
                 switch (e->rd32(G(0xDD538 + 4 * u) + 0x24)) {
                 case 0: break;
                 case 1: e->f72790(u, 1, 0); pp = G(0x11bbfc); break;
-                case 4: if (e->rd8(B + 0x119721)) { e->f47b20(); pp = G(0x11bbfc); } break;
+                case 4: if (e->rd8(B + 0x119721)) {e->f47b20(G(0x11971d));pp = G(0x11bbfc); } break;
                 default: bail = true;
                 }
             }
@@ -89,9 +89,9 @@ EMSCRIPTEN_KEEPALIVE void d2c_65760(const D2cUiFrameEnv* e, i32 doLoop, i32 mode
                 if (!pp || (e->rd32(pp) == 0 && e->f55440() == 0)) S(0xfada4, 1);
                 bool up = G(0xfada4) != 0;
                 if (prev == 0 ? up : !up) {
-                    u32 h = e->ord10048();
-                    if (prev == 0) { e->f3ccc0(h, B + 0xD0680); S(0x11c2f8, 1); }
-                    else { e->f3cc60(h, B + 0xD0680); S(0x11c2f8, 0); }
+                    u32 h = e->ord10048(B + 0xD0680);
+                    if (prev == 0) { e->f3ccc0(7, h); S(0x11c2f8, 1); }
+                    else { e->f3cc60(7, h); S(0x11c2f8, 0); }
                     S(0x11c2f4, 0);
                 }
             }

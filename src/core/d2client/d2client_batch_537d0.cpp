@@ -2,6 +2,7 @@
 // Imported-DLL ordinals and not-yet-recovered D2Client helpers are Svc virtuals (named by ordinal/RVA).
 // Retail 32-bit pointers never appear; globals are fields of G. 0x54E10 (3216 bytes) is not in this batch.
 #include <cstdint>
+#include <cstring>
 #include <string>
 namespace d2client_batch_537d0 {
 // Palette-shift record: id at +0, two 0x800 banks (8 rows x 256) at +4 and +0x804, next at +0x1004 (retail).
@@ -9,7 +10,7 @@ struct Pal { int32_t id; uint8_t bank[0x1000]; Pal* next; };
 struct Unit { int32_t type; int32_t id; };
 struct G {
  Pal* head608{};                // DAT_6fbc9608
- Pal** tab7804{};               // DAT_6fbc7804: entry i (8 bytes in retail) holds Pal* at +4
+ uint8_t* tab7804{};              // DAT_6fbc7804: slot table, 8 bytes per monster id, Pal* stored at slot+4 (retail)
  uint8_t* remap2d8{};           // DAT_6fbcc2d8: 256-byte remap table
  int32_t c2d4{}, c380{};
  uint8_t c7808[30*256]{};       // DAT_6fbc7808
@@ -27,7 +28,7 @@ struct Svc {
  virtual int32_t recType(const uint8_t*)=0;          // *(char*)(rec+0x11c)
  [[noreturn]] virtual void fatal(int32_t line)=0;    // Ordinal_10265/10024 + _exit(-1)
  virtual int32_t monPalType(int32_t monId)=0;        // sgptDataTables monstats(+0xa78,0x1a8)->+0x18 -> table(+0xa90,0x134)+0x11c; -1 if any bound/null check fails
- virtual const char* f1230()=0;                      // FUN_6fab1230 -> record; code chars at +0x10,+0x11
+ virtual const char* f1230(int32_t id)=0;               // FUN_6fab1230(id in EAX) -> record; code chars at +0x10,+0x11
  virtual int32_t f1690()=0;                          // FUN_6fab1690 (count)
  virtual bool openPalshift(const char* path)=0;      // FUN_6fabd6a0(1); path build argument passing unrecovered
  virtual Pal* allocPal()=0;                          // Ordinal_10042(0xf4,0): 0x1008 bytes zeroed
@@ -51,6 +52,9 @@ void sub_537D0(Svc& s,G& g){
 // 1.13c D2Client+0x537A0 (callee of 53C30, already read): list lookup by id
 extern "C" Pal* D2Client_537A0_find(Pal* head,int32_t id){ for(Pal* p=head;p;p=p->next) if(p->id==id) return p; return nullptr; }
 static Pal* find(G& g,int32_t id){ return D2Client_537A0_find(g.head608,id); }
+// Slot table access at DAT_6fbc7804 + 4 + id*8 (retail stores a 4-byte pointer there; host keeps a Pal* in the same slot).
+static Pal* tabGet(const G& g,int32_t id){ Pal* p; std::memcpy(&p,g.tab7804+4+(size_t)id*8,sizeof p); return p; }
+static void tabPut(G& g,int32_t id,Pal* p){ std::memcpy(g.tab7804+4+(size_t)id*8,&p,sizeof p); }
 
 // 1.13c D2Client+0x539E0  (eax = rng state; seed lo at +0x20, hi at +0x24)
 int32_t sub_539E0(Svc& s,uint32_t* st){
@@ -64,7 +68,7 @@ int32_t sub_539E0(Svc& s,uint32_t* st){
 // 1.13c D2Client+0x53A30  (eax = unit)
 uint8_t* sub_53A30(Svc& s,G& g,Unit* u){
  if(!u||u->type!=1) return nullptr;
- Pal* p=g.tab7804[u->id]; if(!p) return nullptr;
+ Pal* p=tabGet(g,u->id); if(!p) return nullptr;
  int32_t k=s.f558e0(u);
  bool alt=false;
  if(k==0||k==1){ if((uint32_t)u->id<0x16b||(uint32_t)u->id>0x16c) return nullptr; }
@@ -99,7 +103,7 @@ void sub_53B20(Svc& s,G& g,int32_t monId,Pal* d){
 
 // 1.13c D2Client+0x53C30  (ecx = monster id)
 void sub_53C30(Svc& s,G& g,int32_t id){
- const char* rec=s.f1230();
+ const char* rec=s.f1230(id);
  if(!rec||find(g,id)) return;
  // "Data\Global\Monsters\" + code[0..1] (a ' ' ends the string) + "\Cof\palshift.dat"
  char path[0x100]; int n=0;
@@ -113,7 +117,7 @@ void sub_53C30(Svc& s,G& g,int32_t id){
  s.closeFile();
  sub_53B20(s,g,id,p);
  p->id=id; p->next=g.head608; g.head608=p;
- for(int32_t i=0;i<s.f1690();i++) if(p->id==i) g.tab7804[i]=p;
+ for(int32_t i=0;i<s.f1690();i++) if(p->id==i) tabPut(g,i,p);
 }
 
 // 1.13c D2Client+0x54000  (esi = int32_t out[0x2a]; ebp = unit/context)

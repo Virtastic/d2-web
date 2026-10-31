@@ -7,7 +7,7 @@ typedef int32_t i32; typedef uint32_t u32;
 extern "C" {
 __attribute__((weak)) u32 Ordinal_10265(u32);
 __attribute__((weak)) void Ordinal_10024(const void*, u32);
-u32 Ordinal_10064();
+intptr_t Ordinal_10064(...);  // variadic like d2game (same wasm signature)
 u32 Ordinal_10013();
 intptr_t Ordinal_10331(...);  // variadic like d2game_batch_b63 (same wasm signature)
 intptr_t Ordinal_10826(...);  // variadic: link sig matches d2game b63
@@ -26,7 +26,7 @@ inline void wr(uint8_t* p, u32 o, u32 v) { memcpy(p + o, &v, 4); }
 void d2c_80a70(uint8_t* player, uint8_t* obj, i32 p1, i32 p2, i32 p3, i32 p4) {
     if (!player) { Ordinal_10024((const void*)0, Ordinal_10265(0x2d2)); return; }
     uint8_t* seed = player + 0x20;
-    u32 slot = Ordinal_10064();
+    u32 slot = (u32)Ordinal_10064();
     if (slot == 0xffffffffu) return;
     uint8_t* e = (uint8_t*)(uintptr_t)rd(obj, 0x11c) + (int16_t)(slot >> 16) * 0x18;
     if (Ordinal_10013() == 0) {

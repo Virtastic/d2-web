@@ -131,7 +131,7 @@ void sub_952A0(Env& e, Globals& g, Unit* owner, const int32_t* slotTab /*0xBCD80
   if (g.hover == it && e.isIdentified(it) && e.flag800(it)) sub_95140(e, it, A, x, y);
  }
 }
-// 1.13c D2Client+0x95F80  (ECX=unit, EDX=x, stack: y, EAX/ESI contextual)
+// 1.13c D2Client+0x95F80 (ECX=unit, EDX, EAX, ESI regs; the exact call is in trade_wrap_95f80.cpp; the arg order below is a stand-in)
 void sub_95F80(Env& e, Globals& g, Unit* u, int32_t a, int32_t b, int32_t c, int32_t esi) {
  if (!u) return;
  if (!e.worldDispatch(b, c, a)) return;   // GUESS arg order (register shuffle)

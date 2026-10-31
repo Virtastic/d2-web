@@ -19,11 +19,13 @@ struct St {            // globals
  U tick,lastTick;      // GetTickCount, DAT_6fbd3404 (in/out)
 };
 struct Imp {
- I(*f64080)();                       // sub_64080 hitTest
+ I(*f64080)(I y);                    // sub_64080 hitTest (EBX = DAT_6fbcb824, the pointer's screen-height-relative coordinate)
  void(*f64fd0)(I);                   // sub_64FD0
  I(*o10227)();                       // Ordinal_10227 (visibility)
- void(*o10138)(I,I,I,I);             // Ordinal_10138 (draw row)
- void(*f63bf0)(I,void*,I,I);         // layout_63bf0 consumer
+ void(*o10138)(U cel,I x,I y,I frame,I mode,I pal); // Ordinal_10138 (ECX = cel, EDX = x)
+ void(*f63bf0)(I y,void*entry,I mode,I tall); // layout_63bf0 (ECX = y)
+ I(*cbState)();                      // entry +0x110 target
+ void(*cbPre)(void*entry,I zero);     // entry +0x11c, __fastcall(ECX = entry, EDX = 0)
  void(*o10041)(const I*,I,I,I,I,I);  // Ordinal_10041 (cel draw)
  void(*fatal)(U);
 };
@@ -38,7 +40,7 @@ void draw_65230(St&s,const Imp&f){
  I base=s.scrH-0x50;
  if(s.lastW!=s.curW||s.lastH!=s.curH){
   s.lastW=s.curW; s.lastH=s.curH;
-  if(s.mode==0){ I r=f.f64080(); if(r!=-1) s.sel=r; } else f.f64fd0(s.curH);
+  if(s.mode==0){ I r=f.f64080(s.curW); if(r!=-1) s.sel=r; } else f.f64fd0(s.curH);
  }
  I vis=0;
  for(I i=0;i<n;i++){
@@ -46,25 +48,28 @@ void draw_65230(St&s,const Imp&f){
   wr(e,8,0);
   if(rd(e,4)==0||f.o10227()!=0){
    // cb@+0x110 / +0x11c are per-entry callbacks (state query / pre-draw); host-supplied via table
-   typedef I(*Cb)(); Cb c1,c2; std::memcpy(&c1,e+0x110,sizeof c1); std::memcpy(&c2,e+0x11c,sizeof c2);
-   bool b=false; if(!c1) b=true; else if(c1()!=0) b=true; // bVar4 set when absent or nonzero
+   // +0x110 state query (called with no register args), +0x11c pre-draw (ECX = entry, EDX = 0): 32-bit guest pointers
+   bool b=true; if(rd(e,0x110)!=0){ b=f.cbState()!=0; }
+   bool has2=rd(e,0x11c)!=0;
    I st=(b?1:0)*4+1;
-   if(c2) c2();
+   if(has2) f.cbPre(e,0);
    I y=rowH*vis+(base/2-(rowH*n)/2);
    I out=top+y; wr(e,8,y);
    switch(rd(e,0)){
-    case 1: f.o10138(out,0,st,-1); f.o10138(out,2,st,-1); break;
-    case 2: if(rd(e,0x53c)!=0) f.o10138(out,0,st,-1);
+    case 1: f.o10138((U)rd(e,0x53c),s.scrW/2-0xe6,out,0,st,-1);
+            f.o10138((U)rd(e,0x540+4*(U)rd(e,0x124)),s.scrW/2+0xe6,out,2,st,-1); break;
+    case 2: if(rd(e,0x53c)!=0) f.o10138((U)rd(e,0x53c),s.scrW/2-0xe6,out,0,st,-1);
             f.f63bf0(y,e,st,rd(e,0x53c)==0); break;
-    case -1: case 0: f.o10138(out,1,st,-1); break;
+    case -1: case 0: f.o10138((U)rd(e,0x53c),s.scrW/2,out,1,st,-1); break;
    }
    vis++;
   }
  }
- I cel[18]={0}; cel[13]=(I)s.cel;   // GUESS: second Ordinal_10041 arg is a distinct stack copy; same fields assumed
+ I cel[18]={0}; cel[13]=(I)s.cel;   // one stack record, field 0 rewritten between the two calls
  cel[0]=s.anim?(I)(8-s.anim):0;
  I y=rd(s.tbl+(U)s.sel*0x550,8)+s.hdr[3];
  f.o10041(cel,s.scrW/2-s.off7c-0xf9,y,-1,5,0);
+ cel[0]=(I)s.anim;   // the second call sees the raw counter (asm 0x6fb1551b), not 8-anim
  f.o10041(cel,s.scrW/2+0xf9,y,-1,5,0);
  if(s.tick-s.lastTick>0x32){
   U a=(s.anim+1)&0x80000007u;

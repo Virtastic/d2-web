@@ -26,14 +26,14 @@ void d2c_63000(i32 mode, B62Menu* m, i32 narrow, i32 scrW, i32 scrH) {
 
 // 1.13c D2Client+0x644F0  (EAX = mode; mouseX=DAT_6fbcb828, mouseY=DAT_6fbcb824)
 void d2c_644F0(i32 mode, const B62Menu* m, i32 narrow, i32 scrW, i32 scrH, i32 mouseX, i32 mouseY,
-               void (*f63940)(i32, i32)) {
+               void (*f63940)(i32 which, i32 x, i32 y)) {   // which = DAT_6fbc5530[i] (EAX of 0x63940)
     i32 n = narrow ? 7 : 8, off = 0;
     if (!mode) return;
     if (mode == 1) off = -0x76; else if (mode == 3) off = 0x77;
     i32 c = scrW / 2 + off;
     if (c - 0x54 < mouseX && mouseX < c + 0x59 && scrH - 0x45 < mouseY && mouseY < scrH - 0x2f)
         for (i32 i = 0; i < n; i++)
-            if (m->x[i] < mouseX && mouseX < m->x[i] + 0x14) f63940(m->x[i], m->y[i]);
+            if (m->x[i] < mouseX && mouseX < m->x[i] + 0x14) f63940(m->a[i], m->x[i], m->y[i]);
 }
 
 // 1.13c D2Client+0x63B20  (EAX = mode; flag[]=DAT_6fbc5550; cel=DAT_6fbcc084)

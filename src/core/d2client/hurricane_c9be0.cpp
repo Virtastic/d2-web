@@ -46,6 +46,29 @@ void spawn(D2UnitStrc* u, uint32_t* seed, const uint8_t* row, int32_t level, int
 }
 }
 
+// Host for the cltactivefunc_c9be0 port: each callee the port names is answered here. 0x225D0 (sound-engine probe) and
+// 0x88C20 (town branch) only touch the sound engine and are not simulated: the probe answers 0 (nothing playing).
+struct D2cHurrCall { uint32_t rva; uint32_t eax; uint32_t ecx; uint32_t ebx; uint32_t n; uint32_t s[4]; };
+struct D2cHurrEnv { uint32_t (*host)(D2cHurrCall*); uint32_t baseGuest; const uint8_t* recBase; int32_t countBA0; };
+extern "C" uint32_t d2c_cltactivefunc_c9be0(const D2cHurrEnv*, uint32_t unitRef, int32_t skill, uint32_t arg);
+
+namespace {
+D2UnitStrc* gUnit; uint32_t* gSeed; decltype(UNITS_GetRoom(static_cast<D2UnitStrc*>(nullptr))) gRoom;
+uint32_t host(D2cHurrCall* c) {
+    switch (c->rva) {
+    case 0xC1F0: gRoom = UNITS_GetRoom(gUnit); return gRoom ? 1u : 0u;
+    case 0xC208: return DUNGEON_IsRoomInTown(gRoom) ? 1u : 0u;
+    case 0x225D0: case 0x88C20: return 0;
+    case 0x88A70: if (int32_t(c->ebx) > 0) d2client_ambient::submit(int32_t(c->ebx)); return 0;   // 9C69: EBX = sound id
+    case 0xC316: {
+        return uint32_t(SKILLS_EvaluateSkillFormula(gUnit, c->s[1], int32_t(c->s[2]), int32_t(c->s[3])));
+    }
+    case 0xC97D0: spawn(gUnit, gSeed, skillRow(), int32_t(c->s[2]), s16(skillRow(), 0x10e)); return 0;
+    }
+    return 0;
+}
+}
+
 namespace d2client_hurricane {
 void reset() { On = false; }
 // One client tick for the hero. active = the Hurricane state is on; seed = the client hero seed.
@@ -56,13 +79,11 @@ void tick(D2UnitStrc* u, uint32_t* seed) {
     const uint8_t* row = skillRow();
     if (!now || !row) return;
     const int32_t sound = s16(row, 0x10e);
-    const bool town = DUNGEON_IsRoomInTown(UNITS_GetRoom(u)) != 0;
     D2SkillStrc* sk = SKILLS_GetSkillById(u, kSkill, -1);
     const int32_t level = sk ? SKILLS_GetSkillLevel(u, sk, 1) : 0;
-    if (!was && sound > 0 && !town) d2client_ambient::submit(sound);   // 0x72C20: 0x88A70(unit,0,0,0)
-    if (sound > 0 && !town) d2client_ambient::submit(sound);           // 0xC9BE0 step 3
-    if (town) return;                                                  // retail returns 0 here
-    int32_t count = SKILLS_EvaluateSkillFormula(u, u32(row, 0x114), kSkill, level);
-    for (; count > 0; --count) for (int k = 0; k < 3; ++k) spawn(u, seed, row, level, sound);
+    gUnit = u; gSeed = seed; gRoom = nullptr;
+    if (!was && sound > 0 && !DUNGEON_IsRoomInTown(UNITS_GetRoom(u))) d2client_ambient::submit(sound);   // 0x72C20: 0x88A70(unit,0,0,0)
+    D2cHurrEnv env{host, 1u, reinterpret_cast<const uint8_t*>(sgptDataTables->pSkillsTxt), sgptDataTables->nSkillsTxtRecordCount};
+    d2c_cltactivefunc_c9be0(&env, 1u, kSkill, uint32_t(level));   // 0xC9BE0 (cltactivefunc 90)
 }
 }
