@@ -266,7 +266,7 @@ extern "C" uint32_t Storm_Sub687E(const S687EEnv& e, const S687ELocale* loc, cha
 // 1.13c STORM+0x0A059
 extern "C" void Storm_SubA059(void (*sub902A)(int)) { sub902A(7); }
 
-struct SPtd { uint8_t* (*getptd)(); };  // Storm+0x76FA
+struct SPtd { uint8_t* (*getptd)(); };  // 1.13c Storm+0x076FA (__getptd): per-thread data; _terrno at +8, _tdoserrno at +0xC.
 // 1.13c STORM+0x0A062
 extern "C" int32_t* Storm_SubA062(const SPtd& e) { return (int32_t*)(e.getptd() + 8); }   // _tiddata._terrno
 // 1.13c STORM+0x0A06B

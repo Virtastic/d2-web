@@ -306,3 +306,12 @@ int Storm_E683(int c, int mbCurMax, const uint16_t* ctype, int (*isctype_mt)(int
   if (mbCurMax > 1) return isctype_mt(c, 4);
   return ctype[c] & 4;
 }
+
+// 1.13c Storm+0xCAFC: _wctomb(dst, wc): locale from the per-thread data; a changed locinfo is refreshed by
+// the update routine, then ___wctomb_mt (Storm_CA9C).
+int Storm_CAFC(const StormWctombSeam& s, const u32* (*ptdLocinfo)(), const u32* globalLocinfo,
+               const u32* (*updateLocinfo)(), char* dst, uint16_t wc) {
+  const u32* lc = ptdLocinfo();
+  if (lc != globalLocinfo) lc = updateLocinfo();
+  return Storm_CA9C(s, lc, dst, wc);
+}

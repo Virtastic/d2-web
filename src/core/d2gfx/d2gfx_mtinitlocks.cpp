@@ -19,7 +19,8 @@ struct D2GfxMtInitLocksHost {
 // 1.13c D2Gfx+0x0191E (__mtinitlocks): assign consecutive 24-byte sections
 // only to slots flagged 1, initialize each with spin count 4000, and stop at
 // the first failure after clearing that slot. Other entries remain untouched.
-extern "C" int32_t d2_fn_d2gfx_191e(const D2GfxMtInitLocksHost* host) {
+// Host-callback form of 191e, kept unexported: the FN probe for 191e is src/core/fn/d2gfx_191e.cpp.
+static int32_t d2gfx_191e_host_form(const D2GfxMtInitLocksHost* host) {
     uint8_t* next = g_sections;
     for (uint32_t i = 0; i < 0x24; ++i) {
         if (g_locks[i].static_init != 1) continue;

@@ -73,7 +73,6 @@ void d2_multi___local_unwind2(void*, int32_t) {}
 // 1.13c D2Multi+0x5986
 void d2_multi_sub_5986(void) {}
 
-// 1.13c D2Multi+0x599E   (codepage in EAX -> LANGID)
 uint32_t d2_multi_sub_599E(int32_t cp) {
     switch (cp) { case 0x3a4: return 0x411; case 0x3a8: return 0x804; case 0x3b5: return 0x412; case 0x3b6: return 0x404; }
     return 0;

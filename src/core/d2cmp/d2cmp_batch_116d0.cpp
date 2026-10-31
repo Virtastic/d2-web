@@ -14,6 +14,7 @@
 #include <cstring>
 #include <unistd.h>
 #include <Windows.h>   // CRITICAL_SECTION no-ops under wasm
+#include "d2cmp_palstate.h"
 
 static inline uint16_t rd16(const void* p, uint32_t o) { uint16_t v; std::memcpy(&v, (const uint8_t*)p + o, 2); return v; }
 static inline uint32_t rd32(const void* p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
@@ -148,15 +149,15 @@ void d2cmp_14f00(int32_t mode) {
     if (mode > 0 && mode < 6) g_d2cmp_32cc0 = (uint32_t)mode;
 }
 
-// Palette reduction tables, zero in the file image and filled by D2CMP's own setup (not a row here).
-static int32_t  g_d2cmp_dist_6fe879f0[511];     // 0x6FE879F0 is table entry 255, the zero offset
-static uint8_t  g_d2cmp_excl_6fe87df0[256];     // 0x6FE87DF0: nonzero = entry participates
-static uint8_t  g_d2cmp_pal_6fe87f18[256 * 4];  // 0x6FE87F18: B, G, R, X per palette entry
-static uint32_t g_d2cmp_palStart_6fe87ef0;      // 0x6FE87EF0: first entry to scan
-static uint32_t g_d2cmp_palEnd_6fe875ec;        // 0x6FE875EC: last entry to scan (inclusive)
-static uint32_t g_d2cmp_skipSame_6fe875e8;      // 0x6FE875E8: nonzero = reject a repeat of lastColor
-static uint32_t g_d2cmp_lastColor_6fe8831c;     // 0x6FE8831C: 0xRRGGBB of the previous result
-static uint32_t g_d2cmp_useExcl_6fe88324;       // 0x6FE88324: nonzero = honour the exclusion table
+// Palette reduction tables, zero in the file image; shared with 0x99D0/0x9C60/0x9C90/0xA2E0/0x9B00 via d2cmp_palstate.h.
+int32_t  g_d2cmp_dist_6fe879f0[511];     // 0x6FE879F0 is table entry 255, the zero offset
+uint8_t  g_d2cmp_excl_6fe87df0[256];     // 0x6FE87DF0: nonzero = entry participates
+uint8_t  g_d2cmp_pal_6fe87f18[256 * 4];  // 0x6FE87F18: B, G, R, X per palette entry
+uint32_t g_d2cmp_palStart_6fe87ef0;      // 0x6FE87EF0: first entry to scan
+uint32_t g_d2cmp_palEnd_6fe875ec;        // 0x6FE875EC: last entry to scan (inclusive)
+uint32_t g_d2cmp_skipSame_6fe875e8;      // 0x6FE875E8: nonzero = reject a repeat of lastColor
+uint32_t g_d2cmp_lastColor_6fe8831c;     // 0x6FE8831C: 0xRRGGBB of the previous result
+uint32_t g_d2cmp_useExcl_6fe88324;       // 0x6FE88324: nonzero = honour the exclusion table
 
 // 1.13c D2CMP+0x9A10 (export #10026, 215 bytes): nearest palette entry for an (R,G,B) triple.
 // Scans palStart..palEnd inclusive; with the exclusion table in force an entry with a zero exclusion

@@ -119,3 +119,11 @@ extern "C" void pk_gen_asc_tabs(uint8_t *c, const uint16_t *tab) {
         }
     }
 }
+
+// 1.13c Storm+0xA01C: __getcwd(buf, size): lock class 7, current-drive directory (getdcwd drive 0), unlock.
+extern "C" char* storm_getcwd(char* buf, size_t size, void (*lock7)(), char* (*getdcwd0)(uint32_t drive, char* buf, size_t len), void (*unlock7)()) {
+    lock7();
+    char* r = getdcwd0(0, buf, size);
+    unlock7();
+    return r;
+}
