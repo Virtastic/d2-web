@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include <cstdlib>
-extern "C" void d2_fn_d2common_e490(uint32_t* r);
+extern "C" void d2common_maze_pick_room_preset_blob(uint32_t* r);  // d2common_maze_pick_blob.cpp
 
 typedef uint8_t* P;
 template <class T> static inline T& F(void* p, int off) { return *(T*)((P)p + off); }
@@ -76,7 +76,7 @@ static void link44950(void* owner, void* room, int dir) {
     nd[5] = U(owner, 0); U(owner, 0) = nn;
     nd[0] = (uint32_t)(uintptr_t)room; nd[1] = dir; nd[3] = 1; nd[4] = (uint32_t)(uintptr_t)room + 0x34;
 }
-static void pick(void* room) { uint32_t r[5] = {(uint32_t)(uintptr_t)room, 1, 0, 0, 0}; d2_fn_d2common_e490(r); }
+static void pick(void* room) { uint32_t r[5] = {(uint32_t)(uintptr_t)room, 1, 0, 0, 0}; d2common_maze_pick_room_preset_blob(r); }
 
 // 1.13c D2Common+0x102F0  (in_EAX = ctx; param_1 = count). Pass k links prev->n with dirs
 // (1,3),(0,2),(3,1),(2,0); EEC0 takes the pass direction in EAX.

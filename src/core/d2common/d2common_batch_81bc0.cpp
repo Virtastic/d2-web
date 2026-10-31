@@ -162,7 +162,7 @@ void D2Common_36CD0_PlotLine(const B36Line* l, const B36Rect* r, int sel, int nT
 }
 
 // 1.13c D2Common+0x83CA0: lazily build the cached preset descriptor at param+0x50. If null: 5BE50(this, param+4)
-// fills it; if its +0x4C is null that is fatal 0x2B6 -> return. Then for each of the +0x14 entries call
+// fills it; if its +0x4C is null that is fatal 0x2B6 -> exit(-1). Then for each of the +0x14 entries call
 // 36840(0, entry[+0x2C+4i]) and 36840(0, entry[+0x1C+4i]); for i in 1..count-1 call 36B10(i<<18, 0); and
 // 36840(0, +0x3C) if +0x18 is set, 36840(0, +0x44) if +0x44 is set.
 void D2Common_83CA0_InitPresetDescriptor(void* self, char* param)
@@ -171,7 +171,7 @@ void D2Common_83CA0_InitPresetDescriptor(void* self, char* param)
     if (*slot) return;
     D2Common_5BE50(self, param + 4);
     char* d = *slot;
-    if (!d || !*(void**)(d + 0x4c)) return;       // fatal 0x2B6
+    if (!d || !*(void**)(d + 0x4c)) std::exit(-1); // fatal 0x2B6: retail formats the message then _exit(-1)
     auto P = [](char* b, int o) { return *(void**)(b + o); };
     const int n = *(int32_t*)(d + 0x14);
     for (int i = 0; i < n; ++i) { D2Common_36840(0, P(d, 0x2c + 4 * i)); D2Common_36840(0, P(*slot, 0x1c + 4 * i)); d = *slot; }

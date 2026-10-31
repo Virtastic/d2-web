@@ -5,7 +5,7 @@
 #include <initializer_list>
 #include <emscripten.h>
 
-extern "C" void d2_fn_d2common_e490(uint32_t* r);  // src/core/fn/d2common_e490.cpp
+extern "C" void d2common_maze_pick_room_preset_blob(uint32_t* r);  // d2common_maze_pick_blob.cpp
 
 namespace {
 uint8_t* p(uint32_t a) { return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(a)); }
@@ -49,7 +49,7 @@ uint32_t pick(uint32_t head, int keyIdx, bool wantMax, int32_t kind, uint32_t di
       const uint32_t o = w(e, 0x58);
       w(t, 0x24) = w(o, 0x10); w(o, 0x10) = t; w(o, 8) += 1;
       uint32_t r[5] = {t, 1, 0, 0, 0};  // retail EBX = the trial room
-      d2_fn_d2common_e490(r);
+      d2common_maze_pick_room_preset_blob(r);
     }
     if (t) { c->release(t); best = e; }
   }
