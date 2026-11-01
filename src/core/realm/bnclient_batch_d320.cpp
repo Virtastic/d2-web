@@ -121,7 +121,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_f3c0(BnEnv* env, char* out) 
 
 // 1.13c BNCLIENT+0x12000: copy the reply into the shared record; when it validates (0xB3A0), clear the
 // 0x20-byte block at 6ff3ecb8, copy 0x14 bytes from 6ff3ed40 and send the 0x54 packet (0xEB00).
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_bnclient_12000(BnEnv* env, int32_t* arg) {
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t bnclient_batch_12000(BnEnv* env, int32_t* arg) {
     int64_t ok = env->call(0xB3A0, nullptr, arg, nullptr, nullptr);
     env->call(0xFFFF01EE, nullptr, (void*)0x20, nullptr, nullptr);             // Ordinal_494 zero 0x20
     if (ok == 0) return 0;
