@@ -17,8 +17,8 @@ struct d2ddraw_crt_fp_STRFLT { int32_t sign, decpt, flag; char* man; };
 
 static inline bool fp_isdigit(uint8_t c) { return (uint8_t)(c - '0') < 10; }
 
-// 1.13c D2DDraw+0x9ED0
-void d2ddraw_crt_fp___fptostr(char* buf, int count, d2ddraw_crt_fp_STRFLT* pt)
+// 1.13c D2DDraw+0x9ED0 (returns the rounding cursor on carry, buf otherwise: retail's errno_t slot)
+char* d2ddraw_crt_fp___fptostr(char* buf, int count, d2ddraw_crt_fp_STRFLT* pt)
 {
     char* dst = buf;
     char* src = pt->man;
@@ -38,8 +38,12 @@ void d2ddraw_crt_fp___fptostr(char* buf, int count, d2ddraw_crt_fp_STRFLT* pt)
         while (*--p == '9') *p = '0';
         *p += 1;
     }
-    if (*dst == '1') pt->decpt++;
-    else memmove(dst, str, strlen(str) + 1);
+    if (*dst == '1') {
+        pt->decpt++;
+        return p;
+    }
+    memmove(dst, str, strlen(str) + 1);
+    return dst;
 }
 
 // 1.13c D2DDraw+0x9F47
