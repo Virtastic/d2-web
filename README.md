@@ -31,40 +31,113 @@ owned copy.
 > details still differ from the original game. If you find one, please
 > [report it](https://github.com/Virtastic/d2-web/issues).
 
-## Screenshots
+## Contents
 
-| | |
+- [Before you start](#before-you-start)
+- [Choose how to play](#choose-how-to-play)
+- [Option A: Play in your browser](#option-a-play-in-your-browser)
+- [Option B: Run your own server with Docker](#option-b-run-your-own-server-with-docker)
+- [Option C: Build from source](#option-c-build-from-source)
+- [Play on other devices on your network](#play-on-other-devices-on-your-network)
+- [Widescreen menu backgrounds (optional)](#widescreen-menu-backgrounds-optional)
+- [Build and publish your own Docker image](#build-and-publish-your-own-docker-image)
+- [Troubleshooting](#troubleshooting)
+- [Tests](#tests) · [Layout](#layout) · [Contributing](#contributing) · [Credits](#credits) · [Legal](#legal)
+
+## Before you start
+
+You need two things:
+
+1. **Your own copy of Diablo II and Lord of Destruction**, installed on your computer.
+   d2-web ships **no Blizzard files**: no art, sound, text, maps or programs. It reads them from
+   your install.
+2. **A desktop Chrome, Edge or other Chromium browser.**
+
+The game files are the `.mpq` files in the folder Diablo II is installed in:
+
+| file | what it holds |
 |---|---|
-| ![Title screen](docs/screenshots/title.png) | ![Hero class selection](docs/screenshots/class-select.png) |
+| `d2data.mpq` | the world: maps, monsters, items |
+| `d2exp.mpq` | Lord of Destruction |
+| `d2char.mpq` | the heroes |
+| `d2sfx.mpq` | sound effects |
+| `d2speech.mpq`, `d2xtalk.mpq` | speech |
+| `d2music.mpq`, `d2xmusic.mpq` | music |
+| `d2video.mpq`, `d2xvideo.mpq` | cinematics |
+| `patch_d2.mpq` | the patch |
+
+> [!TIP]
+> **Where is my Diablo II folder?** It is the folder that holds `d2data.mpq`. It is usually
+> `C:\Program Files (x86)\Diablo II` on Windows and `/Applications/Diablo II` on macOS. From
+> WSL2, the Windows folder is `/mnt/c/Program Files (x86)/Diablo II`.
+
+## Choose how to play
+
+| | you need | best for |
+|---|---|---|
+| **[A. Play in your browser](#option-a-play-in-your-browser)** | a browser | just playing |
+| **[B. Run your own server with Docker](#option-b-run-your-own-server-with-docker)** | Docker | hosting it yourself, at home or on a server |
+| **[C. Build from source](#option-c-build-from-source)** | Docker, Node.js 24+, git, and a game **patched to 1.13c** | changing the code |
+
+## Option A: Play in your browser
+
+1. Open **<https://diablo2.virtastic.app>** in Chrome.
+2. Click **CHOOSE FOLDER** and pick your Diablo II folder. You can also click **CHOOSE FILES**,
+   or drag the `.mpq` files onto the page.
+3. When the page says **All files found.**, click **ENTER SANCTUARY**.
+4. On the main menu, click **SINGLE PLAYER**, pick a hero, type a name and click **OK**.
+
+| the main menu | creating a hero |
+|---|---|
+| ![The Diablo II: Lord of Destruction main menu, with Single Player, Battle.net and Other Multiplayer buttons](docs/screenshots/title.png) | ![Select Hero Class: the heroes standing around the campfire, the Barbarian selected](docs/screenshots/class-select.png) |
 
 *Screenshots are rendered from the player's own game files; the art is Blizzard's.*
 
-## You need your own copy of the game
+> [!NOTE]
+> **Your files never leave your computer.** The page reads them inside your browser; nothing is
+> uploaded. Next time, click **Use the files from last time** and skip step 2.
 
-d2-web ships **no Blizzard assets**: no MPQs, art, sound, text or binaries. It reads them from your
-own legally owned install of Diablo II + Lord of Destruction, patched to **1.13c**. You need the
-`.mpq` files from the install folder (`d2data.mpq`, `d2exp.mpq`, `d2char.mpq`, `d2sfx.mpq`,
-`d2music.mpq`, `d2speech.mpq`, `d2video.mpq`, `d2xmusic.mpq`, `d2xtalk.mpq`, `d2xvideo.mpq` and
-`patch_d2.mpq`). Without them no game starts.
+> [!TIP]
+> **Any patch level works here.** The page supplies the 1.13c patch data itself, so an
+> unpatched install, a 1.14 install or a 1.13c install all play the same.
 
-## Quick start with Docker
+Hover over a file on the file screen to see whether it was found. Saves are kept in your
+browser's storage on that computer. Battle.net is off; Single Player is the way in.
 
-The release image `ghcr.io/virtastic/d2-web` holds the engine and the client, and **no game data**. Your own copy of Diablo II: Lord of Destruction supplies the files: the disc MPQs (`d2data.mpq`, `d2exp.mpq`, `d2char.mpq`, `d2sfx.mpq`, `d2music.mpq`, `d2xmusic.mpq`, `d2speech.mpq`, `d2xtalk.mpq`, `d2video.mpq`, `d2xvideo.mpq`) and the 1.13c `patch_d2.mpq`. `D2_ASSETS` decides where those files come from.
+## Option B: Run your own server with Docker
 
-**Bring your own files (default, `D2_ASSETS=byo`).** The server holds no game data. Each player opens the page and chooses their own D2 folder or MPQs, and the files stay in their browser.
+The image `ghcr.io/virtastic/d2-web` holds the engine and the web page, and **no game data**.
+
+**Step 1.** Install [Docker](https://docs.docker.com/get-docker/) and start it.
+
+**Step 2.** Start the server:
 
 ```bash
 docker run -d --name d2-web --restart unless-stopped -p 8080:8080 ghcr.io/virtastic/d2-web:latest
 ```
 
-**Hosted files (`D2_ASSETS=hosted`).** The server serves the MPQs from a folder you mount at `/retail`, and players just open the page. Use this only for players who own the game, for example behind a login such as Cloudflare Access.
+**Step 3.** Open <http://localhost:8080/> and continue from
+[Option A, step 2](#option-a-play-in-your-browser): each player chooses their own game folder in
+their own browser.
+
+> [!IMPORTANT]
+> **Use HTTPS for anything other than `localhost`.** The engine needs a browser feature
+> (`SharedArrayBuffer`) that browsers only allow on `https://` or `localhost`. Put HTTPS in front
+> of the container, for example with Caddy, nginx or a Cloudflare Tunnel.
+
+<details>
+<summary><b>Serve the game files from the server instead (<code>D2_ASSETS=hosted</code>)</b></summary>
+
+By default (`D2_ASSETS=byo`, "bring your own") the server holds no game files and each player
+picks their own. With `D2_ASSETS=hosted`, the server serves the `.mpq` files from a folder you
+mount at `/retail`, and players just open the page:
 
 ```bash
 docker run -d --name d2-web --restart unless-stopped -p 8080:8080 \
-  -e D2_ASSETS=hosted -v /path/to/Diablo2:/retail:ro ghcr.io/virtastic/d2-web:latest
+  -e D2_ASSETS=hosted -v "/path/to/Diablo II:/retail:ro" ghcr.io/virtastic/d2-web:latest
 ```
 
-With Compose:
+Or with Compose:
 
 ```yaml
 services:
@@ -74,77 +147,146 @@ services:
     ports: ["8080:8080"]
     environment:
       D2_ASSETS: hosted                         # or byo, and drop the volume
-    volumes: ["/path/to/Diablo2:/retail:ro"]
+    volumes: ["/path/to/Diablo II:/retail:ro"]
 ```
 
-Then open `http://localhost:8080/`. Anywhere other than localhost, put HTTPS in front of the container (Caddy, nginx, Cloudflare Tunnel), because the engine needs `SharedArrayBuffer`, which browsers grant only on HTTPS or localhost.
+> [!WARNING]
+> Anyone who can open the page can download those files. Use hosted mode only for players who
+> own the game, for example behind a login such as Cloudflare Access.
 
-### Building your own image
+</details>
 
-```sh
-bash ci/build.sh                          # with your game files in retail/D2/ -- see "Front-door art" below
-tools/docker-release.sh v0.1.1 --no-push  # build the image locally only
-tools/docker-release.sh v0.1.1            # build, then push <tag> and latest
-```
+## Option C: Build from source
 
-`tools/docker-release.sh` builds the image from the staged site in `build-wasm/site/`. Before
-building, it checks that the site is complete:
+You need Linux, macOS, or Windows with WSL2, plus:
 
-| staged path | if it is missing |
-|---|---|
-| `e/<version>/d2.wasm`, `serve.mjs` | stops: run `ci/build.sh` first |
-| `assets/patch-113c.patch` | stops: stage with your 1.13c `patch_d2.mpq` (see below) |
-| `door-art/meta.json` | stops: stage with `patch_d2.mpq`, `d2exp.mpq` and `d2data.mpq` (see below) |
-| `freeres/` (16 `.dc6` files and `LICENSE.md`) | stops: run `ci/stage.sh`; these files are in git |
-| `widebg/manifest.json` | warns and builds without it: the menus use the game's own 4:3 backgrounds |
+| tool | why | get it |
+|---|---|---|
+| Docker | the engine compiles inside a container, so you do not install a compiler | <https://docs.docker.com/get-docker/> |
+| Node.js 24 or newer | runs the setup, the build helpers and the local server | <https://nodejs.org> |
+| git | downloads the code | <https://git-scm.com> |
+| Diablo II + Lord of Destruction, **patched to 1.13c** | the build takes the title-screen art and the 1.13c patch data from it | your own copy |
 
-The image always leaves out `vectors/`, `diag/` and any link to your game folder.
-
-**The image contains files made from your game data.** The front-door art and the patch file are
-cut from your game files when you build, and both are copied into the image. Treat the image like
-your game files: keep it on your own registry or machine unless you are sure you may share it.
-
-## 1. Build
-
-Requirements: Linux, macOS or Windows with WSL2; Docker; Node.js 24+; git.
+### Step 1. Download the code
 
 ```sh
-git clone https://github.com/Virtastic/d2-web.git
+git clone --recursive https://github.com/Virtastic/d2-web.git
 cd d2-web
-git clone https://github.com/ladislav-zezula/StormLib third_party/StormLib
+```
+
+`--recursive` also downloads StormLib, the library that reads `.mpq` files. If you forget it, the
+next step fetches it for you.
+
+### Step 2. Point it at your game
+
+```sh
+node tools/setup.mjs "/path/to/Diablo II"
+```
+
+This one command does all of the game-file setup:
+
+- finds your `.mpq` files, whatever their capitalisation;
+- links them into `retail/D2/`, where the build and the local server look for them, without
+  copying (git ignores that folder, so game files can never be committed);
+- checks that `patch_d2.mpq` is the 1.13c patch;
+- checks that Docker is running and that StormLib is present.
+
+When everything is in place it prints:
+
+```text
+d2-web setup
+
+Game files from /path/to/Diablo II
+  ✓ patch_d2.mpq     The 1.13c patch  linked
+  ✓ d2exp.mpq        Lord of Destruction  linked
+  ✓ d2data.mpq       Maps, monsters, items  linked
+  ✓ d2char.mpq       The heroes  linked
+  ...
+  ✓ d2xvideo.mpq     Expansion cinematics  linked
+
+Build tools
+  ✓ Node.js          24.11.0
+  ✓ Docker           28.5.1
+  ✓ StormLib         third_party/StormLib
+
+✓ Ready to build. Next:
+
+    bash ci/build.sh
+    D2_RETAIL_DIR=retail/D2 node play/serve.mjs 8920 build-wasm/site
+
+  then open http://localhost:8920 in Chrome.
+```
+
+Fix any line marked **✗**, then run the command again; it is safe to repeat. A line marked **!**
+is a file the game needs to play but the build can do without.
+
+> [!TIP]
+> **Your patch is not 1.13c?** Setup tells you. Either update the game to 1.13c, or keep your
+> install as it is and point setup at a 1.13c `Patch_D2.mpq` you have elsewhere:
+> `node tools/setup.mjs "/path/to/Diablo II" --patch /path/to/1.13c/Patch_D2.mpq`
+
+### Step 3. Build
+
+```sh
 bash ci/build.sh
 ```
 
-`ci/build.sh` builds an emscripten toolchain image, compiles the engine to wasm and writes the
-finished site to `build-wasm/site/`. The first run takes a while; later runs are cached.
+This builds a compiler image, compiles the engine to WebAssembly and writes the finished site to
+`build-wasm/site/`. The first run takes a while; later runs reuse what is already built. Near the
+end, the log prints:
 
-### Front-door art and the patch file (built from your own game files)
+```text
+patch shim: retail/D2/patch_d2.mpq (8229959 bytes, 1.13c) -> build-wasm/site/assets/patch-113c.patch
+door-art: ... images -> build-wasm/site/door-art
+```
 
-The front door is the page a player sees before choosing their game files: the title art, the
-file picker and the loading screen. It reads four files and folders from the staged site. One is
-in git. Two are cut from **your own** game files every time you build. One is optional and made
-by hand. Nothing made from game data is ever committed, which is why a fresh clone does not have
-it.
+> [!NOTE]
+> Changed only JavaScript in `play/`? `bash ci/stage.sh` restages the site in seconds without
+> recompiling the engine.
 
-**Your 1.13c `patch_d2.mpq` is required.** Without it, `ci/stage.sh` (and so `ci/build.sh`) stops
-with `FATAL: no retail/D2/patch_d2.mpq`. It has to be the exact `Patch_D2.mpq` that the 1.13c
-update installs. `tools/patch-shim.mjs` compares the file's size and SHA-256 with that file and
-refuses anything else, including other patch versions and modified copies:
+### Step 4. Play
+
+```sh
+D2_RETAIL_DIR=retail/D2 node play/serve.mjs 8920 build-wasm/site
+```
+
+Open <http://localhost:8920/> in Chrome.
+
+`play/serve.mjs` is a small Node server with no dependencies. It serves the site, serves your
+`.mpq` files from `D2_RETAIL_DIR`, and sends the cross-origin isolation headers (COOP/COEP) that
+the engine's threads need.
+
+> [!IMPORTANT]
+> **A plain static file server will not work**: it does not send those headers. Use
+> `play/serve.mjs` or the Docker image.
+
+<details>
+<summary><b>What the build takes from your game files, and why</b></summary>
+
+The front door (the title screen a player sees before choosing their game files) needs two things
+that are made from **your** game files every time you build. Neither is ever committed, which is
+why a fresh clone does not have them.
+
+| staged path | what it is | made from | made by | without it |
+|---|---|---|---|---|
+| `assets/patch-113c.patch` | your 1.13c `patch_d2.mpq`, as base64 text | `patch_d2.mpq` | `tools/patch-shim.mjs` | **the build stops** |
+| `door-art/` | the title-screen art, drawn before any files are chosen | `patch_d2.mpq`, `d2exp.mpq`, `d2data.mpq` | `tools/door-art.mjs` | warning; the title screen uses a plain web font until the player's files load |
+| `freeres/` | the widescreen bottom bar and border panels: 16 `.dc6` files plus their licence | `play/freeres/` in git (SGD2FreeRes art, under its own licence) | `ci/stage.sh` copies it | the build stops |
+| `widebg/` | optional widescreen menu backgrounds | images you supply | `ci/stage.sh` copies them | the menus use the game's own 4:3 backgrounds |
+
+**Why the patch file exists.** Players can bring a game at any patch level, but the engine only
+reads 1.13c data. The page therefore mounts `patch-113c.patch` as `Patch_D2.mpq` on top of
+whatever patch the player chose. The base archives are the same at every patch level, so the
+player only has to supply those.
+
+**The patch must be the exact `Patch_D2.mpq` the 1.13c update installs.** `tools/patch-shim.mjs`
+compares its size and SHA-256 and refuses anything else, including other patch versions and
+modified copies:
 
 | | |
 |---|---|
 | size | 8,229,959 bytes |
 | SHA-256 | `41a5fc95977369e3d5f32127cc4c0d571daad9cf706b6b6523935b705afc5a6d` |
-
-`tools/docker-release.sh` runs the same check (`node tools/patch-shim.mjs --check`) on the staged
-`assets/patch-113c.patch` before it builds an image.
-
-| staged path | what it is | made from | made by | without it |
-|---|---|---|---|---|
-| `freeres/` | the widescreen bottom bar and border panels: 16 `.dc6` files plus their licence | `play/freeres/` in git (SGD2FreeRes art, under its own licence) | `ci/stage.sh` copies it | the build stops |
-| `door-art/` | the title-screen art the door draws before any files are chosen (details below) | your `patch_d2.mpq`, `d2exp.mpq`, `d2data.mpq` | `tools/door-art.mjs` | warning; the door draws in a plain web font until the player's files load, then cuts the same art in the browser from the player's files |
-| `assets/patch-113c.patch` | your 1.13c `patch_d2.mpq` as base64 text | your 1.13c `patch_d2.mpq` | `tools/patch-shim.mjs` | **the build stops**: this file is required |
-| `widebg/` | optional widescreen menu backgrounds | images you supply | `ci/stage.sh` copies them | the menus use the game's own 4:3 backgrounds |
 
 **What `door-art/` contains:**
 
@@ -165,48 +307,48 @@ The art comes from `data\global\ui\FrontEnd\`, `data\local\font\latin\` and the 
 `data\global\palette\`. When a file is in more than one archive, the first one wins, in the order
 `patch_d2.mpq`, `d2exp.mpq`, `d2data.mpq`.
 
-**Why the patch file exists.** Players can bring a game at any patch level, but the engine only
-reads 1.13c data. The page therefore mounts `patch-113c.patch` as `Patch_D2.mpq` on top of
-whatever patch the player chose. The base archives are the same at every patch level, so the
-player only has to supply those.
-
-#### Building them
-
-Put three archives from a Diablo II: Lord of Destruction install **patched to 1.13c** in
-`retail/D2/`. `*.mpq` files are gitignored, so they can never be committed. Then build:
-
-```sh
-mkdir -p retail/D2
-cp "/path/to/Diablo II/Patch_D2.mpq" retail/D2/patch_d2.mpq
-cp "/path/to/Diablo II/d2exp.mpq"    retail/D2/d2exp.mpq
-cp "/path/to/Diablo II/d2data.mpq"   retail/D2/d2data.mpq
-bash ci/build.sh            # or ci/stage.sh, to restage without rebuilding the wasm
-```
-
-The build log should print both of these lines:
-
-```
-patch shim: retail/D2/patch_d2.mpq (8229959 bytes, 1.13c) -> build-wasm/site/assets/patch-113c.patch
-door-art: ... images -> build-wasm/site/door-art
-```
-
-If the build stops with `FATAL: no retail/D2/patch_d2.mpq`, or warns `WARNING: no
-retail/D2/d2data.mpq`, check the names: the build looks them up in **lower case**
-(`patch_d2.mpq`, `d2data.mpq`).
-
-To use your install folder without copying, set `D2_PATCH_SHIM_SRC=/path/to/Diablo\ II/patch_d2.mpq`.
-The build looks for `d2exp.mpq` and `d2data.mpq` in the same folder as that patch.
-
-You can also run both tools on their own:
+`tools/setup.mjs` is the easy way in, but both tools also run on their own:
 
 ```sh
 node tools/patch-shim.mjs "/path/to/Diablo II/Patch_D2.mpq" build-wasm/site/assets/patch-113c.patch
 node tools/door-art.mjs   "/path/to/Diablo II"              build-wasm/site/door-art
 ```
 
-`tools/door-art.mjs` accepts any letter case in the archive names.
+Instead of `retail/D2/`, the build can also read the patch from `D2_PATCH_SHIM_SRC=/path/to/patch_d2.mpq`,
+and then looks for `d2exp.mpq` and `d2data.mpq` in the same folder.
 
-#### Widescreen menu backgrounds (optional)
+</details>
+
+## Play on other devices on your network
+
+`play/serve.mjs` can listen on your home network too:
+
+| variable | effect |
+|---|---|
+| `D2_BIND=0.0.0.0` | listen on every interface (default `127.0.0.1` only) |
+| `D2_TLS_DIR=<dir>` | serve HTTPS using `<dir>/key.pem` and `<dir>/cert.pem` |
+| `D2_RETAIL_DIR=<dir>` | the folder holding your `.mpq` files |
+| `PORT` | port, if not given as the first argument |
+
+```sh
+D2_BIND=0.0.0.0 D2_TLS_DIR=~/certs D2_RETAIL_DIR=retail/D2 \
+  node play/serve.mjs 8443 build-wasm/site
+```
+
+> [!IMPORTANT]
+> Other devices need **HTTPS**, because browsers only allow the engine's threads on `localhost` or
+> over HTTPS. A self-signed certificate, or one from your own certificate authority, is fine on a
+> home network.
+
+> [!WARNING]
+> The server has **no login**. Whoever can reach it can download the `.mpq` files you point it
+> at, and redistributing Blizzard's files is not allowed. Keep it on a private network; never
+> expose it to the internet.
+
+Saves live in each device's browser storage. Battle.net is off: d2-web does not run or connect to
+any official service.
+
+## Widescreen menu backgrounds (optional)
 
 d2-web opens in a widescreen view by default. Each menu screen (title, game select, character
 select, character creation, credits) normally draws the game's own 800×600 background, centred
@@ -247,52 +389,48 @@ backgrounds:
 A screen with no entry, or a missing `widebg/` folder, uses the game's own background. The repo
 ships no backgrounds. Use only images you have the right to use.
 
-## 2. Run it locally
+## Build and publish your own Docker image
+
+After [Option C](#option-c-build-from-source), package the built site as an image:
 
 ```sh
-D2_RETAIL_DIR="/path/to/Diablo II" node play/serve.mjs 8920 build-wasm/site
+tools/docker-release.sh v0.1.1 --no-push  # build the image on this machine only
+tools/docker-release.sh v0.1.1            # build, then push <tag> and latest
 ```
 
-Open <http://localhost:8920/>.
+> [!CAUTION]
+> **The image contains files made from your game data**: the title-screen art and the 1.13c patch
+> file. Treat it like your game files: keep it on your own machine or registry unless you are
+> sure you may share it.
 
-`play/serve.mjs` is a small Node server with no dependencies. It serves the site, serves your MPQs
-under `/retail/`, and sets the cross-origin isolation headers (COOP/COEP) the wasm threads need.
-**A plain static file server will not work** without those headers.
+<details>
+<summary><b>What <code>docker-release.sh</code> checks before it builds</b></summary>
 
-## 3. Host it on your own machine or LAN
-
-The same server can listen on your network:
-
-| variable | effect |
+| staged path | if it is missing |
 |---|---|
-| `D2_BIND=0.0.0.0` | listen on every interface (default `127.0.0.1` only) |
-| `D2_TLS_DIR=<dir>` | serve HTTPS using `<dir>/key.pem` and `<dir>/cert.pem` |
-| `D2_RETAIL_DIR=<dir>` | the folder holding your `.mpq` files |
-| `PORT` | port, if not given as the first argument |
+| `e/<version>/d2.wasm`, `serve.mjs` | stops: run `ci/build.sh` first |
+| `assets/patch-113c.patch` | stops: run `node tools/setup.mjs`, then `ci/build.sh`. It must also pass the 1.13c check (`node tools/patch-shim.mjs --check`) |
+| `door-art/meta.json` | stops: run `node tools/setup.mjs`, then `ci/build.sh` |
+| `freeres/` (16 `.dc6` files and `LICENSE.md`) | stops: run `ci/stage.sh`; these files are in git |
+| `widebg/manifest.json` | warns and builds without it: the menus use the game's own 4:3 backgrounds |
 
-```sh
-D2_BIND=0.0.0.0 D2_TLS_DIR=~/certs D2_RETAIL_DIR="/path/to/Diablo II" \
-  node play/serve.mjs 8443 build-wasm/site
-```
+The image always leaves out `vectors/`, `diag/` and any link to your game folder.
 
-Browsers only allow the threaded build on `localhost` or over **HTTPS**, so any other device needs
-TLS (a self-signed certificate or one from your own CA is fine on a home network).
-
-The server has **no authentication**. Keep it on a private network: whoever can reach it can
-download the MPQs you point it at, and redistributing Blizzard's files is not allowed. Do not expose
-it to the internet.
-
-Saves live in the browser's own storage on each device.
-
-Battle.net is off. d2-web does not run or connect to any official service.
+</details>
 
 ## Troubleshooting
 
-- **Blank page or "SharedArrayBuffer is not defined"**: the page isn't cross-origin isolated. Use
-  `play/serve.mjs`, and use `localhost` or HTTPS.
-- **"missing .mpq" or the title screen never appears**: check that `D2_RETAIL_DIR` points at the
-  folder holding the files listed above, and that `patch_d2.mpq` is the 1.13c one.
-- **Build fails pulling the image**: check that Docker is running and that your user can use it.
+| what you see | what to do |
+|---|---|
+| A blank page, or `SharedArrayBuffer is not defined` | The page is not cross-origin isolated. Use `play/serve.mjs` or the Docker image, and open it on `localhost` or over HTTPS. |
+| The file screen says files are missing | Choose the folder that holds `d2data.mpq`. Hover over a file on that screen to see which ones were not found. |
+| Setup: `✗ patch_d2.mpq ... not the 1.13c patch` | Update the game to 1.13c, or run setup again with `--patch /path/to/1.13c/Patch_D2.mpq`. |
+| Setup: `✗ Docker ... not running` | Start Docker Desktop (or the Docker service) and run setup again. On Linux, make sure your user can run `docker` without `sudo`. |
+| Build: `FATAL: no retail/D2/patch_d2.mpq` | Run `node tools/setup.mjs "/path/to/Diablo II"` first. |
+| The game will not start when built from source | Start the server with `D2_RETAIL_DIR=retail/D2`, and run `node tools/setup.mjs` to check that every file is in place. |
+
+Still stuck? Ask on [Discord](https://discord.gg/PzFfDkbSue) or
+[open an issue](https://github.com/Virtastic/d2-web/issues).
 
 ## Tests
 
@@ -307,7 +445,8 @@ node --test test/*.test.mjs
 | `src/core/` | the engine, by retail DLL (common, game, client, gfx, net, ...) |
 | `src/core/d2moo/` | code adapted from D2MOO (MIT) |
 | `play/` | the browser client and the dev server |
-| `tools/` | build helpers and the realm protocol tools |
+| `tools/` | setup and build helpers, and the realm protocol tools |
+| `tools/setup.mjs` | the one-step game-file setup |
 | `ci/` | build scripts |
 
 ## Contributing
