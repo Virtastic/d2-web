@@ -158,7 +158,7 @@ EMSCRIPTEN_KEEPALIVE void UNIT_SetModeFromRecord_75260(void* param1, int32_t eax
 // (Player.cpp, line 0x2B, 0) in the loop, and clear the head at the end.
 // 1.13c D2Game+0x37500
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_37500(void* ebx, const D2GameBatch268E0Env* env)
+EMSCRIPTEN_KEEPALIVE void d2game_port_37500(void* ebx, const D2GameBatch268E0Env* env)
 {
     static const char kPlayerFile[] = "..\\Source\\D2Game\\PLAYER\\Player.cpp";
 

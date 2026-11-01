@@ -203,10 +203,11 @@ static_assert(offsetof(DamageElementFields, at44) == 0x44);
 
 // 1.13c D2Game+0x394B0
 void assignElement(D2UnitStrc* missile /* EAX */, uint32_t value /* ESI */,
-                    DamageElementFields* damage /* EDI */)
+                    DamageElementFields* damage /* EDI */,
+                    uint32_t (*elemOf)(int32_t) = nullptr /* function probe seam: D2Game+0xB25E */)
 {
     if (!missile) return;
-    switch (MISSILE_GetElemTypeFromMissileId(missile->dwClassId)) {
+    switch (elemOf ? (uint8_t)elemOf((int32_t)missile->dwClassId) : MISSILE_GetElemTypeFromMissileId(missile->dwClassId)) {
     case 4: damage->at30 = value; break;
     case 5: damage->at2c = value; break;
     case 9: damage->at44 = value; break;
@@ -215,3 +216,15 @@ void assignElement(D2UnitStrc* missile /* EAX */, uint32_t value /* ESI */,
     }
 }
 } // namespace d2game_32df0
+
+// function probe seam (src/core/fn/d2game_394b0.cpp): lg = hook log, cfg[0] = what D2Game+0xB25E returns.
+#include "../fn/hookenv.h"
+static uint32_t* g_p394_lg; static const uint32_t* g_p394_cfg;
+void D2Game_394B0_probe(D2UnitStrc* missile, uint32_t value, void* damage, uint32_t* lg, const uint32_t* cfg)
+{
+    g_p394_lg = lg; g_p394_cfg = cfg; lg[0] = 0;
+    d2game_32df0::assignElement(missile, value, (d2game_32df0::DamageElementFields*)damage, [](int32_t cls) -> uint32_t {
+        uint32_t* w = g_p394_lg + 1 + g_p394_lg[0]++ * 10;
+        w[0] = 0xB25E; w[1] = w[2] = w[3] = w[4] = w[5] = 0; w[6] = (uint32_t)cls; w[7] = w[8] = w[9] = 0;
+        return g_p394_cfg[0]; });
+}

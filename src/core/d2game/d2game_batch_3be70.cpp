@@ -40,7 +40,7 @@ struct D2GameBatch3beEnv {
     void*    (*statsRow)(void* u);                              // 0x21420
     void*    (*createMissile)(void* game, uint32_t* req);       // 0x8F930
     void     (*setLife)(void* unit, int32_t v);                 // Ordinal 10637
-    void     (*f3bda0)(void* game);                             // 0x3BDA0
+    void     (*f3bda0)(void* game, int32_t v);                  // 0x3BDA0 (stack game, class row +0x44)
     void     (*f6cc26e0)(void* edi, int32_t dur);               // 0xCC26E0
     void*    (*findTarget)(uint32_t a, int32_t b, uint32_t c, void* client, int32_t x, int32_t y); // 0xCC0F40
     void*    (*getRoom)(void* u);                               // Ordinal 10331
@@ -66,7 +66,7 @@ struct D2GameBatch3beEnv {
     int32_t  (*f21bc0)(void);
     void     (*f21a90)(uint32_t ecx, int32_t v);
     int32_t  (*unitMode)(void* u);                              // Ordinal 10737
-    void     (*fcbf340)(void);
+    void     (*fcbf340)(uint32_t ecx, uint32_t edx, void* game, int32_t y, void* u, int32_t a, int32_t b, uint32_t cbRva); // 0x9F340; cbRva = D2Game RVA of the callback pushed
     int32_t  (*frame)(void);                                    // Ordinal 11018, no args
     int32_t  (*maxFrames)(void* c, uint32_t id, uint32_t lvl, int32_t v); // Ordinal 10510
     void     (*f6663a0)(void* unit, void* client, int32_t v);
@@ -135,8 +135,9 @@ bool hasPath(const int32_t* u) { int t = u[0]; return t != 2 && (t < 4 || t > 5)
 // 1.13c D2Game+0x3BE70
 EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3be70(void* game, const int32_t* u, int32_t flag, const D2GameBatch3beEnv* e = &g3beDirect)
 {
-    if (u && classRow(e, u) && flag == 0 && e->unitGuid((void*)u) == 0)
-        e->f3bda0(game);
+    const uint8_t* row;
+    if (u && (row = classRow(e, u)) && flag == 0 && e->unitGuid((void*)u) == 0)
+        e->f3bda0(game, i32(row, 0x44));
     return 0;
 }
 
@@ -338,19 +339,19 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3eae0(void* game, int32_t* u, int32_t* t, 
     return 0;
 }
 
-// 1.13c D2Game+0x3F6D0 -- the 10750/10867 results are discarded in the decompile (register inputs of 0xBF340).
+// 1.13c D2Game+0x3F6D0 -- ecx = game, edx = unit. Position (y first, then x) as the 3BC00 pair; callback RVA 0x39930
+// for modes 2..0x18, 0x39910 for mode 1; anything else skips 0x9F340. Always ends in the collision handler.
 EMSCRIPTEN_KEEPALIVE void d2_game_3f6d0(void* game, int32_t* u, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     int32_t m = e->unitMode(u);
-    if (m >= 2 && m <= 0x18) {
-        if (hasPath(u)) e->pathY(ptr(u, 0x2c));
-        if (hasPath(u)) e->pathX(ptr(u, 0x2c));
-    } else {
-        if (m != 1) { e->collide(game, u); return; }
-        if (hasPath(u)) e->pathX(ptr(u, 0x2c));
-        if (hasPath(u)) e->pathY(ptr(u, 0x2c));
+    if (m >= 1 && m <= 0x18) {
+        const uint32_t t = (uint32_t)u[0];
+        void* sub = ptr(u, 0x2c);
+        const bool direct = t == 2 || (t > 3 && t <= 5);
+        const int32_t y = direct ? i32(sub, 0x10) : sub ? e->pathY(sub) : 0;
+        const int32_t x = direct ? i32(sub, 0xc) : sub ? e->pathX(sub) : 0;
+        e->fcbf340(0x3002, (uint32_t)x, game, y, u, 0x7c, 1, m == 1 ? 0x39910u : 0x39930u);
     }
-    e->fcbf340();
     e->collide(game, u);
 }
 
@@ -415,4 +416,55 @@ uint32_t D2Game_3CDD0_probe(void* game, int32_t* u, const uint8_t* dt, uint32_t*
     e.unitLevel = [](void* u) -> uint32_t { return g3cH->h(0xB0FC, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
     e.createMissile = [](void* g, uint32_t* req) -> void* { return (void*)(uintptr_t)g3cH->h(0x6F930, 0, (uint32_t)(uintptr_t)g, g3cH->stk(req)); };
     return d2_game_3cdd0(game, u, &e);
+}
+
+// function probe seam (src/core/fn/d2game_3be70.cpp): dt = table blob, lg = hook log, cfg[0] = what #11018 (0xB24C) returns.
+static const uint32_t* g_pbe_cfg; static uint32_t* g_pbe_lg;
+static void pbe_log(uint32_t rva, uint32_t eax, uint32_t ecx, uint32_t edx, uint32_t esi, uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3)
+{
+    uint32_t* w = g_pbe_lg + 1 + g_pbe_lg[0]++ * 10;
+    w[0] = rva; w[1] = eax; w[2] = ecx; w[3] = edx; w[4] = 0; w[5] = esi; w[6] = s0; w[7] = s1; w[8] = s2; w[9] = s3;
+    for (int i = 1; i < 10; i++) if (HookEnv::isStk(w[i])) w[i] = 0xB3000000u;
+}
+static const uint8_t* g_pbe_dt;
+uint32_t D2Game_3BE70_probe(void* game, const int32_t* u, int32_t flag, uint32_t* lg, const uint8_t* dt, const uint32_t* cfg)
+{
+    g_pbe_cfg = cfg; g_pbe_lg = lg; g_pbe_dt = dt; lg[0] = 0;
+    D2GameBatch3beEnv e{};
+    e.dt = dt;
+    e.unitGuid = [](void* u) -> uint32_t { pbe_log(0xB24C, 0, 0, 0, 0, (uint32_t)(uintptr_t)u, 0, 0, 0); return g_pbe_cfg[0]; };
+    e.f3bda0 = [](void* g, int32_t v) { pbe_log(0x3BDA0, 0, 0, 0, 0, (uint32_t)(uintptr_t)g, (uint32_t)v, 0, 0); };
+    return d2_game_3be70(game, u, flag, &e);
+}
+
+void D2Game_3E590_probe(int32_t* u, int32_t* t, uint32_t* lg, const uint8_t* dt, const uint32_t* cfg)
+{   // cfg[0]: the unit createUnit (#11013 / 0xA6A0) returns
+    g_pbe_cfg = cfg; g_pbe_lg = lg; g_pbe_dt = dt; lg[0] = 0;
+    D2GameBatch3beEnv e{};
+    e.dt = dt;
+    auto P = [](const void* p) { return (uint32_t)(uintptr_t)p; };
+    (void)P;
+    e.createUnit = [](void* pool, int32_t ty, uint32_t id, uint32_t a, uint32_t b) -> void* {
+        pbe_log(0xA6A0, 0, 0, 0, 0, (uint32_t)(uintptr_t)pool, (uint32_t)ty, id, a); (void)b; return (void*)(uintptr_t)g_pbe_cfg[0]; };
+    e.f6caea80 = [](void* g, void* u, int32_t a, uint32_t b, int32_t c, int32_t d, int32_t x) {
+        (void)d; (void)x; pbe_log(0x8EA80, 0, (uint32_t)(uintptr_t)g, (uint32_t)(uintptr_t)u, 0, (uint32_t)a, b, (uint32_t)c, 0); };
+    e.setMode = [](void* s, int32_t v) { pbe_log(0xA5B6, 0, 0, 0, 0, (uint32_t)(uintptr_t)s, (uint32_t)v, 0, 0); };
+    e.setCallback = [](void* s, const void* cb) { pbe_log(0xA75A, 0, 0, 0, 0, (uint32_t)(uintptr_t)s, (uint32_t)(uintptr_t)cb, 0, 0); };
+    e.attach = [](void* u, void* s, int32_t v) { pbe_log(0xA60A, 0, 0, 0, 0, (uint32_t)(uintptr_t)u, (uint32_t)(uintptr_t)s, (uint32_t)v, 0); };
+    e.setFlag = [](void* u, int32_t st, int32_t v) { pbe_log(0xA3CA, 0, 0, 0, 0, (uint32_t)(uintptr_t)u, (uint32_t)st, (uint32_t)v, 0); };
+    e.cb58e60 = (const void*)(uintptr_t)0xB2038E60u;   // the vector stores a retail code address as 0xB2<RVA> (callback RVA 0x38E60)
+    d2_game_3e590(u, t, &e);
+}
+
+void D2Game_3F6D0_probe(void* game, int32_t* u, uint32_t* lg, const uint32_t* cfg)
+{   // cfg: mode (#10737 / 0xB102), y (0xA3B8), x (0xA454)
+    g_pbe_cfg = cfg; g_pbe_lg = lg; lg[0] = 0;
+    D2GameBatch3beEnv e{};
+    e.unitMode = [](void* u) -> int32_t { pbe_log(0xB102, 0, 0, 0, 0, (uint32_t)(uintptr_t)u, 0, 0, 0); return (int32_t)g_pbe_cfg[0]; };
+    e.pathY = [](void* p) -> int32_t { pbe_log(0xA3B8, 0, 0, 0, 0, (uint32_t)(uintptr_t)p, 0, 0, 0); return (int32_t)g_pbe_cfg[1]; };
+    e.pathX = [](void* p) -> int32_t { pbe_log(0xA454, 0, 0, 0, 0, (uint32_t)(uintptr_t)p, 0, 0, 0); return (int32_t)g_pbe_cfg[2]; };
+    e.fcbf340 = [](uint32_t c, uint32_t d, void* g, int32_t y, void* u, int32_t a, int32_t b, uint32_t cb) {
+        (void)b; (void)cb; pbe_log(0x9F340, 0, c, d, 0, (uint32_t)(uintptr_t)g, (uint32_t)y, (uint32_t)(uintptr_t)u, (uint32_t)a); };
+    e.collide = [](void* g, void* u) -> int32_t { (void)u; pbe_log(0x3F320, 0, 0, 0, 0, (uint32_t)(uintptr_t)g, 0, 0, 0); return 0; };
+    d2_game_3f6d0(game, u, &e);
 }

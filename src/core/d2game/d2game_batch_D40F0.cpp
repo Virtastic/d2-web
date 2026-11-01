@@ -109,7 +109,7 @@ struct D2GameBatchD40F0Env {
 // data block; three consecutive dwords at +0x60 are filled from 0x69360 and the dword at +0x6C is
 // cleared.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_376f0(uint32_t eaxPlayer, const D2GameBatchD40F0Env* env)
+EMSCRIPTEN_KEEPALIVE void d2game_port_376f0(uint32_t eaxPlayer, const D2GameBatchD40F0Env* env)
 {
     const uint32_t playerData = env->ordinal10920(eaxPlayer);
     if (playerData == 0) return;

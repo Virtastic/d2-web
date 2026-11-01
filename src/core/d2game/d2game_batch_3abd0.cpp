@@ -162,3 +162,24 @@ int32_t D2Game_3C260(void* pGame, void* missile, const D2GameBatch3Env* e = &g_b
     e->createMissile(pGame, p);
     return 1;
 }
+
+// function probe seam (src/core/fn/d2game_3bc00.cpp): cfg dwords: room (A478), y (2A3B8), x (2A454).
+#include "../fn/hookenv.h"
+static const uint32_t* g_p3e_cfg; static uint32_t* g_p3e_lg;
+static void p3e_log(uint32_t rva, uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3)
+{
+    uint32_t* w = g_p3e_lg + 1 + g_p3e_lg[0]++ * 10;
+    w[0] = rva; w[1] = 0; w[2] = 0; w[3] = 0; w[4] = 0; w[5] = 0; w[6] = s0; w[7] = s1; w[8] = s2; w[9] = s3;
+    for (int i = 1; i < 10; i++) if (HookEnv::isStk(w[i])) w[i] = 0xB3000000u;
+}
+static inline uint32_t p3e32(const void* p) { return (uint32_t)(uintptr_t)p; }
+int32_t D2Game_3BC00_probe(void* pGame, void* missile, uint32_t* lg, const uint32_t* cfg)
+{
+    g_p3e_cfg = cfg; g_p3e_lg = lg; lg[0] = 0;
+    D2GameBatch3Env e{};
+    e.ord10750 = [](void* p) -> int32_t { p3e_log(0xA3B8, p3e32(p), 0, 0, 0); return (int32_t)g_p3e_cfg[1]; };
+    e.ord10867 = [](void* p) -> int32_t { p3e_log(0xA454, p3e32(p), 0, 0, 0); return (int32_t)g_p3e_cfg[2]; };
+    e.ord10331 = [](void* u) -> void* { p3e_log(0xA478, p3e32(u), 0, 0, 0); return (void*)(uintptr_t)g_p3e_cfg[0]; };
+    e.spawnRandomMonster = [](void* g, void* room, int32_t x, int32_t y) { p3e_log(0xEF6B0, p3e32(g), p3e32(room), (uint32_t)x, (uint32_t)y); };
+    return D2Game_3BC00(pGame, missile, &e);
+}

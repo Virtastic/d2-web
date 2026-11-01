@@ -83,6 +83,8 @@ struct D2GameBatchFEnv {
     void     (*spawnPreset)(void* ecx, int32_t eax, void* pGame, uint32_t a2, uint32_t a3, int32_t n);
     // 0xA24C0 (eax=owner; stack pGame, r10331, val2, val1, arg2, 0, 0x3C, 1)
     void     (*spawnA24C0)(void* owner, void* pGame, void* r, int32_t val2, int32_t val1, void* arg2, int32_t z, int32_t k, int32_t one);
+    // function-probe seam: 0x3A280 (esi=rec, edi=unit, stack target) as a recorder; null = the D2Game_3A280 port
+    int32_t  (*roll3A280)(void* rec, void* unit, void* target);
 };
 
 // Default env: the seams whose callee is a DEFINED typed function in src/ are direct calls (D2Common ordinal ->
@@ -255,7 +257,7 @@ void D2Game_3A790(void* unit, void* target, void* rec, const D2GameBatchFEnv* e 
     if (!unit) return;
     const void* mr = MonRec(e, (int32_t)rd32(unit, 4));
     if (!mr) return;
-    const int32_t val = D2Game_3A280(rec, unit, target, e);
+    const int32_t val = e->roll3A280 ? e->roll3A280(rec, unit, target) : D2Game_3A280(rec, unit, target, e);
     if ((int32_t)rd32(mr, 0x78) > 0 && e->ord10239(target))
         e->addToField(unit, rec, e->mulDiv((int32_t)rd32(mr, 0x78), val, 100));
     if ((int32_t)rd32(mr, 0x7C) > 0 && e->ord10255(target))
@@ -272,7 +274,7 @@ int32_t D2Game_3A920(void* pGame, void* unit, void* target, const D2GameBatchFEn
     void* owner = UnitOwner(e, pGame, unit);
     if (!owner || !target) return 1;
     uint8_t local[0x70] = {};
-    int32_t v = D2Game_3A280(local, unit, target, e);
+    int32_t v = e->roll3A280 ? e->roll3A280(local, unit, target) : D2Game_3A280(local, unit, target, e);
     if (v < 0) v = 0;
     const int32_t mx = e->maxHp(owner);
     int32_t n = e->getStat(owner, 6, 0) + v;
@@ -466,4 +468,125 @@ void D2Game_3A1D0_probe(void* unit, void* pGame, uint32_t* lg)
     e.ord10331 = [](void* u) -> void* { p3b_log(0xA478, 0, 0, 0, p32(u), 0, 0, 0); return (void*)(uintptr_t)g_p3b_cfg[1]; };
     e.ord10533 = [](void* s, void* u, void* r, int32_t v2, int32_t) { p3b_log(0xA6CA, 0, 0, 0, p32(s), p32(u), p32(r), (uint32_t)v2); };
     D2Game_3A1D0(pGame, unit, &e);
+}
+
+// function probe seam (src/core/fn/d2game_39f70.cpp): 0xE03A0 and #10494 (0xA68E) replaced by recorders (p3b_log shape). cfg dwords: owner, #10494 result.
+int32_t D2Game_39F70_probe(void* pGame, void* unit, void* target, uint32_t* lg, const uint32_t* cfg)
+{
+    g_p3b_cfg = cfg; g_p3b_lg = lg; lg[0] = 0;
+    D2GameBatchFEnv e{};
+    e.getUnit = [](void* g, uint32_t guid, uint32_t type) -> void* {
+        p3b_log(0xE03A0, type, p32(g), guid, 0, 0, 0, 0); return (void*)(uintptr_t)g_p3b_cfg[0]; };
+    e.ord10494 = [](void* u, int32_t v) -> int32_t { p3b_log(0xA68E, 0, 0, 0, p32(u), (uint32_t)v, 0, 0); return (int32_t)g_p3b_cfg[1]; };
+    return D2Game_39F70(pGame, unit, target, &e);
+}
+
+// function probe seam (src/core/fn/d2game_3a790.cpp): dt = the table blob (MonRec reads it), cfg dwords: 3A280 value, undead, mulDiv#1, demon, mulDiv#2
+// (lg: count, then 10 words per call: rva, eax, ecx, edx, ebx, esi, s0..s3)
+static const uint32_t* g_p3c_cfg; static uint32_t* g_p3c_lg; static const void* g_p3c_dt; static uint32_t g_p3c_mul;
+static void p3c_log(uint32_t rva, uint32_t eax, uint32_t ecx, uint32_t edx, uint32_t esi, uint32_t s0)
+{
+    uint32_t* w = g_p3c_lg + 1 + g_p3c_lg[0]++ * 10;
+    w[0] = rva; w[1] = eax; w[2] = ecx; w[3] = edx; w[4] = 0; w[5] = esi; w[6] = s0; w[7] = w[8] = w[9] = 0;
+}
+void D2Game_3A790_probe(void* unit, void* target, void* rec, uint32_t* lg, const void* dt, const uint32_t* cfg)
+{
+    g_p3c_cfg = cfg; g_p3c_lg = lg; g_p3c_dt = dt; g_p3c_mul = 0; lg[0] = 0;
+    D2GameBatchFEnv e{};
+    e.dataTables = []() -> const void* { return g_p3c_dt; };
+    e.roll3A280 = [](void* r, void* u, void* t) -> int32_t { (void)u; p3c_log(0x3A280, 0, 0, 0, p32(r), p32(t)); return (int32_t)g_p3c_cfg[0]; };
+    e.ord10239 = [](void* t) -> int32_t { p3c_log(0xA508, 0, 0, 0, 0, p32(t)); return (int32_t)g_p3c_cfg[1]; };
+    e.ord10255 = [](void* t) -> int32_t { p3c_log(0xA814, 0, 0, 0, 0, p32(t)); return (int32_t)g_p3c_cfg[3]; };
+    e.mulDiv = [](int32_t a, int32_t b, int32_t c) -> int32_t {
+        p3c_log(0x14D0, (uint32_t)a, (uint32_t)c, (uint32_t)b, 0, 0);
+        return (int32_t)g_p3c_cfg[g_p3c_mul++ == 0 ? 2 : 4]; };
+    e.addToField = [](void* u, void* r, int32_t v) { (void)v; p3c_log(0x39260, p32(u), 0, 0, p32(r), 0); };
+    D2Game_3A790(unit, target, rec, &e);
+}
+
+// function probe seam (src/core/fn/d2game_3a920.cpp): dt = the table blob; cfg dwords: owner, 3A280 value, max hp, current hp.
+#include "../fn/hookenv.h"
+static const uint32_t* g_p3d_cfg; static uint32_t* g_p3d_lg; static const void* g_p3d_dt;
+static void p3d_log(uint32_t rva, uint32_t eax, uint32_t ecx, uint32_t edx, uint32_t esi, uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3)
+{
+    uint32_t* w = g_p3d_lg + 1 + g_p3d_lg[0]++ * 10;
+    w[0] = rva; w[1] = eax; w[2] = ecx; w[3] = edx; w[4] = 0; w[5] = esi; w[6] = s0; w[7] = s1; w[8] = s2; w[9] = s3;
+    for (int i = 1; i < 10; i++) if (HookEnv::isStk(w[i])) w[i] = 0xB3000000u;
+}
+int32_t D2Game_3A920_probe(void* pGame, void* unit, void* target, uint32_t* lg, const void* dt, const uint32_t* cfg)
+{
+    g_p3d_cfg = cfg; g_p3d_lg = lg; g_p3d_dt = dt; lg[0] = 0;
+    D2GameBatchFEnv e{};
+    e.dataTables = []() -> const void* { return g_p3d_dt; };
+    e.getUnit = [](void* g, uint32_t guid, uint32_t type) -> void* {
+        p3d_log(0xE03A0, type, p32(g), guid, 0, 0, 0, 0, 0); return (void*)(uintptr_t)g_p3d_cfg[0]; };
+    e.roll3A280 = [](void* r, void* u, void* t) -> int32_t { (void)u; p3d_log(0x3A280, 0, 0, 0, p32(r), p32(t), 0, 0, 0); return (int32_t)g_p3d_cfg[1]; };
+    e.maxHp = [](void* u) -> int32_t { p3d_log(0xA3A0, 0, 0, 0, 0, p32(u), 0, 0, 0); return (int32_t)g_p3d_cfg[2]; };
+    e.getStat = [](void* u, int32_t s, int32_t l) -> int32_t { p3d_log(0xA42A, 0, 0, 0, 0, p32(u), (uint32_t)s, (uint32_t)l, 0); return (int32_t)g_p3d_cfg[3]; };
+    e.setStat = [](void* u, int32_t s, int32_t v, int32_t l) { p3d_log(0xA472, 0, 0, 0, 0, p32(u), (uint32_t)s, (uint32_t)v, (uint32_t)l); };
+    return D2Game_3A920(pGame, unit, target, &e);
+}
+
+// function probe seam (src/core/fn/d2game_39e30.cpp): dt = the table blob; cfg dwords: owner. Shares the p3d log/globals.
+int32_t D2Game_39E30_probe(void* pGame, void* unit, void* target, uint32_t* lg, const void* dt, const uint32_t* cfg)
+{
+    g_p3d_cfg = cfg; g_p3d_lg = lg; g_p3d_dt = dt; lg[0] = 0;
+    D2GameBatchFEnv e{};
+    e.dataTables = []() -> const void* { return g_p3d_dt; };
+    e.ord10240 = [](void* u) -> int32_t { p3d_log(0xB26A, 0, 0, 0, 0, p32(u), 0, 0, 0); return (int32_t)g_p3d_cfg[1]; };
+    e.ord11029 = [](void* u) -> int32_t { p3d_log(0xB0FC, 0, 0, 0, 0, p32(u), 0, 0, 0); return (int32_t)g_p3d_cfg[2]; };
+    e.getOwner = [](void* u, void* g) -> void* { p3d_log(0xE0A20, p32(u), 0, 0, 0, p32(g), 0, 0, 0); return (void*)(uintptr_t)g_p3d_cfg[0]; };
+    e.ord10567 = [](void* o, int32_t c, int32_t v, int32_t k) -> int32_t { p3d_log(0xA796, 0, 0, 0, 0, p32(o), (uint32_t)c, (uint32_t)v, (uint32_t)k); return (int32_t)g_p3d_cfg[3]; };
+    e.ord10297 = [](void* o, int32_t c, int32_t v, int32_t k) -> int32_t { p3d_log(0xA766, 0, 0, 0, 0, p32(o), (uint32_t)c, (uint32_t)v, (uint32_t)k); return (int32_t)g_p3d_cfg[4]; };
+    e.randMod = [](void* s, int32_t r) -> int32_t { p3d_log(0x11D0, 0, p32(s), 0, (uint32_t)r, 0, 0, 0, 0); return (int32_t)g_p3d_cfg[5]; };
+    e.getStat = [](void* u, int32_t s, int32_t l) -> int32_t { p3d_log(0xA42A, 0, 0, 0, 0, p32(u), (uint32_t)s, (uint32_t)l, 0); return (int32_t)g_p3d_cfg[6]; };
+    e.maxHp = [](void* u) -> int32_t { p3d_log(0xA3A0, 0, 0, 0, 0, p32(u), 0, 0, 0); return (int32_t)g_p3d_cfg[7]; };
+    e.ord10689 = [](void* u, int32_t v, int32_t l) { p3d_log(0xA83E, 0, 0, 0, 0, p32(u), (uint32_t)v, (uint32_t)l, 0); };
+    e.setStat = [](void* u, int32_t s, int32_t v, int32_t l) { p3d_log(0xA472, 0, 0, 0, 0, p32(u), (uint32_t)s, (uint32_t)v, (uint32_t)l); };
+    return D2Game_39E30(pGame, unit, target, &e);
+}
+
+// function probes 3AB30 / 3B070 / 3BD10 (src/core/fn/d2game_<rva>.cpp): dt = the table blob, cfg dwords are the scripted callee returns. Share the p3d log/globals.
+int32_t D2Game_3AB30_probe(void* pGame, void* unit, int32_t skip, uint32_t* lg, const void* dt, const uint32_t* cfg)
+{   // cfg: Y(0x1130), X(0x1100), level, class, owner, out, flags(#11018)
+    g_p3d_cfg = cfg; g_p3d_lg = lg; g_p3d_dt = dt; lg[0] = 0;
+    D2GameBatchFEnv e{};
+    e.dataTables = []() -> const void* { return g_p3d_dt; };
+    e.unitY = [](void* u) -> uint32_t { p3d_log(0x1130, 0, p32(u), 0, 0, 0, 0, 0, 0); return g_p3d_cfg[0]; };
+    e.unitX = [](void* u) -> uint32_t { p3d_log(0x1100, 0, p32(u), 0, 0, 0, 0, 0, 0); return g_p3d_cfg[1]; };
+    e.ord11029 = [](void* u) -> int32_t { p3d_log(0xB0FC, 0, 0, 0, 0, p32(u), 0, 0, 0); return (int32_t)g_p3d_cfg[2]; };
+    e.ord10240 = [](void* u) -> int32_t { p3d_log(0xB26A, 0, 0, 0, 0, p32(u), 0, 0, 0); return (int32_t)g_p3d_cfg[3]; };
+    e.getOwner = [](void* u, void* g) -> void* { p3d_log(0xE0A20, p32(u), 0, 0, 0, p32(g), 0, 0, 0); return (void*)(uintptr_t)g_p3d_cfg[5]; };
+    e.spawnA0000 = [](void* o, void* g, int32_t a2, int32_t a3, int32_t a4, uint32_t a5, uint32_t a6) -> void* {
+        (void)a5; (void)a6; p3d_log(0xA0000, 0, 0, 0, p32(o), p32(g), (uint32_t)a2, (uint32_t)a3, (uint32_t)a4); return (void*)(uintptr_t)g_p3d_cfg[6]; };
+    e.ord11018 = [](void* u) -> uint32_t { p3d_log(0xB24C, 0, 0, 0, 0, p32(u), 0, 0, 0); return g_p3d_cfg[4]; };
+    e.ord10637 = [](void* m, int32_t v) { p3d_log(0xA50E, 0, 0, 0, 0, p32(m), (uint32_t)v, 0, 0); };
+    return D2Game_3AB30(pGame, unit, skip, &e);
+}
+int32_t D2Game_3BD10_probe(void* pGame, void* unit, uint32_t* lg, const void* dt, const uint32_t* cfg)
+{   // cfg: Y, X, room
+    g_p3d_cfg = cfg; g_p3d_lg = lg; g_p3d_dt = dt; lg[0] = 0;
+    D2GameBatchFEnv e{};
+    e.dataTables = []() -> const void* { return g_p3d_dt; };
+    e.unitY = [](void* u) -> uint32_t { p3d_log(0x1130, 0, p32(u), 0, 0, 0, 0, 0, 0); return g_p3d_cfg[0]; };
+    e.unitX = [](void* u) -> uint32_t { p3d_log(0x1100, 0, p32(u), 0, 0, 0, 0, 0, 0); return g_p3d_cfg[1]; };
+    e.ord10331 = [](void* u) -> void* { p3d_log(0xA478, 0, 0, 0, 0, p32(u), 0, 0, 0); return (void*)(uintptr_t)g_p3d_cfg[2]; };
+    e.spawnPreset = [](void* room, int32_t a, void* g, uint32_t x, uint32_t y, int32_t n) {
+        p3d_log(0x47CF0, (uint32_t)a, p32(room), 0, 0, p32(g), x, y, (uint32_t)n); };
+    return D2Game_3BD10(pGame, unit, &e);
+}
+int32_t D2Game_3B070_probe(void* unit, void* pGame, uint32_t* lg, const void* dt, const uint32_t* cfg)
+{   // cfg: flags(#11018), Y, X, spawned unit, owner
+    g_p3d_cfg = cfg; g_p3d_lg = lg; g_p3d_dt = dt; lg[0] = 0;
+    D2GameBatchFEnv e{};
+    e.dataTables = []() -> const void* { return g_p3d_dt; };
+    e.ord11018 = [](void* u) -> uint32_t { p3d_log(0xB24C, 0, 0, 0, 0, p32(u), 0, 0, 0); return g_p3d_cfg[0]; };
+    e.getUnit = [](void* g, uint32_t guid, uint32_t type) -> void* {
+        p3d_log(0xE03A0, type, p32(g), guid, 0, 0, 0, 0, 0); return (void*)(uintptr_t)g_p3d_cfg[4]; };
+    e.unitY = [](void* u) -> uint32_t { p3d_log(0x1130, 0, p32(u), 0, 0, 0, 0, 0, 0); return g_p3d_cfg[1]; };
+    e.unitX = [](void* u) -> uint32_t { p3d_log(0x1100, 0, p32(u), 0, 0, 0, 0, 0, 0); return g_p3d_cfg[2]; };
+    e.spawnA0F40 = [](int32_t ecx, int32_t eax, int32_t edx, void* g, void* o, uint32_t x, uint32_t y, void* edi) -> void* {
+        (void)edi; p3d_log(0xA0F40, (uint32_t)eax, (uint32_t)ecx, (uint32_t)edx, 0, p32(g), p32(o), x, y); return (void*)(uintptr_t)g_p3d_cfg[3]; };
+    e.resetGuidedFlight = [](void* u, void* m) { p3d_log(0x397C0, 0, 0, 0, p32(u), p32(m), 0, 0, 0); };
+    return D2Game_3B070(unit, pGame, &e);
 }
