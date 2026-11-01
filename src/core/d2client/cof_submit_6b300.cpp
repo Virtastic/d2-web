@@ -2,7 +2,7 @@
 // Stack ABI (ret 0x1c): a0 unit, a1 type, a2 rand-shift-8, a3..a5 node 8/c/10 (a3 -> +0x38 for type 8),
 // a6 rand-shift-4; EAX = component selector.
 // Env::call(id, w) ids, one per call site of the routine:
-//  1 #10227  2 0x1510(unit id, 2)  3 0x19130(unit, sel)  4 0x19660(sel)  5 alloc(0xa8, 0xc48, 0, tag)  6 0x1E9C0(node, unit)
+//  1 #10227  2 0x1510(unit id, 2)  3 0x19130(unit, sel)  4 0x19660(EDX = sel, EDI = unit)  5 alloc(0xa8, 0xc48, 0, tag)  6 0x1E9C0(node, unit)
 //  7/13/14 0x1380(g+0x20, v) at the type-6 / a2 / a6 sites  8 #10172(unit)  9 0x58C20(5 stack args, ebx 1)
 //  10 0x58BE0(ecx result, eax row+0x74)  11 fatal(line)  12 0x18AE0(node)
 #include <cstdint>
@@ -18,8 +18,9 @@ struct D2cCofEnv {
 extern "C" {
 EMSCRIPTEN_KEEPALIVE void d2c_6b300(const D2cCofEnv* e, u32 sel, u32 unit, u32 type, u32 a2, u32 a3,
                                     u32 a4, u32 a5, u32 a6) {
-    u32 w[6];
-    auto C = [&](u32 id, u32 a, u32 b, u32 c2, u32 d, u32 f, u32 g2) { w[0] = a; w[1] = b; w[2] = c2; w[3] = d; w[4] = f; w[5] = g2; return e->call(id, w); };
+    u32 w[7];
+    // w[6] (not logged by the replay probe) carries EDI = unit, which 0x19660 reads as its implicit first register arg.
+    auto C = [&](u32 id, u32 a, u32 b, u32 c2, u32 d, u32 f, u32 g2) { w[6] = unit; w[0] = a; w[1] = b; w[2] = c2; w[3] = d; w[4] = f; w[5] = g2; return e->call(id, w); };
     if ((i32)sel < 0) return;
     u32 dt = e->rd32(e->rd32(0x6fb7e474));
     if ((i32)sel >= (i32)e->rd32(dt + 0xbc0)) return;
