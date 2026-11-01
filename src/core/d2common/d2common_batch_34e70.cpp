@@ -59,38 +59,42 @@ extern "C"
 // y in [room+0x50, +0x50+0x58); the first point outside the box, or a missing room, sets bit 0.
 // A null path is fatal in retail; we return.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_34e70(uint32_t pPath)
+EMSCRIPTEN_KEEPALIVE void d2_port_d2common_34e70(uint32_t pPath)
 {
-	D2DynamicPathStrc* path = reinterpret_cast<D2DynamicPathStrc*>(static_cast<uintptr_t>(pPath));
+	uint8_t* path = P(pPath);
 	if (!path)
 		return;
 
-	path->dwFlags &= ~1u;
-	if (path->dwPathPoints <= 0)
+	// Retail offsets throughout: the vendored struct's pointer width differs from retail's 32-bit layout.
+	Wr32(path, 0x34, Rd32(path, 0x34) & ~1u);
+	if (static_cast<int32_t>(Rd32(path, 0x28)) <= 0)
 		return;
 
-	const D2ActiveRoomStrc* room = path->pRoom;
+	const uint32_t nRoomAddr = Rd32(path, 0x1C);
+	const uint8_t* room = nRoomAddr ? P(nRoomAddr) : nullptr;
 	int32_t i = 0;
 	for (;;)
 	{
 		if (!room)
 			break;
 
-		const int32_t nX = static_cast<int32_t>(path->PathPoints[i].X);
-		const int32_t nRoomX = room->tCoords.nSubtileX;
-		if (nX < nRoomX || nRoomX + room->tCoords.nSubtileWidth <= nX)
+		uint16_t nX16, nY16;
+		__builtin_memcpy(&nX16, path + 0x9C + i * 4, 2);
+		__builtin_memcpy(&nY16, path + 0x9E + i * 4, 2);
+		const int32_t nX = static_cast<int32_t>(nX16);
+		const int32_t nY = static_cast<int32_t>(nY16);
+		const int32_t nRoomX = static_cast<int32_t>(Rd32(room, 0x4C));
+		const int32_t nRoomY = static_cast<int32_t>(Rd32(room, 0x50));
+		if (nX < nRoomX || nRoomX + static_cast<int32_t>(Rd32(room, 0x54)) <= nX)
 			break;
-
-		const int32_t nY = static_cast<int32_t>(path->PathPoints[i].Y);
-		const int32_t nRoomY = room->tCoords.nSubtileY;
-		if (nY < nRoomY || nRoomY + room->tCoords.nSubtileHeight <= nY)
+		if (nY < nRoomY || nRoomY + static_cast<int32_t>(Rd32(room, 0x58)) <= nY)
 			break;
 
 		++i;
-		if (path->dwPathPoints <= i)
+		if (static_cast<int32_t>(Rd32(path, 0x28)) <= i)
 			return;
 	}
-	path->dwFlags |= 1u;
+	Wr32(path, 0x34, Rd32(path, 0x34) | 1u);
 }
 
 // 1.13c D2Common+0x356E0: town-movement predicate. The second argument must point at a dword equal
@@ -122,7 +126,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_356e0(uint32_t pThis, uint32_t pUnit
 // record+0x30 selects the table (0: 6fdeb160, else 6fdeb1f0); +0x04 takes entry index*3+1 and +0x08
 // takes record+0x28 multiplied by entry index*3, where index is record+0x00.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_37170(uint32_t pRecord)
+EMSCRIPTEN_KEEPALIVE void d2_port_d2common_37170(uint32_t pRecord)
 {
 	uint8_t* rec = P(pRecord);
 	if (!rec)

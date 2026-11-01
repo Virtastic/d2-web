@@ -115,7 +115,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_39530(uint32_t ctx, uint3
 
 struct D2Common1FB50Env { void (*prepare)(); const int32_t* pairs; };
 // 1.13c D2Common+0x1FB50: first equal composite id in slots 1..254.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_1fb50(int32_t a,int32_t b,const D2Common1FB50Env* e) {
+extern "C" uint32_t d2common_1fb50_lookup(int32_t a,int32_t b,const D2Common1FB50Env* e) {
  if (!e) return 0; if (e->prepare) e->prepare(); if (!e->pairs) return 0;
  for (uint32_t i=1;i<=0xfe;i++) { int32_t v=e->pairs[i*2]; if (v==a || v==b) return i; }
  return 0;
@@ -156,7 +156,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_21d70(uint32_t inventory,
 }
 
 // 1.13c D2Common+0x38160: lower-bound insertion index, -1 for an existing key.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_38160(uint32_t list,int32_t key) {
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_38160(uint32_t list,int32_t key) {
  if (!list) return 0;
  auto l=p(list); int32_t lo=0, hi=i16(l,4); uint32_t data=u32(l,0);
  while (lo<hi) { int32_t mid=lo+(hi-lo)/2; int32_t v=i32(p(data),mid*4);
