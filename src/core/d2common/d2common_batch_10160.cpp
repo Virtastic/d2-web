@@ -6,7 +6,7 @@
 #include "Drlg/D2DrlgMaze.h"
 
 // 1.13c D2Common+0x10160
-extern "C" void d2_fn_d2common_10160(D2DrlgLevelStrc* level)
+extern "C" void d2common_10160_engine(D2DrlgLevelStrc* level)
 {
     DRLGMAZE_BuildBasicMaze(level);
 }

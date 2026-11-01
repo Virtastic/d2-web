@@ -15,7 +15,7 @@ extern "C" D2DrlgRoomStrc* d2common_c690_build(D2DrlgLevelStrc* level, D2DrlgMap
 }
 
 // 1.13c D2Common+0x0ECB0 (pick file; EAX=picked file, EBX=level, stack=map)
-extern "C" void d2_fn_d2common_ecb0(D2DrlgMapStrc* map, int32_t picked, D2DrlgLevelStrc* level)
+extern "C" void d2common_ecb0_engine(D2DrlgMapStrc* map, int32_t picked, D2DrlgLevelStrc* level)
 {
     if (picked != -1) { map->nPickedFile = picked; return; }
     int32_t def = map->pLvlPrestTxtRecord->dwDef, files = map->pLvlPrestTxtRecord->dwFiles, base;
@@ -41,10 +41,10 @@ extern "C" void d2_fn_d2common_ecb0(D2DrlgMapStrc* map, int32_t picked, D2DrlgLe
 }
 
 // 1.13c D2Common+0x0F110 (EAX=level, arg=room): one iteration of the maze preset roll
-extern "C" void d2_fn_d2common_f110(D2DrlgLevelStrc* level, D2DrlgRoomStrc* room)
+extern "C" void d2common_f110_engine(D2DrlgLevelStrc* level, D2DrlgRoomStrc* room)
 {
     D2DrlgMapStrc* map = DRLGPRESET_AllocDrlgMap(level, room->pMaze->nLevelPrest, &room->pDrlgCoord, &level->pSeed);
-    d2_fn_d2common_ecb0(map, room->pMaze->nPickedFile, level);
+    d2common_ecb0_engine(map, room->pMaze->nPickedFile, level);
     D2DrlgRoomStrc* built = d2common_c690_build(level, map, 0, room->nTileWidth <= 12 && room->nTileHeight <= 12);
     for (D2DrlgOrthStrc* o = room->pDrlgOrth; o; o = o->pNext)
         if (o->bInit == 1) DRLGROOM_AllocDrlgOrthsForRooms(built, o->pDrlgRoom, o->nDirection);

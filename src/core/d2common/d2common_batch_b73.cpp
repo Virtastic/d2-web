@@ -6,7 +6,6 @@
 #include <initializer_list>
 
 struct D2DynamicPathStrc;
-__attribute__((weak)) uint32_t D2Common_D420_PathMoveCollision(D2DynamicPathStrc*, uint32_t, uint32_t);
 __attribute__((weak)) void sub_6FDAB810(int*, int*);
 
 template <class T> static T rd(const void* p, size_t o) { T v; std::memcpy(&v, (const char*)p + o, sizeof v); return v; }
@@ -14,7 +13,9 @@ template <class T> static void wr(void* p, size_t o, T v) { std::memcpy((char*)p
 
 // 1.13c D2Common+0x0D580: register map ESI = pPath; stack dx, dy (16.16 fixed), out[2], *pCount.
 // Walks the step in whole-tile increments, collision-moving each; returns 1 on a blocked tile.
-uint32_t sub_D580(void* pPathESI, int32_t dx, int32_t dy, int32_t* out, uint32_t* pCount)
+struct D2CommonD580Env { uint32_t (*move_collision)(void* pPath, uint32_t dst, uint32_t src); };   // 0x0D420: EAX = path, stack dst, src
+
+uint32_t sub_D580(void* pPathESI, int32_t dx, int32_t dy, int32_t* out, uint32_t* pCount, const D2CommonD580Env* env)
 {
     char* p = (char*)pPathESI;
     wr<uint32_t>(p, 0x1D4, 0);
@@ -32,7 +33,7 @@ uint32_t sub_D580(void* pPathESI, int32_t dx, int32_t dy, int32_t* out, uint32_t
         uint16_t nx = (uint16_t)((uint32_t)sx + x >> 16), nyh = (uint16_t)(nyU >> 16);
         uint32_t cur = nx | (uint32_t)nyh << 16;
         if (cx != nx || (uint16_t)(prev >> 16) != nyh) {
-            if (!D2Common_D420_PathMoveCollision((D2DynamicPathStrc*)p, cur, prev)) {
+            if (!env->move_collision(p, cur, prev)) {
                 out[0] = (int32_t)((x & 0xffff0000) + 0x8000);
                 out[1] = (int32_t)(((uint32_t)ny & 0xffff0000) + 0x8000);
                 *pCount = rd<uint32_t>(p, 0x1D4);

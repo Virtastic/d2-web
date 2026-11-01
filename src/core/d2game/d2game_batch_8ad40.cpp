@@ -33,28 +33,30 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8ad40(uint32_t eaxIn, uint32_t ecxI
     env->send8A3E0(client, b, 0x67);
 }
 
-// 0x8B1F0: 6-byte packet 0x79.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8b1f0(D2ClientStrc* client) { // 1.13c D2Game+0x8B1F0
+// 1.13c D2Game+0x8B1F0 (EAX = dword at 2, ECX = byte at 1, client on the stack): 6-byte packet 0x79.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8b1f0(D2ClientStrc* client, uint32_t eaxDword, uint8_t ecxByte) { // 1.13c D2Game+0x8B1F0
     uint8_t b[8] = {};
     b[0] = 0x79;
+    b[1] = ecxByte;
+    std::memcpy(b + 2, &eaxDword, 4);
     D2GAME_PACKETS_SendPacket_6FC3C710(client, b, 6);
 }
 
-// 0x8B2F0: relays a 0x15-byte block (EAX) verbatim.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8b2f0(void* client, const void* src, const D2GameBatch8AD40Env* env) { // 1.13c D2Game+0x8B2F0
+// 1.13c D2Game+0x8B2F0 (EAX = source, client on the stack): relays the 0x15-byte block at EAX verbatim.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8b2f0(D2ClientStrc* client, const void* src) { // 1.13c D2Game+0x8B2F0
     uint8_t b[0x15];
     std::memcpy(b, src, 0x15);
-    env->send8A3E0(client, b, 0x15);
+    D2GAME_PACKETS_SendPacket_6FC3C710(client, b, 0x15);
 }
 
-// 0x8B400: relays a 0x28-byte block (EAX); the NUL-terminated name at +8 longer than 15 is fatal
-// (Fog 10265(0x5DA) -> 10024 -> _exit(-1)).
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8b400(void* client, const void* src, const D2GameBatch8AD40Env* env) { // 1.13c D2Game+0x8B400
+// 1.13c D2Game+0x8B400 (EAX = source, client on the stack): relays the 0x28-byte block at EAX; a NUL-terminated name at +8
+// of 16 bytes or more is fatal (Fog 10265(0x5DA) -> 10024 -> _exit(-1)).
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8b400(D2ClientStrc* client, const void* src) { // 1.13c D2Game+0x8B400
     const char* name = (const char*)src + 8;
     if (strnlen(name, 32) > 15) _exit(-1);
     uint8_t b[0x28];
     std::memcpy(b, src, 0x28);
-    env->send8A3E0(client, b, 0x28);
+    D2GAME_PACKETS_SendPacket_6FC3C710(client, b, 0x28);
 }
 
 // 0x8C230: 0x10-byte packet: [1]=ecx low, [2..5]=edx, [6]=p4, [7]=p5, [8..11]=p6, [12..13]=p7, [14..15]=p8.

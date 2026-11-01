@@ -142,6 +142,15 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8ba50(void* client, uint32_t ecxIn,
     env->send8A3E0(client, b, 7);
 }
 
+// Probe entry for 0x8BA50 (ECX, EDX, client then a byte on the stack); `send` takes the place of 0x8A3E0.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2game_8ba50_send(void* client, uint32_t ecxIn, uint32_t edxIn, uint32_t param4,
+                                                       void (*send)(void*, const void*, uint32_t))
+{
+    D2GameBatch16Env env{};
+    env.send8A3E0 = send;
+    d2_game_8ba50(client, ecxIn, edxIn, param4, &env);
+}
+
 // 0x8A6C0: 7-byte packet 0x98 to the client in EAX; bytes 1..4 = ECX, 5..6 = DX.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8a6c0(void* client, uint32_t ecxIn, uint16_t dxIn, const D2GameBatch16Env* env) { // 1.13c D2Game+0x8a6c0
     uint8_t b[7];

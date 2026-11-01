@@ -1,4 +1,4 @@
-// 1.13c D2Common implementation batch: +0xE1E0.
+// 1.13c D2Common+0x0E1E0 (implementation batch).
 // Thin wrapper: hand the room, an extra pointer and a packed 32-bit coordinate pair to the tile
 // updater at 0xDF30 and, on success, clear the room's +0x28 dword.
 #include <cstdint>

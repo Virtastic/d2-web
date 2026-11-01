@@ -311,13 +311,14 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_967b0(uint32_t* r)
     r[4] = (uint32_t)d2game_967B0_113c((void*)(uintptr_t)r[0], (int32_t)r[1], batchEnv(r));
 }
 
-// 1.13c D2Game+0x8B9B0 (r[0]=client, r[1]=packet id, r[2]=GUID, r[3]=value, r[6]=attribute)
+// Probe entry for 0x8B9B0 (EAX = attribute, client and packet fields on the stack); `send` takes the place of 0x8A3E0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8b9b0(uint32_t* r)
+EMSCRIPTEN_KEEPALIVE void d2game_8b9b0_send(void* client, uint8_t nPacketId, uint32_t nGuid, uint32_t nValue,
+                                            uint16_t nAttribute, void (*send)(void*, const void*, uint32_t))
 {
-    d2game_8B9B0_113c((void*)(uintptr_t)r[0], (uint8_t)r[1], r[2], r[3], (uint16_t)r[6],
-                      batchEnv(r));
-    r[4] = 0;
+    D2GameBatchB74Env env{};
+    env.sendPacket = send;
+    d2game_8B9B0_113c(client, nPacketId, nGuid, nValue, nAttribute, env);
 }
 
 // 1.13c D2Game+0x8BD00 (r[0]=client EAX, r[1]=value ECX, r[6]=attribute DX)
@@ -336,12 +337,13 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d29f0(uint32_t* r)
     r[4] = 0;
 }
 
-// 1.13c D2Game+0x8AF10 (r[0]=record EAX, r[1]=client)
+// Probe entry for 0x8AF10 (EAX = record, client on the stack); `send` takes the place of 0x8A3E0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8af10(uint32_t* r)
+EMSCRIPTEN_KEEPALIVE void d2game_8af10_send(void* record, void* client, void (*send)(void*, const void*, uint32_t))
 {
-    d2game_8AF10_113c((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1], batchEnv(r));
-    r[4] = 0;
+    D2GameBatchB74Env env{};
+    env.sendPacket = send;
+    d2game_8AF10_113c(record, client, env);
 }
 
 // 1.13c D2Game+0x7A540 (r[0]=record ECX, r[1]=client)

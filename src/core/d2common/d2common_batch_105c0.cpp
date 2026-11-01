@@ -17,7 +17,7 @@ struct Cb {  // 94bd0, 5eec0, 94f90, 94950, 5e490
 
 extern "C" {
 // 1.13c D2Common+0x105C0
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_105c0(uint32_t head, uint32_t a, uint32_t b, const Cb* c) {
+EMSCRIPTEN_KEEPALIVE uint32_t d2common_105c0_engine(uint32_t head, uint32_t a, uint32_t b, const Cb* c) {
   uint32_t t = 0;
   for (uint32_t e = w(head, 0x10); e; e = w(e, 0x24)) {
     if (w(w(e, 0x20), 0xC) >> 1 & 1) continue;

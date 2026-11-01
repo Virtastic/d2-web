@@ -17,19 +17,19 @@ namespace
 // Seams: 0x1330 (no args) -> room record; 0x66700 / 0x66800 / 0x665C0 (list, [room]) room-list upkeep.
 struct D2CommonD760Env
 {
-	uint32_t (*get_room)(void);                       //0x00 0x1330
+	uint32_t (*get_room)(uint32_t pRoom, uint32_t nX, uint32_t nY);   //0x00 0x1330: EAX = pRoom to search from, EBX = X, EDI = Y
 	void (*list_remove)(uint32_t pList);              //0x04 0x66700
-	void (*list_add)(uint32_t pList, uint32_t pRoom); //0x08 0x66800
+	void (*list_add)(uint32_t pList, uint32_t pRoom, uint32_t nMode); //0x08 0x66800: the call passes 1 as the third word
 	void (*list_refresh)(uint32_t pList);             //0x0C 0x665C0
 };
 
 // 1.13c D2Common+0xD760: keep a path's room (+0x1C) valid. If the current room still contains the
 // path's (x=+2, y=+6) word position (room box x +0x4C/+0x54, y +0x50/+0x58) nothing happens.
-// Otherwise look the room up (retried when arg2 is set); when none is found and flag 0x40000 of
+// Otherwise look the room up from the old room, then (when arg2, a room pointer, is set) from arg2; when none is found and flag 0x40000 of
 // +0x34 is set, clear +0x28 and stop. Else the old room moves to +0x20, the new one is installed
 // (+0x34 |= 2) and the unit's room list (+0x30) is updated.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_d760(uint32_t pPath, int32_t nRetry, const D2CommonD760Env* pEnv)
+EMSCRIPTEN_KEEPALIVE void d2common_d760_port(uint32_t pPath, uint32_t nRetry, const D2CommonD760Env* pEnv)
 {
 	if (!pPath || !pEnv || !pEnv->get_room)
 		return;
@@ -42,8 +42,9 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_d760(uint32_t pPath, int32_t nRetry, co
 		    static_cast<int32_t>(R32(o, 0x50)) <= y && y < static_cast<int32_t>(R32(o, 0x58) + R32(o, 0x50)))
 			return;
 	}
-	uint32_t pNew = pEnv->get_room();
-	if (!pNew && (!nRetry || !(pNew = pEnv->get_room())) && (R32(path, 0x34) & 0x40000)) {
+	// 1.13c: the second argument is a room pointer (EAX of the second 0x1330 lookup), not a flag.
+	uint32_t pNew = pEnv->get_room(pOld, R16(path, 2), R16(path, 6));
+	if (!pNew && (!nRetry || !(pNew = pEnv->get_room(nRetry, R16(path, 2), R16(path, 6)))) && (R32(path, 0x34) & 0x40000)) {
 		*reinterpret_cast<uint32_t*>(path + 0x28) = 0;
 		return;
 	}
@@ -54,7 +55,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_d760(uint32_t pPath, int32_t nRetry, co
 	*reinterpret_cast<uint32_t*>(path + 0x1C) = pNew;
 	*reinterpret_cast<uint32_t*>(path + 0x34) |= 2;
 	if (pNew) {
-		if (pEnv->list_add) pEnv->list_add(pList, pNew);
+		if (pEnv->list_add) pEnv->list_add(pList, pNew, 1);
 		if (pEnv->list_refresh) pEnv->list_refresh(pList);
 	}
 }

@@ -169,6 +169,16 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8ADE0(uint32_t param1, uint32_t param2, u
     env->sendPacket(buf, 0x12);
 }
 
+// Probe entry for 0x8ADE0 (EAX = unit, EDX = other unit, two stack dwords after the client); `send` takes the place of 0x8A3E0.
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2game_8ade0_send(uint32_t eaxUnit, uint32_t edxUnit, uint32_t stack1, uint32_t stack2,
+                                            void (*send)(const void*, uint32_t))
+{
+    D2GameBatch97E20Env env{};
+    env.sendPacket = send;
+    d2_fn_d2game_8ADE0(0, edxUnit, 0, stack1, stack2, eaxUnit, &env);
+}
+
 // SCmd command dispatch on the byte in AL. '8' asserts through #10202 (SCmd.cpp line 0x9C2) when
 // #10516 answers non-zero, then runs the shared tail. '9' brackets the tail with #10020 before and
 // #10728 -> #10012 after, then restores the original value with #10012. Other bytes return.

@@ -1,4 +1,4 @@
-// 1.13c D2Common implementation batch: +0xE150.
+// 1.13c D2Common+0x0E150 (implementation batch).
 // Thin wrapper: hand an extra pointer and a packed 32-bit coordinate pair to the tile updater at
 // 0xDF30 and, on success, set the room's +0x38 dword to 15.
 #include <cstdint>
@@ -20,7 +20,7 @@ struct D2CommonE150Env
 // 1.13c D2Common+0x0e150 (#10906): update one room tile and set the room's +0x38 dword to 15.
 // param_2 is unused by the body. The two 16-bit coordinates pack as (nHi << 16) | nLo.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_e150(uint32_t pRoom, uint32_t unused2, uint32_t pArg,
+EMSCRIPTEN_KEEPALIVE int32_t d2common_e150_port(uint32_t pRoom, uint32_t unused2, uint32_t pArg,
                                                  uint16_t nLo, uint16_t nHi, const D2CommonE150Env* pEnv)
 {
 	(void)unused2;

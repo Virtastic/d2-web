@@ -340,6 +340,15 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8AEC0(uint32_t eaxUnit, const D2GameBatch
     env->sub8A3E0(buf, 0xB);
 }
 
+// Probe entry for 0x8AEC0 (EAX = unit, client on the stack); `send` takes the place of 0x8A3E0.
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2game_8aec0_send(uint32_t eaxUnit, void (*send)(void*, uint32_t))
+{
+    D2GameBatch1EF50Env env{};
+    env.sub8A3E0 = send;
+    d2_fn_d2game_8AEC0(eaxUnit, &env);
+}
+
 // Callback dispatch: EBX+0x10 indexes 0xC-byte rows of the 0x6FD22CE0 table; a non-null first dword is
 // called as (param_2, index) after an IsBadCodePtr gate whose failure logs the 0x148 allocation and
 // exits.

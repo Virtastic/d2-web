@@ -59,7 +59,7 @@ uint32_t pick(uint32_t head, int keyIdx, bool wantMax, int32_t kind, uint32_t di
 
 extern "C" {
 // 1.13c D2Common+0x106B0
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_106b0(uint32_t rec, uint32_t list, uint32_t* counter, void (*add)(uint32_t, uint32_t, uint32_t)) {
+EMSCRIPTEN_KEEPALIVE void d2common_106b0_engine(uint32_t rec, uint32_t list, uint32_t* counter, void (*add)(uint32_t, uint32_t, uint32_t)) {
   const uint32_t v = w(rec, 8);
   for (uint32_t n = w(list, 0x10); n; n = w(n, 0x24)) {
     const uint32_t o = w(n, 0x20);
@@ -77,11 +77,11 @@ done:
   }
 }
 // 1.13c D2Common+0x10730
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_10730(uint32_t head, const Cb* c) { return pick(head, 0xE, true, 3, 3, 1, c); }
+EMSCRIPTEN_KEEPALIVE uint32_t d2common_10730_engine(uint32_t head, const Cb* c) { return pick(head, 0xE, true, 3, 3, 1, c); }
 // 1.13c D2Common+0x10820
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_10820(uint32_t head, const Cb* c) { return pick(head, 0xD, true, 2, 2, 0, c); }
+EMSCRIPTEN_KEEPALIVE uint32_t d2common_10820_engine(uint32_t head, const Cb* c) { return pick(head, 0xD, true, 2, 2, 0, c); }
 // 1.13c D2Common+0x10A00
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_10a00(uint32_t head, const Cb* c) { return pick(head, 0xE, false, 1, 1, 3, c); }
+EMSCRIPTEN_KEEPALIVE uint32_t d2common_10a00_engine(uint32_t head, const Cb* c) { return pick(head, 0xE, false, 1, 1, 3, c); }
 
 // 1.13c D2Common+0x1A080
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_1a080(uint32_t u, void (*a)(), void (*b)(uint32_t), void (*c)()) {

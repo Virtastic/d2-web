@@ -15,7 +15,7 @@
 // refuses the move (and ends a missile's path) when the destination is outside the rider's room
 // list. A null rider or mount is fatal (0x54E / 0x54F) in retail.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_dab0(D2UnitStrc* pRiderUnit, D2UnitStrc* pMountUnit)
+EMSCRIPTEN_KEEPALIVE void d2common_dab0_engine(D2UnitStrc* pRiderUnit, D2UnitStrc* pMountUnit)
 {
 	D2_ASSERT(pRiderUnit);
 	D2_ASSERT(pMountUnit);

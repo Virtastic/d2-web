@@ -158,18 +158,20 @@ void D2Game_8AFB0_PacketSend3F(D2GSend send, void* client, const uint8_t* obj, u
     send(client, b, 8);
 }
 
-// 1.13c D2Game+0x8B360: opcode 0x5C, five bytes (bytes 1..4 unset in retail).
-void D2Game_8B360_PacketSend5C(D2GSend send, void* client)
+// 1.13c D2Game+0x8B360 (EAX = dword): opcode 0x5C, the EAX dword at byte 1. Five bytes, all written.
+void D2Game_8B360_PacketSend5C(D2GSend send, void* client, uint32_t eax)
 {
     uint8_t b[5] = { 0x5C, 0, 0, 0, 0 };
+    pk_w32(b, 1, eax);
     send(client, b, 5);
 }
 
-// 1.13c D2Game+0x8B540 (p2 byte, p4 byte, p5 flag, p6 byte): opcode 0x93, p4 at 5, p2 at 6, byte 7 = p6 when p5 is nonzero else 4.
-// Eight bytes (bytes 1..4 unset in retail).
-void D2Game_8B540_PacketSend93(D2GSend send, void* client, uint8_t p2, uint8_t p4, int p5, uint8_t p6)
+// 1.13c D2Game+0x8B540 (EAX = dword, EDX = p2 byte, p4 byte, p5 flag, p6 byte): opcode 0x93, the EAX dword at 1, p4 at 5,
+// p2 at 6, byte 7 = p6 when p5 is nonzero else 4. Eight bytes, all written.
+void D2Game_8B540_PacketSend93(D2GSend send, void* client, uint32_t eax, uint8_t p2, uint8_t p4, int p5, uint8_t p6)
 {
     uint8_t b[8] = { 0x93, 0, 0, 0, 0, 0, 0, 0 };
+    pk_w32(b, 1, eax);
     b[5] = p4;
     b[6] = p2;
     b[7] = p5 ? p6 : 4;

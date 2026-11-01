@@ -128,21 +128,32 @@ EMSCRIPTEN_KEEPALIVE uint8_t d2game_49db0(void* pClient)
 }
 
 // 1.13c D2Game+0x8B710
-// Packet 0x23 (13 bytes): header byte, one uninitialised gap byte in the retail frame, then the four
-// caller fields. Fastcall arguments param_1/param_3 are unused by the body.
+// Packet 0x23 (13 bytes): header, AL (param_1), EDX (param_2), then the three stack fields. The client
+// is the first stack argument; param_3 stands in for it and is not read here.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void D2GAME_SendPacket0x23_8B710(uint32_t param_1, uint32_t param_2, uint32_t param_3,
                                              uint8_t param_4, uint16_t param_5, uint32_t param_6,
                                              const D2GameBatch4c59Env* env)
 {
-    (void)param_1; (void)param_3;
+    (void)param_3;
     uint8_t packet[0xD] = {};
     packet[0] = 0x23;
+    packet[1] = (uint8_t)param_1;
     wr32(packet, 2, param_2);
     packet[6] = param_4;
     wr16(packet, 7, param_5);
     wr32(packet, 9, param_6);
     env->appendPacket(packet, 0xD);
+}
+
+// Probe entry for 0x8B710 (EAX, EDX; client then three fields on the stack); `send` takes the place of 0x8A3E0.
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2game_8b710_send(uint32_t eaxByte, uint32_t edxDword, uint8_t s1, uint16_t s2, uint32_t s3,
+                                            void (*send)(const void*, uint32_t))
+{
+    D2GameBatch4c59Env env{};
+    env.appendPacket = send;
+    D2GAME_SendPacket0x23_8B710(eaxByte, edxDword, 0, s1, s2, s3, &env);
 }
 
 // 1.13c D2Game+0x8BF80

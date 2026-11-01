@@ -274,8 +274,8 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_23060(void* self, uint32_t mode, void* re
 
 // Outgoing item-name packet: the record's 0x1A string must be shorter than 0x100 (assert 0x5BA),
 // byte +0x119 is cleared, the first 10 record bytes are copied, then the +0x0A string (16-byte copy)
-// and the +0x1A string (0x100-byte copy) are appended back to back, the second overwriting the first
-// copy's terminator. 0x8A3E0(client, buffer, length) sends it. EAX is the record, the stack argument
+// and the +0x1A string (0x100-byte copy) follow, each with its NUL, the second starting right after the
+// first one's NUL. 0x8A3E0(client, buffer, length) sends it. EAX is the record, the stack argument
 // the client.
 // 1.13c D2Game+0x8B470
 extern "C"
@@ -285,12 +285,29 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8B470(void* record, void* client,
     if (std::strlen((const char*)record + 0x1A) >= 0x100) d2game_fatal(0x5BA);
     wr8(record, 0x119, 0);
 
+    // Storm strcopy returns the characters copied without the NUL; the message starts one past the name's NUL.
     uint8_t buf[0x11C];
     std::memcpy(buf, record, 0x0A);
     const uint32_t nameLen = env->storm501(buf + 0x0A, (const uint8_t*)record + 0x0A, 0x10);
-    const uint32_t tailLen = env->storm501(buf + 0x0A + nameLen - 1,
-                                           (const uint8_t*)record + 0x1A, 0x100);
-    env->sub8A3E0(client, buf, 0x09 + nameLen + tailLen);
+    const uint32_t tailLen = env->storm501(buf + 0x0B + nameLen, (const uint8_t*)record + 0x1A, 0x100);
+    env->sub8A3E0(client, buf, 0x0C + nameLen + tailLen);
+}
+
+// Probe entry for 0x8B470; `send` takes the place of 0x8A3E0 and a local bounded copy the place of Storm's.
+static uint32_t d2game_8b470_scopy(void* dst, const void* src, uint32_t n)
+{
+    const char* s = (const char*)src; char* d = (char*)dst; uint32_t i = 0;
+    while (i + 1 < n && s[i]) { d[i] = s[i]; ++i; }
+    d[i] = 0;
+    return i;
+}
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2game_8b470_send(void* record, void* client, void (*send)(void*, const void*, uint32_t))
+{
+    D2GameBatch141E0Env env{};
+    env.storm501 = d2game_8b470_scopy;
+    env.sub8A3E0 = send;
+    d2_fn_d2game_8B470(record, client, &env);
 }
 
 // Eight-byte action packet: 0xA5, the low byte of ECX, the dword in EDX, the low word of the first
@@ -307,6 +324,16 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8BA10(uint32_t p1, uint32_t p2, void* cli
     std::memcpy(buf + 2, &p2, 4);
     std::memcpy(buf + 6, &arg, 2);
     env->sub8A3E0(client, buf, 8);
+}
+
+// Probe entry for 0x8BA10 (ECX byte, EDX dword, client, word); `send` takes the place of 0x8A3E0.
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2game_8ba10_send(uint32_t ecxByte, uint32_t edxDword, void* client, uint16_t arg,
+                                            void (*send)(void*, const void*, uint32_t))
+{
+    D2GameBatch141E0Env env{};
+    env.sub8A3E0 = send;
+    d2_fn_d2game_8BA10(ecxByte, edxDword, client, arg, &env);
 }
 
 // Pet-list node removal. Unlink the node whose +4 equals ECX from the list at *arg1 (+0x14 next),

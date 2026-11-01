@@ -23,7 +23,7 @@
 // room is checked, and movement state is reset; it returns 1. The vendored D2MOO body already
 // carries the 1.13c branch (Step.cpp, //1.13c 0x6FD5DCE0).
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_dce0(D2DynamicPathStrc* pPath, D2UnitStrc* pUnit,
+EMSCRIPTEN_KEEPALIVE int32_t d2common_dce0_engine(D2DynamicPathStrc* pPath, D2UnitStrc* pUnit,
 	D2ActiveRoomStrc* pDestRoom, int32_t nTargetX, int32_t nTargetY)
 {
 	return D2Common_10232(pPath, pUnit, pDestRoom, nTargetX, nTargetY) ? 1 : 0;

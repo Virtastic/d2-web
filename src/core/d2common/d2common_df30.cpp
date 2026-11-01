@@ -2,20 +2,7 @@
 // The tile walkers below remain seams: they are separate D2Common entry points and
 // retain their retail argument order at this boundary.
 #include <cstdint>
-#include <emscripten.h>
-
-struct D2CommonDF30Env
-{
-	void (*walk_base)(uint32_t pTiles, uint32_t nX, uint32_t nY, uint32_t pBase, uint32_t nMode);
-	void (*walk_tile)(uint32_t pTile, uint32_t nX, uint32_t nY, uint32_t pBase, uint32_t nMode);
-	void (*refresh_room)(uint32_t pTiles, uint32_t nX, uint32_t nY, uint32_t nState, uint32_t nMode);
-	uint16_t (*get_tile_state)(uint32_t pTile, uint32_t nX, uint32_t nY, uint32_t nState, uint32_t nFlags);
-	void (*set_tile_state)(uint32_t pTile, uint32_t nX, uint32_t nY, uint32_t nState, uint32_t nMode);
-	void (*set_world_position)(uint32_t nXFixed, uint32_t nYFixed, uint32_t pTile);
-	uint32_t (*get_current_unit)(void);
-	void (*fatal)(uint32_t nMessage);
-	void (*finish_update)(void);
-};
+#include "d2common_df30.h"
 
 namespace
 {
@@ -48,7 +35,7 @@ namespace
 // Models the register-context function body. pContext is the retail EAX context,
 // pTile and nCoords are the two stack arguments. All pointers stored in retail state
 // remain 32-bit values; callbacks resolve the corresponding engine entry points.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_df30(
+extern "C" int32_t d2common_df30_port(
 	uint32_t pContext, uint32_t pTile, uint32_t nCoords, const D2CommonDF30Env* env)
 {
 	if (!pContext || !env)
@@ -109,16 +96,16 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_df30(
 
 	if (pTiles != pTile)
 		W32(context, 0x34, R32(context, 0x34) | 1u);
-	if (env->set_world_position)
-		env->set_world_position(nCoords * 0x10000u + 0x8000u,
+	if (env->recache_room)
+		env->recache_room(pContext, nCoords * 0x10000u + 0x8000u,
 			 nHighY * 0x10000u + 0x8000u, pTile);
-	if (nCoords != 0 && env->get_current_unit && env->get_current_unit() == 0)
+	if (nCoords != 0 && env->get_room && env->get_room(pTile, nLowX, nHighY) == 0)
 	{
 		if (env->fatal)
 			env->fatal(0x489);
 		return 0;
 	}
 	if (env->finish_update)
-		env->finish_update();
+		env->finish_update(pContext);
 	return 1;
 }

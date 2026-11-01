@@ -296,38 +296,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_79100(uint32_t eaxUnit, uint32_t param1,
     env->sub77B20();
 }
 
-// 1.13c D2Game+0x8b010
-// Packet 0x3E (item stat update) writer; the 1.10f form is
-// D2GAME_PACKETS_SendPacket0x3E_6FC3EC20(pClient, pItem, a3, nStatId, nValue, a6). The packet is
-// {0x3E, size, 0x20-byte bit payload}. Fields in order: variable-width GUID (item+0xC, or -1 for a
-// null item) through 0x1CD0, a 1-bit a3 flag, 9-bit nStatId, variable-width nValue, then a6 as 8
-// bits (flag 0) or 16 bits (flag 1). The flush length plus the 2-byte header becomes the size byte;
-// the 0x22-byte packet is queued through 0x8A3E0. pClient is register-only and is not read here.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8b010(uint32_t pClient, uint32_t pItem, uint32_t a3,
-                                             uint32_t nStatId, uint32_t nValue, uint32_t a6,
-                                             const D2GameBatchD40F0Env* env)
-{
-    (void)pClient;
-    uint8_t packet[0x22] = {0};
-    uint8_t writer[20];
-    packet[0] = 0x3E;
-    env->bitWriterInit(writer, packet + 2, 0x20);
-    const uint32_t guid = pItem ? rd32((void*)(uintptr_t)pItem, 0x0C) : 0xFFFFFFFFu;
-    env->bitWriteVar(writer, guid);                             // 0x1CD0
-    env->bitWriterWrite(writer, a3 != 0, 1);
-    env->bitWriterWrite(writer, nStatId, 9);
-    env->bitWriteVar(writer, nValue);                           // 0x1CD0
-    if (a6 < 0x100) {
-        env->bitWriterWrite(writer, 0, 1);
-        env->bitWriterWrite(writer, a6, 8);
-    } else {
-        env->bitWriterWrite(writer, 1, 1);
-        env->bitWriterWrite(writer, a6, 16);
-    }
-    packet[1] = (uint8_t)(env->bitWriterFlush(writer) + 2);
-    env->sendPacket(packet, 0x22);
-}
+// 0x8B010 (the 0x3E item stat packet) lives in D2GAME_PACKETS_SendPacket0x3E_6FC3EC20 (game_net_stubs.cpp).
 
 // 1.13c D2Game+0x97120
 // Pet-list allocator; the 1.10f form is PLAYERPETS_AllocPetList_6FC7CAF0. Ordinal_10920(player)
