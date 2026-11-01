@@ -71,20 +71,21 @@ namespace
 	}
 
 	// 0x1500: skills.txt row -> wSkillDesc -> skilldesc.txt row, as a byte offset (0x120 rows).
-	uint32_t SkillDescOffset(int32_t nSkillId)
+	// -1 is NULL (retail's 0 row pointer); otherwise the offset, which may be 0 for row 0.
+	int64_t SkillDescOffset(int32_t nSkillId)
 	{
 		if (!sgptDataTables->pSkillsTxt || nSkillId < 0 || nSkillId >= sgptDataTables->nSkillsTxtRecordCount)
 		{
-			return 0;
+			return -1;
 		}
 
 		const int16_t nSkillDesc = static_cast<int16_t>(sgptDataTables->pSkillsTxt[nSkillId].wSkillDesc);
 		if (!sgptDataTables->pSkillDescTxt || nSkillDesc < 0 || nSkillDesc >= sgptDataTables->nSkillDescTxtRecordCount)
 		{
-			return 0;
+			return -1;
 		}
 
-		return static_cast<uint32_t>(nSkillDesc) * 0x120;
+		return static_cast<int64_t>(nSkillDesc) * 0x120;
 	}
 
 	// 0x1550..0x15E0: skills.txt dwParam[0..3] of the skill row nSkillId.
@@ -164,9 +165,10 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_12d0(uint32_t* r)
 {
 	if (!TablesLoaded()) { r[4] = 0x7EADBEEF; return; }
 	const int32_t nClassId = static_cast<int32_t>(r[0]);
+	// NULL is 0xFFFFFFFF in the vector (fnptr capture); an offset of 0 is a real row.
 	if (!sgptDataTables->pCharStatsTxt || nClassId < 0 || nClassId >= sgptDataTables->nCharStatsTxtRecordCount)
 	{
-		r[4] = 0;
+		r[4] = 0xFFFFFFFFu;
 		return;
 	}
 	r[4] = static_cast<uint32_t>(nClassId) * 0xC4;
@@ -190,7 +192,8 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_1470(uint32_t* r)
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_1500(uint32_t* r)
 {
 	if (!TablesLoaded()) { r[4] = 0x7EADBEEF; return; }
-	r[4] = SkillDescOffset(static_cast<int32_t>(r[0]));
+	const int64_t nOffset = SkillDescOffset(static_cast<int32_t>(r[0]));
+	r[4] = nOffset < 0 ? 0xFFFFFFFFu : static_cast<uint32_t>(nOffset);
 }
 
 // 1.13c D2Common+0x1550: skills.txt dwParam[0] (+0x148) of nSkillId.

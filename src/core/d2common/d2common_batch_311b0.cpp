@@ -106,18 +106,12 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_38850(uint32_t pRecord, uint32_t pConte
 	}
 }
 
-// +0x132A0 GetGlobalBeltRecord: copies the 0x108-byte record at
-// (nRow * 7 + nIndex) of the global belt table to pOut. The table base is retail's global
-// DAT_6fdf13dc and arrives through the env seam; a zero base with index 0 is retail's fatal path
-// and becomes a no-op.
-struct D2Common132A0Env
+// 1.13c D2Common+0x132A0 GetGlobalBeltRecord: copies the 0x108-byte record at (nRow * 7 + nIndex) of
+// the global belt table (gpBeltsTxtTable, loaded by bringUp) to pOut. A null table with index 0 is
+// retail's fatal path and becomes a no-op. The FN probe is src/core/fn/d2common_132a0.cpp.
+void D2Common_132A0_GetGlobalBeltRecord(uint32_t nIndex, uint32_t nRow, uint32_t* pOut)
 {
-	const uint8_t* pBeltRecords;													//0x00
-};
-
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_132a0(uint32_t nIndex, uint32_t nRow, uint32_t* pOut, const D2Common132A0Env* pEnv) {   // 1.13c D2Common+0x132a0
-	const uint8_t* pBase = pEnv ? pEnv->pBeltRecords : nullptr;
+	const uint8_t* pBase = reinterpret_cast<const uint8_t*>(gpBeltsTxtTable);
 	if (!pBase && nIndex == 0)
 		return;
 	if (!pOut)

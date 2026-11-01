@@ -4,7 +4,7 @@
 
 extern "C" {
 // 1.13c D2Common+0x4DC70
-int32_t D2Common_4DC70_Interp(int32_t p1, int32_t lo, int32_t hi) {
+EMSCRIPTEN_KEEPALIVE int32_t D2Common_4DC70_Interp(int32_t p1, int32_t lo, int32_t hi) {
  int32_t v = ((p1 * 0x6e) / (p1 + 6)) * (hi - lo) / 100 + lo;
  if (v <= ((p1 * 0x6e - 0x6e) / (p1 + 5)) * (hi - lo) / 100 + 1 + lo)
   return D2Common_4DC70_Interp(p1 - 1, lo, hi) + 1;
