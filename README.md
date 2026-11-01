@@ -78,7 +78,30 @@ services:
 
 Then open `http://localhost:8080/`. Anywhere other than localhost, put HTTPS in front of the container (Caddy, nginx, Cloudflare Tunnel), because the engine needs `SharedArrayBuffer`, which browsers grant only on HTTPS or localhost.
 
-Cut a release with `bash ci/build.sh && tools/docker-release.sh v0.1.1`. The script builds the image from `build-wasm/site`, leaves out `vectors/` and `widebg/` (retail-derived), and pushes `<tag>` and `latest`.
+### Building your own image
+
+```sh
+bash ci/build.sh                          # with your game files in retail/D2/ -- see "Front-door art" below
+tools/docker-release.sh v0.1.1 --no-push  # build the image locally only
+tools/docker-release.sh v0.1.1            # build, then push <tag> and latest
+```
+
+`tools/docker-release.sh` builds the image from the staged site in `build-wasm/site/`. Before
+building, it checks that the site is complete:
+
+| staged path | if it is missing |
+|---|---|
+| `e/<version>/d2.wasm`, `serve.mjs` | stops: run `ci/build.sh` first |
+| `assets/patch-113c.patch` | stops: stage with your 1.13c `patch_d2.mpq` (see below) |
+| `door-art/meta.json` | stops: stage with `patch_d2.mpq`, `d2exp.mpq` and `d2data.mpq` (see below) |
+| `freeres/` (16 `.dc6` files and `LICENSE.md`) | stops: run `ci/stage.sh`; these files are in git |
+| `widebg/manifest.json` | warns and builds without it: the menus use the game's own 4:3 backgrounds |
+
+The image always leaves out `vectors/`, `diag/` and any link to your game folder.
+
+**The image contains files made from your game data.** The front-door art and the patch file are
+cut from your game files when you build, and both are copied into the image. Treat the image like
+your game files: keep it on your own registry or machine unless you are sure you may share it.
 
 ## 1. Build
 
@@ -93,6 +116,120 @@ bash ci/build.sh
 
 `ci/build.sh` builds an emscripten toolchain image, compiles the engine to wasm and writes the
 finished site to `build-wasm/site/`. The first run takes a while; later runs are cached.
+
+### Front-door art and the patch file (built from your own game files)
+
+The front door is the page a player sees before choosing their game files: the title art, the
+file picker and the loading screen. It reads four folders from the staged site. One is in git.
+Two are cut from **your own** game files every time you build. One is optional and made by
+hand. Nothing made from game data is ever committed, which is why a fresh clone does not have it.
+
+| staged path | what it is | made from | made by | without it |
+|---|---|---|---|---|
+| `freeres/` | the widescreen bottom bar and border panels: 16 `.dc6` files plus their licence | `play/freeres/` in git (SGD2FreeRes art, under its own licence) | `ci/stage.sh` copies it | the build stops |
+| `door-art/` | the title-screen art the door draws before any files are chosen (details below) | your `patch_d2.mpq`, `d2exp.mpq`, `d2data.mpq` | `tools/door-art.mjs` | warning; the door draws in a plain web font until the player's files load, then cuts the same art in the browser from the player's files |
+| `assets/patch-113c.patch` | your 1.13c `patch_d2.mpq` as base64 text | your 1.13c `patch_d2.mpq` | `tools/patch-shim.mjs` | warning; each player then runs on their own `patch_d2.mpq`, which has to be 1.13c |
+| `widebg/` | optional widescreen menu backgrounds | images you supply | `ci/stage.sh` copies them | the menus use the game's own 4:3 backgrounds |
+
+**What `door-art/` contains:**
+
+- the burning logo, in four PNGs: `logo_blackL`, `logo_fireL`, `logo_blackR`, `logo_fireR`;
+- the wide button (`wide`), the hand cursor (`cursor`) and the loading screen (`loading`);
+- font sheets cut from the game's bitmap fonts:
+  - `f_font16_<colour>` in white, red, gold, grey and tan;
+  - `f_font30_gold`;
+  - `f_fontexocet10_white`;
+- `meta.json`, which gives the width of every character in each font.
+
+**The text is not baked into the images.** Each font sheet is a grid with one cell per character.
+The words are ordinary strings in `play/assets/byo-door.mjs`, and the door copies one character at
+a time from the sheet onto the canvas, the way the game draws text. To change the wording, edit the
+code; you never need to edit the art.
+
+The art comes from `data\global\ui\FrontEnd\`, `data\local\font\latin\` and the palettes in
+`data\global\palette\`. When a file is in more than one archive, the first one wins, in the order
+`patch_d2.mpq`, `d2exp.mpq`, `d2data.mpq`.
+
+**Why the patch file exists.** Players can bring a game at any patch level, but the engine only
+reads 1.13c data. The page therefore mounts `patch-113c.patch` as `Patch_D2.mpq` on top of
+whatever patch the player chose. The base archives are the same at every patch level, so the
+player only has to supply those.
+
+#### Building them
+
+Put three archives from a Diablo II: Lord of Destruction install **patched to 1.13c** in
+`retail/D2/`. `*.mpq` files are gitignored, so they can never be committed. Then build:
+
+```sh
+mkdir -p retail/D2
+cp "/path/to/Diablo II/Patch_D2.mpq" retail/D2/patch_d2.mpq
+cp "/path/to/Diablo II/d2exp.mpq"    retail/D2/d2exp.mpq
+cp "/path/to/Diablo II/d2data.mpq"   retail/D2/d2data.mpq
+bash ci/build.sh            # or ci/stage.sh, to restage without rebuilding the wasm
+```
+
+The build log should print both of these lines:
+
+```
+patch shim: retail/D2/patch_d2.mpq (... bytes) -> build-wasm/site/assets/patch-113c.patch
+door-art: ... images -> build-wasm/site/door-art
+```
+
+If you get `WARNING: no retail/D2/d2data.mpq` or `WARNING: no retail/D2/patch_d2.mpq` instead,
+check the names: the build looks them up in **lower case** (`patch_d2.mpq`, `d2data.mpq`).
+
+To use your install folder without copying, set `D2_PATCH_SHIM_SRC=/path/to/Diablo\ II/patch_d2.mpq`.
+The build looks for `d2exp.mpq` and `d2data.mpq` in the same folder as that patch.
+
+You can also run both tools on their own:
+
+```sh
+node tools/patch-shim.mjs "/path/to/Diablo II/Patch_D2.mpq" build-wasm/site/assets/patch-113c.patch
+node tools/door-art.mjs   "/path/to/Diablo II"              build-wasm/site/door-art
+```
+
+`tools/door-art.mjs` accepts any letter case in the archive names.
+
+#### Widescreen menu backgrounds (optional)
+
+d2-web opens in a widescreen view by default. Each menu screen (title, game select, character
+select, character creation, credits) normally draws the game's own 800×600 background, centred
+with black bars on either side. To fill the whole screen instead, supply larger painted
+backgrounds:
+
+1. Put a JPG or PNG for each screen in `.widebg/` at the root of the main checkout, or in any
+   folder named by `D2_WIDEBG_DIR`. `.widebg/` is gitignored.
+2. Add a `manifest.json` in the same folder. Each screen is keyed by the lower-case name of the
+   game background it replaces:
+   - `trademarkscreenexp` (title screen);
+   - `gameselectscreenexp` (game select);
+   - `characterselectscreenexp` (character select);
+   - `charactercreationscreenexp` (character creation);
+   - `creditsbckgexpand` (credits).
+
+   ```json
+   {
+     "trademarkscreenexp": { "file": "title.jpg", "w": 2752, "h": 1536, "s": 1.94, "ox": 585.31, "oy": 283.5 },
+     "gameselectscreenexp": { "file": "gameselect.jpg", "w": 2752, "h": 1536, "s": 2.5171, "sy": 2.5685, "ox": 373.69, "oy": -3.38 }
+   }
+   ```
+
+   | field | meaning |
+   |---|---|
+   | `file` | the image file, in the same folder as `manifest.json` |
+   | `w`, `h` | the image's width and height in pixels |
+   | `ox`, `oy` | where the game screen's top-left pixel (0,0) sits in the image |
+   | `s` | how many image pixels one game pixel covers, horizontally |
+   | `sy` | the same, vertically; defaults to `s` (set it only for an image stretched slightly differently in each direction) |
+
+   These values line your image up with the game's 800×600 screen. Buttons, text and other
+   overlays are still drawn at the game's own positions, so the painting has to match the
+   original background where the overlays sit.
+3. Run `ci/stage.sh` (or `ci/build.sh`). It copies the folder to `build-wasm/site/widebg/`,
+   following links.
+
+A screen with no entry, or a missing `widebg/` folder, uses the game's own background. The repo
+ships no backgrounds. Use only images you have the right to use.
 
 ## 2. Run it locally
 
