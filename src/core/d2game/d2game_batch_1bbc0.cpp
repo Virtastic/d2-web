@@ -1,33 +1,61 @@
-// src/core/d2game/d2game_batch_1bbc0.cpp -- 1.13c D2Game.dll sub_1BBC0 transcribed from the cached
-// Ghidra decompile (build-wasm/ghidra-d2game/decomp/0x1BBC0.c). Retail data (callback table at
-// 0x6FD2F850) and the 0x11D0 callee arrive as host seams.
+// src/core/d2game/d2game_batch_1bbc0.cpp -- 1.13c D2Game.dll sub_1BBC0 written from the cached
+// Ghidra decompile and the disassembly (stdcall pGame, pUnit, pCtx; ret 0xC). Retail records are read as
+// 32-bit dwords at their retail byte offsets; the handler table at 0x6FD2F850 is a host seam.
 #include <cstdint>
 #include <cstring>
 #include <emscripten.h>
+#include "../prng.h"
+
+extern "C" uint32_t D2Game_SEED_RollLimitedRandomNumber(d2::Seed* pSeed, int32_t nLimit);   // 1.13c D2Game+0x11D0
 
 struct D2Game1BBC0Env {
-    uint32_t (*sub11D0)(uint64_t* seed);                          // 0x11D0, returns an index
-    uint32_t (*handlers[7])(const void* ctx, const void* rec);   // table at 0x6FD2F850 (nullable)
+    // table at 0x6FD2F850 (nullable): handler(ECX = pGame, EDX = pUnit, stack pCtx, pRec), ret 8
+    uint32_t (*handlers[7])(const void* game, void* unit, const void* ctx, const void* rec);
 };
 
-// 1.13c D2Game+0x1BBC0. seedBase = param_2 (+0x20 u64 seed state, +0x24 high dword); ctx = param_3;
-// piVar1 = *(*ctx + 0x38) -> {count, records*, ...}; records are 0xC bytes, +0 = kind.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_1bbc0(uint32_t eax, uint8_t* seedBase, const uint32_t* const* ctx, const D2Game1BBC0Env* env) {
-    auto rd32 = [](const void* p) { uint32_t v; std::memcpy(&v, p, 4); return v; };
-    const uint8_t* g = (const uint8_t*)*(const uint8_t* const*)ctx;
-    const uint8_t* p1 = (const uint8_t*)(uintptr_t)rd32(g + 0x38);
-    if (!p1) return eax & 0xffffff00u;
-    uint64_t s; std::memcpy(&s, seedBase + 0x20, 8);
-    s = (uint64_t)(uint32_t)s * 0x6ac690c5ull + rd32(seedBase + 0x24);
-    std::memcpy(seedBase + 0x20, &s, 8);
-    uint32_t lo = (uint32_t)s;
-    eax = lo / 100;
-    if (lo % 100 >= 0x42) return eax & 0xffffff00u;
-    if (rd32(p1) == 0) return eax & 0xffffff00u;
-    uint32_t idx = env->sub11D0((uint64_t*)(seedBase + 0x20));
-    const uint8_t* rec = (const uint8_t*)(uintptr_t)rd32(p1 + 4) + idx * 0xc;
-    int32_t k = (int32_t)rd32(rec);
-    if (k < 0 || k >= 7) return (uint32_t)(uintptr_t)rec & 0xffffff00u;
-    if (!env->handlers[k]) return (uint32_t)(uintptr_t)rec & 0xffffff00u;
-    return env->handlers[k](ctx, rec);
+static inline uint32_t rd32_1bbc0(const void* p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
+
+// 1.13c D2Game+0x1BBC0. unit+0x20 is the u64 seed; ctx -> g (dword at ctx+0), g+0x38 -> {count, records*};
+// records are 0xC bytes, +0 = kind. Returns AL only (the other bits are residue).
+static uint32_t sub_1BBC0(const void* game, void* unit, const void* ctx, const D2Game1BBC0Env* env)
+{
+    const uint8_t* g = (const uint8_t*)(uintptr_t)rd32_1bbc0(ctx, 0);
+    const uint8_t* p1 = (const uint8_t*)(uintptr_t)rd32_1bbc0(g, 0x38);
+    if (!p1) return 0;
+    d2::Seed* seed = (d2::Seed*)((uint8_t*)unit + 0x20);
+    uint32_t lo = (uint32_t)d2::roll(*seed);
+    if (lo % 100 >= 0x42) return 0;
+    int32_t count = (int32_t)rd32_1bbc0(p1, 0);
+    if (count == 0) return 0;
+    uint32_t idx = D2Game_SEED_RollLimitedRandomNumber(seed, count);
+    const uint8_t* rec = (const uint8_t*)(uintptr_t)rd32_1bbc0(p1, 4) + idx * 0xc;
+    int32_t k = (int32_t)rd32_1bbc0(rec, 0);
+    if (k < 0 || k >= 7) return 0;
+    if (!env->handlers[k]) return 0;
+    return env->handlers[k](game, unit, ctx, rec) & 0xffu;
+}
+
+// FN probe: stdcall (pGame, pUnit, pCtx); ctx+4 carries the call-log blob (retail never reads it past +0).
+// The five table handlers are recorded like the capture's hooks (count, then rva, eax, ecx, edx, ebx, esi, s0..s3 per call)
+// and return 1, as the descriptor's hooks (V = 1) do.
+static uint32_t* g_log1bbc0;
+static uint32_t g_ret1bbc0;
+template <uint32_t Rva> static uint32_t h1bbc0(const void* game, void* unit, const void* ctx, const void* rec)
+{
+    uint32_t* w = g_log1bbc0 + 1 + g_log1bbc0[0]++ * 10;
+    w[0] = Rva; w[1] = 0; w[2] = (uint32_t)(uintptr_t)game; w[3] = (uint32_t)(uintptr_t)unit; w[4] = w[5] = 0;
+    w[6] = (uint32_t)(uintptr_t)ctx; w[7] = (uint32_t)(uintptr_t)rec; w[8] = w[9] = 0;
+    return g_ret1bbc0;
+}
+// 1.13c D2Game+0x1BBC0
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_1bbc0(uint32_t* r)
+{
+    D2Game1BBC0Env env{};
+    env.handlers[1] = h1bbc0<0x16970>; env.handlers[2] = h1bbc0<0x19BB0>; env.handlers[3] = h1bbc0<0x19BA0>;
+    env.handlers[4] = h1bbc0<0x19AD0>; env.handlers[5] = h1bbc0<0x19A00>;
+    const uint8_t* game = (const uint8_t*)(uintptr_t)r[0];
+    g_log1bbc0 = (uint32_t*)(uintptr_t)rd32_1bbc0((const void*)(uintptr_t)r[2], 4);
+    g_log1bbc0[0] = 0;
+    g_ret1bbc0 = 1;
+    r[4] = sub_1BBC0(game, (void*)(uintptr_t)r[1], (const void*)(uintptr_t)r[2], &env);
 }

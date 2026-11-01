@@ -22,6 +22,15 @@ struct HookEnv {
     static uint32_t handlerRva(uint32_t p) { return p & 0xFFFFFF; }   // table words are recorded as 0xB2000000|rva
     static bool isStk(uint32_t a) { return a >= (uint32_t)emscripten_stack_get_end() && a < (uint32_t)emscripten_stack_get_base(); }
     uint32_t stk(const void* p) const { return (uint32_t)(uintptr_t)p; }   // a local's address: only the log tags it (0xB3000000)
+    // hookblk: log n dwords of a stack block the callee was handed, 9 per record (rva|0x40000000); a clear MASK bit (word < 32) records 0
+    void blk(uint32_t rva, const uint32_t* b, uint32_t n, uint32_t mask = ~0u) {
+        for (uint32_t o = 0; o < n; o += 9) {
+            if (L[0] >= kLogMax) abort();
+            uint32_t* e = L + 1 + L[0]++ * 10;
+            e[0] = rva | 0x40000000u;
+            for (uint32_t j = 0; j < 9; j++) { uint32_t i = o + j, v = i < n ? b[i] : 0; if (i < 32 && !(mask >> i & 1)) v = 0; e[1 + j] = isStk(v) ? 0xB3000000u : v; }
+        }
+    }
     uint32_t h(uint32_t rva, uint32_t a = 0, uint32_t c = 0, uint32_t d = 0, uint32_t b = 0, uint32_t s = 0,
                uint32_t s0 = 0, uint32_t s1 = 0, uint32_t s2 = 0, uint32_t s3 = 0, uint32_t s4 = 0) {
         if (L[0] >= kLogMax) abort();   // log capacity exceeded
