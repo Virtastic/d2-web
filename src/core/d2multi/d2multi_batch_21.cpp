@@ -13,13 +13,20 @@ extern uint8_t *DAT_6fa09ef4, *DAT_6fa09f08, *DAT_6fa09f14;
 extern int32_t DAT_6fa09f04, DAT_6fa0a0c8, DAT_6fa0a0d4;
 extern char DAT_6fa09198[];
 extern uint32_t *gdwBitMasks_exref, *gdwInvBitMasks_exref;
-void win2Unicode(uint16_t*, const char*, int32_t);   // Unicode::win2Unicode
-void utf8ToUnicode(uint16_t*, const char*, int32_t); // Unicode::utf8ToUnicode
 uint16_t* ustrcat(uint16_t*, const uint16_t*);            // Unicode::strcat
 void d2_multi_sub_eb70(uint16_t*);
 void d2_multi_sub_ec80(int32_t, uint16_t*);
 void d2_multi_sub_ed60(uint16_t*, int32_t);
 }
+
+// Widen helpers. Unicode::win2Unicode is a __fastcall member (d2lang shim) that the d2multi link does not reach by a plain name.
+// These local stand-ins widen ASCII only (NUL-terminated). FB40 never reads its buffer; rows that do read it are not VECTORED.
+static void win2Unicode(uint16_t* d, const char* s, int32_t n) {
+    int32_t i = 0;
+    for (; i < n - 1 && s[i]; ++i) d[i] = (uint8_t)s[i];
+    d[i] = 0;
+}
+static void utf8ToUnicode(uint16_t* d, const char* s, int32_t n) { win2Unicode(d, s, n); }
 
 static inline uint8_t*& nxt(uint8_t* n) { return *(uint8_t**)(n + 0xb0); }
 static inline uint32_t rank(uint8_t* n) {
@@ -80,7 +87,7 @@ void d2_multi_sub_f750(void) {
 int32_t d2_multi_sub_fb40(char* s) {
     uint16_t u[0x240] = {};
     win2Unicode(u, s, 0x240);
-    if (DAT_6fa0a0d4) { Ordinal_10106(); Ordinal_10000(); }
+    if (DAT_6fa0a0d4) { Ordinal_10106(); Ordinal_10000(); }  // retail: Ordinal_10000(3,0,0); the shared shim takes no arguments
     return 1;
 }
 
