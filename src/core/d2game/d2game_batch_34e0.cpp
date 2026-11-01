@@ -33,35 +33,7 @@ static inline void* rdptr(const void* p, uint32_t o) { return (void*)(uintptr_t)
 
 [[noreturn]] static void d2game_fatal(uint32_t) { _exit(-1); }
 
-// Host seams for the callees the cached decompiles name but src/ does not implement here.
-struct D2GameBatch20Env {
-    // Ordinal_10920 UNITS_GetPlayerData(unit).
-    void*    (*getPlayerData)(void* unit);
-    // Ordinal_10174 QUESTRECORD_GetQuestState(pQuestFlags, nQuest, nFlag) -> 0/1.
-    int32_t  (*getQuestState)(void* pQuestFlags, int32_t nQuest, int32_t nFlag);
-    // 0x33830 QUESTS_FastRemovePlayerGUID(pGUIDs, dwGUID).
-    int32_t  (*fastRemovePlayerGUID)(void* pGUIDs, int32_t dwGUID);
-    // 0x33F30 QUESTS_GetQuestData(pGame, nQuestId).
-    void*    (*getQuestData)(void* pGame, int32_t nQuestId);
-    // Ordinal_10331 UNITS_GetRoom(unit).
-    void*    (*getRoom)(void* unit);
-    // Ordinal_10826 DUNGEON_GetLevelIdFromRoom(room).
-    uint32_t (*getLevelIdFromRoom)(void* room);
-    // Ordinal_10459 level/act table lookup, returning the act byte.
-    uint32_t (*levelLookup)(uint32_t levelId);
-    // Ordinal_10119 BITMANIP_GetBitState(pBuffer, bit).
-    int32_t  (*getBitState)(void* pBuffer, uint32_t bit);
-    // Ordinal_10118 BITMANIP_SetBitState(pBuffer, bit).
-    void     (*setBitState)(void* pBuffer, uint32_t bit);
-    // 0x8A3E0 D2GAME_PACKETS_SendPacket(packet, size).
-    void     (*sendPacket)(const void* packet, uint32_t size);
-    // IsBadCodePtr(fn): nonzero when fn is not callable.
-    int32_t  (*isBadCodePtr)(void* fn);
-    // 0x34510's call *0xA0(unit, 5*4): __fastcall handler(unit in ECX, event record in EDX).
-    void     (*dispatchHandler)(void* unit, const uint32_t* event);
-    // 0x3502's destructor callback argument of __ArrayUnwind.
-    void     (*arrayUnwindOne)(void* element);
-};
+#include "d2game_batch20env.h"
 static const D2GameBatch20Env kNoEnv = {};
 static const D2GameBatch20Env& d2game_env(const uint32_t* r) {
     return r[5] ? *(const D2GameBatch20Env*)(uintptr_t)r[5] : kNoEnv;
@@ -222,7 +194,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_34440(uint32_t* r) {
 // +0xA is 1, take handler[5] from the table at unit+0xA0 (0xA0 + 5*4), reject a non-callable pointer with
 // the retail 0x23E assert, and call it __fastcall(unit, event) where event is the 16-byte record
 // {ecxArg, 5, game, edxArg} built on the stack. r[0]=game (EAX), r[1]=ecx arg, r[2]=edx arg.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_34510(uint32_t* r) {
+void D2Game_34510(uint32_t* r) {
     const D2GameBatch20Env& env = d2game_env(r);
     void* pGame = (void*)(uintptr_t)r[0];
     const uint32_t event[4] = { r[1], 5, r[0], r[2] };
@@ -241,9 +213,9 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_34510(uint32_t* r) {
 
 // 1.13c D2Game+0x34AA0
 // 0x5D packet helper: send the 6-byte {0x5D, byte, 0x00, 0x0C, 0, 0} when the unit's room has no level id
-// or its act is >= minLevel. r[0]=unit (ESI), r[1]=packet byte, r[2]=minLevel; the player-data word the
-// retail code computes at playerData+0x9C is not stored into the packet.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_34aa0(uint32_t* r) {
+// or its act is >= minLevel. r[0]=unit (ESI), r[1]=packet byte, r[2]=minLevel; the client word
+// playerData+0x9C (0 when the unit is not a player) goes to the send in EAX.
+void D2Game_34aa0(uint32_t* r) {
     const D2GameBatch20Env& env = d2game_env(r);
     void* unit = (void*)(uintptr_t)r[0];
     bool send;
@@ -252,31 +224,27 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_34aa0(uint32_t* r) {
         send = true;
     } else {
         const uint32_t nLevelId = env.getLevelIdFromRoom(room);
-        send = nLevelId != 0 && env.levelLookup(nLevelId) >= (uint8_t)r[2];
+        send = nLevelId != 0 && (uint8_t)env.levelLookup(nLevelId) >= (uint8_t)r[2];
     }
     if (!send) { r[4] = 0; return; }
 
-    if (unit != nullptr && rd32(unit, 0) == 0) {
-        void* pPlayerData = env.getPlayerData(unit);
-        (void)rd32(pPlayerData, 0x9C); // computed by retail and dropped
-    }
+    uint32_t client = 0;
+    if (unit != nullptr && rd32(unit, 0) == 0) client = rd32(env.getPlayerData(unit), 0x9C);
     uint8_t packet[6] = { 0x5D, (uint8_t)r[1], 0x00, 0x0C, 0x00, 0x00 };
-    env.sendPacket(packet, 6);
+    env.sendPacket(client, packet, 6);
     r[4] = 0;
 }
 
 // 1.13c D2Game+0x34B20
 // 0x5D packet helper: send the 6-byte {0x5D, byte, 0x02, 0x00, 0, 0}. r[0]=unit (EAX), r[1]=packet byte;
-// as in 0x34AA0 the player-data word computed at playerData+0x9C is dropped.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_34b20(uint32_t* r) {
+// as in 0x34AA0 the send takes the client word playerData+0x9C in EAX.
+void D2Game_34b20(uint32_t* r) {
     const D2GameBatch20Env& env = d2game_env(r);
     void* unit = (void*)(uintptr_t)r[0];
-    if (unit != nullptr && rd32(unit, 0) == 0) {
-        void* pPlayerData = env.getPlayerData(unit);
-        (void)rd32(pPlayerData, 0x9C); // computed by retail and dropped
-    }
+    uint32_t client = 0;
+    if (unit != nullptr && rd32(unit, 0) == 0) client = rd32(env.getPlayerData(unit), 0x9C);
     uint8_t packet[6] = { 0x5D, (uint8_t)r[1], 0x02, 0x00, 0x00, 0x00 };
-    env.sendPacket(packet, 6);
+    env.sendPacket(client, packet, 6);
     r[4] = 0;
 }
 
@@ -285,7 +253,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_34b20(uint32_t* r) {
 // of `count` NPC ids append the id u16 (advancing the write cursor) when its intro bit is set. Returns 1
 // when at least one id was appended, 0 otherwise. r[0]=pPlayerIntro, r[1]=count, r[2]=npc id array,
 // r[3]=packet buffer (the caller writes the 0x91/act header at +0/+1).
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_34c70(uint32_t* r) {
+void D2Game_34c70(uint32_t* r) {
     const D2GameBatch20Env& env = d2game_env(r);
     void* pPlayerIntro = (void*)(uintptr_t)r[0];
     const int32_t nCount = (int32_t)r[1];
@@ -311,7 +279,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_34c70(uint32_t* r) {
 // Set the NPC-intro flags of the player's intro record for one act: each NPC id is mapped to its bit
 // index (missing ids set bit 0) and the bit is set in the record's flag buffer. r[0]=unit (EAX),
 // r[1]=pGame, r[2]=npc id array, r[3]=count (EDI).
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_34d00(uint32_t* r) {
+void D2Game_34d00(uint32_t* r) {
     const D2GameBatch20Env& env = d2game_env(r);
     void* unit = (void*)(uintptr_t)r[0];
     void* pGame = (void*)(uintptr_t)r[1];
