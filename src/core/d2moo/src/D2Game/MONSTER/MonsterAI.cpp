@@ -157,7 +157,7 @@ void __fastcall sub_6FC61270(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
 }
 
 //D2Game.0x6FC61490
-// 1.13c D2Game+0x48950
+// D2Game 0x48950: the 1.13c rule is src/core/d2game/d2game_48950.cpp
 void __fastcall MONSTERAI_SendMercStats(D2GameStrc* pGame, D2UnitStrc* pPlayer, DWORD dwZero)
 {
     D2UnitStrc* pMerc = sub_6FC7E8B0(pGame, pPlayer, PETTYPE_HIREABLE, 0);
@@ -183,7 +183,7 @@ void __fastcall MONSTERAI_SendMercStats(D2GameStrc* pGame, D2UnitStrc* pPlayer, 
 }
 
 //D2Game.0x6FC61610
-// 1.13c D2Game+0x48ba0
+// D2Game 0x48BA0: the 1.13c rule is src/core/d2game/d2game_48ba0.cpp
 void __fastcall MONSTERAI_UpdateMercStatsAndSkills(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pMerc, int32_t nLevel)
 {
     D2_ASSERT(pGame);

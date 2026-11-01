@@ -287,7 +287,7 @@ uint32_t sub_454E0(D2GameBatch43450Env& e, int flag, uint32_t p1, int* unit, voi
     return 1;
 }
 
-// 1.13c D2Game+0x45EE0
+// (the 0x45EE0 rule lives in d2game_45ee0.cpp)
 uint32_t sub_45EE0(D2GameBatch43450Env& e, uint8_t* game, uint32_t, int* unit, int off, int skillId) {
     const uint8_t* t = e.dataTables;
     if (skillId < 0 || skillId >= (int)rd32(t, 0xba0)) return 0;
@@ -310,7 +310,7 @@ uint32_t sub_45EE0(D2GameBatch43450Env& e, uint8_t* game, uint32_t, int* unit, i
     return 1;
 }
 
-// 1.13c D2Game+0x45CE0   (ECX=game, EDX=unit, stack=skillId)
+// (the 0x45CE0 rule lives in d2game_45ce0.cpp)   (ECX=game, EDX=unit, stack=skillId)
 uint32_t sub_45CE0(D2GameBatch43450Env& e, uint8_t* game, int* unit, int skillId) {
     const uint8_t* t = e.dataTables;
     if (skillId < 0 || skillId >= (int)rd32(t, 0xba0)) return 0;
@@ -347,7 +347,7 @@ uint32_t sub_45CE0(D2GameBatch43450Env& e, uint8_t* game, int* unit, int skillId
     return 1;
 }
 
-// 1.13c D2Game+0x46560   (ECX=game, EDX=unit, stack=skillId, lvl)
+// (the 0x46560 rule lives in d2game_46560.cpp)   (ECX=game, EDX=unit, stack=skillId, lvl)
 uint32_t sub_46560(D2GameBatch43450Env& e, uint8_t* game, int* unit, int skillId, uint32_t lvl) {
     const uint8_t* t = e.dataTables;
     if (skillId < 0 || skillId >= (int)rd32(t, 0xba0)) return 0;
@@ -372,7 +372,7 @@ uint32_t sub_46560(D2GameBatch43450Env& e, uint8_t* game, int* unit, int skillId
     return 1;
 }
 
-// 1.13c D2Game+0x463A0   (EAX=unit, ESI=count, EDI=skillId)
+// (the 0x463A0 rule lives in d2game_463a0.cpp)   (EAX=unit, ESI=count, EDI=skillId)
 uint32_t sub_463A0(D2GameBatch43450Env& e, uint8_t* game, uint32_t* p2, int off, int* unit, int count, int skillId) {
     if (count < 1) return 0;
     if (sub_45EE0(e, game, 0, unit, off, skillId)) sub_45410(e, skillId, game, p2);

@@ -22,15 +22,6 @@ extern i32** sgptDataTables_exref;
 static inline i32 sdt(i32 off) { return *(i32*)(*(i32*)sgptDataTables_exref + off); }
 static const char* NEC = "..\\Source\\D2Game\\SKILLS\\SkillNec.cpp";
 
-// 1.13c D2Game+0x4EBE0
-void D2GAME_4EBE0(void* a, i32 b)
-{
-    r_E0460();
-    o10945(a, b, 0);
-    if (a == 0) { o10024((void*)0, o10265(0xa2a)); std::_Exit(-1); } // DAT_6fd19ff9 message arg
-    r_EFC60();
-}
-
 // 1.13c D2Game+0x4EC30 (esi = unit)
 bool D2GAME_4EC30(i32 p1, i32* unit)
 {

@@ -332,23 +332,6 @@ EMSCRIPTEN_KEEPALIVE void d2_old_d2game_47950_unused(void* esi, const D2GameBatc
     }
 }
 
-// Live-unit census on a non-zero EAX: one when 0x11017 answers non-zero, plus one per 0x10460 list node
-// whose 0x11147 probe is non-zero, walking with 0x10464.
-// 1.13c D2Game+0x53260
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint16_t d2_fn_d2game_53260(uint32_t eaxIn, const D2GameBatch54420Env* env)
-{
-    if (eaxIn == 0) return 0;
-    uint16_t uVar3 = (uint16_t)(env->ordinal11017() != 0);
-    int32_t iVar1 = env->ordinal10460();
-    while (iVar1 != 0) {
-        const int32_t iVar2 = env->ordinal11147(iVar1);
-        iVar1 = env->ordinal10464(iVar1);
-        if (iVar2 != 0) uVar3 = (uint16_t)(uVar3 + 1);
-    }
-    return uVar3;
-}
-
 // Level-spawn probe: a +0xB98 record selected by param_2 whose +0x04 byte carries the 0x14 mask bit,
 // whose +0x80 short is non-negative and below DataTables+0xC4, and whose level passes the 0x10630 and
 // 0x10306 probes. The 0x1C mask bit takes the 0xA19A0 + 0x9F3B0 tail; otherwise 0x10945/0x10871

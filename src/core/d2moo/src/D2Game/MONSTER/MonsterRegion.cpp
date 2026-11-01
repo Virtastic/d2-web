@@ -892,7 +892,7 @@ void __fastcall D2GAME_PopulateRoom_6FC67190(D2GameStrc* pGame, D2ActiveRoomStrc
 }
 
 //D2Game.0x6FC67570
-// 1.13c D2Game+0x471E0
+// D2Game 0x471E0: the 1.13c rule is src/core/d2game/d2game_471e0.cpp
 int32_t __fastcall sub_6FC67570(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, D2RoomCoordListStrc* pRoomCoordList, int32_t nMonsterId, D2UnkMonCreateStrc2* a5, int32_t* pX, int32_t* pY)
 {
     int32_t nLeft = 0;

@@ -45,6 +45,7 @@ src/core/fn/*
 !src/core/fn/d2game_78550.cpp
 !src/core/fn/d2game_9ec80.cpp
 !src/core/fn/d2game_gp.h
+!src/core/fn/d2game_hk2.h
 !src/core/fn/d2game_9f4a0.cpp
 !src/core/fn/d2game_9f850.cpp
 !src/core/fn/d2game_9fa30.cpp

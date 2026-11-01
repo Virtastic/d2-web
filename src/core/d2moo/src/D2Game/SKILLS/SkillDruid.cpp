@@ -358,7 +358,7 @@ int32_t __fastcall sub_6FCFE4C0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nS
 }
 
 //D2Game.0x6FCFE5F0
-// 1.13c D2Game+0x456B0: guard confirmed against the 1.13c decompile (nParam <= 0 returns 0; sub_6FCFE4C0 inlined)
+// D2Game 0x456B0: the 1.13c rule is src/core/d2game/d2game_456b0.cpp
 int32_t __fastcall SKILLS_SrvDo117_Firestorm(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
@@ -918,7 +918,7 @@ int32_t __fastcall SKILLS_SrvDo122_Hunger(D2GameStrc* pGame, D2UnitStrc* pUnit, 
 }
 
 //D2Game.0x6FCFF710
-// 1.13c D2Game+0x45850
+// D2Game 0x45850: the 1.13c rule is src/core/d2game/d2game_45850.cpp
 int32_t __fastcall SKILLS_SrvDo123_Volcano(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
     if (!SKILLS_GetSkillsTxtRecord(nSkillId))

@@ -94,63 +94,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_96f40(void* pGame, const D2GameBatch37F20
     }
 }
 
-// 1.13c D2Game+0x53040 (1.10f D2GAME_SAVE_ReadWaypointData_6FC8AD50 / PLRSAVE2_ReadWaypointData)
-// ECX is a scratch pointer in the caller (0x55E10 passes &size) and is unused in the body. The player
-// is the callee-saved EDI of the save loader, so it is explicit here. The section is 0x50 bytes: the
-// 'WS' marker (0x5357) at +0, then three 24-byte act records from +4. Every record's first word must
-// be 0x102, 0x101 or 0 (the 1.10f flag validation); a bad record returns 3 before the copy. The
-// matched records are copied through D2Common #10979 into the player's three waypoint records at
-// pPlayerData+0x1C. On success the consumed size 0x50 is returned through pOutSize.
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_53040(void* pUnit, const void* pSection,
-                                                  uint32_t* pOutSize,
-                                                  const D2GameBatch37F20Env* env)
-{
-    uint8_t buffer[0x50];
-    std::memcpy(buffer, pSection, sizeof buffer);
-
-    *pOutSize = 0;
-    const uint32_t pPlayerData = env->unitsGetPlayerData(pUnit);
-    if (rd16(buffer, 0) != 0x5357) return 3;
-
-    for (int32_t i = 0; i < 3; ++i) {
-        const uint8_t* record = buffer + 4 + 24 * i;
-        const uint16_t flags = rd16(record, 0);
-        if (flags != 0x102 && flags != 0x101 && flags != 0) return 3;
-
-        env->waypointCopyAndValidate(rdptr(pPlayerData, 0x1C + 4 * i), record);
-    }
-
-    *pOutSize = 0x50;
-    return 0;
-}
-
-// 1.13c D2Game+0x530D0
-// EDX = pSection, then pUnit and pOutSize on the stack (caller 0x55E10 passes local_18 and &local_1c).
-// The section is 298 bytes: "Woo!" (0x216F6F57) at +0 and version 6 at +4, else it is rejected with 2.
-// The three 96-byte quest records start at +10 -- 298 = 10 + 3*96, the layout the 1.13c-checked
-// D2WEB_PLRSAVE2_ReadQuestSection in PlrSaveItems.cpp uses; the decompiler's stack-relative record
-// pointer is four bytes low. They are copied into pPlayerData->pQuestData[0..2] (pPlayerData+0x10)
-// through D2Common #10795; on success the consumed size 0x12A is returned through pOutSize.
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_530d0(void* pUnit, const void* pSection,
-                                                  uint32_t* pOutSize,
-                                                  const D2GameBatch37F20Env* env)
-{
-    uint8_t buffer[0x12A];
-    std::memcpy(buffer, pSection, sizeof buffer);
-
-    *pOutSize = 0;
-    if (rd32(buffer, 0) != 0x216F6F57u || rd32(buffer, 4) != 6) return 2;
-
-    const uint32_t pPlayerData = env->unitsGetPlayerData(pUnit);
-    for (int32_t i = 0; i < 3; ++i)
-        env->questRecordCopyBufferToRecord(rdptr(pPlayerData, 0x10 + 4 * i), buffer + 10 + 96 * i,
-                                           0x60, 1);
-
-    *pOutSize = 0x12A;
-    return 0;
-}
+// 1.13c D2Game+0x53040 and +0x530D0 now live in d2game_53040.cpp and d2game_530d0.cpp (seam ports).
 
 // 1.13c D2Game+0x53340
 // EAX = pSection (Ghidra's in_EAX), stack = &size. The player is the callee-saved EDI of the save
