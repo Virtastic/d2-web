@@ -49,7 +49,7 @@ struct D2WinB64Env {
     void (*sub_8920)(uint16_t*, int32_t, int32_t);
     int32_t (*fog10117)(void);                             // Fog #10117 (result ignored by 0xA820)
 };
-extern D2WinB64Env g_d2winB64;
+D2WinB64Env g_d2winB64{};  // zeroed seams; a probe or the client fills the ones it reaches
 #define E g_d2winB64
 
 // 1.13c D2Win+0x0F240
