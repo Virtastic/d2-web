@@ -1,7 +1,7 @@
 // 1.13c Fog+0x1ABB0: bitmap search for a word with a clear bit. EAX=start bit, ECX=uint32 bitmap; returns bit index or -1.
 #include <cstdint>
 
-static int fog_lowest_clear(uint32_t w) {  // 1.13c Fog+0x1AB20
+int fog_lowest_clear(uint32_t w) {  // 1.13c Fog+0x1AB20 (external for the FN probe src/core/fn/fog_1ab20.cpp)
     int i = 0;
     if (~w != 0) while (((~w >> i) & 1) == 0) ++i;
     return i;
