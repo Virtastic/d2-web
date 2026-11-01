@@ -93,13 +93,14 @@ uint8_t* d2win_sub_b810(uint32_t v, const D2WinB54aEnv* e) {
 }
 
 // 1.13c D2Win+0x0b860 -- find node whose entry has +4 == key1 and +0xC == key2; list head in EAX.
-struct D2WinB54aEntry { int32_t pad0; int32_t k1; int32_t pad8; int32_t k2; };
-struct D2WinB54aNode { D2WinB54aEntry* entry; D2WinB54aNode* next; };
+// Links are 32-bit retail-layout dwords (ponytail: wasm64 addresses must fit 32 bits): node {entry, next}.
 extern "C" EMSCRIPTEN_KEEPALIVE
-D2WinB54aNode* d2win_sub_b860(D2WinB54aNode** head, int32_t key1, int32_t key2, const D2WinB54aEnv* e) {
+uint8_t* d2win_sub_b860(uint32_t* head, int32_t key1, int32_t key2, const D2WinB54aEnv* e) {
     if (!head) { e->fatal(0x4a5); return 0; }
-    for (D2WinB54aNode* n = *head; n; n = n->next)
-        if (n->entry->k1 == key1 && n->entry->k2 == key2) return n;
+    for (uint32_t* n = (uint32_t*)(uintptr_t)*head; n; n = (uint32_t*)(uintptr_t)n[1]) {
+        const int32_t* en = (const int32_t*)(uintptr_t)n[0];
+        if (en[1] == key1 && en[3] == key2) return (uint8_t*)n;
+    }
     return 0;
 }
 
