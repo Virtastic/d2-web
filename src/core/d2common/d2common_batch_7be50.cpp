@@ -83,6 +83,10 @@ extern "C" D2DrlgWarpStrc* d2_fn_d2common_2d730(D2DrlgStrc* drlg, int32_t level)
     return DRLG_GetDrlgWarpFromLevelId(drlg, level);
 }
 
+static int32_t orthDirection(const D2DrlgOrthStrc* orth)
+{
+    int32_t value; std::memcpy(&value, &orth->nDirection, sizeof(value)); return value;
+}
 extern "C" void D2Common_44B20(D2DrlgOrthStrc** head, D2DrlgOrthStrc* node, bool (*before)(const D2DrlgOrthStrc*, const D2DrlgOrthStrc*));
 extern "C" bool D2Common_44B20_Before(const D2DrlgOrthStrc* a, const D2DrlgOrthStrc* b);
 

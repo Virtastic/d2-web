@@ -8,7 +8,6 @@
 
 extern "C" {
 void     Storm_Sub1C30(void* rec);                                              // 0x1C30
-void     Storm_Sub1C20(void* arr);                                              // 0x2C20
 void     Storm_Sub2D80(void* rec);                                              // 0x2D80
 void     Storm_Sub1EB0(uint32_t* a, uintptr_t count, const uint8_t* src);       // 0x1EB0
 void     Storm_Sub1F30(uint32_t* a, uint32_t count, const uint32_t* src);       // 0x1F30
@@ -35,7 +34,7 @@ extern "C" void Storm_Sub2C60(uint32_t cap, uint32_t* self);
 // 1.13c Storm+0x26E0
 extern "C" void* Storm_Sub26E0(uint32_t* self) {
     if (self[0] < self[1] + 1) {
-        if (self[3] == 0) __builtin_trap();  // grow helper is not yet ported; the callee previously named here is not it
+        if (self[3] == 0 && self[0] >= 8) self[3] = 8;   // 0x2C20 (EAX = capacity): sets step 8 from capacity 8 up
         // 0x2C60 takes the new capacity in EAX (the grown count) and the array in ESI
         Storm_Sub2C60(self[0], self);
     }
