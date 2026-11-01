@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <emscripten.h>
 struct D2c48150G {
-    uint8_t  g_bc9663;                 // 0x...bc9663 (RVA 0x2F9663 -> 0)
+    uint32_t g_bc9663;                 // 0x6fbc9663: a dword (mov DWORD PTR [..],esi in the retail body)
     uint32_t g_90ea8[6];               // 6fb90ea8..ebc -> 0xffffffff
     uint32_t g_cbc28, g_cbc2c, g_cbc38, g_cbc3c;  // -> 0
 };

@@ -37,7 +37,7 @@ void sub_446B0(Hud446B0& s, void (*send)(int32_t,int32_t,int32_t,uint8_t)) {
 }
 
 // 1.13c D2Client+0x465F0
-struct NpcFlags { int32_t haveCurrent; uint8_t f731; uint16_t f735; };
+struct NpcFlags { int32_t haveCurrent; uint32_t f731; uint16_t f735; };
 void sub_465F0(NpcFlags& s, Services& sv, const uint8_t* pkt) {
  if (!pkt) sv.fatal(0xfc6);
  if (rd<int16_t>(pkt,1) == 3 && s.haveCurrent) { s.f731 = 1; s.f735 = (uint16_t)rd<int16_t>(pkt,1); }

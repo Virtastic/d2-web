@@ -72,7 +72,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_46c00() {
 
 // 1.13c D2Client+0x46E00
 EMSCRIPTEN_KEEPALIVE void d2c_46e00() {
-    for (int32_t i = 0; i < (int32_t)D32(0x6fba3b9c); i++) F(0x46910);
+    for (int32_t i = 0; i < (int32_t)D32(0x6fba3b9c); i++) F(0x46910, A(0x6fba37a8) + (U)i * 0x16);   // EDI = &table[i] (record stride 0x16)
     D8(0x6fbc9662) = 1;
 }
 
@@ -85,19 +85,19 @@ EMSCRIPTEN_KEEPALIVE void d2c_46ee0(int32_t param_1, uint8_t param_2) {
     else if (mode == 2) ch = '3';
     else if (mode == 3) { ch = '5'; F(0x88A70, 0, 0, 0, 0); }
     else {
-        D8(0x6fbc9663) = 3;
+        D32(0x6fbc9663) = 3;
         if (D32(0x6fbcbc34) == 5) F(0x8D300);
         return;
     }
     uint32_t u6 = 0;
     U p = 0;
-    D8(0x6fbc978e) = 0;
+    D32(0x6fbc978e) = 0;
     uint32_t id = D32(0x6fbd22fd);
     if (D32(0x6fbcbc90) == 0) {
         p = unitById(id);
         if (p && R32(p) != 4) fatal(0x5a);
         if (!p) {
-            D8(0x6fbc9663) = 3;
+            D32(0x6fbc9663) = 3;
             F(0x92850);
             D32(0x6fbd2301) = e_.tick();
             D32(0x6fbd2305) = D32(0x6fbd2305) + 1;
@@ -142,20 +142,21 @@ EMSCRIPTEN_KEEPALIVE void d2c_46ee0(int32_t param_1, uint8_t param_2) {
 
 // 1.13c D2Client+0x471F0
 EMSCRIPTEN_KEEPALIVE void d2c_471f0() {
-    static const struct { uint32_t a; uint32_t v; } s[] = {
-        {0x6fba3d51,2},{0x6fba3d59,0},{0x6fba3d67,0},{0x6fba3d9f,2},{0x6fba3da7,0},{0x6fba3db5,0},
-        {0x6fba3ded,2},{0x6fba3df5,0},{0x6fba3e03,0},{0x6fba3c19,3},{0x6fba3c23,0},{0x6fba3c33,0},
-        {0x6fba4231,2},{0x6fba4239,0},{0x6fba4247,0}};
-    for (auto& x : s) D32(x.a) = x.v;
-    if (D32(0x6fba4243) == 0x6faf6d10) D32(0x6fba4231) = 3;
-    static const uint32_t z[] = {0x6fba419f,0x6fba41af,0x6fba41ef,0x6fba4201};
-    for (uint32_t a : z) D32(a) = 0;
-    D32(0x6fba3ed7) = 2; D32(0x6fba3edf) = 0; D32(0x6fba3eed) = 0;
+    // widths follow the retail stores: dword for the 2/3/4 values and the pointer, word (AX) for the zeroed halves and the 0xfb4 field
+    static const struct { uint32_t a; uint32_t v; bool w; } s[] = {
+        {0x6fba3d51,2,0},{0x6fba3d59,0,1},{0x6fba3d67,0,0},{0x6fba3d9f,2,0},{0x6fba3da7,0,1},{0x6fba3db5,0,0},
+        {0x6fba3ded,2,0},{0x6fba3df5,0,1},{0x6fba3e03,0,0},{0x6fba3c19,3,0},{0x6fba3c23,0,1},{0x6fba3c33,0,0},
+        {0x6fba4231,2,0},{0x6fba4239,0,1},{0x6fba4247,0,0}};
+    const bool eq = D32(0x6fba4243) == 0x6faf6d10;
+    for (auto& x : s) { if (x.w) D16(x.a) = (uint16_t)x.v; else D32(x.a) = x.v; }
+    if (eq) D32(0x6fba4231) = 3;
+    D16(0x6fba419f) = 0; D32(0x6fba41af) = 0; D16(0x6fba41ef) = 0; D32(0x6fba4201) = 0;
+    D32(0x6fba3ed7) = 2; D16(0x6fba3edf) = 0; D32(0x6fba3eed) = 0;
     D16(0x6fba3edd) = 0; D32(0x6fba3ee9) = 0;
     D32(0x6fba4195) = 3; D32(0x6fba41e3) = 4;
     static const uint32_t b[] = {0x6fba3e14, 0x6fba3e3b, 0x6fba3e62, 0x6fba3e89, 0x6fba416e};
-    for (uint32_t a : b) {   // {+0: 3, +6: 0xfb4, +0x12: &LAB_6faf6af0}
-        D32(a) = 3; D32(a + 6) = 0xfb4; D32(a + 0x12) = (uint32_t)A(0x6faf6af0);
+    for (uint32_t a : b) {   // {+0: 3, +6 (word): 0xfb4, +0x12: &LAB_6faf6af0}
+        D32(a) = 3; D16(a + 6) = 0xfb4; D32(a + 0x12) = (uint32_t)A(0x6faf6af0);
     }
 }
 
@@ -203,7 +204,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_47810() {
 // dup of D2CLIENT+0x47920
 EMSCRIPTEN_KEEPALIVE void d2c_47920() {
     if (D32(0x6fbc975f)) { F(0xA3D20); D32(0x6fbc975f) = 0; }
-    D8(0x6fbc9663) = 3;
+    D32(0x6fbc9663) = 3;
     F(0x8F660);
     F(0x94970);
     D32(0x6fbcc2f8) = 0;
@@ -224,11 +225,12 @@ EMSCRIPTEN_KEEPALIVE void d2c_47a70(int32_t param_1) {
 
 // 1.13c D2Client+0x47CA0
 EMSCRIPTEN_KEEPALIVE void d2c_47ca0(int32_t param_1) {
-    if (D8(0x6fbc978e) && D8(0x6fbc9781) == 0 && (uint32_t)param_1 == D32(0x6fbc9786)) F(0x47AB0);
+    if (D32(0x6fbc978e) && D8(0x6fbc9781) == 0 && (uint32_t)param_1 == D32(0x6fbc9786)) F(0x47AB0);
 }
 
 }
 
+extern "C" {
 // 1.13c D2Client+0x47AB0
 EMSCRIPTEN_KEEPALIVE void d2c_47ab0() {
     uint32_t t = e_.tick();
@@ -239,9 +241,10 @@ EMSCRIPTEN_KEEPALIVE void d2c_47ab0() {
     } else {
         D32(0x6fbc974f) = t + 100;
     }
-    D8(0x6fbc978e) = 0;
+    D32(0x6fbc978e) = 0;
     D8(0x6fbd22f8) = 0;
     D32(0x6fbd22f9) = 0;
     D32(0x6fbd22fd) = 0;
-    if (D32(0x6fbcc394) == 0) d2c_47920();
+    if (D32(0x6fbcc394) == 0) F(0x47920);   // tail jump to 0x47920
+}
 }
