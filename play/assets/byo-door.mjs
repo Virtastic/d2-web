@@ -346,6 +346,7 @@ export function frontDoor({ onReady } = {}) {
     loading = { t0: t, last: t, p: 0.1, full: 0, readyAt: 0 };
     root.classList.add('loading');
     document.body.classList.remove('door');   // the game lays out underneath while the door stays on top
+    window.__d2PlugyFiles = { ...col.plugy };   // PlugY's stash art and PlugY.ini from the player's folder (gameplay-shell reads them; never uploaded)
     resolveDoor(col.mounts());
   }
   function close() { done = true; root.remove(); style.remove(); }

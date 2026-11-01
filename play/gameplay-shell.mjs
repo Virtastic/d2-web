@@ -140,9 +140,10 @@ import { panelCloseAt } from './assets/panel-close.mjs';
 import { characterPanelCloseAt, createCharacterPanelCloseGesture } from './assets/character-panel-close.mjs';
 import { beginInventoryClosePress, cancelInventoryClosePress, finishInventoryClosePress, inventoryCloseAt } from './assets/inventory-close-gesture.mjs';
 import { installScrollSafeCanvasFocus } from './assets/canvas-focus.mjs';
-import { createPlugyStash, createPlugyPanelArt, createStashLayoutReader, isDc6, parsePlugyIni, pageLabel, PLUGY_INI_DEFAULT } from './assets/plugy-stash-ui.mjs';
+import { createPlugyStash, createPlugyPanelArt, createStashLayoutReader, parsePlugyIni, pageLabel, PLUGY_INI_DEFAULT } from './assets/plugy-stash-ui.mjs';
 import { pagesToSss, sssToPages, pagesToD2x, d2xToPages } from './assets/plugy-stash.mjs';
 import { plugyStashMode } from './assets/plugy-stash-mode.mjs';
+import { plugySource } from './assets/plugy-files.mjs';
 import { closeStashFromInventory, stashCloseAt } from './assets/stash-close.mjs';
 import { createFrontendPointerStates } from './assets/frontend-pointer-states.mjs';
 import { altHoverBox, hoverLife, monsterNameColour, plateBoxes, paintHoverPlate, groundLabelPlate, groundLabelColour } from './assets/hover-lifebar.mjs';
@@ -613,19 +614,15 @@ function plugyMoveGold(kind) {
 const plugyStash = createPlugyStash({ enabled: true, onPage: plugySwap, onGold: plugyMoveGold, lastUsed: plugyUsed });
 let plugyEvidence = null, plugyIni = PLUGY_INI_DEFAULT;
 const plugyPanelArt = createPlugyPanelArt();   // PlugY's TradeStash.dc6, bound to every stash renderer the shell builds
-// PY3: PlugY's own art (StashBtns, SharedGoldBtns, TradeStash), fetched from the dev server's /retail/PlugY/ (never hosted; absent = the plain control and retail's panel stay).
+// PY3: PlugY's own art (StashBtns, SharedGoldBtns, TradeStash) and PlugY.ini: from the dev server's /retail/ (D2SE/ first), or on a
+// bring-your-own-files host from the player's own D2SE folder given at the door (plugy-files.mjs; the site never hosts them).
 if (plugyStash.enabled) (async () => {
   try {
-    // A player's page waits for the archives to be known: a bring-your-own-files host serves nothing under /retail/,
-    // so the fetch was a certain 404 in the player's console. The test runner fetches at once, as before.
-    if (!navigator.webdriver) {
-      while (!window.__d2?.ready) { if (window.__d2?.error) return; await new Promise((r) => setTimeout(r, 250)); }
-      if (window.__d2.byo) { plugyStash.enabled = false; plugyError = 'PlugY art is never in a bring-your-own-files host, stash stays retail'; return; }
-    }
-    // D2SE keeps PlugY.ini and the PlugY folder beside its core; a plain PlugY install keeps them at the game root.
-    const ROOTS = ['/retail/D2SE/', '/retail/'];
-    try { for (const r of ROOTS) { const t = await fetch(r + 'PlugY.ini'); if (t.ok) { const txt = await t.text(); if (/\[STASH\]/i.test(txt)) { plugyIni = parsePlugyIni(txt); plugyStash.cfg = plugyIni; break; } } } } catch {}
-    const get = async (n) => { for (const r of ROOTS) { const res = await fetch(r + 'PlugY/' + n + '.dc6'); const b = new Uint8Array(await res.arrayBuffer()); if (res.ok && isDc6(b)) return b; } throw new Error(n + '.dc6 not served'); };
+    // A player's page waits for the archives to be known (a byo host serves nothing under /retail/). The test runner fetches at once, as before.
+    if (!navigator.webdriver) while (!window.__d2?.ready) { if (window.__d2?.error) return; await new Promise((r) => setTimeout(r, 250)); }
+    const src = plugySource({ byo: Boolean(window.__d2?.byo), given: window.__d2PlugyFiles });
+    try { const txt = await src.ini(); if (txt) { plugyIni = parsePlugyIni(txt); plugyStash.cfg = plugyIni; } } catch {}
+    const get = (n) => src.art(n);
     let btns, gold, trade;
     // No PlugY art, no PlugY: the page buttons, the 10x10 grid and the sidecars are one feature, switched off together before a game starts (retail's stash stays).
     try { [btns, gold, trade] = [await get('StashBtns'), await get('SharedGoldBtns'), await get('TradeStash')]; }

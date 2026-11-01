@@ -141,6 +141,7 @@ test/*
 !test/plugy-stash-sidecar.test.mjs
 !test/plugy-stash-ui.test.mjs
 !test/plugy-stash-wiring.test.mjs
+!test/plugy-stash-byo.test.mjs
 !test/inventory-click-route.test.mjs
 !test/repair-packet-mode.test.mjs
 !test/vendor-repair-confirm.test.mjs

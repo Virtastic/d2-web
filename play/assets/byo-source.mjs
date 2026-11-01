@@ -2,6 +2,7 @@
 // set of file handles. Nothing here is uploaded; every file stays a Blob/File in this browser and is
 // handed to the engine through StreamFS.mountBlob. Detection is byo-detect.mjs.
 import { inspect, classify, extractInnerPatch, ROLES, ORDER } from './byo-detect.mjs';
+import { isPlugyFile } from './plugy-files.mjs';
 
 const DB = 'd2-byo', STORE = 'handles', KEY = 'set';
 const idb = (mode, fn) => new Promise((res, rej) => {
@@ -35,7 +36,8 @@ export const patchShim = () => shim || (shim = fetch('assets/patch-113c.patch')
   })
   .catch(() => null));
 
-const WANT = /\.(mpq|exe)$/i;
+// The archives, plus PlugY's stash art and PlugY.ini from a D2SE folder (plugy-files.mjs): they are not archives and are kept apart.
+const WANT = { test: (n) => /\.(mpq|exe)$/i.test(n) || isPlugyFile(n) };
 
 /** Walk a directory handle (two levels is enough for an install folder with D2SE/CORES inside). */
 async function walk(dir, depth = 3, out = []) {
@@ -99,6 +101,7 @@ export function createCollection() {
   const entries = [];   // { file, handle?, info }
   const state = { slots: {}, issues: [], missing: [], ready: false, patch: { level: 'missing' }, busy: 0 };
   const seen = new Set();
+  const plugy = {}, plugyHandles = [];   // PlugY's files by lower-case name (plugy-files.mjs plugySource reads them)
   async function refold() {
     const k = await knownMpqs();
     const verified = (i) => (k.patch_d2 || []).some((p) => p.compat === 'verified' && p.sha256 === i.sha256);
@@ -112,6 +115,7 @@ export function createCollection() {
   return {
     state,
     entries,
+    plugy,
     async add({ handles = [], files = [] }) {
       state.busy++;
       try {
@@ -122,6 +126,7 @@ export function createCollection() {
           const key = e.file.name + ':' + e.file.size + ':' + e.file.lastModified;
           if (seen.has(key)) continue;
           seen.add(key);
+          if (isPlugyFile(e.file.name)) { plugy[e.file.name.toLowerCase()] = e.file; if (e.handle) plugyHandles.push(e.handle); continue; }
           e.info = await inspect(e.file);
           entries.push(e);
           if (e.info.installer && e.info.inner) {
@@ -131,7 +136,7 @@ export function createCollection() {
         }
         await refold();
         // Only archives the game uses (or an installer that held one) are worth remembering.
-        const keep = entries.filter((e) => e.handle && (e.info.role || e.info.installer)).map((e) => e.handle);
+        const keep = entries.filter((e) => e.handle && (e.info.role || e.info.installer)).map((e) => e.handle).concat(plugyHandles);
         if (keep.length) remember(keep);
       } finally { state.busy--; }
       return state;
