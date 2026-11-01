@@ -26,5 +26,4 @@ extern "C" void d2game_50470(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3,
     }
     S[19] = (uint32_t)(int32_t)(int16_t)d2rd16(rec + 0x82);
     e->call(0x50250, 0, a2, (uint32_t)(uintptr_t)S);
-    e->blk(0x50250, S, 26);
 }

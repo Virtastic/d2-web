@@ -15,15 +15,15 @@ extern "C" uint32_t d2game_4f7d0(uint32_t self, uint32_t unit, uint32_t a0, uint
     if (!rec) return 0;
     uint32_t L[28] = {};
     const uint32_t lvl = e->call(0xACD6, 0, 0, 0, 0, 0, unit, a0, a1, 0);
-    const uint32_t ax = e->call(0xDE5A0, v, 0, 0, 0, 0, self, lvl) & 0xFFFF;
+    const uint32_t ax = e->call(0xDE5A0, self, 0, 0, 0, 0, 0, lvl) & 0xFFFF;
     L[1] = ax;
     if (ax & 1) {
         L[3] = e->call(0xAC9A, 0, 0, 0, 0, 0, unit, d2rd32(rec + 0x138), a0, a1);
         if (d2rd8(rec + 0x1DC)) {
             L[26] = e->call(0xAC9A, 0, 0, 0, 0, 0, unit, d2rd32(rec + 0x144), a0, a1);
             if ((int32_t)L[26] > 0) ((uint8_t*)L)[0x65] = (uint8_t)d2rd8(rec + 0x1DC);
+            e->call(0x9F210, a0, 0, 0, 0, 0, (uint32_t)(uintptr_t)L, a1);
         }
-        e->call(0x9F210, a0, 0, 0, 0, 0, (uint32_t)(uintptr_t)L, a1);
     }
     uint32_t cl = d2rd8(rec + 0x1A5);
     if (!cl) cl = 0x80;
