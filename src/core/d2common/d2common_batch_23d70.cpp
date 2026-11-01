@@ -41,12 +41,19 @@ EMSCRIPTEN_KEEPALIVE int32_t ITEMS_GetSetItemNSetItems(uint32_t pUnit, const D2C
 	if (!pEnv || !pEnv->item_file_index)
 		return -1;
 	const int32_t nFileIndex = pEnv->item_file_index(pUnit);
-	if (nFileIndex < 0 || nFileIndex >= sgptDataTables->nSetItemsTxtRecordCount)
+	// Table block is read at retail guest offsets (Memory64 pointers are 8 bytes natively):
+	// pSetItemsTxt at +0xC18, nSetItemsTxtRecordCount at +0xC1C, sets.txt row stride 0x128.
+	const uint8_t* tb = reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(
+	    reinterpret_cast<uintptr_t>(sgptDataTables)));
+	if (!tb)
 		return -1;
-	if (!sgptDataTables->pSetItemsTxt)
+	const int32_t nRecords = static_cast<int32_t>(W(const_cast<uint8_t*>(tb), 0xC1C));
+	if (nFileIndex < 0 || nFileIndex >= nRecords)
+		return -1;
+	const uint32_t pSetItems = W(const_cast<uint8_t*>(tb), 0xC18);
+	if (!pSetItems)
 		return -1;
 
-	const uint8_t* pRow = reinterpret_cast<const uint8_t*>(sgptDataTables->pSetItemsTxt)
-	                    + static_cast<size_t>(nFileIndex) * sizeof(D2SetItemsTxt);
+	const uint8_t* pRow = P(pSetItems) + static_cast<size_t>(nFileIndex) * 0x128;
 	return RdI16(pRow, 0x2E);
 }

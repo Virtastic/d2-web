@@ -42,7 +42,7 @@ extern "C" uint32_t d2_ours_d2common_24610(D2UnitStrc* pItem) {
 	const uint32_t cap = lvl < 26 ? r->nMaxSock1 : lvl < 41 ? r->nMaxSock25 : r->nMaxSock40;
 	return gem < cap ? gem : cap;
 }
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_24610(uint32_t pUnit) {
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_24610_MaxSockets_u32(uint32_t pUnit) {
 	return d2_ours_d2common_24610(reinterpret_cast<D2UnitStrc*>(P(pUnit)));
 }
 
@@ -161,8 +161,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2df80(uint32_t pContext, int
 
 // Grow a UnitFinds array by fifteen entries via the pool realloc (retail takes the record in ESI;
 // a null record logs the Fog error string and exits, which is not modelled).
-// 1.13c D2Common+0x120F0
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_120f0(D2UnitFindDataStrc* pFinds) {
+// retail 0x120F0 in record layout: d2common_120f0.cpp
+extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_120F0_GrowUnitFinds(D2UnitFindDataStrc* pFinds) {
 	pFinds->nMaxArrayEntries += 15;
 	pFinds->pUnitsArray = (D2UnitStrc**)D2_REALLOC_POOL(pFinds->pMemPool, pFinds->pUnitsArray, sizeof(D2UnitStrc*) * pFinds->nMaxArrayEntries);
 }

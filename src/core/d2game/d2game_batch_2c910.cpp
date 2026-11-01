@@ -424,7 +424,7 @@ bool GAME_ValidateJoinRequest_113c(uint32_t clientId, const uint8_t* record, con
 
     uint8_t gameName[16] = {};
     if (!env->clientGameName(clientId, gameName)) return false;
-    if (!env->clientNameMatchesGameName((const char*)record + 0x01, gameName)) return false;
+    if (!env->clientNameMatchesGameName((const char*)record + 0x15, gameName)) return false;
     return classId < 7;
 }
 

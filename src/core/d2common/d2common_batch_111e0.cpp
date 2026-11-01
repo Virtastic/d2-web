@@ -44,7 +44,7 @@ inline void* RPtr32(const void* p, uint32_t o, void* (*resolveRetailAddress)(uin
 // Position the five preset levels 0x4f..0x53 below the map. Inputs and level records are writable
 // 1.13c x86-layout byte images; pointer fields hold uint32 address tokens resolved by the wasm adapter.
 // Existing records are reused by level id; missing records are made by 0x2D9B0.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_15980(void* pLevel, const D2CommonBatch15980Env* env) { // 1.13c D2Common+0x15980
+extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_15980_LayoutKurastChain(void* pLevel, const D2CommonBatch15980Env* env) { // 1.13c D2Common+0x15980
     if (!pLevel || !env || !env->levelRows || !env->resolveRetailAddress) return;
     void* pDrlg = RPtr32(pLevel, 0x1b4, env->resolveRetailAddress);
     if (!pDrlg) return;

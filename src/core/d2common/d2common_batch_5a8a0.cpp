@@ -32,7 +32,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_5a8a0(int nCount)
 // 1.13c D2Common+0x24F90 (unit in EAX): for an item with a valid inventory (signature 0x1020304),
 // count links of the chain starting at inventory+0x0C (item -> itemdata+0x14 ... next at
 // itemdata+0x64); stops at a non-item, null data, or the -0x5C sentinel. 0 if not socketable.
-EMSCRIPTEN_KEEPALIVE int d2_fn_d2common_24f90(uint32_t unit)
+EMSCRIPTEN_KEEPALIVE int D2Common_24F90_SocketChainCount(uint32_t unit)
 {
 	auto w = [](uint32_t a, int o) { return *reinterpret_cast<uint32_t*>(uintptr_t(a) + o); };
 	if (!unit || w(unit, 0) != 4 || !ITEMS_CheckIfSocketableByItemId(int(w(unit, 4)))) return 0;

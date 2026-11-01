@@ -11,7 +11,7 @@
 #include "D2DataTbls.h"
 #include "DataTbls/ItemsTbls.h"
 
-extern "C" uint32_t d2_fn_d2common_24610(uint32_t pUnit);
+extern "C" uint32_t D2Common_24610_MaxSockets_u32(uint32_t pUnit);
 extern "C" {
 __attribute__((weak)) int32_t d2_sub_38b70_get(uint32_t pUnit, int32_t nStat);
 __attribute__((weak)) void d2_sub_3a740_set(uint32_t pUnit, int32_t nStat, int32_t nValue);
@@ -48,7 +48,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2a480(uint32_t pUnit, uint32
 	case 6: if (n > 1) n = 2; break;
 	case 8: case 9: if (n > 2) n = 3; break;
 	}
-	const uint32_t q = d2_fn_d2common_24610(pUnit) & 0xFF;
+	const uint32_t q = D2Common_24610_MaxSockets_u32(pUnit) & 0xFF;
 	if (q <= n) n = q;
 	if (nMaxI < 2) nMaxI = 1;
 	if (nMaxI < static_cast<int32_t>(n)) n = static_cast<uint32_t>(nMaxI);

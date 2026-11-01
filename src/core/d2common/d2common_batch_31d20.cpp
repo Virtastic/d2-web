@@ -493,34 +493,29 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_5f260(uint32_t pUnit, uint32_t pBuf
 	return pBuffer;
 }
 
-// 1.13c D2Common+0x12140 (#10301): walk the owner's +0x74 unit list through a callback.
-// Each node is offered to the callback (the node is register-only, so the seam takes it); a non-zero
-// answer stores the node in pOutArray[nCount++], and count 15 is fatal in retail (0x78), modelled as a
-// return there. The next node is at +0xE8. A null callback is fatal 0x72 in retail and returns 0 here.
+// 1.13c D2Common+0x12140 (#10301, stdcall room, out, callback, ctx; ret 0x10): walk the room's +0x74 unit list (next at
+// +0xE8). Each unit is offered to the fastcall callback (ECX = unit, EDX = ctx); a non-zero answer stores the unit in
+// out[n++], and n reaching 15 is fatal in retail (0x78), modelled as a return. A bad code pointer is fatal 0x72 (returns 0).
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_12140(uint32_t pOwner, uint32_t pOutArray,
-	int32_t (*pfnCallback)(uint32_t))
+EMSCRIPTEN_KEEPALIVE int32_t D2Common_12140_CollectRoomUnits(uint32_t pOwner, uint32_t pOutArray,
+	int32_t (*pfnCallback)(uint32_t, uint32_t), uint32_t nCtx)
 {
 	uint8_t* owner = P(pOwner);
-	if (!owner || !pfnCallback)
+	if (!pfnCallback)
 		return 0;
-
 	uint32_t pNode = W(owner, 0x74);
 	int32_t nCount = 0;
-	for (;;)
+	while (pNode != 0)
 	{
-		if (pNode == 0)
-			return nCount;
-		if (pfnCallback(pNode) != 0)
+		if (pfnCallback(pNode, nCtx) != 0)
 		{
-			if (pOutArray)
-				W(P(pOutArray), nCount * 4) = pNode;
-			++nCount;
-			if (nCount > 0xE)
+			W(P(pOutArray), nCount * 4) = pNode;
+			if (++nCount >= 15)
 				return nCount;
 		}
 		pNode = W(P(pNode), 0xE8);
 	}
+	return nCount;
 }
 
 // 1.13c D2Common+0x4E2B0 (#10304): the dword at pObject+0x34. A null object is fatal in retail

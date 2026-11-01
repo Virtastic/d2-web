@@ -56,7 +56,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_30340(uint32_t pUnit) {   // 1.13c 
 // monstats2 record, that record's mode flags carry walking, and the monster's own flags (+0x0C)
 // have boss clear and switch-AI set. Same body as the vendored UNITS_CanSwitchAI.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_31200(uint32_t nMonsterId) {   // 1.13c D2Common+0x31200
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_31200_CanSwitchAI(uint32_t nMonsterId) {   // 1.13c D2Common+0x31200
 	return UNITS_CanSwitchAI(static_cast<int>(nMonsterId)) ? 1u : 0u;
 }
 

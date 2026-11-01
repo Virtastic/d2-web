@@ -25,7 +25,7 @@ void OBJRGN_FreeObjectControl(N66Host* h, P game)
         h->mem_free(n, F, 0xc1, 0);
     I(c, 0x1110) = 0;
     P dt = (P)(intptr_t)h->dataTablesRoot;
-    for (int i = 1; i < I(dt, 0xc5c); i++) h->mem_free(0, F, 0xe2, 0);
+    for (int i = 1; i < I(dt, 0xc5c); i++) h->mem_free((void*)(intptr_t)I(c, 0x4c + (i - 1) * 4), F, 0xe2, 0);   // slot +0x4C.., freed even when null (d2game_b8a0.h)
     for (int i = 0; i < 8; i++) if (I(c, 0x28 + i * 4)) h->mem_free((void*)(intptr_t)I(c, 0x28 + i * 4), F, 0xe8, 0);
     h->mem_free(c, F, 0xec, 0);
 }

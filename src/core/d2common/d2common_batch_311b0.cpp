@@ -18,20 +18,21 @@ namespace
 	inline uint32_t R(const uint8_t* b, int o) { return *reinterpret_cast<const uint32_t*>(b + o); }
 }
 
-// +0x311B0: monster (unit type 1) in animation mode 12 (+0x10) whose MonStats2 record (by class id
-// at unit+4) has (byte)gdwBitMasks[12] clear in byte +6 and (byte)gdwBitMasks[28] set in byte +4,
-// and for which the 0x33D60 state-mask test (eax = unit) is false. gdwBitMasks[i] is 1<<i, so both
-// byte-truncated masks are 0: the second test never holds and retail always returns false. The
-// literal truncation is kept; the tail call is therefore unreachable.
+// +0x311B0: monster (unit type 1) in mode 12 (+0x10) whose MonStats2 record (0x13B0, EAX = class id at unit+4) has
+// gdwBitMasks[3] (0x08) clear in byte +6 and gdwBitMasks[7] (0x80) set in byte +4 (retail reads the mask table bytes
+// +0xC and +0x1C, i.e. the low bytes of entries 3 and 7), and for which the 0x33D60 state-mask test (stdcall unit) is 0.
+// The 0x33D60 test is injected (null = the record path only, treated as 0).
 extern "C"
-EMSCRIPTEN_KEEPALIVE bool d2_fn_d2common_311b0(uint32_t pUnit) {   // 1.13c D2Common+0x311B0
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_311B0_CanBeStunned(uint32_t pUnit, uint32_t (*stateTest)(uint32_t)) {   // 1.13c D2Common+0x311B0
 	if (!pUnit || R(P(pUnit), 0) != 1 || R(P(pUnit), 0x10) != 0xC)
-		return false;
+		return 0;
 	const D2MonStats2Txt* rec = UNITS_GetMonStats2TxtRecordFromMonsterId(static_cast<int>(R(P(pUnit), 4)));
 	if (!rec)
-		return false;
+		return 0;
 	const uint8_t* b = reinterpret_cast<const uint8_t*>(rec);
-	return (static_cast<uint8_t>(1u << 12) & b[6]) == 0 && (static_cast<uint8_t>(1u << 28) & b[4]) != 0 && false;
+	if ((b[6] & 0x08) != 0 || (b[4] & 0x80) == 0)
+		return 0;
+	return (stateTest ? stateTest(pUnit) : 0) == 0 ? 1u : 0u;
 }
 
 // +0x4E110: store nValue at +0x10 of the record; a null record is retail's fatal

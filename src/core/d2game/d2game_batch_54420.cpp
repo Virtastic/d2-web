@@ -318,9 +318,9 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9F2B0(void* param1, void* eaxIn,
 // LCG tick on the +0x6C qword (*0x6AC690C5 + the +0x70 dword): the low 15 bits zero and a clear +0x78
 // dword pay 0x10826 -> 0x10014, and a positive +0x2E byte of a unit other than -0x1C then calls
 // 0x47820(esi, value).
-// 1.13c D2Game+0x47950
+// (superseded by src/core/d2game/d2game_47950.cpp)
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_47950(void* esi, const D2GameBatch54420Env* env)
+EMSCRIPTEN_KEEPALIVE void d2_old_d2game_47950_unused(void* esi, const D2GameBatch54420Env* env)
 {
     void* puVar4 = esi != nullptr ? (void*)((uint8_t*)esi + 0x6c) : nullptr;
     const uint64_t uVar1 = (uint64_t)rd32(puVar4, 0) * 0x6ac690c5ULL + (uint64_t)rd32(puVar4, 4);

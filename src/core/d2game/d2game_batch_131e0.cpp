@@ -18,11 +18,10 @@
 // unit's own state list (flag 0x40) or is allocated on the unit's pool and posted to it; stat 0x6B is
 // then written with the candidate as layer. Empty result answers the layer count.
 // 1.13c D2Game+0x13320
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_13320(void* item, int32_t arg1, int32_t arg2,
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2game_rule_13320(void* item, int32_t arg1, int32_t arg2,
                                                            int32_t arg3, const D2GameBatch131E0Env* env)
 {
-    uint64_t* seed = env->ordinal10411(item);
-    uint32_t roll = d2game_lcg_step(seed);
+    uint32_t roll = d2game_lcg_step(env->ordinal10411(item));
 
     int32_t count;
     const int32_t tier = (int32_t)(roll % 100u) + arg3;
@@ -52,7 +51,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_13320(void* item, int32_t a
     int32_t candidate = 0;   // survives the pick loop: the stat write uses the last tried index
     int32_t i = 0;
     while (i < count) {
-        roll = d2game_lcg_step(seed);
+        roll = d2game_lcg_step(env->ordinal10411(item));
         const uint32_t r = roll % 100u;
         int32_t value = delta;
         if (r <= 0x50) {
@@ -66,7 +65,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_13320(void* item, int32_t a
         int32_t tries = 6;
         const int32_t base = arg2 + value * 5 - 5;
         do {
-            roll = d2game_lcg_step(seed);
+            roll = d2game_lcg_step(env->ordinal10411(item));
             candidate = base + (int32_t)(roll % 5u);
             bool accept = true;
             if (candidate >= 0 && candidate < skillsCount) {
@@ -86,7 +85,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_13320(void* item, int32_t a
         if (env->ordinal10718(item) >= 100 && env->ordinal10106(item) == 1) {
             level = 1;
         } else {
-            roll = d2game_lcg_step(seed);
+            roll = d2game_lcg_step(env->ordinal10411(item));
             const int32_t x = (int32_t)(roll % 100u) + arg3 / 2;
             if (x < 0x5A) level = (x < 0x3C) ? 1 : 2;
             else level = 3;
@@ -112,7 +111,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_13320(void* item, int32_t a
     return i;
 }
 
-// Single-item variant of the skill-layer writer (EBX item, EAX level base, one stack argument). The
+// Single-item variant of the skill-layer writer (EBX item, EAX level, one stack argument that is the candidate base). The
 // first draw picks the layer count exactly as 0x13320 does with a zero tier; a low draw answers the
 // quotient instead. Each layer draws a candidate skill index around arg1 + 5*value - 5, rerolls while it
 // lands on 0x49 or repeats any of the three picks it has remembered, then rolls its stat value 1..3 by
@@ -120,11 +119,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_13320(void* item, int32_t a
 // is fetched (flag 0x40) or allocated on the item's pool and posted, then stat 0x6B is set with the
 // candidate as layer. Answers the layer count.
 // 1.13c D2Game+0x135E0
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_135E0(void* item, int32_t arg1,
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_135E0(void* item, int32_t arg1, int32_t arg2,
                                                            const D2GameBatch131E0Env* env)
 {
-    uint64_t* seed = env->ordinal10411(item);
-    uint32_t roll = d2game_lcg_step(seed);
+    uint32_t roll = d2game_lcg_step(env->ordinal10411(item));
 
     int32_t count;
     const uint32_t r0 = roll % 100u;
@@ -147,7 +145,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_135E0(void* item, int32_t a
     int32_t candidate = 0;
     int32_t i = 0;
     while (i < count) {
-        roll = d2game_lcg_step(seed);
+        roll = d2game_lcg_step(env->ordinal10411(item));
         const uint32_t r = roll % 100u;
         int32_t value = delta;
         if (r <= 0x50) {
@@ -157,9 +155,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_135E0(void* item, int32_t a
         }
         if (value < 1) value = 1;
 
-        const int32_t base = arg1 + value * 5 - 5;
+        const int32_t base = arg2 + value * 5 - 5;   // arg2 = the stack word; arg1 (EAX) only picks the tier ladder
         for (;;) {
-            roll = d2game_lcg_step(seed);
+            roll = d2game_lcg_step(env->ordinal10411(item));
             candidate = base + (int32_t)(roll % 5u);
             if (candidate != 0x49 && candidate != picks[0] && candidate != picks[1] &&
                 candidate != picks[2]) break;
@@ -167,7 +165,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_135E0(void* item, int32_t a
         picks[i] = candidate;
 
         int32_t level = 1;
-        roll = d2game_lcg_step(seed);
+        roll = d2game_lcg_step(env->ordinal10411(item));
         const uint32_t r2 = roll % 100u;
         if (r2 >= 0x5A) level = 3;
         else if (r2 >= 0x3C) level = 2;

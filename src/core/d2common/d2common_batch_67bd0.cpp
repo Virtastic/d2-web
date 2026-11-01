@@ -100,7 +100,7 @@ static bool Batch26_RoomInSearchBox(const D2ActiveRoomStrc* pRoom, int32_t nX, i
 	return bYOk;
 }
 
-// 1.13c D2Common+0x12330 (#10314) walks the rooms near the unit's room, keeps those that pass 0x121D0
+// D2Common 0x12330 engine variant (#10314; retail-layout port in d2common_12330.cpp) walks the rooms near the unit's room, keeps those that pass 0x121D0
 // (margin = range, or 0x10000 when range is 0), then walks each one's unit list and keeps the nearest unit
 // (0x7F5E0 distance) below both the range and the best so far that the callback accepts. The callback is
 // fastcall in retail: ecx = candidate unit, edx = the source unit (the first argument), so it is modelled
@@ -109,7 +109,7 @@ static bool Batch26_RoomInSearchBox(const D2ActiveRoomStrc* pRoom, int32_t nX, i
 // the unit list head (+0x74) are the vendored ppRoomList/nNumRooms and pUnitFirst; units chain by
 // pRoomNext (+0xE8 in both).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void* d2_fn_d2common_12330(D2UnitStrc* pUnit, int32_t nX, int32_t nY,
+EMSCRIPTEN_KEEPALIVE void* D2Common_12330_FindNearestUnit(D2UnitStrc* pUnit, int32_t nX, int32_t nY,
 	int32_t nRange, int32_t (*pfnFilter)(D2UnitStrc*, D2UnitStrc*))
 {
 	if (!pUnit || !pfnFilter) return nullptr;

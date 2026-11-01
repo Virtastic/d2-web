@@ -233,29 +233,33 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_50ce0(D2UnitStrc* pUnit, const D2Com
 // flagged 0x10 in their item data are skipped. The walk follows the item data's pNextItem (+0x64)
 // and stops on a null or sentinel (0xFFFFFFA4) data pointer.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2common_CountItemsByNodePos_23e30(D2UnitStrc* pUnit)
+EMSCRIPTEN_KEEPALIVE int32_t d2common_CountItemsByNodePos_23e30(uint32_t pUnitAddr)
 {
+	// Guest layout (retail 32-bit offsets): the walk reads guest memory, not the native structs,
+	// because the build is Memory64 and native pointer fields are 8 bytes wide.
 	int32_t nCount = 0;
-	if (!pUnit)
+	if (!pUnitAddr)
 		return nCount;
-	D2InventoryStrc* pInventory = pUnit->pInventory;
-	if (!pInventory || pInventory->dwSignature != 0x01020304)
+	const uint8_t* pUnit = P(pUnitAddr);
+	const uint32_t pInventory = R(pUnit, 0x60);
+	if (!pInventory || R(P(pInventory), 0x00) != 0x01020304)
 		return nCount;
 
-	D2UnitStrc* pNode = pInventory->pFirstItem;
+	uint32_t pNode = R(P(pInventory), 0x0C);
 	while (pNode)
 	{
-		if (pNode->dwUnitType != 4)
+		const uint8_t* node = P(pNode);
+		if (R(node, 0x00) != 4)
 			return nCount;
 
-		D2ItemDataStrc* pItemData = pNode->pItemData;
-		if (pItemData && (static_cast<intptr_t>(reinterpret_cast<uintptr_t>(pItemData)) != -0x5C) &&
-		    (pItemData->dwItemFlags & 0x10) == 0)
+		const uint32_t pItemData = R(node, 0x14);
+		if (pItemData && pItemData != 0xFFFFFFA4u && (R(P(pItemData), 0x18) & 0x10) == 0)
 		{
-			const uint8_t nPos = pItemData->pExtraData.nNodePosOther;
+			const uint8_t* data = P(pItemData);
+			const uint8_t nPos = data[0x69];
 			if (nPos == 1)
 			{
-				if (pItemData->nInvPage == 0 || pItemData->nInvPage == 3)
+				if (data[0x45] == 0 || data[0x45] == 3)
 					++nCount;
 			}
 			else if (nPos == 3)
@@ -266,9 +270,9 @@ EMSCRIPTEN_KEEPALIVE int32_t d2common_CountItemsByNodePos_23e30(D2UnitStrc* pUni
 
 		if (!pItemData)
 			return nCount;
-		if (static_cast<intptr_t>(reinterpret_cast<uintptr_t>(pItemData)) == -0x5C)
+		if (pItemData == 0xFFFFFFA4u)
 			return nCount;
-		pNode = pItemData->pExtraData.pNextItem;
+		pNode = R(P(pItemData), 0x64);
 	}
 	return nCount;
 }

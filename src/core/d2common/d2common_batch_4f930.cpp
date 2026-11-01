@@ -70,12 +70,12 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_4fcb0(D2UnitStrc* pUnit, D2SkillStrc
 	return SKILLS_GetBonusSkillLevel(pUnit, pSkill);
 }
 
-// 1.13c D2Common+0x17A00 (#?): difficulty-2 DRLG generator. Finds or allocates level 0x4B, stores the
+// D2Common 0x17A00 engine variant (retail-layout port in d2common_17a00.cpp): difficulty-2 DRLG generator. Finds or allocates level 0x4B, stores the
 // levels.txt row's offset X/Y into its position and the sizes for the current difficulty into its
 // width/height, generates the level's jungles, then links 0x4B/0x53 through 0x16CF0 and 0x17760.
 // partial: 0x15980 (room placement), 0x16CF0 and 0x17760 are UNMAPPED and not translated.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_17a00(D2DrlgStrc* pDrlg)
+EMSCRIPTEN_KEEPALIVE void D2Common_17A00_InitAct3Layout(D2DrlgStrc* pDrlg)
 {
 	if (!pDrlg)
 	{
