@@ -38,7 +38,7 @@ extern "C" uint32_t d2lang_9360_find(const uint8_t* tbl, const uint32_t* cache, 
             if (*a == *b) {
                 if (!cache[i]) exit(-1);
                 *out = cache[i];
-                return rd16(nodes + i * 0x10 + 1);
+                return rd16(nodes + i * 0x11 + 1);
             }
         }
         i = (i + 1) % count;

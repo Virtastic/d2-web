@@ -37,11 +37,12 @@ extern "C" int d2lang_utf8_check(const uint8_t* p, int nLen)
 	if (nLen < 1)
 		return -1;
 	const Utf8Row* r = gUtf8;
-	uint32_t v = *p;
+	const uint8_t lead = *p;
+	uint32_t v = lead;
 	int n = 0;
 	if ((int16_t)r->cmask == 0)
 		return -1;
-	while (++n, ((int16_t)r->cmask & *p) != (int16_t)r->cval)
+	while (++n, ((int16_t)r->cmask & lead) != (int16_t)r->cval)
 	{
 		if (nLen <= n)
 			return -1;
