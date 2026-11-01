@@ -1329,13 +1329,17 @@ void __stdcall DUNGEON_SaveKilledUnitGUID(D2ActiveRoomStrc* pRoom, D2UnitGUID nU
 
 //D2Common.0x6FD8D690 (#10107)
 // 1.13c D2Common+0x4daf0
-void __stdcall DUNGEON_ClientToGameTileCoords(int* pX, int* pY)
+int __stdcall DUNGEON_ClientToGameTileCoords(int* pX, int* pY)
 {
+	const int nNumY = 2 * *pY - *pX;
 	const int nOutX = (2 * *pY + *pX) / 160;
-	const int nOutY = (2 * *pY - *pX) / 160;
+	const int nOutY = nNumY / 160;
 
 	*pX = nOutX;
 	*pY = nOutY;
+
+	// 1.13c returns the Y numerator times the divide-by-160 multiplier in EAX (not a value the caller reads).
+	return (int)((uint32_t)nNumY * 0x66666667u);
 }
 
 //D2Common.0x6FD8D870 (#10108)
@@ -1404,10 +1408,10 @@ void __stdcall DUNGEON_GameTileToSubtileCoords(int* pX, int* pY)
 
 //D2Common.0x6FD8D710 (#10114)
 // 1.13c D2Common+0x4DA40
-void __stdcall DUNGEON_ClientTileDrawPositionToGameCoords(int nX, int nY, int* pX, int* pY)
+int __stdcall DUNGEON_ClientTileDrawPositionToGameCoords(int nX, int nY, int* pX, int* pY)
 {
+	const int nNumY = 2 * nY - nX;
 	*pX = 2 * nY + nX;
-	*pY = 2 * nY - nX;
 
 	if (*pX >= 0)
 	{
@@ -1418,14 +1422,15 @@ void __stdcall DUNGEON_ClientTileDrawPositionToGameCoords(int nX, int nY, int* p
 		*pX = *pX / 160 - 1;
 	}
 
-	if (*pY >= 0)
+	if (nNumY >= 0)
 	{
-		*pY /= 160;
+		*pY = nNumY / 160;
+		return *pY;
 	}
-	else
-	{
-		*pY = *pY / 160 - 1;
-	}
+
+	*pY = nNumY / 160 - 1;
+	// 1.13c returns the Y numerator times the divide-by-160 multiplier in EAX for negative Y.
+	return (int)((uint32_t)nNumY * 0x66666667u);
 }
 
 //D2Common.0x6FD8D790 (#10115)

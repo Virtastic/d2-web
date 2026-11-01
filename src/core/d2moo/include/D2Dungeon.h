@@ -199,7 +199,7 @@ D2COMMON_DLL_DECL void __stdcall DUNGEON_SaveKilledUnitGUID(D2ActiveRoomStrc* pR
 //////////////////////////////////////
 
 //D2Common.0x6FD8D690 (#10107)
-D2COMMON_DLL_DECL void __stdcall DUNGEON_ClientToGameTileCoords(int* pX, int* pY);
+D2COMMON_DLL_DECL int __stdcall DUNGEON_ClientToGameTileCoords(int* pX, int* pY);
 //D2Common.0x6FD8D870 (#10108)
 D2COMMON_DLL_DECL void __stdcall DUNGEON_ClientToGameSubtileCoords(int* pX, int* pY);
 //D2Common.0x6FD8D8A0 (#10109)
@@ -215,7 +215,7 @@ D2COMMON_DLL_DECL void __stdcall DUNGEON_GameToClientCoords(int* pX, int* pY);
 D2COMMON_DLL_DECL void __stdcall DUNGEON_GameTileToSubtileCoords(int* pX, int* pY);
 
 //D2Common.0x6FD8D710 (#10114)
-D2COMMON_DLL_DECL void __stdcall DUNGEON_ClientTileDrawPositionToGameCoords(int nX, int nY, int* pX, int* pY);
+D2COMMON_DLL_DECL int __stdcall DUNGEON_ClientTileDrawPositionToGameCoords(int nX, int nY, int* pX, int* pY);
 //D2Common.0x6FD8D790 (#10115)
 D2COMMON_DLL_DECL void __stdcall DUNGEON_GameToClientTileDrawPositionCoords(int nX, int nY, int* pX, int* pY);
 
