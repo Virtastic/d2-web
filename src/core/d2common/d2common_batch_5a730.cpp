@@ -208,7 +208,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_25c10(D2UnitStrc* item, D2Bi
     }
 }
 
-// Not a port of 1.13c D2Common+0x833F0: this LvlSub teardown helper is a different routine. Row stays STALLED.
+// 1.13c D2Common+0x833F0: LvlSub teardown; checked against the decompile, matches retail order (wall/tile layers, floor, shadow, drlg file).
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_833f0(D2LvlSubTxt* record)
 {
     if (!record->pDrlgFile) return;

@@ -127,7 +127,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_6b180(uint32_t pUnit, uin
 	int32_t nChance = StatTotal(u, 0x151);
 	d2::Seed& seed = *reinterpret_cast<d2::Seed*>(u + 0x20);
 
-	if (static_cast<int32_t>(static_cast<uint32_t>(d2::roll(seed))) % 100 < nChance)
+	if (static_cast<int32_t>(static_cast<uint32_t>(d2::roll(seed)) % 100u) < nChance)
 		return 1;
 
 	if (I32(u, 0x5C) && sgptDataTables && sgptDataTables->pItemStatCostTxt &&
@@ -135,7 +135,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_6b180(uint32_t pUnit, uin
 	{
 		nChance = StatTotal(u, 0x8D);
 		if (nChance != 0 &&
-			static_cast<int32_t>(static_cast<uint32_t>(d2::roll(seed))) % 100 < nChance)
+			static_cast<int32_t>(static_cast<uint32_t>(d2::roll(seed)) % 100u) < nChance)
 			return 1;
 	}
 
@@ -144,7 +144,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_6b180(uint32_t pUnit, uin
 		nChance = SKILLS_GetWeaponMasteryBonus(reinterpret_cast<D2UnitStrc*>(u),
 			reinterpret_cast<D2UnitStrc*>(item), nullptr, 2);
 		if (nChance != 0 &&
-			static_cast<int32_t>(static_cast<uint32_t>(d2::roll(seed))) % 100 < nChance)
+			static_cast<int32_t>(static_cast<uint32_t>(d2::roll(seed)) % 100u) < nChance)
 			return 1;
 	}
 

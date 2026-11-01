@@ -419,7 +419,8 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_39b60(uint16_t* pUnit, uint32_t pParam)
 // struct+0x74 is the head; every node's next is at +0xE8 and its payload pointer at +0x2C. The key
 // is payload+0x08 for node types 2 and 4..5 and payload+0x0C otherwise. The list is walked with a
 // trailing pointer, swapping a node ahead of a lower-keyed predecessor. The walk runs to the tail;
-// the outer pass then finds no next node and returns, so one pass is made (retail's outer loop too). Null struct is fatal 0x286 and a broken chain fatal 0x78A; both return.
+// the outer pass then finds no next node and returns, so one pass is made (retail's outer loop too).
+// Null struct is fatal 0x286 and a broken chain fatal 0x78A; retail logs the message then _exit(-1), so both exit(-1) here.
 namespace
 {
 	int32_t Batch37ca0_NodeKey(uint8_t* pNode)
@@ -438,7 +439,7 @@ EMSCRIPTEN_KEEPALIVE void d2common_sub_664b0(uint32_t pStruct)
 {
 	uint8_t* s = P(pStruct);
 	if (!s)
-		return;
+		std::exit(-1);                          // fatal 0x286
 	uint8_t* pHead = P(W(s, 0x74));
 	if (!pHead)
 		return;
@@ -458,7 +459,7 @@ EMSCRIPTEN_KEEPALIVE void d2common_sub_664b0(uint32_t pStruct)
 		for (;;)
 		{
 			if (!pA || !pB)
-				return;                         // fatal 0x78A
+				std::exit(-1);                  // fatal 0x78A
 			const int32_t nKeyB = Batch37ca0_NodeKey(pB);
 			const int32_t nKeyA = Batch37ca0_NodeKey(pA);
 

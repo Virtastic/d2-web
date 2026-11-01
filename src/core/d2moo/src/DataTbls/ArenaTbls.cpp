@@ -1,4 +1,5 @@
 #include "D2DataTbls.h"
+#include <cstdlib>
 
 static const int NUM_ARENA_TYPES = 1;
 
@@ -167,9 +168,12 @@ int __fastcall DATATBLS_GetCharTemplateTxtRecordCount()
 // 1.13c D2Common+0x7fe40
 D2CharTemplateTxt* __fastcall DATATBLS_GetCharTemplateTxtRecord(int nTemplate, int nLevel)
 {
-	D2_ASSERT(nTemplate > 0);
+	// Retail logs and _exit(-1)s on a bad template or index; same exit here.
+	if (nTemplate <= 0)
+		std::exit(-1);
 	const int nIndex = gnCharTemplateStartIds[nLevel] + nTemplate - 1;
-	D2_ASSERT(nIndex < gnCharTemplateTxtTableRecordCount);
+	if (nIndex >= gnCharTemplateTxtTableRecordCount)
+		std::exit(-1);
 
 	return &gpCharTemplateTxtTable[nIndex];
 }
