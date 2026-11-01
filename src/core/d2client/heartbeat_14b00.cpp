@@ -1,4 +1,4 @@
-// 1.13c D2Client+0x14B00: periodic (5 s) 0x6D packet [6d][tick:4][chk:4][g830>>1:4] via D2Net #10024 (13, 0, buf).
+// 1.13c D2Client+0x14B00: periodic (5 s) 0x6D packet [6d][tick:4][g830>>1:4][chk:4] via D2Net #10024 (13, 0, buf).
 // chk = u32 from two WORDs read in a module named by 3 obfuscated globals (x 0x470e31c1; 0 if name empty,
 // 0xCCCCCCCC if module/read missing), times -0x49bf21bf. Host supplies the module probe and the send.
 #include <cstdint>
@@ -20,7 +20,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_14b00(Client14B00State* g, uint32
     if (now - g->lastTick < 5000) return;
     g->lastTick = now;
     uint8_t p[13]; p[0] = 0x6d;
-    uint32_t v[3] = { now, chk * 0xB640DE41u, g->d830 >> 1 };   // -0x49bf21bf mod 2^32
+    uint32_t v[3] = { now, g->d830 >> 1, chk * 0xB640DE41u };   // -0x49bf21bf mod 2^32
     memcpy(p + 1, v, 12);
     send(13, 0, p);
     g->c4e0 += 13; g->c4e8 += 1;
