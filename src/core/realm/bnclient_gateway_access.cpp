@@ -158,6 +158,7 @@ void bn_gateway_load(uint32_t self, const BnetGatewayHost& host);
 void bn_gateway_update_from_ini(uint32_t self, const char* data, const BnetGatewayHost& host);
 int32_t bn_strnicmp(const char* str1, const char* str2, uint32_t max_count);
 int32_t bn_strtol(const char* str, char** end_ptr, int32_t radix);
+uint32_t bn_strtoul(const char* str, const char** end_ptr, int radix);
 
 namespace {
 
@@ -427,9 +428,8 @@ void bn_gateway_load(uint32_t self, const BnetGatewayHost& host) {
             host.terminate(-1);
         }
         int32_t length = (int32_t)host.sstr_len(data);
-        char* end = nullptr;
-        unsigned long parsed = std::strtoul(data + 1 + length, &end, 10);
-        uint32_t current = parsed > 0xFFFFFFFFul ? 0xFFFFFFFFu : (uint32_t)parsed;   // retail _strtoul: 32-bit, clamps to 0xFFFFFFFF
+        const char* end = nullptr;
+        uint32_t current = bn_strtoul(data + 1 + length, &end, 10);   // retail _strtoul 0x18AF: 32-bit, negation wraps, overflow clamps
         access->gateway_count_08 = (uint32_t)((records - 1) / 3);
         access->current_gateway_0c = current;
         access->selection_changed_04 = 0;

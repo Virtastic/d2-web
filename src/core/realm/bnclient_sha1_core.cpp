@@ -89,12 +89,13 @@ extern "C" void d2_bnclient_sha1_final(BnclientSha1Context* ctx, uint8_t* digest
     for (unsigned i = 0; i < 20; ++i) digest[i] = uint8_t(ctx->state[i >> 2] >> (24 - 8 * (i & 3)));
 }
 
-// SRP SHA interleave: hidden EAX = length, param_2 = data, out = 40 bytes.
-// Skips leading zeros, drops one byte if odd, hashes even-index bytes into
-// out[0,2,..] and odd-index bytes into out[1,3,..]. Context seed assumed
-// standard SHA-1 (init is outside this function); NAMED, not vectored.
+// SRP SHA interleave: stdcall(out, data) with the byte count in EAX. Zero bytes at the front are skipped,
+// one more byte is dropped when the remaining count is odd, then the even-index bytes and the odd-index
+// bytes are hashed separately (fresh context each, standard initial state) and the two digests are
+// interleaved into out[0,2,..] and out[1,3,..] (40 bytes). Returns `out`, or 0 when the scratch
+// allocation fails (it does not here).
 // 1.13c BNClient+0x9E90
-extern "C" bool d2_bnclient_srp_interleave(const uint8_t* data, uint32_t len, uint8_t* out) {
+extern "C" uint32_t d2_bnclient_srp_interleave(uint32_t len, uint8_t* out, const uint8_t* data) {
     while (len && !*data) { ++data; --len; }
     if (len & 1) { ++data; --len; }
     const uint32_t half = len >> 1;
@@ -109,15 +110,18 @@ extern "C" bool d2_bnclient_srp_interleave(const uint8_t* data, uint32_t len, ui
         d2_bnclient_sha1_final(&c, d);
         for (unsigned i = 0; i < 20; ++i) out[i * 2 + pass] = d[i];
     }
-    return true;
+    return (uint32_t)(uintptr_t)out;
 }
 
-// Hashes 0x20, 0x14, 0x28 bytes from three buffers into the context (EBX in
-// retail), then finalizes; digest register (EDI) is the caller's.
+// stdcall(a, b, c) with the digest pointer in EDI: a fresh local context (standard initial state, zero
+// counts) takes 0x20 bytes of a, 0x14 of b and 0x28 of c, then is finalized into the 20-byte digest.
 // 1.13c BNClient+0x0A610
-extern "C" void d2_bnclient_sub_a610(BnclientSha1Context* ctx, uint8_t* a, uint8_t* b, uint8_t* c, uint8_t* digest) {
-    d2_bnclient_sha1_update(ctx, a, 0x20);
-    d2_bnclient_sha1_update(ctx, b, 0x14);
-    d2_bnclient_sha1_update(ctx, c, 0x28);
-    d2_bnclient_sha1_final(ctx, digest);
+extern "C" void d2_bnclient_sub_a610(uint8_t* digest, uint8_t* a, uint8_t* b, uint8_t* c) {
+    BnclientSha1Context ctx{};
+    ctx.state[0] = 0x67452301; ctx.state[1] = 0xefcdab89; ctx.state[2] = 0x98badcfe;
+    ctx.state[3] = 0x10325476; ctx.state[4] = 0xc3d2e1f0;
+    d2_bnclient_sha1_update(&ctx, a, 0x20);
+    d2_bnclient_sha1_update(&ctx, b, 0x14);
+    d2_bnclient_sha1_update(&ctx, c, 0x28);
+    d2_bnclient_sha1_final(&ctx, digest);
 }

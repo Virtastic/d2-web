@@ -15,19 +15,19 @@ static void fr(uint32_t p, const char*, uint32_t, uint32_t) { freed = p; }
 int main() {
     uint32_t h[3] = {0, 2, 0};
     rr_ret = 0x1234;  // realloc succeeds: only header changes
-    d2_fn_bnclient_11c0(5, h, rr, al, fr);
+    bn_news_table_grow_11c0(5, h, rr, al, fr);
     assert(h[0] == 5 && h[2] == 0x1234 && !allocd && !freed);
     uint32_t old = blk(2 * 0x408);
     ((uint8_t*)(uintptr_t)old)[0x408] = 7;
     ((uint8_t*)(uintptr_t)old)[0x407 + 0x408] = 9;
     h[0] = 0; h[1] = 2; h[2] = old; rr_ret = 0;  // fallback: alloc, copy min(old,new)=1, free old
-    d2_fn_bnclient_11c0(1, h, rr, al, fr);
+    bn_news_table_grow_11c0(1, h, rr, al, fr);
     assert(allocd == 0x408 && freed == old && h[0] == 1 && h[2] != old);
     h[1] = 2; h[2] = old; freed = 0;
-    d2_fn_bnclient_11c0(2, h, rr, al, fr);
+    bn_news_table_grow_11c0(2, h, rr, al, fr);
     assert(((uint8_t*)(uintptr_t)h[2])[0x408] == 7 && ((uint8_t*)(uintptr_t)h[2])[0x407 + 0x408] == 9);
     h[2] = 0; freed = 0;  // no old buffer: no free
-    d2_fn_bnclient_11c0(2, h, rr, al, fr);
+    bn_news_table_grow_11c0(2, h, rr, al, fr);
     assert(!freed);
     return 0;
 }

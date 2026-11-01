@@ -68,19 +68,19 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_5ea9(int32_t file_handle, BnUnlockFhand
 }
 
 typedef void (*BnNewsTableFreeFn)(uint32_t ptr, const char* type, uint32_t line, uint32_t flags);
-extern "C" void d2_fn_bnclient_1160(uint32_t self, BnNewsTableFreeFn smem_free);   // 0x01160
+void bn_news_table_release_1160(uint32_t self, BnNewsTableFreeFn smem_free);   // 0x01160
 
 // 1.13c BNClient+0x185A0 (8 B, no callers in the image; referenced from .xdata D:0x1B220): SEH unwind
 // thunk for the NewsTable destructor leaf 0x01160. `this` arrives in EAX on retail (Ghidra recovers no
 // stack arguments); it and the SMemFree import are the explicit seam arguments here.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_185a0(uint32_t self, BnNewsTableFreeFn smem_free) {
-    d2_fn_bnclient_1160(self, smem_free);
+    bn_news_table_release_1160(self, smem_free);
 }
 
 // 1.13c BNClient+0x185CA (8 B, no callers in the image; referenced from .xdata D:0x1B24C): the same
 // unwind thunk as 0x185A0 for the second destructor scope.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_185ca(uint32_t self, BnNewsTableFreeFn smem_free) {
-    d2_fn_bnclient_1160(self, smem_free);
+    bn_news_table_release_1160(self, smem_free);
 }

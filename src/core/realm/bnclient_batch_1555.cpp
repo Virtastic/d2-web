@@ -76,7 +76,7 @@ static int32_t bn_time32(int32_t* out) {
 }
 
 // _strtoul (0x018AF) is the unsigned flag (bit 1) of the shared strtoxl parser.
-static uint32_t bn_strtoul(const char* s, const char** endptr, int radix) {
+uint32_t bn_strtoul(const char* s, const char** endptr, int radix) {
     return bn_strtoxl(s, endptr, (uint32_t)radix, 1);
 }
 

@@ -1,4 +1,4 @@
-// BNClient batch n51: the SRP bignum glue (rows 0x0A4E0 0x0A680 0x0A910 0x0AE10 0x0AED0 0x0B0C0), from the cached
+// BNClient batch n51: the SRP bignum glue (rows 0x0A910 0x0AE10 0x0AED0 0x0B0C0), from the cached
 // decompile of retail 1.13c Bnclient.dll. Retail reaches Storm's SBig* imports; here each is a function pointer of
 // BnN51Host (the port's seam): 494 SMemZero, 506 SStrLen, 601 SBigAdd, 603 SBigCompare, 606 SBigDel,
 // 609 SBigFromBinary, 612 SBigFromUnsigned, 624 SBigNew, 628 SBigPowMod, 636 SBigSub, 638 SBigToBinaryBuffer.
@@ -34,41 +34,16 @@ static void bn_n51_bin32(const BnN51Host& h, BnN51Big b, uint8_t* out) {
     if (len < 0x20) memset(out + len, 0, 0x20 - len);   // Ordinal_494 on the tail
 }
 
-// 1.13c BNClient+0x0A4E0
-// Install the SRP group: free a previous pair, then build g (+4) and N (+8) from the caller's 32-byte value.
-// Both Ordinal_609 calls show param_1 as their source; their lengths are not in the listing (0x20 as in 0xAE10).
-extern "C" uint32_t bnclient_a4e0(const BnN51Host* h, BnN51Group* grp, const void* param_1) {
-    if (grp->ready) { h->big_del(grp->n); h->big_del(grp->g); }
-    BnN51Big a = h->big_new();
-    h->big_from_binary(a, param_1, 0x20);
-    grp->g = a;
-    BnN51Big b = h->big_new();
-    h->big_from_binary(b, param_1, 0x20);
-    grp->n = b;
-    grp->ready = 1;
-    return 1;   // the trailing `if (!*ctx) { free; *ctx=0 }` is dead: *ctx was just set to 1
-}
-
-// 1.13c BNClient+0x0A680
-// M1 prefix: H(bin32(N)) xor H(bin32(g)) (20 bytes), then H over the account name, and the working buffers wiped.
-// Reconstruction: which of the three aliased SHA1 contexts holds which digest follows the SRP-3 shape of the loop.
-extern "C" void bnclient_a680(const BnN51Host* h, const BnN51Group* grp, const char* name,
-                              uint8_t xor20[20], uint8_t name_hash[20]) {
-    uint8_t buf[0x20], hn[20], hg[20];
-    bn_n51_bin32(*h, grp->n, buf); h->sha1(buf, 0x20, hn);
-    bn_n51_bin32(*h, grp->g, buf); h->sha1(buf, 0x20, hg);
-    for (int i = 0; i < 0x14; i++) xor20[i] = hn[i] ^ hg[i];
-    h->sha1(name, (uint32_t)strlen(name), name_hash);   // Ordinal_506 length
-    memset(buf, 0, sizeof buf); memset(hn, 0, sizeof hn); memset(hg, 0, sizeof hg);
-}
-
 // 1.13c BNClient+0x0A910
-// SRP u: SHA1 of the bignum serialised to 0x20 bytes (tail zero-padded); the first digest word is returned
-// big-endian-assembled (CONCAT31 chain) through the out pointer.
+// SRP u (EDX = pointer to the handle, stack = out pointer): Storm #638 writes the bignum into a 0x20-byte buffer and its
+// length; a shorter result is zero-filled (#494) but only `len` bytes are hashed (the length register is reloaded
+// unchanged). The first four digest bytes are assembled big-endian into *out.
 extern "C" void bnclient_a910(const BnN51Host* h, uint32_t* out, BnN51Big* bn) {
     uint8_t buf[0x20], d[20];
-    bn_n51_bin32(*h, *bn, buf);
-    h->sha1(buf, 0x20, d);
+    uint32_t len = 0;
+    h->big_to_binary(*bn, buf, 0x20, &len);
+    if (len < 0x20) memset(buf + len, 0, 0x20 - len);
+    h->sha1(buf, len, d);
     *out = (uint32_t)d[0] << 24 | (uint32_t)d[1] << 16 | (uint32_t)d[2] << 8 | d[3];
 }
 

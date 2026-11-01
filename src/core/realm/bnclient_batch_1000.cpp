@@ -77,8 +77,8 @@ void bn_news_table_dtor_1110(uint32_t self, BnSmemFreeFn smem_free) {
 
 // 1.13c BNClient+0x01160 (23 B, callers 0x185A0/0x185CA/0x185E0): the destructor's release step with
 // no SEH frame. `this` arrives in EAX (Ghidra sees only in_EAX); the only argument is the SMemFree thunk.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_1160(uint32_t self, BnSmemFreeFn smem_free) {
+// Plain helper: the FN probe for 0x1160 is src/core/fn/bnclient_1160.cpp (its own export name).
+void bn_news_table_release_1160(uint32_t self, BnSmemFreeFn smem_free) {
     const uint32_t array = *(const uint32_t*)(uintptr_t)(self + 8);
     if (array != 0) smem_free(array, kBnNewsTableType, 0xFFFFFFFEu, 0);
 }
@@ -87,8 +87,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_1160(uint32_t self, BnSmemFreeFn smem_f
 // arrives in EAX (our `n`), the array header at 0x6FF3E8CC is the stack argument. n >= 8: the header's
 // growth field at +0xC (0x6FF3E8D8) becomes 8 and 8 is returned. n < 8: return n with its set bits
 // cleared down to the last non-zero value -- the largest power of two <= n -- and 1 when n is 0.
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_bnclient_1180(uint32_t n, uint32_t* header) {
+uint32_t bn_capacity_step_1180(uint32_t n, uint32_t* header) {
     if (n < 8) {
         uint32_t value = n;
         for (uint32_t next = (value - 1) & value; next != 0; next = (value - 1) & value) value = next;
@@ -105,7 +104,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_bnclient_1180(uint32_t n, uint32_t* header) 
 // full 0x408-byte records are copied to the new block, and the old block is freed. No alloc failure is
 // checked after the fallback (a NULL buffer simply skips the copies, as retail's pointer test does).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_11c0(uint32_t new_capacity, uint32_t* header,
+void bn_news_table_grow_11c0(uint32_t new_capacity, uint32_t* header,
                                               BnSmemReAllocFn smem_realloc,
                                               BnSmemAllocFn smem_alloc, BnSmemFreeFn smem_free) {
     const uint32_t old_buffer = header[2];
@@ -125,20 +124,6 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_11c0(uint32_t new_capacity, uint32_t* h
         }
     }
     smem_free(old_buffer, kBnNewsTableType, 0xFFFFFFFEu, 0);
-}
-
-// 1.13c BNClient+0x01240 (90 B, caller 0x103B0): SHA-1 finish. The context arrives in EDI and the data
-// pointer in EAX; the stack arguments are param_1 = digest output, param_2 (never read in the body) and
-// param_3 = data length. It runs the update step 0x14930(ctx, data, length) and then the final step
-// 0x149E0(ctx, digest output). Both are UNMAPPED, so they are seams after the retail arguments.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_1240(uint32_t digest_out, uint32_t unused, uint32_t length,
-                                              const uint8_t* data, void* context,
-                                              void (*sha1_update)(void*, const uint8_t*, uint32_t),
-                                              void (*sha1_final)(void*, uint32_t)) {
-    (void)unused;
-    sha1_update(context, data, length);   // 0x14930: EAX = data, EDI = context, length on the stack
-    sha1_final(context, digest_out);      // 0x149E0: EAX = context, digest buffer on the stack
 }
 
 // 1.13c BNClient+0x0129A (__onexit_lk, 128 B, caller 0x1342): append the function pointer retail passes
