@@ -82,12 +82,20 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2gfx_sub_b580(uint32_t hInst, uint32_t 
 // +0x10BE0 forward to slot +0x68 as fastcall(ecx = a1, edx = a2, stack 0, a4, a5, a6) -- a3 is dropped; modes 4..7
 // with a zero +0x10BE0 report string 0x99, other modes 0x98, then exit(-1).
 // 1.13c D2Gfx+0x0B730
+// Explicit-state body (the FN probe passes mode, info word and table). Retail has no return after the report: when
+// _exit returns (the FN recorder pops its -1) the code falls into the forward block, so the forward runs here too.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2gfx_sub_b730_fn(uint32_t mode, uint32_t be0, const D2GfxTable* table, uint32_t a1,
+                                                       uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5, uint32_t a6,
+                                                       const D2GfxN124Env* e) {
+    (void)a3;
+    bool be = mode == 4 || mode == 5 || mode == 7 || mode == 6;
+    if (!be || !be0) { e->error(be ? 0x99 : 0x98, nullptr); e->exit_(-1); }
+    table->fatal(a1, a2, 0, a4, a5, a6);
+}
+
 extern "C" EMSCRIPTEN_KEEPALIVE void d2gfx_sub_b730(uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5,
                                                     uint32_t a6, const D2GfxN124Env* e) {
-    (void)a3;
-    bool be = g_mode == 4 || g_mode == 5 || g_mode == 7 || g_mode == 6;
-    if (!be || !g_be0) { e->error(be ? 0x99 : 0x98, nullptr); e->exit_(-1); return; }
-    g_table->fatal(a1, a2, 0, a4, a5, a6);
+    d2gfx_sub_b730_fn(g_mode, g_be0, g_table, a1, a2, a3, a4, a5, a6, e);
 }
 
 // FN-probe seam for sub_88C0's non-fatal paths (table present): same body as d2gfx_sub_88c0 with explicit state.
