@@ -126,8 +126,17 @@ by hand. Nothing made from game data is ever committed, which is why a fresh clo
 it.
 
 **Your 1.13c `patch_d2.mpq` is required.** Without it, `ci/stage.sh` (and so `ci/build.sh`) stops
-with `FATAL: no retail/D2/patch_d2.mpq`. It has to be the patch from an install updated to
-**1.13c**. The build checks that the file is an MPQ archive, but it cannot check its version.
+with `FATAL: no retail/D2/patch_d2.mpq`. It has to be the exact `Patch_D2.mpq` that the 1.13c
+update installs. `tools/patch-shim.mjs` compares the file's size and SHA-256 with that file and
+refuses anything else, including other patch versions and modified copies:
+
+| | |
+|---|---|
+| size | 8,229,959 bytes |
+| SHA-256 | `41a5fc95977369e3d5f32127cc4c0d571daad9cf706b6b6523935b705afc5a6d` |
+
+`tools/docker-release.sh` runs the same check (`node tools/patch-shim.mjs --check`) on the staged
+`assets/patch-113c.patch` before it builds an image.
 
 | staged path | what it is | made from | made by | without it |
 |---|---|---|---|---|
@@ -176,7 +185,7 @@ bash ci/build.sh            # or ci/stage.sh, to restage without rebuilding the 
 The build log should print both of these lines:
 
 ```
-patch shim: retail/D2/patch_d2.mpq (... bytes) -> build-wasm/site/assets/patch-113c.patch
+patch shim: retail/D2/patch_d2.mpq (8229959 bytes, 1.13c) -> build-wasm/site/assets/patch-113c.patch
 door-art: ... images -> build-wasm/site/door-art
 ```
 

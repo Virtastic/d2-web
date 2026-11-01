@@ -6,6 +6,7 @@ cd "$(dirname "$0")/.."
 TAG="${1:?usage: docker-release.sh <tag> [--no-push]}"
 IMAGE="${D2_IMAGE:-ghcr.io/virtastic/d2-web}"
 [ -f build-wasm/site/assets/patch-113c.patch ] || { echo "FATAL: no patch shim staged -- stage with retail/D2/patch_d2.mpq or D2_PATCH_SHIM_SRC" >&2; exit 1; }
+node tools/patch-shim.mjs --check build-wasm/site/assets/patch-113c.patch   # exits 1 unless it is the 1.13c Patch_D2.mpq
 [ -f "build-wasm/site/e/$(cat build-wasm/site/engine-version.txt 2>/dev/null)/d2.wasm" ] && [ -f build-wasm/site/serve.mjs ] || { echo "FATAL: no staged site -- run ci/build.sh" >&2; exit 1; }
 if [ -e build-wasm/site/widebg/manifest.json ]; then
   [ ! -L build-wasm/site/widebg/manifest.json ] || { echo "FATAL: widebg/manifest.json is a link -- restage with ci/stage.sh (it copies .widebg/ with cp -rL)" >&2; exit 1; }
