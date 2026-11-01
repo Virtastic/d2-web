@@ -113,7 +113,7 @@ if [ "${#STALE[@]}" -gt 0 ]; then
   printf '%s\0' "${STALE[@]}" | xargs -0 -n1 -P "$JOBS" bash -c 'compile_one "$1"' _ || exit 1
 fi
 # A probe that failed to compile left no object (its PROBE-SKIP line is above); drop every missing object.
-SKIPPED_FILE="$BUILD/probe-skip.txt"; : > "$SKIPPED_FILE"
+SKIPPED_FILE="$BUILD/probe-skip.txt"; : > "$SKIPPED_FILE"; chmod 666 "$SKIPPED_FILE" 2>/dev/null || true   # the container runs as root; host-side batch proves rewrite it
 KEEP=""
 for o in $OBJS; do
   if [ -f "$o" ]; then KEEP="$KEEP $o"; else basename "$o" .o | sed 's/^src_core_fn_//' >> "$SKIPPED_FILE"; fi
