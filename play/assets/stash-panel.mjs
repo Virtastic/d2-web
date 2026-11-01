@@ -15,8 +15,9 @@
 import { gridCelAt } from './item-cel-place.mjs';
 import { decodeDatPalette, decodeDc6, dc6FrameToRgba } from './d2-formats.mjs';
 import { inventoryCloseFrame } from './inventory-close-gesture.mjs';
-import { inventoryItemAsset } from './inventory-panel.mjs';
+import { inventoryItemAsset, SOCKET_ART } from './inventory-panel.mjs';
 import { BORDER_LEFT, BORDER_RIGHT, CHROME_ART, createPanelChrome } from './panel-chrome.mjs';
+import { createItemBlendCache, drawItemCel } from './item-draw-mode.mjs';
 import { boxTables, heldItemBoxes, itemBoxState, paintBoxes, placedItemBoxes } from './grid-highlight.mjs';
 
 export const STASH_ART = 'data\\global\\ui\\PANEL\\TradeStash.dc6';
@@ -81,9 +82,10 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
     }
     return a;
   };
+  const itemBlend = createItemBlendCache(read);
   const icon = (a, invFile) => {
     let c = a.icons.get(invFile);
-    if (!c) { c = frameCanvas(decodeDc6(read(inventoryItemAsset(invFile))).frames[0], a.palette, documentObject); a.icons.set(invFile, c); }
+    if (!c) { const f = decodeDc6(read(inventoryItemAsset(invFile))).frames[0]; c = frameCanvas(f, a.palette, documentObject); c.frame = f; a.icons.set(invFile, c); }
     return c;
   };
   const origin = (width, height) => {
@@ -179,8 +181,21 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
         const c = icon(a, item.invFile);
         // The art lands one row below the cell's top, like every other grid (item-cel-place.mjs).
         const { left: x, top: y } = gridCelAt(geometry.gridLeft, geometry.gridTop, geometry.boxW, geometry.boxH, item.gridX, item.gridY);
-        ctx.drawImage(c, x, y);
+        drawItemCel(ctx, c, c.frame, x, y, item.itemFlags, itemBlend(act));
         drawn.push({ id: item.id, invFile: item.invFile, cell: [item.gridX, item.gridY], at: [x, y] });
+      }
+      // The hovered item's sockets over its art (the inventory grid's rule): the empty-socket cel at the engine's
+      // footprint offset (x - 1), a filled socket's gem art one cell above it.
+      const sockets = [];
+      if (hoverItem?.sockets && hoverItem.invPage === page) {
+        const cx = geometry.gridLeft + hoverItem.gridX * geometry.boxW, cy = geometry.gridTop + hoverItem.gridY * geometry.boxH;
+        hoverItem.sockets.off.forEach(([ox, oy], n) => {
+          const px = cx + ox, py = cy + oy, gem = hoverItem.sockets.gem[n];
+          const blit = chrome.cel(ctx, act, SOCKET_ART, 0, px - 1, py);
+          let gemAt = null;
+          if (gem) { const g = icon(a, gem), at = gridCelAt(px, py - geometry.boxH, geometry.boxW, geometry.boxH, 0, 0); drawItemCel(ctx, g, g.frame, at.left, at.top, 0, null); gemAt = { invFile: gem, x: at.left, y: at.top }; }
+          sockets.push({ id: hoverItem.id, n, blit, gem: gemAt });
+        });
       }
       // The held item over the grid: its boxes go over the placed items.
       const heldCell = held && p ? this.cellAt(p.x, p.y, width, height, geometry, held) : null;
@@ -205,7 +220,7 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
       chrome.border(ctx, act, BORDER_LEFT); chrome.border(ctx, act, BORDER_RIGHT);
       ctx.restore();
       return { page, anchor: [geometry.left, geometry.top], recordTop: geometry.recordTop, palette: actPalette(act), open: true, composed, frames: frames.length, grid: { columns: geometry.columns, rows: geometry.rows,
-        left: geometry.gridLeft, top: geometry.gridTop, box: [geometry.boxW, geometry.boxH] }, drawn, boxes };
+        left: geometry.gridLeft, top: geometry.gridTop, box: [geometry.boxW, geometry.boxH] }, drawn, boxes, sockets };
     },
   };
 }

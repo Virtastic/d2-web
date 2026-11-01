@@ -7,6 +7,7 @@ import { inventoryCloseFrame } from './inventory-close-gesture.mjs';
 import { boxTables, cellBoxes, gridBoxSlot, heldItemBoxes, itemBoxState, paintBoxes, slotBoxSlot } from './grid-highlight.mjs';
 import { inventoryItemColourIndex, inventoryItemColourKey } from './inventory-item-colour.mjs';
 import { createItemTooltip, itemTooltipSpec } from './item-tooltip.mjs';
+import { createItemBlendCache, drawItemCel } from './item-draw-mode.mjs';
 
 // Inventory.txt Amazon2, normalized from its 800x600 screen coordinates to the
 // invchar6 panel origin. Retail leaves the final 80 pixels for the screen edge.
@@ -197,6 +198,10 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     return entry;
   }
   const icon = (invFile, act = 1, item = null) => iconAt(invFile, act, item).image;
+  const itemBlend = createItemBlendCache(read);
+  // The item's art through retail's blit: opaque, or the AlphaBlend mode for an ethereal item.
+  const drawArt = (ctx, item, act, image, left, top) => drawItemCel(ctx, image, iconAt(item.invFile, act).frame, left, top, item.itemFlags, itemBlend(act),
+    inventoryItemColourKey(item) === 'identity' ? null : (i) => inventoryItemColourIndex(item, i));
   // A grid item sits on retail's own box: `box 419 315 448 344 color=138 mode=0` in
   // the retail captures, one per cell of the item.
   //
@@ -341,7 +346,7 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
         const boxRects = cells.map((b) => ({ x: b.x, y: b.y, width: b.w, height: b.h, colour: b.paletteIndex }));
         const at = celAt(r.left, r.top);
         if (item.sockets && hoverItem?.id === item.id) socketAnchors.push({ item, x: r.left, y: r.top });
-        ctx.drawImage(image, at.left - sx, at.top - sy); itemPixels += image.width * image.height;
+        drawArt(ctx, item, act, image, at.left - sx, at.top - sy); itemPixels += image.width * image.height;
         // `top` stays the CELL's top (s202 asserts the item landed in the cell it was put in);
         // `blitTop` is where the ART actually landed -- one row lower, and the anchor retail's own
         // `cel ?` record carries. An identity row must read `blitTop`, or it compares the cell.
@@ -359,7 +364,7 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
         const [ax, ay] = weaponSetArmShift(state?.weaponSet, item.bodyLoc);
         const { left, top } = slotCelAt(slot, iw, ih, 29, 29, [bx + ax, by + ay]);
         if (item.sockets && hoverItem?.id === item.id) socketAnchors.push({ item, x: left, y: top - 1 });
-        ctx.drawImage(image, left - sx, top - sy);
+        drawArt(ctx, item, act, image, left - sx, top - sy);
         equippedItemPixels += image.width * image.height; equippedItemCount++;
         drawn.push({ ...paperdollIdentity(item, iconAt(item.invFile, act).frame, left, top, slot), width: image.width, height: image.height, blitTop: top,
           ox: iconAt(item.invFile, act).frame.offsetX, oy: iconAt(item.invFile, act).frame.offsetY }); }
