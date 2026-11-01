@@ -410,50 +410,6 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_A1D10(uint32_t param1, int32_t param2, vo
     env->sub9F3B0((void*)(uintptr_t)1, edi);
 }
 
-// Append a unique modifier: a type-1 unit whose +0x14 record has bit 2 of +0x16 clear pays 0x23260,
-// sets bits 0 and 2 of that byte, and while the 0x1C list holds fewer than nine entries stores param_1
-// at the next one, pays 0x10331 and calls 0x248A0(0, self).
-// 1.13c D2Game+0x24BF0
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_24BF0(void* self, int32_t param1, void* eaxIn,
-                                             const D2GameBatch54420Env* env)
-{
-    if (eaxIn == nullptr || rd32(eaxIn, 0) != 1) return;
-    const uint32_t rec = rd32(eaxIn, 0x14);                    // in_EAX[5]
-    if (rec == 0) return;
-    if ((rd8(rec, 0x16) & 4) != 0) return;
-
-    env->sub23260();
-    if (rd32(eaxIn, 0) == 1 && rd32(eaxIn, 0x14) != 0) {
-        const uint32_t sub = rd32(eaxIn, 0x14);
-        wr8(sub, 0x16, (uint8_t)(rd8(sub, 0x16) | 5));
-    }
-
-    const uint32_t pc = rec + 0x1c;
-    const int32_t n = env->getUModCount((void*)(uintptr_t)pc);
-    if (n < 9) {
-        wr8(pc, (uint32_t)n, (uint8_t)param1);
-        env->ordinal10331();
-        env->sub248A0(0, (uint32_t)(uintptr_t)self);
-    }
-}
-
-// Create one record with 0x24950 and, on success, apply 0x23CA0(ESI, record, param_3) and
-// 0x248A0(EBX, ESI) before returning it.
-// 1.13c D2Game+0x24C70
-extern "C"
-EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_24C70(void* self, void* param1, uint32_t param2,
-                                              int32_t param3, uint32_t eaxIn, uint32_t ebx,
-                                              uint32_t esi, const D2GameBatch54420Env* env)
-{
-    void* record = env->sub24950(param2, ebx, esi, param1,
-                                 (uint32_t)(uintptr_t)self & 0xffff, eaxIn & 0xffff, -1);
-    if (record == nullptr) return nullptr;
-    env->sub23CA0(esi, record, param3);
-    env->sub248A0(ebx, esi);
-    return record;
-}
-
 // Unit mode/stat synchronisation: the type-4 unit's 0x1A68E probe must pass, then 11050(0), three
 // rounds of 10312/10525, 10611(0), 10883(0), 10875(the ESI+0x30 override or 0xEE90), and the
 // 10710/10176/10516, 11036/10106, 10119, 10556 classification writes. A switch on the 10106 mode runs

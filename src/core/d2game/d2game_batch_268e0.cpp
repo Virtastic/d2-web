@@ -49,39 +49,6 @@ struct D2GameBatch268E0Env {
     void     (*ordinal10046)(const char* file, uint32_t line, uint32_t zero);
 };
 
-// Per-skill callback dispatch on a unit's skill list. The unit's +0x14 record holds a flag byte at
-// +0x16 (bit 3) and nine skill ids at +0x1C; the walk runs only when the unit type is 1 and the first
-// skill id is non-zero, and each id calls column param_4 of its six-dword table row (the param_4 == 5
-// branch is the same table with the base folded by 0x14). param_1 and param_3 are unused.
-// 1.13c D2Game+0x268E0
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_268E0(uint32_t param1, void* param2, uint32_t param3,
-                                             int32_t param4, const D2GameBatch268E0Env* env)
-{
-    (void)param1;
-    (void)param3;
-
-    uint32_t sub = param2 != nullptr ? rd32(param2, 0x14) : 0;
-
-    uint8_t flag = 0;
-    if (param2 != nullptr && rd32(param2, 0) == 1 && sub != 0) {
-        flag = (uint8_t)((rd8((void*)(uintptr_t)sub, 0x16) >> 3) & 1);
-    }
-
-    if (param2 == nullptr || rd32(param2, 0) != 1 || sub == 0) return;
-    const uint8_t* ids = (const uint8_t*)(uintptr_t)(sub + 0x1C);
-    if (ids[0] == 0) return;                        // pcVar3[0] != '\0' gates the whole walk
-
-    for (int32_t i = 0; i < 9; ++i) {
-        const uint32_t id = ids[i];
-        const int32_t slot = (int32_t)id * 6 + param4;
-        const uint32_t cb = rd32(env->statCallbacks, (uint32_t)(slot * 4));
-        if (cb != 0) {
-            ((void (*)(uint32_t, uint8_t))(uintptr_t)cb)(id, flag);
-        }
-    }
-}
-
 // The unit from param_2+0x04 is reset (0xDA750, then ordinal 11090(unit, 1)); when 0x8E490's value is
 // at most param_1+0xA8, ordinal 10494(unit, 0x15) either sends the param_1+0xA8 + 0x2D tail, or -- for
 // a type-1 unit with a +0x14 record whose first dword is non-null -- sends the +0xA8 plus the record's
