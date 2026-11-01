@@ -17,5 +17,16 @@ export function destroyNativeSession(session, monsterRenderer) {
  */
 export function leaveNativeSession(session, monsterRenderer) {
   if (session) destroyNativeSession(session, monsterRenderer);
-  return { session: null, bootstrapStarted: false, currentFixture: null };
+  return { session: null, bootstrapStarted: false, currentFixture: null, left: true };
+}
+
+/**
+ * The developer notice the game frame draws while it has no native session. Retail has no such
+ * text; it is kept only for a game that never connected (no session adapter, a failed create). A
+ * game the player LEFT (Save and Exit) has no session for the frames until character select's
+ * profile read lands, and retail shows nothing there, so the notice is not drawn.
+ */
+export function noSessionNotice({ session, left }) {
+  if (session || left) return [];
+  return ['Gameplay simulation is not connected', 'The renderer and controls are ready for d2_session_*'];
 }

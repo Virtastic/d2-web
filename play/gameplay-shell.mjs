@@ -98,7 +98,7 @@ import { createSaveStore, CLASS_NAMES } from './assets/save-store.mjs';
 import { importCharacterFiles } from './assets/character-import.mjs';
 import { singlePlayerDestination, createCharacterEntryReader } from './assets/title-single-player-route.mjs';
 import { installUnloadAutosave } from './assets/unload-autosave.mjs';
-import { destroyNativeSession, leaveNativeSession, replaceNativeSession } from './assets/session-lifecycle.mjs';
+import { destroyNativeSession, leaveNativeSession, noSessionNotice, replaceNativeSession } from './assets/session-lifecycle.mjs';
 import { createNpcPanel } from './assets/npc-panel.mjs';
 import { createGameMenu } from './assets/game-menu.mjs';
 import { saveBeforeExit } from './assets/save-exit.mjs';
@@ -232,7 +232,7 @@ const clock = createGameClock();
 // once per shell update, which ran the whole game 2.4x fast.
 let engineTicks = 0;
 let realmGameClock = 0, realmAnimationFrame = 0;
-let session = null, bootstrapStarted = false, sessionEntering = false, sessionError = '', inventoryLayoutKey = '';
+let session = null, gameLeft = false, bootstrapStarted = false, sessionEntering = false, sessionError = '', inventoryLayoutKey = '';
 let currentFixture = null, fixtures = [], actSelect = null;
 // A picked save starts in the town of the act its header says it is in (save-store nTown); retail's
 // town level per act is DUNGEON_GetTownLevelIdFromActNo: Rogue Encampment, Lut Gholein, Kurast
@@ -1909,13 +1909,14 @@ function titleAdvance() {
 if (!PLAY_MODE) setTitlePhase(BOOT_MOVIES[0].phase);
 
 function startGame() {
+  gameLeft = false;
   if (!bootstrapStarted && window.__d2?.ready && !window.__d2.error && sessionAdapter()) bootstrapSession();
 }
 
 // Save and Exit: end the game the way retail does (the game is freed, nothing of it carries into the
 // next one). The next pick builds a new session through bootstrapSession.
 function leaveGame() {
-  ({ session, bootstrapStarted, currentFixture } = leaveNativeSession(session, monsterRenderer));
+  ({ session, bootstrapStarted, currentFixture, left: gameLeft } = leaveNativeSession(session, monsterRenderer));
   snapshot = normalizeSnapshot(null); motion = {};
   window.__d2.session = null;
   stashLayoutReader.reset();   // the next game configures its own InventoryBIN rows (PlugY or retail)
@@ -4212,10 +4213,11 @@ function drawFrame() {
     ctx.fillStyle = 'rgba(82,156,220,.34)'; ctx.strokeStyle = '#8bc6ff'; ctx.lineWidth = 2;
     ctx.fillRect(-9, -9, 18, 18); ctx.strokeRect(-9, -9, 18, 18); ctx.restore();
   }
-  if (!session) {
+  const notice = noSessionNotice({ session, left: gameLeft });
+  if (notice.length) {
     hoverFont = ensureFont(hoverFont, makeHoverFont);
     ctx.fillStyle = 'rgba(0,0,0,.68)'; ctx.fillRect(0, h / 2 - 44, w, 88);
-    drawCentredLines(ctx, hoverFont, ['Gameplay simulation is not connected', 'The renderer and controls are ready for d2_session_*'], w / 2, h / 2 - 22, 22);
+    drawCentredLines(ctx, hoverFont, notice, w / 2, h / 2 - 22, 22);
   }
   // Dead: retail's lettering (play/assets/death-screen.mjs); Esc continues. Stat 175 is
   // STAT_GOLDLOST, which the engine's own death path (PLRMODE_StartID_Death ->
