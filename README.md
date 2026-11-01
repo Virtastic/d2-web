@@ -26,9 +26,10 @@ An unofficial reimplementation of the Diablo II: Lord of Destruction **1.13c** e
 **WebAssembly** and played in the browser. No game data is included: you bring your own legally
 owned copy.
 
-> **Status: early alpha.** Act 1 runs: character creation, Rogue Encampment, the first wilderness
-> areas, combat, items, vendors, waypoints and saves. It is not a complete game yet, and you will
-> hit bugs, missing screens and wrong behaviour. Please report them.
+> **Status: playable.** Create a character and play: towns, wilderness and dungeons, combat and
+> skills, items, vendors, waypoints and saves, in a browser tab with nothing to install. Some
+> details still differ from the original game. If you find one, please
+> [report it](https://github.com/Virtastic/d2-web/issues).
 
 ## Screenshots
 
