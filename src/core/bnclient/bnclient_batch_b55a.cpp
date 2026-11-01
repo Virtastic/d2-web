@@ -71,7 +71,7 @@ extern "C" uint32_t bnb55_flush_queue(const BnB55Env* e, BnB55State* s) {
     while (s->msg_head) {
         uint32_t* cur = s->msg_head;
         s->msg_head = *reinterpret_cast<uint32_t**>(reinterpret_cast<uint8_t*>(cur) + 0x128);
-        e->free_msg(0xA2, cur);
+        e->free_msg(0xA2, nullptr);   // retail: Ordinal_10043(0xA2, 0)
     }
     e->leave_cs();
     return 1;
