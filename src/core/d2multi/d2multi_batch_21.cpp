@@ -4,13 +4,15 @@
 #include <cstdio>
 
 extern "C" {
-int32_t Ordinal_10140(int32_t, int32_t);
-void     Ordinal_10194(int32_t, uint32_t);
-void     Ordinal_10106(void);
-void     Ordinal_10000(void);
+// Net and lobby hooks no other engine file defines yet: weak no-op defaults so the full build links;
+// a real definition elsewhere replaces them.
+__attribute__((weak)) int32_t Ordinal_10140(int32_t, int32_t) { return 0; }
+__attribute__((weak)) void     Ordinal_10194(int32_t, uint32_t) {}
+__attribute__((weak)) void     Ordinal_10106(void) {}
+__attribute__((weak)) void     Ordinal_10000(void) {}
 char*    Ordinal_571(const char* s = nullptr, int c = 0);
 extern uint8_t *DAT_6fa09ef4, *DAT_6fa09f08, *DAT_6fa09f14;
-extern int32_t DAT_6fa09f04, DAT_6fa0a0c8, DAT_6fa0a0d4;
+__attribute__((weak)) int32_t DAT_6fa09f04 = 0, DAT_6fa0a0c8 = 0, DAT_6fa0a0d4 = 0;
 extern char DAT_6fa09198[];
 extern uint32_t *gdwBitMasks_exref, *gdwInvBitMasks_exref;
 uint16_t* ustrcat(uint16_t*, const uint16_t*);            // Unicode::strcat
