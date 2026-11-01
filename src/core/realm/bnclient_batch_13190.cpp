@@ -64,7 +64,9 @@ void init_crypt(uint32_t* table) {
         seed=(seed*125+3)%0x2aaaab; table[i+j*256]=high|(seed&0xffff);
     }
 }
-// 1.13c BNClient+0x130B0
+// The 0x130B0 name hash with its table bound to the state: s->crypt is the DAT_6ff3f62c block (0x500 dwords).
+// The port of the module-table form is src/core/bnclient/bnclient_130b0.cpp (bnclient_130b0_hash).
+// (retail name hash, sub_130B0)
 uint32_t hash_name(const BnCache13190State* s,const char* name,uint32_t type) {
     uint32_t a=0x7fed7fed,b=0xeeeeeeee;
     if(name) while(*name) {
