@@ -21,7 +21,7 @@
 extern "C" void d2game_nmsg_write(int32_t code, const uint32_t* table);   // 0x69DC __NMSG_WRITE
 
 // see 1.13c D2Game+0x078DE: map a Windows code page to its CRT locale identifier.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_78de(uint32_t codepage) {
+extern "C" uint32_t d2game_78de_locale(uint32_t codepage) {
     switch (codepage) {
         case 932: return 0x0411;  // Japanese
         case 936: return 0x0804;  // Simplified Chinese
