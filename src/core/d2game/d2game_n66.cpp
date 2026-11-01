@@ -2,30 +2,8 @@
 // Retail globals / Win32 / ordinals become a host seam struct (function pointers).
 // Struct accesses use the retail 32-bit byte offsets on a flat buffer view.
 #include <cstdint>
-typedef uint8_t* P;
+#include "d2game_n66.h"
 static inline int32_t& I(P p, int off) { return *(int32_t*)(p + off); }
-
-struct N66Host {
-    void (*mem_free)(void* p, const char* file, int line, int zero);  // Ordinal_10046
-    void (*mem_free_named)(void* p, const char* name, int a, int b);  // Ordinal_403
-    void (*unwind)(void* frame, void* target, void* rec, void* ret);  // RtlUnwind
-    void (*unlock_fhandle)(int fh);                                   // __unlock_fhandle
-    void (*fatal)(const char* msg, int code);                         // Ordinal_10024+_exit
-    int32_t dataTablesRoot;                                           // *sgptDataTables_exref
-    // unit/item seams
-    P (*first_room)(P ptr);                                           // Ordinal_10717
-    P (*unit_get_inv)(P unit);                                        // Ordinal_10331
-    void (*inv_remove)(P inv, int type, int guid);                    // Ordinal_10885
-    void (*unit_a)(P unit);                                           // Ordinal_10408
-    void (*unit_b)(P unit);                                           // Ordinal_11016
-    void (*unit_unlink)(P unit);                                      // 0xDFC10
-    void (*unit_free)(P game, P unit);                                // 0xE20A0
-    void (*set_string)(int a, int b);                                 // Ordinal_10786
-    P (*lookup)();                                                    // 0xA00B0
-    void (*apply)(int a, P b, int idx, int ebx);                      // 0x448E0
-    // VirtualQuery family
-    int (*reset_stack)();
-};
 
 // 1.13c D2GAME+0x01000
 void sub_1000(N66Host* h, void* p) { if (p) h->mem_free_named(p, "delete", -1, 0); }
@@ -82,7 +60,7 @@ void SUNITINACTIVE_DeleteExpiredItemNodes(N66Host* h, P game, int slot)
             int32_t* nx = (int32_t*)(intptr_t)cur[0];
             if (cur[1] && cur[1] < I(game, 0xa8)) {
                 if (prev) prev[0] = (int32_t)(intptr_t)nx; else I(n, 8) = (int32_t)(intptr_t)nx;
-                h->mem_free(cur, "..\\Source\\D2Game\\UNIT\\SUnitInactive.cpp", 0x724, 0);
+                h->mem_free_pool((void*)(intptr_t)I(game, 0x1c), cur, "..\\Source\\D2Game\\UNIT\\SUnitInactive.cpp", 0x724, 0);
             } else prev = cur;
             cur = nx;
         }
