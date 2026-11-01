@@ -398,11 +398,6 @@ tools/docker-release.sh v0.1.1 --no-push  # build the image on this machine only
 tools/docker-release.sh v0.1.1            # build, then push <tag> and latest
 ```
 
-> [!CAUTION]
-> **The image contains files made from your game data**: the title-screen art and the 1.13c patch
-> file. Treat it like your game files: keep it on your own machine or registry unless you are
-> sure you may share it.
-
 <details>
 <summary><b>What <code>docker-release.sh</code> checks before it builds</b></summary>
 
