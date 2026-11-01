@@ -22,15 +22,6 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_2fac0(int32_t level, int32_t selecto
  return selected ? selected[level * 5] : 0;
 }
 
-// 1.13c D2Common+0x2FB10: select the level cap or the monster's difficulty level.
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_2fb10(int32_t table, int32_t column, int32_t monster)
-{
- if (table == 0) return ((column == 3) ? 0x65 : 0xD5);
- if (table != 1 || !sgptDataTables || monster < 0 || monster >= sgptDataTables->nMonStatsTxtRecordCount) return 0;
- const auto* r = reinterpret_cast<const uint8_t*>(sgptDataTables->pMonStatsTxt) + monster * 0x1a8;
- return rd<int16_t>(r, column == 0xf ? 0x38 : 0x36);
-}
-
 // 1.13c D2Common+0x30B80: unit eligibility predicate, with the two retail lookup calls injected.
 using D2C_UnitLookup = int32_t (*)(uint32_t);
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_30b80(int32_t unitType, uint32_t unit, int32_t table,
@@ -67,21 +58,6 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_30c70(int32_t index, int32_t table, 
  if (!rec[0] || !unit || !unitFlags) return 0;
  const uint32_t f = static_cast<uint32_t>(unitFlags(unit));
  return (f & 1u) && !(f & 0x1000u);
-}
-
-// 1.13c D2Common+0x30D50: return the selected monster's special velocity in 8.8 fixed point.
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_30d50(int32_t kind, int32_t monster)
-{
- if (!sgptDataTables) return 0;
- if (kind == 0) {
-  if (monster < 0 || monster >= sgptDataTables->nMonStatsTxtRecordCount) return 0x4000;
-  const auto* m = reinterpret_cast<const uint8_t*>(sgptDataTables->pMonStatsTxt) + monster * 0x1a8;
-  return static_cast<int32_t>(rd<uint8_t>(m, 0x40)) << 8;
- }
- if (kind != 1) return 0;
- if (monster < 0 || monster >= sgptDataTables->nMonStatsTxtRecordCount) return 0x3200;
- const auto* m = reinterpret_cast<const uint8_t*>(sgptDataTables->pMonStatsTxt) + monster * 0x1a8;
- return static_cast<int32_t>(rd<int16_t>(m, 0x32)) << 8;
 }
 
 // 1.13c D2Common+0x323E0: resolve the selected stat's resistance value; composition follows retail.

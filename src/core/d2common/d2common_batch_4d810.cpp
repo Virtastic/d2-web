@@ -61,13 +61,6 @@ extern "C" uint32_t D2Common_22760_IsMetal(uint32_t itemId)
     return ITEMS_IsMetalItem(static_cast<int32_t>(itemId));
 }
 
-// 1.13c D2Common+0x4E5A0
-extern "C" uint32_t D2Common_4E5A0_GetSkillFlag(int skillId)
-{
-    const auto* row = DATATBLS_GetSkillsTxtRecord(skillId);
-    return row ? (row->dwFlags[0] >> 16) & 2u : 0;
-}
-
 // 1.13c D2Common+0x2F520
 extern "C" void D2Common_2F520_SetSwitchRightSkill(D2UnitStrc* unit, int id, int flags)
 {

@@ -74,15 +74,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3bd60(const uint8_t* pObject)
 
 // 1.13c D2Common+0x4F0E0 (#10313) skills.txt nPassiveState (+0x94) when it is positive; a bad id or
 // a non-positive value answers 0.
-extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_4f0e0(int32_t nSkillId)
-{
-	if (nSkillId < 0 || nSkillId >= sgptDataTables->nSkillsTxtRecordCount) return 0;
-	if (!sgptDataTables->pSkillsTxt) return 0;
-
-	const int16_t nPassiveState = sgptDataTables->pSkillsTxt[nSkillId].nPassiveState;
-	return nPassiveState > 0 ? nPassiveState : 0;
-}
 
 // 1.13c D2Common+0x121D0 (sub_121D0): does the room's subtile box lie within the search margin m around
 // (x, y)? 1.13c reads the box from the room's coordinate block (0x8BA60 copies 8 dwords from room +0x4C;

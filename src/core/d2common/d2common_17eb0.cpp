@@ -6,7 +6,7 @@
 #include <cstring>
 #include "d2common_17d00.h"
 
-extern "C" int32_t d2_fn_d2common_3e230(int32_t eax, int32_t y1, int32_t y2, int32_t x2);
+extern "C" int32_t D2Common_3E230_DirFromOffsets(int32_t eax, int32_t y1, int32_t y2, int32_t x2);
 
 namespace {
 const int32_t kDirHeading[25] = { 5, 4, 4, 4, 3, 6, 5, 4, 3, 2, 6, 6, 6, 2, 2, 6, 7, 0, 1, 2, 7, 0, 0, 0, 1 };   // D2Common+0xDC320
@@ -43,7 +43,7 @@ extern "C" uint32_t D2Common_17EB0_BuildVertexPath(int32_t nIndex, uint32_t pLev
         I(b, 0) = x2; I(b, 4) = y2;
         return 1;
     }
-    const int32_t d = d2_fn_d2common_3e230(x2, y2, y1, x1);
+    const int32_t d = D2Common_3E230_DirFromOffsets(x2, y2, y1, x1);
     const int32_t lo = ax < ay ? ax : ay, hi = ax < ay ? ay : ax;
     const int32_t h = lo + hi * 2;
     uint32_t head[10] = {};

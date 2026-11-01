@@ -9,7 +9,7 @@
 typedef uintptr_t P;
 P D2Common_17B70(P n, const P* head);
 int D2Common_17C80(P pt, P obj, int32_t x, int32_t y, P list);
-extern "C" int32_t d2_fn_d2common_3e230(int32_t eax, int32_t y1, int32_t y2, int32_t x2);
+extern "C" int32_t D2Common_3E230_DirFromOffsets(int32_t eax, int32_t y1, int32_t y2, int32_t x2);
 
 namespace {
 const int8_t kStepX[4] = { 1, 0, -1, 0 };      // D2Common+0x51E4
@@ -66,7 +66,7 @@ extern "C" uint32_t D2Common_17D00_SearchPath(uint32_t pPool, int32_t nLimit, ui
         const P p = n;
         n = static_cast<P>(static_cast<uint32_t>(I(p, 0x24)));
         I(n, 8) = g; I(n, 4) = h; I(n, 0) = f; I(n, 0x14) = 0;
-        const int32_t d = d2_fn_d2common_3e230(tx, ty, ny, nx);
+        const int32_t d = D2Common_3E230_DirFromOffsets(tx, ty, ny, nx);
         const int8_t c2 = static_cast<int8_t>(kDirHeading[d] / 2);
         const P parent = static_cast<P>(static_cast<uint32_t>(I(n, 0x20)));
         const uint32_t k = static_cast<uint8_t>(U8(parent, 0x1C) - c2) & 3u;

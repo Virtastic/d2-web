@@ -83,8 +83,9 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3b550(uint32_t pUnit)
 
 // 1.13c D2Common+0x82E40: OverlayTxt[nOverlayId].dwOffsetY (row stride 0x84, field at 0x58); an
 // out-of-range id or a null row yields 0. The 1.10f twin is DATATBLS_GetOffsetYFromOverlayTxt.
+// Not an export: the FN probe src/core/fn/d2common_82e40.cpp owns d2_fn_d2common_82e40 (r[] ABI).
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_82e40(int32_t nOverlayId)
+uint32_t D2Common_82E40_OverlayOffsetY(int32_t nOverlayId)
 {
 	return DATATBLS_GetOffsetYFromOverlayTxt(nOverlayId);
 }
