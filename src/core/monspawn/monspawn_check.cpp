@@ -72,6 +72,7 @@
 #include "plugy_stash_grid.h"
 #include "path_attempt_trace.h"
 #include "item_text_visibility.h"
+#include "item_flag_lines.h"
 #include "drop_flip.h"
 #include <D2Environment.h>
 #include <DataTbls/ObjectsTbls.h>
@@ -9835,6 +9836,14 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_lines(uint32_t itemId, char* buf, 
     auto range = [&](int lo, int hi) { return " " + std::to_string(lo) + " " + [&] { std::string x; appendNarrow(x, langIdx(3464)); return x; }() + " " + std::to_string(hi); };
     const bool itemIdentified = d2::item_text::identified(item->pItemData ? item->pItemData->dwItemFlags : 0);
     const bool weapon = t->dwWeapClass != 0 || t->nMaxDam || t->n2HandMaxDam || t->nMaxMisDam;
+    // 1.13c D2Client+0x8E180: the ethereal and socketed lines, before Defense/Damage (blue).
+    if (item->pItemData) {
+        const uint32_t fl = item->pItemData->dwItemFlags;
+        auto tbl = [&](int id) { std::string x; appendNarrow(x, langIdx(id)); return x; };
+        const std::string fl3 = d2::item_text::flagLines(fl, (fl & d2::item_text::kSocketedItemFlag) ? ITEMS_GetSockets(item) : 0,
+            tbl(d2::item_text::kEtherealStringId), tbl(d2::item_text::kSocketedStringId), tbl(3995));
+        if (!fl3.empty()) out += fl3;
+    }
     if (weapon) {
         // Identified items use the affix-adjusted values (ITEMMODS_PropertyFunc05-07). The
         // complete serializer withholds the stat-list payload for unidentified client items,

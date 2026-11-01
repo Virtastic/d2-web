@@ -41,6 +41,7 @@ import { createInventoryPanelRenderer, inventoryLayoutFromEngine, WEAPON_TAB_SOU
 import { beginInventoryGoldPress, cancelInventoryGoldPress, finishInventoryGoldPress } from './assets/inventory-gold-gesture.mjs';
 import { createCharacterPanelRenderer } from './assets/character-panel.mjs';
 import { createItemPropertyCache, itemPropsCacheable } from './assets/item-property-cache.mjs';
+import { parseItemLines } from './assets/item-tooltip.mjs';
 import { createNpcNameLabelCache } from './assets/npc-name-label-cache.mjs';
 import { savedCharacterReadError, setFrontdoorError } from './assets/frontdoor-error.mjs';
 import { createQuestLogRenderer, createMessageLogRenderer, QUESTS_IN_ACT, ACT_BASE, ACT_DONE, questStatus, messageScrollMax, COMPLETING } from './assets/quest-log.mjs';
@@ -1791,7 +1792,7 @@ function itemProps(id) {
     // A line may start "\x01<digit>": its D2Win colour (P8j: 1 red unmet requirement, 3 blue magical property); none = white.
     // "\x01v" (P8j): the label up to ": " is white and the value blue -- a damage line an affix modifies.
     const raw = n ? Module.UTF8ToString(buf).split('\n').filter(Boolean) : [];
-    const lines = raw.map((l) => l.replace(/^\x01./, '')), colours = raw.map((l) => (l[0] === '\x01' ? (l[1] === 'v' ? 'v' : +l[1]) : 0));
+    const { lines, colours } = parseItemLines(raw);
     const tb = (itemProps.tbuf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [128])));
     const title = Module.ccall('d2_session_item_title', 'number', ['number', 'bigint', 'number'], [id, BigInt(tb), 128]) ? Module.UTF8ToString(tb) : '';
     const quality = Module.ccall('d2_session_item_quality', 'number', ['number'], [id]);

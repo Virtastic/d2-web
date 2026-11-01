@@ -12,6 +12,11 @@ export const ITEM_TOOLTIP_ASSETS = {
   fontTbl: 'data\\local\\font\\latin\\font16.tbl',
 };
 
+// The engine's property lines ("\x01<digit>" colour prefix, "\x01v" label-white value-blue; none = white).
+export function parseItemLines(raw) {
+  return { lines: raw.map((l) => l.replace(/^\x01./, '')), colours: raw.map((l) => (l[0] === '\x01' ? (l[1] === 'v' ? 'v' : +l[1]) : 0)) };
+}
+
 // Retail's line order for an item no vendor is selling: the name, then the property lines. P8j's
 // colour rule: a magic (quality 4) name is D2Win blue 3, otherwise white; the engine's own
 // "\x01<digit>" markers colour each property line (1 red unmet requirement, 3 blue magical).

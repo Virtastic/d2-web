@@ -238,6 +238,8 @@ test/*
 !test/item-property-cache.test.mjs
 !test/item-tip-place.test.mjs
 !test/item-tooltip-basename.test.mjs
+!test/item-tooltip-flag-lines.test.mjs
+!test/item-flag-lines.cpp
 !test/izual-ghost-clock.test.mjs
 !test/lit-floor-pixels.test.mjs
 !test/minipanel-input.test.mjs
