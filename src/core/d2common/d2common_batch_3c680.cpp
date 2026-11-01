@@ -47,7 +47,7 @@ uint32_t d2_fn_d2common_3c680(uint32_t param_1, int32_t nX, int32_t nY, const ui
 // `nId * 0x34 + base == NULL` can only be true when the table is unloaded and nId is zero, so the
 // only effect retail has is the D2_ASSERT fatal (Fog #10265, code 0x150); the 1.10f twin is
 // DATATBLS_GetArmTypeTxtRecord, which performs the same assert.
-void d2_fn_d2common_18db0(int32_t nId)
+extern "C" void d2_batch_d2common_18db0(int32_t nId)
 {
 	(void)DATATBLS_GetArmTypeTxtRecord(nId);
 }

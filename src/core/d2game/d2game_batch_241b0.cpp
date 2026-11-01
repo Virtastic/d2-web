@@ -71,22 +71,6 @@ extern "C" void d2game_26320(D2GameStrc* game, D2UnitStrc* unit, int32_t mod, in
     if (unique) MONSTERUNIQUE_CastLightUniqueMissile(game, unit, mod, unique);
 }
 
-// 1.13c D2Game+0x265E0
-extern "C" void d2game_265e0(D2GameStrc* game, D2UnitStrc* unit)
-{
-    MONSTERUNIQUE_CastCorpseExplode2(game, unit, 0, 0);
-}
-
-// EAX=unit; true when both hand composit items are type 0x2e.
-// 1.13c D2Game+0x26A30
-extern "C" int32_t d2game_26a30(D2UnitStrc* unit)
-{
-    if (!unit->pInventory) return 0;
-    auto* left = INVENTORY_GetCompositItem(unit->pInventory, COMPOSIT_LEFTHAND);
-    auto* right = INVENTORY_GetCompositItem(unit->pInventory, COMPOSIT_RIGHTHAND);
-    return left && ITEMS_CheckItemTypeId(left, 0x2e) && right && ITEMS_CheckItemTypeId(right, 0x2e);
-}
-
 // EAX=skill id; coordinates are writable native pointers.
 // 1.13c D2Game+0x26BB0
 extern "C" int32_t d2game_26bb0(D2UnitStrc* unit, int32_t skillId, int32_t level, int32_t* x, int32_t* y)
@@ -124,35 +108,6 @@ extern "C" int32_t d2game_26e40(D2GameStrc* game, D2SkillStrc* skill, D2UnitStrc
     if (next < int32_t(game->dwGameFrame)) next = add32(game->dwGameFrame, duration);
     SKILLS_SetParam4(skill, next);
     return count;
-}
-
-// EAX=unit; game and skill id are independent stack inputs.
-// Table codes are explicit retail little-endian integers, independent of host literals.
-// 1.13c D2Game+0x26F70
-extern "C" uint32_t d2game_26f70(D2GameStrc* game, D2UnitStrc* unit, int32_t skillId)
-{
-    auto* room = UNITS_GetRoom(unit);
-    if (!room) return 0;
-    const uint32_t act = DRLG_GetActNoFromLevelId(DUNGEON_GetLevelIdFromRoom(room)) & 255;
-    if (act >= 5) return 0;
-    const uint32_t index = act + uint32_t(game->nDifficulty) * 5;
-    const int32_t roll = ITEMS_RollRandomNumber(&unit->pSeed) % 100;
-    // Retail helpers 0x1BF0/0x1C20 read skill parameters 3 and 4.
-    auto* record = SKILLS_GetSkillsTxtRecord(skillId);
-    const int32_t manaChance = record ? record->dwParam[2] : 0;
-    const int32_t rejuvChance = record ? record->dwParam[3] : 0;
-    const uint32_t column = roll < manaChance ? 1 : roll < add32(manaChance, rejuvChance) ? 2 : 0;
-    static constexpr uint32_t table[15][3] = {
-        {0x20327068,0x2032706d,0x20737672},{0x20337068,0x2033706d,0x20737672},
-        {0x20337068,0x2033706d,0x20737672},{0x20347068,0x2034706d,0x206c7672},
-        {0x20347068,0x2034706d,0x206c7672},{0x20347068,0x2034706d,0x206c7672},
-        {0x20347068,0x2035706d,0x206c7672},{0x20357068,0x2035706d,0x206c7672},
-        {0x20357068,0x2035706d,0x206c7672},{0x20357068,0x2035706d,0x206c7672},
-        {0x20357068,0x2035706d,0x206c7672},{0x20357068,0x2035706d,0x206c7672},
-        {0x20357068,0x2035706d,0x206c7672},{0x20357068,0x2035706d,0x206c7672},
-        {0x20357068,0x2035706d,0x206c7672}
-    };
-    return index < 15 ? table[index][column] : 0;
 }
 
 // The landing helper resolves the saved target and sets the reflected path. Its
@@ -213,19 +168,5 @@ extern "C" int32_t d2game_27820(D2GameStrc* game, D2UnitStrc* unit, int32_t id, 
             STATLIST_FreeStatList(stats);
         }
     }
-    return 1;
-}
-
-// EAX=target, EBX=skill. The monster's immediate melee strike preserves the
-// selected target type and id on the skill for the following leap phase.
-// 1.13c D2Game+0x279C0
-extern "C" int32_t d2game_279c0(D2GameStrc* game, D2UnitStrc* unit, D2UnitStrc* target, D2SkillStrc* skill)
-{
-    if (!target || !skill) return 0;
-    sub_6FC627B0(unit, MONMODE_ATTACK1);
-    sub_6FC62D90(unit, game);
-    SUNITDMG_DrainItemDurability(game, unit, target, 0);
-    SKILLS_SetParam3(skill, target->dwUnitType);
-    SKILLS_SetParam4(skill, target->dwUnitId);
     return 1;
 }

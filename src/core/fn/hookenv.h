@@ -44,10 +44,14 @@ struct HookEnv {
         if (L[0] >= kLogMax) abort();   // log capacity exceeded
         uint32_t* e = L + 1 + L[0]++ * 10;
         e[0] = rva; e[1] = a; e[2] = c; e[3] = d; e[4] = b; e[5] = s; e[6] = s0; e[7] = s1; e[8] = s2; e[9] = s3;
-        // retail logs a pointer into its stack as 0xB3000000; `hookw` out-parameter writes ride in sc as key ((1+stack word)<<24)|rva
+        // retail logs a pointer into its stack as 0xB3000000; `hookw` out-parameter writes ride in sc as key ((1+stack word)<<24)|rva, or ((0x10+r)<<24)|rva for register r (a c d b s = 0..4); several pairs with one key fill consecutive dwords of that pointee
         const uint32_t sw[5] = { s0, s1, s2, s3, s4 };
         for (int i = 1; i < 10; i++) if (isStk(e[i])) e[i] = 0xB3000000u;
-        for (const uint32_t* p = sc; p[0]; p += 2) for (uint32_t w = 0; w < 5; w++) if (p[0] == (((1 + w) << 24) | rva)) wr32(sw[w], p[1]);
+        const uint32_t rg[5] = { a, c, d, b, s };
+        for (int kind = 0; kind < 2; kind++) for (uint32_t w = 0; w < 5; w++) {
+            const uint32_t key = ((kind ? 0x10u + w : 1u + w) << 24) | rva, ptr = kind ? rg[w] : sw[w]; uint32_t off = 0;
+            for (const uint32_t* p = sc; p[0]; p += 2) if (p[0] == key) { wr32(ptr + off, p[1]); off += 4; }
+        }
         int k = 0; while (k < nseen && seen[k][0] != rva) k++;
         if (k == nseen) { if (nseen >= 48) abort(); seen[nseen][0] = rva; seen[nseen++][1] = 0; }
         uint32_t n = seen[k][1]++, last = 0;

@@ -154,29 +154,6 @@ EMSCRIPTEN_KEEPALIVE void d2_game_56740(void* game, void* unit, const D2GameBatc
     }
 }
 
-// 1.13c D2Game+0x20C00
-// FUN_6fc40c00 AIGENERAL_FreeAiControl(pGame in ECX, pAiControl in EAX): free pMapAi (+0x38) via
-// Ordinal_10850, free the minion chain at +0x34 (next +4), free the command chain (0x20B60), then
-// free the control block itself (AiGeneral.cpp:0x19D).
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_game_20c00(void* pool, void* aiControl, const D2GameBatch15Env* env)
-{
-    if (aiControl == nullptr) return;
-
-    void* mapAi = rdptr(aiControl, 0x38);
-    if (mapAi != nullptr) env->freeMapAi(pool, mapAi);     // Ordinal_10850
-
-    void* node = rdptr(aiControl, 0x34);
-    while (node != nullptr) {
-        void* next = rdptr(node, 0x04);
-        env->freePool(pool, node, 0x246);                  // Ordinal_10046
-        node = next;
-    }
-
-    env->freeAiCommands(pool, aiControl);                  // 0x20B60
-    env->freePool(pool, aiControl, 0x19D);                 // Ordinal_10046
-}
-
 // 1.13c D2Game+0x379E0
 // FUN_6fc579e0: the inventory tail of PLAYER_Destroy. For every item of the player inventory
 // (player+0x60): its unit id must be non-zero (fatal 0x2D3 otherwise), find the matching unit in

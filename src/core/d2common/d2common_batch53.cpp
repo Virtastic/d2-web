@@ -64,19 +64,21 @@ int D2Common_68340(P ranges, P rows, P rangesEnd, int key, uint32_t packed, uint
 }
 
 // 1.13c D2Common+0x17B70 : eax=node, edi=head ptr. Bump node counter (+0x14); while a node hits 3, walk to parent (+0x20) and bump it.
-void D2Common_17B70(P n, const P* head)
+// Returns (EAX) the node it stopped on, or 0 once the walk reached the head node.
+P D2Common_17B70(P n, const P* head)
 {
     if (ri(n, 0x14) < 4) { P p = ru(n, 0x18) + 1; *(uint32_t*)(n + 0x18) = (uint32_t)p; *(uint8_t*)(n + 0x1c) = (*(int8_t*)p + *(int8_t*)(n + 0x1c)) & 3; }
     int32_t c = ri(n, 0x14) + 1; *(int32_t*)(n + 0x14) = c;
-    if (c != 3) return;
+    if (c != 3) return n;
     while (n != *head) {
         n = (P)ru(n, 0x20);
         P p = ru(n, 0x18) + 1; *(uint32_t*)(n + 0x18) = (uint32_t)p;
         c = ri(n, 0x14) + 1;
         *(uint8_t*)(n + 0x1c) = (*(int8_t*)p + *(int8_t*)(n + 0x1c)) & 3;
         *(int32_t*)(n + 0x14) = c;
-        if (c != 3) return;
+        if (c != 3) return n;
     }
+    return 0;
 }
 
 // 1.13c D2Common+0x17C80 : this={x,y}; esi=x, ebx=y, eax=list head, obj=param_1. 1 = (x,y) is the point itself, or in-bounds, open (flag 0x200 clear) and not in list.

@@ -102,17 +102,7 @@ void PARTY_Delete_113c(void* game, int16_t partyId, const D2GameBatch9Env* env)
     }
 }
 
-// 1.13c D2Game+0x10700
-// Item teardown, first phase (1.10f sub_6FC502B0): a socketable item has its socketed contents
-// removed and its inventory (unit+0x60) freed; then the unit's timer chain is released.
-void ITEMS_FreeSocketableInventory_113c(void* game, void* item, const D2GameBatch9Env* env)
-{
-    if (env->itemIsSocketable(item)) {                  // D2Common #10757
-        env->removeAllItemsFromInventory(game, item);   // 0xE1110
-        env->freeInventory(rdptr(item, 0x60));          // D2Common #10820, pInventory
-    }
-    env->freeTimers(game, item);                        // 0x8E880
-}
+// The item teardown first phase (1.10f sub_6FC502B0) lives in d2game_10700.cpp.
 
 // D2Game 1.13c 0x2EE60: the retail-layout port is src/core/d2game/d2game_2ee60.cpp
 // Object teardown (1.10f OBJECTS_FreeHoverMessage): free the hover text (unit+0xA4) through the
@@ -228,6 +218,9 @@ void* CLIENTS_GetSaveHeader_113c(void* client)
     if (client == nullptr) d2game_fatal(0xB41);
     return rdptr(client, 0x17C);
 }
+
+// FN probe access to the game GUID list (0x6FD30C08).
+uint32_t* d2game_9bf40_guidList(void) { return g_batch9_gameGuids; }
 
 // 1.13c D2Game+0x2A0D0
 // GAME_RemoveGuidFromList (ESI = GUID): under the game-list lock, zero every slot whose GUID equals

@@ -4,7 +4,7 @@
 
 extern "C" {
 // 1.13c D2Common+0x463F0: a=EAX, b=ECX, holder=EDX. Retail error paths (_exit(-1)) kept as traps.
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_463f0(int32_t a, int32_t b, const int32_t* holder) {
+int32_t D2Common_463F0_SeededRoll(int32_t a, int32_t b, const int32_t* holder) {
  if (a == b) return b;
  int32_t lo = b, hi = a;
  if (a < b) { hi = b; lo = a; }

@@ -70,33 +70,6 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_4fcb0(D2UnitStrc* pUnit, D2SkillStrc
 	return SKILLS_GetBonusSkillLevel(pUnit, pSkill);
 }
 
-// 1.13c D2Common+0x17930 (#?): difficulty-4 DRLG generator. Retail registers two level linkers
-// (0x16E10) and links the level pairs 0x6F/0x70, 0x6E/0x6F and 0x6D/0x6E through 0x16CF0, then links
-// 0x6F/0x70 through 0x17760.
-// partial: 0x16E10, 0x16CF0 and 0x17760 are UNMAPPED, so only the parameter the decompiler recovers
-// (the DRLG object in EAX) is fixed here.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_17930(D2DrlgStrc* pDrlg)
-{
-	(void)pDrlg;
-}
-
-// 1.13c D2Common+0x17990 (#?): difficulty-3 DRLG generator. Registers two linkers (0x16E10), finds or
-// allocates level 0x68 and ORs a level dword with a global, then links 0x67/0x6A through 0x17760.
-// partial: the linker helper and the image global at the level's +0x14 dword (an unresolved constant)
-// are not translated; the level lookup itself is the vendored 0x2D9B0/0x2DD80 pair.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_17990(D2DrlgStrc* pDrlg)
-{
-	if (!pDrlg)
-	{
-		return;
-	}
-
-	// Retail ORs level+0x14 (the level seed in the engine layout) with global 0x6fdf146c.
-	(void)DRLG_GetLevel(pDrlg, 0x68);
-}
-
 // 1.13c D2Common+0x17A00 (#?): difficulty-2 DRLG generator. Finds or allocates level 0x4B, stores the
 // levels.txt row's offset X/Y into its position and the sizes for the current difficulty into its
 // width/height, generates the level's jungles, then links 0x4B/0x53 through 0x16CF0 and 0x17760.

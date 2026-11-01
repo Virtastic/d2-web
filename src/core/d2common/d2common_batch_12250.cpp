@@ -12,7 +12,7 @@ int32_t s(uint32_t a, int o) { return static_cast<int32_t>(w(a,o)); }
 
 extern "C" {
 // 1.13c D2Common+0x12250: a radius box must fit strictly inside the room box.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_12250(uint32_t room, int32_t x, int32_t y, int32_t radius, void (*roomBox)(uint32_t,int32_t*)) {
+EMSCRIPTEN_KEEPALIVE uint32_t d2_batch_d2common_12250(uint32_t room, int32_t x, int32_t y, int32_t radius, void (*roomBox)(uint32_t,int32_t*)) {
  if (!roomBox) return 1;
  int32_t b[4]{}; roomBox(room,b);
  return !(b[0] < x-radius && b[1] < y-radius && x+radius < b[0]+b[2] && y+radius < b[1]+b[3]);

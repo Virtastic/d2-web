@@ -38,13 +38,12 @@ extern "C" void d2game_8aa70(D2ClientStrc* c, const uint8_t* src)
 	D2GAME_PACKETS_SendPacket_6FC3C710(c, pkt, 0x15);
 }
 
-// 1.13c D2Game+0x8AD10 (EAX = opcode byte, ECX = byte at 1, EDX = dword at 2, client on the stack): 7-byte packet; byte 6 is
-// stack residue in retail (never written), sent here as zero.
-extern "C" void d2game_8ad10(D2ClientStrc* c, uint8_t eaxOpcode, uint8_t ecxByte, uint32_t edxDword)
+// 1.13c D2Game+0x8AD10: 7-byte packet, byte0 = op (AL), byte1 = a (CL), bytes2..5 = b (EDX)
+extern "C" void d2game_8ad10(D2ClientStrc* c, uint8_t op, uint8_t a, uint32_t b)
 {
 	uint8_t pkt[8] = {};
-	pkt[0] = eaxOpcode;
-	pkt[1] = ecxByte;
-	memcpy(pkt + 2, &edxDword, 4);
+	pkt[0] = op;
+	pkt[1] = a;
+	memcpy(pkt + 2, &b, 4);
 	D2GAME_PACKETS_SendPacket_6FC3C710(c, pkt, 7);
 }

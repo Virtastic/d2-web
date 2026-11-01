@@ -170,34 +170,18 @@ EMSCRIPTEN_KEEPALIVE void d2_game_411f(const uint32_t* ebp) {
     g_exceptionList = ebp[-4];
 }
 
-// 1.13c D2Game+0x8C570: build and append the 7-byte party packet 0x8D -- {0x8D, dwPlayerGUID,
-// nPartyGUID} packed, the GUID at byte 1 and the party id at byte 5. The unit arrives in EAX and the
-// packet recipient player in ESI (register-only). A NULL unit yields GUID 0xFFFFFFFF and party 0xFFFF;
-// the party lookup (0x9BEB0) needs unit->pGame (+0x80) and a player unit (type 0). The packet goes to the
-// recipient player's client unless that player is absent or not a player, in which case the client is
-// NULL. Party id from 1.10f SUNIT_GetPartyId, sender from D2GAME_PACKETS_SendPacket0x8D_6FC3F960.
+// 0x8C570 sends the 0x8D party packet; the body lives in d2game_8c570.cpp. The recipient player arrives in ESI.
+struct D2Game8C570Env { uint16_t (*partyId)(const void*); const void* (*playerData)(const void*); void (*send)(const void*, const void*, uint32_t); };
+void D2Game_8C570_PacketSend8D(const D2Game8C570Env*, const uint8_t*, const uint8_t*);
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_game_8c570(void* unit, void* player, const D2GameBatch2a6dEnv* env) {
-    uint8_t packet[7] = {};
-    packet[0] = 0x8D;
-
-    const uint32_t playerGuid = (unit != nullptr) ? rd32(unit, 0xC) : 0xFFFFFFFFu;
-    wr32(packet, 1, playerGuid);
-
-    uint16_t partyId = 0xFFFF;
-    if (unit != nullptr) {
-        void* game = rdptr(unit, 0x80);
-        if (game != nullptr && rd32(unit, 0) == 0)
-            partyId = env->getPartyId(unit, game);
-    }
-    wr16(packet, 5, partyId);
-
-    void* client = nullptr;
-    if (player != nullptr && rd32(player, 0) == 0) {
-        void* playerData = env->getPlayerData(player);
-        client = rdptr(playerData, 0x9C);
-    }
-    env->appendPacket(client, packet, 7);
+    static const D2GameBatch2a6dEnv* s_env;
+    s_env = env;
+    static const D2Game8C570Env e8c570 = {
+        [](const void* u) -> uint16_t { return s_env->getPartyId((void*)u, rdptr((void*)u, 0x80)); },
+        [](const void* p) -> const void* { return s_env->getPlayerData((void*)p); },
+        [](const void* c, const void* b, uint32_t n) { s_env->appendPacket((void*)c, b, n); } };
+    D2Game_8C570_PacketSend8D(&e8c570, (const uint8_t*)unit, (const uint8_t*)player);
 }
 
 // 1.13c D2Game+0x97420: tear down one pet list (1.10f sub_6FC7CDC0). pGame is register-only (EAX);

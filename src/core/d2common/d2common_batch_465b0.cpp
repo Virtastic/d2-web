@@ -9,7 +9,7 @@ void D2Common_1180_RollRange(uint32_t* r);
 // 1.13c D2Common+0x465B0: if EAX == param_1 return param_1. Otherwise roll nMin..nMax on a seed
 // chosen by param_2: kind 4 uses the seed at (param_2[5] + 4) (null link -> null seed, which
 // retail then dereferences), anything else (incl. null param_2) uses the seed at param_2 + 0x20.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_465b0(uint32_t* r)
+void D2Common_465B0_RegRoll(uint32_t* r)
 {
 	const uint32_t p1 = r[1];
 	if (r[0] == p1)

@@ -33,12 +33,12 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8ad40(uint32_t eaxIn, uint32_t ecxI
     env->send8A3E0(client, b, 0x67);
 }
 
-// 1.13c D2Game+0x8B1F0 (EAX = dword at 2, ECX = byte at 1, client on the stack): 6-byte packet 0x79.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8b1f0(D2ClientStrc* client, uint32_t eaxDword, uint8_t ecxByte) { // 1.13c D2Game+0x8B1F0
+// 0x8B1F0: 6-byte packet 0x79: [1]=CL, [2..5]=EAX.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8b1f0(uint32_t eaxIn, uint32_t ecxIn, D2ClientStrc* client) { // 1.13c D2Game+0x8B1F0
     uint8_t b[8] = {};
     b[0] = 0x79;
-    b[1] = ecxByte;
-    std::memcpy(b + 2, &eaxDword, 4);
+    b[1] = (uint8_t)ecxIn;
+    w32(b, 2, eaxIn);
     D2GAME_PACKETS_SendPacket_6FC3C710(client, b, 6);
 }
 
@@ -59,41 +59,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8b400(D2ClientStrc* client, const v
     D2GAME_PACKETS_SendPacket_6FC3C710(client, b, 0x28);
 }
 
-// 0x8C230: 0x10-byte packet: [1]=ecx low, [2..5]=edx, [6]=p4, [7]=p5, [8..11]=p6, [12..13]=p7, [14..15]=p8.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8c230(uint32_t ecxIn, uint32_t edxIn, void* client, uint8_t p4, uint8_t p5, uint32_t p6, uint16_t p7, uint16_t p8, const D2GameBatch8AD40Env* env) { // 1.13c D2Game+0x8C230
-    uint8_t b[0x10] = {};
-    b[1] = (uint8_t)ecxIn;
-    w32(b, 2, edxIn);
-    b[6] = p4;
-    b[7] = p5;
-    w32(b, 8, p6);
-    w16(b, 12, p7);
-    w16(b, 14, p8);
-    env->send8A3E0(client, b, 0x10);
-}
-
-// 0x8C3B0: 6-byte packet: [1]=ecx low, [2..5]=edx.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8c3b0(uint32_t ecxIn, uint32_t edxIn, D2ClientStrc* client) { // 1.13c D2Game+0x8C3B0
-    uint8_t b[8] = {};
-    b[1] = (uint8_t)ecxIn;
-    w32(b, 2, edxIn);
-    D2GAME_PACKETS_SendPacket_6FC3C710(client, b, 6);
-}
-
-// 0x8CFB0: 7-byte packet 0x8D to every unit via 0xDFC10: [1..4]=unit id (-1 if null), [5..6]=0x9BEB0(unit)
-// when unit+0x80 is set and *unit==0, else 0xFFFF.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8cfb0(const uint8_t* unit, const D2GameBatch8AD40Env* env) { // 1.13c D2Game+0x8CFB0
-    uint8_t b[7];
-    uint32_t id = 0xFFFFFFFFu, f0 = 1, f80 = 0;
-    b[0] = 0x8D;
-    uint16_t v = 0xFFFF;
-    if (unit) {
-        std::memcpy(&id, unit + 0xC, 4);
-        std::memcpy(&f0, unit, 4);
-        std::memcpy(&f80, unit + 0x80, 4);
-        if (f80 != 0 && f0 == 0) v = env->sub9BEB0((void*)unit);
-    }
-    w32(b, 1, id);
-    w16(b, 5, v);
-    env->dfc10(b);
+// 0x8CFB0: the party broadcast lives in d2game_8cfb0.cpp.
+void D2Game_8CFB0_PartyBroadcast(void (*)(const void*, uint32_t), uint16_t (*)(const void*), const uint8_t*, uint32_t);
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8cfb0(const uint8_t* unit, const D2GameBatch8AD40Env* env) {
+    static const D2GameBatch8AD40Env* s_env;
+    s_env = env;
+    D2Game_8CFB0_PartyBroadcast([](const void* p, uint32_t) { s_env->dfc10(p); }, [](const void* u) { return s_env->sub9BEB0((void*)u); }, unit, 0);
 }

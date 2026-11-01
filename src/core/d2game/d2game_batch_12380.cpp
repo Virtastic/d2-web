@@ -47,54 +47,6 @@ static inline const D2GameBatch12380Env* d2game12380_env(const uint32_t* r) { re
 
 [[noreturn]] static void d2game_fatal12380(uint32_t) { _exit(-1); }
 
-// 1.13c D2Game+0x1EB90 -- SendItemSlotLookup_1EB90 (62 bytes). Ordinal_10561 (no args), Ordinal_10826 and
-// Ordinal_10459 level lookup, then FUN_6fc3e960 (RVA 0x1E960) with the implicit stack/ESI values, passed
-// as r[0]=stack_c, r[1]=stack_8, r[2]=ESI (unit), r[3]=unused.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_1EB90(uint32_t* r) {
-    const D2GameBatch12380Env* e = d2game12380_env(r);
-    callOrd(e, 10561, {});
-    uint32_t lvl = callOrd(e, 10826, {});
-    uint32_t act = callOrd(e, 10459, {lvl});
-    callRva(e, 0x1E960, {r[0], act & 0xff, r[2], r[1]});
-    r[4] = 0;
-}
-
-// 1.13c D2Game+0x1EC40 -- SUNITINACTIVE_RemoveById_1EC40 (154 bytes). __fastcall: r[0]=ECX (param_1, unit id),
-// r[1]=EAX (type index, low byte), r[2]=EBX (game base). Walks the inactive list at game+0xD8 + type*4.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_1EC40(uint32_t* r) {
-    const D2GameBatch12380Env* e = d2game12380_env(r);
-    uint8_t* game = (uint8_t*)(uintptr_t)r[2];
-    uint32_t param1 = r[0];
-    uint32_t iVar4 = rd32(game, 0xd8 + (r[1] & 0xff) * 4);
-    r[4] = 0;
-    if (iVar4 == 0) return;
-    do {
-        uint32_t iVar3 = rd32((void*)(uintptr_t)iVar4, 0xc);
-        uint32_t iVar2 = 0;
-        uint32_t iVar1;
-        while ((iVar1 = iVar3) != 0) {
-            if (rd32((void*)(uintptr_t)iVar1, 8) == (param1 & 0xffff)) {
-                if (iVar1 == rd32((void*)(uintptr_t)iVar4, 0xc)) {
-                    wr32((void*)(uintptr_t)iVar4, 0xc, rd32((void*)(uintptr_t)iVar1, 0x58));
-                } else {
-                    wr32((void*)(uintptr_t)iVar2, 0x58, rd32((void*)(uintptr_t)iVar1, 0x58));
-                }
-                iVar4 = rd32((void*)(uintptr_t)iVar1, 0x20);
-                while (iVar4 != 0) {
-                    iVar4 = rd32((void*)(uintptr_t)iVar4, 4);
-                    callOrd(e, 10046, {0});   // "..\\Source\\D2Game\\Ai\\AiGeneral.cpp", 0x246
-                }
-                if (rd32((void*)(uintptr_t)iVar1, 0x24) != 0) callOrd(e, 10850, {});
-                callOrd(e, 10046, {0});       // "..\\Source\\D2Game\\UNIT\\SUnitInactive.cpp", 0x8D
-                return;
-            }
-            iVar2 = iVar1;
-            iVar3 = rd32((void*)(uintptr_t)iVar1, 0x58);
-        }
-        iVar4 = rd32((void*)(uintptr_t)iVar4, 0x14);
-    } while (iVar4 != 0);
-}
-
 // 1.13c D2Game+0x19662 -- AiAcquireTargetAndAct_19662 (208 bytes). r[0]=ECX (unused), r[1]=EDX (param_2, a
 // uint32 pointer), r[2]=EDI (unit-owner game arg), r[3]=ESI (unit). Unit seed at unit+8 (uint64).
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_19662(uint32_t* r) {
@@ -567,8 +519,8 @@ LAB_9a8:
 
 // 1.13c D2Game+0x1DB40 -- AI_CommandDispatch_1DB40 (511 bytes). __fastcall: r[0]=ECX (param_1, unit),
 // r[1]=EDX (param_2, command record: +4 is the command id), r[2]=stack param_3. The out-params &local_8,
-// &local_c are scratch offsets S_L8/S_LC; local_4 (a byte the decompile reads but never sets on the reached
-// paths) is passed as 0 (MISMATCH: uninitialized in retail).
+// &local_c are scratch offsets S_L8/S_LC; retail's command-pair callees (0x604C0, 0xE2C40) fill two dwords through
+// ECX, so local_4 is the second dword of that pair (scratch +4), which 0xF2540 receives after the first.
 #define S_L8D 0x00u
 #define S_LCD 0x04u
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_1DB40(uint32_t* r) {
@@ -578,7 +530,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_1DB40(uint32_t* r) {
     uint32_t uVar1 = callRva(e, 0x15D10, {});
     int32_t iVar2 = 0, iVar3 = 0;
     uint32_t uVar4 = 0;
-    uint8_t local_4 = 0;
     r[4] = 0;
     if ((uint8_t)uVar1 != 0) return;
     if (p2 == 0) {
@@ -608,7 +559,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_1DB40(uint32_t* r) {
                     return;
                 }
 LAB_dce1:
-                callRva(e, 0xF2540, {param1, p2, 0, 2, rd32(scr, S_L8D), local_4, 1});
+                callRva(e, 0xF2540, {param1, p2, 0, 2, rd32(scr, S_L8D), rd32(scr, S_LCD), 1});
                 return;
             }
             goto LAB_dd03;
@@ -641,7 +592,7 @@ LAB_dce1:
         return;
     }
 LAB_dd03:
-    uVar1 = d2game12380_call19C20(r, param1, param1, p3);
+    uVar1 = callRva(e, 0x19C20, {param1, p3});
     if ((uint8_t)uVar1 == 0) {
         uVar1 = callRva(e, 0x16A30, {param1});
         if ((uint8_t)uVar1 == 0) {

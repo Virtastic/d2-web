@@ -106,18 +106,6 @@ namespace
 	}
 }
 
-// 1.13c D2Common+0x16C90 (EAX = level record, EDX = target level id; ECX unused).
-// Find (or allocate) the level with that id in the DRLG at level+0x1B4, then add an orthogonal link on it:
-// direction from 0x2D470 over (found+0x00, found+0x1C), node added with 0x44F20.
-// UNVERIFIED: which register carries head/level/preset into 0x44F20 (decompile hides them); head = found
-// level slot, level = EAX, preset = 0 are the decompile-consistent reading.
-extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_16C90_LinkLevelRecordById(uint32_t pLevel, int32_t nLevelId)
-{
-	const uint32_t pDrlg = W(pLevel, 0x1B4);
-	const uint32_t pFound = FindOrAllocLevel(pDrlg, nLevelId);
-	const int32_t nDir = d2_port8_7D470_Direction(W(pFound, 0), pFound + 0x1C);
-	d2_port8_44F20_AddOrth(pFound, pLevel, nDir, 0);
-}
 
 // 1.13c D2Common+0x19C90 (AL = act selector 0..4, stack: pDrlg, idA, idB).
 // Run the act generator for the selector, make sure both levels have rooms (0x2E360), then for up to eight
