@@ -15,7 +15,7 @@ namespace {
 const int8_t kStepX[4] = { 1, 0, -1, 0 };      // D2Common+0x51E4
 const int8_t kStepY[4] = { 0, 1, 0, -1 };      // D2Common+0x51E0
 const int32_t kDirHeading[25] = { 5, 4, 4, 4, 3, 6, 5, 4, 3, 2, 6, 6, 6, 2, 2, 6, 7, 0, 1, 2, 7, 0, 0, 0, 1 };   // D2Common+0xDC320, first dword of each 12-byte row
-const uint8_t kTurns[16] = { 0, 1, 2, 3, 0, 1, 1, 1, 3, 2, 1, 2, 0, 3, 2, 1 };   // D2Common+0xDCAB8
+const uint8_t kTurns[16] = { 0, 1, 2, 3, 0, 1, 1, 1, 3, 2, 1, 2, 0, 3, 2, 1 };   // D2Common+0x8CAB8
 inline int32_t& I(P b, uint32_t o) { return *reinterpret_cast<int32_t*>(b + o); }
 inline uint8_t& U8(P b, uint32_t o) { return *reinterpret_cast<uint8_t*>(b + o); }
 }

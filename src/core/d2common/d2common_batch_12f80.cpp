@@ -77,26 +77,4 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_81ca0(uint32_t level, uint32_t ctx, All
  w(ctx,0x1dc) += w(b,4);
  p1200(level, b); p1a20(level); p1ad0();
 }
-// 1.13c D2Common+0x444F0: flag 0x800000 on the room when a neighbour test hits (ECX = start, EDX = room).
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_444f0(uint32_t room, int32_t start, int (*test)(uint32_t,int32_t)) {
- if (test(room,start) == 0 && 0 < (int32_t)w(room,0x2c)) {
-  while (test(room,start) == 0) if ((int32_t)w(room,0x2c) <= start + 1) return;
-  w(room,0x28) |= 0x800000;
- }
-}
-// 1.13c D2Common+0x44DF0: collect rooms of the level within 5 tiles on both axes, sort, store list at +8.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_44df0(uint32_t room, void (*sortList)(uint32_t*), Alloc alloc) {
- uint32_t tmp[32]; int32_t n = 0;
- for (uint32_t o = w(w(room,0x58),0x10); o; o = w(o,0x24)) {
-  int32_t dx = (int32_t)w(room,0x34) < (int32_t)w(o,0x34) ? (int32_t)w(o,0x34)-(int32_t)w(room,0x3c)-(int32_t)w(room,0x34)
-                                                           : (int32_t)w(room,0x34)-(int32_t)w(o,0x3c)-(int32_t)w(o,0x34);
-  int32_t dy = (int32_t)w(room,0x38) < (int32_t)w(o,0x38) ? (int32_t)w(o,0x38)-(int32_t)w(room,0x40)-(int32_t)w(room,0x38)
-                                                           : (int32_t)w(room,0x38)-(int32_t)w(o,0x40)-(int32_t)w(o,0x38);
-  if (dx < 6 && dy < 6) tmp[n++] = o;
- }
- w(room,0x2c) = n;
- sortList(tmp);
- w(room,8) = alloc("..\\Source\\D2Common\\DRLG\\DrlgRoom.cpp", 0x2cb, 0);
- for (int32_t i = 0; i < n; ++i) w(w(room,8), i*4) = tmp[i];
-}
 }

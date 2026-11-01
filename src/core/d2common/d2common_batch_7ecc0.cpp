@@ -46,8 +46,9 @@ void D2Common_7ECC0(void* pObj, int32_t base, const int32_t* tbl,
 // pRow = the 0x1b0-byte table row (id at +0, count at +0x40); alloc = Ordinal_10045.
 void D2Common_42920(void* pCtx, int32_t id, const void* pRow, int32_t* (*alloc)())
 {
-    int32_t* n = rd<int32_t*>(pCtx, 0x1cc);
-    for (; n; n = (int32_t*)rd<void*>(n, 12)) if (n[0] == id) goto found;
+    // list links are 4-byte retail pointers (wasm32 host addresses), not native pointer width
+    int32_t* n = (int32_t*)(uintptr_t)rd<uint32_t>(pCtx, 0x1cc);
+    for (; n; n = (int32_t*)(uintptr_t)rd<uint32_t>(n, 12)) if (n[0] == id) goto found;
     {
         n = alloc();
         n[0] = rd<int32_t>(pRow, 0); n[1] = rd<int32_t>(pRow, 0x40); n[2] = 0; n[3] = 0;
@@ -59,8 +60,8 @@ void D2Common_42920(void* pCtx, int32_t id, const void* pRow, int32_t* (*alloc)(
             r = (c & (c - 1)) == 0 ? (c - 1) & (uint32_t)s : (uint32_t)((s & 0xffffffffull) % c);
         }
         n[2] = (int32_t)r;
-        wr<void*>(n, 12, rd<void*>(pCtx, 0x1cc));
-        wr<void*>(pCtx, 0x1cc, n);
+        wr<uint32_t>(n, 12, rd<uint32_t>(pCtx, 0x1cc));
+        wr<uint32_t>(pCtx, 0x1cc, (uint32_t)(uintptr_t)n);
     }
 found:
     n[2] = (n[2] + 1) % n[1];

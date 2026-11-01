@@ -1,4 +1,4 @@
-// 1.13c D2Common batch 44a30: +0x44A30, +0x45240, +0x834D0, +0x84220, +0x837F0.
+// 1.13c D2Common batch 44a30: +0x45240, +0x834D0, +0x84220, +0x837F0.
 // Env-seam style: callees are function pointers on Env, register args are explicit params.
 // All struct accesses use retail 32-bit byte offsets on retail-layout images; a stored "pointer" is
 // read as u32 and widened to uintptr_t (no pointer is ever narrowed). Implementations only; unvectored.
@@ -23,17 +23,7 @@ struct D2CommonBatch44A30Env {
     void (*cb250)();                                                      // PTR_FUN_6fdeb250 indirect
 };
 
-// 1.13c D2Common+0x44A30 : room (EAX) grows its +8 array by one dword (count at +0x2c).
-void D2Common_44A30(const D2CommonBatch44A30Env& e, P room)
-{
-    int n = rd(room, 0x2c) + 1;
-    wr(room, 0x2c, n);
-    P a = e.alloc10047(n * 4, "..\\Source\\D2Common\\DRLG\\DrlgRoom.cpp", 0x314, 0);
-    wr(room, 8, (uint32_t)a);
-    if (!a) { e.fatal(0x315); return; }
-    wr(a, (uint32_t)(n * 4 - 4), 0x314);   // guess: decompiler shows the line constant as stored value
-    e.f445A0(room);
-}
+// 0x44A30 moved to d2common_44a30.cpp (retail-layout port, FN-vectored).
 
 // 1.13c D2Common+0x45240 : prepend a new 0x18-byte node to list at EDI+0x4c; ESI = payload.
 void D2Common_45240(const D2CommonBatch44A30Env& e, P esi, P edi, uint32_t ecxAfter69950)

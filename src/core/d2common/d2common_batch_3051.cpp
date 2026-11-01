@@ -83,16 +83,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4f4c0(void* object,
     return 0;
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE void* d2_fn_d2common_41f70(void* p1, uint32_t a,
-    uint32_t b, uint32_t c, void* out, void* fallbackBase,
-    void (*format)(void*, uint32_t, uint32_t, uint32_t, void*, char*, uint8_t*,
-                   uint32_t, uint32_t), void* (*currentString)()) { // 1.13c D2Common+0x41F70
-    uint8_t local[12]{};
-    format(p1, a, b, c, out, reinterpret_cast<char*>(local + 4), local, 0, 1);
-    void* result = currentString();
-    return result ? result : bytes(fallbackBase) + 0x404;
-}
-
 // Adopt the existing native-layout decoder rather than applying x86 offsets to a
 // wasm64 D2UnitStrc. Version, gamble, header and socket-count inputs stay explicit.
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_2a600(D2UnitStrc* item,
@@ -121,16 +111,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_2e790(void* path,
     return -1;
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE void* d2_fn_d2common_44ce0(void* owner, int32_t index,
-    uint8_t* tableRows, int32_t rowCount, const D2Common3051Env* env) { // 1.13c D2Common+0x44CE0
-    for (void* node = link(owner, 0x90, env); node; node = link(node, 0x44, env)) {
-        if (!read32(node, 0)) fatal(env, 0x410);
-        if (signed32(node, 0) == index) return bytes(node) + 4;
-    }
-    if (index < 0 || index >= rowCount) return reinterpret_cast<void*>(uintptr_t{0x48});
-    return tableRows + static_cast<uint32_t>(index) * 0x9c + 0x48;
-}
-
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_2d5b0(void* room,
     int32_t x, int32_t y, const D2Common3051Env* env) { // 1.13c D2Common+0x2D5B0
     for (void* node = link(room, 0x47c, env); node; node = link(node, 0x1ac, env)) {
@@ -154,13 +134,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2d600(void* owner, int32_t x
             y < add32(signed32(node, 0x38), signed32(node, 0x40))) return;
         node = link(node, 0x24, env);
     } while (node);
-}
-
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_41d00(const char* left,
-    const char* right, const D2Common3051Env* env) { // 1.13c D2Common+0x41D00
-    if (std::strlen(left) > 8) fatal(env, 0xd6);
-    if (std::strlen(right) > 8) fatal(env, 0xd7);
-    return std::memcmp(left, right, 8) == 0;
 }
 
 // Callees are explicit: lookupId=0x2D5B0 (id of the owner's room rect holding x,y),

@@ -83,43 +83,8 @@ extern "C" D2DrlgWarpStrc* d2_fn_d2common_2d730(D2DrlgStrc* drlg, int32_t level)
     return DRLG_GetDrlgWarpFromLevelId(drlg, level);
 }
 
-// The 1.13c comparator is strict and takes (new, existing), unlike the
-// boolean convention of the 1.10f helper.
-static int32_t orthDirection(const D2DrlgOrthStrc* orth)
-{
-    int32_t value; std::memcpy(&value, &orth->nDirection, sizeof(value)); return value;
-}
-static bool before(const D2DrlgOrthStrc* a, const D2DrlgOrthStrc* b)
-{
-    const auto da = orthDirection(a), db = orthDirection(b);
-    if (da != db) return da < db;
-    switch (da) {
-    case 0: return a->pBox->nPosY < b->pBox->nPosY;
-    case 1: return a->pBox->nPosX > b->pBox->nPosX;
-    case 2: return a->pBox->nPosY > b->pBox->nPosY;
-    case 3: return a->pBox->nPosX < b->pBox->nPosX;
-    default: return false;
-    }
-}
-
-// 1.13c D2Common+0x44B20
-extern "C" void d2_fn_d2common_44b20(D2DrlgOrthStrc** head, D2DrlgOrthStrc* node)
-{
-    if (!*head) { *head = node; return; }
-    auto* prev = *head;
-    auto* next = prev->pNext;
-    if (!next) {
-        if (before(node, prev)) { node->pNext = prev; *head = node; return; }
-    } else {
-        do {
-            if (before(node, next)) break;
-            prev = next;
-            next = next->pNext;
-        } while (next);
-    }
-    node->pNext = next;
-    prev->pNext = node;
-}
+extern "C" void D2Common_44B20(D2DrlgOrthStrc** head, D2DrlgOrthStrc* node, bool (*before)(const D2DrlgOrthStrc*, const D2DrlgOrthStrc*));
+extern "C" bool D2Common_44B20_Before(const D2DrlgOrthStrc* a, const D2DrlgOrthStrc* b);
 
 struct D2CommonPlacement13c { int32_t x, y, width, height, direction; };
 static_assert(offsetof(D2CommonPlacement13c, direction) == 0x10);
@@ -149,28 +114,6 @@ extern "C" void D2Common_13F30_Placement(const int32_t* origin, int32_t directio
     out->width = width; out->height = height; out->direction = direction;
 }
 
-// 1.13c D2Common+0x44950
-extern "C" void d2_fn_d2common_44950(D2DrlgRoomStrc* owner, D2DrlgRoomStrc* room, int32_t direction)
-{
-    // ESI is the owning room, EAX the neighbour, stack+4 the direction.
-    auto** head = &owner->pDrlgOrth;
-    for (auto* node = *head; node; node = node->pNext) if (node->pDrlgRoom == room) return;
-    auto* node = D2_CALLOC_STRC_POOL(owner->pLevel->pDrlg->pMempool, D2DrlgOrthStrc);
-    node->pDrlgRoom = room; std::memcpy(&node->nDirection, &direction, sizeof(direction));
-    node->bInit = 1; node->pBox = &room->pDrlgCoord;
-    node->pNext = *head; *head = node;
-}
-
-// 1.13c D2Common+0x44F20
-extern "C" void d2_fn_d2common_44f20(D2DrlgOrthStrc** head, D2DrlgLevelStrc* level,
-    int32_t direction, int32_t preset)
-{
-    auto* node = D2_CALLOC_STRC_POOL(level->pDrlg->pMempool, D2DrlgOrthStrc);
-    node->pLevel = level; std::memcpy(&node->nDirection, &direction, sizeof(direction));
-    node->bPreset = preset; node->pBox = &level->pLevelCoords;
-    d2_fn_d2common_44b20(head, node);
-}
-
 // 1.13c D2Common+0x37020
 extern "C" void d2_fn_d2common_37020(D2DrlgGridStrc* grid, D2DrlgVertexStrc* vertex,
     int32_t flag, FlagOperation operation, BOOL includeNext)
@@ -178,34 +121,3 @@ extern "C" void d2_fn_d2common_37020(D2DrlgGridStrc* grid, D2DrlgVertexStrc* ver
     sub_6FD75DE0(grid, vertex, flag, operation, includeNext);
 }
 
-// 1.13c D2Common+0x1B4B0
-extern "C" void d2_fn_d2common_1b4b0(void* pool, D2DrlgVertexStrc* first,
-    D2DrlgCoordStrc* box, uint8_t direction, D2DrlgOrthStrc* orth)
-{
-    auto* second = first->pNext; auto* third = second->pNext; auto* fourth = third->pNext;
-    for (; orth; orth = orth->pNext) {
-        auto* c = orth->pBox ? orth->pBox : box;
-        D2DrlgVertexStrc* v; bool vertical; int32_t sign, lo, hi, start, end;
-        switch (orthDirection(orth)) {
-        case 0: v=first; vertical=true; sign=-1; lo=c->nPosY; hi=add32(c->nPosY,c->nHeight); start=first->nPosY; end=second->nPosY; break;
-        case 1: v=second; vertical=false; sign=1; lo=add32(c->nPosX,c->nWidth); hi=c->nPosX; start=second->nPosX; end=third->nPosX; break;
-        case 2: v=third; vertical=true; sign=1; lo=add32(c->nPosY,c->nHeight); hi=c->nPosY; start=third->nPosY; end=fourth->nPosY; break;
-        case 3: v=fourth; vertical=false; sign=-1; lo=c->nPosX; hi=add32(c->nPosX,c->nWidth); start=fourth->nPosX; end=first->nPosX; break;
-        default: std::abort();
-        }
-        auto split = [&](int32_t position) {
-            auto* n = DRLGVER_AllocVertex(pool, direction);
-            n->nPosX = vertical ? v->nPosX : position;
-            n->nPosY = vertical ? position : v->nPosY;
-            n->pNext = v->pNext; v->pNext = n; return n;
-        };
-        bool touches = false;
-        if (mul32(hi,sign) <= mul32(start,sign)) {
-            touches = mul32(start,sign) <= mul32(lo,sign);
-        } else if (mul32(hi,sign) <= mul32(end,sign)) { v=split(hi); touches=true; }
-        if (touches) {
-            v->dwFlags |= orth->bPreset ? 3 : 1;
-            if (mul32(lo,sign) < mul32(end,sign)) split(lo);
-        }
-    }
-}

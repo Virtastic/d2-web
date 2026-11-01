@@ -1,7 +1,7 @@
 // D2Common 0x17D00 / 0x17EB0: grid path search over the outdoor cell map (DrlgVer.cpp vertex chains).
 #pragma once
 #include <cstdint>
-// The 16-byte turn table the search nodes point into (node+0x18); retail's copy is at D2Common+0xDCAB8.
+// The 16-byte turn table the search nodes point into (node+0x18); retail's copy is at D2Common+0x8CAB8.
 extern "C" const uint8_t* D2Common_17D00_TurnTable();
 extern "C" uint32_t D2Common_17D00_SearchPath(uint32_t pPool, int32_t nLimit, uint32_t pLevel, uint32_t pTarget);
 

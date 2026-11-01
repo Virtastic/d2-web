@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include <emscripten.h>
+#include "d2common_fog_env.h"
 
 #include "D2DataTbls.h"
 #include "D2Inventory.h"
@@ -344,22 +345,20 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_25bd0(D2UnitStrc* pUnit)
 	(void)D2Common_24D00_ItemIsBaseVariantNotQuest((uint32_t)pUnit->dwClassId);
 }
 
-// 1.13c D2Common+0x1D760 (#10330) installs an empty two-dword missile stream (units/MisStream.cpp)
-// on a missile whose data block has no stream. A non-missile, a missing data block or an existing
-// stream is left untouched; the allocation still happens in retail before the ownership check.
+// 1.13c D2Common+0x1D760 (#10330) stdcall(pUnit): installs an empty two-dword missile stream (MisStream.cpp:0x2E). The
+// stream is allocated (Fog 0x9222, pool = unit+8 or 0, size 8) and zeroed unless the unit is a missile (type 3) whose data
+// (unit+0x14) already holds a stream (data+0x30); a missile with data then takes the new stream.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_1d760(D2UnitStrc* pUnit)
+void D2Common_1D760_AllocMissileStream(uint32_t pUnit, const D2CommonFogEnv* env)
 {
-	const bool bMissile = pUnit && pUnit->dwUnitType == UNIT_MISSILE && pUnit->pMissileData;
-	const bool bHasStream = bMissile && pUnit->pMissileData->pStream != nullptr;
-	if (bHasStream) return;
-
-	void* pStream = D2_CALLOC(8);
-	if (bMissile)
-	{
-		pUnit->pMissileData->pStream = (D2MissileStreamStrc*)pStream;
-	}
-	(void)pStream;
+	using d2raw::P; using d2raw::W;
+	uint8_t* u = P(pUnit);
+	uint8_t* md = (u && W(u, 0) == 3) ? P(W(u, 0x14)) : nullptr;
+	if (md && W(md, 0x30)) return;
+	const uint32_t pStream = env->alloc(u ? W(u, 8) : 0, 8);
+	W(P(pStream), 0) = 0;
+	W(P(pStream), 4) = 0;
+	if (md) W(md, 0x30) = pStream;
 }
 
 // 1.13c D2Common+0x13340 (#10333) GetGlobalBeltSlotPosition: copies the belt box nBoxId of row

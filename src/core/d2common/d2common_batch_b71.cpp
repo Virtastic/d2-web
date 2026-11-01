@@ -19,7 +19,7 @@ struct Cb {  // 44bd0 AllocRoomEx, 0eec0 LinkMazeRooms (kind in EAX, e in ECX, t
 
 // D2Common 0x44950 on retail-layout blobs (ESI = owner, EAX = room, stack = direction): add a
 // link node (0x18 bytes: room +0, direction +4, init +0xC, box +0x10 = room+0x34, next +0x14) to the
-// owner's list unless the room is already in it. The wasm64 d2_fn_d2common_44950 takes native structs;
+// owner's list unless the room is already in it. The wasm64 D2Common_44950_Engine takes native structs;
 // these blobs cannot be passed to it.
 void link44950(uint32_t owner, uint32_t room, uint32_t dir) {
   for (uint32_t n = w(owner, 0); n; n = w(n, 0x14)) if (w(n, 0) == room) return;
@@ -83,35 +83,4 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2common_10820_engine(uint32_t head, const Cb* c) 
 // 1.13c D2Common+0x10A00
 EMSCRIPTEN_KEEPALIVE uint32_t d2common_10a00_engine(uint32_t head, const Cb* c) { return pick(head, 0xE, false, 1, 1, 3, c); }
 
-// 1.13c D2Common+0x1A080
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_1a080(uint32_t u, void (*a)(), void (*b)(uint32_t), void (*c)()) {
-  if (!(w(u, 0x28) & 0x1000000)) a();
-  if (!(w(u, 0x28) & 0x2000000) && w(u, 0x48) == 2) b(u);
-  if (!(w(u, 0x28) & 0x100000)) c();
-  return w(u, 0x30);
-}
-
-// 1.13c D2Common+0x19B60: pick a random matching entry (LCG seed at +0x1C4/+0x1C8).
-// tbl is the 8-byte-stride table at DAT_6fde4f48.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_19b60(uint32_t self, int32_t id, int32_t* o1, int32_t* o2, const uint32_t* tbl, void (*fin)(int32_t, int32_t, int32_t, uint32_t)) {
-  const int32_t n = static_cast<int32_t>(w(self, 0x1D8));
-  auto match = [&](int32_t v) { return id == v || (tbl[id * 2] != 0 && tbl[id * 2 + 1] == tbl[v * 2 + 1]); };
-  uint32_t cnt = 0;
-  for (int32_t i = 0; i < n; i++) if (match(static_cast<int32_t>(w(self, 0x34 + i * 12)))) cnt++;
-  int32_t pick = 0;
-  if (cnt) {
-    uint64_t s = static_cast<uint64_t>(w(self, 0x1C4)) * 0x6AC690C5ull + w(self, 0x1C8);
-    *reinterpret_cast<uint64_t*>(p(self + 0x1C4)) = s;
-    pick = (cnt & (cnt - 1)) == 0 ? static_cast<int32_t>(((cnt - 1) & static_cast<uint32_t>(s)) + 1)
-                                  : static_cast<int32_t>(static_cast<uint32_t>(s) % cnt + 1);
-  }
-  int32_t i = 0;
-  for (; i < n; i++) {
-    if (match(static_cast<int32_t>(w(self, 0x34 + i * 12)))) pick--;
-    if (pick < 1) break;
-  }
-  *o1 = static_cast<int32_t>(w(self, 0x2C + i * 12));
-  *o2 = static_cast<int32_t>(w(self, 0x30 + i * 12));
-  fin(*o1, *o2, static_cast<int32_t>(w(self, 0x1B4)), self);
-}
 }

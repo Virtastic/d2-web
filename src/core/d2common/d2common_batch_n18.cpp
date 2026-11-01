@@ -15,16 +15,6 @@ extern "C" int D2Common_3790_ascii_stricmp(const uint8_t* a, const uint8_t* b) {
   }
 }
 
-// 1.13c D2Common+0x1A080: runs three init hooks when their done-flags (+0x28 bits 0x1000000, 0x2000000,
-// 0x100000) are clear; the second only when +0x48 == 2. Returns +0x30. Hooks are seams (0x68400, 0xBF70, 0x7C0E0).
-extern "C" uint32_t D2Common_1A080(uint8_t* u, void (*h68400)(), void (*hBF70)(uint8_t*), void (*h7C0E0)()) {
-  uint32_t f = *(uint32_t*)(u + 0x28);
-  if (!(f & 0x1000000)) h68400();
-  if (!(*(uint32_t*)(u + 0x28) & 0x2000000) && *(int32_t*)(u + 0x48) == 2) hBF70(u);
-  if (!(*(uint32_t*)(u + 0x28) & 0x100000)) h7C0E0();
-  return *(uint32_t*)(u + 0x30);
-}
-
 // 1.13c D2Common+0x19B60: weighted random pick among the 12-byte entries at this+0x2C (count at +0x1d8).
 // tbl = retail's 8-byte table at 0x6FDE4F48 (word0 flag, word1 group). An entry matches key if equal to it or
 // both share a nonzero-flag group. LCG state at +0x1c4/+0x1c8: s = lo*0x6ac690c5 + hi (64-bit stored back).

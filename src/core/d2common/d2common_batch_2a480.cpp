@@ -4,6 +4,7 @@
 // callees is a Stage A stub whose comment names what is unproven.
 #include <cstdint>
 #include <emscripten.h>
+#include "d2common_fog_env.h"
 #include "D2DataTbls.h"
 #include "Units/Units.h"
 
@@ -76,12 +77,17 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_460b0(uint32_t nMode, uint32
 	(void)nArg5;
 }
 
-// +0x1D710 (#10998): MisStream unit teardown. Stub: for unit type 3 with data at unit+0x14 whose dword
-// +0x30 is a stream, the body is two Fog ordinal-10046 calls at MisStream.cpp:0x3B/0x3C (the second
-// unconditional) whose first two, register-only arguments (memory pool, freed pointer) the decompile
-// does not carry.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_1d710(uint32_t pUnit) { // 1.13c D2Common+0x1D710
-	(void)pUnit;
+// +0x1D710 (#10998) stdcall(pUnit): MisStream unit teardown (MisStream.cpp:0x3B/0x3C). For a missile (type 3) whose data
+// (unit+0x14) holds a stream (data+0x30): if the stream's first dword is set, free that block (Fog 0x9228, pool = unit+8),
+// then free the stream itself with the same pool. The stream pointer in the data block is left as it was.
+extern "C" void D2Common_1D710_FreeMissileStream(uint32_t pUnit, const D2CommonFogEnv* env) { // 1.13c D2Common+0x1D710
+	using d2raw::P; using d2raw::W;
+	uint8_t* u = P(pUnit);
+	if (!u || W(u, 0) != 3 || !W(u, 0x14)) return;
+	const uint32_t pStream = W(P(W(u, 0x14)), 0x30);
+	if (!pStream) return;
+	if (W(P(pStream), 0)) env->free(W(u, 8), W(P(pStream), 0));
+	env->free(W(u, 8), pStream);
 }
 
 // +0x30880 (#11002): clear a quest record's waypoint block. The pointer at param+0x14 addresses three

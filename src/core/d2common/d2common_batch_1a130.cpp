@@ -11,36 +11,7 @@ namespace {
 template<class T> T rd(const void* p, int o) { return *reinterpret_cast<const T*>(static_cast<const uint8_t*>(p)+o); }
 }
 
-// 1.13c D2Common+0x1A130: resolve a level's room-coordinate defaults. The environment callbacks
-// represent the still-mapped retail callees and are installed by the caller layer.
 extern "C" {
-using D2C_LevelCoordFn = int32_t (*)(void*, int32_t*, int32_t*);
-using D2C_LevelSetupFn = void (*)(void*);
-using D2C_LevelDefaultFn = int32_t (*)(int32_t*, int32_t*);
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_1a130(void* drlg, int32_t levelId, int32_t mode,
- int32_t* x, int32_t* y, D2C_LevelCoordFn special, D2C_LevelCoordFn regular,
- D2C_LevelDefaultFn fallback, D2C_LevelSetupFn setup, D2C_LevelCoordFn center)
-{
- if (!x || !y) return 0;
- *x = *y = -1;
- if (!drlg || !sgptDataTables || levelId < 0 || levelId >= sgptDataTables->nLevelsTxtRecordCount) return 0;
- auto* levels = reinterpret_cast<const uint8_t*>(sgptDataTables->pLevelsTxt);
- const bool useSpecial = rd<int32_t>(levels + levelId * 0x9c, 0x90) != 0;
- void* level = nullptr;
- for (void* p = reinterpret_cast<void*>(rd<uintptr_t>(drlg, 0x47c)); p;
-      p = reinterpret_cast<void*>(rd<uintptr_t>(p, 0x6b * sizeof(uint32_t))))
-  if (rd<int32_t>(p, 0x74 * sizeof(uint32_t)) == levelId) { level = p; break; }
- if (!level) return 0; // allocation belongs to the retail DRLG allocator seam
- if (rd<int32_t>(level, 0x10) == 0 && setup) setup(level);
- int32_t ok = 0;
- if (useSpecial) ok = (mode == 0xD && special) ? special(level, x, y) : (regular ? regular(level, x, y) : 0);
- else if (fallback) ok = fallback(x, y);
- if (!ok && !useSpecial && center) ok = center(level, x, y);
- if (!ok) return 0;
- if (*x == -1 || *y == -1) { *x = rd<int32_t>(level, 0x34) + rd<int32_t>(level, 0x3c)/2; *y = rd<int32_t>(level, 0x38) + rd<int32_t>(level, 0x40)/2; }
- return 1;
-}
-
 // 1.13c D2Common+0x2FAC0: select the normal or expansion level-monster list entry.
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_2fac0(int32_t level, int32_t selector, int32_t difficulty,
  const int32_t* baseTable, const int32_t* normalTable, const int32_t* expansionTable)

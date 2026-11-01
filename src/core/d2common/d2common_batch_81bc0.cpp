@@ -99,7 +99,8 @@ int D2Common_452C0_LinkNearbyRoom(void* headv, uint8_t level, void* roomv, int p
     int ret = 0;
     // Offsets are retail; node/room are raw buffers.
     auto I = [](void* p, int o) -> int32_t& { return *(int32_t*)((char*)p + o); };
-    for (char* n = (char*)headv; n; n = *(char**)(n + 0x24)) {
+    // +0x24 and +8 are 4-byte retail pointers (wasm32 host addresses), not native pointer width
+    for (char* n = (char*)headv; n; n = (char*)(uintptr_t)*(uint32_t*)(n + 0x24)) {
         if (!(*(uint32_t*)(n + 0x28) & (1u << ((level + 4) & 0x1f)))) continue;
         if (param_5 != -1) { D2Common_44A30(); D2Common_45240(); return 1; }
         int dx = I(roomv, 0x34) < I(n, 0x34) ? (I(n, 0x34) - I(roomv, 0x3c)) - I(roomv, 0x34)
@@ -108,8 +109,8 @@ int D2Common_452C0_LinkNearbyRoom(void* headv, uint8_t level, void* roomv, int p
                                              : (I(roomv, 0x38) - I(n, 0x40)) - I(n, 0x38);
         if (dx < 6 && dy < 6) {
             const int c = ++I(roomv, 0x2c);
-            void** arr = (void**)std::realloc(*(void**)((char*)roomv + 8), (size_t)c * sizeof(void*));
-            *(void***)((char*)roomv + 8) = (void**)arr;
+            void** arr = (void**)std::realloc((void*)(uintptr_t)*(uint32_t*)((char*)roomv + 8), (size_t)c * sizeof(void*));
+            *(uint32_t*)((char*)roomv + 8) = (uint32_t)(uintptr_t)arr;
             if (!arr) return ret;          // fatal 0x315
             arr[c - 1] = n;
             D2Common_445A0();

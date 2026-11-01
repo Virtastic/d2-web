@@ -28,16 +28,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_4E480_FindSkillNode(uint32_t unit, int32_
  }
  return best;
 }
-// 1.13c D2Common+0x41DD0: uppercase the key, sum its bytes, scan that bucket.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_41dd0(uint32_t key, uint32_t buckets, uint32_t (*equal)(uint32_t,uint32_t)) {
- if (!key || !buckets || !equal) return 0;
- uint8_t hash=0;
- for (uint8_t* c=p(key); *c; ++c) { if (*c>='a' && *c<='z') *c-=32; hash=static_cast<uint8_t>(hash+*c); }
- uint32_t bucket=w(buckets,4+hash*4); if (!bucket) return 0;
- int32_t count=s(bucket,0);
- for (uint32_t e=bucket+4; count-->0; e+=0xA0) if (equal(key,e)) return e;
- return 0;
-}
 // 1.13c D2Common+0x32CA0: write owner identity and SOURCEUNIT stats.
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_32ca0(uint32_t unit, int32_t type, int32_t id,
  void (*toggle)(uint32_t,int32_t,int32_t), uint32_t (*find)(uint32_t,int32_t),
