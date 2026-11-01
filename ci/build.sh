@@ -98,10 +98,15 @@ flock -u 9; exec 9>&-
 
 # Guard: every src/core/fn probe must have compiled into this build (link-d2.sh globs src/, so a probe that stops
 # compiling or linking already fails above; this catches one the glob skipped).
+# One listing of the compiled probe objects, then an in-memory lookup per probe (a find per probe walked the whole
+# object dir ~2000 times: 25 s warm, over 100 s cold).
+declare -A PROBE_BUILT=() PROBE_SKIPPED=()
+while IFS= read -r s; do PROBE_BUILT[$s]=1; done < <(find build-wasm/obj -name 'src_core_fn_*.o' -printf '%f\n' | sed -e 's/^src_core_fn_//' -e 's/\.o$//')
+while IFS= read -r s; do PROBE_SKIPPED[$s]=1; done < <(cat build-wasm/probe-skip.txt 2>/dev/null)
 for f in src/core/fn/*.cpp; do
   s=$(basename "$f" .cpp)
-  grep -qxF "$s" build-wasm/probe-skip.txt 2>/dev/null && continue # skipped by link-d2.sh (PROBE-SKIP)
-  find build-wasm/obj -name "src_core_fn_$s.o" -print -quit | grep -q . || { echo "FATAL: probe $f has no compiled object" >&2; exit 1; }
+  [ -n "${PROBE_SKIPPED[$s]:-}" ] && continue # skipped by link-d2.sh (PROBE-SKIP)
+  [ -n "${PROBE_BUILT[$s]:-}" ] || { echo "FATAL: probe $f has no compiled object" >&2; exit 1; }
 done
 bash ci/stage.sh
 if [ -z "${D2_CXXFLAGS:-}" ]; then bash tools/engine-cache.sh put . || true; else rm -f play/.engine-key; fi # custom builds never publish as normal engines
