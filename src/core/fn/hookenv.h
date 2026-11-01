@@ -39,6 +39,14 @@ struct HookEnv {
             for (uint32_t j = 0; j < 9; j++) { uint32_t i = o + j, v = i < n ? b[i] : 0; if (i < 32 && !(mask >> i & 1)) v = 0; e[1 + j] = isStk(v) ? 0xB3000000u : v; }
         }
     }
+    // REGS `D`: the 9 dwords at [EDI] at hook entry (the event record handed to 0x33CE0), one record (rva|0x40000000, d0..d8). `bytemask` bit i keeps byte i
+    // of the 36 (a clear bit zeroes it: stack residue the callee never wrote); a stack pointer is 0xB3000000. Call it where retail calls the callee, after h().
+    void edi9(uint32_t rva, const void* rec, uint64_t bytemask = ~0ull) {
+        if (L[0] >= kLogMax) abort();
+        uint32_t* e = L + 1 + L[0]++ * 10; e[0] = rva | 0x40000000u;
+        const uint8_t* b = (const uint8_t*)rec;
+        for (uint32_t j = 0; j < 9; j++) { uint32_t v = 0; for (uint32_t q = 0; q < 4; q++) if (bytemask >> (4 * j + q) & 1) v |= (uint32_t)b[4 * j + q] << (8 * q); e[1 + j] = isStk(v) ? 0xB3000000u : v; }
+    }
     uint32_t h(uint32_t rva, uint32_t a = 0, uint32_t c = 0, uint32_t d = 0, uint32_t b = 0, uint32_t s = 0,
                uint32_t s0 = 0, uint32_t s1 = 0, uint32_t s2 = 0, uint32_t s3 = 0, uint32_t s4 = 0) {
         if (L[0] >= kLogMax) abort();   // log capacity exceeded
