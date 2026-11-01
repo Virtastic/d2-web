@@ -1,5 +1,5 @@
 #include <cstdint>
-void sub_4B80(intptr_t* p);
+void sub_4B80(void* p);
 // 1.13c Storm+0x3630: zero a 5-dword element (fastcall ecx = element).
 void Storm_Sub3630(uint32_t* e) { e[0] = e[1] = e[2] = e[3] = e[4] = 0; }
 // 1.13c Storm+0x5370: 12-byte list-head ctor; e[1] points at itself, e[2] = ~&e[1], e[0] = 0 (32-bit pointers).

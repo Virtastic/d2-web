@@ -7,11 +7,10 @@
 extern "C" int32_t Storm_Sub1B960(void* p, const char*, int32_t);
 
 // 1.13c Storm+0x44D0 -- empty circular list head: [1]=&[1], [0]=0, [2]=~&[1]
-extern "C" void Storm_Sub44D0(uintptr_t* p) {
-    p[1] = 0; p[2] = 0;
-    p[1] = (uintptr_t)&p[1];
+extern "C" void Storm_Sub44D0(uint32_t* p) {
+    p[1] = (uint32_t)(uintptr_t)&p[1];
     p[0] = 0;
-    p[2] = ~(uintptr_t)&p[1];
+    p[2] = ~p[1];
 }
 
 // 1.13c Storm+0x4B40 -- SEH-framed thunk to Storm+0x4910 (SEH has no wasm analogue; body passed in)
@@ -23,7 +22,7 @@ extern "C" void Storm_Sub4E60(uintptr_t* obj) {
 }
 
 // 1.13c Storm+0x50C0 -- zero four slots
-extern "C" void Storm_Sub50C0(uintptr_t* p) { memset(p, 0, 4 * sizeof *p); }
+extern "C" void Storm_Sub50C0(uint32_t* p) { p[0] = p[1] = p[2] = p[3] = 0; }
 
 // CRT lock table seam: lock(n)/unlock(n) = __lock / FUN_6fbf902a.
 struct StormCrtHost {

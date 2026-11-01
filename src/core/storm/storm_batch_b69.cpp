@@ -25,15 +25,16 @@ unsigned sub_45A0(int* param_1, int* esi) {
 }
 
 // 1.13c Storm+0x4B80
-void sub_4B80(intptr_t* p) {
+void sub_4B80(void* pv) {
+  uint32_t* p = (uint32_t*)pv;   // retail link words are 32-bit dwords
   for (int k = 0; k < 2; k++) {
-    intptr_t* hdr = (intptr_t*)p[0];
+    uint32_t* hdr = (uint32_t*)(uintptr_t)p[0];
     if (hdr) {
-      intptr_t v = p[1];
-      intptr_t* t = (v < 0) ? (intptr_t*)~v
-                            : (intptr_t*)((char*)p + (v - hdr[1]));
-      *t = (intptr_t)hdr;
-      ((intptr_t*)p[0])[1] = p[1];
+      int32_t v = (int32_t)p[1];
+      uint32_t* t = (v < 0) ? (uint32_t*)(uintptr_t)(uint32_t)~v
+                            : (uint32_t*)((char*)pv + (int32_t)((uint32_t)v - hdr[1]));
+      *t = (uint32_t)(uintptr_t)hdr;
+      hdr[1] = p[1];
       p[0] = 0;
       p[1] = 0;
     }
