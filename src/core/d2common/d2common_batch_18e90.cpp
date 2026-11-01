@@ -11,29 +11,16 @@
 #define EMSCRIPTEN_KEEPALIVE
 #endif
 
-// D2AllocNewStats state: record bound and the two allocation arrays whose records are 0x34 bytes.
-static uint32_t s_nStatsAllocCount;
-static uintptr_t s_pStatsAllocArrays[2];
-
-
-// 1.13c D2Common+0x18E90
+// 1.13c D2Common+0x18E90 (#10470): PlrMode table getter. The unsigned index is bounded by the record
+// count; mode 0 answers the type row, mode 1 the mode row (0x34-byte records), any other mode null.
+// Retail's fatal on a null base is modelled as a null return.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uintptr_t D2AllocNewStats(uint32_t nIndex, int32_t nArray)
 {
-    if (s_nStatsAllocCount <= nIndex)
-    {
-        return 0;
-    }
-    if (nArray < 0 || nArray > 1)
-    {
-        return 0;
-    }
-    uintptr_t pRecord = s_pStatsAllocArrays[nArray] + (uintptr_t)nIndex * 0x34u;
-    if (pRecord != 0)
-    {
-        return pRecord;
-    }
-    // retail fatals 0x126 for array 0 and 0x129 for array 1; modelled as a return
+    const D2PlrModeDataTbl& t = sgptDataTables->pPlrModeDataTables;
+    if (nIndex >= (uint32_t)t.nPlrModeTypeTxtRecordCount) return 0;
+    if (nArray == 0) return t.pPlayerType ? (uintptr_t)(t.pPlayerType + nIndex) : 0;
+    if (nArray == 1) return t.pPlayerMode ? (uintptr_t)(t.pPlayerMode + nIndex) : 0;
     return 0;
 }
 

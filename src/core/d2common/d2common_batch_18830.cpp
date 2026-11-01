@@ -7,7 +7,7 @@
 
 extern "C" {
 uint32_t d2_fn_d2common_186d0(uint32_t* w, const int32_t* t5, const int32_t* t6);
-int32_t d2_fn_d2common_18400(uint32_t* w, int32_t* buf, int32_t* idx);
+void D2Common_18400_InsertPoints(uint8_t*, uint8_t*, int32_t*, int32_t*, int32_t);
 
 // 1.13c D2Common+0x18830: bidirectional path walk, copies the shorter path into buf.
 EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_18830(const uint32_t* p1, uint32_t p2, int32_t* buf, int32_t* idx, int32_t* end,
@@ -48,7 +48,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_18830(const uint32_t* p1, uint32_t p
        w[9 + w[1]] = w[3];
        reinterpret_cast<uint16_t*>(&w[10 + w[1]])[0] = 0;
        w[1]++;
-       d2_fn_d2common_18400(w, buf, idx);
+       D2Common_18400_InsertPoints((uint8_t*)w, (uint8_t*)buf, idx, idx, 0);
        return static_cast<int32_t>(cur[1]);
       }
      }

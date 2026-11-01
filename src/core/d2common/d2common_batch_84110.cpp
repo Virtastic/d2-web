@@ -36,7 +36,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_84110(uintptr_t a1, uintptr_t ebx,
 
 // D2Common 0x17B70: advance node n (EAX) one step (cursor +0x18, dir +0x1c, count +0x14); on the
 // count reaching 3 climb parents (+0x20) until the root (*ctx, EDI), advancing each. Returns the node.
-EMSCRIPTEN_KEEPALIVE uintptr_t d2_fn_d2common_17b70(uintptr_t n, const uint32_t* ctx) {
+uintptr_t d2_batch_d2common_17b70(uintptr_t n, const uint32_t* ctx) {
 	auto adv = [](uintptr_t a) {
 		uintptr_t c = w(a, 0x18) + 1;
 		put(a, 0x18, c);
