@@ -2410,17 +2410,26 @@ void __fastcall sub_6FC931D0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
 }
 
 //D2Game.0x6FC933F0
-// 1.13c D2Game+0x53B40 (PlrTrade.cpp:PLRTRADE_CopyTradeSaveDataToBuffer). Delta: retail takes an extra game arg and falls back to 0x537D0 (WriteItems) when no cached trade save fits or its length is 0; the vendored body returns 0 there.
-int32_t __fastcall PLRTRADE_CopyTradeSaveDataToBuffer(D2UnitStrc* pUnit, uint8_t* pBuffer, int32_t nBufferSize)
+// 1.13c D2Game+0x53B40 (PlrTrade.cpp:PLRTRADE_CopyTradeSaveDataToBuffer)
+// Delta vs 1.10f: extra pGame and bUsePlayerTrade args; the cached trade record is used only for a player unit
+// (unit type 0) with the flag set, and a missing, oversized or zero-length record falls back to the item writer
+// (retail 0x537D0 == sub_6FC8A0F0) on the unit instead of returning 0.
+int32_t __fastcall PLRTRADE_CopyTradeSaveDataToBuffer(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t* pBuffer, int32_t nBufferSize, int32_t bUseTradeRecord)
 {
-    D2PlayerTradeStrc* pTrade = UNITS_GetPlayerData(pUnit)->pTrade;
-    if (pTrade && nBufferSize >= pTrade->nSaveLength)
+    if (bUseTradeRecord && pUnit && pUnit->dwUnitType == UNIT_PLAYER)
     {
-        memcpy(pBuffer, pTrade->pSaveData, pTrade->nSaveLength);
-        return pTrade->nSaveLength;
+        D2PlayerTradeStrc* pTrade = UNITS_GetPlayerData(pUnit)->pTrade;
+        if (pTrade && nBufferSize >= pTrade->nSaveLength)
+        {
+            memcpy(pBuffer, pTrade->pSaveData, pTrade->nSaveLength);
+            if (pTrade->nSaveLength != 0)
+            {
+                return pTrade->nSaveLength;
+            }
+        }
     }
 
-    return 0;
+    return sub_6FC8A0F0(pGame, pUnit, pBuffer, nBufferSize, 0, 0);
 }
 
 //D2Game.0x6FC93430

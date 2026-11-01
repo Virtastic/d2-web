@@ -67,7 +67,7 @@ void __fastcall sub_6FC92F10(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
 //D2Game.0x6FC931D0
 void __fastcall sub_6FC931D0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pItem);
 //D2Game.0x6FC933F0
-int32_t __fastcall PLRTRADE_CopyTradeSaveDataToBuffer(D2UnitStrc* pUnit, uint8_t* pBuffer, int32_t nBufferSize);
+int32_t __fastcall PLRTRADE_CopyTradeSaveDataToBuffer(D2GameStrc* pGame, D2UnitStrc* pUnit, uint8_t* pBuffer, int32_t nBufferSize, int32_t bUseTradeRecord);
 //D2Game.0x6FC93430
 int32_t __fastcall sub_6FC93430(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc* pItem);
 //D2Game.0x6FC93740
