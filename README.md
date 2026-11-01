@@ -320,6 +320,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Security issues: [SECURITY.md](SECURITY.
 - **StormLib** (Ladislav Zezula): MPQ archive reading.
 - **libd2**, **d2mapapi**, **PlugY**, **d2bs**, **D2Ex2** and the **Phrozen Keep** guides: prior
   art and cross-checks.
+- **OpenDiablo2** and **OpenD2**: cross-checks for front-end screen layouts, key bindings and
+  file formats (DC6/DCC/COF/PL2/TBL). Neither project's code is used. d2-web is not a fork of
+  either one and not based on them. Its engine is reimplemented from the retail 1.13c program.
 - **unbikit**: Bink video decoding.
 
 See [NOTICE](NOTICE) for licences. Much of the code was written with heavy help from AI coding
