@@ -65,7 +65,7 @@ void bn_enqueue(BnEnv* env, BnGlobals* g, BnMsg* m) {
 
 // 1.13c BNCLIENT+0x0FE00: queue a text message. type is the first stack argument (0xE2E0 passes 1). The copy is
 // SStrCopy-bounded to 0x120 (0x11F chars plus NUL); length = strlen(copy)+1; over 0x120 is fatal (code 0x65).
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_bnclient_fe00(BnEnv* env, BnGlobals* g, uint32_t type, const char* text) {
+extern "C" int32_t bnclient_queue_text(BnEnv* env, BnGlobals* g, uint32_t type, const char* text) {
     BnMsg* m = (BnMsg*)env->alloc(sizeof(BnMsg));
     uint32_t n = 0;
     while (n < 0x11f && text[n]) { m->data[n] = (uint8_t)text[n]; ++n; }
@@ -85,7 +85,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_bnclient_fe00(BnEnv* env, BnGlobal
 // 1.13c BNCLIENT+0x0FEC0: queue a binary message. type is the first stack argument (0xE2E0 passes 3). The size is
 // clamped to 0x120 before the copy and before the stored length, so the fatal 0x47 test after it never fires.
 // Zero size stores an empty string.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_bnclient_fec0(BnEnv* env, BnGlobals* g, uint32_t type,
+extern "C" int32_t bnclient_queue_binary(BnEnv* env, BnGlobals* g, uint32_t type,
                                                             const void* data, uint32_t size) {
     BnMsg* m = (BnMsg*)env->alloc(sizeof(BnMsg));
     uint32_t n = size;
@@ -230,8 +230,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_e2e0(BnEnv* env, BnGlobals* 
         env->call(0xC340, n, u, d, (void*)(uintptr_t)data_len);  // store the ad
         char text[0x120];
         snprintf(text, sizeof text, "<Received Ad: %s, %s>\n", n ? n : "", u ? u : "");
-        d2_fn_bnclient_fe00(env, g, 1, text);
-        d2_fn_bnclient_fec0(env, g, 3, text, (uint32_t)strlen(text) + 1);
+        bnclient_queue_text(env, g, 1, text);
+        bnclient_queue_binary(env, g, 3, text, (uint32_t)strlen(text) + 1);
         return;
     }
     case 0x80000004: {

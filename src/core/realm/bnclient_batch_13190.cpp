@@ -92,7 +92,7 @@ bool equal_ci(const char* a,const char* b) {
 // 1.13c BNClient+0x12EE0
 // Append the cache filename after the final backslash; no backslash means
 // retail appends to the complete module filename, rather than replacing it.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_12ee0(char* path,
+extern "C" EMSCRIPTEN_KEEPALIVE void bn_b13190_12ee0(char* path,
     const BnCache13190Env* e) {
     e->module_filename(e->module_handle(nullptr),path,260);
     char* slash=std::strchr(path,'\\');
@@ -105,7 +105,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_12ee0(char* path,
 // 1.13c BNClient+0x13110
 // Reuse the FILETIME only when BOTH seconds and the millisecond tick match.
 // Keep the second tick read after conversion, including tick-wrap behaviour.
-extern "C" EMSCRIPTEN_KEEPALIVE uint64_t d2_fn_bnclient_13110(BnCache13190State* s,
+extern "C" EMSCRIPTEN_KEEPALIVE uint64_t bn_b13190_13110(BnCache13190State* s,
     const BnCache13190Env* e,uint32_t seconds) {
     if(seconds==s->time_seconds && e->tick_count()==s->time_tick) return s->time_value;
     BnCacheSystemTime time;
@@ -118,7 +118,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint64_t d2_fn_bnclient_13110(BnCache13190State*
 }
 
 // 1.13c BNClient+0x13190 -- ECX=key, EDX=byte count, EAX=buffer.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_13190(BnCache13190State* s,
+extern "C" EMSCRIPTEN_KEEPALIVE void bn_b13190_13190(BnCache13190State* s,
     uint32_t key,uint32_t bytes,uint8_t* buffer) {
     uint32_t b=0xeeeeeeee;
     for(uint32_t n=bytes>>2;n;--n,buffer+=4) {
@@ -128,13 +128,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_13190(BnCache13190State* s,
     }
 }
 // 1.13c BNClient+0x13250 -- ECX=buffer, EAX=byte count. Empty CRC is zero.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_bnclient_13250(const uint8_t* p,
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t bn_b13190_13250(const uint8_t* p,
     uint32_t n,const BnCache13190Env* e) {
     if(!p&&n) { e->fatal_null_buffer(); __builtin_trap(); }
     return crc_bytes(p,n);
 }
 // 1.13c BNClient+0x132D0 -- reset state and free in retail order, inside recursive lock.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_132d0(BnCache13190State* s,
+extern "C" EMSCRIPTEN_KEEPALIVE void bn_b13190_132d0(BnCache13190State* s,
     const BnCache13190Env* e) {
     e->enter(); s->active=0;
     if(s->blocks){e->free(s->blocks,0x140);s->blocks=nullptr;}
@@ -145,7 +145,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_132d0(BnCache13190State* s,
     e->leave();
 }
 // 1.13c BNClient+0x133D0 -- EAX=name (missing in decompile), stack=locale.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_bnclient_133d0(BnCache13190State* s,
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t bn_b13190_133d0(BnCache13190State* s,
     const char* name,uint32_t locale) {
     uint32_t first=hash_name(s,name,0),a=hash_name(s,name,1),b=hash_name(s,name,2);
     uint32_t mask=s->header[6]-1,slot=first&mask,fallback=0xffffffffu; first=slot;
@@ -161,12 +161,12 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_bnclient_133d0(BnCache13190State*
 }
 // 1.13c BNClient+0x13490 -- load/validate BN3 header and encrypted hash/block tables;
 // rebuild old BN2 or invalid archives. Allocator flags 8 zero-initialize in retail.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_bnclient_13490(BnCache13190State* s,
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t bn_b13190_13490(BnCache13190State* s,
     const BnCache13190Env* e) {
-    e->enter(); if(s->active)d2_fn_bnclient_132d0(s,e);
-    char path[260]={};d2_fn_bnclient_12ee0(path,e);
+    e->enter(); if(s->active)bn_b13190_132d0(s,e);
+    char path[260]={};bn_b13190_12ee0(path,e);
     s->file=e->open(path,0xc0000000,0,4,0x80);
-    if(s->file==invalid_file){d2_fn_bnclient_132d0(s,e);e->leave();return 0;}
+    if(s->file==invalid_file){bn_b13190_132d0(s,e);e->leave();return 0;}
     s->crypt=static_cast<uint32_t*>(e->alloc(0x1400,0x17e,0));init_crypt(s->crypt);
     s->header=static_cast<uint32_t*>(e->alloc(0x2c,0x182,8));
     uint32_t size=e->file_size(s->file),actual=0; bool valid=false,warn=false;
@@ -213,12 +213,12 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_bnclient_13490(BnCache13190State*
         if(s->blocks)e->free(s->blocks,0x1e9);
         // 13390 closes, resolves the path again, then deletes the old file.
         if(s->file!=invalid_file){e->close(s->file);s->file=invalid_file;}
-        char remove_path[260]={};d2_fn_bnclient_12ee0(remove_path,e);e->remove(remove_path);
+        char remove_path[260]={};bn_b13190_12ee0(remove_path,e);e->remove(remove_path);
         s->file=e->open(path,0xc0000000,0,4,0x80);
         if(s->file==invalid_file){
             // Retail retains freed table aliases on the failed-reopen path,
             // so the cleanup callback sees those same values again.
-            d2_fn_bnclient_132d0(s,e);e->leave();return 0;
+            bn_b13190_132d0(s,e);e->leave();return 0;
         }
         auto* h=s->header;std::memset(h,0,0x2c);h[0]=0x1a334e42;h[1]=0x2c;
         s->hashes=static_cast<uint32_t*>(e->alloc(0x4000,0x207,8));
@@ -230,18 +230,18 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_bnclient_13490(BnCache13190State*
     s->active=1;e->leave();return 1;
 }
 // 1.13c BNClient+0x13920 -- discard and reopen cache (two deletes when active).
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_13920(BnCache13190State* s,
+extern "C" EMSCRIPTEN_KEEPALIVE void bn_b13190_13920(BnCache13190State* s,
     const BnCache13190Env* e) {
     char path[260]={};
-    if(s->active) {d2_fn_bnclient_132d0(s,e);
+    if(s->active) {bn_b13190_132d0(s,e);
         if(s->file!=invalid_file){e->close(s->file);s->file=invalid_file;}
-        d2_fn_bnclient_12ee0(path,e);e->remove(path);
+        bn_b13190_12ee0(path,e);e->remove(path);
     }
-    path[0]=0;d2_fn_bnclient_12ee0(path,e);e->remove(path);d2_fn_bnclient_13490(s,e);
+    path[0]=0;bn_b13190_12ee0(path,e);e->remove(path);bn_b13190_13490(s,e);
 }
 // 1.13c BNClient+0x139A0 -- ESI=name, passed as EAX on each 133d0 lookup.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_139a0(BnCache13190State* s,const char* name) {
-    for(uint32_t i=d2_fn_bnclient_133d0(s,name,0);i!=0xffffffffu;i=d2_fn_bnclient_133d0(s,name,0)) {
+extern "C" EMSCRIPTEN_KEEPALIVE void bn_b13190_139a0(BnCache13190State* s,const char* name) {
+    for(uint32_t i=bn_b13190_133d0(s,name,0);i!=0xffffffffu;i=bn_b13190_133d0(s,name,0)) {
         uint32_t* p=s->hashes+4*i+3;uint32_t block=*p;
         if(block<s->header[7]){s->blocks[4*block+2]=0;s->blocks[4*block+3]=0;}
         *p=0xfffffffeu;
@@ -249,11 +249,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_139a0(BnCache13190State* s,c
 }
 // 1.13c BNClient+0x13A00 -- ECX=name, EDX=data; stack=size, FILETIME*,
 // first expiry seconds, second expiry seconds. All file offsets remain retail u32.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_bnclient_13a00(BnCache13190State* s,
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t bn_b13190_13a00(BnCache13190State* s,
     const BnCache13190Env* e,const char* name,const uint8_t* data,uint32_t length,
     const uint32_t* stamp,uint32_t expire1,uint32_t expire2) {
     if(!name||!*name||!data||!length||!stamp||!expire2||!s->active||length>0x1000000)return 0;
-    e->enter();d2_fn_bnclient_139a0(s,name);
+    e->enter();bn_b13190_139a0(s,name);
     auto perform=[&]() -> uint32_t {
         uint32_t block=0,count=s->header[7],need=length+0x144;
         for(;block<count;++block) {
@@ -270,7 +270,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_bnclient_13a00(BnCache13190State*
                     if(actual!=4||load32(h)!=0x144)break;
                     e->read(s->file,h+4,0x140,&actual);
                     if(actual!=0x140)break;
-                    if(d2_fn_bnclient_13110(s,e,0)>load64(h+0x30))break;
+                    if(bn_b13190_13110(s,e,0)>load64(h+0x30))break;
                 }
             }
         }
@@ -292,9 +292,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_bnclient_13a00(BnCache13190State*
         hash[0]=a;hash[1]=b;hash[2]=0;hash[3]=block;
         auto* entry=s->blocks+block*4;entry[2]=length;entry[3]=0xc0000000;
         uint8_t h[0x144]={};put32(h,0x144);
-        put64(h+0x28,d2_fn_bnclient_13110(s,e,0));put64(h+0x20,load64(stamp));
-        put64(h+0x30,d2_fn_bnclient_13110(s,e,expire1));put64(h+0x38,d2_fn_bnclient_13110(s,e,expire2));
-        put64(h+0x18,d2_fn_bnclient_13110(s,e,0));std::strcpy(reinterpret_cast<char*>(h+0x40),name);
+        put64(h+0x28,bn_b13190_13110(s,e,0));put64(h+0x20,load64(stamp));
+        put64(h+0x30,bn_b13190_13110(s,e,expire1));put64(h+0x38,bn_b13190_13110(s,e,expire2));
+        put64(h+0x18,bn_b13190_13110(s,e,0));std::strcpy(reinterpret_cast<char*>(h+0x40),name);
         put32(h+0x10,crc_bytes(data,length));put32(h+0xc,crc_bytes(h,0x144));
         uint32_t actual=0;e->seek(s->file,entry[0]);e->write(s->file,h,0x144,&actual);
         if(actual!=0x144)return 0xd;
@@ -302,11 +302,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_bnclient_13a00(BnCache13190State*
         uint32_t hb=std::max(s->header[6],0x400u)*16,bb=std::max(s->header[7],0x400u)*16;
         auto* tmp=static_cast<uint8_t*>(e->alloc(std::max(hb,bb),0x37c,0));
         e->seek(s->file,s->header[4]);std::memcpy(tmp,s->hashes,hb);
-        d2_fn_bnclient_13190(s,hash_name(s,"(hash table)",3),hb,tmp);
+        bn_b13190_13190(s,hash_name(s,"(hash table)",3),hb,tmp);
         s->header[9]=crc_bytes(tmp,hb);actual=0;e->write(s->file,tmp,hb,&actual);
         if(actual!=hb){e->free(tmp,0x388);return 0xf;}
         e->seek(s->file,s->header[5]);std::memcpy(tmp,s->blocks,bb);
-        d2_fn_bnclient_13190(s,hash_name(s,"(block table)",3),bb,tmp);
+        bn_b13190_13190(s,hash_name(s,"(block table)",3),bb,tmp);
         s->header[10]=crc_bytes(tmp,bb);e->write(s->file,tmp,bb,&actual);e->free(tmp,0x396);
         if(actual!=bb)return 0x10;
         s->header[8]=0;s->header[8]=crc_bytes(reinterpret_cast<uint8_t*>(s->header),0x2c);
@@ -314,17 +314,17 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_bnclient_13a00(BnCache13190State*
         return actual==0x2c?0:0x11;
     };
     uint32_t error=perform();
-    if(error){e->log("bncache.dat is corrupt (%d) - rebuilding archive",nullptr,error);d2_fn_bnclient_13920(s,e);}
+    if(error){e->log("bncache.dat is corrupt (%d) - rebuilding archive",nullptr,error);bn_b13190_13920(s,e);}
     e->leave();return error==0;
 }
 // 1.13c BNClient+0x14050 -- ECX=name, EDX=optional FILETIME output;
 // stack=allocated native byte pointer output, u32 length output. Preserves retail's
 // two error classes: rebuild archive (1..7), or delete filename (1..4).
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_bnclient_14050(BnCache13190State* s,
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t bn_b13190_14050(BnCache13190State* s,
     const BnCache13190Env* e,const char* name,uint32_t* stamp,uint8_t** data,uint32_t* length) {
     if(stamp){stamp[0]=0;stamp[1]=0;}if(data)*data=nullptr;if(length)*length=0;
     if(!name||!*name||!data||!length||!s->active)return 0;
-    e->enter();uint32_t slot=d2_fn_bnclient_133d0(s,name,0);
+    e->enter();uint32_t slot=bn_b13190_133d0(s,name,0);
     if(slot==0xffffffffu){e->leave();return 0;}
     uint32_t archive_error=0,file_error=0;
     auto perform=[&]() {
@@ -342,10 +342,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_bnclient_14050(BnCache13190State*
             put32(h+0xc,saved);
         }
         if(!equal_ci(name,reinterpret_cast<char*>(h+0x40))){file_error=2;return;}
-        if(d2_fn_bnclient_13110(s,e,0)>load64(h+0x38)){file_error=3;return;}
+        if(bn_b13190_13110(s,e,0)>load64(h+0x38)){file_error=3;return;}
         if(b[2]>0x1000000){archive_error=5;return;}
         if(stamp) {stamp[0]=load32(h+0x20);stamp[1]=load32(h+0x24);}
-        put64(h+0x18,d2_fn_bnclient_13110(s,e,0));e->seek(s->file,b[0]);put32(h+0xc,0);
+        put64(h+0x18,bn_b13190_13110(s,e,0));e->seek(s->file,b[0]);put32(h+0xc,0);
         put32(h+0xc,crc_bytes(h,0x144));uint32_t bytes=std::min(load32(h),0x144u);
         e->write(s->file,h,bytes,&actual);if(actual!=bytes){archive_error=6;return;}
         *data=static_cast<uint8_t*>(e->alloc(b[2],0x2a0,0));
@@ -354,15 +354,15 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_bnclient_14050(BnCache13190State*
         if(load32(h+0x10)!=crc_bytes(*data,*length))file_error=4;
     };
     perform();
-    if(archive_error){e->log("bncache.dat is corrupt (%d) - rebuilding archive",nullptr,archive_error);d2_fn_bnclient_13920(s,e);}
-    else if(file_error){e->log("File: '%s' in bncache.dat is corrupt (%d) - deleting from cache",name,file_error);d2_fn_bnclient_139a0(s,name);}
+    if(archive_error){e->log("bncache.dat is corrupt (%d) - rebuilding archive",nullptr,archive_error);bn_b13190_13920(s,e);}
+    else if(file_error){e->log("File: '%s' in bncache.dat is corrupt (%d) - deleting from cache",name,file_error);bn_b13190_139a0(s,name);}
     if(archive_error||file_error){if(*data){e->free(*data,0x2c9);*data=nullptr;}*length=0;}
     e->leave();return !archive_error&&!file_error;
 }
 
 // 1.13c BNClient+0x14470 -- EAX=64 input bytes, stack=five native u32 hash words.
 // Standard SHA-1 compression, including 32-bit modular additions and big endian loads.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_14470(uint32_t* state,const uint8_t* block) {
+extern "C" EMSCRIPTEN_KEEPALIVE void bn_b13190_14470(uint32_t* state,const uint8_t* block) {
     auto rol=[](uint32_t v,uint32_t n){return (v<<n)|(v>>(32-n));};
     uint32_t w[80];
     for(uint32_t i=0;i<16;++i)w[i]=(uint32_t(block[4*i])<<24)|(uint32_t(block[4*i+1])<<16)|(uint32_t(block[4*i+2])<<8)|block[4*i+3];
@@ -383,7 +383,7 @@ static_assert(sizeof(BnSha14930State)==0x5c);
 static_assert(offsetof(BnSha14930State,hash)==8);
 static_assert(offsetof(BnSha14930State,buffer)==0x1c);
 // 1.13c BNClient+0x14930 -- EDI=context, EAX=input, stack=u32 length.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_14930(BnSha14930State* s,
+extern "C" EMSCRIPTEN_KEEPALIVE void bn_b13190_14930(BnSha14930State* s,
     const uint8_t* input,uint32_t bytes) {
     uint32_t used=(s->bits_low>>3)&63,old=s->bits_low;
     s->bits_low+=bytes<<3;s->bits_high+=(bytes>>29)+(s->bits_low<old);
@@ -395,17 +395,17 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_14930(BnSha14930State* s,
             return;
         }
         for(uint32_t i=used;i<64;++i)s->buffer[i]=input[i-used];
-        d2_fn_bnclient_14470(s->hash,s->buffer);
+        bn_b13190_14470(s->hash,s->buffer);
         input+=64-used;bytes=total-64;used=0;
     }
-    while(bytes>=64){d2_fn_bnclient_14470(s->hash,input);input+=64;bytes-=64;}
+    while(bytes>=64){bn_b13190_14470(s->hash,input);input+=64;bytes-=64;}
     if(bytes)std::memcpy(s->buffer+used,input,bytes);
 }
 // 1.13c BNClient+0x149E0 -- EAX=context, stack=20-byte digest destination.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_149e0(BnSha14930State* s,uint8_t* digest) {
+extern "C" EMSCRIPTEN_KEEPALIVE void bn_b13190_149e0(BnSha14930State* s,uint8_t* digest) {
     uint64_t bits=(uint64_t(s->bits_high)<<32)|s->bits_low;uint8_t length[8];
     for(uint32_t i=0;i<8;++i)length[7-i]=uint8_t(bits>>(i*8));
     uint8_t pad[64]={0x80};uint32_t n=((0u-(s->bits_low>>3)-9)&63)+1;
-    d2_fn_bnclient_14930(s,pad,n);d2_fn_bnclient_14930(s,length,8);
+    bn_b13190_14930(s,pad,n);bn_b13190_14930(s,length,8);
     for(uint32_t i=0;i<5;++i)for(uint32_t j=0;j<4;++j)digest[4*i+j]=uint8_t(s->hash[i]>>(24-j*8));
 }
