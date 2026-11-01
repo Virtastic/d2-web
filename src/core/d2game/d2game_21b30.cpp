@@ -1,27 +1,27 @@
-// Decompile-derived, 1.13c-only. Seams: D2Common stat get (#10973, D2Game+0xA42A), owner lookup (#10195, +0xA7B4), stat set (#10188, +0xA6E2).
+// Decompile-derived, 1.13c-only. Seams: D2Common ordinals injected.
 #include <cstdint>
 #include <cstring>
 
 struct D2Game21b30Env {
-    int32_t (*getStat)(uint32_t unit, uint32_t id, uint32_t sub);
-    uint32_t (*getOwner)(uint32_t unit, uint32_t flag);
-    void (*setStat)(uint32_t unit, uint32_t id, int32_t v, uint32_t sub);
+    int  (*getStat)(const void* unit, int stat, int layer);          // Ordinal 10973
+    void*(*getStatList)(const void* unit, int flag);                 // Ordinal 10195
+    void (*setStat)(void* list, int stat, int value, int layer);     // Ordinal 10188
 };
 
 // 1.13c D2Game+0x21B30
-// EDX = unit, two unused stack words (ret 8). stat 0x16 > 0 and the unit type (unit+4) != 0x10F: stats 0x15 and 0x16 become
-// (stat + stat 0x17/0x18 - 1) clamped at 0, written to the unit's owner (#10195(unit, 1)).
-extern "C" void d2game_fold_stat_box_21b30(uint32_t unit, const D2Game21b30Env* env)
+// fastcall(ecx unused, edx = unit). Folds stats 0x17/0x18 into 0x15/0x16 on the unit's stat list; skips type 0x10f.
+extern "C" void d2_fn_d2game_21B30(uint32_t /*ecx*/, const void* unit, const D2Game21b30Env* env)
 {
-    int32_t x = env->getStat(unit, 0x15, 0);
-    int32_t y = env->getStat(unit, 0x16, 0);
-    if (y <= 0) return;
-    if (unit && *(const uint32_t*)(uintptr_t)(unit + 4) == 0x10f) return;
-    x = (int32_t)((uint32_t)x + (uint32_t)env->getStat(unit, 0x17, 0) - 1);
-    y = (int32_t)((uint32_t)y + (uint32_t)env->getStat(unit, 0x18, 0) - 1);
-    if (x < 0) x = 0;
-    if (y < 0) y = 0;
-    const uint32_t owner = env->getOwner(unit, 1);
-    env->setStat(owner, 0x15, x, 0);
-    env->setStat(owner, 0x16, y, 0);
+    int a = env->getStat(unit, 0x15, 0);
+    int b = env->getStat(unit, 0x16, 0);
+    uint32_t t = 0; if (unit) std::memcpy(&t, (const uint8_t*)unit + 4, 4);
+    if (b > 0 && (unit == nullptr || t != 0x10f)) {
+        int x = a - 1 + env->getStat(unit, 0x17, 0);
+        int y = b - 1 + env->getStat(unit, 0x18, 0);
+        if (x < 0) x = 0;
+        if (y < 0) y = 0;
+        void* l = env->getStatList(unit, 1);
+        env->setStat(l, 0x15, x, 0);
+        env->setStat(l, 0x16, y, 0);
+    }
 }

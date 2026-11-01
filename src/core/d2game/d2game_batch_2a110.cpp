@@ -110,14 +110,22 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_game_497c0(const char* szName, char* szOutName,
     return 1;
 }
 
-// 1.13c D2Game+0x2AC60 caller of 0x8C420 (CL = 1): the body lives in d2game_8c420.cpp.
-void D2Game_8C420_PacketSendJoinBody(void (*)(void*, const void*, uint32_t), void (*)(uint32_t), const uint8_t*, uint8_t, void*);
+// 1.13c D2Game+0x8C420
+// CLIENTS_SendJoinGameBody (1.10f SCmd.cpp SendPacket0x01): the client arrives in EAX. Fatals (0x139)
+// when the client's pGameData at +0x1D28 is null; otherwise builds the 8-byte 0x01 body -- bytes 2..5
+// from pGameData+0x08, byte 1 from client+0x6D, bytes 6/7 as the non-null tests of client+0x70/+0x74 --
+// and appends it (`appendPacket` writes the header byte itself from the packet header the caller set).
 static void d2_game_8c420(void* client, const D2GameBatch11Env* env)
 {
-    static const D2GameBatch11Env* s_env;
-    s_env = env;
-    D2Game_8C420_PacketSendJoinBody([](void* c, const void* p, uint32_t n) { s_env->appendPacket(c, p, n); },
-                                    [](uint32_t id) { d2game_fatal(id); }, (const uint8_t*)client, 1, client);
+    void* pGameData = rdptr(client, 0x1D28);
+    if (pGameData == nullptr)
+        d2game_fatal(0x139);
+    uint8_t packet[8] = {};
+    wr32(packet, 2, rd32(pGameData, 8));
+    packet[1] = rd8(client, 0x6D);
+    packet[6] = rd32(client, 0x70) != 0;
+    packet[7] = rd32(client, 0x74) != 0;
+    env->appendPacket(client, packet, 8);
 }
 
 // 1.13c D2Game+0x2AC60

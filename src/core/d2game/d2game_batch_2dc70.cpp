@@ -278,14 +278,14 @@ EMSCRIPTEN_KEEPALIVE void d2_game_4a780(uint32_t clientId, int32_t sentTick, int
     LeaveCriticalSection(&g_clientListLock);
 }
 
-// CCmd 0x68 reject: the five-byte 0xB4 packet lives in d2game_8c4b0.cpp (retail passes the payload dword in EAX; this caller leaves it 0).
-void D2Game_8C4B0_PacketSendB4(void (*)(uint32_t, uint32_t, const void*, uint32_t), uint32_t, uint32_t);
+// 1.13c D2Game+0x8C4B0
+// CCmd 0x68 reject: send a five-byte packet beginning 0xB4 on channel 0 to the client (EDX).
+// partial: only byte 0 of the packet is initialised in the decompile; the rest are zeroed here.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_game_8c4b0(uint32_t clientId, const D2GameBatch7Env* env)
 {
-    static const D2GameBatch7Env* s_env;
-    s_env = env;
-    D2Game_8C4B0_PacketSendB4([](uint32_t z, uint32_t id, const void* p, uint32_t n) { s_env->send(z, id, p, n); }, 0, clientId);   // D2Net #10002
+    uint8_t packet[5] = { 0xB4, 0, 0, 0, 0 };
+    env->send(0, clientId, packet, 5);                 // D2Net #10002
 }
 
 // 1.13c D2Game+0xCAD60

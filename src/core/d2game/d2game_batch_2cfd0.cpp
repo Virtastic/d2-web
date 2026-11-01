@@ -93,9 +93,6 @@ void TASK_InitializeClock(void)
     g_clockValid = QueryPerformanceFrequency(&g_clockFrequency) ? 1u : 0u;
 }
 
-// FN probe access to the game GUID table (0x6FD30C08).
-int32_t* d2game_2cfd0_guidTable(void) { return g_gameGuids; }
-
 // 1.13c D2Game+0x29B10
 // Count the occupied game slots (0 and -1 are the empty/ended sentinels). Walks the 1024 words in
 // groups of four, as retail does, with the loop bound at the word after the last entry.

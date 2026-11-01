@@ -17,19 +17,14 @@
 #include <OBJECTS/Objects.h>
 #include <OBJECTS/ObjRgn.h>
 #include <UNIT/SUnit.h>
+#include "d2game_batch_2a9f0.h"
 
 namespace d2game_wave3_1 {
-// Register-only callees are explicit typed hooks. No game/global state is
-// recreated here: the caller supplies the same live state used by the engine.
-struct Calls {
-    void (*queuePacket)(D2ClientStrc*, const void*, uint32_t); // 0x8A3E0
-    void (*savePlayer)(D2GameStrc*, D2UnitStrc*, const char*, int32_t); // 0x54320
-    void (*flushClient)(D2ClientStrc*, D2GameStrc*); // 0x2D790
-    void (*leaveClient)(uint32_t, int32_t); // 0x2DC70
-    void (*spawnAt)(D2GameStrc*, D2ActiveRoomStrc*, D2CoordStrc*, void*); // 0x12230
-    void (*initializeFire)(D2ObjInitFnStrc*); // 0x2ECB0
-};
 [[noreturn]] static void fatal() { std::abort(); }
+uint16_t engineCollide(D2ActiveRoomStrc* room, int32_t x, int32_t y, uint32_t w, uint32_t h, uint16_t mask)
+{
+    return COLLISION_CheckMaskWithSizeXY(room, x, y, w, h, mask);
+}
 static_assert(sizeof(D2DrlgCoordsStrc) == 32);
 static_assert(offsetof(D2DrlgCoordsStrc, nSubtileHeight) == 12);
 static_assert(offsetof(D2ObjectsTxt, dwParm) == 0x178);
@@ -103,28 +98,28 @@ void leaveSelectedClient(D2GameStrc* game, D2ClientStrc* client, const Calls& ca
 // while collision calls receive the complete coordinate dwords.
 // 1.13c D2Game+0x2E5D0
 int32_t placement(D2ActiveRoomStrc* room, const D2DrlgCoordsStrc& r,
-                  const D2CoordStrc& p, int32_t sx, int32_t sy)
+                  const D2CoordStrc& p, int32_t sx, int32_t sy, Collide collide)
 {
     const int32_t x = static_cast<uint16_t>(p.nX), y = static_cast<uint16_t>(p.nY);
     return r.nSubtileWidth > 1 && r.nSubtileHeight > 1 &&
         x > r.nSubtileX + 2 && y > r.nSubtileY + 2 &&
         x < r.nSubtileX - sx + r.nSubtileWidth && y < r.nSubtileY - sy + r.nSubtileHeight &&
-        !COLLISION_CheckMaskWithSizeXY(room, p.nX, p.nY, sx + 2, sy + 2, 0x3f11);
+        !collide(room, p.nX, p.nY, sx + 2, sy + 2, 0x3f11);
 }
 
 // 1.13c D2Game+0x2E660
 int32_t widePlacement(D2ActiveRoomStrc* room, const D2DrlgCoordsStrc& r,
-                      const D2CoordStrc& p, int32_t sx, int32_t sy)
+                      const D2CoordStrc& p, int32_t sx, int32_t sy, Collide collide)
 {
     const int32_t x = static_cast<uint16_t>(p.nX), y = static_cast<uint16_t>(p.nY);
     return r.nSubtileWidth >= sx + 2 && r.nSubtileHeight >= sy + 2 &&
         x > r.nSubtileX + 1 && y > r.nSubtileY + 1 &&
         x < r.nSubtileX - sx - 2 + r.nSubtileWidth && y < r.nSubtileY - sy - 2 + r.nSubtileHeight &&
-        !COLLISION_CheckMaskWithSizeXY(room, p.nX, p.nY, sx + 7, sy + 7, 0xc01) &&
-        !COLLISION_CheckMaskWithSizeXY(room, p.nX, p.nY, sx, sy, 0x3f11);
+        !collide(room, p.nX, p.nY, sx + 7, sy + 7, 0xc01) &&
+        !collide(room, p.nX, p.nY, sx, sy, 0x3f11);
 }
 
-// 1.13c D2Game+0x2E7D0
+// D2Game 1.13c 0x2E7D0: the retail-layout port is src/core/d2game/d2game_2e7d0.cpp
 D2TimerArgStrc* allocTimerArgs(void* pool)
 {
     auto* timer = D2_ALLOC_STRC_POOL(pool, D2TimerArgStrc);
@@ -146,7 +141,7 @@ void changeObjectClass(D2UnitStrc* object)
     object->dwClassId = replacement != 0 && replacement < 573 ? replacement : 84;
 }
 
-// 1.13c D2Game+0x2ED70
+// D2Game 1.13c 0x2ED70: the retail-layout port is src/core/d2game/d2game_2ed70.cpp
 int32_t shrineId(D2GameStrc* game, uint8_t shrineClass, uint32_t level)
 {
     if (!shrineClass || shrineClass > 4) shrineClass = 2;
@@ -164,7 +159,7 @@ int32_t shrineId(D2GameStrc* game, uint8_t shrineClass, uint32_t level)
     return id;
 }
 
-// 1.13c D2Game+0x2EF50
+// D2Game 1.13c 0x2EF50: the retail-layout port is src/core/d2game/d2game_2ef50.cpp
 void initializeFireAndFlag(D2ObjInitFnStrc* op, const Calls& calls)
 {
     calls.initializeFire(op);
@@ -174,7 +169,7 @@ void initializeFireAndFlag(D2ObjInitFnStrc* op, const Calls& calls)
 
 // 1.13c D2Game+0x2F4B0
 int32_t populateSmallGrid(D2GameStrc* game, D2ActiveRoomStrc* room,
-                         const D2DrlgCoordsStrc& r, const Calls& calls)
+                         const D2DrlgCoordsStrc& r, const Calls& calls, Collide collide)
 {
     uint32_t endX = r.nSubtileX + std::min(r.nSubtileWidth, 12);
     uint32_t endY = r.nSubtileY + std::min(r.nSubtileHeight, 12);
@@ -182,7 +177,7 @@ int32_t populateSmallGrid(D2GameStrc* game, D2ActiveRoomStrc* room,
     for (uint32_t x = r.nSubtileX + 1; x < endX; x += 2)
         for (uint32_t y = r.nSubtileY + 1; y < endY; y += 2) {
             D2CoordStrc p{static_cast<int32_t>(x), static_cast<int32_t>(y)};
-            if (placement(room, r, p, 1, 1)) {
+            if (placement(room, r, p, 1, 1, collide)) {
                 calls.spawnAt(game, room, &p, nullptr);
                 if (++count >= 32) return 1;
             }

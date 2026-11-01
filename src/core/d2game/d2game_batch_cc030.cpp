@@ -97,7 +97,7 @@ struct D2GameBatch15Env {
     void     (*sentBlock)(uint32_t value);
 };
 
-// 1.13c D2Game+0x2E790
+// D2Game 1.13c 0x2E790: the retail-layout port is src/core/d2game/d2game_2e790.cpp
 // FUN_6fc4e790: the tail of OBJECTS_FreeHoverMessage (Objects.cpp:0x1CE/0x1D1). Walk the chain
 // whose head is *timerArg, each node's next at +4, freeing every node through the pool, then free
 // the timer-arg block itself. Pool and timer-arg arrive in registers only.
@@ -152,6 +152,29 @@ EMSCRIPTEN_KEEPALIVE void d2_game_56740(void* game, void* unit, const D2GameBatc
     if (rd32(ex, 0x0C) == 0 && rd8(ex, 0x10) != 0) {
         ((uint8_t*)ex)[0x11] = 1;
     }
+}
+
+// 1.13c D2Game+0x20C00
+// FUN_6fc40c00 AIGENERAL_FreeAiControl(pGame in ECX, pAiControl in EAX): free pMapAi (+0x38) via
+// Ordinal_10850, free the minion chain at +0x34 (next +4), free the command chain (0x20B60), then
+// free the control block itself (AiGeneral.cpp:0x19D).
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_game_20c00(void* pool, void* aiControl, const D2GameBatch15Env* env)
+{
+    if (aiControl == nullptr) return;
+
+    void* mapAi = rdptr(aiControl, 0x38);
+    if (mapAi != nullptr) env->freeMapAi(pool, mapAi);     // Ordinal_10850
+
+    void* node = rdptr(aiControl, 0x34);
+    while (node != nullptr) {
+        void* next = rdptr(node, 0x04);
+        env->freePool(pool, node, 0x246);                  // Ordinal_10046
+        node = next;
+    }
+
+    env->freeAiCommands(pool, aiControl);                  // 0x20B60
+    env->freePool(pool, aiControl, 0x19D);                 // Ordinal_10046
 }
 
 // 1.13c D2Game+0x379E0

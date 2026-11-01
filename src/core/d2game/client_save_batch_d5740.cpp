@@ -67,7 +67,7 @@ static void __fastcall SendCorpseAssignment(D2GameStrc*, D2UnitStrc* player, voi
     D2GAME_PACKETS_SendPacket_6FC3C710(SUNIT_GetClientFromPlayer(player, __FILE__, __LINE__), packet, 10);
 }
 
-// 1.10f corpse assignment (the 1.13c routine is d2game_8cf80.cpp)
+// 1.13c D2Game+0x8CF80
 void D2GAME_8CF80_CorpseAssignment(D2GameStrc* game, int32_t playerId,
                                   int32_t corpseId, uint8_t assign)
 {

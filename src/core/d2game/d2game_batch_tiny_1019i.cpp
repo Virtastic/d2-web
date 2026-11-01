@@ -89,7 +89,7 @@ static void d2game_tiny_1019i_e7e0_callback(uint32_t game, uint32_t player, void
 // 0xEE70: walk the living players purging the unit from each inventory (callback 0xE7E0, argument =
 // the unit), then remove the unit itself. EAX = game; ESI = unit and doubles as the pushed walk argument
 // (the walk's `ret 4` consumes that slot, which is why this function never pops ESI).
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fnenv_d2game_ee70(uint32_t game, uint32_t unit, const D2GameBatchTiny1019iEnv* env) {   // 1.13c D2Game+0xEE70
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_ee70(uint32_t game, uint32_t unit, const D2GameBatchTiny1019iEnv* env) {   // 1.13c D2Game+0xEE70
     g_activeEnv = env;
     env->fnDFC10(game, d2game_tiny_1019i_e7e0_callback, (void*)(uintptr_t)unit);
     env->fnE20A0(game, unit);

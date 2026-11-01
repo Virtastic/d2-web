@@ -117,8 +117,8 @@ extern "C" void d2_fn_d2common_34080(const uint32_t* mask, D2UnitStrc* unit)
     UNITROOM_RefreshUnit(unit);
 }
 
-// 1.13c D2Common+0x458C0 (the FN probe exports d2_fn_d2common_458c0; the port keeps a C++ name)
-uint8_t* D2Common_458C0_CellPtr(uint8_t* base,
+// 1.13c D2Common+0x458C0
+extern "C" uint8_t* d2_fn_d2common_458c0(uint8_t* base,
     uint32_t group, uint32_t index)
 {
     if (group >= 3 || index >= 3) std::abort();

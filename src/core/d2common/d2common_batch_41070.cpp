@@ -97,7 +97,7 @@ D2DrlgRoomStrc* D2Common_4A5C0(D2DrlgLevelStrc* level, int x, int y, int width, 
     return room;
 }
 
-// Forwarder kept for the 41070 batch callers; the 1.13c port of this routine is d2common_17180.cpp.
+// 1.13c D2Common+0x17180: same complete border walk as the vendored routine.
 void D2Common_17180(D2DrlgLevelStrc* level) { DRLGOUTPLACE_PlaceAct1245OutdoorBorders(level); }
 
 // 1.13c D2Common+0x3E000: EAX level; final path phase split from the vertex collection.

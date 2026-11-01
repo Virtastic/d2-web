@@ -5,7 +5,7 @@
 
 // 1.13c D2Common+0x18F90: release the token/table blocks held by five slots, each guarded by its own
 // non-null test and cleared afterwards.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_18f90()
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_18f90()
 {
 	if (sgptDataTables->pPlrModeDataTables.pPlrModeTypeTxt != 0)
 	{

@@ -84,6 +84,8 @@ struct D2GameBatchEEnv {
 // functions have their 1.13c exports, not so they can run unwired.
 static const D2GameBatchEEnv g_batchEEnv{};
 
+static const char kAiGeneral[]     = "..\\Source\\D2Game\\Ai\\AiGeneral.cpp";
+static const char kSUnitInactive[] = "..\\Source\\D2Game\\UNIT\\SUnitInactive.cpp";
 
 // ---- 0xEB7B0: quest-record section ('!ooW', version 6, 298 bytes) -------------------------------
 static int32_t QuestSection(void* pPlayer, uint8_t** ppSection, const uint8_t* pEnd, const D2GameBatchEEnv* env)
@@ -274,6 +276,52 @@ static int32_t CorpsesSection(void* pGame, void* pPlayer, uint8_t** ppSection,
     return 0;
 }
 
+// ---- 0x1EBD0: free an inactive-unit list's monster chain ---------------------------------------
+// The list node arrived in EAX; +0x0C is D2InactiveUnitListStrc.pInactiveMonsters (D2UnitStrc's
+// pListNext at +0xE4 and pool at +0x08 belong to the other uses of these helpers).
+static void FreeInactiveChains(void* unit, const D2GameBatchEEnv* env)
+{
+    void* pool = rdptr(unit, 0x08);
+    void* node = rdptr(unit, 0x0C);
+    while (node != nullptr) {
+        void* next = rdptr(node, 0x58);
+        for (void* inner = rdptr(node, 0x20); inner != nullptr; ) {
+            void* innerNext = rdptr(inner, 0x04);
+            env->freePool(pool, inner, kAiGeneral, 0x246);
+            inner = innerNext;
+        }
+        void* aux = rdptr(node, 0x24);
+        if (aux != nullptr) env->freeAux(aux);                  // D2Common #10850
+        env->freePool(pool, node, kSUnitInactive, 0x8D);
+        node = next;
+    }
+}
+
+// ---- 0x20B30: free an AiGeneral chain (node unlink pointer at +0x04) ---------------------------
+static void FreeAiChain(void* pool, void* node, const D2GameBatchEEnv* env)
+{
+    while (node != nullptr) {
+        void* next = rdptr(node, 0x04);
+        env->freePool(pool, node, kAiGeneral, 0x246);
+        node = next;
+    }
+}
+
+// ---- 0x1FB40: free an inactive-unit list, running the 0x1F9F0 callback first when eligible ------
+// pool is the formal argument; ctx (EBX) and the list head (EAX) are register arguments.
+static void FreeInactiveList(void* pool, void* ctx, void* node, const D2GameBatchEEnv* env)
+{
+    while (node != nullptr) {
+        void* next = rdptr(node, 0x00);
+        const int32_t threshold = rd32(node, 0x04);
+        if (threshold == 0 || (int32_t)rd32(ctx, 0xA8) <= threshold) {
+            env->freeNodeCallback(ctx, pool, node);
+        }
+        env->freePool(pool, node, kSUnitInactive, 0x127);
+        node = next;
+    }
+}
+
 // ---- 0x1E900: walk a unit's timer chain, then branch on *(*ppThing+0x14) -----------------------
 // unit arrived in EDX, ppThing on the stack; the chain node's kind byte is at +0x00, next at +0x24.
 static void TimerWalkAndBranch(void* p1, void* unit, void* ppThing, const D2GameBatchEEnv* env)
@@ -287,6 +335,23 @@ static void TimerWalkAndBranch(void* p1, void* unit, void* ppThing, const D2Game
     }
     if (rd32(p32(ppThing, 0x00), 0x14) == 0) env->branchList(p1, unit, ppThing); // 0x1E640
     else env->branchSingle(p1, unit, ppThing);                                          // 0x1E3D0
+}
+
+// ---- 0x20CF0: push a D2MinionListStrc node onto pAiControl->pMinionList (+0x34) ---------------
+// unit arrived in EAX, owner unit in EDI (GUID at +0x0C). The AI control is unit+0x14 (pMonsterData)
+// -> +0x28 (pAiControl) and retail dereferences it unconditionally; the 8-byte node holds
+// {dwMinionGUID, pNext} and is allocated from the unit's pool.
+static void AddTargetNode(void* unit, void* ctx, const D2GameBatchEEnv* env)
+{
+    if (unit == nullptr || rd32(unit, 0x00) != 1 /* UNIT_MONSTER */) return;
+
+    void* monsterData = rdptr(unit, 0x14);
+    void* aiControl = monsterData != nullptr ? rdptr(monsterData, 0x28) : nullptr;
+    uint32_t* node = (uint32_t*)env->allocPool(rdptr(unit, 0x08), 8, kAiGeneral, 499);
+    node[0] = ctx != nullptr ? rd32(ctx, 0x0C) : 0xFFFFFFFFu;  // owner GUID, or -1
+    node[1] = 0;
+    if (rd32(aiControl, 0x34) != 0) node[1] = rd32(aiControl, 0x34);
+    wr32(aiControl, 0x34, (uint32_t)(uintptr_t)node);
 }
 
 // ---- FN-path exports (r[0..3] args, r[4] result; argument 5 rides in r[5]) ----------------------
@@ -343,6 +408,14 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_ec260(uint32_t* r)
                                     &g_batchEEnv);
 }
 
+// 1.13c D2Game+0x1EBD0
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_1ebd0(uint32_t* r)
+{
+    FreeInactiveChains((void*)(uintptr_t)r[0], &g_batchEEnv);
+    r[4] = 0;
+}
+
 // 1.13c D2Game+0x3E70
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3e70(uint32_t* r)
@@ -350,6 +423,23 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3e70(uint32_t* r)
     const uint64_t q = d2game_aulldiv(r[0], r[1], r[2], r[3]);
     r[4] = (uint32_t)q;
     r[5] = (uint32_t)(q >> 32);
+}
+
+// 1.13c D2Game+0x20B30
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_20b30(uint32_t* r)
+{
+    FreeAiChain((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1], &g_batchEEnv);
+    r[4] = 0;
+}
+
+// 1.13c D2Game+0x1FB40
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_1fb40(uint32_t* r)
+{
+    FreeInactiveList((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1],
+                     (void*)(uintptr_t)r[2], &g_batchEEnv);
+    r[4] = 0;
 }
 
 // 1.13c D2Game+0x1E900
@@ -371,5 +461,13 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_1e900(uint32_t* r)
     g_log1e900 = (uint32_t*)(uintptr_t)r[3];
     g_log1e900[0] = 0;
     TimerWalkAndBranch((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1], (void*)(uintptr_t)r[2], &env);
+    r[4] = 0;
+}
+
+// 1.13c D2Game+0x20cf0
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_20cf0(uint32_t* r)
+{
+    AddTargetNode((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1], &g_batchEEnv);
     r[4] = 0;
 }

@@ -139,30 +139,29 @@ void D2Game_8C1B0_PacketSendUnitState(const D2Game8C1B0Env* e, D2GSend send, voi
     send(client, b, 16);
 }
 
-// 1.13c D2Game+0x8C4F0: 53-byte packet, byte 0 = 0xB2, bytes 1..16 = `src` copied as a bounded string of 16 (retail: Storm #501
-// via 0xA280: at most 15 characters, stopping at a NUL, then a terminating NUL), words at 49 (cx) and 51 (ax). Delivered through `deliver` (retail: ordinal 0xA35E with (0, stackArg, buf, 0x35)).
+// 1.13c D2Game+0x8C4F0: 53-byte packet, byte 0 = 0xB2, bytes 1..16 = a 16-byte copy of `src` (retail: ordinal 0xA280 copy
+// helper), words at 49 (cx) and 51 (ax). Delivered through `deliver` (retail: ordinal 0xA35E with (0, stackArg, buf, 0x35)).
 typedef void (*D2GDeliverB2)(uint32_t zero, uint32_t stackArg, const void* buf, uint32_t len);
 void D2Game_8C4F0_PacketSendB2(D2GDeliverB2 deliver, uint32_t stackArg, const uint8_t* src, uint16_t cx, uint16_t ax)
 {
     uint8_t b[0x35] = { 0xB2 };
-    uint32_t n = 0;
-    while (n < 15 && src[n]) { b[1 + n] = src[n]; ++n; }
-    b[1 + n] = 0;
+    memcpy(b + 1, src, 16);
     q16(b, 49, cx);
     q16(b, 51, ax);
     deliver(0, stackArg, b, 0x35);
 }
 
 // 1.13c D2Game+0x8C630: opcode 0x8C, dword 1 = ecx, dword 5 = edx, word 9 = stack word. Length 11. The target is
-// `resolveClient(unit)` (retail: [ordinal 10920(unit) + 0x9C]) when `unit` (EAX) is non-null with *unit == 0, otherwise NULL.
-void D2Game_8C630_PacketSend8CForUnit(D2GSend send, void* (*resolveClient)(const uint32_t* unit), const uint32_t* unit,
+// `target`, unless `unit` is non-null with *unit == 0, when it is `resolveClient(unit)` (retail: ordinal 10920's result + 0x9C).
+void D2Game_8C630_PacketSend8CForUnit(D2GSend send, void* (*resolveClient)(const uint32_t* unit), void* target, const uint32_t* unit,
                                       uint32_t ecx, uint32_t edx, uint16_t w)
 {
     uint8_t b[11] = { 0x8C };
     q32(b, 1, ecx);
     q32(b, 5, edx);
     q16(b, 9, w);
-    send((unit && *unit == 0) ? resolveClient(unit) : nullptr, b, 11);
+    if (unit && *unit == 0) target = resolveClient(unit);
+    send(target, b, 11);
 }
 
 // 1.13c D2Game+0x8D010: opcode 0x8C, dword 1 = eax, dword 5 = ecx, word 9 = dx. Length 11, handed to 0xDFC10

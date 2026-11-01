@@ -41,6 +41,26 @@ struct D2GameBatch22D00Env {
     void (*setStat10188)(void*, void* statList, int32_t stat, int32_t value, int32_t layer);
 };
 
+// 1.13c D2Game+0x22D00
+extern "C" void d2_fn_d2game_22D00(void* unit, int32_t unique, const D2GameBatch22D00Env* e) {
+    if (!unit || read<int32_t>(unit, 0) != 1) return;
+    const uint32_t gameAddress = read<uint32_t>(unit, 0x80);
+    if (!gameAddress || !unique) return;
+    e->scaleLife21EC0(e->context, unit, -75);
+    int32_t toHit = 300, damage = 300;
+    const void* difficulty = e->difficulty10237(e->context,
+        read<uint8_t>(e->resolve(e->context, gameAddress), 0x6d));
+    if (difficulty) {
+        // x86 multiplication wraps before signed division.
+        toHit = static_cast<int32_t>(read<uint32_t>(difficulty, 0x34) * 300u) / 100;
+        e->prepare18A0(e->context, unit);
+        damage = toHit;
+        if (e->monsterId1850(e->context, unit) == 0x76) damage = toHit / 2;
+    }
+    e->addStat10551(e->context, unit, 0x19, damage, 0);
+    e->addStat10551(e->context, unit, 0x77, toHit, 0);
+}
+
 // modeChange is caller-owned native scratch passed through both retail calls;
 // its layout belongs to the adapter, never a fabricated x86 stack address.
 // 1.13c D2Game+0x23390
@@ -115,6 +135,23 @@ extern "C" void d2_fn_d2game_24030(void* game, void* target, void* source, int32
             if (extra) e->setStat10188(e->context, list, extraStat, extra, 0);
         }
     }
+}
+
+// Retail passes unit in EBX and percentage in EDI (not in the decompiler signature).
+// getStat0A3A0 reads the unit's current value via the unit-in-EBX thunk; setStat0A472
+// is (unit, stat, value, layer). The three division forms differ in where /100 lands.
+// 1.13c D2Game+0x21ec0
+extern "C" void d2_fn_d2game_21EC0(void* unit, int32_t pct, void* ctx,
+        int32_t (*getStat0A3A0)(void*, void* unit),
+        void (*setStat0A472)(void*, void* unit, int32_t stat, int32_t value, int32_t layer)) {
+    const int32_t v = getStat0A3A0(ctx, unit);
+    int32_t delta;
+    if (v > 0x100000)      delta = (v / 100) * pct;           // wraps in 32 bits
+    else if (pct > 0x10000) delta = (pct / 100) * v;
+    else                   delta = static_cast<int32_t>(static_cast<uint32_t>(v) * static_cast<uint32_t>(pct)) / 100;
+    const int32_t nv = static_cast<int32_t>(static_cast<uint32_t>(v) + static_cast<uint32_t>(delta));
+    setStat0A472(ctx, unit, 7, nv, 0);
+    setStat0A472(ctx, unit, 6, nv, 0);
 }
 
 struct D2GameSkill241B0Env {

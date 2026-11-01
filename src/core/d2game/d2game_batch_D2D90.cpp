@@ -520,6 +520,14 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_ca5b0(uint32_t* r)
     r[4] = 0;
 }
 
+// 1.13c D2Game+0x109B0 (r[0]=param_1, r[1]=ESI)
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_109b0(uint32_t* r)
+{
+    d2game_109B0_113c((int32_t*)(uintptr_t)r[0], (void*)(uintptr_t)r[1], batchEnv(r));
+    r[4] = 0;
+}
+
 // 1.13c D2Game+0xD2D90 (r[0]=game, r[1]=EAX unit, r[2]=ESI unit)
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d2d90(uint32_t* r)

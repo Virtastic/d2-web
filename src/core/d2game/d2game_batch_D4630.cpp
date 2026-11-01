@@ -132,6 +132,54 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_D4670(void* param1, int32_t eaxValue,
     if (rd32(param1, 0) == 0) env->subD43E0(param1);
 }
 
+// Spawn a group from a record stream: the word at param_3+0xC is the stream length, the payload starts
+// at +0xE. The first record creates the lead unit (its +0x14 record's +0x24 takes the stack4 record's
+// +0x04, or that plus 15000 when smaller). stack14 further records are then created, each appended with
+// #10405 and closed with 0xD47C0. iStack_8's value as the first call's first argument is uninitialised
+// in the decompile and arrives here as 0; stackC/stack14/stack4 are the decompile's stack locals.
+// 1.13c D2Game+0x1F9F0
+extern "C"
+EMSCRIPTEN_KEEPALIVE uint32_t RestoreInactiveUnit(uint32_t param1, uint32_t param2, uint32_t param3,
+                                                  uint32_t stackC, int32_t stack14, uint32_t stack4,
+                                                  const D2GameBatchD4630Env* env)
+{
+    (void)param1;
+    (void)param2;
+
+    const uint32_t len = rd16(param3, 0xC);
+    uint32_t head = param3 + 0xE;
+    int32_t local18 = 0;
+    int32_t stack8 = 0;
+
+    env->ordinal11105(head, len, 1, &local18);
+    uint32_t unit = (uint32_t)(uintptr_t)env->sub2EAE0((uint32_t)stack8, head, len, 1, &stack8, 0x60);
+    if (unit == 0) return 0;
+    head += (uint32_t)stack8;
+    int32_t remaining = (int32_t)len - stack8;
+
+    const int32_t iVar1 = (int32_t)rd32(stack4, 4);
+    const int32_t limit = (int32_t)rd32(stackC, 0xA8) + 15000;
+    const uint32_t value = (iVar1 == 0 || limit <= iVar1) ? (uint32_t)iVar1 : (uint32_t)limit;
+    wr32(rd32(unit, 0x14), 0x24, value);
+
+    if (stack14 != 0) {
+        uint32_t rec = rd32(unit, 0x60);
+        if (rec == 0) rec = (uint32_t)(uintptr_t)env->ordinal10387(0, (void*)(uintptr_t)unit);
+        (void)rec;
+        for (int32_t i = 0; i < stack14; ++i) {
+            env->ordinal11105(head, (uint32_t)remaining, 1, &local18);
+            uint32_t spawned = (uint32_t)(uintptr_t)env->sub2EAE0(0, head, (uint32_t)remaining, 1,
+                                                                 &local18, 0x60);
+            if (spawned == 0) d2game_fatal(0x10D);
+            head += (uint32_t)local18;
+            remaining -= local18;
+            env->ordinal10405(stack14, (void*)(uintptr_t)spawned, 1);
+            env->subD47C0();
+        }
+    }
+    return unit;
+}
+
 // Two units from an index array in EAX: when param_6 is null, only an EBX-clear, param_4- and
 // param_5-clear call decrements the first unit's +0x2CC. With a param_6, a differing pair stores
 // param_2 at param_6[5]+0x58, and when EBX is clear an #10830 of param_6 that answers zero decrements

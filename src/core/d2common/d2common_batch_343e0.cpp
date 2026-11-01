@@ -52,29 +52,37 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_StatListTestFlagBit(uint32_t pUnit, uint3
 	return (1u << (nIndex & 0x1F)) & R(pWords, static_cast<int32_t>(nIndex >> 5) * 4);
 }
 
-// 1.13c D2Common+0x18280 (#10454): build a chat message node for szText (stdcall pool, text, addend).
-// Empty text gives null. The copy length is the text length capped at 0xFE. The node is a 0x110-byte
-// pool allocation (Chat.cpp line 0x32); +0x00 is 0x7D + 8*n, +0x04 that plus nAddend, +0x08 a random
-// byte from the Lang random thunk, +0x0C zero, +0x10 the text and +0x11+n a terminator. The allocator
-// and the random byte are seams; their retail file/line operands are not reproduced.
+// 1.13c D2Common+0x18280 (#10454): build a chat message node for szText.
+// Empty text gives null. The copy length is the text length capped at 0xFE. The node is 0x7D + 8*n
+// bytes; +0x00 is that size, +0x04 the size plus the dropped frame operand, +0x08 a random byte from
+// 0x10009, +0x0C zero, +0x10 the text and +0x11+n a terminator. 0x10045 (allocation) and 0x10009 are
+// env seams; their retail debug file/line operands are not reproduced.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t D2Common_ChatNodeNew_18280(uint32_t pPool, const char* szText, uint32_t nAddend,
-	void* (*pfnAlloc)(uint32_t pool, uint32_t size),
-	uint32_t (*pfnRand)(void))
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_ChatNodeNew_18280(uint32_t nFrameAddend, const char* szText,
+	void* (*pfnAlloc10045)(const char*, int32_t, int32_t),
+	uint32_t (*pfn10009)(void))
 {
-	if (!szText || !szText[0])
+	if (!szText)
 		return 0;
+
 	const size_t nLen = std::strlen(szText);
+	if (nLen == 0)
+		return 0;
 	const int32_t nCopy = nLen < 0xFF ? static_cast<int32_t>(nLen) : 0xFE;
 
-	uint8_t* p = reinterpret_cast<uint8_t*>(pfnAlloc(pPool, 0x110));
+	if (!pfnAlloc10045)
+		return 0;
+	uint8_t* p = reinterpret_cast<uint8_t*>(pfnAlloc10045(nullptr, 0, 0));
+	if (!p)
+		return 0;
+
 	const uint32_t nSize = static_cast<uint32_t>(nCopy) * 8 + 0x7D;
 	W(p, 0x00) = nSize;
-	W(p, 0x04) = nSize + nAddend;
+	W(p, 0x04) = nSize + nFrameAddend;
 	W(p, 0x0C) = 0;
 	std::strncpy(reinterpret_cast<char*>(p + 0x10), szText, static_cast<size_t>(nCopy) + 1);
 	p[0x11 + nCopy] = 0;
-	p[0x08] = static_cast<uint8_t>(pfnRand());
+	p[0x08] = pfn10009 ? static_cast<uint8_t>(pfn10009()) : 0;
 	return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(p));
 }
 

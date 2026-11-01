@@ -4,7 +4,7 @@
 
 extern "C" {
 // 1.13c D2Common+0x464D0: random int in [min(a,b), max(a,b)] (+1 span if holder short @+0x30 != 0).
-int32_t D2Common_464D0_SeededRoll(int32_t a, int32_t b, const int32_t* ctx) {
+EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_464d0(int32_t a, int32_t b, const int32_t* ctx) {
  if (a == b) return b;
  int32_t lo = a, hi = b;
  if (a > b) { lo = b; hi = a; }

@@ -63,6 +63,7 @@ extern "C"
 // are mapped.
 extern "C"
 {
+	uint32_t g_d2common_dat_6fdf13d8 = 0;   // 0x18DF0 record base, stride 0x34
 	int32_t g_d2common_dat_6fdf0b7c = 0;    // 0x5A7D0 lookup count
 	int16_t* g_d2common_dat_6fdf0b6c = nullptr; // 0x5A7D0 lookup table
 	uint8_t g_d2common_dat_6fdf1484[8] = {};    // 0x5A7D0 fallback string
@@ -96,9 +97,9 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_314a0(uint32_t pUnit1, uint32_t pUni
 // 1.13c D2Common+0x18DF0 (#10840): bound check of a 0x34-byte record. Retail fatals 0x147 on a
 // null record; there is nothing else to do.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_18df0(int32_t nIndex)
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_18df0(int32_t nIndex)
 {
-	const uint8_t* pRecord = reinterpret_cast<const uint8_t*>(sgptDataTables->pCompositTxt) + static_cast<uintptr_t>(static_cast<uint32_t>(nIndex)) * 0x34;
+	const uint8_t* pRecord = P(g_d2common_dat_6fdf13d8 + static_cast<uint32_t>(nIndex) * 0x34);
 	(void)pRecord;   // retail fatals 0x147 here; modelled as a no-op
 }
 

@@ -81,9 +81,6 @@ void taskLinkListRemove(void* pLink)
 
 }  // namespace
 
-// FN probe access to the stored game data table pointer (0x6FD31C24).
-void** d2game_2ae40_gameDataTable() { return &g_b2GameDataTable; }
-
 // The register-hidden callees, one seam per 1.13c RVA. Comments name the retail function and where its
 // argument travels (a Ghidra-omitted EAX/ECX/EDX/ESI on the retail call).
 struct D2GameBatch2Env

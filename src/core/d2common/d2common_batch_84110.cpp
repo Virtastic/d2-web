@@ -36,7 +36,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_84110(uintptr_t a1, uintptr_t ebx,
 
 // D2Common 0x17B70: advance node n (EAX) one step (cursor +0x18, dir +0x1c, count +0x14); on the
 // count reaching 3 climb parents (+0x20) until the root (*ctx, EDI), advancing each. Returns the node.
-uintptr_t d2_batch_d2common_17b70(uintptr_t n, const uint32_t* ctx) {
+EMSCRIPTEN_KEEPALIVE uintptr_t d2_fn_d2common_17b70(uintptr_t n, const uint32_t* ctx) {
 	auto adv = [](uintptr_t a) {
 		uintptr_t c = w(a, 0x18) + 1;
 		put(a, 0x18, c);
@@ -53,6 +53,63 @@ uintptr_t d2_batch_d2common_17b70(uintptr_t n, const uint32_t* ctx) {
 	return n;
 }
 
+// 1.13c D2Common+0x17D00: bounded path search over the node pool in ctx (900 nodes of 10 dwords at
+// dword 1, used-count at dword 0x2329); target {x,y} in tgt. Returns the node reached or 0.
+EMSCRIPTEN_KEEPALIVE uintptr_t d2_fn_d2common_17d00(uintptr_t ctx, int32_t limit, int32_t a3, const int32_t* tgt,
+	const int8_t* dy, const int8_t* dx, const int32_t* dirTbl /*stride 0xc*/, const uint8_t* rot /*stride 4*/,
+	int32_t (*c17c80)(const int32_t*, int32_t), uintptr_t (*c17b70)(uintptr_t),
+	int32_t (*c3e230)(int32_t, int32_t, int32_t)) {
+	uintptr_t n = w(ctx, 0);
+	const int32_t X = tgt[0], Y = tgt[1];
+	for (;;) {
+		if (iw(n, 12) == X && iw(n, 16) == Y) return n;
+		int32_t y0 = iw(n, 16);
+		uint8_t d = *(uint8_t*)p(n + 0x1c);
+		int32_t x2 = dx[d] + iw(n, 12), y2 = dy[d] + y0;
+		int32_t k = c17c80(tgt, a3);
+		if (k != 0) {
+			if (iw(n, 12) == x2 || (k = 3, y0 == y2)) k = 2;
+			int32_t g = iw(n, 8);
+			int32_t ax = x2 - X, ay = y2 - Y;
+			if (ax < 0) ax = -ax;
+			if (ay < 0) ay = -ay;
+			int32_t lo = ax, hi = ay;
+			if (!(ay <= ax)) { lo = ax; hi = ay; } else { lo = ay; hi = ax; }
+			int32_t h = lo + hi * 2;
+			int32_t f = h + g + k;
+			if (f <= limit) {
+				if (w(n, 0x24) == 0) {
+					uintptr_t nn = 0;
+					int32_t used = iw(ctx, 0x2329 * 4);
+					if (used != 900) {
+						nn = ctx + 4 + (uintptr_t)used * 40;
+						iw(ctx, 0x2329 * 4) = used + 1;
+						for (int j = 0; j < 10; ++j) w(nn, j * 4) = 0;
+					}
+					put(n, 0x24, nn);
+					if (nn == 0) return 0;
+					put(nn, 0x20, n);
+				}
+				n = w(n, 0x24);
+				iw(n, 8) = g + k;
+				iw(n, 4) = h;
+				iw(n, 0) = f;
+				put(n, 20, 0);
+				int32_t q = c3e230(Y, y2, x2);
+				int8_t cv = *(int8_t*)p(w(n, 0x20) + 0x1c);
+				int8_t c4 = (int8_t)(dirTbl[q * 3] / 2);
+				uint32_t ri = ((uint8_t)(cv - c4)) & 3;
+				put(n, 24, (uintptr_t)(rot + ri * 4));
+				*(uint8_t*)p(n + 0x1c) = (uint8_t)((rot[ri * 4] + c4) & 3);
+				iw(n, 12) = x2;
+				iw(n, 16) = y2;
+				continue;
+			}
+		}
+		n = c17b70(ctx);
+		if (n == 0) return 0;
+	}
+}
 
 // 1.13c D2Common+0x7EA40: first row 1..(h-2) of column x (EDI) whose kind (obj+0x14)->+4 is 0x1c and
 // whose cell byte +2 low nibble is 1; writes {x,row} or {-1,-1}.

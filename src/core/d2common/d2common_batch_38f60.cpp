@@ -86,7 +86,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_32ef0(uint32_t pUnit, int32_
 // the first unit's room. 0x3BA20 supplies that pair from the room; the 1.13c room keeps them at
 // +0x00 (list) and +0x24 (count), a layout delta from the vendored 1.10f D2ActiveRoomStrc, whose
 // same two fields are read by name here. Null units are fatal 0x18/0x19 in retail, modelled as 0.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_batch_d2common_12450(uint32_t pUnit1, uint32_t pUnit2) { // 1.13c D2Common+0x12450
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_12450(uint32_t pUnit1, uint32_t pUnit2) { // 1.13c D2Common+0x12450
 	D2UnitStrc* pUn1 = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit1));
 	D2UnitStrc* pUn2 = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit2));
 

@@ -442,7 +442,7 @@ void __fastcall OBJECTS_InitHandler(D2GameStrc* pGame, D2UnitStrc* pObject, int3
 }
 
 //D2Game.0x6FC70850
-// 1.13c D2Game+0x33740
+// D2Game 1.13c 0x33740: the retail-layout port is src/core/d2game/d2game_33740.cpp
 void __fastcall OBJECTS_InitFunction10_Unused(D2ObjInitFnStrc* pOp)
 {
     if (DUNGEON_GetLevelIdFromRoom(pOp->pRoom) == LEVEL_ROGUEENCAMPMENT)
@@ -728,7 +728,7 @@ void __fastcall OBJECTS_InitFunction58_Fissure(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FC710B0
-// 1.13c D2Game+0x33620
+// D2Game 1.13c 0x33620: the retail-layout port is src/core/d2game/d2game_33620.cpp
 void __fastcall OBJECTS_InitFunction59_VileDogAfterglow(D2ObjInitFnStrc* pOp)
 {
     if (pOp->pObject && pOp->pObject->dwAnimMode != OBJMODE_NEUTRAL)

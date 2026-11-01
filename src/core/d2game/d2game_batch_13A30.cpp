@@ -307,6 +307,27 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8AA10(const void* buf32, void*
     env->send8A3E0(client, copy, 0x20);
 }
 
+// 0x8C010: 0x10-byte packet forwarder. CL and EDX are the register payload; the eight stack arguments
+// follow (client, byte, word, word, byte, byte, word, word). Layout: [0]=CL, [1..4]=EDX, [5]=arg2,
+// [6..7]=arg3, [8..9]=arg4, [0xA]=arg5, [0xB]=arg6, [0xC..0xD]=arg7, [0xE..0xF]=arg8.
+// 1.13c D2Game+0x8C010
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8C010(uint8_t cl, uint32_t edx, void* client, uint8_t a2,
+                                                         uint16_t a3, uint16_t a4, uint8_t a5, uint8_t a6,
+                                                         uint16_t a7, uint16_t a8, const D2GameBatchB87Env* env) {
+    uint8_t buf[0x10];
+    std::memset(buf, 0, sizeof buf);
+    buf[0] = cl;
+    wr32(buf, 1, edx);
+    buf[5] = a2;
+    wr16(buf, 6, a3);
+    wr16(buf, 8, a4);
+    buf[0xA] = a5;
+    buf[0xB] = a6;
+    wr16(buf, 0xC, a7);
+    wr16(buf, 0xE, a8);
+    env->send8A3E0(client, buf, 0x10);
+}
+
 // 0x8D120: monster packet 0x75. EAX=unit, EBX=playerUnit. The client is player data(playerUnit)+0x9C
 // when playerUnit is a type-0 unit. Payload: unit id, the unit's display word (0xFFFF unless the unit
 // is a type-0 unit with +0x80), stat 0x0C word, the party word of the entry whose +0 matches the unit id

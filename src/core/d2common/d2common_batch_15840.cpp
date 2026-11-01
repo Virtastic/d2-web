@@ -34,6 +34,29 @@ struct D2CommonBatchDrlgEnv {
     const int32_t* trimDy;                             // 0x3D920: DAT_6fde4030, 4 ints
 };
 
+// 1.13c D2Common+0x15840 -- walk the four grid corners inward, calling the cell visitor on each
+// unflagged (bit0 clear) cell until a flagged cell is hit.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_15840(void* pLevel, const D2CommonBatchDrlgEnv* env) { // 1.13c D2Common+0x15840
+    if (!pLevel || !env || !env->resolve) return;
+    const uint8_t* od = B(env->resolve(R32(pLevel, 0x14)));
+    const uint8_t* flags = B(env->resolve(R32(od, 0x2c)));
+    const int32_t* rows = static_cast<const int32_t*>(env->resolve(R32(od, 0x30)));
+    // {flipX, flipY, stepX, stepY}; the first slot's flipX is the decompile's uninitialised local_40 (0).
+    static const int32_t k[4][4] = { {0, 0, 1, 1}, {1, 0, -1, 1}, {0, 1, 1, -1}, {1, 1, -1, -1} };
+    for (int i = 0; i < 4; ++i) {
+        int32_t x = k[i][0] ? RI32(od, 0x5c) - 1 : 0;
+        int32_t y = k[i][1] ? RI32(od, 0x60) - 1 : 0;
+        const int32_t sx = k[i][2], sy = k[i][3];
+        while ((flags[(rows[y] + x) * 4] & 1) == 0) {
+            int32_t x2 = x;
+            while ((flags[(rows[y] + x2) * 4] & 1) == 0) {
+                env->visitCell(pLevel, x2, y);
+                x2 += sx;
+            }
+            y += sy;
+        }
+    }
+}
 
 namespace {
 // 1.13c D2Common+0x3E230 direction index (local copy; row 0x3E230 is separate).
@@ -62,6 +85,63 @@ void* newVertex(const D2CommonBatchDrlgEnv* env) {
 }
 }
 
+// 1.13c D2Common+0x17EB0 -- route a vertical corridor between two path-start vertices; builds a
+// vertex list in outdoors+0x68+idx*4 (idx = EBX, the path-start slot). Returns 1 on success.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_17eb0(void* pLevel, int32_t idx, const D2CommonBatchDrlgEnv* env) { // 1.13c D2Common+0x17EB0
+    if (!pLevel || !env || !env->resolve) return 0;
+    uint8_t* od = B(env->resolve(R32(pLevel, 0x14)));
+    const uint32_t lx = R32(pLevel, 0x1c), ly = R32(pLevel, 0x20);
+    const uint32_t vb = 0xf8 + idx * 0x14, wb = 0x170 + idx * 0x14;
+    auto d8 = [](int32_t v) { return (v + ((v >> 31) & 7)) >> 3; };
+    const int32_t x1 = d8(RI32(od, vb) - (int32_t)lx), y1 = d8(RI32(od, vb + 4) - (int32_t)ly);
+    const int32_t x2 = d8(RI32(od, wb) - (int32_t)lx), y2 = d8(RI32(od, wb + 4) - (int32_t)ly);
+    const int32_t dx = x1 - x2, dy = y1 - y2;
+    const int32_t adx = dx < 0 ? -dx : dx, ady = dy < 0 ? -dy : dy;
+    const uint32_t slot = 0x68 + idx * 4;
+    if (adx + ady <= 1) {
+        // endpoints touch: two-vertex list (x1,y1) -> (x2,y2)
+        uint8_t* a = B(newVertex(env));
+        W32(od, slot, env->tokenOf(a));
+        WI32(a, 0, x1); WI32(a, 4, y1);
+        uint8_t* b = B(newVertex(env));
+        W32(a, 0x10, env->tokenOf(b));
+        WI32(b, 0, x2); WI32(b, 4, y2);
+        return 1;
+    }
+    const int32_t dir = dirIndex(x2, y2, y1, x1);
+    const int32_t mn = adx < ady ? adx : ady, mx = adx < ady ? ady : adx;
+    static int32_t nodes[9000];
+    std::memset(nodes, 0, 10 * sizeof(int32_t));
+    int32_t c = mn + mx * 2;
+    int32_t node[10] = {};
+    node[0] = c; node[1] = c; node[2] = 0; node[3] = x1; node[4] = y1;
+    node[5] = -1; node[6] = (int32_t)env->nodeTableToken;
+    node[7] = (uint8_t)((env->dirTable[dir * 3] / 2) & 3);
+    int32_t cost = c / 2 + c;
+    const int32_t limit = cost + 0x23;
+    int32_t endpoints[2] = { x2, y2 };
+    do {
+        std::memcpy(nodes, node, sizeof node);
+        int32_t used = 1;
+        uint8_t* n = B(env->search(nodes, cost, pLevel, endpoints, &used));
+        cost += 5;
+        if (used > 899) return 0;
+        if (n) {
+            uint8_t* prev = nullptr;
+            do {
+                uint8_t* v = B(newVertex(env));
+                if (R32(od, slot) == 0) W32(od, slot, env->tokenOf(v));
+                else W32(prev, 0x10, env->tokenOf(v));
+                W32(v, 0, R32(n, 0xc));
+                W32(v, 4, R32(n, 0x10));
+                prev = v;
+                n = B(env->resolve(R32(n, 0x20)));
+            } while (n);
+            return 1;
+        }
+    } while (cost < limit);
+    return 0;
+}
 
 // 1.13c D2Common+0x3DD40 -- place the second vertex set (outdoors+0x1e8..) for each path start, then
 // convert from the first set (outdoors+0x80) via CalculatePathCoordinates.

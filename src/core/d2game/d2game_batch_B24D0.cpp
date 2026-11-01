@@ -125,6 +125,33 @@ static void d2game_8B9B0_113c(void* pClient, uint8_t nPacketId, uint32_t nGuid, 
     env.sendPacket(pClient, packet, 10);
 }
 
+// 1.13c D2Game+0x8BD00
+// SETATTR_BY_VALUE. EAX=client, ECX=value, DX=attribute, no stack arguments. Asserts 0x3CB for an
+// attribute id of 0xFF or more; then picks the 3/4/6-byte packet by value width: 0x1D byte,
+// 0x1E word, 0x1F dword, each with the attribute as a byte after the id.
+static void d2game_8BD00_113c(void* pClient, uint32_t nValue, uint16_t nAttribute,
+                              const D2GameBatchB74Env& env)
+{
+    if (nAttribute >= 0xFF) d2game_fatal(0x3CB);
+    uint8_t packet[6];
+    if (nValue < 0xFF) {
+        packet[0] = 0x1D;
+        packet[1] = (uint8_t)nAttribute;
+        packet[2] = (uint8_t)nValue;
+        env.sendPacket(pClient, packet, 3);
+    } else if (nValue < 0xFFFF) {
+        packet[0] = 0x1E;
+        packet[1] = (uint8_t)nAttribute;
+        std::memcpy(packet + 2, &nValue, 2);
+        env.sendPacket(pClient, packet, 4);
+    } else {
+        packet[0] = 0x1F;
+        packet[1] = (uint8_t)nAttribute;
+        std::memcpy(packet + 2, &nValue, 4);
+        env.sendPacket(pClient, packet, 6);
+    }
+}
+
 // 1.13c D2Game+0xD29F0
 // Clear the targeting flag on every inventory item of a unit. Stack argument 1 is the unit, ret 4.
 // Requires a unit and its inventory at +0x60. The item fields (#10202, stat 4, flag 0x1D7) are
@@ -292,6 +319,14 @@ EMSCRIPTEN_KEEPALIVE void d2game_8b9b0_send(void* client, uint8_t nPacketId, uin
     D2GameBatchB74Env env{};
     env.sendPacket = send;
     d2game_8B9B0_113c(client, nPacketId, nGuid, nValue, nAttribute, env);
+}
+
+// 1.13c D2Game+0x8BD00 (r[0]=client EAX, r[1]=value ECX, r[6]=attribute DX)
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8bd00(uint32_t* r)
+{
+    d2game_8BD00_113c((void*)(uintptr_t)r[0], r[1], (uint16_t)r[6], batchEnv(r));
+    r[4] = 0;
 }
 
 // 1.13c D2Game+0xD29F0 (r[0]=pUnit)

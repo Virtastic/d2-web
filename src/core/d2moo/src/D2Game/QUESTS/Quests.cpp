@@ -408,7 +408,7 @@ void __fastcall QUESTS_QuestInit(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC93FD0
-// 1.13c D2Game+0x33DC0
+// D2Game 1.13c 0x33DC0: the retail-layout port is src/core/d2game/d2game_33dc0.cpp
 void __fastcall QUESTS_QuestFree(D2GameStrc* pGame)
 {
 	if (!pGame || !pGame->pQuestControl)
@@ -764,7 +764,7 @@ void __fastcall QUESTS_QuestUpdater(D2GameStrc* pGame)
 	pGame->pQuestControl->bExecuting = 0;
 }
 
-// 1.13c D2Game+0x33AF0 (checked against decompile)
+// D2Game 1.13c 0x33AF0: the retail-layout port is src/core/d2game/d2game_33af0.cpp
 //D2Game.0x6FC94690
 void __fastcall QUESTS_CreateTimer(D2QuestDataStrc* pQuest, QUESTUPDATE pfnCallback, int32_t nTicks)
 {
@@ -2500,7 +2500,7 @@ void __fastcall QUESTS_GetFreePosition(D2ActiveRoomStrc* pRoom, D2CoordStrc* pCo
 }
 
 //D2Game.0x6FC96C80
-// 1.13c D2Game+0x340C0
+// D2Game 1.13c 0x340C0: the retail-layout port is src/core/d2game/d2game_340c0.cpp
 void __fastcall QUESTS_RemovePlayerGUID(D2QuestDataStrc* pQuest, D2QuestArgStrc* pArgs)
 {
 	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pArgs->pPlayer)->pQuestData[pQuest->pGame->nDifficulty];
@@ -2864,7 +2864,7 @@ void __fastcall QUESTS_MonsterSpawn(D2GameStrc* pGame, D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FC97400
-// 1.13c D2Game+0x34020 (checked against decompile)
+// D2Game 1.13c 0x34020: the retail-layout port is src/core/d2game/d2game_34020.cpp
 int32_t __fastcall QUESTS_LevelWarpCheck(D2GameStrc* pGame, D2UnitStrc* pPlayer, int32_t nSourceLevel, int32_t nTargetLevel)
 {
 	switch (nTargetLevel)

@@ -5,7 +5,7 @@
 
 extern "C" {
 // 1.13c D2Common+0x18400: open a gap in arr (slots start at +4) at idx, copy this's items into arr[*pos..].
-void D2Common_18400_InsertPoints(uint8_t* self, uint8_t* arr, int32_t* pos, int32_t* cnt, int32_t idx) {
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_18400(uint8_t* self, uint8_t* arr, int32_t* pos, int32_t* cnt, int32_t idx) {
  const int32_t n = *reinterpret_cast<int32_t*>(self + 4);
  const int32_t grow = (*pos - idx) - 1 + n;
  const int32_t dst = grow + idx;

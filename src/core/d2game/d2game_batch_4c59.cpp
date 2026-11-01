@@ -156,6 +156,24 @@ EMSCRIPTEN_KEEPALIVE void d2game_8b710_send(uint32_t eaxByte, uint32_t edxDword,
     D2GAME_SendPacket0x23_8B710(eaxByte, edxDword, 0, s1, s2, s3, &env);
 }
 
+// 1.13c D2Game+0x8BF80
+// Packet 0x0B (11 bytes): a leading byte not written by this body, then a byte from param_1 and the
+// caller fields. Fastcall argument param_3 is unused by the body.
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2game_8bf80_packet0B(uint32_t param_1, uint32_t param_2, uint32_t param_3,
+                                             uint16_t param_4, uint16_t param_5, uint8_t param_6,
+                                             const D2GameBatch4c59Env* env)
+{
+    (void)param_3;
+    uint8_t packet[0xB] = {};
+    packet[1] = (uint8_t)param_1;
+    wr32(packet, 2, param_2);
+    wr16(packet, 6, param_4);
+    wr16(packet, 8, param_5);
+    packet[10] = param_6;
+    env->appendPacket(packet, 0xB);
+}
+
 // 1.13c D2Game+0x9BB10
 // Walks the unit list of `self` (or of the game at client+0x60 when self is null) and removes every
 // unit found in the game unit table at pGame+0x1720 (0x80 buckets, id +0x0C, chain +0xE4) through

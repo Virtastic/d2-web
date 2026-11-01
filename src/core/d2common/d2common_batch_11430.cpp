@@ -43,7 +43,7 @@ bool ready(void* state, const D2CommonPreset11430Env* env) {
 }
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_11430(void* state, const D2CommonPreset11430Env* env) { // 1.13c D2Common+0x11430
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_11430(void* state, const D2CommonPreset11430Env* env) { // 1.13c D2Common+0x11430
     if (!ready(state, env)) return;
     uint32_t index = roll(state);
     uintptr_t ecx = reinterpret_cast<uintptr_t>(&index);
@@ -57,7 +57,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_11430(void* state, const 
     choose(env, ecx, 0, state, &index);
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_114c0(void* state, const D2CommonPreset11430Env* env) { // 1.13c D2Common+0x114C0
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_114c0(void* state, const D2CommonPreset11430Env* env) { // 1.13c D2Common+0x114C0
     if (!ready(state, env)) return;
     void* node = ptr(env, state, 0x10);
     while (node) {
@@ -93,14 +93,14 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_114c0(void* state, const 
         choose(env, reinterpret_cast<uintptr_t>(&index), 0x290, state, &index);
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_11940(void* state, const D2CommonPreset11430Env* env) { // 1.13c D2Common+0x11940
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_11940(void* state, const D2CommonPreset11430Env* env) { // 1.13c D2Common+0x11940
     if (!ready(state, env)) return;
     uint32_t index = roll(state);
     uintptr_t ecx = choose(env, rd(state, 0x1c8), 0x410, state, &index);
     if (rd(state, 0x1d0) == 0x23) choose(env, ecx, 0x450, state, &index);
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_119b0(void* state, const D2CommonPreset11430Env* env) { // 1.13c D2Common+0x119B0
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_119b0(void* state, const D2CommonPreset11430Env* env) { // 1.13c D2Common+0x119B0
     if (!ready(state, env)) return;
     uint32_t index = roll(state);
     uintptr_t ecx = choose(env, rd(state, 0x1c8), 0x490, state, &index);
@@ -110,7 +110,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_119b0(void* state, const 
     choose(env, ecx, level == 0x1f ? 0x4d0 : 0x510, state, &index);
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_11a70(void* state, const D2CommonPreset11430Env* env) { // 1.13c D2Common+0x11A70
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_11a70(void* state, const D2CommonPreset11430Env* env) { // 1.13c D2Common+0x11A70
     if (!ready(state, env)) return;
     uint32_t index = roll(state);
     uintptr_t ecx = choose(env, rd(state, 0x1c8), 0x5d0, state, &index);
@@ -121,7 +121,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_11a70(void* state, const 
     if (level > 0x14 && level < 0x19) choose(env, ecx, 0x6d0, state, &index);
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_11b30(void* state, const D2CommonPreset11430Env* env) { // 1.13c D2Common+0x11B30
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_11b30(void* state, const D2CommonPreset11430Env* env) { // 1.13c D2Common+0x11B30
     if (!ready(state, env)) return;
     uint32_t index = roll(state);
     uintptr_t ecx = choose(env, rd(state, 0x1c8), 0x710, state, &index);

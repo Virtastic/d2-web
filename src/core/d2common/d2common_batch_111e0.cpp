@@ -93,7 +93,7 @@ inline uint32_t choose(const D2CommonBatchPresetEnv* env, uintptr_t ecx, const u
 }
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_batch_d2common_111e0(void* pState, const D2CommonBatchPresetEnv* env) { // 1.13c D2Common+0x111E0
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_111e0(void* pState, const D2CommonBatchPresetEnv* env) { // 1.13c D2Common+0x111E0
     if (!pState || !env || !env->choose) return 0;
     const uint32_t value = advance(pState);
     const uint32_t lane = value % 3;
@@ -119,7 +119,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_batch_d2common_111e0(void* pState, c
     return result;
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_11280(void* pState, const D2CommonBatchPresetEnv* env) { // 1.13c D2Common+0x11280
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_11280(void* pState, const D2CommonBatchPresetEnv* env) { // 1.13c D2Common+0x11280
     if (!pState || !env || !env->choose || !env->candidates4) return;
     uint32_t index = advance(pState) & 3;
     uintptr_t ecx = R32(pState, 0x1c8);
@@ -136,7 +136,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_11280(void* pState, const
         choose(env, firstClobberedEcx, env->candidates4 + 0x80 + index * 0x10, pState, &index, &nextEcx);
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_11320(void* pState, const D2CommonBatchPresetEnv* env) { // 1.13c D2Common+0x11320
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_11320(void* pState, const D2CommonBatchPresetEnv* env) { // 1.13c D2Common+0x11320
     if (!pState || !env || !env->choose || !env->candidates4) return;
     uint32_t index = advance(pState) & 3;
     uintptr_t clobberedEcx;
@@ -147,7 +147,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_11320(void* pState, const
            pState, &index, &nextEcx);
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_11380(void* pState, const D2CommonBatchPresetEnv* env) { // 1.13c D2Common+0x11380
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_11380(void* pState, const D2CommonBatchPresetEnv* env) { // 1.13c D2Common+0x11380
     if (!pState || !env || !env->choose || !env->candidates4) return;
     uint32_t index = advance(pState) & 3;
     uintptr_t clobberedEcx;
@@ -158,7 +158,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_11380(void* pState, const
            pState, &index, &nextEcx);
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_113e0(void* pState, const D2CommonBatchPresetEnv* env) { // 1.13c D2Common+0x113E0
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_113e0(void* pState, const D2CommonBatchPresetEnv* env) { // 1.13c D2Common+0x113E0
     if (!pState || !env || !env->choose || !env->candidates4) return;
     uint32_t index = advance(pState) & 3;
     uintptr_t clobberedEcx;
