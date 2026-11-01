@@ -17,10 +17,12 @@ uint32_t sub_3CEB0(State& s,void* eax,int32_t ebx){return walk(s,eax,ebx);}
 uint32_t sub_3CF00(State& s,void* eax,int32_t ebx){return walk(s,eax,ebx);}
 // 1.13c D2Client+0x3CF50
 uint32_t sub_3CF50(State& s,void* eax,int32_t ebx){return walk(s,eax,ebx);}
-// 1.13c D2Client+0x3CFA0
-int32_t sub_3CFA0(State& s,int32_t eax,int32_t p2){
- int n=s.n9d28; s.a968[n]=eax; s.aA58[n]=p2; s.aB48[n]=s.api.ord10601(); s.api.ord10537();
- s.b9d29=0; s.n9d28=n+1; return eax-0x30;
+// 1.13c D2Client+0x3CFA0  (key=EAX, v2=EDX, esi=ESI, ret 8: p1 selects the +0x30/-0x30 result, p2 lands in the dword at 9d29)
+int32_t sub_3CFA0(State& s,int32_t key,int32_t v2,uint32_t esi,int32_t p1,int32_t p2){
+ unsigned n=s.n9d28; s.a968[n]=key; s.aA58[n]=v2;
+ s.aB48[n]=s.api.c42a(esi,0x6FB867D8u,0x23d); s.api.c766(esi,&s.aC38[n],n);
+ s.d9d29=uint32_t(p2); s.n9d28=uint8_t(n+1);
+ return p1?key+0x30:key-0x30;
 }
 static void pkt51(State& s,int32_t b,int32_t c){ uint8_t p[9]; p[0]='Q'; std::memcpy(p+1,&b,4); std::memcpy(p+5,&c,4); s.api.sendPacket(p);}
 // 1.13c D2Client+0x3D080

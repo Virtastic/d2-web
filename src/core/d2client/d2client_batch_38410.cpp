@@ -3,25 +3,8 @@
 #include <cstdint>
 #include <cstring>
 #include <cctype>
+#include "d2client_batch_38410.h"
 namespace d2client_batch_38410 {
-struct Bind { int32_t cmd; uint16_t key; int32_t mod; };      // 10-byte packed record at D2Client+0xCA2E0 (key @+4, mod @+6 in file)
-constexpr unsigned kBinds = 114;                              // (0xCA754-0xCA2E0)/10
-struct Cmd { uint32_t a; uint32_t handler; uint32_t flag; };  // 12-byte records at D2Client+0xA4F10
-struct Services {
- virtual ~Services()=default;
- virtual bool badCodePtr(uint32_t)=0; virtual void callHandler(uint32_t)=0;
- virtual void ord511(void*)=0; [[noreturn]] virtual void fatal(int32_t)=0;
- virtual bool f2060()=0; virtual bool f2030()=0; virtual bool f20e0()=0; virtual bool f2090()=0;
- virtual void ord10003(uint32_t key)=0;           // low confidence: decompile shows no args
- virtual uint8_t jumpByte(uint32_t key)=0;        // byte table at D2Client+0xEA15C (not recovered)
- virtual void f391e0(uint32_t idx,int32_t mod)=0;
- virtual void ord(int32_t n)=0;                   // Ordinal_NNN no-arg calls: 512-515, 414-417
- virtual void sendClose(void* hwnd)=0; virtual void destroyObj(void* o)=0;
- virtual void ord10043(int32_t a,int32_t b)=0; virtual void ord10065(int32_t)=0;
- virtual int32_t listFirst()=0; virtual int16_t* listData(int32_t)=0; virtual int32_t listCount(int32_t)=0; virtual int32_t listNext(int32_t)=0;
-};
-struct State { Services& api; Cmd cmds[0xE0]{}; Bind binds[kBinds]{}; int32_t mode{}; };
-
 // 1.13c D2Client+0x38410
 void sub_38410(Services& api,uint32_t* p,uint32_t vtA,uint32_t vtB){ p[0]=vtA; if(p[2]) api.destroyObj(reinterpret_cast<void*>(uintptr_t(p[2]))); p[0]=vtB; }
 // 1.13c D2Client+0x38770
@@ -42,7 +25,7 @@ bool sub_38CD0(uint32_t esi){ uint32_t k=esi&0xffff;
    case 8:case 9:case 0xc:case 0xd:case 0x10:case 0x11:case 0x12:case 0x13:case 0x14:case 0x20:case 0x21:case 0x22:case 0x23:case 0x24:return true; default:break; } }
  else { switch(k){ case 0x2b:case 0x5b:case 0x5c:case 0x5d:case 0x90:return false; default:break; }
   if((k>=0x2c&&k<=0x2f)||(k>=0x60&&k<=0x87)||k==0x91||(k>=0xba&&k<=0xc0)||(k>=0xdb&&k<=0xde)||(k>=0x100&&k<=0x104))return true; }
- return k<256 && (std::isalpha(int(k))||std::iscntrl(int(k))); }
+ return k<256 && (std::isalpha(int(k))||std::isdigit(int(k))); }
 // 1.13c D2Client+0x39BA0  (key in AX, out in ESI, cmd in EDI)
 bool sub_39BA0(State& s,uint16_t ax,uint16_t* esi,int32_t edi){
  bool ok=true;
@@ -69,17 +52,18 @@ bool sub_3A270(State& s,int32_t cmd,int32_t mod,int16_t key,uint16_t* out){
    for(unsigned i=0;i<kBinds;++i) if(s.binds[i].cmd==cmd&&s.binds[i].mod==mod){s.binds[i].key=uint16_t(key);return true;}
    if(old!=0x72)s.binds[old].key=uint16_t(key); return false; } }
  if(out)*out=0xf8b; return false; }
-static void dispatch(Services& api,bool nonnull,int32_t sel,int32_t id,int32_t e0,int32_t ec,int32_t base,int32_t special,int32_t fatalNull,int32_t fatalMain){
- if(nonnull){ switch(sel){ case 0: if(id!=0x111){api.ord(base+3);return;} api.fatal(fatalMain); case 1: api.ord(base);return; case 2: api.ord(base+2);return; case 3: api.ord(base+1);default:return; } }
- api.fatal(fatalNull); (void)e0;(void)ec;(void)special; }
-// 1.13c D2Client+0x3CA80
-void sub_3CA80(Services& api,bool nonnull,int32_t sel,int32_t id){ dispatch(api,nonnull,sel,id,0,0,414,0,0x136,0x13a); }
+// 3CA00/3CA80 share one shape: EAX=handle (0 means fatal id fatalNull), ESI=selector, ECX=id, EDX=arg; ordinals base..base+3.
+static void dispatch(Services& api,uint32_t handle,int32_t sel,uint32_t id,uint32_t edx,int32_t base,int32_t fatalNull,int32_t fatalMain){
+ if(handle){ switch(sel){ case 0: if(id!=0x111){api.ord(base+3,handle,id,edx);return;} api.fatal(fatalMain); case 1: api.ord(base,handle,id,edx);return; case 2: api.ord(base+2,handle,id,edx);return; case 3: api.ord(base+1,handle,id,edx);default:return; } }
+ api.fatal(fatalNull); }
+// 1.13c D2Client+0x3CA80  (EAX=handle, ECX=id, EDX, ESI=selector)
+void sub_3CA80(Services& api,uint32_t handle,int32_t sel,uint32_t id,uint32_t edx){ dispatch(api,handle,sel,id,edx,414,0x136,0x13a); }
 // dup of D2Client+0x3CBC0
 void sub_3CBC0(Services& api,uint32_t* p){ api.sendClose(reinterpret_cast<void*>(uintptr_t(p[0]))); p[6]=1; p[7]=0; }
-// 1.13c D2Client+0x3CCC0  (count=EAX; sel is ESI inherited from caller)
-void sub_3CCC0(Services& api,int32_t count,bool param1,const uint8_t* arr,int32_t sel){
- if(!param1)api.fatal(0x179);
- for(const uint8_t* e=arr+4;count>0;--count,e+=12){ int32_t id; std::memcpy(&id,e,4); sub_3CA80(api,true,sel,id); } }
+// 1.13c D2Client+0x3CCC0  (count=EAX, handle=stack param, table of 12-byte {esi,ecx,edx} entries)
+void sub_3CCC0(Services& api,uint32_t count,uint32_t handle,const uint32_t* table){
+ if(!handle)api.fatal(0x179);
+ for(;count>0;--count,table+=3) sub_3CA80(api,handle,int32_t(table[0]),table[1],table[2]); }
 // 1.13c D2Client+0x3CE60  (nonnull=EAX, want=EBX); always returns 0
 uint32_t sub_3CE60(Services& api,bool nonnull,int32_t want){
  if(nonnull){ int32_t it=api.listFirst();
