@@ -86,10 +86,10 @@ extern "C" uint32_t Storm_ExplodeLitEEA0(uint8_t* st) {
     if (!(bb & 1)) {
         if (R(1)) return 0x306;
         if (*(int32_t*)(st + 4) == 0) {
-            s = bb & 0xff;
+            s = *(uint32_t*)(st + 0x14) & 0xff;   // retail re-reads the bit buffer after the refill
             if (R(8)) return 0x306;
         } else {
-            s = bb & 0xff;
+            s = *(uint32_t*)(st + 0x14) & 0xff;   // retail re-reads the bit buffer after the refill
             if (s == 0) {
                 if (R(8)) return 0x306;
                 s = st[(*(uint32_t*)(st + 0x14) & 0xff) + 0x2eb4];

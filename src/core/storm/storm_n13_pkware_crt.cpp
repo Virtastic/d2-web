@@ -392,3 +392,27 @@ extern "C" uintptr_t storm_n13_FD80(const uint16_t* key) {
     }
     return 0;
 }
+
+// 1.13c Storm+0xFB40 / 0xFCC0 / 0xF800: extern seams for the FN replay (the helpers above live in the anonymous namespace).
+extern "C" void storm_n13_seam_FB40(uint8_t* st, uint32_t nbits, uint32_t code) { sub_FB40(st, nbits, code); }
+extern "C" void storm_n13_seam_FCC0(uint8_t* st, uint32_t p2, uint32_t p3) { sub_FCC0(st, p2, p3); }
+extern "C" int storm_n13_seam_F800(uint8_t* st, uint32_t o) { return sub_F800(st, o); }
+
+// 1.13c Storm+0xF0D0: PKWare explode WasteBits (the caller's R lambda). Returns 1 on input exhausted, else 0.
+// Storm+0x2234 is the input buffer; callers pass the raw block, so index by byte offset.
+extern "C" int32_t Storm_InflateRefill(uint8_t* st, uint32_t n) {
+    uint32_t& bitbuf = *(uint32_t*)(st + 0x14); uint32_t& nbits = *(uint32_t*)(st + 0x18);
+    uint32_t& pos = *(uint32_t*)(st + 0x1c); uint32_t& len = *(uint32_t*)(st + 0x20);
+    if (n <= nbits) { nbits -= n; bitbuf >>= n; return 0; }
+    bitbuf >>= nbits;
+    if (pos == len) {
+        pos = 0x800;
+        len = (*(uint32_t(**)(void*, uint32_t*, void*))(st + 0x28))(st + 0x2234, &pos, *(void**)(st + 0x24));
+        if (len == 0) return 1;
+        pos = 0;
+    }
+    bitbuf = ((uint32_t)st[0x2234 + pos++] << 8 | bitbuf);
+    bitbuf >>= (n - nbits) & 0x1f;
+    nbits = nbits - n + 8;
+    return 0;
+}
