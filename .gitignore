@@ -112,6 +112,7 @@ tools/manifest-add.mjs
 tools/manifest_lock.py
 !tools/artifact-lock.sh
 !tools/compiler-cache.sh
+!tools/dcc-decode-bench.mjs
 !tools/docker-release.sh
 !tools/engine-cache.sh
 !tools/engine-key.sh
@@ -191,6 +192,7 @@ test/*
 !test/d2win-sub-a340.test.mjs
 !test/d32-automap-npc.test.mjs
 !test/dcc-bits.test.mjs
+!test/dcc-decode-identity.test.mjs
 !test/drlg-link-place-terminator.test.mjs
 !test/drlg-sub17760-contract.test.mjs
 !test/ensure-font.test.mjs

@@ -729,10 +729,17 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
   // shape, with the counters the pass reports carried on the record so the evidence is exactly what a per-frame resolve gave.
   let resolveFiles = '';
   const resolved_ = new Map();
+  // PERF: the same tiles array comes back every frame while the engine's terrain bytes are unchanged
+  // (readSessionTerrain's cache), so the record resolve_ returned for tiles[i] is remembered by index.
+  // A memo entry is only the object resolved_ holds for that key: it is dropped whenever resolved_ is
+  // cleared or a variant override rewrites its entries, and a hit re-checks the tile and its keys.
+  const tileCacheable = (tile) => tile.librarySlot >= 0 && tile.librarySlot < 64 && tile.orientation >= 0 && tile.orientation < 64 && tile.mainIndex >= 0 && tile.mainIndex < 4096
+    && tile.subIndex >= 0 && tile.subIndex < 4096 && tile.libraryIndex >= 0 && tile.libraryIndex < 65536 && tile.frameIndex >= 0 && tile.frameIndex < 16384
+    && (tile.entry === undefined || (tile.entry >= 0 && tile.entry < 65535));
+  let resolveGen = 0;
+  const recMemo = new WeakMap();
   function resolveTile(tile, files) {
-    const cacheable = tile.librarySlot >= 0 && tile.librarySlot < 64 && tile.orientation >= 0 && tile.orientation < 64 && tile.mainIndex >= 0 && tile.mainIndex < 4096
-      && tile.subIndex >= 0 && tile.subIndex < 4096 && tile.libraryIndex >= 0 && tile.libraryIndex < 65536 && tile.frameIndex >= 0 && tile.frameIndex < 16384
-      && (tile.entry === undefined || (tile.entry >= 0 && tile.entry < 65535));
+    const cacheable = tileCacheable(tile);
     let k1, k2, k3, inner, mid;
     // F96 throwaway probe hook: globalThis.__d2VariantOverride forces the DRAWN DT1 variant of one tile
     // (keyed `${a},${b},${layer},${identity}`, a,b = world subtiles) so a frame test can force each
@@ -883,12 +890,20 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
       let searched = 0, ambiguous = 0;
       // Resolve every tile to a bitmap and an on-screen box once, then split by layer.
       const filesSig = files.join('|');
-      if (filesSig !== resolveFiles) { resolveFiles = filesSig; resolved_.clear(); }
+      if (filesSig !== resolveFiles) { resolveFiles = filesSig; resolved_.clear(); resolveGen++; }
+      if (globalThis.__d2VariantOverride) resolveGen++;
+      let memo = null;
+      if (!globalThis.__d2VariantOverride && tiles && typeof tiles === 'object') {
+        memo = recMemo.get(tiles);
+        if (!memo || memo.gen !== resolveGen) recMemo.set(tiles, memo = { gen: resolveGen, tiles: [], k1: [], k2: [], k3: [], recs: [] });
+      }
+      let ti = -1;
       const floors = [], walls = [];
       let hidden = 0, popHidden = 0, rarityAmbiguous = 0, entryTiles = 0, entryExact = 0, entryDiffers = 0;
       // Attribution (one sample per frame): the per-tile resolve/lookup walk, separate from the blits.
       const pResolve = perfT0();
       for (const tile of tiles) {
+        ti++;
         // MAPTILE_HIDDEN (0x8, D2DrlgDrlg.h) is a DRAW flag: DrlgDrlgAnim hides every frame of an
         // animated floor but the current one by toggling it, and hidden walls (Inv_Wall.dt1 and the
         // like) carry it from their DS1/DRLG placement. Drawing them put every animation frame and
@@ -903,7 +918,14 @@ export function createSessionTerrain({ read, decodeDt1, decodeDatPalette, palett
         // the hero while this client painted the whole Exterior.dt1 15:2:4..15 plane (client-parity F44).
         if (tile.pop === 1) { popHidden++; continue; }
         requested++;
-        const rec = resolveTile(tile, files);
+        let rec;
+        const m1 = (tile.librarySlot * 64 + tile.orientation) * 4096 + tile.mainIndex, m2 = tile.subIndex * 65536 + tile.libraryIndex,
+          m3 = tile.frameIndex * 65536 + (tile.entry === undefined ? 0 : tile.entry + 1);
+        if (memo && memo.tiles[ti] === tile && memo.k1[ti] === m1 && memo.k2[ti] === m2 && memo.k3[ti] === m3) rec = memo.recs[ti];
+        else {
+          rec = resolveTile(tile, files);
+          if (memo && tileCacheable(tile)) { memo.tiles[ti] = tile; memo.k1[ti] = m1; memo.k2[ti] = m2; memo.k3[ti] = m3; memo.recs[ti] = rec; }
+        }
         const { lib, variants, foundSlot, dt1Tile, variantNo, hasBitmap: bitmap } = rec;
         searched += rec.searched; ambiguous += rec.ambiguous; entryTiles += rec.entryTiles; entryExact += rec.entryExact; entryDiffers += rec.entryDiffers;
         rarityAmbiguous += rec.rarityAmbiguous; resolved += rec.resolved; wrongIdentity += rec.wrongIdentity;

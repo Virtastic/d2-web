@@ -59,125 +59,191 @@ export function cofLayerRecord(cof, component) {
 
 const DCC_WIDTHS = [0, 1, 2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 26, 28, 30, 32];
 
-
-function frameCells(frame, box) {
-  const left = frame.xOffset, top = frame.bottomUp ? frame.yOffset : frame.yOffset - frame.height + 1;
-  const relX = left - box.minX, relY = top - box.minY;
-  const partition = (size, relative) => {
-    const first = 4 - (relative & 3);
-    if (size - first <= 1) return [size];
-    const remainder = size - first, tail = remainder & 3;
-    if (tail === 0) return [first, ...Array(remainder >>> 2).fill(4)];
-    if (tail === 1) return [first, ...Array((remainder >>> 2) - 1).fill(4), 5];
-    return [first, ...Array(remainder >>> 2).fill(4), tail];
-  };
-  const widths = partition(frame.width, relX), heights = partition(frame.height, relY);
-  const across = widths.length, down = heights.length;
-  const cells = [];
-  let y = relY;
-  for (const height of heights) {
-    let x = relX;
-    for (const width of widths) { cells.push({ x, y, width, height }); x += width; }
-    y += height;
-  }
-  return { across, down, cells };
+// Cell sizes along one axis: a first cell up to the next 4-pixel boundary, then 4s, with a 1-pixel tail
+// folded into the last cell (5) and any other tail kept as its own cell.
+function partition(size, relative) {
+  const first = 4 - (relative & 3);
+  if (size - first <= 1) return [size];
+  const remainder = size - first, tail = remainder & 3, out = [first];
+  const fours = tail === 1 ? (remainder >>> 2) - 1 : remainder >>> 2;
+  for (let i = 0; i < fours; i++) out.push(4);
+  if (tail === 1) out.push(5); else if (tail) out.push(tail);
+  return out;
 }
 
+const BIT_COUNTS = Uint8Array.of(0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4);
+const truncated = (label, bit, count, limit) => new RangeError(`truncated DCC ${label} at bit ${bit} reading ${count}, limit ${limit}`);
+
+// PERF: the pixel decode is the client's hottest path with many players on screen. Each substream is read
+// through an inline bit cursor (every read here is at most 8 bits, so a 16-bit window always holds it), the
+// per-cell state lives in typed arrays instead of an object per cell, and an error label is only built when a
+// stream overruns. Output is byte-identical to the object-per-cell decoder this replaced
+// (tools/online/dcc-decode-bench.mjs --check-hashes, test/dcc-decode-identity.test.mjs).
 function decodeDccPixels(bytes, direction, directionEnd, index) {
   const start = direction.bitstreamStart;
-  let cursor = start;
-  const stream = (count) => { const out = new Bits(bytes, cursor, cursor + count); cursor += count; return out; };
-  const equal = stream(direction.equalCellsBits), masks = stream(direction.pixelMaskBits);
-  const encodings = stream(direction.encodingTypeBits), raw = stream(direction.rawPixelCodesBits);
-  const codes = new Bits(bytes, cursor, directionEnd * 8);
-  const width = direction.box.maxX - direction.box.minX, height = direction.box.maxY - direction.box.minY;
+  const equalCellsBits = direction.equalCellsBits, encodingTypeBits = direction.encodingTypeBits;
+  const equalLimit = start + equalCellsBits, maskLimit = equalLimit + direction.pixelMaskBits;
+  const encodingLimit = maskLimit + encodingTypeBits, rawLimit = encodingLimit + direction.rawPixelCodesBits;
+  const codesLimit = directionEnd * 8;
+  let equalBit = start, maskBit = equalLimit, encodingBit = maskLimit, rawBit = encodingLimit, codeBit = rawLimit;
+  const box = direction.box, frames = direction.frames, frameCount = frames.length;
+  const palette = direction.paletteEntries, paletteSize = palette.length;
+  const width = box.maxX - box.minX, height = box.maxY - box.minY;
   const cellsAcross = 1 + Math.trunc((width - 1) / 4), cellsDown = 1 + Math.trunc((height - 1) / 4);
-  const state = Array(cellsAcross * cellsDown).fill(null);
-  const entries = [];
-  const bitCounts = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
-  direction.frames.forEach((frame, frameIndex) => {
-    const layout = frameCells(frame, direction.box); frame.cellsAcross = layout.across; frame.cellsDown = layout.down;
-    const originX = Math.trunc((frame.xOffset - direction.box.minX) / 4);
+  const stateCount = cellsAcross * cellsDown;
+
+  const relXs = new Int32Array(frameCount), relYs = new Int32Array(frameCount), widthsOf = new Array(frameCount), heightsOf = new Array(frameCount);
+  let totalCells = 0;
+  for (let f = 0; f < frameCount; f++) {
+    const frame = frames[f];
     const top = frame.bottomUp ? frame.yOffset : frame.yOffset - frame.height + 1;
-    const originY = Math.trunc((top - direction.box.minY) / 4);
-    layout.cells.forEach((cell, frameCellIndex) => {
-      const cx = frameCellIndex % layout.across, cy = Math.trunc(frameCellIndex / layout.across);
-      const stateIndex = originX + cx + (originY + cy) * cellsAcross;
-      if (stateIndex < 0 || stateIndex >= state.length) throw new RangeError(`DCC direction ${index} cell outside bounds`);
-      const old = state[stateIndex];
-      if (old && direction.equalCellsBits && equal.read(1, `direction ${index} equal-cell stream`)) return;
-      const mask = old ? masks.read(4, `direction ${index} pixel-mask stream`) : 15;
-      const changed = bitCounts[mask];
-      const rawEncoding = changed && direction.encodingTypeBits ? encodings.read(1, `direction ${index} encoding stream`) : 0;
-      const stack = []; let last = 0;
-      for (let n = 0; n < changed; n++) {
-        let value;
-        if (rawEncoding) value = raw.read(8, `direction ${index} raw-pixel stream frame ${frameIndex} cell ${frameCellIndex} value ${n}`);
-        else {
-          value = last;
-          let displacement;
-          do { displacement = codes.read(4, `direction ${index} pixel-code stream`); value += displacement; }
-          while (displacement === 15);
-        }
-        if (value === last) break;
-        stack.push(value); last = value;
-      }
-      // A kept cell carries its palette-map INDICES, mapped once below (OpenDiablo2 dcc_direction.go
-      // 395/407-409); carrying the mapped colours mapped them twice and scrambled attack frames (F15).
-      const values = old ? old.raw.slice() : [0, 0, 0, 0];
-      let stackAt = stack.length - 1;
-      for (let n = 0; n < 4; n++) if (mask & (1 << n)) values[n] = stackAt >= 0 ? stack[stackAt--] : 0;
-      const entry = { raw: values, values: values.map((v) => direction.paletteEntries[v] ?? 0), frameIndex, frameCellIndex };
-      entries.push(entry); state[stateIndex] = entry;
-    });
-  });
-  for (const [reader, expected, name] of [[equal, direction.equalCellsBits, 'equal-cell'], [masks, direction.pixelMaskBits, 'pixel-mask'],
-    [encodings, direction.encodingTypeBits, 'encoding'], [raw, direction.rawPixelCodesBits, 'raw-pixel']]) {
-    if (reader.bit !== reader.limit) throw new RangeError(`DCC direction ${index} ${name} stream used ${reader.bit - (reader.limit - expected)}/${expected} bits`);
+    relXs[f] = frame.xOffset - box.minX; relYs[f] = top - box.minY;
+    widthsOf[f] = partition(frame.width, relXs[f]); heightsOf[f] = partition(frame.height, relYs[f]);
+    totalCells += widthsOf[f].length * heightsOf[f].length;
   }
 
-  const canvas = new Uint8Array(width * height), frameOutputs = [];
-  const lastCells = Array(cellsAcross * cellsDown).fill(null); let entryAt = 0;
-  direction.frames.forEach((frame, frameIndex) => {
-    const layout = frameCells(frame, direction.box);
-    for (let frameCellIndex = 0; frameCellIndex < layout.cells.length; frameCellIndex++) {
-      const cell = layout.cells[frameCellIndex];
-      let entry = entries[entryAt];
-      if (entry?.frameIndex === frameIndex && entry.frameCellIndex === frameCellIndex) entryAt++;
-      else entry = null;
-      const sx = Math.trunc(cell.x / 4), sy = Math.trunc(cell.y / 4), stateIndex = sx + sy * cellsAcross;
-      const previous = lastCells[stateIndex];
-      if (!entry) {
-        if (!previous || previous.width !== cell.width || previous.height !== cell.height) {
-          for (let y = 0; y < cell.height; y++) canvas.fill(0, (cell.y + y) * width + cell.x, (cell.y + y) * width + cell.x + cell.width);
+  // Pass 1: which cells change and their 4-entry palette stacks. cellEntry is indexed in visit order
+  // (frame, then row-major cell); entryRaw keeps palette-map INDICES, entryValue the mapped colours.
+  // A kept cell carries its palette-map INDICES, mapped once (OpenDiablo2 dcc_direction.go 395/407-409);
+  // carrying the mapped colours mapped them twice and scrambled attack frames (F15).
+  const stateEntry = new Int32Array(stateCount).fill(-1), cellEntry = new Int32Array(totalCells);
+  const entryRaw = new Int32Array(totalCells * 4), entryValue = new Uint8Array(totalCells * 4), stack = new Int32Array(4);
+  let entries = 0, visit = 0;
+  for (let f = 0; f < frameCount; f++) {
+    const frame = frames[f], widths = widthsOf[f], heights = heightsOf[f], across = widths.length, down = heights.length;
+    frame.cellsAcross = across; frame.cellsDown = down;
+    const originX = Math.trunc(relXs[f] / 4), originY = Math.trunc(relYs[f] / 4);
+    for (let cy = 0; cy < down; cy++) for (let cx = 0; cx < across; cx++) {
+      const stateIndex = originX + cx + (originY + cy) * cellsAcross;
+      if (stateIndex < 0 || stateIndex >= stateCount) throw new RangeError(`DCC direction ${index} cell outside bounds`);
+      const old = stateEntry[stateIndex];
+      let p;
+      if (old >= 0 && equalCellsBits) {
+        if (equalBit + 1 > equalLimit) throw truncated(`direction ${index} equal-cell stream`, equalBit, 1, equalLimit);
+        p = equalBit >>> 3; const same = (bytes[p] >>> (equalBit & 7)) & 1; equalBit++;
+        if (same) { cellEntry[visit++] = -1; continue; }
+      }
+      let mask = 15;
+      if (old >= 0) {
+        if (maskBit + 4 > maskLimit) throw truncated(`direction ${index} pixel-mask stream`, maskBit, 4, maskLimit);
+        p = maskBit >>> 3; mask = ((bytes[p] | (bytes[p + 1] << 8)) >>> (maskBit & 7)) & 15; maskBit += 4;
+      }
+      const changed = BIT_COUNTS[mask];
+      let rawEncoding = 0;
+      if (changed && encodingTypeBits) {
+        if (encodingBit + 1 > encodingLimit) throw truncated(`direction ${index} encoding stream`, encodingBit, 1, encodingLimit);
+        p = encodingBit >>> 3; rawEncoding = (bytes[p] >>> (encodingBit & 7)) & 1; encodingBit++;
+      }
+      let depth = 0, last = 0;
+      for (let n = 0; n < changed; n++) {
+        let value;
+        if (rawEncoding) {
+          if (rawBit + 8 > rawLimit) {
+            throw truncated(`direction ${index} raw-pixel stream frame ${f} cell ${cy * across + cx} value ${n}`, rawBit, 8, rawLimit);
+          }
+          p = rawBit >>> 3; value = ((bytes[p] | (bytes[p + 1] << 8)) >>> (rawBit & 7)) & 255; rawBit += 8;
         } else {
-          for (let y = 0; y < cell.height; y++) {
-            const source = (previous.y + y) * width + previous.x;
-            canvas.copyWithin((cell.y + y) * width + cell.x, source, source + cell.width);
+          value = last;
+          let displacement;
+          do {
+            if (codeBit + 4 > codesLimit) throw truncated(`direction ${index} pixel-code stream`, codeBit, 4, codesLimit);
+            p = codeBit >>> 3; displacement = ((bytes[p] | (bytes[p + 1] << 8)) >>> (codeBit & 7)) & 15; codeBit += 4;
+            value += displacement;
+          } while (displacement === 15);
+        }
+        if (value === last) break;
+        stack[depth++] = value; last = value;
+      }
+      const at = entries * 4, from = old * 4;
+      let stackAt = depth - 1;
+      for (let n = 0; n < 4; n++) {
+        let v;
+        if (mask & (1 << n)) v = stackAt >= 0 ? stack[stackAt--] : 0;
+        else v = old >= 0 ? entryRaw[from + n] : 0;
+        entryRaw[at + n] = v; entryValue[at + n] = v < paletteSize ? palette[v] : 0;
+      }
+      cellEntry[visit++] = entries; stateEntry[stateIndex] = entries++;
+    }
+  }
+  for (const [bit, limit, expected, name] of [[equalBit, equalLimit, equalCellsBits, 'equal-cell'], [maskBit, maskLimit, direction.pixelMaskBits, 'pixel-mask'],
+    [encodingBit, encodingLimit, encodingTypeBits, 'encoding'], [rawBit, rawLimit, direction.rawPixelCodesBits, 'raw-pixel']]) {
+    if (bit !== limit) throw new RangeError(`DCC direction ${index} ${name} stream used ${bit - (limit - expected)}/${expected} bits`);
+  }
+
+  // Pass 2: paint each frame's cells onto the direction canvas (a kept cell copies its last placement, a
+  // one-colour cell fills, otherwise 1- or 2-bit indices into the cell's stack), then cut the frame out.
+  const canvas = new Uint8Array(width * height), frameOutputs = [];
+  const lastX = new Int32Array(stateCount), lastY = new Int32Array(stateCount), lastW = new Int32Array(stateCount), lastH = new Int32Array(stateCount);
+  visit = 0;
+  for (let f = 0; f < frameCount; f++) {
+    const frame = frames[f], widths = widthsOf[f], heights = heightsOf[f], across = widths.length, down = heights.length;
+    let y = relYs[f];
+    for (let cy = 0; cy < down; cy++) {
+      const ch = heights[cy];
+      let x = relXs[f];
+      for (let cx = 0; cx < across; cx++) {
+        const cw = widths[cx], entry = cellEntry[visit++];
+        const stateIndex = Math.trunc(x / 4) + Math.trunc(y / 4) * cellsAcross;
+        if (entry < 0) {
+          const pw = lastW[stateIndex];
+          if (pw === 0 || pw !== cw || lastH[stateIndex] !== ch) {
+            for (let row = 0; row < ch; row++) for (let to = (y + row) * width + x, end = to + cw; to < end; to++) canvas[to] = 0;
+          } else {
+            const px = lastX[stateIndex], py = lastY[stateIndex];
+            for (let row = 0; row < ch; row++) {
+              // a row copy with copyWithin's (memmove) semantics when the old and new placements overlap
+              const source = (py + row) * width + px, to = (y + row) * width + x;
+              if (to > source) for (let i = cw - 1; i >= 0; i--) canvas[to + i] = canvas[source + i];
+              else for (let i = 0; i < cw; i++) canvas[to + i] = canvas[source + i];
+            }
+          }
+        } else {
+          const e = entry * 4, v0 = entryValue[e], v1 = entryValue[e + 1];
+          if (v0 === v1) {
+            for (let row = 0; row < ch; row++) for (let to = (y + row) * width + x, end = to + cw; to < end; to++) canvas[to] = v0;
+          } else {
+            const bits = v1 === entryValue[e + 2] ? 1 : 2, pick = (1 << bits) - 1;
+            if (codeBit + bits * cw * ch <= codesLimit) {
+              // the whole cell is inside the stream: no per-pixel bound check
+              for (let row = 0; row < ch; row++) {
+                let to = (y + row) * width + x;
+                const end = to + cw;
+                while (to < end) {
+                  const p = codeBit >>> 3;
+                  canvas[to++] = entryValue[e + (((bytes[p] | (bytes[p + 1] << 8)) >>> (codeBit & 7)) & pick)];
+                  codeBit += bits;
+                }
+              }
+            } else for (let row = 0; row < ch; row++) {
+              let to = (y + row) * width + x;
+              for (let col = 0; col < cw; col++) {
+                if (codeBit + bits > codesLimit) throw truncated(`direction ${index} frame pixels`, codeBit, bits, codesLimit);
+                const p = codeBit >>> 3;
+                canvas[to++] = entryValue[e + (((bytes[p] | (bytes[p + 1] << 8)) >>> (codeBit & 7)) & pick)];
+                codeBit += bits;
+              }
+            }
           }
         }
-      } else if (entry.values[0] === entry.values[1]) {
-        for (let y = 0; y < cell.height; y++) canvas.fill(entry.values[0], (cell.y + y) * width + cell.x, (cell.y + y) * width + cell.x + cell.width);
-      } else {
-        const bits = entry.values[1] === entry.values[2] ? 1 : 2;
-        for (let y = 0; y < cell.height; y++) for (let x = 0; x < cell.width; x++) {
-          canvas[(cell.y + y) * width + cell.x + x] = entry.values[codes.read(bits, `direction ${index} frame pixels`)];
-        }
+        lastX[stateIndex] = x; lastY[stateIndex] = y; lastW[stateIndex] = cw; lastH[stateIndex] = ch;
+        x += cw;
       }
-      lastCells[stateIndex] = { ...cell };
+      y += ch;
     }
-    const indexed = new Uint8Array(frame.width * frame.height), opaque = new Uint8Array(indexed.length);
-    const left = frame.xOffset - direction.box.minX;
-    const top = (frame.bottomUp ? frame.yOffset : frame.yOffset - frame.height + 1) - direction.box.minY;
-    for (let y = 0; y < frame.height; y++) for (let x = 0; x < frame.width; x++) {
-      const value = canvas[(top + y) * width + left + x], at = y * frame.width + x;
-      indexed[at] = value; opaque[at] = value === 0 ? 0 : 1;
+    const fw = frame.width, fh = frame.height, indexed = new Uint8Array(fw * fh), opaque = new Uint8Array(indexed.length);
+    const left = relXs[f], top = relYs[f];
+    for (let row = 0, at = 0; row < fh; row++) {
+      for (let source = (top + row) * width + left, end = source + fw; source < end; source++, at++) {
+        const value = canvas[source];
+        indexed[at] = value; opaque[at] = value === 0 ? 0 : 1;
+      }
     }
     frame.indexed = indexed; frame.opaque = opaque; frameOutputs.push(frame);
-  });
-  direction.pixelCodeBits = codes.bit - cursor;
+  }
+  direction.pixelCodeBits = codeBit - rawLimit;
   return frameOutputs;
 }
+
 
 function decodeDccDirection(bytes, offset, directionEnd, framesPerDirection, index) {
   const r = new Bits(bytes, offset * 8, directionEnd * 8);
