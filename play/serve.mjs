@@ -48,6 +48,14 @@ createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
     return res.end(ROOT);
   }
+  // Crawler files, built from the request's own host so the image serves any domain without a rebuild.
+  if (url.pathname === '/robots.txt' || url.pathname === '/sitemap.xml') {
+    const origin = `${req.headers['x-forwarded-proto'] || (TLS ? 'https' : 'http')}://${req.headers.host}`;
+    const xml = url.pathname === '/sitemap.xml';
+    res.writeHead(200, { 'Content-Type': xml ? 'application/xml' : 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=86400' });
+    return res.end(xml ? `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${origin}/</loc></url></urlset>\n`
+      : `User-agent: *\nAllow: /\n\nSitemap: ${origin}/sitemap.xml\n`);
+  }
   let rel = normalize(decodeURIComponent(url.pathname)).replace(/^([/\\])+/, '');
   if (rel === '' || rel.endsWith('/') || rel.endsWith('\\')) rel += 'index.html';
   let base = ROOT;
@@ -67,7 +75,15 @@ createServer((req, res) => {
   const br = path + '.br';
   if (!req.headers.range && /\bbr\b/.test(req.headers['accept-encoding'] || '') && existsSync(br)
       && brMayAnswer(path, br)) { file = br; h['Content-Encoding'] = 'br'; }
-  const size = statSync(file).size;
+  const st = statSync(file), size = st.size;
+  // Validators, so a revalidation (the browser's, or the CDN's after its edge TTL) is a 304, not the whole file.
+  h['ETag'] = `W/"${size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`;
+  h['Last-Modified'] = st.mtime.toUTCString();
+  if (req.headers['if-none-match'] ? req.headers['if-none-match'].split(/\s*,\s*/).includes(h['ETag'])
+      : req.headers['if-modified-since'] && Date.parse(req.headers['if-modified-since']) >= Math.floor(st.mtimeMs / 1000) * 1000) {
+    for (const k of ['Content-Type', 'Accept-Ranges']) delete h[k];
+    res.writeHead(304, h); return res.end();
+  }
   const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
   if (m && file === path) {
     const start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
