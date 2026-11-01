@@ -111,7 +111,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_246a0(uint32_t pUnit) {   // 1.13c D
 // is the dword at data tables +0xC4. The decompiler lost the count of the trailing byte loop, so
 // only the dword loop below is modelled; the byte tail is unproven.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_34390(uint32_t pRecord) {   // 1.13c D2Common+0x34390
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_34390_batch(uint32_t pRecord) {   // 1.13c D2Common+0x34390
 	uint8_t* r = P(pRecord);
 	if (!r) return;
 	const uint32_t pInner = U(r, 0x5C);

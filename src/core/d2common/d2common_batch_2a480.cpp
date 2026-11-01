@@ -96,7 +96,7 @@ extern "C" void D2Common_1D710_FreeMissileStream(uint32_t pUnit, const D2CommonF
 // then cleared. A null param fatals 0xF6B and a null block 0xF6D. The QuestRecord.cpp:0x60/0x61 and
 // Waypoint.cpp:0x121 Fog ordinal-10046 calls are not modelled: their first two arguments are
 // register-only in the decompile.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30880(uint32_t nMemPool, uint32_t pData) { // 1.13c D2Common+0x30880
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30880_batch(uint32_t nMemPool, uint32_t pData) { // 1.13c D2Common+0x30880
 	(void)nMemPool;
 	uint8_t* p = P(pData);
 	if (!p) return;                                          // retail fatal 0xF6B
