@@ -111,7 +111,7 @@ EMSCRIPTEN_KEEPALIVE void D2Common_12D20_SetLogFile(const char* szFile, const D2
 // 1.13c D2Common+0x374e0: dword at +0x0C of the object pointed to by +0x04; a null +0x04 yields 0.
 // Null param is retail fatal 0x547.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_374e0(uint32_t pArg)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_374e0_batch(uint32_t pArg)
 {
 	uint8_t* a = P(pArg);
 	if (!a)

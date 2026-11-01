@@ -59,7 +59,7 @@ namespace
 // 1.13c D2Common+0x37320: dword +0x28 of the record at *(param_1 + 4). A null param_1 is retail's
 // fatal 0x547; the inner null record is not checked by retail and is modelled as 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_37320(uint32_t pRecord) {   // 1.13c D2Common+0x37320
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_37320_batch(uint32_t pRecord) {   // 1.13c D2Common+0x37320
 	uint8_t* r = P(pRecord);
 	if (!r) return 0;
 	uint8_t* inner = P(U(r, 0x04));

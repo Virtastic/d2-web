@@ -58,7 +58,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2f570(uint32_t pUnit, int32_t nSkillId,
 // reached through pOwner+0x4. A null pOwner is fatal 0x547 in retail; we return 0. When the minute
 // divisor is zero the out minute is 0. A null data pointer reports value 0 and minute 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_37470(uint32_t pOwner, uint32_t pOutMinute)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_37470_batch(uint32_t pOwner, uint32_t pOutMinute)
 {
 	uint8_t* owner = P(pOwner);
 	if (!owner)
