@@ -1703,7 +1703,7 @@ void __fastcall OBJECTS_InitFunction74_FrozenAnya(D2ObjInitFnStrc* pOp)
 }
 
 //D2Game.0x6FCB54D0
-// 1.13c D2Game+0x5CD50
+// 1.13c D2Game+0x5CD50: every exit path returns 0 (1.10f returned 1 when the quest is missing and at the end)
 int32_t __fastcall OBJECTS_OperateFunction67_FrozenAnya(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
 	if (!pOp || !pOp->pObject)
@@ -1717,7 +1717,7 @@ int32_t __fastcall OBJECTS_OperateFunction67_FrozenAnya(D2ObjOperateFnStrc* pOp,
 
 	if (!pQuestData || !pQuestData->pQuestDataEx)
 	{
-		return 1;
+		return 0;
 	}
 
 	D2Act5Quest3Strc* pQuestDataEx = (D2Act5Quest3Strc*)pQuestData->pQuestDataEx;
@@ -1767,7 +1767,7 @@ int32_t __fastcall OBJECTS_OperateFunction67_FrozenAnya(D2ObjOperateFnStrc* pOp,
 		}
 	}
 
-	return 1;
+	return 0;
 }
 
 //D2Game.0x6FCB56D0
