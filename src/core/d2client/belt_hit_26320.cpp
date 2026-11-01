@@ -1,5 +1,5 @@
-// Prior art: none (D2MOO has no D2Client). Derived from cached 1.13c decompile.
-// Env-seam style: globals and the Ordinal_10991 rect fill come in through Env.
+// Prior art: none (D2MOO has no D2Client). Derived from the 1.13c disassembly (the decompile misreads the slot byte as a register).
+// Env-seam style: globals and the Ordinal_10991 info fill come in through Env.
 #include <cstdint>
 #include <cstring>
 namespace d2client_belt_hit {
@@ -7,14 +7,18 @@ using I=int32_t; using U=uint32_t;
 struct Env {
  I expanded;          // DAT_6fbcc46c
  I width,height;      // DAT_6fb8bc48, DAT_6fb8bc4c
- void (*rect)(I slot,I* r); // Ordinal_10991 fill; r = x0,x1,y0,y1 for slot
+ void (*fill)(U* buf);  // Ordinal_10991 into the 66-dword local: buf[1] low byte = entry count, rect words at fixed offsets
 };
 // 1.13c D2Client+0x26320
-// ev: mouse event (u16 x at +0xc, u16 y at +0xe); slot: DI (read from the unfilled-rect layout).
-U sub_26320(const Env& e,const uint8_t* ev,uint8_t slot){
+// ev: mouse event (u16 x at +0xc, u16 y at +0xe). Expanded belt: x0/y0 are the entry (count-4) words, x1/y1 are buf words 15 and 17.
+U sub_26320(const Env& e,const uint8_t* ev){
  uint16_t ux,uy;std::memcpy(&ux,ev+0xc,2);std::memcpy(&uy,ev+0xe,2);I x=ux,y=uy;
- I r[4]={0,0,0,0};e.rect(slot,r);
- if(!e.expanded) return e.height-0x30<y && e.width/2+0x17<=x && x<=e.width/2+0x91 && e.height-0x27<=y && y<=e.height-10;
- return r[0]<=x&&x<=r[1]&&r[2]<=y&&y<=r[3];
+ U b[66]={0};e.fill(b);
+ if(e.expanded){
+  const I k=2+4*(I(b[1]&0xff)-4);
+  return I(b[k])<=x&&x<=I(b[15])&&I(b[k+2])<=y&&y<=I(b[17]);
+ }
+ const I h=e.height,half=e.width/2;
+ return h-0x30<y&&half+0x17<=x&&x<=half+0x91&&h-0x27<=y&&y<=h-10;
 }
 }

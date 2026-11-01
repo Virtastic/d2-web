@@ -4,29 +4,12 @@
 #include <cstdint>
 #include <cstring>
 #include <algorithm>
+#include "belt_26060.h"
 namespace d2client_belt {
 using U=uint32_t; using I=int32_t; using P=void*;
 static U rd(P p,U n){U v;std::memcpy(&v,static_cast<uint8_t*>(p)+n,4);return v;}
 static void wr(P p,U n,U v){std::memcpy(static_cast<uint8_t*>(p)+n,&v,4);}
 static I add(I a,I b){return I(U(a)+U(b));}
-struct Draw { U words[13]{}; P cell=nullptr; U tail[4]{}; };
-struct Effect { U words[23]{}; P unit=nullptr; };
-struct State {
- I selected=-1,x=-1,y=-1,active=0,mode=0,belt=0,width=0,height=0,mx=0,my=0,expanded=0,enabled=0;
- P current=nullptr,previous=nullptr,inventory=nullptr,player=nullptr,quest=nullptr;
- uint8_t colors[4]{}; P cells[30]{};
-};
-struct Calls {
- P (*resolve)(U);
- I (*pathX)(P); I (*pathY)(P); I (*stat)(P,I,I); void (*effect)(Effect*);
- I (*questFlag)(P,I,I); I (*distance)(P,P); void (*stopPath)(P); I (*canAct)(P); // 29F30 reads the player in ESI.
- void (*action)(I,P,const U*,I); void (*setMode)(P,I); U (*finish)(P,I);
- void (*beltInfo)(I,P,uint8_t*); void (*rect)(I,P,I*,I);
- I (*special)(P); P (*item)(P,I); I (*itemIndex)(P);
- U (*color)(I,I,I); const char16_t* (*text)(U); void (*tooltip)(const char16_t*,I,I,I,I);
- void (*fill)(I,I,I,I,U,I); void (*draw)(Draw*,I,I,U,I,I);
- void (*unload)(P); void (*release)(P,I,I); P (*load)(const char*);
-};
 // 1.13c D2Client+0x26060
 void sub_26060(P source,P unit,Calls& c){
  for(I a=0;a<4;++a)for(I b=0;b<4;++b){
