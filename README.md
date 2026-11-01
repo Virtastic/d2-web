@@ -165,7 +165,7 @@ You need Linux, macOS, or Windows with WSL2, plus:
 | Docker | the engine compiles inside a container, so you do not install a compiler | <https://docs.docker.com/get-docker/> |
 | Node.js 24 or newer | runs the setup, the build helpers and the local server | <https://nodejs.org> |
 | git | downloads the code | <https://git-scm.com> |
-| Diablo II + Lord of Destruction, **patched to 1.13c** | the build takes the title-screen art and the 1.13c patch data from it | your own copy |
+| Diablo II + Lord of Destruction, **patched to 1.13c** | used to create the delta patch for users, to ensure they are on 1.13c | your own copy |
 
 ### Step 1. Download the code
 
