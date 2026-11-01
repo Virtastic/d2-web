@@ -179,6 +179,7 @@ void d2_fn_fog_1120(uint32_t* r)
 	root->link.pNext = (uint32_t)(uintptr_t)&root->link;
 	root->nBase = 0;
 	root->link.nPrev = ~(uint32_t)(uintptr_t)&root->link;
+	r[4] = r[0];   // EAX is the root
 }
 
 // 1.13c Fog+0x1170: list-root destructor -- drain, then unlink the sentinel.

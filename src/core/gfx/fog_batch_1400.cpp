@@ -316,7 +316,10 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_fog_1400(uint32_t* r) {
 
 // 1.13c Fog+0x1520
 EMSCRIPTEN_KEEPALIVE void d2_fn_fog_1520(uint32_t* r) {
-    fog_array_remove_at(reinterpret_cast<FogArray*>(static_cast<uintptr_t>(r[0])), r[1]);
+    FogArray* a = reinterpret_cast<FogArray*>(static_cast<uintptr_t>(r[0]));
+    fog_array_remove_at(a, r[1]);
+    // EAX at ret is items[index] + nodeBase after the move (retail's epilogue); the no-sift paths the vectors cover end here.
+    r[4] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(a->items[r[1]])) + a->nodeBase;
 }
 
 // 1.13c Fog+0x1630
