@@ -361,9 +361,9 @@ void StormFixedArrayDestroy(StormFixedArray* a) {
 }
 
 // 1.13c Storm+0x2410: RGN ctor - zero every field (retail leaves +0 and +0x14).
+extern "C" void* Storm_Port2410(void* e);
 StormElement* StormElementInit(StormElement* e) {
-    std::memset(e, 0, sizeof(StormElement));
-    return e;
+    return (StormElement*)Storm_Port2410(e);
 }
 
 // 1.13c Storm+0x2210: list NewNode - allocate RGN (extrabytes + size), ctor, link by location.

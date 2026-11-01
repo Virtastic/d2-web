@@ -35,7 +35,7 @@ extern "C" void Storm_Sub2C60(uint32_t cap, uint32_t* self);
 // 1.13c Storm+0x26E0
 extern "C" void* Storm_Sub26E0(uint32_t* self) {
     if (self[0] < self[1] + 1) {
-        if (self[3] == 0) Storm_Sub1C20(self);
+        if (self[3] == 0) __builtin_trap();  // grow helper is not yet ported; the callee previously named here is not it
         // 0x2C60 takes the new capacity in EAX (the grown count) and the array in ESI
         Storm_Sub2C60(self[0], self);
     }
