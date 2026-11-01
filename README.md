@@ -120,15 +120,20 @@ finished site to `build-wasm/site/`. The first run takes a while; later runs are
 ### Front-door art and the patch file (built from your own game files)
 
 The front door is the page a player sees before choosing their game files: the title art, the
-file picker and the loading screen. It reads four folders from the staged site. One is in git.
-Two are cut from **your own** game files every time you build. One is optional and made by
-hand. Nothing made from game data is ever committed, which is why a fresh clone does not have it.
+file picker and the loading screen. It reads four files and folders from the staged site. One is
+in git. Two are cut from **your own** game files every time you build. One is optional and made
+by hand. Nothing made from game data is ever committed, which is why a fresh clone does not have
+it.
+
+**Your 1.13c `patch_d2.mpq` is required.** Without it, `ci/stage.sh` (and so `ci/build.sh`) stops
+with `FATAL: no retail/D2/patch_d2.mpq`. It has to be the patch from an install updated to
+**1.13c**. The build checks that the file is an MPQ archive, but it cannot check its version.
 
 | staged path | what it is | made from | made by | without it |
 |---|---|---|---|---|
 | `freeres/` | the widescreen bottom bar and border panels: 16 `.dc6` files plus their licence | `play/freeres/` in git (SGD2FreeRes art, under its own licence) | `ci/stage.sh` copies it | the build stops |
 | `door-art/` | the title-screen art the door draws before any files are chosen (details below) | your `patch_d2.mpq`, `d2exp.mpq`, `d2data.mpq` | `tools/door-art.mjs` | warning; the door draws in a plain web font until the player's files load, then cuts the same art in the browser from the player's files |
-| `assets/patch-113c.patch` | your 1.13c `patch_d2.mpq` as base64 text | your 1.13c `patch_d2.mpq` | `tools/patch-shim.mjs` | warning; each player then runs on their own `patch_d2.mpq`, which has to be 1.13c |
+| `assets/patch-113c.patch` | your 1.13c `patch_d2.mpq` as base64 text | your 1.13c `patch_d2.mpq` | `tools/patch-shim.mjs` | **the build stops**: this file is required |
 | `widebg/` | optional widescreen menu backgrounds | images you supply | `ci/stage.sh` copies them | the menus use the game's own 4:3 backgrounds |
 
 **What `door-art/` contains:**
@@ -175,8 +180,9 @@ patch shim: retail/D2/patch_d2.mpq (... bytes) -> build-wasm/site/assets/patch-1
 door-art: ... images -> build-wasm/site/door-art
 ```
 
-If you get `WARNING: no retail/D2/d2data.mpq` or `WARNING: no retail/D2/patch_d2.mpq` instead,
-check the names: the build looks them up in **lower case** (`patch_d2.mpq`, `d2data.mpq`).
+If the build stops with `FATAL: no retail/D2/patch_d2.mpq`, or warns `WARNING: no
+retail/D2/d2data.mpq`, check the names: the build looks them up in **lower case**
+(`patch_d2.mpq`, `d2data.mpq`).
 
 To use your install folder without copying, set `D2_PATCH_SHIM_SRC=/path/to/Diablo\ II/patch_d2.mpq`.
 The build looks for `d2exp.mpq` and `d2data.mpq` in the same folder as that patch.
