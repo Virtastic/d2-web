@@ -44,7 +44,7 @@ struct D2GameBatch22D00Env {
 // modeChange is caller-owned native scratch passed through both retail calls;
 // its layout belongs to the adapter, never a fabricated x86 stack address.
 // 1.13c D2Game+0x23390
-extern "C" void d2_fn_d2game_23390(void* game, void* unit, void* modeChange,
+extern "C" void d2_batch_d2game_23390(void* game, void* unit, void* modeChange,
                                    const D2GameBatch22D00Env* e) {
     if (unit) {
         const int32_t mode = read<int32_t>(unit, 0x10);
@@ -57,7 +57,7 @@ extern "C" void d2_fn_d2game_23390(void* game, void* unit, void* modeChange,
 }
 
 // 1.13c D2Game+0x23730
-extern "C" void d2_fn_d2game_23730(void* unit, uint32_t gameAddress, void* modeChange,
+extern "C" void d2_batch_d2game_23730(void* unit, uint32_t gameAddress, void* modeChange,
                                    const D2GameBatch22D00Env* e) {
     e->freeMinions216A0(e->context, unit);
     if (!unit) return;
@@ -91,7 +91,7 @@ extern "C" void d2_fn_d2game_237C0(void* unit, int32_t unique, const D2GameBatch
 // Source is an explicit preserved-register input for curse construction, absent
 // from the decompiler's signature. Skill 66 occupies 0x9378 in the retail table.
 // 1.13c D2Game+0x24030
-extern "C" void d2_fn_d2game_24030(void* game, void* target, void* source, int32_t level,
+extern "C" void d2_batch_d2game_24030(void* game, void* target, void* source, int32_t level,
                                    const D2GameBatch22D00Env* e) {
     if (!e->targetAllowedE0A60(e->context, source, target, game)) return;
     if (read<int32_t>(e->dataTables, 0xba0) <= 0x42) return;

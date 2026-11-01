@@ -285,37 +285,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8d5f0(void* target, void* unit, uin
     env->send8A3E0(target, b, 0xC);
 }
 
-// 0x8D710: 0x59 chat/string packet to the client in EAX, then a 0x8D120 refresh of the named unit
-// when it is present in the client's game. Unit id in EDI, the string is the first stack argument,
-// the two trailing words are the last two.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8d710(void* client, uint32_t ecxIn, uint32_t unitId, const char* str, uint16_t arg2, uint16_t arg3, const D2GameBatch16Env* env) { // 1.13c D2Game+0x8d710
-    uint8_t b[0x1A];
-    std::memset(b, 0, sizeof b);
-    b[0] = 0x59;
-    wr32(b, 1, unitId);
-    b[5] = (uint8_t)ecxIn;
-    env->strCopy((char*)b + 6, str, 0x7FFFFFFF);
-    wr16(b, 0x16, arg2);
-    wr16(b, 0x18, arg3);
-    env->send8A3E0(client, b, 0x1A);
-    if (!client) d2game_fatal(0xFB);
-    (void)d2game_current_unit(client, env);
-    void* game = rdptr(client, 0x1A8);
-    if (!game) d2game_fatal(0x2D3);
-    void* node = rdptr(game, kUnitListHead[0] + (unitId & 0x7F) * 4);
-    while (node && rd32(node, 0xC) != unitId) node = rdptr(node, 0xE4);
-    if (node) env->sub8D120(node, d2game_current_unit(client, env));
-}
-
-// 0x8E030: assert that the EAX unit is a player whose player-data id equals ECX, then issue the
-// 0x8D3D0 action (2, stackArg, 0) with the client in EBX (the EAX unit is the client's unit here).
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8e030(void* unit, uint32_t expected, uint32_t arg, const D2GameBatch16Env* env) { // 1.13c D2Game+0x8E030
-    int32_t cur = 0;
-    if (unit && rd32(unit, 0) == 0) cur = (int32_t)rd32(env->getPlayerData(unit), 0x9C);
-    if (cur != (int32_t)expected) d2game_fatal(0x7DD);
-    env->sub8D3D0(unit, 2, arg, 0);
-}
-
 // 0xCD0E0: stat synchronisation. Client in EAX, unit in EBX. When the client's current unit differs,
 // push every opcode in the 0x6FD22DD0 table through #10587 and 0xCC2F0.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_cd0e0(void* client, void* unit, const D2GameBatch16Env* env) { // 1.13c D2Game+0xCD0E0
@@ -388,17 +357,4 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8d210(void* client, int32_t ebx, ui
     wr16(b, 0xD, (uint16_t)env->ordinal10764(rdptr(unit, 0x2C)));
     wr16(b, 0xF, (uint16_t)s6);
     env->send8A3E0(client, b, 0x11);
-}
-
-// 0x8D670: 14-byte packet (id = the byte arg, 0x51 from 0x7B0A0 case 2) to the client in ESI. The unit id
-// is in EDI; the unit (type in EAX, not visible in the decompile; player = 0 assumed) must resolve in the
-// client's game or the process exits (0x996 without a game, 0x341 otherwise). Bytes 1..13 are stack
-// garbage in retail (decompile shows a 1-byte local); zeroed here.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_game_8d670(void* client, uint32_t unitId, uint8_t id, const D2GameBatch16Env* env) { // 1.13c D2Game+0x8D670
-    uint8_t b[14];
-    std::memset(b, 0, sizeof b);
-    b[0] = id;
-    if (!client) d2game_fatal(0x996);
-    if (!env->getUnit(rdptr(client, 0x1A8), 0, unitId)) d2game_fatal(0x341);
-    env->send8A3E0(client, b, 14);
 }

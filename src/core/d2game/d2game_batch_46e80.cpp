@@ -233,7 +233,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_22FA0(void* thisPtr, int32_t param1,
 // answers 0. in_EAX is the unit, param_1 the roll state, param_2 the byte flags.
 // 1.13c D2Game+0x23980
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_23980(uint32_t eaxUnit, uint32_t param1, uint32_t param2,
+EMSCRIPTEN_KEEPALIVE int32_t d2_batch_d2game_23980(uint32_t eaxUnit, uint32_t param1, uint32_t param2,
                                                 const D2GameBatch46E80Env* env)
 {
     if (eaxUnit == 0 || rd8(eaxUnit, 0x6D) > 2) return 0;

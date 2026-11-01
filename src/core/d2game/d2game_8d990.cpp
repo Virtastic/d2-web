@@ -22,8 +22,7 @@ struct D2GameBatch8D990Env {
 // 21-byte unit packet. EAX = unit id, EBX = client, DL = packet[0]; six stack args a1..a6 (ret 0x18):
 // a1 -> [5], a2 -> [0xA], a3 (dword) -> [0xB], a4 -> [0xF], a5 -> [0x14], a6 -> [0x10].
 // Same list walk as 0x8D860; mode byte at [0x11] (8 -> 0x0B only), clamped layer-0x43 stat word at [0x12].
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8d990(uint32_t eaxUnitId, uint32_t ebxClient, uint8_t dl,
+void d2game_port_8d990(uint32_t eaxUnitId, uint32_t ebxClient, uint8_t dl,
                                              uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4,
                                              uint32_t a5, uint32_t a6, const D2GameBatch8D990Env* env)
 {

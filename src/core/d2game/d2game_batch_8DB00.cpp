@@ -156,68 +156,6 @@ EMSCRIPTEN_KEEPALIVE void d2game_8db00_impl(uint32_t eaxUnitId, uint32_t ebxClie
     env->sendPacket(ebxClient, pkt, 16);
 }
 
-// 1.13c D2Game+0x8DC30
-// Player-mode packet, 21 bytes. ECX = unit id, EBX = client, DL = packet[0], stack args a1 (byte),
-// a2 (byte), a3 (dword), a4 (byte). Same list walk as 0x8DB00; the first two words come from the
-// unit's path/type (0x1100-style accessor inlined), then the mode byte and the layer-0x43 stat.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8dc30(uint32_t ecxUnitId, uint32_t ebxClient, uint8_t dl,
-                                             uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4,
-                                             const D2GameBatch8DB00Env* env)
-{
-    if (ebxClient == 0) d2game_fatal(0x996);
-    const uint32_t game = rd32((void*)(uintptr_t)ebxClient, 0x1A8);
-    if (game == 0) d2game_fatal(0x2D3);
-
-    uint8_t pkt[21] = {0};
-    pkt[0] = dl;
-    wr32(pkt, 1, ecxUnitId);
-    pkt[5] = (uint8_t)a1;
-    pkt[0x0A] = (uint8_t)a2;
-    wr32(pkt, 0x0B, a3);
-
-    void* node = (void*)(uintptr_t)rd32((void*)(uintptr_t)game, 0x1320 + (ecxUnitId & 0x7F) * 4);
-    if (node == nullptr) return;
-    while (rd32(node, 0x0C) != ecxUnitId) {
-        node = rdptr(node, 0xE4);
-        if (node == nullptr) return;
-    }
-
-    // first word: path+0x0C for types 2/4/5, else #10867(path) (0 when the path is null)
-    const uint32_t type = rd32(node, 0);
-    const uint32_t path = rd32(node, 0x2C);
-    uint32_t value1;
-    if (type == 2 || type == 4 || type == 5) {
-        value1 = rd32((void*)(uintptr_t)path, 0x0C);
-    } else {
-        value1 = (path != 0) ? (uint32_t)env->ordinal10867(path) : 0;
-    }
-    wr16(pkt, 6, (uint16_t)value1);
-
-    // second word: path+0x10 for types 2/4/5, else #10750(path) (0 when the path is null)
-    uint32_t value2;
-    if (type == 2 || type == 4 || type == 5) {
-        value2 = rd32((void*)(uintptr_t)path, 0x10);
-    } else {
-        value2 = (path != 0) ? (uint32_t)env->ordinal10750(path) : 0;
-    }
-    wr16(pkt, 8, (uint16_t)value2);
-    pkt[0x0F] = (uint8_t)a4;
-
-    const uint8_t mode = env->ordinal10471(path);
-    pkt[0x11] = mode;
-    if (mode >= 5) {
-        if (mode <= 6) pkt[0x11] = 2;
-        else if (mode == 8) pkt[0x11] = 0x0B;
-    }
-    int32_t v = env->ordinal10973((uint32_t)(uintptr_t)node, 0x43, 0);
-    if (v < -0x8000) v = -0x8000;
-    if (v > 0x7FFF) v = 0x7FFF;
-    wr16(pkt, 0x0C, (uint16_t)v);
-    pkt[0x14] = env->ordinal11058(path);
-    env->sendPacket(ebxClient, pkt, 21);
-}
-
 // 1.13c D2Game+0x486D0
 // EAX = unit, ECX = id. Type-1 units with a player-data block at unit+0x14 expose a list at
 // playerData+0x30; the function returns whether the entry whose first dword equals ECX has a value

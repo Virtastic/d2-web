@@ -91,7 +91,7 @@ LAB_fallthrough:
 
 // 1.13c D2Game+0x23440 -- SUNIT_SendStateUpdate_23440 (290 bytes). __fastcall: r[0]=ECX (game), r[1]=EDX
 // (unit pointer). Returns with no output; sends the state update through the seams.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_23440(uint32_t* r) {
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2game_23440(uint32_t* r) {
     const D2GameBatch12380Env* e = d2game12380_env(r);
     uint32_t game = r[0];
     uint32_t unit = r[1];

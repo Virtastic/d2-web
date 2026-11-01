@@ -238,7 +238,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_21FB0(int32_t id,
 // stopping at 9 written bytes, at the source NUL, at an out-of-range id, or at a null row.
 // 1.13c D2Game+0x23060
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_23060(void* self, uint32_t mode, void* record,
+EMSCRIPTEN_KEEPALIVE void d2_batch_d2game_23060(void* self, uint32_t mode, void* record,
                                                         const D2GameBatch141E0Env* env)
 {
     uint8_t* src = nullptr;

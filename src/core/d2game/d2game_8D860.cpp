@@ -21,8 +21,8 @@ static inline uint32_t r32(uint32_t p, uint32_t o) { uint32_t v; std::memcpy(&v,
 // 1.13c D2Game+0x8D860
 // EAX = unit id, EBX = client, DL = packet[0]; stack args a1 (byte), a2 (word), a3 (word),
 // a4 (byte), a5 (byte -> packet[0xF]), a6 (byte). Walks the type-1 unit list at game+0x1320.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8d860(uint32_t eaxUnitId, uint32_t ebxClient, uint8_t dl,
+
+void d2game_port_8d860(uint32_t eaxUnitId, uint32_t ebxClient, uint8_t dl,
                                              uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4,
                                              uint32_t a5, uint32_t a6, const D2Game8D860Env* env)
 {

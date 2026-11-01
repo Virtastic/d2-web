@@ -336,14 +336,3 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8D120(void* unit, void* player
     wr16(buf, 0xB, env->sub101D0(unit, playerUnit));
     env->send8A3E0(client, buf, 0xD);
 }
-
-// 0x8DFD0: action trampoline. EAX=unit, ECX=client, ESI=item, stack dwFlag. The client must be player
-// data(unit)+0x9C or the process fatals 0x7E6; then 0x8D3D0(client, item, nAction=3, dwFlag, bGamble=0).
-// 1.13c D2Game+0x8DFD0
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_8DFD0(void* unit, void* client, void* item, uint32_t dwFlag, const D2GameBatchB87Env* env) {
-    uint32_t id = (unit && rd32(unit, 0) == 0)
-        ? rd32(env->ordinal10920(unit), 0x9C) : 0;
-    if (id != (uint32_t)(uintptr_t)client) d2game_fatal(0x7E6);
-    env->sub8D3D0(client, item, 3, dwFlag, 0);
-}
-

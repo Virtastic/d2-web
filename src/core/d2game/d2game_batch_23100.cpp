@@ -23,7 +23,7 @@ struct D2GameBatch23100Env {
 // sub1560(4), kind 2 fails on MonStats row flag bit1 (bitMasks[1]) or sub15D0(0x11), kind 3 needs
 // sub1560(2). Returns 1 when eligible.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_23100(void* thisPtr, uint32_t param1, uint32_t param2,
+EMSCRIPTEN_KEEPALIVE uint32_t d2_batch_d2game_23100(void* thisPtr, uint32_t param1, uint32_t param2,
                                                  int32_t param3, const D2GameBatch23100Env* env)
 {
     if (rd8(param2, 6) == 0 || (param3 == 0 && rd16(param2, 4) > 99)) return 0;
