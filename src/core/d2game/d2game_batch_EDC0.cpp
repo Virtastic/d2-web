@@ -37,7 +37,7 @@ struct D2GameEDC0Env {
 // since 0xE800 only returns non-zero for a unique one -- unless the id is above 4096. Every path
 // after the flag test returns 1.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_edc0(void* game, void* item, const D2GameEDC0Env* env)
+EMSCRIPTEN_KEEPALIVE int32_t d2_fnenv_d2game_edc0(void* game, void* item, const D2GameEDC0Env* env)
 {
     const void* itemsTxt = env->getItemsTxtRecord(item ? (int32_t)rd32(item, 4) : -1);
     if (!itemsTxt) return 0;

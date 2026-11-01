@@ -81,7 +81,7 @@ static CRITICAL_SECTION g_clientListLock;      // 0x6FD30BB8
 static CRITICAL_SECTION g_clientByNameLock;    // 0x6FD30BD0
 static CRITICAL_SECTION g_gameGuidLock;        // 0x6FD30BE8
 static int32_t  g_clientListInitialized;       // 0x6FD31C18 (1.10f gbClientListInitialized_6FD447E8)
-static int32_t  g_gameGuidSlots[1024];         // 0x6FD30C04 (1.10f gnGamesGUIDs_6FD447F8), -1 free
+static int32_t  g_gameGuidSlots[1025];         // 0x6FD30C04 (1.10f gnGamesGUIDs_6FD447F8), -1 free
 static uint32_t g_updateFlag;                  // 0x6FD31C38
 
 // Client record offsets (1.13c): +0x00 id, +0x04 state, +0x0D name[16], +0x170 unit id,
@@ -196,6 +196,9 @@ void D2GAME_SendHeaderOnlyFF(uint32_t client, const D2GameBatch4Env* env)
     const uint8_t b = 0xFF;
     env->appendPacket((void*)(uintptr_t)client, &b, 1);   // 0x8A3E0
 }
+
+// FN probe access to the game-id slot table (0x6FD30C04).
+int32_t* d2game_49850_gameSlots() { return g_gameGuidSlots; }
 
 // 1.13c D2Game+0x2A2D0
 // Claim a game-GUID slot: under 0x6FD30BE8, if slot param_2 is -1 store param_1 and release; a second

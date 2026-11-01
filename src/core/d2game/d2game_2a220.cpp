@@ -12,6 +12,10 @@ static uint16_t g_gameIdCursor = 1;   // 0x6FD2E350 low word
 static int32_t  g_gameIdSlots[0x401]; // 0x6FD30C04, indexed by cursor value (0 free, -1 taken)
 static CRITICAL_SECTION g_gameIdLock; // 0x6FD30BE8
 
+// FN probe access to the cursor word and the slot table.
+uint16_t* d2game_2a220_cursor() { return &g_gameIdCursor; }
+int32_t* d2game_2a220_slots() { return g_gameIdSlots; }
+
 uint32_t GAME_AllocGameId_2A220()
 {
     EnterCriticalSection(&g_gameIdLock);                    // Ordinal 10050

@@ -72,7 +72,10 @@ D2GameStrc* gpGame_6FD457FC;
 int32_t gnAct_6FD45824;
 D2ServerCallbackFunctions* gpD2EventCallbackTable_6FD45830;
 CRITICAL_SECTION gCriticalSection_6FD45800;
-HGAMEDATA hGameArray_6FD447F8[1024]; // TODO: Right size?
+HGAMEDATA hGameArray_6FD447F8[1025]; // 1.13c table at 0x6FD30C04 indexed by nGameId (1..0x400), slot 0 unused
+CRITICAL_SECTION gCriticalSection_6FD30BB8; // 1.13c D2Game+0x2A9A0 teardown lock
+CRITICAL_SECTION gCriticalSection_6FD30BD0; // 1.13c D2Game+0x2A9A0 teardown lock (client-by-name list)
+int32_t gnClientsInitialized_6FD31C18;
 int32_t gwGameId_6FD2CA04 = 1;
 D2GameDataTableStrc* gpGameDataTbl_6FD45818;
 int32_t gbD2ServerCallbackFunctionsInitialized_6FD45834;
@@ -164,24 +167,28 @@ int32_t __stdcall D2Game_10046()
 //D2Game.0x6FC35810
 int32_t __stdcall D2Game_10050()
 {
-    CLIENTS_Release();
+    // 1.13c D2Game+0x2A9A0: delete the client-list and by-name locks, clear the clients flag, delete the game-list lock,
+    // clear the item cache (0x8F140), reset the game-id cursor's low word, the game-data table and the act word (0x6FD31C30).
+    DeleteCriticalSection(&gCriticalSection_6FD30BB8);
+    DeleteCriticalSection(&gCriticalSection_6FD30BD0);
+    gnClientsInitialized_6FD31C18 = 0;
     DeleteCriticalSection(&gCriticalSection_6FD45800);
     SUNITPROXY_ClearGlobalItemCache();
-    gwGameId_6FD2CA04 = 1;
+    gwGameId_6FD2CA04 = (gwGameId_6FD2CA04 & ~0xFFFF) | 1;
     gpGameDataTbl_6FD45818 = nullptr;
     gnAct_6FD45824 = 0;
     return TRUE;
 }
 
 //D2Game.0x6FC35840
-// 1.13c D2Game+0x2A3B0 (delta: 1.13c indexes the handle array by nGameId directly and returns the raw handle; 1.10f form kept, array is internal)
+// 1.13c D2Game+0x2A3B0 (delta: 1.13c indexes the handle array by nGameId directly, not nGameId - 1)
 D2GameGUID __fastcall GAME_GetGameGUIDFromGameId(uint16_t nGameId)
 {
 	D2GameGUID nGUID = 0;
 	EnterCriticalSection(&gCriticalSection_6FD45800);
-	if (hGameArray_6FD447F8[nGameId - 1] && hGameArray_6FD447F8[nGameId - 1] != D2GameReservedSlotHandle)
+	if (hGameArray_6FD447F8[nGameId] && hGameArray_6FD447F8[nGameId] != D2GameReservedSlotHandle)
 	{
-		nGUID = GetHashValueFromGameHandle(hGameArray_6FD447F8[nGameId - 1]);
+		nGUID = GetHashValueFromGameHandle(hGameArray_6FD447F8[nGameId]);
 	}
 
 	LeaveCriticalSection(&gCriticalSection_6FD45800);
