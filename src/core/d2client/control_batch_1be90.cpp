@@ -1,44 +1,5 @@
-// Prior art used: ; d2bs pointer table is 1.14d and supplies no
-// implementation for these 1.13c internals. D2MOO has no D2Client module.
-#include <array>
-#include <cstdint>
-#include <cstring>
-#include <stdexcept>
+#include "control_batch_1be90.h"
 namespace d2client_control_batch {
-template<class T> T read(const void* p, unsigned o) { T v; std::memcpy(&v,static_cast<const uint8_t*>(p)+o,sizeof v); return v; }
-struct Unit { int32_t type, classId, id, mode; void* data; void* path; Unit* next; uint32_t retailAddress; };
-struct Binding { uint8_t value, slot; int32_t command, item; };
-// Required native-pointer services represent imported DLL calls, never retail pointer tokens.
-struct Services {
- virtual ~Services()=default;
- virtual Unit* selected()=0; virtual void* inventory(Unit*)=0;
- virtual void prepare()=0; virtual void setInventory(void*)=0; virtual void refresh()=0;
- virtual int32_t inventoryValue(void*,Unit*)=0; virtual void publish(int32_t)=0;
- virtual bool active(Unit*)=0; virtual int32_t unitValue(Unit*)=0;
- virtual void deactivate()=0; virtual void update()=0;
- virtual int32_t displayMode()=0;
- virtual void removeItem(void*,uint32_t,int32_t)=0; virtual void packet(const uint8_t*,unsigned)=0;
- virtual void destroy(void*)=0; virtual void sound(int32_t,int32_t)=0;
- [[noreturn]] virtual void fatal(int32_t)=0;
- virtual int32_t itemProperty(void*,int32_t,int32_t)=0;
- virtual void initializeItem(uint8_t*)=0; virtual void inspectItem(uint8_t*)=0;
- virtual void itemPosition(Unit*,int32_t&,int32_t&)=0;
- virtual int32_t x(Unit*)=0; virtual int32_t y(Unit*)=0;
- virtual int32_t pathCoordinate10(void*)=0; virtual int32_t pathCoordinate0C(void*)=0;
- virtual void effect(int32_t,int32_t,int32_t,int32_t,int32_t)=0;
-};
-struct State {
- Services& api; void* inventoryOwner{}; uint32_t active{}; int32_t value{};
- uint32_t packetValues[3]{}; std::array<Binding,41> bindings{}; std::array<uint32_t,256> slots{};
- int32_t panel{},modal{}; int32_t viewportMode{},width{},height{};
- struct Rect { int32_t left,right,top,bottom,unused; }; std::array<Rect,4> rects{};
- int32_t itemCount{}; uint8_t* itemRecords{}; // first record field at retail global 0xD24EA
- void* itemOwner{}; void* otherOwner{};
- std::array<void*,33> controls{}; uint8_t selectionActive{}; uint32_t selectionId{};
- std::array<Unit*,128> buckets{}; bool initialized{}; std::array<uint8_t,37> enabled{};
- uint8_t closeMode{},flag{},flag2{}; uint32_t closeValue{};
- const uint8_t* monstats{}; int32_t monstatsCount{}; uint8_t difficulty{};
-};
 // 1.13c D2Client+0x1BE90
 void sub_1BE90(State& s, Unit* edi) {
  Unit* u=s.api.selected(); if(!u)return;
@@ -95,7 +56,7 @@ bool sub_1D840(State& s,int32_t x,int32_t y) {
 void sub_1D8F0(State& s,uint32_t incoming){if(s.closeMode<5)sub_1CA00(s,incoming);s.closeValue=0;s.flag=0;s.flag2=0;sub_1CAD0(s);}
 // dup of D2Client+0x1FD00
 bool sub_1FD00(Unit* u,uint16_t mask){return u && u->type==1 && u->data && (read<uint16_t>(u->data,0x16)&mask);}
-// 1.13c D2Client+0x1FFC0
+// superseded by d2client_1ffc0.cpp (0x1FFC0)
 void sub_1FFC0(State& s,Unit* u) {
  // Retail dereferences null for an invalid monstats index; reject that invalid domain explicitly.
  if(!u || u->classId<0 || u->classId>=s.monstatsCount)throw std::out_of_range("monstats");

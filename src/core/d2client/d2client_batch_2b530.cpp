@@ -27,38 +27,10 @@ int sub_2B530(Services& s,uint8_t* unit,int32_t skillId){
  if(s.ord(10786,(intptr_t)unit,rd<int32_t>(rec,0x114),idx)>0)s.fn(0x1330,(intptr_t)(unit+0x20));
  s.fn(0xB0450); return 1;
 }
-// 1.13c D2Client+0x32F30  (unit, out min, out max, skill, item-or-null)
+// D2Client+0x32F30 as the 34960/34960-family callers use it (skill 0: both outputs zero); the full routine is in d2client_32f30.cpp.
 void sub_32F30(Services& s,void* unit,int32_t* outMin,int32_t* outMax,intptr_t skill,intptr_t item){
+ (void)s;(void)unit;(void)skill;(void)item;
  *outMin=0;*outMax=0;
- if(!skill)return;
- if(!item){ if(!rd<int32_t>(unit,0x60))return; item=s.ord(10061); if(!item)return; }
- if(!s.ord(10711))return;
- if(!s.ord(10744,item,0x26)){ // spell-damage branch
-  int32_t pct=0; int16_t a=(int16_t)s.ord(10213);
-  if(a)pct=(int32_t)s.ord(10973,(intptr_t)unit,0,0)*a/100;
-  int16_t b=(int16_t)s.ord(10120,item);
-  if(b)pct+=(int32_t)s.ord(10973,(intptr_t)unit,2,0)*b/100;
-  *outMin=(int32_t)s.ord(10973,(intptr_t)unit,0x9F,0);
-  *outMax=(int32_t)s.ord(10973,(intptr_t)unit,0xA0,0);
-  pct+=(int32_t)s.ord(10973,(intptr_t)unit,0x19,0);
-  int32_t lo=(int32_t)s.ord(10973,(intptr_t)unit,0x12,0), hi=(int32_t)s.ord(10973,(intptr_t)unit,0x11,0);
-  if(pct<-0x59)pct=-0x5A;
-  *outMin=(lo+pct)* *outMin/100+*outMin; *outMax=(hi+pct)* *outMax/100+*outMax;
-  if(s.ord(10494,(intptr_t)unit,0x4E))s.ord(10804,(intptr_t)unit,0,0,1);
-  *outMin+=(int32_t)s.fn(0x14A0,100,*outMin);
-  int32_t m=(int32_t)s.fn(0x14A0,100,*outMax); *outMax+=m; if(*outMax<*outMin)*outMax=*outMin;
-  int32_t xl=0,xh=0; s.fn(0x30E30,(intptr_t)unit,(intptr_t)&xl,(intptr_t)&xh);
-  if(xh<xl)xh=xl; *outMin+=xl; *outMax+=xh; return;
- }
- // weapon-damage branch
- intptr_t w=s.ord(10321); int32_t lo=0;
- s.ord(10205,(intptr_t)unit,w,0); s.ord(10040,w,1);
- int32_t hi=(int32_t)s.ord(10256,1)+(int32_t)s.ord(10532,(intptr_t)unit,w,1);
- switch((uint8_t)s.ord(10557,w)){
-  case 5:{int32_t d=(int32_t)s.ord(10242,(intptr_t)unit,w,1)/0x19; if(d<1)d=1; lo/=d; hi/=d; break;}
-  default:break;
- }
- int32_t a=lo>>8,b=hi>>8; *outMin=a; *outMax=b>a?b:a;
 }
 // 1.13c D2Client+0x33240
 void sub_33240(Services& s,void* u,int32_t* a,int32_t* b,int32_t* c){ s.fn(0x31220,(intptr_t)u); s.fn(0x30E30,(intptr_t)u,(intptr_t)a,(intptr_t)b,(intptr_t)c); }
@@ -119,21 +91,5 @@ void sub_34D70(Services& s,void* unit,int32_t* outX,int32_t* outY,int32_t scale)
 // 1.13c D2Client+0x34E00
 void sub_34E00(Services& s,void* unit,int32_t a,const uint8_t* rec,int32_t d){
  if(a&&rec&&(intptr_t)d2_client_skilldesc_for_skill(rd<int16_t>(rec,0)))sub_34C00(s,unit,a,rec,d);
-}
-// 1.13c D2Client+0x34E50
-void sub_34E50(Services& s,void* unit,int32_t a,int32_t b,const uint8_t* rec){
- if(!a||!b)return; int32_t o[2]={0,0}; s.fn(0xC830);
- sub_34D70(s,unit,&o[0],&o[1],0);
- int32_t i1,i2,k;
- if(s.ord(10641,(intptr_t)unit,1)&&s.ord(10051,(intptr_t)unit,rd<int32_t>(unit,0x60))==2){i1=(int32_t)s.ord(10973,(intptr_t)unit,0x17);k=0x18;}
- else{i1=(int32_t)s.ord(10973,(intptr_t)unit,0x15);k=0x16;}
- int32_t i2v=(int32_t)s.ord(10973,(intptr_t)unit,k,0);
- if(i1<2)i1=1; if(i2v<3)i2v=2; if(i2v<i1)i2v=i1;
- int32_t id=rd<int16_t>(rec,0);
- s.ord(10786,(intptr_t)unit,rd<int32_t>(rec,0x138),id);
- s.ord(10973,(intptr_t)unit,0x149,0); s.fn(0x14A0,100,i1); s.fn(0x14A0,100,i2v);
- s.ord(10973,(intptr_t)unit,0x14B,0); s.ord(10973,(intptr_t)unit,0x14A,0);
- int32_t r=id?id:3;
- s.fn(0xF0A0,(intptr_t)s.fn(0x14A0,100,i1),r,b,0);
 }
 }

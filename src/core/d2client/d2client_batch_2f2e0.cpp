@@ -209,21 +209,6 @@ int32_t sub_2FB50(const Host& h, Tables t, Address player) {
     return sum;
 }
 
-// 1.13c D2Client+0x30270 (198 B): ESI=text buffer, param_1, param_2=unit/ECX arg. flag = DAT_6fbc9854 (RVA 0x119854).
-uint32_t sub_30270(const Host& h, Address esiBuf, uint32_t p1, Address p2) {
-    if (h.read<int32_t>(kBase + 0x119854) == 0) {
-        h.call(0x2E190, {esiBuf});
-        h.call(0x2F520, {esiBuf, 0x10a0, 0, 0, 0, 0});
-    } else {
-        sub_2F2E0(h, esiBuf, p2, 0);
-        h.call(0x2EF80, {esiBuf});
-        h.call(0x2D000, {esiBuf, p1, p2});
-        uint32_t v = static_cast<uint32_t>(h.call(ord(10653)));
-        if (v) { h.call(0x2D9B0, {0x10a6, 0x10b3, v, 1}); return 1; }
-    }
-    return 1;
-}
-
 // dup of D2Client+0x2FD10 (28 B): skill-desc record (0x17F0) -> u16 at +8+idx*2, or 0x1506 when none.
 uint16_t sub_2FD10(const Host& h, int32_t idx) {
     Address rec = static_cast<Address>(h.call(0x17F0));

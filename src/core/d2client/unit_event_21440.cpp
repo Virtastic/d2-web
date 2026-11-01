@@ -7,51 +7,8 @@
 #include <cstring>
 #include <cstdlib>
 
+#include "unit_event_21440.h"
 namespace d2client_21440 {
-// These are retail addresses, including callback addresses. Never cast them to
-// native pointers: the caller resolves retail storage and dispatches callbacks.
-struct Event {
-    uint32_t kind, key1, key2, arg, callback, data, prev, next;
-};
-struct Association {
-    uint32_t type;
-    int32_t classId, id, owner;
-    uint32_t value, x, y, percent, pending, extra[3], next;
-};
-static_assert(sizeof(Event) == 0x20 && offsetof(Event, callback) == 0x10);
-static_assert(offsetof(Event, prev) == 0x18 && offsetof(Event, next) == 0x1c);
-static_assert(sizeof(Association) == 0x34 && offsetof(Association, next) == 0x30);
-static_assert(offsetof(Association, percent) == 0x1c && offsetof(Association, pending) == 0x20);
-struct UnitLayout {
-    uint32_t type, classId, pool, id;
-    uint8_t rest[0x80];
-    uint32_t eventHead;
-};
-static_assert(offsetof(UnitLayout, pool) == 8 && offsetof(UnitLayout, id) == 0xc);
-static_assert(offsetof(UnitLayout, eventHead) == 0x90);
-struct State {
-    void* context;
-    uint8_t* (*resolve)(void*, uint32_t);
-    // Fog #10045/#10046 and #10042/#10043 respectively. Allocators return
-    // retail addresses; the native allocation and address mapping belong to caller.
-    uint32_t (*poolAlloc)(void*, uint32_t pool, uint32_t size, const char*, uint32_t line, uint32_t flags);
-    void (*poolFree)(void*, uint32_t pool, uint32_t address, const char*, uint32_t line, uint32_t flags);
-    uint32_t (*alloc)(void*, uint32_t size, const char*, uint32_t line, uint32_t flags);
-    void (*free)(void*, uint32_t address, const char*, uint32_t line, uint32_t flags);
-    uint32_t (*findOwner)(void*, int32_t id); // D2Client+0x9D630, ECX unused
-    int16_t (*ownerGroup)(void*, uint32_t owner); // D2Client+0x9CE80, EAX input
-    uint32_t (*compareUnit)(void*, uint32_t unit, int32_t owner, uint32_t mode); // +0x4FD90
-    const char* (*errorText)(void*, uint32_t code); // Fog #10265
-    void (*printError)(void*, const char* format, const char* text); // Fog #10024
-    void (*exitProcess)(void*, int32_t code);
-    uint32_t head;        // DAT_6fbcc4d4
-    uint32_t currentUnit; // DAT_6fbcbbfc
-    uint32_t tables;      // *sgptDataTables
-    uint32_t bitMasks;    // gdwBitMasks
-    uint32_t returnAddress; // caller return address observed in the retail stack frame
-};
-static constexpr const char* eventFile = "..\\Source\\D2Client\\UNIT\\CUnitEvent.cpp";
-static constexpr const char* associationFile = "..\\Source\\D2Client\\GAME\\RosterPets.cpp";
 static uint32_t read(State& s, uint32_t addr) {
     uint32_t value; std::memcpy(&value, s.resolve(s.context, addr), 4); return value;
 }
@@ -80,21 +37,16 @@ void removeEvents(State& s, uint32_t unit, uint32_t key1, uint32_t key2) {
     }
 }
 // 1.13c D2Client+0x214B0
-uint32_t addEvent(State& s, uint32_t unitEsi, uint32_t param1, uint32_t param2,
-                  uint32_t param3) {
+// ESI = unit, three stack words (ret 0x0C): p1 -> data(+0x14), p2 -> key1(+0x04), p3 -> key2(+0x08).
+// Kind is fixed 0x48; callback (+0x10) is the caller's return address.
+uint32_t addEvent(State& s, uint32_t unitEsi, uint32_t p1, uint32_t p2, uint32_t p3) {
     if (!unitEsi) return 0;
     uint32_t p = s.poolAlloc(s.context, read(s, unitEsi + 8), 0x20, eventFile, 0x48, 0);
     Event& e = event(s, p);
     e = {};
-    // Retail uses ESI for the unit and consumes exactly three stack arguments.
-    // The fourth record word is the caller return address, not a callback arg.
-    e.kind = 0x48;
-    e.key1 = param2;
-    e.key2 = param3;
-    e.callback = s.returnAddress;
-    e.data = param1;
+    e.kind = 0x48; e.callback = s.returnAddress; e.data = p1; e.key1 = p2; e.key2 = p3;
     e.next = read(s, unitEsi + 0x90);
-    if (e.next) event(s, e.next).prev = p;
+    if (read(s, unitEsi + 0x90)) event(s, read(s, unitEsi + 0x90)).prev = p;
     write(s, unitEsi + 0x90, p);
     return p;
 }

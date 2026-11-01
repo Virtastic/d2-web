@@ -206,25 +206,6 @@ uint32_t sub_2E410(const Host& h, Address dst, Address unit, Address dt, Address
     return 1;
 }
 
-// 1.13c D2Client+0x32E20 (261 B), fastcall: p2/p3 nonzero. Gets the skill row (0x23C stride, +0x158
-// percent) and scales the first value by it, then forwards via +0x30E30 and +0x2F0A0.
-void sub_32E20(const Host& h, Address ecx, Address p2, Address p3, Address dt, int32_t esi,
-               int32_t edi, uint32_t ret) {
-    if (!p2 || !p3) return;
-    int32_t v[2]{};
-    h.call(0x31220, {ecx});
-    int32_t id = (int32_t)h.call(0xC42A, {p2, 0, 0xd40});
-    Address tbl = h.read<uint32_t>(dt);
-    int32_t pc = 0;
-    if (id >= 0 && id < h.read<int32_t>(tbl + 0xba0)) {
-        Address row = h.read<uint32_t>(tbl + 0xb98) + id * 0x23c;
-        if (row) pc = h.read<int32_t>(row + 0x158);
-    }
-    v[0] += (pc * v[0]) / 100;
-    h.call(0x30E30, {ecx, out(&v[0]), out(&v[1])});
-    h.call(0x2F0A0, {(uintptr_t)(edi + (pc * edi) / 100), (uintptr_t)esi, ret, 0});
-}
-
 // 1.13c D2Client+0x2FD30 (1317 B): SkillDesc tooltip layout; the 1317-byte body is mostly stack
 // plumbing around the callbacks at 0xF5210 (0x90 entries) and 0xF52A0 (0x48 entries) and the
 // 0xF52E8 layout rows (stride 12). Only the dispatch preconditions are reproduced.

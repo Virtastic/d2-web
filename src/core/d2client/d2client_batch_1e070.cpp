@@ -11,73 +11,7 @@
 #include <cstring>
 #include <emscripten.h>
 
-struct D2ClientBatch1de0Env {
-    // 0x1E070
-    void* (*spawnA7780)(uint32_t* rec, uint32_t a, uint32_t b, int32_t c);      // 0xA7780
-    // 0x1E5F0 (the loading-screen draw; all imported ordinals of the retail thunk table)
-    void     (*ord10227)();
-    uint32_t (*ord10265)();
-    void     (*ord10024)(const uint32_t* msg);
-    void*    (*ord10048)(const uint32_t* path);
-    void     (*fn3CC60)(uint32_t handle, uint32_t* table, uint32_t count);       // 0x3CC60
-    void     (*fn1C720)();                                                       // 0x1C720
-    void     (*ord10021)();
-    void     (*ord10060)();
-    const void* (*ord10003)(uintptr_t arg);
-    void     (*ord10028)();
-    void     (*ord10150)(const void* text, int32_t x, int32_t y, int32_t color, int32_t bfalse);
-    void     (*drawCel)(uint32_t cel, uint32_t frame, int32_t x, int32_t y, int32_t palette, int32_t mode);
-    uint8_t  (*fn1C980)(uint32_t mode);                                          // 0x1C980, mode in EAX
-    uint32_t (*fn1D840)(int32_t x, int32_t y);                                   // 0x1D840
-    void     (*exitProcess)(int32_t code);
-    // 0x200E0 / 0x20B70
-    void     (*ord10569)(void* obj, uint8_t* out, uint8_t* out2);
-    uint32_t (*ord10750)(uint32_t p);
-    uint32_t (*ord10867)(uint32_t p);
-    uint32_t (*fnB0450)(void* obj, uint32_t value);                              // 0xB0450, obj in ESI
-    void     (*ord10973)(void* obj, uint32_t a, uint32_t b);
-    // 0x20180
-    void*    (*fnA60D0)(void* obj);                                              // 0xA60D0
-    bool     (*fn1FD00)(void* obj, uint32_t mask);                               // 0x1FD00, obj in EAX
-    void*    (*fnA5F70)(void* obj);                                              // 0xA5F70, obj in ESI
-    uint32_t (*fn1630)(void* obj);                                               // 0x1630
-    uint32_t (*fn1660)(void* obj);                                               // 0x1660
-    void     (*ord10983)(uint32_t p);
-    uint32_t (*ord10764)(uint32_t p);
-    void     (*ord10936)();
-    void     (*ord10614)();
-    uint32_t (*ord11029)(void* obj);
-    uint32_t (*ord10240)(void* obj, uint32_t value);
-    // 0x20340 / 0x20A60
-    void     (*fnB30F0)(uint32_t* ctx);                                          // 0xB30F0
-    void     (*fn88A70)(void* obj, uint32_t a, uint32_t b, uint32_t c);           // 0x88A70, key in EBX
-    // 0x20620
-    const void* (*ord10038)(int32_t id);
-    void     (*ord10971)();
-    uint32_t (*ord10852)(uint32_t a);
-    const void* (*ord10249)(uint32_t a);
-    uint32_t (*ord10272)(uint32_t a);
-    void     (*fn90CB0)(void* dst, const void* fmt, const void* arg);            // 0x90CB0
-    uint32_t (*fn1330)(uint64_t* state, uint32_t n);                             // 0x1330, n in EAX
-    void     (*unicodeCtor300)(void* buf);                                       // Unicode x300, stride 4
-    void     (*unicodeToUnicode)(void* dst, const char* src, int32_t n);
-    // 0x20FB0
-    void     (*fn53070)();
-    void     (*fn52860)();
-    void     (*fn52230)(void* a, void* b);
-    void     (*fn52620)();
-    void     (*fn527A0)();
-    void     (*fn52270)();
-    void     (*fn52600)();
-    void     (*fn52BD0)(void* obj);
-    void     (*fn52320)();
-    void     (*fn526E0)();
-    void     (*fn530D0)();
-    void     (*fn529F0)();
-    void     (*fn52570)();
-    // 0x21400
-    uint32_t (*invoke1410)(void* fn, uint32_t a, uint32_t b, uint32_t c, uint32_t d);
-};
+#include "d2client_batch_1e070_env.h"
 
 // Retail module state, all zero-initialised.
 static uint8_t  g_enable12339F;      // +0x12339F  DAT_6fbd339f
@@ -108,7 +42,7 @@ static uintptr_t g_animFn[64];       // +0x0FAA340  DAT_6fbaa340, animation call
 static uint8_t  g_conv1223D0[16];    // +0x1223D0  DAT_6fbd23d0, the Unicode conversion scratch
 static int32_t  g_ctx48[0x48 / 4];   // the throwaway context 0x1E5F0 builds (frame +0, cel +0x34)
 
-// 1.13c D2Client+0x1e070: while the byte flag is set, advance the 64-bit client RNG at state+0x20
+// superseded by d2client_1e070.cpp (0x1E070): while the byte flag is set, advance the 64-bit client RNG at state+0x20
 // (x = lo32 * 0x6AC690C5 + hi32, stored back), take used = lo32 % 3, and for i in [0, used+2) spawn
 // actor record {id = ++counter (0x0DE834, wraps 0xFFFFFFFF->0; type 0x95; x = param_1 + (i&1);
 // y = param_2 + (i&1); 0; 0; 1} through 0xA7780; publish flag 1 and the low byte of the returned
@@ -200,7 +134,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_1e5f0(uint32_t mode1C980, const D2ClientBatc
     env->drawCel(g_11C304, frame, x + 3, y - 4, -1, 5);
 }
 
-// 1.13c D2Client+0x200e0: 10569(param_1, &kind, &other); when the object is absent or its +0x10
+// superseded by d2client_200e0.cpp (0x200E0): 10569(param_1, &kind, &other); when the object is absent or its +0x10
 // word is 0, and kind is 4, refresh the two position accessors of +0x2C for every object type except
 // 2 and 4..5, then call 0xB0450. Retail's 0xB0450 argument is the caller's ECX (an artifact of the
 // previous call), modelled as 0.
@@ -217,7 +151,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_200e0(int32_t* param_1, const D2ClientBatch1
     }
 }
 
-// 1.13c D2Client+0x020180: object type 3 only. Resolve the record through 0xA60D0, require the dword
+// superseded by d2client_20180.cpp (0x20180): object type 3 only. Resolve the record through 0xA60D0, require the dword
 // at +4 to be a valid index into sgptDataTables+0xB64 (stride 0x1A4) and the gdwBitMasks[0x10] bit at
 // record+5 clear; 0x1FD00(obj, 0x80) must be false. Take the +0x2C accessor pair (through 0xA5F70 when
 // it resolves, else 10983/10764), compare its vertical accessor with the record object's +0x10
@@ -259,7 +193,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_20180(void* self, int32_t param_1,
     if (*piVar5 == 1 && piVar5[5] != 0) *(uint8_t*)(piVar5[5] + 0x16) &= 0x7F;
 }
 
-// 1.13c D2Client+0x20340 (0x020340): __fastcall(param_1 /*ECX*/, param_2 /*EDX*/), eaxIn = EAX (0 becomes 1).
+// superseded by d2client_20340.cpp (0x20340) (0x020340): __fastcall(param_1 /*ECX*/, param_2 /*EDX*/), eaxIn = EAX (0 becomes 1).
 // Skip only when param_2 == 0xC3 and the object is not a live type-1 object with bit 0 of +0x17 at
 // obj[5]. Build the 0x5C-byte draw context {+0 = 0x21; +4 = obj; +0x10 = param_2; +0x14 = x; +0x18 =
 // y; +0x1C/+0x20 = per-tile x/y; +0x2C = 0; +0x30 = eaxIn; +0x54 = 0x73B60 unless param_2 == 0x141;
@@ -391,7 +325,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_20620(int32_t* param_1, uint32_t param_2, in
     env->ord10971();
 }
 
-// 1.13c D2Client+0x20a60: __fastcall with the object in ESI. Refresh 10867/10750 for every type but 2
+// superseded by d2client_20a60.cpp (0x20A60): __fastcall with the object in ESI. Refresh 10867/10750 for every type but 2
 // and 4..5 when +0x2C is set, emit two 0xB30F0 draws of a zeroed 0x5C-byte context whose first dword is
 // 1, then 0x88A70(obj, 0, 0, 0).
 extern "C"
@@ -410,7 +344,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_20a60(int32_t* obj, const D2ClientBatch1de0E
     env->fn88A70(obj, 0, 0, 0);
 }
 
-// 1.13c D2Client+0x20b70: 10569(param_1, &kind, &other); when the object is absent, its +0x10 word is
+// superseded by d2client_20b70.cpp (0x20B70): 10569(param_1, &kind, &other); when the object is absent, its +0x10 word is
 // 0 or 3, and kind is 2, send 10973(param_1, 0x0C, 0) and run 0x20340(param_1, 0xE1) with the retail
 // EAX (0 -> 1 inside 0x20340).
 extern "C"
@@ -423,7 +357,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_20b70(int32_t* param_1, const D2ClientBatch1
     }
 }
 
-// 1.13c D2Client+0x20f20: __fastcall, object in EBX. Only a live type-1 object whose obj[5] is set and
+// superseded by d2client_20f20.cpp (0x20F20): __fastcall, object in EBX. Only a live type-1 object whose obj[5] is set and
 // whose byte at +0x1C is nonzero: play, with the bit-3 flag of obj[5]+0x16, every non-null callback at
 // 0x0FAA340[index], first for the four indexes at 0x0D6D2C..0x0D6D38, then for the nine bytes at
 // obj[5]+0x1C.
@@ -445,7 +379,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_20f20(int32_t* obj) {
     }
 }
 
-// 1.13c D2Client+0x20fb0: __fastcall, dispatch table on the dword at param_1+4, each handler gated on
+// superseded by d2client_20fb0.cpp (0x20FB0): __fastcall, dispatch table on the dword at param_1+4, each handler gated on
 // the sub-state at +0x10: 0x2D/0x9C/0xD3/0xE5/0xF2/0xF3/0x100/0x10B/0x16E/0x1DF/0x220 at 0 (0x9C also
 // receives param_1 twice, 0x1DF receives param_1), 0x11C only at 0x0E, and 0x21C..0x21E at 0.
 extern "C"
@@ -509,21 +443,23 @@ EMSCRIPTEN_KEEPALIVE void d2_client_212f0(int32_t* param_1, uint32_t param_2, in
     }
 }
 
-// 1.13c D2Client+0x021400: walk the linked list at obj+0x90 (next at node[7]); every node whose key
-// (*node) equals the EBX argument invokes node[5](param_1, param_2, node[3], node[4]) and its return
-// becomes the result. The walk continues after a hit; the last hit wins.
+// 1.13c D2Client+0x021400: EDI = unit, EBX = key, stack (param_1, param_2), ret 8. Walks the event list at unit+0x90 (retail
+// addresses; next at +0x1C); every node whose first dword equals the key calls node+0x14 with ECX = key, EDX = unit and the
+// stack words (param_1, param_2, node+0xC, node+0x10); the walk continues after a hit and the last return wins.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_client_21400(uint32_t param_1, uint32_t param_2, void* obj,
                                               int32_t key, const D2ClientBatch1de0Env* env) {
     uint32_t result = 0;
     if (obj == nullptr) return result;
-    int32_t* node = *(int32_t**)((uint8_t*)obj + 0x90);
-    while (node != nullptr) {
-        int32_t* next = (int32_t*)node[7];
-        if (*node == key)
-            result = env->invoke1410((void*)(uintptr_t)node[5], param_1, param_2,
-                                     (uint32_t)node[3], (uint32_t)node[4]);
-        node = next;
+    auto rd = [&](const uint8_t* p, uint32_t off) { uint32_t v; std::memcpy(&v, p + off, 4); return v; };
+    uint32_t addr = rd((const uint8_t*)obj, 0x90);
+    while (addr != 0) {
+        const uint8_t* node = env->resolve(addr);
+        uint32_t next = rd(node, 0x1c);
+        if (rd(node, 0) == (uint32_t)key)
+            result = env->invoke1410(rd(node, 0x14), (uint32_t)key, (uint32_t)(uintptr_t)obj, param_1, param_2,
+                                     rd(node, 0xc), rd(node, 0x10));
+        addr = next;
     }
     return result;
 }

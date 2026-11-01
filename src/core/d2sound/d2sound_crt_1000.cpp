@@ -15,6 +15,7 @@ static d2s_fn  g_term[1];              // 0x6F9C502C..5034  C terminators (empty
 static uint32_t g_exitFlag;            // 0x6F9C6040
 static uint8_t  g_quickExit;           // 0x6F9C603C
 static uint32_t g_exiting;             // 0x6F9C6044
+static uint32_t g_holdrand = 1;        // per-thread _holdrand; one thread here
 
 // 1.13c D2sound+0x1000  ___crtExitProcess: calls mscoree!CorExitProcess when loaded, then ExitProcess.
 static void crtExitProcess(int code) { _exit(code); }
@@ -63,11 +64,8 @@ void d2sound__exit(unsigned code) { doexit(code, 1, 0); }
 // 1.13c D2sound+0x11A9  __cexit
 void d2sound_cexit(void) { doexit(0, 0, 1); }
 
-uint32_t* d2s_holdrand_slot(void);   // d2sound_sub_18fe.cpp: the holdrand word of the thread data (__getptd 0x18FE)
-
-// 1.13c D2sound+0x11B8  _rand: MSVC LCG on the per-thread holdrand (_tiddata +0x14, from __getptd)
+// 1.13c D2sound+0x11B8  _rand: MSVC LCG on the per-thread holdrand
 int d2sound_rand(void) {
-    uint32_t* h = d2s_holdrand_slot();
-    *h = *h * 0x343fdu + 0x269ec3u;
-    return (int)((*h >> 16) & 0x7fff);
+    g_holdrand = g_holdrand * 0x343fdu + 0x269ec3u;
+    return (int)((g_holdrand >> 16) & 0x7fff);
 }

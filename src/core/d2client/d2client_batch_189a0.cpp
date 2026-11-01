@@ -5,19 +5,7 @@
 #include <cstring>
 #include <emscripten.h>
 
-// Retail memory contains 32-bit addresses, never native pointers. The adapter
-// resolves them; call arguments containing host pointers retain uintptr_t width.
-// call identifies an internal callee by RVA or an imported callee by ordinal.
-// Its adapter supplies the named callee's retail register/stack convention.
-struct D2C189a0Env {
-    void* (*resolve)(uint32_t);
-    uintptr_t (*call)(uint32_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
-    uint32_t* globalClient; // DAT_6fbcbbfc, retail address
-    uint32_t* registry;     // DAT_6fbcb800, eight retail addresses
-    uint32_t* listHead;     // DAT_6fbcc4d4
-    uint32_t* unitBuckets;  // DAT_6fbba808, 128 retail addresses
-    uint32_t* shutdownFlag; // DAT_6fbcc3b8
-};
+#include "d2client_batch_189a0.h"
 static uint32_t word(const void* p, uint32_t offset) {
     uint32_t v; std::memcpy(&v, static_cast<const uint8_t*>(p)+offset, 4); return v;
 }
@@ -43,7 +31,7 @@ static void unitList(void* window,const D2C189a0Env* e) {
     if(word(u,0)!=1) { auto message=call(e,10265,0x5a); call(e,10024,0xD359F,message); call(e,0x3664,UINT32_MAX); return; }
     // Retail uses the first entry with this id, even if a later entry has mode 2.
     for(p=ptr(e,*e->listHead);p;p=ptr(e,word(p,0x30))) if(word(p,8)==id) {
-        if(word(p,0x2c)==2) call(e,0x511F0,host(window),0);
+        if(word(p,0x2c)==2) call(e,0x511F0,host(window),0,host(u));  // ECX = window, stack 0, EAX = the unit found above
         return;
     }
 }
@@ -131,7 +119,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_19d80(uint32_t address,const D2C1
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_1aaa0(void* context,const D2C189a0Env* e) {
     void* client=ptr(e,word(context,4)); if(!client || word(client,0)!=0) return;
     if(!requireRoom(client,e) || call(e,10392,host(ptr(e,word(client,0x2c))))) return;
-    uint32_t mode=word(client,0x10); if(mode==2 || mode==3 || mode==6) call(e,0x1A010,host(ptr(e,word(context,0xc))),mode==3?3:1,host(client));
+    uint32_t mode=word(client,0x10); if(mode==2 || mode==3 || mode==6) call(e,0x1A010,host(ptr(e,word(context,0xc))),mode==3?3:1,host(client),word(context,0x10));  // ECX = obj, stack (mode, client), EAX = context+0x10
 }
 // 1.13c D2Client+0x1B620
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_1b620(void* state,const D2C189a0Env* e) {
