@@ -132,6 +132,7 @@ import { decodeDc6 } from './assets/d2-formats.mjs';
 import { createGameCursor } from './assets/game-cursor.mjs';
 import { createItemTargeting } from './assets/item-targeting.mjs';
 import { createPointerLayer } from './assets/pointer-layer.mjs';
+import { createFrontendHoverSync } from './assets/frontend-hover-sync.mjs';
 import { DROPPED_GAMEPLAY_KEYS } from './assets/retail-key-bindings.mjs';
 import { createHelpOverlayRenderer } from './assets/help-overlay.mjs';
 import { CONFIGURE_CONTROLS_SLOTS, CONFIGURE_CONTROLS_STORAGE_KEY, beltKeyNames, controlActionForKey, createConfigureControls, restoreControlBindings } from './assets/configure-controls.mjs';
@@ -192,6 +193,7 @@ const sessionBar = document.querySelector('#session-bar');
 const ctx = canvas.getContext('2d', { alpha: renderMode(window.__d2Entry.search) === 'w', willReadFrequently: true })   // ?render=w: transparent, the worker's world canvas sits under it;
 const input = new CommandInput();
 const frontendPointerStates = createFrontendPointerStates();
+const frontendHoverSync = createFrontendHoverSync();
 // The front-end screen that owns a pointer gesture, with TITLE's trademark phase exempt: it owns
 // its own countdown (s198), so it arms a control of its own that only advances the phase.
 const trademarkPointerControl = { name: 'trademark', press: () => 'trademark', release: (token) => (token === 'trademark' ? titleAdvance() : false), cancel: () => {} };
@@ -3901,6 +3903,7 @@ async function syncRealmScene() {
 
 function drawFrame() {
   fitView();   // also per frame: a resize that lands between events must never leave a stale view
+  frontendHoverSync.frame(frontendHoverTarget());
   const w = canvas.width, h = canvas.height;
   // The title, character select and the movies draw retail's own pointer sprite (ohand.dc6); the
   // system arrow would be a second one. IN GAME the pointer layer below owns this style instead: the
@@ -5573,6 +5576,16 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 canvas.addEventListener('wheel', (e) => { if (npcMenu?.hireOpen) { npcMenu.hireScroll(Math.sign(e.deltaY)); e.preventDefault(); } }, { passive: false });
+// The front-end screen that takes hover right now, as { key, hover(x, y) }; a screen entered or rebuilt under a still mouse is seeded from frontendHoverSync.
+function frontendHoverTarget() {
+  const at = (o, f) => (o ? { key: o, hover: (x, y) => f(x, y, canvas.width, canvas.height) } : null);
+  if (screen === SCREEN.TITLE) return titlePhase === 'menu' ? at(titleScreen, (...a) => titleScreen.hover(...a)) : null;
+  if (screen === SCREEN.CINEMATICS) return at(cinematicsScreen, (...a) => cinematicsScreen.hover(...a));
+  if (screen === SCREEN.OTHER_MULTIPLAYER) return at(otherMultiplayerScreen, (...a) => otherMultiplayerScreen.hover(...a));
+  if (screen === SCREEN.SELECT) return at(charSelect, (...a) => charSelect.hover(...a));
+  if (screen === SCREEN.CREATE) return at(charCreate, (...a) => charCreate.hover(...a));
+  return null;
+}
 canvas.addEventListener('pointermove', (e) => {
   gameCursor?.noteInput();
   const [x, y] = canvasPoint(e);
@@ -5594,11 +5607,7 @@ canvas.addEventListener('pointermove', (e) => {
   if (screen === SCREEN.GAME && npcMenu?.hireOpen) npcMenu.hireHover(x, y, canvas.width, canvas.height);
   // Retail draws no pointer cel on the trademark screen (its draw list has none), so a move there
   // only ends the phase's clock through the click path below.
-  if (screen === SCREEN.TITLE && titlePhase === 'menu') titleScreen?.hover(x, y, canvas.width, canvas.height);
-  else if (screen === SCREEN.CINEMATICS) cinematicsScreen?.hover(x, y, canvas.width, canvas.height);
-  else if (screen === SCREEN.OTHER_MULTIPLAYER) otherMultiplayerScreen?.hover(x, y, canvas.width, canvas.height);
-  else if (screen === SCREEN.SELECT) charSelect?.hover(x, y, canvas.width, canvas.height);
-  else if (screen === SCREEN.CREATE) charCreate?.hover(x, y, canvas.width, canvas.height);
+  frontendHoverSync.move(x, y, frontendHoverTarget());
 });
 canvas.addEventListener('pointerleave', (e) => {
   controlsPanel?.pointerMove(-1, -1, canvas.width, canvas.height, e.pointerId, e.buttons);
