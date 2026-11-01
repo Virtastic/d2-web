@@ -215,8 +215,8 @@ void sub_43CA0(D2GameBatch43450Env& e, uint8_t* game, int* unit) {
     e.o10945(unit, 0, 0);
     if (unit) {
         for (uint8_t* p = (uint8_t*)(uintptr_t)unit[0x37]; p;) {
-            uint8_t c = *p; p = (uint8_t*)(uintptr_t)rd32(p, 0x24);
-            if (c == 0) e.fAE6F0(p);
+            uint8_t* node = p; p = (uint8_t*)(uintptr_t)rd32(node, 0x24);
+            if (*node == 0) e.fAE6F0(node);   // retail passes the node it just read (EAX), not its successor
         }
         int i = unit[1];
         const uint8_t* t = e.dataTables;
@@ -439,4 +439,18 @@ int sub_45000(D2GameBatch43450Env& e, void* game, void* unit, int skillId) {
         e.fFED30(game, tgt, unit);
     }
     return 1;
+}
+
+// Function probe seam for 0x43CA0: the callees are HookEnv recorders logged as the capture's hooks log them.
+#include "../fn/hookenv.h"
+static HookEnv* g43H;
+void D2Game_43CA0_probe(uint8_t* game, int* unit, const uint8_t* dt, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); g43H = &h;
+    D2GameBatch43450Env e{};
+    e.dataTables = dt;
+    e.o10945 = [](void* u, int, int b) -> uint32_t { return g43H->h(0xA3CA, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u, 0xC, (uint32_t)b); };
+    e.fAE6F0 = [](void* n) { g43H->h(0x8E6F0, (uint32_t)(uintptr_t)n); };
+    e.fAEA80 = [](void* g, void* u, int a, uint32_t b, int c, int d, int) { g43H->h(0x8EA80, 0, (uint32_t)(uintptr_t)g, (uint32_t)(uintptr_t)u, 0, 0, (uint32_t)a, b, (uint32_t)c, (uint32_t)d); };
+    sub_43CA0(e, game, unit);
 }

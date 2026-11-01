@@ -13,7 +13,6 @@ void Ordinal_10024(const void*, uint32_t);
 int32_t Ordinal_11076(void*, int32_t*, int32_t*, int32_t);
 // D2Game RVA callees
 void r_33CE0(int8_t, int8_t);      // QUESTS_EventCallback seam, called with (1, 1)
-void r_DFC10(void*);               // iterate helper, one 4-byte scratch argument
 void r_34D00(int32_t, const void*); // quest message send: (target, string)
 }
 
@@ -33,16 +32,6 @@ void QUESTS_RequireEventArgs_34660(const void* pArgs, const void* moduleTag)
         std::_Exit(-1);
     }
     r_33CE0(1, 1);
-}
-
-// 1.13c D2Game+0x37860
-// The decompile passes a 4-byte scratch to the iterate helper; the returned local is never written by it, so 0.
-int32_t ReturnZeroAfterUnitIterate_37860(void)
-{
-    int32_t scratch = 0;
-    int32_t result = 0;
-    r_DFC10(&scratch);
-    return result;
 }
 
 // 1.13c D2Game+0x38ED0

@@ -834,3 +834,21 @@ uint32_t d2game_55E10(const D2GameBatch531F0Env& E, void** outUnit, uint8_t* bas
     if (E.rd8(p2, 0x45c) != 0) E.c8A670(p2);
     return 0;
 }
+
+// Function probe seam for 0x42510: the callees are
+// HookEnv recorders logged as the capture's hooks log them. A0000 is a 6-word stdcall with esi = a: the record holds s1,s3,s4,s2
+// in the stack slots and x, y in the eax/ecx slots (REGS `sh`).
+#include "../fn/hookenv.h"
+static HookEnv* g42H; static void* g42A;
+uint32_t D2Game_42510_probe(void* a, void* b, int32_t s1, int32_t s2, int32_t s3, int32_t s4, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); g42H = &h; g42A = a;
+    D2GameBatch531F0Env e{};
+    e.ord10331 = [](void* u) -> uint32_t { return g42H->h(0xA478, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
+    e.ord10057 = [](uint32_t room) -> int32_t { return (int32_t)g42H->h(0xA808, 0, 0, 0, 0, 0, room); };
+    e.c1130 = [](void* u) -> int32_t { return (int32_t)g42H->h(0x1130, 0, (uint32_t)(uintptr_t)u); };
+    e.c1100 = [](void* u) -> int32_t { return (int32_t)g42H->h(0x1100, 0, (uint32_t)(uintptr_t)u); };
+    e.cA0000 = [](void* a, int32_t a1, int32_t a3, int32_t a4, int32_t a2, int32_t x, int32_t y) -> uint32_t {
+        return g42H->h(0xA0000, (uint32_t)x, (uint32_t)y, 0, 0, (uint32_t)(uintptr_t)a, (uint32_t)a1, (uint32_t)a3, (uint32_t)a4, (uint32_t)a2); };
+    return d2game_42510(e, a, b, s1, s2, s3, s4);
+}

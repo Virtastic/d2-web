@@ -414,7 +414,8 @@ uint32_t D2Game_3CDD0_probe(void* game, int32_t* u, const uint8_t* dt, uint32_t*
     e.unitY = [](void* u) -> int32_t { return (int32_t)g3cH->h(0x1130, 0, (uint32_t)(uintptr_t)u); };
     e.unitClass = [](void* u) -> uint32_t { return g3cH->h(0xB26A, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
     e.unitLevel = [](void* u) -> uint32_t { return g3cH->h(0xB0FC, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
-    e.createMissile = [](void* g, uint32_t* req) -> void* { return (void*)(uintptr_t)g3cH->h(0x6F930, 0, (uint32_t)(uintptr_t)g, g3cH->stk(req)); };
+    // hookblk 0x6F930 d 23 (the 23-dword request in EDX, mirrored from the capture): the block rides after the call's own record
+    e.createMissile = [](void* g, uint32_t* req) -> void* { void* r = (void*)(uintptr_t)g3cH->h(0x6F930, 0, (uint32_t)(uintptr_t)g, g3cH->stk(req)); g3cH->blk(0x6F930, req, 23); return r; };
     return d2_game_3cdd0(game, u, &e);
 }
 

@@ -69,7 +69,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_4c59(void* _File, const D2GameBatch4c59En
 // and 6 are replayed to 0x8E6F0. When ordinal #11134 reports a container (-1 = none), a 10-byte
 // 0x8E/1 request {u8 0x8E, u8 1, u32 container @2, u32 pair[0] @6} goes to 0xDFC10.
 // Ghidra reconstructs overlapping call frames, so the stack stores are transcribed in call order.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_37b10(void* self, void* pGame, uint32_t nUnitId,
+EMSCRIPTEN_KEEPALIVE void d2game_port_37b10(void* self, void* pGame, uint32_t nUnitId,
                                              const uint32_t* pPair,
                                              const D2GameBatch4c59Env* env)
 {

@@ -391,7 +391,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_af5f0_port(uint32_t eaxIndex,
 // Pushes 0x1100(this) plus the second stack-arg slot through 0xD4E80 with ECX=player, EDX=a1,
 // EAX=this->unitId, and returns whether it succeeded.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2game_37ec0(uint32_t ecxThis, uint32_t ediUnit, uint32_t a1,
+EMSCRIPTEN_KEEPALIVE uint8_t d2game_port_37ec0(uint32_t ecxThis, uint32_t ediUnit, uint32_t a1,
                                                 uint32_t a2, const D2GameBatch8DB00Env* env)
 {
     if (ecxThis == 0) d2game_fatal(0xD8);

@@ -64,7 +64,7 @@ struct D2GameBatch37F20Env {
 // exits through Fog with id 0xC6, a null EDI with 0xC7. Otherwise D2Common #10417 runs first and its
 // byte is forwarded to 0xD60D0(pAttacker, nArg2, byte, pDefender, 1); the result is its non-zero-ness.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_37f20(void* pDefender, void* pAttacker, uint32_t nArg2,
+EMSCRIPTEN_KEEPALIVE int32_t d2game_port_37f20(void* pDefender, void* pAttacker, uint32_t nArg2,
                                                 const D2GameBatch37F20Env* env)
 {
     if (pDefender == nullptr) d2game_fatal(0xC6);
