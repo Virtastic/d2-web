@@ -94,7 +94,7 @@ extern "C" int D2WEB_TakeObjectMessage(int32_t* pGuid, uint32_t* pStringId) {
     --g_d2webObjectMessageCount;
     return 1;
 }
-// OPEND2-18462: retail's NPC "!" (overlay 0x48) is client state driven by two server packets.
+// Retail's NPC "!" (overlay 0x48) is client state driven by two server packets.
 // 0x8A {type 1, guid} -- QUESTS_ActiveCycler on an act quest's pfActiveFilter, or Wussie's AI --
 // attaches it to that NPC; a type-1 0x28 (the NPC-interact quest record, D2Client 0x6FAF6770)
 // clears it from every NPC. Latched here so the page draws exactly the units retail's client would.
@@ -608,6 +608,10 @@ void D2GAME_PACKETS_SendPacket0x6D_6FC3D080(D2ClientStrc* pClient, DWORD dwUnitI
 #pragma pack(pop)
     static_assert(sizeof packet == 10, "0x6D is 10 bytes");
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet, sizeof packet);
+}
+// C-linkage entry for the 0x6D composer, so the function probe can call it.
+extern "C" void d2game_8bfc0(void* pClient, uint32_t id, uint16_t x, uint16_t y, uint8_t life) {
+    D2GAME_PACKETS_SendPacket0x6D_6FC3D080((D2ClientStrc*)pClient, id, x, y, life);
 }
 // 1.13c D2Game+0x8a9c0: 0x74 {header, bAssign, playerGuid, corpseGuid}; a null unit sends -1.
 void D2GAME_PACKETS_SendPacket0x74_6FC3F640(D2ClientStrc* pClient, D2UnitStrc* a2, D2UnitStrc* a3, BYTE bAssign) {

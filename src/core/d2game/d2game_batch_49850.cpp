@@ -189,14 +189,6 @@ uint32_t CLIENTS_AttachSaveFile(uint32_t clientId, const void* pSaveData, uint32
     return result;
 }
 
-// 1.13c D2Game+0x8C490
-// Send a one-byte 0xFF header-only packet to the client in ESI (explicit here) via 0x8A3E0.
-void D2GAME_SendHeaderOnlyFF(uint32_t client, const D2GameBatch4Env* env)
-{
-    const uint8_t b = 0xFF;
-    env->appendPacket((void*)(uintptr_t)client, &b, 1);   // 0x8A3E0
-}
-
 // FN probe access to the game-id slot table (0x6FD30C04).
 int32_t* d2game_49850_gameSlots() { return g_gameGuidSlots; }
 
