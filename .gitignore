@@ -133,6 +133,7 @@ wasm-build/*
 !wasm-build/version-engine.sh
 test/*
 !test/probe-skip.test.mjs
+!test/engine-key-untracked.test.mjs
 !test/plugy-stash-sidecar.test.mjs
 !test/plugy-stash-ui.test.mjs
 !test/plugy-stash-wiring.test.mjs

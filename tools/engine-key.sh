@@ -32,14 +32,17 @@ k=$({ printf '%s\n' "$image_id"; git rev-parse HEAD:src HEAD:wasm-build/link-d2.
 # change invalidates existing engines as well as the local object and StormLib caches.
 [ -z "${D2_CXXFLAGS:-}" ] || k="$k-cxx$(printf '%s' "$D2_CXXFLAGS" | sha256sum | cut -c1-8)"
 inputs=(src wasm-build/link-d2.sh third_party ci/build.sh Dockerfile.builder64 tools/compiler-cache.sh)
-if [ -n "$(git status --porcelain -- "${inputs[@]}")" ]; then
+# Every file on disk under the inputs, tracked or not, IGNORED ONES INCLUDED: link-d2.sh compiles
+# `find src -name '*.cpp'`, and src/core/fn/* is gitignored except the tracked probes, so an
+# --exclude-standard listing (or git status) missed the FN probes and a changed probe reused the
+# stale engine ("engine unchanged"). Listed once, hashed by one git call, no per-file subprocess.
+untracked=$(git ls-files --others -- "${inputs[@]}")
+if [ -n "$untracked" ] || [ -n "$(git status --porcelain -- "${inputs[@]}")" ]; then
   edits=$(
     {
       git diff --no-ext-diff --no-textconv --binary --submodule=diff HEAD -- "${inputs[@]}"
-      while IFS= read -r -d '' file; do
-        printf '%s\0' "$file"
-        git hash-object -- "$file"
-      done < <(git ls-files --others --exclude-standard -z -- "${inputs[@]}")
+      printf '%s\n' "$untracked"
+      [ -z "$untracked" ] || printf '%s\n' "$untracked" | git hash-object --stdin-paths
     } | sha256sum | cut -c1-12
   )
   # Keep the suffix: engine-cache.sh deliberately refuses to reuse dirty builds.
