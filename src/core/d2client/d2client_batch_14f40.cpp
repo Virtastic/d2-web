@@ -16,18 +16,7 @@ struct Host {
  void (*op)(U id,P a,P b,P c);              // generic callee by RVA (see each function)
  I (*opi)(U id,P a,P b,P c);                // generic callee returning int
 };
-// 1.13c D2Client+0x14F40
-I sub_14F40(const Host& H,P unit,I idx){
- if(*((uint8_t*)unit+0x4e)!=3) return 1;
- const uint8_t* dt=H.dataTables();
- if(idx<0||ri(dt,0xba0)<=idx) return 0;
- const uint8_t* e=(const uint8_t*)H.ptr(dt,0xb98)+(size_t)idx*0x23c;
- if(!e) return 0;
- U t=rd(unit,0);
- if(t==0&&int16_t(rw(e,0x102))>0) H.op(0x88A70,unit,0,0);
- if(t==1&&int16_t(rw(e,0x104))>0) H.op(0x88A70,unit,0,0);
- return 1;
-}
+// 1.13c D2Client+0x14F40 moved to d2client_14f40.cpp (the sound id rides in EBX).
 // 1.13c D2Client+0x16250
 struct S16250{I g858,g854,g61c,g864; struct{U w[7];}tbl[7];};
 // 1.13c D2Client+0x16250

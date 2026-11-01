@@ -42,7 +42,7 @@ static void vel(EnvB3720& e, W sp, I x1, I y1, I z1, I x2, I y2, I z2, bool both
  if (I* m = e.motion(sp)) { m[1] = x1; m[2] = y1; m[3] = z1; }
  if (both) if (I* m = e.motion(sp)) { m[4] = x2; m[5] = y2; m[6] = z2; }
 }
-// 1.13c D2Client+0xB3720
+// (superseded by d2client_b3720.cpp) D2Client 0xB3720
 U sub_B3720(EnvB3720& e, Unit* u, U rA /*FUN_1330 result guess*/) {
  if (!u || u->classId < 0) return 1;
  const uint8_t* row = e.dataRow(u->classId);
@@ -56,7 +56,7 @@ U sub_B3720(EnvB3720& e, Unit* u, U rA /*FUN_1330 result guess*/) {
  r.w[2] = W(I(e.cellShort(r3, y - sz))); r.w[5] = W(U(r3 + U(x - sz)));
  e.spawn(&r); return 1;
 }
-// 1.13c D2Client+0xB3860
+// (superseded by d2client_b3860.cpp) D2Client 0xB3860
 void sub_B3860(EnvB3720& e, Unit* u) {
  if (e.level(u) % 3 == 0) {
   U a = rng(*u), b = rng(*u);
@@ -68,7 +68,7 @@ void sub_B3860(EnvB3720& e, Unit* u) {
  }
  e.freeUnit(u);
 }
-// 1.13c D2Client+0xB39E0  (esi=unit seed owner, ebp=flag guess)
+// (superseded by d2client_b39e0.cpp) D2Client 0xB39E0  (esi=unit seed owner, ebp=flag guess)
 void sub_B39E0(EnvB3720& e, I count, I y, Unit* esi, U ebp, I x) {
  if (!esi || !count) return; W p = e.o10331(); if (!p) return;
  do {
@@ -83,7 +83,7 @@ void sub_B39E0(EnvB3720& e, I count, I y, Unit* esi, U ebp, I x) {
  Req r{}; r.w[0] = 1; ids(e, *esi, r, 8, 10); r.w[2] = 0x267; r.w[3] = W(x);
  e.spawn(&r); r.w[2] = 0x268; e.spawn(&r);
 }
-// 1.13c D2Client+0xB3B40  (eax=unit)
+// (superseded by d2client_b3b40.cpp) D2Client 0xB3B40  (eax=unit)
 void sub_B3B40(EnvB3720& e, Unit* eax, W room) {
  e.o10331(); if (e.o10573() != 0) return;
  Req r{}; r.w[0] = 0x2001; e.getRoom(0); rng(*eax); r.w[1] = room;
@@ -93,7 +93,7 @@ void sub_B3B40(EnvB3720& e, Unit* eax, W room) {
  if (I* m = e.motion(sp)) { m[4] = 0; m[5] = 0; m[6] = I(0xffffb000); }
  e.o10558(sp, 0x19); e.o10970(sp, 0x19); e.o10154(sp, 0x80);
 }
-// 1.13c D2Client+0xB3C40  (eax=unit)
+// (superseded by d2client_b3c40.cpp) D2Client 0xB3C40  (eax=unit)
 void sub_B3C40(EnvB3720& e, Unit* eax, W room) {
  Req r{}; r.w[1] = room; r.w[0] = 2; r.w[4] = 0x11d;
  I a = 0x14 - I(rng(*eax) % 0x28), b = 0x14 - I(rng(*eax) % 0x28);
@@ -103,7 +103,7 @@ void sub_B3C40(EnvB3720& e, Unit* eax, W room) {
  e.o10637(sp, a); e.o10019(sp, b);
  if (I* m = e.motion(sp)) { m[1] = 0; m[2] = 0; m[3] = I(0xffffb000); }
 }
-// 1.13c D2Client+0xB3D60  (eax=unit, room=param_1, ebp=speed guess)
+// (superseded by d2client_b3d60.cpp) D2Client 0xB3D60  (eax=unit, room=param_1, ebp=speed guess)
 void sub_B3D60(EnvB3720& e, Unit* eax, W room, I ebp) {
  static const I t[8] = { 1, 0, -1, 0, 0, 1, 0, -1 };
  rng(*eax); U d = rng(*eax) & 3;
@@ -117,7 +117,7 @@ void sub_B3D60(EnvB3720& e, Unit* eax, W room, I ebp) {
  if (I* mo = e.motion(sp)) { mo[1] = 0; mo[2] = 0; mo[3] = ebp << 11; }
  e.o10637(sp, ux(e, *eax)); e.o10019(sp, uy(e, *eax));
 }
-// 1.13c D2Client+0xB3FC0  (this=room, eax=unit, ebp/esi/edi = vel guesses)
+// (superseded by d2client_b3fc0.cpp) D2Client 0xB3FC0  (this=room, eax=unit, ebp/esi/edi = vel guesses)
 void sub_B3FC0(EnvB3720& e, W room, I code, Unit* eax, I ebp, I esi, I edi) {
  I tmp[2] = { 0, 0 };
  if (esi == 0 && ebp == 0) { e.fatal(0x1850); return; }
@@ -132,7 +132,7 @@ void sub_B3FC0(EnvB3720& e, W room, I code, Unit* eax, I ebp, I esi, I edi) {
  e.sub617c0b(nullptr);                              // FUN_6fb77fb0(sp) guess: see effect630f0
  e.setMonsterAlloc(sp, 0);
 }
-// 1.13c D2Client+0xB44A0
+// (superseded by d2client_b44a0.cpp) D2Client 0xB44A0
 void sub_B44A0(EnvB3720& e, Unit* u) {
  U v = e.level(u) & 0x80000003u;
  I m = I(v) < 0 ? I(((v - 1) | 0xfffffffcu) + 1) : I(v);
@@ -143,7 +143,7 @@ void sub_B44A0(EnvB3720& e, Unit* u) {
  }
  e.freeUnit(u);
 }
-// 1.13c D2Client+0xB45D0  (ecx=unit, edx=p2)
+// (superseded by d2client_b45d0.cpp) D2Client 0xB45D0  (ecx=unit, edx=p2)
 U sub_B45D0(EnvB3720& e, Unit* u, I p2) {
  if (p2 != 0) return 0;
  U id = e.o11018(u);
@@ -156,7 +156,7 @@ U sub_B45D0(EnvB3720& e, Unit* u, I p2) {
  W sp = e.spawn(&r); if (sp) e.o10637(sp, tu->id);
  return 1;
 }
-// 1.13c D2Client+0xB4760
+// (superseded by d2client_b4760.cpp) D2Client 0xB4760
 void sub_B4760(EnvB3720& e, Unit* u) {
  I v = e.level(u); int i = 0;
  while (e.tbl4760[i].a >= v) { if (++i >= 4) break; }
@@ -182,7 +182,7 @@ void sub_B4760(EnvB3720& e, Unit* u) {
  }
  e.freeUnit(u);
 }
-// 1.13c D2Client+0xB49F0  (ecx=unit, edx=p2, edi=y guess)
+// (superseded by d2client_b49f0.cpp) D2Client 0xB49F0  (ecx=unit, edx=p2, edi=y guess)
 U sub_B49F0(EnvB3720& e, Unit* u, I p2, I edi) {
  if (p2 != 0) return 0;
  e.o10818(u); e.o10614(); e.o11018(u);
@@ -196,7 +196,7 @@ U sub_B49F0(EnvB3720& e, Unit* u, I p2, I edi) {
  }
  return 1;
 }
-// 1.13c D2Client+0xB4B80
+// (superseded by d2client_b4b80.cpp) D2Client 0xB4B80
 void sub_B4B80(EnvB3720& e, Unit* u) {
  U v = U(e.level(u)); W room = e.getRoom(0);
  if (v == 0x96) { e.g->tick = e.tick(); e.g->z0 = 0; e.g->four000 = 4000; e.g->z1 = 0; e.g->v19 = 0x19; }

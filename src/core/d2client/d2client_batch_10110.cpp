@@ -379,8 +379,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_13390(uint8_t* out, int32_t mode,
 // x = (col - row) * 0x10 + yBase, y = xBase + (col + row) * 8, on the same 20-cell mask.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_13450(uint8_t* out, int32_t mode, int32_t xBase, int32_t yBase,
                                                      int32_t cornersOnly, uint32_t w) {
-    if (mode == 1) yBase -= ((int32_t)(w + (uint32_t)(w >> 31 & 3u)) >> 2);
-    else if (mode == 2) yBase += ((int32_t)(w + (uint32_t)(w >> 31 & 3u)) >> 2);
+    if (mode == 1) yBase -= ((int32_t)(w + ((uint32_t)((int32_t)w >> 31) & 3u)) >> 2);
+    else if (mode == 2) yBase += ((int32_t)(w + ((uint32_t)((int32_t)w >> 31) & 3u)) >> 2);
     uint8_t* rec = out;
     for (int32_t row = 0; row < 6; ++row)
         for (int32_t col = 0; col < 6; ++col, rec += 0xC) {

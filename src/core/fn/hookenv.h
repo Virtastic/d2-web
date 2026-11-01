@@ -9,6 +9,14 @@
 #include <emscripten/stack.h>
 
 struct HookEnv {
+    // the `C` block records of the capture: n dwords at p in 9-word records (rva|0x40000000, d0..d8), stack pointers as 0xB3000000
+    void blk(uint32_t rva, uint32_t p, uint32_t n) {
+        for (uint32_t o = 0; o < n; o += 9) {
+            if (L[0] >= kLogMax) abort();
+            uint32_t* e = L + 1 + L[0]++ * 10; e[0] = rva | 0x40000000u;
+            for (uint32_t j = 0; j < 9; j++) { uint32_t v = o + j < n ? rd32(p + 4 * (o + j)) : 0; e[1 + j] = isStk(v) ? 0xB3000000u : v; }
+        }
+    }
     uint32_t* L; const uint32_t* sc;
     uint32_t tbl = 0, dtPtr = 0, fileStr = 0, bmSlot = 0;     // module globals (addresses of the pinned blobs / scrubbed module words)
     static constexpr uint32_t kLogMax = 128;   // ponytail: a descriptor `blob lg` must hold 4 + 40 * calls bytes; 0x6F930 logs up to 45 calls (blob 2600)

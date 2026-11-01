@@ -155,7 +155,7 @@ void missile_emit_A2540(MissileEmitImports& I, uint32_t p1, uint32_t p2, uint32_
 }
 
 // ---------------------------------------------------------------------------------------------
-// 1.13c D2Client+0xB5540 client missile from a unit's path. unit is ECX; its path pointer (+0x2C) is
+// (superseded by d2client_b5540.cpp) D2Client 0xB5540 client missile from a unit's path. unit is ECX; its path pointer (+0x2C) is
 // passed in as pathOfUnit (the caller reads it). eax is the implicit input the decompile names in_EAX.
 // ---------------------------------------------------------------------------------------------
 struct MissilePathImports {
@@ -164,7 +164,7 @@ struct MissilePathImports {
   virtual uint32_t* emit_B30F0(const Rec* rec) = 0;            // FUN_6fb630f0 (RVA 0xB30F0)
 };
 
-// 1.13c D2Client+0xB5540
+// (superseded by d2client_b5540.cpp) D2Client 0xB5540
 uint32_t* ClientMissileFromUnitPath_B5540(MissilePathImports& I, uint32_t unit, uint32_t pathOfUnit, uint32_t eax) {
   if (pathOfUnit == 0) return nullptr;
   const uint8_t direction = I.ord10042(pathOfUnit);

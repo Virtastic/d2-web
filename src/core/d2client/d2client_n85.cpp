@@ -114,18 +114,16 @@ extern "C" uint32_t d2c_9752_sbh_resize_block(uint32_t hdr, uint32_t blk, int32_
 // --- 0x143E0 outgoing-packet de-duplication (retry window per packet class) ---
 struct N85Pkt { uint32_t lastTick; uint8_t last[0x200]; uint32_t bytes; uint32_t count; };
 static N85Pkt g_pkt;
-// 1.13c D2Client+0x143E0  (buf, len<=0x1ff); sendOrd = Ordinal_10024 seam
+// 1.13c D2Client+0x143E0: the rule lives in d2client_143e0.cpp; this seam keeps the byte counters and the last packet here.
+struct D2Client143e0State { uint32_t lastTick; uint8_t last[0x200]; uint32_t bytes; uint32_t count; };
+struct D2Client143e0Env { uint32_t now; D2Client143e0State* st; void* ctx; uint32_t (*send)(void*, uint32_t, const uint8_t*); void (*fatal)(void*, uint32_t); };
+extern "C" void d2_client_143e0(const uint8_t* buf, int32_t len, const D2Client143e0Env* env);
 extern "C" void d2c_143E0_send_packet(const uint8_t* buf, uint32_t len, uint32_t (*send)(const uint8_t*, uint32_t)) {
-    if (len > 0x1ff) g_n85.fatal(0x26d);
-    uint32_t now = g_n85.tick();
-    bool fast = buf[0] >= 5 && buf[0] <= 0x11 && buf[0] != 0x0b;
-    if (buf[0] != ':') {
-        uint32_t win = fast ? 0x32 : 200;
-        if (now - g_pkt.lastTick < win && memcmp(g_pkt.last, buf, len) == 0) return;
-    }
-    memcpy(g_pkt.last, buf, len);
-    g_pkt.lastTick = now;
-    if (send(buf, len)) { g_pkt.bytes += len; g_pkt.count++; }
+    static_assert(sizeof(N85Pkt) == sizeof(D2Client143e0State), "same layout");
+    const D2Client143e0Env e = { g_n85.tick(), reinterpret_cast<D2Client143e0State*>(&g_pkt), reinterpret_cast<void*>(send),
+        [](void* c, uint32_t n, const uint8_t* b) { return reinterpret_cast<uint32_t (*)(const uint8_t*, uint32_t)>(c)(b, n); },
+        [](void*, uint32_t id) { g_n85.fatal(id); } };
+    d2_client_143e0(buf, (int32_t)len, &e);
 }
 
 // 1.13c D2CLIENT+0x16A90  (centred text line while in-game state 4, modes 6..7)

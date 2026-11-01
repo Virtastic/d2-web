@@ -71,7 +71,7 @@ static void gfxClear(uintptr_t g, uint32_t off, uint32_t a, uint32_t b, uint32_t
     E.wr32(q + off, a); E.wr32(q + off + 4, b); E.wr32(q + off + 8, c);
 }
 
-// 1.13c D2Client+0xB4FB0: 14 spawn records (type 5), each given a random 10..44 value. EBX = unit.
+// (superseded by d2client_b4fb0.cpp) D2Client 0xB4FB0: 14 spawn records (type 5), each given a random 10..44 value. EBX = unit.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_b4fb0(uintptr_t unit) {
     B4fb0Rec r{}; r.w[0] = 5; r.w[1] = 0xfffffffd;
     if (!E.owner(5)) return;
@@ -88,7 +88,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_b4fb0(uintptr_t unit) {
     }
 }
 
-// 1.13c D2Client+0xB5380: EAX = target unit id, EBX = source unit, param_1 = message type.
+// (superseded by d2client_b5380.cpp) D2Client 0xB5380: EAX = target unit id, EBX = source unit, param_1 = message type.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_b5380(uint32_t id, uintptr_t src, uint32_t msg, uint32_t edi) {
     uintptr_t t = E.findUnit(id);
     if (!t) return;
@@ -110,7 +110,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_b5380(uint32_t id, uintptr_t src,
     E.o10019(p, (uint32_t)(a - b));
 }
 
-// 1.13c D2Client+0xB55C0: EAX = n, ESI = unit. Posts type 0x21 at a random offset in +-n of the unit.
+// (superseded by d2client_b55c0.cpp) D2Client 0xB55C0: EAX = n, ESI = unit. Posts type 0x21 at a random offset in +-n of the unit.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_b55c0(int32_t n, uintptr_t unit) {
     uint32_t m = (uint32_t)n * 2;
     uint32_t rx = roll(unit, m), ry = roll(unit, m);
@@ -123,7 +123,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_b55c0(int32_t n, uintptr_t unit) 
     E.post(&r);
 }
 
-// 1.13c D2Client+0xB5770: __fastcall(ECX = unit). Posts two records from rec+0x2C / +0x2E.
+// (superseded by d2client_b5770.cpp) D2Client 0xB5770: __fastcall(ECX = unit). Posts two records from rec+0x2C / +0x2E.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_b5770(uintptr_t unit) {
     uintptr_t rec = unitRec(unit);
     if (!rec) return 1;
@@ -138,7 +138,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_b5770(uintptr_t unit) {
     return 1;
 }
 
-// 1.13c D2Client+0xB5850: __fastcall(ECX = unit). One record from rec+0x2C, then ord10706(p+0x2C, ord10042).
+// (superseded by d2client_b5850.cpp) D2Client 0xB5850: __fastcall(ECX = unit). One record from rec+0x2C, then ord10706(p+0x2C, ord10042).
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_b5850(uintptr_t unit) {
     uintptr_t rec = unitRec(unit);
     if (!rec || E.rd16s(rec + 0x2c) < 0) return 1;
@@ -150,7 +150,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_b5850(uintptr_t unit) {
     return 1;
 }
 
-// 1.13c D2Client+0xB5930: __fastcall(ECX = unit). Posts records for rec+0x2C, +0x2E, +0x30 (when >= 0).
+// (superseded by d2client_b5930.cpp) D2Client 0xB5930: __fastcall(ECX = unit). Posts records for rec+0x2C, +0x2E, +0x30 (when >= 0).
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_b5930(uintptr_t unit) {
     uintptr_t rec = unitRec(unit);
     if (!rec) return 1;
@@ -163,7 +163,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_b5930(uintptr_t unit) {
     return 1;
 }
 
-// 1.13c D2Client+0xB5A10: __fastcall(ECX = unit). Type 0x21 record at the unit's position.
+// (superseded by d2client_b5a10.cpp) D2Client 0xB5A10: __fastcall(ECX = unit). Type 0x21 record at the unit's position.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_b5a10(uintptr_t unit) {
     uintptr_t rec = unitRec(unit);
     if (!rec || E.rd16s(rec + 0x2c) < 0) return 1;
@@ -184,7 +184,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_b5a10(uintptr_t unit) {
     return 1;
 }
 
-// 1.13c D2Client+0xB5B70: __thiscall(ECX = this unit, EAX = n, stack: p1, p2, p3).
+// (superseded by d2client_b5b70.cpp) D2Client 0xB5B70: __thiscall(ECX = this unit, EAX = n, stack: p1, p2, p3).
 // p2 >= 0: n type-0x524 scatter records; p3 >= 0: 18 type-1 ring records from tab3770/tab3728.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_b5b70(uintptr_t self, int32_t n, uint32_t p1, int32_t p2, int32_t p3) {
     if (!E.owner(self)) return;
@@ -208,7 +208,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_b5b70(uintptr_t self, int32_t n, 
     }
 }
 
-// 1.13c D2Client+0xB5DD0: __fastcall(ECX = unit). Type 0x102 records, one per ord11018 count,
+// (superseded by d2client_b5dd0.cpp) D2Client 0xB5DD0: __fastcall(ECX = unit). Type 0x102 records, one per ord11018 count,
 // with a random 1..5 and random offsets about +-max(rec+0x6C,3).
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_b5dd0(uintptr_t unit) {
     uintptr_t rec = unitRec(unit);
@@ -241,12 +241,12 @@ static void ring(uintptr_t unit, const uint32_t* tA, const uint32_t* tB) {
         if (p) { E.o10637(p, tB[i / 4]); E.o10019(p, tA[i / 4]); }
     }
 }
-// 1.13c D2Client+0xB5F00: __fastcall(ECX = unit). Ring from tab37b8 (y) / tab38b8 (x).
+// (superseded by d2client_b5f00.cpp) D2Client 0xB5F00: __fastcall(ECX = unit). Ring from tab37b8 (y) / tab38b8 (x).
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_b5f00(uintptr_t unit) { ring(unit, E.tab37b8, E.tab38b8); return 1; }
-// 1.13c D2Client+0xB6010: same, tables tab39b8 / tab3ab8.
+// (superseded by d2client_b6010.cpp) D2Client 0xB6010: same, tables tab39b8 / tab3ab8.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_b6010(uintptr_t unit) { ring(unit, E.tab39b8, E.tab3ab8); return 1; }
 
-// 1.13c D2Client+0xB6120: __fastcall(ECX = unit). Type 1 record; duration rec+0x6C (0 -> ord10786, min 5).
+// (superseded by d2client_b6120.cpp) D2Client 0xB6120: __fastcall(ECX = unit). Type 1 record; duration rec+0x6C (0 -> ord10786, min 5).
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_b6120(uintptr_t unit, uint32_t esi) {
     uintptr_t rec = unitRec(unit);
     if (!rec || E.rd16s(rec + 0x2c) < 0 || !E.owner(E.dataTables())) return 1;

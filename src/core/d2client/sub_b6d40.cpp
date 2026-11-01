@@ -1,4 +1,4 @@
-// 1.13c D2Client+0xB6D40 (536 B): scatter-spawn over a disc, from the cached decompile.
+// (superseded by d2client_b6d40.cpp) D2Client 0xB6D40 (536 B): scatter-spawn over a disc, from the cached decompile.
 // Retail registers: EAX = table index, ESI = unit* (seed at +0x20/+0x24); stack: x,y,radius,a,b,thin,step.
 // Imports/callees are host seams; ordinal 10331 is unverified (args unknown, called with none).
 #include <cstdint>
@@ -18,7 +18,7 @@ static uint32_t b6d40_roll(uint32_t* seed, uint32_t n) {   // seed[0]=lo, seed[1
     return (n & (n - 1)) == 0 ? (n - 1) & (uint32_t)v : (uint32_t)v % n;
 }
 
-// 1.13c D2Client+0xB6D40
+// (superseded by d2client_b6d40.cpp) D2Client 0xB6D40
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_b6d40(
     int32_t idx, uint32_t* unit, int32_t x, int32_t y, int32_t r,
     uint32_t a, uint32_t b, uint32_t thin, int32_t step, D2ClientB6d40Env* e) {

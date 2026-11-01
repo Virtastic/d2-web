@@ -1,4 +1,4 @@
-// 1.13c D2Client+0xB41F0: per-tick ambient spawner for a unit.
+// (superseded by d2client_b41f0.cpp) D2Client 0xB41F0: per-tick ambient spawner for a unit.
 // u = 32-bit unit words (u[0] type, u[8..9] 64-bit LCG seed, u[0xB] data ptr/word). Ordinals go through the host as 0x80000000|ordinal.
 // tab = 4 x {thresh, divA, divB} ints at D2Client+0xD3610; g = {tick,0,6000,0} at +0x10B9CC; flag20 = int at +0x11BEFC.
 #include "client_host.h"

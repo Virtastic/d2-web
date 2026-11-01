@@ -18,7 +18,7 @@ void* allocate_source(uint32_t bytes, const char*, uint32_t, uint32_t) {
 // destructor 0xCDDF0. Native construction runs before any source registration.
 struct SourceListLifetime {
     SourceListLifetime() { d2_client_2f00(d2_client_message_sources); }
-    ~SourceListLifetime() { d2_fn_d2client_2ec0(d2_client_message_sources); }
+    ~SourceListLifetime() { d2_client_2ec0(d2_client_message_sources); }
 } sourceListLifetime;
 }
 

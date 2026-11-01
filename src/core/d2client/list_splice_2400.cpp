@@ -25,10 +25,15 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_30a0(uintptr_t* self) {
     d2c_link::drain30a0<uintptr_t>(reinterpret_cast<uintptr_t>(self));
 }
 // 1.13c D2Client+0x02EC0 (wraps 0x2580): drain then detach the embedded sentinel pair.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2client_2ec0(void* self) {
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_2ec0(void* self) {
     auto* list = static_cast<uintptr_t*>(self);
     d2_client_30a0(list);
     d2_client_2ff0(list + 1);
+}
+// The same rule on retail's 32-bit words (FN probe, stdcall(list), ret 4; EAX is not defined by the function).
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_2ec0_w32(uint32_t list) {
+    d2c_link::drain30a0<uint32_t>(list);
+    d2c_link::unlink<uint32_t>(list + 4);
 }
 // 1.13c D2Client+0x02F70: ESI = mode; stack = list, extra size, line. Allocates size + three words
 // (d2c_link::alloc2f70); a failed allocation still splices (retail passes EBX = 0 to 0x2400).

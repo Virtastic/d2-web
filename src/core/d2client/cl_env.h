@@ -13,6 +13,8 @@ struct Env {
     uint32_t dt;                                         // *sgptDataTables  (D2Client slot 0xCE474, twice-indirect)
     uint32_t bm;                                         // gdwBitMasks      (D2Client slot 0xCEE50)
     uint32_t self = 0;                                   // playerSelf       (D2Client slot 0x11BBFC)
+    uint32_t gl = 0;                                     // a pinned module-global array the row reads (per-row meaning; 0 in the retail wiring until pointed at the slot)
+    void (*blk)(void* ctx, uint32_t rva, uint32_t p, uint32_t n) = nullptr;   // the capture's `C` block records: n dwords at p, after the call record
     uint32_t R(uint32_t a) const { return rd(ctx, a); }
     int32_t  R16s(uint32_t a) const { return (int16_t)(rd(ctx, a) & 0xffff); }
     uint32_t R8(uint32_t a) const { return rd(ctx, a) & 0xff; }
@@ -21,6 +23,12 @@ struct Env {
                uint32_t a = 0, uint32_t c = 0, uint32_t d = 0, uint32_t b = 0, uint32_t s = 0) const {
         return h(ctx, rva, a, c, d, b, s, s0, s1, s2, s3, s4);
     }
+    // one inline LCG step on the unit seed at p (lo,hi): s = lo * 0x6AC690C5 + hi; returns the new lo
+    uint32_t Lcg(uint32_t p) const { uint64_t s = (uint64_t)R(p) * 0x6AC690C5u + R(p + 4); W(p, (uint32_t)s); W(p + 4, (uint32_t)(s >> 32)); return (uint32_t)s; }
+    // a call whose ECX is a stack-built request block (D2Client 0xB30F0): the call record, then the block records
+    // unit-path coordinate: static-path unit types read the path block, others call the D2Common getter (0 without a path)
+    uint32_t PD(uint32_t u, uint32_t rva, uint32_t off) const { int32_t ty = (int32_t)R(u); uint32_t p = R(u + 0x2c); if (ty == 2 || (ty > 3 && ty <= 5)) return R(p + off); return p ? H(rva, p) : 0u; }
+    uint32_t HB(uint32_t rva, uint32_t p) const { uint32_t r = h(ctx, rva, 0, p, 0, 0, 0, 0, 0, 0, 0, 0); if (blk) blk(ctx, rva, p, 23); return r; }
     // missiles/monsters table row (stride 0x1A4) by index, 0 when out of range (the 0xB64 / 0xB6C pair)
     uint32_t Row(int32_t i) const {
         if (i < 0 || (int32_t)R(dt + 0xb6c) <= i) return 0;

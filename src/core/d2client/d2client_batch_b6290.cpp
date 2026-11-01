@@ -66,7 +66,7 @@ inline uintptr_t rec(const B6290Env* e, int32_t idx) {
 inline bool trio(uint32_t t) { return t == 2 || (t > 3 && t < 6); }
 }
 
-// 1.13c D2Client+0xB6290 (eax = unit, ecx = unused)
+// (superseded by d2client_b6290.cpp) D2Client 0xB6290 (eax = unit, ecx = unused)
 extern "C" EMSCRIPTEN_KEEPALIVE
 uint32_t d2_client_b6290(uintptr_t unit, uint32_t ecx, int32_t txt, uint32_t p3, uint32_t p4, int32_t p5,
                          int32_t p6, const B6290Env* e) {
@@ -85,7 +85,7 @@ uint32_t d2_client_b6290(uintptr_t unit, uint32_t ecx, int32_t txt, uint32_t p3,
     return 1;
 }
 
-// 1.13c D2Client+0xB67D0 (ecx = unit, edx = obj; ebx is read uninitialised on one path -> explicit)
+// (superseded by d2client_b67d0.cpp) D2Client 0xB67D0 (ecx = unit, edx = obj; ebx is read uninitialised on one path -> explicit)
 extern "C" EMSCRIPTEN_KEEPALIVE
 uint32_t d2_client_b67d0(uintptr_t unit, uintptr_t obj, uintptr_t ebx, const B6290Env* e) {
     if (!unit) return 1;
@@ -117,7 +117,7 @@ uint32_t d2_client_b67d0(uintptr_t unit, uintptr_t obj, uintptr_t ebx, const B62
     return 1;
 }
 
-// 1.13c D2Client+0xB6990 (ecx = unit, edx = p2)
+// (superseded by d2client_b6990.cpp) D2Client 0xB6990 (ecx = unit, edx = p2)
 extern "C" EMSCRIPTEN_KEEPALIVE
 uint32_t d2_client_b6990(uintptr_t unit, uintptr_t p2, const B6290Env* e) {
     if (!unit) return 1;
@@ -140,7 +140,7 @@ uint32_t d2_client_b6990(uintptr_t unit, uintptr_t p2, const B6290Env* e) {
     return 1;
 }
 
-// 1.13c D2Client+0xB6AC0 (ecx = unit)
+// (superseded by d2client_b6ac0.cpp) D2Client 0xB6AC0 (ecx = unit)
 extern "C" EMSCRIPTEN_KEEPALIVE
 uint32_t d2_client_b6ac0(uintptr_t unit, const B6290Env* e) {
     uintptr_t g = e->ctx_b6290(unit);
@@ -158,7 +158,7 @@ uint32_t d2_client_b6ac0(uintptr_t unit, const B6290Env* e) {
     return 1;
 }
 
-// 1.13c D2Client+0xB6BC0 (eax = unit, ebx = flag, edx = p2, stack = s1, s2). Per-iteration slots were
+// (superseded by d2client_b6bc0.cpp) D2Client 0xB6BC0 (eax = unit, ebx = flag, edx = p2, stack = s1, s2). Per-iteration slots were
 // lost by the decompiler; only the type/context/loop shape is recovered.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_b6bc0(uintptr_t unit, uint32_t ebx, int32_t p2, int32_t s1, int32_t s2, const B6290Env* e) {
@@ -222,7 +222,7 @@ void d2_client_b70a0(uintptr_t unit, const B6290Env* e) {
     e->done_b6290(unit);
 }
 
-// 1.13c D2Client+0xB7220 (ecx = unit)
+// (superseded by d2client_b7220.cpp) D2Client 0xB7220 (ecx = unit)
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_b7220(uintptr_t unit, const B6290Env* e) {
     uintptr_t r = unit ? rec(e, (int32_t)U(e, unit, 1)) : 0;
@@ -317,7 +317,7 @@ void d2_client_b75c0(uintptr_t unit, const B6290Env* e) {
     e->done_b6290(unit);
 }
 
-// 1.13c D2Client+0xB77A0 (ecx = unit)
+// (superseded by d2client_b77a0.cpp) D2Client 0xB77A0 (ecx = unit)
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_b77a0(uintptr_t unit, const B6290Env* e) {
     uintptr_t r = unit ? rec(e, (int32_t)U(e, unit, 1)) : 0;
