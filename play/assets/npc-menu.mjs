@@ -149,7 +149,7 @@ export function menuFramePieces(x1, y1, x2, y2) {
   out.push([0, x1, y1 + 12], [1, x2 - 12, y1 + 12], [8, x1, y2 + 1], [9, x2 - 12, y2 + 1]);
   return out;
 }
-const GOLD = [0xc7, 0xb3, 0x77], BLUE = [0x69, 0x69, 0xff];
+const GOLD = [0xc7, 0xb3, 0x77], BLUE = [0x69, 0x69, 0xff], RED = [0xff, 0x4d, 0x4d];
 
 /** A hire offer's header line; stat labels are string.tbl 3368 Lvl, 3366 Life, 3367 Def, 3369 Cost. */
 export function hireOfferLine(o, string) {
@@ -177,7 +177,8 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
   const coloured = new Map();
   const fontsFor = (act) => { if (!coloured.has(act)) coloured.set(act, {
     gold: createFont({ dc6, tbl, palette: shifted(4, GOLD, act), documentObject, path: fontPath, drawAs: { ...glyphs, extra: 4 } }),
-    blue: createFont({ dc6, tbl, palette: shifted(3, BLUE, act), documentObject, path: fontPath, drawAs: { ...glyphs, extra: 3 } }) });
+    blue: createFont({ dc6, tbl, palette: shifted(3, BLUE, act), documentObject, path: fontPath, drawAs: { ...glyphs, extra: 3 } }),
+    red: createFont({ dc6, tbl, palette: shifted(1, RED, act), documentObject, path: fontPath, drawAs: { ...glyphs, extra: 1 } }) });
     return coloured.get(act); };
   const pieces = decodeDc6(read(NPC_MENU_ASSETS.pieces));
   const SLIDER = 'data\\global\\ui\\menu\\textslid.dc6';
@@ -244,22 +245,25 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
   let hire = null;
   const hireRow = (i) => ({ x: HW.x1 + 20, y: HW.firstBottom - 12 + i * HW.pitch, w: 440, h: HW.pitch });
   const layout = (feetX, feetY) => {
-    const labels = [state.name, ...state.entries.map((e) => e.label ?? (string(e.stringId) || String(e.stringId)))];
+    // `name` may be several gold lines (the vendor confirm 0x47500 adds title, item, "Gold:" and the amount before Yes/No).
+    const heads = [].concat(state.name);
+    const labels = [...heads, ...state.entries.map((e) => e.label ?? (string(e.stringId) || String(e.stringId)))];
     const cx = Math.trunc(feetX);
     const w = Math.max(...labels.map((l) => white.measure(l))) + L.padX;
     const x1 = cx - Math.trunc(w / 2), x2 = x1 + w;
     const y2 = Math.trunc(feetY) - L.bottomBaseAboveFeet + L.bottomPerLine * labels.length,
       y1 = y2 - (L.pitch * labels.length + L.firstLine);
     const bottoms = labels.map((_, i) => y1 + L.firstLine + i * L.pitch);
-    rows = state.entries.map((e, i) => ({ ...e, label: labels[i + 1], x: x1 + 16, y: bottoms[i + 1] - 12, w: w - 31, h: 15, inkBottom: bottoms[i + 1] }));
+    const k = heads.length;
+    rows = state.entries.map((e, i) => ({ ...e, label: labels[i + k], x: x1 + 16, y: bottoms[i + k] - 12, w: w - 31, h: 15, inkBottom: bottoms[i + k] }));
     box = { x: x1, y: y1, w, h: y2 - y1, x1, y1, x2, y2 };
-    return { labels, bottoms, cx };
+    return { labels, bottoms, cx, heads: k };
   };
   return {
     get open() { return Boolean(state); },
     get state() { return state; },
     /** `entries` from npcMenuEntries; the menu hangs over the NPC (its feet at the anchor). */
-    show(npcId, classId, name, entries) { state = { npcId, classId, name, entries, openedAt: Math.trunc(performance.now()) >>> 0 }; rows = []; box = null; selected = 0; },
+    show(npcId, classId, name, entries, headColour = 4) { state = { npcId, classId, name, entries, headColour, openedAt: Math.trunc(performance.now()) >>> 0 }; rows = []; box = null; selected = 0; },
     /** The pointer moved: the entry under it is selected, none when it is elsewhere (retail). */
     hover(x, y) { if (state && rows.length) selected = rows.findIndex((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h); return selected; },
     get selectedEntry() { return selected >= 0 ? rows[selected] ?? null : null; },
@@ -327,7 +331,7 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
     },
     draw(ctx, feetX, feetY, act = 1) {
       if (!state) return null;
-      const { labels, bottoms } = layout(feetX, feetY);
+      const { labels, bottoms, heads } = layout(feetX, feetY);
       ctx.save();
       darken(ctx, box, act);
       recordPrim('box', box.x1, box.y1, box.x2, box.y2, 0, 1);
@@ -341,8 +345,9 @@ export function createNpcMenu({ read, decodeDc6, decodeDatPalette, string, docum
       // odd-width box holding an even-width line (Jerhyn's 69px menu / "talk"), where retail
       // puts the ink one pixel to the right.
       const line = (font, text, bottom) => font.drawAnchored(ctx, text, box.x1 + Math.ceil((box.w - font.measure(text)) / 2) + 1, bottom);
-      const { gold, blue } = fontsFor(act);
-      line(gold, labels[0], bottoms[0]);
+      const { gold, blue, red } = fontsFor(act);
+      // Head lines are colour 4 (gold); the 0x4B5D0 refusal box draws its message in colour 1 (red).
+      for (let i = 0; i < heads; i++) line(state.headColour === 1 ? red : gold, labels[i], bottoms[i]);
       rows.forEach((r, i) => line(i === selected ? blue : white, r.label, r.inkBottom));
       return { npcId: state.npcId, classId: state.classId, name: state.name, box: { ...box },
         entries: rows.map((r) => ({ stringId: r.stringId, action: r.action, label: r.label, inkBottom: r.inkBottom })) };

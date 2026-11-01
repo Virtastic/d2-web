@@ -477,8 +477,11 @@ void __fastcall D2GAME_PACKETS_SendPacket0x29_6FC3F370(D2ClientStrc* pClient, D2
     if (pClient && pPacket) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof(*pPacket));
 }
 // 1.13c D2Game+0x8AC90: 15-byte transaction reply {header, action, result, 4 bytes retail leaves unset (zero here), item id, gold}
+// The last 0x2A transaction reply's result byte, for the client's 0x4B5D0 refusal box (-1: none since read).
+int32_t g_d2LastTransactionResult = -1;
 void __fastcall D2GAME_SendPacket0x2A_6FC3F3B0(D2ClientStrc* pClient, char nHeader, char result,
     int32_t gold, int32_t itemId, char action) {
+    g_d2LastTransactionResult = (uint8_t)result;
     D2GSPacketSrv2A packet = {};
     packet.nHeader = nHeader; packet.unk0x01 = action; packet.unk0x02 = result;
     packet.unk0x07 = itemId; packet.unk0x0B = gold;

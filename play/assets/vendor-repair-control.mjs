@@ -13,10 +13,8 @@ export function handleVendorRepairClick(button, itemId, repair) {
   if (!armed) return false;
   // A repair-mode click stays inside the shop. Only a real carried item is
   // sent to the engine; stock and empty-panel clicks cannot become purchases.
-  if (Number.isInteger(itemId) && itemId >= 0) {
-    armed = false;
-    repair(itemId);
-  }
+  // The mode survives the repair: retail's success reply re-presses the Repair button (D2Client 0x94970).
+  if (Number.isInteger(itemId) && itemId >= 0) repair(itemId);
   return true;
 }
 

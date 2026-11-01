@@ -6359,9 +6359,17 @@ EMSCRIPTEN_KEEPALIVE int d2_session_item_needs_repair(uint32_t itemId) {
     if (!g_sessionLive || !g_game) return 0;
     D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId);
     if (!item) return 0;
-    const int32_t maxDur = STATLIST_GetMaxDurabilityFromUnit(item);
-    if (maxDur && STATLIST_UnitGetStatValue(item, STAT_DURABILITY, 0) < maxDur) return 1;
-    return ITEMS_CheckIfThrowable(item) && STATLIST_UnitGetStatValue(item, STAT_QUANTITY, 0) < ITEMS_GetTotalMaxStack(item) ? 1 : 0;
+    // 1.13c D2Client+0x45B40 (d2client_45b40::sub_45B40 over the server unit): item type 4 and items
+    // ITEMS_IsRepairable refuses (unidentified, ethereal, no Repair flag) never need repair; then durability
+    // below max, a stackable below its max stack, or a charged skill with used charges.
+    if (ITEMS_GetItemType(item) == 4 || !ITEMS_IsRepairable(item)) return 0;
+    if (ITEMS_HasDurability(item)) {
+        const int32_t maxDur = STATLIST_GetMaxDurabilityFromUnit(item);
+        if (maxDur && STATLIST_UnitGetStatValue(item, STAT_DURABILITY, 0) < maxDur) return 1;
+    }
+    if (ITEMS_CheckIfStackable(item) && STATLIST_UnitGetStatValue(item, STAT_QUANTITY, 0) < ITEMS_GetTotalMaxStack(item)) return 1;
+    BOOL full = FALSE;
+    return ITEMS_HasUsedCharges(item, &full) && !full ? 1 : 0;
 }
 EMSCRIPTEN_KEEPALIVE int d2_session_command_vendor_repair(uint32_t npcId, uint32_t itemId) {
     memset(&g_sessionRepair, 0, sizeof g_sessionRepair);
@@ -6410,8 +6418,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_vendor_repair(uint32_t npcId, uint32
 // The shop's Repair All button: the same 0x35 packet with a negative last dword, which is the
 // branch D2GAME_NPC_Repair_6FCC95B0 takes to price every repairable item the player carries
 // (ITEMS_GetAllRepairCosts), charge it from inventory then stash gold, and repair them all. The
-// handler reads only the sign; 0x80000000 is the value used here (the retail client's exact bits
-// are not captured yet). Returns 1 when the handler took the packet; the outcome is in the items'
+// handler reads only the sign; the retail client sends exactly 0x80000000 (D2Client 0x46EE0, Repair
+// All with no confirm box: 0x47D60). Returns 1 when the handler took the packet; the outcome is in the items'
 // durability and the gold (a non-smith, or too little gold, is answered with a 0x2A refusal).
 EMSCRIPTEN_KEEPALIVE int d2_session_command_vendor_repair_all(uint32_t npcId) {
     if (!g_sessionLive || !g_game || !g_targetPlayer) return 0;
@@ -6423,6 +6431,11 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_vendor_repair_all(uint32_t npcId) {
     return rc == 0;
 }
 EMSCRIPTEN_KEEPALIVE const D2SessionRepair* d2_session_vendor_repair() { return &g_sessionRepair; }
+extern int32_t g_d2LastTransactionResult;
+// The result byte of the last 0x2A trade reply (D2Client+0x4BC80 copies it to 0x6FBC9781), then cleared; -1 = none.
+EMSCRIPTEN_KEEPALIVE int32_t d2_session_last_transaction_result() {
+    const int32_t r = g_d2LastTransactionResult; g_d2LastTransactionResult = -1; return r;
+}
 EMSCRIPTEN_KEEPALIVE int d2_session_command_vendor_sell(uint32_t npcId, uint32_t itemId) {
     return sessionVendorTransaction(npcId, itemId, false);
 }
@@ -6454,6 +6467,25 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_session_item_sell_value(uint32_t itemId) {
     int32_t amt = -1; uint16_t line[16];
     // 1.13c D2Client+0x46230: the sell line (carried item, trade window not the gamble one)
     return d2_client_46230(&amt, item, 1, line, 16, 0, 0, &cb) ? amt : -1;
+}
+// 1.13c D2Client+0x46230 in the repair cursor state (DAT_6FBCBC34 == 4, the uiState argument): the amount
+// D2Client+0x47500 prints under "Gold:" in the single-item Repair confirm. Unidentified -> 0 (the 0xFB6 line);
+// the 0x45B40 gate refuses -> 0; else ITEMS_GetTransactionCost type 3 (repair). -1 = no trade window / item.
+EMSCRIPTEN_KEEPALIVE int32_t d2_session_item_repair_cost(uint32_t itemId) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !(g_sessionVendor.action == 1 || g_sessionVendor.action == 2)) return -1;
+    g_sellNpc = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)g_sessionVendor.npcId);
+    D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId);
+    if (!g_sellNpc || !item || !item->pItemData || !sessionNpcIsVendor(g_sellNpc)) return -1;
+    static const SellLineCb cb = {
+        [](void*) -> int32_t { return 0; }, [](uint32_t) -> int32_t { return 0; },
+        [](int32_t* c) -> bool { *c = (int32_t)g_sellNpc->dwClassId; return true; }, [](void*) -> int32_t { return 1; },
+        sellCost, [](uint32_t) -> const uint16_t* { static const uint16_t z[1] = { 0 }; return z; },
+        []() -> int32_t { return 0; },
+        [](void* u) -> int32_t { return (((D2UnitStrc*)u)->pItemData->dwItemFlags & 0x10) ? 1 : 0; },   // D2Common 10202, flag 0x10
+        [](void* u) -> int32_t { return d2_session_item_needs_repair((uint32_t)((D2UnitStrc*)u)->dwUnitId); },   // 0x45B40
+        [](void*) -> int32_t { return 0; }, [](int32_t) {} };
+    int32_t amt = 0; uint16_t line[64] = { 0 };
+    return d2_client_46230(&amt, item, 1, line, 64, 4, 0, &cb) ? amt : 0;
 }
 EMSCRIPTEN_KEEPALIVE int d2_session_command_vendor_buy(uint32_t npcId, uint32_t itemId) {
     return sessionVendorTransaction(npcId, itemId, true);

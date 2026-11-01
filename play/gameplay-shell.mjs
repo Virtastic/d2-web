@@ -124,7 +124,7 @@ import { createEntryBanner, ENTRY_BANNER } from './assets/level-entry-banner.mjs
 import { hudBarTooltip, levelButtonTooltip } from './assets/hud-bar-tooltip.mjs';
 import { hirelingTextRows } from './assets/hireling-panel.mjs';
 import { createVendorPanel, vendorLayoutFromEngine, SMITH_CLASSES, tooltipSpec } from './assets/vendor-panel.mjs';
-import { createRepairConfirm, createRepairConfirmRenderer } from './assets/vendor-repair-confirm.mjs';
+import { createRepairConfirm, createRepairConfirmRenderer, refusalString } from './assets/vendor-repair-confirm.mjs';
 import { handleVendorRepairClick, disarmVendorRepair, vendorRepairArmed, repairCursorContext } from './assets/vendor-repair-control.mjs';
 import { toggleSellMode, resetSellMode, vendorClickAction, sellModeArmed } from './assets/vendor-sell-mode.mjs';
 import { inventoryClickAction, shopModeOf } from './assets/inventory-click-route.mjs';
@@ -640,7 +640,7 @@ if (plugyStash.enabled) (async () => {
 })();
 let repairConfirmRenderer = null;
 const repairConfirm = createRepairConfirm((id) => repairAtVendor(id),
-  (id) => !Module._d2_session_item_needs_repair || Boolean(Module.ccall('d2_session_item_needs_repair', 'number', ['number'], [id >>> 0])));
+  (id) => !Module._d2_session_item_needs_repair || Boolean(Module.ccall('d2_session_item_needs_repair', 'number', ['number'], [id >>> 0])), disarmVendorRepair);
 let stashGoldRenderer = null, stashGoldEvidence = null, stashGoldError = '', stashGoldDialog = null, stashGoldPress = null;
 const stashGoldSpinnerRepeat = createStashSpinnerRepeat();
 // The waypoint menu is open because the engine sent 0x63; waypointMenu holds that waypoint's unit id.
@@ -1312,7 +1312,7 @@ async function bootstrapSession() {
       stashGold: (limit) => (plugyStash.showShared && !limit) ? plugyGold : Module._d2_session_stash_gold ? Module.ccall('d2_session_stash_gold', 'number', ['number'], [limit]) : 0 }); } catch (error) { stashPanelError = String(error); }
     try { cubePanelRenderer = createStashPanelRenderer(createMpqAssetReader(Module), document, { page: INVPAGE_CUBE, string: null,
       transmute: Module.ccall('d2_lang_string', 'string', ['string'], ['Transmute']) || 'Transmute' }); } catch (error) { stashPanelError += ' cube: ' + error; }
-    try { repairConfirmRenderer = createRepairConfirmRenderer(createMpqAssetReader(Module), document, { string: (n) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [n]) }); } catch (error) { stashGoldError = String(error); }
+    try { repairConfirmRenderer = createRepairConfirmRenderer({ read: createMpqAssetReader(Module), decodeDc6, decodeDatPalette, documentObject: document, string: (n) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [n]) }); } catch (error) { stashGoldError = String(error); }
     try { stashGoldRenderer = createStashGoldRenderer(createMpqAssetReader(Module), document, { string: (key) => Module.ccall('d2_lang_string', 'string', ['string'], [key]) }); } catch (error) { stashGoldError = String(error); }
     try { waypointPanelRenderer = createWaypointPanelRenderer(createMpqAssetReader(Module), document, { string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) }); } catch (error) { waypointPanelError = String(error); }
     if (!navigator.webdriver) await entryYield();
@@ -2367,14 +2367,19 @@ function sellToVendor(itemId) {
 // Repair ONE item. d2_session_command_vendor_repair resolves the id to a real item unit and refuses
 // anything it cannot find, so there is no repair-all sentinel to pass -- an earlier version of this
 // defaulted the argument to -1 with a comment claiming retail did that, which was unfounded.
+// The 0x2A reply's result (take-and-clear); a refusal (above 6) opens D2Client 0x4B5D0's red message box.
+const takeTradeResult = () => (Module._d2_session_last_transaction_result ? Module.ccall('d2_session_last_transaction_result', 'number', [], []) : -1);
+function showRepairRefusal(code) { if (npcState && repairConfirm.refuse(refusalString(code))) repairConfirmRenderer?.showRefusal(npcState.npcId, repairConfirm.refusal); }
 function repairAtVendor(itemId) {
   if (!npcState || !(itemId >= 0)) return false;
   try {
+    takeTradeResult();
     const ok = Module.ccall('d2_session_command_vendor_repair', 'number', ['number', 'number'],
       [npcState.npcId, itemId >>> 0]);
     if (ok) propCache.delete(itemId >>> 0);
     npcState = readNpcState();
     snapshot = session.snapshot();
+    showRepairRefusal(takeTradeResult());
     return Boolean(ok);
   } catch { return false; }
 }
@@ -2385,9 +2390,10 @@ let lastRepairAll = null;
 function repairAllAtVendor() {
   if (!npcState || !Module._d2_session_command_vendor_repair_all) return false;
   const before = Module.ccall('d2_session_player_gold', 'number', [], []);
+  takeTradeResult();
   const ok = Boolean(Module.ccall('d2_session_command_vendor_repair_all', 'number', ['number'], [npcState.npcId]));
   if (ok) propCache.clear();
-  npcState = readNpcState(); snapshot = session.snapshot();
+  npcState = readNpcState(); snapshot = session.snapshot(); showRepairRefusal(takeTradeResult());
   lastRepairAll = { npcId: npcState?.npcId ?? -1, ok, goldBefore: before, goldAfter: Module.ccall('d2_session_player_gold', 'number', [], []) };
   return ok;
 }
@@ -4311,7 +4317,10 @@ function drawFrame() {
     catch (error) { stashPanelError = 'cube: ' + error; cubeEvidence = null; }
   }
   if (repairConfirm.open && !npcState) repairConfirm.no();
-  if (repairConfirm.open && repairConfirmRenderer) repairConfirmRenderer.draw(ctx, w, h);
+  if (repairConfirmRenderer && !repairConfirm.open) repairConfirmRenderer.close();
+  const repairNpc = repairConfirm.open && repairConfirmRenderer ? snapshot.entities.find((u) => u.id === npcState.npcId && u.type === 1) : null;
+  if (repairNpc) { const cam = worldToScreen(cameraGrid().x, cameraGrid().y), pt = worldToScreen(repairNpc.x, repairNpc.y);
+    repairConfirmRenderer.draw(ctx, pt.x - cam.x + viewCX(), pt.y - cam.y + (h / 2 + UNIT_CENTRE_Y), snapshot.act); }
   if (stashGoldRenderer) {
     try {
       if (stashGoldDialog && (stashGoldPress?.action === 'increase' || stashGoldPress?.action === 'decrease')) {
@@ -5575,6 +5584,7 @@ canvas.addEventListener('pointermove', (e) => {
   if (session && skillPanelRenderer)   // a closed panel clears its hover, else the plate is stale when it reopens
     skillPanelRenderer.hover(x, y, canvas.width, canvas.height, { skills: skillsVisible ? readClassSkills() || [] : [] });
   if (screen === SCREEN.GAME && npcMenu?.open) npcMenu.hover(x, y);
+  if (screen === SCREEN.GAME && repairConfirm.open) repairConfirmRenderer?.hover(x, y);
   if (screen === SCREEN.GAME && npcMenu?.hireOpen) npcMenu.hireHover(x, y, canvas.width, canvas.height);
   // Retail draws no pointer cel on the trademark screen (its draw list has none), so a move there
   // only ends the phase's clock through the click path below.
@@ -5667,7 +5677,7 @@ canvas.addEventListener('pointerdown', (e) => {
   // its click before a skill socket or other HUD control can react behind it.
   if (screen === SCREEN.GAME && repairConfirm.open && repairConfirmRenderer) {
     click.spent = 'repairConfirm';
-    const hit = e.button === 0 ? repairConfirmRenderer.hitAt(x, y, canvas.width, canvas.height) : null;
+    const hit = e.button === 0 ? (repairConfirmRenderer.hover(x, y), repairConfirmRenderer.hitAt(x, y)) : null;
     if (hit === 'yes') repairConfirm.yes(); else if (hit === 'no') repairConfirm.no();
     snapshot = session.snapshot(); render(); canvas.focus(); e.preventDefault(); return;
   }
@@ -5964,7 +5974,8 @@ canvas.addEventListener('pointerdown', (e) => {
         const at = { itemId: target?.id, bodyLoc: item ? 0 : slot?.bodyLoc, mode: shopModeOf({ shopOpen: shopOpen(), sell: sellModeArmed(), repair: vendorRepairArmed() }), ctrl: e.ctrlKey, npcOpen: shopOpen() };
         let act = inventoryClickAction(route, { ...at, targeting: itemTargeting.armed });
         if (act === 'identify' && !itemTargeting.leftClick(target.id)) act = inventoryClickAction(route, at);
-        if (act === 'repair') { if (repairConfirm.request(target.id)) disarmVendorRepair(); click.spent = 'vendorRepair'; }
+        if (act === 'repair') { if (repairConfirm.request(target.id)) { const f = tipFields(target.id, itemStringKey(itemCode(target)));
+          repairConfirmRenderer?.show(npcState.npcId, [f.name, f.baseName].filter(Boolean).join('\n'), Module._d2_session_item_repair_cost ? Module.ccall('d2_session_item_repair_cost', 'number', ['number'], [target.id >>> 0]) : 0); } click.spent = 'vendorRepair'; }
         else if (act === 'sell' || act === 'sell-direct') { if (sellToVendor(target.id) && act === 'sell') resetSellMode(); click.spent = 'vendorSell'; }
         else if (act !== 'pickup') { /* identified, or nothing under the click */ }
         else if (item && e.shiftKey && !npcState) lastGridToBelt = { itemId: item.id, result: gridToBelt(item.id) };
