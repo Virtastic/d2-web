@@ -53,26 +53,4 @@ void sub_266C0(State& s,Calls& c,P unit,I x,I y){I n=sub_26460(s,c,x,y);if(n<0)r
  if(special){s.selected=n;s.current=s.previous=nullptr;s.active=1;return;}
  P item=c.item(unit,n);s.selected=n;if(!item){s.active=0;s.current=s.previous=nullptr;return;}
  s.active=1;if(item!=s.previous){I index=c.itemIndex(item),r[4];c.rect(s.belt,s.inventory,r,index);s.current=s.previous=item;s.x=add(r[0],14);s.y=r[2];}}
-static bool hover(const State& s){return add(s.width/2,-8)<=s.mx&&s.mx<=add(s.width/2,5)&&add(s.height,-39)<=s.my&&s.my<=add(s.height,-13);}
-// 1.13c D2Client+0x267B0
-void sub_267B0(State& s,Calls& c){if(hover(s)){const char16_t* text=c.text(s.expanded?0x1048:0x1047);c.tooltip(text,add(s.width/2,-1),add(s.height,-39),0,1);}}
-// ESI color index, stack slot index. Rect x/y are words zero/two.
-// 1.13c D2Client+0x26820
-void sub_26820(State& s,Calls& c,I color,I slot){sub_265E0(s,c);if(color!=2){I r[4];c.rect(s.belt,s.inventory,r,slot);c.fill(r[0],r[2],add(r[0],29),add(r[2],29),s.colors[color],0);}}
-// 1.13c D2Client+0x26880
-void sub_26880(State& s,Calls& c){Draw d{};d.cell=s.cells[(0x7d4-0x770)/4];d.words[0]=U(s.expanded?2:0)+U(s.enabled&&hover(s));c.draw(&d,add(s.width/2,-8),add(s.height,-16),0xffffffff,5,0);}
-// Release receives the saved allocation in ECX after unloading it.
-// 1.13c D2Client+0x26CD0
-void sub_26CD0(State& s,Calls& c){constexpr U offsets[]={0x7e0,0x7c8,0x7dc,0x788,0x7c4,0x778,0x774,0x7d8,0x77c,0x780,0x7cc,0x7e4,0x7d4,0x790,0x784,0x770,0x78c};
- for(U off:offsets){P& cell=s.cells[(off-0x770)/4];P old=cell;if(old){c.unload(old);c.release(old,0x7a,0);cell=nullptr;}}
- for(U n=0;n<12;++n)s.cells[(0x794-0x770)/4+n]=nullptr;
-}
-static void panel(State& s,Calls& c,bool right){P& cell=s.cells[3];if(!cell)cell=c.load("Panel\\800BorderFrame");Draw d{};d.cell=cell;
- constexpr I left[5][2]={{0,253},{256,63},{0,484},{0,553},{256,553}};
- constexpr I rhs[5][2]={{400,63},{544,253},{713,484},{544,553},{400,553}};
- for(U i=0;i<5;++i){d.words[0]=i+(right?5:0);c.draw(&d,right?rhs[i][0]:left[i][0],right?rhs[i][1]:left[i][1],0xffffffff,5,0);}}
-// 1.13c D2Client+0x270D0
-void sub_270D0(State& s,Calls& c){panel(s,c,true);}
-// 1.13c D2Client+0x271C0
-void sub_271C0(State& s,Calls& c){panel(s,c,false);}
 }

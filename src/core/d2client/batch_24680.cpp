@@ -74,18 +74,4 @@ void sub_266C0(I idx,U arg,S66& st,I (*f6460)(),I (*o11017)(U),P (*o10455)(U),I 
  b[0]=1; if(p!=cur[1]){ I r=f1630(p); o10333(); cur[0]=cur[1]=p; b[1]=r+0xe; b[2]=i; }
  (void)idx;
 }
-// 1.13c D2Client+0x267B0
-void sub_267B0(const G& g,void (*o10003)(I,I,I),void (*o10085)()){
- if(g.screenW/2-8<=I(g.my)&&I(g.my)<=g.screenW/2+5&&g.screenH-0x27<=I(g.mx)&&I(g.mx)<=g.screenH-0xd){ o10003(g.screenH-0x27,0,1); o10085(); }
-}
-// 1.13c D2Client+0x26820
-void sub_26820(I sel,void (*f65e0)(),void (*o10333)(P),void (*o10014)(I,I),U arg,I base){
- f65e0(); if(sel!=2){ (void)arg; o10333(nullptr); o10014(base,sel); }
-}
-// 1.13c D2Client+0x26880
-void sub_26880(const G& g,I pressed,I hot,void (*o10041)(const U*,I,I,I,I,I),U tail){
- U b[18]={0}; b[13]=tail; bool in=hot&&g.screenW/2-8<=I(g.my)&&I(g.my)<=g.screenW/2+5&&g.screenH-0x27<=I(g.mx)&&I(g.mx)<=g.screenH-0xd;
- b[0]=pressed?(in?3:2):(in?1:0);
- o10041(b,g.screenW/2-8,g.screenH-0x10,-1,5,0);
-}
 }
