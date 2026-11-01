@@ -195,11 +195,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE int fog_isspace(int c) {  // 1.13c Fog+0x2341
 }
 
 // 1.13c Fog+0x237B
-// _isalnum(c): same branch, 16-bit table read masked with 0x107: 'A'..'Z' return 0x101, 'a'..'z'
-// 0x102, '0'..'9' 0x04, anything else 0.
+// _isalnum(c): same branch, low byte of the table read masked with 0x107 (the _ALPHA bit 0x100 is not
+// returned): 'A'..'Z' return 1, 'a'..'z' return 2, '0'..'9' return 4, anything else 0.
 extern "C" EMSCRIPTEN_KEEPALIVE int fog_isalnum(int c) {  // 1.13c Fog+0x237B
-    if (c >= 'A' && c <= 'Z') return 0x101;
-    if (c >= 'a' && c <= 'z') return 0x102;
+    if (c >= 'A' && c <= 'Z') return 1;
+    if (c >= 'a' && c <= 'z') return 2;
     if (c >= '0' && c <= '9') return 0x04;
     return 0;
 }

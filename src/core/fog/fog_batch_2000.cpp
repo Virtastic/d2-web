@@ -47,11 +47,12 @@ void fog_sub_223F(void) {
 // in retail, so only that range and EOF are modelled.
 
 // 1.13c Fog+0x2289
-// _isalpha: table[c] & 0x103. Returns 0x101, 0x102 or 0.
+// _isalpha: low byte of table[c] & 0x103 (the retail result): 'A'..'Z'
+// return 1, 'a'..'z' return 2, anything else 0. The _ALPHA bit 0x100 is not in the returned value.
 extern "C"
 int fog_isalpha(int c) {
-    if (c >= 'A' && c <= 'Z') return 0x101;
-    if (c >= 'a' && c <= 'z') return 0x102;
+    if (c >= 'A' && c <= 'Z') return 1;
+    if (c >= 'a' && c <= 'z') return 2;
     return 0;
 }
 

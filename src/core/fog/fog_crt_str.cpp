@@ -2,6 +2,7 @@
 // is independent of the MSVC FILE/locale internals are ported; the rest are CRT plumbing.
 #include <cstdarg>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 // 1.13c Fog+0x2C0B: _fclose
@@ -13,15 +14,11 @@ extern "C" int fog_sprintf(char* dst, const char* fmt, ...) {
     va_end(ap);
     return n;
 }
-// 1.13c Fog+0x2CB4: __stricmp (C-locale branch: ASCII fold, difference of the first mismatching folded bytes)
+// 1.13c Fog+0x2CB4: __stricmp. The C-locale branch (lc_category[0].wlocale == NULL) returns ___ascii_stricmp
+// (Fog+0x7940) unchanged, so the result is -1/0/1. The multi-locale branch (___tolower_mt loop) is not ported.
+extern "C" int32_t fog_ascii_stricmp_7940(const uint8_t* a, const uint8_t* b);
 extern "C" int fog_stricmp(const char* a, const char* b) {
-    int x, y;
-    do {
-        x = (unsigned char)*a++; y = (unsigned char)*b++;
-        if (x >= 'A' && x <= 'Z') x += 32;
-        if (y >= 'A' && y <= 'Z') y += 32;
-    } while (x && x == y);
-    return x - y;
+    return fog_ascii_stricmp_7940(reinterpret_cast<const uint8_t*>(a), reinterpret_cast<const uint8_t*>(b));
 }
 // 1.13c Fog+0x2D90: _strncpy (copy up to n, zero-pad the rest, no NUL if the source fills n)
 extern "C" char* fog_strncpy(char* dst, const char* src, size_t n) {
