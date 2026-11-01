@@ -484,7 +484,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_23e0(uint32_t* r) {
 
 // ---- b46-storm-0 batch: SEH wrappers, scalar-deleting dtors, fixed-array tails, id generator ----
 // Retail's SEH frames (ExceptionList push/pop) carry no behaviour of their own; they are omitted.
-extern "C" void d2_fn_storm_1660(uint32_t* r);
+extern "C" void storm_port_1660(uint32_t* r);
 
 namespace {
 // 1.13c Storm+0x1C30: free source/rectf/foundparam storage, then unlink the element (0x1CF0).
@@ -499,7 +499,7 @@ void StormElementDestroy(StormElement* e) {
 // 1.13c Storm+0x1B20: scalar-deleting dtor over 0x1660 (CS delete + foundation dtor).
 extern "C" void* Storm_Sub1B20(void* self, uint8_t flags) {
     uint32_t r[5] = {(uint32_t)(uintptr_t)self, 0, 0, 0, 0};
-    d2_fn_storm_1660(r);
+    storm_port_1660(r);
     if ((flags & 1) && self) StormFree(self);
     return self;
 }

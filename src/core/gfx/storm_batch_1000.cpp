@@ -16,6 +16,7 @@
 //   * 0x1360 indexes Ghidra's _RTL_CRITICAL_SECTION_DEBUG; the byte offsets below are that type's
 //     (Type +0, CriticalSection +4, ProcessLocksList +0xC, 12-byte slot) flattened explicitly;
 //   * 0x4520/0x4390 carry a hidden EBX/EAX; the callers here pass the object and the alloc result.
+#include <emscripten.h>
 #include <cstdint>
 #include <cstring>
 #include <Windows.h>
@@ -29,9 +30,11 @@ constexpr const char* kAuinst = "..\\AUINST";            // s___AUINST___6fc415a
 // unmapped Storm internals, retail argument order (seams; see src/core/storm/storm_batch_123b0.cpp)
 extern "C" int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);                       // 0x1B960 SMemFree
 extern "C" uint32_t* Storm_Sub1C580(uint32_t size, const char* file, int32_t line, uint32_t flags); // 0x1C580 SMemAlloc
-void Storm_Sub38EB0(uint32_t* p);                                                       // 0x38EB0
-void Storm_Sub37ED0(uint32_t a, uint8_t* out, uint32_t n, uint32_t d);                  // 0x37ED0
-void Storm_Sub3A330(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t d, uint32_t e, uint8_t* out); // 0x3A330
+// 0x38EB0 / 0x37ED0 / 0x3A330 are defined elsewhere with an extra seam-env argument; the 0x1360
+// probe has no env to give them, so its slow path calls these file-local seams instead.
+void Seam38EB0(uint32_t*) {}                                                            // 0x38EB0
+void Seam37ED0(uint32_t, uint8_t*, uint32_t, uint32_t) {}                               // 0x37ED0
+void Seam3A330(uint32_t*, uint32_t*, uint32_t*, uint32_t, uint32_t, uint8_t*) {}        // 0x3A330
 
 uint32_t rd32(const void* p) { uint32_t v; std::memcpy(&v, p, 4); return v; }
 void wr32(void* p, uint32_t v) { std::memcpy(p, &v, 4); }
@@ -183,16 +186,16 @@ uint32_t Storm_Sub1360(uint32_t param_1, uint32_t in_eax, LPCRITICAL_SECTION edi
     uint32_t idx = (param_1 >> 16) & 0xFF;
     uint8_t* dbg = (uint8_t*)(uintptr_t)rd32((uint8_t*)edi + 0x30);
     uint8_t* slot = dbg + idx * 12;
-    if (rd32(slot) != 0 && in_eax <= rd32(dbg + 4 + idx * 24)) return rd32(dbg + 0xC + idx * 12);
+    if (rd32(slot) != 0 && in_eax <= rd32(dbg + 4 + idx * 12)) return rd32(dbg + 8 + idx * 12);
     EnterCriticalSection(edi);
-    if (rd32(slot) != 0) Storm_Sub38EB0((uint32_t*)(uintptr_t)rd32(slot + 8));
+    if (rd32(slot) != 0) Seam38EB0((uint32_t*)(uintptr_t)rd32(slot + 8));
     if (in_eax < 0x281) in_eax = 0x280;
     uint8_t name[0x40];
     name[0] = 0;
-    Storm_Sub37ED0(param_1, name, 0x40, 0);
-    uint8_t* out = dbg + 0xC + idx * 12;
-    Storm_Sub3A330((uint32_t*)name, (uint32_t*)name, nullptr, in_eax >> 2, 0x40000, out);
-    wr32(dbg + 4 + idx * 24, in_eax);
+    Seam37ED0(param_1, name, 0x40, 0);
+    uint8_t* out = dbg + 8 + idx * 12;
+    Seam3A330((uint32_t*)name, (uint32_t*)name, nullptr, in_eax >> 2, 0x40000, out);
+    wr32(dbg + 4 + idx * 12, in_eax);
     wr32(slot, 1);
     LeaveCriticalSection(edi);
     return rd32(out);
@@ -210,43 +213,43 @@ void Storm_Sub1460(LPCRITICAL_SECTION cs) { DeleteCriticalSection(cs); }
 }  // namespace
 
 // 1.13c Storm+0x1000 (sub_1000): power(base, exp); retail widens the integer result to float10.
-void d2_fn_storm_1000(uint32_t* r) { r[4] = (uint32_t)Storm_Sub1000((int32_t)r[0], (int32_t)r[1]); }
+extern "C" EMSCRIPTEN_KEEPALIVE void storm_port_1000(uint32_t* r) { r[4] = (uint32_t)Storm_Sub1000((int32_t)r[0], (int32_t)r[1]); }
 
 // 1.13c Storm+0x1050 (sub_1050): SMemFree(p, "delete", -1) when p is non-null.
-void d2_fn_storm_1050(uint32_t* r) { Storm_Sub1050((void*)(uintptr_t)r[0]); r[4] = 0; }
+extern "C" EMSCRIPTEN_KEEPALIVE void storm_port_1050(uint32_t* r) { Storm_Sub1050((void*)(uintptr_t)r[0]); r[4] = 0; }
 
 // 1.13c Storm+0x1080 (sub_1080): DeleteCriticalSection; the pointer arrives in EAX (r[0]).
-void d2_fn_storm_1080(uint32_t* r) { Storm_Sub1080((LPCRITICAL_SECTION)(uintptr_t)r[0]); r[4] = 0; }
+extern "C" EMSCRIPTEN_KEEPALIVE void storm_port_1080(uint32_t* r) { Storm_Sub1080((LPCRITICAL_SECTION)(uintptr_t)r[0]); r[4] = 0; }
 
 // 1.13c Storm+0x1090 (sub_1090): free the three member blocks and run the 0x4B80 teardown.
-void d2_fn_storm_1090(uint32_t* r) { Storm_Sub1090((uint32_t*)(uintptr_t)r[0]); r[4] = 0; }
+extern "C" EMSCRIPTEN_KEEPALIVE void storm_port_1090(uint32_t* r) { Storm_Sub1090((uint32_t*)(uintptr_t)r[0]); r[4] = 0; }
 
 // 1.13c Storm+0x1120 (sub_1120): object constructor.
-void d2_fn_storm_1120(uint32_t* r) { Storm_Sub1120((uint32_t*)(uintptr_t)r[0]); r[4] = 0; }
+extern "C" EMSCRIPTEN_KEEPALIVE void storm_port_1120(uint32_t* r) { Storm_Sub1120((uint32_t*)(uintptr_t)r[0]); r[4] = 0; }
 
 // 1.13c Storm+0x11A0 (sub_11A0): object destructor.
-void d2_fn_storm_11A0(uint32_t* r) { Storm_Sub11A0((uint32_t*)(uintptr_t)r[0]); r[4] = 0; }
+extern "C" EMSCRIPTEN_KEEPALIVE void storm_port_11a0(uint32_t* r) { Storm_Sub11A0((uint32_t*)(uintptr_t)r[0]); r[4] = 0; }
 
 // 1.13c Storm+0x1250 (sub_1250): deleting-destructor thunk over the 0x11A0 body.
-void d2_fn_storm_1250(uint32_t* r) { Storm_Sub1250((uint32_t*)(uintptr_t)r[0]); r[4] = 0; }
+extern "C" EMSCRIPTEN_KEEPALIVE void storm_port_1250(uint32_t* r) { Storm_Sub1250((uint32_t*)(uintptr_t)r[0]); r[4] = 0; }
 
 // 1.13c Storm+0x1290 (sub_1290): r[0]=param_2, r[1]=param_3, r[2]=EDI (mode); r[4]=allocation or 0.
-void d2_fn_storm_1290(uint32_t* r) {
+extern "C" EMSCRIPTEN_KEEPALIVE void storm_port_1290(uint32_t* r) {
     r[4] = (uint32_t)(uintptr_t)Storm_Sub1290((int32_t)r[0], r[1], r[2]);
 }
 
 // 1.13c Storm+0x1310 (sub_1310): clear the list whose head is at EBX+8; EBX is r[0].
-void d2_fn_storm_1310(uint32_t* r) { Storm_Sub1310((uint8_t*)(uintptr_t)r[0]); r[4] = 0; }
+extern "C" EMSCRIPTEN_KEEPALIVE void storm_port_1310(uint32_t* r) { Storm_Sub1310((uint8_t*)(uintptr_t)r[0]); r[4] = 0; }
 
 // 1.13c Storm+0x1360 (sub_1360): r[0]=param_1, r[1]=EAX (requested size), r[2]=EDI (cache lock).
-void d2_fn_storm_1360(uint32_t* r) {
+extern "C" EMSCRIPTEN_KEEPALIVE void storm_port_1360(uint32_t* r) {
     r[4] = Storm_Sub1360(r[0], r[1], (LPCRITICAL_SECTION)(uintptr_t)r[2]);
 }
 
 // 1.13c Storm+0x1420 (sub_1420): InitializeCriticalSection; returns the argument.
-void d2_fn_storm_1420(uint32_t* r) {
+extern "C" EMSCRIPTEN_KEEPALIVE void storm_port_1420(uint32_t* r) {
     r[4] = (uint32_t)(uintptr_t)Storm_Sub1420((LPCRITICAL_SECTION)(uintptr_t)r[0]);
 }
 
 // 1.13c Storm+0x1460 (sub_1460): DeleteCriticalSection.
-void d2_fn_storm_1460(uint32_t* r) { Storm_Sub1460((LPCRITICAL_SECTION)(uintptr_t)r[0]); r[4] = 0; }
+extern "C" EMSCRIPTEN_KEEPALIVE void storm_port_1460(uint32_t* r) { Storm_Sub1460((LPCRITICAL_SECTION)(uintptr_t)r[0]); r[4] = 0; }

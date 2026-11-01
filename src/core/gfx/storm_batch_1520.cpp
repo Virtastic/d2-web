@@ -263,7 +263,7 @@ void storm_sub_1990(uint32_t* p) {
 // 1.13c Storm+0x1520: free one AUBREAKCMD record; returns the record's +4 dword when positive
 // (0 otherwise). ESI carries `this` in retail, EDI/param_1 is the fallback when it is null.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1520(uint32_t* r) {
+EMSCRIPTEN_KEEPALIVE void storm_port_1520(uint32_t* r) {
     uint32_t thisp = r[0];
     uint32_t param_1 = r[1];
     uint32_t* fields = thisp != 0 ? (uint32_t*)(uintptr_t)thisp
@@ -277,7 +277,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1520(uint32_t* r) {
 // 1.13c Storm+0x1560: allocate an AUBREAKCMD record of size+0xc, clear its two list dwords,
 // and insert it (third register argument = insert mode) into the caller's list.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1560(uint32_t* r) {
+EMSCRIPTEN_KEEPALIVE void storm_port_1560(uint32_t* r) {
     uint32_t* p = (uint32_t*)storm_mem_alloc(r[1] + 0xc);
     if (p != nullptr) {
         p[0] = 0;
@@ -300,13 +300,13 @@ extern "C" uint32_t* Storm_Sub15E0(uint32_t* list, uint32_t size, uint32_t flags
     return p;
 }
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_15e0(uint32_t* r) {
+EMSCRIPTEN_KEEPALIVE void storm_port_15e0(uint32_t* r) {
     r[4] = (uint32_t)(uintptr_t)Storm_Sub15E0((uint32_t*)(uintptr_t)r[0], r[1], 0, r[3]);
 }
 
 // 1.13c Storm+0x1660: destroy the critical section at +0x50, then the base object (0x1990).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1660(uint32_t* r) {
+EMSCRIPTEN_KEEPALIVE void storm_port_1660(uint32_t* r) {
     uint32_t* p = (uint32_t*)(uintptr_t)r[0];
     DeleteCriticalSection((LPCRITICAL_SECTION)((uintptr_t)p + 0x50));
     storm_sub_1990(p);
@@ -315,7 +315,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1660(uint32_t* r) {
 
 // 1.13c Storm+0x16B0: base-object destructor only.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_16b0(uint32_t* r) {
+EMSCRIPTEN_KEEPALIVE void storm_port_16b0(uint32_t* r) {
     storm_sub_1990((uint32_t*)(uintptr_t)r[0]);
     r[4] = 0;
 }
@@ -323,7 +323,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_16b0(uint32_t* r) {
 // 1.13c Storm+0x1790: construct the base object, install the vtable (retail 0x6FC36AF4) and
 // initialise the critical section at +0x50; returns the object.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1790(uint32_t* r) {
+EMSCRIPTEN_KEEPALIVE void storm_port_1790(uint32_t* r) {
     uint32_t* p = (uint32_t*)(uintptr_t)r[0];
     storm_sub_2020(p);
     p[0] = (uint32_t)(uintptr_t)&g_vtable_36af4;
@@ -335,7 +335,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1790(uint32_t* r) {
 // and from the list at +0x2c (base at +0x28), then link the second anchor node back as the tail
 // with the saved tag. The two unlink blocks are the shared 0x4C20 snippet.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_17f0(uint32_t* r) {
+EMSCRIPTEN_KEEPALIVE void storm_port_17f0(uint32_t* r) {
     uint8_t* thisp = (uint8_t*)(uintptr_t)r[0];
     uint32_t param_1 = r[1];
     uint32_t* piVar2;
@@ -367,7 +367,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_17f0(uint32_t* r) {
 // absent or full, allocate one (0x2350), grow it (0x2C60) and double the object's +0x34 step;
 // take the next element (0x26E0), replace whatever occupied it, and link it as the tail.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_18b0(uint32_t* r) {
+EMSCRIPTEN_KEEPALIVE void storm_port_18b0(uint32_t* r) {
     uint8_t* thisp = (uint8_t*)(uintptr_t)r[0];
     uint32_t* param_1 = (uint32_t*)(uintptr_t)r[1];
     int32_t iVar3 = *(int32_t*)(thisp + 0x30);
@@ -416,14 +416,14 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_18b0(uint32_t* r) {
 // 1.13c Storm+0x1990: install the base vtable (retail 0x6FC36AD4), drain the chunk lists
 // (0x2080), unlink the two relative lists at +0x38 and +0x28 (0x22D0), then 0x1A70.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1990(uint32_t* r) {
+EMSCRIPTEN_KEEPALIVE void storm_port_1990(uint32_t* r) {
     storm_sub_1990((uint32_t*)(uintptr_t)r[0]);
     r[4] = 0;
 }
 
 // 1.13c Storm+0x1A30: destroy the region record (0x1C30), then SMemFree it with tag AURGN.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1a30(uint32_t* r) {
+EMSCRIPTEN_KEEPALIVE void storm_port_1a30(uint32_t* r) {
     uint32_t* p = (uint32_t*)(uintptr_t)r[0];
     storm_sub_1c30(p);
     storm_mem_free(p, "__AURGN__", -2);
@@ -433,7 +433,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1a30(uint32_t* r) {
 // 1.13c Storm+0x1A70: install the vtable (retail 0x6FC36B04), reset the table part (0x20C0
 // with mode 1), drain the explicit list (0x2290), then unlink the node at +4 (0x22D0).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1a70(uint32_t* r) {
+EMSCRIPTEN_KEEPALIVE void storm_port_1a70(uint32_t* r) {
     storm_sub_1a70((uint32_t*)(uintptr_t)r[0]);
     r[4] = 0;
 }
@@ -441,7 +441,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1a70(uint32_t* r) {
 // 1.13c Storm+0x1AF0: reset the container: blank the table part (0x20C0 mode 1), clear +0x10
 // and +0x24, drain the explicit list (0x2290), then clear +0x14/+0x18/+0x1C.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1af0(uint32_t* r) {
+EMSCRIPTEN_KEEPALIVE void storm_port_1af0(uint32_t* r) {
     uint32_t* p = (uint32_t*)(uintptr_t)r[0];
     storm_sub_20c0(p, 1);
     p[4] = 0;
