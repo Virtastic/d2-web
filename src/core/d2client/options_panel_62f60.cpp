@@ -52,7 +52,7 @@ static void u16cat(char16_t*d,const char16_t*s){ while(*d) d++; u16cpy(d,s); }
 void nameLine_63940(U which,I x,I y,const Imp63940&f){
  static const U kCmd[7]={0,1,0xc,2,7,3,4};
  if(which>7) return;
- char16_t line[400]; std::memset(line,0,sizeof line);
+ char16_t line[200]; std::memset(line,0,sizeof line);   // 1.13c: 200 wide chars (0xC8 zeroed)
  u16cpy(line,f.getString(which==7?0x1050u:0x1049u+which));
  if(which<7){
   U k=kCmd[which];
@@ -78,7 +78,8 @@ struct Imp63bf0 {
 void layout_63bf0(I y0,const B*o,U mode,I tall,I hdrY,I screenW,U celOff,U celOn,U celKnob,const Imp63bf0&f){
  I y=y0+hdrY, half=screenW/2;
  U steps=rd32(o,0x120)-1, v=rd32(o,0x124), on=rd32(o,0x128);
- I r=-I((265u*v)/steps);
+ // steps == 0: the x87 divide yields inf/NaN and __ftol returns 0x80000000
+ I r=steps?-I((265u*v)/steps):I(0x80000000u);
  I base=tall?half-0x90:half-0x3b, split=base+12-r;
  f.drawRect(base,y-0x1e,split,y,0,U(on==0)+1);
  f.drawRect(split,y-0x1e,base+0x121,y,0,U(on!=0));
@@ -101,7 +102,7 @@ void entriesLoad_63e90(const Imp63e90&f,const I*cnt,B*tbl){
  if(!cnt){ f.fatal(0x524); return; }
  if(!tbl){ f.fatal(0x525); return; }
  char lang[4]={0,0,0,0}; f.o10004(lang,0);
- char path[0x108];
+ char path[0x104];
  U*p=(U*)(tbl+0x120);
  for(I i=0;i<*cnt;i++,p+=0x154){
   if(p[-0x47]==0||f.o10227()!=0){
