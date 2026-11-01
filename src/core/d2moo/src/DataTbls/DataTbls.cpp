@@ -435,7 +435,7 @@ void __fastcall DATATBLS_UnloadStatesTxt()
 
 	memset(sgptDataTables->fStateMasks, 0x00, sizeof(sgptDataTables->fStateMasks));
 
-	// 1.13c D2Common+0x5d8b0 frees the states block and linker but does not store NULL back to them.
+	// 1.13c D2Common+0x5d8b0 frees the five state blocks and stores NULL back to each (checked against the decompile); fStateMasks is zeroed whole (retail 40 dwords, our 40 pointers).
 	DATATBLS_UnloadBin(sgptDataTables->pStatesTxt);
 	FOG_FreeLinker(sgptDataTables->pStatesLinker);
 }
