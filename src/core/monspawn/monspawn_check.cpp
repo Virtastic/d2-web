@@ -9853,7 +9853,9 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_lines(uint32_t itemId, char* buf, 
                    STATLIST_UnitGetStatValue(item, STAT_ARMORCLASS, 0), STATLIST_GetUnitBaseStat(item, STAT_ARMORCLASS, 0));
                ac > 0 && t->dwMaxAc > 0) line(3461, " " + std::to_string(ac));
     if (t->nStackable) line(3462, " " + std::to_string(STATLIST_UnitGetStatValue(item, STAT_QUANTITY, 0)));
-    if (t->nDurability && !t->nNoDurability) {
+    // Retail's gate is ITEMS_HasDurability (D2Common #10865): items.txt durability set and nodurability clear, a non-zero max-durability
+    // stat, and not indestructible. Weapons.txt sets nodurability on every bow and crossbow, so those carry stats 72/73 but no line.
+    if (ITEMS_HasDurability(item)) {
         std::string of; appendNarrow(of, langIdx(3463));
         const int32_t maxDurability = d2::item_text::visibleStatValue(itemIdentified,
             STATLIST_UnitGetStatValue(item, STAT_MAXDURABILITY, 0), STATLIST_GetUnitBaseStat(item, STAT_MAXDURABILITY, 0));
