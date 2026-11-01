@@ -3172,10 +3172,17 @@ const D2RunesTxt* __stdcall ITEMS_GetRunesTxtRecordFromItem(const D2UnitStrc* pI
 	// 1.13c delta: retail also requires the socketed inventory's signature (0x1020304) to be intact.
 	if (!DATATBLS_GetItemsTxtRecord(pItem->dwClassId)->nQuest && pItem->pInventory && pItem->pInventory->dwSignature == D2C_InventoryHeader)
 	{
+		// 1.13c D2Common+0x26BA0: a socketed inventory with no first item returns 0 before the socket walk.
+		D2UnitStrc* pFirstInventoryItem = INVENTORY_GetFirstItem(pItem->pInventory);
+		if (!pFirstInventoryItem)
+		{
+			return nullptr;
+		}
+
 		int nSocketableIds[6] = {};
 		int nSocketedItems = 0;
 
-		for (D2UnitStrc* pInventoryItem = INVENTORY_GetFirstItem(pItem->pInventory); pInventoryItem; pInventoryItem = INVENTORY_GetNextItem(pInventoryItem))
+		for (D2UnitStrc* pInventoryItem = pFirstInventoryItem; pInventoryItem; pInventoryItem = INVENTORY_GetNextItem(pInventoryItem))
 		{
 			if (!INVENTORY_UnitIsItem(pInventoryItem))
 			{
