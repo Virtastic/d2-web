@@ -3670,7 +3670,7 @@ int32_t __fastcall D2GAME_PACKETCALLBACK_Rcv0x58_QuestCompleted_6FC883B0(D2GameS
     }
 
     const uint16_t nQuestId = *(uint16_t*)((char*)pPacket + 1);
-    if (nQuestId >= MAX_QUEST_STATUS)
+    if (nQuestId >= 0x2A) // 1.13c D2Game+0xCB3D0: bound is 0x2A, one past MAX_QUEST_STATUS
     {
         return 2;
     }

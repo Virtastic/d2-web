@@ -1099,6 +1099,26 @@ void __fastcall sub_6FCC84D0(D2GameStrc* pGame, D2UnitStrc* pPlayer, D2UnitStrc*
     pPet->dwFlags |= UNITFLAG_NOXP | UNITFLAG_NOTC | UNITFLAG_ISVALIDTARGET | UNITFLAG_CANBEATTACKED | UNITFLAG_TARGETABLE;
     pPet->dwFlagEx &= 0xFFFBFFFF;
 
+    // 1.13c D2Game+0xBCA20 (inlined call): re-merge the pet's item stat lists
+    if (pPet->pInventory)
+    {
+        D2UnitStrc* pItem = INVENTORY_GetFirstItem(pPet->pInventory);
+        while (pItem)
+        {
+            D2UnitStrc* pNextItem = INVENTORY_GetNextItem(pItem);
+            if (INVENTORY_UnitIsItem(pItem) && pItem->dwUnitType == UNIT_ITEM)
+            {
+                int32_t bType = 0;
+                if (STATLIST_GetOwner(pItem, &bType))
+                {
+                    STATLIST_ExpireUnitStatlist(pPet, pItem);
+                    STATLIST_MergeStatLists(pPet, pItem, bType);
+                }
+            }
+            pItem = pNextItem;
+        }
+    }
+
     sub_6FC7E310(pGame, pPlayer, CLIENTS_GetUnitX(pPlayer), CLIENTS_GetUnitY(pPlayer));
     MONSTERAI_SendMercStats(pGame, pPlayer, 0);
 }

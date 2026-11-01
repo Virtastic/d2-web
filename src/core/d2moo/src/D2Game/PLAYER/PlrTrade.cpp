@@ -1060,8 +1060,11 @@ void __fastcall sub_6FC90AE0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3)
     D2GAME_PACKETS_SendPacketSize06_6FC3C850(SUNIT_GetClientFromPlayer(pUnit, __FILE__, __LINE__), 0x92, 0, pUnit ? pUnit->dwUnitId : -1);
     SUNIT_IterateLivingPlayers(pGame, sub_6FC90BE0, pUnit);
 
-    for (D2UnitStrc* i = INVENTORY_GetFirstItem(pUnit->pInventory); i; i = INVENTORY_GetNextItem(i))
+    // 1.13c D2Game+0x716D0: the next link is read before the item is moved to the trade inventory; no trace for a non-item cursor.
+    D2UnitStrc* i = INVENTORY_GetFirstItem(pUnit->pInventory);
+    while (i)
     {
+        D2UnitStrc* pNextInv = INVENTORY_GetNextItem(i);
         D2UnitStrc* pItem = INVENTORY_UnitIsItem(i);
         if (pItem)
         {
@@ -1073,20 +1076,14 @@ void __fastcall sub_6FC90AE0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3)
             INVENTORY_AddItemToTradeInventory(pUnit->pInventory, pItem);
             ITEMS_SetItemCMDFlag(pItem, 1, 1);
         }
+        i = pNextInv;
     }
 
     D2UnitStrc* pCursorItem = INVENTORY_GetCursorItem(pUnit->pInventory);
-    if (pCursorItem)
+    if (pCursorItem && pCursorItem->dwUnitType == UNIT_ITEM)
     {
-        if (pCursorItem->dwUnitType == UNIT_ITEM)
-        {
-            INVENTORY_AddItemToTradeInventory(pUnit->pInventory, pCursorItem);
-            ITEMS_SetItemCMDFlag(pCursorItem, 1, 1);
-        }
-        else
-        {
-            FOG_TraceF(gszEmptyString_6FD447EC, "[sPlayerRestoreInventoryCopy] Deleted/non-item in hand");
-        }
+        INVENTORY_AddItemToTradeInventory(pUnit->pInventory, pCursorItem);
+        ITEMS_SetItemCMDFlag(pCursorItem, 1, 1);
     }
 
     sub_6FC4BA50(pGame, pUnit);

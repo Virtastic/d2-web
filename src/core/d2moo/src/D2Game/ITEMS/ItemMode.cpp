@@ -4621,6 +4621,7 @@ int32_t __fastcall D2GAME_RemoveItemIfOnCursor_6FC49760(D2GameStrc* pGame, D2Uni
 }
 
 //D2Game.0x6FC497E0
+// 1.13c D2Game+0xD4A70
 int32_t __fastcall D2GAME_ITEMSOCKET_PlaceItem_6FC497E0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSocketFillerGUID, int32_t nItemGUID, int32_t* bPlaced, int32_t bRefresh, int32_t bResetCursorItem, int32_t bCheckMode)
 {
     D2_ASSERT(pGame);
@@ -5655,6 +5656,7 @@ void __fastcall D2GAME_UpdatePlayerVitals_6FC4B240(D2GameStrc* pGame, D2UnitStrc
 }
 
 //D2Game.0x6FC4B2D0
+// 1.13c D2Game+0xD1BC0
 int32_t __fastcall D2GAME_CheckHasFilledSockets_6FC4B2D0(D2UnitStrc* pItem, const char* szFile, int32_t nLine)
 {
     if (pItem && pItem->dwUnitType == UNIT_ITEM && ITEMS_CheckIfSocketable(pItem) && pItem->pInventory && INVENTORY_GetItemCount(pItem->pInventory))
