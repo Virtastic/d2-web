@@ -39,10 +39,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_17a90(int32_t** cur, int32_t*
 
 // 1.13c D2Win+0x9200 (listbox visible-row count; ctl type 4)
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2win_sub_9200(int32_t* ctl,
-        void (*sel_font)(int32_t), void (*fatal)(uint32_t), int32_t font_h) {
+        void (*sel_font)(int32_t), void (*fatal)(uint32_t), int32_t (*font_height)()) {
     if (!ctl) { fatal(0x290); return 0; }
     if (ctl[0] != 4) { fatal(0x291); return 0; }
     sel_font(ctl[0x25]);
-    int32_t v = font_h + ctl[0x2a];
+    int32_t v = font_height() + ctl[0x2a];
     return ((ctl[6] - ctl[0x11] * 2) - v) / (ctl[0x29] + v) + 1;
 }
