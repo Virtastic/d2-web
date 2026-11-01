@@ -13,7 +13,7 @@ struct D2Client2C7E0Env {
 // `thisValue` is the retail ECX value. The numeric input arrives in EAX; `destination` is
 // the stack argument. Retail uses `%d` when ECX is null or the value is negative, and `+%d`
 // otherwise, then converts at most 31 narrow characters to Unicode.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2client_2c7e0(
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_old_d2client_2c7e0(
     uint32_t thisValue, int32_t value, uint16_t* destination,
     const D2Client2C7E0Env* env) {
     char text[32];
