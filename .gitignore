@@ -44,6 +44,7 @@ src/core/fn/*
 !src/core/fn/d2client_a4b60.cpp
 !src/core/fn/d2game_78550.cpp
 !src/core/fn/d2game_9ec80.cpp
+!src/core/fn/d2game_gp.h
 !src/core/fn/d2game_9f4a0.cpp
 !src/core/fn/d2game_9f850.cpp
 !src/core/fn/d2game_9fa30.cpp
@@ -133,6 +134,7 @@ wasm-build/*
 !wasm-build/version-engine.sh
 test/*
 !test/probe-skip.test.mjs
+!test/public-includes.test.mjs
 !test/engine-key-untracked.test.mjs
 !test/plugy-stash-sidecar.test.mjs
 !test/plugy-stash-ui.test.mjs
