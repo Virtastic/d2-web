@@ -121,6 +121,9 @@ tools/manifest_lock.py
 !tools/mksmoke.mjs
 !tools/mpq-fingerprint.mjs
 !tools/patch-shim.mjs
+!tools/setup.mjs
+!tools/door-art.mjs
+!tools/mpq-node.mjs
 !tools/realmd
 !tools/vectorfmt
 !tools/leak-check.sh

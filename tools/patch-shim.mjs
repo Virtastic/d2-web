@@ -5,22 +5,29 @@
 // is generated at stage/deploy time and never committed.
 //   node tools/patch-shim.mjs <Patch_D2.mpq> <out.patch>   check the patch is 1.13c, write the shim
 //   node tools/patch-shim.mjs --check <out.patch>          check a staged shim holds the 1.13c patch
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, realpathSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 // Patch_D2.mpq as the 1.13c patch installs it. Any other version (or a modded file) is refused.
-const PATCH_113C = { size: 8229959, sha256: '41a5fc95977369e3d5f32127cc4c0d571daad9cf706b6b6523935b705afc5a6d' };
+export const PATCH_113C = { size: 8229959, sha256: '41a5fc95977369e3d5f32127cc4c0d571daad9cf706b6b6523935b705afc5a6d' };
+
+const sha256Of = (buf) => createHash('sha256').update(buf).digest('hex');
+// True when buf is exactly the 1.13c Patch_D2.mpq (tools/setup.mjs uses this).
+export const isPatch113c = (buf) => buf.length === PATCH_113C.size && sha256Of(buf) === PATCH_113C.sha256;
 
 function verify(mpq, what) {
   if (mpq.length < 4 || mpq.readUInt32LE(0) !== 0x1a51504d) fail(`${what}: not an MPQ archive`);
-  const sha256 = createHash('sha256').update(mpq).digest('hex');
-  if (mpq.length !== PATCH_113C.size || sha256 !== PATCH_113C.sha256)
+  const sha256 = sha256Of(mpq);
+  if (!isPatch113c(mpq))
     fail(`${what}: not the 1.13c Patch_D2.mpq (${mpq.length} bytes, sha256 ${sha256}; expected ${PATCH_113C.size} bytes, sha256 ${PATCH_113C.sha256}). Update the game to 1.13c and use its Patch_D2.mpq.`);
 }
 function fail(msg) { console.error(`FATAL: ${msg}`); process.exit(1); }
 
 const [, , a, b] = process.argv;
-if (a === '--check' && b) {
+const main = (() => { try { return realpathSync(process.argv[1]) === fileURLToPath(import.meta.url); } catch { return false; } })();
+if (!main) { /* imported by tools/setup.mjs: no CLI */ }
+else if (a === '--check' && b) {
   verify(Buffer.from(readFileSync(b, 'latin1'), 'base64'), b);
   console.log(`patch shim: ${b} holds the 1.13c Patch_D2.mpq`);
 } else if (a && b) {

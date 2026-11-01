@@ -57,13 +57,13 @@ if [ "${D2_ASSETS:-}" = "byo" ]; then echo '{"assets":"byo"}' > build-wasm/site/
 # The 1.13c patch shim the BYO page mounts over the player's own patch (tools/patch-shim.mjs; never committed).
 # Required: the engine reads only 1.13c data, and the patch a player brings may be any version.
 SHIM_SRC="${D2_PATCH_SHIM_SRC:-retail/D2/patch_d2.mpq}"
-[ -f "$SHIM_SRC" ] || { echo "FATAL: no $SHIM_SRC -- the 1.13c patch is required; copy your 1.13c Patch_D2.mpq to retail/D2/patch_d2.mpq or set D2_PATCH_SHIM_SRC" >&2; exit 1; }
+[ -f "$SHIM_SRC" ] || { echo "FATAL: no $SHIM_SRC -- run: node tools/setup.mjs \"/path/to/Diablo II\"   (it links your game files and checks the patch is 1.13c)" >&2; exit 1; }
 [ -n "$HAVE_NODE" ] || { echo "FATAL: node not found -- cannot stage the 1.13c patch" >&2; exit 1; }
 "$NODE_BIN" tools/patch-shim.mjs "$SHIM_SRC" build-wasm/site/assets/patch-113c.patch
 # The BYO front door's title-screen art (logo, buttons, fonts, loading screen), cut from the archives beside the patch.
 DA_SRC="$(dirname "$SHIM_SRC")"
 if [ -f "$DA_SRC/d2data.mpq" ] && [ -n "$HAVE_NODE" ]; then "$NODE_BIN" tools/door-art.mjs "$DA_SRC" build-wasm/site/door-art || echo "WARNING: door art failed -- the BYO door draws plain until the player's files arrive" >&2
-else echo "WARNING: no $DA_SRC/d2data.mpq -- the BYO door draws plain until the player's files arrive" >&2; fi
+else echo "WARNING: no $DA_SRC/d2data.mpq -- the title screen draws plain until the player's files arrive (node tools/setup.mjs \"/path/to/Diablo II\" fixes it)" >&2; fi
 # Committed ground truth, served so scenarios can fetch it into the page.
 [ -d vectors ] && mkdir -p build-wasm/site/vectors && cp -rLu vectors/. build-wasm/site/vectors/
 # The widescreen HUD art: SGD2FreeRes's DC6 panels (the list play/assets/wide-hud.mjs names) and its licence,
