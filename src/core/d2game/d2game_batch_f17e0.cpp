@@ -3,26 +3,12 @@
 // below. Pointer fields go through env seams keyed by RETAIL offsets; no pointer in a dword.
 #include <cstdint>
 #include <cstring>
+#include "d2game_batch_f17e0.h"
 namespace d2game_batchf17e0 {
 using U = uint32_t; using I = int32_t; using P = void*;
 static I s(P p,U o) { I v; std::memcpy(&v,(uint8_t*)p+o,4); return v; }
 static void w(P p,U o,I v) { std::memcpy((uint8_t*)p+o,&v,4); }
 static void wb(P p,U o,uint8_t v) { ((uint8_t*)p)[o]=v; }
-struct Env {
-    P (*ptr)(P,U);                          // retail pointer field -> native object
-    I (*walk)(P game,P unit,P target,I mode,I x,I y,I flags); // F2540
-    void (*idle)(P game,P unit,I frames);   // F22C0
-    I (*stateTest)(P,I);                    // D2Common 10494
-    I (*f114f0)(P,P,P,P,P,I);               // F14F0
-    void (*f7a4c0)(P,I);                    // 7A4C0
-    I (*pathX)(P); I (*pathY)(P);           // 10867 / 10750
-    void (*r11103)(P); void (*change)(P,P,I); // 11103, 75E10 (info built by caller)
-    void (*r11005)(P,I); void (*f75070)(P);   // 11005, 75070
-    P (*f1c90)(P,P,P); I (*r10123)(P); I (*r10331)(P,I,I,I,I); I (*r10851)(I); // B1C90..
-    U (*f1560)(I); void (*f1b10)(P,P);       // 1560, F1B10
-    void (*f102f0)(P); void (*f10640)(P,P);  // F02F0, F0640
-    void (*fatal)(I);                        // A2DA/A2C2/2A3C -> _exit path
-};
 static I xOf(Env& e,P u) {
     I t=s(u,0); P p=e.ptr(u,0x2c);
     if (t==2||(t>3&&t<6)) return s(p,0xc);
