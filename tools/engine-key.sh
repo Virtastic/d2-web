@@ -42,7 +42,8 @@ if [ -n "$untracked" ] || [ -n "$(git status --porcelain -- "${inputs[@]}")" ]; 
     {
       git diff --no-ext-diff --no-textconv --binary --submodule=diff HEAD -- "${inputs[@]}"
       printf '%s\n' "$untracked"
-      [ -z "$untracked" ] || printf '%s\n' "$untracked" | git hash-object --stdin-paths
+      # A concurrent build or probe cleanup can delete a listed file before it is hashed: hash what exists now.
+      [ -z "$untracked" ] || printf '%s\n' "$untracked" | while IFS= read -r f; do if [ -e "$f" ]; then printf '%s\n' "$f"; fi; done | git hash-object --stdin-paths
     } | sha256sum | cut -c1-12
   )
   # Keep the suffix: engine-cache.sh deliberately refuses to reuse dirty builds.
