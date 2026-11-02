@@ -105,3 +105,12 @@ extern "C" uint64_t fog_sub_1C6E0(uint64_t edxIn) {  // 1.13c Fog+0x1C6E0
         return g_fogB54a.cpuid1BxCx;
     return edxIn << 32;  // leftover EDX of the failed path; the caller discards it
 }
+
+// FUNCTION-mode seam (fn-capture only): seeds the CPU facts fog_sub_1C640 reads; the function itself is unchanged.
+extern "C" void fog_sub_1C640_seed(int32_t level, int32_t vendor, uint32_t sig) {
+    g_fogB54a.cpuLevel = level;
+    g_fogB54a.cpuVendor = vendor;
+    g_fogB54a.cpuSignature = sig;
+}
+// FUNCTION-mode seam (fn-capture only): the counterpart of retail DAT_6ff82f30 (RVA 0x32F30) for the pinned level.
+extern "C" int32_t* fog_sub_1C640_levelAddr(void) { return &g_fogB54a.cpuLevel; }

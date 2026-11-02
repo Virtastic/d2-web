@@ -114,3 +114,14 @@ int fog_sub_1E880(uint8_t* obj, uint32_t buf, uint32_t len, const fog_sub_1E880_
     uint32_t four = 4; memcpy(obj + 0x30, &four, 4);
     return -1; // CS left held, as retail
 }
+
+// FUNCTION-mode seam (fn-capture only): seeds the lowest-set-bit table the probe needs; fog_sub_13B70 is unchanged.
+extern "C" int32_t fog_sub_13B70_seeded(uint32_t v) {
+    static int32_t t[256];
+    t[0] = 0;
+    for (int b = 1; b < 256; b++) { int i = 0; while (!((b >> i) & 1)) i++; t[b] = i; }
+    fog_batch55a_Env e = {};
+    e.bitIndexTable = t;
+    fog_batch55a_setEnv(&e);
+    return fog_sub_13B70(v);
+}

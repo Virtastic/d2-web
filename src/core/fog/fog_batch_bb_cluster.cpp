@@ -185,3 +185,18 @@ void fog_bb_e9a0(const fog_bb_env* e, fog_bb_srv* s)
     e->cs_leave(s->cs);
     e->wait(s->event, 2000);
 }
+
+// FUNCTION-mode seam (fn-capture only): the error word arrives as a value; the two seams the body calls are no-ops.
+static void fcf0_noop1(int) {}
+static void fcf0_noop_log(const char*) {}
+extern "C" int fog_bb_fcf0_seeded(int in_error, int p1) {
+    fog_bb_env e = {};
+    e.err_dump5fc70 = fcf0_noop1;
+    e.log = fcf0_noop_log;
+    fog_bb_errstate s = { in_error };
+    return fog_bb_fcf0(&e, &s, p1);
+}
+
+// FUNCTION-mode seam (fn-capture only): the counterpart of retail DAT_6ffa6e70 (RVA 0x56E70), the error-in-progress word.
+static int32_t g_fog_fcf0_inerr;
+extern "C" int32_t* fog_bb_fcf0_errAddr(void) { return &g_fog_fcf0_inerr; }
