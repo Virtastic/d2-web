@@ -183,3 +183,31 @@ int32_t D2Game_3BC00_probe(void* pGame, void* missile, uint32_t* lg, const uint3
     e.spawnRandomMonster = [](void* g, void* room, int32_t x, int32_t y) { p3e_log(0xEF6B0, p3e32(g), p3e32(room), (uint32_t)x, (uint32_t)y); };
     return D2Game_3BC00(pGame, missile, &e);
 }
+
+// function probe seam (src/core/fn/d2game_3c160.cpp): callees recorded like the capture's `hook` lines; sc = (rva, value) pairs.
+#include "../fn/d2game_seam_probe.h"
+static D2ProbeSeam* g_p3c; static const void* g_p3cDt;
+static uint32_t p3c_u32(const void* p) { return (uint32_t)(uintptr_t)p; }
+uint32_t D2Game_3C160_probe(void* pGame, void* missile, const uint32_t* r, uint32_t* lg, const uint32_t* sc)
+{
+    static const uint32_t size[7] = { 2048, 4096, 4, 4, 0x120, 1024, 64 };
+    static const uint32_t rv[3] = { 0xE03A0, 0xB26A, 0xB0FC };
+    uint32_t v[3] = {};
+    for (int i = 0; i < 3; i++) for (const uint32_t* p = sc; p[0]; p += 2) if (p[0] == rv[i]) { v[i] = p[1]; break; }
+    const D2ProbeHook hooks[4] = { { 0xE03A0, "acd", 0, v[0] }, { 0xB26A, "", 1, v[1] }, { 0xB0FC, "", 1, v[2] }, { 0x6F930, "cd", 0, 0 } };
+    D2ProbeSeam ps{ r, size, 7, lg, hooks, 4 };
+    lg[0] = 0; g_p3c = &ps; g_p3cDt = (const void*)(uintptr_t)r[3];
+    D2GameBatch3Env e{};
+    e.dataTables = []() -> const void* { return g_p3cDt; };
+    e.getUnit = [](void* g, uint32_t guid, uint32_t type) -> void* { return (void*)(uintptr_t)D2ProbeSeam::thunk(g_p3c, 0xE03A0, type, p3c_u32(g), guid, 0, 0, 0, 0, 0, 0); };
+    e.ord10240 = [](void* u) -> int32_t { return (int32_t)D2ProbeSeam::thunk(g_p3c, 0xB26A, 0, 0, 0, 0, 0, p3c_u32(u), 0, 0, 0); };
+    e.ord11029 = [](void* u) -> int32_t { return (int32_t)D2ProbeSeam::thunk(g_p3c, 0xB0FC, 0, 0, 0, 0, 0, p3c_u32(u), 0, 0, 0); };
+    e.createMissile = [](void* g, uint32_t* p) {
+        D2ProbeSeam::thunk(g_p3c, 0x6F930, 0, p3c_u32(g), p3c_u32(p), 0, 0, 0, 0, 0, 0);
+        for (uint32_t o = 0; o < 23; o += 9) {
+            uint32_t* w = g_p3c->lg + 1 + g_p3c->lg[0]++ * 10;
+            w[0] = 0x6F930u | 0x40000000u;
+            for (uint32_t j = 0; j < 9; j++) w[1 + j] = o + j < 23 ? g_p3c->tag(p[o + j]) : 0;
+        } };
+    return (uint32_t)D2Game_3C160(pGame, missile, &e);
+}
