@@ -289,8 +289,8 @@ void sub_90770(Env& e, uint32_t item, W* out) {
     wcat(out, num); wcat(out, kEmpty);
 }
 
-// 1.13c D2Client+0x908C0 (per-screen panel rect refresh)
-void sub_908C0(Env& e, int32_t& cb99c, int32_t& c3424, int32_t& c20, int32_t& c24, int32_t pool, uint32_t pl2, uint8_t flag9721, uint32_t id971d, uint32_t cc854, int32_t* regionsOut) {
+// 1.13c D2Client+0x908C0 (per-screen panel rect refresh); 0x119721 is read as a dword
+void sub_908C0(Env& e, int32_t& cb99c, int32_t& c3424, int32_t& c20, int32_t& c24, int32_t pool, uint32_t pl2, uint32_t flag9721, uint32_t id971d, uint32_t cc854, int32_t* regionsOut) {
     if (cb99c == c3424) {
         if (c20 == 0) goto fill;
     } else {

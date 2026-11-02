@@ -1,32 +1,8 @@
 // D2Client 0x88D90 / 0xC3DD0..0xC4CE0 batch: env-seam implementations from the decompile.
 // Ordinal_* / FUN_* callees are Env function pointers named by ordinal/RVA; retail memory via rd32/wr32.
 // Registers the decompiler lost (unaff_*, in_EAX) are explicit parameters.
-#include <cstdint>
+#include "d2client_batch_c3dd0.h"
 namespace d2client_batch_c3dd0 {
-using P = uintptr_t;
-struct Env {
- uint32_t (*rd32)(P); void (*wr32)(P, uint32_t);
- P dataTables;                       // *sgptDataTables
- P gCC268, gBB9CC, gBB9D0, gBB9D4, gBB9D8, gCBEFC, gC97F8; // DAT_6fbcc268, 6fbbb9cc.., 6fbcbefc, 6fbc97f8
- uint32_t (*tick)();                 // GetTickCount
- void (*writeFile)(P, const char*, uint32_t); // WriteFile after wvsprintfA
- void (*f39640)(); uint32_t (*f38a70)(P, int, int, int);
- uint32_t (*o10511)(P); int32_t (*o10786)(P, uint32_t, uint32_t, uint32_t);
- void (*o10243)(uint32_t, uint32_t); uint32_t (*o10494)(P, uint32_t); void (*o10945)(P, uint32_t, uint32_t);
- uint32_t (*o10750)(P); uint32_t (*o10867)(P);
- P (*f5ff10)(P, P, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
- uint8_t (*o10663)(); void (*o10706)(uint32_t, uint8_t); void (*o10520)(uint32_t, uint32_t);
- uint32_t (*o10331)(P, uint32_t, uint32_t); void (*o10591)(uint32_t, const uint32_t*, uint32_t); void (*o10052)(P*);
- P (*f630f0)(const uint32_t*); int32_t (*o10534)(P); void (*o10558)(P, int32_t); void (*o10970)(P, int32_t);
- void (*o10344)(P*);
- P (*f560d0)(P); void (*o11121)(P, P);
- void (*fada0b0)(); uint32_t (*o10265)(uint32_t); void (*o10024)(const char*, uint32_t); P (*o10392)(uint32_t);
- int32_t (*o10096)(P); uint32_t (*f1630)(P); uint32_t (*f1660)(P); void (*o10554)(uint32_t, uint32_t); void (*o10748)(uint32_t, uint32_t);
- uint32_t (*o10980)(uint32_t); uint32_t (*o10649)(uint32_t);
- int32_t (*f40550)(P); int32_t (*f51340)(int32_t*); P (*f515c0)(); P (*f51540)();
- void (*o10637)(P, int32_t); void (*o10019)(P, int32_t);
- int32_t (*o10080)(P, uint32_t, uint32_t); void (*o10425)(uint32_t, int32_t); void (*o10441)(P, int32_t); void (*o10837)(P, int32_t);
-};
 static bool isTyped(int32_t t) { return t == 2 || (3 < t && t < 6); }
 static P clsRow(const Env& e, int32_t c) {
  if (c < 0 || (int32_t)e.rd32(e.dataTables + 0xba0) <= c) return 0;
@@ -43,7 +19,7 @@ static uint32_t unitW0c(const Env& e, P u) {
 // 1.13c D2Client+0x88D90
 uint32_t sub_88D90(const Env& e) {
  uint32_t g = e.rd32(e.gCC268), r = g / 3;
- if (g % 3 == 0) { e.f39640(); r = e.f38a70(0, 0, 0, 0); }
+ if (g % 3 == 0) r = e.f38a70e(e.f39640(0x6bb) + 0xb76, 0, 0, 0, 0);   // ESI = 0x6BB into 0x89640; EBX = its result + 0xB76 into 0x88A70
  return r;
 }
 // 1.13c D2Client+0xC3DD0  (formatted text already produced by the caller's vsprintf)

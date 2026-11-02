@@ -4,7 +4,7 @@
 
 struct B71Env {
     int32_t** listHead;                   // &DAT_6fbcbf30 (node: [0]=entry*, [1]=next)
-    int32_t (*unitCheck)();               // Ordinal_10053
+    int32_t (*unitCheck)(int32_t unit, int32_t flag);   // Ordinal_10053 (ECX = entry+0x28, EDX = flag)
     int32_t* dat6fbc9854;                 // expansion/hires flag
     int32_t* rectA;                       // DAT_6fbbb39c..3a8 {x0,r,y0,y1}-> [0]=DAT_..39c [1]=3a0 [2]=3a4 [3]=3a8
     int32_t* rectB;                       // DAT_6fbbb2d4..2e0, same order
@@ -24,7 +24,7 @@ extern "C" void b71_set_env(const B71Env* e) { b71_env = *e; }
 extern "C" int32_t* b71_sub_87BD0(int32_t* self, int32_t flag) {
     for (int32_t* n = *b71_env.listHead; n; n = (int32_t*)(intptr_t)n[1]) {
         int32_t* e = (int32_t*)(intptr_t)n[0];
-        if (e != self && e[0x30 / 4] == 1 && (flag == 0 || b71_env.unitCheck() != 0)
+        if (e != self && e[0x30 / 4] == 1 && (flag == 0 || b71_env.unitCheck(e[0x28 / 4], flag) != 0)
             && e[1] > 0xb75 && e[1] < 0x1231) return e;
     }
     return nullptr;

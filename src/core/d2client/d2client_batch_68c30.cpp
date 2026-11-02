@@ -163,10 +163,11 @@ static void rel(uint32_t* h, void (*o65)(uint32_t), void (*o43)(int32_t, int32_t
 }
 
 // 1.13c D2Client+0x8BB90 (84 B): g[0..4] = cbc34, cbc48, cbe7c, b2a4, b430 cleared; then release b35c, clear b2a0.
+// cbc48 is a byte global (retail stores BL): only the low byte of g5[1] is cleared.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_8bb90(uint32_t* g5, uint32_t* h_b35c, uint32_t* z_b2a0, void (*o65)(uint32_t),
                      void (*o43)(int32_t, int32_t)) {
-    for (int i = 0; i < 5; i++) g5[i] = 0;
+    for (int i = 0; i < 5; i++) if (i == 1) *reinterpret_cast<uint8_t*>(&g5[1]) = 0; else g5[i] = 0;
     rel(h_b35c, o65, o43);
     *z_b2a0 = 0;
 }

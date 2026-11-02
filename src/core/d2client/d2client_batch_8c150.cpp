@@ -29,11 +29,13 @@ void d2_client_8c1e0(uint16_t* dst, uint16_t* (*ord10003)(void), void (*strcat_w
     strcat_w(dst, a);
 }
 
-// 1.13c D2Client+0x8C210 (121 B): string-table lookup by idx 0..6; otherwise error path and _exit(-1).
+// 1.13c D2Client+0x8C210 (121 B): string-table lookup by idx 0..6 (ECX = string id, tail jump to D2Lang 10003);
+// otherwise error path and _exit(-1).
 extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t d2_client_8c210(uint32_t idx, uint32_t (*ord10003)(void), uint32_t (*ord10265)(int),
+uint32_t d2_client_8c210(uint32_t idx, uint32_t (*ord10003)(uint32_t), uint32_t (*ord10265)(int),
                          void (*ord10024)(uint32_t, uint32_t), void (*exit_)(int)) {
-    if (idx < 7) return ord10003();
+    static const uint32_t kId[7] = {0xFAB, 0xFAA, 0xFA9, 0xFA8, 0xFA7, 0x2771, 0x2772};
+    if (idx < 7) return ord10003(kId[idx]);
     ord10024(0, ord10265(0x69c));  // arg0 = &DAT_6fb8359f (message), host supplies
     exit_(-1);
     return 0;

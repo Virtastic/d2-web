@@ -37,14 +37,13 @@ void removeEvents(State& s, uint32_t unit, uint32_t key1, uint32_t key2) {
     }
 }
 // 1.13c D2Client+0x214B0
-// ESI = unit, three stack words (ret 0x0C): p1 -> data(+0x14), p2 -> key1(+0x04), p3 -> key2(+0x08).
-// Kind is fixed 0x48; callback (+0x10) is the caller's return address.
-uint32_t addEvent(State& s, uint32_t unitEsi, uint32_t p1, uint32_t p2, uint32_t p3) {
+// ESI = unit, six stack words (ret 0x18): w0 to kind(+0), w1 to arg(+0xc), w2 to callback(+0x10), w3 to data(+0x14), w4 to key1(+4), w5 to key2(+8).
+uint32_t addEvent(State& s, uint32_t unitEsi, uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3, uint32_t w4, uint32_t w5) {
     if (!unitEsi) return 0;
     uint32_t p = s.poolAlloc(s.context, read(s, unitEsi + 8), 0x20, eventFile, 0x48, 0);
     Event& e = event(s, p);
     e = {};
-    e.kind = 0x48; e.callback = s.returnAddress; e.data = p1; e.key1 = p2; e.key2 = p3;
+    e.kind = w0; e.arg = w1; e.callback = w2; e.data = w3; e.key1 = w4; e.key2 = w5;
     e.next = read(s, unitEsi + 0x90);
     if (read(s, unitEsi + 0x90)) event(s, read(s, unitEsi + 0x90)).prev = p;
     write(s, unitEsi + 0x90, p);

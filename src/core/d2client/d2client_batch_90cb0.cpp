@@ -47,6 +47,7 @@ struct G {
     uint8_t  cc390;                        // 6fbcc390
     uint32_t* hash_ba808;                  // 6fbba808[128] unit buckets (next = word 0x39)
     uint8_t* tab_91182; int32_t tab_n;     // 6fb91182 stride 0x12 table, count 6fb911c0
+    uint32_t a9e18, cc3c4;                 // 6fba9e18 / 6fbcc3c4 (EAX, ESI of the 91070 0x8A4D0 call)
 };
 
 // 1.13c D2Client+0x90CB0 (509 B): substitute "[mN]/[nN]" selectors of fmt (text before ':') from the vararg list, then emit the text after ':'.
@@ -109,14 +110,14 @@ void d2_client_91070(G* g, Host h, int32_t param_1) {
     g->be5c = 0; g->be60 = 0; g->be7c = 0; g->c418 = 0;
     if (param_1 == 0) {
         g->bc34 = 10; g->c414 = 0;
-        H(h, ORD(10006)); H(h, 0x3A4D0, g->a9e14, 0, 0);
+        H(h, ORD(10006)); H(h, 0x8A4D0, g->a9e14, g->a9e18, g->cc3c4, 0);   // ECX, EAX, ESI, stack 0; EDX 0
     } else {
         g->bb2a0 = 0; g->bc34 = 0xb; g->c414 = 3;
-        H(h, ORD(10006)); H(h, 0x3A4D0, g->a9e14, 0, 0);
+        H(h, ORD(10006)); H(h, 0x8A4D0, g->a9e14, g->a9e18, g->cc3c4, 0);   // ECX, EAX, ESI, stack 0; EDX 0
         g->c3dc = 0; g->c3e0 = 0; g->c3f8 = 0; g->c3fc = 0;
         if (!g->bb35c) {
             char buf[260]; snprintf(buf, sizeof buf, "%s\\ui\\panel\\trade", "DATA\\GLOBAL");
-            g->bb35c = (uint32_t)H(h, 0xDB420, 0, P(buf));
+            g->bb35c = (uint32_t)H(h, 0x2B420, 0, P(buf));
         }
     }
     g->beec = 0; g->be64 = 0; g->be68 = 0; g->be6c = 0; g->be70 = 0;
@@ -128,7 +129,7 @@ void d2_client_911a0(G* g, Host h) {
     g->be7c = 0; g->bc88 = -1; g->bc48 = 0; g->bb348 = 0;
     for (int i = 0; i < g->tab_n; i++) memset(g->tab_91182 + 0x12 * i, 0, 8);   // words at -4/+0 of the 6fb91186 pointer
     g->bc30 = 0; g->bc34 = 1;
-    H(h, 0x3F430);
+    H(h, 0x8F430);
     if (!g->c9721) return;
     const uint32_t* node = nullptr;
     for (uintptr_t n = g->hash_ba808[g->c971d & 0x7f]; n; n = ((const uint32_t*)n)[0x39])
@@ -147,7 +148,7 @@ void d2_client_911a0(G* g, Host h) {
         default: break;
         }
     }
-    H(h, 0x3F710, g->bc48);
+    H(h, 0x8F710, g->bc48);
     if (matched) g->bc4c = (int32_t)(H(h, 0xFFFF0001) + 500);   // GetTickCount()
 }
 
@@ -241,7 +242,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_92850(G* g, Host h) {
     uint8_t pkt[7] = {0x5a, 0x0e, 0x01, 0, 0, 0, 0};
     g->bc34 = 1;
-    g->b834 = (int32_t)H(h, ORD(11017));
+    g->b834 = (int32_t)H(h, ORD(11017), ((const uint32_t*)(uintptr_t)g->bbfc)[0x18]);   // player+0x60
     g->b858 = 0; g->b854 = 5; g->b864 = g->b834 ? 4 : 1;
     H(h, 0x7DFB0, P(pkt));
 }

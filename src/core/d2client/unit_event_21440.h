@@ -46,7 +46,7 @@ struct State {
 };
 inline constexpr const char* eventFile = "..\\Source\\D2Client\\UNIT\\CUnitEvent.cpp";
 inline constexpr const char* associationFile = "..\\Source\\D2Client\\GAME\\RosterPets.cpp";
-uint32_t addEvent(State&, uint32_t unit, uint32_t p1, uint32_t p2, uint32_t p3);
+uint32_t addEvent(State&, uint32_t unit, uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3, uint32_t w4, uint32_t w5);
 void removeEvents(State&, uint32_t unit, uint32_t key1, uint32_t key2);
 void clearEvents(State&, uint32_t unit);
 void removeOtherTypeSeven(State&, int32_t id);

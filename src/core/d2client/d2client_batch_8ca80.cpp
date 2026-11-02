@@ -106,13 +106,14 @@ void d2_client_8d370(int32_t p, int32_t* g_bcbc38, uint32_t* g_90ea8, int32_t* g
     *g_bcbc28 = 0; *g_bcbc2c = 0; *g_bcbc38 = 0; *g_bcbc3c = 0;
 }
 
-// 1.13c D2Client+0x8D430 (179 B): EBX = class id; walks the list from ord10460.
+// 1.13c D2Client+0x8D430 (179 B): EAX = inventory, EBX = class id (compared as a full dword against the
+// sign-extended record word); walks the list from ord10460(inventory).
 extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t d2_client_8d430(int16_t id, uint32_t data_tables, uint32_t (*ord10460)(void), uint32_t (*ord11147)(uint32_t),
+uint32_t d2_client_8d430(uint32_t inv, int32_t id, uint32_t data_tables, uint32_t (*ord10460)(uint32_t), uint32_t (*ord11147)(uint32_t),
                          int (*ord10106)(uint32_t), int (*ord10202)(uint32_t, int, int, const char*),
                          int8_t (*ord10020)(uint32_t), int (*ord10698)(uint32_t), int (*ord10620)(uint32_t),
                          uint32_t (*ord10464)(uint32_t)) {
-    for (uint32_t n = ord10460(); n; n = ord10464(n)) {
+    for (uint32_t n = ord10460(inv); n; n = ord10464(n)) {
         uint32_t u = ord11147(n);
         if (ord10106(u) != 5) continue;
         if (!ord10202(u, 0x10, 0xca1, "..\\Source\\D2Client\\UI\\inv.cpp")) continue;
@@ -123,7 +124,7 @@ uint32_t d2_client_8d430(int16_t id, uint32_t data_tables, uint32_t (*ord10460)(
         int idx = ord10620(u);
         if (idx < 0 || idx >= (int)rd32(data_tables + 0xc1c)) continue;
         uint32_t rec = (uint32_t)idx * 0x1b8 + rd32(data_tables + 0xc18);
-        if (rec && *(const int16_t*)(uintptr_t)rec == id) return u;
+        if (rec && (int32_t)*(const int16_t*)(uintptr_t)rec == id) return u;
     }
     return 0;
 }

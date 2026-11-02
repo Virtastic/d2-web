@@ -43,7 +43,7 @@ static uint8_t* find(const D2cSnd87* s, int32_t key) {
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_87de0(D2cSnd87* s, const D2cSnd87Env* e, int32_t key) {
     uint8_t* p = find(s, key);
     if (!p) return 0;
-    if (rd<uintptr_t>(p, 0x2c)) return e->ord10032();
+    if (rd<uint32_t>(p, 0x2c)) return e->ord10032();
     e->fatal(0x45a);
     return 0;
 }
@@ -52,7 +52,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_87de0(D2cSnd87* s, const D2cS
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_87e90(D2cSnd87* s, const D2cSnd87Env*, int32_t key) {
     uint8_t* p = find(s, key);
     if (!p) return 0;
-    uintptr_t a = rd<uintptr_t>(p, 0x28);
+    uintptr_t a = rd<uint32_t>(p, 0x28);   // retail pointers are 32-bit
     return a && rd<int32_t>((const uint8_t*)a, 4) ? 1 : 0;
 }
 
