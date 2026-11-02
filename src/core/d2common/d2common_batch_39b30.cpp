@@ -105,7 +105,7 @@ EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_18df0(int32_t nIndex)
 // 1.13c D2Common+0x24320 (#10844): the items.txt wType[0] of nItemId indexes itemtypes.txt and the
 // answer is nClass (+0x21) < 7. Out-of-range item ids are retail's fatal 0x68E -> false.
 extern "C"
-EMSCRIPTEN_KEEPALIVE bool d2_fn_d2common_24320(uint32_t nItemId)
+EMSCRIPTEN_KEEPALIVE bool D2Common_24320_ItemClassBelow7(uint32_t nItemId)
 {
 	const D2ItemsTxt* pItemRow = DATATBLS_GetItemsTxtRecord(static_cast<int32_t>(nItemId));
 	if (!pItemRow)

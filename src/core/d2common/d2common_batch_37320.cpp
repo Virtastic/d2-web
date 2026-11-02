@@ -132,7 +132,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_34390_batch(uint32_t pRecord) {   // 1.
 // DAT_6fdefd98, base at DAT_6fdefd9C). Index -1 or one past the count answers 0; a null base or a
 // null computed row is retail's fatal 0x5D0/0x5D1 and also answers 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_71430(int32_t nIndex) {   // 1.13c D2Common+0x71430
+EMSCRIPTEN_KEEPALIVE int32_t D2Common_71430_TableRow(int32_t nIndex) {   // 1.13c D2Common+0x71430
 	if (nIndex >= g_d2common_dat_6fdefd98 || nIndex == -1) return 0;
 	if (!g_d2common_dat_6fdefd9c) return 0;
 	const int32_t nRow = static_cast<int32_t>(static_cast<uint32_t>(nIndex) * 0x22u +

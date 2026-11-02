@@ -34,12 +34,12 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4ad20(uint32_t pRoom, uint32_t pBeg
 
 // +0x24800: a null unit or a unit type other than 4 is retail's fatal path (we answer 0). Otherwise
 // the dword at +0x04 is passed to +0x22B20, which reads +0xEC of that items.txt record.
-extern "C" uint32_t d2_fn_d2common_22b20(uint32_t nIndex);
+extern "C" uint32_t D2Common_22B20_ItemDword(uint32_t nIndex);
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t D2Common_24800_GetItemDwordEC(uint32_t pItem) {   // 1.13c D2Common+0x24800
 	if (!pItem || R(P(pItem), 0x00) != 4)
 		return 0;
-	return d2_fn_d2common_22b20(R(P(pItem), 0x04));
+	return D2Common_22B20_ItemDword(R(P(pItem), 0x04));
 }
 
 // +0x30340: precision X. Unit types 2 (object), 4 (item) and 5 (tile) take the static-path game

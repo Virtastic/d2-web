@@ -68,7 +68,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4e030(uint32_t pRecord) {   // 1.13
 // +0x22B20: dword at +0xEC of items.txt record nIndex (retail's count/base globals DAT_6fdefb94/98 are the items
 // table, the same one 0x22760 reads). Out of range is retail's fatal path and answers 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_22b20(uint32_t nIndex) {   // 1.13c D2Common+0x22B20
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_22B20_ItemDword(uint32_t nIndex) {   // 1.13c D2Common+0x22B20
 	static_assert(sizeof(D2ItemsTxt) == 0x1A8, "items.txt record stride");
 
 	const uint32_t nCount = static_cast<uint32_t>(sgptDataTables->pItemDataTables.nItemsTxtRecordCount);
