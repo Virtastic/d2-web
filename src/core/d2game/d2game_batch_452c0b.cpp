@@ -387,7 +387,7 @@ i32 D2GAME_4D710(P game, P unit, i32 skill, i32 lvl)
     r_8EA80(/*edx*/mon, /*ecx*/game, 2, W(PP(game, 0xa8), 0x14) /* address game[0xa8]+0x14 */, 0, 0, 0);
     o10945((void*)mon, 0x5d, 1);
     o10210(mon, unit);
-    r_EFE40(/*ecx*/game, 0, /*edi*/mon, /*ebx*/B(unit, 0xd0));
+    r_EFE40(/*ecx*/game, 0, /*edi*/mon, /*ebx*/W(unit, 0xd0));
     return 1;
 }
 

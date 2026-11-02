@@ -1774,7 +1774,15 @@ D2UnitStrc* __fastcall SKILLS_FindLeapAttackTarget(D2GameStrc* pGame, D2UnitStrc
         return pTarget;
     }
 
-    // 1.13c has no nearby-target search here (1.10f did): it logs an error and marks the skill target invalid.
-    SKILLS_SetParam3(pSkill, 6);
-    return nullptr;
+    // 1.13c D2Game+0x272C0 inlines the aura-target search (range = sub_6FD15460, filter 0x20003) before giving up.
+    pTarget = sub_6FD107F0(pGame, pUnit, 0, 0, sub_6FD15460(pUnit), 0x20003u, -1, nullptr);
+    if (!pTarget)
+    {
+        SKILLS_SetParam3(pSkill, 6);
+        return nullptr;
+    }
+
+    SKILLS_SetParam3(pSkill, pTarget->dwUnitType);
+    SKILLS_SetParam4(pSkill, pTarget->dwUnitId);
+    return pTarget;
 }
