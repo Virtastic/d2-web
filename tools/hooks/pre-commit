@@ -1,3 +1,7 @@
 #!/usr/bin/env bash
 # Public repo: no private content in a commit. Enabled by: git config core.hooksPath tools/hooks
-exec "$(git rev-parse --show-toplevel)/tools/leak-check.sh" --staged
+ROOT="$(git rev-parse --show-toplevel)"
+"$ROOT/tools/leak-check.sh" --staged || exit 1
+# FN probe gate: a staged src/core file whose #include does not resolve, or resolves to a gitignored file, fails the commit.
+# tools/re is private (linked from .private), so the gate runs only where the checker is linked.
+if [ -f "$ROOT/tools/re/check-fn-probes.mjs" ]; then node "$ROOT/tools/re/check-fn-probes.mjs" --staged || exit 1; fi

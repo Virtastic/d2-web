@@ -142,6 +142,7 @@ wasm-build/*
 test/*
 !test/input-touch-name.test.mjs
 !test/probe-skip.test.mjs
+!test/build-key-lock.test.mjs
 !test/land-fold.test.mjs
 !test/public-includes.test.mjs
 !test/engine-key-untracked.test.mjs

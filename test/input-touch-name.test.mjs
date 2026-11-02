@@ -46,13 +46,22 @@ function shellModel() {
   return shell;
 }
 
-function mount() {
+function mount({ width = 800, height = 600, name = '', targets = true } = {}) {
   const canvas = element(), container = element(), head = element();
+  Object.assign(canvas, { width, height });
   const documentObject = {
     head, createElement: element, addEventListener() {},
     getElementById: (id) => (id === 'game' ? canvas : id === 'touch-overlay' ? container : null),
   };
   const shell = shellModel();
+  shell.name = name;
+  // The create screen's own rect for its name box, in canvas pixels, under its one view transform:
+  // the 800x600 scene scaled to fit and centred (charcreate.mjs view()).
+  if (targets) shell.uiTargets = () => {
+    const scale = Math.min(canvas.width / 800, canvas.height / 600);
+    const ox = Math.round((canvas.width - 800 * scale) / 2), oy = Math.round((canvas.height - 600 * scale) / 2);
+    return { screen: 'create', create: { name: [Math.round(ox + 319 * scale), Math.round(oy + 494 * scale), Math.round(220 * scale), Math.round(31 * scale)] } };
+  };
   const windowObject = { matchMedia: () => ({ matches: true }), __d2Shell: shell, addEventListener() {} };
   const saved = { setInterval: globalThis.setInterval, dispatchEvent: globalThis.dispatchEvent,
     KeyboardEvent: globalThis.KeyboardEvent, shell: globalThis.__d2Shell };
@@ -79,7 +88,7 @@ function mount() {
     if (!prevented && key.length === 1) type(box.value + key);
     box.fire('keyup', { code, key });
   };
-  return { shell, box, type, press, restore };
+  return { shell, box, canvas, poll, type, press, restore };
 }
 
 test('Enter in the name box creates the hero once and the game starts with the chat bar closed', () => {
@@ -135,5 +144,42 @@ test('the box is never rewritten mid-composition, and shows the name once the wo
     box.fire('compositionend', {});
     assert.equal(shell.name, 'Abé');
     assert.equal(box.value, 'Abé', 'after composing, the box shows what the name took');
+  } finally { restore(); }
+});
+
+// The box as fractions of the canvas, which the overlay matches (both fill #viewport).
+const placed = (box) => ['left', 'top', 'width', 'height'].map((k) => Number.parseFloat(box.style[k]) / 100);
+
+test('on a landscape phone the name box sits over the drawn box, not where a 4:3 screen has it', () => {
+  // A wide phone: the canvas is 1333x600 and the 800x600 scene is centred in it, 267 px in from the left.
+  const { box, canvas, poll, restore } = mount({ width: 1333, height: 600 });
+  try {
+    const [left, top, width, height] = placed(box);
+    assert.ok(Math.abs(left * 1333 - (267 + 319)) < 1, `left edge on the drawn box (${left * 1333})`);
+    assert.ok(Math.abs(width * 1333 - 220) < 1, 'as wide as the drawn box, not 27.5% of the screen');
+    assert.ok(Math.abs(top * 600 - 494) < 1 && Math.abs(height * 600 - 31) < 1);
+    // Turned to portrait: 800 columns, a taller canvas, the scene centred top to bottom.
+    Object.assign(canvas, { width: 800, height: 1422 });
+    poll();
+    const [, top2, width2] = placed(box);
+    assert.ok(Math.abs(top2 * 1422 - (411 + 494)) < 1, `follows the rotation (${top2 * 1422})`);
+    assert.ok(Math.abs(width2 * 800 - 220) < 1);
+  } finally { restore(); }
+});
+
+test('a screen that reports no rect leaves the stylesheet 4:3 place alone', () => {
+  const { box, restore } = mount({ targets: false });
+  try {
+    assert.equal(box.style.display, 'block');
+    assert.equal(box.style.left, undefined, 'no inline position: the 4:3 percentages apply');
+  } finally { restore(); }
+});
+
+test('a name typed before the box showed is in the box when it opens', () => {
+  const { shell, box, type, restore } = mount({ name: 'Ka' });
+  try {
+    assert.equal(box.value, 'Ka', 'the box opens on the name the game holds');
+    type('K');   // one Backspace on the phone keyboard
+    assert.equal(shell.name, 'K', 'deletes the last real letter');
   } finally { restore(); }
 });

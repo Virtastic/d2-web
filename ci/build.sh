@@ -55,9 +55,18 @@ if [ -z "${D2_CXXFLAGS:-}" ] && [ "${D2_BUILD_FORCE:-0}" != 1 ] && bash tools/en
   bash ci/stage.sh
   exit $?
 fi
+# Identical trees queue on one per-key lock without a slot (d2_build_key_lock); the one behind finds the winner's engine cached.
+if [ -z "${D2_CXXFLAGS:-}" ] && [ "${D2_BUILD_FORCE:-0}" != 1 ]; then
+  source "$SRC/ci/build-slot.sh"
+  if d2_build_key_lock "$LOCK_DIR" "$(bash tools/engine-key.sh . 2>/dev/null || true)" && bash tools/engine-cache.sh get . >/dev/null 2>&1; then
+    echo "==> engine built meanwhile by an identical tree: staging the cached build $(cat play/.engine-key)"
+    bash ci/stage.sh
+    exit $?
+  fi
+fi
 source "$SRC/ci/build-slot.sh"
 d2_build_slot_acquire "$LOCK_DIR"
-got=$D2_BUILD_SLOT; SLOTS="${D2_MAX_BUILDS:-8}"
+got=$D2_BUILD_SLOT; SLOTS="${D2_MAX_BUILDS:-2}"
 JOBS="${D2_COMPILE_JOBS:-$(( $(nproc) / SLOTS > 4 ? $(nproc) / SLOTS : 4 ))}"
 echo "==> build slot $got of $SLOTS, $JOBS compile jobs"
 WAIT=$(( $(date +%s) - T0 ))
