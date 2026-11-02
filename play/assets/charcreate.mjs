@@ -522,7 +522,9 @@ export function createCharacterCreate({ read, decodeDc6, decodeDatPalette, onCre
       const v = view(width, height);
       const centre = (b) => [Math.round(v.ox + (b.x + b.w / 2) * v.scale), Math.round(v.oy + (b.y + b.h / 2) * v.scale)];
       const checkboxTargets = Object.fromEntries(Object.entries(checkboxes.targets()).map(([key, [x, y]]) => [key, [Math.round(v.ox + x * v.scale), Math.round(v.oy + y * v.scale)]]));
-      return { classes: Object.fromEntries(heroes.map((h) => [h.key, centre(h.hit)])), ok: centre(okBox()), exit: centre(exitBox()), checkboxes: checkboxTargets };
+      // The name box as a rect [x, y, w, h]: where a phone puts its text field over the drawn box.
+      const name = [Math.round(v.ox + LAYOUT.nameBox.x * v.scale), Math.round(v.oy + LAYOUT.nameBox.y * v.scale), Math.round(textBox.width * v.scale), Math.round(textBox.height * v.scale)];
+      return { classes: Object.fromEntries(heroes.map((h) => [h.key, centre(h.hit)])), ok: centre(okBox()), exit: centre(exitBox()), checkboxes: checkboxTargets, name };
     },
     click(x, y, width, height) {
       const p = toScreen(x, y, width, height);

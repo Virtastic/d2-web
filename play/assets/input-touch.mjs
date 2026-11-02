@@ -517,9 +517,19 @@ export function installTouchInput({ documentObject = globalThis.document, window
   setInterval(() => {
     const shell = windowObject.__d2Shell;
     const show = revealed && shell?.screen === 'create' && Boolean(shell?.charCreateEvidence?.chosen);
-    if (show && nameInput.style.display === 'none') { nameInput.style.display = 'block'; prevValue = nameInput.value = ''; nameInput.focus(); }
+    if (show) placeNameBox(shell);
+    if (show && nameInput.style.display === 'none') { nameInput.style.display = 'block'; prevValue = nameInput.value = ''; showTakenName(); nameInput.focus(); }
     else if (!show && nameInput.style.display !== 'none') { nameInput.style.display = 'none'; nameInput.blur(); }
   }, 200);
+  // Over the box the screen actually draws. On a phone the canvas takes the screen's shape, not 4:3,
+  // and the 800x600 scene sits centred in it, so the stylesheet's 4:3 percentages would miss the box;
+  // they stay only as the fallback when the screen reports no rect.
+  function placeNameBox(shell) {
+    const rect = shell.uiTargets?.()?.create?.name, w = canvas.width, h = canvas.height;
+    if (!Array.isArray(rect) || !(w > 0) || !(h > 0)) return;
+    const pct = (n, d) => `${(n / d * 100).toFixed(3)}%`;
+    Object.assign(nameInput.style, { left: pct(rect[0], w), top: pct(rect[1], h), width: pct(rect[2], w), height: pct(rect[3], h) });
+  }
 
   // A scripted player (wasm-build/scenarios/lib/player.mjs, S000_INPUT=touch) names the button it
   // wants directly -- unlike a real finger, it never has to put a second one down to say "right".
