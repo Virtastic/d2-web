@@ -13,6 +13,8 @@
 
 #include "D2DataTbls.h"
 #include "DataTbls/ItemsTbls.h"
+#include "Units/Units.h"
+#include "Units/Item.h"
 
 static_assert(offsetof(D2ItemStatCostTxt, nOp) == 0x54, "itemstatcost.txt nOp");
 static_assert(offsetof(D2ItemStatCostTxt, wOpStat) == 0x58, "itemstatcost.txt wOpStat");
@@ -53,10 +55,11 @@ extern "C"
 // only value available until the rows that fill them are mapped.
 extern "C"
 {
-	uint32_t g_d2common_dat_6fdeb1f4 = 0;
+	uint32_t g_d2common_dat_6fdeb1f4 = 3;      // 1.13c .data 0x6FDEB1F4 (= 6fdeb1f0 entry 0, word 1)
 	uint32_t g_d2common_dat_6fdeb23c = 0;
-	uint32_t g_d2common_dat_6fdeb160[18] = {};
-	uint32_t g_d2common_dat_6fdeb1f0[18] = {};
+	// 1.13c .data 0x6FDEB160 / 0x6FDEB1F0: six 3-dword rows (scale, count, colour), initialised in the image.
+	uint32_t g_d2common_dat_6fdeb160[18] = {320, 3, 15962237, 340, 3, 8632528, 0, 0, 16777215, 160, 1, 16777215, 180, 1, 12687554, 200, 2, 15962237};
+	uint32_t g_d2common_dat_6fdeb1f0[18] = {300, 3, 15932928, 0, 0, 15998464, 60, 1, 15932928, 120, 2, 15932928, 180, 2, 15998464, 240, 2, 15932928};
 	uint32_t g_d2common_dat_6fde9c58 = 0;
 	uint16_t g_d2common_dat_6fde9c5a = 0;
 	int32_t* g_d2common_dat_6fdf1420 = nullptr;
@@ -293,6 +296,23 @@ EMSCRIPTEN_KEEPALIVE void D2Common_SetUnitActRecord_37920(uint32_t pUnit, uint32
 // zero. 0x241A0 leaves EDX alone (disassembly), so the decompile's leftover EDX is the unit type
 // loaded from unit[0] before the call; the 0x800 test below uses it.
 extern "C" uint32_t D2Common_241A0_ItemDataGate(uint32_t);
+int32_t D2Common_230A0_ItemTypeFromItemId(uint32_t);   // defined in d2common_batch_1a330.cpp (C++ linkage)
+extern "C" uint32_t d2_ours_d2common_24610(D2UnitStrc*);
+// Max sockets (0x24610) for a guest-layout unit: translated to the native structs it reads.
+static uint32_t d2_26ad0_MaxSockets(const int32_t* pUnit, uint8_t* pData)
+{
+	D2UnitStrc u = {};
+	D2ItemDataStrc d = {};
+	u.dwUnitType = static_cast<D2C_UnitTypes>(pUnit[0]);
+	u.dwClassId = pUnit[1];
+	if (pData)
+	{
+		d.dwItemFlags = W(pData, 0x18);
+		d.dwItemLevel = W(pData, 0x2c);
+		u.pItemData = &d;
+	}
+	return d2_ours_d2common_24610(&u);
+}
 extern "C"
 EMSCRIPTEN_KEEPALIVE bool D2Common_26AD0_ItemAcceptable(int32_t* pUnit)
 {
@@ -302,20 +322,19 @@ EMSCRIPTEN_KEEPALIVE bool D2Common_26AD0_ItemAcceptable(int32_t* pUnit)
 	uint8_t* pFlags = P(static_cast<uint32_t>(pUnit[5]));
 	const uint32_t nFlags = pFlags ? W(pFlags, 0x18) : 0;
 
-	if (pUnit[0] == 4 && g_d2common_fn_230A0 && g_d2common_fn_230A0(pUnit[1]) == 4)
+	if (pUnit[0] == 4 && D2Common_230A0_ItemTypeFromItemId(static_cast<uint32_t>(pUnit[1])) == 4)
 		return false;
 
 	if (pUnit[0] != 4 || !pFlags || (nFlags & 0x1000u) == 0)
 	{
 		const D2ItemsTxt* pRow = DATATBLS_GetItemsTxtRecord(pUnit[1]);
-		if (pRow && pRow->nQuest != 0 && g_d2common_fn_23290 &&
-		    g_d2common_fn_23290(pUnit) != 0x2067656C)
+		if (pRow && pRow->nQuest != 0 && pRow->dwCode != 0x2067656C)
 			return false;
 
 		const bool bNoOwnerFlag = pUnit[0] != 4 || !pFlags || (nFlags & 0x100u) == 0;
 		const bool bNoChainFlag = pUnit[0] != 4 || !pFlags || (nFlags & 0x800u) == 0;
 		if (bNoOwnerFlag && D2Common_241A0_ItemDataGate(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pUnit))) == 0 && bNoChainFlag &&
-		    g_d2common_fn_24610 && static_cast<uint8_t>(g_d2common_fn_24610(pUnit)) != 0)
+		    static_cast<uint8_t>(d2_26ad0_MaxSockets(pUnit, pFlags)) != 0)
 		{
 			return D2Common_26080_ItemOpStatTotal(pUnit) == 0;
 		}

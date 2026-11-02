@@ -10,6 +10,7 @@
 
 #include "D2DataTbls.h"
 #include "D2Skills.h"
+#include "D2StatList.h"
 #include "DataTbls/ItemsTbls.h"
 #include "Path/Path.h"
 #include "Units/Item.h"
@@ -61,10 +62,10 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_38dc0(uint32_t nUnused, uint32_t pUn
 // quality. The socket count is min(invWidth * invHeight, 6, 0x24610's low byte, nRequest), but the
 // whole block is skipped when the item's inventory footprint is zero. The item's dwItemFlags gets
 // bit 0x800 and stat 0xC2 is set to the result through 0x3A740.
+extern "C" uint32_t d2_ours_d2common_24610(D2UnitStrc*);
 extern "C"
-EMSCRIPTEN_KEEPALIVE void ITEMS_SetSocketCount(uint32_t pUnit, int32_t nRequest)
+EMSCRIPTEN_KEEPALIVE void ITEMS_SetSocketCount(D2UnitStrc* unit, int32_t nRequest)
 {
-	D2UnitStrc* unit = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit));
 	if (!unit || unit->dwUnitType != UNIT_ITEM)
 		return;
 
@@ -81,10 +82,7 @@ EMSCRIPTEN_KEEPALIVE void ITEMS_SetSocketCount(uint32_t pUnit, int32_t nRequest)
 		return;
 
 	uint32_t nSockets = nCells < 6 ? nCells : 6;
-	if (!g_d2common_fn_24610)
-		return;
-	const uint32_t nRolled =
-	    g_d2common_fn_24610(reinterpret_cast<void*>(static_cast<uintptr_t>(pUnit)));
+	const uint32_t nRolled = d2_ours_d2common_24610(unit);
 	if ((nRolled & 0xFF) <= nSockets)
 		nSockets = nRolled & 0xFF;
 
@@ -96,8 +94,7 @@ EMSCRIPTEN_KEEPALIVE void ITEMS_SetSocketCount(uint32_t pUnit, int32_t nRequest)
 	if (unit->dwUnitType == UNIT_ITEM && unit->pItemData)
 		unit->pItemData->dwItemFlags |= 0x800;
 
-	if (g_d2common_fn_3A740)
-		g_d2common_fn_3A740(pUnit, 0xC2, nRequest);
+	STATLIST_SetUnitStat(unit, 0xC2, nRequest, 0);
 }
 
 // 1.13c D2Common+0x22A70 (#10602): bit 3 of items.txt dwBitField1 for a UNIT_ITEM's class. A null
