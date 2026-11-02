@@ -23,6 +23,7 @@ struct SeamProbe {
 // a probe blob are written as 0xB1<blob><offset>, as the capture records them.
 #include <cstdint>
 #include "../d2game/d2game_seam.h"
+#include "hookenv.h"
 struct D2ProbeHook { uint32_t rva; const char* regs; int nst; uint32_t ret; const uint32_t* seq = nullptr; int nseq = 0; mutable int used = 0; };
 struct D2ProbeSeam {
     const uint32_t* r;            // the probe ABI array: blob k at r[14 + 2k]
@@ -32,7 +33,7 @@ struct D2ProbeSeam {
     const D2ProbeHook* hooks; int nhooks;
     uint32_t tag(uint32_t a) const {
         for (int k = 0; k < nblob; ++k) if (a >= r[14 + 2 * k] && a < r[14 + 2 * k] + size[k]) return 0xB1000000u | (uint32_t)k << 16 | (a - r[14 + 2 * k]);
-        return a;
+        return HookEnv::isStk(a) ? 0xB3000000u : a;   // a caller-stack pointer (the request block) is logged as retail logs it
     }
     static uint32_t thunk(void* c, uint32_t rva, uint32_t eax, uint32_t ecx, uint32_t edx, uint32_t ebx, uint32_t esi,
                           uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3) {
