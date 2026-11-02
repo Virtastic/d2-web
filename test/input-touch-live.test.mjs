@@ -555,3 +555,20 @@ test("the layer's own two-finger right click still sends its contextmenu past th
   w.up(1, 400, 300);
   assert.deepEqual(menus(w.sent).length, 1);
 });
+
+test('a belt aim on a wider canvas aims at the box where the shell draws it', () => {
+  // 1000x600 puts retail's screen 100 px in, so retail box 100..129 is drawn at 200..229.
+  const w = world({ screen: 'game', beltHudBoxes: [{ left: 100, top: 540, right: 129, bottom: 569 }] });
+  w.canvas.width = 1000;
+  w.canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1000, height: 600 });
+  w.down(1, 210, 550);
+  w.up(1, 210, 550);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 214.5, 554.5));
+});
+
+test('a near miss beside the run button is delivered at the button', () => {
+  const w = world({ screen: 'game', controlPanelEvidence: { hud: { runButton: { left: 255, top: 571, w: 16, h: 20 } } } });
+  w.down(1, 245, 580);
+  w.up(1, 245, 580);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 263, 581));
+});

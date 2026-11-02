@@ -38,7 +38,8 @@
 // this module owns in the page is the hero-name input, shown only where retail shows its name box.
 
 import { click, pointer, tapKey, toClient, toCanvas } from './input-common.mjs';
-import { isHudDeadZone } from './control-panel.mjs';
+import { isHudDeadZone, hudAimPoint } from './control-panel.mjs';
+import { hudOrigin } from './hud-origin.mjs';
 
 // Overlay face: the game's serif, not the browser's monospace (no web font ships).
 export const OVERLAY_FONT = 'Palatino Linotype, Palatino, Georgia, serif';
@@ -118,11 +119,13 @@ export function installTouchInput({ documentObject = globalThis.document, window
   //     through, still delivers the raw point -- an instrument that knows where it is pointing).
   // Half a cell is the width of the rule, not a taste: it is the distance at which the neighbouring
   // box is as close as this one, so no point inside the band has a box "in front of" another.
-  function beltAim(x, y) {
+  function beltAim(cx, cy) {
     const shell = windowObject.__d2Shell;
     if (!shell || shell.screen !== 'game' || shell.clearScreen) return null;
     const boxes = shell.beltHudBoxes;
     if (!boxes || !boxes.length) return null;
+    // The boxes are retail 800x600 coordinates on the bottom anchor, as the shell draws them; aim in that space.
+    const o = hudOrigin(canvas.width, canvas.height, 'bottom'), x = (cx - o.x) / o.scale, y = (cy - o.y) / o.scale;
     let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
     for (const b of boxes) {
       if (b.left < left) left = b.left;
@@ -137,7 +140,7 @@ export function installTouchInput({ documentObject = globalThis.document, window
       const distance = Math.abs((b.left + b.right) / 2 - x);
       if (distance < bestDistance) { bestDistance = distance; best = b; }
     }
-    return [(best.left + best.right) / 2, (top + bottom) / 2];
+    return [o.x + (best.left + best.right) / 2 * o.scale, o.y + (top + bottom) / 2 * o.scale];
   }
 
   // ---- M15: the same aim, one panel deeper -- the open grids --------------------------------------
@@ -238,8 +241,24 @@ export function installTouchInput({ documentObject = globalThis.document, window
     }
     return null;
   }
+  // ---- M17: the HUD's own small controls ---------------------------------------------------------
+  // The run button (16x20 game px), the menu arrow and the mini-panel icons (18x18) are 11-14 CSS px of
+  // glass at the phone floor, under a finger's own aim error, and a miss walks the hero. A finger that
+  // lands NEAR one (control-panel.mjs's hudAimPoint: within HUD_FINGER_REACH, nearest wins) presses its
+  // centre; a point already on a control, a belt box or an open panel is delivered raw. Off while the
+  // skill popup is up (its icons sit over the band). The mouse and the scripted seam are untouched.
+  function hudAim(x, y) {
+    const shell = windowObject.__d2Shell;
+    if (!shell || shell.screen !== 'game' || shell.clearScreen || shell.skillSelectOpen) return null;
+    const hud = shell.controlPanelEvidence?.hud;
+    if (!hud) return null;
+    const extra = [];
+    if (shell.inventoryVisible && shell.inventoryPanelRect) extra.push(shell.inventoryPanelRect);
+    if (shell.stashPanelRect) extra.push(shell.stashPanelRect);
+    return hudAimPoint(x, y, { width: canvas.width, height: canvas.height, hud, belt: shell.beltHudBoxes || [], extra });
+  }
   // The point a finger's aim snaps to, or null when the finger is on nothing the aim rules cover.
-  function snapAim(x, y) { return beltAim(x, y) || panelAim(x, y) || statAim(x, y); }
+  function snapAim(x, y) { return beltAim(x, y) || panelAim(x, y) || statAim(x, y) || hudAim(x, y); }
   // A finger's aim: the belt's boxes, an open panel's grid cells, the character screen's "+", else
   // exactly where it landed.
   function aim(x, y) { return snapAim(x, y) || [x, y]; }

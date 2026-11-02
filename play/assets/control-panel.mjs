@@ -408,3 +408,39 @@ export function isHudDeadZone(x, y, { width = 800, height = 600, hud = {}, belt 
   live.push({ left: HUD_LAYOUT.stamina.x, top: HUD_LAYOUT.stamina.y, w: HUD_LAYOUT.stamina.width, h: HUD_LAYOUT.stamina.height });
   return !live.some((b) => hudBoxContains(b, rx, ry));
 }
+
+// How far (in game px) a finger may miss a small HUD control and still press it. The controls are
+// 16x20 (run), 16x16-ish (menu arrow) and 18x18 (the mini-panel icons): 11-14 CSS px of glass at the
+// phone floor (0.6867 CSS px per game px), against a finger's own aim error of ~15 game px. Half a
+// control alone is 8-10 game px, under that error, so the reach is the larger of the two.
+export const HUD_FINGER_REACH = 15;
+
+/**
+ * Where a finger at canvas point (x, y) should press, if it landed NEAR one of the HUD's small live
+ * controls without being on one: the centre of the nearest control, in canvas pixels; else null.
+ *
+ * The controls are the ones the shell's own hit tests take: the run button, the menu arrow, the
+ * mini-panel icons while the row is shown, and the add-point buttons only while lit. A point already
+ * inside one, or inside a belt box or an open panel rect (`extra`), is null: the shell's own hit test
+ * decides it exactly as before. Nearest wins, so two neighbouring icons split the gap between them.
+ */
+export function hudAimPoint(x, y, { width = 800, height = 600, hud = {}, belt = [], extra = [], reach = HUD_FINGER_REACH } = {}) {
+  const scale = Math.min(1, width / 800);
+  const x0 = panelOriginX(width, scale), y0 = height - CONTROL_LAYOUT.height * scale;
+  const rx = (x - x0) / scale, ry = (y - y0) / scale + PANEL_SCREEN_TOP;
+  if ([...belt, ...extra].some((b) => hudBoxContains(b, rx, ry))) return null;
+  const level = HUD_LAYOUT.levelButtons;
+  const controls = [hud.runButton, hud.menuButton, ...(hud.miniPanel?.buttons || []),
+    ...(hud.levelButtons || []).filter((b) => b && (b.frame === level.litFrame || b.frame === level.pressedFrame))]
+    .filter((b) => b && b.w > 0 && b.h > 0);
+  let best = null, bestDistance = Infinity;
+  for (const b of controls) {
+    if (hudBoxContains(b, rx, ry)) return null;
+    const dx = Math.max(b.left - rx, 0, rx - (b.left + b.w)), dy = Math.max(b.top - ry, 0, ry - (b.top + b.h));
+    const distance = Math.hypot(dx, dy);
+    if (distance > Math.max(reach, Math.min(b.w, b.h) / 2) || distance >= bestDistance) continue;
+    best = b; bestDistance = distance;
+  }
+  if (!best) return null;
+  return [x0 + (best.left + best.w / 2) * scale, y0 + (best.top + best.h / 2 - PANEL_SCREEN_TOP) * scale];
+}
