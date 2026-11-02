@@ -7,51 +7,13 @@
 #include <cstdint>
 #include <cstring>
 #include <emscripten.h>
+#include "../fn/hookenv.h"
 
 static inline uint16_t rd16(const void* p, uint32_t o) { uint16_t v; std::memcpy(&v, (const uint8_t*)p + o, 2); return v; }
 static inline uint32_t rd32(const void* p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
 static inline void* rdptr(const void* p, uint32_t o) { void* v; std::memcpy(&v, (const uint8_t*)p + o, sizeof v); return v; }
 
-struct D2GameBatch3fEnv {
-    void*    dataTables;                                   // *sgptDataTables: +0xB64 monstats, +0xB6C count, +0xB98/+0xBA0 skills, +0xC4 missiles cnt, +0xBD4, +0xBC0
-    uint32_t (*tail)(void* game);                          // 0x3F320, the common mode tail
-    void*    (*getTarget)(void* game, uint32_t guid);      // 0xE03A0
-    uint32_t (*targetBusy)(void);                          // 0xDFA90
-    void*    (*refreshTarget)(void* game);                 // 0xE07A0
-    uint32_t (*gameKey)(void* game);                       // 0xE0A20
-    uint32_t (*unitX)(void* unit);                         // 0x1100 via 0x21100
-    uint32_t (*unitY)(void* unit);                         // 0x1130 via 0x21130
-    uint32_t (*roll)(uint32_t a, uint32_t b);              // 0x214D0 scaled-percent
-    uint32_t (*sendRequest)(void* game, uint32_t* req);    // 0x6F930/0x8F930 request sink (23 dwords)
-    void     (*sub_A0000)(void* game);                     // 0xA0000
-    void     (*sub_CC0000)(void* game);                    // FUN_6fcc0000
-    void     (*sub_3A1D0)(void* game);
-    void     (*sub_3EDE0)(void* game, void* p, uint32_t f);
-    void     (*sub_3D1E0)(uint32_t v);
-    uint32_t (*o10240get)(void* unit);                    // Ordinal_10240(unit)
-    void     (*o10240set)(void* unit, uint32_t v);
-    uint32_t (*o10985)(void* unit);
-    uint32_t (*o11029)(void* unit);
-    uint32_t (*o11029set)(void* unit, int32_t skill, uint32_t x, uint32_t y);
-    uint32_t (*o10973)(void* unit, uint32_t stat, uint32_t p);
-    uint32_t (*o10913)(void* unit);
-    void     (*o10786)(void* unit, uint32_t a, uint32_t b);
-    void     (*o10887)(void* unit, uint32_t stat, uint32_t v, uint32_t p);
-    void     (*o10689)(void* unit, int32_t a, uint32_t b);
-    void     (*o10970)(void* unit, uint32_t mode);
-    void*    (*o10203)(void* room);                        // room validity
-    uint32_t (*o10737)(void* unit);
-    uint32_t (*o10522)(void* a, void* b);
-    void*    (*o10392)(void* room);
-    void     (*o10286)(void* room, uint32_t x, uint32_t y);
-    void     (*o10334)(void* room, void* unit, uint32_t z);
-    uint32_t (*sub_BD00)(void* game);                      // 0xE0BD0
-    void     (*sub_E0570)(void* unit);
-    void*    (*sub_C00B0)(void);                           // 0xCC00B0
-    void*    (*o10786r)(void* unit, uint32_t a, uint32_t b, uint32_t c);
-    void     (*o10188)(void* p, int32_t a, void* b, uint32_t c);
-    void     (*o11039)(void* game, int32_t skill, uint32_t one);
-};
+#include "d2game_batch_3fed0_env.h"
 
 static inline void* monsRow(const D2GameBatch3fEnv* e, void* unit)
 {
@@ -210,29 +172,63 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_game_41670(void* game, void* unit, c
 {
     void* rec = monsRow(e, unit);
     if (!rec || (int16_t)rd16(rec, 0x18) < 0) return 2;
-    e->sub_3D1E0(e->o11029(unit));
+    // retail (disassembled): q = Ordinal_11029(unit) / max(row+0x40, 1); 0x3D1E0(EAX = max(row+0x3C - q, 3); stack game, row+0x38 + max(q, 2), row+0x18, 5)
+    int32_t step = (int32_t)rd32(rec, 0x40);
+    if (step < 1) step = 1;
+    int32_t q = (int32_t)e->o11029(unit) / step;
+    int32_t a = q < 2 ? 2 : q;
+    int32_t b = (int32_t)rd32(rec, 0x3C) - q;
+    if (b < 3) b = 3;
+    e->sub_3D1E0((uint32_t)b, game, rd32(rec, 0x38) + (uint32_t)a, (uint32_t)(int32_t)(int16_t)rd16(rec, 0x18), 5);
     return e->tail(game);
 }
 
-// 1.13c D2Game+0x42570
-// unaff_EDI in the decompile is taken as the game (Ordinal_11039's first argument).
+// 1.13c D2Game+0x42570 (re-read from the disassembly: EDX = unit, stack = skill index, p4; ret 8)
+// owner = 0xE0BD0(ESI = unit); a null owner, or one whose 0xE0570(ECX = unit) is zero, falls back to the unit. The 8-dword block {unit, owner, skill, p4,
+// 0xAC9A(unit, row+0x60, skill, p4), -1, 0, row+0x80} goes to 0xA00B0 (EAX); its list takes one 0xA6E2 per valid skill word; 0xA706(owner, row+0x80, 1).
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_game_42570(void* game, void* unit, int32_t skillIdx, uint32_t p4, const D2GameBatch3fEnv* e)
 {
     void* sk = skillRow(e, skillIdx);
     if (!sk) return 0;
     int16_t a = (int16_t)rd16(sk, 0x54), b = (int16_t)rd16(sk, 0x80);
     if (a < -1 || a >= (int32_t)rd32(e->dataTables, 0xBD4) || b < 0 || b >= (int32_t)rd32(e->dataTables, 0xC4)) return 0;
-    if (e->sub_BD00(game)) e->sub_E0570(unit);
-    e->o10786r(unit, rd32(sk, 0x60), (uint32_t)skillIdx, p4);
-    void* list = e->sub_C00B0();
+    (void)game;
+    uint32_t owner = e->sub_BD00(unit);
+    if (!owner || e->sub_E0570(unit) == 0) owner = (uint32_t)(uintptr_t)unit;
+    uint32_t blk[8] = { (uint32_t)(uintptr_t)unit, owner, (uint32_t)skillIdx, p4, 0, 0xFFFFFFFFu, 0, (uint32_t)(int32_t)b };
+    blk[4] = (uint32_t)(uintptr_t)e->o10786r(unit, rd32(sk, 0x60), (uint32_t)skillIdx, p4);
+    void* list = e->sub_C00B0(blk);
     if (!list) return 0;
     for (uint32_t i = 0; i < 6; ++i) {
         int16_t s = (int16_t)rd16(sk, 0x54 + 2 * i);
         if (s >= 0 && s < (int32_t)rd32(e->dataTables, 0xBD4)) {
-            void* it = e->o10786r(unit, rd32(sk, 0x68 + 4 * i), 0, 0);
+            void* it = e->o10786r(unit, rd32(sk, 0x68 + 4 * i), (uint32_t)skillIdx, p4);
             if (it) e->o10188(list, s, it, 0);
         }
     }
-    e->o11039(game, (int16_t)rd16(sk, 0x80), 1);
+    e->o11039((void*)(uintptr_t)owner, b, 1);
     return 1;
+}
+
+// function probe seam (src/core/fn/d2game_40420.cpp). The port's seams are Ghidra-shaped; retail's calls are
+// 1130 y, 1100 x, B0FC(unit) level, B26A(unit) class, E0A20(eax unit, game) client (esi), CC0000(esi; game, class, level, skill, x, y).
+static HookEnv* g4H; static void* g4U; static void* g4Game; static uint32_t g4Lvl, g4Cls, g4Sk, g4X, g4Y, g4Cli;
+uint32_t D2Game_40420_probe(void* game, void* unit, const uint8_t* dt, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); g4H = &h; g4U = unit; g4Game = game;
+    D2GameBatch3fEnv e{};
+    e.dataTables = (void*)dt;
+    auto P = [](const void* p) { return (uint32_t)(uintptr_t)p; };
+    (void)P;
+    e.o10985 = [](void* u) { return g4H->h(0xB28E, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
+    e.unitY = [](void* u) { return g4H->h(0x1130, 0, (uint32_t)(uintptr_t)u); };
+    e.unitX = [](void* u) { return g4H->h(0x1100, 0, (uint32_t)(uintptr_t)u); };
+    e.o11029set = [](void* u, int32_t sk, uint32_t x, uint32_t y) {
+        g4Lvl = g4H->h(0xB0FC, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); g4Cls = g4H->h(0xB26A, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u);
+        g4Sk = (uint32_t)sk; g4X = x; g4Y = y; return 0u; };
+    e.o10240set = [](void*, uint32_t) {};
+    e.gameKey = [](void* g) { g4Cli = g4H->h(0xE0A20, (uint32_t)(uintptr_t)g4U, 0, 0, 0, 0, (uint32_t)(uintptr_t)g); return g4Cli; };
+    e.sub_CC0000 = [](void* g) { g4H->h(0xA0000, 0, 0, 0, 0, g4Cli, (uint32_t)(uintptr_t)g, g4Cls, g4Lvl, g4Sk, g4X, g4Y); };
+    e.tail = [](void* g) { return g4H->h(0x3F320, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)g); };
+    return d2_game_40420(game, unit, &e);
 }

@@ -13,6 +13,8 @@
 #include <cstdint>
 #include <cstring>
 #include <unistd.h>
+#include <emscripten.h>
+#include "../fn/hookenv.h"
 
 static inline uint8_t  rd8 (const void* p, uint32_t o) { return ((const uint8_t*)p)[o]; }
 static inline int16_t  rd16(const void* p, uint32_t o) { int16_t v; std::memcpy(&v, (const uint8_t*)p + o, 2); return v; }
@@ -102,10 +104,19 @@ static const uint8_t* unitRecord(void* unit)
 // 1.13c D2Game+0x405E0 -- game in ECX, unit in EDX.
 uint32_t D2GAME_405E0(void* game, void* unit)
 {
-    if (!unitRecord(unit)) return 2;
+    const uint8_t* rec = unitRecord(unit);
+    if (!rec) return 2;
     if (E.ord10203(rd32(unit, 0x2c))) {
         uint32_t pkt[0x17] = {};
-        E.sub0A20(game); E.sub21100(unit); E.sub21130(unit); E.ord10240(unit); E.ord11029(unit);
+        int32_t step = rd32(rec, 0x38);
+        pkt[0] = 1;
+        if (step > 0) { pkt[0] = 9; pkt[13] = (uint32_t)step; }
+        pkt[1] = (uint32_t)E.sub0A20(game);
+        pkt[5] = (uint32_t)E.sub21100(unit);
+        pkt[6] = (uint32_t)E.sub21130(unit);
+        pkt[11] = (uint32_t)E.ord10240(unit);
+        pkt[12] = (uint32_t)E.ord11029(unit);
+        pkt[4] = (uint32_t)(int32_t)rd16(rec, 0x18);
         E.sub8F930(game, pkt);
     }
     return E.sub5F320(game);
@@ -333,4 +344,25 @@ uint32_t D2GAME_57320(void* pdata, int32_t unitHandle)
     if (rd8(n, 0xc) == 2) { E.ord10003(quest, 0x28, 2); return 0; }
     if (rd8(n, 0xc) == 3) E.ord10003(quest, 0x28, 3);
     return 0;
+}
+
+// function probe seam (src/core/fn/d2game_405e0.cpp): ACC4(path) gate, E0A20(eax unit, game), 1100/1130, B26A, B0FC, 6F930(ecx game, edx pkt), 3F320(game).
+static HookEnv* g5H; static void* g5U;
+uint32_t D2Game_405E0_probe(void* game, void* unit, const uint8_t* dt, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); g5H = &h; g5U = unit;
+    D2GameBatch405E0Env e{};
+    e.dataTables = dt;
+    e.ord10203 = [](int32_t v) { return (int32_t)g5H->h(0xACC4, 0, 0, 0, 0, 0, (uint32_t)v); };
+    e.sub0A20 = [](void* g) { return (int32_t)g5H->h(0xE0A20, (uint32_t)(uintptr_t)g5U, 0, 0, 0, 0, (uint32_t)(uintptr_t)g); };
+    e.sub21100 = [](void* u) { return (int32_t)g5H->h(0x1100, 0, (uint32_t)(uintptr_t)u); };
+    e.sub21130 = [](void* u) { return (int32_t)g5H->h(0x1130, 0, (uint32_t)(uintptr_t)u); };
+    e.ord10240 = [](void* u) { return (int32_t)g5H->h(0xB26A, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
+    e.ord11029 = [](void* u) { return (int32_t)g5H->h(0xB0FC, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
+    e.sub8F930 = [](void* g, uint32_t* pkt) { g5H->h(0x6F930, 0, (uint32_t)(uintptr_t)g, g5H->stk(pkt)); g5H->blk(0x6F930, pkt, 23); };
+    e.sub5F320 = [](void* g) { return (int32_t)g5H->h(0x3F320, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)g); };
+    d2game_batch_405e0_bind(&e);
+    uint32_t r = D2GAME_405E0(game, unit);
+    d2game_batch_405e0_bind(nullptr);
+    return r;
 }

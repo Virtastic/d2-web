@@ -69,7 +69,7 @@ struct D2GameBatch3beEnv {
     void     (*fcbf340)(uint32_t ecx, uint32_t edx, void* game, int32_t y, void* u, int32_t a, int32_t b, uint32_t cbRva); // 0x9F340; cbRva = D2Game RVA of the callback pushed
     int32_t  (*frame)(void);                                    // Ordinal 11018, no args
     int32_t  (*maxFrames)(void* c, uint32_t id, uint32_t lvl, int32_t v); // Ordinal 10510
-    void     (*f6663a0)(void* unit, void* client, int32_t v);
+    void     (*f6663a0)(void* game, void* client, int32_t elapsed, int32_t flag, uint32_t lvl);   // 0x463A0: eax = flag, esi = level, stack game/client/elapsed
     int32_t  (*dir)(void* u);                                   // Ordinal 10985
     int32_t  (*dirPacked)(void* u);                             // Ordinal 10818
     void     (*r10614)(void);
@@ -364,7 +364,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3f7d0(void* game, int32_t* u, int32_t flag
     uint32_t id = e->unitClass(u), lvl = e->unitLevel(u);
     int32_t f = e->frame() - i32(esi, 0xa8);
     if (f > 9 && f <= e->maxFrames(client, id, lvl, 1)) {
-        e->f6663a0(u, client, f);
+        e->f6663a0(esi, client, f, flag, lvl);
         return 2;
     }
     return 1;
@@ -393,7 +393,8 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3f890(void* game, int32_t* u, const D2Game
     if (sx == 0) sx = 1;
     if (sy == 0) sy = 1;
     void* path = ptr(u, 0x2c);
-    e->setPos(path, e->unitX(u) + sx, e->unitY(u) + sy);
+    int32_t py = e->unitY(u), px = e->unitX(u);   // retail reads 0x21130 (y) before 0x21100 (x)
+    e->setPos(path, px + sx, py + sy);
     e->moveTo(path, u, 0);
     e->setLife(u, (int32_t)e->r10513());
     e->setDir(u, sy * 0x10000 + (sx & 0xffff));
@@ -417,6 +418,43 @@ uint32_t D2Game_3CDD0_probe(void* game, int32_t* u, const uint8_t* dt, uint32_t*
     // hookblk 0x6F930 d 23 (the 23-dword request in EDX, mirrored from the capture): the block rides after the call's own record
     e.createMissile = [](void* g, uint32_t* req) -> void* { void* r = (void*)(uintptr_t)g3cH->h(0x6F930, 0, (uint32_t)(uintptr_t)g, g3cH->stk(req)); g3cH->blk(0x6F930, req, 23); return r; };
     return d2_game_3cdd0(game, u, &e);
+}
+
+// function probe seam (src/core/fn/d2game_3f7d0.cpp): retail's callees are HookEnv recorders (E03A0, B26A, B0FC, B24C, ACE2, 463A0).
+static HookEnv* g3fH; static int32_t* g3fU;
+uint32_t D2Game_3F7D0_probe(void* game, int32_t* u, int32_t flag, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); g3fH = &h; g3fU = u;
+    D2GameBatch3beEnv e = g3beDirect;
+    e.getClient = [](void* g, uint32_t id) -> void* { return (void*)(uintptr_t)g3fH->h(0xE03A0, (uint32_t)g3fU[0x25], (uint32_t)(uintptr_t)g, id); };
+    e.unitClass = [](void* u) -> uint32_t { return g3fH->h(0xB26A, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
+    e.unitLevel = [](void* u) -> uint32_t { return g3fH->h(0xB0FC, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
+    e.frame = []() -> int32_t { return (int32_t)g3fH->h(0xB24C, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)g3fU); };
+    e.maxFrames = [](void* c, uint32_t id, uint32_t lvl, int32_t v) -> int32_t { return (int32_t)g3fH->h(0xACE2, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)c, id, lvl, (uint32_t)v); };
+    e.f6663a0 = [](void* g, void* c, int32_t el, int32_t fl, uint32_t lv) { g3fH->h(0x463A0, (uint32_t)fl, 0, 0, (uint32_t)el, lv, (uint32_t)(uintptr_t)g, (uint32_t)(uintptr_t)c, (uint32_t)el); };
+    return d2_game_3f7d0(game, u, flag, game, &e);
+}
+
+// function probe seam (src/core/fn/d2game_3f890.cpp): hooks as in the descriptor; the seed pointer is unit+0x20.
+static int32_t g3gFrame;
+uint32_t D2Game_3F890_probe(void* game, int32_t* u, const uint8_t* dt, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); g3fH = &h; g3fU = u;
+    D2GameBatch3beEnv e = g3beDirect;
+    e.dt = dt;
+    e.dir = [](void* x) -> int32_t { return (int32_t)g3fH->h(0xB28E, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)x); };
+    e.unitGuid = [](void* x) -> uint32_t { g3gFrame = (int32_t)g3fH->h(0xB24C, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)x); return (uint32_t)g3gFrame; };
+    e.r10614 = []() { g3fH->h(0xA628, 0, (uint32_t)(uintptr_t)(g3fU + 8), (uint32_t)g3gFrame); };
+    e.dirPacked = [](void* x) -> int32_t { return (int32_t)g3fH->h(0xB288, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)x); };
+    e.unitX = [](void* x) -> int32_t { return (int32_t)g3fH->h(0x1100, 0, (uint32_t)(uintptr_t)x); };
+    e.unitY = [](void* x) -> int32_t { return (int32_t)g3fH->h(0x1130, 0, (uint32_t)(uintptr_t)x); };
+    e.setPos = [](void* p, int32_t x, int32_t y) { g3fH->h(0xAB2C, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)p, (uint32_t)x, (uint32_t)y); };
+    e.moveTo = [](void* p, void* x, int32_t v) { g3fH->h(0xAAF0, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)p, (uint32_t)(uintptr_t)x, (uint32_t)v); };
+    e.r10513 = []() -> uint32_t { return g3fH->h(0xAFB2, 0, (uint32_t)(uintptr_t)(g3fU + 8)); };
+    e.setLife = [](void* x, int32_t v) { g3fH->h(0xA50E, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)x, (uint32_t)v); };
+    e.setDir = [](void* x, int32_t v) { g3fH->h(0xAF5E, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)x, (uint32_t)v); };
+    e.collide = [](void* g, void* x) -> int32_t { (void)x; return (int32_t)g3fH->h(0x3F320, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)g); };
+    return d2_game_3f890(game, u, &e);
 }
 
 // function probe seam (src/core/fn/d2game_3be70.cpp): dt = table blob, lg = hook log, cfg[0] = what #11018 (0xB24C) returns.
