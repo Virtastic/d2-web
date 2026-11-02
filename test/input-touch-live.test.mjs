@@ -572,3 +572,20 @@ test('a near miss beside the run button is delivered at the button', () => {
   w.up(1, 245, 580);
   assert.deepEqual(w.sent.at(-1), left('pointerup', 263, 581));
 });
+
+test('a finger held still on a belt potion is a right click; a quick tap there stays a left click', () => {
+  const clock = { t: 1000 };
+  const belt = [{ left: 100, top: 540, right: 129, bottom: 569 }];
+  const w = world({ screen: 'game', beltHudBoxes: belt }, clock);
+  w.down(1, 114, 554);
+  clock.t += 450; w.touch.flush();
+  const press = w.sent.filter((e) => e.type === 'pointerdown');
+  assert.deepEqual(press.map((e) => e.button), [2]);
+  assert.equal(menus(w.sent).length, 1);
+  w.up(1, 114, 554);
+  assert.deepEqual([w.sent.at(-1).type, w.sent.at(-1).button], ['pointerup', 2]);
+  const t = world({ screen: 'game', beltHudBoxes: belt }, clock);
+  t.down(1, 114, 554);
+  clock.t += 100; t.up(1, 114, 554);
+  assert.deepEqual(t.sent.filter((e) => e.type === 'pointerdown').map((e) => e.button), [0]);
+});

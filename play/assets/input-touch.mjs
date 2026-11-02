@@ -313,7 +313,40 @@ export function installTouchInput({ documentObject = globalThis.document, window
   const clock = () => windowObject.performance?.now?.();
   function inWindow(h) {
     const t = clock();
-    return h.t !== undefined && t !== undefined && t - h.t < LAND_MS;
+    return h.t !== undefined && t !== undefined && t - h.t < (h.item ? HOLD_MS : LAND_MS);
+  }
+  // ---- press-and-hold on an item is the RIGHT button ----------------------------------------------
+  // A potion, a scroll or a tome is USED with a right click, and the two-finger right click needs one
+  // finger on a 20 CSS px cell while a second lands -- awkward on a phone. So a finger that lands on
+  // the belt or an open item grid (inventory, stash, cube) waits HOLD_MS before its left press: lifted
+  // sooner it is a plain tap (pick up / put down), dragged past the slop it is a left drag, and held
+  // still that long it is a right click at the aimed point (the button stays down until the lift).
+  // In the world a held finger keeps walking: nothing changes there.
+  const HOLD_MS = 400;
+  function inRect(x, y, l, t, w, h) { return x >= l && x < l + w && y >= t && y < t + h; }
+  function itemGround(x, y) {
+    const shell = windowObject.__d2Shell;
+    if (!shell || shell.screen !== 'game' || shell.clearScreen) return false;
+    const stash = shell.stashGeometry;
+    if (stash && shell.stashPanelRect && inRect(x, y, stash.gridLeft, stash.gridTop, stash.columns * stash.boxW, stash.rows * stash.boxH)) return true;
+    const g = shell.inventoryVisible && shell.inventoryLayout?.grid;
+    if (g && inRect(x, y, g.left, g.top, g.columns * g.cellWidth, g.rows * g.cellHeight)) return true;
+    const boxes = shell.beltHudBoxes;
+    if (boxes?.length) {
+      const o = hudOrigin(canvas.width, canvas.height, 'bottom'), bx = (x - o.x) / o.scale, by = (y - o.y) / o.scale;
+      if (boxes.some((b) => bx >= b.left && bx < b.right && by >= b.top && by < b.bottom)) return true;
+    }
+    return Boolean(beltAim(x, y));
+  }
+  function holdRight(pointerId, h) {
+    h.pending = false;
+    h.released = true;
+    h.right = true;
+    const [ax, ay] = aim(h.x, h.y);
+    const shiftKey = restDown();
+    send('pointermove', ax, ay, { button: 0, pointerType: 'touch', pointerId, shiftKey });
+    send('pointerdown', ax, ay, { button: 2, pointerType: 'touch', pointerId, shiftKey });
+    sendContextMenu(ax, ay, shiftKey);
   }
   function land(pointerId, h) {
     if (!h.pending) return;
@@ -323,7 +356,12 @@ export function installTouchInput({ documentObject = globalThis.document, window
     send('pointermove', ax, ay, opts);
     send('pointerdown', ax, ay, opts);
   }
-  function flush() { for (const [id, h] of holds) if (h.role === 'aim' && !h.released && !inWindow(h)) land(id, h); }
+  function flush() {
+    for (const [id, h] of holds) {
+      if (h.role !== 'aim' || h.released || inWindow(h)) continue;
+      if (h.item && h.pending && h.t !== undefined) holdRight(id, h); else land(id, h);
+    }
+  }
 
   // A finger leaves (pointerup): the release its press opened. The browser takes it (pointercancel):
   // the press is called off, not completed -- an interrupted touch (the notification shade, an app
@@ -335,6 +373,11 @@ export function installTouchInput({ documentObject = globalThis.document, window
     holds.delete(pointerId);
     if (!h) return;
     if (h.role === 'aim' && !h.released && cancelled && h.pending) return;
+    if (h.role === 'aim' && h.right) {
+      const [ax, ay] = aim(h.x, h.y);
+      send('pointerup', ax, ay, { button: 2, pointerType: 'touch', pointerId, shiftKey: restDown() });
+      return;
+    }
     if (h.role === 'aim' && !h.released) land(pointerId, h);   // a tap inside the window: move, down, up
     const shiftKey = restDown();
     if (h.role === 'aim' && !h.released) {
@@ -367,6 +410,7 @@ export function installTouchInput({ documentObject = globalThis.document, window
       return;
     }
     const aiming = [...holds.entries()].find(([, h]) => h.role === 'aim');
+    if (aiming?.[1].right) { holds.set(e.pointerId, { role: 'swallowed' }); return; }
     if (aiming) {
       // The second finger: the right button goes down where the aiming finger is pointing.
       const [ax, ay] = aim(aiming[1].x, aiming[1].y);
@@ -388,7 +432,7 @@ export function installTouchInput({ documentObject = globalThis.document, window
       return;
     }
     // The first finger: the left button goes down, aimed, once the landing window closes (land()).
-    holds.set(e.pointerId, { role: 'aim', x, y, pending: true, t: clock() });
+    holds.set(e.pointerId, { role: 'aim', x, y, pending: true, t: clock(), item: itemGround(x, y) });
   }, { capture: true });
 
   documentObject.addEventListener('pointermove', (e) => {
