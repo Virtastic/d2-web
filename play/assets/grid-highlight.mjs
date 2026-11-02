@@ -63,8 +63,12 @@ export function placedItemBoxes(grid, item, state, hovered, cursorMode = 0) {
     gridBoxSlot(state, hovered, cursorMode));
 }
 
-// The held item `held` over cell (x, y) of `page`: green over its own footprint when it fits, yellow
-// over the one item it would swap with (or the Horadric Cube it would go into), red otherwise.
+// The held item `held` over cell (x, y) of `page` (D2Client 0x8E440): green over its own footprint when
+// INVENTORY_CanItemBePlaced (D2Common 0x1F1F0) accepts it; else INVENTORY_CanItemsBeExchanged (0x1F040, checkCube
+// always 1) decides: it fails at the FIRST occupied cell, in row-major order, whose item is a Horadric Cube, and
+// leaves that cube as the exchange item; two or more distinct occupants clear it. Yellow over the exchange item's own
+// footprint when the call succeeds (exactly one occupant) or the exchange item is a cube; red over the held footprint
+// otherwise. Retail's client has no cube-page or held-cube exception.
 export function heldItemBoxes(grid, items, page, x, y, held) {
   if (!held || x < 0 || y < 0) return [];
   const w = held.invWidth || 1, h = held.invHeight || 1;
@@ -72,8 +76,10 @@ export function heldItemBoxes(grid, items, page, x, y, held) {
   const own = (slot) => cellBoxes(grid.left, grid.top, grid.cw, grid.ch, x, y, w, h, slot, 'over');
   const over = (it) => cellBoxes(grid.left, grid.top, grid.cw, grid.ch, it.gridX, it.gridY, it.invWidth || 1, it.invHeight || 1, BOX_YELLOW, 'over');
   if (hit.length === 0) return own(BOX_GREEN);
-  if (hit.length === 1 && (!(page === CUBE_PAGE && held.code === 'box') || hit[0].code === 'box')) return over(hit[0]);
-  return own(BOX_RED);
+  for (let cy = y; cy < y + h; cy++) for (let cx = x; cx < x + w; cx++) {
+    const at = hit.find((i) => cx >= i.gridX && cx < i.gridX + (i.invWidth || 1) && cy >= i.gridY && cy < i.gridY + (i.invHeight || 1));
+    if (at && at.code === 'box') return over(at); }
+  return hit.length === 1 ? over(hit[0]) : own(BOX_RED);
 }
 
 // The act tables the painter blends through.
