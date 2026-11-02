@@ -15,7 +15,7 @@ template <class T> static inline T& F(void* p, int off) { return *(T*)((P)p + of
 extern "C++" {
 void sub_4A9B0(void* ecx); void sub_45550(); void sub_AB50(void* unit); void sub_2E1F0(void* p);
 void sub_4A670(); void sub_C940(void* unit);
-uint8_t sub_222B0(); void sub_27180(void*, uint32_t, int, int); void sub_25C10(void*);
+uint8_t sub_222B0(void* unit); void sub_27180(void*, uint32_t, int, int); void sub_25C10(void*, uint32_t, int);
 void q_d2common_batch_b63_Ordinal_10128(uint32_t, uint32_t, uint32_t); void Ordinal_10131(uint32_t); void Ordinal_10127(uint32_t);
 void* sub_44BD0(int); void sub_44F90(void*); void sub_44950(); int sub_EEC0(int dir, void*, void*);
 void sub_EB80(void*); void sub_E490(int); void* sub_F000(void*, int, int); void sub_10010(void* game, int a, int b);
@@ -39,25 +39,27 @@ void sub_7C0E0(void* unit) {
     I(iVar1, 8) += 1;
 }
 
-// 1.13c D2Common+0x28D70  (fastcall: ecx=p1, edx=p2; unaff_retaddr=skip, unaff_EBX=ebx, unaff_EBP=ebp)
-void sub_28D70(void* p1, uint32_t p2, int p3, int p4, int p5, int skip, int ebx, int ebp) {
+// 1.13c D2Common+0x28D70 = ITEMS_SerializeItem(pItem=ecx, pBuffer=edx, bServer=p3, bSaveItemInv=p4,
+// bGamble=p5); all five are retail arguments. The entry-stack slot the decompile calls unaff_retaddr is p5.
+// The register reads sub_222B0 takes the unit in EAX; sub_25C10 takes the buffer in EBX (see the spec).
+void sub_28D70(void* p1, uint32_t p2, int p3, int p4, int p5) {
     uint32_t a = 0;
     if (p1 && I(p1, 0) == 4 && PT(p1, 0x14)) a = U(PT(p1, 0x14), 0x18);
     uint32_t b = (a & 0xfff7ffff) | 0x800000;
-    if (sub_222B0()) b = (a & 0xfff7ffff) | 0xa00000;
+    if (sub_222B0(p1)) b = (a & 0xfff7ffff) | 0xa00000;
     if (p5) b = (b & 0xffbfffff) | 0x2000000;
     if (p3 == 0) { if (!(b & 0x10)) b &= 0xfffff7ff; }
     else q_d2common_batch_b63_Ordinal_10128(p2, 0x4d4a, 0x10);
     q_d2common_batch_b63_Ordinal_10128(p2, b, 0x20);
-    if (!(b & 0x200000)) sub_27180(p1, p2, p3, skip); else sub_25C10(p1);
-    if (skip == 0 && ebx != 0) {
+    if (!(b & 0x200000)) sub_27180(p1, p2, p3, p5); else sub_25C10(p1, p2, p3);
+    // Inventory walk: only for a non-gamble save with bSaveItemInv set.
+    if (p5 == 0 && p4 != 0) {
         void* q = PT(p1, 0x60);
         if (q && I(q, 0) == 0x1020304 && (q = PT(q, 0xc))) {
             for (;;) {
                 int t = I(q, 0);
                 Ordinal_10131(p2);
-                // Retail recurses as a real call, so its return address (unaff_retaddr) is nonzero: skip = 1 here.
-                sub_28D70((t != 4) ? nullptr : q, p2, ebp, ebx, 0, 1, 0, 0);
+                sub_28D70((t != 4) ? nullptr : q, p2, p3, p4, 0);
                 if (I(q, 0) != 4) break;
                 int s = I(q, 0x14);
                 if (s == 0 || s == -0x5c || !(q = PT((P)(intptr_t)s, 100))) break;
