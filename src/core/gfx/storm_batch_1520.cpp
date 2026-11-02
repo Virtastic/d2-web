@@ -83,7 +83,10 @@ void storm_link(uint32_t* list, uint32_t* node, uint32_t mode) {
 // 0x2780: drain the node at obj[0] + obj[2] while obj[2] is positive.
 void storm_sub_2780(uint32_t* obj) {
     int32_t off;
-    while ((off = (int32_t)obj[2]) > 0) storm_unlink((uint32_t*)(uintptr_t)(obj[0] + (uint32_t)off));
+    while ((off = (int32_t)obj[2]) > 0) {
+        storm_unlink((uint32_t*)(uintptr_t)(obj[0] + (uint32_t)off));
+        if ((int32_t)obj[2] == off) break;   // the unlink left the head alone (a node that is already free): nothing more to drain
+    }
 }
 
 // 0x1CF0: unlink the two embedded nodes at +0xc and +4.
