@@ -66,18 +66,24 @@ extern "C" void sub_B8B0(uint32_t col, uint32_t idx, char* out, uint32_t a, uint
   d2win_exit(UINT32_MAX);  // _exit(-1)
 }
 
-// 1.13c D2Win+0xca00  find/create refcounted node keyed (ebx,param_1,edi)
-extern "C" int32_t* sub_CA00(int32_t key2, int32_t key1, int32_t key3) {
+// 1.13c D2Win+0xca00  find/create refcounted node keyed (ebx, [esp+4], edi); [esp+8] rides in EAX to 0x7C60. ret 8.
+// Seams (host-set, else the weak imports): the Fog #10042 thunk 0x7678 (ECX = 0x20, line 0x42c) and 0x7C60 (EAX = name).
+static void* (*s_ca00Alloc)(uint32_t size, int line, int zero);
+static int32_t* (*s_ca00Open)(uint32_t name, int zero, int32_t* out);
+extern "C" void d2win_b72_set_ca00_seams(void* (*alloc)(uint32_t, int, int), int32_t* (*open)(uint32_t, int, int32_t*)) {
+  s_ca00Alloc = alloc; s_ca00Open = open;
+}
+extern "C" int32_t* sub_CA00(int32_t key1, int32_t key3, int32_t key2, uint32_t name) {
   int32_t* p = g_head();
   for (; p; p = (int32_t*)(intptr_t)p[6])
     if (p[1] == key1 && p[2] == key2 && p[3] == key3) { p[0]++; return p; }
-  p = (int32_t*)Ordinal_10042(0x42c, 0);
+  p = (int32_t*)(s_ca00Alloc ? s_ca00Alloc(0x20, 0x42c, 0) : Ordinal_10042(0x42c, 0));
   for (int i = 0; i < 8; i++) p[i] = 0;
   p[1] = key1; p[2] = key2; p[0]++; p[3] = key3;
   p[6] = (int32_t)(intptr_t)d2win_list_head; p[7] = 0;
   if (d2win_list_head) d2win_list_head[7] = (int32_t)(intptr_t)p;
   d2win_list_head = p;
-  int32_t* r = sub_7C60(0, p + 4);
+  int32_t* r = s_ca00Open ? s_ca00Open(name, 0, p + 4) : sub_7C60(0, p + 4);
   uint32_t e = !r ? 0x3e1 : 0x3ea;
   if (r && ((uint8_t*)r)[3] == 0x14) { p[5] = (int32_t)(intptr_t)r; return p; }
   Ordinal_10024("", Ordinal_10265(e));

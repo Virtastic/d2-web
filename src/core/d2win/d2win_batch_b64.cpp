@@ -42,12 +42,13 @@ struct D2WinB64Env {
     uint32_t* dat14a8;                                     // DAT_6f9014a8
     uint32_t* dat14ec;                                     // DAT_6f9014ec
     const uint32_t* entryTbl;                              // DAT_6f8ffbb0, 0x20 x 3 words
-    void* (*openMpq)(const char*, const char*, const char*); // 0x7E60
+    void* (*openMpq)(int32_t timeout, const char*, const char*, const char*, uint32_t, uint32_t); // 0x7E60 (EAX = timeout, 5 stack words)
     void** mpqVideo; void** mpqExpansion;                  // DAT_6f9a9cc4 / DAT_6f9a9cdc
     void (*unicodeInit)(uint16_t*);                        // closure ctor
     void (*win2Unicode)(uint16_t*, const char*, int32_t);
     void (*sub_8920)(uint16_t*, int32_t, int32_t);
-    int32_t (*fog10117)(void);                             // Fog #10117 (result ignored by 0xA820)
+    int32_t (*fog10117)(void);                             // Fog #10117 (nonzero zeroes 0xA820's ecx)
+    const uint32_t* handlersA250;                          // {LAB_6f8ea0e0, LAB_6f8e9e10} as the host names them
 };
 D2WinB64Env g_d2winB64{};  // zeroed seams; a probe or the client fills the ones it reaches
 #define E g_d2winB64
@@ -216,7 +217,8 @@ uint32_t* d2win_sub_A250(uint32_t r5, uint32_t r6, uint32_t p1, uint32_t p2, uin
     o[0x13] = p3; o[6] = r6;
     o[2] = m2 | old | m0;
     o[3] = p1; o[4] = p2; o[5] = r5;
-    // o[7] = &LAB_6f8ea0e0, o[9] = &LAB_6f8e9e10: code addresses, wired by the caller
+    // o[7] = &LAB_6f8ea0e0, o[9] = &LAB_6f8e9e10: code addresses, the host's handler tokens when it set them
+    if (E.handlersA250) { o[7] = E.handlersA250[0]; o[9] = E.handlersA250[1]; }
     if (!p4) { o[0x14] = 1; o[0x15] = 0; } else { o[0x14] = p4[0]; o[0x15] = p4[1]; }
     if (!*E.listHead) { *E.listHead = o; return o; }
     uint32_t* t = *E.listHead;
@@ -225,12 +227,27 @@ uint32_t* d2win_sub_A250(uint32_t r5, uint32_t r6, uint32_t p1, uint32_t p2, uin
     return o;
 }
 
-// 1.13c D2Win+0x0a820
-uint32_t d2win_sub_A820(int32_t expansion) {
-    if (E.fog10117) E.fog10117();
-    if (expansion == 0) { *E.mpqVideo = E.openMpq("D2Win.DLL", "d2video.mpq", "D2VIDEO"); return *E.mpqVideo != nullptr; }
-    *E.mpqExpansion = E.openMpq("D2Win.DLL", "d2Xvideo.mpq", "D2EXPANSION");
+// 1.13c D2Win+0x0a820 -- __fastcall(ecx, edx, expansion) ret 4. Fog #10117 nonzero drops ecx to 0; the opener 0x7E60
+// takes EAX = 1000 (timeout) and five stack words (dll, mpq, tag, edx, ecx). The handle lands in DAT_6f9a9cc4 (classic)
+// or DAT_6f9a9cdc (expansion); the result is 1 when it is nonzero.
+uint32_t d2win_sub_A820(uint32_t ecx, uint32_t edx, int32_t expansion) {
+    if (E.fog10117 && E.fog10117() != 0) ecx = 0;
+    if (expansion == 0) {
+        *E.mpqVideo = E.openMpq(1000, "D2Win.DLL", "d2video.mpq", "D2VIDEO", edx, ecx);
+        return *E.mpqVideo != nullptr;
+    }
+    *E.mpqExpansion = E.openMpq(1000, "D2Win.DLL", "d2Xvideo.mpq", "D2EXPANSION", edx, ecx);
     return *E.mpqExpansion != nullptr;
+}
+// FN probe seam (src/core/fn/d2win_a820.cpp): the probe points the callees and the two handle globals at its own.
+extern "C" void d2win_b64_set_a250_seams(void* (*alloc)(uint32_t, uint32_t), uint32_t* bitMasks, uint32_t** listHead,
+                                         const uint32_t* handlers) {
+    E.alloc = alloc; E.bitMasks = bitMasks; E.listHead = listHead; E.handlersA250 = handlers;
+}
+extern "C" void d2win_b64_set_a820_seams(int32_t (*fog10117)(void),
+                                         void* (*openMpq)(int32_t, const char*, const char*, const char*, uint32_t, uint32_t),
+                                         void** mpqVideo, void** mpqExpansion) {
+    E.fog10117 = fog10117; E.openMpq = openMpq; E.mpqVideo = mpqVideo; E.mpqExpansion = mpqExpansion;
 }
 
 // 1.13c D2Win+0x0B3A0

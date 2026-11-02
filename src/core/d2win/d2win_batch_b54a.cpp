@@ -104,7 +104,7 @@ uint8_t* d2win_sub_b860(uint32_t* head, int32_t key1, int32_t key2, const D2WinB
     return 0;
 }
 
-// 1.13c D2Win+0x0c980 -- append a text row (0x208-byte stride; width at +0x400, height at +0x408).
+// 1.13c D2Win+0x0c980 -- append a text row (0x208-byte stride; width at +0x200, height at +0x204).
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2win_sub_c980(uint8_t* base, const uint16_t* text, int32_t* totalH, int32_t* maxW, int32_t* count, const D2WinB54aEnv* e) {
     uint8_t* row = base + *count * 0x208;
@@ -112,8 +112,8 @@ void d2win_sub_c980(uint8_t* base, const uint16_t* text, int32_t* totalH, int32_
     e->ustrcpy((uint16_t*)row, text);
     int32_t w = e->maxLineWidth((const uint16_t*)row);
     int32_t h = e->textBlockHeight((const uint16_t*)row);
-    *(int32_t*)(row + 0x400) = w;
-    *(int32_t*)(row + 0x408) = h;
+    *(int32_t*)(row + 0x200) = w;
+    *(int32_t*)(row + 0x204) = h;
     *maxW = (w + 6 < *maxW) ? *maxW : w + 6;
     *totalH += h;
     *count += 1;
