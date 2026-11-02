@@ -12,7 +12,7 @@ struct Env {
  I (*o10744)(I,I);         // Ordinal_10744
  I (*o11006)(I);           // Ordinal_11006
  I (*o11160)(I,I);         // Ordinal_11160
- void (*o10164)();         // Ordinal_10164
+ void (*o10164)(I h,I flag);   // Ordinal_10164 (ctx, h, flag)
 };
 // 1.13c D2Client+0x2C230
 // ebx: object whose dword at +0x60 is the source handle (unaff_EBX).
@@ -26,8 +26,8 @@ I sub_2C230(const Env& e,const uint8_t* ebx){
  if(!d||d==b) return 0;
  if(!e.o10744(d,0x2d)) return 0;
  if(!e.o11006(b)||!e.o11006(d)) return 0;
- if(e.o11160(b,0)) e.o10164();
- if(e.o11160(d,0)) e.o10164();
+ if(e.o11160(b,0)) e.o10164(b,0);
+ if(e.o11160(d,0)) e.o10164(d,1);
  return d;
 }
 }

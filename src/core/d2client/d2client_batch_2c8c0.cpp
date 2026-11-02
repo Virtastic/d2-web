@@ -111,7 +111,7 @@ static std::u16string formatNumber(int32_t lo, int32_t hi, bool plusSingle = fal
 // descriptor+4, then validate the matching entry through ordinals 10708/10306.
 uint32_t checkSkillLevelEntry(const Host& h, Address levelDescriptor) {
     if (global(h, 0x1234A4)) return 1;
-    const Address tables = h.word(kBase + 0xCE474); // sgptDataTables import cell
+    const Address tables = h.word(h.word(kBase + 0xCE474)); // sgptDataTables import cell
     if (!tables) return 0;
     const int32_t count = h.read<int32_t>(tables + 0xBA0);
     const Address rows = h.word(tables + 0xB98);

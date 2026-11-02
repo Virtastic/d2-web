@@ -10,7 +10,7 @@ struct Env {
  U (*o11139)(U h,int k);   // (h, (c==4)+4) -> b
  U (*o10744)(U b,int k);   // called with 0x2d
  U (*o11006)(U x);
- void (*o10164)();         // register args, none visible
+ void (*o10164)(U h,U flag);   // (ctx, h, flag): the third word is 0 for the destination handle, 1 for the source
 };
 // 1.13c D2Client+0x2C190
 U sub_2C190(const Env& e,U ctx60){
@@ -19,8 +19,8 @@ U sub_2C190(const Env& e,U ctx60){
  U a=e.o10061(h); if(!a) return 0;
  int c=(int8_t)e.o10417(a);
  U b=e.o11139(h,(c==4)+4);
- if(b&&b!=a&&e.o10744(b,0x2d)&&e.o11006(a)&&e.o11006(b)){e.o10164();e.o10164();return a;}
- if(e.o11006(a)) e.o10164();
+ if(b&&b!=a&&e.o10744(b,0x2d)&&e.o11006(a)&&e.o11006(b)){e.o10164(b,0);e.o10164(a,1);return a;}
+ if(e.o11006(a)) e.o10164(a,1);
  return a;
 }
 }
