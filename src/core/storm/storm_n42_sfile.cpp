@@ -83,6 +83,9 @@ clamp:
 
 // 1.13c Storm+0x25D30
 u32 Storm_25D30(u32 a, u32 b) { G.cbA = (int)a; G.cbB = (int)b; return 1; }
+// Accessors for the file callback's two stored words, for the function replay.
+extern "C" int* storm_n42_cbA_global(void) { return &G.cbA; }
+extern "C" int* storm_n42_cbB_global(void) { return &G.cbB; }
 
 // 1.13c Storm+0x26330
 u32 Storm_26330(uint8_t* f, char* out, int n) {
