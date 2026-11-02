@@ -2113,25 +2113,22 @@ BOOL __stdcall D2Common_10574(D2UnitStrc* pUnit, int nStateId, BOOL bSet)
 	{
 		if (D2StatListStrc* pStatList = D2Common_GetStateFromStatListEx_6FDB8190(pUnit->pStatListEx, nStateId))
 		{
+			// 1.13c D2Common+0x3AAB0: already in the wanted state returns 0; a change returns 1.
 			if (bSet)
 			{
-				if (!(pStatList->dwFlags & STATLIST_SET))
-				{
-					D2Common_ExpireStatList_6FDB6E30((D2StatListExStrc*)pStatList);
-					pStatList->dwFlags |= STATLIST_SET;
-					D2COMMON_10475_PostStatToStatList(pUnit, pStatList, TRUE);
-				}
+				if (pStatList->dwFlags & STATLIST_SET)
+					return FALSE;
+				D2Common_ExpireStatList_6FDB6E30((D2StatListExStrc*)pStatList);
+				pStatList->dwFlags |= STATLIST_SET;
 			}
 			else
 			{
-				if (pStatList->dwFlags & STATLIST_SET)
-				{
-					D2Common_ExpireStatList_6FDB6E30((D2StatListExStrc*)pStatList);
-					pStatList->dwFlags &= ~STATLIST_SET;
-					D2COMMON_10475_PostStatToStatList(pUnit, pStatList, TRUE);
-				}
+				if (!(pStatList->dwFlags & STATLIST_SET))
+					return FALSE;
+				D2Common_ExpireStatList_6FDB6E30((D2StatListExStrc*)pStatList);
+				pStatList->dwFlags &= ~STATLIST_SET;
 			}
-
+			D2COMMON_10475_PostStatToStatList(pUnit, pStatList, TRUE);
 			return TRUE;
 		}
 	}
