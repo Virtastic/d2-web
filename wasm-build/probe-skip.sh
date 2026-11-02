@@ -11,6 +11,22 @@ probe_objs_from_link_log() {
     grep -oE '[^ :()/]*src_core_fn_[A-Za-z0-9_]+\.o' | sort -u
 }
 
+# probe_objs_blamed_on_engine <log>: wasm-ld keeps only live code, so an engine port with undefined symbols links until
+# a probe calls into it, and then the error names the ENGINE object. Name the probes in $OBJS whose undefined symbols
+# an engine object blamed by the log defines (nm; D2_NM overrides). Dropped for this build only, like any skipped probe.
+probe_objs_blamed_on_engine() {
+  local nm eng defs o b
+  nm=${D2_NM:-$(command -v emnm || command -v llvm-nm || echo nm)}
+  eng=$(sed -nE 's/^wasm-ld: error: ([^ ]+\.o): .*/\1/p' "$1" | xargs -r -n1 basename | grep -v '^src_core_fn_' | sort -u)
+  [ -n "$eng" ] || return 0
+  defs=$(for b in $eng; do for o in $OBJS; do [ "$(basename "$o")" = "$b" ] && $nm -j --defined-only "$o" 2>/dev/null; done; done | sort -u)
+  [ -n "$defs" ] || return 0
+  for o in $OBJS; do
+    case "$(basename "$o")" in src_core_fn_*) ;; *) continue ;; esac
+    if $nm -j -u "$o" 2>/dev/null | sort -u | comm -12 - <(echo "$defs") | grep -q .; then basename "$o"; fi
+  done
+}
+
 # probe_link_retry: link_engine (defined by the caller) over $OBJS into $LINKLOG. On failure, drop the probe objects
 # the log names (this build only; the sources are never touched), print one PROBE-SKIP line per object and relink.
 # Dropping a probe can expose a second one that needed it, so up to 6 rounds; an error that names no probe
@@ -20,11 +36,12 @@ probe_link_retry() {
   for round in 1 2 3 4 5 6; do
     if link_engine >"$LINKLOG" 2>&1; then return 0; fi
     bad=$(probe_objs_from_link_log "$LINKLOG")
+    [ -n "$bad" ] || bad=$(probe_objs_blamed_on_engine "$LINKLOG")
     [ -n "$bad" ] || break
     keep=""
     for o in $OBJS; do
       if echo "$bad" | grep -qxF "$(basename "$o")"; then
-        echo "PROBE-SKIP $o: $(grep -F "$(basename "$o")" "$LINKLOG" | grep -m1 -E 'undefined symbol|duplicate symbol' | cut -c1-160) (link)"
+        echo "PROBE-SKIP $o: $( (grep -F "$(basename "$o")" "$LINKLOG" || cat "$LINKLOG") | grep -m1 -E 'undefined symbol|duplicate symbol' | cut -c1-160) (link)"
         basename "$o" .o | sed 's/^src_core_fn_//' >> "$SKIPPED_FILE"
       else keep="$keep $o"; fi
     done

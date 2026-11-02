@@ -106,3 +106,24 @@ test('link log: the object named in the error header counts, a warning block doe
   ].join('\n'));
   assert.equal(sh(`probe_objs_from_link_log ${log}`), 'src_core_fn_d2cmp_10b70.o\n');
 });
+
+test('link retry: a probe that makes a broken engine port live is dropped, the engine object is not', () => {
+  const d = mkdtempSync(join(tmpdir(), 'probe-eng-'));
+  // fake nm: the engine object defines Port, probe a_1 needs it, probe b_2 needs nothing from it
+  writeFileSync(join(d, 'nm'), [
+    '#!/bin/sh', 'for last; do :; done',
+    'case "$*" in',
+    '  *--defined-only*src_core_a.o) echo Port;;',
+    '  *-u*src_core_fn_a_1.o) echo Port; echo libc;;',
+    '  *-u*src_core_fn_b_2.o) echo libc;;',
+    'esac', ''].join('\n'), { mode: 0o755 });
+  const out = sh(`
+    D2_NM=${d}/nm; BUILD=${d}; LINKLOG=$BUILD/link.log; SKIPPED_FILE=$BUILD/skipped.txt; : > $SKIPPED_FILE
+    OBJS="o/src_core_a.o o/src_core_fn_a_1.o o/src_core_fn_b_2.o"; calls=0
+    link_engine() { calls=$((calls+1)); [ $calls -gt 1 ] && return 0
+      echo 'wasm-ld: error: /build/o/src_core_a.o: undefined symbol: ns::g'; return 1; }
+    probe_link_retry 2>/dev/null; echo "rc=$? calls=$calls objs=$(echo $OBJS | tr ' ' ',') skipped=$(cat $SKIPPED_FILE | tr '\\n' ',')"
+  `);
+  assert.match(out, /rc=0 calls=2 objs=o\/src_core_a\.o,o\/src_core_fn_b_2\.o skipped=a_1,/);
+  assert.match(out, /^PROBE-SKIP o\/src_core_fn_a_1\.o: .*undefined symbol: ns::g.*\(link\)/m);
+});
