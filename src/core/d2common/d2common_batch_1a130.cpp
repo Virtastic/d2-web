@@ -23,8 +23,9 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_2fac0(int32_t level, int32_t selecto
 }
 
 // 1.13c D2Common+0x30B80: unit eligibility predicate, with the two retail lookup calls injected.
+// Named d2c_30b80_eligible: the FN probe owns the d2_fn_d2common_30b80 symbol (r[] shape).
 using D2C_UnitLookup = int32_t (*)(uint32_t);
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_30b80(int32_t unitType, uint32_t unit, int32_t table,
+EMSCRIPTEN_KEEPALIVE int32_t d2c_30b80_eligible(int32_t unitType, uint32_t unit, int32_t table,
  D2C_UnitLookup typeOf, D2C_UnitLookup modeOf)
 {
  if (table == 0) {
