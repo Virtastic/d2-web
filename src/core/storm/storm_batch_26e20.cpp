@@ -16,17 +16,18 @@
 // 0x4C20 relative-list unlink (src/core/fn/storm_leaves_b23.cpp)
 void Storm_Sub4C20(uint8_t* node);
 
+uint32_t g_list459CC;             // 0x6FC459CC  handle-record list head (external: the FN probe seeds it)
+int32_t g_lastError;              // 0x6FC45388  last Storm error, mirrored to SetLastError (external: the FN probe round-trips it)
+
 namespace {
 
 // ---- retail module state (all zero-initialised unless noted) -----------------------------------
-int32_t g_lastError;              // 0x6FC45388  last Storm error, mirrored to SetLastError
 CRITICAL_SECTION g_lock;          // 0x6FC45988  guards every field below
 uint32_t g_dummyNode[2];          // 0x6FC45968  fallback {link,tag} node for a null argument
 uint32_t g_flag4311C;             // 0x6FC4311C  teardown-in-progress flag
 uint32_t g_thread43110;           // 0x6FC43110  worker thread handle
 uint32_t g_obj43108;              // 0x6FC43108  archive object; +0x28 is its bound handle id
 uint32_t g_list45978;             // 0x6FC45978  request list head
-uint32_t g_list459CC;             // 0x6FC459CC  handle-record list head
 uint32_t g_list4596C;             // 0x6FC4596C  HSFILE list head
 uint32_t g_list45984;             // 0x6FC45984  HSARCHIVE list head
 uint32_t g_dword42FFC;            // 0x6FC42FFC  value set by 0x265B0, cleared by 0x26F30

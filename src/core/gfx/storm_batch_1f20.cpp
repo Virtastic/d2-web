@@ -559,3 +559,13 @@ extern "C" uint32_t Storm_Sub24F0(StormHashTable* h) {
         if (!taken) return id;
     }
 }
+
+// C-linkage entry points for the FN probes: the ports above live in an anonymous namespace.
+extern "C" void Storm_Sub1CF0(void* e) { StormElementUnlink((StormElement*)e); }
+extern "C" void Storm_Port1990(void* h) { StormHashTableFoundationDestroy((StormHashTable*)h); }
+extern "C" void Storm_Port16B0(void* h) { StormHashTableReuseDestroy((StormHashTable*)h); }
+extern "C" void Storm_Port2560(void* h) { StormHashTableReuseInit((StormHashTable*)h); }
+extern "C" void Storm_Port2740(void* c) { StormChunkDestroy((StormChunk*)c); }
+extern "C" void Storm_Port27D0(void* c) { StormChunkDelete((StormChunk*)c); }
+extern "C" void Storm_Port2AF0(void* h) { StormHashTableBaseInit((StormHashTable*)h); }
+extern "C" void Storm_Port32E0(void* a, uintptr_t wanted) { StormArrayResize((StormGrowableArray*)a, wanted); }
