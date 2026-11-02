@@ -43,8 +43,11 @@ behaviour differs from 1.10f.
 - D2Game+0x8B010 (packet 0x3E item stat update, game_net_stubs.cpp): bit-packed writer replaces the empty stub.
 - D2Common+0x24B20 ITEMS_CheckIfAutoBeltable: matches the 1.13c decompile; no change.
 - D2Common+0x25810 and D2Common+0x25970 (charged-skill and item-skill costs): arithmetic matches; the stat copy they rely on, STATLIST_CopyStats, now returns 0 for a unit with no stat list instead of dereferencing a null pointer.
+- D2Common+0x7E4F0 DATATBLS_LoadCollisionField (FieldTbls.cpp): center X is half the height and center Y half the width (1.13c 0x1414/0x1418); ours had them swapped, which moved every field lookup. 0x7E480 getter and 0x7E290 lookup match after the swap.
+- D2Common+0x7E4A0 DATATBLS_FreeCollisionFieldTable: 1.13c clears the field globals and asserts the data is already released; the release moved to the unload caller (DATATBLS_UnloadAllBins) so it still happens once before the clear.
+- D2Common+0x6B2B0 MISSILE_EvaluateMissileFormula: arguments, level and id defaults, and the expression table guard match 1.13c; no change. The callback at 0x6B160 is not decompiled (Ghidra refuses the label), so its identity with MISSILE_GetCalcParamValue is unverified.
 - D2Common+0x26BA0 ITEMS_GetRunesTxtRecordFromItem: returns NULL unless the socketed inventory's signature is 0x1020304 (1.13c check added).
-- D2Common+0x28850 ITEMS_CalculateAdditionalCostsForBonusStats: all encode cases match the 1.13c arithmetic; no change.
+- D2Common+0x28850 ITEMS_CalculateAdditionalCostsForBonusStats: all encode cases match the 1.13c arithmetic; encode 2/3 skips the stat when the skill record is missing (1.13c's null read contributes zero).
 - D2Common+0x2C910 ITEMS_UpdateSets: body matches; the 1.13c routing through 0x2C7C0 and 0x2C630 is ported in src/core/d2common/d2common_2c910.cpp (d2_fn_d2common_2c910); the play path still calls this 1.10f-routed copy.
 - D2Game+0x68D70 OBJECTS_OperateFunction06_TowerTome (QUESTS/ACT1/A1Q5.cpp): returns 0 on every path (1.10f returned 1 after activating the tome); validated against the vector.
 - D2Game+0x5CD50 OBJECTS_OperateFunction67_FrozenAnya (QUESTS/ACT5/A5Q3.cpp): returns 0 on every path (1.10f returned 1 when the quest is missing and at the end).

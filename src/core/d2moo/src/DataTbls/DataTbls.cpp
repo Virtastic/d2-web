@@ -813,6 +813,11 @@ void __stdcall DATATBLS_UnloadAllBins()
 	DATATBLS_UnloadShrinesTxt();
 	DATATBLS_UnloadInventoryTxt();
 	DATATBLS_UnloadRunesTxt();
+	if (sgptDataTables->pFieldData)
+	{
+		D2_FREE_POOL(nullptr, sgptDataTables->pFieldData);
+		sgptDataTables->pFieldData = NULL;
+	}
 	DATATBLS_FreeCollisionFieldTable();
 	DATATBLS_UnloadBeltsTxt();
 	DATATBLS_UnloadMonItemPercentTxt();

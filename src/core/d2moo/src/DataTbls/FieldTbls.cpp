@@ -40,8 +40,9 @@ BOOL __stdcall DATATBLS_InitializeCollisionFieldTable(char* pExpField, int nSize
 	sgptDataTables->pCollisionField.nWidth = v3;
 	sgptDataTables->pCollisionField.nHeight = v2;
 	sgptDataTables->pCollisionField.nArea = v2 * v3;
-	sgptDataTables->pCollisionField.nCenterX = v3 >> 1;
-	sgptDataTables->pCollisionField.nCenterY = v2 >> 1;
+	// 1.13c 0x7E4F0: center X (0x1414) is half the height, center Y (0x1418) is half the width
+	sgptDataTables->pCollisionField.nCenterX = v2 >> 1;
+	sgptDataTables->pCollisionField.nCenterY = v3 >> 1;
 
 	for (int i = 0; i < ARRAY_SIZE(gnFieldXOffsets); ++i)
 	{
@@ -57,10 +58,8 @@ BOOL __stdcall DATATBLS_InitializeCollisionFieldTable(char* pExpField, int nSize
 // 1.13c D2Common+0x7e4a0
 BOOL __stdcall DATATBLS_FreeCollisionFieldTable()
 {
-	if (sgptDataTables->pFieldData)
-	{
-		D2_FREE_POOL(nullptr, sgptDataTables->pFieldData);
-	}
+	// 1.13c clears the field globals and asserts the data was already released by the caller (DATATBLS_UnloadAllBins)
+	D2_ASSERT(!sgptDataTables->pFieldData);
 
 	sgptDataTables->pFieldData = NULL;
 	sgptDataTables->pCollisionField.nWidth = 0;

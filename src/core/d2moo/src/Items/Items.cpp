@@ -1955,17 +1955,20 @@ void __fastcall ITEMS_CalculateAdditionalCostsForBonusStats(D2UnitStrc* pItem, i
 
 					pSkillsTxtRecord = DATATBLS_GetSkillsTxtRecord(nSkillId);
 
-					if (nValue * *pSellCost > 65535 && pSkillsTxtRecord->nCostMult)
+					if (pSkillsTxtRecord)
 					{
-						nSell += pSkillsTxtRecord->nCostAdd + nValue * *pSellCost / 1024 * pSkillsTxtRecord->nCostMult;
-						nBuy += pSkillsTxtRecord->nCostAdd + nValue * *pBuyCost / 4096 * pSkillsTxtRecord->nCostMult;
-						nRep += pSkillsTxtRecord->nCostAdd + nValue * *pRepCost / 1024 * pSkillsTxtRecord->nCostMult;
-					}
-					else
-					{
-						nSell += pSkillsTxtRecord->nCostAdd + nValue * *pSellCost * pSkillsTxtRecord->nCostMult / 1024;
-						nBuy += pSkillsTxtRecord->nCostAdd + nValue * pSkillsTxtRecord->nCostMult * *pBuyCost / 4096;
-						nRep += pSkillsTxtRecord->nCostAdd + nValue * pSkillsTxtRecord->nCostMult * *pRepCost / 1024;
+						if (nValue * *pSellCost > 65535 && pSkillsTxtRecord->nCostMult)
+						{
+							nSell += pSkillsTxtRecord->nCostAdd + nValue * *pSellCost / 1024 * pSkillsTxtRecord->nCostMult;
+							nBuy += pSkillsTxtRecord->nCostAdd + nValue * *pBuyCost / 4096 * pSkillsTxtRecord->nCostMult;
+							nRep += pSkillsTxtRecord->nCostAdd + nValue * *pRepCost / 1024 * pSkillsTxtRecord->nCostMult;
+						}
+						else
+						{
+							nSell += pSkillsTxtRecord->nCostAdd + nValue * *pSellCost * pSkillsTxtRecord->nCostMult / 1024;
+							nBuy += pSkillsTxtRecord->nCostAdd + nValue * pSkillsTxtRecord->nCostMult * *pBuyCost / 4096;
+							nRep += pSkillsTxtRecord->nCostAdd + nValue * pSkillsTxtRecord->nCostMult * *pRepCost / 1024;
+						}
 					}
 					break;
 				case 4:
