@@ -21,7 +21,7 @@ struct G{
  U a9777=0,v973b=0,v971d=0,c390=0,v9747=0,v9743=0,d22fd=0,d22f9=0,t2309=0,t2301=0,d2305=0;
  U v9725=0,c2f4=0,c2f8=0,d22f8=0,v97b4=0,v97b8=0,v97bc=0,v974f=0,v974b=0,c394=0;
  U a9675=0,a9679=0,cbf94=0,cbf98=0,c404=0,c3a4=0,a8c9c=0;
- uint8_t v9729=0,v9663=0,v9661=0,v9662=0,v9648=0;
+ uint8_t v9729=0,v9661=0,v9662=0,v9648=0; U v9663=0;  // v9663: dword (disassembly 492F0 cmps eax, writes a dword)
  Ctl*ctl9763=nullptr,*ctl9767=nullptr,*ctl976b=nullptr,*ctl976f=nullptr,*ctl9773=nullptr;
  U v975b=0,v975f=0,v9757=0; void**v977b=nullptr;
  Menu*tbl=nullptr; I menuCount=0;  // 6fba3ba0, 6fba42f0
@@ -44,6 +44,11 @@ struct H{
  U (*lower)(U); I (*f5c00)(); void (*f72790)(I,I,I); void (*f3ca20)(); void (*f4fd70)(); I (*o10227)();
  void (*unitFlag)(P,I);                            // 7b20 side
  P (*unitLookup)(U);                               // slot (&DAT_6fbba808)[id&0x7f]
+
+ // 48930/48B20 (disassembly): 6880 with ESI = out pair; ctor 53E40 = 11 stack words; 536F0 = EAX + ctl in ECX + 6 stack words;
+ // Unicode helpers (strcpy/strlen/strcat/toUnicode/zero) are pure and native; snprintf into the 0x1507 line is a seam.
+ void (*f6880o)(U*xy); Ctl* (*ctor)(const U*w11); void (*line)(U eax,Ctl*,const char16_t*,U,U,U,U,U);
+ void (*usnprintf)(char16_t*,U,const char16_t*,const char16_t*,U);
 };
 inline G g; inline H h;
 }

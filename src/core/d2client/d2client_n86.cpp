@@ -154,20 +154,7 @@ void sub_47920(Env& e, ResetG& g) {
  g.a9663 = 3; e.call(R(0x8F660), {}); e.call(R(0x94970), {}); g.cc2f8 = 0; g.cc2f4 = 0;
 }
 
-// 1.13c D2CLIENT+0x47970  (in_EAX = packet: +1 byte slot, +2 int id)
-struct PktG { uint8_t* slots /*bba608, 0x80 each*/; int32_t p973b; uint8_t cc33e; };
-void sub_47970(Env& e, PktG& g, const uint8_t* pkt) {
- uint8_t sl = pkt[1];
- uint8_t* u = (uint8_t*)e.call(R(0xA4E20), {rd<int32_t>(pkt, 2), (W)(g.slots + sl * 0x80), sl});
- if (!u) return;
- if (rd<int32_t>(u, 4) == 0x216) { e.call(R(0x88A70), {(W)u, 0, 0, 0}); return; }  // both arms of the 0x3c test make the same call
- if (u == (uint8_t*)e.call(R(0x46150), {})) return;
- e.call(R(0x6B300), {(W)u, 3, 0, 0, 0});
- if (rd<int32_t>(u, 4) != 0x14b || e.call(R(0x46150), {}) || !g.p973b) return;
- if (e.call(10174, {g.p973b, 0xc, 8}) != 0 || e.call(10174, {g.p973b, 0xc, 1}) != 0) return;
- g.cc33e = 0; e.call(R(0xA5360), {});
- if (g.cc33e == 0) e.call(R(0x88A70), {(W)u, 0, 0, 0});
-}
+// D2CLIENT+0x47970 moved to d2client_47970.cpp (the Env seam cannot carry the register inputs the disassembly shows)
 
 // 1.13c D2CLIENT+0x4BE70  ordinal 10004 QueryInterface: returns the fixed interface table
 void* const* QueryInterface(void* const* ifaceTable) { return ifaceTable; }

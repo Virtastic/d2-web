@@ -99,28 +99,32 @@ void sub_486A0(U id,void (*node)(U,P&)){
 
 static void clearBuf(char16_t*b,int n){std::memset(b,0,n*2);}
 
-// 1.13c D2Client+0x48930
+// 1.13c D2Client+0x48930 (from the disassembly: ctor 11 words, 536F0 EAX 4 for the title, key 0xD3A+(seed%5), 0x102E)
 void sub_48930(){
  if(!h.cur()){h.f8150();return;}
  if(g.ctl9773){h.fatal(0xd69);return;}
- h.f6880();
- g.ctl9773=h.newCtl(H82F0,H8290);
+ U xy[2]={0,0}; h.f6880o(xy);
+ const U w[11]={xy[0],xy[1],H82F0,H8290,0,0,1,0,0,0,1};
+ g.ctl9773=h.ctor(w);
  if(!g.ctl9773){h.fatal(0x529);return;}
  g.ctl9773->w[0x17]=1;
- char16_t b[160];clearBuf(b,160);
+ char16_t b[80];clearBuf(b,80);
  h.cur(); cpy(b,h.title());
  int n=0;while(b[n])++n;
  for(int i=0;i<n;++i)if(b[i]<0x100)b[i]=char16_t(h.lower(b[i]));
- h.addLine(g.ctl9773,b,0x15,0,1,0,0);
+ h.line(4,g.ctl9773,b,0x15,0,1,0,0);
  g.v9663=1;
  // 64-bit seed update at player+0x20: lo*0x6ac690c5 + hi
  U lo=rd(g.player,0x20),hi=rd(g.player,0x24);uint64_t s=uint64_t(lo)*0x6ac690c5u+hi;std::memcpy(g.player+0x20,&s,8);
- h.addLine(g.ctl9773,h.str(0),0xf,0,1,H81C0,1);
- h.addLine(g.ctl9773,h.str(1),0xf,0,1,H82F0,1);
+ static const uint16_t K[5]={0xd3a,0xd3b,0xd3c,0xd3d,0xd3e};
+ h.line(0,g.ctl9773,h.str(K[U(s)%5]),0xf,0,1,H81C0,1);
+ h.line(0,g.ctl9773,h.str(0x102e),0xf,0,1,H82F0,1);
  h.ctlOpen(g.ctl9773);
 }
 
-// 1.13c D2Client+0x48B20
+// 1.13c D2Client+0x48B20 (from the disassembly)
+static void toUni9(char16_t*t,I v){char nb[12];int n=0;U u=v<0?-U(v):U(v);char r[12];do r[n++]=char('0'+u%10),u/=10;while(u);int k=0;if(v<0)nb[k++]='-';while(n)nb[k++]=r[--n];nb[k]=0;
+ char16_t*d=t;while(*d)++d;for(int i=0;i<9&&nb[i];++i)*d++=char16_t(uint8_t(nb[i]));*d=0;}
 void sub_48B20(){
  if(g.ctl9763){h.fatal(0xc74);return;}
  I*c=h.cur(); if(!c){h.f8150();return;}
@@ -128,42 +132,54 @@ void sub_48B20(){
   uint8_t pk[13]={0x38,3,0,0,0};U pid=g.player?rd(g.player,0xc):0xffffffff;
   std::memcpy(pk+5,&g.v971d,4);std::memcpy(pk+9,&pid,4);h.send(pk,13);
  }
- h.f6880();
- g.ctl9763=h.newCtl(H8380,H8350);
+ U xy[2]={0,0}; h.f6880o(xy);
+ const U w[11]={xy[0],xy[1],H8380,H8350,0,0,1,0,0,0,1};
+ g.ctl9763=h.ctor(w);
  if(!g.ctl9763){h.fatal(0x529);return;}
  g.ctl9763->w[0x17]=1;
- char16_t b[160];clearBuf(b,160);h.cur();cpy(b,h.title());
- h.addLine(g.ctl9763,b,0x15,0,1,0,0);
+ char16_t b[80];clearBuf(b,80);h.cur();cpy(b,h.title());
+ h.line(4,g.ctl9763,b,0x15,0,1,0,0);
  c=h.cur(); if(!c)return;
- I idx=0;for(I i=0;i<g.menuCount;++i,++idx)if(g.tbl[i].id==c[1])break;
- if(idx>=g.menuCount){ if(g.menuCount>0){}else return; }
- if(idx>=g.menuCount)idx=0;
- if(!(idx<g.menuCount))return;
+ I cnt=g.menuCount,idx=0;
+ for(I i=0;i<cnt;++i)if(g.tbl[i].id==c[1]){idx=i;break;}
+ if(idx>=cnt)return;
  Menu&m=g.tbl[idx];
  g.v9663=1;
- if(m.count!=1&&m.count-1>=0){
-  for(I i=0;i<m.count-1;++i){
-   char16_t t[1024];clearBuf(t,1024);I show=1;int16_t id=m.s[i];bool emit=false;
+ I i=0;
+ if(m.count-1>0){
+  do{
+   char16_t t[0x200];clearBuf(t,0x200);I show=1;uint16_t id=uint16_t(m.s[i]);bool emit=true;
    if(id==0x1507){
-    const char16_t*k=h.str(0); if(int16_t(g.v23e8)!=0x421)k=h.str(1);
-    (void)k; cpy(t,h.str(2)); emit=true; // sprintf(t,fmt(k,c334)): format args UNVERIFIED
+    const char16_t*k=h.str(0x2b0d); if(uint16_t(g.v23e8)!=0x421)k=h.str(uint16_t(g.v23e8));
+    h.usnprintf(t,0x200,h.str(0x58a8),k,U(g.c334));
    }else if(id==0xd09){
     I a=h.o10973(g.player,6,0),b2=h.o10913(g.player);
-    if(b2<=a)continue;
-    I n=h.o10504(g.player);if(!n)n=1;
-    char16_t nb[10];cpy(t,h.str(3));cat(t,num(nb,n));if(!n)show=0;emit=true;
+    if(a>=b2)emit=false;
+    else{
+     I n=h.o10504(g.player);if(!n)n=1;
+     cpy(t,h.str(id));toUni9(t,n);
+    }
    }else if(id==0xfb4){
     bool none=h.o10174(g.v973b,4,0)==0&&h.o10174(g.v973b,4,1)==0;
     I v=h.o10640(g.player);
-    if(v){m.count=3;char16_t nb[10];cpy(t,h.str(4));if(none)cat(t,num(nb,v*100));emit=true;}
-    else m.count=2;
-   }else if(id!=0x2ba0||(h.o10174(g.v973b,0x29,0)==0&&(h.o10174(g.v973b,0x29,1)==1||(g.c390==2&&h.o10174(g.v973b,0x29,1)==0)))){
-    cpy(t,h.str(5));emit=true;
-   }
-   if(emit)h.addLine(g.ctl9763,t,0xf,0,1,m.f[i],show);
-  }
+    if(!v){m.count=2;emit=false;}
+    else{
+     m.count=3;
+     if(!none)cpy(t,h.str(0xfb4));
+     else{cpy(t,h.str(0xfb5));toUni9(t,v*100);}
+    }
+   }else if(id==0x2ba0){
+    if(h.o10174(g.v973b,0x29,0)!=0)emit=false;
+    else if(h.o10174(g.v973b,0x29,1)==1)cpy(t,h.str(id));
+    else if((g.c390&0xff)!=2)emit=false;
+    else if(h.o10174(g.v973b,0x29,1)!=0)emit=false;
+    else cpy(t,h.str(id));
+   }else cpy(t,h.str(id));
+   if(emit)h.line(0,g.ctl9763,t,0xf,0,1,m.f[i],U(show));
+   ++i;
+  }while(i<m.count-1);
  }
- h.addLine(g.ctl9763,h.str(6),0xf,0,1,H8380,1);
+ h.line(0,g.ctl9763,h.str(0x102e),0xf,0,1,H8380,1);
 }
 
 // 1.13c D2Client+0x49090

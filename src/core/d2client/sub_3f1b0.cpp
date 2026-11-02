@@ -13,10 +13,9 @@ struct Services {
 // 1.13c D2Client+0x3F1B0
 void sub_3F1B0(void* r,Services& s){
  if(rd(r,0x38)||rd(r,0x34)){wr(r,0x40,rd(r,0x40)+1);s.callback(r,rd(r,0x3c));}
- U a[4]={rd(r,0x14),0xffffffffu,5,0};
  U l[18]={}; l[13]=rd(r,0x50); l[0]=rd(r,0x34)<<1;
- s.draw(l,rd(r,0x10),0,0,0,0,2);
- a[0]=rd(r,0x38)*2+1;
- s.draw(a,rd(r,0x18),rd(r,0x1c),0xffffffffu,5,0,6);
+ s.draw(l,rd(r,0x10),rd(r,0x14),0xffffffffu,5,0,6);
+ l[0]=rd(r,0x38)*2+1; // retail reuses the one stack block for both calls
+ s.draw(l,rd(r,0x18),rd(r,0x1c),0xffffffffu,5,0,6);
 }
 }
