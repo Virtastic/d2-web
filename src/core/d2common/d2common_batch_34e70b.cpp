@@ -71,7 +71,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_7f490(uint32_t pRoom, int
 // stat list for stat 0x149/0x14A/0x14C; category 4/12 asks for itemstatcost row 0x14B (331) and
 // additionally requires a unit stat list. A zero stat returns 0, otherwise the retail ratio
 // (100, percent, 100) is returned unchanged. Unknown categories return 0.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_6ab20(uint32_t pUnit, int32_t nCategory,
+int32_t D2Common_6AB20_DamagePercentGate(uint32_t pUnit, int32_t nCategory,
 	int32_t nPercent)
 {
 	uint8_t* u = P(pUnit);
@@ -117,7 +117,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_6ab20(uint32_t pUnit, int
 // pass advances the unit's 8-byte seed at +0x20 (one 64-bit LCG step) and compares low % 100
 // (signed modulo) against the pass's percentage. A pass with percentage <= 0 never fires but the
 // seed still advances first for pass 1.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_6b180(uint32_t pUnit, uint32_t pItem)
+int32_t D2Common_6B180_CritRoll(uint32_t pUnit, uint32_t pItem)
 {
 	uint8_t* u = P(pUnit);
 	uint8_t* item = P(pItem);

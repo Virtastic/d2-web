@@ -79,7 +79,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_5dad0(int32_t bit, uint32_t*
 }
 
 // 1.13c D2Common+0x6C280
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_6c280(const char* name)
+int32_t D2Common_6C280_NameIndex(const char* name)
 {
     static const char* names[] = {"fl", "wl", "wr", "wtlr", "wtll", "wtr", "wbl", "wbr", "wld", "wrd", "wle", "wre", "co", "sh", "tr", "rf", "ld", "rd", "fd", "fi"};
     if (*name == '0') return 0;
