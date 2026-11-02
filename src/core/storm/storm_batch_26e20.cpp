@@ -310,3 +310,8 @@ void Storm_Sub28DA0(uint32_t* param_1, uint32_t* param_2) {
     if ((int32_t)g_list45984 < 1 && g_dword43130 == 0) flags = (uint8_t)(flags | 1);
     Storm_Sub28960(nullptr, param_1, flags, param_2);
 }
+
+// Fixture hooks for the FN probe of Storm+0x26500 (src/core/fn/storm_26500.cpp): the globals above
+// sit in the file's anonymous namespace, so the probe reaches them through these pointers.
+extern "C" uint32_t* Storm_Fn26500ListHead() { return &g_list459CC; }
+extern "C" int32_t* Storm_Fn26500LastError() { return &g_lastError; }
