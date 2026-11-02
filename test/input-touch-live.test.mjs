@@ -59,7 +59,10 @@ function world(shell = { screen: 'game' }, clock = null) {
     createElement: element,
     addEventListener(type, fn) { docListeners.set(type, [...(docListeners.get(type) || []), fn]); },
   };
-  const windowObject = { matchMedia: () => ({ matches: true }), __d2Shell: shell };
+  documentObject.visibilityState = 'visible';
+  const winListeners = new Map();
+  const windowObject = { matchMedia: () => ({ matches: true }), __d2Shell: shell,
+    addEventListener(type, fn) { winListeners.set(type, [...(winListeners.get(type) || []), fn]); } };
   if (clock) windowObject.performance = { now: () => clock.t };
   const realSetInterval = globalThis.setInterval;
   globalThis.setInterval = () => 1;
@@ -90,6 +93,9 @@ function world(shell = { screen: 'game' }, clock = null) {
     move: (id, x, y) => finger('pointermove', id, x, y),
     up: (id, x, y) => finger('pointerup', id, x, y),
     cancel: (id, x, y) => finger('pointercancel', id, x, y),
+    // The window loses focus; the page goes to the background (and comes back).
+    blur: () => { for (const fn of winListeners.get('blur') || []) fn({ type: 'blur' }); },
+    hide: (state = 'hidden') => { documentObject.visibilityState = state; for (const fn of docListeners.get('visibilitychange') || []) fn({ type: 'visibilitychange' }); },
   };
 }
 
@@ -351,6 +357,65 @@ test('a non-primary finger never clears the holds: the second finger is still th
   assert.deepEqual(w.sent, [
     left('pointermove', 400, 300), right('pointerdown', 400, 300), menu(400, 300), right('pointerup', 400, 300),
   ]);
+});
+
+// The page loses focus or goes to the background with fingers down: their lifts never arrive. A
+// non-primary next finger (or one whose browser reports no isPrimary) gets no help from the
+// primary-finger guard above, so the layer calls every hold off itself.
+function holdWalkThen(callOff) {
+  const w = world({ screen: 'title' });
+  w.down(1, 400, 300, { isPrimary: true });
+  w.move(1, 410, 300);            // the press is out (a hold-walk)
+  callOff(w);
+  w.down(2, 500, 400, { isPrimary: false });
+  w.up(2, 500, 400);
+  return w.sent;
+}
+
+test('blur with a hold-walk down: the press is called off, and the next finger is a fresh left press', () => {
+  assert.deepEqual(holdWalkThen((w) => w.blur()), [
+    left('pointermove', 400, 300), left('pointerdown', 400, 300),
+    left('pointermove', 410, 300, 1),
+    { ...left('pointercancel', 410, 300), buttons: 0 },
+    left('pointermove', 500, 400, 2), left('pointerdown', 500, 400, 2),
+    left('pointerup', 500, 400, 2),
+  ]);
+});
+
+test('the page hidden with a hold-walk down: the same call-off; the page shown again changes nothing', () => {
+  assert.deepEqual(holdWalkThen((w) => w.hide()), holdWalkThen((w) => w.blur()));
+  const shown = holdWalkThen((w) => w.hide('visible'));
+  // NEGATIVE CONTROL: with nothing called off, the stale aim makes the next finger a second finger.
+  assert.deepEqual(shown, holdWalkThen(() => {}));
+  assert.notDeepEqual(shown, holdWalkThen((w) => w.blur()), 'without the call-off the next finger is not a fresh press');
+  assert.ok(!shown.some((e) => e.type === 'pointercancel'), 'a page shown again calls nothing off');
+});
+
+test('the page hidden with a rest finger down: Shift is not left armed for the next tap', () => {
+  const w = world({ screen: 'game' });
+  w.down(3, 400, 570, { isPrimary: true });   // a rest
+  assert.equal(w.touch.isShiftArmed(), true);
+  w.hide();
+  assert.equal(w.touch.isShiftArmed(), false, 'a hidden page holds no Shift');
+  w.down(1, 300, 300, { isPrimary: false });
+  w.up(1, 300, 300);
+  assert.deepEqual(w.sent, [
+    left('pointermove', 300, 300, 1, false), left('pointerdown', 300, 300, 1, false),
+    left('pointerup', 300, 300, 1, false),
+  ]);
+});
+
+test('blur with a second finger held: its right button is released, so a held cast ends', () => {
+  const w = world({ screen: 'title' });
+  w.down(1, 400, 300, { isPrimary: true });
+  w.down(2, 500, 400, { isPrimary: false });
+  w.blur();
+  assert.deepEqual(w.sent, [
+    left('pointermove', 400, 300), right('pointerdown', 400, 300), menu(400, 300), right('pointerup', 400, 300),
+  ]);
+  w.up(2, 500, 400);              // a late lift after the call-off sends nothing more
+  w.up(1, 400, 300);
+  assert.equal(w.sent.length, 4);
 });
 
 test('a rest finger on a control the frame placed is not a rest: the control takes the press', () => {

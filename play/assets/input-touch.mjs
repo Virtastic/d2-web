@@ -414,6 +414,15 @@ export function installTouchInput({ documentObject = globalThis.document, window
     lift(e.pointerId, true);
   }, { capture: true });
 
+  // The page lost focus or went to the background (a call, the app switcher, a notification shade):
+  // a finger then on the glass never reports its lift. Every hold is called off now, as a cancel, so
+  // nothing stale survives into the next touch -- no Shift left armed by a rest finger, no aim that
+  // would make the next finger a right click. A held second finger ends with its button-2 up, the
+  // shell's path that also ends a held cast.
+  const callOff = () => { for (const id of [...holds.keys()]) lift(id, true); };
+  windowObject.addEventListener?.('blur', callOff);
+  documentObject.addEventListener('visibilitychange', () => { if (documentObject.visibilityState === 'hidden') callOff(); });
+
   // A finger held still is a long-press to the browser, and Chrome for Android answers it with a
   // contextmenu of its own (~500 ms in, while a hold-walk or a slow tap is still down). The shell reads
   // every contextmenu at the canvas as the right button -- in the inventory that uses the item under
