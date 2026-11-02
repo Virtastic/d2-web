@@ -65,6 +65,8 @@ DA_SRC="$(dirname "$SHIM_SRC")"
 if [ -f "$DA_SRC/d2data.mpq" ] && [ -n "$HAVE_NODE" ]; then "$NODE_BIN" tools/door-art.mjs "$DA_SRC" build-wasm/site/door-art || echo "WARNING: door art failed -- the BYO door draws plain until the player's files arrive" >&2
 else echo "WARNING: no $DA_SRC/d2data.mpq -- the title screen draws plain until the player's files arrive (node tools/setup.mjs \"/path/to/Diablo II\" fixes it)" >&2; fi
 # Committed ground truth, served so scenarios can fetch it into the page.
+# A vector moved or retired leaves a dangling link in a worktree; it is skipped, not fatal.
+[ -d vectors ] && find vectors/ -xtype l -printf "WARNING: skipping dangling vector link %p\n" -delete >&2
 [ -d vectors ] && mkdir -p build-wasm/site/vectors && cp -rLu vectors/. build-wasm/site/vectors/
 # The widescreen HUD art: SGD2FreeRes's DC6 panels (the list play/assets/wide-hud.mjs names) and its licence,
 # tracked in play/freeres/. Never optional: without them the bottom bar draws only the 800 px centre panel, so
