@@ -284,8 +284,26 @@ export function installTouchInput({ documentObject = globalThis.document, window
     }
     return null;
   }
+  // ---- the panels' close buttons ------------------------------------------------------------------
+  // The inventory, character and stash close buttons are 32x32 game px. A finger that lands within half
+  // a button of an open panel's close presses its centre; a point on it is delivered raw. Rects are the
+  // ones the close modules hit-test, in the centred 800x600 space.
+  const CLOSES = [['inventoryVisible', 418, 444, 33, 33], ['characterVisible', 208, 448, 33, 33], ['stashPanelRect', 352, 445, 32, 32]];
+  function closeAim(x, y) {
+    const shell = windowObject.__d2Shell;
+    if (!shell || shell.screen !== 'game' || shell.clearScreen) return null;
+    const w = canvas.width, h = canvas.height, s = Math.min(1, w / 800, h / 600);
+    const ox = (w - 800 * s) / 2, oy = (h - 600 * s) / 2, gx = (x - ox) / s, gy = (y - oy) / s;
+    for (const [flag, l, t, bw, bh] of CLOSES) {
+      if (!shell[flag]) continue;
+      if (gx >= l && gx < l + bw && gy >= t && gy < t + bh) return null;
+      if (gx < l - bw / 2 || gx > l + bw * 1.5 || gy < t - bh / 2 || gy > t + bh * 1.5) continue;
+      return [ox + (l + bw / 2) * s, oy + (t + bh / 2) * s];
+    }
+    return null;
+  }
   // The point a finger's aim snaps to, or null when the finger is on nothing the aim rules cover.
-  function snapAim(x, y) { return beltAim(x, y) || panelAim(x, y) || statAim(x, y) || hudAim(x, y); }
+  function snapAim(x, y) { return closeAim(x, y) || beltAim(x, y) || panelAim(x, y) || statAim(x, y) || hudAim(x, y); }
   function fingerAim(x, y) { return snapAim(x, y) || worldAim(x, y); }
   // A finger's aim: the belt's boxes, an open panel's grid cells, the character screen's "+", else
   // exactly where it landed.

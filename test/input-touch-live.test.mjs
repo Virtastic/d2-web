@@ -606,3 +606,14 @@ test('a tap just beside a monster lands on it; a tap on open ground still walks 
   on.up(1, 405, 305);
   assert.deepEqual(on.sent.at(-1), left('pointerup', 405, 305));
 });
+
+test('a tap just beside an open inventory close presses it; on it, or with the panel shut, it does not', () => {
+  const w = world({ screen: 'game', inventoryVisible: true });
+  w.down(1, 412, 460); w.up(1, 412, 460);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 434.5, 460.5));
+  w.down(1, 430, 460); w.up(1, 430, 460);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 430, 460));
+  const shut = world({ screen: 'game' });
+  shut.down(1, 412, 460); shut.up(1, 412, 460);
+  assert.deepEqual(shut.sent.at(-1), left('pointerup', 412, 460));
+});
