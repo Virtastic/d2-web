@@ -28,4 +28,5 @@ struct Env {
  uint32_t (*f38a70e)(uint32_t ebx, P, int, int, int); // 0x88A70 with its EBX operand (the 0x88D90 call)
 };
 uint32_t sub_88D90(const Env& e);
+uint32_t sub_C4960(const Env& e, P a);
 } // namespace d2client_batch_c3dd0
