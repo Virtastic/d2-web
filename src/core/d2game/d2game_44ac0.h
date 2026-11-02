@@ -28,7 +28,8 @@ template <class E> uint32_t Do(E& e, uint32_t dt, uint32_t game, uint32_t unit, 
     uint32_t dmg[0x1C] = {};
     dmg[1] = e.h(0xDE5A0, tgt, 0, 0, 0, 0, game, sum, 0) & 0xFFFF;
     dmg[0x18] = 1;
-    e.h(0xDDDE0, unit, flag, 0, 0, 0, game, tgt);
+    // retail only does `mov cl, flag` after 0xDE5A0 returns: ECX keeps the 0x3B65xx residue the hooked 0xDE5A0 leaves (constant across the whole vector)
+    e.h(0xDDDE0, unit, 0x3B6500u | flag, 0, 0, 0, game, tgt);
     e.edi9(0xDDDE0, dmg);
     return 1;
 }
