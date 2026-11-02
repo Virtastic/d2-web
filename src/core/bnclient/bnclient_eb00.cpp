@@ -9,9 +9,9 @@
 
 namespace d2::bnclient::eb00 {
 struct SendState {
-    uint32_t conn;        // DAT_6FF3F654 (0x13654)
-    int32_t closing;      // DAT_6FF3F660 (0x13660)
-    int32_t disconnect;   // DAT_6FF3F644 (0x13644)
+    uint32_t conn;        // DAT_6FF3F654 (0x1F654)
+    int32_t closing;      // DAT_6FF3F660 (0x1F660)
+    int32_t disconnect;   // DAT_6FF3F644 (0x1F644)
 };
 struct SendEnv {
     void (*copy)(void* dst, const void* src, uint32_t n);  // Storm #491 (SMemCopy), stdcall 3 args
