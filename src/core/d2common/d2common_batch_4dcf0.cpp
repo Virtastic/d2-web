@@ -88,10 +88,8 @@ static uint32_t (*env_10265_GetErrorText)(uint32_t nCode) = nullptr;
 static void (*env_10024_ReportError)(void* pContext, uint32_t nText) = nullptr;
 static uint8_t g_D2Common_errorContext[8];
 
-// 0x67E50 reads a counted table of 0x220-byte records: count at singleton+0xc5c, base at +0xc58
-// in the retail 32-bit data-tables layout. Exposed as seams until the field is pinned for wasm64.
-static int32_t (*env_10436_TableCount)(void) = nullptr;
-static const uint8_t* (*env_10436_TableBase)(void) = nullptr;
+// 0x67E50 reads levels.txt (0x220-byte records) from the loaded data tables.
+static_assert(sizeof(D2LevelsTxt) == 0x220, "levels.txt record");
 
 // 1.13c D2Common+0x2F410: lazily installs the 32-byte aux block at unit +0x2C and zeroes it.
 // ponytail: raw retail offsets; map onto the real D2UnitStrc fields when this row is verified.
@@ -148,8 +146,8 @@ extern "C"
 uint32_t D2Common_10436_GetTableRecordByteField(int32_t nIndex, uint16_t* pOut)
 {
     *pOut = 0xff;
-    const int32_t nCount = env_10436_TableCount ? env_10436_TableCount() : 0;
-    const uint8_t* pBase = env_10436_TableBase ? env_10436_TableBase() : nullptr;
+    const int32_t nCount = sgptDataTables ? sgptDataTables->nLevelsTxtRecordCount : 0;
+    const uint8_t* pBase = sgptDataTables ? (const uint8_t*)sgptDataTables->pLevelsTxt : nullptr;
     if (nIndex < nCount && nIndex > 0 && pBase != nullptr)
     {
         const uint8_t* pRecord = pBase + (intptr_t)nIndex * 0x220;

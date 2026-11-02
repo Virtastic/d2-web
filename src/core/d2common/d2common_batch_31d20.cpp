@@ -533,7 +533,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_4E2B0_GetField34(uint32_t pObject)
 // 0x13B0 resolves (register-only operand, so it is an env seam). Any other unit type, index, or a null
 // block gives 0. The byte is at +0x15 + nIndex.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_84c30(uint32_t pUnit, uint32_t nIndex,
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_84C30_GetMonStats2ComponentByte(uint32_t pUnit, uint32_t nIndex,
 	uint32_t (*pfnBlock13B0)(uint32_t))
 {
 	uint8_t* u = P(pUnit);

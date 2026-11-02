@@ -373,7 +373,6 @@ EMSCRIPTEN_KEEPALIVE int32_t D2Common_26080_ItemOpStatTotal(int32_t* pUnit)
 }
 
 // 1.13c D2Common+0x4E150 (#10371): the dword at struct+0x10. Null is fatal 0xA24; we answer 0.
-extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t D2Common_4E150_GetDword10(uint32_t pStruct)
 {
 	uint8_t* s = P(pStruct);

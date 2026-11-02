@@ -17,14 +17,14 @@ D2SkillStrc* D2Common_52660_AddSkill(D2UnitStrc* pUnit, int32_t nSkillId);
 // dword at +0x10 of the last. The argument's struct is not identified (no callers in the image); the
 // offsets are kept raw. A null argument is 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_67fb0(const void* pArg)
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_67FB0_GetNestedDword10(const void* pArg)
 {
 	if (!pArg) return 0;
 
-	const uint8_t* pFirst = *(const uint8_t* const*)((const uint8_t*)pArg + 0x10);
+	const uint8_t* pFirst = (const uint8_t*)(uintptr_t)*(const uint32_t*)((const uint8_t*)pArg + 0x10);
 	if (!pFirst) return 0;
 
-	const uint8_t* pSecond = *(const uint8_t* const*)(pFirst + 0x54);
+	const uint8_t* pSecond = (const uint8_t*)(uintptr_t)*(const uint32_t*)(pFirst + 0x54);
 	if (!pSecond) return 0;
 
 	return *(const uint32_t*)(pSecond + 0x10);

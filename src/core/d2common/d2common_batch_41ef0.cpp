@@ -200,7 +200,7 @@ int32_t D2Common_SkillDescEval(uint32_t nContext, uint32_t nIndex, uint32_t nArg
 // type-4 unit's item type. A null unit, another type, an item type outside the row count or a
 // -1/absent row answers -1.
 extern "C" EMSCRIPTEN_KEEPALIVE
-int8_t d2_fn_d2common_234a0(D2UnitStrc* pItem)
+int8_t D2Common_234A0_ITEMS_GetStorePage(D2UnitStrc* pItem)
 {
 	if (pItem == nullptr || pItem->dwUnitType != 4)
 		return -1;

@@ -45,7 +45,7 @@ struct D2CommonBatch2F5C0Env {
 // the point: x (argument 2) inside [node+0x5C, node+0x5C+node+0x64) and y (argument 3) inside
 // [node+0x60, node+0x60+node+0x68). The next node is node+0x7C; an exhausted chain answers null.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3c1b0(uint32_t pRecord, int32_t nX, int32_t nY)
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_3C1B0_FindNodeAtPoint(uint32_t pRecord, int32_t nX, int32_t nY)
 {
 	uint32_t pNode = pRecord != 0 ? rd32(pRecord, 0x10) : 0;
 	while (pNode != 0) {
@@ -65,7 +65,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3c1b0(uint32_t pRecord, int32_t nX,
 // (node+4) is zero -- and returns the first word of the node at index nIndex. A node's successor
 // is at node+8. No such node, or a short list, answers 0xFFFF.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint16_t d2_fn_d2common_3d120(uint32_t pRecord, int32_t nIndex)
+EMSCRIPTEN_KEEPALIVE uint16_t D2Common_3D120_NthListEntryOfKind0(uint32_t pRecord, int32_t nIndex)
 {
 	uint32_t pNode = pRecord != 0 ? rd32(pRecord, 8) : 0;
 	int32_t nSeen = 0;

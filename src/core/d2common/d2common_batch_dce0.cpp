@@ -46,7 +46,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2common_IsTransmogrify_223d0(int32_t nItemId)
 // input (null unit, another unit type, no data block) reports home type 0 and the invalid GUID
 // 0xFFFFFFFF. The vendored 1.10f body (Units/Missile.cpp) is the same function.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_69eb0(D2UnitStrc* pMissile, int32_t* pOutHomeType,
+EMSCRIPTEN_KEEPALIVE void D2Common_69EB0_MISSILE_GetHomeType(D2UnitStrc* pMissile, int32_t* pOutHomeType,
 	D2UnitGUID* pOutHomeGuid)
 {
 	static_assert(offsetof(D2MissileDataStrc, nHomeType) == 0x20, "missile data home type");
@@ -58,7 +58,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_69eb0(D2UnitStrc* pMissile, int32_t* pO
 // unit. A null unit (fatal 0xDC4), a unit of another type (0xDC5) or a missing items row (0xDC7)
 // is fatal in retail; each returns 0 here. The 1.10f body is ITEMS_GetDurWarnCount (Items.cpp).
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_22a20(const int32_t* pUnit)
+EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_22a20_batch(const int32_t* pUnit)
 {
 	static_assert(offsetof(D2ItemsTxt, nDurWarning) == 0x135, "items.txt nDurWarning");
 	if (pUnit == nullptr || pUnit[0] != UNIT_ITEM)

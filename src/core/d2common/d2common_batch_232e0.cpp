@@ -93,7 +93,7 @@ namespace
 
 // 1.13c D2Common+0x232E0 (#10664): two-handed weapon class of an item unit (items.txt +0xC4).
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_232e0(uint32_t pUnit)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_232e0_batch(uint32_t pUnit)
 {
 	uint8_t* u = P(pUnit);
 	if (!u || W(u, 0) != 4)

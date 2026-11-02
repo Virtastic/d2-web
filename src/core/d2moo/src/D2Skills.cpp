@@ -681,7 +681,7 @@ int __stdcall SKILLS_GetRange(D2SkillStrc* pSkill)
 {
 	if (pSkill && pSkill->pSkillsTxt)
 	{
-		return pSkill->pSkillsTxt->nRange;
+		return (int8_t)pSkill->pSkillsTxt->nRange;
 	}
 
 	return 0;

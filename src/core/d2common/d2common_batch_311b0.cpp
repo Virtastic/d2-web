@@ -47,7 +47,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_4e110(uint32_t pRecord, uint32_t nValue
 
 // +0x3BF00: true when the byte at (pointer+0x10)->0x44 is at least 3.
 extern "C"
-EMSCRIPTEN_KEEPALIVE bool d2_fn_d2common_3bf00(uint32_t pRecord) {   // 1.13c D2Common+0x3bf00
+EMSCRIPTEN_KEEPALIVE bool D2Common_3BF00_InnerByte44AtLeast3(uint32_t pRecord) {   // 1.13c D2Common+0x3bf00
 	if (!pRecord)
 		return false;
 	const uint32_t pInner = R(P(pRecord), 0x10);
