@@ -257,11 +257,41 @@ export function installTouchInput({ documentObject = globalThis.document, window
     if (shell.stashPanelRect) extra.push(shell.stashPanelRect);
     return hudAimPoint(x, y, { width: canvas.width, height: canvas.height, hud, belt: shell.beltHudBoxes || [], extra });
   }
+  // ---- the world: a finger near a monster, NPC, ground item, object or exit picks it ------------------
+  // A finger lands ~10 CSS px (~15 game px) off what the player meant. When the exact point resolves to
+  // nothing a click would take (it would walk), the shell's own click resolver is asked at a ring of
+  // points around it, nearest ring first; the first hit is where the press goes. A point that already
+  // hits something is delivered raw, and ground that has nothing near it still walks exactly there.
+  // Panels, the HUD band and the belt are excluded: their own aim rules (above) decide there.
+  const WORLD_RINGS = [8, 16], WORLD_SPOKES = 8;
+  function worldAim(x, y) {
+    const shell = windowObject.__d2Shell;
+    if (!shell || shell.screen !== 'game' || shell.clearScreen || typeof shell.touchPickAt !== 'function') return null;
+    if (shell.skillSelectOpen || shell.characterVisible || shell.skillsVisible) return null;
+    const panels = [shell.inventoryVisible && shell.inventoryPanelRect, shell.stashPanelRect].filter(Boolean);
+    const inPanel = (px, py) => panels.some((r) => px >= r.left && px < r.left + (r.width ?? r.w) && py >= r.top && py < r.top + (r.height ?? r.h));
+    const bandTop = canvas.height - 104 * Math.min(1, canvas.width / 800);
+    if (y >= bandTop || inPanel(x, y)) return null;
+    let hit;
+    try { if (shell.touchPickAt(x, y)) return null; } catch { return null; }
+    for (const r of WORLD_RINGS) {
+      for (let i = 0; i < WORLD_SPOKES; i += 1) {
+        const a = (i / WORLD_SPOKES) * 2 * Math.PI, px = x + r * Math.cos(a), py = y + r * Math.sin(a);
+        if (py >= bandTop || inPanel(px, py)) continue;
+        try { hit = shell.touchPickAt(px, py); } catch { hit = false; }
+        if (hit) return [px, py];
+      }
+    }
+    return null;
+  }
   // The point a finger's aim snaps to, or null when the finger is on nothing the aim rules cover.
   function snapAim(x, y) { return beltAim(x, y) || panelAim(x, y) || statAim(x, y) || hudAim(x, y); }
+  function fingerAim(x, y) { return snapAim(x, y) || worldAim(x, y); }
   // A finger's aim: the belt's boxes, an open panel's grid cells, the character screen's "+", else
   // exactly where it landed.
-  function aim(x, y) { return snapAim(x, y) || [x, y]; }
+  function aim(x, y) { return fingerAim(x, y) || [x, y]; }
+  // A dragging finger's aim: the world probe is for where a finger LANDS, never for a held walk's path.
+  function moveAim(x, y) { return snapAim(x, y) || [x, y]; }
 
   // ---- row 2: the shift rest finger's ground ------------------------------------------------------
   // A finger that lands on nothing the aim rules cover, in the console gap of the bottom band, on no
@@ -381,7 +411,7 @@ export function installTouchInput({ documentObject = globalThis.document, window
     if (h.role === 'aim' && !h.released) land(pointerId, h);   // a tap inside the window: move, down, up
     const shiftKey = restDown();
     if (h.role === 'aim' && !h.released) {
-      const [ax, ay] = aim(h.x, h.y);
+      const [ax, ay] = h.moved ? moveAim(h.x, h.y) : aim(h.x, h.y);
       send(cancelled ? 'pointercancel' : 'pointerup', ax, ay, { button: 0, pointerType: 'touch', pointerId, shiftKey });
     } else if (h.role === 'second') {
       send('pointerup', h.ax, h.ay, { button: 2, pointerType: 'touch', pointerId, shiftKey });
@@ -450,16 +480,17 @@ export function installTouchInput({ documentObject = globalThis.document, window
       h.x = x; h.y = y;
       const held = [...holds.entries()].find(([, o]) => o.role === 'second');
       if (!held) return;
-      const [ax, ay] = aim(x, y);
+      const [ax, ay] = moveAim(x, y);
       held[1].ax = ax; held[1].ay = ay;
       send('pointermove', ax, ay, { button: 2, pointerType: 'touch', pointerId: held[0], shiftKey: restDown() });
       return;
     }
     // A jitter inside the landing window keeps the press waiting, at the point the finger landed.
     if (h.pending && inWindow(h) && Math.hypot(x - h.x, y - h.y) <= LAND_SLOP) return;
-    land(e.pointerId, h);   // the press goes where the finger landed, before the drag
+    land(e.pointerId, h);
+    h.moved = true;   // the press goes where the finger landed, before the drag
     h.x = x; h.y = y;
-    const [ax, ay] = aim(x, y);
+    const [ax, ay] = moveAim(x, y);
     send('pointermove', ax, ay, { button: 0, pointerType: 'touch', pointerId: e.pointerId, shiftKey: restDown() });
   }, { capture: true });
 

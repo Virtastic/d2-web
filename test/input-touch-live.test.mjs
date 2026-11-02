@@ -589,3 +589,20 @@ test('a finger held still on a belt potion is a right click; a quick tap there s
   clock.t += 100; t.up(1, 114, 554);
   assert.deepEqual(t.sent.filter((e) => e.type === 'pointerdown').map((e) => e.button), [0]);
 });
+
+test('a tap just beside a monster lands on it; a tap on open ground still walks exactly there', () => {
+  // A monster occupies 400..420 x 300..320; the finger lands 6 px left of it.
+  const touchPickAt = (x, y) => x >= 400 && x < 420 && y >= 300 && y < 320;
+  const w = world({ screen: 'game', touchPickAt });
+  w.down(1, 394, 310);
+  w.up(1, 394, 310);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 402, 310));
+  const g = world({ screen: 'game', touchPickAt });
+  g.down(1, 200, 200);
+  g.up(1, 200, 200);
+  assert.deepEqual(g.sent.at(-1), left('pointerup', 200, 200));
+  const on = world({ screen: 'game', touchPickAt });
+  on.down(1, 405, 305);
+  on.up(1, 405, 305);
+  assert.deepEqual(on.sent.at(-1), left('pointerup', 405, 305));
+});

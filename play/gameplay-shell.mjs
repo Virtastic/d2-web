@@ -6817,6 +6817,14 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
   },
   get hoverEvidence() { return hoverEvidence && JSON.parse(JSON.stringify(hoverEvidence)); },
   get hoverFontReady() { return Boolean(hoverFont); },
+  // Touch picking: is there a monster, NPC, ground item, object or exit a click at (x, y) would take?
+  // The same resolvers a click calls; the touch layer probes around a finger that hit nothing.
+  touchPickAt(x, y) {
+    const target = resolvePointerTarget(x, y);
+    if (target.unitId || target.item) return true;
+    if (warpUnderPointer(x, y) || npcUnderPointer(x, y)) return true;
+    return Boolean(selectPointerCandidate(resolvePointerCandidates(x, y), { click: true, reference: snapshot.player }));
+  },
   // s286 checks the hover/click boundary contract through the same resolver the input paths call.
   pointerTargetAt(x, y) {
     const target = resolvePointerTarget(x, y);
