@@ -22,7 +22,8 @@ struct D2WinA500Env {
     void (*sub_A340)(void);
 };
 
-static const char kArchiveCpp[] = "..\\Source\\D2Win\\Src\\D2WinArchive.cpp";
+// Retail EDX 0x6F8FD150 (rva 0x1D150).
+static const char kArchiveCpp[] = "..\\Source\\D2Hell\\SRC\\Archive.cpp";
 
 // 1.13c D2Win+0x0A500 (ordinal 10158)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_A500(const D2WinA500Env* env) {
