@@ -64,6 +64,7 @@ void d2sound__exit(unsigned code) { doexit(code, 1, 0); }
 // 1.13c D2sound+0x11A9  __cexit
 void d2sound_cexit(void) { doexit(0, 0, 1); }
 
+uint32_t* d2s_holdrand_slot(void) { return &g_holdrand; }
 // 1.13c D2sound+0x11B8  _rand: MSVC LCG on the per-thread holdrand
 int d2sound_rand(void) {
     g_holdrand = g_holdrand * 0x343fdu + 0x269ec3u;
