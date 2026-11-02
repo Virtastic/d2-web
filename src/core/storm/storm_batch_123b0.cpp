@@ -566,6 +566,7 @@ extern "C" void Storm_123B0_FnPin(uint32_t smack, uint32_t archive0, uint32_t he
 extern "C" int32_t Storm_123B0_FnLastError(void) { return g_lastError; }
 extern "C" uint32_t Storm_123B0_Fn104F0(uint32_t* p1, uint32_t* p2, int32_t* p3) { return Storm_Sub104F0(p1, p2, p3); }
 extern "C" uint32_t Storm_123B0_Fn10610(uint32_t kind, uint32_t* out) { return Storm_Sub10610(kind, out); }
+extern "C" uint32_t Storm_123B0_Fn16D90(int* p1, uint32_t cb) { return Storm_Sub16D90(p1, (Storm_Enum105)(uintptr_t)cb); }
 // FN seam for 0x10720: the config strings (retail 0x6FC45240/0x6FC452C0 0x80 bytes, 0x6FC451B8 0x88 bytes) and values.
 extern "C" void Storm_123B0_FnPin10720(const uint8_t* s1, const uint8_t* s2, const uint8_t* s3, uint32_t v344, uint32_t v350, uint32_t p358, uint32_t v170) {
     std::memset(g_45240, 0, sizeof g_45240); std::memcpy(g_45240, s1, 0x80);

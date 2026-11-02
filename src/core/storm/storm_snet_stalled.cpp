@@ -18,7 +18,7 @@ extern "C" uint16_t Storm_SubFF40(uint32_t, uint32_t, const uint8_t*);
 extern "C" void Storm_Sub5440(void* table, uint32_t n);
 uint32_t* Storm_Sub5040(uint32_t, int32_t param_2, uint32_t param_3, int32_t edi_src);
 uint32_t Storm_Sub4EF0(uint32_t, uint32_t p2, uint32_t p3, uint32_t edi);
-void Storm_Sub4390(void* a, uint32_t* obj, int32_t src);
+extern "C" void Storm_ListLink4390(uint32_t* eax, uint8_t* this_, uint8_t* node_arg, int32_t mode);   // 0x4390 (storm_batch_1000.cpp)
 void Storm_Sub4D60(uint8_t* node);
 void Storm_Sub10E30(uint8_t* conn, const uint8_t* pkt);
 uint32_t Storm_Sub10D20(const void* const* parts, const uint8_t* data, uint32_t length, uint32_t count);
@@ -107,11 +107,11 @@ void Storm_Sub5110(uint32_t* obj, uint32_t n) {
 }
 
 // 1.13c Storm+0x5170
-// Allocate a "__AUUSEREVENT__" node of param_2+0x18 bytes, zero its link words, link into edi's list.
-uint32_t* Storm_Sub5170(uint32_t, int32_t param_2, uint32_t param_3, uint32_t edi) {
+// Allocate a "__AUUSEREVENT__" node of param_2+0x18 bytes, zero its link words, link it (EDI = mode) on own's list (EAX = own).
+uint32_t* Storm_Sub5170(uint32_t own, int32_t param_2, uint32_t param_3, uint32_t edi) {
     uint32_t* p = (uint32_t*)Storm_Sub1C580((uint32_t)param_2 + 0x18, "__AUUSEREVENT__", -2, param_3 | 8);
     if (p) { p[0] = 0; p[1] = 0; }
-    if (edi != 0) Storm_Sub4390(nullptr, p, (int32_t)edi);
+    if (edi != 0) Storm_ListLink4390((uint32_t*)(uintptr_t)own, nullptr, (uint8_t*)p, (int32_t)edi);   // EAX = own, ECX = 0
     return p;
 }
 

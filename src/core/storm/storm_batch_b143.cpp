@@ -35,6 +35,8 @@ extern "C" void Storm_Sub1A6C0(uint32_t dwPageSize) {
   g_pageSize = 1;
   while (v < dwPageSize) { v <<= 1; g_pageSize = v; }
 }
+// The 0x6FC43550 slot, for the function-mode probe.
+extern "C" uint32_t Storm_Sub1A6C0_PageSize(void) { return g_pageSize; }
 
 // 1.13c Storm+0x1a550: grow committed region of page (EDI) to newEnd (EAX); VirtualAlloc replaced by caller-reserved memory
 extern "C" uint32_t Storm_Sub1A550(uint8_t* pg, int32_t newEnd) {

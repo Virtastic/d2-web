@@ -33,6 +33,8 @@ extern "C" void Storm_Sub18F90(void) {
     for (; i < 0xf6; i++) ((uint8_t*)&g_palFlags[i])[3] = 5;
     for (; i < 0x100; i++) ((uint8_t*)&g_palFlags[i])[3] = 0;
 }
+// The 0x6FC453F0 table itself (256 4-byte entries), for the function-mode probe.
+extern "C" uint32_t* Storm_Sub18F90_Table(void) { return g_palFlags; }
 
 // 1.13c Storm+0x18FE0: window-state test (hwnd in EAX). 0 if style has WS_MAXIMIZE (bit 24);
 // else 1 unless WS_EX_TOOLWINDOW-bit 8 is set and the window reaches the screen edge.

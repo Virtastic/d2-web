@@ -21,3 +21,11 @@ extern "C" uint32_t* storm_sub_51f0(uint32_t* p, const StormObjEnv* e) {
     n[1] = ~static_cast<uint32_t>(reinterpret_cast<uintptr_t>(n));
     return p;
 }
+
+// The 0x51F0 call as 0x5040 makes it: the element ctor is Storm+0x5370.
+void Storm_Sub5370(uint32_t* e);
+static void storm51f0ElemCtor(uint8_t* e) { Storm_Sub5370(reinterpret_cast<uint32_t*>(e)); }
+uint32_t* Storm_Sub51F0(uint32_t* p) {
+    const StormObjEnv env{storm51f0ElemCtor};
+    return storm_sub_51f0(p, &env);
+}

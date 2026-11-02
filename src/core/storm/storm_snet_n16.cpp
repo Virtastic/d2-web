@@ -102,6 +102,8 @@ static void Storm_Sub5110(uint32_t* tbl, uint32_t n) {
     }
     tbl[1] = n;
 }
+// FUNCTION-mode probe entry for this file-local port (src/core/fn/storm_5110.cpp).
+extern "C" void storm_sub_5110_n16(uint32_t* tbl, uint32_t n) { Storm_Sub5110(tbl, n); }
 
 // 1.13c Storm+0x05170
 // Allocate an event node (0x18 + extra bytes, "(AUUSEREVENT)"), clear its link words and, when

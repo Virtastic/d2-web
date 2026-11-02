@@ -92,9 +92,9 @@ extern "C" void* Storm_Sub3080(void* self, void* dst) {
 // 1.13c Storm+0x30D0
 extern "C" void* Storm_Sub30D0(uint8_t* d, uint8_t* s) {
     *w(d, 4) = 0; *w(d, 8) = 0; *w(d, 0xc) = 0; *w(d, 0x10) = 0;
-    Storm_Sub3190(w(d, 0x18), s);
-    Storm_Sub3200(w(d, 0x28), s);
-    Storm_Sub3270(w(d, 0x38), s);
+    Storm_Sub3190(w(d, 0x18), s + 0x18);   // ESI = src + 0x18
+    Storm_Sub3200(w(d, 0x28), s + 0x28);   // EBX = src + 0x28
+    Storm_Sub3270(w(d, 0x38), s + 0x38);   // EBX = src + 0x38
     for (uint32_t o = 0x48; o <= 0x5c; o += 4) *w(d, o) = *w(s, o);
     return d;
 }

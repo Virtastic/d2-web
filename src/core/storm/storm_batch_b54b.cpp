@@ -13,8 +13,10 @@ int32_t g_debugFill;         // 0x6FC45164
 int32_t g_listHead;          // 0x6FC459F0
 const char* const g_defaultStrings[1] = {nullptr};  // 0x6FC35CB0 table
 
-void Storm_SetLastError(uint32_t);
-void Storm_Sub1F590(uint32_t, uint32_t*, int32_t, uint8_t*, int32_t, int32_t);
+// Seams with no state of their own in the port: Win32 SetLastError (0x6FC45388 above holds the code), and the unmapped
+// 0x1F590 error reporter, reached only while 0x6FC44D58 is set.
+void Storm_SetLastError(uint32_t) {}
+void Storm_Sub1F590(uint32_t, uint32_t*, int32_t, uint8_t*, int32_t, int32_t) {}
 void Storm_Sub1ABF0();
 void Storm_Sub1A9E0(int32_t, uint32_t, uint32_t);
 int32_t Storm_Sub1AA70(uint16_t* hdr, uint32_t oldSize, uint32_t newSize);
@@ -52,6 +54,8 @@ void Storm_Sub1ACF0(uint32_t* p1, int32_t p2, uint32_t err) {
     Storm_SetLastError(err);
     if (g_errReport != 0) Storm_Sub1F590(err, p1, p2, nullptr, 1, 1);
 }
+// Storm+0x1ACF0's 0x6FC45388 slot (the last recorded error), for the function-mode probe.
+uint32_t Storm_Sub1ACF0_LastError() { return g_lastError; }
 
 // 1.13c Storm+0x1B170: debug-fill the freed block payload with 0xDD, then release.
 void Storm_Sub1B170(uint32_t, uint16_t* hdr, uint32_t, uint32_t* p) {

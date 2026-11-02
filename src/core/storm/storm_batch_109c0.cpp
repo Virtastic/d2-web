@@ -164,6 +164,12 @@ void Storm_109C0_FnPin(uint32_t smack, uint8_t* head, uint8_t b4c, uint32_t w170
     g_lastError = lastError;
 }
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t Storm_109C0_FnLastError(void) { return g_lastError; }
+// FN replay seam for 0x10FC0: pin the two connection list heads (0x6FC45A3C+8, 0x6FC45A64+8).
+extern "C" EMSCRIPTEN_KEEPALIVE
+void Storm_109C0_FnPinLists(uint8_t* head3c, uint8_t* head64) {
+    g_list0_3c = head3c;
+    g_list0_64 = head64;
+}
 
 // 1.13c Storm+0x10B50: checksum a packet's payload. EAX = packet, ECX = seed (ignored by 0xFF40).
 // Length is the packet's own word at +0x02 minus 2; payload starts at +0x02.
@@ -243,11 +249,11 @@ void Storm_Sub10FC0(uint8_t* rec, char provider) {  // 1.13c Storm+0x10FC0
     rec[0x212] = (uint8_t)provider;
     for (int32_t which = 1; which >= 0; --which) {
         uint8_t* head = (which != 0) ? g_list0_3c : g_list0_64;
-        intptr_t node = (intptr_t)head;
-        while (node > 0) {
-            uint8_t* n = (uint8_t*)node;
+        uint32_t node = (uint32_t)(uintptr_t)head;   // retail walks while the 32-bit link is > 0 (signed)
+        while ((int32_t)node > 0) {
+            uint8_t* n = (uint8_t*)(uintptr_t)node;
             if (n[0x213] == (uint8_t)provider) n[0x213] = 0xFF;
-            node = (intptr_t)(uintptr_t)rd32(n, 0x04);
+            node = rd32(n, 0x04);
         }
     }
 }
