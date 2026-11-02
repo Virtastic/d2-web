@@ -8,7 +8,7 @@
 
 void Storm_Sub3E20(uint32_t obj);
 void Storm_Sub3EF0(uint32_t obj);
-void Storm_Sub4390(uint32_t* eax, uint8_t* this_, uint8_t* node_arg, int32_t mode);   // 0x4390 (storm_batch_1000.cpp)
+extern "C" void Storm_ListLink4390(uint32_t* eax, uint8_t* this_, uint8_t* node_arg, int32_t mode);   // 0x4390 (storm_batch_1000.cpp)
 namespace {
 uint8_t* at(uint32_t p, uintptr_t off) { return (uint8_t*)(uintptr_t)(p + off); }
 uint32_t& u32(uint32_t p, uintptr_t off) { return *(uint32_t*)at(p, off); }
@@ -31,7 +31,7 @@ const char* kScmd = "..\\3rdParty\\STORM\\SOURCE\\SCMD.CPP";
 uint32_t Alloc4(uint32_t own, uint32_t base, uint32_t off, const char* name, uint32_t flags, uint32_t edi) {
     uint32_t p = (uint32_t)(uintptr_t)Storm_Sub1C580(base + off, name, -2, flags | 8);
     if (p) { u32(p, 0) = 0; u32(p, 4) = 0; }
-    if (edi) Storm_Sub4390((uint32_t*)(uintptr_t)own, nullptr, (uint8_t*)(uintptr_t)p, (int32_t)edi);
+    if (edi) Storm_ListLink4390((uint32_t*)(uintptr_t)own, nullptr, (uint8_t*)(uintptr_t)p, (int32_t)edi);
     return p;
 }
 }

@@ -141,11 +141,11 @@ void Storm_Sub10AA0(uint32_t* info, uint32_t* out) {  // 1.13c Storm+0x10AA0
         StormSetLastError(0x85100070);
     } else {
         info[1] = 1;
-        intptr_t node = (intptr_t)g_listHead;
+        int32_t node = (int32_t)(uintptr_t)g_listHead;   // retail links are 32-bit: a negative dword ends the walk
         while (node > 0) {
-            const uint8_t* n = (const uint8_t*)node;
+            const uint8_t* n = (const uint8_t*)(uintptr_t)(uint32_t)node;
             if (n[0x212] != 0xFF) ++info[1];
-            node = (intptr_t)(uintptr_t)rd32(n, 0x04);
+            node = (int32_t)rd32(n, 0x04);
         }
     }
     LeaveCriticalSection(&g_lock);

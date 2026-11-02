@@ -88,21 +88,22 @@ int sub_2F330(char* param_1, char* esi, int ebx) {
 }
 
 // 1.13c Storm+0x53C0 helper: drain list at +8 (Storm+0x1310), then unlink node at +4.
+// Unlink one 32-bit link pair {hdr, v} at p (the sub_4B80 body); retail words are dwords, not native pointers.
+static void storm_52d0_unlink(uint32_t* p) {
+  uint32_t* hdr = (uint32_t*)(uintptr_t)p[0];
+  int32_t v = (int32_t)p[1];
+  uint32_t* t = (v < 0) ? (uint32_t*)(uintptr_t)(uint32_t)~v
+                        : (uint32_t*)((char*)p + (int32_t)((uint32_t)v - hdr[1]));
+  *t = (uint32_t)(uintptr_t)hdr; hdr[1] = p[1]; p[0] = 0; p[1] = 0;
+}
 static void storm_52d0_elem(char* e) {
-  for (intptr_t* n; (n = *(intptr_t**)(e + 8)) && (intptr_t)n > 0;) {
-    intptr_t* hdr = (intptr_t*)n[0];
-    if (!hdr) break;
-    intptr_t v = n[1];
-    intptr_t* t = (v < 0) ? (intptr_t*)~v : (intptr_t*)((char*)n + (v - hdr[1]));
-    *t = (intptr_t)hdr; ((intptr_t*)n[0])[1] = n[1]; n[0] = 0; n[1] = 0;
+  for (uint32_t w; (w = *(uint32_t*)(e + 8)) && (int32_t)w > 0;) {
+    uint32_t* n = (uint32_t*)(uintptr_t)w;
+    if (!n[0]) break;
+    storm_52d0_unlink(n);
   }
-  intptr_t* p = (intptr_t*)(e + 4);
-  if (p[0]) {
-    intptr_t* hdr = (intptr_t*)p[0];
-    intptr_t v = p[1];
-    intptr_t* t = (v < 0) ? (intptr_t*)~v : (intptr_t*)((char*)p + (v - hdr[1]));
-    *t = (intptr_t)hdr; hdr[1] = p[1]; p[0] = 0; p[1] = 0;
-  }
+  uint32_t* p = (uint32_t*)(e + 4);
+  if (p[0]) storm_52d0_unlink(p);
 }
 
 // 1.13c Storm+0x53C0 (fastcall ECX = element): the FN probe seam over the static helper.
