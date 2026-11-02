@@ -460,8 +460,8 @@ void bn_gateway_update_from_ini(uint32_t self, const char* data, const BnetGatew
         if (version_text == nullptr) {
             fatal_code = 0x23B;
         } else {
-            char* version_end = nullptr;
-            uint32_t version = (uint32_t)std::strtoul(version_text, &version_end, 10);
+            const char* version_end = nullptr;
+            uint32_t version = bn_strtoul(version_text, &version_end, 10);   // retail _strtoul 0x18AF: 32-bit, overflow clamps
             if (version <= access->gateway_list_value_18) return;
             host.log_printf("Parsing new gateway list (version %d)", version);
             int32_t gmt = access->gateway_buffer_ptr_10 == 0
@@ -518,7 +518,7 @@ void bn_gateway_update_from_ini(uint32_t self, const char* data, const BnetGatew
             }
             *cursor = '\0';
             uint32_t size = (uint32_t)(cursor - buffer) + 1;
-            if (size < allocation) {
+            if ((int32_t)size < (int32_t)allocation) {   // retail cmp/jl: signed, strict
                 if (buffer[size - 1] == '\0' && buffer[size - 2] == '\0') {
                     access->gateway_buffer_ptr_10 = (uint32_t)(uintptr_t)buffer;
                     access->gateway_buffer_bytes_14 = size;
