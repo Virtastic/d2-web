@@ -171,7 +171,8 @@ int __stdcall DATATBLS_GetDirFromOverlayTxt(int nOverlayId)
 //Inlined at various places
 D2OverlayTxt* __fastcall DATATBLS_GetOverlayTxtRecord(int nOverlay)
 {
-	// 1.13c D2Common+0x82d20/0x82d60/0x82f00 test the table pointer as well as the index (no table: zero result).
+	// The table-pointer test is ours. 1.13c D2Common+0x82d60 tests only the record address (base + id*0x84, non-zero):
+	// with no table and id > 0 retail reads low memory, this port returns NULL. Unreachable while the table is loaded.
 	if (nOverlay >= 0 && nOverlay < sgptDataTables->nOverlayTxtRecordCount && sgptDataTables->pOverlayTxt)
 	{
 		return &sgptDataTables->pOverlayTxt[nOverlay];
