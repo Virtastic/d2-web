@@ -20,16 +20,15 @@
 #include <emscripten.h>
 #include <Windows.h>   // CRITICAL_SECTION: host kernel state, a no-op under wasm
 
+extern "C" int32_t Storm_Sub1B960(void* p, const char* tag, int32_t line);   // 0x1B960 SMemFree
+
 namespace {
 
 // ---- pool seams --------------------------------------------------------------------------------
 // 0x1C580 SMemAlloc(size, tag, -2, flags): deterministic host allocation, tag/flags kept for
 // provenance. 0x1B960 SMemFree(ptr, tag, -2) is its pair.
 void* storm_mem_alloc(uint32_t size) { return std::calloc(1, size ? size : 1); }
-void storm_mem_free(void* p, const char* tag, int32_t line) {
-    (void)tag; (void)line;
-    std::free(p);
-}
+void storm_mem_free(void* p, const char* tag, int32_t line) { Storm_Sub1B960(p, tag, line); }
 
 // The {link, tag} relative-list node unlink, byte-for-byte the snippet at Storm+0x4C20 and
 // repeated in 0x4B80/0x17F0/0x18B0/0x22D0. Retail is 32-bit; ours keeps the same truncation.

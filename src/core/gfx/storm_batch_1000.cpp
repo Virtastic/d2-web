@@ -73,6 +73,7 @@ void Storm_Sub4520(uint8_t* p) {
     UnlinkNode(p + 4);
 }
 
+}  // namespace: Storm_Sub4390 has external linkage, the storm batches call it
 // 0x4390 __thiscall(this, node, mode); EAX is the list anchor. this/node fall back to eax+4.
 void Storm_Sub4390(uint32_t* eax, uint8_t* this_, uint8_t* node_arg, int32_t mode) {
     uint8_t* node = node_arg ? node_arg : (uint8_t*)(eax + 1);
@@ -100,6 +101,7 @@ void Storm_Sub4390(uint32_t* eax, uint8_t* this_, uint8_t* node_arg, int32_t mod
     wr32((void*)(uintptr_t)(tag + eax_head), (uint32_t)(uintptr_t)node);
     wr32(anchor + 4, (uint32_t)(uintptr_t)node_arg);
 }
+namespace {
 
 // 0x1000: integer power. Retail returns the same integer widened to float10 (ST(0)); the negative
 // exponent path does integer division first, so 0 or 1.

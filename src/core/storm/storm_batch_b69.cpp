@@ -105,6 +105,9 @@ static void storm_52d0_elem(char* e) {
   }
 }
 
+// 1.13c Storm+0x53C0 (fastcall ECX = element): the FN probe seam over the static helper.
+void Storm_Sub53C0(char* e) { storm_52d0_elem(e); }
+
 // 1.13c Storm+0x52D0
 void sub_52D0(intptr_t* p) {
   char* b = (char*)p;

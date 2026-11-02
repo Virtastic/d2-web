@@ -18,7 +18,7 @@ extern "C" void Storm_Sub4B40(intptr_t arg, void (*sub4910)(intptr_t)) { sub4910
 
 // 1.13c Storm+0x4E60 -- free the owned buffer at slot [2] (retail passes "\\AU_PLAYERNAME\\", line -2)
 extern "C" void Storm_Sub4E60(uintptr_t* obj) {
-    if (obj[1]) Storm_Sub1B960((void*)obj[1], "\\AU_PLAYERNAME\\", -2);
+    if (obj[2]) Storm_Sub1B960((void*)obj[2], "\\AU_PLAYERNAME\\", -2);
 }
 
 // 1.13c Storm+0x50C0 -- zero four slots

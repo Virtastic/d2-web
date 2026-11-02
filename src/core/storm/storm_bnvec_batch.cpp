@@ -291,3 +291,6 @@ void storm_bnvec_sub_word(StormBnVec* v, uint32_t w, const StormBnVec* src) {
     }
     storm_bnvec_setsize(v, v->base + i);
 }
+
+// C-linkage entry point for the FN probe (storm_bnvec_touch is in an anonymous namespace above).
+extern "C" void Storm_Port35C0(void* v, uint32_t idx) { storm_bnvec_touch((StormBnVec*)v, idx); }

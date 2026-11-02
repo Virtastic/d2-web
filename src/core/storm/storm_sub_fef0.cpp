@@ -7,7 +7,7 @@ extern "C" uint8_t* Storm_SubFEF0(int id, const StormEnvFef0* env) {
     for (int i = 1; i >= 0; --i) {
         uint8_t* l = i ? env->list0 : env->list1;
         uint8_t* n; memcpy(&n, l + 8, sizeof n);
-        while (n) {
+        while ((intptr_t)n > 0) {   // retail walks while the 32-bit link is positive
             if (n[0x213] == (uint8_t)id && n[0x212] == 0xff) return n;
             memcpy(&n, n + 4, sizeof n);
         }

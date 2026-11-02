@@ -9,6 +9,8 @@
 #include <cstdlib>
 #include <cstring>
 
+extern "C" int32_t Storm_Sub1B960(void* p, const char* tag, int32_t line);   // 0x1B960 SMemFree
+
 namespace {
 
 constexpr uintptr_t kStormVtblHashReuseRgn = 0x6fc36ae4u;
@@ -82,6 +84,8 @@ inline void* StormRealloc(void* p, uintptr_t size) {
     return r;
 }
 inline void StormFree(void* p) { std::free(p); }
+// SMemFree with retail's type-name tag and line -2 (the probe logs it; the game frees)
+inline void StormFreeTag(void* p, const char* tag) { Storm_Sub1B960(p, tag, -2); }
 
 // 1.13c Storm+0x4C20/0x2160 unlink step: resolve NextLink(-1), splice, clear.
 void StormUnlink(StormLink* link) {
@@ -489,9 +493,9 @@ extern "C" void storm_port_1660(uint32_t* r);
 namespace {
 // 1.13c Storm+0x1C30: free source/rectf/foundparam storage, then unlink the element (0x1CF0).
 void StormElementDestroy(StormElement* e) {
-    if (e->foundparam.data) StormFree(e->foundparam.data);
-    if (e->rectf.data) StormFree(e->rectf.data);
-    if (e->source.data) StormFree(e->source.data);
+    if (e->foundparam.data) StormFreeTag(e->foundparam.data, ".?AU_FOUNDPARAM@@");
+    if (e->rectf.data) StormFreeTag(e->rectf.data, ".?AURECTF@@");
+    if (e->source.data) StormFreeTag(e->source.data, ".?AU_SOURCE@@");
     StormElementUnlink(e);
 }
 }  // namespace
@@ -522,11 +526,11 @@ extern "C" void Storm_Sub1BF0(StormGrowableArray* a) { StormListArrayDestroy(a);
 // Storm 0x1C30 (1.13c)
 extern "C" void Storm_Sub1C30(StormElement* e) { StormElementDestroy(e); }
 // 1.13c Storm+0x1DA0: free the SOURCE array storage (data at +8).
-extern "C" void Storm_Sub1DA0(StormFixedArray* a) { if (a->data) StormFree(a->data); }
+extern "C" void Storm_Sub1DA0(StormFixedArray* a) { if (a->data) StormFreeTag(a->data, ".?AU_SOURCE@@"); }
 // 1.13c Storm+0x1DF0: free the RECTF array storage.
 extern "C" void Storm_Sub1DF0(StormFixedArray* a) { if (a->data) StormFree(a->data); }
 // 1.13c Storm+0x1E40: free the FOUNDPARAM array storage.
-extern "C" void Storm_Sub1E40(StormFixedArray* a) { if (a->data) StormFree(a->data); }
+extern "C" void Storm_Sub1E40(StormFixedArray* a) { if (a->data) StormFreeTag(a->data, ".?AU_FOUNDPARAM@@"); }
 
 // 1.13c Storm+0x1EB0: set a 0x1C-byte-element fixed array to `count` copies of src[0..count).
 extern "C" void Storm_Sub1EB0(uint32_t* a, uintptr_t count, const uint8_t* src) {   // retail 32-bit words {alloc, count, data}, not StormFixedArray's native fields

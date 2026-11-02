@@ -556,3 +556,21 @@ uint32_t Storm_Sub170B0(uint32_t param_1, uint32_t param_2, uint32_t* param_3, u
 // failure. Its only caller (0x169A0) finds no .snp modules in the web build, so no archive opens:
 // the failure path (null, nothing allocated, nothing to close) is the only reachable one.
 void* Storm_Sub168B0(void* /*snpModule*/) { return nullptr; }
+
+// FN seam: pin the archive-set globals 0x104F0/0x10610 read (retail's 0x6FC45834, 0x6FC45840,
+// 0x6FC45A6C, 0x6FC45830, 0x6FC41B4C, 0x6FC45388) and read the last error back.
+extern "C" void Storm_123B0_FnPin(uint32_t smack, uint32_t archive0, uint32_t head, int32_t base, uint8_t b4c, int32_t lastError) {
+    g_smack = (void*)(uintptr_t)smack; g_archive0 = (uint8_t*)(uintptr_t)archive0;
+    g_listHead = (uint8_t*)(uintptr_t)head; g_45830 = base; g_41b4c = b4c; g_lastError = lastError;
+}
+extern "C" int32_t Storm_123B0_FnLastError(void) { return g_lastError; }
+extern "C" uint32_t Storm_123B0_Fn104F0(uint32_t* p1, uint32_t* p2, int32_t* p3) { return Storm_Sub104F0(p1, p2, p3); }
+extern "C" uint32_t Storm_123B0_Fn10610(uint32_t kind, uint32_t* out) { return Storm_Sub10610(kind, out); }
+// FN seam for 0x10720: the config strings (retail 0x6FC45240/0x6FC452C0 0x80 bytes, 0x6FC451B8 0x88 bytes) and values.
+extern "C" void Storm_123B0_FnPin10720(const uint8_t* s1, const uint8_t* s2, const uint8_t* s3, uint32_t v344, uint32_t v350, uint32_t p358, uint32_t v170) {
+    std::memset(g_45240, 0, sizeof g_45240); std::memcpy(g_45240, s1, 0x80);
+    std::memset(g_452c0, 0, sizeof g_452c0); std::memcpy(g_452c0, s2, 0x80);
+    std::memset(g_451b8, 0, sizeof g_451b8); std::memcpy(g_451b8, s3, 0x88);
+    g_45344 = v344; g_45350 = v350; g_45358 = (void*)(uintptr_t)p358; g_45170 = v170;
+}
+extern "C" uint32_t Storm_123B0_Fn10720(uint32_t kind, void* dst, uint32_t size, uint32_t* len) { return Storm_Sub10720(kind, dst, size, len); }

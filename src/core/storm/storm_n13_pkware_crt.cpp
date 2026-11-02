@@ -380,12 +380,13 @@ extern "C" int storm_n13_DEAA(const Host& h, int mode, uint32_t lcid, uint32_t t
     return -1;
 }
 
-// 1.13c Storm+0xFD80 (list head 0x6FC45A50; nodes link through a 32-bit slot at +4, wide key at +0x114)
+// 1.13c Storm+0xFD80 (list head 0x6FC45A50; nodes link through a 32-bit slot at +4, byte-string key at +0x114)
 uintptr_t g_n13_listHead;
 extern "C" uintptr_t storm_n13_FD80(const uint16_t* key) {
     intptr_t n = (intptr_t)g_n13_listHead;
     while (0 < n) {
-        const uint16_t* a = (const uint16_t*)(n + 0x114); const uint16_t* b = key;
+        // retail compares bytes (an inlined strcmp), not 16-bit units
+        const uint8_t* a = (const uint8_t*)(n + 0x114); const uint8_t* b = (const uint8_t*)key;
         while (*a == *b && *a) { a++; b++; }
         if (*a == *b) return (uintptr_t)n;
         n = (intptr_t)*(uint32_t*)(n + 4);

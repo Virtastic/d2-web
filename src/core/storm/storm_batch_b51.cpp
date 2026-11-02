@@ -8,6 +8,7 @@
 
 void Storm_Sub3E20(uint32_t obj);
 void Storm_Sub3EF0(uint32_t obj);
+void Storm_Sub4390(uint32_t* eax, uint8_t* this_, uint8_t* node_arg, int32_t mode);   // 0x4390 (storm_batch_1000.cpp)
 namespace {
 uint8_t* at(uint32_t p, uintptr_t off) { return (uint8_t*)(uintptr_t)(p + off); }
 uint32_t& u32(uint32_t p, uintptr_t off) { return *(uint32_t*)at(p, off); }
@@ -20,17 +21,17 @@ void Storm_Sub4D60(uint32_t node);                                     // 0x4D60
 void Storm_Sub1D460(int32_t a, int32_t b);                             // 0x1D460
 void Storm_Sub36020(uint32_t tag, uint32_t wnd);                       // 0x36020
 extern "C" uint32_t* Storm_Sub1C580(uint32_t pool, const char* name, int32_t k, uint32_t flags); // 0x1C580
-void Storm_Sub4390(void* z, uint32_t node, uint32_t edi);              // 0x4390
 void Storm_Sub2FB30(const char* a, const char* b);                     // 0x2FB30
 
 const char* kSfile = "..\\3rdParty\\STORM\\SOURCE\\SFILE.CPP";
 const char* kSgdi = "..\\3rdParty\\STORM\\SOURCE\\SGDI.CPP";
 const char* kScmd = "..\\3rdParty\\STORM\\SOURCE\\SCMD.CPP";
 
-uint32_t Alloc4(uint32_t base, uint32_t off, const char* name, uint32_t flags, uint32_t edi) {
+// 0x4390 runs with EAX = the caller's first stack word (the owner list) and ECX = 0, so its anchor is own+4.
+uint32_t Alloc4(uint32_t own, uint32_t base, uint32_t off, const char* name, uint32_t flags, uint32_t edi) {
     uint32_t p = (uint32_t)(uintptr_t)Storm_Sub1C580(base + off, name, -2, flags | 8);
     if (p) { u32(p, 0) = 0; u32(p, 4) = 0; }
-    if (edi) Storm_Sub4390(nullptr, p, edi);
+    if (edi) Storm_Sub4390((uint32_t*)(uintptr_t)own, nullptr, (uint8_t*)(uintptr_t)p, (int32_t)edi);
     return p;
 }
 }
@@ -74,23 +75,23 @@ void Storm_Sub3FC0(uint32_t p) {
 }
 
 // 1.13c Storm+0x41D0
-uint32_t Storm_Sub41D0(uint32_t, uint32_t p2, uint32_t p3, uint32_t edi) {
-    return Alloc4(p2, 0x158, ".?AUFILEREC@@", p3, edi);
+uint32_t Storm_Sub41D0(uint32_t own, uint32_t p2, uint32_t p3, uint32_t edi) {
+    return Alloc4(own, p2, 0x158, ".?AUFILEREC@@", p3, edi);
 }
 
 // 1.13c Storm+0x4310
-uint32_t Storm_Sub4310(uint32_t, uint32_t p2, uint32_t p3, uint32_t edi) {
-    return Alloc4(p2, 0x50, ".?AUAUDIOSTREAM@@", p3, edi);
+uint32_t Storm_Sub4310(uint32_t own, uint32_t p2, uint32_t p3, uint32_t edi) {
+    return Alloc4(own, p2, 0x50, ".?AUAUDIOSTREAM@@", p3, edi);
 }
 
 // 1.13c Storm+0x4EF0
-uint32_t Storm_Sub4EF0(uint32_t, uint32_t p2, uint32_t p3, uint32_t edi) {
-    return Alloc4(p2, 0x20, ".?AUMESSAGE@@", p3, edi);
+uint32_t Storm_Sub4EF0(uint32_t own, uint32_t p2, uint32_t p3, uint32_t edi) {
+    return Alloc4(own, p2, 0x20, ".?AUMESSAGE@@", p3, edi);
 }
 
 // 1.13c Storm+0x4C60
-uint32_t Storm_Sub4C60(uint32_t, uint32_t p2, uint32_t p3, uint32_t edi) {
-    return Alloc4(p2, 0x5c, ".?AUBITMAPREC@@", p3, edi);
+uint32_t Storm_Sub4C60(uint32_t own, uint32_t p2, uint32_t p3, uint32_t edi) {
+    return Alloc4(own, p2, 0x5c, ".?AUBITMAPREC@@", p3, edi);
 }
 
 // 1.13c Storm+0x17D60

@@ -153,6 +153,18 @@ void Storm_Sub10AA0(uint32_t* info, uint32_t* out) {  // 1.13c Storm+0x10AA0
     *out = info[0];
 }
 
+// FN replay seam for 0x10AA0: pin the module state it reads (provider table 0x6FC45834, archive list head 0x6FC45A6C,
+// provider index byte 0x6FC41B4C, info word 0x6FC45170, last error 0x6FC45388) and read the last error back.
+extern "C" EMSCRIPTEN_KEEPALIVE
+void Storm_109C0_FnPin(uint32_t smack, uint8_t* head, uint8_t b4c, uint32_t w170, uint32_t lastError) {
+    g_smack = (uintptr_t*)(uintptr_t)smack;
+    g_listHead = head;
+    g_41b4c = b4c;
+    g_45170 = w170;
+    g_lastError = lastError;
+}
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t Storm_109C0_FnLastError(void) { return g_lastError; }
+
 // 1.13c Storm+0x10B50: checksum a packet's payload. EAX = packet, ECX = seed (ignored by 0xFF40).
 // Length is the packet's own word at +0x02 minus 2; payload starts at +0x02.
 extern "C" EMSCRIPTEN_KEEPALIVE
