@@ -2017,15 +2017,19 @@ int __stdcall STATLIST_GetBaseStatsData(D2StatListStrc* pStatListEx, D2StatStrc*
 	return 0;
 }
 
+// 1.13c D2Common+0x3A330 (src/core/d2common/d2common_batch_31d20.cpp)
+uint32_t D2Common_3A330_AddStat(D2StatListStrc* pStatList, uint32_t nPackedStat, int32_t nDelta);
+
 //D2Common.0x6FDB8C50 (#10573)
-// 1.13c D2Common+0x3A600
+// 1.13c D2Common+0x3A600: every base entry of the source (raw stat id at +2, value at +4) is added
+// to the target through 3A330, passing the stat id unshifted as retail does.
 void __stdcall STATLIST_MergeBaseStats(D2StatListStrc* pTargetStatList, D2StatListStrc* pSourceStatlist)
 {
 	if (pTargetStatList && pSourceStatlist)
 	{
 		for (D2StatStrc* i = pSourceStatlist->Stats.pStat; i < &pSourceStatlist->Stats.pStat[pSourceStatlist->Stats.nStatCount]; ++i)
 		{
-			STATLIST_AddStat(pTargetStatList, i->nStat, i->nValue, i->nLayer);
+			D2Common_3A330_AddStat(pTargetStatList, i->nStat, i->nValue);
 		}
 	}
 }

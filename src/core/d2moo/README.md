@@ -82,3 +82,5 @@ behaviour differs from 1.10f.
 - D2Game+0x272C0 (SKILLS/SkillBar.cpp SKILLS_FindLeapAttackTarget): when the path target and the remembered target both fail, 1.13c runs the aura-target search (range melee+4, filter 0x20003) as 1.10f does; the search had been dropped here and is restored.
 - D2Game+0x4D710 (d2game_batch_452c0b.cpp D2GAME_4D710): the closing timer start takes the caster's dword at +0xd0 (ebx), not its low byte.
 - D2Common+0x3AAB0 (D2StatList.cpp D2Common_10574): already in the wanted SET state returns 0 without expiring or re-posting; a change returns 1 (the vendored copy returned 1 for both).
+
+- STATLIST_MergeBaseStats (D2Common+0x3A600): base entries now fold through D2Common_3A330_AddStat (1.13c), not STATLIST_AddStat.
