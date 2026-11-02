@@ -47,8 +47,11 @@ int D2Common_834D0(int p1, int p2, P p3, P p4, P p5)
         for (int i = 0; i < w; i++) {
             int idx = (rd(rp(p5, 0xf8), (rd(p4, 4) + j) * 4) + rd(p4, 0) + i) * 4;
             bool hit = (*(uint8_t*)(rp(p5, 0xf4) + idx) & 2) != 0;
-            if (!hit && rd(p5, 0xac))
-                hit = (*(uint8_t*)(rp(p5, 0xa4) + idx) & 1) != 0;   // same index expr in decompile
+            if (!hit && rd(p5, 0xac)) {
+                // wall test indexes through the wall row offsets at +0xA8 (decompile: *(p5+0xa8)+iVar5)
+                int widx = (rd(rp(p5, 0xa8), (rd(p4, 4) + j) * 4) + rd(p4, 0) + i) * 4;
+                hit = (*(uint8_t*)(rp(p5, 0xa4) + widx) & 1) != 0;
+            }
             if (!hit) continue;
             P g = rp(p3, 0x24);
             uint32_t v = ru(rp(g, 0), (rd(rp(g, 4), row) + i + p1) * 4);

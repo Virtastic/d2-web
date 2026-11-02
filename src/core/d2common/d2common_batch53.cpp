@@ -27,6 +27,7 @@ uint32_t D2Common_83E20(P p1, P p2, P p3)
     int32_t h = ri((P)ru(p1, 4), 0xc) - ri(p3, 12) * ri(p2, 0x4c) + 1;
     uint32_t n = (uint32_t)(h * w);
     if (n == 0) return 0;
+    if (n > 256) return 0; // retail local_808[514] holds 256 (x,y) cells; larger windows never occur (guard, not a 1.13c path)
     uint32_t cell[514]; // [0]=count [1]=skip-centre flag, then (x,y) pairs from [2]
     cell[1] = (ri(p1, 24) == 1 && small && w <= 5 && h <= 5) ? 1 : 0;
     for (int32_t i = 0; i < (int32_t)n; i++) { cell[2 + i * 2] = i % w; cell[3 + i * 2] = i / w; }
