@@ -32,7 +32,7 @@ static bool in_chain(uint32_t from, uint32_t c) {
 extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_182A0(uint32_t* msg, const D2Win182A0Env* env) {
     bool handled = false;
     if (*env->focus && !(*env->modal && !in_chain(*env->modal, *env->focus)))
-        handled = env->focusKey(msg[2]) != 0;
+        handled = env->focusKey((uint32_t)(int32_t)(int8_t)msg[2]) != 0;   // decompile: (char)param_1[2]
     if (!handled) {
         for (uint32_t c = *env->modal ? *env->modal : *env->head; c; c = rd32(ptr(c), 0x3C)) {
             uint32_t cb = rd32(ptr(c), 0x30);

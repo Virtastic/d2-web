@@ -11,7 +11,7 @@
 using namespace d2win_open;
 
 struct D2Win16B90Env {
-    void (*lock)(uint32_t v);                                // D2Win+0x12FE0
+    void (*lock)(uint32_t v);                                // D2Win+0x12FE0 (SetUnicodeTextFont)
     uint8_t* (*alloc)(uint32_t size, const char* file, int32_t line, int32_t n0);  // Fog #10042
     int32_t (*textWidth)(const uint16_t* text);              // D2Win+0x11FB0 (EAX)
     int32_t (*textHeight)(void);                             // D2Win+0x11E80, result unused
@@ -27,7 +27,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_16B90(uint8_t* list, const uint16
                                                     uint32_t a3, int32_t head, int32_t select,
                                                     const D2Win16B90Env* env) {
     if (rd32(list, 0) != 7) fatal(0xA1);
-    env->lock(rd32(list, 0x10));
+    env->lock(rd32(list, 0x40));   // the list's font (eFont), decompile param_1[0x10]
     uint8_t* item = env->alloc(0x224, "..\\Source\\D2Win\\Src\\D2WinList.cpp", 0xA5, 0);
     if (u16len(text) >= 0x100) fatal(0xA6);
     u16cpy(reinterpret_cast<uint16_t*>(item), text);
