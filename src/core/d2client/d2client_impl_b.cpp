@@ -142,10 +142,11 @@ struct MissileEmitImports {
 };
 
 // 1.13c D2Client+0xA2540
-void missile_emit_A2540(MissileEmitImports& I, uint32_t p1, uint32_t p2, uint32_t p3, uint32_t p4, int32_t p5) {
+void missile_emit_A2540(MissileEmitImports& I, uint32_t eax, uint32_t p1, uint32_t p2, uint32_t p3, uint32_t p4, int32_t p5) {
   if ((p4 == 0 || p5 == 0) && I.resolve_A1340(&p5) == 0) return;
   Rec rec{};
   rec.w[0x0] = 1;
+  rec.w[0x1] = eax;  // EAX is live on entry; retail stores it in the request's second word
   rec.w[0x4] = p1;
   rec.w[0x5] = p4;
   rec.w[0x6] = static_cast<uint32_t>(p5);
