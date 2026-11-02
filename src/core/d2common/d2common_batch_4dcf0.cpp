@@ -7,6 +7,8 @@
 #include <cstring>
 #include <cstdlib>
 
+#include "D2DataTbls.h"
+
 // ---- environment seams -----------------------------------------------------
 // The host installs these; a null seam leaves the helper inert instead of faulting.
 
@@ -43,8 +45,9 @@ int32_t D2Common_10456_GetDiminishingPercent(int32_t nValue)
 extern "C"
 int32_t D2Common_10465_GetCountedTableRecord(int32_t nIndex)
 {
-    const int32_t nCount = env_10465_TableCount ? env_10465_TableCount() : 0;
-    const uint8_t* pBase = env_10465_TableBase ? env_10465_TableBase() : nullptr;
+    // no seam installed: the table is objgroup.txt (the loader fills DAT_6fdf0b9c/0ba0 from "objgroup"), ours loaded
+    const int32_t nCount = env_10465_TableCount ? env_10465_TableCount() : sgptDataTables ? sgptDataTables->nObjGroupTxtRecordCount : 0;
+    const uint8_t* pBase = env_10465_TableBase ? env_10465_TableBase() : sgptDataTables ? reinterpret_cast<const uint8_t*>(sgptDataTables->pObjGroupTxt) : nullptr;
     if (nIndex < nCount && pBase != nullptr)
     {
         return (int32_t)((intptr_t)pBase + (intptr_t)nIndex * 0x34);

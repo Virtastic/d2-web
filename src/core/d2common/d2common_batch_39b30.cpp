@@ -175,33 +175,29 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_d2common_5a7d0(uint32_t pUnit)
 // inventory (body-loc grid cells +0x10 then +0x14) that is of item type 0x33. Cell 4 is taken
 // only when it is a non-item-type-4 unit or a type-4 unit whose itemdata flags lack 0x100 and
 // 0x4000; cell 5 must pass ITEMS_CanBeEquipped. 
-extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_1ff40(uint32_t pInventory, uint32_t pOutItem)
+int32_t D2Common_1FF40_GetHandAmmoItem(D2InventoryStrc* pInventory, D2UnitStrc** ppItem)
 {
-	uint8_t* p = P(pInventory);
-	if (!p)
+	if (!pInventory)
 		return 0;
 
-	uint8_t* pOut = P(pOutItem);
-	if (pOut)
-		W(pOut, 0) = 0;
+	if (ppItem)
+		*ppItem = nullptr;
 
 	D2UnitStrc* pItem = nullptr;
-	if (RdU32(p, 0) == 0x01020304u)
+	if (pInventory->dwSignature == 0x01020304u)
 	{
-		D2InventoryGridStrc* pGrid = INVENTORY_GetGrid(reinterpret_cast<D2InventoryStrc*>(p), INVGRID_BODYLOC, &gBodyLocInventoryGridInfo);
+		D2InventoryGridStrc* pGrid = INVENTORY_GetGrid(pInventory, INVGRID_BODYLOC, &gBodyLocInventoryGridInfo);
 		if (pGrid)
 		{
 			pItem = pGrid->ppItems[4];
 			if (pItem)
 			{
-				const uint8_t* u = reinterpret_cast<const uint8_t*>(pItem);
-				const uint8_t* d = P(RdU32(u, 0x14));
-				if ((RdU32(u, 0) != 4 || (!d || !(RdU32(d, 0x18) & 0x100)) && (!d || !(RdU32(d, 0x18) & 0x4000)))
+				const D2ItemDataStrc* d = pItem->dwUnitType == UNIT_ITEM ? pItem->pItemData : nullptr;
+				if ((pItem->dwUnitType != UNIT_ITEM || ((!d || !(d->dwItemFlags & 0x100)) && (!d || !(d->dwItemFlags & 0x4000))))
 					&& ITEMS_CheckItemTypeId(pItem, 0x33))
 				{
-					if (pOut)
-						W(pOut, 0) = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pItem));
+					if (ppItem)
+						*ppItem = pItem;
 					return 1;
 				}
 			}
@@ -211,8 +207,8 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_1ff40(uint32_t pInventory, uint32_t 
 
 	if (!ITEMS_CanBeEquipped(pItem) || !ITEMS_CheckItemTypeId(pItem, 0x33))
 		return 0;
-	if (pOut)
-		W(pOut, 0) = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pItem));
+	if (ppItem)
+		*ppItem = pItem;
 	return 1;
 }
 

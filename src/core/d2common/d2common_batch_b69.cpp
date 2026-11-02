@@ -9,7 +9,11 @@ inline void* gp(const void* b, int off) { return reinterpret_cast<void*>(static_
 }
 
 extern "C++" {
-__attribute__((weak)) extern int32_t g_d2common_distTable_3f20[64]; // DAT_6fde3f20
+// D2Common .rdata 0x93F20: the 8x8 near-distance class table (index dx + dy * 8; a negative entry answers 0), copied from the image
+int32_t g_d2common_distTable_3f20[64] = {
+    -1, -1, -1, 0, 2, 4, 6, 8,   -1, -1, 0, 1, 2, 4, 6, 8,   -1, 0, 0, 2, 3, 5, 7, 8,   0, 1, 2, 2, 4, 5, 7, 8,
+    2, 2, 3, 4, 5, 6, 7, 9,      4, 4, 5, 5, 6, 7, 8, 9,     6, 6, 7, 7, 7, 8, 10, 10,  8, 8, 8, 8, 9, 9, 10, 11,
+};
 __attribute__((weak)) int sub_681A0(int a, int b, int c);
 __attribute__((weak)) int32_t* sub_69950(void* thisp, int a);
 __attribute__((weak)) uint32_t sub_68B90(void* edi, void* p);
