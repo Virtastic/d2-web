@@ -106,6 +106,8 @@ while IFS= read -r s; do PROBE_SKIPPED[$s]=1; done < <(cat build-wasm/probe-skip
 for f in src/core/fn/*.cpp; do
   s=$(basename "$f" .cpp)
   [ -n "${PROBE_SKIPPED[$s]:-}" ] && continue # skipped by link-d2.sh (PROBE-SKIP)
+  # added after this build started (link-d2.sh globbed src/ before it existed): the next build compiles it
+  if [ -z "${PROBE_BUILT[$s]:-}" ] && [ "$(stat -c %Y "$f")" -ge "$T0" ]; then echo "WARN: probe $f was added during this build; not compiled here" >&2; continue; fi
   [ -n "${PROBE_BUILT[$s]:-}" ] || { echo "FATAL: probe $f has no compiled object" >&2; exit 1; }
 done
 bash ci/stage.sh
