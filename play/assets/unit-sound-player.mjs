@@ -1,4 +1,5 @@
 import { decodeWav } from './wav.mjs';
+import { unlockOnGesture } from './audio-unlock.mjs';
 import { resolveUnitSound, soundRow, soundRowByHandle } from './unit-sound-resolver.mjs';
 import { retailSoundChannelVolume, soundSourceGain, sliderPercent } from './sound-channel-volume.mjs';
 import { unitSoundNativeSpatial, unitSoundNativePanCode, nativeSoundPanBalance } from './unit-sound-spatial.mjs';
@@ -66,27 +67,8 @@ export function createUnitSoundPlayer(read, AudioContextClass = globalThis.Audio
       activeSources.delete(node);
     }
   };
-  // A suspended context still schedules source.start(); it sounds once a trusted gesture resumes it.
-  if (context.state === 'suspended' && typeof gestureTarget?.addEventListener === 'function') {
-    const controller = new AbortController();
-    let resuming = false;
-    const unlock = () => {
-      if (resuming) return;
-      if (context.state !== 'suspended') { controller.abort(); return; }
-      resuming = true;
-      let resumed;
-      try { resumed = Promise.resolve(context.resume()); }
-      catch { resuming = false; return; }
-      resumed.then(() => {
-        resuming = false;
-        // Browsers can reject resume(), or fulfill it while leaving the context suspended.
-        // Keep listening until a trusted gesture actually unlocks this audio context.
-        if (context.state !== 'suspended') controller.abort();
-      }, () => { resuming = false; });
-    };
-    for (const t of ['pointerdown', 'keydown', 'touchstart', 'gamepadconnected'])
-      gestureTarget.addEventListener(t, unlock, { signal: controller.signal, passive: true });
-  }
+  // A suspended context still schedules source.start(); it sounds once a gesture resumes it.
+  unlockOnGesture(context, gestureTarget);
   let soundsTxt = null, started = 0, dialogueGeneration = 0, dialogueSource = null;
   let dialogueDone = Promise.resolve(), finishDialogue = null;
   const table = () => soundsTxt ??= new TextDecoder('latin1').decode(read('data\\global\\excel\\Sounds.txt'));

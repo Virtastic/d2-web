@@ -70,20 +70,67 @@ async function entryFiles(e, depth = 3) {
   return (await Promise.all(all.map((x) => entryFiles(x, depth - 1)))).flat();
 }
 
-/** Chromium pickers return handles (which can be remembered); elsewhere an <input> returns Files. */
-export async function pickFiles() {
+// ---- pickerless browsers (Android Chrome): the picked files are copied into OPFS, so a reload keeps them ----
+// An <input> File is a snapshot the browser will not remember. Where neither picker exists, each picked file is
+// copied into the origin's private file system (navigator.storage.getDirectory()) and its handle joins the same
+// remembered set the Chromium pickers fill. A later boot reopens it through restore(), and the door mounts it as
+// it mounts a remembered desktop handle. Without OPFS, or where a picker exists, nothing here runs.
+const OPFS_DIR = 'd2-byo', CHUNK = 16 << 20;
+const storeAvailable = () => !window.showOpenFilePicker && !window.showDirectoryPicker
+  && !!navigator.storage?.getDirectory && typeof FileSystemFileHandle !== 'undefined';
+
+/**
+ * Copy each File into OPFS, asking the browser to keep the storage first. Resolves { handles, files }: a file
+ * whose copy fails (quota, a locked file) stays a File for this visit only, so the page still works without OPFS.
+ */
+export async function stashFiles(files, progress = () => {}) {
+  try { await navigator.storage.persist?.(); } catch { /* refused: the copy still works, the browser may evict it */ }
+  const dir = await (await navigator.storage.getDirectory()).getDirectoryHandle(OPFS_DIR, { create: true });
+  const total = files.reduce((n, f) => n + f.size, 0) || 1, names = new Set(), handles = [], kept = [];
+  let done = 0;
+  for (const f of files) {
+    if (names.has(f.name)) { kept.push(f); continue; }   // two picks with one name: the second stays a File
+    names.add(f.name);
+    try {
+      const h = await dir.getFileHandle(f.name, { create: true }), w = await h.createWritable();
+      try {
+        for (let p = 0; p < f.size; p += CHUNK) {
+          const part = f.slice(p, p + CHUNK);
+          await w.write(part); done += part.size;
+          progress(`Copying your files to this browser: ${Math.floor(100 * done / total)}%`);
+        }
+        await w.close();
+      } catch (e) { await w.abort?.().catch(() => {}); throw e; }
+      handles.push(h);
+    } catch (e) {
+      done += f.size; kept.push(f);
+      await dir.removeEntry(f.name).catch(() => {});
+      progress(`${f.name} could not be copied (${e.name || 'error'}); it lasts this visit only`);
+    }
+  }
+  return { handles, files: kept };
+}
+
+/** Pickerless browsers copy into OPFS; everyone else, or a host where OPFS will not open, keeps the Files. */
+async function keepFiles(files, progress) {
+  if (!files.length || !storeAvailable()) return { handles: [], files };
+  try { return await stashFiles(files, progress); } catch { return { handles: [], files }; }
+}
+
+/** Chromium pickers return handles (which can be remembered); elsewhere an <input> returns Files, copied to OPFS where it exists. */
+export async function pickFiles({ progress } = {}) {
   if (window.showOpenFilePicker) {
     try { return { handles: await window.showOpenFilePicker({ multiple: true, types: [{ description: 'Diablo II archives', accept: { 'application/octet-stream': ['.mpq', '.exe'] } }] }), files: [] }; }
     catch (e) { if (e.name === 'AbortError') return { handles: [], files: [] }; }
   }
-  return { handles: [], files: await inputFiles(false) };
+  return keepFiles(await inputFiles(false), progress);
 }
-export async function pickFolder() {
+export async function pickFolder({ progress } = {}) {
   if (window.showDirectoryPicker) {
     try { return { handles: await walk(await window.showDirectoryPicker()), files: [] }; }
     catch (e) { if (e.name === 'AbortError') return { handles: [], files: [] }; }
   }
-  return { handles: [], files: await inputFiles(true) };
+  return keepFiles(await inputFiles(true), progress);
 }
 const inputFiles = (folder) => new Promise((res) => {
   const i = document.createElement('input');
@@ -153,6 +200,8 @@ export async function restore(ask) {
   const hs = await remembered(), ok = [];
   for (const h of hs) {
     try {
+      // An OPFS handle (a phone's copy) has no permission to ask about: this origin always reads its own files.
+      if (typeof h.queryPermission !== 'function') { ok.push(h); continue; }
       let p = await h.queryPermission({ mode: 'read' });
       if (p !== 'granted' && ask) p = await h.requestPermission({ mode: 'read' });
       if (p === 'granted') ok.push(h);

@@ -57,7 +57,7 @@ function logInput(rec) { globalThis.__d2InputLog?.push({ ...rec, tick: globalThi
 /** One pointer event on the canvas at canvas pixel (x, y). */
 export function pointer(canvas, type, x, y, { button = 0, pointerType = 'mouse', pointerId = 1, shiftKey = false } = {}) {
   const [clientX, clientY] = toClient(canvas, x, y);
-  const buttons = type === 'pointerup' ? 0 : button === 2 ? 2 : 1;
+  const buttons = type === 'pointerup' || type === 'pointercancel' ? 0 : button === 2 ? 2 : 1;
   logInput({ t: type, x, y, button, pointerType });
   canvas.dispatchEvent(new PointerEvent(type, {
     clientX, clientY, button, buttons, pointerType, pointerId, isPrimary: true, bubbles: true, cancelable: true, shiftKey,

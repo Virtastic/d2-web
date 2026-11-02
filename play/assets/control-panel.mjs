@@ -356,3 +356,55 @@ export function createControlPanelRenderer(read, documentObject = globalThis.doc
       && hitControlBox(b, x, y, width, height));
   return { draw, hitMenuButton, hitRunButton, hitMiniButton, hitLevelButton };
 }
+
+// ---- Row 2 (touch): the console gap a shift rest finger may land on ----------------------------
+// The console is centred between the orbs, and its middle (x 167..635 on the 800x600 screen) is the
+// only stretch of the bottom band that is neither an orb, a skill button nor a retail control drawn
+// on the console. A finger that lands in the band there, on nothing the shell can act on, is the
+// phone's shift key (input-touch.mjs): it sends nothing itself. The gap is the one the console leaves
+// between the two skill buttons (117..167 and 635..685), per the comment on CONTROL_LAYOUT above.
+// `top` is the console bar's top row (the mini panel container's bottom row, y=553 above): over the
+// gap, the panel's 104-row cel is clear above it, and a mouse click there walks (s315 measures y=520),
+// so a finger there must aim like the mouse, not rest.
+export const HUD_CONSOLE_GAP = Object.freeze({ left: 167, right: 635, top: 553 });
+
+// The shell's own boxes come in three shapes: {left,top,w,h} (the drawn controls), {left,top,width,
+// height} (a panel's rect) and {left,top,right,bottom} (the belt's). One test for all of them.
+function hudBoxContains(box, x, y) {
+  if (!box) return false;
+  const left = box.left, top = box.top;
+  const right = box.right ?? (left + (box.w ?? box.width ?? 0));
+  const bottom = box.bottom ?? (top + (box.h ?? box.height ?? 0));
+  return x >= left && x < right && y >= top && y < bottom;
+}
+
+/**
+ * True when the canvas point (x, y) -- canvas pixels, the space the touch layer aims in -- is a point
+ * of the HUD band that nothing the shell can act on sits under: inside the bottom panel's band, inside
+ * the console gap, and outside every control the frame last placed.
+ *
+ *   `hud`        the shell's controlPanelEvidence.hud (menuButton, runButton, miniPanel, levelButtons);
+ *   `belt`       the shell's beltHudBoxes;
+ *   `extra`      open panel rects the band overlaps (the inventory's and the stash's): live;
+ *   `panelOpen`  true while a panel that covers the band itself is up (the character screen, the skill
+ *                tree, the skill popup): then the band is no place for a rest finger at all.
+ *
+ * The geometry is the renderer's own -- panelOriginX, CONTROL_LAYOUT.height, PANEL_SCREEN_TOP, the
+ * scale draw() uses -- so the zone moves with the panel when the window is narrower than 800.
+ */
+export function isHudDeadZone(x, y, { width = 800, height = 600, hud = {}, belt = [], extra = [], panelOpen = false } = {}) {
+  if (panelOpen) return false;
+  const scale = Math.min(1, width / 800);
+  const x0 = panelOriginX(width, scale), y0 = height - CONTROL_LAYOUT.height * scale;
+  // Retail coordinates: x as the 800-wide screen has it, y as a top row on the 800x600 screen.
+  const rx = (x - x0) / scale, ry = (y - y0) / scale + PANEL_SCREEN_TOP;
+  if (ry < HUD_CONSOLE_GAP.top || ry >= PANEL_SCREEN_TOP + CONTROL_LAYOUT.height) return false;
+  if (rx < HUD_CONSOLE_GAP.left || rx >= HUD_CONSOLE_GAP.right) return false;
+  const live = [...belt, ...extra, hud.menuButton, hud.runButton, ...(hud.levelButtons || []), ...(hud.miniPanel?.buttons || [])];
+  if (hud.miniPanel) {
+    const spec = HUD_LAYOUT.miniPanel, shift = Math.round(Number(hud.miniPanel.offsetX) || 0);
+    live.push({ left: spec.x + shift, top: spec.y, w: spec.w, h: spec.h });
+  }
+  live.push({ left: HUD_LAYOUT.stamina.x, top: HUD_LAYOUT.stamina.y, w: HUD_LAYOUT.stamina.width, h: HUD_LAYOUT.stamina.height });
+  return !live.some((b) => hudBoxContains(b, rx, ry));
+}

@@ -37,7 +37,12 @@ export const MEMORY64_PROBE_BYTES = Uint8Array.from([
 export const MIN_CHROME = 133, MIN_FIREFOX = 134, MIN_SAMSUNG = 29;
 export const SUPPORTED_BROWSERS =
   `Chrome or Edge ${MIN_CHROME}+, Firefox ${MIN_FIREFOX}+, Android Chrome or Samsung Internet ${MIN_SAMSUNG}+` +
-  ` -- not Safari or any iPhone/iPad browser yet`;
+  ` -- not Safari or any iPhone/iPad browser yet (iOS is waiting on WebKit for 64-bit WebAssembly)`;
+
+/** Every browser on iPhone, iPad or iPod is WebKit underneath, so one missing feature covers them all. */
+export function isIOS(ua) {
+  return /iPad|iPhone|iPod/.test(String(ua || ''));
+}
 
 /**
  * Feature-detects Memory64 without instantiating a module (a real 64-bit memory reserves address
@@ -148,7 +153,10 @@ export function unsupportedMessage(caps, ua = (typeof navigator !== 'undefined' 
   // missing, in the browser's own terms, and `text` below is the three lines the page renders.
   const summary = `${browser} cannot run d2-web: missing ${missing.join(' and ')}.`;
   const advice = [
-    !caps.memory64 ? `The engine is built on 64-bit WebAssembly memory (wasm64), which this browser does not implement yet.` : '',
+    !caps.memory64 && isIOS(ua)
+      ? `This browser has no 64-bit WebAssembly memory yet, and the game needs it. Every browser on iPhone and iPad is WebKit, `
+        + `so iOS is waiting on WebKit for 64-bit WebAssembly; no browser there can run d2-web until WebKit ships it.`
+      : !caps.memory64 ? `This browser has no 64-bit WebAssembly memory yet, and the game needs it.` : '',
     !caps.crossOriginIsolated ? `It also needs a cross-origin isolated page (COOP/COEP), which this host did not send.` : '',
   ].filter(Boolean).join(' ');
   const listLine = SUPPORTED_BROWSERS ? `Runs today on ${SUPPORTED_BROWSERS}.` : '';
@@ -157,18 +165,3 @@ export function unsupportedMessage(caps, ua = (typeof navigator !== 'undefined' 
     text: [summary, advice, listLine].filter(Boolean).join(' '),
   };
 }
-
-// Phones are not supported yet: the client is built for a mouse and keyboard on a desktop-sized screen.
-// A touch device whose screen is phone-sized in both directions is a phone; a tablet or a touch laptop
-// is not (the same test openmw-web uses).
-export function isPhone(g = globalThis) {
-  const touch = !!(g.matchMedia?.('(pointer: coarse)').matches || g.navigator?.maxTouchPoints > 0);
-  const w = g.innerWidth || 0, h = g.innerHeight || 0;
-  return touch && Math.min(w, h) < 820 && Math.max(w, h) < 1100;
-}
-
-export const PHONE_MESSAGE = {
-  title: 'Not on mobile browsers yet',
-  summary: "Diablo II Web doesn't support mobile browsers yet.",
-  advice: 'It runs in Chrome or Edge on a desktop or laptop. Open this page there.',
-};

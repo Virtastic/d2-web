@@ -1,4 +1,5 @@
 import { decodeWav } from './wav.mjs';
+import { unlockOnGesture } from './audio-unlock.mjs';
 
 export const TITLE_MUSIC = 'introedit.wav';
 const MUSIC_VOLUME_MAX = 255;
@@ -174,30 +175,10 @@ export function retailMusicChannelGain(sourceVolume, music, master) {
   return volume / MUSIC_VOLUME_MAX;
 }
 
-// Every browser starts a fresh AudioContext 'suspended' until a user gesture (
-// "Support matrix": iOS always; Chrome/Firefox once autoplay heuristics decide there was none). This
-// resumes it on the FIRST pointer, key, touch or gamepad activity anywhere on the page, rather than waiting for whatever later UI click happens to call `play()` --
-// so town music can start the instant a level loads, not on some second, unrelated click.
-function unlockOnGesture(context, target = globalThis.window) {
-  if (typeof target?.addEventListener !== 'function' || context.state !== 'suspended') return;
-  const controller = new AbortController();
-  let resuming = false;
-  const unlock = () => {
-    if (resuming || context.state !== 'suspended') return;
-    resuming = true;
-    let resumed;
-    try { resumed = Promise.resolve(context.resume()); }
-    catch { resuming = false; return; }
-    resumed.then(() => {
-      resuming = false;
-      // A browser can reject resume() when the first event was not a qualifying user gesture.
-      // Keep the listeners installed in that case so a later real click/key/touch can unlock audio.
-      if (context.state !== 'suspended') controller.abort();
-    }, () => { resuming = false; });
-  };
-  const opts = { signal: controller.signal, passive: true };
-  for (const type of ['pointerdown', 'keydown', 'touchstart', 'gamepadconnected']) target.addEventListener(type, unlock, opts);
-}
+// Every browser starts a fresh AudioContext 'suspended' until a user gesture. The music resumes on the FIRST
+// gesture anywhere on the page (audio-unlock.mjs), not on whatever later UI click happens to call `play()`, so town
+// music can start the instant a level loads.
+export { unlockOnGesture };
 
 // fetched(names) -> Promise (optional): resolves once a file is in the stream cache, so the whole-WAV read below does not
 // spin the main thread on the network (the title track is ~13 range misses of d2music.mpq on first play).

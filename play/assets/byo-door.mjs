@@ -304,8 +304,9 @@ export function frontDoor({ onReady } = {}) {
   function paint() { cv.style.cursor = sysCursor(); }   // the canvas repaints every frame; kept for the test hook
   async function act(h) {
     if (h === 'discord') window.open(DISCORD, '_blank', 'noopener');
-    if (h === 'dir') add(await pickFolder());
-    if (h === 'files') add(await pickFiles());
+    const progress = (s) => say(s, 'tan', 4000);   // a pickerless phone copies the files to OPFS; its progress shows here
+    if (h === 'dir') add(await pickFolder({ progress }));
+    if (h === 'files') add(await pickFiles({ progress }));
     if (h === 'again') { offerAgain = false; const r = await restore(true); await add({ handles: r.handles }); }
     if (h === 'enter') {
       const miss = FILES.filter((x) => !have(x));

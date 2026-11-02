@@ -44,7 +44,12 @@
 <script src="entry.js"></script>
 <style>
   :root{color-scheme:dark;--d2-vw:100dvw;--d2-vh:100dvh} *{box-sizing:border-box}
-  body{background:#050505;color:#ccc;font:14px monospace;margin:0;min-height:100dvh;display:grid;place-items:center}
+  /* phone page chrome (assets/phone-shell.mjs): no rubber-band pull or pinch-select of the page, and the
+     safe-area insets (a notch, the rounded corners) keep the page clear of the screen's edge. Every inset
+     resolves to 0 on a desktop, so the layout there is unchanged. */
+  html,body{overscroll-behavior:none}
+  body{background:#050505;color:#ccc;font:14px monospace;margin:0;min-height:100dvh;display:grid;place-items:center;
+    padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
   main{width:min(var(--d2-vw),1000px);padding:16px}
   h1{font:26px/30px Georgia,serif;height:30px;color:#c9ad68;margin:0 0 10px;letter-spacing:.08em}
   /* the largest 4:3 box that fits BOTH main's own width budget (unchanged) and the viewport's
@@ -53,7 +58,15 @@
      above it in the window: main's 16px padding, the 30px heading and its 10px margin, #viewport's border. */
   #viewport{position:relative;border:1px solid #493d27;background:#080a08;box-shadow:0 8px 40px #000;
     width:min(100%, (var(--d2-vh) - 60px) * 4 / 3);aspect-ratio:4/3;margin:0 auto}
+  #viewport{-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
   canvas{display:block;width:100%;height:100%;outline:none;image-rendering:pixelated}
+  /* the portrait notice: plain text, shown only for a touch screen held upright. It is not a control and it
+     takes no pointer events, so it never sits between a finger and the game. */
+  #rotate-notice{display:none;position:fixed;inset:0;z-index:3;align-items:center;justify-content:center;margin:0;
+    background:#050505;color:#c9ad68;font:18px/1.5 Georgia,serif;text-align:center;padding:24px;pointer-events:none}
+  @media (orientation: portrait) and (pointer: coarse){#rotate-notice{display:flex}}
+  /* the unsupported screen is prose a phone reads upright (every iPhone gets it); never cover it */
+  body.unsupported #rotate-notice{display:none}
   #hud{position:absolute;left:12px;top:10px;margin:0;color:#ddd;text-shadow:1px 1px #000;pointer-events:none;line-height:1.45}
   #frontdoor-error{position:absolute;z-index:2;top:12px;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100% - 24px);margin:0;padding:8px 12px;
     border:1px solid #80622f;background:rgba(0,0,0,.92);color:#e8d49d;text-align:center;font:13px/1.4 Georgia,serif;white-space:pre-wrap;overflow-wrap:anywhere;pointer-events:none}
@@ -77,14 +90,13 @@
   html.playing h1,html.playing #session-bar,html.playing .controls,html.playing #log,html.playing #hud{display:none}
   html.playing #viewport{border:0;box-shadow:none;width:min(100%, var(--d2-vh) * 4 / 3)}
   html.fill,html.fill body{overflow:hidden;height:100%}
-  html.fill #viewport{position:fixed;inset:0;width:100%;height:100%;aspect-ratio:auto;margin:0}
+  html.fill #viewport{position:fixed;width:100%;height:100%;aspect-ratio:auto;margin:0;
+    top:env(safe-area-inset-top,0px);right:env(safe-area-inset-right,0px);bottom:env(safe-area-inset-bottom,0px);left:env(safe-area-inset-left,0px)}
   #unsupported{display:none;max-width:560px;padding:20px 24px;margin-top:8px;border:1px solid #493d27;background:#0b0c09;line-height:1.6}
   #unsupported h2{color:#c9ad68;margin:0 0 10px;font:20px Georgia,serif}
   #unsupported .detail{color:#8a8069;font-size:12px;margin:.4em 0 0}
   body.unsupported #viewport,body.unsupported #session-bar,body.unsupported .controls,body.unsupported #log{display:none}
   body.unsupported #unsupported{display:block}
-  body.phone main{width:auto;padding:16px}
-  body.phone h1{display:block}
   #unsupported button{margin-top:10px;padding:8px 16px;background:#100f0c;color:#c9ad68;border:1px solid #80622f;font:15px Georgia,serif}
 </style>
 <main>
@@ -99,6 +111,7 @@
     <p class="detail"><span data-field="browser"></span> · missing <span data-field="missing"></span></p>
     <p class="detail" data-field="runs-today">Runs today on <span data-field="supported"></span>.</p>
   </div>
+  <p id="rotate-notice">Turn your phone sideways to play</p>
   <div id="viewport"><canvas id="game" width="800" height="600" tabindex="0" aria-label="Diablo II game viewport"></canvas><pre id="hud"></pre><pre id="frontdoor-error" role="alert" aria-live="assertive" hidden></pre><div id="touch-overlay"></div></div>
   <div id="session-bar"><div id="session-status">starting engine…</div><label>Class <select id="class-select" disabled></select></label></div>
   <!-- The bindings the client ACTUALLY answers (F407): the shell's keydown handler plus CommandInput's
@@ -111,6 +124,7 @@
 <script type="module" src="gameplay-shell.mjs"></script>
 <script type="module" src="assets/input-controller.mjs"></script>
 <script type="module" src="assets/input-touch.mjs"></script>
+<script type="module" src="assets/phone-shell.mjs"></script>
 <!-- version-engine.sh rewrites this src into e/<hash>/ alongside the engine. -->
 <script src="streamfs.js"></script>
 <script>
@@ -139,23 +153,6 @@ function showUnsupported(info) {
   // issue 16's player layout drops the heading and the padding; this screen is prose and needs them.
   document.documentElement.classList.remove('playing');
   document.body.classList.add('unsupported');
-}
-// Phones are not supported yet: say so before anything heavy loads, with the page's link to send to a desktop.
-function showPhone(msg) {
-  const box = document.querySelector('#unsupported');
-  box.querySelector('h2').textContent = msg.title;
-  box.querySelector('[data-field=summary]').textContent = msg.summary;
-  box.querySelector('[data-field=advice]').textContent = msg.advice;
-  for (const el of box.querySelectorAll('.detail')) el.style.display = 'none';
-  const copy = document.createElement('button');
-  copy.type = 'button'; copy.textContent = 'Copy this link';
-  copy.onclick = async () => {
-    try { await navigator.clipboard.writeText(location.href); copy.textContent = 'Link copied'; }
-    catch { copy.textContent = location.href; }
-  };
-  box.append(copy);
-  document.documentElement.classList.remove('playing', 'fill');
-  document.body.classList.add('unsupported', 'phone');
 }
 // A boot that does not complete says so ON THE SCREEN (issue 3: "never a crash or
 // a blank page"). Two measured ways a player met a page that never finished instead:
@@ -213,17 +210,8 @@ function showBootFailure(why) {
     //                             streamfs read (the issue 9 Firefox mechanism -- a worker's fetch needs a
     //                             main thread this page never yields), which is what showBootFailure
     //                             below was written for.
-    const { probeCapabilities, unsupportedMessage, isPhone, PHONE_MESSAGE } = await import('./assets/platform-probe.mjs');
-    // A phone gets the "not yet" screen (`?unsupported=phone` forces it under the test runner, whose
-    // phone-emulating rows otherwise keep running the client).
-    const forcePhone = /[?&]unsupported=phone\b/.test(window.__d2Entry.search);
-    if (forcePhone || (!window.__d2Entry.test && isPhone())) {
-      showPhone(PHONE_MESSAGE);
-      window.__d2Platform = { phone: true };
-      window.__d2 = { ready: true, smoke: null, error: null };
-      log('unsupported: phone');
-      return;
-    }
+    // Phones take the same gate as desktop: Memory64 and cross-origin isolation decide, nothing else.
+    const { probeCapabilities, unsupportedMessage } = await import('./assets/platform-probe.mjs');
     const force = /[?&]unsupported=([\w,]+)/.exec(window.__d2Entry.search);
     const forced = force ? (force[1] === '1' ? ['isolated', 'memory64'] : force[1].split(',')) : [];
     const real = force ? probeCapabilities() : null;

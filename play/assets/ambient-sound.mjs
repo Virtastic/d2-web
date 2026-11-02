@@ -1,5 +1,6 @@
 import { decodeWav } from './wav.mjs';
 import { resolveLevelSoundEnvironment } from './act-music.mjs';
+import { unlockOnGesture } from './audio-unlock.mjs';
 import { retailSoundChannelVolume, sliderPercent } from './sound-channel-volume.mjs';
 
 const ROOTS = ['data\\global\\sfx\\', 'data\\local\\sfx\\'];
@@ -32,10 +33,11 @@ export function nextEventInterval(delay, rand) {
  * is a no-op, a different id (level or day/night change) stops the old loop first, so loops never stack.
  * `cycle` is the raw D2Common-10396 value (1..3 = night), read via ambientCycleOf(Module).
  */
-export function createAmbientSound(read, AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext, rand = Math.random, fetched = null) {
+export function createAmbientSound(read, AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext, rand = Math.random, fetched = null, gestureTarget = globalThis.window) {
   if (typeof read !== 'function') throw new TypeError('retail asset reader is required');
   if (!AudioContextClass) throw new Error('Web Audio is unavailable');
   const context = new AudioContextClass(), buffers = new Map();
+  unlockOnGesture(context, gestureTarget);   // the shared gesture unlock (a fresh context starts suspended)
   const gain = typeof context.createGain === 'function' ? context.createGain() : null;
   if (gain) gain.connect(context.destination);
   const out = gain ?? context.destination;

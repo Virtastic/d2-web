@@ -1,4 +1,5 @@
 import { decodeWav } from './wav.mjs';
+import { unlockOnGesture } from './audio-unlock.mjs';
 import { soundRowByHandle } from './unit-sound-resolver.mjs';
 import { sliderPercent, soundSourceGain } from './sound-channel-volume.mjs';
 
@@ -15,17 +16,6 @@ export const UI_BUTTON_CLICK = Object.freeze({
 const WORLD_ACTIONS = new Set(['world', 'corpse', 'warp', 'npc', 'object', 'weaponTab']); // weaponTab: D2Client +0x90F60 plays cursor_pass itself, not the button click
 export function isUiButtonClick(event) {
   return event?.button === 0 && event.defaultPrevented && !WORLD_ACTIONS.has(event.__d2ClickRecord?.spent);
-}
-
-// Match act-music: an AudioContext may only be resumed from a trusted browser
-// gesture.  Keep that policy at the edge rather than treating a test runner-made
-// event as if it were player input.
-function unlockOnGesture(context, target = globalThis.window) {
-  if (typeof target?.addEventListener !== 'function' || context.state !== 'suspended') return;
-  const controller = new AbortController();
-  const unlock = () => { context.resume().catch(() => {}); controller.abort(); };
-  const options = { signal: controller.signal, passive: true };
-  for (const type of ['pointerdown', 'keydown', 'touchstart', 'gamepadconnected']) target.addEventListener(type, unlock, options);
 }
 
 /** Play the retail button sound after the shell consumes a canvas click. */

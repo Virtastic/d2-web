@@ -1,3 +1,4 @@
+import { unlockOnGesture } from './audio-unlock.mjs';
 /**
  * Send the PCM blocks emitted by unbikit's Bink audio decoder to Web Audio. Bink audio is
  * interleaved by frame but returned as per-channel float blocks. Bink's packet `numSamples` field
@@ -26,30 +27,6 @@ export function makeBikAudioBuffer(context, track) {
     }
   }
   return buffer;
-}
-
-function unlockOnGesture(context, target, onRunning) {
-  if (typeof target?.addEventListener !== 'function' || context.state !== 'suspended') return;
-  const controller = new AbortController();
-  let resuming = false;
-  const unlock = () => {
-    if (resuming || context.state !== 'suspended') return;
-    resuming = true;
-    let resumed;
-    try { resumed = Promise.resolve(context.resume()); }
-    catch { resuming = false; return; }
-    resumed.then(() => {
-      resuming = false;
-      // Some browsers can resolve resume() without actually moving a suspended context to
-      // running. Keep the listener so a later qualifying gesture can retry.
-      if (context.state !== 'suspended') {
-        controller.abort();
-        if (context.state === 'running') onRunning();
-      }
-    }, () => { resuming = false; });
-  };
-  const options = { signal: controller.signal, passive: true };
-  for (const type of ['pointerdown', 'keydown', 'touchstart', 'gamepadconnected']) target.addEventListener(type, unlock, options);
 }
 
 export function createBikAudioPlayer(AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext,

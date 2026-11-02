@@ -160,7 +160,9 @@ let requestedDisplayResolution = videoResolutionSettings.selected ? videoResolut
 // The game always sizes to the viewport (D2GL's resolution model, ): the game view is the
 // window's own size in DEVICE pixels (CSS px x devicePixelRatio) divided by one whole-number scale S, so the
 // bitmap has the window's aspect and no bars/stretch, and the CSS fill is an exact S-times nearest upscale.
-// S keeps the world scale near retail's (game height ~600-1200): floor(deviceH/600), rounded on touch screens.
+// S keeps the world scale near retail's (game height ~600-1200): floor(deviceH/600). A touch screen gets
+// exactly retail's 600 rows (S = deviceH/600, fractional, smoothed): a whole-number S there either drops the
+// height under 600, where the panels and the control panel stop fitting, or doubles it and halves the text.
 // D2GL keeps a game size and a viewport offset/scale for mouse mapping; here the canvas rect is that mapping.
 // ?view=800 (and the dev page) keeps retail's fixed 800x600.
 let renderWireResize = null;   // set once RENDER_WIRE exists (it is declared after the first fitView call)
@@ -175,9 +177,11 @@ function fitView() {
     return;
   }
   const dpr = devicePixelRatio || 1, dw = Math.round(innerWidth * dpr), dh = Math.round(innerHeight * dpr);
-  const q = dh / 600, S = Math.max(1, matchMedia('(pointer: coarse)').matches ? Math.round(q) : Math.floor(q));
-  const w = Math.max(1, Math.floor(dw / S)), h = Math.max(1, Math.floor(dh / S));
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const S = touch ? dh / 600 : Math.max(1, Math.floor(dh / 600));
+  const w = Math.max(1, touch ? Math.round(dw / S) : Math.floor(dw / S)), h = touch ? 600 : Math.max(1, Math.floor(dh / S));
   window.__d2ViewScale = S;
+  canvas.style.imageRendering = Number.isInteger(S) ? '' : 'auto';   // a fractional upscale is smoothed, not uneven pixels
   if (canvas.width !== w) canvas.width = w;
   if (canvas.height !== h) canvas.height = h;
   window.Module?._d2_set_view_size?.(w, h);
@@ -2728,6 +2732,7 @@ function drainUnitSounds() {
   }
 }
 function update(forceTick = false, live = false) {
+  window.__d2TouchInput?.flush?.();   // a touch press whose landing window has closed goes down now
   charCreate = keepWhileOpen(screen === SCREEN.CREATE, charCreate);   // the create screen is rebuilt fresh each open
   drainUnitSounds();
   // The engine advances every tick, so last tick's advancement record is stale by definition.
