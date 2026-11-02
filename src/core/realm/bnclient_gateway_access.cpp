@@ -65,9 +65,11 @@ void bn_get_battlenet_gateway_list(uint32_t self,
     get_gateway_list(self, "Diablo II Battle.net gateways");
 }
 
+uint32_t bn_strtoul(const char* str, const char** end_ptr, int radix);
+
 // 1.13c BNClient+0x14BB0 BNGatewayAccess::GetGatewayList
 // Loads one registry-backed value (Storm #421 SRegLoadData) into an SMemAlloc'd buffer and parses its first
-// string as a decimal version. All six import/CRT callees are parameters; _strtoul is plain base-10 strtoul.
+// string as a decimal version. All six import/CRT callees are parameters; _strtoul is base-10 retail _strtoul (0x18AF), 32-bit, so the value goes through bn_strtoul.
 // A returning `terminate` falls through into the normal body, as retail's instruction stream does when `_exit`
 // is stubbed (retail itself never returns from it).
 constexpr uint32_t kGatewayMessageData = 0x1A813u;
@@ -101,9 +103,9 @@ void bn_get_gateway_list(
     access->gateway_list_value_18 = 0;
     if (access->gateway_buffer_ptr_10 != 0) {
         char* start = (char*)(uintptr_t)access->gateway_buffer_ptr_10;
-        char* end = start;
-        unsigned long value = std::strtoul(start, &end, 10);
-        access->gateway_list_value_18 = (uint32_t)value;
+        const char* end = start;
+        uint32_t value = bn_strtoul(start, &end, 10);   // retail _strtoul 0x18AF: 32-bit, negation wraps, overflow clamps
+        access->gateway_list_value_18 = value;
         if (end == start) access->gateway_list_value_18 = 0;
     }
 }
@@ -158,7 +160,6 @@ void bn_gateway_load(uint32_t self, const BnetGatewayHost& host);
 void bn_gateway_update_from_ini(uint32_t self, const char* data, const BnetGatewayHost& host);
 int32_t bn_strnicmp(const char* str1, const char* str2, uint32_t max_count);
 int32_t bn_strtol(const char* str, char** end_ptr, int32_t radix);
-uint32_t bn_strtoul(const char* str, const char** end_ptr, int radix);
 
 namespace {
 
