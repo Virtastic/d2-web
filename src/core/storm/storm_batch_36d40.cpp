@@ -9,32 +9,41 @@
 #include <cstring>
 #include <Windows.h>
 
+// ---- real ports this file binds to (global scope; each keeps its own file) ----
+extern "C" int32_t Storm_Sub1B960(void* p, const char* tag, int32_t line);   // storm_alloc_1b960.cpp (SMemFree)
+extern "C" void*   Storm_Sub1C580(uint32_t size, const char* tag, int32_t line, uint32_t flags);  // same file (SMemAlloc)
+void Storm_Sub4D60(uint8_t* node);                                 // storm_batch_b47.cpp (list unlink)
+extern "C" void storm_port_1090(uint32_t* r);                      // gfx/storm_batch_1000.cpp: r[0] = node, Storm+0x1090 (SCODE release)
+void Storm_Sub2FB30(const char* name, const char* detail);         // storm_2fb30.cpp (handle-leak report)
+CRITICAL_SECTION* Storm_StreamLockCS();                            // storm_batch_34110.cpp: AUSTREAM lock, 0x6FC45858
+void Storm_SetError45388(uint32_t e);                              // storm_batch_26e20.cpp: last error 0x6FC45388 + SetLastError
+uint32_t*         Storm_StreamTailWord();                          // storm_batch_34110.cpp: AUSTREAM tail, 0x6FC45878
+
 namespace storm_b36d40 {
 
-// ---- seams (retail callee / global, argument order) ----
-void  Storm_Free(void* p, const char* tag, int32_t line);          // 0x0B960
-void  Storm_Sub4D60(void* p);                                      // 0x04D60
-void  Storm_Sub1FB30(const char* name, const char* arg);           // 0x1FB30
-void  Storm_Sub1090(void* p);                                      // 0x01090
-void* Storm_Alloc(uint32_t n, const char* file, int32_t line, uint32_t flags);  // 0x0C580
+// ---- seams (retail callee / global, argument order), bound to the ports above ----
+inline void Storm_Free(void* p, const char* tag, int32_t line) { (void)Storm_Sub1B960(p, tag, line); }  // 0x0B960
+inline void Storm_Sub4D60(void* p) { ::Storm_Sub4D60((uint8_t*)p); }                                  // 0x04D60
+inline void Storm_Sub1FB30(const char* name, const char* arg) { ::Storm_Sub2FB30(name, arg); }        // 0x2FB30
+inline void Storm_Sub1090(void* p) { uint32_t r[5] = {(uint32_t)(uintptr_t)p, 0, 0, 0, 0}; storm_port_1090(r); }  // 0x01090
+inline void* Storm_Alloc(uint32_t n, const char* file, int32_t line, uint32_t flags) { return Storm_Sub1C580(n, file, line, flags); }  // 0x0C580
 void  Storm_Sub21C40(uint8_t* a, int32_t b, const uint8_t* c, uint8_t* d, uint32_t w, uint32_t e, uint32_t bpp);
 void  Storm_Sub21FF0(uint32_t ecx, void* dst, const void* src, int32_t h, uint32_t stride, uint32_t w);
 int32_t Storm_Sub22690(const uint8_t* esi);
 int32_t Storm_Sub225C0(const uint8_t* esi, const uint8_t* p, int32_t n, void* pal);
 int32_t Storm_Sub222F0(const uint8_t* p, const uint8_t* esi, int32_t n, uint8_t* out);
 uint32_t Storm_Sub22D50(const void* src, void* dst);
-extern int32_t* g_trans_list;       // 0x6FC458B8
-extern uint32_t g_trans_a;          // 0x6FC45364
-extern int32_t  g_trans_b;          // 0x6FC45368
-extern uint32_t g_trans_c;          // 0x6FC45360
-extern int32_t  g_stream_list;      // 0x6FC45878
-extern CRITICAL_SECTION g_stream_cs;// 0x6FC45858
-extern int32_t  g_lastError;        // 0x6FC45388
+// Transport globals (STRANS): no port writes them yet, so they read as zero (the list is empty).
+int32_t* g_trans_list = nullptr;    // 0x6FC458B8 head of the HSTRANS list
+uint32_t g_trans_a = 0;             // 0x6FC45364
+int32_t  g_trans_b = 0;             // 0x6FC45368
+uint32_t g_trans_c = 0;             // 0x6FC45360
+static int32_t streamList() { return (int32_t)*Storm_StreamTailWord(); }   // 0x6FC45878
 
 static uint32_t rd32(const void* p, uintptr_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
 static uint16_t rd16(const void* p, uintptr_t o) { uint16_t v; std::memcpy(&v, (const uint8_t*)p + o, 2); return v; }
 static void wr16(uint8_t* p, uintptr_t o, uint16_t v) { std::memcpy(p + o, &v, 2); }
-static void setErr(int32_t e) { g_lastError = e; SetLastError(e); }
+static void setErr(int32_t e) { Storm_SetError45388((uint32_t)e); }   // 0x6FC45388 + SetLastError
 
 static const char* kTrans = "..\\3rdParty\\STORM\\SOURCE\\STRANS.CPP";
 static const char* kBlt = "..\\3rdParty\\STORM\\SOURCE\\SBLT.CPP";
@@ -61,10 +70,10 @@ int32_t Storm_Sub36D40(void) {
 }
 
 static void freeStream(void* s) {
-  EnterCriticalSection(&g_stream_cs);
+  EnterCriticalSection(Storm_StreamLockCS());
   Storm_Sub1090(s);
   Storm_Free(s, "AUSTREAM", -2);
-  LeaveCriticalSection(&g_stream_cs);
+  LeaveCriticalSection(Storm_StreamLockCS());
 }
 
 // 1.13c Storm+0x38130
@@ -88,13 +97,13 @@ void Storm_Sub38130(uint8_t* obj) {
 
 // 1.13c Storm+0x38F90
 int32_t Storm_Sub38F90(void) {
-  EnterCriticalSection(&g_stream_cs);
-  while (g_stream_list > 0) {
+  EnterCriticalSection(Storm_StreamLockCS());
+  while (streamList() > 0) {
     Storm_Sub1FB30("HSCODESTREAM", nullptr);
-    void* s = (void*)(uintptr_t)g_stream_list;  // (n<1 ? 0 : n) & n == n here
+    void* s = (void*)(uintptr_t)streamList();  // (n<1 ? 0 : n) & n == n here
     freeStream(s);
   }
-  LeaveCriticalSection(&g_stream_cs);
+  LeaveCriticalSection(Storm_StreamLockCS());
   return 1;
 }
 

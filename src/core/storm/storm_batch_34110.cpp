@@ -102,6 +102,11 @@ struct SFileImage {
 
 } // namespace
 
+// Seams for storm_batch_36d40.cpp: the AUSTREAM lock (0x6FC45858) and the list tail word (0x6FC45878, the
+// g_streamAnchor sentinel's prev link). Owned here; the release path there reads them through these.
+CRITICAL_SECTION* Storm_StreamLockCS() { return &g_streamLock; }
+uint32_t*         Storm_StreamTailWord() { return &g_streamAnchor[1]; }
+
 // 1.13c Storm+0x34110: unregister the four SEVT commands for key param_1; always 1.
 extern "C"
 uint32_t Storm_Sub34110(uint32_t param_1, const StormBatch34110Env* env) {
