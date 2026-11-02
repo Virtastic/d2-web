@@ -52,6 +52,11 @@ struct D2WinB64Env {
 D2WinB64Env g_d2winB64{};  // zeroed seams; a probe or the client fills the ones it reaches
 #define E g_d2winB64
 
+// FN probe seam (src/core/fn/d2win_f240.cpp): the probe points the two palette callees at its recorders.
+extern "C" void d2win_b64_set_pl2_seams(void (*loadPl2)(const char*), void (*applyPalette)(void)) {
+    E.loadPl2 = loadPl2; E.applyPalette = applyPalette;
+}
+
 // 1.13c D2Win+0x0F240
 uint32_t d2win_load_palette_pl2(int32_t mode, const char* path) {
     char a[260], b[260];
