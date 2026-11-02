@@ -185,6 +185,6 @@ EMSCRIPTEN_KEEPALIVE i32 d2c_5f9f0(const D2cF9F0G* g, i32 (*f108d0)(i32)) {
     if (g->c1b0 != 1) { *g->c230 = g->bc48; *g->c228 = -16; *g->c22c = -16; *g->c234 = g->bc4c; return -16; }
     *g->c228 = *g->c23c - 8; *g->c230 = g->bc48 / 3 + *g->c23c;
     *g->c22c = *g->c238; *g->c234 = g->bc4c / 3 + *g->c238;
-    return (i32)(((int64_t)g->bc4c * 0x55555556) >> 32);
+    return (i32)((u32)g->bc4c * 0x55555556u);   // retail leaves the low word of the multiply in eax
 }
 }
