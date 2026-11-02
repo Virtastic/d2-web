@@ -116,7 +116,7 @@ extern "C" int32_t D2Common_2A210_InventoryRepairCount(const D2Common2A210Env* e
 
 // D2Common 0x22880 (#10081): items.txt row nItemId, byte +0x13E (nGemApplyType).
 // Out of range is fatal in retail (_exit).
-uint32_t D2Common_22880_ItemGemApplyType(uint32_t nItemId)
+extern "C" uint32_t D2Common_22880_ItemGemApplyType(uint32_t nItemId)
 {
     static_assert(offsetof(D2ItemsTxt, nGemApplyType) == 0x13E, "items.txt nGemApplyType");
     const D2ItemsTxt* pRow = DATATBLS_GetItemsTxtRecord(static_cast<int32_t>(nItemId));
