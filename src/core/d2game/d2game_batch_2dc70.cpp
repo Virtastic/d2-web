@@ -130,7 +130,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_2dc70(uint32_t clientId, const D2GameBatch7Env
         env->strCopy(name, (const uint8_t*)client + 0x34, 0x10);          // Storm #501
 
         env->removeClient(game, killed ? 0u : 1u, 0u);   // 0x4B7F0(game, !killed); flag arg unrendered
-        if (id != 0) env->terminateName(info);           // 0xCBDB0, buffer in EAX
+        if (clientId != 0) env->terminateName(info);     // 0xCBDB0; tests the original param_1, not the loop id
 
         if (!killed) break;
         client = rdptr(game, 0x88);

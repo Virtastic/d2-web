@@ -386,7 +386,8 @@ int32_t D2GAME_SAVE_WriteFileOnRealm_113c(void* game, void* player, const char* 
 int32_t GAME_VerifyJoinGame_113c(int32_t clientId, uint16_t gameId, uint8_t playerClass,
                                  const char* clientName, int32_t tokenId, char* accountName,
                                  int32_t* outCharSaveTransactionToken, uint8_t locale,
-                                 int32_t* a9, int32_t* a10, const Batch5Env* env)
+                                 int32_t* a9, int32_t* a10, int32_t* a11, int32_t* a12,
+                                 const Batch5Env* env)
 {
     if (!nameFits15(clientName)) return 0;
     if (locale >= 13) return 0;
@@ -400,9 +401,11 @@ int32_t GAME_VerifyJoinGame_113c(int32_t clientId, uint16_t gameId, uint8_t play
 
     if (env->callbackTable == nullptr) return 1;
     if (env->isBadCodePtr(env->callbackTable[6 /* +0x18 pfFindPlayerToken */]) != 0) fatal(0x714);
-    typedef int32_t (*TokenFn)(const char*, int32_t, uint16_t, char*, int32_t*, int32_t*, int32_t*);
+    // name/tokenId travel in ECX/EDX (Ghidra drops them); the stack carries gameId..a12.
+    typedef int32_t (*TokenFn)(const char*, int32_t, uint16_t, char*, int32_t*, int32_t*, int32_t*,
+                               int32_t*, int32_t*);
     return ((TokenFn)env->callbackTable[6])(clientName, tokenId, gameId, accountName,
-                                            outCharSaveTransactionToken, a9, a10) ? 1 : 0;
+                                            outCharSaveTransactionToken, a9, a10, a11, a12) ? 1 : 0;
 }
 
 // 1.13c D2Game+0x2A850

@@ -197,7 +197,7 @@ void GAME_CloseAllGames(const D2GameBatchEnv* env)
                 if ((rd8(client, 0x3D4) & 1) == 0 && rd32(client, 0x5D * 4) != 0 &&
                     env->getServerUnit(rd32(client, 0x6A * 4), rd32(client, 0x5C * 4), 0) == 0)
                     wr32(client, 0x5D * 4, 0);
-                env->gameSweep(game);                                    // 0x74320
+                env->gameSweep(game);                                    // 0x54320
                 env->clientFlush(client);                                // 0x2D790
                 env->send(1, rd32(client, 0), &local_d, 1);              // Ordinal 10002
                 env->removeClient(game, 0, 0);                           // 0x4B7F0(game, 0)
