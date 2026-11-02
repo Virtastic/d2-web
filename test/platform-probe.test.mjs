@@ -252,7 +252,14 @@ test('an Android WebView browser is told to open the address in Chrome, not to f
     assert.doesNotMatch(info.text, /served without/);
   }
   assert.equal(describeBrowser('Mozilla/5.0 (Linux; Android 14) Version/4.0 Chrome/130.0.0.0 Mobile DuckDuckGo/5 Safari/537.36'), 'DuckDuckGo');
-  // Chrome itself on Android is not a WebView and keeps the host-fault text.
-  const chrome = unsupportedMessage(caps, 'Mozilla/5.0 (Linux; Android 14; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36');
+  // A Chrome-identical user agent on Android may be an in-app browser (DuckDuckGo sends one, seen on a
+  // phone), so the screen names that case first and keeps the header cause for Chrome itself.
+  const chrome = unsupportedMessage(caps, 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Mobile Safari/537.36');
+  assert.match(chrome.text, /DuckDuckGo/);
+  assert.match(chrome.advice, /open the same address in Chrome/);
   assert.match(chrome.text, /served without/);
+  // A desktop browser keeps the plain host-fault text.
+  const desktop = unsupportedMessage(caps, 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36');
+  assert.doesNotMatch(desktop.text, /DuckDuckGo/);
+  assert.match(desktop.text, /served without/);
 });

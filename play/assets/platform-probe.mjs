@@ -154,6 +154,17 @@ export function unsupportedMessage(caps, ua = (typeof navigator !== 'undefined' 
         + `same address in Chrome, Edge, Firefox or Samsung Internet.`;
       return { browser, missing, cause, supportedBrowsers: '', summary, advice, text: `${summary} ${advice}` };
     }
+    // Some in-app browsers (DuckDuckGo's among them) send a user agent identical to Chrome's, so on
+    // Android the page cannot tell them apart. Name that case first: it is far more common than a
+    // server that drops the headers.
+    if (/Android/.test(ua)) {
+      const summary = `This browser cannot start the game on this phone.`;
+      const advice = `DuckDuckGo and the browsers built into other apps never make a page cross-origin `
+        + `isolated, whatever the server sends, and the engine needs that for SharedArrayBuffer. If this is `
+        + `one of them, open the same address in Chrome, Edge, Firefox or Samsung Internet. If this already `
+        + `is Chrome, the page was served without the COOP/COEP headers the engine requires.`;
+      return { browser, missing, cause, supportedBrowsers: '', summary, advice, text: `${summary} ${advice}` };
+    }
     const summary = `This page is not cross-origin isolated, so the game cannot start.`;
     const advice = `${browser} supports what the game needs -- the page was served without the `
       + `COOP/COEP headers the engine requires for SharedArrayBuffer. Open it from a server that `
