@@ -40,6 +40,12 @@ export const SUPPORTED_BROWSERS =
   ` -- not Safari or any iPhone/iPad browser yet (iOS is waiting on WebKit for 64-bit WebAssembly)`;
 
 /** Every browser on iPhone, iPad or iPod is WebKit underneath, so one missing feature covers them all. */
+/** An Android WebView page: its standard `; wv)` token, its `Version/4.0 Chrome/` pair, or DuckDuckGo's own token. */
+export function isAndroidWebView(ua) {
+  ua = String(ua || '');
+  return /Android/.test(ua) && (/; wv\)/.test(ua) || /Version\/4\.0 Chrome\//.test(ua) || /DuckDuckGo\//.test(ua));
+}
+
 export function isIOS(ua) {
   return /iPad|iPhone|iPod/.test(String(ua || ''));
 }
@@ -89,6 +95,7 @@ export function describeBrowser(ua) {
   if (/OPR\//.test(ua)) return 'Opera';
   if (/SamsungBrowser\//.test(ua)) return 'Samsung Internet';
   if (/Firefox\//.test(ua)) return 'Firefox';
+  if (/DuckDuckGo\//.test(ua)) return 'DuckDuckGo';
   if (/Chrome\//.test(ua)) return 'Chrome';
   if (/Version\/.*Safari\//.test(ua)) return 'Safari';
   return 'This browser';
@@ -135,6 +142,16 @@ export function unsupportedMessage(caps, ua = (typeof navigator !== 'undefined' 
         + `is available only on HTTPS or localhost, and the COOP/COEP headers cannot change that. Open `
         + `it from an HTTPS host (this repo's play/serve.mjs does with D2_TLS_DIR) or from localhost, `
         + `and reload.`;
+      return { browser, missing, cause, supportedBrowsers: '', summary, advice, text: `${summary} ${advice}` };
+    }
+    // An Android in-app browser (DuckDuckGo, and every app that shows pages in a WebView) is never
+    // cross-origin isolated: the WebView ignores COOP, so the headers the host sent cannot help, and
+    // telling the person to fix the server sends them to the one thing that is already right.
+    if (isAndroidWebView(ua)) {
+      const summary = `${browser} cannot start the game on this phone.`;
+      const advice = `${browser} shows pages in Android's WebView, which never makes a page cross-origin `
+        + `isolated, whatever the server sends -- and the engine needs that for SharedArrayBuffer. Open the `
+        + `same address in Chrome, Edge, Firefox or Samsung Internet.`;
       return { browser, missing, cause, supportedBrowsers: '', summary, advice, text: `${summary} ${advice}` };
     }
     const summary = `This page is not cross-origin isolated, so the game cannot start.`;

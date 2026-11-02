@@ -237,3 +237,22 @@ test('the phone block is gone from the probe module and the page: no isPhone, no
   const src = readFileSync(new URL('../play/assets/platform-probe.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(src, /isPhone|PHONE_MESSAGE|Not on mobile/);
 });
+
+// An Android in-app browser is never cross-origin isolated (the WebView ignores COOP), so the host is
+// not at fault and the screen must not tell the person to fix the server; it names a browser to use.
+test('an Android WebView browser is told to open the address in Chrome, not to fix the server', () => {
+  const caps = { crossOriginIsolated: false, memory64: true, secureContext: true, supported: false };
+  for (const ua of [
+    'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.0.0 Mobile DuckDuckGo/5 Safari/537.36',
+    'Mozilla/5.0 (Linux; Android 14; K; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.0.0 Mobile Safari/537.36',
+  ]) {
+    const info = unsupportedMessage(caps, ua);
+    assert.match(info.text, /WebView/);
+    assert.match(info.advice, /Open the same address in Chrome/);
+    assert.doesNotMatch(info.text, /served without/);
+  }
+  assert.equal(describeBrowser('Mozilla/5.0 (Linux; Android 14) Version/4.0 Chrome/130.0.0.0 Mobile DuckDuckGo/5 Safari/537.36'), 'DuckDuckGo');
+  // Chrome itself on Android is not a WebView and keeps the host-fault text.
+  const chrome = unsupportedMessage(caps, 'Mozilla/5.0 (Linux; Android 14; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36');
+  assert.match(chrome.text, /served without/);
+});

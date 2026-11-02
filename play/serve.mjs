@@ -10,10 +10,23 @@
 // version-engine.sh never rewrites the tracked play/index.html.
 import { createServer as createHttp } from 'node:http';
 import { createServer as createHttps } from 'node:https';
+import { createServer as createNet } from 'node:net';
 import { readFileSync } from 'node:fs';
 // D2_TLS_DIR=<dir with key.pem + cert.pem> serves HTTPS (a secure context, so the game can be cross-origin isolated from a LAN address).
 const TLS = process.env.D2_TLS_DIR ? { key: readFileSync(join(process.env.D2_TLS_DIR, 'key.pem')), cert: readFileSync(join(process.env.D2_TLS_DIR, 'cert.pem')) } : null;
-const createServer = (h) => TLS ? createHttps(TLS, h) : createHttp(h);
+// With TLS, a plain-http request on the same port (an address typed without https://) gets a redirect
+// to https instead of an empty reply, which phone browsers report as a connection failure.
+const createServer = (h) => {
+  if (!TLS) return createHttp(h);
+  const secure = createHttps(TLS, h);
+  const plain = createHttp((req, res) => { res.writeHead(301, { Location: `https://${req.headers.host || 'localhost'}${req.url}` }); res.end(); });
+  return createNet((s) => s.once('readable', () => {
+    const b = s.read(1);
+    if (!b) return s.destroy();
+    s.unshift(b);
+    (b[0] === 0x16 ? secure : plain).emit('connection', s);
+  }));
+};
 import { createReadStream, statSync, existsSync } from 'node:fs';
 import { join, extname, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -97,4 +110,4 @@ createServer((req, res) => {
   res.writeHead(200, h);
   if (req.method === 'HEAD') return res.end();
   createReadStream(file).pipe(res);
-}).listen(PORT, process.env.D2_BIND || '127.0.0.1', () => console.log(`play/ on http://${process.env.D2_BIND || '127.0.0.1'}:${PORT}/`));
+}).listen(PORT, process.env.D2_BIND || '127.0.0.1', () => console.log(`play/ on ${TLS ? 'https' : 'http'}://${process.env.D2_BIND || '127.0.0.1'}:${PORT}/`));
