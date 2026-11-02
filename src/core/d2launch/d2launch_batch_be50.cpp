@@ -1,5 +1,6 @@
 // D2Launch batch be50: BE50 BEB0 C3F0 C430 CB00 (CharSel/realm list). Register-passed args shown as explicit params.
 #include <cstdint>
+#include <cstddef>
 #include <cstring>
 
 __attribute__((weak)) extern void* Ordinal_10042(int32_t size, int32_t);
@@ -9,7 +10,7 @@ __attribute__((weak)) extern void Ordinal_10172(int32_t, int32_t);
 __attribute__((weak)) extern void Ordinal_10093(void);
 __attribute__((weak)) extern int32_t Ordinal_10003(void);
 __attribute__((weak)) extern int32_t Ordinal_10227(void);
-__attribute__((weak)) extern int32_t Ordinal_509(void);
+int32_t SStrCmpI(const char* a, const char* b, size_t n);  // Storm #509 (src/core/d2moo/compat/stubs.cpp)
 __attribute__((weak)) extern int32_t Ordinal_422(const char*, const char*, int32_t, void*, int32_t);
 __attribute__((weak)) extern void Ordinal_425(const char*, const char*, int32_t, void*);
 __attribute__((weak)) extern void Ordinal_501(void*, const char*, int32_t);
@@ -42,8 +43,8 @@ __attribute__((weak)) extern uint8_t* DAT_6fa65abc;
 __attribute__((weak)) extern uint8_t* DAT_6fa656c4;
 __attribute__((weak)) extern uint8_t* DAT_6fa65ec8;
 
-// 1.13c D2Launch+0xBE50
-int32_t d2l_be50_FUN_6fa4be50(void) {
+// 1.13c D2Launch+0xBE50  (name in EDI; each table entry's first dword is a string pointer)
+int32_t d2l_be50_FUN_6fa4be50(const char* name) {
   for (int32_t i = 0;; i++) {
     int32_t v = 0;
     if (i < DAT_6fa65e78) {
@@ -52,7 +53,7 @@ int32_t d2l_be50_FUN_6fa4be50(void) {
       v = *p;
     }
     if (!v) return 0;
-    if (Ordinal_509() == 0) return 1;
+    if (SStrCmpI(name, (const char*)(intptr_t)v, 0x7fffffff) == 0) return 1;
   }
 }
 
@@ -129,11 +130,11 @@ int32_t d2l_c430_FUN_6fa4c430(void) {
   Ordinal_10003();
   FUN_6fa52b10();
   Ordinal_10000();
-  if (!Ordinal_422("Diablo II", "Preferred Realm", 0, DAT_6fa65758, 0x100) || !d2l_be50_FUN_6fa4be50()) {
+  if (!Ordinal_422("Diablo II", "Preferred Realm", 0, DAT_6fa65758, 0x100) || !d2l_be50_FUN_6fa4be50((const char*)DAT_6fa65758)) {
     int32_t g = (*(int32_t (**)(void))(DAT_6fa656c4 + 0x98))();
     Ordinal_501(DAT_6fa65758, BNGatewayAccess_Realm(g), 0x7fffffff);
     Ordinal_425("Diablo II", "Preferred Realm", 0, DAT_6fa65758);
-    if (!d2l_be50_FUN_6fa4be50()) {
+    if (!d2l_be50_FUN_6fa4be50((const char*)DAT_6fa65758)) {
       Ordinal_501(DAT_6fa65758, (const char*)(intptr_t)FUN_6fa4b5b0(), 0x7fffffff);
       Ordinal_425("Diablo II", "Preferred Realm", 0, DAT_6fa65758);
     }

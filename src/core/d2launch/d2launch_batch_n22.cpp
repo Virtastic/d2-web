@@ -166,25 +166,10 @@ long n22_atol(const char* s, bool (*isspace_)(uint8_t)) {
     return first == '-' ? -v : v;
 }
 
-// UI-side seams (ordinals / FUN_ callees)
-struct N22Ui {
-    void (*Ord10089)(); void (*Ord10124)();               // 0x9A3C, 0x99FA
-    void (*Ord10147)(); void (*Ord10106)(); void (*Ord10022)(int);
-    int (*Ord502)(); void (*Ord10003_fn)(); int (*Ord10227)();
-    void (*ae60)(); void (*a8c0)(); void (*b600)(); void (*bda0)(); void (*c3f0)(); void (*cc50)();
-    void (*cb00)(const char*, int); void (*fn5090)(const void*, void (*)(), int); void (*fn7df0)();
-    void (*ord10003_str)(void** out);
-    uint32_t (*GetTickCount)();
-    int32_t (*gate68)();                                  // (*(DAT_6fa656c4+0x68))()
-    int32_t* dat_ec4; int32_t* dat_eb8; int32_t* dat_ebc; int32_t* dat_ee4; int32_t* dat_ad4;
-    int32_t* list_ef4;                                    // DAT_6fa65ef4 chain head (nodes of 4 ints)
-    void (*ordinal_10182)(int, int, int); int32_t* dat_ab0; int32_t* dat_ed0; int32_t* dat_db0;
-    int32_t* dat_ed4; int32_t* dat_dbc; int32_t* dat_710; int32_t* dat_ec8;
-    void (*ordinal_10131)();
-};
+#include "d2launch_n22_ui.h"
 
-// 1.13c D2Launch+0x9BD0
-void n22_9BD0(N22Ui* u) { u->Ord10089(); u->Ord10124(); }
+// 1.13c D2Launch+0x9BD0  (stdcall, one stack word; ret 4)
+void n22_9BD0(N22Ui* u, int32_t a) { int32_t v = u->Ord10089(*u->dat_aa0) + a; u->Ord10124(*u->dat_aa0, v); }
 
 // Selector in EAX 0..6 (else default); each arm: Unicode::strcpy(dst, Ordinal_10003()) via the host seam.
 // 1.13c D2Launch+0x9E40
