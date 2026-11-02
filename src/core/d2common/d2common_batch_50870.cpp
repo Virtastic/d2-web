@@ -214,7 +214,8 @@ extern "C" int32_t D2Common_39CE0_ResolveStatDependencies(uint32_t pOwner, uint3
                     (i32(ptr(unit), 0) == 0 || i32(ptr(unit), 0) == 1) &&
                     readStat(unit, stat) > 0) clearKeep = true;
             } else if (mode == 6 || mode == 7) {
-                clearKeep = i32(ptr(pOwner), 8) == 1;
+                // retail: owner mode 0 falls through to the default (clear); mode 1 clears too
+                clearKeep = i32(ptr(pOwner), 8) == 0 || i32(ptr(pOwner), 8) == 1;
             } else if (mode == 13) {
                 clearKeep = i32(ptr(pOwner), 8) == 4;
             }

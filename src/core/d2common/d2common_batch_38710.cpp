@@ -25,9 +25,10 @@ void* retailPointer(const void* p, size_t offset, RetailPointerResolver resolve)
 }
 }
 
-// 1.13c D2Common+0x38710
-void D2Common_38710_ForwardRoomSelection(void* room, uint32_t flags, int mode,
+// 1.13c D2Common+0x38710: (ignored, flags, room, mode) forwarded to 382F0 as (room, flags, mode).
+void D2Common_38710_ForwardRoomSelection(void* ignored, uint32_t flags, void* room, int mode,
                                           void (*select)(void*, uint32_t, int)) {
+    (void)ignored;
     select(room, flags, mode);
 }
 
