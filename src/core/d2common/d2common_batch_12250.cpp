@@ -97,7 +97,7 @@ extern "C" uint32_t D2Common_3B3A0_ValidateUnitIds(uint32_t room) {
  for (uint32_t i=0;i<count;i++) if (!w(a,i*4)) return 0;
  return 1;
 }
-// 1.13c D2Common+0x3CF30: stable insertion sort of 12-byte records; compare 6-byte keys.
+// 1.13c D2Common+0x3CF30: stable insertion sort of 12-byte records; retail calls compare(ecx=earlier record, edx=moving record) and shifts while it is positive.
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3cf30(uint32_t records, uint32_t count,
  int32_t (*compare)(uintptr_t,uintptr_t)) {
  if (!records || !compare) return;
@@ -105,7 +105,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3cf30(uint32_t records, uint32_t count,
  for (uint32_t i=1;i<count;i++) {
   std::memcpy(saved,p(records+i*12),12);
   uint32_t j=i;
-  while (j && compare(reinterpret_cast<uintptr_t>(saved),records+(j-1)*12)>0) {
+  while (j && compare(records+(j-1)*12,reinterpret_cast<uintptr_t>(saved))>0) {
    std::memmove(p(records+j*12),p(records+(j-1)*12),12); --j;
   }
   std::memcpy(p(records+j*12),saved,12);

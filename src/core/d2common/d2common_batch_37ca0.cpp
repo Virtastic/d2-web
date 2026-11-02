@@ -313,7 +313,10 @@ static uint32_t d2_26ad0_MaxSockets(const int32_t* pUnit, uint8_t* pData)
 		d.dwItemLevel = W(pData, 0x2c);
 		u.pItemData = &d;
 	}
-	return d2_ours_d2common_24610(&u);
+	const uint32_t nMax = d2_ours_d2common_24610(&u);
+	if (pData)
+		W(pData, 0x2c) = static_cast<uint32_t>(d.dwItemLevel);   // 0x23810 raises a level below 1 to 1 in the real item data
+	return nMax;
 }
 extern "C"
 EMSCRIPTEN_KEEPALIVE bool D2Common_26AD0_ItemAcceptable(int32_t* pUnit)

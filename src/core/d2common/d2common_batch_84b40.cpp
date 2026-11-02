@@ -40,9 +40,10 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2GetDropRoom(int32_t nMonsterId, uint32_t nCompon
 	if (nChoice >= pRow->nComponentChoiceCounts[nComponent]) return 0;
 
 	const uint32_t nIndex = ((const uint8_t*)&pRow->unk0x26[nComponent])[nChoice];
-	if ((int32_t)nIndex >= g_d2common_dat_6fdeff5c) return 0;
-	if (!g_d2common_dat_6fdeff54) return 0;
-	return g_d2common_dat_6fdeff54[nIndex];
+	// DAT_6fdeff54/5c in 1.13c are the compcode table the loader fills (sgptDataTables->pCompCodeTxt and its count).
+	if ((int32_t)nIndex >= sgptDataTables->nCompCodeTxtRecordCount) return 0;
+	if (!sgptDataTables->pCompCodeTxt) return 0;
+	return sgptDataTables->pCompCodeTxt[nIndex].dwCode;
 }
 
 namespace
