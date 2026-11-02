@@ -19,7 +19,7 @@ probe_objs_blamed_on_engine() {
   nm=${D2_NM:-$(command -v emnm || command -v llvm-nm || echo nm)}
   eng=$(sed -nE 's/^wasm-ld: error: ([^ ]+\.o): .*/\1/p' "$1" | xargs -r -n1 basename | grep -v '^src_core_fn_' | sort -u)
   [ -n "$eng" ] || return 0
-  defs=$(for b in $eng; do for o in $OBJS; do [ "$(basename "$o")" = "$b" ] && $nm -j --defined-only "$o" 2>/dev/null; done; done | sort -u)
+  defs=$(for b in $eng; do for o in $OBJS; do [ "$(basename "$o")" = "$b" ] && $nm -j -g --defined-only "$o" 2>/dev/null; done; done | sort -u)
   [ -n "$defs" ] || return 0
   for o in $OBJS; do
     case "$(basename "$o")" in src_core_fn_*) ;; *) continue ;; esac
