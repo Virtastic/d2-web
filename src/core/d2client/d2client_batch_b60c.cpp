@@ -54,7 +54,7 @@ EMSCRIPTEN_KEEPALIVE i32 d2c_88350(const float* src, uint8_t* dst, float lo, flo
     if (lo < x) { a = x; if (hi <= x) a = hi; }
     float y = src[1], b = lo;
     if (y > lo) b = (hi <= y) ? hi : y;
-    float r = a * a + b * b;
+    float r = (float)((double)a * a + (double)b * b);   // retail sums on the x87 stack and rounds once on the store
     memcpy(dst + 0x18, &r, 4);
     return 1;
 }

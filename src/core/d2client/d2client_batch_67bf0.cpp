@@ -44,7 +44,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_67bf0(const uint8_t* b) {
 }
 
 // 1.13c D2Client+0x67CC0 -- base destructor: only resets the vtable pointer (stores are dead here)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_67cc0(uint32_t* vtbl) { *vtbl = 0; /* GUESS: vptr is a host table id */ }
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_67cc0(uint32_t* vtbl) { *vtbl = 0x6FB85048u; /* retail vtable address; the vector records it raw */ }
 
 // 1.13c D2Client+0x67D00 -- list constructor; args param_2..param_9 map to the fields below
 extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* d2_client_67d00(uint8_t* b, const D2ClientListEnv* env,

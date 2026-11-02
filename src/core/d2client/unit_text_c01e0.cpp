@@ -8,7 +8,7 @@ struct ClientC01E0Env {
 };
 extern "C" uint32_t d2_client_c01e0(const uint32_t* unit, uint16_t* buf, const uint8_t* itemData, ClientC01E0Env& e) {
     if (e.viewMode == 3 || e.flag9721) return 0;
-    *e.clearWord = 0;
+    *(uint16_t*)e.clearWord = 0;   // retail clears one WORD (mov word ptr), the high word survives
     if (!unit || unit[0] != 1 || !itemData || !(itemData[0x16] & 0x18)) return 0;
     e.build(unit, buf, 0x100);
     return 1;

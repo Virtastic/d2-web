@@ -134,7 +134,7 @@ I hitTest_64080(I mx,I scrH,const I*hdr,const B*ents,I(*pred)(const B*e)){
  return -1;
 }
 
-// 1.13c D2Client+0x64110  (ECX = obj). scale = D2Client+0x13620(EAX=100, ECX=0, EDX=obj) (x87; caller-supplied);
+// 1.13c D2Client+0x64110  (ECX = obj). scale = D2Client+0x63620(EAX=100, ECX=0, EDX=obj) (x87; caller-supplied);
 // then D2gfx#10068(ECX=0xb, EDX=obj[0x124]) and D2gfx#10034(0).
 void contrast_64110(const Imp&f,const B*o,U(*f13620)(U,U,const B*),void(*o10068)(U,U),void(*o10034)(U)){
  f.ini("Diablo II","Contrast",0,f13620(100,0,o)); o10068(0xb,rd32(o,0x124)); o10034(0);
