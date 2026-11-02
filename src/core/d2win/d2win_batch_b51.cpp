@@ -40,7 +40,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE
 void d2win_sub_136e0(D2WinCtl* c, uint32_t v, const D2WinB51Env* e) {
     if (!c) e->fatal(0x445);
     if (c->type != 1) e->fatal(0x448);
-    c->v48 = v;
+    // Store at the retail byte offset: the C struct above widens its pointers, so v48 sits at 0x50 here.
+    *(uint32_t*)((uint8_t*)c + 0x48) = v;
 }
 
 // 1.13c D2Win+0xBD00
