@@ -138,7 +138,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_69090(uintptr_t self, int32_t x, in
 // 6fddbd68, 38 rows of {key, first, last} dwords) is scanned for key == a; inside [first,last] the row
 // of table B (retail 6fddbf28, stride 0x1c) matches when its dword 0 == (id>>20 & 0x3f), dword 1 ==
 // (id>>8 & 0xff) and dword 2 == c (the caller's EBX). Returns the row index or -1.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_68340(int32_t a, uint32_t id, uint32_t c,
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_68340_batch(int32_t a, uint32_t id, uint32_t c,
 	const int32_t* ga /*retail 6fddbd68*/, const uint8_t* tb /*retail 6fddbf28*/) {
 	for (int r = 0; r < 38; ++r) {
 		const int32_t* g = ga + r * 3;

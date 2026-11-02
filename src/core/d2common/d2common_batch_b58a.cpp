@@ -67,8 +67,8 @@ struct D2Common30BD0Env
 	const uint8_t* tbl0;               //0x00
 	const uint8_t* tbl1_lo;            //0x04 used when nArg4 < 0x19A
 	const uint8_t* tbl1_hi;            //0x08 used when nArg4 >= 0x19A
-	int32_t (*check)(uint32_t nArg3);  //0x0C 0x303A0
-	uint32_t (*get_record)(void);      //0x10 0x1250
+	uint32_t (*check)(uint32_t nArg3); //0x0C 0x303A0 -> pointer to the skill list slot, 0 when none
+	uint32_t (*get_record)(int32_t nSkillId); //0x10 0x1250 (EAX = skill id) -> skills record, 0 out of range
 	uint32_t nBitMask3;                //0x14 gdwBitMasks word at +0xC
 };
 
@@ -77,7 +77,7 @@ struct D2Common30BD0Env
 // check passing -> byte +6 of the 0x1250 record masked with gdwBitMasks[3]; otherwise 0. Any other
 // nMode is fatal in retail (_exit); modelled as 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_30bd0(int32_t nIndex, int32_t nMode, uint32_t nArg3, int32_t nArg4,
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_30bd0_batch(int32_t nIndex, int32_t nMode, uint32_t nArg3, int32_t nArg4,
                                                    const D2Common30BD0Env* pEnv)
 {
 	if (!pEnv)
@@ -91,7 +91,13 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_30bd0(int32_t nIndex, int32_t nMode
 		return 0;
 	if (R32(row, 0xC))
 		return 1;
-	if (R32(row, 8) && pEnv->check && pEnv->check(nArg3) && pEnv->get_record)
-		return static_cast<uint32_t>(P(pEnv->get_record())[6]) & pEnv->nBitMask3;
+	if (R32(row, 8) && pEnv->check && pEnv->get_record)
+	{
+		const uint32_t pSlot = pEnv->check(nArg3);
+		if (!pSlot)
+			return 0;
+		const int16_t nSkillId = *reinterpret_cast<const int16_t*>(P(R32(P(pSlot), 0)));
+		return static_cast<uint32_t>(P(pEnv->get_record(nSkillId))[6]) & pEnv->nBitMask3;
+	}
 	return 0;
 }

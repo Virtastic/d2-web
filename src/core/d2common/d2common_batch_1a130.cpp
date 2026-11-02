@@ -40,21 +40,23 @@ EMSCRIPTEN_KEEPALIVE int32_t d2c_30b80_eligible(int32_t unitType, uint32_t unit,
 }
 
 // 1.13c D2Common+0x30C70: reads the correct normal/expansion eligibility record, then applies
-// the unit's active-state flags. Table-specific fields are kept as explicit offsets.
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_30c70(int32_t index, int32_t table, uint32_t unit,
- int32_t monster, const uint32_t* records, D2C_UnitLookup unitFlags)
+// the unit's active-state flags. The three records tables are retail's contiguous 0x14-byte-row modulator
+// tables (player, monster, expansion monster); unitFlags is the word at +0xC of what 0x303A0 answers.
+EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_30c70_batch(int32_t index, int32_t table, uint32_t unit,
+ int32_t monster, const uint32_t* tbl0, const uint32_t* tbl1Lo, const uint32_t* tbl1Hi, D2C_UnitLookup unitFlags)
 {
- if (!records) return 0;
  const uint32_t* rec = nullptr;
- if (table == 0) rec = records + index * 5;
+ if (table == 0) rec = tbl0 ? tbl0 + index * 5 : nullptr;
  else if (table == 1) {
   // in-range monster flagged (+0x0d & bit0) answers 1 only for index 2 / 0xf; otherwise (or out of range) fall to the table
   if (sgptDataTables && monster >= 0 && monster < sgptDataTables->nMonStatsTxtRecordCount) {
    const auto* m = reinterpret_cast<const uint8_t*>(sgptDataTables->pMonStatsTxt) + monster * 0x1a8;
    if (rd<uint8_t>(m, 0x0d) & 1u) return (index == 2 || index == 0xf) ? 1 : 0;
   }
-  rec = records + (monster < 0x19a ? 0 : 0x19a) + index * 5;
+  const uint32_t* base = monster < 0x19a ? tbl1Lo : tbl1Hi;
+  rec = base ? base + index * 5 : nullptr;
  } else return 0;
+ if (!rec) return 0;
  if (rec[1]) return 1;
  if (!rec[0] || !unit || !unitFlags) return 0;
  const uint32_t f = static_cast<uint32_t>(unitFlags(unit));

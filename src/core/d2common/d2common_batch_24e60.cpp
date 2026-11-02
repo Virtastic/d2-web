@@ -46,11 +46,34 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_24610_MaxSockets_u32(uint32_t 
 	return d2_ours_d2common_24610(reinterpret_cast<D2UnitStrc*>(P(pUnit)));
 }
 
-// Find a matching saved-item row in the sorted item table. Table globals are not yet modeled.
+// Hireling row lookup by (expansion flag, class, level): the start-row index table is classic ids first, expansion ids next;
+// rows run in class order, the last row whose level does not exceed the value wins. Class above 0xFF answers null.
 // 1.13c D2Common+0x532C0
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_532c0(uint32_t pItems, uint32_t nCount, uint32_t nKind, uint32_t nMinLevel, uint32_t nExpansion) {
-	(void)pItems; (void)nCount; (void)nKind; (void)nMinLevel; (void)nExpansion;
-	return 0; // Retail's indexed table base/count globals are still outside the engine model.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_532c0_batch(uint32_t nExpansion, int32_t nClass, int32_t nLevel) {
+	if (nClass > 0xFF) return 0;
+	const bool bExp = nExpansion != 0;
+	int32_t nRow = sgptDataTables->nHirelingStartRecordIds[(bExp ? 0x100 : 0) + nClass];
+	if (nRow < 0) return 0;
+	const D2HirelingTxt* pPrev = nullptr;
+	if (nRow < sgptDataTables->nHirelingTxtRecordCount)
+	{
+		const uint16_t nVersion = bExp ? 100 : 0;
+		const D2HirelingTxt* pRow = sgptDataTables->pHirelingTxt + nRow;
+		for (; nRow < sgptDataTables->nHirelingTxtRecordCount; ++nRow, ++pRow)
+		{
+			if (pRow->nId == nClass && pRow->wVersion == nVersion)
+			{
+				const D2HirelingTxt* pMatch = pRow;
+				if (pPrev && nLevel < pRow->nHirelingLevel) return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pPrev));
+				pPrev = pMatch;
+			}
+			else if (nClass < pRow->nId)
+			{
+				return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pPrev));
+			}
+		}
+	}
+	return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pPrev));
 }
 
 // Body is byte-identical to 0x4FF80 (monster in anim mode 12, no state-mask-33 hit, MonStats2 bit 7).

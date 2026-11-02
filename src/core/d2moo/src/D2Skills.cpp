@@ -477,6 +477,13 @@ int __fastcall sub_6FDAF7A0(int nSkillId, int a2, int a3, void* pUserData)
 
 // 1.13c D2Common+0x51BF0 (#10786)
 //D2Common.0x6FDAF7E0 (#11276)
+// Evaluates one skills calc expression over a {unit, skill id, skill level} block with the skill callback table;
+// the passive-stat lookup in D2Common shares this evaluator, and the replay probes call it through here.
+extern "C" int D2Skills_EvaluateCalcSpan(const void* pExpression, int nExpressionSize, void* pUserData)
+{
+	return DATATBLS_CalcEvaluateExpression((const FOGASTNodeStrc*)pExpression, nExpressionSize, sub_6FDAF6A0, off_6FDE5804, dword_6FDE583C, pUserData);
+}
+
 int __stdcall SKILLS_EvaluateSkillFormula(D2UnitStrc* pUnit, unsigned int nCalc, int nSkillId, int nSkillLevel)
 {
 	D2SkillCalcStrc pSkillCalc = {};

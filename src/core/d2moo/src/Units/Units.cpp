@@ -1213,6 +1213,19 @@ static D2AnimUnkStrc gaMonModesAnimModulatorsExpansion[NUMBER_OF_MONMODES] = {
 	{ 0, 1, 0, 0, 0 }
 };
 
+// The three animation-modulator tables as the retail layout holds them (player, monster, expansion monster), for the
+// replay probes that read them through their 0x14-byte rows.
+extern "C" const void* UNITS_GetAnimModulatorTable(int nWhich)
+{
+	switch (nWhich)
+	{
+	case 0: return gaPlayerModesAnimModulators;
+	case 1: return gaMonModesAnimModulators;
+	case 2: return gaMonModesAnimModulatorsExpansion;
+	}
+	return nullptr;
+}
+
 struct D2UnitAnimModeStatBasePercentageStrc
 {
 	BOOL bHasBasePercentage;
