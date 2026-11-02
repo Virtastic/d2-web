@@ -9,6 +9,7 @@ retail/
 # Build output
 build-wasm/
 *.wasm
+!play/assets/vendor/libarchive/libarchive.wasm
 *.data
 *.br
 play/d2.js
@@ -175,6 +176,7 @@ test/*
 !test/block-sound.test.mjs
 !test/button-held-feedback.test.mjs
 !test/byo-detect.test.mjs
+!test/archive-upload.test.mjs
 !test/centred-lines.test.mjs
 !test/centred-text.test.mjs
 !test/character-panel-close.test.mjs

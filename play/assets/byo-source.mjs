@@ -3,6 +3,7 @@
 // handed to the engine through StreamFS.mountBlob. Detection is byo-detect.mjs.
 import { inspect, classify, extractInnerPatch, ROLES, ORDER } from './byo-detect.mjs';
 import { isPlugyFile } from './plugy-files.mjs';
+import { unpackArchive, isArchiveName } from './byo-archive.mjs';
 
 const DB = 'd2-byo', STORE = 'handles', KEY = 'set';
 const idb = (mode, fn) => new Promise((res, rej) => {
@@ -117,13 +118,61 @@ async function keepFiles(files, progress) {
   try { return await stashFiles(files, progress); } catch { return { handles: [], files }; }
 }
 
+async function archiveDir() {
+  if (!storeAvailable()) return null;
+  try { await navigator.storage.persist?.(); } catch { /* refused: the copies still work, the browser may evict them */ }
+  try { return await (await navigator.storage.getDirectory()).getDirectoryHandle(OPFS_DIR, { create: true }); }
+  catch { return null; }
+}
+/**
+ * The .mpq/.exe/PlugY entries of each picked .zip or .7z (byo-archive.mjs). Where OPFS exists each entry is
+ * written there, in a folder of its own, so it is remembered like a copied pick; elsewhere it is kept as a File.
+ */
+async function unpackPicked(archives) {
+  const handles = [], files = [];
+  if (!archives.length) return { handles, files };
+  const dir = await archiveDir();
+  let seq = 0;
+  const copy = async (name, open) => {
+    const sub = await dir.getDirectoryHandle(`archive-${seq++}`, { create: true });
+    const h = await sub.getFileHandle(name, { create: true }), w = await h.createWritable();
+    const r = (await open()).getReader();
+    try {
+      for (;;) { const { done, value } = await r.read(); if (done) break; await w.write(value); }
+      await w.close();
+    } catch (e) { await w.abort?.().catch(() => {}); await sub.removeEntry(name).catch(() => {}); throw e; }
+    return h;
+  };
+  const collect = async (name, open) => {
+    const r = (await open()).getReader(), parts = [];
+    for (;;) { const { done, value } = await r.read(); if (done) break; parts.push(value); }
+    return new File(parts, name, { type: 'application/octet-stream' });
+  };
+  for (const a of archives) {
+    await unpackArchive(a, {
+      wanted: (n) => WANT.test(n),
+      place: async (name, size, open) => {
+        if (dir) {
+          try { handles.push(await copy(name, open)); return; }
+          catch (e) { if (e.corrupt) throw e; }   // a bad entry is skipped; a copy the disk refused is kept in memory
+        }
+        files.push(await collect(name, open));
+      },
+    });
+  }
+  return { handles, files };
+}
+
 /** Chromium pickers return handles (which can be remembered); elsewhere an <input> returns Files, copied to OPFS where it exists. */
 export async function pickFiles({ progress } = {}) {
   if (window.showOpenFilePicker) {
     try { return { handles: await window.showOpenFilePicker({ multiple: true, types: [{ description: 'Diablo II archives', accept: { 'application/octet-stream': ['.mpq', '.exe'] } }] }), files: [] }; }
     catch (e) { if (e.name === 'AbortError') return { handles: [], files: [] }; }
   }
-  return keepFiles(await inputFiles(false), progress);
+  const picked = await inputFiles(false);
+  const unpacked = await unpackPicked(picked.filter((f) => isArchiveName(f.name)));
+  const kept = await keepFiles(picked.filter((f) => !isArchiveName(f.name)), progress);
+  return { handles: [...unpacked.handles, ...kept.handles], files: [...unpacked.files, ...kept.files] };
 }
 export async function pickFolder({ progress } = {}) {
   if (window.showDirectoryPicker) {
@@ -134,8 +183,8 @@ export async function pickFolder({ progress } = {}) {
 }
 const inputFiles = (folder) => new Promise((res) => {
   const i = document.createElement('input');
-  i.type = 'file'; i.multiple = true; if (folder) i.webkitdirectory = true; else i.accept = '.mpq,.exe';
-  i.onchange = () => res([...i.files].filter((f) => WANT.test(f.name)));
+  i.type = 'file'; i.multiple = true; if (folder) i.webkitdirectory = true; else i.accept = '.mpq,.exe,.zip,.7z';
+  i.onchange = () => res([...i.files].filter((f) => WANT.test(f.name) || (!folder && isArchiveName(f.name))));
   i.oncancel = () => res([]);
   i.click();
 });
