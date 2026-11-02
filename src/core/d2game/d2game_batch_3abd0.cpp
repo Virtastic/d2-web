@@ -23,10 +23,10 @@ struct D2GameBatch3Env {
     void (*fn448E0)(int32_t zero, void* p, int32_t skill, int32_t level);// 0x448E0
     uint32_t (*unitX)(void* unit);                                       // 0x1100
     uint32_t (*unitY)(void* unit);                                       // 0x1130
-    uint32_t (*roll)(void* pSeed);                                       // 0x1180 (range register unresolved)
+    uint32_t (*roll)(void* pSeed, uint32_t range);                       // 0x1180: eax = range, ecx = seed
     int32_t (*ord10983)(void* p);
     int32_t (*ord10764)(void* p);
-    void (*ord10614)(void* owner);
+    void (*ord10614)(void* seed, uint32_t x);                            // 0xA628: ecx = seed (missile+0x20), edx = X (first 0x1100)
     void (*createMissile)(void* pGame, uint32_t* params23);              // 0x6F930, D2MissileStrc-shaped
     void (*spawnRandomMonster)(void* pGame, void* room, int32_t x, int32_t y); // 0xEF6B0
 };
@@ -92,13 +92,13 @@ int32_t D2Game_3BED0(void* pGame, void* missile, const D2GameBatch3Env* e = &g_b
     if ((int16_t)b3_rd16(rec, 0x24) < 0 || !b3_flag10(missile)) return 1;
     void* owner = b3_owner(e, pGame, missile);
     if (!owner) return 1;
-    e->unitX(missile);
-    e->ord10614(owner);
+    void* seed = (uint8_t*)missile + 0x20;
+    e->ord10614(seed, e->unitX(missile));
     int32_t r = 1;
     if ((int32_t)b3_rd32(rec, 0x4C) > 0) r = (int32_t)b3_rd32(rec, 0x4C);
     const uint32_t x = e->unitX(missile), y = e->unitY(missile);
-    void* seed = (uint8_t*)missile + 0x20;
-    const uint32_t r1 = e->roll(seed), r2 = e->roll(seed);
+    const uint32_t range = (uint32_t)(2 * r + 1);
+    const uint32_t r1 = e->roll(seed, range), r2 = e->roll(seed, range);
     uint32_t p[23] = {};
     p[MS_FLAGS] = 0x20;
     p[MS_OWNER] = (uint32_t)(uintptr_t)owner;
@@ -147,8 +147,10 @@ int32_t D2Game_3C260(void* pGame, void* missile, const D2GameBatch3Env* e = &g_b
     const uint8_t* rec = (const uint8_t*)b3_ptr(dt, 0xB64) + (uint32_t)cls * 0x1A4;
     if ((int16_t)b3_rd16(rec, 0x24) < 0) return 1;
     int32_t y, x;
-    b3_pos(e, missile, &y, &x);
     void* sub = b3_ptr(missile, 0x2C);
+    // retail's order (decompile): #10867 (x) is called before #10750 (y); b3_pos calls them the other way round.
+    if (b3_petlike(b3_rd32(missile, 0))) { y = (int32_t)b3_rd32(sub, 0x10); x = (int32_t)b3_rd32(sub, 0xC); }
+    else { x = sub ? e->ord10867(sub) : 0; y = sub ? e->ord10750(sub) : 0; }
     uint32_t p[23] = {};
     p[MS_FLAGS] = 0x21;
     p[MS_OWNER] = b3_flag10(missile) ? (uint32_t)(uintptr_t)b3_owner(e, pGame, missile) : 0;
@@ -210,4 +212,89 @@ uint32_t D2Game_3C160_probe(void* pGame, void* missile, const uint32_t* r, uint3
             for (uint32_t j = 0; j < 9; j++) w[1 + j] = o + j < 23 ? g_p3c->tag(p[o + j]) : 0;
         } };
     return (uint32_t)D2Game_3C160(pGame, missile, &e);
+}
+
+// function probe seam (src/core/fn/d2game_3abd0.cpp): callees recorded like the capture's `hook` lines; sc = (rva, value) pairs.
+// blobs (descriptor order): tab dt var slot skl m lg sc. target = the stack word (r[2]).
+static D2ProbeSeam* g_p3a; static const void* g_p3aDt;
+static uint32_t p3a_u32(const void* p) { return (uint32_t)(uintptr_t)p; }
+static uint32_t p3a_sc(const uint32_t* sc, uint32_t rva) { for (const uint32_t* p = sc; p[0]; p += 2) if (p[0] == rva) return p[1]; return 0; }
+uint32_t D2Game_3ABD0_probe(void* pGame, void* missile, uint32_t target, const uint32_t* r, uint32_t* lg, const uint32_t* sc)
+{
+    static const uint32_t size[8] = { 2048, 4096, 4, 4, 1152, 0x120, 1024, 64 };
+    const uint32_t v0 = p3a_sc(sc, 0xE03A0), v1 = p3a_sc(sc, 0xB26A), v2 = p3a_sc(sc, 0xB0FC), v3 = p3a_sc(sc, 0xA0370), v4 = p3a_sc(sc, 0xA00B0);
+    const D2ProbeHook hooks[7] = { { 0xE03A0, "acd", 0, v0 }, { 0xB26A, "", 1, v1 }, { 0xB0FC, "", 1, v2 }, { 0xA0370, "c", 0, v3 },
+                                   { 0xAC9A, "", 4, 0 }, { 0xA00B0, "", 0, v4 }, { 0x448E0, "", 4, 0 } };
+    D2ProbeSeam ps{ r, size, 8, lg, hooks, 7 };
+    lg[0] = 0; g_p3a = &ps; g_p3aDt = (const void*)(uintptr_t)r[3];
+    D2GameBatch3Env e{};
+    e.dataTables = []() -> const void* { return g_p3aDt; };
+    e.getUnit = [](void* g, uint32_t guid, uint32_t type) -> void* { return (void*)(uintptr_t)D2ProbeSeam::thunk(g_p3a, 0xE03A0, type, p3a_u32(g), guid, 0, 0, 0, 0, 0, 0); };
+    e.ord10240 = [](void* u) -> int32_t { return (int32_t)D2ProbeSeam::thunk(g_p3a, 0xB26A, 0, 0, 0, 0, 0, p3a_u32(u), 0, 0, 0); };
+    e.ord11029 = [](void* u) -> int32_t { return (int32_t)D2ProbeSeam::thunk(g_p3a, 0xB0FC, 0, 0, 0, 0, 0, p3a_u32(u), 0, 0, 0); };
+    e.chk0370 = [](void* owner) -> int32_t { return (int32_t)D2ProbeSeam::thunk(g_p3a, 0xA0370, 0, p3a_u32(owner), 0, 0, 0, 0, 0, 0, 0); };
+    e.ord10786 = [](void* owner, uint32_t rec60, int32_t skill, int32_t lvl) { D2ProbeSeam::thunk(g_p3a, 0xAC9A, 0, 0, 0, 0, 0, p3a_u32(owner), rec60, (uint32_t)skill, (uint32_t)lvl); };
+    e.get00B0 = []() -> void* { return (void*)(uintptr_t)D2ProbeSeam::thunk(g_p3a, 0xA00B0, 0, 0, 0, 0, 0, 0, 0, 0, 0); };
+    e.fn448E0 = [](int32_t zero, void* p, int32_t skill, int32_t lvl) { D2ProbeSeam::thunk(g_p3a, 0x448E0, 0, 0, 0, 0, 0, (uint32_t)zero, p3a_u32(p), (uint32_t)skill, (uint32_t)lvl); };
+    return (uint32_t)D2Game_3ABD0(pGame, missile, (void*)(uintptr_t)target, &e);
+}
+
+// function probe seam (src/core/fn/d2game_3bed0.cpp): blobs (descriptor order) tab dt var slot m lg sc; the 1100/1130/1180 returns come from sc.
+static D2ProbeSeam* g_p3b; static const void* g_p3bDt;
+uint32_t D2Game_3BED0_probe(void* pGame, void* missile, const uint32_t* r, uint32_t* lg, const uint32_t* sc)
+{
+    static const uint32_t size[7] = { 2048, 4096, 4, 4, 0x120, 1024, 64 };
+    const uint32_t v0 = p3a_sc(sc, 0xE03A0), v1 = p3a_sc(sc, 0xB26A), v2 = p3a_sc(sc, 0xB0FC),
+                   v3 = p3a_sc(sc, 0x1100), v4 = p3a_sc(sc, 0x1130), v5 = p3a_sc(sc, 0x1180);
+    const D2ProbeHook hooks[8] = { { 0xE03A0, "acd", 0, v0 }, { 0xA628, "cd", 0, 0 }, { 0x1100, "c", 0, v3 }, { 0x1130, "c", 0, v4 },
+                                   { 0x1180, "ac", 0, v5 }, { 0xB26A, "", 1, v1 }, { 0xB0FC, "", 1, v2 }, { 0x6F930, "cd", 0, 0 } };
+    D2ProbeSeam ps{ r, size, 7, lg, hooks, 8 };
+    lg[0] = 0; g_p3b = &ps; g_p3bDt = (const void*)(uintptr_t)r[3];
+    D2GameBatch3Env e{};
+    e.dataTables = []() -> const void* { return g_p3bDt; };
+    e.getUnit = [](void* g, uint32_t guid, uint32_t type) -> void* { return (void*)(uintptr_t)D2ProbeSeam::thunk(g_p3b, 0xE03A0, type, p3a_u32(g), guid, 0, 0, 0, 0, 0, 0); };
+    e.unitX = [](void* u) -> uint32_t { return D2ProbeSeam::thunk(g_p3b, 0x1100, 0, p3a_u32(u), 0, 0, 0, 0, 0, 0, 0); };
+    e.unitY = [](void* u) -> uint32_t { return D2ProbeSeam::thunk(g_p3b, 0x1130, 0, p3a_u32(u), 0, 0, 0, 0, 0, 0, 0); };
+    e.ord10614 = [](void* seed, uint32_t x) { D2ProbeSeam::thunk(g_p3b, 0xA628, 0, p3a_u32(seed), x, 0, 0, 0, 0, 0, 0); };
+    e.roll = [](void* seed, uint32_t range) -> uint32_t { return D2ProbeSeam::thunk(g_p3b, 0x1180, range, p3a_u32(seed), 0, 0, 0, 0, 0, 0, 0); };
+    e.ord10240 = [](void* u) -> int32_t { return (int32_t)D2ProbeSeam::thunk(g_p3b, 0xB26A, 0, 0, 0, 0, 0, p3a_u32(u), 0, 0, 0); };
+    e.ord11029 = [](void* u) -> int32_t { return (int32_t)D2ProbeSeam::thunk(g_p3b, 0xB0FC, 0, 0, 0, 0, 0, p3a_u32(u), 0, 0, 0); };
+    e.createMissile = [](void* g, uint32_t* p) {
+        D2ProbeSeam::thunk(g_p3b, 0x6F930, 0, p3a_u32(g), p3a_u32(p), 0, 0, 0, 0, 0, 0);
+        for (uint32_t o = 0; o < 23; o += 9) {
+            uint32_t* w = g_p3b->lg + 1 + g_p3b->lg[0]++ * 10;
+            w[0] = 0x6F930u | 0x40000000u;
+            for (uint32_t j = 0; j < 9; j++) w[1 + j] = o + j < 23 ? g_p3b->tag(p[o + j]) : 0;
+        } };
+    return (uint32_t)D2Game_3BED0(pGame, missile, &e);
+}
+
+// function probe seam (src/core/fn/d2game_3c260.cpp): blobs tab dt var slot sub m lg sc; sub = missile+0x2C record.
+static D2ProbeSeam* g_p3c2; static const void* g_p3c2Dt;
+uint32_t D2Game_3C260_probe(void* pGame, void* missile, const uint32_t* r, uint32_t* lg, const uint32_t* sc)
+{
+    static const uint32_t size[8] = { 2048, 4096, 4, 4, 0x100, 0x120, 1024, 64 };
+    const uint32_t v0 = p3a_sc(sc, 0xE03A0), v1 = p3a_sc(sc, 0xB26A), v2 = p3a_sc(sc, 0xB0FC), v3 = p3a_sc(sc, 0xA454),
+                   v4 = p3a_sc(sc, 0xA3B8), v5 = p3a_sc(sc, 0xAAC6), v6 = p3a_sc(sc, 0xAAD8);
+    const D2ProbeHook hooks[8] = { { 0xE03A0, "acd", 0, v0 }, { 0xB26A, "", 1, v1 }, { 0xB0FC, "", 1, v2 }, { 0xA454, "", 1, v3 },
+                                   { 0xA3B8, "", 1, v4 }, { 0xAAC6, "", 1, v5 }, { 0xAAD8, "", 1, v6 }, { 0x6F930, "cd", 0, 0 } };
+    D2ProbeSeam ps{ r, size, 8, lg, hooks, 8 };
+    lg[0] = 0; g_p3c2 = &ps; g_p3c2Dt = (const void*)(uintptr_t)r[3];
+    D2GameBatch3Env e{};
+    e.dataTables = []() -> const void* { return g_p3c2Dt; };
+    e.getUnit = [](void* g, uint32_t guid, uint32_t type) -> void* { return (void*)(uintptr_t)D2ProbeSeam::thunk(g_p3c2, 0xE03A0, type, p3a_u32(g), guid, 0, 0, 0, 0, 0, 0); };
+    e.ord10240 = [](void* u) -> int32_t { return (int32_t)D2ProbeSeam::thunk(g_p3c2, 0xB26A, 0, 0, 0, 0, 0, p3a_u32(u), 0, 0, 0); };
+    e.ord11029 = [](void* u) -> int32_t { return (int32_t)D2ProbeSeam::thunk(g_p3c2, 0xB0FC, 0, 0, 0, 0, 0, p3a_u32(u), 0, 0, 0); };
+    e.ord10867 = [](void* p) -> int32_t { return (int32_t)D2ProbeSeam::thunk(g_p3c2, 0xA454, 0, 0, 0, 0, 0, p3a_u32(p), 0, 0, 0); };
+    e.ord10750 = [](void* p) -> int32_t { return (int32_t)D2ProbeSeam::thunk(g_p3c2, 0xA3B8, 0, 0, 0, 0, 0, p3a_u32(p), 0, 0, 0); };
+    e.ord10983 = [](void* p) -> int32_t { return (int32_t)D2ProbeSeam::thunk(g_p3c2, 0xAAC6, 0, 0, 0, 0, 0, p3a_u32(p), 0, 0, 0); };
+    e.ord10764 = [](void* p) -> int32_t { return (int32_t)D2ProbeSeam::thunk(g_p3c2, 0xAAD8, 0, 0, 0, 0, 0, p3a_u32(p), 0, 0, 0); };
+    e.createMissile = [](void* g, uint32_t* p) {
+        D2ProbeSeam::thunk(g_p3c2, 0x6F930, 0, p3a_u32(g), p3a_u32(p), 0, 0, 0, 0, 0, 0);
+        for (uint32_t o = 0; o < 23; o += 9) {
+            uint32_t* w = g_p3c2->lg + 1 + g_p3c2->lg[0]++ * 10;
+            w[0] = 0x6F930u | 0x40000000u;
+            for (uint32_t j = 0; j < 9; j++) w[1 + j] = o + j < 23 ? g_p3c2->tag(p[o + j]) : 0;
+        } };
+    return (uint32_t)D2Game_3C260(pGame, missile, &e);
 }
