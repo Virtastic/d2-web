@@ -20,8 +20,8 @@ extern "C" uint32_t FOG_FCloseFile(void* file) {
 }
 
 // 1.13c Fog+0x17D80
-// Retail: CloseHandle(h). No OS handles in wasm; nothing to release.
-extern "C" void FOG_CloseHandle(void*) {}
+// Retail: CloseHandle(h), BOOL in eax. No OS handle is live in wasm, so every value is one CloseHandle refuses: FALSE.
+extern "C" uint32_t FOG_CloseHandle(void*) { return 0; }
 
 // 1.13c Fog+0x17DF0
 extern "C" uint32_t FOG_FGetFileSize(void* file, uint32_t* high) {

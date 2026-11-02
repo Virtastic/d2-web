@@ -48,8 +48,8 @@ bool MpqVfs::closeFile(void* file) {
 }
 
 uint32_t MpqVfs::fileSize(void* file, uint32_t* high) const {
-    if (high) *high = 0;
     if (!files_.contains(file)) { SErrSetLastError(ERROR_INVALID_HANDLE); return 0xFFFFFFFF; }
+    if (high) *high = 0;
     return SFileGetFileSize(file, high);
 }
 
