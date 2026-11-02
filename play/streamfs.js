@@ -302,9 +302,21 @@
   }
 
   let generation = 0;
+  // d2-web divergence: the first BOOT_MAX distinct chunks this page read, kept in localStorage so the next
+  // load can fetch them in the background while the title screen is up (warmRecorded) instead of each
+  // being a synchronous miss at session start. Cache only: the bytes the engine reads do not change.
+  // Keyed by the source's persistent key (path, size, mtime, chunk size), so a changed archive misses.
+  const BOOT_MAX = 128, BOOT_KEY = 'd2web.streamfs.bootreads';
+  const boot = { set: new Set(), timer: 0 };
+  function noteBootRead(k) {
+    if (boot.set.has(k)) return;
+    boot.set.add(k);
+    if (!boot.timer) boot.timer = setTimeout(() => { boot.timer = 0; try { localStorage.setItem(BOOT_KEY, JSON.stringify([...boot.set])); } catch (e) {} }, 3000);
+  }
   // src: {url} for a range-fetched URL, or {id} for a local file handle. cacheKey uniquely
   // identifies the (source, offset) chunk across both modes.
   function fetchChunkSync(src, cacheKey, start, end, size) {
+    if (src.pkey && boot.set.size < BOOT_MAX) noteBootRead(src.pkey + '#' + start);
     const hit = S.cache.get(cacheKey);
     if (hit) {
       S.cache.delete(cacheKey); S.cache.set(cacheKey, hit); // move-to-end (most-recently-used)
@@ -457,6 +469,17 @@
         warmQ.push(Object.assign({ warm: 1, key, start: cs, end: Math.min(cs + CHUNK, m.size) }, m.src));
       }
       pumpWarm();
+    },
+
+    // Warm the chunks the previous load read first (see noteBootRead). Oldest read is fetched first.
+    warmRecorded() {
+      let list = []; try { list = JSON.parse(localStorage.getItem(BOOT_KEY) || '[]'); } catch (e) {}
+      if (!Array.isArray(list) || !list.length) return;
+      const byKey = new Map(); for (const [path, m] of S.mounts) if (m.src.pkey) byKey.set(m.src.pkey, path);
+      for (const k of list.slice(0, BOOT_MAX).reverse()) {   // warm() pushes to a stack popped newest-first
+        const i = typeof k === 'string' ? k.lastIndexOf('#') : -1, path = i > 0 && byKey.get(k.slice(0, i));
+        if (path) this.warm(path, +k.slice(i + 1), 1);
+      }
     },
 
     // d2-web divergence: warm() and resolve once those chunks are cached or their background fetch ended, so a

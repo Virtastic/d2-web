@@ -351,6 +351,7 @@ function showBootFailure(why) {
         await Promise.all(['(listfile)', '(attributes)'].map((n) => { const hit = find && find(n); return hit && StreamFS.fetched(path, hit.pos, hit.size); }));
         return find && { path, find };
       }));
+      StreamFS.warmRecorded();   // the previous load's reads; the title art below is queued after, so it is fetched first
       const title = [...Object.values(FRONTEND).flat(), 'data\\global\\palette\\Sky\\pal.pl2'].map((name) => {
         for (const a of archives) { const hit = a && a.find(name); if (hit) return StreamFS.fetched(a.path, hit.pos, hit.size); }
       });
