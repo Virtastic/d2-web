@@ -707,7 +707,12 @@ void D2GAME_PACKETS_SendPacket_6FC3C710(D2ClientStrc* pClient, void* pPacket, in
     if (pClient && pPacket && nPacketSize == (int32_t)sizeof(D2GSPacketSrv8A) &&
         static_cast<D2GSPacketSrv8A*>(pPacket)->nHeader == 0x8A && static_cast<D2GSPacketSrv8A*>(pPacket)->nUnitType == UNIT_MONSTER) {
         const int32_t guid = (int32_t)static_cast<D2GSPacketSrv8A*>(pPacket)->dwUnitGUID;
-        if (!D2WEB_NpcAlertActive(guid) && g_d2webNpcAlertCount < 64) g_d2webNpcAlertGuids[g_d2webNpcAlertCount++] = guid;
+        // Retail's 0x8A handler (D2Client 0x47970) attaches the overlay only when the unit is not the
+        // selected interaction unit (0x46150): an NPC the player is talking to gets no new "!".
+        int32_t interactType = -1, interactGuid = -1;
+        const bool selected = pClient->pPlayer && SUNIT_GetInteractInfo(pClient->pPlayer, &interactType, &interactGuid) &&
+            interactType == UNIT_MONSTER && interactGuid == guid;
+        if (!selected && !D2WEB_NpcAlertActive(guid) && g_d2webNpcAlertCount < 64) g_d2webNpcAlertGuids[g_d2webNpcAlertCount++] = guid;
     }
     if (pClient && pPacket && nPacketSize == (int32_t)sizeof(D2GSPacketSrv28) &&
         static_cast<D2GSPacketSrv28*>(pPacket)->nHeader == 0x28 && static_cast<D2GSPacketSrv28*>(pPacket)->unk0x01 == UNIT_MONSTER)
