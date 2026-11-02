@@ -16,9 +16,18 @@ __attribute__((weak)) int32_t d2win_unicode2Win(char* dst, const uint16_t* src, 
 __attribute__((weak)) void d2win_win2Unicode(uint16_t* dst, const char* src, int32_t n);
 __attribute__((weak)) uint8_t* (*d2win_glyph_lookup)(uint16_t);   // DAT_6f901508, returns glyph rec
 __attribute__((weak)) uint32_t d2win_str_ellipsis;            // DAT_6f8fcedc (4 bytes)
-__attribute__((weak)) uint32_t d2win_tbl_a[25];               // DAT_6f8ffd48
-__attribute__((weak)) uint32_t d2win_tbl_b[64];               // DAT_6f8ffdb0
-__attribute__((weak)) uint32_t d2win_tbl_b_count;             // DAT_6f8ffe00
+// COF code tables: 25 rows, 20 columns, column count 20.
+// A zero-filled table made every call take the fatal branch.
+static const uint32_t d2win_tbl_a[25] = {
+  0x20204d41, 0x20204f53, 0x2020454e, 0x20204150, 0x20204142, 0x20205a44, 0x20204941, 0x20204f52,
+  0x20204852, 0x20204852, 0x2020314f, 0x2020324f, 0x2020334f, 0x2020344f, 0x2020444d, 0x2020394f,
+  0x2020594f, 0x2020594f, 0x2020354f, 0x2020374f, 0x2020384f, 0x2020364f, 0x2020304f, 0x20204354,
+  0x20204f52 };
+static const uint32_t d2win_tbl_b[20] = {
+  0x20205444, 0x2020554e, 0x20204c57, 0x20204e52, 0x20204847, 0x20204e54, 0x20205754, 0x20203141,
+  0x20203241, 0x20204c42, 0x20204353, 0x20204854, 0x20204b4b, 0x20203153, 0x20203253, 0x20203353,
+  0x20203453, 0x20204444, 0x20204847, 0x20204847 };
+static const uint32_t d2win_tbl_b_count = 20;
 __attribute__((weak)) int32_t* d2win_list_head;               // DAT_6f9a9e34
 __attribute__((weak)) int32_t* sub_7C60(int, int32_t*);
 }
