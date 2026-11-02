@@ -118,11 +118,16 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30880_batch(uint32_t nMemPoo
 
 // +0x71610 (#11007, D2TestQuestState): return the quest-state record for nQuest -- the table base at
 // DAT_6fdefd94 plus nQuest * 0x70 -- when nQuest is not -1 and is below the record count at
-// DAT_6fdefd90, else null. Stub: the quest-state table is not modelled in the engine, so it returns
-// null; retail fatals 0x4F2/0x4F3 when the table or the entry is missing.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_71610(int32_t nQuest) { // 1.13c D2Common+0x71610
-	(void)nQuest;
-	return 0;
+// DAT_6fdefd90, else null. DAT_6fdefd90/94 are the qualityitems loader's (0x74E70) count and base,
+// so the row comes from sgptDataTables->pQualityItemDataTables. Retail fatals 0x4F2/0x4F3 when an
+// in-range index finds no table or no entry; that path answers null here.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_71610_QuestRow(int32_t nQuest) { // 1.13c D2Common+0x71610
+	if (!sgptDataTables) return 0;
+	const D2QualityItemDataTbl& tbl = sgptDataTables->pQualityItemDataTables;
+	if (nQuest >= tbl.nQualityItemsTxtRecordCount || nQuest == -1) return 0;
+	if (!tbl.pQualityItemsTxt) return 0;
+	return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(tbl.pQualityItemsTxt)) +
+		static_cast<uint32_t>(nQuest) * 0x70u;
 }
 
 extern "C" uint32_t D2Common_4E480_FindSkillNode(uint32_t, int32_t);

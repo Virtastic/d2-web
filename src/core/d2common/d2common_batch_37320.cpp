@@ -30,8 +30,6 @@ uint32_t D2Common_230A0_ItemTypeFromItemId(uint32_t nItemId);
 extern "C" const InvEnv* g_d2common_inv_env = nullptr;
 extern "C" int32_t (*g_d2common_fn_38a80)(uint32_t) = nullptr;
 
-extern "C" uint32_t* g_d2common_dat_6fdefd9c = nullptr;	// row base of the 0x22-byte table
-extern "C" int32_t g_d2common_dat_6fdefd98 = 0;			// its record count
 
 namespace
 {
@@ -129,14 +127,17 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_34390_batch(uint32_t pRecord) {   // 1.
 }
 
 // 1.13c D2Common+0x71430: address of row param_1 in the 0x22-byte table (count at
-// DAT_6fdefd98, base at DAT_6fdefd9C). Index -1 or one past the count answers 0; a null base or a
+// DAT_6fdefd98, base at DAT_6fdefd9C; wired to sgptDataTables->pLowQualityItemDataTables, the
+// lowqualityitems loader 0x74400's destination). Index -1 or one past the count answers 0; a null base or a
 // null computed row is retail's fatal 0x5D0/0x5D1 and also answers 0.
 extern "C"
 EMSCRIPTEN_KEEPALIVE int32_t D2Common_71430_TableRow(int32_t nIndex) {   // 1.13c D2Common+0x71430
-	if (nIndex >= g_d2common_dat_6fdefd98 || nIndex == -1) return 0;
-	if (!g_d2common_dat_6fdefd9c) return 0;
+	if (!sgptDataTables) return 0;
+	const D2LowQualityItemDataTbl& tbl = sgptDataTables->pLowQualityItemDataTables;
+	if (nIndex >= tbl.nLowQualityItemsTxtRecordCount || nIndex == -1) return 0;
+	if (!tbl.pLowQualityItemsTxt) return 0;
 	const int32_t nRow = static_cast<int32_t>(static_cast<uint32_t>(nIndex) * 0x22u +
-		static_cast<uint32_t>(reinterpret_cast<uintptr_t>(g_d2common_dat_6fdefd9c)));
+		static_cast<uint32_t>(reinterpret_cast<uintptr_t>(tbl.pLowQualityItemsTxt)));
 	return nRow;
 }
 
