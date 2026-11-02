@@ -347,10 +347,13 @@ export function selectUnitTypePickCandidate(candidates, {
 // separate fallback and remains available only when no accepted hit candidate won. Click policy is
 // intentionally the pre-existing browser policy because the native click picker is distinct.
 export function selectPointerCandidate(candidates, { click = false, reference = null, prior = null } = {}) {
-  const object = click && !(candidates.units?.length || candidates.itemsOnCell?.length || candidates.objectsUnderPointer?.length) ? candidates.object : (candidates.objectsUnderPointer == null
+  // A click tests an object by its painted box (the hitTest=0 path), never by the padded hover rectangle:
+  // the padded list only joins the arbitration when the pointer is over units or ground items too.
+  const clickPlain = click && !(candidates.units?.length || candidates.itemsOnCell?.length);
+  const object = clickPlain ? candidates.object : (candidates.objectsUnderPointer == null
     ? (candidates.hoverObject ?? candidates.object) : null);
   // Overlap lists arbitrate by the same type-priority walk as hover, so a click picks what hover shows.
-  if (click && !(candidates.units?.length || candidates.itemsOnCell?.length || candidates.objectsUnderPointer?.length)) {
+  if (clickPlain) {
     if (candidates.itemOnCell && object) return { kind: 'object', target: object };
     if (candidates.itemOnCell) return { kind: 'item', target: candidates.itemOnCell };
     if (candidates.npc) return { kind: 'npc', target: candidates.npc };

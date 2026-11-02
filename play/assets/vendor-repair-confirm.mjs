@@ -71,6 +71,7 @@ export function createRepairConfirmRenderer(deps) {
     showRefusal(npcId, stringId) { menu.show(npcId, 0, [deps.string(stringId) || String(stringId)], [{ stringId: CONTINUE_STRING, action: 'no' }], 1); },
     close() { menu.close(); },
     hover(x, y) { return menu.hover(x, y); },
+    targets() { return menu.targets(); },
     hitAt(x, y) {
       const e = menu.entryAt(x, y);
       if (e) return e.action;

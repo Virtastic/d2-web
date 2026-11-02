@@ -6738,7 +6738,7 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
             .replace(/\0/g, '').trim()
         : i.code;
       return { id: i.id, code, invPage: i.invPage, bodyLoc: i.bodyLoc,
-        name: Module.ccall('d2_lang_string', 'string', ['string'], [code]) || code };
+        name: tipFields(i.id, code).name };
     });
   },
   get purchaseEvidence() { return lastPurchase ? { ...lastPurchase } : null; },
@@ -7008,6 +7008,7 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
     if (screen === SCREEN.SELECT && charSelect?.targets) out.select = charSelect.targets(w, h);
     if (screen === SCREEN.GAME && gameMenu?.open) out.gameMenu = gameMenu.targets(w, h);
     if (screen === SCREEN.GAME && npcMenu?.open) out.npcMenu = npcMenu.targets();
+    if (screen === SCREEN.GAME && repairConfirm.open && repairConfirmRenderer?.open) out.repairConfirm = repairConfirmRenderer.targets();
     // The shop's stock under the pointer, found through the same itemAt the click handler uses:
     // item id -> { at, code, cost } for the vendor's side of the trade screen.
     if (screen === SCREEN.GAME && shopOpen() && vendorPanel) {

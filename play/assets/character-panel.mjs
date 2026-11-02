@@ -273,7 +273,7 @@ export function createCharacterPanelRenderer(read, documentObject = globalThis.d
       chrome.border(ctx, state?.act || 1, BORDER_LEFT);
       ctx.restore();
       return { x: v.ox, y: v.oy, scale: v.scale, buttons, statPoints: state?.statPoints ?? 0, skillPoints: state?.skillPoints ?? 0,
-        texts, shown: FIELDS.filter((f) => !/Label|1$|2$/.test(f.key)).map((f) => ({ key: f.key, value: text[f.key] ?? null })) };
+        texts, shown: FIELDS.filter((f) => !/Label|1$|2$/.test(f.key)).map((f) => ({ key: f.key, value: (text[f.key] != null && (f.key === 'experience' || f.key === 'nextExperience') ? Number(String(text[f.key]).replace(/,/g, '')) : text[f.key]) ?? null })) };
     },
   };
 }
