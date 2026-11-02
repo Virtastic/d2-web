@@ -416,3 +416,17 @@ store:
     (void)stat10;
     return 1;
 }
+
+// ---- FUNCTION-mode probe for 0x56740 (src/core/fn/d2game_56740.cpp): each seam logs through HookEnv as the capture's hook recorder does and
+// returns the scripted value; the quest-node walk reads the real blob.
+#include <emscripten.h>
+#include "../fn/hookenv.h"
+static HookEnv* q15H;
+void D2G15_56740_probe(void* game, void* unit, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); q15H = &h;
+    D2GameBatch15Env e{};
+    e.getRoom = [](void* u) -> void* { return (void*)(uintptr_t)q15H->h(0xA478, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
+    e.getLevelIdFromRoom = [](void* r) -> uint32_t { return q15H->h(0xA556, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)r); };
+    d2_game_56740(game, unit, &e);
+}

@@ -316,10 +316,11 @@ uint32_t d2game_57750(const D2GameBatch531F0Env& E, void* game, void* client) {
 // MISMATCH risk: the decompile reuses one stack slot (iStack_28) for the difficulty index and the Ordinal_10383
 // output array. The index is taken from the game, as in 57750; a null type-0x22 node returns 0 (retail crashes).
 uint32_t d2game_57900(const D2GameBatch531F0Env& E, void* game, void* client) {
-    uint32_t room = E.ord10331(client);
-    if (room == 0) return 0;
+    // retail calls Ordinal_10920 (the quest array) before Ordinal_10331 (the room): the array call is logged first
     uint32_t diff = E.rd8(game, 0x6d);
     uint32_t rec = E.questRec(client, diff);
+    uint32_t room = E.ord10331(client);
+    if (room == 0) return 0;
     if (E.ord10174(rec, 0x26, 0xe) != 0) return 0;
     if (E.ord10174(rec, 0x26, 0) != 0) return 0;
     if (E.ptr(game, 0x10f4) == nullptr) return 0;
@@ -365,6 +366,7 @@ void d2game_57A60(const D2GameBatch531F0Env& E, void* obj, void* msg) {
         return;
     }
     if (E.ord10174(rec, E.rd32(obj, 0xe0), 1) != 0) {
+        E.ord10174(rec, 0x26, 4);  // retail queries it and sends either way
         E.c33EB0(obj, target, kind);
         return;
     }
@@ -413,22 +415,32 @@ uint32_t d2game_586C0(const D2GameBatch531F0Env& E, void* game, void* msg) {
 
 // 1.13c D2Game+0x587C0 (fastcall: obj = param_1, msg = param_2). The decompile's one-argument
 // Ordinal_10174 call has its result unused and is a read-only query, so it is dropped.
+uint32_t g_q5Eax33EB0 = 0;  // EAX at the 0x33EB0 call: 3 on the quest-flag path, else the table word (the capture hook logs it as 0)
 void d2game_587C0(const D2GameBatch531F0Env& E, void* obj, void* msg) {
+    // Delta from the decompile (checked against the 1.13c bytes): the kind sent is msg->+8->+4 (-1 when +8 is null), the 0xd query
+    // result gates modes >= 4, and the quest-flag path calls with EAX = 3.
     void* game = E.ptr(obj, 4);
     uint32_t rec = E.questRec(E.ptr(msg, 0xc), E.rd8(game, 0x6d));
     int32_t iv3 = E.ord10174(rec, E.rd32(obj, 0xe0), 0);
-    uint32_t e0 = E.rd32(obj, 0xe0);
-    int32_t iv4 = E.ord10174(rec, e0, 1);
-    if (iv4 == 0) {
-        if (iv3 == 1) return;
-        if (E.rd8(obj, 9) == 0) return;
-        uint32_t t = E.tableB2d8(E.rd8(obj, 0xc));
-        if (t == 0xffffffffu) return;
-        if (t > 7) return;
+    int32_t v14 = E.ord10174(rec, E.rd32(obj, 0xe0), 0xd);
+    void* a8 = E.ptr(msg, 8);
+    int32_t kind = a8 ? (int32_t)E.rd32(a8, 4) : -1;
+    int32_t iv4 = E.ord10174(rec, E.rd32(obj, 0xe0), 1);
+    if (iv4 != 0) {
+        if (E.ord10174(rec, E.rd32(obj, 0xe0), 5) != 0) return;
+        g_q5Eax33EB0 = 3;
     } else {
-        if (E.ord10174(rec, e0, 5) != 0) return;
+        if (iv3 == 1) return;
+        uint8_t m = E.rd8(obj, 0xc);
+        if (m >= 4 && v14 == 0) return;
+        if (E.rd8(obj, 9) == 0) return;
+        uint32_t t = E.tableB2d8(m);
+        if (t == 0xffffffffu) return;
+        if (t >= 8) return;
+        g_q5Eax33EB0 = t;
     }
-    E.c33EB0(obj, E.rd32(msg, 0x14), (int32_t)e0);
+    E.c33EB0(obj, E.rd32(msg, 0x14), kind);
+    g_q5Eax33EB0 = 0;
 }
 
 // 1.13c D2Game+0x596B0 (fastcall: obj = param_1, msg = param_2). The matching arms all make the
@@ -851,4 +863,64 @@ uint32_t D2Game_42510_probe(void* a, void* b, int32_t s1, int32_t s2, int32_t s3
     e.cA0000 = [](void* a, int32_t a1, int32_t a3, int32_t a4, int32_t a2, int32_t x, int32_t y) -> uint32_t {
         return g42H->h(0xA0000, (uint32_t)x, (uint32_t)y, 0, 0, (uint32_t)(uintptr_t)a, (uint32_t)a1, (uint32_t)a3, (uint32_t)a4, (uint32_t)a2); };
     return d2game_42510(e, a, b, s1, s2, s3, s4);
+}
+
+// ---- function probes for 0x56E00 / 0x57750 / 0x57900 / 0x57A60 / 0x586C0 / 0x587C0 / 0x59360 (src/core/fn/d2game_<rva>.cpp).
+// Field walks read real memory; every callee seam logs through HookEnv exactly as the capture's hook recorder does
+// and returns the scripted value. `arr` is the blob Ordinal_10920 returns; tc / tb are the pinned module tables.
+#include <emscripten.h>
+#include "../fn/hookenv.h"
+static HookEnv* q5H; static void* q5Arr; static const uint32_t* q5Tc; static const uint32_t* q5Tb;
+static uint32_t Q5U(const void* p) { return (uint32_t)(uintptr_t)p; }
+static D2GameBatch531F0Env mkE5(HookEnv& h)
+{
+    q5H = &h;
+    D2GameBatch531F0Env e{};
+    e.rd8 = [](void* p, uint32_t o) { return ((const uint8_t*)p)[o]; };
+    e.rd16 = [](void* p, uint32_t o) { uint16_t v; __builtin_memcpy(&v, (const uint8_t*)p + o, 2); return v; };
+    e.rd32 = [](void* p, uint32_t o) { uint32_t v; __builtin_memcpy(&v, (const uint8_t*)p + o, 4); return v; };
+    e.ptr = [](void* p, uint32_t o) { uint32_t v; __builtin_memcpy(&v, (const uint8_t*)p + o, 4); return (void*)(uintptr_t)v; };
+    e.wr8 = [](void* p, uint32_t o, uint8_t v) { ((uint8_t*)p)[o] = v; };
+    e.wr16 = [](void* p, uint32_t o, uint16_t v) { __builtin_memcpy((uint8_t*)p + o, &v, 2); };
+    e.wr32 = [](void* p, uint32_t o, uint32_t v) { __builtin_memcpy((uint8_t*)p + o, &v, 4); };
+    e.ord10174 = [](uint32_t r, int32_t a, int32_t b) -> int32_t { return (int32_t)q5H->h(0xA568, 0, 0, 0, 0, 0, r, (uint32_t)a, (uint32_t)b); };
+    e.ord10003 = [](uint32_t r, int32_t a, int32_t b) { q5H->h(0xA57A, 0, 0, 0, 0, 0, r, (uint32_t)a, (uint32_t)b); };
+    e.questRec = [](void* c, uint32_t d) -> uint32_t { q5H->h(0xA4C0, 0, 0, 0, 0, 0, Q5U(c)); return (uint32_t)((const int32_t*)((const uint8_t*)q5Arr + 0x10))[d]; };
+    e.ord10587 = [](void* c, int32_t a, int32_t b) -> int32_t { return (int32_t)q5H->h(0xA3E2, 0, 0, 0, 0, 0, Q5U(c), (uint32_t)a, (uint32_t)b); };
+    e.ord10331 = [](void* u) -> uint32_t { return q5H->h(0xA478, 0, 0, 0, 0, 0, Q5U(u)); };
+    e.ord10383 = [](uint32_t room, uint32_t** arr, uint32_t* cnt) { q5H->h(0xA55C, 0, 0, 0, 0, 0, room, Q5U(arr), Q5U(cnt)); };
+    e.c33EB0 = [](void* o, uint32_t hd, int32_t kind) { q5H->h(0x33EB0, 0, Q5U(o), 0, 0, 0, hd, (uint32_t)kind); };
+    e.tableCaa8 = [](uint32_t i) -> uint32_t { return q5Tc[i]; };
+    e.tableB2d8 = [](uint32_t i) -> uint32_t { return q5Tb[i]; };
+    e.counterIndex = [](void* o) -> int32_t { return (int32_t)q5H->h(0x58260, 0, Q5U(o)); };
+    e.counterBlock = [](void* o) -> uint8_t* { uint32_t v; __builtin_memcpy(&v, (const uint8_t*)o + 0x18, 4); return (uint8_t*)(uintptr_t)v; };
+    return e;
+}
+uint32_t D2G5_56E00_probe(void* obj, uint32_t rec, uint8_t* out, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); D2GameBatch531F0Env e = mkE5(h); return d2game_56E00(e, obj, rec, out);
+}
+uint32_t D2G5_57750_probe(void* game, void* cl, void* arr, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); q5Arr = arr; D2GameBatch531F0Env e = mkE5(h); return d2game_57750(e, game, cl);
+}
+uint32_t D2G5_57900_probe(void* game, void* cl, void* arr, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); q5Arr = arr; D2GameBatch531F0Env e = mkE5(h); return d2game_57900(e, game, cl);
+}
+void D2G5_57A60_probe(void* obj, void* msg, void* arr, const uint32_t* tc, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); q5Arr = arr; q5Tc = tc; D2GameBatch531F0Env e = mkE5(h); d2game_57A60(e, obj, msg);
+}
+uint32_t D2G5_586C0_probe(void* game, void* msg, void* arr, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); q5Arr = arr; D2GameBatch531F0Env e = mkE5(h); return d2game_586C0(e, game, msg);
+}
+void D2G5_587C0_probe(void* obj, void* msg, void* arr, const uint32_t* tb, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); q5Arr = arr; q5Tb = tb; D2GameBatch531F0Env e = mkE5(h); d2game_587C0(e, obj, msg);
+}
+void D2G5_59360_probe(void* obj, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); D2GameBatch531F0Env e = mkE5(h); g_d2game531F0Env = e; d2game_59360(obj); g_d2game531F0Env = D2GameBatch531F0Env{};
 }

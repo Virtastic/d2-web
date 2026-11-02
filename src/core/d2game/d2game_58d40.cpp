@@ -1,22 +1,16 @@
-// src/core/d2game/d2game_58d40.cpp -- 1.13c D2Game.dll sub_58D40 from the cached decompile.
-// Same quest-state callback shape as 0x58F90 (quest id 0x28); callees are seams on the 58F90 env.
-#include <cstdint>
-#include <cstring>
-
-struct D2GameBatch58F90Env {
-    void*   (*ordinal10920)(void* p);
-    uint32_t(*ordinal10174)(uint32_t a, uint32_t b, uint32_t c);
-    void    (*sub354F0)(void* a, void* b);
-};
-extern D2GameBatch58F90Env g_d2game58F90Env;
-
-// 1.13c D2Game+0x58D40
-uint32_t d2game_58D40(void* p1, void* p2) {
-    auto& E = g_d2game58F90Env;
-    void* r = E.ordinal10920(p2);
-    uint32_t u; std::memcpy(&u, (uint8_t*)r + 0x10 + ((uint8_t*)p1)[0x6d] * 4, 4);
-    if ((E.ordinal10174(u, 0x28, 0) != 0 || E.ordinal10174(u, 0x28, 0xf) != 0) &&
-        E.ordinal10174(u, 0x28, 0xd) == 0 && E.ordinal10174(u, 0x28, 0xe) == 0) return 0;
-    E.sub354F0(p2, p1);
-    return 0;
+// 1.13c D2Game+0x58D40: ecx = unit (+0x6D byte index), edx = ctx, one unused stack word... (ret 4: the stack word is the unit passed on); returns 0. #A4C0 = Ordinal_10920(ctx); #A568 = Ordinal_10174 (getter); #354F0 is a register callee (al = 0x24 over the last getter result's upper bytes, ecx = ctx, one stack word = unit).
+#include "d2game_seam4e.h"
+extern "C" void d2g_58d40(uint32_t unit, uint32_t ctx, const D2Seam* e)
+{
+    const uint32_t tbl = e->call(0xA4C0, 0, 0, 0, 0, 0, ctx);
+    const uint32_t ent = d2rd32(tbl + 0x10 + d2rd8(unit + 0x6D) * 4);
+    uint32_t last = e->call(0xA568, 0, 0, 0, 0, 0, ent, 0x28, 0);
+    bool go = false;
+    if (!last) { last = e->call(0xA568, 0, 0, 0, 0, 0, ent, 0x28, 0xF); go = (last == 0); }
+    if (!go) {
+        last = e->call(0xA568, 0, 0, 0, 0, 0, ent, 0x28, 0xD);
+        if (last) go = true;
+        else { last = e->call(0xA568, 0, 0, 0, 0, 0, ent, 0x28, 0xE); go = (last != 0); }
+    }
+    if (go) e->call(0x354F0, (last & ~0xFFu) | 0x24, ctx, 0, 0, 0, unit);
 }

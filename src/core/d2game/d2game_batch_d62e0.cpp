@@ -44,11 +44,12 @@ template <typename E> static inline uint32_t R32(const E* e, uint32_t a, uint32_
 template <typename E> static inline void     W32(const E* e, uint32_t a, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)e->at(a) + o, &v, 4); }
 
 // 1.13c D2Game+0xD62E0 -- move an item out of a unit's inventory onto the cursor (ItemMode.cpp 0x966/0x979).
-// self = unit whose +0x60 holds the inventory (zero type = player), p1 = game-side table base, p2 / p3 = out cells,
-// eax = inventory override (0 keeps the unit's own), edi = caller flag (low byte), p5 = bypass the lock check.
+// self = unit whose +0x60 holds the inventory (zero type = player), p1 = game, p2 = item id, p3 = out cell (retail ret 0x18: game, id, out, unused, unused, bypass),
+// eax = inventory override (0 keeps the unit's own), edi unused (the decompile's unaff_EDI is the item kind from #10020, verified against the disassembly), p5 = bypass the lock check.
+// Delta fixed vs the earlier port: the item-hash walk keys on the item id (p2), not the game pointer, and the two out writes hit the same cell (p3).
 
 extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t d2_fn_d2game_D62E0(uint32_t self, uint32_t p1, uint32_t p2, uint32_t p3, uint32_t eax, uint32_t edi,
+uint32_t d2_fn_d2game_D62E0(uint32_t self, uint32_t p1, uint32_t p2, uint32_t p3, uint32_t eax, uint32_t /*edi*/,
                             int32_t p5, const D2GameBatchD62E0Env* e)
 {
     if (p1 == 0) e->fatal(0x907);
@@ -59,15 +60,15 @@ uint32_t d2_fn_d2game_D62E0(uint32_t self, uint32_t p1, uint32_t p2, uint32_t p3
     if (inv == 0) e->fatal(0x911);
     if (e->o11017(inv) != 0 && p5 == 0) return 0;
 
-    uint32_t item = R32(e, p1, 0x1720 + (p1 & 0x7f) * 4);
+    uint32_t item = R32(e, p1, 0x1720 + (p2 & 0x7f) * 4);
     for (;;) {
-        if (item == 0) { W32(e, p2, 0, 1); return 0; }
-        if (R32(e, item, 0xC) == p1) break;
+        if (item == 0) { W32(e, p3, 0, 1); return 0; }
+        if (R32(e, item, 0xC) == p2) break;
         item = R32(e, item, 0xE4);
     }
     if (R32(e, item, 0) != 4) return 0;
-    if (R32(e, self, 0) == 0 && e->sub57680() == 0 && e->o10020(item) != 0) { W32(e, p2, 0, 1); return 0; }
-    if (R32(e, item, 0x10) != 0) { W32(e, p2, 0, 1); return 0; }
+    if (R32(e, self, 0) == 0 && e->sub57680() == 0 && e->o10020(item) != 0) { W32(e, p3, 0, 1); return 0; }
+    if (R32(e, item, 0x10) != 0) { W32(e, p3, 0, 1); return 0; }
 
     e->sub29F0(self);
     W32(e, item, 0xC4, R32(e, item, 0xC4) & ~0x2u);
@@ -81,7 +82,7 @@ uint32_t d2_fn_d2game_D62E0(uint32_t self, uint32_t p1, uint32_t p2, uint32_t p3
     e->sub4630(self);
     uint8_t kind = e->o10020(item);
     iVar7 = e->o10584(self, kind, R32(e, p1, 0x70));
-    bool notifyClient = !(R32(e, self, 0) != 0 || (edi & 0xff) == 1);
+    bool notifyClient = !(R32(e, self, 0) != 0 || kind == 1);
     int32_t iVar5 = e->sub21130(item);
     int32_t iVar8 = e->sub21100(item);
     e->o10869(e->fileItemMode, 0x966, item);

@@ -387,3 +387,15 @@ extern "C" void d2game_687d0(uint8_t* q)
     wr32(q, 0x18, (uint32_t)(uintptr_t)d);
     std::memset(d, 0, 0x6f * 4);   // remaining field stores in retail are zero over the zeroed block
 }
+
+// ---- FUNCTION-mode probe for 0x573D0 (src/core/fn/d2game_573d0.cpp): the one seam it uses (D2Common #11090) logs through HookEnv.
+#include <emscripten.h>
+#include "../fn/hookenv.h"
+static HookEnv* q573H; static D2G573Env q573E;
+extern "C" __attribute__((weak)) D2G573Env* d2g573_env() { return &q573E; }
+void D2G573_573D0_probe(int32_t* ctx, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); q573H = &h; q573E = D2G573Env{};
+    q573E.setMode = [](void* u, int32_t m) { q573H->h(0xA4A2, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u, (uint32_t)m); };
+    d2game_573d0(ctx);
+}

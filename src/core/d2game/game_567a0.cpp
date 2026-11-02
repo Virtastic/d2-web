@@ -20,3 +20,23 @@ W GAME_567A0(const D2G567A0Seam& s, W rec)
     }
     return C(6, s.rd(q + 0xF0));
 }
+
+// ---- FUNCTION-mode probe for 0x567A0 (src/core/fn/d2game_567a0.cpp): 33F30 and the quest handler log through HookEnv; IsBadCodePtr is 0 (the descriptor pins a module code pointer).
+#include <emscripten.h>
+#include "../fn/hookenv.h"
+static HookEnv* q67H; static W q67Rec, q67Node;
+uint32_t D2G567A0_probe(uint32_t rec, uint32_t* lg, const uint32_t* sc, uint32_t nd)
+{
+    HookEnv h(lg, sc); q67H = &h; q67Rec = rec; q67Node = nd;
+    D2G567A0Seam s{};
+    s.rd = [](W a) -> W { return HookEnv::rd32(a); };
+    s.wr8 = [](W a, uint8_t v) { *(uint8_t*)(uintptr_t)a = v; };
+    s.call = [](void*, W id, const W* w) -> W {
+        switch (id) {
+        case 1: return q67H->h(0x33F30, HookEnv::rd32(q67Rec + 4), w[0]) ? q67Node : 0;
+        case 6: return q67H->h(HookEnv::handlerRva(w[0]), 0, q67Node);
+        default: return 0;
+        }
+    };
+    return GAME_567A0(s, rec);
+}

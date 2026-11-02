@@ -427,12 +427,12 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d8020(uint32_t player, uin
     uint32_t o2 = call(env->o10646, pd, other);
     if (o2 == 0) FATAL(0xbc9);
     if (other != o2) FATAL(0xbca);
-    call(env->o10608, pd);
+    call(env->o10608, pd, slot);
     if (call(env->o11088, o2) == 0x13) call(env->sub_D7E30, game, player);
     call(env->o10466, pd, other);
     wr32(H(other), 0xC4, rd32(H(other), 0xC4) & 0xfffffffdu);
     call(env->o11090, other, 4);
-    if (call(env->o11041, pd, it, other) != 0) {
+    if (call(env->o11041, pd, it, param2) != 0) {
         if (call(env->o10405, pd, it, 3) == 0) { *outErr = 1; return 0; }
         call(env->o10058, it, param2);
         call(env->o10138, pd, it);
@@ -440,12 +440,12 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d8020(uint32_t player, uin
         wr32(H(it), 0xC4, rd32(H(it), 0xC4) & 0xfffffffdu);
         call(env->o11090, it, 1);
         call(env->o10012, it, 0xff);
-        call(env->o10892, it, 0x10000);
+        call(env->o10892, it, 0x10000, 1);   // third arg 1 (disasm 0x6FCF8299)
         call(env->o10977, it, 1, 1);
         if (call(env->o10202, it, 0x4000, 0xbe7)) call(env->o10977, it, 0x4000, 0);
         call(env->o10050, pd, it);
         call(env->sub_D28D0);
-        call(env->sub_D51A0, 1, player);
+        call(env->sub_D51A0, game, player, 0);
     }
     call(env->o10201, player, 1);
     return 1;
@@ -471,8 +471,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d8600(uint32_t player, uin
     uint32_t inv = call(env->o10061, pd);
     if (inv) call(env->o11055, player, inv);
     uint32_t other = call(env->o11139, pd, slot);
-    uint32_t tmp = 0;
-    call(env->o10605, player, pd, (uint32_t)(uintptr_t)&tmp, slot);
+    call(env->o10605, player, pd, (uint32_t)(uintptr_t)&other, slot);   // writes through the same local as `other` (disasm 0x6FCF86F4..6FCF8704)
     if (other == 0 || rd32(H(other), 0x10) != 1) { *outErr = 1; return 0; }
     call(env->sub_D46B0, game, 0);
     if (param3 == 0 && call(env->o10244, it, player, 0, 0, 0, 0) == 0) {
@@ -481,11 +480,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d8600(uint32_t player, uin
         return 0;
     }
     if (call(env->o11088, it) == 0x13) call(env->sub_D7E30, game, player);
-    call(env->o10013, player, slot);
+    call(env->o10013, player, other);
     call(env->o10694, pd, other);
-    uint32_t o2 = call(env->o10646, pd, it);
+    uint32_t o2 = call(env->o10646, pd, other);
     if (o2 == 0) FATAL(0xcef);
-    if (player != o2) FATAL(0xcf0);
+    if (other != o2) FATAL(0xcf0);
     call(env->o10608, pd, slot);
     call(env->o10466, pd, other);
     wr32(H(other), 0xC4, rd32(H(other), 0xC4) & 0xfffffffdu);
@@ -497,7 +496,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d8600(uint32_t player, uin
     call(env->o10050, pd, other);
     if (call(env->o11041, pd, it, slot) == 0) { *outErr = 1; return 0; }
     if (call(env->o10405, pd, it, 3) == 0) { *outErr = 1; return 0; }
-    call(env->o10058, it, other);
+    call(env->o10058, it, slot);
     call(env->o10138, pd, it);
     call(env->sub_D47C0);
     wr32(H(it), 0xC4, rd32(H(it), 0xC4) & 0xfffffffdu);
@@ -510,6 +509,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d8600(uint32_t player, uin
     if (call(env->o10202, it, 0x4000, 0xd13)) call(env->o10977, it, 0x4000, 0);
     call(env->o10050, pd, it);
     call(env->sub_D28D0);
-    call(env->sub_D51A0, 1, player);
+    call(env->sub_D51A0, game, player, 0);
     return 1;
 }

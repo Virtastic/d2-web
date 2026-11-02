@@ -19,7 +19,8 @@
 static inline uint8_t  rd8 (const void* p, uint32_t o) { return ((const uint8_t*)p)[o]; }
 static inline int16_t  rd16(const void* p, uint32_t o) { int16_t v; std::memcpy(&v, (const uint8_t*)p + o, 2); return v; }
 static inline int32_t  rd32(const void* p, uint32_t o) { int32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
-static inline void*    rdptr(const void* p, uint32_t o) { void* v; std::memcpy(&v, (const uint8_t*)p + o, sizeof v); return v; }
+// retail structs hold 32-bit pointers (the FN blobs patch 4-byte words): read 4 bytes, widen
+static inline void*    rdptr(const void* p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return (void*)(uintptr_t)v; }
 static inline void     wr8 (void* p, uint32_t o, uint8_t v) { ((uint8_t*)p)[o] = v; }
 static inline void     wr32(void* p, uint32_t o, int32_t v) { std::memcpy((uint8_t*)p + o, &v, 4); }
 
@@ -302,9 +303,9 @@ void D2GAME_57000(void* obj, void* msg, void* game)
     auto send = [&] { E.sub53EB0(obj, a14, id); };
     uint8_t mode = rd8(obj, 0xc);
     if (id > 0x218 && id < 0x21c) {
-        void* d = nullptr;
-        if (!D2GAME_56640(game, &d)) return;
-        bool off = rd8(d, 0x90) == 0;
+        if (!D2GAME_56640(game, nullptr)) return;
+        // retail loads edx from [obj+0x18] before the call and 56640 leaves it alone: the +0x90 flag is on the obj's own pointer.
+        bool off = rd8(rdptr(obj, 0x18), 0x90) == 0;
         if ((mode == 1 && off) || (mode == 2 && !off)) send();
         return;
     }
@@ -365,4 +366,53 @@ uint32_t D2Game_405E0_probe(void* game, void* unit, const uint8_t* dt, uint32_t*
     uint32_t r = D2GAME_405E0(game, unit);
     d2game_batch_405e0_bind(nullptr);
     return r;
+}
+
+// ---- function probes for 0x56A00 / 0x56A40 / 0x56BD0 / 0x56D10 / 0x57000 / 0x57320 (src/core/fn/d2game_<rva>.cpp).
+// Each seam logs through HookEnv exactly as the capture's hook recorder does and returns the scripted value; `arr`
+// (the quest array 10920 returns) and `nd` (the node 33F30 returns) are blobs the descriptor passes as extra args.
+static uint32_t U32(const void* p) { return (uint32_t)(uintptr_t)p; }
+static void* g6Arr; static void* g6Node; static void* g6Game; static const uint32_t* g6Tbl;
+static D2GameBatch405E0Env mkQuestEnv(HookEnv& h)
+{
+    g5H = &h;
+    D2GameBatch405E0Env e{};
+    e.tbl57000 = g6Tbl;
+    e.ord10141 = [](void* s, void* d) { g5H->h(0xA544, 0, 0, 0, 0, 0, U32(s), U32(d)); };
+    e.ord10920 = [](int32_t v) -> int32_t { g5H->h(0xA4C0, 0, 0, 0, 0, 0, (uint32_t)v); return (int32_t)(intptr_t)g6Arr; };
+    e.ord10174 = [](int32_t q, int32_t t, int32_t f) -> int32_t { return (int32_t)g5H->h(0xA568, 0, 0, 0, 0, 0, (uint32_t)q, (uint32_t)t, (uint32_t)f); };
+    e.ord10003 = [](int32_t q, int32_t t, int32_t v) { g5H->h(0xA57A, 0, 0, 0, 0, 0, (uint32_t)q, (uint32_t)t, (uint32_t)v); };
+    e.sub53EB0 = [](void* o, int32_t a, int32_t m) { g5H->h(0x33EB0, 0, U32(o), 0, 0, 0, (uint32_t)a, (uint32_t)m); };
+    e.ord10331 = [](int32_t v) -> void* { return (void*)(uintptr_t)g5H->h(0xA478, 0, 0, 0, 0, 0, (uint32_t)v); };
+    e.ord10826 = [](void* p) -> void* { return (void*)(uintptr_t)g5H->h(0xA556, 0, 0, 0, 0, 0, U32(p)); };
+    e.ord10459 = [](void* p) -> int8_t { return (int8_t)g5H->h(0xA56E, 0, 0, 0, 0, 0, U32(p)); };
+    e.sub53F30 = [](int32_t id) -> void* { uint32_t v = g5H->h(0x33F30, U32(g6Game), (uint32_t)id); return v ? g6Node : nullptr; };
+    e.isBadCodePtr = [](void*) -> int32_t { return 0; };
+    e.callHandler = [](void* handler, void*) -> int32_t { return (int32_t)g5H->h(HookEnv::handlerRva(U32(handler)), 0, U32(g6Node)); };
+    return e;
+}
+uint32_t D2Game_56A00_probe(void* game, void* pt, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); D2GameBatch405E0Env e = mkQuestEnv(h); d2game_batch_405e0_bind(&e);
+    uint32_t r = D2GAME_56A00(game, pt); d2game_batch_405e0_bind(nullptr); return r;
+}
+uint32_t D2Game_56A40_probe(void* game, void* pt, int32_t* out, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); D2GameBatch405E0Env e = mkQuestEnv(h); d2game_batch_405e0_bind(&e);
+    uint32_t r = D2GAME_56A40(game, pt, out); d2game_batch_405e0_bind(nullptr); return r;
+}
+uint32_t D2Game_56BD0_probe(void* obj, void* nd, uint32_t* lg, const uint32_t* sc, bool second)
+{
+    HookEnv h(lg, sc); g6Node = nd; g6Game = rdptr(obj, 4); D2GameBatch405E0Env e = mkQuestEnv(h); d2game_batch_405e0_bind(&e);
+    uint32_t r = second ? D2GAME_56D10(obj) : D2GAME_56BD0(obj); d2game_batch_405e0_bind(nullptr); return r;
+}
+void D2Game_57000_probe(void* obj, void* msg, uint32_t* lg, const uint32_t* sc, void* arr, const uint32_t* tbl)
+{
+    HookEnv h(lg, sc); g6Arr = arr; g6Tbl = tbl; D2GameBatch405E0Env e = mkQuestEnv(h); d2game_batch_405e0_bind(&e);
+    D2GAME_57000(obj, msg, rdptr(obj, 4)); d2game_batch_405e0_bind(nullptr);
+}
+uint32_t D2Game_57320_probe(void* game, int32_t handle, uint32_t* lg, const uint32_t* sc, void* arr)
+{
+    HookEnv h(lg, sc); g6Arr = arr; D2GameBatch405E0Env e = mkQuestEnv(h); d2game_batch_405e0_bind(&e);
+    uint32_t r = D2GAME_57320(game, handle); d2game_batch_405e0_bind(nullptr); return r;
 }

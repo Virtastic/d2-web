@@ -38,11 +38,17 @@ struct D2GameBatchAD860Env {
 };
 #define O(n, a, b, c, d, e) env->ord(n, (uintptr_t)(a), (uintptr_t)(b), (uintptr_t)(c), (uintptr_t)(d), (uintptr_t)(e))
 
-// AD860 / AD910 share one body. ECX=self, p4 packs two words (Ordinal_10910(unit, p4>>16, p4)).
-static uint32_t useSkillItem(void* self, void* unit, uint32_t p2, uint32_t p4, const D2GameBatchAD860Env* env)
+// AD860 / AD910 share one body: SKILLITEM_EventFunc10 (lightning, +0x1C, hit class 0x4D) and EventFunc06 (physical, +0x08, 0x8D).
+// ECX=self, p4 packs two words (Ordinal_10910(unit, p4>>16, p4)). The decompile hid the stores into the damage block; the
+// disassembly writes wResultFlags |= 0x4021 (+4), the damage word (n << 8) and dwHitClass (+0x60) before the 0xDE0C0 call.
+static uint32_t useSkillItem(void* self, void* unit, uint32_t p2, uint32_t p4, uint32_t dmgOff, uint32_t hitClass, const D2GameBatchAD860Env* env)
 {
-    if (unit && p2 && (rd32((void*)(uintptr_t)p2, 0xc4) >> 2 & 1) && (int32_t)O(10910, unit, p4 >> 16, p4, 0, 0) > 0) {
+    int32_t n;
+    if (unit && p2 && (rd32((void*)(uintptr_t)p2, 0xc4) >> 2 & 1) && (n = (int32_t)O(10910, unit, p4 >> 16, p4, 0, 0)) > 0) {
         uint32_t buf[0x1c] = {0};
+        buf[1] |= 0x4021;                       // wResultFlags (16-bit at +4)
+        buf[dmgOff / 4] = (uint32_t)n << 8;
+        buf[0x60 / 4] = hitClass;
         env->subDE0C0(self, unit, 1, buf);
         env->subDCF20(self, unit, buf);
         return 1;
@@ -51,10 +57,10 @@ static uint32_t useSkillItem(void* self, void* unit, uint32_t p2, uint32_t p4, c
 }
 // 1.13c D2Game+0xAD860
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_AD860(void* self, void* unit, uint32_t p2, uint32_t p3, uint32_t p4, const D2GameBatchAD860Env* env)
-{ (void)p3; return useSkillItem(self, unit, p2, p4, env); }
+{ (void)p3; return useSkillItem(self, unit, p2, p4, 0x1c, 0x4d, env); }
 // 1.13c D2Game+0xAD910
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_AD910(void* self, void* unit, uint32_t p2, uint32_t p3, uint32_t p4, const D2GameBatchAD860Env* env)
-{ (void)p3; return useSkillItem(self, unit, p2, p4, env); }
+{ (void)p3; return useSkillItem(self, unit, p2, p4, 0x08, 0x8d, env); }
 
 // 1.13c D2Game+0xADAC0
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_ADAC0(uint32_t p1, void* p2, uint32_t p3, uint32_t p4, const D2GameBatchAD860Env* env)
