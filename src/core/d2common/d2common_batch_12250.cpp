@@ -45,7 +45,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_32ca0(uint32_t unit, int32_t type, int3
  w(unit,0xC8)|=0x400;
 }
 // 1.13c D2Common+0x24F00: item record gate, durability, type, and ethereal flag.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_24f00(uint32_t item, int32_t rowCount, uint32_t rows,
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_24F00_ItemRepairable(uint32_t item, int32_t rowCount, uint32_t rows,
  int32_t (*itemRow)(uint32_t), uint32_t (*hasDurability)(uint32_t),
  uint32_t (*validType)(uint32_t), uint32_t (*isEthereal)(uint32_t)) {
  if (!item) return 0;

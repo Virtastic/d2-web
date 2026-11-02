@@ -3,7 +3,7 @@
 #include <emscripten.h>
 extern "C" {
 // 1.13c D2Common+0x876D7
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_876d7(uint32_t* m, int32_t n) {
+EMSCRIPTEN_KEEPALIVE void D2Common_ShrMan_876D7(uint32_t* m, int32_t n) {
   uint32_t b = (uint32_t)(n % 32), carry = 0;
   for (int i = 0; i < 3; i++) {
     uint32_t v = m[i];

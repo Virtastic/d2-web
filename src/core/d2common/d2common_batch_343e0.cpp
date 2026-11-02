@@ -133,12 +133,11 @@ EMSCRIPTEN_KEEPALIVE int32_t D2SetStatWithNoTest(uint32_t pUnit,
 		return 0;
 
 	int32_t nValue = pfn22B70 ? pfn22B70(W(u, 0x04)) : 0;
-	uint8_t* t = T();
-	if (W(u, 0x5C) != 0 && static_cast<int32_t>(R(t, 0xBD4)) >= 0xFF)
+	if (W(u, 0x5C) != 0 && sgptDataTables->nItemStatCostTxtRecordCount >= 0xFF)
 	{
-		const uint32_t pStatList = R(t, 0xBCC) + 0x14178;
-		if (pStatList != 0 && pfn38A80)
-			nValue += pfn38A80(pStatList, 0);
+		const D2ItemStatCostTxt* pRow = sgptDataTables->pItemStatCostTxt + 0xFE;   // retail: +0xBCC table, row 0xFE (+0x14178)
+		if (sgptDataTables->pItemStatCostTxt && pfn38A80)
+			nValue += pfn38A80(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pRow)), 0);
 	}
 
 	if (nValue > 0x1FE)

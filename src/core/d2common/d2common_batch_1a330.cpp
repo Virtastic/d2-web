@@ -7,6 +7,7 @@
 #include "D2DataTbls.h"
 #include "DataTbls/ItemsTbls.h"
 #include "DataTbls/MonsterTbls.h"
+#include "D2Items.h"
 
 extern "C" {
 __attribute__((weak)) uint32_t Ordinal_10265(uint32_t);
@@ -148,10 +149,10 @@ extern "C" uint32_t D2Common_27090_ItemCheck(const void* pUnit,
 {
     if (pUnit == nullptr || *static_cast<const int32_t*>(pUnit) != 4)
         return 0;
-    const uint8_t* pItemData = *reinterpret_cast<const uint8_t* const*>(static_cast<const uint8_t*>(pUnit) + 0x14);
+    const D2ItemDataStrc* pItemData = static_cast<const D2UnitStrc*>(pUnit)->pItemData;   // retail +0x14
     if (pItemData == nullptr)
         return 0;
-    const uint32_t dwFlags = *reinterpret_cast<const uint32_t*>(pItemData + 0x18);
+    const uint32_t dwFlags = pItemData->dwItemFlags;   // retail item data +0x18
     if ((dwFlags & 0x10) == 0 || (dwFlags & 0x400000) != 0)
         return 0;
     uint32_t nOut = 0;

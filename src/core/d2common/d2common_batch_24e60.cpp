@@ -22,7 +22,7 @@ namespace
 
 // Item unit -> ItemTypes.txt row (via 0x230F0) field +0x0E (wQuiver), sign-extended; 0 otherwise.
 // 1.13c D2Common+0x24E60
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_24e60(uint32_t pUnit) {
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t D2Common_24E60_GetItemQuiver(uint32_t pUnit) {
 	if (!pUnit || W(P(pUnit), 0) != 4) return 0;
 	const int32_t t = static_cast<int32_t>(ITEMS_GetItemType(reinterpret_cast<D2UnitStrc*>(P(pUnit))));
 	if (t < 0 || t >= sgptDataTables->nItemTypesTxtRecordCount || !sgptDataTables->pItemTypesTxt) return 0;

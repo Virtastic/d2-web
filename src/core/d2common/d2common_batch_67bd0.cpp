@@ -318,7 +318,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_4e0a0(uint8_t* pObject, uint32_t nValue
 // path is a fatal report in retail; we answer 0.
 // 1.13c D2Common+0x24BF0
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_24bf0(D2UnitStrc* pUnit)
+EMSCRIPTEN_KEEPALIVE uint8_t D2Common_24BF0_GetItem2Handed(D2UnitStrc* pUnit)
 {
 	if (!pUnit || pUnit->dwUnitType != UNIT_ITEM) return 0;
 
@@ -327,13 +327,14 @@ EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_24bf0(D2UnitStrc* pUnit)
 }
 
 // 1.13c D2Common+0x25BD0 (#10328) applies the base-variant check (0x24D00) to an item unit's class
-// id. A null unit (0x78D) or a non-item (0x78E) is fatal in retail; here a no-op.
+// id and returns its answer (retail tail-jumps into 0x24D00). A null unit (0x78D) or a non-item (0x78E)
+// is fatal in retail; here 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_25bd0(D2UnitStrc* pUnit)
+EMSCRIPTEN_KEEPALIVE uint8_t D2Common_25BD0_CheckBaseVariant(D2UnitStrc* pUnit)
 {
-	if (!pUnit || pUnit->dwUnitType != UNIT_ITEM) return;
+	if (!pUnit || pUnit->dwUnitType != UNIT_ITEM) return 0;
 
-	(void)D2Common_24D00_ItemIsBaseVariantNotQuest((uint32_t)pUnit->dwClassId);
+	return (uint8_t)D2Common_24D00_ItemIsBaseVariantNotQuest((uint32_t)pUnit->dwClassId);
 }
 
 // 1.13c D2Common+0x1D760 (#10330) stdcall(pUnit): installs an empty two-dword missile stream (MisStream.cpp:0x2E). The

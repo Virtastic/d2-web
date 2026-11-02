@@ -83,7 +83,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3bb80(uint32_t pRecord, uint32_t nValue
 // 1.13c D2Common+0x24e10: itemtypes.txt nAutoStack (+0x13) of an item unit's item type. Anything
 // but a type-4 unit, an out-of-range item type or a missing row answers 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_24e10(uint32_t pUnit) {   // 1.13c D2Common+0x24E10
+EMSCRIPTEN_KEEPALIVE uint8_t D2Common_24E10_GetItemAutoStack(uint32_t pUnit) {   // 1.13c D2Common+0x24E10
 	uint8_t* u = P(pUnit);
 	if (!u || U(u, 0x00) != 4) return 0;
 	const int32_t nItemType = static_cast<int32_t>(ITEMS_GetItemType(reinterpret_cast<D2UnitStrc*>(u)));
