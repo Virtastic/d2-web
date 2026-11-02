@@ -682,7 +682,7 @@ void D2GAME_PACKETS_SendPacket0xA0_A1_A2_6FC3D610(D2ClientStrc* pClient, D2UnitS
     memcpy(b + 2, &id, 4);
     int n;
     if (d < 0xFF) { b[0] = 0xA1; b[6] = (uint8_t)d; n = 7; }
-    else if (d > 0xFFFE) { b[0] = 0xA0; memcpy(b + 6, &nBaseValue, 4); n = 10; } // 1.13c D2Game+0x8BB10: the wide form carries EDI (the base value), not the delta
+    else if (d > 0xFFFE) { b[0] = 0xA0; memcpy(b + 6, &nBaseValue, 4); n = 10; } // the wide form carries the base value, not the delta
     else { b[0] = 0xA2; uint16_t w = (uint16_t)d; memcpy(b + 6, &w, 2); n = 8; }
     D2GAME_PACKETS_SendPacket_6FC3C710(pClient, b, n);
 }

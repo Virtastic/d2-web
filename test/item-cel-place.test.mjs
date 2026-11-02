@@ -8,7 +8,7 @@ import { VENDOR_LAYOUT } from '../play/assets/vendor-panel.mjs';
 import { beltBoxes } from '../play/assets/belt-renderer.mjs';
 import { stashGeometry } from '../play/assets/stash-panel.mjs';
 
-// OPEND2-18463: small items straddled the cell lines in some panels. Retail 1.13c D2Client has ONE
+// Regression: small items straddled the cell lines in some panels. Retail 1.13c D2Client has ONE
 // rule per kind of placement (item-cel-place.mjs cites the RVAs); these rows pin it for every footprint
 // and every panel, written out independently of the module so the module cannot drift unseen.
 //

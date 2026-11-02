@@ -45,7 +45,7 @@ const TAB_FRAMES = 4;
 //
 // This grid was invented at 90x58 for a cycle, which is why the icons never sat on the
 // background's connector arrows -- and it was written off as "needs RE" while the constants sat in
-// reference/OpenDiablo2. See , "UI / HUD panel layouts".
+// OpenDiablo2.
 // Where the panel's own art is anchored. OpenDiablo2 puts the skill tree at (401, 64) and retail's
 // draw list anchors its backdrop frames at (400|656, 316|492) -- the same pair the inventory panel's
 // InvChar6 frames use, in the same sheet geometry -- so the panel is 320 wide at x 400, and its top is

@@ -1,5 +1,5 @@
 // Where an item's inventory cel lands, for every panel that draws one: the one rule each renderer
-// calls, so the grids, the body and the cursor cannot drift apart again (OPEND2-18463: the stash,
+// calls, so the grids, the body and the cursor cannot drift apart again (a past defect: the stash,
 // cube and trade grids drew one row higher than the inventory and the vendor).
 //
 // Decompile-derived from 1.13c D2Client; the placement is engine behaviour carried here as a JS
