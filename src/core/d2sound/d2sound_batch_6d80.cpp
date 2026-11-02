@@ -27,6 +27,8 @@ void D2Sound_Batch25SetHost(const D2SndBatch25Host& h) { g_h = h; }
 uint32_t D2Sound_PositionalBiasSet(uint32_t v) { g_h.regSave("Diablo II", "Positional Bias", 0, v); g_positionalBias = v; return v; }
 // 1.13c D2sound+0x9AD0 ordinal 10029: stores "Master Volume", identity return.
 uint32_t D2Sound_MasterVolumeSet(uint32_t v) { g_h.regSave("Diablo II", "Master Volume", 0, v); g_masterVolume = v; return v; }
+// FN probe read-back of the module globals 0x164AC (positional bias) and 0x164A4 (master volume).
+void D2Sound_VolumesGet(uint32_t* bias, uint32_t* master) { *bias = g_positionalBias; *master = g_masterVolume; }
 
 // 1.13c D2sound+0x8710 ordinal 10034: push-front {value, next} (0xD4 alloc, only 8 bytes used).
 void D2Sound_ListPush(uint32_t** head, uint32_t value) {

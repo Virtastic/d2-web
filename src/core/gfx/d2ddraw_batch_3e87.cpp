@@ -429,7 +429,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t* d2ddraw_sub_43F0(uint32_t* param_1, uint32_t* par
                 puVar5 = (uint32_t*)((uintptr_t)puVar5 + 2);
                 goto copy;
             }
-            if ((uVar1 & 0xFF000000u) == 0) goto copy;
+            if ((uVar1 & 0xFF000000u) == 0) { puVar5 = (uint32_t*)((uintptr_t)puVar5 + 3); goto copy; }
         }
     }
 copy:

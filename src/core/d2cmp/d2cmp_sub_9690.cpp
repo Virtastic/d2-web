@@ -7,9 +7,13 @@
 extern "C" uint8_t* d2cmp_sub_9690(uint8_t* head, const uint8_t* name) {
     for (uint8_t* n = head; n; std::memcpy(&n, n + 0x10c, 4) ) {
         const uint8_t* a = n; const uint8_t* b = name;
+        // retail (0x9690): a unit matches when its low byte is 0, or when its high byte is 0 after the
+        // low bytes agree; the loop ends on the high byte, not the whole unit ("A" matches node "AB")
         for (;; a += 2, b += 2) {
-            if (a[0] != b[0] || a[1] != b[1]) break;
-            if (!a[0] && !a[1]) return n;
+            if (a[0] != b[0]) break;
+            if (!a[0]) return n;
+            if (a[1] != b[1]) break;
+            if (!a[1]) return n;
         }
     }
     return nullptr;

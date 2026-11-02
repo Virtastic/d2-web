@@ -7,7 +7,7 @@ extern const char s__I_6fc41c80[];                  // Storm .rdata @0x6FC41C80
 }
 
 // 1.13c Storm+0x03820: element dtor, frees the block at +8.
-static void sub_3820(intptr_t e) {
+void sub_3820(intptr_t e) {
   int* p = *(int**)(e + 8);
   if (p) sub_1B960(p, s__I_6fc41c80, -2);
 }
