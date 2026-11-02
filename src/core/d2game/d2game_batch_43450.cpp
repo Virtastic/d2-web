@@ -454,3 +454,16 @@ void D2Game_43CA0_probe(uint8_t* game, int* unit, const uint8_t* dt, uint32_t* l
     e.fAEA80 = [](void* g, void* u, int a, uint32_t b, int c, int d, int) { g43H->h(0x8EA80, 0, (uint32_t)(uintptr_t)g, (uint32_t)(uintptr_t)u, 0, 0, (uint32_t)a, b, (uint32_t)c, (uint32_t)d); };
     sub_43CA0(e, game, unit);
 }
+
+// Probe seam: the expansion client count over a caller-supplied gate and 256-slot client table (the lock is a no-op).
+int d2game_probe_expansion_clients(int init, const uint32_t* buckets32)
+{
+    void* buckets[0x100];   // the capture's table holds 32-bit pointers; widen them for the wasm64 walk
+    for (int i = 0; i < 0x100; ++i) buckets[i] = (void*)(uintptr_t)buckets32[i];
+    D2GameBatch43450Env e{};
+    e.clientsInit = init;
+    e.enterCS = [] {};
+    e.leaveCS = [] {};
+    e.clientBuckets = buckets;
+    return CLIENTS_GetExpansionClientCount(e);
+}
