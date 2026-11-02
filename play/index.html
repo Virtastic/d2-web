@@ -43,7 +43,7 @@
 </script>
 <script src="entry.js"></script>
 <style>
-  :root{color-scheme:dark;--d2-vw:100dvw;--d2-vh:100dvh} *{box-sizing:border-box}
+  :root{color-scheme:dark;--d2-vw:100vw;--d2-vh:100vh} @supports (height:100dvh){:root{--d2-vw:100dvw;--d2-vh:100dvh}} *{box-sizing:border-box}
   /* phone page chrome (assets/phone-shell.mjs): no rubber-band pull or pinch-select of the page, and the
      safe-area insets (a notch, the rounded corners) keep the page clear of the screen's edge. Every inset
      resolves to 0 on a desktop, so the layout there is unchanged. */
@@ -64,7 +64,7 @@
      takes no pointer events, so it never sits between a finger and the game. */
   #rotate-notice{display:none;position:fixed;inset:0;z-index:3;align-items:center;justify-content:center;margin:0;
     background:#050505;color:#c9ad68;font:18px/1.5 Georgia,serif;text-align:center;padding:24px;pointer-events:none}
-  @media (orientation: portrait) and (pointer: coarse){#rotate-notice{display:flex}}
+  @media (orientation: portrait) and (pointer: coarse) and (max-width: 600px){#rotate-notice{display:flex}}
   /* the unsupported screen is prose a phone reads upright (every iPhone gets it); never cover it */
   body.unsupported #rotate-notice{display:none}
   #hud{position:absolute;left:12px;top:10px;margin:0;color:#ddd;text-shadow:1px 1px #000;pointer-events:none;line-height:1.45}
@@ -90,7 +90,7 @@
   html.playing h1,html.playing #session-bar,html.playing .controls,html.playing #log,html.playing #hud{display:none}
   html.playing #viewport{border:0;box-shadow:none;width:min(100%, var(--d2-vh) * 4 / 3)}
   html.fill,html.fill body{overflow:hidden;height:100%}
-  html.fill #viewport{position:fixed;width:100%;height:100%;aspect-ratio:auto;margin:0;
+  html.fill #viewport{position:fixed;width:auto;height:auto;aspect-ratio:auto;margin:0;
     top:env(safe-area-inset-top,0px);right:env(safe-area-inset-right,0px);bottom:env(safe-area-inset-bottom,0px);left:env(safe-area-inset-left,0px)}
   #unsupported{display:none;max-width:560px;padding:20px 24px;margin-top:8px;border:1px solid #493d27;background:#0b0c09;line-height:1.6}
   #unsupported h2{color:#c9ad68;margin:0 0 10px;font:20px Georgia,serif}

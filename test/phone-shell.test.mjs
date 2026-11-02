@@ -333,7 +333,7 @@ test('installPhoneShell on a desktop page with no APIs at all does not throw', a
 test('the portrait rotate notice never covers the unsupported-browser screen', async () => {
   const { readFileSync } = await import('node:fs');
   const html = readFileSync(new URL('../play/index.html', import.meta.url), 'utf8');
-  assert.match(html, /@media \(orientation: portrait\) and \(pointer: coarse\)\{#rotate-notice\{display:flex\}\}/);
+  assert.match(html, /@media \(orientation: portrait\) and \(pointer: coarse\) and \(max-width: 600px\)\{#rotate-notice\{display:flex\}\}/);
   // An upright iPhone gets the unsupported screen; the notice must yield to it, and come after the media rule.
   const media = html.indexOf('#rotate-notice{display:flex}');
   const yieldRule = html.indexOf('body.unsupported #rotate-notice{display:none}');

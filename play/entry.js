@@ -4,7 +4,8 @@
 // empty for them. The test runner keeps its URL options (play=1, seed, debug...) that every scenario uses.
 (() => {
   const test = !!navigator.webdriver;
-  const fill = !test;
+  // fill=1 lets a test run the full-screen view too: the screen-size rows measure its sizing on emulated devices.
+  const fill = !test || /[?&]fill=1(?:&|$)/.test(location.search);
   const search = test ? location.search : '';
   globalThis.__d2Entry = { retail: true, player: true, fill, parity: !fill, search, test, assets: '' };
   if (typeof document !== 'undefined' && document.documentElement) {
