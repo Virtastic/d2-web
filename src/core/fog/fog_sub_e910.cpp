@@ -29,3 +29,9 @@ void fog_sub_E910(const uint8_t* tbl, uint32_t key, uint32_t a, uint32_t b) {
     if (g_after) g_after();
     if (val && g_dispatch) g_dispatch(val, a, b);
 }
+
+// Host hookup: the lock validate, the lock pair, the close callee and the dispatch.
+extern "C" void fog_sub_e910_host(void (*lockInit)(void*), void (*enter)(void*), void (*leave)(void*), void (*after)(),
+                                  void (*dispatch)(uint32_t, uint32_t, uint32_t)) {
+    g_lockInit = lockInit; g_enter = enter; g_leave = leave; g_after = after; g_dispatch = dispatch;
+}

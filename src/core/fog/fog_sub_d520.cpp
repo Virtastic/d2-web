@@ -30,3 +30,8 @@ bool fog_sub_d520(uint8_t* self, int n) {
     }
     return true;
 }
+
+// Host hookup: the clock, the lock pair and the limit callee.
+extern "C" void fog_sub_d520_host(uint32_t (*tick)(), void (*lock)(void*), void (*unlock)(void*), int (*onLimit)(uint32_t)) {
+    g_d520Host = {tick, lock, unlock, onLimit};
+}

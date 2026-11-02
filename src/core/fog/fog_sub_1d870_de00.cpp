@@ -13,6 +13,7 @@ struct FogB14Env {
     uint32_t (*tick)(void);                  // GetTickCount
     void (*log)(const char* fmt, uint32_t v);// Fog+0x190A0
 };
+extern "C" uint32_t DAT_6ffa6ed4;  // hacklist log gate, shared with the other hacklist logs
 static inline uint32_t& W(FogB14Env* e, uint32_t a) { return *reinterpret_cast<uint32_t*>(e->mem + a); }
 
 // 1.13c Fog+0x1D870 -- slot = {HANDLE, int busy, int}; table 0x6FF9AF70, count 0x6FF9AF6C, enabled 0x6FF9AF68.
@@ -50,7 +51,6 @@ extern "C" void fog_sub_DE00(FogB14Env* e, uint32_t self, uint32_t k) {  // 1.13
         cur = next;
     }
     e->leave(cs);
-    static uint32_t last;  // DAT_6ffa6ed4
     uint32_t t = e->tick();
-    if (t - last > 2000) { e->log("[HACKLIST]  Hacklist size is %d", W(e, self + 0x890)); last = t; }
+    if (t - DAT_6ffa6ed4 > 2000) { e->log("[HACKLIST]  Hacklist size is %d", W(e, self + 0x890)); DAT_6ffa6ed4 = t; }
 }
