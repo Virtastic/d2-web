@@ -298,6 +298,8 @@ EMSCRIPTEN_KEEPALIVE void D2Common_SetUnitActRecord_37920(uint32_t pUnit, uint32
 extern "C" uint32_t D2Common_241A0_ItemDataGate(uint32_t);
 int32_t D2Common_230A0_ItemTypeFromItemId(uint32_t);   // defined in d2common_batch_1a330.cpp (C++ linkage)
 extern "C" uint32_t d2_ours_d2common_24610(D2UnitStrc*);
+// Retail's fatal path (error report, then _exit(-1)) is a trap here; the code is kept for the spec.
+[[noreturn]] static void d2_fatal(uint32_t) { __builtin_trap(); }
 // Max sockets (0x24610) for a guest-layout unit: translated to the native structs it reads.
 static uint32_t d2_26ad0_MaxSockets(const int32_t* pUnit, uint8_t* pData)
 {
@@ -317,7 +319,7 @@ extern "C"
 EMSCRIPTEN_KEEPALIVE bool D2Common_26AD0_ItemAcceptable(int32_t* pUnit)
 {
 	if (!pUnit)
-		return false;
+		d2_fatal(0x67E);   // retail: Ordinal_10265(0x67e), Ordinal_10024, _exit(-1)
 
 	uint8_t* pFlags = P(static_cast<uint32_t>(pUnit[5]));
 	const uint32_t nFlags = pFlags ? W(pFlags, 0x18) : 0;
@@ -328,8 +330,14 @@ EMSCRIPTEN_KEEPALIVE bool D2Common_26AD0_ItemAcceptable(int32_t* pUnit)
 	if (pUnit[0] != 4 || !pFlags || (nFlags & 0x1000u) == 0)
 	{
 		const D2ItemsTxt* pRow = DATATBLS_GetItemsTxtRecord(pUnit[1]);
-		if (pRow && pRow->nQuest != 0 && pRow->dwCode != 0x2067656C)
-			return false;
+		if (pRow && pRow->nQuest != 0)
+		{
+			// retail: 0x23290 (FUN_6fd73290) returns the row's dwCode for a type-4 unit and is fatal otherwise (0x61C / 0x61F)
+			if (pUnit[0] != 4)
+				d2_fatal(0x61C);
+			if (pRow->dwCode != 0x2067656C)
+				return false;
+		}
 
 		const bool bNoOwnerFlag = pUnit[0] != 4 || !pFlags || (nFlags & 0x100u) == 0;
 		const bool bNoChainFlag = pUnit[0] != 4 || !pFlags || (nFlags & 0x800u) == 0;
