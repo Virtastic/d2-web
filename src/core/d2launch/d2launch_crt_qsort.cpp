@@ -54,9 +54,13 @@ extern "C" void d2launch_qsort(void* base, size_t num, size_t w, LaunchCmp cmp) 
                 if (mid == g) mid = l;
             }
             g += w;
+            // retail: a first scan reaching g <= mid falls into the second scan (0x1310)
+            bool scan2 = true;
             if (mid < g) {
-                do { g -= w; } while (g > mid && cmp(g, mid) == 0);
-            } else {
+                do { g -= w; if (g <= mid) break; } while (cmp(g, mid) == 0);
+                scan2 = (g <= mid);
+            }
+            if (scan2) {
                 do { g -= w; } while (g > lo && cmp(g, mid) == 0);
             }
             if (g - lo >= hi - l) {
