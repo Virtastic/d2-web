@@ -301,24 +301,35 @@ void D2sound_cc84(const double* p1, const double* p2, double* p3, int op,
     *p3 = m.ret;
 }
 
-// 1.13c D2sound+0x9f40 -- x87 operand classifier used by the pow/exp helpers (FUN_6f9b9f40).
-// The decompile reduces to bit tests on the 80-bit operands; the 0xe000000 / table path is kept as seams.
-uint32_t D2sound_9f40(uint32_t lo, uint32_t hi, uint16_t se, uint32_t lo2, uint32_t hi2, uint32_t se2,
-                      const uint8_t* tbl59c0, void (*scale)(uint32_t*, uint32_t*, uint16_t*)) {
-    (void)lo2; (void)hi2;
+// 1.13c D2sound+0x9f40 FUN_6f9b9f40(int p1, uint p2, ushort p3, undefined4 p4, uint p5, uint p6), cdecl.
+// p1/p2/p3 are an 80-bit x87 value (mantissa lo/hi, sign+exponent); retail never reads p4; p5 is the fallback
+// operand and p6 its exponent word. The scale is FMUL by DAT_6f9c59d8, which is float32 2^63 (exact), so on the
+// denormal path it is a normalise: shift the mantissa left by clz64 and set the exponent to 64 - clz64.
+// Table DAT_6f9c59c0 (16 bytes) is read at (hi & 0x7fffffff) >> 27.
+static const uint8_t kTbl59c0[16] = { 0x00, 0x01, 0x00, 0x00, 0x04, 0x00, 0x00, 0x07,
+                                      0x00, 0x00, 0x0a, 0x00, 0x00, 0x0d, 0x00, 0x00 };
+uint32_t D2sound_9f40(uint32_t p1, uint32_t p2, uint16_t p3, uint32_t p4, uint32_t p5, uint32_t p6) {
+    (void)p4;
+    uint32_t lo = p1, hi = p2;
+    uint16_t se = p3;
     while (!((hi >> 31) != 0)) {                       // !CARRY4(hi,hi): top bit clear = denormal/zero path
         if (lo == 0 && hi == 0) return 0;
         if ((se & 0x7fff) != 0) return se & 0x7fff;
-        uint32_t v = se2 & 0x7fff;
-        if (v == 0) { if (lo2 >> 31) return lo2 * 2; }
-        else if (v == 0x7fff || (v = lo2 * 2, !(lo2 >> 31))) return v;
-        scale(&lo, &hi, &se);                          // multiply by DAT_6f9c59d8, renormalise
+        uint32_t v = p6 & 0x7fff;
+        if (v == 0) { if (p5 >> 31) return p5 * 2; }
+        else if (v == 0x7fff || (v = p5 * 2, !(p5 >> 31))) return v;
+        uint64_t m = ((uint64_t)hi << 32) | lo;          // m != 0 here (zero returned above)
+        int lz = __builtin_clzll(m);
+        m <<= lz;
+        lo = (uint32_t)m;
+        hi = (uint32_t)(m >> 32);
+        se = (uint16_t)((se & 0x8000) | (64 - lz));
     }
     uint32_t u = hi * 2 ^ 0xe000000u;
     if (u & 0xe000000u) return u;
     u = (hi & 0x7fffffffu) >> 0x1b;
-    if (tbl59c0[u]) {
-        if ((se & 0x7fff) != 0 && (se & 0x7fff) != 0x7fff) return (se2 & 0x7fff) != 1 ? (se2 & 0x7fff) : 1;
+    if (kTbl59c0[u]) {
+        if ((se & 0x7fff) != 0 && (se & 0x7fff) != 0x7fff) return (p6 & 0x7fff) != 1 ? (p6 & 0x7fff) : 1;
         return se & 0x7fff;
     }
     return u;
