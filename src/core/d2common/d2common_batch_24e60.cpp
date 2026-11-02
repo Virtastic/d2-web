@@ -85,7 +85,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4ffd0(uint32_t pUnit) {
 
 // Read the object's flags result and its one-bit auxiliary marker.
 // 1.13c D2Common+0x37E70
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_37e70(uint32_t pUnit, uint32_t pAux) {
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_37e70_batch(uint32_t pUnit, uint32_t pAux) {
 	if (pAux) W(P(pAux), 0, 0);
 	if (!pUnit) return 0;
 	const uint32_t pUnitData = W(P(pUnit), 0x5C);

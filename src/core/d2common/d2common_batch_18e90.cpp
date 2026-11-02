@@ -63,7 +63,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_3C020_TakeUnitDataValue(uintptr_t pUnit)
 
 // 1.13c D2Common+0x34720
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint16_t d2_fn_d2common_34720(uintptr_t pPath)
+EMSCRIPTEN_KEEPALIVE uint16_t d2_fn_d2common_34720_batch(uintptr_t pPath)
 {
     if ((*(const uint32_t*)(pPath + 0x34) & 0x20000u) == 0)
     {

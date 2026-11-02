@@ -59,7 +59,7 @@ EMSCRIPTEN_KEEPALIVE bool D2Common_3BF00_InnerByte44AtLeast3(uint32_t pRecord) {
 // +0x4E030: the dword at +0x18 of the record; a null record is retail's fatal path
 // and answers 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4e030(uint32_t pRecord) {   // 1.13c D2Common+0x4E030
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4e030_batch(uint32_t pRecord) {   // 1.13c D2Common+0x4E030
 	if (!pRecord)
 		return 0;
 	return R(P(pRecord), 0x18);
