@@ -214,6 +214,8 @@ void Storm_Sub1460(LPCRITICAL_SECTION cs) { DeleteCriticalSection(cs); }
 
 }  // namespace
 
+// the 0x4C20 node unlink on retail's 32-bit node layout, for the guest-layout element entries in storm_batch_1f20.cpp
+extern "C" void Storm_GuestUnlink(uint8_t* n) { UnlinkNode(n); }
 // 0x4390 for the other Storm list allocators (storm_batch_b51.cpp, storm_sub_4430.cpp): EAX anchor, ECX this, node, EDI mode.
 extern "C" void Storm_ListLink4390(uint32_t* eax, uint8_t* this_, uint8_t* node, int32_t mode) { Storm_Sub4390(eax, this_, node, mode); }
 

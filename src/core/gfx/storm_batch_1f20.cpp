@@ -524,13 +524,23 @@ extern "C" void* Storm_Sub1BC0(void* self, uint8_t flags) {
 // 1.13c Storm+0x1BF0: TSGrowableArray<TSList> dtor (SEH wrapper over 0x2290).
 extern "C" void Storm_Sub1BF0(StormGrowableArray* a) { StormListArrayDestroy(a); }
 // Storm 0x1C30 (1.13c)
-extern "C" void Storm_Sub1C30(StormElement* e) { StormElementDestroy(e); }
+// The exported element entries below take retail's 32-bit element (the native StormElement is wider on wasm64).
+extern "C" void Storm_GuestUnlink(uint8_t* n);   // storm_batch_1000.cpp
+static uint32_t GuestWord(const void* p, uint32_t off) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + off, 4); return v; }
+static void GuestFree(const void* p, uint32_t off, const char* tag) { if (uint32_t d = GuestWord(p, off)) StormFreeTag((void*)(uintptr_t)d, tag); }
+extern "C" void Storm_Sub1C30(void* e) {
+    GuestFree(e, 0x40, ".?AU_FOUNDPARAM@@");
+    GuestFree(e, 0x30, ".?AURECTF@@");
+    GuestFree(e, 0x20, ".?AU_SOURCE@@");
+    Storm_GuestUnlink((uint8_t*)e + 0xC);
+    Storm_GuestUnlink((uint8_t*)e + 4);
+}
 // 1.13c Storm+0x1DA0: free the SOURCE array storage (data at +8).
-extern "C" void Storm_Sub1DA0(StormFixedArray* a) { if (a->data) StormFreeTag(a->data, ".?AU_SOURCE@@"); }
+extern "C" void Storm_Sub1DA0(void* a) { GuestFree(a, 8, ".?AU_SOURCE@@"); }
 // 1.13c Storm+0x1DF0: free the RECTF array storage.
 extern "C" void Storm_Sub1DF0(StormFixedArray* a) { if (a->data) StormFree(a->data); }
 // 1.13c Storm+0x1E40: free the FOUNDPARAM array storage.
-extern "C" void Storm_Sub1E40(StormFixedArray* a) { if (a->data) StormFreeTag(a->data, ".?AU_FOUNDPARAM@@"); }
+extern "C" void Storm_Sub1E40(void* a) { GuestFree(a, 8, ".?AU_FOUNDPARAM@@"); }
 
 // 1.13c Storm+0x1EB0: set a 0x1C-byte-element fixed array to `count` copies of src[0..count).
 extern "C" void Storm_Sub1EB0(uint32_t* a, uintptr_t count, const uint8_t* src) {   // retail 32-bit words {alloc, count, data}, not StormFixedArray's native fields
@@ -565,7 +575,7 @@ extern "C" uint32_t Storm_Sub24F0(StormHashTable* h) {
 }
 
 // C-linkage entry points for the FN probes: the ports above live in an anonymous namespace.
-extern "C" void Storm_Sub1CF0(void* e) { StormElementUnlink((StormElement*)e); }
+extern "C" void Storm_Sub1CF0(void* e) { Storm_GuestUnlink((uint8_t*)e + 0xC); Storm_GuestUnlink((uint8_t*)e + 4); }
 extern "C" void Storm_Port1990(void* h) { StormHashTableFoundationDestroy((StormHashTable*)h); }
 extern "C" void Storm_Port16B0(void* h) { StormHashTableReuseDestroy((StormHashTable*)h); }
 extern "C" void Storm_Port2560(void* h) { StormHashTableReuseInit((StormHashTable*)h); }

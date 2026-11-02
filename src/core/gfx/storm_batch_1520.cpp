@@ -258,6 +258,7 @@ void storm_sub_1990(uint32_t* p) {
 }
 
 }  // namespace
+extern "C" uintptr_t storm_vtable_36b04_standin() { return (uintptr_t)&g_vtable_36b04; }   // the FN probe maps it to retail's 0x6FC36B04
 
 // 1.13c Storm+0x1520: free one AUBREAKCMD record; returns the record's +4 dword when positive
 // (0 otherwise). ESI carries `this` in retail, EDI/param_1 is the fallback when it is null.
