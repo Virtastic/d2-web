@@ -73,6 +73,11 @@ mkdir -p build-wasm
 # pwd -W: git-bash on Windows, where the daemon wants C:/... and MSYS would otherwise mangle
 # the "/c/...:/build" pair into a semicolon list. MSYS_NO_PATHCONV stops the second mangling.
 MOUNT="$(pwd -W 2>/dev/null || pwd)"
+# A worktree links its private sources by absolute path into the main checkout's .private;
+# mount that read-only too, or the links dangle inside the container.
+PRIV_ARGS=()
+PRIV="$(cd "$(git rev-parse --git-common-dir)/.." && pwd)/.private"
+[ -d "$PRIV" ] && [ "$PRIV" != "$MOUNT/.private" ] && PRIV_ARGS=(-v "$PRIV:$PRIV:ro")
 # D2_COMPILER_CACHE (default on; =0 disables) shares compiler results across worktrees, never
 # mutable build objects, so a build recompiles only what changed.
 CACHE_ARGS=()
@@ -82,7 +87,7 @@ if [ "${D2_COMPILER_CACHE:-1}" = 1 ]; then
 fi
 MSYS_NO_PATHCONV=1 docker run --rm "${CACHE_ARGS[@]}" \
   -e D2_TOOLCHAIN_ID="$TOOLCHAIN_ID" -e D2_COMPILE_JOBS="$JOBS" -e HOME=/tmp -e D2_CXXFLAGS="${D2_CXXFLAGS:-}" -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" \
-  -v "$MOUNT:/build" -v "$MOUNT:$MOUNT:ro" "$TOOLCHAIN_ID" bash wasm-build/link-d2.sh
+  -v "$MOUNT:/build" -v "$MOUNT:$MOUNT:ro" "${PRIV_ARGS[@]}" "$TOOLCHAIN_ID" bash wasm-build/link-d2.sh
 
 echo "==> synthetic smoke.mpq"
 NODE_BIN="$(command -v node || command -v node.exe || true)"
@@ -91,7 +96,7 @@ NODE_BIN="$(command -v node || command -v node.exe || true)"
 
 echo "==> precompress engine (in $TOOLCHAIN_ID)"
 MSYS_NO_PATHCONV=1 docker run --rm \
-  -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" -v "$MOUNT:/build" -v "$MOUNT:$MOUNT:ro" "$TOOLCHAIN_ID" \
+  -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" -v "$MOUNT:/build" -v "$MOUNT:$MOUNT:ro" "${PRIV_ARGS[@]}" "$TOOLCHAIN_ID" \
   bash -c 'bash wasm-build/make_br.sh && chown "$D2_OUTPUT_OWNER" play/d2.js.br play/d2.wasm.br'
 
 flock -u 9; exec 9>&-
