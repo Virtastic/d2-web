@@ -140,6 +140,7 @@ wasm-build/*
 !wasm-build/make_br.sh
 !wasm-build/version-engine.sh
 test/*
+!test/input-touch-name.test.mjs
 !test/probe-skip.test.mjs
 !test/land-fold.test.mjs
 !test/public-includes.test.mjs

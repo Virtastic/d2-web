@@ -492,8 +492,25 @@ export function installTouchInput({ documentObject = globalThis.document, window
     else if (oldValue.startsWith(newValue)) { for (let i = oldValue.length; i > newValue.length; i--) tapKey('Backspace', 'Backspace'); }
     else { for (let i = 0; i < oldValue.length; i++) tapKey('Backspace', 'Backspace'); for (const ch of newValue) tapKey('', ch); }
   }
-  nameInput.addEventListener('input', () => { const value = nameInput.value; forwardNameDiff(prevValue, value); prevValue = value; });
-  nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { tapKey('Enter', 'Enter'); e.preventDefault(); } });
+  // The box then shows what the hero's name actually took, never what was typed: a character the game
+  // refuses (an emoji, a letter outside its font) would otherwise stay in the box, and the next
+  // Backspace there would delete a real letter from the name. A real keydown the shell already took
+  // (a hardware keyboard, iOS) leaves the box empty, so keyup re-reads it too. Never mid-composition:
+  // rewriting the value would cancel the keyboard's word.
+  let composing = false;
+  function showTakenName() {
+    if (composing) return;
+    const taken = windowObject.__d2Shell?.charCreateEvidence?.name;
+    if (typeof taken === 'string' && taken !== nameInput.value) nameInput.value = taken;
+    prevValue = nameInput.value;
+  }
+  nameInput.addEventListener('compositionstart', () => { composing = true; });
+  nameInput.addEventListener('compositionend', () => { composing = false; showTakenName(); });
+  nameInput.addEventListener('input', () => { const value = nameInput.value; forwardNameDiff(prevValue, value); prevValue = value; showTakenName(); });
+  nameInput.addEventListener('keyup', showTakenName);
+  // Enter is forwarded once and goes no further: the forwarded one creates the hero and starts the
+  // game, so the real one reaching the window a moment later would open the chat bar.
+  nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { tapKey('Enter', 'Enter'); e.preventDefault(); e.stopPropagation(); } });
 
   // The shell already exposes exactly the signal retail's own name box uses to appear (a class
   // picked): polled, so this needs no new hook into the hot shared shell file.
