@@ -1,5 +1,10 @@
 // Implementation batch (alpha lane): D2Client 0x41100..0x42240. Decompile-derived; no vectors yet.
 // Imported DLL calls and register-passed args are Services; globals are named by RVA in comments.
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#else
+#define EMSCRIPTEN_KEEPALIVE
+#endif
 #include <cstdint>
 #include <cstring>
 extern "C" void d2client_scatter_41100(void* unit, int32_t seedLow, int32_t cx, int32_t cy, int32_t r, int32_t a5, int32_t a6);
@@ -119,4 +124,9 @@ bool queuePush2(Svc& s,int32_t state,int32_t& cnt,int32_t q[5]){
  if(cnt>4) s.fatal(0xa6);
  q[cnt++]=2; return true;
 }
+}
+
+// 1.13c D2Client+0x42090 entry for the FN path: the five inputs the dispatcher reads.
+extern "C" EMSCRIPTEN_KEEPALIVE int d2_client_42090(int32_t metric4b, int32_t cc3cc, int32_t mode, int32_t v90, int32_t v8c) {
+ return d2client_batch_41100::dispA({metric4b, cc3cc, mode, v90, v8c}) ? 1 : 0;
 }
