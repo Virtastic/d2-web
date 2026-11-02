@@ -204,7 +204,7 @@ int32_t sub_2FB50(const Host& h, Tables t, Address player) {
         if (sv < 0 || sv >= h.read<int32_t>(t.dt + 0xBD4)) continue;
         int32_t cnt = static_cast<int32_t>(h.call(ord(10680), {st, static_cast<uintptr_t>(sv), 0}));
         if (cnt <= 0) continue;
-        sum += static_cast<int32_t>(h.call(0x2CD0, {0, static_cast<uintptr_t>(lvl)})) * cnt;
+        sum += static_cast<int32_t>(h.call(0x2CD0, {static_cast<uintptr_t>(id), static_cast<uintptr_t>(lvl)})) * cnt;
     }
     return sum;
 }
