@@ -17,7 +17,7 @@ void     D2Common_36CD0(void* p, int32_t a, int32_t b, int32_t c);
 void*    D2Common_6C4D0(uint32_t a, int32_t idx);
 void     D2Common_83CA0(void* ctx, void* e);
 void     D2Common_84500(void* self, void* e);
-void     D2Common_84890(void* self, void* e);
+extern "C" void D2Common_84890(void* self, void* e);   // C linkage: the 81bc0 port exports it under this name
 void     D2Common_fatal_10024(const void* msg, uint32_t code);
 
 // 1.13c D2Common+0x453D0: thiscall(this, param_1, unit, idx). unit+0x58 = data, data+0x1D0 = key,

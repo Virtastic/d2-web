@@ -214,6 +214,8 @@ void D2Common_84890_ScatterObjects(char** ctx, char* param2)
     }
 }
 
+extern "C" void D2Common_84890(void* self, void* e) { D2Common_84890_ScatterObjects((char**)self, (char*)e); }   // symbol 84AD0 calls
+
 // 1.13c D2Common+0x3DB20: sweep the (w+1)x(h+1) grid column by column, bottom row up, with a 3x3 window kept
 // in locals (initial window from 3D810, then slid one row per step). Window bits (nb[4] centre first, MSB order
 // out[8],out[7],out[6],out[5],out[4]...) index a 256-entry flag table; a hit calls the callback at 0x6FDEB250.

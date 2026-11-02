@@ -208,15 +208,27 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_25c10(D2UnitStrc* item, D2Bi
     }
 }
 
-// 1.13c D2Common+0x833F0: LvlSub teardown; checked against the decompile, matches retail order (wall/tile layers, floor, shadow, drlg file).
+// 1.13c D2Common+0x833F0: LvlSub teardown. Retail does not free the grids: for each grid it asserts the
+// row-offsets pointer is null (Fog assert, DrlgGrid.cpp line 0x218), then zeroes flags and row offsets.
+// Order: per layer wall (+0xA4/+0xA8) then tile (+0x54/+0x58), then floor, then shadow, then the drlg file.
+extern "C" {
+#define W __attribute__((weak))
+W void Ordinal_10046(const char* file, int32_t line, int32_t z);
+}
+static void b5a730_zeroGrid(D2DrlgGridStrc* g)
+{
+    if (g->pCellsRowOffsets) Ordinal_10046("..\\Source\\D2Common\\DRLG\\DrlgGrid.cpp", 0x218, 0);
+    g->pCellsFlags = nullptr;
+    g->pCellsRowOffsets = nullptr;
+}
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_833f0(D2LvlSubTxt* record)
 {
     if (!record->pDrlgFile) return;
     for (int i = 0; i < record->pDrlgFile->nWallLayers; ++i) {
-        DRLGGRID_FreeGrid(nullptr, &record->pWallGrid[i]);
-        DRLGGRID_FreeGrid(nullptr, &record->pTileTypeGrid[i]);
+        b5a730_zeroGrid(&record->pWallGrid[i]);
+        b5a730_zeroGrid(&record->pTileTypeGrid[i]);
     }
-    DRLGGRID_FreeGrid(nullptr, &record->pFloorGrid);
-    DRLGGRID_FreeGrid(nullptr, &record->pShadowGrid);
+    b5a730_zeroGrid(&record->pFloorGrid);
+    b5a730_zeroGrid(&record->pShadowGrid);
     DRLGPRESET_FreeDrlgFile(&record->pDrlgFile);
 }
