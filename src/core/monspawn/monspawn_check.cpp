@@ -901,7 +901,7 @@ static int32_t g_sessionTargetX, g_sessionTargetY;
 static bool g_sessionRunToggle = false;
 
 extern "C" void D2WEB_ResetLastDialogPacket();
-// OPEND2-18462: the NPC "!" latch the send shim keeps from 0x8A / type-1 0x28 (game_net_stubs.cpp).
+// The NPC "!" latch the send shim keeps from 0x8A / type-1 0x28 (game_net_stubs.cpp).
 extern "C" void D2WEB_ResetNpcAlerts();
 extern "C" int D2WEB_NpcAlertActive(int32_t guid);
 extern "C" int D2WEB_CopyLastDialogPacket(D2GSPacketSrv27* pPacket);
@@ -5025,7 +5025,11 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_object_packet(uint32_t objectId) {
     // OBJECTS_OperateHandler through sub_6FC78B20 once the target is in range, so an unfiltered click on a
     // non-selectable object aborts the game. Refuse it where the click is ISSUED, as retail's client does.
     D2UnitStrc* clickedObject = SUNIT_GetServerUnit(g_game, UNIT_OBJECT, (int32_t)objectId);
-    if (!objectClickIsSelectable(clickedObject)) return 0;
+    if (!objectClickIsSelectable(clickedObject)) {
+        D2WEB_ResetPacketStream();   // a refused click sends nothing: the stream the caller reads is empty, not the previous command's
+        D2WEB_PacketStream(&g_sessionPacketStreamLength, &g_sessionPacketStreamPackets);
+        return 0;
+    }
     const int32_t oldLevel = DUNGEON_GetLevelIdFromRoom(UNITS_GetRoom(g_targetPlayer));
     D2WEB_ResetPacketStream();
     if (!sessionDispatchGate(0x13)) return 0;
@@ -5638,7 +5642,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_npc_speech_alerts(uint8_t* out, int cap) {
         if (written >= cap) break;
         uint8_t pending = 0;
         if (unit.type == UNIT_MONSTER) {
-            // OPEND2-18462: retail draws "!" from the 0x8A the server sent (QUESTS_ActiveCycler's
+            // NPC "!" marker: retail draws "!" from the 0x8A the server sent (QUESTS_ActiveCycler's
             // act-quest filters), not from the NPC-intro flags; Halbu and the rest of Act 4 have none.
             pending = (uint8_t)D2WEB_NpcAlertActive((int32_t)unit.id);
         }
