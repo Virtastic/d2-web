@@ -3,28 +3,8 @@
 // Pointers are uintptr_t; wire-packet fields are read at their byte offsets with memcpy.
 #include <cstdint>
 #include <cstring>
+#include "d2client_batch_ad4b0.h"
 namespace d2client_batch_ad4b0 {
-struct Env {
- uint8_t* (*ga)(uint32_t rva);                    // address of D2Client global at RVA
- void (*fatal)(int32_t msgId);                    // Ordinal_10265 + Ordinal_10024 + _exit(-1)
- void (*f62E60)(uint32_t a);
- void (*f4C3C0)(uintptr_t pkt,const void* copy7);
- void (*f7DFB0)(const void* copy40);
- uintptr_t (*f4D630)(uintptr_t pkt,uint32_t id);
- void (*f4DA70)(uint32_t v);
- void (*f272E0)();
- void (*f1A1B0)(uintptr_t a,uint32_t b,uint32_t c);   // FUN_6fada1b0
- void (*f194E0)();
- void (*f34BB0)(); void (*f34AF0)(); void (*f34990)(); void (*f36810)(const void* pkt);
- void (*f34750)(); void (*f32320)(); void (*f34080)(); void (*f35AA0)(); void (*f33AD0)();
- void (*f32C60)(const void* pkt); void (*f32E10)(); void (*f339E0)();
- uintptr_t (*f54E20)(uint32_t key,uintptr_t row,uint32_t idx);
- void (*f32FE0)(uintptr_t unit);
- void (*f21D60)(uintptr_t a,uint32_t b,uint32_t c);
- uint16_t (*f5C1B0)();                            // FUN_6fb5c1b0; result = local_f (GUESS: decompiler lost the out value)
- void (*o10887)(uintptr_t a,uint32_t b,uint32_t c,uint32_t d);
- void (*f6A6C0)(); void (*f56210)();
-};
 static const uint32_t NEXT_OFF=0x39*4; // puVar1[0x39] link in unit node (original 32-bit layout)
 static uintptr_t rdp(uintptr_t a){ uintptr_t v; std::memcpy(&v,(const void*)a,sizeof v); return v; }
 static uint32_t r32(uintptr_t a){ uint32_t v; std::memcpy(&v,(const void*)a,4); return v; }
@@ -32,7 +12,7 @@ static uint16_t r16(uintptr_t a){ uint16_t v; std::memcpy(&v,(const void*)a,2); 
 static uintptr_t row(Env& e,uint32_t t){ return (uintptr_t)e.ga(0xFBA608 + 0) + (uintptr_t)t*0x80*sizeof(uintptr_t); }
 
 // 1.13c D2Client+0xAD4B0
-void sub_AD4B0(Env& e,uint32_t a){ e.f62E60(a); }
+void sub_AD4B0(Env& e,uint32_t a){ uint8_t l[16]={0}; std::memcpy(l,(const void*)(uintptr_t)a,15); e.f62E60((uint32_t)(uintptr_t)l); }   // ECX = packet: its 15 bytes copied to a stack local, EAX = &local
 
 // 1.13c D2Client+0xAD4F0
 void sub_AD4F0(Env& e,uintptr_t p){ uint8_t l[7]; std::memcpy(l,(const void*)p,7); e.f4C3C0(p,l); }
@@ -61,7 +41,7 @@ void sub_AD9D0(Env& e,uintptr_t p){
 }
 
 // 1.13c D2Client+0xADEF0
-void sub_ADEF0(Env& e){ e.f194E0(); }
+void sub_ADEF0(Env& e,uintptr_t p){ uint8_t l[12]={0}; std::memcpy(l,(const void*)p,10); e.f194E0(l); }   // ECX = packet: its 10 bytes copied to a stack local, EAX = &local
 
 // 1.13c D2Client+0xAE080
 void sub_AE080(Env& e,const uint8_t* src){

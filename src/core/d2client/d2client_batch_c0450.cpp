@@ -3,42 +3,8 @@
 // ordinals are Env function pointers (names positional: fNNNN = D2Client RVA, oNNNNN = ordinal).
 #include <cstdint>
 #include <emscripten.h>
+#include "d2client_batch_c0450.h"
 namespace d2client_batch_c0450 {
-using P = uintptr_t;
-struct Env {
- uint32_t (*rd32)(P); void (*wr32)(P, uint32_t); uint8_t (*rd8)(P); void (*wr8)(P, uint8_t);
- uint16_t (*rd16)(P); void (*wr16)(P, uint16_t);
- P dataTables;                       // *sgptDataTables
- P bitMasks10;                       // gdwBitMasks[0x10]
- P str_loadScreenGlobal, str_loadScreenLocal, str_fmtGlobal, str_fmtLocal; // sprintf format/dir strings
- P buf_c980; P str_c8359f; P tbl_fb80580, tbl_fb80864, tbl_fba51bc; // misc data addresses
- P (*f4d850)(P); P (*f4d630)(P, int32_t); bool (*f4dc60)(int32_t, int32_t, int32_t);
- void (*win2Unicode)(P, P, int32_t); void (*personalize)(P, P, P, int32_t, int32_t); void (*ustrcpy)(P, P);
- uint32_t (*o10009)(); P (*o10003)(); void (*o10070)(int32_t, int32_t, int32_t, int32_t);
- int32_t (*o10651)(); int32_t (*o11142)(P); uint32_t (*o11080)(); uint32_t (*o11168)(P);
- int32_t (*o10012)(uint32_t, uint32_t); void (*o10023)(uint32_t, uint32_t, int32_t); int32_t (*o10013)();
- uint32_t (*o10265)(uint32_t); void (*o10024)(P, uint32_t); void (*exit_)(int32_t);
- P (*f55d90)(); int32_t (*f70590)(); void (*f54da0)(P);
- void (*f6e860)(); void (*f0f090)(); void (*f31750)(); void (*f6e020)();
- uint32_t (*getTick)(); void (*o10065)(uint32_t); int32_t (*o10043)(int32_t, int32_t);
- P (*o10331)(P, uint32_t); int32_t (*o10031)(); int32_t (*o10494)(P, int32_t); int32_t (*o10871)(P, int32_t);
- P (*f12b0)(); int32_t (*o10973)(P, int32_t, int32_t); void (*f1b190)(P, int32_t, int32_t, int32_t);
- void (*f4b00)(); int32_t (*o10085)(int32_t, int32_t, int32_t, int32_t);
- void (*f71580)(); uint8_t (*o10190)(int32_t, int32_t, int32_t); void (*o10014)(int32_t, int32_t, int32_t, int32_t, uint32_t, int32_t);
- int32_t (*o10086)(uint32_t); void (*o10041)(const int32_t*, int32_t, int32_t, uint32_t, int32_t, int32_t); void (*o10040)();
- P (*fdb420)(const char*, int32_t);
- uint32_t (*ustrlen)(P); P (*f1a80)(); int32_t (*o10083)(); void (*f6f370)(int32_t, int32_t, uint32_t);
- void (*o10227)(); void (*f72790)(int32_t, int32_t, int32_t); void (*faf7b20)(); int32_t (*f55440)();
- void (*feccc0)(int32_t, P); void (*fecc60)(int32_t, P); int32_t (*o10048)(); int32_t (*o423)(const char*, const char*, int32_t, P);
- void (*o10066)();
- int32_t (*o10043z)(); void (*o10021z)(int32_t); void (*o10062z)(); // register/stack-arg forms (args not recovered)
- void (*fd6cd0)(); void (*fed470)(); void (*f27d30)(); void (*f2cb80)(); void (*f12f60)(); void (*fe5920)(); void (*ffffc0)();
- void (*f0afa0)(); void (*ff6640)(); void (*f11440)(); void (*f5a380)(); void (*f5a190)(); void (*f09740)(int32_t);
- void (*f6f720)(); void (*f3bf10)(); void (*f4fa90)(); void (*fccad0)(); void (*f3b840)(); void (*f53ad0)(); void (*f13d90)();
- void (*o10897)(int32_t, uint32_t);
- // C14F0 register/stack-exact seams (disasm): Fog#10043 free(ecx=blk, edx=file, 0x7a, 0); D2Win#10065 via thunk D39C takes cl; D2CMP#10024 one stack word; f31750 takes eax
- void (*freeFile)(P, P, int32_t, int32_t); void (*o10065cl)(uint8_t); void (*o10024w)(uint32_t); void (*f31750a)(uint32_t);
-};
 // ---- D2Client+0xC0450 ----
 // 1.13c D2Client+0xC0450  (this=param, out=in_EAX; edx result taken as this->0xc id)
 void sub_C0450(const Env& e, P self, P out, P p1, P p2, int32_t p3) {
@@ -79,7 +45,7 @@ void sub_C07C0(const Env& e, int32_t p) {
  if (s) { e.ustrcpy(0x6fbcc980, s); e.wr32(0x6fbcca24, (uint32_t)y); e.wr32(0x6fbcca28, (uint32_t)r); e.wr32(0x6fbcca20, x); }
 }
 // 1.13c D2Client+0xC0CE0
-void sub_C0CE0(const Env& e) { if (e.rd32(0x6fbcc394)) e.f54da0(0x6fbba608); }
+void sub_C0CE0(const Env& e) { if (e.rd32(0x6fbcc394)) e.f54da0(0x6fbba608, 0x6fb70680); }   // EBX = D2Client+0xC0680 (a callback)
 // 1.13c D2Client+0xC1340
 void sub_C1340(const Env& e) {
  uint32_t pl = e.rd32(0x6fbcbbfc);

@@ -1,28 +1,8 @@
 // D2Client 0xAFD10..0xB0DF0 batch: env-seam implementations from the decompile.
 // Imported ordinals are Env function pointers (names are positional guesses); retail memory via rd32/wr32.
 #include <cstdint>
+#include "d2client_batch_afd10.h"
 namespace d2client_batch_afd10 {
-using P = uintptr_t;
-struct Env {
- uint32_t (*rd32)(P); void (*wr32)(P, uint32_t);
- P dataTables;            // *sgptDataTables
- uint32_t bitMask8;       // gdwBitMasks[8]
- P playerSelf;            // DAT_6fbcbbfc
- const int32_t* tbl83cb0; // 3 rows x 5 dwords: [count, 4 entries]
- const int32_t* tblY83cec; const int32_t* tblX83d0c; // 8 dwords each
- void (*o10034)(uint32_t); void (*f3cb00)();
- int32_t (*o10985)(); int32_t (*o10191)(P); uint32_t (*o11029)(P); void (*o10240)(P, uint32_t);
- int32_t (*o10973)(P); void (*o10887)(P, int32_t, int32_t, int32_t);
- P (*f560d0)(uint32_t); P (*f630f0)(const uint32_t* block);  // B30F0 takes one 0x17-dword block
- uint32_t (*o10042)(uint32_t, uint32_t); void (*o10706)(uint32_t, uint32_t);
- int32_t (*o10867)(P); int32_t (*o10750)(P); uint32_t (*o10818)(P);
- void (*o10286)(P, int32_t, int32_t); void (*o10558)(P, int32_t); void (*o10970)(P);
- void (*o10336)(uint32_t, P); int32_t (*o10637)(); int32_t (*o10080)(); int32_t (*o10522)(); void (*o10334)(uint32_t);
- void (*o10739)(uint32_t, int32_t, int32_t, int32_t);
- int32_t (*o10910)(P); int32_t (*o10587)(); void (*o10614)();
- int32_t (*o10534)(P); uint32_t (*o10777)(uint32_t); void (*o10488)(int32_t, uint32_t, const char*, int32_t);
- void (*f77c80)(int32_t, int32_t); void (*f1380)(P); void (*f58be0)(P);
-};
 static P row(const Env& e, int32_t i) {
  return (i < 0 || (int32_t)e.rd32(e.dataTables + 0xb6c) <= i) ? 0 : e.rd32(e.dataTables + 0xb64) + (P)i * 0x1a4;
 }
@@ -40,8 +20,8 @@ static uint32_t rnd(const Env& e, P u, int32_t n) { // 0 when n<=0
  uint32_t s = (uint32_t)seedStep(e, u);
  return ((uint32_t)n & ((uint32_t)n - 1)) == 0 ? ((uint32_t)n - 1) & s : s % (uint32_t)n;
 }
-// 1.13c D2Client+0xAFD10
-uint32_t sub_AFD10(const Env& e, uint32_t a) { e.o10034(a); e.f3cb00(); return 1; }
+// 1.13c D2Client+0xAFD10 (ECX = a, EAX = b)
+uint32_t sub_AFD10(const Env& e, uint32_t a, uint32_t b) { e.o10034(a, b); e.f3cb00(0xAFC40); return 1; }   // a = ECX, b = EAX; EBX = D2Client+0xAFC40 (a callback)
 // 1.13c D2Client+0xAFF80  (in_EAX = v)
 int32_t sub_AFF80(int32_t v) {
  if (v < 0x96) return 0x14; if (v < 200) return 0xf; if (v < 0xe1) return 10;

@@ -3,32 +3,8 @@
 // Register-passed args the decompile shows as unaff_*/in_EAX are explicit parameters.
 #include <cstdint>
 #include <initializer_list>
+#include "d2client_batch_bbc10.h"
 namespace d2client_batch_bbc10 {
-using P = uintptr_t;
-struct Env {
- uint32_t (*rd32)(P); uint32_t (*rd16)(P); void (*wr16)(P, uint32_t); void (*wr32)(P, uint32_t);
- P dataTables;                                   // *sgptDataTables
- P gA218C, gCC390, gCC394, gC9858, gC9854;       // DAT_6fba218c, 6fbcc390, 6fbcc394, 6fbc9858, 6fbc9854
- P g9A0, g9A4, g8BC4C, gBBFC, gBBC8;             // DAT_6fbcb9a0, 6fbcb9a4, 6fb8bc4c, 6fbcbbfc, 6fbcbbc8
- uint32_t (*o10240)(P); uint32_t (*o11029)(P); uint32_t (*o10203)(uint32_t);
- int32_t (*o10786)(P, uint32_t, uint32_t, uint32_t, int32_t* aux);  // aux = stack local the caller reads back
- void (*o10231)(P, P, uint32_t, uint32_t, uint32_t); uint32_t (*o10985)(P);
- uint32_t (*o11139)(P, uint32_t); int32_t (*o10702)(); int32_t (*o10744)(P, int32_t);
- void (*o10028)(); void (*o10150)(uint32_t, uint32_t, uint32_t);
- int32_t (*o10672)(); int32_t (*o10973)(uint32_t, uint32_t, uint32_t);
- void (*o11089)(int32_t, uint32_t, uint32_t, int32_t, uint32_t flag, P st);
- uint32_t (*o10265)(uint32_t); void (*o10024)(uint32_t msgTag, uint32_t); 
- int32_t (*o10212)(P, uint32_t); void (*o10431)(P, uint32_t, P, int32_t, uint32_t);
- uint32_t (*o10003)(uint32_t); uint32_t (*o10003b)(uint32_t, uint32_t);
- void (*usprintf)(uint32_t n, P buf, uint32_t fmt); void (*o10013)(int32_t, uint32_t, uint32_t, uint32_t);
- uint32_t (*bc430)(P);                           // caller supplies the BC430 register args
- uint32_t (*f1230)();
- void (*f1380)(P); P (*f560d0)(); P (*f68df0)(uint32_t); void (*f62e00)(); void (*f617c0)(P); void (*f61720)();
- void (*f69470)(); void (*f69650)(int32_t); void (*fb210)(uint32_t, int32_t, uint32_t, P, uint32_t, P);
- uint32_t (*f60000)(P); void (*f6b5b0)(P, P, int32_t, uint32_t, uint32_t); void (*f682b0)(P, int32_t, int32_t);
- void (*f39f00)(uint32_t, int32_t, int32_t); void (*f6b570)();
- void (*fatal)(uint32_t);
-};
 static int32_t s16(const Env& e, P a) { return (int16_t)e.rd32(a); }
 static P rowAt(const Env& e, int32_t i) {
  return (i < 0 || (int32_t)e.rd32(e.dataTables + 0xb6c) <= i) ? 0 : e.rd32(e.dataTables + 0xb64) + (P)i * 0x1a4;
@@ -139,8 +115,14 @@ int32_t sub_BC430(const Env& e, P a, P b, P c) {
  }
  return res;
 }
-// 1.13c D2Client+0xBC4E0
-void sub_BC4E0(const Env& e, uint32_t a, uint32_t b) { e.o10028(); e.o10150(a, b, 0); }
+// 1.13c D2Client+0xBC4E0  (EBX = str, ECX = left, EAX = right; stack a, b; ret 8): centres str in [left, right] when its width
+// (Ordinal_10028) is under the span, then draws it (Ordinal_10150: ECX = str, EDX = x, stack a, b, 0).
+void sub_BC4E0(const Env& e, P str, uint32_t left, uint32_t right, uint32_t a, uint32_t b) {
+ int32_t span = (int32_t)(right - left + 1u);
+ int32_t w = e.o10028(str);
+ if (w < span) left += (uint32_t)((int32_t)((uint32_t)span - (uint32_t)w) >> 1);
+ e.o10150(str, left, a, b, 0);
+}
 // 1.13c D2Client+0xBC520  (ebp = unaff_EBP, 3rd o10973 arg)
 int32_t sub_BC520(const Env& e) {
  int32_t tot = e.o10672() + e.o10973(0, 0, 0);
@@ -169,8 +151,16 @@ int32_t sub_BC520(const Env& e) {
  int32_t w = e.o10973(0, 0xc, 0);
  return (val * pct * 2) / (w + val);
 }
-// 1.13c D2Client+0xBC720
-void sub_BC720() {}
+// 1.13c D2Client+0xBC720  (ECX = c, EAX = a): a + the dword at +0x3C of data-table record [c+4] (0xC4-byte records at
+// [*sgptDataTables+0xBC4], count [+0xBC8], signed compare) when c is set, [c] == 0 and 0 <= [c+4] < count; else a unchanged.
+uint32_t sub_BC720(const Env& e, P c, uint32_t a) {
+ if (!c || e.rd32(c) != 0) return a;
+ int32_t i = (int32_t)e.rd32(c + 4);
+ if (i < 0 || i >= (int32_t)e.rd32(e.dataTables + 0xbc8)) return a;
+ P r = (P)(uint32_t)(e.rd32(e.dataTables + 0xbc4) + (uint32_t)i * 0xc4);
+ if (!r) return a;
+ return a + e.rd32(r + 0x3c);
+}
 // 1.13c D2Client+0xBC760  (level = EAX, key = EBP; formats a level string into a 128-wchar local)
 void sub_BC760(const Env& e, int32_t level, int32_t x, int32_t y, int32_t key) {
  if (level < 5) level = 5; else if (level > 0x5f) level = 0x5f;
