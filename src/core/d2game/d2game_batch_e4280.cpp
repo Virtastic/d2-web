@@ -28,18 +28,18 @@ __attribute__((weak, import_module("env"), import_name("o10630"))) i32 o10630();
 __attribute__((weak, import_module("env"), import_name("o10750"))) i32 o10750(i32);
 } using namespace e4280_env;
 namespace e4280_env {
-__attribute__((weak, import_module("env"), import_name("r_E660"))) i32 r_E660(i32 magic);                      // FUN_6fc2e660, the magic check
+__attribute__((weak, import_module("env"), import_name("r_E660"))) intptr_t r_E660(...);                      // FUN_6fc2e660, the magic check
 __attribute__((weak, import_module("env"), import_name("r_354F0"))) i32 r_354F0(i32 game, i32 unit);            // FUN_6fc554f0
 __attribute__((weak, import_module("env"), import_name("r_E2CD0"))) i32 r_E2CD0();                              // FUN_6fd02cd0, the mode gate
 __attribute__((weak, import_module("env"), import_name("r_33F80"))) void r_33F80();                             // FUN_6fc53f80, list helper
 __attribute__((weak, import_module("env"), import_name("r_E8780"))) i32 r_E8780(i32 unit);                      // FUN_6fd08780
 __attribute__((weak, import_module("env"), import_name("r_E8140"))) void r_E8140(); __attribute__((weak, import_module("env"), import_name("r_E8010"))) void r_E8010();             // LAB_6fd08140 / LAB_6fd08010 callbacks
-__attribute__((weak, import_module("env"), import_name("r_8EA80"))) void r_8EA80(i32 game, i32 unit, i32 a, i32 b, i32 c, i32 d, i32 e); // FUN_6fcaea80
-__attribute__((weak, import_module("env"), import_name("r_6F930"))) void r_6F930(); __attribute__((weak, import_module("env"), import_name("r_6F930_"))) i32 r_6F930_(i32 game, i32 rec); // FUN_6fc8f930
-__attribute__((weak, import_module("env"), import_name("r_EAE20"))) i32 r_EAE20(); __attribute__((weak, import_module("env"), import_name("r_EAD10"))) i32 r_EAD10();               // FUN_6fd0ae20 / FUN_6fd0ad10
-__attribute__((weak, import_module("env"), import_name("r_EEF10"))) void r_EEF10(i32* rec);                     // FUN_6fd0ef10
-__attribute__((weak, import_module("env"), import_name("r_EF940"))) i32 r_EF940(i32, i32, i32, i32, i32, i32, i32); // FUN_6fd0f940
-__attribute__((weak, import_module("env"), import_name("r_1320"))) i32 r_1320(i32 unit);                       // FUN_6fc21320, the skill row
+__attribute__((weak, import_module("env"), import_name("r_8EA80"))) intptr_t r_8EA80(...); // FUN_6fcaea80
+__attribute__((weak, import_module("env"), import_name("r_6F930"))) intptr_t r_6F930(...); __attribute__((weak, import_module("env"), import_name("r_6F930_"))) i32 r_6F930_(i32 game, i32 rec); // FUN_6fc8f930
+__attribute__((weak, import_module("env"), import_name("r_EAE20"))) intptr_t r_EAE20(...); __attribute__((weak, import_module("env"), import_name("r_EAD10"))) i32 r_EAD10();               // FUN_6fd0ae20 / FUN_6fd0ad10
+__attribute__((weak, import_module("env"), import_name("r_EEF10"))) intptr_t r_EEF10(...);                     // FUN_6fd0ef10
+__attribute__((weak, import_module("env"), import_name("r_EF940"))) intptr_t r_EF940(...); // FUN_6fd0f940
+__attribute__((weak, import_module("env"), import_name("r_1320"))) intptr_t r_1320(...);                       // FUN_6fc21320, the skill row
 } using namespace e4280_env;
 extern i32** sgptDataTables_exref;
 static inline i32 sdt(i32 off) { return *(i32*)(*(i32*)sgptDataTables_exref + off); }

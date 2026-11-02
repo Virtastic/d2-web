@@ -6,8 +6,8 @@ using i32 = int32_t; using u32 = uint32_t; using u8 = uint8_t;
 extern "C" {
 intptr_t o10920(...); i32 o10174(i32, i32, i32); intptr_t o10024(...); intptr_t o10265(...);
 intptr_t o10045(...); void o10285(i32, int16_t);
-int16_t r_9BEB0(); void r_9C160(void*);
-i32 r_E660(u32); intptr_t r_DFCC0(...); i32* r_EEF10(i32*); void r_33F80(void* pUnitEdi, void* pNodeEsi); void r_5C690(i32*, i32);
+intptr_t r_9BEB0(...); intptr_t r_9C160(...);
+intptr_t r_E660(...); intptr_t r_DFCC0(...); intptr_t r_EEF10(...); void r_33F80(void* pUnitEdi, void* pNodeEsi); void r_5C690(i32*, i32);
 i32* r_47CF0(void*, i32, i32, i32);
 // callbacks (RVA of function / label)
 void r_58C90(); void r_57830(); void r_57D80(); void r_580A0(); void r_582E0(); void r_58640();
@@ -115,7 +115,7 @@ i32 D2GAME_5C2A0(i32 q, i32 p2, i32 p3)
     if (q && *(char*)(intptr_t)(q + 9)) {
         for (i32 k = 0; k < 0x19; k++) {
             i32 a[10] = { rd(q, 4), rd(p2, 8), 0, 0x216, 1, 0, rd(p2, 0x14), rd(p2, 0x18), 5, 0 };
-            i32* u = r_EEF10(a);
+            i32* u = (i32*)r_EEF10(a);
             if (u) {
                 u[0x31] |= 0x3000000;
                 *(i32*)(intptr_t)(rd(q, 0x18) + 0xb0 + n * 4 + p3 * 0x14) = u[3];

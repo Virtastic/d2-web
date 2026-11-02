@@ -29,9 +29,9 @@ static inline P sdtBase() { return (P)ld<u32>((P)sgptDataTables_exref); }
 R o10024(...); R o10158(...); R o10174(...); R o10003(...); R o10265(...); R o10331(...); R o10383(...);
 R o10427(...); R o10551(...); R o10587(...); R o10630(...); R o10688(...); R o10750(...); R o10826(...);
 R o10867(...); R o10920(...); R o11010(...); R o11090(...); R o11103(...);
-R r_1320(...); R r_33F80(...); R r_354A0(...); R r_35EB0(...); R r_8A3E0(...); R r_8EA80(...); R r_8F5C0(...);
-R r_BCED0(...); R r_DFCC0(...); R r_E1C00(...); R r_E2CD0(...); R r_E660(...); R r_E8780(...); R r_EAD10(...);
-R r_EAE20(...); R r_EEF10(...); R r_EF940(...); R r_354F0(...); R r_C8950(...);
+intptr_t r_1320(...); R r_33F80(...); R r_354A0(...); R r_35EB0(...); intptr_t r_8A3E0(...); intptr_t r_8EA80(...); R r_8F5C0(...);
+R r_BCED0(...); intptr_t r_DFCC0(...); R r_E1C00(...); R r_E2CD0(...); intptr_t r_E660(...); R r_E8780(...); R r_EAD10(...);
+intptr_t r_EAE20(...); intptr_t r_EEF10(...); intptr_t r_EF940(...); R r_354F0(...); R r_C8950(...);
 
 [[noreturn]] static void fatal(u32 msg) { o10024(AD(DAT_6fd19ff9[0]), o10265(msg)); d2_exit(-1); }
 

@@ -12,7 +12,7 @@ intptr_t r_DFA90(...); intptr_t r_9F120(...); intptr_t r_13B0(...); intptr_t o10
 intptr_t r_E07A0(...); intptr_t o10392(...); i32 o11064(i32); i32 o10202(void*, i32, i32, const char*); i32 o11160(void*, i32);
 intptr_t o10830(...); intptr_t r_E0A60(...); intptr_t o10331(...); i32 o10057(i32);
 i32 o10910(i32, i32, i32); bool r_22A80(i32); intptr_t r_A00B0(...); void o10261(i32, i32, i32, i32); intptr_t o10819(...);
-void r_DE0C0(i32*, i32*, i32, u32*); void r_DCF20(i32, i32*, i32); intptr_t o10750(...); intptr_t o10867(...); void o10769(i32, i32, i32, i32);
+intptr_t r_DE0C0(...); void r_DCF20(i32, i32*, i32); intptr_t o10750(...); intptr_t o10867(...); void o10769(i32, i32, i32, i32);
 intptr_t o10913(...); intptr_t r_DE5A0(...); intptr_t o10653(...); intptr_t o10786(...); intptr_t r_9F210(...); intptr_t r_DDDE0(...);
 void r_9D230(i32, i32*); void r_57110(i32, i32); void r_9F7A0(i32*, i32);
 intptr_t o10045(...); intptr_t o10188(...); intptr_t r_4E230(...); bool r_215D0(i32, u32); intptr_t r_8EA80(...);

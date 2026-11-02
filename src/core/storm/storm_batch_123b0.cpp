@@ -82,7 +82,9 @@ int32_t Storm_Sub11C90(uint32_t* head, uint32_t arg, int32_t* cnt, uint32_t** ou
 void Storm_Sub169A0(void) { g_45844 = 1; }
 void Storm_Sub12740(void* a);
 int32_t* Storm_Sub12690(void);
-void Storm_Sub14F20(void);
+}  // namespace
+void Storm_Sub14F20(void);  // external: defined in storm_snet_stalled.cpp
+namespace {
 int32_t* Storm_SubFEB0(int32_t index);
 void Storm_Sub3B080(uint8_t* out, uint8_t* src, int32_t n);
 int32_t Storm_Sub11F10(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d, uint32_t* e, uint32_t* f);
