@@ -36,6 +36,8 @@ static uint32_t g_109c0_slots[4];
 // +0x11C568  DAT_6fbcc568: the live-entry count.
 static uint32_t g_109c0_count;
 
+extern "C" uint32_t* d2_client_109c0_state(uint32_t i) { return i < 4 ? &g_109c0_slots[i] : &g_109c0_count; }
+
 // 1.13c D2Client+0x109c0 (95 B): pop the front dword of the four-slot queue. When the count is zero the
 // retail path is fatal: Fog ordinal 10265 supplies the caller's return address and Fog ordinal 10024
 // (FOG_DisplayHalt) reports "queue is empty" with the format at +0x0D359F, then _exit(-1). Otherwise it
@@ -181,7 +183,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_client_112e0(int32_t param, int32_t x, int32_t y
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// 0x117C0 -- HUD scroll list page step (caller 0x11A80; it also recurses into itself and calls 0x1240).
+// 0x117C0 -- HUD scroll list page step (caller 0x11A80; it also recurses into itself and calls 0x11240).
 
 // The scroll-list record at +0x11C4FC..: total rows, visible rows, first visible, selected; the thumb and
 // the HUD height are the same globals the hit boxes use.
@@ -192,11 +194,15 @@ static int32_t g_scroll_selected;     // +0x11C538  DAT_6fbcc538
 static int32_t g_scroll_thumbY;       // +0x1233F4  DAT_6fbd33f4
 static int32_t g_scroll_hudH;         // +0x0F9E18  DAT_6fba9e18
 
-// D2Client+0x1240 is not a recovered row: the thumb ratio's divisor is a host seam. Called with no
-// argument (the decompiler shows a 64-bit result whose low dword is used).
-struct D2ClientBatch109C0Scroll {
-    int32_t (*row_count_1240)(void);
-};
+// The thumb ratio's divisor is D2Client+0x11240 (Ghidra FUN_6fac1240, VERIFIED row hittest_11240.cpp):
+// its low dword is total-15, or 0. It reads DAT_6fbcc4fc and DAT_6fba9e18 itself.
+extern "C" int32_t d2_client_11240(int32_t g, int32_t hudH);
+
+extern "C" int32_t* d2_client_117c0_state(uint32_t i) {
+    int32_t* const a[6] = { &g_scroll_total, &g_scroll_visibleRows, &g_scroll_first,
+                            &g_scroll_selected, &g_scroll_thumbY, &g_scroll_hudH };
+    return a[i];
+}
 
 // 1.13c D2Client+0x117c0 (333 B): move the selection by ECX (0 = no-op). |n| > 1 is applied one unit at a
 // time through recursive calls. -1 clamps the selected row down to 0; +1 stops at total-1. It then
@@ -204,19 +210,18 @@ struct D2ClientBatch109C0Scroll {
 // window by one row at a time and recomputing the thumb Y each step:
 //   thumbY = ((visibleRows * -0xC + 0xF6) * first) / 0x1240() + 0x2F + (hudH - 0x1A4) / 2
 // When the first visible row is already past the selection it jumps first := selected and recomputes
-// thumbY once. All divisions are signed (truncate toward zero). Ghidra's callee list also names 0x11240,
-// which the body never calls.
+// thumbY once. All divisions are signed (truncate toward zero). The divisor is the VERIFIED 0x11240.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_client_117c0(int32_t param, const D2ClientBatch109C0Scroll* env) {
+EMSCRIPTEN_KEEPALIVE void d2_client_117c0(int32_t param) {
     int32_t rows = g_scroll_visibleRows;
     if (param == 0) return;
     if (param < -1) {
         int32_t n = -param;
-        do { d2_client_117c0(-1, env); n--; } while (n != 0);
+        do { d2_client_117c0(-1); n--; } while (n != 0);
         return;
     }
     if (param > 1) {
-        do { d2_client_117c0(1, env); param--; } while (param != 0);
+        do { d2_client_117c0(1); param--; } while (param != 0);
         return;
     }
     if (param < 0) {
@@ -238,7 +243,7 @@ recompute:
         if (first > sel) {
             int32_t h = g_scroll_hudH - 0x1A4;
             g_scroll_first = sel;
-            g_scroll_thumbY = ((rows * -0xC + 0xF6) * sel) / env->row_count_1240() +
+            g_scroll_thumbY = ((rows * -0xC + 0xF6) * sel) / d2_client_11240(g_scroll_total, g_scroll_hudH) +
                               0x2F + h / 2;
             return;
         }
@@ -246,7 +251,7 @@ recompute:
             int32_t last = first;
             for (int32_t i = 0; last < g_scroll_total && i < 0xF; i++) last++;
             if (sel < last) break;
-            int32_t limit = env->row_count_1240();
+            int32_t limit = d2_client_11240(g_scroll_total, g_scroll_hudH);
             int32_t cand = (first < limit) ? first + 1 : first;
             if (cand <= limit) first = cand;
             g_scroll_thumbY = ((rows * -0xC + 0xF6) * first) / limit +
