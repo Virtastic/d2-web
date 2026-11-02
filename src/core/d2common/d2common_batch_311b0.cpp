@@ -10,6 +10,7 @@
 
 #include "D2DataTbls.h"
 #include "DataTbls/MonsterTbls.h"
+#include "DataTbls/ItemsTbls.h"
 #include "Units/Units.h"
 
 namespace
@@ -64,19 +65,17 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4e030(uint32_t pRecord) {   // 1.13
 	return R(P(pRecord), 0x18);
 }
 
-// +0x22B20: dword at +0xEC of monstats.txt record nIndex. The two globals retail
-// reads (count, base) are the same table this engine reaches through sgptDataTables; an
-// out-of-range index is retail's fatal path and answers 0.
+// +0x22B20: dword at +0xEC of items.txt record nIndex (retail's count/base globals DAT_6fdefb94/98 are the items
+// table, the same one 0x22760 reads). Out of range is retail's fatal path and answers 0.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_22b20(uint32_t nIndex) {   // 1.13c D2Common+0x22B20
-	static_assert(sizeof(D2MonStatsTxt) == 0x1A8, "monstats.txt record stride");
-	static_assert(offsetof(D2MonStatsTxt, nA2MaxD) == 0xEC, "monstats.txt +0xEC");
+	static_assert(sizeof(D2ItemsTxt) == 0x1A8, "items.txt record stride");
 
-	const uint32_t nCount = static_cast<uint32_t>(sgptDataTables->nMonStatsTxtRecordCount);
-	if (!sgptDataTables->pMonStatsTxt || nIndex >= nCount)
+	const uint32_t nCount = static_cast<uint32_t>(sgptDataTables->pItemDataTables.nItemsTxtRecordCount);
+	if (!sgptDataTables->pItemDataTables.pItemsTxt || nIndex >= nCount)
 		return 0;
 
-	const uint8_t* pRecord = reinterpret_cast<const uint8_t*>(&sgptDataTables->pMonStatsTxt[nIndex]);
+	const uint8_t* pRecord = reinterpret_cast<const uint8_t*>(&sgptDataTables->pItemDataTables.pItemsTxt[nIndex]);
 	return R(pRecord, 0xEC);
 }
 
