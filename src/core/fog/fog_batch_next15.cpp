@@ -23,13 +23,13 @@ void fog_writeLineThenTail(void (*sink)(void*, const char*, int), void* h, const
 struct fog_HashEnv { void (*initLock)(void*); void (*enter)(void*); void (*leave)(void*); };
 uint32_t* fog_hashLookup(const uint8_t* tbl, uint32_t key, void** cs, const fog_HashEnv* e) {
     uint32_t i = *(const uint32_t*)(tbl + 0xC) & key;
-    uint8_t* lock = *(uint8_t* const*)(tbl + 0x1C) + i * 0x18;
+    uint8_t* lock = (uint8_t*)(uintptr_t)*(const uint32_t*)(tbl + 0x1C) + i * 0x18;  // retail 32-bit addresses
     e->initLock(lock);
     e->enter(lock);
-    uint32_t* p = (*(uint32_t* const* const*)(tbl + 0x14))[i];
+    uint32_t* p = (uint32_t*)(uintptr_t)((const uint32_t*)(uintptr_t)*(const uint32_t*)(tbl + 0x14))[i];
     while (p && *p != key) p = (uint32_t*)(uintptr_t)p[1];
     if (!p) { e->leave(lock); return 0; }
-    *cs = lock;
+    *(uint32_t*)cs = (uint32_t)(uintptr_t)lock;  // the caller slot is a 32-bit word
     return p;
 }
 

@@ -30,9 +30,10 @@ extern "C" void* fog_qs_find_by_value(void* srv, int value) {  // 1.13c Fog+0xE4
     uint32_t n = at<uint32_t>(srv, 8);
     if (!n) return nullptr;
     for (uint32_t i = 0; i < n; ++i) {
-        CRITICAL_SECTION* cs = reinterpret_cast<CRITICAL_SECTION*>(at<char*>(srv, 0x1c) + i * 0x18);
+        // retail 32-bit addresses (+0x1C locks, +0x14 heads, next +4); the CS is a no-op in single-threaded wasm
+        CRITICAL_SECTION* cs = reinterpret_cast<CRITICAL_SECTION*>((char*)(uintptr_t)at<uint32_t>(srv, 0x1c) + i * 0x18);
         EnterCriticalSection(cs);
-        for (char* p = at<char**>(srv, 0x14)[i]; p; p = at<char*>(p, 4))
+        for (char* p = (char*)(uintptr_t)((uint32_t*)(uintptr_t)at<uint32_t>(srv, 0x14))[i]; p; p = (char*)(uintptr_t)at<uint32_t>(p, 4))
             if (at<int>(p, 0x10) == value) { LeaveCriticalSection(cs); return p; }
         LeaveCriticalSection(cs);
     }

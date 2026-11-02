@@ -22,7 +22,7 @@ struct fog_bb_env {
     void (*wait)(void* h, uint32_t ms);
 };
 
-struct fog_bb_node { uint32_t a, b, c; fog_bb_node* next; };
+struct fog_bb_node { uint32_t a, b, c, next; };  // retail 32-bit layout: next +0xC is a 32-bit address
 
 // 1.13c Fog+0x1D620
 struct fog_bb_sha1ctx { uint32_t state[5]; uint32_t block[16]; };
@@ -95,13 +95,13 @@ bool fog_bb_16df0(const fog_bb_env* e, fog_bb_sock* s, void* a, void* b)
 struct fog_bb_qs {
     fog_bb_node* head84c; uint8_t cs854[24];
     int count890; uint8_t cs894[24];
-    fog_bb_node** buckets8ac; uint32_t nbuckets8b0;
+    uint32_t* buckets8ac; uint32_t nbuckets8b0;  // 32-bit bucket heads
 };
 void fog_bb_d5e0(const fog_bb_env* e, fog_bb_qs* q)
 {
     e->cs_prep(q->cs854); e->cs_enter(q->cs854);
     fog_bb_node* n = q->head84c;
-    while (n) { fog_bb_node* nx = n->next; void* t = n; e->free_ptr(&t); n = nx; }
+    while (n) { fog_bb_node* nx = (fog_bb_node*)(uintptr_t)n->next; void* t = n; e->free_ptr(&t); n = nx; }
     q->head84c = 0;
     e->cs_leave(q->cs854);
 }
@@ -111,8 +111,8 @@ void fog_bb_d710(const fog_bb_env* e, fog_bb_qs* q)
 {
     e->cs_prep(q->cs894); e->cs_enter(q->cs894);
     for (uint32_t i = 0; i < q->nbuckets8b0; i++) {
-        fog_bb_node* n = q->buckets8ac[i];
-        while (n) { fog_bb_node* nx = n->next; void* t = n; e->free_ptr(&t); n = nx; }
+        fog_bb_node* n = (fog_bb_node*)(uintptr_t)q->buckets8ac[i];
+        while (n) { fog_bb_node* nx = (fog_bb_node*)(uintptr_t)n->next; void* t = n; e->free_ptr(&t); n = nx; }
         q->buckets8ac[i] = 0;
     }
     q->count890 = 0;

@@ -11,7 +11,7 @@ struct FogN04Seams {
     void (*leaveCs)(void* cs);                          // LeaveCriticalSection
     void (*deleteCs)(void* cs);                         // DeleteCriticalSection
     uint32_t (*nameOf)(uint32_t handle);                // Fog import Ordinal_11 (handle -> string)
-    void (*strCopy)(uint32_t a, uint32_t b, void* c);   // Fog import Ordinal_501, argument order as retail pushes it
+    void (*strCopy)(void* dst, uint32_t src, uint32_t max);  // Fog import Ordinal_501 (SStrCopy)
     void (*free_)(void* p);                             // Fog+0x1B0C0
     void (*sub5E550)(void);                             // Fog+0xE550
     void (*sub64260)(void);                             // Fog+0x14260
@@ -37,7 +37,7 @@ int32_t g_fogN04LogReady;
 static inline uint32_t rd(const void* p, uint32_t o) { return *reinterpret_cast<const uint32_t*>(static_cast<const uint8_t*>(p) + o); }
 
 // 1.13c Fog+0xD940
-extern "C" void fog_sub_D940(void* table, uint32_t key, uint8_t* out) {
+extern "C" void fog_sub_D940(void* table, uint32_t key, uint8_t* out, uint32_t max) {
     const uint32_t bucket = rd(table, 0xC) & key;
     uint8_t* cs = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(rd(table, 0x1C))) + bucket * 0x18;
     g_fogN04.validateCs(cs);
@@ -50,7 +50,7 @@ extern "C" void fog_sub_D940(void* table, uint32_t key, uint8_t* out) {
         *out = 0;
         return;
     }
-    g_fogN04.strCopy(key, g_fogN04.nameOf(e[6]), out);
+    g_fogN04.strCopy(out, g_fogN04.nameOf(e[6]), max);
     g_fogN04.leaveCs(cs);
 }
 
