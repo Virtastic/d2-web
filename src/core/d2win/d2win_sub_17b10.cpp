@@ -7,3 +7,6 @@ int32_t d2win_sub_17b10(uint32_t v) {
     g_d2win_9014dc = v;
     return 1;
 }
+
+// The counterpart of DAT_6f9014dc, for the seeded-state replay.
+uint32_t* d2win_sub_17b10_global(void) { return &g_d2win_9014dc; }
