@@ -69,6 +69,7 @@ import { createUnitSoundPlayer } from './assets/unit-sound-player.mjs';
 import { createAmbientSound, ambientCycleOf } from './assets/ambient-sound.mjs';
 import { createCombatSoundTrigger } from './assets/combat-sound-trigger.mjs';
 import { createEventSounds } from './assets/event-sounds.mjs';
+import { createStatUpdateWatch, ITEM_RECHECK } from './assets/stat-update-watch.mjs';
 import { createMissileSounds } from './assets/missile-sounds.mjs';
 import { playNpcDialogueVoice, npcDialogueVoiceSource } from './assets/npc-dialogue-voice.mjs';
 import { createNpcSpeechScrollGate } from './assets/npc-speech-scroll-gate.mjs';
@@ -1241,7 +1242,7 @@ async function bootstrapSession() {
       lastLoad = { attempted: true, pending: false, rc, bytes: pendingLoad.length };
       if (rc !== 0) throw new Error(`loading ${chosenName || 'the saved character'} failed with PLRSAVE2 error ${rc}`);
       pendingLoad = null;
-      propCache.clear(); tooltipPlayerRequirements = null;
+      propCache.clear(); heroStatWatch = null;
       session = api; snapshot = api.snapshot(); clock.reset();
       resetConfiguredHolds();
       fixture = Object.freeze({ seed: snapshot.seed, difficulty: loadDifficulty, act0: snapshot.act - 1, level: snapshot.level });
@@ -1251,7 +1252,7 @@ async function bootstrapSession() {
       // game gets a fresh seed from the clock, as retail's game create does (assets/game-seed.mjs).
       fixture = Object.freeze({ ...fixtures[0], seed: MAP_SEED_OVERRIDE != null ? MAP_SEED_OVERRIDE : gameInitSeed(clockInputs()) });
       if (!api?.create(fixture, Number(classSelect.value))) throw new Error('d2_session_create failed');
-      propCache.clear(); tooltipPlayerRequirements = null;
+      propCache.clear(); heroStatWatch = null;
       session = api; snapshot = api.snapshot(); clock.reset();   // a new game starts its own 25 Hz clock
       resetConfiguredHolds();
     }
@@ -1779,18 +1780,16 @@ function ensureCreditsScreen() {
 // P8i: retail's tooltip property lines from the engine (d2_session_item_lines), cached for the
 // most recently inspected item IDs. Item IDs accumulate over a session, so this remains bounded.
 const propCache = createItemPropertyCache();
-let tooltipPlayerRequirements = null;
+let heroStatWatch = null;
 function invalidateWornItemProps() {
   // Combat can drain durability on equipped items during a game tick. The native item presentation
   // has no tooltip revision, so retire only worn-item entries instead of clearing every cached ID.
   for (const item of snapshot?.items ?? []) if (item.bodyLoc > 0 && item.bodyLoc < 255) propCache.delete(item.id);
 }
 function itemProps(id) {
-  // Requirement colors depend on the hero as well as the item. Level-ups can happen during a
-  // normal tick, so compare the three retail stats whenever a tooltip is requested.
-  const playerRequirements = [0, 2, 12].map((stat) => Module.ccall('d2_session_player_stat', 'number', ['number', 'number'], [stat, 0])).join(':');
-  if (tooltipPlayerRequirements !== null && playerRequirements !== tooltipPlayerRequirements) propCache.clear();
-  tooltipPlayerRequirements = playerRequirements;
+  // Requirement colours depend on the hero: a stat change D2Client+0xAEB10 answers with an item re-check (level, str, dex) retires them.
+  heroStatWatch ||= createStatUpdateWatch((stat) => Module.ccall('d2_session_player_stat', 'number', ['number', 'number'], [stat, 0]), (stat, value) => Module.ccall('d2_client_stat_update_actions', 'number', ['number', 'number', 'number', 'number'], [stat, value, 1, 0]));
+  if (heroStatWatch() & ITEM_RECHECK) propCache.clear();
   let cacheable = false;
   return propCache.getOrRead(id, () => {
     const buf = (itemProps.buf ||= Number(Module.ccall('malloc', 'bigint', ['number'], [512])));

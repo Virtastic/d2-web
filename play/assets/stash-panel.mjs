@@ -29,8 +29,10 @@ export const INVPAGE_STASH = 4;
 // column missed the drawn coin.
 export const STASH_GOLD_COIN_ANCHOR = Object.freeze({ x: 155, bottom: 100 });
 // The Horadric Cube's grid is page 3 and Inventory.txt row TRANSMOGRIFY_BOX_PAGE_1 (D2Inventory.h); its window
-// reuses this renderer -- the same TradeStash art (the only 141012-byte trade panel the MPQs carry: no cube-specific
-// DC6 exists under PANEL) with the cube's own grid.
+// reuses this renderer with its OWN art: 1.13c D2Client+0x8CB40 loads "%s\ui\panel\supertransmogrifier" and
+// +0x99440 (panel state 0xE) draws its four frames at the same left-panel anchors before the page-3 grid
+// (+0x958A0). TradeStash's printed cells sit half a cell left of the cube grid (198,199); this art's sit on it.
+export const CUBE_ART = 'data\\global\\ui\\panel\\supertransmogrifier.dc6';
 export const INVPAGE_CUBE = 3;
 export const TRANSMOGRIFY_BOX_PAGE_1 = 9;
 // Inventory.txt row for a Lord of Destruction stash, and the 800x600 flag (row + 16 * higherRes).
@@ -70,7 +72,7 @@ const actPalette = (act) => `data\\global\\palette\\ACT${Math.min(5, Math.max(1,
 
 export function createStashPanelRenderer(read, documentObject = globalThis.document, { string = null, stashGold = null, page = INVPAGE_STASH, transmute = null } = {}) {
   const chrome = createPanelChrome(read, documentObject);
-  let dc6 = decodeDc6(read(STASH_ART));
+  let dc6 = decodeDc6(read(page === INVPAGE_CUBE ? CUBE_ART : STASH_ART));
   const perAct = new Map();
   const plugy = { on: false, pageName: null };   // PY3: ?plugy=1 swaps the art for PlugY's TradeStash.dc6 and names the page
   const forAct = (act) => {
