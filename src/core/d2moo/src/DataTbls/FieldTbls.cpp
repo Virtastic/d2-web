@@ -58,8 +58,12 @@ BOOL __stdcall DATATBLS_InitializeCollisionFieldTable(char* pExpField, int nSize
 // 1.13c D2Common+0x7e4a0
 BOOL __stdcall DATATBLS_FreeCollisionFieldTable()
 {
-	// 1.13c clears the field globals and asserts the data was already released by the caller (DATATBLS_UnloadAllBins)
-	D2_ASSERT(!sgptDataTables->pFieldData);
+	// 1.13c clears the field globals and reports (does not stop on) a field table the caller left in place
+	// (DATATBLS_UnloadAllBins releases it first); the display-only assert matches retail's Ordinal_10046 call.
+	if (sgptDataTables->pFieldData)
+	{
+		FOG_DisplayAssert("pFieldData == NULL", __FILE__, __LINE__);
+	}
 
 	sgptDataTables->pFieldData = NULL;
 	sgptDataTables->pCollisionField.nWidth = 0;

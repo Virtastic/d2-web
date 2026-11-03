@@ -45,7 +45,10 @@ behaviour differs from 1.10f.
 - D2Common+0x24B20 ITEMS_CheckIfAutoBeltable: matches the 1.13c decompile; no change.
 - D2Common+0x25810 and D2Common+0x25970 (charged-skill and item-skill costs): arithmetic matches; the stat copy they rely on, STATLIST_CopyStats, now returns 0 for a unit with no stat list instead of dereferencing a null pointer.
 - D2Common+0x7E4F0 DATATBLS_LoadCollisionField (FieldTbls.cpp): center X is half the height and center Y half the width (1.13c 0x1414/0x1418); ours had them swapped, which moved every field lookup. 0x7E480 getter and 0x7E290 lookup match after the swap.
-- D2Common+0x7E4A0 DATATBLS_FreeCollisionFieldTable: 1.13c clears the field globals and asserts the data is already released; the release moved to the unload caller (DATATBLS_UnloadAllBins) so it still happens once before the clear.
+- D2Common+0x7E4A0 DATATBLS_FreeCollisionFieldTable: 1.13c clears the field globals and reports (does not stop on) a field table still set; the port reports through FOG_DisplayAssert, not the aborting D2_ASSERT, so the call completes as retail does.
+- D2Common+0x71330 DATATBLS_UnloadItemStatCostTxt: retail asserts the bin slot is null and does not free it; the port frees it through DATATBLS_UnloadBin (same global writes), and nulls the descriptor-function list pointer after its free.
+- D2Common+0x71A50 DATATBLS_UnloadItemsTxt: retail asserts the items table and old-to-current map are null without freeing them; the port frees both and nulls pItemsLinker and pIndexOldToCurrent so a second unload is a no-op.
+- D2Common+0x7C4F0 DATATBLS_UnloadMissilesTxt: retail does not null pMissilesTxt or pMissilesLinker after release; the port nulls them (unrecorded globals, not compared by the replay).
 - D2Common+0x6B2B0 MISSILE_EvaluateMissileFormula: arguments, level and id defaults, and the expression table guard match 1.13c; no change. The callback at 0x6B160 is not decompiled (Ghidra refuses the label), so its identity with MISSILE_GetCalcParamValue is unverified.
 - D2Common+0x26BA0 ITEMS_GetRunesTxtRecordFromItem: returns NULL unless the socketed inventory's signature is 0x1020304 (1.13c check added).
 - D2Common+0x28850 ITEMS_CalculateAdditionalCostsForBonusStats: all encode cases match the 1.13c arithmetic; encode 2/3 skips the stat when the skill record is missing (1.13c's null read contributes zero).

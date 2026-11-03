@@ -362,10 +362,11 @@ void __fastcall DATATBLS_LoadItemsTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD575D0
-// 1.13c D2Common+0x71A50: matches 1.10f (linker free, free items + old-index map, null pItemsTxt)
+// 1.13c D2Common+0x71A50: linker free, free items + old-index map, null pItemsTxt; the port also nulls pItemsLinker and pIndexOldToCurrent (retail leaves them set)
 void __fastcall DATATBLS_UnloadItemsTxt()
 {
 	FOG_FreeLinker(sgptDataTables->pItemsLinker);
+	sgptDataTables->pItemsLinker = NULL;
 
 	if (sgptDataTables->pItemDataTables.pItemsTxt)
 	{
@@ -375,6 +376,7 @@ void __fastcall DATATBLS_UnloadItemsTxt()
 	if (sgptDataTables->pIndexOldToCurrent)
 	{
 		D2_FREE_POOL(nullptr, sgptDataTables->pIndexOldToCurrent);
+		sgptDataTables->pIndexOldToCurrent = NULL;
 	}
 
 	sgptDataTables->pItemDataTables.pItemsTxt = NULL;
@@ -1637,6 +1639,7 @@ void __fastcall DATATBLS_UnloadItemStatCostTxt()
 	if (sgptDataTables->pStatsWithDescFunc)
 	{
 		D2_FREE_POOL(nullptr, sgptDataTables->pStatsWithDescFunc);
+		sgptDataTables->pStatsWithDescFunc = NULL;
 	}
 	sgptDataTables->nStatsWithDescFunc = 0;
 }

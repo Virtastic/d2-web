@@ -322,7 +322,7 @@ void __fastcall DATATBLS_LoadMissilesTxt(HD2ARCHIVE hArchive)
 }
 
 //D2Common.0x6FD64B80
-// 1.13c D2Common+0x7C4F0: pMissilesTxt and pMissilesLinker are released but NOT nulled (1.10f nulled them)
+// 1.13c D2Common+0x7C4F0: pMissilesTxt and pMissilesLinker are released but retail does not null them; the port nulls them so a second unload is a no-op (the replay checks only the globals retail writes)
 void __fastcall DATATBLS_UnloadMissilesTxt()
 {
 	if (sgptDataTables->pMissCode)
@@ -336,11 +336,13 @@ void __fastcall DATATBLS_UnloadMissilesTxt()
 	if (sgptDataTables->pMissilesTxt)
 	{
 		DATATBLS_UnloadBin(sgptDataTables->pMissilesTxt);
+		sgptDataTables->pMissilesTxt = NULL;
 	}
 
 	if (sgptDataTables->pMissilesLinker)
 	{
 		FOG_FreeLinker(sgptDataTables->pMissilesLinker);
+		sgptDataTables->pMissilesLinker = NULL;
 	}
 	sgptDataTables->nMissilesTxtRecordCount = 0;
 }
