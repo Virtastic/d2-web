@@ -53,3 +53,8 @@ void fog_sub_79f0(const double* p1, const double* p2, double* p3, int op) {
     if ((path == B || path == D) && r == 0) g_errno = 0x21;
     *p3 = e.retval;
 }
+
+// Seams for the FN replay (src/core/fn/fog_79f0.cpp): the matherr hook (retail global 0x6FF7E754) and the CRT errno slot are host state.
+void fog_sub_79f0_set_matherr(void* f) { g_matherr = reinterpret_cast<MatherrFn>(f); }
+void fog_sub_79f0_set_errno(int v) { g_errno = v; }
+int fog_sub_79f0_get_errno() { return g_errno; }

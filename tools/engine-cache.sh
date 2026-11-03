@@ -7,7 +7,9 @@ set -euo pipefail
 [ -z "${D2_CXXFLAGS:-}" ] || { echo "engine-cache: custom compiler flags cannot use the normal cache" >&2; exit 1; }
 cmd=${1:-has}; WT=$(cd "${2:-.}" && pwd); MAIN="$(dirname "$(git -C "$WT" rev-parse --path-format=absolute --git-common-dir)")"
 source "$(dirname "${BASH_SOURCE[0]}")/artifact-lock.sh"
-d2_artifact_lock "$WT"
+# has only reads the shared cache under its per-key lock; it never touches this worktree's artifacts,
+# so it must not queue behind a build holding the worktree lock (land-main waited 19 min on it).
+[ "$cmd" = has ] || d2_artifact_lock "$WT"
 KEY=$(bash "$WT/tools/engine-key.sh" "$WT"); C="$MAIN/build-wasm/engine-cache/$KEY"
 case "$KEY" in *-dirty) [ "$cmd" = has ] && exit 1; [ "$cmd" = get ] && { echo "engine-cache: tree has uncommitted engine-source edits; build it" >&2; exit 1; };; esac
 # Cache publishers and readers share a per-key lock. A reader must never copy

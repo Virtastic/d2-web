@@ -29,7 +29,8 @@ W u32 n36_g2n_u32(u32 guest); // guest ptr -> value read helper unused
 }
 #define A(x) ((u32)(uintptr_t)&(x))
 
-static void freeAll() { for (int i = 0; i < DAT_6fa65e34; i++) Ordinal_10050(&DAT_6fa653c0[i]); DAT_6fa65e34 = 0; }
+extern "C" void d2l_149e0(u32*, u32*, void (*)(u32*));
+static void freeAll() { d2l_149e0((u32*)&DAT_6fa65e34, DAT_6fa653c0, Ordinal_10050); }
 [[noreturn]] static void fatal(u32 id) { Ordinal_10024("", q_d2launch_batch_n36_Ordinal_10265(id)); _Exit(-1); }
 // push a control from a template; fatal on a full 0x40 table (retail checks before each push after the first)
 static u32 pushC(u32 dat, u32 id = 0x60d) {
@@ -83,13 +84,18 @@ u32 FUN_6fa54290(u32* p) {
   return 1;
 }
 
-// 1.13c D2Launch+0x14920
-void FUN_6fa54920(char* buf, const char* fmt) {
-  Ordinal_10004();
-  n36_sprintf(buf, fmt, 0, 0);
-  if (Ordinal_268(0)) { Ordinal_253(buf); return; }
-  if (!Ordinal_10009()) { n36_sprintf(buf, fmt, "DATA\\LOCAL", (const char*)A(DAT_6fa5e0f8)); if (Ordinal_268(0)) Ordinal_253(buf); }
-  else { n36_sprintf(buf, fmt, "DATA\\LOCAL", (const char*)A(DAT_6fa5e1b8)); if (Ordinal_268(0)) Ordinal_253(buf); }
+// 1.13c D2Launch+0x14920 (ESI = buf, EBX = fmt, EDI = resolution string; core in d2launch_14920.cpp)
+struct D2l14920Seams { void (*lang4)(void*, u32); void (*sprintf5)(char*, const char*, const char*, const void*, const void*);
+  int (*open268)(u32, const char*, u32, u32*); void (*close253)(u32); int (*lang9)(); };
+extern "C" void d2l_14920_core(char*, const char*, const void*, const char*, const char*, const char*, u32, const D2l14920Seams*);
+static void n36_lang4(void*, u32) { Ordinal_10004(); }
+static void n36_sp5(char* d, const char* f, const char* a, const void* b, const void*) { n36_sprintf(d, f, a, (const char*)b); }
+static int n36_open(u32, const char*, u32, u32*) { return Ordinal_268(0); }
+static void n36_close(u32 h) { Ordinal_253((const char*)(uintptr_t)h); }
+static int n36_lang9() { return (int)Ordinal_10009(); }
+void FUN_6fa54920(char* buf, const char* fmt, const char* res) {
+  static const D2l14920Seams S = { n36_lang4, n36_sp5, n36_open, n36_close, n36_lang9 };
+  d2l_14920_core(buf, fmt, res, "DATA\\LOCAL", "CHI", "ENG", 0, &S);
 }
 
 // 1.13c D2Launch+0x149E0
@@ -197,12 +203,4 @@ void FUN_6fa567b0(u32 mode) {
   for (int32_t c = start; c <= 6; c++) { Ordinal_10147(); Ordinal_10192(text, 0); }
 }
 
-// 1.13c D2Launch+0x176C0
-void FUN_6fa576c0(void) {
-  FUN_6fa55d30();
-  Ordinal_10091(pushS(A(DAT_6fa61040)), 0);
-  Ordinal_10091(pushS(A(DAT_6fa61070)), 0);
-  pushS(A(DAT_6fa610a0));
-  FUN_6fa52bf0("palette\\sky\\pal.pl2");
-}
 }

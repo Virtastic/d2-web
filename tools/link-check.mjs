@@ -196,7 +196,7 @@ function findFnParen(s) {
     const ch = s[k];
     if (ch === '(') {
       if (depth === 0) {
-        if (/^\(\s*[*&^]/.test(s.slice(k)) ) return -1;           // function-pointer variable
+        if (/^\(\s*(?:(?:__cdecl|__stdcall|__fastcall|__thiscall|_cdecl|_stdcall|_fastcall|WINAPI|CALLBACK|APIENTRY)\s*)?[*&^]/.test(s.slice(k)) ) return -1;           // function-pointer variable
         if (/\b(__attribute__|__declspec|alignas|decltype)\s*$/.test(s.slice(0, k))) { depth++; continue; }
         if (/=/.test(s.slice(0, k)) && !/operator\s*=\s*$/.test(s.slice(0, k))) return -1;   // initializer with a call
         if (!/[\w>~]\s*$/.test(s.slice(0, k))) return -1;

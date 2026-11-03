@@ -147,12 +147,10 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_10190(uint32_t* controlPtr) {
     return 0;
 }
 
-// 1.13c D2Win+0x103D0 (212 bytes): construct and link a 0x4C-byte type-2 control. __fastcall: ECX and
-// EDX land at +0x0C and +0x10. Six stack words: s0 to +0x14, s1 to +0x18, s2 to +0x04, s3 to +0x34,
-// s4 to +0x48, s5 to +0x30. The +0x08 word is gdwBitMasks[0] | gdwBitMasks[2]; +0x1C gets the render
-// callback D2Win+0xFEE0, +0x24 the hit-test D2Win+0x10190, +0x44 the value 5. The zeroed +0x3C link is
-// appended after the current 0x6F9014A0 tail (or becomes the head). FOG_Alloc: size 0x4C, line 0x1D.
-// Ghidra's __fastcall label hides that ret 0x18 means six stack words after ECX and EDX.
+// 1.13c D2Win+0x103D0 (ret 0x18, 6 stack words): builds the 0x4C-byte type-2 control, FOG_Alloc size 0x4C line 0x1D.
+// ECX/EDX land at +0x0C/+0x10; stack words s0..s5 at +0x14, +0x18, +0x04, +0x34, +0x48, +0x30 (s5). +0x08 = gdwBitMasks[0]|[2];
+// +0x1C the render callback D2Win+0xFEE0, +0x24 the hit-test D2Win+0x10190, +0x44 the value 5. The zeroed +0x3C link is appended
+// to the 0x6F9014A0 list through d2win_control_append (tail or head).
 // 1.13c D2Win+0x103D0
 extern "C"
 EMSCRIPTEN_KEEPALIVE void* d2win_sub_103D0(uint32_t ecx, uint32_t edx, uint32_t s0, uint32_t s1,
@@ -161,14 +159,14 @@ EMSCRIPTEN_KEEPALIVE void* d2win_sub_103D0(uint32_t ecx, uint32_t edx, uint32_t 
     void* obj = env->alloc(0x4C, kD2WinImageCpp, 0x1D, 0);
     std::memset(obj, 0, 0x4C);
     wr32(obj, 0x00, 2);
-    wr32(obj, 0x08, env->gdwBitMasks[0] | env->gdwBitMasks[2]);
+    wr32(obj, 0x08, (1u << 0) | (1u << 2));
     wr32(obj, 0x04, s2);
     wr32(obj, 0x0C, ecx);
     wr32(obj, 0x10, edx);
     wr32(obj, 0x14, s0);
     wr32(obj, 0x18, s1);
-    wr32(obj, 0x1C, (uint32_t)(uintptr_t)env->renderFEE0);
-    wr32(obj, 0x24, (uint32_t)(uintptr_t)&d2win_sub_10190);
+    wr32(obj, 0x1C, 0x6F8EFEE0u);   // D2Win+0xFEE0 (retail VA)
+    wr32(obj, 0x24, 0x6F8F0190u);   // D2Win+0x10190 (retail VA)
     wr32(obj, 0x30, s5);
     wr32(obj, 0x34, s3);
     wr32(obj, 0x44, 5);

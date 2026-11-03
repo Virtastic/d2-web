@@ -18,7 +18,7 @@ static uint64_t z22_bits(double d) { uint64_t u; memcpy(&u, &d, 8); return u; }
 static double z22_dbl(uint64_t u) { double d; memcpy(&d, &u, 8); return d; }
 
 // 1.13c Storm+0x4076E: __sptype, classify a double (lo, hi words): 0 normal, 1 +inf, 2 -inf, 3 QNaN, 4 SNaN.
-int z22_sptype(int lo, uint32_t hi) {
+extern "C" int z22_sptype(int lo, uint32_t hi) {   // C linkage: the FN probe src/core/fn/storm_4076e.cpp calls it by name
   if (hi == 0x7ff00000) { if (lo == 0) return 1; }
   else if (hi == 0xfff00000 && lo == 0) return 2;
   if (((hi >> 16) & 0x7ff8) == 0x7ff8) return 3;

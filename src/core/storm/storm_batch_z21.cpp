@@ -11,21 +11,22 @@ extern const int32_t z21_ld12_dbl[6], z21_ld12_flt[6];    // Storm+0x41ED0 / 0x4
 void z21_terminate();
 int z21_validate_execute(uint32_t fn);                    // Storm+0x9DAE
 int32_t* z21_errno();                                     // Storm+0xA062
-int z21_sptype(uint32_t lo, uint32_t hi);                 // Storm+0x4076E
+int z22_sptype(int lo, uint32_t hi);                      // Storm+0x4076E (the port: storm_batch_z22.cpp)
 int z21_IsZeroMan(void*); void z21_CopyMan(void*, void*); int z21_RoundMan(void*, int); void z21_ShrMan(void*, int); // Storm+0x3EF59/EFE6/EFFF/EFCB (guessed order)
 bool z21_handle_exc(uint32_t, double*, uint32_t); void z21_raise_exc(void*, uint32_t*, uint32_t, int, double*, double*);
 void z21_ctrlfp(); int z21_31123(); void z21_315ef(int);  // Storm+0x413CB.. (guessed names)
 }
+double z21_dat_37b10 = 0.0;   // Storm+0x37B10: the zero constant __fpclass compares against (defined here, the one seam it needs)
 
 // 1.13c Storm+0x40697: __frnd, round to integral (fistp-style; default FPU mode = nearest-even)
 double z21_frnd(double x) { return __builtin_nearbyint(x); }
 
-// 1.13c Storm+0x406A8: __fpclass
-int z21_fpclass(double x) {
+// 1.13c Storm+0x406A8: __fpclass (C linkage: the FN probe src/core/fn/storm_406a8.cpp calls it by name)
+extern "C" int z21_fpclass(double x) {
   uint64_t b; memcpy(&b, &x, 8);
   uint32_t lo = (uint32_t)b, hi = (uint32_t)(b >> 32); bool neg = (b >> 63) != 0;
   if (((b >> 48) & 0x7ff0) == 0x7ff0) {
-    int t = z21_sptype(lo, hi);
+    int t = z22_sptype((int)lo, hi);
     if (t == 1) return 0x200;
     if (t == 2) return 4;
     if (t == 3) return 2;
