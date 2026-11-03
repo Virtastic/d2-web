@@ -1,17 +1,19 @@
 #include <cstdint>
 namespace d2client_512e0 {
-struct Svc { virtual ~Svc()=default; virtual uintptr_t o10141(void* unit)=0; virtual int32_t o10296_13c()=0; };
-// 1.13c D2Client+0x512E0  (ESI=limit, param_1=probe)
-int32_t sub_512E0(Svc& s,void* cbbfc,uintptr_t limit,const uint32_t* limitHdr,uintptr_t probe,uintptr_t addrLocal18,uintptr_t addrLocal8){
- if(limit&&limitHdr[4]) return 0;
- uintptr_t base=cbbfc? s.o10141(cbbfc):0;
- if(s.o10296_13c()==1){
-  if(base<probe&&probe<limit) return 0;
-  if(probe<base&&limit<probe) return 0;
- } else {
-  if(addrLocal18<addrLocal8&&limit<addrLocal18) return 0;
-  if(addrLocal8<addrLocal18&&addrLocal18<limit) return 0;
- }
+// Ordinal_10141(unit, int32_t out[2]) fills a unit's (x,y); Ordinal_10296(esi) +0x13c flag byte.
+struct Svc { virtual ~Svc()=default; virtual void o10141(const void* unit,uint32_t* out)=0; virtual int32_t o10296_13c()=0; };
+// 1.13c D2Client+0x512E0  (ESI=unit under test, param_1=other unit; disassembly: A=player point (0,0 if null),
+// B=param_1 point, C=ESI point; flag==1 compares y else x, unsigned; 0 if C strictly between A and B)
+int32_t sub_512E0(Svc& s,const void* cbbfc,const uint32_t* esi,const void* param1){
+ if(esi&&esi[4]) return 0;
+ uint32_t A[2]={0,0},B[2],C[2];
+ if(cbbfc) s.o10141(cbbfc,A);
+ s.o10141(param1,B);
+ s.o10141(esi,C);
+ int k=s.o10296_13c()==1?1:0;
+ uint32_t a=A[k],b=B[k],c=C[k];
+ if(c>b&&c<a) return 0;
+ if(c<b&&c>a) return 0;
  return 1;
 }
 }

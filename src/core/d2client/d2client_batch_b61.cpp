@@ -6,7 +6,7 @@
 
 struct D2ClientB61Env {
     uint32_t (*ord10331)(uint32_t);   // Ordinal_10331(DAT_6fbcbbfc)
-    void (*ord10184)();               // Ordinal_10184 (called twice)
+    uint32_t (*ord10184)(uint32_t);   // Ordinal_10184 (ECX = 1, returns the old value; called again with that value)
     void (*f0f9f0)();                 // 0x5F9F0
     void (*f10c40)();                 // 0x60C40
     void (*f12410)();                 // 0x62410
@@ -35,12 +35,12 @@ void d2client_62680(D2ClientB61State* s, const D2ClientB61Env* e) {
     e->f12410();
     uint32_t mode = s->d_c394;
     s->d_c21c = 0x18;
-    e->ord10184();
+    uint32_t prev = e->ord10184(1);
     e->f0ffe0();
     e->f10aa0();
     e->f0fe90();
     e->f0fd20();
     if (mode == 6 || mode == 8) e->f0fe10();
     if (s->d_9854 != 0) e->f0ff70();
-    e->ord10184();
+    e->ord10184(prev);
 }

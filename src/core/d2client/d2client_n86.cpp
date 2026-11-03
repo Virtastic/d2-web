@@ -159,21 +159,23 @@ void sub_47920(Env& e, ResetG& g) {
 // 1.13c D2CLIENT+0x4BE70  ordinal 10004 QueryInterface: returns the fixed interface table
 void* const* QueryInterface(void* const* ifaceTable) { return ifaceTable; }
 
-// 1.13c D2CLIENT+0x57A90  (ebp/esi = lost register inputs forwarded to Ordinal_10440/10074)
-int32_t sub_57A90(Env& e, const uint8_t* dt, uint8_t* unit, int32_t idx, W p3, W ebp, W esi) {
+// 1.13c D2CLIENT+0x57A90  fastcall(ecx=unit, edx=idx) + one stack arg p3 (ret 4).
+// 6FB51340 (ebx=unit, edi=&buf[0], stack=&buf[1]) fills buf[0]=X, buf[1]=Y; the 0x5C-byte record handed to B30F0 (ecx) is
+// {1, unit, 0, 0, 0xbf, buf[0], buf[1], .., [0xb]=idx, [0xc]=p3}. 10440 gets the record short (+0xec), 10074 the 10786 result.
+int32_t sub_57A90(Env& e, const uint8_t* dt, uint8_t* unit, int32_t idx, W p3) {
  if (idx < 0 || idx >= rd<int32_t>(dt, 0xba0)) return 0;
  const uint8_t* rec = rdp<uint8_t>(dt, 0xb98) + idx * 0x23c;
  int32_t cls = rd<int16_t>(rec, 0xec);
  if (cls < 0 || cls >= rd<int32_t>(dt, 0xb6c)) return 0;
- int32_t a[28] = {};
- if (!e.call(R(0xA1340), {(W)(a + 1)})) return 0;
+ int32_t buf[2] = {};  // X, Y: 51340 writes *edi = X and *stack = Y
+ if (!e.call(R(0xA1340), {(W)unit, (W)buf})) return 0;
  if (unit) wr<uint32_t>(unit, 0xc4, rd<uint32_t>(unit, 0xc4) | 0x40);
- e.call(10786, {(W)unit, rd<int32_t>(rec, 100), idx, p3});
- int32_t tail = a[24]; std::memset(a, 0, 23 * 4);
- a[0] = 1; a[12] = tail; a[4] = 0xbf; a[1] = (int32_t)(intptr_t)unit; a[11] = idx;
+ W r316 = e.call(10786, {(W)unit, rd<int32_t>(rec, 100), idx, p3});
+ int32_t a[23] = {};
+ a[0] = 1; a[1] = (int32_t)(intptr_t)unit; a[4] = 0xbf; a[5] = buf[0]; a[6] = buf[1]; a[11] = idx; a[12] = (int32_t)p3;
  W p = e.call(R(0xB30F0), {(W)a});
  if (!p) return 0;
- e.call(10440, {p, ebp}); e.call(10074, {p, esi});
+ e.call(10440, {p, (W)cls}); e.call(10074, {p, r316});
  return 1;
 }
 

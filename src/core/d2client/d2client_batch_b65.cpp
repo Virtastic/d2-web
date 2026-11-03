@@ -107,50 +107,6 @@ EMSCRIPTEN_KEEPALIVE int32_t d2c_72610(const D2cB65Env* e, int32_t eax, int32_t 
     return p3;
 }
 
-// 1.13c D2Client+0x73630  (eax=record index)
-EMSCRIPTEN_KEEPALIVE void d2c_73630(const D2cB65Env* e, int32_t eax, const uint8_t* u) {
-    const uint8_t* dt = *e->sgptDataTables;
-    if (!u || eax < 0 || eax >= at<int32_t>(dt, 0xc4)) return;
-    const uint8_t* r = at<const uint8_t*>(dt, 0xbc) + eax * 0x3c;
-    if (!r) return;
-    if (e->ord10494(u)) {
-        int32_t i = e->ord10871(u);
-        if (i && e->ord11132(i) == eax) { e->ord11111(u, i); e->ord11108(i); }
-        if (at<int16_t>(r, 0x28) >= 0) e->f38a70(u, 0, 0, 0);
-    }
-    e->ord10945(u);
-    if (r[0x21]) e->f22130(u);
-    int16_t s = at<int16_t>(r, 0xc);
-    if (s >= 0) {
-        if (s != -1) { e->ord10799(s); e->f1380(u + 0x20); }
-        e->f1b300(u, 4, 0, -1, -1);
-    }
-    if (at<int16_t>(r, 2) >= 0) e->f227f0(at<int16_t>(r, 2));
-    if (at<int16_t>(r, 4) >= 0) e->f227f0(at<int16_t>(r, 4));
-    if (e->gdwBitMasks[12] & r[0x10]) e->f234d0(e->gdwBitMasks);
-    e->ord10819(u, "..\\Source\\D2Client\\UNIT\\PlrSkills.cpp", 0x59c);
-}
-
-// 1.13c D2Client+0x73760  (eax=unit)
-EMSCRIPTEN_KEEPALIVE void d2c_73760(const D2cB65Env* e, uint8_t* u, int32_t idx) {
-    const uint8_t* dt = *e->sgptDataTables;
-    if (!u || idx < 0 || idx >= at<int32_t>(dt, 0xc4)) return;
-    const uint8_t* r = at<const uint8_t*>(dt, 0xbc) + idx * 0x3c;
-    if (!r) return;
-    int32_t t = at<int32_t>(u, 0), m = at<int32_t>(u, 0x10);
-    if ((e->gdwBitMasks[0x1c] & r[0x14]) && ((t == 1 && m == 0xc) || (t == 0 && m == 0x11))) { e->ord10945(u); return; }
-    if (!e->ord10494(u)) { if (at<int16_t>(r, 0x26) >= 0) e->f38a70(u, 0, 0, 0); }
-    else { int32_t i = e->ord10871(u); if (!(e->gdwBitMasks[0x10] & r[0x14])) e->ord10343(i); }
-    e->ord10945(u);
-    if (r[0x21]) e->f22130(u);
-    e->f22c80(idx);
-    if (e->f55440() && e->ord10341()) {
-        at<uint32_t>(u, 0xc8) |= 0x40000;
-        at<uint32_t>(u, 0xc4) = (at<uint32_t>(u, 0xc4) & 0xfffffffdu) | 0x20;
-    }
-    if (e->gdwBitMasks[12] & r[0x10]) e->f234d0((const void*)(uintptr_t)r[0x10]);
-}
-
 static void buysell(const D2cB65Env* e, const int32_t* flag, int32_t x, int32_t y) {
     int32_t rec[18] = {};
     if (!*e->g_6fbcb9c4) *e->g_6fbcb9c4 = e->fadb420(0);  // wsprintfA path string built first in original

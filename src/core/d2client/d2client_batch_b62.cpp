@@ -4,7 +4,7 @@
 typedef int32_t i32; typedef uint32_t u32;
 
 // 1.13c D2Client+0x63000  (EAX = mode; DAT_6fbcc098 = narrow flag; DAT_6fb8bc48/4c = screen w/h)
-struct B62Menu { i32 x[8], y[8], a[8], idx[8]; };   // DAT_6fbc54f0 / 5510 / 5530 / 5570
+struct B62Menu { i32 x[8], y[8], a[8], flag[8], idx[8]; };   // DAT_6fbc54f0 / 5510 / 5530 / 5550 / 5570
 void d2c_63000(i32 mode, B62Menu* m, i32 narrow, i32 scrW, i32 scrH) {
     i32 n = narrow ? 7 : 8, extra = 0, extra2 = 0;
     if (!mode) return;

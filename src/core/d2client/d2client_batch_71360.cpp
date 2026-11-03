@@ -67,32 +67,32 @@ void d2_client_727f0(int32_t id, int32_t (*ord10799)(int32_t), void (*sub_69660)
 
 static void skill_tail(uint32_t unit, uint32_t ebx, uint32_t dt_b98, int32_t dt_ba0, int line,
                        int32_t (*ord10601)(uint32_t, const char*, int), uint32_t (*ord10397)(uint32_t),
-                       void (*sub_2b960)(uint32_t, uint32_t), void (*sub_75e50)(uint32_t), uint32_t in_eax) {
+                       void (*sub_2b960)(uint32_t, uint32_t, uint32_t), void (*sub_75e50)(uint32_t, uint32_t), uint32_t in_eax) {
     int32_t i = ord10601(unit, "..\\Source\\D2Client\\UNIT\\PlrSkills.cpp", line);
     if (i < 0 || i >= dt_ba0) return;
     uint32_t rec = dt_b98 + (uint32_t)i * 0x23c;
     int16_t k = rs16(rec + 0x2e);
-    if (k == 0x43) { if (ord10397(unit) & 1) sub_2b960(in_eax, ebx); }
-    else if (k == 0x4c) sub_75e50(ebx);
+    if (k == 0x43) { if (ord10397(unit) & 1) sub_2b960(in_eax, ebx, 0); }
+    else if (k == 0x4c) sub_75e50(ebx, 0);
 }
 
 // 1.13c D2Client+0x72830 (line 0x4f)
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_72830(uint32_t in_eax, uint32_t ebx, uint32_t dt_b98, int32_t dt_ba0,
-                     uint32_t (*ord10511)(void), int (*sub_724e0)(uint32_t),
+                     uint32_t (*ord10511)(uint32_t), int (*sub_724e0)(uint32_t),
                      int32_t (*ord10601)(uint32_t, const char*, int), uint32_t (*ord10397)(uint32_t),
-                     void (*sub_2b960)(uint32_t, uint32_t), void (*sub_75e50)(uint32_t)) {
-    uint32_t u = ord10511();
+                     void (*sub_2b960)(uint32_t, uint32_t, uint32_t), void (*sub_75e50)(uint32_t, uint32_t)) {
+    uint32_t u = ord10511(in_eax);
     if (u && sub_724e0(in_eax)) skill_tail(u, ebx, dt_b98, dt_ba0, 0x4f, ord10601, ord10397, sub_2b960, sub_75e50, in_eax);
 }
 
 // 1.13c D2Client+0x728B0 (line 0x26)
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_728b0(uint32_t in_eax, uint32_t ebx, uint32_t dt_b98, int32_t dt_ba0,
-                     uint32_t (*ord10511)(void), int (*sub_724e0)(uint32_t),
+                     uint32_t (*ord10511)(uint32_t), int (*sub_724e0)(uint32_t),
                      int32_t (*ord10601)(uint32_t, const char*, int), uint32_t (*ord10397)(uint32_t),
-                     void (*sub_2b960)(uint32_t, uint32_t), void (*sub_75e50)(uint32_t)) {
-    uint32_t u = ord10511();
+                     void (*sub_2b960)(uint32_t, uint32_t, uint32_t), void (*sub_75e50)(uint32_t, uint32_t)) {
+    uint32_t u = ord10511(in_eax);
     if (u && sub_724e0(in_eax)) skill_tail(u, ebx, dt_b98, dt_ba0, 0x26, ord10601, ord10397, sub_2b960, sub_75e50, in_eax);
 }
 
@@ -122,22 +122,24 @@ void d2_client_72a50(int32_t idx, uint32_t dt_bc, int32_t dt_c4, void (*sub_727f
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_72bb0(int32_t p1, uint32_t p2, uint32_t dt_b98, int32_t dt_ba0,
                      uint32_t (*ord10871)(int32_t, uint32_t), int32_t (*ord10680)(uint32_t, int, int),
-                     uint32_t (*sub_225d0)(int32_t), void (*sub_88c20)(int32_t, int)) {
+                     uint32_t (*sub_225d0)(int32_t, int32_t), void (*sub_88c20)(int32_t, int)) {
     uint32_t u = ord10871(p1, p2);
     if (!u) return;
     int32_t i = ord10680(u, 0x15e, 0);
     if (i < 0 || i >= dt_ba0) return;
-    if (rs16(dt_b98 + (uint32_t)i * 0x23c + 0x10e) > 0 && sub_225d0(p1)) sub_88c20(p1, 1);
+    int16_t v = rs16(dt_b98 + (uint32_t)i * 0x23c + 0x10e);   // ECX=p1, EAX=movsx(v) into 0x225D0
+    if (v > 0 && sub_225d0(p1, v)) sub_88c20(p1, 1);
 }
 
 // 1.13c D2Client+0x72C20
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_72c20(int32_t p1, uint32_t p2, uint32_t dt_b98, int32_t dt_ba0,
                      uint32_t (*ord10871)(int32_t, uint32_t), int32_t (*ord10680)(uint32_t, int, int),
-                     void (*sub_88a70)(int32_t, int, int, int)) {
+                     void (*sub_88a70)(int32_t, int, int, int, int32_t)) {
     uint32_t u = ord10871(p1, p2);
     if (!u) return;
     int32_t i = ord10680(u, 0x15e, 0);
     if (i < 0 || i >= dt_ba0) return;
-    if (rs16(dt_b98 + (uint32_t)i * 0x23c + 0x10e) > 0) sub_88a70(p1, 0, 0, 0);
+    int16_t v = rs16(dt_b98 + (uint32_t)i * 0x23c + 0x10e);   // EBX=movsx(v) into 0x88A70
+    if (v > 0) sub_88a70(p1, 0, 0, 0, v);
 }

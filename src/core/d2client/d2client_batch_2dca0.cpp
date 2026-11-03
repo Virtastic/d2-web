@@ -99,111 +99,85 @@ uint32_t sub_2DF50(const Host& h, Address ebx, int32_t lo, int32_t hi) {
     return 1;
 }
 
-// 1.13c D2Client+0x2E060 (218 B): EAX=record. value p3 frames/25; 0x2C7E0 whole, 0x2C790 fractional.
-uint32_t sub_2E060(const Host& h, Address dst, Address eax, int32_t p3) {
-    int32_t f = ((p3 % 25) * 10) / 25;
+// 1.13c D2Client+0x2E060 (218 B): stdcall(dst, key, frames), EAX=record. whole = frames/25, tenth = (frames%25)*10/25; both 0 returns 0.
+// Tenth 0: 0x2C7E0(eax=whole, ecx=rec, [buf]); else 0x2C790(eax=whole, ecx=tenth, edx=rec, [buf]), both ret 4.
+// Appends D2Lang(key), the number, D2Lang(whole==1 && tenth==0 ? 0x10AB : 0x10AC), D2Lang(0xF9E) to dst.
+uint32_t sub_2E060(const Host& h, Address dst, Address eax, uint32_t key, int32_t p3) {
+    int32_t whole = p3 / 25, f = ((p3 % 25) * 10) / 25;
     char16_t buf[64]{};
-    if (p3 / 25 == 0) { if (!f) return 0; h.call(0x2C790, {(uintptr_t)f, eax, out(buf)}); }
-    else if (!f) h.call(0x2C7E0, {eax, out(buf)});
-    else h.call(0x2C790, {(uintptr_t)f, eax, out(buf)});
-    ref(h, dst); local(h, dst, buf); ref(h, dst); ref(h, dst);
+    if (!whole && !f) return 0;
+    if (f) h.call(0x2C790, {(uintptr_t)whole, (uintptr_t)f, eax, out(buf)});
+    else h.call(0x2C7E0, {(uintptr_t)whole, eax, out(buf)});
+    ref(h, dst, key); local(h, dst, buf);
+    ref(h, dst, (whole == 1 && !f) ? 0x10AB : 0x10AC);
+    ref(h, dst, 0xF9E);
     return 1;
 }
 
 // 1.13c D2Client+0x2E140 (45 B), fastcall: ECX, EDX forwarded; EAX compared with p3.
 uint32_t sub_2E140(const Host& h, uintptr_t ecx, uintptr_t edx, int32_t p3, int32_t eax) {
-    if (p3 == eax) h.call(0x2C7E0, {ecx, edx});
-    else h.call(0x2C6A0, {ecx, 1, edx});
+    if (p3 == eax) h.call(0x2C7E0, {(uintptr_t)p3, ecx, edx});
+    else h.call(0x2C6A0, {(uintptr_t)eax, ecx, 1, edx});
     return 1;
 }
 
-// 1.13c D2Client+0x2E190 (195 B). EAX=record (mode byte at +0x1dc, shorts at +0), EBX=out Y, outX=
-// retail's [sp] slot. Mode 5 scales by param_1 first. Adds (x>>8)/(y>>8) into the two outputs.
-void sub_2E190(const Host& h, Address eax, int32_t p1, Address outX, Address ebx, Address kindOut) {
+// 1.13c D2Client+0x2E190 (195 B). EAX=record (id int16 at +0, mode byte at +0x1dc), EBX=register arg, stack p1,outX,outY,kindOut (ret 0x10).
+// D2Common thunks 0xCEB6/0xCEC2/0xCECE take (p1, id, ebx, 1). Mode 5 scales both by CEB6 (>>8), then kindOut by mode, then *outX+=x, *outY+=y.
+void sub_2E190(const Host& h, Address eax, Address ebx, int32_t p1, Address outX, Address outY, Address kindOut) {
     uint8_t mode = h.read<uint8_t>(eax + 0x1dc);
-    int16_t id = h.read<int16_t>(eax);
+    uintptr_t id = (uintptr_t)(int32_t)h.read<int16_t>(eax);
+    auto d2 = [&](uint32_t t) { return (int32_t)h.call(t, {(uintptr_t)p1, id, (uintptr_t)ebx, 1}); };
     int32_t x, y;
     if (mode == 5) {
-        int32_t k = (int32_t)h.call(0xCEB6, {(uintptr_t)p1, (uintptr_t)(int32_t)id});
+        int32_t k = d2(0xCEB6);
         h.write<uint32_t>(kindOut, 2);
-        x = k * (int32_t)h.call(0xCEC2, {(uintptr_t)p1, (uintptr_t)(int32_t)id}) ;
-        y = (int32_t)h.call(0xCECE, {(uintptr_t)p1, (uintptr_t)(int32_t)id}) * p1;
+        x = (int32_t)((int64_t)k * d2(0xCEC2)) >> 8;
+        y = (int32_t)((int64_t)d2(0xCECE) * k) >> 8;
     } else {
-        x = (int32_t)h.call(0xCEC2, {(uintptr_t)p1, (uintptr_t)(int32_t)id});
-        y = (int32_t)h.call(0xCECE, {(uintptr_t)p1});
-        uint32_t kind = mode == 1 ? 1 : mode == 2 ? 9 : (mode == 3 || mode == 4) ? 3 : 0;
-        if (kind) h.write<uint32_t>(kindOut, kind);
+        x = d2(0xCEC2) >> 8;
+        y = d2(0xCECE) >> 8;
+        if (kindOut) {
+            static const uint32_t kind[6] = {0, 1, 9, 3, 3, 2};
+            if (mode >= 1 && mode <= 5) h.write<uint32_t>(kindOut, kind[mode]);
+        }
     }
-    h.write<int32_t>(outX, h.read<int32_t>(outX) + (x >> 8));
-    h.write<int32_t>(ebx, h.read<int32_t>(ebx) + (y >> 8));
+    h.write<int32_t>(outX, h.read<int32_t>(outX) + x);
+    h.write<int32_t>(outY, h.read<int32_t>(outY) + y);
 }
 
 // 1.13c D2Client+0x2E2D0 (90 B), thiscall: when this+0x1dc==1 and #10973(global 0xBBFC, 0x149)!=0,
 // each of the two values grows by FUN +0x14A0(100, v) (percent of v).
-void sub_2E2D0(const Host& h, Address self, Address p1, Address ebx, Address lang, uint32_t flagArg) {
+void sub_2E2D0(const Host& h, Address self, Address p1, Address ebx, Address player) {
     if (!self || h.read<uint8_t>(self + 0x1dc) != 1) return;
-    if (!h.call(0xC1C6, {lang, 0x149, 0})) return;
+    uintptr_t v = h.call(0xC1C6, {player, 0x149, 0});
+    if (!v) return;
     for (Address p : {p1, ebx}) {
-        int32_t v = h.read<int32_t>(p);
-        h.write<int32_t>(p, v + (int32_t)h.call(0x14A0, {100, (uintptr_t)v}));
+        int32_t x = h.read<int32_t>(p);
+        h.write<int32_t>(p, (int32_t)h.call(0x14A0, {v, 100, (uintptr_t)(uint32_t)x}) + x);
     }
-    (void)flagArg;
 }
 
-// 1.13c D2Client+0x2E350 (187 B): dispatch through the 0x48-entry callback table at 0xF52A0.
-uint32_t sub_2E350(const Host& h, int32_t unit, int32_t mode, Address table) {
+// 1.13c D2Client+0x2E350 (187 B, ret 8): stack unit, mode. Unit 0 returns 0. a = mode ? 0xC5BC(unit) : 0xC5CE(unit); b = 0xC640(ECX=a), 0 returns 0;
+// rec = 0x17F0(EAX=int16 [b]), 0 returns 0. Retail zeroes its own unit and mode argument slots and uses them as out-variables: when word rec+0x14 (< 0x48)
+// has a non-null entry in the table at 0xF52A0, c = 0xC718(unit, a, 1) and the entry runs with ECX=unit, EDX=a, stack b, c, &v1, &lb, &v2, &la (ret 0x18);
+// the result is v1 (the unit slot, zeroed before the call).
+uint32_t sub_2E350(const Host& h, uint32_t unit, int32_t mode) {
     if (!unit) return 0;
-    uintptr_t a = mode ? h.call(0xC5CE) : h.call(0xC5BC);
-    uintptr_t b = h.call(0xC640);
+    const uintptr_t a = mode ? h.call(0xC5BC, {unit}) : h.call(0xC5CE, {unit});
+    const Address b = static_cast<Address>(h.call(0xC640, {a}));
     if (!b) return 0;
-    Address rec = (Address)h.call(0x17F0);
+    const Address rec = static_cast<Address>(h.call(0x17F0, {static_cast<uintptr_t>(static_cast<uint32_t>(static_cast<int32_t>(h.read<int16_t>(b))))}));
     if (!rec) return 0;
-    uint16_t idx = h.read<uint16_t>(rec + 0x14);
-    if (idx >= 0x48 || !h.read<uint32_t>(table + idx * 4)) return 0;
-    uintptr_t c = h.call(0xC718, {(uintptr_t)unit, a, 1});
-    // Retail invokes the table entry (b, c, scratch...); ours reports it through the same seam.
-    h.call(h.read<uint32_t>(table + idx * 4) - 0x6FAB0000, {b, c});
-    return 0;
-}
-
-// 1.13c D2Client+0x2E410 (713 B): aggregates two stat lists (6+5 entries) for skill 0x19 / 0x6F
-// bonuses, applies the percentage to both totals, then emits via +0x2D220. a/b/c: stat helper args.
-static int32_t pct(int32_t base, int32_t p) {
-    if (base <= 0x100000) {
-        if (p <= 0x10000) return (int32_t)((uint32_t)p * (uint32_t)base) / 100;
-        if ((p & ~0xF) < 0x640) return (int32_t)((int64_t)p * base / 100);
-        return (p / 100) * base;
-    }
-    if ((base & ~0xF) < 0x640) return (int32_t)((int64_t)p * base / 100);
-    return (base / 100) * p;
-}
-uint32_t sub_2E410(const Host& h, Address dst, Address unit, Address dt, Address stats, uint32_t a,
-                   uint32_t b, uint32_t c, uint32_t cls, uint32_t lvl, uint32_t gA, uint32_t gB) {
-    int16_t rec = h.read<int16_t>(unit + 0xbc);
-    Address tbl = h.read<uint32_t>(dt);
-    if (rec < 0 || rec >= h.read<int32_t>(tbl + 0xa80)) return 0;
-    Address row = h.read<uint32_t>(tbl + 0xa78) + rec * 0x1a8;
-    uint32_t t[14]{};
-    h.call(0xC244, {(uintptr_t)rec, gA < 2 || gA > 3 ? 1u : gB, cls, (uintptr_t)h.read<int16_t>(row + 0xaa + cls * 2), 8, out(t)});
-    int32_t sum = 0, t0 = (int32_t)t[0], tot = t[0];
-    (void)lvl;
-    auto scan = [&](Address kinds, Address vals, int n) {
-        for (int i = 0; i < n; ++i) {
-            int16_t k = h.read<int16_t>(kinds + i * 2);
-            if (k != 0x19 && k != 0x6f) continue;
-            int32_t v = (int32_t)h.call(0xC316, {a, h.read<uint32_t>(vals + i * 4), b, c});
-            if (k == 0x19) sum += v; else { t0 += v; tot += v; }
+    uint32_t v1 = 0, v2 = 0, la = 0, lb = 0;
+    const uint16_t idx = h.read<uint16_t>(rec + 0x14);
+    if (idx < 0x48) {
+        const Address fn = h.read<uint32_t>(0x6FAB0000 + 0xF52A0 + idx * 4);
+        if (fn) {
+            const uintptr_t c = h.call(0xC718, {unit, a, 1});
+            h.call(fn - 0x6FAB0000, {unit, a, b, c, reinterpret_cast<uintptr_t>(&v1), reinterpret_cast<uintptr_t>(&lb), reinterpret_cast<uintptr_t>(&v2), reinterpret_cast<uintptr_t>(&la)});
         }
-    };
-    scan(stats + 0x54, stats + 0x68, 6);
-    scan(stats + 0x98, stats + 0xa4, 5);
-    if (sum) {
-        if (sum < -0x59) sum = -0x5A;
-        t0 += pct(t0, sum);
-        tot += pct(tot, sum);
     }
-    h.call(0x2D220, {dst, (uintptr_t)t0, (uintptr_t)tot});
-    return 1;
+    return v1;
 }
 
 // 1.13c D2Client+0x2FD30 (1317 B): SkillDesc tooltip layout; the 1317-byte body is mostly stack

@@ -6,7 +6,7 @@
 // ECX:EBX receives the remainder. Integer division retains retail's zero-
 // divisor trap, while fixed-width words keep the x86 register layout explicit.
 extern "C" EMSCRIPTEN_KEEPALIVE
-uint64_t d2_fn_d2client_a050(uint32_t dividendLow, uint32_t dividendHigh,
+uint64_t d2client_aulldvrm_a050(uint32_t dividendLow, uint32_t dividendHigh,
                              uint32_t divisorLow, uint32_t divisorHigh,
                              uint64_t* remainder) {
     const uint64_t dividend = (uint64_t(dividendHigh) << 32) | dividendLow;

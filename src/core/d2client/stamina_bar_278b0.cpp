@@ -12,23 +12,23 @@ struct D2ClientStaminaEnv {
     int32_t  screenH;  // 0x6FB8BC4C
     uint8_t  colRed, colYellow, colBlue; // 0x6FBCC4B8/9/A, 0 = not yet resolved
 
-    int32_t  (*smoothedStamina)();                    // 0x26B20, current stamina (8.8 fixed)
-    int32_t  (*getStat)(uint32_t unit, uint32_t stat);// Ordinal_10578, stat 11 = max stamina
+    int32_t  (*smoothedStamina)(int32_t stat);        // 0x26B20, EAX = 0xA, current stamina (8.8 fixed)
+    int32_t  (*maxStamina)(uint32_t unit);            // Ordinal_10578 (one argument: the unit)
     int32_t  (*hasStateA)(uint32_t unit, uint32_t st);// Ordinal_10866 (state 0x18)
     int32_t  (*hasStateB)(uint32_t unit, uint32_t st);// Ordinal_10494 (state 0x88)
     uint8_t  (*paletteIndex)(uint32_t r, uint32_t g, uint32_t b); // Ordinal_10190
     void     (*fillRect)(int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint32_t color, uint32_t mode); // Ordinal_10014
-    const uint16_t* (*getStringByIndex)(uint32_t index); // D2Lang #10003 (4164)
+    const uint16_t* (*getString)(uint32_t index, int32_t a, int32_t b); // #10003: ECX = 0x1044, stack = (cur>>8, max>>8)
     void     (*unicodeDefaultCtor)(uint16_t* self);
-    void     (*unicodeSprintf)(int32_t count, uint16_t* buf, const uint16_t* fmt, ...);
+    void     (*unicodeSprintf)(int32_t count, uint16_t* buf, const uint16_t* str);
     void     (*setPopupUnicodeText)(const uint16_t* text, int32_t x, int32_t y, int32_t color, int32_t center); // D2Win #10085
 };
 
 // 1.13c D2Client+0x278B0
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2client_278b0(D2ClientStaminaEnv* env) {
-    const int32_t cur = env->smoothedStamina();
-    const int32_t max = env->getStat(env->player, 11);
+    const int32_t cur = env->smoothedStamina(0xa);
+    const int32_t max = env->maxStamina(env->player);
     if (env->colRed == 0) {
         env->colRed = env->paletteIndex(0xff, 0, 0);
         env->colYellow = env->paletteIndex(0xf4, 0xc0, 0x4c);
@@ -54,11 +54,10 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2client_278b0(D2ClientStaminaEnv* env) {
 
     uint16_t text[100];
     for (int32_t i = 0; i < 100; i++) env->unicodeDefaultCtor(&text[i]);
-    // ponytail: decompile compares the bar colour reg against the x range (register reuse);
-    // the hover box is taken as cursor x/y
+    // retail compares the saved mouse x/y ([esp+14], [esp+18]) against the box
     if (env->cursorX >= left && env->cursorX <= w / 2 - 0x19 &&
         env->cursorY >= h - 0x1b && env->cursorY <= h - 9) {
-        env->unicodeSprintf(100, text, env->getStringByIndex(4164), c8, m8);
+        env->unicodeSprintf(100, text, env->getString(0x1044, c8, m8));
         env->setPopupUnicodeText(text, w / 2 - 76, h - 0x34, (int32_t)tcol, 1);
     }
 }

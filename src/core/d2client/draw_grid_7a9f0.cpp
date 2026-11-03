@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstring>
 #include <emscripten.h>
+#include "client_host.h"
 
 static std::string g_gout;
 namespace {
@@ -13,8 +14,8 @@ constexpr uint32_t kCtx = 0x40;          // ctx base inside the arena (keeps 0 a
 constexpr uint32_t kSq = kCtx + 0x38;    // node pool header (flags word, then 0x14-byte nodes)
 constexpr uint32_t kCells = 0xEAC0 + kCtx + 0x40;  // cell array start
 constexpr uint32_t kMaxN = 64;
-constexpr uint32_t kUnitRec = kCells + kMaxN * kMaxN * 0x24 + 4096 * 0x30;  // fake unit records: [type, classId]
-alignas(8) uint8_t g_arena[kUnitRec + 1024 * 8];
+constexpr uint32_t kUnitRec = kCells + kMaxN * kMaxN * 0x24 + 4096 * 0x30;  // fake unit records: [type, classId, sx, sy]
+alignas(8) uint8_t g_arena[kUnitRec + 1024 * 16];
 
 inline uint32_t rd(uint32_t o) { uint32_t v; memcpy(&v, g_arena + o, 4); return v; }
 inline void wr(uint32_t o, uint32_t v) { memcpy(g_arena + o, &v, 4); }
@@ -297,7 +298,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_stage_tile(uint32_t type, uint32_t flags, in
 }
 EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_stage_unit(uint32_t unit, int32_t type, int32_t sx, int32_t sy, uint32_t a6180, uint32_t bit20, uint32_t bit7) {
     if (g_nUnits >= kMaxUnits) return 0;
-    uint32_t rec = kUnitRec + g_nUnits * 8;   // unit arg = classId; the node's unit pointer is the record (written in d2_dg_frame, after the arena reset)
+    uint32_t rec = kUnitRec + g_nUnits * 16;   // unit arg = classId; the node's unit pointer is the record (written in d2_dg_frame, after the arena reset)
     g_units[g_nUnits] = {rec, (int32_t)unit, type, sx, sy, a6180, bit20, bit7};
     return g_nUnits++;
 }
@@ -311,7 +312,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_frame(int32_t l, int32_t t, int32_t r, int32
     if (n < 1 || n > (int32_t)kMaxN) return 0;
     d2_dg_reset(n, ox, oy);
     g_view[0] = l; g_view[1] = t; g_view[2] = r; g_view[3] = b; g_ox = ox; g_oy = oy; g_skipUnits = skipUnits; g_now = now;
-    for (uint32_t i = 0; i < g_nUnits; i++) { wr(g_units[i].unit, (uint32_t)g_units[i].type); wr(g_units[i].unit + 4, (uint32_t)g_units[i].cls); }
+    for (uint32_t i = 0; i < g_nUnits; i++) { wr(g_units[i].unit, (uint32_t)g_units[i].type); wr(g_units[i].unit + 4, (uint32_t)g_units[i].cls); wr(g_units[i].unit + 8, (uint32_t)g_units[i].sx); wr(g_units[i].unit + 12, (uint32_t)g_units[i].sy); }
     for (uint32_t i = 0; i < g_nRooms; i++) { g_roomNodes[i] = 0; d2c_7a5d0(i); }
     return rd(kCtx + 0xEAAC);
 }
@@ -342,7 +343,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_dg_a6180(uint32_t u, uint32_t monBit, uint32_t o
 
 // G-stream walk of the built grid: 8B110's tail, D2Client+0x9F270 (floor nodes -> Ordinal_10069) then +0x9EE90 (tile timers -> Ordinal_10001/10058),
 // each env seam recording the D2Gfx call in retail's G format. ecx/edx leftovers are not recoverable from C: written 0.
-// Units are skipped by the feeder, so 666D0 (-> 6BA90) never runs; 1BA90/9E970 are silent stubs. 9EE90's colour tables are retail .data: counts read 0,
+// 666D0 runs per staged unit (unit666d0); 6BA90 (the flag-2 nodes) runs per staged unit (unit6ba90); 9E970 is a silent stub. 9EE90's colour tables are retail .data: counts read 0,
 // which the record does not carry (colours print as a pointer).
 static uint32_t g_r13 = 0, g_ledx;   // edx a Ordinal_10069 call left behind: the next 10013 reads it (8B110 trace, the retail captures)
 static void gRec(int ord, std::initializer_list<uint32_t> a, uint32_t ecx = 0, uint32_t edx = 0) {
@@ -350,7 +351,7 @@ static void gRec(int ord, std::initializer_list<uint32_t> a, uint32_t ecx = 0, u
     for (uint32_t v : a) { if (v >= 0x100000u) g_gout += ",*"; else { std::snprintf(b, sizeof b, ",%x", v); g_gout += b; } }
     g_gout += '\n';
 }
-struct D2ClientCellWalk9f270Env { uint32_t arg; void (*sub666d0)(uint32_t); uint32_t (*ord10013)(); void (*sub1ba90)();
+struct D2ClientCellWalk9f270Env { uint32_t arg; void (*sub666d0)(uint32_t); uint32_t (*ord10013)(); void (*sub1ba90)(uint32_t);
     void (*ord10069)(uint32_t, int32_t, int32_t, uint32_t, uint32_t); void (*sub9e970)(uint32_t, uint32_t, uint32_t); };
 // D2Client+0x9E970 over the arena's cell+0x14 list (overlay_list_9e970.cpp). Draw tables are retail .data (counts read 0, as 9EE90), colours not carried.
 struct D2Client9E970Node; struct D2Client9E970Entry;
@@ -364,14 +365,82 @@ struct D2c9EE90Env { uint32_t (*rd32)(uint32_t); uint8_t (*rd8)(uint32_t); void 
     void (*f58230)(uint32_t, uint8_t*, uint8_t*, uint8_t*, uint8_t*); int32_t (*ord10001)(uint32_t, int32_t, int32_t, const uint32_t*, uint32_t);
     int32_t (*ord10058)(uint32_t, int32_t, int32_t, const uint32_t*, uint32_t, uint32_t); void (*f166d0)(uint32_t); };
 extern "C" void d2_client_9f270(const uint8_t*, uint32_t, D2ClientCellWalk9f270Env*);
+extern "C" void d2c_666d0(D2cHost, int32_t, uint32_t, int32_t, uint32_t);
+extern "C" void d2c_728b0(D2cHost, uint32_t, uint32_t);
+extern "C" void d2c_72830(D2cHost, uint32_t, uint32_t);
+// D2Client+0x6C490 / +0x6CC00 are the env-seam ports (d2client_6c490.cpp, d2client_batch_6cc00.cpp).
+struct D2c6C490Env { uint32_t (*rd32)(uint32_t); int32_t (*ord10175)(uint32_t); void (*ord10350)(uint32_t, int32_t*); int32_t (*ord10013)(); int32_t (*ord10036)(); void (*ord10083)(int32_t);
+    int32_t (*f1a3d0)(int32_t); void (*f6aee0)(uint32_t, uint32_t, int32_t, int32_t, int32_t, int32_t); int32_t (*ord10164)(); int32_t (*ord10866)(uint32_t, int32_t); uint32_t (*f560d0)();
+    uint32_t (*ord10431)(uint32_t, uint32_t, uint32_t*); uint32_t (*f1af0)(); uint32_t (*f1a2f0)(uint32_t, uint32_t); uint32_t (*f3a30)(); int32_t (*f56fc0)(uint32_t); uint32_t (*ord10663)(uint32_t);
+    void (*f1dca0)(uint32_t, int32_t, int32_t, uint32_t, uint32_t*, int32_t*, int32_t*, uint32_t, int32_t); uint32_t (*ord10688)(uint32_t); int32_t (*ord10576)(uint32_t); uint32_t (*f1260)();
+    int32_t (*f1e2c0)(uint32_t, const uint32_t*); int32_t (*f1dfe0)(uint32_t, uint32_t*); uint32_t (*f1dee0)(uint32_t, uint32_t); int32_t (*f1d780)(int32_t); int32_t (*f1d690)();
+    void (*ord10016)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, int32_t, uint32_t); uint32_t (*ord11080)(uint32_t); uint32_t (*ord11168)(uint32_t);
+    void (*ord10041)(const uint32_t*, int32_t, int32_t, uint32_t, uint32_t, uint32_t); int32_t (*ord10494)(uint32_t, int32_t); void (*f166d0)(uint32_t); void (*fatal)(int32_t); };
+extern "C" int32_t d2c_6c490(const D2c6C490Env*, uint32_t, uint32_t, uint32_t, int32_t, int32_t, int32_t, int32_t, int32_t, uint32_t, int32_t, int32_t, uint32_t, uint32_t);
+struct H6cc00 { uint32_t (*ord10013)(); uint32_t (*ord10175)(); void (*ord10350)(uint32_t, void*, void*, void*); uint8_t (*ord10663)(uint32_t); void (*ord10569)(uint32_t); uint32_t (*ord10164)();
+    int (*ord11088)(uint32_t); uint32_t (*ord10973)(uint32_t, int, int); int (*ord10005)(void*, int, int); int (*ord10893)(int, uint32_t, void*, int);
+    void (*ord10041)(uint32_t, int32_t, int32_t, uint32_t, uint32_t, int32_t); bool (*sub_54b90)(); void (*sub_1b700)(); int (*sub_6c490)(uint32_t); int (*sub_6e2c0)(uint32_t, void*);
+    uint32_t (*sub_01a80)(); uint32_t (*sub_01580)(); void (*sub_1aee0)(uint32_t, uint32_t, int, int, int, int); };
+extern "C" int d2_client_6cc00(uint32_t, uint32_t, const H6cc00*, uint32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t);
+// D2Client+0x666D0 for a staged unit node. The unit is a host struct: type @+0, class @+4, iso px from the stage (sx,sy subtiles), and the COF chain 6C490 walks is
+// faked with the layer count retail draws (8 for the player, 1 otherwise; no COF data is staged). Callees not ported answer 0; 0x66620 answers 1.
+// ecx/edx on 10013 are leftovers: edx is the one a 10069 left behind, read once. 10041's edx is the y it drew at.
+static int32_t g_vx, g_vy;   // ctx+0x24/+0x28, the view origin (iso px)
+static uint32_t g_hu[0x80], g_hinfo[0x10], g_hnode[8], g_hx[8], g_hhdr[2];
+static int32_t g_hpx, g_hpy; static uint32_t g_hself;
+static uint32_t rec10013() { gRec(10013, {}, 0, g_ledx); g_ledx = 0; return g_r13; }
+static void rec10041(int32_t x, int32_t y, uint32_t mode) { gRec(10041, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, mode, 0}, 0, y > 0 ? (uint32_t)y : 0); }
+static const D2c6C490Env kE6c490 = {
+    [](uint32_t a) { uint32_t v; memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }, [](uint32_t) -> int32_t { return 0; },
+    [](uint32_t, int32_t* xy) { xy[0] = g_hpx; xy[1] = g_hpy - 8; }, []() -> int32_t { return (int32_t)rec10013(); }, []() -> int32_t { gRec(10036, {}); return 0; },
+    [](int32_t) {}, [](int32_t x) -> int32_t { return x >= 0 && x < 639; }, [](uint32_t, uint32_t, int32_t, int32_t, int32_t, int32_t) { rec10013(); },
+    []() -> int32_t { return 0; }, [](uint32_t, int32_t) -> int32_t { return 0; }, []() -> uint32_t { return 0; },
+    [](uint32_t, uint32_t, uint32_t*) -> uint32_t { return 2; }, []() -> uint32_t { return 1; }, [](uint32_t, uint32_t) -> uint32_t { return 1; }, []() -> uint32_t { return 0; },
+    [](uint32_t) -> int32_t { return 0; }, [](uint32_t) -> uint32_t { return 0; }, nullptr, [](uint32_t) -> uint32_t { return 0; }, [](uint32_t) -> int32_t { return 0; }, []() -> uint32_t { return 0; },
+    [](uint32_t, const uint32_t*) -> int32_t { return 1; }, [](uint32_t, uint32_t*) -> int32_t { return 0; }, [](uint32_t, uint32_t) -> uint32_t { return 0; }, [](int32_t) -> int32_t { return 0; },
+    []() -> int32_t { return 0; }, [](uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, int32_t, uint32_t) {}, [](uint32_t) -> uint32_t { return 0; }, [](uint32_t) -> uint32_t { return 0; },
+    [](const uint32_t*, int32_t x, int32_t y, uint32_t, uint32_t mode, uint32_t) { rec10041(x, y, mode); }, [](uint32_t, int32_t) -> int32_t { return 0; }, [](uint32_t) {}, [](int32_t) {} };
+static const H6cc00 kH6cc00 = {
+    []() -> uint32_t { return rec10013(); }, []() -> uint32_t { return 0; }, [](uint32_t, void*, void*, void*) {}, [](uint32_t) -> uint8_t { return 0; }, [](uint32_t) {}, []() -> uint32_t { return 0; },
+    [](uint32_t) -> int { return 0; }, [](uint32_t, int, int) -> uint32_t { return 0; }, [](void*, int, int) -> int { return 1; }, [](int, uint32_t, void*, int) -> int { return 0; },
+    [](uint32_t, int32_t x, int32_t y, uint32_t, uint32_t col, int32_t) { rec10041(x, y, col); }, []() -> bool { return false; }, []() {},
+    [](uint32_t u) -> int { return d2c_6c490(&kE6c490, u, 0, 0, g_vx, 0, g_vy, 0, 640, g_hself, 0, 0, 0, 1); },
+    [](uint32_t, void* r) -> int { uint32_t* w = (uint32_t*)r; w[16] = 0; w[17] = (uint32_t)(g_hpy - 8); return 1; }, []() -> uint32_t { return g_hself; }, []() -> uint32_t { return 0; },
+    [](uint32_t, uint32_t, int, int, int, int) {} };
+static uint32_t hostCall(D2cCall* c) {
+    if (c->rva == (0x80000000u | 10013)) return rec10013();
+    if (c->rva == 0x6CC00) return (uint32_t)d2_client_6cc00(c->s[0], c->s[1], &kH6cc00, g_hself, g_vy, g_vx, 0, 0, 640, 0, 0, g_hpx);
+    if (c->rva == 0x728B0) { d2c_728b0(hostCall, c->eax, c->ebx); return 0; }
+    if (c->rva == 0x72830) { d2c_72830(hostCall, c->eax, c->ebx); return 0; }
+    return c->rva == 0x66620 ? 1 : 0;
+}
+static uint32_t stageUnit(uint32_t rec) {
+    memset(g_hu, 0, sizeof g_hu); memcpy(g_hu, g_arena + rec, 8);
+    int32_t sx, sy; memcpy(&sx, g_arena + rec + 8, 4); memcpy(&sy, g_arena + rec + 12, 4);
+    g_hpx = (sx - sy) * 16; g_hpy = (sx + sy) * 8;
+    // fake cel chain: unit+0x54 -> info; info+0x28 -> node {key 1, class 2, +8 -> x, +0x10 next 0}; x+0x14 -> hdr (layer count byte)
+    uint32_t u = (uint32_t)(uintptr_t)g_hu;
+    memset(g_hinfo, 0, sizeof g_hinfo); memset(g_hnode, 0, sizeof g_hnode); memset(g_hx, 0, sizeof g_hx); g_hhdr[0] = g_hu[0] == 0 ? 8 : 1;
+    g_hu[0x54 / 4] = (uint32_t)(uintptr_t)g_hinfo; g_hinfo[0x28 / 4] = (uint32_t)(uintptr_t)g_hnode;
+    g_hnode[0] = 1; g_hnode[1] = 2; g_hnode[2] = (uint32_t)(uintptr_t)g_hx; g_hx[0x14 / 4] = (uint32_t)(uintptr_t)g_hhdr;
+    g_hself = g_hu[0] == 0 ? u : 0;
+    return u;
+}
+static void unit666d0(uint32_t rec) { uint32_t u = stageUnit(rec); d2c_666d0(hostCall, 0, u, 2, 0); }
+// 1.13c D2Client+0x6BA90 (the flag-2 node, named "1BA90" in the walk env by mistake): 10036 (returns 0), the 10013 read, then per layer 10011 at the 6C490 position minus 2 (cull x in [0,639)).
+static void unit6ba90(uint32_t rec) {
+    stageUnit(rec); gRec(10036, {}); rec10013();
+    int32_t x = g_hpx - g_vx - 2, y = g_hpy - g_vy;
+    if (!(x >= 0 && x < 639)) return;
+    for (uint32_t i = 0; i < g_hhdr[0]; i++) gRec(10011, {0x100000u, (uint32_t)x, (uint32_t)y}, (uint32_t)y, (uint32_t)x);
+}
 extern "C" void d2c_9ee90(const D2c9EE90Env*, uint32_t);
 static uint32_t gRd32(uint32_t a) { uint32_t v = 0; if (a < sizeof g_arena - 4) memcpy(&v, g_arena + a, 4); return v; }
-static int32_t g_vx, g_vy;   // ctx+0x24/+0x28, the view origin (iso px)
 EMSCRIPTEN_KEEPALIVE void d2_dg_set_origin(int32_t x, int32_t y) { g_vx = x; g_vy = y; }
 EMSCRIPTEN_KEEPALIVE const char* d2_dg_walk_g() {
     wr(kCtx + 0x24, (uint32_t)g_vx); wr(kCtx + 0x28, (uint32_t)g_vy);
     g_gout.clear(); g_ledx = 0;
-    D2ClientCellWalk9f270Env w{0, [](uint32_t) {}, []() -> uint32_t { gRec(10013, {}, 0, g_ledx); return g_r13; }, []() {},
+    D2ClientCellWalk9f270Env w{0, unit666d0, []() -> uint32_t { return rec10013(); }, unit6ba90,
         [](uint32_t, int32_t x, int32_t y, uint32_t m, uint32_t arg) { g_ledx = x > 0 ? x : 0; gRec(10069, {0x100000u, (uint32_t)x, (uint32_t)y, m, arg}, 0, g_ledx); }, [](uint32_t room, uint32_t mode, uint32_t) {
             static const uint32_t z[1024] = {};
             D2Client9E970Env e{0, 0, z, z, z, 0, 0, 0, 0, []() -> uint32_t { gRec(10013, {}, 0, g_ledx); g_ledx = 0; return g_r13; }, []() -> uint32_t { return g_now; }, [](uint32_t) {},

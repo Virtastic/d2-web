@@ -11,9 +11,12 @@ struct N99Env {
     uint32_t (*ord)(uint32_t ordinal, uint32_t a, uint32_t b, uint32_t c, uint32_t d);
     uint32_t (*call)(uint32_t rva, uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e, uint32_t f, uint32_t g);
     uint32_t (*callb)(uint32_t rva, uint32_t* blk); // 0xB30F0 spawn: block in a register
+    uint32_t (*callStk)(uint32_t rva, uint32_t eax, uint32_t esi, const uint32_t* stk, uint32_t n); // stack args, first = top
+    uint32_t (*callR)(uint32_t rva, uint32_t ecx, const uint32_t* edi, uint32_t stack0); // register ecx/edi + one stack arg
     uint32_t (*fatal)(uint32_t strId);              // Ordinal_10265 -> Ordinal_10024 -> _exit(-1)
     uint32_t dataTables;                            // *sgptDataTables_exref
     uint32_t g_cbbfc, g_cbc14, g_a16b8, g_bba608;   // D2Client globals 0x1CBBFC/0x1CBC14/0x1A16B8/0x1BA608 (rva bases)
+    uint32_t tab_ab8, tab_9b8;                      // 0xD5AB8 / 0xD59B8 dword tables (64 entries, spawn x/y offsets)
     uint32_t tab_c8c, tab_c90;                      // dir tables 0x185C8C / 0x185C90
 };
 static N99Env g99;
@@ -41,15 +44,18 @@ static uint32_t n99_rec(uint32_t idx, int32_t* sub, bool needSub) {
 }
 static void n99_mark(uint32_t unit) { if (unit) W(unit + 0xc4, R(unit + 0xc4) | 0x40); }
 
-// 1.13c D2CLIENT+0x57BB0
+// 1.13c D2CLIENT+0x57BB0  fastcall(ecx=unit, edx=idx) + stack p3 (ret 4). sub = (short)rec[0xEA].
 extern "C" uint32_t d2c_57BB0_n99(uint32_t unit, int32_t idx, uint32_t p3) {
     int32_t sub; if (!n99_rec(idx, &sub, true)) return 0;
     n99_mark(unit);
     if (!CALL(0xA5F70)) return 0;
-    ORD(11169, sub, p3);
+    uint32_t r = ORD(11169, sub, p3);   // 6FABCB5C(sub, p3)
     uint32_t b[23] = {0};
+    b[0] = 7; b[1] = unit; b[4] = (uint32_t)sub;
     b[5] = CALL(0x1630, unit); b[6] = CALL(0x1660, unit);
-    for (int i = 0; i < 0x100; i += 4) {
+    b[10] = r; b[11] = (uint32_t)idx; b[12] = p3;
+    for (uint32_t i = 0; i < 0x100; i += 4) {
+        b[7] = R(g99.tab_ab8 + i); b[8] = R(g99.tab_9b8 + i);
         uint32_t m = g99.callb(0xB30F0, b);
         if (!m) continue;
         uint32_t s = R(m + 0x54);
@@ -62,34 +68,28 @@ extern "C" uint32_t d2c_57BB0_n99(uint32_t unit, int32_t idx, uint32_t p3) {
     return 1;
 }
 
-// 1.13c D2CLIENT+0x57D50
-// stepX = unaff_EDI (dx step the caller leaves in EDI); tx = local_7c (target x filled by 0xA1340 pair)
-extern "C" uint32_t d2c_57D50_n99(uint32_t unit, int32_t idx, uint32_t p3, int32_t stepX) {
+// 1.13c D2CLIENT+0x57D50  fastcall(ecx=unit, edx=idx) + stack p3. 51340 writes *edi=X, *stack=Y (target).
+// stepX = -2*sign(dy), stepY = 2*sign(dx) (the retail branch ladder), n = 10786(unit, rec[0x138], idx, p3).
+extern "C" uint32_t d2c_57D50_n99(uint32_t unit, int32_t idx, uint32_t p3) {
     int32_t sub; uint32_t rec = n99_rec(idx, &sub, true); if (!rec) return 0;
     n99_mark(unit);
     int32_t out[2] = {0, 0};
-    if (!CALL(0xA1340, (uint32_t)(uintptr_t)out)) return 0;
+    if (!CALL(0xA1340, unit, (uint32_t)(uintptr_t)out)) return 0;
     int32_t ux = (int32_t)CALL(0x1630, unit), uy = (int32_t)CALL(0x1660, unit);
-    int32_t dx = out[0] - ux, dy = out[1] - uy, step = 0;
+    int32_t dx = out[0] - ux, dy = out[1] - uy;
     if (dx == 0 && dy == 0) return 0;
-    if (dx >= 0 || dy >= 0) {
-        if (dx == 0) goto have;
-        if (dx > 0) { step = 2; goto have; }
-        if (dx >= 0) goto have;
-        if (dy > 0) { step = -2; goto have; }
-        if (dy != 0) goto have;
-    }
-    step = -2;
-have:;
+    int32_t stepX = dy > 0 ? -2 : (dy < 0 ? 2 : 0);
+    int32_t step = dx > 0 ? 2 : (dx < 0 ? -2 : 0);
     int32_t n = (int32_t)ORD(10786, unit, R(rec + 0x138), idx, p3);
     dy = dy - (n / 2) * step;
     dx = dx - (n / 2) * stepX;
     uint32_t b[23] = {0};
     b[0] = 3;
     for (; n > 0; n--) {
-        b[5] = (uint32_t)(dx / 6 + (int32_t)unit);
-        b[6] = (uint32_t)(dy / 6 + out[1]);
-        b[12] = 0; b[4] = idx; b[7] = dx; b[8] = dy;
+        b[1] = unit; b[4] = (uint32_t)sub;
+        b[5] = (uint32_t)(dx / 6 + ux);
+        b[6] = (uint32_t)(dy / 6 + uy);
+        b[7] = (uint32_t)dx; b[8] = (uint32_t)dy; b[12] = p3;
         g99.callb(0xB30F0, b);
         dx += stepX; dy += step;
     }
@@ -103,62 +103,76 @@ extern "C" uint32_t d2c_58070_n99(uint32_t unit, int32_t idx, uint32_t p3) {
     if (!(sub * 0x1a4 + R(dt + 0xb64))) return 0;
     n99_mark(unit);
     uint32_t b[23] = {0};
-    b[0] = 3; b[1] = unit; b[2] = unit; b[4] = sub;
+    b[0] = 3; b[1] = unit; b[2] = unit; b[4] = (uint32_t)sub;
     b[5] = CALL(0x1630, unit); b[6] = CALL(0x1660, unit);
-    b[11] = idx; b[12] = p3; b[13] = ORD(10786, unit);
+    b[11] = (uint32_t)idx; b[12] = p3;
+    b[13] = ORD(10786, unit, R(rec + 0x138), (uint32_t)idx, p3);
     uint32_t t = CALL(0xA5F70);
-    int32_t r;
-    if (!t) {
-        r = (int32_t)ORD(10983, R(unit + 0x2c));
-        b[2] = (uint32_t)(r - (int32_t)CALL(0x1630, unit));
-        r = (int32_t)ORD(10764, R(unit + 0x2c));
+    uint32_t path = R(unit + 0x2c);
+    int32_t y;
+    if (t) {
+        ORD(10739, path, CALL(0x1630, t), CALL(0x1660, t), 0);   // 6FABC478(path, X(t), Y(t), 0), result unused
+        b[7] = CALL(0x1630, t) - CALL(0x1630, unit);
+        y = (int32_t)CALL(0x1660, t);
     } else {
-        ORD(10739, R(unit + 0x2c), CALL(0x1630, t), CALL(0x1660, t), 0);
-        CALL(0x1630, t); CALL(0x1630, unit);
-        r = (int32_t)CALL(0x1660, t);
+        int32_t r = (int32_t)ORD(10983, path);                    // 6FABC31C(path)
+        b[7] = (uint32_t)(r - (int32_t)CALL(0x1630, unit));
+        y = (int32_t)ORD(10764, path);                            // 6FABC340(path)
     }
-    b[0] = (uint32_t)(r - (int32_t)CALL(0x1660, unit));
+    b[8] = (uint32_t)(y - (int32_t)CALL(0x1660, unit));
     uint32_t m = g99.callb(0xB30F0, b);
-    if (m) ORD(10637, m, b[16]);
+    if (m) ORD(10637, m, p3);                                     // 6FABC448(m, p3)
     return 1;
 }
 
-// 1.13c D2CLIENT+0x58370
-// esi = unit, eax = missile index, stack = second arg of 0x56E10
-extern "C" uint32_t d2c_58370_n99(uint32_t unit, int32_t idx, uint32_t stackArg) {
-    uint32_t b[23] = {0};
-    uint64_t s = (uint64_t)R(unit + 0x20) * 0x6ac690c5ull + R(unit + 0x24);
-    b[0] = 0x25;
-    W(unit + 0x20, (uint32_t)s); W(unit + 0x24, (uint32_t)(s >> 32));
-    if (s & 3) b[0] = 0x4025;
-    uint32_t t = R(unit), pos = R(unit + 0x2c);
-    if (t != 2 && (t < 4 || t > 5) && pos) b[6] = ORD(10867, pos);
-    if (t != 2 && (t < 4 || t > 5) && pos) b[5] = ORD(10750, pos);
-    uint32_t dt = g99.dataTables;
-    if (idx >= 0 && idx < (int32_t)R(dt + 0xb6c) && (idx * 0x1a4 + R(dt + 0xb64))) {
-        s = (uint64_t)R(unit + 0x20) * 0x6ac690c5ull + R(unit + 0x24);
-        W(unit + 0x20, (uint32_t)s); W(unit + 0x24, (uint32_t)(s >> 32));
-        uint32_t m = g99.callb(0xB30F0, b);
-        if (m) { CALL(0x56E10, unit, stackArg); return m; }
-    }
-    return 0;
+// unit X/Y as the retail inline ladder: type 2/4/5 read the path (unit+0x2c) +0xC/+0x10, else ordinal 10867/10750 (0 if no path).
+static uint32_t n99_ux(uint32_t unit, bool y) {
+    uint32_t t = R(unit), path = R(unit + 0x2c);
+    if (t == 2 || (t >= 4 && t <= 5)) return R(path + (y ? 0x10 : 0xc));
+    return path ? ORD(y ? 10750 : 10867, path) : 0;
 }
 
-// 1.13c D2CLIENT+0x584D0
-extern "C" uint32_t d2c_584D0_n99(uint32_t unit, int32_t idx, uint32_t p3, uint32_t edi) {
+// 1.13c D2CLIENT+0x58370  EAX = idx (entry index), ESI = unit, stack A0..A4 (ret 0x14).
+// A0 = dword table of 5, A1/A2 go to b[7]/b[8], A3 to b[11], A4 to b[12]; 56E10 gets eax=A3, stack (unit, A4).
+extern "C" uint32_t d2c_58370_n99(uint32_t unit, int32_t idx, uint32_t A0, uint32_t A1, uint32_t A2, uint32_t A3, uint32_t A4) {
+    uint32_t b[23] = {0};
+    uint64_t s = (uint64_t)R(unit + 0x20) * 0x6ac690c5ull + R(unit + 0x24);
+    W(unit + 0x20, (uint32_t)s); W(unit + 0x24, (uint32_t)(s >> 32));
+    b[0] = 0x25; b[1] = unit;
+    if (((uint32_t)s & 3) > 0) b[0] = 0x4025;
+    b[4] = (uint32_t)idx;
+    b[5] = n99_ux(unit, false); b[6] = n99_ux(unit, true);
+    b[7] = A1; b[8] = A2; b[11] = A3; b[12] = A4;
+    uint32_t dt = g99.dataTables;
+    if (idx < 0 || idx >= (int32_t)R(dt + 0xb6c)) return 0;
+    uint32_t ent = (uint32_t)idx * 0x1a4 + R(dt + 0xb64);
+    if (!ent) return 0;
+    s = (uint64_t)R(unit + 0x20) * 0x6ac690c5ull + R(unit + 0x24);
+    W(unit + 0x20, (uint32_t)s); W(unit + 0x24, (uint32_t)(s >> 32));
+    b[10] = (R(ent + 0x9a) & 0xff) + R(A0 + ((uint32_t)s % 5) * 4);
+    uint32_t m = g99.callb(0xB30F0, b);
+    if (!m) return 0;
+    CALL(0x56E10, A3, unit, A4);
+    return m;
+}
+
+// 1.13c D2CLIENT+0x584D0  fastcall(ecx=unit, edx=idx) + stack p3 (ret 4).
+// 51340 (ebx=unit, edi=&X, stack=&Y). B6D40: EAX=sub, ESI=unit, stack (X, Y, r1, idx, p3, r2, 1).
+extern "C" uint32_t d2c_584D0_n99(uint32_t unit, int32_t idx, uint32_t p3) {
     int32_t sub; uint32_t rec = n99_rec(idx, &sub, true); if (!rec) return 0;
     n99_mark(unit);
     int32_t out[2] = {0, 0};
-    if (!CALL(0xA1340, (uint32_t)(uintptr_t)out)) return 0;
-    uint32_t a = R(rec + 100);
-    int32_t h = (int32_t)ORD(10786, unit, a, idx, p3) - 6;
+    if (!CALL(0xA1340, unit, (uint32_t)(uintptr_t)out)) return 0;
+    int32_t h = (int32_t)ORD(10786, unit, R(rec + 100), (uint32_t)idx, p3) - 6;
     if (h < 1) h = 1;
-    uint32_t v = ORD(10786, unit, R(rec + 0x114), idx, (uint32_t)out[0]);
-    CALL(0xB6D40, unit, a, unit, (uint32_t)h, (uint32_t)idx, edi, v);
+    uint32_t v = ORD(10786, unit, R(rec + 0x114), (uint32_t)idx, p3);
+    uint32_t stk[7] = {(uint32_t)out[0], (uint32_t)out[1], (uint32_t)h, (uint32_t)idx, p3, v, 1};
+    g99.callStk(0xB6D40, (uint32_t)sub, unit, stk, 7);
     return 1;
 }
 
-// 1.13c D2CLIENT+0x585C0
+// 1.13c D2CLIENT+0x585C0  fastcall(ecx=unit, edx=idx) + stack p3 (ret 4).
+// The 0xD5C90 / 0xD5C8C tables are BYTE tables (movzx / mov cl), not dwords.
 extern "C" uint32_t d2c_585C0_n99(uint32_t unit, int32_t idx, uint32_t p3) {
     int32_t sub; if (!n99_rec(idx, &sub, true)) return 0;
     n99_mark(unit);
@@ -168,36 +182,40 @@ extern "C" uint32_t d2c_585C0_n99(uint32_t unit, int32_t idx, uint32_t p3) {
     int32_t ux = (int32_t)CALL(0x1630, unit), uy = (int32_t)CALL(0x1660, unit);
     int32_t ax = tx - ux; if (ax < 0) ax = -ax;
     int32_t ay = ty - uy; if (ay < 0) ay = -ay;
-    int32_t px = ux, py = uy;
-    if (ax < ay) {
-        for (int i = 0; i < 4; i++) { if (tx < px) px--; else if (px < tx) px++; }
-    } else {
-        for (int i = 0; i < 4; i++) { if (ty < py) py--; else if (py < ty) py++; }
-        px = tx;
+    int32_t px, py;
+    if (ax < ay) {              // x steps four times toward the target; y is the target's
+        px = ux; py = ty;
+        for (int i = 0; i < 4; i++) { if (px > tx) px--; else if (px < tx) px++; }
+    } else {                    // y steps four times toward the target; x is the target's
+        px = tx; py = uy;
+        for (int i = 0; i < 4; i++) { if (py > ty) py--; else if (py < ty) py++; }
     }
+    int32_t pdx = px - ux, pdy = py - uy;
     uint32_t b[23] = {0};
-    b[10] = (uint32_t)(px - ux); b[9] = (uint32_t)(py - uy);
-    b[6] = (uint32_t)((px - ux) / 6 - 1 + ux);
-    b[5] = (uint32_t)((py - uy) / 6 - 1 + uy);
-    b[0] = 3; b[11] = idx; b[12] = p3; b[4] = sub; b[1] = unit;
+    b[0] = 3; b[1] = unit; b[4] = (uint32_t)sub;
+    b[5] = (uint32_t)(pdx / 6 + ux - 1);
+    b[6] = (uint32_t)(pdy / 6 + uy - 1);
+    b[7] = (uint32_t)pdx; b[8] = (uint32_t)pdy;
+    b[11] = (uint32_t)idx; b[12] = p3;
     uint32_t dir = ORD(10192, unit, (uint32_t)px, (uint32_t)py);
-    uint32_t tbl = R(g99.tab_c8c + (R(g99.tab_c90 + (dir & 0x3f)) & 3) * 4) ;
-    ORD(10706, R(unit + 0x2c), tbl);
+    uint32_t k = R(g99.tab_c90 + (dir & 0x3f)) & 0xff;
+    uint32_t v = R(g99.tab_c8c + (k & 3)) & 0xff;
+    ORD(10706, R(unit + 0x2c), v);
     g99.callb(0xB30F0, b);
     return 1;
 }
 
-// 1.13c D2CLIENT+0x58A70
+// 1.13c D2CLIENT+0x58A70  fastcall(ecx=unit, edx=idx) + stack p3 (ret 4). 52380: ecx=kind, edi=&b, stack=arg.
 extern "C" uint32_t d2c_58A70_n99(uint32_t unit, int32_t idx, uint32_t p3) {
     int32_t sub; uint32_t rec = n99_rec(idx, &sub, true); if (!rec) return 0;
     n99_mark(unit);
     uint32_t b[23] = {0};
     b[0] = 0x2021; b[1] = unit; b[2] = unit;
     b[5] = CALL(0x1630, unit); b[6] = CALL(0x1660, unit);
-    b[12] = p3; b[4] = sub; b[11] = idx;
-    CALL(0xA2380, 1, 2);
+    b[12] = p3; b[11] = (uint32_t)idx; b[4] = (uint32_t)sub;
+    g99.callR(0xA2380, 1, b, 2);
     int32_t s2 = (int16_t)(R(rec + 0xec) & 0xffff);
-    if (s2 >= 0 && s2 < (int32_t)R(g99.dataTables + 0xb6c)) CALL(0xA2380, 5, 4);
+    if (s2 >= 0 && s2 < (int32_t)R(g99.dataTables + 0xb6c)) { b[4] = (uint32_t)s2; g99.callR(0xA2380, 5, b, 4); }
     return 1;
 }
 

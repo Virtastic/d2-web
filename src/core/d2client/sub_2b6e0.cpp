@@ -11,7 +11,7 @@ struct Env {
  I (*tbl5)(I tbl,I i);              // byte at tbl+5 (per-entry flag), tbl is o10421 result
  void (*o10980)(void* h);
  I (*o10649)(void* h);
- void* (*f54e20)(I a,I slotBase,I u);   // FUN_6fb54e20; slotBase = &DAT_6fbba608 + u*0x80
+ void* (*f54e20)(I a,I slotBase,I u);   // FUN_6fb54e20; slotBase = 0x6fbba608 + kind*0x200 (shl edx,9)
  I (*o11138)(void* u,void* p,I z);
  void (*o10137)(void* h,I v);
  void (*o10542)(void* u,I v);
@@ -27,7 +27,8 @@ struct Env {
 };
 // 1.13c D2Client+0x2B6E0
 // u: int32 view of the unit (u[0]=type, u[4], u[0xb], u[0xe], u[0x12], u[0x31]; byte +0x4e).
-// pw: the 32-bit value of the unit pointer (compared to 6 and to u[0xe]>>8 as the decompile does).
+// pw: the one stack argument (ret 4), the skill/kind id the decompile calls param_1 once ECX is reused;
+// the unit itself arrives in ECX (esi). Compared to 6 and to u[0xe]>>8.
 U sub_2B6E0(const Env& e,I* u,I pw,uint8_t b4e){
  void* h=e.o10511(); if(!h) return 0;
  e.o10397(h);
@@ -36,7 +37,7 @@ U sub_2B6E0(const Env& e,I* u,I pw,uint8_t b4e){
  if(tbl){ I n=e.o10577(u); for(I i=0;i<n;i++) if(e.tbl5(tbl,i)==0){ f=(U)(i-1); break; } }
  if(u==nullptr || ((u[0]!=0&&u[0]!=1)||b4e!=3)){
   void* p=nullptr; e.o10980(h); I t=e.o10649(h);
-  if(pw!=6) p=e.f54e20(t,0x6fbba608+pw*0x80,pw);
+  if(pw!=6) p=e.f54e20(t,0x6fbba608+pw*0x200,pw);
   if(f&1){
    if(p && e.o11138(u,p,0)){ e.o10137(h,0); e.o10542(u,pw+1); u[0x12]=iVar9<<8; return 1; }
    if(!(f&2)){

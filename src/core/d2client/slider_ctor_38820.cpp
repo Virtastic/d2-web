@@ -9,10 +9,12 @@ struct Services {
  virtual uint32_t defaultFont()=0;               // FUN_6fadb420(0) -> +0x52
  virtual uint32_t* alloc(uint32_t id)=0;         // Fog #10042(id,0) (0x5d, 0x5e), retail passes 0 as 2nd arg
  virtual void initLabels(uint32_t* tmp)=0;       // 11x Unicode ctor + #10184 + win2Unicode(tmp,..,11)
+ virtual uint32_t vtable()=0;                 // &PTR_FUN_6fb868c0 (the base vtable 6fb85048 is stored first, then replaced)
  virtual int32_t scaleBase()=0;                  // Ordinal_10028 (/10 when width<1)
 };
 // 1.13c D2Client+0x38820 ; this=obj, p7=count (u16), width=unaff_retaddr, step=unaff_EDI; returns obj
 uint8_t* sliderCtor(Services& s,uint8_t* o,uint32_t p2,uint32_t p3,uint32_t p5,uint16_t p7,uint32_t p8,int32_t width,int32_t step){
+ wr<uint32_t>(o,0,s.vtable());
  wr<uint32_t>(o,0x52,s.defaultFont());
  wr<uint32_t>(o,0x42,p8);
  uint32_t bytes=(uint32_t)p7*2+2;

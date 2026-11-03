@@ -60,9 +60,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_23c00(uint32_t unit, const ui
     uint32_t base = cb(ctx, OP_PROFILE, unit, flag, 0);                   // 0x23D8F, ret 4
     uint32_t snd = cb(ctx, OP_PLAY, unit, 0, base);                       // 0x23D96, stack unit,0,0,0
     if (snd) {
-        uint32_t vol = (unit == nPlayer) ? 0xFF : 200;                    // 0x23DA1
-        if (elapsed > (per * 3) >> 1) vol = (uint32_t)((int32_t)(vol * 160) / 255);   // 0x23DC4
-        cb(ctx, OP_VOLUME, snd, vol, 0);                                  // 0x23DE0
+        uint32_t vol = (unit == nPlayer) ? 0xFF : 200, first = elapsed;      // 0x23DA1
+        if (elapsed > (per * 3) >> 1) { first = vol * 160; vol = first / 255; }   // 0x23DC4: unsigned, both words change
+        cb(ctx, OP_VOLUME, first, snd, vol);                                  // 0x23DE0: (elapsed|vol*0xA0, sound, vol|that/0xFF)
     }
     if (doRand && cb(ctx, OP_RAND, 100, 0, 0) < rate)                     // 0x23DF2
         cb(ctx, OP_PLAY, unit, 0, 0);

@@ -69,44 +69,71 @@ extern "C" {
 
 EMSCRIPTEN_KEEPALIVE void d2c573a0_setHost(D2cHost h) { g_h = h; }
 
-// 1.13c D2Client+0x573A0 (s3495). fastcall(unit=ecx, classId=edx). PARTIAL: the DAT_6fb85cd0/cd8
-// tables and the stack-slot out-params of Ordinal_10569/10740 are not decoded; calls go via the seam.
+// 1.13c D2Client+0x573A0 (s3495). fastcall(unit=ecx, classId=edx) + one stack arg (ret 4), returns EAX 0/1.
+// Byte tables DAT_6fb85cd0 (RVA 0xD5CD0, 8 bytes) and DAT_6fb85cd8 (RVA 0xD5CD8, 9 per row) are read
+// through the host as rva 0x20000000|tableRva (one byte). Ordinal args per the disassembly:
+// 10511(unit) 10980(h) 10649(h) 6fb51340(ebx=unit, edi=&o0, stack=&o1) 10192(unit,a,b,callerEbp)
+// 10266(al) 10740(id,&dx,&dy) 10569(unit,&r,&r2) 6fb60450(sub,x,y,idx,p).
 EMSCRIPTEN_KEEPALIVE uint32_t d2c_573A0(uint32_t unit, int32_t idx, uint32_t dataTables, uint32_t tblBase, uint32_t tblCount,
-                                         uint32_t rec, int32_t recSub, int32_t subCount) {
+                                         uint32_t rec, int32_t recSub, int32_t subCount, uint32_t stackArg, uint32_t callerEbp) {
     // Bounds exactly as retail: 0 <= idx < *(dt+0xBA0); rec = idx*0x23C + *(dt+0xB98); (short)rec[0xEA] in [0,*(dt+0xB6C)).
-    (void)tblBase; (void)tblCount;
-    if (idx < 0 || rec == 0 || recSub < 0 || recSub >= subCount) return 0;
-    (void)dataTables;
-    if (ord(10511, unit) == 0) return 0;
-    uint32_t a = ord(10980), b = ord(10649);
-    if (a == 0 || b == 0) { if (call(0xA1340, 0, uptr(&a)) == 0) return 0; }
-    ord(10192, unit); uint32_t bv = ord(10266) & 0xFF;
-    call(0x1630, 0, unit); call(0x1660, 0, unit);
-    ord(10740, bv & 7);
-    ord(10569, unit);
-    ord(10740);
-    call(0xB0450, 0, unit);
+    (void)tblBase; (void)tblCount; (void)dataTables; (void)rec;
+    if (idx < 0 || recSub < 0 || recSub >= subCount) return 0;
+    uint32_t h = ord(10511, 0, 0, 0, unit);
+    if (h == 0) return 0;
+    uint32_t a = ord(10980, 0, 0, 0, h), b = ord(10649, 0, 0, 0, h);
+    if (a == 0 || b == 0) {
+        uint32_t o[2] = {0, 0};
+        D2cCall c = {};
+        c.rva = 0xA1340; c.ebx = unit; c.ecx = uptr(&o[0]); c.edx = 0; c.s[0] = uptr(&o[1]);  // edi=&o[0] in ecx slot
+        if (g_h(&c) == 0) return 0;
+        a = o[0]; b = o[1];
+    }
+    uint32_t bv = ord(10266, 0, 0, 0, ord(10192, 0, 0, 0, unit, a, b, callerEbp) & 0xFF) & 7;
+    uint32_t x = call(0x1630, 0, unit), y = call(0x1660, 0, unit);
+    int32_t d[2] = {0, 0};
+    ord(10740, 0, 0, 0, call(0x20000000u | (0xD5CD0 + bv)) & 0xFF, uptr(&d[0]), uptr(&d[1]));
+    x += (uint32_t)d[0]; y += (uint32_t)d[1];
+    int32_t r[2] = {0, 0}, q[2] = {0, 0};
+    ord(10569, 0, 0, 0, unit, uptr(&r[0]), uptr(&q[0]));
+    int32_t k = r[0] - 4;
+    k = k > 0 ? (k >= 8 ? 8 : k) : 0;
+    uint32_t t = call(0x20000000u | (0xD5CD8 + bv * 9 + (uint32_t)k)) & 0xFF;
+    if (t != 0x63) {
+        ord(10740, 0, 0, 0, t, uptr(&d[0]), uptr(&d[1]));
+        x += (uint32_t)d[0]; y += (uint32_t)d[1];
+    }
+    uint32_t args[5] = {(uint32_t)recSub, x, y, (uint32_t)idx, stackArg};
+    call(0xB0450, 0, uptr(args));
     return 1;
 }
 
-// 1.13c D2Client+0x578F0 (s3496). Register ESI = this (unaff_ESI). PARTIAL: ESI-carried object and
-// Ordinal_10203/10306/10331/10630/10788 results are seam-only.
+// 1.13c D2Client+0x578F0 (s3496). ESI = unit (self); no stack args; returns EAX = 630F0 result or 0.
+// X/Y: type in {2,4,5} read path (self[0xb]) +0xC/+0x10, else ordinal 10867/10750 on self[0xb] (0 if null).
 EMSCRIPTEN_KEEPALIVE uint32_t d2c_578F0(int32_t* self) {
     int32_t o = self[0xb];
-    if (o == 0 || ord(10203) == 0) return 0;
-    ord(10630); ord(10306); ord(10331);
+    if (o == 0 || ord(10203, 0, 0, 0, (uint32_t)o) == 0) return 0;
+    uint32_t h = ord(10630, 0, uptr(self), 0xad, 1);   // ecx=unit, edx=0xad, stack 1
+    uint32_t v = ord(10306, 0, 0, 0, uptr(self), h);
+    ord(10331, 0, 0, 0, uptr(self));
     int32_t t = self[0];
-    if (t != 2 && (t < 4 || t > 5) && self[0xb]) ord(10867, self[0xb]);
-    t = self[0];
-    if (t != 2 && (t < 4 || t > 5) && self[0xb]) ord(10750, self[0xb]);
-    uint32_t u = ord(10788, o);
-    ord(10266, u);
-    ord(10740);
-    uint32_t r = call(0x1400);
-    if (ord(10057, r) != 0) return 0;
-    uint32_t rec[23] = {0x25};
+    bool direct = (t == 2 || (t >= 4 && t <= 5));
+    const int32_t* path = (const int32_t*)(uintptr_t)(uint32_t)o;
+    uint32_t x = direct ? (uint32_t)path[3] : (o ? ord(10867, 0, 0, 0, (uint32_t)o) : 0);
+    uint32_t y = direct ? (uint32_t)path[4] : (o ? ord(10750, 0, 0, 0, (uint32_t)o) : 0);
+    static const uint8_t k[8] = {0xa, 0x8, 0x16, 0x14, 0x12, 0x10, 0xe, 0xc};
+    uint32_t cls = ord(10266, 0, 0, 0, ord(10788, 0, 0, 0, (uint32_t)o)) & 0xFF;
+    int32_t d[2] = {0, 0};
+    ord(10740, 0, 0, 0, k[cls & 7], uptr(&d[0]), uptr(&d[1]));   // retail indexes with the full al; keep in range
+    x += (uint32_t)d[0]; y += (uint32_t)d[1];
+    if (ord(10057, 0, 0, 0, call(0x1400)) != 0) return 0;
+    uint32_t rec[23] = {};
+    rec[0] = 0x25; rec[1] = uptr(self); rec[4] = 0x8f; rec[5] = x; rec[6] = y;
+    rec[7] = x + (uint32_t)d[0] * 2; rec[8] = y + (uint32_t)d[1] * 2; rec[10] = 3; rec[12] = v;
     uint32_t ret = call(0xB30F0, 0, uptr(rec));
-    call(0x88A70, 0, uptr(self));
+    D2cCall c = {};
+    c.rva = 0x88A70; c.ebx = 0x726; c.s[0] = uptr(self);
+    g_h(&c);
     return ret;
 }
 

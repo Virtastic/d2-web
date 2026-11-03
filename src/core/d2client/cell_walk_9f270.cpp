@@ -8,7 +8,7 @@ struct D2ClientCellWalk9f270Env {
     uint32_t arg;                                   // DAT 0x6FBCC414
     void (*sub666d0)(uint32_t unit);                // D2Client+0x666D0
     uint32_t (*ord10013)();
-    void (*sub1ba90)();                             // D2Client+0x1BA90
+    void (*sub1ba90)(uint32_t unit);                // D2Client+0x6BA90 (EAX = node unit)
     void (*ord10069)(uint32_t a, int32_t x, int32_t y, uint32_t mode, uint32_t arg);
     void (*sub9e970)(uint32_t room, uint32_t one, uint32_t ctx);  // D2Client+0x9E970
 };
@@ -24,7 +24,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9f270(const uint8_t* mem, uint32_
             uint32_t fl = rd(mem, p);
             if (!(fl & 3)) { e->sub666d0(rd(mem, p + 0xc)); continue; }
             uint32_t r = e->ord10013();
-            if (!(fl & 1)) { if (fl & 2) e->sub1ba90(); }
+            if (!(fl & 1)) { if (fl & 2) e->sub1ba90(rd(mem, p + 0xc)); }
             else if (!r) {
                 uint32_t q = rd(mem, p + 0xc);
                 e->ord10069(rd(mem, q + 0x18), (int32_t)(rd(mem, ctx + 4) - rd(mem, ctx + 0x24) + rd(mem, q)),

@@ -7,10 +7,11 @@ using U=uint32_t; using I=int32_t; using P=void*;
 static U rd(P p,U n){U v;std::memcpy(&v,static_cast<uint8_t*>(p)+n,4);return v;}
 struct Calls {
  I (*pathX)(P); I (*pathY)(P);           // Ordinal_10867 / 10750 (path x/y)
- P (*resolve)(U);                        // Ordinal_10331
+ P (*resolve)(U);                        // Ordinal_10331 (1 arg)
+ P (*resolve3)(U,U,U);                   // Ordinal_10331 (room,1,0x220) as 52570 pushes it
  P (*node630f0)(U*);                     // D2Client+0xB30F0 (msg dispatch, 23 words)
  void (*o10637)(P,I); void (*o10019)(P,I); P (*o10754)(P);
- void (*fn5ff10)(P,U,I,U,U,I,I);         // D2Client+0xAFF10
+ void (*fn5ff10)(U,I,U,U,I,I);           // D2Client+0xB5FF10: EDX=unit, stack (id,x,y,0,1)
  I (*o10573)(P,I,I,I,I); P (*o10389)(P,I,I,P,I,I);
  U (*o11117)(); void (*o11129)(); I (*mask)(); P (*o10078)(...);
 };
@@ -33,13 +34,13 @@ I* sub_51390(U* out0,U* out1,I* unit,U x,U fallback,P client,Calls& c,U unk){
 struct Probe { const I* order; const I* dx; const I* dy; I n; };
 P sub_51500(P unit,Calls& c,const Probe& t,U start,const uint8_t* st,U mask10,U cb11b0,
             U (*f1510)(const uint8_t*,I),U (*f562a0)(P)){
- U s=(c.o11117()&0xff)>>3; P room=c.resolve(0);
+ U s0=(c.o11117()&0xff)>>3, s=s0; P room=c.resolve(U(uintptr_t(unit))); (void)start; // Ordinal_10331(unit); the rotation resets to the initial value, not a caller register
  for(I i=0;i<5;++i){
   s=(U(t.order[i])+s)&7; I x=I(ux(unit,c))+t.dx[s], y=I(uy(unit,c))+t.dy[s];
   if(int16_t(c.o10573(room,x,y,1,0x180))!=0){
    P o=c.o10389(room,x,y,reinterpret_cast<P>(uintptr_t(cb11b0)),0,1);
    if(o&&((rd(o,0xc4)>>2)&1)&&(((mask10&st[6])&0xff)==0||(I(rd(o,0))==1&&f1510(st,6)!=0)||f562a0(unit)!=0)){c.o11129();return o;} }
-  s=start;
+  s=s0;
  }
  return nullptr;
 }
@@ -74,14 +75,20 @@ void sub_51E30(P esi,I (*f568e0)(P,I,I,I),void (*f1860)(),I& c2f4,I& c2f8){
 static P send(Calls& c,U w0,U w1,U w2,U w3,U w4,U w5){U m[23]={};m[0]=w0;m[1]=w1;m[2]=w2;m[3]=w3;m[4]=w4;m[5]=w5;return c.node630f0(m);}
 // 1.13c D2Client+0x52230  (word idx = byte offset from frame base / 4: [0x10]=0x133,[0x30]=1)
 void sub_52230(U p2,Calls& c){U m[23]={};m[1]=p2;m[2]=p2;m[4]=0x133;m[12]=1;c.node630f0(m);}
-// 1.13c D2Client+0x52270
-void sub_52270(Calls& c){U m[23]={};P p=c.node630f0(m);
+// 1.13c D2Client+0x52270  (ESI = id; disassembly: each message is 23 zeroed words with [1]=[2]=ESI, [4]=type, [12]=1;
+// types 0x12b (result p goes to Ordinal_10637/10019 with 0x4b), 0x166, 0x132)
+void sub_52270(U esi,Calls& c){
+ U m[23]={}; m[1]=esi; m[2]=esi; m[4]=0x12b; m[12]=1;
+ P p=c.node630f0(m);
  if(p){c.o10637(p,0x4b);c.o10019(p,0x4b);}
- std::memset(m,0,sizeof m);c.node630f0(m);std::memset(m,0,sizeof m);c.node630f0(m);}
-// 1.13c D2Client+0x52320
-void sub_52320(Calls& c){U m[23]={};P p=c.node630f0(m);
- if(p)c.o10637(p,0x32);
- std::memset(m,0,sizeof m);c.node630f0(m);c.node630f0(m);}
+ std::memset(m,0,sizeof m); m[1]=esi; m[12]=1; m[2]=esi; m[4]=0x166; c.node630f0(m);
+ std::memset(m,0,sizeof m); m[1]=esi; m[2]=esi; m[12]=1; m[4]=0x132; c.node630f0(m);
+}
+// 1.13c D2Client+0x52320 (ESI = unit/client handle; three messages 0x11c, 0x128, 0x125)
+void sub_52320(U esi,Calls& c){U m[23]={}; m[1]=esi; m[2]=esi; m[4]=0x11c; m[12]=1;
+ P p=c.node630f0(m); if(p)c.o10637(p,0x32);
+ std::memset(m,0,sizeof m); m[1]=esi; m[2]=esi; m[4]=0x128; m[12]=1; c.node630f0(m);
+ m[4]=0x125; c.node630f0(m);}
 // 1.13c D2Client+0x524D0
 // Returns packed pair; rgb outputs set when flag 5591 set.
 uint64_t sub_524D0(U p2,I c2e0,I c0a0,uint8_t c5591,I a212c,uint8_t* o3,uint8_t* o4,uint8_t* o5,uint64_t (*tail)(I)){
@@ -93,10 +100,11 @@ uint64_t sub_524D0(U p2,I c2e0,I c0a0,uint8_t c5591,I a212c,uint8_t* o3,uint8_t*
  }
  return uint64_t(p2)<<32;
 }
-// 1.13c D2Client+0x52570
+// 1.13c D2Client+0x52570 (cbbfc = global at DAT_6fbcbbfc, passed as client)
 void sub_52570(P client,Calls& c){
- P p=c.o10754(c.resolve(U(uintptr_t(client)))); if(!p)return;
- c.fn5ff10(client,U(uintptr_t(client)),0x271,uy(p,c)*0+ux(p,c),uy(p,c),0,1);
+ P p=c.o10754(c.resolve3(U(uintptr_t(client)),1,0x220)); if(!p)return;
+ U y=uy(p,c),x=ux(p,c);
+ c.fn5ff10(U(uintptr_t(client)),0x271,x,y,0,1);
 }
 // 1.13c D2Client+0x52620 / 526E0 / 527A0: unit event message (ids 0x16b / 0x161 / 0x15b)
 static void unitMsg(P unit,U client,U id,Calls& c){

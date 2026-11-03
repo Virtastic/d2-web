@@ -10,7 +10,11 @@ using I=int32_t; using U=uint32_t; using P=void*;
 // Native objects are resolved by the embedding client. Retail scalar offsets
 // remain byte offsets, never offsets into a widened native pointer structure.
 struct Cell { I frame{}; U reserved[12]{}; P file{}; U tail[4]{}; };
+// retail key table entry: 10 bytes (0x6FBCA2E0 + 10*i): action @0, key @4, side @6, unaligned
+#pragma pack(push,1)
 struct Key { U action; int16_t key; U side; };
+#pragma pack(pop)
+static_assert(sizeof(Key)==10,"retail key entry stride");
 struct Threshold { U type,frame,high,medium,low; };
 struct State {
  I width,height; P panel{},widePanel{},oldPanel{},button{},warning{},durability{},bars{},barFrame{};

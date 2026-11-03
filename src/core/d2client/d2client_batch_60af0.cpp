@@ -12,34 +12,6 @@ static inline int16_t rd16(uint32_t a) { return *(const int16_t*)(uintptr_t)a; }
 static inline void wr32(uint32_t a, uint32_t v) { *(uint32_t*)(uintptr_t)a = v; }
 static inline void wr16(uint32_t a, int16_t v) { *(int16_t*)(uintptr_t)a = v; }
 
-// 1.13c D2Client+0x60AF0 (332 B) NAMED: unit in EDI (guess). Draws the 12-segment marker outline on the
-// automap when the unit's party matches the local player's.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_60af0(uint32_t unit_edi, uint32_t local_unit_11bbfc,
-                     uint32_t (*ord10331)(void), uint32_t (*ord10826)(uint32_t), int (*ord10459)(uint32_t),
-                     void (*ord11087)(uint32_t*, uint32_t*), int32_t cell_div_1a16b0,
-                     int32_t org_x_c1f8, int32_t org_y_c1fc, const int32_t* bounds_c228_c234,
-                     const int32_t* seg_82de8, uint8_t col_c213,
-                     void (*ord10010)(int, int, int, int, int, int), int flag_1a16bc,
-                     void (*sub_4d280)(void), void (*sub_601a0)(int, int, int)) {
-    (void)local_unit_11bbfc;
-    int32_t px = (int32_t)ord10331();
-    uint32_t u = ord10826(0);
-    int32_t py = unit_edi ? (int32_t)rd32(unit_edi + 0x24) : 0;
-    int c1 = ord10459(0), c2 = ord10459(u);
-    if (c2 != c1) return;
-    uint32_t tmp = unit_edi ? rd32(unit_edi + 0x2c) : 0, out[3];
-    ord11087(out, &tmp);
-    int32_t x = (px / cell_div_1a16b0 - org_x_c1f8) + 8, y = (py / cell_div_1a16b0 - org_y_c1fc) - 8;
-    if (bounds_c228_c234[0] <= x && x <= bounds_c228_c234[2] && bounds_c228_c234[1] <= y && y <= bounds_c228_c234[3]) {
-        for (uint32_t i = 0; i < 0x60; i += 8) {
-            const int32_t* s = seg_82de8 + i / 4;
-            ord10010(x + s[0] * 2, y + s[1] * 2, x + s[2] * 2, y + s[3] * 2, col_c213, 0xff);
-        }
-        if (flag_1a16bc) { sub_4d280(); sub_601a0(x, y, 2); }
-    }
-}
-
 // 1.13c D2Client+0x61140 (470 B): for each of four list heads (via 0x5F3B0 -> chain) that is non-zero,
 // load the string id (0x4ea/0x4f1/0x4f8/0x4ff), call 0x5F360 on that entry, then 0x60510 and free (0x509..0x50c).
 extern "C" EMSCRIPTEN_KEEPALIVE
@@ -113,13 +85,13 @@ int32_t d2_client_61320(uint32_t n, uint32_t* root, const int32_t* grp_table_115
 }
 
 // 1.13c D2Client+0x61440 (72 B): flush the current list: 0x61140, 0x5F300, 0x5F180, free each node of the
-// chain at [0x11CC1C0] via next=[node+0x18] (ordinal 10043, 0xc1a), then clear [0x11CC1C0] and [0x11CC1C4].
+// chain at [0x11CC1C0] via next=[node+0x18] (0xBF86: ecx=node, line 0xc1a, 0), then clear [0x11CC1C0] and [0x11CC1C4].
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_61440(uint32_t* head_c1c0, uint32_t* cur_c1c4, void (*sub_61140)(void),
-                     void (*sub_5f300)(void), void (*sub_5f180)(void), void (*ord10043)(int, int)) {
+                     void (*sub_5f300)(void), void (*sub_5f180)(void), void (*free_bf86)(uint32_t node, int line, int s1)) {
     sub_61140(); sub_5f300(); sub_5f180();
     uint32_t p = *head_c1c0;
-    while (p) { p = rd32(p + 0x18); ord10043(0xc1a, 0); }
+    while (p) { uint32_t node = p; p = rd32(p + 0x18); free_bf86(node, 0xc1a, 0); }
     *head_c1c0 = 0; *cur_c1c4 = 0;
 }
 
@@ -176,79 +148,39 @@ uint32_t d2_client_61490(uint32_t unit, uint8_t* out, uint32_t local_unit_11bbfc
     return 0;
 }
 
-// 1.13c D2Client+0x61780 (188 B) NAMED: second argument is a stack/return-slot value in the decompile
-// (unaff_retaddr, GUESS = tree root pointer). Fills a node from the player position and inserts it.
-// Range failures call ordinal 10265/10024 then _exit(-1) in retail: here they return -1.
+// 1.13c D2Client+0x62580 (218 B, ret 0xC): stack (room, a1, force, ctx). Retail: edi = cc4c(ecx=room); base = cc34(room, &cnt);
+// for each 0x30-byte record whose flags (+0x14) lack 8 and have 0x20000, or [11C200], or force: 61880(esi=record, ctx+8).
+// Then cb0e(esi, &cnt) with esi = a1 (room if the first count was 0), second loop passes ctx+0xC; then 61d00(esi, ctx+0x10).
+struct D2c62580Env {
+    uint32_t (*cc4c)(uint32_t room);
+    uint32_t (*cc34)(uint32_t room, uint32_t* cnt);
+    uint32_t (*cb0e)(uint32_t a, uint32_t* cnt);
+    void (*f61880)(uint32_t rec, uint32_t edi, uint32_t arg);
+    void (*f61d00)(uint32_t esi, uint32_t edi, uint32_t arg);
+};
 extern "C" EMSCRIPTEN_KEEPALIVE
-int32_t d2_client_61780(int32_t kind, uint32_t* tree_root, uint32_t (*sub_5f6b0)(void),
-                        int32_t (*ord10651)(void), int32_t (*ord11142)(void),
-                        int32_t (*insert_61320)(uint32_t, uint32_t*)) {
-    uint32_t node = sub_5f6b0();
-    int32_t x = ord10651() / 10 + 1, y = ord11142() / 10 - 3;
-    if (x < -0x8000 || x > 0x7fff) return -1;
-    if (y < -0x8000 || y > 0x7fff) return -1;
-    if (kind <= -0x8001 || kind >= 0x8000) return -1;
-    wr16(node + 4, (int16_t)kind); wr16(node + 6, (int16_t)x); wr16(node + 8, (int16_t)y);
-    return insert_61320(node, tree_root);
-}
-
-// 1.13c D2Client+0x61D00 (365 B): walk the unit's item chain ([unit+0x74], next [+0xe8]); for each entry
-// with flag 0x20000000 handling and a resolved record, insert via 0x61780.
-// data tables (sgptDataTables) are pre-resolved by the caller: monsters/objects table accessors.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_61d00(uint32_t unit, uint32_t flag_c200,
-                     uint32_t (*monster_118_of)(uint32_t cls), uint32_t (*ord10688)(int32_t),
-                     uint32_t (*ord10826)(uint32_t), int (*ord10459)(uint32_t), void (*sub_61780)(int32_t)) {
-    for (uint32_t p = rd32(unit + 0x74); p; p = rd32(p + 0xe8)) {
-        uint32_t fl = rd32(p + 0xc4);
-        if (!flag_c200) {
-            if (!((fl >> 0x1c) & 1)) continue;
-            if (!((fl >> 0x1d) & 1)) { /* falls to LAB_51: mark and process */ } else continue;
-        }
-        wr32(p + 0xc4, rd32(p + 0xc4) | 0x20000000);
-        uint32_t type = rd32(p);
-        if (type == 1) {
-            uint32_t v = monster_118_of(rd32(p + 4));
-            if (v) sub_61780((int32_t)v);
-        } else if (type == 2) {
-            int32_t cls = (int32_t)rd32(p + 4);
-            uint32_t rec = ord10688(cls);
-            int32_t v = (int32_t)rd32(rec + 0x1bc);
-            if (!v) continue;
-            if (cls == 0x10b) {
-                int c = ord10459(ord10826(unit));
-                if (c != 2 && c != 3) continue;
-                v = (int32_t)rd32(rec + 0x1bc);
-            } else if (cls == 0x16e) {
-                if (rd32(p + 0x10) != 2) continue;
-            } else if (cls == 0x192) {
-                if (ord10826(unit) != 0x4a) continue;
-                v = (int32_t)rd32(rec + 0x1bc);
-            }
-            sub_61780(v);
+void d2c_62580(uint32_t room, uint32_t a1, uint32_t force, uint32_t ctx, uint32_t c200, const D2c62580Env* e) {
+    uint32_t esi = room, cnt = 0;
+    uint32_t edi = e->cc4c(room);
+    uint32_t base = e->cc34(esi, &cnt);
+    if (cnt > 0) {
+        uint32_t n = cnt;
+        for (uint32_t i = 0; i < n; i++) {
+            uint32_t f = rd32(base + 0x14 + i * 0x30);
+            if (!(f & 8) && ((f & 0x20000) || c200 || force)) e->f61880(base + i * 0x30, edi, ctx + 8);
+            esi = a1;
         }
     }
-}
-
-// 1.13c D2Client+0x62580 (218 B) NAMED: EBX/EBP/EDI/stack args hidden. Two passes over 0x30-byte records
-// (flags at +0x14): call 0x61880 for entries with !(f&8) && (f&0x20000 || [c200] || forced), then 0x61D00.
-extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_62580(uint32_t room, uint32_t n1_ebp, uint32_t n2_edi, int32_t force1_stack, int32_t force2_ebx,
-                     uint32_t flag_c200, uint32_t (*ord10544)(uint32_t, uint32_t*), uint32_t (*ord10388)(uint32_t, uint32_t*),
-                     void (*ord10262)(void), void (*sub_61880)(void), void (*sub_61d00)(uint32_t)) {
-    uint32_t cnt = 0, p;
-    ord10262();
-    uint32_t base = ord10544(room, &cnt);
-    for (uint32_t i = 0; i < n1_ebp; i++) {
-        uint32_t f = rd32(base + 0x14 + i * 0x30);
-        if (!(f & 8) && ((f & 0x20000) || flag_c200 || force1_stack)) sub_61880();
+    base = e->cb0e(esi, &cnt);
+    if (cnt > 0) {
+        uint32_t n = cnt;
+        for (uint32_t i = 0; i < n; i++) {
+            uint32_t f = rd32(base + 0x14 + i * 0x30);
+            if (!(f & 8) && ((f & 0x20000) || c200 || force)) e->f61880(base + i * 0x30, edi, ctx + 0xc);
+            esi = a1;
+        }
     }
-    p = ord10388(cnt, &cnt);
-    for (uint32_t i = 0; i < n2_edi; i++) {
-        uint32_t f = rd32(p + 0x14 + i * 0x30);
-        if (!(f & 8) && ((f & 0x20000) || flag_c200 || force2_ebx)) sub_61880();
-    }
-    sub_61d00(n1_ebp);
+    e->f61d00(esi, edi, ctx + 0x10);
 }
 
 // 1.13c D2Client+0x62710 (65 B) NAMED: key in EAX (GUESS). Find the list node with *node == key (next [+0x18])
@@ -295,13 +227,13 @@ uint32_t d2_client_62cf0(char* path_c0a8, uint32_t* lng_c1ac, uint32_t* accel_c0
 // Dispatch on u16 [pkt+1].
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_62e60(uint32_t pkt, void (*c740)(uint32_t), void (*f5e50)(uint32_t), void (*f65f0)(void),
-                     void (*b2acc0)(void), void (*c4660)(void), uint32_t* f8c9c, uint32_t* c404, uint32_t* c3a4,
+                     void (*b2acc0)(uint32_t), void (*c4660)(void), uint32_t* f8c9c, uint32_t* c404, uint32_t* c3a4,
                      uint8_t* d339f, uint32_t* d33a5) {
     switch ((uint16_t)rd16(pkt + 1)) {
     case 1: c740(pkt); return;
     case 2: f5e50((uint16_t)rd16(pkt + 3)); return;
     case 3: case 6: f65f0(); return;
-    case 4: case 0xd: b2acc0(); return;
+    case 4: case 0xd: b2acc0(pkt); return;
     case 0x17: c4660(); *f8c9c = 0; *c404 = 1; *c3a4 = 1; return;
     case 0x24: *d339f = 1; *d33a5 = (uint16_t)rd16(pkt + 3); return;
     }

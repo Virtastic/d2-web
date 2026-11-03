@@ -1,61 +1,50 @@
-// 1.13c D2Client+0x135E0 -- build the 6x6 tile-grid records used by the high-quality floor path.
-// Stage A transcription from build-wasm/ghidra-d2client/decomp/0x135E0.c; the FN signature and
-// the D2Gfx-facing integration are intentionally left for the Stage B vector cycle.
+// 1.13c D2Client+0x135E0 -- build the 6x6 floor-vertex records (12 bytes each: 4 colour bytes, x, y).
+// Recovered from the disassembly (the decompile loses the stack arguments): stdcall, ret 0x18:
+//   arg1 rec        output records, 36 x 12 bytes (row-major, row outer)
+//   arg2 colBase    added to the column for the world x (<< 16) and for the null-context fill
+//   arg3 rowBase    added to the row for the world y (<< 16)
+//   arg4 height     tile height word (0x13A00 passes uint16 sub+4), handed to the projector (Ordinal 10023); 0 selects the light-sampling branch
+//   arg5 mode       (0x13A00 passes DAT 0x6FBCC414) 1: x adjust = -(width / 4), 2: x adjust = +(width / 4), else 0 (width = [0x6FB8BC48])
+//   arg6 cornersOnly (0x13A00 passes D2Gfx 10047) nonzero: only the four corner cells (col, row in {0, 5}) are written
+// Before the loops: b0 = Ordinal_10731(color) (via 0xC5A4), (b1, b3, b2) = Ordinal_10189(color) (via 0xC5B6, out
+// pointers in that order), color = [0x6FBCC3B8]. A nonzero height writes rec[0] = b0, rec[1] = b1, rec[2] = b3,
+// rec[3] = b2 after adding the x adjust to rec.x; the zero-height branch calls 0x6FB58230 (ECX = (colBase + col) * 8,
+// EAX = (rowBase + row) * 8, the four colour byte pointers) after the x adjust instead.
 #include <cstdint>
 #include <emscripten.h>
 
 struct D2ClientFloorGrid135E0Env {
-    // Ordinal_10189 supplies the two coordinate bases (EBP and ESI in the retail body).
-    void (*coordinate_bases)(int32_t* world_x, int32_t* screen_x_adjust);
-    // Ordinal_10731 supplies the low-byte row origin.
-    uint8_t (*row_origin)();
-    // Ordinal_10023 transforms 16.16 world coordinates into record x/y; retail calls it even
-    // when context is null.
-    void (*world_to_screen)(void* context, int32_t world_x, int32_t world_y,
-                            int32_t* screen_x, int32_t* screen_y);
-    // Null-context retail path's helper, which also writes the record's first four bytes.
-    void (*null_context_fill)(int32_t grid_x_times_8, uint8_t* color_bytes);
-    uint32_t color;
+    uint8_t (*color_byte0)(uint32_t color);                                          // 0xC5A4 / Ordinal 10731
+    void (*color_split)(uint32_t color, uint8_t* o1, uint8_t* o3, uint8_t* o2);      // 0xC5B6 / Ordinal 10189
+    void (*project)(int32_t x16, int32_t y16, int32_t height, int32_t* px, int32_t* py);  // 0xD084 / Ordinal 10023
+    void (*null_fill)(int32_t col8, int32_t row8, uint8_t* c0, uint8_t* c1, uint8_t* c2, uint8_t* c3);  // 0xA8230
+    uint32_t color;                                                                  // [0x6FBCC3B8]
+    int32_t screen_width;                                                            // [0x6FB8BC48]
 };
 
-// The retail body advances 12 bytes per cell for 36 cells. With corners_only set it visits only
-// the 20 border cells; otherwise it visits all 36. The output coordinates and color are written
-// only for visited records. Inputs expose the retail caller context and coordinate sources so
-// the capture cycle can pin each import without pretending those imports are local constants.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_135e0(
-    void* context, uint8_t* records, int32_t corners_only, const D2ClientFloorGrid135E0Env* env) {
-    if (records == nullptr || env == nullptr) return;
-    int32_t world_x_base = 0;
-    int32_t screen_x_adjust = 0;
-    if (env->coordinate_bases) env->coordinate_bases(&world_x_base, &screen_x_adjust);
-    const int32_t row_base = env->row_origin ? (int32_t)env->row_origin() : 0;
-
-    uint8_t* record = records;
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_135e0(uint8_t* rec, int32_t colBase, int32_t rowBase, int32_t height,
+                                                     int32_t mode, int32_t cornersOnly,
+                                                     const D2ClientFloorGrid135E0Env* env) {
+    const uint8_t b0 = env->color_byte0(env->color);
+    uint8_t b[4] = {b0, 0, 0, 0};
+    int32_t xadj = 0;
+    if (mode == 1 || mode == 2) {
+        const int32_t w = env->screen_width;
+        const int32_t q = (w + ((w >> 31) & 3)) >> 2;
+        xadj = mode == 1 ? -q : q;
+    }
+    env->color_split(env->color, &b[1], &b[3], &b[2]);
     for (int32_t row = 0; row < 6; ++row) {
-        for (int32_t col = 0; col < 6; ++col, record += 0xC) {
-            if (corners_only != 0 && !((col == 0 || col == 5) && (row == 0 || row == 5))) continue;
-            int32_t x = 0;
-            int32_t y = 0;
-            if (env->world_to_screen)
-                env->world_to_screen(context, (world_x_base + col) * 0x10000,
-                                     (row + row_base) * 0x10000, &x, &y);
-            x += screen_x_adjust;
-            if (context != nullptr) {
-                record[0] = (uint8_t)env->color;
-                record[1] = (uint8_t)(env->color >> 8);
-                record[2] = (uint8_t)(env->color >> 24);
-                record[3] = (uint8_t)(env->color >> 16);
-            } else if (env->null_context_fill) {
-                env->null_context_fill((world_x_base + col) * 8, record);
+        for (int32_t col = 0; col < 6; ++col, rec += 0xC) {
+            if (cornersOnly != 0 && !((col == 0 || col == 5) && (row == 0 || row == 5))) continue;
+            int32_t x = 0, y = 0;
+            env->project((colBase + col) << 16, (rowBase + row) << 16, height, &x, &y);
+            x += xadj;
+            if (height != 0) {
+                rec[0] = b[0]; rec[1] = b[1]; rec[2] = b[3]; rec[3] = b[2];
             }
-            record[4] = (uint8_t)x;
-            record[5] = (uint8_t)(x >> 8);
-            record[6] = (uint8_t)(x >> 16);
-            record[7] = (uint8_t)(x >> 24);
-            record[8] = (uint8_t)y;
-            record[9] = (uint8_t)(y >> 8);
-            record[10] = (uint8_t)(y >> 16);
-            record[11] = (uint8_t)(y >> 24);
+            for (int i = 0; i < 4; ++i) { rec[4 + i] = (uint8_t)(x >> (8 * i)); rec[8 + i] = (uint8_t)(y >> (8 * i)); }
+            if (height == 0) env->null_fill((colBase + col) * 8, (rowBase + row) * 8, rec, rec + 1, rec + 2, rec + 3);
         }
     }
 }

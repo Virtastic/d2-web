@@ -100,7 +100,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_2aa40(
 struct D2ClientBatch2ac10Env {
     D2ClientBatch2a700Host host;
     uint32_t* globals;
-    uint8_t* table; // DAT_6fbba608, 0x80 bytes per kind
+    uint8_t* table; // DAT_6fbba608, 0x200 bytes per kind (shl edx,9)
     uint32_t (*tick)(void);
     void (*message)(const uint8_t*, uint32_t);
     uint32_t* (*record)(uint32_t arg, uint8_t* slot, uint32_t kind); // D2Client+0x54E20
@@ -111,7 +111,7 @@ struct D2ClientBatch2ac10Env {
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_2ac10(
     uint32_t selector, uint32_t argument, D2ClientBatch2ac10Env* env) {
     uint32_t kind=selector&0xFFFFu;
-    uint32_t* record=env->record(argument,env->table+kind*0x80u,kind);
+    uint32_t* record=env->record(argument,env->table+kind*0x200u,kind);
     if (!record) return;
     if (kind==0) env->category0(record);
     else if (kind==1) {
@@ -130,22 +130,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_2ac10(
     env->message(packet,sizeof packet);
 }
 
-// 1.13c D2Client+0x2AE30 (100 B): when the unit supports queued actions, test 0x29E80 and enqueue
-// through 0x2AA40; otherwise latch the two failure globals. Return values are retail's 0/1.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_2ae30(
-    D2ClientBatch2a700Host host, D2ClientBatchUnit* unit, uint32_t action,
-    int32_t arg, uint32_t payload, uint32_t* result_flags,
-    void (*enqueue)(uint32_t,uint32_t,int32_t,uint32_t)) {
-    if (unit && (unit->flags & 2u)) {
-        if (invoke(host,0x29E80,unit->id)) {
-            enqueue(action,unit->id,arg,payload);
-            return 0;
-        }
-        return 1;
-    }
-    result_flags[0]=1; result_flags[1]=0;
-    return 0;
-}
+// 1.13c D2Client+0x2AE30 moved to d2client_2ae30.cpp (faithful register/stack form).
 
 // 1.13c D2Client+0x2AEA0 (245 B): validates action ids 5..0x12 against the corresponding resource
 // table, then requires 0x29E80 before queueing. A rejected action sets failure globals and returns 0.
@@ -206,7 +191,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_2b090(
     uint32_t* pd=unit->playerData;
     if (!pd[0x54]) return;
     uint32_t action=pd[0x55], kind=pd[0x56], value=pd[0x57];
-    uint32_t* record=env->record(value,env->table+kind*0x80u,kind);
+    uint32_t* record=env->record(value,env->table+kind*0x200u,kind);
     invoke(host,0x16A0);
     if (action==0x13 && kind==5) *cooldown=env->globals[0x97EC]+500;
     if (!record || action==0) return;

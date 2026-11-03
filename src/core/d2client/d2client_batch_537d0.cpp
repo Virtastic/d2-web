@@ -17,12 +17,12 @@ struct G {
  int32_t t20c0{};               // DAT_6fba20c0 entry count of table 6fba17d0
  struct Ent { int32_t key, a, b, c; } t17d0[64]{};
  int32_t t2128{};               // DAT_6fba2128
- struct Row { int32_t id, f1, f2, f3; } t20d4[64]{};
+ struct Row { int32_t id, f1; uint16_t w8, wA; int32_t f3; } t20d4[64]{};
 };
 struct Svc {
  virtual ~Svc()=default;
- virtual void release(int32_t line)=0;               // Ordinal_10043 (free)
- virtual void ord10614(Unit*)=0;                     // Ordinal_10614 (args unrecovered)
+ virtual void release(void* p,int32_t line)=0;       // FUN_6fabbf86 (ecx = pointer, line)
+ virtual void ord10614(uint32_t* seed,uint32_t id)=0; // Ordinal_10614 (ecx = &unit+0x20, edx = (u16)edx + unit.id)
  virtual int32_t f558e0(Unit*)=0;                    // FUN_6fb558e0 (arg unrecovered; reads state)
  virtual const uint8_t* f1260()=0;                   // FUN_6fab1260 -> record (byte +0x11c checked via recType)
  virtual int32_t recType(const uint8_t*)=0;          // *(char*)(rec+0x11c)
@@ -38,16 +38,16 @@ struct Svc {
  virtual int32_t stat10973(int32_t id)=0;            // Ordinal_10973(unit,id,0)
  virtual int32_t stat10744(void* unit,int32_t id)=0; // Ordinal_10744
  virtual int32_t ord10620(int32_t)=0;
- virtual std::u16string str(int32_t a=0,int32_t b=0,int32_t c=0)=0; // Ordinal_10003 (string-table fetch; args unrecovered)
- virtual std::u16string fmt(const std::u16string& f,int32_t a,int32_t b,int32_t c)=0; // Unicode::sprintf
+ virtual std::u16string str(int32_t id)=0;           // FUN_6fabd1ec (ecx = string-table id)
+ virtual std::u16string fmt(const std::u16string& f,int32_t a,int32_t b,int32_t c)=0; // Unicode::sprintf(0x100,buf,f,a,b,c): a is the first stacked vararg
 };
 static std::u16string dec(int32_t v){ std::string s=std::to_string(v); return std::u16string(s.begin(),s.end()); } // Ordinal_578 "%d" (DAT_6fb834c4 assumed) + toUnicode
 
 // 1.13c D2Client+0x537D0
 void sub_537D0(Svc& s,G& g){
- while(g.head608){ Pal* n=g.head608->next; s.release(0x84); g.head608=n; }
- if(g.tab7804){ s.release(0x8a); g.tab7804=nullptr; }
- if(g.remap2d8){ s.release(0x90); g.remap2d8=nullptr; }
+ while(g.head608){ Pal* n=g.head608->next; s.release(g.head608,0x84); g.head608=n; }
+ if(g.tab7804){ s.release(g.tab7804,0x8a); g.tab7804=nullptr; }
+ if(g.remap2d8){ s.release(g.remap2d8,0x90); g.remap2d8=nullptr; }
 }
 // 1.13c D2Client+0x537A0 (callee of 53C30, already read): list lookup by id
 extern "C" Pal* D2Client_537A0_find(Pal* head,int32_t id){ for(Pal* p=head;p;p=p->next) if(p->id==id) return p; return nullptr; }
@@ -56,10 +56,11 @@ static Pal* find(G& g,int32_t id){ return D2Client_537A0_find(g.head608,id); }
 static Pal* tabGet(const G& g,int32_t id){ Pal* p; std::memcpy(&p,g.tab7804+4+(size_t)id*8,sizeof p); return p; }
 static void tabPut(G& g,int32_t id,Pal* p){ std::memcpy(g.tab7804+4+(size_t)id*8,&p,sizeof p); }
 
-// 1.13c D2Client+0x539E0  (eax = rng state; seed lo at +0x20, hi at +0x24)
-int32_t sub_539E0(Svc& s,uint32_t* st){
- if(!st) return 9;
- s.ord10614(nullptr);
+// 1.13c D2Client+0x539E0  (eax = unit as u32 words [seed lo at word 8, hi at word 9, id at word 1]; edx = u16)
+int32_t sub_539E0(Svc& s,uint32_t* unit,uint32_t edx){
+ if(!unit) return 9;
+ uint32_t* st=unit+8;
+ s.ord10614(st,(uint16_t)edx+unit[1]);
  uint64_t v=(uint64_t)st[0]*0x6ac690c5u+st[1];
  st[0]=(uint32_t)v; st[1]=(uint32_t)(v>>32);
  return (int32_t)((uint32_t)v%0x1e)+9;
@@ -127,8 +128,8 @@ void sub_54000(Svc& s,G& g,int32_t* o){
   switch(g.t17d0[i].key){
   case 0x11: o[7]=s.stat(0x11,0); break;
   case 0x12: o[6]=s.stat(0x12,0); break;
-  case 0x15: o[0]=s.stat(0x15,0); if(!o[0]) o[0]=s.stat(0x15,1); break;
-  case 0x16: o[1]=s.stat(0x16,0); if(!o[1]) o[1]=s.stat(0x16,1); break;
+  case 0x15: o[0]=s.stat(0x15,0); if(!o[0]) o[0]=s.stat(0x17,0); break;
+  case 0x16: o[1]=s.stat(0x16,0); if(!o[1]) o[1]=s.stat(0x18,0); break;
   case 0x30: o[0x18]=s.stat(0x30,0); break;
   case 0x31: o[0x19]=s.stat(0x31,0); break;
   case 0x32: o[0x12]=s.stat(0x32,0); break;
@@ -152,30 +153,31 @@ void sub_54000(Svc& s,G& g,int32_t* o){
 }
 
 // 1.13c D2Client+0x54280  (eax = int32_t* in[0x2a] (output of 54000), param_1 = key, param_2 = out string)
+// String ids and vararg order are from the disassembly (ecx = id for FUN_6fabd1ec; sprintf(0x100,buf,fmt,args...)).
 int32_t sub_54280(Svc& s,int32_t* in,int32_t key,std::u16string& out){
  std::u16string buf;
- auto pr=[&](int32_t a,int32_t b,int32_t c){ buf=s.fmt(s.str(a,b,c),a,b,c); };
+ auto pr=[&](int32_t id,int32_t a,int32_t b,int32_t c){ buf=s.fmt(s.str(id),a,b,c); };
  switch(key){
  case 0x11: return in[10];
  case 0x12: {
-  auto a=s.str(), b=s.str(), c=s.str(); auto d=dec(in[6]);
+  auto a=s.str(0xfa1), b=s.str(0xf9b), c=s.str(0xfa2); auto d=dec(in[6]);
   if(!in[10]) return 0;
-  buf=c+d+a+b+s.str(); break; }
+  buf=c+d+a+b+s.str(0x2727); break; }
  case 0x15: case 0x16: case 0x17:
   if(!in[5]){
    if(!in[4]) return 0;
    if(in[1]<=in[0]){ in[5]=0; in[4]=0; return 0; }
-   in[5]=1; pr(in[0],in[1],0);
+   in[5]=1; pr(0xe27,in[0],in[1],0);
   }
   break;
  case 0x18: return in[5]?1:in[4];
- case 0x30: if(!in[0x1c]) return 0; if(in[0x18]<in[0x19]) pr(in[0x18],in[0x19],0); else pr(0,0,0); break;
+ case 0x30: if(!in[0x1c]) return 0; if(in[0x18]<in[0x19]) pr(0xe1d,in[0x18],in[0x19],0); else pr(0xe1c,in[0x19],0,0); break;
  case 0x31: return in[0x1c];
- case 0x32: if(!in[0x16]) return 0; if(in[0x12]<in[0x13]) pr(in[0x12],in[0x13],0); else pr(0,0,0); break;
+ case 0x32: if(!in[0x16]) return 0; if(in[0x12]<in[0x13]) pr(0xe21,in[0x12],in[0x13],0); else pr(0xe20,in[0x13],0,0); break;
  case 0x33: return in[0x16];
- case 0x34: if(!in[0x28]) return 0; if(in[0x25]<=in[0x24]) pr(0,0,0); else pr(in[0x24],in[0x25],0); break;
+ case 0x34: if(!in[0x28]) return 0; if(in[0x24]<in[0x25]) pr(0xe23,in[0x24],in[0x25],0); else pr(0xe22,in[0x25],0,0); break;
  case 0x35: return in[0x28];
- case 0x36: if(!in[0x10]) return 0; if(in[0xc]<in[0xd]) pr(in[0xc],in[0xd],0); else pr(0,0,0); break;
+ case 0x36: if(!in[0x10]) return 0; if(in[0xc]<in[0xd]) pr(0xe1f,in[0xc],in[0xd],0); else pr(0xe1e,in[0xd],0,0); break;
  case 0x37: return in[0x10];
  case 0x39: {
   if(!in[0x22]) return 0;
@@ -183,7 +185,7 @@ int32_t sub_54280(Svc& s,int32_t* in,int32_t key,std::u16string& out){
   int32_t v=in[0x20]/in[0x21]; in[0x20]=v;
   int32_t i7=v/0x19, i5=(in[0x1f]*v+0x80)>>8, i1=(in[0x1e]*v+0x80)>>8;
   in[0x1e]=i1; in[0x1f]=i5;
-  if(i5<=i1) pr(i5,i7,0); else pr(i1,i5,i7);   // retail passes (i5,i7) on the <= branch
+  if(i1<i5) pr(0xe25,i1,i5,i7); else pr(0xe24,i5,i7,0);
   break; }
  case 0x3a: case 0x3b: return in[0x22];
  default: return 0;
@@ -207,26 +209,28 @@ int32_t sub_546E0(Svc& s,const uint8_t* rec,int32_t base,void* unit,int32_t unit
 
 // 1.13c D2Client+0x54780  (param_1 = out string)
 void sub_54780(Svc& s,std::u16string& out){
- auto a=s.str(), b=s.str(), c=s.str(), d=s.str(); auto n=dec(0x32);
- out+=a+n+d+c+s.str()+b;
+ auto a=s.str(0xfa2), b=s.str(0xf9e), c=s.str(0xf9b), d=s.str(0xfa1); auto n=dec(0x32);
+ out+=a+n+d+c+s.str(0xde2)+b;
 }
 
-// 1.13c D2Client+0x54880  (param_1 = unit, ebp/unaff_retaddr context; param_3 = G::Row* start of table 6fba20d4)
-void sub_54880(Svc& s,G& g,int32_t unitArg,std::u16string& outA,std::u16string& outB){
- s.str(); s.str(); s.str();
+// 1.13c D2Client+0x54880  (param_1 = unit, param_2 = out string, param_3 = Row* walked in step with the global table 6fba20d4)
+void sub_54880(Svc& s,G& g,int32_t unitArg,std::u16string& out,const G::Row* tbl){
+ auto sF9e=s.str(0xf9e), sF9b=s.str(0xf9b), sFa2=s.str(0xfa2);
  int32_t want=s.ord10620(unitArg);
- for(int32_t i=0;i<g.t2128;i++){
-  G::Row& r=g.t20d4[i];
-  if(r.id!=want) continue;
+ for(uint32_t i=0;i<(uint32_t)g.t2128;i++,tbl++){
+  if(tbl->id!=want) continue;
   int32_t v=s.stat10973(0x47);
-  if(r.id==8||r.id==9||r.id==6||r.id==7||r.id==10||r.id==0xb) v>>=8;
-  std::u16string tail; if(v) tail=s.str();
-  if(!v) continue;
+  int32_t id=tbl->id;
+  if(id==8||id==9) v>>=8;
+  if(id==6||id==7) v>>=8;
+  if(id==10||id==0xb) v>>=8;
+  std::u16string tail; if(v>0) tail=s.str(tbl->w8); else if(v<0) tail=s.str(tbl->wA);
+  if(v==0) continue;
   auto d=dec(v);
-  if(r.f1!=1) s.fatal(0x141);
-  outA = v<1 ? d : tail+d;           // retail: v<1 -> strcpy(d); else strcpy(prefix)+strcat(d)
-  if(r.f2!=2) s.fatal(0x13d);
-  outB = tail;                        // then four strcat calls via strcat_exref (operands unrecovered)
+  if(tbl->f1!=1) s.fatal(0x141);
+  std::u16string val = v<1 ? d : sFa2+d;
+  if(g.t20d4[i].id!=2) s.fatal(0x13d);
+  out += tail+sF9b+val+sF9e;
  }
 }
 

@@ -9,6 +9,8 @@ struct Services {
  virtual ~Services()=default;
  virtual int32_t ord(uint32_t n, int32_t a=0, int32_t b=0, int32_t c=0, int32_t d=0)=0; // D2 import by ordinal
  virtual int32_t rva(uint32_t r, int32_t a=0, int32_t b=0, int32_t c=0, int32_t d=0)=0;  // un-recovered D2Client callee
+ virtual int32_t ordN(uint32_t n,const int32_t* args,int cnt)=0; // import by ordinal, cnt args in call order
+ virtual int32_t rvaN(uint32_t r,const int32_t* args,int n)=0; // n stack args, in push-reverse (call) order
  virtual int32_t dataTables()=0;            // *sgptDataTables
  virtual int32_t global(uint32_t r)=0;      // D2Client data global by RVA
  virtual const char16_t* string(int32_t id)=0; // Ordinal_10003 result (id taken from call order)
@@ -18,29 +20,51 @@ static void wr32(void* p,unsigned o,int32_t v){std::memcpy((uint8_t*)p+o,&v,4);}
 static int32_t skillRecord(Services& s,int32_t id){ // 0xBA0 count, 0xB98 table, stride 0x23C
  int32_t dt=s.dataTables(); if(id<0||id>=rd32((void*)(intptr_t)dt,0xba0))return 0; return id*0x23c+rd32((void*)(intptr_t)dt,0xb98);}
 // 1.13c D2Client+0x2B680
-int32_t sub_2B680(Services& s,int32_t* p){ s.rva(0xA1860,(int32_t)(intptr_t)p,0,0,3); (void)0xa283; return 0; }
-// 1.13c D2Client+0x2B960
-void sub_2B960(Services& s,int32_t* unit,int32_t flag){
- if(!s.ord(10511))return; s.ord(10651); s.ord(11142);
- int32_t a=0,b=0; s.ord(10604,(int32_t)(intptr_t)unit,(int32_t)(intptr_t)&a); int32_t other=b;
- int32_t u=(int32_t)(intptr_t)unit; // sign of the unit word
- if(flag==0){ if(u>=0)return; } else if(u<0)return;
- int32_t x=other<0?-other:other, y=u<0?-u:u, d;
- d = y<x ? y+x*2 : x+y*2; d/=2; if(d==0)d=1;
- int32_t sx=(other*15)/d, sy=(u*15)/d;
- int32_t saved=unit[0x11]>>8; int32_t n=s.ord(10179);
- int32_t cx=sy, ox=sx, oy=sy; (void)ox;(void)oy;
- int32_t lo=-sy, hi=n*sy, lo2=-sx, hi2=n*sx, step=sx;
- for(;n>0;--n){
-  int32_t f=(unit[0x11]>>8)-1; if(f<0)f+=8; unit[0x11]=f<<8;
-  int32_t px=0,py=0,bx=0,by=0;
-  if(other!=0){ int32_t r=s.ord(11168,u,0x60); r=s.ord(11080,u,r); s.ord(10002,r);
-   bx=px+(s.global(0xC9960)-s.global(0xCC418)); by=py+s.global(0xC995C)-8; }
-  int32_t dx=cx, dy=step; if(b!=0){dx=hi;dy=hi2;} (void)dx;(void)dy;
-  s.rva(0x6CC00,u,0,bx,by);
-  cx+=sx; sy+=0; hi+=lo2; hi2+=lo;
+int32_t sub_2B680(Services& s,int32_t* p,int32_t eax){
+ // ECX=p, EAX caller register stored into local[3],local[4]; local[0]=0,local[1]=-1,local[2]=0,local[5]=0.
+ int32_t loc[6]={0,-1,0,eax,eax,0};
+ const int32_t a[8]={(int32_t)(intptr_t)p,0,0,3,0xa283,(int32_t)0x6fb509f0,(int32_t)(intptr_t)loc,0};
+ s.rvaN(0xA1860,a,8);
+ return loc[0]?loc[0]:loc[2];
+}
+// 1.13c D2Client+0x2B960 (ECX=unit, EDX=edx, stack flag; ret 4). Frame B (after sub 0x40) per disassembly:
+// out2 @B+0xC, out1 @B+0x18, h @B+0x1C, R10013 @B+0x20, R10651 @B+0x24, R11142 @B+0x28, edx @B+0x2C.
+void sub_2B960(Services& s,int32_t* unit,int32_t edx,int32_t flag){
+ const int32_t u=(int32_t)(intptr_t)unit;
+ int32_t h=s.ord(10511,u); if(!h) return;
+ int32_t r10651=s.ord(10651,u), r11142=s.ord(11142,u);
+ int32_t out1=0,out2=0;
+ { const int32_t a[3]={u,(int32_t)(intptr_t)&out1,(int32_t)(intptr_t)&out2}; s.ordN(10604,a,3); }
+ int32_t edi=out2;
+ if(flag==0){ if(edi>=0) return; } else { if(edi<0) return; }
+ int32_t ex=out1<0?-out1:out1, ey=edi<0?-edi:edi, d;
+ if(ex>ey) d=ey+ex*2; else d=ex+ey*2;
+ d=(d-(d>>31))>>1; if(d==0) d=1;
+ const int32_t Xs=(out1*15)/d, Ys=(edi*15)/d;
+ int32_t r10013=s.ord(10013);
+ const int32_t savedFrame=unit[0x11]>>8;
+ int32_t F=savedFrame;
+ int32_t n=s.ord(10179,h);
+ if(n>0){
+  int32_t curX=Xs, curY=Ys, nx=n*Xs, ny=n*Ys;
+  for(;n>0;--n){
+   int32_t px=0,py=0;
+   F-=1; if(F<0) F+=8;
+   unit[0x11]=F<<8;
+   int32_t x,y;
+   if(r10013!=0){
+    const int32_t a[5]={u,0x60,(int32_t)(intptr_t)&px,(int32_t)(intptr_t)&py,0};
+    int32_t r1=s.ordN(11168,a,5);
+    int32_t r2=s.ord(11080,u,r1); s.ord(10002,r2);
+    x=px+(s.global(0xC9960)-s.global(0xCC418));
+    y=py+s.global(0xC995C)-8;
+   } else { x=r10651; y=r11142; }
+   if(flag!=0){ x-=nx; y-=ny; } else { x-=curX; y-=curY; }
+   { const int32_t a[6]={u,edx,x,y,1,0}; s.rvaN(0x6CC00,a,6); } // ECX=unit, EDX=edx, stack (x,y,1,0)
+   curX+=Xs; curY+=Ys; nx-=Xs; ny-=Ys;
+  }
  }
- unit[0x11]=saved<<8;
+ unit[0x11]=savedFrame<<8;
 }
 // 1.13c D2Client+0x2BB50
 int32_t sub_2BB50(Services& s,int32_t unit,int32_t skillId){

@@ -16,19 +16,21 @@ static i32 unit_xy(const i32* u, int off, i32 (*ord)(const i32*), i32 (*pathrd)(
 }
 
 extern "C" {
-// 1.13c D2Client+0x512E0  (esi = other-unit/point block; param_1 = point ptr value)
-// Ordinal_10141 fills a point for DAT_6fbcbbfc; the decompile's else-branch compares stack addresses
-// (decompiler artefact), so both branches compare coordinates here.
+// 1.13c D2Client+0x512E0  (esi = unit under test, param_1 = other unit; disassembly: three Ordinal_10141 points
+// A=player(DAT_6fbcbbfc, (0,0) if null) B=param_1 C=esi; flag byte +0x13c==1 picks y else x; unsigned compares)
+// Returns 0 when esi[4]!=0 or when C lies strictly between A and B on the chosen axis, else 1.
 EMSCRIPTEN_KEEPALIVE i32 d2c_512E0(const i32* esi, i32 param_1, i32 player, i32 (*getpt)(i32 unit, i32* out),
     i32 (*ord10296)(), i32 (*flagbyte)(i32 base)) {
     if (esi && esi[4]) return 0;
-    i32 pt[2] = {0, 0};
-    if (player) getpt(player, pt);
+    uint32_t A[2] = {0, 0}, B[2], C[2];
+    if (player) getpt(player, (i32*)A);
+    getpt(param_1, (i32*)B);
+    getpt((i32)(intptr_t)esi, (i32*)C);
     i32 base = ord10296();
-    if (flagbyte(base + 0x13c) == 1) {
-        if (pt[0] < param_1 && param_1 < (i32)(intptr_t)esi) return 0;
-        if (param_1 < pt[0] && (i32)(intptr_t)esi < param_1) return 0;
-    }
+    int k = flagbyte(base + 0x13c) == 1 ? 1 : 0;
+    uint32_t a = A[k], b = B[k], c = C[k];
+    if (c > b && c < a) return 0;
+    if (c < b && c > a) return 0;
     return 1;
 }
 
@@ -104,8 +106,8 @@ tail:
     if (g->lastType == 1) {
         if (!same) {
             i32 id = in_EAX[1], a = e->f1230();
-            if (a && e->f1260()) {
-                i32 b = e->f1260();
+            i32 b = a ? e->f1260() : 0;  // retail calls 0x1260 once, only when 0x1230 returned nonzero
+            if (a && b) {
                 if (!(bitmask[0] & rd((void*)(intptr_t)a, 0xd) & 0xff) && (rd((void*)(intptr_t)a, 0x4c) & 0xff) != 1 &&
                     (rd((void*)(intptr_t)b, 5) & bitmask[1] & 0xff)) {
                     g->hover[0] = id;
@@ -128,7 +130,7 @@ struct D2cE51AE0 {
     i32 (*ord10331)(i32 p, i32 q); void (*ord10742)(i32); i32 (*f1630)(i32*); i32 (*f1660)(i32*);
     i32 (*pathx)(i32 path); i32 (*pathy)(i32 path); void (*f50b30)(i32*);
     i32 (*ord10143)(i32*); i32 (*ord10787)(i32*, i32*);
-    i32* (*f1650)(i32*, i32*, const i32*); i32* (*f1500)(); i32* (*f1390)(const i32*);
+    i32* (*f1650)(i32* p1, i32* p2, const i32* p3, i32* p4); i32* (*f1500)(); i32* (*f1390)(const i32*);
 };
 struct D2cG51AE0 { i32 g2f8, g3a68, g2f4, g964c, g9638, g985c, g97f8; uint8_t* g3afa; i32* flags; i32* player; };
 static i32 unit_pos(const D2cE51AE0* e, const i32* u, int off) {
@@ -165,7 +167,7 @@ EMSCRIPTEN_KEEPALIVE i32* d2c_51AE0(const D2cE51AE0* e, D2cG51AE0* g, const i32*
     if ((!((param_4 & 8) && (param_4 & 1) && !(param_4 & 0x20)) || !e->ord10143(piVar6)) &&
         !e->ord10787(piVar6, param_1) && (piVar6 != g->player || g->g985c <= g->g97f8)) {
         u32 b6 = st[6];
-        if ((u32)bitmask[6] & b6) return e->f1650(param_1, in_EAX, retaddr);
+        if ((u32)bitmask[6] & b6) return e->f1650(param_1, in_EAX, retaddr, param_1);  // retail pushes param_1 twice (param_1 and param_4)
         if (!in_EAX && ((u32)bitmask[5] & b6) && param_3) return e->f1500();
         if ((u32)bitmask[7] & b6) return e->f1390(retaddr);
     }
@@ -294,18 +296,20 @@ EMSCRIPTEN_KEEPALIVE uint64_t d2c_636A0(i32 g3710, void (*f9ff7)(), uint64_t (*f
 }
 
 extern "C" {
-// 1.13c D2Client+0x51230  (esi = other-unit/point block; param_1 = second point's x, from the 2nd Ordinal_10141)
-// Twin of 0x512E0: same gate and range test; the else-branch compares stack addresses (decompiler artefact).
+// 1.13c D2Client+0x51230  (esi = unit P under test, param_1 = other unit Q; disassembly: A=player (0,0 if null), Q, P points;
+// 10296(esi) flag byte +0x13c==1 picks y else x; unsigned). Returns 0 when esi[4]!=0 or P is not strictly between Q and A, else 1.
 EMSCRIPTEN_KEEPALIVE i32 d2c_51230(const i32* esi, i32 param_1, i32 player, i32 (*getpt)(i32 unit, i32* out),
     i32 (*ord10296)(), i32 (*flagbyte)(i32 base)) {
     if (esi && esi[4]) return 0;
-    i32 pt[2] = {0, 0};
-    if (player) getpt(player, pt);
     i32 base = ord10296();
-    if (flagbyte(base + 0x13c) == 1) {
-        if (pt[0] < param_1 && param_1 < (i32)(intptr_t)esi) return 0;
-        if (param_1 < pt[0] && (i32)(intptr_t)esi < param_1) return 0;
-    }
-    return 1;
+    uint32_t A[2] = {0, 0}, P[2], Q[2];
+    if (player) getpt(player, (i32*)A);
+    getpt((i32)(intptr_t)esi, (i32*)P);
+    getpt(param_1, (i32*)Q);
+    int k = flagbyte(base + 0x13c) == 1 ? 1 : 0;
+    uint32_t a = A[k], p = P[k], q = Q[k];
+    if (q < p && p < a) return 1;
+    if (q > p && p > a) return 1;
+    return 0;
 }
 }

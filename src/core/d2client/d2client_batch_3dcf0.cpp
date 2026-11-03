@@ -105,6 +105,7 @@ void sub_40200(I* u,const Hw& h,int16_t* buf){
  }
  h.o10165(10,cnt);
 }
+// NOTE retail writes the points into the path array at u[0xb] (iVar12), so `buf` must be that array.
 // ponytail: x seed is the stack residue of puStack_44 (unaff); starts 0 here -- trace needed to vector.
 
 // (NOT MAPPED) D2Client 3FC20 stub; draws path-node markers for entries with state 0x4000 and, for the local player, the room-rect frame

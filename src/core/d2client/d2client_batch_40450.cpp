@@ -28,7 +28,13 @@ struct Calls {
  void (*setField)(P,U);   // Ordinal_10637
  void (*setPos)(P,U);     // Ordinal_10019
  U (*rand)();             // Ordinal_10513
+ // 0x40CA0 tail (all host callbacks; register args are the decompile's unaff_ESI / implicit)
+ I (*o10494)(); void (*fx1b300)(P,I,I,I,I); void (*fx38a70)(I,I,I,I); P (*o10871)();
+ P (*o11013)(I,I,I,I,I); P (*o10630)(); void (*o10807)(); void (*o10911)(P,U); void (*o10785)(P,I);
+ void (*o10945)(); void (*o10542)(); void (*o11043)(P,I);
 };
+// retail: the 0x2A0B0 call, then fatal assert 0x946 only when unit+0x2c is ZERO; a non-zero id that resolves to null just fails the caller.
+static P unitRes(const Calls& c,P u,bool& fatal){ U id=rd(u,0x2c); fatal=(id==0); if(fatal){c.fatal(u);return nullptr;} return c.resolve(id); }
 static const uint8_t* rec(const Calls& c,I id){
  if(id<0||id>=c.dt.skillCount||!c.dt.skills)return nullptr; return c.dt.skills+id*0x23c; }
 // Seam wrappers over the real functions in skill_gates_40450.cpp (the Calls table is no longer consulted).
@@ -36,19 +42,19 @@ I sub_40550(const Calls&,P unit,I id){ return d2_client_40550(static_cast<D2Unit
 U sub_40450(const Calls&,I id){ return U(d2_client_40450(id,nullptr,0,0)); }
 // 1.13c D2Client+0x40610
 U sub_40610(const Calls& c,P u){
- P d=c.resolve(rd(u,0x2c)); if(!d){c.fatal(u);return 0;}
+ bool f; P d=unitRes(c,u,f); if(!d)return 0;
  I t=I(rd(d,0)); return t==0||t==1;
 }
 // 1.13c D2Client+0x40670
 U sub_40670(const Calls& c,P u){
  P o=c.getOwner(u); if(!o)return 0;
- if(!c.resolve(rd(u,0x2c))){c.fatal(u);return 0;}
+ {bool f; if(!unitRes(c,u,f))return 0;}
  I n=c.listCount(o); if(n-1>0){c.listSet(o,n-1); std::memset(static_cast<uint8_t*>(u)+0x44,0,4);} return 1;
 }
 // 1.13c D2Client+0x407C0 (extra arg is the caller's return-address slot, passed as ret)
 U sub_407C0(const Calls& c,P u,I id,U ret){
  if(!rec(c,id))return 0; I s=sub_40550(c,u,id); if(s<0)return 0;
- if(!c.resolve(rd(u,0x2c))){c.fatal(u);return 0;}
+ {bool f; if(!unitRes(c,u,f))return 0;}
  c.setSkill(s,ret); c.cast(u,s,-1); return 1;
 }
 // 1.13c D2Client+0x40880
@@ -58,18 +64,33 @@ U sub_40880(const Calls& c,P u,I id){
 }
 // 1.13c D2Client+0x40910
 U sub_40910(const Calls& c,P u,I id){
- if(!c.resolve(rd(u,0x2c))){c.fatal(u);return 0;}
+ {bool f; if(!unitRes(c,u,f))return 0;}
  if(!rec(c,id)||sub_40550(c,u,id)<0)return 0;
  c.castEnd(); uint32_t f=rd(u,0xc4)|0x40; std::memcpy(static_cast<uint8_t*>(u)+0xc4,&f,4); return 1;
 }
 // 1.13c D2Client+0x409B0
 bool sub_409B0(const Calls& c,P u){
- P d=c.resolve(rd(u,0x2c)); if(!d){c.fatal(u);return false;}
+ bool f; P d=unitRes(c,u,f); if(!d)return false;
  if(c.isDead(u)||c.isDead(d))return false;
  I t=I(rd(d,0)); return t>=0&&t<2&&c.check562a0(u)!=0;
 }
-// 1.13c D2Client+0x40CA0: body is host-ordered Ordinal sequence; only the table gates are recovered here.
-// ponytail: tail (Ordinals 10871/11013/10630...) left to caller via host hooks, add when a vector pins it.
+// 1.13c D2Client+0x40CA0 (skill id in the stack arg, ESI = the caller's unit/pointer `u`, may be null)
+U sub_40CA0(const Calls& c,I id,P u){
+ const uint8_t* r=rec(c,id); if(!r)return 0;
+ if(c.o10494()==0){
+  I a=rs(r,0x10c); if(a>0&&a<c.dt.bc0)c.fx1b300(u,2,0,0,0);
+  if(rs(r,0x10e)>0)c.fx38a70(0,0,0,0);
+ }
+ P h=c.o10871();
+ if(!h){
+  I x=-1,t=6; if(u){x=I(rd(u,12));t=I(rd(u,0));}
+  P n=c.o11013(0,2,0x14,t,x); if(!n)return 0;
+  P l=c.o10630(); if(!l)return 0;
+  c.listSet(l,0); c.o10807(); c.o10911(n,0x40190); c.o10785(n,0xc); c.o10945(); return 1;
+ }
+ c.o10542(); { uint32_t v=0x800; std::memcpy(static_cast<uint8_t*>(u)+0x48,&v,4); }
+ c.o11043(h,7); return 1;
+}
 bool sub_40CA0_gate(const Calls& c,I id){ return rec(c,id)!=nullptr; }
 void sub_40DF0(const Calls&,I n,U p1,U p2,U p3,U p4,U p5,U p6,uint64_t seed){ d2_client_40df0(n,p1,p2,p3,p4,p5,p6,U(seed)); }
 // 1.13c D2Client+0x40F00 and 0x41000: same loop over two 64-word tables (DAT_6fb862e0/e0 and 6fb86520/620)

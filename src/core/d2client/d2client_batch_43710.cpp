@@ -13,11 +13,11 @@ struct Calls {
  void (*ord10003)(I,I,I); void (*ord10150)(); // text/draw ORD
  P (*ord10331)(P); U (*ord10826)(P); P (*ord10014)(U); U (*ord10265)(I); void (*ord10024)(const void*,U);
  void (*ord10936)(); void (*ord10614)(); void (*fb60450)(U);
- I (*ord10106)(); I (*ord10620)(); P (*ord10871)(); I (*ord10680)(P,I,I);
- P (*ord10218)(); U (*ord11161)(); I (*ord10550)();
- void (*fb05b20)(P ths,P unit,W* out,I cap,I flag,U col); // 55B20
- void (*ord10996)(I,I,P,U); I (*ord10872)(P,I,I); void (*ord11111)(P,I); void (*ord11108)(I);
- I (*ord10744)(P,I); const W* (*ord10003s)(I); I (*ord10695)(I); I (*ord10806)(U); void (*ord10569)(P,I*,I*);
+ I (*ord10106)(P); I (*ord10620)(P); P (*ord10871)(P,U); I (*ord10680)(P,I,I);
+ P (*ord10218)(P); U (*ord11161)(P,P,I); I (*ord10550)(P);
+ void (*fb05b20)(U ecx,P a1,P a2,U a3,U a4,U a5,U a6,U a7); // 55B20 (stdcall 7 stack args + ECX), raw as pushed by the callers
+ void (*ord10996)(I,I,P,U,U,I); P (*ord10872)(P,I,I); void (*ord11111)(P,P); void (*ord11108)(P);
+ I (*ord10744)(P,I); const W* (*ord10003s)(I); P (*ord10695)(I); P (*ord10806)(P); void (*ord10569)(P,I*,I*);
  const void* dataTables; // sgptDataTables
 };
 // 1.13c D2Client+0x43710
@@ -45,51 +45,77 @@ void sub_4C7C0(Calls&c,const I*unit,U param_1,const uint8_t*dt_a78,I dt_a80){
  }
 }
 // tooltip line builder (rva 0x55B20) is transcribed in d2client_n86.cpp:sub_55B20.
-// 1.13c D2Client+0x55F10  (REG? unaff_EBX/ESI/retaddr passed through to 55B20)
-void sub_55F10(Calls&c,const uint8_t*dt_c18,I dt_c1c){
- if(c.ord10106()!=5) return; I q=c.ord10620();
- if(q<0||q>=dt_c1c) return; const uint8_t*rec=dt_c18+q*0x1b8; int16_t w; std::memcpy(&w,rec+0x2c,2);
- for(I i=0;i<=5;++i){P it=c.ord10871(); if(it&&c.ord10680(it,0x47,0)==w){c.fb05b20(nullptr,nullptr,nullptr,0,0,c.tbl_82e50[i]);return;}}
+// 1.13c D2Client+0x55F10  (EAX = unit/handle; EBX = item context passed to 10871 and 55B20; stack: a1, a2 passed through to 55B20; ret 8)
+void sub_55F10(Calls&c,P eax,P ebx,P a1,U a2,const uint8_t*dt_c18,I dt_c1c){
+ if(c.ord10106(eax)!=5) return; I q=c.ord10620(eax);
+ if(q<0||q>=dt_c1c) return; const uint8_t*rec=dt_c18+q*0x1b8; if(!rec) return;
+ int16_t w; std::memcpy(&w,rec+0x2c,2);
+ for(I i=0;i<6;++i){ P it=c.ord10871(ebx,c.tbl_82e50[i]);
+  if(it&&(I)w==c.ord10680(it,0x47,0)){ c.fb05b20(0,ebx,a1,a2,0,c.tbl_82e50[i],0,1); return; } }
 }
-// 1.13c D2Client+0x55FB0  (REG? unaff_EDI = unit/mask word, EBX)
-void sub_55FB0(Calls&c,const I*edi,P unitMask){
- if(!edi||edi[0]!=4||c.ord10106()!=5) return; const uint8_t*p=(const uint8_t*)c.ord10218(); if(!p) return;
+// 1.13c D2Client+0x55FB0  (EAX = esi ctx; EDI = type-4 unit; stack: a1, a2 (ret 8); 55B20 gets (EDI, a1, a2, 0, tbl, 0, 1) with ECX = 0)
+void sub_55FB0(Calls&c,P esi,const I*edi,P a1,U a2,const U*tbl85d20){
+ if(!edi||edi[0]!=4||c.ord10106((P)edi)!=5) return; const uint8_t*p=(const uint8_t*)c.ord10218((P)edi); if(!p) return;
  if(p[0x87]==1){
-  c.ord11161(); I me=c.ord10550();
-  for(I i=0;i<6;++i){ if(i==me) continue; I o=i*4; if(me<i)o-=4;
-   if(((uintptr_t)unitMask>>i)&1) c.fb05b20(nullptr,nullptr,nullptr,0,0,*(const U*)((const uint8_t*)c.tbl_82e50+o)); }
+  U mask=c.ord11161(esi,(P)edi,0); I me=c.ord10550((P)edi);
+  for(I i=0;i<6;++i){ if(i==me) continue; I o=i; if(me<i)o--;
+   if((mask>>i)&1) c.fb05b20(0,(P)edi,a1,a2,0,c.tbl_82e50[o],0,1); }
  } else if(p[0x87]==2){
-  U v=c.ord11161(); I n=v<0x40?(I)c.tbl_85d20[v]:0;
-  for(I i=0;i<n-1;++i)c.fb05b20(nullptr,nullptr,nullptr,0,0,c.tbl_82e50[i]);
+  U v=c.ord11161(esi,(P)edi,1); I n=v<0x40?(I)tbl85d20[v]:0;
+  for(I i=0;i<n-1;++i) c.fb05b20(0,(P)edi,a1,a2,0,c.tbl_82e50[i],0,1);
  }
 }
-// 1.13c D2Client+0x560B0  (REG? unaff_EDI = destination W*)
-void sub_560B0(Calls&c,P unit,W*dst,const W*param_3){
- static thread_local W buf[1024]; buf[0]=0; c.fb05b20(nullptr,unit,buf,0x400,1,0);
- I len=param_3?(I)wlen(buf):0;
- if(!param_3||len==0){wcat(dst,buf);return;}
- I k=len-2;
- if(k>0){ while(buf[k-1]!=10){--k; if(k<1){wcat(dst,param_3);wcat(dst,buf);return;}}
-  const W*a=c.ord10003s(0),*b=c.ord10003s(0); buf[k-1]=0;
-  wcat(dst,buf);wcat(dst,a);wcat(dst,param_3);
-  if(buf[len]==10)buf[len]=0;   // mirrors decompile: index relative to local_804
-  wcat(dst,buf+k);wcat(dst,b);wcat(dst,a);return; }
- wcat(dst,param_3);wcat(dst,buf);
+// 1.13c D2Client+0x560B0  (EDI = destination W*; stack: unit, a7 (the 7th arg handed to 55B20), tail string; ret 0xc)
+void sub_560B0(Calls&c,P unit,U a7,W*dst,const W*param_3){
+ static thread_local W buf[0x400]; for(int i=0;i<0x400;i++)buf[i]=0;
+ c.fb05b20(0xab,unit,buf,0x400,1,0,0x40,a7);
+ I len=0; if(param_3){ len=(I)wlen(buf); }
+ if(!param_3||len==0){ wcat(dst,buf); return; }
+ I k=len-2; bool found=false;
+ if(k>0){ for(;;){ if(buf[k]==10){found=true;break;} k--; if(k<=0) break; } }
+ if(!found||k<=0){ wcat(dst,param_3); wcat(dst,buf); return; }
+ const W*a=c.ord10003s(0xf9e),*b=c.ord10003s(0xf0c);
+ buf[k]=0; wcat(dst,buf); wcat(dst,a); wcat(dst,param_3);
+ if(buf[len-1]==10) buf[len-1]=0;   // reads the original tail (buf[len-1]); k<len-1 so it was not the zeroed cell
+ wcat(dst,buf+k+1); wcat(dst,b); wcat(dst,a);
 }
-static void trimNl(W*s){size_t n=wlen(s); if(n&&s[n-1]==10)s[n-1]=0;}
-// 1.13c D2Client+0x56210  (fastcall ECX=param_1)
-void sub_56210(Calls&c,U param_1,W*out,P unit){
- c.ord10996(2,0,unit,param_1); sub_560B0(c,unit,out,nullptr);
- I it=c.ord10872(unit,0,0x40); if(it){c.ord11111(unit,it);c.ord11108(it);} trimNl(out);
+static void trimNl(W*s){ size_t n=wlen(s); if(n&&s[n-1]==10){ s[n-1]=0; } }
+// 1.13c D2Client+0x56210  (ECX, EAX = passed to 10996; EDX = out; stack: unit, arg2 (unused), tail string; ret 0xc)
+void sub_56210(Calls&c,U ecx,U eax,W*out,P unit,U arg2,const W*tail){
+ (void)arg2;
+ c.ord10996(2,0,unit,ecx,eax,0); sub_560B0(c,unit,0,out,tail);
+ P it=c.ord10872(unit,0,0x40); if(it){ c.ord11111(unit,it); c.ord11108(it); } trimNl(out);
 }
-// 1.13c D2Client+0x56280  (REG? EBX = unit, stack = tooltip arg)
-void sub_56280(Calls&c,W*out,P unit,const W*arg){
- c.ord10996(5,0,nullptr,0); static thread_local W buf[1024]; buf[0]=0;
- sub_560B0(c,unit,buf,arg); wcat(out,buf);
- I it=c.ord10872(unit,0,0x40); if(it){c.ord11111(unit,it);c.ord11108(it);} trimNl(out);
+// 1.13c D2Client+0x56280  (EBX = unit; ECX, EAX passed to 10996; stack: out, arg2 (unused), tail string; ret 0xc)
+void sub_56280(Calls&c,P ebx,U ecx,U eax,W*out,U arg2,const W*tail){
+ (void)arg2;
+ c.ord10996(5,0,ebx,ecx,eax,0); static thread_local W buf[0x400]; for(int i=0;i<0x400;i++)buf[i]=0;
+ sub_560B0(c,ebx,1,buf,tail); wcat(out,buf);
+ P it=c.ord10872(ebx,0,0x40); if(it){ c.ord11111(ebx,it); c.ord11108(it); } trimNl(out);
 }
-// 1.13c D2Client+0x56330 : item tooltip assembler (931 bytes), caller 0x933E0. Fatal strings 0x21a/0x21c/0x223/0x245.
-// NAMED only; body is 4x(strcat x3 + 56210|56280) repeated per quality branch, see decompile.
+// 1.13c D2Client+0x56330  (EAX = ebx = unit; ESI = out string; stack: arg2 passed on; ret 4). Returns 0 on the _exit(-1) paths (*fatalId = the string id).
+void sub_56330(Calls&c,P ebx,W*esi,U ebp,I*fatalId){
+ *fatalId=0;
+ if(!c.ord10744(ebx,0x35)){*fatalId=0x21a;return;}
+ I id=ebx?static_cast<const I*>(ebx)[1]:-1;
+ uint8_t*edi=static_cast<uint8_t*>(c.ord10695(id));
+ if(!edi){*fatalId=0x21c;return;}
+ esi[0]=0;
+ bool has14=c.ord10744(ebx,0x14)!=0;
+ if(!has14&&!c.ord10744(ebx,0x4a)) return;
+ P val; std::memcpy(&val,edi+0xf0,sizeof val); // ord10806 takes the dword at +0xf0
+ val=c.ord10806(val);
+ if(!val){*fatalId=has14?0x223:0x245;return;}
+ static const U kA[4]={2,1,1,0}; static const U kS[4]={0x2b42,0x2b41,0x2b44,0x2b43};
+ for(int g=0;g<4;++g){
+  W loc[0x100]; for(int i=0;i<0x100;i++)loc[i]=0; // Unicode ctor per cell (2 wchar each in the frame)
+  wcat(esi,c.ord10003s(0xf9e)); loc[0]=0;
+  wcat(loc,c.ord10003s(kS[g])); wcat(loc,c.ord10003s(0xf9b));
+  if(has14) sub_56210(c,(U)(uintptr_t)val,kA[g],esi,ebx,ebp,loc);
+  else sub_56280(c,ebx,(U)(uintptr_t)val,kA[g],esi,ebp,loc);
+ }
+ wcat(esi,c.ord10003s(0xf9e)); wcat(esi,c.ord10003s(0xf9e));
+}
 // 1.13c D2Client+0x56700  (fastcall ECX=obj)
 U sub_56700(Calls&c,uint8_t*obj){ I a,b; c.ord10569(obj,&a,&b); obj[0x4e]=0; if(a<1){U z=0;std::memcpy(obj+0x3c,&z,4);} return 1; }
 // 1.13c D2Client+0x56740  (byte-identical twin of 56700)
