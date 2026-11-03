@@ -138,8 +138,9 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_3BF60(uint32_t pUnit)
 // unit at prop 4 with 0x51280 in 0x230..0x231, or a type-0 unit whose class id equals the prop.
 // 0x11E0, 0x230F0, 0x24280, 0x26190, 0x266E0, 0x38A80, 0x38B70 and 0x51280 are env seams.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_26db0(uint32_t pItem, uint32_t pUnit, int32_t nCheckStats,
-	int32_t* pOutStrOk, uint32_t* pOutDexOk, int32_t* pOutLevelOk,
+int32_t d2common_26db0_port(uint32_t pItem, uint32_t pUnit, int32_t nCheckStats,
+	int32_t* pOutStrOk, uint32_t* pOutDexOk, int32_t* pOutLevelOk, const uint8_t* pDataTables,
+	uint32_t (*pfnRow719A0)(int32_t),
 	int32_t (*pfnRatio11E0)(int32_t, int32_t),
 	int32_t (*pfnType230F0)(uint32_t),
 	uint32_t (*pfnProp24280)(uint32_t),
@@ -147,7 +148,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_26db0(uint32_t pItem, uint32_t pUnit
 	int32_t (*pfn266E0)(uint32_t, int32_t, int32_t*),
 	int32_t (*pfnTotal38A80)(uint32_t, uint32_t),
 	int32_t (*pfnStat38B70)(uint32_t, int32_t),
-	int32_t (*pfn51280)())
+	int32_t (*pfn51280)(uint32_t))
 {
 	uint8_t* item = P(pItem);
 	if (pOutStrOk)
@@ -159,12 +160,12 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_26db0(uint32_t pItem, uint32_t pUnit
 
 	if (!item || W(item, 0) != 4)
 		return 0;
-	const D2ItemsTxt* pRow = DATATBLS_GetItemsTxtRecord(static_cast<int32_t>(W(item, 4)));
+	const uint32_t pRow = pfnRow719A0(static_cast<int32_t>(W(item, 4)));
 	if (!pRow)
 		return 0;
 
-	const int32_t nReqStrBase = pRow->wReqStr;
-	const int32_t nReqDexBase = pRow->wReqDex;
+	const int32_t nReqStrBase = *reinterpret_cast<const uint16_t*>(P(pRow) + 0x10A);
+	const int32_t nReqDexBase = *reinterpret_cast<const uint16_t*>(P(pRow) + 0x10C);
 	const uint32_t pItemData = W(item, 0x14);
 	const uint32_t nItemFlags = pItemData ? (W(P(pItemData), 0x18) & 0x10) : 0;
 	const uint32_t nStatList = W(item, 0x5C);
@@ -175,11 +176,17 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_26db0(uint32_t pItem, uint32_t pUnit
 	int32_t nStrBonus = 0;
 	int32_t nDexBonus = 0;
 
-	const uint32_t pRow91 = ItemStatRow(0x732C / 0x144);
-	if (nStatList && pRow91 && pfnTotal38A80 && pfnTotal38A80(nStatList, pRow91) != 0)
+	// retail: sgptDataTables+0xBD4 (ItemStatCost count) above 0x5B and +0xBCC (table base) + 0x732C non-zero, then 0x38A80 (EBX list, EDI 0x5B0000)
+	const uint32_t pRow91 = pDataTables && *reinterpret_cast<const int32_t*>(pDataTables + 0xBD4) > 0x5B
+		? *reinterpret_cast<const uint32_t*>(pDataTables + 0xBCC) + 0x732C : 0;
+	if (nStatList && pRow91)
 	{
-		nStrBonus = pfnRatio11E0 ? pfnRatio11E0(100, nReqStrBase) : 0;
-		nDexBonus = pfnRatio11E0 ? pfnRatio11E0(100, nReqDexBase) : 0;
+		const int32_t nPct = pfnTotal38A80(nStatList, pRow91);
+		if (nPct != 0)
+		{
+			nStrBonus = pfnRatio11E0(nPct, nReqStrBase);
+			nDexBonus = pfnRatio11E0(nPct, nReqDexBase);
+		}
 	}
 
 	if (pItemData && (W(P(pItemData), 0x18) & 0x400000) != 0)
@@ -188,7 +195,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_26db0(uint32_t pItem, uint32_t pUnit
 		nDexBonus -= 10;
 	}
 
-	int32_t nStr = (pUnit && pfnStat38B70) ? pfnStat38B70(pUnit, 0) : 0;
+	int32_t nStr = pfnStat38B70(pUnit, 0);
 	if (nStr < 1)
 	{
 		nStrOk = 0;
@@ -206,15 +213,14 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_26db0(uint32_t pItem, uint32_t pUnit
 			if (pOwner && static_cast<int32_t>(W(P(pOwner), 0x10)) < 0 && W(P(pOwner), 0x44) != 0)
 			{
 				int32_t nReduction = 0;
-				if (pfn266E0)
-					pfn266E0(pItem, 0, &nReduction);
+				pfn266E0(pItem, 0, &nReduction);
 				if (nStr - nReduction < 1 || nStr - nReduction < nReqStr)
 					nStrOk = 0;
 			}
 		}
 	}
 
-	int32_t nDex = (pUnit && pfnStat38B70) ? pfnStat38B70(pUnit, 2) : 0;
+	int32_t nDex = pfnStat38B70(pUnit, 2);
 	if (nDex < 1)
 	{
 		nDexOk = 0;
@@ -229,18 +235,17 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_26db0(uint32_t pItem, uint32_t pUnit
 		else if (nCheckStats)
 		{
 			int32_t nReduction = 0;
-			if (pfn266E0)
-				pfn266E0(pItem, 2, &nReduction);
+			pfn266E0(pItem, 2, &nReduction);
 			nDexOk = (nDex - nReduction > 0) ? 1 : 0;
 			if (nDex - nReduction < nReqDex)
 				nDexOk = 0;
 		}
 	}
 
-	const int32_t nLevelReq = pfn26190 ? pfn26190(pItem, pUnit) : -1;
+	const int32_t nLevelReq = pfn26190(pItem, pUnit);
 	if (nLevelReq != -1)
 	{
-		const int32_t nLevel = (pUnit && pfnStat38B70) ? pfnStat38B70(pUnit, 0xC) : 0;
+		const int32_t nLevel = pfnStat38B70(pUnit, 0xC);
 		if (nLevel < nLevelReq)
 			nLevelOk = 0;
 	}
@@ -255,11 +260,11 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_26db0(uint32_t pItem, uint32_t pUnit
 	if (!nStrOk || !nDexOk || !nLevelOk || !nItemFlags)
 		return 0;
 
-	const int32_t nType = pfnType230F0 ? pfnType230F0(pItem) : 0;
-	if (nType == 0x12 && !(pfnStat38B70 && pfnStat38B70(pItem, 0x46) > 0))
+	const int32_t nType = pfnType230F0(pItem);
+	if (nType == 0x12 && !(pfnStat38B70(pItem, 0x46) > 0))
 		return 0;
 
-	const uint32_t nProp = pfnProp24280 ? pfnProp24280(pItem) : 0;
+	const uint32_t nProp = pfnProp24280(pItem) & 0xFF;
 	if (nProp == 7)
 		return 1;
 
@@ -270,7 +275,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_26db0(uint32_t pItem, uint32_t pUnit
 	const uint32_t nUnitType = W(pu, 0);
 	if (nUnitType == 1 && nProp == 4)
 	{
-		const int32_t nArea = pfn51280 ? pfn51280() : 0;
+		const int32_t nArea = pfn51280(W(pu, 4));
 		if (nArea > 0x22F && nArea < 0x232)
 			return 1;
 	}

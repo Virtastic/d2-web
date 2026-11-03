@@ -29,7 +29,7 @@ namespace
 // 8/9 -> 3, 5/7 -> 1 when stat 0xC2 (STAT_ITEM_NUMSOCKETS) is below 1; finally the low byte of 0x24610
 // and the caller's count (at least 1) cap it. A positive result sets IFLAG_SOCKETED (0x800) at item
 // data +0x18 and writes stat 0xC2.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2a480(uint32_t pUnit, uint32_t nMax) { // 1.13c D2Common+0x2A480
+extern "C" void D2Common_2A480_ItemSocketCount(uint32_t pUnit, uint32_t nMax) { // 1.13c D2Common+0x2A480
 	uint8_t* u = P(pUnit);
 	if (!u || W(u, 0) != 4) return;
 	const uint8_t* t = reinterpret_cast<const uint8_t*>(DATATBLS_GetItemsTxtRecord(static_cast<int32_t>(W(u, 4))));
