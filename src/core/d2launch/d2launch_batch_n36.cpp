@@ -43,7 +43,7 @@ static u32 pushS(u32 dat) {
 
 extern "C" {
 // D2Launch 0x141F0 (1.13c)
-u32 FUN_6fa541f0(u32* p) { if (!Ordinal_10227()) return 0; FUN_6fa521b0(p[3], 0); return 1; }
+u32 FUN_6fa541f0(u32* p) { if (!Ordinal_10227()) return 0; FUN_6fa521b0(p[3], 6); return 1; }
 
 // D2Launch 0x14290 (1.13c)
 u32 FUN_6fa54290(u32* p) {
@@ -56,7 +56,7 @@ u32 FUN_6fa54290(u32* p) {
   static const int8_t map[7] = {4, 2, 0, 1, 3, 5, 6};
   for (int i = 0; i < 7; i++) if (id == DAT_6fa654dc[i]) {
     cur = map[i];
-    if (i < 5) FUN_6fa521b0(p[3], 0); else if (i == 5) FUN_6fa541b0((u32)(uintptr_t)p); else FUN_6fa541f0(p);
+    if (i < 5) FUN_6fa521b0(p[3], cur); else if (i == 5) FUN_6fa541b0((u32)(uintptr_t)p); else FUN_6fa541f0(p);
     break;
   }
   if (cur == prev || mode != 1) { if (mode == 2 || mode == 3 || mode == 4) goto set; }

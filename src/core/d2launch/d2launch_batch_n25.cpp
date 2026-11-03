@@ -48,10 +48,12 @@ extern "C" void sub_13D60() {
   Ordinal_10192(out, 0);
 }
 
-// 1.13c D2Launch+0x141B0
-extern "C" uint32_t sub_141B0(int p) { if (!Ordinal_10227()) return 0; FUN_6fa521b0(*(int*)(p + 0xc), 0); return 1; }
-// 1.13c D2Launch+0x141F0
-extern "C" uint32_t sub_141F0(int p) { if (!Ordinal_10227()) return 0; FUN_6fa521b0(*(int*)(p + 0xc), 0); return 1; }
+// 1.13c D2Launch+0x141B0 / +0x141F0 (core in d2launch_141b0.cpp): 0x121B0(p[3], tag, tag) with ESI = 5 / 6
+extern "C" uint32_t d2l_141b0_core(uint32_t esi, uint32_t tag1, uint32_t tag2, uint32_t p, int (*gate)(),
+                                   void (*f)(uint32_t, uint32_t, uint32_t, uint32_t));
+static void d2l_call121b0(uint32_t a, uint32_t, uint32_t, uint32_t esi) { FUN_6fa521b0((int)a, esi); }
+extern "C" uint32_t sub_141B0(int p) { return d2l_141b0_core(5, 0x2771, 0x57f6, (uint32_t)p, Ordinal_10227, d2l_call121b0); }
+extern "C" uint32_t sub_141F0(int p) { return d2l_141b0_core(6, 0x2772, 0x57f7, (uint32_t)p, Ordinal_10227, d2l_call121b0); }
 
 // 1.13c D2Launch+0x14290
 extern "C" uint32_t sub_14290(int* p) {
@@ -64,7 +66,7 @@ extern "C" uint32_t sub_14290(int* p) {
   static const int map[7] = {4, 2, 0, 1, 3, 5, 6};
   for (int i = 0; i < 7; i++) if ((uint32_t)p[0] == DAT_6fa654dc[i]) {
     sel = map[i];
-    if (i < 5) FUN_6fa521b0(p[3], 0); else if (i == 5) FUN_6fa541b0((int)(intptr_t)p); else FUN_6fa541f0((void*)p);
+    if (i < 5) FUN_6fa521b0(p[3], sel); else if (i == 5) FUN_6fa541b0((int)(intptr_t)p); else FUN_6fa541f0((void*)p);
     break;
   }
   if (sel == prev || mode != 1) { if (mode == 2 || mode == 3 || mode == 4) DAT_6fa64d94 = sel; }
