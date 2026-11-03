@@ -707,3 +707,18 @@ test('the same reach snaps a front-screen control and the HUD run button by thei
   // Reach 8: the raw point is in the console gap, so it is a shift rest finger, and sends nothing.
   assert.equal(run(1600, 800, 240), 'rest');
 });
+
+test('with the game menu open, a tap just beside one of its rows presses that row; off the rows, it lands raw', () => {
+  // The shell answers touchControlAt from gameMenu.hitAt while the menu is open: a row's own rect.
+  const rows = [{ x: 300, y: 200, w: 200, h: 24 }, { x: 300, y: 230, w: 200, h: 24 }];
+  const onRow = (x, y) => rows.some((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
+  const menu = { open: true, hitAt: (x, y) => onRow(x, y) };
+  const w = world({ screen: 'game', gameMenu: menu, touchControlAt: (x, y) => (menu.open ? onRow(x, y) : null),
+    uiTargets: () => ({ screen: 'game', gameMenu: { rows: [{ x: 400, y: 212 }, { x: 400, y: 242 }] } }) });
+  w.down(1, 320, 226); w.up(1, 320, 226);
+  const snapped = w.sent.at(-1); assert.ok(snapped.type === 'pointerup' && onRow(snapped.x, snapped.y));
+  w.down(1, 296, 196); w.up(1, 296, 196);
+  const near = w.sent.at(-1); assert.ok(near.type === 'pointerup' && onRow(near.x, near.y));
+  w.down(1, 120, 120); w.up(1, 120, 120);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 120, 120));
+});

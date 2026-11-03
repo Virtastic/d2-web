@@ -230,6 +230,8 @@ export function createOptionsPages({ read, decodeDc6, decodeDatPalette, document
         return this.click(x, y, width, height) === 'previous' ? 'previous' : true;
       return true;
     },
+    /** Whether a canvas point is on one of the page's rows (the band click() takes); the touch probe reads it. */
+    hitAt(x, y, width, height) { return Boolean(page) && rowAt(x, y, width, height) >= 0; },
     pointerCancel(pointerId) { return optionPointers.delete(pointerId); },
     pointerCancelAll() { optionPointers.clear(); },
     hover(x, y, width, height) {

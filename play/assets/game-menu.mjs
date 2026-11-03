@@ -275,6 +275,11 @@ export function createGameMenu({ read, decodeDc6, decodeDatPalette, onChoose, on
       if (sub?.isOpen) { if (sub.click(x, y, width, height) === 'previous') sub.close(); return; }
       const i = rowAt(x, y, width, height); if (i >= 0) { selected = i; choose(rows[i].label); } return i;
     },
+    /** Whether a canvas point is on a row click() would take: the touch layer's modal probe reads it. */
+    hitAt(x, y, width, height) {
+      if (sub?.isOpen) return Boolean(sub.hitAt?.(x, y, width, height));
+      return rowAt(x, y, width, height) >= 0;
+    },
     /** Canvas pixel centre of each row, from the same rect click() tests. */
     targets(width, height) {
       const v = view(width, height);

@@ -6830,11 +6830,16 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
     }
     if (npcMenu?.open) return Boolean(npcMenu.entryAt(x, y));
     const W = canvas.width, H = canvas.height;
+    if (gameMenu?.open) return gameMenu.hitAt(x, y, W, H);
     if (controlsPanel?.open) return Boolean(controlsPanel.hitAt?.(x, y, W, H));
     if (helpVisible && helpRenderer) return Boolean(helpRenderer.hitClose(x, y, W, H));
     if (messageVisible && messageLogRenderer) return Boolean(messageLogRenderer.hitClose(x, y, W, H) || messageLogRenderer.hitScroll(x, y, W, H));
     if (questVisible && questLogRenderer && questEvidence) return Boolean(questLogRenderer.hit(x, y, W, H, questEvidence.tabs, questEvidence.act));
-    if (skillsVisible && snapshot) return Boolean(panelCloseAt(x, y, W, H, { skills: { playerClass: snapshot.playerClass, tab: skillPanelRenderer?.tab } }));
+    if (skillsVisible && snapshot) {
+      const skills = readClassSkills() || [];
+      if (skillPanelRenderer?.skillAt(x, y, W, H, { skills })) return true;
+      return Boolean(panelCloseAt(x, y, W, H, { skills: { playerClass: snapshot.playerClass, tab: skillPanelRenderer?.tab } }));
+    }
     return null;
   },
   // The touch layer's weapon-tab probe: null while the inventory is shut, else the tab / equipped-slot read at (x,y).
