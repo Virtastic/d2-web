@@ -69,10 +69,12 @@ function world(shell = { screen: 'game' }, clock = null) {
   let touch;
   try { touch = installTouchInput({ documentObject, windowObject }); } finally { globalThis.setInterval = realSetInterval; }
 
-  // A finger event at canvas pixel (x, y), as the browser delivers it to the document.
+  // A finger event at canvas pixel (x, y), as the browser delivers it to the document: on the canvas's
+  // drawn box (1:1 unless a test draws the canvas at another size).
   function finger(type, pointerId, x, y, extra = {}) {
+    const r = canvas.getBoundingClientRect();
     const e = {
-      type, pointerType: 'touch', pointerId, clientX: x + 0.5, clientY: y + 0.5, target: canvas,
+      type, pointerType: 'touch', pointerId, clientX: (x + 0.5) * r.width / canvas.width, clientY: (y + 0.5) * r.height / canvas.height, target: canvas,
       cancelable: true, stopped: false,
       stopPropagation() { this.stopped = true; }, preventDefault() {},
       ...extra,
@@ -660,4 +662,48 @@ test('out of game, a tap within reach of a control presses its click point; far 
   assert.deepEqual(w.sent.at(-1), left('pointerup', 400, 300));
   w.down(1, 500, 400); w.up(1, 500, 400);
   assert.deepEqual(w.sent.at(-1), left('pointerup', 500, 400));
+});
+
+// The canvas drawn cssW CSS px wide over a backing store `backing` px wide (the page's own scaling). The
+// finger lands on that box; returns CSS px per canvas px, to read back what the canvas received.
+function drawn(w, cssW, backing) {
+  w.canvas.width = backing;
+  w.canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: cssW, height: 600 * cssW / backing });
+  return cssW / backing;
+}
+// The last pointer event the canvas received, back in canvas pixels (the inverse of the drawn box).
+const onCanvas = (w, k) => { const e = w.sent.at(-1); return [(e.x + 0.5) / k - 0.5, (e.y + 0.5) / k - 0.5]; };
+
+test('the finger reach is a physical size: the same near miss snaps on a 1:1 canvas, not on one drawn twice as large', () => {
+  // The inventory close's left edge is at 418: a finger 10 px left of it is 16 CSS px of reach at 1:1.
+  const near = (cssW, backing, x) => {
+    const w = world({ screen: 'game', inventoryVisible: true });
+    const k = drawn(w, cssW, backing);
+    w.down(1, x, 460); w.up(1, x, 460);
+    return onCanvas(w, k);
+  };
+  assert.deepEqual(near(800, 800, 408), [434.5, 460.5]);   // reach 16 canvas px: 10 is in
+  assert.deepEqual(near(1600, 800, 408), [408, 460]);      // 800 canvas px drawn over 1600 CSS: reach 8, 10 is out
+  assert.deepEqual(near(400, 800, 390), [434.5, 460.5]);   // drawn over 400 CSS: reach 32, 28 is in
+});
+
+test('the same reach snaps a front-screen control and the HUD run button by their drawn size', () => {
+  const front = (cssW, backing, x, y) => {
+    const w = world({ screen: 'create', uiTargets: () => ({ screen: 'create', create: { ok: [400, 300] } }) });
+    const k = drawn(w, cssW, backing);
+    w.down(1, x, y); w.up(1, x, y);
+    return onCanvas(w, k);
+  };
+  assert.deepEqual(front(800, 800, 410, 312), [400, 300]);   // 15.6 px away, reach 16
+  assert.deepEqual(front(1600, 800, 410, 312), [410, 312]);  // reach 8: raw
+  assert.deepEqual(front(800, 1600, 430, 300), [400, 300]);  // backing 1600 drawn at 800: reach 32, 30 is in
+  const run = (cssW, backing, x) => {
+    const w = world({ screen: 'game', controlPanelEvidence: { hud: { runButton: { left: 255, top: 571, w: 16, h: 20 } } } });
+    const k = drawn(w, cssW, backing);
+    w.down(1, x, 580); w.up(1, x, 580);
+    return w.sent.length ? onCanvas(w, k) : 'rest';
+  };
+  assert.deepEqual(run(800, 800, 240), [263, 581]);   // 15 px left of the button: reach 16 presses it
+  // Reach 8: the raw point is in the console gap, so it is a shift rest finger, and sends nothing.
+  assert.equal(run(1600, 800, 240), 'rest');
 });

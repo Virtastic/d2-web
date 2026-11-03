@@ -38,7 +38,7 @@
 // this module owns in the page is the hero-name input, shown only where retail shows its name box.
 
 import { click, pointer, tapKey, toClient, toCanvas } from './input-common.mjs';
-import { isHudDeadZone, hudAimPoint } from './control-panel.mjs';
+import { isHudDeadZone, hudAimPoint, HUD_FINGER_REACH } from './control-panel.mjs';
 import { hudOrigin } from './hud-origin.mjs';
 
 // Overlay face: the game's serif, not the browser's monospace (no web font ships).
@@ -72,6 +72,21 @@ export function installTouchInput({ documentObject = globalThis.document, window
 
   injectStyle(documentObject);
   canvas.style.touchAction = 'none';   // M3: a touch drag on the canvas walks the hero, never the page
+
+  // ---- one finger's reach, as a physical size on glass ------------------------------------------
+  // Every snap below (the belt, the grids, the "+" buttons, the HUD's small controls, the close buttons,
+  // the dialogs, the world and the out-of-game screens) reaches a finger this far from its target. The
+  // reach is FINGER_REACH_CSS CSS px -- a finger's own aim error (~10 CSS px), with margin -- converted
+  // to canvas px through the canvas's drawn box, so the same finger reaches the same distance on a phone
+  // and on a desktop. The target rectangles stay in game space; only the distance is converted.
+  // `legacyCanvasPx` is the reach this aim used before (in canvas px): returned unchanged when the drawn
+  // box is not measurable (a stub, a canvas outside the page), so nothing moves where there is no glass.
+  const FINGER_REACH_CSS = 16;
+  function fingerReach(legacyCanvasPx) {
+    const rect = canvas.getBoundingClientRect?.();
+    if (!rect || !(rect.width > 0) || !(canvas.width > 0)) return legacyCanvasPx;
+    return FINGER_REACH_CSS * canvas.width / rect.width;
+  }
 
   let revealed = false;
   function reveal() { if (!revealed) { revealed = true; container.classList.add('d2-touch-on'); } }
@@ -117,8 +132,9 @@ export function installTouchInput({ documentObject = globalThis.document, window
   //   * the SCRIPTED seam is untouched (input-touch's exported tap()/longPress(), which
   //     lib/player.mjs's S000_INPUT=touch and s315's 112-point mouse/touch identity sweep dispatch
   //     through, still delivers the raw point -- an instrument that knows where it is pointing).
-  // Half a cell is the width of the rule, not a taste: it is the distance at which the neighbouring
-  // box is as close as this one, so no point inside the band has a box "in front of" another.
+  // How far out from the band the finger still snaps is the finger's own reach (fingerReach), not a
+  // share of a box. The box chosen is the nearest centre, so no point inside the band has a box "in
+  // front of" another whatever the reach.
   function beltAim(cx, cy) {
     const shell = windowObject.__d2Shell;
     if (!shell || shell.screen !== 'game' || shell.clearScreen) return null;
@@ -133,7 +149,8 @@ export function installTouchInput({ documentObject = globalThis.document, window
       if (b.top < top) top = b.top;
       if (b.bottom > bottom) bottom = b.bottom;
     }
-    const half = (bottom - top) / 2;
+    // The reach out from the band, in game px (the finger's physical reach, converted at this scale).
+    const half = fingerReach((bottom - top) / 2 * o.scale) / o.scale;
     if (x < left - half || x > right + half || y < top - half || y > bottom + half) return null;
     let best = boxes[0], bestDistance = Infinity;
     for (const b of boxes) {
@@ -174,7 +191,8 @@ export function installTouchInput({ documentObject = globalThis.document, window
   //     3.5 game px into the world outside it;
   //   * and the MOUSE and the SCRIPTED seam are untouched, exactly as for the belt.
   function gridAim(x, y, grid, panel) {
-    const halfW = grid.cellWidth / 2, halfH = grid.cellHeight / 2;
+    // The ring is the finger's reach (canvas px, the grid's rectangles being canvas px too).
+    const halfW = fingerReach(grid.cellWidth / 2), halfH = fingerReach(grid.cellHeight / 2);
     const right = grid.left + grid.columns * grid.cellWidth, bottom = grid.top + grid.rows * grid.cellHeight;
     // INSIDE the grid the point is delivered exactly where it landed: the shell's own hit test decides
     // there, and it is not only the grid's cells that live inside a grid's rectangle -- the stash's gold
@@ -236,7 +254,8 @@ export function installTouchInput({ documentObject = globalThis.document, window
     for (const b of buttons) {
       const r = b.rect;
       if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) return null;   // inside: raw
-      if (x < r.x - r.w / 2 || x > r.x + r.w + r.w / 2 || y < r.y - r.h / 2 || y > r.y + r.h + r.h / 2) continue;
+      const reach = fingerReach(r.w / 2);
+      if (x < r.x - reach || x > r.x + r.w + reach || y < r.y - reach || y > r.y + r.h + reach) continue;
       return [r.x + r.w / 2, r.y + r.h / 2];
     }
     return null;
@@ -255,7 +274,10 @@ export function installTouchInput({ documentObject = globalThis.document, window
     const extra = [];
     if (shell.inventoryVisible && shell.inventoryPanelRect) extra.push(shell.inventoryPanelRect);
     if (shell.stashPanelRect) extra.push(shell.stashPanelRect);
-    return hudAimPoint(x, y, { width: canvas.width, height: canvas.height, hud, belt: shell.beltHudBoxes || [], extra });
+    // hudAimPoint measures in game px at its own scale: the finger's reach converted to that scale.
+    const scale = Math.min(1, canvas.width / 800);
+    const reach = fingerReach(HUD_FINGER_REACH * scale) / scale;
+    return hudAimPoint(x, y, { width: canvas.width, height: canvas.height, hud, belt: shell.beltHudBoxes || [], extra, reach });
   }
   // ---- the world: a finger near a monster, NPC, ground item, object or exit picks it ------------------
   // A finger lands ~10 CSS px (~15 game px) off what the player meant. When the exact point resolves to
@@ -263,7 +285,7 @@ export function installTouchInput({ documentObject = globalThis.document, window
   // points around it, nearest ring first; the first hit is where the press goes. A point that already
   // hits something is delivered raw, and ground that has nothing near it still walks exactly there.
   // Panels, the HUD band and the belt are excluded: their own aim rules (above) decide there.
-  const WORLD_RINGS = [8, 16], WORLD_SPOKES = 8;
+  const WORLD_SPOKES = 8;
   function worldAim(x, y) {
     const shell = windowObject.__d2Shell;
     if (!shell || shell.screen !== 'game' || shell.clearScreen || typeof shell.touchPickAt !== 'function') return null;
@@ -274,7 +296,8 @@ export function installTouchInput({ documentObject = globalThis.document, window
     if (y >= bandTop || inPanel(x, y)) return null;
     let hit;
     try { if (shell.touchPickAt(x, y)) return null; } catch { return null; }
-    for (const r of WORLD_RINGS) {
+    const reach = fingerReach(16);
+    for (const r of [reach / 2, reach]) {
       for (let i = 0; i < WORLD_SPOKES; i += 1) {
         const a = (i / WORLD_SPOKES) * 2 * Math.PI, px = x + r * Math.cos(a), py = y + r * Math.sin(a);
         if (py >= bandTop || inPanel(px, py)) continue;
@@ -297,7 +320,8 @@ export function installTouchInput({ documentObject = globalThis.document, window
     for (const [flag, l, t, bw, bh] of CLOSES) {
       if (!shell[flag]) continue;
       if (gx >= l && gx < l + bw && gy >= t && gy < t + bh) return null;
-      if (gx < l - bw / 2 || gx > l + bw * 1.5 || gy < t - bh / 2 || gy > t + bh * 1.5) continue;
+      const reach = fingerReach(bw * s / 2) / s;   // the finger's reach, in game px at this scale
+      if (gx < l - reach || gx > l + bw + reach || gy < t - reach || gy > t + bh + reach) continue;
       return [ox + (l + bw / 2) * s, oy + (t + bh / 2) * s];
     }
     return null;
@@ -328,22 +352,22 @@ export function installTouchInput({ documentObject = globalThis.document, window
   // ---- a dialog's small buttons: NPC menu rows, the gold dialog's arrows/ok/close, repair yes/no ----
   // While one is up, a finger that hits none of its buttons is probed at rings around it with the
   // dialog's own hit test; the first ring point on a button is where the press goes.
-  const MODAL_RINGS = [6, 12], MODAL_SPOKES = 8;
+  const MODAL_SPOKES = 8;
   function modalAim(x, y) {
     const shell = windowObject.__d2Shell;
     if (!shell || typeof shell.touchControlAt !== 'function') return null;
     let on;
     try { on = shell.touchControlAt(x, y); } catch { return null; }
     if (on !== false) return null;
-    for (const r of MODAL_RINGS) for (let i = 0; i < MODAL_SPOKES; i += 1) {
+    const reach = fingerReach(12);
+    for (const r of [reach / 2, reach]) for (let i = 0; i < MODAL_SPOKES; i += 1) {
       const a = (i / MODAL_SPOKES) * 2 * Math.PI, px = x + r * Math.cos(a), py = y + r * Math.sin(a);
       try { if (shell.touchControlAt(px, py)) return [px, py]; } catch { return null; }
     }
     return null;
   }
   // ---- the out-of-game screens: title, gateways, character select/create, options ---------------------
-  // A finger within FRONT_REACH game px of a control's click point presses that point; the nearest wins.
-  const FRONT_REACH = 20;
+  // A finger within the finger's reach of a control's click point presses that point; the nearest wins.
   function frontAim(x, y) {
     const shell = windowObject.__d2Shell;
     if (!shell || shell.screen === 'game' || typeof shell.uiTargets !== 'function') return null;
@@ -353,7 +377,7 @@ export function installTouchInput({ documentObject = globalThis.document, window
       else if (v && typeof v === 'object') for (const k in v) walk(v[k]);
     };
     walk(t);
-    const s = Math.min(1, canvas.width / 800, canvas.height / 600), reach = FRONT_REACH * s;
+    const reach = fingerReach(20 * Math.min(1, canvas.width / 800, canvas.height / 600));
     let best = null, bd = reach * reach;
     for (const [px, py] of pts) { const d = (px - x) ** 2 + (py - y) ** 2; if (d <= bd) { bd = d; best = [px, py]; } }
     return best;
