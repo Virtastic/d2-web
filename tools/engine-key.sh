@@ -36,8 +36,11 @@ inputs=(src wasm-build/link-d2.sh third_party ci/build.sh Dockerfile.builder64 t
 # `find src -name '*.cpp'`, and src/core/fn/* is gitignored except the tracked probes, so an
 # --exclude-standard listing (or git status) missed the FN probes and a changed probe reused the
 # stale engine ("engine unchanged"). Listed once, hashed by one git call, no per-file subprocess.
-untracked=$(git ls-files --others -- "${inputs[@]}")
-if [ -n "$untracked" ] || [ -n "$(git status --porcelain -- "${inputs[@]}")" ]; then
+# D2_ENGINE_KEY_COMMITTED=1: the key of the committed tree only (land-main's gate: the main checkout
+# always holds private probes on disk, so its working key is always dirty; a clean worktree build of
+# the same commit stores exactly this key).
+untracked=""; [ "${D2_ENGINE_KEY_COMMITTED:-0}" = 1 ] || untracked=$(git ls-files --others -- "${inputs[@]}")
+if [ "${D2_ENGINE_KEY_COMMITTED:-0}" != 1 ] && { [ -n "$untracked" ] || [ -n "$(git status --porcelain -- "${inputs[@]}")" ]; } || [ -n "$(git status --porcelain -- "${inputs[@]}")" ]; then
   edits=$(
     {
       git diff --no-ext-diff --no-textconv --binary --submodule=diff HEAD -- "${inputs[@]}"
