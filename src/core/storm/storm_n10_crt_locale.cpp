@@ -320,3 +320,11 @@ uint32_t storm_fn_locale(int which, uint32_t* st, const char* hex, uint32_t stri
     return r;
 }
 
+
+// FN-probe seam for the locale-info table lookup: cb stands in for the OS fallback.
+extern "C" int storm_fn_b45f(uint32_t lcid, uint32_t type, char* out, int n, const uint8_t* table,
+                             int (*cb)(uint32_t, uint32_t, char*, int)) {
+    Host h{};
+    h.getLocaleInfoA = cb;
+    return storm_B45F(h, table, lcid, type, out, n);
+}
