@@ -10,7 +10,7 @@
 struct D2GameB8E2Env {
     // D2Common ordinals
     int      (*o10680)(void* unit, int stat, int layer);
-    int      (*o10630)(int v);
+    int      (*o10630)(void* unit, int row, int v); // 0xA3F4: ecx=unit edx=row, stack v
     int      (*o10306)(void* unit, int v);
     int      (*o10786)(void* unit, int a, int b, void* c);
     int      (*o10392)(uint32_t id);
@@ -106,49 +106,51 @@ EMSCRIPTEN_KEEPALIVE void d2_game_8e8c0(int id, uint8_t* owner, uint32_t type, c
 }
 
 // 1.13c D2Game+0x91040
-// Walks a random path of param_1[0xB] (u16 x,y pairs) points. Ordinals: 10534/10558/10970/10614/10647/
-// 10168/10817/10867/10750/10764/10983/10192/10266/10165 (all seams, retail order); tables at 0x6FD1BA60/80
-// (dx/dy per direction), 0x6FD2F144/48 (turn base / run length).
+// fastcall: ecx = unit (edx is unused). Fills a random walk of min(#10534(unit), 0x4D) points as u16 x,y pairs into
+// the buffer #10817 returns through its out-pointer. Start x/y = path+0xC/+0x10 for unit types 2/4/5, else
+// #10867/#10750 of the path (0 when no path). Register-argument thunks follow the disassembly, not the decompile.
+// Tables: 0x6FD1BA80/60 (dx/dy per direction), 0x6FD2F144/48 (turn base / run length).
 struct D2GameB91040Env {
     int      (*o10534)(void* u);
     void     (*o10558)(void* u, int v);
     void     (*o10970)(void* u, int v);
-    void     (*o10614)(void);
+    void     (*o10614)(void* seed);          // 0xA628: ecx = &unit[8] (edx is a stack leftover)
     void     (*o10647)(int path, int v);
     void     (*o10168)(int path, int n);
-    void     (*o10817)(int path);
-    void     (*o10867)(int v);
-    int      (*o10750)(int v);
-    uint32_t (*o10764)(void);
-    uint32_t (*o10983)(int v, uint32_t w);
-    uint32_t (*o10192)(void* u, uint32_t w);
-    uint32_t (*o10266)(uint32_t v);
-    void     (*o10165)(uint32_t a, int b);
+    void     (*o10817)(int path, int** outBuf); // 0xAF8E
+    int      (*o10867)(int path);            // 0xA454, x
+    int      (*o10750)(int path);            // 0xA3B8, y
+    uint32_t (*o10764)(int path);            // 0xAAD8
+    uint32_t (*o10983)(int path, uint32_t w);// 0xAAC6
+    uint32_t (*o10192)(void* u, uint32_t w); // 0xA7A8
+    uint32_t (*o10266)(uint32_t v);          // 0xAD1E
+    void     (*o10165)(int path, int n);     // 0xAFA6
     const int* dxTab;   // 0x6FD1BA80
     const int* dyTab;   // 0x6FD1BA60
     int turnBase;       // 0x6FD2F144
     int runLen;         // 0x6FD2F148
 };
-EMSCRIPTEN_KEEPALIVE void d2_game_91040(int32_t* u, int32_t* pathBuf, int32_t startX,
-                                        const D2GameB91040Env* e)
+EMSCRIPTEN_KEEPALIVE void d2_game_91040(int32_t* u, const D2GameB91040Env* e)
 {
     if (!u) return;
     int n = e->o10534(u);
     if (n > 0x4D) { e->o10558(u, 0x4D); e->o10970(u, 0x4D); n = 0x4D; }
     const int path = u[0xB];
     uint64_t* seed = (uint64_t*)(u + 8);
-    e->o10614();
+    e->o10614(seed);
     e->o10647(path, 10);
     e->o10168(path, n);
-    e->o10817(path);
+    int* buf = nullptr;
+    e->o10817(path, &buf);
     int type = *u;
-    if (type != 2 && (type < 4 || type > 5) && u[0xB] != 0) e->o10867(u[0xB]);
+    int x;
+    if (type == 2 || (type > 3 && type < 6)) x = *(int*)((intptr_t)u[0xB] + 0xC);
+    else x = u[0xB] != 0 ? e->o10867(u[0xB]) : 0;
     type = *u;
     int y;
     if (type == 2 || (type > 3 && type < 6)) y = *(int*)((intptr_t)u[0xB] + 0x10);
-    else y = u[0xB] == 0 ? 0 : e->o10750(u[0xB]);
-    const int cnt = u[0xB];
-    uint32_t h = e->o10983(u[0xB], e->o10764());
+    else y = u[0xB] != 0 ? e->o10750(u[0xB]) : 0;
+    uint32_t h = e->o10983(u[0xB], e->o10764(u[0xB]));
     uint32_t dir = e->o10192(u, h) & 0xFF;
     uint64_t s = (uint64_t)(uint32_t)*seed * 0x6AC690C5ull + (uint32_t)u[9];
     *(uint32_t*)seed = (uint32_t)s;
@@ -156,14 +158,13 @@ EMSCRIPTEN_KEEPALIVE void d2_game_91040(int32_t* u, int32_t* pathBuf, int32_t st
     s = (s & 0xFFFFFFFFull) * 0x6AC690C5ull + (s >> 32);
     *seed = s;
     int step = (int)((s & 0xFFFFFFFFull) % 3) + e->turnBase;
-    int x = startX;
-    for (int i = 0; i < cnt; ++i) {
+    for (int i = 0; i < n; ++i) {
         dir += step * sign;
         const uint32_t d = e->o10266(dir & 0xFFFFFF3F) & 0xFF;
         x += e->dxTab[d];
         y += e->dyTab[d];
-        ((int16_t*)(intptr_t)path)[i * 2] = (int16_t)x;
-        ((int16_t*)(intptr_t)path)[i * 2 + 1] = (int16_t)y;
+        ((int16_t*)buf)[i * 2] = (int16_t)x;
+        ((int16_t*)buf)[i * 2 + 1] = (int16_t)y;
         if (i % e->runLen == 0) {
             sign = -sign;
             s = (uint64_t)(uint32_t)*seed * 0x6AC690C5ull + (uint32_t)u[9];
@@ -171,26 +172,27 @@ EMSCRIPTEN_KEEPALIVE void d2_game_91040(int32_t* u, int32_t* pathBuf, int32_t st
             step = (int)((s & 0xFFFFFFFFull) % 3) + e->turnBase;
         }
     }
-    e->o10165(10, cnt);
+    e->o10165(path, n);
 }
 
 // 1.13c D2Game+0x91400
-// param_1 = unit (ecx), param_2 = skill-holder (edx), unaff_ESI = target unit, record = unaff register (iVar6=0x15F
-// kept as in the decompile: the adds target the caller-frame accumulator at +0x38/+0x3C).
-EMSCRIPTEN_KEEPALIVE void d2_game_91400(void* p1, void* p2, void* esi, uint8_t* acc, const uint8_t* dt,
+// stack args (ret 0xC): a0 = unit, a1 = skill-holder (also the stat-lookup target), a2 = accumulator whose +0x38/+0x3C
+// get the bonus. Disassembly-checked: 0x21B10 takes (eax = skill row, edx = value).
+EMSCRIPTEN_KEEPALIVE void d2_game_91400(void* p1, void* p2, uint8_t* acc, const uint8_t* dt,
                                         const D2GameB8E2Env* e)
 {
-    const uint8_t* row = b8e2Row(dt, e->o10680(p2, 0x15E, 0));
+    const int row_i = e->o10680(p2, 0x15E, 0);
+    const uint8_t* row = b8e2Row(dt, row_i);
     if (!row) return;
     int v = e->o10680(p2, 0x15F, 0);
-    const int w = e->o10306(p1, e->o10630(1));
+    const int w = e->o10306(p1, e->o10630(p1, row_i, 1));
     if (v < w) v = w;
     if (v <= 0) return;
     const int16_t st = *(const int16_t*)(row + 0x54);
     if (st < 0 || st >= *(const int*)(dt + 0xBD4)) return;
-    const int lvl = e->o10680(esi, st, 0);
+    const int lvl = e->o10680(p2, st, 0);
     if (lvl <= 0) return;
-    v = e->f21B10(0, v);
+    v = e->f21B10(row_i, v);
     if (lvl != 1) {
         if (lvl != 2) {
             if (lvl != 3) return;
@@ -225,12 +227,12 @@ struct D2GameB91660Env {
     int      (*o10786)(void* u, int a, int b, void* c);
     void     (*o10188)(int h, int state, int v, int z);
     int64_t  (*alldiv)(int64_t a, int64_t b);
-    void     (*f43260)(void);
+    void     (*f43260)(void* eaxUnit, const void* esiA0); // eax = unit, esi = arg0
     const uint32_t* statesCountPtr; // sgptDataTables+0xBD4 value pointer
-    void (*const* cb)(int);         // 0x6FD2E550 callback table
+    void (*const* cb)(void* ecxUnit, int edxState, int one); // 0x6FD2E550 table, called ecx=unit edx=s push 1
 };
 EMSCRIPTEN_KEEPALIVE void d2_game_91660(const uint8_t* rec, int32_t* unit, int skillRow, int level,
-                                        const uint8_t* dt, int ret1C, const D2GameB91660Env* e)
+                                        const uint8_t* dt, const uint8_t* a0, const D2GameB91660Env* e)
 {
     if (level < 2) return;
     const uint8_t* srow = b8e2Row(dt, skillRow);
@@ -248,25 +250,25 @@ EMSCRIPTEN_KEEPALIVE void d2_game_91660(const uint8_t* rec, int32_t* unit, int s
     e->o10887(unit, 6, base + add, 0);
     const int uid = unit ? unit[3] : -1;
     const int utype = unit ? *unit : 6;
-    const int h = e->o11013(ret1C, 0, 0, utype, uid);
+    const int h = e->o11013(*(const int*)(a0 + 0x1C), 0, 0, utype, uid);
     if (!h) return;
     e->o10807(unit, h, 1);
     const int16_t* ps = (const int16_t*)(rec + 0x54);
     const int nst = *(const int*)(dt + 0xBD4);
     for (int i = 0; i < 6; ++i, ++ps)
-        if (*ps > -1 && *ps < nst) e->o10188(h, *ps, e->o10786(unit, *(const int*)(rec + 0x6C), uid, unit), 0);
+        if (*ps > -1 && *ps < nst) e->o10188(h, *ps, e->o10786(unit, *(const int*)(rec + 0x6C), skillRow, (void*)(intptr_t)level), 0);
     ps = (const int16_t*)(rec + 0x98);
     for (int i = 0; i < 5; ++i, ++ps)
-        if (*ps > -1 && *ps < nst) e->o10188(h, *ps, e->o10786(unit, *(const int*)(rec + 0xA8), uid, unit), 0);
+        if (*ps > -1 && *ps < nst) e->o10188(h, *ps, e->o10786(unit, *(const int*)(rec + 0xA8), skillRow, (void*)(intptr_t)level), 0);
     const int16_t s = *(const int16_t*)(rec + 0xE4);
     if (s > 0 && s < 0x2B && unit && *unit == 1 && unit[5] != 0) {
         uint8_t* name = (uint8_t*)(intptr_t)unit[5] + 0x1C;
-        e->f43260();
+        e->f43260(unit, a0);
         int k = 0;
         while (name[k] != 0) { if (++k > 8) return; }
         if (k < 9) {
             name[k] = (uint8_t)s;
-            if (e->cb[s]) e->cb[s](1);
+            if (e->cb[s]) e->cb[s](unit, s, 1);
         }
     }
 }
@@ -277,10 +279,11 @@ EMSCRIPTEN_KEEPALIVE void d2_game_91660(const uint8_t* rec, int32_t* unit, int s
 EMSCRIPTEN_KEEPALIVE void d2_game_91a30(void* p1, void* p2, void* ebp, uint8_t* acc, const uint8_t* dt,
                                         const D2GameB8E2Env* e)
 {
-    const uint8_t* row = b8e2Row(dt, e->o10680(p2, 0x15E, 0));
+    const int row_i = e->o10680(p2, 0x15E, 0);
+    const uint8_t* row = b8e2Row(dt, row_i);
     if (!row) return;
     int v = e->o10680(p2, 0x15F, 0);
-    const int w = e->o10306(p2, e->o10630(1));
+    const int w = e->o10306(p2, e->o10630(p1, row_i, 1));
     if (v < w) v = w;
     if (v <= 0) return;
     const int16_t st = *(const int16_t*)(row + 0x54);
@@ -308,7 +311,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_91f10(void* unit, int* field, const uint8_t* d
     const uint8_t* row = b8e2Row(dt, e->o10680(unit, 0x15E, 0));
     if (!row) return;
     int v = e->o10680(unit, 0x15F, 0);
-    e->o10630(1);
+    e->o10630(unit, 0, 1);
     const int w = e->o10306(nullptr, 0);
     if (v < w) v = w;
     if (v <= 0) return;

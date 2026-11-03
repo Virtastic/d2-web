@@ -396,24 +396,10 @@ void* StormHashTableChunkNew(StormHashTable* h, uintptr_t location, uintptr_t ex
 
 #define P(T, i) ((T)(uintptr_t)r[i])
 
-// 1.13c Storm+0x1F30: TSFixedArray<RECTF>::Set(esi=this, edi=count, [esp+4]=src)
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1f30(uint32_t* r) {
-    StormFixedArraySetRectF(P(StormFixedArray*, 0), (uintptr_t)r[1], P(const void*, 2));
-    r[4] = 0;
-}
-
 // 1.13c Storm+0x1FA0: TSFixedArray destructor(eax=this)
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1fa0(uint32_t* r) {
     StormFixedArrayDestroy(P(StormFixedArray*, 0));
-    r[4] = 0;
-}
-
-// Storm 0x1FC0 (1.13c, probe entry for StormFixedArraySetFoundParam): TSFixedArray<_FOUNDPARAM>::Set(edi=this, esi=count, eax=src)
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1fc0(uint32_t* r) {
-    StormFixedArraySetFoundParam(P(StormFixedArray*, 0), (uintptr_t)r[1], P(const void*, 2));
     r[4] = 0;
 }
 

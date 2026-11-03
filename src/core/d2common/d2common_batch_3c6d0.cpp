@@ -2,8 +2,8 @@
 #include <cstdint>
 #include <emscripten.h>
 
-// 0x819C0 has C++ linkage in d2common_batch_45aa0.cpp; same signature here.
-__attribute__((weak)) uint32_t d2_fn_d2common_819c0(int32_t nSubY, uint32_t pRoom, int32_t nSubX);
+// 0x819C0 lives in d2common_batch_45aa0.cpp under the _batch name (the FN probe owns the plain one).
+extern "C" __attribute__((weak)) uint32_t d2_fn_d2common_819c0_batch(int32_t nSubY, uint32_t pRoom, int32_t nSubX);
 
 namespace
 {
@@ -17,10 +17,10 @@ extern "C" {
 EMSCRIPTEN_KEEPALIVE void D2Common_DoNothing916(uint32_t, int32_t nX, int32_t nY)
 {
 	const uint32_t pRec = env_3c6d0_GetRecord ? env_3c6d0_GetRecord() : 0;
-	if (pRec == 0 || !d2_fn_d2common_819c0)
+	if (pRec == 0 || !d2_fn_d2common_819c0_batch)
 		return;
 	// record+0x10 is a 32-bit retail pointer
 	const uint32_t pRoom = *reinterpret_cast<const uint32_t*>(static_cast<intptr_t>(pRec) + 0x10);
-	d2_fn_d2common_819c0(nY / 5, pRoom, nX / 5);
+	d2_fn_d2common_819c0_batch(nY / 5, pRoom, nX / 5);
 }
 }

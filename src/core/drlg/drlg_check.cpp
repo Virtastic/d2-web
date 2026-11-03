@@ -408,7 +408,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_feed(int level, int l, int t, int r, int b, 
         for (const FeedUnit& u : g_feedUnits) {
             int tx = u.sx / 5, ty = u.sy / 5;
             if (tx < room->nTileXPos || ty < room->nTileYPos || tx >= room->nTileXPos + room->nTileWidth || ty >= room->nTileYPos + room->nTileHeight) continue;
-            uint32_t k = d2_dg_stage_unit((uint32_t)u.cls, u.type, u.sx, u.sy, 0, (u.flags >> 20) & 1, 1);
+            uint32_t k = d2_dg_stage_unit((uint32_t)u.cls, u.type, u.sx, u.sy, 0, (u.flags >> 20) & 1, (u.flagsEx & 1) ? 0 : 1);   // flagsEx bit0: the unit +0xC8 bit7 (the shadow node) is clear
             if (!nU++) u0 = k;
         }
         d2_dg_stage_room(room->nTileXPos, room->nTileYPos, room->nTileWidth, room->nTileHeight, room->nTileXPos * 5, room->nTileYPos * 5, nA, a0, nB, b0, nU, u0);

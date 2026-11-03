@@ -73,7 +73,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_45aa0(
 // already in subtiles; the row-offset table is relative to room+0x38 and the selected cell is
 // relative to room+0x34. A flat grid (flag bit 0) uses its sole cell at +0x30. A missing grid
 // follows retail's fatal 0x29C path; the staged function returns 0 after that modeled fatal.
-uint32_t d2_fn_d2common_819c0(int32_t nSubY, uint32_t pRoom, int32_t nSubX) { // 1.13c D2Common+0x819C0
+extern "C" uint32_t d2_fn_d2common_819c0_batch(int32_t nSubY, uint32_t pRoom, int32_t nSubX) { // 1.13c D2Common+0x819C0
 	const uint32_t pGrid = U(pRoom + 0x64);
 	if (pGrid == 0)
 		return 0;

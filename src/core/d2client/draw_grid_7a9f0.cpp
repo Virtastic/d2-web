@@ -457,7 +457,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_dg_walk_g() {
         [](uint32_t a, uint8_t v) { if (a < sizeof g_arena) g_arena[a] = v; }, []() -> int32_t { gRec(10013, {}); return g_r13; }, []() -> uint32_t { return g_now; },
         [](uint32_t) -> uint32_t { return 0; }, [](uint32_t, uint32_t) {}, [](int32_t) {}, [](uint32_t, uint8_t* r, uint8_t* g, uint8_t* b, uint8_t* a) { *r = *g = *b = *a = 0; },
         [](uint32_t, int32_t x, int32_t y, const uint32_t*, uint32_t g) -> int32_t { gRec(10001, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, g}, y > 0 ? y : 0); return 1; },
-        [](uint32_t, int32_t x, int32_t y, const uint32_t*, uint32_t g, uint32_t al) -> int32_t { gRec(10058, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, g, al}, y > 0 ? y : 0); return 1; }, [](uint32_t) {}};
+        [](uint32_t, int32_t x, int32_t y, const uint32_t*, uint32_t g, uint32_t al) -> int32_t { gRec(10058, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, g, al}, y > 0 ? y : 0); return 1; }, unit666d0};
     d2c_9ee90(&e, kCtx);
     return g_gout.c_str();
 }

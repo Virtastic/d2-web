@@ -28,7 +28,7 @@ namespace
 // in which case the end coord is set to the begin coord), 0 when the path stays clear. The vendored
 // COLLISION_RayTrace is this body.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4ad20(uint32_t pRoom, uint32_t pBeginCoord, uint32_t pEndCoord, uint32_t nCollisionMask) {   // 1.13c D2Common+0x4AD20
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4ad20_batch(uint32_t pRoom, uint32_t pBeginCoord, uint32_t pEndCoord, uint32_t nCollisionMask) {   // 1.13c D2Common+0x4AD20
 	return COLLISION_RayTrace(reinterpret_cast<D2ActiveRoomStrc*>(pRoom), reinterpret_cast<D2CoordStrc*>(pBeginCoord), reinterpret_cast<D2CoordStrc*>(pEndCoord), static_cast<uint16_t>(nCollisionMask)) ? 1u : 0u;
 }
 

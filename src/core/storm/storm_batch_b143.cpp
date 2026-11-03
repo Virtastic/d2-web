@@ -12,6 +12,7 @@ void (*Storm_LeaveCS)(void*) = nullptr;  // LeaveCriticalSection; null on wasm (
 static uint32_t g_ctxSaved[3];       // DAT_6fc407d4/d8/dc
 
 // 1.13c Storm+0x902a: CRT _unlock(n)
+void Storm_SetCrtLock(int n, void* p) { g_crtLocks[n] = p; }   // FN probes pin a lock slot
 extern "C" void Storm_Sub902A(int n) { if (Storm_LeaveCS) Storm_LeaveCS(g_crtLocks[n]); }
 // 1.13c Storm+0x6d64
 extern "C" void Storm_Sub6D64() { Storm_Sub902A(0xc); }

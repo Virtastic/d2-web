@@ -189,17 +189,16 @@ EMSCRIPTEN_KEEPALIVE void D2GAME_SUnitArmTimers_37E20(uint32_t esiGame, uint32_t
     env->subAEA80(esiGame, ediUnit, 0xB, (int32_t)rd32(esiGame, 0xA8) + 0xFA, 0, 0, 0);
 }
 
-// Action picker: under load (this+8 below this+0xC times 10 the call is skipped) the count at this+8
-// against this+4 raises the threshold by 5 twice; a 64-bit LCG (seed behind param_1+0x10F0, constant
-// 0x6AC690C5) rolled below threshold+0xC picks one of the action ids bit-selected from param_1's low
-// seven bits and invokes the 0x6FD2E2FC row's callback with the id list. The decompile uses param_1
-// both as the RNG-owner address (+0x10F0) and as the bit mask; it is transcribed as given. Its stack
-// symbols (writes at auStack_28-0x1C, payload at local_20, callback argument auStack_28) do not
-// reconstruct a single frame: the ids are modelled as one array and the callback receives it.
+// Action picker (thiscall, three stack args after ECX=this): this+8 below this+0xC times 10 skips the call;
+// the 64-bit LCG (constant 0x6AC690C5) lives behind param1+0x10F0 and every modulo uses its LOW dword only.
+// A roll below threshold+0xC (threshold: +5 when this+8/2 < this+4, +5 when this+8 - this+8/4 < this+4)
+// picks one of the action ids bit-selected from param3's low seven bits (ids array at esp+0x10, payload
+// from #10561(param2) at esp+0x2C) and calls the row's callback at 0x6FD2E300 with ECX=param1, EDX=param2
+// and the payload on the stack. Disassembly-verified (Ghidra mixes up the third argument and the frame).
 // 1.13c D2Game+0x2EAD0
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t GAME_RandomActionRoll_2EAD0(void* thisp, uint32_t param1, uint32_t param2,
-                                                  const D2GameBatchD4630Env* env)
+                                                  uint32_t param3, const D2GameBatchD4630Env* env)
 {
     if ((int32_t)rd32(thisp, 8) < (int32_t)rd32(thisp, 0xC) * 10) return 0;
 
@@ -214,43 +213,39 @@ EMSCRIPTEN_KEEPALIVE uint32_t GAME_RandomActionRoll_2EAD0(void* thisp, uint32_t 
     const int32_t size = (int32_t)rd32(thisp, 8);
     if (size - size / 4 < (int32_t)rd32(thisp, 4)) chance += 5;
 
-    if ((uint32_t)(state % 100) < (uint32_t)(chance + 0xC)) {
+    if ((uint32_t)state % 100u < (uint32_t)(chance + 0xC)) {
         uint8_t payload[32] = {};
         env->ordinal10561(param2, payload);
 
-        int32_t ids[8] = {};
-        uint32_t count = (param1 & 1) != 0 ? 1u : 0u;
-        if (param1 & 2) ids[count++] = 2;
-        if (param1 & 4) ids[count++] = 3;
-        if (param1 & 8) ids[count++] = 4;
-        if (param1 & 0x10) ids[count++] = 5;
-        if (param1 & 0x20) ids[count++] = 6;
-        if (param1 & 0x40) ids[count++] = 7;
+        int32_t ids[7] = {};
+        int32_t count = (param3 & 1) != 0 ? 1 : 0;
+        if (count) ids[0] = 1;
+        if (param3 & 2) ids[count++] = 2;
+        if (param3 & 4) ids[count++] = 3;
+        if (param3 & 8) ids[count++] = 4;
+        if (param3 & 0x10) ids[count++] = 5;
+        if (param3 & 0x20) ids[count++] = 6;
+        if (param3 & 0x40) ids[count++] = 7;
 
-        uint32_t pick;
-        if (count == 0) {
+        int32_t pick;
+        if (count <= 0) {
             pick = 0;
-        }
-        else if ((count & (count - 1)) == 0) {
-            state = (uint64_t)rd32(seedPtr, 0) * 0x6AC690C5ULL + (uint64_t)rd32(seedPtr, 4);
-            wr32(seedPtr, 0, (uint32_t)state);
-            wr32(seedPtr, 4, (uint32_t)(state >> 32));
-            pick = (count - 1) & (uint32_t)state;
         }
         else {
             state = (uint64_t)rd32(seedPtr, 0) * 0x6AC690C5ULL + (uint64_t)rd32(seedPtr, 4);
             wr32(seedPtr, 0, (uint32_t)state);
             wr32(seedPtr, 4, (uint32_t)(state >> 32));
-            pick = (uint32_t)(state % count);
+            if (((uint32_t)count & ((uint32_t)count - 1)) == 0) pick = (int32_t)(((uint32_t)count - 1) & (uint32_t)state);
+            else pick = (int32_t)((uint32_t)state % (uint32_t)count);
         }
 
         const int32_t action = ids[pick];
-        if ((int32_t)pick < (int32_t)count && action < (int32_t)count &&
+        if (pick < count && action < count &&
             rd32(env->actionTable, (uint32_t)action * 8) != 0 &&
             rd32(env->actionTable, (uint32_t)action * 8 + 4) != 0) {
-            uint32_t (*fn)(uint32_t) =
-                (uint32_t (*)(uint32_t))(uintptr_t)rd32(env->actionTable, (uint32_t)action * 8 + 4);
-            return fn((uint32_t)(uintptr_t)ids);
+            uint32_t (*fn)(uint32_t, uint32_t, void*) =
+                (uint32_t (*)(uint32_t, uint32_t, void*))(uintptr_t)rd32(env->actionTable, (uint32_t)action * 8 + 4);
+            return fn(param1, param2, payload);
         }
     }
     return 0;

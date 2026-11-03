@@ -13,7 +13,7 @@ void     Storm_Sub1EB0(uint32_t* a, uintptr_t count, const uint8_t* src);       
 void     Storm_Sub1F30(uint32_t* a, uint32_t count, const uint32_t* src);       // 0x1F30
 extern "C" void Storm_Sub1FC0(void) {}  // Storm 0x1FC0 (1.13c) is TSFixedArray<_FOUNDPARAM>::Set, ported as StormFixedArraySetFoundParam in gfx/storm_batch_1f20.cpp; this empty placeholder is not it
 void*    Storm_Sub1C580(uint32_t size, const char* src, int32_t line, uint32_t f);   // 0x1C580 SMemAlloc
-void*    Storm_Sub1C760(void* p, uint32_t size, const char* src, int32_t line, uint32_t f); // 0x1C760 SMemReAlloc
+void*    Storm_SMemReAlloc(void* p, uint32_t size, const char* src, int32_t line, uint32_t f); // 0x1C760 SMemReAlloc
 int32_t  Storm_Sub1B960(void* p, const char* src, int32_t line);                // 0x1B960 SMemFree
 void     Storm_Sub605E(void* p, uint32_t sz, int32_t n, void (*dtor)(void*));   // 0x605E _eh_vector_destructor_iterator_
 void     Storm_Sub3820(void* p);                                                // 0x3820
@@ -51,7 +51,7 @@ extern "C" void Storm_Sub2C60(uint32_t cap, uint32_t* self) {
         for (uint32_t i = cap; i < self[1]; i++, p += 0x60) Storm_Sub1C30(p);
     }
     self[0] = cap;
-    uint8_t* n = (uint8_t*)Storm_Sub1C760(old, cap * 0x60, kAurgn, -2, 0x10);
+    uint8_t* n = (uint8_t*)Storm_SMemReAlloc(old, cap * 0x60, kAurgn, -2, 0x10);
     self[2] = (uint32_t)(uintptr_t)n;
     if (!n) {
         n = (uint8_t*)Storm_Sub1C580(cap * 0x60, kAurgn, -2, 0);
@@ -111,7 +111,7 @@ extern "C" void* Storm_Sub3190(uint32_t* p, uint8_t* src) {
 extern "C" void Storm_Sub1F30(uint32_t* a, uint32_t count, const uint32_t* src) {
     a[0] = count;
     if (a[2] || count) {
-        a[2] = (uint32_t)(uintptr_t)Storm_Sub1C760((void*)(uintptr_t)a[2], count << 4, "AURECTF", -2, 0);
+        a[2] = (uint32_t)(uintptr_t)Storm_SMemReAlloc((void*)(uintptr_t)a[2], count << 4, "AURECTF", -2, 0);
         if (count) memcpy((void*)(uintptr_t)a[2], src, count << 4);
     }
     a[1] = count;
