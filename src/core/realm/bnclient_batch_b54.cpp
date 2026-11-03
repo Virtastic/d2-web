@@ -44,13 +44,7 @@ EMSCRIPTEN_KEEPALIVE void bn_unlock_2494(void) {
     bn_unlock_lock(4);
 }
 
-// 1.13c BNClient+0x030AE (21 B, 15 callers): __unlock(lock_num) -- the shared release of the CRT lock
-// table slot DAT_6FF3D090[lock_num*2]. The table, its initialisation and the LeaveCriticalSection are
-// bn_unlock_lock in bnclient_batch_2558.cpp; a slot that was never created holds 0 and is skipped.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void bn_unlock_30ae(int32_t lock_num) {
-    bn_unlock_lock(lock_num);
-}
+// (BNClient __unlock 0x030AE moved to src/core/realm/bnclient_30ae.cpp, own file, 2026-11-02.)
 
 // 1.13c BNClient+0x0315A (9 B, caller 0x30C3 __mtinitlocknum): __unlock(0xA) -- leave slot 10.
 extern "C"

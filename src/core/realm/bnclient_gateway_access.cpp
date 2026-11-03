@@ -287,11 +287,6 @@ void bn_set_cur_gateway(uint32_t self, int32_t index) {
 // (primary English 9, sublanguage 3), per the decompile's masks.
 int32_t bn_get_system_time_zone(const BnetGatewayHost& host) {
     TimeZoneInformation tz;
-    // The retail instruction stream seeds these before the zero/OS calls; TIME_ZONE_INFORMATION
-    // overwrites the whole struct, so they have no observable effect.
-    tz.bias = (int32_t)(uintptr_t)(tz.standard_name + 2);
-    tz.standard_name[0] = 0x00AC;
-    tz.standard_name[1] = 0;
     host.mem_zero(&tz, (uint32_t)sizeof(tz));
     host.get_time_zone_information(&tz);
     uint16_t lang = host.get_user_default_lang_id();
@@ -447,8 +442,8 @@ void bn_gateway_load(uint32_t self, const BnetGatewayHost& host) {
 // 1.13c BNClient+0x15260
 // BNGatewayAccess::UpdateGatewaysFromIni(char*): parse a newer ini (Server List Version / VER,
 // Server Gateways / <n> / ZONE / ENU) into the NUL-separated buffer, then pick, save and reload.
-// Ghidra's stack-variable recovery for this function is poor (several locals show as uninitialized
-// pointers); the buffer layout is the one the comments reads.
+// The Ghidra decompile aliases its SkipToEOL bounds and its buffer test; the 1.13c disassembly uses
+// data_end for every bound and tests the loaded buffer pointer, which is what this body does.
 void bn_gateway_update_from_ini(uint32_t self, const char* data, const BnetGatewayHost& host) {
     BNGatewayAccess32* access = (BNGatewayAccess32*)(uintptr_t)self;
     const char* data_end = data + std::strlen(data);
