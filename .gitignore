@@ -159,6 +159,7 @@ test/*
 !test/desktop-protocol.test.mjs
 !test/desktop-detect.test.mjs
 !test/desktop-startup.test.mjs
+!test/desktop-door.test.mjs
 !test/build-key-lock.test.mjs
 !test/land-fold.test.mjs
 !test/link-check.test.mjs

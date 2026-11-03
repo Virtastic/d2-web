@@ -67,11 +67,15 @@ async function loadArchiveArt(col) {
 const PLAIN = { font30: '26px Georgia,serif', font16: '13px Georgia,serif', fontexocet10: '600 13px Georgia,serif' };
 const INK = { white: '#d8d8d8', red: '#e05050', gold: '#c7b377', grey: '#8b8b8b', tan: '#a8997a' };
 
-export function frontDoor({ onReady } = {}) {
+// hosted: the desktop app (electron/) serves the player's own archives under /retail/, so the door has nothing to
+// read. Every file counts as found, the two choose buttons and the drop target are not there, and boot waits for ENTER
+// SANCTUARY. index.html gates it on window.d2Desktop; a byo host (no desktop) takes the default path below.
+export function frontDoor({ onReady, hosted = false } = {}) {
   const style = el('style'); style.textContent = CSS; document.head.appendChild(style);
   const root = el('div'); root.id = 'door';
   const cv = el('canvas'); cv.setAttribute('role', 'img');
-  cv.setAttribute('aria-label', 'Diablo II title screen: choose the folder where Diablo II is installed, then enter.');
+  cv.setAttribute('aria-label', hosted ? 'Diablo II title screen: press enter to begin.'
+    : 'Diablo II title screen: choose the folder where Diablo II is installed, then enter.');
   root.append(cv);
   document.body.append(root);
   document.body.classList.add('door');
@@ -123,8 +127,10 @@ export function frontDoor({ onReady } = {}) {
   const centre = (name, colour, s, cx, y, op) => text(name, colour, s, cx - measure(name, s) / 2, y, op);
 
   // ---- the title screen, in retail's 800x600 coordinates ----
-  const ready = () => !!col.state.ready && !col.state.busy;
-  const have = (x) => !!col.state.slots[x.role]?.have;
+  const ready = () => hosted || (!!col.state.ready && !col.state.busy);
+  const have = (x) => hosted || !!col.state.slots[x.role]?.have;
+  // The buttons this door shows: a hosted door has no folder or file chooser, so ENTER and the Discord link move up.
+  const BTNS = hosted ? { enter: { ...BTN.enter, y: BTN.dir.y }, discord: { ...BTN.discord, y: BTN.files.y } } : BTN;
   function logo(t) {
     if (!art) return;
     const f = Math.floor(t * 25 / 1000);
@@ -176,16 +182,18 @@ export function frontDoor({ onReady } = {}) {
     const sh = g.createRadialGradient(400, 350, 40, 400, 350, 300); sh.addColorStop(0, 'rgba(0,0,0,0.78)'); sh.addColorStop(1, 'rgba(0,0,0,0)');
     g.save(); g.translate(400, 350); g.scale(1, 0.6); g.translate(-400, -350); g.fillStyle = sh; g.fillRect(0, 0, 800, 700); g.restore();
     centre('font30', 'gold', 'Your Diablo II Files', 400, 236);
-    centre('font16', 'grey', 'Choose the folder where Diablo II is installed.', 400, 276);
-    centre('font16', 'grey', 'Your files are read here, never uploaded.', 400, 292);
+    if (hosted) centre('font16', 'grey', 'Your files stay on this computer. Nothing is uploaded.', 400, 284);
+    else {
+      centre('font16', 'grey', 'Choose the folder where Diablo II is installed.', 400, 276);
+      centre('font16', 'grey', 'Your files are read here, never uploaded.', 400, 292);
+    }
     COLS.forEach((c, i) => c.forEach((x, r) => centre('font16', have(x) ? 'white' : 'red', x.f, LIST.cx[i], LIST.y + r * 16)));
     const [s, c] = status(), lines = wrap(s, 600);
     lines.forEach((l, i) => centre('font16', c, l, 400, (lines.length > 1 ? 380 : 386) + i * 15));
     if (offerAgain && !ready() && lines.length === 1) centre('font16', hover === 'again' ? 'white' : 'gold', AGAIN.label, 400, AGAIN.y);
-    wideButton(BTN.dir, down === 'dir');
-    wideButton(BTN.files, down === 'files');
-    wideButton(BTN.enter, down === 'enter' && ready(), !ready());
-    wideButton(BTN.discord, down === 'discord');
+    if (!hosted) { wideButton(BTN.dir, down === 'dir'); wideButton(BTN.files, down === 'files'); }
+    wideButton(BTNS.enter, down === 'enter' && ready(), !ready());
+    wideButton(BTNS.discord, down === 'discord');
     if (hover && hover.f) { const b = entryBox(hover), left = COLS[0].includes(hover);
       tooltip([[hover.f, 'white'], [hover.what, 'grey'], have(hover) ? ['Found', 'gold'] : ['Required', 'red']], left ? b.x : b.x + b.w, b.y + b.h / 2, left ? -1 : 1); }
   }
@@ -286,7 +294,7 @@ export function frontDoor({ onReady } = {}) {
   // less than its reach (16 CSS px, door-finger.mjs) snaps to the nearest; a mouse keeps the exact hit test.
   function hit(p, touch = false) {
     if (loading) return null;
-    const controls = ['dir', 'files', 'enter', 'discord'].map((k) => ({ key: k, ...BTN[k], w: 272, h: 35 }));
+    const controls = Object.keys(BTNS).map((k) => ({ key: k, ...BTNS[k], w: 272, h: 35 }));
     if (offerAgain && !ready()) { const b = againBox(); controls.push({ key: 'again', x: b.x, y: b.y, w: b.w, h: b.h }); }
     return fingerHit(p, controls, touch ? fingerReachGame(cv.width / (cv.getBoundingClientRect().width || 1), view.s) : 0);
   }
@@ -328,13 +336,12 @@ export function frontDoor({ onReady } = {}) {
   cv.addEventListener('pointerleave', () => { hover = null; mouse = null; });
   cv.addEventListener('pointerdown', (e) => { down = hit(at(e), e.pointerType === 'touch'); });
   addEventListener('pointerup', onUp);
-  addEventListener('dragover', onOver);
-  addEventListener('drop', onDrop);
+  if (!hosted) { addEventListener('dragover', onOver); addEventListener('drop', onDrop); }
   addEventListener('keydown', onKey);
 
   // A returning visitor on Chromium: the browser remembered the handles; re-open them quietly if it
-  // still allows, else offer one click that may prompt.
-  restore(false).then(async ({ count, handles }) => {
+  // still allows, else offer one click that may prompt. A hosted door reads nothing, so it remembers nothing.
+  if (!hosted) restore(false).then(async ({ count, handles }) => {
     if (handles.length) await add({ handles });
     if (count && !col.state.ready) offerAgain = true;
   });
