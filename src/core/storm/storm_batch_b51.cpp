@@ -1,3 +1,4 @@
+#include "storm_retail_globals.h"
 // src/core/storm/storm_batch_b51.cpp -- Storm.dll teardown/ctor helpers, transcribed from the cached
 // decompiles. Stage A batch lane: implementation + marker only. SEH frames omitted. Register-passed
 // values (unaff_EDI) are explicit trailing parameters. Skipped: 0x29DF0 (reads uninitialised
@@ -10,20 +11,21 @@ void Storm_Sub3E20(uint32_t obj);
 void Storm_Sub3EF0(uint32_t obj);
 extern "C" void Storm_ListLink4390(uint32_t* eax, uint8_t* this_, uint8_t* node_arg, int32_t mode);   // 0x4390 (storm_batch_1000.cpp)
 extern "C" int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);   // 0x1B960 SMemFree
+void Storm_Sub4D60(uint8_t* node);   // storm_batch_b47.cpp (global definition)
+void Storm_Sub2FB30(const char* a, const char* b);   // storm_2fb30.cpp (global definition)
+uint32_t Storm_Sub1D460(int32_t a, int32_t b);      // 0x1D460 (storm_1d460.cpp, global definition)
 namespace {
 uint8_t* at(uint32_t p, uintptr_t off) { return (uint8_t*)(uintptr_t)(p + off); }
 uint32_t& u32(uint32_t p, uintptr_t off) { return *(uint32_t*)at(p, off); }
-uint32_t& w(uint32_t a) { return *(uint32_t*)(uintptr_t)a; }
+uint32_t& w(uint32_t a) { return Storm_IsRetailGlobal(a) ? Storm_RetailW(a) : *(uint32_t*)(uintptr_t)a; }
 
 // Storm internals (seams, defined by their own rows)
 extern "C" int32_t Storm_Sub1B960(void* p, const char* tag, int32_t line); // 0x1B960 (storm_alloc_1b960.cpp)
 inline void Storm_Free(uint32_t p, const char* file, int32_t line) { (void)Storm_Sub1B960((void*)(uintptr_t)p, file, line); } // 0x1B960 wrapper
 extern "C" void Storm_Sub4B80(uint32_t obj);                                    // 0x4B80 (base dtor)
-void Storm_Sub4D60(uint32_t node);                                     // 0x4D60 (list unlink)
-void Storm_Sub1D460(int32_t a, int32_t b);                             // 0x1D460
+inline void Storm_Unlink4D60(uint32_t node) { Storm_Sub4D60((uint8_t*)(uintptr_t)node); }  // 0x4D60 (list unlink), storm_batch_b47.cpp
 void Storm_Sub36020(uint32_t tag, uint32_t wnd);                       // 0x36020
 extern "C" uint32_t* Storm_Sub1C580(uint32_t pool, const char* name, int32_t k, uint32_t flags); // 0x1C580
-void Storm_Sub2FB30(const char* a, const char* b);                     // 0x2FB30
 
 const char* kSfile = "..\\3rdParty\\STORM\\SOURCE\\SFILE.CPP";
 const char* kSgdi = "..\\3rdParty\\STORM\\SOURCE\\SGDI.CPP";
@@ -96,7 +98,7 @@ uint32_t Storm_Sub17D60() {
         if (*(int16_t*)at(n, 8) == 0x4f4d && *(int16_t*)at(n, 10) == 0) {
             if (w(0x6FC45824) == n) w(0x6FC45824) = 0;
             if (u32(n, 0xc)) { Storm_Free(u32(n, 0xc), kSgdi, 0x117); u32(n, 0xc) = 0; }
-            Storm_Sub4D60(n);
+            Storm_Unlink4D60(n);
             Storm_Free(n, ".?AUSGDIOBJ@@", -2);
         }
     }
@@ -115,7 +117,7 @@ uint32_t Storm_Sub1D4D0() {
         Storm_Sub1D460(u32(w(0x6FC459FC), 8), u32(w(0x6FC459FC), 0xc));
     uint32_t n;
     while ((int32_t)(n = w(0x6FC45A08)) > 0) {
-        Storm_Sub4D60(n);
+        Storm_Unlink4D60(n);
         Storm_Free(n, ".?AUBITMAPREC@@", -2);
     }
     if (w(0x6FC453A8)) { Storm_Free(w(0x6FC453A8), "delete", -1); w(0x6FC453A8) = 0; }
@@ -134,8 +136,8 @@ uint32_t Storm_Sub24FD0() {
         }
     }
     uint32_t n;
-    while ((int32_t)(n = w(0x6FC459E4)) > 0) { Storm_Sub4D60(n); Storm_Free(n, ".?AUCMDDEF@@", -2); }
-    while ((int32_t)(n = w(0x6FC459D8)) > 0) { Storm_Sub4D60(n); Storm_Free(n, ".?AUCMDDEF@@", -2); }
+    while ((int32_t)(n = w(0x6FC459E4)) > 0) { Storm_Unlink4D60(n); Storm_Free(n, ".?AUCMDDEF@@", -2); }
+    while ((int32_t)(n = w(0x6FC459D8)) > 0) { Storm_Unlink4D60(n); Storm_Free(n, ".?AUCMDDEF@@", -2); }
     w(0x6FC45398) = 0;
     return 1;
 }
@@ -154,7 +156,7 @@ void Storm_Sub34150(uint32_t edi) {
         Storm_Sub36020(0x534d5348, edi);
         Storm_Sub36020(0x534d534a, edi);
         Storm_Sub36020(0x534d5349, edi);
-        Storm_Sub4D60(n);
+        Storm_Unlink4D60(n);
         Storm_Free(n, ".?AUWNDREC@@", -2);
     }
 }

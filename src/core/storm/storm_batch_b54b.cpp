@@ -37,6 +37,10 @@ uint32_t Storm_RegOpenKeyEx(uintptr_t root, const char* sub, void** outKey);
 uint32_t Storm_RegDeleteValue(void* key, const char* name);
 }  // namespace
 
+// 1.13c Storm+0x22FA0 probe seam: sets the list head the retail global at 0x6FC459F0 holds before the call.
+extern "C" void Storm_SetListHead22FA0(int32_t head) { g_listHead = head; }
+extern "C" uint32_t* Storm_ListHeadAddr22FA0() { return (uint32_t*)&g_listHead; }
+
 // 1.13c Storm+0x6851: strtoul via the CRT worker (unsigned flag).
 unsigned long Storm_strtoul_6851(const char* s, char** end, int radix) {
     // retail's 32-bit worker clamps to 0xFFFFFFFF past 32 bits (host strtoul is 64-bit here)

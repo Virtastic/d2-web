@@ -23,8 +23,10 @@ uint32_t mapc(uint32_t f, uint32_t c) {
     if ((f & 0x300) == 0x100 && c >= 'A' && c <= 'Z') return c + 32;
     return c;
 }
+uint32_t g_gle = 0;
 bool okflags(uint32_t f) { uint32_t m = f & 0x300; return m == 0x100 || m == 0x200; }
-int lmw(uint32_t, uint32_t f, const uint16_t* s, int n, uint16_t* d, int dn) {
+int lmw(uint32_t loc, uint32_t f, const uint16_t* s, int n, uint16_t* d, int dn) {
+    if (loc == 0) { g_gle = 0x57; return 0; }  // capture host: locale 0 is rejected (mode stays 0)
     if (!okflags(f) || n <= 0) return 0;
     if (!dn) return n;
     if (dn < n) return 0;
@@ -35,7 +37,7 @@ int lma(uint32_t, uint32_t f, const char* s, int n, char* d, int dn) {
     if (!okflags(f) || n == 0) return 0;
     if (n < 0) n = (int)strlen(s) + 1;
     if (!dn) return n;
-    if (dn < n) return 0;
+    if (dn < n) { for (int i = 0; i < dn; i++) d[i] = (char)mapc(f, (uint8_t)s[i]); return 0; }  // too small: partial write, as the capture host
     for (int i = 0; i < n; i++) d[i] = (char)mapc(f, (uint8_t)s[i]);
     return n;
 }
@@ -49,15 +51,16 @@ int mbw(uint32_t, uint32_t, const char* s, int n, uint16_t* d, int dn) {
 }
 int wmb(uint32_t, uint32_t, const uint16_t* s, int n, char* d, int dn) {
     if (!dn) return n;
-    if (dn < n) return 0;
+    if (dn < n) { for (int i = 0; i < dn; i++) d[i] = (char)s[i]; return 0; }  // too small: partial write, as the capture host
     for (int i = 0; i < n; i++) d[i] = (char)s[i];
     return n;
 }
-uint32_t gle() { return 0; }
+uint32_t gle() { return g_gle; }
 int32_t lcp(uint32_t) { return 1252; }
 char* conv(uint32_t, uint32_t, const char*, int*, char*, int) { return nullptr; }
 }  // namespace
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_storm_8644(uint32_t* r) {   // r[0..3] locale flags src len, r[5..8] dst dstLen cp err, r[9] g; r[4] result
+    g_gle = 0;
     uint32_t* g = (uint32_t*)(uintptr_t)r[9];
     S8644Env e = { lmw, lma, mbw, wmb, gle, lcp, conv, (int)g[0], g[1], g[2] };
     r[4] = (uint32_t)Storm_8644(e, r[0], r[1], (const char*)(uintptr_t)r[2], (int)r[3], (char*)(uintptr_t)r[5], (int)r[6], r[7], (int)r[8]);
