@@ -35,7 +35,7 @@ struct D2GameBatchEnv {
     void*    (*getGameByGuid)(int32_t guid);                // 0x2AAE0, explicit GUID form
     void*    (*getCurrentGameForClient)(uint32_t clientId);  // 0x2AB70, ESI = client id
     void*    (*getClientById)(uint32_t clientId);           // 0x49FE0
-    int32_t  (*gameQuery)(void* game);                      // 0x2A680, ESI = game; one of five counters
+    int32_t  (*gameQuery)(void* table);                     // 0x2A680, ESI = a 128-pointer chain table (game + 0x1120/0x1320/0x1520/0x1720/0x1920); counts the chain nodes
     int32_t  (*strCopy)(void* dst, const void* src, uint32_t n); // Storm #501 (SStrCopy)
     void     (*send)(uint32_t channel, uint32_t clientId, const void* data, uint32_t len); // D2Net #10002
     int32_t  (*terminateName)(const void* packet, void* game);   // 0xCBDB0
@@ -54,6 +54,10 @@ struct D2GameBatchEnv {
     void     (*taskEnqueue)(void* slot);                    // 0x524C0
     int32_t  (*slotIsBad)(uint32_t index);                  // IsBadCodePtr(&0x6FD2E3D0[index])
     void     (*invokeSlot)(uint32_t index);                 // (&0x6FD2E3D0)[index]()
+    // 0x2B550 only (null = the compat no-op critical sections): the list lock wrapper 0xA328 (edx 0x125), its IAT leave 0xF8D00, and the leave of the game lock at game+0x18.
+    void     (*enterList)(void);
+    void     (*leaveList)(void);
+    void     (*leaveGame)(uint32_t lock);
 };
 
 // ---- module state --------------------------------------------------------------------------------
@@ -343,11 +347,16 @@ void GAME_LogMessage(uint32_t param_1, char* text, uint32_t ecxIn, const D2GameB
 // at words 0x2A/0x2B. Returns 0 when no game is current, else 1.
 uint32_t GAME_GetGameSummary(uint32_t param_1, uint32_t* out, const D2GameBatchEnv* env)
 {
-    (void)param_1;
-    EnterCriticalSection(&g_gameListLock);   // Ordinal 10050
-    LeaveCriticalSection(&g_gameListLock);
-    void* game = env->getGame();
+    if (env->enterList) env->enterList(); else EnterCriticalSection(&g_gameListLock);   // Ordinal 10050 (0xA328, edx 0x125)
+    // The game id is the slot at 0x6FD30C04 + 4 * (param_1 & 0xFFFF); 0 and -1 are "no game" and look up as 0. Ours holds 1024 GUIDs from 0x6FD30C08
+    // (index 0 is the cached current game), so an index past 1024 is not reproduced (retail reads past the table).
+    const uint32_t idx = param_1 & 0xFFFF;
+    int32_t id = idx == 0 ? (int32_t)(uintptr_t)g_currentGameSlot : (idx <= 1024 ? g_gameGuids[idx - 1] : 0);
+    if (id == -1) id = 0;
+    if (env->leaveList) env->leaveList(); else LeaveCriticalSection(&g_gameListLock);
+    void* game = env->getGameByGuid(id);   // 0x2AAE0 is called even for id 0
     if (game == nullptr) return 0;
+    auto tab = [&](uint32_t off) { return (uint8_t*)game + off; };
     out[0] = (uint16_t)rd32(game, 0x0A * 4);
     out[1] = rd32(game, 0x1F * 4);
     out[2] = rd32(game, 0x23 * 4);
@@ -357,11 +366,11 @@ uint32_t GAME_GetGameSummary(uint32_t param_1, uint32_t* out, const D2GameBatchE
     out[13] = rd32(game, 0x27 * 4);
     out[14] = rd32(game, 0x28 * 4);
     out[15] = rd32(game, 0x29 * 4);
-    out[3] = (uint32_t)env->gameQuery(game);   // 0x2A680 x5 but its own count too; five consecutive reads
-    out[4] = (uint32_t)env->gameQuery(game);
-    out[5] = (uint32_t)env->gameQuery(game);
-    out[6] = (uint32_t)env->gameQuery(game);
-    out[7] = (uint32_t)env->gameQuery(game);
+    out[3] = (uint32_t)env->gameQuery(tab(0x1120));
+    out[4] = (uint32_t)env->gameQuery(tab(0x1320));
+    out[5] = (uint32_t)env->gameQuery(tab(0x1520));
+    out[6] = (uint32_t)env->gameQuery(tab(0x1720));
+    out[7] = (uint32_t)env->gameQuery(tab(0x1920));
     const uint32_t total = rd32(game, 0x76D * 4);
     if (total != 0) {
         out[0x10] = (rd32(game, 0x75E * 4) * 100) / total;
@@ -387,8 +396,18 @@ uint32_t GAME_GetGameSummary(uint32_t param_1, uint32_t* out, const D2GameBatchE
     if (rd32(game, 0x74A * 4) == 0) d2game_fatal(0x139);
     out[0x2A] = rd32((const void*)(uintptr_t)rd32(game, 0x74A * 4), 8);
     out[0x2B] = rd32(game, 0x7 * 4);
-    gameUnlockOrDie(game);
+    if (rdptr(game, 0x18) == nullptr) d2game_fatal(0x100F);
+    if (env->leaveGame) env->leaveGame(rd32(game, 0x18)); else gameUnlockOrDie(game);
     return 1;
+}
+extern "C" uint32_t d2game_2b550_run(uint32_t p1, uint32_t* out, uint32_t slot0, const int32_t* guids, void* (*byGuid)(int32_t), int32_t (*query)(void*),
+    int32_t (*strCopy)(void*, const void*, uint32_t), void (*enterList)(void), void (*leaveList)(void), void (*leaveGame)(uint32_t))
+{
+    g_currentGameSlot = (void*)(uintptr_t)slot0;
+    std::memcpy(g_gameGuids, guids, sizeof g_gameGuids);
+    D2GameBatchEnv env{}; env.getGameByGuid = byGuid; env.gameQuery = query; env.strCopy = strCopy;
+    env.enterList = enterList; env.leaveList = leaveList; env.leaveGame = leaveGame;
+    return GAME_GetGameSummary(p1, out, &env);
 }
 
 // 1.13c D2Game+0x52390

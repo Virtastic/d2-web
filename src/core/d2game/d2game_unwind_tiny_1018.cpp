@@ -53,7 +53,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_f7880(const uint32_t* ebp) {
 
 // 1.13c D2Game+0x0F788A (10 B): lea -0x18(%ebp),%eax; push eax; call 0x1FE0; ret -- same list, direct call.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_f788a(const uint32_t* ebp) {
+EMSCRIPTEN_KEEPALIVE void d2g_f788a(const uint32_t* ebp) {   // probe src/core/fn/d2game_f788a.cpp
     listUninit(guestAddr(ebp - 6));
 }
 

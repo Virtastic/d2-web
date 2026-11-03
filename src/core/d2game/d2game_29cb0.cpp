@@ -49,17 +49,20 @@ void D2GAME_ClientEvent_29CB0(const uint8_t* msg, const D2Game29CB0Env* e)
     }
     case 0xfa:
         e->mode(id, A(0x28c));
+        *A(0x28c) = 0xfa;   // 1.13c D2Game+0x29CB0: the reply's first byte (mov [esp+0x18], imm8 before the send)
         __atomic_add_fetch(e->counter, 1, __ATOMIC_SEQ_CST);
         e->send(2, id, A(0x28c), 0x10);
         return;
     case 0xfb:
         e->mode(id, A(0x28c));
+        *A(0x28c) = 0xfb;   // 1.13c D2Game+0x29CB0: the reply's first byte (mov [esp+0x18], imm8 before the send)
         e->send(2, id, A(0x28c), 0x10);
         e->close(id);
         __atomic_sub_fetch(e->counter, 1, __ATOMIC_SEQ_CST);
         return;
     case 0xfc:
         e->mode(id, A(0x28c));
+        *A(0x28c) = 0xfc;   // 1.13c D2Game+0x29CB0: the reply's first byte (mov [esp+0x18], imm8 before the send)
         e->send(2, id, A(0x28c), 0x10);
         return;
     }

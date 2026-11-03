@@ -4,7 +4,7 @@
 // Prologue: 0x5A690 (EAX = game, ECX = target, EDX = unit); minion p = 0xE09D0(EAX = unit, stack = game): a player (type 0) in mode 0 or 0x11 or a
 // monster (type 1) in mode 0 or 0xC is none, a monster needs 0xE0A60(EAX = p, ECX = unit, EDX = its mode, stack = game) != 0, any other type is none.
 // Whip: skill +0x170 >= 0, a type-1 unit with data whose +0x54 is 3 or 0x13, game frame +0xA8 > control +0x14, p set and 0xB0840(EAX = unit,
-// EDX = skill) != 0: 0xF2380 (EAX = that result with low byte +0x180, ECX = unit, EDX = skill, EBX = game, stack = skill, p, 0, 0), control +0x14 =
+// EDX = skill) != 0: 0xF2380 (EAX = the pushed stack word p with low byte +0x180, ECX = unit, EDX = skill, EBX = game, stack = skill, p, 0, 0), control +0x14 =
 // frame + w56. Mode != 0 and roll < w74: 0xA496(unit, 0), the command {roll < w7A ? 5 : 4, unit, target, 0, 0, flag << 8, 0, 0} through 0x75E10
 // (stack = game, &block, 1); flag 0x65 when the unit's monstats row (0x1320) byte +0x104 & ga[+0x14 for 5, +0x10 for 4] (global 0xF8BE0), else 0x64.
 // Otherwise 0xB17B0 (EAX = 1, ECX = &{0x240, 0x190, 0x32, 0, 0, 0}, EDX = game, stack = unit, 0x6FC35C40) fills b3..b5 of the block:
@@ -42,7 +42,7 @@ template <class E> void Overseer(E& e, uint32_t game, uint32_t unit, uint32_t tp
             const uint32_t sk = (uint32_t)e.rd16s(row + 0x170);
             const uint32_t ok = e.h(0xB0840, unit, 0, sk);
             if (ok) {
-                e.h(0xF2380, (ok & ~0xFFu) | e.rd8(row + 0x180), unit, 0, game, 0, sk, p, 0, 0);
+                e.h(0xF2380, (p & ~0xFFu) | e.rd8(row + 0x180), unit, 0, game, 0, sk, p, 0, 0);
                 e.wr32(ctl + 0x14, (uint32_t)(w(0x56) + (int32_t)e.rd32(game + 0xA8)));
                 return;
             }
@@ -69,12 +69,12 @@ template <class E> void Overseer(E& e, uint32_t game, uint32_t unit, uint32_t tp
     if (e.rd16s(row + 0x172) >= 0 && b3 && (int32_t)Roll(e, unit) < w(0x5C)) {
         const uint32_t sk = (uint32_t)e.rd16s(row + 0x172);
         const uint32_t ok = e.h(0xB0840, unit, 0, sk);
-        if (ok) { e.h(0xF2380, (ok & ~0xFFu) | e.rd8(row + 0x181), unit, 0, game, 0, sk, b3, 0, 0); return; }
+        if (ok) { e.h(0xF2380, (b3 & ~0xFFu) | e.rd8(row + 0x181), unit, 0, game, 0, sk, b3, 0, 0); return; }
     }
     if (e.rd16s(row + 0x174) != 0 && b4 && (int32_t)Roll(e, unit) < w(0x62) && e.h(0xA514, 0, 0, 0, 0, 0, unit) != 2) {
         const uint32_t sk = (uint32_t)e.rd16s(row + 0x174);
         const uint32_t ok = e.h(0xB0840, unit, 0, sk);
-        if (ok) { e.h(0xF2380, (ok & ~0xFFu) | e.rd8(row + 0x182), unit, 0, game, 0, sk, b4, 0, 0); return; }
+        if (ok) { e.h(0xF2380, (b4 & ~0xFFu) | e.rd8(row + 0x182), unit, 0, game, 0, sk, b4, 0, 0); return; }
     }
     bool attack;
     if (b5) {

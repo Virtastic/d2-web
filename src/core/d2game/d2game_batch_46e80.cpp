@@ -42,7 +42,6 @@ struct D2GameBatch46E80Env {
     void*    (*subEEF10)(void* query);                     // 0xEEF10, returns a unit node
     void     (*sub20CF0)();                                // 0x20CF0
     int32_t  (*isBadCodePtr)(void* fn);                    // IsBadCodePtr
-    void*    (*subE03A0)(int32_t unit, uint32_t id);       // 0xE03A0, returns a type-1 record
     int32_t  (*sub23100)(void* thisPtr, uint32_t param1, uint32_t entry, void* thisArg); // 0x23100
     void     (*sub21FB0)();                                // 0x21FB0
     void     (*sub21EC0)();                                // 0x21EC0
@@ -159,48 +158,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_EF8B0(uint32_t esiValue, int32_t stack10,
     wr32(link, 0x28, esiValue);
 }
 
-// Callback dispatch: for a type-1 EAX unit with a +0x14 record whose +0x28 record links to +0x28, the
-// 0xE03A0 lookup ((record+0x28, record+0x2C)) is followed for each key in the record's +0x34 list:
-// the key is masked to 7 bits into the base+0x1320 bucket array, each chain node's +0xC is compared
-// and a match calls EBX(param_2) once, then the walk continues with the captured next pointer. The
-// callback is validated with IsBadCodePtr (fatal 0x24E); a null bucket base is fatal 0x2D3.
-// 1.13c D2Game+0x21490
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_21490(uint32_t param1, uint32_t param2, void* eaxUnit,
-                                             void (*ebxCallback)(uint32_t),
-                                             const D2GameBatch46E80Env* env)
-{
-    (void)param1;
-
-    if (env->isBadCodePtr((void*)ebxCallback) != 0) d2game_fatal(0x24E);
-    if (eaxUnit == nullptr || rd32(eaxUnit, 0) != 1) return;
-
-    void* unitRec = rdptr(eaxUnit, 0x14);
-    if (unitRec == nullptr) return;
-    void* rec = rdptr(unitRec, 0x28);
-    if (rec == nullptr || rd32(rec, 0x28) == 0) return;
-
-    void* sought = env->subE03A0((int32_t)rd32(rec, 0x28), rd32(rec, 0x2C));
-    if (sought == nullptr || rd32(sought, 0) != 1) return;
-
-    void* inner = rdptr(sought, 0x14);
-    const uint32_t base = inner != nullptr ? rd32(inner, 0x28) : 0;
-    if (base == 0) return;                 // retail dereferences the null inner record
-    uint32_t node = rd32((const void*)(uintptr_t)base, 0x34);
-    while (node != 0) {
-        const uint32_t next = rd32((const void*)(uintptr_t)node, 4);
-        const uint32_t key = rd32((const void*)(uintptr_t)node, 0);
-        uint32_t entry = rd32(base, 0x1320 + (key & 0x7F) * 4);
-        while (entry != 0) {
-            if (rd32(entry, 0xC) == key) {
-                ebxCallback(param2);
-                break;
-            }
-            entry = rd32(entry, 0xE4);
-        }
-        node = next;
-    }
-}
+// 0x21490 (callback dispatch) moved to src/core/d2game/d2game_21490.cpp.
 
 // Quest re-init on a type-1 unit whose +0x80 game record has +0x6D below 3: param_1 zero runs the two
 // re-init helpers; non-zero first re-arms mode 4 via 0x22A80, runs the same helpers and then

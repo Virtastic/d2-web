@@ -25,6 +25,7 @@
 #include "PLAYER/Player.h"
 #include "GAME/Clients.h"
 #include "QUESTS/Quests.h"
+#include "d2game_27820_env.h"
 
 void __fastcall MONSTERUNIQUE_SetUniqueFlag_6FC43260(D2GameStrc*, D2UnitStrc*);
 
@@ -138,35 +139,26 @@ extern "C" int32_t d2game_27030_batch(D2GameStrc* game, D2UnitStrc* unit, D2Skil
 }
 
 // The attack-resolution half of LeapAttack, split from the stage dispatcher.
-// 1.13c D2Game+0x27820
+// 1.13c D2Game+0x27820: the rule is d2game_27820.cpp (d2game_27820_env); this builds its env from the engine functions.
+extern "C" int32_t d2game_27820_env(void*, void*, int32_t, int32_t, const D2Game27820Env*);
 extern "C" int32_t d2game_27820(D2GameStrc* game, D2UnitStrc* unit, int32_t id, int32_t level)
 {
-    auto* record = SKILLS_GetSkillsTxtRecord(id);
-    if (!record) return 0;
-    auto* skill = UNITS_GetUsedSkill(unit);
-    if (!skill) return 0;
-    auto* target = SKILLS_FindLeapAttackTarget(game, unit, skill);
-    if (!target) return 0;
-    D2DamageStrc damage = {};
-    damage.wResultFlags = SUNITDMG_GetResultFlags(game, unit, target, SKILLS_GetToHitFactor(unit,id,level), 0);
-    if (damage.wResultFlags & 1) {
-        damage.wResultFlags |= 8;
-        damage.dwHitClass = UNITS_GetHitClass(unit);
-        damage.dwHitFlags |= 0x20;
-        damage.dwEnDmgPct = SKILLS_EvaluateSkillFormula(unit, record->dwCalc[0], id, level);
-        if (record->nEType) {
-            damage.dwConvPct = SKILLS_EvaluateSkillFormula(unit, record->dwCalc[3], id, level);
-            if (int32_t(damage.dwConvPct) > 0) damage.nConvType = record->nEType;
-        }
-        D2GAME_RollElementalDamage_6FD14DD0(unit, &damage, id, level);
-        SUNITDMG_AllocCombat(game, unit, target, &damage, record->nSrcDam ? record->nSrcDam : 128);
-        SUNITDMG_DrainItemDurability(game, unit, target, 0);
-        if (record->wSrvOverlay > 0 && record->wSrvOverlay <= sgptDataTables->nOverlayTxtRecordCount)
-            UNITS_SetOverlay(target, record->wSrvOverlay, 0);
-        if (auto* stats = STATLIST_GetStatListFromUnitAndState(target, 0x15)) {
-            D2Common_10474(target, stats);
-            STATLIST_FreeStatList(stats);
-        }
-    }
-    return 1;
+    static const D2Game27820Env env = {
+        [](int32_t i) { return (const uint8_t*)SKILLS_GetSkillsTxtRecord(i); },
+        []() { return (int32_t)sgptDataTables->nOverlayTxtRecordCount; },
+        [](void* u, int32_t i) { return (void*)SKILLS_GetSkillById((D2UnitStrc*)u, i, -1); },
+        [](void* g, void* sk, void* u) { return (void*)SKILLS_FindLeapAttackTarget((D2GameStrc*)g, (D2UnitStrc*)u, (D2SkillStrc*)sk); },
+        [](void* u, int32_t i, int32_t l) { return (int32_t)SKILLS_GetToHitFactor((D2UnitStrc*)u, i, l); },
+        [](void* g, void* u, void* t, int32_t th) { return (uint32_t)SUNITDMG_GetResultFlags((D2GameStrc*)g, (D2UnitStrc*)u, (D2UnitStrc*)t, th, 0); },
+        [](void* u) { return (int32_t)UNITS_GetHitClass((D2UnitStrc*)u); },
+        [](void* u, int32_t c, int32_t i, int32_t l) { return (int32_t)SKILLS_EvaluateSkillFormula((D2UnitStrc*)u, c, i, l); },
+        [](void* u, uint8_t* d, int32_t i, int32_t l) { D2GAME_RollElementalDamage_6FD14DD0((D2UnitStrc*)u, (D2DamageStrc*)d, i, l); },
+        [](void* g, void* u, void* t, uint8_t* d, uint8_t sd) { SUNITDMG_AllocCombat((D2GameStrc*)g, (D2UnitStrc*)u, (D2UnitStrc*)t, (D2DamageStrc*)d, sd); },
+        [](void* g, void* u, void* t) { SUNITDMG_DrainItemDurability((D2GameStrc*)g, (D2UnitStrc*)u, (D2UnitStrc*)t, 0); },
+        [](void* t, int32_t o) { UNITS_SetOverlay((D2UnitStrc*)t, o, 0); },
+        [](void* t, int32_t st) { return (void*)STATLIST_GetStatListFromUnitAndState((D2UnitStrc*)t, st); },
+        [](void* t, void* sl) { D2Common_10474((D2UnitStrc*)t, (D2StatListStrc*)sl); },
+        [](void* sl) { STATLIST_FreeStatList((D2StatListStrc*)sl); },
+    };
+    return d2game_27820_env(game, unit, id, level, &env);
 }
