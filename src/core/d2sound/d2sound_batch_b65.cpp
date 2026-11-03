@@ -67,3 +67,9 @@ int D2sound_b65_8DB0(int mode)
     if (((B65PropFn)g_b65_prop->vt->slots[4])(g_b65_prop, g_b65_guidB, 3, 0, 0, &v, 4) < 0) return 0;
     g_b65_flag = 1; return 1;
 }
+
+// FN probe seam for 0x8FD0: the module globals 0x16594 / 0x164B8 / 0x16598 / 0x1659C.
+void D2sound_b65_fnSet8FD0(uint32_t prop, uint32_t enabled, uint32_t mode, uint32_t flag) {
+    g_b65_prop = (B65PropSet*)(uintptr_t)prop; g_b65_enabled = (int)enabled; g_b65_mode = (int)mode; g_b65_flag = flag;
+}
+uint32_t D2sound_b65_fnFlag8FD0() { return g_b65_flag; }

@@ -34,6 +34,7 @@ static void*    g_primary;             // 0x6F9C6580  the primary stream (0x7FB0
 static uint32_t g_soundOn;             // 0x6F9C658C  nonzero once the device is open
 static uint32_t g_masterVolume = 0xFF; // 0x6F9C5994  0..0xFF; 0x83C0 pins it to 0xFF
 static uint32_t g_initialized;         // 0x6F9C65B8
+static uint32_t g_firstPick;           // 0x6F9C65C4  nonzero: take entry 0 once
 static uint32_t g_stopFlag;            // 0x6F9C65C0  cleared by 0x7FB0/0x7FE0
 static void*    g_list;                // 0x6F9C65CC  nodes appended by 0x8640, walked by 0x83C0
 static uint32_t g_flag5900 = 1;        // 0x6F9C5900  tested by 0x7650
@@ -125,6 +126,22 @@ void D2Sound_6B80(void* obj, uint32_t arg, int32_t ms) {
 
 // Test hook: sets the sound-on flag (0x6F9C658C) that the fade-start function tests.
 void D2Sound_fnSetSoundOn(uint32_t v) { g_soundOn = v; }
+// Test hooks (FN probes): install the retail globals DAT_6f9c6580 (primary stream) and DAT_6f9c6560..657C + DAT_6f9c65B8
+// (the 8 stream slots and the init flag) at the host values the descriptor pins.
+void D2Sound_fnSetPrimary(void* p) { g_primary = p; }
+// FN-probe hooks for the scalar module globals: DAT_6f9c658c (sound-on), DAT_6f9c5994 (master volume), DAT_6f9c65c0
+// (music stop flag), DAT_6f9c65c4 (first-pick flag), DAT_6f9c65cc (the stream list head), and the music-track tables.
+void D2Sound_fnSetCore(uint32_t soundOn, uint32_t vol, uint32_t stopFlag, uint32_t firstPick) {
+    g_soundOn = soundOn; g_masterVolume = vol; g_stopFlag = stopFlag; g_firstPick = firstPick;
+}
+void D2Sound_fnGetCore(uint32_t* vol, uint32_t* stopFlag, uint32_t* firstPick) {
+    *vol = g_masterVolume; *stopFlag = g_stopFlag; *firstPick = g_firstPick;
+}
+void D2Sound_fnSetList(void* l) { g_list = l; }
+void D2Sound_fnSetStreams(void* const* slots, uint32_t initialized) {
+    for (int i = 0; i < 8; i++) g_streams[i] = slots[i];
+    g_initialized = initialized;
+}
 
 // The interface method behind +0x10 is IKsPropertySet::Set(this, guid, id, inst, instLen, data, len).
 static void d2sound_setProp(void* iface, const void* guid, uint32_t id, const void* data, uint32_t len) {
@@ -326,7 +343,6 @@ static int32_t  g_trackCount2 = 0;     // 0x6F9C5990  must equal g_trackCount or
 static uint32_t g_listInit;            // 0x6F9C65E0
 static uint32_t g_listSel;             // 0x6F9C65DC  copied from g_listDefault on first use
 static uint32_t g_listDefault;         // 0x6F9C65B4
-static uint32_t g_firstPick;           // 0x6F9C65C4  nonzero: take entry 0 once
 
 // Host seams for 0x7D30's unmapped callees.
 struct D2SoundPickEnv {
@@ -761,19 +777,25 @@ void D2Sound_8320(const char* name, uint32_t esiFlags, const D2SoundEnv* env) {
 }
 
 // 1.13c D2Sound+0x8B50
-// Distance + pan -> (left, right) 0..255 gains. d = |(x,y,z)|; d < 2 -> 0 dB gain index, else 6*log2(min(d,100)/2) dB
-// -> 255 / 10^(dB/20); right = 0.8*127*pan + 128.
+// Distance + pan to (left, right) 0..255 gains; the x87 runs at the CRT's 53-bit precision.
+// d = sqrt((x*x + y*y) + z*z), clamped to 100; v = (float)(ln(d/2) * 1.4426950f * 6) when d >= 2, else 0;
+// left = _ftol(255 / pow(10, v * 0.05f)), right = _ftol(x * 127 * 0.8f + 128), each clamped to 0..255.
+// _ftol (0xACCC) truncates toward zero: fistp m64, the low dword.
+static int32_t d2sound_ftol(double v) {
+    if (!(v > -9.2e18 && v < 9.2e18)) return 0;   // the integer indefinite 0x8000000000000000: low dword 0
+    return (int32_t)(uint32_t)(uint64_t)(int64_t)v;
+}
 void D2Sound_8B50(int32_t* left, int32_t* right, float x, float y, float z) {
-    double d = std::sqrt((double)z * z + (double)y * y + (double)x * x);
-    float v;
-    if (d <= 100.0) { if (d < 2.0) v = 0.0f; else v = (float)(6.0 * std::log2(d * 0.5)); }
-    else v = (float)(6.0 * std::log2(100.0 * 0.5));
-    double g = 255.0 / std::pow(10.0, (double)(v * 0.05f));
-    int64_t l = std::llrint(g);
-    int32_t L = l < 1 ? 0 : l > 0xFE ? 0xFF : (int32_t)l;
-    int64_t r = std::llrint((double)(x * 127.0f * 0.8f + 128.0f));
+    double d = std::sqrt(((double)x * x + (double)y * y) + (double)z * z);
+    float v = 0.0f;
+    if (d > 100.0) d = 100.0;
+    if (!(d < 2.0)) v = (float)(std::log(d * 0.5) * (double)1.44269502f * 6.0);
+    double g = 255.0 / std::pow(10.0, (double)v * (double)0.05f);
+    int32_t l = d2sound_ftol(g);
+    int32_t L = l <= 0 ? 0 : l < 0xFF ? l : 0xFF;
+    int32_t r = d2sound_ftol((double)x * 127.0 * (double)0.8f + 128.0);
     *left = L;
-    *right = r > 0 ? (r > 0xFE ? 0xFF : (int32_t)r) : 0;
+    *right = r > 0 ? (r < 0xFF ? r : 0xFF) : 0;
 }
 
 // 1.13c D2Sound+0x9230
@@ -797,3 +819,25 @@ void D2Sound_9230(const D2SoundEnv* env) {
     g_soundOn = 0;
     if (g_cs65a0) { DeleteCriticalSection(&g_lock); g_cs65a0 = 0; }
 }
+
+// ---- FN-probe wrappers: they build the host seams a vectored path needs (every other seam stays null, so a
+// descriptor that reached an unmapped callee would crash the replay instead of silently passing) ----------
+void D2Sound_fnRun7510(uint32_t percent) {
+    D2SoundEnv e{};
+    e.setMasterVolume = [](uint32_t v) { D2Sound_7480(v, nullptr); };   // empty stream list: the env is never read
+    D2Sound_7510(percent, &e);
+}
+void D2Sound_fnRun7D00(uint32_t on) { D2Sound_7D00(on, [] {}); }        // pinned track count 0: retail's 0x7BC0 changes nothing
+void D2Sound_fnRun7FE0(void) { D2SoundEnv e{}; D2Sound_7FE0(&e); }
+void D2Sound_fnRun8020(void) { D2SoundEnv e{}; D2Sound_8020(&e); }
+uint32_t D2Sound_fnRun7D30(void) { D2SoundPickEnv pe{}; return D2Sound_7D30(&pe); }
+void D2Sound_fnSetPending(void* p) { g_pending = (uint8_t*)p; }
+static uint32_t d2sound_fnAfter6F30(void*) { return 0; }
+void D2Sound_fnRun8200(const uint8_t* name) { D2SoundEnvB e{}; D2Sound_8200(name, &e, d2sound_fnAfter6F30); }
+uint32_t D2Sound_fnRun7C60(int32_t enable, int32_t loop) { D2SoundEnvB e{}; return D2Sound_7C60(enable, loop, &e); }
+
+// FN probe seam for 0x8320: the 0x6360 file load answers "no file", so only the init gate and the null-load return run.
+static void* d2sound_fnNoFile(void*, int32_t*) { return nullptr; }
+void D2Sound_fnRun8320(const char* name, uint32_t esiFlags) { D2SoundEnv e{}; e.loadFile = d2sound_fnNoFile; D2Sound_8320(name, esiFlags, &e); }
+// FN probe seam for 0x83C0: the gate (sound off, or already initialised) never reaches the env.
+void D2Sound_fnRun83C0() { D2SoundEnv e{}; D2Sound_83C0(&e); }
