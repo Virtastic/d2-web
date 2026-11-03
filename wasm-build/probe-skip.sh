@@ -11,36 +11,64 @@ probe_objs_from_link_log() {
     grep -oE '[^ :()/]*src_core_fn_[A-Za-z0-9_]+\.o' | sort -u
 }
 
+# _probe_nm_hits <nm> <setfile> <nm flags...>: ONE nm run (xargs only batches if the argument list is long) over every
+# src_core_fn_ object in $OBJS, the symbols looked up in memory (awk) against the lines of <setfile>. Prints the basenames of
+# the probes with at least one symbol in the set, in $OBJS order. (-A prefixes each symbol with "<path>: ".) An nm whose
+# output does not carry that prefix on every line (a wrapper, an nm without -A) cannot attribute symbols, so the probes are
+# then listed one nm run each, as before.
+_probe_nm_hits() {
+  local nm=$1 set=$2 o fn="" out hits; shift 2
+  for o in $OBJS; do case "${o##*/}" in src_core_fn_*) fn="$fn$o"$'\n' ;; esac; done
+  [ -n "$fn" ] || return 0
+  out=$(printf '%s' "$fn" | xargs -r -d '\n' "$nm" -A "$@" 2>/dev/null)
+  if [ -n "$out" ] && ! awk 'FNR == NR { if ($0 != "") f[$0] = 1; next }
+       $0 != "" { i = index($0, ": "); if (!i || !(substr($0, 1, i - 1) in f)) exit 1 }' <(printf '%s' "$fn") <(echo "$out"); then
+    out=$(printf '%s' "$fn" | while read -r o; do "$nm" "$@" "$o" 2>/dev/null | sed "s|^|$o: |"; done)
+  fi
+  hits=$(echo "$out" | awk 'FNR == NR { want[$0] = 1; next }
+         { i = index($0, ": "); if (i && (substr($0, i + 2) in want)) hit[substr($0, 1, i - 1)] = 1 }
+         END { for (p in hit) print p }' "$set" -)
+  [ -n "$hits" ] || return 0
+  printf '%s\n' $OBJS | awk 'FNR == NR { h[$0] = 1; next } ($0 in h) { n = split($0, p, "/"); if (p[n] ~ /^src_core_fn_/) print p[n] }' <(echo "$hits") -
+  return 0
+}
+
 # probe_objs_blamed_on_engine <log>: wasm-ld keeps only live code, so an engine port with undefined symbols links until
 # a probe calls into it, and then the error names the ENGINE object. Name the probes in $OBJS whose undefined symbols
 # an engine object blamed by the log defines (nm; D2_NM overrides). Dropped for this build only, like any skipped probe.
+# The engine objects' definitions and every probe's undefined symbols are each listed in one nm run, not one per object.
 probe_objs_blamed_on_engine() {
-  local nm eng defs o b
+  local nm eng engobjs o set
   nm=${D2_NM:-$(command -v emnm || command -v llvm-nm || echo nm)}
   eng=$(sed -nE 's/^wasm-ld: error: ([^ ]+\.o): .*/\1/p' "$1" | xargs -r -n1 basename | grep -v '^src_core_fn_' | sort -u)
   [ -n "$eng" ] || return 0
-  defs=$(for b in $eng; do for o in $OBJS; do [ "$(basename "$o")" = "$b" ] && $nm -j -g --defined-only "$o" 2>/dev/null; done; done | sort -u)
-  [ -n "$defs" ] || return 0
-  for o in $OBJS; do
-    case "$(basename "$o")" in src_core_fn_*) ;; *) continue ;; esac
-    if $nm -j -u "$o" 2>/dev/null | sort -u | comm -12 - <(echo "$defs") | grep -q .; then basename "$o"; fi
-  done
+  engobjs=$(for o in $OBJS; do echo "${o##*/} $o"; done | awk 'FNR == NR { e[$0] = 1; next } ($1 in e) { print $2 }' <(echo "$eng") -)
+  [ -n "$engobjs" ] || return 0
+  set=$(mktemp)
+  echo "$engobjs" | xargs -r -d '\n' "$nm" -j -g --defined-only 2>/dev/null | sort -u > "$set"
+  [ -s "$set" ] && _probe_nm_hits "$nm" "$set" -j -u
+  rm -f "$set"
+  return 0
 }
 
 # probe_objs_by_symbol <log>: the error block does not always name the probe (a header without an object, a ">>>" list cut short),
 # but it always names the SYMBOL. Name the probes in $OBJS that reference an undefined symbol the log reports, or that define a
 # symbol the log reports as duplicated (nm -C: wasm-ld prints demangled names; D2_NM overrides). Dropped for this build only.
+# One nm run per question (undefined, defined) over all probes, not one per object.
 probe_objs_by_symbol() {
-  local nm undef dup o
+  local nm undef dup set o
   nm=${D2_NM:-$(command -v emnm || command -v llvm-nm || echo nm)}
   undef=$(sed -nE 's/^wasm-ld: error: ([^ ]+: )?undefined symbol: (.*[^ ])[ ]*$/\2/p' "$1" | sort -u)
   dup=$(sed -nE 's/^wasm-ld: error: duplicate symbol: (.*[^ ])[ ]*$/\1/p' "$1" | sort -u)
   [ -n "$undef$dup" ] || return 0
-  for o in $OBJS; do
-    case "$(basename "$o")" in src_core_fn_*) ;; *) continue ;; esac
-    if [ -n "$undef" ] && $nm -C -j -u "$o" 2>/dev/null | sort -u | comm -12 - <(echo "$undef") | grep -q .; then basename "$o"; continue; fi
-    if [ -n "$dup" ] && $nm -C -j -g --defined-only "$o" 2>/dev/null | sort -u | comm -12 - <(echo "$dup") | grep -q .; then basename "$o"; fi
-  done
+  set=$(mktemp)
+  {
+    if [ -n "$undef" ]; then echo "$undef" > "$set"; _probe_nm_hits "$nm" "$set" -C -j -u; fi
+    if [ -n "$dup" ]; then echo "$dup" > "$set"; _probe_nm_hits "$nm" "$set" -C -j -g --defined-only; fi
+  } > "$set.out"
+  printf '%s\n' $OBJS | awk 'FNR == NR { h[$0] = 1; next } { n = split($0, p, "/"); if (p[n] in h) print p[n] }' "$set.out" -
+  rm -f "$set" "$set.out"
+  return 0
 }
 
 # probe_engine_objs_quarantinable <log>: with D2_QUARANTINE=1, the ENGINE objects (not src_core_fn_) a link error names, minus the
