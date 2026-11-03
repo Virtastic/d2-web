@@ -1,15 +1,17 @@
 // D2Client per-frame (callee/global args are Ghidra VAs, image base 0x6fab0000) draw/UI pass, derived from the 1.13c decompile.
+// The word stores to DAT_6fbcca30/6fbcc578 are 16-bit (mov word ptr); 6faeccc0/6faecc60 take EAX = 5 (passed as the third routed value).
 // Env-seam: every callee is routed through call(va,a,b,c) / ord(n,a,b,c) (D2 ordinal; names UNVERIFIED).
 #include <cstdint>
 struct ClientC39E0Env {
     int32_t (*call)(uint32_t va, int32_t a, int32_t b, int32_t c);  // D2Client callee by VA
     int32_t (*ord)(uint32_t ordinal, int32_t a, int32_t b, int32_t c); // imported ordinal (UNVERIFIED names)
     int32_t* g;      // DAT_6fbaad.. flag bytes indexed by (va-0x6fbaad60)/4 ; see spec
-    int32_t* cc414; int32_t* cc46c; int32_t* cc578; int32_t* cca30; int32_t* cb9a0; int32_t* cb9a4; int32_t* ae04w;
+    int32_t* cc414; int32_t* cc46c; uint16_t* cc578; uint16_t* cca30; int32_t* cb9a0; int32_t* cb9a4; int32_t* ae04w;
     const int32_t* bbfc;       // DAT_6fbcbbfc (int*)
     const int32_t* c3a68; const uint8_t* c9721;
     int32_t nPanels;           // DAT_6fb8d5d0 (must be 0x26)
     const int32_t* panelMode;  // *(PTR_DAT_6fb8d538[i]+0x84) per panel
+    int32_t arg0;              // the one stack word (ret 4); only 6fb2ea90 reads it, in EAX
 };
 #define F(rva) (e.g[((rva) - 0x6fbaad60u) / 4])
 extern "C" void d2_client_c39e0(const ClientC39E0Env& e) {
@@ -71,14 +73,14 @@ extern "C" void d2_client_c39e0(const ClientC39E0Env& e) {
         if (toggle) {
             int32_t cur = F(0x6fbaae04);
             if (!e.bbfc || (*e.bbfc == 0 && C(0x6fb55440) == 0)) { cur = (cur == 0); *e.ae04w = cur; }
-            if (!was) { if (cur) C(0x6faeccc0, e.ord(10048, 0, 0, 0), 0x6fb80924); }
-            else if (!cur) { C(0x6fae58e0); C(0x6faecc60, e.ord(10048, 0, 0, 0), 0x6fb80924); }
+            if (!was) { if (cur) C(0x6faeccc0, e.ord(10048, 0, 0, 0), 0x6fb80924, 5); }
+            else if (!cur) { C(0x6fae58e0); C(0x6faecc60, e.ord(10048, 0, 0, 0), 0x6fb80924, 5); }
         }
         C(0x6fae7c80);
     }
     if (F(0x6fbaadb4) && *e.cc414 != 3) { C(0x6fb08fb0); C(0x6fb70ce0); }
     if (F(0x6fbaada0)) C(0x6faf83b0);
     if (F(0x6fbaadb8)) C(0x6fb4fb00);
-    C(0x6fad85c0); C(0x6fb2ea90); e.ord(10110, 0, 0, 0);
+    C(0x6fad85c0); C(0x6fb2ea90, 0, 0, e.arg0); e.ord(10110, 0, 0, 0);
     C(0x6fb71a20); C(0x6fb6e430); C(0x6fb719b0); C(0x6fb6f990); C(0x6fb6ee60); C(0x6fb02d90);
 }
