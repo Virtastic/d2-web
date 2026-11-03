@@ -144,6 +144,7 @@ wasm-build/*
 !wasm-build/version-engine.sh
 test/*
 !test/input-touch-name.test.mjs
+!test/door-finger.test.mjs
 !test/probe-skip.test.mjs
 !test/build-key-lock.test.mjs
 !test/land-fold.test.mjs

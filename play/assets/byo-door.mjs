@@ -8,6 +8,7 @@ import { createCollection, fromDrop, pickFiles, pickFolder, restore, forget } fr
 import { ROLES } from './byo-detect.mjs';
 import { readMpqFile } from './mpq-read.mjs';
 import { buildDoorArt, DOOR_IMAGES } from './door-art-build.mjs';
+import { fingerHit, fingerReachGame } from './door-finger.mjs';
 
 const CSS = `
 body.door #viewport,body.door #session-bar,body.door .controls,body.door #log,body.door #hud{display:none}
@@ -283,11 +284,13 @@ export function frontDoor({ onReady } = {}) {
   const inside = (p, r) => p.x >= r.x && p.y >= r.y && p.x < r.x + (r.w || 272) && p.y < r.y + (r.h || 35);
   const at = (e) => { const r = cv.getBoundingClientRect(), d = cv.width / (r.width || 1);
     return { x: ((e.clientX - r.left) * d - view.x) / view.s, y: ((e.clientY - r.top) * d - view.y) / view.s }; };
-  function hit(p) {
+  // The controls a press can land on, in the door's frame. A finger (touch=true) that misses every one by
+  // less than its reach (16 CSS px, door-finger.mjs) snaps to the nearest; a mouse keeps the exact hit test.
+  function hit(p, touch = false) {
     if (loading) return null;
-    for (const k of ['dir', 'files', 'enter', 'discord']) if (inside(p, BTN[k])) return k;
-    if (offerAgain && !ready() && inside(p, againBox())) return 'again';
-    return null;
+    const controls = ['dir', 'files', 'enter', 'discord'].map((k) => ({ key: k, ...BTN[k], w: 272, h: 35 }));
+    if (offerAgain && !ready()) { const b = againBox(); controls.push({ key: 'again', x: b.x, y: b.y, w: b.w, h: b.h }); }
+    return fingerHit(p, controls, touch ? fingerReachGame(cv.width / (cv.getBoundingClientRect().width || 1), view.s) : 0);
   }
   function say(s, c = 'tan', ms = 2600) { msg = [s, c]; msgUntil = performance.now() + ms; }
   async function add(src) {
@@ -319,13 +322,13 @@ export function frontDoor({ onReady } = {}) {
   const onMove = (e) => { const p = at(e), h = hit(p); mouse = p;
     hover = loading ? null : h === 'again' ? 'again' : FILES.find((x) => inside(p, entryBox(x))) || null;
     cv.style.cursor = sysCursor(h); };
-  const onUp = (e) => { const h = hit(at(e)); if (h && h === down) act(h); down = null; };
+  const onUp = (e) => { const h = hit(at(e), e.pointerType === 'touch'); if (h && h === down) act(h); down = null; };
   const onOver = (e) => e.preventDefault();
   const onDrop = async (e) => { e.preventDefault(); if (!loading) add(await fromDrop(e.dataTransfer)); };
   const onKey = (e) => { if (e.key === 'Enter' && !loading && e.target === document.body) act('enter'); };
   cv.addEventListener('pointermove', onMove);
   cv.addEventListener('pointerleave', () => { hover = null; mouse = null; });
-  cv.addEventListener('pointerdown', (e) => { down = hit(at(e)); });
+  cv.addEventListener('pointerdown', (e) => { down = hit(at(e), e.pointerType === 'touch'); });
   addEventListener('pointerup', onUp);
   addEventListener('dragover', onOver);
   addEventListener('drop', onDrop);

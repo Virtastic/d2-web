@@ -791,3 +791,183 @@ test('a finger that drags off an uninspected item is a drag: it presses where it
   w.up(1, 340, 210);
   assert.deepEqual(w.sent.at(-1), left('pointerup', 340, 210));
 });
+
+// ---- M18: the orbs, and the belt's tap-to-inspect -------------------------------------------------------
+test('a near miss beside the life or the mana orb presses that orb\'s centre; a far miss lands where it was', () => {
+  const life = world({ screen: 'game' });
+  life.down(1, 24, 550); life.up(1, 24, 550);
+  assert.deepEqual(life.sent, [left('pointermove', 70, 555), left('pointerdown', 70, 555), left('pointerup', 70, 555)]);
+  const mana = world({ screen: 'game' });
+  mana.down(1, 775, 550); mana.up(1, 775, 550);
+  assert.deepEqual(mana.sent, [left('pointermove', 729, 555), left('pointerdown', 729, 555), left('pointerup', 729, 555)]);
+  const far = world({ screen: 'game' });
+  far.down(1, 5, 550); far.up(1, 5, 550);
+  assert.deepEqual(far.sent.at(-1), left('pointerup', 5, 550));
+});
+
+test('an open inventory owns its panel: a finger on it beside the mana orb is delivered raw', () => {
+  const w = world({ screen: 'game', inventoryVisible: true, inventoryPanelRect: { left: 680, top: 100, width: 120, height: 500 } });
+  w.down(1, 686, 550); w.up(1, 686, 550);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 686, 550));
+});
+
+// A belt of one potion-holding box at 100..129 x 540..569 (retail 800x600 coordinates, drawn 1:1).
+const beltBox = { left: 100, top: 540, right: 129, bottom: 569 };
+const beltShell = (extra = {}) => ({ screen: 'game', beltHudBoxes: [beltBox],
+  touchBeltItemAt: (x, y) => (x >= 100 && x < 129 && y >= 540 && y < 569 ? 77 : 0), ...extra });
+const beltCentre = [114.5, 554.5];
+
+test('a first tap on a belt potion shows its tooltip (a hover at the box, no press); the second tap uses it', () => {
+  const w = world(beltShell());
+  w.down(1, 114, 554); w.up(1, 114, 554);
+  assert.deepEqual(w.sent, [hoverAt(...beltCentre)]);
+  w.down(1, 114, 554); w.up(1, 114, 554);
+  assert.deepEqual(w.sent.slice(1), [left('pointermove', ...beltCentre), right('pointerdown', ...beltCentre, 1),
+    menu(...beltCentre), right('pointerup', ...beltCentre, 1)]);
+  // The use spent the inspection: the next tap on the potion inspects it again.
+  w.down(1, 114, 554); w.up(1, 114, 554);
+  assert.deepEqual(w.sent.at(-1), hoverAt(...beltCentre));
+});
+
+test('a belt box with no potion is a plain left click at once: no tooltip, no inspect', () => {
+  const w = world(beltShell({ touchBeltItemAt: () => 0 }));
+  w.down(1, 114, 554); w.up(1, 114, 554);
+  assert.deepEqual(w.sent, [left('pointermove', ...beltCentre), left('pointerdown', ...beltCentre), left('pointerup', ...beltCentre)]);
+});
+
+test('with an item on the cursor, a tap on a belt potion acts at once: placing it takes one tap', () => {
+  const w = world(beltShell({ cursorItem: 55 }));
+  w.down(1, 114, 554); w.up(1, 114, 554);
+  assert.deepEqual(w.sent, [left('pointermove', ...beltCentre), left('pointerdown', ...beltCentre), left('pointerup', ...beltCentre)]);
+});
+
+test('a drag off an uninspected belt potion presses where it landed; it is not a hover', () => {
+  const w = world(beltShell());
+  w.down(1, 114, 554);
+  w.move(1, 200, 554);
+  assert.deepEqual(w.sent.slice(0, 2), [left('pointermove', ...beltCentre), left('pointerdown', ...beltCentre)]);
+  assert.ok(!w.sent.some((e) => e.type === 'pointermove' && e.buttons === 0));
+  w.up(1, 200, 554);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 200, 554));
+});
+
+test('a near miss beside a belt potion snaps to its box: the first tap shows that potion\'s tooltip', () => {
+  const w = world(beltShell());
+  w.down(1, 132, 554); w.up(1, 132, 554);
+  assert.deepEqual(w.sent, [hoverAt(...beltCentre)]);
+});
+
+// ---- the panels' small targets: a near miss snaps to the nearest centre the shell reports --------------
+// touchPanelTargets answers with canvas centres: a vendor's tabs and buttons, the waypoint menu's tabs,
+// close and rows, the NPC menu's rows, the skill popup's icons. A finger within 16 px (the reach on a
+// 1:1 canvas) presses the nearest centre; a finger farther from all of them lands where it was.
+function tapAt(w, x, y) { w.down(1, x, y); w.up(1, x, y); return w.sent.at(-1); }
+const at = (e, x, y) => e.type === 'pointerup' && e.x === x && e.y === y;
+
+test('a vendor window: a tap just beside a tab or a button presses it; far from both, it lands raw', () => {
+  const w = world({ screen: 'game', touchPanelTargets: () => ({ shop: { tabs: { 1: [100, 50], 2: [164, 50] }, buttons: { repair: [400, 500], exit: [440, 500] } } }) });
+  assert.ok(at(tapAt(w, 108, 56), 100, 50));
+  assert.ok(at(tapAt(w, 404, 492), 400, 500));
+  assert.deepEqual(tapAt(w, 300, 300), left('pointerup', 300, 300));
+});
+
+test('a waypoint menu: a near miss presses the tab, close or row beside it; far from all of them, it lands raw', () => {
+  const w = world({ screen: 'game', touchPanelTargets: () => ({ waypoint: { tabs: { 1: [118, 80] }, close: [360, 460], rows: [[200, 150], [200, 190]] } }) });
+  assert.ok(at(tapAt(w, 112, 84), 118, 80));
+  assert.ok(at(tapAt(w, 200, 176), 200, 190));
+  assert.ok(at(tapAt(w, 366, 466), 360, 460));
+  assert.deepEqual(tapAt(w, 200, 230), left('pointerup', 200, 230));
+});
+
+test('an NPC menu: of two rows a tap between them presses the nearer one', () => {
+  // The rows are listed buy-first: a first-hit probe would press buy; the nearer row is talk (14 px away, buy 22 px).
+  const w = world({ screen: 'game', touchPanelTargets: () => ({ npc: { buy: [300, 200], talk: [300, 236] } }) });
+  assert.ok(at(tapAt(w, 300, 222), 300, 236));
+  assert.ok(at(tapAt(w, 300, 208), 300, 200));
+});
+
+test('the skill popup: a near miss presses the icon it is beside; of two close icons, the nearer one', () => {
+  const w = world({ screen: 'game', touchPanelTargets: () => ({ skills: { 12: [600, 400], 13: [640, 400] } }) });
+  assert.ok(at(tapAt(w, 626, 402), 640, 400));
+  assert.ok(at(tapAt(w, 604, 396), 600, 400));
+});
+
+test('two panels at once: the nearest centre wins across the vendor tab and the waypoint row', () => {
+  // (103, 54) is 5 px from the tab and 15 from the row; (108, 62) is 5.7 px from the row and 14.4 from the tab.
+  const w = world({ screen: 'game', touchPanelTargets: () => ({ shop: { tabs: { 1: [100, 50] } }, waypoint: { rows: [[112, 66]] } }) });
+  assert.ok(at(tapAt(w, 103, 54), 100, 50));
+  assert.ok(at(tapAt(w, 108, 62), 112, 66));
+});
+
+test('with no panel up the probe reports nothing, and a tap beside where a panel was lands raw', () => {
+  const w = world({ screen: 'game', touchPanelTargets: () => null });
+  assert.deepEqual(tapAt(w, 100, 56), left('pointerup', 100, 56));
+});
+
+// The stash's PlugY page buttons and close, and the cube's Transmute button and grid, in game px at 800x600
+// (the origin is identity there). PlugY's buttons are 32x32 cels at BTN's top-left: prevIndex 176, prev 208,
+// next 240, nextIndex 272, all at y 445; the stash close cel is at 352,445.
+const stashOnly = (plugy) => ({ screen: 'game', touchControlAt: () => null, touchPanelLayout: () => ({ stash: { plugy }, cube: null }) });
+const CUBE_GEOMETRY = { left: 280, top: 180, right: 580, bottom: 380, columns: 4, rows: 3, gridLeft: 300, gridTop: 200, boxW: 29, boxH: 29 };
+const cubeShell = { screen: 'game', touchControlAt: () => null,
+  touchPanelLayout: () => ({ stash: null, cube: { geometry: CUBE_GEOMETRY, panel: { left: 280, top: 180, width: 300, height: 200 } } }) };
+
+test('a tap just beside a stash page button or the stash close presses it; on it, or far off, it lands raw', () => {
+  const near = world(stashOnly(true));
+  near.down(1, 172, 460); near.up(1, 172, 460);   // 4 px left of the index button at 176..208
+  assert.deepEqual(near.sent.at(-1), left('pointerup', 192, 461));
+  const close = world(stashOnly(true));
+  close.down(1, 390, 460); close.up(1, 390, 460);   // 6 px right of the close cel at 352..384
+  assert.deepEqual(close.sent.at(-1), left('pointerup', 368, 461));
+  const on = world(stashOnly(true));
+  on.down(1, 220, 460); on.up(1, 220, 460);   // inside the prev button: raw
+  assert.deepEqual(on.sent.at(-1), left('pointerup', 220, 460));
+  const far = world(stashOnly(true));
+  far.down(1, 500, 300); far.up(1, 500, 300);
+  assert.deepEqual(far.sent.at(-1), left('pointerup', 500, 300));
+});
+
+test('PlugY off: the stash close still snaps, but the page buttons are not drawn, so a tap beside where one was lands raw', () => {
+  const w = world(stashOnly(false));
+  w.down(1, 172, 460); w.up(1, 172, 460);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 172, 460));
+  const close = world(stashOnly(false));
+  close.down(1, 390, 460); close.up(1, 390, 460);
+  assert.deepEqual(close.sent.at(-1), left('pointerup', 368, 461));
+});
+
+test('the cube: a tap just beside the Transmute button presses it; on it, it lands raw', () => {
+  const near = world(cubeShell);
+  near.down(1, 350, 326); near.up(1, 350, 326);   // 5 px under the button at 300..416 x 297..321
+  assert.deepEqual(near.sent.at(-1), left('pointerup', 358, 309));
+  const on = world(cubeShell);
+  on.down(1, 350, 310); on.up(1, 350, 310);
+  assert.deepEqual(on.sent.at(-1), left('pointerup', 350, 310));
+});
+
+test('the cube grid: a tap in the ring just outside a cell snaps to that cell; a cell interior lands raw', () => {
+  const ring = world(cubeShell);
+  ring.down(1, 296, 210); ring.up(1, 296, 210);   // 4 px left of the grid, in its top row
+  assert.deepEqual(ring.sent.at(-1), left('pointerup', 314.5, 214.5));
+  const cell = world(cubeShell);
+  cell.down(1, 320, 220); cell.up(1, 320, 220);
+  assert.deepEqual(cell.sent.at(-1), left('pointerup', 320, 220));
+  const far = world(cubeShell);
+  far.down(1, 100, 100); far.up(1, 100, 100);
+  assert.deepEqual(far.sent.at(-1), left('pointerup', 100, 100));
+});
+
+test('the cube closed (or the inventory shut): no cube control snaps, and a tap beside its button lands raw', () => {
+  const shut = world({ screen: 'game', touchControlAt: () => null, touchPanelLayout: () => null });
+  shut.down(1, 350, 326); shut.up(1, 350, 326);
+  assert.deepEqual(shut.sent.at(-1), left('pointerup', 350, 326));
+});
+
+test('a stash or cube item: the first tap shows its tooltip, the second tap is the click (the same probe as the inventory)', () => {
+  const cubeItem = (x, y) => (x >= 300 && x < 329 && y >= 200 && y < 229 ? 55 : 0);
+  const w = world({ ...inspectShell({ touchItemAt: cubeItem }), touchPanelLayout: cubeShell.touchPanelLayout });
+  w.down(1, 310, 210); w.up(1, 310, 210);
+  assert.deepEqual(w.sent, [hoverAt(310, 210)]);
+  w.down(1, 310, 210); w.up(1, 310, 210);
+  assert.deepEqual(w.sent.slice(1), [left('pointermove', 310, 210), left('pointerdown', 310, 210), left('pointerup', 310, 210)]);
+});

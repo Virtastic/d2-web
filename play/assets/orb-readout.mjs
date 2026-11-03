@@ -8,6 +8,22 @@ export function orbAt(width, height, x, y) {
   return null;
 }
 
+// The finger's aim at an orb (M18): a point off both rings, within `reach` canvas px of one, presses that
+// ring's centre (the nearest ring wins). A point already on a ring is delivered raw, and so is one inside
+// an open panel (`panels`: {left, top, width, height} rectangles): the mana ring reaches into an open
+// inventory's right edge, and the panel's own hit test decides there. Returns [x, y] or null.
+export function orbAimPoint(width, height, x, y, reach, panels = []) {
+  if (orbAt(width, height, x, y)) return null;
+  if (panels.some((p) => x >= p.left && x < p.left + (p.width ?? p.w) && y >= p.top && y < p.top + (p.height ?? p.h))) return null;
+  const s = Math.min(1, width / 800), top = height - 75 * s, bottom = height - 15 * s;
+  let best = null;
+  for (const [left, right] of [[30 * s, 110 * s], [width - 111 * s, width - 31 * s]]) {
+    const d = Math.hypot(Math.max(left - x, 0, x - right), Math.max(top - y, 0, y - bottom));
+    if (d <= reach && (!best || d < best.d)) best = { d, point: [(left + right) / 2, (top + bottom) / 2] };
+  }
+  return best ? best.point : null;
+}
+
 export function drawOrbReadouts(ctx, font, snapshot, width, height, pointer, pins, line) {
   const hovered = orbAt(width, height, pointer.x, pointer.y), drawn = [];
   const scale = Math.min(1, width / 800), player = snapshot.player;

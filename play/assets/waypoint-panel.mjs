@@ -34,7 +34,7 @@ export const WAYGATE_ART = {
 };
 // The left panel's ornate border, drawn after the menu: 800borderframe frames 0..4 at these anchors.
 // Retail's row hit-y table (D2Client .data 0x6FB8E6D8, field 5 of each 6-dword entry), panel coordinates.
-const ROW_HIT_Y = [60, 96, 132, 168, 205, 241, 277, 313, 349];
+export const ROW_HIT_Y = [60, 96, 132, 168, 205, 241, 277, 313, 349];
 const BORDER = [[0, 253], [256, 63], [0, 484], [0, 553], [256, 553]];
 // Retail's draw list (anchors are cel anchors: left edge, BOTTOM row). The panel's four background
 // cels have their top-left at (80, 61); the act tab frame 2*(act-1) at (85 + 62*(act-1), 94); the

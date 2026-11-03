@@ -8,7 +8,7 @@ export const PLUGY_GRID = { columns: 10, rows: 10, gridLeft: 96, gridTop: 143 };
 const POPUP_TEXT_UP = 3;   // the text baseline sits 3 px above the box bottom (calibrated on plugy-rb-hover-toggle)
 const POPUP_DY = 1;   // popup baseline = button top - 32 + POPUP_DY (calibrated on the capture)
 const WSX = 80, BOTTOM = 541;   // RX(v) = WSX + v; RY(v) = BOTTOM - v
-const BTN = {
+export const BTN = {
   prev: { f: 0, x: WSX + 0x80, y: BOTTOM - 0x40 - 32 }, next: { f: 2, x: WSX + 0xA0, y: BOTTOM - 0x40 - 32 },
   shared: { f: 4, x: WSX + 0x10, y: BOTTOM - 0x40 - 32 }, prevIndex: { f: 8, x: WSX + 0x60, y: BOTTOM - 0x40 - 32 }, nextIndex: { f: 10, x: WSX + 0xC0, y: BOTTOM - 0x40 - 32 },
   putGold: { f: 0, gold: true, x: WSX + 0x1C, y: BOTTOM - 0x1A8 - 32 }, takeGold: { f: 2, gold: true, x: WSX + 0x105, y: BOTTOM - 0x1A8 - 32 },

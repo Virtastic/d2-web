@@ -43,6 +43,9 @@
 import { click, pointer, tapKey, toClient, toCanvas } from './input-common.mjs';
 import { isHudDeadZone, hudAimPoint, HUD_FINGER_REACH } from './control-panel.mjs';
 import { hudOrigin } from './hud-origin.mjs';
+import { orbAimPoint } from './orb-readout.mjs';
+import { nearestPointAim, nearestControlAim, panelControlPoints } from './touch-panel-aim.mjs';
+import { panelSpec, panelControlAim as aimPanelControls } from './touch-panel-aim.mjs';
 
 // Overlay face: the game's serif, not the browser's monospace (no web font ships).
 export const OVERLAY_FONT = 'Palatino Linotype, Palatino, Georgia, serif';
@@ -282,6 +285,21 @@ export function installTouchInput({ documentObject = globalThis.document, window
     const reach = fingerReach(HUD_FINGER_REACH * scale) / scale;
     return hudAimPoint(x, y, { width: canvas.width, height: canvas.height, hud, belt: shell.beltHudBoxes || [], extra, reach });
   }
+  // ---- M18: the life and mana orbs -----------------------------------------------------------------
+  // The orbs are the bottom band's two readouts, and their rings are 80 px wide at scale 1 (orbAt in
+  // orb-readout.mjs). A finger a few px off a ring is on nothing the shell hit-tests, and the orb's
+  // click (the pin) never sees it. So a finger within HUD_FINGER_REACH of a ring presses its centre,
+  // like the HUD's small controls (M17). Off while a panel covers the band (the character screen, the
+  // skill tree, the skill popup); an open inventory or stash keeps its own rectangle (orbAimPoint).
+  function orbAim(x, y) {
+    const shell = windowObject.__d2Shell;
+    if (!shell || shell.screen !== 'game' || shell.clearScreen || shell.skillSelectOpen || shell.characterVisible || shell.skillsVisible) return null;
+    const panels = [];
+    if (shell.inventoryVisible && shell.inventoryPanelRect) panels.push(shell.inventoryPanelRect);
+    if (shell.stashPanelRect) panels.push(shell.stashPanelRect);
+    const scale = Math.min(1, canvas.width / 800);
+    return orbAimPoint(canvas.width, canvas.height, x, y, fingerReach(HUD_FINGER_REACH * scale), panels);
+  }
   // ---- the world: a finger near a monster, NPC, ground item, object or exit picks it ------------------
   // A finger lands ~10 CSS px (~15 game px) off what the player meant. When the exact point resolves to
   // nothing a click would take (it would walk), the shell's own click resolver is asked at a ring of
@@ -352,22 +370,27 @@ export function installTouchInput({ documentObject = globalThis.document, window
     }
     return null;
   }
-  // ---- a dialog's small buttons: NPC menu rows, the gold dialog's arrows/ok/close, repair yes/no ----
+  // ---- a dialog's small buttons: the gold dialog's arrows/ok/close, repair yes/no -------------------
   // While one is up, a finger that hits none of its buttons is probed at rings around it with the
-  // dialog's own hit test; the first ring point on a button is where the press goes.
-  const MODAL_SPOKES = 8;
+  // dialog's own hit test; the nearest ring's first point on a button is where the press goes.
   function modalAim(x, y) {
     const shell = windowObject.__d2Shell;
     if (!shell || typeof shell.touchControlAt !== 'function') return null;
     let on;
     try { on = shell.touchControlAt(x, y); } catch { return null; }
     if (on !== false) return null;
-    const reach = fingerReach(12);
-    for (const r of [reach / 2, reach]) for (let i = 0; i < MODAL_SPOKES; i += 1) {
-      const a = (i / MODAL_SPOKES) * 2 * Math.PI, px = x + r * Math.cos(a), py = y + r * Math.sin(a);
-      try { if (shell.touchControlAt(px, py)) return [px, py]; } catch { return null; }
-    }
-    return null;
+    try { return nearestControlAim(x, y, (px, py) => Boolean(shell.touchControlAt(px, py)), fingerReach(12)); } catch { return null; }
+  }
+  // ---- the panels' small targets: vendor tabs and buttons, waypoint tabs/close/rows, NPC menu rows, the
+  // skill popup's icons ------------------------------------------------------------------------------
+  // The shell reports each one's canvas centre (touchPanelTargets); a finger within reach of one presses
+  // the nearest, so of two close targets the one the finger is nearer to wins.
+  function panelTargetAim(x, y) {
+    const shell = windowObject.__d2Shell;
+    if (!shell || typeof shell.touchPanelTargets !== 'function') return null;
+    let t; try { t = shell.touchPanelTargets(); } catch { return null; }
+    if (!t) return null;
+    return nearestPointAim(x, y, panelControlPoints(t), fingerReach(12));
   }
   // ---- the out-of-game screens: title, gateways, character select/create, options ---------------------
   // A finger within the finger's reach of a control's click point presses that point; the nearest wins.
@@ -386,7 +409,15 @@ export function installTouchInput({ documentObject = globalThis.document, window
     return best;
   }
   // The point a finger's aim snaps to, or null when the finger is on nothing the aim rules cover.
-  function snapAim(x, y) { return frontAim(x, y) || modalAim(x, y) || closeAim(x, y) || tabAim(x, y) || beltAim(x, y) || panelAim(x, y) || statAim(x, y) || hudAim(x, y); }
+  // ---- the stash's page buttons and close, the cube's Transmute button and its grid (touch-panel-aim.mjs) ----
+  // The shell reports the open panels in game px; the same nearest-control and grid-ring rules as the rest apply.
+  function panelControlAim(x, y) {
+    const shell = windowObject.__d2Shell;
+    if (!shell || shell.screen !== 'game' || shell.clearScreen || typeof shell.touchPanelLayout !== 'function') return null;
+    let layout; try { layout = shell.touchPanelLayout(); } catch { return null; }
+    return aimPanelControls(x, y, panelSpec(layout, canvas.width, canvas.height), fingerReach);
+  }
+  function snapAim(x, y) { return frontAim(x, y) || panelTargetAim(x, y) || modalAim(x, y) || closeAim(x, y) || tabAim(x, y) || panelControlAim(x, y) || beltAim(x, y) || panelAim(x, y) || statAim(x, y) || hudAim(x, y) || orbAim(x, y); }
   function fingerAim(x, y) { return snapAim(x, y) || worldAim(x, y); }
   // A finger's aim: the belt's boxes, an open panel's grid cells, the character screen's "+", else
   // exactly where it landed.
@@ -478,7 +509,8 @@ export function installTouchInput({ documentObject = globalThis.document, window
   // the same item is the click it always was (buy, lift, sell, drop). Any other tap clears the
   // inspected item. A held finger on a grid cell is the right click (HOLD_MS, above) and counts as
   // inspected too. Taps with an item on the cursor act at once: placing it must not take two taps.
-  // The belt keeps its own popup and is not inspected here.
+  // A BELT potion follows the same two taps, the second being a USE (a right click, the belt's own
+  // right button) rather than a lift: see lift(). Its tooltip is the shell's to draw (see the handback).
   let inspected = null;
   function inspectKeyAt(x, y) {
     const shell = windowObject.__d2Shell;
@@ -487,11 +519,22 @@ export function installTouchInput({ documentObject = globalThis.document, window
     const shop = shell.touchShopItemAt?.(ix, iy) || 0;
     if (shop) return { key: `shop:${shop}`, shop: true };
     const item = shell.touchItemAt?.(ix, iy) || 0;
-    return item ? { key: `item:${item}`, shop: false } : null;
+    if (item) return { key: `item:${item}`, shop: false };
+    const belt = shell.touchBeltItemAt?.(ix, iy) || 0;
+    return belt ? { key: `belt:${belt}`, shop: false, belt: true } : null;
   }
   function heldItem() { return windowObject.__d2Shell?.cursorItem || 0; }
   function hover(x, y, pointerId) {
     send('pointermove', x, y, { button: 0, buttons: 0, pointerType: 'touch', pointerId, shiftKey: restDown() });
+  }
+  // The second tap on a belt potion: a quick right click at the potion's box, the press and the menu a
+  // real right click makes. The belt's right button uses the potion (belt-popup.mjs's beltClickAction).
+  function useBelt(pointerId, x, y) {
+    const shiftKey = restDown();
+    send('pointermove', x, y, { button: 0, pointerType: 'touch', pointerId, shiftKey });
+    send('pointerdown', x, y, { button: 2, pointerType: 'touch', pointerId, shiftKey });
+    sendContextMenu(x, y, shiftKey);
+    send('pointerup', x, y, { button: 2, pointerType: 'touch', pointerId, shiftKey });
   }
   function holdRight(pointerId, h) {
     h.pending = false;
@@ -537,6 +580,14 @@ export function installTouchInput({ documentObject = globalThis.document, window
       inspected = h.itemKey;
       const [hx, hy] = moveAim(h.x, h.y);
       hover(hx, hy, pointerId);
+      return;
+    }
+    if (h.role === 'aim' && !h.released && h.belt && !h.moved && !cancelled) {
+      // The second tap on an inspected belt potion: a use, not a lift. The inspection is spent.
+      h.released = true;
+      inspected = null;
+      const [ux, uy] = aim(h.x, h.y);
+      useBelt(pointerId, ux, uy);
       return;
     }
     if (h.role === 'aim' && h.right) {
@@ -612,7 +663,7 @@ export function installTouchInput({ documentObject = globalThis.document, window
       return;
     }
     holds.set(e.pointerId, { role: 'aim', x, y, pending: true, t: clock(), item: itemGround(x, y),
-      hoverFirst, itemKey: found?.key ?? null });
+      hoverFirst, itemKey: found?.key ?? null, belt: Boolean(found?.belt) });
   }, { capture: true });
 
   documentObject.addEventListener('pointermove', (e) => {

@@ -70,6 +70,9 @@ export function stashGeometry(layout) {
 // In-game panels are drawn with the ACT's palette.
 const actPalette = (act) => `data\\global\\palette\\ACT${Math.min(5, Math.max(1, act | 0))}\\pal.dat`;
 
+// The Transmute button's rect in game px: the cube grid's width, under the grid (the level-1 layout, declared not measured).
+export function transmuteRect(g) { return { x: g.gridLeft, y: g.gridTop + g.rows * g.boxH + 10, w: g.columns * g.boxW, h: 24 }; }
+
 export function createStashPanelRenderer(read, documentObject = globalThis.document, { string = null, stashGold = null, page = INVPAGE_STASH, transmute = null } = {}) {
   const chrome = createPanelChrome(read, documentObject);
   let dc6 = decodeDc6(read(page === INVPAGE_CUBE ? CUBE_ART : STASH_ART));
@@ -96,7 +99,7 @@ export function createStashPanelRenderer(read, documentObject = globalThis.docum
   };
 
   // Level 1 (declared, not retail-measured): the Transmute button sits under the cube's grid, its width.
-  const buttonRect = (g) => ({ x: g.gridLeft, y: g.gridTop + g.rows * g.boxH + 10, w: g.columns * g.boxW, h: 24 });
+  const buttonRect = transmuteRect;
   return {
     /** Whether a canvas point is on the Transmute button (cube window only). */
     transmuteAt(px, py, width, height, geometry) {

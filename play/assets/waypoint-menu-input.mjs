@@ -11,7 +11,7 @@
 //          60,96,132,168,205,241,277,313,349 (irregular 36/37 pitch) -> screen x 98..376.
 // A click on tab zone k selects the highest act whose preceding completion flags are all set
 // (FUN_6FB5A090). This is independent of which tab cels the waypoint table happened to draw.
-import { WAYPOINT_LAYOUT } from './waypoint-panel.mjs';
+import { WAYPOINT_LAYOUT, ROW_HIT_Y } from './waypoint-panel.mjs';
 
 const PANEL_X = 80, PANEL_Y = 60;
 const TAB_ZONE_W = 64, TAB_PX_MAX = 0x140, TAB_PY_MAX = 0x1e;
@@ -70,6 +70,11 @@ export function createWaypointMenuInput() {
       return row && row.active && row.levelId !== hereLevelId ? { action: 'row', row } : null;
     },
     inCloseRect(px, py, width, height) { return contains(menuPoint(px, py, width, height), closeRect()); },
+    /** Canvas centres of the rows a click would press (active, not the level the player stands at), by row index. */
+    rowTargets(width, height, rows, hereLevelId = null) {
+      return rows.flatMap((row, i) => (i < ROW_HIT_Y.length && row?.active && row.levelId !== hereLevelId
+        ? [canvasPoint({ x: PANEL_X + 18, y: ROW_HIT_Y[i] + PANEL_Y + 1, w: 279, h: 29 }, width, height)] : []));
+    },
     targets(width, height, drawnTabs = []) {
       const acts = [...new Set(drawnTabs.filter((tab) => tab?.drawn && Number.isInteger(tab.act) && tab.act >= 1 && tab.act <= 5)
         .map((tab) => tab.act))].sort((a, b) => a - b);

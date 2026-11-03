@@ -59,6 +59,7 @@ import { panelSides as panelViewSides, viewCentreX } from './assets/panel-view-s
 import { createFreeResArt, barParts, halfParts, stoneTiles, drawParts } from './assets/wide-hud.mjs';
 import { createBeltRenderer } from './assets/belt-renderer.mjs';
 import { createBeltPopup, popupRows, beltClickAction } from './assets/belt-popup.mjs';
+import { beltHoverPlan, createBeltTooltip } from './assets/belt-tooltip.mjs';
 import { createActMusicPlayer, createLevelMusicSync, levelMusicDue } from './assets/act-music.mjs';
 import { createAudioVolume } from './assets/audio-volume.mjs';
 import { createNpcSpeechSetting, npcSpeechHasAudio, npcSpeechHasText } from './assets/npc-speech-setting.mjs';
@@ -657,7 +658,7 @@ const stashGoldSpinnerRepeat = createStashSpinnerRepeat();
 let waypointPanelRenderer = null, waypointPanelError = '', waypointEvidence = null, waypointMenu = null, lastWaypointTravel = null;
 const waypointMenuInput = createWaypointMenuInput();
 const beltPopup = createBeltPopup();
-let beltRenderer = null, beltEvidence = null, beltBoxCache = null, beltBoxRecord = -1;
+let beltRenderer = null, beltTooltip = null, beltEvidence = null, beltBoxCache = null, beltBoxRecord = -1;
 let miniDown = -1, miniPointerId = null;
 let controlPanelRenderer = null, controlPanelEvidence = null, hudIconRow = true, lastRunToggle = null;
 const orbPins = { life: false, mana: false };
@@ -1327,6 +1328,7 @@ async function bootstrapSession() {
     try { waypointPanelRenderer = createWaypointPanelRenderer(createMpqAssetReader(Module), document, { string: (i) => Module.ccall('d2_lang_string_by_index', 'string', ['number'], [i]) }); } catch (error) { waypointPanelError = String(error); }
     if (!navigator.webdriver) await entryYield();
     beltRenderer = createBeltRenderer(createMpqAssetReader(Module));
+    try { beltTooltip = createBeltTooltip(createMpqAssetReader(Module), document); } catch (error) { beltTooltip = null; }
     controlPanelRenderer = createControlPanelRenderer(assetReader);
     try { hudHelp = createHudHelp(createMpqAssetReader(Module)); } catch (error) { hudHelp = null; hudHelpError = String(error); }
     // The help screen's text is the engine's string table read by KEY, the way this screen's own
@@ -4462,6 +4464,11 @@ function drawFrame() {
   }
   // The inventory item hover text goes over every panel (stash, cube, waypoint, ...) and the HUD, uncut at the seam between panels.
   if (inventoryPanelEvidence?.tooltipDraw) { try { inventoryPanelEvidence.tooltip = inventoryPanelEvidence.tooltipDraw(ctx); } catch (error) { inventoryPanelEvidence.tooltip = null; } }
+  // A belt potion's hover text, when no inventory tooltip took the hover: the box under the pointer (a mouse's hover, or a phone's inspect tap, which is a hover too).
+  if (beltTooltip && beltRenderer && screen === SCREEN.GAME && !clearScreen && session && !inventoryPanelEvidence?.tooltip) {
+    const plan = beltHoverPlan({ boxes: beltShownBoxes(), origin: hudOrigin(w, h, 'bottom'), x: pointer.x, y: pointer.y, items: snapshot.items, tip: (item) => tipFields(item.id, item.code) });
+    try { beltTooltip.draw(ctx, snapshot.act, plan, w, h); } catch (error) { /* no font, no tooltip: the belt still draws */ }
+  }
   // FUN_6FB739E0 draws ordinary speech after the main gameplay/panel passes. Match that late
   // overlay order so inventory and quest art cannot cover the viewport-centred text.
   if (pendingSpeech) {
@@ -6842,10 +6849,32 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
     }
     return null;
   },
+  // The touch layer's panel probe (touch-panel-aim.mjs): the stash's PlugY buttons (drawn with the art) and the cube's
+  // Transmute and grid, in game px; null off the game screen or with neither panel open.
+  touchPanelLayout() {
+    if (screen !== SCREEN.GAME || clearScreen || !session) return null;
+    const stash = stashOpen && readStashLayout() && stashPanelRenderer ? { plugy: Boolean(plugyStash.enabled && plugyStash.artReady) } : null;
+    const cube = cubeOpen && inventoryVisible ? readCubeLayout() : null;
+    return { stash, cube: cube && cubePanelRenderer ? { geometry: cube, panel: cubePanelRenderer.panelRect(cube) } : null };
+  },
   // The touch layer's weapon-tab probe: null while the inventory is shut, else the tab / equipped-slot read at (x,y).
   touchWeaponTabAt(x, y) {
     if (screen !== SCREEN.GAME || !inventoryVisible || !inventoryPanelRenderer) return null;
     return inventoryPanelRenderer.weaponTabProbe(x, y, canvas.width, canvas.height);
+  },
+  // The touch layer's panel probe (touch-panel-aim.mjs): the canvas centres of the open vendor's tabs and
+  // buttons, the waypoint menu's tabs, close and active rows, the NPC menu's rows and the skill popup's
+  // icons. Each group is null where that panel is not up. Read-only; the same targets the clicks hit.
+  touchPanelTargets() {
+    if (screen !== SCREEN.GAME || clearScreen || !session) return null;
+    const w = canvas.width, h = canvas.height;
+    return {
+      shop: shopOpen() && vendorPanel ? { tabs: vendorPanel.tabTargets(w, h), buttons: vendorPanel.buttonTargets(w, h, npcState.classId) } : null,
+      waypoint: waypointMenu && waypointPanelRenderer ? { ...waypointMenuInput.targets(w, h, waypointEvidence?.tabs ?? []),
+        rows: waypointMenuInput.rowTargets(w, h, readWaypointTable().rows(waypointMenu.act), snapshot.level) } : null,
+      npc: npcMenu?.open ? npcMenu.targets() : null,
+      skills: skillSelectRenderer?.open ? skillSelectRenderer.targets(w, h, readSkillChoices()).skills : null,
+    };
   },
   // Touch's inspect-before-act (input-touch.mjs): the id of the item under a point, or 0. Read-only, and
   // the same hit tests the click path runs before it buys, sells, lifts or drops -- so a finger's first
@@ -6868,6 +6897,14 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
       return item?.id ?? inventoryPanelRenderer.slotAt(x, y, W, H, snapshot)?.item?.id ?? 0;
     }
     return 0;
+  },
+  // Touch's inspect-before-act for the belt: the id of the potion in the box under a point, or 0. Read-only;
+  // the box test is the belt click's own (beltSlot in the click handler), so the first tap names the box a click would drink from.
+  touchBeltItemAt(x, y) {
+    if (screen !== SCREEN.GAME || clearScreen || !beltRenderer) return 0;
+    const bo = hudOrigin(canvas.width, canvas.height, 'bottom');
+    const slot = beltShownBoxes()?.findIndex((b) => x - bo.x >= b.left && x - bo.x < b.right && y - bo.y >= b.top && y - bo.y < b.bottom) ?? -1;
+    return slot < 0 ? 0 : snapshot.items.find((it) => it.mode === 2 && it.gridX === slot)?.id ?? 0;
   },
   // The item the cursor holds (0 for none): a finger with an item in hand acts at once (input-touch.mjs).
   get cursorItem() { return session && Module._d2_session_cursor_item ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0; },

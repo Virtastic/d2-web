@@ -26,3 +26,14 @@ test('readouts use fixed-point engine values, native centering and independent p
   assert.equal(drawOrbReadouts(ctx,font,snapshot,800,600,{x:70,y:550},{},line)[0].text,'Life: 0 / 50');
   assert.equal(painted.length,3);
 });
+
+import { orbAimPoint } from '../play/assets/orb-readout.mjs';
+
+test('an orb near miss aims at its ring centre within reach; on a ring, out of reach, or in an open panel, it is raw', () => {
+  assert.deepEqual(orbAimPoint(800, 600, 24, 550, 16), [70, 555]);
+  assert.deepEqual(orbAimPoint(800, 600, 775, 550, 16), [729, 555]);
+  assert.equal(orbAimPoint(800, 600, 5, 550, 16), null);
+  assert.equal(orbAimPoint(800, 600, 50, 550, 16), null);
+  assert.equal(orbAimPoint(800, 600, 686, 550, 16, [{ left: 680, top: 100, width: 120, height: 500 }]), null);
+  assert.deepEqual(orbAimPoint(640, 480, 18, 440, 16), [56, 444]);
+});
