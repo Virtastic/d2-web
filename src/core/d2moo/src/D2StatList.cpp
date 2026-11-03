@@ -1442,6 +1442,8 @@ int32_t __stdcall STATLIST_UnitGetItemStatOrSkillStatValue(D2UnitStrc* pUnit, in
 
 
 //D2Common.0x6FDB7D40 (#10466)
+// 1.13c D2Common+0x39140: list in EBX, packed layer/stat id in EDI, ItemStatCost row = the stat id's record; the
+// body is 0x38B00 (find the entry, clamp to the record's minimum for a player/monster owner). Same as 1.10f.
 int __stdcall STATLIST_GetStatValue(D2StatListStrc* pStatList, int nStatId, uint16_t nLayer)
 {
 	if (!pStatList)
@@ -2018,18 +2020,18 @@ int __stdcall STATLIST_GetBaseStatsData(D2StatListStrc* pStatListEx, D2StatStrc*
 }
 
 // 1.13c D2Common+0x3A330 (src/core/d2common/d2common_batch_31d20.cpp)
-uint32_t D2Common_3A330_AddStat(D2StatListStrc* pStatList, uint32_t nPackedStat, int32_t nDelta);
+void D2Common_3A330_AddStatLayer(D2StatListStrc* pStatList, int32_t nStatId, int32_t nDelta, uint16_t nLayer);
 
 //D2Common.0x6FDB8C50 (#10573)
 // 1.13c D2Common+0x3A600: every base entry of the source (raw stat id at +2, value at +4) is added
-// to the target through 3A330, passing the stat id unshifted as retail does.
+// to the target through 3A330 as (list, stat id, value, the entry's layer word at +0).
 void __stdcall STATLIST_MergeBaseStats(D2StatListStrc* pTargetStatList, D2StatListStrc* pSourceStatlist)
 {
 	if (pTargetStatList && pSourceStatlist)
 	{
 		for (D2StatStrc* i = pSourceStatlist->Stats.pStat; i < &pSourceStatlist->Stats.pStat[pSourceStatlist->Stats.nStatCount]; ++i)
 		{
-			D2Common_3A330_AddStat(pTargetStatList, i->nStat, i->nValue);
+			D2Common_3A330_AddStatLayer(pTargetStatList, i->nStat, i->nValue, i->nLayer);
 		}
 	}
 }

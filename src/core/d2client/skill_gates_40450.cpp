@@ -14,7 +14,6 @@
 #include "../d2moo/include/Units/Missile.h"
 #include "skill_gates_40450.h"
 
-extern "C" int32_t sub_39140(int32_t list, int32_t statId);        // D2Common+0x39140 (#10680)
 extern "C" void* d2client_msl_create_b30f0(const uint32_t* req);   // D2Client+0xB30F0
 
 // Row of sgptDataTables+0xB98 (stride 0x23C, count +0xBA0), null when out of range.
@@ -37,7 +36,7 @@ extern "C" int32_t d2_client_40550(D2UnitStrc* unit, int32_t id) {
     if (gated(r)) {
         D2StatListStrc* l = STATLIST_GetStatListFromUnitAndState(unit, s16(r, 0x80));
         if (l) {
-            int32_t lv = sub_39140(static_cast<int32_t>(reinterpret_cast<intptr_t>(l)), s16(r, 0x54));
+            int32_t lv = STATLIST_GetStatValue(l, s16(r, 0x54), 0);
             if (lv >= 2) { if (lv > 2) lv = 3; return s16(r, 0xe8 + lv * 2); }
         }
     }
@@ -50,7 +49,7 @@ extern "C" int32_t d2_client_40450(int32_t idx, D2UnitStrc* unit, uint32_t calc,
     if (!r) return 0;
     if (gated(r)) {
         D2StatListStrc* l = STATLIST_GetStatListFromUnitAndState(unit, s16(r, 0x80));
-        if (l) sub_39140(static_cast<int32_t>(reinterpret_cast<intptr_t>(l)), s16(r, 0x54));
+        if (l) STATLIST_GetStatValue(l, s16(r, 0x54), 0);
     }
     return SKILLS_EvaluateSkillFormula(unit, calc, idx, level);  // every path ends in #10786
 }

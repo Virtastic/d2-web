@@ -5,9 +5,9 @@
 #include <emscripten.h>
 
 struct D2StatListStrc;
-uint32_t D2Common_3A330_AddStat(D2StatListStrc* pStatList, uint32_t nPackedStat, int32_t nDelta); // 0x3A330, d2common_batch_31d20.cpp
+void D2Common_3A330_AddStatLayer(D2StatListStrc* pStatList, int32_t nStatId, int32_t nDelta, uint16_t nLayer); // 0x3A330, d2common_batch_31d20.cpp
 static void add3a330(uint32_t pList, uint32_t nStat, int32_t nDelta) {
- D2Common_3A330_AddStat(reinterpret_cast<D2StatListStrc*>(static_cast<uintptr_t>(pList)), nStat, nDelta);
+ D2Common_3A330_AddStatLayer(reinterpret_cast<D2StatListStrc*>(static_cast<uintptr_t>(pList)), static_cast<int32_t>(nStat), nDelta, 0); // retail passes the bare stat id, layer 0
 }
 
 extern "C" {

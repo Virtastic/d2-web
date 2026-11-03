@@ -284,6 +284,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_26db0(uint32_t pItem, uint32_t pUnit
 // inserted (0x38640 = STATLIST_InsertStatOrFail); the value is adjusted; zero removes it (0x381A0);
 // then sub_6FDB6C10 (0x39F70) with a null unit; list flags < 0 and owner type 0 end with 0x38550.
 // All five callees are the vendored D2StatList.cpp functions, called directly.
+// 1.13c D2Common+0x3A330 core: the key is already packed ((statId << 16) + layer).
 uint32_t D2Common_3A330_AddStat(D2StatListStrc* pStatList, uint32_t nPackedStat, int32_t nDelta)
 {
 	if (!pStatList || nDelta == 0)
@@ -308,10 +309,10 @@ uint32_t D2Common_3A330_AddStat(D2StatListStrc* pStatList, uint32_t nPackedStat,
 	return 1;
 }
 
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3a330(uint32_t pStatList, uint32_t nPackedStat, int32_t nDelta)
+// The retail call shape of 0x3A330: stdcall(list, statId, delta, layer), the packed key (statId << 16) + layer built inside.
+void D2Common_3A330_AddStatLayer(D2StatListStrc* pStatList, int32_t nStatId, int32_t nDelta, uint16_t nLayer)
 {
-	D2Common_3A330_AddStat(reinterpret_cast<D2StatListStrc*>(static_cast<uintptr_t>(pStatList)), nPackedStat, nDelta);
+	D2Common_3A330_AddStat(pStatList, (static_cast<uint32_t>(nStatId) << 16) + nLayer, nDelta);
 }
 
 // 1.13c D2Common+0x30AC0 (#10246): the skills.txt record of skill nSkillId inside the unit's skill list.

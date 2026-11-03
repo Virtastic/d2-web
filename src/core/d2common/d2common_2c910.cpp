@@ -2,40 +2,16 @@
 // and the owner's set bonus, routed through the 1.13c helpers 0x2C7C0 and 0x2C630 rather than the
 // 1.10f sub_6FDA4380 / sub_6FDA4490 the vendored ITEMS_UpdateSets still calls.
 #include <cstdint>
-#include <emscripten.h>
 
 #include "D2Inventory.h"
 #include "D2ItemMods.h"
 #include "D2Items.h"
 
-// Same layout as the definition in d2common_batch_87080.cpp (only sub45F90 is used here).
-struct D2CommonBatch87080Env {
-	void (*sub45F90)(uint32_t pUnit, uint32_t pItem, int32_t nState);
-	void (*sub7BB70)(uint32_t pRoom, uint8_t nStatus);
-	void (*setStatus[4])(uint32_t pRoom);
-};
-
-extern "C" int32_t d2_fn_d2common_2c630(uint32_t pUnit, uint32_t pItem, int32_t nMode,
-                                        const D2CommonBatch87080Env* env);
+int32_t D2Common_2C630_SetItemApplyBonus(D2UnitStrc* pUnit, D2UnitStrc* pItem, int32_t nMode);
 extern "C" int32_t D2Common_2C7C0_SetItemToggleStates(D2UnitStrc* pItem, uint32_t nSetItemMask);
 
-namespace
-{
-	inline uint32_t A(const D2UnitStrc* p) { return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(p)); }
-	inline D2UnitStrc* U(uint32_t a) { return reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(a)); }
-
-	// 0x45F90(unit, state) with the item in EBX: 1.10f ITEMMODS_UpdateFullSetBoni.
-	void UpdateFullSetBoni(uint32_t pUnit, uint32_t pItem, int32_t nState)
-	{
-		ITEMMODS_UpdateFullSetBoni(U(pUnit), U(pItem), nState);
-	}
-
-	const D2CommonBatch87080Env kEnv{ UpdateFullSetBoni, nullptr, { nullptr, nullptr, nullptr, nullptr } };
-}
-
 // 1.13c D2Common+0x2C910
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_2c910(D2UnitStrc* pUnit, D2UnitStrc* pItem,
-                                                              int32_t nMode, int32_t bForceStates)
+int32_t D2Common_2C910_UpdateSets(D2UnitStrc* pUnit, D2UnitStrc* pItem, int32_t nMode, int32_t bForceStates)
 {
 	if (pUnit == nullptr)
 		return 0;
@@ -51,6 +27,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_2c910(D2UnitStrc* pUnit, 
 	if (bForceStates != 0 || nMode == 0)
 		D2Common_2C7C0_SetItemToggleStates(const_cast<D2UnitStrc*>(pItem), nSetItemMask);
 
-	d2_fn_d2common_2c630(A(pUnit), A(pItem), nMode, &kEnv);
+	D2Common_2C630_SetItemApplyBonus(pUnit, pItem, nMode);
 	return 1;
 }
