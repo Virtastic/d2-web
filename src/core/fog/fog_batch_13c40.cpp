@@ -62,6 +62,9 @@ int8_t code_width(int32_t n) {
 }
 }  // namespace
 
+// 1.13c Fog+0x1D100 FUNCTION-mode seam (src/core/fn/fog_1d100.cpp): the anonymous-namespace code_width.
+extern "C" int8_t fog_code_width_1d100(int32_t n) { return code_width(n); }
+
 // 1.13c Fog+0x13E40: dst = ~src over (bits+7)/8 bytes.
 extern "C" void fog_sub_13E40(const uint8_t* src, uint8_t* dst, int32_t bits) {  // 1.13c Fog+0x13E40
     int32_t n = (bits + 7) / 8;
@@ -112,6 +115,9 @@ extern "C" void fog_sub_1D190(uint8_t* h, uint8_t maxBits, const char* syms) {  
     std::memcpy(h, &w, 4);
 }
 
+// FUNCTION-mode seams (src/core/fn/fog_1cfa0.cpp, fog_1ce50.cpp): retail's void routines leave a defined EAX the vector records.
+extern "C" uint32_t fog_eax_1cfa0 = 0, fog_eax_1ce50 = 0;
+
 // 1.13c Fog+0x1CFA0: encode a NUL-terminated string into out[outLen] with the coder.
 extern "C" void fog_sub_1CFA0(const uint8_t* h, const char* str, uint8_t* out, int32_t outLen, int32_t terminate) {  // 1.13c Fog+0x1CFA0
     if (!h) fatal(0x6e);
@@ -128,7 +134,8 @@ extern "C" void fog_sub_1CFA0(const uint8_t* h, const char* str, uint8_t* out, i
         bits_write(&b, (int8_t)h[c + 4], w);
         c = *++str;
     }
-    if (terminate || cnt < lim) bits_write(&b, 0, w);
+    fog_eax_1cfa0 = 0;
+    if (terminate || cnt < lim) { bits_write(&b, 0, w); fog_eax_1cfa0 = (uint32_t)b.bit; }
 }
 
 // 1.13c Fog+0x1CE50: decode in[inLen] into out[outCap] (NUL-terminated).
@@ -147,10 +154,11 @@ extern "C" void fog_sub_1CE50(const uint8_t* h, char* out, uint8_t* in, int32_t 
         do {
             int8_t idx = (int8_t)bits_read(&b, w);
             out[i++] = (char)h[idx + 0x103];
-            if (idx == 0) return;
+            if (idx == 0) { fog_eax_1ce50 = 0; return; }
         } while (i < cap);
     }
     out[i] = 0;
+    fog_eax_1ce50 = (uint32_t)(uintptr_t)out;
 }
 
 // 1.13c Fog+0x1F910: capitalise the first letter of each space-separated word, lower-case the rest.

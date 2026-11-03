@@ -37,9 +37,9 @@ extern "C" uint16_t fog_sub_1e7d0(int32_t enable, uint8_t* q, uint8_t* dst, uint
     uint8_t* head = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(headAddr));
     if (!head) return 0;
     uint16_t size; std::memcpy(&size, head, 2);
-    if ((uint16_t)cap < size) { uint32_t one = 1; std::memcpy(q, &one, 4); size = 0; }
+    uint16_t ret = size;
+    if ((uint16_t)cap < size) { uint32_t one = 1; std::memcpy(q, &one, 4); ret = 0; }   // oversized: flag set, nothing copied, returns 0 (EDI = 0)
     else std::memcpy(dst, head + 8, size);
-    uint16_t ret; std::memcpy(&ret, head, 2);
     uint32_t next; std::memcpy(&next, head + 4, 4);
     fog_free_block(head, "", 0);
     std::memcpy(q + 0x1C, &next, 4);
