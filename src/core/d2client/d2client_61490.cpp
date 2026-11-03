@@ -8,8 +8,8 @@ struct D2c61490Env {
     u32 (*f1760)(u32 type, u32 group);           // EAX = type, EDX = 9
     void (*c658)(u32 unit, i32* kind, i32* type, i32* mode, u32 file, u32 line);   // stdcall 6
     u32 (*cbda)(u32 unit, u32 what);             // stdcall 2
-    u32 (*f560d0)(u32 unit);                     // EAX = unit
-    u32 (*f55b60)(u32 unit);                     // EAX = unit, low 16 bits used
+    u32 (*f560d0)(u32 unit);                     // D2Client+0xA60D0, EAX = unit
+    u32 (*f55b60)(u32 unit);                     // D2Client+0xA5B60 (party id), EAX = unit, low 16 bits used
     u32 (*f219f0)(u32 v);                        // EAX = v
     u32 (*cc52)(u32 p);                          // stdcall 1
 };

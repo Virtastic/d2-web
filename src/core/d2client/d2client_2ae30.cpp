@@ -1,6 +1,7 @@
 // Unit action gate. Retail: EAX = unit, EBX = id, ESI = unit id word,
 // stack (ret 8) = p1, p2. A unit whose +0xC4 bit 1 is set asks callee(ESI, EBX); true calls callee(EBX; ESI, p1, p2) and returns 0,
-// false returns 1. No unit or bit clear: globals callee := 1, callee := 0, return 0.
+// false returns 1. No unit or bit clear: [D2Client+0x11C2F8] := 1, [D2Client+0x11C2F4] := 0, return 0.
+// 1.13c D2Client+0x2AE30
 #include <cstdint>
 #include <emscripten.h>
 

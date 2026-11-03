@@ -144,15 +144,15 @@ uint32_t sub_C5670(const Env& e, uint32_t, int32_t cls, uint32_t a3) {
  e.f630f0(S);
  return 1;
 }
-// 1.13c D2Client+0xC5730
-uint32_t sub_C5730(const Env& e, uint32_t, uint32_t a2, int32_t cnt, uint32_t a4, uint32_t a5) {
+// 1.13c D2Client+0xC5730 (disassembly: EAX = unit, EDX = a2, ret 0xC; the 0x5C-byte record is S[0x17])
+uint32_t sub_C5730(const Env& e, uint32_t unit, uint32_t a2, int32_t cnt, uint32_t a4, uint32_t a5) {
  uint32_t S[23]; zero23(S);
- S[0] = 3; S[7] = a4; S[8] = a5; S[4] = a2;
+ S[11] = a4; S[0] = 3; S[12] = a5; S[21] = (uint32_t)e.cb23b60; S[1] = unit; S[4] = a2;
  int32_t pt[2];
  if (!e.f51340(pt)) return 0;
- S[5] = (uint32_t)pt[0]; S[6] = (uint32_t)pt[1];
+ S[6] = (uint32_t)pt[0]; S[7] = (uint32_t)pt[1];   // 0x51340 fills the two words at record +0x18
  for (uint32_t i = 0; (int32_t)i < cnt; i++) {
-  S[9] = e.rd32(e.tbl87078 + (i & 7) * 4); S[10] = e.rd32(e.tbl87098 + (i & 7) * 4);
+  S[7] = e.rd32(e.tbl87078 + (i & 7) * 4); S[8] = e.rd32(e.tbl87098 + (i & 7) * 4);
   S[22] = i;
   e.f630f0(S);
  }
@@ -184,7 +184,7 @@ uint32_t sub_C5C70(const Env& e, P u, int32_t cls, uint32_t a3) {
  if (skOk(e, s)) e.f74410(s, cls, a3);
  if (skOk(e, s16(e, r + 0xec))) {
   int32_t n = e.o10786(u, e.rd32(r + 0x114), cls, a3);
-  sub_C5730(e, 0, 0, n, (uint32_t)cls, a3);
+  sub_C5730(e, (uint32_t)u, (uint32_t)s16(e, r + 0xec), n, (uint32_t)cls, a3);   // EAX = unit, EDX = the 0xEC skill
  }
  return 1;
 }

@@ -253,6 +253,7 @@ U sub_4A210(){Menu&m=g.tbl[11];m.count=3;m.f[1]=H9440;m.s[1]=int16_t(0xd45);retu
 
 // 1.13c D2Client+0x4A270
 U sub_4A270(){
- g.v9663=1; I i=h.f5c00(); g.a9675=U(i); sub_49D80(i); return 1;
+ g.v9663=1; I i=h.f5c00(); g.a9675=0x6fba37a8u+U(i)*0x16u; if(g.tab37a8)g.tab9675rec=g.tab37a8+i*0x16;  // retail: DAT_6fbc9675 = &DAT_6fba37a8 + idx*0x16 (a record pointer, not the index)
+ sub_49D80(i); return 1;
 }
 }

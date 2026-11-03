@@ -266,7 +266,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE U d2_client_b9a80(U unit, U self, uint32_t p1, i
     uint32_t c[0x17]; zero(c);
     c[0] = 0x521; c[1] = (uint32_t)cx; c[4] = p1;
     c[5] = (uint32_t)(ux(unit) + dx); c[6] = (uint32_t)(uy(unit) + dy);
-    c[7] = (uint32_t)p4; c[8] = (uint32_t)p5; c[9] = (uint32_t)p8; c[10] = p6; c[11] = p7;
+    c[7] = (uint32_t)p4; c[8] = (uint32_t)p5; c[9] = (uint32_t)p8; c[11] = p6; c[12] = p7;
     return spawn(c);
 }
 

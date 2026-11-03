@@ -6,30 +6,29 @@ namespace d2client_23a30 {
 using U=uint32_t; using I=int32_t; using P=void*;
 static U rd(P p,U n){U v;std::memcpy(&v,static_cast<uint8_t*>(p)+n,4);return v;}
 static void wr(P p,U n,U v){std::memcpy(static_cast<uint8_t*>(p)+n,&v,4);}
-struct Node{U id; Node* next;};
 
 struct Env23A30 {
  P (*find)(U id);              // DAT_6fbcbf30 list: entry whose [+8]==id, else null
  bool tableOn; I tableCount;   // DAT_6fbcc24c != 0, DAT_6fbcc250
  U (*rec32)(I idx,U off);      // 0x8e-byte record field read, idx validated here
  U (*rec8)(I idx,U off);
- P (*player)();                // FUN_2a70
- U (*c37e90)(P,U); void (*c37ed0)(I,U,I); void (*c38c20)(P,I);
+ P (*player)(P a);              // FUN_2a70 (EAX = a)
+ U (*c37e90)(P,U); void (*c37ed0)(I,U,I); void (*c38c20)(P,I,U);   // EAX = id, stack (a, 1)
  U now;                        // DAT_6fbcc268
 };
 static I recIdx(const Env23A30& e,I i){return (i<0||e.tableCount<=i)?0:i;}
 // 1.13c D2Client+0x23A30
 void sub_23A30(P a,I param2,Env23A30& e){
- for(Node* n=reinterpret_cast<Node*>(static_cast<uintptr_t>(rd(a,0x78)));n;){
-  U id=n->id; n=n->next;
+ for(P n=reinterpret_cast<P>(static_cast<uintptr_t>(rd(a,0x78)));n;){   // retail list cell: {id, next} dwords
+  U id=rd(n,0); n=reinterpret_cast<P>(static_cast<uintptr_t>(rd(n,4)));
   P en=id?e.find(id):nullptr;
   U v=0;
   if(e.tableOn) v=e.rec32(recIdx(e,en?I(rd(en,4)):0),0x60);
-  P pl=e.player(); U want=pl?rd(pl,0x68):0;
+  P pl=e.player(a); U want=pl?rd(pl,0x68):0;
   if(v!=want) continue;
-  if(!param2){ e.c38c20(a,1); continue; }
+  if(!param2){ e.c38c20(a,1,id); continue; }
   P q=id?e.find(id):nullptr; U ptr=q?rd(q,0x28):0;
-  if(ptr&&rd(reinterpret_cast<P>(static_cast<uintptr_t>(ptr)),4)){ e.c38c20(a,1); continue; }
+  if(ptr&&rd(reinterpret_cast<P>(static_cast<uintptr_t>(ptr)),4)){ e.c38c20(a,1,id); continue; }
   P en2=id?e.find(id):nullptr;
   if(!en2) continue;
   if(e.c37e90(reinterpret_cast<P>(static_cast<uintptr_t>(ptr)),id)) continue;

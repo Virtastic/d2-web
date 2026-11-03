@@ -3,6 +3,17 @@
 // this resumable codes state machine and its circular-window transitions.
 #include "inflate_codes.h"
 
+// Test seam: the fast loop and the window flush are separate rows; a probe replaces them with recorders.
+static D2ClientInflateCodesCallees g_callees;
+void D2Client_SetInflateCodesCallees(const D2ClientInflateCodesCallees* c) { g_callees = c ? *c : D2ClientInflateCodesCallees{}; }
+static int32_t callFast(uint32_t lb, uint32_t db, const D2ClientInflateHuft* lt, const D2ClientInflateHuft* dt,
+                        D2ClientInflateBlocks& b, D2ClientInflateInput& in) {
+    return g_callees.fast ? g_callees.fast(lb, db, lt, dt, b, in) : D2Client_InflateFast(lb, db, lt, dt, b, in);
+}
+static int32_t callFlush(D2ClientInflateWindow& w, D2ClientInflateOutput& o, int32_t r) {
+    return g_callees.flush ? g_callees.flush(w, o, r) : D2Client_FlushInflateWindow(w, o, r);
+}
+
 // 1.13c D2Client+0x0E350
 int32_t D2Client_InflateCodes(D2ClientInflateBlocks& blocks,
     D2ClientInflateInput& input, D2ClientInflateOutput& output, int32_t result) {
@@ -24,7 +35,7 @@ int32_t D2Client_InflateCodes(D2ClientInflateBlocks& blocks,
         blocks.bitBuffer >>= n & 31;
         blocks.bitCount -= n;
     };
-    auto flush = [&]() { return D2Client_FlushInflateWindow(window, output, result); };
+    auto flush = [&]() { return callFlush(window, output, result); };
     auto space = [&]() -> std::ptrdiff_t {
         return window.write < window.read ? window.read - window.write - 1 : window.end - window.write;
     };
@@ -40,7 +51,7 @@ int32_t D2Client_InflateCodes(D2ClientInflateBlocks& blocks,
         switch (code.mode) {
         case 0:
             if (space() >= 258 && input.available >= 10) {
-                result = D2Client_InflateFast(code.literalBits, code.distanceBits,
+                result = callFast(code.literalBits, code.distanceBits,
                     code.literalTree, code.distanceTree, blocks, input);
                 if (result != 0) { code.mode = result == 1 ? 7 : 9; break; }
             }

@@ -7,11 +7,12 @@ struct D2c601a0Env {
     void (*drawText)(const uint16_t* text, uint32_t x);                            // 0xD37E, ECX = text, EDX = x
 };
 // 1.13c D2Client+0x601A0
-void d2c_601a0(const char* s, uint32_t p1, int32_t p2, uint8_t p3, int32_t p4, const D2c601a0Env* e) {
+// returns EAX as retail leaves it: 0 (the length) for an empty string, else the restoring D3A8's result
+uint32_t d2c_601a0(const char* s, uint32_t p1, int32_t p2, uint8_t p3, int32_t p4, const D2c601a0Env* e) {
     (void)p1;
     uint32_t len = 0;
     while (s[len]) len++;
-    if (len == 0) return;
+    if (len == 0) return 0;
     if (p3 > 0xc) p3 = 0;
     uint32_t prev = e->setFont(6);
     uint16_t buf[23];
@@ -19,5 +20,5 @@ void d2c_601a0(const char* s, uint32_t p1, int32_t p2, uint8_t p3, int32_t p4, c
     for (uint32_t i = 0; i < 22 && i < len; i++) buf[i] = (uint8_t)s[i];
     int32_t w = (int32_t)e->textWidth(buf, (uint32_t)(p2 - 10), p3, 0);
     e->drawText(buf, (uint32_t)(p4 - ((w + (w < 0 ? 1 : 0)) >> 1)));
-    e->setFont(prev);
+    return e->setFont(prev);
 }

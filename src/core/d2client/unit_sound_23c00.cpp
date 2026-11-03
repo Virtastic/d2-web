@@ -65,6 +65,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_23c00(uint32_t unit, const ui
         cb(ctx, OP_VOLUME, first, snd, vol);                                  // 0x23DE0: (elapsed|vol*0xA0, sound, vol|that/0xFF)
     }
     if (doRand && cb(ctx, OP_RAND, 100, 0, 0) < rate)                     // 0x23DF2
-        cb(ctx, OP_PLAY, unit, 0, 0);
+        cb(ctx, OP_PLAY, unit, 0, doRand);                   // 0x23E04: EBX = [esp+0x20] (the record's +0x58)
     return cb(ctx, OP_FINAL, unit, nNow, 0);                              // 0x23E10
 }

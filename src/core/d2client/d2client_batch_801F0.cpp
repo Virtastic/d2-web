@@ -15,7 +15,7 @@ struct G { // D2Client globals by RVA-less VA (6fb.. image)
 struct Ops {
  void (*destroy)(P);            // Ordinal_10065
  void (*fatal)(U);              // Ordinal_10265+10024+_exit
- void (*err7a)(I,I);            // Ordinal_10043
+ void (*err7a)(P,I,I);          // Ordinal_10043
  void (*f80ca0)();              // 0x80CA0
  void (*o10063)();              // Ordinal_10063
  void (*f814f0)();              // 0x814F0
@@ -24,8 +24,8 @@ struct Ops {
 void sub_801F0(G& g,U p){ if(!g.g6fbcbf6c){g.g6fbcbf6c=1;g.g6fbc393c=1;g.g6fbc38c0=0;g.g6fb91380=p;} }
 // 1.13c D2Client+0x80220
 void sub_80220(G& g,Ops& o){
- for(P& h:g.h3904) if(h){o.destroy(h);o.err7a(0x7a,0);h=nullptr;}
- for(P& h:g.h3890) if(h){o.destroy(h);o.err7a(0x7a,0);h=nullptr;}
+ for(P& h:g.h3904) if(h){o.destroy(h);o.err7a(h,0x7a,0);h=nullptr;}
+ for(P& h:g.h3890) if(h){o.destroy(h);o.err7a(h,0x7a,0);h=nullptr;}
 }
 // 1.13c D2Client+0x812F0 (EAX = in)
 void sub_812F0(G& g,Ops& o,U in){

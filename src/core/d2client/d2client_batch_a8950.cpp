@@ -196,14 +196,17 @@ void d2_client_a9860(int32_t flag, uintptr_t rec, int32_t ox, int32_t oy, int32_
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_a9a20(uint32_t thiz, int32_t flag, uint32_t* oa, uint8_t* orr, uint8_t* og, uint8_t* ob,
                      uint32_t c9610, const uint8_t* c9614, uint32_t c2e4, int32_t a2130, uint32_t c3b8,
-                     int32_t (*ord10826)(void), uint32_t (*f24d0)(uint8_t* rgb),
-                     void (*ord10636)(void), void (*ord10189)(uint32_t, uint8_t*, uint8_t*, uint8_t*),
-                     uint32_t (*ord10731)(uint32_t)) {
+                     int32_t (*ord10826)(uintptr_t), uint32_t (*f24d0)(uint8_t* rgb),
+                     void (*ord10636)(uintptr_t, uint8_t* alpha, uint8_t* r, uint8_t* g, uint8_t* b),
+                     void (*ord10189)(uint32_t, uint8_t*, uint8_t*, uint8_t*),
+                     uint32_t (*ord10731)(uint32_t), uintptr_t esiUnit) {
+    // ESI is a hidden register input (disassembly): stdcall Ordinal_10826(esi) and Ordinal_10636(esi, &alpha, &r, &g, &b),
+    // the latter writes the top byte of the saved ECX slot and the three colour bytes; eax = that alpha byte.
     uint8_t c[3] = {0, 0, 0};
     uint32_t hi = thiz & 0xff000000u, a = 0;
     bool done = false;
     if (flag != 0) {
-        int32_t m = ord10826();
+        int32_t m = ord10826(esiUnit);
         if (m == 8) a = f24d0(c);
         else if (m < 0x6b || m > 0x6c) { c[0] = c9614[0]; c[1] = c9614[1]; c[2] = c9614[2]; a = c9610; }
         else if (c2e4 == 0 || a2130 != -1) a = 0;
@@ -211,8 +214,9 @@ void d2_client_a9a20(uint32_t thiz, int32_t flag, uint32_t* oa, uint8_t* orr, ui
         done = c[0] || c[1] || c[2];
     }
     if (!done) {
-        ord10636();
-        a = hi >> 24;
+        uint8_t al = (uint8_t)(hi >> 24);
+        ord10636(esiUnit, &al, &c[0], &c[1], &c[2]);
+        a = al;
         if (!c[0] && !c[1] && !c[2]) { ord10189(c3b8, &c[0], &c[1], &c[2]); a = ord10731(c3b8); }
     }
     *oa = a; *orr = c[0]; *og = c[1]; *ob = c[2];

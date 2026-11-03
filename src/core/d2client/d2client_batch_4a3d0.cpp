@@ -62,7 +62,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_4a3d0(D2C4A3D0State* g, const D2C
             if (g->cur_unit == 0) { e->fatal(0xfab); return; }
             e->sub_6910();
         }
-        s[0x14] = 1;
+        s[0x15] = 1;   // pcVar5[4] with pcVar5 = slot+0x11
     }
     if (!e->sub_6150()) return;
     g->f_9663 = 0;

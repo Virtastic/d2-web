@@ -70,7 +70,7 @@ struct D2ClientInflateEnv {
     void      (*zfree)(uint32_t, void*);                 // +0x0FFF0 default free
     void*     (*blocks_new)(B81ZStream*, int32_t);       // +0x0FF60 inflate_blocks_new
     int32_t   (*blocks)(B81ZBlocks*, B81ZStream*, int32_t); // +0x0F4C0 inflate_blocks
-    void      (*blocks_end)();                           // +0x0F3F0 called when inflate_blocks returns 1
+    void      (*blocks_end)(B81ZBlocks*, B81ZStream*, uint32_t* prev); // +0x0F3F0 (ESI blocks, EDI z, EAX &state->hold: *EAX := blocks checksum) when inflate_blocks returns 1
     void      (*blocks_free)(B81ZBlocks*, B81ZStream*);  // +0x0F450 inflate_blocks_free
 };
 static D2ClientInflateEnv g_inflate;
@@ -235,7 +235,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_10250(B81ZStream* z, int32_t f
             int32_t r = r0;
             if (r == 0) r = ok;
             if (r != 1) return r;
-            if (g_inflate.blocks_end) g_inflate.blocks_end();
+            if (g_inflate.blocks_end) g_inflate.blocks_end((B81ZBlocks*)(uintptr_t)st->blocks, z, &st->hold);
             if (st->raw == 0) { st->mode = 8; ret = ok; goto trailer; }
             st->mode = 0xC; ret = ok;
             break;

@@ -11,6 +11,8 @@ inline u32 go(D2cHost h, u32 rva, u32 a = 0, u32 s0 = 0, u32 s1 = 0, u32 s2 = 0,
     u32 r = h(&c); if (o) *o = c.out[0]; return r;
 }
 inline u32 ord(D2cHost h, u32 n, u32 a = 0, u32 s1 = 0, u32 s2 = 0, u32 s3 = 0, u32 s4 = 0) { return go(h, 0x80000000u | n, a, a, s1, s2, s3, nullptr) + 0 * s4; }
+// ord10065 (thunk 0xBFF8, register args): ECX = pool, EDX = slot index << 16 (the loop counter)
+inline void ord10065(D2cHost h, u32 obj, u32 i) { D2cCall c = {}; c.rva = 0x80000000u | 10065; c.ecx = obj; c.edx = i << 16; h(&c); }
 inline i32 rd(const void* p, u32 off) { i32 v; memcpy(&v, (const char*)p + off, 4); return v; }
 inline void wr(void* p, u32 off, i32 v) { memcpy((char*)p + off, &v, 4); }
 // shared body of 0x800D0 / 0x80160: obj = DAT_6fbcbf64 / DAT_6fbcbf60, frames = DAT_6fbc3880 / DAT_6fbc391c
@@ -24,7 +26,7 @@ void tick(D2cHost h, uint8_t* obj, const i32* frames, const i32* dx, const i32* 
         if (t < 1) {
             i32 f = rd(e, 0x10); wr(e, 0x10, f + 1);
             *(int16_t*)(e + 0x14) = 2; *(int16_t*)(e + 0x16) = 0;
-            if (frames[rd(e, 0xc)] <= f + 1) ord(h, 10065);
+            if (frames[rd(e, 0xc)] <= f + 1) ord10065(h, (u32)(uintptr_t)obj, (u32)i);
         }
     }
 }

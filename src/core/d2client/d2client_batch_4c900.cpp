@@ -31,7 +31,7 @@ void sub_4C900(Services& s, int32_t* e) {
 uint8_t sub_4C990(Services& s, void* a, int32_t* b) {
  if(!b||b[0]!=1) return 0;
  int32_t id=b[1]; if(id<0) return 0;
- if(id<s.classCount()){ int32_t r=s.classToId(id); if(r!=-1) id=r; }
+ if(id<s.classCount()){ id=s.classToId(id); }   // retail: id = (short)row[2] unconditionally (a -1 short fails the next range check)
  if(id<0||id>=s.classCount()||id!=0x12a) return 0;
  if(s.ord10522()>=2) return 0;
  uint8_t u=s.ord10042(b[0xb]); uint32_t k=s.ord10266(u);

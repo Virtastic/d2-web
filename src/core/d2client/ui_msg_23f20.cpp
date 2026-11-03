@@ -1,9 +1,10 @@
 // D2Client+0x23F20: per-message dispatcher (fastcall ecx, dl; stack arg p3, ret 4). Callees go through D2cHost in retail order.
-// A "load" is the self-RVA call: eax = base, ecx = byte offset, returns the dword at base+offset (caller truncates to retail's width).
+// A "load" is a plain dword read at base+offset (retail reads the unit/record memory directly; the caller truncates to retail's width).
 #include "client_host.h"
 #include <emscripten.h>
+#include <cstring>
 static uint32_t cl(D2cHost h, D2cCall c) { return h(&c); }
-static uint32_t ld(D2cHost h, uint32_t base, uint32_t off) { return cl(h, { 0x23F20, base, off, 0, 0, 0, { 0, 0, 0, 0 } }); }
+static uint32_t ld(D2cHost, uint32_t base, uint32_t off) { uint32_t v; memcpy(&v, (const void*)(uintptr_t)(base + off), 4); return v; }
 static uint32_t ui(D2cHost h, uint32_t edi, uint32_t ebx) { return cl(h, { 0x88A70, 0, 0, 0, ebx, 0, { edi, 0, 0, 0 } }); }
 static void tail(D2cHost h, uint32_t edi, uint32_t id) {   // esi = ebx = id, eax = edi
     cl(h, { 0x7C270, edi, 0, 0, id, id, { 0, 0, 0, 0 } });
@@ -13,7 +14,7 @@ static void tail(D2cHost h, uint32_t edi, uint32_t id) {   // esi = ebx = id, ea
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_23f20(D2cHost h, uint32_t ecx, uint32_t edx, uint32_t p3, const uint32_t* g, uint32_t* w) {
     uint32_t idx = edx & 0xFF;
     w[3] = 0;
-    uint32_t edi = cl(h, { 0xA4E20, ecx & 0x7F, 0x6FBBA608u + (idx << 9), 0, 0, 0, { idx, 0, 0, 0 } });
+    uint32_t edi = cl(h, { 0xA4E20, ecx & 0x7F, ecx, 0x6FBBA608u + (idx << 9), 0, 0, { idx, 0, 0, 0 } });
     if (!edi) return;
     uint32_t n = (p3 & 0xFFFF) - 10, id;
     if (n <= 0x53) switch (p3 & 0xFFFF) {

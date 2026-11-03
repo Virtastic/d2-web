@@ -95,6 +95,10 @@ int32_t D2Client_BuildInflateTree(const uint32_t* lengths, uint32_t count,
     return remaining && maximum != 1 ? -5 : 0;
 }
 
+static D2ClientBuildTreeFn g_buildTree = nullptr;
+void D2Client_SetInflateTreeBuilder(D2ClientBuildTreeFn f) { g_buildTree = f; }
+static inline D2ClientBuildTreeFn buildTree() { return g_buildTree ? g_buildTree : D2Client_BuildInflateTree; }
+
 // 1.13c D2Client+0x0F0A0
 int32_t D2Client_InflateDynamicTrees(uint32_t literals, uint32_t distances,
     const uint32_t* lengths, uint32_t& literalBits, uint32_t& distanceBits,
@@ -103,13 +107,13 @@ int32_t D2Client_InflateDynamicTrees(uint32_t literals, uint32_t distances,
     auto* sorted = static_cast<uint32_t*>(allocator.allocate(allocator.opaque, 288, sizeof(uint32_t)));
     if (!sorted) return -4;
     uint32_t used = 0;
-    int32_t result = D2Client_BuildInflateTree(lengths, literals, 257, lengthBase, lengthExtra,
+    int32_t result = buildTree()(lengths, literals, 257, lengthBase, lengthExtra,
         literalTree, literalBits, workspace, used, sorted);
     if (result || !literalBits) {
         if (result == -3) message = "oversubscribed literal/length tree";
         else if (result != -4) { message = "incomplete literal/length tree"; result = -3; }
     } else {
-        result = D2Client_BuildInflateTree(lengths + literals, distances, 0, distanceBase, distanceExtra,
+        result = buildTree()(lengths + literals, distances, 0, distanceBase, distanceExtra,
             distanceTree, distanceBits, workspace, used, sorted);
         if (result == -3) message = "oversubscribed distance tree";
         else if (result == -5) { message = "incomplete distance tree"; result = -3; }
@@ -128,7 +132,7 @@ int32_t D2Client_InflateBitTree(const uint32_t* lengths, uint32_t& bits,
     auto* sorted = static_cast<uint32_t*>(allocator.allocate(allocator.opaque, 19, sizeof(uint32_t)));
     if (!sorted) return -4;
     uint32_t used = 0;
-    int32_t result = D2Client_BuildInflateTree(lengths, 19, 19, nullptr, nullptr,
+    int32_t result = buildTree()(lengths, 19, 19, nullptr, nullptr,
         tree, bits, workspace, used, sorted);
     if (result == -3) message = "oversubscribed dynamic bit lengths tree";
     else if (result == -5 || !bits) { message = "incomplete dynamic bit lengths tree"; result = -3; }

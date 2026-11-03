@@ -49,7 +49,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_67cc0(uint32_t* vtbl) { *vtbl = 0
 // 1.13c D2Client+0x67D00 -- list constructor; args param_2..param_9 map to the fields below
 extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* d2_client_67d00(uint8_t* b, const D2ClientListEnv* env,
     uint32_t p2, uint32_t p3, uint32_t p4, uint32_t p5, uint32_t p6, uint32_t p7, uint32_t p8, uint32_t p9, char p10) {
-    for (int i = 0; i < 0x80; i++) env->ctor_1cb0(b + 8 + (uint32_t)i * 0xC038);
+    for (int i = 0; i < 0x80; i++) env->ctor_1cb0(b + 8 + (uint32_t)i * 0x300E);
     wr<uint32_t>(b, 0x180708, p2); wr<uint32_t>(b, 0x18070c, p3);
     wr<uint32_t>(b, 0x180710, p4); wr<uint32_t>(b, 0x180714, p5);
     wr<uint32_t>(b, 0x180740, p7);
@@ -73,11 +73,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* d2_client_67d00(uint8_t* b, const D2Cli
     return b;
 }
 
-// 1.13c D2Client+0x67F20 -- wrapper ctor: allocates 0x180776 bytes (Ordinal_401) and runs 0x67D00
+// 1.13c D2Client+0x67F20 -- wrapper ctor (ret 0x28: this + nine stack args): allocates 0x180776 bytes (Ordinal_401)
+// and forwards the nine stack args verbatim, in order, to 0x67D00 (disassembly: nine pushes of [esp+..] then the block)
 extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* d2_client_67f20(uint8_t* wrapper, uint8_t* alloc, const D2ClientListEnv* env,
-    uint32_t p2, uint32_t p3, uint32_t p4, uint32_t p5, char p6) {
-    // GUESS: the five stack args to 0x67D00 are decompiler-shifted; mapping here is (wrapper,p2..p5,p6) positional
-    uint8_t* o = alloc ? d2_client_67d00(alloc, env, 0, 0, 0, p2, p3, p4, p5, 0, p6) : nullptr;
+    uint32_t p2, uint32_t p3, uint32_t p4, uint32_t p5, uint32_t p6, uint32_t p7, uint32_t p8, uint32_t p9, char p10) {
+    uint8_t* o = alloc ? d2_client_67d00(alloc, env, p2, p3, p4, p5, p6, p7, p8, p9, p10) : nullptr;
     wr<uint64_t>(wrapper, 8, (uint64_t)(uintptr_t)o);
     return wrapper;
 }

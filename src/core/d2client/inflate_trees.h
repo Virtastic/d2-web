@@ -5,6 +5,10 @@ int32_t D2Client_BuildInflateTree(const uint32_t* lengths, uint32_t count,
     uint32_t simple, const uint32_t* bases, const uint32_t* extra,
     D2ClientInflateHuft*& tree, uint32_t& bits, D2ClientInflateHuft* workspace,
     uint32_t& used, uint32_t* sorted);
+// Test seam (FN probes of F0A0/F1E0 replace the 0xEBB0 callee with a recorder, as the capture hooks it); null restores the builder.
+using D2ClientBuildTreeFn = int32_t (*)(const uint32_t*, uint32_t, uint32_t, const uint32_t*, const uint32_t*,
+    D2ClientInflateHuft*&, uint32_t&, D2ClientInflateHuft*, uint32_t&, uint32_t*);
+void D2Client_SetInflateTreeBuilder(D2ClientBuildTreeFn);
 int32_t D2Client_InflateDynamicTrees(uint32_t literals, uint32_t distances,
     const uint32_t* lengths, uint32_t& literalBits, uint32_t& distanceBits,
     D2ClientInflateHuft*& literalTree, D2ClientInflateHuft*& distanceTree,

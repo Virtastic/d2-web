@@ -237,7 +237,7 @@ void sub_4A4F0(Env& e, UiG& g, uint8_t* u, int32_t uStack4, uint8_t* uiTypeTab[]
 
 // 1.13c D2CLIENT+0x4B5D0
 struct ScrG { int32_t a9781, a975f, a9663, cbc34, a9729, a9737, b834, a978e, a9786; uint8_t* a975b; uint8_t** buckets;
-  int32_t b828, b824, cc2f8, cc2f4; uint8_t d22f8, d22f9[4]; uint8_t* bbfc; };
+  int32_t b828, b824, cc2f8, cc2f4; uint8_t d22f8, d22f9[4]; uint8_t* bbfc; int32_t a9753 = 0; };
 void sub_4B5D0(Env& e, ScrG& g, W cb) {
  W who = rd<int32_t>(g.bbfc, 0x60);
  if (g.a9781 > 6) {
@@ -262,12 +262,15 @@ void sub_4B5D0(Env& e, ScrG& g, W cb) {
  }
  if (g.a9781 == 0 || g.a9781 == 1) {
   e.call(R(0x88A70), {0, 0, 0, 0});
-  if (g.a9781 == 0) { /* d2 clears a9753 */ }
+  if (g.a9781 == 0) g.a9753 = 0;
   uint8_t* p = g.buckets[g.a9786 & 0x7f];
   while (p && rd<int32_t>(p, 12) != g.a9786) p = rdp<uint8_t>(p, 0xe4);
-  if (!p) { g.a978e = 1; return; }
-  if (rd<int32_t>(p, 0) != 4) fatal(e, 0x5a);
-  if (g.a9781 == 1) { g.a978e = 1; return; }
+  // retail: state 0 with no unit sets a978e=1 and returns; state 1 with no unit falls through to the common tail
+  if (!p) { if (g.a9781 == 0) { g.a978e = 1; return; } }
+  else {
+   if (rd<int32_t>(p, 0) != 4) fatal(e, 0x5a);
+   if (g.a9781 == 1) { g.a978e = 1; return; }
+  }
  } else if (g.a9781 == 5) e.call(R(0x5AC00), {});
  g.a978e = 0;
  if (g.a975f) { e.call(R(0xA3D20), {}); g.a975f = 0; }
@@ -280,7 +283,7 @@ void sub_4B5D0(Env& e, ScrG& g, W cb) {
 void sub_55B20(Env& e, const uint8_t* dt, uint8_t* unit, W thisU, W p4, W p5, char16_t* dst, int32_t sep, int32_t hasDst) {
  char16_t tmp[0x100], tmp2[0x100];
  e.call(U_Init, {(W)tmp, 0x80}); e.call(U_Init, {(W)tmp2, 0x80});
- if (e.call(11088, {(W)unit}) == 0xb) { e.call(R(0x54880), {(W)unit, (W)unit, 0}); return; }
+ if (e.call(11088, {(W)unit}) == 0xb) { e.call(R(0x54880), {(W)unit, (W)dst, 0x6FBA20C8}); return; }   // disassembly: (unit, arg2 = dst, &DAT_6fba20c8)
  W a = e.call(10930, {(W)unit, p4, p5});
  if (!a) return;
  int32_t t = unit ? rd<int32_t>(unit, 0) : 6, cls = unit ? rd<int32_t>(unit, 8) : 0, id = unit ? rd<int32_t>(unit, 12) : -1;
@@ -291,14 +294,14 @@ void sub_55B20(Env& e, const uint8_t* dt, uint8_t* unit, W thisU, W p4, W p5, ch
   for (W n = e.call(10460, {rd<int32_t>(unit, 0x60)}); n; ) {
    W it = e.call(11147, {n}); if (!it) break;
    n = e.call(10464, {n});
-   W c = e.call(10930, {it, hasDst, sep}); if (c) e.call(10308, {h, c});
+   W c = e.call(10930, {it, p4, p5});   // disassembly: same (arg5, arg6) as the first call if (c) e.call(10308, {h, c});
   }
  }
- W s1 = e.call(10003, {}), s2 = e.call(10003, {}), s3 = e.call(10003, {});
+ W s1 = e.call(10003, {0xf9e}), s2 = e.call(10003, {0xf9b}), s3 = e.call(10003, {0xf0c});   // string ids via 0xD1EC (ecx)
  if (hasDst && e.call(10744, {(W)unit, 0x39}) && e.call(10910, {(W)unit, 0x7a, 0}) == 0) {
   e.call(R(0x54780), {(W)tmp2}); e.call(U_Strcat, {(W)dst, (W)tmp2});
  }
- e.call(R(0x54000), {});
+ e.call(R(0x54000), {(W)unit});   // stack arg = unit; ESI = scratch record (hidden)
  int32_t any = 0, nStat = rd<int32_t>(dt, 0xbdc);
  for (int32_t i = 0; i < nStat; ++i) {
   int32_t sid = rd<int16_t>(rdp<uint8_t>(dt, 0xbd8), i * 2);
@@ -306,7 +309,7 @@ void sub_55B20(Env& e, const uint8_t* dt, uint8_t* unit, W thisU, W p4, W p5, ch
   uint16_t rec[0x800]; int32_t n = (int32_t)e.call(11110, {h, sid, (W)rec, 0x1ff});
   for (int32_t k = 0; k < n; ++k) {
    uint16_t layer = rec[k * 4]; int32_t val = rd<int32_t>(rec, 4 + k * 8);
-   if (!val || e.call(R(0x54280), {sid, (W)dst}) != 0 || !e.call(R(0x54E10), {(W)unit, h, layer})) continue;
+   if (!val || e.call(R(0x54280), {sid, (W)dst}) != 0 || !e.call(R(0x54E10), {(W)unit, h, layer, val, sid, (W)tmp})) continue;
    if (sid == 0x17 && e.call(10680, {h, 0x15, 0})) continue;
    if (sid == 0x18 && e.call(10680, {h, 0x16, 0})) continue;
    if (sep) e.call(U_Strcat, {(W)tmp, s1});
@@ -317,10 +320,10 @@ void sub_55B20(Env& e, const uint8_t* dt, uint8_t* unit, W thisU, W p4, W p5, ch
  if (unit && rd<int32_t>(unit, 0) == 4) {
   const uint8_t* mon = (const uint8_t*)e.call(10695, {rd<int32_t>(unit, 4)});
   if (mon[0x113] == 0 && mon[0x112] != 0 && e.call(10973, {(W)unit, 0x98, 0}) < 1 && e.call(11116, {(W)unit}) == 0) {
-   e.call(10003, {});
-   if (any && !sep) { e.call(U_Strcat, {(W)dst, 0}); e.call(U_Strcat, {(W)dst, 0}); }
-   e.call(U_Strcat, {(W)dst, 0});
-   if (sep) e.call(U_Strcat, {(W)dst, 0});
+   W tail = e.call(10003, {0x52f8});
+   if (any && !sep) { e.call(U_Strcat, {(W)dst, s3}); e.call(U_Strcat, {(W)dst, s2}); }
+   e.call(U_Strcat, {(W)dst, tail});
+   if (sep) e.call(U_Strcat, {(W)dst, s1});
   }
  }
  e.call(11108, {h});
