@@ -302,5 +302,18 @@ void storm_C0AA(CrtState& g, const Host& h) {
         }
     }
 }
+} // namespace
 
-} // extern "C"
+// FN-probe seam for B594 / B62C: st = the nine CRT locale-search words at 0x6FC4274C..0x6FC4276C (flags, lcidA, lcidB,
+// flagCtry, flagLang, langName, ctryLen, ctryName, getLocale); the pointer words are the caller's (the getLocale word is
+// replaced by cb). which 0 = B594(hex), 1 = B62C(lcid = (uintptr_t)hex, strict). Flags and lcids are written back.
+uint32_t storm_fn_locale(int which, uint32_t* st, const char* hex, uint32_t strict, int (*cb)(uint32_t, uint32_t, char*, int)) {
+    CrtState g{};
+    g.flags = st[0]; g.lcidA = st[1]; g.lcidB = st[2]; g.flagCtry = st[3]; g.flagLang = st[4];
+    g.langName = (const char*)(uintptr_t)st[5]; g.ctryLen = st[6]; g.ctryName = (const char*)(uintptr_t)st[7];
+    g.getLocale = cb;
+    uint32_t r = which ? storm_B62C(g, (uint32_t)(uintptr_t)hex, (int)strict) : storm_B594(g, hex);
+    st[0] = g.flags; st[1] = g.lcidA; st[2] = g.lcidB;
+    return r;
+}
+

@@ -101,7 +101,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE char* fog_sub_11FE0(void* linker, int32_t index,
     char* const miss = static_cast<char*>(fog_sub_11DF0(nullptr, 0));
     if (linker == nullptr) return miss;
     if (index < 0 || index >= *static_cast<int32_t*>(linker)) return miss;
-    void* const root = *reinterpret_cast<void**>(static_cast<uint8_t*>(linker) + 0xC);
+    // The root link is retail's 32-bit dword at +0xC (see fog_sub_11DF0 on the 32-bit child links).
+    void* const root = reinterpret_cast<void*>(
+        static_cast<uintptr_t>(*reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(linker) + 0xC)));
     char* const found = static_cast<char*>(fog_sub_11DF0(root, index));
     if ((found == nullptr || found == miss) && log_missing != 0) return miss;
     return found;

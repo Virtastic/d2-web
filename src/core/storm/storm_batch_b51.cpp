@@ -9,13 +9,15 @@
 void Storm_Sub3E20(uint32_t obj);
 void Storm_Sub3EF0(uint32_t obj);
 extern "C" void Storm_ListLink4390(uint32_t* eax, uint8_t* this_, uint8_t* node_arg, int32_t mode);   // 0x4390 (storm_batch_1000.cpp)
+extern "C" int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);   // 0x1B960 SMemFree
 namespace {
 uint8_t* at(uint32_t p, uintptr_t off) { return (uint8_t*)(uintptr_t)(p + off); }
 uint32_t& u32(uint32_t p, uintptr_t off) { return *(uint32_t*)at(p, off); }
 uint32_t& w(uint32_t a) { return *(uint32_t*)(uintptr_t)a; }
 
 // Storm internals (seams, defined by their own rows)
-void Storm_Free(uint32_t p, const char* file, int32_t line);           // 0x1B960
+extern "C" int32_t Storm_Sub1B960(void* p, const char* tag, int32_t line); // 0x1B960 (storm_alloc_1b960.cpp)
+inline void Storm_Free(uint32_t p, const char* file, int32_t line) { (void)Storm_Sub1B960((void*)(uintptr_t)p, file, line); } // 0x1B960 wrapper
 void Storm_Sub4B80(uint32_t obj);                                      // 0x4B80 (base dtor)
 void Storm_Sub4D60(uint32_t node);                                     // 0x4D60 (list unlink)
 void Storm_Sub1D460(int32_t a, int32_t b);                             // 0x1D460

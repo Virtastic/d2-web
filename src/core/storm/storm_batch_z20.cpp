@@ -7,7 +7,7 @@
 extern uint32_t g_z20_sse2Flag;                         // Storm DAT_6fc468fc
 bool z20_fpuMasked();                                   // (MXCSR&0x1f80)==0x1f80 && (FPUCW&0x7f)==0x7f
 double z20_pow_x87(double x, double y);                 // Storm+0x3CA1D (no decompile; x87 fallback)
-void z20_matherr(int type, uint32_t* a);                // Storm+0x4059B (FUN_6fc3059b)
+void z20_matherr(int type, uint32_t* a, uint16_t* cw);  // Storm+0x4059B (FUN_6fc3059b, __cdecl(type, &rec, &cw))
 
 // 1.13c Storm+0x3C908: double -> int64 truncation (_ftol); result in edx:eax.
 int64_t z20_ftol(double v) { return (int64_t)v; }
@@ -38,19 +38,20 @@ uint32_t z20_fload_withFB(const uint32_t* p) {
     return e != 0x7ff00000 ? e : p[1];
 }
 
-// 1.13c Storm+0x3EA60: build error record, call matherr (type in ecx-arg), return ST0.
-double z20_3EA60(int type, uint16_t cw, double st0, uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
-    uint32_t rec[6] = {0, a, b, c, d, 0};
-    (void)cw;
-    z20_matherr(type, rec);
+// 1.13c Storm+0x3EA60: __fastcall(ecx=ecx, edx=type, stack cw, p4..p8). Record is
+// {0, ecx, p5, p6, p7, p8} (p4 unused); calls matherr(type, &rec, &cw); ST0 passes through.
+double z20_3EA60(uint32_t ecx, int type, uint16_t cw, uint32_t p4, uint32_t p5, uint32_t p6,
+                 uint32_t p7, uint32_t p8, double st0) {
+    uint32_t rec[6] = {0, ecx, p5, p6, p7, p8};
+    (void)p4;
+    z20_matherr(type, rec, &cw);
     return st0;
 }
 
 // 1.13c Storm+0x3EA77 (__startOneArgErrorHandling): same, one-arg record.
 double z20_startOneArgErrorHandling(int type, uint16_t cw, double st0, uint32_t a, uint32_t b, uint32_t c) {
     uint32_t rec[5] = {0, a, b, c, 0};
-    (void)cw;
-    z20_matherr(type, rec);
+    z20_matherr(type, rec, &cw);
     return st0;
 }
 
@@ -60,7 +61,7 @@ void z20_3EBA9(int type, uint16_t cw, uint16_t fpuStatus, double st0, uint32_t a
     uint64_t bits; std::memcpy(&bits, &st0, 8);
     bool special = (bits & 0x7ff0000000000000ull) == 0 || ((bits >> 32) & 0x7ff00000) == 0x7ff00000;
     if (!special && (cw == 0x27f || (cw & 0x20) != 0 || (fpuStatus & 0x20) == 0)) return;
-    if (type == 0x1d) z20_3EA60(0x1d, cw, st0, a, b, c, 0);
+    if (type == 0x1d) z20_3EA60(a, 0x1d, cw, 0, b, c, 0, 0, st0);  // GUESSED arg mapping (3EBA9 not in this batch)
     else z20_startOneArgErrorHandling(type, cw, st0, a, b, c);
 }
 // 1.13c Storm+0x3CA1D: x87 pow fallback; no decompile (Ghidra fails), modelled by seam z20_pow_x87 (GUESSED).

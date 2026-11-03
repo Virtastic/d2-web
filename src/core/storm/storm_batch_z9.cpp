@@ -6,11 +6,13 @@
 #include <cstring>
 #include <Windows.h>
 
+extern "C" int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);   // 0x1B960 SMemFree
+
 namespace storm_z9 {
 
 // ---- seams ----
 uint32_t* Storm_Sub1560(void* list, int32_t a, int32_t b);               // 0x01560
-void  Storm_Free(void* p, const char* file, int32_t line);               // 0x0B960
+void  Storm_Free(void* p, const char* file, int32_t line);               // 0x1B960
 void* Storm_Alloc(uint32_t n, const char* file, int32_t line, uint32_t flags);  // 0x0C580
 void  Storm_Sub4D60(void* p);                                            // 0x04D60
 extern uint8_t* g_list_458BC;          // 0x6FC458BC (list head, address taken)

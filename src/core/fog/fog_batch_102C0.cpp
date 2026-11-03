@@ -443,19 +443,21 @@ extern "C" EMSCRIPTEN_KEEPALIVE void fog_sub_11690(uint32_t* section) {  // 1.13
 // the +0x24 child and then the +0x28 child. A NULL node or a miss returns the Fog+0x6FF78350
 // sentinel (the "???" string pointer), not NULL.
 // 1.13c Fog+0x11DF0
+// The child links are retail's 32-bit dwords: read each as uint32_t and widen it. An 8-byte pointer
+// read at +0x24 would overlap the +0x28 link on wasm64.
 extern "C" EMSCRIPTEN_KEEPALIVE void* fog_sub_11DF0(void* node,
                                                     int32_t key) {
     if (node != nullptr) {
         uint8_t* base = static_cast<uint8_t*>(node);
         if (*reinterpret_cast<int32_t*>(base + 0x20) == key) return node;
-        void* left = *reinterpret_cast<void**>(base + 0x24);
-        if (left != nullptr) {
-            void* found = fog_sub_11DF0(left, key);
+        const uint32_t leftLink = *reinterpret_cast<uint32_t*>(base + 0x24);
+        if (leftLink != 0) {
+            void* found = fog_sub_11DF0(reinterpret_cast<void*>(static_cast<uintptr_t>(leftLink)), key);
             if (found != g_fogNotFound) return found;
         }
-        void* right = *reinterpret_cast<void**>(base + 0x28);
-        if (right != nullptr) {
-            void* found = fog_sub_11DF0(right, key);
+        const uint32_t rightLink = *reinterpret_cast<uint32_t*>(base + 0x28);
+        if (rightLink != 0) {
+            void* found = fog_sub_11DF0(reinterpret_cast<void*>(static_cast<uintptr_t>(rightLink)), key);
             if (found != g_fogNotFound) return found;
         }
     }

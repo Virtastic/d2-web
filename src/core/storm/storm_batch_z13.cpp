@@ -294,7 +294,9 @@ static u32 z13_37A60Wrap(const StormZ13Seam& s, i32 p1, u32 p2, u32 p3, i32 rcmo
 // 1.13c Storm+0x37B90 (ordinal 446)
 u32 Storm_Z13_37B90(const StormZ13Seam& s, i32 p1, u32 p2, u32 p3, u32, i32* rc, u32 flags, u32** out) { return z13_37A60Wrap(s, p1, p2, p3, 0, rc, flags, out, 1); }
 // 1.13c Storm+0x37C10 (ordinal 445)
-u32 Storm_Z13_37C10(const StormZ13Seam& s, i32 p1, u32 p2, u32 p3, u32, i32* rc, u32 flags, u32** out) { return z13_37A60Wrap(s, p1, p2, p3, 0, rc, flags, out, 0); }
+// Decompile: p5 is never read; 37A60 is called as __thiscall(this=p6 -> flags, p1, p2, p3, 0, p7=out) with ESI not set here,
+// so rc is passed as null (GUESSED: the ESI seam is not visible from this function).
+u32 Storm_Z13_37C10(const StormZ13Seam& s, i32 p1, u32 p2, u32 p3, u32, i32* rc, u32 flags, u32** out) { (void)rc; return z13_37A60Wrap(s, p1, p2, p3, 0, nullptr, flags, out, 0); }
 // 1.13c Storm+0x37C90 (ordinal 444): inclusive rect (p5) -> exclusive, then 37B90.
 void Storm_Z13_37C90(const StormZ13Seam& s, i32 p1, u32 p2, u32 p3, u32 p4, const i32* r5, u32 flags, u32** out) {
     i32 rc[4]; i32* pr = nullptr;
