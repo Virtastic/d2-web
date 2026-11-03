@@ -34,7 +34,6 @@ uint32_t g_fogCriticalSectionChecks;             // +0x5A6E74, validation-enable
 
 // Fog+0x6FF78350 = "???": the +0x11DF0 tree returns this pointer, not NULL, when the key is absent.
 char g_fogNotFound[] = "???";
-const char* g_fogPendingLine = "";   // the line the +0x10660 callback prints
 
 // Fog+0x6FF7FC74, the error-message pointer table (index 0..10 used by the assert paths).
 const char* const kFogErrorText[] = {
@@ -71,12 +70,6 @@ void fog_log_printf(const char* format, ...) {
     va_start(ap, format);
     std::vfprintf(stderr, format, ap);
     va_end(ap);
-    std::fputc('\n', stderr);
-}
-
-// Fog+0xFD80, the default +0x10660 sink: print the pending line.
-void fog_log_sink_default(void) {
-    std::fputs(g_fogPendingLine, stderr);
     std::fputc('\n', stderr);
 }
 
@@ -215,49 +208,20 @@ extern "C" EMSCRIPTEN_KEEPALIVE void fog_sub_102C0(void) {  // 1.13c Fog+0x102C0
     g_fogOsProbed = 1;
 }
 
-// 1.13c Fog+0x10660
-// Build the five-line log header: program name (with the version suffix when one was set),
-// computer name, user name, local time, then an empty line. Each line is formatted into the same
-// 0x200-byte buffer and handed to the caller's no-argument sink (the +0xFD80 default when NULL).
-// 1.13c Fog+0x10660
-extern "C" EMSCRIPTEN_KEEPALIVE void fog_sub_10660(uint32_t param_1,
-                                                   void (*sink)(void)) {
-    (void)param_1;
-    if (sink == nullptr) sink = fog_log_sink_default;
-    SYSTEMTIME time;
-    GetLocalTime(&time);
-    char computer[64];
-    char user[64];
-    uint32_t count = 0x40;
-    if (fog_host_computer_name(computer, &count) == 0) computer[0] = '\0';
-    count = 0x40;
-    if (fog_host_user_name(user, &count) == 0) user[0] = '\0';
-    char program[0x104];
-    if (g_fogVersionText[0] == '\0') {
-        fog_str_copy(program, g_fogProgramName, 0x104);
-    } else {
-        std::snprintf(program, 0x104, "%s %s", g_fogProgramName, g_fogVersionText);
-    }
-    char line[0x200];
-    std::snprintf(line, 0x200, "PROGRAM:       %s", program);
-    g_fogPendingLine = line;
-    sink();
-    std::snprintf(line, 0x200, "COMPUTER NAME: %s", computer);
-    g_fogPendingLine = line;
-    sink();
-    std::snprintf(line, 0x200, "USER NAME:     %s", user);
-    g_fogPendingLine = line;
-    sink();
-    std::snprintf(line, 0x200, "TIME:          %04u-%02u-%02u %02u:%02u:%02u.%03u",
-                  static_cast<unsigned>(time.wYear), static_cast<unsigned>(time.wMonth),
-                  static_cast<unsigned>(time.wDay), static_cast<unsigned>(time.wHour),
-                  static_cast<unsigned>(time.wMinute), static_cast<unsigned>(time.wSecond),
-                  static_cast<unsigned>(time.wMilliseconds));
-    g_fogPendingLine = line;
-    sink();
-    line[0] = '\0';  // +0x6FF768EC is an empty format at runtime
-    g_fogPendingLine = line;
-    sink();
+// 1.13c Fog+0x10660: the port is src/core/fog/fog_10660.cpp (env seam); this is the host-side env it runs with here.
+struct Fog10660Env {
+    void (*localTime)(uint16_t t[8]);
+    int32_t (*userName)(char* buf, uint32_t* count);
+    int32_t (*computerName)(char* buf, uint32_t* count);
+    const char* program;
+    const char* version;
+};
+extern "C" void fog_sub_10660(const Fog10660Env* e, void* h, void (*sink)(void*, const char*));
+void fog_10660_host(void) {
+    Fog10660Env e = {
+        [](uint16_t t[8]) { SYSTEMTIME s; GetLocalTime(&s); std::memcpy(t, &s, 16); },
+        fog_host_user_name, fog_host_computer_name, g_fogProgramName, g_fogVersionText};
+    fog_sub_10660(&e, nullptr, nullptr);
 }
 
 // 1.13c Fog+0x10810
@@ -279,7 +243,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void fog_sub_109A0(uint32_t line, const char* fi
     fog_log_printf("");
     fog_log_printf("");
     fog_log_printf("------------------------------------------------------");
-    fog_sub_10660(0, fog_log_sink_default);
+    fog_10660_host();
     if (file != nullptr) {
         char expression[0x1000];
         std::snprintf(expression, sizeof(expression),

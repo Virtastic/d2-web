@@ -2,10 +2,11 @@
 // 64-slot int stack; pushes onto a full stack are dropped, pops from an empty one yield 0.
 #include <cstdint>
 
-struct FogExprFn { uint32_t (*fn)(uint32_t arg, uint32_t ctx); int32_t argc; };  // 8-byte table entry
+// 8-byte table entry; retail calls fn with ECX/EDX = the popped values and two stack words (s0, ctx), callee pops 8
+struct FogExprFn { uint32_t (*fn)(uint32_t ecx, uint32_t edx, uint32_t s0, uint32_t ctx); int32_t argc; };
 
 // 1.13c Fog+0x19E90
-uint32_t fog_expr_eval_19e90(const uint8_t* code, int len, uint32_t (*cb)(),
+uint32_t fog_expr_eval_19e90(const uint8_t* code, int len, uint32_t (*cb)(uint32_t operand, uint32_t ctx),
                              const FogExprFn* tbl, int ntbl, uint32_t ctx)
 {
     if (len < 1) return 0;
@@ -19,20 +20,22 @@ uint32_t fog_expr_eval_19e90(const uint8_t* code, int len, uint32_t (*cb)(),
         case 1: {
             uint32_t i = *n; n = p + 2;
             if ((int)i >= ntbl) { push(0); break; }
-            uint32_t a = 0;
+            uint32_t c = 0, d = 0, s0 = 0;
             switch (tbl[i].argc) {
-            case 3: a = pop(); pop(); pop(); break;
-            case 2: pop(); pop(); break;
-            case 1: pop(); break;
+            case 3: s0 = pop(); d = pop(); c = pop(); break;
+            case 2: d = pop(); c = pop(); break;
+            case 1: c = pop(); break;
             case 0: break;
             default: push(0); goto next;
             }
-            push(tbl[i].fn(a, ctx));
+            push(tbl[i].fn(c, d, s0, ctx));
             break;
         }
         case 4: case 5: case 6: {
             if (!cb || len <= n - code) return 0;
-            uint32_t v = cb(); push(v);
+            uint32_t opd = *p == 4 ? (uint32_t)*n : *p == 5 ? (uint32_t)(int32_t)(int16_t)(n[0] | n[1] << 8)
+                                                          : (uint32_t)(n[0] | n[1] << 8 | n[2] << 16 | (uint32_t)n[3] << 24);
+            uint32_t v = cb(opd, ctx); push(v);
             n = p + (*p == 4 ? 2 : *p == 5 ? 3 : 5);
             break;
         }

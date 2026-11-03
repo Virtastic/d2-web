@@ -54,8 +54,7 @@ extern "C" void fog_sub_D940(void* table, uint32_t key, uint8_t* out, uint32_t m
     g_fogN04.leaveCs(cs);
 }
 
-// 1.13c Fog+0xEAF0
-extern "C" void fog_sub_EAF0(void) { g_fogN04.sub5E550(); }
+// Fog+0xEAF0 moved to src/core/fog/fog_eaf0.cpp (faithful stdcall(srv, key, a2, a3) wrapper over fog_e550).
 
 // 1.13c Fog+0x14530
 extern "C" void fog_sub_14530(void) { g_fogN04.sub64260(); }

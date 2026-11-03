@@ -62,40 +62,48 @@ fail:   *buf = 0;
     return nullptr;
 }
 
-// 1.13c Fog+0x197B0 -- tokenizer. lookup(type,val,name) < 0 means unknown; call(name) >= 0 = function id.
-// esi = retail's ESI flag (type 0x10 vs 0x11 for resolved names).
-const char* fog_expr_token_197b0(FogExprState* st, const char* p, int* val, uint8_t* type, int* val2,
-                                 int esi, int (*call)(const char*), int (*lookup)(uint8_t, int32_t, const char*))
+// 1.13c Fog+0x197B0 -- tokenizer. Retail: EAX = input, EBX = type out (byte), stack (ret 0x10): state, val out,
+// call-callback (fastcall ECX = name, returns an id, < 0 = not a call), lookup callback (ECX = name, EDX = &flag, stack: op, val
+// of the state's top entry, ret 8; < 0 = unknown). Returns the pointer after the token, 0 on failure (type/val untouched).
+// The lookup flag selects type 0x10 (set) / 0x11 (clear) for a resolved name; a '.' name always yields 0x10.
+const char* fog_expr_token_197b0(FogExprState* st, const char* p, uint32_t* val, uint8_t* type,
+                                 int (*call)(const char*), int (*lookup)(const char*, int32_t*, uint32_t, uint32_t))
 {
     char nm[256]; int i;
     *val = 0;
     while (*p && (isspace((unsigned char)*p) || *p == '"')) p++;
-    auto cur = [&]() { return lookup(st->op[st->top - 1], st->val[st->top - 1], nm); };
+    auto look = [&](int32_t* flag) { *flag = 0; return lookup(nm, flag, st->op[st->top - 1], (uint32_t)st->val[st->top - 1]); };
     if (isdigit((unsigned char)*p)) {
-        *type = 0x10; *val = *p - '0';
-        while (isdigit((unsigned char)p[1])) { p++; *val = *val * 10 + (*p - '0'); }
+        *type = 0x10; *val = (uint32_t)(*p - '0');
+        while (isdigit((unsigned char)p[1])) { p++; *val = *val * 10u + (uint32_t)(*p - '0'); }
         return p + 1;
     }
+    int32_t fl;
     if (*p == '\'') {
-        nm[0] = p[1]; const char* q = p + 2; i = 1;
-        for (; *q; q++) { if (*q == '\'') { q++; break; } if (i < 0xff) nm[i++] = *q; }
-        nm[i] = 0; int r = cur();
-        if (r < 0) { *type = 0x10; *val = 0; } else { *type = (esi == 0) + 0x10; *val = r; }
-        return q;
+        nm[0] = p[1]; p += 2; i = 1;
+        while (*p) {
+            if (*p == '\'') { p++; break; }
+            if (i < 0xff) nm[i++] = *p;
+            p++;
+        }
+        nm[i] = 0; int r = look(&fl);
+        if (r < 0) { *type = 0x10; *val = 0; } else { *type = (uint8_t)(0x10 + (fl == 0)); *val = (uint32_t)r; }
+        return p;
     }
     if (isalpha((unsigned char)*p)) {
-        nm[0] = *p; i = 1; const char* q = p + 1;
-        while (isalnum((unsigned char)*q)) { if (i < 0xff) nm[i++] = *q; q++; }
+        nm[0] = *p; i = 1; p++;
+        while (isalnum((unsigned char)*p)) { if (i < 0xff) nm[i++] = *p; p++; }
         nm[i] = 0;
-        const char* s = q; while (*s && isspace((unsigned char)*s)) s++;
-        if (*s == '(') { int f = call(nm); if (f >= 0) { *type = 0x12; *val = f; return s + 1; } }
-        int r = cur();
-        if (r < 0) { *type = 0x10; *val2 = 0; } else { *type = (esi == 0) + 0x10; *val2 = r; }
-        return s;
+        while (*p && isspace((unsigned char)*p)) p++;
+        if (*p == '(') { int f = call(nm); if (f >= 0) { *type = 0x12; *val = (uint32_t)f; return p + 1; } }
+        int r = look(&fl);
+        if (r < 0) { *type = 0x10; *val = 0; } else { *type = (uint8_t)(0x10 + (fl == 0)); *val = (uint32_t)r; }
+        return p;
     }
+    if ((unsigned char)*p > 0x5e) return nullptr;
     switch (*p) {
-    case '!': if (p[1] == '=') { *type = 0x0f; return p + 2; } break;
-    case '=': if (p[1] == '=') { *type = 0x0e; return p + 2; } break;
+    case '!': if (p[1] == '=') { *type = 0x0f; return p + 2; } return nullptr;
+    case '=': if (p[1] == '=') { *type = 0x0e; return p + 2; } return nullptr;
     case '(': *type = 0; return p + 1;
     case ')': *type = 1; return p + 1;
     case ',': *type = 2; return p + 1;
@@ -109,10 +117,11 @@ const char* fog_expr_token_197b0(FogExprState* st, const char* p, int* val, uint
     case '<': if (p[1] == '=') { *type = 10; return p + 2; } *type = 11; return p + 1;
     case '>': if (p[1] == '=') { *type = 13; return p + 2; } *type = 12; return p + 1;
     case '.': {
-        nm[0] = p[1]; const char* q = p + 2; i = 1;
-        while (isalnum((unsigned char)*q)) { if (i < 0xff) nm[i++] = *q; q++; }
-        nm[i] = 0; int r = cur();
-        if (r >= 0) { *type = 0x10; *val2 = r; return q; }
+        nm[0] = p[1]; p += 2; i = 1;
+        while (isalnum((unsigned char)*p)) { if (i < 0xff) nm[i++] = *p; p++; }
+        nm[i] = 0; int r = look(&fl);
+        if (r < 0) return nullptr;
+        *type = 0x10; *val = (uint32_t)r; return p;
     }
     }
     return nullptr;
