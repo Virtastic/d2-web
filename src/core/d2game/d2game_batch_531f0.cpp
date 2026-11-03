@@ -707,16 +707,17 @@ uint32_t d2game_42510(const D2GameBatch531F0Env& E, void* a, void* b, int32_t s1
 
 // Player-block load: builds the player unit from a saved block, then reads the sections in order.
 // Returns 0 on success, 9 when the block is shorter than 0x82 bytes, or the first section error.
-// 1.13c D2Game+0x55E10 (eax = out unit slot, ecx = block base, stack p1, p2, size; callee pops 0x18).
-uint32_t d2game_55E10(const D2GameBatch531F0Env& E, void** outUnit, uint8_t* base, int32_t p1, void* p2, uint32_t size) {
+// 1.13c D2Game+0x55E10 (eax = out unit slot, ecx = block base, stack p1, p2, size and three unused words; callee pops 0x18).
+// The out slot is retail's 32-bit unit word.
+uint32_t d2game_55E10(const D2GameBatch531F0Env& E, uint32_t* outUnit, uint8_t* base, int32_t p1, void* p2, uint32_t size) {
     uint32_t used = 0, v18 = 0, o8 = 0, o4 = 0, o10 = 0, oc = 0, flag = size;
     void* unit = nullptr;
-    *outUnit = nullptr;
+    *outUnit = 0;
     if (size < 0x82) return 9;
     uint32_t r = E.c55320(base, p1, p2, &unit, &flag, &v18, &o8, &o4, &o10, &oc, &used);
     if (r != 0) return r;
     if (flag != 0) return E.c55840(p1, p2, outUnit);
-    *outUnit = unit;
+    *outUnit = (uint32_t)(uintptr_t)unit;
     int32_t rem = (int32_t)size - (int32_t)used;
     uint8_t* d = base + used;
     if ((r = E.c530D0(d, unit, &used)) != 0) return r;

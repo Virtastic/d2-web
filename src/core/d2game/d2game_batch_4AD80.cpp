@@ -113,41 +113,6 @@ EMSCRIPTEN_KEEPALIVE void d2_game_8a2a0(void* client)
     wr32(block, 0, rd32(block, 0) + (size & 0xFFFF));
 }
 
-// 1.13c D2Game+0x715E0
-// Inventory/trade item pass (game in ECX, unit in EAX): D2Common #10920 on the unit must return a
-// data block (fatal 0x87D); pages 1..12 of the inventory at unit+0x60 are selected with
-// D2ItemSetPage, the block's +0x5C must be non-null (fatal 0x885), every entry on the unit+0xDC
-// chain (next at +0x24) whose leading byte is 9 goes through 0xAE6F0, and 0x74810 saves the items
-// with the (0x60, 0x2000, 0) header. A positive #10973 result on a unit whose +0x10 is neither 0
-// nor 0x11 applies -result and the block's +0x10 through 0x21670.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_game_715e0(void* game, void* unit, const D2GameBatch14Env* env)
-{
-    void* data = env->getUnitInventory(unit);                        // D2Common #10920
-    if (data == nullptr) d2game_fatal(0x87D);
-
-    for (uint32_t page = 1; page < 0xD; ++page) {
-        env->itemSetPage(rd32(unit, 0x60), page);                    // D2Common #10608
-    }
-
-    void* block = (void*)(uintptr_t)rd32(data, 0x5C);
-    if (block == nullptr) d2game_fatal(0x885);
-
-    for (void* e = (void*)(uintptr_t)rd32(unit, 0xDC); e != nullptr;
-         e = (void*)(uintptr_t)rd32(e, 0x24)) {
-        if (rd8(e, 0) == 9) env->itemChainCallback(unit);            // 0xAE6F0
-    }
-
-    uint32_t out = 0;
-    env->saveItems(game, unit, 0x60, 0x2000, 0, &out);               // 0x74810
-    const int32_t result = env->getSaveResult(unit);                 // D2Common #10973
-    const uint32_t kind = rd32(unit, 0x10);
-    if (result > 0 && kind != 0 && kind != 0x11) {
-        env->adjustStat(-result);                                    // 0x21670
-        env->adjustStat((int32_t)rd32(block, 0x10));                 // 0x21670
-    }
-}
-
 // Retail 0x6FD1A3DC: unit type -> event-queue slot (D2MOO EVENT_MapUnitTypeToIndex, 1.10f table
 // 0x6FD27D6C; player, monster, object, missile, item, tile, other).
 static const int32_t g_d2game_6FD1A3DC[] = { 0, 1, 3, 2, 4, -1, 0 };

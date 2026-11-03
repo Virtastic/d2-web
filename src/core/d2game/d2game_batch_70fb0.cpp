@@ -134,78 +134,8 @@ struct D2Game75680Env { void (*f75680)(int* p, void* eax); };
 // 1.13c D2Game+0x758D0: tail-forward (param_1, EAX).
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_758d0(int* param1, void* eax, const D2Game75680Env* e) { e->f75680(param1, eax); }
 
-struct D2Game75900Env {
-    uint32_t (*f21130)(void* p); uint32_t (*f21100)(void* p);
-    void* (*a10331)(void* p, uint32_t a, uint32_t b, uint32_t c);   // GUESS: only p is real, rest stack junk
-    int16_t (*a10482)(void* p); void* (*a10331x)(void* p); int (*f21220)();
-    void (*f75680)(int* p, void* q);
-};
-// 1.13c-NAMED D2Game+0x75900: EDI = record whose +4 is the unit; skips flagged (+0xC4 bit 17) units.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_75900(int* param1, void* edi, const D2Game75900Env* e) {
-    void* u = rdp(edi, 4);
-    if (!u) d2game_fatal();                                   // 0x1ed
-    if ((rd32(u, 0xc4) >> 17) & 1) return;
-    if (rd32(u, 4) == 0x158) d2game_fatal();                  // 0x1f8
-    uint32_t y = e->f21130(u), x = e->f21100(u);
-    void* r = e->a10331(u, x, y, 0x801);
-    if (e->a10482(r) != 0) return;
-    if (!e->a10331x(u)) d2game_fatal();                       // 0x1ff
-    if (!e->f21220()) d2game_fatal();                         // 0x204
-    e->f75680(param1, u);
-}
 
 // ---- 0x75A40 (NAMED, last) / 0x75C60 ---------------------------------------------------------------
-struct D2Game75a40Env {
-    const uint8_t* monstats; int32_t monCount;     // *(sgptDataTables+0xA78/0xA80), 0x1A8 records
-    void (*f7a0)(void* game, void* unit);          // 0xD007A0 / 0xE07A0 (EAX=unit, ECX=game)
-    void* (*a10392)(uint32_t id);                  // D2Common #10392 (A598)
-    uint32_t (*a10983)(uint32_t); uint32_t (*a10764)(uint32_t);   // AAC6 / AAD8: x / y of the path
-    uint32_t (*a10867)(uint32_t); uint32_t (*a10750)(uint32_t);   // A454 / A3B8: x / y of the path
-    void (*a10336)(uint32_t id, uint32_t v);       // A5FE
-    void (*a10936)(uint64_t* seed); void (*a10614)(uint64_t* seed, uint32_t v);   // A616 / A628 (ECX=seed, EDX=v)
-    void (*a10286)(uint32_t id, int x, int y);     // AB2C
-    void* (*spawn)(void* game, uint32_t, void* unit, int, int, int, int, int, int, int);   // 0xCC28F0
-};
-// 1.13c D2Game+0x75A40: custom convention, stack args (game, tag) retd 8, EDI=unit. For a monster whose class
-// is 0x3f, take the owner link's position, then respawn the per-difficulty count (monstats+0x62+game[0x6d]*2)
-// of children at +-5 jitter around it (seed lo from #10936/#10614, hi=unit[3]), finally restore the link.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_75a40(void* game, uint32_t tag, int32_t* unit, const D2Game75a40Env* e) {
-    if (!unit || unit[0] != 1 || unit[1] < 0) return;
-    int32_t cls = unit[1];
-    if (cls < e->monCount) { const uint8_t* r = e->monstats + (uint32_t)cls * 0x1a8; if (r) cls = (int16_t)rd16(r, 2); }
-    if (cls < 0 || cls >= e->monCount || cls != 0x3f) return;
-    uint32_t id = unit[0xb];
-    e->f7a0(game, unit);
-    int32_t* owner = (int32_t*)e->a10392(unit[0xb]);
-    uint32_t x, y;
-    if (owner == unit || owner == nullptr) {
-        x = e->a10983(id); y = e->a10764(id);
-        owner = nullptr;
-    } else {
-        int t = owner[0];
-        bool pathStruct = t == 2 || (t > 3 && t < 6);
-        uint32_t p = owner[0xb];
-        x = pathStruct ? rd32((const void*)(uintptr_t)p, 0xc) : (p ? e->a10867(p) : 0);
-        y = pathStruct ? rd32((const void*)(uintptr_t)p, 0x10) : (p ? e->a10750(p) : 0);
-    }
-    int sx = 5, sy = 5;
-    e->a10336(id, 0);
-    uint64_t seed;
-    e->a10936(&seed); e->a10614(&seed, 0x53454953);
-    seed = (seed & 0xffffffffULL) | ((uint64_t)(uint32_t)unit[3] << 32);
-    int c = unit[1];
-    const uint8_t* rec = (c < 0 || c >= e->monCount) ? nullptr : e->monstats + (uint32_t)c * 0x1a8;
-    int n = (int16_t)rd16(rec, 0x62 + (uint32_t)rd8(game, 0x6d) * 2);
-    for (; n > 0; n--) {
-        uint64_t s = (seed & 0xffffffff) * 0x6ac690c5ULL + (seed >> 32);
-        if (s & 1) sx = -sx;
-        seed = (s & 0xffffffff) * 0x6ac690c5ULL + (s >> 32);
-        if (seed & 1) sy = -sy;
-        e->a10286(id, sx + (int)x, sy + (int)y);
-        e->spawn(game, tag, unit, 0, 1, 0, 0, 0, 0, 0);
-    }
-    e->a10336(id, (uint32_t)(uintptr_t)owner);
-}
 
 struct D2Game75c60Env {
     int (*a10362)(); void* (*a10237)(uint8_t); uint32_t (*a10973)();

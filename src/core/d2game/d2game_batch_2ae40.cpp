@@ -83,6 +83,8 @@ void taskLinkListRemove(void* pLink)
 
 // FN probe access to the stored game data table pointer (0x6FD31C24).
 void** d2game_2ae40_gameDataTable() { return &g_b2GameDataTable; }
+// FN probe access to the task queue state (0x6FD30318 slots, 0x6FD303A8 tasks created, 0x6FD303AC games count).
+void d2game_52090_state(uint32_t** slots, uint32_t** created, uint32_t** games) { *slots = g_b2TaskSlots; *created = &g_b2TasksCreated; *games = &g_b2GamesCount; }
 
 // The register-hidden callees, one seam per 1.13c RVA. Comments name the retail function and where its
 // argument travels (a Ghidra-omitted EAX/ECX/EDX/ESI on the retail call).
@@ -430,4 +432,12 @@ void TASK_FreeAllQueueSlots(const D2GameBatch2Env* pEnv)
     g_b2TasksCreated = 0;
     g_b2GamesCount = 0;
     LeaveCriticalSection(&g_b2TaskGlobalLock);
+}
+
+// FN probe entry for D2Game+0x52090: the pool free (ordinal 10046) is the probe's recorder.
+void d2game_52090_run(void (*freePool)(const char*, uint32_t, void*))
+{
+    D2GameBatch2Env env{};
+    env.freePool = freePool;
+    TASK_FreeAllQueueSlots(&env);
 }

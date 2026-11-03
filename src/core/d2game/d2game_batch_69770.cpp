@@ -1,6 +1,6 @@
-// 1.13c D2Game+0x69770 0x697A0 0x69800 0x69860 0x698A0 0x6AB60 0x6ABB0 0x6AC30 0x6ACE0
+// 1.13c D2Game+0x69770 0x697A0 0x69800 0x69860 0x698A0 0x6AB60
 // Small fastcall (ecx, edx) skill-effect callbacks. Written from the 1.13c disassembly; the Ghidra views of
-// 6AB60-6ACE0 drop the 6A960 register/stack arguments and the 89EE0 register arguments.
+// 6AB60 drop the 6A960 register/stack arguments and the 89EE0 register arguments.
 // c = effect context (+4 game, +8 unit); e = record (+0 byte table index, +4 value, +8, +0xC).
 #include <cstdint>
 
@@ -98,32 +98,4 @@ extern "C" void D2GAME_6AB60(uintptr_t c, uintptr_t e)
     uintptr_t u = r32(c, 8);
     Ordinal_10418(u);
     if (u && r32(u, 0) == 0) FUN_6fcb6fa0(r32(u, 0x80), u);
-}
-
-// 1.13c D2Game+0x6ABB0 : value from 89EE0 (selector from the row, or 0), then spawn through 6A960
-extern "C" void D2GAME_6ABB0(uintptr_t c, uintptr_t e)
-{
-    const EffEntry& t = entry(*reinterpret_cast<uint8_t*>(e), 0x9F9);
-    uint32_t v = t.sel != -1 ? FUN_6fc89ee0(r32(c, 8), r32(e, 4), t.sel) : 0;
-    make6A960(r32(c, 4), r32(c, 8), r32(e, 0xC), v, t.sel, t.arg, 0);
-}
-
-// 1.13c D2Game+0x6AC30
-extern "C" void D2GAME_6AC30(uintptr_t c, uintptr_t e)
-{
-    const EffEntry& t = entry(*reinterpret_cast<uint8_t*>(e), 0x9E7);
-    Ordinal_10887(r32(c, 8), 10, Ordinal_10578(r32(c, 8)), 0);
-    uint32_t v = FUN_6fc89ee0(r32(c, 8), r32(e, 4), t.sel);
-    uint32_t u = make6A960(r32(c, 4), r32(c, 8), r32(e, 0xC), v, t.sel, t.arg, reinterpret_cast<uintptr_t>(&FUN_6fc8a900));
-    Ordinal_10261(u, 10, v * 2, 0);
-    Ordinal_10261(u, 0x1C, 1000, 0);
-}
-
-// 1.13c D2Game+0x6ACE0
-extern "C" void D2GAME_6ACE0(uintptr_t c, uintptr_t e)
-{
-    const EffEntry& t = entry(*reinterpret_cast<uint8_t*>(e), 0x9C1);
-    uint32_t v = FUN_6fc89ee0(r32(c, 8), r32(e, 4), 0x13);
-    uint32_t u = make6A960(r32(c, 4), r32(c, 8), r32(e, 0xC), r32(e, 8), 0x19, t.arg, 0);
-    Ordinal_10261(u, 0x13, v, 0);
 }

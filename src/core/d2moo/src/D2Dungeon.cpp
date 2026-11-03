@@ -1178,39 +1178,25 @@ D2RoomCoordListStrc* __stdcall DUNGEON_GetRoomCoordList(D2ActiveRoomStrc* pRoom)
 	return DRLGLOGIC_GetRoomCoordList(pRoom->pDrlgRoom);
 }
 
-// 1.13c D2Common+0x3BC80
+// 1.13c D2Common+0x3BC80: the body is the port in src/core/d2common/d2common_3bc80.cpp. The portal table and
+// count come from the data tables here, and the pool allocation goes through D2_ALLOC_POOL.
+static uint32_t DUNGEON_PortalLevelAlloc(uint32_t pMemPool, uint32_t nSize, uint32_t nFile, uint32_t nLine, uint32_t nFlags)
+{
+	(void)nFile; (void)nLine; (void)nFlags;
+	return (uint32_t)(uintptr_t)D2_ALLOC_POOL((void*)(uintptr_t)pMemPool, nSize);
+}
+
+extern "C" void D2Common_3BC80_PortalLevelArray(uint32_t pMemPool, uint32_t nFlags, uint32_t ppLevels, uint32_t pnLevels,
+	uint32_t portalCount, uint32_t portalTable, uint32_t (*alloc)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t));
+
 //D2Common.0x6FD8D3D0 (#10098)
 void __stdcall DUNGEON_GetPortalLevelArrayFromPortalFlags(void* pMemPool, int nFlags, int** ppLevels, int* pnLevels)
 {
-	int* pPortalLevels = NULL;
 	int nPortalLevels = 0;
-	int nCurrentFlag = 0;
-	int pLevels[32] = {};
+	int* pPortalLevels = DATATBLS_GetPortalLevels(&nPortalLevels);
 
-	nCurrentFlag = 1;
-
-	pPortalLevels = DATATBLS_GetPortalLevels(&nPortalLevels);
-	D2_ASSERT(nPortalLevels <= ARRAY_SIZE(pLevels));
-
-	*ppLevels = NULL;
-	*pnLevels = 0;
-
-	for (int i = 0; i < nPortalLevels; ++i)
-	{
-		if (nFlags & nCurrentFlag)
-		{
-			pLevels[*pnLevels] = pPortalLevels[i];
-			++*pnLevels;
-		}
-
-		nCurrentFlag <<= 1;
-	}		
-	
-	if (*pnLevels)
-	{
-		*ppLevels = (int*)D2_ALLOC_POOL(pMemPool, sizeof(int) * *pnLevels);
-		memcpy(*ppLevels, pLevels, sizeof(int) * *pnLevels);
-	}
+	D2Common_3BC80_PortalLevelArray((uint32_t)(uintptr_t)pMemPool, (uint32_t)nFlags, (uint32_t)(uintptr_t)ppLevels,
+		(uint32_t)(uintptr_t)pnLevels, (uint32_t)nPortalLevels, (uint32_t)(uintptr_t)pPortalLevels, DUNGEON_PortalLevelAlloc);
 }
 
 //D2Common.0x6FD8D4B0 (#10099)

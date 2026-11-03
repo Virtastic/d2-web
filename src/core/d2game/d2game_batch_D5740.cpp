@@ -208,7 +208,7 @@ int d2game_550A0(Env& e,void* game,void* player,const uint8_t* data,uint32_t ver
     e.call(10945,{a(body),7,1});w32(body,0xc4,r32(body,0xc4)&~0x10u);
     e.call(10268,{a(e.ptr(body,0x60)),r32(player,12)});
     int32_t read=0;int result;
-    if(version==71)result=d2game_54D90(e,data,game,body,version,1,&read);
+    if(version==71)result=int(e.call(0x54d90,{a(data),a(game),a(body),Word(remaining),1,a(&read)}));   // ECX = data, stack: game, body, remaining, 1, &read
     else if(version>=72&&version<=96)result=int(e.call(0x54810,{a(game),a(body),a(data),version,Word(remaining),1,a(&read)}));
     else return 1;
     if(result)return result;

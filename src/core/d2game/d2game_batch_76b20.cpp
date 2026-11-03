@@ -118,28 +118,6 @@ extern "C" int D2GAME_77BB0(void* edi)
     return 0;
 }
 
-// 1.13c D2Game+0x77E70  (fastcall: ecx=param_1, edx=param_2; EAX=unit)
-extern "C" uint32_t D2GAME_77E70(int* p1, int p2, void* eax)
-{
-    int id;
-    if (!p1) id = 0x38c;
-    else if (!eax) id = 0x38d;
-    else if (*p1 == 0) {
-        uint32_t u = Ordinal_11134(at<int>(eax, 0x60));
-        if ((uint32_t)p1[3] == u) return 1;
-        if (p2) {
-            int n = *(int*)(p2 + 0x1120 + (u & 0x7f) * 4);
-            for (;; n = *(int*)(n + 0xe4)) {
-                if (!n) return 0;
-                if (*(uint32_t*)(n + 0xc) == u) break;
-            }
-            return FUN_6fd102a0();
-        }
-        id = 0x2d3;
-    } else id = 0x38e;
-    fatal(id);
-}
-
 // 1.13c D2Game+0x77F00  (REG: eax=unit, ebx=game, ebp=count)
 extern "C" int D2GAME_77F00(void* eax, int ebx, int ebp)
 {
@@ -200,7 +178,7 @@ extern "C" void D2GAME_78A90(int param_1, int* ebx, int edi)
     }
 }
 
-// 1.13c D2Game+0x78C50  (REG: eax=a, ebx=obj, edi=n)
+// superseded by d2game_78c50.cpp: D2Game+0x78C50  (REG: eax=a, ebx=obj, edi=n)
 extern "C" void D2GAME_78C50(int eax, int ebx, int edi)
 {
     if (edi <= 0) return;
@@ -213,7 +191,7 @@ extern "C" void D2GAME_78C50(int eax, int ebx, int edi)
     Ordinal_10386(p, ebx ? *(int*)(ebx + 0xc) : -1);
 }
 
-// 1.13c D2Game+0x78FA0  (REG: eax=client; stack param_1)
+// superseded by d2game_78fa0.cpp: D2Game+0x78FA0  (REG: eax=client; stack param_1)
 extern "C" void D2GAME_78FA0(int* eax, int param_1)
 {
     int list = eax[0x18];

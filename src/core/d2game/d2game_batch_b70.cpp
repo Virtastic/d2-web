@@ -81,7 +81,7 @@ extern "C" uint32_t D2Game_75CE0(int32_t* game, int32_t* unit)
     return 1;
 }
 
-// 1.13c D2Game+0x79730
+// (superseded by d2game_79730.cpp) D2Game 79730
 extern "C" void D2Game_79730(int32_t* game, int32_t* unit)
 {
     int32_t t = unit[0];

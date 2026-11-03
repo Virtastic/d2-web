@@ -45,5 +45,6 @@ struct D2GameBatch7Env {
     uint32_t (*net10015)(uint32_t clientId);                         // 0xA364: the client's game GUID, which 0x2AAE0 takes
     void     (*net10000)(uint32_t clientId);                         // 0xA37C (stack: the id)
     void     (*net10001)(uint32_t clientId, uint32_t file, uint32_t line);   // 0xA358 (id, source-file string 0x6FD1CD98, 0x633)
+    uint32_t (*tick)();                                              // GetTickCount (0x4A780); null = the host clock
+    void (*enterClientList)();                                       // 0xA328 lock thunk record (0x4A780); null = none
 };
-

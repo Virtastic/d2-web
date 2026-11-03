@@ -54,7 +54,10 @@ void  FOG_10207(D2BinFileStrc* pBinFile, D2BinFieldStrc* pTbl, void* pTxt, int n
 // D2MOO marks several allocations D2_ALLOC that the original code reads before writing.
 inline void* FOG_AllocPool(void*, size_t n, const char*, int, int) { return calloc(1, n ? n : 1); }
 inline void* FOG_ReallocPool(void*, void* p, size_t n, const char*, int, int) { return realloc(p, n ? n : 1); }
-inline void  FOG_FreePool(void*, void* p, const char*, int, int) { free(p); }
+// g_fogFreePoolHook: the FN probes' seam (src/core/fn/d2game_700c0.cpp): when set, a pool free is reported to it instead of freeing, so a probe
+// can log the frees retail's 0xA2EC hook records. Null in the engine.
+inline void (*g_fogFreePoolHook)(void*, void*, const char*, int) = nullptr;
+inline void  FOG_FreePool(void* pool, void* p, const char* f, int l, int) { if (g_fogFreePoolHook) { g_fogFreePoolHook(pool, p, f, l); return; } free(p); }
 inline void* FOG_Alloc(size_t n, const char*, int, int) { return calloc(1, n ? n : 1); }
 inline void  FOG_Free(void* p, const char*, int, int) { free(p); }
 

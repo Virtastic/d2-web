@@ -186,23 +186,3 @@ void D2GAME_6A1A0_ClearRef(void* msg, void* game, void* unit)
     }
     if (ref) *ref = 0xffffffff;
 }
-
-// 1.13c D2Game+0x6A220  (REG: ecx=unitId, eax=game, edi=arg)
-void D2GAME_6A220_ModeSwitch(uint32_t id, void* game, int arg)
-{
-    if (!game) assertFail(0);
-    void* u = at<void*>(game, 0x1520 + (id & 0x7f) * 4);
-    while (u && at<uint32_t>(u, 0xc) != id) u = at<void*>(u, 0xe4);
-    if (!u) assertFail(0xd37);
-    int buf[3];
-    void* g = Ordinal_10331(u);
-    Ordinal_10141(u, buf);
-    int a = Ordinal_10589(u), b = Ordinal_10904(u);
-    int m = at<int>(u, 0x10);
-    if (m == 0) Ordinal_10303((int)(intptr_t)g, u, arg, a, b, 0x8180);
-    else if (m == 2 || m == 5) {
-        short r = Ordinal_10303((int)(intptr_t)g, u, arg, a, b, 0x8180);
-        if (r == 0) { if (m != 2) Ordinal_11090(u, 2); }
-        else if (m != 5) Ordinal_11090(u, 5);
-    }
-}

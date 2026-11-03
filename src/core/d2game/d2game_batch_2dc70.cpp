@@ -183,7 +183,7 @@ extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_game_4a780(uint32_t clientId, int32_t sentTick, int32_t delay,
                                         const D2GameBatch7Env* env)
 {
-    void* game = env->getGame(clientId);               // 0x2AAE0
+    void* game = env->getGame(env->net10015(clientId));   // 1.13c D2Game+0x4A780: D2Net #10015 (0xA364) turns the id into the GUID first
     if (game != nullptr) {
         bool present = false;
         for (void* c = rdptr(game, 0x88); c != nullptr; c = rdptr(c, 0x4A8))
@@ -191,7 +191,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_4a780(uint32_t clientId, int32_t sentTick, int
         if (present) {
             for (void* c = rdptr(game, 0x88); c != nullptr; c = rdptr(c, 0x4A8)) {
                 if (rd32(c, 0x00) != clientId) continue;
-                const DWORD now = GetTickCount();
+                const DWORD now = env->tick ? env->tick() : GetTickCount();
                 uint32_t count = rd32(c, 0x500);
                 wr32(c, 0x4B4 + 4 * (count & 0xF), (now - (DWORD)sentTick) - (DWORD)delay);
                 count += 1;
@@ -213,10 +213,11 @@ EMSCRIPTEN_KEEPALIVE void d2_game_4a780(uint32_t clientId, int32_t sentTick, int
     }
 
     if (g_clientListInitialized == 0) return;
+    if (env->enterClientList) env->enterClientList();   // thunk 0xA328 (ECX = lock, EDX = line 0xA84)
     EnterCriticalSection(&g_clientListLock);
     for (void* c = g_clientList[clientId & 0xFF]; c != nullptr; c = rdptr(c, 0x4AC)) {
         if (rd32(c, 0x00) != clientId) continue;
-        const DWORD now = GetTickCount();
+        const DWORD now = env->tick ? env->tick() : GetTickCount();
         const uint32_t count = rd32(c, 0x500);
         if ((int32_t)count < 10) {
             const int64_t sum = (int64_t)count * (int64_t)rd64(c, 0x4F8) +
@@ -231,6 +232,9 @@ EMSCRIPTEN_KEEPALIVE void d2_game_4a780(uint32_t clientId, int32_t sentTick, int
     }
     LeaveCriticalSection(&g_clientListLock);
 }
+
+// FN-probe accessor: the module's client table and its init flag (0x6FD307B8 / 0x6FD31C18).
+extern "C" void d2_game_4a780_state(void*** list, uint32_t** init) { *list = g_clientList; *init = &g_clientListInitialized; }
 
 // CCmd 0x68 reject: the five-byte 0xB4 packet lives in d2game_8c4b0.cpp (retail passes the payload dword in EAX; this caller leaves it 0).
 void D2Game_8C4B0_PacketSendB4(void (*)(uint32_t, uint32_t, const void*, uint32_t), uint32_t, uint32_t);

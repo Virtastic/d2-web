@@ -244,34 +244,6 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_f3410(uint32_t ebxUnit, uint32_t client,
     env->sendPacket(client, pkt, 14);
 }
 
-// 1.13c D2Game+0x778A0
-// ESI = 16-byte output record, EBX = unit. Fills {right skill id, left skill id, right owner,
-// left owner} from #10828/#10507; a missing skill stores owner -1 and id 0. The file/line pair is
-// the D2Common #10601 debug tag.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_778a0(uint32_t esiOut, uint32_t ebxUnit,
-                                             const D2GameBatch8DB00Env* env)
-{
-    static const char kPlrModesFile[] = "..\\Source\\D2Game\\PLAYER\\PlrModes.cpp";
-    void* out = (void*)(uintptr_t)esiOut;
-    void* left = env->ordinal10828(ebxUnit);
-    if (left != nullptr) {
-        wr32(out, 0x0C, env->ordinal10304(left));
-        wr32(out, 0x04, env->ordinal10601(left, kPlrModesFile, 0x56D));
-    } else {
-        wr32(out, 0x0C, 0xFFFFFFFFu);
-        wr32(out, 0x04, 0);
-    }
-    void* right = env->ordinal10507(ebxUnit);
-    if (right != nullptr) {
-        wr32(out, 0x08, env->ordinal10304(right));
-        wr32(out, 0x00, env->ordinal10601(right, kPlrModesFile, 0x579));
-    } else {
-        wr32(out, 0x08, 0xFFFFFFFFu);
-        wr32(out, 0x00, 0);
-    }
-}
-
 // 1.13c D2Game+0x77B20
 // ESI = unit, EDI = the record filled by 0x778A0. Applies each side's skill through 0x6FCC2100
 // when the skill exists, differs from the current one, and its use state is neither 2 nor 7.
@@ -302,7 +274,8 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_77b20(uint32_t esiUnit, uint32_t ediRec,
     }
 }
 
-// 1.13c D2Game+0x78DD0
+#if 0  // superseded: this probe-form 78DD0 collided with the new d2_fn_d2game_78dd0 (pb11)
+// (superseded by d2game_78dd0.cpp) D2Game 78DD0
 // EAX = unit, EBX = unit, stack args arg1 (context), arg2 (unit). The 1.13c form of the 1.10f
 // PlrModes weapon pass: gates on the unit's handles/stats, then refreshes a thrown or stackable
 // weapon and walks the inventory for a replacement. EBP (arg2) supplies the handle at +0x60; the
@@ -374,6 +347,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_78dd0(uint32_t eaxUnit, uint32_t ebxUnit,
         env->sub98B60((local & 0xFFFFFF00u) | (slot & 0xFF), arg1Ctx, ebp);
     }
 }
+#endif  // superseded by d2game_78dd0.cpp
 
 // 1.13c D2Game+0xAF5F0
 // EAX = index. Indices below 9 read the nine-entry table at DAT_6FD1B614; everything above is

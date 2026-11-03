@@ -461,3 +461,15 @@ void TASK_QueueIncrement(uint32_t delta, uint32_t* rec, void* queue)
     *next = (uint32_t)(uintptr_t)link;
     wrptr(node, 4, link);
 }
+
+// FN probe access to the client bucket table (0x6FD307B8), its initialised flag (0x6FD31C18), and CLIENTS_AttachSaveFile with the pool allocator and checksum as recorders.
+void** d2game_4a190_list() { return g_clientList; }
+int32_t* d2game_4a190_init() { return &g_clientListInitialized; }
+uint32_t d2game_4a190_run(uint32_t clientId, const void* pData, uint32_t nSize, uint32_t nTotal, uint32_t bUnlock,
+                          void* (*alloc)(void*, uint32_t, const char*, uint32_t, uint32_t), uint32_t (*checksum)(const void*, uint32_t))
+{
+    D2GameBatch4Env env{};
+    env.allocPool = alloc;
+    env.checksum = checksum;
+    return CLIENTS_AttachSaveFile(clientId, pData, nSize, nTotal, bUnlock, &env);
+}

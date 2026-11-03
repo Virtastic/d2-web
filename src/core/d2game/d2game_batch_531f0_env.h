@@ -91,7 +91,7 @@ struct D2GameBatch531F0Env {
     void      (*cA2100)(void* unit, int32_t sel, void* item, int32_t z);       // D2Game+0xA2100, ecx = unit, edx = sel
     uint32_t  (*c55320)(void* data, int32_t p1, void* p2, void** outUnit, uint32_t* size, uint32_t* o14, uint32_t* o8,
                         uint32_t* o4, uint32_t* o10, uint32_t* oc, uint32_t* used);        // D2Game+0x55320, edx = data
-    uint32_t  (*c55840)(int32_t p1, void* p2, void** out);                  // D2Game+0x55840, edi = p1
+    uint32_t  (*c55840)(int32_t p1, void* p2, uint32_t* out);               // D2Game+0x55840, edi = p1; out is the retail 32-bit unit slot
     uint32_t  (*c530D0)(void* data, void* unit, uint32_t* used);               // edx = data
     uint32_t  (*c53040)(void* unit, void* data, uint32_t* used);               // eax = unit, edx = data
     uint32_t  (*c53340)(void* data, void* unit, uint32_t* used);               // eax = data, ebx = unit

@@ -29,14 +29,14 @@ static void enqueue(const H& h, int* client, u32* m) {  // shared tail of 7A020/
     h.o10158();
 }
 
-// 1.13c D2Game+0x7A020   GUESS: client (ESI), arg (retaddr slot)
+// superseded by d2game_7a020.cpp: D2Game+0x7A020   GUESS: client (ESI), arg (retaddr slot)
 void D2GAME_7A020(const H& h, int* client, u32 arg) {
     u32* m = (u32*)h.o10045("..\\Source\\D2Game\\UNIT\\SUnitMsg.cpp");
     ((u8*)m)[0xe] = 0x2f; ((u8*)(m + 1))[0] = 0x23; m[0] = 0; ((u16*)(m + 3))[0] = 0; m[2] = arg;
     enqueue(h, client, m);
 }
 
-// 1.13c D2Game+0x7A4C0   GUESS: client (ESI), b11 (retaddr slot)
+// superseded by d2game_7a4C0.cpp: D2Game+0x7A4C0   GUESS: client (ESI), b11 (retaddr slot)
 void D2GAME_7A4C0(const H& h, int* client, u32 p1, u8 p2, u8 b11) {
     u32* m = (u32*)h.o10045("..\\Source\\D2Game\\UNIT\\SUnitMsg.cpp");
     *(u16*)(m + 2) = 0x281; ((u8*)m)[10] = 0; ((u8*)m)[0xb] = b11; ((u8*)(m + 1))[0] = 0x99;

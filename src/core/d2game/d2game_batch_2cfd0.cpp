@@ -474,31 +474,4 @@ uint32_t TASK_InsertTask(uint32_t* rec, uint32_t param_2, uint32_t param_3, cons
     return result;
 }
 
-// 1.13c D2Game+0x52650
-// Round-robin task queue slot: initialise the list head once, take the next slot number (counter &
-// 0x1F), and, when the slot has no descriptor yet, allocate one through Fog #10045 named
-// "..\\Source\\D2Game\\GAME\\Task.cpp":0x3F7, set [0]=slot, [1]=0, self-link [2]/[3], publish it and
-// 0x524C0 it. Returns the slot number.
-uint32_t TASK_GetQueueSlot(const D2GameBatchEnv* env)
-{
-    EnterCriticalSection(&g_taskLock);
-    if (g_taskHeadVar == 0) {
-        g_taskHeadVar = (uintptr_t)&g_taskHeadVar;
-        g_taskTail = &g_taskHeadVar;
-    }
-    const uint32_t index = g_taskSlotCounter & 0x1F;
-    g_taskSlotCounter = g_taskSlotCounter + 1;
-    EnterCriticalSection(&g_taskSlotLocks[index]);
-    if (g_taskSlots[index] == nullptr) {
-        TaskSlot* slot = (TaskSlot*)env->allocPool("..\\Source\\D2Game\\GAME\\Task.cpp", 0x3F7, 0);
-        slot->idx = index;
-        slot->count = 0;
-        slot->first = (uintptr_t)&slot->first;
-        slot->last = (uintptr_t)&slot->first;
-        g_taskSlots[index] = slot;
-        env->taskEnqueue(slot);   // 0x524C0
-    }
-    LeaveCriticalSection(&g_taskSlotLocks[index]);
-    LeaveCriticalSection(&g_taskLock);
-    return index;
-}
+// 1.13c D2Game+0x52650 TASK_GetQueueSlot: retail-layout port in d2game_52650.cpp.

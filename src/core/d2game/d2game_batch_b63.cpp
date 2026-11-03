@@ -161,41 +161,6 @@ void D2GAME_69B00(i32 p_eax, i32 param_1, i32* param_2, i32* param_3)
     }
 }
 
-// 1.13c D2Game+0x6A330  EAX=out ptr (in_EAX), EBX=param_a, EDI=unit; stack retaddr slot=skill id (unaff_retaddr).
-i32 D2GAME_6A330(i32* in_eax, i32 ebx, i32* edi, i32 param_1, u32 param_2, i32 skillId)
-{
-    (void)param_1;
-    *in_eax = 1;
-    i32 iVar2 = (i32)FUN_6fd003a0(ebx, param_2);
-    i32 iVar3 = (i32)Ordinal_10296(iVar2);
-    if (edi && *edi == 0 &&
-        ((char)edi[0x1b] != 0 || W(Ordinal_10920(), 0x4c) != 0 ||
-         (Ordinal_11017(edi[0x18]) != 0 && skillId != 0x10b)))
-        return 0;
-    uint8_t b = B(iVar3, 0x1b3);
-    if (b < 0x65) {
-        if (skillId != 0x79 && skillId != 0x7a && skillId != 0x16 && g_b63_vtbl6A330[b]) {
-            Ordinal_10331(iVar2);
-            return (i32)((intptr_t(*)())g_b63_vtbl6A330[b])();
-        }
-        return 0;
-    }
-    b63_fatal(0xcf8);
-}
-
-// 1.13c D2Game+0x6A720  __thiscall: this -> thisp.
-i32 D2GAME_6A720(i32* thisp, i32 param_1, u32 param_2)
-{
-    i32 iVar1 = (i32)FUN_6fd003a0(param_1, param_2);
-    if (!iVar1) return 0;
-    if (thisp) {
-        if (*thisp == 1 && B(Ordinal_10688(W(iVar1, 4)), 0x16d) == 0) return 1;
-        if (Ordinal_10594(P(thisp), iVar1) == 0) return 1;
-    }
-    FUN_6fc8a330(0, param_2);
-    return 1;
-}
-
 // 1.13c D2Game+0x6C900  __fastcall param_1; EBX=env (unaff_EBX), EDI=units array (unaff_EDI).
 void D2GAME_6C900(i32* p, i32 ebx, i32* edi)
 {

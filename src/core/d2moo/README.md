@@ -13,6 +13,7 @@ a `// 1.13c <DLL>+0x<offset>` marker naming the 1.13c function the code correspo
 behaviour differs from 1.10f.
 
 - D2Game+0x6A560 OBJMODE_WellHeal: split out of the well operate; refills life/mana/stamina by parm[1]/256 of max, clears poison and freeze, heals pets, returns 1 when anything was used else 0.
+- D2Game+0x6A9D0 OBJECTS_OperateFunction08_Door: the rule is `src/core/d2game/d2game_6a9d0.cpp` (every callee a seam in retail order); the collision results are tested as 16-bit, the rate check is unsigned 32-bit.
 - D2Game+0x6CEE0 OBJECTS_OperateFunction22_Well: no null checks; anim step uses the byte-truncated 2*parm[2]; always returns 0.
 - D2Game+0x6D960 OBJECTS_OperateFunction33_WirtsBody: ENDANIM fires (FrameCnt[1] >> 8) + 1 ticks out (not OBJECTS_GetOperatingTicks); no null checks.
 - D2Game+0x6DA00 OBJECTS_OperateFunction02_Shrine: a null shrine-table handler (code 0) falls back to Refill instead of asserting; no null checks on pOp/pObject/pPlayer.
@@ -96,3 +97,8 @@ behaviour differs from 1.10f.
 
 - D2Game+0x1F2D0, +0x204E0, +0x20760, +0x24440, +0x2E4F0, +0x2FEC0, +0x365E0, +0x366A0: retail-layout (32-bit offset) ports in src/core/d2game/d2game_<rva>.cpp, each with an FN probe; the vendored D2MOO twins are unchanged. Deltas against 1.10f: 0x204E0 splits the monster (0x1F600) and item (0x203D0) branches out of the compress; 0x24440 finds the free spot through 0xE930 and drops through 0xE990; 0x2FEC0 inlines the unit allocation (rolls the seed before the placement test, 32-unit cap); 0x366A0/0x365E0 take EAX = item code/item, ECX = game/player register arguments.
 - D2Game+0x4D420 (SkillSpawnMissileFan), +0x4F970 (SetSummonPassiveStats), +0x50B70 (SkillNec_ApplySkillToUnit), +0x526F0 (Server_ClientTimeoutCheck), +0x53640 (the legacy compact-stat save section): 1.13c rules written from the disassembly as templates over the probe's HookEnv in src/core/d2game/d2game_<rva>.h, each with an FN probe. The vendored D2MOO twins (SkillNec.cpp SetSummonPassiveStats, PlrSave) and the older batch sketches (d2game_batch_452c0b.cpp, d2game_batch_4ebe0.cpp, d2game_n89.cpp) are unchanged and point at the headers; d2game_batch_53640.cpp's export is renamed d2game_53640_batch so the probe owns d2_fn_d2game_53640.
+- `src/core/d2game/d2game_batch_2dc70.cpp` `d2_game_4a780` (`// 1.13c D2Game+0x4A780`): resolves the game through D2Net #10015 then 0x2AAE0 (the port passed the client id to 0x2AAE0); clock and client-list lock are seams for the FN probe.
+- D2Game+0x5DA70 A5Q4 event handler: the module table is at 0x10C468 (the old port used 0x12C468) and the 0x337D0 id comes from the player unit.
+- D2Game+0x5E940 quest 0x21 object spawn: q32 port replaces the Env port.
+- D2Game+0x5FE30 A5Q3 event handler: rewritten from the disassembly (old argument orders wrong); the data+0x88 loop is unreachable in FN mode.
+- D2Game+0x5D960, 0x5FB50, 0x5FC20, 0x64B60, 0x664F0: q32 ports from the disassembly (64B60 callees are 0xE660/0x9BEB0/0x9C160; 664F0 replaces the d2game_batch_573d0.cpp Env port).

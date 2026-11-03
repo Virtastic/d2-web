@@ -68,6 +68,7 @@
 #include "UNIT/SUnit.h"
 #include "UNIT/SUnitMsg.h"
 #include "UNIT/SUnitNpc.h"
+#include "../../../../d2game/d2game_6a9d0.h"   // 0x6A9D0 door operate rule
 
 
 
@@ -792,81 +793,29 @@ int32_t __fastcall OBJECTS_OperateFunction30_ExplodingChest(D2ObjOperateFnStrc* 
 // 1.13c D2Game+0x6A9D0
 int32_t __fastcall OBJECTS_OperateFunction08_Door(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
+    // the 1.13c rule is src/core/d2game/d2game_6a9d0.cpp; the null guard is ours (retail has none)
     if (!pOp || !pOp->pObject)
     {
         return 0;
     }
 
-    D2UnitStrc* pObject = pOp->pObject;
-
-    D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pObject);
-    D2CoordStrc pCoord = {};
-    UNITS_GetCoords(pObject, &pCoord);
-    
-    const int32_t nSizeX = UNITS_GetUnitSizeX(pObject);
-    const int32_t nSizeY = UNITS_GetUnitSizeY(pObject);
-    const uint32_t nTickCount = GetTickCount();
-
-    const int32_t nAnimMode = pObject->dwAnimMode;
-
-    if (nTickCount < pObject->dwTickCount + 500)
-    {
-        return 1;
-    }
-    else
-    {
-        switch (nAnimMode)
-        {
-        case OBJMODE_SPECIAL4:
-            if (D2GAME_DoKeyCheck_6FC4A4B0(pOp->pGame, pOp->pPlayer))
-            {
-                UNITS_FreeCollisionPath(pObject);
-                UNITS_ChangeAnimMode(pObject, OBJMODE_OPENED);
-                pObject->dwTickCount = nTickCount;
-                return 1;
-            }
-
-            SUNIT_AttachSound(pOp->pPlayer, 0x16, pOp->pPlayer);
-            return 1;
-
-        case OBJMODE_NEUTRAL:
-            UNITS_FreeCollisionPath(pObject);
-            UNITS_ChangeAnimMode(pObject, OBJMODE_OPENED);
-            pObject->dwTickCount = nTickCount;
-            return 1;
-
-        case OBJMODE_OPENED:
-        case OBJMODE_SPECIAL3:
-            if (!COLLISION_CheckMaskWithSizeXY(pRoom, pCoord.nX, pCoord.nY, nSizeX, nSizeY, COLLIDE_PLAYER | COLLIDE_MONSTER | COLLIDE_CORPSE))
-            {
-                UNITS_BlockCollisionPath(pObject, pRoom, pCoord.nX, pCoord.nY);
-                UNITS_ChangeAnimMode(pObject, OBJMODE_NEUTRAL);
-                pObject->dwTickCount = nTickCount;
-                return 1;
-            }
-
-            if (COLLISION_CheckMaskWithSizeXY(pRoom, pCoord.nX, pCoord.nY, nSizeX, nSizeY, COLLIDE_CORPSE))
-            {
-                UNITS_ChangeAnimMode(pObject, OBJMODE_SPECIAL2);
-                pObject->dwTickCount = nTickCount;
-                return 1;
-            }
-
-            if (nAnimMode == OBJMODE_SPECIAL3)
-            {
-                return 1;
-            }
-
-            UNITS_ChangeAnimMode(pObject, OBJMODE_SPECIAL3);
-            pObject->dwTickCount = nTickCount;
-            return 1;
-
-        default:
-            return 1;
-        }
-    }
-
-    return 1;
+    static const D2G6A9D0Env env = {
+        [](void* o) { return (void*)UNITS_GetRoom((D2UnitStrc*)o); },
+        [](void* o, int32_t* xy) { D2CoordStrc c = {}; UNITS_GetCoords((D2UnitStrc*)o, &c); xy[0] = c.nX; xy[1] = c.nY; },
+        [](void* o) { return (int32_t)UNITS_GetUnitSizeX((D2UnitStrc*)o); },
+        [](void* o) { return (int32_t)UNITS_GetUnitSizeY((D2UnitStrc*)o); },
+        []() { return (uint32_t)GetTickCount(); },
+        [](void* o) { return (uint32_t)((D2UnitStrc*)o)->dwAnimMode; },
+        [](void* o) { return (uint32_t)((D2UnitStrc*)o)->dwTickCount; },
+        [](void* o, uint32_t t) { ((D2UnitStrc*)o)->dwTickCount = t; },
+        [](void* pl, void* g) { return (int32_t)D2GAME_DoKeyCheck_6FC4A4B0((D2GameStrc*)g, (D2UnitStrc*)pl); },
+        [](void* pl, int32_t t, void* u) { SUNIT_AttachSound((D2UnitStrc*)pl, t, (D2UnitStrc*)u); },
+        [](void* o) { UNITS_FreeCollisionPath((D2UnitStrc*)o); },
+        [](void* r, int32_t x, int32_t y, int32_t sx, int32_t sy, uint32_t m) { return (uint32_t)COLLISION_CheckMaskWithSizeXY((D2ActiveRoomStrc*)r, x, y, sx, sy, (uint16_t)m); },
+        [](void* o, void* r, int32_t x, int32_t y) { UNITS_BlockCollisionPath((D2UnitStrc*)o, (D2ActiveRoomStrc*)r, x, y); },
+        [](void* o, int32_t m) { UNITS_ChangeAnimMode((D2UnitStrc*)o, m); },
+    };
+    return d2g_6a9d0(pOp->pGame, pOp->pObject, pOp->pPlayer, &env);
 }
 
 //D2Game.0x6FC75730

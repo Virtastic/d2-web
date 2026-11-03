@@ -101,8 +101,6 @@ struct Batch5Env {
 };
 
 // ---- save-module state ---------------------------------------------------------------------------
-static uint32_t g_batch5_writeSaveFile;    // 0x6FD2D8BC gbWriteSaveFile: file writing enabled
-static uint32_t g_batch5_sameSaveCount;    // 0x6FD31F84: realm saves skipped as unchanged
 
 // ---- shared: verify a NUL-terminated name is at most 15 characters -------------------------------
 static bool nameFits15(const char* name)
@@ -267,116 +265,7 @@ void D2GAME_SAVE_AttachSaveFile_113c(void* client, void* player, void* game, uin
     wr32(client, 0x188, 0);
 }
 
-// 1.13c D2Game+0x53F10
-// D2GAME_SAVE_WriteFileToDisk: when file writing is enabled (0x6FD2D8BC), build the player save
-// into a 0x2000-byte buffer (0xEC7F0), format "<savePath><name>.d2s" from FOG_GetSavePath and
-// write it when the size is positive; a failed fopen traces "Unable to open player save file %s".
-void D2GAME_SAVE_WriteFileToDisk_113c(void* player, void* game, const char* name, uint32_t arg,
-                                      const Batch5Env* env)
-{
-    if (g_batch5_writeSaveFile == 0) return;
-
-    char directory[1024] = {};
-    env->getSavePath(directory, 1024);
-
-    char fileName[500] = {};
-    std::snprintf(fileName, sizeof fileName, "%s%s.d2s", directory, name);
-
-    uint8_t buffer[0x2000];
-    uint32_t size = 0;
-    env->createSaveFile(game, player, buffer, &size, 0x2000, arg, 0);
-    if ((int32_t)size <= 0) return;
-
-    void* file = env->fileOpen(fileName, "wb");
-    if (file != nullptr) {
-        env->fileWrite(buffer, size, file);
-        env->fileClose(file);
-        return;
-    }
-    env->trace("Unable to open player save file %s", fileName);
-}
-
-// 1.13c D2Game+0x54000
-// D2GAME_SAVE_WriteFileOnRealm: build the save into a 0x2002-byte buffer whose first word is the
-// size+2 (0xEC7F0). Compare the freshly calculated checksum (0x53170) with the client's (+0x18C).
-// When they match and the old save header (0x49790) has the same size (0x49760), zero the four
-// version-91+ fields on both sides, compare the bytes, restore the fields, and on an identical
-// save count it, call the relock callback (+0x38), store the client info and return 0. Otherwise
-// store the client info and checksum, call the save callback (+0xC) and return 1.
-int32_t D2GAME_SAVE_WriteFileOnRealm_113c(void* game, void* player, const char* name,
-                                          const char* account, uint32_t bInteracts, uint32_t token,
-                                          uint32_t arg, void* clientInfo, const Batch5Env* env)
-{
-    if (g_batch5_writeSaveFile == 0) return 0;
-
-    uint8_t buffer[0x2002];
-    uint32_t size = 0;
-    env->createSaveFile(game, player, buffer + 2, &size, 0x2000, bInteracts, arg);
-    if ((int32_t)size < 1) return 0;
-    size += 2;
-    wr16(buffer, 0, (uint16_t)size);                   // stream length prefix
-
-    void* client = env->getClientFromPlayer(player);   // import #10920
-    if (client == nullptr) fatal(0x7EB);
-    const uint32_t oldChecksum = rd32(client, 0x18C);
-
-    void* oldSave = env->getSaveHeader(client);        // 0x49790
-    const uint32_t oldSize = env->getSaveHeaderSize(client);   // 0x49760
-    if (oldSave == nullptr) fatal(0xA3B);              // D2_ASSERT(pOldSaveData)
-
-    const uint32_t newChecksum = (uint32_t)env->calculateChecksum(buffer + 2, size - 2);
-    bool same = true;
-    if (newChecksum == oldChecksum) {
-        if (oldSize == size - 2) {
-            const uint32_t oldVersion = rd32(oldSave, 0x04);
-            uint32_t oldF[4] = {};
-            if (oldVersion > 91) {
-                oldF[0] = rd32(oldSave, 0x0C); oldF[1] = rd32(oldSave, 0x30);
-                oldF[2] = rd32(oldSave, 0x34); oldF[3] = rd32(oldSave, 0xAB);
-                wr32(oldSave, 0x0C, 0); wr32(oldSave, 0x30, 0);
-                wr32(oldSave, 0x34, 0); wr32(oldSave, 0xAB, 0);
-            }
-            const uint32_t newVersion = rd32(buffer, 6);   // buffer+2+4
-            uint32_t newF[4] = {};
-            if (newVersion > 91) {
-                newF[0] = rd32(buffer, 14); newF[1] = rd32(buffer, 50);
-                newF[2] = rd32(buffer, 54); newF[3] = rd32(buffer, 173);
-                wr32(buffer, 14, 0); wr32(buffer, 50, 0);
-                wr32(buffer, 54, 0); wr32(buffer, 173, 0);
-            }
-            for (uint32_t i = 0; i < oldSize; ++i) {
-                if (((const uint8_t*)oldSave)[i] != buffer[i + 2]) { same = false; break; }
-            }
-            if (oldVersion > 91) {
-                wr32(oldSave, 0x0C, oldF[0]); wr32(oldSave, 0x30, oldF[1]);
-                wr32(oldSave, 0x34, oldF[2]); wr32(oldSave, 0xAB, oldF[3]);
-            }
-            if (newVersion > 91) {
-                wr32(buffer, 14, newF[0]); wr32(buffer, 50, newF[1]);
-                wr32(buffer, 54, newF[2]); wr32(buffer, 173, newF[3]);
-            }
-            if (same) {
-                ++g_batch5_sameSaveCount;
-                if (env->callbackTable != nullptr && env->callbackTable[14 /* +0x38 pfRelockDatabaseCharacter */] != nullptr) {
-                    typedef int32_t (*RelockFn)(void*, const char*, const char*);
-                    ((RelockFn)env->callbackTable[14])(clientInfo, name, account);
-                }
-                env->setClientInfo(client, clientInfo);
-                return 0;
-            }
-        }
-        // checksums matched but the bytes differ: fall through to the save callback
-    }
-
-    env->setClientInfo(client, clientInfo);
-    env->setSaveChecksum(client, newChecksum);
-    if (env->callbackTable != nullptr && env->callbackTable[3 /* +0x0C pfSaveDatabaseCharacter */] != nullptr) {
-        if (env->isBadCodePtr(env->callbackTable[3]) != 0) fatal(0xAD1);
-        typedef int32_t (*SaveDbFn)(void*, const char*, const char*, const void*, uint32_t, uint32_t);
-        ((SaveDbFn)env->callbackTable[3])(clientInfo, name, account, buffer, size, token);
-    }
-    return 1;
-}
+// 1.13c D2Game+0x53F10 and +0x54000 moved to d2game_53f10.cpp / d2game_54000.cpp (their own probes).
 
 // 1.13c D2Game+0x2A740
 // GAME_VerifyJoinGame (1.13c split): reject a non-NUL-terminated/over-15 name, locale >= 13, a

@@ -19,7 +19,7 @@ static void msgQueue(uint8_t* client, uint8_t* n)
     Ordinal_10158(client); // GUESS: arg is the client (ESI)
 }
 
-// 1.13c D2Game+0x7A090
+// superseded by d2game_7a090.cpp: D2Game+0x7A090
 extern "C" void D2Game_7A090(uint8_t* client) // GUESS: client = unaff_ESI
 {
     uint8_t* n = (uint8_t*)msgAlloc(799);
@@ -29,7 +29,7 @@ extern "C" void D2Game_7A090(uint8_t* client) // GUESS: client = unaff_ESI
     msgQueue(client, n);
 }
 
-// 1.13c D2Game+0x7A440
+// superseded by d2game_7a440.cpp: D2Game+0x7A440
 extern "C" void D2Game_7A440(uint8_t* client, uint16_t retaddrWord, uint16_t p1, uint8_t p2) // GUESS: client=ESI, retaddrWord=unaff_retaddr
 {
     uint8_t* n = (uint8_t*)msgAlloc(0x298); // GUESS: line arg 0x298 matches the stored word

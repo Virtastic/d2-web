@@ -55,7 +55,7 @@ uint32_t D2GAME_534D0(int* param_1, uint32_t param_2, int* param_3, uint32_t* pa
     return 0;
 }
 
-// 1.13c D2Game+0x78DD0
+// (superseded by d2game_78dd0.cpp) D2Game 78DD0
 void D2GAME_78DD0(int ebx, int* param_2, int in_EAX)
 {
     uint32_t stk = 0;

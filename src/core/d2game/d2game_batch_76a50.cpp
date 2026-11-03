@@ -230,7 +230,7 @@ void D2Game_78A90(D2GameBatch76Env& e, int p, void* unit, int flag)
     }
 }
 
-// 1.13c D2Game+0x78C50: a = EAX, b = EBX, n = EDI
+// superseded by d2game_78c50.cpp: D2Game+0x78C50: a = EAX, b = EBX, n = EDI
 void D2Game_78C50(D2GameBatch76Env& e, void* a, const void* b, int32_t n)
 {
     if (n <= 0) return;

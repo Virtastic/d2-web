@@ -164,39 +164,6 @@ void D2GAME_6B7A0(void* p1, void* p2, int ebx, void* esi)
     }
 }
 
-// 1.13c D2Game+0x6B9B0  (ecx = ctx)
-void D2GAME_6B9B0(int* ctx)
-{
-    u8 b1[12], b2[20];
-    void* a = Ordinal_10331();
-    Ordinal_10141(ctx[2], b1);
-    void* d = Ordinal_10826();
-    int lvl = Ordinal_10459();
-    Ordinal_10585();
-    Ordinal_10331(ctx[2], b2, 3, 0x1c09, 0);
-    if (!Ordinal_10509()) return;
-    int unit = ctx[2], game = ctx[0];
-    if (!a) assertFail(0xe42);
-    if (unit && Ordinal_10057(a)) { FUN_6fcfffd0(0x18, unit); return; }
-    char c1 = (char)Ordinal_10459(b2);
-    void* d2 = Ordinal_10826(a);
-    char c2 = (char)Ordinal_10459(d2);
-    if (c1 != c2) assertFail(0xe5c);
-    int args[2] = {(int)(intptr_t)d2, lvl + 5};
-    if (!Ordinal_10654(a, args, args, 3, 0x3e01, 0xc01, 0)) return;
-    int r = FUN_6fc21280();
-    if (!r) return;
-    int* p = FUN_6fd01d90(2, 0x3b, 0, 0, game);
-    Ordinal_11090(p, 1);
-    int* q = FUN_6fcc22e0(game, p, args);
-    if (!q) return;
-    int f = Ordinal_10258(q);
-    Ordinal_10111(q, f | 3);
-    Ordinal_10346(r, 0);
-    Ordinal_10346(Ordinal_10331(q, 0));
-    (void)d;
-}
-
 // 1.13c D2Game+0x6BD60  (caller 0x6BE40; REG? esi=unit, edi)
 void D2GAME_6BD60(int* esi, int edi)
 {

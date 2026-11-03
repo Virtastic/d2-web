@@ -130,50 +130,6 @@ template <class E> u32 IterateNearbyQuestTargets(E& e, u32 obj)
     return 0;
 }
 
-// 1.13c D2Game+0x6B430
-// Spawn the rotating code items: for each marked code item on the room list (+0x60) that is not "non ",
-// sub_6B070 places it; with none placed, the rotation state at p[2]+0x20 (64-bit) picks one of six colour
-// codes ("cgw ", "cgr ", "cg g", "cgb ", "cgy ", "cgv ") and sub_6B070 places it. Fatal 0x823 / 0x84C on a lookup miss.
-template <class E> void SpawnRotatingCodeItems(E& e, u32 p1, u32 p1b)
-{
-    (void)p1b;
-    u32 uVar6 = e.rd32(e.rd32(p1 + 8) + 0x60);
-    u32 it = e.ord10010(uVar6, 0x14, 0);
-    bool placed = false;
-    if (it != 0) {
-        do {
-            if (placed) return;
-            u32 id = (it == 0) ? 0xFFFFFFFFu : e.rd32(it + 4);
-            u32 rec = e.ord10695(id);
-            if (e.rd32(rec + 0xBC) != 0x206E6F6Eu) {
-                s32 code = e.ord10814(e.rd32(rec + 0xBC));
-                if (code == -1) { e.fatal(0x823); return; }
-                if (e.sub_6B070(e.rd32(p1), e.rd32(p1 + 8), (u32)code, it) != 0) { placed = true; it = 0; }
-            }
-            it = e.ord10010(uVar6, 0x14, it);
-        } while (it != 0);
-        if (placed) return;
-    }
-    u32 st = e.rd32(p1 + 8);
-    {
-        u64 v = (u64)e.rd32(st + 0x20) * 0x6AC690C5ull + (u64)e.rd32(st + 0x24);
-        e.wr32(st + 0x20, (u32)v);
-        e.wr32(st + 0x24, (u32)(v >> 32));
-        u32 code = 0;
-        switch ((u32)v % 6u) {
-        case 0: code = 0x20776367u; break;
-        case 1: code = 0x20726367u; break;
-        case 2: code = 0x20676367u; break;
-        case 3: code = 0x20626367u; break;
-        case 4: code = 0x20796367u; break;
-        default: code = 0x20766367u; break;
-        }
-        s32 id = e.ord10814(code);
-        if (id != -1) { e.sub_6B070(e.rd32(p1), e.rd32(p1 + 8), (u32)id, 0); return; }
-        e.fatal(0x84C);
-    }
-}
-
 // 1.13c D2Game+0x6B8A0
 // Move a unit along its path point: the x/y pair comes from the target unit's (or its record's) +0x10 and +0xC,
 // then ord10314 starts the move with the sub_6A440 callback. On failure the sub_24B70 seam runs on the game.
@@ -240,21 +196,6 @@ template <class E> void PLRTRADE_AddItemTradePair(E& e, u32 esi, u32 eax)
             e.wr32(rec + 8, node);
         }
     }
-}
-
-// 1.13c D2Game+0x75070
-// Initialise a 0x20-byte state record: fatal 0x7B8 when the index is above 0xF; zero it, set the index and the
-// unit at +4, and set the byte at +0x15 to 0x65 when sub_74F20 says so, else 100.
-template <class E> void PLRSTATE_InitRecord(E& e, u32 index, u32 esi, u32 edi)
-{
-    if (index > 0xF) { e.fatal(0x7B8); return; }
-    e.ord11103();
-    for (u32 i = 0; i < 8; i++) e.wr32(esi + i * 4, 0);
-    e.wr32(esi, index);
-    e.wr32(esi + 4, edi);
-    u8 v = 100;
-    if (e.sub_74F20(edi) != 0) v = 0x65;
-    e.wr8(esi + 0x15, v);
 }
 
 // 1.13c D2Game+0x75350
