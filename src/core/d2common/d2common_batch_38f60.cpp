@@ -38,13 +38,6 @@ extern "C"
 		int32_t nOtherBodyLoc, void* pItemAtRequestBodyLoc) = nullptr;
 }
 
-// 1.13c D2Common+0x38F60 (#10925): a unit's max-damage stat total, the two-handed row when the
-// second argument is non-zero. The vendored 1.10f STATLIST_GetMaxDamageFromUnit walks the same
-// row selection through STATLIST_GetTotalStatValue (same count bound, same null gates).
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_38f60(uint32_t pUnit, int32_t b2Handed) { // 1.13c D2Common+0x38F60
-	return STATLIST_GetMaxDamageFromUnit(reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit)), b2Handed);
-}
-
 // 1.13c D2Common+0x32EF0 (#10932): merge the dual-wield weapon stat lists into the unit. The
 // weapon 0x31B90 selects and the left-hand weapon decide which of the two hands is merged with
 // type 1 and which with type 0; only a weapon whose stat list has an owning extended parent

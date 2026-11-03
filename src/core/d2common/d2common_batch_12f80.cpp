@@ -11,46 +11,7 @@ typedef uint32_t (*Alloc)(const char*, int, int);
 }
 
 extern "C" {
-// 1.13c D2Common+0x12F80: build DrlgAnim records for each 0x30-byte cell entry (array base in EAX)
-// whose type has bit 0x100; the first picked tile fills the entry, the rest become linked objects.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_12f80(uint32_t arr, uint32_t drlg, int32_t dflt, int32_t count, uint32_t tbl,
-  uint32_t (*typeFlags)(uint32_t), uint32_t (*pick)(uint32_t,uint32_t,uint32_t,uint32_t,int32_t*,int),
-  Alloc alloc, int (*same)(int32_t,uint32_t), uint32_t (*rank)(int32_t),
-  uint32_t (*mk0)(int32_t,int32_t,uint32_t,int32_t), uint32_t (*mkD)(uint32_t,int32_t,uint32_t,int32_t,int32_t),
-  uint32_t (*mkN)(uint32_t,uint32_t,int32_t,int32_t,uint32_t,int32_t,int32_t), void (*fatal)(int)) {
- if (!arr) return;
- if (!dflt) dflt = 0x50;
- const char* F = "..\\Source\\D2Common\\DRLG\\DrlgAnim.cpp";
- int32_t t[40];
- uint32_t e = arr + 0x18;
- for (int i = 0; i < count; ++i, e += 0x30) {
-  if (!w(e,0) || !(typeFlags(w(e,0)) & 0x100)) continue;
-  uint32_t g = tbl - 0x14 + ((w(e,-4) >> 14) & 7) * 0x14;
-  uint32_t v = w(w(g,0) + (w(w(g,4) + w(e,-12)*4, 0) + w(e,-16))*4, 0);
-  uint32_t bt = v ? (v >> 20) & 0x3f : 0, ix = v ? v >> 8 : 0;
-  uint32_t n = pick(drlg + 0x68, w(e,4), bt, ix & 0xff, t, 0x28);
-  uint32_t r = alloc(F, 0x9b, 0);
-  memset(p(r), 0, 20); w(r,4) = n;
-  w(r,0) = alloc(F, 0xa1, 0); memset(p(w(r,0)), 0, n * 4);
-  w(r,12) = dflt; uint32_t lvl = w(drlg,0x54);
-  w(r,16) = w(lvl,4); w(lvl,4) = r;
-  uint32_t k = 0;
-  while (k < n && same(t[k], n)) ++k;
-  if (k >= n) { fatal(0xb6); return; }
-  w(e,0) = t[k]; w(w(r,0),0) = e - 24;
-  uint32_t x = w(e,-12) + w(drlg,0x38), y = w(e,-16) + w(drlg,0x34);
-  for (uint32_t s = 1; s < n; ++s) {
-   uint32_t j = 0;
-   while (j < n && rank(t[j]) != s) ++j;
-   if (j >= n) { fatal(0xcb); return; }
-   uint32_t o, ty = w(e,4);
-   if (!ty) { o = w(lvl,0x1c) + w(lvl,0xc)*0x30; w(o,32) = 0; w(lvl,0xc)++; mk0(x,y,v,t[j]); }
-   else if (ty == 0xd) o = mkD(drlg,y,0,x,t[j]);   // retail FUN_6fdb8cd0(drlg, y, 0, x, t): third arg 0, fourth x
-   else o = mkN(drlg,0,y,x,v,t[j],ty);
-   w(w(r,0), s*4) = o; w(o,20) |= 8;
-  }
- }
-}
+// 1.13c D2Common+0x12F80 lives in d2common_12f80.cpp (own file, exact seam signatures).
 // 1.13c D2Common+0x69B50: visit every cell of the room (+1 when the edge flag is 0), calling the per-cell hook.
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_69b50(uint32_t room, uint32_t grid, int32_t a3, int32_t noEdgeX, int32_t noEdgeY,
   void (*cell)(uint32_t,uint32_t,uint32_t,int32_t,int32_t,int32_t)) {

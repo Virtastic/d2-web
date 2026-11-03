@@ -14,6 +14,8 @@ struct D2Common55400State {
     uintptr_t addrFile;    // source-file string, block word 0
     uintptr_t addrTable;   // DAT_6FDDA3E0 table address, block word 7
     uintptr_t addrSounds;  // "sounds" string (the load's name)
+    uintptr_t arg0;        // the function's own stack argument: the create call pops two words the frame never pushed, so the
+                           // load's first argument is read from the slot above the return address, i.e. this argument
 };
 
 typedef uintptr_t (*D2Common55400Create)(const uint32_t* blk);                                                  // 0x924C
@@ -23,11 +25,11 @@ typedef int32_t (*D2Common55400Load)(uintptr_t zero, uintptr_t szName, const uin
 extern "C" void D2Common_55400_Load(D2Common55400State* s, D2Common55400Create pCreate, D2Common55400Load pLoad)
 {
     if (s->bCompile == 0) return;
-    // Block: file, line 0xC99, "Sound", 0x11, 0, 0, &linker, table, 0, 0, 0, 0 (slot 11 is the zero the load receives as ECX).
+    // Block: file, line 0xC99, "Sound", 0x11, 0, 0, &linker, table, 0, 0, 0, 0 (slot 11 is dead: the load's first word is the caller's argument).
     uint32_t blk[12] = {
         (uint32_t)s->addrFile, 0xC99u, (uint32_t)s->addrSound, 0x11u, 0u, 0u,
         (uint32_t)s->addrLinker, (uint32_t)s->addrTable, 0u, 0u, 0u, 0u
     };
     s->pLinker = pCreate(blk);
-    s->pResult = (uintptr_t)pLoad(blk[11], s->addrSounds, blk, s->pOutAddr, 2u);
+    s->pResult = (uintptr_t)pLoad(s->arg0, s->addrSounds, blk, s->pOutAddr, 2u);
 }

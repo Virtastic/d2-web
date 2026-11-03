@@ -1,4 +1,4 @@
-// 1.13c D2Common implementation batch: +0x3CDF0, +0x3CEE0.
+// 1.13c D2Common implementation batch: +0x3CDF0 (3CEE0 moved to d2common_3cee0.cpp).
 // Bodies follow the cached 1.13c decompile. Callees that are still separate UNMAPPED rows arrive
 // through an env struct passed after the retail arguments (a null env leaves the call inert);
 // retail's fatal paths (Fog message + _exit(-1)) are modelled as returns, as in the other
@@ -70,21 +70,6 @@ EMSCRIPTEN_KEEPALIVE int32_t* d2_fn_d2common_3cdf0(uint32_t pUnit, int32_t nArg2
 		*pOutY = coords[1];
 
 	return pEnv->room_at(pRecord, coords[0], coords[1]);
-}
-
-// 1.13c D2Common+0x3CEE0 (#10942): fatal 0x221 on a null unit; otherwise forward (unit+0x48, arg2,
-// arg3, out) to the 0x1A130 record resolver. Retail returns void. The seam's second output (y, which
-// retail leaves in EAX) has no caller slot here, so it lands in a scratch word.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3cee0(uint32_t pUnit, int32_t nArg2, int32_t nArg3,
-                                               int32_t* pOut, const D2Common3CDF0Env* pEnv)
-{
-	if (!pUnit)
-		d2common_fatal(0x221);
-	if (!pEnv || !pEnv->resolve_room)
-		return;
-	int32_t nScratchY = 0;
-	pEnv->resolve_room(R(P(pUnit), 0x48), nArg2, nArg3, pOut, &nScratchY);
 }
 
 // 1.13c D2Common+0x39B30 (#10810): count of nItemId in the unit's inventory grid. The grid is at

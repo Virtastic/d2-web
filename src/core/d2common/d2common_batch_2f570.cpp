@@ -25,14 +25,15 @@ namespace
 	inline uint32_t& W(void* b, int o) { return *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(b) + o); }
 }
 
-// Env seams for callees that are still-UNMAPPED rows. Register use taken from the 1.13c call sites
-// (0 and 2 take class id + buffer, 1 and 4 take the class id only).
+// Name ports (one file each): 0x5E4D0, 0x5E480 and 0x5E410.
+void D2Common_5E4D0_GetPlayerName(int32_t nClassId, char* szOut);
+void D2Common_5E480_GetMonsterName(int32_t nClassId, char* szOut);
+void D2Common_5E410_GetItemName(int32_t nItemId, char* szOut);
+
+// Env seam for 0x5D800, still an UNMAPPED row (null until the environment installs it).
 extern "C"
 {
-	void (*g_d2common_fn_5E4D0)(int32_t, uint32_t) = nullptr;
-	void (*g_d2common_fn_5E480)(int32_t) = nullptr;
 	void (*g_d2common_fn_5D800)(int32_t, uint32_t) = nullptr;
-	void (*g_d2common_fn_5E410)(int32_t) = nullptr;
 }
 
 // 1.13c D2Common+0x2f570: stores the switched left skill id and flags in a player unit's player data
@@ -161,7 +162,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3be90_batch(uint32_t pOwner)
 
 // 1.13c D2Common+0x5f1c0: formats a unit description into pBuffer from an explicit unit type and
 // class id (the buffer's first byte is cleared). Types 0, 1, 2 and 4 dispatch to 0x5E4D0, 0x5E480,
-// 0x5D800 and 0x5E410, type 3 writes "missile %d", and any other type writes "Invalid Unit Type".
+// 0x5D800 and 0x5E410, type 3 writes "missile %d", and any other type leaves the buffer empty.
 // Returns pBuffer.
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t D2Common_5F1C0_UnitTypeName(uint32_t nUnitType, int32_t nClassId,
@@ -176,13 +177,11 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_5F1C0_UnitTypeName(uint32_t nUnitType, in
 
 	switch (nUnitType)
 	{
-	case 0:
-		if (g_d2common_fn_5E4D0)
-			g_d2common_fn_5E4D0(nClassId, pBuffer);
+	case 0: // 0x5E4D0: class id in ECX, buffer in EDX (both explicit in the 1.13c call)
+		D2Common_5E4D0_GetPlayerName(nClassId, reinterpret_cast<char*>(buf));
 		break;
-	case 1:
-		if (g_d2common_fn_5E480)
-			g_d2common_fn_5E480(nClassId);
+	case 1: // 0x5E480: the 1.13c body writes through ESI, the buffer this function was entered with
+		D2Common_5E480_GetMonsterName(nClassId, reinterpret_cast<char*>(buf));
 		break;
 	case 2:
 		if (g_d2common_fn_5D800)
@@ -191,12 +190,11 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_5F1C0_UnitTypeName(uint32_t nUnitType, in
 	case 3:
 		std::sprintf(reinterpret_cast<char*>(buf), "missile %d", static_cast<int>(nClassId));
 		break;
-	case 4:
-		if (g_d2common_fn_5E410)
-			g_d2common_fn_5E410(nClassId);
+	case 4: // 0x5E410: the item-name port, buffer as for case 1
+		D2Common_5E410_GetItemName(nClassId, reinterpret_cast<char*>(buf));
 		break;
 	default:
-		std::strcpy(reinterpret_cast<char*>(buf), "Invalid Unit Type");
+		// 1.13c hands the narrow literal to a wide printf; retail's capture leaves the buffer empty.
 		break;
 	}
 

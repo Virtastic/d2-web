@@ -47,30 +47,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_port_d2common_5a730(HD2ARCHIVE archive)
     if (sgptDataTables->nTreasureClassEx >= 65535) std::exit(-1);
 }
 
-// 1.13c D2Common+0x5D9B0
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_5d9b0(int16_t** output, int16_t* count)
-{
-    *output = (int16_t*)D2_CALLOC(uint32_t(sgptDataTables->nStatesTxtRecordCount) * 2u);
-    *count = 0;
-    for (int i = 0; i < sgptDataTables->nStatesTxtRecordCount; ++i)
-        if (int16_t(sgptDataTables->pStatesTxt[i].wState) > 0) {
-            (*output)[*count] = int16_t(i);
-            *count = int16_t(uint16_t(*count) + 1u);
-        }
-}
-
-// 1.13c D2Common+0x5DA30
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_5da30(int32_t bit, int16_t** output, int16_t* count)
-{
-    *output = (int16_t*)D2_CALLOC(uint32_t(sgptDataTables->nStatesTxtRecordCount) * 2u);
-    *count = 0;
-    for (int i = 0; i < sgptDataTables->nStatesTxtRecordCount; ++i)
-        if (sgptDataTables->pStatesTxt[i].nStateFlags[bit >> 3] & uint8_t(1u << (bit & 7))) {
-            (*output)[*count] = int16_t(i);
-            *count = int16_t(uint16_t(*count) + 1u);
-        }
-}
-
 // 1.13c D2Common+0x5DAD0
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_5dad0_batch(int32_t bit, uint32_t* output)
 {
@@ -166,49 +142,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_1f980(D2UnitStrc* unit,
     return D2Common_24430_CheckItemTypeId(first, 0x43) && D2Common_24430_CheckItemTypeId(second, 0x43);
 }
 
-// 1.13c D2Common+0x25C10
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_25c10(D2UnitStrc* item, D2BitBufferStrc* buffer, int32_t server)
-{
-    if (!item || uint32_t(item->dwClassId) >= uint32_t(sgptDataTables->pItemDataTables.nItemsTxtRecordCount) || !sgptDataTables->pItemDataTables.pItemsTxt
-        || item->dwUnitType != 4 || !item->pItemData) std::exit(-1);
-    const D2ItemsTxt* row = &sgptDataTables->pItemDataTables.pItemsTxt[item->dwClassId];
-    auto write = [buffer](int32_t value, int bits) { ITEMS_WriteBitsToBitstream(buffer, value, bits); };
-    write(uint32_t(std::clamp<int>(ITEMS_GetItemFormat(item), 0, 1023)), 10);
-    write(item->dwAnimMode, 3);
-    if (item->dwAnimMode == 3 || item->dwAnimMode == 5) {
-        write(UNITS_GetXPosition(item), 16); write(UNITS_GetYPosition(item), 16);
-    } else {
-        write(ITEMS_GetBodyLocation(item), 4);
-        write(std::clamp(UNITS_GetXPosition(item), 0, 15), 4);
-        write(std::clamp(UNITS_GetYPosition(item), 0, 15), 4);
-        // Retail increments AL, then MOVSX before the saturating write.
-        write(int8_t(uint8_t(ITEMS_GetInvPage(item) + 1)), 3);
-    }
-    if (ITEMS_GetItemFlags(item) & 0x10000) {
-        write(std::clamp(ITEMS_GetFileIndex(item), 0, 7), 3);
-        write(ITEMS_GetEarLevel(item), 7);
-        const char* name = ITEMS_GetEarName(item);
-        do { write(*name, 7); } while (*name++);
-    } else {
-        write(ITEMS_GetBaseCode(item), 32);
-        if (ITEMS_CheckItemTypeId(item, 4)) {
-            const int32_t gold = STATLIST_UnitGetStatValue(item, 14, 0);
-            write(gold >= 4096, 1); write(gold, gold < 4096 ? 12 : 32);
-        }
-    }
-    if (row->nQuest && row->nQuestDiffCheck) {
-        if (sgptDataTables->nItemStatCostTxtRecordCount < 0x165 || !sgptDataTables->pItemStatCostTxt) std::exit(-1);
-        const auto& stat = sgptDataTables->pItemStatCostTxt[0x164];
-        const int value = STATLIST_UnitGetStatValue(item, 0x164, 0);
-        ITEMS_WriteBitsToBitstream(buffer, uint32_t(value >> (stat.nValShift & 31)) + stat.dwSaveAdd, stat.nSaveBits);
-    }
-    if (server) {
-        int realm0 = 0, realm1 = 0;
-        ITEMS_GetRealmData(item, &realm0, &realm1);
-        write(realm1 != 0, 1);
-        if (realm1) { write(realm0, 32); write(realm1, 32); write(0, 32); }
-    }
-}
+// 1.13c D2Common+0x25C10: moved to d2common_25c10.cpp (seam-based port).
 
 // 1.13c D2Common+0x833F0: LvlSub teardown. Retail does not free the grids: for each grid it asserts the
 // row-offsets pointer is null (Fog assert, DrlgGrid.cpp line 0x218), then zeroes flags and row offsets.

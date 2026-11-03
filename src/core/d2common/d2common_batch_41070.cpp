@@ -15,21 +15,7 @@
 // 1.13c D2Common+0x42A70: the footprint stamp retail calls directly (ECX=level, EDX=x, stack y, idx, flag, extra).
 extern "C" void D2Common_42A70(void*, int32_t, int32_t, int32_t, int32_t, int32_t);
 
-// 1.13c D2Common+0x41070: level+0x14 is pOutdoors; preset 0x361 gives the column step (nSizeX at +0x28, rounded
-// up to whole 8-cell units); fifteen stamps walk left from the last column, each with idx 0x361+i. The retail
-// guards are kept: a missing pOutdoors or a short table is fatal (0x28A / 0x28D).
-void D2Common_41070(D2DrlgLevelStrc* level) {
-    D2_ASSERT(level->pOutdoors);
-    auto* preset = DATATBLS_GetLvlPrestTxtRecord(0x361);
-    D2_ASSERT(preset);
-    const int32_t w = preset->nSizeX;
-    const int32_t step = (w + (w >> 31 & 7)) >> 3;
-    int x = level->pOutdoors->nGridWidth - step;
-    for (int i = 0; i < 15; ++i, x -= step) {
-        D2_ASSERT(x >= 0);
-        D2Common_42A70(level, x, 0, 0x361 + i, 0, 0);
-    }
-}
+// 1.13c D2Common+0x41070 is in src/core/d2common/d2common_41070.cpp (one file per function).
 
 // 1.13c D2Common+0x41340
 void D2Common_41340(D2DrlgLevelStrc* level) {

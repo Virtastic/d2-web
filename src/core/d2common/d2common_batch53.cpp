@@ -102,19 +102,4 @@ extern void D2Common_Ordinal_10024(const void*, uint32_t);
 extern const char D2Common_Dat_DDA728[];
 extern void D2Common_exit(int);
 
-// 1.13c D2Common+0x68800 : esi=unit, arg=param_1. Re-resolve unit->+0x10 record when its type byte (+0x2c) is not 'b' and not the wanted one.
-void D2Common_68800(uint32_t ecxArg, int32_t param_1, P unit)
-{
-    uint32_t err = 0x273;
-    if (unit) {
-        err = 0x274;
-        if (ru(unit, 0x10)) {
-            uint8_t c1 = *(uint8_t*)((P)ru(unit, 0x10) + 0x2c);
-            uint8_t c2 = (uint8_t)((((param_1 != 0xb) - 1u) & 6) + 0x6c);
-            if (c1 != 'b' && c1 != c2) *(uint32_t*)(unit + 0x10) = D2Common_6C5D0(c1, c2);
-            return;
-        }
-    }
-    D2Common_Ordinal_10024(D2Common_Dat_DDA728, D2Common_Ordinal_10265(err));
-    D2Common_exit(-1);
-}
+// 1.13c D2Common+0x68800 moved to d2common_68800.cpp (pb8).

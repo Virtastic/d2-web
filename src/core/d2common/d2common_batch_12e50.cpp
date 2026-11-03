@@ -12,7 +12,7 @@ extern "C" {
 // 1.13c D2Common+0x12E50: walk the (h+extra) x (w+extra) cell grid; for cells with flags
 // 0x8000003 look up a 0x28-byte record via ord 10059, and if its ord-10051 flags have 0x100,
 // add (count-1) to the totals at +0x28 / +0x18 / +0x20 of ctx+0x54 and set 0x8000000 in ctx+0x28.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_12e50(
+EMSCRIPTEN_KEEPALIVE void d2_port_d2common_12e50(
     int32_t eax, int32_t edx, uint32_t ctx, uint32_t flagGrid, uint32_t idGrid, uint32_t defId,
     int32_t (*lookup)(uint32_t, uint32_t, uint8_t, uint32_t, uint32_t*, int32_t),
     uint32_t (*recFlags)(uint32_t)) {

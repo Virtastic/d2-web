@@ -229,13 +229,6 @@ extern "C" uint32_t D2Common_3A1D0(const N87Env* e, uint32_t o, uint32_t, int v,
 // 1.13c D2COMMON+0x3C800
 extern "C" void D2Common_3C800(const N87Env* e) { e->f2E2C0(); }
 
-// 1.13c D2COMMON+0x3CCA0
-extern "C" void D2Common_3CCA0(const N87Env* e, int a, void* b, int c, int d)
-{
-	if (!a) e->fatal(0x2d7);
-	e->f7C300(b, c, d);
-}
-
 // D2Common 0x4CF40
 extern "C" uint32_t D2Common_4CF40(const N87Env* e, uint32_t a, int x, int y, uint32_t mode, uint32_t flags)
 {

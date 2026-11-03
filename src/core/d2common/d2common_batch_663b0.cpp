@@ -1,4 +1,4 @@
-// 1.13c D2Common implementation batch 11: +0x663B0, +0x2EC00, +0x2EC60, +0x3C3B0, +0x1EC30,
+// 1.13c D2Common implementation batch 11: +0x663B0, +0x2EC00, +0x2EC60, +0x1EC30,
 // +0x24D00, +0x51070, +0x1EEE0, +0x3D2B0, +0x3C520, +0x4D6E0, +0x3D0F0.
 // These are naming implementations: every branch written here is the 1.13c branch; helpers that
 // are separate, still-UNMAPPED rows are named in ponytail notes and are not called.
@@ -48,38 +48,6 @@ void D2Common_663B0_ClearRoomUpdateList(uint32_t pRoom)
 		unitAddress = next;
 	}
 	W(room, 0x1C) = 0;
-}
-
-// 1.13c D2Common+0x3C3B0 (#10144): remove a unit id from the room's unit array.
-// room+0x48 is an array of dword unit ids and room+0x78 its count. Retail first calls 0x3B3A0,
-// which walks the array and fatals (0x453) on a null entry; that walk is inlined here. A found
-// entry is overwritten with the last one and the count drops by one before the room's client
-// list is refreshed. Retail fatals 0x487/0x488/0x490 on a null room, a zero id and a miss.
-void D2Common_3C3B0_RemoveRoomUnit(uint32_t pRoom, uint32_t nUnitId)
-{
-	uint8_t* room = P(pRoom);
-	if (!room || nUnitId == 0)
-		return;
-
-	const uint32_t count = W(room, 0x78);
-	uint8_t* units = P(W(room, 0x48));
-
-	for (uint32_t i = 0; i < count; ++i)
-	{
-		if (W(units, static_cast<int>(i * 4)) == 0)
-			return;
-	}
-
-	uint32_t i = 0;
-	while (i < count && W(units, static_cast<int>(i * 4)) != nUnitId)
-		++i;
-
-	if (i >= count)
-		return;
-
-	W(units, static_cast<int>(i * 4)) = W(units, static_cast<int>((count - 1) * 4));
-	W(room, 0x78) = count - 1;
-	DUNGEON_UpdateClientListOfRoom(reinterpret_cast<D2ActiveRoomStrc*>(room));
 }
 
 // 1.13c D2Common+0x1EC30 (#10145): count belt items of one item-data type. stdcall(inventory, nItemType).

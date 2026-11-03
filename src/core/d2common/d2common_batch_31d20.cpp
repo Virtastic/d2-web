@@ -399,61 +399,6 @@ EMSCRIPTEN_KEEPALIVE void D2Common_2F6A0_TakePlayerOutputs(uint32_t pUnit, uint3
 		*pOut8C = 0xFFFFFFFFu;
 }
 
-// 1.13c D2Common+0x5F260 (#10274): unit to display string in pBuffer.
-// The buffer's first byte is cleared. A null unit becomes "NULL Unit"; otherwise unit type 0, 1, 2 and 4
-// dispatch to 0x5E4D0, 0x5E480, 0x5D800 and 0x5E410 (the first two with the unit type, the buffer cases
-// with class id), type 3 formats "missile %d" with the class id, and any other type writes
-// "Invalid Unit". Returns pBuffer. Retail reaches the four helpers with register/stack operands the
-// decompiler drops, so they are env seams.
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t D2Common_5F260_UnitName(uint32_t pUnit, uint32_t pBuffer,
-	void (*pfn5E4D0)(uint32_t, uint32_t),
-	void (*pfn5E480)(uint32_t, uint32_t),
-	void (*pfn5D800)(uint32_t, uint32_t),
-	void (*pfn5E410)(uint32_t))
-{
-	uint8_t* u = P(pUnit);
-	uint8_t* buf = P(pBuffer);
-	if (buf)
-		buf[0] = 0;
-
-	if (!u)
-	{
-		if (buf)
-			std::strcpy(reinterpret_cast<char*>(buf), "NULL Unit");
-		return pBuffer;
-	}
-
-	switch (W(u, 0))
-	{
-	case 0:
-		if (pfn5E4D0)
-			pfn5E4D0(W(u, 4), pBuffer);
-		break;
-	case 1:
-		if (pfn5E480)
-			pfn5E480(W(u, 0), W(u, 4));
-		break;
-	case 2:
-		if (pfn5D800)
-			pfn5D800(W(u, 4), pBuffer);
-		break;
-	case 3:
-		if (buf)
-			std::sprintf(reinterpret_cast<char*>(buf), "missile %d", static_cast<int>(W(u, 4)));
-		break;
-	case 4:
-		if (pfn5E410)
-			pfn5E410(W(u, 4));
-		break;
-	default:
-		if (buf)
-			std::strcpy(reinterpret_cast<char*>(buf), "Invalid Unit");
-		break;
-	}
-	return pBuffer;
-}
-
 // 1.13c D2Common+0x12140 (#10301, stdcall room, out, callback, ctx; ret 0x10): walk the room's +0x74 unit list (next at
 // +0xE8). Each unit is offered to the fastcall callback (ECX = unit, EDX = ctx); a non-zero answer stores the unit in
 // out[n++], and n reaching 15 is fatal in retail (0x78), modelled as a return. A bad code pointer is fatal 0x72 (returns 0).
