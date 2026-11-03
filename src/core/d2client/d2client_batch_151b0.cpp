@@ -155,7 +155,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2client_15350(
 
 // 1.13c D2Client+0x15500. Selects a record between the row's two bounds and updates the
 // current list entry to either the selected unit or the empty-selection sentinel.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2client_15500(
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_batchhost_d2client_15500(
     void* owner, int32_t index, const D2ClientBatch151Host* h) {
     if (!h || !owner || !fn(h, 0xA0A30)) return 0;
     uint8_t* row = nullptr;
@@ -194,7 +194,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2client_15500(
 
 // 1.13c D2Client+0x15ab0. Builds one placement descriptor for each eligible entry in the
 // selected range and dispatches it to the client's placement worker.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2client_15ab0(
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_batchhost_d2client_15ab0(
     void* owner, int32_t index, const D2ClientBatch151Host* h) {
     uint8_t* row = nullptr;
     if (!h || !owner || !(row = record(h, index))) return 0;
@@ -229,7 +229,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2client_15ab0(
 
 // 1.13c D2Client+0x15c40 (sub_15C40). Creates a UI placement descriptor, chooses its mode from the
 // current client selection state, and returns the selected unit's screen-relative coordinates.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2client_15c40(
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_batchhost_d2client_15c40(
     void* owner, int32_t index, uint32_t extra, const D2ClientBatch151Host* h) {
     if (!h || !record(h, index)) return 0;
     if (owner) store32(owner, 0xc4, load32(owner, 0xc4) | 0x40);

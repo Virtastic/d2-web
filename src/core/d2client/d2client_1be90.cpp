@@ -1,8 +1,8 @@
 #include <cstdint>
 // 1.13c D2Client+0x1BE90 -- refresh a unit's room state (EDI = unit). Reads the unit's room; with none it returns. Otherwise the
 // unit's flags are (flagsA(unit) | flagsB(roomType(room))), applied to the unit; a second room lookup feeds a table lookup keyed by
-// the dword at unit+0x2C whose answer is stored against the [0xCC3B8] global. The room's in-town answer t becomes the new value of
-// the [0xCB7FC] global; if that changed and t is 0 the leave-town routine runs on the unit. [0xCBF74] takes the room value, then the
+// the dword at unit+0x2C whose answer is stored against the [0x11C3B8] global. The room's in-town answer t becomes the new value of
+// the [0x11B7FC] global; if that changed and t is 0 the leave-town routine runs on the unit. [0x11BF74] takes the room value, then the
 // room is finished.
 struct D2c1be90Env {
     const uint8_t* (*mem)(uint32_t);
