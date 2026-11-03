@@ -6837,6 +6837,11 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
     if (skillsVisible && snapshot) return Boolean(panelCloseAt(x, y, W, H, { skills: { playerClass: snapshot.playerClass, tab: skillPanelRenderer?.tab } }));
     return null;
   },
+  // The touch layer's weapon-tab probe: null while the inventory is shut, else the tab / equipped-slot read at (x,y).
+  touchWeaponTabAt(x, y) {
+    if (screen !== SCREEN.GAME || !inventoryVisible || !inventoryPanelRenderer) return null;
+    return inventoryPanelRenderer.weaponTabProbe(x, y, canvas.width, canvas.height);
+  },
   touchPickAt(x, y) {
     const target = resolvePointerTarget(x, y);
     if (target.unitId || target.item) return true;

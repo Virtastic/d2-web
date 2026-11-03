@@ -302,6 +302,29 @@ export function installTouchInput({ documentObject = globalThis.document, window
     }
     return null;
   }
+  // ---- the inventory's weapon-set tabs ------------------------------------------------------------
+  // The two tabs sit 24 game px above the arm slots, so a tab's near miss is close to a slot too. A
+  // finger on a tab or an equipped slot is delivered raw; so is a finger within TAB_RING of any slot
+  // (that finger is the slot's). Only a finger clear of every slot, with a tab inside the ring, is
+  // pulled to the tab's first ring point. A dialog up over the inventory owns the touch: raw.
+  const TAB_RING = 6, TAB_SPOKES = 8;
+  function tabAim(x, y) {
+    const shell = windowObject.__d2Shell;
+    if (!shell || typeof shell.touchWeaponTabAt !== 'function') return null;
+    const probe = (px, py) => { try { return shell.touchWeaponTabAt(px, py); } catch { return null; } };
+    const here = probe(x, y);
+    if (!here || here.tab || here.slot || here.gap <= TAB_RING) return null;
+    if (typeof shell.touchControlAt === 'function') {
+      let on; try { on = shell.touchControlAt(x, y); } catch { return null; }
+      if (on != null) return null;
+    }
+    for (let i = 0; i < TAB_SPOKES; i += 1) {
+      const a = (i / TAB_SPOKES) * 2 * Math.PI, px = x + TAB_RING * Math.cos(a), py = y + TAB_RING * Math.sin(a);
+      const c = probe(px, py);
+      if (c && c.tab && !c.slot) return [px, py];
+    }
+    return null;
+  }
   // ---- a dialog's small buttons: NPC menu rows, the gold dialog's arrows/ok/close, repair yes/no ----
   // While one is up, a finger that hits none of its buttons is probed at rings around it with the
   // dialog's own hit test; the first ring point on a button is where the press goes.
@@ -336,7 +359,7 @@ export function installTouchInput({ documentObject = globalThis.document, window
     return best;
   }
   // The point a finger's aim snaps to, or null when the finger is on nothing the aim rules cover.
-  function snapAim(x, y) { return frontAim(x, y) || modalAim(x, y) || closeAim(x, y) || beltAim(x, y) || panelAim(x, y) || statAim(x, y) || hudAim(x, y); }
+  function snapAim(x, y) { return frontAim(x, y) || modalAim(x, y) || closeAim(x, y) || tabAim(x, y) || beltAim(x, y) || panelAim(x, y) || statAim(x, y) || hudAim(x, y); }
   function fingerAim(x, y) { return snapAim(x, y) || worldAim(x, y); }
   // A finger's aim: the belt's boxes, an open panel's grid cells, the character screen's "+", else
   // exactly where it landed.

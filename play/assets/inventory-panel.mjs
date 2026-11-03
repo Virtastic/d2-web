@@ -248,6 +248,20 @@ export function createInventoryPanelRenderer(read, documentObject = globalThis.d
     const [x, y] = toScreen(width, height, screenX, screenY);
     return weaponTabHit(x, y, slotRect);
   },
+  // The touch layer's read of a point for the weapon-tab snap: whether it is on a tab, whether it is on
+  // an equipped slot (slotAt's own rule), and how far it is from the nearest slot, in screen px.
+  weaponTabProbe(screenX, screenY, width, height) {
+    const [x, y] = toScreen(width, height, screenX, screenY);
+    let slot = false, gap = Infinity;
+    for (let bodyLoc = 1; bodyLoc <= 10; bodyLoc++) {
+      const r = slotRect(bodyLoc);
+      if (!r) continue;
+      if (inside(x, y, r)) slot = true;
+      const dx = Math.max(r.left - x, 0, x - (r.left + r.width)), dy = Math.max(r.top - y, 0, y - (r.top + r.height));
+      gap = Math.min(gap, Math.hypot(dx, dy));
+    }
+    return { tab: Boolean(weaponTabHit(x, y, slotRect)), slot, gap: gap * view(width, height).scale };
+  },
   // The worn item under the pointer, or the empty slot: { bodyLoc, item }.
   slotAt(screenX, screenY, width, height, state) {
     const [x, y] = toScreen(width, height, screenX, screenY);

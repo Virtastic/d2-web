@@ -628,6 +628,32 @@ test('with a dialog up, a tap just beside one of its buttons presses it; no dial
   assert.deepEqual(none.sent.at(-1), left('pointerup', 320, 222));
 });
 
+// The weapon-set tab geometry of the 800x600 canvas, as the inventory's probe reads it: one arm slot
+// (x 400..455, y 340..452) with its tab directly above it (y 316..340).
+const ARM_SLOT = { left: 400, top: 340, right: 455, bottom: 452 }, ARM_TAB = { left: 400, top: 316, right: 455, bottom: 340 };
+const inside = (x, y, r) => x >= r.left && x < r.right && y >= r.top && y < r.bottom;
+function tabProbe(x, y) {
+  const gap = Math.hypot(Math.max(ARM_SLOT.left - x, 0, x - ARM_SLOT.right), Math.max(ARM_SLOT.top - y, 0, y - ARM_SLOT.bottom));
+  return { tab: inside(x, y, ARM_TAB), slot: inside(x, y, ARM_SLOT), gap };
+}
+
+test('the inventory weapon tabs: a tap just beside a tab presses its ring point; on a tab, on a slot, or within reach of one, it lands raw', () => {
+  const shell = { screen: 'game', inventoryVisible: true, touchControlAt: () => null, touchWeaponTabAt: tabProbe };
+  const near = world(shell);
+  near.down(1, 394, 330); near.up(1, 394, 330);
+  assert.deepEqual(near.sent.at(-1), left('pointerup', 400, 330));
+  for (const [x, y] of [[420, 330], [420, 360], [394, 346]]) {
+    const w = world(shell); w.down(1, x, y); w.up(1, x, y);
+    assert.deepEqual(w.sent.at(-1), left('pointerup', x, y));
+  }
+  const dialog = world({ ...shell, touchControlAt: () => false });
+  dialog.down(1, 394, 330); dialog.up(1, 394, 330);
+  assert.deepEqual(dialog.sent.at(-1), left('pointerup', 394, 330));
+  const shut = world({ screen: 'game', inventoryVisible: false, touchWeaponTabAt: () => null });
+  shut.down(1, 394, 330); shut.up(1, 394, 330);
+  assert.deepEqual(shut.sent.at(-1), left('pointerup', 394, 330));
+});
+
 test('out of game, a tap within reach of a control presses its click point; far from all, it lands raw', () => {
   const w = world({ screen: 'create', uiTargets: () => ({ screen: 'create', create: { hardcore: [400, 300], ok: [700, 560] } }) });
   w.down(1, 410, 312); w.up(1, 410, 312);
