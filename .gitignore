@@ -77,7 +77,7 @@ harness-out/
 coverage/
 scenarios/
 vectors/
-reference/
+/reference
 iso/
 ghidra/
 shots/
