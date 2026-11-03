@@ -21,6 +21,7 @@ struct Env {
     void Edj(uint32_t rva, uint32_t v) const { if (edj) edj(ctx, rva, v); }
     void (*xs)(void* ctx, uint32_t s5, uint32_t s6) = nullptr;      // stack words 5 and 6 of the NEXT h() (a callee with more than five stack words; the log keeps s0..s3)
     void Xs(uint32_t s5, uint32_t s6 = 0) const { if (xs) xs(ctx, s5, s6); }
+    void Ej(uint32_t rva, uint32_t v) const { if (edj) edj(ctx, rva, v); }
     uint32_t R(uint32_t a) const { return rd(ctx, a); }
     int32_t  R16s(uint32_t a) const { return (int16_t)(rd(ctx, a) & 0xffff); }
     uint32_t R8(uint32_t a) const { return rd(ctx, a) & 0xff; }

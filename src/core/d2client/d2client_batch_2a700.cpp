@@ -155,7 +155,7 @@ rejected:
     return 0;
 }
 
-// 1.13c D2Client+0x2AFB0 (220 B): `unit` is the thiscall object (the 0x80-byte kind record from 0x54E20: type @0, mode @0x10, flags @0xC4),
+// old test-seam port of D2Client 2AFB0 (220 B; the retail port is d2client_2afb0.cpp): `unit` is the thiscall object (the 0x80-byte kind record from 0x54E20: type @0, mode @0x10, flags @0xC4),
 // `target_id` is param_1->+0xC (or -1 when param_1 is null). Allowed type/mode (0/0|0x11, 1/0|0xC) or
 // flags&0x10000 skip straight to the record check; otherwise flags&2 selects the 0x9E80 test and the
 // 0x2AA40 enqueue, else the failure latch. `lookup` is 0x4D630 (fills the record's +0x10), `class_ok` is 0x4FD90.
@@ -181,7 +181,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_2afb0(
     return 0;
 }
 
-// 1.13c D2Client+0x2B090 (326 B): pending-action worker. It validates the unit/player-data fields,
+// old test-seam port of D2Client 2B090 (326 B; the retail port is d2client_2b090.cpp): pending-action worker. It validates the unit/player-data fields,
 // restores the queued tuple, resolves the matching record, then dispatches by queue kind. The last
 // queue action is performed only on a nonzero handler result (except the kind-2 fallback).
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_2b090(

@@ -192,7 +192,7 @@ extern "C" void d2_client_17f70(uint32_t unit,Env* env) {
     }
 }
 
-// 1.13c D2Client+0x181A0
+// old test-seam port of D2Client 181A0 (the retail port is d2client_181a0.cpp)
 extern "C" void d2_client_181a0(uint32_t room,int32_t classId,uint32_t seed,Env* env) {
     using namespace d2client179e0; auto& e=*env;
     Bounds b; e.roomBounds(room,&b);
