@@ -4,6 +4,7 @@
 // Register inputs (EAX/ECX/EDX/EBX/EBP/ESI/EDI) are explicit leading params.
 #include <cstdint>
 #include <initializer_list>
+#include "d2game_e5d20.h"
 
 typedef intptr_t I;
 #define O(n) extern "C" __attribute__((weak)) I Ord##n(...)
@@ -110,55 +111,7 @@ uint32_t D2GAME_D1720(uint32_t in)
     }
 }
 
-// 1.13c D2Game+0xD1C00  (hidden: EAX=out type ptr, ECX, EDX, EBX, ESI)
-bool D2GAME_D1C00(uint32_t* eax, I ecx, I edx, int* ebx, int** esi, int* p1, int* p2)
-{
-    // esi is the address of a pointer slot (*unaff_ESI in the decompile is an int; kept as I)
-    I* s = (I*)esi;
-    if (p1 && ebx && *ebx == 4) {
-        if (*p2 == 0) { if (*s == 0) return true; }
-        else if (*s != 0) return false;
-        uint32_t u = D2GAME_D1720(*eax);
-        if (edx != 0) { *p2 = (int)ecx; *s = edx; *eax = u; }
-        switch (*eax) {
-        case 4: case 5: case 0xb: case 0xc: goto c4;
-        default: return *p2 == 0;
-        }
-    }
-    return false;
-c4:
-    I i = Ord10543();
-    if (0 < i) {
-        if (*s == 0) return true;
-        I u = Ord10543();
-        return Ord10744(*s, u) != 0;
-    }
-    if (Ord11144() == 0) {
-        if (Ord10543(*s) < 1) {
-            if (0 < Ord11144(*s)) { Ord11144(*s); return Ord10744() != 0; }
-            if (Ord10326() != 0 && Ord10364(p1) == 0) return false;
-            int* q = (int*)*s;
-            if (Ord10326() != 0 && Ord10364(p1, *s) == 0) return false;
-            I a = Ord10744();
-            I b = Ord10744(*s, 0x2d);
-            if (a == 0) { if (b == 0) return false; }
-            else if (b != 0) {
-                if (*p1 == 1) return true;
-                if (p1[1] == 4) return true;
-                if (p1[1] != 6) return false;
-                if (Ord10744() == 0) return false;
-                return Ord10744(*s, 0x43) != 0;
-            }
-            return *q == 0;
-        }
-        Ord10543(*s);
-        return Ord10744() != 0;
-    }
-    if (*s == 0) return true;
-    if (Ord10543(*s) < 1) return false;
-    Ord10543(*s);
-    return Ord10744() != 0;
-}
+// 1.13c D2Game+0xD1C00 moved to src/core/d2game/d2game_d1c00.cpp
 
 // 1.13c D2Game+0xD1E10  (hidden: EBX=src unit, ESI=out 0x84-byte struct)
 void D2GAME_D1E10(I ebx, uint32_t* esi, I p1)
@@ -353,14 +306,10 @@ void D2GAME_DDAC0(void* self, int* eax, int p1)
     D2GAME_CAEA80(u, eax, 2, U32(u, 0xa8) + 1 + q, 0, 0, 0);
 }
 
-// 1.13c D2Game+0xE5D20  (fastcall)
+// 1.13c D2Game+0xE5D20  (fastcall; body shared with the FN probe in d2game_e5d20.h)
 I D2GAME_E5D20(I p1, void* p2)
 {
-    I r = Ord10920(p2);
-    I v = (I)U32(r, 0x10 + *(uint8_t*)(p1 + 0x6d) * 4);
-    if (((Ord10174(v, 0x15, 0) != 0 || Ord10174(v, 0x15, 0xf) != 0) &&
-         Ord10174(v, 0x15, 0xd) == 0) && Ord10174(v, 0x15, 0xe) == 0)
-        return 0;
-    D2GAME_C554F0(p2, p1);
-    return 0;
+    return d2game_e5d20_body(p1, p2, [](void* u) { return Ord10920(u); },
+                             [](I a, I b, I c) { return Ord10174(a, b, c); },
+                             [](void* u, I g) { D2GAME_C554F0(u, g); });
 }

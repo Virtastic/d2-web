@@ -384,7 +384,7 @@ i32 D2GAME_4D710(P game, P unit, i32 skill, i32 lvl)
         if (c == 2) r_8E6F0(/*eax*/n);
         n = nx;
     }
-    r_8EA80(/*edx*/mon, /*ecx*/game, 2, W(PP(game, 0xa8), 0x14) /* address game[0xa8]+0x14 */, 0, 0, 0);
+    r_8EA80(/*edx*/mon, /*ecx*/game, 2, (P)((char*)PP(game, 0xa8) + 0x14) /* the pointer plus 0x14, not a read */, 0, 0, 0);
     o10945((void*)mon, 0x5d, 1);
     o10210(mon, unit);
     r_EFE40(/*ecx*/game, 0, /*edi*/mon, /*ebx*/W(unit, 0xd0));
@@ -657,6 +657,23 @@ static void fillSlots(P unit, P row, i32 skill, i32 lvl, i32* rec)
     }
 }
 
+// 505D0 slot loop (asm 0x706f3): i = 0..5 over the s16 ids at row+0x54 with calc dwords at row+0x68; an unknown
+// id stores -1 into rec[7+i] and ends, a missing table row ends without a store, a hit with
+// (row[5] & gdwBitMasks[4]) sets rec[3]; rec[13+i] = 10786(unit, calc i, skill, lvl).
+static void fillSlots505D0(P unit, P row, i32 skill, i32 lvl, i32* rec)
+{
+    rec[3] = 0;
+    for (int i = 0; i < 6; ++i) {
+        i16 id = S(row, 0x54 + 2 * i);
+        if (id < 0 || id >= sdt(0xbd4)) { rec[7 + i] = -1; return; }
+        P p = r_10D0(/*eax*/(i32)id, /*ecx*/DT());
+        if (!p) return;
+        if (gdwBitMasks_exref[4] & B(p, 5)) rec[3] = 1;
+        rec[7 + i] = id;
+        rec[13 + i] = (i32)o10786(unit, W(row, 0x68 + 4 * i), skill, lvl);
+    }
+}
+
 // 1.13c D2Game+0x505D0 (ecx = game, edx = unit; stack: skill, lvl; ret 8)
 i32 D2GAME_505D0(P game /*ecx*/, P unit /*edx*/, i32 skill, i32 lvl)
 {
@@ -669,7 +686,7 @@ i32 D2GAME_505D0(P game /*ecx*/, P unit /*edx*/, i32 skill, i32 lvl)
     if (g) v2 = (i32)r_4DF60(/*eax*/(i32)B(game, 0x6d), /*esi*/v2);
     i32 rec[0x1a] = {};
     rec[0] = (i32)game; rec[1] = (i32)unit; rec[2] = g; rec[4] = skill; rec[5] = lvl; rec[6] = v2;
-    fillSlots(unit, row, skill, lvl, rec);
+    fillSlots505D0(unit, row, skill, lvl, rec);
     rec[19] = S(row, 0x82); rec[20] = S(row, 0x84); rec[21] = S(row, 0x86); rec[22] = S(row, 0x88);
     rec[23] = S(row, 0x8a); rec[24] = S(row, 0x8c); rec[25] = S(row, 0x8e);
     return (i32)r_A0AD0(/*ecx*/game, W(row, 0x50), unit, v1, (void*)D2GAME_50250, rec);

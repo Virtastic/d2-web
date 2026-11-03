@@ -160,7 +160,7 @@ void GAME_TriggerClientSave_113c(void* client, void* game, const Batch5Env* env)
 void CLIENTS_FillCharacterPreviewInfo(void* client, uint8_t* preview, const Batch5Env* env)
 {
     env->encode14(preview, 0xD);                      // nVersion (1.13c: 0xD)
-    if (client == nullptr) fatal(0x130);              // D2_ASSERT(pClient)
+    if (client == nullptr) fatal(0xFB);               // D2_ASSERT(pClient), line 0xFB in 1.13c
 
     void* player = env->getPlayerFromClient(client, 0);
     if (player == nullptr) return;

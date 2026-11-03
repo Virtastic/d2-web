@@ -132,7 +132,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_5FE30(uint32_t q, uint32_t ev,
     if (p) e->o10346(e->o10331(p), 0);
 }
 
-// 1.13c D2Game+0x60A30
+// (1.13c D2Game 0x60A30: the q32 port in d2game_60a30.cpp is the proved one)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_60A30(uint32_t q, const D2GameBatch5E840Env* e)
 {
     e->sub540c0();
@@ -140,7 +140,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_60A30(uint32_t q, const D2Game
     e->sub33830(d); e->sub33830(d + 0x84); e->sub33830(d + 0x108);
 }
 
-// 1.13c D2Game+0x60A80
+// (1.13c D2Game 0x60A80: the q32 port in d2game_60a80.cpp is the proved one)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_60A80(uint32_t q, uint32_t* ev, const D2GameBatch5E840Env* e)
 {
     // ev = int[6]: 0 game, 2 msg unit, 3 player, 5 arg
@@ -170,7 +170,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_60A80(uint32_t q, uint32_t* ev
     }
 }
 
-// 1.13c D2Game+0x60F70 (ECX = game, EDX = player)
+// (1.13c D2Game 0x60F70: the q32 port in d2game_60f70.cpp is the proved one) (ECX = game, EDX = player)
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_60F70(uint32_t game, uint32_t pl, const D2GameBatch5E840Env* e)
 {
     uint32_t sk = rd32(e->o10920(pl), 0x10 + rd8(game, 0x6d) * 4);
@@ -186,7 +186,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_60F70(uint32_t game, uint3
     return 0;
 }
 
-// 1.13c D2Game+0x61340
+// (1.13c D2Game 0x61340: the q32 port in d2game_61340.cpp is the proved one)
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_61340(uint32_t game, uint32_t unit, const D2GameBatch5E840Env* e)
 {
     uint32_t n = findQ(game, 4);
@@ -204,14 +204,14 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_61340(uint32_t game, uint3
     return 1;
 }
 
-// 1.13c D2Game+0x61420 (EAX = game, ECX unused, EDX = flag)
+// (1.13c D2Game 0x61420: the q32 port in d2game_61420.cpp is the proved one) (EAX = game, ECX unused, EDX = flag)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_61420(uint32_t game, uint32_t, uint32_t, const D2GameBatch5E840Env* e)
 {
     uint32_t n = findQ(game, 4);
     e->sub33830(rd32(n, 0x18) + 0xb4);   // both flag branches are identical
 }
 
-// 1.13c D2Game+0x61880
+// (1.13c D2Game 0x61880: the q32 port in d2game_61880.cpp is the proved one)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_61880(uint32_t q, uint32_t ev, const D2GameBatch5E840Env* e)
 {
     e->sub540c0();
@@ -221,7 +221,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_61880(uint32_t q, uint32_t ev,
     (void)ev;
 }
 
-// 1.13c D2Game+0x61910 (ECX = game, EDX = player)
+// (1.13c D2Game 0x61910: the q32 port in d2game_61910.cpp is the proved one) (ECX = game, EDX = player)
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_61910(uint32_t game, uint32_t pl, const D2GameBatch5E840Env* e)
 {
     uint32_t sk = rd32(e->o10920(pl), 0x10 + rd8(game, 0x6d) * 4);
@@ -233,7 +233,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_61910(uint32_t game, uint3
     return 0;
 }
 
-// 1.13c D2Game+0x624D0
+// (1.13c D2Game 0x624D0: the q32 port in d2game_624d0.cpp is the proved one)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_624D0(uint32_t q, uint32_t* ev, const D2GameBatch5E840Env* e)
 {
     if (!ev[2] || rd32(ev[2], 4) != 0x10a) return;
@@ -256,7 +256,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_624D0(uint32_t q, uint32_t* ev
     e->sub33eb0(q, ev[5], 0x10a);
 }
 
-// 1.13c D2Game+0x62640 (ECX = player unit, EAX = game)
+// (1.13c D2Game 0x62640: the q32 port in d2game_62640.cpp is the proved one) (ECX = player unit, EAX = game)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_62640(uint32_t pl, uint32_t game, const D2GameBatch5E840Env* e)
 {
     e->o10003r(); e->o10003r();

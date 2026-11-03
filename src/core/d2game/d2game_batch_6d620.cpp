@@ -198,15 +198,7 @@ extern "C" int d2game_987d0(int game)
     return (r & (r - 1)) ? (int)((uint32_t)s % r) + lo : (int)((r - 1) & (uint32_t)s) + lo;
 }
 
-// 1.13c D2Game+0x988B0
-extern "C" int d2game_988b0(int game, int* ebx, int skill)
-{
-    if (skill < 0 || skill >= dt(0xba0)) return 0;
-    int row = skill * 0x23c + dt(0xb98);
-    if (!row || d2ord_11104() || !ebx || *ebx != 1 || d2ord_10830() || !d2game_bf120()) return 0;
-    int c = d2ord_10786(game, rd(row, 0x138));
-    return c > (int)d2game_21180((uint64_t*)(game + 0x20));
-}
+// 1.13c D2Game+0x988B0 moved to src/core/d2game/d2game_988b0.cpp
 
 // 1.13c D2Game+0x98950
 extern "C" void d2game_98950(int unit, int p2)

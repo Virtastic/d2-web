@@ -12,7 +12,7 @@ struct D2Game62700Seams {
 };
 static D2Game62700Seams g_seams62700;
 
-// 1.13c D2Game+0x62700
+// (1.13c D2Game 0x62700: the q32 port in d2game_62700.cpp is the proved one)
 uint32_t d2game_sub_62700(void* param_1, void* param_2) {
     const D2Game62700Seams& s = g_seams62700;
     const uint8_t* rec = (const uint8_t*)s.o10920(param_2);

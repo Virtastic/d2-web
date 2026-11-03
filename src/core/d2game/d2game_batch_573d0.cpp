@@ -399,3 +399,17 @@ void D2G573_573D0_probe(int32_t* ctx, uint32_t* lg, const uint32_t* sc)
     q573E.setMode = [](void* u, int32_t m) { q573H->h(0xA4A2, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u, (uint32_t)m); };
     d2game_573d0(ctx);
 }
+
+// ---- FUNCTION-mode probe for 0x64150 / 0x64FE0 / 0x65200 (src/core/fn/d2game_64150.cpp ...): D2Common #10920 (0xA4C0), #10174 (0xA568),
+// 0x9BEB0 and 0x9C160 are recorders. The callback word is recorded as the retail module-image pointer (0xB2000000|rva).
+static void* q573_getPd(void* x) { return (void*)(uintptr_t)q573H->h(0xA4C0, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)x); }
+static int32_t q573_flag(uint32_t p, int32_t a, int32_t b) { return (int32_t)q573H->h(0xA568, 0, 0, 0, 0, 0, p, (uint32_t)a, (uint32_t)b); }
+static int16_t q573_bbeb0() { return (int16_t)q573H->h(0x9BEB0); }
+static void q573_bc160(void* cb) { q573H->h(0x9C160, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)cb); }
+void D2G573_questcb_probe(int which, const uint8_t* q, uint8_t* u, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); q573H = &h; q573E = D2G573Env{};
+    q573E.getPlayerData = q573_getPd; q573E.questFlag = q573_flag; q573E.fnBBEB0 = q573_bbeb0; q573E.fnBC160 = q573_bc160;
+    q573E.cbLab80ec0 = (void*)(uintptr_t)0xB2080EC0u; q573E.cbLab81ec0 = (void*)(uintptr_t)0xB2081EC0u; q573E.cbLab821b0 = (void*)(uintptr_t)0xB20821B0u;
+    if (which == 0) d2game_64150(q, u); else if (which == 1) d2game_64fe0(q, u); else d2game_65200(q, u);
+}

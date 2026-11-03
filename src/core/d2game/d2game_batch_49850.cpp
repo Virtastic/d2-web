@@ -36,7 +36,7 @@ struct D2GameBatch4Env {
     uint32_t (*crc16)(const char* s);                                   // 0xA334, Fog #10137
     int32_t  (*strCmpI)(const char* a, const char* b, uint32_t n);      // 0xA280, Storm #509
     uint32_t (*strCopy)(char* dst, const char* src, uint32_t n);        // 0xA280, Storm #501
-    void*    (*allocPool)(const char* file, uint32_t line, uint32_t zero); // 0xA2E6, Fog #10045
+    void*    (*allocPool)(void* pool, uint32_t size, const char* file, uint32_t line, uint32_t zero); // 0xA2E6 (ECX=pool, EDX=size), Fog #10045
     int32_t  (*getClientGameGuid)(uint32_t clientId);                   // 0xA364, D2Net #10015
     void     (*disconnectClient)(uint32_t clientId, const char* file, uint32_t line); // 0xA358, D2Net #10001
     int32_t  (*sendToList)(uint32_t list, uint32_t clientId, const void* data, uint32_t len); // 0xA35E, D2Net #10002
@@ -170,7 +170,8 @@ uint32_t CLIENTS_AttachSaveFile(uint32_t clientId, const void* pSaveData, uint32
         if (have != 0) {
             dst = (uint8_t*)rdptr(client, 0x17C) + have;
         } else {
-            void* header = env->allocPool(kClientsFile, 0xB16, 0);   // Ordinal 10045
+            // ECX = pClient->pGame->pMemoryPool (+0x1A8, +0x1C), EDX = nTotalSize (disassembly-checked)
+            void* header = env->allocPool(rdptr(rdptr(client, 0x1A8), 0x1C), nTotalSize, kClientsFile, 0xB16, 0);   // Ordinal 10045
             wrptr(client, 0x17C, header);
             dst = (uint8_t*)header;
         }

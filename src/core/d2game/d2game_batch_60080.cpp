@@ -14,7 +14,7 @@ W void r_92FC0(i32*, i32*); W void r_D4570(); W i32* r_749A0(i32*); W void r_750
 W extern i32* sgptDataTables;
 }
 
-// 1.13c D2Game+0x60080 (fastcall: ecx = quest record)
+// (1.13c D2Game 0x60080: the q32 port in d2game_60080.cpp is the proved one) (fastcall: ecx = quest record)
 void D2GAME_60080(i32 b)
 {
     i32* z = (i32*)(intptr_t)(b + 0xa0);

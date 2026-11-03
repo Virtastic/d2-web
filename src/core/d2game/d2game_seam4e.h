@@ -7,13 +7,13 @@
 struct D2Seam {
     void* ctx;
     uint32_t (*fn)(void* ctx, uint32_t rva, uint32_t a, uint32_t c, uint32_t d, uint32_t b, uint32_t s,
-                   uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3, uint32_t s4);
+                   uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3, uint32_t s4, uint32_t s5, uint32_t s6, uint32_t s7);
     // hookblk: log n dwords at p (a stack block handed to the callee just called), 9 per record
     void (*bl)(void* ctx, uint32_t rva, uint32_t p, uint32_t n) = nullptr;
     void blk(uint32_t rva, const void* p, uint32_t n) const { if (bl) bl(ctx, rva, (uint32_t)(uintptr_t)p, n); }
     uint32_t call(uint32_t rva, uint32_t a = 0, uint32_t c = 0, uint32_t d = 0, uint32_t b = 0, uint32_t s = 0,
-                  uint32_t s0 = 0, uint32_t s1 = 0, uint32_t s2 = 0, uint32_t s3 = 0, uint32_t s4 = 0) const {
-        return fn(ctx, rva, a, c, d, b, s, s0, s1, s2, s3, s4);
+                  uint32_t s0 = 0, uint32_t s1 = 0, uint32_t s2 = 0, uint32_t s3 = 0, uint32_t s4 = 0, uint32_t s5 = 0, uint32_t s6 = 0, uint32_t s7 = 0) const {
+        return fn(ctx, rva, a, c, d, b, s, s0, s1, s2, s3, s4, s5, s6, s7);
     }
 };
 // Retail-offset field access: `a` is a 32-bit retail-style address (a blob in the replay).

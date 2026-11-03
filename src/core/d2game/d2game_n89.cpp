@@ -35,11 +35,19 @@ struct N89Host {
     P (*find_client)(uint32_t id);                             // 0x49FE0
     void (*cl_a)(P cl);                                        // 0x4AE90
     void (*cl_b)(P cl, P game);                                // 0x4C910
-    void (*cl_c)(P game);                                      // 0x4BED0
+    void (*cl_c)(P client, P game);                            // 0x4BED0 (EAX=client, stack game)
     P (*get_player)(P cl, int ignoreDeath);                    // 0x4AD10
     int (*unit_stat)(P unit, int stat, int z);                 // Ordinal_10587
-    void (*u_a)(); void (*u_b)(P game, P unit); void (*u_c)(P unit); void (*u_d)(P game);
-    void (*u_e)();                                             // 0xBC840,0xB7640,0xB0560,0x54760,0x93AA0
+    void (*u_a)(P unit, P game);                               // 0xBC840 (EAX=unit, stack game)
+    void (*u_b)(P unit, P game);                               // 0xB7640 (EDX=unit, ECX=game)
+    void (*u_c)(P game, P unit);                               // 0xB0560 (EAX=game, stack unit)
+    void (*u_d)(P unit, P game);                               // 0x54760 (EAX=unit, stack game)
+    void (*u_e)(P game);                                       // 0x93AA0 (EAX=game)
+    void (*pool_free)(void* pool, void* p, const char* file, int line, int z); // 0xA2EC (ECX=pool, EDX=ptr)
+    int (*bad_code_ptr)(void* fn);                             // IAT 0x6FD18D14 (Win32 IsBadCodePtr)
+    // DAT_6fd31c3c[1]: the leave-game callback; ECX=client+0x68, EDX=word, 18 stack args (see N89_4B7F0)
+    void* (*leaveFn)();                                        // returns table[1] (0 when unset)
+    void (*callLeave)(void* fn, P ecx, uint32_t edx, const uint32_t* stk18);
     P (*unit_inv)(P unit);                                     // Ordinal_10331
     void (*inv_remove)(P inv, int type, int guid);             // Ordinal_10885
     void (*unit_free)(P pool, P unit);                         // 0xE20A0
@@ -55,6 +63,7 @@ struct N89Host {
     P sessionLock; int sessionOn;                              // DAT_6fd31c18
     P* gameTab;     // DAT_6fd30318[32]
     P queueHead;    // DAT_6fd30398
+    P queueTail; P queueSentinel; // DAT_6fd3039c, &DAT_6fd30398 (the 0x2e9 / 0x2f2 asserts)
     int* queueCount;// DAT_6fd303ac
     P* clientTabSz; // DAT_6fd30c04 (current game)
 };
@@ -118,7 +127,7 @@ void N89_526F0(N89Host* h, uint32_t id, int* msg)
     h->proc_clients(g);
     for (uint32_t c = U89(g, 0x22 * 4); c;) { uint32_t nx = U89((P)(uintptr_t)c, 0x4a8); (void)nx; c = nx; h->free_client(g, 1); }
     uint32_t now = h->frame();
-    bool direct = true;
+    bool direct = false;
     if (U89(g, 0x771 * 4) != 1 && now - U89(g, 0x771 * 4) < 0x709) {
         uint32_t tk = h->tick();
         if (U89(g, 0x23 * 4) == 0) {
@@ -146,23 +155,26 @@ void N89_526F0(N89Host* h, uint32_t id, int* msg)
     }
     { void* cs = (void*)(uintptr_t)U89(g, 6 * 4); if (!cs) h->fatal(0x100f); h->leave_cs(cs); }
 drain:
-    if (direct) {
-        void* cs = (void*)(uintptr_t)U89(g, 6 * 4); (void)cs;
+    if (direct) { // 0x6FC7280C: the game critical section is left here when the loop above was skipped
+        void* cs = (void*)(uintptr_t)U89(g, 6 * 4);
+        if (!cs) h->fatal(0x100f);
+        h->leave_cs(cs);
     }
     h->sweep();
     h->enter_cs(h->csQueue);
     P q = h->queueHead;
     P ent = h->gameTab[id & 0x1f];
     if (ent) {
-        if (!q) h->fatal(0x2e9);
+        if (h->queueTail == h->queueSentinel || !q) h->fatal(0x2e9);
         P e = q - 0x10;
         if (I89(q, -0xc) == I89(ent, 4) + 1) {
             h->enter_cs((P)h->csTab + U89(e, 0) * 0x18);
-            if (!q) h->fatal(0x2f2);
+            P qn = (P)(uintptr_t)U89(q, -8);
+            if ((P)(uintptr_t)U89(q, -4) == q - 8 || !qn) h->fatal(0x2f2);
             h->list_unlink(q);
             h->leave_cs((P)h->csTab + U89(e, 0) * 0x18);
             h->enter_cs((P)h->csTab + U89(ent, 0) * 0x18);
-            h->game_tick(ent, nullptr);
+            h->game_tick(ent, qn - 0xc);
             h->leave_cs((P)h->csTab + U89(ent, 0) * 0x18);
             I89(q, -0xc) -= 1;
             h->list_unlink(q);
@@ -230,26 +242,46 @@ void N89_4B7F0(N89Host* h, uint32_t clientId, P game, int param2)
         h->leave_cs(h->csName);
     }
     if (!found) return;
-    h->cl_c(game);
-    P pl = h->get_player(nullptr, 0);
+    h->cl_c(found, game);                                  // 0x4BED0
+    P pl = h->get_player(found, 0);                        // 0x4AD10, ESI=found
+    const uint32_t gameWord = (uint32_t)*(uint16_t*)(game + 0x28);
+    // The 18 stack args, top of stack first: class, level, exp lo, exp hi, flags word, name,
+    // found+0x6C, found+0x178, 0, 0, found+0x1D, found+0x60, 0 x5, found+0x190.
+    auto fire = [&](uint32_t cls, uint32_t lvl, uint32_t expLo, uint32_t expHi, uint32_t flagsWord,
+                    P nameP, P p6c, int fatalCode) {
+        if (!h->leaveCallback) return;
+        if (h->bad_code_ptr(h->leaveFn())) h->fatal(fatalCode);
+        void* fn = h->leaveFn();
+        if (!fn) return;
+        const uint32_t stk[18] = { cls, lvl, expLo, expHi, flagsWord, (uint32_t)(uintptr_t)nameP,
+            (uint32_t)(uintptr_t)p6c, U89(found, 0x178), 0, 0, (uint32_t)(uintptr_t)(found + 0x1d),
+            U89(found, 0x60), 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)(found + 0x190) };
+        h->callLeave(fn, found + 0x68, gameWord, stk);
+    };
     if (!pl) {
-        if (h->leaveCallback) { found[0x1b * 4] = 0; h->callback(h->leaveCallback, nullptr); }
+        found[0x6c] = 0;                                   // preview byte cleared first
+        fire(0, 0, 0, 0, 0, found + 0xd, found + 0x6c, 0x5ba);
     } else {
-        h->u_a(); h->u_b(game, pl); h->u_c(pl); h->u_d(game); h->u_e();
+        const int32_t exp = h->unit_stat(pl, 0x0d, 0);     // Ordinal_10587 STAT_EXPERIENCE
+        const uint32_t expHi = (uint32_t)(exp >> 31);      // cdq
+        const uint32_t cls = U89(pl, 4);
+        const int32_t lvl = h->unit_stat(pl, 0x0c, 0);     // STAT_LEVEL
+        h->u_a(pl, game); h->u_b(pl, game); h->u_c(game, pl); h->u_d(pl, game); h->u_e(game);
         P inv = h->unit_inv(pl);
         if (inv) h->inv_remove(inv, I89(pl, 0), I89(pl, 0xc));
         h->unit_free((P)(uintptr_t)U89(found, 0x6a * 4), pl);
-        h->unit_a(inv, 0);
+        h->unit_a(inv, 0);                                 // Ordinal_10622 x2 (0x2B1E6, 0x2B1EC)
         h->free_ord((int)(uintptr_t)inv, 0);
-        if (h->leaveCallback) h->callback(h->leaveCallback, nullptr);
+        fire(cls, (uint32_t)lvl, (uint32_t)exp, expHi, *(uint16_t*)(found + 0xa), found + 0xd, found + 0x6c, 0x592);
     }
-    if (U89(found, 0x6d * 4)) h->cb_free();
-    if (U89(found, 0x5f * 4)) { h->mem_free((void*)(uintptr_t)U89(found, 0x5f * 4), "..\\Source\\D2Game\\GAME\\Clients.cpp", 0x5e1, 0); U89(found, 0x5f * 4) = 0; }
+    if (U89(found, 0x6d * 4)) h->cb_free();                // EDI=client
+    void* gpool = (void*)(uintptr_t)U89((P)(uintptr_t)U89(found, 0x6a * 4), 0x1c);
+    if (U89(found, 0x5f * 4)) { h->pool_free(gpool, (void*)(uintptr_t)U89(found, 0x5f * 4), "..\\Source\\D2Game\\GAME\\Clients.cpp", 0x5e1, 0); U89(found, 0x5f * 4) = 0; }
     while (U89(found, 0x70 * 4)) {
         void* x = (void*)(uintptr_t)U89(found, 0x70 * 4);
         U89(found, 0x70 * 4) = U89((P)x, 0x204);
-        h->mem_free(x, "..\\Source\\D2Game\\GAME\\Clients.cpp", 0x5f1, 0);
+        h->pool_free(nullptr, x, "..\\Source\\D2Game\\GAME\\Clients.cpp", 0x5f1, 0);   // ECX = 0 here
     }
-    h->mem_free(found, "..\\Source\\D2Game\\GAME\\Clients.cpp", 0x5f4, 0);
+    h->pool_free(gpool, found, "..\\Source\\D2Game\\GAME\\Clients.cpp", 0x5f4, 0);
     I89(game, 0x8c) -= 1;
 }

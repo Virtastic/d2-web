@@ -28,7 +28,7 @@ static inline void     wrptr(void* p, uint32_t o, const void* v) { std::memcpy((
 
 // Host seams for the callees src/ does not implement, in retail argument order.
 struct D2GameBatch12Env {
-    void*    (*allocPool)(const char* file, uint32_t line, uint32_t zero); // 0xA2E6, Fog #10045
+    void*    (*allocPool)(void* pool, uint32_t size, const char* file, uint32_t line, uint32_t zero); // 0xA2E6, Fog #10045 (ECX=pool, EDX=size)
     uint32_t (*strCopy)(char* dst, const char* src, uint32_t max);         // 0xA280, Storm #501
     uint16_t (*crc16)(const char* s);                                      // 0xA334, Fog #10137
     int32_t  (*shouldTreatClassAsTemplateId)(void* game);                  // 0xB2620
@@ -100,7 +100,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_4a9b0(void* pGame, uint32_t nClientId, uint8_t
     if (g_clientListInitialized == 0 || pGame == nullptr) return;
     if ((int32_t)rd32(pGame, 0x8C) >= 8) return;
 
-    void* client = env->allocPool(kClientsFile, 0x331, 0);   // Fog #10045
+    void* client = env->allocPool(rdptr(pGame, 0x1C), 0x518, kClientsFile, 0x331, 0);   // Fog #10045
     std::memset(client, 0, 0x146 * 4);
     wr32(client, 0x00, nClientId);
     wr32(client, 0x3D8, (uint32_t)GetTickCount() + 180000);
@@ -116,7 +116,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_4a9b0(void* pGame, uint32_t nClientId, uint8_t
     env->strCopy((char*)client + 0x1D, szAccount, 0x7FFFFFFF);
     wr32(client, 0x60, (uint32_t)nCharSaveTransactionToken);
     wr32(client, 0x68, 0);
-    wr32(client, 0x50C, nLocale);
+    wr32(client, 0x50C, (uint8_t)nLocale);   // movzx byte arg
     CLIENTS_SetClientState(client, 0);                        // 0x49B70
     wr32(client, 0x1B8, 0);
     wr32(client, 0x1BC, 0);

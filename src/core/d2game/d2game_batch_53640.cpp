@@ -119,7 +119,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_53640(void* pGame, void* pU
 // 0x55050: item-section version dispatch (1.10f sub_6FC8BC70). Version 0x47 goes to 0x54D90, the
 // range 0x48..0x60 to 0x54810; every other version returns 1 unchanged. The two targets are seam
 // calls because they are outside this batch.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_55050(void* pGame, uint32_t nVersion, void* pSection, int32_t* p4, void* p5, int32_t ebx, int32_t edi, int32_t* esi, const D2GameBatch53640Env* env) {  // 1.13c D2Game+0x55050
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2g_55050(void* pGame, uint32_t nVersion, void* pSection, int32_t* p4, void* p5, int32_t ebx, int32_t edi, int32_t* esi, const D2GameBatch53640Env* env) {  // 1.13c D2Game+0x55050
     if (nVersion == 0x47) {
         return env->sub54d90(p5, pSection, p4, ebx, edi, esi);
     }

@@ -5,7 +5,7 @@
 // unverified seam: 1.13c D2Game+0x33F30 (quest-data lookup by id, returns a table whose slot 0x3C is a callback).
 extern "C" int* D2GAME_33F30_Lookup(int id);
 
-// 1.13c D2Game+0x606E0
+// (1.13c D2Game 0x606E0: the q32 port in d2game_606e0.cpp is the proved one)
 // Not-yet-verified: the first short-circuit and the callback call convention (no args, __fastcall decompile).
 uint32_t D2GAME_606E0(uint8_t* p)
 {

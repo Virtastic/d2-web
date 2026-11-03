@@ -157,75 +157,7 @@ u32 TierPick(const EE90Seams& s, u8* unit, const i32 order[6], const u8* levelTb
     return (rd<u8>(unit, 0x80) & 0x40 | 0x20) >> 5;
 }
 
-// 1.13c D2GAME+0x1F600
-// Compresses a monster unit into a 0x5C-byte inactive record and links it into the per-type list (callee of 0x204E0).
-struct F600Seams {
-    void* (*game)(); void* (*allocRec)(); int (*dtRowCount)(); int (*rowActive)(int); int (*rowCond)(int);
-    void (*rowA)(int); void (*rowB)(int); void (*removeFromRoom)(void*);
-    u32 (*unitX)(void*); u32 (*unitY)(void*); int (*mode)(void*);
-    u32 (*getUnitType)(void*); void (*fillInfo)(void*, void*); void (*removeEvent)(void*);
-    u32 (*coordA)(void*, int); u32 (*coordB)(void*); u32 (*coordC)(void*, int);
-    void (*updateRoom)(void*, void*); int (*aiKind)(void*); void (*nihRemove)(void*);
-    void* (*listFor)(int, u32, int, int); void (*fatal)(int);
-};
-void RemoveNihlathakFromTown(const F600Seams& s, u8* unit, u8* gameArg) {
-    void* g = s.game();
-    if (!unit || !g) return;
-    for (int i = 0, n = s.dtRowCount(); i < n; i++)
-        if (s.rowActive(i) && s.rowCond(i)) { s.rowA(i); s.rowB(i); }
-    for (u8* ev = rd<u8*>(unit, 0xdc); ev;) {
-        u8 t = *ev; ev = rd<u8*>(ev, 0x24);
-        if (t == 2) s.removeEvent(unit);
-    }
-    u32* rec = (u32*)s.allocRec();
-    memset(rec, 0, 0x5c);
-    rec[7] = 0xffffffff;
-    int ty = rd<i32>(unit, 0);
-    bool mon = ty == 1;
-    u8* d = rd<u8*>(unit, 0x14);
-    rec[0] = s.unitX(unit); rec[1] = s.unitY(unit);
-    rec[2] = rd<u32>(unit, 4);
-    rec[0x15] = rd<u32>(gameArg, 0xa8);
-    rec[10] = (mon && d) ? rd<u32>(rd<u8*>(d, 0x28), 0) : 0;
-    wr<u16>(rec, 0x30, (mon && d) ? rd<u16>(d, 0x14) : 0x1506);
-    s.fillInfo(gameArg, rec);
-    if (mon && d && (d[0x16] & 4)) rec[6] |= 2;
-    if (mon) {
-        if (d && (d[0x16] & 2)) { rec[6] |= 0x800; wr<u16>(rec, 0x3c, d ? rd<u16>(d, 0x26) : 0xffff); }
-        if (d && (d[0x16] & 1)) {
-            rec[6] |= 1;
-            u8* ai = rd<u8*>(unit, 0x74);
-            if (ai) {
-                u8* a0 = rd<u8*>(ai, 0);
-                if (s.aiKind(unit) == 2 && rd<i32>(a0, 0xe0) == 0x14 && a0[10] == 1) s.nihRemove(unit);
-            }
-        }
-    }
-    if (mon && d && (d[0x16] & 0x10)) rec[6] |= 0x20;
-    if (mon && d && (d[0x5c] & 2)) rec[6] |= 0x40;
-    int m = s.mode(unit);
-    if (m == 2) rec[6] |= 0x100; else if (m == 0) rec[6] |= 0x200; else if (m == 1) rec[6] |= 0x80;
-    if (rd<i32>(unit, 0xd0) <= 7) { s.fatal(0); return; }
-    if (rd<i32>(unit, 0xd0) != 0xb) rec[6] |= 0x400;
-    rec[0x10] = s.coordA(unit, 0xd); rec[0x11] = s.coordB(unit); rec[0x12] = s.coordC(unit, 0xd);
-    rec[0xb] = (mon && d) ? rd<u32>(d, 0x58) : 0;
-    if (mon && d) memcpy((u8*)rec + 0x32, d + 0x1c, 9);  // bytes 0x32..0x3a from d+0x1c..0x24
-    u32 ds = rd<u32>(unit, 0x10);
-    if (ds == 0xc || ds == 0) rec[6] |= 4;
-    if (mon) {
-        u8* p = d ? rd<u8*>(d, 0x28) : nullptr;
-        if (rd<i32>(p, 0x30) == 1) {
-            u16 fl = rd<u16>(p, 8); u32 a = rd<u32>(p, 0x2c), b = rd<u32>(p, 0x34);
-            wr<u32>(p, 0x2c, 0xffffffff); wr<u32>(p, 0x34, 0);
-            if (a != 0xffffffff) { rec[7] = a; rec[8] = b; if (fl & 1) rec[6] |= 8; if (fl & 2) rec[6] |= 0x10; }
-        }
-    }
-    rec[3] = rd<u32>(unit, 0xc); rec[4] = rd<u32>(unit, 0xc4); rec[5] = rd<u32>(unit, 0xc8);
-    s.updateRoom(unit, rec);
-    u32* list = (u32*)s.listFor(0, s.getUnitType(unit) & 0xff, 0, 1);
-    rec[0x16] = list[3];
-    list[3] = (u32)(uintptr_t)rec;  // ponytail: ptr truncated as in retail 32-bit layout
-}
+// 1.13c D2GAME+0x1F600 moved to src/core/d2game/d2game_1f600.cpp
 
 // 1.13c D2GAME+0x26230
 struct CorpseCloudSeams {

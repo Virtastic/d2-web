@@ -123,77 +123,9 @@ uint32_t D2GAME_405E0(void* game, void* unit)
     return E.sub5F320(game);
 }
 
-// 1.13c D2Game+0x406D0 -- ecxArg in ECX, unit in EDX, game = unaff_EBX, esiArg = unaff_ESI.
-uint32_t D2GAME_406D0(uint32_t ecxArg, void* unit, void* game, int32_t esiArg)
-{
-    const uint8_t* rec = unitRecord(unit);
-    if (!rec) return 2;
-    uint32_t v = (uint32_t)rd32(unit, 0x2c);
-    if (v == 0) return 2;
-    int32_t a = E.sub21100(unit);
-    E.sub21130(unit);
-    if (E.ord10985(unit) < 2) {
-        int32_t b = E.ord10983(rd32(unit, 0x2c));
-        int32_t c = E.ord10764(rd32(unit, 0x2c));
-        E.ord10637(unit, -(c - esiArg));
-        E.ord10019(unit, b - a);
-        v = ecxArg;
-    }
-    if (E.ord10203((int32_t)v)) {
-        uint32_t p[0x17] = {};
-        p[0] = 0xb;
-        p[1] = (uint32_t)E.sub0A20(game);
-        p[5] = ecxArg;
-        E.ord10240(unit);
-        p[11] = (uint32_t)E.ord11029(unit);
-        p[2] = (uint32_t)(int32_t)rd16(rec, 0x18);
-        p[12] = (uint32_t)rd32(rec, 0x38);
-        E.ord11018(unit);
-        p[4] = (uint32_t)E.ord10818(unit);
-        E.sub8F930(game, p);
-        p[2] = (uint32_t)-E.ord11018(unit);
-        p[9] = (uint32_t)-E.ord10818(unit);
-        E.sub8F930(game, p);
-    }
-    return E.sub5F320(game);
-}
+// 1.13c D2Game+0x406D0 now lives in d2game_406d0.cpp (retail convention: ECX = game, EDX = unit).
 
-// 1.13c D2Game+0x41FB0 -- the second use of param_4 as a pointer is `attacker` (separate register in
-// retail); the decompile's param_1 = iVar3 reassignments are register reuse and read as `unit`.
-uint32_t D2GAME_41FB0(void* unit, int32_t, uint8_t* pools, int32_t recIdx, void* attacker)
-{
-    if (!unit || !pools) return 0;
-    if (recIdx < 0 || recIdx >= rd32(E.dataTables, 0xba0)) return 0;
-    const uint8_t* rec = (const uint8_t*)rdptr(E.dataTables, 0xb98) + (size_t)recIdx * 0x23c;
-    int16_t state = rd16(rec, 0x80);
-    if (state < 0 || state >= rd32(E.dataTables, 0xc4) || !E.ord10871(unit, state)) return 0;
-    int32_t statA = rd32(rec, 0x138);
-    if (E.ord10786(unit, statA, nullptr) <= 0) return 0;
-    int32_t cur = E.ord10973(unit, 8);
-    int32_t n = E.ord10786(unit, rd32(rec, 0x13c), attacker);
-    if (n < 1) n = 1;
-    bool all = true;
-    if (attacker && (rd32(attacker, 0) != 1 || E.ord11104(attacker) != 0)) all = false;
-    for (int i = 0; i < 8; ++i) {
-        int32_t off = E.tbl41FB0[i * 2], flag = E.tbl41FB0[i * 2 + 1];
-        if (flag != 0 && !all) continue;
-        int32_t pool = rd32(pools, off);
-        if (pool <= 0) continue;
-        int32_t take = E.sub214D0(100, pool), cap = E.sub214D0(n, cur);
-        if (cap < take) take = cap;
-        wr32(pools, off, pool - take);
-        cur -= E.sub214D0(0x10, take);
-        if (cur < 1) cur = 0;
-    }
-    if (cur < 1) cur = 0;
-    E.ord10887(unit, 8, cur, 0);
-    if (cur < 1) {
-        void* sl = E.ord10871(unit, rd16(rec, 0x80));
-        if (sl) { E.ord11111(unit, sl); E.ord11108(sl); return 1; }
-        E.ord10945(unit, rd16(rec, 0x80), 0);
-    }
-    return 1;
-}
+// 1.13c D2Game+0x41FB0 now lives in d2game_41fb0.cpp (the old transcription took the wrong stdcall arguments and missed the attacker block).
 
 // 1.13c D2Game+0x51E70 -- game in ECX, unit in EDX, arg = stack param_4, ebx = unaff_EBX.
 // Retail writes through a null spawned->+0x14 here (address 8..0x30); skipped as unreachable.

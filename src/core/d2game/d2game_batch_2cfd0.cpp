@@ -43,7 +43,7 @@ struct D2GameBatchEnv {
     void     (*removeClient)(void* game, uint32_t clientId, uint32_t flag); // 0x4B7F0
     void     (*unlockGame)(void* game);                     // 0x29BA0
     void     (*clearTasks)(void);                           // 0x52090
-    void     (*gameSweep)(void* game);                      // 0x54320
+    void     (*gameSweep)(void* game, const void* name);    // 0x54320, EBX = game, stack (client name at client+0x0D, 1)
     void     (*clientFlush)(void* client);                  // 0x2D790
     void     (*closeGame)(void* game);                      // 0x2CE20
     int32_t  (*getServerUnit)(uint32_t a, uint32_t b, uint32_t classEax); // 0xE03A0, EAX = type class
@@ -195,12 +195,12 @@ void GAME_CloseAllGames(const D2GameBatchEnv* env)
                 uint8_t local_d = 0xB0;
                 env->send(0, rd32(client, 0), &local_d, 1);              // Ordinal 10002
                 if ((rd8(client, 0x3D4) & 1) == 0 && rd32(client, 0x5D * 4) != 0 &&
-                    env->getServerUnit(rd32(client, 0x6A * 4), rd32(client, 0x5C * 4), 0) == 0)
+                    env->getServerUnit(rd32(client, 0x6A * 4), rd32(client, 0x5C * 4), rd32(client, 0x5B * 4)) == 0)
                     wr32(client, 0x5D * 4, 0);
-                env->gameSweep(game);                                    // 0x54320
+                env->gameSweep(game, (const uint8_t*)client + 0x0D);     // 0x54320
                 env->clientFlush(client);                                // 0x2D790
                 env->send(1, rd32(client, 0), &local_d, 1);              // Ordinal 10002
-                env->removeClient(game, 0, 0);                           // 0x4B7F0(game, 0)
+                env->removeClient(game, rd32(client, 0), 0);             // 0x4B7F0(game, 0), EAX = client id
                 client = next;
             }
             gameUnlockOrDie(game);
@@ -208,6 +208,24 @@ void GAME_CloseAllGames(const D2GameBatchEnv* env)
         }
         if (++nextSlot > &g_gameGuids[1023]) return;
     }
+}
+
+// FN-probe seam (the 2DF10 FN probe): the addresses of the module state 0x2DF10 reads and writes, so a probe can set the
+// pinned retail globals 0x6FD30C08 (1024 GUIDs) and 0x6FD31C48 before the call and read them back after it.
+extern "C" void d2game_2cfd0_state(int32_t** gameGuids, uint32_t** lastGameTick) { *gameGuids = g_gameGuids; *lastGameTick = &g_lastGameTick; }
+// The probe's env for 0x2DF10: only the four callees it calls are filled.
+int32_t GAME_UpdateGames(int32_t param_1, int32_t param_2, const D2GameBatchEnv* env);
+extern "C" void d2game_2d820_run(void (*clearTasks)(void), void* (*byGuid)(int32_t), void (*send)(uint32_t, uint32_t, const void*, uint32_t),
+    int32_t (*unit)(uint32_t, uint32_t, uint32_t), void (*sweep)(void*, const void*), void (*flush)(void*), void (*remove)(void*, uint32_t, uint32_t), void (*close)(void*))
+{
+    D2GameBatchEnv env{}; env.clearTasks = clearTasks; env.getGameByGuid = byGuid; env.send = send; env.getServerUnit = unit; env.gameSweep = sweep;
+    env.clientFlush = flush; env.removeClient = remove; env.closeGame = close;
+    GAME_CloseAllGames(&env);
+}
+extern "C" int32_t d2game_2df10_run(int32_t p1, int32_t p2, void* (*byGuid)(int32_t), void (*frame)(void*), void (*unlock)(void*), void (*close)(void*))
+{
+    D2GameBatchEnv env{}; env.getGameByGuid = byGuid; env.frameAdvance = frame; env.unlockGame = unlock; env.closeGame = close;
+    return GAME_UpdateGames(p1, p2, &env);
 }
 
 // 1.13c D2Game+0x2DF10

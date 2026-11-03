@@ -14,7 +14,7 @@ static inline uint32_t monData(uint32_t u) { return (u != 0 && rd32(u) == 1) ? r
 static inline void put8(uint32_t u, uint32_t off, uint8_t v) { const uint32_t d = monData(u); if (d) *(uint8_t*)(uintptr_t)(d + off) = v; }
 
 // 1.13c D2Game+0x4E390
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_4e390(uint32_t unit, int32_t tier, uint32_t seedOwner,
+extern "C" void d2game_4e390(uint32_t unit, int32_t tier, uint32_t seedOwner,
                                                        uint32_t setB, uint32_t roll, const D2Game4E390Env* env)
 {
     if (tier > 10) tier = 10;

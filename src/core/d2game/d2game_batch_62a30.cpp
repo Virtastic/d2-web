@@ -17,7 +17,7 @@ extern "C" void LAB_6fc811b0(i32, i32); // 1.13c D2Game+0x611B0 (quest 5 state c
 extern "C" void LAB_6fc83000(); // 1.13c D2Game+0x63000 (quest 6 callback)
 static inline i32 rd(i32 p, i32 o) { return *(i32*)(intptr_t)(p + o); }
 
-// 1.13c D2Game+0x62A30
+// (1.13c D2Game 0x62A30: the q32 port in d2game_62a30.cpp is the proved one)
 void D2GAME_62A30(i32* unit)
 {
     struct { u32 a; u16 b; } pkt = { 0x1045d, 0 };
@@ -35,16 +35,16 @@ static i32 stoneActive(i32 game, void* unit, i32 q)
     return 0;
 }
 
-// 1.13c D2Game+0x62A80
+// (1.13c D2Game 0x62A80: the q32 port in d2game_62a80.cpp is the proved one)
 i32 D2GAME_62A80(i32 game, void* unit) { return stoneActive(game, unit, 4); }
-// 1.13c D2Game+0x62AE0
+// (1.13c D2Game 0x62AE0: the q32 port in d2game_62ae0.cpp is the proved one)
 i32 D2GAME_62AE0(i32 game, void* unit) { return stoneActive(game, unit, 3); }
-// 1.13c D2Game+0x62C00
+// (1.13c D2Game 0x62C00: the q32 port in d2game_62c00.cpp is the proved one)
 i32 D2GAME_62C00(i32 game, void* unit) { return stoneActive(game, unit, 2); }
-// 1.13c D2Game+0x62D30
+// (1.13c D2Game 0x62D30: the q32 port in d2game_62d30.cpp is the proved one)
 i32 D2GAME_62D30(i32 game, void* unit) { return stoneActive(game, unit, 1); }
 
-// 1.13c D2Game+0x62CD0
+// (1.13c D2Game 0x62CD0: the q32 port in d2game_62cd0.cpp is the proved one)
 i32 D2GAME_62CD0(i32 game, void* unit)
 {
     i32 s = stoneSlot(game, unit);
@@ -56,7 +56,7 @@ i32 D2GAME_62CD0(i32 game, void* unit)
     return 0;
 }
 
-// 1.13c D2Game+0x63270 (ebx = game)
+// (1.13c D2Game 0x63270: the q32 port in d2game_63270.cpp is the proved one) (ebx = game)
 void D2GAME_63270(i32 ids, i32 quest, i32 flag, i32 game)
 {
     for (i32 n = 0; n < (i32)*(u16*)(intptr_t)(ids + 0x80); n++) {

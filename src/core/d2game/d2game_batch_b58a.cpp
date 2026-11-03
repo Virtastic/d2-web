@@ -58,7 +58,7 @@ EMSCRIPTEN_KEEPALIVE void d2_old_9f7a0(int32_t* u, int32_t skill, const D2GameBa
 // Returns the unit when it is a type-2 / class-0x233 unit within range of Ordinal_10522(unit, p2).
 struct D2GameA39E0Env { int (*ord10522)(const int32_t* unit, uint32_t p2); };
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_a39e0(uint32_t, uint32_t p2, const int32_t* p3,
+uint32_t d2game_a39e0_gate(uint32_t, uint32_t p2, const int32_t* p3,
                                                  const int32_t* stk, const D2GameA39E0Env* env)
 {
     if (p3 && p3[0] == 2 && p3[1] == 0x233) {

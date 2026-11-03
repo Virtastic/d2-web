@@ -12,19 +12,20 @@ struct D2G4B100Seams {
     // D2Common ordinals
     P (*o10392)(P), (*o10511)(P), (*o11133)(P), (*o10786)(P, P, P, P);
     void (*o10243)(P, P), (*o10554)(P, P), (*o10748)(P, P), (*o10867)(P), (*o10750)(P);
-    P (*o10744)(P, P), (*o10048)(), (*o10865)(P), (*o10973)(P, P, P), (*o10913)(P);
-    void (*o10887)(P, P, P, P), (*o10920)(P); P (*o10265)(P); void (*o10024)(const char*, P);
+    P (*o10744)(P, P), (*o10048)(P), (*o10865)(P), (*o10973)(P, P, P), (*o10913)(P);
+    void (*o10887)(P, P, P, P); P (*o10920)(P); P (*o10265)(P); void (*o10024)(const char*, P);
     P (*o10383)(P, P*, P*), (*o10076)(), (*o11129)(P, P), (*o10179)(), (*o10649)(P), (*o10980)();
     void (*o10637)(P, P), (*o10019)(P, P);
     P (*o10494)(P, P), (*o10871)(P, P);
     void (*o10680)(P, P, P);
     // D2Game internal
-    P (*f6ad10)(P), (*ff620)(), (*f9b0a0_)(P, P), (*f0f40)(P, P, P, P, P, P), (*f007a0)(P);
-    void (*f9b0a0)(P, P);
+    P (*f6ad10)(P, P), (*ff620)(P, P), (*f9b0a0_)(P, P), (*f0f40)(P, P, P, P, P, P, P, P), (*f007a0)(P);
+    void (*f9b0a0)(P, P, P);   // (game, unit, client)
     void (*fcc00b0)(), (*fed30)(P, P, P); P (*f8f930)(P, P*); void (*f98a90)(P), (*f99100)(P);
-    P (*fbeb80)(), (*fb1340)(P), (*fab010)(), (*ff5740)(P, P), (*fc1790)(), (*fbfa30)(P, P*);
-    P (*f21100)(P), (*f21130)(P), (*f003a0)(P, P), (*f21ec0)(), (*f35d0_)(P);
-    void (*fcc35d0)(P);
+    P (*fbeb80)(), (*fb1340)(P, P), (*fab010)(P, P, P, P, P), (*ff5740)(P, P, P), (*fc1790)(P), (*fbfa30)(P, P, P*, P*);
+    P (*f21100)(P), (*f21130)(P), (*f003a0)(P, P, P), (*f21ec0)(P), (*f35d0_)(P);
+    void (*fcc35d0)(P, P);
+    P (*fa454)(P), (*fa3b8)(P), (*fac28)(P), (*fad12)(P), (*fad3c)(P), (*facb2)(P), (*facd0)(P, P);
     P (*f41260)(P), (*ffa90)(), (*f21220)();
     void (*f21c50)();
     P (*f214d0)(P, P);
@@ -49,8 +50,8 @@ static uint32_t lcg(P s) {
 // 1.13c D2Game+0x4B100
 void D2G_4B100(P unit, P ebx) {
     P local4 = rd(ebx, 0x1a8);
-    if (unit == g4b100.f6ad10(0)) return;
-    P iVar4 = g4b100.ff620();
+    if (unit == g4b100.f6ad10(ebx, 0)   /* ESI=client, stack 0 */) return;
+    P iVar4 = g4b100.ff620(local4, unit);   // stack game, ESI=unit
     if (!iVar4) return;
     if (rd(ebx, 0x1b4) == 0) fatal(0x827);
     P arr, cnt;
@@ -60,7 +61,7 @@ void D2G_4B100(P unit, P ebx) {
         if (!e) fatal(0x82c);
         if (e == iVar4) return;
     }
-    g4b100.f9b0a0(local4, unit);
+    g4b100.f9b0a0(local4, unit, ebx);   // pushes client, unit, game
 }
 
 // 1.13c D2Game+0x4C220
@@ -78,7 +79,7 @@ int D2G_4C4F0(P p1, P unit, int idx, P esi, P edi, P stk8) {
     if (q == unit || q == 0) {
         arg = esi;
         if (q == unit || q == 0) {
-            q = g4b100.f0f40(-1, iVar2 + 4, arg, unit, 0, 0);
+            q = g4b100.f0f40(0x20003, -1, iVar2 + 4, 0, p1, unit, 0, 0);
             if (!q) { g4b100.o10243(edi, 0); return 0; }
         }
     }
@@ -97,123 +98,141 @@ int D2G_4C840(P p1, P ecx) {
     return 0;
 }
 
-// 1.13c D2Game+0x4C9E0  (eax = chance)
-P D2G_4C9E0(P unit, P seed, int chance) {
-    P r = g4b100.o10744(unit, 0x2d);
-    if (!r) return 0;
-    if (!g4b100.o10048()) {
-        if (!g4b100.o10865(unit)) return 0;
+// 1.13c D2Game+0x4C9E0  (eax = chance, ecx = item, edx = seed; stack: game, amount; ret 8)
+P D2G_4C9E0(P game, P amount, int chance, P item, P seed) {
+    if (!g4b100.o10744(item, 0x2d)) return 0;
+    if (g4b100.o10048(item)) {                       // 2A940: the stackable branch
+        if (g4b100.o10973(item, 0x46, 0) <= 0) return 0;
         uint32_t v = lcg(seed);
-        if ((int)(v % 100) < chance) {
-            P d = g4b100.o10973(unit, 0x48, 0) - unit;  // as decompiled
-            if (d >= 0 && d != 0) {
-                g4b100.o10887(unit, 0x48, d, 0);
-                if (seed && rd(seed, 0) == 0) g4b100.o10920(seed);
-                return g4b100.fab010();
-            }
-            return g4b100.ff5740(seed, unit);
-        }
-        return v / 100;
+        if ((int)(v % 100) < chance) return g4b100.fc1790(game);
+        return 0;
     }
-    P s = g4b100.o10973(unit, 0x46, 0);
-    if (s > 0) {
-        uint32_t v = lcg(seed);
-        if ((int)(v % 100) < chance) return g4b100.fc1790();
-        return v / 100;
-    }
-    return s;
+    if (!g4b100.o10865(item)) return 0;              // 2A970
+    uint32_t v = lcg(seed);
+    if ((int)(v % 100) >= chance) return 0;
+    int d = (int)g4b100.o10973(item, 0x48, 0) - (int)amount;
+    if (d < 0 || d == 0) return g4b100.ff5740(game, item, seed);
+    g4b100.o10887(item, 0x48, d, 0);
+    P client = 0;
+    if (seed && rd(seed, 0) == 0) client = (P)rd(g4b100.o10920(seed), 0x9c);
+    return g4b100.fab010(item, client, 1, 0x48, d);
 }
 
-// 1.13c D2Game+0x4D040  (esi/regs is seam arg; local 23-dword zeroed struct)
-int D2G_4D040(P p1, P unit, int idx, P esi) {
+// unit position the way 4D040 inlines it: types 2, 4 and 5 read the path block directly
+static P posX(P u) {
+    int t = rd(u, 0);
+    if (t == 2 || (t > 3 && t <= 5)) return rd(rd(u, 0x2c), 0xc);
+    P pa = rd(u, 0x2c);
+    return pa ? g4b100.fa454(pa) : 0;
+}
+static P posY(P u) {
+    int t = rd(u, 0);
+    if (t == 2 || (t > 3 && t <= 5)) return rd(rd(u, 0x2c), 0x10);
+    P pa = rd(u, 0x2c);
+    return pa ? g4b100.fa3b8(pa) : 0;
+}
+
+// 1.13c D2Game+0x4D040  (ecx = game, edx = unit; stack: skill, lvl; ret 8)
+int D2G_4D040(P game, P unit, int skill, int lvl) {
     if (unit) wr(unit, 0xc4, rd(unit, 0xc4) | 0x40);
-    P row = skillRow(idx);
+    P row = skillRow(skill);
     if (!row) return 0;
-    g4b100.f007a0(p1);
-    P o = g4b100.o10392(rd(unit, 0x2c));
-    if (o == unit || !o) return 0;
-    g4b100.fed30(0, unit, o);
-    P n = g4b100.o10786(unit, rd(row, 0x138), idx, idx);
-    auto ok = [](P u) { int t = rd(u, 0); return t != 2 && (t < 4 || t > 5) && rd(u, 0x2c) != 0; };
-    if (ok(o)) g4b100.o10867(rd(o, 0x2c));
-    if (ok(o)) g4b100.o10750(rd(o, 0x2c));
-    if (ok(unit)) g4b100.o10867(rd(unit, 0x2c));
-    if (ok(unit)) g4b100.o10750(rd(unit, 0x2c));
-    int s = (int)g4b100.fb1340(unit);
-    if (s < 0 || s >= rd(g4b100.dataTables, 0xb6c)) return 0;
-    uint32_t blk[23] = {0};  // seam arg: fields set by the lost stack writes
-    for (int i = 0; i < n; i++) g4b100.f8f930(esi, (P*)blk);
+    g4b100.f007a0(unit);                               // eax = unit, ecx = game
+    P owner = g4b100.o10392(rd(unit, 0x2c));
+    if (owner == unit || !owner) return 0;
+    g4b100.fed30(game, unit, owner);
+    int n = (int)g4b100.o10786(unit, rd(row, 0x138), skill, lvl);
+    P ox = posX(owner), oy = posY(owner);
+    P tx = 2 * ox - posX(unit);
+    P uy = posY(unit);
+    int mid = (int)g4b100.fb1340(skill, unit);         // eax = skill, stack unit
+    if (mid < 0 || mid >= rd(g4b100.dataTables, 0xb6c)) return 0;
+    int32_t blk[23] = {0};
+    blk[0] = 0x21; blk[1] = (int32_t)unit; blk[4] = mid;
+    blk[5] = (int32_t)ox; blk[6] = (int32_t)oy;
+    blk[7] = (int32_t)tx; blk[8] = (int32_t)(2 * oy - uy);
+    blk[0xb] = skill; blk[0xc] = lvl;
+    blk[0x15] = 0x41f50;                               // callback D2Game+0x41F50
+    for (int i = 0; i < n; i++) { blk[0x16] = i; g4b100.f8f930(game, (P*)blk); }
     return 1;
 }
 
-// 1.13c D2Game+0x4D270  (ebx flag, ebp, si/di coords are register args)
-int D2G_4D270(P p1, P unit, int idx, P ebx, P ebp, short si, short di) {
+// 1.13c D2Game+0x4D270  (ecx = game, edx = unit; stack: skill, lvl; ret 8)
+int D2G_4D270(P game, P unit, int skill, int lvl) {
     if (unit) wr(unit, 0xc4, rd(unit, 0xc4) | 0x40);
-    P row = skillRow(idx);
+    P row = skillRow(skill);
     if (!row) return 0;
-    g4b100.f007a0(p1);
-    P iVar1 = rd(unit, 0x2c);
-    g4b100.o10392(0);
-    int tmp[8];
-    if (!g4b100.fbfa30(ebp, (P*)tmp)) return 0;
-    P n = g4b100.o10786(unit, rd(row, 0x138), idx, idx);
-    int s = (short)rd(row, 0x48) & 0xffff; s = (int16_t)s;
-    if (g4b100.o10076() != 1 && (int16_t)(rd(row, 0x48) >> 16) >= 0) s = (int16_t)(rd(row, 0x48) >> 16);
-    // NB: +0x4A is the high half of the dword at +0x48
-    if (s < 0 || s >= rd(g4b100.dataTables, 0xb6c)) return 0;
-    uint32_t blk[23] = {0};  // seam arg: blk[3]=s, [?]=idx, n!=0 -> callback LAB_6fc6c190
-    P r = 0;
-    P e = g4b100.f8f930(iVar1, (P*)blk);
-    (void)n; (void)r;
+    g4b100.f007a0(unit);                               // eax = unit, ecx = game
+    P p = g4b100.o10392(rd(unit, 0x2c));
+    P q = (p == unit) ? 0 : p;
+    P x = 0, y = 0;
+    if (!g4b100.fbfa30(unit, game, &y, &x)) return 0;   // stack = &y, ebx = &x
+    int n = (int)g4b100.o10786(unit, rd(row, 0x138), skill, lvl);
+    int mid = (int16_t)rd(row, 0x48);
+    if ((int)g4b100.fac28(unit) != 1) {
+        int16_t alt = (int16_t)(rd(row, 0x48) >> 16);
+        if (alt >= 0) mid = alt;
+    }
+    if (mid < 0 || mid >= rd(g4b100.dataTables, 0xb6c)) return 0;
+    int32_t blk[23] = {0};
+    blk[0] = q ? 0x20 : 0x420;
+    blk[1] = (int32_t)unit; blk[2] = (int32_t)unit; blk[3] = (int32_t)q; blk[4] = mid;
+    blk[7] = (int32_t)x; blk[8] = (int32_t)y;
+    blk[0xb] = skill; blk[0xc] = lvl;
+    if (n) blk[0x15] = 0x4c190;                        // callback D2Game+0x4C190
+    blk[0x16] = n;
+    P e = g4b100.f8f930(game, (P*)blk);
     if (e) {
-        g4b100.o10637(e, ebx ? 1 : 2);
-        P x = g4b100.f21100(unit), y = g4b100.f21130(unit);
-        g4b100.o10019(e, (int16_t)(si - (int16_t)y) * 0x10000 + (int16_t)(di - (int16_t)x));
+        g4b100.o10637(e, q ? 1 : 2);
+        P dx = x - g4b100.f21100(unit), dy = y - g4b100.f21130(unit);
+        g4b100.o10019(e, (int16_t)dy * 0x10000 + (int16_t)dx);
     }
     return 1;
 }
 
-// 1.13c D2Game+0x4DCD0  (esi is register arg; stack structs partially lost)
-int D2G_4DCD0(P p1, P unit, int idx, P esi) {
-    P row = skillRow(idx);
+// 1.13c D2Game+0x4DCD0  (ecx = game, edx = unit; stack: skill, lvl; ret 8)
+int D2G_4DCD0(P game, P unit, int skill, int lvl) {
+    P row = skillRow(skill);
     if (!row) return 0;
-    P th = g4b100.o10511(unit);
-    if (!th) return 0;
-    P iVar3 = rd(row, 100);
-    g4b100.o10786(unit, iVar3, idx, 0);
-    if (!g4b100.o10980()) return 0;
-    P u2 = g4b100.o10179();
-    g4b100.o10649(th);
-    P cnt = iVar3;
-    P a = g4b100.f003a0(iVar3, u2);
+    P X = g4b100.o10511(unit);
+    if (!X) return 0;
+    int range = (int)g4b100.o10786(unit, rd(row, 0x64), skill, lvl);
+    P cnt = g4b100.fad12(X);                           // param 1 of the used skill
+    if (!cnt) return 0;
+    P pty = g4b100.fad3c(X), pid = g4b100.facb2(X);
+    P a = g4b100.f003a0(pid, game, pty);               // eax = param 3, ecx = game, edx = param 2
     if (!a) {
-        a = g4b100.f0f40(u2, esi, iVar3, unit, 0, 0);
+        a = g4b100.f0f40(3, pty, range, 0, game, unit, 0, 0);
         if (!a) return 1;
     }
-    g4b100.o11129(unit, a);
-    uint32_t blk[23] = {0};
-    g4b100.fbfa30(th, (P*)blk);
-    int s = (int16_t)rd(row, 0x48);
-    if (g4b100.o10076() != 1 && (int16_t)(rd(row, 0x48) >> 16) >= 0) s = (int16_t)(rd(row, 0x48) >> 16);
-    if (s < 0 || s >= rd(g4b100.dataTables, 0xb6c)) return 0;
-    g4b100.o10786(unit, rd(row, 0x13c), 0, 0);
-    memset(blk, 0, sizeof blk);
-    blk[0] = 0x21;
-    g4b100.f21100(unit);
-    g4b100.f21130(unit);
-    g4b100.f8f930(a, (P*)blk);
-    g4b100.o10243(0, cnt - 1);
-    if (cnt - 1 > 0) {
-        P ar = a ? rd(a, 12) : -1;
-        P q = g4b100.f0f40(ar, th, 0, unit, 0, 0);
-        if (q) {
-            g4b100.o10554(0, rd(q, 0));
-            g4b100.o10748(0, rd(q, 12));
-            g4b100.fcc35d0(g4b100.f21ec0());
-        }
-        return 1;
+    g4b100.facd0(unit, a);
+    P x = 0, y = 0;
+    g4b100.fbfa30(unit, game, &y, &x);                 // stack = &y, ebx = &x
+    int mid = (int16_t)rd(row, 0x48);
+    if ((int)g4b100.fac28(unit) != 1) {
+        int16_t alt = (int16_t)(rd(row, 0x48) >> 16);
+        if (alt >= 0) mid = alt;
     }
-    return 0;
+    if (mid < 0 || mid >= rd(g4b100.dataTables, 0xb6c)) return 0;
+    int c = (int)g4b100.o10786(unit, rd(row, 0x13c), skill, lvl);
+    int32_t blk[23] = {0};
+    blk[0] = 0x21; blk[1] = (int32_t)unit;
+    blk[4] = mid;
+    blk[5] = (int32_t)g4b100.f21100(unit); blk[6] = (int32_t)g4b100.f21130(unit);
+    blk[7] = (int32_t)x; blk[8] = (int32_t)y;
+    blk[0xb] = skill; blk[0xc] = lvl;
+    blk[0x15] = 0x4c190; blk[0x16] = c;
+    g4b100.f8f930(game, (P*)blk);
+    P left = cnt - 1;
+    g4b100.o10243(X, left);                            // SetParam1
+    if (left <= 0) return 0;
+    P ecx = a ? rd(a, 0xc) : -1;
+    P q = g4b100.f0f40(3, ecx, range, 0, game, unit, 0, 0);
+    if (!q) return 1;
+    g4b100.o10554(X, rd(q, 0));                        // SetParam2
+    g4b100.o10748(X, rd(q, 0xc));                      // SetParam3
+    g4b100.fcc35d0(unit, g4b100.f21ec0(skill));
+    return 1;
 }
 
 // 1.13c D2Game+0x4DF20  (eax = amount; ecx unit/stat regs are seam args)

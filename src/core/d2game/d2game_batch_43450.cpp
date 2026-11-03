@@ -26,6 +26,12 @@ struct D2GameBatch43450Env {
     int      (*o10686)(void* unit, uint32_t ebp, uint32_t esi, uint32_t flags);
     void*    (*o10392)(uint32_t id);                      // unit lookup by id
     void     (*o10786)(void* unit, uint32_t a, uint32_t b);
+    uint32_t (*o10203_id)(uint32_t id);
+    void*    (*o10871_3)(void* unit, int a, uint32_t edi);                 // 3 stack args
+    int      (*o10680_3)(void* p, int stat, int z);                        // 3 stack args
+    void*    (*f21420s)(int skillId);                                      // 0x1420: EAX=skillId
+    uint32_t (*o10786_4)(void* unit, uint32_t a, uint32_t b, uint32_t c);   // 4 stack args, result in EAX
+    void     (*fD007A0u)(void* unit, void* game);                          // 0xE07A0: EAX=unit, ECX=game
     void     (*o10637)(void* missile, uint32_t v);
     void     (*o10019)(void* missile, uint32_t v);
     void*    (*o10203)(void* unit);
@@ -130,8 +136,9 @@ uint32_t sub_434E0(D2GameBatch43450Env& e, void* game, void* src, void* tgt, uin
     return 1;
 }
 
-// 1.13c D2Game+0x43610   (param_1=game, param_2=unit, param_3=skillId, param_4)
-uint32_t sub_43610(D2GameBatch43450Env& e, uint32_t game, int* unit, int skillId, uint32_t p4) {
+// 1.13c D2Game+0x43610   (ECX=game, EDX=unit, stack: skillId, arg; ret 8). Disassembly-checked: Ordinal 10786 takes
+// four stack args (unit, rec+0x138, skillId, arg) and its result is the second argument of Ordinal 10637.
+uint32_t sub_43610(D2GameBatch43450Env& e, void* game, int* unit, int skillId, uint32_t arg) {
     const uint8_t* t = e.dataTables;
     if (skillId < 0 || (int)rd32(t, 0xba0) <= skillId) return 0;
     uint8_t* sk = (uint8_t*)(uintptr_t)rd32(t, 0xb98) + (uint32_t)skillId * 0x23c;
@@ -139,73 +146,77 @@ uint32_t sub_43610(D2GameBatch43450Env& e, uint32_t game, int* unit, int skillId
     int missile = rds16(sk, 0x48);
     if (missile < 0 || missile >= (int)rd32(t, 0xb6c)) return 0;
     if (unit) unit[0x31] |= 0x40;
-    e.o10786(unit, rd32(sk, 0x138), skillId);
+    uint32_t r = e.o10786_4(unit, rd32(sk, 0x138), (uint32_t)skillId, arg);
     int dx = 0, dy = 0;
-    e.fD007A0((void*)(uintptr_t)game);
+    e.fD007A0u(unit, game);                               // EAX=unit, ECX=game
     int* tgt = (int*)e.o10392(unit[0xb]);
     if (tgt != unit && tgt) {
         dx = (int)e.f21100(tgt) - (int)e.f21100(unit);
         dy = (int)e.f21130(tgt) - (int)e.f21130(unit);
     }
-    // seam: EBX (game) / EBP / EDI of 0xA28F0 and 0xAC9A are ambient registers in the decompile.
-    int* m = (int*)e.fCC28F0((void*)(uintptr_t)game, p4, unit, 0, (uint32_t)missile, dx, dy, 0, 0, 0);
+    // ECX=game, EDX=missile; stack: unit, skillId, arg, dx, dy, 0, 0, 0
+    int* m = (int*)e.fCC28F0(game, (uint32_t)missile, unit, (uint32_t)skillId, arg, dx, dy, 0, 0, 0);
     if (!m) return 0;
-    e.o10637(m, 0);
+    e.o10637(m, r);
     return 1;
 }
 
-// 1.13c D2Game+0x437D0   (param_1=game, param_2=unit, param_3=skillId; EDI=game ptr, EBP=skill record)
-uint32_t sub_437D0(D2GameBatch43450Env& e, uint32_t game, int* unit, int skillId, void* gameEdi) {
+// 1.13c D2Game+0x437D0   (ECX=game, EDX=unit, stack: skillId, arg; ret 8). Packet words per the disassembly:
+// p[0]=0x21 p[1]=unit p[4]=missile p[5]=x p[6]=y p[7],p[8]=corner, p[11]=skillId p[12]=arg.
+uint32_t sub_437D0(D2GameBatch43450Env& e, void* game, int* unit, int skillId, uint32_t arg) {
     const uint8_t* t = e.dataTables;
     if (skillId < 0 || skillId >= (int)rd32(t, 0xba0)) return 0;
     uint8_t* sk = (uint8_t*)(uintptr_t)rd32(t, 0xb98) + (uint32_t)skillId * 0x23c;
     if (!sk) return 0;
     int m = rds16(sk, 0x48);
     if (m < 0 || m >= (int)rd32(t, 0xb6c)) return 0;
-    if (!e.fCC0630(game, unit)) return 0;
-    e.fD007A0((void*)(uintptr_t)game);
+    if (!e.fCC0630((uint32_t)(uintptr_t)game, unit)) return 0;
+    e.fD007A0u(unit, game);                               // EAX=unit, ECX=game
     int* tgt = (int*)e.o10392(unit[0xb]);
     int x, y;
     if (tgt == unit || !tgt) { x = e.o10983(unit[0xb]); y = e.o10764(unit[0xb]); }
     else { x = (int)e.f21100(tgt); y = (int)e.f21130(tgt); }
     if (!x || !y) return 0;
     e.o10331(unit);
-    if (e.o10057(nullptr)) return 0; // seam: 0x1280 result feeds Ordinal 10057
+    if (e.o10057((void*)(uintptr_t)e.f21280())) return 0; // 0x1280() feeds Ordinal 10057
     uint32_t p[0x17] = {};
-    p[0] = 0x21; p[1] = (uint32_t)(uintptr_t)unit;
-    p[3] = (uint32_t)x; p[4] = (uint32_t)y;       // iStack_54/50
-    int ux = (int)e.f21100(unit), uy = (int)e.f21130(unit);
-    p[5] = (uint32_t)(x - (uy - y));              // iStack_4c
-    p[6] = (uint32_t)((ux - x) + y);              // iStack_48
-    e.f8F930(gameEdi, p);
-    p[6] = (uint32_t)(y - (ux - x));
-    p[5] = (uint32_t)((uy - y) + x);
-    e.f8F930(gameEdi, p);
+    p[0] = 0x21; p[1] = (uint32_t)(uintptr_t)unit; p[4] = (uint32_t)m;
+    p[5] = (uint32_t)x; p[6] = (uint32_t)y;
+    p[11] = (uint32_t)skillId; p[12] = arg;
+    int dxu = (int)e.f21100(unit) - x;                    // edi
+    int dyu = (int)e.f21130(unit) - y;                    // ebp
+    p[7] = (uint32_t)(x - dyu);
+    p[8] = (uint32_t)(dxu + y);
+    e.f8F930(game, p);
+    p[8] = (uint32_t)(y - dxu);
+    p[7] = (uint32_t)(dyu + x);
+    e.f8F930(game, p);
     int m2 = rds16(sk, 0x4a);
-    if (m2 >= 0 && m2 < (int)rd32(t, 0xb6c)) { p[5] = 0; p[6] = 0; p[0] = 1; e.f8F930(gameEdi, p); }
+    if (m2 >= 0 && m2 < (int)rd32(t, 0xb6c)) { p[7] = 0; p[8] = 0; p[0] = 1; p[4] = (uint32_t)m2; e.f8F930(game, p); }
     return 1;
 }
 
-// 1.13c D2Game+0x439A0   (ESI=unit; register-only otherwise; seam: Ordinal args are ambient)
-void sub_439A0(D2GameBatch43450Env& e, int* unit, void* game) {
+// 1.13c D2Game+0x439A0   (ESI=unit, EDI=ambient arg of Ordinal 10871, stack: game; ret 4). Disassembly-checked.
+void sub_439A0(D2GameBatch43450Env& e, int* unit, void* game, uint32_t edi) {
     if (!unit[0xb]) return;
-    void* a = e.o10203(unit);
-    if (!a) return;
-    void* b = e.o10871(a, 0);
+    if (!e.o10203_id((uint32_t)unit[0xb])) return;
+    void* b = e.o10871_3(unit, 0xd, edi);
     if (!b) return;
-    int skill = e.o10680(b); e.o10680(b);
+    int skill = e.o10680_3(b, 0x15e, 0);
+    int lvl = e.o10680_3(b, 0x15f, 0);
     const uint8_t* t = e.dataTables;
     if (skill <= 0 || skill >= (int)rd32(t, 0xba0)) return;
-    void* sk = e.f21420(nullptr);
+    if (lvl < 0) lvl = 1;
+    void* sk = e.f21420s(skill);                   // EAX=skillId
     if (!sk) return;
     int m = rds16(sk, 0x48);
     if (m < 0 || m >= (int)rd32(t, 0xb6c)) return;
-    if (e.o10057(e.o10331(nullptr))) return;
-    e.f21100(unit);
+    if (e.o10057(e.o10331(unit))) return;
+    uint32_t x = e.f21100(unit);
     uint32_t p[0x17] = {};
-    p[0] = 0x21;
-    e.f21130(unit);
-    p[4] = (uint32_t)m;                            // iStack_78
+    p[0] = 0x21; p[1] = (uint32_t)(uintptr_t)unit; p[5] = x;
+    p[6] = e.f21130(unit);
+    p[12] = (uint32_t)lvl; p[11] = (uint32_t)skill; p[4] = (uint32_t)m;
     e.f8F930(game, p);
 }
 

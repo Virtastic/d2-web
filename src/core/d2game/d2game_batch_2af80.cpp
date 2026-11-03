@@ -455,9 +455,10 @@ void TASK_InsertIntoQueues(D2TaskStrc* pTask)
             D2LinkStrc* pCurrent = pTaskBalanceLink->pPrev;
             while (pCurrent != pTaskBalanceLink)
             {
-                const int32_t nQueuedSlot = linkKey(pBalanceIterator);
+                // 1.13c D2Game+0x524C0: the key is the node being moved (pIteratorNext), break when it is >= pCurrent's.
+                const int32_t nQueuedSlot = linkKey(pIteratorNext);
                 const int32_t nCurrentSlot = linkKey(pCurrent);
-                if (nQueuedSlot - nCurrentSlot <= 0) break;
+                if (nQueuedSlot - nCurrentSlot >= 0) break;
                 pCurrent = pCurrent->pPrev;
             }
 

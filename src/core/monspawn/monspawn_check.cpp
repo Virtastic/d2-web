@@ -6456,6 +6456,19 @@ static int32_t sellCost(void* item, int32_t npcClass, int32_t type) {
     return ITEMS_GetTransactionCost(g_targetPlayer, (D2UnitStrc*)item, (D2C_Difficulties)g_game->nDifficulty,
         UNITS_GetPlayerData(g_targetPlayer)->pQuestData[g_game->nDifficulty], npcClass, (D2C_TransactionTypes)type);
 }
+// D69 gamble-case instrument: ITEMS_GetTransactionCost type 2 (gamble) of any item unit for NPC class `npcClass`,
+// optionally with wItemFormat (pItemData+0x30) forced to 0 for the call, as the retail capture prices it. -1 = no item.
+EMSCRIPTEN_KEEPALIVE int32_t d2_session_gamble_price(uint32_t itemId, uint32_t npcClass, uint32_t forceFormat0) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer) return -1;
+    D2UnitStrc* item = SUNIT_GetServerUnit(g_game, UNIT_ITEM, (int32_t)itemId);
+    if (!item || !item->pItemData) return -1;
+    const uint16_t fmt = item->pItemData->wItemFormat;
+    if (forceFormat0 == 2) return fmt;   // 2: report wItemFormat
+    if (forceFormat0) item->pItemData->wItemFormat = 0;
+    const int32_t price = sellCost(item, (int32_t)npcClass, 2);
+    item->pItemData->wItemFormat = fmt;
+    return price;
+}
 EMSCRIPTEN_KEEPALIVE int32_t d2_session_item_sell_value(uint32_t itemId) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !(g_sessionVendor.action == 1 || g_sessionVendor.action == 2)) return -1;
     g_sellNpc = SUNIT_GetServerUnit(g_game, UNIT_MONSTER, (int32_t)g_sessionVendor.npcId);

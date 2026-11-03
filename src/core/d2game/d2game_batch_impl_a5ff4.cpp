@@ -485,7 +485,8 @@ extern "C" int d2game_a5ff4_fn_b7300(const int* param_1, int eax, int edi)
     return 1;
 }
 
-// 1.13c D2Game+0xB8610   __fastcall(ecx = pGame, edx = pUnit, pCmd)
+// 1.13c D2Game+0xB8610   AITHINK_Fn135_BaalCrab (AIBAAL_GetTarget, then the main skill handler)
+// __fastcall(ecx = pGame, edx = pUnit, pAiTickParam)
 extern "C" void d2game_a5ff4_fn_b8610(int param_1, int param_2, int* param_3)
 {
     int a = 0, b = 0;

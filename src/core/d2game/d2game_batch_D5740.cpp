@@ -70,7 +70,9 @@ int32_t d2game_52A20(int16_t id,int32_t level) {
 uint32_t d2game_532C0(Env& e,void* game,int16_t id,uint32_t experience) {
     int32_t level=1;
     // x86's products wrap at 32 bits; this is the saved hireling's inferred level.
-    for(int32_t next=2;next<=99;++next) {
+    // Retail bumps the level before testing the next threshold and leaves when the counter reaches 99, so the
+    // threshold for 99 never raises the level: the cap is 98 (disassembly 0x6FC732E6-0x6FC73304).
+    for(int32_t next=2;next<=98;++next) {
         const uint32_t threshold=uint32_t(d2game_52A20(id,next))*uint32_t(next)*uint32_t(next+1)*3u;
         if(threshold>experience) break;
         ++level;
@@ -140,6 +142,7 @@ int d2game_54D90(Env& e,const uint8_t* section,void* game,void* player,uint32_t 
         const uint32_t callee=corpse?0x54a20:0x54bc0;
         int result=int(e.call(callee,{a(game),a(player),a(&item),a(&parent),a(&sockets)}));
         if(corpse&&result)return result;
+        if(corpse)sockets=0; // 1.13c: 54A20 never writes the child count (local_5070 stays 0); it writes rec[1] into the record's first dword
         if(!corpse&&result)continue;
         for(int32_t i=0;i<sockets;++i) { if(!read())return 14;int32_t unused=0;result=int(e.call(callee,{a(game),a(player),a(&item),a(&parent),a(&unused)}));if(result)return result; }
     }

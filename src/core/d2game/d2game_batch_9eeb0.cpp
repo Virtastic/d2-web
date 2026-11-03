@@ -80,23 +80,34 @@ bool D2GAME_A3090_Apply(void* p1, uint8_t* unit, uint8_t* rec, const HooksA3090&
     return true;
 }
 
-// 1.13c D2Game+0xA34E0 : spawn from a 0x23c-stride table row (row+0x60 = type) ; helpers injected
+// 1.13c D2Game+0xA34E0 : EBX = game, stack (unit, s1, s2, row, p5), ret 0x14. Skill-table row (0x23c stride) spawns an object.
+// Every callee is a seam in retail argument order (all stdcall; D2Common ordinals 10786, 11013, 10785, 10911, 10807, 10945).
+// Fixed against the disassembly: ordinals 10785/10945 take the stack word s2, 10807/10945 take s1 (the decompile showed the row type).
 struct HooksA34E0 {
-    uint32_t (*calc)(uint32_t unit, uint32_t type, int row, uint32_t p5); // Ordinal 10786
-    uint32_t (*create)(uint32_t clientGame, int two, uint32_t off, uint32_t a, uint32_t b); // 11013
-    void (*finish)(uint32_t obj, uint32_t type, int row); // 10785,10911,10807,10945,8ea80,448e0
+    uint32_t (*calc)(uint32_t unit, uint32_t calc, int row, uint32_t p5);                         // 10786 (thunk AC9A)
+    uint32_t (*create)(uint32_t clientGame, int two, uint32_t pos, uint32_t kind, uint32_t id);   // 11013 (A6A0)
+    void (*initObj)(uint32_t obj, uint32_t s2);                                                   // 10785 (A5B6)
+    void (*setCb)(uint32_t obj, uint32_t cbRva);                                                  // 10911 (A75A), callback = D2Game+0x9F7A0
+    void (*link)(uint32_t s1, uint32_t obj, int one);                                             // 10807 (A60A)
+    void (*setSkill)(uint32_t s1, uint32_t s2, int one);                                          // 10945 (A3CA)
+    void (*arm)(uint32_t type, uint32_t when);                                                    // 0x8EA80 (ECX game, EDX s1)
+    void (*finish)(uint32_t rowAddr, uint32_t unit, uint32_t obj, int row, uint32_t p5);          // 0x448E0 (EAX row record)
 };
-uint32_t D2GAME_A34E0_Create(const uint8_t* unit, uint32_t p2, int row, uint32_t p5, const uint8_t* rows,
+uint32_t D2GAME_A34E0_Create(const uint8_t* unit, uint32_t s1, uint32_t s2, int row, uint32_t p5, const uint8_t* rows,
                              int rowCount, uint32_t game1c, uint32_t gameA8, const HooksA34E0& h)
 {
-    (void)p2;
-    if (row < 0 || row >= rowCount) return 0;
-    uint32_t type = rd<uint32_t>(rows + (size_t)row * 0x23c, 0x60);
-    uint32_t off = h.calc(0, type, row, p5);
+    if (row < 0 || row >= rowCount || !rows) return 0;
+    const uint8_t* rec = rows + (size_t)row * 0x23c;
+    uint32_t off = h.calc((uint32_t)(uintptr_t)unit, rd<uint32_t>(rec, 0x60), row, p5);
     uint32_t id = unit ? rd<uint32_t>(unit, 0xc) : 0xffffffffu, kind = unit ? rd<uint32_t>(unit, 0) : 6;
     uint32_t o = h.create(game1c, 2, gameA8 + off, kind, id);
     if (!o) return 0;
-    h.finish(o, type, row);
+    h.initObj(o, s2);
+    h.setCb(o, 0x9F7A0);
+    h.link(s1, o, 1);
+    h.setSkill(s1, s2, 1);
+    h.arm(0xc, gameA8 + off);
+    h.finish((uint32_t)(uintptr_t)rec, (uint32_t)(uintptr_t)unit, o, row, p5);
     return o;
 }
 

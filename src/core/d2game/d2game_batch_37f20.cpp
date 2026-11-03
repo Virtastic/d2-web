@@ -28,6 +28,8 @@ static inline void     wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint
 static inline uint32_t rd32(uint32_t a, uint32_t o) { return rd32((const void*)(uintptr_t)a, o); }
 static inline uint16_t rd16(uint32_t a, uint32_t o) { return rd16((const void*)(uintptr_t)a, o); }
 static inline uint8_t  rd8 (uint32_t a, uint32_t o) { return rd8((const void*)(uintptr_t)a, o); }
+// retail 32-bit link at a (zero-extended): the section buffers of 0x53340 hold 4-byte pointers
+static inline void*    rdp32(const void* p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return (void*)(uintptr_t)v; }
 static inline void*    rdptr(uint32_t a, uint32_t o) { return rdptr((const void*)(uintptr_t)a, o); }
 
 [[noreturn]] static void d2game_fatal(uint32_t) { _exit(-1); }
@@ -104,7 +106,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_96f40(void* pGame, const D2GameBatch37F20
 // pPlayerIntro[i]->pQuestIntroFlags / ->pNpcIntroFlags; pPlayerIntro[0..2] is at pPlayerData+0x60.
 // A wrong marker returns 0xB without touching the output size; success writes 0x34 there.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_53340(void* pUnit, const void* pSection,
+EMSCRIPTEN_KEEPALIVE uint32_t d2g_53340(void* pUnit, const void* pSection,
                                                   uint32_t* pOutSize,
                                                   const D2GameBatch37F20Env* env)
 {
@@ -114,13 +116,14 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_53340(void* pUnit, const void* pSecti
     *pOutSize = 0;
     if (rd16(buffer, 0) != 0x7701) return 0xB;
 
-    const uint32_t pPlayerData = env->unitsGetPlayerData(pUnit);
+    // Retail calls #10920 once per store (twice per slot), so the seam is hit six times.
     for (int32_t i = 0; i < 3; ++i) {
-        const uint32_t pIntro = (uint32_t)(uintptr_t)rdptr(pPlayerData, 0x60 + 4 * i);
-        void* pQuestIntroBuffer = rdptr(rdptr(pIntro, 0x00), 0x00);
+        void* pIntro = rdp32((const void*)(uintptr_t)env->unitsGetPlayerData(pUnit), 0x60 + 4 * i);
+        void* pQuestIntroBuffer = rdp32(rdp32(pIntro, 0x00), 0x00);
         wr32(pQuestIntroBuffer, 0, rd32(buffer, 4 + 8 * i));
         wr32(pQuestIntroBuffer, 4, rd32(buffer, 8 + 8 * i));
-        void* pNpcIntroBuffer = rdptr(rdptr(pIntro, 0x04), 0x00);
+        pIntro = rdp32((const void*)(uintptr_t)env->unitsGetPlayerData(pUnit), 0x60 + 4 * i);
+        void* pNpcIntroBuffer = rdp32(rdp32(pIntro, 0x04), 0x00);
         wr32(pNpcIntroBuffer, 0, rd32(buffer, 0x1C + 8 * i));
         wr32(pNpcIntroBuffer, 4, rd32(buffer, 0x20 + 8 * i));
     }
@@ -130,20 +133,19 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_53340(void* pUnit, const void* pSecti
 }
 
 // 1.13c D2Game+0x534D0
-// nSectionSize is param_2, pCursor advances, pOutSize receives the consumed size. Nothing is consumed
+// Stack arguments (disassembly, ret 0x10): pUnit, pSection (the 0x30-byte hotkey table source), nSectionSize,
+// pOutSize (in/out: the consumed byte count, also the offset of the trailing pair). Nothing is consumed
 // unless pUnit is non-null, its first dword is zero, and pPlayerData+0x9C (the player's hotkey/skill
 // record) is non-null; whenever that record exists the out size is set to 0x30, but the eight entries
 // are only written when the section is larger than 0x48 bytes.
 // Each entry is 8 bytes (u16 skill id, u8 hand, u32 -1) from pHotkeys+0x41C. The source (skill, hand)
-// pairs are at pUnit+0, +6, +12, +18 and, after the outer 0x18 step, +24, +30, +36, +42. A skill byte
+// pairs are at pSection+0, +6, +12, +18 and, after the outer 0x18 step, +24, +30, +36, +42. A skill byte
 // in [0x9C,0xD8] becomes byte+0x41, 0xFF becomes 0xFFFF, anything else stays as-is.
-// For a section larger than 0x51 the cursor's two dwords go to D2Common #11042 and #11072 with -1 and
-// the cursor advances by 8 (the `+ (int)param_1` inside that address in the decompile is an artifact).
-// Always returns 0.
+// For a section larger than 0x51 the two dwords at pSection + *pOutSize go to D2Common #11042 and #11072
+// with -1 and *pOutSize advances by 8. Always returns 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_534d0(void* pUnit, uint32_t nSectionSize,
-                                                  uint32_t* pCursor, uint32_t* pOutSize,
-                                                  const D2GameBatch37F20Env* env)
+EMSCRIPTEN_KEEPALIVE uint32_t d2g_534d0(void* pUnit, const void* pSection, uint32_t nSectionSize,
+                                        uint32_t* pOutSize, const D2GameBatch37F20Env* env)
 {
     *pOutSize = 0;
     if (pUnit == nullptr || rd32(pUnit, 0) != 0) return 0;
@@ -159,22 +161,22 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_534d0(void* pUnit, uint32_t nSectionS
             const uint32_t src = (uint32_t)(outer * 0x18 + entry * 6);
             const uint32_t dst = pHotkeys + 0x41C + (uint32_t)((outer * 4 + entry) * 8);
 
-            uint16_t skill = rd8(pUnit, src);
+            uint16_t skill = rd8(pSection, src);
             if (skill >= 0x9C && skill <= 0xD8) skill = (uint16_t)(skill + 0x41);
             else if (skill == 0xFF) skill = 0xFFFF;
 
             wr16((void*)(uintptr_t)dst, 0, skill);
-            wr8((void*)(uintptr_t)dst, 2, rd8(pUnit, src + 1));
+            wr8((void*)(uintptr_t)dst, 2, rd8(pSection, src + 1));
             wr32((void*)(uintptr_t)dst, 4, 0xFFFFFFFFu);
         }
     }
 
     if (nSectionSize > 0x51) {
-        const uint32_t cursor = *pCursor;
-        const uint32_t second = rd32(cursor, 4);
-        env->ordinal11042(pUnit, rd32(cursor, 0), 0xFFFFFFFFu);
+        const uint32_t off = *pOutSize;
+        const uint32_t second = rd32(pSection, off + 4);
+        env->ordinal11042(pUnit, rd32(pSection, off), 0xFFFFFFFFu);
         env->ordinal11072(pUnit, second, 0xFFFFFFFFu);
-        *pCursor = cursor + 8;
+        *pOutSize = off + 8;
     }
 
     return 0;

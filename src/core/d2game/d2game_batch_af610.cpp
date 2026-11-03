@@ -34,6 +34,10 @@ struct ItemOps {
     void (*refresh)();                                 // 0x345A0
     int32_t (*fromBuf)(int32_t*, uint32_t);            // 0xD76A0
     int32_t (*fromInv)(int32_t*, uint32_t, void*);     // 0xD4A70
+    void (*setA)(int32_t*, uint32_t);                  // Ordinal_10882 (rec+0x18)
+    void (*setB)(int32_t*, uint32_t);                  // Ordinal_11118 (rec+0x1c)
+    void (*prep1130)(int32_t*);                        // 0x1130
+    void (*prep1100)(int32_t*);                        // 0x1100
 };
 }
 
@@ -46,7 +50,9 @@ extern "C" uint32_t D2Game_54A20_PlaceCorpseItemByMode(const ItemOps* o, const u
     int32_t kind = it[4];
     if (kind == 0) {
         o->setMode(it, 4);
-        (void)*(uint32_t*)(rec + 0x18); (void)*(uint32_t*)(rec + 0x1c);
+        o->setA(it, *(const uint32_t*)(rec + 0x18));   // 1.13c: Ordinal_10882 / 11118, then 0x1130, 0x1100
+        o->setB(it, *(const uint32_t*)(rec + 0x1c));
+        o->prep1130(it); o->prep1100(it);
         if (!o->fromBuf(game, (uint32_t)it[3])) return 0xd;
     } else if (kind == 1) {
         int32_t owner = game[0x18];
@@ -80,6 +86,10 @@ struct PickupOps {
     int32_t (*fromId)(void*, int32_t*, int32_t, int32_t, void*);     // 0xD4E80
     int32_t (*fromUnit)(void*, int32_t*, void*);          // 0xD1650
     int32_t (*fromInv)(void*, int32_t*, uint32_t, void*); // 0xD4A70
+    void (*setA)(int32_t*, uint32_t);                     // Ordinal_10882
+    void (*setB)(int32_t*, uint32_t);                     // Ordinal_11118
+    void (*prep1130)(int32_t*);                           // 0x1130
+    void (*prep1100)(int32_t*);                           // 0x1100
 };
 }
 
@@ -92,9 +102,15 @@ extern "C" uint32_t D2Game_54BC0_DropPickupMercItem(const PickupOps* o, void* ct
     if (!it) return 0xc;
     int32_t ok;
     switch (it[4]) {
-    case 0: o->setMode(it, 4); ok = o->fromBuf(ctx, game, (uint32_t)it[3]); break;
+    case 0: // 1.13c also calls Ordinal_10114(it, ..., "PlrSave.cpp", 0xe2) here (stack args unpinned: capture request)
+        o->setMode(it, 4);
+        // 10882/11118 args are stack garbage in the decompile: unpinned, capture request
+        { const uint32_t id = (uint32_t)it[3]; o->prep1130(it); o->prep1100(it); ok = o->fromBuf(ctx, game, id); }
+        break;
     case 1: o->setMode(it, 4); ok = o->fromHandle(game, it, *rec, 1, nullptr); break;
-    case 2: o->setMode(it, 4); ok = o->fromId(game, it, *(int32_t*)(rec + 0x18), 0, nullptr); break;
+    case 2: o->setMode(it, 4);
+        o->setA(it, *(const uint32_t*)(rec + 0x18)); o->setB(it, *(const uint32_t*)(rec + 0x1c));
+        ok = o->fromId(game, it, *(int32_t*)(rec + 0x18), 0, nullptr); break;
     case 4: o->setMode(it, 4); ok = o->fromUnit(game, it, nullptr); break;
     case 6:
         o->setMode(it, 4);

@@ -39,16 +39,14 @@ struct D2GameBatch14Env {
     uint32_t (*getRoomUnitArray)(uint32_t roomHandle, void** out, uint32_t* count);
     // 0x4AD10 CLIENTS_GetPlayerFromClient(client, ignoreDeath); the client is passed in ESI.
     void*    (*getPlayerFromClient)(void* client, int32_t ignoreDeath);
-    // 0x21100 prepares the client unit-update list (client in EAX).
-    void     (*prepareUnitUpdate)(void* client);
-    // 0x21130 initialises the 0x38-node sort list (buffer in ESI) and returns the client's
-    // coordinate key for the distance comparison.
-    uint32_t (*getUnitUpdateKey)(void* client, void* nodes);
-    // 0x4A460 inserts one unit into the sorted node list: param_1 = unit, param_2 = key,
-    // param_3 = best distance so far, param_4 = client, param_5 = max count; the node array
-    // (12 bytes per node: unit, distance, next index) arrives in ESI.
-    void     (*insertSortedUnit)(void* unit, uint32_t key, uint32_t* best, void* client,
-                                 uint32_t maxCount, uint32_t* nodes);
+    // 0x1100 / 0x1130: the player unit's x and y (unit in ECX).
+    int32_t  (*unitX)(void* unit);
+    int32_t  (*unitY)(void* unit);
+    // 0x4A460 inserts one unit into the sorted node list: param_1 = unit, param_2 = y,
+    // param_3 = best distance so far, param_4 = client, param_5 = max count; x arrives in EAX and
+    // the node array (12 bytes per node: unit, distance, next index) in ESI.
+    void     (*insertSortedUnit)(void* unit, int32_t y, uint32_t* best, void* client,
+                                 uint32_t maxCount, uint32_t* nodes, int32_t x);
     // 0x4A370 writes the sorted list into client+0x1CC (9 bytes per entry); client in ESI,
     // node array in the argument.
     void     (*flushUnitUpdateList)(uint32_t* nodes, void* client);
@@ -91,7 +89,7 @@ struct D2GameBatch14Env {
 // CLIENTS_BuildUnitsUpdateList (client in EBX): the room handle at client+0x1B4 is required (fatal
 // 0x6F7 when null) and D2Common #10383 must return a unit array (fatal 0x6F9 when null). The client's
 // player is fetched with 0x4AD10; when absent the function returns without touching the list. The
-// list is prepared by 0x21100, keyed by 0x21130, the count at client+0x3BC reset to zero, and every
+// list is prepared by the player's x/y (0x1100, 0x1130), the count at client+0x3BC reset to zero, and every
 // unit on each room entry's +0x74 chain (next at +0xE8) is inserted by 0x4A460 against the caller's
 // max count. 0x4A370 then flushes the sorted list into client+0x1CC.
 extern "C"
@@ -107,10 +105,10 @@ EMSCRIPTEN_KEEPALIVE void d2_game_4ad80(void* client, uint32_t maxCount, const D
     void* player = env->getPlayerFromClient(client, 0);
     if (player == nullptr) return;
 
-    env->prepareUnitUpdate(player);                                   // 0x21100
     uint32_t nodes[0x38 * 3];
     std::memset(nodes, 0, sizeof nodes);
-    const uint32_t key = env->getUnitUpdateKey(player, nodes);        // 0x21130
+    const int32_t x = env->unitX(player);                             // 0x1100
+    const int32_t y = env->unitY(player);                             // 0x1130
     uint32_t best = 0;
     wr32(client, 0x3BC, 0);
 
@@ -118,7 +116,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_4ad80(void* client, uint32_t maxCount, const D
         const uint32_t entry = rd32(rooms, i * 4);
         for (void* unit = rdptr((const void*)(uintptr_t)entry, 0x74); unit != nullptr;
              unit = rdptr(unit, 0xE8)) {
-            env->insertSortedUnit(unit, key, &best, client, maxCount, nodes); // 0x4A460
+            env->insertSortedUnit(unit, y, &best, client, maxCount, nodes, x); // 0x4A460
         }
     }
     env->flushUnitUpdateList(nodes, client);                          // 0x4A370
