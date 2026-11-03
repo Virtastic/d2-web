@@ -161,15 +161,4 @@ extern "C" void d2_fn_d2common_4bb70(uint32_t nUnused, int32_t nX, int32_t nY, u
 	ClearGridCell1330(pfnGrid1330, nX, nY, nMask);
 }
 
-// 1.13c D2Common+0x4BBB0: clear nMask over the plus-shaped 5-subtile footprint centred on (nX, nY) of the
-// 0x1330 grid. The cells are (nX-1,nY), (nX,nY), (nX+1,nY), (nX,nY-1), (nX,nY+1); retail reads y from ESI.
-extern "C" void d2_fn_d2common_4bbb0(uint32_t nUnused, int32_t nX, int32_t nY, uint16_t nMask,
-	void* (*pfnGrid1330)(void))
-{
-	(void)nUnused;
-	ClearGridCell1330(pfnGrid1330, nX - 1, nY, nMask);
-	ClearGridCell1330(pfnGrid1330, nX, nY, nMask);
-	ClearGridCell1330(pfnGrid1330, nX + 1, nY, nMask);
-	ClearGridCell1330(pfnGrid1330, nX, nY - 1, nMask);
-	ClearGridCell1330(pfnGrid1330, nX, nY + 1, nMask);
-}
+// D2Common+0x4BBB0 (the plus-shaped reset) now lives in d2common_4bbb0.cpp on the retail signature.

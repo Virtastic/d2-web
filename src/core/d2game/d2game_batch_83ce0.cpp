@@ -14,7 +14,7 @@ extern "C" void d2game_851e0(D2GameStrc* g, D2UnitStrc* u, D2AiTickParamStrc* p)
 // 1.13c D2Game+0x85B60 (Mephisto)
 extern "C" void d2game_85b60(D2GameStrc* g, D2UnitStrc* u, D2AiTickParamStrc* p) { AITHINK_Fn050_Mephisto(g, u, p); }
 
-// 1.13c D2Game+0x87A60 (SandMaggotQueen)
+// D2Game+0x87A60 (SandMaggotQueen): the retail-shaped port is d2game_87a60.cpp
 extern "C" void d2game_87a60(D2GameStrc* g, D2UnitStrc* u, D2AiTickParamStrc* p) { AITHINK_Fn066_SandMaggotQueen(g, u, p); }
 
 // 1.13c D2Game+0x8A330: hysteresis on a value; ctx+4 last int, ctx+0xc byte counter
