@@ -27,22 +27,44 @@ probe_objs_blamed_on_engine() {
   done
 }
 
+# probe_engine_objs_quarantinable <log>: with D2_QUARANTINE=1, the ENGINE objects (not src_core_fn_) a link error names, minus the
+# sources in D2_QUARANTINE_KEEP (space-separated src paths: the rows being proved and the files the branch changed). Dropped for
+# this build only; one QUARANTINED <src file> line each. Rows that need a quarantined file then fail BUILD-FAIL on their own.
+probe_engine_objs_quarantinable() {
+  local o b src k keepobj
+  keepobj=$(for k in ${D2_QUARANTINE_KEEP:-}; do echo "$k" | tr / _ | sed "s/\.cpp$/.o/"; done)
+  awk "/^[^ >].*(error|warning):/ { inerr = (\$0 ~ /wasm-ld: error:/) } /^$/ { inerr = 0 } inerr && (/^wasm-ld: error:/ || /^>>>/)" "$1" |
+    grep -oE "[^ :()/]*src_[A-Za-z0-9_]+\.o" | grep -v "^src_core_fn_" | sort -u | while read -r b; do
+      echo "$keepobj" | grep -qxF "$b" || echo "$b"
+    done
+}
+
 # probe_link_retry: link_engine (defined by the caller) over $OBJS into $LINKLOG. On failure, drop the probe objects
 # the log names (this build only; the sources are never touched), print one PROBE-SKIP line per object and relink.
 # Dropping a probe can expose a second one that needed it, so up to 6 rounds; an error that names no probe
 # (an engine source) fails at once. Returns 0 on a link, 1 otherwise (log tail on stderr).
 probe_link_retry() {
   local round bad o keep
-  for round in 1 2 3 4 5 6; do
+  for round in 1 2 3 4 5 6 7 8; do
     if link_engine >"$LINKLOG" 2>&1; then return 0; fi
     bad=$(probe_objs_from_link_log "$LINKLOG")
     [ -n "$bad" ] || bad=$(probe_objs_blamed_on_engine "$LINKLOG")
+    if [ -z "$bad" ] && [ "${D2_QUARANTINE:-0}" = 1 ]; then
+      bad=$(probe_engine_objs_quarantinable "$LINKLOG")
+      for o in $bad; do
+        src=$(for f in ${SRCS:-}; do [ "$(echo "$f" | tr / _ | sed "s/\.cpp$/.o/")" = "$o" ] && echo "$f"; done)
+        echo "QUARANTINED ${src:-$o}"
+      done
+    fi
     [ -n "$bad" ] || break
     keep=""
     for o in $OBJS; do
       if echo "$bad" | grep -qxF "$(basename "$o")"; then
-        echo "PROBE-SKIP $o: $( (grep -F "$(basename "$o")" "$LINKLOG" || cat "$LINKLOG") | grep -m1 -E 'undefined symbol|duplicate symbol' | cut -c1-160) (link)"
-        basename "$o" .o | sed 's/^src_core_fn_//' >> "$SKIPPED_FILE"
+        case "$(basename "$o")" in
+          src_core_fn_*)
+            echo "PROBE-SKIP $o: $( (grep -F "$(basename "$o")" "$LINKLOG" || cat "$LINKLOG") | grep -m1 -E "undefined symbol|duplicate symbol" | cut -c1-160) (link)"
+            basename "$o" .o | sed "s/^src_core_fn_//" >> "$SKIPPED_FILE" ;;
+        esac
       else keep="$keep $o"; fi
     done
     OBJS="$keep"

@@ -95,7 +95,7 @@ if [ "${D2_COMPILER_CACHE:-1}" = 1 ]; then
   CACHE_ARGS=(-v "$LOCK_DIR/compiler-cache:/d2-compiler-cache" -e D2_COMPILER_CACHE=1)
 fi
 MSYS_NO_PATHCONV=1 docker run --rm "${CACHE_ARGS[@]}" \
-  -e D2_TOOLCHAIN_ID="$TOOLCHAIN_ID" -e D2_COMPILE_JOBS="$JOBS" -e HOME=/tmp -e D2_CXXFLAGS="${D2_CXXFLAGS:-}" -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" \
+  -e D2_TOOLCHAIN_ID="$TOOLCHAIN_ID" -e D2_COMPILE_JOBS="$JOBS" -e HOME=/tmp -e D2_CXXFLAGS="${D2_CXXFLAGS:-}" -e D2_OUTPUT_OWNER="$(id -u):$(id -g)" -e D2_QUARANTINE="${D2_QUARANTINE:-0}" -e D2_QUARANTINE_KEEP="${D2_QUARANTINE_KEEP:-}" \
   -v "$MOUNT:/build" -v "$MOUNT:$MOUNT:ro" "${PRIV_ARGS[@]}" "$TOOLCHAIN_ID" bash wasm-build/link-d2.sh
 
 echo "==> synthetic smoke.mpq"
