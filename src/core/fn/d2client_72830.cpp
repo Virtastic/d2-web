@@ -11,6 +11,7 @@ uint32_t fileTag(const char* s) { return s && !strcmp(s, "..\\Source\\D2Client\\
 void L(uint32_t rva, uint32_t a, uint32_t c, uint32_t d, uint32_t b, uint32_t s, uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3) {
     uint32_t* w = g_lg + 1 + g_lg[0]++ * 10; w[0] = rva; w[1] = a; w[2] = c; w[3] = d; w[4] = b; w[5] = s; w[6] = s0; w[7] = s1; w[8] = s2; w[9] = s3;
 }
+} // namespace
 extern "C" void d2_client_72830(uint32_t in_eax, uint32_t ebx, uint32_t dt_b98, int32_t dt_ba0,
     uint32_t (*ord10511)(uint32_t), int (*sub_724e0)(uint32_t), int32_t (*ord10601)(uint32_t, const char*, int), uint32_t (*ord10397)(uint32_t),
     void (*sub_2b960)(uint32_t, uint32_t, uint32_t), void (*sub_75e50)(uint32_t, uint32_t));
