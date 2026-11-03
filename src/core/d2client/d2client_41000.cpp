@@ -1,7 +1,7 @@
 // 1.13c D2Client+0x41000 -- client missile ring spawn: EDX = seed init value, EBX = Missiles-table index (hidden registers),
 // stack a0..a5 (ret 0x18), no return value.
 // A local LCG seed is set up by #C3B2(ECX = &seed, EDX). The request block (23 dwords, zeroed) is: [0] = 3, [1] = a0, [4] = a1, [5] = a2,
-// [6] = a3, [9] = EBX, [10] = a4, [21] = 0x6FAF0130 (the do-func at +0x40130). Then for i = 0, a5*4, 2*a5*4 .. while i < 0x100: [7] = word
+// [6] = a3, [11] = EBX, [12] = a4, [21] = 0x6FAF0130 (the do-func at +0x40130). Then for i = 0, a5*4, 2*a5*4 .. while i < 0x100: [7] = word
 // at global 0x6FB86620 + i, [8] = word at 0x6FB86520 + i (the two direction tables, pinned in e.gl: +0 is 0xD6520, +0x100 is 0xD6620),
 // one LCG step on the local seed ([22] = the new low word), r = #B30F0(ECX = block); then #C448(r, k + 1) where k is word +0x14C of row EBX
 // in the table at sgptDataTables+0xB98 (stride 0x23C, count +0xBA0; 0 when EBX is out of range or the row address is 0). a5 <= 0 never ends.
@@ -12,7 +12,7 @@ extern "C" void d2c_41000(uint32_t edx, int32_t ebx, uint32_t a0, uint32_t a1, u
     uint32_t sp = (uint32_t)(uintptr_t)sd;
     e.H(0xc3b2, 0, 0, 0, 0, 0, 0, sp, edx);
     uint32_t q[23] = {};
-    q[0] = 3; q[1] = a0; q[4] = a1; q[5] = a2; q[6] = a3; q[9] = (uint32_t)ebx; q[10] = a4; q[21] = 0x6faf0130u;
+    q[0] = 3; q[1] = a0; q[4] = a1; q[5] = a2; q[6] = a3; q[11] = (uint32_t)ebx; q[12] = a4; q[21] = 0x6faf0130u;
     for (uint32_t i = 0; (int32_t)i < 0x100; i += a5 * 4) {
         q[8] = e.R(e.gl + i);
         q[7] = e.R(e.gl + 0x100 + i);
