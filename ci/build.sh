@@ -10,6 +10,9 @@
 #      e/<hash>/; doing that to the tracked play/ dirties the checkout on every build.
 set -euo pipefail
 SRC="${SRC:-$(cd "$(dirname "$0")/.." && pwd)}"
+# Agents never build in their own worktree (one shared prove build covers every queued row): an
+# unroled build under .claude/worktrees/ is refused; batch-prove, merges and coverage set D2_BUILD_ROLE.
+case "$SRC" in */.claude/worktrees/*) [ -n "${D2_BUILD_ROLE:-}" ] || { echo "ci/build.sh: refused -- agent worktree build; queue a prove: node tools/re/batch-prove.mjs --rows ... --item <id>" >&2; exit 3; };; esac
 # One tag per recipe: worktrees on different Dockerfile versions never retag each other's image.
 IMAGE="${BUILDER_IMAGE:-d2-builder64:$(sha256sum "$SRC/Dockerfile.builder64" | cut -c1-12)}"
 cd "$SRC"
