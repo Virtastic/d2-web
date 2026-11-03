@@ -38,6 +38,7 @@ owned copy.
 - [Option A: Play in your browser](#option-a-play-in-your-browser)
 - [Option B: Run your own server with Docker](#option-b-run-your-own-server-with-docker)
 - [Option C: Build from source](#option-c-build-from-source)
+- [Option D: Desktop app](#option-d-desktop-app)
 - [Play on other devices on your network](#play-on-other-devices-on-your-network)
 - [Widescreen menu backgrounds (optional)](#widescreen-menu-backgrounds-optional)
 - [Build and publish your own Docker image](#build-and-publish-your-own-docker-image)
@@ -318,6 +319,62 @@ Instead of `retail/D2/`, the build can also read the patch from `D2_PATCH_SHIM_S
 and then looks for `d2exp.mpq` and `d2data.mpq` in the same folder.
 
 </details>
+
+## Option D: Desktop app
+
+The desktop app is the same page in a window of its own, with the same engine. It runs on Linux,
+Windows and macOS. Your game files stay on your computer: the app reads them from your Diablo II
+folder when it runs and never copies them into the app.
+
+**Install it** from the files on the repository's **Releases** page. The builds work and you are welcome to use
+them, but **they are unsigned for now**: there is no Apple Developer ID and no Windows code-signing certificate
+yet. Windows and macOS will warn you that the app comes from an unknown or unverified developer. That warning
+is expected. Each system asks you once, and the steps below get you past it. Linux packages have nothing to
+sign and show no warning.
+
+| OS | file | steps |
+|---|---|---|
+| Linux | `d2-web-<version>-linux-x86_64.AppImage` | `chmod +x` the file, then run it (no install) |
+| Linux (Debian, Ubuntu) | `...-linux-amd64.deb` | `sudo apt install ./d2-web-<version>-linux-amd64.deb` |
+| Linux (Fedora, openSUSE) | `...-linux-x86_64.rpm` | `sudo dnf install ./d2-web-<version>-linux-x86_64.rpm` |
+| Windows | `...-win-x64-setup.exe` (installer) or `...-win-x64-portable.exe` | run it. *Windows protected your PC* (SmartScreen): click **More info**, then **Run anyway** |
+| macOS | `...-mac-arm64.zip` (Apple Silicon) or `...-mac-x64.zip` (Intel); a universal `.dmg` where one is published | unzip, drag the app to Applications, then see below |
+
+**macOS, first launch.** The app is not signed or notarized, so Gatekeeper blocks it. Either open
+**System Settings > Privacy & Security**, find the message about the app, and click **Open Anyway**, or run
+this in Terminal once:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Diablo II (d2-web).app"
+```
+
+If an Apple Silicon Mac still says the app is damaged or will not open, sign it on your own machine (ad-hoc,
+no account needed) and open it again:
+
+```bash
+codesign --force --deep -s - "/Applications/Diablo II (d2-web).app"
+```
+
+**The first time it runs**, the app looks for your Diablo II folder by itself (Windows registry and Program
+Files, `/Applications/Diablo II*`, wine prefixes, `~/Games`, Steam-style folders) and uses the first one that
+holds `d2data.mpq` and the **1.13c** `Patch_D2.mpq`. If none is found, the front door asks you to choose the
+folder or the files, the same as in Option A. In both cases the title art is applied to the front door first,
+and the game starts when you click **ENTER SANCTUARY**. You can change the folder later from the **Game** menu.
+
+Your game files stay on your computer: the app reads them where they are and never copies them into the
+app. The title-screen art is cut from your own archives on first run (a second or two) and cached in the
+app's data folder; it is not part of the download. The widescreen menu backgrounds come with the
+app.
+
+**Build it yourself** from a checkout of this repository, after `bash ci/build.sh` has staged the site:
+
+```bash
+bash tools/desktop-release.sh          # this OS; or: linux | mac | win | --all
+```
+
+The packages land in `electron/dist/`. From Linux, `--all` builds Linux (AppImage, deb, rpm; the rpm needs
+`rpmbuild`), Windows (installer and portable exe; the exe's icon needs `wine`) and macOS (one zip per CPU
+type). The macOS dmg and the universal build need a Mac: run the `desktop` workflow in `.github/workflows/`.
 
 ## Play on other devices on your network
 
