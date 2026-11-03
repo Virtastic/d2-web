@@ -40,7 +40,7 @@ extern "C" void D2GAME_UNIT_BindType3BById_6CC00(uint32_t id, uint8_t state, uin
     uint32_t fl = (Ordinal_10258(u) & 0xFF) | 1;
     Ordinal_10111(u, fl);
     Ordinal_11090(u, 3);
-    Ordinal_10885(Ordinal_10331(partner, 2, *at32(partner, 0xC)));
+    Ordinal_10885(Ordinal_10331(partner), 2, *at32(partner, 0xC));   // retail: #10885(#10331(partner), 2, partner id)
     FUN_6fd020a0(game, partner);
     uintptr_t nu = FUN_6fcc22e0(game, u, state, Ordinal_10826(Ordinal_10331(u)));
     if (!nu) fatal(0x11FB);

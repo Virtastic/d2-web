@@ -497,7 +497,7 @@ static void d2game_EE480_113c(void* pEaxUnit, void* pParam1, const D2GameBatchB6
 
 // 1.13c D2Game+0x9e330
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9e330(uint32_t* r)
+EMSCRIPTEN_KEEPALIVE void d2_old_9e330(uint32_t* r)
 {
     d2game_9E330_113c((int32_t*)(uintptr_t)r[0], batchEnv(r));
     r[4] = 0;
@@ -505,7 +505,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9e330(uint32_t* r)
 
 // 1.13c D2Game+0x9F9A0
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9f9a0(uint32_t* r)
+EMSCRIPTEN_KEEPALIVE void d2_old_9f9a0(uint32_t* r)
 {
     d2game_9F9A0_113c((void*)(uintptr_t)r[0], (int32_t)r[1], batchEnv(r));
     r[4] = 0;
@@ -531,7 +531,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d2d90(uint32_t* r)
 
 // 1.13c D2Game+0x9F3B0 (r[0]=this, r[1]=param_1, r[2]=missile id, r[3]=EBX, r[6]=EBP, r[4]=result)
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9f3b0(uint32_t* r)
+EMSCRIPTEN_KEEPALIVE void d2_old_9f3b0(uint32_t* r)
 {
     r[4] = d2game_9F3B0_113c((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1], (int32_t)r[2], r[3],
                              r[6], batchEnv(r));
@@ -539,7 +539,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9f3b0(uint32_t* r)
 
 // 1.13c D2Game+0x9FAE0 (r[0]=unit, r[1]=missile id, r[4]=result)
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9fae0(uint32_t* r)
+EMSCRIPTEN_KEEPALIVE void d2_old_9fae0(uint32_t* r)
 {
     r[4] = d2game_9FAE0_113c((void*)(uintptr_t)r[0], (int32_t)r[1], batchEnv(r));
 }

@@ -38,7 +38,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_96810(uint32_t, int32_t* p2, const uint32
 
 // 1.13c D2Game+0x9F7A0
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9f7a0(int32_t* u, int32_t skill, const D2GameBatchB58aEnv* env)
+EMSCRIPTEN_KEEPALIVE void d2_old_9f7a0(int32_t* u, int32_t skill, const D2GameBatchB58aEnv* env)
 {
     if (!u) env->fatal(0xa2a);
     env->d2game57110(1, skill);
