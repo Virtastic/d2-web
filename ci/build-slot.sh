@@ -10,6 +10,11 @@ d2_build_slot_acquire() {
   local dir=$1 max="${D2_MAX_BUILDS:-2}" i waited="" ids
   case "$max" in ''|*[!0-9]*|0) max=2;; esac
   mkdir -p "$dir"
+  # D2_BUILD_ROLE=main (the build that lands main, from the main checkout) has its own slot outside the cap:
+  # nothing else ever takes .build.lock.main, so landing main never queues behind agent, prove or merge builds.
+  if [ "${D2_BUILD_ROLE:-}" = main ]; then
+    exec 9>"$dir/.build.lock.main"; flock 9; D2_BUILD_SLOT=main; export D2_BUILD_SLOT; return 0
+  fi
   ids=$(seq 0 $((max - 1)))
   if [ "${D2_BUILD_ROLE:-}" = merge ] || [ "${D2_BUILD_ROLE:-}" = coverage ] || [ "${D2_BUILD_ROLE:-}" = prove ]; then ids=$(seq $((max - 1)) -1 0)
   elif [ "$max" -gt 1 ]; then ids=$(seq 0 $((max - 2))); fi
