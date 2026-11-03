@@ -52,8 +52,8 @@ struct D2GameBatch531F0Env {
     int32_t   (*ord10802)(uint32_t handle);
     void      (*fatal)(uint32_t line);                     // Ordinal_10265 + Ordinal_10024 + _exit(-1)
     void      (*c34C00)(void* client, void* game);         // D2Game+0x34C00 (eax = client, stack = game, ret 4)
-    void      (*c35EB0)(void);                             // D2Game+0x35EB0
-    void      (*c5BF70)(void* game);                       // D2Game+0x5BF70
+    void      (*c35EB0)(uint32_t mode);                    // D2Game+0x35EB0, mode in EAX (disassembly)
+    void      (*c5BF70)(void* game, void* client);         // D2Game+0x5BF70, client in EAX
     void      (*c5E0E0)(void* game, void* node, void* sub);// D2Game+0x5E0E0
     void      (*c8EA80)(void* game, void* p, int32_t sel, uint32_t arg, int32_t z1, int32_t z2, int32_t z3); // +0x8EA80
     void      (*c64940)(void* ecx);                        // D2Game+0x64940
@@ -102,4 +102,11 @@ struct D2GameBatch531F0Env {
     uint32_t  (*c55AD0)(int32_t p1, void* unit, void* data, uint32_t v18, int32_t rem, uint32_t* used);
     void      (*c534D0)(void* unit, void* data, uint32_t v18, uint32_t* used);
     void      (*c8A670)(void* p2);
+    // Disassembly-true seams (the cached decompile loses register arguments; sm-56950 rows reviewed 2026-11-02 use these):
+    void      (*c53EB0)(uint32_t mode, void* obj, uint32_t a, int32_t b);      // 0x53EB0: EAX mode, ECX obj, stack a, b
+    int32_t   (*c69590g)(void* game);                                          // 0x69590: stack game
+    void*     (*cDFCC0)(uint32_t eax, uint32_t cbRva, void* game, uint32_t s1);  // 0xDFCC0: EAX unit class, EBX callback RVA, EDI game, stack s1
+    void*     (*c36820r)(uint32_t eaxWord, int32_t n, uint32_t* esiBuf, void* game, void* msg);
+    uint16_t  (*gTblW)(uint32_t off);                      // word at (*DAT_6fd1829c)+off
+    void      (*logStarted)(void* obj);            // LogStartedQuestDebug body (Ordinal/log seam)
 };

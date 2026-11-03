@@ -16,7 +16,7 @@ intptr_t r_DE0C0(...); void r_DCF20(i32, i32*, i32); intptr_t o10750(...); intpt
 intptr_t o10913(...); intptr_t r_DE5A0(...); intptr_t o10653(...); intptr_t o10786(...); intptr_t r_9F210(...); intptr_t r_DDDE0(...);
 void r_9D230(i32, i32*); void r_57110(i32, i32); void r_9F7A0(i32*, i32);
 intptr_t o10045(...); intptr_t o10188(...); intptr_t r_4E230(...); bool r_215D0(i32, u32); intptr_t r_8EA80(...);
-intptr_t r_A3610(...); intptr_t r_4F970(...); void r_232B0(i32*, i32); void r_EFDB0(i32*); intptr_t r_9EE50(...); i32 r_21280();
+intptr_t r_A3610(...); intptr_t r_4F970(...); void r_232B0(i32*, i32); void r_EFDB0(i32*); intptr_t r_9EE50(...); i32 r_21280(...);
 }
 extern i32** sgptDataTables_exref;
 static inline i32 sdt(i32 off) { return *(i32*)(*(i32*)sgptDataTables_exref + off); }

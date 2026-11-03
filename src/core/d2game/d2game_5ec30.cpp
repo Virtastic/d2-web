@@ -22,16 +22,19 @@ extern "C" void s5ec30_sub_5EC30(i32 p) {
     i32* u = (i32*)(intptr_t)W(g, 0x1320 + (W(s, 0x94) & 0x7f) * 4);
     for (; u; u = (i32*)(intptr_t)u[0x39])
       if ((u32)u[3] == (u32)W(s, 0x94)) {
-        if (MONSTERAI_HasInteractUnit()) FUN_6fc68410(g, u, 0);
+        // 68370: EAX = the player's list (unit type 1 with data), else 0
+        i32 lst = (u[0] == 1 && u[5]) ? W(u[5], 0x30) : 0;
+        if (MONSTERAI_HasInteractUnit(lst)) FUN_6fc68410(g, u, 0);
         Ordinal_11103(u, 0);
-        i32 ev[8] = {0};  // stack0xffffffd8: uninitialised local in the decompile
-        FUN_6fc95e10(W(p, 4), ev);
-        Ordinal_10885(Ordinal_10331(u, u[0], W(s, 0x94)));
+        i32 ev[8] = {0};  // 0x20-byte message: [0] = 0xc, [1] = unit, byte 0x15 = 0x64
+        ev[0] = 0xc; ev[1] = (i32)(intptr_t)u; ((uint8_t*)ev)[0x15] = 0x64;
+        FUN_6fc95e10(W(p, 4), ev, 1);
+        Ordinal_10885(Ordinal_10331(u), u[0], W(s, 0x94));
         Ordinal_10408(u);
         Ordinal_11016(u);
         goto done1;
       }
-    FUN_6fc3ec40(0x200);
+    FUN_6fc3ec40(4, 0x200);  // AL = 4, ECX = 0x200
   done1:
     *(uint8_t*)(s + 0x91) = 0;
   }
@@ -40,7 +43,7 @@ extern "C" void s5ec30_sub_5EC30(i32 p) {
     if (!g) die();
     for (i32 o = W(g, 0x1320 + ((u32)W(s, 0x9c) & 0x7f) * 4); o; o = W(o, 0xe4))
       if ((u32)W(o, 0xc) == (u32)W(s, 0x9c)) {
-        FUN_6fc7dd00(p);
+        FUN_6fc7dd00(o, p);  // ESI = the unit found, stack = p
         g = W(p, 4);
         if (!g) die();
         for (i32* q = (i32*)(intptr_t)W(g, 0x1520 + ((u32)W(s, 0x110) & 0x7f) * 4); q; q = (i32*)(intptr_t)q[0x39])
@@ -50,7 +53,7 @@ extern "C" void s5ec30_sub_5EC30(i32 p) {
           }
         goto done2;
       }
-    FUN_6fc3ec40(0x202);
+    FUN_6fc3ec40(4, 0x202);  // AL = 4, ECX = 0x202
   done2:
     *(uint8_t*)(s + 0x93) = 0;
   }

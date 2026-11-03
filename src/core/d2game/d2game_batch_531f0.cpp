@@ -342,22 +342,24 @@ void d2game_587C0(const D2GameBatch531F0Env& E, void* obj, void* msg) {
     g_q5Eax33EB0 = 0;
 }
 
-// 1.13c D2Game+0x596B0 (fastcall: obj = param_1, msg = param_2). The matching arms all make the
-// same call, so the transcription makes it once, after the 0x69590 gate.
+// 1.13c D2Game+0x596B0 (fastcall: obj = ECX, msg = EDX; ported from the disassembly: the call passes the
+// mode in EAX (1 when the +0xC unit id equals the first arm value, 2 for the second, else 0) and 0x69590 takes msg[0])
 void d2game_596B0(const D2GameBatch531F0Env& E, void* obj, void* msg) {
     void* a8 = E.ptr(msg, 8);
     int32_t kind = (a8 == nullptr) ? -1 : (int32_t)E.rd32(a8, 4);
+    void* ac = E.ptr(msg, 0xc);
+    int32_t other = (ac == nullptr) ? -1 : (int32_t)E.rd32(ac, 4);
+    int32_t A = 7, B = 7;
     switch (kind) {
-    case 0x200:
-    case 0x208:
-    case 0x201:
-    case 0x202:
-    case 0x203:
-        break;
-    default:
-        return;
+    case 0x200: case 0x208: break;
+    case 0x201: A = 4; B = 1; break;
+    case 0x202: A = 6; B = 2; break;
+    case 0x203: A = 5; B = 3; break;
+    default: return;
     }
-    if (E.c89590() == 0) E.c33EB0(obj, E.rd32(msg, 0x14), kind);
+    if (E.c69590g(E.ptr(msg, 0)) != 0) return;
+    uint32_t mode = other == A ? 1 : other == B ? 2 : 0;
+    E.c53EB0(mode, obj, E.rd32(msg, 0x14), kind);
 }
 
 // 1.13c D2Game+0x5E3C0 (no arguments in the decompile: game = unaff_ESI, unit = the Ordinal_10331 argument,
@@ -394,7 +396,7 @@ extern "C" void d2game_5E7F0_env(const void* env, void* game, void* p) {
 }
 
 // 1.13c D2Game+0x5EE30 (no arguments in the decompile: game = unaff_EBX, obj = unaff_EDI).
-// Ordinal_11090 has no arguments in the decompile; (obj, 4) is assumed from its other call sites.
+// Ordinal_11090's second argument comes from the disassembly (see below).
 void d2game_5EE30(const D2GameBatch531F0Env& E, void* game, void* obj) {
     int32_t id = (obj == nullptr) ? -1 : (int32_t)E.rd32(obj, 3 * 4);
     void* sub = E.ptr(game, 0x18);
@@ -404,17 +406,18 @@ void d2game_5EE30(const D2GameBatch531F0Env& E, void* game, void* obj) {
         if ((int32_t)E.rd32(sub, 0xec + i * 4) == id) break;
     }
     int32_t kind = (obj == nullptr) ? 0 : (int32_t)E.rd32(obj, 4 * 4);
-    bool skipOrd = false;
-    if (kind != 1) {
-        if (kind == 2) {
-            if (E.rd8(sub, 0x108 + i) == 1) E.wr32(sub, 0xfc + i * 4, E.rd32(sub, 0xfc + i * 4) + 1);
-            if ((int32_t)E.rd32(sub, 0xfc + i * 4) > 5) E.wr8(sub, 0x10b + i, 1);
-            if (E.rd8(sub, 0x10b + i) == 0) skipOrd = true;
-        } else if (kind != 3) {
-            skipOrd = true;
-        }
+    // Ordinal_11090(obj, n): n is 2, 3 or 4 by kind 1, 2, 3 (disassembly); kind 2 only when the flag at +0x10b+i is set.
+    int32_t n = 0;
+    if (kind == 1) {
+        n = 2;
+    } else if (kind == 2) {
+        if (E.rd8(sub, 0x108 + i) == 1) E.wr32(sub, 0xfc + i * 4, E.rd32(sub, 0xfc + i * 4) + 1);
+        if ((int32_t)E.rd32(sub, 0xfc + i * 4) > 5) E.wr8(sub, 0x10b + i, 1);
+        if (E.rd8(sub, 0x10b + i) != 0) n = 3;
+    } else if (kind == 3) {
+        n = 4;
     }
-    if (!skipOrd) E.ord11090(obj, 4);
+    if (n != 0) E.ord11090(obj, n);
     E.c8EA80(E.ptr(game, 4), obj, 7, E.rd32(E.ptr(game, 4), 0xa8) + 0x19, 0, 0, 0);
 }
 
@@ -492,7 +495,7 @@ void d2game_654A0(const D2GameBatch531F0Env& E, void* obj, void* msg) {
     int32_t id = E.ord10802(E.rd32(msg, 8));
     if (id == 0x20646b62 || id == 0x20736b62) E.wr32(sub, 0x7c, E.rd32(sub, 0x7c) - 1);
     if (E.rd32(sub, 0x7c) == 0 && E.rd8(obj, 0xc) < 6 && E.rd8(sub, 0x4f) != 1 && E.rd8(sub, 0x47) == 1) {
-        E.c35EB0();
+        E.c35EB0(3);
         E.c64940(obj);  // ECX lost in the decompile (extraout_ECX); obj assumed
     }
 }
@@ -510,7 +513,7 @@ void d2game_5C080(const D2GameBatch531F0Env& E, void* game, void* client) {
     if (E.ord10459(cls) == 4) {
         E.ord10003(rec, 0x27, 0);
         E.ord10003(rec, 0x27, 0xd);
-        E.c5BF70(game);
+        E.c5BF70(game, client);
     }
 }
 
@@ -519,7 +522,7 @@ void d2game_5C080(const D2GameBatch531F0Env& E, void* game, void* client) {
 // game); the code pointer called is the one read from the 0x33F30 result at +0xf0 with ecx = that result.
 uint32_t d2game_5AFB0(const D2GameBatch531F0Env& E, void* obj) {
     if (E.rd8(obj, 0xc) < 4 && E.rd8(obj, 9) != 0) {
-        if (E.rd8(obj, 0xc) == 0) E.c35EB0();
+        if (E.rd8(obj, 0xc) == 0) E.c35EB0(1);
         return 1;
     }
     void* p = E.c53F30(E.rd32(obj, 0x10), E.ptr(obj, 4));
@@ -538,18 +541,18 @@ void d2game_5E420(const D2GameBatch531F0Env& E, void* obj, void* msg) {
     if (msg == nullptr || E.rd32(msg, 0x10) != 4) {
         if ((int32_t)E.rd32(sub, 0x40) < 3) {
             int32_t id = (msg == nullptr) ? -1 : (int32_t)E.rd32(msg, 4);
-            uint32_t slot;
-            if (id == 0x1da) slot = 1;
-            else if (id == 0x1db) slot = 0;
-            else if (id == 0x1dc) slot = 2;
+            uint32_t slot, tw;
+            if (id == 0x1da) { slot = 1; tw = 0xb3a; }
+            else if (id == 0x1db) { slot = 0; tw = 0xb36; }
+            else if (id == 0x1dc) { slot = 2; tw = 0xb38; }
             else return;
             if ((int32_t)E.rd32(sub, 0xc) > 0) {
                 E.c5E0E0(E.ptr(obj, 4), obj, sub);
                 return;
             }
-            uint32_t scratch = 0;
-            E.ord10141(msg, &scratch);
-            void* piv = E.c36820(2);
+            uint32_t scratch[2] = {0, 0};  // 8-byte out buffer (esp+0x10)
+            E.ord10141(msg, scratch);
+            void* piv = E.c36820r(E.gTblW(tw), 2, scratch, E.ptr(obj, 4), msg);
             if (piv == nullptr) {
                 E.c8EA80(E.ptr(obj, 4), msg, 7, E.rd32(E.ptr(obj, 4), 0xa8) + 10, 0, 0, 0);
                 return;
@@ -581,7 +584,7 @@ void d2game_5F3F0(const D2GameBatch531F0Env& E, void* obj, void* msg) {
         }
     } else if ((iv1 == 0x71 || iv1 == 0x72) && E.rd8(obj, 9) != 0) {
         bool gt2 = E.rd8(obj, 0xc) > 2;
-        if (!gt2) E.c35EB0();
+        if (!gt2) E.c35EB0(3);
         if (E.rd8(obj, 0xb) == 0) {
             E.wr8(obj, 0x14, 0);
             E.wr8(obj, 0xb, 1);
@@ -603,7 +606,7 @@ void d2game_5F3F0(const D2GameBatch531F0Env& E, void* obj, void* msg) {
             uint32_t rec = E.questRec(E.ptr(msg, 0xc), E.rd8(game, 0x6d));
             if (E.ord10174(rec, E.rd32(obj, 0xe0), 0) == 1) return;
             if (E.ord10174(rec, E.rd32(obj, 0xe0), 1) == 1) return;
-            E.c35EB0();
+            E.c35EB0(3);
             if (E.rd8(obj, 0xb) == 0) {
                 E.wr8(obj, 0x14, 0);
                 E.wr8(obj, 0xb, 1);
@@ -668,9 +671,10 @@ void d2game_5A310(const D2GameBatch531F0Env& E, void* obj, void* msg) {
     if ((int32_t)E.rd32(sub, 0xa8) > 4 && E.rd8(obj, 0xb) != 0xc) {
         E.wr8(obj, 0x14, 0);
         E.wr8(obj, 0xb, 0xc);
-        E.cFFCC0(obj, 0);
+        // disassembly: DFCC0(EAX = 0, EBX = callback RVA, EDI = obj->game, stack arg); callbacks 0x593F0 then 0x59390
+        E.cDFCC0(0, 0x593F0, E.ptr(obj, 4), 0);
         E.wr8(sub, 0x84, 0);
-        E.cFFCC0(E.ptr(msg, 0xc), (int32_t)E.rd32(msg, 0xc));
+        E.cDFCC0(0, 0x59390, E.ptr(obj, 4), E.rd32(msg, 0xc));
     }
     d2game_5A310_bump(E, obj, sub);
 }

@@ -814,6 +814,33 @@ void __fastcall ACT5Q3_SendPacket0x5DToClient(D2UnitStrc* pUnit)
 }
 
 //D2Game.0x6FCB4190
+// 1.13c D2Game+0x56B10 (standalone helper called from 5C690; ECX = quest). Returns 1 when the quest is
+// started or idle below state 5, else the quest's sequence callback result (0 when the quest is missing).
+static int32_t __fastcall ACT5Q3_QuestSeqHelper(D2QuestDataStrc* pQuestData)
+{
+	if (pQuestData->fState < 5 && pQuestData->bNotIntro)
+	{
+		if (!pQuestData->fState)
+		{
+			pQuestData->fState = 1;
+		}
+		return 1;
+	}
+
+	D2QuestDataStrc* pQuest = QUESTS_GetQuestData(pQuestData->pGame, pQuestData->nSeqId);
+	if (!pQuest)
+	{
+		return 0;
+	}
+
+	if (IsBadCodePtr((FARPROC)pQuest->pfSeqFilter))
+	{
+		FOG_DisplayAssert("pQuestInfo->pSequence", __FILE__, __LINE__);
+		exit(-1);
+	}
+	return pQuest->pfSeqFilter(pQuest);
+}
+
 // 1.13c D2Game+0x5C690
 void __fastcall ACT5Q3_SpawnDrehyaInTown(D2QuestDataStrc* pQuestData, D2Act5Quest3Strc* pQuestDataEx)
 {
@@ -860,27 +887,7 @@ void __fastcall ACT5Q3_SpawnDrehyaInTown(D2QuestDataStrc* pQuestData, D2Act5Ques
 		}
 	}
 
-	if (pQuestData->fState < 5 && pQuestData->bNotIntro)
-	{
-		if (!pQuestData->fState)
-		{
-			pQuestData->fState = 1;
-		}
-		return;
-	}
-
-	D2QuestDataStrc* pQuest = QUESTS_GetQuestData(pQuestData->pGame, pQuestData->nSeqId);
-	if (!pQuest)
-	{
-		return;
-	}
-
-	if (IsBadCodePtr((FARPROC)pQuest->pfSeqFilter))
-	{
-		FOG_DisplayAssert("pQuestInfo->pSequence", __FILE__, __LINE__);
-		exit(-1);
-	}
-	pQuest->pfSeqFilter(pQuest);
+	ACT5Q3_QuestSeqHelper(pQuestData);
 }
 
 //D2Game.0x6FCB4400

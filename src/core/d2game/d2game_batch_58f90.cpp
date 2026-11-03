@@ -17,15 +17,14 @@ struct D2GameBatch58F90Env {
     uint32_t(*ordinal10174)(uint32_t a, uint32_t b, uint32_t c); // Ordinal_10174
     void    (*sub354F0)(void* a, void* b);                  // 0x354F0 (FUN_6fc554f0)
     void    (*subA3E0)(void* buf, uint32_t n);              // 0x8A3E0 (FUN_6fcaa3e0)
-    void    (*subDFCC0)(void* node, uint32_t z);            // 0xDFCC0 (FUN_6fcffcc0)
+    void    (*subDFCC0)(uint32_t eax, uint32_t cbRva, void* game, uint32_t s1);  // 0xDFCC0: EAX=unit class, EBX=callback (RVA), EDI=game, stack s1 (disassembly)
     void*   (*sub4AD10)(uint32_t z);                        // 0x4AD10
     void*   (*ordinal10331)(void* p);                       // Ordinal_10331
-    uint32_t(*ordinal10383)(void* p, void** out);           // Ordinal_10383 (fills out[])
+    void    (*ordinal10383)(void* room, void*** arr, uint32_t* n);  // Ordinal_10383(room, &array, &count) -- verified against the disassembly
     int32_t (*sub58260)(void* node);                        // 0x58260
-    void    (*sub58A40)(void* p);                           // 0x58A40
-    void    (*sub33830)(void* p);                           // 0x33830
-    void    (*sub35EB0)(void);                              // 0x35EB0
-    void    (*sub58D40)(void);                              // 0x58D40 (passed as FUN_6fc78d40)
+    void    (*sub58A40)(void* game, void* unit);            // 0x58A40: stack game, EAX unit
+    void    (*sub33830)(void* p, int32_t id);               // 0x53830: ECX p, EAX id
+    void    (*sub35EB0)(uint32_t mode);                     // 0x55EB0, mode in EAX
 };
 extern D2GameBatch58F90Env g_d2game58F90Env;
 #define E g_d2game58F90Env
@@ -71,7 +70,7 @@ void d2game_59C50(void* game) {
     void* n = findNode(game, 0x22);
     if (!n || rd8(n, 9) == 0 || rd8(n, 0xb) > 2) return;
     wr8(n, 0x14, 0); wr8(n, 0xb, 3);
-    E.subDFCC0(n, 0);
+    E.subDFCC0(0, 0x590C0, rdptr(n, 4), 0);
 }
 
 // 1.13c D2Game+0x59F80  (in_EAX = game)
@@ -79,7 +78,7 @@ void d2game_59F80(void* game) {
     void* n = findNode(game, 0x21);
     if (!n || rd8(n, 9) == 0 || rd8(n, 0xb) > 1) return;
     wr8(n, 0x14, 0); wr8(n, 0xb, 2);
-    E.subDFCC0(n, 0);
+    E.subDFCC0(0, 0x591D0, rdptr(n, 4), 0);
 }
 
 // 1.13c D2Game+0x5A160  (this = ecx, in_EAX = eax, param_1)
@@ -88,9 +87,9 @@ uint32_t d2game_5A160(void* self, void* inEax, void* param1) {
     if (!u && (rd8(self, 0x6a) != 3 || rd32(self, 0x88) == 0 || !(u = E.sub4AD10(0)))) u = param1;
     void* h = E.ordinal10331(u);
     if (h) {
-        void* items[8] = {};
-        uint32_t n = E.ordinal10383(h, items);
-        for (uint32_t i = 0; i < n && i < 8; i++)
+        void** items = nullptr; uint32_t n = 0;
+        E.ordinal10383(h, &items, &n);
+        for (uint32_t i = 0; i < n; i++)
             for (void* p = rdptr(items[i], 0x74); p; p = rdptr(p, 0xe8))
                 if (rd32(p, 0) == 1 && rd32(p, 4) == 0x1b2 && rd32(p, 0x10) == 0xc) return 1;
     }
@@ -103,7 +102,7 @@ void d2game_5A200(void* game) {
     if (!n || rd8(n, 9) == 0 || rd8(n, 0xb) == 5) return;
     if ((int32_t)rd32(rdptr(n, 0x18), 0xa8) < 5) {
         wr8(n, 0xb, 5); wr8(n, 0x14, 0);
-        E.subDFCC0(n, 0);
+        E.subDFCC0(0, 0x593F0, rdptr(n, 4), 0);
     }
 }
 
@@ -127,35 +126,40 @@ void d2game_5A690(void* game, void* unit) {
     void* d = rdptr(unit, 0x14);
     if (rd32(unit, 0) == 1 && d && rd16(d, 0x26) == 0x2a) {
         wr8(n, 0x14, 0); wr8(n, 0xb, 2);
-        E.subDFCC0(n, 0);
+        E.subDFCC0(0, 0x59620, rdptr(n, 4), 0);
     }
 }
 
-// 1.13c D2Game+0x5A9B0  (param_1 = node ecx, param_2 = event {+0 game,+0xc,+0x14,+0x18})
+// 1.13c D2Game+0x5A9B0  (param_1 = node ecx, param_2 = event {+0 game,+0xc unit,+0x14,+0x18}); the two
+// DFCC0 calls per path carry the callbacks 0x58D40 / 0x57320 in EBX (cached decompile hides them)
 void d2game_5A9B0(void* node, void* ev) {
-    uint32_t a = rd32(ev, 0x18), b = rd32(ev, 0x14);
-    if (a == 0x6d) E.sub58A40((void*)(uintptr_t)rd32(ev, 0));
+    int32_t a = (int32_t)rd32(ev, 0x18); uint32_t b = rd32(ev, 0x14);
+    void* game4 = rdptr(node, 4);
+    if (a == 0x6d) E.sub58A40(rdptr(ev, 0), rdptr(ev, 0xc));
     if (b == 0x6d) {
-        if (rd16(node, 0x9c) != 0) E.sub33830((uint8_t*)node + 0x1c);
+        if (rd16(node, 0x9c) != 0) {
+            void* u = rdptr(ev, 0xc);
+            E.sub33830((uint8_t*)node + 0x1c, u ? (int32_t)rd32(u, 0xc) : -1);
+        }
         if (rd8(node, 0xc) == 2) {
             void* game = rdptr(ev, 0);
             void* r = E.ordinal10920(rdptr(ev, 0xc));
             uint32_t u = rd32(r, 0x10 + rd8(game, 0x6d) * 4);
             if (E.ordinal10174(u, rd32(node, 0xe0), 0) == 1) return;
             if (E.ordinal10174(u, rd32(node, 0xe0), 1) == 1) return;
-            E.sub35EB0();
+            E.sub35EB0(3);
             if (rd8(node, 0xb) != 1) {
                 wr8(node, 0x14, 0); wr8(node, 0xb, 1);
-                E.subDFCC0((void*)E.sub58D40, 0);
+                E.subDFCC0(0, 0x58D40, game4, 0);
             }
-            E.subDFCC0(node, 0);
+            E.subDFCC0(0, 0x57320, game4, 0);
         }
     }
     if (a > 0x82) {
         if (rd8(node, 9) != 0 && rd8(node, 0xb) < 2) {
             wr8(node, 0x14, 0); wr8(node, 0xb, 2);
-            E.subDFCC0(node, 0);
+            E.subDFCC0(0, 0x58D40, game4, 0);
         }
-        E.subDFCC0(node, 0);
+        E.subDFCC0(0, 0x57320, game4, 0);
     }
 }

@@ -306,7 +306,7 @@ void __fastcall ACT5Q5_RewardPlayer(D2GameStrc* pGame, D2UnitStrc* pUnit)
 		const int32_t nNextExp = STATLIST_GetUnitBaseStat(pUnit, STAT_NEXTEXP, 0);
 		const int32_t nDeltaExp = nNextExp - STATLIST_GetUnitBaseStat(pUnit, STAT_EXPERIENCE, 0);
 
-		if (nRewardExp < nDeltaExp)
+		if ((uint32_t)nRewardExp < (uint32_t)nDeltaExp)	// 1.13c: unsigned compare (jb)
 		{
 			const int32_t nExp = STATLIST_GetUnitBaseStat(pUnit, STAT_EXPERIENCE, 0);
 			STATLIST_SetUnitStat(pUnit, STAT_EXPERIENCE, nExp + nRewardExp, 0);

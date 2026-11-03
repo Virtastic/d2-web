@@ -37,7 +37,7 @@ template <class E> void A5Q4Init(E& e, u32 q)
     e.wr32(q + 0xA0, 0x77A60); e.wr32(q + 0xC8, 0x77A20); e.wr32(q + 0xAC, 0x7AD50); e.wr32(q + 0xC0, 0x7B690);
     e.wr32(q + 0xA8, 0x7D520); e.wr32(q + 0xCC, 0x7B7A0); e.wr32(q + 0xD4, 0x7AE20); e.wr32(q + 0xDC, e.mod(0x12C488));
     e.wr8(q + 0xA, 1);
-    u32 p = e.h(0xA2E6, 0, 0x30d, 0);   // "..\Source\D2Game/Quests/a5q4.cpp", line 0x30d, flag 0
+    u32 p = e.h(0xA2E6, e.rd32(e.rd32(q + 4) + 0x1c), 0x90, 0x30d, 0);   // ECX pool = game[0x1c], EDX size 0x90, stack file a5q4.cpp / 0x30d / 0
     e.wr32(q + 0x18, p);
     e.wr32(q + 0xE0, 0x26);
     e.wr32(q + 0xE8, 0x768C0);
@@ -52,50 +52,53 @@ template <class E> void A5Q4Init(E& e, u32 q)
 // 1.13c D2Game+0x5DA70 (ECX=quest record, EDX=message)
 template <class E> void A5Q4Msg(E& e, u32 q, u32 msg)
 {
-    u32 blk[4] = { 0xC, 0, 0, 0 };
-    const u32 E0 = e.rd32(q + 0xE0);
-    u32 st = e.rd32(msg + 0xC); (void)st;
+    // ECX = q, EDX = msg. Register args first: 33EB0 (EAX = mode), 337D0 (ESI, EDX), E660 (EAX, EBX).
     u32 unit = e.rd32(q + 4);
-    u32 t = e.h(0xA4C0);
-    u32 s = e.rd32(t + 0x10 + e.rd8(unit + 0x6d) * 4), s5 = s;
-    e.h(0xA568, s, E0, 0);
-    u32 id = E0;
-    e.h(0xA568, s, id, 0xd);
+    u32 t = e.h(0xA4C0, e.rd32(msg + 0xC));
+    u32 E0 = e.rd32(q + 0xE0);
+    u32 s = e.rd32(t + 0x10 + e.rd8(unit + 0x6d) * 4);
+    u32 r0 = e.h(0xA568, s, E0, 0);
+    u32 r13 = e.h(0xA568, s, E0, 0xd);
     u32 tgt = e.rd32(msg + 8);
     int32_t type = tgt ? (int32_t)e.rd32(tgt + 4) : -1;
     u32 d = e.rd32(q + 0x18);
     const u32 m5 = e.rd32(msg + 0x14);
     if (type == 0x20f) {
-        if (e.rd8(q + 0xC) == 6) { e.h(0xA496, tgt, 0); e.h(0x75E10, e.rd32(msg), e.stk(blk)); }
+        if (e.rd8(q + 0xC) == 6) {
+            u32 blk[8] = { 0xC, tgt, 0, 0, 0, 0, 0, 0 };
+            e.wr8(e.stk(blk) + 0x15, 0x64);
+            e.h(0xA496, tgt, 0);
+            e.h(0x75E10, e.rd32(msg), e.stk(blk), 1);
+        }
         return;
     }
-    bool done = false;
     if (type == 0x201) {
         if (e.rd8(q + 0xC) == 4) {
-            if (e.h(0xE660, 0x20656369)) return;
+            if (e.h(0xE660, e.rd32(msg + 0xC), e.rd32(msg), 0x20656369)) return;
             if (e.rd32(d + 0xD8)) return;
-            e.h(0x33EB0, q, m5, 0x201);
+            e.h(0x33EB0, 3, q, m5, 0x201);
             return;
         }
         if ((e.h(0xA568, s, E0, 0) || e.h(0xA568, s, E0, 0xF)) && e.rd8(d + 0x102) == 0 &&
-            e.h(0xA568, s, 0x25, 8) && !e.h(0xA568, s, E0, 7) && !e.h(0xE660, 0x20327274) && !e.h(0xA568, s, 0x25, 8))
-            e.h(0x33EB0, q, m5, 0x201);
+            e.h(0xA568, s, 0x25, 8) && !e.h(0xA568, s, E0, 7) &&
+            !e.h(0xE660, e.rd32(msg + 0xC), e.rd32(msg), 0x20327274) && !e.h(0xA568, s, 0x25, 8))
+            e.h(0x33EB0, 5, q, m5, 0x201);
     }
-    (void)done;
-    if (e.h(0xA568, s, E0, 1) == 0) {
-        if (e.h(0x337D0, q) == 1) { e.h(0x33EB0, q, m5, id); return; }
-        if (s5 == 1) return;
-        if (e.rd8(q + 0xC) > 4 && type == 0) return;
-        if (e.rd8(q + 9) == 0) return;
-        u32 v = e.rd32(e.mod(0x12C468) + e.rd8(q + 0xC) * 4);
-        if (v == 0xFFFFFFFFu || v > 9) return;
-        e.h(0x33EB0, q, m5, id);
+    if (e.h(0xA568, s, E0, 1) != 0) {
+        if (type == 0x200 || type == 0x201)
+            if (e.h(0xA568, s, 0x25, type == 0x200 ? 9 : 8)) return;
+        e.h(0x33EB0, 5, q, m5, (u32)type);
         return;
     }
-    if (id == 0x200 || id == 0x201) {
-        if (e.h(0xA568, s, 0x25, id == 0x200 ? 9 : 8)) return;
-    }
-    e.h(0x33EB0, q, m5, id);
+    u32 tid = tgt ? e.rd32(tgt + 0xC) : 0xFFFFFFFFu;
+    if (e.h(0x337D0, tid, q) == 1) { e.h(0x33EB0, 6, q, m5, (u32)type); return; }
+    if (r0 == 1) return;
+    u32 al = e.rd8(q + 0xC);
+    if (al >= 5 && r13 == 0) return;
+    if (e.rd8(q + 9) == 0) return;
+    u32 v = e.rd32(e.mod(0x12C468) + al * 4);
+    if (v == 0xFFFFFFFFu || v >= 10) return;
+    e.h(0x33EB0, v, q, m5, (u32)type);
 }
 
 // 1.13c D2Game+0x5DDF0 (ECX=game, EDX=message)
@@ -105,9 +108,10 @@ template <class E> u32 A5Q4Pickup(E& e, u32 game, u32 msg)
     u32 p = (e.rd32(msg) == 1 && e.rd32(msg + 0x14)) ? e.rd32(e.rd32(msg + 0x14) + 0x30) : 0;
     for (u32 n = e.rd32(p); n; n = e.rd32(n + 8))
         if (e.rd32(n)) { e.h(0x48410, game, msg, 0x79180); return 1; }
-    u32 blk[4] = { 0, 0, 0, 0 };
+    u32 blk[8] = { 0xC, msg, 0, 0, 0, 0, 0, 0 };   // 0x20-byte message: [0] = 0xc, [1] = unit, byte 0x15 = 0x64
+    e.wr8(e.stk(blk) + 0x15, 0x64);
     e.h(0xA496, msg, 0);
-    e.h(0x75E10, game, e.stk(blk));
+    e.h(0x75E10, game, e.stk(blk), 1);               // stack (game, &blk, 1)
     if (u32 n = FindType(e, game, 0x21)) e.wr8(e.rd32(n + 0x18) + 0xE3, 1);
     return 1;
 }
@@ -121,7 +125,8 @@ template <class E> void A5Q4Tick(E& e, u32 game)
     if (!g) { Fatal(e); return; }
     u32 id = e.rd32(e.rd32(n + 0x18) + 0x9C);
     for (u32 c = e.rd32(g + 0x1320 + (id & 0x7f) * 4); c; c = e.rd32(c + 0xE4))
-        if (e.rd32(c + 0xC) == id) { e.h(0x5DD00, n); return; }
+        if (e.rd32(c + 0xC) == id) { e.h(0x5DD00, c, n); return; }   // ESI = the unit found, stack = node
+
 }
 
 // 1.13c D2Game+0x5E000 (EBX=game, EDI=unit id)
@@ -132,17 +137,16 @@ template <class E> u32 A5Q4FreeSlot(E& e, u32 game, u32 id)
     for (u32 c = e.rd32(game + 0x1320 + (id & 0x7f) * 4); c; c = e.rd32(c + 0xE4)) if (e.rd32(c + 0xC) == id) { p = c; break; }
     if (!p) return 0;
     if (e.h(0xA68E, p, 0x36)) e.h(0xE2240, p, 0);
-    u32 r = 0;
-    if (e.h(0xA478, p)) {
-        u32 blk[4] = { 0xC, p, 0, 0 };
+    if (u32 room = e.h(0xA478, p)) {
+        u32 blk[8] = { 0xC, p, 0, 0, 0, 0, 0, 0 };   // 0x20-byte message: [0] = 0xc, [1] = unit, byte 0x15 = 0x64
+        e.wr8(e.stk(blk) + 0x15, 0x64);
         e.h(0xA496, p, 0);
-        e.h(0x75E10, game, e.stk(blk));
-        r = e.h(0xA478, p, 1);
-        e.h(0xA44E, r);
+        e.h(0x75E10, game, e.stk(blk), 1);           // stack (game, &blk, 1)
+        e.h(0xA44E, room, 1, id);                    // A478 takes only the unit; A44E gets (room, 1, id)
         e.h(0xA550, p);
-        r = e.h(0xA63A, p);
+        e.h(0xA63A, p);
     }
-    return (r & 0xFFFFFF00u) | 1;
+    return 1;
 }
 
 // 1.13c D2Game+0x5E0E0 (game, unit, quest data)
@@ -150,7 +154,7 @@ template <class E> void A5Q4Reset(E& e, u32 game, u32 unit, u32 q)
 {
     for (u32 i = 0; i < 3; i++) {
         if (e.rd8(q + 0x2C + i)) {
-            if (((uint8_t)A5Q4FreeSlot(e, game, e.rd32(q + 0x14 + 4 * i))) == 0) e.h(0x1EC40, i + 0x21C);
+            if (((uint8_t)A5Q4FreeSlot(e, game, e.rd32(q + 0x20 + 4 * i))) == 0) e.h(0x3EC40, 4, i + 0x21C);   // ids are q[0x20+4i]; 3EC40: AL = 4, ECX = code
             else { e.wr32(q + 0x40, e.rd32(q + 0x40) - 1); e.wr32(q + 0x44, e.rd32(q + 0x44) - 1); }
             e.wr8(q + 0x2C + i, 0);
         }
@@ -168,17 +172,17 @@ template <class E> void A5Q4Reset(E& e, u32 game, u32 unit, u32 q)
     if (u32 n = Find(e, game, 0x1520, e.rd32(q + 0x50))) e.h(0xA4A2, n, 0);
 }
 
-// 1.13c D2Game+0x5E200 (ECX=game)
-template <class E> void A5Q4Exit(E& e, u32 game)
+// 1.13c D2Game+0x5E200 (EAX=unit, ECX=game)
+template <class E> void A5Q4Exit(E& e, u32 game, u32 unit)
 {
-    u32 u = e.h(0xA478, 0);
+    u32 u = e.h(0xA478, unit);
     if (!u || e.h(0xA556, u) != 0x78) return;
     u32 n = FindType(e, game, 0x23);
     if (!n) return;
     u32 q = e.rd32(n + 0x18);
     if (e.rd8(n + 9) && e.rd32(q + 0xC) == 0 && e.rd8(q) == 0 && e.rd8(q + 0x11)) {
         e.wr32(q + 0x54, 0);
-        e.h(0xDFCC0, 0, 0);
+        e.h(0xDFCC0, 0, 0x57440, game, 0);   // EAX = class 0, EBX = callback RVA, EDI = game, stack 0
         if (e.rd32(q + 0x54) == 0) {
             e.wr8(e.rd32(n + 0x18) + 0x11, 0); e.wr8(e.rd32(n + 0x18) + 0x10, 0);
             A5Q4Reset(e, game, n, e.rd32(n + 0x18));
@@ -195,7 +199,7 @@ template <class E> u32 A5Q4Arm(E& e, u32 game, u32 q)
         if (!g) { Fatal(e); return 0; }
         ids[i] = Find(e, g, 0x1520, e.rd32(q + 0x14 + 4 * i));
         if (!ids[i]) return 0;
-        e.h(0xA51A, e.h(0xA478, ids[i], 0));
+        e.h(0xA51A, e.h(0xA478, ids[i]), 0);
     }
     for (u32 i = 0; i < 3; i++) {
         e.h(0xA4A2, ids[i], 3);

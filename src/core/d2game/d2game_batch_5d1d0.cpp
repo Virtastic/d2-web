@@ -8,45 +8,49 @@
 using i32 = int32_t; using u32 = uint32_t;
 extern "C" {
 intptr_t o10331(...); i32 o10826(i32); char o10459(i32); intptr_t o10750(...); intptr_t o10867(...); intptr_t o10265(...);
-intptr_t o10024(...); i32 r_21280(); intptr_t r_E1D90(...);
-void o11090(i32*, i32); i32* r_A22E0(i32, i32*, i32*); uint8_t o10258(i32*); void o10111(i32*); void o10346(i32, i32);
+intptr_t o10024(...); i32 r_21280(...); intptr_t r_E1D90(...);
+void o11090(i32*, i32); i32* r_A22E0(...); uint8_t o10258(i32*); void o10111(i32*, i32); void o10346(i32, i32);
 }
+// NB: unitX reads +0x10 / #10750 which is the unit Y; unitY reads +0xc / #10867 which is the unit X (5D960 stores them as nTargetY / nTargetX). The (y+10, x+5) call below is therefore (X+10, Y+5).
 static i32 unitX(i32* u) { return (*u == 2 || (*u > 3 && *u < 6)) ? *(i32*)(intptr_t)(u[0xb] + 0x10) : (u[0xb] ? (i32)o10750((intptr_t)(u32)u[0xb]) : 0); }
 static i32 unitY(i32* u) { return (*u == 2 || (*u > 3 && *u < 6)) ? *(i32*)(intptr_t)(u[0xb] + 0xc) : (u[0xb] ? (i32)o10867((intptr_t)(u32)u[0xb]) : 0); }
 [[noreturn]] static void die(i32 line) { o10024((void*)0, o10265(line)); std::_Exit(-1); }
 
-// shared tail: spawn 0x79 at (x+5,y+10) in room, link it, return false if creation failed
-static bool spawn79(i32* unit, i32 room, uint8_t* st, bool full)
+// shared tail (disassembly-checked): spawn 0x79 at (x+5,y+10) near the unit's room, link it, false if creation failed.
+// 1D90: ECX=2, EDX=0x3c, stack (y+10, x+5, game, h, 1, 1, 0); A22E0: stack (game, obj, 0x79, owner class id).
+static bool spawn79(i32* unit, i32 game, uint8_t* st, bool full)
 {
     i32 x = unitX(unit), y = unitY(unit);
-    i32 owner = o10331(0);
+    i32 owner = (i32)o10331(unit);
     if (!owner) die(0xe42);
-    o10459(0x79);
-    char a = o10459(0x79), b = o10459(o10826(owner));
-    if (a != b) die(0xe5c);
-    i32 h = r_21280();
+    char b = o10459(0x79);
+    i32 cls = o10826(owner);
+    if (b != o10459(cls)) die(0xe5c);
+    i32 h = r_21280(owner);
     if (!h) return false;
-    i32* o = (i32*)r_E1D90(2, 0x3c, (uint8_t)(y + 10), x + 5, room);
+    i32* o = (i32*)r_E1D90(2, 0x3c, y + 10, x + 5, game, h, 1, 1, 0);
     o11090(o, 1);
-    o = r_A22E0(room, o, (i32*)(intptr_t)0x79);
+    o = r_A22E0(game, o, 0x79, cls);
     if (!o) return false;
-    o10258(o); o10111(o); o10346(h, 0); o10346(o10331(0), 0); // unverified arg order
+    o10111(o, (uint8_t)(o10258(o) | 3));
+    o10346(h, 0); o10346((i32)o10331(o), 0);
     if (full) { st[0x88] = 1; st[0x87] = 0; } else st[0x89] = 0;
     return true;
 }
 
-// 1.13c D2Game+0x5D1D0 (eax = unit, param_1 = game/owner with list at +0x10f4)
+// 1.13c D2Game+0x5D1D0 (EAX = unit, stack = game; ret 4)
 void D2GAME_5D1D0(i32* unit, uint8_t* p1)
 {
     i32* it = nullptr;
     if (*(i32***)(p1 + 0x10f4)) for (it = **(i32***)(p1 + 0x10f4); it; it = (i32*)(intptr_t)it[0x3d]) if (*it == 0x22) break;
+    if (!it) return;
     uint8_t* st = (uint8_t*)(intptr_t)it[6];
     if (!st[0x89]) return;
-    if (o10459(o10826(o10331(0))) != 4) return;
-    spawn79(unit, (i32)(intptr_t)st, st, false); // room arg = piVar5[6] (iVar1) per decompile
+    if (o10459(o10826((i32)o10331(unit))) != 4) return;
+    spawn79(unit, (i32)(intptr_t)p1, st, false);
 }
 
-// 1.13c D2Game+0x5D380 (eax = unit, cl = unaff_retaddr char, param_1 = struct)
+// 1.13c D2Game+0x5D380 (EAX = unit, stack = p1; game = p1[1], state = p1[6]; returns 1 on spawn; ret 4)
 bool D2GAME_5D380(i32* unit, uint8_t* p1)
 {
     uint8_t* st = *(uint8_t**)(p1 + 0x18);

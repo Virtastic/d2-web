@@ -6,7 +6,7 @@ extern "C" {
 intptr_t o10045(...); intptr_t o10331(...); i32 o10826(i32);
 void r_587C0(); void r_5B380(); void r_5A720(); void r_5BDB0(); void r_5B4F0(); void r_59450();
 void r_587A0(); void r_56E00(); void r_56D80(); void r_56D10(); extern char r_DAT_10ACB8[];
-void r_9E170(void*);
+void r_9E170(i32 eaxUnit, i32 ediCode, i32 game, i32 arg); // EAX unit, EDI code, stack (game,arg)
 }
 
 // 1.13c D2Game+0x5BEA0
@@ -19,7 +19,7 @@ void D2GAME_5BEA0(i32 b)
     P(0xa0, (void*)r_587C0); P(0xc8, (void*)r_587A0); P(0xac, (void*)r_5B380); P(0xc0, (void*)r_5BDB0);
     P(0xa8, (void*)r_5A720); P(0xcc, (void*)r_5B4F0); P(0xd4, (void*)r_59450); P(0xdc, r_DAT_10ACB8);
     *(u8*)(intptr_t)(b + 10) = 1;
-    i32* s = (i32*)o10045("..\\Source\\D2Game/Quests/a5q1.cpp", 0x2d3, 0);
+    i32* s = (i32*)o10045(*(i32*)(intptr_t)(*(i32*)(intptr_t)(b + 4) + 0x1c), 0x18, "..\\Source\\D2Game/Quests/a5q1.cpp", 0x2d3, 0); // ECX pool, EDX size
     *(i32**)(intptr_t)(b + 0x18) = s;
     *(i32*)(intptr_t)(b + 0xe0) = 0x23; P(0xe8, (void*)r_56E00);
     *(u8*)(intptr_t)(b + 0xd) = 4;
@@ -39,7 +39,7 @@ i32 D2GAME_5DF70(i32* p1)
     i32 u = o10331(p1[2]);
     if (!u) return 0;
     if (o10826(u) == 0x83) {
-        if (*(char*)(intptr_t)(q[6] + 0x86) == 1) r_9E170((void*)(intptr_t)p1[0]);
-    } else r_9E170((void*)(intptr_t)p1[0]);
+        if (*(char*)(intptr_t)(q[6] + 0x86) == 1) r_9E170(p1[2], 0x84, p1[0], 0xb);
+    } else r_9E170(p1[2], 0x83, p1[0], 0);
     return 0;
 }

@@ -22,7 +22,7 @@ struct D2GameBatch5E840Env {
     int32_t  (*o10174)(uint32_t, uint32_t, uint32_t);      // #10174
     void     (*o10003)(uint32_t, uint32_t, uint32_t);      // #10003
     void     (*o10003r)();                                 // #10003, register args (0x62640)
-    void     (*o11090)();                                  // #11090
+    void     (*o11090)(uint32_t unit, uint32_t mode);      // #11090 (the call thunk a4a2)
     void*    (*o10045)(const char*, int, int);             // #10045 alloc
     void     (*o10750)(uint32_t);
     void     (*o10867)(uint32_t);
@@ -57,20 +57,21 @@ static uint32_t findQ(uint32_t game, uint32_t id) {
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_5E840(uint32_t q, uint32_t unit, const D2GameBatch5E840Env* e)
 {
     int32_t t = unit ? (int32_t)rd32(unit, 0x10) : 0;
-    bool fire = false;
-    if (t == 1 || t == 3) fire = true;
+    uint32_t mode = 0;
+    if (t == 1) mode = 2;
+    else if (t == 3) mode = 4;
     else if (t == 2) {
         uint32_t d = rd32(q, 0x18);
         uint8_t c;
-        if (e->o10826(e->o10331(0)) == 0x6d) {
+        if (e->o10826(e->o10331(unit)) == 0x6d) {
             int32_t n = (int32_t)rd32(d, 0xdc) + 1;
             wr32(d, 0xdc, n);
             if (n > 5) wr8(d, 0xae, 1);
             c = rd8(d, 0xae);
         } else c = rd8(d, 0xad);
-        fire = c != 0;
+        if (c) mode = 3;
     }
-    if (fire) e->o11090();
+    if (mode) e->o11090(unit, mode);
     uint32_t g = rd32(q, 4);
     e->subAEA80(g, unit, 7, rd32(g, 0xa8) + 0x19, 0, 0, 0);
 }

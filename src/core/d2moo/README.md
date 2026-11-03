@@ -51,6 +51,8 @@ behaviour differs from 1.10f.
 - D2Common+0x2C910 ITEMS_UpdateSets: body matches; the 1.13c routing through 0x2C7C0 and 0x2C630 is ported in src/core/d2common/d2common_2c910.cpp (d2_fn_d2common_2c910); the play path still calls this 1.10f-routed copy.
 - D2Game+0x68D70 OBJECTS_OperateFunction06_TowerTome (QUESTS/ACT1/A1Q5.cpp): returns 0 on every path (1.10f returned 1 after activating the tome); validated against the vector.
 - D2Game+0x5CD50 OBJECTS_OperateFunction67_FrozenAnya (QUESTS/ACT5/A5Q3.cpp): returns 0 on every path (1.10f returned 1 when the quest is missing and at the end).
+- D2Game+0x56B10 (QUESTS/ACT5/A5Q3.cpp `ACT5Q3_QuestSeqHelper`): the quest-sequence tail that 0x5C690 ACT5Q3_SpawnDrehyaInTown calls is its own function in 1.13c; split out of the 1.10f body, same behaviour.
+- D2Game+0x5BF70 ACT5Q5_RewardPlayer (QUESTS/ACT5/A5Q5.cpp): the exp-versus-delta compare is unsigned (jb) in 1.13c.
 - D2Game+0xC6070 ACT2Q1_UnitIterate_SetPrimaryGoalDoneForPartyMembers: matches the 1.13c decompile; validated against the vector (in-room path).
 - `src/D2Game/GAME/Game.cpp` `GAME_UpdateGamesProgress` (`// 1.13c D2Game+0x2E1E0`): the elapsed-time compare against the target frame time is signed (retail casts both sides to int); 1.10f compared unsigned.
 - `src/core/d2game/d2game_n88.cpp` `D2Game_2C2D0` (`// 1.13c D2Game+0x2C2D0`, game creation): the D2Net#10021 call between 0x6A9B0 and the `b[0x6a]==1` test is now a seam. Row 0x33290 (object sweep) is `OBJECTS_RemoveAll`; the monster sweep is 0xB0640. `GAME_ProcessNetworkMessages` still calls the 1.10f `sub_6FC38140` in its third loop where 1.13c calls 0x29CB0.

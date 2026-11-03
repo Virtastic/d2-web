@@ -3,11 +3,12 @@
 #include <cstdlib>
 using i32 = int32_t; using u32 = uint32_t;
 extern "C" {
-intptr_t o10920(...); intptr_t o10331(...); i32 o10826(i32); void r_386F0(); intptr_t o10265(...); intptr_t o10024(...);
+intptr_t o10920(...); intptr_t o10331(...); i32 o10826(i32); void r_386F0(i32 eaxUnit); intptr_t o10265(...); intptr_t o10024(...);
 }
 
 // 1.13c D2Game+0x5CFF0
-i32 D2GAME_5CFF0(i32 game, i32 unit) // REG? ecx/edx assumed from __fastcall; r_386F0 takes no visible args (REG? none shown)
+// ecx = game, edx = unit, one unused stack arg (ret 4). 586F0 takes EAX = unit (disassembly).
+i32 D2GAME_5CFF0(i32 game, i32 unit, i32 /*stack*/)
 {
     i32 code;
     if (unit == 0) code = 0x24c;
@@ -23,7 +24,7 @@ i32 D2GAME_5CFF0(i32 game, i32 unit) // REG? ecx/edx assumed from __fastcall; r_
                 n = *(i32*)(intptr_t)(n + 0xe4);
                 if (n == 0) return 0;
             }
-            if (o10826(o10331(n)) == 0x78) r_386F0();
+            if (o10826(o10331(n)) == 0x78) r_386F0(unit);
             return 0;
         }
     }

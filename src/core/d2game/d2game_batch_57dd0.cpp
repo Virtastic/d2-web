@@ -32,7 +32,7 @@ struct D2GameBatch57dd0Env {
     void     (*ord10003_v)(void);                              // Ordinal_10003, args in registers (0x58BE0)
     int32_t  (*sub2E660)(uint32_t tag);                        // 0x2E660
     void     (*sub33830)(void* p);                             // 0x33830
-    void     (*sub33EB0)(void* ai, uint32_t a, uint32_t b);    // 0x33EB0
+    void     (*sub33EB0)(uint32_t mode, void* ai, uint32_t a, uint32_t b);  // 0x53EB0, mode in EAX
     void     (*sub354F0)(void* a, void* b);                    // 0x354F0
     void     (*sub8A3E0)(const void* pkt, uint32_t len);       // 0x8A3E0
     void*    (*ord10331)(void* unit);                          // Ordinal_10331
@@ -120,24 +120,30 @@ void d2game_582e0(void* unit, void* p2) {
     g.ord10003(h, 0x24, v == 0xf ? 5 : v == 0xe ? 6 : 7);
 }
 
-// 1.13c D2Game+0x583C0   (table = DAT_6fd2bc20, 12 dwords indexed by mode)
+// 1.13c D2Game+0x583C0   (table = DAT_6fd2bc20, 12 dwords indexed by mode; the cached decompile drops the
+// 0xD stat query and passes the unit id, not the stat handle, to 0x53EB0 -- ported from the disassembly:
+// ecx = ai, edx = p2, 0x53EB0 takes the mode in EAX, ai in ECX and (p2+0x14, id) on the stack)
 void d2game_583c0(void* ai, void* p2, const uint32_t* modeTable) {
     uint32_t h = statHandle(g.ord10920(rdptr(p2, 0xc)), rdptr(ai, 4));
     uint32_t e0 = rd32(ai, 0xe0);
-    g.ord10174(h, e0, 0);
-    int32_t r1 = g.ord10174(h, e0, 0);  // second call: result in a register, kept as iVar3
-    if (g.ord10174(h, e0, 1)) { g.sub33EB0(ai, rd32(p2, 0x14), h); return; }
+    int32_t r0 = g.ord10174(h, e0, 0);
+    int32_t rd = g.ord10174(h, e0, 0xd);
+    void* s = rdptr(p2, 8);
+    uint32_t id = s ? rd32(s, 4) : 0xffffffffu;
+    if (g.ord10174(h, e0, 1)) { g.sub33EB0(3, ai, rd32(p2, 0x14), id); return; }
     void* t = rdptr(p2, 0xc);
-    int32_t id = t ? (int32_t)rd32(t, 0xc) : -1;
+    int32_t tgt = t ? (int32_t)rd32(t, 0xc) : -1;
     for (int i = 0; i < (int)rd16(ai, 0x9c); i++)
-        if ((int32_t)rd32(ai, 0x1c + i * 4) == id) { g.sub33EB0(ai, rd32(p2, 0x14), h); return; }
-    if (r1 != 1 && rd8(ai, 9)) {
-        uint32_t m = modeTable[rd8(ai, 0xc)];
-        if (m == 2 && h == 0x203) {
-            if (g.ord10174(0x203, 0x24, 4)) { g.sub33EB0(ai, rd32(p2, 0x14), 0x203); return; }
-        } else if (m == 0xffffffffu || m > 0xb) return;
-        g.sub33EB0(ai, rd32(p2, 0x14), h);
-    }
+        if ((int32_t)rd32(ai, 0x1c + i * 4) == tgt) { g.sub33EB0(4, ai, rd32(p2, 0x14), id); return; }
+    if (r0 == 1) return;
+    uint8_t mode = rd8(ai, 0xc);
+    if (mode >= 4 && rd == 0) return;
+    if (!rd8(ai, 9)) return;
+    uint32_t m = modeTable[mode];
+    if (m == 2 && id == 0x203) {
+        if (g.ord10174(h, 0x24, 4)) { g.sub33EB0(5, ai, rd32(p2, 0x14), 0x203); return; }
+    } else if (m == 0xffffffffu || m >= 0xc) return;
+    g.sub33EB0(m, ai, rd32(p2, 0x14), id);
 }
 
 // 1.13c D2Game+0x58930
@@ -165,7 +171,7 @@ void d2game_58a40(void* owner, void* target) {
     if (target && rd32(target, 0) == 0) g.ord10920(target);
     void* n = findNode(owner, 0x24);
     uint16_t w = rd16(rdptr(n, 0x18), 0xa4);
-    uint8_t pkt[8] = {0x50, 0x24, 0, (uint8_t)w, (uint8_t)(w >> 8), 0, 0, 0};
+    uint8_t pkt[16] = {0x50, 0x24, 0, (uint8_t)w, (uint8_t)(w >> 8)};  // 0xF bytes sent; tail past byte 4 is stack garbage in retail, zero here
     g.sub8A3E0(pkt, 0xf);
 }
 
