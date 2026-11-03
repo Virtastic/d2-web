@@ -11,6 +11,7 @@ inline uint16_t rd16(const uint8_t* p) { uint16_t v; memcpy(&v, p, 2); return v;
 inline void wr16(uint8_t* p, uint16_t v) { memcpy(p, &v, 2); }
 inline bool dig(uint8_t c) { return c >= '0' && c <= '9'; }
 inline bool dig19(uint8_t c) { return c > '0' && c < ':'; }
+}  // namespace
 // 1.13c Storm+0x408A6 (___add_12), 0x40904 (___shl_12), 0x40932 (___shr_12): 96-bit helpers.
 void add12(uint32_t* a, const uint32_t* b) {
   uint64_t s = (uint64_t)a[0] + b[0]; a[0] = (uint32_t)s; uint32_t c = s >> 32;
@@ -18,6 +19,7 @@ void add12(uint32_t* a, const uint32_t* b) {
   uint64_t t = (uint64_t)a[1] + b[1]; a[1] = (uint32_t)t; if (t >> 32) a[2]++;
   a[2] += b[2];
 }
+namespace {
 void shl12(uint32_t* a) { uint32_t x = a[0], y = a[1]; a[0] = x << 1; a[1] = y << 1 | x >> 31; a[2] = a[2] << 1 | y >> 31; }
 void shr12(uint32_t* a) { uint32_t y = a[1]; a[1] = y >> 1 | a[2] << 31; a[2] >>= 1; a[0] = a[0] >> 1 | y << 31; }
 }  // namespace
