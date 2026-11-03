@@ -1,19 +1,22 @@
-// Rules from cached 1.13c body. Callee 17400 (unmapped) is an injected hook; ECX (cache) passed through.
-#include <cstdint>
-#include <cstring>
-
-// 1.13c D2CMP+0x0bc00
-// Walks obj+0x10C records (stride 0x60) at obj+0x110; each with node (+0x5C) set is released via 17400,
-// then data (+0x54) and node (+0x5C) are cleared.
-extern "C" void d2cmp_bc00(void* cache, uint8_t* obj, void (*release)(void* cache)) {
-    int32_t n = *(int32_t*)(obj + 0x10C);
-    for (int32_t i = 0; i < n; i++) {
-        uint8_t* r = *(uint8_t**)(obj + 0x110) + i * 0x60;
-        if (*(int32_t*)(r + 0x5C)) {
-            release(cache);
-            *(int32_t*)(r + 0x54) = 0;
-            *(int32_t*)(r + 0x5C) = 0;
+// 1.13c D2CMP+0xBC00: release every cached record of a cel file object. stdcall(obj).
+#include "d2cmp_cache32.h"
+using namespace d2cmp32;
+// obj+0x10C count, obj+0x110 records (0x60 bytes each); a record's +0x5C is its LRU node, +0x54 its data.
+// 1.13c D2CMP+0xBC00
+extern "C" void d2cmp_bc00(uint8_t* obj, LruCache* cache, const Env& e) {
+    int32_t i = 0, ebx = 0;
+    uint32_t count;
+    std::memcpy(&count, obj + 0x10C, 4);
+    if ((int32_t)count <= 0) return;
+    do {
+        uint32_t recs; std::memcpy(&recs, obj + 0x110, 4);
+        uint32_t rec = recs + (uint32_t)ebx;
+        if (ld(rec + 0x5C)) {
+            e.lruRelease(e.ctx, cache, ld(rec + 0x5C));
+            st(rec + 0x54, 0);
+            st(rec + 0x5C, 0);
         }
-        n = *(int32_t*)(obj + 0x10C);
-    }
+        std::memcpy(&count, obj + 0x10C, 4);   // re-read every pass
+        ++i; ebx += 0x60;
+    } while (i < (int32_t)count);
 }

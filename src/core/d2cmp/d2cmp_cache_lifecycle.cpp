@@ -244,19 +244,6 @@ extern "C" void d2cmp_bb60(D2CMPLruNode& node) {
     payload->allocation5c = nullptr;
 }
 
-// Retail fixes the destroy routine to BB60, rather than accepting a caller
-// supplied destructor. All nodes read the same mutable global callback slot.
-// 1.13c D2CMP+0x0BBB0
-extern "C" void d2cmp_bbb0(D2CMPCacheLifecycle& s, uint32_t identity, uint32_t budget,
-    const D2CMPCacheMemory& memory) {
-    s.cache = {};
-    s.budget = budget;
-    d2cmp_17270(s.cache, identity, budget, 0x1000, d2cmp_bb60, memory);
-    for (uint32_t i = 0; i < s.cache.capacity; ++i)
-        s.cache.nodes[i].releasePayloadSlot = &s.releasePayload;
-    s.enabled = 1;
-}
-
 // 1.13c D2CMP+0x0BA60
 extern "C" void d2cmp_ba60(D2CMPCacheLifecycle& s) {
     s.cache.misses = 0;
@@ -284,35 +271,6 @@ extern "C" uint32_t d2cmp_be10(D2CMPCacheLifecycle& s, uint32_t a, uint32_t b,
         }
     }
     return 0;
-}
-
-// 1.13c D2CMP+0x0BDB0
-extern "C" void d2cmp_bdb0(D2CMPCacheLifecycle& s, const D2CMPCelResourceOps& ops) {
-    for (auto* n = s.celHead; n; n = n->next) {
-        auto* cel = n->cel;
-        if (cel) {
-            // Retail holds +b0 in EDI across the busy callback.
-            void* resource = cel->resource;
-            if (resource && !ops.busy(resource)) {
-                ops.release(resource);
-                cel->resource = nullptr;
-            }
-        }
-    }
-}
-
-// 1.13c D2CMP+0x0BC60
-extern "C" void d2cmp_bc60(D2CMPLruCache& cache, const D2CMPCacheMemory& memory) {
-    d2cmp_175c0(cache, memory);
-}
-
-// HOLD BD70: requires native 9880 registry shutdown, including tile cleanup
-// 16600 and hash teardown 12D30. No implementation or source marker is claimed
-// while those essential callees lack a compatible native owner binding.
-
-// 1.13c D2CMP+0x0C9D0
-extern "C" const uint8_t* d2cmp_c9d0(const D2CMPCacheLifecycle& s, uint32_t alternate) {
-    return alternate && s.tableEnabled ? s.activeTable : s.fallbackTable;
 }
 
 struct D2CMPCelFrameOwner {

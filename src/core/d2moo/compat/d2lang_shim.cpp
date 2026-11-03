@@ -17,7 +17,7 @@ static_assert(sizeof(Unicode) == 2, "Unicode is one UCS-2 unit");
 
 Unicode::Unicode(unsigned short c) : ch(c) {}
 // 1.13c D2Lang+0x11C0 Unicode default constructor closure: *(u16*)this = 0 (this = Unicode(0))
-static inline void Unicode_default_ctor_closure(Unicode* t) { *t = Unicode(0); }
+void Unicode_default_ctor_closure(Unicode* t) { *t = Unicode(0); }
 Unicode::operator unsigned short() const { return ch; }
 Unicode& Unicode::operator=(const Unicode& o) { ch = o.ch; return *this; }
 // 1.13c D2Lang+0x1040/0x1050/0x1070/0x10A0/0x10C0
