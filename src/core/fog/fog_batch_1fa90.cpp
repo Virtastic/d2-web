@@ -76,16 +76,10 @@ static_assert(sizeof(FogDataArray) == 0x120, "handle header");
 // Reset the performance accumulator: clear the first two dwords of each 6-dword entry while the
 // index is positive, then stamp the module tick with GetTickCount(). The tail is not conditioned
 // on the index.
+extern "C" void fog_perf_reset_fb90(uint32_t index, uint8_t* acc, uint32_t* tickSlot, uint32_t now);
 extern "C"
 void fog_sub_FB90(void) {
-    uint32_t i = g_perfAccumulatorIndex;
-    uint32_t* entry = reinterpret_cast<uint32_t*>(g_perfAccumulator);
-    for (; i != 0; --i) {
-        entry[0] = 0;
-        entry[1] = 0;
-        entry += 6;
-    }
-    g_perfTick = GetTickCount();
+    fog_perf_reset_fb90(g_perfAccumulatorIndex, g_perfAccumulator, &g_perfTick, GetTickCount());
 }
 
 // 1.13c Fog+0x1FA90 (ordinal 10060)
