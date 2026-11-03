@@ -129,7 +129,7 @@ uint8_t* D2CMP_10085_GetTileFlagArray(D2TileLibraryEntryStrc* e) { D2_ASSERT(e);
 // 1.13c D2CMP+0x14EC0 -- retail returns &DAT_6fe34aa8 + (a*0x69+b)*0x100, or NULL. This returns that
 // byte offset from the table base (0 = NULL; a valid row is never offset 0). Table bytes are retail data,
 // so the absolute pointer is not reproduced.
-uint32_t D2CMP_14EC0_TableIndex(int a, int b) {
+extern "C" uint32_t D2CMP_14EC0_TableIndex(int a, int b) {
     return (a < 9 && b < 0x15 && a != 0 && (a < 3 || a > 4)) ? (uint32_t)(a * 0x69 + b) * 0x100u : 0u;
 }
 

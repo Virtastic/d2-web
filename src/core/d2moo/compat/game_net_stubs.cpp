@@ -981,3 +981,6 @@ void sub_6FC3FC80(D2ClientStrc* pClient, D2UnitStrc* pUnit) {}
 void GAME_LogMessage(int32_t, const char*, ...) {}
 // Classic end-of-game after Diablo's death (A4Q2 timer); the session never ends a game this way.
 void __fastcall sub_6FC37FB0(D2GameStrc*, D2ClientStrc*) {}
+// D2Game+0xDF80: tells one client about another player (join packet and pets). The headless session has one
+// client, so the caller (which skips the joining client itself) never reaches it.
+void __fastcall sub_6FC3DF80(D2ClientStrc*, D2UnitStrc*, D2ClientStrc*) {}
