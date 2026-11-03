@@ -101,6 +101,14 @@ int map_columns(uint16_t* out, const File* f, const Field* fl) {  // 1.13c Fog+0
 
 }  // namespace
 
+// Probe seam for src/core/fn/fog_12290.cpp (the FN replay of Fog+0x12290): the file-local mapper by C linkage.
+extern "C" EMSCRIPTEN_KEEPALIVE int fog_map_columns(uint16_t* out, const void* f, const void* fl) {
+    return map_columns(out, static_cast<const File*>(f), static_cast<const Field*>(fl));
+}
+
+// Probe seam for src/core/fn/fog_12510.cpp (the FN replay of Fog+0x12510, find-or-add by C linkage).
+extern "C" EMSCRIPTEN_KEEPALIVE int fog_find_or_add(int* linker, char* name) { return find_or_add(linker, name); }
+
 // 1.13c Fog+0x12A60 (ordinal 10207)
 extern "C" EMSCRIPTEN_KEEPALIVE void fog_sub_12A60(File* f, Field* fl, uint8_t* out, int32_t count, int32_t stride) {  // 1.13c Fog+0x12A60
     if (!count) fatal(0x112);

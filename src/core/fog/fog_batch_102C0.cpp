@@ -30,7 +30,6 @@ uint8_t  g_fogSystemInfo[0x40];                  // +0x32F10, GetSystemInfo outp
 char     g_fogProgramName[0x104] = "Diablo II";  // +0x2FCD8
 char     g_fogVersionText[0x104];                // +0x32B08
 uint32_t g_fogThreadDumpCount;                   // +0x32AC8
-uint32_t g_fogCriticalSectionChecks;             // +0x5A6E74, validation-enabled flag
 
 // Fog+0x6FF78350 = "???": the +0x11DF0 tree returns this pointer, not NULL, when the key is absent.
 char g_fogNotFound[] = "???";
@@ -111,6 +110,8 @@ const char* fog_basename(const char* path) {
     const size_t offset = 10;
     return std::strlen(path) > offset ? path + offset : path;
 }
+// +0x5A6E74: the validation flag, outside the anonymous namespace so the FN probe for +0x11690 can pin it.
+uint32_t g_fogCriticalSectionChecks;
 namespace {
 
 // Fog+0x1BA9 (Storm _exit) and the reporter's MessageBoxA tail.
