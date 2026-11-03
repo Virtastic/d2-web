@@ -24,6 +24,9 @@ static inline void wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*
 static inline uint16_t rd16(const void* p, uint32_t o) { uint16_t v; std::memcpy(&v, (const uint8_t*)p + o, 2); return v; }
 static inline uint8_t rd8(const void* p, uint32_t o) { return ((const uint8_t*)p)[o]; }
 static inline void* rdptr(const void* p, uint32_t o) { void* v; std::memcpy(&v, (const uint8_t*)p + o, sizeof v); return v; }
+// retail-layout (32-bit) pointer fields: the client record keeps 4-byte links (the FN blobs carry them as the low 32 bits)
+static inline void* rp32(const void* p, uint32_t o) { return (void*)(uintptr_t)rd32(p, o); }
+static inline void wp32(void* p, uint32_t o, const void* v) { wr32(p, o, (uint32_t)(uintptr_t)v); }
 static inline void wrptr(void* p, uint32_t o, const void* v) { std::memcpy((uint8_t*)p + o, &v, sizeof v); }
 
 [[noreturn]] static void d2game_fatal(uint32_t) { _exit(-1); }
@@ -162,17 +165,17 @@ uint32_t CLIENTS_AttachSaveFile(uint32_t clientId, const void* pSaveData, uint32
     if (g_clientListInitialized == 0) return 0;
     EnterCriticalSection(&g_clientListLock);              // Ordinal 10050
     void* client = g_clientList[clientId & 0xFF];
-    while (client != nullptr && rd32(client, 0) != clientId) client = rdptr(client, 0x4AC);
+    while (client != nullptr && rd32(client, 0) != clientId) client = rp32(client, 0x4AC);
     uint32_t result = 0;
     if (client != nullptr) {
         const uint32_t have = rd32(client, 0x180);
         uint8_t* dst;
         if (have != 0) {
-            dst = (uint8_t*)rdptr(client, 0x17C) + have;
+            dst = (uint8_t*)rp32(client, 0x17C) + have;
         } else {
             // ECX = pClient->pGame->pMemoryPool (+0x1A8, +0x1C), EDX = nTotalSize (disassembly-checked)
-            void* header = env->allocPool(rdptr(rdptr(client, 0x1A8), 0x1C), nTotalSize, kClientsFile, 0xB16, 0);   // Ordinal 10045
-            wrptr(client, 0x17C, header);
+            void* header = env->allocPool(rp32(rp32(client, 0x1A8), 0x1C), nTotalSize, kClientsFile, 0xB16, 0);   // Ordinal 10045
+            wp32(client, 0x17C, header);
             dst = (uint8_t*)header;
         }
         const uint32_t total = have + nSize;
@@ -182,7 +185,7 @@ uint32_t CLIENTS_AttachSaveFile(uint32_t clientId, const void* pSaveData, uint32
         wr32(client, 0x178, bUnlockCharacter);
         if (total == nTotalSize) {
             wr32(client, 0x3D4, rd32(client, 0x3D4) | 8);
-            wr32(client, 0x18C, env->checksum(rdptr(client, 0x17C), total)); // 0x53170
+            wr32(client, 0x18C, env->checksum(rp32(client, 0x17C), total)); // 0x53170
             result = 1;
         }
     }

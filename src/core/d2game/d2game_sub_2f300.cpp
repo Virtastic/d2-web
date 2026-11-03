@@ -1,6 +1,8 @@
-// D2Game sub_2F300 -- unit-state set (row s3334), transcribed from the cached decompile.
-// Register args explicit: unit = ESI, game = EBX, value = stack slot stored at +0xC. Records are opaque
-// host blocks read at retail offsets; callees are Env seams. Fatal: Ordinal 10265(code)->10024(text)->_exit(-1).
+// D2Game OBJECTS_InitHandler, over retail-layout (32-bit) blobs.
+// Convention (disassembly): ESI = object unit, EBX = game, stack: unitId, room, x, y; ret 0x10.
+// The first call pushes ESI for the stdcall objects.txt lookup (D2Common 10296), so the word stored at unit+0xC
+// is the first stack argument (the unit id), not a return address. Callees are Env seams.
+// Fatal paths: Ordinal 10265(code) -> 10024(text) -> _exit(-1).
 #include <cstdint>
 #include <cstring>
 #include <unistd.h>
@@ -9,56 +11,54 @@ static inline uint32_t r32(const void* p, uint32_t o) { uint32_t v; std::memcpy(
 static inline void w32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)p + o, &v, 4); }
 
 struct D2GameSub2F300Env {
-    void*    (*ptr)(uint32_t v);
-    void*    (*ord10296)();                       // current-context record
+    void*    (*ptr)(uint32_t v);                          // a 32-bit struct field -> host pointer
+    uint8_t* (*objTxt)(void* unit);                       // 0xB156: D2Common 10296 (stdcall unit)
     uint32_t (*ord10265)(uint32_t code);
-    void     (*ord10024)(uint32_t text, uint32_t code);
-    uint32_t fatalText;                           // DAT_6fd19ff9
-    void     (*sub8E880)(void* unit);
-    uint32_t (*sub1180)(void* p);
-    void     (*ord11090)();
-    void     (*sub2E7D0)();
-    void     (*ord10169)();
-    uint32_t handlers[0x50];                      // DAT_6fd2e050 retail fn pointers (0 = none)
-    bool     (*isBadCodePtr)(uint32_t fn);
-    void     (*callHandler)(uint32_t fn);
+    void     (*ord10024)(uint32_t code);
+    void     (*deleteTimers)(void* game, void* unit);     // 0x8E880: EAX = game, stack unit
+    const uint32_t* initTable;                            // DAT_6fd2e050: 0x50 init-function words (0 = none)
+    int      (*isBadCodePtr)(uint32_t fn);
+    void     (*callInit)(uint32_t fn, uint32_t* block);   // ECX = the 7-word init block
+    uint32_t (*roll)(void* seed, int32_t n);              // 0x1180: EAX = n, ECX = seed
+    void     (*changeMode)(void* unit, uint32_t mode);    // 0xA4A2: D2Common 11090 (stdcall unit, mode)
+    uint32_t (*allocTimerArg)(void* game);                // 0x2E7D0: EDI = game
+    void     (*setTimerArg)(void* unit, uint32_t arg);    // 0xB2D0: D2Common 10169 (ECX unit, EDX arg)
 };
 
 [[noreturn]] static void fatal(const D2GameSub2F300Env* e, uint32_t code) {
-    e->ord10024(e->fatalText, e->ord10265(code));
+    e->ord10024(e->ord10265(code));
     _exit(-1);
 }
 
 // 1.13c D2Game+0x2F300
-void D2Game_sub_2F300(const D2GameSub2F300Env* e, void* unit, void* game, uint32_t value) {
-    uint8_t* c = (uint8_t*)e->ord10296();
+void D2Game_sub_2F300(const D2GameSub2F300Env* e, void* unit, void* game, uint32_t unitId, uint32_t room, uint32_t x, uint32_t y) {
+    uint8_t* t = e->objTxt(unit);
     if (!unit) fatal(e, 0xa48);
     uint8_t* u = (uint8_t*)unit;
-    int32_t idx = (int32_t)r32(u, 0x10);
-    uint32_t f = r32(u, 0xc4);
-    uint32_t g = f & 0xfffffff7;
-    w32(u, 0xc, value); u[0x78] = 0; w32(u, 0xc4, g); w32(u, 0xa4, 0);
-    if (idx >= 8) fatal(e, 0x240);
-    g = c[0x128] ? (g | 4) : (f & 0xfffffff3);
-    w32(u, 0xc4, g);
-    ((uint8_t*)e->ptr(r32(u, 0x14)))[4] = 0;
-    uint16_t cls = (uint16_t)r32(u, 4);
-    if (r32(u, 0xdc)) e->sub8E880(u);
+    const uint32_t mode = r32(u, 0x10);
+    const uint32_t f0 = r32(u, 0xc4);
+    uint32_t f = f0 & ~8u;
+    w32(u, 0xc, unitId); u[0x78] = 0; w32(u, 0xc4, f); w32(u, 0xa4, 0);
+    if ((int32_t)mode >= 8) fatal(e, 0x240);
+    f = t[0x128] ? (f | 4) : (f0 & 0xfffffff3);
+    w32(u, 0xc4, f);
+    ((uint8_t*)e->ptr(r32(u, 0x14)))[4] = 0;                  // pObjectData->InteractType, no null check
+    const uint16_t cls = (uint16_t)r32(u, 4);
+    if (r32(u, 0xdc)) e->deleteTimers(game, u);
     w32(u, 0xdc, 0);
     if (cls >= 0x23d) fatal(e, 0x260);
-    uint8_t k = c[0x1b1];
+    const uint8_t k = t[0x1b1];
     if (k >= 0x50) fatal(e, 0x262);
-    uint32_t puVar2 = r32(game, 0x10f0);
-    uint32_t fn = e->handlers[k];
-    if (fn) {
+    const uint32_t ctrl = r32(game, 0x10f0);
+    if (const uint32_t fn = e->initTable[k]) {
         if (e->isBadCodePtr(fn)) fatal(e, 0x26a);
-        e->callHandler(fn);
+        uint32_t blk[7] = { (uint32_t)(uintptr_t)game, (uint32_t)(uintptr_t)unit, room, ctrl, (uint32_t)(uintptr_t)t, x, y };
+        e->callInit(fn, blk);
     }
     f = r32(u, 0xc4);
-    w32(u, 0xc4, c[idx + 0xc4] ? (f | 2) : (f & 0xfffffffd));
-    if (c[0x13d] && !((r32(u, 0xc4) >> 7) & 1)) {
-        if (e->sub1180(e->ptr(puVar2)) == 0) e->ord11090();
+    w32(u, 0xc4, t[mode + 0xc4] ? (f | 2) : (f & ~2u));
+    if (t[0x13d] && !((r32(u, 0xc4) >> 7) & 1)) {
+        if (e->roll(e->ptr(ctrl), 14) == 0) e->changeMode(u, 2);
     }
-    e->sub2E7D0();
-    e->ord10169();
+    e->setTimerArg(u, e->allocTimerArg(game));
 }
