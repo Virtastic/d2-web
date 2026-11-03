@@ -1,3 +1,4 @@
+// 1.13c D2Common+0x83E20 (probe-side body; the batch53 port is the engine copy)
 // D2Common 0x83E20: substitution placement. Visits every cell of the window in seed-shuffled
 // order, tests each with the 0x83B30 worker, applies the first hit with the 0x83990 worker.
 #include <cstdint>
@@ -30,8 +31,8 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_83e20(uintptr_t a1, uintptr_t a2, ui
 	int32_t n = ch * cw;
 	if (n == 0) return 0;
 	bool skipCenter = iw(a1, 0x18) == 1 && small && cw <= 5 && ch <= 5;
-	static int32_t xs[1024], ys[1024]; // ponytail: window assumed <=1024 cells (retail stack holds 1024)
-	if (n > 1024) return 0;
+	static int32_t xs[256], ys[256]; // retail local_808[514] holds 256 (x,y) pairs
+	if (n > 256) return 0;
 	for (int32_t i = 0; i < n; ++i) { xs[i] = i % cw; ys[i] = i / cw; }
 	for (int32_t c = n; c > 0; --c) {
 		uint32_t a = roll(lvl + 0x1c4, n), b = roll(lvl + 0x1c4, n);

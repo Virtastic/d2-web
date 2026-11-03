@@ -489,6 +489,11 @@ void d2game_5E7F0(const D2GameBatch531F0Env& E, void* game, void* p) {
         E.c8EA80(game, p, 7, E.rd32(game, 0xa8) + 0xc, 0, 0, 0);
 }
 
+// C-linkage entry for callers that cannot name the env struct; env points at a D2GameBatch531F0Env.
+extern "C" void d2game_5E7F0_env(const void* env, void* game, void* p) {
+    d2game_5E7F0(*(const D2GameBatch531F0Env*)env, game, p);
+}
+
 // 1.13c D2Game+0x5EE30 (no arguments in the decompile: game = unaff_EBX, obj = unaff_EDI).
 // Ordinal_11090 has no arguments in the decompile; (obj, 4) is assumed from its other call sites.
 void d2game_5EE30(const D2GameBatch531F0Env& E, void* game, void* obj) {

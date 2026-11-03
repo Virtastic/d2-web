@@ -168,17 +168,21 @@ void D2Common_36CD0_PlotLine(const B36Line* l, const B36Rect* r, int sel, int nT
 // 36840(0, +0x3C) if +0x18 is set, 36840(0, +0x44) if +0x44 is set.
 void D2Common_83CA0_InitPresetDescriptor(void* self, char* param)
 {
-    char** slot = (char**)(param + 0x50);
-    if (*slot) return;
+    // retail layout: the cached pointer and every pointer field are 32-bit dwords (batch53 ru/ri convention)
+    auto P = [](char* b, int o) { return (char*)(uintptr_t)*(uint32_t*)(b + o); };
+    auto I = [](char* b, int o) { return *(int32_t*)(b + o); };
+    if (P(param, 0x50)) return;
     D2Common_5BE50(self, param + 4);
-    char* d = *slot;
-    if (!d || !*(void**)(d + 0x4c)) std::exit(-1); // fatal 0x2B6: retail formats the message then _exit(-1)
-    auto P = [](char* b, int o) { return *(void**)(b + o); };
-    const int n = *(int32_t*)(d + 0x14);
-    for (int i = 0; i < n; ++i) { D2Common_36840(0, P(d, 0x2c + 4 * i)); D2Common_36840(0, P(*slot, 0x1c + 4 * i)); d = *slot; }
-    for (int i = 1; i < *(int32_t*)(*slot + 0x14); ++i) D2Common_36B10(i << 18, 0);
-    if (*(int32_t*)(*slot + 0x18)) D2Common_36840(0, P(*slot, 0x3c));
-    if (*(int32_t*)(*slot + 0x44)) D2Common_36840(0, P(*slot, 0x44));
+    char* d = P(param, 0x50);
+    if (!d || !P(d, 0x4c)) std::exit(-1); // fatal 0x2B6: retail formats the message then _exit(-1)
+    const int n = I(d, 0x14);
+    for (int i = 0; i < n; ++i) {
+        D2Common_36840(0, P(P(param, 0x50), 0x2c + 4 * i));
+        D2Common_36840(0, P(P(param, 0x50), 0x1c + 4 * i));
+    }
+    for (int i = 1; i < I(P(param, 0x50), 0x14); ++i) D2Common_36B10(i << 18, 0);
+    if (I(P(param, 0x50), 0x18)) D2Common_36840(0, P(P(param, 0x50), 0x3c));
+    if (I(P(param, 0x50), 0x44)) D2Common_36840(0, P(P(param, 0x50), 0x44));
 }
 
 // 1.13c D2Common+0x84890: scatter preset objects over a room grid. Context A = *ctx: +0x3C/+0x40 dims,
