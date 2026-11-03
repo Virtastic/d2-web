@@ -14,7 +14,7 @@
 extern "C" {
 __attribute__((weak)) void* Fog_Alloc10045(const char* file, int32_t line, int32_t zero);
 __attribute__((weak)) void Fog_Fatal10265_10024(int32_t msg);   // 10265 + 10024 then _exit(-1)
-uint32_t D2Common_35100_MonsterPathType(struct D2UnitStrc* unit); // src/core/d2common/d2common_35100.cpp
+extern "C" uint32_t D2Common_35100_MonsterPathType(struct D2UnitStrc* unit); // src/core/d2common/d2common_35100.cpp
 __attribute__((weak)) void D2Common_359D0(void* unit);
 __attribute__((weak)) int32_t D2Common_35360(void* unit, int32_t size);
 __attribute__((weak)) void D2Common_34F80(void* path, int32_t type);
