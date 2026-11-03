@@ -24,9 +24,18 @@ struct HookEnv {
         for (int i = 2; i < 10; i++) e[i] = 0;
     }
     uint32_t* L; const uint32_t* sc;
+    uint32_t ediReg = 0;   // EDI at the next h(): a `hookw RVA e V...` write goes through it (key (0x15<<24)|rva); set by ed()
     uint32_t tbl = 0, dtPtr = 0, fileStr = 0, bmSlot = 0;     // module globals (addresses of the pinned blobs / scrubbed module words)
     static constexpr uint32_t kLogMax = 512;   // 512 (main had 400): 3C850 and 40CA0 log 6 records per step over a 64-step missile ring, past 400; a larger cap only raises the limit. ponytail: a descriptor `blob lg` must hold 4 + 40 * calls bytes; 0x6F930 logs up to 45 calls (blob 2600)
     uint32_t seen[48][2]; int nseen = 0;
+    // per-site NST (descriptor `hook RVA NST REGS site=RET:NST ...`): the stack words a hooked callee pops when it is called from the
+    // caller whose return address (RVA) is RET. st = (RET, NST) pairs, zero RET ends; a miss returns dflt. Probes that mirror a
+    // balanced call site use it to size the pop; the log record is the same at every site.
+    const uint32_t* st = nullptr;
+    uint32_t nstAt(uint32_t retRva, uint32_t dflt) const {
+        if (st) for (const uint32_t* p = st; p[0]; p += 2) if (p[0] == retRva) return p[1];
+        return dflt;
+    }
     HookEnv(uint32_t* log, const uint32_t* seq) : L(log), sc(seq) { L[0] = 0; }
     static uint32_t rd32(uint32_t a) { uint32_t v; memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }
     static int32_t rd16s(uint32_t a) { int16_t v; memcpy(&v, (const void*)(uintptr_t)a, 2); return v; }
@@ -54,6 +63,14 @@ struct HookEnv {
         const uint8_t* b = (const uint8_t*)rec;
         for (uint32_t j = 0; j < 9; j++) { uint32_t v = 0; for (uint32_t q = 0; q < 4; q++) if (bytemask >> (4 * j + q) & 1) v |= (uint32_t)b[4 * j + q] << (8 * q); e[1 + j] = isStk(v) ? 0xB3000000u : v; }
     }
+    // REGS `J` / `hookw RVA e`: a callee that takes EDI as an argument or fills an EDI out-pointer. ed() sets EDI for the next h() of that callee (the out-pointer
+    // write); edi() logs it as the capture does, one record (rva|0x20000000, edi, 0 x8) after h(). Order: ed(edi); h(rva, ...); edi(rva, edi).
+    void ed(uint32_t v) { ediReg = v; }
+    void edi(uint32_t rva, uint32_t v) {
+        if (L[0] >= kLogMax) abort();
+        uint32_t* e = L + 1 + L[0]++ * 10; e[0] = rva | 0x20000000u; e[1] = isStk(v) ? 0xB3000000u : v;
+        for (int j = 2; j < 10; j++) e[j] = 0;
+    }
     uint32_t h(uint32_t rva, uint32_t a = 0, uint32_t c = 0, uint32_t d = 0, uint32_t b = 0, uint32_t s = 0,
                uint32_t s0 = 0, uint32_t s1 = 0, uint32_t s2 = 0, uint32_t s3 = 0, uint32_t s4 = 0, uint32_t s5 = 0, uint32_t s6 = 0) {
         if (L[0] >= kLogMax) abort();   // log capacity exceeded
@@ -62,8 +79,8 @@ struct HookEnv {
         // retail logs a pointer into its stack as 0xB3000000; `hookw` out-parameter writes ride in sc as key ((1+stack word)<<24)|rva, or ((0x10+r)<<24)|rva for register r (a c d b s = 0..4); several pairs with one key fill consecutive dwords of that pointee
         const uint32_t sw[7] = { s0, s1, s2, s3, s4, s5, s6 };
         for (int i = 1; i < 10; i++) if (isStk(e[i])) e[i] = 0xB3000000u;
-        const uint32_t rg[5] = { a, c, d, b, s };
-        for (int kind = 0; kind < 2; kind++) for (uint32_t w = 0; w < (kind ? 5u : 7u); w++) {
+        const uint32_t rg[6] = { a, c, d, b, s, ediReg }; ediReg = 0;
+        for (int kind = 0; kind < 2; kind++) for (uint32_t w = 0; w < (kind ? 6u : 7u); w++) {
             const uint32_t key = ((kind ? 0x10u + w : 1u + w) << 24) | rva, ptr = kind ? rg[w] : sw[w]; uint32_t off = 0;
             for (const uint32_t* p = sc; p[0]; p += 2) if (p[0] == key) { wr32(ptr + off, p[1]); off += 4; }
         }

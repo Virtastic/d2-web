@@ -69,18 +69,16 @@ void sub_42C70(G&g,const uint8_t* uidata,uint8_t b991c,I v9854,C42C70& c){
  char buf[128+72]; std::size_t n=strnlen(s,127); std::memcpy(buf,s,n); strncpy(buf+n,nm,71); buf[n+71]=0; // ponytail: concat src inferred = name copy
  c.show(buf,v9854?0x165:0x115,4,0); (void)uidata;
 }
-// 1.13c D2Client+0x43310 (REG?: ecx = key id passed to fae98c0)
+// 1.13c D2Client+0x43310 (ecx unused; FUN_6fae98c0 takes edx=id, esi=mode and ignores ecx)
+// scan the 10-byte binding table [0x6fbca2e4, 0x6fbca75a): {i32 id@-4 from the vk word; u16 vk@0; i32 mode@+2}.
+// Mode 1 binding held sets 0x6fbcc3f0=1; else mode 0 binding held sets it; else 0. A vk of 0xffff counts as unbound.
 void sub_43310(G&g,U ecx){
- // scan 10-byte binding table [0x6fbca2e4, 0x6fbca75a): {u16 vk; i32 id@+2 (0x24); i32 mode@+6}
- const I N=(0x6fbca75a-0x6fbca2e4)/10;
- if(g.isKeyDef(ecx,0x24)){
-  for(I i=0;i<N;++i){ const uint8_t*e=g.keyTab+i*10; if(I(rdu(e+2))==0x24&&I(rdu(e+6))==1){
-   U vk=e[0]|e[1]<<8; if(vk!=0xffff&&GetAsyncKeyState(I(vk))<0){g.cc3f0=1;return;} break; } }
- }
- if(g.isKeyDef(ecx,0x24)){
-  for(I i=0;i<N;++i){ const uint8_t*e=g.keyTab+i*10; if(I(rdu(e+2))==0x24&&I(rdu(e+6))==0){
-   U vk=e[0]|e[1]<<8; if(vk!=0xffff&&GetAsyncKeyState(I(vk))<0){g.cc3f0=1;return;} break; }
-   if(i==N-1){g.cc3f0=0;return;} }
+ (void)ecx;
+ const I N=(0x6fbca75a-0x6fbca2e6+9)/10;   // loop is on the mode-field pointer (starts 6fbca2e6)
+ for(I m=1;m>=0;--m){
+  for(I i=0;i<N;++i){ const uint8_t*e=g.keyTab+i*10;
+   if(I(rdu(e-4))==0x24&&I(rdu(e+2))==m){   // keyTab = 6fbca2e4 (the vk word); id is at -4, mode at +2
+    U vk=e[0]|e[1]<<8; if(vk!=0xffff&&GetAsyncKeyState(I(vk))<0){g.cc3f0=1;return;} break; } }
  }
  g.cc3f0=0;
 }

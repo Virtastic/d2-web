@@ -170,28 +170,30 @@ EMSCRIPTEN_KEEPALIVE void d2c_47500() {
     W32(box + 0x5c, 1);
     uint32_t mode = D32(0x6fbc9729);
     if (mode < 1 || mode > 5) fatal(0x1550);
-    F(0xA36F0, box, (U)O(10003), 0x15, 0, 1, 0);
+    static const uint32_t ids[5] = {0xd14, 0xd13, 0xd17, 0xd16, 0xd18};   // jump table 0x6faf77f4
+    F(0xA36F0, box, (U)O(10003, ids[mode - 1]), 0x15, 0, 1, 0, 0);
     if (mode != 5) {
         U p = unitById(D32(0x6fbd22fd));
         if (!p) return;
         if (R32(p) != 4) fatal(0x5a);
         uint16_t t[384] = {0};
-        F(0x914F0, p, (U)t);
+        F(0x914F0, p, (U)t, 0xbf);   // (unit, buf, 0xbf) all stack
         int n = 0; while (t[n]) n++;
         for (int i = 0; i < n; i++) if (t[i] == 10) { t[i] = 0; break; }
         F(0xA36F0, box, (U)t, 0xf, 0, 1, A(0x6faf7480));
         D16(0x6fbd230d) = 0;
-        uint32_t v = (uint32_t)F(0x46230, p);   // guess: the "%d" arg the decompile lost
+        uint32_t v = 0;   // 0x46230: EAX = &out, ECX = unit, stack (ebp = 0, buf 0x6fbd230d, 0x28); wsprintf reads the OUT slot, not the return
+        F(0x46230, (U)&v, p, 0, A(0x6fbd230d), 0x28);
         char a[12]; uint16_t w[10] = {0};
         snprintf(a, sizeof a, "%d", (int)v);
         for (int i = 0; i < 9 && a[i]; i++) w[i] = (uint8_t)a[i];
         uint16_t* d = (uint16_t*)A(0x6fbd230d);
         int i = 0; do d[i] = w[i]; while (w[i++]);
-        F(0xA36F0, box, (U)O(10003), 0xf, 0, 1, A(0x6faf7480));
+        F(0xA36F0, box, (U)O(10003, 0xd12), 0xf, 0, 1, A(0x6faf7480));
         F(0xA36F0, box, (U)d, 0xf, 0, 1, A(0x6faf7480));
     }
-    F(0xA36F0, box, (U)O(10003), 0xf, 0, 1, A(0x6faf7480), 1);
-    F(0xA36F0, box, (U)O(10003), 0xf, 0, 1, A(0x6faf61d0), 1);
+    F(0xA36F0, box, (U)O(10003, 0xd10), 0xf, 0, 1, A(0x6faf7480), 1);
+    F(0xA36F0, box, (U)O(10003, 0xd11), 0xf, 0, 1, A(0x6faf61d0), 1);
 }
 
 // (env-seam copy; verified body: dialog_47810_4b420.cpp)

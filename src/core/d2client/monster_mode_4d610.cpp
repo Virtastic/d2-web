@@ -12,10 +12,10 @@ struct Svc {
  virtual void f19700(Unit*)=0; virtual void f55c50(int32_t)=0; virtual void o10820(int32_t)=0; virtual void f58630(int32_t)=0;
  virtual int32_t o10327()=0; virtual void o10043(int32_t,int32_t)=0;
  virtual void o10488(uint32_t anim,int32_t shifted)=0; virtual void o10938()=0;
- virtual int32_t o10387(int32_t)=0; virtual void o11166()=0; virtual void o10887()=0; virtual void o11090()=0;
+ virtual int32_t o10387(int32_t)=0; virtual void o11166()=0; virtual void o10887(Unit*,int32_t stat,int32_t val,int32_t layer)=0; virtual void o11090()=0;
  virtual uint32_t f1380(uint32_t* seed)=0;
  virtual void fc370(int32_t)=0; virtual void fcec0(Unit*)=0; virtual void fc150()=0; virtual void f20f20()=0;
- virtual int32_t o10856(int32_t)=0; virtual void o10302(int32_t)=0; virtual void o10706(int32_t,uint32_t)=0;
+ virtual int32_t o10856(int32_t)=0; virtual void o10302(Unit*,int32_t skill,int32_t level)=0; virtual void o10706(int32_t,uint32_t)=0;
  virtual void f16950()=0; virtual void f1b300(Unit*,int32_t,int32_t,int32_t,int32_t)=0;
  virtual uint32_t rd(uint32_t addr)=0; virtual void wr(uint32_t addr,uint32_t v)=0;
  virtual int32_t gate390()=0;                 // DAT_6fbcc390
@@ -40,7 +40,10 @@ void sub_4D610(Svc& s,Unit* u,int32_t cls){
  const uint8_t* bm=s.bitMasks();
  if((bm[4]&ms[0xd]) && w[0x18]==0) w[0x18]=(uint32_t)s.o10387(0);
  s.o11166();
- for(int i=0;i<11;i++) s.o10887();
+ s.o10887(u,0x44,100,0); s.o10887(u,0x43,100,0); s.o10887(u,0x45,100,0);
+ { uint32_t d=s.gate390()&0xff; static const uint8_t st[6]={0x24,0x25,0x27,0x29,0x2b,0x2d};
+   for(int i=0;i<6;i++) s.o10887(u,st[i],(int32_t)*(const int16_t*)(ms+0x144+i*6+d*2),0); }
+ s.o10887(u,7,0x8000,0); s.o10887(u,6,0x8000,0);
  s.o11090();
  w[0x11]=s.f1380(&w[8]);
  w[0x31]=(bm[0xc]&m2[4]) ? (w[0x31]|2) : (w[0x31]&~2u);
@@ -50,11 +53,11 @@ void sub_4D610(Svc& s,Unit* u,int32_t cls){
  w[0x31]=(bm[4]&m2[5]) ? (w[0x31]|0xc) : ((w[0x31]&~4u)|8);
  s.fc370(0); s.fcec0(u); s.fc150(); s.f20f20();
  w[0x2a]=(uint32_t)s.o10856(0);
- for(int i=0;i<8;i++){ int16_t v=*(const int16_t*)(ms+0x170+i*2); if(v>=0) s.o10302(v); }
+ for(int i=0;i<8;i++){ int16_t v=*(const int16_t*)(ms+0x170+i*2); if(v>=0) s.o10302(u,v,(int32_t)(int8_t)ms[0x198+i]); }
  if((bm[0]&ms[0xd])==0){
   uint64_t v=(uint64_t)w[8]*0x6ac690c5u+w[9];
   w[8]=(uint32_t)v; w[9]=(uint32_t)(v>>32);
-  s.o10706(0x8000,(uint32_t)v&0x3f);
+  s.o10706(w[0xb],(uint32_t)v&0x3f);
  }
  s.f16950();
  uint32_t m=2; if(ms[0x4d]<8) m=ms[0x4d]+2u;

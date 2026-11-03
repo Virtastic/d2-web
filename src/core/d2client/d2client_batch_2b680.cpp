@@ -8,9 +8,10 @@ namespace d2client_batch_2b680 {
 struct Services {
  virtual ~Services()=default;
  virtual int32_t ord(uint32_t n, int32_t a=0, int32_t b=0, int32_t c=0, int32_t d=0)=0; // D2 import by ordinal
- virtual int32_t rva(uint32_t r, int32_t a=0, int32_t b=0, int32_t c=0, int32_t d=0)=0;  // un-recovered D2Client callee
+ virtual int32_t rva(uint32_t r, int32_t a=0, int32_t b=0, int32_t c=0, int32_t d=0, int32_t e=0, int32_t f=0)=0;  // un-recovered D2Client callee
  virtual int32_t ordN(uint32_t n,const int32_t* args,int cnt)=0; // import by ordinal, cnt args in call order
  virtual int32_t rvaN(uint32_t r,const int32_t* args,int n)=0; // n stack args, in push-reverse (call) order
+ virtual intptr_t b30f0(const uint32_t* params)=0; // D2Client+0xB30F0 on a 0x5C-byte (23 dword) spawn-parameter block; returns the new object or 0
  virtual int32_t dataTables()=0;            // *sgptDataTables
  virtual int32_t global(uint32_t r)=0;      // D2Client data global by RVA
  virtual const char16_t* string(int32_t id)=0; // Ordinal_10003 result (id taken from call order)
@@ -20,13 +21,7 @@ static void wr32(void* p,unsigned o,int32_t v){std::memcpy((uint8_t*)p+o,&v,4);}
 static int32_t skillRecord(Services& s,int32_t id){ // 0xBA0 count, 0xB98 table, stride 0x23C
  int32_t dt=s.dataTables(); if(id<0||id>=rd32((void*)(intptr_t)dt,0xba0))return 0; return id*0x23c+rd32((void*)(intptr_t)dt,0xb98);}
 // 1.13c D2Client+0x2B680
-int32_t sub_2B680(Services& s,int32_t* p,int32_t eax){
- // ECX=p, EAX caller register stored into local[3],local[4]; local[0]=0,local[1]=-1,local[2]=0,local[5]=0.
- int32_t loc[6]={0,-1,0,eax,eax,0};
- const int32_t a[8]={(int32_t)(intptr_t)p,0,0,3,0xa283,(int32_t)0x6fb509f0,(int32_t)(intptr_t)loc,0};
- s.rvaN(0xA1860,a,8);
- return loc[0]?loc[0]:loc[2];
-}
+int32_t sub_2B680(Services& s,int32_t* p){ s.rva(0xA1860,(int32_t)(intptr_t)p,0,0,3,0xa283,0xA09F0); return 0; } // ECX=p; stack 0,0,3,0xA283, callback RVA 0xA09F0 (6fb509f0)
 // 1.13c D2Client+0x2B960 (ECX=unit, EDX=edx, stack flag; ret 4). Frame B (after sub 0x40) per disassembly:
 // out2 @B+0xC, out1 @B+0x18, h @B+0x1C, R10013 @B+0x20, R10651 @B+0x24, R11142 @B+0x28, edx @B+0x2C.
 void sub_2B960(Services& s,int32_t* unit,int32_t edx,int32_t flag){
@@ -66,54 +61,63 @@ void sub_2B960(Services& s,int32_t* unit,int32_t edx,int32_t flag){
  }
  unit[0x11]=savedFrame<<8;
 }
-// 1.13c D2Client+0x2BB50
+// Spawn-parameter block for 0xB30F0: 23 dwords, zeroed; [0]=kind, [1]=owner unit, [4]=unit class (0x40550),
+// [5]/[6]=x/y (0x1630/0x1660), [11]=skill id, [12]=extra (2BD20/2BE30 build the block at +4 of a local).
+struct Spawn { uint32_t d[23]; };
+static bool skillOk(Services& s,int32_t id){ int32_t dt=s.dataTables(); return id>=0 && id<rd32((void*)(intptr_t)dt,0xba0) && skillRecord(s,id)!=0; }
+// 1.13c D2Client+0x2BB50  (ECX = unit, EDX = skillId)
 int32_t sub_2BB50(Services& s,int32_t unit,int32_t skillId){
  if(!s.ord(10331)||s.ord(10057))return 0;
- if(skillId<0)return 0; int32_t rec=skillRecord(s,skillId); if(!rec)return 0;
+ if(skillId<0)return 0; if(!skillOk(s,skillId))return 0; int32_t rec=skillRecord(s,skillId);
  int32_t cls=s.rva(0x40550,unit); int32_t dt=s.dataTables();
  if(cls<0||cls>=rd32((void*)(intptr_t)dt,0xb6c))return 0;
- int32_t r=s.ord(10786,unit,s.rva(0,rec+100),skillId); if(r<=0)return 0;
- int32_t r2=s.ord(10786,unit,s.rva(0,rec+100),1); if(r2<=0)return 0;
- uint32_t seed=(uint32_t)s.rva(0x1330,unit+32);
+ int32_t r=s.ord(10786,unit,rd32((void*)(intptr_t)rec,100),skillId); if(r<=0)return 0;
+ int32_t r2=s.ord(10786,unit,rd32((void*)(intptr_t)rec,100),1); if(r2<=0)return 0;
+ int32_t rr=r*r; uint32_t seed=(uint32_t)s.rva(0x1330,unit+32);
  int32_t n=((r*r)/(r2*r2))/(int32_t)(seed+1);
  s.rva(0x1630,unit); s.rva(0x1660,unit);
+ Spawn sp{}; sp.d[0]=0x2001; sp.d[1]=(uint32_t)unit;
  for(;n>0;--n){
   uint32_t a=(uint32_t)s.rva(0x1380,unit+32), b=(uint32_t)s.rva(0x1380,unit+32);
-  if((int32_t)((b-r)*(b-r)+(a-r)*(a-r))<r*r){
-   int32_t o=s.rva(0xB30F0,0x2001,unit); if(o){ s.ord(10706,o,s.rva(0x1330,unit+32)); } }
+  if((int32_t)((b-r)*(b-r)+(a-r)*(a-r))<rr){
+   intptr_t o=s.b30f0(sp.d); if(o){ s.ord(10706,rd32((void*)o,0x2c),s.rva(0x1330,unit+32)); } }
  }
  return 1;
 }
-// 1.13c D2Client+0x2BD20
-int32_t sub_2BD20(Services& s,int32_t unit,int32_t skillId,int32_t extra){
- if(!skillRecord(s,skillId))return 0;
+// 1.13c D2Client+0x2BD20  (ECX = unit, EDX = skillId, stack = param_3)
+int32_t sub_2BD20(Services& s,int32_t unit,int32_t skillId,int32_t param3){
+ if(skillId<0||!skillOk(s,skillId))return 0;
  int32_t cls=s.rva(0x40550,unit); if(cls<0||cls>=rd32((void*)(intptr_t)s.dataTables(),0xb6c))return 0;
- (void)cls; // unit+0xC4 |= 0x40 happens on the live unit (caller's struct)
- int32_t cur=s.rva(0xA5F70); if(!cur)return 0;
- int32_t o=s.rva(0xB30F0,1,unit,s.rva(0x1630,cur),s.rva(0x1660,cur));
- (void)extra;
- if(!o)return 0;
- s.ord(10637,o); s.ord(10019,o); return 1;
+ if(unit) wr32((void*)(intptr_t)unit,0xC4,rd32((void*)(intptr_t)unit,0xC4)|0x40);
+ intptr_t cur=(intptr_t)s.rva(0xA5F70); if(!cur)return 0;
+ Spawn sp{}; sp.d[0]=1; sp.d[1]=(uint32_t)unit; sp.d[5]=(uint32_t)s.rva(0x1630,(int32_t)cur); sp.d[6]=(uint32_t)s.rva(0x1660,(int32_t)cur);
+ sp.d[12]=(uint32_t)param3; sp.d[4]=(uint32_t)cls; sp.d[11]=(uint32_t)skillId;
+ intptr_t o=s.b30f0(sp.d); if(!o)return 0;
+ s.ord(10637,(int32_t)o,rd32((void*)cur,0)); s.ord(10019,(int32_t)o,rd32((void*)cur,12)); return 1;
 }
-// 1.13c D2Client+0x2BE30
-int32_t sub_2BE30(Services& s,int32_t unit,int32_t skillId,int32_t extra){
- if(!skillRecord(s,skillId))return 0;
+// 1.13c D2Client+0x2BE30  (ECX = unit, EDX = skillId, stack = param_3)
+int32_t sub_2BE30(Services& s,int32_t unit,int32_t skillId,int32_t param3){
+ if(skillId<0||!skillOk(s,skillId))return 0;
  int32_t cls=s.rva(0x40550,unit); if(cls<0||cls>=rd32((void*)(intptr_t)s.dataTables(),0xb6c))return 0;
- if(!s.rva(0xA1340))return 0; (void)extra;
- int32_t o=s.rva(0xB30F0,0x20,unit); if(!o)return 0;
- int32_t h=s.rva(0,o); if(!h)return 0;
- s.ord(10647,h,0xe); s.ord(10334,h,o,0); return 1;
+ if(unit) wr32((void*)(intptr_t)unit,0xC4,rd32((void*)(intptr_t)unit,0xC4)|0x40);
+ uint32_t pos[2]={0,0}; // 0xA1340 fills local_60[0]; nonzero result continues
+ if(!s.rva(0xA1340,(int32_t)(intptr_t)pos))return 0;
+ Spawn sp{}; sp.d[0]=0x20; sp.d[1]=(uint32_t)unit; sp.d[2]=(uint32_t)unit; sp.d[8]=pos[0];
+ sp.d[12]=(uint32_t)param3; sp.d[4]=(uint32_t)cls; sp.d[11]=(uint32_t)skillId;
+ intptr_t o=s.b30f0(sp.d); if(!o)return 0;
+ int32_t h=rd32((void*)o,0x2c); if(!h)return 0;
+ s.ord(10647,h,0xe); s.ord(10334,h,(int32_t)o,0); return 1;
 }
-// 1.13c D2Client+0x2BF40
+// 1.13c D2Client+0x2BF40 (string args of #10601/#10488, SkillsPal.cpp lines 0x176/0x1ca, are not carried by Services::ord)
 int32_t sub_2BF40(Services& s,int32_t* unit,int32_t skillId){
  int32_t p=s.ord(10511,(int32_t)(intptr_t)unit); if(!p)return 0;
  int32_t rec=skillRecord(s,skillId); if(!rec)return 0;
  if(s.ord(10601,p)==skillId && (int32_t)(intptr_t)unit==s.global(0xCBBFC) && (s.ord(10397,p)&1))return 0;
  if(unit[0xb]==0)return 0;
  int32_t cur=s.rva(0xA5F70);
- if(unit[0]==0 && cur && s.ord(11138,(int32_t)(intptr_t)unit,cur,0)) return s.rva(0xB3040,(int32_t)(intptr_t)unit);
- bool go = unit[0]==0 ? rd32((void*)(intptr_t)rec,0x102)<<16>>16 >=1 : (unit[0]==1 && (int32_t)s.rva(0xB779C0)>=1);
- if(go) s.rva(0xB38A70,(int32_t)(intptr_t)unit,0,0,0);
+ if(unit[0]==0 && cur && s.ord(11138,(int32_t)(intptr_t)unit,cur,0)) return s.rva(0xA3040,(int32_t)(intptr_t)unit);
+ bool go = unit[0]==0 ? rd32((void*)(intptr_t)rec,0x102)<<16>>16 >=1 : (unit[0]==1 && (int32_t)s.rva(0xC79C0)>=1);
+ if(go) s.rva(0x88A70,(int32_t)(intptr_t)unit,0,0,0);
  int32_t sub; 
  if(!cur||s.ord(10494,cur,0x36)){ s.ord(10243,p,6); sub=0; } else { s.ord(10243,p,rd32((void*)(intptr_t)cur,0)); sub=rd32((void*)(intptr_t)cur,12); }
  s.ord(10554,p,sub); int32_t spd=0x100; s.ord(11031,p,7);
@@ -123,14 +127,14 @@ int32_t sub_2BF40(Services& s,int32_t* unit,int32_t skillId){
  s.ord(10973,(int32_t)(intptr_t)unit,0x43,0);
  s.rva(0x2D20); int32_t a=s.rva(0x14A0,100,spd);
  s.ord(10488,sub,a); s.ord(10334,sub,(int32_t)(intptr_t)unit,0);
- if(cur)s.rva(0xB5FB0);
- s.ord(10137,a,0x1001); s.ord(10748,a,0); s.rva(0xB3220); return 1;
+ if(cur)s.rva(0xA5FB0);
+ s.ord(10137,a,0x1001); s.ord(10748,a,0); s.rva(0xA3220); return 1;
 }
 // 1.13c D2Client+0x2C2D0   (eax/esi are caller registers: inEax, esi60)
 int32_t sub_2C2D0(Services& s,int32_t* out,int32_t inEax,int32_t esi60,int32_t gate,uint32_t* flagOut){
- if(!gate)return 0; if(!s.ord(10858))return 0;
+ if(!gate)return 0; int32_t desc=s.ord(10858); if(!desc)return 0;
  *out=s.ord(10621);
- if(inEax||(esi60&&(inEax=s.ord(10061,esi60)))) if(s.ord(11088,inEax)==0x26){*out=0;}
+ if(inEax||(esi60&&(inEax=s.ord(10061,esi60)))) if(s.ord(11088,inEax)==0x26){*out=0; wr32((void*)(intptr_t)desc,0,0);}
  int32_t t=0; if(s.ord(10494))t=s.ord(10804);
  *out=(*out*(t+s.ord(10910)+s.ord(10653)))/100+*out;
  *flagOut=0; if(s.ord(10402))*flagOut=3; if(s.ord(11038))*flagOut=1; return 1;

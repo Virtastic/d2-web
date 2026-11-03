@@ -155,26 +155,29 @@ rejected:
     return 0;
 }
 
-// 1.13c D2Client+0x2AFB0 (220 B): unit queue compatibility gate. A failed queue lookup or mismatched
-// resource class latches failure; a valid unit reaches 0x2A7C0. The unresolved object lookups are seams.
+// 1.13c D2Client+0x2AFB0 (220 B): `unit` is the thiscall object (the 0x80-byte kind record from 0x54E20: type @0, mode @0x10, flags @0xC4),
+// `target_id` is param_1->+0xC (or -1 when param_1 is null). Allowed type/mode (0/0|0x11, 1/0|0xC) or
+// flags&0x10000 skip straight to the record check; otherwise flags&2 selects the 0x9E80 test and the
+// 0x2AA40 enqueue, else the failure latch. `lookup` is 0x4D630 (fills the record's +0x10), `class_ok` is 0x4FD90.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_2afb0(
     D2ClientBatch2a700Host host, D2ClientBatchUnit* unit, uint32_t action,
-    uint32_t object_id, uint32_t payload, int32_t arg, uint32_t* result_flags,
-    int32_t (*lookup)(uint32_t,uint32_t*), int32_t (*class_ok)(uint32_t,uint32_t)) {
-    uint32_t object_class=0;
-    if (unit && !(unit->flags&0x10000u)) {
-        bool allowed=(unit->type==0 && (unit->mode==0 || unit->mode==0x11)) ||
-                     (unit->type==1 && (unit->mode==0 || unit->mode==0xC));
-        if (!allowed && !(unit->flags&2u)) goto failed;
-        if (!invoke(host,0x29E80,unit->id)) return 1;
-        if (unit->flags&2u) { invoke(host,0x2AA40,action,0,unit->id,0,0,arg,payload); return 0; }
+    uint32_t target_id, int32_t arg, uint32_t* result_flags,
+    int32_t (*lookup)(uint32_t*), int32_t (*class_ok)(uint32_t,uint32_t)) {
+    if (!(unit->flags&0x10000u)) {
+        bool direct=false;
+        if (unit->type==0) direct=(unit->mode==0 || unit->mode==0x11);
+        else if (unit->type==1) direct=(unit->mode==0 || unit->mode==0xC);
+        if (!direct) {
+            if (!(unit->flags&2u)) { result_flags[0]=0; result_flags[1]=1; return 0; }
+            if (!invoke(host,0x29E80,target_id)) return 1;
+            invoke(host,0x2AA40,target_id,0,0,0,0,action,(uint32_t)arg); // EAX = param_1; stack = param_2, param_3
+            return 0;
+        }
     }
-    if (!lookup(object_id,&object_class)) goto failed;
-    if (object_class && !class_ok(object_class,1)) goto failed;
+    uint32_t field10=0;
+    if (!lookup(&field10)) { result_flags[1]=1; result_flags[0]=0; return 0; }
+    if (target_id!=field10 && !class_ok(field10,1)) { result_flags[0]=0; result_flags[1]=1; return 0; }
     invoke(host,0x2A7C0,action);
-    return 0;
-failed:
-    result_flags[0]=0; result_flags[1]=1;
     return 0;
 }
 
@@ -243,10 +246,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE const char* d2_client_2b420(
     char* append_start = reinterpret_cast<char*>(&frame.uStack_10c) + 4;
     const char* file = env->ordinal10016(append_start);
     void* archive = env->helper_bd810(file, nullptr);
-    char helper_out[4]{};
-    void* archive_arg = nullptr;
+    void* archive_arg = nullptr; // retail reuses uStack_10c, zeroed, as the out slot
     env->ordinal10006(archive, &archive_arg,
-        "..\\Source\\D2Client\\CORE\\ARCHIVE.CPP", 0x56, 0xFFFFFFFFu, helper_out);
+        "..\\Source\\D2Client\\CORE\\ARCHIVE.CPP", 0x56, 0xFFFFFFFFu, frame.acStack_108);
     return "..\\Source\\D2Client\\CORE\\ARCHIVE.CPP";
 }
 
@@ -354,16 +356,18 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_2c4f0(
     return 1;
 }
 
-// 1.13c D2Client+0x2C6A0 (236 B): format a signed min/max range. Values above 9999 use the K form;
-// the UI's sign and K-prefix strings are selected from the two module literals before Unicode copy.
+// 1.13c D2Client+0x2C6A0 (236 B): ECX bonus, EDX range_mode, stack unicode target, ESI minimum, EAX maximum.
+// The K forms prefix the module string DAT_6fb86a30 (`plus_str`, bonus set) or DAT_6fb8359f (`plain_str`);
+// the plain form is the literal "+%d-%d" / "%d-%d". Strings are read from the module, so they are arguments.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_2c6a0(
     int32_t bonus, int32_t range_mode, int32_t minimum, int32_t maximum, char* output,
     void (*to_unicode)(void*,const char*,uint32_t), void* unicode_target,
-    const char* plus, const char* plain, const char* kilo) {
-    const char* prefix=bonus?plus:plain;
-    if (range_mode && minimum>9999) std::snprintf(output,32,"%s%dK-%dK",kilo,(minimum+500)/1000,(maximum+500)/1000);
-    else if (range_mode && maximum>9999) std::snprintf(output,32,"%s%d-%dK",kilo,minimum,(maximum+500)/1000);
-    else std::snprintf(output,32,"%s%d-%d",prefix,minimum,maximum);
+    const char* plus_str, const char* plain_str) {
+    if (range_mode && minimum>9999)
+        std::snprintf(output,32,"%s%dK-%dK",bonus?plus_str:plain_str,(minimum+500)/1000,(maximum+500)/1000);
+    else if (range_mode && maximum>9999)
+        std::snprintf(output,32,"%s%d-%dK",bonus?plus_str:plain_str,minimum,(maximum+500)/1000);
+    else std::snprintf(output,32,bonus?"+%d-%d":"%d-%d",minimum,maximum);
     to_unicode(unicode_target,output,0x20);
 }
 

@@ -5,8 +5,6 @@
 #include <cctype>
 #include "d2client_batch_38410.h"
 namespace d2client_batch_38410 {
-// 1.13c D2Client+0x38410
-void sub_38410(Services& api,uint32_t* p,uint32_t vtA,uint32_t vtB){ p[0]=vtA; if(p[2]) api.destroyObj(reinterpret_cast<void*>(uintptr_t(p[2]))); p[0]=vtB; }
 // 1.13c D2Client+0x38770
 void sub_38770(Services& api,uint32_t* p,uint32_t vt,uint32_t baseVt){
  p[0]=vt; if(p[10]){api.ord10043(0x8e,0);p[10]=0;} if(p[11]){api.ord10043(0x93,0);p[11]=0;}

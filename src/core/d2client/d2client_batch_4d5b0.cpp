@@ -45,12 +45,12 @@ struct Svc {
  virtual uint8_t* gc9663()=0; virtual uint8_t* gc9729()=0; virtual int32_t* gc966b()=0;
 };
 
-// 1.13c D2Client+0x4D5B0 (register-arg fragment: unaff_EBP stored at [EDI+0x10] each pass)
+// 1.13c D2Client+0x4D5B0 (register-arg fragment: EDI = unit; the stored word is the 4th out of Ordinal_10292)
 void sub_4D5B0(Svc& s,uint8_t* edi,uint32_t ebp){
  void* h=s.o10421(); int32_t n=s.o10034(); int32_t o[4]={0};
  for(int32_t i=0;i<(n>>8);++i){
   s.o10292(h,i<<8,i<<8,&o[0],&o[1],&o[2],&o[3]);
-  wr<uint32_t>(edi,0x10,ebp); s.sub6A220();
+  wr<uint32_t>(edi,0x10,(uint32_t)o[0]); s.sub6A220(); (void)ebp;
  }
 }
 

@@ -92,24 +92,21 @@ void sub_1AB20(const uint8_t*fr,I a,I b,const Fn1AB20&f){
   if(f.o10407(tgt,pl)>4){f.s7c0(rd(fr,0x18));f.s2d50(0x13,a,b);*f.g9828=*f.g97ec+500;return;}
   tail9f(pl,a,b,f); *f.g9828=*f.g97ec+500; return;
  default: common(); return;}}
-// 1.13c D2CLIENT+0x2B380 (stdcall ret 8; EAX=name, stack param_1 feeds #10016, param_2 feeds #10070).
-// Frame as retail: uStack_10c @F-4, acStack_108 @F+0 (uninitialised bytes: caller-supplied), local_104 @F+4.
-// The name is copied unbounded to local_104, the root is appended at the first NUL found scanning from
-// F+0, #10006 gets &uStack_10c (zeroed) and the pointer to acStack_108. Returns the ARCHIVE.CPP string.
-struct Fn2B380{ const char*(*o10070)(U); U (*o10016)(U); I (*s_d810)(U,P); void (*o10006)(I,U*,const char*,I,I,char*);};
-const char* sub_2B380(const char*name,U param_1,U param_2,const uint8_t acStack_108_initial[4],const Fn2B380&f){
- struct { U uStack_10c; char acStack_108[4]; char local_104[260]; } fr;
+// 1.13c D2CLIENT+0x2B380 (EAX = path; stack param_1 unused, param_2 is stored in uStack_10c; the d810 second
+// argument is the caller's return slot `retslot`). Same frame as 0x2B420: uStack_10c(4) | acStack_108(4) | local_104[260];
+// the root is appended at the first NUL found scanning from acStack_108, and acStack_108 is #10006's last argument.
+struct Fn2B380{ const char*(*o10070)(); const char*(*o10016)(const char*); void*(*d810)(const char*,uint32_t*); void (*o10006)(void*,void**,const char*,U,U,char*);};
+const char* sub_2B380(const char*name,U param2,const uint8_t acStack_108_initial[4],uint32_t*retslot,const Fn2B380&f){
+ struct{U uStack_10c; char acStack_108[4]; char local_104[260];} fr;
  std::memcpy(fr.acStack_108,acStack_108_initial,4);
- { const char*s=name; char*d=fr.local_104; do { *d++=*s; } while(*s++); }
- const char* root=f.o10070(param_2);
- char* p=fr.acStack_108; while(*p) ++p;
- { const char*r=root; do { *p++=*r; } while(*r++); }
- U h16=f.o10016(param_1);
- I h=f.s_d810(h16,fr.local_104+4);
- const char*src="..\\Source\\D2Client\\CORE\\ARCHIVE.CPP";
- fr.uStack_10c=0;
- f.o10006(h,&fr.uStack_10c,src,0x6b,-1,fr.acStack_108);
- return src;}
+ size_t i=0; for(;i+1<sizeof fr.local_104&&name[i];++i)fr.local_104[i]=name[i]; fr.local_104[i]=0;
+ fr.uStack_10c=param2;
+ const char*root=f.o10070();
+ char*d=reinterpret_cast<char*>(&fr.uStack_10c)+3; do{++d;}while(*d);
+ for(size_t k=0;;++k){d[k]=root[k]; if(!root[k])break;}
+ const char*file=f.o10016(reinterpret_cast<char*>(&fr.uStack_10c)+4);
+ void*h=f.d810(file,retslot); void*z=nullptr; const char*src="..\\Source\\D2Client\\CORE\\ARCHIVE.CPP";
+ f.o10006(h,&z,src,0x6b,0xFFFFFFFFu,fr.acStack_108); return src;}
 static void wcat(char16_t*d,const char16_t*s){while(*d)++d;while((*d++=*s++));}
 // 1.13c D2CLIENT+0x2CE10
 struct Fn2CE10{ const char16_t*(*str)(I);};

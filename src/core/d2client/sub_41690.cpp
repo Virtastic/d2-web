@@ -1,6 +1,7 @@
 // D2Client sub_41690 (0x41690) and its callee 0x41000, real functions over the real callees.
 #include <cstdint>
 #include <cstring>
+#include "../d2moo/include/D2Seed.h"
 #include <unistd.h>
 #include "../d2moo/include/D2DataTbls.h"
 #include "../d2moo/include/D2Skills.h"
@@ -14,21 +15,21 @@ uint32_t Fog_Ordinal_10265(uint32_t);
 void Fog_Ordinal_10024(const void*, const void*, uint32_t);
 W uint8_t DAT_6fb8359f[1];
 W uint32_t DAT_6fb86520[64], DAT_6fb86620[64];
-W void Ordinal_10614(void);
 W void Ordinal_10637(void* missile, int32_t level);
 void* d2client_msl_create_b30f0(const uint32_t* req);          // D2Client+0xB30F0
 void FUN_6fada0b0(const uint8_t* in_EAX, uint32_t unaff_EDI);  // D2Client+0x2A0B0
 
-// 1.13c D2Client+0x41000 (unaff_EBX = skill id; param_5 unused by retail)
+// 1.13c D2Client+0x41000 (unaff_EBX = skill id, unaff_EDX = unit+0x28 seed)
 void FUN_6faf1000(uint32_t param_1, uint32_t param_2, uint32_t param_3, uint32_t param_4,
-                  uint32_t param_5, int32_t param_6, int32_t unaff_EBX) {
-    (void)param_5;
-    Ordinal_10614();
+                  uint32_t param_5, int32_t param_6, int32_t unaff_EBX, uint32_t unaff_EDX) {
+    D2SeedStrc seed; SEED_InitLowSeed(&seed, static_cast<int>(unaff_EDX));   // #10614 (ecx=&seed, edx=unit+0x28)
     uint32_t s[0x17]; memset(s, 0, sizeof s);
     s[0] = 3; s[1] = param_1; s[4] = param_2; s[5] = param_3; s[6] = param_4;
+    s[0xb] = static_cast<uint32_t>(unaff_EBX); s[0xc] = param_5; s[0x15] = 0x6faf0130u;   // disasm: +0x40 skill id, +0x44 param_5, +0x68 callback
     for (int32_t i = 0; i < 0x100; i += param_6 * 4) {
         s[8] = *(const uint32_t*)((const uint8_t*)DAT_6fb86520 + i);
         s[7] = *(const uint32_t*)((const uint8_t*)DAT_6fb86620 + i);
+        { uint64_t r; std::memcpy(&r, &seed, 8); r = (r & 0xffffffff) * 0x6ac690c5u + (r >> 32); std::memcpy(&seed, &r, 8); s[0x16] = static_cast<uint32_t>(r); }
         void* m = d2client_msl_create_b30f0(s);
         int32_t lvl = 0;
         if (unaff_EBX >= 0 && unaff_EBX < sgptDataTables->nSkillsTxtRecordCount)
@@ -52,11 +53,11 @@ int32_t d2_client_41690(D2UnitStrc* unit, int32_t idx, uint32_t param_3) {
     D2UnitStrc* tgt = PATH_GetTargetUnit(unit->pDynamicPath);   // #10392
     if (!tgt) return 0;
     uint32_t calc; std::memcpy(&calc, row + 0x64, 4);
-    int32_t len = d2_client_40450(idx, unit, calc, static_cast<int32_t>(param_3));
+    int32_t len = d2_client_40450(idx, unit, static_cast<int32_t>(param_3));
     if (len < 1) len = SKILLS_EvaluateSkillFormula(unit, calc, idx, static_cast<int32_t>(param_3));  // #10786
     FUN_6faf1000(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(unit)), static_cast<uint32_t>(variant),
                  static_cast<uint32_t>(UNITS_GetXPosition(tgt)), static_cast<uint32_t>(UNITS_GetYPosition(tgt)),
-                 param_3, len, idx);
+                 param_3, len, idx, *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(unit) + 0x28));  // edx = unit+0x28
     return 1;
 }
 }

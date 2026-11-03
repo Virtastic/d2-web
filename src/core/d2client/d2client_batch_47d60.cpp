@@ -199,32 +199,33 @@ void sub_492F0(){
  g.v9661=0;h.f8150();h.f67c0();g.v9663=0;
 }
 
-// 1.13c D2Client+0x49D80  (menu index in EAX)
+// 1.13c D2Client+0x49D80  (menu index in EAX; stack arg 0xd35 is the title string key, its only caller 4A270 passes it)
+// h.rowOf(s,lo,hi) must return the string key: the u16 at 6fb91402+4*k for the first k in [lo,hi) with u16 6fb91400+4*k == s, else 0xe8c.
 void sub_49D80(I idx){
  if(g.ctl9767){h.fatal(0x76f);return;}
  h.f6880();
  g.ctl9767=h.newCtl(H9250,H8650);
  if(!g.ctl9767){h.fatal(0x529);return;}
  g.ctl9767->w[0x17]=1;
- h.addLine(g.ctl9767,h.str(0),0x15,0,1,0,0);
+ h.addLine(g.ctl9767,h.str(0xd35),0x15,0,1,0,0);
  I inv=g.a3b10; if(inv)
  {
   I n=h.o10720(); g.a9679=U(idx);
-  if(g.tab37a8[idx*0x16+0x14]==0)h.addLine(g.ctl9767,h.str(1),0xf,0,1,0x6faf9130,1);
-  h.addLine(g.ctl9767,h.str(2),0xf,0,1,0x6faf91e0,inv);
+  if(g.tab37a8[idx*0x16+0x14]==0)h.addLine(g.ctl9767,h.str(0xd47),0xf,0,1,0x6faf9130,1);
+  h.addLine(g.ctl9767,h.str(0xd43),0xf,0,1,0x6faf91e0,inv);
   for(I i=0;i<n;++i){
    U s=h.o10109(inv,i); I row=h.rowOf(s,s<U(uint16_t(g.a91590))?0:100,s<U(uint16_t(g.a91590))?100:g.a91c3c);
    h.addLine(g.ctl9767,h.str(U(row)),0xf,0,1,0x6faf73b0,1);
   }
-  if(g.v9725==0xc9)h.addLine(g.ctl9767,h.str(3),0xf,0,1,0x6faf7360,1);
+  if(g.v9725==0xc9)h.addLine(g.ctl9767,h.str(0xd40),0xf,0,1,0x6faf7360,1);
   if((g.v9725==0x109||g.v9725==0xf4||g.v9725==0xf5||g.v9725==0x208||g.v9725==0xf6)&&g.player&&rd(g.player,0x60)){
    for(I u=h.o10460(rd(g.player,0x60));u;u=h.o10464(u)){
     I it=h.o11147(u);
-    if(it&&h.o10802(it)==0x20786f62){h.addLine(g.ctl9767,h.str(4),0xf,0,1,0x6faf7310,u);break;}
+    if(it&&h.o10802(it)==0x20786f62){h.addLine(g.ctl9767,h.str(0x8b7),0xf,0,1,0x6faf7310,u);break;}
    }
   }
  }
- h.addLine(g.ctl9767,h.str(5),0xf,0,1,H9250,1);
+ h.addLine(g.ctl9767,h.str(0xd48),0xf,0,1,H9250,1);
 }
 
 // 1.13c D2Client+0x4A060  (menu index in EAX)

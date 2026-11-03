@@ -37,7 +37,7 @@ uint8_t sub_4C990(Services& s, void* a, int32_t* b) {
  uint8_t u=s.ord10042(b[0xb]); uint32_t k=s.ord10266(u);
  int32_t o[2]; s.ord10740(k&0xff,&o[0],&o[1]);   // decompile stack-garbled: out pair
  int32_t bx=s.x(b), by=s.y(b), ax=s.x(a);
- if(bx+o[0]==ax && by+o[1]==s.y(a)) return u;
+ if(bx+o[0]*3==ax && by+o[1]*3==s.y(a)) return u;
  return 0;
 }
 }

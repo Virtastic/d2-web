@@ -179,8 +179,9 @@ uint32_t appendPairLabel(const Host& h, Address destination, int16_t left, int16
 // source record and positive amount. The amount is rendered in decimal between
 // the localized value label and suffixes; the record formatter is +0xC7E0.
 uint32_t appendCountedRecord(const Host& h, Address destination, int16_t selector,
-                             uint32_t ignored, Address record, int32_t amount) {
-    if (selector == 0x1506 || !record || amount <= 0) return 0;
+                             uint32_t ignored, uint32_t gate, int32_t amount, Address record) {
+    // param_1 selector, param_2 ignored, param_3 gate, param_4 amount, param_5 record (the 0x2C7E0 source).
+    if (selector == 0x1506 || !gate || amount <= 0) return 0;
     char16_t formatted[64]{};
     h.call(0x2C7E0, {record, out(formatted)});
     for (int i = 0; i < 3; ++i) appendCurrentRef(h, destination);
@@ -230,12 +231,16 @@ uint32_t appendPlainRange(const Host& h, Address destination, int32_t low, int32
 // signed single value or range. Return low word 1 when text was emitted.
 uint64_t appendScaledRange(const Host& h, Address destination, int32_t low, int32_t high,
                            int32_t scale, int32_t offset, int32_t sharedOffset) {
-    auto scaled = [scale](int32_t value) -> int32_t {
-        if (scale < 0x10001) return static_cast<int32_t>((value * scale) / 100);
-        const int32_t maskedScale = scale & static_cast<int32_t>(0xFFFFFFF0u);
-        if (maskedScale < 0x640)
-            return static_cast<int32_t>((int64_t(value) * scale) / 100);
-        return static_cast<int32_t>((scale / 100) * value);
+    // Retail ladder (decompile 0x2D000): small values choose by scale, values above 0x100000 by value.
+    auto scaled = [scale](int32_t value) {
+        const int64_t wide = (int64_t(value) * int64_t(scale)) / 100;
+        if (value < 0x100001) {
+            if (scale < 0x10001) return static_cast<int32_t>(static_cast<int32_t>(uint32_t(value) * uint32_t(scale)) / 100);
+            if ((scale & static_cast<int32_t>(0xFFFFFFF0u)) < 0x640) return static_cast<int32_t>(wide);
+            return static_cast<int32_t>(uint32_t(scale / 100) * uint32_t(value));
+        }
+        if ((value & static_cast<int32_t>(0xFFFFFFF0u)) < 0x640) return static_cast<int32_t>(wide);
+        return static_cast<int32_t>(uint32_t(value / 100) * uint32_t(scale));
     };
     int32_t a = static_cast<int32_t>(static_cast<uint32_t>(low) + scaled(low) + offset);
     int32_t b = static_cast<int32_t>(static_cast<uint32_t>(high) + scaled(high) + offset);
@@ -252,7 +257,8 @@ uint64_t appendScaledRange(const Host& h, Address destination, int32_t low, int3
 uint32_t appendConditionalRange(const Host& h, Address destination, int16_t enabled,
                                int32_t low, int32_t high) {
     if (enabled == 0 && static_cast<int16_t>(h.call(0x2C870)) == 0) return 0;
-    std::u16string number = formatNumber(low, high);
+    // Retail: "%d" when (low==0 ? high==0 : low==high), else "%d-%d".
+    std::u16string number = formatNumber(low, low == 0 ? (high == 0 ? 0 : high) : high);
     appendCurrentRef(h, destination);
     appendLocal(h, destination, number.c_str());
     appendCurrentRef(h, destination);

@@ -17,7 +17,7 @@ void Fog_Ordinal_10024(const void*, const void*, uint32_t);                     
 __attribute__((weak)) uint8_t DAT_6fb8359f[1];                      // D2Client+0xB8359F format string
 uint32_t FUN_6fb51340(int32_t* outH, const uint8_t* self, int32_t* outW);  // D2Client+0xA1340
 void FUN_6fada0b0(const uint8_t* in_EAX, uint32_t unaff_EDI);             // D2Client+0x2A0B0
-void FUN_6faf0f00(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, int32_t, int32_t);  // D2Client+0x40F00
+void FUN_6faf0f00(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, int32_t, int32_t, uint32_t);  // D2Client+0x40F00
 }
 
 static const uint8_t* skillRow(int32_t idx) {
@@ -27,7 +27,7 @@ static const uint8_t* skillRow(int32_t idx) {
 
 // 1.13c D2Client+0x414F0 (ecx = unit, edx = skill id, stack = param_3)
 // 0x40450 is called with the same registers; its result is the burst count handed to 0x40DF0 in EAX.
-// GUESS: 0x40450's calc is row+0x64 (as the 0x415A0 fallback), level = param_3; 0x40DF0's seedLow = n.
+// 0x40450 takes (idx, unit, level=param_3) and derives its own calc; 0x40DF0's seedLow = n.
 extern "C" int32_t d2_client_414f0(D2UnitStrc* unit, int32_t idx, uint32_t param_3) {
     const uint8_t* row = skillRow(idx);
     if (!row) return 0;
@@ -35,12 +35,11 @@ extern "C" int32_t d2_client_414f0(D2UnitStrc* unit, int32_t idx, uint32_t param
     if (variant < 0) return 0;
     int32_t outW = 0, outH = 0;
     if (!FUN_6fb51340(&outH, reinterpret_cast<const uint8_t*>(unit), &outW)) return 0;
-    uint32_t calc; std::memcpy(&calc, row + 0x64, 4);
-    int32_t n = d2_client_40450(idx, unit, calc, static_cast<int32_t>(param_3));
+    int32_t n = d2_client_40450(idx, unit, static_cast<int32_t>(param_3));
     if (!n) return 0;
     d2_client_40df0(n, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(unit)), static_cast<uint32_t>(outW),
                     static_cast<uint32_t>(outH), static_cast<uint32_t>(idx), param_3,
-                    static_cast<uint32_t>(variant), static_cast<uint32_t>(n));
+                    static_cast<uint32_t>(variant));
     return 1;
 }
 
@@ -59,10 +58,10 @@ extern "C" int32_t d2_client_415a0(D2UnitStrc* unit, int32_t idx, uint32_t param
     D2UnitStrc* tgt = PATH_GetTargetUnit(unit->pDynamicPath);   // #10392
     if (!tgt) return 0;
     uint32_t calc; std::memcpy(&calc, row + 0x64, 4);
-    int32_t len = d2_client_40450(idx, unit, calc, static_cast<int32_t>(param_3));
+    int32_t len = d2_client_40450(idx, unit, static_cast<int32_t>(param_3));
     if (len < 1) len = SKILLS_EvaluateSkillFormula(unit, calc, idx, static_cast<int32_t>(param_3));  // #10786
     FUN_6faf0f00(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(unit)), static_cast<uint32_t>(variant),
                  static_cast<uint32_t>(UNITS_GetXPosition(tgt)), static_cast<uint32_t>(UNITS_GetYPosition(tgt)),
-                 param_3, len, idx);
+                 param_3, len, idx, *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(unit) + 0x28));  // edx = unit+0x28
     return 1;
 }

@@ -13,54 +13,48 @@
 #include "../d2moo/include/D2BitManip.h"
 #include "../d2moo/include/Units/Missile.h"
 #include "skill_gates_40450.h"
+#include "d2c_seam.h"
+extern "C" int32_t d2c_40550(const D2cSkillTbl*, const D2cSeam*, int32_t, const uint8_t*);
+extern "C" uint32_t d2c_40450(const D2cSkillTbl*, const D2cSeam*, int32_t, const uint8_t*, uint32_t);
 
 extern "C" void* d2client_msl_create_b30f0(const uint32_t* req);   // D2Client+0xB30F0
 
-// Row of sgptDataTables+0xB98 (stride 0x23C, count +0xBA0), null when out of range.
-static const uint8_t* skillRec(int32_t id) {
-    if (id < 0 || id >= sgptDataTables->nSkillsTxtRecordCount) return nullptr;
-    return reinterpret_cast<const uint8_t*>(sgptDataTables->pSkillsTxt) + static_cast<uint32_t>(id) * 0x23c;
+// The D2Common exports the three skill-gate callees resolve to (the ports in d2client_40450.cpp / d2client_40550.cpp take them as seam calls).
+static uint64_t engSeam(void*, uint32_t rva, const uint64_t (&w)[14]) {
+    switch (rva) {
+    case 0xc1c0: return reinterpret_cast<uintptr_t>(STATLIST_GetStatListFromUnitAndState(reinterpret_cast<D2UnitStrc*>(w[5]), static_cast<int32_t>(w[6])));
+    case 0xc4b4: return static_cast<uint32_t>(STATLIST_GetStatValue(reinterpret_cast<D2StatListStrc*>(w[5]), static_cast<int32_t>(w[6]), 0));
+    case 0xc316: return static_cast<uint32_t>(SKILLS_EvaluateSkillFormula(reinterpret_cast<D2UnitStrc*>(w[5]), static_cast<uint32_t>(w[6]),
+                                                                       static_cast<int32_t>(w[7]), static_cast<int32_t>(w[8])));
+    }
+    __builtin_trap();
 }
-static int16_t s16(const uint8_t* r, int o) { int16_t v; std::memcpy(&v, r + o, 2); return v; }
-// The flagged branch's gate: state id (+0x80) in States.txt range, stat id (+0x54) in ItemStatCost range.
-static bool gated(const uint8_t* r) {
-    return (static_cast<uint8_t>(gdwBitMasks[8]) & r[4]) && s16(r, 0x80) >= 0 &&
-           s16(r, 0x80) < sgptDataTables->nStatesTxtRecordCount && s16(r, 0x54) >= 0 &&
-           s16(r, 0x54) < sgptDataTables->nItemStatCostTxtRecordCount;
+static D2cSkillTbl engTbl() {
+    return { reinterpret_cast<const uint8_t*>(sgptDataTables->pSkillsTxt), sgptDataTables->nSkillsTxtRecordCount,
+             sgptDataTables->nStatesTxtRecordCount, sgptDataTables->nItemStatCostTxtRecordCount, 0,
+             reinterpret_cast<const uint8_t*>(gdwBitMasks)[8] };
 }
 
-// 1.13c D2Client+0x40550 (unit in param, skill id in EAX)
+// engine wrapper of d2client_40550.cpp (unit in param, skill id in EAX)
 extern "C" int32_t d2_client_40550(D2UnitStrc* unit, int32_t id) {
-    const uint8_t* r = skillRec(id);
-    if (!r) return -1;
-    if (gated(r)) {
-        D2StatListStrc* l = STATLIST_GetStatListFromUnitAndState(unit, s16(r, 0x80));
-        if (l) {
-            int32_t lv = STATLIST_GetStatValue(l, s16(r, 0x54), 0);
-            if (lv >= 2) { if (lv > 2) lv = 3; return s16(r, 0xe8 + lv * 2); }
-        }
-    }
-    return s16(r, 0xea);
+    const D2cSkillTbl t = engTbl(); const D2cSeam s{ engSeam, nullptr };
+    return d2c_40550(&t, &s, id, reinterpret_cast<const uint8_t*>(unit));
 }
 
-// 1.13c D2Client+0x40450 (skill index in EDI; unit/calc/level are the caller's pass-through for the tail call)
-extern "C" int32_t d2_client_40450(int32_t idx, D2UnitStrc* unit, uint32_t calc, int32_t level) {
-    const uint8_t* r = skillRec(idx);
-    if (!r) return 0;
-    if (gated(r)) {
-        D2StatListStrc* l = STATLIST_GetStatListFromUnitAndState(unit, s16(r, 0x80));
-        if (l) STATLIST_GetStatValue(l, s16(r, 0x54), 0);
-    }
-    return SKILLS_EvaluateSkillFormula(unit, calc, idx, level);  // every path ends in #10786
+// engine wrapper of d2client_40450.cpp (skill index in EDI, unit in EBX, level on the stack; the calc word is read from the record)
+extern "C" int32_t d2_client_40450(int32_t idx, D2UnitStrc* unit, int32_t level) {
+    const D2cSkillTbl t = engTbl(); const D2cSeam s{ engSeam, nullptr };
+    return static_cast<int32_t>(d2c_40450(&t, &s, idx, reinterpret_cast<const uint8_t*>(unit), static_cast<uint32_t>(level)));
 }
 
-// 1.13c D2Client+0x40DF0 (n in EAX; seedLow = the value #10614 receives in a register)
+// 1.13c D2Client+0x40DF0 (n in EAX, EDX = p2 at entry is the value #10614 receives; six stack args, ret 0x18).
+// Request words (disasm, base esp+0x18): [0]=3 [1]=p1 [4]=p6 [5]=p2 [6]=p3 [7]=x [8]=y [0xb]=p4 [0xc]=p5.
 extern "C" void d2_client_40df0(int32_t n, uint32_t p1, uint32_t p2, uint32_t p3, uint32_t p4, uint32_t p5,
-                                uint32_t p6, uint32_t seedLow) {
+                                uint32_t p6) {
     D2SeedStrc seed;
-    SEED_InitLowSeed(&seed, static_cast<int>(seedLow));
+    SEED_InitLowSeed(&seed, static_cast<int>(p2));
     uint32_t s[23] = {};
-    s[0] = 3; s[1] = p1; s[5] = p2; s[6] = p3; s[4] = p6; s[15] = p4; s[16] = p5;
+    s[0] = 3; s[1] = p1; s[5] = p2; s[6] = p3; s[4] = p6; s[11] = p4; s[12] = p5;
     for (; n > 0; --n) {
         uint64_t r; std::memcpy(&r, &seed, 8);
         uint64_t a = (r & 0xffffffff) * 0x6ac690c5u + (r >> 32);
@@ -69,7 +63,7 @@ extern "C" void d2_client_40df0(int32_t n, uint32_t p1, uint32_t p2, uint32_t p3
         int32_t y = static_cast<int32_t>(static_cast<uint32_t>(r) % 0x28) - 0x14;
         std::memcpy(&seed, &r, 8);
         if (x == 0 && y == 0) x = 0x14;
-        s[11] = static_cast<uint32_t>(x); s[12] = static_cast<uint32_t>(y);
+        s[7] = static_cast<uint32_t>(x); s[8] = static_cast<uint32_t>(y);
         D2UnitStrc* m = static_cast<D2UnitStrc*>(d2client_msl_create_b30f0(s));
         if (m) {
             MISSILE_SetTargetX(m, static_cast<int>(SEED_GetLowSeed(&seed)));

@@ -7,13 +7,13 @@
 #endif
 #include <cstdint>
 #include <cstring>
-extern "C" void d2client_scatter_41100(void* unit, int32_t seedLow, int32_t cx, int32_t cy, int32_t r, int32_t a5, int32_t a6);
+extern "C" void d2client_scatter_41100(void* unit, int32_t seedLow, int32_t arg1, int32_t cx, int32_t cy, int32_t r, int32_t a5, int32_t a6);
 namespace d2client_batch_41100 {
 struct Svc {
  virtual ~Svc()=default;
  virtual const uint8_t* row(int32_t i)=0;            // sgptDataTables +0xb98 base, +0xba0 count, stride 0x23c
  virtual int32_t unitVariant(void* u)=0;             // D2Client+0x40550
- virtual int32_t unitAnimLen(void* u)=0;             // D2Client+0x40450
+ virtual int32_t unitAnimLen(void* u,int32_t idx,int32_t b)=0; // D2Client+0x40450 (edi=idx, ebx=u, stack=b)
  virtual bool coords(int32_t* out2)=0;               // D2Client+0xA1340
  virtual void* spawn(const uint32_t* rec)=0;         // D2Client+0xB30F0
  virtual void seed(uint32_t& hi,int32_t& count)=0;   // Ordinal_10614 / Ordinal_10331
@@ -30,36 +30,41 @@ struct Svc {
 template<class T> static T rd(const uint8_t* p,unsigned o){T v;std::memcpy(&v,p+o,sizeof v);return v;}
 
 // 1.13c D2Client+0x41100 : see scatter_41100.cpp (real callees)
-// 1.13c D2Client+0x41290
+// 1.13c D2Client+0x41290 (ecx=unit, edx=idx, stack=b, ret 4). coords: xy[0]=0xB1340 stack out, xy[1]=its EDI out.
+// Request words (disasm): [0]=1 [1]=unit [4]=s16(+0xea) [5]=xy[1] [6]=xy[0] [0xb]=idx [0xc]=b. The #10786 result goes to the new
+// object (the 0xCC7C call), s16(+0xec) to the 0xCC76 call.
 bool spawnEffect(Svc& s,uint32_t a,int32_t idx,int32_t b){
  const uint8_t* e=s.row(idx); if(!e) return false;
  int32_t xy[2]; if(!s.coords(xy)) return false;
  if(rd<int16_t>(e,0xea)<0||rd<int16_t>(e,0xec)<0) return false;
- s.o10786((void*)(uintptr_t)a,rd<int32_t>(e,100),idx,b);
- uint32_t rec[24]={0}; rec[0]=1; rec[7]=(uint32_t)b; rec[6]=(uint32_t)idx; // +0x1c, +0x18 (decomp)
+ int32_t calc=s.o10786((void*)(uintptr_t)a,rd<int32_t>(e,100),idx,b);
+ uint32_t rec[24]={0}; rec[0]=1; rec[1]=a; rec[4]=(uint32_t)int32_t(rd<int16_t>(e,0xea)); rec[5]=(uint32_t)xy[1]; rec[6]=(uint32_t)xy[0];
+ rec[0xb]=(uint32_t)idx; rec[0xc]=(uint32_t)b;
  void* o=s.spawn(rec);
- if(o){ s.setFrame(o,rd<int16_t>(e,0xec)); s.setSpeed(o,xy[1]); }
+ if(o){ s.setFrame(o,rd<int16_t>(e,0xec)); s.setSpeed(o,calc); }
  return true;
 }
 
-// 1.13c D2Client+0x413A0 : start use-animation; spawn rec type 0x20 when no current frame count
+// 1.13c D2Client+0x413A0 (ecx=unit, edx=idx, stack=b, ret 4): start the use animation.
+// Spawn request when the handle has no count (disasm): [0]=0x20 [1]=[2]=unit [4]=variant [7]=xy[1] [8]=xy[0] [0xb]=idx [0xc]=b; then
+// #10243(handle, n) with n = the 0x40450 result; otherwise #10243(handle, count-1).
 struct Svc2 : Svc {
- virtual int32_t o10630()=0; virtual int32_t o10980(int32_t)=0; virtual void o10243(int32_t,int32_t)=0;
+ virtual int32_t o10630(void* u,int32_t idx)=0; virtual int32_t o10980(int32_t)=0; virtual void o10243(int32_t,int32_t)=0;
  virtual bool o10494(void*,int32_t)=0; virtual void o10542(void*,int32_t)=0; virtual void sound(int32_t)=0;
 };
-bool startAnim(Svc2& s,uint8_t* u,int32_t idx){
+bool startAnim(Svc2& s,uint8_t* u,int32_t idx,int32_t b){
  const uint8_t* e=s.row(idx); if(!e) return false;
  int32_t v=s.unitVariant(u); if(v<0) return false;
- int32_t h=s.o10630(); if(!h) return false;
- if(s.unitAnimLen(u)<=0) return false;
+ int32_t h=s.o10630(u,idx); if(!h) return false;
+ int32_t n=s.unitAnimLen(u,idx,b); if(n<=0) return false;
  if(u) { uint32_t f=rd<uint32_t>(u,0xc4)&0xffffffbfu; std::memcpy(u+0xc4,&f,4); }
  int32_t xy[2]; if(!s.coords(xy)) return false;
- int32_t a=xy[0], b=h;
- int32_t n=s.o10980(h);
- if(n<1){ uint32_t rec[24]={0}; rec[0]=0x20; rec[1]=rec[2]=(uint32_t)(uintptr_t)u; rec[4]=(uint32_t)h; rec[7]=(uint32_t)v; rec[11]=(uint32_t)idx;
-  if(s.spawn(rec)) s.sound(0xf); b=0 /* unaff_EBX unset in decomp */; }
- else { a=n-1; b=h; }
- s.o10243(b,a);
+ int32_t cnt=s.o10980(h);
+ if(cnt<1){ uint32_t rec[24]={0}; rec[0]=0x20; rec[1]=rec[2]=(uint32_t)(uintptr_t)u; rec[4]=(uint32_t)v; rec[7]=(uint32_t)xy[1]; rec[8]=(uint32_t)xy[0];
+  rec[0xb]=(uint32_t)idx; rec[0xc]=(uint32_t)b;
+  if(s.spawn(rec)) s.sound(0xf);
+  s.o10243(h,n); }
+ else s.o10243(h,cnt-1);
  if(s.o10494(u,0xc)){ s.o10542(u,e[0x16]-1); uint32_t m=0x800; std::memcpy(u+0x48,&m,4); }
  return true;
 }
@@ -69,7 +74,7 @@ bool dispatchC(Svc& s,void* u,int32_t idx,int32_t b){
  if(!s.row(idx)) return false;
  int32_t v=s.unitVariant(u); if(v<0) return false;
  int32_t xy[2]; if(!s.coords(xy)) return false;
- if(!s.unitAnimLen(u)) return false;
+ if(!s.unitAnimLen(u,idx,b)) return false;
  s.drawC(u,xy[1],xy[0],idx,b,v); return true;
 }
 
@@ -80,7 +85,7 @@ static bool viaPath(Svc& s,uint8_t* u,int32_t idx,int32_t b,bool second){
  s.prep();
  int32_t h=rd<int32_t>(u,0x2c); if(!h) s.fatal(0x946);
  void* p=s.o10392(h); if(!p) return false;
- int32_t len=s.unitAnimLen(u);
+ int32_t len=s.unitAnimLen(u,idx,b);
  if(len<1) len=s.o10786(u,rd<int32_t>(e,100),idx,b);
  int32_t x=s.px(p),y=s.py(p);
  if(second) s.drawB(u,v,x,y,b,len); else s.drawA(u,v,x,y,b,len);
@@ -93,14 +98,14 @@ bool path41690(Svc& s,uint8_t* u,int32_t i,int32_t b){return viaPath(s,u,i,b,tru
 bool scatterVia(Svc& s,uint8_t* u,int32_t idx,int32_t b,int32_t r){
  const uint8_t* e=s.row(idx); if(!e) return false;
  int32_t v=s.unitVariant(u); if(v<0) return false;
- int32_t len=s.unitAnimLen(u);
+ int32_t len=s.unitAnimLen(u,idx,b);
  if(len<1) len=s.o10786(u,rd<int32_t>(e,100),idx,b);
  s.prep();
  int32_t h=rd<int32_t>(u,0x2c); if(!h) s.fatal(0x946);
- int32_t y2; void* p=s.o10392(h); int32_t xy[2];
- if(!p){ if(!s.coords(xy)) return false; y2=xy[0]; (void)len; }
- else { len=s.px(p); y2=s.py(p); }
- d2client_scatter_41100(u,len,len,y2,r,idx,b); (void)v; return true;
+ int32_t cx,cy; void* p=s.o10392(h); int32_t xy[2];
+ if(!p){ if(!s.coords(xy)) return false; cx=xy[0]; cy=xy[1]; }
+ else { cx=s.px(p); cy=s.py(p); }
+ d2client_scatter_41100(u,cx,v,cx,cy,len,idx,b); return true;
 }
 
 // 1.13c D2Client+0x41F40 : copy login fields out of a packet; ip string copied only if not "0"

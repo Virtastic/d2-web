@@ -10,12 +10,13 @@ extern "C" void* d2client_msl_create_b30f0(const uint32_t* req);          // mis
 
 // 1.13c D2Client+0x41100: n = r*r tries; each draws two LCG (0x6AC690C5, carry word) offsets in [0,2r), dx=r-v1,
 // dy=r-v2; inside the circle (dx^2+dy^2 <= n) and room-found -> create a type-1 record at (cx+dx, cy+dy).
-// arg1 (the first pushed stack arg) is only a scratch slot overwritten by the room lookup; not a parameter here.
-extern "C" void d2client_scatter_41100(void* unit, int32_t seedLow, int32_t cx, int32_t cy, int32_t r, int32_t a5, int32_t a6) {
+// edx (seedLow) is the incoming register; arg1 (first stack arg) goes to request word 4 before the room lookup
+// overwrites its slot. Request word indices from the rep-stos base esp+0x1c: s0=1 s1=unit s4=arg1 s5=x s6=y sB=a5 sC=a6.
+extern "C" void d2client_scatter_41100(void* unit, int32_t seedLow, int32_t arg1, int32_t cx, int32_t cy, int32_t r, int32_t a5, int32_t a6) {
     D2SeedStrc seed; SEED_InitLowSeed(&seed, seedLow);
     int32_t n = r * r;
     uint32_t rec[0x17] = {0};
-    rec[1] = 1; rec[2] = (uint32_t)(uintptr_t)unit; rec[12] = (uint32_t)a5; rec[13] = (uint32_t)a6;
+    rec[0] = 1; rec[1] = (uint32_t)(uintptr_t)unit; rec[4] = (uint32_t)arg1; rec[0xb] = (uint32_t)a5; rec[0xc] = (uint32_t)a6;
     int32_t room = (int32_t)(intptr_t)UNITS_GetRoom((D2UnitStrc*)unit);
     uint32_t m = (uint32_t)r * 2;
     auto draw = [&]() -> int32_t {

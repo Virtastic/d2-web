@@ -13,15 +13,6 @@ u32 ord(D2cHost h, u32 n, u32 a = 0, u32 s1 = 0, u32 s2 = 0, u32 s3 = 0) {
 }
 struct D2cB58G { i32 *state /*B925F0*/, *mouseY /*1CB828*/, *mouseX /*1CB824*/, *gW /*1B8BC48*/, *gH /*1B8BC4C*/, *offX /*1CB9A0*/, *offY /*1CB9A4*/; };
 extern "C" {
-// 1.13c D2Client+0x73B60  (ECX = unit)
-EMSCRIPTEN_KEEPALIVE void d2c_73b60(D2cHost h, const uint8_t* unit, u32 unitHandle) {
-    if (!unit) return;
-    i32 lvl = (i32)ord(h, 10534, unitHandle);
-    if (lvl > 0x4d) { lvl = 0x4d; ord(h, 10558, unitHandle, 0x4d); ord(h, 10970, unitHandle, 0x4d); }
-    u32 f; memcpy(&f, unit + 0x2c, 4);
-    ord(h, 10983, f); ord(h, 10614); ord(h, 10647, f, 10); ord(h, 10168, f, (u32)lvl); ord(h, 10334, f, unitHandle, 0);
-}
-
 // 1.13c D2Client+0x77DE0
 EMSCRIPTEN_KEEPALIVE void d2c_77de0(D2cHost h, D2cB58G* g) {
     i32 base = *g->gW - *g->offX, lo, hi;

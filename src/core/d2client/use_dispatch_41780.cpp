@@ -15,7 +15,7 @@ void Fog_Ordinal_10024(const void*, const void*, uint32_t);
 __attribute__((weak)) uint8_t DAT_6fb8359f[1];
 uint32_t FUN_6fb51340(int32_t* outH, const uint8_t* self, int32_t* outW);  // D2Client+0xA1340
 void FUN_6fada0b0(const uint8_t* in_EAX, uint32_t unaff_EDI);             // D2Client+0x2A0B0
-void d2client_scatter_41100(void* unit, int32_t seedLow, int32_t cx, int32_t cy, int32_t r, int32_t a5, int32_t a6);
+void d2client_scatter_41100(void* unit, int32_t seedLow, int32_t arg1, int32_t cx, int32_t cy, int32_t r, int32_t a5, int32_t a6);
 }
 
 // 1.13c D2Client+0x41780 (ecx = unit, edx = skill id, stack = param_3)
@@ -27,21 +27,22 @@ extern "C" int32_t d2_client_41780(D2UnitStrc* unit, int32_t idx, uint32_t param
     int32_t variant = d2_client_40550(unit, idx);
     if (variant < 0) return 0;
     uint32_t calc; std::memcpy(&calc, row + 0x64, 4);
-    int32_t n = d2_client_40450(idx, unit, calc, static_cast<int32_t>(param_3));
+    int32_t n = d2_client_40450(idx, unit, static_cast<int32_t>(param_3));
     if (n < 1) n = SKILLS_EvaluateSkillFormula(unit, calc, idx, static_cast<int32_t>(param_3));  // #10786
     FUN_6fada0b0(reinterpret_cast<const uint8_t*>(unit), 0);
     if (!unit->pDynamicPath) {
         Fog_Ordinal_10024(DAT_6fb8359f, 0, Fog_Ordinal_10265(0x946));
         _exit(-1);
     }
-    int32_t cx, cy;
+    int32_t cx, cy, o1 = 0, o2 = 0;
     D2UnitStrc* tgt = PATH_GetTargetUnit(unit->pDynamicPath);   // #10392
     if (!tgt) {
-        if (!FUN_6fb51340(&cy, reinterpret_cast<const uint8_t*>(unit), &cx)) return 0;
+        if (!FUN_6fb51340(&o1, reinterpret_cast<const uint8_t*>(unit), &o2)) return 0;
+        cx = o1; cy = o2;   // asm passes the edi-side out slot first, the stack-arg out slot second
     } else {
         cx = static_cast<int32_t>(UNITS_GetXPosition(tgt));
         cy = static_cast<int32_t>(UNITS_GetYPosition(tgt));
     }
-    d2client_scatter_41100(unit, variant, cx, cy, n, idx, static_cast<int32_t>(param_3));
+    d2client_scatter_41100(unit, cx, variant, cx, cy, n, idx, static_cast<int32_t>(param_3));
     return 1;
 }

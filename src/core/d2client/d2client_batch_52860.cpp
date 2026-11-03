@@ -93,8 +93,8 @@ void sub_52F10(Svc& s,G& g){
  if(g.c9624<g.c9628||v!=g.c9630){ // rep stos of 11 dwords from 0x6fbc960c
   g.c960c=0; g.c9610=0; g.c9614=g.c9615=g.c9616=g.c9617=0; g.c9618=0; g.c961c=0; g.c9620=0; g.c9624=0; g.c9628=0; g.c962c=0; g.c9630=0; g.c9634=0; }
 }
-// 1.13c D2Client+0x53070  (esi = message source handle)
-void sub_53070(Svc& s,uint32_t esi){ s.f45570(0x1253,0,0xfa,0,0,0); Rec r{}; r.w[4]=0x17b; r.w[1]=esi; r.w[2]=esi; r.w[12]=1; s.f630f0(r); }
+// 1.13c D2Client+0x53070
+void sub_53070(Svc& s){ s.f45570(0x1253,0,0xfa,0,0,0); Rec r{}; s.f630f0(r); }
 // 1.13c D2Client+0x530D0  (esi = unit)
 void sub_530D0(Svc& s,Unit* esi){
  Unit* o=s.o10754(s.o10331x(esi,2,0x182));

@@ -34,6 +34,8 @@ struct Svc {
  virtual void* f46150()=0; virtual void f38a70()=0; virtual void f16360()=0; virtual void o511(void*)=0;
  virtual int32_t o10587(Unit*,int32_t,int32_t)=0; virtual void o10227()=0; virtual void f72790(int32_t,int32_t,int32_t)=0;
  virtual void f7b20()=0; virtual int32_t f55440()=0;
+ virtual void* strLookup(int32_t id)=0; // Ordinal_10003 (ECX=id); its stack words stay for the next call
+ virtual void textAt(void* str,int32_t x,int32_t y,int32_t a,int32_t b)=0; // Ordinal_10085 (ECX=str, EDX=x, stack y,a,b)
  virtual void fecc60(int32_t)=0; virtual void feccc0(int32_t)=0; virtual int32_t o10048()=0; virtual int32_t o10013()=0;
 };
 static Inner* inner(Unit* u){ return u->node? u->node->p30:nullptr; }
@@ -103,14 +105,14 @@ static void blank(Frame& f,G& g){ for(auto& w:f.w)w=0; f.w[13]=(uint32_t)g.cc300
 void sub_50020(Svc& s,G& g){
  if(s.gfxMode()!=2) return;
  Frame f; blank(f,g); f.w[0]=2;
- if(s.f4fe70()&&!g.aada4){ s.o10003(g.d2bc4c-0x32,0,1); s.o10085(); }
+ if(s.f4fe70()&&!g.aada4) s.textAt(s.strLookup(0xf93),g.d2bc48/2+0xb2,g.d2bc4c-0x32,0,1);
  s.o10041(f,g.d2bc48/2+0xa3,g.d2bc4c-8,-1,5,0);
 }
 // 1.13c D2Client+0x50100
 void sub_50100(Svc& s,G& g){
  if(s.gfxMode()!=2) return;
  Frame f; blank(f,g); f.w[0]=2;
- if(s.f4ff10()&&!g.aada4){ s.o10003(g.d2bc4c-0x32,0,1); s.o10085(); }
+ if(s.f4ff10()&&!g.aada4) s.textAt(s.strLookup(0xf92),g.d2bc48/2-0xb3,g.d2bc4c-0x32,0,1);
  s.o10041(f,g.d2bc48/2-0xc2,g.d2bc4c-8,-1,5,0);
 }
 // 1.13c D2Client+0x501F0.  Ordinal_10041 takes the Frame by value (retail pushes the stack record just built).

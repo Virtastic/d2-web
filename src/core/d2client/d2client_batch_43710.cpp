@@ -12,7 +12,7 @@ struct Calls {
  void (*drawText)(I strId,I x);              // D2Client+0x42C10
  void (*ord10003)(I,I,I); void (*ord10150)(); // text/draw ORD
  P (*ord10331)(P); U (*ord10826)(P); P (*ord10014)(U); U (*ord10265)(I); void (*ord10024)(const void*,U);
- void (*ord10936)(); void (*ord10614)(); void (*fb60450)(U);
+ void (*ord10936)(U* seed); void (*ord10614)(U* seed,U magic); void (*fb60450)(U a1,I x,I y,I zero,I one);
  I (*ord10106)(P); I (*ord10620)(P); P (*ord10871)(P,U); I (*ord10680)(P,I,I);
  P (*ord10218)(P); U (*ord11161)(P,P,I); I (*ord10550)(P);
  void (*fb05b20)(U ecx,P a1,P a2,U a3,U a4,U a5,U a6,U a7); // 55B20 (stdcall 7 stack args + ECX), raw as pushed by the callers
@@ -34,14 +34,23 @@ U sub_437E0(Calls&c,bool*fatal){
  if(!r){c.ord10024(nullptr,c.ord10265(0x5d7));*fatal=true;return 0;}
  U v; std::memcpy(&v,static_cast<uint8_t*>(r)+0x218,4); return v;
 }
-// 1.13c D2Client+0x4C7C0  (REG? in_EAX = unit; param_1 stack)
-void sub_4C7C0(Calls&c,const I*unit,U param_1,const uint8_t*dt_a78,I dt_a80){
+// 1.13c D2Client+0x4C7C0  (EAX = unit, stack a1,a2,a3; ret 0xc)
+void sub_4C7C0(Calls&c,const I*unit,U a1,I a2,I a3,const uint8_t*dt_a78,I dt_a80){
  if(!unit||unit[0]!=1) return;
  I i=unit[1],k=i; const uint8_t*rec=nullptr;
  if(i>=0&&i<dt_a80){rec=dt_a78+i*0x1a8;int16_t s;std::memcpy(&s,rec+2,2);k=s;}
- if(k>=0&&k<dt_a80&&k==0x3f&&rec){
-  c.ord10936();c.ord10614();int16_t n;std::memcpy(&n,rec+0x62+(c.g_cc390&0xffff)*2,2);
-  for(I j=n;j>0;--j)c.fb60450(param_1);
+ if(!(k>=0&&k<dt_a80&&k==0x3f)) return;
+ if(!(i>=0&&i<dt_a80&&rec)) return;
+ U seed[2]; c.ord10936(seed); c.ord10614(seed,0x53454953u);
+ seed[1]=(U)unit[3];
+ int16_t n;std::memcpy(&n,rec+0x62+(c.g_cc390&0xff)*2,2);
+ I bx=5,bp=5;
+ for(I j=n;j>0;--j){
+  uint64_t r=(uint64_t)seed[0]*0x6ac690c5u+seed[1]; U rl=(U)r,rh=(U)(r>>32);
+  if(rl&1) bp=-bp;
+  uint64_t q=(uint64_t)rl*0x6ac690c5u+rh; seed[0]=(U)q; seed[1]=(U)(q>>32);
+  if(seed[0]&1) bx=-bx;
+  c.fb60450(a1,a2+bp,a3+bx,0,1);
  }
 }
 // tooltip line builder (rva 0x55B20) is transcribed in d2client_n86.cpp:sub_55B20.
