@@ -6819,6 +6819,18 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
   get hoverFontReady() { return Boolean(hoverFont); },
   // Touch picking: is there a monster, NPC, ground item, object or exit a click at (x, y) would take?
   // The same resolvers a click calls; the touch layer probes around a finger that hit nothing.
+  // The touch layer's modal probe: null while no small-button dialog is up, else whether (x,y) is on
+  // one of its buttons (the dialogs' own hit tests).
+  touchControlAt(x, y) {
+    if (screen !== SCREEN.GAME) return null;
+    if (repairConfirm.open && repairConfirmRenderer) return Boolean(repairConfirmRenderer.hitAt(x, y));
+    if (modalOwner === MODAL_POINTER_OWNER.STASH_GOLD_DIALOG && stashGoldRenderer) {
+      const a = stashGoldRenderer.hitAt(x, y, canvas.width, canvas.height, readStashLayout(), true)?.action;
+      return Boolean(a && a !== 'modal');
+    }
+    if (npcMenu?.open) return Boolean(npcMenu.entryAt(x, y));
+    return null;
+  },
   touchPickAt(x, y) {
     const target = resolvePointerTarget(x, y);
     if (target.unitId || target.item) return true;

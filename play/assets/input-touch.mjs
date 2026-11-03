@@ -302,8 +302,24 @@ export function installTouchInput({ documentObject = globalThis.document, window
     }
     return null;
   }
+  // ---- a dialog's small buttons: NPC menu rows, the gold dialog's arrows/ok/close, repair yes/no ----
+  // While one is up, a finger that hits none of its buttons is probed at rings around it with the
+  // dialog's own hit test; the first ring point on a button is where the press goes.
+  const MODAL_RINGS = [6, 12], MODAL_SPOKES = 8;
+  function modalAim(x, y) {
+    const shell = windowObject.__d2Shell;
+    if (!shell || typeof shell.touchControlAt !== 'function') return null;
+    let on;
+    try { on = shell.touchControlAt(x, y); } catch { return null; }
+    if (on !== false) return null;
+    for (const r of MODAL_RINGS) for (let i = 0; i < MODAL_SPOKES; i += 1) {
+      const a = (i / MODAL_SPOKES) * 2 * Math.PI, px = x + r * Math.cos(a), py = y + r * Math.sin(a);
+      try { if (shell.touchControlAt(px, py)) return [px, py]; } catch { return null; }
+    }
+    return null;
+  }
   // The point a finger's aim snaps to, or null when the finger is on nothing the aim rules cover.
-  function snapAim(x, y) { return closeAim(x, y) || beltAim(x, y) || panelAim(x, y) || statAim(x, y) || hudAim(x, y); }
+  function snapAim(x, y) { return modalAim(x, y) || closeAim(x, y) || beltAim(x, y) || panelAim(x, y) || statAim(x, y) || hudAim(x, y); }
   function fingerAim(x, y) { return snapAim(x, y) || worldAim(x, y); }
   // A finger's aim: the belt's boxes, an open panel's grid cells, the character screen's "+", else
   // exactly where it landed.

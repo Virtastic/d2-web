@@ -617,3 +617,13 @@ test('a tap just beside an open inventory close presses it; on it, or with the p
   shut.down(1, 412, 460); shut.up(1, 412, 460);
   assert.deepEqual(shut.sent.at(-1), left('pointerup', 412, 460));
 });
+
+test('with a dialog up, a tap just beside one of its buttons presses it; no dialog, no snap', () => {
+  const onButton = (x, y) => x >= 300 && x < 340 && y >= 200 && y < 215;
+  const w = world({ screen: 'game', touchControlAt: (x, y) => onButton(x, y) });
+  w.down(1, 320, 222); w.up(1, 320, 222);
+  const e = w.sent.at(-1); assert.ok(e.type === 'pointerup' && onButton(e.x, e.y));
+  const none = world({ screen: 'game', touchControlAt: () => null });
+  none.down(1, 320, 222); none.up(1, 320, 222);
+  assert.deepEqual(none.sent.at(-1), left('pointerup', 320, 222));
+});
