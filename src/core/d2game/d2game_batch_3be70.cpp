@@ -77,6 +77,7 @@ struct D2GameBatch3beEnv {
     uint32_t (*r10513)(void);
     void     (*setDir)(void* u, int32_t packed);                // Ordinal 10019
     int32_t  (*collide)(void* game, void* unit);                // 0x3F320 MISSMODE_HandleMissileCollision
+    const uint8_t* (*skillRow1420)(int32_t id);                 // 0x21420 (eax = id): the skills row; null = the inline table lookup (3D020 only)
 };
 
 // Default env: seams whose callee is a DEFINED typed function in src/ are direct calls (D2Common ordinal ->
@@ -233,10 +234,10 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3d020(void* game, int32_t* u, int32_t* ctx
     if ((int32_t)guid <= 1) return 3;
     int32_t x = e->unitX(u), y = e->unitY(u);
     int32_t dur = i32(row, 0x4c);
-    uint32_t lvl = e->unitLevel(u);
     if (dur <= 0) {
         uint32_t id = e->unitClass(u);
-        const uint8_t* srow = skillRow(e, (int32_t)id);
+        uint32_t lvl = e->unitLevel(u);
+        const uint8_t* srow = e->skillRow1420 ? e->skillRow1420((int32_t)id) : skillRow(e, (int32_t)id);
         if (!srow) return 3;
         dur = e->skillDuration(client, u32(srow, 100), id, lvl);
         if (dur < 1) dur = 1;
@@ -247,7 +248,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3d020(void* game, int32_t* u, int32_t* ctx
         req[0] = 0x21; req[1] = (uint32_t)(uintptr_t)client; req[3] = (uint32_t)(uintptr_t)t;
         req[4] = (uint32_t)u[1]; req[5] = x; req[6] = y;
         req[7] = e->unitX(t); req[8] = e->unitY(t);
-        req[11] = e->unitClass(u); req[12] = lvl;
+        req[11] = e->unitClass(u); req[12] = e->unitLevel(u);
         void* m = e->createMissile(game, req);
         if (m) e->setLife(m, (int32_t)guid - 1);
     }
@@ -428,6 +429,49 @@ uint32_t D2Game_3CDD0_probe(void* game, int32_t* u, const uint8_t* dt, uint32_t*
     // hookblk 0x6F930 d 23 (the 23-dword request in EDX, mirrored from the capture): the block rides after the call's own record
     e.createMissile = [](void* g, uint32_t* req) -> void* { void* r = (void*)(uintptr_t)g3cH->h(0x6F930, 0, (uint32_t)(uintptr_t)g, g3cH->stk(req)); g3cH->blk(0x6F930, req, 23); return r; };
     return d2_game_3cdd0(game, u, &e);
+}
+
+// function probe seams for the missile rows (src/core/fn/d2game_3c990.cpp, _3d020, _3d450): retail's callees are HookEnv recorders.
+static HookEnv* g3mH;
+static void g3mCommon(D2GameBatch3beEnv& e)
+{
+    e.getClient = [](void* g, uint32_t ty, uint32_t id) -> void* { return (void*)(uintptr_t)g3mH->h(0xE03A0, ty, (uint32_t)(uintptr_t)g, id); };
+    e.unitX = [](void* u) -> int32_t { return (int32_t)g3mH->h(0x1100, 0, (uint32_t)(uintptr_t)u); };
+    e.unitY = [](void* u) -> int32_t { return (int32_t)g3mH->h(0x1130, 0, (uint32_t)(uintptr_t)u); };
+    e.unitClass = [](void* u) -> uint32_t { return g3mH->h(0xB26A, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
+    e.unitLevel = [](void* u) -> uint32_t { return g3mH->h(0xB0FC, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
+    e.skillDuration = [](void* c, uint32_t a, uint32_t id, uint32_t lvl) -> int32_t { return (int32_t)g3mH->h(0xAC9A, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)c, a, id, lvl); };
+    e.createMissile = [](void* g, uint32_t* req) -> void* { void* r = (void*)(uintptr_t)g3mH->h(0x6F930, 0, (uint32_t)(uintptr_t)g, g3mH->stk(req)); g3mH->blk(0x6F930, req, 23); return r; };
+}
+uint32_t D2Game_3C990_probe(void* game, int32_t* u, const uint8_t* dt, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); g3mH = &h;
+    D2GameBatch3beEnv e = g3beDirect; e.dt = dt; g3mCommon(e);
+    return d2_game_3c990(game, u, &e);
+}
+uint32_t D2Game_3D020_probe(void* game, int32_t* u, int32_t* ctx, const uint8_t* dt, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); g3mH = &h;
+    D2GameBatch3beEnv e = g3beDirect; e.dt = dt; g3mCommon(e);
+    e.unitGuid = [](void* u) -> uint32_t { return g3mH->h(0xB24C, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
+    e.skillRow1420 = [](int32_t id) -> const uint8_t* { return (const uint8_t*)(uintptr_t)g3mH->h(0x1420, (uint32_t)id); };
+    e.findTarget = [](void* g, void* c, int32_t x, int32_t y, int32_t range, uint32_t filter, int32_t a7, int32_t*) -> void* {
+        return (void*)(uintptr_t)g3mH->h(0xA0F40, filter, (uint32_t)a7, (uint32_t)range, 0, 0, (uint32_t)(uintptr_t)g, (uint32_t)(uintptr_t)c, (uint32_t)x, (uint32_t)y); };
+    e.setLife = [](void* m, int32_t v) { g3mH->h(0xA50E, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)m, (uint32_t)v); };
+    return d2_game_3d020(game, u, ctx, &e);
+}
+void D2Game_3D450_probe(void* game, int32_t* u, int32_t radius, uint32_t a4, int32_t a5, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); g3mH = &h;
+    D2GameBatch3beEnv e = g3beDirect; g3mCommon(e);
+    e.getRoom = [](void* u) -> void* { return (void*)(uintptr_t)g3mH->h(0xA478, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
+    e.pathX = [](void* p) -> int32_t { return (int32_t)g3mH->h(0xA454, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)p); };
+    e.pathY = [](void* p) -> int32_t { return (int32_t)g3mH->h(0xA3B8, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)p); };
+    e.roomCollide = [](void* r, const int32_t* a, const int32_t* b, int32_t m) -> int32_t {
+        return (int32_t)g3mH->h(0xAEB0, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)r, g3mH->stk(a), g3mH->stk(b), (uint32_t)m); };
+    e.roomAux = [](void* r) -> void* { return (void*)(uintptr_t)g3mH->h(0x1280, (uint32_t)(uintptr_t)r); };
+    e.auxTest = [](void* a) -> int32_t { return (int32_t)g3mH->h(0xA808, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)a); };
+    d2_game_3d450(game, u, radius, a4, a5, &e);
 }
 
 // function probe seam (src/core/fn/d2game_3f7d0.cpp): retail's callees are HookEnv recorders (E03A0, B26A, B0FC, B24C, ACE2, 463A0).

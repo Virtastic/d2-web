@@ -100,38 +100,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_97E20(uint32_t param1, uint32_t param2, i
     env->subDFC10(record);
 }
 
-// Attach a game/session record to an argument: EAX+0x16C = arg[0], +0x170 = arg[3], +0x174 = arg.
-// When arg[0] is zero the player data's +0x9C is set to EAX, 10140(arg, EAX+0x0D) and 0xE0110 run,
-// 11090(arg, 1) runs, and the player data's +0x50/+0x54/+0x58/+0x5C are zeroed. A null EAX, a null
-// arg, or a non-zero arg[0] is fatal (0x114 / 0x4BB / 0x4BC).
-// 1.13c D2Game+0x53720
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_53720(uint32_t eaxGame, uint32_t param1,
-                                             const D2GameBatch97E20Env* env)
-{
-    if (eaxGame == 0) d2game_fatal(0x114);
-    if (param1 == 0) {
-        wr32((void*)(uintptr_t)eaxGame, 0x174, 0);
-        d2game_fatal(0x4BB);
-    }
-
-    wr32((void*)(uintptr_t)eaxGame, 0x16C, rd32(param1, 0));
-    wr32((void*)(uintptr_t)eaxGame, 0x170, rd32(param1, 0xC));
-    wrptr((void*)(uintptr_t)eaxGame, 0x174, (const void*)(uintptr_t)param1);
-    if (rd32(param1, 0) != 0) d2game_fatal(0x4BC);
-
-    uint32_t playerData = env->ordinal10920((void*)(uintptr_t)param1);
-    wr32((void*)(uintptr_t)playerData, 0x9C, eaxGame);
-    env->ordinal10140((void*)(uintptr_t)param1, (void*)(uintptr_t)(eaxGame + 0xD));
-    env->subE0110();
-    env->ordinal11090((void*)(uintptr_t)param1, 1);
-
-    playerData = env->ordinal10920((void*)(uintptr_t)param1);
-    wr32((void*)(uintptr_t)playerData, 0x5C, 0);
-    wr32((void*)(uintptr_t)playerData, 0x50, 0);
-    wr32((void*)(uintptr_t)playerData, 0x58, 0);
-    wr32((void*)(uintptr_t)playerData, 0x54, 0);
-}
+// The 0x53720 attach moved to src/core/d2game/d2game_53720.cpp (D2Game_53720; FN-probed).
 
 // Eighteen-byte packet 0x7D: type byte, a byte from *in_EAX (6 when in_EAX is null), in_EAX[3]
 // split into two words, *(param_2+0x0C) split the same way, then param_4 and param_5 as dwords.

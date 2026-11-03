@@ -91,10 +91,16 @@ static CRITICAL_SECTION g_taskSlotLocks[32];  // 0x6FD31C58, stride 0x18
 
 // 1.13c D2Game+0x52140
 // TASK_InitializeClock: record the QPC frequency; a nonzero result switches 0x52020 onto the QPC
-// clock instead of GetTickCount.
+// clock instead of GetTickCount. Retail stores the raw BOOL (EAX) at 0x6FD303B0, not 0/1.
+// The host primitive is a seam so the FN probe can script the answer (the wasm host has no QPC and answers FALSE).
+void d2game_52140_core(int32_t (*qpf)(LARGE_INTEGER*), LARGE_INTEGER* freq, uint32_t* valid)
+{
+    *valid = (uint32_t)qpf(freq);
+}
+static int32_t hostQpf(LARGE_INTEGER* p) { return QueryPerformanceFrequency(p) ? 1 : 0; }
 void TASK_InitializeClock(void)
 {
-    g_clockValid = QueryPerformanceFrequency(&g_clockFrequency) ? 1u : 0u;
+    d2game_52140_core(hostQpf, &g_clockFrequency, &g_clockValid);
 }
 
 // FN probe access to the game GUID table (0x6FD30C08).

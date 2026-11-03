@@ -211,16 +211,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DFDC0(uint32_t esi, uint32_t e
     if (h) { e->ordinal10561(h, out); wr32(rd32(esi, 0x14), 0x18, out[0]); wr32(rd32(esi, 0x14), 0x1c, out[1]); }
 }
 
-// 1.13c D2Game+0xE0410  fastcall(ecx unused, unit)
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_E0410(uint32_t ecx, uint32_t unit, const D2GameBatchDBD00Env* e)
-{
-    (void)ecx;
-    if (unit && rd32(unit, 0) == 0) {
-        uint32_t r = e->ordinal10920(unit);
-        if (r) { wr32(r, 0x148, 0); wr32(r, 0x14c, 0); e->sub8E8C0(0x6fd00410); return 1; }
-    }
-    return 0;
-}
+// 1.13c D2Game+0xE0410 moved to src/core/d2game/d2game_e0410.cpp (it passes 0x8E8C0 its registers).
 
 // 1.13c D2Game+0xE0570  fastcall(unit a = ECX), EAX = unit b. Resolve owner via E03A0, then compare.
 // GUESS: subBBEB0 takes the unit's +0x80 field (decompile shows no args).

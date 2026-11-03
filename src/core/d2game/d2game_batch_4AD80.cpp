@@ -85,42 +85,7 @@ struct D2GameBatch14Env {
     void     (*displayWarning)(const char* file, uint32_t line, uint32_t flag);
 };
 
-// 1.13c D2Game+0x4AD80
-// CLIENTS_BuildUnitsUpdateList (client in EBX): the room handle at client+0x1B4 is required (fatal
-// 0x6F7 when null) and D2Common #10383 must return a unit array (fatal 0x6F9 when null). The client's
-// player is fetched with 0x4AD10; when absent the function returns without touching the list. The
-// list is prepared by the player's x/y (0x1100, 0x1130), the count at client+0x3BC reset to zero, and every
-// unit on each room entry's +0x74 chain (next at +0xE8) is inserted by 0x4A460 against the caller's
-// max count. 0x4A370 then flushes the sorted list into client+0x1CC.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_game_4ad80(void* client, uint32_t maxCount, const D2GameBatch14Env* env)
-{
-    if (rd32(client, 0x1B4) == 0) d2game_fatal(0x6F7);
-
-    void* rooms = nullptr;
-    uint32_t nRooms = 0;
-    env->getRoomUnitArray(rd32(client, 0x1B4), &rooms, &nRooms);
-    if (rooms == nullptr) d2game_fatal(0x6F9);
-
-    void* player = env->getPlayerFromClient(client, 0);
-    if (player == nullptr) return;
-
-    uint32_t nodes[0x38 * 3];
-    std::memset(nodes, 0, sizeof nodes);
-    const int32_t x = env->unitX(player);                             // 0x1100
-    const int32_t y = env->unitY(player);                             // 0x1130
-    uint32_t best = 0;
-    wr32(client, 0x3BC, 0);
-
-    for (uint32_t i = 0; i < nRooms; ++i) {
-        const uint32_t entry = rd32(rooms, i * 4);
-        for (void* unit = rdptr((const void*)(uintptr_t)entry, 0x74); unit != nullptr;
-             unit = rdptr(unit, 0xE8)) {
-            env->insertSortedUnit(unit, y, &best, client, maxCount, nodes, x); // 0x4A460
-        }
-    }
-    env->flushUnitUpdateList(nodes, client);                          // 0x4A370
-}
+// The 0x4AD80 builder moved to src/core/d2game/d2game_4ad80.cpp (D2Game_4AD80; FN-probed).
 
 // 1.13c D2Game+0x8A2A0
 // D2GAME_PACKETS_SendPacket0x16_UnitsUpdate (client in EDX; retail's ECX argument is unused): when

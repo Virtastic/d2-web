@@ -24,37 +24,7 @@ static i32* findAI(i32* unit, i32 type) { // walk unit->0x10f4 list for entry of
     return nullptr;
 }
 
-// 1.13c D2Game+0x5A820
-void D2GAME_5A820(i32* p1)
-{
-    i32* e = (i32*)(intptr_t)(*(i32*)(intptr_t)p1[0] + 0x10f4);
-    i32* q = nullptr;
-    if (*e) for (i32* p = (i32*)(intptr_t)**(i32**)e; p; p = (i32*)(intptr_t)p[0x3d]) if (*p == 0x24) { q = p; break; }
-    i32 st = q[6];
-    if (*(char*)(intptr_t)(st + 0xa0) != 0) return;
-    i32 n = sdt(0xa80), loc = 0;
-    do {
-        if (loc > 9) break;
-        i32* rng = (i32*)(intptr_t)rd(q[1], 0x10f4);
-        if (!rng) { o10024((void*)0, o10265(0x1fb)); std::_Exit(-1); }
-        i32 v;
-        if (n < 2) v = 1;
-        else {
-            uint64_t m = (uint64_t)(u32)rng[6] * 0x6ac690c5ULL + (u32)rng[7];
-            *(uint64_t*)&rng[6] = m;
-            u32 r = ((n - 1) & (n - 2)) == 0 ? (u32)(n - 2) & (u32)m : (u32)((m & 0xffffffff) % (u32)(n - 1));
-            v = r + 1;
-        }
-        loc++;
-        *(i32*)(intptr_t)(st + 0xa4) = v;
-        if (v >= 0 && v < sdt(0xa80)) {
-            i32 rec = v * 0x1a8 + sdt(0xa78);
-            if (rec && ((u32)*(u8*)(intptr_t)(rec + 0xe) & *(u32*)(intptr_t)(gdwBitMasks_exref + 0x18))) *(u8*)(intptr_t)(st + 0xa0) = 1;
-        }
-    } while (*(char*)(intptr_t)(st + 0xa0) == 0);
-    if (*(char*)(intptr_t)(st + 0xa0) == 0) { *(u8*)(intptr_t)(st + 0xa0) = 1; *(i32*)(intptr_t)(st + 0xa4) = 0; }
-    r_DFCC0(0, 0x599D0, p1[0], 0);  // disassembly: callback 0x599D0, game = *p1
-}
+// 1.13c D2Game+0x5A820: moved to d2game_5a820.cpp (env seam for the FN probe).
 
 static i32 stateCb(i32 p1, i32* p2, i32 st, void* cb)
 {
@@ -108,26 +78,7 @@ L1:
     return 1;
 }
 
-// 1.13c D2Game+0x5C2A0
-i32 D2GAME_5C2A0(i32 q, i32 p2, i32 p3)
-{
-    i32 n = 0;
-    if (q && *(char*)(intptr_t)(q + 9)) {
-        for (i32 k = 0; k < 0x19; k++) {
-            i32 a[10] = { rd(q, 4), rd(p2, 8), 0, 0x216, 1, 0, rd(p2, 0x14), rd(p2, 0x18), 5, 0 };
-            i32* u = (i32*)r_EEF10(a);
-            if (u) {
-                u[0x31] |= 0x3000000;
-                *(i32*)(intptr_t)(rd(q, 0x18) + 0xb0 + n * 4 + p3 * 0x14) = u[3];
-                n++;
-                i32* l = (i32*)(intptr_t)rd(rd(q, 4), 0x10f4);
-                if (l) for (i32* p = (i32*)(intptr_t)*l; p; p = (i32*)(intptr_t)p[0x3d]) if (*p == 0x20) { r_33F80((void*)(intptr_t)u, p, rd(q, 4)); break;  /* EDI = new unit, ESI = node, stack = game */ }
-                if (n > 4) return n;
-            }
-        }
-    }
-    return n;
-}
+// 1.13c D2Game+0x5C2A0: moved to d2game_5c2a0.cpp (env seam for the FN probe).
 
 // 1.13c D2Game+0x5CC30
 void D2GAME_5CC30(i32 unit)
