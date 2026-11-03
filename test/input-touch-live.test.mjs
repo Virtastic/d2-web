@@ -627,3 +627,11 @@ test('with a dialog up, a tap just beside one of its buttons presses it; no dial
   none.down(1, 320, 222); none.up(1, 320, 222);
   assert.deepEqual(none.sent.at(-1), left('pointerup', 320, 222));
 });
+
+test('out of game, a tap within reach of a control presses its click point; far from all, it lands raw', () => {
+  const w = world({ screen: 'create', uiTargets: () => ({ screen: 'create', create: { hardcore: [400, 300], ok: [700, 560] } }) });
+  w.down(1, 410, 312); w.up(1, 410, 312);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 400, 300));
+  w.down(1, 500, 400); w.up(1, 500, 400);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 500, 400));
+});

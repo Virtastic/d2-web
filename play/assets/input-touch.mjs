@@ -318,8 +318,25 @@ export function installTouchInput({ documentObject = globalThis.document, window
     }
     return null;
   }
+  // ---- the out-of-game screens: title, gateways, character select/create, options ---------------------
+  // A finger within FRONT_REACH game px of a control's click point presses that point; the nearest wins.
+  const FRONT_REACH = 20;
+  function frontAim(x, y) {
+    const shell = windowObject.__d2Shell;
+    if (!shell || shell.screen === 'game' || typeof shell.uiTargets !== 'function') return null;
+    let t; try { t = shell.uiTargets(); } catch { return null; }
+    const pts = [], walk = (v) => {
+      if (Array.isArray(v) && v.length === 2 && typeof v[0] === 'number' && typeof v[1] === 'number') pts.push(v);
+      else if (v && typeof v === 'object') for (const k in v) walk(v[k]);
+    };
+    walk(t);
+    const s = Math.min(1, canvas.width / 800, canvas.height / 600), reach = FRONT_REACH * s;
+    let best = null, bd = reach * reach;
+    for (const [px, py] of pts) { const d = (px - x) ** 2 + (py - y) ** 2; if (d <= bd) { bd = d; best = [px, py]; } }
+    return best;
+  }
   // The point a finger's aim snaps to, or null when the finger is on nothing the aim rules cover.
-  function snapAim(x, y) { return modalAim(x, y) || closeAim(x, y) || beltAim(x, y) || panelAim(x, y) || statAim(x, y) || hudAim(x, y); }
+  function snapAim(x, y) { return frontAim(x, y) || modalAim(x, y) || closeAim(x, y) || beltAim(x, y) || panelAim(x, y) || statAim(x, y) || hudAim(x, y); }
   function fingerAim(x, y) { return snapAim(x, y) || worldAim(x, y); }
   // A finger's aim: the belt's boxes, an open panel's grid cells, the character screen's "+", else
   // exactly where it landed.
