@@ -6847,6 +6847,30 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
     if (screen !== SCREEN.GAME || !inventoryVisible || !inventoryPanelRenderer) return null;
     return inventoryPanelRenderer.weaponTabProbe(x, y, canvas.width, canvas.height);
   },
+  // Touch's inspect-before-act (input-touch.mjs): the id of the item under a point, or 0. Read-only, and
+  // the same hit tests the click path runs before it buys, sells, lifts or drops -- so a finger's first
+  // tap can show the tooltip the click would have acted on.
+  touchShopItemAt(x, y) {
+    if (!shopOpen() || !vendorPanel) return 0;
+    return vendorPanel.itemAt(x, y, canvas.width, canvas.height, npcState)?.id ?? 0;
+  },
+  touchItemAt(x, y) {
+    if (screen !== SCREEN.GAME || clearScreen || !session) return 0;
+    const W = canvas.width, H = canvas.height;
+    const cubeGeometry = cubeOpen && inventoryVisible ? readCubeLayout() : null;
+    if (cubeGeometry && cubePanelRenderer && cubePanelRenderer.contains(x, y, W, H, cubeGeometry))
+      return cubePanelRenderer.itemAt(x, y, W, H, cubeGeometry, snapshot.items)?.id ?? 0;
+    const geometry = stashOpen ? readStashLayout() : null;
+    if (geometry && stashPanelRenderer && stashPanelRenderer.contains(x, y, W, H, geometry))
+      return stashPanelRenderer.itemAt(x, y, W, H, geometry, snapshot.items)?.id ?? 0;
+    if (inventoryVisible && inventoryPanelRenderer?.contains(x, y, W, H)) {
+      const item = inventoryPanelRenderer.itemAt(x, y, W, H, snapshot);
+      return item?.id ?? inventoryPanelRenderer.slotAt(x, y, W, H, snapshot)?.item?.id ?? 0;
+    }
+    return 0;
+  },
+  // The item the cursor holds (0 for none): a finger with an item in hand acts at once (input-touch.mjs).
+  get cursorItem() { return session && Module._d2_session_cursor_item ? Module.ccall('d2_session_cursor_item', 'number', [], []) : 0; },
   touchPickAt(x, y) {
     const target = resolvePointerTarget(x, y);
     if (target.unitId || target.item) return true;

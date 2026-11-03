@@ -722,3 +722,72 @@ test('with the game menu open, a tap just beside one of its rows presses that ro
   w.down(1, 120, 120); w.up(1, 120, 120);
   assert.deepEqual(w.sent.at(-1), left('pointerup', 120, 120));
 });
+
+// ---- inspect before act: a phone's first tap on an item shows its tooltip ----------------------------
+// The shell's hooks answer for two rectangles: an inventory cell (item 77) and a shop's stock slot
+// (item 900). A tap there is inspected first: a hover (a pointermove with no button held) and no press.
+const hoverAt = (x, y, pointerId = 1) => ({ type: 'pointermove', x, y, button: 0, buttons: 0, pointerType: 'touch', pointerId, shiftKey: false });
+function inspectShell(extra = {}) {
+  const cell = { x0: 300, y0: 200, x1: 330, y1: 230 }, stock = { x0: 500, y0: 100, x1: 540, y1: 140 };
+  const inside = (r, x, y) => x >= r.x0 && x < r.x1 && y >= r.y0 && y < r.y1;
+  return { screen: 'game', inventoryVisible: true, inventoryLayout: { grid: { left: 300, top: 200, columns: 1, rows: 1, cellWidth: 30, cellHeight: 30 } },
+    touchItemAt: (x, y) => (inside(cell, x, y) ? 77 : 0), touchShopItemAt: (x, y) => (inside(stock, x, y) ? 900 : 0), ...extra };
+}
+
+test('a first tap on an inventory item shows its tooltip (a hover, no press); the second tap is the click', () => {
+  const w = world(inspectShell());
+  w.down(1, 310, 210); w.up(1, 310, 210);
+  assert.deepEqual(w.sent, [hoverAt(310, 210)]);
+  w.down(1, 310, 210); w.up(1, 310, 210);
+  assert.deepEqual(w.sent.slice(1), [left('pointermove', 310, 210), left('pointerdown', 310, 210), left('pointerup', 310, 210)]);
+  // The click consumed the inspection: the next tap on the same cell inspects it again.
+  w.down(1, 310, 210); w.up(1, 310, 210);
+  assert.deepEqual(w.sent.at(-1), hoverAt(310, 210));
+});
+
+test('a tap elsewhere clears the inspected item: the next tap on it inspects again instead of clicking', () => {
+  const w = world(inspectShell());
+  w.down(1, 310, 210); w.up(1, 310, 210);
+  w.down(1, 600, 400); w.up(1, 600, 400);
+  const before = w.sent.length;
+  w.down(1, 310, 210); w.up(1, 310, 210);
+  assert.deepEqual(w.sent.slice(before), [hoverAt(310, 210)]);
+});
+
+test('a shop item: its first tap shows the tooltip and sends no press, so nothing is bought; the second tap buys', () => {
+  const w = world(inspectShell());
+  w.down(1, 510, 110); w.up(1, 510, 110);
+  assert.deepEqual(w.sent, [hoverAt(510, 110)]);
+  w.down(1, 510, 110); w.up(1, 510, 110);
+  assert.deepEqual(w.sent.slice(1), [left('pointermove', 510, 110), left('pointerdown', 510, 110), left('pointerup', 510, 110)]);
+});
+
+test('with an item on the cursor, a tap on an item or on stock acts at once: placing it takes one tap', () => {
+  const w = world(inspectShell({ cursorItem: 55 }));
+  w.down(1, 310, 210); w.up(1, 310, 210);
+  assert.deepEqual(w.sent, [left('pointermove', 310, 210), left('pointerdown', 310, 210), left('pointerup', 310, 210)]);
+  const s = world(inspectShell({ cursorItem: 55 }));
+  s.down(1, 510, 110); s.up(1, 510, 110);
+  assert.deepEqual(s.sent, [left('pointermove', 510, 110), left('pointerdown', 510, 110), left('pointerup', 510, 110)]);
+});
+
+test('a hold on an inventory item is its right click, and counts as inspected: the next tap on it clicks', () => {
+  const clock = { t: 1000 };
+  const w = world(inspectShell(), clock);
+  w.down(1, 310, 210);
+  clock.t += 450; w.touch.flush();
+  assert.deepEqual(w.sent.filter((e) => e.type === 'pointerdown').map((e) => e.button), [2]);
+  w.up(1, 310, 210);
+  w.down(1, 310, 210); w.up(1, 310, 210);
+  assert.deepEqual(w.sent.slice(-3), [left('pointermove', 310, 210), left('pointerdown', 310, 210), left('pointerup', 310, 210)]);
+});
+
+test('a finger that drags off an uninspected item is a drag: it presses where it landed, it is not a hover', () => {
+  const w = world(inspectShell());
+  w.down(1, 310, 210);
+  w.move(1, 340, 210);
+  assert.deepEqual(w.sent.slice(0, 2), [left('pointermove', 310, 210), left('pointerdown', 310, 210)]);
+  assert.ok(!w.sent.some((e) => e.type === 'pointermove' && e.buttons === 0));
+  w.up(1, 340, 210);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 340, 210));
+});

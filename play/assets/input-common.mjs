@@ -55,9 +55,10 @@ export function toCanvas(canvas, clientX, clientY) {
 function logInput(rec) { globalThis.__d2InputLog?.push({ ...rec, tick: globalThis.__d2Shell?.snapshot?.tick ?? null }); }
 
 /** One pointer event on the canvas at canvas pixel (x, y). */
-export function pointer(canvas, type, x, y, { button = 0, pointerType = 'mouse', pointerId = 1, shiftKey = false } = {}) {
+export function pointer(canvas, type, x, y, { button = 0, pointerType = 'mouse', pointerId = 1, shiftKey = false, buttons: held = null } = {}) {
   const [clientX, clientY] = toClient(canvas, x, y);
-  const buttons = type === 'pointerup' || type === 'pointercancel' ? 0 : button === 2 ? 2 : 1;
+  // `buttons` names what is held outright: a move with none held is a hover (touch's inspect tap).
+  const buttons = held ?? (type === 'pointerup' || type === 'pointercancel' ? 0 : button === 2 ? 2 : 1);
   logInput({ t: type, x, y, button, pointerType });
   canvas.dispatchEvent(new PointerEvent(type, {
     clientX, clientY, button, buttons, pointerType, pointerId, isPrimary: true, bubbles: true, cancelable: true, shiftKey,

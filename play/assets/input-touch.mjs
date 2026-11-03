@@ -22,6 +22,9 @@
 //     and a rest finger is the one thing a thumb can hold while the other thumb aims.
 //   * PRESS/LIFT CANCEL: a pointercancel sends the release the lift would have sent, so the shell never
 //     keeps a button down that the finger no longer holds.
+//   * INSPECT BEFORE ACT: a phone has no hover, so an item's tooltip (drawn from the shell's hover
+//     pointer) never showed. A FIRST tap on an item (shop stock, an inventory, stash or cube cell) sends
+//     only a hover at it; the SECOND tap is the click. See inspectKeyAt below. Mouse input never reaches it.
 //
 // The canvas's touch events are held back from the shell (a capture-phase listener above the canvas,
 // stopping the real event before the shell's own bubble-phase listener sees it) for the things a raw
@@ -466,10 +469,35 @@ export function installTouchInput({ documentObject = globalThis.document, window
     }
     return Boolean(beltAim(x, y));
   }
+  // ---- inspect before act: a phone's first tap on an item shows its tooltip -----------------------
+  // A tooltip is drawn from the shell's hover pointer, and only a pointermove sets it. A phone has no
+  // hover, so a tap on an item never showed one, and a tap on shop stock bought it at once. So a finger
+  // that lands on an item (shop stock, an inventory, stash or cube cell, an equipped slot) that is NOT
+  // the item inspected last sends no press at all: it sends a hover (a pointermove with no button held)
+  // at the item, which the shell's tooltip reads, and records the item as inspected. The SECOND tap on
+  // the same item is the click it always was (buy, lift, sell, drop). Any other tap clears the
+  // inspected item. A held finger on a grid cell is the right click (HOLD_MS, above) and counts as
+  // inspected too. Taps with an item on the cursor act at once: placing it must not take two taps.
+  // The belt keeps its own popup and is not inspected here.
+  let inspected = null;
+  function inspectKeyAt(x, y) {
+    const shell = windowObject.__d2Shell;
+    if (!shell || shell.screen !== 'game' || shell.clearScreen) return null;
+    const [ix, iy] = moveAim(x, y);
+    const shop = shell.touchShopItemAt?.(ix, iy) || 0;
+    if (shop) return { key: `shop:${shop}`, shop: true };
+    const item = shell.touchItemAt?.(ix, iy) || 0;
+    return item ? { key: `item:${item}`, shop: false } : null;
+  }
+  function heldItem() { return windowObject.__d2Shell?.cursorItem || 0; }
+  function hover(x, y, pointerId) {
+    send('pointermove', x, y, { button: 0, buttons: 0, pointerType: 'touch', pointerId, shiftKey: restDown() });
+  }
   function holdRight(pointerId, h) {
     h.pending = false;
     h.released = true;
     h.right = true;
+    inspected = h.itemKey ?? null;
     const [ax, ay] = aim(h.x, h.y);
     const shiftKey = restDown();
     send('pointermove', ax, ay, { button: 0, pointerType: 'touch', pointerId, shiftKey });
@@ -479,6 +507,7 @@ export function installTouchInput({ documentObject = globalThis.document, window
   function land(pointerId, h) {
     if (!h.pending) return;
     h.pending = false;
+    inspected = null;   // a press is a click: the item it lands on is no longer only inspected
     const [ax, ay] = aim(h.x, h.y);
     const opts = { button: 0, pointerType: 'touch', pointerId, shiftKey: restDown() };
     send('pointermove', ax, ay, opts);
@@ -487,7 +516,8 @@ export function installTouchInput({ documentObject = globalThis.document, window
   function flush() {
     for (const [id, h] of holds) {
       if (h.role !== 'aim' || h.released || inWindow(h)) continue;
-      if (h.item && h.pending && h.t !== undefined) holdRight(id, h); else land(id, h);
+      if (h.item && h.pending && h.t !== undefined) holdRight(id, h);
+      else if (!h.hoverFirst) land(id, h);   // an inspect tap waits for its lift: a tap, a hold or a drag decides it
     }
   }
 
@@ -501,6 +531,14 @@ export function installTouchInput({ documentObject = globalThis.document, window
     holds.delete(pointerId);
     if (!h) return;
     if (h.role === 'aim' && !h.released && cancelled && h.pending) return;
+    if (h.role === 'aim' && !h.released && h.hoverFirst && !h.moved && !cancelled) {
+      // An inspect tap on an item: a hover at the item, and no press (see inspectKeyAt above).
+      h.released = true;
+      inspected = h.itemKey;
+      const [hx, hy] = moveAim(h.x, h.y);
+      hover(hx, hy, pointerId);
+      return;
+    }
     if (h.role === 'aim' && h.right) {
       const [ax, ay] = aim(h.x, h.y);
       send('pointerup', ax, ay, { button: 2, pointerType: 'touch', pointerId, shiftKey: restDown() });
@@ -560,7 +598,21 @@ export function installTouchInput({ documentObject = globalThis.document, window
       return;
     }
     // The first finger: the left button goes down, aimed, once the landing window closes (land()).
-    holds.set(e.pointerId, { role: 'aim', x, y, pending: true, t: clock(), item: itemGround(x, y) });
+    // An item it lands on that is not the inspected one is inspected first (see inspectKeyAt): the
+    // press waits for the second tap. With an item in hand, nothing waits.
+    const found = heldItem() ? null : inspectKeyAt(x, y);
+    const hoverFirst = Boolean(found && found.key !== inspected);
+    if (!hoverFirst) inspected = null;
+    if (hoverFirst && found.shop) {
+      // Stock is bought on the press, so this tap is decided at the landing: a hover, no press.
+      inspected = found.key;
+      const [hx, hy] = moveAim(x, y);
+      holds.set(e.pointerId, { role: 'aim', x, y, released: true });
+      hover(hx, hy, e.pointerId);
+      return;
+    }
+    holds.set(e.pointerId, { role: 'aim', x, y, pending: true, t: clock(), item: itemGround(x, y),
+      hoverFirst, itemKey: found?.key ?? null });
   }, { capture: true });
 
   documentObject.addEventListener('pointermove', (e) => {
