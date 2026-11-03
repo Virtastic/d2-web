@@ -220,3 +220,7 @@ bool sub_26ED0(bool (*readAt)(int32_t* pos, void* buf, uint32_t n, uint32_t* ctx
     return n == 0;
 }
 }
+
+// FN probes (src/core/fn/storm_40d0.cpp, storm_4290.cpp) call these two at global scope.
+uint32_t* sub_040D0(uint32_t* (*a)(uint32_t, int32_t, uint32_t), void (*l)(uint32_t*, int), int e, uint32_t b, uint32_t f) { return stormb65::sub_040D0(a, l, e, b, f); }
+uint32_t* sub_04290(uint32_t* (*a)(uint32_t, int32_t, uint32_t), void (*l)(uint32_t*, int), int e, uint32_t b, uint32_t f) { return stormb65::sub_04290(a, l, e, b, f); }

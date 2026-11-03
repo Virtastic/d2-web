@@ -16,7 +16,7 @@ void*    Storm_Sub1C580(uint32_t size, const char* src, int32_t line, uint32_t f
 void*    Storm_SMemReAlloc(void* p, uint32_t size, const char* src, int32_t line, uint32_t f); // 0x1C760 SMemReAlloc
 int32_t  Storm_Sub1B960(void* p, const char* src, int32_t line);                // 0x1B960 SMemFree
 void     Storm_Sub605E(void* p, uint32_t sz, int32_t n, void (*dtor)(void*));   // 0x605E _eh_vector_destructor_iterator_
-void     Storm_Sub3820(void* p);                                                // 0x3820
+extern "C" void Storm_Sub3820(void* p);                                                // 0x3820
 void     Storm_Sub4D60(void* p);                                                // 0x4D60
 void* Storm_Sub3080(void* src, void* dst);                                      // 0x3080
 }

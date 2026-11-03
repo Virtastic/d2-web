@@ -113,3 +113,15 @@ void fog_sub_21bf7_x87_dispatch(void) {}
 // scanner (sub_1A153) and narrow to a 32-bit float stored through the out pointer. Only caller
 // is CRT __fassign (sub_18ABC), unreachable from D2CMP's decoders; strtof is the same grammar.
 void d2cmp_crt_atoflt(float* out, const char* str) { *out = strtof(str, nullptr); }
+
+// --- Storm: SErrDisplayErrorFmt ---------------------------------------------------------------
+// 1.13c Storm+0x12570 (#562): vsprintf the message into a 0x400 buffer, then SErrDisplayError(messageId, file, line,
+// buffer, recoverable, exitcode). Headless there is no dialog: log it, return 1 when recoverable (retail's IDNO),
+// otherwise end the process with the exit code, as retail does after the dialog.
+int32_t SErrDisplayErrorFmt(uint32_t messageId, const char* filename, int32_t linenumber, int32_t recoverable, uint32_t uExitCode, char* Format, ...) {
+    char buf[0x400];
+    va_list a; va_start(a, Format); vsnprintf(buf, sizeof buf, Format, a); va_end(a);
+    fprintf(stderr, "storm error 0x%08X %s(%d): %s\n", messageId, filename ? filename : "", linenumber, buf);
+    if (recoverable) return 1;
+    exit((int)uExitCode);
+}

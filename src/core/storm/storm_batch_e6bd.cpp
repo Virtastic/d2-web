@@ -233,7 +233,7 @@ static void push(uint32_t* l, const float* r) {
 }
 
 // 1.13c Storm+0x31150: add rect, recursively clipping against rects [from,to)
-void Storm_Sub31150(uint32_t* l, uint32_t from, uint32_t to, float* r) {
+extern "C" void Storm_Sub31150(uint32_t* l, uint32_t from, uint32_t to, float* r) {
   for (uint32_t i = from; i < to; i++) {
     float* q = RF(l, i);
     if (r[0] < q[2] && r[1] < q[3] && q[0] < r[2] && q[1] < r[3]) {
@@ -249,7 +249,7 @@ void Storm_Sub31150(uint32_t* l, uint32_t from, uint32_t to, float* r) {
 }
 
 // 1.13c Storm+0x31350: coalesce/split overlapping rects (see merge rules below)
-void Storm_Sub31350(uint32_t* l) {
+extern "C" void Storm_Sub31350(uint32_t* l) {
   for (uint32_t i = 1; i < l[1]; i++) {
     for (uint32_t j = 0; j < i; j++) {
       float* p = RF(l, j); float* c = RF(l, i);

@@ -11,7 +11,7 @@ void Storm_Sub1DA0(uint32_t obj);                        // 0x1DA0
 void Storm_Sub1DF0(uint32_t obj);                        // 0x1DF0
 void Storm_Sub1E40(uint32_t obj);                        // 0x1E40
 void Storm_Sub3770(uint32_t obj);                        // 0x3770
-void Storm_Sub3820(void* p);                             // 0x3820 element destructor
+extern "C" void Storm_Sub3820(void* p);                             // 0x3820 element destructor
 void Storm_EhVectorDestructorIterator(void* arr, uint32_t size, uint32_t count, void (*dtor)(void*)); // 0x605E
 
 // 1.13c Storm+0x41E40
