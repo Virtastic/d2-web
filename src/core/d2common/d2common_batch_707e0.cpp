@@ -5,7 +5,7 @@
 
 extern "C" {
 // 1.13c D2Common+0x707E0: advance accumulator s+0x10 by *src (+ table[seed&31] when seeded), mod 8.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_707e0(int32_t flag, uint32_t* seed, const int32_t* tbl, const int32_t* src, uint32_t* acc) {
+EMSCRIPTEN_KEEPALIVE void D2Common_707E0_AdvanceAcc(int32_t flag, uint32_t* seed, const int32_t* tbl, const int32_t* src, uint32_t* acc) {
  if (flag) {
   const uint64_t v = (uint64_t)seed[0] * 0x6ac690c5u + seed[1];
   seed[0] = (uint32_t)v; seed[1] = (uint32_t)(v >> 32);

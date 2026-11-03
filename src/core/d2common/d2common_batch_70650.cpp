@@ -6,7 +6,7 @@
 extern "C" {
 // 1.13c D2Common+0x70650: walk the node chain, keep a point where the step direction changes
 // (max 0x4d), emit them reversed (last kept first) into owner->+0x30->+0x9c; return count or 0.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_70650(const uint8_t* owner, const uint8_t* node) {
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_70650_PathPoints(const uint8_t* owner, const uint8_t* node) {
  uint32_t out[0x4e];
  uint8_t* dst = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(*reinterpret_cast<const uint32_t*>(owner + 0x30)) + 0x9c);
  uint32_t n = 0;

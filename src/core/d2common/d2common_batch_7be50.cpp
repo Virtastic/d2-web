@@ -14,27 +14,24 @@
 static int32_t add32(int32_t a, int32_t b) { return int32_t(uint32_t(a) + uint32_t(b)); }
 static int32_t mul32(int32_t a, int32_t b) { return int32_t(uint32_t(a) * uint32_t(b)); }
 
-// 1.13c D2Common+0x7BE50
-extern "C" void d2_fn_d2common_7be50(D2DrlgRoomStrc* room)
+// 1.13c D2Common+0x7BE50 (ECX = room): same body as 0x7BC20. A status byte (+0x44) >= 4 or a zero ref count
+// at +0xC+status*2 picks the first status 0..3 with a non-zero count (4 when none), relinks through
+// 0x7BB70 and stores it at +0x44. Retail room records are read by their 32-bit offsets.
+extern "C" void D2Common_7BB70_RelinkStatus(intptr_t pRoom, uint8_t nStatus);
+extern "C" void D2Common_7BE50_NormaliseStatus(intptr_t pRoom)
 {
-    if (room->fRoomStatus < 4 && room->wRoomsInList[room->fRoomStatus]) return;
-    uint8_t status = 0;
-    while (status < 4 && !room->wRoomsInList[status]) ++status;
-    if (room->fRoomStatus == status) return;
-    if (room->pStatusPrev && room->pStatusNext) {
-        room->pStatusPrev->pStatusNext = room->pStatusNext;
-        room->pStatusNext->pStatusPrev = room->pStatusPrev;
-        room->pStatusNext = nullptr;
-        room->pStatusPrev = nullptr;
-    }
-    if (status < 4) {
-        auto* head = &room->pLevel->pDrlg->tStatusRoomsLists[status];
-        room->pStatusNext = head;
-        room->pStatusPrev = head->pStatusPrev;
-        head->pStatusPrev->pStatusNext = room;
-        head->pStatusPrev = room;
-        room->fRoomStatus = status;
-    }
+    uint8_t* r = reinterpret_cast<uint8_t*>(pRoom);
+    const uint8_t cur = r[0x44];
+    uint16_t c[4];
+    std::memcpy(c, r + 0xC, sizeof c);
+    if (cur < 4 && c[cur] != 0) return;
+    uint8_t s = 0;
+    do {
+        if (c[s] != 0) break;
+        ++s;
+    } while (s < 4);
+    D2Common_7BB70_RelinkStatus(pRoom, s);
+    r[0x44] = s;
 }
 
 // 1.13c D2Common+0x29F30

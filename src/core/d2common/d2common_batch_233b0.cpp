@@ -1,3 +1,4 @@
+#include <cstring>
 // 1.13c D2Common implementation batch (rows 0x233B0, 0x24C30, 0x3C120, 0x7C170, 0x3B550, 0x82E40,
 // 0x12D20, 0x374E0, 0x3B470, 0x3A030, 0x4E0E0, 0x3B120).
 // Six of the bodies are the same code as a vendored D2MOO 1.10f twin (same branches, same fields), so
@@ -61,14 +62,57 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_3C120_GetAdjacentRoomByTile(uint32_t pRoo
 	return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pFound));
 }
 
-// 1.13c D2Common+0x7C170: update the four DRLG room-allocation counters (client vs general, by flag
-// bit 0 at +0x8C), then once every 5/7 timeouts walk the out-of-sight room list and ensure each room
-// has its real room. Same body as the 1.10f twin DRLGACTIVATE_Update; the room visit that 1.13c
-// inlines is 0x7C0E0 (DRLGACTIVATE_RoomEx_EnsureHasRoom).
+// 1.13c D2Common+0x7C170 (DRLGACTIVATE_Update, stack arg = the lists struct, ret 4): mirror the +8 / +0x468
+// pair into the four DAT_6FDEFB84.. globals when lists+0x8C bit 0 is set, then once every 5 or 7 timeouts
+// (+0x45C) walk the status-2 ring from +0x460 and run 0x7C0E0 on each idle room. Retail 32-bit layout:
+// pDrlg and every link are retail tokens; the globals are passed in as G[4] (84, 88, 8C, 90).
+void sub_7C0E0(void* unit);
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_7c170(uint32_t pDrlg)
+void D2Common_7C170_ActivateUpdate(uint32_t pDrlg, uint32_t* G)
 {
-	DRLGACTIVATE_Update(reinterpret_cast<D2DrlgStrc*>(static_cast<uintptr_t>(pDrlg)));
+	if (pDrlg == 0)
+		return;
+	auto rd32 = [](uint32_t a, uint32_t o) { uint32_t v; std::memcpy(&v, reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(a)) + o, 4); return v; };
+	auto wr32 = [](uint32_t a, uint32_t o, uint32_t v) { std::memcpy(reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(a)) + o, &v, 4); };
+	auto rd8 = [](uint32_t a, uint32_t o) { return *(reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(a)) + o); };
+	auto wr8 = [](uint32_t a, uint32_t o, uint8_t v) { *(reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(a)) + o) = v; };
+	uint32_t u4 = rd32(pDrlg, 0x468);
+	uint32_t u3 = rd32(pDrlg, 8);
+	if (rd32(pDrlg, 0x8C) & 1)
+	{
+		G[0] = rd32(pDrlg, 8);
+		G[1] = rd32(pDrlg, 0x468);
+		u4 = G[2];
+		u3 = G[3];
+	}
+	G[3] = u3;
+	G[2] = u4;
+	if (rd8(pDrlg, 0x98) < 2)
+	{
+		wr8(pDrlg, 0x45C, static_cast<uint8_t>(rd8(pDrlg, 0x45C) - 1));
+		if (rd8(pDrlg, 0x45C) == 0)
+		{
+			wr8(pDrlg, 0x45C, static_cast<uint8_t>((~(static_cast<uint8_t>(rd32(pDrlg, 0x8C)) << 1) & 2) | 5));
+			const uint32_t cur = rd32(pDrlg, 0x460);
+			if (cur == 0 || rd8(cur, 0x44) != 2)
+				wr32(pDrlg, 0x460, rd32(pDrlg, 0x294));
+			const uint32_t start = rd32(pDrlg, 0x460);
+			uint32_t room = start;
+			if (start != 0)
+			{
+				do
+				{
+					if ((rd32(room, 0x28) & 0x100000) == 0 && room != pDrlg + 0x278 && rd32(room, 0x30) == 0)
+						sub_7C0E0(reinterpret_cast<void*>(static_cast<uintptr_t>(room)));
+					room = rd32(room, 0x1C);
+				} while (room != start && rd8(pDrlg, 0x98) == 0);
+				wr32(pDrlg, 0x460, room);
+				wr8(pDrlg, 0x98, 0);
+			}
+		}
+		return;
+	}
+	wr8(pDrlg, 0x98, 0);
 }
 
 // 1.13c D2Common+0x3B550: dword at unit+0x10. Null unit is retail fatal 0x31E.

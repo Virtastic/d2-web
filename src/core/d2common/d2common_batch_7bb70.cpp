@@ -7,7 +7,7 @@ extern "C" {
 // unlink the room from its current list node (+0x1c prev / +0xe8 next, only when both set), then if
 // status < 4 insert it after list head (*(*(+0x58)+0x1b4) + 0xa0 + status*0xec) and store +0x44.
 // Oddity: when status >= 4 the room is left unlinked and +0x44 is not updated.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_7bb70(intptr_t pRoom, uint8_t nStatus) {
+EMSCRIPTEN_KEEPALIVE void D2Common_7BB70_RelinkStatus(intptr_t pRoom, uint8_t nStatus) {
  auto F = [](intptr_t p, int off) -> uint32_t& { return *reinterpret_cast<uint32_t*>(p + off); };
  if (*reinterpret_cast<uint8_t*>(pRoom + 0x44) == nStatus) return;
  if (F(pRoom, 0xe8) != 0 && F(pRoom, 0x1c) != 0) {

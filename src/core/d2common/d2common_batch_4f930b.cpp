@@ -66,19 +66,19 @@ void D2Common_2D4E0_LoadTownTiles(void* drlg, void (*loadTiles)(void*, const cha
 }
 
 // 1.13c D2Common+0x7B8D0
-void D2Common_7B8D0_InitDrlgLists(void* drlg) {
+void D2Common_7B8D0_InitDrlgLists(void* drlg) {  // retail pointers are 32-bit: the low 32 bits of the blob address
     auto* base = static_cast<uint8_t*>(drlg);
-    put<void*>(drlg, 0xbc, base + 0xa0);
-    put<void*>(drlg, 0x188, base + 0xa0);
-    put<void*>(drlg, 0x1a8, base + 0x18c);
-    put<void*>(drlg, 0x274, base + 0x18c);
-    put<void*>(drlg, 0x294, base + 0x278);
-    put<void*>(drlg, 0x360, base + 0x278);
+    put<uint32_t>(drlg, 0xbc, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(base + 0xa0)));
+    put<uint32_t>(drlg, 0x188, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(base + 0xa0)));
+    put<uint32_t>(drlg, 0x1a8, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(base + 0x18c)));
+    put<uint32_t>(drlg, 0x274, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(base + 0x18c)));
+    put<uint32_t>(drlg, 0x294, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(base + 0x278)));
+    put<uint32_t>(drlg, 0x360, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(base + 0x278)));
     put<uint8_t>(drlg, 0xe4, 0);
     put<uint8_t>(drlg, 0x1d0, 1);
     put<uint8_t>(drlg, 700, 2);
-    put<void*>(drlg, 0x380, base + 0x364);
-    put<void*>(drlg, 0x44c, base + 0x364);
+    put<uint32_t>(drlg, 0x380, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(base + 0x364)));
+    put<uint32_t>(drlg, 0x44c, static_cast<uint32_t>(reinterpret_cast<uintptr_t>(base + 0x364)));
     put<uint8_t>(drlg, 0x3a8, 3);
 }
 

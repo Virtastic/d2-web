@@ -22,7 +22,7 @@ W void* sub_7E5C0(int32_t, int32_t, void*, void*);
 W void  sub_CC090();
 W void  sub_B8400();
 W void  sub_5BF70(void*);
-W void  sub_CC0E0();
+W void  sub_7C0E0(void*);
 W int32_t sub_5D0A0(int32_t, void*, int32_t* out2);
 W int32_t sub_5D580(int32_t, int32_t, int32_t*, uint32_t*);
 W int32_t sub_5D820(void*, int32_t);
@@ -95,24 +95,33 @@ int32_t sub_35780(void* pCtxEDI)
     return rd<int32_t>(pCtxEDI, 0x28);
 }
 
-// 1.13c D2Common+0x7C300: __thiscall this = key (compared with +0x1d0), ESI = pOwner (list head at +0x47c, next at +0x1ac).
-void sub_7C300(void* key, int32_t p1, int32_t p2, void* pOwnerESI)
+// 1.13c D2Common+0x7C300: __thiscall ECX = key (compared with +0x1d0), ESI = owner (list head +0x47c, next +0x1ac), EAX = room, stack p1 p2.
+// Same lookup as 0x7BF20; a result whose u16 at +0xE is zero goes to 0x7C090 (EDI = result, BL = 1). Retail-layout tokens.
+struct D2Common7c300Env {
+    uint32_t (*sub2D9B0)(uint32_t pOwner, uint32_t nKey);
+    uint32_t (*sub2E5C0)(uint32_t pRoom, uint32_t p1, uint32_t p2, uint32_t pOwner, uint32_t pNode);
+    void (*sub7C090)(uint32_t pRoom, uint32_t nStatus);
+};
+extern "C" void D2Common_7C300_Update(uint32_t nKey, uint32_t pRoom, uint32_t p1, uint32_t p2, uint32_t pOwner, const D2Common7c300Env* env)
 {
-    void* n = rdp(pOwnerESI, 0x47c);
-    for (; n; n = rdp(n, 0x1ac))
-        if (rdp(n, 0x1d0) == key) break;
-    if (!n) n = sub_7D9B0(pOwnerESI, (int32_t)(intptr_t)key);
-    void* r = sub_7E5C0(p1, p2, pOwnerESI, n);
-    if (rd<int16_t>(r, 0xe) == 0) sub_CC090();
+    auto t32 = [](uint32_t a) { uint32_t v; std::memcpy(&v, reinterpret_cast<const void*>(static_cast<uintptr_t>(a)), 4); return v; };
+    uint32_t node = t32(pOwner + 0x47c);
+    while (node && t32(node + 0x1d0) != nKey) node = t32(node + 0x1ac);
+    if (!node) node = env->sub2D9B0(pOwner, nKey);
+    uint32_t arg = pRoom;
+    if (pRoom && t32(t32(pRoom + 0x58) + 0x1d0) != nKey) arg = 0;
+    const uint32_t res = env->sub2E5C0(arg, p1, p2, pOwner, node);
+    uint16_t cnt; std::memcpy(&cnt, reinterpret_cast<const void*>(static_cast<uintptr_t>(res + 0xe)), 2);
+    if (cnt == 0) env->sub7C090(res, 1);
 }
 
 // 1.13c D2Common+0x7C270: register map EAX = pUnit.
 uint32_t sub_7C270(void* pUnitEAX)
 {
     uint32_t f = rd<uint32_t>(pUnitEAX, 0x28);
-    if (!(f & 0x1000000)) sub_B8400();
-    if (!(rd<uint32_t>(pUnitEAX, 0x28) & 0x2000000) && rd<int32_t>(pUnitEAX, 0x48) == 2) sub_5BF70(pUnitEAX);
-    if (!(rd<uint32_t>(pUnitEAX, 0x28) & 0x100000)) sub_CC0E0();
+    if (!(f & 0x1000000) && sub_B8400) sub_B8400();
+    if (!(rd<uint32_t>(pUnitEAX, 0x28) & 0x2000000) && rd<int32_t>(pUnitEAX, 0x48) == 2 && sub_5BF70) sub_5BF70(pUnitEAX);
+    if (!(rd<uint32_t>(pUnitEAX, 0x28) & 0x100000) && sub_7C0E0) sub_7C0E0(pUnitEAX);
     return rd<uint32_t>(pUnitEAX, 0x30);
 }
 

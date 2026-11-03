@@ -8,6 +8,7 @@ inline int32_t rd(const void* b, int off) { return *reinterpret_cast<const int32
 inline void* gp(const void* b, int off) { return reinterpret_cast<void*>(static_cast<uintptr_t>(static_cast<uint32_t>(rd(b, off)))); }
 }
 
+extern "C" void D2Common_7BCD0_LinkList1(intptr_t n);
 extern "C++" {
 // D2Common .rdata 0x93F20: the 8x8 near-distance class table (index dx + dy * 8; a negative entry answers 0), copied from the image
 int32_t g_d2common_distTable_3f20[64] = {
@@ -23,8 +24,7 @@ __attribute__((weak)) int32_t* sub_68F00(void* edi, int32_t* list, int x, int y,
 __attribute__((weak)) int D2Common_Ordinal_10265(int);
 __attribute__((weak)) void D2Common_Ordinal_10024(const void* fmt, int);
 __attribute__((weak)) extern const char g_d2common_fmt_dda728[]; // DAT_6fdda728
-__attribute__((weak)) void sub_7BCD0();
-__attribute__((weak)) void sub_7C0E0();
+__attribute__((weak)) void sub_7C0E0(void*);
 }
 
 // 1.13c D2Common+0x68780
@@ -95,8 +95,8 @@ int sub_3E2B0(uint32_t a, uint32_t b) {
 void sub_7C370(char* u) {
     if (rd(u, 0x30) == 0 && (static_cast<uint32_t>(rd(u, 0x28)) & 0x100000) == 0) {
         char* pl = static_cast<char*>(gp(gp(u, 0x58), 0x1b4));
-        sub_7C0E0();
+        if (sub_7C0E0) sub_7C0E0(u);
         pl[0x45c] = static_cast<char>((~(pl[0x8c] << 1) & 2) | 5);
     }
-    if (static_cast<uint8_t>(u[0x44]) > 1) sub_7BCD0();
+    if (static_cast<uint8_t>(u[0x44]) > 1) D2Common_7BCD0_LinkList1(reinterpret_cast<intptr_t>(u));
 }

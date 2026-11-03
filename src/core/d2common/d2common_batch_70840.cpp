@@ -6,20 +6,20 @@
 struct D2Node70840 { uint8_t p0[6]; int16_t cnt; int32_t p8; const int32_t* src; uint32_t acc; D2Node70840* parent; };
 
 extern "C" {
-void d2_fn_d2common_707e0(int32_t flag, uint32_t* seed, const int32_t* tbl, const int32_t* src, uint32_t* acc);
+void D2Common_707E0_AdvanceAcc(int32_t flag, uint32_t* seed, const int32_t* tbl, const int32_t* src, uint32_t* acc);
 
 // 1.13c D2Common+0x70840: bump node count; on reaching 5 carry into the parent chain. Returns node or 0 at root.
-EMSCRIPTEN_KEEPALIVE D2Node70840* d2_fn_d2common_70840(D2Node70840* n, D2Node70840* const* root, int32_t flag, uint32_t* seed, const int32_t* tbl) {
+EMSCRIPTEN_KEEPALIVE D2Node70840* D2Common_70840_BumpCarry(D2Node70840* n, D2Node70840* const* root, int32_t flag, uint32_t* seed, const int32_t* tbl) {
  if (n->cnt < 4) {
   n->src += 1;
-  d2_fn_d2common_707e0(flag, seed, tbl, n->src, &n->acc);
+  D2Common_707E0_AdvanceAcc(flag, seed, tbl, n->src, &n->acc);
  }
  n->cnt++;
  while (n->cnt == 5) {
   if (n == *root) return 0;
   n = n->parent;
   n->src += 1;
-  d2_fn_d2common_707e0(flag, seed, tbl, n->src, &n->acc);
+  D2Common_707E0_AdvanceAcc(flag, seed, tbl, n->src, &n->acc);
   n->cnt++;
  }
  return n;

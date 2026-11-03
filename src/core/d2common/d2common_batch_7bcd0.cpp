@@ -9,7 +9,7 @@ extern "C" {
 // 1.13c D2Common+0x7BCD0: unlink node (EAX) from its current list, push it on the head of the
 // list in (node->+0x58)->+0x1b4. Oddity: node->+0x1c is set to list+0x18c (a head sentinel),
 // +0xe8 to the old head (list+0x274); a node already flagged (+0x44 == 1) is left alone.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_7bcd0(intptr_t n) {
+EMSCRIPTEN_KEEPALIVE void D2Common_7BCD0_LinkList1(intptr_t n) {
  if (*reinterpret_cast<char*>(n + 0x44) == 1) return;
  if (F(n, 0xE8) != 0 && F(n, 0x1C) != 0) {
   F(F(n, 0xE8), 0x1C) = F(n, 0x1C);

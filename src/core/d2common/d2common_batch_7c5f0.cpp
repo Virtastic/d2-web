@@ -5,7 +5,7 @@
 
 extern "C" {
 // 1.13c D2Common+0x7C5F0
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_7c5f0(char* dst, const char* src) {
+EMSCRIPTEN_KEEPALIVE void D2Common_7C5F0_CopyPad4(char* dst, const char* src) {
  int i = 0;
  for (; i < 4 && src[i]; ++i) dst[i] = src[i];
  for (; i < 4; ++i) dst[i] = ' ';

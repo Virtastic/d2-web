@@ -57,6 +57,8 @@ struct D2CommonBatch87080Env {
 	void (*sub7BB70)(uint32_t pRoom, uint8_t nStatus);
 	// gRoomExSetStatus[status](room): the four callbacks in the table at retail 0x6FDE9BE8.
 	void (*setStatus[4])(uint32_t pRoom);
+	// 0x7BFA0(pool in ECX, room in EDX, status on the stack): propagate a status to the near rooms.
+	void (*sub7BFA0)(uint32_t pPool, uint32_t pRoom, uint32_t nStatus);
 };
 
 // 1.13c D2Common+0x87080: the CRT's signed 64-bit division helper __alldiv. Each operand is a pair
@@ -241,7 +243,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_2c7c0(uint32_t pItem, uint32_t nSetI
 // in 0..3 whose ref count is non-zero (4 when none is) and force the room to it through 0x7BB70; the
 // status byte is written afterwards.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_7be90(uint32_t pRoom, const D2CommonBatch87080Env* env)
+EMSCRIPTEN_KEEPALIVE void D2Common_7BE90_NormaliseStatus(uint32_t pRoom, const D2CommonBatch87080Env* env)
 {
 	if (pRoom == 0)
 		return;
@@ -269,7 +271,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_7be90(uint32_t pRoom, const D2CommonBat
 // count at +0xC+nStatus*2 is then incremented. The room is the register argument (EDI) and nStatus the
 // low byte of BL, as 0x3CC40 and 0x7C300 call it.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_7c090(uint32_t pRoom, uint32_t nStatus,
+EMSCRIPTEN_KEEPALIVE void D2Common_7C090_SetAndPropagate(uint32_t pRoom, uint32_t nStatus,
                                                const D2CommonBatch87080Env* env)
 {
 	if (pRoom == 0)
@@ -280,10 +282,13 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_7c090(uint32_t pRoom, uint32_t nStatus,
 	const uint32_t pDrlg = pLevel != 0 ? rd32(pLevel, 0x1B4) : 0;
 	const uint32_t pMemPool = pDrlg != 0 ? rd32(pDrlg, 0x478) : 0;
 
-	DRLGACTIVATE_RoomExPropagateSetStatus(
-		reinterpret_cast<void*>(static_cast<uintptr_t>(pMemPool)),
-		reinterpret_cast<D2DrlgRoomStrc*>(static_cast<uintptr_t>(pRoom)),
-		static_cast<uint8_t>(nBL + 1));
+	if (env != nullptr && env->sub7BFA0 != nullptr)
+		env->sub7BFA0(pMemPool, pRoom, static_cast<uint8_t>(nBL + 1));
+	else
+		DRLGACTIVATE_RoomExPropagateSetStatus(
+			reinterpret_cast<void*>(static_cast<uintptr_t>(pMemPool)),
+			reinterpret_cast<D2DrlgRoomStrc*>(static_cast<uintptr_t>(pRoom)),
+			static_cast<uint8_t>(nBL + 1));
 
 	if (nBL <= rd8(pRoom, 0x44))
 	{

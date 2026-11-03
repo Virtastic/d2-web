@@ -44,7 +44,7 @@ void D2Common_7ECC0(void* pObj, int32_t base, const int32_t* tbl,
 // 1.13c D2Common+0x42920: find-or-create a per-id round-robin node on the list at +0x1cc of pCtx
 // (node: id, count, cursor, next), seed LCG at +0x1c4/+0x1c8, then advance cursor = (cursor+1)%count.
 // pRow = the 0x1b0-byte table row (id at +0, count at +0x40); alloc = Ordinal_10045.
-void D2Common_42920(void* pCtx, int32_t id, const void* pRow, int32_t* (*alloc)())
+int32_t D2Common_42920(void* pCtx, int32_t id, const void* pRow, int32_t* (*alloc)())
 {
     // list links are 4-byte retail pointers (wasm32 host addresses), not native pointer width
     int32_t* n = (int32_t*)(uintptr_t)rd<uint32_t>(pCtx, 0x1cc);
@@ -65,6 +65,7 @@ void D2Common_42920(void* pCtx, int32_t id, const void* pRow, int32_t* (*alloc)(
     }
 found:
     n[2] = (n[2] + 1) % n[1];
+    return n[2];   // EAX on return: the advanced cursor (0x42A70 takes it as the flag)
 }
 
 // Shared tail of 0x68CD0 / 0x68F00: apply the 'flags' word (unaff_EBX / param_5) to rec[5].

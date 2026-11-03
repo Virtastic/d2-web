@@ -6,7 +6,7 @@
 extern "C" {
 // 1.13c D2Common+0x7B220: pop the pending-list head, unlink it from its bucket, push on the second bucket set.
 // Ghidra types the callee void, but 0x7B630 consumes EAX as the popped node (null when the list is empty).
-EMSCRIPTEN_KEEPALIVE intptr_t d2_fn_d2common_7b220(uint32_t* t, const int32_t* h1, const int32_t* h2) {
+EMSCRIPTEN_KEEPALIVE intptr_t D2Common_7B220_HashRelink(uint32_t* t, const int32_t* h1, const int32_t* h2) {
  auto P = [](uint32_t v) { return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(v)); };
  auto W = [](uint8_t* n) { return reinterpret_cast<uint32_t*>(n + 0x30); };
  uint8_t* n = P(t[0x100]);

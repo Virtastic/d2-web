@@ -15,7 +15,7 @@ void wr(void* p, uint32_t o, uint32_t v) { std::memcpy(static_cast<uint8_t*>(p) 
 
 extern "C" {
 // 1.13c D2Common+0x7BC60: unit (EAX) at +0x44 kind byte; kind 3 = already linked, return.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_7bc60(uint8_t* u, const D2Common7bc60Env* env) {
+EMSCRIPTEN_KEEPALIVE void D2Common_7BC60_LinkTail(uint8_t* u, const D2Common7bc60Env* env) {
     if (u[0x44] == 3) return;
     // Unlink from the current pair (+0xE8 prev / +0x1C next), if both are set.
     if (rd(u, 0xE8) && rd(u, 0x1C)) {

@@ -43,20 +43,33 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3b5b0(void* object,
     return read32(object, 0x20);
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_7bf20(void* owner,
-    uint32_t arg1, uint32_t arg2, int32_t ownerId, const D2Common3051Env* env,
-    void* (*getOrCreateRoom)(void*, int32_t),
-    void* (*findPath)(uint32_t, uint32_t, void*, void*),
-    void (*pathReleased)(), void (*notify)(void*, uint32_t)) { // 1.13c D2Common+0x7BF20
-    void* node = link(owner, 0x47c, env);
-    while (node && signed32(node, 0x1d0) != ownerId) node = link(node, 0x1ac, env);
-    if (!node) node = getOrCreateRoom(owner, ownerId);
-    void* path = findPath(arg1, arg2, owner, node);
-    if (path && read16(path, 0x0e)) {
-        const uint16_t count = static_cast<uint16_t>(read16(path, 0x0e)) - 1u;
-        std::memcpy(bytes(path) + 0x0e, &count, sizeof(count));
-        pathReleased();
-        notify(path, 2);
+// 1.13c D2Common+0x7BF20 (__thiscall owner in ECX, room in EAX, key in EDI, two stack words p1 p2). Retail-layout tokens.
+// Finds the owner's list entry (list head +0x47c, next +0x1ac, key +0x1d0) or asks 0x2D9B0 for one; hands the room
+// to 0x2E5C0 only when its level's key (+0x58 then +0x1d0) equals the key. A result with a non-zero u16 at +0xE
+// loses one count, runs the callback at [0x6FDE9BFC] (= 0x7BE50) and then 0x7BB20(result, 2).
+struct D2Common7bf20Env {
+    uint32_t (*sub2D9B0)(uint32_t pOwner, uint32_t nKey);
+    uint32_t (*sub2E5C0)(uint32_t pRoom, uint32_t p1, uint32_t p2, uint32_t pOwner, uint32_t pNode);
+    void (*callback)(uint32_t pResult);
+    void (*sub7BB20)(uint32_t pResult, uint32_t nMode);
+};
+namespace {
+uint32_t T32(uint32_t a) { uint32_t v; std::memcpy(&v, reinterpret_cast<const void*>(static_cast<uintptr_t>(a)), 4); return v; }
+uint16_t T16(uint32_t a) { uint16_t v; std::memcpy(&v, reinterpret_cast<const void*>(static_cast<uintptr_t>(a)), 2); return v; }
+}
+extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_7BF20_Update(uint32_t pOwner, uint32_t pRoom, uint32_t nKey,
+    uint32_t p1, uint32_t p2, const D2Common7bf20Env* env) {
+    uint32_t node = T32(pOwner + 0x47c);
+    while (node && T32(node + 0x1d0) != nKey) node = T32(node + 0x1ac);
+    if (!node) node = env->sub2D9B0(pOwner, nKey);
+    uint32_t arg = pRoom;
+    if (pRoom && T32(T32(pRoom + 0x58) + 0x1d0) != nKey) arg = 0;
+    const uint32_t res = env->sub2E5C0(arg, p1, p2, pOwner, node);
+    if (res && T16(res + 0xe)) {
+        const uint16_t c = static_cast<uint16_t>(T16(res + 0xe) - 1);
+        std::memcpy(reinterpret_cast<void*>(static_cast<uintptr_t>(res + 0xe)), &c, 2);
+        env->callback(res);
+        env->sub7BB20(res, 2);
     }
 }
 
