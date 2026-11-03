@@ -1883,6 +1883,7 @@ void __stdcall UNITS_SetAnimActionFrame(D2UnitStrc* pUnit, int nFrame)
 }
 
 //D2Common.0x6FDBFA90 (#10382)
+// 1.13c D2Common+0x32770 (validated, no delta: unit type, mode 0x12 / 0x0E, frame bound 0x8F, sequence record and compute)
 int __stdcall UNITS_GetEventFrameInfo(D2UnitStrc* pUnit, int nFrame)
 {
 	D2_ASSERT(pUnit);
