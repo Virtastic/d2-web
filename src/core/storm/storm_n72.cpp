@@ -10,9 +10,6 @@ struct S2780Link { uintptr_t prevlink, next; };
 struct S2780List { intptr_t linkoffset; S2780Link term; };
 
 // ---------------------------------------------------------------- 0x2DD0 hash-table grow
-struct S2DD0Table { S2780List* buckets; uint32_t mask; };  // retail +0x1c, +0x24
-struct S2DD0Env { void (*growBuckets)(S2DD0Table* t, uint32_t newCount); };  // Storm+0x32E0
-
 static void n72_unlinkLink(S2780Link* l) {  // shared splice: l is a link at address l
     uintptr_t prev = l->prevlink;
     if (!prev) return;
@@ -24,52 +21,7 @@ static void n72_unlinkLink(S2780Link* l) {  // shared splice: l is a link at add
     l->prevlink = 0; l->next = 0;
 }
 
-// 1.13c STORM+0x02DD0
-extern "C" void Storm_Sub2DD0(const S2DD0Env& e, S2DD0Table* t) {
-    uint32_t oldN = t->mask + 1, newN = oldN * 2;
-    S2780Link tmp; tmp.prevlink = (uintptr_t)&tmp; tmp.next = ~(uintptr_t)&tmp;  // stack list head (local_14/local_10)
-    for (uint32_t i = 0; i < oldN; i++) {
-        S2780List* b = &t->buckets[i];
-        while ((intptr_t)b->term.next > 0) {
-            uintptr_t n = b->term.next;
-            S2780Link* l = (S2780Link*)(n + sizeof(uintptr_t));  // link offset 4 (pointer-width here)
-            n72_unlinkLink(l);
-            S2780Link* tail = (S2780Link*)tmp.prevlink;
-            l->prevlink = (uintptr_t)tail;
-            l->next = tail->next;
-            tail->next = n;
-            tmp.prevlink = (uintptr_t)l;
-        }
-    }
-    e.growBuckets(t, newN);
-    for (uint32_t i = 0; i < newN; i++) {
-        S2780List* b = &t->buckets[i];
-        if (b->linkoffset != (intptr_t)sizeof(uintptr_t)) {
-            StormSub2780ListUnlinkAll(b);
-            b->linkoffset = sizeof(uintptr_t);
-            b->term.prevlink = (uintptr_t)&b->term;
-            b->term.next = ~(uintptr_t)&b->term;
-        }
-    }
-    t->mask = newN - 1;
-    while ((intptr_t)tmp.next > 0) {
-        uintptr_t n = tmp.next;
-        S2780List* b = &t->buckets[*(uint32_t*)n & t->mask];
-        S2780Link* l = (S2780Link*)(n + b->linkoffset);
-        n72_unlinkLink(l);
-        S2780Link* tail = (S2780Link*)b->term.prevlink;
-        l->prevlink = (uintptr_t)tail;
-        l->next = tail->next;
-        tail->next = n;
-        b->term.prevlink = (uintptr_t)l;
-    }
-    // retail tail: temp-list destructor (Storm+0x2780 on the empty stack list, then link self-reset)
-    if (tmp.prevlink) {
-        uintptr_t* tg = (intptr_t)tmp.next < 0 ? (uintptr_t*)~tmp.next : (uintptr_t*)tmp.next;
-        *tg = tmp.prevlink;
-        ((S2780Link*)tmp.prevlink)->next = tmp.next;
-    }
-}
+// 0x2DD0 moved to storm_2dd0.cpp (32-bit word layout).
 
 // ---------------------------------------------------------------- 0x46D0 destructor
 struct S46D0Env {

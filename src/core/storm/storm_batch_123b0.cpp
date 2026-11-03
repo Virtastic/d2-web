@@ -81,8 +81,8 @@ int32_t Storm_Sub11C90(uint32_t* head, uint32_t arg, int32_t* cnt, uint32_t** ou
 // scan finds nothing: only the once-flag (0x6FC45844) is set.
 void Storm_Sub169A0(void) { g_45844 = 1; }
 void Storm_Sub12740(void* a);
-int32_t* Storm_Sub12690(void);
 }  // namespace
+uint32_t Storm_Sub12690(void);  // storm_snet_n16.cpp (32-bit record address)
 void Storm_Sub14F20(void);  // external: defined in storm_snet_stalled.cpp
 namespace {
 int32_t* Storm_SubFEB0(int32_t index);
@@ -323,7 +323,7 @@ uint32_t Storm_Sub16030(int32_t* param_1) {
     } else {
         if (g_41b4c != 0xFF) {
             Storm_Sub14F20();
-            int32_t* piVar1 = Storm_Sub12690();
+            int32_t* piVar1 = (int32_t*)(uintptr_t)Storm_Sub12690();
             if (piVar1 != nullptr) {
                 if (piVar1[0x80] == 0) {
                     piVar1 = (int32_t*)g_listHead;

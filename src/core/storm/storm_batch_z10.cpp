@@ -3,39 +3,7 @@
 #include <cstdint>
 #include <cstring>
 
-struct StormZ10Env {
-    uint32_t* lastError;                                            // DAT_6fc45388
-    void (*setLastError)(uint32_t);                                 // SetLastError
-    void (*enter)(void*); void (*leave)(void*);                     // Enter/LeaveCriticalSection
-    void* csList;                                                   // DAT_6fc45940
-    void* csFile;                                                   // DAT_6fc45988
-    uint32_t* (*list2690)(void* ecx, uint32_t table);               // Storm+0x2690
-    uint32_t table458f0;                                            // 0x6fc458f0
-    void (*sub317F0)(uint32_t* e);                                  // Storm+0x317F0
-    void (*sub308A0)(uint32_t* e, const float* rect);               // Storm+0x308A0
-    void (*sub316D0)(int a, const float* r, uint32_t b, int c);     // Storm+0x316D0
-    void (*sub319C0)(int a, const float* r, uint32_t* n, uint32_t* o); // Storm+0x319C0
-    void (*sub318F0)(int a, uint32_t* n, uint32_t* o);              // Storm+0x318F0
-    int32_t (*ftol)(void* st0);                                     // Storm+0x3C908 (x87 st0 -> int)
-    // file side
-    int (*read195B0)(uint8_t* f, void* buf, uint32_t n, int* got, int, int, int); // Storm+0x195B0
-    int (*read19BE0)(uint8_t* f, void* buf, uint32_t n, int* got, int);           // Storm+0x19BE0
-    uint32_t (*size162D0)(uint8_t* f, uint32_t* hi);                              // Storm+0x162D0
-    uint32_t (*getFileSize)(uint32_t h);                            // GetFileSize
-    uint32_t (*setFilePointer)(uint32_t h, int32_t d, int method);  // SetFilePointer
-    void (*close16E20)(uint8_t* f);                                 // Storm+0x16E20
-    int (*open18960)(void*, const void* name, uint8_t flags, uint8_t** out); // Storm+0x18960
-    void* (*alloc)(uint32_t n, const char* file, int line, int fl); // Storm+0xC580
-    void (*free)(void* p, const char* file, int line);              // Storm+0xB960
-    uint32_t* openFlags43130; int32_t* cnt45984;                    // DAT_6fc43130 / DAT_6fc45984
-    int (*bmp220B0)(uint32_t*, uint32_t*, int, uint32_t*, uint32_t);                     // Storm+0x220B0
-    int (*bmp21E80)(const void*, int*, uint32_t, int, uint8_t*, uint32_t, int*);         // Storm+0x21E80
-    int (*bmp228C0)(uint32_t, const void*, uint8_t*, uint32_t, uint32_t*, uint32_t*, uint32_t*); // Storm+0x228C0
-    int (*bmp21FF0)(uint32_t, void*, void*, uint32_t, uint32_t, uint32_t);              // Storm+0x21FF0
-    void (*bmp21C40)(int, uint32_t, uint8_t*, const uint8_t*, uint32_t, uint32_t, uint32_t); // Storm+0x21C40
-    int (*tga22690)(void); int (*tga225C0)(const void*, uint8_t*, uint32_t, void*);     // Storm+0x22690 / 0x225C0
-    int (*tga222F0)(uint8_t*, const void*, uint32_t, uint8_t*);                         // Storm+0x222F0
-};
+#include "storm_z10.h"
 
 static inline uint32_t& F(uint8_t* f, uint32_t o) { return *(uint32_t*)(f + o); }
 static inline uint32_t Zm(uint32_t* e, uint32_t i) { return e[i]; }
@@ -165,7 +133,7 @@ int Storm_Sub333F0(const StormZ10Env& E, const char* name, const int* pal, uint8
                         else if (k == 2) E.bmp21E80(buf, nullptr, sz, (int)(intptr_t)pal, *outBuf, bytes, nullptr);
                         else if (k == 3) E.bmp228C0(sz, pal, *outBuf, bytes, nullptr, nullptr, nullptr);
                     }
-                    if (h) *h = bw; if (w) *w = bh; if (bpp) *bpp = wantBpp;  // decompile stores local_18 (bw) to param_4, local_14 to param_5
+                    if (w) *w = bw; if (h) *h = bh; if (bpp) *bpp = wantBpp;  // retail: param_4 (w) := local_18 (bw), param_5 (h) := local_14 (bh)
                     ok = 1;
                 }
             }
@@ -211,7 +179,7 @@ int Storm_Sub33730(const StormZ10Env& E, uint8_t* f, uint32_t* outW, int pal, ui
 
 // 1.13c Storm+0x33A10  (BMP info/palette/pixels; GUESSED: ECX(this) = out width ptr, EAX = out bpp ptr, ESI = file object)
 int Storm_Sub33A10(const StormZ10Env& E, uint8_t* f, uint32_t* outW, uint32_t* outBpp, int pal, uint32_t* pix, uint32_t arg, uint32_t* outH) {
-    uint8_t fh[0xe]; uint8_t ih[0x28];
+    uint8_t fh[0x10]; uint8_t ih[0x28];   // retail fh slot is 0x10 bytes (the next local starts at +0x10)
     if (!E.read195B0(f, fh, 0xe, nullptr, 0, 0, 0) || !E.read195B0(f, ih, 0x28, nullptr, 0, 0, 0)) return 0;
     uint32_t imgSz = *(uint32_t*)(ih + 0x14);
     uint16_t bits = *(uint16_t*)(ih + 0xe);
@@ -244,7 +212,7 @@ int Storm_Sub33A10(const StormZ10Env& E, uint8_t* f, uint32_t* outW, uint32_t* o
 
 // 1.13c Storm+0x33C30  (TGA header/palette/pixels; GUESSED: ESI = file object)
 int Storm_Sub33C30(const StormZ10Env& E, uint8_t* f, void* palOut, uint8_t* pixOut, uint32_t* outW, uint32_t* outH, uint32_t* outBpp) {
-    uint8_t h[0x12]; int got = 0;
+    uint8_t h[0x14]; int got = 0;   // retail slot: 0x14 bytes between the header and the next local
     if (!E.read195B0(f, h, 0x12, &got, 0, 0, 0) || got != 0x12 || !E.tga22690()) return 0;
     uint32_t w = *(uint16_t*)(h + 12), ht = *(uint16_t*)(h + 14), bpp = h[16];
     uint32_t idLen = h[0];
@@ -273,13 +241,13 @@ int Storm_Sub33EA0(const StormZ10Env& E, const char* name, int pal, uint8_t* pix
                    int (*pcx)(uint8_t*, int, uint8_t*, int, int*, int*), int (*bmp)(uint32_t*, int, uint8_t*, int, uint32_t*), int (*tga)(int, uint8_t*, int, uint32_t*, uint32_t*, uint32_t*)) {
     (void)pcx; (void)bmp; (void)tga;
     if (w) *w = 0; if (h) *h = 0; if (bpp) *bpp = 0;
-    if (!(name && *name && pixSz == 0 && pix)) { Z10Err(E); return 0; }
+    if (!(name && *name) || (pixSz == 0 && pix)) { Z10Err(E); return 0; }   // retail: error unless the name is non-empty and not (pixSz == 0 with a pix buffer)
     uint8_t* f;
     if (!E.open18960(nullptr, name, Z10OpenFlags(E), &f)) return 0;
-    int k = 0; uint16_t magic = 0;
+    int k = 0; uint32_t magic = 0;   // retail reads into the 4-byte name argument slot
     if (E.read195B0(f, &magic, 2, nullptr, 0, 0, 0)) {
         Z10Seek(E, f, -2, 1);
-        k = magic == 0x50a ? 2 : magic != 0x4d42 ? 3 : 1;
+        k = (magic & 0xffff) == 0x50a ? 2 : (magic & 0xffff) != 0x4d42 ? 3 : 1;
     }
     int r = 0;
     if (k == 1) r = Storm_Sub33A10(E, f, w, bpp, pal, (uint32_t*)pix, (uint32_t)pixSz, h);
@@ -292,8 +260,16 @@ int Storm_Sub33EA0(const StormZ10Env& E, const char* name, int pal, uint8_t* pix
 // 1.13c Storm+0x340B0
 uint32_t Storm_Sub340B0(uint32_t* g42fd0, uint32_t v) { *g42fd0 = v; return 1; }
 // 1.13c Storm+0x34370
-intptr_t Storm_Sub34300(void* hwnd, uint32_t msg, uint32_t wp, intptr_t lp);
+// The answer is E.wndProc34300 (a caller binds &Storm_Sub34300), so a probe links without the window-procedure chain.
 void* Storm_Sub34370(const StormZ10Env& E, int a) {
     if (a != 0) { Z10Err(E); return nullptr; }
-    return (void*)&Storm_Sub34300;
+    return E.wndProc34300;
+}
+
+// FUNCTION-mode binding for 0x34370: the SetLastError seam is a no-op, the result is the window-procedure address.
+static void z10NoErr(uint32_t) {}
+extern "C" void* Storm_Sub34370Probe(int a, void* wndProc) {
+    static uint32_t lastErr; static StormZ10Env E;
+    E.lastError = &lastErr; E.setLastError = z10NoErr; E.wndProc34300 = wndProc;
+    return Storm_Sub34370(E, a);
 }

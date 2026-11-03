@@ -437,10 +437,6 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_2160(uint32_t* r) {
 
 // 1.13c Storm+0x2210: NewNode(esi=location, [esp+4]=list, [esp+8]=extrabytes, [esp+12]=flags)
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_2210(uint32_t* r) {
-    void* p = StormHashTableInternalNew(P(StormHashTable*, 1), (uintptr_t)r[0], (uintptr_t)r[2], (uint32_t)r[3]);
-    r[4] = (uint32_t)(uintptr_t)p;
-}
 
 // Storm 0x2290 (1.13c): TSGrowableArray<TSList> dtor(eax=array)
 extern "C"
@@ -458,10 +454,6 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_22d0(uint32_t* r) {
 
 // Storm 0x2350 (1.13c): chunk NewNode(esi=location, [esp+4]=list, [esp+8]=extrabytes, [esp+12]=flags)
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_2350(uint32_t* r) {
-    void* p = StormHashTableChunkNew(P(StormHashTable*, 1), (uintptr_t)r[0], (uintptr_t)r[2], (uint32_t)r[3]);
-    r[4] = (uint32_t)(uintptr_t)p;
-}
 
 // 1.13c Storm+0x23E0: TSHashTableReuse<RGN> deleting dtor(ecx=this, [esp+4]=flags) -> this
 extern "C"

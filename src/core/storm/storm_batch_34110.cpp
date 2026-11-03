@@ -126,6 +126,7 @@ uint32_t Storm_Sub341D0(uint32_t param_1, uint32_t param_2, uint32_t param_3, ui
                         uint32_t* param_5, uint32_t* param_6, const StormBatch34110Env* env) {
     if (param_5 != nullptr) *param_5 = 0;
     if (param_6 != nullptr) *param_6 = 0;
+    const uint32_t orig = param_1;   // the 0x82 flush gets the caller's window (retail EBP), not the cleared copy
     uint32_t record[8] = {};
     record[0] = param_1;
     record[1] = param_2;
@@ -142,7 +143,7 @@ uint32_t Storm_Sub341D0(uint32_t param_1, uint32_t param_2, uint32_t param_3, ui
             env->f_35dd0(0x534D534A, param_1, param_3, record, nullptr);
         }
         if (param_1 == 0 || param_1 != g_displayRoot) {
-            if (param_2 == 0x82) env->f_34150(0);
+            if (param_2 == 0x82) env->f_34150(orig);
             if (param_5 != nullptr) *param_5 = record[6];
             if (param_6 != nullptr) *param_6 = record[7];
             return 1;
@@ -488,4 +489,34 @@ uint32_t Storm_Sub3A330(uint32_t* param_1, uint32_t* param_2, int32_t* param_3, 
     }
     g_exceptionList = savedList;
     return uVar1;
+}
+
+// FUNCTION-mode bindings: the callee seams are supplied by the probe (a recorder that logs the call as the capture's hook does).
+extern "C" uint32_t Storm_Sub34110Real(uint32_t key, uint32_t (*f36120)(uint32_t, uint32_t)) {
+    StormBatch34110Env env{};
+    env.f_36120 = f36120;
+    return Storm_Sub34110(key, &env);
+}
+
+static void sevtFlush34150(uint32_t edi) { if (edi == g_displayRoot) g_displayRoot = 0; }   // 0x34150 with the group list empty
+extern "C" uint32_t Storm_Sub341D0Real(uint32_t p1, uint32_t p2, uint32_t p3, uint32_t p4, uint32_t* p5, uint32_t* p6, uint32_t* displayRoot,
+                                       uint32_t (*f35dd0)(uint32_t, uint32_t, uint32_t, uint32_t*, void*)) {
+    StormBatch34110Env env{};
+    env.f_35dd0 = f35dd0;
+    env.f_34150 = sevtFlush34150;
+    g_displayRoot = *displayRoot;
+    uint32_t r = Storm_Sub341D0(p1, p2, p3, p4, p5, p6, &env);
+    *displayRoot = g_displayRoot;
+    return r;
+}
+// which: 0 = 0x34550, 1 = 0x34570, 2 = 0x34590, 3 = 0x345B0
+extern "C" uint32_t Storm_Sub345xxReal(int which, uint32_t key, uint32_t p2, uint32_t h, uint32_t (*f34460)(uint32_t, uint32_t, uint32_t, uint32_t)) {
+    StormBatch34110Env env{};
+    env.f_34460 = f34460;
+    switch (which) {
+        case 0: return Storm_Sub34550(key, p2, h, &env);
+        case 1: return Storm_Sub34570(key, p2, h, &env);
+        case 2: return Storm_Sub34590(key, p2, h, &env);
+        default: return Storm_Sub345B0(key, p2, h, &env);
+    }
 }

@@ -35,11 +35,13 @@ struct StormBatch382c0Env {
     uint32_t (*f_22170)(void* file, int32_t palette, void* dst, int32_t width,
                         int32_t height, uint32_t pitch);                                  // TGA
     uint32_t (*f_22ec0)(void* file, void* dst, int32_t height);                           // raw
-    uint32_t (*f_320b0)(uint32_t* w_out, uint32_t* h_out, void* out, uint8_t* src, int32_t size);
-    uint32_t (*f_31e80)(int16_t* header, int32_t* h_out, uint32_t size, void* out, uint8_t* src,
-                        int32_t param_6, int32_t* w_out);
-    uint32_t (*f_328c0)(uint32_t size, void* out, uint8_t* src, int32_t param_6, uint32_t* a,
-                        uint32_t* b, uint32_t* c);
+    // The three decoders take hidden register arguments; they are explicit here (0x320B0: EAX/ECX/EDX = pw/ph/pbpp, EDI = file;
+    // 0x31E80: EAX = pw, ECX = file, EDX = ph; 0x328C0: ESI = file, its 4th stack word is the pixel limit).
+    uint32_t (*f_320b0)(uint32_t* pw, int32_t* ph, uint32_t* pbpp, uint8_t* pal, uint8_t* pix, int32_t size, const uint8_t* file);
+    uint32_t (*f_31e80)(uint32_t* pw, const uint8_t* file, int32_t* ph, int32_t size, uint8_t* pal, uint8_t* pix,
+                        uint32_t limit, int32_t* pbpp);
+    uint32_t (*f_328c0)(uint32_t size, void* pal, uint8_t* pix, uint32_t limit, const uint8_t* file, uint32_t* pw,
+                        uint32_t* ph, uint32_t* pbpp);
     uint32_t (*f_9150)(void);                                     // 0x09150, capture begin
     void     (*f_8f90)(void);                                     // 0x08F90 palette reset
     uint32_t (*f_92a0)(int32_t a, void* b, int32_t* w, void** pixels, int32_t e); // 0x092A0
@@ -179,13 +181,15 @@ uint32_t Storm_Sub329C0(int32_t param_1, int16_t* param_2, uint32_t param_3, uin
         if (*param_2 == 0x50a) param_1 = 2;
         else param_1 = (uint32_t)(*param_2 != 0x4d42) * 2 + 1;
     }
-    if (param_1 == 1) return env->f_320b0(param_8, param_9, param_4, param_5, param_6);
+    if (param_1 == 1) {
+        return env->f_320b0(param_7, (int32_t*)param_8, param_9, (uint8_t*)param_4, param_5, param_6, (const uint8_t*)param_2);
+    }
     if (param_1 == 2) {
-        return env->f_31e80(param_2, (int32_t*)param_8, param_3, param_4, param_5, param_6,
-                            (int32_t*)param_9);
+        return env->f_31e80(param_7, (const uint8_t*)param_2, (int32_t*)param_8, (int32_t)param_3, (uint8_t*)param_4, param_5,
+                            (uint32_t)param_6, (int32_t*)param_9);
     }
     if (param_1 == 3) {
-        return env->f_328c0(param_3, param_4, param_5, param_6, param_7, param_8, param_9);
+        return env->f_328c0(param_3, param_4, param_5, (uint32_t)param_6, (const uint8_t*)param_2, param_7, param_8, param_9);
     }
     return 0;
 }
@@ -457,4 +461,41 @@ uint32_t Storm_Sub18F00(const StormBatch382c0Env* env) {
         }
     } while (iVar1 == (int32_t)0x8876021cu);
     return 1;
+}
+
+// Real-port binding for the FUNCTION-mode probe: the three decoders are the storm_b36d40 ports, every other seam unused.
+namespace storm_b36d40 {
+int32_t Storm_Sub31E80(uint32_t* pw, const uint8_t* hdr, int32_t* ph, int32_t p3, uint8_t* pal, uint8_t* pix, uint32_t p6, int32_t* pbpp);
+int32_t Storm_Sub320B0(uint32_t* pw, int32_t* ph, uint32_t* pbpp, uint8_t* pal, uint8_t* pix, int32_t p5, const uint8_t* bmp);
+int32_t Storm_Sub328C0(uint32_t size, void* pal, uint8_t* pix, uint32_t limit, const uint8_t* esi, uint32_t* pw, uint32_t* ph, uint32_t* pbpp);
+}
+extern "C" uint32_t Storm_Sub329C0Real(int32_t p1, int16_t* p2, uint32_t p3, uint32_t* p4, uint8_t* p5, int32_t p6, uint32_t* p7, uint32_t* p8, uint32_t* p9) {
+    static StormBatch382c0Env env;
+    env.f_320b0 = +[](uint32_t* pw, int32_t* ph, uint32_t* pbpp, uint8_t* pal, uint8_t* pix, int32_t sz, const uint8_t* f) {
+        return (uint32_t)storm_b36d40::Storm_Sub320B0(pw, ph, pbpp, pal, pix, sz, f); };
+    env.f_31e80 = +[](uint32_t* pw, const uint8_t* f, int32_t* ph, int32_t sz, uint8_t* pal, uint8_t* pix, uint32_t lim, int32_t* pbpp) {
+        return (uint32_t)storm_b36d40::Storm_Sub31E80(pw, f, ph, sz, pal, pix, lim, pbpp); };
+    env.f_328c0 = +[](uint32_t sz, void* pal, uint8_t* pix, uint32_t lim, const uint8_t* f, uint32_t* pw, uint32_t* ph, uint32_t* pbpp) {
+        return (uint32_t)storm_b36d40::Storm_Sub328C0(sz, pal, pix, lim, f, pw, ph, pbpp); };
+    return Storm_Sub329C0(p1, p2, p3, p4, p5, p6, p7, p8, p9, &env);
+}
+
+// FUNCTION-mode binding for 0x331F0/0x333C0: the extension finder is the real port, CreateFileA always fails, so only the
+// rejection and open-failure paths are reachable (the writers are never called).
+namespace storm_b36d40 { char* Storm_Sub32710(char* p); }
+static const char* imgExt(const char* p) { return storm_b36d40::Storm_Sub32710(const_cast<char*>(p)); }
+static void* imgCreate(const char*, uint32_t, uint32_t, void*, uint32_t, uint32_t, void*) { return (void*)(intptr_t)-1; }
+static int32_t imgClose(void*) { return 1; }
+static StormBatch382c0Env& imgWriteEnv() {
+    static StormBatch382c0Env env;
+    env.f_22710 = imgExt;
+    env.create_file_a = imgCreate;
+    env.close_handle = imgClose;
+    return env;
+}
+extern "C" uint32_t Storm_Sub331F0Real(const char* n, int32_t pal, void* dst, int32_t w, int32_t h, int32_t bpp, uint32_t pitch) {
+    return Storm_Sub331F0(n, pal, dst, w, h, bpp, pitch, &imgWriteEnv());
+}
+extern "C" uint32_t Storm_Sub333C0Real(const char* n, int32_t pal, void* dst, int32_t w, int32_t h, int32_t bpp) {
+    return Storm_Sub333C0(n, pal, dst, w, h, bpp, &imgWriteEnv());
 }

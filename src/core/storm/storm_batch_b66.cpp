@@ -118,9 +118,11 @@ void Put(Sink* s, const void* p, size_t n) {
     if (s->len + n <= s->cap) std::memcpy(s->buf + s->len, p, n);
     s->len += n;
 }
-void Rows21FF0(uint8_t* dst, const uint8_t* src, uint32_t, uint32_t pitch, uint32_t w) {  // 0x21FF0 row copy
-    (void)dst; (void)src; (void)pitch; (void)w;
-}
+}  // namespace
+extern "C" void* Storm_Sub1C580(uint32_t size, const char* tag, int32_t line, uint32_t flags);   // storm_alloc_1b960.cpp
+extern "C" int32_t Storm_Sub1B960(void* p, const char* tag, int32_t line);
+extern "C" bool Storm_Sub31FF0(int32_t rows, uint8_t* dst, const uint8_t* src, int32_t dstSize, int32_t rowBytes, int32_t stride, int32_t* lastError);
+namespace {
 }  // namespace
 
 // 1.13c Storm+0x32C00  PCX writer. in_EAX = height; stack: file, palette (256 x RGBX), pixels, width
@@ -133,12 +135,12 @@ uint32_t Storm_sub_32C00(int32_t height, Sink* file, const uint8_t* pal, const u
     hdr[0x41] = 1;                                          // planes
     std::memcpy(hdr + 0x42, &width, 2);                     // bytes per line
     Put(file, hdr, sizeof hdr);
-    auto* buf = (uint8_t*)SeamAlloc1C580((uint32_t)(width * height * 2), "..\\3rdParty\\STORM\\SOURCE\\SBMP.CPP", 0x4eb, 0);
+    auto* buf = (uint8_t*)Storm_Sub1C580((uint32_t)(width * height * 2), "..\\3rdParty\\STORM\\SOURCE\\SBMP.CPP", 0x4eb, 0);
     uint8_t* out = buf;
     const uint8_t* src = pixels;
     for (int32_t y = 0; y < height; ++y) Storm_Sub31F60((uint32_t)width, &src, &out);  // 1.13c 0x31F60 row RLE
     Put(file, buf, (size_t)(out - buf));
-    SeamFree1B960(buf, "..\\3rdParty\\STORM\\SOURCE\\SBMP.CPP", 0x4f2);
+    Storm_Sub1B960(buf, "..\\3rdParty\\STORM\\SOURCE\\SBMP.CPP", 0x4f2);
     uint8_t tail[0x301]; tail[0] = 0x0c;
     for (int i = 0; i < 256; ++i) { tail[1 + i*3] = pal[i*4]; tail[2 + i*3] = pal[i*4+1]; tail[3 + i*3] = pal[i*4+2]; }
     Put(file, tail, sizeof tail);
@@ -158,11 +160,22 @@ uint32_t Storm_sub_32EC0(const uint8_t* pal, int32_t width, Sink* file, const ui
     Put(file, quad, sizeof quad);
     uint32_t pitch = (uint32_t)width; if (pitch & 3) pitch += 4 - (pitch & 3);
     uint32_t n = pitch * (uint32_t)height;
-    auto* buf = (uint8_t*)SeamAlloc1C580(n, "..\\3rdParty\\STORM\\SOURCE\\SBMP.CPP", 0x294, 0);
-    Rows21FF0(buf, pixels, n, pitch, (uint32_t)width);
+    auto* buf = (uint8_t*)Storm_Sub1C580(n, "..\\3rdParty\\STORM\\SOURCE\\SBMP.CPP", 0x294, 0);
+    int32_t lastErr = 0;
+    Storm_Sub31FF0(height, buf, pixels, (int32_t)n, (int32_t)pitch, width, &lastErr);   // 0x31FF0 bottom-up row copy
     Put(file, buf, n);
-    SeamFree1B960(buf, "..\\3rdParty\\STORM\\SOURCE\\SBMP.CPP", 0x29c);
+    Storm_Sub1B960(buf, "..\\3rdParty\\STORM\\SOURCE\\SBMP.CPP", 0x29c);
     return 1;
+}
+
+// FUNCTION-mode entries: the WriteFile sink is a caller buffer (payloads are not observable in the capture).
+extern "C" uint32_t Storm_Sub32C00Probe(int32_t height, const uint8_t* pal, const uint8_t* pixels, int32_t width, uint8_t* sink, size_t cap) {
+    Sink sk{sink, cap, 0};
+    return Storm_sub_32C00(height, &sk, pal, pixels, width);
+}
+extern "C" uint32_t Storm_Sub32EC0Probe(const uint8_t* pal, int32_t width, const uint8_t* pixels, int32_t height, uint8_t* sink, size_t cap) {
+    Sink sk{sink, cap, 0};
+    return Storm_sub_32EC0(pal, width, &sk, pixels, height);
 }
 
 namespace { struct Msg { void* link; int32_t pad; void* data; void* aux; int32_t type; int32_t owned; }; }

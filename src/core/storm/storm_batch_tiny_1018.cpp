@@ -32,17 +32,9 @@ void Storm_Sub1F10(uint32_t* self) {
     if (self[2] != 0) Storm_Sub1B960((void*)(uintptr_t)self[2], ".?AURECTF@@", -2);
 }
 
-// 1.13c Storm+0x3A30
-extern "C"
-void Storm_Sub3A30(uint32_t* self) {
-    if (self[2] != 0) Storm_Sub1B960((void*)(uintptr_t)self[2], ".I", -2);
-}
+// 1.13c Storm+0x3A30 moved to src/core/storm/storm_3a30.cpp (own file: this TU has an unresolved 0x30B70 seam)
 
-// 1.13c Storm+0x3AC0
-extern "C"
-void Storm_Sub3AC0(uint32_t* self) {
-    if (self[2] != 0) Storm_Sub1B960((void*)(uintptr_t)self[2], ".E", -2);
-}
+// 1.13c Storm+0x3AC0 moved to src/core/storm/storm_3ac0.cpp (own file: this TU has an unresolved 0x30B70 seam)
 
 // 1.13c Storm+0x44B0
 extern "C"

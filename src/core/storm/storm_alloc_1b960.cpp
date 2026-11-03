@@ -10,6 +10,7 @@
 // FUNCTION-mode probes set these to log the call instead (src/core/fn/storm_hk.h); null in the game.
 extern "C" int32_t (*g_storm_free_hook)(void*, const char*, int32_t) = nullptr;
 extern "C" void* (*g_storm_alloc_hook)(uint32_t, const char*, int32_t, uint32_t) = nullptr;
+extern "C" void* (*g_storm_realloc_hook)(void*, uint32_t, const char*, int32_t, uint32_t) = nullptr;  // 0x1C760 (storm_hk.h)
 
 extern "C" void* (*g_storm_realloc_hook)(void*, uint32_t, const char*, int32_t, uint32_t) = nullptr;
 

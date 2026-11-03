@@ -36,15 +36,7 @@ uint32_t Alloc4(uint32_t own, uint32_t base, uint32_t off, const char* name, uin
 }
 }
 
-// 1.13c Storm+0x3E20
-void Storm_Sub3E20(uint32_t p) {
-    if (u32(p, 0x10c) != 0xffffffff) CloseHandle((HANDLE)(uintptr_t)u32(p, 0x10c));
-    if (u32(p, 0x124)) Storm_Free(u32(p, 0x124), kSfile, 0xd6);
-    if (u32(p, 0x130)) Storm_Free(u32(p, 0x130), kSfile, 0xd7);
-    if (u32(p, 0x134)) Storm_Free(u32(p, 0x134), kSfile, 0xde);
-    if (u32(p, 0x138)) Storm_Free(u32(p, 0x138), kSfile, 0xdf);
-    Storm_Sub4B80(p);
-}
+// 1.13c Storm+0x3E20 moved to src/core/storm/storm_3e20.cpp (own file, self-contained link)
 
 // 1.13c Storm+0x3EF0
 void Storm_Sub3EF0(uint32_t p) {

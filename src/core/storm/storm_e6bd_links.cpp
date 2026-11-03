@@ -31,7 +31,8 @@ WEAK void Win_SetEvent(uint32_t) {}
 WEAK int32_t Win_InterlockedIncrement(int32_t* p) { return ++*p; }
 
 // Retail Storm functions not yet ported.
-WEAK void Storm_Grow(uint32_t*, uint32_t) {}
+WEAK void (*g_storm_grow_hook)(uint32_t*, uint32_t) = nullptr;   // test seam: a probe records the grow request (retail's 0x2950) instead of reallocating
+WEAK void Storm_Grow(uint32_t* l, uint32_t n) { if (g_storm_grow_hook) g_storm_grow_hook(l, n); }
 WEAK void Storm_Qsort(uint32_t, uint32_t, uint32_t, int (*)(const void*, const void*)) {}
 WEAK int Storm_Sub1FD50(float*) { return 0; }
 WEAK void Storm_Sub1FEA0(int) {}
