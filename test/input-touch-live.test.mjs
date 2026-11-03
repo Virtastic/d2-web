@@ -34,11 +34,13 @@ function element() {
 // The canvas's own record of what it receives. The shell's listeners see every replayed event as
 // the browser delivers it: pointer events bubble to the document, where the touch layer's capture
 // listeners sit above them; the layer's replay guard must keep those from being read back as fingers.
-function world(shell = { screen: 'game' }, clock = null) {
+function world(shell = { screen: 'game' }, clock = null, size = { width: 800, height: 600 }) {
   const sent = [];
   const docListeners = new Map();
   const canvas = Object.assign(element(), {
-    width: 800, height: 600,
+    width: size.width, height: size.height,
+    // Drawn 1:1 at the canvas's own size, so a canvas px is a CSS px (the reach is 16 px on every canvas).
+    getBoundingClientRect() { return { left: 0, top: 0, width: size.width, height: size.height }; },
     dispatchEvent(e) {
       // A contextmenu passes the document's capture listeners before the canvas's own: one they stop
       // never reaches the shell. (The layer must never stop the menus it sends itself.)
@@ -970,4 +972,125 @@ test('a stash or cube item: the first tap shows its tooltip, the second tap is t
   assert.deepEqual(w.sent, [hoverAt(310, 210)]);
   w.down(1, 310, 210); w.up(1, 310, 210);
   assert.deepEqual(w.sent.slice(1), [left('pointermove', 310, 210), left('pointerdown', 310, 210), left('pointerup', 310, 210)]);
+});
+
+// The gold coins (F162): the stash panel's coin opens WITHDRAW, the inventory panel's DEPOSIT. A coin is a small
+// cel, so a finger a few px off it snaps to the nearest ring point that the shell's own hitAt answers for.
+const COIN = { x0: 480, y0: 460, x1: 504, y1: 480 };
+const coinInside = (x, y) => x >= COIN.x0 && x < COIN.x1 && y >= COIN.y0 && y < COIN.y1;
+const coinShell = { screen: 'game', inventoryVisible: true, touchGoldAt: (x, y) => (coinInside(x, y) ? 'deposit' : null) };
+
+test('a finger near the inventory coin snaps to it (the ring point the coin answers for); on it, or far from it, the tap lands raw', () => {
+  const near = world(coinShell);   // (510,470) is 6 px past the coin's right edge: the 180-degree spoke at 8 px is the first inside it
+  near.down(1, 510, 470); near.up(1, 510, 470);
+  assert.deepEqual(near.sent.at(-1), left('pointerup', 502, 470));
+  const on = world(coinShell); on.down(1, 492, 470); on.up(1, 492, 470);
+  assert.deepEqual(on.sent.at(-1), left('pointerup', 492, 470));
+  const far = world(coinShell); far.down(1, 560, 470); far.up(1, 560, 470);
+  assert.deepEqual(far.sent.at(-1), left('pointerup', 560, 470));
+});
+
+test('with no coin on screen (no gold probe, or a probe that answers null), a tap near that point lands raw', () => {
+  const none = world({ screen: 'game', touchGoldAt: () => null });
+  none.down(1, 510, 470); none.up(1, 510, 470);
+  assert.deepEqual(none.sent.at(-1), left('pointerup', 510, 470));
+});
+
+// The skill tree (skillsVisible): a skill cell's plate is a hover, so its first tap is a hover too, and the second is the
+// click (learn or assign), as an inventory item's is. A skill tab has no plate: it is a plain click at once.
+const SKILL_CELL = { x0: 300, y0: 200, x1: 330, y1: 230 };
+const skillShell = { screen: 'game', skillsVisible: true,
+  touchSkillAt: (x, y) => (x >= SKILL_CELL.x0 && x < SKILL_CELL.x1 && y >= SKILL_CELL.y0 && y < SKILL_CELL.y1 ? 26 : 0) };
+
+test('a first tap on a skill cell shows its plate (a hover, no press); the second tap is the click; a tap elsewhere re-arms it', () => {
+  const w = world(skillShell);
+  w.down(1, 310, 210); w.up(1, 310, 210);
+  assert.deepEqual(w.sent, [hoverAt(310, 210)]);
+  w.down(1, 310, 210); w.up(1, 310, 210);
+  assert.deepEqual(w.sent.slice(1), [left('pointermove', 310, 210), left('pointerdown', 310, 210), left('pointerup', 310, 210)]);
+  w.down(1, 600, 400); w.up(1, 600, 400);
+  const before = w.sent.length;
+  w.down(1, 310, 210); w.up(1, 310, 210);
+  assert.deepEqual(w.sent.slice(before), [hoverAt(310, 210)]);
+});
+
+test('a skill-tree tap that is not on a cell (a tab, the bare panel) is never inspected', () => {
+  const w = world({ screen: 'game', skillsVisible: true, touchSkillAt: () => 0 });
+  w.down(1, 310, 210); w.up(1, 310, 210);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 310, 210));
+  assert.ok(!w.sent.some((e) => e.type === 'pointermove' && e.buttons === 0));
+});
+
+// ---- a canvas that is not 800x600: the frame is centred, and every game-px rectangle the shell hands
+// over is carried to canvas px through the same origin the renderers draw with (panelOrigin). At 1200x700
+// the scale is 1 and the frame's origin is (200, 50): game (x, y) is canvas (x + 200, y + 50).
+const WIDE = { width: 1200, height: 700 };
+const wideStash = (extra = {}) => ({ screen: 'game',
+  stashGeometry: { gridLeft: 100, gridTop: 100, columns: 2, rows: 2, boxW: 29, boxH: 29 },
+  stashPanelRect: { left: 80, top: 80, width: 200, height: 200 }, ...extra });
+
+test('on a wider canvas a stash-grid finger snaps to the cell its game-px grid is drawn at (the canvas-px ring)', () => {
+  // Canvas grid: left 300, top 150, cell 29. The finger is 5 px left of it, on row 0: the cell (0,0) centre, (314.5, 164.5).
+  const w = world(wideStash(), null, WIDE);
+  w.down(1, 295, 164); w.up(1, 295, 164);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 314.5, 164.5));
+});
+
+test('on a wider canvas the stash ring is the canvas-px one: the 800x600 position of the ring is not snapped to', () => {
+  // (95, 164) is the grid's ring on an 800x600 canvas (game px). On 1200x700 it is off the panel: nothing moves it.
+  const w = world(wideStash(), null, WIDE);
+  w.down(1, 95, 164); w.up(1, 95, 164);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 95, 164));
+});
+
+test('on a wider canvas an open inventory grid snaps in canvas px (its game-px grid at 500,250)', () => {
+  const w = world({ screen: 'game', inventoryVisible: true,
+    inventoryLayout: { grid: { left: 300, top: 200, columns: 1, rows: 1, cellWidth: 30, cellHeight: 30 } },
+    inventoryPanelRect: { left: 280, top: 180, width: 120, height: 120 } }, null, WIDE);
+  w.down(1, 495, 260); w.up(1, 495, 260);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 515, 265));
+});
+
+test('on a wider canvas a point inside an open panel is delivered raw, however close it is to the ring of a cell', () => {
+  // The inventory panel is game (680,100)-(800,600): canvas (880..1000, 150..650). The grid is off the finger.
+  const w = world({ screen: 'game', inventoryVisible: true,
+    inventoryLayout: { grid: { left: 680, top: 100, columns: 1, rows: 1, cellWidth: 30, cellHeight: 30 } },
+    inventoryPanelRect: { left: 680, top: 100, width: 120, height: 500 } }, null, WIDE);
+  w.down(1, 882, 400); w.up(1, 882, 400);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 882, 400));
+});
+
+test('on a wider canvas the world ring checks the panel in canvas px: a target outside the canvas panel is snapped to', () => {
+  // The inventory panel is game (880,100,120,500): canvas (1080..1200, 150..650). The target sits at canvas (880..900, 280..320),
+  // which is outside that panel. The finger at (872, 300) is 8 px short of it, so the ring takes it to (880, 300). Read as game
+  // px, the panel would be (880..1000) and would cover the target, and the snap would be refused: that is the bug this pins.
+  const pick = (x, y) => x >= 880 && x < 900 && y >= 280 && y < 320;
+  const w = world({ screen: 'game', inventoryVisible: true,
+    inventoryPanelRect: { left: 880, top: 100, width: 120, height: 500 }, touchPickAt: pick }, null, WIDE);
+  w.down(1, 872, 300); w.up(1, 872, 300);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 880, 300));
+});
+
+test('on a wider canvas the orb ring stays out of an open inventory: a finger just left of the mana ring inside the panel is raw', () => {
+  // The mana ring on 1200x700 is canvas x 1089..1169. The panel is game (880,100,120,500): canvas (1080..1200, 150..650).
+  // (1085, 640) is inside it, so the panel's own hit test decides (raw); on 800x600 game px the same point is outside.
+  const w = world({ screen: 'game', inventoryVisible: true,
+    inventoryPanelRect: { left: 880, top: 100, width: 120, height: 500 } }, null, WIDE);
+  w.down(1, 1085, 640); w.up(1, 1085, 640);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 1085, 640));
+});
+
+test('on a wider canvas a finger just outside the life orb snaps to its centre, in canvas px', () => {
+  // The life ring is canvas x 30..110, y 625..685 (the frame is full-width here, so the orb is not offset). Its centre is (70, 655).
+  const w = world({ screen: 'game' }, null, WIDE);
+  w.down(1, 115, 650); w.up(1, 115, 650);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 70, 655));
+});
+
+test('on a wider canvas a gold coin is found by the shell probe in canvas px (the coin at canvas 700..724, 400..420)', () => {
+  const coin = { x0: 700, y0: 400, x1: 724, y1: 420 };
+  const w = world({ screen: 'game', inventoryVisible: true,
+    touchGoldAt: (x, y) => (x >= coin.x0 && x < coin.x1 && y >= coin.y0 && y < coin.y1 ? 'deposit' : null) }, null, WIDE);
+  w.down(1, 697, 410); w.up(1, 697, 410);
+  assert.deepEqual(w.sent.at(-1), left('pointerup', 705, 410));
 });

@@ -1,5 +1,5 @@
 // The touch aim for the panels a finger has to hit on the stash and the Horadric Cube: PlugY's page
-// buttons and the stash close, the cube's Transmute button, and the cube's grid cells.
+// buttons and the stash close, the cube's close, its Transmute button, and the cube's grid cells.
 //
 // The controls are small. Every stash control is a 32x32 game-px cel (plugy-stash-ui.mjs BTN: the
 // page buttons and the close at 352,445), and the Transmute button is the cube grid's width by 24 game
@@ -16,6 +16,7 @@
 // same origin the renderers draw with. The reach is passed in, so this module stays free of the DOM.
 import { BTN } from './plugy-stash-ui.mjs';
 import { transmuteRect } from './stash-panel.mjs';
+import { CUBE_CLOSE } from './cube-close.mjs';
 
 export const CONTROL_CEL = 32;
 // PlugY's page buttons the stash draws while the shared-stash art is loaded (plugy-stash-ui.mjs LIVE, minus the gold ones).
@@ -46,6 +47,8 @@ export function panelSpec(layout, width, height) {
   }
   if (layout.cube) {
     const g = layout.cube.geometry, p = layout.cube.panel;
+    // The cube's close cel is drawn with the window (cube-close.mjs CUBE_CLOSE), whatever its grid record says.
+    controls.push(toCanvasRect(CUBE_CLOSE, o));
     if (g) {
       controls.push(toCanvasRect(transmuteRect(g), o));
       cube = {
@@ -71,6 +74,11 @@ function cubeCellAim(x, y, cube, reachOf) {
   const column = Math.min(g.columns - 1, Math.max(0, Math.round((x - g.left) / g.cellWidth - 0.5)));
   const row = Math.min(g.rows - 1, Math.max(0, Math.round((y - g.top) / g.cellHeight - 0.5)));
   return [g.left + (column + 0.5) * g.cellWidth, g.top + (row + 0.5) * g.cellHeight];
+}
+
+// True when a canvas point is on one of the spec's controls (the shell's own hit test decides there).
+export function onPanelControl(x, y, spec) {
+  return Boolean(spec) && spec.controls.some((r) => inside(x, y, r));
 }
 
 // The aim for a finger at (x, y): the nearest control's centre within reach, else the cube grid's ring cell,

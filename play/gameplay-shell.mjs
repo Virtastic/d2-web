@@ -149,6 +149,7 @@ import { pagesToSss, sssToPages, pagesToD2x, d2xToPages } from './assets/plugy-s
 import { plugyStashMode } from './assets/plugy-stash-mode.mjs';
 import { plugySource } from './assets/plugy-files.mjs';
 import { closeStashFromInventory, stashCloseAt } from './assets/stash-close.mjs';
+import { closeCubeFromPanel, cubeCloseAt } from './assets/cube-close.mjs';
 import { createFrontendPointerStates } from './assets/frontend-pointer-states.mjs';
 import { altHoverBox, hoverLife, monsterNameColour, plateBoxes, paintHoverPlate, groundLabelPlate, groundLabelColour } from './assets/hover-lifebar.mjs';
 import { weaponClassTokenForMode } from './assets/player-weapon-class.mjs';
@@ -515,7 +516,9 @@ const toggleMessage = () => { messageVisible = !messageVisible; if (messageVisib
 // TRADEBTN_CLOSESTASH was accepted -- never because of a click alone.
 // The Horadric Cube window (P3c): a right click on the cube in the pack USES it (0x20) and its spell sends 0x77 UPDATEUI_OPENCUBE (21),
 // its items live on invPage 3 and the Transmute button is TRADEBTN_TRANSMUTE (24).
-let cubePanelRenderer = null, cubeOpen = false, cubeLayout = null, cubeEvidence = null;
+let cubePanelRenderer = null, cubeOpen = false, cubeLayout = null, cubeEvidence = null, cubeClosePress = null;
+// The cube's close (the cel at 352,445) and Escape run this one function: TRADEBTN_CLOSECUBE (23), the window closes only on acceptance.
+const closeCubeWindow = () => closeCubeFromPanel({ cubeOpen, commandButton: (button, amount) => Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [button, amount]), onAccepted: () => { cubeOpen = false; } });
 let stashPanelRenderer = null, stashPanelError = '', stashEvidence = null, stashOpen = false, stashLayout = null;
 // Stash pages and the shared stash (PlugY-style, always on). Sidecars: the character's .d2x and the shared .sss; the .d2s stays retail.
 // Page 0 of a fresh character is the engine's own stash, so a player who never turns a page sees only the larger grid.
@@ -4331,7 +4334,7 @@ function drawFrame() {
     plugyEvidence = plugyStash.draw(ctx, w, h, stashOpen ? snapOr('stashLayout', readStashLayout) : null, stashOpen, snapshot.act || 1);
   }
   if (cubePanelRenderer) {
-    try { cubeEvidence = cubePanelRenderer.draw(ctx, w, h, cubeOpen ? snapOr('cubeLayout', readCubeLayout) : null, snapshot.items, cubeOpen, snapshot.act, false, gridBoxHover()); }
+    try { cubeEvidence = cubePanelRenderer.draw(ctx, w, h, cubeOpen ? snapOr('cubeLayout', readCubeLayout) : null, snapshot.items, cubeOpen, snapshot.act, Boolean(cubeClosePress), gridBoxHover()); }
     catch (error) { stashPanelError = 'cube: ' + error; cubeEvidence = null; }
   }
   if (repairConfirm.open && !npcState) repairConfirm.no();
@@ -5553,8 +5556,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && objectSpeech && !npcState) { dismissObjectSpeech(); e.preventDefault(); return; }
   if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && helpVisible) { helpVisible = false; e.preventDefault(); return; }
   if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && cubeOpen) {
-    // TRADEBTN_CLOSECUBE (23): the window closes when the engine accepts it, as the stash's does.
-    if (Module.ccall('d2_session_command_button', 'number', ['number', 'number'], [23, 0])) cubeOpen = false;
+    closeCubeWindow();
     e.preventDefault(); return; }
   if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && gameMenu?.open) { gameMenu.back(); e.preventDefault(); return; }
   if (e.code === 'Escape' && !e.repeat && screen === SCREEN.GAME && (messageVisible || questVisible) && !(waypointMenu || stashOpen || npcState || inventoryVisible || hirelingVisible || characterVisible || skillsVisible)) { messageVisible = false; questVisible = false; e.preventDefault(); return; }
@@ -5576,7 +5578,7 @@ addEventListener('keydown', (e) => {
   }
   if (input.key(e.code, true, e.repeat)) e.preventDefault(); });
 addEventListener('keyup', (e) => { if (releaseConfiguredHold(e.code) || input.key(e.code, false)) e.preventDefault(); });
-addEventListener('blur', () => { controlsPanel?.pointerCancel(); gameMenu?.pointerCancelAll(); releaseAllConfiguredHolds(); input.keys.clear(); hudHelpPointer.clear(); cancelHelpClosePress(); worldPointerHeld = false; worldRightPointerHeld = false; heldRightPointerTicks = 0; inventoryGoldPress = null; inventoryClosePress = null; stashClosePress = null; clearStashGoldPress(); });
+addEventListener('blur', () => { controlsPanel?.pointerCancel(); gameMenu?.pointerCancelAll(); releaseAllConfiguredHolds(); input.keys.clear(); hudHelpPointer.clear(); cancelHelpClosePress(); worldPointerHeld = false; worldRightPointerHeld = false; heldRightPointerTicks = 0; inventoryGoldPress = null; inventoryClosePress = null; stashClosePress = null; cubeClosePress = null; clearStashGoldPress(); });
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') {
     controlsPanel?.pointerCancel();
@@ -5586,7 +5588,7 @@ document.addEventListener('visibilitychange', () => {
     cancelHelpClosePress();
     worldPointerHeld = false;
     worldRightPointerHeld = false; heldRightPointerTicks = 0;
-    inventoryGoldPress = null; inventoryClosePress = null; clearStashGoldPress();
+    inventoryGoldPress = null; inventoryClosePress = null; cubeClosePress = null; clearStashGoldPress();
   }
 });
 canvas.addEventListener('wheel', (e) => { if (npcMenu?.hireOpen) { npcMenu.hireScroll(Math.sign(e.deltaY)); e.preventDefault(); } }, { passive: false });
@@ -5767,6 +5769,11 @@ canvas.addEventListener('pointerdown', (e) => {
       render();
     }
     click.spent = 'character-panel-close'; canvas.focus(); e.preventDefault(); return;
+  }
+  if (e.button === 0 && cubeCloseAt(x, y, canvas.width, canvas.height, cubeOpen && inventoryVisible)) {
+    cubeClosePress = beginInventoryClosePress(e.pointerId, cubeOpen, true);
+    try { canvas.setPointerCapture(e.pointerId); } catch {}
+    render(); canvas.focus(); e.preventDefault(); return;
   }
   if (e.button === 0 && stashCloseAt(x, y, canvas.width, canvas.height, stashOpen)) {
     stashClosePress = beginInventoryClosePress(e.pointerId, stashOpen, true);
@@ -6295,6 +6302,12 @@ globalThis.addEventListener('pointerup', (e) => {
     if (entry) chooseNpcMenu(entry);
     render(); canvas.focus(); if (e.cancelable) e.preventDefault(); return;
   }
+  if (cubeClosePress?.pointerId === e.pointerId) {
+    const press = cubeClosePress; cubeClosePress = null;
+    const [x, y] = canvasPoint(e);
+    if (finishInventoryClosePress(press, e.pointerId, e.button === 0, cubeOpen, cubeCloseAt(x, y, canvas.width, canvas.height, cubeOpen && inventoryVisible)).activate) closeCubeWindow();
+    render(); canvas.focus(); if (e.cancelable) e.preventDefault(); return;
+  }
   if (stashClosePress?.pointerId === e.pointerId) {
     const press = stashClosePress; stashClosePress = null;
     const [x, y] = canvasPoint(e);
@@ -6473,6 +6486,7 @@ canvas.addEventListener('pointercancel', (e) => {
   if (miniPointerId === e.pointerId) { miniDown = -1; miniPointerId = null; render(); }
   if (npcMenuPointerPress?.pointerId === e.pointerId) npcMenuPointerPress = null;
   if (cancelInventoryClosePress(stashClosePress, e.pointerId)) { stashClosePress = null; render(); }
+  if (cancelInventoryClosePress(cubeClosePress, e.pointerId)) { cubeClosePress = null; render(); }
   if (cancelInventoryClosePress(inventoryClosePress, e.pointerId)) { inventoryClosePress = null; render(); }
   controlsPanel?.pointerCancel(e.pointerId);
   if (characterPanelCloseGesture.cancel(e.pointerId) | vendorButtonGesture.cancel(e.pointerId)) render();
@@ -6488,6 +6502,7 @@ canvas.addEventListener('pointercancel', (e) => {
 canvas.addEventListener('lostpointercapture', (e) => {
   if (miniPointerId === e.pointerId) { miniDown = -1; miniPointerId = null; render(); }
   if (cancelInventoryClosePress(stashClosePress, e.pointerId)) { stashClosePress = null; render(); }
+  if (cancelInventoryClosePress(cubeClosePress, e.pointerId)) { cubeClosePress = null; render(); }
   if (cancelInventoryClosePress(inventoryClosePress, e.pointerId)) { inventoryClosePress = null; render(); }
   controlsPanel?.pointerCancel(e.pointerId);
   if (characterPanelCloseGesture.cancel(e.pointerId) | vendorButtonGesture.cancel(e.pointerId)) render();
@@ -6875,6 +6890,17 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
       npc: npcMenu?.open ? npcMenu.targets() : null,
       skills: skillSelectRenderer?.open ? skillSelectRenderer.targets(w, h, readSkillChoices()).skills : null,
     };
+  },
+  // The touch layer's gold-coin probe: 'withdraw' on the stash's coin, 'deposit' on the inventory's, else null.
+  // The coins' own hitAt, read-only; while a gold dialog is up, touchControlAt answers for it instead.
+  touchGoldAt(x, y) {
+    if (screen !== SCREEN.GAME || stashGoldDialog || !stashGoldRenderer || !(stashOpen || inventoryVisible)) return null;
+    return stashGoldRenderer.hitAt(x, y, canvas.width, canvas.height, stashOpen ? readStashLayout() : null, false)?.action ?? null;
+  },
+  // Touch's inspect-before-act for the skill tree: the id of the skill cell under a point, or 0. Tabs are not cells.
+  touchSkillAt(x, y) {
+    if (screen !== SCREEN.GAME || !skillsVisible || !skillPanelRenderer || !session) return 0;
+    return skillPanelRenderer.skillAt(x, y, canvas.width, canvas.height, { skills: readClassSkills() || [] })?.skill?.id ?? 0;
   },
   // Touch's inspect-before-act (input-touch.mjs): the id of the item under a point, or 0. Read-only, and
   // the same hit tests the click path runs before it buys, sells, lifts or drops -- so a finger's first

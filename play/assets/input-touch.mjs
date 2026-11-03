@@ -45,7 +45,7 @@ import { isHudDeadZone, hudAimPoint, HUD_FINGER_REACH } from './control-panel.mj
 import { hudOrigin } from './hud-origin.mjs';
 import { orbAimPoint } from './orb-readout.mjs';
 import { nearestPointAim, nearestControlAim, panelControlPoints } from './touch-panel-aim.mjs';
-import { panelSpec, panelControlAim as aimPanelControls } from './touch-panel-aim.mjs';
+import { panelSpec, panelOrigin, onPanelControl, panelControlAim as aimPanelControls } from './touch-panel-aim.mjs';
 
 // Overlay face: the game's serif, not the browser's monospace (no web font ships).
 export const OVERLAY_FONT = 'Palatino Linotype, Palatino, Georgia, serif';
@@ -166,6 +166,13 @@ export function installTouchInput({ documentObject = globalThis.document, window
     return [o.x + (best.left + best.right) / 2 * o.scale, o.y + (top + bottom) / 2 * o.scale];
   }
 
+  // A game-px rectangle the shell reports ({left, top, width|w, height|h}, the 800x600 frame) as the canvas-px rectangle
+  // it is drawn at. Every panel rect the shell hands this module is game px; a finger is canvas px, so they meet here.
+  function canvasRect(r) {
+    const o = panelOrigin(canvas.width, canvas.height);
+    return { left: o.x + r.left * o.scale, top: o.y + r.top * o.scale,
+      width: (r.width ?? r.w) * o.scale, height: (r.height ?? r.h) * o.scale };
+  }
   // ---- M15: the same aim, one panel deeper -- the open grids --------------------------------------
   // The belt's finding generalises to the game's OTHER 29x29 controls, and the grid cells are exactly
   // that class: measured at the phone floor (915x412 CSS, dpr 2.625, 0.6867 CSS px per game px), the
@@ -196,8 +203,16 @@ export function installTouchInput({ documentObject = globalThis.document, window
   //     (709) is 11 game px from the panel's (720), so an unbounded half-cell band would reach
   //     3.5 game px into the world outside it;
   //   * and the MOUSE and the SCRIPTED seam are untouched, exactly as for the belt.
-  function gridAim(x, y, grid, panel) {
-    // The ring is the finger's reach (canvas px, the grid's rectangles being canvas px too).
+  // The grid and the panel arrive in GAME px (the shell's stashGeometry / inventoryLayout and its panel rects, the
+  // 800x600 frame); the finger is canvas px. Both are carried to canvas px here, through the origin and scale the
+  // renderers draw the frame with (panelOrigin), so the ring sits where the grid is drawn on any canvas, not at its
+  // game-px numbers. At 800x600 that is the identity.
+  function gridAim(x, y, gameGrid, gamePanel) {
+    const o = panelOrigin(canvas.width, canvas.height);
+    const grid = { left: o.x + gameGrid.left * o.scale, top: o.y + gameGrid.top * o.scale, columns: gameGrid.columns,
+      rows: gameGrid.rows, cellWidth: gameGrid.cellWidth * o.scale, cellHeight: gameGrid.cellHeight * o.scale };
+    const panel = canvasRect(gamePanel);
+    // The ring is the finger's reach (canvas px, the grid's rectangles being canvas px now).
     const halfW = fingerReach(grid.cellWidth / 2), halfH = fingerReach(grid.cellHeight / 2);
     const right = grid.left + grid.columns * grid.cellWidth, bottom = grid.top + grid.rows * grid.cellHeight;
     // INSIDE the grid the point is delivered exactly where it landed: the shell's own hit test decides
@@ -295,8 +310,8 @@ export function installTouchInput({ documentObject = globalThis.document, window
     const shell = windowObject.__d2Shell;
     if (!shell || shell.screen !== 'game' || shell.clearScreen || shell.skillSelectOpen || shell.characterVisible || shell.skillsVisible) return null;
     const panels = [];
-    if (shell.inventoryVisible && shell.inventoryPanelRect) panels.push(shell.inventoryPanelRect);
-    if (shell.stashPanelRect) panels.push(shell.stashPanelRect);
+    if (shell.inventoryVisible && shell.inventoryPanelRect) panels.push(canvasRect(shell.inventoryPanelRect));
+    if (shell.stashPanelRect) panels.push(canvasRect(shell.stashPanelRect));
     const scale = Math.min(1, canvas.width / 800);
     return orbAimPoint(canvas.width, canvas.height, x, y, fingerReach(HUD_FINGER_REACH * scale), panels);
   }
@@ -311,7 +326,7 @@ export function installTouchInput({ documentObject = globalThis.document, window
     const shell = windowObject.__d2Shell;
     if (!shell || shell.screen !== 'game' || shell.clearScreen || typeof shell.touchPickAt !== 'function') return null;
     if (shell.skillSelectOpen || shell.characterVisible || shell.skillsVisible) return null;
-    const panels = [shell.inventoryVisible && shell.inventoryPanelRect, shell.stashPanelRect].filter(Boolean);
+    const panels = [shell.inventoryVisible && shell.inventoryPanelRect, shell.stashPanelRect].filter(Boolean).map(canvasRect);
     const inPanel = (px, py) => panels.some((r) => px >= r.left && px < r.left + (r.width ?? r.w) && py >= r.top && py < r.top + (r.height ?? r.h));
     const bandTop = canvas.height - 104 * Math.min(1, canvas.width / 800);
     if (y >= bandTop || inPanel(x, y)) return null;
@@ -370,6 +385,24 @@ export function installTouchInput({ documentObject = globalThis.document, window
     }
     return null;
   }
+  // ---- the two gold coins (the stash's withdraw, the inventory's deposit): small cels a finger misses ----
+  // The coins' own hitAt (touchGoldAt) is the probe. A point on a coin is delivered raw, and so is one on a panel
+  // control (that control's own hit test decides it). A finger beside a coin presses the first ring point, at
+  // reach/2 then reach, that the probe answers for, as modalAim reads its dialog.
+  const COIN_SPOKES = 8;
+  function goldAim(x, y) {
+    const shell = windowObject.__d2Shell;
+    if (!shell || typeof shell.touchGoldAt !== 'function') return null;
+    const probe = (px, py) => { try { return shell.touchGoldAt(px, py); } catch { return null; } };
+    if (probe(x, y)) return [x, y];
+    if (onPanelControl(x, y, panelSpecNow())) return null;
+    const reach = fingerReach(10);
+    for (const r of [reach / 2, reach]) for (let i = 0; i < COIN_SPOKES; i += 1) {
+      const a = (i / COIN_SPOKES) * 2 * Math.PI, px = x + r * Math.cos(a), py = y + r * Math.sin(a);
+      if (probe(px, py)) return [px, py];
+    }
+    return null;
+  }
   // ---- a dialog's small buttons: the gold dialog's arrows/ok/close, repair yes/no -------------------
   // While one is up, a finger that hits none of its buttons is probed at rings around it with the
   // dialog's own hit test; the nearest ring's first point on a button is where the press goes.
@@ -409,15 +442,19 @@ export function installTouchInput({ documentObject = globalThis.document, window
     return best;
   }
   // The point a finger's aim snaps to, or null when the finger is on nothing the aim rules cover.
-  // ---- the stash's page buttons and close, the cube's Transmute button and its grid (touch-panel-aim.mjs) ----
-  // The shell reports the open panels in game px; the same nearest-control and grid-ring rules as the rest apply.
-  function panelControlAim(x, y) {
+  // The shell's panel layout as a canvas-px spec (touch-panel-aim.mjs), or null when no panel control is up.
+  function panelSpecNow() {
     const shell = windowObject.__d2Shell;
     if (!shell || shell.screen !== 'game' || shell.clearScreen || typeof shell.touchPanelLayout !== 'function') return null;
     let layout; try { layout = shell.touchPanelLayout(); } catch { return null; }
-    return aimPanelControls(x, y, panelSpec(layout, canvas.width, canvas.height), fingerReach);
+    return panelSpec(layout, canvas.width, canvas.height);
   }
-  function snapAim(x, y) { return frontAim(x, y) || panelTargetAim(x, y) || modalAim(x, y) || closeAim(x, y) || tabAim(x, y) || panelControlAim(x, y) || beltAim(x, y) || panelAim(x, y) || statAim(x, y) || hudAim(x, y) || orbAim(x, y); }
+  // ---- the stash's page buttons and close, the cube's Transmute button and its grid (touch-panel-aim.mjs) ----
+  // The shell reports the open panels in game px; the same nearest-control and grid-ring rules as the rest apply.
+  function panelControlAim(x, y) { return aimPanelControls(x, y, panelSpecNow(), fingerReach); }
+  // The chain's order: a point on a target wins over a ring, and the gold coins' ring (goldAim) comes before the
+  // panel-control ring, so a coin a finger is beside is pressed rather than a panel button past it.
+  function snapAim(x, y) { return frontAim(x, y) || panelTargetAim(x, y) || modalAim(x, y) || closeAim(x, y) || goldAim(x, y) || tabAim(x, y) || panelControlAim(x, y) || beltAim(x, y) || panelAim(x, y) || statAim(x, y) || hudAim(x, y) || orbAim(x, y); }
   function fingerAim(x, y) { return snapAim(x, y) || worldAim(x, y); }
   // A finger's aim: the belt's boxes, an open panel's grid cells, the character screen's "+", else
   // exactly where it landed.
@@ -518,6 +555,8 @@ export function installTouchInput({ documentObject = globalThis.document, window
     const [ix, iy] = moveAim(x, y);
     const shop = shell.touchShopItemAt?.(ix, iy) || 0;
     if (shop) return { key: `shop:${shop}`, shop: true };
+    const skill = shell.touchSkillAt?.(ix, iy) || 0;
+    if (skill) return { key: `skill:${skill}`, shop: false };
     const item = shell.touchItemAt?.(ix, iy) || 0;
     if (item) return { key: `item:${item}`, shop: false };
     const belt = shell.touchBeltItemAt?.(ix, iy) || 0;
