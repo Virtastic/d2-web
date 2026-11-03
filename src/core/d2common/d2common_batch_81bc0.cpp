@@ -56,7 +56,7 @@ void D2Common_81BC0_FloodCells(B81Flood* s)
 struct B4DEntry { char _0[8]; struct { void* a; int32_t na; void* b; int32_t nb; void* c; int32_t nc; }* span; char _10[0x18]; int32_t flag; }; // +8, +0x20
 struct B4DOwner { B4DEntry** entries; char _[0x20 - sizeof(void*)]; void* grid; int32_t count; };   // [0], [8], [9]
 
-// 1.13c D2Common+0x4D010: given the owner (param_1) and a room, size and zero a collision buffer
+// Superseded by src/core/d2common/d2common_4d010.cpp (D2Common_4D010_Build). 1.13c D2Common+0x4D010: given the owner (param_1) and a room, size and zero a collision buffer
 // (Collisn.cpp:0x185), store it at owner[8], then for every entry stamp its three spans (+8/+0xC,
 // +0/+4, +0x10/+0x14) with the entry flag via 4CA90. A null entry is fatal (0x2C5/0xB1/0xBE) -> return.
 // The buffer allocation/size comes from 3BA60's rect (w*h*2 bytes zeroed after a 0x24-byte header); the

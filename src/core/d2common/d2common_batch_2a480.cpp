@@ -15,6 +15,9 @@ extern "C" uint32_t D2Common_24610_MaxSockets_u32(uint32_t pUnit);
 extern "C" {
 __attribute__((weak)) int32_t d2_sub_38b70_get(uint32_t pUnit, int32_t nStat);
 __attribute__((weak)) void d2_sub_3a740_set(uint32_t pUnit, int32_t nStat, int32_t nValue);
+// The 0x24610 and ItemsTxt-record callees as seams: the default is the real function; the FN probe overrides both (its logged V).
+__attribute__((weak)) uint32_t d2_sub_24610_get(uint32_t pUnit) { return D2Common_24610_MaxSockets_u32(pUnit); }
+__attribute__((weak)) const void* d2_itemstxt_record_get(int32_t nId) { return DATATBLS_GetItemsTxtRecord(nId); }
 }
 
 namespace
@@ -32,7 +35,7 @@ namespace
 extern "C" void D2Common_2A480_ItemSocketCount(uint32_t pUnit, uint32_t nMax) { // 1.13c D2Common+0x2A480
 	uint8_t* u = P(pUnit);
 	if (!u || W(u, 0) != 4) return;
-	const uint8_t* t = reinterpret_cast<const uint8_t*>(DATATBLS_GetItemsTxtRecord(static_cast<int32_t>(W(u, 4))));
+	const uint8_t* t = reinterpret_cast<const uint8_t*>(d2_itemstxt_record_get(static_cast<int32_t>(W(u, 4))));
 	uint32_t nCap = t ? uint32_t(t[0x10F]) * t[0x110] : 0;
 	if (nCap == 0) return;
 	uint32_t n = nCap < 6 ? nCap : 6;
@@ -48,7 +51,7 @@ extern "C" void D2Common_2A480_ItemSocketCount(uint32_t pUnit, uint32_t nMax) { 
 	case 6: if (n > 1) n = 2; break;
 	case 8: case 9: if (n > 2) n = 3; break;
 	}
-	const uint32_t q = D2Common_24610_MaxSockets_u32(pUnit) & 0xFF;
+	const uint32_t q = d2_sub_24610_get(pUnit) & 0xFF;
 	if (q <= n) n = q;
 	if (nMaxI < 2) nMaxI = 1;
 	if (nMaxI < static_cast<int32_t>(n)) n = static_cast<uint32_t>(nMaxI);

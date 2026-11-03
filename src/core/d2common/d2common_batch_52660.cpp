@@ -309,21 +309,6 @@ uint32_t D2Common_4EC50_SkillSequence(D2UnitStrc* pUnit, D2SkillStrc* pSkill)
 	return 0;
 }
 
-// 1.13c D2Common+0x31850 (#10032) set the collision mask with the unit's own size and mask; a
-// null unit is fatal in retail (_exit), here a no-op.
-void D2Common_31850_SetCollisionWithSize(D2UnitStrc* pUnit, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY)
-{
-	if (!pUnit) return;
-
-	const int nSizeX = UNITS_GetUnitSizeX(pUnit);
-	const int nSizeY = UNITS_GetUnitSizeY(pUnit);
-
-	if (nSizeX != 0 && nSizeY != 0)
-	{
-		const int nMask = UNITS_GetCollisionMask(pUnit);
-		COLLISION_SetMaskWithSizeXY(pRoom, nX, nY, (unsigned int)nSizeX, (unsigned int)nSizeY, (uint16_t)nMask);
-	}
-}
 
 static int32_t StatArray_Find25(const D2StatsArrayStrc* a)
 {

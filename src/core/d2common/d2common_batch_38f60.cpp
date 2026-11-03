@@ -106,12 +106,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_batch_d2common_12450(uint32_t pUnit1
 	return 0;
 }
 
-// 1.13c D2Common+0x38DE0 (#10935): a unit's armor-class stat total. The vendored 1.10f
-// STATLIST_GetDefenseFromUnit walks STAT_ARMORCLASS through the same bound-checked
-// STATLIST_GetTotalStatValue chain.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_38de0(uint32_t pUnit) { // 1.13c D2Common+0x38DE0
-	return STATLIST_GetDefenseFromUnit(reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit)));
-}
 
 // 1.13c D2Common+0x203B0 (#10937): non-zero when a weapon of the requested weapon class sits in
 // either hand. The left hand is checked with the raw broken/no-equip item-data flags of the

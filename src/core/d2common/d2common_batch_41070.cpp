@@ -31,25 +31,6 @@ void D2Common_41070(D2DrlgLevelStrc* level) {
     }
 }
 
-// 1.13c D2Common+0x41230: walks the grid from (width-2, 0) to (0, height-2) two cells per step. The cell value
-// minus (0x371 + snow) picks the step and the stamp idx (0x37d + that); the walk ends on the two corner stamps
-// 0x389 and 0x38a. The step tables are retail data (DAT_6fde3770/74) and are not transcribed here.
-void D2Common_41230(D2DrlgLevelStrc* level) {
-    static constexpr int direction[12][2] = {{-1,0},{0,-1},{1,0},{0,1},{0,-1},{1,0},{0,1},{-1,0},{-1,0},{0,-1},{1,0},{0,1}};
-    auto* out = level->pOutdoors;
-    const int snow = level->nLevelId == 0x75 ? 0x4c : 0;
-    const int lastX = out->nGridWidth - 2, lastY = out->nGridHeight - 2;
-    int x = lastX, y = 0;
-    while (x != 0 || y != lastY) {
-        const int index = DRLGGRID_GetGridEntry(&out->pGrid[0], x, y) - (0x371 + snow);
-        D2Common_42A70(level, x, y, index + 0x37d + snow, -1, 0);
-        x += direction[index][0] * 2;
-        y += direction[index][1] * 2;
-    }
-    D2Common_42A70(level, lastX, 0, 0x38a + snow, -1, 0);
-    D2Common_42A70(level, 0, lastY, 0x389 + snow, -1, 0);
-}
-
 // 1.13c D2Common+0x41340
 void D2Common_41340(D2DrlgLevelStrc* level) {
     auto* out = level->pOutdoors;

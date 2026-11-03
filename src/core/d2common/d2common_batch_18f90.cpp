@@ -81,9 +81,16 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_53ad0()
 // NOT free the record pInfo blocks or the record array: it only reports each 0x2C-stride record whose +0x28
 // is non-null (Ordinal_10046, MonsterTbls.cpp lines 0x643 and 0x647) and drops the pointers, so those
 // blocks leak exactly as they do in retail. The report itself is a log seam with no wasm effect.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_534b0()
+// The 1.13c body is the port in d2common_534b0.cpp; the engine keeps its record count at 0 because the
+// TC record layout is not pinned, so only the linker and the array are released here.
+struct D2Common534B0Tables { uintptr_t pLinker; uintptr_t pRecs; int32_t nRecs; };
+extern "C" void D2Common_534B0_Release(D2Common534B0Tables* t, void (*pFree)(uintptr_t, int32_t, int32_t), void (*pLinkerFree)(uintptr_t));
+static void d2common_534b0_free(uintptr_t p, int32_t, int32_t) { FOG_Free((void*)p, nullptr, 0, 0); }
+static void d2common_534b0_linker_free(uintptr_t p) { FOG_FreeLinker((void*)p); }
+static void d2common_534b0_engine()
 {
-	FOG_FreeLinker(sgptDataTables->pTreasureClassExLinker);
+	D2Common534B0Tables t = { (uintptr_t)sgptDataTables->pTreasureClassExLinker, (uintptr_t)sgptDataTables->pTreasureClassEx, 0 };
+	D2Common_534B0_Release(&t, d2common_534b0_free, d2common_534b0_linker_free);
 	sgptDataTables->pTreasureClassEx = 0;
 	sgptDataTables->nTreasureClassEx = 0;
 }
@@ -177,7 +184,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_54200()
 		sgptDataTables->nMonSoundsTxtRecordCount = 0;
 	}
 	d2_fn_d2common_539e0();
-	d2_fn_d2common_534b0();
+	d2common_534b0_engine();
 	if (sgptDataTables->pMonLvlTxt != 0)
 	{
 		DATATBLS_UnloadBin(sgptDataTables->pMonLvlTxt);               // DataTbls.cpp

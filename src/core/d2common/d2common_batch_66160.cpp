@@ -7,7 +7,7 @@
 extern "C" {
 #define W __attribute__((weak))
 W void d2_fn_d2common_56a10(void* a);
-void d2_fn_d2common_55400(HD2ARCHIVE a);
+void d2_port_d2common_55400(HD2ARCHIVE a);
 W void d2_fn_d2common_77b70(void* a);
 W void d2_fn_d2common_74400(HD2ARCHIVE a);
 W void d2_fn_d2common_72c50(void* a);
@@ -35,7 +35,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_66160(HD2ARCHIVE h, int32_t p2, int32_t
  d2_fn_d2common_616d0(h);
  DATATBLS_LoadItemTypesTxt(h);
  d2_fn_d2common_56a10(a);
- d2_fn_d2common_55400(h);
+ d2_port_d2common_55400(h);
  DATATBLS_LoadPetTypeTxt(h);
  DATATBLS_LoadOverlayTxt(h);
  DATATBLS_LoadItemStatCostTxt(h);

@@ -68,31 +68,6 @@ extern "C"
 	uint8_t g_d2common_dat_6fdf1484[8] = {};    // 0x5A7D0 fallback string
 }
 
-// 1.13c D2Common+0x314A0 (#10839): UNITS_TestCollisionWithUnit on raw units -- room from the
-// first unit, both coordinate pairs, both X sizes, then 0x30730 (UNITS_TestCollision) with the
-// collision mask. Null units are retail's fatal 0x1290/0x1291; no room answers 0.
-extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_314a0(uint32_t pUnit1, uint32_t pUnit2, uint16_t nMask)
-{
-	uint8_t* p1 = P(pUnit1);
-	uint8_t* p2 = P(pUnit2);
-	if (!p1 || !p2)
-		return 0;
-
-	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(reinterpret_cast<D2UnitStrc*>(p1));
-	if (!pRoom)
-		return 0;
-
-	D2CoordStrc coords1 = {};
-	D2CoordStrc coords2 = {};
-	UNITS_GetCoords(reinterpret_cast<D2UnitStrc*>(p1), &coords1);
-	UNITS_GetCoords(reinterpret_cast<D2UnitStrc*>(p2), &coords2);
-
-	return UNITS_TestCollision(coords1.nX, coords1.nY, UNITS_GetUnitSizeX(reinterpret_cast<D2UnitStrc*>(p1)),
-	                           coords2.nX, coords2.nY, UNITS_GetUnitSizeX(reinterpret_cast<D2UnitStrc*>(p2)),
-	                           pRoom, nMask);
-}
-
 // 1.13c D2Common+0x18DF0 (#10840): bound check of a 0x34-byte record. Retail fatals 0x147 on a
 // null record; there is nothing else to do.
 extern "C"
@@ -118,21 +93,6 @@ EMSCRIPTEN_KEEPALIVE bool D2Common_24320_ItemClassBelow7(uint32_t nItemId)
 	return RdU8(reinterpret_cast<const uint8_t*>(&sgptDataTables->pItemTypesTxt[nType]), 0x21) < 7;
 }
 
-// 1.13c D2Common+0x38e30 (#10845): item stat 159 (0xC93C = 159 * 0x144) from the stat list at
-// unit+0x5C. No unit, no stat list, or no itemstatcost row answers 0.
-extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_38e30(uint32_t pUnit)
-{
-	const uint8_t* p = P(pUnit);
-	if (!p)
-		return 0;
-
-	D2StatListStrc* pStatList = reinterpret_cast<D2StatListStrc*>(P(RdU32(p, 0x5C)));
-	if (!pStatList || sgptDataTables->nItemStatCostTxtRecordCount < 160 || !sgptDataTables->pItemStatCostTxt)
-		return 0;
-
-	return STATLIST_GetTotalStat_6FDB63E0(pStatList, 159, &sgptDataTables->pItemStatCostTxt[159]);
-}
 
 // 1.13c D2Common+0x391a0 (#10848): total of one itemstatcost stat on a stat list. Null list or an
 // out-of-range stat id answers 0.

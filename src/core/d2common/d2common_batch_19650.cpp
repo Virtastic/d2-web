@@ -21,7 +21,7 @@ extern "C" void d2_port_d2common_19650(HD2ARCHIVE archive)
 }
 
 // 1.13c D2Common+0x55400
-extern "C" void d2_fn_d2common_55400(HD2ARCHIVE archive)
+extern "C" void d2_port_d2common_55400(HD2ARCHIVE archive)
 {
     // The sound-name linker is created only in text-compilation mode.
     DATATBLS_LoadSoundsTxt(archive);
@@ -106,12 +106,4 @@ uint8_t* D2Common_458C0_CellPtr(uint8_t* base,
     return base + 0x30 + group * 0x30 + index * 0x10;
 }
 
-// 1.13c D2Common+0x35100
-extern "C" uint32_t d2_fn_d2common_35100(D2UnitStrc* unit)
-{
-    // Retail assumes a valid monster record on this path; retain that invariant.
-    D2MonStatsTxt* record = unit ? DATATBLS_GetMonStatsTxtRecord(unit->dwClassId) : nullptr;
-    if (!record) std::abort();
-    if (record->dwMonStatsFlags & MONSTATSFLAG_FLYING) return 0x1804;
-    return (record->dwMonStatsFlags & MONSTATSFLAG_OPENDOORS) ? 0x3401 : 0x3c01;
-}
+// 1.13c D2Common+0x35100 moved to src/core/d2common/d2common_35100.cpp (D2Common_35100_MonsterPathType).

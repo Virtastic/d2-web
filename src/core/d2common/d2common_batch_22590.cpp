@@ -87,22 +87,6 @@ EMSCRIPTEN_KEEPALIVE int32_t UNITS_GetTotalMaxStamina_39050(D2UnitStrc* pUnit)
 		&sgptDataTables->pItemStatCostTxt[0xB]);
 }
 
-// 1.13c D2Common+0x38E80 (#10583): the unit's total stat 160 (layer 0, packed 0xA00000) from
-// ItemStatCost row 160. Guards: null unit, null stat list, 160 or fewer rows.
-extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t D2Common_GetUnitStat160_38E80(D2UnitStrc* pUnit)
-{
-	if (!pUnit || !pUnit->pStatListEx)
-		return 0;
-	if (!sgptDataTables || !sgptDataTables->pItemStatCostTxt)
-		return 0;
-	if (sgptDataTables->nItemStatCostTxtRecordCount <= 0xA0)
-		return 0;
-	return STATLIST_GetTotalStat_6FDB63E0(STATLIST_StatListExCast(pUnit->pStatListEx),
-		D2SLayerStatIdStrc::MakeFromStatId(0xA0).nPackedValue,
-		&sgptDataTables->pItemStatCostTxt[0xA0]);
-}
-
 // 1.13c D2Common+0x38C20 (#10587): stat value (layer nLayer, stat nStatId) of a unit, from
 // ItemStatCost row nStatId through the 0x38B00 getter. Guards: null unit, nStatId out of range,
 // null row, null stat list.

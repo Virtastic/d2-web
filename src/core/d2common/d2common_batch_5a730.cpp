@@ -28,8 +28,8 @@ static_assert(sizeof(D2LevelDefBin) == 0x9c);
 static_assert(offsetof(D2LevelDefBin, dwPortal) == 0x8c);
 static_assert(sizeof(D2ItemsTxt) == 0x1a8);
 
-// 1.13c D2Common+0x5A730
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_5a730(HD2ARCHIVE archive)
+// Superseded by d2common_5a730.cpp (the 1.13c body); kept only until the batch is retired.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_port_d2common_5a730(HD2ARCHIVE archive)
 {
     sgptDataTables->pTreasureClassExLinker = (D2TxtLinkStrc*)FOG_AllocLinker(__FILE__, 0x60e);
     DATATBLS_CreateItemTypeTreasureClasses();

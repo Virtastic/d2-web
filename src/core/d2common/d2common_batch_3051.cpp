@@ -109,21 +109,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_2c0c0(D2UnitStrc* item,
     return ITEMS_DecodeItemBitstreamCompact(item, buffer, checkHeader, version);
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_2e790(void* path,
-    const D2Common3051Env* env, const int32_t (*mapping)[2],
-    void (*normalize)(void*, int32_t*, int32_t*, int32_t*),
-    void (*resolve)(void*, int32_t, int32_t, int32_t, void*, int32_t*)) { // 1.13c D2Common+0x2E790
-    int32_t x = signed32(path, 0), y = signed32(path, 4);
-    // Retail saves this pointer before normalize, which may mutate the path.
-    void* auxiliary = link(path, 0x60, env);
-    int32_t level = signed32(path, ((x == 0 || x == 1) && read32(path, 0x30)) ? 0x40 : 0x10);
-    if ((read32(path, 0xc8) >> 3) & 1) normalize(path, &x, &y, &level);
-    resolve(path, x, y, level, auxiliary, &x);
-    for (int32_t i = 0; i < 14; ++i)
-        if (x == mapping[i][1]) return mapping[i][0];
-    return -1;
-}
-
 
 
 // Callees are explicit: lookupId=0x2D5B0 (id of the owner's room rect holding x,y),
