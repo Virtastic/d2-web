@@ -1999,8 +1999,9 @@ async function importDroppedFiles(fileList) {
   if (screen !== SCREEN.SELECT) return;
   try {
     const files = await Promise.all([...fileList].map(async (f) => ({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) })));
-    const r = await importCharacterFiles(files, { store: saveStore, confirmOverwrite: (n) => confirm(`A character named ${n} already exists. Overwrite it?`) });
+    const r = await importCharacterFiles(files, { store: saveStore, confirmOverwrite: () => false });
     if (r.status === 'error') { charSelectError = r.error; return; }
+    if (r.status === 'cancelled') { charSelectError = `a character named ${r.name} already exists`; return; }
     charSelectError = '';
     if (r.status !== 'imported') return;
     savedCharacters = await saveStore.list();

@@ -242,8 +242,6 @@ test/*
 !test/hud-bar-tooltip.test.mjs
 !test/hud-help-hover.test.mjs
 !test/indexed-rgba-palette-cache.test.mjs
-!test/input-controller-field-navigation.test.mjs
-!test/input-controller.test.mjs
 !test/inventory-close-gesture.test.mjs
 !test/inventory-gold-gesture.test.mjs
 !test/inventory-hover-desc.test.mjs

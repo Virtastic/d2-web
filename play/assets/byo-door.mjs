@@ -14,8 +14,6 @@ const CSS = `
 body.door #viewport,body.door #session-bar,body.door .controls,body.door #log,body.door #hud{display:none}
 #door{position:fixed;inset:0;z-index:1000;background:#000}
 #door canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:manipulation}
-#door .legal{position:absolute;left:16px;right:16px;bottom:6px;margin:0;color:#6d6552;font:11px/1.4 system-ui,sans-serif;text-align:center;pointer-events:none}
-#door.loading .legal{display:none}
 #door :focus-visible{outline:2px solid #c7b377;outline-offset:2px}
 `;
 const DISCORD = 'https://discord.gg/PzFfDkbSue';
@@ -74,7 +72,7 @@ export function frontDoor({ onReady } = {}) {
   const root = el('div'); root.id = 'door';
   const cv = el('canvas'); cv.setAttribute('role', 'img');
   cv.setAttribute('aria-label', 'Diablo II title screen: choose the folder where Diablo II is installed, then enter.');
-  root.append(cv, el('p', 'legal', 'Unofficial fan project, not affiliated with or endorsed by Blizzard Entertainment. You need to own Diablo II: Lord of Destruction.'));
+  root.append(cv);
   document.body.append(root);
   document.body.classList.add('door');
   const g0 = cv.getContext('2d');
