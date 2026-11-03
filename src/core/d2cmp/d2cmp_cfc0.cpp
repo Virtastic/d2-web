@@ -4,7 +4,7 @@
 
 // 1.13c D2CMP+0x0CFC0
 // fatal(id): retail Ordinal_10265(id) + Ordinal_10024 + _exit(-1); never returns.
-void d2cmp_cfc0(uint8_t* flags, int arg, uint8_t* spr, uint8_t* (*alloc)(uint32_t), uint8_t* (*dataBase)(),
+extern "C" void d2cmp_cfc0(uint8_t* flags, int arg, uint8_t* spr, uint8_t* (*alloc)(uint32_t), uint8_t* (*dataBase)(),
                 void (*fatal)(uint32_t))
 {
     if (!arg) fatal(0x519);

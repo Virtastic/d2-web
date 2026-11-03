@@ -148,6 +148,9 @@ extern "C"
 void d2cmp_14f00(int32_t mode) {
     if (mode > 0 && mode < 6) g_d2cmp_32cc0 = (uint32_t)mode;
 }
+// FUNCTION-mode accessors for the 0x6FE32CC0 global (probe pins it before the call and reads it back).
+extern "C" uint32_t d2cmp_14f00_get(void) { return g_d2cmp_32cc0; }
+extern "C" void d2cmp_14f00_set(uint32_t v) { g_d2cmp_32cc0 = v; }
 
 // Palette reduction tables, zero in the file image; shared with 0x99D0/0x9C60/0x9C90/0xA2E0/0x9B00 via d2cmp_palstate.h.
 int32_t  g_d2cmp_dist_6fe879f0[511];     // 0x6FE879F0 is table entry 255, the zero offset
