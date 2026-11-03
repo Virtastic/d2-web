@@ -102,8 +102,8 @@ extern "C" void d2_fn_d2common_2e0c0(uint8_t act, void* library,
     if (bits & 4) output->dwFlags |= 0x800;
 }
 
-// 1.13c D2Common+0x34080
-extern "C" void d2_fn_d2common_34080(const uint32_t* mask, D2UnitStrc* unit)
+// 1.13c D2Common+0x34080 (named D2Common_34080_ApplyStateMask: the FN probe owns the d2_fn_ export)
+extern "C" void D2Common_34080_ApplyStateMask(const uint32_t* mask, D2UnitStrc* unit)
 {
     if (!unit) return;
     uint32_t* gfx = D2COMMON_STATES_GetListGfxFlags_6FDB8AC0(unit);

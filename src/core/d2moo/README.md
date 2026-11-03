@@ -84,3 +84,4 @@ behaviour differs from 1.10f.
 - D2Common+0x3AAB0 (D2StatList.cpp D2Common_10574): already in the wanted SET state returns 0 without expiring or re-posting; a change returns 1 (the vendored copy returned 1 for both).
 
 - STATLIST_MergeBaseStats (D2Common+0x3A600): base entries now fold through D2Common_3A330_AddStat (1.13c), not STATLIST_AddStat.
+- D2Common+0x335F0 (UnitSetupSpeeds): rewritten over D2UnitStrc by field name (the word-array port was wrong for the widened unit); +0x32EF0 port renamed D2Common_32EF0_MergeDualWield. Frame bonus still goes through UNITS_GetFrameBonus (1.10f); 1.13c 0x32220 reads a weapon-class table instead -- player branch not captured.

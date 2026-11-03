@@ -154,12 +154,13 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_d2common_2e3e0(const uint8_t* pDrlg, uint8_t nD
 	*(uint32_t*)(pLevel + 0x454) = nParam6;
 	*(uint32_t*)(pLevel + 0x458) = nSeed;
 	*(uint32_t*)(pLevel + 0x464) = nDifficulty;
+	// retail writes the 0x29A dword at +4 before the state word (the state word below overwrites it)
+	*(uint32_t*)(pLevel + 0x004) = 0x29A;
 	*(uint64_t*)(pLevel + 0x000) = nState;
 	*(char*)(pLevel + 0x480) = (char)nDifficulty;
 	*(uint32_t*)(pLevel + 0x46C) = (uint32_t)(uintptr_t)pDrlg;
 	*(uint32_t*)(pLevel + 0x470) = (uint32_t)nState;
 	*(uint32_t*)(pLevel + 0x488) = nParam7;
-	*(uint32_t*)(pLevel + 0x004) = 0x29A;
 
 	if (nDifficulty == 1)
 	{

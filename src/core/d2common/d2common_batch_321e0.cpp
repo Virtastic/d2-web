@@ -12,6 +12,8 @@
 
 #include <emscripten.h>
 
+#include "D2Collision.h"
+
 namespace
 {
 	// Grid record / layer prefix: three int32 fields then a pointer. The pointer still lands at byte
@@ -49,20 +51,16 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_4c940(uint32_t nUnused, int32_t nX, int
 	*pCell &= static_cast<uint16_t>(~nFlags);
 }
 
-// 1.13c D2Common+0x4e750 (#10864, community name D2GetMaxGoldBank): a thin wrapper over the collision
-// ray walk 0x4AD20 (still UNMAPPED, hence the seam). The first four values are the start point
-// (nFromX, nFromY) and the end point (nToX, nToY), the last the collision mask; the first argument is
-// the collision record 0x4AD20 walks from. The answer is true when the walk finds nothing (result 0).
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4e750(uint32_t pCollision, int32_t nFromX, int32_t nFromY,
-	int32_t nToX, int32_t nToY, uint16_t nMask,
-	int32_t (*pfnTest4AD20)(uint32_t, const int32_t*, const int32_t*, uint16_t))
+// 1.13c D2Common+0x4e750 (#10864, community name D2GetMaxGoldBank): from the decompile, the start point
+// (nFromX, nFromY) and end point (nToX, nToY) go to the collision ray walk 0x4AD20 (COLLISION_RayTrace,
+// VECTORED) as (pCollision, &from, &to, nMask); the answer is true when the walk finds nothing.
+// The former seam (a null function pointer that returned 0) is replaced by the direct call.
+BOOL D2Common_4E750_GetMaxGoldBank(int32_t nFromX, int32_t nFromY, int32_t nToX, int32_t nToY,
+	uint32_t pCollision, uint16_t nMask)
 {
-	const int32_t from[2] = { nFromX, nFromY };
-	const int32_t to[2] = { nToX, nToY };
+	D2CoordStrc from = { nFromX, nFromY };
+	D2CoordStrc to = { nToX, nToY };
 
-	if (!pfnTest4AD20)
-		return 0;
-
-	return pfnTest4AD20(pCollision, from, to, nMask) == 0 ? 1u : 0u;
+	return COLLISION_RayTrace(reinterpret_cast<D2ActiveRoomStrc*>(static_cast<uintptr_t>(pCollision)),
+		&from, &to, nMask) ? FALSE : TRUE;
 }

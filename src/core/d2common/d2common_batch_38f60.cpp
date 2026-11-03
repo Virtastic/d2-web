@@ -49,7 +49,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_38f60(uint32_t pUnit, int
 // weapon 0x31B90 selects and the left-hand weapon decide which of the two hands is merged with
 // type 1 and which with type 0; only a weapon whose stat list has an owning extended parent
 // (STATLIST_GetOwner non-null) is merged.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_32ef0(uint32_t pUnit, int32_t bFlag) { // 1.13c D2Common+0x32EF0
+extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_32EF0_MergeDualWield(uint32_t pUnit, int32_t bFlag) { // 1.13c D2Common+0x32EF0
 	D2UnitStrc* pUn = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit));
 
 	if (!UNITS_CanDualWield(pUn))

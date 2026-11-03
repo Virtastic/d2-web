@@ -60,9 +60,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2a480(uint32_t pUnit, uint32
 }
 
 // +0x344F0 (#10993): forwards the state mask at data-tables +0xDC (fStateMasks[4]) and the unit to 0x34080.
-extern "C" void d2_fn_d2common_34080(const uint32_t* mask, D2UnitStrc* unit);
+extern "C" void D2Common_34080_ApplyStateMask(const uint32_t* mask, D2UnitStrc* unit);
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_344f0(uint32_t pArg) { // 1.13c D2Common+0x344f0
-	d2_fn_d2common_34080(sgptDataTables->fStateMasks[4], reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pArg)));
+	D2Common_34080_ApplyStateMask(sgptDataTables->fStateMasks[4], reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pArg)));
 }
 
 // +0x460B0 (#10996): per-mode emit loop. Stub: every side effect is a still-UNMAPPED callee -- 0x22640
