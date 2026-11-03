@@ -46,10 +46,40 @@ void setBool(uint8_t* rec,const char* str,int32_t* consumed) {
     if(on) wr(rec+0x3c,rd(rec+0x24)|v);
     // dest at +2C is a 32-bit retail address: caller's resolve is needed, see setBoolDest
 }
+// The CRT strtoul/strtol that retail calls (0x6851 / 0x683A, 32-bit longs): blanks, sign, base 0 prefixes
+// (0x -> 16 when a hex digit follows, 0 -> 8, else 10), no digits -> 0 with endptr at the start, overflow
+// saturates to ULONG_MAX or LONG_MAX / LONG_MIN. A host strtol is 64-bit on this build and would not match.
+static uint32_t crtStrto32(const char* s, char** end, int base, bool sgn) {
+    const char* p=s;
+    while(*p==' '||(*p>=9&&*p<=13)) ++p;
+    bool neg=false;
+    if(*p=='-'||*p=='+') { neg=(*p=='-'); ++p; }
+    auto isx=[](char ch){ return (ch>='0'&&ch<='9')||(ch>='a'&&ch<='f')||(ch>='A'&&ch<='F'); };
+    if((base==0||base==16)&&p[0]=='0'&&(p[1]=='x'||p[1]=='X')&&isx(p[2])) { base=16; p+=2; }
+    else if(base==0) base=(p[0]=='0')?8:10;
+    uint64_t acc=0; bool any=false, ovf=false;
+    for(;;) {
+        int ch=(unsigned char)*p, d;
+        if(ch>='0'&&ch<='9') d=ch-'0';
+        else if(ch>='a'&&ch<='z') d=ch-'a'+10;
+        else if(ch>='A'&&ch<='Z') d=ch-'A'+10;
+        else break;
+        if(d>=base) break;
+        any=true;
+        if(!ovf) { acc=acc*(uint64_t)base+(uint64_t)d; if(acc>0xFFFFFFFFull) ovf=true; }
+        ++p;
+    }
+    if(!any) { if(end) *end=const_cast<char*>(s); return 0; }
+    if(end) *end=const_cast<char*>(p);
+    if(!sgn) { if(ovf) return 0xFFFFFFFFu; uint32_t v=(uint32_t)acc; return neg?0u-v:v; }
+    if(neg) { if(ovf||acc>0x80000000ull) return 0x80000000u; return 0u-(uint32_t)acc; }
+    if(ovf||acc>0x7FFFFFFFull) return 0x7FFFFFFFu;
+    return (uint32_t)acc;
+}
 // 1.13c Storm+0x24e60
 void setNumber(Ctx& c,uint8_t* rec,const char* str,int32_t* consumed) {
     char* e=nullptr;
-    uint32_t v=(rec[8]&1)==0?(uint32_t)std::strtoul(str,&e,0):(uint32_t)(int32_t)std::strtol(str,&e,0);
+    uint32_t v=crtStrto32(str,&e,0,(rec[8]&1)!=0);
     wr(rec+0x3c,v);
     *consumed=e?(int32_t)(e-str):(int32_t)std::strlen(str);
     if(uint8_t* d=at(c,rec,0x2c)) { uint32_t n=rd(rec+0x30); if(n>4) n=4; std::memcpy(d,rec+0x3c,n); }

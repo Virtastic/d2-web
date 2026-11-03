@@ -39,15 +39,23 @@ extern "C" void Storm_Sub1A6C0(uint32_t dwPageSize) {
 // The 0x6FC43550 slot, for the function-mode probe.
 extern "C" uint32_t Storm_Sub1A6C0_PageSize(void) { return g_pageSize; }
 
-// 1.13c Storm+0x1a550: grow committed region of page (EDI) to newEnd (EAX); VirtualAlloc replaced by caller-reserved memory
-extern "C" uint32_t Storm_Sub1A550(uint8_t* pg, int32_t newEnd) {
+// 1.13c Storm+0x1a550: grow committed region of page (EDI) to newEnd (EAX). Retail calls
+// VirtualAlloc(page+cm, size, MEM_COMMIT, PAGE_READWRITE) and returns 0 with the commit point unchanged
+// when it returns NULL. The commit seam takes (address, size) and answers nonzero on success.
+extern "C" uint32_t Storm_Sub1A550_commit(uint8_t* pg, int32_t newEnd, bool (*commit)(uintptr_t addr, uint32_t size)) {
   int32_t cm = *(int32_t*)(pg + 0x2c);
-  uint32_t sz = newEnd - cm, al = *(uint32_t*)(pg + 0x28);
+  uint32_t sz = (uint32_t)newEnd - (uint32_t)cm, al = *(uint32_t*)(pg + 0x28);
   uint32_t r = (al - 1) & sz;
   if (r) sz += al - r;
-  if (*(uint32_t*)(pg + 0x30) < cm + sz) sz = *(uint32_t*)(pg + 0x30) - cm;
-  *(int32_t*)(pg + 0x2c) = cm + sz;  // commit assumed to succeed (reserved up front)
+  if (*(uint32_t*)(pg + 0x30) < (uint32_t)cm + sz) sz = *(uint32_t*)(pg + 0x30) - (uint32_t)cm;
+  if (!commit((uintptr_t)pg + (uint32_t)cm, sz)) return 0;
+  *(int32_t*)(pg + 0x2c) = cm + (int32_t)sz;
   return 1;
+}
+// Engine callers keep the reserved-up-front model: the commit always succeeds.
+static bool commit_reserved(uintptr_t, uint32_t) { return true; }
+extern "C" uint32_t Storm_Sub1A550(uint8_t* pg, int32_t newEnd) {
+  return Storm_Sub1A550_commit(pg, newEnd, commit_reserved);
 }
 
 // 1.13c Storm+0x1a6f0

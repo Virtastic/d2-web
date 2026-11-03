@@ -58,10 +58,12 @@ u32 Storm_26030(uint8_t* f, int32_t off, int* hi, u32 mode) {
     N42Host* h = G.h;
     if (hi && *hi) { G.lastErr = 0x57; h->setErr(0x57); return 0xffffffff; }
     h->lock();
-    void* fh = *(void**)(f + 0x10c);
-    if ((intptr_t)fh != -1) { h->unlock(); return h->setFilePtr(fh, off, mode); }
+    // Retail fields are 32-bit: the handle (+10C), the stream block pointer (+114) and its size (+8).
+    u32 fhv = *(u32*)(f + 0x10c);
+    if (fhv != 0xffffffffu) { h->unlock(); return h->setFilePtr((void*)(uintptr_t)fhv, off, mode); }
     u32* pos = (u32*)(f + 0x11c);
-    u32 size = *(u32*)(*(uint8_t**)(f + 0x114) + 8);
+    uint8_t* ss = (uint8_t*)(uintptr_t)*(u32*)(f + 0x114);
+    u32 size = *(u32*)(ss + 8);
     if (mode != 0) {
         if (mode == 1) {
             if (off < 0 && *pos < (u32)-off) *pos = 0; else *pos += off;
@@ -79,6 +81,19 @@ clamp:
     *(u32*)(f + 0x138) = 0; *(u32*)(f + 0x13c) = 0;
     h->unlock();
     return v;
+}
+
+// Probe seam: install a host table (lock/unlock/setErr no-op; SetFilePointer answers sfp) for the FN probe.
+static u32 g_probeSfp;
+static void probeNop() {}
+static void probeSetErr(u32) {}
+static u32 probeSetFilePtr(void*, int32_t, u32) { return g_probeSfp; }
+static N42Host g_probeHost;
+extern "C" void storm_n42_probe_install(u32 sfp) {
+    g_probeSfp = sfp;
+    g_probeHost.lock = probeNop; g_probeHost.unlock = probeNop; g_probeHost.setErr = probeSetErr;
+    g_probeHost.setFilePtr = probeSetFilePtr;
+    G.h = &g_probeHost;
 }
 
 // 1.13c Storm+0x25D30
