@@ -1,4 +1,5 @@
 #include "GAME/Game.h"
+#include "../../../../d2game/d2game_2d4b0.h"
 
 #include <algorithm>
 
@@ -154,13 +155,16 @@ void GAME_LogMessage(int32_t a1, const char* szFormat, ...)
 // 1.13c D2Game+0x2D4B0
 int32_t __stdcall D2Game_10046()
 {
-    SRegLoadValue("Diablo II", "PlayerPos", 0, &dword_6FD4582C);
-    memset(gnGamesGUIDs_6FD447F8, 0, sizeof(gnGamesGUIDs_6FD447F8));
-    InitializeCriticalSection(&gCriticalSection_6FD45800);
-    CLIENTS_Initialize();
-    D2NET_10019(sub_6FC36B20);
-    SUNITPROXY_FillGlobalItemCache();
-    return TRUE;
+    // The body lives in src/core/d2game/d2game_2d4b0.cpp (callees behind a seam so the FN probe can log them); the kick callback
+    // retail registers is 0x2D2F0, whose 1.10f twin is sub_6FC36B20.
+    static const D2Game2D4B0Env env = {
+        [](uint32_t* out) { SRegLoadValue("Diablo II", "PlayerPos", 0, (DWORD*)out); },
+        []() { InitializeCriticalSection(&gCriticalSection_6FD45800); },
+        []() { CLIENTS_Initialize(); },
+        []() { D2NET_10019(sub_6FC36B20); },
+        []() { SUNITPROXY_FillGlobalItemCache(); },
+    };
+    return d2game_port_2d4b0(&env, gnGamesGUIDs_6FD447F8, (uint32_t*)&dword_6FD4582C);
 }
 
 // 1.13c D2Game+0x2A9A0
