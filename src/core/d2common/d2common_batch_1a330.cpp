@@ -8,6 +8,8 @@
 #include "DataTbls/ItemsTbls.h"
 #include "DataTbls/MonsterTbls.h"
 #include "D2Items.h"
+#include "d2common_fatal.h"
+#include "d2common_fog_env.h"
 
 extern "C" {
 __attribute__((weak)) uint32_t Ordinal_10265(uint32_t);
@@ -167,11 +169,28 @@ extern "C" uint32_t D2Common_27090_ItemCheck(const void* pUnit,
     return 1;
 }
 
-// 1.13c D2Common+0x3CD80 (#10093): if pUnit is non-null, calls 0x455B0(a2, *(int*)(pUnit+0x10), a2).
-// ponytail: 0x455B0 is a still-UNMAPPED row; the call is recorded here but not linked.
-void D2Common_3CD80_Forward(const void* pUnit, uint32_t nArg)
+// 1.13c D2Common+0x3CD80 (#10093): if pUnit is non-null, calls 0x455B0(nArg, *(pUnit+0x10), nArg) (fastcall).
+// 0x455B0 resolves the destination room through 0x1A0D0 and fatals 0x25C / 0x25E / 0x25F on a missing
+// source room, warp room or warp unit. Its value is dropped by this caller.
+// The 455B0 body is inlined here; the resolver is the 1A0D0 port and its env is the one 1A0D0 takes.
+struct D2CommonWarpEnv;
+extern "C" uint32_t D2Common_1A0D0_GetDestinationRoom(int32_t nSourceLevel, uint32_t pDrlgRoom,
+                                                       uint32_t pDestLevel, uint32_t ppLvlWarp,
+                                                       const D2CommonWarpEnv* env);
+void D2Common_3CD80_Forward(uint32_t pUnit, uint32_t nArg, const D2CommonWarpEnv* env)
 {
-    (void)pUnit; (void)nArg;
+    using d2raw::P; using d2raw::W;
+    if (!pUnit) return;
+    const uint32_t pRoom = W(P(pUnit), 0x10);
+    uint32_t nDestLevel = 0, ppLvlWarp = 0;
+    const uint32_t pSrcRoom = D2Common_1A0D0_GetDestinationRoom(static_cast<int32_t>(nArg), pRoom,
+        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&nDestLevel)),
+        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&ppLvlWarp)), env);
+    if (!pSrcRoom) d2common_fatal(0x25C);
+    const uint32_t pWarpRoom = W(P(pSrcRoom), 0x10);
+    if (!pWarpRoom) d2common_fatal(0x25E);
+    const uint32_t pWarpUnit = W(P(pWarpRoom), 0x58);
+    if (!pWarpUnit) d2common_fatal(0x25F);
 }
 
 // 1.13c D2Common+0x4D870 (#10078): thin forwarder to 0x4D140 with the argument list

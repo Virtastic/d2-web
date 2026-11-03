@@ -2,6 +2,7 @@
 // retail 32-bit offsets (documented in each block); callees are named by RVA, declared here.
 // Registers the decompile shows as implicit (EAX/EDI) are explicit parameters.
 #include <cstdint>
+#include "d2common_fatal.h"
 
 struct D2B453 { uint8_t* base; };
 static inline int32_t& I32(void* p, uint32_t off) { return *(int32_t*)((uint8_t*)p + off); }
@@ -25,7 +26,7 @@ void     D2Common_fatal_10024(const void* msg, uint32_t code);
 // Tries the idx-th slot whose table entry equals key first, then falls back to the first that works.
 void D2Common_453D0(void* self, int32_t p1, void* unit, uint32_t idx)
 {
-    if (!unit || (uint8_t)idx > 7) { D2Common_fatal_10024(nullptr, 0x350); return; }
+    if (!unit || (uint8_t)idx > 7) d2common_fatal(0x350);
     void* data = P32(unit, 0x58);
     int32_t key = I32(data, 0x1D0);
     int32_t* t = D2Common_44CE0(self, key);

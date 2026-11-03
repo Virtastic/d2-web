@@ -74,7 +74,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_697c0(uint32_t a1, uintptr_t a2, uintpt
 	w69470(a2, a1, ebx, edi, esi);
 }
 
-// 1.13c D2Common+0x816C0: (ecx=x, edx=roomA, eax=y, a3=roomB). If (x,y) is inside roomA's rect (+0x34/38,
+// superseded by d2common_816c0.cpp, D2Common 0x816C0: (ecx=x, edx=roomA, eax=y, a3=roomB). If (x,y) is inside roomA's rect (+0x34/38,
 // size +0x3c/40) fetch both tiles via 0x810A0; when both have +0x28 set, same +0x58->+0x1d0, differing
 // +0x28 and equal +0x20, call 0x80EE0(roomB, tileB+0x28, tileA+0x28, tileA+0x20).
 EMSCRIPTEN_KEEPALIVE void d2c_816c0_old(int32_t x, uintptr_t roomA, int32_t y, uintptr_t roomB,
@@ -90,10 +90,10 @@ EMSCRIPTEN_KEEPALIVE void d2c_816c0_old(int32_t x, uintptr_t roomA, int32_t y, u
 	if (ta != tb && w(a, 0x20) == w(b, 0x20)) w80ee0(roomB, tb, ta, w(a, 0x20));
 }
 
-// 1.13c D2Common+0x817A0: recursive flood over a tile grid. ctx (4-byte ptr cells): [0]=room, [1]=flag grid,
+// superseded by d2common_817a0.cpp, D2Common 0x817A0: recursive flood over a tile grid. ctx (4-byte ptr cells): [0]=room, [1]=flag grid,
 // [2]=optional type grid, [5]=visited grid; grids are {rows base, row-offset table}. dirXY = DAT_6fdda80c
 // ({dx,dy} x4), cls = DAT_6fdda758, mask = DAT_6fdda7ac (5 dwords per class); cb = PTR_FUN_6fdeb244.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_817a0(uintptr_t ctx, int32_t x, int32_t y, int32_t dir,
+EMSCRIPTEN_KEEPALIVE void d2c_817a0_old(uintptr_t ctx, int32_t x, int32_t y, int32_t dir,
 	const int32_t* dirXY, const int32_t* cls, const uint32_t* mask, void (*cb)()) {
 	for (;;) {
 		uintptr_t room = w(ctx, 0);
@@ -106,7 +106,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_817a0(uintptr_t ctx, int32_t x, int32_t
 		if (w(w(g5, 0), ((uint32_t)iw(w(g5, 4), y * 4) + x) * 4) == 0) {
 			cb();
 			for (int32_t i = 0; i < 4; ++i)
-				d2_fn_d2common_817a0(ctx, dirXY[i * 2] + x, dirXY[i * 2 + 1] + y, i, dirXY, cls, mask, cb);
+				d2c_817a0_old(ctx, dirXY[i * 2] + x, dirXY[i * 2 + 1] + y, i, dirXY, cls, mask, cb);
 			return;
 		}
 		int32_t t = 0;
@@ -114,10 +114,10 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_817a0(uintptr_t ctx, int32_t x, int32_t
 			t = iw(w(g2, 0), ((uint32_t)iw(w(g2, 4), y * 4) + x) * 4);
 		uint32_t m = mask[dir + cls[t] * 5];
 		if (m & 1) cb();
-		if ((m & 2) && dir != 2) d2_fn_d2common_817a0(ctx, x + 1, y, 0, dirXY, cls, mask, cb);
-		if ((m & 4) && dir != 3) d2_fn_d2common_817a0(ctx, x, y + 1, 1, dirXY, cls, mask, cb);
-		if ((m & 8) && dir != 0) d2_fn_d2common_817a0(ctx, x - 1, y, 2, dirXY, cls, mask, cb);
-		if ((m & 0x10) && dir != 1) d2_fn_d2common_817a0(ctx, x, y - 1, 3, dirXY, cls, mask, cb);
+		if ((m & 2) && dir != 2) d2c_817a0_old(ctx, x + 1, y, 0, dirXY, cls, mask, cb);
+		if ((m & 4) && dir != 3) d2c_817a0_old(ctx, x, y + 1, 1, dirXY, cls, mask, cb);
+		if ((m & 8) && dir != 0) d2c_817a0_old(ctx, x - 1, y, 2, dirXY, cls, mask, cb);
+		if ((m & 0x10) && dir != 1) d2c_817a0_old(ctx, x, y - 1, 3, dirXY, cls, mask, cb);
 		if ((m & 0x20) == 0) return;
 		y += 1; dir = -1; x += 1;
 	}

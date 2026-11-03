@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <emscripten.h>
 
+#include "d2common_fatal.h"
+
 #include "D2Skills.h"
 #include "DataTbls/ItemsTbls.h"
 #include "DataTbls/SkillsTbls.h"
@@ -45,7 +47,7 @@ EMSCRIPTEN_KEEPALIVE int32_t* d2_fn_d2common_3cdf0(uint32_t pUnit, int32_t nArg2
                                                    const D2Common3CDF0Env* pEnv)
 {
 	if (!pUnit)
-		return nullptr;
+		d2common_fatal(0x22c);
 	if (!pEnv || !pEnv->resolve_room || !pEnv->find_field_record || !pEnv->room_at)
 		return nullptr;
 
@@ -60,7 +62,7 @@ EMSCRIPTEN_KEEPALIVE int32_t* d2_fn_d2common_3cdf0(uint32_t pUnit, int32_t nArg2
 	int32_t coords[2] = { nX * 5 + 3, nY * 5 + 3 };
 	if (!pEnv->find_field_record(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pRecord)), coords, nullptr, nArg6,
 	                             0x1C09, 0x1C09, 0, 0x32, 1))
-		return nullptr;
+		d2common_fatal(0x238);
 
 	if (pOutX)
 		*pOutX = coords[0];
@@ -70,18 +72,19 @@ EMSCRIPTEN_KEEPALIVE int32_t* d2_fn_d2common_3cdf0(uint32_t pUnit, int32_t nArg2
 	return pEnv->room_at(pRecord, coords[0], coords[1]);
 }
 
-// 1.13c D2Common+0x3CEE0 (#10942): null-check the unit and forward (unit+0x48, arg2, arg3, out x,
-// out y) to the 0x1A130 record resolver; the resolver's return value is the caller's result.
+// 1.13c D2Common+0x3CEE0 (#10942): fatal 0x221 on a null unit; otherwise forward (unit+0x48, arg2,
+// arg3, out) to the 0x1A130 record resolver. Retail returns void. The seam's second output (y, which
+// retail leaves in EAX) has no caller slot here, so it lands in a scratch word.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t* d2_fn_d2common_3cee0(uint32_t pUnit, int32_t nArg2, int32_t nArg3,
-                                                   int32_t* pOutX, int32_t* pOutY,
-                                                   const D2Common3CDF0Env* pEnv)
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3cee0(uint32_t pUnit, int32_t nArg2, int32_t nArg3,
+                                               int32_t* pOut, const D2Common3CDF0Env* pEnv)
 {
 	if (!pUnit)
-		return nullptr;
+		d2common_fatal(0x221);
 	if (!pEnv || !pEnv->resolve_room)
-		return nullptr;
-	return pEnv->resolve_room(R(P(pUnit), 0x48), nArg2, nArg3, pOutX, pOutY);
+		return;
+	int32_t nScratchY = 0;
+	pEnv->resolve_room(R(P(pUnit), 0x48), nArg2, nArg3, pOut, &nScratchY);
 }
 
 // 1.13c D2Common+0x39B30 (#10810): count of nItemId in the unit's inventory grid. The grid is at

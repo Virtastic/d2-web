@@ -128,7 +128,7 @@ int32_t* D2Common_68F00(void* pRoom, int32_t** pHead, int32_t x, int32_t y, uint
     return r;
 }
 
-// 1.13c D2Common+0x814C0: walk pRoom's record array (+0x54 -> +0x14, count +0x18, stride 0x30) and
+// (superseded by the per-function port; was D2Common+0x814C0): walk pRoom's record array (+0x54 -> +0x14, count +0x18, stride 0x30) and
 // call cb(rec) for records with (f&0x1c000)==0x4000, type(+0x1c)!=0xf, bit 11 clear; then for each
 // neighbour room (array +8, count +0x2c) other than pRoom, over its list head (**(+0x54)) entries
 // with kind==0, the same test on each chained record (next +0x20) whose absolute tile (neighbour
@@ -157,7 +157,7 @@ void D2Common_814C0(void* pRoom, void (*cb)(void*))
     }
 }
 
-// 1.13c D2Common+0x81650: cb(rec) for each record of pRoom's array with flag 4 set and (f&0x1c000)==0.
+// (superseded by the per-function port; was D2Common+0x81650): cb(rec) for each record of pRoom's array with flag 4 set and (f&0x1c000)==0.
 void D2Common_81650(void* pRoom, void (*cb)(void*))
 {
     void* pool = rd<void*>(pRoom, 0x54);
@@ -168,7 +168,7 @@ void D2Common_81650(void* pRoom, void (*cb)(void*))
     }
 }
 
-// 1.13c D2Common+0x81AD0: for each neighbour room (array +8, count +0x2c, != pRoom, +100 non-null)
+// (superseded by the per-function port; was D2Common+0x81AD0): for each neighbour room (array +8, count +0x2c, != pRoom, +100 non-null)
 // whose box (+0x34,+0x38,+0x3c,+0x40) touches or overlaps pRoom's on both axes (gap < 1), call
 // f816C0(x, other, pRoom) twice per column x along pRoom's top/bottom edge and twice per row y
 // (with x = left, then right edge); loops are inclusive. Argument order as the decompile.

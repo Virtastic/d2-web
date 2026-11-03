@@ -160,3 +160,6 @@ uint32_t D2Common_10436_GetTableRecordByteField(int32_t nIndex, uint16_t* pOut)
     }
     return 0;
 }
+
+// FN probe seam: install the 0x1330 emulation the 4C990 probe supplies.
+extern "C" void D2Common_4C990_SetEnv(void* (*pfn)(void)) { env_1330_GetGridRecord = pfn; }

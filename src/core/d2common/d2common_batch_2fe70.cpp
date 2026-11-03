@@ -7,6 +7,8 @@
 
 #include <emscripten.h>
 
+#include "d2common_fatal.h"
+
 #include "D2BitManip.h"
 #include "D2DataTbls.h"
 #include "D2StatList.h"
@@ -161,13 +163,13 @@ extern "C"
 EMSCRIPTEN_KEEPALIVE void D2Common_3D380_AddTextEntries(uint32_t* pOwner, const uint8_t* pList,
 	const Batch2_3D380Env* pEnv)
 {
-	if (!pOwner) return;
-	if (!pList) return;
+	if (!pOwner) d2common_fatal(0x10b);
+	if (!pList) d2common_fatal(0x10c);
 
 	if (pEnv && pEnv->reset) pEnv->reset();
 
 	const int32_t nCount = *pList;
-	if (nCount >= 8) return;
+	if (nCount >= 8) d2common_fatal(0x112);
 
 	for (int32_t i = 0; i < nCount; ++i)
 	{

@@ -36,7 +36,7 @@ struct B81Flood {   // esi
     uint32_t mark;      // [7]
 };
 
-// 1.13c D2Common+0x81BC0: over cells (0..w, 0..h) whose visited flag 0x10000000 is clear: bump the counter,
+// (superseded by the per-function port; was D2Common+0x81BC0): over cells (0..w, 0..h) whose visited flag 0x10000000 is clear: bump the counter,
 // mark = counter&0x0FFFFFFF | 0x10000000 (| 0x30000000 if the tile masks to 0x1E00000 under 0x1E0FF00 or is
 // negative), then 817A0(self, x, y, -1).
 void D2Common_81BC0_FloodCells(B81Flood* s)

@@ -65,7 +65,7 @@ extern "C" bool d2_fn_d2common_50610(D2UnitStrc* item, D2UnitStrc* unit,
 // Retail level+0x08 is nRooms, +0x10 is pFirstRoomEx, +0x1c4 is pSeed;
 // room+0x24 is pDrlgRoomNext. Use the native fields after pointer expansion.
 // 1.13c D2Common+0x19A50
-extern "C" D2DrlgRoomStrc* d2_fn_d2common_19a50(D2DrlgLevelStrc* level)
+extern "C" D2DrlgRoomStrc* d2common_19a50_port(D2DrlgLevelStrc* level)
 {
     if (!level || !level->pFirstRoomEx) std::abort();
     uint32_t index = SEED_RollLimitedRandomNumber(&level->pSeed, level->nRooms);
@@ -78,7 +78,7 @@ extern "C" D2DrlgRoomStrc* d2_fn_d2common_19a50(D2DrlgLevelStrc* level)
 using D2C113WarpIds = const int32_t* (*)(void*, int32_t);
 // Retail level+0x1b4 is pDrlg, +0x1d0 is nLevelId; room+0x28 is dwFlags.
 // 1.13c D2Common+0x19AD0
-extern "C" D2DrlgRoomStrc* d2_fn_d2common_19ad0(D2DrlgLevelStrc* level,
+extern "C" D2DrlgRoomStrc* d2common_19ad0_port(D2DrlgLevelStrc* level,
     D2C113WarpIds warpIds)
 {
     for (auto* room = level->pFirstRoomEx; room; room = room->pDrlgRoomNext) {
