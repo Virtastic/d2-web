@@ -88,7 +88,7 @@ void D2GAME_63350(void* p1, i32 unit)
     if (rd(q, 8) == 0) { o10024((void*)0, o10265(0x820)); std::_Exit(-1); }
     o10003(rd(q, 0xc), 5, 0xd);
     if (*(int16_t*)(intptr_t)(rd(unit, 0x18) + 100) == 0) { *(u8*)(intptr_t)(unit + 10) = 0; return; }
-    *(void**)(intptr_t)(unit + 200) = (void*)&LAB_6fc811b0;
+    *(u32*)(intptr_t)(unit + 200) = (u32)(uintptr_t)&LAB_6fc811b0;   // a 32-bit slot in retail
 }
 
 // 1.13c D2Game+0x633C0 (caller 0x664F0): shuffle the five stone classes into slots, optionally log each
@@ -123,7 +123,8 @@ i32 D2GAME_633C0(i32 unit)
             n++;
         }
     } while (n <= 4);
-    return q;
+    (void)q;
+    return n;   // retail returns the slot count (5): the loop exits straight after the increment
 }
 
 // 1.13c D2Game+0x63930 (ebx = count, ebp = unit)

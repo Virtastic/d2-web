@@ -26,55 +26,12 @@ static inline uint32_t rd32(const void* p, uint32_t o) { uint32_t v; std::memcpy
 static inline uint64_t rd64(const void* p, uint32_t o) { uint64_t v; std::memcpy(&v, (const uint8_t*)p + o, 8); return v; }
 static inline void wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)p + o, &v, 4); }
 static inline void wr64(void* p, uint32_t o, uint64_t v) { std::memcpy((uint8_t*)p + o, &v, 8); }
-static inline void* rdptr(const void* p, uint32_t o) { void* v; std::memcpy(&v, (const uint8_t*)p + o, sizeof v); return v; }
+// Retail records are 32-bit images (game +0x88 head, client +0x4A8 next, ...): a link is a 32-bit word whose value is the host address of the linked record (wasm memory is below 4 GB).
+static inline void* rdptr(const void* p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return (void*)(uintptr_t)v; }
 
 [[noreturn]] static void d2game_fatal(uint32_t) { _exit(-1); }
 
-// Host seams for the callees the cached decompiles name but src/ does not implement.
-struct D2GameBatch7Env {
-    // 0x2AAE0 GAME_GetGameByGUID: the decompiles pass the GUID/client key in ESI/ECX.
-    void*    (*getGame)(uint32_t key);
-    // 0x49FE0 CLIENTS_GetClientFromClientId(game, clientId): game in EAX, id in the argument.
-    void*    (*findClientInGame)(void* game, uint32_t clientId);
-    // 0x29BA0 GAME_LeaveGamesCriticalSection(game); 0x2C830 client sweep; 0x2D500 send-queue pump
-    // (game argument, client in EAX).
-    void     (*unlockGame)(void* game);
-    void     (*clientSweep)(void* game);
-    void     (*pumpClientQueue)(void* client, void* game, uint32_t flag);
-    // 0x8A3E0 appends len bytes to the client's SCmd block list (client in EAX).
-    void     (*queuePacket)(void* client, const void* data, uint32_t len);
-    // 0x2D790 client flush (client in ESI, game in EDI).
-    void     (*flushClient)(void* client, void* game);
-    // 0x4B7F0 CLIENTS_RemoveClientFromGame(game, clientId, flag).
-    void     (*removeClient)(void* game, uint32_t clientId, uint32_t flag);
-    // 0xCBDB0 name-termination callback; its buffer arrives in EAX.
-    void     (*terminateName)(void* buffer);
-    // 0x2BF90 (game in EAX, client in EDI) and 0x4B500 (client, game, two flags).
-    void     (*prepareClientState)(void* game, void* client);
-    void     (*addClientToGame)(void* client, void* game, uint32_t a3, uint32_t a4);
-    // 0x4BCC0 (client in EAX, game, then three flags): NULL or the rejection packet to send.
-    void*    (*buildRejectPacket)(void* client, void* game, uint32_t a2, uint32_t a3, uint32_t a4);
-    // 0x4AD10 CLIENTS_GetPlayerFromClient(client, ignoreDeath).
-    void*    (*getPlayerFromClient)(void* client, int32_t ignoreDeath);
-    // 0x4AD80 (client in EBX) and 0x8A2A0 (client in the stack argument).
-    void     (*refreshUnitList)(void* client, uint32_t count);
-    void     (*sendUnitsUpdate)(void* client);
-    // 0xE03A0 SUNIT_GetServerUnit(game in ECX, type in EDX, guid on the stack).
-    void*    (*getServerUnit)(void* game, uint32_t unitType, uint32_t unitGuid);
-    // 0xCC030 unit update dispatch (unit in EAX).
-    int32_t  (*unitUpdateDispatch)(void* unit);
-    // 0x8A730 D2GAME_PACKETS_SendPacket_0x8F (client in EAX).
-    void     (*sendPacket8F)(void* client);
-    // Storm #509 SStrCmp(a, b, n); Storm #501 SStrCopy(dst, src, n).
-    int32_t  (*strCmp)(const void* a, const void* b, uint32_t n);
-    void     (*strCopy)(void* dst, const void* src, uint32_t n);
-    // D2Net #10002 send(channel, clientId, data, len); the other three are D2Net ordinals 10015,
-    // 10000 and 10001, whose register-only arguments are lost in the decompiles.
-    int32_t  (*send)(uint32_t channel, uint32_t clientId, const void* data, uint32_t len);
-    void     (*net10015)(uint32_t clientId);
-    void     (*net10000)(void);
-    void     (*net10001)(void);
-};
+#include "d2game_batch7_env.h"
 
 // ---- module state, each at its retail address ---------------------------------------------------
 static void*    g_clientList[256];        // 0x6FD307B8: by-id client chains, next at client+0x4AC
@@ -84,21 +41,21 @@ static CRITICAL_SECTION g_clientListLock; // 0x6FD30BB8
 static CRITICAL_SECTION g_gameListLock;   // 0x6FD30BE8
 
 // 1.13c D2Game+0x2DC70
-// GAME_ClientLeaveGame (CCmd 0x69): resolve the client's game (0x2AAE0), look for the id in the
-// game's client list (next at +0x4A8) and bail out through 0x29BA0 when absent; then the client
-// record (0x49FE0, code-less fatal when missing) decides the sweep: flag bit 5 at client+0x3D4, or
-// a non-zero game state byte +0x6A. Per client the handler queues and sends a one-byte packet twice
-// (0x8A3E0), flushes (0x2D790), pumps the send queue (0x2D500), copies 0x32 bytes from client+0x74
-// and 0x10 bytes from client+0x34 into stack buffers, removes the client with flag !sweep (0x4B7F0)
-// and terminates the name (0xCBDB0). Sweeping repeats over the list from the head; then the game
-// lock is released and, for state bytes 1/2, Sleep(100) and D2Net #10000 run.
-// partial: the queued/sent byte and the length of the #10002 call come from uninitialised stack
-// slots; both are modelled as byte 0 / length 1.
+// GAME_ClientLeaveGame (CCmd 0x69, stdcall(clientId, announce)): D2Net #10015 turns the id into the game GUID, 0x2AAE0 resolves the game, and the
+// id is looked up in the game's client list (next at +0x4A8; absent: 0x29BA0 and out). The client record (0x49FE0; missing is fatal) decides the
+// sweep: flag bit 5 at client+0x3D4 (killed), or a non-zero game state byte +0x6A (0x2C830). Per client: queue byte 5 (0x8A3E0), flush (0x2D790),
+// queue byte 6, send byte 0xB0 (D2Net #10002, channel 0), pump (0x2D500), build the 0x5A leave packet on the stack (type 3, 4; the 16-byte name
+// from client+0xD at +8, the 0x32-byte string from client+0x1D at +0x18, both SStrCopy), remove the client (0x4B7F0 with !killed) and, when
+// `announce` is set, broadcast the packet (0xCBDB0). While killed it repeats from the list head. Then the game lock (+0x18; null is fatal 0x100F)
+// is left, state bytes 1/2 sleep 100 ms, and D2Net #10000 closes with the last id.
+static void sstrcpy(uint8_t* dst, const uint8_t* src, uint32_t n) {   // Storm SStrCopy: up to n-1 bytes of src, always NUL-terminated
+    uint32_t i = 0; while (i + 1 < n && src[i]) { dst[i] = src[i]; ++i; } dst[i] = 0;
+}
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_game_2dc70(uint32_t clientId, const D2GameBatch7Env* env)
+EMSCRIPTEN_KEEPALIVE void d2_game_2dc70(uint32_t clientId, uint32_t announce, const D2GameBatch7Env* env)
 {
-    env->net10015(clientId);                          // D2Net #10015 (client in EAX)
-    void* game = env->getGame(clientId);              // 0x2AAE0
+    const uint32_t guid = env->net10015(clientId);    // D2Net #10015
+    void* game = env->getGame(guid);                  // 0x2AAE0
     if (game == nullptr) return;
 
     void* listed = rdptr(game, 0x88);
@@ -106,7 +63,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_2dc70(uint32_t clientId, const D2GameBatch7Env
     if (listed == nullptr) { env->unlockGame(game); return; }   // 0x29BA0
 
     void* client = env->findClientInGame(game, clientId);       // 0x49FE0
-    if (client == nullptr) d2game_fatal(0);                     // code not rendered
+    if (client == nullptr) d2game_fatal(0xBA6);
 
     const bool killed = (rd8(client, 0x3D4) & 0x20) != 0;
     const bool sweep = killed || rd8(game, 0x6A) != 0;
@@ -114,23 +71,21 @@ EMSCRIPTEN_KEEPALIVE void d2_game_2dc70(uint32_t clientId, const D2GameBatch7Env
 
     uint32_t id = clientId;
     for (;;) {
-        uint8_t packetByte = 0;                    // partial: uninitialised slot in the decompile
-        env->queuePacket(client, &packetByte, 1);  // 0x8A3E0
+        const uint8_t b5 = 5, b6 = 6, bB0 = 0xB0;
+        env->queuePacket(client, &b5, 1);          // 0x8A3E0
         env->flushClient(client, game);            // 0x2D790
-        env->queuePacket(client, &packetByte, 1);  // 0x8A3E0
-        env->send(0, id, &packetByte, 1);          // D2Net #10002
+        env->queuePacket(client, &b6, 1);          // 0x8A3E0
+        env->send(0, id, &bB0, 1);                 // D2Net #10002
         env->pumpClientQueue(client, game, 0);     // 0x2D500
 
-        uint8_t info[0x32];                        // auStack_24 (0x32 bytes)
-        std::memset(info, 0, sizeof info);
-        env->strCopy(info, (const uint8_t*)client + 0x74, 0x32);          // Storm #501
-        wr32(info, 0, rd32(info, 0) & 0xFFFFFFu);                          // auStack_24[0] &= 0xffffff
-        uint8_t name[0x10];                        // &stack0xffffffc0
-        std::memset(name, 0, sizeof name);
-        env->strCopy(name, (const uint8_t*)client + 0x34, 0x10);          // Storm #501
+        uint8_t pkt[0x4C];                         // the stack packet at B+0x10
+        std::memset(pkt, 0, sizeof pkt);
+        pkt[0] = 0x5A; pkt[1] = 3; pkt[2] = 4;
+        sstrcpy(pkt + 0x18, (const uint8_t*)client + 0x1D, 0x32);
+        sstrcpy(pkt + 0x08, (const uint8_t*)client + 0x0D, 0x10);
 
-        env->removeClient(game, killed ? 0u : 1u, 0u);   // 0x4B7F0(game, !killed); flag arg unrendered
-        if (clientId != 0) env->terminateName(info);     // 0xCBDB0; tests the original param_1, not the loop id
+        env->removeClient(game, id, killed ? 0u : 1u);   // 0x4B7F0(EAX = id, game, !killed)
+        if (announce != 0) env->terminateName(pkt, game);   // 0xCBDB0
 
         if (!killed) break;
         client = rdptr(game, 0x88);
@@ -141,21 +96,19 @@ EMSCRIPTEN_KEEPALIVE void d2_game_2dc70(uint32_t clientId, const D2GameBatch7Env
     if (rdptr(game, 0x18) == nullptr) d2game_fatal(0x100F);
     LeaveCriticalSection((LPCRITICAL_SECTION)rdptr(game, 0x18));
     if (rd8(game, 0x6A) == 1 || rd8(game, 0x6A) == 2) Sleep(100);
-    env->net10000();                                   // D2Net #10000
+    env->net10000(id);                                 // D2Net #10000
 }
 
 // 1.13c D2Game+0x2E360
-// GAME_ClientJoinGame (CCmd 0x6B): with the client id in EAX, resolve the game and confirm the id
-// is on its client list (else 0x29BA0 and return). 0x4BCC0 either returns a rejection packet (sent
-// on channel 0, client removed with flag 1, #10001, game unlocked) or NULL, in which case 0x2BF90
-// prepares the client (fatal 0xFB when the client record is missing), 0x4B500 adds the player and
-// client state +0x04 becomes 3.
-// partial: the rejection send's data/length arrive in registers; only channel 0 is rendered.
+// GAME_ClientJoinGame (CCmd 0x6B): with the client id in EAX, #10015 and 0x2AAE0 resolve the game and the id must be on its client list (else 0x29BA0
+// and return). 0x4BCC0 (client in EAX; game, 1, 0, 0, 0 on the stack) returns 0 or a rejection code: a code sends {0xB4, code LE} on channel 0,
+// removes the client with flag 1 (0x4B7F0, EAX = id), calls #10001(id, file string, 0x633) and unlocks. Otherwise 0x2BF90 prepares the client (EAX
+// game, EDI client; a missing record is fatal 0xFB), 0x4B500 (EAX 0; client, game, 0, 0) adds the player, client state +4 becomes 3, and the game is unlocked.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_game_2e360(uint32_t clientId, const D2GameBatch7Env* env)
 {
-    env->net10015(clientId);                          // D2Net #10015
-    void* game = env->getGame(clientId);              // 0x2AAE0
+    const uint32_t guid = env->net10015(clientId);    // D2Net #10015
+    void* game = env->getGame(guid);                  // 0x2AAE0
     if (game == nullptr) return;
 
     bool listed = false;
@@ -164,11 +117,12 @@ EMSCRIPTEN_KEEPALIVE void d2_game_2e360(uint32_t clientId, const D2GameBatch7Env
     if (!listed) { env->unlockGame(game); return; }
 
     void* client = env->findClientInGame(game, clientId);           // 0x49FE0
-    void* reject = env->buildRejectPacket(client, game, 1, 0, 0);   // 0x4BCC0
-    if (reject != nullptr) {
-        env->send(0, clientId, reject, 0);             // D2Net #10002(channel 0); length in a register
-        env->removeClient(game, 1, 0);                 // 0x4B7F0(game, 1)
-        env->net10001();                               // D2Net #10001
+    const uint32_t code = env->buildRejectPacket(client, game, 1, 0, 0);   // 0x4BCC0
+    if (code != 0) {
+        uint8_t pkt[5] = { 0xB4, (uint8_t)code, (uint8_t)(code >> 8), (uint8_t)(code >> 16), (uint8_t)(code >> 24) };
+        env->send(0, clientId, pkt, 5);                // D2Net #10002
+        env->removeClient(game, clientId, 1);          // 0x4B7F0
+        env->net10001(clientId, 0x6FD1CD98u, 0x633u);  // D2Net #10001
         env->unlockGame(game);                         // 0x29BA0
         return;
     }

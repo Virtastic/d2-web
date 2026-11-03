@@ -26,4 +26,7 @@ int32_t widePlacement(D2ActiveRoomStrc* room, const D2DrlgCoordsStrc& r, const D
                       Collide collide = engineCollide);
 int32_t populateSmallGrid(D2GameStrc* game, D2ActiveRoomStrc* room, const D2DrlgCoordsStrc& r, const Calls& calls,
                           Collide collide = engineCollide);
+// 0x2DE30 / 0x2E160: reached by the FN probes.
+void saveAndFlush(D2GameStrc* game, const Calls& calls);
+void leaveSelectedClient(D2GameStrc* game, D2ClientStrc* client, const Calls& calls);
 }

@@ -2149,6 +2149,24 @@ void __fastcall sub_6FC38E00()
     gnTargetMsPerFrame_6FD457F8 = 1000 / gnTargetFrameRate_6FD2CA60;
 }
 
+// Replay seam for the 1.13c D2Game+0x2E1E0 vector (null in the engine): the game lookup by GUID (0x2AAE0) and the
+// per-frame update (0x2E050) are the callees the capture records; the module globals the function reads are exposed
+// so the probe can pin them (GlobalPins).
+struct D2GameUpdateProgressSeam
+{
+	D2GameStrc* (*lockGame)(int32_t nGameGUID);
+	void (*updateProgress)(D2GameStrc* pGame);
+};
+static const D2GameUpdateProgressSeam* gpUpdateProgressSeam_D2Web = nullptr;
+extern "C" void d2game_2e1e0_state(int32_t** ppGameGUIDs, uint32_t** ppLastTick, int32_t** ppTargetMsPerFrame, int32_t** ppFixedRatio, const D2GameUpdateProgressSeam* pSeam)
+{
+	*ppGameGUIDs = gnGamesGUIDs_6FD447F8;
+	*ppLastTick = (uint32_t*)&dword_6FD45844;
+	*ppTargetMsPerFrame = &gnTargetMsPerFrame_6FD457F8;
+	*ppFixedRatio = &dword_6FD2CA10;
+	gpUpdateProgressSeam_D2Web = pSeam;
+}
+
 //1.10f:D2Game.0x6FC38E20 (#10004)
 //1.13c:D2Game.0x6FC4E1E0 (#10008)
 // 1.13c D2Game+0x2E1E0
@@ -2184,7 +2202,7 @@ int32_t __stdcall GAME_UpdateGamesProgress(int32_t a1)
         const int32_t nGUID = gnGamesGUIDs_6FD447F8[i];
         if (nGUID && nGUID != -1)
         {
-            if (D2GameStrc* pGame = GAME_LockGame(nGUID))
+            if (D2GameStrc* pGame = gpUpdateProgressSeam_D2Web ? gpUpdateProgressSeam_D2Web->lockGame(nGUID) : GAME_LockGame(nGUID))
             {
                 bQueryPerformance = 1;
 
@@ -2203,7 +2221,7 @@ int32_t __stdcall GAME_UpdateGamesProgress(int32_t a1)
                     pGame->nLastUpdateSystemTimeMs = nSysTimeMs;
                 }
 
-                GAME_UpdateProgress(pGame);
+                if (gpUpdateProgressSeam_D2Web) gpUpdateProgressSeam_D2Web->updateProgress(pGame); else GAME_UpdateProgress(pGame);
 
                 D2_UNLOCK(pGame->lpCriticalSection);
             }

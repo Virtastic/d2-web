@@ -48,7 +48,7 @@ behaviour differs from 1.10f.
 - D2Common+0x6B2B0 MISSILE_EvaluateMissileFormula: arguments, level and id defaults, and the expression table guard match 1.13c; no change. The callback at 0x6B160 is not decompiled (Ghidra refuses the label), so its identity with MISSILE_GetCalcParamValue is unverified.
 - D2Common+0x26BA0 ITEMS_GetRunesTxtRecordFromItem: returns NULL unless the socketed inventory's signature is 0x1020304 (1.13c check added).
 - D2Common+0x28850 ITEMS_CalculateAdditionalCostsForBonusStats: all encode cases match the 1.13c arithmetic; encode 2/3 skips the stat when the skill record is missing (1.13c's null read contributes zero).
-- D2Common+0x2C910 ITEMS_UpdateSets: body matches; the 1.13c routing through 0x2C7C0 and 0x2C630 is ported in src/core/d2common/d2common_2c910.cpp (d2_fn_d2common_2c910); the play path still calls this 1.10f-routed copy.
+- D2Common+0x2C910 ITEMS_UpdateSets: body matches; the 1.13c routing through 0x2C7C0 and 0x2C630 is ported in src/core/d2common/d2common_2c910.cpp (D2Common_2C910_UpdateSets); the play path still calls this 1.10f-routed copy.
 - D2Game+0x68D70 OBJECTS_OperateFunction06_TowerTome (QUESTS/ACT1/A1Q5.cpp): returns 0 on every path (1.10f returned 1 after activating the tome); validated against the vector.
 - D2Game+0x5CD50 OBJECTS_OperateFunction67_FrozenAnya (QUESTS/ACT5/A5Q3.cpp): returns 0 on every path (1.10f returned 1 when the quest is missing and at the end).
 - D2Game+0x56B10 (QUESTS/ACT5/A5Q3.cpp `ACT5Q3_QuestSeqHelper`): the quest-sequence tail that 0x5C690 ACT5Q3_SpawnDrehyaInTown calls is its own function in 1.13c; split out of the 1.10f body, same behaviour.
@@ -92,3 +92,4 @@ behaviour differs from 1.10f.
 
 - D2Game+0xA34E0 (d2game_batch_9eeb0.cpp): callee argument slots corrected against the disassembly (10785/10945 take s2, 10807/10945 take s1). D2Game+0xA39E0: port renamed d2game_a39e0_gate so the FN probe owns d2_fn_d2game_a39e0.
 - D2Game+0x11A70 (ITEMS/Items.cpp D2GAME_DropItemAtUnit_6FC4FEC0): the drop spot comes from D2GAME_GetFreeSpaceEx (0xE930) on the unit coords, not the 1.10f COLLISION free-coordinates search at (x+2,y+3); the ObjMode DropItemWithCodeAndQuality copy was wrongly marked with this RVA.
+- D2Common+0x3A330 AddStat: the real ABI is stdcall(list, statId, delta, layer); STATLIST_MergeBaseStats (0x3A600) and the 0x47EF0/0x47FA0/0x475E0 batches now pass the layer through D2Common_3A330_AddStatLayer (the old 3-argument call passed the stat id as the packed key). D2Common+0x39140 is the vendored STATLIST_GetStatValue (stdcall list, id, layer); its separate batch copy was removed. D2Common+0x45F90 (d2common_45f90.cpp), +0x2C630 (d2common_2c630.cpp) and +0x2C910 (D2Common_2C910_UpdateSets) are real ports with FN descriptors.

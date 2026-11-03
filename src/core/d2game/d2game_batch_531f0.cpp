@@ -68,9 +68,11 @@ D2GameBatch531F0Env g_d2game531F0Env{};  // seams are assigned by the play path;
 // ACT5_Counter_Bump: idx = FUN_6fc78260(obj); if idx >= 0, the counter at block+0x114+idx*4 goes up by one,
 // and when it passes 4 the flag byte at block+0x108+idx is set.
 // 1.13c D2Game+0x59360
-void d2game_59360(void* obj) {
+// eaxOut (optional): retail's EAX at return, which is idx (the callee's result is never overwritten); only the FN probe reads it.
+void d2game_59360(void* obj, uint32_t* eaxOut) {
     auto& E = g_d2game531F0Env;
     int32_t idx = E.counterIndex(obj);
+    if (eaxOut) *eaxOut = (uint32_t)idx;
     if (idx < 0) return;
     uint8_t* blk = E.counterBlock(obj);
     int32_t v;
@@ -247,26 +249,31 @@ uint32_t d2game_57900(const D2GameBatch531F0Env& E, void* game, void* client) {
 }
 
 // 1.13c D2Game+0x57A60 (fastcall: obj = param_1 (this), msg = param_2)
-// Ordinal_10174(uVar1) has its arguments lost in the decompile; (0x25,0) is assumed, by analogy with 0x57900.
-void d2game_57A60(const D2GameBatch531F0Env& E, void* obj, void* msg) {
+// The decompile loses the two saved quest queries: the results of (rec, obj+0xE0, 0) and (rec, obj+0xE0, 0xD) are kept in
+// locals and gate the final send (saved0 == 1 exits, class >= 4 with saved13 == 0 exits). Ordinal_10174(uVar1) lost its
+// arguments: (0x25, 0). eaxOut (optional): retail's EAX at return (a void function; the register is residue the FN
+// vector records), read from the disassembly exit by exit; the 0x33EB0 send leaves its own return, 0 in the recording.
+void d2game_57A60(const D2GameBatch531F0Env& E, void* obj, void* msg, uint32_t* eaxOut) {
+    uint32_t eax = 0;
+    struct Out { uint32_t* p; uint32_t& v; ~Out() { if (p) *p = v; } } out{eaxOut, eax};
     void* game = E.ptr(obj, 4);
     void* client = E.ptr(msg, 0xc);
     uint32_t rec = E.questRec(client, E.rd8(game, 0x6d));
-    E.ord10174(rec, E.rd32(obj, 0xe0), 0);
-    E.ord10174(rec, E.rd32(obj, 0xe0), 0xd);
+    int32_t saved0 = E.ord10174(rec, E.rd32(obj, 0xe0), 0);
+    int32_t saved13 = E.ord10174(rec, E.rd32(obj, 0xe0), 0xd);
     void* m8 = E.ptr(msg, 8);
     int32_t kind = (m8 == nullptr) ? -1 : (int32_t)E.rd32(m8, 4);
-    if (E.ord10174(rec, 0x25, 0) == 0 && E.ord10174(rec, 0x25, 1) == 0) return;
+    if (E.ord10174(rec, 0x25, 0) == 0 && (eax = (uint32_t)E.ord10174(rec, 0x25, 1)) == 0) return;
     uint32_t target = E.rd32(msg, 0x14);
     if (kind == 0x200 && E.rd8(obj, 0xc) == 1) {
-        if (E.ord10174(rec, E.rd32(obj, 0xe0), 1) == 0 && E.ord10174(rec, E.rd32(obj, 0xe0), 0) == 0) {
-            E.c33EB0(obj, target, 0x200);
-        }
+        if ((eax = (uint32_t)E.ord10174(rec, E.rd32(obj, 0xe0), 1)) != 0) return;
+        if ((eax = (uint32_t)E.ord10174(rec, E.rd32(obj, 0xe0), 0)) != 0) return;
+        eax = 0; E.c33EB0(obj, target, 0x200);
         return;
     }
-    if (E.ord10174(rec, E.rd32(obj, 0xe0), 1) != 0) {
+    if ((eax = (uint32_t)E.ord10174(rec, E.rd32(obj, 0xe0), 1)) != 0) {
         E.ord10174(rec, 0x26, 4);  // retail queries it and sends either way
-        E.c33EB0(obj, target, kind);
+        eax = 0; E.c33EB0(obj, target, kind);
         return;
     }
     void* m12 = E.ptr(msg, 0xc);
@@ -274,15 +281,20 @@ void d2game_57A60(const D2GameBatch531F0Env& E, void* obj, void* msg) {
     uint32_t n = E.rd16(obj, 0x9c);
     for (uint32_t i = 0; i < n; ++i) {
         if ((int32_t)E.rd32(obj, 0x1c + i * 4) == id) {
-            E.c33EB0(obj, target, kind);
+            eax = 0; E.c33EB0(obj, target, kind);
             return;
         }
     }
+    eax = n;                                  // the loop counter ran up to n
+    if (saved0 == 1) return;
     uint8_t cls = E.rd8(obj, 0xc);
-    if (cls < 4 && E.rd8(obj, 9) != 0) {
-        uint32_t t = E.tableCaa8(cls);
-        if (t != 0xffffffffu && t < 8) E.c33EB0(obj, target, kind);
-    }
+    eax = (eax & ~0xffu) | cls;               // mov al, [obj+0xC]
+    if (cls >= 4 && saved13 == 0) return;
+    if (E.rd8(obj, 9) == 0) return;
+    uint32_t t = E.tableCaa8(cls);
+    eax = t;
+    if (t == 0xffffffffu || t >= 8) return;
+    eax = 0; E.c33EB0(obj, target, kind);
 }
 
 // 1.13c D2Game+0x586C0 (fastcall: game = param_1, msg = param_2). Ordinal_10920 arg lost, taken as msg.
@@ -312,34 +324,35 @@ uint32_t d2game_586C0(const D2GameBatch531F0Env& E, void* game, void* msg) {
     return 0;
 }
 
-// 1.13c D2Game+0x587C0 (fastcall: obj = param_1, msg = param_2). The decompile's one-argument
-// Ordinal_10174 call has its result unused and is a read-only query, so it is dropped.
-uint32_t g_q5Eax33EB0 = 0;  // EAX at the 0x33EB0 call: 3 on the quest-flag path, else the table word (the capture hook logs it as 0)
-void d2game_587C0(const D2GameBatch531F0Env& E, void* obj, void* msg) {
-    // Delta from the decompile (checked against the 1.13c bytes): the kind sent is msg->+8->+4 (-1 when +8 is null), the 0xd query
-    // result gates modes >= 4, and the quest-flag path calls with EAX = 3.
+// 1.13c D2Game+0x587C0 (fastcall: obj = param_1, msg = param_2). The decompile mis-types two locals: the value sent is the
+// message kind (msg+8 then +4, -1 when null, read before the (e0,1) query), not obj+0xE0, and the (e0,0xD) query result is kept
+// and gates the class >= 4 exit. eaxOut (optional): retail's EAX at return (void function; residue the FN vector records).
+void d2game_587C0(const D2GameBatch531F0Env& E, void* obj, void* msg, uint32_t* eaxOut) {
+    uint32_t eax = 0;
+    struct Out { uint32_t* p; uint32_t& v; ~Out() { if (p) *p = v; } } out{eaxOut, eax};
     void* game = E.ptr(obj, 4);
     uint32_t rec = E.questRec(E.ptr(msg, 0xc), E.rd8(game, 0x6d));
-    int32_t iv3 = E.ord10174(rec, E.rd32(obj, 0xe0), 0);
-    int32_t v14 = E.ord10174(rec, E.rd32(obj, 0xe0), 0xd);
-    void* a8 = E.ptr(msg, 8);
-    int32_t kind = a8 ? (int32_t)E.rd32(a8, 4) : -1;
-    int32_t iv4 = E.ord10174(rec, E.rd32(obj, 0xe0), 1);
-    if (iv4 != 0) {
-        if (E.ord10174(rec, E.rd32(obj, 0xe0), 5) != 0) return;
-        g_q5Eax33EB0 = 3;
+    int32_t saved0 = E.ord10174(rec, E.rd32(obj, 0xe0), 0);
+    int32_t saved13 = E.ord10174(rec, E.rd32(obj, 0xe0), 0xd);
+    void* m8 = E.ptr(msg, 8);
+    int32_t kind = (m8 == nullptr) ? -1 : (int32_t)E.rd32(m8, 4);
+    uint32_t e0 = E.rd32(obj, 0xe0);
+    eax = (uint32_t)E.ord10174(rec, e0, 1);
+    if (eax != 0) {
+        eax = (uint32_t)E.ord10174(rec, e0, 5);
+        if (eax != 0) return;
     } else {
-        if (iv3 == 1) return;
-        uint8_t m = E.rd8(obj, 0xc);
-        if (m >= 4 && v14 == 0) return;
+        if (saved0 == 1) return;
+        uint8_t cls = E.rd8(obj, 0xc);
+        eax = cls;                            // eax was 0: mov al, [obj+0xC]
+        if (cls >= 4 && saved13 == 0) return;
         if (E.rd8(obj, 9) == 0) return;
-        uint32_t t = E.tableB2d8(m);
-        if (t == 0xffffffffu) return;
-        if (t >= 8) return;
-        g_q5Eax33EB0 = t;
+        uint32_t t = E.tableB2d8(cls);
+        eax = t;
+        if (t == 0xffffffffu || t >= 8) return;
     }
+    eax = 0;                                  // the 0x33EB0 send leaves its own return (0 in the recording)
     E.c33EB0(obj, E.rd32(msg, 0x14), kind);
-    g_q5Eax33EB0 = 0;
 }
 
 // 1.13c D2Game+0x596B0 (fastcall: obj = ECX, msg = EDX; ported from the disassembly: the call passes the
@@ -816,19 +829,19 @@ uint32_t D2G5_57900_probe(void* game, void* cl, void* arr, uint32_t* lg, const u
 {
     HookEnv h(lg, sc); q5Arr = arr; D2GameBatch531F0Env e = mkE5(h); return d2game_57900(e, game, cl);
 }
-void D2G5_57A60_probe(void* obj, void* msg, void* arr, const uint32_t* tc, uint32_t* lg, const uint32_t* sc)
+void D2G5_57A60_probe(void* obj, void* msg, void* arr, const uint32_t* tc, uint32_t* lg, const uint32_t* sc, uint32_t* eax)
 {
-    HookEnv h(lg, sc); q5Arr = arr; q5Tc = tc; D2GameBatch531F0Env e = mkE5(h); d2game_57A60(e, obj, msg);
+    HookEnv h(lg, sc); q5Arr = arr; q5Tc = tc; D2GameBatch531F0Env e = mkE5(h); d2game_57A60(e, obj, msg, eax);
 }
 uint32_t D2G5_586C0_probe(void* game, void* msg, void* arr, uint32_t* lg, const uint32_t* sc)
 {
     HookEnv h(lg, sc); q5Arr = arr; D2GameBatch531F0Env e = mkE5(h); return d2game_586C0(e, game, msg);
 }
-void D2G5_587C0_probe(void* obj, void* msg, void* arr, const uint32_t* tb, uint32_t* lg, const uint32_t* sc)
+void D2G5_587C0_probe(void* obj, void* msg, void* arr, const uint32_t* tb, uint32_t* lg, const uint32_t* sc, uint32_t* eax)
 {
-    HookEnv h(lg, sc); q5Arr = arr; q5Tb = tb; D2GameBatch531F0Env e = mkE5(h); d2game_587C0(e, obj, msg);
+    HookEnv h(lg, sc); q5Arr = arr; q5Tb = tb; D2GameBatch531F0Env e = mkE5(h); d2game_587C0(e, obj, msg, eax);
 }
-void D2G5_59360_probe(void* obj, uint32_t* lg, const uint32_t* sc)
+void D2G5_59360_probe(void* obj, uint32_t* lg, const uint32_t* sc, uint32_t* eax)
 {
-    HookEnv h(lg, sc); D2GameBatch531F0Env e = mkE5(h); g_d2game531F0Env = e; d2game_59360(obj); g_d2game531F0Env = D2GameBatch531F0Env{};
+    HookEnv h(lg, sc); D2GameBatch531F0Env e = mkE5(h); g_d2game531F0Env = e; d2game_59360(obj, eax); g_d2game531F0Env = D2GameBatch531F0Env{};
 }
