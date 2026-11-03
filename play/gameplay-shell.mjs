@@ -6830,9 +6830,11 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
     }
     if (npcMenu?.open) return Boolean(npcMenu.entryAt(x, y));
     const W = canvas.width, H = canvas.height;
+    if (controlsPanel?.open) return Boolean(controlsPanel.hitAt?.(x, y, W, H));
     if (helpVisible && helpRenderer) return Boolean(helpRenderer.hitClose(x, y, W, H));
     if (messageVisible && messageLogRenderer) return Boolean(messageLogRenderer.hitClose(x, y, W, H) || messageLogRenderer.hitScroll(x, y, W, H));
     if (questVisible && questLogRenderer && questEvidence) return Boolean(questLogRenderer.hit(x, y, W, H, questEvidence.tabs, questEvidence.act));
+    if (skillsVisible && snapshot) return Boolean(panelCloseAt(x, y, W, H, { skills: { playerClass: snapshot.playerClass, tab: skillPanelRenderer?.tab } }));
     return null;
   },
   touchPickAt(x, y) {

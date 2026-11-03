@@ -277,6 +277,7 @@ export function createConfigureControls({ read, palettePath = () => 'data\\globa
   return {
     get open() { return open; },
     get bindings() { return committed.map((b) => (b ? [...b] : null)); },
+    hitAt(px, py, width, height) { return open ? hit(px, py, width, height) : null; },
     isBound(functionName, code) { return controlBindingMatches(committed, functionName, code); },
     actionFor(code) { return controlActionForKey(committed, code); },
     get evidence() { return { open, stop: scrollIndex, scrollIndex, firstSlot: scrollIndex, thumbY: thumbYForScrollIndex(scrollIndex),
