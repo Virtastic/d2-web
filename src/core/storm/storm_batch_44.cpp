@@ -50,12 +50,18 @@ void Storm_FreeLibrary(void*) {}
 void setErr(uint32_t e) { g_lastError = (int32_t)e; SetLastError(e); }
 }
 
-// 1.13c Storm+0x17B30: validate a 'MO' (0x4F4D) object with subtype 0; drop it from the current-global, free +0xC, clear list.
+// 1.13c Storm+0x17B30 (disassembly, not the decompile): stdcall ret 4, one arg O. O must carry tag 0x4F4D and a subtype
+// below 1 (cmp ax,1 jae). g_45824[subtype] == O clears that slot; a nonzero +0xC is freed via 1B960 (SGDI.CPP, 0x117) and
+// cleared; then 4DA0 runs with ESI = O (its stack word is the list 0x6FC45A0C, unused while ESI != 0). Returns 1, else 0.
+extern "C" uint32_t storm_4da0(int param_1, int* self, void (*dtor_4d60)(int*), void (*free_)(void*, const char*, int));
+void Storm_Sub4D60(uint8_t* node);
+static void s17b30_4d60(int* p) { Storm_Sub4D60((uint8_t*)p); }
+static void s17b30_free(void* p, const char* f, int l) { Storm_Sub1B960(p, f, l); }
 uint32_t Storm_Sub17B30(uint8_t* o) {
-    if (o && *(int16_t*)(o + 8) == 0x4F4D && *(int16_t*)(o + 10) == 0) {
+    if (o && *(int16_t*)(o + 8) == 0x4F4D && *(uint16_t*)(o + 10) < 1) {
         if (g_45824 == o) g_45824 = nullptr;
         if (*(void**)(o + 0xC)) { Storm_Sub1B960(*(void**)(o + 0xC), "..\\3rdParty\\STORM\\SOURCE\\SGDI.CPP", 0x117); *(void**)(o + 0xC) = nullptr; }
-        Storm_Sub4DA0(nullptr);
+        storm_4da0(0x6FC45A0C, (int*)o, s17b30_4d60, s17b30_free);
         return 1;
     }
     return 0;
