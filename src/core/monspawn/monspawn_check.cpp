@@ -6,6 +6,7 @@
 // units that hang off the rooms exactly as the retail capture tool does (D2VecMonUnit from `room` on).
 #include <emscripten.h>
 #include "warp_interaction.h"
+#include "object_client_clock.h"
 #include <algorithm>
 #include <cstdint>
 #include <set>
@@ -7630,14 +7631,10 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
                         ClientObjectClock& c = clientObjectClock(animUnit);
                         const D2ObjectsTxt* ot = animUnit->pObjectData->pObjectTxt;
                         const bool cycling = c.shown < 8 && ot->nCycleAnim[c.shown];
-                        if (!ot->nIsDoor && !cycling && c.count > 256) {
-                            if (c.shown == 1 && c.clock >= c.count - 256) { setClientObjectShown(c, ot, 2); continue; }
-                            c.clock += c.speed;
-                            if (c.clock >= c.count) c.clock = c.count - 256;
-                            continue;
-                        }
-                        c.clock += c.speed;
-                        if (c.count > 0 && c.clock >= c.count) c.clock -= c.count;
+                        d2::object_clock::State st{c.shown, c.clock, c.count, c.speed};
+                        const bool toOn = d2::object_clock::step(st, ot->nIsDoor != 0, cycling);
+                        c.clock = st.clock;
+                        if (toOn) setClientObjectShown(c, ot, 2);
                         continue;
                     }
                     if (animUnit->dwFrameCountPrecise > 0) {
