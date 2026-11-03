@@ -44,8 +44,8 @@ constexpr const char* kSFileCpp = "..\\3rdParty\\STORM\\SOURCE\\SFILE.CPP";
 extern "C" int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);        // SMemFree
 void Storm_Sub3EF0(uint8_t* p);                                         // file-object destructor
 void Storm_Sub3FC0(uint8_t* p);                                         // handle-record destructor
-void Storm_Sub3E20(uint8_t* p);                                         // archive-object destructor
-void Storm_Sub4040(uint8_t* p);                                         // request-record destructor
+void Storm_Sub3E20(uint32_t p);                                         // archive-object destructor
+extern "C" void Storm_Sub4040(uint32_t o);                                 // request-record destructor (C linkage: storm_4040.cpp)
 void Storm_Sub27EF0(int32_t a, int32_t b);
 int32_t Storm_Sub28960(void* a, uint32_t* b, uint8_t flags, uint32_t* d);
 void Storm_Sub2FB30(const char* type, const char* name);                // "handle never released"
@@ -236,13 +236,13 @@ uint32_t Storm_Sub27020(void) {
         }
     }
     if (g_obj43108 != 0) {
-        Storm_Sub4040((uint8_t*)(uintptr_t)g_obj43108);
+        Storm_Sub4040((uint32_t)(uintptr_t)g_obj43108);
         Storm_Sub1B960((void*)(uintptr_t)g_obj43108, "delete", -1);
         g_obj43108 = 0;
     }
     while ((int32_t)g_list45978 > 0) {
         uint32_t p = g_list45978;
-        Storm_Sub4040((uint8_t*)(uintptr_t)p);
+        Storm_Sub4040((uint32_t)(uintptr_t)p);
         Storm_Sub1B960((void*)(uintptr_t)p, "delete", -1);
     }
     while ((int32_t)g_list459CC > 0) {
@@ -260,7 +260,7 @@ uint32_t Storm_Sub27020(void) {
     while ((int32_t)g_list45984 > 0) {
         uint32_t p = g_list45984;
         Storm_Sub2FB30("HSARCHIVE", (const char*)(uintptr_t)(g_list45984 + 2));
-        Storm_Sub3E20((uint8_t*)(uintptr_t)p);
+        Storm_Sub3E20(p);
         Storm_Sub1B960((void*)(uintptr_t)p, "delete", -1);
     }
     if (g_ptr43120 != 0) {

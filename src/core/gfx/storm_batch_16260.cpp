@@ -401,8 +401,9 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1da10(uint32_t* r) {
     int32_t mode = (int32_t)r[6];
     int32_t param7 = (int32_t)r[7];
     uint32_t ok = (hwnd != nullptr && ids != nullptr && param4 != 0 && exts != nullptr) ? 1u : 0u;
-    if ((uint32_t)(-(int32_t)ok) & (uint32_t)(((int32_t)exts[0] < 1) - 1) &
-        (uint32_t)(((int32_t)exts[1] < 1) - 1)) {
+    // exts is read only when non-null (retail reads it unconditionally; a null here already fails ok)
+    int32_t e0 = exts ? (int32_t)exts[0] : 0, e1 = exts ? (int32_t)exts[1] : 0;
+    if ((uint32_t)(-(int32_t)ok) & (uint32_t)((e0 < 1) - 1) & (uint32_t)((e1 < 1) - 1)) {
         ok = 1;
     } else {
         ok = 0;

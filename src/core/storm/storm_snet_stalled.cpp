@@ -202,13 +202,13 @@ int32_t Storm_Sub11F10Full(const uint32_t* in3c, uint32_t* out3c, const uint32_t
     out3c[0] = 0x3c;
     if (!out3c[1]) out3c[1] = A(kEmpty);
     if (!out3c[2]) {
-        // 0x11AF0: "<prefix> " + the info override string (ProductVersion has no wasm source)
+        // 0x11AF0: "<prefix> " then the module's ProductVersion (FUN_6fc2ae00). The web build has no version
+        // resource, so retail's GetFileVersionInfoA failure path is the contract here: the prefix and a space only.
         const char* pre = (const char*)P(out3c[1]);
         size_t n = std::strlen(pre) < 0xfe ? std::strlen(pre) : 0xfe;
         std::memcpy(g_463f0, pre, n);
         g_463f0[n] = ' ';
         g_463f0[n + 1] = 0;
-        std::strncat(g_463f0, pre, sizeof g_463f0 - n - 2);
         out3c[2] = A(g_463f0);
     }
     if (!out3c[0xb]) out3c[0xb] = A(kEmpty);

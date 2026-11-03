@@ -15,7 +15,7 @@
 // ---- seams: callees owned by other rows -------------------------------------------------------
 extern "C" void*   Storm_Sub1C580(uint32_t size, const char* tag, int32_t line, uint32_t flags);   // SMemAlloc
 extern "C" int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);                        // SMemFree
-int32_t Storm_Sub4040(void* p);                                                         // request-record dtor
+extern "C" void Storm_Sub4040(uint32_t o);                                               // request-record dtor (C linkage: storm_4040.cpp)
 void    Storm_Sub4D60(void* node);                                                      // list unlink
 uint32_t Storm_Sub4250(void* listHead);                                                 // list next
 void    Storm_Sub2FB30(const char* type, const char* name);
@@ -559,7 +559,7 @@ uint32_t Storm_Sub29200(void) {
         uint32_t ev = U(r, 8);
         EnterCriticalSection(&g_45988);
         if (U(N(g_43108), 0x38) != 0) {
-            Storm_Sub4040(N(g_43108));
+            Storm_Sub4040((uint32_t)(uintptr_t)N(g_43108));
             Storm_Sub1B960(N(g_43108), "delete", -1);
         }
         g_43108 = 0;

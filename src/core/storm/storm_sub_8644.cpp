@@ -47,7 +47,7 @@ int Storm_8644(S8644Env& e, uint32_t locale, uint32_t flags, const char* src, in
         free(w);
         return r;
     }
-    if (e.mode != 0) {
+    {  // mode 0 (probe failed with an error other than 0x78) and mode 2 both take the code-page path
         if (!locale) locale = e.defLocale;
         if (!cp) cp = e.defCodePage;
         int32_t lcp = e.LocaleCodePage(locale);

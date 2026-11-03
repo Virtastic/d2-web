@@ -1,7 +1,7 @@
 // 1.13c Storm+0x271D0: merge request node b (ESI) into the preceding node a (EAX) when b is the
 // contiguous continuation (same +0x24 key, a.+0x10 + b.+0x34 == ... see spec). Then unlink + free b.
 #include <cstdint>
-void Storm_Sub4040(int* node);                                  // Storm+0x4040 (unlink)
+extern "C" void Storm_Sub4040(uint32_t o);                       // Storm+0x4040 (unlink; C linkage: storm_4040.cpp)
 void sub_1B960(int* esi, const char* name, int n);              // Storm+0x1B960 (SMemFree)
 
 // 1.13c Storm+0x271D0
@@ -13,6 +13,6 @@ void Storm_Sub271D0(int* a /*EAX*/, int* b /*ESI*/) {
     if (b[0x10] || b[0xf] || b[0xc] || a[0xf] || b[10] || a[0xc] || a[10] || b[2]) return;
     a[4] = b[4]; a[5] = b[5]; a[6] = b[6]; a[8] = b[8];
     a[0xd] = b[0xd] + a[0xd];
-    Storm_Sub4040(b);
+    Storm_Sub4040((uint32_t)(uintptr_t)b);
     sub_1B960(b, "delete", -1);
 }

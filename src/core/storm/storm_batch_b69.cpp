@@ -117,3 +117,6 @@ void sub_52D0(intptr_t* p) {
     for (int i = 3; i >= 0; i--) storm_52d0_elem(b + off + i * 0xc);
   sub_4B80(p);
 }
+
+// C-linkage entry for the 0x4B80 base release (the storm_4040 port and its probe call this symbol).
+extern "C" void Storm_Sub4B80(uint32_t o) { sub_4B80((void*)(uintptr_t)o); }

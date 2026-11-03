@@ -80,9 +80,9 @@ int32_t Storm_Sub11C90(uint32_t* head, uint32_t arg, int32_t* cnt, uint32_t** ou
 // each provider appended to the list at 0x6FC45A48). The web build has no .snp modules, so the
 // scan finds nothing: only the once-flag (0x6FC45844) is set.
 void Storm_Sub169A0(void) { g_45844 = 1; }
-void Storm_Sub12740(void* a);
 }  // namespace
-uint32_t Storm_Sub12690(void);  // storm_snet_n16.cpp (32-bit record address)
+uint32_t Storm_Sub12690(void);  // storm_snet_n16.cpp (32-bit record address; main's signature kept)
+void Storm_Sub12740(void* a);   // outside the anonymous namespace so the link finds it
 void Storm_Sub14F20(void);  // external: defined in storm_snet_stalled.cpp
 namespace {
 int32_t* Storm_SubFEB0(int32_t index);

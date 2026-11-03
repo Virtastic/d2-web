@@ -37,7 +37,7 @@ void StormSetLastError(uint32_t e) { g_lastError = (int32_t)e; }
 
 // ---- unmapped internals, retail argument order (seams) ----------------------------------------
 uint32_t* Storm_Sub4290(uint32_t* anchor, uint32_t, uint32_t);            // 0x4290 pool alloc
-int32_t Storm_Sub4040(void* p);                                            // 0x4040 pool free
+extern "C" void Storm_Sub4040(uint32_t o);                                  // 0x4040 pool free (C linkage: storm_4040.cpp)
 int32_t Storm_SubB960(void* p, const char* tag, int32_t line);             // 0xB960 operator delete
 void Storm_Sub179F0(int32_t h);                                            // 0x179F0 stream close
 void Storm_SubD4D0(void);                                                  // 0x1D4D0
@@ -138,7 +138,7 @@ void Storm_Sub28370(int32_t param_1) {
                 puVar3[2] = (uint32_t)piVar2[2];
             }
             uint32_t uVar1 = (uint32_t)piVar2[1];
-            Storm_Sub4040(piVar2);
+            Storm_Sub4040((uint32_t)(uintptr_t)piVar2);
             Storm_SubB960(piVar2, "..\\AUREQUEST", -2);
             piVar2 = (int32_t*)(intptr_t)(((int32_t)uVar1 < 1) ? uVar1 : 0u);
         } else {
@@ -501,7 +501,7 @@ LAB_197dd:
             EnterCriticalSection(&g_lock);
             StormCloseHandle(hHandle);
             result += (int32_t)rd32(puVar9, 0x3c);
-            Storm_Sub4040(puVar9);
+            Storm_Sub4040((uint32_t)(uintptr_t)puVar9);
             Storm_SubB960(puVar9, "delete", -1);
         }
         uint32_t uVar10 = param_3;
@@ -600,7 +600,7 @@ void Storm_Sub15F30(uint32_t key, uint32_t* table);                        // 0x
 void Storm_Sub15E50(uint32_t count);                                       // 0x15E50 count init
 void Storm_Sub16CB0(uint32_t* rec);                                        // 0x16CB0 teardown
 void Storm_Sub19F60(uint8_t* rec, void* blockTable, int32_t count);        // 0x19F60 post-open
-void Storm_Sub3E20(void* rec);                                             // 0x3E20 free archive
+void Storm_Sub3E20(uint32_t rec);                                             // 0x3E20 free archive
 void Storm_Sub181F0(uint8_t* rec);                                         // 0x181F0 release buffer
 int32_t Storm_Sub19DF0(uint32_t magic, int32_t* size);                     // 0x19DF0 find chunk
 uint32_t* Storm_Sub4310(uint32_t* anchor, uint32_t, uint32_t);             // 0x4310 alloc stream
@@ -677,7 +677,7 @@ uint32_t Storm_SFileOpenArchive_2A0B0(uint32_t* param_1, uint32_t param_2, uint3
             DWORD local_11c = 0;
             StormReadFile(hFile, local_118, 0x1000, &local_11c);
             if (local_11c < 0x20) {
-                Storm_Sub3E20(rec);
+                Storm_Sub3E20((uint32_t)(uintptr_t)rec);
                 Storm_SubB960(rec, "delete", -1);
                 g_lastError = 0x8510006c;
                 StormSetLastError(0x8510006c);

@@ -46,11 +46,12 @@ extern "C" void storm_lock10(void (*lock)(int)) { lock(10); }
 extern "C" char *storm_strcat(char *dst, const char *src) { strcat(dst, src); return dst; }
 
 // 1.13c STORM+0x9F15: _getdcwd; drive 0 = current. getcwd/fullpath are seams for the two Win32 calls,
-// each returns the length (0 = failure). validdrive failure -> errno 0xd (EACCES-ish), alloc fail 0xc, too small 0x22.
+// each returns the length (0 = failure). validdrive failure sets _tdoserrno 0xf (doserr, nullable) and errno 0xd;
+// alloc fail 0xc, too small 0x22.
 extern "C" char *storm_getdcwd(uint32_t drive, char *buf, size_t len, int (*validdrive)(uint32_t),
-                               uint32_t (*get_path)(uint32_t drive, char *out260), int *err) {
+                               uint32_t (*get_path)(uint32_t drive, char *out260), int *err, int *doserr) {
     char tmp[0x104];
-    if (drive && !validdrive(drive)) { *err = 0xd; return nullptr; }
+    if (drive && !validdrive(drive)) { if (doserr) *doserr = 0xf; *err = 0xd; return nullptr; }
     uint32_t n = get_path(drive, tmp);
     if (n == 0 || n + 1 >= 0x105) return nullptr;
     uint32_t sz = n + 1;
