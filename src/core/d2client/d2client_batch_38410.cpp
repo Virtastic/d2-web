@@ -11,7 +11,9 @@ void sub_38410(Services& api,uint32_t* p,uint32_t vtA,uint32_t vtB){ p[0]=vtA; i
 void sub_38770(Services& api,uint32_t* p,uint32_t vt,uint32_t baseVt){
  p[0]=vt; if(p[10]){api.ord10043(0x8e,0);p[10]=0;} if(p[11]){api.ord10043(0x93,0);p[11]=0;}
  int32_t v; std::memcpy(&v,reinterpret_cast<uint8_t*>(p)+0x52,4); api.ord10065(v); if(v)api.ord10043(0x7a,0); p[0]=baseVt; }
-// 1.13c D2Client+0x38AD0
+// 1.13c D2Client+0x38AD0 (stdcall msg, ret 4). The bind word is compared with the msg+8
+// DWORD; retail's command test is signed cmd < 0x39 (and <= 0xDF) with no lower bound: a negative cmd would read the handler before
+// the table at 0xF4F10. No shipped bind holds one; the port takes it as no match (c>=0).
 void sub_38AD0(State& s,uint8_t* msg){
  uint32_t key; std::memcpy(&key,msg+8,4); unsigned i=0;
  for(;i<kBinds;++i){ int32_t c=s.binds[i].cmd; if(s.binds[i].key==key && c!=0xffff && c<=0x38 && c>=0 && s.cmds[c].handler) break; }

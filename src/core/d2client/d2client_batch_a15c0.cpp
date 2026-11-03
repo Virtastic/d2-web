@@ -171,19 +171,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2client_a1860(uintptr_t unit, uint32
     }
 }
 
-// 1.13c D2Client+0xA1A50 (117 B): scan with flags|0xA280 and the 0x509F0 filter; clears *out.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2client_a1a50(uintptr_t unit, uint32_t radius, uint32_t flags, int32_t limit, uint32_t* out, const Env* e) {
-    if (!flags) flags = 0x583;
-    d2_fn_d2client_a1860(unit, radius, flags | 0xA280, limit, e->cb509f0, e);
-    if (out) *out = 0;
-    return 0;
-}
-
-// 1.13c D2Client+0xA1AD0 (55 B): scan with flags|0xA783 and the 0x50740 filter.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2client_a1ad0(uintptr_t unit, uint32_t radius, uint32_t flags, int32_t limit, const Env* e) {
-    d2_fn_d2client_a1860(unit, radius, flags | 0xA783, limit, e->cb50740, e);
-    return 0;
-}
+// 0xA1A50 / 0xA1AD0: real register conventions live in d2client_a1a50.cpp / d2client_a1ad0.cpp (the old ports here followed a wrong decompile reading).
 
 // 1.13c D2Client+0xA1B10 (468 B): apply skill `idx`'s start handler to `unit` (EAX). param_3/4/5 are the
 // pair/byte; `swap` is the caller-pushed flag (unaff_retaddr), `ebx`/`ebp` the register-passed flags.

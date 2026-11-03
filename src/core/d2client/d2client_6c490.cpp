@@ -94,6 +94,7 @@ EMSCRIPTEN_KEEPALIVE i32 d2c_6c490(const D2c6C490Env* e, u32 unit, u32 cls, u32 
         }
         (void)g17c8; (void)type; (void)st; (void)pal;
     }
+    if (xy[1]) e->f6aee0(unit, 0, 0, -1, -1, hid);   // 6C490 tail: the closing 6AEE0 call (b=0) after the component loop, guarded as the opening one
     if (hid) e->ord10083(xy[0]);
     return 1;
 }

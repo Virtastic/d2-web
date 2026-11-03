@@ -105,18 +105,7 @@ void d2_client_a5600(uintptr_t eax, const D2ClientA4b60Env* e) {
     e->o10739(a, x, y, 0);
 }
 
-// 1.13c D2Client+0xA56C0 (caller 0xA6070): EAX = index into the D2Common table (count +0xba0, base
-// +0xb98, stride 0x23c). byte rec+0x15 in 1..nclass-1 -> classify[byte]() != 0.
-extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t d2_client_a56c0(int32_t eax, const D2ClientA4b60Env* e) {
-    uintptr_t dt = e->rd_ptr(e->data_tables);
-    if (eax < 0 || eax >= (int32_t)e->rd32(dt + 0xba0)) return 0;
-    uintptr_t rec = (uintptr_t)eax * 0x23c + e->rd_ptr(dt + 0xb98);
-    if (!rec) return 0;
-    uint32_t b = e->rd32(rec + 0x15) & 0xff;
-    if (b == 0 || b >= e->nclass) return 0;
-    return e->classify[b]() != 0;
-}
+// 1.13c D2Client+0xA56C0 lives in d2client_a56c0.cpp (it also forwards ECX/EDX to the class handler).
 
 // 1.13c D2Client+0xA5720 (caller 0xA68E0): EAX = unit, stack param_1 = py, EBX = px, ESI = y bias,
 // EDI = rect struct (+0x1a0..+0x1ac). Hit test of (px,py) against the unit's transformed box.

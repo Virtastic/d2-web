@@ -190,7 +190,7 @@ void d2_client_a9860(int32_t flag, uintptr_t rec, int32_t ox, int32_t oy, int32_
     }
 }
 
-// 1.13c D2Client+0xA9A20 (297 B): ECX = this (only its top byte survives), EAX = flag. Outputs
+// earlier port of D2Client A9A20 (live port d2client_a9a20.cpp) (297 B): ECX = this (only its top byte survives), EAX = flag. Outputs
 // alpha + rgb. c9610/c9614 = DAT_6fbc9610 / bytes at 6fbc9614..16, c2e4 = DAT_6fbcc2e4,
 // a2130 = DAT_6fba2130, c3b8 = DAT_6fbcc3b8.
 extern "C" EMSCRIPTEN_KEEPALIVE
@@ -222,7 +222,7 @@ void d2_client_a9a20(uint32_t thiz, int32_t flag, uint32_t* oa, uint8_t* orr, ui
     *oa = a; *orr = c[0]; *og = c[1]; *ob = c[2];
 }
 
-// 1.13c D2Client+0xA9C90 (410 B): EBX = unit-id array, count (iStack_30, set by the caller),
+// earlier port of D2Client A9C90 (live port d2client_a9c90.cpp) (410 B): EBX = unit-id array, count (iStack_30, set by the caller),
 // localunit = DAT_6fbcbbfc. s[] mirrors the stack locals (30,2c,28,24,20); 0x10561 fills &s[1].
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_a9c90(int32_t param_1, const uint32_t* ids, int32_t count, uintptr_t localunit,
@@ -253,7 +253,7 @@ void d2_client_a9c90(int32_t param_1, const uint32_t* ids, int32_t count, uintpt
     }
 }
 
-// 1.13c D2Client+0xAA190 (141 B): release the three handles at DAT_6fbacdc1/c5/c9.
+// earlier port of D2Client AA190 (live port d2client_aa190.cpp) (141 B): release the three handles at DAT_6fbacdc1/c5/c9.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_aa190(uint32_t* h, void (*ord10065)(uint32_t), void (*ord10043)(uint32_t, uint32_t)) {
     for (int i = 0; i < 3; i++) {

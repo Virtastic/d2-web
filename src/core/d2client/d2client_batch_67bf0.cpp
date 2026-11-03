@@ -73,14 +73,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* d2_client_67d00(uint8_t* b, const D2Cli
     return b;
 }
 
-// 1.13c D2Client+0x67F20 -- wrapper ctor (ret 0x28: this + nine stack args): allocates 0x180776 bytes (Ordinal_401)
-// and forwards the nine stack args verbatim, in order, to 0x67D00 (disassembly: nine pushes of [esp+..] then the block)
-extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* d2_client_67f20(uint8_t* wrapper, uint8_t* alloc, const D2ClientListEnv* env,
-    uint32_t p2, uint32_t p3, uint32_t p4, uint32_t p5, uint32_t p6, uint32_t p7, uint32_t p8, uint32_t p9, char p10) {
-    uint8_t* o = alloc ? d2_client_67d00(alloc, env, p2, p3, p4, p5, p6, p7, p8, p9, p10) : nullptr;
-    wr<uint64_t>(wrapper, 8, (uint64_t)(uintptr_t)o);
-    return wrapper;
-}
+// 1.13c D2Client+0x67F20: ported in d2client_67f20.cpp (two vtable stores, the Storm allocator seam, a 32-bit this+8 store).
 
 static void clamp_scroll(uint8_t* b) {
     int32_t sel = rd<int32_t>(b, 0x180738), top = rd<int32_t>(b, 0x180730), vis = rd<int32_t>(b, 0x18074e);

@@ -459,6 +459,7 @@ EMSCRIPTEN_KEEPALIVE const char* d2_dg_walk_g() {
         [](uint32_t, int32_t x, int32_t y, const uint32_t*, uint32_t g) -> int32_t { gRec(10001, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, g}, y > 0 ? y : 0); return 1; },
         [](uint32_t, int32_t x, int32_t y, const uint32_t*, uint32_t g, uint32_t al) -> int32_t { gRec(10058, {0x100000u, (uint32_t)x, (uint32_t)y, 0x100000u, g, al}, y > 0 ? y : 0); return 1; }, unit666d0};
     d2c_9ee90(&e, kCtx);
+    gRec(10054, {});   // 1.13c D2Client+0x8B110 tail: Ordinal_10054() after the 4EE90 cell walk
     return g_gout.c_str();
 }
 }

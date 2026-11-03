@@ -5,16 +5,27 @@
 #include <initializer_list>
 #include <emscripten.h>
 
-// 1.13c D2Client+0x87F30 (173 B): out = {dx, 2*dy, 640}. x1/x0 and y1/y0 are the two coordinate pairs
-// fetched through Ordinal_10628; when the fetched type (local_8) is 0xA27 both x1 and y1 come from two
-// calls to ftol (0xCACC4, x first) instead.
+// 1.13c D2Client+0x87F30 (EDI = float out[3], stdcall unit, type, ret 8).
+// Ordinal_10628 (thunk 0xC21A, stdcall unit, POINT*) gives A = the player's position ([0x6FBCBBFC]) and B = the unit's.
+// type 0xA27: B is replaced by a projection computed on the x87 (53-bit control word, so C doubles are the same):
+// t = ((-2*Ax - 0.5*Bx) + Ay - By) * -0.4f, B.x = ftol(t), B.y = ftol((-2*Ax - (-2*t)) + Ay); _ftol2 (0xCACC4) truncates
+// to an int64 in EDX:EAX and the caller keeps EAX (the inputs are int32, so |v| < 2^35 and the int64 always holds). out = {(float)(B.x - Ax), (float)(2*(B.y - Ay)), 640.0f}, the differences int32-wrapped.
+static int32_t ftol87(double v) { return (int32_t)(uint32_t)(uint64_t)(int64_t)v; }
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_87f30(float* out, int32_t x1, int32_t x0, int32_t y1, int32_t y0, int32_t type,
-                     int32_t (*ftol)(void)) {
-    if (type == 0xa27) { x1 = ftol(); y1 = ftol(); }
+void d2_client_87f30(float* out, uint32_t player, uint32_t unit, int32_t type, void (*pos)(uint32_t unit, int32_t* pt)) {
+    int32_t a[2], b[2];
+    pos(player, a);
+    pos(unit, b);
+    int32_t bx = b[0], by = b[1];
+    if (type == 0xa27) {
+        const double c64 = (double)-0.4f, c68 = 0.5, c6c = -2.0, ax2 = (double)a[0] * c6c;
+        const double t = (((ax2 - (double)b[0] * c68) + (double)a[1]) - (double)b[1]) * c64;
+        bx = ftol87(t);
+        by = ftol87((ax2 - t * c6c) + (double)a[1]);
+    }
     out[2] = 640.0f;
-    out[0] = (float)(x1 - x0);
-    out[1] = (float)(y1 - y0) + (float)(y1 - y0);
+    out[0] = (float)(int32_t)((uint32_t)bx - (uint32_t)a[0]);
+    out[1] = (float)(2.0 * (double)(int32_t)((uint32_t)by - (uint32_t)a[1]));
 }
 
 // 1.13c D2Client+0x88440 (132 B): picks between two float constants ([0x6FB87568] / [0x6FB87578]).

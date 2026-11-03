@@ -17,11 +17,7 @@ struct Globals {   // D2Client globals by RVA (base 6fb40000)
 };
 struct Env {   // imported calls
  virtual ~Env() = default;
- virtual void* ownerStrA() = 0;                               // Ordinal_10003
- virtual bool  lookup53(int32_t) = 0;                         // Ordinal_10744(0xBCC38,0x35)
  [[noreturn]] virtual void fatal(int32_t msgId) = 0;          // Ordinal_10265+10024+_exit(-1)
- virtual void  strcat(void* dst, void* src) = 0;
- virtual void  buildLabel() = 0;                              // FUN 0x6330
  virtual uint32_t ownerKind(void*) = 0;                       // Ordinal_10584
  virtual Unit* itemAtCell(void* inv, uint32_t cx, uint32_t cy, int32_t* a, int32_t* b) = 0; // Ordinal_10801
  virtual void  itemSize(Unit*, uint8_t* w, uint8_t* h) = 0;   // Ordinal_10114
@@ -48,14 +44,7 @@ struct Env {   // imported calls
 };
 static inline int32_t clampNeg0(int32_t v) { return v < 0 ? 0 : v; }
 
-// 1.13c D2Client+0x933E0
-void sub_933E0(Env& e, void* dst) {
- void* a = e.ownerStrA();
- if (!e.lookup53(0x35)) e.fatal(0xc43);
- e.buildLabel();
- void* b = e.ownerStrA();
- e.strcat(dst, b); e.strcat(dst, a);
-}
+// 1.13c D2Client+0x933E0: ported in d2client_933e0.cpp (string ids 0xF9E/0x2B48, the item global and 0x56330's args).
 // 1.13c D2Client+0x945D0  (args GUESS: EAX=area, item or null, x, y, flags)
 void sub_945D0(Env& e, Globals& g, const Area* A, Unit* item, void* inv, int32_t x, int32_t y, uint32_t flag) {
  uint32_t cx = uint32_t(x - A->left) / A->cellW, cy = uint32_t(y - A->top) / A->cellH;

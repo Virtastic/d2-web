@@ -32,6 +32,7 @@ int32_t D2Client_BuildInflateTree(const uint32_t* lengths, uint32_t count,
         if (lengths[i]) sorted[offsets[lengths[i]]++] = i;
     const uint32_t realCount = offsets[maximum];
     uint32_t code = 0, symbol = 0, tableSize = 0;
+    uint32_t base = 0; // retail's entry base word persists: a 0xC0 filler keeps the last symbol base or link distance written
     int32_t level = -1, consumed = -static_cast<int32_t>(root);
     D2ClientInflateHuft* table = nullptr;
     for (uint32_t length = minimum; length <= maximum; ++length) {
@@ -64,7 +65,7 @@ int32_t D2Client_BuildInflateTree(const uint32_t* lengths, uint32_t count,
                     auto& link = tables[level - 1][index];
                     link.operation = static_cast<uint8_t>(width);
                     link.bits = static_cast<uint8_t>(root);
-                    link.value.base = static_cast<uint32_t>(table - &link);
+                    link.value.base = base = static_cast<uint32_t>(table - &link);
                 }
             }
             D2ClientInflateHuft entry{};
@@ -74,12 +75,13 @@ int32_t D2Client_BuildInflateTree(const uint32_t* lengths, uint32_t count,
                 const uint32_t value = sorted[symbol++];
                 if (value < simple) {
                     entry.operation = value < 256 ? 0 : 96;
-                    entry.value.base = value;
+                    base = value;
                 } else {
                     entry.operation = static_cast<uint8_t>(extra[value - simple] + 80);
-                    entry.value.base = bases[value - simple];
+                    base = bases[value - simple];
                 }
             }
+            entry.value.base = base;
             const uint32_t stride = uint32_t{1} << (length - consumed);
             for (uint32_t index = code >> consumed; index < tableSize; index += stride)
                 table[index] = entry;

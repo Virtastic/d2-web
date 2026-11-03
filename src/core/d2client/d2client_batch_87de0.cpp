@@ -21,9 +21,6 @@ struct D2cSnd87Env {
     void     (*ord10062)(void);   // per-node call in 88150 (args implicit in retail)
     void     (*ord10063)(void);
     void     (*fn87ed0)(int32_t now, uint32_t key, int32_t mode);
-    // Ordinal_10628: unit/pos query; retail's decompile of 0x881B0 is stack-garbled, modelled as point out.
-    void     (*ord10628)(uint32_t player, int32_t* x, int32_t* y);
-    int64_t  limit;               // _DAT_6fb87570 compared against dx^2+dy^2
     void     (*fatal)(uint32_t code); // Ordinal_10265+10024+_exit(-1); no return
 };
 
@@ -99,13 +96,17 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_88150(D2cSnd87*, const D2cSnd87En
     e->ord10063();
 }
 
-// 1.13c D2Client+0x881B0
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_881b0(D2cSnd87* s, const D2cSnd87Env* e) {
-    int32_t ax, ay, bx, by;
-    e->ord10628(s->player, &ax, &ay);
-    e->ord10628(s->player, &bx, &by);
-    int64_t dx = (int64_t)(ax - bx) * 2, dy = (int64_t)(by - ay);
-    return (dx * dx + dy * dy) < e->limit ? 1 : 0;
+// 1.13c D2Client+0x881B0 (stdcall unit, ret 4). Ordinal_10628 (thunk 0xC21A,
+// stdcall unit, POINT*) fills the player's position ([0x6FBCBBFC]) then the argument unit's; dx = B.x - A.x, dy = B.y - A.y
+// (int32 wrap); retail sums dx*dx + (2*dy)*(2*dy) on the x87 and returns 1 when it is <= 490000.0f ([0x6FB87570]). Past
+// |dx| > 700 or |dy| > 350 one square alone exceeds the bound, so the exact integer compare below is the same verdict.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_881b0(uint32_t player, uint32_t unit, void (*pos)(uint32_t unit, int32_t* pt)) {
+    int32_t a[2], b[2];
+    pos(player, a);
+    pos(unit, b);
+    const int64_t dx = (int32_t)((uint32_t)b[0] - (uint32_t)a[0]), dy = (int32_t)((uint32_t)b[1] - (uint32_t)a[1]);
+    if (dx > 700 || dx < -700 || dy > 350 || dy < -350) return 0;
+    return dx * dx + 4 * dy * dy <= 490000 ? 1 : 0;
 }
 
 // 1.13c D2Client+0x88230 (this ignored, eax = base duration in EAX on entry)

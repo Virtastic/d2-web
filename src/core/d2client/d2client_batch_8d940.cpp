@@ -182,3 +182,18 @@ void drawBeltPanelCaps(Env& e){
  e.q(10184,0,0); e.q(10150,0x82-e.g(0xBCB9A4),e.g(0xBCBEF4)); e.q(10184,0,0);
 }
 }
+// FN probe entry for 0x8DCC0 (src/core/fn/d2client_8dcc0.cpp): the D2Lang string getter is the only seam; Storm _snprintf and the
+// D2Lang Unicode copies run as the port's own helpers.
+extern "C" void d2c_port_8dcc0(const uint8_t* data, int32_t add, uint16_t* out, const uint16_t* (*str)(uint32_t id)) {
+    struct E final : d2client_batch_8d940::Env {
+        const uint16_t* (*s)(uint32_t); explicit E(const uint16_t* (*f)(uint32_t)) : s(f) {}
+        const d2client_batch_8d940::wc* str(int32_t id) override { return s((uint32_t)id); }
+        void fmt(char*, int32_t, int32_t) override { __builtin_trap(); }
+        int32_t q(int32_t, int32_t, int32_t) override { __builtin_trap(); }
+        int32_t g(int32_t) override { __builtin_trap(); }
+        void gset(int32_t, int32_t) override { __builtin_trap(); }
+        void draw(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t) override { __builtin_trap(); }
+        bool personalize(uint16_t*, const uint16_t*, int32_t) override { __builtin_trap(); }
+    } e(str);
+    d2client_batch_8d940::tooltipField10c(e, data, add, out);
+}

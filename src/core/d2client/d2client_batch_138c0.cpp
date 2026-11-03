@@ -39,6 +39,11 @@ struct D2ClientBatch138C0Env {
     void (*send_message)(const uint8_t* packet, uint32_t length);
     // retail fatal path: Fog #10265 (0xBF92) -> Fog #10024 (0xBF80) -> _exit(0x3664) with -1.
     void (*fatal)(uint32_t code);
+    // Optional call seams for the two D2Client callees of 0x13A00 (null: the real 0x138C0 / 0x137A0 above); a capture
+    // probe records the call instead of running it.
+    void (*call_138c0)(uint8_t* block, int32_t mode, int32_t x, int32_t y);
+    void (*call_137a0)(int32_t x, D2ClientFloorVertex* out, int32_t y, int32_t lx, int32_t ly, uint32_t constant_color,
+                       int32_t shift_mode, uint32_t corners_only);
 };
 
 // The room view 0x13A00 walks. Offsets are retail's; pointers are the low 32 bits as in FloorCtx.
@@ -193,12 +198,15 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_13a00(FloorDrawCtx* ctx, const D2
                 uint32_t block;
                 if (env->light_quality < 4) {                // the global is re-read per tile
                     static uint8_t light_block[768];         // auStack_300, S+0x1F8
-                    d2_client_138c0(light_block, (int32_t)sub->height, pos5, pos6, env);
+                    if (env->call_138c0) env->call_138c0(light_block, (int32_t)sub->height, pos5, pos6);
+                    else d2_client_138c0(light_block, (int32_t)sub->height, pos5, pos6, env);
                     block = (uint32_t)(uintptr_t)light_block;
                 } else {
                     static D2ClientFloorVertex high_grid[36];   // auStack_4b0, S+0x48
                     uint8_t* high_block = reinterpret_cast<uint8_t*>(high_grid);
-                    if (gfx == 0)
+                    if (gfx == 0 && env->call_137a0)
+                        env->call_137a0(sx, high_grid, sy, pos5, pos6, sub->height, static_cast<int32_t>(draw_ctx), sub_word);
+                    else if (gfx == 0)
                         d2_client_137a0(env->floor_grid_137a0, high_grid,
                                          sy, pos5, pos6, sub->height, static_cast<int32_t>(draw_ctx), sub_word, sx);
                     else

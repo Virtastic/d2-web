@@ -100,6 +100,11 @@ uint64_t sub_524D0(U p2,I c2e0,I c0a0,uint8_t c5591,I a212c,uint8_t* o3,uint8_t*
  }
  return uint64_t(p2)<<32;
 }
+// Probe-facing form: EAX only, Fog's float cosine as the tail, truncated as _ftol does.
+int32_t sub_524D0(I c2e0,I c0a0,uint8_t c5591,I a212c,uint8_t* o3,uint8_t* o4,uint8_t* o5,float (*f)(I)){
+ static float (*s_f)(I); s_f=f;
+ return I(sub_524D0(0,c2e0,c0a0,c5591,a212c,o3,o4,o5,[](I v)->uint64_t{return uint64_t(int64_t(s_f(v)));}));
+}
 // 1.13c D2Client+0x52570 (cbbfc = global at DAT_6fbcbbfc, passed as client)
 void sub_52570(P client,Calls& c){
  P p=c.o10754(c.resolve3(U(uintptr_t(client)),1,0x220)); if(!p)return;
