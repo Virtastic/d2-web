@@ -29,3 +29,17 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_8B00(void* p, const D2WinFreeEnv*
     e->reportError("", e->errorText(line));
     std::_Exit(-1);
 }
+// FN probe glue (checked against retail): hooked 0x8450 and 0x17FC0 log (rva, ecx=token) into lg; both return 0.
+static uint32_t* fn8bLg; static void* fn8bP;
+static void fn8bLog(uint32_t rva, uint32_t tok) {
+    uint32_t* w = fn8bLg + 1 + fn8bLg[0]++ * 10;
+    w[0] = rva; w[1] = 0; w[2] = tok; for (int i = 3; i < 10; ++i) w[i] = 0;
+}
+static void fn8bClear(void*) { fn8bLog(0x8450, 0xB1000000u); }
+static uint32_t fn8bRelease(void* q) { fn8bLog(0x17FC0, q == fn8bP ? 0xB1000000u : 0xB1010000u); return 0; }
+extern "C" uint32_t d2win_sub_8B00_fn(void* p, uint32_t* lg) {
+    fn8bLg = lg; lg[0] = 0; fn8bP = p;
+    D2WinFreeEnv e = {}; e.clearList = fn8bClear; e.release = fn8bRelease;
+    d2win_sub_8B00(p, &e);
+    return 0;
+}

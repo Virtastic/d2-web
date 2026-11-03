@@ -116,3 +116,15 @@ extern "C" uint32_t d2win_sub_159E0_fn(void* p,uint32_t* lg,uint32_t tok,uint32_
     D2WinSmallEnv e={}; e.removeControl=fn159Remove;
     return d2win_sub_159E0(p,&e);
 }
+// FN probe glue (checked against retail): hooked 0x17FC0 logs (rva, ecx=token) into lg and returns ret.
+static uint32_t* fnF8Lg; static uint32_t fnF8Ret, fnF8Tok;
+static uint32_t fnF8Remove(void*) {
+    uint32_t* w=fnF8Lg+1+fnF8Lg[0]++*10;
+    w[0]=0x17FC0; w[1]=0; w[2]=fnF8Tok; for(int i=3;i<10;++i) w[i]=0;
+    return fnF8Ret;
+}
+extern "C" uint32_t d2win_sub_F8A0_fn(void* p,uint32_t* lg,uint32_t tok,uint32_t ret) {
+    fnF8Lg=lg; lg[0]=0; fnF8Tok=tok; fnF8Ret=ret;
+    D2WinSmallEnv e={}; e.removeControl=fnF8Remove;
+    return d2win_sub_F8A0(p,&e);
+}
