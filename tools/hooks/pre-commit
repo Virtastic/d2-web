@@ -4,7 +4,7 @@ ROOT="$(git rev-parse --show-toplevel)"
 "$ROOT/tools/leak-check.sh" --staged || exit 1
 # FN probe gate: a staged src/core file whose #include does not resolve, or resolves to a gitignored file, fails the commit.
 # tools/re is private (linked from .private), so the gate runs only where the checker is linked.
-if [ -f "$ROOT/tools/re/check-fn-probes.mjs" ]; then node "$ROOT/tools/re/check-fn-probes.mjs" --staged || exit 1; fi
+if [ -f "$ROOT/tools/re/check-fn-probes.mjs" ]; then CHECK_FN_ROOT="$ROOT" node "$ROOT/tools/re/check-fn-probes.mjs" --staged || exit 1; fi
 # Link gate: a staged src/ .cpp that defines a function twice, mixes extern "C" with C++ linkage, or references an undefined variable.
 staged=$(git diff --cached --name-only --diff-filter=ACM -- 'src/*.cpp' | paste -sd, -)
 if [ -n "$staged" ] && [ -f "$ROOT/tools/link-check.mjs" ]; then node "$ROOT/tools/link-check.mjs" --root "$ROOT" --files "$staged" || { echo "pre-commit: link-check found a link defect in the staged files (see above)" >&2; exit 1; }; fi

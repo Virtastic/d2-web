@@ -149,6 +149,7 @@ test/*
 !test/touch-panel-aim.test.mjs
 !test/cube-close.test.mjs
 !test/probe-skip.test.mjs
+!test/fn-probe-root.test.mjs
 !test/build-key-lock.test.mjs
 !test/land-fold.test.mjs
 !test/link-check.test.mjs
