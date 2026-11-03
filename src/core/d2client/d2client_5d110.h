@@ -20,9 +20,9 @@ static_assert(sizeof(D2cRes5d::Slot) >= 0x18, "slot");
 
 struct D2cRes5dEnv {
     int      (*ord10041)(void);
-    void     (*ord10061)(void);
+    void     (*ord10061)(uint32_t ecx);   // thunk 0xD2A6: ECX = 0 (enter) / 0xFF (leave)
     uint32_t (*ord10032)(void);
-    void     (*ord10006)(void);
+    void     (*ord10006)(uint32_t h);     // thunk 0xD336: ECX = the slot handle
     void     (*ord10049)(void);
     uint32_t (*ord10065)(void);          // slot handle alloc, 0 = fail
     int      (*ord10056)(void);

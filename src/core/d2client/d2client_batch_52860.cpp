@@ -136,7 +136,7 @@ void sub_53550(Svc& s,G& g,Unit* a){
  for(int32_t i=0;i<0x19;){
   uint32_t x=box[0]+rnd(box[2]);
   uint32_t y=box[1]+rnd(box[3]);
-  r.w[5]=x; r.w[6]=y;
+  r.w[3]=x; r.w[4]=y; // disassembly 53550: [rec+0xc]=x, [rec+0x10]=y (the 0x11f at w[4] is overwritten)
   if(s.o10482(a,(int32_t)x,(int32_t)y,5)==0) s.f630f0(r); else ok--;
   ok++; i++;
   if(ok>=3) break;

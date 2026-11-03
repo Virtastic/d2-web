@@ -126,7 +126,7 @@ extern "C" void d2c_143E0_send_packet(const uint8_t* buf, uint32_t len, uint32_t
     d2_client_143e0(buf, (int32_t)len, &e);
 }
 
-// 1.13c D2CLIENT+0x16A90  (centred text line while in-game state 4, modes 6..7)
+// superseded by d2client_16a90.cpp (0x16A90); kept for reference, the mode test and record indices here are wrong
 struct N85Hud { uint32_t on, stateObj, mode, route, w, y, xoff; };
 extern "C" void d2c_16A90_hud_line(const N85Hud* h, uint32_t (*reqFn)(uint32_t), uint32_t (*lookup)(uint32_t obj, uint32_t* rec),
                                    uint32_t (*drawNext)(uint32_t x, uint32_t ctx)) {

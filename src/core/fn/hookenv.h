@@ -24,6 +24,7 @@ struct HookEnv {
         for (int i = 2; i < 10; i++) e[i] = 0;
     }
     uint32_t* L; const uint32_t* sc;
+    uint32_t xs5 = 0, xs6 = 0;   // stack words 5 and 6 of the next h() (set by Env::Xs; cleared by h)
     uint32_t ediReg = 0;   // EDI at the next h(): a `hookw RVA e V...` write goes through it (key (0x15<<24)|rva); set by ed()
     uint32_t tbl = 0, dtPtr = 0, fileStr = 0, bmSlot = 0;     // module globals (addresses of the pinned blobs / scrubbed module words)
     static constexpr uint32_t kLogMax = 512;   // 512 (main had 400): 3C850 and 40CA0 log 6 records per step over a 64-step missile ring, past 400; a larger cap only raises the limit. ponytail: a descriptor `blob lg` must hold 4 + 40 * calls bytes; 0x6F930 logs up to 45 calls (blob 2600)
@@ -71,12 +72,40 @@ struct HookEnv {
         uint32_t* e = L + 1 + L[0]++ * 10; e[0] = rva | 0x20000000u; e[1] = isStk(v) ? 0xB3000000u : v;
         for (int j = 2; j < 10; j++) e[j] = 0;
     }
+    // `giat DLL ORD ... w=LIST` (README "Import recorders"): the wide string an import was handed, logged after its h() record, one ws() per
+    // LIST code in ascending order (0-3 stack word, 4 ecx, 5 edx, 6 eax). Records tagged 0x0C000000|code<<20|slot: e[1] = chunk<<16|len
+    // (chars, NUL excluded, at most wmax), e[2..9] = 16 chars, zero past the end; a NULL pointer is one record with len 0xFFFF.
+    void ws(uint32_t slot, uint32_t code, const char16_t* w, uint32_t wmax = 1024) {
+        const uint32_t tag = 0x0C000000u | code << 20 | (slot & 0xFFFFFu);
+        uint32_t len = 0; if (!w) len = 0xFFFF; else while (len < wmax && w[len]) ++len;
+        if (len == 0xFFFF) { if (L[0] >= kLogMax) abort(); uint32_t* e = L + 1 + L[0]++ * 10; e[0] = tag; e[1] = len; for (int i = 2; i < 10; i++) e[i] = 0; return; }
+        for (uint32_t c = 0; c * 16 <= len; ++c) {
+            if (L[0] >= kLogMax) abort();
+            uint32_t* e = L + 1 + L[0]++ * 10; e[0] = tag; e[1] = c << 16 | len; uint16_t ch[16] = {};
+            for (uint32_t j = 0; j < 16 && c * 16 + j < len; ++j) ch[j] = (uint16_t)w[c * 16 + j];
+            memcpy(e + 2, ch, 32);
+        }
+    }
+    // `giat ... wid`: the pinned answer of a string lookup (D2Lang 10003), u"{id}" (id & 0xFFFF, decimal), from a ring of 64 buffers in the order
+    // the capture fills its own; widReset() at the start of each call (the capture resets per tuple). An answer handed on to a hooked callee is
+    // logged 0xB4000000|offset into the ring: pass widTag(p) in h().
+    char16_t widBuf[64][16]; uint32_t widN = 0;
+    void widReset() { widN = 0; }
+    const char16_t* wid(uint32_t id) {
+        char16_t* b = widBuf[widN++ & 63]; char t[16]; uint32_t v = id & 0xFFFFu; int n = 0; char r[8]; int m = 0;
+        do { r[m++] = (char)('0' + v % 10); v /= 10; } while (v);
+        t[n++] = '{'; while (m) t[n++] = r[--m]; t[n++] = '}'; t[n] = 0;
+        for (int i = 0; i <= n; ++i) b[i] = (char16_t)t[i];
+        return b;
+    }
+    uint32_t widTag(const void* p) const { uint32_t o = (uint32_t)((const uint8_t*)p - (const uint8_t*)widBuf); return o < sizeof widBuf ? 0xB4000000u | o : (uint32_t)(uintptr_t)p; }
     uint32_t h(uint32_t rva, uint32_t a = 0, uint32_t c = 0, uint32_t d = 0, uint32_t b = 0, uint32_t s = 0,
                uint32_t s0 = 0, uint32_t s1 = 0, uint32_t s2 = 0, uint32_t s3 = 0, uint32_t s4 = 0, uint32_t s5 = 0, uint32_t s6 = 0) {
         if (L[0] >= kLogMax) abort();   // log capacity exceeded
         uint32_t* e = L + 1 + L[0]++ * 10;
         e[0] = rva; e[1] = a; e[2] = c; e[3] = d; e[4] = b; e[5] = s; e[6] = s0; e[7] = s1; e[8] = s2; e[9] = s3;
         // retail logs a pointer into its stack as 0xB3000000; `hookw` out-parameter writes ride in sc as key ((1+stack word)<<24)|rva, or ((0x10+r)<<24)|rva for register r (a c d b s = 0..4); several pairs with one key fill consecutive dwords of that pointee
+        if (!s5) s5 = xs5; if (!s6) s6 = xs6; xs5 = xs6 = 0;
         const uint32_t sw[7] = { s0, s1, s2, s3, s4, s5, s6 };
         for (int i = 1; i < 10; i++) if (isStk(e[i])) e[i] = 0xB3000000u;
         const uint32_t rg[6] = { a, c, d, b, s, ediReg }; ediReg = 0;

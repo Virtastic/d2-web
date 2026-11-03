@@ -76,7 +76,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_client_1e070(int32_t param_1, int32_t param_2,
     return result;
 }
 
-// 1.13c D2Client+0x01E5F0: the loading screen's per-frame draw. On the 0x11 client state (or no
+// superseded by d2client_1e5f0.cpp (0x1E5F0): the loading screen's per-frame draw. On the 0x11 client state (or no
 // state) it runs the shutdown path: 10227, an abort when the exit code (0x0DD5D0) is not 0x26, clear
 // 0x0FADC4, unload the pending path table through 0x3CC60 and 0x1C720, then clear 0x1223D8/0x1223F0.
 // Otherwise it returns while the screen mode is 3 or 0x0FADBC is set; else it draws the bar: quadrant

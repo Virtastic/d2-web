@@ -34,12 +34,12 @@ void sub_32F30(Services& s,void* unit,int32_t* outMin,int32_t* outMax,intptr_t s
 }
 // 1.13c D2Client+0x33240
 void sub_33240(Services& s,void* u,int32_t* a,int32_t* b,int32_t* c){ s.fn(0x31220,(intptr_t)u); s.fn(0x30E30,(intptr_t)u,(intptr_t)a,(intptr_t)b,(intptr_t)c); }
-// 1.13c D2Client+0x33550 (tooltip text builder, skill-level variant; text assembly via Services)
+// D2Client+0x33550 as the Services callers reach it (preconditions only); the port is sub_33550.cpp:sub_33550
 void sub_33550(Services& s,int32_t level,int32_t skillId,int32_t y){
  if(!level||skillId<0||skillId>=s.skillCount()||!s.skillRecord(skillId))return;
  s.fn(0x33550,level,skillId,y); // ponytail: string assembly (Ordinal_10003 ids lost) delegated wholesale
 }
-// 1.13c D2Client+0x33B50 (sibling of 0x33550, this=skillId)
+// D2Client+0x33B50 as the Services callers reach it (preconditions only); the port is sub_33550.cpp:sub_33B50
 void sub_33B50(Services& s,int32_t skillId,int32_t unit,int32_t y){
  if(!unit||skillId<0||skillId>=s.skillCount()||!s.skillRecord(skillId))return;
  s.fn(0x33B50,skillId,unit,y); // ponytail: same as above

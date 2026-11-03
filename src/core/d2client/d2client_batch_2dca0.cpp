@@ -68,7 +68,7 @@ uint32_t sub_2DD50(const Host& h, Address ebx, int16_t sel, uint32_t strId) {
     return 1;
 }
 
-// 1.13c D2Client+0x2DE00 (326 B): EBX=scale. 24.8 fixed-point range "lo-hi" or "lo.f-hi.f".
+// (host-style body, superseded by d2client_2de00.cpp) D2Client+0x2DE00 (326 B): EBX=scale. 24.8 fixed-point range "lo-hi" or "lo.f-hi.f".
 uint32_t sub_2DE00(const Host& h, Address dst, int16_t selA, int16_t selB, uint32_t p4, uint32_t p5,
                    int32_t ebx) {
     int32_t a = (int32_t)p4, b = (int32_t)p5;
@@ -87,7 +87,7 @@ uint32_t sub_2DE00(const Host& h, Address dst, int16_t selA, int16_t selB, uint3
     return 1;
 }
 
-// 1.13c D2Client+0x2DF50 (268 B): EBX=dest; frames/25 range with one decimal.
+// (host-style body, superseded by d2client_2df50.cpp) D2Client+0x2DF50 (268 B): EBX=dest; frames/25 range with one decimal.
 uint32_t sub_2DF50(const Host& h, Address ebx, int32_t lo, int32_t hi) {
     int32_t a = lo / 25, af = ((lo % 25) * 10) / 25, b = hi / 25, bf = ((hi % 25) * 10) / 25;
     char s[48];

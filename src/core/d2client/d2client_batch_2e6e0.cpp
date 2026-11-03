@@ -93,7 +93,7 @@ uint32_t sub_2E770(const Host& h, const Env& e, Address dst, Address item, int32
     return 1;
 }
 
-// 1.13c D2Client+0x2E900 (632 B): stdcall(a1, dst, a3, item, a5) ret 0x14. 0xC244(itemcls, g, cls, word, 8, &local); A = local[5], B = local[6]; sum of 0xC316(a1, dword, a3, a5)
+// (host-style body, superseded by d2client_2e900.cpp) D2Client+0x2E900 (632 B): stdcall(a1, dst, a3, item, a5) ret 0x14. 0xC244(itemcls, g, cls, word, 8, &local); A = local[5], B = local[6]; sum of 0xC316(a1, dword, a3, a5)
 // over the 6 words item+0x54 / dwords item+0x68 and the 5 words item+0x98 / dwords item+0xA4 whose word == 0x19; sum != 0: clamp >= -90, A += A*sum/100, B += B*sum/100;
 // then 0x2D220(EAX=0x10A0; dst, A, B, 0). Returns 1 (0 for an out-of-range class).
 uint32_t sub_2E900(const Host& h, const Env& e, uint32_t a1, Address dst, uint32_t a3, Address item, uint32_t a5) {
@@ -116,7 +116,7 @@ uint32_t sub_2E900(const Host& h, const Env& e, uint32_t a1, Address dst, uint32
     return 1;
 }
 
-// 1.13c D2Client+0x2E410 (713 B): sibling of 0x2E900 with the stat kind 0x6F as well (ret 0x14: a1, dst, a3, item, a5). C244 as in 0x2E900; kind 0x19 entries sum
+// (host-style body, superseded by d2client_2e410.cpp) D2Client+0x2E410 (713 B): sibling of 0x2E900 with the stat kind 0x6F as well (ret 0x14: a1, dst, a3, item, a5). C244 as in 0x2E900; kind 0x19 entries sum
 // C316(a1, value, a3, a5) into `sum`, kind 0x6F entries add the same C316 to both A and B; sum != 0 is clamped to >= -90 and scales A and B; 0x2D220(EAX=0x10A0; dst, A, B, 0).
 uint32_t sub_2E410(const Host& h, const Env& e, uint32_t a1, Address dst, uint32_t a3, Address item, uint32_t a5) {
     const int32_t idx = h.read<int16_t>(item + 0xBC);

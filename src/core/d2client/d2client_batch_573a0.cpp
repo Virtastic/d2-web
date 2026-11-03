@@ -108,34 +108,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2c_573A0(uint32_t unit, int32_t idx, uint32_t dat
     return 1;
 }
 
-// 1.13c D2Client+0x578F0 (s3496). ESI = unit (self); no stack args; returns EAX = 630F0 result or 0.
-// X/Y: type in {2,4,5} read path (self[0xb]) +0xC/+0x10, else ordinal 10867/10750 on self[0xb] (0 if null).
-EMSCRIPTEN_KEEPALIVE uint32_t d2c_578F0(int32_t* self) {
-    int32_t o = self[0xb];
-    if (o == 0 || ord(10203, 0, 0, 0, (uint32_t)o) == 0) return 0;
-    uint32_t h = ord(10630, 0, uptr(self), 0xad, 1);   // ecx=unit, edx=0xad, stack 1
-    uint32_t v = ord(10306, 0, 0, 0, uptr(self), h);
-    ord(10331, 0, 0, 0, uptr(self));
-    int32_t t = self[0];
-    bool direct = (t == 2 || (t >= 4 && t <= 5));
-    const int32_t* path = (const int32_t*)(uintptr_t)(uint32_t)o;
-    uint32_t x = direct ? (uint32_t)path[3] : (o ? ord(10867, 0, 0, 0, (uint32_t)o) : 0);
-    uint32_t y = direct ? (uint32_t)path[4] : (o ? ord(10750, 0, 0, 0, (uint32_t)o) : 0);
-    static const uint8_t k[8] = {0xa, 0x8, 0x16, 0x14, 0x12, 0x10, 0xe, 0xc};
-    uint32_t cls = ord(10266, 0, 0, 0, ord(10788, 0, 0, 0, (uint32_t)o)) & 0xFF;
-    int32_t d[2] = {0, 0};
-    ord(10740, 0, 0, 0, k[cls & 7], uptr(&d[0]), uptr(&d[1]));   // retail indexes with the full al; keep in range
-    x += (uint32_t)d[0]; y += (uint32_t)d[1];
-    if (ord(10057, 0, 0, 0, call(0x1400)) != 0) return 0;
-    uint32_t rec[23] = {};
-    rec[0] = 0x25; rec[1] = uptr(self); rec[4] = 0x8f; rec[5] = x; rec[6] = y;
-    rec[7] = x + (uint32_t)d[0] * 2; rec[8] = y + (uint32_t)d[1] * 2; rec[10] = 3; rec[12] = v;
-    uint32_t ret = call(0xB30F0, 0, uptr(rec));
-    D2cCall c = {};
-    c.rva = 0x88A70; c.ebx = 0x726; c.s[0] = uptr(self);
-    g_h(&c);
-    return ret;
-}
+// 1.13c D2Client+0x578F0 moved to d2client_578f0.cpp (corrected callee args).
 
 // 1.13c D2Client+0x6F5B0 (s3497). IME init for the Korean/Japanese/Chinese builds.
 EMSCRIPTEN_KEEPALIVE void d2c_6F5B0(uint32_t sysLangId) {

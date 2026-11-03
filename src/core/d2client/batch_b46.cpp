@@ -43,10 +43,10 @@ EMSCRIPTEN_KEEPALIVE i32 d2c_51470(i32 (*f557e0)(i32), i32 (*ord10143)(i32), con
 
 // 1.13c D2Client+0x51A80
 EMSCRIPTEN_KEEPALIVE void* d2c_51a80(i32* g_c2f4, i32* g_c2f8, void* (*f54e20)(i32, i32, i32),
-    i32 (*f568e0)(void*, i32, i32, i32), i32 g_9638, i32 slotbase, i32 g_964c) {
+    i32 (*fA68E0)(void*, i32, i32, i32), i32 g_9638, i32 slotbase, i32 g_964c) {
     if (!*g_c2f4) return nullptr;
-    void* p = f54e20(g_9638, slotbase + g_964c * 0x80, g_964c);
-    if (p && f568e0(p, 0, 0, 0)) return p;
+    void* p = f54e20(g_9638, slotbase + (i32)((uint32_t)g_964c << 9), g_964c);   // retail: edx = 0x10A608 + (kind << 9)
+    if (p && fA68E0(p, 0, 0, 0)) return p;
     *g_c2f8 = 0; *g_c2f4 = 0;
     return nullptr;
 }

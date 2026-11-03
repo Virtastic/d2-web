@@ -197,7 +197,7 @@ uint32_t appendCountedRecord(const Host& h, Address destination, int16_t selecto
     return 1;
 }
 
-// 1.13c D2Client+0x2CD20 (227 B). Uses +0xC790 to build the param_3/param_4
+// (host-style body, superseded by d2client_2cd20.cpp) D2Client+0x2CD20 (227 B). Uses +0xC790 to build the param_3/param_4
 // value. Either param_2 or param_3 must be nonzero; param_5 controls one extra
 // localized suffix. EBX is the active destination string.
 uint32_t appendRangeRecord(const Host& h, Address destination, int16_t selector,
@@ -225,7 +225,7 @@ uint32_t appendPlainRange(const Host& h, Address destination, int32_t low, int32
     return 1;
 }
 
-// 1.13c D2Client+0x2D000 (542 B). Scale both endpoints by the signed
+// (host-style body, superseded by d2client_2d000.cpp) D2Client+0x2D000 (542 B). Scale both endpoints by the signed
 // percentage in EBX, preserving the retail branch's divide-before-multiply
 // optimization for large values. Then add the shared offset and append the
 // signed single value or range. Return low word 1 when text was emitted.

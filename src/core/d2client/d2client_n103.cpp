@@ -153,7 +153,7 @@ uint32_t d2client_sub_316C0(const Ops& o, R a0, W* dst, const uint8_t* a2, R a3,
         static const uint32_t f[4] = {0x3CF50, 0x3CF00, 0x3CEB0, 0x3CE60};
         r.eax = a0; r.ebx = a3;
         R v = c.sib(f[sw - 0x35], r, {B});
-        c.sib(0x2C950, Regs(), {v}); return 1; }
+        c.sib(0x2C950, Regs(), {v, B}); return 1; }   // B stays pushed across 0x3CF50 (it pops nothing); 0x2C950 is ret 8
     case 0x39: r.eax = 1; c.sib(0x2E060, r, {(R)dst, B, v4}); return 1;
     case 0x3a: r.eax = (R)dst; c.sib(0x2F600, r, {B, D, v4, v5, 1}); return 1;
     case 0x3e: r.eax = (R)dst; c.sib(0x2F600, r, {B, D, v4, v5, 0}); return 1;

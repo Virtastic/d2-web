@@ -76,14 +76,17 @@ EMSCRIPTEN_KEEPALIVE void d2c_46e00() {
     D8(0x6fbc9662) = 1;
 }
 
-// 1.13c D2Client+0x46EE0
+// 1.13c D2Client+0x46EE0 (stdcall, ret 8: param_1 dword, param_2 byte). The leaf calls carry their register/stack inputs as retail does
+// (F args = the probe's FnMap order): 0x88A70 EBX + 4 stack words; ord 0xC202/0xC1BA/0xC1C6 1/1/3 stack words; 0x8BB00/0x8BB20 EAX = param_1;
+// 0x148A0 ECX EDX + 2 stack words (AL = the packet code '2'/'3'/'5' is not passed: its upper bytes are stale in retail); 0x46880 ESI = &out[2];
+// 0xA3E40 11 stack words (the port passes the first 9); 0xA3340 EAX + 1 stack word; 0xD1EC ECX; 0xA36F0 EAX ECX + 6 stack words.
 EMSCRIPTEN_KEEPALIVE void d2c_46ee0(int32_t param_1, uint8_t param_2) {
     if (D8(0x6fbd22f8) == 0) { if (D32(0x6fbcbc34) == 5) F(0x8D300); return; }
     char ch;
     uint32_t mode = D32(0x6fbc9729);
     if (mode == 1) ch = '2';
     else if (mode == 2) ch = '3';
-    else if (mode == 3) { ch = '5'; F(0x88A70, 0, 0, 0, 0); }
+    else if (mode == 3) { ch = '5'; F(0x88A70, 0xf, 0, 0, 0, 0); }
     else {
         D32(0x6fbc9663) = 3;
         if (D32(0x6fbcbc34) == 5) F(0x8D300);
@@ -106,38 +109,40 @@ EMSCRIPTEN_KEEPALIVE void d2c_46ee0(int32_t param_1, uint8_t param_2) {
         }
         u6 = R32(p + 0x10);
         if (mode == 2) {
-            U q = (U)O(11017, R32(D32(0x6fbcc338) + 0x60));
+            U q = (U)(uint32_t)F(0xC202, R32(D32(0x6fbcc338) + 0x60));
             D32(0x6fbc9737) = (q == p);
         }
     } else {
         if (e_.tick() - D32(0x6fbd3484) < 2000) { if (D32(0x6fbcbc34) == 5) F(0x8D300); return; }
         D32(0x6fbd3484) = e_.tick();
     }
-    if (param_1 == 0) F(0x8BB20); else F(0x8BB00);
-    D8(0x6fbc9663) = 5;
+    F(param_1 ? 0x8BB00 : 0x8BB20, (U)(uint32_t)param_1);
+    D32(0x6fbc9663) = 5;
     D32(0x6fbd2309) = e_.tick();
     if (ch == '2') {
-        u6 <<= 16;
+        u6 = (u6 & 0xffff) << 16;
         if (D32(0x6fbc97a8)) u6 |= 2;
         if (param_2 & 4) {
-            U r = (U)O(10695, p ? R32(p + 4) : (uint32_t)-1);
+            U r = (U)(uint32_t)F(0xC1BA, p ? R32(p + 4) : 0xffffffffu);
             if (r && *(volatile uint8_t*)(r + 0x1a5)) u6 |= 0x80000000u;
         }
         F(0x148A0, D32(0x6fbc971d), D32(0x6fbd22fd), u6, D32(0x6fbc9777));
         D32(0x6fbc9753) = (uint32_t)F(0x81E40);
     } else {
         uint32_t v = D32(0x6fbc9777);
-        if (ch == '5') v = D32(0x6fbcbc90) ? 0x80000000u : (p ? (uint32_t)O(10973, p, 0x48) : 0);
+        if (ch == '5') v = D32(0x6fbcbc90) ? 0x80000000u : (p ? (uint32_t)F(0xC1C6, p, 0x48, 0) : 0);
         F(0x148A0, D32(0x6fbc971d), D32(0x6fbd22fd), u6 & 0xffff, v);
     }
     if (D32(0x6fbc975f) != 0) fatal(0x11b6);
-    F(0x46880);
-    U box = (U)F(0xA3E40, 0, 0, A(0x6faf5bf0), 0, 0, 0, 1, 0, 0);
+    uint32_t loc[2] = { 0, 0 };
+    F(0x46880, (U)loc);
+    U box = (U)F(0xA3E40, loc[0], loc[1], A(0x6faf5bf0), 0, 0, 0, 1, 0, 0);
     D32(0x6fbc975f) = (uint32_t)box;
     D32(0x6fbc974b) = e_.tick() + 60000;
     D32(0x6fbc974f) = 0;
-    F(0xA3340, 0);
-    F(0xA36F0, box, (U)O(10003), 0xf, 0, 1, 0, 0);
+    F(0xA3340, D32(0x6fbc975f), 0);
+    uint32_t s = (uint32_t)F(0xD1EC, 0xd19);
+    F(0xA36F0, 0, D32(0x6fbc975f), s, 0xf, 0, 1, 0, 0);
 }
 
 // 1.13c D2Client+0x471F0

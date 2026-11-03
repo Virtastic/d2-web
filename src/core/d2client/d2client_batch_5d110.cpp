@@ -31,11 +31,11 @@ static D2cRes5d::Slot* pick5cc10(D2cRes5d* s, const D2cRes5dEnv* e, int32_t key)
 // 1.13c D2Client+0x5D110
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_5d110(D2cRes5d* s, const D2cRes5dEnv* e) {
     if (!e->ord10041()) return;
-    e->ord10061();
+    e->ord10061(0);
     for (auto& sl : s->slot) {
         if (sl.h) {                       // piVar3[-2]
             if (sl.rec) wr<uint32_t>(sl.rec, 0x41, e->ord10032());
-            e->ord10006();
+            e->ord10006(sl.h);
         }
         if (sl.rec) {
             wr<uint32_t>(sl.rec, 0x30, 2);
@@ -43,7 +43,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_5d110(D2cRes5d* s, const D2cRes5d
             sl.rec = nullptr;
         }
     }
-    e->ord10061();
+    e->ord10061(0xFF);
 }
 
 // 1.13c D2Client+0x5D180

@@ -32,7 +32,7 @@ struct G{
 struct H{
  I* (*cur)();                                      // 6150
  U (*o10071)(I,I,I,U,U,I); U (*o10107)(P,P,U,U,I,I); I (*o10705)(P); I (*o11088)(P); I (*o11017)(U);
- U (*tick)(); I (*f5b40)(); I (*f5bd0)(); void (*f6ee0)(I,uint8_t); void (*f38a70)(I,I,I,I); void (*f7500)();
+ U (*tick)(); I (*f5b40)(); I (*f5bd0)(P); void (*f6ee0)(I,U); void (*f38a70)(I,I,I,I); void (*f7500)();
  void (*f67c0)(); void (*f8150)(); void (*f2ad0)(); void (*f3840)(); void (*f42850)(); void (*f3d20)(); void (*f4660)();
  void (*f7920)(); U (*r1380)(P); void (*f6880)(); void (*f7b20)(); void (*f6e00)(); void (*f2d3c0)(I*,int16_t);
  Ctl* (*newCtl)(U,U); void (*addLine)(Ctl*,const char16_t*,I,I,I,U,I); void (*ctlOpen)(Ctl*);

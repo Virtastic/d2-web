@@ -152,7 +152,7 @@ void sub_2D6E0(Services& s,uint8_t mode,int32_t* x,int32_t* y){
 }
 static void app(char16_t* d,const char16_t* s_){ if(!s_)return; size_t n=0; while(d[n])++n; while((d[n++]=*s_++)); }
 static void num(char16_t* dst,int32_t v,bool plus){ char b[32]; std::snprintf(b,32,(plus&&v>=0)?"+%d":"%d",v); size_t n=0; for(;b[n];++n)dst[n]=(uint8_t)b[n]; dst[n]=0; }
-// 1.13c D2Client+0x2D810  (dst = edi, ids are call order of Ordinal_10003)
+// (host-style body, superseded by d2client_2d810.cpp) D2Client+0x2D810  (dst = edi, ids are call order of Ordinal_10003)
 int32_t sub_2D810(Services& s,char16_t* dst,int32_t v,const int32_t id[5]){
  const char16_t *a=s.string(id[0]),*b=s.string(id[1]),*c=s.string(id[2]),*d=s.string(id[3]); char16_t n[32]; num(n,v,false);
  app(dst,b); app(dst,n); app(dst,d); app(dst,a); app(dst,c); app(dst,s.string(id[4])); return 1;

@@ -78,7 +78,7 @@ EMSCRIPTEN_KEEPALIVE i32* d2c_51650(const D2cE51650* e, const uint8_t* in_EAX, c
 
 struct D2cE51860 {
     i32* (*f2c5c0)(); i32 (*f568e0)(i32* u, i32 a, i32 b, i32 c); i32 (*f55b40)(i32 id, i32 type);
-    i32 (*ord10331)(i32 p, i32 q); void (*ord10742)(i32); void (*ord10880)(i32); i32 (*ord10331b)();
+    i32 (*ord10331)(i32 p, i32 q); void (*ord10742)(i32); void (*ord10880)(i32);
     i32 (*f1230)(); i32 (*f1260)(); i32 (*ord11020)(); u32 (*tick)(); void (*f4940)(); void (*fatal)(i32 code);
 };
 struct D2cG51860 { i32 busy, g3a68, *cur, lastType, lastId, hover[2]; uint8_t* g3afa; i32* g3afb; i32* flags; };
@@ -121,7 +121,7 @@ tail:
             if (t - (u32)in_EAX[0x35] > 500) { in_EAX[0x35] = (i32)t; e->f4940(); }
         }
     } else if (g->lastType == 5 && !same) {
-        e->ord10880(e->ord10331b()); *g->flags |= 1;
+        e->ord10880(e->ord10331((i32)(intptr_t)in_EAX, in_EAX[1])); *g->flags |= 1;
     }
 }
 

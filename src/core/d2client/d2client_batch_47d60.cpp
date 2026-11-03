@@ -5,14 +5,14 @@ static void cpy(char16_t*d,const char16_t*s){while((*d++=*s++));}
 static void cat(char16_t*d,const char16_t*s){while(*d)++d;cpy(d,s);}
 static const char16_t* num(char16_t*b,I v){char t[12];int n=0;U u=v<0?-U(v):U(v);do t[n++]=char('0'+u%10),u/=10;while(u);int k=0;if(v<0)b[k++]='-';while(n)b[k++]=t[--n];b[k]=0;return b;}
 
-// 1.13c D2Client+0x47D60
-U sub_47D60(P self,I p1,U p3,I p4,I p6,U eax,uint8_t bp){
+// 1.13c D2Client+0x47D60  (thiscall ECX=self, EAX=eax, stack s0 p1 p3 bp p4 p6; ret 0x18; s0 is the 2nd argument of Ordinal_10071, bp the 2nd of 0x46EE0)
+U sub_47D60(P self,U s0,I p1,U p3,I p4,I p6,U eax,U bp){
  I*c=h.cur(); if(!c)return 0; I id=c[1];
  if(p6){
   bool ok=id<0xfe?(id==0xfd||id==0x9a||id==0xb2):(id==0x101||id==0x1ff);
   if(!ok)return 0;
   if(!g.bc90)return 1;
-  g.a9777=h.o10071(0,p1,id,g.c390,g.v973b,0); g.v9729=3; g.d22f8=1; g.d22fd=0; g.c2f8=1; g.c2f4=0;
+  g.a9777=h.o10071(0,s0,id,g.c390,g.v973b,0); g.v9729=3; g.d22f8=1; g.d22fd=0; g.c2f8=1; g.c2f4=0;
   g.v9747=p3; g.v9743=eax; h.f6ee0(1,bp); return 1;
  }
  if(h.o11088(self)==4)return 0;
@@ -30,7 +30,7 @@ U sub_47D60(P self,I p1,U p3,I p4,I p6,U eax,uint8_t bp){
   }else if(id!=0x195){
    switch(id){case 0xfe:case 0xff:via93=true;break;case 0x101:via9a=true;break;case 0x109:viaF4=true;break;default:g.v9743=eax;return 0;}
   }else via93=true;
-  if(viaF4){g.v9743=eax;if(h.f5bd0()==1)return 0;g.v9729=4;step=true;}
+  if(viaF4){g.v9743=eax;if(h.f5bd0(self)==1)return 0;g.v9729=4;step=true;}
   else if(via9a&&g.bc34==4){g.v9743=eax;if(!h.f5b40())return 0;g.v9729=3;mode=3;toFinish=true;}
   else{g.v9743=eax;g.a9777=h.o10107(g.player,self,g.c390,g.v973b,id,1);if(!h.o10705(self))return 0;g.v9729=2;step=true;}
  }else{
@@ -42,7 +42,7 @@ U sub_47D60(P self,I p1,U p3,I p4,I p6,U eax,uint8_t bp){
  g.d22f8=1;
  if(!self){g.d22fd=0xffffffff;g.d22f9=0xffffffff;}else{g.d22fd=rd(self,0xc);g.d22f9=rd(self,4);}
  g.c2f8=1; g.c2f4=0;
- if((g.v9729==2||g.v9729==1)&&p4){h.f6ee0(1,uint8_t(p3));return 1;}
+ if((g.v9729==2||g.v9729==1)&&p4){h.f6ee0(1,bp);return 1;}
  h.f38a70(0,0,0,0); g.v9663=4; h.f7500(); return 1;
 }
 

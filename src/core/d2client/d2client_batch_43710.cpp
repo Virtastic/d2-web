@@ -130,3 +130,8 @@ U sub_56700(Calls&c,uint8_t*obj){ I a,b; c.ord10569(obj,&a,&b); obj[0x4e]=0; if(
 // 1.13c D2Client+0x56740  (byte-identical twin of 56700)
 U sub_56740(Calls&c,uint8_t*obj){ return sub_56700(c,obj); }
 }
+// Probe entry for 0x560B0: the two seams are the 55B20 text fetch and the 0xD1EC string lookup.
+extern "C" void d2c_560b0(void (*f55b20)(uint32_t,void*,void*,uint32_t,uint32_t,uint32_t,uint32_t,uint32_t),const char16_t*(*str)(int32_t),
+                          void* unit,uint32_t a7,char16_t* dst,const char16_t* tail){
+ d2client_batch_43710::Calls c{}; c.fb05b20=f55b20; c.ord10003s=str; d2client_batch_43710::sub_560B0(c,unit,a7,dst,tail);
+}
