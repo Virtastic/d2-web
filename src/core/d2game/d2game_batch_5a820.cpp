@@ -7,7 +7,7 @@ extern "C" {
 intptr_t o10920(...); i32 o10174(i32, i32, i32); intptr_t o10024(...); intptr_t o10265(...);
 intptr_t o10045(...);  /* ECX pool, EDX size, stack file, line, 0 (disassembly) */ void o10285(i32, int16_t);
 intptr_t r_9BEB0(...); intptr_t r_9C160(...);
-i32 r_E660(u32); void r_DFCC0(u32 eaxClass, u32 cbRva, i32 gameEdi, u32 stackArg);  /* EAX unit class (0 player), EBX callback RVA, EDI game, stack arg */ i32* r_EEF10(i32*); void r_33F80(void* pUnitEdi, void* pNodeEsi, i32 gameStack); void r_5C690(i32*, i32);
+intptr_t r_E660(...); intptr_t r_DFCC0(...); /* EAX unit class (0 player), EBX callback RVA, EDI game, stack arg */ intptr_t r_EEF10(...); intptr_t r_33F80(...); /* EDI unit, ESI node, stack game */ void r_5C690(i32*, i32);
 i32* r_47CF0(void* ecx, i32, i32, i32, i32);
 // callbacks (RVA of function / label)
 void r_58C90(); void r_57830(); void r_57D80(); void r_580A0(); void r_582E0(); void r_58640();
