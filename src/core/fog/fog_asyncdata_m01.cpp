@@ -186,7 +186,10 @@ extern "C" void fog_sub_1e010(FogAsyncEnv& e, FogAsyncReq* r) {
 // 1.13c Fog+0x212C0 -- CRT-adjacent crossfade filler (hidden-arg recovery from the disassembly):
 // out[i] for i = 0..count-1 = trunc(0.01 * (pow(i/(count-1), 100/n) * max * (100-pct) + min(i/(count-1) * max * n * 0.01, max) * pct)),
 // stored as 1, 2 or 4 byte elements. n = ECX (>=0), out = EDX, pct (0..100) double; elem size 1/2/4; count; max.
-// ponytail: doubles (retail is x87); n == 0 follows IEEE (inf) where retail routes through the CRT error hook 0x21BF7.
+// Retail D2 runs the x87 at 53-bit precision (control word 0x27F), so every FMUL/FADD here rounds exactly as a double
+// (no intermediate leaves the double exponent range); pow is Fog's _CIpow (+0x228B0, call at +0x21441).
+// n == 0 follows IEEE (inf) where retail routes the FDIV through the CRT error hook 0x21BF7 (only when DAT_805cc != 0).
+extern "C" double fog_sub_228b0(double base, double exp);
 extern "C" void fog_sub_212c0(int32_t n, void* out, double pct, int32_t elemSize, int32_t count, int32_t maxv) {
     auto die = [](uint32_t line) { std::fprintf(stderr, "Fog unrecoverable internal error line %u\n", line); std::abort(); };
     if (elemSize != 1 && elemSize != 2 && elemSize != 4) die(0xe);
@@ -197,8 +200,8 @@ extern "C" void fog_sub_212c0(int32_t n, void* out, double pct, int32_t elemSize
     auto* p = static_cast<uint8_t*>(out);
     for (double t = 0.0; t <= lim; t += 1.0, p += elemSize) {
         double x = d * t * m * s;
-        if (!(x < m) && x == x) x = m;  // retail keeps x on x<m or unordered
-        const int32_t v = static_cast<int32_t>((std::pow(d * t, b) * m * a + x * pct) * 0.01);
+        if (!(x < m)) x = m;  // retail: FCOM; test ah,5; jnp -- keeps x only on C0 alone (x < m); unordered takes m
+        const int32_t v = static_cast<int32_t>((fog_sub_228b0(d * t, b) * m * a + x * pct) * 0.01);
         if (elemSize == 1) *p = static_cast<uint8_t>(v);
         else if (elemSize == 2) { const uint16_t w = static_cast<uint16_t>(v); std::memcpy(p, &w, 2); }
         else std::memcpy(p, &v, 4);

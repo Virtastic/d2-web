@@ -12,7 +12,7 @@ struct fog_bb_env {
     void (*reset_event)(void* h);
     void (*release253)(void* h);        // Fog ordinal 253 object release
     int  (*send6)(void* sock, void* a, void* b);   // Fog ordinal 6
-    void (*sock_close707f0)(void* self, int idx);  // Fog+0x207F0
+    void (*sock_close707f0)(void* self, uint32_t timeout, int idx);  // Fog+0x207F0 (the 20AF0 sweep now lives in fog_20af0.cpp)
     void (*sha1_block)(uint32_t* state);           // Fog+0x1D2A0, block follows state
     void (*qpf)(uint64_t* out);
     uint32_t (*tick)(void);
@@ -146,16 +146,6 @@ void fog_bb_pq_destroy(const fog_bb_env* e, fog_bb_pq* q)
     while (q->head) { fog_bb_pkt* nx = q->head->next; void* t = q->head; e->free_ptr(&t); q->head = nx; }
     q->tail = 0; q->head = 0;
     e->cs_delete(q->cs);
-}
-
-// 1.13c Fog+0x20AF0
-struct fog_bb_net { uint8_t pad[4]; int socks[4]; int f_c18; };
-int fog_bb_20af0(const fog_bb_env* e, fog_bb_net* n)
-{
-    if (n->f_c18 == 0)
-        for (int i = 0; i < 4; i++)
-            if (n->socks[i] != -1) e->sock_close707f0(n, i);
-    return 1;
 }
 
 // 1.13c Fog+0x1D740

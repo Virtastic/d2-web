@@ -53,13 +53,13 @@ struct FogDataArray {
     uint32_t at114;        // +0x114
     uint16_t at118;        // +0x118
     uint8_t pad11a[2];     // +0x11A
-    void* data;            // +0x11C
+    uint32_t data;         // +0x11C (a 32-bit retail pointer: the wasm build keeps the 0x120-byte layout)
 };
 #pragma pack(pop)
-static_assert(sizeof(void*) != 4 || offsetof(FogDataArray, count) == 0x100, "count");
-static_assert(sizeof(void*) != 4 || offsetof(FogDataArray, init) == 0x108, "init");
-static_assert(sizeof(void*) != 4 || offsetof(FogDataArray, data) == 0x11C, "data");
-static_assert(sizeof(void*) != 4 || sizeof(FogDataArray) == 0x120, "handle header");
+static_assert(offsetof(FogDataArray, count) == 0x100, "count");
+static_assert(offsetof(FogDataArray, init) == 0x108, "init");
+static_assert(offsetof(FogDataArray, data) == 0x11C, "data");
+static_assert(sizeof(FogDataArray) == 0x120, "handle header");
 
 [[noreturn]] void fog_dataarray_fatal(const FogDataArrayApi* api, uint32_t line) {
     const uint32_t ip = api->capture_ip();
@@ -104,7 +104,7 @@ void* fog_sub_1FA90(const FogDataArrayApi* api, const char* name, int32_t count,
     api->strncpy_(array->name, name, 0x100);
     array->stride = stride;
     array->count = count;
-    array->data = array + 1;
+    array->data = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(array + 1));
     array->init = 0;
     return array;
 }
@@ -131,7 +131,7 @@ void fog_sub_1FCD0(const FogDataArrayApi* api, FogDataArray* array) {
     array->at10c = 0;
     array->at118 = 0x8000;
     for (int32_t i = 0; i < array->count; ++i) {
-        *reinterpret_cast<uint16_t*>(static_cast<uint8_t*>(array->data) +
+        *reinterpret_cast<uint16_t*>(reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(array->data)) +
                                      static_cast<size_t>(array->stride) * static_cast<size_t>(i)) = 0;
     }
 }
