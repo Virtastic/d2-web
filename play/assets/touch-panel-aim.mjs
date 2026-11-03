@@ -21,6 +21,7 @@ import { CUBE_CLOSE } from './cube-close.mjs';
 export const CONTROL_CEL = 32;
 // PlugY's page buttons the stash draws while the shared-stash art is loaded (plugy-stash-ui.mjs LIVE, minus the gold ones).
 const PAGE_BUTTONS = ['prev', 'next', 'shared', 'prevIndex', 'nextIndex'];
+const GOLD_BUTTONS = ['putGold', 'takeGold'];
 
 // The retail 800x600 frame's origin on a canvas of width x height (the same centred scale the renderers use).
 export function panelOrigin(width, height) {
@@ -32,7 +33,7 @@ const toCanvasRect = (r, o) => ({ x: o.x + r.x * o.scale, y: o.y + r.y * o.scale
 const inside = (x, y, r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
 
 // The game-px layout the shell reports -> the canvas-px spec the aim reads, or null when no panel is open.
-//   layout.stash: { plugy } while the stash is open (plugy: PlugY's page buttons are drawn);
+//   layout.stash: { plugy, gold } while the stash is open (plugy: PlugY's page buttons are drawn; gold: its shared-gold buttons too);
 //   layout.cube:  { geometry, panel } while the cube is open -- geometry is the cube's own record (the
 //                 renderer's grid numbers), panel its drawn rectangle { left, top, width, height }.
 export function panelSpec(layout, width, height) {
@@ -42,6 +43,8 @@ export function panelSpec(layout, width, height) {
   let cube = null;
   if (layout.stash) {
     if (layout.stash.plugy) for (const n of PAGE_BUTTONS) controls.push(toCanvasRect({ x: BTN[n].x, y: BTN[n].y, w: CONTROL_CEL, h: CONTROL_CEL }, o));
+    // The shared-gold put/take cels, drawn only while PlugY's ActiveSharedGold is on (plugy-stash-ui.mjs off()).
+    if (layout.stash.plugy && layout.stash.gold) for (const n of GOLD_BUTTONS) controls.push(toCanvasRect({ x: BTN[n].x, y: BTN[n].y, w: CONTROL_CEL, h: CONTROL_CEL }, o));
     // The stash's close cel is drawn whether or not PlugY is on (stash-close.mjs stashCloseAt).
     controls.push(toCanvasRect({ x: BTN.close.x, y: BTN.close.y, w: CONTROL_CEL, h: CONTROL_CEL }, o));
   }

@@ -28,3 +28,12 @@ test('no panel open gives no spec, and onPanelControl is false for a null spec',
   assert.equal(panelSpec(null, 1200, 700), null);
   assert.equal(onPanelControl(10, 10, null), false);
 });
+
+test('the shared-gold buttons are finger targets only while PlugY shared gold is on', () => {
+  const cel = (n) => ({ x: BTN[n].x, y: BTN[n].y, w: 32, h: 32 });
+  const on = panelSpec({ stash: { plugy: true, gold: true } }, 800, 600).controls;
+  assert.ok(on.some((r) => JSON.stringify(r) === JSON.stringify(cel('putGold'))));
+  assert.ok(on.some((r) => JSON.stringify(r) === JSON.stringify(cel('takeGold'))));
+  const off = panelSpec({ stash: { plugy: true, gold: false } }, 800, 600).controls;
+  assert.ok(!off.some((r) => JSON.stringify(r) === JSON.stringify(cel('putGold'))));
+});

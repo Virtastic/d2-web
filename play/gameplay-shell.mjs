@@ -6868,7 +6868,7 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
   // Transmute and grid, in game px; null off the game screen or with neither panel open.
   touchPanelLayout() {
     if (screen !== SCREEN.GAME || clearScreen || !session) return null;
-    const stash = stashOpen && readStashLayout() && stashPanelRenderer ? { plugy: Boolean(plugyStash.enabled && plugyStash.artReady) } : null;
+    const stash = stashOpen && readStashLayout() && stashPanelRenderer ? { plugy: Boolean(plugyStash.enabled && plugyStash.artReady), gold: Boolean(plugyStash.cfg?.sharedGold) } : null;
     const cube = cubeOpen && inventoryVisible ? readCubeLayout() : null;
     return { stash, cube: cube && cubePanelRenderer ? { geometry: cube, panel: cubePanelRenderer.panelRect(cube) } : null };
   },
