@@ -13,6 +13,8 @@ intptr_t r_8A3E0(...); void r_354F0(void*, i32); void r_34AA0(i32); void r_34C00
 void r_8B470(void*); intptr_t r_9BEB0(...); intptr_t r_9C160(...);
 }
 extern "C" i32 DAT_6fd31c20;
+extern "C" void LAB_6fc811b0(); // 1.13c D2Game+0x611B0 (state callback), defined in src/core/fn/d2game_shim62a30.cpp
+extern "C" void LAB_6fc83000(); // 1.13c D2Game+0x63000 (quest 6 callback)
 static inline i32 rd(i32 p, i32 o) { return *(i32*)(intptr_t)(p + o); }
 
 // 1.13c D2Game+0x62A30
@@ -86,7 +88,6 @@ void D2GAME_63350(void* p1, i32 unit)
     if (rd(q, 8) == 0) { o10024((void*)0, o10265(0x820)); std::_Exit(-1); }
     o10003(rd(q, 0xc), 5, 0xd);
     if (*(int16_t*)(intptr_t)(rd(unit, 0x18) + 100) == 0) { *(u8*)(intptr_t)(unit + 10) = 0; return; }
-    extern void LAB_6fc811b0(); // 1.13c D2Game+0x611B0 (state callback)
     *(void**)(intptr_t)(unit + 200) = (void*)&LAB_6fc811b0;
 }
 
@@ -168,7 +169,6 @@ i32 D2GAME_63D70(i32 game, i32* unit)
 {
     i32 s = rd(o10920(unit), 0x10 + *(u8*)(intptr_t)(game + 0x6d) * 4);
     if (o10174(s, 6, 0xd) != 0 && unit && unit[0x20] != 0 && *unit == 0 && (int16_t)r_9BEB0() != -1) {
-        extern void LAB_6fc83000(); // 1.13c D2Game+0x63000
         r_9C160((void*)&LAB_6fc83000);
     }
     return 0;
