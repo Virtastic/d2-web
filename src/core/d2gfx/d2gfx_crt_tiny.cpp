@@ -14,7 +14,7 @@ struct D2GfxCrtTinyHost {
 };
 
 // 1.13c D2Gfx+0x0151C
-extern "C" void d2gfx_exit(D2GfxCrtTinyHost* host, uint32_t code) {
+extern "C" void d2gfx_exit_host(D2GfxCrtTinyHost* host, uint32_t code) {
     host->doexit(code, 1, 0);
 }
 

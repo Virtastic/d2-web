@@ -16,7 +16,7 @@ extern "C" void* Storm_Sub1C580(uint32_t size, const char* tag, int32_t line, ui
 extern "C" int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);
 extern "C" uint16_t Storm_SubFF40(uint32_t, uint32_t, const uint8_t*);
 extern "C" void Storm_Sub5440(void* table, uint32_t n);
-uint32_t* Storm_Sub5040(uint32_t, int32_t param_2, uint32_t param_3, int32_t edi_src);
+extern "C" uint32_t* Storm_Sub5040(uint32_t, int32_t param_2, uint32_t param_3, int32_t edi_src);
 uint32_t Storm_Sub4EF0(uint32_t, uint32_t p2, uint32_t p3, uint32_t edi);
 extern "C" void Storm_ListLink4390(uint32_t* eax, uint8_t* this_, uint8_t* node_arg, int32_t mode);   // 0x4390 (storm_batch_1000.cpp)
 void Storm_Sub4D60(uint8_t* node);
@@ -235,20 +235,7 @@ int32_t Storm_Sub11F10(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d, uint3
     return Storm_Sub11F10Full(nullptr, scratch, a, b, c, d, e, f);
 }
 
-// Storm 0x12690 (1.13c)
-// The local peer record: created on first use from the 0x5040 allocator, with its counters reset.
-int32_t* Storm_Sub12690(void) {
-    uint32_t p = g_a3c[2];
-    if ((int32_t)p < 1) {
-        uint32_t* r = Storm_Sub5040(0, 0, 0, (int32_t)A(g_a3c));
-        p = A(r);
-        for (int i = 0x42; i <= 0x45; i++) wr32(P(p) + i * 4, 0);
-        P(p)[0x212] = 0xff;
-        P(p)[0x213] = 0xff;
-        wr32(P(p) + 0x47 * 4, GetTickCount());
-    }
-    return (int32_t*)P(p);
-}
+// Storm 0x12690 lives in storm_snet_n16.cpp (one definition; it owns the connection list).
 
 // 1.13c Storm+0x12740
 // Release acked/stale messages for peer param_1 (0 = every peer) and the local peer.

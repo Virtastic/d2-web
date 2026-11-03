@@ -32,7 +32,7 @@ static_assert(offsetof(D2MonStatsTxt, wNameStr) == 0x06, "monstats.txt name stri
 static_assert(sizeof(D2ItemsTxt) == 0x1A8, "items.txt stride");
 static_assert(offsetof(D2ItemsTxt, wNameStr) == 0xF4, "items.txt name string");
 
-int D2Common_10211_ITEMS_CheckIfSocketableByItemId(int nItemId);
+extern "C" int D2Common_10211_ITEMS_CheckIfSocketableByItemId(int nItemId);
 int32_t STATLIST_GetTotalStatValue(D2StatListStrc* pStatList, int nStatId, uint16_t nLayer);
 
 // 1.13c D2Common+0x26190 (#?): required level of an item unit for a player unit.

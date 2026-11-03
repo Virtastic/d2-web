@@ -108,7 +108,7 @@ extern "C" void write_multi_char(uint8_t ch, int32_t n, int32_t* pcount, D2Multi
 
 // 1.13c D2Multi+0x22FD
 // Register inputs: EAX -> pcount, EDI -> f; text (ESI/hidden) -> s. n is the stack length.
-extern "C" void write_string(int32_t n, const char* s, int32_t* pcount, D2MultiFile* f) {
+extern "C" void d2multi_write_string(int32_t n, const char* s, int32_t* pcount, D2MultiFile* f) {
     if ((f->_flag & 0x40) == 0 || f->_base != nullptr) {
         while (n > 0) { --n; write_char((uint8_t)*s++, f, pcount); if (*pcount == -1) return; }
     } else {

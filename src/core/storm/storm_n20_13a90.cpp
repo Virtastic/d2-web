@@ -468,7 +468,7 @@ static uint32_t n20_Sub25D70(uint32_t v) { g_43130 = v; return 1; }
 
 // 1.13c Storm+0x262D0
 extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t Storm_Sub262D0(const uint8_t* file, uint32_t* hi, uint32_t (*getFileSize)(uintptr_t, uint32_t*)) {
+uint32_t Storm_Sub262D0_n20(const uint8_t* file, uint32_t* hi, uint32_t (*getFileSize)(uintptr_t, uint32_t*)) {
     if (hi) *hi = 0;
     EnterCriticalSection(&g_fileLock);
     const uint32_t h = r32(file, 0x10C);
@@ -499,7 +499,7 @@ struct StormFileShutSeam {
 
 // 1.13c Storm+0x27020
 extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t Storm_Sub27020(StormFileShutSeam* s) {
+uint32_t Storm_Sub27020_n20(StormFileShutSeam* s) {
     s->sub26F30();
     if (s->threadAlive) { *s->stopFlag = 1; s->setEvent(); s->waitThread(1000); s->closeHandles(); s->threadAlive = 0; }
     if (s->obj43108) { s->dtor[0](s->obj43108); s->free(s->obj43108, "delete", -1); s->obj43108 = nullptr; }

@@ -21,7 +21,7 @@ extern "C" int d2lang_26e0(const char* a, const char* b)
 }
 
 // 1.13c D2Lang+0x01B90 __aulldvrm: unsigned 64-bit divide; quotient returned, remainder via *rem.
-extern "C" uint64_t d2_fn_d2lang_1b90(uint64_t n, uint64_t d, uint64_t* rem)
+extern "C" uint64_t d2_fn_d2lang_1b90_rem(uint64_t n, uint64_t d, uint64_t* rem)
 {
 	uint64_t q = n / d;
 	if (rem)

@@ -80,7 +80,7 @@ extern "C" int32_t d2game_26bb0(D2UnitStrc* unit, int32_t skillId, int32_t level
 
 // The extracted whirlwind scheduler returns 0, 1 or 2, not a C++ bool.
 // 1.13c D2Game+0x26E40
-extern "C" int32_t d2game_26e40(D2GameStrc* game, D2SkillStrc* skill, D2UnitStrc* unit)
+extern "C" int32_t d2game_26e40_batch(D2GameStrc* game, D2SkillStrc* skill, D2UnitStrc* unit)
 {
     if (unit && unit->dwUnitType == UNIT_MONSTER)
         return (ITEMS_RollRandomNumber(&unit->pSeed) & 1) == 0;
@@ -113,7 +113,7 @@ extern "C" int32_t d2game_26e40(D2GameStrc* game, D2SkillStrc* skill, D2UnitStrc
 // The landing helper resolves the saved target and sets the reflected path. Its
 // town test occurs after animation/path bookkeeping, as in retail.
 // 1.13c D2Game+0x27030
-extern "C" int32_t d2game_27030(D2GameStrc* game, D2UnitStrc* unit, D2SkillStrc* skill, int32_t x, int32_t y)
+extern "C" int32_t d2game_27030_batch(D2GameStrc* game, D2UnitStrc* unit, D2SkillStrc* skill, int32_t x, int32_t y)
 {
     if (!skill || !unit->pDynamicPath) return 0;
     auto* target = SUNIT_GetServerUnit(game, SKILLS_GetParam3(skill), SKILLS_GetParam4(skill));

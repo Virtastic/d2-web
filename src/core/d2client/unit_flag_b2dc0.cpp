@@ -16,7 +16,7 @@ static inline void d2c_wr32(uint8_t* p, uint32_t off, uint32_t v) { std::memcpy(
 
 extern "C" {
 // 1.13c D2Client+0xB2DC0
-EMSCRIPTEN_KEEPALIVE void d2c_b2dc0(const D2cB2DC0Env* e, uint8_t* unit, uint32_t unitRetail) {
+EMSCRIPTEN_KEEPALIVE void d2c_b2dc0_unit(const D2cB2DC0Env* e, uint8_t* unit, uint32_t unitRetail) {
     if (!e->pred46C(unitRetail)) { e->b17C0(unitRetail); return; }
     if (unit) d2c_wr32(unit, 0xC4, d2c_rd32(unit, 0xC4) | 0x10000u);
     uint32_t esi = unit ? d2c_rd32(unit, 0x64) : 0;

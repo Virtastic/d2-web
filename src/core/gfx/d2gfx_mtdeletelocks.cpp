@@ -8,7 +8,7 @@
 #include <emscripten.h>
 
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2gfx_mtdeletelocks(uint32_t* table, void (*delete_cs)(uint32_t), void (*free_fn)(uint32_t)) {
+void d2gfx_mtdeletelocks_tbl(uint32_t* table, void (*delete_cs)(uint32_t), void (*free_fn)(uint32_t)) {
     for (int i = 0; i < 0x24; ++i) {
         uint32_t p = table[i * 2];
         if (p != 0 && table[i * 2 + 1] != 1) {

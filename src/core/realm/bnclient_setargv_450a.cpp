@@ -11,7 +11,7 @@ typedef uint32_t *(*bn_malloc_fn)(uint32_t n);
 // on success *argc_out = argc-1, *argv_out = block, return 0; malloc failure returns -1. The mbctable init,
 // GetModuleFileNameA and the argv0 global are the caller's (host CRT) side.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t bn_setargv(int32_t chars, bn_parse_fn parse, bn_malloc_fn alloc,
+EMSCRIPTEN_KEEPALIVE int32_t bn_setargv_450a(int32_t chars, bn_parse_fn parse, bn_malloc_fn alloc,
                                         int32_t *argc_out, uint32_t **argv_out) {
     int32_t st[2] = {chars, 0};
     parse(nullptr, st);

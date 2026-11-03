@@ -63,7 +63,7 @@ EMSCRIPTEN_KEEPALIVE int d2launch_sscanf(const char* src, const char* fmt, ...) 
 typedef int (*D2LaunchCompare)(const void*, const void*);
 
 extern "C"
-void d2launch_shortsort(uint8_t* lo, uint8_t* hi, uint32_t width, D2LaunchCompare comp) {
+void d2launch_shortsort_9b60(uint8_t* lo, uint8_t* hi, uint32_t width, D2LaunchCompare comp) {
     while (lo < hi) {
         uint8_t* maxp = lo;
         for (uint8_t* p = lo + width; p <= hi; p += width) {
