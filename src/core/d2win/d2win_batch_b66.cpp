@@ -79,10 +79,10 @@ static void appendWidget(int32_t* w, const D2WinB66Env* e) {
 }
 
 // 1.13c D2Win+0x115A0 -- new type-9 widget (0x150 bytes), appended to the list.
-// x=ECX, y=EDX, param_3 at stack; hidden: width=EBX, height=caller-pushed (unaff_retaddr).
+// x=ECX, y=EDX; stack words: width, height, p3. FOG_Alloc: size 0x150, line 0x21.
 extern "C" EMSCRIPTEN_KEEPALIVE
-int32_t* d2win_b66_115A0(int32_t x, int32_t y, int32_t p3, int32_t width, int32_t height, const D2WinB66Env* e) {
-    int32_t* w = (int32_t*)e->alloc(0x21, 0);
+int32_t* d2win_b66_115A0(int32_t x, int32_t y, int32_t width, int32_t height, int32_t p3, const D2WinB66Env* e) {
+    int32_t* w = (int32_t*)e->alloc(0x150, 0x21);
     for (int i = 0; i < 0x54; i++) w[i] = 0;
     w[0] = 9;
     w[2] = (w[2] | e->bitMasks[0]) | e->bitMasks[2];

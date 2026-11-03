@@ -73,8 +73,8 @@ uint32_t d2win_load_palette_pl2(int32_t mode, const char* path) {
     return 1;
 }
 
-// 1.13c D2Win+0x117A0 -- __thiscall; hidden EBX (x) and stack-retaddr slot (y) become leading params.
-void d2win_sub_117A0(int32_t x, uint32_t y, void* thisp, int32_t align, uint32_t a2, int32_t a3) {
+// 1.13c D2Win+0x117A0 -- __thiscall, four stack words (ret 0x10): ECX = this, EDX = y, stack = x, align, a2, a3.
+void d2win_sub_117A0(void* thisp, uint32_t y, int32_t x, int32_t align, uint32_t a2, int32_t a3) {
     uint32_t n = E.cellCount(thisp);
     uint32_t rec[18] = {0};
     if (align == 1 || align == 2) {

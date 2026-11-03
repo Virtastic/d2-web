@@ -47,6 +47,8 @@ struct D2WinBatch10030Env {
     uint32_t (*celC)(void* cel);                   // D2CMP #10002, returns cel[3]
     uint32_t (*cel10)(void* cel);                  // D2CMP #10069, returns cel[4]
     uint32_t (*getTickCount)(void);
+    // The table behind the pointer in the slot at 0x6F8FB17C; [0] and [2] are the masks 103D0 uses.
+    const uint32_t* gdwBitMasks;
 };
 
 // Retail source-file literal passed to FOG_Alloc (read from the DLL's .rdata at 0x6F8FC9D8).
@@ -145,32 +147,32 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_10190(uint32_t* controlPtr) {
     return 0;
 }
 
-// 1.13c D2Win+0x103D0 (212 bytes): construct and link a 0x4C-byte type-2 control. __fastcall: ECX
-// and EDX land at +0x0C and +0x10, EBX and the return address (unaff_*) at +0x14 and +0x18; stack
-// words 0..3 (decompile param_3..param_6) go to +0x04, +0x34, +0x48 and +0x30. The +0x08 word is gdwBitMasks[0] | gdwBitMasks[2];
-// +0x1C gets the render callback D2Win+0xFEE0, +0x24 the hit-test D2Win+0x10190, +0x44 the value 5,
-// and the zeroed +0x3C link is appended after the current 0x6F9014A0 tail (or becomes the head).
-// Returns the new object. FOG_Alloc is called with size 0x4C and line 0x1D.
+// 1.13c D2Win+0x103D0 (212 bytes): construct and link a 0x4C-byte type-2 control. __fastcall: ECX and
+// EDX land at +0x0C and +0x10. Six stack words: s0 to +0x14, s1 to +0x18, s2 to +0x04, s3 to +0x34,
+// s4 to +0x48, s5 to +0x30. The +0x08 word is gdwBitMasks[0] | gdwBitMasks[2]; +0x1C gets the render
+// callback D2Win+0xFEE0, +0x24 the hit-test D2Win+0x10190, +0x44 the value 5. The zeroed +0x3C link is
+// appended after the current 0x6F9014A0 tail (or becomes the head). FOG_Alloc: size 0x4C, line 0x1D.
+// Ghidra's __fastcall label hides that ret 0x18 means six stack words after ECX and EDX.
 // 1.13c D2Win+0x103D0
 extern "C"
-EMSCRIPTEN_KEEPALIVE void* d2win_sub_103D0(uint32_t ecx, uint32_t edx, uint32_t ebx, uint32_t retaddr,
-                                           uint32_t s1, uint32_t s2, uint32_t s3, uint32_t s4,
+EMSCRIPTEN_KEEPALIVE void* d2win_sub_103D0(uint32_t ecx, uint32_t edx, uint32_t s0, uint32_t s1,
+                                           uint32_t s2, uint32_t s3, uint32_t s4, uint32_t s5,
                                            const D2WinBatch10030Env* env) {
     void* obj = env->alloc(0x4C, kD2WinImageCpp, 0x1D, 0);
     std::memset(obj, 0, 0x4C);
     wr32(obj, 0x00, 2);
-    wr32(obj, 0x08, d2win_g_6f8fb17c | d2win_g_6f8fb184);
-    wr32(obj, 0x04, s1);       // decompile param_3 (stack word 0)
+    wr32(obj, 0x08, env->gdwBitMasks[0] | env->gdwBitMasks[2]);
+    wr32(obj, 0x04, s2);
     wr32(obj, 0x0C, ecx);
     wr32(obj, 0x10, edx);
-    wr32(obj, 0x14, ebx);      // unaff_EBX
-    wr32(obj, 0x18, retaddr);  // unaff_retaddr
+    wr32(obj, 0x14, s0);
+    wr32(obj, 0x18, s1);
     wr32(obj, 0x1C, (uint32_t)(uintptr_t)env->renderFEE0);
     wr32(obj, 0x24, (uint32_t)(uintptr_t)&d2win_sub_10190);
-    wr32(obj, 0x30, s4);       // param_6
-    wr32(obj, 0x34, s2);       // param_4
+    wr32(obj, 0x30, s5);
+    wr32(obj, 0x34, s3);
     wr32(obj, 0x44, 5);
-    wr32(obj, 0x48, s3);       // param_5
+    wr32(obj, 0x48, s4);
     return d2win_control_append(obj);
 }
 

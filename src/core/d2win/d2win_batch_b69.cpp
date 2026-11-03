@@ -97,6 +97,7 @@ struct D2WinB69Env {
     void (*sub_1E80)(void);                                            // 0x11E80
     void (*sub_2940)(void* str, int32_t x, int32_t y, int32_t color, int32_t z);
     const char* (*sub_BB50)(uint32_t, uint32_t, uint32_t);
+    void (*sub_B250)(uint32_t slot, const char* name);                 // 0xB250: ECX = slot 1..8, EAX = palette name
 };
 
 static void d2win_fatal(uint32_t id) { Ordinal_10024("", Ordinal_10265(id)); _exit(-1); }
@@ -119,7 +120,8 @@ uint32_t d2win_sub_DFF0(uint32_t* rec, const D2WinB69Env* env) {
 
 // 1.13c D2Win+0x0B250 -- name = EAX: open Data\Global\Items\Palette\<name><ext>, read, close.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2win_sub_B250(const char* name, const D2WinB69Env* env) {
+void d2win_sub_B250(uint32_t slot, const char* name, const D2WinB69Env* env) {
+    (void)slot;   // ECX = slot is the palette table index (0x6900 stride); the body below is the file load
     char path[256];
     strcpy(path, "Data\\Global\\Items\\Palette\\");
     strcat(path, name);
@@ -433,5 +435,5 @@ void d2win_sub_EA30(uint32_t* p, const D2WinB69Env* env) {
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2win_sub_BE00(const D2WinB69Env* env) {
     static const char* const k[8] = {"grey", "grey2", "gold", "brown", "greybrown", "invgrey", "invgrey2", "invgreybrown"};
-    for (int i = 0; i < 8; i++) d2win_sub_B250(k[i], env);  // ponytail: slot ECX=i+1 not modelled in sub_B250's seam
+    for (uint32_t i = 0; i < 8; i++) env->sub_B250(i + 1, k[i]);
 }
