@@ -417,3 +417,5 @@ extern "C" int32_t Storm_InflateRefill(uint8_t* st, uint32_t n) {
     nbits = nbits - n + 8;
     return 0;
 }
+extern "C" void storm_n13_seam_F480(uint8_t* st) { sub_F480(st); }
+extern "C" void storm_n13_seam_FC40(uint8_t* st) { sub_FC40(st); }

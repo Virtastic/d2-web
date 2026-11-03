@@ -195,7 +195,7 @@ int32_t Storm_Sub11D90(uint32_t size, uint8_t* conn, const uint8_t* src) {
 
 // 1.13c Storm+0x11F10
 // Normalise the SNP info blocks: in3c (EAX) -> out3c (EBX, 0x3c), p1 -> out10, p2 -> out50, p3 -> out14.
-int32_t Storm_Sub11F10Full(const uint32_t* in3c, uint32_t* out3c, const uint32_t* p1, const uint32_t* p2,
+extern "C" int32_t Storm_Sub11F10Full(const uint32_t* in3c, uint32_t* out3c, const uint32_t* p1, const uint32_t* p2,
                            const uint32_t* p3, uint32_t* out10, uint32_t* out50, uint32_t* out14) {
     std::memset(out3c, 0, 0x3c);
     copyClamped((uint8_t*)out3c, in3c, 0x3c);
