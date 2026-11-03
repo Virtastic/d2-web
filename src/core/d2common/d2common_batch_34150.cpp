@@ -191,43 +191,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2COMMON_GetOverlayOffsetX(int32_t nOverlay)
 	return sgptDataTables->pOverlayTxt[nOverlay].dwOffsetX;
 }
 
-// 0x50CE0's callees 0x81B90 and 0x767F0 are still UNMAPPED rows (no cached body).
-struct D2Common50CE0Env
-{
-	uint32_t (*pGetList)(uint32_t pUnit, uint32_t nArg);
-	int32_t (*pGetDivisor)(uint32_t pUnit, uint32_t pList);
-};
-
-// 1.13c D2Common+0x50CE0 (#10639): for a player unit whose dwFlagEx (+0xC8) has bit 3 set, divide
-// the low byte-cleared dwFrameCountPrecise (+0x48) by the divisor from 0x767F0 (0x13 when 0x81B90
-// answers null, 0 when the divisor is not positive).
-extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_50ce0(D2UnitStrc* pUnit, const D2Common50CE0Env* pEnv)
-{
-	if (!pUnit || pUnit->dwUnitType != 0)
-		return 0;
-	if (((pUnit->dwFlagEx >> 3) & 1) == 0)
-		return 0;
-
-	int32_t nDivisor = 0x13;
-	const uint32_t pList = (pEnv && pEnv->pGetList) ? pEnv->pGetList(static_cast<uint32_t>(
-	                                                      reinterpret_cast<uintptr_t>(pUnit)), 0)
-	                                                : 0;
-	if (pList)
-	{
-		nDivisor = (pEnv && pEnv->pGetDivisor)
-		               ? pEnv->pGetDivisor(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pUnit)),
-		                                   pList)
-		               : 0;
-		if (nDivisor < 1)
-			return 0;
-	}
-
-	const int64_t nValue = static_cast<int64_t>(pUnit->dwFrameCountPrecise) &
-	                       static_cast<int64_t>(~static_cast<int64_t>(0xFF));
-	return static_cast<int32_t>(nValue / nDivisor);
-}
-
 // 1.13c D2Common+0x23E30 (#10640): count the items on a unit's inventory list (signature
 // 0x01020304) that sit on inventory page 0 or 3 at node position 1, or at node position 3. Items
 // flagged 0x10 in their item data are skipped. The walk follows the item data's pNextItem (+0x64)

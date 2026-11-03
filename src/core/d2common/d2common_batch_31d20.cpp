@@ -362,51 +362,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_5a810(uint32_t pUnit,
 	return pfnLang10003 ? pfnLang10003(static_cast<uint32_t>(nStringId)) : 0;
 }
 
-// 1.13c D2Common+0x46770 (#10260): assign the rune properties of an item.
-// 0x26BA0 gives the runes.txt row; none means 0. When the item's stat list (item+0x5C) has a negative
-// dword at +0x10, both node lists (+0x3C and +0x40, next at +0x2C) are scanned and a node whose dword
-// at +0x14 is 0xAB aborts with 0. Otherwise a type-4 item with item data (+0x14) gets 0x4000000 in the
-// data dword at +0x18, then the row's seven properties (stride 0x10 from +0xB0) are walked: a negative
-// property id ends the walk with 1, otherwise 0x45990(6, item, nArg2) is called. Always ends 1.
-// 0x26BA0 and 0x45990 (whose other operands are register/stack and dropped) are env seams.
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_46770(uint32_t pItem, uint32_t nArg2,
-	uint32_t (*pfnRunes26BA0)(uint32_t),
-	void (*pfnAssign45990)(int32_t, uint32_t, uint32_t))
-{
-	uint8_t* item = P(pItem);
-	const uint32_t pRunes = (item && pfnRunes26BA0) ? pfnRunes26BA0(pItem) : 0;
-	if (pRunes == 0)
-		return 0;
-
-	const uint32_t nStatList = W(item, 0x5C);
-	if (nStatList && static_cast<int32_t>(W(P(nStatList), 0x10)) < 0)
-	{
-		for (int nList = 0; nList < 2; ++nList)
-		{
-			for (uint32_t pNode = W(P(nStatList), 0x3C + nList * 4); pNode != 0; pNode = W(P(pNode), 0x2C))
-			{
-				if (W(P(pNode), 0x14) == 0xAB)
-					return 0;
-			}
-		}
-	}
-
-	const uint32_t pItemData = W(item, 0x14);
-	if (W(item, 0) == 4 && pItemData)
-		W(P(pItemData), 0x18) |= 0x4000000;
-
-	for (int i = 0; i < 7; ++i)
-	{
-		const int32_t nProperty = static_cast<int32_t>(W(P(pRunes), 0xB0 + i * 0x10));
-		if (nProperty < 0)
-			return 1;
-		if (pfnAssign45990)
-			pfnAssign45990(6, pItem, nArg2);
-	}
-	return 1;
-}
-
 // 1.13c D2Common+0x2F6A0 (#10265): take and reset a type-0 unit's +0x14 data block fields.
 // Dword +0x84 and +0x8C are read out, then +0x74 is cleared, +0x7C and +0x90 become -1 and +0x94 is
 // cleared. A non-type-0 (or null) unit writes 0 and -1. A type-0 unit with a null data block is fatal in

@@ -3,6 +3,7 @@
 // Where the retail body is line-for-line a vendored 1.10f function, the vendored one is called; the
 // rest follow the decompile stores. Retail's fatal _exit paths are modelled as returns, as elsewhere
 // in src/core/d2common.
+#include <cstddef>
 #include <cstdint>
 
 #include "D2DataTbls.h"
@@ -131,26 +132,54 @@ extern "C" void d2_fn_d2common_4bb30(uint32_t pRoom, int32_t nX, int32_t nY, uin
 		reinterpret_cast<D2ActiveRoomStrc*>(static_cast<uintptr_t>(pRoom)), &pBoundingBox, nMask);
 }
 
-// 1.13c D2Common+0x4BB70: clear nMask on the single subtile (nX, nY) -- the size-1 footprint. The
-// room is resolved with DUNGEON_GetRoomAtPosition (retail 0x1330) and the grid's mask word is
-// pCollisionMask[nX + width * (nY - nSubtileY) - nSubtileX]. This is the vendored 1.10f
-// COLLISION_ResetCollisionMask body.
-extern "C" void d2_fn_d2common_4bb70(uint32_t pRoom, int32_t nX, int32_t nY, uint16_t nMask)
+namespace
 {
-	COLLISION_ResetCollisionMask(reinterpret_cast<D2ActiveRoomStrc*>(static_cast<uintptr_t>(pRoom)),
-		nX, nY, nMask);
+	// Grid record and layer prefix, as in d2common_batch_321e0.cpp (0x4C940): the cell array sits at +0x20.
+	struct D2Grid2D88Hdr
+	{
+		int32_t nField0;   // 0x00
+		int32_t nField1;   // 0x04
+		int32_t nField2;   // 0x08
+		int32_t nPad[5];   // 0x0C
+		void* pCells;      // 0x20
+	};
+	static_assert(offsetof(D2Grid2D88Hdr, pCells) == 0x20, "grid header pointer at retail offset 0x20");
+
+	// Clears nMask in the 0x1330 grid cell (nX, nY): layer = record +0x20, index = (nY - layer[+4]) *
+	// layer[+8] - layer[+0] + nX. A missing record or layer leaves the grid alone, as retail does.
+	void ClearGridCell1330(void* (*pfnGrid1330)(void), int32_t nX, int32_t nY, uint16_t nMask)
+	{
+		if (!pfnGrid1330)
+			return;
+		auto* pRecord = static_cast<D2Grid2D88Hdr*>(pfnGrid1330());
+		auto* pLayer = pRecord ? static_cast<D2Grid2D88Hdr*>(pRecord->pCells) : nullptr;
+		if (!pLayer || !pLayer->pCells)
+			return;
+		const int32_t nIndex = (nY - pLayer->nField1) * pLayer->nField2 - pLayer->nField0 + nX;
+		auto* pCell = reinterpret_cast<uint16_t*>(static_cast<uint8_t*>(pLayer->pCells) +
+			static_cast<intptr_t>(nIndex) * 2);
+		*pCell &= static_cast<uint16_t>(~nMask);
+	}
 }
 
-// 1.13c D2Common+0x4BBB0: clear nMask over the plus-shaped 5-subtile footprint centred on (nX, nY)
-// -- the size-2 and small-unit-pattern footprint. The five cells are (nX-1,nY), (nX,nY), (nX+1,nY),
-// (nX,nY-1) and (nX,nY+1), each through COLLISION_ResetCollisionMask.
-extern "C" void d2_fn_d2common_4bbb0(uint32_t pRoom, int32_t nX, int32_t nY, uint16_t nMask)
+// 1.13c D2Common+0x4BB70: clear nMask on the single subtile (nX, nY) of the 0x1330 grid. Retail takes the
+// mask in CX and x in EDX, y on the stack; the first argument is not read.
+extern "C" void d2_fn_d2common_4bb70(uint32_t nUnused, int32_t nX, int32_t nY, uint16_t nMask,
+	void* (*pfnGrid1330)(void))
 {
-	D2ActiveRoomStrc* pActiveRoom = reinterpret_cast<D2ActiveRoomStrc*>(static_cast<uintptr_t>(pRoom));
+	(void)nUnused;
+	ClearGridCell1330(pfnGrid1330, nX, nY, nMask);
+}
 
-	COLLISION_ResetCollisionMask(pActiveRoom, nX - 1, nY, nMask);
-	COLLISION_ResetCollisionMask(pActiveRoom, nX, nY, nMask);
-	COLLISION_ResetCollisionMask(pActiveRoom, nX + 1, nY, nMask);
-	COLLISION_ResetCollisionMask(pActiveRoom, nX, nY - 1, nMask);
-	COLLISION_ResetCollisionMask(pActiveRoom, nX, nY + 1, nMask);
+// 1.13c D2Common+0x4BBB0: clear nMask over the plus-shaped 5-subtile footprint centred on (nX, nY) of the
+// 0x1330 grid. The cells are (nX-1,nY), (nX,nY), (nX+1,nY), (nX,nY-1), (nX,nY+1); retail reads y from ESI.
+extern "C" void d2_fn_d2common_4bbb0(uint32_t nUnused, int32_t nX, int32_t nY, uint16_t nMask,
+	void* (*pfnGrid1330)(void))
+{
+	(void)nUnused;
+	ClearGridCell1330(pfnGrid1330, nX - 1, nY, nMask);
+	ClearGridCell1330(pfnGrid1330, nX, nY, nMask);
+	ClearGridCell1330(pfnGrid1330, nX + 1, nY, nMask);
+	ClearGridCell1330(pfnGrid1330, nX, nY - 1, nMask);
+	ClearGridCell1330(pfnGrid1330, nX, nY + 1, nMask);
 }

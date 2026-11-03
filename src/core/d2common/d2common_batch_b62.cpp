@@ -33,27 +33,6 @@ template <class T> static void wr(void* p, size_t o, T v) { std::memcpy((char*)p
 static void* rdp(const void* p, size_t o) { return (void*)(uintptr_t)rd<uint32_t>(p, o); }
 [[noreturn]] static void fatal() { __builtin_trap(); } // retail: Ordinal_10024(msg); _exit(-1)
 
-// 1.13c D2Common+0x522C0: register map EDI = pUnit (this unit), EBX = stat-list id; stack param_1 = bCreate.
-void* sub_522C0(void* pUnitEDI, int32_t idEBX, int32_t bCreate)
-{
-    void* l = rdp(pUnitEDI, 0x5c);
-    void* r = nullptr;
-    if (l && rd<int32_t>(l, 0x10) < 0) r = sub_87F80(l, idEBX);
-    if (bCreate) {
-        if (!r) {
-            r = sub_88100(rdp(pUnitEDI, 8), 0);
-            if (r) wr<int32_t>(r, 0x14, idEBX);
-            sub_8A7D0(pUnitEDI, r, 1);
-        }
-        return r;
-    }
-    if (r) {
-        D2Common_ExpireStatList_6FDB6E30(r);
-        if (rd<int32_t>(r, 0x10) >= 0) D2Common_STATLIST_FreeStatListImpl_6FDB7050(r);
-    }
-    return nullptr;
-}
-
 // 1.13c D2Common+0x35470: register map EDI = pCtx (+0x30 -> pathInfo), ESI only feeds a fatal-code arg.
 int32_t sub_35470(void* pCtxEDI)
 {

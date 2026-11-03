@@ -77,20 +77,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_53ad0()
 	sgptDataTables->nMonPresetTxtActRecordCounts[4] = 0;
 }
 
-// 1.13c D2Common+0x534B0: release the linker at 0x6FDF0890, report every one of the 0x2C-stride
-// records whose +0x28 is still non-null, then clear the base/count pair. Native typed indexing
-// preserves the widened pInfo pointer and record stride.
+// 1.13c D2Common+0x534B0: release the linker at 0x6FDF0890, then clear the base/count pair. Retail does
+// NOT free the record pInfo blocks or the record array: it only reports each 0x2C-stride record whose +0x28
+// is non-null (Ordinal_10046, MonsterTbls.cpp lines 0x643 and 0x647) and drops the pointers, so those
+// blocks leak exactly as they do in retail. The report itself is a log seam with no wasm effect.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_534b0()
 {
 	FOG_FreeLinker(sgptDataTables->pTreasureClassExLinker);
-	for (int i = 0; i < sgptDataTables->nTreasureClassEx; ++i)
-	{
-		if (sgptDataTables->pTreasureClassEx[i].pInfo != 0)
-		{
-			D2_FREE_POOL(nullptr, sgptDataTables->pTreasureClassEx[i].pInfo);
-		}
-	}
-	D2_FREE_POOL(nullptr, sgptDataTables->pTreasureClassEx);
 	sgptDataTables->pTreasureClassEx = 0;
 	sgptDataTables->nTreasureClassEx = 0;
 }

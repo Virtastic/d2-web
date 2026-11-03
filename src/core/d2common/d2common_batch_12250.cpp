@@ -54,14 +54,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_24F00_ItemRepairable(uint32_t item, int32
  return hasDurability && hasDurability(item) && validType && validType(item) &&
         (!isEthereal || !isEthereal(item));
 }
-// 1.13c D2Common+0x455B0: resolve a unit and return its item data field +0x1D0.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_455b0(uint32_t first, uint32_t second, uint32_t third,
- uint32_t (*resolve)(uint32_t,uint32_t,uint32_t*,uint32_t*)) {
- if (!resolve) return 0;
- uint32_t a=first,b=third; uint32_t unit=resolve(third,second,&a,&b);
- if (!unit || !w(unit,0x10) || !w(w(unit,0x10),0x58)) return 0;
- return w(w(w(unit,0x10),0x58),0x1D0);
-}
 // 1.13c D2Common+0x2F100: update sequence mode, frame and event; report a mode change.
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_2f100(uint32_t unit, uint32_t target,
  void (*compute)(uint32_t,uint32_t,uint32_t,uint32_t*,uint32_t*,int32_t*,uint32_t*)) {

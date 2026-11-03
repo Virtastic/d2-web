@@ -100,20 +100,6 @@ extern "C" int32_t D2Common_66630_ValidateRoomMembership(const uint8_t* pRoom, c
     return -1;
 }
 
-// 1.13c D2Common+0x4F120: succeeds only when the unit helper accepts the input, the current
-// record exists, and the record-check helper returns zero.
-extern "C" uint32_t D2Common_4F120_CheckCurrentRecord(int32_t* pUnit,
-    int32_t (*pfnValidateUnit4FE10)(int32_t*), void* (*pfnGetCurrentRecord51330)(void),
-    int32_t (*pfnCheckRecord7D320)(void))
-{
-    if (pfnValidateUnit4FE10 == nullptr || !pfnValidateUnit4FE10(pUnit))
-        return 0;
-    if (pfnGetCurrentRecord51330 == nullptr || pfnGetCurrentRecord51330() == nullptr)
-        return 0;
-    const int32_t nResult = pfnCheckRecord7D320 ? pfnCheckRecord7D320() : 1;
-    return nResult == 0 ? 1u : 0u;
-}
-
 // 1.13c D2Common+0x12AF0: emits a timestamped tab-separated diagnostic prefix and the caller's
 // formatted message when logging is enabled. The environment and output stream are explicit inputs.
 extern "C" void D2Common_12AF0_WriteDiagnostic(uint32_t bEnabled, const char* szTimestamp,

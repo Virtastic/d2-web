@@ -15,12 +15,6 @@
 #include "Units/Item.h"
 #include "DataTbls/MonsterTbls.h"
 
-// 1.13c D2Common+0x4EBF0
-extern "C" D2UnitStrc* d2_fn_d2common_4ebf0(D2InventoryStrc* inventory, int32_t bodyLoc)
-{
-    return INVENTORY_GetItemFromBodyLoc(inventory, bodyLoc == 5 ? 4 : 5);
-}
-
 static_assert(offsetof(D2SkillsTxt, nSkillId) == 0);
 static_assert(offsetof(D2SkillsTxt, nItemTypeAB) == 0x18);
 static_assert(offsetof(D2SkillsTxt, nElemTypeAB) == 0x24);
