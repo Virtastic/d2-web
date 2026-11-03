@@ -130,30 +130,4 @@ extern "C" void D2Common_12AF0_WriteDiagnostic(uint32_t bEnabled, const char* sz
         pfnFlush();
 }
 
-// 1.13c D2Common+0x32E10: initializes the 15-dword temporary stat record, selects the base value
-// from the parameter record (or 6), fills the stat metadata and conditionally applies the scaled
-// table ratio to the target. Table and engine helpers are seams pending their own rows.
-extern "C" void D2Common_32E10_ApplyScaledStat(int32_t nTableIndex, int32_t* pParameters,
-    int32_t nOwner, int32_t nSource, int32_t (*pfnGetStatTableValue)(int32_t, uint32_t*, uint32_t*),
-    void (*pfnSetStatRecord)(StatRecord*, uint32_t, int32_t),
-    void (*pfnApplyStatRecord)(int32_t, const StatRecord*, int32_t))
-{
-    const int32_t nBase = pParameters ? pParameters[0] : 6;
-    const int32_t nSeed = pParameters ? pParameters[2] : 0;
-    StatRecord record{};
-    record.fields[0] = nSeed;
-    record.fields[2] = nOwner;
-    record.fields[3] = nSource;
-    record.fields[4] = 4;
-    uint32_t nNumerator = 0;
-    uint32_t nDenominator = 0;
-    if (nTableIndex >= 0 && pfnGetStatTableValue != nullptr &&
-        pfnGetStatTableValue(nTableIndex, &nNumerator, &nDenominator) && nDenominator != 0)
-    {
-        const int32_t nPercent = static_cast<int32_t>((static_cast<uint64_t>(nNumerator) * 100) / nDenominator) - 100;
-        if (pfnSetStatRecord != nullptr)
-            pfnSetStatRecord(&record, 0x43, nPercent);
-        if (pfnApplyStatRecord != nullptr)
-            pfnApplyStatRecord(nBase, &record, 1);
-    }
-}
+// 0x32E10 is UNITS_CharacterStartRunningOrKnockback (src/core/d2moo/src/Units/Units.cpp); the word-array placeholder that stood here is retired.

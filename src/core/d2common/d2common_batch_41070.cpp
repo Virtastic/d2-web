@@ -165,7 +165,7 @@ void D2Common_7EE50(D2DrlgLevelStrc* level) {
     }
 }
 
-// 1.13c D2Common+0x7EF60: ESI level, ECX forwarded; preserves transposed scan bounds.
+// (superseded by the per-function port; was D2Common+0x7EF60): ESI level, ECX forwarded; preserves transposed scan bounds.
 void D2Common_7EF60(D2DrlgLevelStrc* level) {
     if (level->nLevelId == 0x27) return;
     auto* out = level->pOutdoors;
@@ -189,7 +189,7 @@ void D2Common_7EF60(D2DrlgLevelStrc* level) {
     }
 }
 
-// 1.13c D2Common+0x7F180: EAX level; cottage IDs recovered from caller EAX loads.
+// (superseded by the per-function port; was D2Common+0x7F180): EAX level; cottage IDs recovered from caller EAX loads.
 void D2Common_7F180(D2DrlgLevelStrc* level) {
     const auto preset = [level](int id) { DRLGOUTDOORS_SpawnOutdoorLevelPreset(level, id, -1, 0, 15); };
     const auto random = [level](int id) { DRLGOUTDOORS_SpawnRandomOutdoorDS1(level, id, -1); };
@@ -208,8 +208,8 @@ void D2Common_7F180(D2DrlgLevelStrc* level) {
     preset(0x1d); preset(0x1e);
 }
 
-// 1.13c D2Common+0x858E0: EDI level; nine fixed tomb entries followed by the central warp.
+// (superseded by the per-function port; was D2Common+0x858E0): EDI level; nine fixed tomb entries followed by the central warp.
 void D2Common_858E0(D2DrlgLevelStrc* level) { DRLGOUTDESR_PlaceTombEntriesInCanyon(level); }
 
-// 1.13c D2Common+0x85930: EDI level; one seed roll selects one of eight five-preset cliff layouts.
+// (superseded by the per-function port; was D2Common+0x85930): EDI level; one seed roll selects one of eight five-preset cliff layouts.
 void D2Common_85930(D2DrlgLevelStrc* level) { DRLGOUTDESR_PlaceCliffs(level); }

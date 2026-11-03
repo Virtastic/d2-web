@@ -77,7 +77,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_697c0(uint32_t a1, uintptr_t a2, uintpt
 // 1.13c D2Common+0x816C0: (ecx=x, edx=roomA, eax=y, a3=roomB). If (x,y) is inside roomA's rect (+0x34/38,
 // size +0x3c/40) fetch both tiles via 0x810A0; when both have +0x28 set, same +0x58->+0x1d0, differing
 // +0x28 and equal +0x20, call 0x80EE0(roomB, tileB+0x28, tileA+0x28, tileA+0x20).
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_816c0(int32_t x, uintptr_t roomA, int32_t y, uintptr_t roomB,
+EMSCRIPTEN_KEEPALIVE void d2c_816c0_old(int32_t x, uintptr_t roomA, int32_t y, uintptr_t roomB,
 	uintptr_t (*w810a0)(int32_t, uintptr_t, int32_t), void (*w80ee0)(uintptr_t, uint32_t, uint32_t, uint32_t)) {
 	if (!(iw(roomA, 0x34) <= x && iw(roomA, 0x38) <= y &&
 		x <= iw(roomA, 0x3c) + iw(roomA, 0x34) && y <= iw(roomA, 0x40) + iw(roomA, 0x38))) return;

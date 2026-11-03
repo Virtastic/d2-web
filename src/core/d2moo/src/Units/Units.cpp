@@ -25,6 +25,7 @@
 #include <D2Math.h>
 #include <limits>
 #include <cstddef>
+#include "../../../d2common/d2common_33110.h"   // d2-web: the 1.13c body of UNITS_UpdateAnimRateAndVelocity
 
 extern D2InventoryGridInfoStrc gBodyLocInventoryGridInfo;   // D2Inventory.cpp; 1.13c DAT_6FDED378 = {13,1}
 
@@ -693,9 +694,12 @@ void __stdcall UNITS_SetAnimData(D2UnitStrc* pUnit, int nUnitType, int nClassId,
 }
 
 //Helper function
+// 1.13c D2Common+0x32E10 (EAX = nClassId, [esp+4] = pUnit, ret 4). 1.13c delta: a null unit allocates from no pool with
+// owner type 6, owner id -1 (1.10f dereferenced it); the post that follows still needs a unit, as in retail.
 void __stdcall UNITS_CharacterStartRunningOrKnockback(D2UnitStrc* pUnit, int nClassId)
 {
-	D2StatListStrc* pStatList = STATLIST_AllocStatList(pUnit->pMemoryPool, STATLIST_TEMPONLY, 0, pUnit->dwUnitType, pUnit->dwUnitId);
+	D2StatListStrc* pStatList = pUnit ? STATLIST_AllocStatList(pUnit->pMemoryPool, STATLIST_TEMPONLY, 0, pUnit->dwUnitType, pUnit->dwUnitId)
+	                                  : STATLIST_AllocStatList(nullptr, STATLIST_TEMPONLY, 0, 6, (D2UnitGUID)-1);
 	if (D2CharStatsTxt* pCharStatsTxtRecord = UNITS_GetCharStatsTxtRecord(nClassId))
 	{
 		if (pCharStatsTxtRecord->nWalkSpeed != 0)
@@ -1735,59 +1739,38 @@ __forceinline void __fastcall UNITS_UpdateRunWalkAnimRateAndVelocity(D2UnitStrc*
 
 //1.10f: D2Common.0x6FDBF050 (#10376)
 //1.13c: D2Common.0x6FD83110 (#10819)
+// 1.13c D2Common+0x33110: the body is the 1.13c port in d2common/d2common_33110.cpp; this binds its callees to the D2MOO
+// functions. 1.13c deltas: no trace on a null unit, bad type or null path; cast, block, get-hit, attack and the stat-rate
+// "other" path divide the rate product unsigned (a negative product saturates to 0x7FFF); the holy-shield test guards the
+// raw unit type and the states.txt count inline; pAnimData is read as SetAnimData left it.
 void __stdcall UNITS_UpdateAnimRateAndVelocity(D2UnitStrc* pUnit, const char* szFile, int nLine)
 {
-	if (!pUnit)
-	{
-		FOG_Trace("UnitUpdateAnimRateAndVel(): NULL unit  FILE:%s  LINE:%d", szFile, nLine);
-		return;
-	}
-
-	int nUnitType = pUnit->dwUnitType;
-	if (nUnitType >= UNIT_TILE)
-	{
-		FOG_Trace("UnitUpdateAnimRateAndVel(): invalid unit (TYPE:%d)  FILE:%s  LINE:%d", nUnitType, szFile, nLine);
-		return;
-	}
-	else if (nUnitType == UNIT_ITEM)
-	{
-		return;
-	}
-
-	int nClassId = pUnit->dwClassId;
-	int nAnimMode = pUnit->dwAnimMode;
-	D2COMMON_11013_ConvertMode(pUnit, &nUnitType, &nClassId, &nAnimMode, __FILE__, __LINE__);
-	UNITS_SetAnimData(pUnit, nUnitType, nClassId, nAnimMode);
-	pUnit->pAnimData = DATATBLS_GetAnimDataRecord(pUnit, nClassId, nAnimMode, nUnitType, pUnit->pInventory);
-
-	if (UNITS_IsSeqAnimSpeedModulatedByFCR(pUnit, nUnitType, nAnimMode))
-	{
-		return UNITS_UpdateCastAnimRateAndVelocity(pUnit);
-	}
-	else if (UNITS_IsAnimModeBlocking(nUnitType, nAnimMode))
-	{
-		return UNITS_UpdateBlockAnimRateAndVelocity(pUnit);
-	}
-	else if (UNITS_IsAnimModeGetHit(nUnitType, nAnimMode))
-	{
-		return UNITS_UpdateGetHitAnimRateAndVelocity(pUnit);
-	}
-	else if (UNITS_IsAnimModeKnockBack(nUnitType, nAnimMode))
-	{
-		return UNITS_UpdateKnockbackAnimRateAndVelocity(pUnit, nAnimMode, nUnitType, nClassId);
-	}
-	else if (UNITS_CanAnimModeUseVelocityModifier(nUnitType, nAnimMode, pUnit, nClassId))
-	{
-		return UNITS_UpdateRunWalkAnimRateAndVelocity(pUnit, nAnimMode, nUnitType, nClassId, szFile, nLine);
-	}
-	else if (UNITS_CanAnimModeUseAttackRate(nUnitType, nAnimMode, pUnit, nClassId))
-	{
-		return UNITS_UpdateAttackAnimRateAndVelocity(pUnit);
-	}
-	else
-	{
-		return UNITS_UpdateOtherAnimRateAndVelocity(pUnit, nAnimMode, nUnitType, nClassId);
-	}
+	(void)szFile; (void)nLine;
+	static const D2Common33110Env kEnv = {
+		[](D2UnitStrc* u, int* t, int* c, int* m) { D2COMMON_11013_ConvertMode(u, t, c, m, __FILE__, __LINE__); },
+		[](D2UnitStrc* u, int t, int c, int m) { UNITS_SetAnimData(u, t, c, m); },
+		[](D2UnitStrc* u, int t, int m) -> int { return UNITS_IsSeqAnimSpeedModulatedByFCR(u, t, m); },
+		[](int n, D2UnitStrc* u) -> int { return UNITS_GetAnimStatBasePercentage((D2C_UnitAnimModeStats)n, u); },
+		[](int t, int m) -> int { return UNITS_IsAnimModeBlocking(t, m); },
+		[](D2UnitStrc* u, int n) -> int { return STATES_CheckState(u, n); },
+		[](int t, int m) -> int { return UNITS_IsAnimModeGetHit(t, m); },
+		[](int t, int m) -> int { return UNITS_IsAnimModeKnockBack(t, m); },
+		[](int t, int c, int m) -> int { return UNITS_GetBaseAnimSpeed(t, c, m); },
+		[](D2DynamicPathStrc* p, int v) { PATH_SetVelocity(p, v, __FILE__, __LINE__); },
+		[](int t, int m, D2UnitStrc* u, int c) -> int { return UNITS_CanAnimModeUseVelocityModifier(t, m, u, c); },
+		[](D2UnitStrc* u, int n, int l) -> int { return STATLIST_UnitGetStatValue(u, n, (uint16_t)l); },
+		[](int t, int c) -> int { return UNITS_GetBaseVelocity(t, c); },
+		[](int t, int m, D2UnitStrc* u, int c) -> int { return UNITS_CanAnimModeUseAttackRate(t, m, u, c); },
+		[](D2UnitStrc* u, int b) { UNITS_MergeDualWieldWeaponStatLists(u, b); },
+		[](D2UnitStrc* u) -> int { return UNITS_CanDualWield(u); },
+		[](D2InventoryStrc* i, int l) { return INVENTORY_GetItemFromBodyLoc(i, l); },
+		[](D2UnitStrc* i) -> int { return ITEMS_CanBeEquipped(i); },
+		[](D2UnitStrc* i, int n) -> int { return ITEMS_CheckItemTypeId(i, n); },
+		[](D2UnitStrc* u, int n) -> int { return STATES_CheckStateMaskOnUnit(u, n); },
+		[](D2UnitStrc* u) -> int { return D2Common_11043(u); },
+		[](int t, int m, int c) -> int { return UNITS_AnimModeAllowsAnimSpeed(t, m, c); },
+	};
+	D2Common_33110_UpdateAnimRate(pUnit, kEnv);
 }
 
 // 1.13c D2Common+0x30B40

@@ -99,7 +99,7 @@ void __fastcall d2c_41ca0_init_act5_outdoors(D2DrlgLevelStrc* level)
 	DRLGOUTSIEGE_InitAct5OutdoorLevel(level);
 }
 
-// 1.13c D2Common+0x7F3A0
+// (superseded by the per-function port; was D2Common+0x7F3A0)
 void __fastcall d2c_7f3a0_init_act1_outdoors(D2DrlgLevelStrc* level)
 {
 	DRLGOUTWILD_InitAct1OutdoorLevel(level);
@@ -111,13 +111,13 @@ void __fastcall d2c_854c0_build_jungle(D2DrlgLevelStrc* level)
 	DRLGOUTJUNG_BuildJungle(level);
 }
 
-// 1.13c D2Common+0x85E20
+// (superseded by the per-function port; was D2Common+0x85E20)
 void __fastcall d2c_85e20_init_act2_outdoors(D2DrlgLevelStrc* level)
 {
 	DRLGOUTDESR_InitAct2OutdoorLevel(level);
 }
 
-// 1.13c D2Common+0x861A0
+// (superseded by the per-function port; was D2Common+0x861A0)
 void __fastcall d2c_861a0_init_act4_outdoors(D2DrlgLevelStrc* level)
 {
 	DRLGOUTDOORS_InitAct4OutdoorLevel(level);

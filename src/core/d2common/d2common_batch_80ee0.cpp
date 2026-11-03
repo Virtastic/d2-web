@@ -13,7 +13,7 @@ namespace
 
 // 1.13c D2Common+0x80EE0
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_80ee0(uint32_t room, uint32_t from, uint32_t to, uint32_t p4)
+EMSCRIPTEN_KEEPALIVE void d2c_80ee0_old(uint32_t room, uint32_t from, uint32_t to, uint32_t p4)
 {
 	uint32_t data = W(room, 0x64);
 	if (!data || (*reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(data)) & 1)) return;
@@ -25,6 +25,6 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_80ee0(uint32_t room, uint32_t from, uin
 	{
 		uint32_t n = W(W(room, 8), i * 4);
 		if (n != room && W(W(n, 0x58), 0x1D0) == W(W(room, 0x58), 0x1D0))
-			d2_fn_d2common_80ee0(n, from, to, p4);
+			d2c_80ee0_old(n, from, to, p4);
 	}
 }

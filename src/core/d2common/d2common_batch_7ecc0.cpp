@@ -24,7 +24,7 @@ static int32_t Map7ECC0(int32_t kind, uint32_t flags, const int32_t* tbl, int la
     if (kind == 7 && (flags & 0xf0000) == 0x30000) return 3;
     return tbl[kind * 2 + lane];
 }
-// 1.13c D2Common+0x7ECC0
+// (superseded by the per-function port; was D2Common+0x7ECC0)
 void D2Common_7ECC0(void* pObj, int32_t base, const int32_t* tbl,
                     void (*set42A70)(void*, int32_t, int32_t, int32_t, int32_t, int32_t),
                     void (*call7EB40)())

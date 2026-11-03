@@ -56,7 +56,7 @@ uintptr_t d2_batch_d2common_17b70(uintptr_t n, const uint32_t* ctx) {
 
 // 1.13c D2Common+0x7EA40: first row 1..(h-2) of column x (EDI) whose kind (obj+0x14)->+4 is 0x1c and
 // whose cell byte +2 low nibble is 1; writes {x,row} or {-1,-1}.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_7ea40(uintptr_t obj, int32_t x, int32_t* outX, int32_t* outY) {
+EMSCRIPTEN_KEEPALIVE void d2c_7ea40_env(uintptr_t obj, int32_t x, int32_t* outX, int32_t* outY) {
 	uintptr_t g = w(obj, 0x14);
 	int32_t end = iw(g, 0x5c) - 1;
 	for (int32_t r = 1; r < end; ++r) {
@@ -70,7 +70,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_7ea40(uintptr_t obj, int32_t x, int32_t
 
 // 1.13c D2Common+0x7EB40: (EDI = obj, EBX = x) pick, from a seed-rolled start among rows 1..h-3, a row
 // whose flags are clear and cells have nibble 3; place two 0x1c markers via the placer.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_7eb40(uintptr_t obj, int32_t x,
+EMSCRIPTEN_KEEPALIVE uint32_t d2c_7eb40_port(uintptr_t obj, int32_t x,
 	uint32_t (*place)(uintptr_t, int32_t, int32_t, int32_t, int32_t, int32_t)) {
 	uintptr_t g = w(obj, 0x14);
 	uint32_t h = w(g, 0x60), alt = w(g, 0) & 4;
@@ -94,9 +94,8 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_7eb40(uintptr_t obj, int32_t x,
 			place(obj, x, row, 0x1c, 1, 0);
 			return place(obj, x + 1, row, 0x1c, (alt != 0) + 2, 0);
 		}
-		ret = c + 1;
 	}
-	return ret;
+	return m;   // retail falls out with the loop counter, which equals m
 }
 
 // 1.13c D2Common+0x68970: (ECX = this, EAX = x) fire a sound for the table entry of param_2 when the

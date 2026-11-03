@@ -37,7 +37,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_12e50(
   }
 }
 // 1.13c D2Common+0x86000: ESI = unit; its +0x14 data flags 0x400000 / 0x800000 each fire 0x42A70.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_86000(uint32_t unit, void (*f42a70)(uint32_t,int32_t,int32_t,int32_t,int32_t,int32_t)) {
+EMSCRIPTEN_KEEPALIVE void d2c_86000_port(uint32_t unit, void (*f42a70)(uint32_t,int32_t,int32_t,int32_t,int32_t,int32_t)) {
  const uint32_t fl = w(w(unit,0x14),0);
  if (fl & 0x400000) f42a70(unit,0,1,0x31e,-1,0);
  if (fl & 0x800000) f42a70(unit,0,4,0x31e,-1,0);

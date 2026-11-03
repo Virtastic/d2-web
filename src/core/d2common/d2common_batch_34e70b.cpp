@@ -40,11 +40,11 @@ namespace
 	}
 }
 
-// 1.13c D2Common+0x7F490: per-room guard of #10406/#10407. Takes the room, the search point and
+// (superseded by the per-function port; was D2Common+0x7F490): per-room guard of #10406/#10407. Takes the room, the search point and
 // the search radius (retail: ECX=room, EDX=x, EAX=y, EDI=radius), fetches the room's subtile
 // coordinates and answers whether the radius square overlaps the room box. The x test can only
 // reject when both ends fail (as in the 1.10f inline || chain); the y test is the same ||.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_7f490(uint32_t pRoom, int32_t nX,
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2c_7f490_old(uint32_t pRoom, int32_t nX,
 	int32_t nY, int32_t nRadius)
 {
 	if (!pRoom)

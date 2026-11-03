@@ -135,7 +135,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3dd40(void* pLevel, const D2
 }
 
 // 1.13c D2Common+0x7E9F0 -- 1 if column x (and x+1) has no cell with bit1 set in any row, else 0.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_7e9f0(void* pLevel, int32_t x, const D2CommonBatchDrlgEnv* env) { // 1.13c D2Common+0x7E9F0
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2c_7e9f0_env(void* pLevel, int32_t x, const D2CommonBatchDrlgEnv* env) { // 1.13c D2Common+0x7E9F0
     if (!pLevel || !env || !env->resolve) return 1;
     const uint8_t* od = B(env->resolve(R32(pLevel, 0x14)));
     const uint8_t* flags = B(env->resolve(R32(od, 0x2c)));

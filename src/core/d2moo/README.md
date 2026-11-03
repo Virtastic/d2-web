@@ -85,3 +85,4 @@ behaviour differs from 1.10f.
 
 - STATLIST_MergeBaseStats (D2Common+0x3A600): base entries now fold through D2Common_3A330_AddStat (1.13c), not STATLIST_AddStat.
 - D2Common+0x335F0 (UnitSetupSpeeds): rewritten over D2UnitStrc by field name (the word-array port was wrong for the widened unit); +0x32EF0 port renamed D2Common_32EF0_MergeDualWield. Frame bonus still goes through UNITS_GetFrameBonus (1.10f); 1.13c 0x32220 reads a weapon-class table instead -- player branch not captured.
+- D2Common+0x32E10 (Units.cpp UNITS_CharacterStartRunningOrKnockback): a null unit allocates the temp statlist from no pool, owner type 6, owner id -1 (1.10f dereferenced it); the old word-array placeholder in d2common_batch_wave1018.cpp is retired.

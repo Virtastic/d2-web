@@ -9,17 +9,16 @@
 #include "D2Skills.h"
 
 void D2Common_32820_InitializeSequence(D2UnitStrc* pUnit); // real def: d2common_batch_500e0.cpp (C++ linkage)
+void __stdcall UNITS_CharacterStartRunningOrKnockback(D2UnitStrc* pUnit, int nClassId); // 0x32E10 (Units.cpp): retail EAX = converted class
 
 extern "C" {
 #define W __attribute__((weak))
-W int32_t sub_33110(D2UnitStrc* u);                // 0x33110 (unmapped)
 W intptr_t sub_3E980(int32_t id);                  // 0x3E980 (unmapped): row ptr
 W intptr_t d2_sub_1150(int32_t id);                // 0x1150 row ptr (r[0]=id -> r[4]), hidden id operand explicit
 W void d2_fn_d2common_1100(uint32_t* r);           // 0x1100: r[0]=pSeed, r[1]=nMax -> r[4]
 W uint32_t Ordinal_10265(uint32_t);
 W void Ordinal_10024(const void*, uint32_t);
 W char DAT_6fdda728[1];
-W int32_t sub_32E10(D2UnitStrc* u);                // 0x32E10: retail EAX = class index, stack arg = unit (not ported with that convention)
 [[noreturn]] static void fail(uint32_t c) { Ordinal_10024(DAT_6fdda728, Ordinal_10265(c)); __builtin_trap(); }
 
 // 1.13c D2Common+0x335F0 (#10595): per-type unit speed/anim setup.
@@ -31,13 +30,13 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_335F0_UnitSetupSpeeds(D2UnitStrc* u) {
  D2COMMON_11013_ConvertMode(u, &type, &cls, &mode, nullptr, 0);
  switch (type) {
  case 0:
-  if (mode == 3 || mode == 0x13) sub_32E10(u);
-  if (mode != 0x12) { u->pAnimSeq = nullptr; sub_33110(u); u->dwFrameCountPrecise = (int32_t)u->pAnimData->dwFrames << 8; return 1; }
-  D2Common_32820_InitializeSequence(u); sub_33110(u); return 1;
+  if (mode == 3 || mode == 0x13) UNITS_CharacterStartRunningOrKnockback(u, cls);
+  if (mode != 0x12) { u->pAnimSeq = nullptr; UNITS_UpdateAnimRateAndVelocity(u, nullptr, 0); u->dwFrameCountPrecise = (int32_t)u->pAnimData->dwFrames << 8; return 1; }
+  D2Common_32820_InitializeSequence(u); UNITS_UpdateAnimRateAndVelocity(u, nullptr, 0); return 1;
  case 1:
-  if (u->dwUnitType == 0 && STATES_IsUnitShapeShifted(u) && (mode == 0xd || mode == 0xf)) sub_32E10(u);
-  if (mode != 0xe) { sub_33110(u); u->pAnimSeq = nullptr; u->dwFrameCountPrecise = (int32_t)u->pAnimData->dwFrames << 8; return 1; }
-  D2Common_32820_InitializeSequence(u); sub_33110(u); return 1;
+  if (u->dwUnitType == 0 && STATES_IsUnitShapeShifted(u) && (mode == 0xd || mode == 0xf)) UNITS_CharacterStartRunningOrKnockback(u, cls);
+  if (mode != 0xe) { UNITS_UpdateAnimRateAndVelocity(u, nullptr, 0); u->pAnimSeq = nullptr; u->dwFrameCountPrecise = (int32_t)u->pAnimData->dwFrames << 8; return 1; }
+  D2Common_32820_InitializeSequence(u); UNITS_UpdateAnimRateAndVelocity(u, nullptr, 0); return 1;
  case 2: {
   if (mode > 7) { Ordinal_10265(0x98a); Ordinal_10024(DAT_6fdda728, 0); __builtin_trap(); }
   const intptr_t r = sub_3E980(cls);

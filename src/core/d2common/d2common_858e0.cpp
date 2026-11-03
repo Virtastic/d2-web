@@ -1,0 +1,18 @@
+// 1.13c D2Common+0x858E0: EDI = drlg (ECX for 0x42A70), plain ret. Nine rows {tbl, n1, edx, y} from the .rdata table at 0x95B68
+// (stride 16) call 0x42A70(ecx = drlg, edx, y, tbl, n1, 0); then 0x42A70(drlg, 4, 4, 0x18A, -1, 0).
+#include <cstdint>
+#include <emscripten.h>
+typedef void (*D2C42A70Fn)(uint32_t ecx, int32_t edx, int32_t y, int32_t tbl, int32_t n1, int32_t z);
+static const int32_t kTbl95B68[36] = {
+	0x180, 0x0, 0x8, 0x0, 0x17F, 0x2, 0x6, 0x0,
+	0x17F, 0x1, 0x4, 0x0, 0x17F, 0x0, 0x2, 0x0,
+	0x183, 0x0, 0x0, 0x0, 0x181, 0x0, 0x0, 0x2,
+	0x181, 0x1, 0x0, 0x4, 0x181, 0x2, 0x0, 0x6,
+	0x182, 0x0, 0x0, 0x8,
+};
+extern "C" void d2c_858e0_port(uint32_t drlg, D2C42A70Fn f)
+{
+	for (int i = 0; i < 9; i++)
+		f(drlg, kTbl95B68[i * 4 + 2], kTbl95B68[i * 4 + 3], kTbl95B68[i * 4], kTbl95B68[i * 4 + 1], 0);
+	f(drlg, 4, 4, 0x18A, -1, 0);
+}
