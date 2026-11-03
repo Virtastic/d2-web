@@ -84,7 +84,8 @@ struct D2GameBatch53640Env {
 // mask at +2 select stats; the present values are 32-bit words after the mask, read at a +3 byte
 // offset from the mask end exactly as the 1.10f baseline does. The section length written back is
 // 4*present+5. In arena mode hitpoints and mana are set to their maxima; stamina is always.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_53640(void* pGame, void* pUnit, const uint8_t* pSection, int32_t nStats, int32_t* pSize, const D2GameBatch53640Env* env) {  // 1.13c D2Game+0x53640
+// The vectored rule is src/core/d2game/d2game_53640.h (probe src/core/fn/d2game_53640.cpp owns the d2_fn_d2game_53640 export).
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2game_53640_batch(void* pGame, void* pUnit, const uint8_t* pSection, int32_t nStats, int32_t* pSize, const D2GameBatch53640Env* env) {  // 1.13c D2Game+0x53640
     *pSize = 0;
     if (rd16u(pSection, 0) != 0x6667) {
         return 4;

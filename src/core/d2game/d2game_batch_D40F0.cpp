@@ -251,33 +251,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_6f660(uint32_t eaxUnit, const uint32_t* p
 // bit 3 of unit+0xC4 are cleared, and any old record at unit+0xDC is freed through 0x8E880. The
 // record from 0x8E680 gets its flag byte +2 |= 4, fields +0, +4, +0x14, +0x18 and +0x2C reset, and
 // is pushed onto the game's per-unit-type list at game+0xB8 -> +0xA04 -> petTypeOffsets[type]*4.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_6f8a0(uint32_t eaxUnit, uint32_t ediGame, uint32_t retaddr,
-                                             const D2GameBatchD40F0Env* env)
-{
-    if (eaxUnit == 0) return;
-    env->ordinal10098(eaxUnit);
-    wr32((void*)(uintptr_t)eaxUnit, 0x0C, retaddr);
-    wr32((void*)(uintptr_t)eaxUnit, 0xC4, rd32((void*)(uintptr_t)eaxUnit, 0xC4) & 0xFFFFFFF5u);
-    if (rd32((void*)(uintptr_t)eaxUnit, 0xDC) != 0) env->sub8E880(eaxUnit);
-    wr32((void*)(uintptr_t)eaxUnit, 0xDC, 0);
-
-    uint8_t* rec = (uint8_t*)env->sub8E680(eaxUnit);
-    rec[2] |= 4;
-    wr32(rec, 0x00, 0);
-    wr32(rec, 0x04, 0xFFFFFFFFu);
-    wr32(rec, 0x14, 0);
-    wr32(rec, 0x18, 0);
-    wr32(rec, 0x2C, 0);
-    const uint32_t type = rd32((void*)(uintptr_t)eaxUnit, 0);
-    const uint32_t headAddr = rd32((void*)(uintptr_t)ediGame, 0xB8) + 0xA04
-                            + env->petTypeOffsets[type] * 4;
-    const uint32_t oldHead = rd32((void*)(uintptr_t)headAddr, 0);
-    wr32(rec, 0x1C, oldHead);
-    wr32(rec, 0x20, 0);
-    if (oldHead != 0) wr32((void*)(uintptr_t)oldHead, 0x20, (uint32_t)(uintptr_t)rec);
-    wr32((void*)(uintptr_t)headAddr, 0, (uint32_t)(uintptr_t)rec);
-}
+// 0x6F8A0 moved to d2game_6f8a0.cpp (pb9).
 
 // 1.13c D2Game+0x79100
 // Item-to-client skill pass. EAX = unit, param_1 = client/context. Only unit type 0 with a non-null

@@ -246,7 +246,7 @@ void CLIENTS_ReleaseClientUnits_113c(uint32_t unitEax, const Batch5Env* env)
     }
 }
 
-// 1.13c D2Game+0x53E50
+// superseded by d2game_53e50.cpp: 1.13c D2Game+0x53E50
 // D2GAME_SAVE_AttachSaveFile: free the client's pending save header (0x49630), build the player
 // save into a 0x2000-byte buffer (0xEC7F0), assert the size is positive (fatal 0xB27), attach the
 // buffer to the client (0x4A190), set client flag bit 4, and arm the chunked send at +0x184 = 5,

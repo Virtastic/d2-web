@@ -24,7 +24,7 @@ static uint32_t hk32(uint32_t v) { return (v < 0x9c || v > 0xd8) ? (v == 0xff ? 
 
 // src = param_2 (0x82-byte header), self = param_3, cl = param_4
 // 1.13c D2Game+0x55320
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_55320(const uint8_t* src, uint8_t* self, uint8_t* cl,
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_55320_old(const uint8_t* src, uint8_t* self, uint8_t* cl,
     void** pUnit, uint32_t* o6, uint32_t* o7, uint32_t* o8, uint32_t* o9, uint32_t* o10, uint32_t* o11, uint32_t* o12,
     const D2Game55320Env* env)
 {

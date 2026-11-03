@@ -153,9 +153,9 @@ struct D2GameBatch54420Env {
 // and answers 0. A type-6 unit with a non-null EAX calls 0xD4A70 and answers 0 on success. Every other
 // non-zero class, and the class-0 teardown, answer 0xD after 11090(4); the class-0 path conditionally
 // pays 10750/10867 on self+0x2C for types other than 2 and 4..5, then 0xD76A0.
-// 1.13c D2Game+0x54420
+// 1.13c D2Game+0x54420 (superseded by d2game_54420.cpp; export renamed so the FN probe owns d2_fn_d2game_54420)
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_54420(void* self, uint32_t param1, void* param2,
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_54420_old(void* self, uint32_t param1, void* param2,
                                                  uint32_t eaxIn, uint32_t ebx,
                                                  const D2GameBatch54420Env* env)
 {

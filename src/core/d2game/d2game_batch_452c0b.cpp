@@ -320,6 +320,7 @@ i32 D2GAME_4CC50(P game, P unit, i32 skill, i32 lvl)
 
 
 // 1.13c D2Game+0x4D420 (ecx = game, edx = unit; stack: skill, lvl; ret 8)
+// 1.13c D2Game+0x4D420: the disassembly-checked rule (the FN-proved one) is src/core/d2game/d2game_4d420.h; this sketch predates it.
 i32 D2GAME_4D420(P game, P unit, i32 skill, i32 lvl)
 {
     if (unit) U(unit, 0xc4) |= 0x40;
@@ -480,6 +481,7 @@ bool D2GAME_4ECD0(P unit /*esi*/, P a1, P a2)
 
 
 // 1.13c D2Game+0x4F970 (no register inputs; stack: game, unit, mon, skill, lvl, v; ret 0x18)
+// 1.13c D2Game+0x4F970: the disassembly-checked rule (the FN-proved one) is src/core/d2game/d2game_4f970.h; this sketch predates it.
 i32 D2GAME_4F970(P game, P unit, P mon, i32 skill, i32 lvl, i32 v)
 {
     if (skill == 0) return 0;

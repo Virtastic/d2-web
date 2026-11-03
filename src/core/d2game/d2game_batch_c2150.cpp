@@ -126,73 +126,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C2150(uint32_t param1, uint8_t inAL,
     }
 }
 
-// Client/unit creation for one game. param_1 is the caller's request record: +0x08 is the spawn
-// selector (only < 7 proceeds) and +0x3D4 bit 0 is a set-once flag; +0x1AC byte is captured before
-// the tail. EDI is the game state: +0x1C the unit handle, +0x70 a gate for bit 0x02000000 at
-// result+0xC8, +0x90 the sequence counter, +0xBC an index table. The unit record gets +0 at 0, the
-// selector at +4, the handle at +8, EDI at +0x80, bit 0x04000000 folded in at +0xC8, the
-// D2Common #10459 byte at +0x18 (and its +0xBC table dword at +0x1C), +0x74 cleared and +0xC4
-// OR'd with 0x10, +0xD0 set to 0xB. Afterwards the monster-stat record (D2Common #10920) has
-// +0x74/+0x70 cleared and, when the pre-captured byte was 0 and the unit's +4 id is in range, the
-// data-table row's +0xAC word (when non-zero and D2Common #10630 agrees) is sent through 0xCC2100
-// and stored at stat+0x70. Both later calls take the game state first. *param_1 = unit; returns 0.
-// 1.13c D2Game+0x55840
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_55840(uint32_t param1, uint32_t edi,
-                                                 const D2GameBatchC2150Env* env)
-{
-    if (param1 == 0) d2game_fatal(0x206);
-
-    const uint8_t selector = rd8(param1, 8);
-    wr32(param1, 0x3D4, rd32(param1, 0x3D4) | 1);
-    uint32_t unit = 0;
-    if (selector < 7) {
-        unit = env->ordinal11153(rd32(edi, 0x1C), 0);
-        if (unit != 0) {
-            wr32(unit, 0, 0);
-            wr32(unit, 4, selector);
-            wr32(unit, 8, rd32(edi, 0x1C));
-            wr32(unit, 0x80, edi);
-            uint32_t flags;
-            if (rd32(edi, 0x70) == 0) flags = rd32(unit, 0xC8) & 0xFDFFFFFF;
-            else                       flags = rd32(unit, 0xC8) | 0x02000000;
-            wr32(unit, 0xC8, flags | 0x04000000);
-            const uint8_t indexByte = (uint8_t)env->ordinal10459(env->ordinal10826(0));
-            wr8(unit, 0x18, indexByte);
-            wr32(unit, 0x1C, rd32(edi, 0xBC + (uint32_t)indexByte * 4));
-            wr32(unit, 0x74, 0);
-            wr32(unit, 0xC4, rd32(unit, 0xC4) | 0x10);
-            wr32(unit, 0xD0, 0xB);
-            int32_t seq = (int32_t)rd32(edi, 0x90) + 1;
-            if (seq == -1) seq = 1;
-            wr32(edi, 0x90, (uint32_t)seq);
-            env->sub58620((uint32_t)seq);
-            env->sub0FED0();
-        }
-    }
-    env->sub73720(unit);
-    env->sub9B0A0(edi, unit);
-    const uint8_t tailGate = rd8(param1, 0x1AC);
-    env->sub0B2C0(unit);
-    env->sub585C0(unit, edi);
-    const uint32_t statList = env->ordinal10920(unit);
-    wr32(statList, 0x74, 0);
-    wr32(statList, 0x70, 0);
-    if (tailGate == 0 && unit != 0) {
-        const int32_t id = (int32_t)rd32(unit, 4);
-        if (id >= 0 && id < (int32_t)rd32(env->dataTables, 0xBC8)) {
-            const uint32_t row = (uint32_t)id * 0xC4 + rd32(env->dataTables, 0xBC4);
-            if (row != 0 && rd16(row, 0xAC) != 0 && env->ordinal10630() != 0) {
-                const int32_t value = (int16_t)rd16(row, 0xAC);
-                env->subCC2100(unit, 0, value, 0xFFFFFFFF);
-                wr32(statList, 0x70, (uint32_t)value);
-            }
-        }
-    }
-    env->sub55090(edi, unit, 1);
-    wr32(param1, 0, unit);
-    return 0;
-}
+// 0x55840 (client/unit creation) now lives in src/core/d2game/d2game_55840.h; its FN probe exports d2_fn_d2game_55840.
 
 // Guarded create: when the module guard dword is clear, 0x76250(EBX, param1, param2, &local) creates
 // the record; a non-null local is then released through 0x55090(EBX, local, 0) and stored at *param3.

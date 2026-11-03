@@ -26,61 +26,7 @@ static inline void     wrp (void* p, uint32_t o, void* v)    { wr32(p, o, (uint3
 
 [[noreturn]] static void d2game_fatal() { _exit(-1); }
 
-// ---- 0x70FB0 PlrTrade init (NAMED) ------------------------------------------------------------------
-struct D2Game70fb0Env {
-    void* (*getPlayerData)(void* unit);                       // #10920 GUESS: arg is the unit (EBX)
-    void* (*alloc)(const char* file, int line, int flag);     // #10045
-    uint8_t* (*writeItems)(uint8_t* dest, void* inv, void* game, void* unit, int size); // 0x537D0
-    uint32_t (*getStat)(void* unit, int stat, int layer);     // #10973 GUESS: (unit, 0, 0); stat/layer not shown
-};
-// 1.13c-NAMED D2Game+0x70FB0: allocate the PlrTrade record at playerData+0x5C if absent.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_70fb0(void* unit, void* game, const D2Game70fb0Env* e) {
-    void* pd = e->getPlayerData(unit);
-    uint32_t cur = rd32(pd, 0x5c);
-    if (cur != 0) return cur & 0xffffff00;
-    uint8_t* rec = (uint8_t*)e->alloc("..\\Source\\D2Game\\PLAYER\\PlrTrade.cpp", 0x803, 0);
-    uint8_t* buf = (uint8_t*)e->alloc("..\\Source\\D2Game\\PLAYER\\PlrTrade.cpp", 0x804, 0);
-    wrp(rec, 4, buf);
-    uint8_t* end = e->writeItems(buf, rdp(unit, 0x60), game, unit, 0x2000);
-    wrp(rec, 0, end);
-    if ((int32_t)(uintptr_t)end < 1) d2game_fatal();   // Fog #10265(0x806)
-    wr32(rec, 8, 0); wr32(rec, 12, 0); wr32(rec, 20, 0);
-    wr32(rec, 16, e->getStat(unit, 0, 0));
-    wrp(pd, 0x5c, rec);
-    return 1;
-}
-
-// ---- 0x71060 pick a game slot ----------------------------------------------------------------------
-struct D2Game71060Env {
-    int32_t* (*getTable)();                                   // #10535 {count, base}; entries 0x1A8 bytes
-    uint32_t (*seedRoll)(void* pSeed);                        // 0x11D0
-    int32_t  (*slotOk)(uint32_t slot, uint32_t arg);          // #10517
-};
-// 1.13c D2Game+0x71060: collect up to 256 eligible slots in ring order from a random start, return a
-// random pick (0 if none). param_1 = game (+0xD0 seed, +0x78 ushort), param_2 = max level, param_3 = filter.
-extern "C" EMSCRIPTEN_KEEPALIVE uint16_t d2_fn_d2game_71060(void* game, int32_t maxLevel, uint32_t filter, const D2Game71060Env* e) {
-    int32_t* t = e->getTable();
-    if (!t) d2game_fatal();                                   // line 0x381
-    uint16_t picks[256];
-    int n = 0;
-    uint32_t cur = e->seedRoll((uint8_t*)game + 0xd0);
-    int32_t endIdx = (int32_t)cur - 1;
-    if (endIdx < 0) endIdx = t[0] - 1;
-    if ((int32_t)cur == endIdx) return 0;
-    uint8_t* base = (uint8_t*)(uintptr_t)(uint32_t)t[1];
-    do {
-        if (n > 0xff) break;
-        if (e->slotOk(cur, filter)) {
-            uint8_t* ent = base + cur * 0x1a8;
-            if (ent[0x133] != 0 && (rd16(ent, 0xf6) < 100 || rd16(game, 0x78) > 99) && (int32_t)ent[0xfd] <= maxLevel)
-                picks[n++] = (uint16_t)cur;
-        }
-        cur++;
-        if (t[0] <= (int32_t)cur) cur = 0;
-    } while ((int32_t)cur != endIdx);
-    if (n == 0) return 0;
-    return picks[e->seedRoll((uint8_t*)game + 0xd0)];
-}
+// 0x70FB0 and 0x71060 moved to d2game_70fb0.cpp / d2game_71060.cpp (pb9).
 
 // ---- 0x71170 ---------------------------------------------------------------------------------------
 struct D2Game71170Env {

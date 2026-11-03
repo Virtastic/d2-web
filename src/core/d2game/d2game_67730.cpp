@@ -9,7 +9,6 @@
 // passes (0x6FC848B0, 0x6FC82960 over game; 0x6FC82A80 over node+4) and node +0x14 = 0, +0xb = 6.
 #include <cstdint>
 #include <cstring>
-#include <emscripten.h>
 
 struct D2Game67730Env {
     void     (*fatal)(uint32_t line);
@@ -28,7 +27,7 @@ struct D2Game67730Env {
     uint8_t  (*a56e)(uint32_t level);
     uint32_t (*a556)(uint32_t room);
     uint32_t (*ae98)(uint32_t room, uint32_t pt, uint32_t c, uint32_t a4, uint32_t a5, uint32_t a6, uint32_t a7);
-    uint32_t (*sub1280)(uint32_t room);
+    uint32_t (*sub1280)(uint32_t room, uint32_t x, uint32_t y);
     uint32_t (*subE1D90)(uint32_t ecx, uint32_t edx, uint32_t s1, uint32_t s2, uint32_t s3, uint32_t s4, uint32_t s5, uint32_t s6, uint32_t s7);
     uint32_t (*subA22E0)(uint32_t game, uint32_t obj, uint32_t one, uint32_t level);
     uint8_t  (*aee0)(uint32_t obj);
@@ -42,7 +41,7 @@ static inline uint8_t rd8(uint32_t a) { return *(const uint8_t*)(uintptr_t)a; }
 static inline void wr8(uint32_t a, uint8_t v) { *(uint8_t*)(uintptr_t)a = v; }
 
 // 1.13c D2Game+0x67730
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_67730(uint32_t game, uint32_t player, const D2Game67730Env* env)
+void D2Game_67730(uint32_t game, uint32_t player, const D2Game67730Env* env)
 {
     const uint32_t list = rd32(game + 0x10f4);
     uint32_t node = list ? rd32(list) : 0;
@@ -87,7 +86,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_67730(uint32_t game, uint32_t 
                 x += 3; y += 3;
                 pt[0] = x; pt[1] = y;
                 if (env->ae98(room, (uint32_t)(uintptr_t)pt, (uint32_t)(uintptr_t)pt, 3, 0x3e01, 0xc01, 0) != 0) {
-                    const uint32_t r2 = env->sub1280(room);
+                    const uint32_t r2 = env->sub1280(room, (uint32_t)pt[0], (uint32_t)pt[1]);
                     if (r2 != 0) {
                         uint32_t obj = env->subE1D90(2, 0x3b, (uint32_t)pt[0], (uint32_t)pt[1], game, r2, 1, 1, 0);
                         env->a4a2(obj, 1);

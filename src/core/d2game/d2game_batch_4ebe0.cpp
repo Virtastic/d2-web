@@ -139,6 +139,7 @@ void D2GAME_50130(i32* unit, i32 p2)
 }
 
 // 1.13c D2Game+0x50B70
+// 1.13c D2Game+0x50B70: the disassembly-checked rule (the FN-proved one) is src/core/d2game/d2game_50b70.h; this sketch predates it.
 u32 D2GAME_50B70(i32* unit, i32* p2)
 {
     i32 g = *p2; void* room = (void*)(intptr_t)p2[1];

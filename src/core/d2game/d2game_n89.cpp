@@ -105,6 +105,7 @@ void N89_529F0(N89Host* h, uint32_t id, int* msg, void (*f526F0)(uint32_t, int*)
 }
 
 // 1.13c D2GAME+0x526F0
+// 1.13c D2Game+0x526F0: the disassembly-checked rule (the FN-proved one) is src/core/d2game/d2game_526f0.h; this sketch predates it.
 void N89_526F0(N89Host* h, uint32_t id, int* msg)
 {
     P g = h->get_game();
