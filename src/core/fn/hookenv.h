@@ -17,9 +17,15 @@ struct HookEnv {
             for (uint32_t j = 0; j < 9; j++) { uint32_t v = o + j < n ? rd32(p + 4 * (o + j)) : 0; e[1 + j] = isStk(v) ? 0xB3000000u : v; }
         }
     }
+    // REGS `J`: EDI at hook entry as an argument, one record (rva|0x20000000, edi, 0...) straight after the call's own record; a stack pointer is 0xB3000000.
+    void j(uint32_t rva, uint32_t edi) {
+        if (L[0] >= kLogMax) abort();
+        uint32_t* e = L + 1 + L[0]++ * 10; e[0] = rva | 0x20000000u; e[1] = isStk(edi) ? 0xB3000000u : edi;
+        for (int i = 2; i < 10; i++) e[i] = 0;
+    }
     uint32_t* L; const uint32_t* sc;
     uint32_t tbl = 0, dtPtr = 0, fileStr = 0, bmSlot = 0;     // module globals (addresses of the pinned blobs / scrubbed module words)
-    static constexpr uint32_t kLogMax = 128;   // ponytail: a descriptor `blob lg` must hold 4 + 40 * calls bytes; 0x6F930 logs up to 45 calls (blob 2600)
+    static constexpr uint32_t kLogMax = 400;   // ponytail: a descriptor `blob lg` must hold 4 + 40 * calls bytes; 0x6F930 logs up to 45 calls (blob 2600)
     uint32_t seen[48][2]; int nseen = 0;
     HookEnv(uint32_t* log, const uint32_t* seq) : L(log), sc(seq) { L[0] = 0; }
     static uint32_t rd32(uint32_t a) { uint32_t v; memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }
@@ -67,4 +73,18 @@ struct HookEnv {
         for (const uint32_t* p = sc; p[0]; p += 2) if (p[0] == rva) { last = p[1]; if (!n--) return last; }
         return last;
     }
+};
+
+// Mirror of the descriptor's `gvar NAME RVA LEN [V...]` (the FN descriptor README): the capture pins blob NAME onto the
+// module range [RVA, RVA+LEN) before the call and reads it back after. The probe registers each blob with add(rva, blobAddr, len)
+// (blob k's address is r[14 + 2k]) and reaches a pinned global by its retail RVA: at(rva) is the pointer to those bytes (null outside every
+// pin), rd/wr read and write a dword. The probe copies the pinned bytes into the port's own state before the call and back after it, so the
+// blob holds what retail's global would hold. A range is looked up by RVA, so a probe can address a word inside a larger pin (0x110C08+4*i).
+struct GlobalPins {
+    struct R { uint32_t rva, len; uint8_t* p; };
+    R r[8]; int n = 0;
+    void add(uint32_t rva, uint32_t blobAddr, uint32_t len) { if (n >= 8) abort(); r[n++] = { rva, len, (uint8_t*)(uintptr_t)blobAddr }; }
+    uint8_t* at(uint32_t rva, uint32_t len = 4) const { for (int i = 0; i < n; i++) if (rva >= r[i].rva && rva + len <= r[i].rva + r[i].len) return r[i].p + (rva - r[i].rva); return nullptr; }
+    uint32_t rd(uint32_t rva) const { uint8_t* q = at(rva); if (!q) abort(); uint32_t v; memcpy(&v, q, 4); return v; }
+    void wr(uint32_t rva, uint32_t v) const { uint8_t* q = at(rva); if (!q) abort(); memcpy(q, &v, 4); }
 };

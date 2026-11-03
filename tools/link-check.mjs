@@ -7,7 +7,8 @@
 //   LINK-DUP <name> <file:line> <file:line>      the same external function or variable defined in two .cpp files
 //   LINK-LINKAGE <name> <file:line> <detail>     declared extern "C" where the only definitions have C++ linkage (or the reverse)
 //   LINK-UNDEF <name> <file:line>                a variable declared, used in a function body, and defined nowhere in src/
-//                                                (an undefined FUNCTION is imported by the link, not an error, so it is not reported)
+//   LINK-UNDEF-FN <name> <file:line>             a function declared (not weak), called in a function body, and defined nowhere in src/:
+//                                                wasm-ld fails on it as soon as the caller is live (declare it weak and guard the call if it is a seam)
 //
 // usage: node tools/link-check.mjs [--root DIR] [--files a.cpp,b.cpp] [--no-undef] [--no-baseline] [--write-baseline] [--json]
 //   --files  report only findings that involve one of these files (the staged files; the whole tree is still scanned)
@@ -98,7 +99,7 @@ export function scan(text, weakMacros = []) {
   let pendingInit = false;   // a '{' that opened an initializer or tag body: the statement ends at the next ';'
   const declScope = () => stack.every((s) => s.t !== 'opaque');
   const inExtC = () => stack.some((s) => s.t === 'extc');
-  const nsPath = () => stack.filter((s) => s.t === 'ns').map((s) => s.name).join('::');
+  const nsPath = () => stack.filter((s) => s.t === 'ns' && s.name !== '\0').map((s) => s.name).join('::');
   const anon = () => stack.some((s) => s.t === 'ns' && s.name === '');
   let opaqueBuf = '';
   const flushOpaque = () => { for (const m of opaqueBuf.matchAll(/[A-Za-z_]\w*/g)) used.add(m[0]); opaqueBuf = ''; };
@@ -137,7 +138,7 @@ export function scan(text, weakMacros = []) {
     }
     // a variable: strip initializer and array bounds, last identifier is the name
     let v = sNoExtern.replace(/=.*$/s, '').replace(/\[[^\]]*\]/g, '').replace(/\bconst\b/g, (m) => m).trim();
-    const vm = /([A-Za-z_]\w*)\s*$/.exec(v);
+    const vm = /^[^(]*\(\s*\*\s*([A-Za-z_]\w*)\s*\)\s*\(.*\)\s*$/s.exec(v) || /([A-Za-z_]\w*)\s*$/.exec(v);   // a function-pointer variable names itself inside (*name)
     if (!vm || v.split(/\s+/).length < 2 && !/[*&]/.test(v)) return;
     const hasConst = /\bconst\b/.test(v) && !isExtern && !c;   // namespace-scope const has internal linkage in C++
     items.push({ kind: isExtern && !/=/.test(s) ? 'decl' : 'def', what: 'var', name: vm[1], ns: nsPath(), c, line: ln, sig: '', weak, internal: isStatic || anon() || hasConst });
@@ -285,8 +286,8 @@ export function check(root, { undef = true } = {}) {
           const want = it.c ? 'C' : 'X';
           if (D && D.has(want)) continue;
           const k = `${f}|${it.name}|${want}`; if (reported.has(k)) continue; reported.add(k);
-          if (!D && it.what === 'fn') continue;   // the link imports an undefined function (a runtime trap, not a link error); an undefined variable fails the link
-          if (!D) findings.push({ kind: 'LINK-UNDEF', name: it.name, where: [`${gi.rel}:${it.line}`], files: [fi.rel, gi.rel], user: fi.rel });
+          // an undefined function fails the link once anything live calls it (wasm-ld: undefined symbol); a weak declaration does not
+          if (!D) findings.push({ kind: it.what === 'fn' ? 'LINK-UNDEF-FN' : 'LINK-UNDEF', name: it.name, where: [`${gi.rel}:${it.line}`], files: [fi.rel, gi.rel], user: fi.rel });
           else findings.push({ kind: 'LINK-LINKAGE', name: it.name, where: [`${gi.rel}:${it.line}`], detail: `declared ${it.c ? 'extern "C"' : 'with C++ linkage'}, defined only ${it.c ? 'with C++ linkage' : 'extern "C"'}; used in ${fi.rel}`, files: [fi.rel, gi.rel], user: fi.rel });
         }
       }
@@ -308,7 +309,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const seen = new Set(), outl = [];
   for (const f of sel) {
     const k = `${f.kind}|${f.name}|${f.where[0]}`; if (seen.has(k)) continue; seen.add(k);
-    outl.push(f.kind === 'LINK-DUP' ? `LINK-DUP ${f.name} ${f.where.join(' ')}` : f.kind === 'LINK-LINKAGE' ? `LINK-LINKAGE ${f.name} ${f.where[0]} ${f.detail}` : `LINK-UNDEF ${f.name} ${f.where[0]} (used in ${f.user})`);
+    outl.push(f.kind === 'LINK-DUP' ? `LINK-DUP ${f.name} ${f.where.join(' ')}` : f.kind === 'LINK-LINKAGE' ? `LINK-LINKAGE ${f.name} ${f.where[0]} ${f.detail}` : `${f.kind} ${f.name} ${f.where[0]} (used in ${f.user})`);
   }
   if (argv.includes('--json')) console.log(JSON.stringify(sel));
   else if (outl.length) console.log(outl.join('\n'));

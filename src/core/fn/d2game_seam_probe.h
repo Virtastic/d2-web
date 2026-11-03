@@ -7,9 +7,9 @@ struct SeamProbe {
     HookEnv e; uint32_t ov[8][2]; int nov = 0;
     SeamProbe(uint32_t* lg, const uint32_t* sc) : e(lg, sc) {}
     void ret(uint32_t rva, uint32_t v) { ov[nov][0] = rva; ov[nov++][1] = v; }
-    static uint32_t thunk(void* c, uint32_t rva, uint32_t a, uint32_t cc, uint32_t d, uint32_t b, uint32_t s, uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3, uint32_t s4) {
+    static uint32_t thunk(void* c, uint32_t rva, uint32_t a, uint32_t cc, uint32_t d, uint32_t b, uint32_t s, uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3, uint32_t s4, uint32_t s5, uint32_t s6, uint32_t) {
         SeamProbe* p = (SeamProbe*)c;
-        uint32_t v = p->e.h(rva, a, cc, d, b, s, s0, s1, s2, s3, s4);
+        uint32_t v = p->e.h(rva, a, cc, d, b, s, s0, s1, s2, s3, s4, s5, s6);
         for (int i = 0; i < p->nov; i++) if (p->ov[i][0] == rva) return p->ov[i][1];
         return v;
     }

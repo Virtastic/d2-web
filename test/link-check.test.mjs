@@ -36,6 +36,14 @@ test('undefined data reference is refused', () => {
   assert.match(r.stdout, /LINK-UNDEF.*g_missing_var/);
 });
 
+test('a called function defined nowhere is refused, unless weak', () => {
+  const r = run(tree({ 'a.cpp': 'extern "C++" { void sub_missing(void* p); }\nvoid h(void* p) { sub_missing(p); }\n' }));
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /LINK-UNDEF-FN sub_missing/);
+  const w = run(tree({ 'a.cpp': '__attribute__((weak)) void sub_missing(void* p);\nvoid h(void* p) { if (sub_missing) sub_missing(p); }\n' }));
+  assert.equal(w.status, 0, w.stdout);
+});
+
 test('a #define rename keeps a vendored copy from counting as a duplicate', () => {
   const r = run(tree({ 'a.cpp': 'extern "C" int ren(void) { return 1; }\n', 'b.cpp': '#define ren ren_vendored\nextern "C" int ren(void) { return 2; }\n' }));
   assert.equal(r.status, 0, r.stdout);

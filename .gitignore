@@ -385,3 +385,4 @@ test/stub/Windows.h
 
 # The BYO 1.13c patch shim (tools/patch-shim.mjs): Blizzard bytes, generated at stage time, never committed
 patch-113c.patch
+reference/
