@@ -6829,6 +6829,10 @@ window.__d2Shell = { get soundEvents() { return unitSounds?.events ?? []; }, too
       return Boolean(a && a !== 'modal');
     }
     if (npcMenu?.open) return Boolean(npcMenu.entryAt(x, y));
+    const W = canvas.width, H = canvas.height;
+    if (helpVisible && helpRenderer) return Boolean(helpRenderer.hitClose(x, y, W, H));
+    if (messageVisible && messageLogRenderer) return Boolean(messageLogRenderer.hitClose(x, y, W, H) || messageLogRenderer.hitScroll(x, y, W, H));
+    if (questVisible && questLogRenderer && questEvidence) return Boolean(questLogRenderer.hit(x, y, W, H, questEvidence.tabs, questEvidence.act));
     return null;
   },
   touchPickAt(x, y) {
