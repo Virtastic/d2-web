@@ -39,10 +39,9 @@ extern "C"
 // (+0x84 and +0x8C). Non-player units and null units are ignored; a player unit without player data
 // is fatal 0x14A8 in retail, we return.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2f570(uint32_t pUnit, int32_t nSkillId,
+EMSCRIPTEN_KEEPALIVE void d2common_port_2f570(D2UnitStrc* unit, int32_t nSkillId,
                                                 int32_t nSkillFlags)
 {
-	D2UnitStrc* unit = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit));
 	if (!unit || unit->dwUnitType != UNIT_PLAYER)
 		return;
 
@@ -165,7 +164,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3be90_batch(uint32_t pOwner)
 // 0x5D800 and 0x5E410, type 3 writes "missile %d", and any other type writes "Invalid Unit Type".
 // Returns pBuffer.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_5f1c0(uint32_t nUnitType, int32_t nClassId,
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_5F1C0_UnitTypeName(uint32_t nUnitType, int32_t nClassId,
                                                    uint32_t pBuffer)
 {
 	nClassId = static_cast<int16_t>(nClassId); // retail param is a short, sign-extended

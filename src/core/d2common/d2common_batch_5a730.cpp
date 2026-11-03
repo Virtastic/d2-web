@@ -12,6 +12,7 @@
 #include "D2BitManip.h"
 #include "D2DataTbls.h"
 #include "D2Items.h"
+uint32_t D2Common_24430_CheckItemTypeId(const D2UnitStrc* pItem, int nItemType);
 #include "D2Monsters.h"
 #include "D2StatList.h"
 #include "DataTbls/MonsterTbls.h"
@@ -97,7 +98,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_6c300(const char* name)
 }
 
 // 1.13c D2Common+0x6C710
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_6c710(const char* prefix, char* file)
+extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_6C710_PrefixPath(const char* prefix, char* file)
 {
     const size_t length = std::strlen(file);
     for (size_t i = 0; i < length; ++i) if (file[i] == '/') file[i] = '\\';
@@ -140,16 +141,17 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_710f0(HD2ARCHIVE archive,
 }
 
 // 1.13c D2Common+0x1F980
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_1f980(D2UnitStrc* unit, D2UnitStrc* first, D2UnitStrc* second)
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_1f980(D2UnitStrc* unit, D2UnitStrc* first, D2UnitStrc* second)
 {
+    // Item-type tests are the 1.13c 0x24430 form (D2Common_24430_CheckItemTypeId), not the 1.10f ITEMS_CheckItemTypeId.
     if (!first || !second) return 1;
-    if (ITEMS_GetAmmoType(first) && ITEMS_CheckItemTypeId(second, ITEMS_GetAmmoType(first))) return 1;
-    if (ITEMS_GetAmmoType(second) && ITEMS_CheckItemTypeId(first, ITEMS_GetAmmoType(second))) return 1;
+    if (ITEMS_GetAmmoType(first) && D2Common_24430_CheckItemTypeId(second, ITEMS_GetAmmoType(first))) return 1;
+    if (ITEMS_GetAmmoType(second) && D2Common_24430_CheckItemTypeId(first, ITEMS_GetAmmoType(second))) return 1;
     if (ITEMS_GetQuiverType(first) || ITEMS_GetQuiverType(second)) return 0;
     if (ITEMS_CheckWeaponIfTwoHanded(first) && !ITEMS_Is1Or2Handed(unit, first)) return 0;
     if (ITEMS_CheckWeaponIfTwoHanded(second) && !ITEMS_Is1Or2Handed(unit, second)) return 0;
-    if (!ITEMS_CheckItemTypeId(first, 0x2d) || !ITEMS_CheckItemTypeId(second, 0x2d))
-        return ITEMS_CheckItemTypeId(first, 0x2d) || ITEMS_CheckItemTypeId(second, 0x2d);
+    if (!D2Common_24430_CheckItemTypeId(first, 0x2d) || !D2Common_24430_CheckItemTypeId(second, 0x2d))
+        return D2Common_24430_CheckItemTypeId(first, 0x2d) || D2Common_24430_CheckItemTypeId(second, 0x2d);
     if (!unit) return 0;
     if (unit->dwUnitType == 0) {
         if (unit->dwClassId == 4) return 1;
@@ -161,7 +163,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_1f980(D2UnitStrc* unit, D
             default: return 0;
         }
     } else return 0;
-    return ITEMS_CheckItemTypeId(first, 0x43) && ITEMS_CheckItemTypeId(second, 0x43);
+    return D2Common_24430_CheckItemTypeId(first, 0x43) && D2Common_24430_CheckItemTypeId(second, 0x43);
 }
 
 // 1.13c D2Common+0x25C10

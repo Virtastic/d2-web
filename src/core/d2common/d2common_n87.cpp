@@ -12,13 +12,13 @@ struct N87Env
 	void (*f7C270)(void);							// 0x7C270
 	void (*f7C300)(void* a, int b, int c);					// 0x7C300
 	void (*f1B0D)(void);
-	uint32_t (*f208E0)(uint32_t a, uint32_t b, int c, uint32_t* pOutB, uint32_t* pOutA);
-	uint32_t (*f218A0)(uint32_t a, uint32_t b, uint32_t c, int d);
+	uint32_t (*f208E0)(uint32_t inv, uint32_t item, int rec, uint32_t* pX, uint32_t* pY, uint32_t page);
+	uint32_t (*f218A0)(uint32_t inv, uint32_t item, uint32_t x, uint32_t y, uint32_t grid, int rec);
 	void (*f21B40)(uint32_t p);
 	void (*f28E80)(uint32_t a, int b, uint32_t* c, int d, int e);
 	void (*f2E2C0)(void);
-	void (*f61BF0)(void); void (*f5CD10)(uint32_t u); void (*f93580)(void);
-	void (*f7D420)(uint32_t u); void (*f7DC90)(void);
+	void (*f61BF0)(uint32_t u); void (*f5CD10)(uint32_t u); void (*f93580)(uint32_t u);
+	void (*f7D420)(uint32_t u); void (*f7DC90)(uint32_t u);
 	uint32_t (*f80F80)(uint32_t unit); uint32_t (*f85360)(uint32_t unit, uint32_t v);
 	void (*f84F80)(uint32_t path, int v); uint32_t (*f85100)(void);
 	void (*f859D0)(uint32_t unit); void (*f66800)(uint32_t unit, uint32_t v);
@@ -30,6 +30,8 @@ struct N87Env
 	uint32_t sgptDataTables; const int32_t* levelBandTbl;		// 0x6FDE4668 (6 ints)
 };
 
+static void* n87Identity(uint32_t g) { return reinterpret_cast<void*>(static_cast<uintptr_t>(g)); }
+static void n87Fatal(uint32_t) { __builtin_trap(); }
 static uint32_t* W(const N87Env* e, uint32_t g) { return (uint32_t*)e->at(g); }
 
 // 1.13c D2COMMON+0x1A0D0
@@ -78,13 +80,13 @@ extern "C" void D2Common_21C50(const N87Env* e, uint32_t arg)
 	}
 }
 
-// 1.13c D2Common+0x21E10
-extern "C" uint32_t D2Common_21E10(const N87Env* e, uint32_t a, uint32_t b, int c, uint32_t d, uint32_t flags)
+// 1.13c D2Common+0x21E10: stdcall(inv, item, rec, unused, page) ret 0x1c (7 stack words; words 3, 5, 6 are ignored)
+extern "C" uint32_t D2Common_21E10(const N87Env* e, uint32_t inv, uint32_t item, int rec, uint32_t, uint32_t page)
 {
-	if (!a || !b || W(e, b)[0] != 4) return 0;
-	uint32_t oa = b, ob = a;
-	if (!e->f208E0(a, b, c, &oa, &ob)) return 0;
-	return e->f218A0(oa, ob, (flags & 0xff) + 2, c);
+	if (!inv || !item || W(e, item)[0] != 4) return 0;
+	uint32_t x, y;
+	if (!e->f208E0(inv, item, rec, &x, &y, page)) return 0;
+	return e->f218A0(inv, item, x, y, (page & 0xff) + 2, rec);
 }
 
 // 1.13c D2Common+0x29D60
@@ -93,16 +95,34 @@ extern "C" void D2Common_29D60(const N87Env* e, uint32_t, uint32_t a, int b, uin
 	e->f28E80(a, b, c, d, f);
 }
 
-// 1.13c D2Common+0x2E360
+// 1.13c D2Common+0x2E360: stdcall(unit) ret 4; the callees take the unit in EAX (11BF0, 43580), ECX (CD10), EDX (2D420), ESI (2DC90)
 extern "C" void D2Common_2E360(const N87Env* e, uint32_t unit)
 {
 	uint32_t* u = W(e, unit);
 	u[0x71] = W(e, u[0x6d])[0x470 / 4] + u[0x74];
 	u[0x72] = 0x29a;
-	if (u[0] == 1) e->f61BF0();
-	else if (u[0] == 2) { e->f5CD10(unit); e->f7D420(unit); e->f7DC90(); return; }
-	else if (u[0] == 3) { e->f93580(); e->f7D420(unit); e->f7DC90(); return; }
-	e->f7D420(unit); e->f7DC90();
+	if (u[0] == 1) e->f61BF0(unit);
+	else if (u[0] == 2) e->f5CD10(unit);
+	else if (u[0] == 3) e->f93580(unit);
+	e->f7D420(unit); e->f7DC90(unit);
+}
+
+// FN-probe entries for 0x21E10 and 0x2E360 (identity guest->host mapping, as 0x37AF0)
+extern "C" uint32_t d2common_21e10_port(uint32_t inv, uint32_t item, int rec, uint32_t page,
+	uint32_t (*f208)(uint32_t, uint32_t, int, uint32_t*, uint32_t*, uint32_t),
+	uint32_t (*f218)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, int))
+{
+	N87Env e = {};
+	e.at = n87Identity; e.fatal = n87Fatal; e.f208E0 = f208; e.f218A0 = f218;
+	return D2Common_21E10(&e, inv, item, rec, 0, page);
+}
+extern "C" void d2common_2e360_port(uint32_t unit, void (*f11bf0)(uint32_t), void (*fcd10)(uint32_t), void (*f43580)(uint32_t),
+	void (*f2d420)(uint32_t), void (*f2dc90)(uint32_t))
+{
+	N87Env e = {};
+	e.at = n87Identity; e.fatal = n87Fatal;
+	e.f61BF0 = f11bf0; e.f5CD10 = fcd10; e.f93580 = f43580; e.f7D420 = f2d420; e.f7DC90 = f2dc90;
+	D2Common_2E360(&e, unit);
 }
 
 // D2Common 0x36030
@@ -176,8 +196,6 @@ extern "C" bool D2Common_37AF0(const N87Env* e, uint32_t a, uint32_t b)
 
 // FN-probe entry for 0x37AF0: wasm32 guest addresses are host addresses, so the env resolves them as identity; the three
 // callees and the 6-int band table are the probe's.
-static void* n87Identity(uint32_t g) { return reinterpret_cast<void*>(static_cast<uintptr_t>(g)); }
-static void n87Fatal(uint32_t) { __builtin_trap(); }
 extern "C" bool d2common_37af0_port(uint32_t a, uint32_t b, void (*f87570)(uint32_t), void (*f876F0)(int),
                                     void (*f871C0)(uint32_t, uint32_t), const int32_t* bands)
 {

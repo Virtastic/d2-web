@@ -117,7 +117,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_38de0(uint32_t pUnit) { /
 // either hand. The left hand is checked with the raw broken/no-equip item-data flags of the
 // decompile (ITEMS_CanBeEquipped is the same pair for a present item data), the right hand always
 // through 0x23EF0. The grid is only read when the inventory carries signature 0x01020304.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_203b0(uint32_t pInventory, int32_t nWeapClass) { // 1.13c D2Common+0x203B0
+int32_t D2Common_203B0_HasWeaponClassEquipped(uint32_t pInventory, int32_t nWeapClass) { // 1.13c D2Common+0x203B0
 	D2InventoryStrc* pInv = reinterpret_cast<D2InventoryStrc*>(static_cast<uintptr_t>(pInventory));
 
 	if (!pInv)

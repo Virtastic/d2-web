@@ -401,7 +401,7 @@ EMSCRIPTEN_KEEPALIVE void D2Common_2F6A0_TakePlayerOutputs(uint32_t pUnit, uint3
 // "Invalid Unit". Returns pBuffer. Retail reaches the four helpers with register/stack operands the
 // decompiler drops, so they are env seams.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_5f260(uint32_t pUnit, uint32_t pBuffer,
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_5F260_UnitName(uint32_t pUnit, uint32_t pBuffer,
 	void (*pfn5E4D0)(uint32_t, uint32_t),
 	void (*pfn5E480)(uint32_t, uint32_t),
 	void (*pfn5D800)(uint32_t, uint32_t),

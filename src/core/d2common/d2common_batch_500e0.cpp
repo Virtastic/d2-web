@@ -7,6 +7,9 @@
 #include "Units/Units.h"
 #include "DataTbls/SequenceTbls.h"
 
+// 1.13c 0x24430 (src/core/d2common/d2common_24430.cpp): the retail item-type check the 1FD40 port calls.
+uint32_t D2Common_24430_CheckItemTypeId(const D2UnitStrc* pItem, int nItemType);
+
 namespace {
 inline uint8_t* P(uint32_t a) { return (uint8_t*)(uintptr_t)a; }
 inline uint32_t& W(uint8_t* b, int o) { return *(uint32_t*)(b + o); }
@@ -195,7 +198,7 @@ uint32_t D2Common_1FD40_FindBodyGridItemOfType(uint32_t pInv, uint32_t nItemType
         }
     }
     while (it) {
-        if (ITEMS_CheckItemTypeId((D2UnitStrc*)it, (int)nItemType)) {
+        if (D2Common_24430_CheckItemTypeId((const D2UnitStrc*)it, (int)nItemType)) {
             uint32_t nType = W(it, 0);
             uint32_t nValue;
             uint8_t* path = P(W(it, 0x2C));

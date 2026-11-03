@@ -55,7 +55,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_24F00_ItemRepairable(uint32_t item, int32
         (!isEthereal || !isEthereal(item));
 }
 // 1.13c D2Common+0x2F100: update sequence mode, frame and event; report a mode change.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_2f100(uint32_t unit, uint32_t target,
+EMSCRIPTEN_KEEPALIVE uint32_t d2common_port_2f100(uint32_t unit, uint32_t target,
  void (*compute)(uint32_t,uint32_t,uint32_t,uint32_t*,uint32_t*,int32_t*,uint32_t*)) {
  if (!unit || !compute) return 0;
  uint32_t old=w(unit,0x40),mode=0,frame=0,event=0; int32_t dir=0;

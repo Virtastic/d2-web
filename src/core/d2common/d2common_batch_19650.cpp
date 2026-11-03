@@ -14,7 +14,7 @@
 #include "Drlg/D2DrlgDrlg.h"
 
 // 1.13c D2Common+0x19650
-extern "C" void d2_fn_d2common_19650(HD2ARCHIVE archive)
+extern "C" void d2_port_d2common_19650(HD2ARCHIVE archive)
 {
     // Compile two 0x34-byte token tables, concatenate, then release both inputs.
     DATATBLS_LoadPlrType_ModeTxt(archive);

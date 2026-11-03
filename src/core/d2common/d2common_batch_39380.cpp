@@ -121,31 +121,6 @@ extern "C" uint32_t d2common_1fb50_lookup(int32_t a,int32_t b,const D2Common1FB5
  return 0;
 }
 
-struct D2Common21300Env {
- uint32_t item_count, item_table;
- uint32_t (*component)(uint32_t,int32_t); // +0x20830
- uint8_t (*slot)(uint32_t); // +0x231E0
- uint32_t (*composite)(int32_t,int32_t); // +0x1FB50
- void (*update)(uint32_t,uint32_t,uint32_t); // +0x20E80
- int32_t (*color)(uint32_t,uint32_t,uint8_t*,int32_t); // +0x251C0
-};
-// 1.13c D2Common+0x21300: map one item component into its 16-byte color tables.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_21300(uint32_t unit,uint32_t out_a,uint32_t out_b,
- uint32_t item,const D2Common21300Env* e) {
- if (!unit || !out_a || !out_b || !e || !item) return;
- uint32_t inv=u32(p(unit),0x60); if (!inv) return;
- uint32_t c5=e->component?e->component(inv,5):0, c6=e->component?e->component(inv,6):0;
- uint32_t id=u32(p(item),4); if (id>=e->item_count || !e->item_table) return;
- uint32_t record=e->item_table+id*0x1a8; if (!record) return;
- uint8_t slot=e->slot?e->slot(item):0xff;
- uint32_t composite=e->composite?e->composite(i32(p(item),4),i32(p(unit),4)):0;
- if (!composite) { if (slot<16) { p(out_a)[slot]=0xff; p(out_b)[slot]=0xff; } return; }
- if (item==c5) slot=5; else if (item==c6) slot=6; else if (slot>=16) return;
- p(out_a)[slot]=static_cast<uint8_t>(composite);
- if (e->update) e->update(unit,out_a,out_b);
- uint8_t* dest=p(out_b)+slot;
- if (!e->color || !e->color(unit,item,dest,0)) *dest=0xff; else ++*dest;
-}
 
 struct D2Common21D70Env { int32_t (*place)(uint32_t,uint32_t,int32_t,int32_t,int32_t,int32_t,int32_t); };
 // 1.13c D2Common+0x21D70: place an item in belt slot 0..15.
@@ -179,35 +154,4 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4fdc0(uint32_t unit,uint
  if (value<static_cast<int32_t>(threshold)*0x100 &&
   (!e || !e->tables || i32(p(e->tables),0xc4)<13 || !e->state || !e->state(12))) return 0;
  return 1;
-}
-
-struct D2Common20E80Env {
- int32_t (*weapon_class)(uint32_t,uint32_t,uint32_t*,int32_t,int32_t); // +0x441E0
- uint8_t (*slot)(uint32_t); // +0x231E0
- uint32_t (*component)(uint32_t,int32_t); // +0x20830
- uint32_t (*items_txt)(uint32_t); // +0x719A0
- uint32_t (*item_by_code)(uint32_t); // +0x71960
- uint32_t (*composite)(uint32_t,uint32_t,uint32_t); // +0x1FB50, args unknown: unit,item,record
-};
-// 1.13c D2Common+0x20E80: bow/crossbow items set composite byte 5 or 6 of the weapon-held tables.
-// Null unit/item is fatal in retail (_exit); here it is a no-op.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_20e80(uint32_t unit,uint32_t out_a,uint32_t out_b,
- uint32_t item,const D2Common20E80Env* e) {
- if (!unit || !item || !e) return;
- uint32_t data=u32(p(item),0x14);
- if (i32(p(item),0)!=4 || !data) return;
- uint8_t t=p(data)[0x44]; if (t!=4 && t!=5) return;
- uint32_t inv=u32(p(unit),0x60), tmp=out_a;
- int32_t code=e->weapon_class(unit,inv,&tmp,-1,1);
- uint8_t slot=e->slot(item);
- if (code==0x20776278) {
-  if ((slot!=5 && slot!=6) || !inv) return;
-  uint32_t c=e->component(inv,5); if (!c) return;
-  uint32_t rec=e->items_txt(u32(p(c),4)); if (!rec) return; // retail: fatal
-  int32_t n=static_cast<int32_t>(e->composite(unit,item,rec));
-  if (n>0) p(out_a)[6]=static_cast<uint8_t>(n); else p(out_a)[6]=p(out_b)[6]=0xff;
- } else if (code==0x20776f62 && slot==6 && e->item_by_code(0x2074696c)) {
-  uint32_t n=e->composite(unit,item,0);
-  if (n==0) p(out_a)[5]=p(out_b)[5]=0xff; else p(out_a)[5]=static_cast<uint8_t>(n);
- }
 }
