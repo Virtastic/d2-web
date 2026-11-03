@@ -27,7 +27,7 @@ static inline void wr32(uint32_t a, uint32_t v) { std::memcpy((void*)(uintptr_t)
 static uint32_t clientOf(uint32_t pl, const D2Game36890Env* env) { return (pl != 0 && rd32(pl) == 0) ? rd32(env->a4c0(pl) + 0x9c) : 0; }
 
 // 1.13c D2Game+0x36890
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_36890(uint32_t player, uint32_t target, uint32_t game, const D2Game36890Env* env)
+extern "C" EMSCRIPTEN_KEEPALIVE void D2Game_36890(uint32_t player, uint32_t target, uint32_t game, const D2Game36890Env* env)
 {
     const uint32_t flags = rd32(env->a4c0(player) + 0x10 + *(const uint8_t*)(uintptr_t)(game + 0x6d) * 4);
     if (target == 0 || rd32(target) != 1) return;

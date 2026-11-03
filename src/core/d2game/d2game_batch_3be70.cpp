@@ -33,16 +33,15 @@ struct D2GameBatch3beEnv {
     uint32_t (*unitClass)(void* u);                             // Ordinal 10240 (skill/class id)
     uint32_t (*unitLevel)(void* u);                             // Ordinal 11029
     uint32_t (*unitGuid)(void* u);                              // Ordinal 11018
-    void*    (*getClient)(void* game, uint32_t clientId);       // 0x400003A0-ish FUN_6fd003a0
+    void*    (*getClient)(void* game, uint32_t type, uint32_t id); // 0xE03A0 (eax = owner type unit+0x94, edx = owner id unit+0x98)
     int32_t  (*unitX)(void* u);                                 // 0x21100
     int32_t  (*unitY)(void* u);                                 // 0x21130
     int32_t  (*skillDuration)(void* client, uint32_t a, uint32_t id, uint32_t lvl); // Ordinal 10786
-    void*    (*statsRow)(void* u);                              // 0x21420
     void*    (*createMissile)(void* game, uint32_t* req);       // 0x8F930
     void     (*setLife)(void* unit, int32_t v);                 // Ordinal 10637
     void     (*f3bda0)(void* game, int32_t v);                  // 0x3BDA0 (stack game, class row +0x44)
-    void     (*f6cc26e0)(void* edi, int32_t dur);               // 0xCC26E0
-    void*    (*findTarget)(uint32_t a, int32_t b, uint32_t c, void* client, int32_t x, int32_t y); // 0xCC0F40
+    void     (*f6cc26e0)(void* game, uint32_t* req, int32_t dur); // 0xA26E0 (ecx = game, esi = request, stack dur)
+    void*    (*findTarget)(void* game, void* client, int32_t x, int32_t y, int32_t range, uint32_t filter, int32_t a7, int32_t* a8); // 0xA0F40
     void*    (*getRoom)(void* u);                               // Ordinal 10331
     int32_t  (*pathX)(void* path);                              // Ordinal 10867
     int32_t  (*pathY)(void* path);                              // Ordinal 10750
@@ -57,14 +56,14 @@ struct D2GameBatch3beEnv {
     void     (*setFlag)(void* u, int32_t a, int32_t b);         // 10945
     const void* cb58e60;                                        // LAB_6fc58e60
     int32_t  (*dist2)(int32_t x1, int32_t y1, int32_t x2, int32_t y2); // Ordinal 10769
-    int32_t  (*f21b10)(uint32_t ecx, uint32_t edi);
-    void     (*f21ec0)(void);
-    void     (*fd2120)(void* esi);                              // 0xCD2120
-    int32_t  (*isDead)(void* t);                                // Ordinal 10494
-    int32_t  (*stat1)(void* a);                                 // Ordinal 10973 (1 arg)
-    int32_t  (*stat3)(void* a, int32_t b, int32_t c);           // Ordinal 10973 (3 args)
-    int32_t  (*f21bc0)(void);
-    void     (*f21a90)(uint32_t ecx, int32_t v);
+    int32_t  (*f21b10)(int32_t id, int32_t lvl);                // 0x21B10: (lvl-1)*row[0x14c]+row[0x148]
+    int32_t  (*f21ec0)(int32_t id);                             // 0x21EC0: row[0x15c]
+    void     (*fd2120)(void* t, void* node, void* game, int32_t v); // 0xB2120: esi = target, eax = node/caster, ecx = game, stack value
+    int32_t  (*isDead)(void* t, int32_t s);                     // 0xA68E (eax-free: stack unit, stack index)
+    int32_t  (*stat3)(void* a, int32_t b, int32_t c);           // Ordinal 10973 (unit, stat, layer)
+    int32_t  (*f21bc0)(int32_t id);                             // 0x21BC0: row[0x14c]
+    int32_t  (*f21a90)(int32_t id, int32_t lvl);                // 0x21A90: linear [0x158,0x15c]
+    const void* cb59210;                                        // LAB_6fc59210 (callback address only)
     int32_t  (*unitMode)(void* u);                              // Ordinal 10737
     void     (*fcbf340)(uint32_t ecx, uint32_t edx, void* game, int32_t y, void* u, int32_t a, int32_t b, uint32_t cbRva); // 0x9F340; cbRva = D2Game RVA of the callback pushed
     int32_t  (*frame)(void);                                    // Ordinal 11018, no args
@@ -83,18 +82,26 @@ struct D2GameBatch3beEnv {
 // Default env: seams whose callee is a DEFINED typed function in src/ are direct calls (D2Common ordinal ->
 // ordinal column). Null seams are the documented gaps (no usable definition):
 //   createMissile 0x6F930 (template over a hook env only), f3bda0 (39e30 env-typed), f6cc26e0 (0xA26E0 env-typed), findTarget 0xA0F40
-//   (arg order unverified), statsRow/skillDuration/maxFrames/ord10786/10510 (probe or env-ABI definitions), roomCollide #11076,
-//   roomAux 0x1280, pathX/pathY #10867/#10750 (register-array probes), f21b10/f21ec0/f21bc0/f21a90 (probes), fd2120 0xB2120,
-//   isDead #10494 (probe), stat1/stat3 #10973 (2-arg row probe), fcbf340 0x9F340 (stack-arg thunk), r10614, r10513, cb58e60 (LAB_6fc58e60 has no row).
-// getClient is SUNIT_GetServerUnit(game, UNIT_PLAYER, id): the decompile drops the type register (player owner id, unit+0x98 / +0x26 dword).
+//   (arg order unverified), skillDuration/maxFrames/ord10786/10510 (probe or env-ABI definitions), roomCollide #11076,
+//   roomAux 0x1280, pathX/pathY #10867/#10750 (register-array probes), fd2120 0xB2120,
+//   isDead #10494 (probe), stat3 #10973, fcbf340 0x9F340 (stack-arg thunk), r10614, r10513, cb58e60 (LAB_6fc58e60 has no row).
+// getClient is SUNIT_GetServerUnit(game, owner type unit+0x94, owner id unit+0x98) (E03A0: eax = type, edx = id).
+static const uint8_t* g3beSkillRow(int32_t i) {
+    if (i < 0 || i >= i32(sgptDataTables, 0xba0)) return nullptr;
+    return (const uint8_t*)ptr(sgptDataTables, 0xb98) + (size_t)i * 0x23c;
+}
 static const D2GameBatch3beEnv g3beDirect = [] {
     D2GameBatch3beEnv e{};
     e.unitClass = [](void* u) -> uint32_t { return (uint32_t)MISSILE_GetSkill((D2UnitStrc*)u); };
     e.unitLevel = [](void* u) -> uint32_t { return MISSILE_GetLevel((D2UnitStrc*)u); };
     e.unitGuid  = [](void* u) -> uint32_t { return (uint32_t)MISSILE_GetTargetX((D2UnitStrc*)u); };
-    e.getClient = [](void* g, uint32_t id) -> void* { return SUNIT_GetServerUnit((D2GameStrc*)g, UNIT_PLAYER, (int32_t)id); };
+    e.getClient = [](void* g, uint32_t ty, uint32_t id) -> void* { return SUNIT_GetServerUnit((D2GameStrc*)g, (D2C_UnitTypes)ty, (int32_t)id); };
     e.unitX = [](void* u) -> int32_t { return UNITS_GetXPosition((D2UnitStrc*)u); };
     e.unitY = [](void* u) -> int32_t { return UNITS_GetYPosition((D2UnitStrc*)u); };
+    // 0x21B10 / 0x21BC0 / 0x21EC0: skills-row formulas (row +0x148/0x14C/0x15C).
+    e.f21b10 = [](int32_t id, int32_t lvl) -> int32_t { const uint8_t* r = g3beSkillRow(id); return r ? (lvl - 1) * i32(r, 0x14c) + i32(r, 0x148) : 0; };
+    e.f21bc0 = [](int32_t id) -> int32_t { const uint8_t* r = g3beSkillRow(id); return r ? i32(r, 0x14c) : 0; };
+    e.f21ec0 = [](int32_t id) -> int32_t { const uint8_t* r = g3beSkillRow(id); return r ? i32(r, 0x15c) : 0; };
     e.setLife = [](void* u, int32_t v) { MISSILE_SetTargetX((D2UnitStrc*)u, v); };
     e.getRoom = [](void* u) -> void* { return UNITS_GetRoom((D2UnitStrc*)u); };
     e.auxTest = [](void* r) -> int32_t { return D2Common_10057_DUNGEON_IsRoomInTown((D2ActiveRoomStrc*)r); };
@@ -141,48 +148,54 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3be70(void* game, const int32_t* u, int32_
     return 0;
 }
 
-// 1.13c D2Game+0x3C5B0 -- `edi` is the hidden first argument of 0xCC26E0. The request struct the
-// decompile builds is never passed anywhere in this function and is omitted.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3c5b0(void* game, int32_t* u, void* edi, const D2GameBatch3beEnv* e = &g3beDirect)
+// 1.13c D2Game+0x3C5B0 -- ecx = game, edx = unit. Builds the type-3 missile request (callback 0x39210 in req[21]) and
+// hands it to 0xA26E0 (ecx = game, esi = request, stack = duration).
+EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3c5b0(void* game, int32_t* u, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     if (!u) return 1;
     const uint8_t* row = classRow(e, u);
     if (!row || i16(row, 0x24) < 0) return 1;
     if (!isPlayerBit(u)) return 1;
-    void* client = e->getClient(game, u[0x26]);
+    void* client = e->getClient(game, u[0x25], u[0x26]);
     if (!client) return 1;
-    int32_t dur = (int32_t)(e->unitLevel(u) - 1) * i32(row, 0x50) + i32(row, 0x4c);
+    uint32_t req[23] = {};
+    req[0] = 3; req[1] = (uint32_t)(uintptr_t)client;
+    req[4] = (uint32_t)(int32_t)i16(row, 0x24);
+    req[5] = e->unitX(u); req[6] = e->unitY(u);
+    const uint32_t id = e->unitClass(u), lvl = e->unitLevel(u);
+    req[11] = id; req[12] = lvl;
+    req[21] = (uint32_t)(uintptr_t)e->cb59210;
+    int32_t dur = (int32_t)(lvl - 1) * i32(row, 0x50) + i32(row, 0x4c);
     if (dur < 1) {
-        uint32_t id = e->unitClass(u), lvl = e->unitLevel(u);
-        void* st = e->statsRow(u);   // hidden argument of 0x21420 assumed to be the unit
-        if (!st) return 1;
-        dur = e->skillDuration(client, u32(st, 0x144), id, lvl);
+        const uint8_t* srow = skillRow(e, (int32_t)id);
+        if (!srow) return 1;
+        dur = e->skillDuration(client, u32(srow, 0x144), id, lvl);
         if (dur < 1) dur = 1;
     }
-    e->f6cc26e0(edi, dur);
+    e->f6cc26e0(game, req, dur);
     return 1;
 }
 
-// 1.13c D2Game+0x3C990 -- the request's first argument is the game (Ghidra shows a stale register).
-EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3c990(void* game, int32_t* u, const uint8_t* urow, const D2GameBatch3beEnv* e = &g3beDirect)
+// 1.13c D2Game+0x3C990 -- ecx = game, edx = unit; the class row (unit+4) also supplies the duration and request word 4.
+EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3c990(void* game, int32_t* u, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     if (!u) return 1;
     const uint8_t* row = classRow(e, u);
     if (!row || i16(row, 0x24) < 0 || !isPlayerBit(u)) return 1;
-    void* client = e->getClient(game, u[0x26]);
+    void* client = e->getClient(game, u[0x25], u[0x26]);
     if (!client) return 1;
     int32_t id = (int32_t)e->unitClass(u);
     uint32_t lvl = e->unitLevel(u);
     const uint8_t* srow = skillRow(e, id);
     if (!srow) return 1;
-    int32_t dur = i32(urow, 0x4c);   // urow = unaff_EDI
+    int32_t dur = i32(row, 0x4c);
     if (dur < 1) {
         dur = e->skillDuration(client, u32(srow, 0x138), id, lvl);
         if (dur < 5) dur = 5;
     }
     uint32_t req[23] = {};
     req[0] = 0x8001; req[1] = (uint32_t)(uintptr_t)client;
-    req[4] = (uint32_t)(int32_t)i16(urow, 0x24);
+    req[4] = (uint32_t)(int32_t)i16(row, 0x24);
     req[5] = e->unitX(u); req[6] = e->unitY(u);
     req[11] = id; req[12] = lvl; req[19] = dur;
     e->createMissile(game, req);
@@ -195,7 +208,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3cdd0(void* game, int32_t* u, const D2Game
     if (!u) return 1;
     const uint8_t* row = classRow(e, u);
     if (!row || i16(row, 0x24) < 0 || !isPlayerBit(u)) return 1;
-    void* client = e->getClient(game, u[0x26]);
+    void* client = e->getClient(game, u[0x25], u[0x26]);
     if (!client) return 1;
     uint32_t req[23] = {};
     req[0] = 1; req[1] = (uint32_t)(uintptr_t)client;
@@ -207,50 +220,52 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3cdd0(void* game, int32_t* u, const D2Game
     return 0;
 }
 
-// 1.13c D2Game+0x3D020 -- `ctx` is the hidden stack argument (its +0x0C feeds the target search).
-EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3d020(void* game, int32_t* u, int32_t flag, int32_t* ctx, uint32_t seed, const D2GameBatch3beEnv* e = &g3beDirect)
+// 1.13c D2Game+0x3D020 -- ecx = game, edx = unit, stack ctx (ret 4; ctx+0x0C feeds the target search 0xA0F40).
+EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3d020(void* game, int32_t* u, int32_t* ctx, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     if (!u) return 1;
     const uint8_t* row = classRow(e, u);
     if (!row) return 1;
     if (!isPlayerBit(u)) return 3;
-    void* client = e->getClient(game, u[0x26]);
-    if (!client || !flag || e->unitGuid(u) <= 1) return 3;
+    void* client = e->getClient(game, u[0x25], u[0x26]);
+    if (!client || !ctx) return 3;
+    const uint32_t guid = e->unitGuid(u);
+    if ((int32_t)guid <= 1) return 3;
     int32_t x = e->unitX(u), y = e->unitY(u);
     int32_t dur = i32(row, 0x4c);
-    uint32_t lvl = 0;
-    if (dur < 1) {
-        uint32_t id = e->unitClass(u); lvl = e->unitLevel(u);
-        void* st = e->statsRow(u);
-        if (!st) return 3;
-        dur = e->skillDuration(client, u32(st, 100), id, lvl);
+    uint32_t lvl = e->unitLevel(u);
+    if (dur <= 0) {
+        uint32_t id = e->unitClass(u);
+        const uint8_t* srow = skillRow(e, (int32_t)id);
+        if (!srow) return 3;
+        dur = e->skillDuration(client, u32(srow, 100), id, lvl);
         if (dur < 1) dur = 1;
     }
-    int32_t* t = (int32_t*)e->findTarget((uint32_t)ctx[3], dur, seed, client, x, y);
+    int32_t* t = (int32_t*)e->findTarget(game, client, x, y, dur, 0x88583, ctx[3], nullptr);
     if (t && t != ctx) {
         uint32_t req[23] = {};
         req[0] = 0x21; req[1] = (uint32_t)(uintptr_t)client; req[3] = (uint32_t)(uintptr_t)t;
         req[4] = (uint32_t)u[1]; req[5] = x; req[6] = y;
         req[7] = e->unitX(t); req[8] = e->unitY(t);
-        req[10] = e->unitLevel(u);
+        req[11] = e->unitClass(u); req[12] = lvl;
         void* m = e->createMissile(game, req);
-        if (m) e->setLife(m, y - 1);
+        if (m) e->setLife(m, (int32_t)guid - 1);
     }
     return 3;
 }
 
-// 1.13c D2Game+0x3D450 -- `radius` and `game` are the hidden arguments (Ghidra's unaff_retaddr / uStack_8).
-EMSCRIPTEN_KEEPALIVE void d2_game_3d450(uint32_t p1, int32_t* u, int32_t radius, void* game, const D2GameBatch3beEnv* e = &g3beDirect)
+// 1.13c D2Game+0x3D450 -- five stack arguments (ret 0x14): game, unit, radius, request word 4, duration (0 = no word 19).
+EMSCRIPTEN_KEEPALIVE void d2_game_3d450(void* game, int32_t* u, int32_t radius, uint32_t a4, int32_t a5, const D2GameBatch3beEnv* e = &g3beDirect)
 {
+    if (a5 < 0) a5 = 0;
     if (!e->getRoom(u)) return;
-    uint32_t req[25] = {};
-    req[2] = 1;
-    uint32_t cid = 0;
+    uint32_t req[23] = {};
     void* client = nullptr;
-    if (u && isPlayerBit(u)) client = e->getClient(game, u[0x26]);
-    cid = (uint32_t)(uintptr_t)client;
-    req[3] = cid; req[4] = p1; req[12] = e->unitLevel(u);
-    if (u) req[0] = 0x8001;
+    if (u && isPlayerBit(u)) client = e->getClient(game, u[0x25], u[0x26]);
+    req[0] = a5 != 0 ? 0x8001 : 1;
+    req[1] = (uint32_t)(uintptr_t)client;
+    req[4] = a4;
+    req[11] = e->unitClass(u); req[12] = e->unitLevel(u);
     const bool direct = u[0] == 2 || (u[0] > 3 && u[0] < 6);
     void* path = ptr(u, 0x2c);
     int32_t cx = direct ? i32(path, 0xc) : path ? e->pathX(path) : 0;
@@ -265,7 +280,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_3d450(uint32_t p1, int32_t* u, int32_t radius,
             if (e->roomCollide(room, p1, p2, 4) != 0) continue;
             void* aux = e->roomAux(e->getRoom(u));
             if (aux && e->auxTest(aux) == 0) {
-                req[19] = (uint32_t)(uintptr_t)u;
+                if (a5 != 0) req[19] = (uint32_t)a5;
                 req[5] = x1; req[6] = y1;
                 e->createMissile(game, req);
             }
@@ -290,13 +305,13 @@ EMSCRIPTEN_KEEPALIVE void d2_game_3e590(int32_t* u, int32_t* t, const D2GameBatc
     e->setFlag(t, 0x56, 1);
 }
 
-// 1.13c D2Game+0x3E740 -- t = stack argument, ecx/edi = hidden args of 0x21B10, esi of 0xCD2120.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3e740(void* game, int32_t* u, int32_t* t, uint32_t ecx, uint32_t edi, void* esi, const D2GameBatch3beEnv* e = &g3beDirect)
+// 1.13c D2Game+0x3E740 -- ecx = game, edx = unit, stack t (ret 4).
+EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3e740(void* game, int32_t* u, int32_t* t, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     int32_t id = (int32_t)e->unitClass(u);
-    e->unitLevel(u);
+    int32_t lvl = (int32_t)e->unitLevel(u);
     if (!skillRow(e, id) || !u || !isPlayerBit(u)) return 1;
-    if (!e->getClient(game, u[0x26])) return 1;
+    if (!e->getClient(game, u[0x25], u[0x26])) return 1;
     if (!t || t[0] != 1) return 1;
     uint32_t guid = e->unitGuid(u);
     if (!game) fatal(0x2d3);
@@ -306,34 +321,30 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3e740(void* game, int32_t* u, int32_t* t, 
         n = (int32_t*)ptr(n, 0x39 * 4);
         if (!n) return 1;
     }
-    int32_t r = e->f21b10(ecx, edi);
-    if (e->dist2(e->unitX(n), e->unitY(n), e->unitX(t), e->unitY(t)) < r * r) {
-        e->f21ec0();
-        e->fd2120(esi);
-    }
+    int32_t r = e->f21b10(id, lvl);
+    if (e->dist2(e->unitX(n), e->unitY(n), e->unitX(t), e->unitY(t)) < r * r)
+        e->fd2120(t, n, game, e->f21ec0(id));
     return 1;
 }
 
-// 1.13c D2Game+0x3EAE0 -- t = stack argument, ecx = hidden argument of 0x21A90.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3eae0(void* game, int32_t* u, int32_t* t, uint32_t ecx, const D2GameBatch3beEnv* e = &g3beDirect)
+// 1.13c D2Game+0x3EAE0 -- ecx = game, edx = unit, stack t (ret 4).
+EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3eae0(void* game, int32_t* u, int32_t* t, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     int32_t id = (int32_t)e->unitClass(u);
-    e->unitLevel(u);
+    int32_t lvl = (int32_t)e->unitLevel(u);
     const uint8_t* srow = skillRow(e, id);
     if (!srow || !u || !isPlayerBit(u)) return 1;
-    void* client = e->getClient(game, u[0x26]);
+    void* client = e->getClient(game, u[0x25], u[0x26]);
     if (!client) return 1;
     if (t && t[0] == 1) {
         int16_t s = i16(srow, 0x82);
         if (s < 0 || s >= i32(dtab(e), 0xc4)) return 1;
-        if (e->isDead(t) == 0) {
-            int32_t a = e->stat1(client);
-            int32_t b = e->f21bc0();
+        if (e->isDead(t, s) == 0) {
+            int32_t a = e->stat3(client, 0xc, 0);
+            int32_t b = e->f21bc0(id);
+            int32_t sum = b + (a + lvl);
             int32_t c = e->stat3(t, 0xc, 0);
-            if (c < b + a + s) {
-                e->f21a90(ecx, 0xc);
-                e->fd2120(nullptr);
-            }
+            if (sum > c) e->fd2120(t, client, game, e->f21a90(id, lvl));
         }
     }
     return 0;
@@ -359,7 +370,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_3f6d0(void* game, int32_t* u, const D2GameBatc
 EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3f7d0(void* game, int32_t* u, int32_t flag, void* esi, const D2GameBatch3beEnv* e = &g3beDirect)
 {
     if (!u || !isPlayerBit(u)) return 1;
-    void* client = e->getClient(game, u[0x26]);
+    void* client = e->getClient(game, u[0x25], u[0x26]);
     if (!client || !flag) return 1;
     uint32_t id = e->unitClass(u), lvl = e->unitLevel(u);
     int32_t f = e->frame() - i32(esi, 0xa8);
@@ -403,14 +414,13 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3f890(void* game, int32_t* u, const D2Game
 }
 
 // function probe seam (src/core/fn/d2game_3cdd0.cpp): callees are HookEnv recorders; dt is the descriptor's data-table blob.
-// Retail calls E03A0 with eax = unit+0x94 (owner type), edx = unit+0x98; the vendored getClient fixes the type to player.
 static HookEnv* g3cH; static int32_t* g3cU;
 uint32_t D2Game_3CDD0_probe(void* game, int32_t* u, const uint8_t* dt, uint32_t* lg, const uint32_t* sc)
 {
     HookEnv h(lg, sc); g3cH = &h; g3cU = u;
     D2GameBatch3beEnv e = g3beDirect;
     e.dt = dt;
-    e.getClient = [](void* g, uint32_t id) -> void* { return (void*)(uintptr_t)g3cH->h(0xE03A0, (uint32_t)g3cU[0x25], (uint32_t)(uintptr_t)g, id); };
+    e.getClient = [](void* g, uint32_t ty, uint32_t id) -> void* { return (void*)(uintptr_t)g3cH->h(0xE03A0, ty, (uint32_t)(uintptr_t)g, id); };
     e.unitX = [](void* u) -> int32_t { return (int32_t)g3cH->h(0x1100, 0, (uint32_t)(uintptr_t)u); };
     e.unitY = [](void* u) -> int32_t { return (int32_t)g3cH->h(0x1130, 0, (uint32_t)(uintptr_t)u); };
     e.unitClass = [](void* u) -> uint32_t { return g3cH->h(0xB26A, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
@@ -426,7 +436,7 @@ uint32_t D2Game_3F7D0_probe(void* game, int32_t* u, int32_t flag, uint32_t* lg, 
 {
     HookEnv h(lg, sc); g3fH = &h; g3fU = u;
     D2GameBatch3beEnv e = g3beDirect;
-    e.getClient = [](void* g, uint32_t id) -> void* { return (void*)(uintptr_t)g3fH->h(0xE03A0, (uint32_t)g3fU[0x25], (uint32_t)(uintptr_t)g, id); };
+    e.getClient = [](void* g, uint32_t ty, uint32_t id) -> void* { return (void*)(uintptr_t)g3fH->h(0xE03A0, ty, (uint32_t)(uintptr_t)g, id); };
     e.unitClass = [](void* u) -> uint32_t { return g3fH->h(0xB26A, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
     e.unitLevel = [](void* u) -> uint32_t { return g3fH->h(0xB0FC, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
     e.frame = []() -> int32_t { return (int32_t)g3fH->h(0xB24C, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)g3fU); };

@@ -27,7 +27,7 @@ struct D2Game36C50Env {
     void     (*sub_5E790)();
     void     (*sub_5E940)(uint32_t unit, uint32_t game);  // eax = unit, ecx = game
     void     (*sub_5DEF0)(uint32_t game);                 // eax = game
-    void     (*sub_68D20)(uint32_t unit);                 // stack
+    void     (*sub_68D20)(uint32_t node, uint32_t unit);  // esi = node, stack = unit (ret 4; checked against the 0x68D20 body, which reads [esi+0x18])
 };
 
 static inline uint32_t rd32(uint32_t a) { uint32_t v; std::memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }
@@ -85,7 +85,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_36C50(uint32_t unit, uint32_t 
         if ((n = findQuest(game, 0x14))) e->sub_E9960(n);
         return;
     case 0x173:
-        if ((n = findQuest(game, 5))) e->sub_68D20(unit);
+        if ((n = findQuest(game, 5))) e->sub_68D20(n, unit);
         return;
     case 0x178:
         if ((n = findQuest(game, 0x18))) e->sub_BB6A0(n, unit);

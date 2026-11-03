@@ -48,10 +48,13 @@ struct D2GameBatch405E0Env {
     void    (*ord10019)(void* unit, int32_t v);
     // 0x41FB0
     void*   (*ord10871)(void* unit, int32_t state);
-    int32_t (*ord10786)(void* unit, int32_t stat, void* extra);
+    int32_t (*ord10786)(void* unit, int32_t stat, int32_t level, void* extra); // RVA 0xAC9A
     int32_t (*ord10973)(void* unit, int32_t stat);
     int32_t (*ord11104)(void* unit);
-    int32_t (*sub214D0)(int32_t a, int32_t b);
+    int32_t (*sub214D0)(int32_t a, int32_t b, int32_t c);   // 0x14D0 (RVA): a*b/c, eax=a edx=b ecx=c
+    int32_t (*subA7A8)(void* unit, int32_t x, int32_t y);   // RVA 0xA7A8, returns al
+    int32_t (*subAD1E)(int32_t v);                          // RVA 0xAD1E, returns al
+    void    (*subA83E)(void* unit, int32_t stat, int32_t z); // RVA 0xA83E
     void    (*ord10887)(void* unit, int32_t stat, int32_t v, int32_t z);
     void    (*ord11111)(void* unit, void* statList);
     void    (*ord11108)(void* statList);

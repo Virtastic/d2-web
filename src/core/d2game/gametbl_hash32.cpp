@@ -59,7 +59,9 @@ W arrAlign(W n, W hdr) {
     for (W c = (n - 1) & n; c; c = (n - 1) & n) n = c;
     return n < 1 ? 1 : n;
 }
-// 1.13c D2Game+0x26f0 (thiscall(this,p): if p, 0x2740(p,this); only reached from the OOM fallback below, not modelled)
+// 1.13c D2Game+0x26F0: thiscall(this, p): if p, copy-construct the slot p from this (0x2740(p, this)); the SEH frame is the only other thing it does.
+void d2game_26f0_construct(W thisp, W p) { if (p) d2game_2740_copyConstruct(p, thisp); }
+// 1.13c D2Game+0x2630 body (arrSetCap); the OOM copy-construct fallback (via 0x26F0) is
 void arrSetCap(W hdr, W cap) {   // the OOM copy-construct fallback of 0x2630 (via 0x26F0/0x2740) is not modelled
     W old = w(hdr, 8);
     for (W i = cap; i < w(hdr, 4); ++i) listUninit(old + i * 12);

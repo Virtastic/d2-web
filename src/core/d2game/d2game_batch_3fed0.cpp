@@ -29,31 +29,7 @@ static inline void* skillRow(const D2GameBatch3fEnv* e, int32_t i)
 }
 static inline bool hasTargetFlag(void* unit) { return (rd32(unit, 0xC8) >> 10) & 1; }
 
-// 1.13c D2Game+0x3FED0
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3fed0(void* game, void* unit, const D2GameBatch3fEnv* e)
-{
-    void* rec = monsRow(e, unit);
-    if (!rec) return 2;
-    void* sk = skillRow(e, (int32_t)e->o10240get(unit));
-    if (!sk) return 2;
-    void* tgt;
-    if (!hasTargetFlag(unit) || !(tgt = e->getTarget(game, rd32(unit, 0x98))) || e->targetBusy() != 0)
-        return e->tail(game);
-    uint32_t v = e->o11029(unit);
-    if (e->o10985(unit) == rd32(rec, 0x38)) {
-        int32_t cur = (int32_t)e->o10973(tgt, 6, 0);
-        int32_t max = (int32_t)e->o10913(tgt) >> 8;
-        if ((cur >> 8) < max) {
-            e->o10786(tgt, rd32(sk, 0x138), v);
-            int32_t n = (cur >> 8) + (int32_t)e->roll(100, (uint32_t)max);
-            if (max <= n) n = max;
-            e->o10887(tgt, 6, (uint32_t)n << 8, 0);
-            int16_t s = (int16_t)rd16(rec, 0x36);   // ponytail: Ghidra read uVar4+0x36 (uVar4==1); monstats row +0x36 taken
-            if (0 < s && s < (int32_t)rd32(e->dataTables, 0xBC0)) e->o10689(tgt, s, 0);
-        }
-    }
-    return e->tail(game);
-}
+// D2Game+0x3FED0 moved to d2game_3fed0.cpp (retail convention ECX = game, EDX = unit).
 
 // 1.13c D2Game+0x40420
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_game_40420(void* game, void* unit, const D2GameBatch3fEnv* e)

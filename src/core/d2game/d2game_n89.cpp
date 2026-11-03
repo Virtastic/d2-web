@@ -68,22 +68,7 @@ struct N89Host {
     P* clientTabSz; // DAT_6fd30c04 (current game)
 };
 
-// 1.13c D2GAME+0x38C70
-int N89_38C70(N89Host* h, P* curGame, void* csGlobal, void* csTab)
-{
-    h->net_lock();
-    h->leave_cs(csGlobal);
-    P g = h->get_game();
-    *curGame = g;
-    if (!g) h->fatal(0x7b);
-    int n = 0;
-    for (int i = 0; i < 0x80; i++)
-        for (uint32_t u = U89(g, 0x4c8 * 4 + i * 4); u; u = U89((P)(uintptr_t)u, 0xe4)) n++;
-    void* cs = (void*)(uintptr_t)U89(g, 6 * 4);
-    if (!cs) h->fatal(0x100f);
-    h->leave_cs(cs);
-    return n;
-}
+// 1.13c D2GAME+0x38C70 lives in d2game_38c70.cpp (the old transcription took no game id and mis-ordered the lock calls)
 
 // 1.13c D2GAME+0x483B0
 void N89_483B0(N89Host* h, int** pInteract)

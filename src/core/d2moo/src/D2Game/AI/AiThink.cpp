@@ -3415,7 +3415,6 @@ enum D2C_HellMeteorAIParams
 };
 
 //D2Game.0x6FCD7EB0
-// 1.13c D2Game+0x18CE0
 void __fastcall AITHINK_Fn033_HellMeteor(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	if (pAiTickParam->pMonstatsTxt->nSkill[0] >= 0 && AIRollChanceParam(pGame, pUnit, pAiTickParam, HELLMETEOR_AI_PARAM_ATTACK_CHANCE_PCT))
@@ -7131,7 +7130,7 @@ void __fastcall AITHINK_Fn085_HighPriest(D2GameStrc* pGame, D2UnitStrc* pUnit, D
 		{
 			if (AI_GetParamValue(pGame, pAiTickParam, HIGHPRIEST_AI_PARAM_LIGHTNING_AT_RANGE_CHANCE_PCT) > 0)
 			{
-				D2MissilesTxt* pMissilesTxtRecord = SKILLS_GetMissilesTxtRecord(pAiTickParam->pMonstatsTxt->wMissS1);
+				D2MissilesTxt* pMissilesTxtRecord = (int16_t)pAiTickParam->pMonstatsTxt->wMissS1 > 0 ? SKILLS_GetMissilesTxtRecord(pAiTickParam->pMonstatsTxt->wMissS1) : nullptr; // 1.13c tests wMissS1 > 0 first
 				if (pMissilesTxtRecord && pAiTickParam->nTargetDistance < pMissilesTxtRecord->wRange - 2 && AIRollChanceParam(pGame, pUnit, pAiTickParam, HIGHPRIEST_AI_PARAM_LIGHTNING_AT_RANGE_CHANCE_PCT))
 				{
 					AITACTICS_ChangeModeAndTargetUnit(pGame, pUnit, MONMODE_SKILL1, pAiTickParam->pTarget);
@@ -7203,7 +7202,7 @@ void __fastcall AITHINK_Fn085_HighPriest(D2GameStrc* pGame, D2UnitStrc* pUnit, D
 			}
 			else
 			{
-				AITACTICS_WalkToTargetUnitWithFlags(pGame, pUnit, pAiTickParam->pTarget, 7);
+				AITACTICS_WalkToTargetUnitWithFlags(pGame, pUnit, pAiTickParam->pTarget, 0); // 1.13c: FUN_6fd12540(..., 2, 0, 0, 1)
 			}
 		}
 		else
@@ -7360,6 +7359,7 @@ enum D2C_MegademonAIParams
 };
 
 //D2Game.0x6FCDF780
+// 1.13c D2Game+0x18CE0 (both approach walks pass flags 0: FUN_6fd12540(..., 2, 0, 0, 1))
 void __fastcall AITHINK_Fn089_Megademon(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
 	int32_t nSkillLevel = 1;
@@ -7402,7 +7402,7 @@ void __fastcall AITHINK_Fn089_Megademon(D2GameStrc* pGame, D2UnitStrc* pUnit, D2
 			}
 			else
 			{
-				AITACTICS_WalkToTargetUnitWithFlags(pGame, pUnit, pAiTickParam->pTarget, 7);
+				AITACTICS_WalkToTargetUnitWithFlags(pGame, pUnit, pAiTickParam->pTarget, 0);
 			}
 			return;
 		}
@@ -7416,7 +7416,7 @@ void __fastcall AITHINK_Fn089_Megademon(D2GameStrc* pGame, D2UnitStrc* pUnit, D2
 		}
 		else
 		{
-			AITACTICS_WalkToTargetUnitWithFlags(pGame, pUnit, pAiTickParam->pTarget, 7);
+			AITACTICS_WalkToTargetUnitWithFlags(pGame, pUnit, pAiTickParam->pTarget, 0);
 		}
 		return;
 	}
@@ -9922,7 +9922,7 @@ void __fastcall sub_6FCE4830(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMons
 		const int32_t nSkillId = pHirelingTxtRecord->dwSkill[i];
 
 		D2SkillsTxt* pSkillsTxtRecord = SKILLS_GetSkillsTxtRecord(nSkillId);
-		if (!pSkillsTxtRecord)
+		if (nSkillId < 1 || !pSkillsTxtRecord) // 1.13c breaks on a skill id below 1
 		{
 			break;
 		}

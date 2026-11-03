@@ -51,9 +51,14 @@ struct D2GameBatch43450Env {
     uint32_t (*o10653)();
     // D2Game unmapped / mapped RVAs
     int      (*f9FA30)(void* game, int* out);
-    uint32_t (*fE19C0_d019c0)(uint32_t ebp, uint32_t z, void* game, void* unit, uint32_t z2); // 0xD019C0
+    int      (*f9FA30u)(void* unit, void* game, int* outRegX, int* outStackY);   // 0x9FA30: eax=unit, ecx=game, ebx=&x, stack &y
+    uint32_t (*fE19C0_d019c0)(uint32_t y, uint32_t x, uint32_t z, void* game, void* unit, uint32_t z2, uint32_t z3); // 0xD019C0: eax=y ecx=x edx=0, 4 stack args
     void*    (*f_d003a0)(void* game, uint32_t id);        // 0xE03A0
+    void*    (*f_d003a0t)(void* game, uint32_t type, uint32_t id); // 0xE03A0: ecx=game, eax=owner type, edx=owner id
     uint32_t (*f_d00a60)(void* a, void* game);            // 0xE0A60
+    uint32_t (*f_d00a60u)(void* u, void* src, void* game); // 0xE0A60: eax=u, ecx=src, stack game
+    void*    (*f21420id)(uint32_t id);                    // 0x1420: eax=skill id
+    uint8_t* (*f21250id)(uint32_t classId);               // 0x1250: eax=class id
     void*    (*f21420)(void* p);
     uint8_t* (*f21250)(void* p);
     uint32_t (*f21100)(void* unit);                       // 0x1100 unit x
@@ -98,40 +103,40 @@ struct D2GameBatch43450Env {
     void**   clientBuckets;                               // DAT_6fd307b8, 0x100 entries
 };
 
-// 1.13c D2Game+0x43450
-uint32_t sub_43450(D2GameBatch43450Env& e, void* game, void* unit, uint32_t ebp, uint32_t esi) {
-    int local8[2];
-    e.f9FA30(game, local8);
+// 1.13c D2Game+0x43450: ecx = game, edx = unit, two unused stack args (ret 8). x/y come from 0x9FA30.
+uint32_t sub_43450(D2GameBatch43450Env& e, void* game, void* unit) {
+    int x = 0, y = 0;
+    e.f9FA30u(unit, game, &x, &y);
     void* r = e.o10331(unit);
     if (r) {
         uint8_t* rec = e.o10014(e.o10826(r));
         if (rec && rec[4]) {
-            if (rec[4] == 2 && e.o10686(unit, ebp, esi, 0x804)) return 0;
-            return e.fE19C0_d019c0(ebp, 0, game, unit, 0);
+            if (rec[4] == 2 && e.o10686(unit, (uint32_t)x, (uint32_t)y, 0x804)) return 0;
+            return e.fE19C0_d019c0((uint32_t)y, (uint32_t)x, 0, game, unit, 0, 0);
         }
     }
     return 0;
 }
 
-// 1.13c D2Game+0x434E0   (this=game, param_1=src unit, param_2=target unit)
+// 1.13c D2Game+0x434E0: ecx = game, stack (src, tgt, unused, skillId, level), ret 0x14.
 uint32_t sub_434E0(D2GameBatch43450Env& e, void* game, void* src, void* tgt, uint32_t p3, uint32_t p4, int p5) {
     (void)p3;
     if (!src || !tgt) return 0;
     if (!((rd32(tgt, 200) >> 10) & 1)) return 0;
-    void* u = e.f_d003a0(game, rd32(tgt, 0x98));
-    if (!u || !e.f_d00a60(src, game)) return 0;
-    void* sk = e.f21420(nullptr); // seam: 0x1420 takes ambient register arg
+    void* u = e.f_d003a0t(game, rd32(tgt, 0x94), rd32(tgt, 0x98));
+    if (!u || !e.f_d00a60u(u, src, game)) return 0;
+    void* sk = e.f21420id(p4);
     if (!sk) return 0;
     int m = rds16(sk, 0x48);
     if (m < 0 || m >= (int)rd32(e.dataTables, 0xb6c)) return 0;
     if (p5 < 0) p5 = 1;
-    uint8_t* r = e.f21250(nullptr); // seam: 0x1250 ambient register arg
+    uint8_t* r = e.f21250id(rd32(tgt, 4));
     if (!(e.bitMask4 & r[5])) return 0;
     uint32_t p[0x17] = {};
     p[0] = 0x20; p[1] = (uint32_t)(uintptr_t)src; p[2] = (uint32_t)(uintptr_t)src;
-    p[4] = (uint32_t)m;                  // local_4c (frame 0x5c bytes, dword = (0x5c-off)/4)
-    p[7] = e.f21100(u); p[8] = e.f21130(u); // local_40, local_3c
-    p[11] = p4; p[12] = (uint32_t)p5;       // local_30, local_2c
+    p[4] = (uint32_t)m;
+    p[7] = e.f21100(u); p[8] = e.f21130(u);
+    p[11] = p4; p[12] = (uint32_t)p5;
     e.f8F930(game, p);
     return 1;
 }
