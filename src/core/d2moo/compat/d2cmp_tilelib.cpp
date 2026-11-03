@@ -150,41 +150,54 @@ const uint8_t* D2CMP_17020_CacheFind(const uint8_t* pTable, const uint8_t* pKey,
     return nullptr;
 }
 
-// 1.13c D2CMP+0xc0b0 -- sprite-cache init (SpriteCache.cpp): 0x1400 zeroed nodes chained next/prev,
+// 1.13c D2CMP+0xc0b0 -- sprite-cache init (SpriteCache.cpp): 0x1400 zeroed 0x1c-byte nodes chained next/prev,
 // head/tail kept at [9]/[10], critical section created once.
-// Stateful, register args (ecx,eax,edx -> param1,eax,param2): no FN vector; mapped from the decompile.
-// Slots are named by retail's dword index ([n]). Retail's node is 0x1c bytes with 32-bit links at +0x14
-// (next) and +0x18 (prev); here the links are native pointers, so the node is wasm-width and its byte
-// layout differs, while the chain (node i -> i+1, node 0 prev null, node 0x13ff next null), the zeroed
-// fields and every slot value are the same. Node pool and lock are host-allocated (zeroed), as Fog #10045.
+// Stateful, register args (ecx,eax,edx = param1,eax,param2); the struct is the ESI block. Layout is retail's
+// dword for dword: slot [n] sits at byte 4n, a node is 0x1c bytes with next at +0x14 and prev at +0x18.
+// Pointer-valued slots hold 32-bit addresses as retail's do. The build caps linear memory at 4 GiB
+// (wasm-build/link-d2.sh MAXIMUM_MEMORY), so slot32 is lossless; it aborts if an address ever does not fit.
+// Byte values differ from retail only where retail's are its own heap addresses (pool, links, lock).
+// No FN vector can pin those: they are retail heap addresses.
 struct D2SpriteNode {
     uint32_t z[5];               // +0x00..+0x13 zero (retail +0,+4,+8,+0xC,+0x10)
-    D2SpriteNode* next;          // retail +0x14
-    D2SpriteNode* prev;          // retail +0x18
+    uint32_t next;               // +0x14 retail next, address (0 = null)
+    uint32_t prev;               // +0x18 retail prev, address (0 = null)
 };
+static_assert(sizeof(D2SpriteNode) == 0x1c, "D2SpriteNode is retail's 0x1c-byte node");
 struct D2SpriteCache {
     uint32_t s0;                 // [0]  param_1 (ECX)
     uint32_t s1;                 // [1]  in_EAX
     uint32_t s2, s3;             // [2],[3] 0
-    D2SpriteNode* pNodes;        // [4]  node array
+    uint32_t pNodes;             // [4]  node array address
     uint32_t s5_8[4];            // [5..8] 0
-    D2SpriteNode* pHead;         // [9]
-    D2SpriteNode* pTail;         // [10]
+    uint32_t pHead;              // [9]  node 0
+    uint32_t pTail;              // [10] node 0x13ff
     uint32_t s11;                // [11] param_2 (EDX)
-    void* pLock;                 // [12] CRITICAL_SECTION stand-in, created once
+    uint32_t pLock;              // [12] lock address, created once
     uint32_t s13_14[2];          // [13],[14] 0
 };
+static_assert(sizeof(D2SpriteCache) == 0x3c, "D2SpriteCache slots are retail's dwords [0]..[14]");
+// retail's debug file literal for both Fog calls (D2CMP.dll 0x6FE2FEA8); the allocator ignores it.
+static const char kSpriteCacheFile[] = "..\\Source\\D2CMP\\SRC\\SpriteCache.cpp";
+static uint32_t slot32(const void* p) {
+    uintptr_t v = (uintptr_t)p;
+    if (v > 0xFFFFFFFFu) { fprintf(stderr, "D2CMP: sprite cache address %p does not fit a 32-bit slot\n", p); abort(); }
+    return (uint32_t)v;
+}
 void D2CMP_SpriteCacheInit(D2SpriteCache* p, uint32_t param1, uint32_t eax, uint32_t param2) {
     p->s0 = param1; p->s1 = eax; p->s2 = p->s3 = 0; p->s11 = param2;
-    p->pNodes = (D2SpriteNode*)calloc(0x1400, sizeof(D2SpriteNode));   // retail: Fog #10045, zeroed
+    // retail: Fog #10045 FOG_AllocPool(pool = ECX = param_1, size = EDX = 0x23000, file, 0x905, 0), zeroed
+    D2SpriteNode* nodes = (D2SpriteNode*)FOG_AllocPool((void*)(uintptr_t)param1, 0x23000, kSpriteCacheFile, 0x905, 0);
+    p->pNodes = slot32(nodes);
     for (uint32_t i = 0; i < 0x1400; i++) {
-        p->pNodes[i].next = i < 0x13ff ? &p->pNodes[i + 1] : nullptr;
-        p->pNodes[i].prev = i > 0 ? &p->pNodes[i - 1] : nullptr;
+        nodes[i].next = i < 0x13ff ? slot32(&nodes[i + 1]) : 0;
+        nodes[i].prev = i > 0 ? slot32(&nodes[i - 1]) : 0;
     }
-    p->pHead = p->pNodes; p->pTail = &p->pNodes[0x13ff];
+    p->pHead = slot32(&nodes[0]); p->pTail = slot32(&nodes[0x13ff]);
     p->s5_8[0] = p->s5_8[1] = p->s5_8[2] = p->s5_8[3] = 0;
     p->s13_14[0] = p->s13_14[1] = 0;
-    if (!p->pLock) p->pLock = calloc(1, 0x18);   // retail: Fog #10042 + InitializeCriticalSection
+    // retail: Fog #10042 FOG_Alloc(ECX = 0x18, file, 0x92d, 0), stored at [12]; then InitializeCriticalSection (not reproduced)
+    if (!p->pLock) p->pLock = slot32(FOG_Alloc(0x18, kSpriteCacheFile, 0x92d, 0));
 }
 
 // 1.13c D2CMP+0x08710 -- statically linked CRT __convertcp(fromCP, toCP, src, &len, dst, dstLen).
