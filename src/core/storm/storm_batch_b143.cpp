@@ -121,32 +121,4 @@ extern "C" uint32_t Storm_Sub28110(uint32_t p1, uint32_t p2, uint32_t p3) {
   return 1;
 }
 
-// 1.13c Storm+0x11160: drain queued SNet messages whose seq (+4 of msg) == st[0x1d4]. st = session (EDI).
-struct StormSnetHooks {
-  int32_t* (*queueHead)(uint8_t* st);                       // *(st+0x168) link resolution
-  void (*post)(uint32_t tag, int kind, uint32_t id, void* ev);  // FUN_25dd0
-  void (*handler)(uint32_t, uint32_t, uint32_t);            // *(DAT_6fc45834+0xc)
-  void (*freeNode)(int32_t*); void (*release)(int32_t*);    // 4D60 / 1B960
-};
-extern "C" StormSnetHooks Storm_SnetHooks = {};
-static uint8_t Storm_Dat45178[16];
-extern "C" void Storm_Sub11160(uint8_t* st) {
-  StormSnetHooks& h = Storm_SnetHooks;
-  if (!h.queueHead) return;
-  for (;;) {
-    int32_t* n = h.queueHead(st);
-    if (!n) break;
-    uint8_t* m = (uint8_t*)(uintptr_t)(uint32_t)n[3];
-    if (*(int16_t*)(m + 4) != *(int16_t*)(st + 0x1d4)) break;
-    uint8_t ch = m[9];
-    if (ch < 0x10) Storm_Dat45178[ch] = 1;
-    struct { int32_t a, b, c; uint8_t d, e; } ev;
-    ev.d = m[10]; ev.e = ch; ev.a = n[2]; ev.b = (int32_t)(uintptr_t)(m + 0xc);
-    ev.c = *(uint16_t*)(m + 2) - 0xc;
-    if (h.post) h.post(0x534e4554, 2, ch, &ev);
-    *(int16_t*)(st + 0x1d4) += 1;
-    if (h.handler) h.handler(n[2], n[3], n[4]);
-    if (h.freeNode) h.freeNode(n);
-    if (h.release) h.release(n);
-  }
-}
+// 1.13c Storm+0x11160 moved to storm_11160.cpp (retail layout).

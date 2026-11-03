@@ -6,7 +6,7 @@
 #include <algorithm>
 
 #include "storm_big_types.h"
-struct Storm2fEvent { Storm2fEvent* next; Storm2fEvent* prev; uint32_t a,b; void* payload; };
+// The SNet user-event node (retail 32-bit TSExplicitList node) lives in storm_112e0.cpp / storm_11240.cpp, not here.
 // Caller-owned state and actual callee seams: no private duplicate retail globals.
 struct StormBatch2f0e0Env {
     int32_t (*f_2ebb0)(Storm2fVector*, Storm2fScratch*); // EAX scratch
@@ -18,9 +18,7 @@ struct StormBatch2f0e0Env {
     void (*f_2c210)(Storm2fVector*,uint32_t,uint32_t); // EAX third
     void (*f_2ba20)(Storm2fVector*,uint32_t,uint32_t); // EAX first
     void (*f_2b020)(Storm2fBytes*,Storm2fVector*);
-    Storm2fEvent** event_head; // retail +0x45A20, signed sentinel preserved
     void (*free_memory)(void*,const char*,int32_t);
-    void (*unlink_event)(Storm2fEvent*);
 };
 // 1.13c Storm+0x2F0E0
 int32_t Storm_2F0E0(Storm2fBig* p, StormBatch2f0e0Env& e) {
@@ -143,16 +141,7 @@ int32_t Storm_35B50(uint16_t* out,const uint8_t* in,int32_t capacity) {
     if(capacity)out[n++]=0;
     return static_cast<int32_t>(n);
 }
-// 1.13c Storm+0x112E0
-void Storm_112E0(StormBatch2f0e0Env& e) {
-    // Retail positive signed-pointer test excludes null and tagged negative sentinels.
-    while(reinterpret_cast<intptr_t>(*e.event_head)>0) {
-        Storm2fEvent* p=*e.event_head;
-        if(p->payload)e.free_memory(p->payload,"..\\3rdParty\\STORM\\SOURCE\\SNET.CPP",0x723);
-        e.unlink_event(p);
-        e.free_memory(p,".?AUUSEREVENT@@",-2);
-    }
-}
+// 1.13c Storm+0x112E0: see storm_112e0.cpp (Storm13c_112E0, retail 4-byte node layout)
 // 1.13c Storm+0x39A0 (SBig ctor; inlines 0x37C0: 16 zeroed vectors, used=0)
 Storm2fBig* Storm_39A0(Storm2fBig* p) {
     *p = Storm2fBig{};

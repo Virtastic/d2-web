@@ -52,7 +52,7 @@ extern "C" void Storm_SErrAddSource_2F200(uint16_t id) {
 extern "C" uint32_t Storm_SErrGetErrorStr_2F3F0(uint32_t msgId, char* buf, uint32_t count) {
     if (buf == nullptr || count == 0) {
         g_stormLastError = 0x57;
-        SetLastError(0x57);
+        if (SetLastError) SetLastError(0x57);   // weak in the wasm build: the Win32 copy is not observable there
         return 0;
     }
     if (InterlockedIncrement((long volatile*)&g_stormLockInit) == 0)

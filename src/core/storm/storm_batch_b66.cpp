@@ -178,16 +178,4 @@ extern "C" uint32_t Storm_Sub32EC0Probe(const uint8_t* pal, int32_t width, const
     return Storm_sub_32EC0(pal, width, &sk, pixels, height);
 }
 
-namespace { struct Msg { void* link; int32_t pad; void* data; void* aux; int32_t type; int32_t owned; }; }
-// 1.13c Storm+0x115B0  drains a queue. unaff_EBX = queue (head at +8); provider callback table = 0x6FC45834
-void Storm_sub_115B0(Msg** queueHead, void (*providerFree)(void*, void*, int32_t), void (*unlink)(Msg*)) {
-    while (Msg* m = *queueHead) {
-        if (!m->owned) { if (providerFree) providerFree(m->data, m->aux, m->type); }
-        else {
-            if (m->data) SeamFree1B960(m->data, "delete", -1);
-            if (m->aux) SeamFree1B960(m->aux, "..\\3rdParty\\STORM\\SOURCE\\SNET.CPP", 0x3b6);
-        }
-        unlink(m); SeamNetFree4D60(m);
-        SeamFree1B960(m, "AUMESSAGE", -2);
-    }
-}
+// 1.13c Storm+0x115B0 moved to storm_115b0.cpp (retail 4-byte node layout).
