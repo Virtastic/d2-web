@@ -7,6 +7,7 @@
 #include <cstring>
 #include <unistd.h>
 #include <emscripten.h>
+#include "d2win_open_util.h"
 
 struct D2Win11520Env {
     const uint32_t* bitMasks;                       // gdwBitMasks
@@ -22,7 +23,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_11520(void* box, const D2Win1
     uint8_t* b = (uint8_t*)box;
     uint32_t type, flags;
     std::memcpy(&type, b, 4);
-    if (type != 9) _exit(-1);
+    if (type != 9) d2win_open::fatal(0xA2);  // retail: Fog #10265(0xA2) -> #10024 -> _exit(-1)
     std::memcpy(&flags, b + 8, 4);
     if ((env->bitMasks[2] & flags) && (env->bitMasks[0] & flags)) {
         if (d2win_g_6f9a9e20) {

@@ -146,59 +146,60 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_10190(uint32_t* controlPtr) {
 }
 
 // 1.13c D2Win+0x103D0 (212 bytes): construct and link a 0x4C-byte type-2 control. __fastcall: ECX
-// and EDX land at +0x0C and +0x10; six stack words are taken in the order arg1..arg6, stored at
-// +0x18, +0x14, +0x04, +0x34, +0x48 and +0x30. The +0x08 word is gdwBitMasks[0] | gdwBitMasks[2];
+// and EDX land at +0x0C and +0x10, EBX and the return address (unaff_*) at +0x14 and +0x18; stack
+// words 0..3 (decompile param_3..param_6) go to +0x04, +0x34, +0x48 and +0x30. The +0x08 word is gdwBitMasks[0] | gdwBitMasks[2];
 // +0x1C gets the render callback D2Win+0xFEE0, +0x24 the hit-test D2Win+0x10190, +0x44 the value 5,
 // and the zeroed +0x3C link is appended after the current 0x6F9014A0 tail (or becomes the head).
 // Returns the new object. FOG_Alloc is called with size 0x4C and line 0x1D.
 // 1.13c D2Win+0x103D0
 extern "C"
-EMSCRIPTEN_KEEPALIVE void* d2win_sub_103D0(uint32_t ecx, uint32_t edx,
-                                           uint32_t s1, uint32_t s2, uint32_t s3,
-                                           uint32_t s4, uint32_t s5, uint32_t s6,
+EMSCRIPTEN_KEEPALIVE void* d2win_sub_103D0(uint32_t ecx, uint32_t edx, uint32_t ebx, uint32_t retaddr,
+                                           uint32_t s1, uint32_t s2, uint32_t s3, uint32_t s4,
                                            const D2WinBatch10030Env* env) {
     void* obj = env->alloc(0x4C, kD2WinImageCpp, 0x1D, 0);
     std::memset(obj, 0, 0x4C);
     wr32(obj, 0x00, 2);
     wr32(obj, 0x08, d2win_g_6f8fb17c | d2win_g_6f8fb184);
-    wr32(obj, 0x04, s3);
+    wr32(obj, 0x04, s1);       // decompile param_3 (stack word 0)
     wr32(obj, 0x0C, ecx);
     wr32(obj, 0x10, edx);
-    wr32(obj, 0x14, s2);
-    wr32(obj, 0x18, s1);
+    wr32(obj, 0x14, ebx);      // unaff_EBX
+    wr32(obj, 0x18, retaddr);  // unaff_retaddr
     wr32(obj, 0x1C, (uint32_t)(uintptr_t)env->renderFEE0);
     wr32(obj, 0x24, (uint32_t)(uintptr_t)&d2win_sub_10190);
-    wr32(obj, 0x30, s6);
-    wr32(obj, 0x34, s4);
+    wr32(obj, 0x30, s4);       // param_6
+    wr32(obj, 0x34, s2);       // param_4
     wr32(obj, 0x44, 5);
-    wr32(obj, 0x48, s5);
+    wr32(obj, 0x48, s3);       // param_5
     return d2win_control_append(obj);
 }
 
-// 1.13c D2Win+0x10610 (210 bytes): construct and link a 0x54-byte type-2 control; seven stack words
-// arg1..arg7 go to +0x0C, +0x10, +0x14, +0x18, +0x04, +0x4C and +0x50. The +0x08 word is
+// 1.13c D2Win+0x10610 (210 bytes): construct and link a 0x54-byte type-2 control; ESI and the return
+// address (unaff_*) land at +0x0C and +0x10; stack words 0..4 (decompile param_1..param_5) go to
+// +0x14, +0x18, +0x04, +0x4C and +0x50. The +0x08 word is
 // gdwBitMasks[0] | gdwBitMasks[2]; +0x1C gets D2Win+0x104B0, +0x24 D2Win+0x10190, +0x44 the value 5,
 // and the zeroed +0x3C link is appended after 0x6F9014A0's tail (or becomes the head). Returns the
 // new object. FOG_Alloc is called with size 0x54 and line 0x3B.
 // 1.13c D2Win+0x10610
 extern "C"
-EMSCRIPTEN_KEEPALIVE void* d2win_sub_10610(uint32_t s1, uint32_t s2, uint32_t s3, uint32_t s4,
-                                           uint32_t s5, uint32_t s6, uint32_t s7,
+EMSCRIPTEN_KEEPALIVE void* d2win_sub_10610(uint32_t esi, uint32_t retaddr,
+                                           uint32_t s1, uint32_t s2, uint32_t s3,
+                                           uint32_t s4, uint32_t s5,
                                            const D2WinBatch10030Env* env) {
     void* obj = env->alloc(0x54, kD2WinImageCpp, 0x3B, 0);
     std::memset(obj, 0, 0x54);
     wr32(obj, 0x00, 2);
     wr32(obj, 0x08, d2win_g_6f8fb17c | d2win_g_6f8fb184);
-    wr32(obj, 0x04, s5);
-    wr32(obj, 0x0C, s1);
-    wr32(obj, 0x10, s2);
-    wr32(obj, 0x14, s3);
-    wr32(obj, 0x18, s4);
+    wr32(obj, 0x04, s3);       // decompile param_3
+    wr32(obj, 0x0C, esi);      // unaff_ESI
+    wr32(obj, 0x10, retaddr);  // unaff_retaddr
+    wr32(obj, 0x14, s1);       // param_1
+    wr32(obj, 0x18, s2);       // param_2
     wr32(obj, 0x1C, (uint32_t)(uintptr_t)env->render104B0);
     wr32(obj, 0x24, (uint32_t)(uintptr_t)&d2win_sub_10190);
     wr32(obj, 0x44, 5);
-    wr32(obj, 0x4C, s6);
-    wr32(obj, 0x50, s7);
+    wr32(obj, 0x4C, s4);       // param_4
+    wr32(obj, 0x50, s5);       // param_5
     return d2win_control_append(obj);
 }
 

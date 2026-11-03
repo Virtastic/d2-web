@@ -4,12 +4,12 @@
 #include <cstdint>
 
 struct D2WinGlyphEnv {
-    const uint8_t* (*glyph)();  // DAT_6f901508
+    const uint8_t* (*glyph)(uint16_t ch);  // DAT_6f901508, char in CX (mov cx,[esi]; call [6f901508])
 };
 
 int32_t d2win_GetUnicodeTextNDrawWidth(const int16_t* s, int32_t n, const D2WinGlyphEnv& env) {
     int32_t w = 0;
     for (int32_t i = 0; *s != 0 && i < n; ++i, ++s)
-        if (*s != 10) w += env.glyph()[3];
+        if (*s != 10) w += env.glyph((uint16_t)*s)[3];
     return w;
 }

@@ -2,7 +2,8 @@
 // FillRect8 and DrawLine8 helpers (same arithmetic as the retail wrappers).
 #include <cstdint>
 
-extern "C" void (*d2ddraw_fatal)(uint32_t code);
+static void d2ddraw_fatal_default(uint32_t) {}
+extern "C" { void (*d2ddraw_fatal)(uint32_t code) = d2ddraw_fatal_default; }   // the host sets the fatal-error handler; the default returns
 extern "C" void d2ddraw_fill_rect(int32_t* r, uint8_t color);
 extern "C" void d2ddraw_draw_line(const int32_t* p1, const int32_t* p0, uint8_t color);
 

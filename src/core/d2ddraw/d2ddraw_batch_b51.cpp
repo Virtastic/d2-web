@@ -199,3 +199,6 @@ void d2ddraw_log_error(uint32_t hr, const char* what) {
     for (const auto& e : tbl) if (e.hr == hr) { name = e.name; break; }
     d2ddraw_log("***** DirectDraw error: %s - %s (0x%x)", what, name, hr);
 }
+
+// Test seam: sets the surface width, height and buffer the fill family reads.
+extern "C" void d2ddraw_surface_state(int32_t w, int32_t h, uint8_t* s) { g_width = w; g_height = h; g_surface = s; }

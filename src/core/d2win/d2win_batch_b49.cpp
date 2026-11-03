@@ -9,7 +9,7 @@ struct D2WinB49Env {
   uint32_t (*lineCount)(void* ctl);             // sub_9200
   void (*a050)(void* ctl);                      // sub_A050
   void (*f7fc0)(void* ctl);                     // sub_17FC0
-  uint8_t* (*glyphInfo)();                      // *DAT_6f901508 call
+  uint8_t* (*glyphInfo)(uint16_t ch);           // *DAT_6f901508 call, char in CX
   uint32_t* g149c;                              // DAT_6f90149c
   void (*o10104)(uint32_t); void (*o10005)(uint32_t); void (*o10068)(uint32_t, uint32_t, uint32_t, uint32_t);
 };
@@ -80,7 +80,7 @@ int32_t d2win_sub_120c0(D2WinB49Env& e, const uint16_t* s, int32_t n) {
     uint16_t ch = *s;
     if (ch == 10) { s++; i++; lim++; continue; }
     if (!(n <= lim) && ch == 0xff && s[1] == 'c' && s[2] >= 0x30 && s[2] <= 0x36) { s += 3; i += 3; lim += 3; continue; }
-    w += e.glyphInfo()[3]; s++; i++; lim++;
+    w += e.glyphInfo(ch)[3]; s++; i++; lim++;
   }
   return w;
 }

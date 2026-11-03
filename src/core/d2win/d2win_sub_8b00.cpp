@@ -12,7 +12,8 @@ struct D2WinFreeEnv {
     uint32_t (*release)(void*);                 // 0x17FC0
 };
 // 1.13c D2Win+0x8B00 -- free a type-4 control: its +0x90 block, its lists, then itself.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_8B00(void* p, const D2WinFreeEnv* e) {
+// The retail eax on return is the last callee's (17FC0's release of p): the void decompile drops it, so it passes through.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_8B00(void* p, const D2WinFreeEnv* e) {
     uint32_t line = 0xCB;
     if (p) {
         uint32_t type, blk;
@@ -21,8 +22,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_8B00(void* p, const D2WinFreeEnv*
             std::memcpy(&blk, static_cast<uint8_t*>(p) + 0x90, 4);
             if (blk) e->release(reinterpret_cast<void*>(static_cast<uintptr_t>(blk)));
             e->clearList(p);
-            e->release(p);
-            return;
+            return e->release(p);
         }
         line = 0xCC;
     }
