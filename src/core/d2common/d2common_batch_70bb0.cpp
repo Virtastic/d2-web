@@ -31,7 +31,7 @@ struct D2C70BB0Env {
 __attribute__((weak)) const D2C70BB0Env* d2_env_d2common_70bb0 = nullptr;
 __attribute__((weak)) int32_t d2_fn_d2common_3e190(uint32_t a, uint32_t b);
 __attribute__((weak)) const int16_t* d2_fn_d2common_708f0(int32_t dist, const uint32_t* p3, D2C70BB0Frame* f, D2C70BB0Search* s);
-uint32_t d2_fn_d2common_70650(const uint8_t* owner, const uint8_t* node);
+__attribute__((weak)) uint32_t d2_fn_d2common_70650(const uint8_t* owner, const uint8_t* node);
 
 // 1.13c D2Common+0x70BB0: build the (w+6)x(h+6) search frame, retry the walker with growing
 // distance (+5) until it finds a node or the limit is hit, then flatten the chain; 0 if >0x4d.
@@ -79,7 +79,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_70bb0(uint32_t owner, const uint16_
   cur += 5;
  } while (((r || f.count != 900) && (f.count = 1, !r)) && cur < limit);
  uint32_t out = 0;
- if (r) {
+ if (r && d2_fn_d2common_70650) {
   out = d2_fn_d2common_70650(reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(owner)), reinterpret_cast<const uint8_t*>(r));
   if (out > 0x4d) out = 0;
  }
