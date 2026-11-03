@@ -1,0 +1,71 @@
+name: desktop
+
+# The macOS desktop packages that need a macOS runner: the universal (arm64 + x64) dmg and zip. Manual only.
+# Linux and Windows packages are cross-built from a Linux machine with tools/desktop-release.sh --all.
+#
+# CI has no game files, so it cannot stage the site. Stage it yourself (ci/build.sh or ci/stage.sh), upload
+# build-wasm/site as an artifact of any workflow run in this repository (actions/upload-artifact), then run this
+# workflow with that run's id and the artifact's name. The desktop script drops everything retail-derived
+# (vectors, diag, retail, widebg, door-art, the patch shim) when it copies the site into the package, and the
+# audit step below fails the run if any of it is still there. The packages are unsigned.
+
+on:
+  workflow_dispatch:
+    inputs:
+      site_run_id:
+        description: "Id of the workflow run that uploaded the staged site artifact"
+        required: true
+        type: string
+      site_artifact:
+        description: "Name of that artifact (the contents of build-wasm/site)"
+        required: true
+        default: staged-site
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Fetch the staged site
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.site_artifact }}
+          path: build-wasm/site
+          run-id: ${{ inputs.site_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Build the universal dmg and zip (unsigned)
+        run: bash tools/desktop-release.sh mac dmg zip --universal
+
+      - name: Audit, then check the app is ad-hoc signable
+        run: |
+          set -euo pipefail
+          cd electron/dist
+          app=$(ls -d mac-universal/*.app)
+          for leak in vectors diag retail widebg door-art assets/patch-113c.patch; do
+            if [ -e "$app/Contents/Resources/site/$leak" ]; then echo "FATAL: $leak is in the package" >&2; exit 1; fi
+          done
+          lipo -archs "$app/Contents/MacOS/"* | tee /dev/stderr | grep -q arm64
+          # An unsigned arm64 binary will not run: ad-hoc sign the whole bundle, then verify it.
+          codesign --force --deep -s - "$app"
+          codesign --verify --deep --strict "$app"
+          codesign -dv "$app" 2>&1 | head -5
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: d2-web-desktop-mac
+          path: |
+            electron/dist/*.dmg
+            electron/dist/*.zip
+          if-no-files-found: error
