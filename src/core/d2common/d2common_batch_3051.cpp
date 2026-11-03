@@ -60,7 +60,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_7bf20(void* owner,
     }
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4eb40(void* object,
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2common_4eb40_env(void* object,
     uint32_t value, const D2Common3051Env* env) { // 1.13c D2Common+0x4EB40
     if (!object) fatal(env, 0x638);
     void* root = link(object, 0xa8, env);
@@ -73,7 +73,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4eb40(void* object,
     return 0;
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4f4c0(void* object,
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2common_4f4c0_env(void* object,
     int32_t key, const D2Common3051Env* env) { // 1.13c D2Common+0x4F4C0
     if (!object) return 0;
     void* root = link(object, 0xa8, env);

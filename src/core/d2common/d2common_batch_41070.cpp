@@ -12,20 +12,28 @@
 #include <algorithm>
 #include <cstdlib>
 
-// 1.13c D2Common+0x41070
+// 1.13c D2Common+0x42A70: the footprint stamp retail calls directly (ECX=level, EDX=x, stack y, idx, flag, extra).
+extern "C" void D2Common_42A70(void*, int32_t, int32_t, int32_t, int32_t, int32_t);
+
+// 1.13c D2Common+0x41070: level+0x14 is pOutdoors; preset 0x361 gives the column step (nSizeX at +0x28, rounded
+// up to whole 8-cell units); fifteen stamps walk left from the last column, each with idx 0x361+i. The retail
+// guards are kept: a missing pOutdoors or a short table is fatal (0x28A / 0x28D).
 void D2Common_41070(D2DrlgLevelStrc* level) {
     D2_ASSERT(level->pOutdoors);
     auto* preset = DATATBLS_GetLvlPrestTxtRecord(0x361);
     D2_ASSERT(preset);
-    const int step = preset->nSizeX / 8;
+    const int32_t w = preset->nSizeX;
+    const int32_t step = (w + (w >> 31 & 7)) >> 3;
     int x = level->pOutdoors->nGridWidth - step;
     for (int i = 0; i < 15; ++i, x -= step) {
         D2_ASSERT(x >= 0);
-        DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(level, x, 0, 0x361 + i, 0, 0);
+        D2Common_42A70(level, x, 0, 0x361 + i, 0, 0);
     }
 }
 
-// 1.13c D2Common+0x41230
+// 1.13c D2Common+0x41230: walks the grid from (width-2, 0) to (0, height-2) two cells per step. The cell value
+// minus (0x371 + snow) picks the step and the stamp idx (0x37d + that); the walk ends on the two corner stamps
+// 0x389 and 0x38a. The step tables are retail data (DAT_6fde3770/74) and are not transcribed here.
 void D2Common_41230(D2DrlgLevelStrc* level) {
     static constexpr int direction[12][2] = {{-1,0},{0,-1},{1,0},{0,1},{0,-1},{1,0},{0,1},{-1,0},{-1,0},{0,-1},{1,0},{0,1}};
     auto* out = level->pOutdoors;
@@ -33,13 +41,13 @@ void D2Common_41230(D2DrlgLevelStrc* level) {
     const int lastX = out->nGridWidth - 2, lastY = out->nGridHeight - 2;
     int x = lastX, y = 0;
     while (x != 0 || y != lastY) {
-        const int index = DRLGGRID_GetGridEntry(out->pGrid, x, y) - (0x371 + snow);
-        DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(level, x, y, index + 0x37d + snow, -1, 0);
+        const int index = DRLGGRID_GetGridEntry(&out->pGrid[0], x, y) - (0x371 + snow);
+        D2Common_42A70(level, x, y, index + 0x37d + snow, -1, 0);
         x += direction[index][0] * 2;
         y += direction[index][1] * 2;
     }
-    DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(level, lastX, 0, 0x38a + snow, -1, 0);
-    DRLGOUTDOORS_SpawnOutdoorLevelPresetEx(level, 0, lastY, 0x389 + snow, -1, 0);
+    D2Common_42A70(level, lastX, 0, 0x38a + snow, -1, 0);
+    D2Common_42A70(level, 0, lastY, 0x389 + snow, -1, 0);
 }
 
 // 1.13c D2Common+0x41340

@@ -45,7 +45,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_12f80(uint32_t arr, uint32_t drlg, int3
    if (j >= n) { fatal(0xcb); return; }
    uint32_t o, ty = w(e,4);
    if (!ty) { o = w(lvl,0x1c) + w(lvl,0xc)*0x30; w(o,32) = 0; w(lvl,0xc)++; mk0(x,y,v,t[j]); }
-   else if (ty == 0xd) o = mkD(drlg,y,x,0,t[j]);
+   else if (ty == 0xd) o = mkD(drlg,y,0,x,t[j]);   // retail FUN_6fdb8cd0(drlg, y, 0, x, t): third arg 0, fourth x
    else o = mkN(drlg,0,y,x,v,t[j],ty);
    w(w(r,0), s*4) = o; w(o,20) |= 8;
   }

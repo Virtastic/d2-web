@@ -79,7 +79,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_532c0_batch(uint32_t nEx
 // Body is byte-identical to 0x4FF80 (monster in anim mode 12, no state-mask-33 hit, MonStats2 bit 7).
 // 1.13c D2Common+0x4FFD0
 extern "C" uint32_t D2Common_4FF80_MonsterAnim12NoStateFlag7(D2UnitStrc* pUnit);
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4ffd0(uint32_t pUnit) {
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2common_4ffd0_value(uint32_t pUnit) {
 	return D2Common_4FF80_MonsterAnim12NoStateFlag7(reinterpret_cast<D2UnitStrc*>(P(pUnit)));
 }
 
