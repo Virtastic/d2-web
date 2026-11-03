@@ -14,7 +14,6 @@
 extern "C" {
 __attribute__((weak)) uint32_t Ordinal_10265(uint32_t);
 __attribute__((weak)) void Ordinal_10024(const void*, uint32_t);
-__attribute__((weak)) char DAT_6fdda728[1];
 }
 // retail fatal: Ordinal_10024(&DAT_6fdda728, Ordinal_10265(code)); _exit(-1). Seams are weak; skip if unlinked.
 [[noreturn]] static void d2_fatal(uint32_t code)

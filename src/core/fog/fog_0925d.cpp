@@ -11,7 +11,7 @@ struct FogSbcsWindow {
     uint32_t at_56ee4;             // window +0x00
     uint8_t  gap_56ee8[4];
     uint32_t at_56eec;             // window +0x08
-    uint8_t  gap_56ef0[0x0C];      // window +0x0C..+0x1B
+    uint8_t  gap_56ef0[0x10];      // window +0x0C..+0x1B
     uint8_t  table_56f00[0x100];   // window +0x1C: 0x40 dwords
     uint8_t  byte_57000;           // window +0x11C
     uint8_t  gap_57001[3];
