@@ -153,7 +153,7 @@ uint32_t Storm_Sub136C0(uint32_t* data, uint32_t len) {
 }
 
 // 1.13c Storm+0x137F0
-uint32_t Storm_Sub137F0(int32_t id, uint32_t* data, uint32_t len) {
+extern "C" uint32_t Storm_Sub137F0(int32_t id, uint32_t* data, uint32_t len) {
   if (!data || len == 0) return fail(0x57);
   Win_EnterCS(g_cs_6fc45a24);
   if (g_init_6fc45834 == 0) { fail(0x4b4); Win_LeaveCS(g_cs_6fc45a24); return 0; }
