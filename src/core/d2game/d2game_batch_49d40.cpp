@@ -144,6 +144,12 @@ EMSCRIPTEN_KEEPALIVE void d2_game_4a9b0(void* pGame, uint32_t nClientId, uint8_t
     *ppClient = client;
 }
 
+// FN probe access to the module state CLIENTS_AddToGame reads and links into.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2game_49d40_state(void*** list, void*** byName, int32_t** init)
+{
+    *list = g_clientList; *byName = g_clientListByName; *init = &g_clientListInitialized;
+}
+
 // 1.13c D2Game+0x49580
 // The client arrives in EAX (explicit here); a null client is the 0xB9B fatal, otherwise set the 0x20
 // bit of dwFlags (client+0x3D4). Called from GAME_CreateNewEmptyGame (0x2C2D0) for game type 1 right

@@ -322,9 +322,15 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3e740(void* game, int32_t* u, int32_t* t, 
         n = (int32_t*)ptr(n, 0x39 * 4);
         if (!n) return 1;
     }
-    int32_t r = e->f21b10(id, lvl);
-    if (e->dist2(e->unitX(n), e->unitY(n), e->unitX(t), e->unitY(t)) < r * r)
-        e->fd2120(t, n, game, e->f21ec0(id));
+    // 0x1B10 (eax = id, edx = level): 0 for a bad row or level <= 0, else (lvl-1)*row[0x14c] + row[0x148]; read through the data-table seam (e.dt)
+    const uint8_t* srow = skillRow(e, id);
+    int32_t r = (srow && lvl > 0) ? (lvl - 1) * i32(srow, 0x14c) + i32(srow, 0x148) : 0;
+    // retail order: 0x1130 (y) then 0x1100 (x) of the target, then of the node
+    int32_t ty = e->unitY(t), tx = e->unitX(t), ny = e->unitY(n), nx = e->unitX(n);
+    if (e->dist2(nx, ny, tx, ty) < r * r) {
+        int32_t v = srow ? i32(srow, 0x15c) : 0;   // 0x1EC0 (eax = id)
+        e->fd2120(t, n, game, v);
+    }
     return 1;
 }
 
@@ -459,6 +465,15 @@ uint32_t D2Game_3D020_probe(void* game, int32_t* u, int32_t* ctx, const uint8_t*
         return (void*)(uintptr_t)g3mH->h(0xA0F40, filter, (uint32_t)a7, (uint32_t)range, 0, 0, (uint32_t)(uintptr_t)g, (uint32_t)(uintptr_t)c, (uint32_t)x, (uint32_t)y); };
     e.setLife = [](void* m, int32_t v) { g3mH->h(0xA50E, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)m, (uint32_t)v); };
     return d2_game_3d020(game, u, ctx, &e);
+}
+uint32_t D2Game_3E740_probe(void* game, int32_t* u, int32_t* t, const uint8_t* dt, uint32_t* lg, const uint32_t* sc)
+{   // src/core/fn/d2game_3e740.cpp: callees are HookEnv recorders (0xB2120: eax = node, ecx = game, esi = target, stack value)
+    HookEnv h(lg, sc); g3mH = &h;
+    D2GameBatch3beEnv e = g3beDirect; e.dt = dt; g3mCommon(e);
+    e.unitGuid = [](void* u) -> uint32_t { return g3mH->h(0xB24C, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
+    e.dist2 = [](int32_t a, int32_t b, int32_t c, int32_t d) -> int32_t { return (int32_t)g3mH->h(0xAE26, 0, 0, 0, 0, 0, (uint32_t)a, (uint32_t)b, (uint32_t)c, (uint32_t)d); };
+    e.fd2120 = [](void* tg, void* node, void* g, int32_t v) { g3mH->h(0xB2120, (uint32_t)(uintptr_t)node, (uint32_t)(uintptr_t)g, 0, 0, (uint32_t)(uintptr_t)tg, (uint32_t)v); };
+    return d2_game_3e740(game, u, t, &e);
 }
 void D2Game_3D450_probe(void* game, int32_t* u, int32_t radius, uint32_t a4, int32_t a5, uint32_t* lg, const uint32_t* sc)
 {
