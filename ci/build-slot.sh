@@ -5,13 +5,13 @@
 # D2_BUILD_SLOT to the slot number. `D2_BUILD_SLOT_NOWAIT=1` returns 1 instead of waiting.
 # Merge builds try their slot first but never get extra ones: the cap is a hard cap.
 # The last slot is reserved for D2_BUILD_ROLE=merge or coverage (when the cap is above 1): other builds never take it, so a
-# queue of agent builds cannot starve a merge. A merge build may use any slot, the reserved one first.
+# queue of agent builds cannot starve a merge or the shared prove. Merge, coverage and prove builds may use any slot, the reserved one first.
 d2_build_slot_acquire() {
   local dir=$1 max="${D2_MAX_BUILDS:-2}" i waited="" ids
   case "$max" in ''|*[!0-9]*|0) max=2;; esac
   mkdir -p "$dir"
   ids=$(seq 0 $((max - 1)))
-  if [ "${D2_BUILD_ROLE:-}" = merge ] || [ "${D2_BUILD_ROLE:-}" = coverage ]; then ids=$(seq $((max - 1)) -1 0)
+  if [ "${D2_BUILD_ROLE:-}" = merge ] || [ "${D2_BUILD_ROLE:-}" = coverage ] || [ "${D2_BUILD_ROLE:-}" = prove ]; then ids=$(seq $((max - 1)) -1 0)
   elif [ "$max" -gt 1 ]; then ids=$(seq 0 $((max - 2))); fi
   D2_BUILD_SLOT=""
   while [ -z "$D2_BUILD_SLOT" ]; do
