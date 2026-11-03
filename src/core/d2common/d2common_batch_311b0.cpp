@@ -79,30 +79,36 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_22B20_ItemDword(uint32_t nIndex) {   // 1
 	return R(pRecord, 0xEC);
 }
 
-// +0x38850: when the unit's stat-list record (pRecord+0x5C) has flags (+0x10) < 0, for each
-// id 0..count(+0x54) looks it up by binary search in the stat array {ptr +0x24, u16 count +0x28,
-// 8-byte entries keyed by dword 0} (0x382B0) and calls pCallback(entry dword +4 or 0, pContext).
-// Runs only if pRecord != 0 and (pContext != 0 or pCallback == 0). The id fed to 0x382B0 is a
-// register argument the decompile hides; the loop index is the only candidate.
+// +0x38850 (stdcall unit, ctx, cb; ret 0xC): when the unit's stat-list record (unit+0x5C) has flags (+0x10) < 0, for each of its
+// int16 count (+0x54) ids (dword array at +0x50) look the id up in the sorted stat array {ptr +0x24, int16 count +0x28, 8-byte
+// entries keyed by a signed dword 0} with 0x382B0 (EAX = the +0x24 header, EDI = id: lo = 0, hi = count, mid = lo + (hi - lo) / 2,
+// hi = mid on a smaller key, lo = mid + 1 on a larger one) and call cb(ECX = unit, EDX = the entry's word +2 or id >> 16, stack
+// entry dword +4 or 0, stack ctx; callee pops 8). Runs only if unit != 0 and (ctx != 0 or cb == 0).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_38850(uint32_t pRecord, uint32_t pContext, void (*pCallback)(uint32_t, uint32_t)) {   // 1.13c D2Common+0x38850
-	if (!pRecord || (!pContext && pCallback))
+EMSCRIPTEN_KEEPALIVE void d2common_38850_port(uint32_t pUnit, uint32_t pContext, void (*pCallback)(uint32_t unit, uint32_t edx, uint32_t value, uint32_t ctx)) {   // 1.13c D2Common+0x38850
+	if (!pUnit || (!pContext && pCallback))
 		return;
-	const uint8_t* r = reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(*reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(pRecord) + 0x5C)));
+	const uint8_t* r = reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(*reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(pUnit) + 0x5C)));
 	if (!r || *reinterpret_cast<const int32_t*>(r + 0x10) >= 0)
 		return;
 	const int16_t n = *reinterpret_cast<const int16_t*>(r + 0x54);
+	const uint32_t* ids = reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(*reinterpret_cast<const uint32_t*>(r + 0x50)));
 	const uint8_t* arr = reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(*reinterpret_cast<const uint32_t*>(r + 0x24)));
 	const int16_t cnt = *reinterpret_cast<const int16_t*>(r + 0x28);
 	for (int32_t i = 0; i < n; ++i) {
-		int32_t lo = 0, hi = cnt - 1, f = -1;
-		while (lo <= hi) {
-			const int32_t m = (lo + hi) / 2;
-			const uint32_t k = *reinterpret_cast<const uint32_t*>(arr + m * 8);
-			if (k == static_cast<uint32_t>(i)) { f = m; break; }
-			if (k < static_cast<uint32_t>(i)) lo = m + 1; else hi = m - 1;
+		const int32_t id = static_cast<int32_t>(ids[i]);
+		int32_t lo = 0, hi = cnt, f = -1;
+		while (lo < hi) {
+			const int32_t m = lo + (hi - lo) / 2;
+			const int32_t k = *reinterpret_cast<const int32_t*>(arr + m * 8);
+			if (id > k) lo = m + 1;
+			else if (id < k) hi = m;
+			else { f = m; break; }
 		}
-		pCallback(f < 0 ? 0 : *reinterpret_cast<const uint32_t*>(arr + f * 8 + 4), pContext);
+		if (f < 0)
+			pCallback(pUnit, (static_cast<uint32_t>(id) >> 16) & 0xFFFF, 0, pContext);
+		else
+			pCallback(pUnit, *reinterpret_cast<const uint16_t*>(arr + f * 8 + 2), *reinterpret_cast<const uint32_t*>(arr + f * 8 + 4), pContext);
 	}
 }
 

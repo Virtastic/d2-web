@@ -13,8 +13,11 @@ template <class T> static inline T& F(void* p, int off) { return *(T*)((P)p + of
 #define PT(p, o) ((void*)(uintptr_t)F<uint32_t>(p, o))
 
 extern "C++" {
-void sub_4A9B0(void* ecx); void sub_AB50(void* unit); void sub_2E1F0(void* p);
-void sub_4A670(); void sub_C940(void* unit);
+// weak: these five are blob-layout seams not ported at this width yet (the struct ports take native room pointers);
+// sub_7C0E0 returns untouched until all are defined, exactly as when its callers saw it unresolved.
+__attribute__((weak)) void sub_4A9B0(void* ecx); __attribute__((weak)) void sub_AB50(void* unit);
+__attribute__((weak)) void sub_2E1F0(void* p); __attribute__((weak)) void sub_4A670();
+__attribute__((weak)) void sub_C940(void* unit);
 uint8_t sub_222B0(void* unit); void sub_27180(void*, uint32_t, int, int); void sub_25C10(void*, uint32_t, int);
 void q_d2common_batch_b63_Ordinal_10128(uint32_t, uint32_t, uint32_t); void Ordinal_10131(uint32_t); void Ordinal_10127(uint32_t);
 void* sub_44BD0(int); void sub_44F90(void*); void sub_44950(); int sub_EEC0(int dir, void*, void*);
@@ -32,6 +35,7 @@ void sub_45550() { std::abort(); }
 
 // 1.13c D2Common+0x7C0E0  (in_EAX = unit)
 void sub_7C0E0(void* unit) {
+    if (!sub_4A670 || !sub_AB50 || !sub_4A9B0 || !sub_C940 || !sub_2E1F0) return;
     void* iVar1 = PT(PT(unit, 0x58), 0x1b4);
     if (I(unit, 0x2c) == 0) sub_45550();
     I(unit, 0x14) = I(unit, 4);

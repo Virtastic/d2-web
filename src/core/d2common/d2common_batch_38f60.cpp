@@ -205,10 +205,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_211d0(uint32_t pUnit, ui
 
 // 1.13c D2Common+0x304A0 (#10947): the skill list's first skill (list+0x04), or 0 without a
 // skill list. A null unit is fatal 0x638 in retail, modelled as 0.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_304a0(uint32_t pUnit) { // 1.13c D2Common+0x304A0
-	D2UnitStrc* pUn = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit));
-
-	if (!pUn || !pUn->pSkills)
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_304A0_FirstSkill(uint32_t pUnit) { // 1.13c D2Common+0x304A0
+	if (!pUnit)
 		return 0;
-	return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pUn->pSkills->pFirstSkill));
+	const uint32_t pSkills = *reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(pUnit) + 0xA8);
+	if (!pSkills)
+		return 0;
+	return *reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(pSkills) + 4);
 }

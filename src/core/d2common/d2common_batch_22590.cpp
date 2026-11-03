@@ -30,8 +30,6 @@ extern "C"
 {
 	// 0x38B00: stat value from a stat list (EBX = list, EDI = packed layer/stat id).
 	int32_t (*g_d2common_fn_38B00)(uint32_t, int32_t) = nullptr;
-	// Fog.dll 0x14040 (ordinal 10120): clear bit nBit of the bit array at pBits.
-	void (*g_d2common_fn_fog14040)(uint32_t, uint32_t) = nullptr;
 }
 
 // 1.13c D2Common+0x22590 (#10572): the two dwords at pItemData+0x1C/+0x20 for a UNIT_ITEM with a
@@ -126,15 +124,3 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_38c20(D2UnitStrc* pUnit, int32_t nSt
 		&sgptDataTables->pItemStatCostTxt[nStatId]);
 }
 
-// 1.13c D2Common+0x2D070 (#10593): clear bit (nRow * 0x10 + nColumn) of the bit array whose
-// address is the first dword of pGrid. A null pGrid is fatal 0x34 in retail; we return.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2d070(uint32_t pGrid, int32_t nRow, int32_t nColumn)
-{
-	if (!pGrid)
-		return;
-	if (!g_d2common_fn_fog14040)
-		return;
-	g_d2common_fn_fog14040(W(P(pGrid), 0x00),
-	                       static_cast<uint32_t>(nRow * 0x10 + nColumn));
-}

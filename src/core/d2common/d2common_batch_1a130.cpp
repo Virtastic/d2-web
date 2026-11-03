@@ -65,7 +65,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_30c70_batch(int32_t index, int32_t t
 
 // 1.13c D2Common+0x323E0: resolve the selected stat's resistance value; composition follows retail.
 using D2C_StatValue = int32_t (*)(uint32_t, int32_t);
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_323e0(uint32_t unit, int32_t statId,
+EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_323e0_batch(uint32_t unit, int32_t statId,
  int32_t baseId, int32_t itemValue, int32_t combine, D2C_StatValue readStat)
 {
  if (!unit || !readStat || !baseId) return 0;

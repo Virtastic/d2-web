@@ -31,7 +31,7 @@ extern "C" void d2_fn_d2common_19860(uint32_t* pArgs);
 // record is the 1.13c assert at line 0x5C4 (fatal); it returns here. The owner pointer is the
 // record's dword at +0x10. The body forwards (key, owner) to 0x19860 unchanged.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3b160(uint32_t pRecord, uint32_t nKey)
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3b160_batch(uint32_t pRecord, uint32_t nKey)
 {
 	if (pRecord == 0) {
 		return;

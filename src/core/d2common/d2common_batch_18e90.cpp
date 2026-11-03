@@ -3,6 +3,7 @@
 // returns (our engine does not abort) and pointer-sized loads follow the wasm64 port's 8-byte pointers.
 #include <cstdint>
 #include <cstddef>
+#include <cstring>
 
 #include "D2DataTbls.h"
 #include "D2Inventory.h"
@@ -48,7 +49,8 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_3C020_TakeUnitDataValue(uintptr_t pUnit)
     {
         return 0; // retail fatals 699; modelled as a return
     }
-    uint8_t* pUnitData = *(uint8_t**)(pUnit + 0x10);
+    uint32_t nData; memcpy(&nData, (const void*)(pUnit + 0x10), 4);
+    uint8_t* pUnitData = (uint8_t*)(uintptr_t)nData;
     uint32_t nFlags = *(uint32_t*)(pUnitData + 0x28);
     if ((nFlags & 0x40000u) == 0)
     {
@@ -99,7 +101,7 @@ EMSCRIPTEN_KEEPALIVE void D2Common10472(uintptr_t pPlayer, uintptr_t pOutValue, 
 {
     if (pPlayer != 0 && *(const uint32_t*)pPlayer == 0u)
     {
-        uint8_t* pPlayerData = *(uint8_t**)(pPlayer + 0x14);
+        uint8_t* pPlayerData = (uint8_t*)(uintptr_t)*(const uint32_t*)(pPlayer + 0x14); // retail 32-bit link
         if (pPlayerData == nullptr)
         {
             return; // retail fatals 0x145a; modelled as a return

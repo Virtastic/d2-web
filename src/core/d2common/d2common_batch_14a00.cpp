@@ -5,7 +5,7 @@
 
 extern "C" {
 // 1.13c D2Common+0x14A00: check entry p2 against the other entries' boxes, then kind rule.
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_14a00(const int32_t* a, int32_t p2, const int32_t* tbl, const int32_t* grid) {
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_14A00_GridTableBox(const int32_t* a, int32_t p2, const int32_t* tbl, const int32_t* grid) {
  const int32_t link = tbl[p2*4+1];
  const int32_t* q = a + 3;
  for (int32_t i = 0; i < p2; ++i, q += 4) {

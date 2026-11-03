@@ -33,8 +33,8 @@ namespace
 extern "C"
 {
 	uint32_t (*g_d2common_fn_2D2C0)(int32_t) = nullptr;               // 0x2D2C0
-	void (*g_d2common_fn_376F0)(int32_t) = nullptr;                   // 0x376F0
-	void (*g_d2common_fn_37170)(void) = nullptr;                      // 0x37170
+	void (*g_d2common_fn_376F0)(uint32_t ecx, uint32_t edi, void* rec) = nullptr; // 0x376F0 (ECX = level, EDI = band byte, ESI = rec)
+	void (*g_d2common_fn_37170)(void* rec) = nullptr;                 // 0x37170 (EAX = rec)
 	void (*g_d2common_fn_371C0)(uint32_t, uint8_t, void*) = nullptr;  // 0x371C0
 	uint32_t (*g_d2common_fn_51470)(void*, int32_t) = nullptr;        // 0x1470
 	void (*g_d2common_fn_381A0)(uint32_t, void*) = nullptr;           // 0x381A0
@@ -56,7 +56,7 @@ extern "C"
 extern "C"
 {
 	uint32_t g_d2common_dat_6fdeb1f4 = 3;      // 1.13c .data 0x6FDEB1F4 (= 6fdeb1f0 entry 0, word 1)
-	uint32_t g_d2common_dat_6fdeb23c = 0;
+	uint32_t g_d2common_dat_6fdeb23c = 4;
 	// 1.13c .data 0x6FDEB160 / 0x6FDEB1F0: six 3-dword rows (scale, count, colour), initialised in the image.
 	uint32_t g_d2common_dat_6fdeb160[18] = {320, 3, 15962237, 340, 3, 8632528, 0, 0, 16777215, 160, 1, 16777215, 180, 1, 12687554, 200, 2, 15962237};
 	uint32_t g_d2common_dat_6fdeb1f0[18] = {300, 3, 15932928, 0, 0, 15998464, 60, 1, 15932928, 120, 2, 15932928, 180, 2, 15998464, 240, 2, 15932928};
@@ -90,12 +90,12 @@ EMSCRIPTEN_KEEPALIVE void D2Common_37CA0_ResetActRecord(uint32_t pUnit)
 
 	const uint32_t nResult = g_d2common_fn_2D2C0 ? g_d2common_fn_2D2C0(0) : 0;
 	if (g_d2common_fn_376F0)
-		g_d2common_fn_376F0(0);
+		g_d2common_fn_376F0(0, nResult & 0xFF, rec);
 	W(rec, 0x30) = 1;
 	if (g_d2common_fn_37170)
-		g_d2common_fn_37170();
+		g_d2common_fn_37170(rec);
 	if (g_d2common_fn_376F0)
-		g_d2common_fn_376F0(0);
+		g_d2common_fn_376F0(0, nResult & 0xFF, rec);
 	if (g_d2common_fn_371C0)
 		g_d2common_fn_371C0(0, static_cast<uint8_t>(nResult & 0xFF), rec);
 }
@@ -269,14 +269,14 @@ EMSCRIPTEN_KEEPALIVE void D2Common_SetUnitActRecord_37920(uint32_t pUnit, uint32
 
 	const uint32_t nResult = g_d2common_fn_2D2C0 ? g_d2common_fn_2D2C0(nChain) : 0;
 	if (g_d2common_fn_376F0)
-		g_d2common_fn_376F0(nChain);
+		g_d2common_fn_376F0(static_cast<uint32_t>(nChain), nResult & 0xFF, rec);
 	W(rec, 0x30) = static_cast<uint32_t>(nFlag);
 	if (nFlag != 0)
 	{
 		if (g_d2common_fn_37170)
-			g_d2common_fn_37170();
+			g_d2common_fn_37170(rec);
 		if (g_d2common_fn_376F0)
-			g_d2common_fn_376F0(nChain);
+			g_d2common_fn_376F0(static_cast<uint32_t>(nChain), nResult & 0xFF, rec);
 		if (g_d2common_fn_371C0)
 			g_d2common_fn_371C0(0, static_cast<uint8_t>(nResult & 0xFF), rec);
 	}

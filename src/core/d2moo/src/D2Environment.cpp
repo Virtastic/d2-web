@@ -509,11 +509,20 @@ int __stdcall ENVIRONMENT_GetTimeRateFromAct(D2DrlgActStrc* pAct)
 	return DUNGEON_GetEnvironmentFromAct(pAct)->nTimeRate;
 }
 
+void ENVIRONMENT_SetNextTimeRateForLevel(D2DrlgEnvironmentStrc* pEnvironment, int nLevelId);
+
 //D2Common.0x6FD8E100 (#10935) - UNUSED
 void __stdcall ENVIRONMENT_SetNextTimeRate(D2DrlgActStrc* pAct, D2ActiveRoomStrc* pRoom)
 {
-	
 	D2DrlgEnvironmentStrc* pEnvironment = DUNGEON_GetEnvironmentFromAct(pAct);
+	const int nRoomLevelId = pRoom ? DUNGEON_GetLevelIdFromRoom(pRoom) : 0;
+	ENVIRONMENT_SetNextTimeRateForLevel(pEnvironment, nRoomLevelId);
+}
+
+// The body of the above on an environment record and a level id: 1.13c's 0x37840 reaches the record through act+4 and the level
+// through room+0x10, +0x58, +0x1D0 rather than through the 1.10 act layout.
+void ENVIRONMENT_SetNextTimeRateForLevel(D2DrlgEnvironmentStrc* pEnvironment, int nLevelId)
+{
 
 	pEnvironment->nTimeRateIndex = (pEnvironment->nTimeRateIndex + 1) % NUM_TIME_RATES;
 
@@ -533,7 +542,6 @@ void __stdcall ENVIRONMENT_SetNextTimeRate(D2DrlgActStrc* pAct, D2ActiveRoomStrc
 	pEnvironment->nPeriodOfDay = pEnvironmentCycle->nPeriodOfDay;
 	pEnvironment->nTicks = pEnvironment->nTimeRate * pEnvironmentCycle->nTicksBegin;
 
-	const int nLevelId = pRoom ? DUNGEON_GetLevelIdFromRoom(pRoom) : 0;
 	const int nActNo = DRLG_GetActNoFromLevelId(nLevelId);
 
 	ENVIRONMENT_UpdateLightIntensity(pEnvironment, nLevelId, nActNo);

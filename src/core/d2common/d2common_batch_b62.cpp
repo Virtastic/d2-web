@@ -12,10 +12,10 @@ W void* sub_88100(void* a, int32_t b);
 W void  sub_8A7D0(void* list, void* stat, int32_t flag);
 W void  D2Common_ExpireStatList_6FDB6E30(void*);
 W void  D2Common_STATLIST_FreeStatListImpl_6FDB7050(void*);
-W void  sub_8E080(int32_t);
+W void  sub_8E080(void* pathInfoESI);
 W uint8_t sub_7EDA0(void*);
-W int32_t sub_85530();
-W void  sub_B6AA0(void*);
+W int32_t sub_85530(void* ctxEAX);
+W void  sub_B6AA0(void* ctx, void* esi);
 W void  sub_B6920(void*);
 W void* sub_7D9B0(void*, int32_t);
 W void* sub_7E5C0(int32_t, int32_t, void*, void*);
@@ -50,11 +50,11 @@ int32_t sub_35470(void* pCtxEDI)
     if (!sx && !sy) return 0;
     int32_t t = rd<int32_t>(u, 0);
     if (t == 0 || t == 1) {
-        if (rd<char>(p1, 0x68)) sub_8E080(t);
-        return 2;                       // retail falls into case 4 when +0x68 != 0
+        if (rd<char>(p1, 0x68)) sub_8E080(p1);   // ESI = pathInfo
+        return 1;
     }
     if (t == 2) {
-        if (!sub_7EDA0(u)) return 0;
+        if (!sub_7EDA0(u)) return 2;
         p1 = (char*)rdp(pCtxEDI, 0x30);
         u = (char*)rdp(p1, 0x58);
         if (!u) fatal();
@@ -72,18 +72,18 @@ int32_t sub_35470(void* pCtxEDI)
     return 1;
 }
 
-// 1.13c D2Common+0x35780: register map EDI = pCtx.
-int32_t sub_35780(void* pCtxEDI)
+// 1.13c D2Common+0x35780: register map EDI = pCtx, one stack arg (ret 4).
+int32_t sub_35780(void* pCtxEDI, void* pArg)
 {
     int32_t k = rd<int32_t>(pCtxEDI, 0x3c);
     uint32_t f;
     if (k == 4) {
-        int32_t r = sub_85530();
+        int32_t r = sub_85530(pCtxEDI);
         f = rd<uint32_t>(pCtxEDI, 0x34);
         if (!r) { wr<uint32_t>(pCtxEDI, 0x34, f & 0xffffffdf); return 0; }
     } else {
         if (k == 10) {
-            sub_B6AA0(pCtxEDI);
+            sub_B6AA0(pCtxEDI, (char*)pArg + 0x20);   // ESI = stack arg + 0x20
             wr<uint32_t>(pCtxEDI, 0x34, rd<uint32_t>(pCtxEDI, 0x34) | 0x20);
             return rd<int32_t>(pCtxEDI, 0x28);
         }

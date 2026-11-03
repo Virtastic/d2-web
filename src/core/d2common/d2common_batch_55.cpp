@@ -55,7 +55,7 @@ struct D2Common53C80Env
 };
 
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_53c80(char* p, uint8_t* rec, int32_t slot, const D2Common53C80Env* env)
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_53c80_batch(char* p, uint8_t* rec, int32_t slot, const D2Common53C80Env* env)
 {
 	if (!rec || slot < 0 || slot >= 16 || !env)
 		return;

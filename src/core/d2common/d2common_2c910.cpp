@@ -17,7 +17,7 @@ struct D2CommonBatch87080Env {
 
 extern "C" int32_t d2_fn_d2common_2c630(uint32_t pUnit, uint32_t pItem, int32_t nMode,
                                         const D2CommonBatch87080Env* env);
-extern "C" int32_t d2_fn_d2common_2c7c0(uint32_t pItem, uint32_t nSetItemMask);
+extern "C" int32_t D2Common_2C7C0_SetItemToggleStates(D2UnitStrc* pItem, uint32_t nSetItemMask);
 
 namespace
 {
@@ -49,7 +49,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_2c910(D2UnitStrc* pUnit, 
 		nSetItemMask = ITEMS_GetSetItemsMask(pUnit, pItem, TRUE); // 0x23F90
 
 	if (bForceStates != 0 || nMode == 0)
-		d2_fn_d2common_2c7c0(A(pItem), nSetItemMask);
+		D2Common_2C7C0_SetItemToggleStates(const_cast<D2UnitStrc*>(pItem), nSetItemMask);
 
 	d2_fn_d2common_2c630(A(pUnit), A(pItem), nMode, &kEnv);
 	return 1;

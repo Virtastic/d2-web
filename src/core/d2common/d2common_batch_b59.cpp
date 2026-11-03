@@ -115,7 +115,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_39b30(uint32_t pUnit, int32_t nItemI
 // (unit type 4, class id at +0x04). Retail treats a non-item unit or a bad class id as a fatal
 // error; those paths answer 0 here.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_2f8a0(uint32_t pUnit)
+EMSCRIPTEN_KEEPALIVE uint8_t D2Common_2F8A0_ItemBeltByte(uint32_t pUnit)
 {
 	static_assert(offsetof(D2ItemsTxt, nBelt) == 0x130, "items.txt nBelt");
 	static_assert(sizeof(D2ItemsTxt) == 0x1A8, "items.txt record stride");

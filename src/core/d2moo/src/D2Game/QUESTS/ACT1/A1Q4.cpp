@@ -1647,7 +1647,7 @@ static void ACT1Q4_MarkCainNotSpawned(D2GameStrc* pGame)
         ((D2Act1Quest4Strc*)pQuest->pQuestDataEx)->unk0x52 = 1;
 }
 
-// 1.13c D2Game+0x605C0
+// (1.13c D2Game 0x605C0: the q32 port in d2game_605c0.cpp is the proved one)
 static void ACT1Q4_MarkQuestCompleteBefore(D2GameStrc* pGame)
 {
     D2QuestDataStrc* pQuest = QUESTS_GetQuestData(pGame, QUEST_A1Q4_CAIN);
@@ -2105,7 +2105,7 @@ void __fastcall ACT1Q4_UpdatePortalInTown(D2QuestDataStrc* pQuestData, D2UnitStr
 }
 
 //D2Game.0x6FC9C7A0
-// 1.13c D2Game+0x604C0
+// (1.13c D2Game 0x604C0: the q32 port in d2game_604c0.cpp is the proved one)
 int32_t __fastcall ACT1Q4_GetCainPortalInTownCoordinates(D2GameStrc* pGame, D2UnitStrc* pUnit, D2CoordStrc* pCoord)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A1Q4_CAIN);
@@ -2163,7 +2163,7 @@ int32_t __fastcall ACT1Q4_SpawnCainPortalOutsideTown(D2GameStrc* pGame, D2UnitSt
 }
 
 //D2Game.0x6FC9C930
-// 1.13c D2Game+0x60450
+// (1.13c D2Game 0x60450: the q32 port in d2game_60450.cpp is the proved one)
 int32_t __fastcall ACT1Q4_GetCainPortalOutsideTownCoordinates(D2GameStrc* pGame, D2UnitStrc* pUnit, D2CoordStrc* pCoord)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A1Q4_CAIN);
@@ -2187,7 +2187,7 @@ int32_t __fastcall ACT1Q4_GetCainPortalOutsideTownCoordinates(D2GameStrc* pGame,
 }
 
 //D2Game.0x6FC9C990
-// 1.13c D2Game+0x60400
+// (1.13c D2Game 0x60400: the q32 port in d2game_60400.cpp is the proved one)
 int32_t __fastcall ACT1Q4_UpdateCainPortalCoordinates(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A1Q4_CAIN);
@@ -2276,7 +2276,7 @@ void __fastcall ACT1Q4_SpawnCainPortalInTown(D2GameStrc* pGame)
 }
 
 //D2Game.0x6FC9CBE0
-// 1.13c D2Game+0x603D0
+// (1.13c D2Game 0x603D0: the q32 port in d2game_603d0.cpp is the proved one)
 void __fastcall ACT1Q4_OnCainInTownActivated(D2GameStrc* pGame)
 {
 	D2QuestDataStrc* pQuestData = QUESTS_GetQuestData(pGame, QUEST_A1Q4_CAIN);

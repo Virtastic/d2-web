@@ -1389,6 +1389,7 @@ D2UnitStrc* __fastcall sub_6FC4FCA0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, 
 }
 
 //D2Game.0x6FC4FEC0
+// 1.13c D2Game+0x11A70 (placement is D2GAME_GetFreeSpaceEx, not the 1.10f free-coordinates search; checked against objdump)
 D2UnitStrc* __fastcall D2GAME_DropItemAtUnit_6FC4FEC0(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nQuality, int32_t* pItemLevel, D2ItemDropStrc* pItemDrop, int32_t a6, int32_t a7)
 {
     D2_ASSERT(pGame);
@@ -1433,24 +1434,11 @@ D2UnitStrc* __fastcall D2GAME_DropItemAtUnit_6FC4FEC0(D2GameStrc* pGame, D2UnitS
         }
     }
 
-    D2CoordStrc coords1 = {};
     D2CoordStrc unitCoords = {};
-
     UNITS_GetCoords(pUnit, &unitCoords);
 
-    D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
-    if (D2GAME_GetRoom_6FC52070(pRoom, unitCoords.nX + 2, unitCoords.nY + 3))
-    {
-        coords1.nX = unitCoords.nX + 2;
-        coords1.nY = unitCoords.nY + 3;
-    }
-    else
-    {
-        coords1.nX = unitCoords.nX;
-        coords1.nY = unitCoords.nY;
-    }
-
-    D2ActiveRoomStrc* pTargetRoom = COLLISION_GetFreeCoordinatesWithField(pRoom, &coords1, &unitCoords, 1, COLLIDE_MASK_SPAWN, 0x801u, 1);
+    D2CoordStrc coords1 = {};
+    D2ActiveRoomStrc* pTargetRoom = D2GAME_GetFreeSpaceEx_6FC4BF00(UNITS_GetRoom(pUnit), &unitCoords, &coords1, 1);
     if (!pTargetRoom)
     {
         return nullptr;

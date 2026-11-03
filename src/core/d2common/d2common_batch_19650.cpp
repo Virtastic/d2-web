@@ -82,25 +82,6 @@ using TileFlags = uint32_t (*)(D2TileLibraryEntryStrc*);
 static_assert(offsetof(D2DrlgTileDataStrc, dwFlags) == 0x14);
 static_assert(offsetof(D2DrlgTileDataStrc, pTile) == 0x18);
 
-// 1.13c D2Common+0x2E0C0
-extern "C" void d2_fn_d2common_2e0c0(uint8_t act, void* library,
-    D2DrlgTileDataStrc* output, FindTiles find, TileFlags flags)
-{
-    if (!output || !find || !flags) std::abort();
-    std::memset(output, 0, sizeof(*output));
-    int32_t style = 0, sequence = 0;
-    if (act == 1) sequence = 1;
-    else if (act == 2) { style = 29; sequence = 12; }
-    else if (act != 0) return;
-    D2TileLibraryEntryStrc* tiles[40]{};
-    if (!find(library, 0, style, sequence, tiles, 40)) std::abort();
-    output->pTile = tiles[0];
-    output->nRed = output->nGreen = output->nBlue = 255;
-    output->dwFlags = 0x4000;
-    const uint32_t bits = flags(tiles[0]);
-    if (bits & 1) output->dwFlags |= 4;
-    if (bits & 4) output->dwFlags |= 0x800;
-}
 
 // 1.13c D2Common+0x34080 (named D2Common_34080_ApplyStateMask: the FN probe owns the d2_fn_ export)
 extern "C" void D2Common_34080_ApplyStateMask(const uint32_t* mask, D2UnitStrc* unit)

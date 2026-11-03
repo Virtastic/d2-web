@@ -178,8 +178,8 @@ EMSCRIPTEN_KEEPALIVE void UNITS_ReseedFromNativeSkill_4F390(uint32_t pUnit, int3
 		nValue = static_cast<int32_t>((unit->dwUnitType << 16) + unit->dwUnitId);
 	}
 
-	int32_t& nPar1 = *reinterpret_cast<int32_t*>(reinterpret_cast<uint8_t*>(pFound) + 0x18);
-	int32_t& nPar2 = *reinterpret_cast<int32_t*>(reinterpret_cast<uint8_t*>(pFound) + 0x1C);
+	int32_t& nPar1 = *reinterpret_cast<int32_t*>(&pFound->nPar1);
+	int32_t& nPar2 = *reinterpret_cast<int32_t*>(&pFound->nPar2);
 	if (nPar1 == nValue)
 	{
 		const int32_t nOld = nPar2;

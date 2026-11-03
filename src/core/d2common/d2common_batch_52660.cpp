@@ -398,7 +398,7 @@ int32_t D2Common_4FE80_GetSkillStatValue(D2UnitStrc* pUnit, int32_t nSkillId)
 
 // 1.13c D2Common+0x3C810 (#10043) compare the stat-flag pointers reached from two retail 32-bit
 // images and adjust a counter by -1/+1 when they differ.
-extern "C" void d2_fn_d2common_2df80(uint32_t pContext, int32_t nDelta);
+extern "C" void D2Common_2DF80_AdjustRefsBatch(uint32_t pContext, int32_t nDelta);
 // pContext is retail's ESI, passed through untouched to 0x2DF80.
 void D2Common_3C810_CompareStatFlags(const uint8_t* pFirst, const uint8_t* pSecond, uint32_t pContext)
 {
@@ -410,7 +410,7 @@ void D2Common_3C810_CompareStatFlags(const uint8_t* pFirst, const uint8_t* pSeco
 
 	if (nFlagsFirst != nFlagsSecond)
 	{
-		if (nFlagsFirst) d2_fn_d2common_2df80(pContext, -1);
-		if (nFlagsSecond) d2_fn_d2common_2df80(pContext, 1);
+		if (nFlagsFirst) D2Common_2DF80_AdjustRefsBatch(pContext, -1);
+		if (nFlagsSecond) D2Common_2DF80_AdjustRefsBatch(pContext, 1);
 	}
 }

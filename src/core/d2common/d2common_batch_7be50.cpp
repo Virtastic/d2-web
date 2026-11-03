@@ -56,29 +56,7 @@ extern "C" void d2_fn_d2common_67f50(D2DrlgRoomStrc* room, void* pool,
     }
 }
 
-// 1.13c D2Common+0x2D210
-extern "C" void d2_fn_d2common_2d210(D2DrlgWarpStrc* warp, int32_t id, int32_t vis, int32_t dest)
-{
-    for (int32_t i = 0; i < 8; ++i) {
-        if (warp->nVis[i] == vis) { warp->nWarp[i] = dest; return; }
-    }
-    if (id == -1) {
-        for (int32_t i = 0; i < 8; ++i) {
-            if (!warp->nVis[i] && warp->nWarp[i] == -1) { id = i; break; }
-        }
-    }
-    // Retail also leaves id=-1 when full: address the fields relative to the
-    // containing object (nVis[-1] is nLevel; nWarp[-1] is nVis[7]).
-    if (id == -1) { warp->nLevel = vis; warp->nVis[7] = dest; return; }
-    warp->nVis[id] = vis;
-    warp->nWarp[id] = dest;
-}
 
-// 1.13c D2Common+0x2D730
-extern "C" D2DrlgWarpStrc* d2_fn_d2common_2d730(D2DrlgStrc* drlg, int32_t level)
-{
-    return DRLG_GetDrlgWarpFromLevelId(drlg, level);
-}
 
 extern "C" void D2Common_44B20(D2DrlgOrthStrc** head, D2DrlgOrthStrc* node, bool (*before)(const D2DrlgOrthStrc*, const D2DrlgOrthStrc*));
 extern "C" bool D2Common_44B20_Before(const D2DrlgOrthStrc* a, const D2DrlgOrthStrc* b);
@@ -112,7 +90,7 @@ extern "C" void D2Common_13F30_Placement(const int32_t* origin, int32_t directio
 }
 
 // 1.13c D2Common+0x37020
-extern "C" void d2_fn_d2common_37020(D2DrlgGridStrc* grid, D2DrlgVertexStrc* vertex,
+extern "C" void d2common_37020_port(D2DrlgGridStrc* grid, D2DrlgVertexStrc* vertex,
     int32_t flag, FlagOperation operation, BOOL includeNext)
 {
     sub_6FD75DE0(grid, vertex, flag, operation, includeNext);

@@ -62,14 +62,16 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_d2common_67bd0(void)
 // 1.13c D2Common+0x3BD60 (#10310) reads a pointer out of the object at +0x10/+0x64 and returns its
 // +0x30 dword. A null inner pointer is a fatal report in retail (message 0x2CD); we return 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3bd60(const uint8_t* pObject)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3bd60_batch(const uint8_t* pObject)
 {
 	if (!pObject) return 0;
-	const uint8_t* pInner = *(const uint8_t* const*)(pObject + 0x10);
-	if (!pInner) return 0;
-	const uint8_t* pRecord = *(const uint8_t* const*)(pInner + 0x64);
-	if (!pRecord) return 0;
-	return *(const uint32_t*)(pRecord + 0x30);
+	uint32_t a = 0, b = 0, v = 0;
+	memcpy(&a, pObject + 0x10, 4);
+	if (!a) return 0;
+	memcpy(&b, (const uint8_t*)(uintptr_t)a + 0x64, 4);
+	if (!b) return 0;
+	memcpy(&v, (const uint8_t*)(uintptr_t)b + 0x30, 4);
+	return v;
 }
 
 // 1.13c D2Common+0x4F0E0 (#10313) skills.txt nPassiveState (+0x94) when it is positive; a bad id or

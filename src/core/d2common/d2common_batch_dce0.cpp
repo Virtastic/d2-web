@@ -71,7 +71,7 @@ EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_22a20_batch(const int32_t* pUnit)
 // DRLGTYPE_MAZE) returns the outdoor room's flag bit 0x80, else 0. The 1.10f body is sub_6FD779F0
 // (DrlgDrlgRoom.cpp); retail fatals on a null room (0x5A5), here a null pointer returns 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3c330(const D2ActiveRoomStrc* pRoom)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3c330_batch(const D2ActiveRoomStrc* pRoom)
 {
 	if (pRoom == nullptr || pRoom->pDrlgRoom == nullptr)
 		return 0;

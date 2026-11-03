@@ -166,12 +166,12 @@ namespace
 	}
 }
 
-// 1.13c D2Common+0x38C80 (EAX = stat-cost id, ECX = stat list; EBX/EDI pass through to 0x38B00).
-// Null list or id outside [0, count) -> 0; else 0x38B00(list, packed id, record).
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t D2Common_38C80_StatValueById(uint32_t pDataTables, int32_t nStatCostId, uint32_t pList, int32_t nPackedStatId)
+// 1.13c D2Common+0x38C80 (EAX = stat-cost id, ECX = stat list, stack = layer word; ret 4).
+// Null list or id outside [0, count): 0; else 0x38B00(list, (id << 16) + layer, record) (EBX = list, EDI = key).
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t D2Common_38C80_StatValueById(uint32_t pDataTables, int32_t nStatCostId, uint32_t pList, int32_t nLayer)
 {
 	const uint32_t rec = pList ? StatCostRecord(pDataTables, nStatCostId) : 0;
-	return rec ? d2_sub_38B00_StatValue(pList, nPackedStatId, rec) : 0;
+	return rec ? d2_sub_38B00_StatValue(pList, static_cast<int32_t>((static_cast<uint32_t>(nStatCostId) << 16) + (static_cast<uint32_t>(nLayer) & 0xFFFFu)), rec) : 0;
 }
 
 // 1.13c D2Common+0x39490: same gates, calls 0x38A80 (the clamped/maximum variant) instead.

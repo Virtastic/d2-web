@@ -85,7 +85,7 @@ EMSCRIPTEN_KEEPALIVE uint16_t D2Common_3D120_NthListEntryOfKind0(uint32_t pRecor
 // A record field at record+0x10 points at a second structure; this answers its +0x58 pointer plus
 // 0x1E0. A null record is the 1.13c assert at line 0x5B9 (fatal); it answers null here.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3b1a0(uint32_t pRecord)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3b1a0_batch(uint32_t pRecord)
 {
 	if (pRecord == 0) {
 		return 0;

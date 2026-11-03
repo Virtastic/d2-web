@@ -71,7 +71,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_5da30(int32_t bit, int16_t**
 }
 
 // 1.13c D2Common+0x5DAD0
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_5dad0(int32_t bit, uint32_t* output)
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_5dad0_batch(int32_t bit, uint32_t* output)
 {
     for (int32_t i = 0; i < sgptDataTables->nStatesTxtRecordCount; ++i)
         if (sgptDataTables->pStatesTxt[i].nStateFlags[bit >> 3] & uint8_t(1u << (bit & 7)))

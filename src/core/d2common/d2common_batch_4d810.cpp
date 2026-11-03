@@ -68,74 +68,22 @@ extern "C" void D2Common_2F520_SetSwitchRightSkill(D2UnitStrc* unit, int id, int
 }
 
 // 1.13c D2Common+0x37840
-extern "C" void D2Common_37840_NextTimeRate(D2DrlgActStrc* act, D2ActiveRoomStrc* room)
+extern "C" void D2Common_37840_NextTimeRate(void* act, void* room)
 {
-    ENVIRONMENT_SetNextTimeRate(act, room);
+    // 1.13c layout: the environment record is act+4, the level id room+0x10, +0x58, +0x1D0 (no null checks, as in retail)
+    auto rd = [](const void* b, uint32_t o) { uint32_t v; memcpy(&v, static_cast<const uint8_t*>(b) + o, 4); return v; };
+    auto* env = reinterpret_cast<D2DrlgEnvironmentStrc*>(static_cast<uintptr_t>(rd(act, 4)));
+    int level = 0;
+    if (room)
+        level = static_cast<int>(rd(reinterpret_cast<const void*>(static_cast<uintptr_t>(rd(reinterpret_cast<const void*>(static_cast<uintptr_t>(rd(room, 0x10))), 0x58))), 0x1D0));
+    ENVIRONMENT_SetNextTimeRateForLevel(env, level);
 }
 
 namespace {
-int UnitLevel(D2UnitStrc* unit)
-{
-    if (!unit || !unit->pStatListEx || sgptDataTables->nItemStatCostTxtRecordCount < 13)
-        return 0;
-    return STATLIST_UnitGetStatValue(unit, STAT_LEVEL, 0);
-}
 int OwnedSkillLevel(D2UnitStrc* unit, int id)
 {
     if (!unit || !unit->pSkills) return 0;
     auto* skill = SKILLS_GetSkill(unit, id, -1);
     return skill ? skill->nSkillLevel : 0;
 }
-}
-
-// 1.13c D2Common+0x2CC60
-extern "C" uint32_t D2Common_2CC60_HirelingReviveCost(D2UnitStrc* unit)
-{
-    const uint32_t level = static_cast<uint32_t>(UnitLevel(unit));
-    // Unlike the 1.10f map, retail divides the wrapped square BEFORE multiplying by 15.
-    const int32_t square = static_cast<int32_t>(level * level);
-    const uint32_t cost = static_cast<uint32_t>(square / 2) * 15u;
-    return cost > 50000u ? 50000u : cost;
-}
-
-// 1.13c D2Common+0x4FB30
-extern "C" BOOL D2Common_4FB30_CheckRequiredSkills(D2UnitStrc* unit, int skillId)
-{
-    auto* row = DATATBLS_GetSkillsTxtRecord(skillId);
-    if (!row) return FALSE;
-    const int level = UnitLevel(unit);
-    const int requiredLevel = row->wReqLevel + OwnedSkillLevel(unit, skillId);
-    if (requiredLevel > level) return FALSE;
-    for (const int required : row->nReqSkill) {
-        if (required < 0) continue;
-        auto* requiredRow = DATATBLS_GetSkillsTxtRecord(required);
-        if (!requiredRow) return FALSE;
-        bool found = false;
-        if (unit && unit->pSkills) {
-            for (auto* skill = unit->pSkills->pFirstSkill; skill; skill = skill->pNextSkill)
-                if (skill->pSkillsTxt == requiredRow) { found = true; break; }
-        }
-        if (!found || OwnedSkillLevel(unit, required) < 1) return FALSE;
-    }
-    return TRUE;
-}
-
-// 1.13c D2Common+0x26930
-extern "C" BOOL D2Common_26930_AreStackablesEqual(D2UnitStrc* first, D2UnitStrc* second)
-{
-    return ITEMS_AreStackablesEqual(first, second);
-}
-
-// 1.13c D2Common+0x303E0
-extern "C" void D2Common_303E0_SetUsedSkill(D2UnitStrc* unit, D2SkillStrc* skill)
-{
-    if (!unit) std::abort();
-    if (unit->pSkills) unit->pSkills->pUsedSkill = skill;
-}
-
-// 1.13c D2Common+0x21dd0
-extern "C" void D2Common_21DD0_PlaceAtPage(D2InventoryStrc* inventory,
-    D2UnitStrc* item, int x, int y, int record, BOOL unused, uint8_t page)
-{
-    if (inventory) INVENTORY_PlaceItemInGrid(inventory, item, x, y, page + 2, record, unused);
 }

@@ -3672,6 +3672,7 @@ D2UnitStrc* __fastcall D2GAME_SummonPet_6FD14430(D2GameStrc* pGame, D2SummonArgS
 
 //D2Game.0x6FD146D0
 // 1.13c D2Game+0xA2EE0
+// 1.13c D2Game+0xA2EE0
 void __fastcall sub_6FD146D0(D2GameStrc* pGame, D2UnitStrc* pUnit)
 {
     D2_ASSERT(pUnit);
@@ -3898,9 +3899,10 @@ void __fastcall D2GAME_RollPhysicalDamage_6FD14EC0(D2UnitStrc* pUnit, D2DamageSt
 }
 
 //D2Game.0x6FD14F70
+// 1.13c D2Game+0xA2F90: retail tests the boss bit (pData+0x16 & 8) before the unique flag; both are reads, so only the order differs from 1.10f
 void __fastcall sub_6FD14F70(D2GameStrc* pGame, D2UnitStrc* pUnused, D2UnitStrc* pUnit, int32_t nDelay)
 {
-    if (!STATES_CheckState(pUnit, STATE_UNINTERRUPTABLE) && pUnit && pUnit->dwUnitType == UNIT_MONSTER && !MONSTERUNIQUE_CheckMonTypeFlag(pUnit, MONTYPEFLAG_UNIQUE) && !MONSTERS_IsBoss(nullptr, pUnit))
+    if (!STATES_CheckState(pUnit, STATE_UNINTERRUPTABLE) && pUnit && pUnit->dwUnitType == UNIT_MONSTER && !MONSTERS_IsBoss(nullptr, pUnit) && !MONSTERUNIQUE_CheckMonTypeFlag(pUnit, MONTYPEFLAG_UNIQUE))
     {
         D2StatListStrc* pStatList = STATLIST_GetStatListFromUnitAndState(pUnit, nDelay);
         if (pStatList)

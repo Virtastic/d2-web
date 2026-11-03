@@ -174,6 +174,19 @@ extern "C" bool D2Common_37AF0(const N87Env* e, uint32_t a, uint32_t b)
 	return old != (int32_t)p[1];
 }
 
+// FN-probe entry for 0x37AF0: wasm32 guest addresses are host addresses, so the env resolves them as identity; the three
+// callees and the 6-int band table are the probe's.
+static void* n87Identity(uint32_t g) { return reinterpret_cast<void*>(static_cast<uintptr_t>(g)); }
+static void n87Fatal(uint32_t) { __builtin_trap(); }
+extern "C" bool d2common_37af0_port(uint32_t a, uint32_t b, void (*f87570)(uint32_t), void (*f876F0)(int),
+                                    void (*f871C0)(uint32_t, uint32_t), const int32_t* bands)
+{
+	N87Env e = {};
+	e.at = n87Identity; e.fatal = n87Fatal;
+	e.f87570 = f87570; e.f876F0 = f876F0; e.f871C0 = f871C0; e.levelBandTbl = bands;
+	return D2Common_37AF0(&e, a, b);
+}
+
 // D2Common 0x3A1D0
 extern "C" uint32_t D2Common_3A1D0(const N87Env* e, uint32_t o, uint32_t, int v, uint32_t, uint32_t arg)
 {

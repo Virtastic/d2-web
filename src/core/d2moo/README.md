@@ -86,3 +86,7 @@ behaviour differs from 1.10f.
 - STATLIST_MergeBaseStats (D2Common+0x3A600): base entries now fold through D2Common_3A330_AddStat (1.13c), not STATLIST_AddStat.
 - D2Common+0x335F0 (UnitSetupSpeeds): rewritten over D2UnitStrc by field name (the word-array port was wrong for the widened unit); +0x32EF0 port renamed D2Common_32EF0_MergeDualWield. Frame bonus still goes through UNITS_GetFrameBonus (1.10f); 1.13c 0x32220 reads a weapon-class table instead -- player branch not captured.
 - D2Common+0x32E10 (Units.cpp UNITS_CharacterStartRunningOrKnockback): a null unit allocates the temp statlist from no pool, owner type 6, owner id -1 (1.10f dereferenced it); the old word-array placeholder in d2common_batch_wave1018.cpp is retired.
+- D2Game+0xA2F90 (sub_6FD14F70): the boss bit (pData+0x16 & 8) is tested before the unique flag as in 1.13c (reads only; order only). +0xA2EE0, +0xA2DE0, +0xA3120 and +0xA3090 are marked 1.13c.
+
+- D2Game+0xA34E0 (d2game_batch_9eeb0.cpp): callee argument slots corrected against the disassembly (10785/10945 take s2, 10807/10945 take s1). D2Game+0xA39E0: port renamed d2game_a39e0_gate so the FN probe owns d2_fn_d2game_a39e0.
+- D2Game+0x11A70 (ITEMS/Items.cpp D2GAME_DropItemAtUnit_6FC4FEC0): the drop spot comes from D2GAME_GetFreeSpaceEx (0xE930) on the unit coords, not the 1.10f COLLISION free-coordinates search at (x+2,y+3); the ObjMode DropItemWithCodeAndQuality copy was wrongly marked with this RVA.

@@ -19,18 +19,19 @@ namespace
 	constexpr uint32_t kRetailNoonPeriodOfDay = 0;
 }
 
-// Env seams for the two callees this row makes; both are still-UNMAPPED rows.
-struct D2CommonBatch37C20Env {
-	int32_t (*sub2D2C0)(int32_t nLevelId);   // 0x2D2C0, answer discarded here
-	void    (*sub376F0)(int32_t nLevelId);   // 0x376F0, light intensity update
-};
+// Env seams (defined in d2common_batch_37ca0.cpp, null until the environment installs them).
+extern "C"
+{
+	extern uint32_t (*g_d2common_fn_2D2C0)(int32_t);                              // 0x2D2C0
+	extern void (*g_d2common_fn_376F0)(uint32_t ecx, uint32_t edi, void* rec);    // 0x376F0
+}
 
 // 1.13c D2Common+0x37C20: reset the environment record at wrapper+0x04 to noon. Its time-rate
 // index (+0x2C) and eclipse flag (+0x30) clear, the time rate (+0x28) takes gnTimeRates[0], the
 // cycle index (+0x00) becomes ENVCYCLE_NOON with nTicks (+0x08) zero and the period of day
-// (+0x04) ENVPERIOD_DAY, then 0x2D2C0(0) and 0x376F0(0) run.
+// (+0x04) ENVPERIOD_DAY, then 0x2D2C0(0) runs (its byte goes to EDI) and 0x376F0 (ECX 0, ESI rec).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_37c20(uint32_t pWrapper, const D2CommonBatch37C20Env* env)
+void d2common_37c20_port(uint32_t pWrapper)
 {
 	uint8_t* wrapper = P(pWrapper);
 	if (!wrapper)
@@ -46,10 +47,9 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_37c20(uint32_t pWrapper, const D2Common
 	W(rec, 0x08) = 0;
 	W(rec, 0x04) = kRetailNoonPeriodOfDay;
 
-	if (env != nullptr && env->sub2D2C0 != nullptr)
-		env->sub2D2C0(0);
-	if (env != nullptr && env->sub376F0 != nullptr)
-		env->sub376F0(0);
+	const uint32_t nBand = g_d2common_fn_2D2C0 ? g_d2common_fn_2D2C0(0) & 0xFF : 0;
+	if (g_d2common_fn_376F0)
+		g_d2common_fn_376F0(0, nBand, rec);
 
 	W(rec, 0x30) = 0;
 }

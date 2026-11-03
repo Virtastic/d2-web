@@ -46,10 +46,14 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_24800_GetItemDwordEC(uint32_t pItem) {   
 // coord x at +0x0C shifted left 16; types 0, 1 and 3 take the dynamic-path fixed-point x at +0.
 // A null unit is retail's fatal path; we answer 0.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_30340(uint32_t pUnit) {   // 1.13c D2Common+0x30340
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_30340_PrecisionX(uint32_t pUnit) {   // 1.13c D2Common+0x30340
 	if (!pUnit)
 		return 0;
-	return static_cast<uint32_t>(UNITS_GetPrecisionX(reinterpret_cast<D2UnitStrc*>(pUnit)));
+	const uint32_t nType = R(P(pUnit), 0x00);
+	const uint32_t pPath = R(P(pUnit), 0x2C);
+	if (nType == 2 || nType == 4 || nType == 5)
+		return pPath ? R(P(pPath), 0x0C) << 16 : 0;
+	return pPath ? R(P(pPath), 0x00) : 0;
 }
 
 // +0x31200: a monster can switch AI when its id is in monsters.txt, its MonStatsEx (+0x18) names a

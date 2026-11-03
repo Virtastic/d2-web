@@ -100,6 +100,7 @@ D2COMMON_DLL_DECL void __stdcall ENVIRONMENT_GetStatistics(D2DrlgActStrc* pAct, 
 //D2Common.0x6FD8E0F0 (#10934)
 D2COMMON_DLL_DECL int __stdcall ENVIRONMENT_GetTimeRateFromAct(D2DrlgActStrc* pAct);
 //D2Common.0x6FD8E100 (#10935)
+void ENVIRONMENT_SetNextTimeRateForLevel(D2DrlgEnvironmentStrc* pEnvironment, int nLevelId);
 D2COMMON_DLL_DECL void __stdcall ENVIRONMENT_SetNextTimeRate(D2DrlgActStrc* pAct, D2ActiveRoomStrc* pRoom);
 //D2Common.0x6FD8E1B0 (#10936)
 D2COMMON_DLL_DECL void __stdcall ENVIRONMENT_TaintedSunBegin(D2DrlgActStrc* pAct);

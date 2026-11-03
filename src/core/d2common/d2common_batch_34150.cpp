@@ -240,31 +240,32 @@ EMSCRIPTEN_KEEPALIVE int32_t d2common_CountItemsByNodePos_23e30(uint32_t pUnitAd
 	return nCount;
 }
 
-// 1.13c D2Common+0x30600 (#10645): copy the switch-right skill id (int16 at the record 0x30420
-// returns) and that record's +0x34 word into the player data at +0x80/+0x88. Null unit, a non-player
-// unit or missing player data is a no-op; a null record writes the id 0 (retail then exits).
+// 1.13c D2Common+0x30600 (#10645): copy the switch-right skill id (int16 behind the first dword of the record
+// 0x30420 returns, i.e. [[unit+0xA8]+0xC]) and that record's +0x34 dword into the player data at +0x80/+0x88.
+// Null unit, a non-player unit or missing player data is a no-op; a null record writes the id 0 (retail then
+// exits). The unit is the retail 32-bit image.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void D2Common_SetPlayerSwitchRightSkill(D2UnitStrc* pUnit)
+EMSCRIPTEN_KEEPALIVE void D2Common_SetPlayerSwitchRightSkill(uint32_t pUnit)
 {
-	if (!pUnit || pUnit->dwUnitType != 0)
+	const uint8_t* u = P(pUnit);
+	if (!u || R(u, 0x00) != 0)
 		return;
-	D2PlayerDataStrc* pPlayerData = pUnit->pPlayerData;
+	uint8_t* pPlayerData = P(R(u, 0x14));
 	if (!pPlayerData)
 		return;
 
-	uint32_t r[5] = { static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pUnit)), 0, 0, 0, 0 };
-	d2_fn_d2common_30420(r);
-	const uint32_t pRecord = r[4];
+	const uint32_t pList = R(u, 0xA8);
+	const uint32_t pRecord = pList ? R(P(pList), 0x0C) : 0;
 	if (!pRecord)
 	{
-		pPlayerData->nSwitchRightSkillId = 0;
+		*reinterpret_cast<uint32_t*>(pPlayerData + 0x80) = 0;
 		return;
 	}
 
 	const uint32_t pSkills = R(P(pRecord), 0x00);
-	pPlayerData->nSwitchRightSkillId =
+	*reinterpret_cast<int32_t*>(pPlayerData + 0x80) =
 	    pSkills ? static_cast<int32_t>(*reinterpret_cast<const int16_t*>(P(pSkills))) : 0;
-	pPlayerData->nSwitchRightSkillFlags = static_cast<int32_t>(R(P(pRecord), 0x34));
+	*reinterpret_cast<uint32_t*>(pPlayerData + 0x88) = R(P(pRecord), 0x34);
 }
 
 // 1.13c D2Common+0x4E000 (#10649): the dword at +0x1C of the given block. A null block yields 0

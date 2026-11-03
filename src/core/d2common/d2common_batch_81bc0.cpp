@@ -134,9 +134,11 @@ void D2Common_3D810_Read3x3(const B81Grid* g, int row, int col, int32_t out[9])
 struct B36Line { int32_t x, y; void* _2; void* _3; int32_t** end; };   // [0],[1],[4]->{x,y}
 struct B36Rect { int32_t x, y, w, h; };
 
-// 1.13c D2Common+0x36CD0: Bresenham from line start (x,y) to *end, plotting a nThick-long run per step
-// (perpendicular to the major axis) through callback table entry `sel` (0x6FDEB244) for cells inside rect.
-void D2Common_36CD0_PlotLine(const B36Line* l, const B36Rect* r, int sel, int nThick)
+// 1.13c D2Common+0x36CD0: EAX = line, ESI = clip rect, stack (grid, value, sel, nThick), ret 0x10. Bresenham from the
+// line start (x,y) to *end, plotting an nThick-long run per step (perpendicular to the major axis); each cell inside the
+// rect is combined with `value` by table entry `sel` of 0x6FDEB244 (or and xor mov mov-if-zero and-not) at
+// grid.data[grid.rowOff[row] + col].
+void D2Common_36CD0_PlotLine(const B36Line* l, const B36Rect* r, B81Grid* grid, int value, int sel, int nThick)
 {
     auto inRect = [](const B36Rect* r, int x, int y) { return r->x <= x && r->y <= y && x < r->w + r->x && y < r->h + r->y; };
     int x = l->x, y = l->y;
@@ -144,7 +146,19 @@ void D2Common_36CD0_PlotLine(const B36Line* l, const B36Rect* r, int sel, int nT
     if (dx < 0) { dx = -dx; sx = -1; }
     if (dy < 0) { dy = -dy; sy = -1; }
     int err = 0;
-    auto plot = [&](int px, int py) { if (inRect(r, px, py)) D2Common_EB244[sel](); };   // args in regs, not recovered
+    auto plot = [&](int px, int py) {
+        if (!inRect(r, px, py)) return;
+        int32_t* c = &grid->data[grid->rowOff[py] + px];
+        const int32_t v = value;
+        switch (sel) {
+        case 0: *c |= v; break;
+        case 1: *c &= v; break;
+        case 2: *c ^= v; break;
+        case 3: *c = v; break;
+        case 4: if (*c == 0) *c = v; break;
+        case 5: *c &= ~v; break;
+        }
+    };
     if (dx < dy) {
         for (int i = 0; i < nThick; ++i) plot(x + i, y);
         for (int n = dy; n > 0; --n) {
@@ -160,6 +174,11 @@ void D2Common_36CD0_PlotLine(const B36Line* l, const B36Rect* r, int sel, int nT
             for (int i = 0; i < nThick; ++i) plot(x, y + i);
         }
     }
+}
+
+extern "C" void d2common_36cd0_port(const B36Line* l, const B36Rect* r, B81Grid* grid, int value, int sel, int nThick)
+{
+    D2Common_36CD0_PlotLine(l, r, grid, value, sel, nThick);
 }
 
 // 1.13c D2Common+0x83CA0: lazily build the cached preset descriptor at param+0x50. If null: 5BE50(this, param+4)

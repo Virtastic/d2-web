@@ -37,7 +37,7 @@ namespace
 // 0x1FF40, 0x31680, 0x38B70 (unit stat getter) and 0x38A80 (whose stat-list operand is register-only)
 // are env seams.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_31d20(uint32_t pUnit, int32_t nScaleByLevel,
+EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_31d20_batch(uint32_t pUnit, int32_t nScaleByLevel,
 	int32_t (*pfnInv1FF40)(uint32_t, void*),
 	int32_t (*pfnUnit31680)(uint32_t),
 	int32_t (*pfnStat38B70)(uint32_t, int32_t),
@@ -319,7 +319,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3a330(uint32_t pStatList, uint32_t nPac
 // a null unit is fatal 0x638, both modelled as a null return. The list lives at unit+0xA8: its +0x04 is
 // the first node, each node {record at +0x00, next at +0x04}. Returns the node whose record matches.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_30ac0(uint32_t pUnit, int32_t nSkillId)
+EMSCRIPTEN_KEEPALIVE uint32_t D2Common_30AC0_FindSkillNode(uint32_t pUnit, int32_t nSkillId)
 {
 	uint8_t* u = P(pUnit);
 	if (nSkillId < 0 || !sgptDataTables->pSkillsTxt || nSkillId >= sgptDataTables->nSkillsTxtRecordCount)
@@ -367,7 +367,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_5a810(uint32_t pUnit,
 // cleared. A non-type-0 (or null) unit writes 0 and -1. A type-0 unit with a null data block is fatal in
 // retail (0x1470), modelled as a return that leaves the outputs untouched.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2f6a0(uint32_t pUnit, uint32_t* pOut84, uint32_t* pOut8C)
+EMSCRIPTEN_KEEPALIVE void D2Common_2F6A0_TakePlayerOutputs(uint32_t pUnit, uint32_t* pOut84, uint32_t* pOut8C)
 {
 	uint8_t* u = P(pUnit);
 	if (u && W(u, 0) == 0)

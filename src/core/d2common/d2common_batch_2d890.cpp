@@ -15,23 +15,13 @@
 #include "Drlg/D2DrlgDrlg.h"
 #include "Units/Units.h"
 
-// 1.13c D2Common+0x2D890: level position and size from the level-definition record.
-// The parent (dwDepend) is found in the level chain or allocated on demand; positions are the parent's
-// plus dwOffsetX/dwOffsetY and width/height are the record's per-difficulty dwSizeX/dwSizeY. This is
-// exactly the vendored 1.10f DRLG_SetLevelPositionAndSize (its DRLG_GetLevel is the same chain scan
-// plus DRLG_AllocLevel fallback).
-extern "C" void d2_fn_d2common_2d890(uint32_t pDrlg, uint32_t pLevel)
-{
-	DRLG_SetLevelPositionAndSize(reinterpret_cast<D2DrlgStrc*>(static_cast<uintptr_t>(pDrlg)),
-		reinterpret_cast<D2DrlgLevelStrc*>(static_cast<uintptr_t>(pLevel)));
-}
 
 // 1.13c D2Common+0x31680: "monster blocks with its shield" predicate, factored out of the 1.10f
 // UNITS_GetBlockRate monster branch. Diablo, DoomKnight1 and DiabloClone always qualify; ACT3HIRE
 // never does. Otherwise the monster's component slot 7 code is looked up: a torch (' hct') is
 // rejected, anything else is resolved through the item linker and qualifies when its items.txt
 // wType[0] is ITEMTYPE_SHIELD. A null or non-monster unit, an empty slot or an unknown code is 0.
-extern "C" int32_t d2_fn_d2common_31680(uint32_t pUnit)
+extern "C" int32_t d2_fn_d2common_31680_batch(uint32_t pUnit)
 {
 	static const uint32_t gnRejectedCodes[] = { ' hct' };   // torch: not a shield
 

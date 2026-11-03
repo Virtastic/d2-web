@@ -126,9 +126,12 @@ int D2CMP_10081_GetTileRarity(D2TileLibraryEntryStrc* e)   { D2_ASSERT(e); const
 int D2CMP_10082_GetTileSequence(D2TileLibraryEntryStrc* e) { D2_ASSERT(e); return tileSeq((const uint8_t*)e); }
 uint8_t* D2CMP_10085_GetTileFlagArray(D2TileLibraryEntryStrc* e) { D2_ASSERT(e); return (uint8_t*)e + 0x28; }
 
-// 1.13c D2CMP+0x14EC0 -- row index into the 256-byte-record static table (base DAT_6fe34aa8); -1 = retail's NULL.
-// Table bytes are retail data, so the pointer itself is not reproduced; the index is.
-int D2CMP_14EC0_TableIndex(int a, int b) { return (a < 9 && b < 0x15 && a != 0 && (a < 3 || a > 4)) ? a * 0x69 + b : -1; }
+// 1.13c D2CMP+0x14EC0 -- retail returns &DAT_6fe34aa8 + (a*0x69+b)*0x100, or NULL. This returns that
+// byte offset from the table base (0 = NULL; a valid row is never offset 0). Table bytes are retail data,
+// so the absolute pointer is not reproduced.
+uint32_t D2CMP_14EC0_TableIndex(int a, int b) {
+    return (a < 9 && b < 0x15 && a != 0 && (a < 3 || a > 4)) ? (uint32_t)(a * 0x69 + b) * 0x100u : 0u;
+}
 
 // 1.13c D2CMP+0x17020 (verified against decompile)
 // Cache bucket lookup. Retail gets bucket index + key hash from 0x16E80 (register args); the caller supplies them.
@@ -199,6 +202,7 @@ extern "C" void* d2cmp_convertcp_8710(unsigned from, unsigned to, const char* sr
 	char* out = (char*)malloc(n);
 	if (!out) return nullptr;
 	memcpy(out, src, n);
+	if (*len != 0xFFFFFFFFu) *len = n;   // retail 0x8710: *len := converted byte count unless len == -1
 	return out;
 }
 

@@ -13,7 +13,7 @@ void*    D2Common_2D9B0(void* ctx, int32_t id);
 void     D2Common_2E360(void* p);
 int32_t* D2Common_19950(void* ctx, int32_t id);
 int      D2Common_452C0(uint8_t slot, void* unit, int32_t a, uint32_t idx, int32_t v);
-void     D2Common_36CD0(void* p, int32_t a, int32_t b, int32_t c);
+extern "C" void d2common_36cd0_port(void* line, const int32_t* rect, void* grid, int32_t value, int32_t sel, int32_t thick);
 void*    D2Common_6C4D0(uint32_t a, int32_t idx);
 void     D2Common_83CA0(void* ctx, void* e);
 void     D2Common_84500(void* self, void* e);
@@ -59,10 +59,12 @@ void D2Common_453D0(void* self, int32_t p1, void* unit, uint32_t idx)
 void D2Common_3DC90(void* a, void* b)
 {
     uint8_t* tgt = (uint8_t*)P32(b, 0x20);
+    const int32_t* q = (const int32_t*)((uint8_t*)b + 0x34);
+    const int32_t rect[4] = { q[0] - 1, q[1] - 1, q[2] + 3, q[3] + 3 };
     void* t = P32(a, 0x14);
     for (int32_t i = 0; i < I32(t, 0x260); ++i)
         for (void* n = P32(t, 0x68 + 4 * i); n; n = P32(n, 0x10))
-            if (I32(n, 0x10)) D2Common_36CD0(tgt + 0x3C, 1, 0, 2);
+            if (I32(n, 0x10)) d2common_36cd0_port(n, rect, tgt + 0x3C, 1, 0, 2);
 }
 
 // 1.13c D2Common+0x84AD0: fastcall(a), EDI=self. self[0xC] = entry index (-1 none), self[0xE] =

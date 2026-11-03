@@ -132,7 +132,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2e2c0(uint32_t pDrlg) {
 }
 
 // Value of stat nStatId (EDI) in stat list pList (EBX), binary-searched in the array at +0x24
-// (0x382B0); with the ItemStatCost record pRec (stack): flag bit 8 + extended list (flags<0) + owner
+// (0x382B0); with the ItemStatCost record pRec (stack): flag byte+5 bit 2 (gdwBitMasks+8) + extended list (flags<0) + owner
 // type 0/1 + value < pRec->+0x2C => value = +0x2C << (+0x18 & 31). 0 if the stat is absent.
 // 1.13c D2Common+0x38B00
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t D2Common_38B00_StatValue(uint32_t pList, int32_t nStatId, uint32_t pRec) {
@@ -148,7 +148,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t D2Common_38B00_StatValue(uint32_t pList,
 	}
 	if (idx < 0) return 0;
 	int32_t val = static_cast<int32_t>(W(arr, idx * 8 + 4));
-	if (pRec && (P(pRec)[5] & 1) && static_cast<int32_t>(W(l, 0x10)) < 0) {
+	if (pRec && (P(pRec)[5] & 4) && static_cast<int32_t>(W(l, 0x10)) < 0) {
 		const uint32_t o = W(l, 0x44);
 		if (o && (W(P(o), 0) == 0 || W(P(o), 0) == 1) && val < static_cast<int32_t>(W(P(pRec), 0x2C)))
 			val = static_cast<int32_t>(W(P(pRec), 0x2C)) << (P(pRec)[0x18] & 31);
@@ -162,24 +162,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t D2Common_38B00_StatValue(uint32_t pList,
 // allocating it with 0x2D9B0. pContext is retail's ESI. The 0x44CE0 seam is null until installed.
 // 1.13c D2Common+0x2DF80
 extern "C" int32_t* (*g_d2common_fn_44CE0)(uint32_t pDrlg, int32_t nLevelId);
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2df80(uint32_t pContext, int32_t nDelta) {
-	auto bump = [nDelta](uint32_t p) {
-		const int32_t v = static_cast<int32_t>(W(P(p), 0x0C)) + nDelta;
-		W(P(p), 0x1D4, 10);
-		W(P(p), 0x0C, v < 1 ? 0 : static_cast<uint32_t>(v));
-	};
-	bump(pContext);
-	const uint32_t pDrlg = W(P(pContext), 0x1B4);
-	if (!g_d2common_fn_44CE0) return;
-	const int32_t* ids = g_d2common_fn_44CE0(pDrlg, static_cast<int32_t>(W(P(pContext), 0x1D0)));
-	for (int i = 0; i < 8; ++i) {
-		if (!ids[i]) continue;
-		uint32_t p = W(P(pDrlg), 0x47C);
-		while (p && static_cast<int32_t>(W(P(p), 0x1D0)) != ids[i]) p = W(P(p), 0x1AC);
-		if (!p) p = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(
-			DRLG_AllocLevel(reinterpret_cast<D2DrlgStrc*>(P(pDrlg)), ids[i])));
-		bump(p);
-	}
+extern "C" void D2Common_2DF80_AdjustRefs(uint32_t pContext, int32_t nDelta, int32_t* (*ids44)(uint32_t, int32_t), uint32_t (*node2D9B0)(uint32_t, int32_t));
+static uint32_t Batch2DF80Node(uint32_t pDrlg, int32_t nLevelId) {
+	return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(
+		DRLG_AllocLevel(reinterpret_cast<D2DrlgStrc*>(P(pDrlg)), nLevelId)));
+}
+extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_2DF80_AdjustRefsBatch(uint32_t pContext, int32_t nDelta) {
+	D2Common_2DF80_AdjustRefs(pContext, nDelta, g_d2common_fn_44CE0, Batch2DF80Node);
 }
 
 // Grow a UnitFinds array by fifteen entries via the pool realloc (retail takes the record in ESI;

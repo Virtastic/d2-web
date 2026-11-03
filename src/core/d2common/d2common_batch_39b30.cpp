@@ -227,11 +227,11 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_4e3f0(uint32_t nValue)
 	W(p, 0) = nValue;
 }
 
-// 1.13c D2Common+0x30590 (#10859): refresh the item data's grid class from 0x30460's record: the
-// int16 behind the pointer at unit+0xA8 -> +8 becomes itemdata+0x84, and the record's dword +0x34
-// becomes itemdata+0x8C. A unit with type != 0 or no item data is retail's fatal 0x1424/0x638.
+// 1.13c D2Common+0x30590 (#10859): refresh the item data's grid class from 0x30460's record S = [[unit+0xA8]+8]:
+// the int16 behind the pointer S[0] becomes itemdata+0x84, and S's dword +0x34 becomes itemdata+0x8C. A unit
+// with type != 0 is a no-op; no item data is retail's fatal 0x1424, a null record fatal 0x638.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30590(uint32_t pUnit)
+EMSCRIPTEN_KEEPALIVE void D2Common_30590_RefreshGridClass(uint32_t pUnit)
 {
 	uint8_t* p = P(pUnit);
 	if (!p || RdU32(p, 0) != 0)
@@ -241,13 +241,12 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_30590(uint32_t pUnit)
 	if (!pItemData)
 		return;   // retail fatals 0x1424
 
-	// 0x30460: unit+0xA8 is the record; its dword +8 is a pointer whose int16 +0 is the grid class
-	// and whose dword +0x34 is stored beside it.
-	const uint32_t nRecord = RdU32(p, 0xA8);
-	const uint32_t nGridClass = nRecord ? RdU32(P(nRecord), 8) : 0;
-	W(pItemData, 0x84) = nGridClass ? static_cast<uint32_t>(RdI16(P(nGridClass), 0)) : 0;
-	if (!nGridClass)
+	const uint32_t nList = RdU32(p, 0xA8);
+	const uint32_t nRecord = nList ? RdU32(P(nList), 8) : 0;
+	const uint32_t pClass = nRecord ? RdU32(P(nRecord), 0) : 0;
+	W(pItemData, 0x84) = pClass ? static_cast<uint32_t>(RdI16(P(pClass), 0)) : 0;
+	if (!nRecord)
 		return;   // retail fatals 0x638
 
-	W(pItemData, 0x8C) = RdU32(P(nGridClass), 0x34);
+	W(pItemData, 0x8C) = RdU32(P(nRecord), 0x34);
 }

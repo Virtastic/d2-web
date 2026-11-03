@@ -515,7 +515,9 @@ D2UnitStrc* __fastcall D2WEB_PLRSAVE2_ReadMercData(D2GameStrc* pGame, D2UnitStrc
 
     D2GAME_MERCS_SendStat_6FCC61D0(pMerc, STAT_EXPERIENCE, hirelingData.nExperience);
 
-    do
+    // The level is the last one whose experience floor the saved experience reaches: a candidate level is
+    // kept only after it passes (unsigned compare), so a reload never promotes the mercenary past it.
+    for (;;)
     {
         pHirelingTxtRecord = DATATBLS_GetHirelingTxtRecordFromIdAndLevel(pGame->bExpansion, hirelingData.nHirelingId, nLevel);
         if (!pHirelingTxtRecord)
@@ -524,9 +526,13 @@ D2UnitStrc* __fastcall D2WEB_PLRSAVE2_ReadMercData(D2GameStrc* pGame, D2UnitStrc
             return nullptr;
         }
 
-        ++nLevel;
+        const int32_t nNext = nLevel + 1;
+        if (nNext > nMaxLevel || (uint32_t)hirelingData.nExperience < (uint32_t)MONSTERS_GetHirelingExpForNextLevel(nNext, pHirelingTxtRecord->dwExpPerLvl))
+        {
+            break;
+        }
+        nLevel = nNext;
     }
-    while (nLevel <= nMaxLevel && hirelingData.nExperience >= MONSTERS_GetHirelingExpForNextLevel(nLevel, pHirelingTxtRecord->dwExpPerLvl));
 
     MONSTERAI_UpdateMercStatsAndSkills(pGame, pPlayer, pMerc, nLevel);
 

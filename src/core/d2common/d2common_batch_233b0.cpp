@@ -57,9 +57,25 @@ EMSCRIPTEN_KEEPALIVE uint8_t D2Common_ItemIsThrowable_24C30(uint32_t pItem)
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t D2Common_3C120_GetAdjacentRoomByTile(uint32_t pRoom, int32_t nX, int32_t nY)
 {
-	D2ActiveRoomStrc* pFound = DUNGEON_GetAdjacentRoomByTileCoordinates(
-		reinterpret_cast<D2ActiveRoomStrc*>(static_cast<uintptr_t>(pRoom)), nX, nY);
-	return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pFound));
+	// Retail 32-bit layout: list pointer +0x00, count +0x24; each listed room's tile rect is
+	// x +0x5C, y +0x60, width +0x64, height +0x68 (0x3B910's test).
+	if (!pRoom)
+		return 0;
+	const uint8_t* r = P(pRoom);
+	const uint8_t* list = P(R(r, 0x00));
+	const int32_t nNum = static_cast<int32_t>(R(r, 0x24));
+	for (int32_t i = 0; i < nNum; ++i)
+	{
+		const uint32_t pTemp = R(list, i * 4);
+		if (!pTemp)
+			return 0;
+		const uint8_t* t = P(pTemp);
+		const int32_t x = static_cast<int32_t>(R(t, 0x5C)), y = static_cast<int32_t>(R(t, 0x60));
+		const int32_t w = static_cast<int32_t>(R(t, 0x64)), h = static_cast<int32_t>(R(t, 0x68));
+		if (nX >= x && nX < x + w && nY >= y && nY < y + h)
+			return pTemp;
+	}
+	return 0;
 }
 
 // 1.13c D2Common+0x7C170 (DRLGACTIVATE_Update, stack arg = the lists struct, ret 4): mirror the +8 / +0x468
@@ -169,7 +185,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_374e0_batch(uint32_t pArg)
 
 // 1.13c D2Common+0x3b470: dword at unit+0x18. Null unit is retail fatal 0x3A6.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3b470(uint32_t pUnit)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3b470_batch(uint32_t pUnit)
 {
 	uint8_t* u = P(pUnit);
 	if (!u)
@@ -203,7 +219,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_4e0e0(uint32_t pUnit)
 // key. The decompiler drops both the second stack argument and the register argument; retail's
 // `mov eax,[esp+8]; mov ecx,[ecx+0x10]; call` is reproduced here. Null param is retail fatal 0x5CF.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3b120(uint32_t pUnit, uint32_t nKey,
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3b120_batch(uint32_t pUnit, uint32_t nKey,
                                                const D2CommonBatch233B0Env* pEnv)
 {
 	uint8_t* u = P(pUnit);

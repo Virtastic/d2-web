@@ -3,6 +3,7 @@
 // retail byte offsets, and retail's fatal asserts (_exit) are modelled as neutral returns.
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 #include <emscripten.h>
 
@@ -31,20 +32,27 @@ EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_24280(const D2UnitStrc* pUnit)
 	return nClass < 7 ? nClass : 7;
 }
 
+static inline uint32_t ld32(uint32_t a, uint32_t off)
+{
+	uint32_t v = 0;
+	memcpy(&v, reinterpret_cast<const void*>(static_cast<uintptr_t>(a) + off), 4);
+	return v;
+}
+
 // 1.13c D2Common+0x66350 (#10821): whether the chain starting at unit+0x74 contains pNode as a
 // link; the next link is read at +0xE8. A null pNode is fatal in retail (message 0x14E).
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_66350(const uint8_t* pUnit, const uint8_t* pNode)
+EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_66350_batch(uint32_t pUnit, uint32_t pNode)
 {
 	if (!pNode || !pUnit)
 		return 0;
 
-	const uint8_t* pLink = *reinterpret_cast<const uint8_t* const*>(pUnit + 0x74);
+	uint32_t pLink = ld32(pUnit, 0x74);
 	while (pLink)
 	{
 		if (pLink == pNode)
 			return 1;
-		pLink = *reinterpret_cast<const uint8_t* const*>(pLink + 0xE8);
+		pLink = ld32(pLink, 0xE8);
 	}
 	return 0;
 }
@@ -53,21 +61,21 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_66350(const uint8_t* pUnit, const ui
 // lists (heads +0xBC/+0x18C, self-pointer means empty) hanging off object+0x48; both empty answers
 // 0. A null object is fatal in retail (message 0x3C5).
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3c5e0(const uint8_t* pObject)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3c5e0_batch(uint32_t pObject)
 {
 	if (!pObject)
 		return 0;
 
-	const uint8_t* pHolder = *reinterpret_cast<const uint8_t* const*>(pObject + 0x48);
+	const uint32_t pHolder = ld32(pObject, 0x48);
 	if (!pHolder)
 		return 0;
 
-	const uint8_t* pEntry = *reinterpret_cast<const uint8_t* const*>(pHolder + 0xBC);
+	uint32_t pEntry = ld32(pHolder, 0xBC);
 	if (!pEntry || pEntry == pHolder + 0xA0)
 	{
-		pEntry = *reinterpret_cast<const uint8_t* const*>(pHolder + 0x1A8);
+		pEntry = ld32(pHolder, 0x1A8);
 		if (!pEntry || pEntry == pHolder + 0x18C)
 			return 0;
 	}
-	return *reinterpret_cast<const uint32_t*>(pEntry + 0x30);
+	return ld32(pEntry, 0x30);
 }

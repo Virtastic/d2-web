@@ -39,17 +39,6 @@ void D2Common_17AE0_RunActTable1(
     apply(self, index, 1, 0x11);
 }
 
-// 1.13c D2Common+0x2D420
-void D2Common_2D420_MarkRoomChainFlag(void* /*unused*/, void* drlg) {
-    if (!at<uint32_t>(drlg, 8) || !at<uint32_t>(drlg, 0x22c)) return;
-    const auto* counters = static_cast<const uint8_t*>(at<void*>(drlg, 0x22c));
-    void* node = at<void*>(drlg, 0x10);
-    for (uint32_t offset = 0; node; offset += 4, node = at<void*>(node, 0x24)) {
-        uint32_t counter;
-        std::memcpy(&counter, counters + offset, sizeof counter);
-        if (counter) put(node, 0x60, at<uint32_t>(node, 0x60) | 1u);
-    }
-}
 
 // 1.13c D2Common+0x2D4E0
 void D2Common_2D4E0_LoadTownTiles(void* drlg, void (*loadTiles)(void*, const char*)) {

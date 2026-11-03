@@ -3896,7 +3896,7 @@ int32_t __fastcall OBJECTS_OperateFunction48_TrappedSoul(D2ObjOperateFnStrc* pOp
 }
 
 //D2Game.0x6FC7A140
-// 1.13c D2Game+0x11A70
+// (no own 1.13c row: retail 0x11A70 is D2GAME_DropItemAtUnit_6FC4FEC0 in Items.cpp)
 D2UnitStrc* __fastcall OBJMODE_DropItemWithCodeAndQuality(D2GameStrc* pGame, D2UnitStrc* pUnit, uint32_t dwCode, int32_t nItemQuality)
 {
     const int32_t nItemId = DATATBLS_GetItemIdFromItemCode(dwCode);

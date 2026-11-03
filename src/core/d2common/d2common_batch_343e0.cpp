@@ -157,8 +157,8 @@ extern "C" void D2Common_1B0D_Exit(int32_t);
 extern "C"
 EMSCRIPTEN_KEEPALIVE void D2Common_37A20_AdvanceEnvState(uint32_t pUnit, uint32_t pOther,
 	const int32_t* pTable0, const int32_t* pTable1, const int32_t* pThresholds,
-	void (*pfn376F0)(int32_t),
-	void (*pfn371C0)(uint32_t, uint32_t, uint32_t))
+	void (*pfn376F0)(uint32_t ecx, uint32_t edi, void* rec),     // 0x376F0: ECX level, EDI band, ESI rec
+	void (*pfn371C0)(uint32_t ecx, uint32_t edx, void* rec))     // 0x371C0: EDX band, stack arg rec
 {
 	uint8_t* u = P(pUnit);
 	if (!u)
@@ -213,9 +213,9 @@ EMSCRIPTEN_KEEPALIVE void D2Common_37A20_AdvanceEnvState(uint32_t pUnit, uint32_
 	}
 
 	if (pfn376F0)
-		pfn376F0(nValue);
+		pfn376F0(static_cast<uint32_t>(nValue), nIndex, s);
 	if (pfn371C0)
-		pfn371C0(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(sgptDataTables)), nIndex, pState);
+		pfn371C0(static_cast<uint32_t>(nValue), nIndex, s);
 
 	if (nValue == 0x78)
 	{

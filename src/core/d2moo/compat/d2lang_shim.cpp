@@ -88,15 +88,15 @@ int __fastcall Unicode::stricmp(const Unicode* a, const Unicode* b) {
 }
 // 1.13c D2Lang+0xB560 (#10045): stricmp over at most count units. The first pair is compared
 // unconditionally (retail quirk: empty/zero-count still orders a differing first pair); after that
-// a terminator or exhausted count returns 0.
+// a terminator or exhausted count ends the loop, but the pointers have already advanced, so the
+// result compares the post-advance upper units (retail: returns (b<=a) ? (b<a) : -1).
 int __fastcall Unicode::strnicmp(const Unicode* a, const Unicode* b, size_t n) {
     unsigned short x = a->toUpper().ch, y = b->toUpper().ch;
     while (a->ch && b->ch && n && x == y) {
         a++; b++; n--;
-        if (!(a->ch && b->ch && n)) return 0;
         x = a->toUpper().ch; y = b->toUpper().ch;
     }
-    return x == y ? 0 : x < y ? -1 : 1;
+    return y <= x ? (y < x ? 1 : 0) : -1;
 }
 // 1.13c D2Lang+0xB120 (#10041): append at most count units of src to dest, always NUL-terminate.
 Unicode* __fastcall Unicode::strncat(Unicode* dest, const Unicode* src, int count) {

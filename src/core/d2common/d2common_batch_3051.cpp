@@ -124,30 +124,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_2e790(void* path,
     return -1;
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_2d5b0(void* room,
-    int32_t x, int32_t y, const D2Common3051Env* env) { // 1.13c D2Common+0x2D5B0
-    for (void* node = link(room, 0x47c, env); node; node = link(node, 0x1ac, env)) {
-        const int32_t nx = signed32(node, 0x1c), ny = signed32(node, 0x20);
-        if (x >= nx && y >= ny && x < add32(nx, signed32(node, 0x24)) &&
-            y < add32(ny, signed32(node, 0x28))) return read32(node, 0x1d0);
-    }
-    return 0;
-}
 
-// The cached body has no stores or calls on its nonfatal paths: it traverses the
-// rectangles and returns normally on either match or exhaustion.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_2d600(void* owner, int32_t x,
-    int32_t y, const D2Common3051Env* env) { // 1.13c D2Common+0x2D600
-    if (!owner) fatal(env, 0x2fd);
-    void* node = link(owner, 0x10, env);
-    if (!node) fatal(env, 0x2fe);
-    do {
-        if (x >= signed32(node, 0x34) && y >= signed32(node, 0x38) &&
-            x < add32(signed32(node, 0x34), signed32(node, 0x3c)) &&
-            y < add32(signed32(node, 0x38), signed32(node, 0x40))) return;
-        node = link(node, 0x24, env);
-    } while (node);
-}
 
 // Callees are explicit: lookupId=0x2D5B0 (id of the owner's room rect holding x,y),
 // getOrCreate=0x2D9B0, loadRoom=0x2E360, touch=0x2D600. `cur` is the register-passed room.

@@ -130,7 +130,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_37660(uint32_t pOwner, int32_t nAct
 // at owner+0x00 must point at an object whose byte +0x34 has bit 0 set. Empty counts pass. A null
 // owner is fatal 0x3EF in retail; we return 0 (as for a null array or element).
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3be90(uint32_t pOwner)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_3be90_batch(uint32_t pOwner)
 {
 	uint8_t* owner = P(pOwner);
 	if (!owner)
