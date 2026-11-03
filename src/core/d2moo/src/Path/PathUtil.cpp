@@ -15,13 +15,10 @@ void __fastcall PATHUtil_AdvanceTowardsTarget_6FDAB890(D2DynamicPathStrc* ptPath
 	D2_ASSERT(ptPath);
 	D2UnitStrc* ptTarget = ptPath->pTargetUnit;
 	D2_ASSERT(ptTarget);
-	uint8_t nDirection = PATH_GetDirection(ptTarget->pDynamicPath);
-	int nSpeed = ptPath->dwSpeed;
-	uint16_t v4 = (uint16_t)nSpeed << 8;
-	const float nDistance = nSpeed;
-	const uint16_t nAngleRad512 = (8 * nDirection - v4) & 0x1FF;
-	ptPath->tTargetCoord.X += (int64_t)(FOG_10083_Cos_LUT(nAngleRad512) * nDistance);
-	ptPath->tTargetCoord.Y += (int64_t)(FOG_10084_Sin_LUT(nAngleRad512) * nDistance);
+	// 1.13c D2Common+0x3E080: integer only. The speed byte folds into a 64-step index (x8); the truncated LUT value is added to the 16-bit X and Y.
+	int32_t nIndex = ((PATH_GetDirection(ptTarget->pDynamicPath) + (int32_t)ptPath->dwSpeed * -0x20) & 0x3F) << 3;
+	ptPath->tTargetCoord.X = (uint16_t)(ptPath->tTargetCoord.X + (int16_t)(int64_t)FOG_10083_Cos_LUT((uint16_t)nIndex));
+	ptPath->tTargetCoord.Y = (uint16_t)(ptPath->tTargetCoord.Y + (int16_t)(int64_t)FOG_10084_Sin_LUT((uint16_t)nIndex));
 }
 
 //1.10f: D2Common.0x6FDAB940

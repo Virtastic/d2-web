@@ -2082,7 +2082,18 @@ void __stdcall D2Common_11030(D2UnitStrc* pUnit, int nSkillId, int a3)
 				return;
 			}
 
-			SKILLS_AssignSkill(pUnit, nSkillId, 0, 0, __FILE__, __LINE__);
+			// 1.13c D2Common+0x52d50: a missing native node is retried once, then the level is cleared and the skill refreshed
+			D2SkillStrc* pNative = SKILLS_GetSkill(pUnit, nSkillId, -1);
+			if (!pNative)
+			{
+				SKILLS_AddSkill(pUnit, nSkillId);
+				pNative = SKILLS_GetSkill(pUnit, nSkillId, -1);
+			}
+			if (pNative)
+			{
+				pNative->nSkillLevel = 0;
+				SKILLS_RefreshSkill(pUnit, nSkillId);
+			}
 		}
 
 		if (pSkill->nOwnerGUID == D2UnitInvalidGUID)
@@ -2112,7 +2123,18 @@ void __stdcall D2Common_11031(D2UnitStrc* pUnit, int nSkillId, int a3)
 			return;
 		}
 
-		SKILLS_AssignSkill(pUnit, nSkillId, 0, 0, __FILE__, __LINE__);
+		// 1.13c D2Common+0x52ca0: the same native-node retry as 11030, then the level is cleared and the skill refreshed
+		D2SkillStrc* pNative = SKILLS_GetSkill(pUnit, nSkillId, -1);
+		if (!pNative)
+		{
+			SKILLS_AddSkill(pUnit, nSkillId);
+			pNative = SKILLS_GetSkill(pUnit, nSkillId, -1);
+		}
+		if (pNative)
+		{
+			pNative->nSkillLevel = 0;
+			SKILLS_RefreshSkill(pUnit, nSkillId);
+		}
 	}
 
 	if (pSkill->nOwnerGUID == D2UnitInvalidGUID)
