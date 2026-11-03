@@ -13,7 +13,7 @@ template <class T> static inline T& F(void* p, int off) { return *(T*)((P)p + of
 #define PT(p, o) ((void*)(uintptr_t)F<uint32_t>(p, o))
 
 extern "C++" {
-void sub_4A9B0(void* ecx); void sub_45550(); void sub_AB50(void* unit); void sub_2E1F0(void* p);
+void sub_4A9B0(void* ecx); void sub_AB50(void* unit); void sub_2E1F0(void* p);
 void sub_4A670(); void sub_C940(void* unit);
 uint8_t sub_222B0(void* unit); void sub_27180(void*, uint32_t, int, int); void sub_25C10(void*, uint32_t, int);
 void q_d2common_batch_b63_Ordinal_10128(uint32_t, uint32_t, uint32_t); void Ordinal_10131(uint32_t); void Ordinal_10127(uint32_t);
@@ -24,6 +24,11 @@ void sub_106B0(uint32_t, const int32_t* tbl, void* ctx, uint32_t* out); void sub
 extern const int32_t DAT_6fde5f98[], DAT_6fde5fd8[], DAT_6fde6018[], DAT_6fde6058[], DAT_6fde6098[], DAT_6fde60d8[];
 extern const int32_t DAT_6fde6ce8[]; // 6 dwords per entry
 }
+
+// 1.13c D2Common+0x45550 (room warps, reached from 0x7C0E0 for a room with no neighbours). Not ported: the seam
+// D2Common_45550_RoomWarps (d2common_batch_3e310.cpp) takes three callees, and 0x445A0, the neighbour sort that 0x44DF0 needs,
+// has no port. Reaching it stops the process; a silent skip would leave the room without the warps retail builds.
+void sub_45550() { std::abort(); }
 
 // 1.13c D2Common+0x7C0E0  (in_EAX = unit)
 void sub_7C0E0(void* unit) {
