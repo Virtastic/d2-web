@@ -13,7 +13,7 @@ intptr_t r_8A3E0(...); void r_354F0(void*, i32); void r_34AA0(i32); void r_34C00
 void r_8B470(void*); intptr_t r_9BEB0(...); intptr_t r_9C160(...);
 }
 extern "C" i32 DAT_6fd31c20;
-extern "C" void LAB_6fc811b0(); // 1.13c D2Game+0x611B0 (state callback), defined in src/core/fn/d2game_shim62a30.cpp
+extern "C" void LAB_6fc811b0(i32, i32); // 1.13c D2Game+0x611B0 (quest 5 state callback), defined in src/core/d2game/d2game_611b0.cpp
 extern "C" void LAB_6fc83000(); // 1.13c D2Game+0x63000 (quest 6 callback)
 static inline i32 rd(i32 p, i32 o) { return *(i32*)(intptr_t)(p + o); }
 
