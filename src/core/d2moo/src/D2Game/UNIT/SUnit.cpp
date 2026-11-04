@@ -1942,7 +1942,7 @@ void __stdcall SUNIT_ResetInteractInfo(D2UnitStrc* pUnit)
 {
     pUnit->dwInteractGUID = -1;
     pUnit->dwInteractType = 6;
-    pUnit->nInteract = 0;
+    *reinterpret_cast<uint8_t*>(&pUnit->nInteract) = 0; // 1.13c writes one byte at +0x6C
 }
 
 //D2Game.0x6FCBD8B0
