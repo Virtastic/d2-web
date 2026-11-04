@@ -83,7 +83,7 @@ extern "C" int32_t d2_fn_d2common_31680_batch(uint32_t pUnit)
 // plus the column indexes the cell array (+0x1C). A null grid is fatal in retail (Fog #10265, code
 // 0x29C); modelled as a 0 return. Retail receives the room in a register the decompiler shows as
 // unaff_ESI (its caller 0x3C680 drops it), so it is the first argument here.
-extern "C" uint32_t d2_fn_d2common_81950(uint32_t pRoom, int32_t nX, int32_t nY)
+uint32_t D2Common_81950_RoomTileCell(uint32_t pRoom, int32_t nX, int32_t nY)
 {
 	const uint8_t* pRoomBytes = reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(pRoom));
 	if (!pRoomBytes)
