@@ -13,8 +13,8 @@ uint32_t Ordinal_10265(int32_t);
 void    Ordinal_10024(const void*, int32_t);
 void d2_multi_sub_1a20(void); void d2_multi_sub_1da0(void); void d2_multi_sub_b900(void);
 void d2_multi_sub_8790(void); void d2_multi_sub_1510(void);
-void d2_multi_sub_b160(void*, int32_t); void d2_multi_sub_b2a0(int32_t eax, int32_t ecx, int32_t edi);
-void d2_multi_sub_acb0(void); bool d2_multi_sub_9000(const char*, const char*, uint8_t*, uint32_t*, uint32_t);
+extern "C" void d2_multi_sub_b160(const void* filetime, char* out, int32_t n); extern "C" void d2_multi_sub_b2a0(int32_t eax, int32_t ecx, int32_t edi);
+bool d2_multi_sub_9000(const char*, const char*, uint8_t*, uint32_t*, uint32_t);
 void d2_multi_exit(int32_t);
 extern uint8_t DAT_6fa0a0d8[], DAT_6fa0a0cc[], DAT_6fa09dbc[], DAT_6fa09db0[], DAT_6fa09db4[], DAT_6fa09db8[];
 extern int32_t DAT_6fa0a03c, DAT_6fa09dc0, DAT_6fa09160, DAT_6fa09f20, DAT_6fa09f88, DAT_6fa0a0e0;
@@ -63,9 +63,9 @@ int32_t d2_multi_sub_c510(uint32_t t, int32_t flag) {
     if (t != 0) {
         // unix time -> FILETIME (t*10^7 + 0x019DB1DED53E8000), then local; 64-bit math is exact
         uint64_t ft = ((uint64_t)t + 11644473600ull) * 10000000ull;
-        d2_multi_sub_b160(&ft, 0x40);  // local-time conversion is the host's FileTimeToLocalFileTime
+        char dtxt[0x40] = {0}; d2_multi_sub_b160(&ft, dtxt, 0x40);  // local-time conversion is the host's FileTimeToLocalFileTime
         // retail: (EAX 0, ECX 0, EDI = the converted-time text), (0, 4, EDI = the flag word as a pointer), (0, 0, EDI = the module constant 0x6F9E75D7)
-        d2_multi_sub_b2a0(0, 0, (int32_t)(intptr_t)&ft);
+        d2_multi_sub_b2a0(0, 0, (int32_t)(intptr_t)dtxt);
         d2_multi_sub_b2a0(0, 4, flag);
         d2_multi_sub_b2a0(0, 0, (int32_t)(intptr_t)DAT_6f9e75d7);
     }

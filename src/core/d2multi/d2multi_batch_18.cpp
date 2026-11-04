@@ -18,7 +18,7 @@ void*   Ordinal_10166(void);
 uint32_t Ordinal_10023(int32_t);
 void    d2_multi_sub_be00(void);
 void    d2_multi_sub_c610(int32_t);
-void    d2_multi_sub_acb0(void);
+extern "C" void d2_multi_sub_acb0(int32_t ebx, const void* text);
 void    d2_multi_sub_e150(void*);
 extern uintptr_t DAT_6fa0917c;
 extern uint8_t* DAT_6fa09f14;
@@ -77,8 +77,7 @@ void d2_multi_sub_ce70(int32_t in_eax) {
         Ordinal_10147();
         if (DAT_6fa09f88 != 0) Ordinal_10131();
     } else if (Ordinal_10054() == 0) {
-        Ordinal_10003();
-        d2_multi_sub_acb0();
+        d2_multi_sub_acb0(0, (const void*)(intptr_t)Ordinal_10003());
     } else {
         DAT_6fa09f20 = 0;
         d2_multi_sub_c610(Ordinal_10003());

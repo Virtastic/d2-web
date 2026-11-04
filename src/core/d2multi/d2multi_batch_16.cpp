@@ -60,7 +60,7 @@ void d2_multi_sub_b1f0(void) {
 }
 
 // 1.13c D2Multi+0xB2A0: EAX, ECX, EDI are register inputs, handed to 8BD0 as the EDI string and the stack words (ECX, EAX)
-void d2_multi_sub_b2a0(int32_t eax, int32_t ecx, int32_t edi) {
+extern "C" void d2_multi_sub_b2a0(int32_t eax, int32_t ecx, int32_t edi) {
     int32_t* n = d2_multi_sub_8bd0(edi, ecx, eax);
     if (!n) return;
     EnterCriticalSection(DAT_6fa08f00);

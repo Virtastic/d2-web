@@ -18,7 +18,7 @@ int32_t n37_Ordinal_10172(...); int32_t n37_Ordinal_10179(...); void n37_Ordinal
 void n37_Ordinal_10196(...); intptr_t n37_Ordinal_10202(...); int32_t n37_Ordinal_10010(...);
 int32_t n37_Ordinal_10021(...); int32_t n37_Ordinal_10227(...); uint32_t n37_Ordinal_10265(...);
 #pragma clang attribute pop
-void d2_multi_sub_8790(void);
+void d2_multi_sub_8790(void); __attribute__((weak)) void n37_cb_8790(void) { d2_multi_sub_8790(); }
 void d2_multi_unicode_strcpy(void* dst, const void* src);
 void d2_multi_utf8ToUnicode(void* dst, const char* src, int32_t n);
 void d2_multi_unicode2Win(char* dst, const void* src, int32_t n);
@@ -275,8 +275,11 @@ extern "C" void d2_multi_sub_9550(void) {
 }
 
 // 1.13c D2Multi+0x9D60
-void d2_multi_sub_9d60(void) {
-    uint16_t wide[1024]; memset(wide, 0, sizeof wide);
+// The Unicode default-constructor loop (0x200 two-byte units) zeroes the local wide buffer; D2Win #10131 (IAT 0x161D4: ECX = DAT_6fa0a044,
+// EDX = 1 when the joined text is empty) and #10000 (IAT 0x16174: ECX = DAT_6fa09f88, EDX = the wide text, stack 1,0,0) take register inputs.
+__attribute__((weak)) int32_t DAT_6fa0a044;
+extern "C" void d2_multi_sub_9d60(void) {
+    uint16_t wide[512]; memset(wide, 0, sizeof wide);
     if (DAT_6fa09f88) {
         char buf[512]; buf[0] = 0;
         int32_t n = 0;
@@ -284,9 +287,9 @@ void d2_multi_sub_9d60(void) {
             strncat(buf, s, 0x200 - n);
             n = (int32_t)strlen(buf);
         }
-        n37_Ordinal_10131();
+        n37_Ordinal_10131(DAT_6fa0a044, buf[0] == 0 ? 1 : 0);
         d2_multi_utf8ToUnicode(wide, buf, 0x200);
-        n37_Ordinal_10000(1, 0, 0);
+        n37_Ordinal_10000(DAT_6fa09f88, wide, 1, 0, 0);
     }
 }
 
@@ -294,44 +297,48 @@ static void fatal13e8(void) {
     n37_Ordinal_10024(DAT_6f9e75d7, n37_Ordinal_10265(0x13e8));
     d2_host_exit(-1);
 }
-static void push_ctl(const char* name, bool zero) {
+// One control of the 32-slot table: Ordinal_10098(descriptor VA), table[count++] = handle, 10196(h, 0) on the first, 10001(h, 1). Returns the handle.
+static int32_t push_ctl(int32_t name, bool zero) {
     int32_t h = n37_Ordinal_10098(name);
     DAT_6fa08e80[DAT_6fa09f24++] = h;
     if (zero) n37_Ordinal_10196(h, 0);
     n37_Ordinal_10001(h, 1);
+    return h;
 }
 
 // 1.13c D2Multi+0xAA60
 void d2_multi_sub_aa60(int32_t ebx) {
     d2_multi_sub_8790();
     if (DAT_6fa09f24 > 0x1f) { fatal13e8(); return; }
-    push_ctl(DAT_6f9ea360, true);
+    push_ctl(0x6F9EA360, true);
     if (DAT_6fa09f24 >= 0x20) { fatal13e8(); return; }
-    push_ctl(DAT_6f9ea3c0, false);
+    push_ctl(0x6F9EA3C0, false);
     if (DAT_6fa09f24 >= 0x20) { fatal13e8(); return; }
-    push_ctl(DAT_6f9ea3f0, false);
-    n37_Ordinal_10000(0, 0, 0);
+    push_ctl(0x6F9EA3F0, false);
+    n37_Ordinal_10000(0, 0, 0, 0, 0);
     DAT_6fa0a0e0 = ebx ? ebx : 0x6f9daa50;
     DAT_6fa09f2c = (int32_t)d2_host_tick();
 }
 
-// D2Multi+0xACB0 (source marker lives in d2multi_batch_b15.cpp)
-void d2_multi_sub_acb0(int32_t ebx) {
-    d2_multi_sub_8790();
+// 1.13c D2Multi+0xACB0: EBX = callback (0: LAB_6f9daa50), stack word 0 = the wide text handed to D2Win #10000 in EDX (ECX = the last control handle); ret 4.
+extern "C" void d2_multi_sub_acb0(int32_t ebx, const void* text) {
+    n37_cb_8790();
     if (DAT_6fa09f24 > 0x1f) { fatal13e8(); return; }
-    push_ctl(DAT_6f9ea360, true);
+    push_ctl(0x6F9EA360, true);
     if (DAT_6fa09f24 >= 0x20) { fatal13e8(); return; }
-    push_ctl(DAT_6f9ea390, false);
+    push_ctl(0x6F9EA390, false);
     if (DAT_6fa09f24 >= 0x20) { fatal13e8(); return; }
-    push_ctl(DAT_6f9ea3f0, false);
-    n37_Ordinal_10000(0, 0, 0);
+    int32_t h = push_ctl(0x6F9EA3F0, false);
+    n37_Ordinal_10000(h, text, 0, 0, 0);
     DAT_6fa0a0e0 = ebx ? ebx : 0x6f9daa50;
 }
 
-// D2Multi+0xB160 (source marker lives in d2multi_batch_b15.cpp)
-void d2_multi_sub_b160(const void* filetime, char* out, int32_t n) {
+// 1.13c D2Multi+0xB160: EBX = out buffer, stack words (FILETIME*, n); ret 8. FileTimeToSystemTime + GetDateFormatA(0x400, 2, st, 0, out, n) is the host's
+// d2_host_date_format; MultiByteToWideChar(ACP, 1, out, -1, wide, 0x100) widens the date (ASCII here); Unicode::toUtf(out, wide, n) is D2Lang's.
+extern "C" void d2_multi_sub_b160(const void* filetime, char* out, int32_t n) {
+    uint16_t wide[256]; memset(wide, 0, sizeof wide);
     d2_host_date_format(filetime, out, n);
-    uint16_t wide[512]; memset(wide, 0, sizeof wide);
+    for (int i = 0; i < 255 && out[i]; i++) wide[i] = (uint8_t)out[i];
     d2_multi_toUtf(out, wide, n);
 }
 
