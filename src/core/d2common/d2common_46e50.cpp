@@ -1,4 +1,4 @@
-// 1.13c D2Common+0x46E50: item-unit stat application by item-type class. The unit comes in ESI (one arg, ret 4, void).
+// 1.13c D2Common+0x46E50: item-unit stat application by item-type class. The unit comes in ESI, the stat id (the switch selector, 0x10..0x1f) is the one stack word (ret 4, void); the items row key only feeds the link lookup.
 // Every callee and module global goes through D2Common46E50Env, so the FN probe (src/core/fn/d2common_46e50.cpp) can mirror each call.
 #include <cstdint>
 
@@ -11,13 +11,13 @@ struct D2Common46E50Env {
     int32_t (*getStat)(void* unit, int32_t stat, int32_t layer);                   // 0x38C20 STATLIST get: ret 0xC
     void (*setStat)(void* unit, int32_t stat, int32_t value, int32_t layer);       // 0x3A740 STATLIST set: ret 0x10
     void (*fatal)(uint32_t msg);                                                    // Ordinal 10265 report, 10024, _exit(-1): does not return
-    const uint8_t* linker;                                                          // DAT_6FDEFF6C (RVA 0x8EF6C), the fog link table
-    const uint8_t* itemsTxt;                                                        // DAT_6FDEFB98 (RVA 0x8EB98), items.txt rows of 0x1A8 bytes
+    const uint8_t* linker;                                                          // DAT_6FDEFF6C (RVA 0x9FF6C), the fog link table
+    const uint8_t* itemsTxt;                                                        // DAT_6FDEFB98 (RVA 0x9FB98), items.txt rows of 0x1A8 bytes
 };
-void D2Common_46E50_ApplyItemClassStats(const D2Common46E50Env* e, void* unit);
+void D2Common_46E50_ApplyItemClassStats(const D2Common46E50Env* e, void* unit, int32_t stat);
 }
 
-extern "C" void D2Common_46E50_ApplyItemClassStats(const D2Common46E50Env* e, void* unit) {
+extern "C" void D2Common_46E50_ApplyItemClassStats(const D2Common46E50Env* e, void* unit, int32_t stat) {
     const int32_t* u = static_cast<const int32_t*>(unit);
     if (!u) { e->fatal(0x61b); return; }
     if (u[0] != 4) { e->fatal(0x61c); return; }
@@ -28,7 +28,7 @@ extern "C" void D2Common_46E50_ApplyItemClassStats(const D2Common46E50Env* e, vo
     if (idx < 0) return;
     const uint8_t* r = e->itemsTxt + static_cast<int64_t>(idx) * 0x1a8;
     if (!r) return;
-    switch (key) {
+    switch (stat) {
     case 0x10: case 0x1f:
         if (e->itemTypeIs(unit, 0x32)) {
             const int32_t lim = *reinterpret_cast<const int32_t*>(r + 0xd0);
