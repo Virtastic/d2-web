@@ -1048,6 +1048,12 @@ function sessionAdapter() {
             if (identity.getUint32(0, true) === 1 && identity.getUint32(4, true) === 24) {
               base.player.renderIdentity = { unitType: identity.getUint32(8, true), classId: identity.getInt32(12, true),
                 mode: identity.getInt32(16, true), weaponClassId: identity.getInt32(20, true) };
+              // A Disguise state (Werebear, Werewolf) converts the player to a monster: the engine's
+              // animation record for that monster is what is drawn, not the class token's COF.
+              if (base.player.renderIdentity.unitType === 1 && Module._d2_session_player_form_actor) {
+                const formPtr = Number(Module.ccall('d2_session_player_form_actor', 'number', [], []));
+                if (formPtr) base.player.form = parseMonsterAnimations(Module.HEAPU8.subarray(formPtr, formPtr + 96), 1)[0];
+              }
             }
           }
         }
@@ -3210,7 +3216,12 @@ function drawPlayer(c) {
   if (playerRenderer) {
     const drawFx = (pre) => { try { for (const fx of heroFx) if (!!fx.predraw === pre) (fx.kind === 'overlay' ? overlayRenderer : missileRenderer)?.draw(c, ...(fx.wx === undefined ? [viewCX(), (h / 2 + UNIT_CENTRE_Y)] : projectStatic(fx.wx, fx.wy)), { classId: fx.kind === 'overlay' ? fx.file : fx.classId }, 0, 0, fx.age, fx.trans === 3 ? 1 : 0, snapshot?.act ?? 1); } catch { /* an effect that fails to draw is not fatal */ } };
     drawFx(true);
-    try { playerRenderer.draw(c, viewCX(), (h / 2 + UNIT_CENTRE_Y), source.renderState); playerRenderError = ''; }
+    try {
+      const st = source.renderState;
+      if (st?.form && monsterRenderer) monsterRenderer.draw(c, viewCX(), (h / 2 + UNIT_CENTRE_Y), st.form, st.act ?? 1);
+      else playerRenderer.draw(c, viewCX(), (h / 2 + UNIT_CENTRE_Y), st);
+      playerRenderError = '';
+    }
     // One animation that fails to draw is reported, not fatal: the next mode may draw fine.
     catch (error) { playerRenderError = String(error); }
     drawFx(false);

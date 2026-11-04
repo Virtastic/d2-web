@@ -132,7 +132,8 @@ export function buildSprites(ctx, frame, env) {
       .draw(c, ...(f.wx === undefined ? [meta.viewCX, py] : proj(f.wx - 0.5, f.wy - 0.5)), { classId: f.kind === 'overlay' ? f.file : f.classId }, 0, 0, f.age, f.trans === 3 ? 1 : 0, act); };
     sprites.push({ depth: py, wx: lp.x, wy: lp.y, pass: 'player', draw: guard((c) => {
       try { drawFx(c, true); } catch { sprites.failed = true; }   // not fatal (as main); a missed file resets the renderers
-      renderers.player.draw(c, meta.viewCX, py, lp.renderState);
+      if (lp.renderState?.form) renderers.monster.draw(c, meta.viewCX, py, lp.renderState.form, act);
+      else renderers.player.draw(c, meta.viewCX, py, lp.renderState);
       try { drawFx(c, false); } catch { sprites.failed = true; }
     }) });
   }

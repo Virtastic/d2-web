@@ -32,6 +32,7 @@ export function selectPlayerRenderSource(snapshot, motion, realmSessionOpen, rea
       mode: Number.isInteger(motion?.presentationMode) ? motion.presentationMode : snapshot.mode, tick: snapshot.tick,
       act: snapshot.act, weaponClass: snapshot.player.weaponClass,
       renderIdentity: snapshot.player.renderIdentity ? { ...snapshot.player.renderIdentity } : null,
+      form: snapshot.player.form ?? null,
       primaryWeaponId: snapshot.player.primaryWeaponId, items: snapshot.items },
   };
 }

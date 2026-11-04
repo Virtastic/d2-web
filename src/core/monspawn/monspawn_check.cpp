@@ -9569,6 +9569,32 @@ EMSCRIPTEN_KEEPALIVE const D2SessionPlayerRenderIdentity* d2_session_player_rend
     g_sessionPlayerRenderIdentity.weaponClassId = weaponClassId;
     return &g_sessionPlayerRenderIdentity;
 }
+// The player's shapeshifted form as a monster-style animation record (Werebear, Werewolf and the other
+// Disguise states). ConvertMode swaps the unit for {monster, class, mode}; the form is then drawn from
+// that monster's MonStats2 row, component choice 0, like any monster. Returns null when the player is
+// not in a monster form.
+static D2SessionMonsterAnimation g_sessionPlayerForm;
+EMSCRIPTEN_KEEPALIVE const D2SessionMonsterAnimation* d2_session_player_form_actor() {
+    if (!g_targetPlayer) return nullptr;
+    int unitType = g_targetPlayer->dwUnitType;
+    int classId = g_targetPlayer->dwClassId;
+    int mode = UNITS_GetAnimOrSeqMode(g_targetPlayer);
+    D2COMMON_11013_ConvertMode(g_targetPlayer, &unitType, &classId, &mode, __FILE__, __LINE__);
+    if (unitType != UNIT_MONSTER) return nullptr;
+    D2SessionMonsterAnimation& a = g_sessionPlayerForm;
+    a = {};
+    const D2MonStatsTxt* mon = DATATBLS_GetMonStatsTxtRecord(classId);
+    const D2MonStats2Txt* mon2 = UNITS_GetMonStats2TxtRecordFromMonsterId(classId);
+    if (!mon) return nullptr;
+    a.id = g_targetPlayer->dwUnitId; a.classId = (uint32_t)classId; a.code = mon->dwCode; a.mode = (uint32_t)mode;
+    a.framePrecise = g_targetPlayer->nSeqCurrentFramePrecise; a.frameCountPrecise = g_targetPlayer->dwFrameCountPrecise;
+    a.animSpeed = g_targetPlayer->wAnimSpeed;
+    a.direction = g_targetPlayer->pDynamicPath ? g_targetPlayer->pDynamicPath->nDirection : 0;
+    a.baseWeaponClass = mon2 ? static_cast<uint32_t>(mon2->nBaseW) : 0;
+    a.animationFlags = (mon2 && (mon2->dwModeFlags & MONSTATS2MODEFLAG_DD) ? 0x02 : 0);
+    for (uint32_t c = 0; c < 16; ++c) a.componentCodes[c] = (uint32_t)D2Common_11070(classId, c, 0);
+    return &a;
+}
 EMSCRIPTEN_KEEPALIVE const D2SessionResources* d2_session_resources() {
     memset(&g_sessionResources, 0, sizeof g_sessionResources);
     g_sessionResources.version = 1; g_sessionResources.size = sizeof g_sessionResources;
