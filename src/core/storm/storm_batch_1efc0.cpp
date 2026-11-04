@@ -571,8 +571,10 @@ bool Storm_Sub29C10(void* param_1, uint32_t* param_2, int32_t* param_3, uint32_t
         }
         uint32_t uVar7 = param_5;
         uint8_t* puVar4 = (uint8_t*)Storm_Sub1C580(uVar3 + param_5, kSFileCpp, 0xfc2, 0);
-        int32_t iVar5 = Storm_SFileReadFile_295B0(rec, (uint32_t*)puVar4, uVar3, nullptr, nullptr,
-                                                 param_7, param_8);
+        // Retail argument order: (obj, buf, n, NULL, ov = param_7, param_8, 0).
+        int32_t iVar5 = Storm_SFileReadFile_295B0(rec, (uint32_t*)puVar4, uVar3, nullptr,
+                                                 (uint8_t*)(uintptr_t)(uint32_t)param_7,
+                                                 param_8, 0);
         if (iVar5 == 0) {
             if (puVar4 != nullptr) Storm_SubB960(puVar4, kSFileCpp, 0xfcf);
         } else {

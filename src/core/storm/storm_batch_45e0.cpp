@@ -34,7 +34,7 @@ extern "C" uint32_t *storm_autimerrec_new(int extra, uint32_t flags, uint32_t li
     return storm_au2(extra, flags, link, a, l, 0x1c, "AUTIMERREC");
 }
 
-// 1.13c STORM+0x4DE0 AUSGDIOBJ new: alloc(extra+0x10), zero two dwords, link if link!=0.
+// 1.13c Storm+0x4DE0 AUSGDIOBJ new: alloc(extra+0x10), zero two dwords, link if link!=0.
 extern "C" uint32_t *storm_ausgdiobj_new(int extra, uint32_t flags, uint32_t link, StormAllocFn a, StormLinkFn l) {
     return storm_au2(extra, flags, link, a, l, 0x10, "AUSGDIOBJ");
 }

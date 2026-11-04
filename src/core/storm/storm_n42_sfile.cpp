@@ -96,6 +96,17 @@ extern "C" void storm_n42_probe_install(u32 sfp) {
     G.h = &g_probeHost;
 }
 
+// Capture-probe install for 0x26C40 (SFileUnloadFile): the free seam forwards to the SMemFree stub hook (storm_hk.h) so the
+// tuple's hook log records the call exactly as retail's SMemFree is logged; lock/unlock/setErr are the no-op pins.
+extern "C" int32_t (*g_storm_free_hook)(void*, const char*, int32_t);
+static N42Host g_26c40Host;
+static void probe26c40Free(void* p, const char* f, u32 line) { if (g_storm_free_hook) g_storm_free_hook(p, f, (int32_t)line); }
+extern "C" void storm_n42_26c40_install(void) {
+    g_26c40Host.lock = probeNop; g_26c40Host.unlock = probeNop; g_26c40Host.setErr = probeSetErr;
+    g_26c40Host.free_ = probe26c40Free;
+    G.h = &g_26c40Host;
+}
+
 // Capture-probe install for 0x26190: lock/unlock/setErr are the no-op pins, strlen and the bounded copy/append are
 // plain C (the length check in Storm_26190 keeps both inside the 0x104 buffer, so truncation never happens). Exposes G.dir (Storm+0x43000) and G.lastErr (Storm+0x45388).
 static u32 probeStrlen(const char* s) { return (u32)strlen(s); }

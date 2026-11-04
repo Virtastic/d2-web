@@ -91,7 +91,21 @@ uint32_t Storm_Sub3AD50_z14(const char* s) {
   if (v < 10) { for (uint32_t d; (d = (uint32_t)(int)*++s - 0x30) < 10;) v = d + v * 10; } else v = 0;
   return neg == '-' ? (uint32_t)-(int32_t)v : v;
 }
-// 1.13c Storm+0x3B560 (guessed: Sub2C908 converts the x87 pow(10,n) left by Storm+0x1000 to int64)
+// 1.13c Storm+0x1000 is an integer power: a 32-bit signed product that wraps, handed back as float10.
+// Storm+0x3C908 then rounds it to int64, which is exact for any int32 value (sign-extended).
+static int64_t z14_Pow10Wrap(int n) {
+  int32_t r = 1, b = 10;
+  uint32_t e = n < 0 ? (uint32_t)-n : (uint32_t)n;
+  for (;;) {
+    if (e & 1) r = (int32_t)((uint32_t)r * (uint32_t)b);
+    e >>= 1;
+    if (e == 0) break;
+    b = (int32_t)((uint32_t)b * (uint32_t)b);
+  }
+  return (int64_t)r;
+}
+
+// 1.13c Storm+0x3B560
 uint64_t Storm_Sub3B560_z14(const char* s) {
   if (!s) { z14_lastErr = 0x57; z14_SetLastError(0x57); return 0; }
   char neg = *s; if (neg == '-') ++s;
@@ -101,10 +115,10 @@ uint64_t Storm_Sub3B560_z14(const char* s) {
     if (d < 10) {
       do {
         v = d + v * 10; ++p;
-        if (v > 0x19999998) { z14_Pow(10, (int)(p - s)); acc = z14_Sub2C908() * acc + v; v = 0; s = p; }
+        if (v > 0x19999998) { acc = z14_Pow10Wrap((int)(p - s)) * acc + v; v = 0; s = p; }
         d = (uint32_t)(int)*p - 0x30;
       } while (d < 10);
-      if (acc) { z14_Pow(10, (int)(p - s)); r = (uint64_t)(z14_Sub2C908() * acc + v); goto done; }
+      if (acc) { r = (uint64_t)(z14_Pow10Wrap((int)(p - s)) * acc + v); goto done; }
     }
   } else v = 0;
   r = v;

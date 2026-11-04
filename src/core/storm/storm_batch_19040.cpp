@@ -565,7 +565,8 @@ extern "C"
 uint32_t Storm_Sub36290(uint32_t param_1, uint32_t param_2, uint32_t param_3, uint32_t param_4,
                         uint32_t param_5, const StormBatch19040Env* env) {
     static const char* const kSevt = "..\\3rdParty\\STORM\\SOURCE\\SEVT.CPP";
-    if (param_4 == 0 || param_5 == 0) {
+    // 1.13c: -(param_5 != 0) & ((param_4 != 0) - 1) == 0 -- fails when param_4 is nonzero or the handler is null.
+    if (param_4 != 0 || param_5 == 0) {
         StormSetLastError(0x57);
         return 0;
     }
