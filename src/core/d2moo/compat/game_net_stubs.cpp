@@ -779,6 +779,15 @@ void __fastcall D2GAME_SendPacket0x58_6FC3F520(D2ClientStrc* pClient, D2GSPacket
     if (pClient && pPacket) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof(*pPacket));
 }
 void D2GAME_SendPacket0x8E_CorpseAssign_ToAllPlayers_6FC3F9B0(D2GameStrc* pGame, int32_t nUnitId, int32_t nCorpseId, BYTE bAssign) {}
+// Corpse-assign packet (0x8E) to one client; defined here because the vendored SCmd.cpp is not linked.
+void __fastcall D2GAME_PACKETS_SendPacket0x8E_6FC3FA20(D2ClientStrc* pClient, int32_t nUnitId, int32_t nCorpseId, BYTE bAssign) {
+    D2GSPacketSrv8E packet8E = {};
+    packet8E.nHeader = 0x8E;
+    packet8E.nType = bAssign;
+    packet8E.dwPlayerGUID = nUnitId;
+    packet8E.dwCorpseGUID = nCorpseId;
+    D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet8E, sizeof(packet8E));
+}
 void D2GAME_SetClientDead_6FC33830(D2ClientStrc* pClient, void* pAlwaysNull) {}
 // Item action packets (D2Game 0x6FC3E570 / 0x6FC3E6F0 and their wrappers, ported from D2MOO's
 // SCmd.cpp): the item's wire bitstream behind an action code, 0x9C for items on the ground or
