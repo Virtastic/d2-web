@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <charconv>
 #include <cstdlib>
+#include <cstdio>
 #include <cstring>
 #include <Fog.h>
 #include "../../lang/strtable.h"
@@ -326,19 +327,63 @@ unsigned char* d2lang_strtok_16e4(unsigned char* s, const unsigned char* delim) 
     return s != p ? s : nullptr;
 }
 
-// 1.13c D2Lang+0x7EF0: read a whole file into a fresh buffer; *size_out gets its length. NULL when the file cannot be opened
-// (retail's other failure paths -- zero size, short read, no memory -- print a message and _exit(-1)).
-unsigned char* d2lang_read_file_7ef0(const char* path, int* size_out) {
-    FILE* f = path ? fopen(path, "rb") : nullptr;
-    if (!f) return nullptr;
-    fseek(f, 0, SEEK_END);
-    long n = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    unsigned char* buf = n > 0 ? (unsigned char*)malloc((size_t)n) : nullptr;
-    if (!buf || fread(buf, 1, (size_t)n, f) != (size_t)n) { fclose(f); free(buf); return nullptr; }
-    fclose(f);
-    if (size_out) *size_out = (int)n;
+// 1.13c D2Lang+0x7EF0: read a whole file into a fresh buffer; *size_out gets its length. Retail's callees are reached through the env:
+// open (0x7AF4), GetLastError (0xC104), the open-failure print (0x7AFA), file size (0x7B0C), file name (0x7B54), message text (0x7ADC),
+// report (0x7AD6), exit (0x1540), alloc (0x7AE8), read-and-check (0x7C00), close (0x7B00). A fatal path (no handle, zero size) reports and
+// _exits in retail; here exit_ returns and the call returns NULL.
+struct d2lang_7ef0_env {
+    int       (*openFile)(const char* path, uintptr_t* handle);
+    uint32_t  (*lastError)(void);
+    void      (*printOpenError)(const char* path);
+    uint32_t  (*fileSize)(uintptr_t handle);
+    void      (*fileName)(uintptr_t handle, char* buf, uint32_t n);
+    const char* (*message)(uint32_t id);
+    void      (*report)(const char* msg);
+    void      (*exit_)(int32_t code);
+    void*     (*alloc)(uint32_t size);
+    int       (*readCheck)(uintptr_t handle, uint32_t size, void* buf);
+    void      (*close)(uintptr_t handle);
+};
+extern "C" unsigned char* d2lang_7ef0_core(const char* path, int* size_out, const d2lang_7ef0_env* e) {
+    uintptr_t h = 0;
+    if (!e->openFile(path, &h)) {
+        e->lastError();
+        e->printOpenError(path);
+        return nullptr;
+    }
+    if (!h) { e->report(e->message(0x59)); e->exit_(-1); return nullptr; }
+    uint32_t size = e->fileSize(h);
+    if (!size) {
+        char name[0x104];
+        e->fileName(h, name, 0x104);
+        e->report(e->message(0x5f)); e->exit_(-1);
+        return nullptr;
+    }
+    unsigned char* buf = (unsigned char*)e->alloc(size + 0x320);
+    if (!buf) return nullptr;
+    if (!e->readCheck(h, size, buf)) return nullptr;
+    e->close(h);
+    if (size_out) *size_out = (int)size;
     return buf;
+}
+
+namespace {
+int fsOpen(const char* path, uintptr_t* h) { FILE* f = path ? fopen(path, "rb") : nullptr; *h = (uintptr_t)f; return f != nullptr; }
+uint32_t fsLastError() { return 0; }
+void fsPrint(const char*) {}
+uint32_t fsSize(uintptr_t h) { FILE* f = (FILE*)h; fseek(f, 0, SEEK_END); long n = ftell(f); fseek(f, 0, SEEK_SET); if (n <= 0) { fclose(f); return 0; } return (uint32_t)n; }
+void fsName(uintptr_t, char* b, uint32_t) { b[0] = 0; }
+const char* fsMessage(uint32_t) { return ""; }
+void fsReport(const char*) {}
+void fsExit(int32_t) {}
+void* fsAlloc(uint32_t n) { return malloc(n); }
+int fsRead(uintptr_t h, uint32_t n, void* b) { FILE* f = (FILE*)h; if (fread(b, 1, n, f) == n) return 1; fclose(f); free(b); return 0; }
+void fsClose(uintptr_t h) { fclose((FILE*)h); }
+}
+
+unsigned char* d2lang_read_file_7ef0(const char* path, int* size_out) {
+    static const d2lang_7ef0_env env = { fsOpen, fsLastError, fsPrint, fsSize, fsName, fsMessage, fsReport, fsExit, fsAlloc, fsRead, fsClose };
+    return d2lang_7ef0_core(path, size_out, &env);
 }
 
 // Flat C exports of the real D2Lang functions, for D2Client/D2Win/D2Launch callers (flat Ordinal_N names
