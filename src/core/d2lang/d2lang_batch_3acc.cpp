@@ -3,7 +3,7 @@
 #include <cstring>
 #include <cstddef>
 
-struct d2lang_3acc_msg { int num; const char* text; }; // DAT_6fc0f3c8, 0x13 entries
+struct d2lang_3acc_msg { int32_t num; uint32_t text; }; // DAT_6fc0f3c8, 0x13 entries: retail 8-byte records, the text pointer a 32-bit word
 struct d2lang_3acc_env
 {
 	const d2lang_3acc_msg* table;
@@ -22,7 +22,7 @@ extern "C" void d2lang_3acc__NMSG_WRITE(int num)
 	unsigned i = 0;
 	while (i < 0x13 && e.table[i].num != num) i++;
 	if (i >= 0x13) return;
-	const char* msg = e.table[i].text;
+	const char* msg = (const char*)(uintptr_t)e.table[i].text;
 	if (e.fileMode == 1 || (e.fileMode == 0 && e.appType == 1)) { e.writeStdout(msg, strlen(msg)); return; }
 	if (num == 0xfc) return;
 	char buf[0x1f + 0x104 + 0x100 + 64];

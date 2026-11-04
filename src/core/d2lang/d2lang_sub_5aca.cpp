@@ -4,9 +4,9 @@
 extern "C" int* d2lang_crt_errno_ptr();
 extern "C" unsigned long* d2lang_crt_doserrno_ptr();
 
-struct D2LangIoInfo { void* handle; uint8_t osfile; uint8_t pad[0x1f]; };
+struct D2LangIoInfo { uint32_t handle; uint8_t osfile; uint8_t pad[0x1f]; };   // retail layout: the handle is a 32-bit word
 struct D2LangWriteSeams {
-	D2LangIoInfo** table;                                              // 32 entries per block
+	const uint32_t* table;                                             // block addresses (32-bit words), 32 entries per block
 	int64_t (*lseek)(int fd, int64_t off, int whence);                 // __lseeki64_lk
 	int (*write_file)(void* h, const void* b, uint32_t n, uint32_t* w); // WriteFile, nonzero = ok
 	unsigned long (*last_error)();                                     // GetLastError
@@ -17,10 +17,10 @@ extern "C" int d2lang_crt_write_nolock(const D2LangWriteSeams* s, unsigned fd, c
 {
 	unsigned wrote = 0; int lf = 0; unsigned long err = 0; uint32_t w = 0;
 	if (!cnt) return 0;
-	D2LangIoInfo* io = &s->table[fd >> 5][fd & 0x1f];
+	D2LangIoInfo* io = (D2LangIoInfo*)(uintptr_t)s->table[fd >> 5] + (fd & 0x1f);
 	if (io->osfile & 0x20) s->lseek(fd, 0, 2);
 	if (!(io->osfile & 0x80)) {
-		if (!s->write_file(io->handle, buf, cnt, &w)) err = s->last_error(); else wrote = w;
+		if (!s->write_file((void*)(uintptr_t)io->handle, buf, cnt, &w)) err = s->last_error(); else wrote = w;
 	} else {
 		const char* p = buf;
 		do {
@@ -30,7 +30,7 @@ extern "C" int d2lang_crt_write_nolock(const D2LangWriteSeams* s, unsigned fd, c
 				if (c == '\n') { ++lf; tmp[n++] = '\r'; }
 				tmp[n++] = c;
 			}
-			if (!s->write_file(io->handle, tmp, n, &w)) { err = s->last_error(); break; }
+			if (!s->write_file((void*)(uintptr_t)io->handle, tmp, n, &w)) { err = s->last_error(); break; }
 			wrote += w;
 			if (n > (int)w || (unsigned)(p - buf) >= cnt) break;
 		} while (true);
