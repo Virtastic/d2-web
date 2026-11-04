@@ -202,19 +202,25 @@ extern "C" void d2game_a5ff4_fn_b0510(int param_1, int param_2, int param_3, int
 }
 
 // 1.13c D2Game+0xB0840   __fastcall(ecx, edx = nId), eax = pUnit
-extern "C" int d2game_a5ff4_fn_b0840(int param_1, int param_2, int eax)
+// tbl = *sgptDataTables_exref (the monstats-2 table pointers live at +0xA78 rows and +0xA80 count).
+extern "C" int d2game_a5ff4_b0840_tbl(int tbl, int param_2, int eax)
 {
-    (void)param_1;
     if (eax == 0 || rd(eax, 0) != 1) return 0;
     int c = rd(eax, 4);
-    if (c >= 0 && c < dt(0xA80)) {
-        int rec = c * 0x1A8 + dt(0xA78);
+    if (c >= 0 && c < rd(tbl, 0xA80)) {
+        int rec = c * 0x1A8 + rd(tbl, 0xA78);
         if (rec != 0) {
             for (int i = 0; i < 8; ++i)
-                if (*(short*)(intptr_t)(rec + 0x170 + i * 2) == (short)param_2) return 1;
+                if (*(short*)(intptr_t)(rec + 0x170 + i * 2) == param_2) return 1;
         }
     }
     return 0;
+}
+
+extern "C" int d2game_a5ff4_fn_b0840(int param_1, int param_2, int eax)
+{
+    (void)param_1;
+    return d2game_a5ff4_b0840_tbl(*(int*)sgptDataTables_exref, param_2, eax);
 }
 
 // 1.13c D2Game+0xB0B20   esi = pUnit, edi = nIndex. Ordinal_10494/11085/FFA90 take the unit in a register.
