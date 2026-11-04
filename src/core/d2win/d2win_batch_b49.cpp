@@ -65,7 +65,7 @@ void d2win_sub_13970(D2WinB49Env& e, int32_t* p, int32_t v) {
 }
 
 // 1.13c D2Win+0x17C00
-void d2win_sub_17c00(D2WinB49Env& e, uint32_t m) {
+extern "C" void d2win_sub_17c00(D2WinB49Env& e, uint32_t m) {
   *e.g149c = m;
   if (m == 1) e.o10104(1);
   e.o10005(m);

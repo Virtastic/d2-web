@@ -24,6 +24,7 @@ static_assert(sizeof(GfxData32) == 0x48);
 // The owner may update it during callbacks (including changing the list head).
 struct D2WinDrawState {
     uint32_t head, customWindowProc, backgroundCell, dimmed;
+    uint32_t foregroundMask;   // gdwBitMasks[3]: a control whose flags hit it draws in the second pass
 };
 struct D2WinDrawServices {
     uint32_t (*windowState)();                       // D2Gfx #10043
@@ -74,7 +75,7 @@ extern "C" void d2win_sub_187E0(D2WinDrawState* state, const D2WinDrawServices* 
             auto drawPass = [&](bool foreground) {
                 for (uint32_t h = state->head; h;) {
                     const Control32* c = control(h);
-                    if (c->draw && bool(c->flags & 8u) == foreground)
+                    if (c->draw && bool(c->flags & state->foregroundMask) == foreground)
                         api->invokeControl(c->draw, h);
                     h = control(h)->next;
                 }

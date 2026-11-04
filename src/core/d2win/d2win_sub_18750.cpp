@@ -8,8 +8,8 @@
 
 struct D2WinSub18750Env {
     uint8_t* head;                       // DAT_6f9a9e30
-    void (*ea30)();                      // sub_EA30
-    void (*e5f0)(int32_t);               // sub_E5F0
+    void (*ea30)(uint8_t*);               // sub_EA30 (EAX = node)
+    void (*e5f0)(uint8_t*, int32_t);       // sub_E5F0 (EBX = node, stack -1)
     void (*d4d0)();                      // sub_D4D0
     void (*cfc0)(uint8_t*);              // sub_CFC0
     void (*fatal)(uint32_t code);        // 0xD41
@@ -17,9 +17,9 @@ struct D2WinSub18750Env {
 };
 
 // 1.13c D2Win+0x18750
-void D2Win_sub_18750(const D2WinSub18750Env& e) {
+extern "C" void D2Win_sub_18750(const D2WinSub18750Env& e) {
     if (!e.head) return;
-    for (uint8_t* n = e.head; n; n = e.next(n)) e.ea30();
-    for (uint8_t* n = e.head; n; n = e.next(n)) e.e5f0(-1);
+    for (uint8_t* n = e.head; n; n = e.next(n)) e.ea30(n);
+    for (uint8_t* n = e.head; n; n = e.next(n)) e.e5f0(n, -1);
     for (uint8_t* n = e.head; n;) { e.d4d0(); e.cfc0(n); n = e.next(n); }
 }

@@ -119,10 +119,15 @@ EMSCRIPTEN_KEEPALIVE int32_t d2win_sub_10110(void* obj, uint32_t a, uint32_t b) 
 // yBase >= top - bottom, xRange < right + left and yBase < top has its callback called with no
 // arguments and that result returned. Otherwise the control's own +0x34 callback is called and its
 // result returned; with neither, 0.
+// Seam for the tail jump: retail jumps to the callback with the caller's stack word (the pointer
+// argument) still in place; `call` receives the 32-bit callback word and that argument.
+struct D2WinSub10190Env { uint32_t (*call)(uint32_t target, uint32_t arg); };
+
 // 1.13c D2Win+0x10190
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_10190(uint32_t* controlPtr) {
+EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_10190_env(uint32_t* controlPtr, const D2WinSub10190Env* env) {
     void* obj = (void*)(uintptr_t)*controlPtr;
+    const uint32_t arg = (uint32_t)(uintptr_t)controlPtr;
     if (rd32(obj, 0x00) != 2) d2win_fatal(0x159);
     if ((d2win_g_6f8fb184 & rd32(obj, 0x08)) == 0) return 0;
     if ((d2win_g_6f8fb17c & rd32(obj, 0x08)) == 0) return 0;
@@ -138,13 +143,19 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_10190(uint32_t* controlPtr) {
             const int32_t right  = (int32_t)rd32((void*)(uintptr_t)node, 0x08);
             const int32_t bottom = (int32_t)rd32((void*)(uintptr_t)node, 0x0C);
             if (xRange >= left && yBase >= top - bottom && xRange < right + left && yBase < top)
-                return ((uint32_t (*)(void))(uintptr_t)rd32((void*)(uintptr_t)node, 0x10))();
+                return env->call(rd32((void*)(uintptr_t)node, 0x10), arg);
             node += 0x14;
         }
     }
     const uint32_t own = rd32(obj, 0x34);
-    if (own != 0) return ((uint32_t (*)(void))(uintptr_t)own)();
+    if (own != 0) return env->call(own, arg);
     return 0;
+}
+
+extern "C"
+EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_10190(uint32_t* controlPtr) {
+    static const D2WinSub10190Env env = { [](uint32_t target, uint32_t) { return ((uint32_t (*)(void))(uintptr_t)target)(); } };
+    return d2win_sub_10190_env(controlPtr, &env);
 }
 
 // 1.13c D2Win+0x103D0 (ret 0x18, 6 stack words): builds the 0x4C-byte type-2 control, FOG_Alloc size 0x4C line 0x1D.

@@ -97,6 +97,14 @@ void d2win_sub_117A0(void* thisp, uint32_t y, int32_t x, int32_t align, uint32_t
     }
 }
 
+// FN probe seam (src/core/fn/d2win_18060.cpp): the callees and globals sub_18060 reaches.
+extern "C" void d2win_b64_set_18060_seams(void (*pre)(void), void (*gfxFree)(uint32_t), void (*gfxCall)(uint32_t, uint32_t), void (*s12200)(void), uint32_t (*getWindow)(void),
+                                          void (*registerEntry)(uint32_t, uint32_t, int32_t, uint32_t), void (*fatal)(uint32_t),
+                                          uint32_t* dat14a8, uint32_t* dat14ec, const uint32_t* entryTbl) {
+    E.pre18060 = pre; E.gfxFree = gfxFree; E.gfxCall = gfxCall; E.sub_12200 = s12200; E.getWindow = getWindow;
+    E.registerEntry = registerEntry; E.fatal = fatal; E.dat14a8 = dat14a8; E.dat14ec = dat14ec; E.entryTbl = entryTbl;
+}
+
 // 1.13c D2Win+0x18060
 uint32_t d2win_sub_18060(void) {
     *E.dat14a8 = 0;

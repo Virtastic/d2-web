@@ -15,7 +15,7 @@ struct D2Win18400Env {
 };
 
 // 1.13c D2Win+0x18400
-int32_t D2Win_18400(const D2Win18400Env& e) {
+extern "C" int32_t D2Win_18400(const D2Win18400Env& e) {
     e.f3110(); e.f2fe0(1); e.f6990(); e.fbe00();
     *e.g9014bc = 0;
     int32_t h = e.getHandle();
