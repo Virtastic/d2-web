@@ -54,11 +54,14 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_6ec00(const uint16_t* w) {
 }
 
 // 1.13c D2Client+0x6EDF0 (75 B, fastcall ecx=delta, caller 0x6F200)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_6edf0(D2cChatState* s, int32_t d) {
-    int32_t i = s->cur + d;
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_6edf0_cur(int32_t cur, uint8_t count, int32_t d) {
+    int32_t i = cur + d;
     if (i < 8) { if (i < 0) i = 7; } else i = 0;
-    if (s->count < 7 && (int32_t)s->count < 8 - i) i = s->cur;
-    s->cur = i;
+    if (count < 7 && (int32_t)count < 8 - i) i = cur;
+    return i;
+}
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_6edf0(D2cChatState* s, int32_t d) {
+    s->cur = d2_client_6edf0_cur(s->cur, s->count, d);
 }
 
 // 1.13c D2Client+0x6EE40 (116 B, edx = 0x202-byte entry)

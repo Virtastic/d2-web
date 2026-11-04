@@ -198,6 +198,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_9cad0(const uint32_t* p) {
     return 0x6FB80000u + a;   // 0x6fb8f0dc..0x6fb8f37c
 }
 
+// Addresses of the item chain head (0x11BC14) and group chain head (0x11BC1C), so a probe can pin the retail globals.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t* d2_client_item_head_ref() { return &g_item_head; }
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t* d2_client_group_head_ref() { return &g_group_head; }
+
 // 1.13c D2Client+0x9CF10: pull every item with key to just after its predecessor's relink (transcribed
 // quirk: node moved to head, walk resumes through its new next)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9cf10(uint32_t key) {

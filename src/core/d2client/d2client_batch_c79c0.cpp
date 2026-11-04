@@ -212,3 +212,11 @@ uint32_t sub_C8710(const Env& e, int32_t sk, uint32_t p1, int32_t cls, P p3, uin
  return 1;
 }
 }
+// Plain-memory entry for the browser and the FN probe: the unit chain is read and written in place (32-bit retail pointers).
+extern "C" __attribute__((used)) void d2_client_c7e30(uint32_t u, int32_t x, int32_t y, int32_t z) {
+ using namespace d2client_batch_c79c0;
+ Env e{};
+ e.rd32 = [](P a) { return *(const uint32_t*)a; };
+ e.wr32 = [](P a, uint32_t v) { *(uint32_t*)a = v; };
+ sub_C7E30(e, (P)u, x, y, z);
+}
