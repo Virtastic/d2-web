@@ -293,19 +293,7 @@ uint32_t d2multi_crtLCMapStringA(uint32_t lcid, uint32_t flags, const char* src,
 }
 
 // ---- _output (0x2334): printf core. Output helpers are the retail write_char/write_multi_char/write_string.
-struct d2multi_out_env {
-    void* ctx; int* count;                              // stream and running count (local_228)
-    void (*write_char)(d2multi_out_env*, int ch);
-    void (*write_multi_char)(d2multi_out_env*, int ch, int n);
-    void (*write_string)(d2multi_out_env*, const char* p, int n);
-    void* (*addr)(uint32_t);                            // retail 32-bit address -> host pointer
-    int (*wctomb)(char*, uint16_t);
-    void (*cfltcvt)(const void* dbl8, char* buf, int fmt, int prec, int caps);   // 0x9860
-    void (*cropzeros)(char*); void (*forcdecpt)(char*); // 0x9864, 0x986c
-    const uint8_t* mbctype;                             // PTR_DAT_6f9e9488
-    const char* nullStr; const uint16_t* nullWStr;      // "(null)" / L"(null)"
-    uint32_t (*udivrem)(uint64_t* val, uint32_t base);  // __aulldvrm; returns remainder, val updated
-};
+#include "d2multi_out_env.h"
 extern const char DAT_6f9e63f8[] W; extern const char DAT_6f9e6418[] W;
 
 // 1.13c D2Multi+0x2334
