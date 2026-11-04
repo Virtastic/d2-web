@@ -43,6 +43,8 @@ export function armFirstTouchFullscreen({ documentObject, windowObject, screenOb
   const onTouch = (event) => {
     if (event?.pointerType !== 'touch' || pending) return;
     if (attempt(() => documentObject.fullscreenElement)) return;
+    // An installed app already fills the screen; asking again only raises the browser's long "exit full screen" notice.
+    if (attempt(() => windowObject?.matchMedia?.('(display-mode: fullscreen), (display-mode: standalone)')?.matches)) return;
     if (typeof attempt(() => root?.requestFullscreen) !== 'function') {
       documentObject.removeEventListener('pointerup', onTouch, FIRST_TOUCH);
     }
