@@ -19,17 +19,19 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2win_sub_AF40(int32_t* c, const D2WinA
     int32_t x = c[3], base = c[1], y = c[4] - 1;
     if (!c[0x12]) return 1;
     if (!env->captureFlag) c[0x16] = 0;
-    if (c[0x16]) { uintptr_t a[2] = {(uintptr_t)c, 0x201}; env->sub_AD60(a); }
-    // retail's 6-dword cell overlays the zeroed 18-dword cell on the stack: one contiguous buffer
-    uint32_t b[24] = {};
-    uint32_t* cell = b + 6;
-    cell[0] = (c[0x11] != 0) * 2 + 1;
+    if (c[0x16]) { /* retail stack block: two 32-bit words */ uint32_t a[2] = {(uint32_t)(uintptr_t)c, 0x201}; env->sub_AD60(a); }
+    // retail passes one 18-dword cell to all five draws: word 13 = base, word 0 = the draw's mode (first draw 1/3 by
+    // c[0x11], loop draws 5, top 2/0 by c[0x10], bottom 4), every other word zero. The loop and end draws must read the
+    // same cell.
+    uint32_t cell[18] = {};
     cell[13] = (uint32_t)base;
+    cell[0] = (c[0x11] != 0) * 2 + 1;
     env->draw(cell, x, y, 0xffffffff, 5, 0);
-    b[0] = 5;
-    if (10 < c[6] - 10) { int32_t i = 10; do { y -= 10; i += 10; env->draw(b, x, y, 0xffffffff, 5, 0); } while (i < c[6] - 10); }
-    b[0] = c[0x10] ? 2 : 0;
-    env->draw(b, x, (c[4] - c[6]) + 9, 0xffffffff, 5, 0);
-    env->draw(b, x, (int32_t)(((int64_t)(c[6] - 0x1e) * c[0x13]) / c[0x12]) - c[6] + 0x13 + c[4], 0xffffffff, 5, 0);
+    cell[0] = 5;
+    if (10 < c[6] - 10) { int32_t i = 10; do { y -= 10; i += 10; env->draw(cell, x, y, 0xffffffff, 5, 0); } while (i < c[6] - 10); }
+    cell[0] = c[0x10] ? 2 : 0;
+    env->draw(cell, x, (c[4] - c[6]) + 9, 0xffffffff, 5, 0);
+    cell[0] = 4;
+    env->draw(cell, x, (int32_t)(((int64_t)(c[6] - 0x1e) * c[0x13]) / c[0x12]) - c[6] + 0x13 + c[4], 0xffffffff, 5, 0);
     return 1;
 }
