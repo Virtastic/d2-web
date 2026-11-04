@@ -24,6 +24,7 @@ extern int32_t DAT_6fa09f34, DAT_6f9e9bc0, DAT_6fa09178, DAT_6fa09184;
 extern char DAT_6fa09df0[], DAT_6f9e75d7[];
 extern uint32_t* gdwInvBitMasks_exref;
 extern "C" void d2_multi_sub_e760(void);
+__attribute__((weak)) void d2m_e860_t7cfe(int32_t, uint32_t);   // D2Win #10194 (thunk 0x7CFE), own seam: batch 21 holds an empty weak Ordinal_10194
 size_t ustrlen(const uint16_t*);
 uint16_t* ustrstr(const uint16_t*, const uint16_t*);
 uint16_t* ustrcpy(uint16_t*, const uint16_t*);
@@ -41,7 +42,7 @@ extern "C" void d2_multi_sub_e860(void) {
         int32_t p = *(int32_t*)(DAT_6fa09f08 + 0x9c);
         if (!p) { Ordinal_10024(DAT_6f9e75d7, Ordinal_10265(0x84c)); exit(-1); }
         uint32_t m = Ordinal_10023(p);
-        Ordinal_10194(*(int32_t*)(DAT_6fa09f08 + 0x9c), gdwInvBitMasks_exref[10] & m);
+        d2m_e860_t7cfe(*(int32_t*)(DAT_6fa09f08 + 0x9c), ~(1u << 10) & m  /* gdwInvBitMasks[10] */);
         DAT_6fa09f08 = 0;
         DAT_6f9e9bc0 = -1;
     }

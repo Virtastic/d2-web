@@ -1,6 +1,8 @@
 // D2Multi data globals that no port defines yet: retail slots named by address, zero-initialised.
 #include <cstdint>
 extern "C" {
+int32_t DAT_6fa0a094;
+uint8_t LAB_6f9d8fc0[16];
 alignas(8) uint8_t DAT_6fa09cc0[16];
 alignas(8) uint8_t DAT_6fa09d64[16];
 alignas(8) uint8_t DAT_6fa09d68[16];
