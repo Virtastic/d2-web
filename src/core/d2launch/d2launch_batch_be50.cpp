@@ -89,12 +89,16 @@ int32_t d2l_beb0_FUN_6fa4beb0(const void* name, const void* src, char kind, int3
   return 1;
 }
 
-// 1.13c D2Launch+0xC3F0
-void d2l_c3f0_FUN_6fa4c3f0(void) {
-  int32_t a = Ordinal_10003();
-  char c = (char)Ordinal_10003();
-  DAT_6fa64db4 = DAT_6fa65ed0;
-  d2l_beb0_FUN_6fa4beb0((void*)(intptr_t)a, nullptr, c, 0);
+struct D2lC3f0S {
+  uint32_t (*lang)(uint32_t id);                                  // 0x9B32 (ECX = string id, EAX = the string)
+  void (*f_beb0)(uint32_t a, uint32_t b, uint32_t one, uint32_t c); // 0xBEB0 (4 stack words, ret 0x10)
+};
+// 1.13c D2Launch+0xC3F0  (g25ad4, g25ed0 pinned; g24db4 written)
+extern "C" void d2l_c3f0_core(int32_t g25ad4, int32_t g25ed0, int32_t* g24db4, const D2lC3f0S* s) {
+  uint32_t a = s->lang(0x1419);
+  uint32_t b = s->lang(g25ad4 == 1 ? 0x141b : 0x141a);
+  *g24db4 = g25ed0;
+  s->f_beb0(a, b, 1, 0xc);
 }
 
 // 1.13c D2Launch+0xC430

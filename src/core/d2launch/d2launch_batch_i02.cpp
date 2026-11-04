@@ -11,11 +11,31 @@ static void* (*i02_sbh_alloc)(size_t) = nullptr;                 // ___sbh_alloc
 static void (*i02_lock)(int) = nullptr;                          // 0x352E
 static void (*i02_unlock)(int) = nullptr;                        // 0x3479
 static void* (*i02_heap_alloc_win)(uint32_t flags, size_t) = nullptr;  // HeapAlloc(DAT_6fa66f7c,..)
+static void (*i02_memset)(void*, int, size_t) = nullptr;         // 0x5C90
+static uint32_t i02_heap_handle = 0;                             // DAT_6fa66f7c
 static int32_t i02_sbh_mode = 0;                                 // DAT_6fa66f80 (3 = small-block heap)
 static size_t i02_sbh_threshold = 0;                             // DAT_6fa66f6c
 static int32_t i02_new_handler_set = 0;                          // DAT_6fa65124
 static void (*i02_flush_all)(int) = nullptr;                     // 0x81C0
 static void (*i02_exit_process)(uint32_t) = nullptr;             // ExitProcess
+
+// The test seam for _calloc_impl: the callees and the four pinned globals (set before each call).
+struct I02CallocSeams {
+  void* (*heap_alloc)(uint32_t heap, uint32_t flags, size_t size);   // HeapAlloc import
+  int (*callnewh)(size_t);                                           // 0x7F43
+  void* (*sbh_alloc)(size_t);                                        // 0x74CA
+  void (*lock)(int);                                                 // 0x352E
+  void (*unlock)(int);                                               // 0x4AB0 (push 4, call 0x3479)
+  void (*memset_)(void*, int, size_t);                               // 0x5C90
+  int32_t sbh_mode; uint32_t sbh_threshold; int32_t new_handler_set; uint32_t heap_handle;
+};
+static void* (*i02_heap_alloc3)(uint32_t, uint32_t, size_t) = nullptr;
+static void* i02_heap_alloc_adapt(uint32_t flags, size_t n) { return i02_heap_alloc3(i02_heap_handle, flags, n); }
+extern "C" void i02_set_calloc_seams(const I02CallocSeams* s) {
+  i02_heap_alloc3 = s->heap_alloc; i02_heap_alloc_win = i02_heap_alloc_adapt; i02_callnewh = s->callnewh;
+  i02_sbh_alloc = s->sbh_alloc; i02_lock = s->lock; i02_unlock = s->unlock; i02_memset = s->memset_;
+  i02_sbh_mode = s->sbh_mode; i02_sbh_threshold = s->sbh_threshold; i02_new_handler_set = s->new_handler_set; i02_heap_handle = s->heap_handle;
+}
 
 // 1.13c D2LAUNCH+0x49EA  (_calloc_impl)
 void* i02_calloc(uint32_t n, uint32_t sz) {
@@ -28,7 +48,7 @@ void* i02_calloc(uint32_t n, uint32_t sz) {
         req = (req + 0xf) & 0xfffffff0u;
         if (size <= i02_sbh_threshold) {
           i02_lock(4); p = i02_sbh_alloc(size); i02_unlock(4);
-          if (p) { memset(p, 0, size); return p; }
+          if (p) { if (i02_memset) i02_memset(p, 0, size); else memset(p, 0, size); return p; }
         }
       }
       p = i02_heap_alloc_win(8, req);
