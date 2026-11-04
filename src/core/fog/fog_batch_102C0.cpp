@@ -281,9 +281,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE void fog_sub_109A0(uint32_t line, const char* fi
     fog_message_box(display, title, 0x30);
 }
 
-// 1.13c Fog+0x10B80
+// older port of Fog+0x10B80 (the vectored FogEnv port is in fog_debug_env.cpp)
 // Dump the captured stack bytes (0x1000) and code bytes (0x20) to the log, then close it.
-// 1.13c Fog+0x10B80
+// older port of Fog+0x10B80 (the vectored FogEnv port is in fog_debug_env.cpp)
 extern "C" EMSCRIPTEN_KEEPALIVE void fog_sub_10B80(void* stackBytes,
                                                    void* codeBytes) {
     fog_log_printf("Stack bytes:");

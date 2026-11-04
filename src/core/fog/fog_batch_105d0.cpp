@@ -136,7 +136,7 @@ char* fog_sub_10600(char* dest, const char* format, ...) {
     return dest;
 }
 
-// 1.13c Fog+0x11130
+// older port of Fog+0x11130 (the vectored FogEnv port is in fog_debug_env.cpp)
 // ordinal 10023 DisplayAssert (function list: D2FogAssertOld). WSAUnhookBlockingHook, then the error
 // reporter at type 5 with file "" and the caller's line; the caller's second argument is the
 // %08x value. The assert message itself is not forwarded. 0x184A0 then closes the logs.
@@ -149,7 +149,7 @@ void fog_D2FogAssertOld(const char* msg, const char* file, int32_t line) {
     fog_close_logs();
 }
 
-// 1.13c Fog+0x11070
+// older port of Fog+0x11070 (the vectored FogEnv port is in fog_debug_env.cpp)
 // ordinal 10026 DisplayError(category, msg, file, line): reports the caller's category with file
 // "" and line at the fmt's %08x argument; 0x184A0 closes the logs.
 extern "C"
@@ -161,7 +161,7 @@ void fog_sub_11070(int32_t category, const char* msg, const char* file, int32_t 
     fog_close_logs();
 }
 
-// 1.13c Fog+0x110A0
+// older port of Fog+0x110A0 (the vectored FogEnv port is in fog_debug_env.cpp)
 // ordinal 10027: deadlock report(thread, ticks). The thread handle takes the reporter's "file"
 // slot (type 10 reinterprets it) and the line is the fixed 0x780; the format carries both values.
 extern "C"
@@ -171,7 +171,7 @@ void fog_sub_110A0(uint32_t thread, int32_t ticks) {
     fog_close_logs();
 }
 
-// 1.13c Fog+0x110D0
+// older port of Fog+0x110D0 (the vectored FogEnv port is in fog_debug_env.cpp)
 // ordinal 10025 DisplayWarning: same shape as DisplayAssert at type 7.
 extern "C"
 void fog_sub_110D0(const char* msg, const char* file, int32_t line) {

@@ -197,7 +197,7 @@ void fog_sub_16470(uint32_t thread_handle, const FogAbortApi* api) {
 
 // --- debug print path -------------------------------------------------------------------------
 
-// 1.13c Fog+0x10DD0
+// older port of Fog+0x10DD0 (the vectored FogEnv port is in fog_debug_env.cpp)
 // Format a varargs message into a 0x1000-byte buffer and hand it to OutputDebugStringA. The
 // buffer is NUL-terminated both before (offset 0) and after formatting; the 0x1000 bound is what
 // makes the trailing byte 0xFFF.
@@ -232,7 +232,7 @@ void fog_sub_10d60(fog_async_key_fn get_async_key_state, const char* fmt, ...) {
     OutputDebugStringA(buf);
 }
 
-// 1.13c Fog+0x10CD0
+// older port of Fog+0x10CD0 (the vectored FogEnv port is in fog_debug_env.cpp)
 // Format into a 0x1000-byte buffer, debug-print it, then log it through Fog+0x18AF0 against the
 // "LOG" tag with a "%s" format. The env is first because the varargs list must stay last.
 extern "C"
