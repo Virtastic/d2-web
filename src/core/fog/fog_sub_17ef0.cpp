@@ -2,7 +2,7 @@
 // #263(a), #274(0,0), #286(b), stores a to Fog global 0x2DAAC, then #304 x3 with (2,&0x8000,4), (1,&1,4), (3,&4,4).
 #include <cstdint>
 typedef void (*storm_fn)(uint32_t, uint32_t, uint32_t);
-extern "C" uint32_t g_fog_2daac;
+extern "C" uint32_t g_fog_2daac = 0;   // Fog+0x56E1C (the module global the init stores its first argument in)
 // 1.13c Fog+0x17EF0
 extern "C" void fog_sub_17ef0(uint32_t a, uint32_t b, uint32_t str, storm_fn s270, storm_fn s263, storm_fn s274,
                               storm_fn s286, storm_fn s304) {

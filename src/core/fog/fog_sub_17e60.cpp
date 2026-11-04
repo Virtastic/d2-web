@@ -3,16 +3,16 @@
 #include <cstdint>
 #include <cstring>
 
-namespace {
 // Host seams (registry, GetFileAttributesA, GetModuleFileNameA); default: nothing available.
+extern "C" {
 int (*g_regRead)(char*, uint32_t) = [](char*, uint32_t) { return 0; };
 void (*g_regWrite)(const char*) = [](const char*) {};
 bool (*g_exists)(const char*) = [](const char*) { return false; };
 void (*g_exePath)(char*, uint32_t) = [](char* b, uint32_t) { b[0] = '\0'; };
-}  // namespace
+}
 
 // 1.13c Fog+0x17E60
-void fog_sub_17e60(char* buf, uint32_t size) {
+extern "C" void fog_sub_17e60(char* buf, uint32_t size) {
     if (g_regRead(buf, size) == 0) buf[0] = '\0';
     if (!g_exists(buf) || buf[0] == '\0') {
         buf[0] = '\0';

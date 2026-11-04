@@ -2,9 +2,6 @@
 #include <cstdarg>
 #include <cstdint>
 
-// 1.13c Fog+0x18430: build the log file name from the program name and append the argument; no file on the host.
-void fog_log_name_18430(uint32_t) {}
-
 // (superseded by fog_d128a.cpp, was Fog 18770): format a message and queue it on the error-reporter list; the reporter is absent, so drop it.
 void fog_log_va_18770(const char*, int, int, const char*, va_list) {}
 

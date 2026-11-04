@@ -293,3 +293,4 @@ void* Ordinal_10042(int32_t size, const char* file, int32_t line)
 	if (!p) FUN_6ff60f30(2, file, line, DAT_6ff768ec);
 	return p;
 }
+extern "C" uint8_t* fog_pool_state_1ae90() { return g_pools; }

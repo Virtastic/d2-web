@@ -34,7 +34,17 @@ typedef struct FogWin32 {
     int (*find_next)(void* h, char* name_out);                  // FindNextFileA
     void (*find_close)(void* h);                                // FindClose
 } FogWin32;
-static const FogWin32* g_w32;
+
+// State the FN probes pin and read back (retail addresses in the comments); external linkage in a namespace.
+namespace fogb144pub {
+const FogWin32* g_w32;
+HANDLE   g_thread;            // 0x6FF818A0
+uint32_t g_stop;              // 0x6FF819A0
+uint32_t g_816f0, g_81848, g_818f8, g_819a4;
+uint32_t g_list_head;         // 0x6FFA6EC4 (retail address of first node)
+HANDLE g_sw_wake, g_sw_done, g_sw_self, g_sw_victim;  // 0x6FFA6E5C, E60, E58, E64
+}
+using namespace fogb144pub;
 
 static void fogb144_die(const FogB144Api* a, int line) {
     const uint32_t ip = a->capture_ip();
@@ -49,12 +59,8 @@ static uint8_t  g_names[20][16];     // 0x6FF816F8
 static SYSTEMTIME g_startup;         // 0x6FF81838
 static uint32_t g_banner[20];        // 0x6FF81850, startup banner pending
 static uint32_t g_last_use[20];      // 0x6FF818A8
-static HANDLE   g_thread;            // 0x6FF818A0
 static FILE*    g_files[20];         // 0x6FF81900
 static uint32_t g_opened[20];        // 0x6FF81950
-static uint32_t g_stop;              // 0x6FF819A0
-static uint32_t g_816f0, g_81848, g_818f8, g_819a4;
-static uint32_t g_list_head;         // 0x6FFA6EC4 (retail address of first node)
 static uint32_t g_cleanup_tick;      // 0x6FFA6ED8
 static CRITICAL_SECTION g_cs_a6e8c;  // 0x6FFA6E8C
 static CRITICAL_SECTION g_cs_a6ea4;  // 0x6FFA6EA4
@@ -66,7 +72,6 @@ typedef struct FogStackWalkApi {
     void (*log)(const char* fmt, ...);        // Fog+0x190A0 against &DAT_6ff768ec
     void (*walk)(void);                       // Fog+0x155E0, run on the suspended victim
 } FogStackWalkApi;
-static HANDLE g_sw_wake, g_sw_done, g_sw_self, g_sw_victim;  // 0x6FFA6E5C, E60, E58, E64
 
 // 1.13c Fog+0x15d50
 // Stack-walk thread: wait for the wake event; if it is not signalled close the three handles and

@@ -68,7 +68,7 @@ extern "C" void fog_sub_17f60(const FogSavePathHost* h, char* p, uint32_t cap) {
     if (*p == 0) {
         h->installPath(p, cap);
         size_t n = std::strlen(p);
-        if (n + 6 <= cap) std::memcpy(p + n, "Save\\", 6); else if (cap) p[cap - 1] = 0;  // SStrNCat truncates
+        if (n + 1 < cap) { size_t k = cap - n - 1; if (k > 5) k = 5; std::memcpy(p + n, "Save\\", k); p[n + k] = 0; }  // SStrNCat copies what fits and terminates
         h->regSet("Diablo II", "Save Path", p);
     }
     if (cap) {
