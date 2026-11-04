@@ -103,16 +103,15 @@ uint32_t g_fog_errorMgrInit = 0;
 
 char* fog_resolve_host(const FogNetApi* api, char* host) {
     const uint8_t* he = static_cast<const uint8_t*>(api->gethostbyname_(host));
-    uint32_t addr = 0;
-    if (he != nullptr) {
-        const uint32_t list = *reinterpret_cast<const uint32_t*>(he + 0x0C);
-        if (list != 0) addr = *reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(list));
-    }
-    if (addr != 0) {
-        fog_str_copy(g_fog_resolvedIp, api->inet_ntoa_(addr), sizeof(g_fog_resolvedIp));
-        return g_fog_resolvedIp;
-    }
-    return nullptr;
+    if (he == nullptr) return nullptr;
+    // h_addr_list (+0x0C), its first entry (a pointer to the 4 address bytes), then the dword inet_ntoa takes.
+    const uint32_t list = *reinterpret_cast<const uint32_t*>(he + 0x0C);
+    if (list == 0) return nullptr;
+    const uint32_t entry = *reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(list));
+    if (entry == 0) return nullptr;
+    const uint32_t addr = *reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(entry));
+    fog_str_copy(g_fog_resolvedIp, api->inet_ntoa_(addr), sizeof(g_fog_resolvedIp));
+    return g_fog_resolvedIp;
 }
 
 }  // namespace
