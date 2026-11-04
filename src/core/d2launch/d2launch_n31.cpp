@@ -254,3 +254,20 @@ void FUN_6fa51aa0(State& s, char m) {
 }
 
 }  // namespace d2launch_n31
+
+// Replay seam for the BNET disconnect routine: the port with raw seams. *eb0 is the flag global,
+// ctx the state block, hasBn is the interface pointer != 0 (its slot 0x10 is the vtDisc seam).
+struct D2lE250Seams { void (*debugOut)(const char*); void (*o10018)(); void (*vtDisc)(uint32_t); };
+extern "C" void d2l_e250_core(int32_t* eb0, uint8_t* ctx, uint32_t hasBn, const D2lE250Seams* sk) {
+    d2launch_n31::BnClient bn;
+    bn.vt = [sk](int off) { sk->vtDisc((uint32_t)off); return 0; };
+    d2launch_n31::Host h;
+    h.debugOut = [sk](const char* m) { sk->debugOut(m); };
+    h.o10018 = [sk]() { sk->o10018(); };
+    d2launch_n31::State s;
+    s.bn = hasBn ? &bn : nullptr;
+    s.ctx = ctx;
+    s.eb0 = *eb0;
+    d2launch_n31::FUN_6fa4e250(s, h);
+    *eb0 = s.eb0;
+}

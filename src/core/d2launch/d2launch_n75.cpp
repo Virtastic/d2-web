@@ -591,7 +591,7 @@ int tos_18e10(H* h) {
         return 0;
     }
     if (F(h, VT | 0x68)) {
-        F(h, 0x12B60); F(h, 0x176C0); pool_idx(h, 0); pool_idx(h, 0);  // idx args not recovered
+        F(h, 0x12B60); F(h, 0x176C0); pool_idx(h, 0x4d); uint32_t hdl = pool_idx(h, 0x4e);
         intptr_t hf = O(h, 10107, 0, 0, 3, 0x8000000, 0);
         if (hf != -1) {
             uint32_t size = (uint32_t)F(h, SEAM_GETFILESIZE, hf);
@@ -629,14 +629,14 @@ int tos_18e10(H* h) {
                 for (int i = 0; i < len; i++) if (line[i] != 0x20) { O(h, 10000, line, 0, 0); break; }
             }
             O(h, 10043, text, 0xc9b, 0);
-            O(h, 10037);
+            O(h, 10037, hdl, 0);
             pool_add(h, REC(0x61df0)); pool_add(h, REC(0x61e20)); pool_add(h, REC(0x61e50));
             O(h, 10003, 0, 0, 0); O(h, 10000);
             pool_add(h, REC(0x61e80)); pool_add(h, REC(0x61eb0));
             return 1;
         }
     }
-    popup_15090(h, O(h, 10003), 0x57df0, 1);
+    popup_15090(h, O(h, 10003, 0x14e3), 0x57df0, 1);
     return 0;
 }
 }  // namespace n75
