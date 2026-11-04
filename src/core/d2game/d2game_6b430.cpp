@@ -22,7 +22,7 @@ void D2Game_6B430(uint32_t pCtx, const D2GameCodeItemEnv* pEnv)
         if (code != 0x206E6F6Eu) {
             const int32_t idx = pEnv->codeIdx(code);
             if (idx == -1) { pEnv->fatal(0x823); return; }
-            if (pEnv->place(rd32(pCtx, 0), rd32(pCtx, 8), (uint32_t)idx, it)) placed = true;
+            if (pEnv->place(rd32(pCtx, 0), rd32(pCtx, 8), (uint32_t)idx, it)) { placed = true; it = 0; }
         }
         it = pEnv->nextItem(list, 0x14, it);
         if (placed) return;
