@@ -141,21 +141,40 @@ int ___crtMessageBoxA(const MsgBoxHost* h, const char* text, const char* cap, ui
   return h->messageBox(owner, text, cap, type);
 }
 
-// 1.13c D2Launch+0x81C0
-void FUN_6fa481c0(int code, void (*handler)(void), const char* module, void (*msg)(const char*, const char*, uint32_t),
-                  void (*exit_)(int)) {
-  if (handler) handler();
-  else {
-    char b[0x200];
+// 1.13c D2Launch+0x81C0 (__security_error_handler): the installed handler runs, or the message box is built and shown; then _exit(3).
+struct SecErrHost {
+  void (*handler)(int, int);                                               // DAT_6fa6513c (null: no handler installed)
+  uint32_t (*getModuleFileName)(char* buf, uint32_t size);                // GetModuleFileNameA(NULL, buf, 0x104); 0 = failed
+  void (*msgBox)(const char* text, const char* caption, uint32_t flags);  // ___crtMessageBoxA
+  void (*exit_)(int);                                                     // __exit
+};
+void FUN_6fa481c0(int code, int arg2, const SecErrHost* h) {
+  if (h->handler) {
+    h->handler(code, arg2);
+  } else {
+    static const char kOverrun[] =
+        "A buffer overrun has been detected which has corrupted the program's\ninternal state.  The program cannot safely continue execution and must\nnow be terminated.\n";
+    static const char kUnknown[] =
+        "A security error of unknown cause has been detected which has\ncorrupted the program's internal state.  The program cannot safely\ncontinue execution and must now be terminated.\n";
     const char* what = code == 1 ? "Buffer overrun detected!" : "Unknown security failure detected!";
-    char name[0x104];
-    strncpy(name, module ? module : "<program name unknown>", sizeof name - 1); name[sizeof name - 1] = 0;
-    const char* n = name;
-    if (strlen(n) + 11 > 0x3c) { n = name + strlen(name) - 0x3c + 11 + 3; memcpy((char*)n - 3 + 0, "...", 3); n -= 3; }
-    snprintf(b, sizeof b, "%s\n\nProgram: %s\n\n%s", what, n, "");
-    msg(b, "Microsoft Visual C++ Runtime Library", 0x12010);
+    const char* note = code == 1 ? kOverrun : kUnknown;
+    char name[0x104 + 4];
+    if (h->getModuleFileName(name, 0x104) == 0) strcpy(name, "<program name unknown>");
+    char* pn = name;
+    if (0x3c < strlen(pn) + 0xb) {
+      pn = name + strlen(name) - 0x31;
+      strncpy(pn, "...", 3);
+    }
+    char buf[0x300];
+    strcpy(buf, what);
+    strcat(buf, "\n\n");
+    strcat(buf, "Program: ");
+    strcat(buf, pn);
+    strcat(buf, "\n\n");
+    strcat(buf, note);
+    h->msgBox(buf, "Microsoft Visual C++ Runtime Library", 0x12010);
   }
-  exit_(3);
+  h->exit_(3);
 }
 
 // 1.13c D2Launch+0x830B

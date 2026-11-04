@@ -57,7 +57,53 @@ int32_t d2l_be50_FUN_6fa4be50(const char* name) {
   }
 }
 
-// 1.13c D2Launch+0xBEB0  (name utf in EBX, wide src on stack, kind, EDI = user dword)
+// 1.13c D2Launch+0xBEB0 (stdcall, ret 0x10: name, src, user, kind). Retail pointers are 32-bit words; callees and the list head/count are seams.
+struct D2lBeb0S {
+  uint32_t (*alloc)(uint32_t size, uint32_t line);          // 0x97DE
+  void (*toUtf)(uint32_t dst, uint32_t src, uint32_t n);    // D2Lang Unicode::toUtf
+  void (*ustrcpy)(uint32_t dst, uint32_t src);              // D2Lang Unicode::strcpy
+  uint32_t (*f99ca)(uint32_t kind, uint32_t five, uint32_t p0, uint32_t p1);
+  void (*f9a0c)(uint32_t h, uint32_t z);
+  void (*f9a06)(uint32_t h, uint32_t z);
+  void (*f9a2a)(uint32_t h, uint32_t five);
+  void (*fb600)(void);
+};
+static inline uint8_t* d2lP(uint32_t a) { return (uint8_t*)(uintptr_t)a; }
+static inline uint32_t d2lRd(uint32_t a) { uint32_t v; memcpy(&v, d2lP(a), 4); return v; }
+static inline void d2lWr(uint32_t a, uint32_t v) { memcpy(d2lP(a), &v, 4); }
+extern "C" int32_t d2l_beb0_core(uint32_t name, uint32_t src, uint32_t user, uint32_t kind, uint32_t* head, uint32_t* count, const D2lBeb0S* s) {
+  const uint32_t n = s->alloc(0x350, 0xbc4);
+  s->toUtf(n, name, 0x100);
+  s->ustrcpy(n + 0x100, src);
+  uint8_t* b = d2lP(n);
+  memset(b + 0x300, 0, 0x10);
+  memset(b + 0x310, 0, 0x10);
+  b[0x320] = (uint8_t)kind;
+  memset(b + 0x322, 0, 8);
+  memset(b + 0x32e, 0, 3);
+  d2lWr(n + 0x338, 0);
+  d2lWr(n + 0x34c, 0);
+  memset(b + 0x310, 0xff, 0x10);
+  b[0x301] = 1;
+  const uint32_t h = s->f99ca(b[0x320], 5, n + 0x300, n + 0x310);
+  d2lWr(n + 0x338, h);
+  d2lWr(n + 0x334, user);
+  s->f9a0c(h, 0);
+  s->f9a06(d2lRd(n + 0x338), 0);
+  s->f9a2a(d2lRd(n + 0x338), 5);
+  if (*head == 0) {
+    *head = n;
+  } else {
+    uint32_t t = *head;
+    while (d2lRd(t + 0x34c)) t = d2lRd(t + 0x34c);
+    d2lWr(t + 0x34c, n);
+  }
+  (*count)++;
+  s->fb600();
+  return 1;
+}
+
+// legacy host-width wrapper kept for the CB00 port (retail layout is d2l_beb0_core)
 int32_t d2l_beb0_FUN_6fa4beb0(const void* name, const void* src, char kind, int32_t user) {
   uint8_t* n = (uint8_t*)Ordinal_10042(0xbc4, 0);
   Unicode_toUtf(n, name, 0x100);
@@ -146,35 +192,58 @@ int32_t d2l_c430_FUN_6fa4c430(void) {
   return 1;
 }
 
-// 1.13c D2Launch+0xCB00
-void d2l_cb00_FUN_6fa4cb00(int32_t, const uint8_t* pkt, int32_t redraw) {
+struct D2lCb00S {
+  int32_t (*f10227)(void);                                                                  // 0x980E (Fog 10227)
+  uint32_t (*lang)(uint32_t id);                                                            // 0x9B32 (ECX = id)
+  void (*f_beb0)(uint32_t a, uint32_t b, uint32_t kind, uint32_t user);                     // 0xBEB0 (4 stack words)
+  int32_t (*f_c720)(uint32_t eax, uint32_t s1, uint32_t s2, uint32_t extra, uint32_t z0, uint32_t z1); // 0xC720 (EAX = arg0, 5 stack words)
+  void (*f_bdf0)(void);                                                                     // 0xBDF0
+  void (*f_a230)(uint32_t eax, const void* pkt, uint32_t len);                              // 0xA230 (EAX = arg0, ECX = pkt, 1 stack word)
+  void (*f_a8c0)(void);                                                                     // 0xA8C0
+};
+// 1.13c D2Launch+0xCB00  stdcall(arg0, pkt, redraw), ret 0xc. g25ad4/g25ed0 pinned; g64db4, g64db8, g65ee4 written.
+extern "C" void d2l_cb00_core(uint32_t arg0, const uint8_t* pkt, int32_t redraw, int32_t g25ad4, int32_t g25ed0,
+                              int32_t* g64db4, int32_t* g64db8, int32_t* g65ee4, const D2lCb00S* s) {
   uint32_t left = *(const uint16_t*)(pkt + 7);
   uint8_t kind = pkt[0];
   const char* p = (const char*)pkt + 9;
-  if (!Ordinal_10227()) {
-    int32_t a = Ordinal_10003();
-    char c = (char)Ordinal_10003();
-    DAT_6fa64db4 = DAT_6fa65ed0;
-    d2l_beb0_FUN_6fa4beb0((void*)(intptr_t)a, nullptr, c, 0);
+  if (!s->f10227()) {
+    uint32_t a = s->lang(0x1419);
+    uint32_t c = s->lang(g25ad4 == 1 ? 0x141b : 0x141a);
+    *g64db4 = g25ed0;
+    s->f_beb0(a, c, 1, 0xc);
   }
   uint32_t cnt = *(const uint16_t*)(pkt + 3);
   if (left < cnt) cnt = left;
   for (; cnt; cnt--) {
-    int32_t extra = 0;
+    uint32_t extra = 0;
     const char* s1 = p;
     if (kind == 0x19) { memcpy(&extra, p, 4); p += 4; s1 = p; }
     while (*p++) {}
     const char* s2 = p;
     const char* q = p;
     while (*q++) {}
-    if (!FUN_6fa4c720(s1, s2, extra)) { left--; FUN_6fa4bdf0(); redraw = 0; }
+    if (!s->f_c720(arg0, (uint32_t)(uintptr_t)s1, (uint32_t)(uintptr_t)s2, extra, 0, 0)) { left--; s->f_bdf0(); redraw = 0; }
     p = q;
   }
-  if (redraw) FUN_6fa4a230(pkt, (int32_t)(p - (const char*)pkt));
-  if (*(const uint16_t*)(pkt + 1) <= left) DAT_6fa65ee4 = 1;
+  if (redraw) s->f_a230(arg0, pkt, (uint32_t)(p - (const char*)pkt));
+  if (*(const uint16_t*)(pkt + 1) <= left) *g65ee4 = 1;
   if (*(const uint16_t*)(pkt + 7) < *(const uint16_t*)(pkt + 3)) {
-    DAT_6fa64db8 = DAT_6fa65ed0;
-    d2l_beb0_FUN_6fa4beb0((void*)(intptr_t)Ordinal_10003(), nullptr, 8, 0);
+    *g64db8 = g25ed0;
+    uint32_t a = s->lang(0x2b3b);
+    uint16_t z = 0;
+    s->f_beb0(a, (uint32_t)(uintptr_t)&z, 2, 0x12);
   }
-  FUN_6fa4a8c0();
+  s->f_a8c0();
+}
+void d2l_cb00_FUN_6fa4cb00(int32_t arg0, const uint8_t* pkt, int32_t redraw) {
+  static const D2lCb00S S = {
+    Ordinal_10227,
+    [](uint32_t) { return (uint32_t)Ordinal_10003(); },
+    [](uint32_t a, uint32_t b, uint32_t k, uint32_t u) { d2l_beb0_FUN_6fa4beb0((void*)(intptr_t)a, (void*)(intptr_t)b, (char)k, (int32_t)u); },
+    [](uint32_t, uint32_t a, uint32_t b, uint32_t c, uint32_t, uint32_t) { return FUN_6fa4c720((const char*)(intptr_t)a, (const char*)(intptr_t)b, (int32_t)c); },
+    FUN_6fa4bdf0,
+    [](uint32_t, const void* k, uint32_t n) { FUN_6fa4a230(k, (int32_t)n); },
+    FUN_6fa4a8c0 };
+  d2l_cb00_core((uint32_t)arg0, pkt, redraw, DAT_6fa65ad4, DAT_6fa65ed0, &DAT_6fa64db4, &DAT_6fa64db8, &DAT_6fa65ee4, &S);
 }

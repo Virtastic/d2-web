@@ -89,12 +89,14 @@ struct LaunchFind {
     void* (*first)(const char* pattern, char* nameOut /*260*/);   // returns null on failure
     bool  (*next)(void* h, char* nameOut);
     void  (*close)(void* h);
+    void  (*stamp)(void* h, uint32_t out[2]);   // ftLastWriteTime {low, high} of the entry the last first/next returned (C720's 4th and 5th stack words)
 };
-static uint32_t g_charCount;           // DAT_6fa65eec
-static char g_charName[16];            // DAT_6fa65880
+extern "C" { uint32_t d2l_cc50_count; char d2l_cc50_name[280]; }   // DAT_6fa65eec, DAT_6fa65880 (the FN probe pins and reads them back)
+#define g_charCount d2l_cc50_count
+#define g_charName d2l_cc50_name
 extern "C" uint32_t d2launch_sub_CC50(const LaunchHost& H, const LaunchFind& F, char* savePath,
                                       int (*sub_F190)(uint8_t* hdr, const char* name),
-                                      void (*sub_C720)(const char* name, uint8_t* hdr, int)) {
+                                      void (*sub_C720)(const char* name, uint8_t* hdr, int, uint32_t ftLo, uint32_t ftHi)) {
     uint8_t hdr[1280]; char pat[1024], fn[260];
     g_charCount = 0;
     H.ord(10115, (u)savePath, 0, 0);
@@ -107,7 +109,7 @@ extern "C" uint32_t d2launch_sub_CC50(const LaunchHost& H, const LaunchFind& F, 
             *p = 0;
             int len = (int)(p - g_charName);
             if (len > 1 && len < 0x10 && p[-1] != '-' && g_charName[0] != '_' && sub_F190(hdr, g_charName) != 0) {
-                sub_C720(g_charName, hdr, 0);
+                uint32_t ft[2]; F.stamp(h, ft); sub_C720(g_charName, hdr, 0, ft[0], ft[1]);
                 ++g_charCount;
             }
         } while (F.next(h, fn));
