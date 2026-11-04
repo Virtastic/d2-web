@@ -171,33 +171,37 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t bn_b13190_13490(BnCache13190State* s,
     if(s->file==invalid_file){bn_b13190_132d0(s,e);e->leave();return 0;}
     s->crypt=static_cast<uint32_t*>(e->alloc(0x1400,0x17e,0));init_crypt(s->crypt);
     s->header=static_cast<uint32_t*>(e->alloc(0x2c,0x182,8));
-    uint32_t size=e->file_size(s->file),actual=0; bool valid=false,warn=false;
+    uint32_t size=e->file_size(s->file),actual=0; bool valid=false; uint32_t code=0;
+    // code: retail's log argument (1..12); size 0, size over 0xA00000 and a BN2 header rebuild without a log
     if(size&&size<=0xa00000) {
-        if(size<0x2c)warn=true;
+        if(size<0x2c)code=1;
         else {e->read(s->file,s->header,0x2c,&actual);
-            if(actual<0x2c)warn=true;
+            if(actual<0x2c)code=2;
             else if(s->header[0]!=0x1a324e42) {
-                if(s->header[0]!=0x1a334e42)warn=true;
+                if(s->header[0]!=0x1a334e42)code=3;
                 else {
                     auto* h=s->header;uint32_t crc=h[8];h[8]=0;
-                    if(crc_bytes(reinterpret_cast<uint8_t*>(h),0x2c)!=crc)warn=true;
+                    if(crc_bytes(reinterpret_cast<uint8_t*>(h),0x2c)!=crc)code=4;
                     else {h[8]=crc;
-                        if(!h[4]||!h[6]||!h[5]||!h[7])warn=true;
+                        if(!h[4]||!h[6])code=5;
+                        else if(!h[5]||!h[7])code=6;
                         else {
                             uint32_t bytes=std::max(h[6],0x400u)*16;
-                            if(size<uint32_t(h[4]+bytes))warn=true;
+                            if(size<uint32_t(h[4]+bytes))code=7;
                             else {
                                 s->hashes=static_cast<uint32_t*>(e->alloc(bytes,0x1b7,8));
                                 e->seek(s->file,h[4]);e->read(s->file,s->hashes,bytes,&actual);
-                                if(actual!=bytes||crc_bytes(reinterpret_cast<uint8_t*>(s->hashes),bytes)!=h[9])warn=true;
+                                if(actual!=bytes)code=8;
+                                else if(crc_bytes(reinterpret_cast<uint8_t*>(s->hashes),bytes)!=h[9])code=9;
                                 else {
                                     decrypt(s,reinterpret_cast<uint8_t*>(s->hashes),hash_name(s,"(hash table)",3),bytes);
                                     bytes=std::max(h[7],0x400u)*16;
-                                    if(size<uint32_t(h[5]+bytes))warn=true;
+                                    if(size<uint32_t(h[5]+bytes))code=10;
                                     else {
                                         s->blocks=static_cast<uint32_t*>(e->alloc(bytes,0x1cd,8));
                                         e->seek(s->file,h[5]);e->read(s->file,s->blocks,bytes,&actual);
-                                        if(actual!=bytes||crc_bytes(reinterpret_cast<uint8_t*>(s->blocks),bytes)!=h[10])warn=true;
+                                        if(actual!=bytes)code=11;
+                                        else if(crc_bytes(reinterpret_cast<uint8_t*>(s->blocks),bytes)!=h[10])code=12;
                                         else {decrypt(s,reinterpret_cast<uint8_t*>(s->blocks),hash_name(s,"(block table)",3),bytes);valid=true;}
                                     }
                                 }
@@ -209,7 +213,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t bn_b13190_13490(BnCache13190State* s,
         }
     }
     if(!valid) {
-        if(warn)e->log("WARNING- cache file is invalid. Replacing with new cache file",nullptr,0);
+        if(code)e->log("WARNING- cache file is invalid. Replacing with new cache file",nullptr,code);
         if(s->active){e->leave();return 1;}
         if(s->hashes)e->free(s->hashes,0x1e7);
         if(s->blocks)e->free(s->blocks,0x1e9);
