@@ -175,18 +175,24 @@ bool parseOption(Ctx& c,const char* str,int32_t* st,void* errCb) {
     }
     return true;
 }
-// 1.13c Storm+0x119f0
-bool netQuery(Ctx& c,uint32_t cb,uint32_t arg,uint32_t* out2,void** buf) {
+// 1.13c Storm+0x119f0 (registers: EAX = out2, EBX = cb, EDI = buf; stack: p1, p2, p3; ret 0xC): query the provider callback (stdcall, 8 words) for an
+// image: call 1 (p1, p2, 0, 0, 0, &B, &A, &C0) fills B, A and C0; out2 = {B, A}; the buffer is (B*A*C0 / 8) bytes, rounded toward zero (SMemAlloc
+// SNET.CPP:0xB56); call 2 (p1, p2, &C1, buf, size, &B, &A, &C0) fills it. p3 != 0 loads the reply's words at C+8 as palette entry 0xFE
+// (0x19520 (1, 0xFE, &C2, 0)). A failed call 2 frees the buffer (SNET.CPP:0xB62). Any failure returns 0; a null cb leaves out2 and *buf zero.
+bool netQuery(Ctx& c,uint32_t cb,uint32_t p1,uint32_t p2,uint32_t p3,uint32_t* out2,void** buf) {
     *buf=nullptr; out2[0]=out2[1]=0;
     if(!cb) return false;
-    uint32_t info[0x110]={}; uint32_t a[5]={0,0,0,0,0};
-    if(!c.callCb(cb,a,5)) return false;
-    out2[0]=a[0]; out2[1]=0;
-    *buf=c.alloc(a[0],kSnet,0xb56);
-    uint32_t b[6]={info[0x108],arg,0,c.st->encode(*buf),0,0};
-    if(c.callCb(cb,b,6)) {
-      // retail tests a field of the reply block (iStack_34) then loads palette entry 0xfe; layout unverified
-      if(info[0x100]) c.setPalette(1,0xfe,info,0);
+    uint32_t A=0,B=0,C[0x100]={};
+    auto enc=[&](const void* p){ return c.st->encode(p); };
+    const uint32_t a[8]={p1,p2,0,0,0,enc(&B),enc(&A),enc(&C[0])};
+    if(!c.callCb(cb,a,8)) return false;
+    out2[0]=B; out2[1]=A;
+    int32_t prod=(int32_t)(B*A*C[0]);
+    const uint32_t size=(uint32_t)((prod+((prod>>31)&7))>>3);
+    *buf=c.alloc(size,kSnet,0xb56);
+    const uint32_t b[8]={p1,p2,enc(&C[1]),enc(*buf),size,enc(&B),enc(&A),enc(&C[0])};
+    if(c.callCb(cb,b,8)) {
+      if(p3) c.setPalette(1,0xfe,&C[2],0);
       return true;
     }
     c.free(*buf,kSnet,0xb62); *buf=nullptr; return false;

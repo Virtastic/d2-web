@@ -78,12 +78,33 @@ struct StormHashTable {
     uintptr_t field4c;          // retail +0x4c (0x2020)
 };
 
-inline void* StormAlloc(uintptr_t size) { return std::malloc(size ? size : 1); }
+// FN capture seam: with an arena set, the three allocator entries serve zeroed 16-aligned blocks bumped from it (the
+// capture's `heap` frame serves retail's SMem* the same way), so a heap-derived pointer is a blob offset and replays.
+struct StormArena { uint8_t* base; uintptr_t cap, off; };
+StormArena g_stormArena = { nullptr, 0, 0 };
+inline void* StormArenaAlloc(uintptr_t size) {
+    uintptr_t n = size ? (size + 15u) & ~(uintptr_t)15u : 16u;
+    if (size > g_stormArena.cap || g_stormArena.off + n > g_stormArena.cap) return nullptr;
+    uint8_t* q = g_stormArena.base + g_stormArena.off;
+    std::memset(q, 0, n);
+    g_stormArena.off += n;
+    return q;
+}
+inline void* StormAlloc(uintptr_t size) { return g_stormArena.base ? StormArenaAlloc(size) : std::malloc(size ? size : 1); }
 inline void* StormRealloc(void* p, uintptr_t size) {
+    if (g_stormArena.base) {
+        uint8_t* q = (uint8_t*)StormArenaAlloc(size);
+        uint8_t* e = g_stormArena.base + g_stormArena.cap;
+        if (q && p && (uint8_t*)p >= g_stormArena.base && (uint8_t*)p < e) {
+            uintptr_t room = (uintptr_t)(e - (uint8_t*)p);
+            std::memcpy(q, p, size < room ? size : room);
+        }
+        return q;
+    }
     void* r = std::realloc(p, size ? size : 1);
     return r;
 }
-inline void StormFree(void* p) { std::free(p); }
+inline void StormFree(void* p) { if (!g_stormArena.base) std::free(p); }
 // SMemFree with retail's type-name tag and line -2 (the probe logs it; the game frees)
 inline void StormFreeTag(void* p, const char* tag) { Storm_Sub1B960(p, tag, -2); }
 
@@ -407,7 +428,9 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1fa0(uint32_t* r) {
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_storm_2020(uint32_t* r) {
     StormHashTable* h = P(StormHashTable*, 0);
+    if (r[13] >= 2) g_stormArena = { (uint8_t*)(uintptr_t)r[16], r[31], 0x10 };   // FN vector: blob 1 is the allocator arena
     StormHashTableReuseInit(h);
+    g_stormArena.base = nullptr;
     h->vtable = (void*)kStormVtblHashReuseRgn;
     h->field48 = (~(uintptr_t)h) & 0x0fffffffu;
     h->field4c = 0;
@@ -556,6 +579,7 @@ extern "C" uint32_t Storm_Sub24F0(StormHashTable* h) {
 extern "C" void Storm_Sub1CF0(void* e) { Storm_GuestUnlink((uint8_t*)e + 0xC); Storm_GuestUnlink((uint8_t*)e + 4); }
 extern "C" void Storm_Port1990(void* h) { StormHashTableFoundationDestroy((StormHashTable*)h); }
 extern "C" void Storm_Port16B0(void* h) { StormHashTableReuseDestroy((StormHashTable*)h); }
+extern "C" void Storm_FnArena(void* base, uintptr_t cap, uintptr_t start) { g_stormArena.base = (uint8_t*)base; g_stormArena.cap = base ? cap : 0; g_stormArena.off = start; }
 extern "C" void Storm_Port2560(void* h) { StormHashTableReuseInit((StormHashTable*)h); }
 extern "C" void Storm_Port2740(void* c) { StormChunkDestroy((StormChunk*)c); }
 extern "C" void Storm_Port27D0(void* c) { StormChunkDelete((StormChunk*)c); }

@@ -15,6 +15,9 @@
 #include <cstring>
 #include <Windows.h>
 
+extern "C" void* Storm_Sub1C580(uint32_t size, const char* tag, int32_t line, uint32_t flags);   // storm_alloc_1b960.cpp
+extern "C" int32_t Storm_Sub1B960(void* p, const char* tag, int32_t line);
+
 namespace {
 
 // ---- retail module state (all zero-initialised unless noted) -----------------------------------
@@ -42,23 +45,25 @@ uint32_t g_table[0x10][4];        // 0x6FC41A38  per-index {value0,value1,value2
 // ---- unmapped internal callees, retail argument order -----------------------------------------
 int32_t Storm_SubFF80(void* a);
 
-// 1.13c Storm+0x11C90: fetch the provider's list (vtable +0x28), count entries whose flags (+4) & 0xB are 0 into *cnt (retail EAX),
-// and pack those 0x23C-byte nodes plus their payload (+0x12C ptr, +0x130 len) into one fresh block stored at *out (retail ESI).
-// ponytail: malloc stands in for the SCode pool allocator 0x1C580; g_smack is never set here, so 123B0 never reaches this.
-int32_t Storm_Sub11C90(uint32_t* head, uint32_t arg, int32_t* cnt, uint32_t** out) {
-    typedef int (*Fetch)(uint32_t, uint32_t*, uint32_t**);
-    typedef void (*Release)(uint32_t*, uint32_t*);
-    uint32_t* tail = head;
+// 1.13c Storm+0x11C90 (registers: EAX = &count, ECX = p1, EDX = p2; stack: &outBlock, relArg; ret 8): ask the provider (vtable +0x28, stdcall
+// (p2, p1, &head); head starts as p1) for its node list, count the nodes whose flags (+4) & 0xB are 0 into *cnt, and when any, pack those
+// 0x23C-byte nodes plus their payload (+0x12C ptr, +0x130 len) into one SMemAlloc block (SNET.CPP:0x631) stored at *outBlock. The list is handed back
+// to the provider (vtable +0x4C, stdcall (head, relArg)) on every path past a successful fetch. A failed fetch returns 0 with *cnt = 0.
+const char kSnetCpp[] = "..\\3rdParty\\STORM\\SOURCE\\SNET.CPP";
+int32_t Storm_Sub11C90(int32_t* cnt, uint32_t p1, uint32_t p2, uint32_t* outBlock, uint32_t relArg) {
+    typedef int (*Fetch)(uint32_t, uint32_t, uint32_t*);
+    typedef void (*Release)(uint32_t, uint32_t);
+    uint32_t head = p1;
     *cnt = 0;
-    if (!((Fetch)(((void**)g_smack)[0x28 / sizeof(void*)]))(arg, head, &tail)) return 0;
+    if (!((Fetch)(((void**)g_smack)[0x28 / sizeof(void*)]))(p2, p1, &head)) return 0;
     *cnt = 0;
     if (head) {
-        for (uint32_t* n = head; n; n = (uint32_t*)(uintptr_t)n[0x4a]) if ((n[1] & 0xb) == 0) ++*cnt;
+        for (uint32_t* n = (uint32_t*)(uintptr_t)head; n; n = (uint32_t*)(uintptr_t)n[0x4a]) if ((n[1] & 0xb) == 0) ++*cnt;
         if (*cnt) {
-            uint8_t* dst = (uint8_t*)malloc((size_t)*cnt * 0x23c);
-            *out = (uint32_t*)dst;
+            uint8_t* dst = (uint8_t*)Storm_Sub1C580((uint32_t)*cnt * 0x23c, kSnetCpp, 0x631, 0);
+            *outBlock = (uint32_t)(uintptr_t)dst;
             uint32_t* prev = nullptr;
-            for (uint32_t* n = head; n; n = (uint32_t*)(uintptr_t)n[0x4a]) {
+            for (uint32_t* n = (uint32_t*)(uintptr_t)head; n; n = (uint32_t*)(uintptr_t)n[0x4a]) {
                 if ((n[1] & 0xb) != 0) continue;
                 uint32_t* d = (uint32_t*)dst;
                 if (prev) prev[0x4a] = (uint32_t)(uintptr_t)d;
@@ -73,7 +78,7 @@ int32_t Storm_Sub11C90(uint32_t* head, uint32_t arg, int32_t* cnt, uint32_t** ou
             }
         }
     }
-    ((Release)(((void**)g_smack)[0x4c / sizeof(void*)]))(head, tail);
+    ((Release)(((void**)g_smack)[0x4c / sizeof(void*)]))(head, relArg);
     return 1;
 }
 // 1.13c Storm+0x169A0: one-shot SNP provider scan (*.snp beside the module, SnpQuery per file,
@@ -107,25 +112,44 @@ int32_t SystemTimeToFileTime(const SYSTEMTIME*, FILETIME* out) {
     return 1;
 }
 
-// 1.13c Storm+0x123B0 (ordinal 104): open a file inside an archive; returns 0/1.
-// param_3 must be non-null (0x57 otherwise); param_4 (if given) receives 0 on entry.
-uint32_t Storm_Sub123B0(uint32_t param_1, uint32_t* param_2, void* param_3, uint32_t* param_4) {
-    if (param_3 == nullptr) {
+// 1.13c Storm+0x123B0 (ordinal 104, stdcall a0 a1 cb a3, ret 0x10): enumerate the provider's list. A null callback is 0x57. Under the lock *a3 (when
+// given) takes 0; no provider table is 0x4B4. Otherwise 0x11C90 (a0 in EDX, a1 in ECX; block and count land in locals) builds the packed list, and
+// after the lock drops the callback runs (stdcall (node[0], node+0x28, node+0xA8)) over at most `count` nodes, stopping on a 0 result; the block is
+// freed (SNET.CPP:0xE30) and the function returns 1. a3 is passed through to the provider's release slot.
+uint32_t Storm_Sub123B0(uint32_t a0, uint32_t a1, uint32_t cb, uint32_t* a3) {
+    typedef int (*Cb)(uint32_t, const void*, const void*);
+    if (cb == 0) {
         g_lastError = 0x57;
         StormSetLastError(0x57);
         return 0;
     }
     EnterCriticalSection(&g_lock);
-    if (param_4 != nullptr) *param_4 = 0;
+    if (a3 != nullptr) *a3 = 0;
     if (g_smack == nullptr) {
         g_lastError = 0x4b4;
         StormSetLastError(0x4b4);
-    } else if (Storm_Sub11C90(param_2, param_1, (int32_t*)param_4, (uint32_t**)param_3) != 0) {
         LeaveCriticalSection(&g_lock);
-        return 1;
+        return 0;
+    }
+    int32_t count = 0;
+    uint32_t block = 0;
+    if (Storm_Sub11C90(&count, a1, a0, &block, (uint32_t)(uintptr_t)a3) == 0) {
+        LeaveCriticalSection(&g_lock);
+        return 0;
     }
     LeaveCriticalSection(&g_lock);
-    return 0;
+    uint8_t* node = (uint8_t*)(uintptr_t)block;
+    if (count != 0) {
+        uint32_t left = (uint32_t)count;
+        while (true) {
+            --left;
+            if (((Cb)(uintptr_t)cb)(rd32(node, 0), node + 0x28, node + 0xa8) == 0) break;
+            node = (uint8_t*)(uintptr_t)rd32(node, 0x128);
+            if (left == 0) break;
+        }
+    }
+    if (block != 0) Storm_Sub1B960((void*)(uintptr_t)block, kSnetCpp, 0xe30);
+    return 1;
 }
 
 // 1.13c Storm+0x16D90 (ordinal 105): walk the archive list and invoke the caller's callback.
@@ -578,3 +602,13 @@ extern "C" void Storm_123B0_FnPin10720(const uint8_t* s1, const uint8_t* s2, con
     g_45344 = v344; g_45350 = v350; g_45358 = (void*)(uintptr_t)p358; g_45170 = v170;
 }
 extern "C" uint32_t Storm_123B0_Fn10720(uint32_t kind, void* dst, uint32_t size, uint32_t* len) { return Storm_Sub10720(kind, dst, size, len); }
+
+// FN seam for 0x11C90 / 0x123B0: a provider table whose +0x28 (fetch) and +0x4C (release) slots are the probe's recorders; null slots mean no provider.
+static void* g_fnVt[0x50 / sizeof(void*)];
+extern "C" void Storm_123B0_FnSetVt(void* fetch, void* release) {
+    g_fnVt[0x28 / sizeof(void*)] = fetch; g_fnVt[0x4c / sizeof(void*)] = release;
+    g_smack = (fetch || release) ? (void*)g_fnVt : nullptr;
+}
+extern "C" int32_t Storm_123B0_Fn11C90(int32_t* cnt, uint32_t p1, uint32_t p2, uint32_t* out, uint32_t rel) { return Storm_Sub11C90(cnt, p1, p2, out, rel); }
+extern "C" uint32_t Storm_123B0_Fn123B0(uint32_t a0, uint32_t a1, uint32_t cb, uint32_t* a3) { return Storm_Sub123B0(a0, a1, cb, a3); }
+extern "C" void Storm_123B0_FnSetLastError(int32_t e) { g_lastError = e; }

@@ -30,7 +30,7 @@ void setBool(uint8_t* rec, const char* str, int32_t* consumed);
 void setNumber(Ctx&, uint8_t* rec, const char* str, int32_t* consumed);
 void setString(Ctx&, uint8_t* rec, const char* str, int32_t* consumed);
 uint8_t* findLongest(Ctx&, uint8_t* head, int32_t minLen, const char* str);
-bool netQuery(Ctx&, uint32_t cb, uint32_t arg, uint32_t* out2, void** buf);
+bool netQuery(Ctx&, uint32_t cb, uint32_t p1, uint32_t p2, uint32_t p3, uint32_t* out2, void** buf);
 void postEvent(Ctx&, uint32_t a, uint32_t b, const void* data, uint32_t len);
 void initMemory(Ctx&);
 }
