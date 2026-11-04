@@ -161,7 +161,7 @@ int32_t sub_46230(NpcMenu& m, int32_t unit, bool withBuf, int32_t uiState, int32
  *out = m.send(1, k); return 1;
 }
 
-// 1.13c D2Client+0x43A70 (end-game-ok screen build/teardown). 6 or 12 tile layout; positions recovered, widget calls seams.
+// 1.13c D2Client+0x43A70 (end-game-ok screen build/teardown). 8 or 12 tile layout; widget calls seams.
 struct EndGame {
  virtual ~EndGame() = default;
  virtual bool alreadyBuilt() = 0;               // Ordinal_10043 != 0
@@ -176,11 +176,11 @@ bool sub_43A70(EndGame& g, bool hiRes, int32_t w, int32_t h) {
  if (!g.alreadyBuilt()) {
   if (!g.menuReady()) return false;
   g.loadAssets();
-  if (!hiRes) {
-   g.tile(2,0x100,0); g.tile(3,0,h-1); g.tile(4,0x100,h-1);
-   g.tile(5,w/2,0x100); g.tile(6,w/2+0x100,w/2); g.tile(7,h,w/2+0x100);
-  } else {
-   for (int i = 0; i < 12; ++i) g.tile(i+1, (i%4)*0x100, (i/4)*0x100);
+  if (!hiRes) {   // 8 tiles; y is the bottom edge; w=DAT_bc48 h=DAT_bc4c
+   g.tile(0,0,0x100); g.tile(1,0x100,0x100); g.tile(2,0,h-1); g.tile(3,0x100,h-1);
+   g.tile(4,w/2,0x100); g.tile(5,w/2+0x100,0x100); g.tile(6,w/2,h); g.tile(7,w/2+0x100,h);
+  } else {        // 12 tiles, 4 columns; rows end at y=0x100, 0x200, 600
+   for (int i = 0; i < 12; ++i) g.tile(i, (i%4)*0x100, i < 8 ? (i/4+1)*0x100 : 600);
   }
   g.finish();
  }

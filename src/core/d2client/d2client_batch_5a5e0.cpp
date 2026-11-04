@@ -30,7 +30,7 @@ struct State {
  uint32_t popupHireling{},hireFlag{};
  int32_t* dataTables{};
 };
-static float kf(int32_t v){ float f=(float)v; if(v<0) f+=4294967296.0f; return f*(1.0f/1024.0f); }
+static double kf(int32_t v){ double f=(double)v; if(v<0) f+=4294967296.0; return f*(1.0/1024.0); }
 static void emit(Services& s,int x,int y,const char* fmt,...) __attribute__((format(printf,4,5)));
 static void emit(Services& s,int x,int y,const char* fmt,...){
  char b[1024]; va_list a; va_start(a,fmt); vsnprintf(b,sizeof b,fmt,a); va_end(a); s.drawText(x,y,b); }
@@ -45,7 +45,7 @@ void toggleDebug(Services& s,State& st){
 void cacheOverlay(Services& s){
  int32_t a,b,c,d; s.tileStats(a,b,c,d);
  if(c>0){
-  float pct=(float)((double)d*100.0/(double)c);
+  double pct=(double)b*100.0/(double)c;
   emit(s,10,0x30,"Tile Cache: (%.2fK) %3.2f%%, Misses: %d, %d percent utilized\n",(double)kf(a),(double)pct,b,d);
  }
  uint32_t* p=s.cacheStats(); if(!p) return;

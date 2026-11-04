@@ -247,7 +247,8 @@ uint32_t sub_C7550(const Env& e, P u, P a2) {
  e.f53220(0, 0, 0, 0, 0, 0);
  return 1;
 }
-// 1.13c D2Client+0xC76C0  (lim = stack arg forwarded to C66A0)
+// 1.13c D2Client+0xC76C0  (ECX=u, EDX=a2 class, stack lim forwarded to C66A0)
+// Seam arg order: f51340(unit, &X, &Y) [EBX, EDI, stack]; f75fe0(a2, unit, X) [EAX, stack]; f53220(unit) [EDI].
 uint32_t sub_C76C0(const Env& e, P u, P a2, int32_t lim) {
  P o = e.o10511(u, 0, 0, 0, 0, 0);
  if (!o) return 0;
@@ -256,39 +257,37 @@ uint32_t sub_C76C0(const Env& e, P u, P a2, int32_t lim) {
   if (e.o10601(o, (P)e.skillsBarPath, 0x1ba, 0, 0, 0) == a2 && ((uint32_t)e.o10397(o, 0, 0, 0, 0, 0) & 1)) return 0;
  }
  bool one = (u ? e.rd32(u) : 6) == 1;
- int32_t xy[2] = {0, 0};
- uint32_t buf[2];
- int32_t x, y;
- if (!one) {
-  if (!e.f51340((P)buf, 0, 0, 0, 0, 0)) return 0;
-  xy[0] = (int32_t)buf[0]; xy[1] = (int32_t)buf[1];
-  if (!e.f75fe0(u, 0, 0, 0, 0, 0)) return 0;
-  if (!sub_C66A0(e, u, e.rd32(u + 4), lim, &xy[0], &xy[1])) return 0;
-  x = xy[0]; y = xy[1];
- } else {
+ int32_t X = 0, Y = 0, x, y;
+ if (one) {
   P k = e.f55f70(0, 0, 0, 0, 0, 0);
   if (!k) {
-   if (!e.f51340((P)buf, 0, 0, 0, 0, 0)) return 0;
+   if (!e.f51340(u, (P)&X, (P)&Y, 0, 0, 0)) return 0;
    e.o11031(o, 0xffffffffu, 0, 0, 0, 0);
-   x = (int32_t)buf[0]; y = (int32_t)buf[1];
+   x = X; y = Y;
   } else {
    x = 2 * (int32_t)e.f1630(k, 0, 0, 0, 0, 0) - (int32_t)e.f1630(u, 0, 0, 0, 0, 0);
    y = 2 * (int32_t)e.f1660(k, 0, 0, 0, 0, 0) - (int32_t)e.f1660(u, 0, 0, 0, 0, 0);
   }
   int32_t pt[2] = {x, y};
-  P mk = e.o10589(u, 0x3c01, 0, 0, 0, 0);
-  P r = e.o10331(u, (P)pt, mk, 0, 0, 0);
-  if (!e.o10509(r, 0, 0, 0, 0, 0)) return 0;
+  P room = e.o10331(u, 0, 0, 0, 0, 0);
+  P m = e.o10589(u, 0, 0, 0, 0, 0);
+  if (!e.o10509(room, (P)pt, m, 0x3c01, 0, 0)) return 0;
+  x = pt[0]; y = pt[1];
+ } else {
+  if (!e.f51340(u, (P)&X, (P)&Y, 0, 0, 0)) return 0;
+  if (!e.f75fe0(a2, u, (P)(uint32_t)X, 0, 0, 0)) return 0;
+  if (!sub_C66A0(e, u, a2, lim, &X, &Y)) return 0;
+  x = X; y = Y;
  }
  e.o10331(u, 0, 0, 0, 0, 0);
- e.f1400(0, 0, 0, 0, 0, 0);
- P w = e.o10123(u, 0x80, 0, 0, 0, 0);
- e.o10565(one, (P)(uint32_t)x, (P)(uint32_t)y, w, 0, 0);
+ P r1400 = e.f1400(0, 0, 0, 0, 0, 0);
+ P w = e.o10123(u, 0, 0, 0, 0, 0);
+ e.o10565(r1400, (P)(uint32_t)x, (P)(uint32_t)y, w, 0x80, 0);
  e.o10243(o, (P)(uint32_t)x, 0, 0, 0, 0);
  e.o10554(o, (P)(uint32_t)y, 0, 0, 0, 0);
- if (u) { P k = e.f55f70(0, 0, 0, 0, 0, 0); if (k) { e.o10748(o, e.rd32(k), 0, 0, 0, 0); e.o11031(o, e.rd32(k + 12), 0, 0, 0, 0); } }
+ if (one) { P k = e.f55f70(0, 0, 0, 0, 0, 0); if (k) { e.o10748(o, e.rd32(k), 0, 0, 0, 0); e.o11031(o, e.rd32(k + 12), 0, 0, 0, 0); } }
  e.o10137(o, 0x1080, 0, 0, 0, 0);
- e.f53220(0, 0, 0, 0, 0, 0);
+ e.f53220(u, 0, 0, 0, 0, 0);
  return 1;
 }
 }

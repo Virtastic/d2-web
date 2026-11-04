@@ -3,6 +3,7 @@
 // shows only as in_EAX/unaff_*: a GUESS, so rows using it stay NAMED.
 #include <cstdint>
 #include <cstddef>
+#include <cstdio>
 namespace d2client_batch_5ebc0 {
 struct G {
  uint8_t* cc24c{}; int32_t cc250{};          // sound-record array (0x8e bytes each) and count
@@ -107,29 +108,60 @@ void sub_5F360(G& g,TNode* n){
 void sub_5F3B0(TNode* n,int32_t* cnt){
  for(;n;n=n->sib){ sub_5F3B0(n->child,cnt); if(n->kind==0) *cnt+=6; }
 }
-// 1.13c D2Client+0x5F3E0  map-file open: ordinals unattributed, flow only (REG?/stack args of 10107/10110/578/501 are guesses)
+// 1.13c D2Client+0x5F3E0  automap map-file handle: opens "<save dir><name>.map", checks the 0x18-byte header, returns the
+// handle of "<save dir><name>.ma<slot>". Name text = DAT_6fbc9928, subdir text = DAT_6fbc9860 (first byte tests it).
+// Callees: Fog#10115 getSavePath, Storm#578 snprintf, Fog#10114 ensureDir, Fog#10107 open (path, access, 0,0,4,0x80,0),
+// Storm#501 strcpy, Fog#10110 read, Fog#10108 delete, Fog#10112 seek, Fog#10111 write, Fog#10109 close.
 struct MapSvc {
  virtual ~MapSvc()=default;
- virtual void o10115()=0; virtual void o578(char*)=0; virtual void o10114()=0;
- virtual int32_t o10107(int32_t a,int32_t b,int32_t c,int32_t d,int32_t e)=0; virtual void o501()=0;
- virtual void o10110(int32_t n,int32_t* blk)=0; virtual void o10108()=0; virtual void o10109()=0; // Fog 10110 = ReadFile(hFile, blk+1, n, &blk[0], 0)
- virtual void o10112(int32_t,int32_t)=0; virtual void o10111(int32_t,int32_t*,int32_t)=0;
- virtual void fmtMap(char* out)=0; virtual void fmtMa(char* out,int32_t n)=0; // "%s%s.map" / "%s%s.ma%d"
+ virtual void getSavePath(char* buf,uint32_t max)=0;
+ virtual void ensureDir(const char* path)=0;
+ virtual int32_t open(const char* path,uint32_t access,int32_t a,int32_t b,int32_t c,int32_t d,int32_t e)=0;
+ virtual void strcopy(char* dst,const char* src,uint32_t max)=0;
+ virtual void read(int32_t h,void* buf,uint32_t n,uint32_t* got,int32_t z)=0;
+ virtual void remove(const char* path)=0;
+ virtual void seek(int32_t h,int32_t pos,int32_t a,int32_t b)=0;
+ virtual void write(int32_t h,const void* buf,uint32_t n,uint32_t* put,int32_t z)=0;
+ virtual void close(int32_t h)=0;
 };
-int32_t sub_5F3E0(MapSvc& s,G& g){
- char b[264]{},c[264]{},ma[24]{}; int32_t blk[7]{}; int32_t idx=0;
- s.o10115();
+int32_t sub_5F3E0(MapSvc& s,G& g,const char* subdir,const char* name){
+ char A[0x104]={},B[0x104]={},C[0x104]={};
+ int32_t hdr[6]={};      // E+0x10..: [0]=version 0xc, [1]=next slot, [2..5]=four owner ids
+ uint32_t got=0;
+ s.getSavePath(A,0x104);
+ int32_t h;
  bool direct=true;
- if(g.c9860!=0){ s.o578(c); s.o10114(); s.o578(b); if(s.o10107(0,0,0,0,0)!=-1){ direct=false; s.o501(); } }
- if(direct){ s.fmtMap(b); if(s.o10107(0,4,0x80,0,0)==-1) return -1; }
- s.o10110(0x18,blk); // blk[0]=bytes read, blk[1..6]=0x18-byte header; retail tests blk[0]==0x18 and blk[1]==0xc
- if(blk[0]==0x18&&blk[1]==0xc){
-  int i=0; for(;i<4;i++) if(blk[i]==g.cc3bc) break;
-  if(i==4){ blk[idx]=g.cc3bc; s.fmtMa(ma,idx); s.o10108(); s.o10112(0,0); s.o10111(0x18,blk,0); }
-  else idx=i;
- } else { for(int i=0;i<4;i++){ s.fmtMa(ma,i); s.o10108(); } idx=0; s.o10112(0,0); s.o10111(0x18,blk,0); }
- s.o10109(); s.fmtMa(ma,idx);
- return s.o10107(0,0,4,0x80,0);
+ if(g.c9860!=0){
+  std::snprintf(C,sizeof C,"%s%s\\",A,subdir);
+  s.ensureDir(C);
+  std::snprintf(B,sizeof B,"%s%s.map",C,name);
+  h=s.open(B,0xC0000000u,0,0,4,0x80,0);
+  if(h!=-1){ direct=false; s.strcopy(A,C,0x104); }
+ }
+ if(direct){
+  std::snprintf(B,sizeof B,"%s%s.map",A,name);
+  h=s.open(B,0xC0000000u,0,0,4,0x80,0);
+  if(h==-1) return -1;
+ }
+ s.read(h,hdr,0x18,&got,0);
+ int32_t idx;
+ bool rewrite=true;
+ if(got==0x18&&hdr[0]==0xc){
+  int i=0; for(;i<4;i++) if(hdr[2+i]==g.cc3bc) break;
+  if(i!=4){ idx=i; rewrite=false; }
+  else{
+   idx=hdr[1]; hdr[1]=(idx+1)%4; hdr[2+idx]=g.cc3bc;   // C signed remainder
+   std::snprintf(B,sizeof B,"%s%s.ma%d",A,name,idx); s.remove(B);
+  }
+ } else {
+  hdr[0]=0xc; hdr[1]=1; hdr[2]=g.cc3bc;
+  for(int i=0;i<4;i++){ std::snprintf(B,sizeof B,"%s%s.ma%d",A,name,i); s.remove(B); }
+  idx=0;
+ }
+ if(rewrite){ s.seek(h,0,0,0); s.write(h,hdr,0x18,&got,0); }
+ s.close(h);
+ std::snprintf(B,sizeof B,"%s%s.ma%d",A,name,idx);
+ return s.open(B,0xC0000000u,0,0,4,0x80,0);
 }
 // 1.13c D2Client+0x5F6B0  (appends 20-byte entry slot; blocks of 0x2800 bytes = 512 entries, next ptr word 0xa00)
 void sub_5F6B0(Svc& s,G& g){

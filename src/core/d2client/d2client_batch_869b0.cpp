@@ -90,16 +90,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_87230(const uint8_t* key16, D2cWa
     if (w->ctx) { uint8_t ft[8] = {0}; slot_d0(ret, ft, -1, -1); }  // GetSystemTimeAsFileTime -> slot
 }
 
-// 1.13c D2Client+0x872D0 -- header check "SIGN" (0x5349474E), ends via sigcheck
-extern "C" EMSCRIPTEN_KEEPALIVE bool d2_client_872d0(uint32_t param1, uint32_t eax, int32_t edi, const D2cWardenEnv* e) {
-    if (eax < param1) { e->fatal(); return false; }
-    if (edi + 4U <= eax) {
-        uint32_t magic = 0;
-        e->ord491(&magic);
-        if (magic == 0x5349474e) return e->sigcheck() == 0;
-    }
-    return false;
-}
 
 static void d2c_drop(D2cWardenNode*& n, const D2cWardenEnv* e) {
     if (n) { e->fn4e630(n); e->fn1a00(n); e->free_(n); }

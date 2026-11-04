@@ -103,24 +103,28 @@ void sub_60AA0(Host& h, int32_t looked /*Ordinal_10331(handle)*/, int32_t handle
  W buf[1] = {};
  h.drawText(buf, 4, 0); h.emit(buf, 0, 0); lineY += 0x10;
 }
-// 1.13c D2Client+0x645A0  UI widget setup; calls FUN_6fb13e90 on 5 table pairs, loads OptBar/OptBarC/OptSkull
+// 1.13c D2Client+0x645A0  options menu table and art init. Table addresses are image addresses minus the 6FAB0000 base (RVAs).
 struct UiInit {
  virtual ~UiInit() = default;
- virtual void table(int a, int b) = 0;                 // FUN_6fb13e90(start,end) with region RVAs GUESS
- virtual int32_t loadCel(const char* path) = 0;        // FUN_6fadb420(0)
- virtual int32_t expansion() = 0;                      // Ordinal_10227
- virtual uint32_t count() = 0;                         // Ordinal_10086
- virtual int32_t entryWidth(uint32_t i) = 0;           // Ordinal_10060(Ordinal_10021(..)) GUESS
+ virtual void table(uint32_t cntRva, uint32_t entsRva) = 0;   // D2Client+0x63E90(count*, entries*)
+ virtual int32_t loadCel(const char* path) = 0;               // D2Client+0x2B420(path, 0)
+ virtual int32_t expansion() = 0;                             // Ordinal_10227
+ virtual uint32_t count(uint32_t h) = 0;                      // Ordinal_10086(DAT_6fbcb9c0)
+ virtual int32_t entryWidth(uint32_t* req) = 0;               // Ordinal_10060(Ordinal_10021(req)); req = 0x48-byte request, req[0]=index, req[13]=handle
 };
-void sub_645A0(UiInit& u, int32_t out[4]) {
- u.table(0x92ac0, 0x92ad8); u.table(0x93ac8, 0x93ae0); u.table(0x95570, 0x95588);
- if (!u.expansion()) { u.table(0x98008, 0x98020); u.table(0x9cfe8, 0x9d000); }
- else { u.table(0x9a550, 0x9a568); u.table(0x9efe0, 0x9eff8); }
- out[0] = u.loadCel("DATA\\GLOBAL\\UI\\Widgets\\OptBar");     // DAT_6fbcc070
- out[1] = u.loadCel("DATA\\GLOBAL\\UI\\Widgets\\OptBarC");    // DAT_6fbcc074
- out[2] = u.loadCel("DATA\\GLOBAL\\UI\\Widgets\\OptSkull");   // DAT_6fbcc078
- int32_t m = 0; for (uint32_t i = 0, n = u.count(); i < n; i++) { int32_t w = u.entryWidth(i); if (m <= w) m = w; }
- out[3] = m;                                                   // DAT_6fbcc07c
+// out: [0]=+0xCC05C [1]=+0xCC060 [2]=+0xCC070 [3]=+0xCC074 [4]=+0xCC078 [5]=+0xCC07C; h = +0xBCB9C0
+void sub_645A0(UiInit& u, uint32_t h, int32_t out[6]) {
+ u.table(0xe2ac0, 0xe2ad8); u.table(0xe3ac8, 0xe3ae0); u.table(0xe5570, 0xe5588);
+ if (!u.expansion()) { u.table(0xe8008, 0xe8020); u.table(0xecfe8, 0xed000); }
+ else { u.table(0xea550, 0xea568); u.table(0xeefe0, 0xeeff8); }
+ out[0] = 0xe2ac0; out[1] = 0xe2ad8;
+ out[2] = u.loadCel("DATA\\GLOBAL\\UI\\Widgets\\OptBar");
+ out[3] = u.loadCel("DATA\\GLOBAL\\UI\\Widgets\\OptBarC");
+ out[4] = u.loadCel("DATA\\GLOBAL\\UI\\Widgets\\OptSkull");
+ uint32_t req[18] = {}; req[13] = h;
+ int32_t m = 0; uint32_t n = u.count(h);
+ for (req[0] = 0; req[0] < n; req[0]++) { int32_t w = u.entryWidth(req); if (m <= w) m = w; }
+ out[5] = m;
 }
 // 1.13c D2Client+0x67940  destructor: vtable reset, delete owned member [2]
 struct Obj { const void* vt; int32_t f1; struct Del { virtual void d(int) = 0; }* owned; };

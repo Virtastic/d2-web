@@ -20,6 +20,7 @@ struct D2cItmEnv {
     const char* file;                         // "..\Source\D2Client\UNIT\Item.cpp"
     uint8_t*  slotOn;                         // +0x10C484 u8[4]
     uint32_t  tick;                           // DAT_6fbc9854
+    W    (*call8)(uint32_t id, W a, W b, W c, W d, W e, W f, W g, W h);   // 8-argument callees (log call, 0x32660)
 };
 struct D2cHdr { uint8_t act, slot, flag, pad; uint32_t a, b; };  // Ordinal_11105 decode result
 
@@ -114,9 +115,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_84c60(const D2cItmEnv* e, uint8_t
 }
 
 // 1.13c D2Client+0x84F00 (packet in param_1; returns the new/updated item unit or null)
+// Ordinal_11105 decode result at the frame: +0 item code, +4/+6 u16 pair, +8 action, +0xC flags, +0x10 dword, +0x11 slot byte.
+struct D2cItemHdr { uint32_t code; uint16_t a, b; uint8_t act, p9, pa, pb; uint32_t flags; uint8_t x10, slot, p12, p13; uint32_t x14; };
+static_assert(sizeof(D2cItemHdr) == 0x18, "hdr");
+static_assert(offsetof(D2cItemHdr, act) == 8 && offsetof(D2cItemHdr, flags) == 0xc && offsetof(D2cItemHdr, slot) == 0x11, "hdr offsets");
 extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* d2_client_84f00(const D2cItmEnv* e, const uint8_t* p) {
-    D2cHdr h; memset(&h, 0, sizeof h);
-    C(11105, A(p + 0xd), p[2] - 0xd, A(&h), 0);
+    D2cItemHdr h; memset(&h, 0, sizeof h);
+    C(11105, A(p + 0xd), p[2] - 0xd, 0, A(&h));
     uint8_t* pl = e->player;
     uint8_t* u = (uint8_t*)C(F_UNPACK_PLAYER, rd<uint32_t>(p, 9), p[8], 0, 0);
     if (!u) return nullptr;
@@ -128,68 +133,91 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* d2_client_84f00(const D2cItmEnv* e, con
     if (u == pl && h.act == 0) {
         uint8_t* n = findItem(e, id, bad);
         if (n) {
-            if (bad || (uint8_t*)C(10646, inv, A(n), 0, 0) != n) FATALR(0x5a);
-            C(10061, inv, 0, 0, 0);
-            if (!C(10202, A(n), 0x100, 0x96, A(e->file))) C(11127, 0, 0, 0, 0);
+            if (bad) FATALR(0x5a);
+            if ((uint8_t*)C(10646, inv, A(n), 0, 0) != n) FATALR(0xbf5);
+            if (rd<int32_t>(u, 0) == 0) C(10061, inv, 0, 0, 0);
+            if (!C(10202, A(n), 0x100, 0x96, A(e->file))) C(11127, A(u), A(n), 0, 0);
             C(V(0x6fb55b00), rd<int32_t>(n, 0), rd<uint32_t>(n, 0xC), 0, 0);
         }
         C(F_SELECT, 0, 0, 0, 0);
-        C(10869, A(e->file), 0xbfc, inv, C(10584, A(u), 0, e->tick, 0));
+        {
+            W r = C(10584, A(u), rd<uint32_t>((const uint8_t*)&h, 0x10), e->tick, 0);
+            e->call8(10869, A(e->file), 0xbfc, inv, h.a, h.b, r, 1, rd<uint32_t>((const uint8_t*)&h, 0x10));
+        }
+        if (h.x10 == 0xff) return nullptr;
         item = (uint8_t*)C(F_MAKE, A(p), A(&h), 0, 0);
-        C(V(0x6fb32660), A(item), 0, 0, 0);
-        if (C(11057, A(item), A(u), 0, 0)) C(F_UI1, 0, 0, 0, 0);
+        // eax=hdr+4 dword, ecx=item, stack: hdr+6 dword, hdr+0x10 dword, owner (register args first, then stack)
+        e->call8(V(0x6fb32660), rd<uint32_t>((const uint8_t*)&h, 4), A(item), rd<uint32_t>((const uint8_t*)&h, 6), rd<uint32_t>((const uint8_t*)&h, 0x10), A(u), 0, 0, 0);
+        if (!C(11057, A(item), A(u), 0, 0)) goto done;
+        C(F_UI1, 0, 0, 0, 0);
     } else if (h.act == 1) {
         W rec = C(11139, inv, h.slot, 0, 0);
         C(F_PRE, A(u), 0, 0, 0);
         if (!rec) return nullptr;
         C(10694, inv, rec, 0, 0);
-        C(F_PRE2, A(u), 0, 0, 0);
-        C(10605, A(u), inv, A(&h), h.slot);
-        if (C(10646, inv, rec, 0, 0)) FATALR(0x5a);
-        C(10061, inv, 0, 0, 0);
-        if (!C(10202, 0, 0x100, 0x96, A(e->file))) C(11127, A(u), 0, 0, 0);
-        C(10600, A(u), 0, 1, 1);
-        C(10608, inv, 0, 0, 0);
-        C(F_UI3, 0, 0, 0, 0);
-        C(V(0x6fb55b00), 6, 0xffffffffu, 0, 0);
-        if (u == pl) { C(F_SELECT, 0, 0, 0, 0); if (h.slot == 5) e->v5c[1] = 0; }
+        C(F_PRE2, A(u), p[3], 0, 0);
+        C(10605, A(u), inv, A(&rec), h.slot);   // retail passes the address of the stack local holding rec
+        if ((W)C(10646, inv, rec, 0, 0) != rec) FATALR(0xc1e);
+        if (rd<int32_t>(u, 0) == 0) C(10061, inv, 0, 0, 0);
+        if (!C(10202, rec, 0x100, 0x96, A(e->file))) C(11127, A(u), rec, 0, 0);
+        C(10600, A(u), rec, 1, 1);
+        C(10608, inv, h.slot, 0, 0);
+        C(F_UI3, A(u), 0, 0, 0);
+        if (rec) C(V(0x6fb55b00), rd<int32_t>((const uint8_t*)rec, 0), rd<uint32_t>((const uint8_t*)rec, 0xC), 0, 0);
+        else C(V(0x6fb55b00), 6, 0xffffffffu, 0, 0);
+        rec = 0;
+        if (u == pl) {
+            C(F_SELECT, 0, 0, 0, 0);
+            if (h.slot == 4) e->v5c[0] = 0;
+            else if (h.slot == 5) e->v5c[1] = 0;
+        }
         item = (uint8_t*)C(F_MAKE, A(p), A(&h), 0, 0);
-        C(10058, A(item), h.slot, 0, 0);
+        C(10058, A(item), rd<uint32_t>((const uint8_t*)&h, 0x11), 0, 0);
         if (!C(10405, inv, A(item), isEquipSlot(h.slot) ? 4 : 3)) return nullptr;
         if (!C(F_TRY, 0, 0, 0, 0)) return nullptr;
         C(10138, inv, A(item), 0, 0);
-        C(F_POST, 0, 0, 0, 0);
-        if (rd<uint8_t>((const uint8_t*)rec, 3) <= 1) C(F_PRE2, 0, 0, 0, 0);
-        C(F_UI3, 0, 0, 0, 0);
-        C(F_UI2, 0, 0, 0, 0);
-        C(F_UI1, 0, 0, 0, 0);
+        C(F_POST, A(u), 0, 0, 0);
+        if (p[3] == 0 || p[3] == 1) C(F_PRE2, A(u), p[3], 0, 0);
+        C(F_UI3, A(u), 0, 0, 0);
+        if (u == pl) {
+            C(F_UI2, A(item), 0, 0, 0);
+            if (!C(10197, h.flags, 8, 0, 0)) {
+                C(10466, inv, 0, 0, 0);
+                C(11017, inv, 0, 0, 0);
+                C(F_KILL, 0, 0, 0, 0);
+            }
+        }
+        C(F_UI1, A(item), 0, 0, 0);
         tail(e, A(u));
     } else {
         if (u != pl) return nullptr;
         if (h.act == 2) {
             uint8_t* n = findItem(e, id, bad);
             if (n) {
-                if (bad || (uint8_t*)C(10646, inv, A(n), 0, 0) != n) FATALR(0x5a);
+                if (bad) FATALR(0x5a);
+                if ((uint8_t*)C(10646, inv, A(n), 0, 0) != n) FATALR(0xc5e);
                 uint32_t k = (uint32_t)C(V(0x6fab1630), A(n), 0, 0, 0);
-                C(10267, 0, 0, 0, 0);
+                C(10267, inv, k, 0, 0);
+                k = (uint32_t)C(V(0x6fab1630), A(n), 0, 0, 0);
                 if (k < 4) e->slotOn[k] = 0;
-                C(10061, inv, 0, 0, 0);
-                if (!C(10202, A(n), 0x100, 0x96, 0)) C(11127, 0, 0, 0, 0);
+                if (rd<int32_t>(u, 0) == 0) C(10061, inv, 0, 0, 0);
+                if (!C(10202, A(n), 0x100, 0x96, A(e->file))) C(11127, A(u), A(n), 0, 0);
                 C(V(0x6fb55b00), rd<int32_t>(n, 0), rd<uint32_t>(n, 0xC), 0, 0);
             }
             C(V(0x6fad6410), 0, 0, 0, 0);
             item = (uint8_t*)C(F_MAKE, A(p), A(&h), 0, 0);
-            if (h.act != 2) FATALR(0x5a);
-            C(10882, A(item), 0, 0, 0);
-            C(11118, A(item), 0, 0, 0);
-            if (!C(10405, inv, A(item), 2)) FATALR(0x5a);
-            if (!C(10655, C(V(0x6fab1630), A(item), 0, 0, 0), 0, 0, 0)) C(V(0x6fb31c90), 0, 0, 0, 0);
+            if (h.act != 2) FATALR(0xc69);
+            C(10882, A(item), h.a, 0, 0);
+            C(11118, A(item), h.b, 0, 0);
+            if (!C(10405, inv, A(item), 2)) FATALR(0xc89);
+            uint32_t pg = (uint32_t)C(V(0x6fab1630), A(item), 0, 0, 0);
+            if (!C(10655, inv, A(item), pg, 0)) C(V(0x6fb31c90), 0, 0, 0, 0);
             if (C(11057, A(item), A(u), 0, 0)) C(F_UI1, 0, 0, 0, 0);
             uint32_t k = (uint32_t)C(V(0x6fab1630), A(item), 0, 0, 0);
             if (k < 4) e->slotOn[k] = 1;
             C(F_DONE, 0, 0, 0, 0);
-            if (C(10197, A(u), 0x400, 0, 0)) C(V(0x6fb1b300), A(item), 2, 0, 0);
-            if (item) C(F_REFRESH, 0, 0, 0, 0);
+            if (C(10197, h.flags, 0x400, 0, 0)) C(V(0x6fb1b300), A(item), 2, 0, 0);
+            if (item) C(F_REFRESH, A(item), 0, 0, 0);
             return item;
         }
         if (h.act != 4) return nullptr;
@@ -197,14 +225,15 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint8_t* d2_client_84f00(const D2cItmEnv* e, con
         uint8_t* n = findItem(e, id, bad);
         if (n) { if (bad) FATALR(0x5a); C(V(0x6fb55b00), 4, rd<uint32_t>(n, 0xC), 0, 0); }
         item = (uint8_t*)C(F_MAKE, A(p), A(&h), 0, 0);
-        C(10882, A(item), 0, 0, 0);
-        C(11118, A(item), 0, 0, 0);
+        C(10882, A(item), h.a, 0, 0);
+        C(11118, A(item), h.b, 0, 0);
         C(10466, inv, A(item), 0, 0);
         C(11017, inv, 0, 0, 0);
         C(F_KILL, 0, 0, 0, 0);
     }
+done:
     C(F_DONE, 0, 0, 0, 0);
-    if (item) C(F_REFRESH, 0, 0, 0, 0);
+    if (item) C(F_REFRESH, A(item), 0, 0, 0);
     return item;
 }
 

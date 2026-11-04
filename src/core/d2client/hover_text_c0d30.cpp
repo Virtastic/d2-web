@@ -5,8 +5,9 @@
 struct D2cC0D30Env {
     int32_t mode;               // DAT D2Client+0x11C414 (3 = hidden)
     int32_t kindSwitch;         // Ordinal_10013() != 0 -> anchor from unit/screen pair
-    int32_t anchorX, anchorY;   // Ordinal_11080/11168 pair (kindSwitch) or Ordinal_10651/11142 derived pair
-    int32_t mouseX, mouseY;     // DAT 0x11995C/0x119960 + 0x11C418 (non-kindSwitch branch inputs)
+    int32_t anchorX, anchorY;   // Ordinal_11080/11168 pair (kindSwitch: Ordinal_10023 out pair) or Ordinal_10651/11142 results (else)
+    int32_t mouseX, mouseY;     // DAT 0x11995C / 0x119960 (non-kindSwitch branch inputs)
+    int32_t datCc418;           // DAT 0x11C418 (non-kindSwitch branch input)
     int32_t boxW;               // DAT D2Client+0x1BC48 (shifted by mode 1/2)
     int32_t (*bubbleLimit)();   // Ordinal_10522 (type 5 only; >100 suppresses)
     int32_t (*anchorOk)();      // Ordinal_10012 (kindSwitch branch; 0 returns)
@@ -23,7 +24,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_c0d30(const D2cC0D30Env* e, const int32_t* p) {
     int32_t t = p[0];
     if (t == 5 && e->bubbleLimit() > 100) return;
     int32_t x, y;
-    if (!e->kindSwitch) { x = e->mouseX; y = e->mouseY; }
+    if (!e->kindSwitch) { x = e->anchorX - (e->mouseY - e->datCc418); y = e->anchorY - (e->mouseX - 8); }
     else {
         if (!e->anchorOk()) return;
         x = e->anchorX; y = e->anchorY + 0x10;

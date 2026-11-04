@@ -3,16 +3,16 @@
 #include <cstdio>
 #include <emscripten.h>
 struct D2c89830Env {
-    uint32_t tableVal;                                      // dword at D2Client+0x91310 + eax*12
+    uint32_t tableVal;                                      // dword at D2Client+0xE1310 + eax*12
     int32_t (*regRead)(const char* app, const char* key, int32_t z, char* buf, int32_t cap);  // Ordinal_422
     void (*regWrite)(const char* app, const char* key, int32_t z, const char* val);          // Ordinal_425
-    uint32_t keyAddrLow;                                    // value of the "Aux Battle.net" pointer, kept when sscanf stores nothing
+    uint32_t unused;                                        // ABI placeholder (the fourth scan target starts at 0x22 in retail)
 };
 extern "C" {
 // 1.13c D2Client+0x89830
 EMSCRIPTEN_KEEPALIVE void d2c_89830(const D2c89830Env* e) {
     char buf[100];
-    uint32_t last = e->keyAddrLow;
+    uint32_t last = 0x22;   // the 4th scan target is initialised to 0x22 and kept when sscanf stores nothing
     uint8_t cur;
     if (!e->regRead("Diablo II", "Aux Battle.net", 0, buf, 100)) cur = 0x22;
     else {

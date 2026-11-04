@@ -20,8 +20,10 @@ struct D2c84750Env {
     uint16_t  hoverOn; uint8_t hoverBusy; // +0x10978E / +0x109781
     int32_t   hoverId;                   // +0x109786
 };
-struct Hdr { uint8_t act, slot, flag, pad; uint32_t a, b; uint8_t rest[12]; };  // Ordinal_11105 decode result
+// Ordinal_11105 decode result: +0 item code, +4/+6 u16 pair, +8 action byte, +0xC flags, +0x10 byte (0xff = none), +0x11 slot byte
+struct Hdr { uint32_t code; uint16_t a, b; uint8_t act, p9, pa, pb; uint32_t flags; uint8_t x10, slot, p12, p13; uint32_t x14; };
 static_assert(sizeof(Hdr) == 24, "hdr");
+static_assert(offsetof(Hdr, act) == 8 && offsetof(Hdr, flags) == 0xc && offsetof(Hdr, x10) == 0x10, "hdr offsets");
 
 template <class T> static T rd(const uint8_t* p, size_t o) { T v; memcpy(&v, p + o, sizeof v); return v; }
 #define V(va) (0x1000000u + ((va) - 0x6FAB0000u))
@@ -33,19 +35,18 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_84750(const D2c84750Env* e, const
     Hdr h; memset(&h, 0, sizeof h);
     uint8_t* pl = e->player;
     uint32_t id = rd<uint32_t>(p, 4);
-    C(11105, A(p + 8), p[2] - 8, A(&h));
+    C(11105, A(p + 8), p[2] - 8, 0, A(&h));
     uint8_t* u = e->buckets[id & 0x7f];
     while (u && rd<uint32_t>(u, 0xC) != id) u = rd<uint8_t*>(u, 0xE4);
     if (u && rd<int32_t>(u, 0) != 4) { e->fatal(0x5a); return; }
     if (!u) {
         u = (uint8_t*)C(V(0x6fb335c0), A(p), A(&h));
-    } else if (!C(10197, h.a, 1)) {
-        // FUN_6fb32820 gets the low/high words of the decoded header's first dword (stack-address artifact in the decompile)
-        W w = rd<uint32_t>((const uint8_t*)&h, 0);
-        C(V(0x6fb32820), w & 0xffff, w >> 16);
-        C(10012, A(u), h.slot);
+    } else if (!C(10197, h.flags, 1)) {
+        // 0x32820: eax = hdr+8 byte, stack = hdr+4 u16, hdr+6 u16, 0 (register args first, then stack)
+        C(V(0x6fb32820), h.act, h.a, h.b, 0);
+        C(10012, A(u), h.x10);
         C(10977, A(u), 0xffffffffu, 0);
-        C(10977, A(u), A(p + 8), 1);
+        C(10977, A(u), h.flags, 1);
     } else {
         W inv = rd<uint32_t>(pl, 0x60);
         if (C(10646, inv, A(u))) {
@@ -60,10 +61,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_84750(const D2c84750Env* e, const
         u = (uint8_t*)C(V(0x6fb335c0), A(p), A(&h));
         if (!u) return;
     }
-    if (h.act == 0xff) return;
-    C(V(0x6fb32660), A(u));
-    if (C(11057, A(u), A(pl))) C(V(0x6fb31ff0));
+    if (h.x10 == 0xff) return;
+    // eax = hdr+4 dword, ecx = item, stack: hdr+6 dword, hdr+0x10 dword, player
+    e->call8(V(0x6fb32660), rd<uint32_t>((const uint8_t*)&h, 4), A(u), rd<uint32_t>((const uint8_t*)&h, 6), rd<uint32_t>((const uint8_t*)&h, 0x10), A(pl), 0, 0, 0);
+    if (C(11057, A(u), A(pl))) C(V(0x6fb31ff0), 0, A(u), A(pl));   // stack 0; esi = item, edi = player
     e->sendMouseMove(C(10048), 0, (W)e->mouseX | (W)e->mouseY << 16);   // SendMessageA(WM_MOUSEMOVE, 0, MAKELONG(DAT_6fbcb828, DAT_6fbcb824))
-    C(V(0x6fb31aa0));
+    C(V(0x6fb31aa0), A(u));   // esi = item
     if (e->hoverOn && !e->hoverBusy && rd<int32_t>(u, 0xC) == e->hoverId) C(V(0x6faf7ab0));
 }

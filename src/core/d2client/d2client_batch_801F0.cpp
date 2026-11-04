@@ -62,16 +62,6 @@ bool sub_81B40(Ops2& o,U ebx){
  if(o.o11139()) o.o10608();
  return o.o11041()!=0;
 }
-// 1.13c D2Client+0x81B90 (ESI = out, 7 words)
-void sub_81B90(Ops2& o,P out){
- wr(out,0,o.o10973()); wr(out,4,o.o10973()); wr(out,8,o.o10973());
- P a=o.o10828();
- if(!a){wr(out,24,0xffffffffu);wr(out,16,0);}
- else{wr(out,24,o.o10304(a));wr(out,16,o.o10601(a,"..\\Source\\D2Client\\UNIT\\Item.cpp",0x155));}
- P b=o.o10507();
- if(b){wr(out,20,o.o10304(b));wr(out,12,o.o10601(b,"..\\Source\\D2Client\\UNIT\\Item.cpp",0x161));}
- else{wr(out,20,0xffffffffu);wr(out,12,0);}
-}
 // 1.13c D2Client+0x81C30 (EAX = a, EBX = ebx)
 P sub_81C30(Ops2& o,P a,P ebx){
  P r=o.o10244();
