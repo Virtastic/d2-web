@@ -19,6 +19,15 @@ void Storm_Sub4C20(uint8_t* node);
 uint32_t g_list459CC;             // 0x6FC459CC  handle-record list head (external: the FN probe seeds it)
 int32_t g_lastError;              // 0x6FC45388  last Storm error, mirrored to SetLastError (external: the FN probe round-trips it)
 
+extern "C" void Storm_Sub4040(uint32_t o);                                 // request-record destructor (C linkage: storm_4040.cpp)
+void Storm_Sub3EF0(uint32_t p);                                         // file-object destructor
+void Storm_Sub3FC0(uint32_t p);                                         // handle-record destructor
+void Storm_Sub3E20(uint32_t p);                                         // archive-object destructor
+void Storm_Sub2FB30(const char* type, const char* name);                // "handle never released"
+// Not ported yet: weak stand-ins until their rows land, so the file links without dragging in the archive reader.
+__attribute__((weak)) void Storm_Sub27EF0(int32_t, int32_t) {}
+__attribute__((weak)) int32_t Storm_Sub28960(void*, uint32_t*, uint8_t, uint32_t*) { return 0; }
+
 namespace {
 
 // ---- retail module state (all zero-initialised unless noted) -----------------------------------
@@ -42,13 +51,7 @@ constexpr const char* kSFileCpp = "..\\3rdParty\\STORM\\SOURCE\\SFILE.CPP";
 
 // ---- unmapped internal callees, retail argument order -----------------------------------------
 extern "C" int32_t Storm_Sub1B960(void* p, const char* file, int32_t line);        // SMemFree
-void Storm_Sub3EF0(uint8_t* p);                                         // file-object destructor
-void Storm_Sub3FC0(uint8_t* p);                                         // handle-record destructor
-void Storm_Sub3E20(uint32_t p);                                         // archive-object destructor
-extern "C" void Storm_Sub4040(uint32_t o);                                 // request-record destructor (C linkage: storm_4040.cpp)
-void Storm_Sub27EF0(int32_t a, int32_t b);
-int32_t Storm_Sub28960(void* a, uint32_t* b, uint8_t flags, uint32_t* d);
-void Storm_Sub2FB30(const char* type, const char* name);                // "handle never released"
+// 0x3EF0, 0x3FC0, 0x3E20, 0x2FB30 are global definitions (storm_batch_b51.cpp, storm_3e20.cpp, storm_2fb30.cpp); 0x27EF0 and 0x28960 are declared after the namespace.
 
 uint32_t rd32(const void* p) { uint32_t v; std::memcpy(&v, p, 4); return v; }
 void wr32(void* p, uint32_t v) { std::memcpy(p, &v, 4); }
@@ -94,7 +97,7 @@ uint32_t Storm_Sub26E20(uint32_t* param_1) {
         uint32_t* refs = param_1 + 0x50;
         *refs -= 1;
         if (*refs == 0) {
-            Storm_Sub3EF0((uint8_t*)param_1);
+            Storm_Sub3EF0((uint32_t)(uintptr_t)param_1);
             Storm_Sub1B960(param_1, "delete", -1);
         }
     }
@@ -123,7 +126,7 @@ uint32_t Storm_Sub26F30(void) {
             uint32_t* refs = (uint32_t*)at(p, 0x4C);
             *refs -= 1;
             if (*refs == 0) {
-                Storm_Sub3FC0((uint8_t*)(uintptr_t)p);
+                Storm_Sub3FC0((uint32_t)p);
                 Storm_Sub1B960((void*)(uintptr_t)p, "delete", -1);
             }
             p = next;
@@ -157,7 +160,7 @@ uint32_t Storm_Sub281F0(uint32_t param_1) {
                 uint32_t* refs = (uint32_t*)at(p, 0x4C);
                 *refs -= 1;
                 if (*refs == 0) {
-                    Storm_Sub3FC0((uint8_t*)(uintptr_t)p);
+                    Storm_Sub3FC0((uint32_t)p);
                     Storm_Sub1B960((void*)(uintptr_t)p, "delete", -1);
                 }
             }
@@ -248,13 +251,13 @@ uint32_t Storm_Sub27020(void) {
     while ((int32_t)g_list459CC > 0) {
         uint32_t p = g_list459CC;
         Storm_Sub2FB30("AUDIOSTREAM", nullptr);
-        Storm_Sub3FC0((uint8_t*)(uintptr_t)p);
+        Storm_Sub3FC0((uint32_t)p);
         Storm_Sub1B960((void*)(uintptr_t)p, "delete", -1);
     }
     while ((int32_t)g_list4596C > 0) {
         uint32_t p = g_list4596C;
         Storm_Sub2FB30("HSFILE", (const char*)(uintptr_t)(g_list4596C + 2));
-        Storm_Sub3EF0((uint8_t*)(uintptr_t)p);
+        Storm_Sub3EF0((uint32_t)p);
         Storm_Sub1B960((void*)(uintptr_t)p, "delete", -1);
     }
     while ((int32_t)g_list45984 > 0) {

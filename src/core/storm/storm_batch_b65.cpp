@@ -132,8 +132,12 @@ struct DriveEnv {
     bool (*freeSpace)(const char* root, uint32_t* secPerClus, uint32_t* bytesPerSec, uint32_t* freeClus, uint32_t* total);
 };
 uint32_t sub_26750(const DriveEnv& e, const char* path) {
-    char root[8] = {0};
-    std::strncpy(root, path, 3);
+    // SStrCopy(root, path, 4): up to three characters and a NUL; the byte after a short path keeps the previous call's value, as the stack slot does.
+    static char keep[4];
+    char root[4];
+    std::memcpy(root, keep, 4);
+    { int i = 0; for (; i < 3 && path[i]; i++) root[i] = path[i]; root[i] = 0; }
+    std::memcpy(keep, root, 4);
     uint32_t t = e.driveType(root), flags = 0, name0 = 0;
     if (!e.volInfo(root, &flags, &name0)) return 0;
     uint32_t spc = 0, bps = 0, fc = 0, tc = 0;

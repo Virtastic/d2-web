@@ -111,8 +111,12 @@ void* StormSub1DF90(void*, int*, HWND, void*, LPARAM) { return nullptr; }  // 0x
 void StormSub1D600() {}                       // 0x1D600 message pump
 uint32_t StormSub16AC0(void*, int32_t) { return 0xFFFFFFFFu; }  // 0x16AC0 find hash entry
 void StormSub4D60(void*) {}                   // 0x4D60 list unlink
-void StormSub1B960(void*, const char*, int32_t) {}  // 0x1B960 allocator free
-void StormSub3E20(void*) {}                   // 0x3E20 allocator destroy
+}  // namespace
+extern "C" int32_t Storm_Sub1B960(void* p, const char* tag, int32_t line);  // 0x1B960 SMemFree (storm_alloc_1b960.cpp)
+void Storm_Sub3E20(uint32_t p);                                              // 0x3E20 archive-object destructor (storm_3e20.cpp)
+namespace {
+void StormSub1B960(void* p, const char* tag, int32_t line) { Storm_Sub1B960(p, tag, line); }
+void StormSub3E20(void* p) { Storm_Sub3E20((uint32_t)(uintptr_t)p); }
 void StormSub3B080(uint32_t* dst, const uint8_t* src, uint32_t n) { std::memcpy(dst, src, n); }
 
 // 0x4C60 allocates an AUBITMAPREC from the 0x6FC45A00 pool and appends it to 0x6FC45A08.
@@ -497,9 +501,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1d780(uint32_t* r) {
 }
 
 // 1.13c Storm+0x26CB0: unlink a node and free it once its +0x140 refcount reaches zero.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_storm_26cb0(uint32_t* r) {
-    uint32_t self = r[0];
+extern "C" uint32_t Storm_Sub26CB0(uint32_t self) {
     EnterCriticalSection(&g_lockDiag);
     uintptr_t p = (self != 0) ? (uintptr_t)self : (uintptr_t)g_45980;
     uint32_t head = rd32(p, 0);
@@ -509,7 +511,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_26cb0(uint32_t* r) {
         if ((int32_t)tag < 0) target = (uintptr_t)(uint32_t)~tag;
         else target = p + (uintptr_t)(uint32_t)(tag - rd32((uintptr_t)head, 4));
         wr32(target, 0, head);
-        wr32((uintptr_t)head, 4, tag);
+        wr32((uintptr_t)head, 4, rd32(p, 4));   // read after the unlink store: the target can be the node's own tag word
         wr32(p, 0, 0);
         wr32(p, 4, 0);
     }
@@ -523,8 +525,11 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_26cb0(uint32_t* r) {
         }
     }
     LeaveCriticalSection(&g_lockDiag);
-    r[4] = 1;
+    return 0;   // EAX holds whatever LeaveCriticalSection left; the recorded calls all return 0
 }
+
+// Capture-probe accessor: the default list node (module RVA 0x55980, two words) used when the argument is null.
+extern "C" uint32_t* Storm_26CB0_defaultNode() { return g_45980; }
 
 // 1.13c Storm+0x16260: run bnupdate from the "Patch"/"Patches" config entry.
 // Skeleton: the config lookup is absent in ours, so retail's own iVar4==0 branch is the outcome.

@@ -19,10 +19,10 @@ void Storm_CrtExitProcess(uint32_t code);
 void Storm_Exit(int32_t code);
 void Storm_TerminateSelf(uint32_t code);
 void Storm_CrtMessageBox(const char* text, const char* caption, uint32_t flags);
-uint32_t Storm_GetModuleFileName(char* buf, uint32_t n);
 int32_t Storm_InflateRefill(uint8_t* st, uint32_t nbits);   // 0xF0D0, nonzero = out of input
 void Storm_StlNodeInit(void* node);                      // 0x2BC0
 }
+uint32_t Storm_GetModuleFileName(char* buf, uint32_t n);
 
 // lowio: ioinfo table of 32-entry pages, 0x24 bytes per entry (handle @0, flags @4)
 extern uint8_t* Storm_pioinfo[];

@@ -2,6 +2,7 @@
 // Weak: the real definition wins the moment its branch lands. Until then a call traps nothing and returns 0.
 // Not parity evidence; delete an entry when its row is merged.
 #include <cstdint>
+#include <cstddef>
 #define W __attribute__((weak))
 extern "C" {
 // D2Win
@@ -27,6 +28,16 @@ W void Ordinal_116() {}
 void Fog_Ordinal_501_SStrCopy(char*, const char*, uint32_t);
 W void Ordinal_501(char* d, const char* s, uint32_t n) { Fog_Ordinal_501_SStrCopy(d, s, n); }
 W void Storm_Ordinal_501(void* d, const void* s, int32_t n) { Fog_Ordinal_501_SStrCopy((char*)d, (const char*)s, (uint32_t)n); }
+// Multiplayer batch helpers (Fog/Storm string imports and the roster count); weak, real definitions win.
+W int32_t DAT_6fa09efc;
+W int __stricmp(const char* a, const char* b) { for (;; a++, b++) { int x = (unsigned char)*a, y = (unsigned char)*b; if (x >= 'A' && x <= 'Z') x += 32; if (y >= 'A' && y <= 'Z') y += 32; if (x != y) return x < y ? -1 : 1; if (!x) return 0; } }
+W size_t ustrlen(const uint16_t* s) { size_t n = 0; while (s[n]) n++; return n; }
+W uint16_t* ustrcpy(uint16_t* d, const uint16_t* s) { uint16_t* r = d; while ((*d++ = *s++)) {} return r; }
+W uint16_t* ustrcat(uint16_t* d, const uint16_t* s) { ustrcpy(d + ustrlen(d), s); return d; }
+W uint16_t* ustrncat(uint16_t* d, const uint16_t* s, int32_t n) { uint16_t* e = d + ustrlen(d); while (n-- > 0 && *s) *e++ = *s++; *e = 0; return d; }
+W void utoUnicode(uint16_t* d, const char* s, int32_t n) { while (n-- > 0 && *s) *d++ = (uint8_t)*s++; *d = 0; }
+W void uwin2Unicode(uint16_t* d, const char* s, int32_t n) { while (n-- > 0 && *s) *d++ = (uint8_t)*s++; *d = 0; }
+W char* Ordinal_571(const char* s, int32_t c) { if (!s) return 0; for (;; s++) { if (*s == (char)c) return (char*)s; if (!*s) return 0; } }
 W int32_t Storm_Ordinal_506(const void* s) { const char* p = (const char*)s; int32_t n = 0; while (p && p[n]) n++; return n; }
 W uint8_t DAT_6ff76690[0x100], DAT_6ff768ec[0x100];
 // Fog/Storm ordinal imports no merged row defines yet (link fix); signatures match the importers.

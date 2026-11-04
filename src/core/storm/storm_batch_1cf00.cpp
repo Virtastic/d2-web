@@ -16,25 +16,38 @@ const char g_sep[] = "\\";// 0x6FC370D4
 void* g_ioThread;         // 0x6FC43110
 void* g_ioEvent;          // 0x6FC4312C
 
-uint32_t Storm_Sub15ED0(int32_t i);                           // 0x25ED0 hash component
-void Storm_Sub3AE00(char* dst, const char* src, uint32_t n);  // 0x3AE00 append
-void Storm_Sub1D570();                                        // 0x1D570 idle step
-uint32_t Storm_Sub19200(void*);                               // 0x19200 I/O thread proc
-void* Storm_GetDesktopWindow();
-void* Storm_GetTopWindow(void*);
-void* Storm_GetNextSibling(void*);
-uint32_t Storm_WindowPid(void*);
-uint32_t Storm_CurrentPid();
-void Storm_InvalidateIntersect(void* hwnd, int32_t l, int32_t t, int32_t r, int32_t b);
-bool Storm_PeekMessage(void* msg, uint32_t* message, uintptr_t* wParam);
-bool Storm_IsDialogMessage(void* dlg, void* msg);
-void Storm_TranslateDispatch(void* msg);
-void Storm_PostQuit(uintptr_t code);
-void Storm_GetCursorPos(int32_t* x, int32_t* y);
-void Storm_GetModuleFileName(char* buf, uint32_t n);
-void* Storm_CreateEvent();
-void* Storm_CreateThread(uint32_t (*fn)(void*));
-void Storm_SetThreadPriority(void* h, int32_t p);
+uint32_t Storm_Sub15ED0(int32_t) { return 0; }                // 0x25ED0 hash component seam (not wired; 0x26AC0 is not proved here)
+// 0x3AE00 bounded strcat (non-null arguments, n > 0, the only case 0x26860 produces).
+void Storm_Sub3AE00(char* dst, const char* src, uint32_t n) {
+    dst[n - 1] = '\0';
+    uint32_t l = (uint32_t)strlen(dst);
+    uint32_t room = n - l;
+    uint32_t i = 0;
+    for (; i + 1 < room && src[i]; ++i) dst[l + i] = src[i];
+    dst[l + i] = '\0';
+}
+void Storm_Sub1D570() {}                                        // 0x1D570 idle step
+uint32_t Storm_Sub19200(void*) { return 0; }                               // 0x19200 I/O thread proc
+void* Storm_GetDesktopWindow() { return nullptr; }
+void* Storm_GetTopWindow(void*) { return nullptr; }
+void* Storm_GetNextSibling(void*) { return nullptr; }
+uint32_t Storm_WindowPid(void*) { return 0; }
+uint32_t Storm_CurrentPid() { return 0; }
+void Storm_InvalidateIntersect(void*, int32_t, int32_t, int32_t, int32_t) {}
+bool Storm_PeekMessage(void*, uint32_t*, uintptr_t*) { return false; }
+bool Storm_IsDialogMessage(void*, void*) { return false; }
+void Storm_TranslateDispatch(void*) {}
+void Storm_PostQuit(uintptr_t) {}
+void Storm_GetCursorPos(int32_t* x, int32_t* y) { *x = 0; *y = 0; }
+void (*g_modFile)(char* buf, uint32_t n);
+uint32_t Storm_GetModuleFileName(char* buf, uint32_t n) {
+    if (!g_modFile) return 0;
+    g_modFile(buf, n);
+    return (uint32_t)strlen(buf);
+}
+void* Storm_CreateEvent() { return nullptr; }
+void* Storm_CreateThread(uint32_t (*)(void*)) { return nullptr; }
+void Storm_SetThreadPriority(void*, int32_t) {}
 }  // namespace
 
 // 1.13c Storm+0x1CF00: walk the window tree; for windows of this process, invalidate the cursor rect.
@@ -122,4 +135,14 @@ extern "C" void storm_29560_fnrun(uint32_t* g) {
     Storm_Sub29560();
     g[0] = (uint32_t)(uintptr_t)g_ioThread;
     g[7] = (uint32_t)(uintptr_t)g_ioEvent;
+}
+
+// Capture-probe accessor: the base-path buffer (module RVA 0x53000, 0x104 bytes) copied in and out around the call;
+// modFile stands in for the GetModuleFileNameA import.
+extern "C" void storm_26860_fnrun(char* bp, void (*modFile)(char*, uint32_t)) {
+    memcpy(g_basePath, bp, sizeof g_basePath);
+    g_modFile = modFile;
+    Storm_Sub26860();
+    g_modFile = nullptr;
+    memcpy(bp, g_basePath, sizeof g_basePath);
 }
