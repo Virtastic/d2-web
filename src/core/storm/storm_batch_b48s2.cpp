@@ -11,16 +11,16 @@ uint32_t Storm_Sub25ED0(const uint32_t* tbl, int32_t type, const char* s) {
     }
     return h;
 }
-// 1.13c Storm+0x27FC0: fill 0x500-dword table from seed; returns final state / 0x2aaaab
+// 1.13c Storm+0x27FC0: fill 0x500-dword table from seed; returns the last step's quotient (u1*0x7d+3)/0x2aaaab
 uint32_t Storm_Sub27FC0(uint32_t* t, uint32_t seed) {
     uint32_t a = seed, b = 0, nx = 0;
     for (int i = 0; i < 0x100; i++) {
         for (int k = 0; k < 5; k++) {
             a = (a * 0x7d + 3) % 0x2aaaab;
-            b = (a * 0x7d + 3) % 0x2aaaab;
+            nx = a * 0x7d + 3;   // the last DIV's dividend: its quotient is the return value
+            b = nx % 0x2aaaab;
             t[i + 0x100 * k] = a << 16 | (b & 0xffff);
-            nx = b * 0x7d + 3;
-            a = nx % 0x2aaaab;
+            a = b;
         }
     }
     return nx / 0x2aaaab;
