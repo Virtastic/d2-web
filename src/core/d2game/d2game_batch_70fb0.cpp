@@ -101,7 +101,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_717e0(void* param1, void* game
     void* b = e->getOwner(n);      if (!b || !e->isValid(b)) return;
     if (msg == 0x12) {
         if (rd8(param1, 0x6c) != 0 && rd32(param1, 0x68) == 2) { wr32(param1, 100, 0xffffffff); wr32(param1, 0x68, 6); wr8(param1, 0x6c, 0); }
-        e->fd4570(eax);
+        e->fd4570();
     } else if (msg == 0x13) {
         if (param4 > 0 && (int32_t)e->getStat(param1, 0xf, 0) >= param4) {
             int32_t cur = (int32_t)e->getStat(param1, 0xe, 0);
