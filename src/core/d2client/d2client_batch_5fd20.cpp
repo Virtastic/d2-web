@@ -127,15 +127,15 @@ struct Obj { const void* vt; int32_t f1; struct Del { virtual void d(int) = 0; }
 void sub_67940(Obj* o) { if (o->owned) o->owned->d(1); /* vtable PTR_LAB_6fb85048 restored */ }
 // 1.13c D2Client+0x679F0  press handler; this = panel (+0x180708 x,+0x18070c y,+0x180710 w,+0x180714 h)
 struct Panel {
- int32_t x, y, w, h, sbX, sbY, active, sbDown, itemDown, trackDown, trackY, hasList, listSel;
+ int32_t x, y, w, h, sbX, sbY, active, sbDown, itemDown, trackDown, trackY, hasList, listSel, sbState /*+0x18076e, cleared by both button presses*/;
  int32_t (*hitItem)(Panel*, const uint16_t*); int32_t (*hitTrack)(const uint16_t*); int32_t (*listIdx)(Panel*);
 };
 int32_t sub_679F0(Panel* p, const uint16_t* ev /*mouse x at +0xc, y at +0xe*/) {
  int mx = ev[0], my = ev[1];
  if (mx <= p->x || p->w + p->x <= mx || my <= p->y || p->h + p->y <= my) return 0;
  p->active = 1;
- if (p->sbX < mx && mx < p->sbX + 0x10 && p->sbY - 0xc < my && my < p->sbY) { p->sbDown = 1; return 1; }
- if (p->hitItem(p, ev) == 1) { p->itemDown = 1; return 1; }
+ if (p->sbX < mx && mx < p->sbX + 0x10 && p->sbY - 0xc < my && my < p->sbY) { p->sbDown = 1; p->sbState = 0; return 1; }
+ if (p->hitItem(p, ev) == 1) { p->itemDown = 1; p->sbState = 0; return 1; }
  if (p->hitTrack(ev) == 1) { p->trackDown = 1; p->trackY = my; return 1; }
  if (p->hasList) p->listSel = p->listIdx(p);
  return 1;
