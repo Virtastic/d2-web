@@ -147,7 +147,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_game_41240(void* game, void* unit, c
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_game_41670(void* game, void* unit, const D2GameBatch3fEnv* e)
 {
     void* rec = monsRow(e, unit);
-    if (!rec || (int16_t)rd16(rec, 0x18) < 0) return 2;
+    if (!rec) return 2;
     // retail (disassembled): q = Ordinal_11029(unit) / max(row+0x40, 1); 0x3D1E0(EAX = max(row+0x3C - q, 3); stack game, row+0x38 + max(q, 2), row+0x18, 5)
     int32_t step = (int32_t)rd32(rec, 0x40);
     if (step < 1) step = 1;

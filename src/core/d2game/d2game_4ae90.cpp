@@ -7,19 +7,20 @@
 // out+0x21 = client dword +0x460. Then out[0] = 0 when the level is out of 1..99, the class is 7 or more, flags & 0x13, or 0xA292(out) != 0x21.
 #include "d2game_seam4e.h"
 // 1.13c D2Game+0x4AE90
-extern "C" void d2game_4ae90(uint32_t out, uint32_t cl, const D2Seam* e)
+// Returns retail's EAX at the ret: the 0xA292 != 0x21 flag when the record is filled (the last live value), 0 on the early returns.
+extern "C" uint32_t d2game_4ae90(uint32_t out, uint32_t cl, const D2Seam* e)
 {
     e->call(0xA32E, 0, 0, 0, 0, 0, out, 0xD);
     const uint32_t o2 = out + 2;
-    if (!cl) return;   // retail: fatal error path
+    if (!cl) return 0;   // retail: fatal error path
     uint32_t un;
     if (d2rd8(cl + 0x3D4) & 1) un = d2rd32(cl + 0x174);
     else {
-        if (!d2rd32(cl + 0x174)) return;
+        if (!d2rd32(cl + 0x174)) return 0;
         un = e->call(0xE03A0, d2rd32(cl + 0x16C), d2rd32(cl + 0x1A8), d2rd32(cl + 0x170), 0, 0);
         if (!un) d2wr32(cl + 0x174, 0);
     }
-    if (!un) return;
+    if (!un) return 0;
     const uint8_t lvl = (uint8_t)e->call(0xA42A, 0, 0, 0, 0, 0, un, 0xC, 0);
     const uint32_t cls = d2rd32(un + 4);
     uint8_t blk[40];   // B at 0 (16 bytes), A at 16 (16 bytes), the shared out slot at 32
@@ -47,4 +48,5 @@ extern "C" void d2game_4ae90(uint32_t out, uint32_t cl, const D2Seam* e)
     const bool bad1 = !(lvl >= 1 && lvl <= 0x63), bad2 = (uint8_t)cls >= 7, bad3 = (fl & 0x13) != 0;
     const bool bad4 = e->call(0xA292, 0, 0, 0, 0, 0, out) != 0x21;
     if (bad1 || bad2 || bad3 || bad4) d2wr8(out, 0);
+    return bad4;
 }
