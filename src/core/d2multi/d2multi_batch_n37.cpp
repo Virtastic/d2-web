@@ -119,7 +119,7 @@ extern "C" void d2_multi_sub_8c80_r(int32_t p1, int32_t flag, char* s) {
     }
 }
 // batch_16 (B1F0) calls with flag and no text: the port runs on an empty line.
-void d2_multi_sub_8c80(int32_t p1, int32_t flag) { char empty[1] = { 0 }; d2_multi_sub_8c80_r(p1, flag, empty); }
+extern "C" void d2_multi_sub_8c80(int32_t p1, int32_t flag) { char empty[1] = { 0 }; d2_multi_sub_8c80_r(p1, flag, empty); }
 
 // 1.13c D2Multi+0x8D80 (FUN_6f9d8d80, ret): EAX = sel picks the string id (0-6: 0xFAB, 0xFAA, 0xFA9, 0xFA8, 0xFA7, 0x2771, 0x2772;
 // default 0x1507); ESI = destination. D2Lang #10003 (ECX = id) answers the string; Unicode::strcpy (ECX = dst, EDX = src).

@@ -11,7 +11,7 @@ intptr_t Ordinal_10020(intptr_t);  // signature shared with D2Game batch_b63 (wa
 int32_t Ordinal_10003(void);
 uint32_t Ordinal_10265(int32_t);
 void    Ordinal_10024(const void*, int32_t);
-void d2_multi_sub_1a20(void); void d2_multi_sub_1da0(void); void d2_multi_sub_b900(void);
+extern "C" { void d2_multi_sub_1a20(void); void d2_multi_sub_1da0(void); void d2_multi_sub_b900(void); }
 void d2_multi_sub_8790(void); void d2_multi_sub_1510(void);
 extern "C" void d2_multi_sub_b160(const void* filetime, char* out, int32_t n); extern "C" void d2_multi_sub_b2a0(int32_t eax, int32_t ecx, int32_t edi);
 extern "C" bool d2_multi_sub_9000(const char*, const char*, uint8_t*, uint32_t*, uint32_t);
@@ -22,7 +22,7 @@ extern uintptr_t DAT_6fa0917c;
 extern uint8_t DAT_6f9ea2a0[], DAT_6f9e75d7[];
 
 // 1.13c D2Multi+0xBE00
-void d2_multi_sub_be00(void) {
+extern "C" void d2_multi_sub_be00(void) {
     d2_multi_sub_1a20();
     d2_multi_sub_1da0();
     d2_multi_sub_b900();

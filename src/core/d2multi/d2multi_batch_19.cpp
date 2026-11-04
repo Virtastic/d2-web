@@ -48,22 +48,36 @@ extern "C" void d2_multi_sub_e860(void) {
     if (DAT_6fa09f34 == 0) d2_multi_sub_e760();
 }
 
-// 1.13c D2Multi+0xEA50
+// 1.13c D2Multi+0xEA50: ad-download finish. ESI = request struct (+0 id, +8 name, +0xc, +0x10 payload, +0x14 size).
+// The D2Win/Fog thunks keep their register arguments (ECX/EDX) as leading parameters; the temp-file imports are the three Win32 calls.
+extern "C" {
+__attribute__((weak)) uint32_t d2m_ea50_tmppath(uint32_t, char*);
+__attribute__((weak)) uint32_t d2m_ea50_tmpname(const char*, const char*, uint32_t, char*);
+__attribute__((weak)) int d2m_ea50_del(const char*);
+__attribute__((weak)) void d2m_ea50_t7d2e(uint32_t);
+__attribute__((weak)) int32_t d2m_ea50_t7bea(const char*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+__attribute__((weak)) void d2m_ea50_t7c08(int32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+__attribute__((weak)) void d2m_ea50_t7bf6(int32_t);
+__attribute__((weak)) void d2m_ea50_t7d10(uint32_t, const void*, uint32_t);
+__attribute__((weak)) void d2m_ea50_t7bf0(uint32_t, uint32_t, uint32_t, uint32_t);
+}
 int32_t d2_multi_sub_ea50(uint32_t* esi) {
     char tmp[260], dir[264];
-    Ordinal_10060(0, nullptr, nullptr);
-    if (GetTempPathA(0x104, dir) == 0) { dir[0] = '.'; dir[1] = 0; }
-    if (GetTempFileNameA(dir, "BNetAd", 0, tmp) != 0) {
-        DeleteFileA(DAT_6fa09df0);
+    d2m_ea50_t7d2e((uint32_t)DAT_6fa09178);
+    if (d2m_ea50_tmppath(0x104, dir) == 0) { dir[0] = '.'; dir[1] = 0; }
+    if (d2m_ea50_tmpname(dir, "BNetAd", 0, tmp) != 0) {
+        d2m_ea50_del(DAT_6fa09df0);
         uint32_t z = 0;
-        if (Ordinal_10107(0) != -1) { Ordinal_10111((intptr_t)esi[5], (intptr_t)&z); Ordinal_10109(); }
-        const char* dot = strrchr((const char*)esi[2], '.');
-        (void)tmp, Ordinal_10002((uint32_t)DAT_6fa09178);
+        int32_t h = d2m_ea50_t7bea(tmp, 0x40000000, 0, 0, 4, 0x8000000, 0);
+        if (h != -1) { d2m_ea50_t7c08(h, esi[4], esi[5], (uint32_t)(uintptr_t)&z, 0); d2m_ea50_t7bf6(h); }
+        const char* dot = strrchr((const char*)(uintptr_t)esi[2], '.');
+        int lc = tolower((unsigned char)dot[1]);
+        d2m_ea50_t7d10((uint32_t)DAT_6fa09178, tmp, (uint32_t)lc);
         strcpy(DAT_6fa09df0, tmp);
     }
-    DAT_6fa09184 = *esi;
-    Ordinal_10043(0, 0);
-    Ordinal_10043(0, 0);
+    DAT_6fa09184 = (int32_t)*esi;
+    d2m_ea50_t7bf0(esi[2], 0x6f9e7780, 0x375, 0);
+    d2m_ea50_t7bf0(esi[3], 0x6f9e7780, 0x376, 0);
     return 1;
 }
 

@@ -17,7 +17,7 @@ int32_t Ordinal_10021(void);
 void d2_multi_sub_aa60(int32_t, const void*);
 void d2_multi_sub_8450(void);
 void d2_multi_sub_8790(void);
-void d2_multi_sub_be00(void);
+extern "C" void d2_multi_sub_be00(void);
 void d2_multi_sub_11600(void);
 uint32_t d2_multi_sub_1274(uint8_t*, uint8_t*);
 extern uint8_t* DAT_6fa0917c;

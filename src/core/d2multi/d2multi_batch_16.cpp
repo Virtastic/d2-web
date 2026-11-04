@@ -24,7 +24,7 @@ void    Ordinal_10022(int32_t);
 void    EnterCriticalSection(void*);
 void    LeaveCriticalSection(void*);
 int32_t* d2_multi_sub_8bd0(int32_t edi, int32_t esi, int32_t third);
-void    d2_multi_sub_8c80(int32_t, int32_t);
+extern "C" void d2_multi_sub_8c80(int32_t, int32_t);
 void    d2_multi_sub_8d80(void);
 void    d2_multi_sub_8790(void);
 void    d2_multi_sub_aa60(int32_t, const void*);
