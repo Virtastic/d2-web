@@ -68,7 +68,7 @@ static_assert(offsetof(B81ZBlocks, bitk) == 0x1C && offsetof(B81ZBlocks, window)
 struct D2ClientInflateEnv {
     uint32_t* (*zalloc)(uint32_t, uint32_t, uint32_t);   // +0x10000 default allocator
     void      (*zfree)(uint32_t, void*);                 // +0x0FFF0 default free
-    void*     (*blocks_new)(B81ZStream*, int32_t);       // +0x0FF60 inflate_blocks_new
+    void*     (*blocks_new)(B81ZStream*, int32_t, uint32_t);  // +0x0FF60 inflate_blocks_new(z, wbits, check): check = raw ? 0 : RVA 0xF280 (adler32)
     int32_t   (*blocks)(B81ZBlocks*, B81ZStream*, int32_t); // +0x0F4C0 inflate_blocks
     void      (*blocks_end)(B81ZBlocks*, B81ZStream*, uint32_t* prev); // +0x0F3F0 (ESI blocks, EDI z, EAX &state->hold: *EAX := blocks checksum) when inflate_blocks returns 1
     void      (*blocks_free)(B81ZBlocks*, B81ZStream*);  // +0x0F450 inflate_blocks_free
@@ -153,7 +153,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_10680(const char* version, B81
     if (windowBits < 0) { windowBits = -windowBits; st->raw = 1; }
     if (windowBits < 8 || windowBits > 15) { d2_client_10640(z); return -2; }
     st->wbits = (uint32_t)windowBits;
-    st->blocks = (uint32_t)(uintptr_t)(g_inflate.blocks_new ? g_inflate.blocks_new(z, windowBits) : nullptr);
+    st->blocks = (uint32_t)(uintptr_t)(g_inflate.blocks_new ? g_inflate.blocks_new(z, windowBits, st->raw ? 0u : 0xF280u) : nullptr);
     if (st->blocks != 0) { d2_client_10110(z); return 0; }
     d2_client_10640(z);
     return -4;
@@ -187,9 +187,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_10250(B81ZStream* z, int32_t f
             if (z->avail_in == 0) return ret;
             --z->avail_in; ++z->total_in;
             const uint8_t b = *(const uint8_t*)(uintptr_t)z->next_in;
-            st->hold = st->hold * 0x100 + b;
-            ++z->next_in;
-            if (st->hold % 0x1F != 0) {
+            ++z->next_in;   // retail tests (hold*256 + b) % 31 without storing it back
+            if ((st->hold * 0x100 + b) % 0x1F != 0) {
                 st->mode = 0xD; z->msg = (uint32_t)(uintptr_t)kBadHeader; st->hold = 5; ret = ok; break;
             }
             if ((b & 0x20) != 0) { st->mode = 2; ret = ok; goto dictid; }
@@ -358,8 +357,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_13390(uint8_t* out, int32_t mode,
                                                      uint32_t p3, int32_t cornersOnly, uint32_t w,
                                                      const D2ClientGridEnv* env) {
     int32_t shift = 0;                                    // local_4: mode 1 -> -W/4, mode 2 -> +W/4
-    if (mode == 1) shift = -((int32_t)(w + (int32_t)(w >> 31 & 3u)) >> 2);
-    else if (mode == 2) shift = (int32_t)(w + (int32_t)(w >> 31 & 3u)) >> 2;
+    if (mode == 1) shift = -((int32_t)(w + ((uint32_t)((int32_t)w >> 31) & 3u)) >> 2);
+    else if (mode == 2) shift = (int32_t)(w + ((uint32_t)((int32_t)w >> 31) & 3u)) >> 2;
     uint8_t* rec = out;
     for (int32_t row = 0; row < 6; ++row)
         for (int32_t col = 0; col < 6; ++col, rec += 0xC) {
