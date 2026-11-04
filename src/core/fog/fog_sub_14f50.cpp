@@ -16,8 +16,11 @@ struct FogPsapiSeams {
 };
 FogPsapiSeams g_fogPsapi{};
 
-// Node (0x210): path[0x104] name[0x100+] base@0x204 size@0x208 next@0x20C. Pointers are host-width here.
-struct FogModNode { char path[0x104]; char name[0x100]; uint32_t base, size; FogModNode* next; };
+// Node (0x210): path[0x104] name[0x100] base@0x204 size@0x208 next@0x20C. next is the 32-bit guest pointer (retail's layout), so the node stays 0x210 bytes
+// on the 64-bit host and the allocator's 0x210 holds it.
+struct FogModNode { char path[0x104]; char name[0x100]; uint32_t base, size; uint32_t next; };
+static inline FogModNode* N(uint32_t v) { return (FogModNode*)(uintptr_t)v; }
+static inline uint32_t G(const FogModNode* p) { return (uint32_t)(uintptr_t)p; }
 
 extern "C" FogModNode* fog_sub_14f50(uint32_t proc) {  // 1.13c Fog+0x14F50
     const FogPsapiSeams& s = g_fogPsapi;
@@ -33,7 +36,7 @@ extern "C" FogModNode* fog_sub_14f50(uint32_t proc) {  // 1.13c Fog+0x14F50
         uint32_t n = needed >> 2;
         if (n > 0x100) { err = "PSAPI EnumProcessModules returned invalid number of modules"; goto failMsg; }
         s.log("\nEnumerate modules...");
-        FogModNode* head = nullptr;
+        uint32_t head = 0;
         for (uint32_t i = 0; i < n; ++i) {
             if (!s.modInfo(proc, mods[i], info, 0xc)) { s.log("ERROR: PSAPI GetModuleInformation (%d)"); goto fail; }
             if (!s.fileName(proc, mods[i], path, 0x104)) { s.log("ERROR: PSAPI GetModuleFileNameExA (%d)"); goto fail; }
@@ -46,20 +49,21 @@ extern "C" FogModNode* fog_sub_14f50(uint32_t proc) {  // 1.13c Fog+0x14F50
             nd->size = info[1];
             nd->next = head;
             // One bubble pass: bubble nd toward the tail while its base exceeds its successor's.
-            FogModNode *h = nd, *prev = nullptr;
+            uint32_t h = G(nd), prev = 0;
             for (;;) {
-                FogModNode* nx = nd->next;
+                const uint32_t nx = nd->next;
                 head = h;
-                if (!nx || nd->base <= nx->base) break;
-                if (nd != h) prev->next = nx; else head = nx;
-                nd->next = nx->next;
-                nx->next = nd;
+                if (!nx || nd->base <= N(nx)->base) break;
+                if (G(nd) != h) N(prev)->next = nx; else head = nx;
+                nd->next = N(nx)->next;
+                N(nx)->next = G(nd);
                 h = head;
                 prev = nx;
             }
+            head = h;
         }
         s.unload();
-        return head;
+        return N(head);
     }
 failMsg:
     s.log(err);

@@ -51,7 +51,7 @@ int enumModules(uint32_t proc, uint32_t* mods, uint32_t cb, uint32_t* needed) {
     const int ret = (int)stub(gPn[2], proc, (uint32_t)(uintptr_t)mods, cb, (uint32_t)(uintptr_t)needed, 1, h, nm ? nm : 1);
     *needed = gPn[3];
     for (uint32_t i = 0; i < (nm ? nm : 1) && i < 256; i++) mods[i] = h[i];
-    if (!ret) { H->h(0x190A0, 0, 0, 0, 0, 0, kLog, 0xB2027644u, 5); }
+    if (!ret) { H->h(0x190A0, 0, 0, 0, 0, 0, kLog, 0xB2027644u); }
     return ret;
 }
 int modInfo(uint32_t proc, uint32_t mod, uint32_t* info, uint32_t cb) {
@@ -59,21 +59,21 @@ int modInfo(uint32_t proc, uint32_t mod, uint32_t* info, uint32_t cb) {
     const uint32_t v[3] = { m[3], m[4], 0 };
     const int ret = (int)stub(m[0], proc, mod, (uint32_t)(uintptr_t)info, cb, 2, v, 3);
     info[0] = v[0]; info[1] = v[1]; info[2] = v[2];
-    if (!ret) H->h(0x190A0, 0, 0, 0, 0, 0, kLog, 0xB20275C8u, 5);
+    if (!ret) H->h(0x190A0, 0, 0, 0, 0, 0, kLog, 0xB20275C8u);
     return ret;
 }
 int fileName(uint32_t proc, uint32_t mod, char* buf, uint32_t n) {
     const uint32_t* m = gPn + 8 + 16 * gMod;
     const int ret = (int)stub(m[1], proc, mod, (uint32_t)(uintptr_t)buf, n, 2, m + 5, 4);
     std::memcpy(buf, m + 5, 16);
-    if (!ret) H->h(0x190A0, 0, 0, 0, 0, 0, kLog, 0xB20275A0u, 5);
+    if (!ret) H->h(0x190A0, 0, 0, 0, 0, 0, kLog, 0xB20275A0u);
     return ret;
 }
 int baseName(uint32_t proc, uint32_t mod, char* buf, uint32_t n) {
     const uint32_t* m = gPn + 8 + 16 * gMod;
     const int ret = (int)stub(m[2], proc, mod, (uint32_t)(uintptr_t)buf, n, 2, m + 9, 4);
     std::memcpy(buf, m + 9, 16);
-    if (!ret) H->h(0x190A0, 0, 0, 0, 0, 0, kLog, 0xB2027578u, 5);
+    if (!ret) H->h(0x190A0, 0, 0, 0, 0, 0, kLog, 0xB2027578u);
     else gMod++;
     return ret;
 }
@@ -92,5 +92,5 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_14f50(uint32_t* r) {
     H = &e; gMod = 0;
     g_fogPsapi = FogPsapiSeams{ load, unload, enumModules, modInfo, fileName, baseName, alloc, logf, freeList };
     FogModNode* head = fog_sub_14f50(r[0]);
-    r[4] = head ? 0xB5000000u : 0;
+    (void)head; r[4] = 0;   // retmask 0: the head is a heap address, recorded as 0
 }

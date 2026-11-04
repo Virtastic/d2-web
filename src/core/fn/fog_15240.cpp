@@ -11,9 +11,9 @@
 #include "hookenv.h"
 struct FogModNode {
     char szModule[0x104];
-    char szExePath[0x104];
+    char szExePath[0x100];
     uint32_t base, size;
-    FogModNode* next;
+    uint32_t next;
 };
 struct FogModEntry { const char* szModule; const char* szExePath; uint32_t base, size; };
 typedef int (*FogModEnum)(uint32_t pid, FogModEntry* out, int idx);
@@ -37,13 +37,13 @@ int enumerate(uint32_t pid, FogModEntry* out, int idx) {
         const uint32_t r = H->h(kFn, 0, 0, 0, 0, 0, gPn[2], (uint32_t)(uintptr_t)out);
         if (!r || (uint32_t)idx >= nm) return 0;
     }
-    const uint32_t* m = gPn + 8 + 16 * idx;
+    const uint32_t* m = gPn + 8 + 14 * idx;
     std::memcpy(gName[idx], m + 2, 16); gName[idx][16] = 0;
     std::memcpy(gPath[idx], m + 6, 16); gPath[idx][16] = 0;
     out->szModule = gPath[idx];      // retail's node +0 is the entry's szExePath
     out->szExePath = gName[idx];     // node +0x104 is szModule
     out->base = m[0]; out->size = m[1];
-    H->h(0x1B560, 0x210, 0, 0, 0, 0, 0, 0);
+    H->h(0x1B560, 0x210, 0, 0, 0, 0, 0xB20277A0u, 0x3FB);
     return 1;
 }
 }
@@ -60,9 +60,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_fog_15240(uint32_t* r) {
     FogModNode* head = fog_sub_15240(r[0], enumerate);
     uint32_t order[8]; uint32_t cnt = 0;
     FogModNode* byIdx[8] = {};
-    for (FogModNode* n = head; n && cnt < 8; n = n->next) {
+    for (FogModNode* n = head; n && cnt < 8; n = (FogModNode*)(uintptr_t)n->next) {
         uint32_t idx = 0xFF;
-        for (uint32_t i = 0; i < nm; i++) if (!byIdx[i] && gPn[8 + 16 * i] == n->base) { idx = i; break; }
+        for (uint32_t i = 0; i < nm; i++) if (!byIdx[i] && gPn[8 + 14 * i] == n->base && !std::strncmp(n->szModule, gPath[i], 16)) { idx = i; break; }
         if (idx == 0xFF) abort();
         byIdx[idx] = n; order[cnt++] = idx;
     }
