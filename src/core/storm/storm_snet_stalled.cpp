@@ -22,7 +22,7 @@ extern "C" void Storm_ListLink4390(uint32_t* eax, uint8_t* this_, uint8_t* node_
 void Storm_Sub4D60(uint8_t* node);
 void Storm_Sub10E30(uint8_t* conn, const uint8_t* pkt);
 uint32_t Storm_Sub10D20(const void* const* parts, const uint8_t* data, uint32_t length, uint32_t count);
-void Storm_Sub10CB0(void);
+extern "C" void Storm_Sub10CB0(void);
 int32_t* Storm_Sub12690(void);
 uint32_t* Storm_Sub5170(uint32_t, int32_t param_2, uint32_t param_3, uint32_t edi);
 

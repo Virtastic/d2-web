@@ -10,7 +10,7 @@ extern void q_d2multi_batch_n49_Ordinal_10185(int) W; extern int Ordinal_10030()
 extern int Ordinal_10054() W; extern int Ordinal_10087() W; extern int Ordinal_10186(int, int) W; extern int Ordinal_10079() W;
 extern void q_d2multi_batch_n49_Ordinal_10022(int, const char*) W; extern int Ordinal_10003() W;
 extern int d2multi_unicode2Win(char* dst, const void* src, int n) W;
-bool d2_multi_sub_9000(const char* key, const char* val, uint8_t* out, uint32_t* size, uint32_t cap);   // registry read (n37)
+extern "C" bool d2_multi_sub_9000(const char* key, const char* val, uint8_t* out, uint32_t* size, uint32_t cap);   // registry read (n37)
 extern const char* d2multi_urlArg() W;                                                   // (*(DAT_6fa0917c+0xa4))()
 extern void d2multi_hostLaunch(const char* cmd) W;                                       // CreateProcessA seam
 extern void d2multi_acb0() W; extern void d2multi_onDone() W;                            // FUN_ACB0, (*(DAT_6fa0917c+0x6c))()

@@ -21,7 +21,7 @@ void Ordinal_501(void*, const void*, int32_t);
 extern uint8_t *DAT_6fa09ef4, *DAT_6fa09ef8, *DAT_6fa09f08;
 extern int32_t DAT_6fa09efc, DAT_6fa09f00, DAT_6fa09f04, DAT_6fa0a090, DAT_6fa0a0fc;
 extern char DAT_6fa08d48[];
-void d2_multi_sub_e860(void);
+extern "C" void d2_multi_sub_e860(void);
 void d2_multi_sub_f020(const char*, uint8_t*);
 void d2_multi_sub_f170(int32_t*);
 uint32_t d2_multi_sub_f340(const char*, uint32_t, uint8_t*);

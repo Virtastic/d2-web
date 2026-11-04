@@ -96,7 +96,7 @@ int32_t d2_multi_sub_e730(uint8_t* p1) {
 }
 
 // 1.13c D2Multi+0xE760
-void d2_multi_sub_e760(void) {
+extern "C" void d2_multi_sub_e760(void) {
     void* s = Ordinal_10166();
     (void)s;  // retail: Unicode::strlen(s) when non-null, result unused
     Ordinal_10147(); Ordinal_10147(); Ordinal_10147();

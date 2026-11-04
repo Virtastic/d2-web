@@ -148,7 +148,7 @@ extern "C" void d2_multi_sub_8e70(uint8_t* s) {
 }
 
 // 1.13c D2Multi+0x9000
-bool d2_multi_sub_9000(const char* key, const char* val, uint8_t* out, uint32_t* size, uint32_t cap) {
+extern "C" bool d2_multi_sub_9000(const char* key, const char* val, uint8_t* out, uint32_t* size, uint32_t cap) {
     *size = 0;
     uint32_t sz = cap;
     if (!d2_host_reg_query(key, val, out, &sz)) return false;

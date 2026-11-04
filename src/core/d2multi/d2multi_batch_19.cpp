@@ -23,7 +23,7 @@ extern uint8_t* DAT_6fa09f08;
 extern int32_t DAT_6fa09f34, DAT_6f9e9bc0, DAT_6fa09178, DAT_6fa09184;
 extern char DAT_6fa09df0[], DAT_6f9e75d7[];
 extern uint32_t* gdwInvBitMasks_exref;
-void d2_multi_sub_e760(void);
+extern "C" void d2_multi_sub_e760(void);
 size_t ustrlen(const uint16_t*);
 uint16_t* ustrstr(const uint16_t*, const uint16_t*);
 uint16_t* ustrcpy(uint16_t*, const uint16_t*);
@@ -36,7 +36,7 @@ int wsprintfA(char*, const char*, ...);
 }
 
 // 1.13c D2Multi+0xE860
-void d2_multi_sub_e860(void) {
+extern "C" void d2_multi_sub_e860(void) {
     if (DAT_6fa09f08) {
         int32_t p = *(int32_t*)(DAT_6fa09f08 + 0x9c);
         if (!p) { Ordinal_10024(DAT_6f9e75d7, Ordinal_10265(0x84c)); exit(-1); }

@@ -31,7 +31,7 @@ extern uint32_t g_ver_6fc45344, g_event_6fc4584c;
 extern int32_t g_cnt_6fc41a78, g_cnt_6fc41a98;
 uint32_t* Storm_Sub12690();                                             // current net ctx
 void Storm_Sub12F40(uint32_t, int8_t, uint32_t* data, uint32_t len);   // queue msg
-void Storm_Sub10CB0(void);   // matches the definition in storm_batch_109c0.cpp
+extern "C" void Storm_Sub10CB0(void);   // matches the definition in storm_batch_109c0.cpp
 uint32_t Storm_SubFEB0(int32_t id);                                    // find peer node
 void Storm_Grow(uint32_t* list, uint32_t n);                           // FUN_6fbf2950 (ecx = list)
 void* Storm_Sub1C580(uint32_t sz, const char* f, uint32_t line, uint32_t fl);

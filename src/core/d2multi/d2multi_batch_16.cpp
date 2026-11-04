@@ -42,7 +42,7 @@ extern int32_t DAT_6fa0a018, DAT_6fa0a01c, DAT_6fa0a020, DAT_6fa0a024, DAT_6fa0a
 }
 
 // 1.13c D2Multi+0xB1F0
-void d2_multi_sub_b1f0(void) {
+extern "C" void d2_multi_sub_b1f0(void) {
     for (;;) {
         EnterCriticalSection(DAT_6fa08f00);
         int32_t* n = DAT_6fa0a0e8;

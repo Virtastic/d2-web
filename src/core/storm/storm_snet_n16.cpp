@@ -19,7 +19,7 @@ int32_t Storm_Sub1B960(void* p, const char* tag, int32_t line);
 extern "C" uint32_t* Storm_Sub5040(uint32_t, int32_t extra, uint32_t flags, int32_t edi);
 uint16_t Storm_SubFF40(uint32_t, uint32_t bytes, const uint8_t* data);
 uint32_t Storm_Sub10D20(const void* const* parts, const uint8_t* data, uint32_t length, uint32_t count);
-void Storm_Sub10CB0(void);
+extern "C" void Storm_Sub10CB0(void);
 void Storm_Sub10E30(uint8_t* conn, const uint8_t* pkt);
 void Storm_Sub5440(void* tbl, uint32_t n);
 }
