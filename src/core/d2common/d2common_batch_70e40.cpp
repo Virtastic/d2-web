@@ -10,6 +10,7 @@ struct D2Common70e40Env {
 
 static uint32_t r32_70e40(uint32_t a) { uint32_t v; std::memcpy(&v, reinterpret_cast<const void*>(static_cast<uintptr_t>(a)), 4); return v; }
 
+// 1.13c D2Common+0x70E40
 extern "C" void D2Common_70E40_BoundingBox(uint32_t p, const D2Common70e40Env* env) {
  *reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(p + 0x14)) = static_cast<uint8_t>(r32_70e40(p + 0x14) << 1);
  const uint32_t room = r32_70e40(p + 8), other = r32_70e40(p + 0xc);

@@ -17,7 +17,7 @@ extern D2InventoryGridInfoStrc gBodyLocInventoryGridInfo;
 
 namespace
 {
-	// 1.13c D2Common+0x522C0: the state's stat list when it exists. With nSkillLevel 0 the list
+	// Passive-state form of the 0x522C0 stat-list rule (the id form is d2common_522c0.cpp): the state's stat list when it exists. With nSkillLevel 0 the list
 	// is expired and freed; with a level it is allocated, given the state and posted to the unit.
 	D2StatListStrc* GetOrCreateStateStatList(D2UnitStrc* pUnit, int nPassiveState, int nSkillLevel)
 	{
