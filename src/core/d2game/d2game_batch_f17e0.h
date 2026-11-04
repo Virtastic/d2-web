@@ -6,7 +6,7 @@ namespace d2game_batchf17e0 {
 using U = uint32_t; using I = int32_t; using P = void*;
 struct Env {
     P (*ptr)(P,U);                          // retail pointer field -> native object
-    I (*walk)(P game,P unit,P target,I mode,I x,I y,I flags); // F2540
+    I (*walk)(P game,P unit,P target,I mode,I x,I y,I flags,I w6); // F2540 (w6 = sixth stack word)
     void (*idle)(P game,P unit,I frames);   // F22C0
     I (*stateTest)(P,I);                    // D2Common 10494
     I (*f114f0)(P,P,P,P,P,I);               // F14F0
@@ -21,5 +21,5 @@ struct Env {
 };
 void sub_F2F00(Env& e,P target,P unit,P game,I flag);
 void sub_F2F30(Env& e,P target,P unit,P game,I flag);
-void sub_F3000(Env& e,P target,P unit,P game);
+void sub_F3000(Env& e,P target,P unit,P game,I w);
 }

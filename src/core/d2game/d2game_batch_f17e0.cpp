@@ -56,7 +56,7 @@ void sub_F29B0(Env& e,P game,P u,uint8_t al,I(*rand)(P seed)) {
     dx=rand((P)seed); 
     uint64_t v=uint64_t(uint32_t(*seed))*0x6ac690c5u+s(u,0x24); *seed=v; if(v&1) dx=-dx;
     v=(v&0xffffffffu)*0x6ac690c5u+(v>>32); *seed=v; if(v&1) dy=-dy;
-    e.walk(game,u,nullptr,2,dx+x,I(int8_t(dy))+y,1);
+    e.walk(game,u,nullptr,2,dx+x,I(int8_t(dy))+y,1,0);
 }
 // 1.13c D2Game+0xF2C10
 void sub_F2C10(Env& e,P game,P a,P b,uint8_t d) {
@@ -66,16 +66,16 @@ void sub_F2C10(Env& e,P game,P a,P b,uint8_t d) {
     int8_t sy=by<ay?-1:(ay<by?1:0);
     int8_t oy=int8_t(d*sy);
     if (d>5) { P ai=aiData(e,b); if (d) wb(ai,0x20,d>0x4d?0x4d:d); }
-    e.walk(game,b,nullptr,0xf,I(bx+U(d)*U(sx)),I(int8_t(by)+oy),1);
+    e.walk(game,b,nullptr,0xf,I(bx+U(d)*U(sx)),I(int8_t(by)+oy),1,0);
 }
 // 1.13c D2Game+0xF2F00
-void sub_F2F00(Env& e,P target,P unit,P game,I flag) { e.walk(game,unit,target,0xf,0,0,(flag&0xff)?flag:((flag&~0xff)|1)); }
+void sub_F2F00(Env& e,P target,P unit,P game,I flag) { e.walk(game,unit,target,0xf,0,0,(flag&0xff)?flag:((flag&~0xff)|1),0); }
 // 1.13c D2Game+0xF2F30
-void sub_F2F30(Env& e,P target,P unit,P game,I flag) { e.walk(game,unit,target,2,0,0,(flag&0xff)?flag:((flag&~0xff)|1)); }
+void sub_F2F30(Env& e,P target,P unit,P game,I flag) { e.walk(game,unit,target,2,0,0,(flag&0xff)?flag:((flag&~0xff)|1),0); }
 // 1.13c D2Game+0xF3000
-void sub_F3000(Env& e,P target,P unit,P game) {
+void sub_F3000(Env& e,P target,P unit,P game,I wv) {
     w(aiData(e,unit),0x18,0xd);
-    e.walk(game,unit,target,2,0,0,1);
+    e.walk(game,unit,target,2,0,0,1,wv);
 }
 // 1.13c D2Game+0xF3220
 P sub_F3220(Env& e,P unit,P a,P game,P b) {

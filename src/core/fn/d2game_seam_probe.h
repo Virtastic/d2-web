@@ -4,14 +4,14 @@
 #include "hookenv.h"
 #include "../d2game/d2game_seam4e.h"
 struct SeamProbe {
-    HookEnv e; uint32_t ov[8][2]; int nov = 0;
+    HookEnv e; uint32_t ov[8][2]; int nov = 0; uint32_t last = 0;   // last = the final callee's return: a void port's EAX residue
     SeamProbe(uint32_t* lg, const uint32_t* sc) : e(lg, sc) {}
     void ret(uint32_t rva, uint32_t v) { ov[nov][0] = rva; ov[nov++][1] = v; }
     static uint32_t thunk(void* c, uint32_t rva, uint32_t a, uint32_t cc, uint32_t d, uint32_t b, uint32_t s, uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3, uint32_t s4, uint32_t s5, uint32_t s6, uint32_t) {
         SeamProbe* p = (SeamProbe*)c;
         uint32_t v = p->e.h(rva, a, cc, d, b, s, s0, s1, s2, s3, s4, s5, s6);
-        for (int i = 0; i < p->nov; i++) if (p->ov[i][0] == rva) return p->ov[i][1];
-        return v;
+        for (int i = 0; i < p->nov; i++) if (p->ov[i][0] == rva) return p->last = p->ov[i][1];
+        return p->last = v;
     }
     static void blkthunk(void* c, uint32_t rva, uint32_t p, uint32_t n) { ((SeamProbe*)c)->e.blk(rva, p, n); }
     static void ejthunk(void* c, uint32_t rva, uint32_t v) { ((SeamProbe*)c)->e.edi(rva, v); }

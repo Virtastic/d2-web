@@ -18,7 +18,7 @@ extern "C" uint32_t d2game_4cc50(uint32_t game, uint32_t unit, uint32_t skill, u
         st[2] = e->call(0xDC530, v, 0, unit, 0,0, 0, 0, 0, d2rd8(row+0x1a5));   // words 1..4 of the five stack args (1,0,0,0,b)
         if ((uint8_t)d2rd8(row+0x1dc)) {
             const uint32_t t = e->call(0xAC9A,0,0,0,0,0,unit,d2rd32(row+0x144),skill,lvl);
-            st[27] = t;
+            st[26] = t;
             if ((int32_t)t > 0) ((uint8_t*)st)[0x65] = (uint8_t)d2rd8(row+0x1dc);
         }
         e->call(0x9F210, skill, 0,0,0,0, (uint32_t)(uintptr_t)st, lvl);
