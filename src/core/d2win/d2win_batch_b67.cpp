@@ -16,14 +16,14 @@ __attribute__((weak)) void* Ordinal_10042(int32_t size, int32_t line);
 void _exit(int);
 // retail globals
 int32_t d2win_g_6f9a98a4;          // count
-int32_t d2win_g_6f9a8cb0[1];       // 12-byte stride, [i*3]
-int32_t d2win_g_6f9a98a8[1];
-int32_t d2win_g_6f8ffee0[1];       // 12-byte stride: [i*3], [i*3+1]
+int32_t d2win_g_6f9a8cb0[3 * 255]; // 12-byte stride, [i*3] key, [i*3+1] style, [i*3+2] feature id; ends at the count word 0x6f9a98a4
+int32_t d2win_g_6f9a98a8[256];
+int32_t d2win_g_6f8ffee0[3 * 256]; // 12-byte stride: [i*3], [i*3+1], [i*3+2]
 extern uint32_t d2win_g_6f9014a0;
 }
 
 struct D2WinB67Env {
-    uint32_t (*sub_B4F0)(void);               // 0xB4F0, hidden EAX/EDI inputs left to the seam
+    uint32_t (*sub_B4F0)(uint32_t eax, uint32_t edi);   // 0xB4F0: EAX = the table's feature id, EDI = the constant the call site loads
     uint32_t (*sub_7A60)(void);               // 0x7A60
     void (*sub_7970)(void);                   // 0x7970
     uint32_t (*getTickCount)(void);
@@ -39,11 +39,14 @@ void d2win_sub_BF60(int32_t mode, uint8_t* p, const D2WinB67Env* env) {
         if (fallback) *p = (uint8_t)(*p % 3 + 1);
         return false;
     };
+    static const uint32_t kEdi[4] = { 3, 0x10, 0xf, 0x33 };   // EDI at the four unrolled B4F0 calls
     if (mode >= 1 && mode <= 4 && *p > 3)
-        for (int k = 0; k < 4; k++)
-            if (env->sub_B4F0() != 0) search(true);
-    if (mode == 0 && env->sub_B4F0() == 0) {
-        if (env->sub_B4F0() != 0 && search(false)) return;
+        for (int k = 0; k < 4; k++) {
+            if (env->sub_B4F0((uint32_t)d2win_g_6f8ffee0[*p * 3 + 2], kEdi[k]) != 0) search(true);
+            else if (k == 3) *p = (uint8_t)(*p % 3 + 1);   // the last block's "not set" jump lands on the fallback, not on the exit
+        }
+    if (mode == 0 && env->sub_B4F0((uint32_t)d2win_g_6f9a8cb0[*p * 3 + 2], 0x25) == 0) {
+        if (env->sub_B4F0((uint32_t)d2win_g_6f8ffee0[*p * 3 + 2], 0x25) != 0 && search(false)) return;
         *p = 1;
     }
 }
@@ -58,13 +61,13 @@ int32_t d2win_sub_C180(int32_t param_1, const uint8_t* rec, const D2WinB67Env* e
         if (both || ((a = d2win_g_6f9a8cb0[b5 * 3 + 1], rec[6] == 0xff && rec[7] == 0xff) &&
                      d2win_g_6f9a98a8[b5] != d2win_g_6f9a8cb0[b5 * 3 + 1]))
             a = d2win_g_6f9a98a8[b5];
-        if (((a == 0xd || a == 0xe) && param_1 != 6) || env->sub_B4F0() != 0)
+        if (((a == 0xd || a == 0xe) && param_1 != 6) || env->sub_B4F0((uint32_t)d2win_g_6f9a8cb0[b5 * 3 + 2], 0x32) != 0)
             a = d2win_g_6f8ffee0[b5 * 3 + 1];
     }
     uint8_t b6 = rec[6];
     if (b6 != 0xff) {
         b = both ? d2win_g_6f9a98a8[b6] : d2win_g_6f9a8cb0[b6 * 3 + 1];
-        if (((b == 0xd || b == 0xe) && param_1 != 6) || env->sub_B4F0() != 0)
+        if (((b == 0xd || b == 0xe) && param_1 != 6) || env->sub_B4F0((uint32_t)d2win_g_6f9a8cb0[b6 * 3 + 2], 0x32) != 0)
             b = d2win_g_6f8ffee0[rec[6] * 3 + 1];
     }
     if ((a == 0xd || a == 0xe) && param_1 != 6) a = 0;

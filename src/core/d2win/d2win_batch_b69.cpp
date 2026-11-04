@@ -73,7 +73,7 @@ G(uint8_t*, d2win_g_6f9a8c6c); G(uint8_t*, d2win_g_6f9a8c70); G(uint8_t*, d2win_
 G(uint16_t*, d2win_g_6f9a8c88); G(void*, d2win_g_6f9a8ca0); G(uint32_t, d2win_g_6f9a8ca4);
 G(const char*, d2win_g_6f8fc884); G(const char*, d2win_g_6f8fc8a8); G(const char*, d2win_g_6f9014f4); G(const char*, d2win_g_FontInGameChat);
 __attribute__((weak)) const char* d2win_g_fontNames[32] = {};
-__attribute__((weak)) extern const char d2win_g_6f8fcc00[4] = {'.', 't', 'x', 't'};
+__attribute__((weak)) extern const char d2win_g_6f8fcc00[4] = {'.', 'd', 'a', 't'};
 __attribute__((weak)) extern const char d2win_g_6f8fcdb0[8] = ".txt";
 }
 struct D2WinB69Env {
@@ -88,7 +88,7 @@ struct D2WinB69Env {
     void (*sub_E5C0)(uint32_t, int32_t, void*, uint32_t*, uint8_t);
     void* (*sub_7C60)(void* thisp, int32_t** out);                     // 0x7C60
     void (*sub_B8B0)(void* p, uint32_t eax, uint8_t di);
-    void (*sub_7970)(void);
+    void (*sub_7970)(uint32_t esi_handle, uint32_t edi_size, uint32_t slot);   // 0x7970 as 0xB250 calls it: ESI = handle, EDI = 0x1500, [esp] = palette slot buffer
     void (*sub_1000)(void);
     void (*sub_2FE0)(int32_t);                                         // 0x12FE0
     void (*sub_C980)(void* ecx, uint8_t* dst, void* str, int32_t* y);
@@ -98,6 +98,8 @@ struct D2WinB69Env {
     void (*sub_2940)(void* str, int32_t x, int32_t y, int32_t color, int32_t z);
     const char* (*sub_BB50)(uint32_t, uint32_t, uint32_t);
     void (*sub_B250)(uint32_t slot, const char* name);                 // 0xB250: ECX = slot 1..8, EAX = palette name
+    uint32_t (*open_76BA)(const char* path, uint32_t* handle);         // thunk 0x76BA = Fog #10102: ECX = path, EDX = &handle
+    void (*close_76D2)(void);                                          // thunk 0x76D2 = Fog #10103
 };
 
 static void d2win_fatal(uint32_t id) { Ordinal_10024("", Ordinal_10265(id)); _exit(-1); }
@@ -121,20 +123,21 @@ uint32_t d2win_sub_DFF0(uint32_t* rec, const D2WinB69Env* env) {
 // 1.13c D2Win+0x0B250 -- name = EAX: open Data\Global\Items\Palette\<name><ext>, read, close.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2win_sub_B250(uint32_t slot, const char* name, const D2WinB69Env* env) {
-    (void)slot;   // ECX = slot is the palette table index (0x6900 stride); the body below is the file load
     char path[256];
     strcpy(path, "Data\\Global\\Items\\Palette\\");
     strcat(path, name);
     memcpy(path + strlen(path), d2win_g_6f8fcc00, 4);
     size_t n = strlen(path);
     path[n] = d2win_g_6f8fcc04; path[n + 1] = 0;
-    if (Ordinal_10102() == 0) {
+    uint32_t handle = 0;
+    if ((env->open_76BA ? env->open_76BA(path, &handle) : Ordinal_10102()) == 0) {
         // GetLastError()==2 (file not found) stays silent; the host seam reports other errors.
          Ordinal_10029("Error opening file: %s", path);
         d2win_fatal(0xdcd);
     }
-    env->sub_7970();
-     Ordinal_10103();
+    env->sub_7970(handle, 0x1500, slot);   // read the 0x1500-byte palette into the slot's buffer (0x6f96db68 + slot * 0x6900)
+    if (!handle) d2win_fatal(0x49);        // retail re-tests the handle local after the read
+    if (env->close_76D2) env->close_76D2(); else Ordinal_10103();
 }
 
 // 1.13c D2Win+0x07970 -- ESI = handle, EDI = expected size; size read through Ordinal_10104.
@@ -190,7 +193,7 @@ int32_t* d2win_sub_C810(const char* name, void* thisp, int32_t stride, int32_t* 
     if (d2win_g_6f900c2c == 0 && strcasecmp(name, "leveldefs") == 0)
         wsprintfA(path, "%s\\%s%s", "DATA\\GLOBAL\\EXCEL", "levels", d2win_g_6f8fcdb0);
     else
-        wsprintfA(path, "%s\\%s%s", "DATA\\GLOBAL\\EXCEL", name, d2win_g_6f8fcdb0);
+        wsprintfA(path, "%s\\%s%s", "DATA\\GLOBAL\\EXCEL", name, d2win_g_6f900c2c ? ".bin" : d2win_g_6f8fcdb0);
     int32_t* raw = (int32_t*)env->sub_7C60(thisp, &data);
     if (!raw) d2win_fatal(0x9d8);
     int32_t count;
