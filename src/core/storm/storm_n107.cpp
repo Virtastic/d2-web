@@ -66,8 +66,7 @@ void llInsert(uint8_t* st, u32* n, u32* at) {
 extern "C" void Storm_N107_21CB0(void* self, int32_t param_1, void (*sub4810)(void* self)) {
     uint8_t* st = (uint8_t*)self;
     u32 t = *W(st, 0x3064);
-    u32 parent = ((int32_t)t < 1 ? 0u : 0xffffffffu) ^ 0xffffffffu;  // ((t<1)-1)&t
-    parent &= t;
+    u32 parent = ((int32_t)t < 1 ? 0u : 0xffffffffu) & t;  // ((t<1)-1)&t: the tail node, or 0 when the list is empty
     u32* n1 = poolTake(st);
     llUnlink(n1);
     llAppend(st, n1, 0x3060, 0x3064, 0x305c);

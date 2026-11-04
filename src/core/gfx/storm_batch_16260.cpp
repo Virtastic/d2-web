@@ -18,7 +18,12 @@
 #include <cstring>
 #include <strings.h>
 #include <emscripten.h>
+#include "../fn/storm_hk.h"
 #include <Windows.h>
+
+// FUNCTION-mode capture: a probe sets this to log each Win32 import call as retail's IAT recorder does (slot rva, stack words).
+extern "C" void (*g_storm_imp_hook)(uint32_t slot, uint32_t w0, uint32_t w1, uint32_t w2) = nullptr;
+#define STORM_IMP(slot, a, b, c) do { if (g_storm_imp_hook) g_storm_imp_hook((slot), (uint32_t)(a), (uint32_t)(b), (uint32_t)(c)); } while (0)
 
 namespace {
 
@@ -59,17 +64,17 @@ void wr32(uintptr_t p, uint32_t off, uint32_t v) { std::memcpy((void*)(p + off),
 // The wasm target has no window manager: handles are opaque 32-bit tokens, no callback fires, and
 // the resource table is empty. Each seam below is the "nothing present" branch of the real call.
 void StormSetLastError(uint32_t e) { g_lastError = (int32_t)e; }
-void StormShowCursor(int) {}
-void StormEndPaint() {}
-void StormSetPropA(HWND, const char*, HANDLE) {}
+void StormShowCursor(int a) { STORM_IMP(0x432f4, a, 0, 0); }
+void StormEndPaint() { STORM_IMP(0x432cc, 0, 0, 0); }
+void StormSetPropA(HWND h, const char* n, HANDLE v) { STORM_IMP(0x432fc, (uintptr_t)h, (uintptr_t)n, (uintptr_t)v); }
 HANDLE StormGetPropA(HWND, const char*) { return nullptr; }
 void StormRemovePropA(HWND, const char*) {}
-void StormEndDialog(HWND, INT_PTR) {}
-void StormSetTextColor(HDC, uint32_t) {}
-void StormSetBkColor(HDC, uint32_t) {}
-void StormSetBkMode(HDC, int) {}
-HGDIOBJ StormGetStockObject(int) { return nullptr; }
-int StormGetClassNameA(HWND, LPSTR out, int n) { if (n > 0) out[0] = '\0'; return 0; }
+void StormEndDialog(HWND h, INT_PTR v) { STORM_IMP(0x4331c, (uintptr_t)h, (uintptr_t)v, 0); }
+void StormSetTextColor(HDC h, uint32_t v) { STORM_IMP(0x43044, (uintptr_t)h, v, 0); }
+void StormSetBkColor(HDC h, uint32_t v) { STORM_IMP(0x43034, (uintptr_t)h, v, 0); }
+void StormSetBkMode(HDC h, int v) { STORM_IMP(0x43028, (uintptr_t)h, v, 0); }
+HGDIOBJ StormGetStockObject(int v) { STORM_IMP(0x43090, v, 0, 0); return nullptr; }
+int StormGetClassNameA(HWND h, LPSTR out, int n) { STORM_IMP(0x432bc, (uintptr_t)h, 0, n); if (n > 0) out[0] = '\0'; return 0; }
 void StormPostMessageA(HWND, uint32_t, WPARAM, LPARAM) {}
 HWND StormGetDesktopWindow() { return nullptr; }
 BOOL StormIsIconic(HWND) { return 0; }
@@ -229,22 +234,43 @@ HANDLE StormSub21350(HINSTANCE hinst, int* tmpl, HWND parent, void* dlgProc, LPA
 
 }  // namespace
 
+// FUNCTION-mode capture scope: while live, each Win32 seam logs one hook record (slot rva, stack words) into blob 0 (hooklog lg).
+namespace {
+struct ImpScope {
+    stormhk::Scope hk;
+    static void log(uint32_t slot, uint32_t w0, uint32_t w1, uint32_t w2) {
+        stormhk::Scope* c = stormhk::Scope::cur();
+        if (slot == 0x432cc) { w0 = c->r[0]; w1 = c->r[1]; }   // EndPaint is the tail jump: it gets the caller's own two words
+        if (slot == 0x432fc) w1 = 0;                           // property-name pointer (hookmask'd in the descriptor)
+        c->e.h(slot, 0, 0, 0, 0, 0, w0, w1, w2);
+    }
+    explicit ImpScope(uint32_t* r) : hk(r, 0, 2, kSc) { g_storm_imp_hook = log; }
+    ~ImpScope() { g_storm_imp_hook = nullptr; }
+    static constexpr uint32_t kSc[2] = {0, 0};
+};
+}  // namespace
+
 // 1.13c Storm+0x1CAF0: drop the queued ShowCursor(1) calls, the paint refcount, then EndPaint.
 // The decompile leaves the tail as an unresolved indirect jump; it is EndPaint's epilogue.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1caf0(uint32_t* r) {
+    ImpScope impScope(r);
+    uint32_t* pin = (uint32_t*)(uintptr_t)r[16];   // blob 1: [0] 0x453ac, [4] 0x453bc in; [8], [12] out
+    g_453ac = (int32_t)pin[0]; g_453bc = (int32_t)pin[1];
     while (g_453ac != 0) {
         StormShowCursor(1);
         g_453ac = g_453ac - 1;
     }
     g_453bc = g_453bc - 1;
     StormEndPaint();
+    pin[2] = (uint32_t)g_453ac; pin[3] = (uint32_t)g_453bc;
     r[4] = 0;
 }
 
 // 1.13c Storm+0x1CB20: end an SDlg dialog, publishing the result through two window properties.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1cb20(uint32_t* r) {
+    ImpScope impScope(r);
     StormSub1CB20((HWND)(uintptr_t)r[0], (HANDLE)(uintptr_t)r[1]);
     r[4] = 0;
 }
@@ -304,6 +330,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1d460(uint32_t* r) {
 // 1.13c Storm+0x1CB60: the SDlgStatic colour/dialog window procedure.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_storm_1cb60(uint32_t* r) {
+    ImpScope impScope(r);
     HWND hwnd = (HWND)(uintptr_t)r[0];
     uint32_t msg = r[1];
     HDC hdc = (HDC)(uintptr_t)r[2];
