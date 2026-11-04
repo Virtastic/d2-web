@@ -30,6 +30,7 @@ __attribute__((weak)) void Ordinal_10209(void*);
 __attribute__((weak)) int wsprintfA(char*, const char*, ...);
 void _exit(int);
 extern const uint32_t* gdwBitMasks_exref;
+__attribute__((weak)) extern const uint32_t* d2win_ea30_masks;
 extern uint32_t d2win_g_6f8ffdac, d2win_g_6f8ffe00, d2win_g_6f8ffe98;
 extern char d2win_g_6f9a9d12;
 extern int32_t d2win_g_6f900c2c;
@@ -413,7 +414,7 @@ uint32_t d2win_sub_E5F0(uint32_t arg, uint32_t* p, const D2WinB69Env* env) {
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2win_sub_EA30(uint32_t* p, const D2WinB69Env* env) {
     if (!p) d2win_fatal(0x5a8);
-    const uint32_t* m = gdwBitMasks_exref;
+    const uint32_t* m = d2win_ea30_masks ? d2win_ea30_masks : gdwBitMasks_exref;   // the FN probe pins retail's table pointer (IAT slot 0x1B17C) here
     if (!(m[0] & p[0]) || !(m[2] & p[0])) return;
     int32_t x = (int32_t)p[5] - 2, y = (int32_t)p[6];
     if (!p[0x2e]) d2win_fatal(0x5b8);

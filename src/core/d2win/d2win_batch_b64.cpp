@@ -22,6 +22,7 @@ struct D2WinB64Env {
     void (*registerEntry)(uint32_t w, uint32_t a, int32_t b, uint32_t c); // 0x11190
     void (*initWidgetTail)(void);                          // 0xD880
     uint32_t (*lookupColor)(uint32_t idx);                 // 0xBF60
+    void (*palSlot)(uint32_t slot, uint8_t* pcol);         // 0xBF60 as sub_E240 calls it: EAX = slot, ESI = &cols[slot]; may rewrite *pcol
     uint32_t (*fn_dff0)(void);                             // 0xDFF0
     uint32_t (*fn_c410)(uint32_t* w, uint32_t a);          // 0xC410
     uint32_t (*fn_c180)(uint32_t a);                       // 0xC180
@@ -56,6 +57,12 @@ D2WinB64Env g_d2winB64{};  // zeroed seams; a probe or the client fills the ones
 // FN probe seam (src/core/fn/d2win_f240.cpp): the probe points the two palette callees at its recorders.
 extern "C" void d2win_b64_set_pl2_seams(void (*loadPl2)(const char*), void (*applyPalette)(void)) {
     E.loadPl2 = loadPl2; E.applyPalette = applyPalette;
+}
+
+// FN probe seam (src/core/fn/d2win_e240.cpp): the callees sub_E240 reaches.
+extern "C" void d2win_b64_set_e240_seams(void* (*alloc)(uint32_t, uint32_t), void (*palSlot)(uint32_t, uint8_t*), uint32_t (*c180)(uint32_t),
+                                         uint32_t (*dff0)(void), uint32_t (*c410)(uint32_t*, uint32_t), uint32_t* bitMasks, uint32_t* palTable) {
+    E.alloc = alloc; E.palSlot = palSlot; E.fn_c180 = c180; E.fn_dff0 = dff0; E.fn_c410 = c410; E.bitMasks = bitMasks; E.palTable = palTable;
 }
 
 // 1.13c D2Win+0x0F240
@@ -197,10 +204,11 @@ void d2win_sub_E240(uint32_t* w, uint32_t p2, uint32_t p3, const uint8_t* cols, 
     if (p2 < 7) { w[9] = E.fn_c180(p2); if (!w[9]) return; }
     else w[9] = 1;
     w[8] = p3;
+    w[0] |= E.bitMasks[0]; w[0] |= E.bitMasks[1]; w[0] |= E.bitMasks[2];
     for (uint32_t i = 0; i < 16; i++) {
         w[0xe + 0x10 + i] = 1;
         if (cols[i] == 0 || cols[i] == 0xff) w[0xe + i] = 0;
-        else { E.lookupColor(cols[i]); w[0xe + i] = E.palTable[cols[i] * 3]; w[0xe + 0x10 + i] = E.palTable[cols[i] * 3 + 2]; }
+        else { E.palSlot(i, const_cast<uint8_t*>(cols) + i); w[0xe + i] = E.palTable[cols[i] * 3]; w[0xe + 0x10 + i] = E.palTable[cols[i] * 3 + 2]; }
     }
     char* p = (char*)w + 0x28;
     for (int i = 0; i < 16; i++) { char c = tx[i]; p[i] = (c != -1) ? (char)(c - 1) : c; }

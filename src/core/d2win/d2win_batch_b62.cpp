@@ -12,7 +12,7 @@ __attribute__((weak)) int   Ordinal_10069(uint32_t v);
 __attribute__((weak)) int   d2win_flsbuf(int ch, void* file);               // MSVC __flsbuf
 }
 extern "C" __attribute__((weak)) uint8_t* FUN_6f8ed790(void* self, void* self2, int a, void* b);   // 0xD790
-extern "C" __attribute__((weak)) void FUN_6f8ebb00(uint8_t* a, char* b);   // 0xBB00
+extern "C" __attribute__((weak)) uint32_t FUN_6f8ebb00(uint8_t* ecx, char* edx);   // 0xBB00: ECX = entry, EDX = entry+5, EAX = &out (zeroed); returns the out word
 extern "C" __attribute__((weak)) uint32_t DAT_6f8ffe08[], DAT_6f8ffe5c[], DAT_6f8ffd48[], DAT_6f8ffdb0[];
 
 namespace {
@@ -66,8 +66,7 @@ void D2Win_E0D0(uint8_t* eax, uint8_t* esi)
             u32(esi, 0x08) = 6 < (int)u32(esi, 0x0c);
             u32(esi, 0x24) = DAT_6f8ffdb0[u32(esi, 0x10)];
             if (!u32(esi, 0x20)) fatal(0x514);
-            if (FUN_6f8ebb00) FUN_6f8ebb00(e, (char*)(e + 5));
-            u32(esi, 0x28) = 0;
+            u32(esi, 0x28) = FUN_6f8ebb00 ? FUN_6f8ebb00(e, (char*)(e + 5)) : 0;   // retail stores BB00's out word (zeroed first) into +0x28
             break;
         }
     }
