@@ -117,7 +117,7 @@ struct D2Common5DD80Env
 };
 
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_5dd80(int32_t* pCap, uint32_t* ppBuf, int32_t* pUsed,
+EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_5dd80(int32_t* pCap, uint32_t* ppBuf, int32_t* pUsed,
                                                    const uint8_t* src, uint32_t n, const D2Common5DD80Env* env)
 {
 	while (*pCap <= static_cast<int32_t>(*pUsed + n))

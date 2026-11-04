@@ -19,7 +19,7 @@ inline uint32_t roll(uintptr_t s, int32_t n) {
 
 extern "C" {
 // a1=param_1 (a1[0]=level, a1[1]=box, a1[6]=mode), a2=param_2 (sub record), a3=param_3 (group).
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_83e20(uintptr_t a1, uintptr_t a2, uintptr_t a3,
+EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_83e20(uintptr_t a1, uintptr_t a2, uintptr_t a3,
 	int32_t (*test)(int32_t, int32_t, uintptr_t, uintptr_t),
 	void (*apply)(int32_t, int32_t, int32_t, int32_t, uintptr_t, uintptr_t, uintptr_t)) {
 	uintptr_t lvl = w(a1, 0), box = w(a1, 4);
