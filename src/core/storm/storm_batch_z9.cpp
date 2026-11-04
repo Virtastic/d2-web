@@ -251,3 +251,6 @@ uint32_t Storm_Sub36E00(int32_t totalW, int32_t totalH, int32_t tileW, int32_t t
 }
 
 }  // namespace storm_z9
+
+// C-linkage entry for the capture probe (the port itself lives in storm_z9).
+extern "C" uint32_t Storm_Sub36CD0(uint32_t* rec) { return storm_z9::Storm_Sub36CD0(rec); }

@@ -57,7 +57,7 @@ extern "C" uint32_t storm_4da0(int param_1, int* self, void (*dtor_4d60)(int*), 
 void Storm_Sub4D60(uint8_t* node);
 static void s17b30_4d60(int* p) { Storm_Sub4D60((uint8_t*)p); }
 static void s17b30_free(void* p, const char* f, int l) { Storm_Sub1B960(p, f, l); }
-uint32_t Storm_Sub17B30(uint8_t* o) {
+extern "C" uint32_t Storm_Sub17B30(uint8_t* o) {
     if (o && *(int16_t*)(o + 8) == 0x4F4D && *(uint16_t*)(o + 10) < 1) {
         if (g_45824 == o) g_45824 = nullptr;
         if (*(void**)(o + 0xC)) { Storm_Sub1B960(*(void**)(o + 0xC), "..\\3rdParty\\STORM\\SOURCE\\SGDI.CPP", 0x117); *(void**)(o + 0xC) = nullptr; }

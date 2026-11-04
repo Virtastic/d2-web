@@ -16,7 +16,7 @@ struct StormHeapAllocEnv {
     void (*onFail)();                                                   // 1ABF0
 };
 
-uint32_t* Storm_Sub1C0C0(StormHeapAllocEnv& e, uint32_t* pg, uint32_t size, uint8_t flags) {
+extern "C" uint32_t* Storm_Sub1C0C0(StormHeapAllocEnv& e, uint32_t* pg, uint32_t size, uint8_t flags) {
     // 1A6F0
     int big = (!e.addrTopDown && size < 0xfe88) ? 0 : 1;
     int tail = (e.guardTail && !big) ? 1 : 0;
