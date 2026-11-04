@@ -1,6 +1,11 @@
 // Link seams for the z14 number/strans batch (callees not yet ported); never reached by the probes.
 #include <cstdint>
 uint32_t z14_vtbl36848;
+// Last-error global and the strchr/strrchr pair for the z14 string helpers (their only definition; the probes reset and read it).
+uint32_t z14_lastErr;
+void z14_SetLastError(uint32_t) {}
+char* z14_Sub3B280(char*, char) { return nullptr; }
+char* z14_Sub3B2D0(char*, char) { return nullptr; }
 extern const uint32_t z14_tab35458[2] = {0, 0};
 extern const double z14_d37af8 = 0, z14_d37b10 = 0, z14_d37b08 = 0;
 extern const double z14_tab42918[2] = {0, 0};
