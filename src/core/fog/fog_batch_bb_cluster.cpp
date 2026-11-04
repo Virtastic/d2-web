@@ -69,8 +69,8 @@ void fog_bb_perf_init(const fog_bb_env* e, fog_bb_perf* p)
 }
 
 // 1.13c Fog+0x1E5C0
-struct fog_bb_sub { uint8_t pad0[0xc]; uint8_t cs[24]; int f24; int f2c; };
-struct fog_bb_obj { fog_bb_sub* sub; int f124; };
+struct fog_bb_sub { uint8_t pad0[0xc]; uint8_t cs[24]; int f24; int pad28; int f2c; };
+struct fog_bb_obj { uint8_t pad0[0x110]; fog_bb_sub* sub; uint8_t pad114[0xc]; int f124; };
 void fog_bb_1e5c0(const fog_bb_env* e, fog_bb_obj* o)
 {
     if (o && o->sub && o->sub->f24 != 0) {
