@@ -456,14 +456,21 @@ EMSCRIPTEN_KEEPALIVE int32_t D2Common_10703_SkillParamCurve(int32_t nLevel, int3
 		static_cast<int32_t>(pTxt->dwParam[1]));
 }
 
-// 1.13c D2Common+0x50D40 (#10709, D2GetFlags): non-player units return 0x1B with stat 157 in *pOut
-// when it is positive, else 0x29 with stat 158, else 0. Players resolve their selection (hidden
-// 0x81B90(unit,1)) and its mode (hidden 0x72430): mode 1 takes stat 157 or 158 (0 when neither is
-// positive); mode 7 takes stat 157, else stat 158 (0x29), else 0x1F; any other mode 0xFFFFFFFF.
+// 1.13c D2Common+0x50D40 (#10709, D2GetFlags): stdcall (unit, pOut), ret 8, read from the 1.13c
+// disassembly. A null unit answers 0. Non-player units read stat 157 and then 158 of their stat list
+// (+0x5C) through 0x38A80 (EBX = list, EDI = stat << 16, stack = the ItemStatCost row), each only when
+// the list is set, the row count exceeds the stat id and the row address is nonzero: a positive 157
+// answers 0x1B, a positive 158 answers 0x29, both storing the value in *pOut when pOut is set; else 0.
+// Players take the item 0x31B90(unit, 1) (none answers -1) and its type word 0x22430(item): type 1
+// reads 157 as above, then 158 through 0x39430(unit, 158, 0) (0x29, else 0); type 7 reads 157 and 158
+// through 0x39430 (0x1B, 0x29, else 0x1F); any other type answers -1. A null 0x38A80 / 0x39430 seam
+// falls back to the engine stat total.
 struct D2Common50D40Env
 {
-	uint32_t (*fn81B90)(uint32_t pUnit, int32_t nIndex);
-	uint32_t (*fn72430)(uint32_t pSelection);
+	uint32_t (*fn31B90)(uint32_t pUnit, int32_t nIndex);
+	uint32_t (*fn22430)(uint32_t pItem);
+	int32_t  (*fn38A80)(uint32_t pStatList, uint32_t nLayerStat, uint32_t pIscRow);
+	int32_t  (*fn39430)(uint32_t pUnit, int32_t nStat, int32_t nLayer);
 };
 
 // 1.13c D2Common+0x50D40
@@ -474,68 +481,51 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2GetFlags(uint32_t pUnit, int32_t* pOut,
 	uint8_t* u = P(pUnit);
 	if (!u)
 		return 0;
-	uint8_t* sl = StatListOf(u);
-	const int32_t nCount = sgptDataTables ? sgptDataTables->nItemStatCostTxtRecordCount : 0;
 
+	// the stat-list read with its row gates; bRead is false when a gate fails
+	auto listStat = [&](uint32_t nStat, bool& bRead) -> int32_t {
+		bRead = false;
+		const uint32_t sl = W(u, 0x5C);
+		if (!sl || sgptDataTables->nItemStatCostTxtRecordCount <= (int32_t)nStat) return 0;
+		const uint32_t pRow = (uint32_t)(uintptr_t)sgptDataTables->pItemStatCostTxt + nStat * 0x144;
+		if (!pRow) return 0;
+		bRead = true;
+		return pEnv && pEnv->fn38A80 ? pEnv->fn38A80(sl, nStat << 16, pRow) : StatTotal(u, (int32_t)nStat);
+	};
+	auto unitStat = [&](int32_t nStat) -> int32_t {
+		return pEnv && pEnv->fn39430 ? pEnv->fn39430(pUnit, nStat, 0) : StatTotal(u, nStat);
+	};
+	auto put = [&](int32_t v, uint32_t r) { if (pOut) *pOut = v; return r; };
+
+	bool bRead;
 	if (W(u, 0) != 0)
 	{
-		if (sl && nCount > 0x9D)
-		{
-			const int32_t n157 = StatTotal(u, 157);
-			if (n157 > 0)
-			{
-				if (pOut) *pOut = n157;
-				return 0x1B;
-			}
-		}
-		if (sl && nCount > 0x9E)
-		{
-			const int32_t n158 = StatTotal(u, 158);
-			if (n158 > 0)
-			{
-				if (pOut) *pOut = n158;
-				return 0x29;
-			}
-		}
+		if (!W(u, 0x5C)) return 0;
+		int32_t v = listStat(157, bRead);
+		if (bRead && v > 0) return put(v, 0x1B);
+		v = listStat(158, bRead);
+		if (bRead && v > 0) return put(v, 0x29);
 		return 0;
 	}
 
-	if (!pEnv || !pEnv->fn81B90)
-		return 0;
-	const uint32_t nSel = pEnv->fn81B90(pUnit, 1);
-	if (!nSel)
+	const uint32_t nItem = pEnv && pEnv->fn31B90 ? pEnv->fn31B90(pUnit, 1) : 0;
+	if (!nItem)
 		return 0xFFFFFFFFu;
-	const uint32_t nMode = pEnv->fn72430 ? (pEnv->fn72430(nSel) & 0xFFFF) : 0;
+	const uint32_t nType = pEnv->fn22430 ? (pEnv->fn22430(nItem) & 0xFFFF) : 0;
 
-	if (nMode == 1)
+	if (nType == 1)
 	{
-		if (sl && nCount >= 0x9E)
-		{
-			const int32_t n157 = StatTotal(u, 157);
-			if (n157 > 0)
-			{
-				if (pOut) *pOut = n157;
-				return 0x1B;
-			}
-		}
-		const int32_t n158 = StatTotal(u, 158);
-		if (n158 < 1)
-			return 0;
-		if (pOut) *pOut = n158;
-		return 0x29;
+		int32_t v = listStat(157, bRead);
+		if (bRead && v > 0) return put(v, 0x1B);
+		v = unitStat(158);
+		return v > 0 ? put(v, 0x29) : 0;
 	}
-	if (nMode != 7)
+	if (nType != 7)
 		return 0xFFFFFFFFu;
 
-	const int32_t n157 = sl ? StatTotal(u, 157) : 0;
-	if (n157 < 1)
-	{
-		const int32_t n158 = sl ? StatTotal(u, 158) : 0;
-		if (n158 < 1)
-			return 0x1F;
-		if (pOut) *pOut = n158;
-		return 0x29;
-	}
-	if (pOut) *pOut = n157;
-	return 0x1B;
+	int32_t v = unitStat(157);
+	if (v > 0) return put(v, 0x1B);
+	v = unitStat(158);
+	if (v > 0) return put(v, 0x29);
+	return 0x1F;
 }

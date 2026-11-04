@@ -19,8 +19,6 @@
 #include "Drlg/D2DrlgActivate.h"
 #include "Units/Units.h"
 
-// Implemented in d2common_batch_1fb80.cpp; called by 0x51FF0.
-int32_t D2Common_1FB80_GetWieldType(D2UnitStrc* pPlayer, D2InventoryStrc* pInventory);
 
 namespace
 {
@@ -42,7 +40,7 @@ namespace
 struct D2CommonBatch2F7A0Env {
 	// 0x22EC0(class id, value): items.txt row +0xC0 == value.
 	int32_t  (*sub22EC0)(int32_t nClassId, int32_t nValue);
-	// 0x4F930(0): the alternate branch of 0x51FF0.
+	// 0x4F930: unused here since 0x51FF0 moved out; kept so the layout other files mirror is unchanged.
 	int32_t  (*sub4F930)(int32_t nZero);
 	// 0x38F60(unit, 0x18): a weapon's stat total.
 	int32_t  (*sub38F60)(uint32_t pUnit, int32_t nStatId);
@@ -120,64 +118,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_2ECF0(uint32_t pUnit)
 	return pObject != 0 ? rd32(pObject, 0) : 0;
 }
 
-// 1.13c D2Common+0x51FF0 (#10297)
-// The max-damage skill roll of the 0x6BAA0 damage builder, same body as the vendored 1.10f max branch:
-// an out-of-range skill id or a missing table answers 2; bit 0x10 of the row's +0x05 flags byte answers
-// 0x4F930(0); with nSrcDam (+0x1A5) and nScaleSource both set, the source damage is the weapon's +0x18
-// total when 0x1FB80 reports wield type 2, else the unit's +0x16 total, scaled by nSrcDam and divided
-// by 128; then dwMaxDam (+0x1AC) and the level bonus over dwMaxLvlDam (+0x1C4, level in the dropped
-// EAX, taken from this function's level argument) are added; a dwDmgSymPerCalc (+0x1D8) other than
-// -1 that the formula evaluator accepts adds ApplyRatio(damage, formula, 100); the result is shifted
-// left by nToHitShift (+0x1A4) mod 32.
-extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_51FF0(uint32_t pUnit, int32_t nSkillId, int32_t nSkillLevel,
-                                                  int32_t nScaleSource, const D2CommonBatch2F7A0Env* env)
-{
-	if (pUnit == 0) return 2;                       // retail faults in 0x31B90; not observable
-	if (nSkillId < 0 || nSkillId >= sgptDataTables->nSkillsTxtRecordCount ||
-	    sgptDataTables->pSkillsTxt == nullptr) {
-		return 2;
-	}
-
-	const D2SkillsTxt* pRow = &sgptDataTables->pSkillsTxt[nSkillId];
-	if (((uint8_t)rd32(gdwBitMasks, 16) & rd8(pRow, 5)) != 0) {
-		return env->sub4F930 != nullptr ? env->sub4F930(0) : 0;
-	}
-
-	int32_t nSource = 0;
-	if (rd8(pRow, 0x1A5) != 0 && nScaleSource != 0) {
-		D2UnitStrc* pUnitNative = reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pUnit));
-		D2UnitStrc* pWeapon = D2Common_10434(pUnitNative, 0);
-		if (pWeapon == nullptr) {
-			nSource = env->sub38B70 != nullptr ? env->sub38B70(pUnit, 0x16) : 0;
-		}
-		else {
-			D2InventoryStrc* pInventory = reinterpret_cast<D2InventoryStrc*>(static_cast<uintptr_t>(rd32(pUnit, 0x60)));
-			const int32_t nWield = D2Common_1FB80_GetWieldType(pUnitNative, pInventory);
-			nSource = nWield == 2
-				? (env->sub38F60 != nullptr ? env->sub38F60((uint32_t)(uintptr_t)pWeapon, 0x18) : 0)
-				: (env->sub38B70 != nullptr ? env->sub38B70(pUnit, 0x16) : 0);
-		}
-
-		const int32_t nProduct = (int32_t)((uint32_t)rd8(pRow, 0x1A5) * (uint32_t)nSource);
-		nSource = nProduct / 128;                    // retail's sign-corrected arithmetic shift by 7
-	}
-
-	int32_t nDamage = nSource
-		+ SKILLS_CalculateDamageBonusByLevel(nSkillLevel, (int*)pRow->dwMaxLvlDam)
-		+ (int32_t)pRow->dwMaxDam;
-
-	if (pRow->dwDmgSymPerCalc != 0xFFFFFFFFu) {
-		const int32_t nFormula = env->sub51BF0 != nullptr
-			? env->sub51BF0(pUnit, pRow->dwDmgSymPerCalc, nSkillId, nSkillLevel)
-			: 0;
-		if (nFormula != 0) {
-			nDamage += DATATBLS_ApplyRatio(nDamage, nFormula, 100);
-		}
-	}
-
-	return (int32_t)((uint32_t)nDamage << (pRow->nToHitShift & 0x1F));
-}
+// 0x51FF0 (#10297) moved to d2common_51ff0.cpp.
 
 // 1.13c D2Common+0x82E00 (#10299)
 // Overlay record id lookup: a non-negative id below the overlay count answers the record's nTrans

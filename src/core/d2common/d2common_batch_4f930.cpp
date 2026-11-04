@@ -25,7 +25,7 @@ static_assert(offsetof(D2LevelDefBin, dwOffsetX) == 0x24, "levels.bin offset X")
 // is clamped to at least 1 and scaled by 256: divided by 4 when nMin is set (minimum damage) and by 3
 // otherwise (maximum damage). The unit arrives in EAX in retail and the selector is the stack argument.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_4f930(D2UnitStrc* pUnit, int32_t nMin)
+EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_4f930_port(D2UnitStrc* pUnit, int32_t nMin)
 {
 	int32_t nDamage;
 
@@ -52,7 +52,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_4f930(D2UnitStrc* pUnit, int32_t nMi
 // skill list (freeing it when bDecrementAndCheckSkillLevel is clear or the level drops to 0) and refresh
 // the unit. The unit arrives in EBX in retail. The vendored body is the same function.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_528b0(D2UnitStrc* pUnit, int32_t nSkillId,
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_528b0_port(D2UnitStrc* pUnit, int32_t nSkillId,
 	int32_t bDecrementAndCheckSkillLevel)
 {
 	D2COMMON_SKILLS_RemoveSkill_6FDAFFF0(pUnit, nSkillId, bDecrementAndCheckSkillLevel, __FILE__, __LINE__);

@@ -292,17 +292,19 @@ bool D2Common_51870_FindPlacement(int32_t* pUnit, int32_t* pTarget, uint32_t* pO
 }
 
 // ---------------------------------------------------------------------------------------------
-// 0x52100: minimum physical damage of a skill (D2MOO's SKILLS_GetMinPhysDamage body matches the
-// 1.13c row arithmetic field for field). Unrecovered helper rows are behind the seam.
+// 0x52100: minimum physical damage of a skill, read from the 1.13c disassembly. Callees are behind the
+// seam. The kick test is the low byte of Fog's gdwBitMasks[1] (0x02) against the row's +0x05 byte; the
+// kick callee gets the unit (EAX) and 1; the unit stat read is 0x38B70(unit, 0x15, 0); the formula
+// ratio is ApplyRatio(damage, formula value, 100) (0x11E0: EDX = damage, EAX = value, ECX = 100).
 struct D2Common52100Env
 {
-	int32_t (*kick_damage)(int32_t);												//0x00 0x4F930
+	int32_t (*kick_damage)(uint32_t, int32_t);										//0x00 0x4F930
 	uint32_t (*get_item)(uint32_t, int32_t);										//0x04 0x31B90
 	int32_t (*wield_type)(uint32_t, uint32_t);										//0x08 0x1FB80
-	int32_t (*get_stat)(uint32_t, int32_t);											//0x0C 0x38B70
+	int32_t (*get_stat)(uint32_t, int32_t, int32_t);								//0x0C 0x38B70
 	int32_t (*min_damage)(uint32_t, int32_t);										//0x10 0x38ED0
 	int32_t (*damage_bonus_by_level)(int32_t, const int32_t*);						//0x14 0x4DDB0
-	int32_t (*evaluate_formula)(uint32_t, uint32_t, int32_t, uint32_t);				//0x18 0xA1BF0
+	int32_t (*evaluate_formula)(uint32_t, uint32_t, int32_t, uint32_t);				//0x18 0x51BF0
 };
 
 // 1.13c D2Common+0x52100 (#10567)
@@ -315,8 +317,8 @@ int32_t D2Common_52100_SkillsGetMinPhysDamage(uint32_t pUnit, int32_t nSkillId, 
 		return 1;
 	const uint8_t* pRow = reinterpret_cast<const uint8_t*>(&sgptDataTables->pSkillsTxt[nSkillId]);
 
-	if (RdU8(pRow, 0x05) & gdwBitMasks[4])
-		return pEnv && pEnv->kick_damage ? pEnv->kick_damage(1) : 1;
+	if (RdU8(pRow, 0x05) & static_cast<uint8_t>(gdwBitMasks[1]))
+		return pEnv && pEnv->kick_damage ? pEnv->kick_damage(pUnit, 1) : 1;
 
 	int32_t nDamage = 0;
 	if (RdU8(pRow, 0x1A5) != 0 && bUseWeapon != 0 && pEnv)
@@ -324,7 +326,7 @@ int32_t D2Common_52100_SkillsGetMinPhysDamage(uint32_t pUnit, int32_t nSkillId, 
 		const uint32_t pItem = pEnv->get_item ? pEnv->get_item(pUnit, 0) : 0;
 		if (!pItem)
 		{
-			nDamage = pEnv->get_stat ? pEnv->get_stat(pUnit, 0x15) : 0;
+			nDamage = pEnv->get_stat ? pEnv->get_stat(pUnit, 0x15, 0) : 0;
 		}
 		else
 		{
@@ -332,7 +334,7 @@ int32_t D2Common_52100_SkillsGetMinPhysDamage(uint32_t pUnit, int32_t nSkillId, 
 			if ((pEnv->wield_type ? pEnv->wield_type(pUnit, pInventory) : 0) == 2)
 				nDamage = pEnv->min_damage ? pEnv->min_damage(pItem, 1) : 0;
 			else
-				nDamage = pEnv->get_stat ? pEnv->get_stat(pUnit, 0x15) : 0;
+				nDamage = pEnv->get_stat ? pEnv->get_stat(pUnit, 0x15, 0) : 0;
 		}
 		nDamage = static_cast<int32_t>(RdU8(pRow, 0x1A5)) * nDamage / 128;
 	}
@@ -346,7 +348,7 @@ int32_t D2Common_52100_SkillsGetMinPhysDamage(uint32_t pUnit, int32_t nSkillId, 
 	{
 		const int32_t nBonus = pEnv->evaluate_formula(pUnit, nFormula, nSkillId, nSkillLevel);
 		if (nBonus != 0)
-			nDamage += DATATBLS_ApplyRatio(nBonus, nDamage, 100);
+			nDamage += DATATBLS_ApplyRatio(nDamage, nBonus, 100);
 	}
 
 	return nDamage << (RdU8(pRow, 0x1A4) & 0x1F);
