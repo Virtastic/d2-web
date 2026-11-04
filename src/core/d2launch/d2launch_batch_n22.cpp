@@ -173,7 +173,10 @@ void n22_9BD0(N22Ui* u, int32_t a) { int32_t v = u->Ord10089(*u->dat_aa0) + a; u
 
 // Selector in EAX 0..6 (else default); each arm: Unicode::strcpy(dst, Ordinal_10003()) via the host seam.
 // 1.13c D2Launch+0x9E40
-void n22_9E40(N22Ui* u, uint32_t sel, void** out) { (void)sel; u->ord10003_str(out); }
+void n22_9E40(N22Ui* u, uint32_t sel, void** out) {
+  static const uint32_t ids[7] = { 0xfab, 0xfaa, 0xfa9, 0xfa8, 0xfa7, 0x2771, 0x2772 };
+  u->ord10003_str(sel > 6 ? 0x1507u : ids[sel], out);
+}
 
 // 1.13c D2Launch+0x9BF0
 int n22_9BF0(N22Ui* u) {

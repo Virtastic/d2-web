@@ -9,7 +9,7 @@ struct N22Ui {
     int (*Ord502)(); void (*Ord10003_fn)(); int (*Ord10227)();
     void (*ae60)(); void (*a8c0)(); void (*b600)(); void (*bda0)(); void (*c3f0)(); void (*cc50)();
     void (*cb00)(const char*, int); void (*fn5090)(const void*, void (*)(), int); void (*fn7df0)();
-    void (*ord10003_str)(void** out);
+    void (*ord10003_str)(uint32_t id, void** out);   // D2Lang 10003 (ECX = id)
     uint32_t (*GetTickCount)();
     int32_t (*gate68)();                                  // (*(DAT_6fa656c4+0x68))()
     int32_t* dat_ec4; int32_t* dat_eb8; int32_t* dat_ebc; int32_t* dat_ee4; int32_t* dat_ad4;
