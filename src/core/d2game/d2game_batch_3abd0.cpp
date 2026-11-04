@@ -20,7 +20,7 @@ struct D2GameBatch3Env {
     int32_t (*chk0370)(void* owner);                                     // 0xA0370
     void (*ord10786)(void* owner, uint32_t rec60, int32_t skill, int32_t level);
     void* (*get00B0)();                                                  // 0xA00B0
-    void (*fn448E0)(int32_t zero, void* p, int32_t skill, int32_t level);// 0x448E0
+    void (*fn448E0)(int32_t target, void* p, int32_t skill, int32_t level);// 0x448E0
     uint32_t (*unitX)(void* unit);                                       // 0x1100
     uint32_t (*unitY)(void* unit);                                       // 0x1130
     uint32_t (*roll)(void* pSeed, uint32_t range);                       // 0x1180: eax = range, ecx = seed
@@ -53,7 +53,7 @@ int32_t D2Game_3ABD0(void* pGame, void* missile, void* target, const D2GameBatch
     if (st < 0 || st > (int32_t)b3_rd32(dt, 0xC4)) return 1;        // note: <= count (1.10f used <)
     if (!e->chk0370(owner)) return 1;
     e->ord10786(owner, b3_rd32(rec, 0x60), id, lvl);
-    if (void* x = e->get00B0()) e->fn448E0(0, x, id, lvl);
+    if (void* x = e->get00B0()) e->fn448E0((int32_t)(uintptr_t)target, x, id, lvl);   // 1.13c: first stack word is the target (EAX = the missile)
     return 0;
 }
 

@@ -410,6 +410,6 @@ void D2G573_questcb_probe(int which, const uint8_t* q, uint8_t* u, uint32_t* lg,
 {
     HookEnv h(lg, sc); q573H = &h; q573E = D2G573Env{};
     q573E.getPlayerData = q573_getPd; q573E.questFlag = q573_flag; q573E.fnBBEB0 = q573_bbeb0; q573E.fnBC160 = q573_bc160;
-    q573E.cbLab80ec0 = (void*)(uintptr_t)0xB2080EC0u; q573E.cbLab81ec0 = (void*)(uintptr_t)0xB2081EC0u; q573E.cbLab821b0 = (void*)(uintptr_t)0xB20821B0u;
+    q573E.cbLab80ec0 = (void*)(uintptr_t)0xB2060EC0u; q573E.cbLab81ec0 = (void*)(uintptr_t)0xB2061EC0u; q573E.cbLab821b0 = (void*)(uintptr_t)0xB20621B0u;
     if (which == 0) d2game_64150(q, u); else if (which == 1) d2game_64fe0(q, u); else d2game_65200(q, u);
 }

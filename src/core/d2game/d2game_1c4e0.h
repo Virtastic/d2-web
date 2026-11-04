@@ -15,7 +15,9 @@
 #include <cstdint>
 
 namespace g1c4e0 {
-template <class E> void Choose(E& e, uint32_t unit, uint32_t game, uint32_t cls, uint32_t X, uint32_t Y, uint32_t S, uint32_t dt, uint32_t bm)
+// bias: the low byte of the block holding the monstats rows. The capture aligns it to 256 but the replay's large-blob path does not, so the probe
+// passes that low byte and the row-address-over-byte word is formed as if the block were 256-aligned.
+template <class E> void Choose(E& e, uint32_t unit, uint32_t game, uint32_t cls, uint32_t X, uint32_t Y, uint32_t S, uint32_t dt, uint32_t bm, uint32_t bias = 0)
 {
     // 1.13c D2Game+0x1C4E0
     if ((int32_t)cls < 0 || (int32_t)cls >= (int32_t)e.rd32(dt + 0xA80)) return;
@@ -83,7 +85,7 @@ template <class E> void Choose(E& e, uint32_t unit, uint32_t game, uint32_t cls,
     if (cls > 0x167) { if (cls < 0x230 || cls > 0x231) { idle(); return; } }
     else if (cls != 0x167) {
         if (cls == 0x10F) {
-            e.h(0xF2380, (row & ~0xFFu) | e.rd8(row + 0x180), unit, 0, game, 0, (uint32_t)e.rd16s(row + 0x170), Y, 0, 0);
+            e.h(0xF2380, ((((row - bias) & ~0xFFu) | e.rd8(row + 0x180)) + bias), unit, 0, game, 0, (uint32_t)e.rd16s(row + 0x170), Y, 0, 0);
             return;
         }
         if (cls != 0x152) { idle(); return; }
