@@ -147,6 +147,25 @@ extern "C" EMSCRIPTEN_KEEPALIVE void fog_sub_120A0(void* node) {  // 1.13c Fog+0
 
 // 1.13c Fog+0x120E0 (ordinal 10209)
 // Free a parsed-bin-file handle: the data buffer at +0x00 (:0x9A), then the handle itself (:0x9B).
+// Pool-free seam for the capture probes: the retail pool free takes ECX = &slot and the file/line words.
+struct FogPoolEnv { void (*poolFree)(uint32_t* slot, uint32_t line); };
+
+// 1.13c Fog+0x120A0 with the pool free injected: children first (recursing here), then the node (:0x346).
+extern "C" void fog_120A0_run(uint32_t node, const FogPoolEnv* env) {
+    uint32_t left = *reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(node) + 0x24);
+    if (left != 0) fog_120A0_run(left, env);
+    uint32_t right = *reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(node) + 0x28);
+    if (right != 0) fog_120A0_run(right, env);
+    env->poolFree(&node, 0x346);
+}
+
+// 1.13c Fog+0x120E0 with the pool free injected (the capture probe observes the two calls).
+extern "C" void fog_120E0_run(uint32_t bin_file, const FogPoolEnv* env) {
+    uint32_t data = *reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(bin_file));
+    env->poolFree(&data, 0x9A);
+    env->poolFree(&bin_file, 0x9B);
+}
+
 extern "C" EMSCRIPTEN_KEEPALIVE void fog_sub_120E0(void* bin_file) {  // 1.13c Fog+0x120E0
     void* const data = *reinterpret_cast<void**>(bin_file);
     fog_free_block(data, kExcelFile, 0x9A);
@@ -217,6 +236,17 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t fog_sub_121A0(void* linker, const char* 
 // Allocate a zeroed 0x10-byte linker with the caller's (file, line). An allocation failure reports
 // level 2 at that line with an empty message (Excel.cpp:0x4A5); retail then still writes the zero
 // fields, so a NULL allocation faults.
+// Pool-alloc seam for the capture probe: EAX = size, ECX = zero flag, stack file and line; returns the block.
+struct Fog12720Env { void* (*poolAlloc)(uint32_t size, uint32_t zero, const char* file, uint32_t line); };
+
+// 1.13c Fog+0x12720 with the pool alloc injected.
+extern "C" void* fog_12720_run(const char* file, uint32_t line, const Fog12720Env* env) {
+    void* const linker = env->poolAlloc(0x10, 0, file, line);
+    if (linker == nullptr) fog_error_report(2, file, line, "");
+    std::memset(linker, 0, 0x10);
+    return linker;
+}
+
 extern "C" EMSCRIPTEN_KEEPALIVE void* fog_sub_12720(const char* file, uint32_t line) {  // 1.13c Fog+0x12720
     void* const linker = fog_alloc_block(0x10, 0, file, line);
     if (linker == nullptr) fog_error_report(2, file, line, "");

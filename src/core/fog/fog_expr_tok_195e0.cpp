@@ -129,7 +129,7 @@ const char* fog_expr_token_197b0(FogExprState* st, const char* p, uint32_t* val,
 
 // 1.13c Fog+0x143D0 -- strip the exe path in `buf` (filled by GetModuleFileNameA) to its directory.
 // Returns 1 and truncates after the last '\\' '/' (or ':' kept) separator; 0 if none/empty.
-int fog_app_dir_143d0(char* buf)
+extern "C" int fog_app_dir_143d0(char* buf)
 {
     int n = (int)strlen(buf);
     if (n <= 0) return 0;
