@@ -102,26 +102,34 @@ void d2_multi_sub_7b5f(uint32_t* p) {
     }
 }
 
-// 1.13c D2Multi+0x8C80
-void d2_multi_sub_8c80(char* s, int32_t flag) {
-    if (strlen(s) == 0) { n37_Ordinal_10022(s); return; }
+// 1.13c D2Multi+0x8C80 (FUN_6f9d8c80, ret 8): EAX = text, edited in place (each line NUL-ended, restored after); stack: p1, flag.
+// Each line is one D2Win #10022 call (thunk 0x7C5C) with ECX = p1 and EDX = the line start; with flag set the call repeats with
+// EDX = the module constant 0x6F9E75D7 (not text). The empty text is one call with EDX = 0x6F9E75D7.
+void d2_multi_sub_8c80_r(int32_t p1, int32_t flag, char* s) {
+    if (strlen(s) == 0) { n37_Ordinal_10022(p1, (int32_t)0x6F9E75D7); return; }
     while (*s) {
         char* e = s; while (*e && *e != '\n') e++;
         char* nl = (*e == '\n') ? e : nullptr;
         if (nl) *nl = 0;
-        n37_Ordinal_10022(s);
-        if (flag) n37_Ordinal_10022(s);
+        n37_Ordinal_10022(p1, (int32_t)(uintptr_t)s);
+        if (flag) n37_Ordinal_10022(p1, (int32_t)0x6F9E75D7);
         if (nl) *nl = '\n';
         if (!*e) return;
         s = nl ? nl + 1 : e;
     }
 }
+// batch_16 (B1F0) calls with flag and no text: the port runs on an empty line.
+void d2_multi_sub_8c80(int32_t p1, int32_t flag) { char empty[1] = { 0 }; d2_multi_sub_8c80_r(p1, flag, empty); }
 
-// 1.13c D2Multi+0x8D80
-void d2_multi_sub_8d80(int32_t sel, void* dst) {
-    if (sel < 0 || sel > 6) sel = 7;  // default case shares the call shape; string id is a hidden arg
-    d2_multi_unicode_strcpy(dst, (void*)(uintptr_t)n37_Ordinal_10003(sel));
+// 1.13c D2Multi+0x8D80 (FUN_6f9d8d80, ret): EAX = sel picks the string id (0-6: 0xFAB, 0xFAA, 0xFA9, 0xFA8, 0xFA7, 0x2771, 0x2772;
+// default 0x1507); ESI = destination. D2Lang #10003 (ECX = id) answers the string; Unicode::strcpy (ECX = dst, EDX = src).
+void d2_multi_sub_8d80_r(int32_t sel, void* dst) {
+    static const uint32_t ids[7] = { 0xFAB, 0xFAA, 0xFA9, 0xFA8, 0xFA7, 0x2771, 0x2772 };
+    const uint32_t id = (sel >= 0 && sel <= 6) ? ids[sel] : 0x1507u;
+    d2_multi_unicode_strcpy(dst, (const void*)(uintptr_t)n37_Ordinal_10003(id));
 }
+// batch_16 (B300) calls with no arguments: the destination is a scratch buffer and the selector is 0.
+void d2_multi_sub_8d80(void) { static uint16_t buf[64]; d2_multi_sub_8d80_r(0, buf); }
 
 // 1.13c D2Multi+0x8E70
 void d2_multi_sub_8e70(uint8_t* s) {
@@ -148,127 +156,121 @@ bool d2_multi_sub_9000(const char* key, const char* val, uint8_t* out, uint32_t*
     return true;
 }
 
-// 1.13c D2Multi+0x90D0
+// 1.13c D2Multi+0x90D0: releases each handle that is set, in decompile order: D2Win #10126 (thunk 0x7D40) with ECX = the handle,
+// then the slot is cleared. Slot pairs as decompiled (54 blocks).
 void d2_multi_sub_90d0(void) {
-    static int32_t* const t[] = {
-        &DAT_6fa09f48,
-        &DAT_6fa09f4c,
-        &DAT_6fa09f40,
-        &DAT_6fa09f44,
-        &DAT_6fa09f50,
-        &DAT_6fa09f54,
-        &DAT_6fa09f58,
-        &DAT_6fa09f5c,
-        &DAT_6fa09f64,
-        &DAT_6fa09f68,
-        &DAT_6fa09f6c,
-        &DAT_6fa09f70,
-        &DAT_6fa09f74,
-        &DAT_6fa09f78,
-        &DAT_6fa09f8c,
-        &DAT_6fa09f98,
-        &DAT_6fa09f9c,
-        &DAT_6fa09ffc,
-        &DAT_6fa0a000,
-        &DAT_6fa0a004,
-        &DAT_6fa0a008,
-        &DAT_6fa0a00c,
-        &DAT_6fa09fa0,
-        &DAT_6fa0a010,
-        &DAT_6fa0a014,
-        &DAT_6fa0a048,
-        &DAT_6fa0a04c,
-        &DAT_6fa09f60,
-        &DAT_6fa0a054,
-        &DAT_6fa0a068,
-        &DAT_6fa0a06c,
-        &DAT_6fa0a084,
-        &DAT_6fa0a088,
-        &DAT_6fa09f90,
-        &DAT_6fa09f94,
-        &DAT_6fa0a070,
-        &DAT_6fa0a074,
-        &DAT_6fa0a078,
-        &DAT_6fa0a080,
-        &DAT_6fa0a07c,
-        &DAT_6fa09fa4,
-        &DAT_6fa09fac,
-        &DAT_6fa09fb0,
-        &DAT_6fa09fb4,
-        &DAT_6fa09fb8,
-        &DAT_6fa09fbc,
-        &DAT_6fa09fc0,
-        &DAT_6fa09fc4,
-        &DAT_6fa09fc8,
-        &DAT_6fa09fcc,
-        &DAT_6fa09fd0,
-        &DAT_6fa09ff4,
-        &DAT_6fa09ff8,
-    };
-    for (int32_t* p : t) if (*p) { n37_Ordinal_10126(*p); *p = 0; }
-    // retail quirk: 9fa8 is released (after 9fa4) but 9fa4 is the one cleared; 9fa8 stays set
-    if (DAT_6fa09fa8) { n37_Ordinal_10126(DAT_6fa09fa8); DAT_6fa09fa4 = 0; }
+    if (DAT_6fa09f48 != 0) { n37_Ordinal_10126(DAT_6fa09f48); DAT_6fa09f48 = 0; }
+    if (DAT_6fa09f4c != 0) { n37_Ordinal_10126(DAT_6fa09f4c); DAT_6fa09f4c = 0; }
+    if (DAT_6fa09f40 != 0) { n37_Ordinal_10126(DAT_6fa09f40); DAT_6fa09f40 = 0; }
+    if (DAT_6fa09f44 != 0) { n37_Ordinal_10126(DAT_6fa09f44); DAT_6fa09f44 = 0; }
+    if (DAT_6fa09f50 != 0) { n37_Ordinal_10126(DAT_6fa09f50); DAT_6fa09f50 = 0; }
+    if (DAT_6fa09f54 != 0) { n37_Ordinal_10126(DAT_6fa09f54); DAT_6fa09f54 = 0; }
+    if (DAT_6fa09f58 != 0) { n37_Ordinal_10126(DAT_6fa09f58); DAT_6fa09f58 = 0; }
+    if (DAT_6fa09f5c != 0) { n37_Ordinal_10126(DAT_6fa09f5c); DAT_6fa09f5c = 0; }
+    if (DAT_6fa09f64 != 0) { n37_Ordinal_10126(DAT_6fa09f64); DAT_6fa09f64 = 0; }
+    if (DAT_6fa09f68 != 0) { n37_Ordinal_10126(DAT_6fa09f68); DAT_6fa09f68 = 0; }
+    if (DAT_6fa09f6c != 0) { n37_Ordinal_10126(DAT_6fa09f6c); DAT_6fa09f6c = 0; }
+    if (DAT_6fa09f70 != 0) { n37_Ordinal_10126(DAT_6fa09f70); DAT_6fa09f70 = 0; }
+    if (DAT_6fa09f74 != 0) { n37_Ordinal_10126(DAT_6fa09f74); DAT_6fa09f74 = 0; }
+    if (DAT_6fa09f78 != 0) { n37_Ordinal_10126(DAT_6fa09f78); DAT_6fa09f78 = 0; }
+    if (DAT_6fa09f8c != 0) { n37_Ordinal_10126(DAT_6fa09f8c); DAT_6fa09f8c = 0; }
+    if (DAT_6fa09f98 != 0) { n37_Ordinal_10126(DAT_6fa09f98); DAT_6fa09f98 = 0; }
+    if (DAT_6fa09f9c != 0) { n37_Ordinal_10126(DAT_6fa09f9c); DAT_6fa09f9c = 0; }
+    if (DAT_6fa09ffc != 0) { n37_Ordinal_10126(DAT_6fa09ffc); DAT_6fa09ffc = 0; }
+    if (DAT_6fa0a000 != 0) { n37_Ordinal_10126(DAT_6fa0a000); DAT_6fa0a000 = 0; }
+    if (DAT_6fa0a004 != 0) { n37_Ordinal_10126(DAT_6fa0a004); DAT_6fa0a004 = 0; }
+    if (DAT_6fa0a008 != 0) { n37_Ordinal_10126(DAT_6fa0a008); DAT_6fa0a008 = 0; }
+    if (DAT_6fa0a00c != 0) { n37_Ordinal_10126(DAT_6fa0a00c); DAT_6fa0a00c = 0; }
+    if (DAT_6fa09fa0 != 0) { n37_Ordinal_10126(DAT_6fa09fa0); DAT_6fa09fa0 = 0; }
+    if (DAT_6fa0a010 != 0) { n37_Ordinal_10126(DAT_6fa0a010); DAT_6fa0a010 = 0; }
+    if (DAT_6fa0a014 != 0) { n37_Ordinal_10126(DAT_6fa0a014); DAT_6fa0a014 = 0; }
+    if (DAT_6fa0a048 != 0) { n37_Ordinal_10126(DAT_6fa0a048); DAT_6fa0a048 = 0; }
+    if (DAT_6fa0a04c != 0) { n37_Ordinal_10126(DAT_6fa0a04c); DAT_6fa0a04c = 0; }
+    if (DAT_6fa09f60 != 0) { n37_Ordinal_10126(DAT_6fa09f60); DAT_6fa09f60 = 0; }
+    if (DAT_6fa0a054 != 0) { n37_Ordinal_10126(DAT_6fa0a054); DAT_6fa0a054 = 0; }
+    if (DAT_6fa0a068 != 0) { n37_Ordinal_10126(DAT_6fa0a068); DAT_6fa0a068 = 0; }
+    if (DAT_6fa0a06c != 0) { n37_Ordinal_10126(DAT_6fa0a06c); DAT_6fa0a06c = 0; }
+    if (DAT_6fa0a084 != 0) { n37_Ordinal_10126(DAT_6fa0a084); DAT_6fa0a084 = 0; }
+    if (DAT_6fa0a088 != 0) { n37_Ordinal_10126(DAT_6fa0a088); DAT_6fa0a088 = 0; }
+    if (DAT_6fa09f90 != 0) { n37_Ordinal_10126(DAT_6fa09f90); DAT_6fa09f90 = 0; }
+    if (DAT_6fa09f94 != 0) { n37_Ordinal_10126(DAT_6fa09f94); DAT_6fa09f94 = 0; }
+    if (DAT_6fa0a070 != 0) { n37_Ordinal_10126(DAT_6fa0a070); DAT_6fa0a070 = 0; }
+    if (DAT_6fa0a074 != 0) { n37_Ordinal_10126(DAT_6fa0a074); DAT_6fa0a074 = 0; }
+    if (DAT_6fa0a078 != 0) { n37_Ordinal_10126(DAT_6fa0a078); DAT_6fa0a078 = 0; }
+    if (DAT_6fa0a080 != 0) { n37_Ordinal_10126(DAT_6fa0a080); DAT_6fa0a080 = 0; }
+    if (DAT_6fa0a07c != 0) { n37_Ordinal_10126(DAT_6fa0a07c); DAT_6fa0a07c = 0; }
+    if (DAT_6fa09fa4 != 0) { n37_Ordinal_10126(DAT_6fa09fa4); DAT_6fa09fa4 = 0; }
+    if (DAT_6fa09fa8 != 0) { n37_Ordinal_10126(DAT_6fa09fa8); DAT_6fa09fa4 = 0; }
+    if (DAT_6fa09fac != 0) { n37_Ordinal_10126(DAT_6fa09fac); DAT_6fa09fac = 0; }
+    if (DAT_6fa09fb0 != 0) { n37_Ordinal_10126(DAT_6fa09fb0); DAT_6fa09fb0 = 0; }
+    if (DAT_6fa09fb4 != 0) { n37_Ordinal_10126(DAT_6fa09fb4); DAT_6fa09fb4 = 0; }
+    if (DAT_6fa09fb8 != 0) { n37_Ordinal_10126(DAT_6fa09fb8); DAT_6fa09fb8 = 0; }
+    if (DAT_6fa09fbc != 0) { n37_Ordinal_10126(DAT_6fa09fbc); DAT_6fa09fbc = 0; }
+    if (DAT_6fa09fc0 != 0) { n37_Ordinal_10126(DAT_6fa09fc0); DAT_6fa09fc0 = 0; }
+    if (DAT_6fa09fc4 != 0) { n37_Ordinal_10126(DAT_6fa09fc4); DAT_6fa09fc4 = 0; }
+    if (DAT_6fa09fc8 != 0) { n37_Ordinal_10126(DAT_6fa09fc8); DAT_6fa09fc8 = 0; }
+    if (DAT_6fa09fcc != 0) { n37_Ordinal_10126(DAT_6fa09fcc); DAT_6fa09fcc = 0; }
+    if (DAT_6fa09fd0 != 0) { n37_Ordinal_10126(DAT_6fa09fd0); DAT_6fa09fd0 = 0; }
+    if (DAT_6fa09ff4 != 0) { n37_Ordinal_10126(DAT_6fa09ff4); DAT_6fa09ff4 = 0; }
+    if (DAT_6fa09ff8 != 0) { n37_Ordinal_10126(DAT_6fa09ff8); DAT_6fa09ff8 = 0; }
 }
 
-// 1.13c D2Multi+0x9550
+// 1.13c D2Multi+0x9550: each UI path DATA\GLOBAL\... is formatted into a stack buffer and D2Win #10111 (thunk 0x7DAC, ECX = the path)
+// returns the handle stored in its slot (53 slots, decompile order); then D2Win #10101 (thunk 0x7D6A) with the last two slots.
 void d2_multi_sub_9550(void) {
-    char p[260];
-    static const struct { const char* f; int32_t* g; bool w; } L[] = {
-        {"%s\\\\UI\\\\FrontEnd\\\\PopUpLargest2", &DAT_6fa09f48, false},
-        {"%s\\\\UI\\\\FrontEnd\\\\MediumButtonBlank2", &DAT_6fa09f4c, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\bnet", &DAT_6fa09f40, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\waitingroombkgd", &DAT_6fa09f44, false},
-        {"%s\\\\UI\\\\CURSOR\\\\ohand", &DAT_6fa09f50, false},
-        {"%s\\\\UI\\\\CURSOR\\\\lrotate", &DAT_6fa09f54, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\scrollbar", &DAT_6fa09f58, false},
-        {"%s\\\\UI\\\\FRONTEND\\\\joingamescrollbars", &DAT_6fa09f5c, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\chatleftbuttons", &DAT_6fa09f64, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\chatleftbuttons1", &DAT_6fa09f68, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\chatleftbuttons2", &DAT_6fa09f6c, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\chatrightbuttons", &DAT_6fa09f70, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\chatrighttopbuttons", &DAT_6fa09f74, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\chatarrows", &DAT_6fa09f78, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\joingamebckg", &DAT_6fa09f8c, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\GameButtonBlank", &DAT_6fa09f98, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\joingameclickbox", &DAT_6fa09f9c, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\numberarrows", &DAT_6fa09ffc, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\numberarrows", &DAT_6fa0a000, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\numberarrows", &DAT_6fa0a004, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\numberarrows", &DAT_6fa0a008, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\numbergreyarrows", &DAT_6fa0a00c, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\GreyLevelBox", &DAT_6fa09fa0, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\createjoinbckg", &DAT_6fa0a010, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\okaybutton", &DAT_6fa0a014, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\creategamebckg", &DAT_6fa0a048, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\creategamebutton", &DAT_6fa0a04c, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\widebuttonblank", &DAT_6fa0a054, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\CancelButtonBlank", &DAT_6fa0a068, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\yesnobuttonblank", &DAT_6fa0a06c, false},
-        {"%s\\\\ui\\\\BIGMENU\\\\D2logoBlackBnet", &DAT_6fa0a084, true},
-        {"%s\\\\ui\\\\BIGMENU\\\\D2logoBnet", &DAT_6fa0a088, true},
-        {"%s\\\\UI\\\\BIGMENU\\\\blankbckg2", &DAT_6fa09f90, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\gembutton", &DAT_6fa09f94, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\LadderChoiceEXP", &DAT_6fa0a070, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\HardcoreLadderBckg", &DAT_6fa0a074, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\PlayerProfileBckg", &DAT_6fa0a07c, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\PlayerProfileBckg", &DAT_6fa0a078, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\HelpBckg", &DAT_6fa0a080, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\radiobutton", &DAT_6fa09fa4, false},
-        {"%s\\\\UI\\\\BIGMENU\\\\radiobuttonGrey", &DAT_6fa09fa8, false},
-        {"%s\\\\ui\\\\BIGMENU\\\\PopUpOK", &DAT_6fa09fac, true},
-        {"%s\\\\ui\\\\BIGMENU\\\\CancelButtonBlank", &DAT_6fa09fb0, true},
-        {"%s\\\\ui\\\\BIGMENU\\\\overalltab", &DAT_6fa09fb4, true},
-        {"%s\\\\ui\\\\BIGMENU\\\\amazontab", &DAT_6fa09fb8, true},
-        {"%s\\\\ui\\\\BIGMENU\\\\sorceresstab", &DAT_6fa09fbc, true},
-        {"%s\\\\ui\\\\BIGMENU\\\\necromancertab", &DAT_6fa09fc0, true},
-        {"%s\\\\ui\\\\BIGMENU\\\\paladintab", &DAT_6fa09fc4, true},
-        {"%s\\\\ui\\\\BIGMENU\\\\barbariantab", &DAT_6fa09fc8, true},
-        {"%s\\\\ui\\\\BIGMENU\\\\druidtab", &DAT_6fa09fcc, true},
-        {"%s\\\\ui\\\\BIGMENU\\\\assassintab", &DAT_6fa09fd0, true},
-        {"%s\\\\UncompOverlays\\\\SquelchAura", &DAT_6fa09ff4, true},
-        {"%s\\\\UncompOverlays\\\\SelectAura", &DAT_6fa09ff8, true},
-    };
-    for (auto& e : L) { snprintf(p, sizeof p, e.f, "DATA\\GLOBAL"); *e.g = n37_Ordinal_10111(p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\FrontEnd\\PopUpLargest2"; DAT_6fa09f48 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\FrontEnd\\MediumButtonBlank2"; DAT_6fa09f4c = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\bnet"; DAT_6fa09f40 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\waitingroombkgd"; DAT_6fa09f44 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\CURSOR\\ohand"; DAT_6fa09f50 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\CURSOR\\lrotate"; DAT_6fa09f54 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\scrollbar"; DAT_6fa09f58 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\FRONTEND\\joingamescrollbars"; DAT_6fa09f5c = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\chatleftbuttons"; DAT_6fa09f64 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\chatleftbuttons1"; DAT_6fa09f68 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\chatleftbuttons2"; DAT_6fa09f6c = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\chatrightbuttons"; DAT_6fa09f70 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\chatrighttopbuttons"; DAT_6fa09f74 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\chatarrows"; DAT_6fa09f78 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\joingamebckg"; DAT_6fa09f8c = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\GameButtonBlank"; DAT_6fa09f98 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\joingameclickbox"; DAT_6fa09f9c = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\numberarrows"; DAT_6fa09ffc = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\numberarrows"; DAT_6fa0a000 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\numberarrows"; DAT_6fa0a004 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\numberarrows"; DAT_6fa0a008 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\numbergreyarrows"; DAT_6fa0a00c = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\GreyLevelBox"; DAT_6fa09fa0 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\createjoinbckg"; DAT_6fa0a010 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\okaybutton"; DAT_6fa0a014 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\creategamebckg"; DAT_6fa0a048 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\creategamebutton"; DAT_6fa0a04c = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\widebuttonblank"; DAT_6fa0a054 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\CancelButtonBlank"; DAT_6fa0a068 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\yesnobuttonblank"; DAT_6fa0a06c = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\ui\\BIGMENU\\D2logoBlackBnet"; DAT_6fa0a084 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\ui\\BIGMENU\\D2logoBnet"; DAT_6fa0a088 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\blankbckg2"; DAT_6fa09f90 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\gembutton"; DAT_6fa09f94 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\LadderChoiceEXP"; DAT_6fa0a070 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\HardcoreLadderBckg"; DAT_6fa0a074 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\PlayerProfileBckg"; DAT_6fa0a07c = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\PlayerProfileBckg"; DAT_6fa0a078 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\HelpBckg"; DAT_6fa0a080 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\radiobutton"; DAT_6fa09fa4 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\radiobuttonGrey"; DAT_6fa09fa8 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\ui\\BIGMENU\\PopUpOK"; DAT_6fa09fac = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\ui\\BIGMENU\\CancelButtonBlank"; DAT_6fa09fb0 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\ui\\BIGMENU\\overalltab"; DAT_6fa09fb4 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\ui\\BIGMENU\\amazontab"; DAT_6fa09fb8 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\ui\\BIGMENU\\sorceresstab"; DAT_6fa09fbc = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\ui\\BIGMENU\\necromancertab"; DAT_6fa09fc0 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\ui\\BIGMENU\\paladintab"; DAT_6fa09fc4 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\ui\\BIGMENU\\barbariantab"; DAT_6fa09fc8 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\ui\\BIGMENU\\druidtab"; DAT_6fa09fcc = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\ui\\BIGMENU\\assassintab"; DAT_6fa09fd0 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UncompOverlays\\SquelchAura"; DAT_6fa09ff4 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
+    { char p[] = "DATA\\GLOBAL\\UncompOverlays\\SelectAura"; DAT_6fa09ff8 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
     n37_Ordinal_10101(DAT_6fa09ff4, DAT_6fa09ff8);
 }
 
