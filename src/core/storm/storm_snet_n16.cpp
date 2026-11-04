@@ -18,7 +18,7 @@ void* Storm_Sub1C580(uint32_t size, const char* tag, int32_t line, uint32_t flag
 int32_t Storm_Sub1B960(void* p, const char* tag, int32_t line);
 extern "C" uint32_t* Storm_Sub5040(uint32_t, int32_t extra, uint32_t flags, int32_t edi);
 uint16_t Storm_SubFF40(uint32_t, uint32_t bytes, const uint8_t* data);
-uint32_t Storm_Sub10D20(const void* const* parts, const uint8_t* data, uint32_t length, uint32_t count);
+extern "C" uint32_t Storm_Sub10D20(const void* const* parts, const uint8_t* data, uint32_t length, uint32_t count);
 extern "C" void Storm_Sub10CB0(void);
 void Storm_Sub10E30(uint8_t* conn, const uint8_t* pkt);
 void Storm_Sub5440(void* tbl, uint32_t n);
@@ -231,7 +231,7 @@ static int32_t Storm_Sub11F10(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d
 // 1.13c Storm+0x12690
 // The local player's own connection record: the tail of the 0x6FC45A3C list, created (0x214 bytes,
 // mark bytes +0x212/+0x213 = 0xFF, start tick at +0x11C) when the list is empty.
-int32_t* Storm_Sub12690(void) {
+int32_t* Snet12690(void) {
     uint32_t c = tail(g_self);
     if (!c) {
         c = A(Storm_Sub5040(A(&g_self), 0, 0, 0));
@@ -249,7 +249,7 @@ int32_t* Storm_Sub12690(void) {
 // Retire acknowledged messages (all connections, or only `only`): move sent messages older than our
 // sequence from the +0x180 list to the +0x1C4 list, then free those older than the lowest peer ack.
 void Storm_Sub12740(uint32_t only) {
-    uint32_t cur = A(Storm_Sub12690());
+    uint32_t cur = A(Snet12690());
     if (!cur) return;
     int16_t mine = (int16_t)U16(cur, 0x1d8), lowest = mine;
     for (uint32_t c = tail(g_conns); (int32_t)c > 0; c = U32(c, 4))
@@ -283,7 +283,7 @@ void Storm_Sub12740(uint32_t only) {
 // and the sealed packet; the local record keeps it on its slot list, a peer gets it staged now (0x10E30)
 // and byte-counted. Returns the queued message node or 0.
 uint32_t Storm_Sub12F40(uint32_t conn, uint8_t slot, char type, const void* data, uint32_t len) {
-    uint32_t cur = A(Storm_Sub12690());
+    uint32_t cur = A(Snet12690());
     if (!cur) return 0;
     uint32_t total = len + 0xc;
     uint32_t rec = node(0x10, kSnet, 0x39b);
@@ -322,7 +322,7 @@ uint32_t Storm_Sub12F40(uint32_t conn, uint8_t slot, char type, const void* data
 // 0x0D) and refresh the provider player count.
 static void Storm_Sub14F20(void) {
     uint32_t n = tail(g_conns);
-    uint32_t cur = A(Storm_Sub12690());
+    uint32_t cur = A(Snet12690());
     if (!cur) return;
     do {
         if (!n) return;
@@ -346,7 +346,7 @@ static void Storm_Sub14F20(void) {
                         if (U8(c, 0x212) != 0xff) { uint32_t v = g_provId; Storm_Sub12F40(c, 0, 13, &v, 4); }
                 }
             }
-            uint32_t cur2 = A(Storm_Sub12690());
+            uint32_t cur2 = A(Snet12690());
             if (cur2 && U32(cur2, 0x200)) {
                 EnterCriticalSection(&g_lock);
                 uint32_t count = 0;
@@ -378,3 +378,4 @@ uint32_t Storm_Sub161E0(uint32_t* outEvent) {
 }
 
 static int32_t Storm_Sub161E0(void) { return (int32_t)Storm_Sub161E0(nullptr); }   // bridge for storm_batch_123b0.cpp
+extern "C" int32_t* storm_sub_12690_n16() { return Snet12690(); }   // exported for storm_batch_e6bd.cpp / storm_batch_44.cpp

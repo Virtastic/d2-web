@@ -21,7 +21,7 @@ uint32_t Storm_Sub4EF0(uint32_t, uint32_t p2, uint32_t p3, uint32_t edi);
 extern "C" void Storm_ListLink4390(uint32_t* eax, uint8_t* this_, uint8_t* node_arg, int32_t mode);   // 0x4390 (storm_batch_1000.cpp)
 void Storm_Sub4D60(uint8_t* node);
 void Storm_Sub10E30(uint8_t* conn, const uint8_t* pkt);
-uint32_t Storm_Sub10D20(const void* const* parts, const uint8_t* data, uint32_t length, uint32_t count);
+extern "C" uint32_t Storm_Sub10D20(const void* const* parts, const uint8_t* data, uint32_t length, uint32_t count);
 extern "C" void Storm_Sub10CB0(void);
 int32_t* Storm_Sub12690(void);
 uint32_t* Storm_Sub5170(uint32_t, int32_t param_2, uint32_t param_3, uint32_t edi);
@@ -427,3 +427,12 @@ int32_t Storm_Sub161E0Out(uint32_t* out) {
 
 // Storm 0x161E0 (1.13c)
 int32_t Storm_Sub161E0(void) { return Storm_Sub161E0Out(nullptr); }
+
+// FN probe entry (src/core/fn/storm_161e0.cpp): g = the three module words 0x6FC4584C..0x6FC45854
+// (event, worker flag, worker handle) pinned in and out around the call; out = ESI.
+extern "C" int32_t Storm_161E0_FnRun(uint32_t* g, uint32_t* out) {
+    g_4584c = g[0]; g_45850 = g[1]; g_45854 = g[2];
+    int32_t r = Storm_Sub161E0Out(out);
+    g[0] = g_4584c; g[1] = g_45850; g[2] = g_45854;
+    return r;
+}

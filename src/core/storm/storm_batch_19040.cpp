@@ -102,11 +102,13 @@ uint32_t val(const void* p) { return (uint32_t)(uintptr_t)p; }
 
 } // namespace
 
-// 1.13c Storm+0x19040: flip/clear a surface. Indices 0..3 only; while the capture rect is held a
-// primary flip is routed to the depth interface (index 3). A zero result from the flip releases the
-// rect and blits the stored rectangle across the four surfaces.
+// 1.13c Storm+0x19040 (stdcall, ret 0x10): flip/clear a surface. Arguments (idx, rect, count, rects). Indices 0..3 only; while the capture rect
+// is held a primary flip is routed to the depth interface (index 3). A zero result from the flip releases the rect and blits the primary back
+// from the capture surface: `count` rects of 16 bytes from `rects` when count != 0, else the stored rect g_rect. (The decompile names the loop
+// count and base after param_1 / param_2; the disassembly reads them from the third and fourth stack words.)
 extern "C"
-uint32_t Storm_Sub19040(uint32_t param_1, uint32_t param_2, const StormBatch19040Env* env) {
+uint32_t Storm_Sub19040(uint32_t param_1, uint32_t param_2, uint32_t param_3, uint32_t param_4,
+                        const StormBatch19040Env* env) {
     (void)env;
     if ((int32_t)param_1 < 0 || param_1 > 3) {
         StormSetLastError(0x57);
@@ -122,17 +124,16 @@ uint32_t Storm_Sub19040(uint32_t param_1, uint32_t param_2, const StormBatch1904
         if (iVar2 == 3 && g_rectLock != 0) {
             g_rectLock = 0;
             if (g_draw[0] != nullptr) {
-                if (param_1 != 0) {
+                using Blt = void (*)(void*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+                if (param_3 != 0) {
                     do {
-                        vcall<void (*)(void*, uint32_t, void*, uint32_t, uint32_t, int32_t)>
-                            (g_draw[0], 0x14)(g_draw[0], param_2, g_draw[3], param_2, 0x1000000, 0);
-                        param_2 += 0x10;
-                        param_1--;
-                    } while (param_1 != 0);
+                        vcall<Blt>(g_draw[0], 0x14)(g_draw[0], param_4, val(g_draw[3]), param_4, 0x1000000, 0);
+                        param_4 += 0x10;
+                        param_3--;
+                    } while (param_3 != 0);
                     return 1;
                 }
-                vcall<void (*)(void*, void*, void*, void*, uint32_t, int32_t)>(g_draw[0], 0x14)
-                    (g_draw[0], g_rect, g_draw[3], g_rect, 0x1000000, 0);
+                vcall<Blt>(g_draw[0], 0x14)(g_draw[0], val(g_rect), val(g_draw[3]), val(g_rect), 0x1000000, 0);
             }
         }
         return 1;
@@ -146,10 +147,9 @@ uint32_t Storm_Sub19040(uint32_t param_1, uint32_t param_2, const StormBatch1904
 
 // 1.13c Storm+0x19150: begin the update pump. The display interface is asked to flush into a
 // caller-word, and the pump runs only when that word's relation to the primary surface matches
-// param_1: param_1 != 0 wants "changed", param_1 == 0 wants "unchanged". param_2 is unused.
+// param_1: param_1 != 0 wants "changed", param_1 == 0 wants "unchanged". param_2 != 0 also blits the primary into the back surface.
 extern "C"
 uint32_t Storm_Sub19150(uint32_t param_1, uint32_t param_2, const StormBatch19040Env* env) {
-    (void)param_2;
     if (g_captureDialog != 0 || g_display == nullptr || g_draw[0] == nullptr ||
         g_draw[1] == nullptr) {
         return 0;
@@ -158,9 +158,9 @@ uint32_t Storm_Sub19150(uint32_t param_1, uint32_t param_2, const StormBatch1904
     vcall<void (*)(void*, uint32_t*)>(g_display, 0x38)(g_display, &local_4);
     uint32_t changed = (local_4 != val(g_draw[0])) ? 1u : 0u;
     if (changed == (param_1 != 0 ? 1u : 0u)) {
-        if (param_1 != 0) {
-            vcall<void (*)(void*, uint32_t, void*, uint32_t, uint32_t, uint32_t)>(g_draw[1], 0x14)
-                (g_draw[1], 0, g_draw[0], 0, 0, 0);
+        if (param_2 != 0) {   // retail tests the second stack word here (esi was popped), not param_1
+            vcall<void (*)(void*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t)>(g_draw[1], 0x14)
+                (g_draw[1], 0, val(g_draw[0]), 0, 0, 0);
         }
         return env->f_18f00();
     }
@@ -672,4 +672,21 @@ uint32_t Storm_Sub36680(uint32_t param_1, uint32_t param_2, const StormBatch1904
     }
     LeaveCriticalSection(&g_evtLock);
     return uVar2;
+}
+
+// FN seam for the capture probes of 0x19040 / 0x19150 / 0x19520 (src/core/fn/storm_19x.h): copy the pinned module words in, run the body with the
+// four callee seams the probe supplies, copy the words the body may write back. `which`: 0 = 0x19040(a, b, c, d), 1 = 0x19150(a, b), 2 = 0x19520(a, b, c, d).
+// addr[0] / addr[1] return the addresses of the rect and palette words so the probe can log them as the module globals retail passes.
+#include "storm_19pins.h"
+extern "C" uint32_t Storm_19_FnRun(uint32_t which, uint32_t a, uint32_t b, uint32_t c, uint32_t d, Storm19Pins* p,
+                                   uint32_t (*f18f00)(void), void (*f18f90)(void), int32_t (*vis)(void*), int32_t (*ico)(void*),
+                                   const void** addr) {
+    g_lastError = p->err; g_display = p->display; g_paletteIface = p->pal; g_captureDialog = p->capDlg; g_hwnd = p->hwnd; g_hpal = p->hpal;
+    g_rectLock = p->rectLock; memcpy(g_rect, p->rect, sizeof g_rect); memcpy(g_draw, p->draw, sizeof g_draw); memcpy(g_palette, p->palette, sizeof g_palette);
+    StormBatch19040Env env{};
+    env.f_18f00 = f18f00; env.f_18f90 = f18f90; env.is_window_visible = vis; env.is_iconic = ico;
+    addr[0] = g_rect; addr[1] = g_palette;
+    uint32_t r = which == 0 ? Storm_Sub19040(a, b, c, d, &env) : which == 1 ? Storm_Sub19150(a, b, &env) : Storm_Sub19520(a, b, (uint32_t*)(uintptr_t)c, d, &env);
+    p->err = g_lastError; p->rectLock = g_rectLock; memcpy(p->palette, g_palette, sizeof g_palette);
+    return r;
 }

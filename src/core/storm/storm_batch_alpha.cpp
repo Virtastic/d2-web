@@ -32,7 +32,7 @@ void Storm_SubC8A9(int32_t fileHandle) { Storm_UnlockFHandle(fileHandle); }
 extern "C"
 void Storm_Unwind_41970(uint8_t* node) { Storm_Sub4C20(node); }
 
-void Storm_Sub902A(int32_t lock);               // 0x902A __unlock(lock)
+extern "C" void Storm_Sub902A(int32_t lock);               // 0x902A __unlock(lock)
 
 // 1.13c Storm+0x7561
 extern "C"

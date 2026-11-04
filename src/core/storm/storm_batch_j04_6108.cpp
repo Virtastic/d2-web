@@ -7,7 +7,7 @@
 
 extern "C" {
 void Storm_ArrayUnwind(void* ptr, uint32_t size, int32_t count, void (*dtor)(void*));  // 0x6000
-void Storm_Sub902A(int32_t lock);                       // __unlock
+extern "C" void Storm_Sub902A(int32_t lock);                       // __unlock
 void Storm_Lock(int32_t lock);                          // __lock
 void Storm_InitTerm(void (**b)(void), void (**e)(void)); // __initterm
 int32_t Storm_Lseeki64_lk(int32_t fh, int64_t off, int32_t whence); // __lseeki64_lk

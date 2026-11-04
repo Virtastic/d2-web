@@ -581,7 +581,11 @@ uint32_t Storm_Sub170B0(uint32_t param_1, uint32_t param_2, uint32_t* param_3, u
 // 0x18960/0x195B0 into a SMemAlloc'd buffer, SNET.CPP:0x2ff); returns the buffer or null on any
 // failure. Its only caller (0x169A0) finds no .snp modules in the web build, so no archive opens:
 // the failure path (null, nothing allocated, nothing to close) is the only reachable one.
-void* Storm_Sub168B0(void* /*snpModule*/) { return nullptr; }
+void* Storm_Sub168B0(void* snpModule) {
+    // 0x1A0B0 rejects an empty path with ERROR_INVALID_PARAMETER; absent files leave the error word alone
+    if (!snpModule || !*(const char*)snpModule) g_lastError = 0x57;
+    return nullptr;
+}
 
 // FN seam: pin the archive-set globals 0x104F0/0x10610 read (retail's 0x6FC45834, 0x6FC45840,
 // 0x6FC45A6C, 0x6FC45830, 0x6FC41B4C, 0x6FC45388) and read the last error back.
@@ -612,3 +616,15 @@ extern "C" void Storm_123B0_FnSetVt(void* fetch, void* release) {
 extern "C" int32_t Storm_123B0_Fn11C90(int32_t* cnt, uint32_t p1, uint32_t p2, uint32_t* out, uint32_t rel) { return Storm_Sub11C90(cnt, p1, p2, out, rel); }
 extern "C" uint32_t Storm_123B0_Fn123B0(uint32_t a0, uint32_t a1, uint32_t cb, uint32_t* a3) { return Storm_Sub123B0(a0, a1, cb, a3); }
 extern "C" void Storm_123B0_FnSetLastError(int32_t e) { g_lastError = e; }
+// FN seams for 0x168B0 (path in, buffer or null out) and 0x169A0 (the once-flag word 0x6FC45844 pinned in and out).
+extern "C" uint32_t Storm_123B0_Fn168B0(const char* path, uint32_t* err) {
+    g_lastError = (int32_t)*err;
+    uint32_t r = (uint32_t)(uintptr_t)Storm_Sub168B0((void*)path);
+    *err = (uint32_t)g_lastError;
+    return r;
+}
+extern "C" void Storm_123B0_Fn169A0(uint32_t* flag, uint32_t* err) {
+    g_45844 = (int32_t)*flag; g_lastError = (int32_t)*err;
+    Storm_Sub169A0();
+    *flag = (uint32_t)g_45844; *err = (uint32_t)g_lastError;
+}

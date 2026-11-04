@@ -17,7 +17,7 @@ const char* const g_defaultStrings[1] = {nullptr};  // 0x6FC35CB0 table
 // 0x1F590 error reporter, reached only while 0x6FC44D58 is set.
 void Storm_SetLastError(uint32_t) {}
 void Storm_Sub1F590(uint32_t, uint32_t*, int32_t, uint8_t*, int32_t, int32_t) {}
-void Storm_Sub1ABF0();
+void Storm_Sub1ABF0() {}   // the heap-block free (0x1ABF0, register args) is a seam here; its port is storm_sub_1abf0.cpp
 void Storm_Sub1A9E0(int32_t, uint32_t, uint32_t);
 int32_t Storm_Sub1AA70(uint16_t* hdr, uint32_t oldSize, uint32_t newSize);
 uint32_t* Storm_Sub1C390(int32_t, uint32_t);

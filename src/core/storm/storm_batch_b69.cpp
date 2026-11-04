@@ -4,15 +4,25 @@
 #include <cstring>
 
 extern "C" {
-void sub_46D0(int* esi);                               // Storm+0x46D0, ESI=arg
-void sub_1B960(int* esi, const char* name, int n);     // Storm+0x1B960, ESI=arg
 char* sub_2AFD0(const char* s);                        // Storm+0x2AFD0 (strlen-like)
 void sub_2B080(char* dst, const char* src, int n);     // Storm+0x2B080
 void sub_2AE00(char* dst, const char* src, int n);     // Storm+0x2AE00
 int sub_6868(const short* s);                          // Storm+0x6868 (wide length)
-extern const char s_AUVIDEOREC[];                      // Storm .rdata @0x6FC41D24
+extern const char s_AUVIDEOREC[] = "AUVIDEOREC";   // Storm .rdata @0x6FC41D24
 extern const char DAT_36b84[];                         // Storm .rdata @0x6FC36B84
 extern const char DAT_36b80[];                         // Storm .rdata @0x6FC36B80
+}
+
+extern "C" int32_t Storm_Sub1B960(void* p, const char* tag, int32_t line);   // storm_alloc_1b960.cpp
+extern "C" void sub_1B960(int* esi, const char* name, int n) { Storm_Sub1B960(esi, name, n); }   // Storm+0x1B960, ESI=arg
+struct S46D0Env { void (*elemDtor)(uint8_t* e); void (*baseDtor)(uint8_t* self); };
+extern "C" void Storm_Sub46D0(const S46D0Env& e, uint8_t* self);
+void sub_4B80(void* pv);
+static void b69_elem44C0(uint8_t*) {}   // Storm+0x44C0 element dtor: not ported yet (seam)
+static void b69_base4B80(uint8_t* self) { sub_4B80(self); }
+extern "C" void sub_46D0(int* esi) {      // Storm+0x46D0, ESI=arg
+  const S46D0Env env{ b69_elem44C0, b69_base4B80 };
+  Storm_Sub46D0(env, (uint8_t*)esi);
 }
 
 // 1.13c Storm+0x45A0   (ESI = unaff_ESI)

@@ -201,7 +201,7 @@ void Storm_Sub10CB0(void) {  // 1.13c Storm+0x10CB0
 // data (arg 2) is copied at +0x140, length is arg 3, and the record count arrives in EBX.
 // Returns 0 before staging when the provider is absent or the count/length is out of range.
 extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t Storm_Sub10D20(const void* const* parts, const uint8_t* data, uint32_t length, uint32_t count) {  // 1.13c Storm+0x10D20
+extern "C" uint32_t Storm_Sub10D20(const void* const* parts, const uint8_t* data, uint32_t length, uint32_t count) {  // 1.13c Storm+0x10D20
     if (g_smack == nullptr) return 0;
     const uint32_t now = GetTickCount();
     uint32_t stamp = g_4583c;
