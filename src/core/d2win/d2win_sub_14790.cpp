@@ -10,7 +10,7 @@ struct D2WinSub14790Env {
     void (*win2Unicode)(uint16_t* dst, const char* src, int32_t n);
     int32_t (*unicode2Win)(char* dst, const uint16_t* src, int32_t n);
     int32_t (*textWidth)(const uint16_t* s, int32_t n);      // 0x12080
-    const uint8_t* (*glyph)();                               // DAT_6f901508 (byte +3 = advance)
+    const uint8_t* (*glyph)(uint16_t ch);                    // DAT_6f901508, ECX = ch (byte +3 = advance)
     uint8_t (*lineHeight)();                                 // font table[cur]->byte +10
     void (*fatal)(int32_t code);                             // Ordinal_10265/10024 + _exit(-1)
 };
@@ -40,7 +40,7 @@ int32_t d2win_sub_14790(const int32_t* box, const uint16_t* text, const D2WinSub
             e.win2Unicode(w16, line, 0x100);
             int32_t w = 0;
             for (int32_t i = 0; w16[i] && i < n; ++i)
-                if (w16[i] != 10) w += e.glyph()[3];
+                if (w16[i] != 10) w += e.glyph(w16[i])[3];
             if (maxw < w + uw) { wrapped = true; break; }
         }
         e.win2Unicode(w16, line, 0x100);

@@ -28,7 +28,7 @@ struct D2WinB66Env {
     int32_t (*sub_93C0)(int32_t* w, const uint16_t* text, int32_t flag, int32_t mode);
     int32_t* (*sub_B160)(int32_t a, int32_t b, int32_t c, int32_t d);
     void (*sub_2FE0)(int32_t font);                    // 0x12FE0
-    const uint8_t* (*glyph)(void);                     // (*DAT_6f901508)()
+    const uint8_t* (*glyph)(uint16_t ch);              // (*DAT_6f901508)(), ECX = ch
     const char* (*fontName)(int32_t idx, int32_t ingame, int32_t* dirTag, const char** dirOut);
     int32_t (*sub_7C60)(int32_t, int32_t);
     void (*sub_2280)(int32_t);
@@ -229,7 +229,7 @@ void d2win_b66_13AC0(uint8_t* esi, const D2WinB66Env* e) {
             int32_t cnt = I(0x50) - s + 1, wsum = 0, k = 0;
             const uint16_t* q = buf + s;
             for (uint16_t ch = *q; ch && k < cnt; k++) {
-                if (ch != 10) wsum += e->glyph()[3];
+                if (ch != 10) wsum += e->glyph(ch)[3];
                 ch = *++q;
             }
             if (avail <= wsum) break;
