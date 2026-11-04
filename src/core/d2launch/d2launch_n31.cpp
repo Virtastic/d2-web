@@ -7,34 +7,9 @@
 #include <string>
 #include <functional>
 
+#include "d2launch_n31.h"
+
 namespace d2launch_n31 {
-
-struct BnClient { std::function<int(int)> vt; };  // vt(offset): 0x10 disconnect, 0x4c, 0x48, 0x28, 0x68, 0x80, 0x98...
-
-struct Host {
-  std::function<void(const char*)> debugOut;       // OutputDebugStringA
-  std::function<void()> o10018;                    // Ordinal_10018
-  std::function<void(const char*)> messageBox;     // MessageBoxA "D2Multi" MB_ICONERROR
-  std::function<void(int)> fatal;                  // Ordinal_10265(id)+Ordinal_10024+_exit(-1)
-  std::function<bool(void**, int*, int*)> loadBnclient;  // iface, stage(0 ok,1 load,2 QueryInterface), err
-  std::function<std::u16string(int)> str;          // Ordinal_10003 string by id
-  std::function<void(const std::u16string&, std::function<void()>, int)> dlgOk;       // FUN_6fa55090
-  std::function<void()> dlgInfo;                   // FUN_6fa555b0
-  std::function<void(const std::u16string&, const std::u16string&, const std::u16string&)> dlgYesNo;  // FUN_6fa55400
-  std::function<void(const std::u16string&)> dlg6;  // FUN_6fa55230
-  std::function<uint32_t()> tick;                  // GetTickCount
-  std::function<int(int)> ctl;                     // BNclient vtable-free call by offset
-};
-
-struct State {
-  BnClient* bn = nullptr;            // DAT_6fa656c4
-  uint8_t* ctx = nullptr;            // DAT_6fa65abc
-  int ea0 = 0, ea8 = 0, eb0 = 0, e6c = 0, dac = 0, a294 = 0;
-  uint8_t d2sOut[0x14f + 0x20];      // DAT_6fa65570
-  int cnt = 0; int32_t list[0x40];   // DAT_6fa65e34 / DAT_6fa653c0
-  int32_t hStatus = 0, hStatus2 = 0, strId = -1, a554 = 0; uint32_t startTick = 0;  // 65548/6554c/65550/65554/65558
-  uint8_t classDefault[16] = {0};    // DAT_6fa64d9c
-};
 
 // 1.13c D2Launch+0xE250
 void FUN_6fa4e250(State& s, Host& h) {
@@ -108,20 +83,15 @@ void FUN_6fa4ea90(State& s, Host& h, const std::function<std::u16string(const ch
 }
 
 // 1.13c D2Launch+0xEE10  (edi = cmdline-restart flag; gw callbacks as seams)
-struct ConnSeams {
-  std::function<void()> fc40, f582d0, f57df0, f549e0, saveGateway, terminate, o10014a, o10014b, o10032;
-  std::function<void(const char*, const char*, int, int)> o426;
-  int ad4 = 0; int a0 = 0; int a4 = 0;               // DAT_6fa65ad4, DAT_6fa65ea0 , DAT_6fa65ea4
-  int errCode = 0;                                   // aiStack_c[0] after call 0x28
-};
 int FUN_6fa4ee10(State& s, Host& h, ConnSeams& c, const std::function<std::u16string(const char*)>& w, int edi) {
+  auto E = [&](const uint32_t* m) { return c.e510 ? c.e510(m) : FUN_6fa4e510(s, h, m, nullptr, w); };
   if (!s.bn) return 0;
   if (s.ea8) { h.fatal(0x128); return 0; }
   s.ea8 = 1; s.eb0 = 1; s.a294 = 0;
   h.debugOut("------------------\nConnect to Battle.net\n------------------\n");
   h.o10018();
   if (s.bn->vt(0x10) == 0) {
-    s.ea8 = 0; uint32_t m[2] = {0, 0}; return FUN_6fa4e510(s, h, m, nullptr, w);
+    s.ea8 = 0; uint32_t m[2] = {0, 0}; return E(m);
   }
   c.a4 = 0; c.fc40(); c.o10014a();
   if (c.a0 == 0) {
@@ -131,19 +101,19 @@ int FUN_6fa4ee10(State& s, Host& h, ConnSeams& c, const std::function<std::u16st
         s.bn->vt(0x10); s.ea8 = 0; c.f57df0(); return 0;
       }
       int r = s.bn->vt(0x48);
-      if (edi != 0) {
+      if (edi != 0 || c.out48 != 0) {
         c.o426("Diablo II", "UseCmdLine", 0, 1);
         c.o426("Diablo II", "Skip To Open", 0, c.ad4 == 3);
         c.o10032(); s.bn->vt(0x10); s.ea8 = 0; s.bn->vt(0x98);
         c.saveGateway(); c.terminate(); return 0;
       }
-      if (r == 0) { s.ea8 = 0; uint32_t m[2] = {0x12, 0}; return FUN_6fa4e510(s, h, m, nullptr, w); }
+      if (r == 0) { s.ea8 = 0; uint32_t m[2] = {0x12, 0}; return E(m); }
     }
     c.f549e0(); s.bn->vt(0x28); s.ea8 = 0;
     if (c.errCode == 0) return s.bn->vt(0x68) != 0;
-    uint32_t m[2] = {(uint32_t)c.errCode, 0}; return FUN_6fa4e510(s, h, m, nullptr, w);
+    uint32_t m[2] = {(uint32_t)c.errCode, 0}; return E(m);
   }
-  c.f549e0(); s.bn->vt(0x10); s.ea8 = 0; return 0;
+  c.be0 = 1; c.f549e0(); s.bn->vt(0x10); s.ea8 = 0; return 0;
 }
 
 // 1.13c D2Launch+0xF030  (buf = 0x2000 read of "<dir><name>.d2s"; returns result of write)
