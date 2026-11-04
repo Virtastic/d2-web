@@ -32,6 +32,7 @@ void _exit(int);
 extern const uint32_t* gdwBitMasks_exref;
 __attribute__((weak)) extern const uint32_t* d2win_ea30_masks;
 extern uint32_t d2win_g_6f8ffdac, d2win_g_6f8ffe00, d2win_g_6f8ffe98;
+extern uint32_t d2win_g_6f8ffe5c[];   // the table 0xDFF0 indexes by rec[9]; its entry is the EAX argument of sub_D790
 extern char d2win_g_6f9a9d12;
 extern int32_t d2win_g_6f900c2c;
 extern uint32_t d2win_g_6f9a9e48, d2win_g_6f9a9e50, d2win_g_6f9a9e38, d2win_g_6f9a9e44,
@@ -67,6 +68,7 @@ extern const char* d2win_g_FontInGameChat;
 extern "C" {
 #define G(T, n) __attribute__((weak)) T n = {}
 G(char, d2win_g_6f8fcc04); G(char, d2win_g_6f9a9d12); G(int32_t, d2win_g_6f900c2c);
+__attribute__((weak)) uint32_t d2win_g_6f8ffe5c[16] = {};
 G(uint32_t, d2win_g_6f8ffdac); G(uint32_t, d2win_g_6f8ffe00); G(uint32_t, d2win_g_6f8ffe98);
 G(uint32_t, d2win_g_6f9a9e38); G(uint32_t, d2win_g_6f9a9e40); G(uint32_t, d2win_g_6f9a9e4c); G(uint32_t, d2win_g_6f9a9e3c); G(uint32_t, d2win_g_6f9a9e44); G(uint32_t, d2win_g_6f9a9e48); G(uint32_t, d2win_g_6f9a9e50);
 G(int32_t, d2win_g_6f9a8c68); G(int32_t, d2win_g_6f9a8c74); G(int32_t, d2win_g_6f9a8c7c); G(int32_t, d2win_g_6f9a8c84);
@@ -114,9 +116,9 @@ uint32_t d2win_sub_DFF0(uint32_t* rec, const D2WinB69Env* env) {
     }
     int32_t* tbl = (int32_t*)(uintptr_t)rec[0x2e];
     if (!tbl) d2win_fatal(0x81c);
-    if (env->sub_D790((void*)(uintptr_t)rec[8], tbl, (int32_t)rec[7], (void*)(uintptr_t)rec[8]) == 0) {
+    if (env->sub_D790((void*)(uintptr_t)d2win_g_6f8ffe5c[rec[9]], tbl, (int32_t)rec[7], (void*)(uintptr_t)rec[8]) == 0) {
         rec[7] = 7; rec[8] = 5; rec[9] = 1;
-        if (env->sub_D790((void*)(uintptr_t)5, tbl, 7, (void*)(uintptr_t)5) == 0) d2win_fatal(0x82b);
+        if (env->sub_D790((void*)(uintptr_t)d2win_g_6f8ffe5c[1], tbl, 7, (void*)(uintptr_t)5) == 0) d2win_fatal(0x82b);
     }
     return 1;
 }
