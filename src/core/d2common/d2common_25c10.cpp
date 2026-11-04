@@ -7,7 +7,7 @@
 //   stat     0x38B70  (item, stat id, layer)                realm 0x22590 (item, &out0, &out1)
 //   putAdj   0x23DD0  (EDX value, ESI bits, stack buffer)   fatal: the 0x921C/0x9216/0x1B0D path (noreturn in retail)
 // The two item tables are module globals read through the env: ItemsTxt count/base (0x9FB94/98, row stride 0x1A8, format word at +0x30,
-// quest flags at +0x12A/+0x12B) and the ItemStatCost table of the data-tables block (row stride 0x140; save-bits +0x19, shift +0x18, save-add +0x1C).
+// quest flags at +0x12A/+0x12B) and the ItemStatCost table of the data-tables block (row stride 0x144; save-bits +0x19, shift +0x18, save-add +0x1C).
 #include <cstdint>
 #include <emscripten.h>
 
@@ -75,7 +75,7 @@ EMSCRIPTEN_KEEPALIVE void d2_port_d2common_25c10(uint32_t buf, uint32_t item, in
     }
     if (P(row)[0x12a] && P(row)[0x12b]) {
         if (E->statCount <= 0x164 || !E->statBase) { E->fatal(0x1c7b); return; }
-        const uint32_t sc = E->statBase + 0x164 * 0x140;
+        const uint32_t sc = E->statBase + 0x164 * 0x144;
         const uint32_t bits = P(sc)[0x19];
         const int32_t v = E->stat(item, 0x164, 0);
         E->putAdj(buf, static_cast<uint32_t>((v >> (P(sc)[0x18] & 31)) + static_cast<int32_t>(D(sc, 0x1c))), bits);

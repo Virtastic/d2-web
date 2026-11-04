@@ -400,11 +400,11 @@ D2LvlWarpTxt* __fastcall DRLGWARP_GetLvlWarpTxtRecordFromWarpIdAndDirection(D2Dr
 
 //D2Common.0x6FD78DF0
 // 1.13c D2Common+0x3C280
-// Delta vs 1.10f: class id compared as its low byte; the first tile whose warp Id matches ends the scan (a disabled one yields NULL).
+// Delta vs 1.10f: class id (or -1 for no unit) compared as its low byte; the first tile whose warp Id matches ends the scan (a disabled one yields NULL).
 D2LvlWarpTxt* __fastcall DRLGWARP_GetLvlWarpTxtRecordFromUnit(D2DrlgRoomStrc* pDrlgRoom, D2UnitStrc* pUnit)
 {
 	D2RoomTileStrc* pRoomTile = pDrlgRoom->pRoomTiles;
-	const uint32_t nClassId = pUnit ? (pUnit->dwClassId & 0xFF) : 0xFFFFFFFFu;
+	const uint32_t nClassId = (pUnit ? (uint32_t)pUnit->dwClassId : 0xFFFFFFFFu) & 0xFFu;
 
 	for (; pRoomTile; pRoomTile = pRoomTile->pNext)
 	{
