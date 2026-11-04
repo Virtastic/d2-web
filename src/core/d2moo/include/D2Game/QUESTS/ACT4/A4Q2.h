@@ -41,6 +41,9 @@ struct D2Act4Quest2Strc						//sizeof 0x4C
 
 //D2Game.0x6FCAE4C0
 bool __fastcall ACT4Q2_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNpcId, D2UnitStrc* pPlayer, D2BitBufferStrc* pQuestFlags, D2UnitStrc* pNPC);
+// Capture seam (null in the game): the steps of ACT4Q2_UnitIterate_SetPrimaryGoalDone, replaced by recorders in the FUNCTION-mode probe.
+struct D2A4Q2GoalSeam { D2BitBufferStrc* (*flags)(D2GameStrc*, D2UnitStrc*); int32_t (*state)(D2BitBufferStrc*); D2ActiveRoomStrc* (*room)(D2UnitStrc*); int32_t (*level)(D2ActiveRoomStrc*); int32_t (*act)(int32_t); void (*apply)(D2GameStrc*, D2UnitStrc*, D2BitBufferStrc*); };
+extern D2A4Q2GoalSeam g_d2A4Q2Goal;
 //D2Game.0x6FCAE5B0
 void __fastcall ACT4Q2_UnitIterate_SetPrimaryGoalDone(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData);
 //D2Game.0x6FCAE670
@@ -97,5 +100,23 @@ void __fastcall ACT4Q2_SpawnSealBoss(D2GameStrc* pGame, D2UnitStrc* pUnit);
 int32_t __fastcall ACT4Q2_HasDiabloBeenKilled(D2GameStrc* pGame);
 //D2Game.0x6FCAFDB0
 void __fastcall OBJECTS_InitFunction78_LastLastPortal(D2ObjInitFnStrc* pOp);
+// Capture seam (null in the game): the callees of OBJECTS_OperateFunction73_LastLastPortal, replaced by recorders in the FUNCTION-mode probe.
+struct D2A4Q2PortalSeam
+{
+	D2PlayerDataStrc* (*playerData)(D2UnitStrc*);
+	int32_t (*getState)(D2BitBufferStrc*, int32_t, int32_t);
+	void (*setState)(D2BitBufferStrc*, int32_t, int32_t);
+	void (*sound)(D2UnitStrc*, int32_t);
+	D2ActiveRoomStrc* (*room)(D2UnitStrc*);
+	int32_t (*level)(D2ActiveRoomStrc*);
+	int32_t (*act)(int32_t);
+	D2ClientStrc* (*client)(D2UnitStrc*);
+	int32_t (*busy)(D2UnitStrc*);
+	void (*send)(D2ClientStrc*, void*, int32_t);
+	void (*changeAct)(D2GameStrc*, D2UnitStrc*, uint32_t, uint32_t);
+	void (*updateFlags)(D2GameStrc*, D2UnitStrc*);
+	void (*waypoint)(D2GameStrc*, D2UnitStrc*, D2PlayerDataStrc*);
+};
+extern D2A4Q2PortalSeam g_d2A4Q2Portal;
 //D2Game.0x6FCAFDF0
 int32_t __fastcall OBJECTS_OperateFunction73_LastLastPortal(D2ObjOperateFnStrc* pOp, int32_t nOperate);

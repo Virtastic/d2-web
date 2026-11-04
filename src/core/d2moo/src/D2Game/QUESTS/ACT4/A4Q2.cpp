@@ -122,25 +122,34 @@ bool __fastcall ACT4Q2_ActiveFilterCallback(D2QuestDataStrc* pQuest, int32_t nNp
 	return 0;
 }
 
+D2A4Q2GoalSeam g_d2A4Q2Goal;
+
 //D2Game.0x6FCAE5B0
 // 1.13c D2Game+0xBA010
 void __fastcall ACT4Q2_UnitIterate_SetPrimaryGoalDone(D2GameStrc* pGame, D2UnitStrc* pUnit, void* pData)
 {
-	D2BitBufferStrc* pQuestFlags = UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
-	if (QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A4Q2, QFLAG_REWARDGRANTED) == 1)
+	const D2A4Q2GoalSeam& s = g_d2A4Q2Goal;
+	D2BitBufferStrc* pQuestFlags = s.flags ? s.flags(pGame, pUnit) : UNITS_GetPlayerData(pUnit)->pQuestData[pGame->nDifficulty];
+	if ((s.state ? s.state(pQuestFlags) : QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A4Q2, QFLAG_REWARDGRANTED)) == 1)
 	{
 		return;
 	}
 
-	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
+	D2ActiveRoomStrc* pRoom = s.room ? s.room(pUnit) : UNITS_GetRoom(pUnit);
 	if (!pRoom)
 	{
 		return;
 	}
 
-	const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(pRoom);
-	if (DRLG_GetActNoFromLevelId(nLevelId) != ACT_IV)
+	const int32_t nLevelId = s.level ? s.level(pRoom) : DUNGEON_GetLevelIdFromRoom(pRoom);
+	if ((s.act ? s.act(nLevelId) : DRLG_GetActNoFromLevelId(nLevelId)) != ACT_IV)
 	{
+		return;
+	}
+
+	if (s.apply)
+	{
+		s.apply(pGame, pUnit, pQuestFlags);
 		return;
 	}
 
@@ -1259,11 +1268,14 @@ void __fastcall OBJECTS_InitFunction78_LastLastPortal(D2ObjInitFnStrc* pOp)
 	}
 }
 
+D2A4Q2PortalSeam g_d2A4Q2Portal;
+
 //D2Game.0x6FCAFDF0
 // 1.13c D2Game+0xBB550
 int32_t __fastcall OBJECTS_OperateFunction73_LastLastPortal(D2ObjOperateFnStrc* pOp, int32_t nOperate)
 {
 	// 1.13c D2Game+0xBB550: every exit path returns 0 (the 1.10f sources returned 1 on the early outs and the warp).
+	const D2A4Q2PortalSeam& s = g_d2A4Q2Portal;
 	if (!pOp || !pOp->pGame)
 	{
 		return 0;
@@ -1274,33 +1286,35 @@ int32_t __fastcall OBJECTS_OperateFunction73_LastLastPortal(D2ObjOperateFnStrc* 
 		return 0;
 	}
 
-	D2PlayerDataStrc* pPlayerData = UNITS_GetPlayerData(pOp->pPlayer);
+	D2PlayerDataStrc* pPlayerData = s.playerData ? s.playerData(pOp->pPlayer) : UNITS_GetPlayerData(pOp->pPlayer);
 	D2BitBufferStrc* pQuestFlags = pPlayerData->pQuestData[pOp->pGame->nDifficulty];
-	if (!QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A4Q2, QFLAG_REWARDGRANTED) && !QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A4Q2, QFLAG_PRIMARYGOALDONE))
+	auto getState = [&](int32_t nQuest, int32_t nFlag) { return s.getState ? s.getState(pQuestFlags, nQuest, nFlag) : QUESTRECORD_GetQuestState(pQuestFlags, nQuest, nFlag); };
+	auto setState = [&](int32_t nQuest, int32_t nFlag) { if (s.setState) s.setState(pQuestFlags, nQuest, nFlag); else QUESTRECORD_SetQuestState(pQuestFlags, nQuest, nFlag); };
+	if (!getState(QUESTSTATEFLAG_A4Q2, QFLAG_REWARDGRANTED) && !getState(QUESTSTATEFLAG_A4Q2, QFLAG_PRIMARYGOALDONE))
 	{
-		SUNIT_AttachSound(pOp->pPlayer, 19, pOp->pPlayer);
+		if (s.sound) s.sound(pOp->pPlayer, 19); else SUNIT_AttachSound(pOp->pPlayer, 19, pOp->pPlayer);
 		return 0;
 	}
 
-	D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pOp->pPlayer);
+	D2ActiveRoomStrc* pRoom = s.room ? s.room(pOp->pPlayer) : UNITS_GetRoom(pOp->pPlayer);
 	if (!pRoom)
 	{
 		return 0;
 	}
 
-	const int32_t nLevelId = DUNGEON_GetLevelIdFromRoom(pRoom);
-	if (DRLG_GetActNoFromLevelId(nLevelId) != ACT_IV)
+	const int32_t nLevelId = s.level ? s.level(pRoom) : DUNGEON_GetLevelIdFromRoom(pRoom);
+	if ((s.act ? s.act(nLevelId) : DRLG_GetActNoFromLevelId(nLevelId)) != ACT_IV)
 	{
 		return 0;
 	}
 
-	if (!QUESTRECORD_GetQuestState(pQuestFlags, QUESTSTATEFLAG_A4COMPLETED, QFLAG_REWARDGRANTED))
+	if (!getState(QUESTSTATEFLAG_A4COMPLETED, QFLAG_REWARDGRANTED))
 	{
-		QUESTRECORD_SetQuestState(pQuestFlags, QUESTSTATEFLAG_A4COMPLETED, QFLAG_REWARDGRANTED);
-		QUESTRECORD_SetQuestState(pQuestFlags, QUESTSTATEFLAG_A4COMPLETED, QFLAG_PRIMARYGOALDONE);
+		setState(QUESTSTATEFLAG_A4COMPLETED, QFLAG_REWARDGRANTED);
+		setState(QUESTSTATEFLAG_A4COMPLETED, QFLAG_PRIMARYGOALDONE);
 
-		D2ClientStrc* pClient = SUNIT_GetClientFromPlayer(pOp->pPlayer, "..\\D2Game/Quests/a4q2.cpp", 1370);
-		if (pClient && !PLAYER_IsBusy(pOp->pPlayer))
+		D2ClientStrc* pClient = s.client ? s.client(pOp->pPlayer) : SUNIT_GetClientFromPlayer(pOp->pPlayer, "..\\D2Game/Quests/a4q2.cpp", 1370);
+		if (pClient && !(s.busy ? s.busy(pOp->pPlayer) : PLAYER_IsBusy(pOp->pPlayer)))
 		{
 			SUNIT_ResetInteractInfo(pOp->pPlayer);
 			pPlayerData->bBusy = 1;
@@ -1309,17 +1323,23 @@ int32_t __fastcall OBJECTS_OperateFunction73_LastLastPortal(D2ObjOperateFnStrc* 
 			packet5D.nHeader = 0x5D;
 			packet5D.nQuestId = QUEST_A4Q2_DIABLO;
 			packet5D.nFlags = 2;
-			D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet5D, sizeof(packet5D));
+			if (s.send) s.send(pClient, &packet5D, sizeof(packet5D)); else D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet5D, sizeof(packet5D));
 
 			D2GSPacketSrv61 packet61 = {};
 			packet61.nHeader = 0x61;
 			packet61.unk0x001 = 5;
-			D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet61, sizeof(packet61));
+			if (s.send) s.send(pClient, &packet61, sizeof(packet61)); else D2GAME_PACKETS_SendPacket_6FC3C710(pClient, &packet61, sizeof(packet61));
 		}
 	}
 
-	D2GAME_PlayerChangeAct_6FC867C0(pOp->pGame, pOp->pPlayer, LEVEL_HARROGATH, 5);
-	QUESTS_UpdatePlayerFlags(pOp->pGame, pOp->pPlayer);
+	if (s.changeAct) s.changeAct(pOp->pGame, pOp->pPlayer, LEVEL_HARROGATH, 5); else D2GAME_PlayerChangeAct_6FC867C0(pOp->pGame, pOp->pPlayer, LEVEL_HARROGATH, 5);
+	if (s.updateFlags) s.updateFlags(pOp->pGame, pOp->pPlayer); else QUESTS_UpdatePlayerFlags(pOp->pGame, pOp->pPlayer);
+
+	if (s.waypoint)
+	{
+		s.waypoint(pOp->pGame, pOp->pPlayer, pPlayerData);
+		return 0;
+	}
 
 	int16_t nWpNo = 0;
 	if (WAYPOINTS_GetWaypointNoFromLevelId(LEVEL_HARROGATH, &nWpNo))
@@ -1329,3 +1349,4 @@ int32_t __fastcall OBJECTS_OperateFunction73_LastLastPortal(D2ObjOperateFnStrc* 
 
 	return 0;
 }
+

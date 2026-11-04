@@ -544,6 +544,8 @@ int32_t __fastcall MONSTER_HasComponents(D2UnitStrc* pMonster)
     return 0;
 }
 
+D2ReinitializeSeam g_d2Reinitialize;
+
 //D2Game.0x6FC610F0
 int32_t __fastcall MONSTER_Reinitialize(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nClassId, int32_t nMode)
 {
@@ -559,11 +561,11 @@ int32_t __fastcall MONSTER_Reinitialize(D2GameStrc* pGame, D2UnitStrc* pUnit, in
     }
 
     const int32_t nUnitGUID = pUnit->dwUnitId;
-    D2ActiveRoomStrc* pRoom = UNITS_GetRoom(pUnit);
-    MONSTER_Free(pGame, pUnit);
+    D2ActiveRoomStrc* pRoom = g_d2Reinitialize.room ? g_d2Reinitialize.room(pUnit) : UNITS_GetRoom(pUnit);
+    if (g_d2Reinitialize.free) g_d2Reinitialize.free(pGame, pUnit); else MONSTER_Free(pGame, pUnit);
 
     pUnit->dwClassId = nClassId;
-    MONSTER_Initialize(pGame, pRoom, pUnit, nUnitGUID);
-    UNITS_ChangeAnimMode(pUnit, nMode);
+    if (g_d2Reinitialize.init) g_d2Reinitialize.init(pGame, pRoom, pUnit, nUnitGUID); else MONSTER_Initialize(pGame, pRoom, pUnit, nUnitGUID);
+    if (g_d2Reinitialize.anim) g_d2Reinitialize.anim(pUnit, nMode); else UNITS_ChangeAnimMode(pUnit, nMode);
     return 1;
 }

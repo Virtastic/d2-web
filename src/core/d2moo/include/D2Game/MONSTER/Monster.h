@@ -27,6 +27,15 @@ void __fastcall MONSTER_RemoveAll(D2GameStrc* pGame);
 //D2Game.0x6FC60C10
 void __fastcall MONSTER_Free(D2GameStrc* pGame, D2UnitStrc* pMonster);
 extern void (*g_d2MonsterFreeSeam)(int32_t nSite, void* a, void* b);   // replay seam (kind 3448), null in the game
+// d2-web: callee seam for the 1.13c D2Game+0xAFC50 replay; all null in the game
+struct D2ReinitializeSeam
+{
+    D2ActiveRoomStrc* (*room)(D2UnitStrc*);
+    void (*free)(D2GameStrc*, D2UnitStrc*);
+    void (*init)(D2GameStrc*, D2ActiveRoomStrc*, D2UnitStrc*, int32_t);
+    void (*anim)(D2UnitStrc*, int32_t);
+};
+extern D2ReinitializeSeam g_d2Reinitialize;
 //D2Game.0x6FC60CD0
 void __fastcall MONSTER_UpdateAiCallbackEvent(D2GameStrc* pGame, D2UnitStrc* pMonster);
 //D2Game.0x6FC60E50

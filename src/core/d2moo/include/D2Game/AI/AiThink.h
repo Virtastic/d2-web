@@ -455,6 +455,9 @@ BOOL __fastcall AITHINK_CanUnitSwitchAi(D2UnitStrc* pUnit, D2MonStatsTxt* pMonSt
 //D2Game.0x6FCF0750
 const D2AiTableStrc* __fastcall AITHINK_GetAiTableRecord(D2UnitStrc* pUnit, D2C_AiSpecialState nAiSpecialState);
 //D2Game.0x6FCF07D0
+// Capture seam (null in the game): the callees of D2GAME_AI_Unk015_6FCD34A0, replaced by recorders in the FUNCTION-mode probe.
+struct D2AiUnk015Seam { D2AiCmdStrc* (*cmd)(D2GameStrc*, D2UnitStrc*); D2UnitStrc* (*target)(D2GameStrc*, D2UnitStrc*); void (*useSkill)(D2GameStrc*, D2UnitStrc*, uint8_t, int32_t, D2UnitStrc*); void (*delay)(D2GameStrc*, D2UnitStrc*, int32_t); void (*exec)(D2GameStrc*, D2UnitStrc*, D2AiControlStrc*, D2C_AiSpecialState); };
+extern D2AiUnk015Seam g_d2AiUnk015;
 void __fastcall AITHINK_ExecuteAiFn(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiControlStrc* pAiControl, D2C_AiSpecialState nAiSpecialState);
 //D2Game.0x6FCF0A70
 void __fastcall D2GAME_MONSTERS_AiFunction03_6FCF0A70(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t a3, int32_t a4);

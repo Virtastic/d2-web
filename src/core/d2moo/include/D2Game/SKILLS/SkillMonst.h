@@ -6,6 +6,9 @@
 //D2Game.0x6FD061C0
 int32_t __fastcall SKILLS_SrvSt42_FireHit(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel);
 //D2Game.0x6FD062E0
+// Capture seam (null in the game): the callees of SKILLS_SrvDo083_FireHit, replaced by recorders in the FUNCTION-mode probe.
+struct D2FireHitSeam { D2UnitStrc* (*target)(D2GameStrc*, D2UnitStrc*); void (*drain)(D2GameStrc*, D2UnitStrc*, D2UnitStrc*, int32_t); void (*freeList)(D2GameStrc*, D2UnitStrc*, D2UnitStrc*); int32_t (*fire)(D2GameStrc*, D2UnitStrc*, int32_t, int32_t, int32_t); };
+extern D2FireHitSeam g_d2FireHit;
 int32_t __fastcall SKILLS_SrvDo083_FireHit(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel);
 //D2Game.0x6FD06330
 int32_t __fastcall SKILLS_SrvSt43_MaggotEgg(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel);

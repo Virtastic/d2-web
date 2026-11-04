@@ -1236,23 +1236,27 @@ enum D2C_SandMaggotAIParams
 	SANDMAGGOT_AI_PARAM_MIN_UP_DOWN_TIME = 4,
 };
 
+D2AiUnk015Seam g_d2AiUnk015;
+
 //D2Game.0x6FCD34A0
 // 1.13c D2Game+0x7D670
 void __fastcall D2GAME_AI_Unk015_6FCD34A0(D2GameStrc* pGame, D2UnitStrc* pUnit, D2AiTickParamStrc* pAiTickParam)
 {
-	D2AiCmdStrc* pAiCmd = AIGENERAL_SetCurrentAiCommand(pGame, pUnit, 14, 0);
+	const D2AiUnk015Seam& s = g_d2AiUnk015;
+	D2AiCmdStrc* pAiCmd = s.cmd ? s.cmd(pGame, pUnit) : AIGENERAL_SetCurrentAiCommand(pGame, pUnit, 14, 0);
 	if (pAiCmd->nCmdParam[4] == 1 && pAiTickParam->pMonstatsTxt->nSkill[0] >= 0)
 	{
-		AITACTICS_UseSkill(pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkillMode[0], pAiTickParam->pMonstatsTxt->nSkill[0], SUNIT_GetTargetUnit(pGame, pUnit), 0, 0);
-		sub_6FCD0150(pGame, pUnit, 30);
+		D2UnitStrc* pTarget = s.target ? s.target(pGame, pUnit) : SUNIT_GetTargetUnit(pGame, pUnit);
+		if (s.useSkill) s.useSkill(pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkillMode[0], pAiTickParam->pMonstatsTxt->nSkill[0], pTarget); else AITACTICS_UseSkill(pGame, pUnit, pAiTickParam->pMonstatsTxt->nSkillMode[0], pAiTickParam->pMonstatsTxt->nSkill[0], pTarget, 0, 0);
+		if (s.delay) s.delay(pGame, pUnit, 30); else sub_6FCD0150(pGame, pUnit, 30);
 		pAiCmd->nCmdParam[4] = 0;
 		return;
 	}
 
 	const int32_t nParam = pAiTickParam->pAiControl->dwAiParam[2];
-	AITHINK_ExecuteAiFn(pGame, pUnit, pAiTickParam->pAiControl, pAiTickParam->pAiControl->nAiSpecialState);
+	if (s.exec) s.exec(pGame, pUnit, pAiTickParam->pAiControl, pAiTickParam->pAiControl->nAiSpecialState); else AITHINK_ExecuteAiFn(pGame, pUnit, pAiTickParam->pAiControl, pAiTickParam->pAiControl->nAiSpecialState);
 	pAiTickParam->pAiControl->dwAiParam[2] = nParam;
-	sub_6FCD0150(pGame, pUnit, 1);
+	if (s.delay) s.delay(pGame, pUnit, 1); else sub_6FCD0150(pGame, pUnit, 1);
 }
 
 //D2Game.0x6FCD3540

@@ -79,17 +79,20 @@ int32_t __fastcall SKILLS_SrvSt42_FireHit(D2GameStrc* pGame, D2UnitStrc* pUnit, 
     return 1;
 }
 
+D2FireHitSeam g_d2FireHit;
+
 //D2Game.0x6FD062E0
 // 1.13c D2Game+0xB4660
 int32_t __fastcall SKILLS_SrvDo083_FireHit(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nSkillId, int32_t nSkillLevel)
 {
-    D2UnitStrc* pTarget = SUNIT_GetTargetUnit(pGame, pUnit);
+    const D2FireHitSeam& s = g_d2FireHit;
+    D2UnitStrc* pTarget = s.target ? s.target(pGame, pUnit) : SUNIT_GetTargetUnit(pGame, pUnit);
 
-    if (pTarget)
+    if (pTarget && pTarget != pUnit)
     {
-        SUNITDMG_DrainItemDurability(pGame, pUnit, pTarget, 0);
-        SUNITDMG_FreeAttackerDefenderCombatList(pGame, pUnit, pTarget);
-        return sub_6FD12950(pGame, pUnit, nSkillId, nSkillLevel, 0);
+        if (s.drain) s.drain(pGame, pUnit, pTarget, 0); else SUNITDMG_DrainItemDurability(pGame, pUnit, pTarget, 0);
+        if (s.freeList) s.freeList(pGame, pUnit, pTarget); else SUNITDMG_FreeAttackerDefenderCombatList(pGame, pUnit, pTarget);
+        return s.fire ? s.fire(pGame, pUnit, nSkillId, nSkillLevel, 0) : sub_6FD12950(pGame, pUnit, nSkillId, nSkillLevel, 0);
     }
 
     return 0;
