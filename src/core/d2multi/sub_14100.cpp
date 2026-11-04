@@ -14,7 +14,7 @@ extern int32_t DAT_6fa09dcc;
 extern uint8_t DAT_6f9fa598[];
 void d2_multi_sub_cbd0(uint16_t, char*);
 void d2_multi_sub_1da0(void);
-void d2_multi_sub_aa60(void);
+void d2_multi_sub_aa60(int32_t, const void*);
 void d2_multi_sub_acb0(void);
 int32_t d2_multi_sub_139b0(uint8_t*);
 }
@@ -54,7 +54,6 @@ uint32_t d2_multi_sub_14100(void) {
     }
     d2_multi_sub_cbd0(id, nm);
     d2_multi_sub_1da0();
-    Ordinal_10003();
-    d2_multi_sub_aa60();
+    d2_multi_sub_aa60(0, (const void*)(intptr_t)Ordinal_10003());
     return 1;
 }

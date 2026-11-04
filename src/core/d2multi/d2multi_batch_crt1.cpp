@@ -71,7 +71,13 @@ void d2_multi___global_unwind2(void*) {}
 void d2_multi___local_unwind2(void*, int32_t) {}
 
 // 1.13c D2Multi+0x5986
-void d2_multi_sub_5986(void) {}
+// EAX and EBP are live-in (the __local_unwind2 caller's frame); [EBP+8] arrives as ebp8. 32-bit words: DAT_6f9e9990, 9994, 9998.
+uint32_t d2_multi_g5986[3];
+void d2_multi_sub_5986(uint32_t eax, uint32_t ebp, uint32_t ebp8) {
+    d2_multi_g5986[1] = ebp8;
+    d2_multi_g5986[0] = eax;
+    d2_multi_g5986[2] = ebp;
+}
 
 uint32_t d2_multi_sub_599E(int32_t cp) {
     switch (cp) { case 0x3a4: return 0x411; case 0x3a8: return 0x804; case 0x3b5: return 0x412; case 0x3b6: return 0x404; }

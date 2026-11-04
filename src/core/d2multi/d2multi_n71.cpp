@@ -14,7 +14,7 @@ void q_d2multi_n71_Ordinal_10031(intptr_t);
 void q_d2multi_n71_Ordinal_10053(intptr_t);
 void Ordinal_10146(void);
 int32_t Ordinal_10021(void);
-void d2_multi_sub_aa60(void);
+void d2_multi_sub_aa60(int32_t, const void*);
 void d2_multi_sub_8450(void);
 void d2_multi_sub_8790(void);
 void d2_multi_sub_be00(void);
@@ -37,8 +37,7 @@ static void login_prologue(uint8_t* b12, uint8_t* b44, uint8_t* b160, uint8_t* b
     DAT_6fa09188 = b12; DAT_6fa0918c = b44; DAT_6fa09190 = b160;
     (*(void (**)(int, void*))(DAT_6fa0917c + 0x78))(1, PTR_s_profile_sex_6f9e9c28);
     DAT_6fa09118 = 0;
-    Ordinal_10003();
-    d2_multi_sub_aa60();
+    d2_multi_sub_aa60(0x6f9d84b0, (const void*)(intptr_t)Ordinal_10003());
     n71_Ordinal_10014((void*)d2_multi_sub_8450);
     d2_multi_sub_8790();
 }

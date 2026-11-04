@@ -27,7 +27,7 @@ int32_t* d2_multi_sub_8bd0(int32_t edi, int32_t esi, int32_t third);
 void    d2_multi_sub_8c80(int32_t, int32_t);
 void    d2_multi_sub_8d80(void);
 void    d2_multi_sub_8790(void);
-void    d2_multi_sub_aa60(void);
+void    d2_multi_sub_aa60(int32_t, const void*);
 extern uint8_t DAT_6fa08f00[];            // CRITICAL_SECTION
 extern int32_t *DAT_6fa0a0e8, *DAT_6fa0a0ec;
 extern int32_t DAT_6fa0a0c8, DAT_6fa0a0d0, DAT_6fa0a0d4, DAT_6fa0a09c, DAT_6fa09160;
@@ -100,8 +100,7 @@ bool d2_multi_sub_b670(void) {
     if (DAT_6fa0917c && ((int32_t(*)(void))*(uintptr_t*)(DAT_6fa0917c + 0x68))()) {
         if (Ordinal_10054()) return true;
         DAT_6fa0a09c = 0;
-        Ordinal_10003();
-        d2_multi_sub_aa60();
+        d2_multi_sub_aa60(0x6f9d90b0, (const void*)(intptr_t)Ordinal_10003());
         uint32_t* p = ((uint32_t*(*)(void))*(uintptr_t*)(DAT_6fa0917c + 0x44))();
         if (p && *p > 8) {
             Ordinal_10035(p + 1);

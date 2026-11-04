@@ -306,16 +306,16 @@ static int32_t push_ctl(int32_t name, bool zero) {
     return h;
 }
 
-// 1.13c D2Multi+0xAA60
-void d2_multi_sub_aa60(int32_t ebx) {
-    d2_multi_sub_8790();
+// 1.13c D2Multi+0xAA60: EBX = callback (0: LAB_6f9daa50), stack word 0 = the wide text handed to D2Win #10000 in EDX (ECX = the last control handle); ret 4.
+extern "C" void d2_multi_sub_aa60(int32_t ebx, const void* text) {
+    n37_cb_8790();
     if (DAT_6fa09f24 > 0x1f) { fatal13e8(); return; }
     push_ctl(0x6F9EA360, true);
     if (DAT_6fa09f24 >= 0x20) { fatal13e8(); return; }
     push_ctl(0x6F9EA3C0, false);
     if (DAT_6fa09f24 >= 0x20) { fatal13e8(); return; }
-    push_ctl(0x6F9EA3F0, false);
-    n37_Ordinal_10000(0, 0, 0, 0, 0);
+    int32_t h = push_ctl(0x6F9EA3F0, false);
+    n37_Ordinal_10000(h, text, 0, 0, 0);
     DAT_6fa0a0e0 = ebx ? ebx : 0x6f9daa50;
     DAT_6fa09f2c = (int32_t)d2_host_tick();
 }
