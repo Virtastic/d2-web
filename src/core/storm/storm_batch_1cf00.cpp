@@ -114,3 +114,12 @@ void Storm_Sub29560() {
         Storm_SetThreadPriority(g_ioThread, 1);
     }
 }
+
+// Capture-probe accessor: the I/O thread and wake event words (module RVAs 0x53110 and 0x5312C) copied in and out around the call.
+extern "C" void storm_29560_fnrun(uint32_t* g) {
+    g_ioThread = (void*)(uintptr_t)g[0];
+    g_ioEvent = (void*)(uintptr_t)g[7];
+    Storm_Sub29560();
+    g[0] = (uint32_t)(uintptr_t)g_ioThread;
+    g[7] = (uint32_t)(uintptr_t)g_ioEvent;
+}

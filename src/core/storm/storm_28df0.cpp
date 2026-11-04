@@ -2,7 +2,7 @@
 #include <cstdint>
 struct S28DFCache { uint8_t pad[0x118]; void* owner; uint32_t off; uint32_t blockSize; uint8_t* data; uint32_t result; };
 struct S28DFInfo { uint32_t pad[2]; uint32_t size; uint32_t flags; };
-struct S28DFFile { void* pad[1]; S28DFCache* cache; S28DFInfo* info; };  // retail dwords 0x44 / 0x45
+struct S28DFFile { uint8_t pad[0x110]; S28DFCache* cache; S28DFInfo* info; };  // retail +0x110 / +0x114 (dwords 0x44 / 0x45)
 // seam: Storm+0x28450 (file, off, dst, len) -> bytes read; unmapped, empty provider state
 uint32_t Seam28450_28DF0(void*, uint32_t, uint8_t*, uint32_t) { return 0; }
 
@@ -16,3 +16,6 @@ uint32_t Storm_28DF0(S28DFFile* f, uint32_t off) {
     c->result = Seam28450_28DF0(f, off, c->data, len);
     return c->result;
 }
+
+// FN replay entry: f = the file struct, off = the second argument.
+extern "C" uint32_t storm_28df0_fnrun(void* f, uint32_t off) { return Storm_28DF0((S28DFFile*)f, off); }

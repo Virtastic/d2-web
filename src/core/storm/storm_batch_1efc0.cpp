@@ -1071,3 +1071,12 @@ extern "C" uint32_t* storm_1efc0_global(uint32_t rva) {
     }
     return nullptr;
 }
+
+// Capture-probe runner: the last-error and wake-event words (module RVAs 0x55388 and 0x5312C) copied in and out around the call.
+extern "C" void storm_281a0_fnrun(uint32_t* gErr, uint32_t* gEv, int32_t h, int32_t sig) {
+    g_lastError = (int32_t)gErr[0];
+    g_event_4312c = (void*)(uintptr_t)gEv[0];
+    Storm_Sub281A0(h, sig);
+    gErr[0] = (uint32_t)g_lastError;
+    gEv[0] = (uint32_t)(uintptr_t)g_event_4312c;
+}

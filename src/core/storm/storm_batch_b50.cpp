@@ -17,9 +17,14 @@ uint32_t& u32(uint32_t p, uintptr_t off) { return *(uint32_t*)at(p, off); }
 // Win32 not in compat/Windows.h: deterministic no-op seams (StormLib replaces Storm)
 void StormSetLastError(uint32_t) {}
 void SetEvent(HANDLE) {}
-void Storm_Sub271D0();                                              // wake/dispatch
 uint32_t* Storm_Sub4150(void* list, uint32_t a, uint32_t b);        // node alloc
 }
+
+// Storm+0x271D0 (storm_sub_271d0.cpp, C++ linkage): EAX = cur node, ESI = prev node at the wake call (measured from the capture).
+void Storm_Sub271D0(int* cur /*EAX*/, int* prev /*ESI*/);
+
+// The probe's view of the 0x55978 list head (the FN capture pins it per call).
+uint32_t* Storm_Sub279F0ListHead() { return &g_list45978; }
 
 // 1.13c Storm+0x279F0
 void Storm_Sub279F0(int32_t param_1, int32_t newVal /*EBX*/) {
@@ -30,9 +35,11 @@ void Storm_Sub279F0(int32_t param_1, int32_t newVal /*EBX*/) {
         if ((int32_t)u32(n, 0x24) == param_1) {
             int32_t old = (int32_t)u32(n, 0x1c);
             bool had = uVar3 != 0;
+            uint32_t prev = uVar3;
             u32(n, 0x1c) = newVal;
             uVar3 = n;
-            if (had && 0 < newVal && old < 1) Storm_Sub271D0();
+            if (had && 0 < newVal && old < 1)
+                Storm_Sub271D0((int*)(uintptr_t)n, (int*)(uintptr_t)prev);
         }
     }
     LeaveCriticalSection(&g_lock);
