@@ -5,6 +5,6 @@
 // only reachable one, so it returns 0 (log line "sShowStack: imagehlp.dll not loaded" omitted: no log sink).
 #include <cstdint>
 
-uint32_t fog_sub_155E0() {  // 1.13c Fog+0x155E0
+extern "C" uint32_t fog_sub_155E0() {  // 1.13c Fog+0x155E0
     return 0;
 }

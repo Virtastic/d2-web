@@ -36,7 +36,7 @@ extern const char DAT_6ff768ec[];
   _Exit(-1);
 }
 
-struct ExcelRaw { char* base; char* data; int rows; int cols; };
+struct ExcelRaw { uint32_t base; uint32_t data; int rows; int cols; };  // retail's 16 bytes: the two links are 32-bit dwords
 struct ExcelIdx { int count; int cap; uint32_t (*ents)[2]; int flag; };
 struct ExcelLink { int next; };
 
@@ -63,11 +63,14 @@ int Fog_17170(const char* name, const uint8_t* list, uint32_t* out1, uint32_t* o
 }
 
 // 1.13c Fog+0x12770
-ExcelRaw* Fog_12770(char* buf, int size) {
+// Excel table loader. The pool alloc (0x1B560), pool free (0x1B0C0 fastcall on &ptr), SStrCmpI (Ordinal_508) and the
+// overlapping copy (Ordinal_491) are the env, so the capture's replay serves them from its blobs.
+struct Fog12770Env { void* (*alloc)(); void (*release)(void** p); int (*cmpi)(const char*, const char*, int); void (*move)(void*, const void*, size_t); };
+extern "C" ExcelRaw* fog_12770_run(char* buf, int size, const Fog12770Env* env) {
   char* end = buf + size;
-  ExcelRaw* r = (ExcelRaw*)FUN_6ff6b560(nullptr);
+  ExcelRaw* r = (ExcelRaw*)env->alloc();
   if (!r) FUN_6ff60f30(2, "..\\Source\\Fog\\Src\\Excel\\Excel.cpp", 0x4d, DAT_6ff768ec);
-  r->base = buf; r->data = nullptr; r->rows = 0; r->cols = 0;
+  r->base = (uint32_t)(uintptr_t)buf; r->data = 0; r->rows = 0; r->cols = 0;
   char* p = buf;
   for (;;) {
     if (end <= p) goto fail;
@@ -82,7 +85,7 @@ ExcelRaw* Fog_12770(char* buf, int size) {
     char* q = p + 1;
     if (end <= q) goto fail;
     if (0x118 < cols) fog_fatal(0x67);
-    r->data = q;
+    r->data = (uint32_t)(uintptr_t)q;
     char* start = q;
     for (;;) {
       if (q < end) {
@@ -94,9 +97,9 @@ ExcelRaw* Fog_12770(char* buf, int size) {
         q = q - 1 + 2;
         r->rows++;
       }
-      if (Ordinal_508(start, "Expansion", 10) == 0) {
+      if (env->cmpi(start, "Expansion", 10) == 0) {
         r->rows--;
-        Ordinal_491(start, q, end - q);
+        env->move(start, q, end - q);
         end += start - q;
         q = start;
       }
@@ -105,9 +108,18 @@ ExcelRaw* Fog_12770(char* buf, int size) {
     }
   }
 fail:
-  void* t = r->base; FUN_6ff6b0c0(&t);
-  t = r; FUN_6ff6b0c0(&t);
+  void* t = (void*)(uintptr_t)r->base; env->release(&t);
+  t = r; env->release(&t);
   return nullptr;
+}
+
+static void* fog_12770_alloc() { return FUN_6ff6b560(nullptr); }
+static void fog_12770_free(void** p) { FUN_6ff6b0c0(p); }
+static int fog_12770_cmpi(const char* a, const char* b, int n) { return Ordinal_508(a, b, n); }
+static void fog_12770_move(void* d, const void* s, size_t n) { Ordinal_491(d, s, n); }
+ExcelRaw* Fog_12770(char* buf, int size) {
+  static const Fog12770Env env{ fog_12770_alloc, fog_12770_free, fog_12770_cmpi, fog_12770_move };
+  return fog_12770_run(buf, size, &env);
 }
 
 // 1.13c Fog+0x12930
@@ -141,17 +153,26 @@ int Fog_12930(ExcelIdx* t, uint32_t key) {
 }
 
 // 1.13c Fog+0x12610
-void Fog_12610(int* t, const void* name) {
+// The tree insert (0x12020) takes EAX = &t[3] (the string-tree root) beside the node; the decompile drops it.
+// The pool alloc, the insert and the case table are the env, so the capture's replay can serve them from its blobs.
+struct Fog12610Env { void* (*alloc)(); void (*insert)(uint32_t* slot, uint8_t* node); const uint8_t* table; };
+extern "C" void fog_sub_12020(uint32_t* slot, uint8_t* node);
+extern "C" void fog_12610_run(int* t, const void* name, const Fog12610Env* env) {
   if (!t) fog_fatal(0x4b2);
   if (t[2]) fog_fatal(0x4b6);
-  uint8_t* rec = (uint8_t*)FUN_6ff6b560(nullptr);
+  uint8_t* rec = (uint8_t*)env->alloc();
   if (!rec) FUN_6ff60f30(2, "..\\Source\\Fog\\Src\\Excel\\Excel.cpp", 0x4b9, DAT_6ff768ec);
   memset(rec, 0, 0x2c);
   Ordinal_501(rec, name, 0x20);
-  for (uint8_t* p = rec; *p && p < rec + 0x20; p++) *p = DAT_6ff76690[(char)*p];
+  for (uint8_t* p = rec; *p && p < rec + 0x20; p++) *p = env->table[(char)*p];
   *(int*)(rec + 0x20) = *t;
-  FUN_6ff62020(rec);
+  env->insert((uint32_t*)(t + 3), rec);
   (*t)++;
+}
+static void* fog_12610_alloc() { return FUN_6ff6b560(nullptr); }
+void Fog_12610(int* t, const void* name) {
+  static const Fog12610Env env{ fog_12610_alloc, fog_sub_12020, DAT_6ff76690 };
+  fog_12610_run(t, name, &env);
 }
 
 // 1.13c Fog+0x1F550

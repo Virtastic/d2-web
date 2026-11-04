@@ -114,18 +114,19 @@ extern "C" EMSCRIPTEN_KEEPALIVE char* fog_sub_11FE0(void* linker, int32_t index,
 // argument): walk left (+0x24) when the new key sorts lower, right (+0x28) when higher, write it
 // into the first empty slot. An exact duplicate frees the new node (Excel.cpp:0x4A7) and keeps the
 // existing one.
-extern "C" EMSCRIPTEN_KEEPALIVE void fog_sub_12020(uint8_t** slot, uint8_t* node) {  // 1.13c Fog+0x12020
+// The links (the root dword at linker+0xC, the children at node+0x24/+0x28) are retail's 32-bit dwords.
+extern "C" EMSCRIPTEN_KEEPALIVE void fog_sub_12020(uint32_t* slot, uint8_t* node) {  // 1.13c Fog+0x12020
     for (;;) {
-        uint8_t* const current = *slot;
+        uint8_t* const current = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(*slot));
         if (current == nullptr) {
-            *slot = node;
+            *slot = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(node));
             return;
         }
         const int32_t order = fog_key_compare(node, current);
         if (order < 0) {
-            slot = reinterpret_cast<uint8_t**>(current + 0x24);
+            slot = reinterpret_cast<uint32_t*>(current + 0x24);
         } else if (order > 0) {
-            slot = reinterpret_cast<uint8_t**>(current + 0x28);
+            slot = reinterpret_cast<uint32_t*>(current + 0x28);
         } else {
             fog_free_block(node, kExcelFile, 0x4A7);
             return;

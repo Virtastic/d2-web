@@ -16,7 +16,7 @@
 struct ExcelIdx { int count; int cap; uint32_t (*ents)[2]; int flag; };       // as fog_batch_b69.cpp
 int Fog_12930(ExcelIdx* t, uint32_t key);                                      // Fog+0x12930
 void Fog_12610(int* t, const void* name);                                      // Fog+0x12610
-extern "C" void fog_sub_12020(uint8_t** slot, uint8_t* node);                  // Fog+0x12020
+extern "C" void fog_sub_12020(uint32_t* slot, uint8_t* node);                  // Fog+0x12020
 extern "C" int32_t fog_sub_121A0(void* linker, const char* text, int32_t log); // Fog+0x121A0
 extern "C" void fog_sub_1F8A0(char* s, int32_t len);                           // Fog+0x1F8A0
 
@@ -54,7 +54,7 @@ int find_or_add(int* linker, char* name) {
     std::strncpy(reinterpret_cast<char*>(rec), name, 0x1f);
     fog_sub_1F8A0(reinterpret_cast<char*>(rec), 0x20);
     *reinterpret_cast<int*>(rec + 0x20) = *linker;
-    fog_sub_12020(reinterpret_cast<uint8_t**>(reinterpret_cast<uint8_t*>(linker) + 0xc), rec);
+    fog_sub_12020(reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(linker) + 0xc), rec);
     return (*linker)++;
 }
 
