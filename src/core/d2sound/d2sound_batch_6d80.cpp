@@ -2,6 +2,7 @@
 // Host seams (Storm #426/#10042/#10043, 0x6FA0, 0x8020, 0x8830, 0xACCC, DirectSound vtbl) are function pointers.
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 
 struct D2SndBatch25Host {
     void (*regSave)(const char* sect, const char* key, uint32_t type, uint32_t val); // Storm #426
@@ -39,12 +40,18 @@ void D2Sound_ListPush(uint32_t** head, uint32_t value) {
 }
 
 // 1.13c D2sound+0x6D80 ordinal 10028: pan from 0..255 (0x80 centre); null buffer is fatal.
+// ECX = wrapper (guest dword [0] = the DirectSound interface, whose vtable +0x40 is SetPan(iface, v), stdcall);
+// pan > 0x80: v = trunc(-attenuate(0,127,255-pan)); pan < 0x80: v = trunc(attenuate(0,127,pan)); pan == 0x80: v = 0.
 void D2Sound_SetPan(void* buf, int32_t p) {
     if (!buf) { g_h.fatal(); return; }
     int32_t v = 0;
-    if (p > 0x80) v = (int32_t)g_h.attenuate(0.0f, 127.0f, (float)(0xff - p)), v = (int32_t)g_h.mixValue();
-    else if (p < 0x80) g_h.attenuate(0.0f, 127.0f, (float)p), v = (int32_t)g_h.mixValue();
-    g_h.setPan(buf, v);
+    if (p > 0x80) { g_h.attenuate(0.0f, 127.0f, (float)(0xff - p)); v = -(int32_t)g_h.mixValue(); }   // fchs before 0xACCC
+    else if (p < 0x80) { g_h.attenuate(0.0f, 127.0f, (float)p); v = (int32_t)g_h.mixValue(); }
+    uint32_t iface, vt, fn;
+    std::memcpy(&iface, buf, 4);
+    std::memcpy(&vt, (const void*)(uintptr_t)iface, 4);
+    std::memcpy(&fn, (const void*)(uintptr_t)(vt + 0x40), 4);
+    ((void (*)(uint32_t, int32_t))(uintptr_t)fn)(iface, v);
 }
 
 // 1.13c D2sound+0x8160 ordinal 10017: shutdown; no-op unless initialised.

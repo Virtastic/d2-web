@@ -1,21 +1,18 @@
+// 1.13c D2sound+0x6070 -- read exactly `size` bytes of an open file into `buf` (register inputs ESI = file handle, EDI = expected size,
+// one stack word = destination buffer; ret 4). Every failure is the fatal path (a message id through Ordinal_10265 / Ordinal_10024, then
+// _exit(-1)), so the only observable of a surviving call is the Fog read (Ordinal_10104 thunk 0x5FD2).
 #include <cstdint>
-#include <cstdlib>
 #include <unistd.h>
-#include <initializer_list>
 
-extern "C" __attribute__((weak)) uint32_t Ordinal_10104(void);
-extern "C" __attribute__((weak)) void Ordinal_276(void);
-extern "C" __attribute__((weak)) uint32_t Ordinal_10265(uint32_t);
-extern "C" __attribute__((weak)) void Ordinal_10024(const void*, uint32_t);
-static const char g_b68_msg[1] = {0};  // DAT_6f9c0684
+struct D2sound6070Env {
+    // 0x5FD2: ECX = hFile, EDX = buf, stack (size, &bytesRead, 0, 0, 0), ret 0x14; 0 = failed
+    int32_t (*read)(uint32_t hFile, uint32_t buf, uint32_t size, uint32_t* bytesRead);
+};
 
-// 1.13c D2sound+0x6070  (hidden register inputs: ESI=obj, EDI=expected, local_108=caller stack local)
-void D2sound_b68_6070(int esi, int edi, int local_108)
-{
-    uint32_t id;
-    if (esi == 0) id = 0x87;
-    else if (Ordinal_10104() == 0) { Ordinal_276(); id = 0x8f; }
-    else { if (edi == local_108) return; id = 0x92; }
-    Ordinal_10024(g_b68_msg, Ordinal_10265(id));
-    _exit(-1);
+// 1.13c D2sound+0x6070
+void D2sound_b68_6070(uint32_t hFile, uint32_t size, uint32_t buf, const D2sound6070Env* e) {
+    uint32_t got = 0;
+    if (!hFile) _exit(-1);                      // id 0x87
+    if (!e->read(hFile, buf, size, &got)) _exit(-1);   // Ordinal_276 then id 0x8F
+    if (size != got) _exit(-1);                 // id 0x92
 }

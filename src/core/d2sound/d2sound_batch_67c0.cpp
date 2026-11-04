@@ -156,26 +156,34 @@ static const uint8_t kGuid01E8[16] = { 0xC0, 0x6F, 0x4E, 0x4A, 0x41, 0xC3, 0xD1,
 static const uint8_t kGuid0208[16] = { 0xA7, 0xA6, 0x06, 0x03, 0x24, 0xB2, 0xD2, 0x11,
                                        0x99, 0xE5, 0x00, 0x00, 0xE8, 0xD8, 0xC7, 0x22 };
 
-// 1.13c D2Sound+0x6C00
-// Push a float (distance ratio / volume) into the stream's +0x10 interface. With the DS3D global at 1
-// it is property 1 on kGuid01E8 and the value is passed through unless it equals 0.0f (retail then
-// substitutes -1.0f); otherwise the value goes through the 0x8830 curve and 0xACCC mixer first and both
-// properties 5 and 4 on kGuid0208 get the mixer's low dword.
+// Guest-layout COM access (declared ahead of 0x6F30 below): the retail record holds 4-byte pointers and vtable slots are 4-byte code addresses.
+static inline uint32_t g32(uint32_t addr, uint32_t off);
+// IKsPropertySet::Set(iface, guid, id, 0, 0, data, len): vtable +0x10, stdcall, the interface a guest dword.
+static void d2sound_prop32(uint32_t iface, const uint8_t* guid, uint32_t id, const void* data, uint32_t len) {
+    typedef int32_t (*PropFn)(void*, const void*, uint32_t, uint32_t, uint32_t, const void*, uint32_t);
+    ((PropFn)(uintptr_t)g32(g32(iface, 0), 0x10))((void*)(uintptr_t)iface, guid, id, 0, 0, data, len);
+}
+// FN probe hook: DAT_6f9c6598 (the DS3D mode) and DAT_6f9c659c (silent) as the descriptor pins them.
+void D2Sound_fnSetModes(uint32_t ds3d, uint32_t silent) { g_ds3d = ds3d; g_silent = silent; }
+
+// 1.13c D2Sound+0x6C00 (thiscall, float on the stack, ret 4)
+// Push a float into the stream's +0x10 interface. silent (DAT_659C) forces the value to 0.0f. Mode 1: the value is replaced by -1.0f
+// unless it equals 0.0f (a NaN is replaced too: fucompp unordered reaches the substitution), then property 1 of GUID 0x6F9C01E8 gets
+// the float. Any other mode: v = trunc(0x8830(0, 1, value)) and property 5, then property 4, of GUID 0x6F9C0208 get that dword.
 void D2Sound_6C00(void* obj, float value, const D2SoundEnv* env) {
     if (!obj) d2sound_fatal(0x359);
     if (g_silent) value = 0.0f;
-    void* iface = rdptr(obj, 0x10);
+    const uint32_t iface = rd32(obj, 0x10);
     if (!iface) return;
     if (g_ds3d == 1) {
-        // Retail skips the substitution only when the compare is equal or unordered (NaN).
-        if (value == value && value != g_c0978) value = -1.0f;
-        d2sound_setProp(iface, kGuid01E8, 1, &value, 4);
+        if (!(value == g_c0978)) value = -1.0f;
+        d2sound_prop32(iface, kGuid01E8, 1, &value, 4);
         return;
     }
     env->attenuate(0.0f, 1.0f, value);
     uint32_t mixed = (uint32_t)env->mixValue();
-    d2sound_setProp(iface, kGuid0208, 5, &mixed, 4);
-    d2sound_setProp(iface, kGuid0208, 4, &mixed, 4);
+    d2sound_prop32(iface, kGuid0208, 5, &mixed, 4);
+    d2sound_prop32(iface, kGuid0208, 4, &mixed, 4);
 }
 
 // 1.13c D2Sound+0x7510
@@ -430,14 +438,18 @@ uint32_t D2Sound_80A0(void) {
     return 0;
 }
 
+// Guest-layout access for the COM calls of 0x6C00, 0x6CE0 and 0x6F30: the retail record holds 4-byte pointers and a vtable
+// slot is a 4-byte code address, so they are read as dwords (a void* element would be 8 bytes on wasm64).
+static inline uint32_t g32(uint32_t addr, uint32_t off) { uint32_t v; std::memcpy(&v, (const void*)(uintptr_t)(addr + off), 4); return v; }
+
 // 1.13c D2sound+0x06F30
 // Call the stream interface's vtable+0x30 (0,0,1) under the lock; on success set +0x1C=1, return 1; failure returns 0.
 uint32_t D2Sound_6F30(void* obj) {
     if (!obj) d2sound_fatal(0x279);
     EnterCriticalSection(&g_lock);
-    void* iface = *(void**)obj;
-    void** vt = *(void***)iface;
-    if ((int32_t)((uint32_t(*)(void*, uint32_t, uint32_t, uint32_t))vt[0x30 / 4])(iface, 0, 0, 1) < 0) {
+    const uint32_t iface = rd32(obj, 0);
+    typedef int32_t (*Slot4)(uint32_t, uint32_t, uint32_t, uint32_t);
+    if (((Slot4)(uintptr_t)g32(g32(iface, 0), 0x30))(iface, 0, 0, 1) < 0) {
         LeaveCriticalSection(&g_lock);
         return 0;
     }
@@ -524,15 +536,18 @@ static uint32_t g_tag6584;             // 0x6F9C6584  last 0x7740 argument
 static uint8_t* g_pending;             // 0x6F9C65BC  queue of {name, ..., +0x50 data, +0x54 size, +0x58 id, +0x5C next}
 
 // 1.13c D2sound+0x06EC0 (Ordinal 10054)
-// Call interface method +0x24 of the stream's +0x00 object under the lock; the result is always 0.
+// Call interface method +0x24 of the stream's +0x00 object under the lock. The slot is stdcall with two words:
+// the iface and &local, where local starts as the ECX (the stream pointer) and the slot writes it. Success
+// (eax >= 0) returns the low bit of local (`movzx eax, byte [esp+4]; and eax, 1`); failure returns 0.
 uint32_t D2Sound_6EC0(void* obj) {
     if (!obj || !rd32(obj, 0)) d2sound_fatal(0x2B0);
     EnterCriticalSection(&g_lock);
     void* iface = rdptr(obj, 0);
     void** vt = *(void***)iface;
-    ((int32_t (*)(void*))vt[0x24 / 4])(iface);
+    uint32_t local = (uint32_t)(uintptr_t)obj;
+    int32_t hr = ((int32_t (*)(void*, uint32_t*))vt[0x24 / 4])(iface, &local);
     LeaveCriticalSection(&g_lock);
-    return 0;
+    return hr < 0 ? 0u : (local & 1u);
 }
 
 // 1.13c D2sound+0x07B10 (Ordinal 10057)
@@ -700,19 +715,18 @@ static void com_release(void*& o) {
     o = nullptr;
 }
 
-// 1.13c D2Sound+0x6CE0
-// Store the pan/attenuation float at +0x3c; in DS3D mode 2 (or flag bit 2, or value == 0) push the 1-x curve
-// into property 7 of the interface at +0x10.
+// 1.13c D2Sound+0x6CE0 (thiscall, float on the stack, ret 4)
+// Store the float at +0x3C. With an interface at +0x10, mode 2 and (flags bit 2 set, or value == 0.0f): property 7 of GUID 0x6F9C0208 gets
+// trunc(0x8830(0, 1, 1.0f - value)).
 void D2Sound_6CE0(void* obj, float v, const D2SoundEnv* env) {
     if (!obj) d2sound_fatal(0x345);
-    void* iface = rdptr(obj, 0x10);
+    const uint32_t iface = rd32(obj, 0x10);
     std::memcpy((uint8_t*)obj + 0x3C, &v, 4);
     if (iface && g_ds3d == 2 && ((rd8(obj, 0x34) & 4) || v == g_c0978)) {
-        env->attenuate(0.0f, 1.0f, g_c0974 - v);
-        float p = (float)env->mixValue();
-        static const uint8_t k_guid[16] = {0};   // ponytail: DAT_6f9c0208 is the DS property-set GUID; the host seam ignores it
-        void** vt = *(void***)iface;
-        ((int32_t (*)(void*, const void*, uint32_t, uint32_t, uint32_t, void*, uint32_t))vt[0x10 / 4])(iface, k_guid, 7, 0, 0, &p, 4);
+        const float c = g_c0974 - v;
+        env->attenuate(0.0f, 1.0f, c);
+        uint32_t mixed = (uint32_t)env->mixValue();
+        d2sound_prop32(iface, kGuid0208, 7, &mixed, 4);
     }
 }
 

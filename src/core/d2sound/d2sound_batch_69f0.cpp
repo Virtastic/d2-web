@@ -124,6 +124,26 @@ int32_t* D2sound_8790(uint32_t* size, int32_t* data, int32_t tag, uint32_t* outL
 // (e_lfanew at +0x3C), take the record at header+0xB8 (Win32 error 0x714 if header+0xBC is 0).
 // Copies it into `dest` (zeroed *size bytes first) when it fits and sets LastError 0, returns 1;
 // otherwise *size = needed and LastError 0x7A. Not-LE / not-MZ -> LastError 0xB. Failure to open/map -> 0.
+// The mapped-view half of D2sound_84A0 (no file I/O): returns the result, *err = the LastError the function leaves (0 when the copy succeeds).
+uint32_t D2sound_84A0_view(const uint8_t* v, void* dest, uint32_t* size, uint32_t* err) {
+    if (*(const uint16_t*)v == 0x5A4D) {
+        const uint8_t* pe = v + rd32(v, 0x3C);
+        if (rd32(pe, 0) != 0x454C) { *err = 0xB; return 0; }
+        if (rd32(pe, 0xBC) == 0) { *size = 0; *err = 0x714; return 0; }
+        uint32_t rec = rd32(pe, 0xB8);
+        uint32_t n = rd32(v, rec + 8);
+        if (dest && n <= *size) {
+            std::memset(dest, 0, *size);
+            std::memcpy(dest, v + rec + 0xC, n);
+            *size = n;
+            *err = 0;
+            return 1;
+        }
+        *size = n; *err = 0x7A; return 0;
+    }
+    *err = 0xB; return 0;
+}
+
 uint32_t D2sound_84A0(void* dest, const char* path, uint32_t* size) {
     HANDLE f = CreateFileA(path, 0x80000000, 1, nullptr, 3, 0, nullptr);
     if (f == INVALID_HANDLE_VALUE) return 0;
@@ -131,43 +151,32 @@ uint32_t D2sound_84A0(void* dest, const char* path, uint32_t* size) {
     if (!m) return 0;
     uint8_t* v = (uint8_t*)MapViewOfFile(m, 4, 0, 0, 0);
     if (!v) return 0;
-    uint32_t ret = 0, err;
-    if (*(uint16_t*)v == 0x5A4D) {
-        uint8_t* pe = v + rd32(v, 0x3C);
-        if (rd32(pe, 0) != 0x454C) err = 0xB;
-        else if (rd32(pe, 0xBC) == 0) { *size = 0; err = 0x714; }
-        else {
-            uint32_t rec = rd32(pe, 0xB8);
-            uint32_t n = rd32(v, rec + 8);
-            if (dest && n <= *size) {
-                std::memset(dest, 0, *size);
-                std::memcpy(dest, v + rec + 0xC, n);
-                *size = n;
-                SetLastError(0);
-                return 1;
-            }
-            *size = n; err = 0x7A;
-        }
-    } else err = 0xB;
+    uint32_t err = 0;
+    const uint32_t ret = D2sound_84A0_view(v, dest, size, &err);
     SetLastError(err);
     return ret;
 }
 
 // 1.13c D2sound+0x6A40
 // Silence a DirectSoundBuffer region (this = ESI = IDirectSoundBuffer*, stdcall(offset, bytes)): under the
-// global CS at 0x6F9C6530, Lock(offset, bytes, &p1, &len1, 0,0,0) (vtbl+0x2c); on failure leave, return 0.
-// Else zero len1 bytes at p1, Unlock(p1, len1, 0, 0) (vtbl+0x4c), leave, return 1. NULL this -> fatal (_exit(-1)).
-uint32_t D2sound_6A40(void* dsb, uint32_t offset, uint32_t bytes, CRITICAL_SECTION* cs) {
+// global CS at 0x6F9C6530, Lock(offset, bytes, &p1, &len1, 0,0,0) (vtbl+0x2c; len1 is the caller's `bytes` slot, in/out); on failure leave, return 0.
+// Else zero len1 bytes at p1, Unlock(p1, len1, 0, 0) (vtbl+0x4c), leave, return 1. NULL this: fatal (_exit(-1)).
+// `dsb` is the retail 32-bit COM pointer: the object and vtable words are read as guest dwords, never as host pointers.
+uint32_t D2sound_6A40(uint32_t dsb, uint32_t offset, uint32_t bytes, CRITICAL_SECTION* cs) {
     if (!dsb) _exit(-1);
     EnterCriticalSection(cs);
-    void** vt = *(void***)dsb;
-    void* p1 = nullptr; uint32_t len1 = bytes;
-    if ((int)((int (__stdcall*)(void*, uint32_t, uint32_t, void**, uint32_t*, void*, void*, uint32_t))vt[0x2c / 4])(dsb, offset, bytes, &p1, &len1, nullptr, nullptr, 0) < 0) {
+    const uint32_t vt = rd32((const void*)(uintptr_t)dsb, 0);
+    uint32_t p1 = 0, len1 = bytes;
+    typedef int32_t (__stdcall *LockFn)(uint32_t, uint32_t, uint32_t, uint32_t*, uint32_t*, uint32_t, uint32_t, uint32_t);
+    typedef int32_t (__stdcall *UnlockFn)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+    const LockFn lock = (LockFn)(uintptr_t)rd32((const void*)(uintptr_t)vt, 0x2c);
+    if (lock(dsb, offset, bytes, &p1, &len1, 0, 0, 0) < 0) {
         LeaveCriticalSection(cs);
         return 0;
     }
-    std::memset(p1, 0, len1);
-    ((int (__stdcall*)(void*, void*, uint32_t, void*, uint32_t))vt[0x4c / 4])(dsb, p1, len1, nullptr, 0);
+    std::memset((void*)(uintptr_t)p1, 0, len1);
+    const UnlockFn unlock = (UnlockFn)(uintptr_t)rd32((const void*)(uintptr_t)vt, 0x4c);
+    unlock(dsb, p1, len1, 0, 0);
     LeaveCriticalSection(cs);
     return 1;
 }
