@@ -23,7 +23,7 @@ const char* Ordinal_10205(int32_t);
 void    Ordinal_10022(int32_t);
 void    EnterCriticalSection(void*);
 void    LeaveCriticalSection(void*);
-int32_t* d2_multi_sub_8bd0(void);
+int32_t* d2_multi_sub_8bd0(int32_t edi, int32_t esi, int32_t third);
 void    d2_multi_sub_8c80(int32_t, int32_t);
 void    d2_multi_sub_8d80(void);
 void    d2_multi_sub_8790(void);
@@ -59,9 +59,9 @@ void d2_multi_sub_b1f0(void) {
     }
 }
 
-// 1.13c D2Multi+0xB2A0
-void d2_multi_sub_b2a0(void) {
-    int32_t* n = d2_multi_sub_8bd0();
+// 1.13c D2Multi+0xB2A0: EAX, ECX, EDI are register inputs, handed to 8BD0 as the EDI string and the stack words (ECX, EAX)
+void d2_multi_sub_b2a0(int32_t eax, int32_t ecx, int32_t edi) {
+    int32_t* n = d2_multi_sub_8bd0(edi, ecx, eax);
     if (!n) return;
     EnterCriticalSection(DAT_6fa08f00);
     if (DAT_6fa0a0e8) DAT_6fa0a0ec[3] = (int32_t)(intptr_t)n;  // append to tail
@@ -120,7 +120,7 @@ bool d2_multi_sub_b670(void) {
 }
 
 // 1.13c D2Multi+0xB900
-void d2_multi_sub_b900(void) {
+extern "C" void d2_multi_sub_b900(void) {
     Ordinal_10050(&DAT_6fa0a018); Ordinal_10050(&DAT_6fa0a01c); Ordinal_10050(&DAT_6fa0a020);
     Ordinal_10050(&DAT_6fa0a024); Ordinal_10050(&DAT_6fa0a028); Ordinal_10050(&DAT_6fa0a02c);
     Ordinal_10050(&DAT_6fa0a030); Ordinal_10050(&DAT_6fa0a038);
