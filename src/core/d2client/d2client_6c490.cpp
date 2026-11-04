@@ -12,7 +12,7 @@ struct D2c6C490Env {
     i32 (*ord10013)();                         // client-draw mode
     i32 (*ord10036)();
     void (*ord10083)(i32 v);
-    i32 (*f1a3d0)(i32 x);                      // D2Client+0x6A3D0 visibility
+    i32 (*f1a3d0)(u32 unit, i32 x, i32 y, i32 flag);   // D2Client+0x6A3D0 visibility (eax = unit; x, y, flag on the stack)
     void (*f6aee0)(u32 unit, u32 a, i32 b, i32 c, i32 d, i32 e);
     i32 (*ord10164)();
     i32 (*ord10866)(u32 unit, i32 k);
@@ -53,7 +53,7 @@ EMSCRIPTEN_KEEPALIVE i32 d2c_6c490(const D2c6C490Env* e, u32 unit, u32 cls, u32 
     if (draw) { if (gcc414 == 1) x -= q; else if (gcc414 == 2) x += q; }
     i32 hid = 0, o36 = e->ord10036();
     if (o36 && draw && unit == gUnitSelf && altArg == 0) { e->ord10083(0); hid = 1; draw = 0; }
-    if (!e->f1a3d0(x)) { if (hid) e->ord10083(o36); return 0; }
+    if (!e->f1a3d0(unit, x, y, 0)) { if (hid) e->ord10083(o36); return 0; }
     if (xy[1]) e->f6aee0(unit, 0, 1, -1, -1, hid);
     u32 sub = 0;
     if (unit && e->rd32(unit + 0x6c)) sub = (u32)e->ord10164();

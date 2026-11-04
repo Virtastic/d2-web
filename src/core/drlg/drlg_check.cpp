@@ -23,6 +23,7 @@
 #include "drlg_room_trace.h"
 #include "drlg_room_snapshot.h"
 #include "../../../tools/vectorfmt/vectorfmt.h"
+#include "../../assets/mpqvfs.h"
 
 static D2DrlgActStrc* g_act = nullptr;
 static uint8_t g_actNo = 0;
@@ -377,10 +378,18 @@ EMSCRIPTEN_KEEPALIVE const int32_t* d2_drlg_client_room_status_cells(int levelId
 // Feeder for the D2Client room walk (src/core/d2client/draw_grid_7a9f0.cpp): the client level's rooms in
 // pFirstRoomEx order, walls = list A, roofs = list B. Units are not staged (skipUnits stays the caller's).
 extern "C" uint32_t d2_dg_stage_unit(uint32_t, int32_t, int32_t, int32_t, uint32_t, uint32_t, uint32_t);
-struct FeedUnit { int32_t type, cls, sx, sy; uint32_t flags, flagsEx; };
+extern "C" void d2_dg_stage_unit_cof(uint32_t, const uint8_t*);
+struct FeedUnit { int32_t type, cls, sx, sy; uint32_t flags, flagsEx; uint8_t cof[0x18]; bool hasCof; };
 static std::vector<FeedUnit> g_feedUnits;   // the caller's per-tick client units (JS has no game logic: raw fields only)
 EMSCRIPTEN_KEEPALIVE void d2_dg_feed_unit(int type, int cls, int sx, int sy, uint32_t flags, uint32_t flagsEx) {
-    if (type < 0) g_feedUnits.clear(); else g_feedUnits.push_back({type, cls, sx, sy, flags, flagsEx});
+    if (type < 0) g_feedUnits.clear(); else g_feedUnits.push_back({type, cls, sx, sy, flags, flagsEx, {}, false});
+}
+// The last fed unit's COF: the .cof its mode and weapon class load (the cel chain's header: layer count, bounding box). 0 when the file is absent.
+EMSCRIPTEN_KEEPALIVE int d2_dg_feed_unit_cof(const char* path) {
+    std::vector<uint8_t> f;
+    if (g_feedUnits.empty() || !path || !d2::sharedVfs().read(path, f) || f.size() < 0x18) return 0;
+    memcpy(g_feedUnits.back().cof, f.data(), 0x18); g_feedUnits.back().hasCof = true;
+    return 1;
 }
 extern "C" void d2_dg_stage_reset();
 extern "C" uint32_t d2_dg_stage_tile(uint32_t, uint32_t, int32_t, int32_t, int32_t, int32_t);
@@ -409,6 +418,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_dg_feed(int level, int l, int t, int r, int b, 
             int tx = u.sx / 5, ty = u.sy / 5;
             if (tx < room->nTileXPos || ty < room->nTileYPos || tx >= room->nTileXPos + room->nTileWidth || ty >= room->nTileYPos + room->nTileHeight) continue;
             uint32_t k = d2_dg_stage_unit((uint32_t)u.cls, u.type, u.sx, u.sy, 0, (u.flags >> 20) & 1, (u.flagsEx & 1) ? 0 : 1);   // flagsEx bit0: the unit +0xC8 bit7 (the shadow node) is clear
+            if (u.hasCof) d2_dg_stage_unit_cof(k, u.cof);
             if (!nU++) u0 = k;
         }
         d2_dg_stage_room(room->nTileXPos, room->nTileYPos, room->nTileWidth, room->nTileHeight, room->nTileXPos * 5, room->nTileYPos * 5, nA, a0, nB, b0, nU, u0);
