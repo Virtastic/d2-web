@@ -4,24 +4,6 @@
 typedef int32_t i32; typedef uint32_t u32;
 extern "C" {
 
-// 1.13c D2Client+0x14fd0
-struct E14FD0 { i32 tblCount; uint8_t* tblBase;  // sgptDataTables+0xba0 / +0xb98 (0x23c stride)
-  i32 (*o10511)(); i32 (*o10179)(); i32 (*o10649)();
-  void (*f54e20)(i32, i32 slotPtr, i32); i32 slotBase;  // DAT 0xBBA608, stride 0x80
-  i32 (*o11133)(i32*); i32 (*o11138)(i32*, i32, i32);
-  i32 (*o10980)(i32); void (*o10243)(i32, i32);
-  void (*f51860)(i32*, i32, i32, i32, i32, i32); };
-EMSCRIPTEN_KEEPALIVE u32 d2c_14fd0(E14FD0* e, i32* u, i32 idx, i32 ebp) {
-  if (!(idx > -1 && idx < e->tblCount && e->tblBase + idx * 0x23c)) return 0;
-  i32 a = e->o10511(); if (!a) return 0;
-  i32 b = e->o10179(), c = e->o10649();
-  e->f54e20(b, e->slotBase + c * 0x80, c);
-  i32 d = e->o11133(u);
-  if (ebp == 0 || e->o11138(u, ebp, 0) == 0) { e->f51860(u, 0, 0, d + 4, 0x2a283, 0x6fb509f0); }
-  else { i32 n = e->o10980(a); e->o10243(a, n - 1); if (n - 1 < 1) return 1;
-         e->f51860(u, 0, 0, d + 4, 0x2a283, 0x6fb509f0); }
-  return 0; }
-
 // 1.13c D2Client+0x15DA0
 struct E15DA0 { i32 tblCount; uint8_t* tblBase; i32 cofCount;  // +0xba0/+0xb98/+0xb6c
   i32 (*o10076)(); i32 (*o10786)(i32*, i32, i32, i32);

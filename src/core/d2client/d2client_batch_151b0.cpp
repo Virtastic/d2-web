@@ -71,87 +71,8 @@ static bool validInput(const D2ClientBatch151Host* h, const void* owner, int32_t
     *row = record(h, index);
     return owner && *row && cc(h, 10511, reinterpret_cast<Word>(owner)) != 0;
 }
-static bool selectedTypeHasInlineCoords(const uint8_t* unit) {
-    const int32_t type = static_cast<int32_t>(load32(unit, 0));
-    return type == 2 || (type > 3 && type < 6);
-}
-static uint32_t unitY(const D2ClientBatch151Host* h, const uint8_t* unit) {
-    if (!unit) return 0;
-    const Word data = resolve(h, load32(unit, 0x2c));
-    if (!data) return 0;
-    return selectedTypeHasInlineCoords(unit) ? load32(reinterpret_cast<const void*>(data), 0x10)
-                                              : static_cast<uint32_t>(cc(h, 10750, data));
-}
-static uint32_t unitX(const D2ClientBatch151Host* h, const uint8_t* unit) {
-    if (!unit) return 0;
-    const Word data = resolve(h, load32(unit, 0x2c));
-    if (!data) return 0;
-    return selectedTypeHasInlineCoords(unit) ? load32(reinterpret_cast<const void*>(data), 0x0c)
-                                              : static_cast<uint32_t>(cc(h, 10867, data));
-}
-static void setSelectedCoords(const D2ClientBatch151Host* h, Word handle, const uint8_t* unit) {
-    const uint32_t y = unitY(h, unit);
-    const uint32_t x = unitX(h, unit);
-    cc(h, 10739, handle, x, y, 0);
-}
 
 } // namespace
-
-// 1.13c D2Client+0x151B0. Validates a character-data record, refreshes the selected unit's
-// coordinates and list selection, or creates the fallback entry when no selection exists.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2client_151b0(
-    void* owner, int32_t index, const D2ClientBatch151Host* h) {
-    uint8_t* row = nullptr;
-    if (!validInput(h, owner, index, &row)) return 0;
-    const Word listIndex = cc(h, 11133, reinterpret_cast<Word>(owner));
-    fn(h, 0x2A0B0);
-    const Word window = resolve(h, load32(owner, 0x2c));
-    if (!window) { halt(h); return 0; }
-    uint8_t* selected = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(cc(h, 10392, window)));
-    if (selected) {
-        const Word selectedRecord = cc(h, 10786, reinterpret_cast<Word>(owner), load32(row, 0x138));
-        cc(h, 10243, window, selectedRecord);
-        setSelectedCoords(h, window, selected);
-        cc(h, 10554, window, load32(selected, 0));
-        cc(h, 10748, window, load32(selected, 0x0c));
-        return 1;
-    }
-    fn(h, 0xA1860, reinterpret_cast<Word>(owner), 0, 0, listIndex + 4, 0x2a283, 0x6fb509f0);
-    cc(h, 10243, reinterpret_cast<Word>(owner), 0);
-    return 1;
-}
-
-// 1.13c D2Client+0x15350. Opens or creates the row's list entry, queries its valid selection,
-// and applies the same coordinate and selected-item updates as 0x151B0.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2client_15350(
-    void* owner, int32_t index, const D2ClientBatch151Host* h) {
-    uint8_t* row = nullptr;
-    row = record(h, index);
-    if (!owner || !row) return 0;
-    const Word valid = cc(h, 10511, reinterpret_cast<Word>(owner));
-    if (!valid) return 0;
-    const Word listIndex = cc(h, 11133, reinterpret_cast<Word>(owner));
-    fn(h, 0x2A0B0);
-    const Word window = resolve(h, load32(owner, 0x2c));
-    if (!window) { halt(h); return 0; }
-    uint8_t* selected = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(cc(h, 10392, window)));
-    if (!selected) {
-        selected = reinterpret_cast<uint8_t*>(fn(h, 0xA1A50, static_cast<Word>(-1), listIndex + 4,
-                                                reinterpret_cast<Word>(owner), 0, 0));
-        if (!selected) { cc(h, 10243, reinterpret_cast<Word>(owner), 0); return 1; }
-    } else {
-        fn(h, 0xA1860, reinterpret_cast<Word>(owner), 0, 0, listIndex + 4, 0x2a783, 0x6fb50740);
-    }
-    int32_t selection = 0;
-    const Word found = cc(h, 10786, reinterpret_cast<Word>(owner), load32(row, 0x138),
-                          valid, reinterpret_cast<Word>(owner));
-    if (static_cast<int32_t>(found) < 1) selection = static_cast<int32_t>(found);
-    cc(h, 10243, reinterpret_cast<Word>(owner), static_cast<uint32_t>(selection));
-    setSelectedCoords(h, window, selected);
-    cc(h, 10554, reinterpret_cast<Word>(owner), load32(selected, 0));
-    cc(h, 10748, reinterpret_cast<Word>(owner), load32(selected, 0x0c));
-    return 1;
-}
 
 // 1.13c D2Client+0x15500. Selects a record between the row's two bounds and updates the
 // current list entry to either the selected unit or the empty-selection sentinel.

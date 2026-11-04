@@ -69,7 +69,7 @@ extern "C" void d2c_70140_svc(const D2cSvc& v, const D2c70140G& g) {
                 width = d2c_call(v, 0xd35a, 0, text, 0, 0, 0);
             }
             it = *(const uint32_t*)(uintptr_t)(it + 4);
-            if (!it && imeOn && comp) d2c_call(v, 0x6f3e0, width + 0x83, 0, 0, 0, 0, H - 0x58 + y);
+            if (!it && imeOn && comp) d2c_call(v, 0x6f3e0, d2c_call(v, 0xd35a, 0, text, 0, 0, 0) + 0x83, 0, 0, 0, 0, H - 0x58 + y);   // the caret column is measured again (width keeps the loop's value)
             ++cnt; y += 0xf;
         }
         d2c_call(v, 0xd3f6, 0, list, 0, 0, 0);
