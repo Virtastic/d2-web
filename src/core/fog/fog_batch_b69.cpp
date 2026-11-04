@@ -54,8 +54,12 @@ int Fog_172B0(uint8_t* list, const char* name, uint32_t v1, uint32_t v2) {
 }
 
 // 1.13c Fog+0x17170  (ESI = out2, EDI = out1 hidden)
+int Fog_17170_hash(uint32_t h, const uint8_t* list, uint32_t* out1, uint32_t* out2);
 int Fog_17170(const char* name, const uint8_t* list, uint32_t* out1, uint32_t* out2) {
-  uint32_t h = Ordinal_502(name, 0, 0);
+  return Fog_17170_hash(Ordinal_502(name, 0, 0), list, out1, out2);
+}
+// The lookup proper, with the name hash passed in (the capture pins Ordinal_502).
+int Fog_17170_hash(uint32_t h, const uint8_t* list, uint32_t* out1, uint32_t* out2) {
   const uint32_t* p = (const uint32_t*)(list + 8);
   for (uint32_t i = 0; i < *(const uint32_t*)(list + 4); i++, p += 3)
     if (p[0] == h) { *out1 = p[1]; *out2 = p[2]; return 0; }
