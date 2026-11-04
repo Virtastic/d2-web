@@ -8,10 +8,15 @@ SymGetLineFn g_symGetLine = nullptr;
 }
 
 // outDisp is the displacement slot the retail code receives in EDI; written only when a retry hit.
-int fog_symGetLineRetry(uint32_t addr, uint32_t back, int* outDisp) {
-    if (!g_symGetLine) return 0;
-    if (g_symGetLine(addr, back)) return 1;
+// The callback is a parameter so a capture probe can stand in for the dbghelp call; null means dbghelp is absent.
+extern "C" int fog_symGetLineRetry_run(int (*fn)(uint32_t addr, uint32_t back), uint32_t addr, uint32_t back, int* outDisp) {
+    if (!fn) return 0;
+    if (fn(addr, back)) return 1;
     for (int i = 1; i < 100; ++i)
-        if (g_symGetLine(addr, back - i)) { *outDisp = i; return 1; }
+        if (fn(addr, back - i)) { *outDisp = i; return 1; }
     return 0;
+}
+
+int fog_symGetLineRetry(uint32_t addr, uint32_t back, int* outDisp) {
+    return fog_symGetLineRetry_run(g_symGetLine, addr, back, outDisp);
 }
