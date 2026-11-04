@@ -26,6 +26,8 @@ W void FUN_6ff6cda0() {}
 W void Ordinal_116() {}
 void Fog_Ordinal_501_SStrCopy(char*, const char*, uint32_t);
 W void Ordinal_501(char* d, const char* s, uint32_t n) { Fog_Ordinal_501_SStrCopy(d, s, n); }
+W void Storm_Ordinal_501(void* d, const void* s, int32_t n) { Fog_Ordinal_501_SStrCopy((char*)d, (const char*)s, (uint32_t)n); }
+W int32_t Storm_Ordinal_506(const void* s) { const char* p = (const char*)s; int32_t n = 0; while (p && p[n]) n++; return n; }
 W uint8_t DAT_6ff76690[0x100], DAT_6ff768ec[0x100];
 // Fog/Storm ordinal imports no merged row defines yet (link fix); signatures match the importers.
 extern uint32_t Fog_Ordinal_10265(uint32_t); extern void Fog_Ordinal_10024(const void*, const void*, uint32_t); extern void Fog_Ordinal_10043(int32_t, int32_t);

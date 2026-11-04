@@ -8,6 +8,8 @@ void    Ordinal_10043(int32_t, int32_t); // Fog free
 void    Ordinal_10050(void*);            // release (per slot)
 void    Ordinal_10031(int32_t);          // reset(handle)
 void    Ordinal_10199(void);
+int32_t Storm_Ordinal_506(const void*);                       // SStrLen
+void    Storm_Ordinal_501(void*, const void*, int32_t);       // SStrCopy(dst, src, max)
 extern int32_t DAT_6f9eaed8, DAT_6f9eb058, DAT_6f9eaa58, DAT_6f9eaa88, DAT_6f9eacc8, DAT_6f9eacf8,
     DAT_6f9ead28, DAT_6f9ea578, DAT_6f9ea5a8, DAT_6f9eb8f8, DAT_6f9ea7e8, DAT_6fa0a0f4, DAT_6f9ea818,
     DAT_6f9ea848, DAT_6f9ea968, DAT_6f9ea998, DAT_6f9ea9c8, DAT_6f9ea9f8, DAT_6f9eaa28, DAT_6f9ea548,
@@ -56,14 +58,17 @@ void d2_multi_sub_8790(void) {
     DAT_6fa09f2c = 0;
 }
 
-// 1.13c D2Multi+0x8BD0 (retail: edi/esi/retaddr-slot are implicit register inputs; named here)
+// 1.13c D2Multi+0x8BD0 (retail: edi is a register input; esi/third are the two stack words, `ret 8`; named here)
 int32_t* d2_multi_sub_8bd0(int32_t edi, int32_t esi, int32_t third) {
     int32_t* p = (int32_t*)Ordinal_10042(0xc17, 0);
     p[0] = p[1] = p[2] = p[3] = 0;  // retail writes before the null test
     if (!p) return p;
     if (edi == 0) { p[2] = third; p[0] = 0; p[1] = esi; return p; }
-    p[0] = (int32_t)(intptr_t)Ordinal_10042(0xc22, 0);
-    p[1] = edi; p[2] = 0xc17;
+    Storm_Ordinal_506((const void*)(intptr_t)edi);   // SStrLen(edi): size = len + 1 (ECX of the alloc)
+    char* q = (char*)Ordinal_10042(0xc22, 0);
+    p[0] = (int32_t)(intptr_t)q;
+    if (q) Storm_Ordinal_501(q, (const void*)(intptr_t)edi, 0x7fffffff);
+    p[1] = esi; p[2] = third;
     return p;
 }
 }  // extern "C"
