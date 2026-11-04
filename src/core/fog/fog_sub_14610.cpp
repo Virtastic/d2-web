@@ -3,7 +3,6 @@
 #include <cstring>
 #include <strings.h>
 
-namespace {
 // Host seams: exe dir (Fog+0x143D0), GetCurrentDirectoryA, GetEnvironmentVariableA, Fog log (0x190A0).
 struct FogSymPathHost {
     bool (*exeDir)(char* out, unsigned cap);
@@ -11,6 +10,7 @@ struct FogSymPathHost {
     bool (*getenv)(const char* name, char* out, unsigned cap);
     void (*log)(const char* fmt, const char* arg);
 };
+namespace {
 FogSymPathHost g_host = {};
 void add(char* dst, const char* s) { std::strcat(dst, s); std::strcat(dst, ";"); }
 }

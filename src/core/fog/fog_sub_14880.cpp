@@ -4,7 +4,6 @@
 #include <cstdio>
 #include <cstring>
 
-namespace {
 struct Module { uint8_t pad[0x204]; uint32_t base; uint32_t size; Module* next; };  // +0x204/+0x208/+0x20c
 struct FogStackDumpHost {
     void (*log)(const char* fmt, ...);                                   // Fog+0x190A0/+0x18AF0 to the open log
@@ -13,12 +12,18 @@ struct FogStackDumpHost {
     void (*fatal)(uint32_t code);                                        // Fog+0x10F30 channel 6, then _exit(-1)
     void (*readString)(char* dst, uint32_t addr, uint32_t n);            // Fog+0x1F710 (string literal peek)
 };
+namespace {
 FogStackDumpHost g_host{};
-bool inModules(const Module* m, uint32_t v) {
-    for (; m; m = m->next) if (m->base <= v && v < m->base + m->size) return true;
-    return false;
+const Module* findModule(const Module* m, uint32_t v) {
+    for (; m; m = m->next) if (m->base <= v && v < m->base + m->size) return m;
+    return nullptr;
 }
+bool inModules(const Module* m, uint32_t v) { return findModule(m, v) != nullptr; }
+// the module node's name string (node + 0x104), the literal "" when no node holds the address
+const char* nameOf(const Module* m) { return m ? reinterpret_cast<const char*>(m) + 0x104 : ""; }
 }
+
+void fog_stackDumpSetHost(const FogStackDumpHost& h) { g_host = h; }
 
 // ctx: eip at +0xb8, esp at +0xc4. Returns when 400 lines are written or the stack range is exhausted.
 void fog_annotatedStackDump(uint32_t proc, const uint8_t* ctx, const Module* mods) {
@@ -28,7 +33,7 @@ void fog_annotatedStackDump(uint32_t proc, const uint8_t* ctx, const Module* mod
     g_host.log("");
     g_host.log("Annotated stack dump");
     g_host.symLookup(proc, eip, &disp, name);
-    g_host.log("\n                     // EIP = 0x%08X - %s - %s+%04X\n\n", eip, "", name, disp);
+    g_host.log("\n                     // EIP = 0x%08X - %s - %s+%04X\n\n", eip, nameOf(findModule(mods, eip)), name, disp);
     uint32_t left = 0x1000;
     for (int line = 0; line < 400;) {
         g_host.log("              %08X:", (uint32_t)(uintptr_t)sp);
@@ -53,14 +58,15 @@ void fog_annotatedStackDump(uint32_t proc, const uint8_t* ctx, const Module* mod
         g_host.log("%s\n", buf);
         if (hit) {
             uint32_t tgt; std::memcpy(&tgt, sp + i - 4, 4);
-            if (!inModules(mods, tgt)) { g_host.fatal(tgt); return; }
+            const Module* tm = findModule(mods, tgt);
+            if (!tm) { g_host.fatal(tgt); return; }
             int d2 = 0; char nm[24]; char lit[0x50];
             const char* sym = g_host.symLookup(proc, tgt, &d2, nm) ? nm : "unknown";
             if (!strcasecmp(sym, "`string'") && d2 == 0) {
                 g_host.readString(lit, tgt, 0x50);
-                g_host.log("\n                           // 0x%08X - %s - %s='%s'\n\n", tgt, "", sym, lit);
+                g_host.log("\n                           // 0x%08X - %s - %s='%s'\n\n", tgt, nameOf(tm), sym, lit);
             } else
-                g_host.log("\n                           // 0x%08X - %s - %s+%04X\n\n", tgt, "", sym, d2);
+                g_host.log("\n                           // 0x%08X - %s - %s+%04X\n\n", tgt, nameOf(tm), sym, d2);
             line += 3;
         }
         left -= i; sp += i; ++line;

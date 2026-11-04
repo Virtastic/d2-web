@@ -27,7 +27,7 @@ struct HookEnv {
     uint32_t xs5 = 0, xs6 = 0;   // stack words 5 and 6 of the next h() (set by Env::Xs; cleared by h)
     uint32_t ediReg = 0;   // EDI at the next h(): a `hookw RVA e V...` write goes through it (key (0x15<<24)|rva); set by ed()
     uint32_t tbl = 0, dtPtr = 0, fileStr = 0, bmSlot = 0;     // module globals (addresses of the pinned blobs / scrubbed module words)
-    static constexpr uint32_t kLogMax = 512;   // 512 (main had 400): 3C850 and 40CA0 log 6 records per step over a 64-step missile ring, past 400; a larger cap only raises the limit. ponytail: a descriptor `blob lg` must hold 4 + 40 * calls bytes; 0x6F930 logs up to 45 calls (blob 2600)
+    static constexpr uint32_t kLogMax = 1024;   // 1024 (was 512; main had 400): 3C850 and 40CA0 log 6 records per step over a 64-step missile ring, past 400; a larger cap only raises the limit. ponytail: a descriptor `blob lg` must hold 4 + 40 * calls bytes; 0x6F930 logs up to 45 calls (blob 2600)
     uint32_t seen[64][2]; int nseen = 0;   // 64 (was 48): D2Game 0x72220 (cube outputs) reaches up to 61 distinct hooked callees
     // per-site NST (descriptor `hook RVA NST REGS site=RET:NST ...`): the stack words a hooked callee pops when it is called from the
     // caller whose return address (RVA) is RET. st = (RET, NST) pairs, zero RET ends; a miss returns dflt. Probes that mirror a
