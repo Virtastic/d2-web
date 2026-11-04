@@ -9,7 +9,7 @@ extern "C" void d2lang_92f0(uint16_t*, const uint8_t*, uint32_t, uint32_t);
 // Header (packed): u16 crc @0, u16 n @2, i32 count @4, u32 dataStart @9, u32 size @0x11.
 // CRC16 over [dataStart,size) must equal the stored crc; each 0x11-byte node at 0x20+2n has
 // two u32 (at -4 and 0) that must be < size. Any failure exits -1 in retail; returns tbl on success.
-extern "C" uint8_t* d2_fn_d2lang_94e0(uint8_t* tbl)
+extern "C" uint8_t* d2lang_94e0_validate(uint8_t* tbl)
 {
     uint32_t start, size, a, b;
     std::memcpy(&start, tbl + 9, 4);
