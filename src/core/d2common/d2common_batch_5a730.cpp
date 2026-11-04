@@ -65,7 +65,7 @@ int32_t D2Common_6C280_NameIndex(const char* name)
 }
 
 // 1.13c D2Common+0x6C300
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_6c300(const char* name)
+int32_t D2Common_6C300_NameIndex(const char* name)
 {
     static const char* names[] = {"None", "1 Town", "1 Wilderness", "1 Cave", "1 Crypt", "1 Monestary", "1 Courtyard", "1 Barracks", "1 Jail", "1 Cathedral", "1 Catacombs", "1 Tristram", "2 Town", "2 Sewer", "2 Harem", "2 Basement", "2 Desert", "2 Tomb", "2 Lair", "2 Arcane", "3 Town", "3 Jungle", "3 Kurast", "3 Spider", "3 Dungeon", "3 Sewer", "4 Town", "4 Mesa", "4 Lava", "5 Town", "5 Siege", "5 Barricade", "5 Temple", "5 Ice", "5 Baal", "5 Lava"};
     if (*name == '0') return 0;
