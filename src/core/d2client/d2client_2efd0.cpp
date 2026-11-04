@@ -17,8 +17,8 @@ extern "C" void d2cl_2efd0(int32_t skill, uint32_t s0, int32_t pct, int32_t flat
     if (!e.H(0xc244, (uint32_t)skill, arg, b, (uint32_t)lvl, 1)) return;
     const int32_t sum = (int32_t)out[0] + (int32_t)out[1];
     int32_t avg = (sum - (sum >> 31)) >> 1;
-    const int64_t m = (int64_t)avg * pct;
-    int32_t v = avg + (int32_t)(m / 100) + flat;
+    const int32_t m = (int32_t)((uint32_t)avg * (uint32_t)pct);   // 32-bit imul
+    int32_t v = (int32_t)((uint32_t)avg + (uint32_t)(m / 100) + (uint32_t)flat);
     if (!v) return;
     e.H(0x2dca0, 0x10c6, (uint32_t)v, 0, 0, 0, 0, 0, 0, s0);
 }

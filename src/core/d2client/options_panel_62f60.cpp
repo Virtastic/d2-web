@@ -78,8 +78,8 @@ struct Imp63bf0 {
 void layout_63bf0(I y0,const B*o,U mode,I tall,I hdrY,I screenW,U celOff,U celOn,U celKnob,const Imp63bf0&f){
  I y=y0+hdrY, half=screenW/2;
  U steps=rd32(o,0x120)-1, v=rd32(o,0x124), on=rd32(o,0x128);
- // steps == 0: the x87 divide yields inf/NaN and __ftol returns 0x80000000
- I r=steps?-I((265u*v)/steps):I(0x80000000u);
+ // steps == 0: the x87 divide yields inf/NaN; the CRT truncation stores a 64-bit integer indefinite, whose low dword is 0
+ I r=steps?-I((265u*v)/steps):0;
  I base=tall?half-0x90:half-0x3b, split=base+12-r;
  f.drawRect(base,y-0x1e,split,y,0,U(on==0)+1);
  f.drawRect(split,y-0x1e,base+0x121,y,0,U(on!=0));

@@ -13,7 +13,7 @@ extern "C" void d2cl_373c0(uint32_t tbl, const cl::Env& e) {
     for (int i = 0; i < 199; i++) { uint16_t c = (uint16_t)w16(e, s + 2 * i); buf[i] = c; if (!c) break; }
     for (uint32_t flag = 1;; flag--) {
         uint32_t idx = 0; bool hit = false;
-        for (uint32_t i = 0; i < 115; i++) {
+        for (uint32_t i = 0; i < 114; i++) {
             if (e.R(tbl + i * 10) == 6 && e.R(tbl + i * 10 + 6) == flag) { idx = i; hit = true; break; }
         }
         if (hit && w16(e, tbl + idx * 10 + 4) != 0xffff) {

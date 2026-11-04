@@ -41,7 +41,7 @@ extern "C" void d2c_28dc0(const D2cSvc& v, D2c28dc0G* g, uint32_t player, uint32
         uint32_t blk[18] = {}; blk[13] = g->cell;
         for (int i = 0; i < 3; ++i) if (b[i]) {
             const int32_t y = g->h - 0x20 * i - 0x29;
-            const int32_t x = ((g->w - (y >> 31)) >> 1) + 0x15;
+            const int32_t x = ((g->w - (g->w >> 31)) >> 1) + 0x15;   // cdq sign-extends eax = width
             d2c_call(v, 0xd096, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)blk, (uint32_t)x, (uint32_t)y, 0xffffffffu, 5, 0);
         }
     }
