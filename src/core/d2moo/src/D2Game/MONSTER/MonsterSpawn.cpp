@@ -987,8 +987,9 @@ D2UnitStrc* __fastcall sub_6FC6A0F0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, 
     monCreate.nFlags = nFlags;
     monCreate.nY = nY;
 
-    return D2GAME_SpawnNormalMonster_6FC68E30(&monCreate);
+    return g_d2SpawnEF450.spawn ? g_d2SpawnEF450.spawn(&monCreate) : D2GAME_SpawnNormalMonster_6FC68E30(&monCreate);
 }
+D2SpawnEF450Seam g_d2SpawnEF450;
 
 //D2Game.0x6FC6A150
 D2UnitStrc* __fastcall sub_6FC6A150(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMonsterId, int32_t nAnimMode, int32_t a5, int16_t nFlags)

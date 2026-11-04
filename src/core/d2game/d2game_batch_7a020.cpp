@@ -106,42 +106,7 @@ int D2GAME_7BB00(const H& h, U* a, U* b, i32* ebx) {
     return 0;
 }
 
-// 1.13c D2Game+0x7BC70   GUESS: esi = out {best, count, bestVal, maxDist}
-int D2GAME_7BC70(const H& h, U* a, U* b, i32* esi) {
-    if (a != b && b && b->t == 1 && h.o10666(a, b) && h.o10830(b) != 2 && h.o10648(b) == 0) {
-        h.f18A0();
-        int k = h.f1850();
-        if (k == 0xeb || k == 0xee) {
-            if (h.f1900() <= esi[3]) {
-                int v = h.o11027(b);
-                if (v < 0x3d) {
-                    if (esi[2] < 1) esi[2] = 0x7fffffff;
-                    esi[1]++;
-                    if (v < esi[2]) esi[0] = (i32)(intptr_t)b;
-                }
-            }
-        }
-    }
-    return 0;
-}
-
-// 1.13c D2Game+0x7BD00
-int D2GAME_7BD00(const H& h, U* u) {
-    if (u && u->t == 1 && h.o10648(u) == 0) { int k = h.f18A0(); return inRange(h, k) && k == 0x76; }
-    return 0;
-}
-
-// 1.13c D2Game+0x7BD50   GUESS: ebx = ctx (+0xc maxdist), ecx = out {best,count,x}, edx = x
-int D2GAME_7BD50(const H& h, U* a, U* b, i32* ctx, u32* out, u32 edx) {
-    if (a != b && b && b->t == 1) {
-        int k = h.f18A0();
-        if (inRange(h, k) && (k == 0x13 || k == 0x3a) && h.o10830(b) == 0 && hasF1(b) &&
-            h.o10541(b) == 0 && b->f[3] == 0xc && h.o10341(b) == 0 && h.f1900() <= ctx[3] && !h.f42a80(0xc)) {
-            out[0] = (u32)(intptr_t)b; out[1]++; out[2] = edx;
-        }
-    }
-    return 0;
-}
+// 1.13c D2Game+0x7BC70, 0x7BD00 and 0x7BD50 moved to d2game_7bc70.cpp (retail register and stack arguments).
 
 // 1.13c D2Game+0x7BE10   GUESS: game (eax), unit (esi); hooks for ordinals 10750/10867/10870/10331/10671/11164, FUN_6fcae6f0, FUN_6fcaea80
 struct BE10H { void (*o10750)(i32); void (*o10867)(i32); void (*o10870)(int); int (*o10331)();

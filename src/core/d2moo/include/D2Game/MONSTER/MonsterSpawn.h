@@ -67,6 +67,9 @@ D2UnitStrc* __fastcall sub_6FC6A030(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, 
 D2UnitStrc* __fastcall sub_6FC6A090(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t nMonsterId, int32_t nAnimMode, int16_t nFlags);
 //D2Game.0x6FC6A0F0
 D2UnitStrc* __fastcall sub_6FC6A0F0(D2GameStrc* pGame, D2ActiveRoomStrc* pRoom, int32_t nX, int32_t nY, int32_t nMonsterId, int32_t nMode, int32_t nUnitId, int32_t a8, int16_t nFlags);
+// d2-web: the spawn call of sub_6FC6A0F0 as a seam (an FN probe stands in for 0xEEF10); null in the game
+struct D2SpawnEF450Seam { D2UnitStrc* (*spawn)(D2UnkMonCreateStrc*); };
+extern D2SpawnEF450Seam g_d2SpawnEF450;
 //D2Game.0x6FC6A150
 D2UnitStrc* __fastcall sub_6FC6A150(D2GameStrc* pGame, D2UnitStrc* pUnit, int32_t nMonsterId, int32_t nAnimMode, int32_t a5, int16_t nFlags);
 //D2Game.0x6FC6A230

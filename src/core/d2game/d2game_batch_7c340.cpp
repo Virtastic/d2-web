@@ -146,19 +146,7 @@ void sub_7CE40(Env& e,P g,P u,P t) {
     e.aiTarget(g,u,ai,kind); e.idle20C0(g,u,1);
 }
 
-// 1.13c D2Game+0x7CF10 (param_4 = nearest-search accumulator)
-I sub_7CF10(Env& e,P a,P cand,P other,U* acc) {
-    if (a==other||e.isFriend(a,other)!=0||!other||!((r(other,0xc4)>>2)&1)||!e.check(a,other)) return 0;
-    I d=e.dist(a,other);
-    if (d>0x400) return 0;
-    acc[7]++;
-    if (d<0xe2) acc[2]++;
-    if (d<I(acc[1])) { acc[0]=U(uintptr_t(other)); acc[1]=U(d); }
-    I hp=e.stat(other,6,0)>>8;
-    if (hp<I(acc[4])) { acc[3]=U(uintptr_t(other)); acc[4]=U(hp); }
-    if (d<I(acc[6]) && a && s(a,0)==0) { acc[5]=U(uintptr_t(other)); acc[6]=U(d); }
-    (void)cand; return 0;
-}
+// 1.13c D2Game+0x7CF10 moved to d2game_7cf10.cpp (retail register and stack arguments).
 
 static void ranged(Env& e,P g,P u,P t,I maxDist,I idleDist,I cap,I skillBase,I mask,bool le,bool stamp) {
     P ai=e.ptr(t,0),m=e.ptr(t,0x1c);
