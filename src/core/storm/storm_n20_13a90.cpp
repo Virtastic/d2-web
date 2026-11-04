@@ -463,6 +463,14 @@ static uint32_t n20_Sub265B0(uint32_t v) {
     return 1;
 }
 
+// Probe seam: run 0x265B0 against caller-held words for the stored value (0x6FC42FFC) and the last-error word (0x6FC45388).
+extern "C" uint32_t storm_n20_probe_265b0(uint32_t v, uint32_t* stored, uint32_t* err) {
+    g_42ffc = *stored; g_lastError = *err;
+    uint32_t r = n20_Sub265B0(v);
+    *stored = g_42ffc; *err = g_lastError;
+    return r;
+}
+
 // 1.13c Storm+0x25D70
 static uint32_t n20_Sub25D70(uint32_t v) { g_43130 = v; return 1; }
 

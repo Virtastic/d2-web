@@ -96,6 +96,18 @@ extern "C" void storm_n42_probe_install(u32 sfp) {
     G.h = &g_probeHost;
 }
 
+// Capture-probe install for 0x26190: lock/unlock/setErr are the no-op pins, strlen and the bounded copy/append are
+// plain C (the length check in Storm_26190 keeps both inside the 0x104 buffer, so truncation never happens). Exposes G.dir (Storm+0x43000) and G.lastErr (Storm+0x45388).
+static u32 probeStrlen(const char* s) { return (u32)strlen(s); }
+static void probeCpy(char* d, const char* s, u32 n) { u32 l = (u32)strlen(s); if (l >= n) l = n - 1; memcpy(d, s, l); d[l] = 0; }
+static void probeCat(char* d, const char* s, u32 n) { u32 a = (u32)strlen(d), l = (u32)strlen(s); if (a + l >= n) l = n - 1 - a; memcpy(d + a, s, l); d[a + l] = 0; }
+static N42Host g_26190Host;
+extern "C" void storm_n42_26190_install(char** dir, u32** lastErr) {
+    g_26190Host.lock = probeNop; g_26190Host.unlock = probeNop; g_26190Host.setErr = probeSetErr;
+    g_26190Host.strlen_ = probeStrlen; g_26190Host.strcpyN = probeCpy; g_26190Host.strcatN = probeCat;
+    G.h = &g_26190Host; *dir = G.dir; *lastErr = &G.lastErr;
+}
+
 // 1.13c Storm+0x25D30
 u32 Storm_25D30(u32 a, u32 b) { G.cbA = (int)a; G.cbB = (int)b; return 1; }
 // Accessors for the file callback's two stored words, for the function replay.
@@ -107,6 +119,17 @@ u32 Storm_26330(uint8_t* f, char* out, int n) {
     N42Host* h = G.h;
     if (out) { *out = 0; h->lock(); h->strcpyN(out, (char*)(f + 8), n); h->unlock(); return 1; }
     G.lastErr = 0x57; h->setErr(0x57); return 0;
+}
+
+// Probe seam: host table with no-op lock/unlock/error and a caller-supplied bounded copy; the last-error word is returned for pinning.
+static void probeCopyHost_nop() {}
+static void probeCopyHost_err(u32) {}
+static N42Host g_copyHost;
+extern "C" void storm_n42_26330_install(u32** lastErr, void (*cp)(char*, const char*, u32)) {
+    g_copyHost.lock = probeCopyHost_nop; g_copyHost.unlock = probeCopyHost_nop; g_copyHost.setErr = probeCopyHost_err;
+    g_copyHost.strcpyN = cp;
+    G.h = &g_copyHost;
+    *lastErr = &G.lastErr;
 }
 
 // 1.13c Storm+0x29D90

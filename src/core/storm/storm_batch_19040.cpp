@@ -288,25 +288,48 @@ lab_95e6:
 
 // 1.13c Storm+0x1A600: sweep the SCode pool. Clears the tracked heap, then for every dirty id unlinks
 // and releases each node whose use count (+0x14) is zero and whose size (+4) is below 0x80000000.
+// Words are retail's 32-bit ones: dirty / lists are the 0x100-entry tables, each list slot a 32-bit node address.
+struct StormSweepEnv {
+    void (*untrack)();                  // DAT_6FC45160 := 0
+    uint32_t* dirty;                    // 0x6FC44D60
+    uint32_t* lists;                    // 0x6FC43150
+    void (*enter)(int id);              // EnterCriticalSection(lock id)
+    void (*leave)(int id);
+    void (*release)(void* node);        // VirtualFree(node, 0, MEM_RELEASE)
+};
 extern "C"
-void Storm_Sub1A600() {
-    g_heapTrack = nullptr;
+void Storm_Sub1A600Env(const StormSweepEnv& e) {
+    e.untrack();
     for (int i = 0; i < 0x100; i++) {
-        if (g_heapDirty[i] == 0) continue;
-        EnterCriticalSection(&g_heapLocks[i]);
-        g_heapDirty[i] = 0;
-        uint32_t* link = &g_heapLists[i];
+        if (e.dirty[i] == 0) continue;
+        e.enter(i);
+        e.dirty[i] = 0;
+        uint32_t* link = &e.lists[i];
         while (*link != 0) {
             uint32_t* n = ptr<uint32_t>(*link);
             if (n[5] == 0 && n[1] < 0x80000000u) {
                 *link = n[0];
-                StormSeamVirtualFree(n, 0, 0x8000);
+                e.release(n);
             } else {
                 link = n;
             }
         }
-        LeaveCriticalSection(&g_heapLocks[i]);
+        e.leave(i);
     }
+}
+
+extern "C"
+void Storm_Sub1A600() {
+    static uint32_t lists[0x100];
+    for (int i = 0; i < 0x100; i++) lists[i] = g_heapLists[i];
+    static uint32_t dirty[0x100];
+    for (int i = 0; i < 0x100; i++) dirty[i] = (uint32_t)g_heapDirty[i];
+    StormSweepEnv e{ [] { g_heapTrack = nullptr; }, dirty, lists,
+                     [](int i) { EnterCriticalSection(&g_heapLocks[i]); },
+                     [](int i) { LeaveCriticalSection(&g_heapLocks[i]); },
+                     [](void* n) { StormSeamVirtualFree(n, 0, 0x8000); } };
+    Storm_Sub1A600Env(e);
+    for (int i = 0; i < 0x100; i++) { g_heapLists[i] = lists[i]; g_heapDirty[i] = (int32_t)dirty[i]; }
 }
 
 // 1.13c Storm+0x1C580: SCode pool allocate. The pool id selects a 256-entry heap list guarded by its

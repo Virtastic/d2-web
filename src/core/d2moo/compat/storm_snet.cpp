@@ -5,6 +5,33 @@
 // 1.13c Storm+0x13E10: SNet teardown; the return is unconditional 1 (side effects touch Storm-internal state only).
 extern "C" int storm_sub_13e10() { return 1; }
 
+// The same body with its callees and module words handed in (the capture records each callee and pins the words; there is no
+// SNet session in ours). Order is retail's: lock, tear down the provider when a session id is set, unlock, 0xFDF0, lock, 0x112E0,
+// the two 'SNET' event drains, 0x11690, clear 0x45A58, 0x11040(1), close the event handle, clear two flags, unlock.
+struct Storm13e10Env {
+    uint8_t* sessionId; uint32_t *eventHandle, *w45a58, *w45340, *w4516c;
+    void (*lock)(); void (*unlock)(); void (*end13a90)(uint32_t); void (*c0fdf0)(); void (*c112e0)();
+    void (*drain36020)(uint32_t, uint32_t); void (*c11690)(); void (*c11040)(uint32_t); void (*closeHandle)(uint32_t);
+};
+extern "C" uint32_t storm_sub_13e10_env(const Storm13e10Env* e) {
+    e->lock();
+    if (*e->sessionId != 0xff) e->end13a90(3);
+    e->unlock();
+    e->c0fdf0();
+    e->lock();
+    e->c112e0();
+    e->drain36020(0x534e4554, 1);
+    e->drain36020(0x534e4554, 2);
+    e->c11690();
+    *e->w45a58 = 0;
+    e->c11040(1);
+    if (*e->eventHandle != 0) { e->closeHandle(*e->eventHandle); *e->eventHandle = 0; }
+    *e->w45340 = 0;
+    *e->w4516c = 0;
+    e->unlock();
+    return 1;
+}
+
 // 1.13c Storm+0x13EB0: create-game setup. 0 for a null/empty name, a zero arg 8, or a null out pointer (arg 11);
 // otherwise 0 as well: the provider table is not initialised (retail's 0x4b4 branch). Provider state is not ported.
 extern "C" int storm_sub_13eb0(const char* name, const char*, const char*, const void*, uint32_t, uint32_t, uint32_t, uint32_t,

@@ -76,17 +76,17 @@ uint32_t sub_27EF0(const NodeEnv& e, int32_t a, int32_t b) {
 }
 
 // 1.13c Storm+0x25DC0
-// Hidden ESI = o: u32 fields at 0x24,0x2c(out),0x30,0x40. iface = *(o+0x3c); call = vtable slot +0x10 (iface,&a,&b).
-// Returns iface, or nullptr on failure (retail 0xffffffff).
-void* sub_25DC0(uint8_t* o, void* iface, int (*call)(void*, uint32_t*, uint32_t*), uint32_t ifaceAddr32) {
+// Hidden ESI = o: u32 fields at 0x24,0x2c(out),0x30,0x40. iface = *(o+0x3c); call = vtable slot +0x10 (iface,&a,&b), a and b zeroed first.
+// Retail returns a (the first out value, EAX after the modulo) on success and 0xffffffff when the call's result is negative.
+uint32_t sub_25DC0(uint8_t* o, void* iface, int (*call)(void*, uint32_t*, uint32_t*)) {
     uint32_t a = 0, b = 0;
-    if (call(iface, &a, &b) < 0) return nullptr;
-    int32_t d = (int32_t)(rd(o, 0x30) % rd(o, 0x40) - ifaceAddr32);
+    if (call(iface, &a, &b) < 0) return 0xffffffffu;
+    int32_t d = (int32_t)(rd(o, 0x30) % rd(o, 0x40) - a);
     if (d < 1) d += (int32_t)rd(o, 0x40);
     uint32_t v = rd(o, 0x30) - (uint32_t)d;
     if (rd(o, 0x24) <= v) v = rd(o, 0x24);
     wr(o, 0x2c, v);
-    return iface;
+    return a;
 }
 
 // 1.13c Storm+0x04040

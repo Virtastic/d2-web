@@ -464,3 +464,19 @@ uint32_t Storm_SVidDestroy(StormBatch3c2b0Env& e) {
     }
     return 1;
 }
+
+// Capture seam for the SVidDestroy probe: g = {ctx, alloc, dll} module state, vl = the video list head.
+// A nonzero word is a host block or stand-in handle; the free releases it.
+extern "C" uint32_t Storm_23250_FnRun(uint32_t* g, uint32_t* vl) {
+    g_svidCtx = g[0] ? (uint32_t)(uintptr_t)std::calloc(1, 12) : 0;
+    g_svidAlloc = g[1] ? (uint32_t)(uintptr_t)std::calloc(1, 16) : 0;
+    g_svidDll = g[2];
+    g_videoList = vl[0];
+    StormBatch3c2b0Env e{};
+    uint32_t r = Storm_SVidDestroy(e);
+    g[0] = g_svidCtx;
+    g[1] = g_svidAlloc;
+    g[2] = g_svidDll;
+    vl[0] = g_videoList;
+    return r;
+}

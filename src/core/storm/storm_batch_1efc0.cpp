@@ -18,6 +18,20 @@
 #include <cstdlib>
 #include <Windows.h>
 
+extern "C" __attribute__((weak)) void Storm_SubD4D0(void);                                                  // 0x1D4D0
+extern "C" __attribute__((weak)) void Storm_Sub7D60(void);                                                  // 0x17D60
+extern "C" __attribute__((weak)) void Storm_Sub13250(void);                                                 // 0x23250
+extern "C" __attribute__((weak)) void Storm_Sub98D0(void);                                                  // 0x198D0
+extern "C" __attribute__((weak)) void Storm_SubF20C0(uint32_t);                                             // 0x20C0
+extern "C" __attribute__((weak)) void Storm_SubF2080(void);                                                 // 0x2080
+extern "C" __attribute__((weak)) void Storm_Sub24150(void);                                                 // 0x34150
+extern "C" __attribute__((weak)) void Storm_Sub3E10(void);                                                  // 0x13E10
+extern "C" __attribute__((weak)) void Storm_Sub261C0(void);                                                 // 0x361C0
+extern "C" __attribute__((weak)) void Storm_Sub28130(uint8_t*);                                             // 0x38130
+extern "C" __attribute__((weak)) void Storm_Sub28F90(void);                                                 // 0x38F90
+extern "C" __attribute__((weak)) void Storm_Sub14FD0(void);                                                 // 0x24FD0
+extern "C" __attribute__((weak)) void Storm_Sub17020(void);                                                 // 0x27020
+extern "C" __attribute__((weak)) void Storm_Sub26D40(void);                                                 // 0x36D40
 namespace {
 
 int32_t g_lastError = 0;            // 0x6FC45388  last Storm error, mirrored to SetLastError
@@ -40,20 +54,6 @@ uint32_t* Storm_Sub4290(uint32_t* anchor, uint32_t, uint32_t);            // 0x4
 extern "C" void Storm_Sub4040(uint32_t o);                                  // 0x4040 pool free (C linkage: storm_4040.cpp)
 int32_t Storm_SubB960(void* p, const char* tag, int32_t line);             // 0xB960 operator delete
 void Storm_Sub179F0(int32_t h);                                            // 0x179F0 stream close
-void Storm_SubD4D0(void);                                                  // 0x1D4D0
-void Storm_Sub7D60(void);                                                  // 0x17D60
-void Storm_Sub13250(void);                                                 // 0x23250
-void Storm_Sub98D0(void);                                                  // 0x198D0
-void Storm_SubF20C0(uint32_t);                                             // 0x20C0
-void Storm_SubF2080(void);                                                 // 0x2080
-void Storm_Sub24150(void);                                                 // 0x34150
-void Storm_Sub3E10(void);                                                  // 0x13E10
-void Storm_Sub261C0(void);                                                 // 0x361C0
-void Storm_Sub28130(uint8_t*);                                             // 0x38130
-void Storm_Sub28F90(void);                                                 // 0x38F90
-void Storm_Sub14FD0(void);                                                 // 0x24FD0
-void Storm_Sub17020(void);                                                 // 0x27020
-void Storm_Sub26D40(void);                                                 // 0x36D40
 
 // Host event handle: a no-op wake in ours, as the sound thread does not exist.
 void StormSetEvent(void* h) { (void)h; }
@@ -1054,3 +1054,18 @@ bool Storm_Sub37ED0(uint32_t param_1, int32_t param_2, char* param_3, int32_t pa
 }
 
 }  // namespace
+
+// Capture-probe accessor: the port globals by retail RVA (the probes copy the pinned state in/out).
+extern "C" uint32_t* storm_1efc0_global(uint32_t rva) {
+    switch (rva) {
+    case 0x45388: return (uint32_t*)&g_lastError;
+    case 0x41a00: return &g_chunk_41a00;
+    case 0x4313c: return &g_4313c;
+    case 0x43138: return &g_43138;
+    case 0x43134: return &g_43134;
+    case 0x43140: return &g_43140;
+    case 0x43148: return &g_43148;
+    case 0x458e8: return (uint32_t*)&g_count_458e8;
+    }
+    return nullptr;
+}

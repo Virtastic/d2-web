@@ -59,6 +59,8 @@ struct StormBatch382c0Env {
     void     (*delete_object)(void* obj);
     int32_t  (*destroy_cursor)(void* cursor);
     int32_t  (*invalidate_rect)(void* hwnd, void* rect, int32_t erase);
+    // Optional seam for the PCX writer (0x333C0) of the screen-capture row; null runs the port.
+    uint32_t (*f_333c0)(const char* file, int32_t palette, void* pixels, int32_t width, int32_t height, int32_t bpp);
 };
 
 namespace {
@@ -344,6 +346,13 @@ uint32_t Storm_Sub38470(int32_t param_1, int32_t* param_2, int32_t param_3, int3
 // caller path it opens the "Save Screen Capture" dialog (field offsets of OPENFILENAMEA below; the
 // dialog buffer is 0x150 bytes and its +0x4C holds the 0x104-byte filename). The screen is grabbed
 // through 0x92A0, blitted into the capture buffer with the primary blit, then written as PCX.
+// Display state the capture reads: interface words, bits per pixel and size; no palette interface.
+extern "C"
+void Storm_Sub19C80_Pin(uint32_t display, uint32_t hwnd, uint32_t draw, int32_t bpp, uint32_t width, uint32_t height) {
+    g_453e4 = (void*)(uintptr_t)display; g_453d8 = (void*)(uintptr_t)hwnd; g_45804 = (void*)(uintptr_t)draw;
+    g_453e8 = nullptr; g_41a1c = bpp; g_41a20 = width; g_41a24 = height;
+}
+
 extern "C"
 uint32_t Storm_Sub19C80(uint32_t* param_1, const StormBatch382c0Env* env) {
     if (g_453e4 == nullptr || g_453d8 == nullptr || g_45804 == nullptr || g_41a1c != 8) return 0;
@@ -386,10 +395,34 @@ uint32_t Storm_Sub19C80(uint32_t* param_1, const StormBatch382c0Env* env) {
     } else {
         env->f_2b080((char*)ofn + 0x4c, (const char*)param_1, 0x104);
     }
-    Storm_Sub333C0((const char*)ofn + 0x4c, (int32_t)(uintptr_t)g_453f0, cap, (int32_t)g_41a20,
-                   (int32_t)g_41a24, g_41a1c, env);
+    if (env->f_333c0)
+        env->f_333c0((const char*)ofn + 0x4c, (int32_t)(uintptr_t)g_453f0, cap, (int32_t)g_41a20,
+                     (int32_t)g_41a24, g_41a1c);
+    else
+        Storm_Sub333C0((const char*)ofn + 0x4c, (int32_t)(uintptr_t)g_453f0, cap, (int32_t)g_41a20,
+                       (int32_t)g_41a24, g_41a1c, env);
     env->f_b960(cap, "..\\3rdParty\\STORM\\SOURCE\\SDRAW.CPP", 0x1d7);
     return 1;
+}
+
+// Probe seam for the capture row: the callees the path-string branch reaches, as plain function pointers.
+struct Storm19C80Seams {
+    uint32_t (*f_9150)(void);
+    void*    (*f_c580)(uint32_t size, const char* file, int32_t line, uint32_t type);
+    uint32_t (*f_92a0)(int32_t a, void* b, int32_t* w, void** pixels, int32_t e);
+    uint32_t (*f_2b080)(char* dst, const char* src, uint32_t size);
+    void     (*f_b960)(void* p, const char* file, int32_t line);
+    uint32_t (*f_333c0)(const char* file, int32_t palette, void* pixels, int32_t width, int32_t height, int32_t bpp);
+    void*    (*get_module_handle)(const char* name);
+    int32_t  (*get_save_file_name)(void* ofn);
+};
+extern "C"
+uint32_t Storm_Sub19C80_Seams(uint32_t* path, const Storm19C80Seams* s) {
+    StormBatch382c0Env e{};
+    e.f_9150 = s->f_9150; e.f_c580 = s->f_c580; e.f_92a0 = s->f_92a0; e.f_2b080 = s->f_2b080;
+    e.f_b960 = s->f_b960; e.f_333c0 = s->f_333c0;
+    e.get_module_handle = s->get_module_handle; e.get_save_file_name = s->get_save_file_name;
+    return Storm_Sub19C80(path, &e);
 }
 
 // 1.13c Storm+0x198D0: shut the display layer down. Runs the three teardown seams, releases the
@@ -440,6 +473,28 @@ uint32_t Storm_Sub198D0(const StormBatch382c0Env* env) {
         g_453d8 = nullptr;
     }
     return uVar2 & 1 & uVar3 & uVar4;
+}
+
+// capture seams for 0x198D0: the module's display words as one array (453dc, 453cc, 453c8, 453d0, 453d8, 453e4,
+// 453e8, 45804, 45808, 4580c, 45810, 41a1c, 41a20, 41a24, 42fd0), pinned before a call and read back after it.
+extern "C" void storm_sdraw_pin(const uint32_t* g) {
+    g_453dc = (void*)(uintptr_t)g[0]; g_453cc = (int32_t)g[1]; g_453c8 = (int32_t)g[2]; g_453d0 = (void*)(uintptr_t)g[3];
+    g_453d8 = (void*)(uintptr_t)g[4]; g_453e4 = (void*)(uintptr_t)g[5]; g_453e8 = (void*)(uintptr_t)g[6];
+    g_45804 = (void*)(uintptr_t)g[7]; g_45808 = (void*)(uintptr_t)g[8]; g_4580c = (void*)(uintptr_t)g[9];
+    g_45810 = (void*)(uintptr_t)g[10]; g_41a1c = (int32_t)g[11]; g_41a20 = g[12]; g_41a24 = g[13]; g_42fd0 = (int32_t)g[14];
+}
+extern "C" void storm_sdraw_dump(uint32_t* g) {
+    g[0] = (uint32_t)(uintptr_t)g_453dc; g[1] = (uint32_t)g_453cc; g[2] = (uint32_t)g_453c8; g[3] = (uint32_t)(uintptr_t)g_453d0;
+    g[4] = (uint32_t)(uintptr_t)g_453d8; g[5] = (uint32_t)(uintptr_t)g_453e4; g[6] = (uint32_t)(uintptr_t)g_453e8;
+    g[7] = (uint32_t)(uintptr_t)g_45804; g[8] = (uint32_t)(uintptr_t)g_45808; g[9] = (uint32_t)(uintptr_t)g_4580c;
+    g[10] = (uint32_t)(uintptr_t)g_45810; g[11] = (uint32_t)g_41a1c; g[12] = g_41a20; g[13] = g_41a24; g[14] = (uint32_t)g_42fd0;
+}
+extern "C" uint32_t storm_sub_198d0_calls(uint32_t (*d4d0)(), uint32_t (*c7d60)(), uint32_t (*c13250)(),
+                                         void (*del)(void*), int32_t (*destroy)(void*)) {
+    StormBatch382c0Env env;
+    memset(&env, 0, sizeof env);
+    env.f_d4d0 = d4d0; env.f_7d60 = c7d60; env.f_13250 = c13250; env.delete_object = del; env.destroy_cursor = destroy;
+    return Storm_Sub198D0(&env);
 }
 
 // 1.13c Storm+0x18F00: pump the message queue while the display is live and the save dialog is not.

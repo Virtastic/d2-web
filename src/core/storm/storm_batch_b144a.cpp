@@ -28,7 +28,7 @@ void trimBlock(Ctx& c,uint8_t* heap,uint8_t* blk,int32_t* off,int32_t* total) {
 // 1.13c Storm+0x25290
 bool loadFile(Ctx& c,const char* path,int32_t* a,uint32_t* b,void* cc,void* errCb) {
     std::FILE* f=std::fopen(path,"rb");
-    if(!f) { if(errCb) c.reportError(errCb,c.lastError()); return false; }
+    if(!f) { if(errCb) c.reportError(errCb,c.lastError(),0); return false; }
     std::fseek(f,0,SEEK_END); long n=std::ftell(f); std::fseek(f,0,SEEK_SET);
     char* buf=static_cast<char*>(c.alloc((uint32_t)n+1,kScmd,0x153));
     size_t got=std::fread(buf,1,(size_t)n,f); (void)got; std::fclose(f);
@@ -90,7 +90,7 @@ void setString(Ctx& c,uint8_t* rec,const char* str,int32_t* consumed) {
     if(rd(rec+0x3c)) c.free(c.st->resolve(rd(rec+0x3c)),kScmd,0x8b);
     char* p=static_cast<char*>(c.alloc((uint32_t)std::strlen(str)+1,kScmd,0x8c));
     std::strcpy(p,str); wr(rec+0x3c,c.st->encode(p));
-    if(uint8_t* d=at(c,rec,0x2c)) { uint32_t n=rd(rec+0x30); std::strncpy((char*)d,str,n); if(n) ((char*)d)[n-1]=0; }
+    if(uint8_t* d=at(c,rec,0x2c)) { uint32_t n=rd(rec+0x30); if(n) { uint32_t i=0; for(;i+1<n&&str[i];++i) ((char*)d)[i]=str[i]; ((char*)d)[i]=0; } }
 }
 // 1.13c Storm+0x253c0
 bool applyArg(Ctx& c,uint8_t* rec,const char* str,int32_t* consumed) {
@@ -107,9 +107,9 @@ bool applyArg(Ctx& c,uint8_t* rec,const char* str,int32_t* consumed) {
     else return false;
     wr(rec+0x38,1);
     if(uint32_t cb=rd(rec+0x34)) {
-      uint32_t a[7]={rd(rec+8),rd(rec+0xc),c.st->encode(rec+0x10),rd(rec+0x24),rd(rec+0x28),rd(rec+0x2c),rd(rec+0x3c)};
-      // args order in retail: flags,id,name,value,mask,dest,current (local_1c..local_4 order is flags,id,name,limit,..)
-      if(!c.callCb(cb,a,7)) return false;
+      // frame (retail locals, low to high): flags, id, &name, dest, value, mask, current; the callee gets (&frame, str)
+      uint32_t a[7]={rd(rec+8),rd(rec+0xc),c.st->encode(rec+0x10),rd(rec+0x2c),rd(rec+0x24),rd(rec+0x28),rd(rec+0x3c)};
+      if(!c.callOpt(cb,a,str)) return false;
     }
     for(int g=0;g<2;++g) {
       uint8_t* list=static_cast<uint8_t*>(c.st->commandLists[g==0?1:0]);
@@ -141,34 +141,40 @@ uint8_t* findLongest(Ctx& c,uint8_t* head,int32_t minLen,const char* str) {
     }
     return r;
 }
-// 1.13c Storm+0x25520: st[0]=current record addr, st[5]=min length
+// 1.13c Storm+0x25520 (EBX = st, stack: str, int* maxConsumed; ret 8): st[0] = current record (cleared), st[1..4] = name, st[5] = min length.
+// After each record the next candidate is the longest option at or after the record's own +4 link that matches the NAME buffer.
 bool applyChain(Ctx& c,const char* str,int32_t* st,int32_t* maxConsumed) {
     *maxConsumed=0; uint32_t cur=(uint32_t)st[0]; st[0]=0;
     while(cur) {
-      int32_t used; if(!applyArg(c,c.st->resolve(cur),str,&used)) return false;
+      uint8_t* rec=c.st->resolve(cur);
+      int32_t used; if(!applyArg(c,rec,str,&used)) return false;
       if(used>*maxConsumed) *maxConsumed=used;
-      uint8_t* nx=findLongest(c,c.searchHead,st[5],str); cur=c.st->encode(nx);
+      uint32_t n=rd(rec+4); uint8_t* head=((int32_t)n>0)?c.st->resolve(n):nullptr;
+      uint8_t* nx=findLongest(c,head,st[5],(const char*)(st+1)); cur=c.st->encode(nx);
     }
     return true;
 }
-// 1.13c Storm+0x255a0: st[0]=record addr, st[1..4]=name, st[5]=name length
+// 1.13c Storm+0x255a0 (stack: str, st, errCb; ret 0xC): st[0]=record addr, st[1..]=name, st[5]=name length. The search head is the first option
+// of the list at Storm+0x459d0 (word +8).
 bool parseOption(Ctx& c,const char* str,int32_t* st,void* errCb) {
     char local[256]; local[0]=0;
     while(*str) {
       size_t sl=std::strlen(str), ll=std::strlen(local);
       size_t k=ll?ll:1; uint8_t* rec=nullptr; int32_t len=-1;
+      uint8_t* list=static_cast<uint8_t*>(c.st->commandLists[0]);
       for(;;) {
         do { if(!k) goto fail; --k; } while(sl+k>0xff);
-        std::strncpy(local+k,str,0x100-k);
-        rec=findLongest(c,c.searchHead,0,local); if(rec) break;
+        { size_t i=0; for(;i<0xff&&str[i];++i) local[k+i]=str[i]; local[k+i]=0; }
+        { uint32_t h=list?rd(list+8):0; rec=findLongest(c,((int32_t)h>0)?c.st->resolve(h):nullptr,0,local); }
+        if(rec) break;
       }
       len=(int32_t)rd(rec+0x20); local[len]=0;
       fail:
-      if(!rec) { if(errCb) c.reportError(errCb,c.lastError()); return false; }
+      if(!rec) { if(errCb) c.reportError(errCb,0x85100065u,c.st->encode(str)); return false; }
       const char* p=str+len;
       while(*p&&std::strchr(c.separators,*p)) ++p;
       st[0]=(int32_t)c.st->encode(rec); st[5]=len;
-      std::strncpy((char*)(st+1),local,16);
+      std::strcpy((char*)(st+1),local);
       if(!*p && (rd(rec+8)&0x30000)) return true;
       int32_t used; if(!applyChain(c,p,st,&used)) return false;
       str=p+used;

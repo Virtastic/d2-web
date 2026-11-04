@@ -245,6 +245,9 @@ int32_t* Snet12690(void) {
     return (int32_t*)P(c);
 }
 
+// capture seam: the local record word (0x6FC45A44) the retail module keeps; a capture pins it before a call
+extern "C" void storm_snet_pin_self(uint32_t rec) { ensure(); g_self.tag = rec; }
+
 // 1.13c Storm+0x12740
 // Retire acknowledged messages (all connections, or only `only`): move sent messages older than our
 // sequence from the +0x180 list to the +0x1C4 list, then free those older than the lowest peer ack.

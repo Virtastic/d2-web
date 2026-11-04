@@ -46,9 +46,9 @@ extern uint32_t* g_stormHeapLists_1bdd0[0x100];                                 
 struct StormPageEnv {                                                                    // as storm_1b1c0.cpp
   bool trackingOff; void (*setLastError)(uint32_t);
   void (*errDisplay)(uint32_t, const char*, int32_t); void (*debugOut)(const char*);
-  void (*blockFree)(); void (*virtualFree)(void*);
+  void (*blockFree)(uint8_t*, uint8_t*); void (*virtualFree)(void*);
 };
-extern "C" uint8_t** Storm_Sub1B1C0(StormPageEnv& e, uint8_t** head, bool errHook);
+extern "C" uint32_t* Storm_Sub1B1C0(StormPageEnv& e, uint32_t* head, bool errHook);
 
 namespace {
 
@@ -87,28 +87,54 @@ const uint32_t kStep[89] = {  // 0x6FC36690
 }  // namespace
 
 // 1.13c Storm+0x1bd00: tear down all 0x100 heap lists (frees empty pages, reports leaks via 1B1C0).
-uint32_t Storm_Sub1BD00(void) {
-    if (g_45168 == 0) return 1;
-    g_45168 = 0;
-    StormPageEnv env{};
+// Slots are retail's 32-bit words; the seams are the critical sections, 2FB30, 1B1C0 and VirtualFree.
+struct StormTeardownEnv {
+    uint32_t* gate;                     // 0x6FC45168
+    uint32_t* dirty;                    // 0x6FC44D60
+    uint32_t* lists;                    // 0x6FC43150
+    void (*enter)(int id); void (*leave)(int id); void (*destroy)(int id);
+    void (*leak)(const char* type, const char* name);   // 2FB30
+    uint32_t* (*pageTeardown)(uint32_t* slot);          // 1B1C0
+    void (*release)(void* page);                        // VirtualFree(page, 0, MEM_RELEASE)
+};
+extern "C" uint32_t Storm_Sub1BD00Env(const StormTeardownEnv& e) {
+    if (*e.gate == 0) return 1;
+    *e.gate = 0;
     for (int i = 0; i < 0x100; i++) {
-        EnterCriticalSection(&g_heapCs[i]);
-        g_44d60[i] = 0;
-        uint8_t** pp = (uint8_t**)&g_stormHeapLists_1bdd0[i];
+        e.enter(i);
+        e.dirty[i] = 0;
+        uint32_t* pp = &e.lists[i];
         while (*pp) {
-            uint8_t* pg = *pp;
+            uint8_t* pg = N(*pp);
             if (U(pg, 0x14) == 0) {
-                if (U(pg, 0x10) != 0 && 0x7fffffffu < U(pg, 4)) Storm_Sub2FB30("HSHEAP", nullptr);
-                *pp = N(U(pg, 0));  // next page (32-bit link, see header)
-                free(pg);           // VirtualFree(pg,0,MEM_RELEASE); 1bdd0 allocates with calloc
+                if (U(pg, 0x10) != 0 && 0x7fffffffu < U(pg, 4)) e.leak("HSHEAP", nullptr);
+                *pp = U(pg, 0);     // next page (32-bit link, see header)
+                e.release(pg);
             } else {
-                pp = Storm_Sub1B1C0(env, pp, true);
+                pp = e.pageTeardown(pp);
             }
         }
-        LeaveCriticalSection(&g_heapCs[i]);
-        DeleteCriticalSection(&g_heapCs[i]);
+        e.leave(i);
+        e.destroy(i);
     }
     return 1;
+}
+
+uint32_t Storm_Sub1BD00(void) {
+    static uint32_t lists[0x100];
+    for (int i = 0; i < 0x100; i++) lists[i] = Lo(g_stormHeapLists_1bdd0[i]);
+    StormPageEnv pageEnv{};
+    static StormPageEnv* gp; gp = &pageEnv;
+    StormTeardownEnv e{ &g_45168, g_44d60, lists,
+        [](int i) { EnterCriticalSection(&g_heapCs[i]); },
+        [](int i) { LeaveCriticalSection(&g_heapCs[i]); },
+        [](int i) { DeleteCriticalSection(&g_heapCs[i]); },
+        [](const char* t, const char* n) { Storm_Sub2FB30(t, n); },
+        [](uint32_t* slot) { return Storm_Sub1B1C0(*gp, slot, true); },
+        [](void* pg) { free(pg); } };   // 1bdd0 allocates with calloc
+    uint32_t r = Storm_Sub1BD00Env(e);
+    for (int i = 0; i < 0x100; i++) g_stormHeapLists_1bdd0[i] = (uint32_t*)N(lists[i]);
+    return r;
 }
 
 // 1.13c Storm+0x1d6b0: free every __AUBITMAPREC__ bound to hwnd (or its owner), then recurse children.

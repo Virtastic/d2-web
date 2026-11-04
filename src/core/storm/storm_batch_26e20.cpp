@@ -55,18 +55,18 @@ void wr32(void* p, uint32_t v) { std::memcpy(p, &v, 4); }
 uint8_t* at(uint32_t p, uintptr_t off) { return (uint8_t*)(uintptr_t)(p + off); }
 
 // 1.13c Storm+0x25DC0: node (retail ESI); iface = *(node+0x3c), GetCurrentPosition = vtable slot +0x10.
-// Returns iface, or 0xffffffff on a failed HRESULT; else stores the clamped play position at node+0x2C.
+// Returns the position word the method stored (retail EAX), or 0xffffffff on a failed HRESULT; else stores the clamped play position at node+0x2C.
 int32_t* Storm_Sub25DC0(uint8_t* node) {
     uint8_t* iface = (uint8_t*)(uintptr_t)rd32(node + 0x3c);
     uint32_t a = 0, b = 0;
     auto fn = (int32_t (*)(void*, uint32_t*, uint32_t*))(uintptr_t)rd32((uint8_t*)(uintptr_t)rd32(iface) + 0x10);
     if (fn(iface, &a, &b) < 0) return (int32_t*)(uintptr_t)0xffffffffu;
-    int32_t d = (int32_t)(rd32(node + 0x30) % rd32(node + 0x40) - (uint32_t)(uintptr_t)iface);
+    int32_t d = (int32_t)(rd32(node + 0x30) % rd32(node + 0x40) - a);
     if (d < 1) d += (int32_t)rd32(node + 0x40);
     uint32_t v = rd32(node + 0x30) - (uint32_t)d;
     if (rd32(node + 0x24) <= v) v = rd32(node + 0x24);
     wr32(node + 0x2c, v);
-    return (int32_t*)iface;
+    return (int32_t*)(uintptr_t)a;
 }
 
 // kernel32 seams (compat/Windows.h carries no thread, event or file-size API)

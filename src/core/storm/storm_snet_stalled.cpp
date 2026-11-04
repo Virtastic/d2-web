@@ -239,6 +239,9 @@ int32_t Storm_Sub11F10(uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d, uint3
 
 // 1.13c Storm+0x12740
 // Release acked/stale messages for peer param_1 (0 = every peer) and the local peer.
+// capture seam: the first peer word (0x6FC45A6C)
+extern "C" void storm_snet_pin_peers(uint32_t first) { g_a64[2] = first; }
+
 void Storm_Sub12740(void* arg) {
     uint32_t param_1 = A(arg);
     uint8_t* self = (uint8_t*)Storm_Sub12690();

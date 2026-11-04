@@ -15,16 +15,17 @@
 #include <cstdint>
 #include <cstring>
 
+// internal callees, retail argument order. 3B3A0 is the real tokenizer (storm_sub_3b3a0.cpp, C++ linkage); 257F0 and 24CD0 are unmapped seams (C linkage,
+// defined by the replay probe src/core/fn/storm_25890.cpp).
+void Storm_Sub3B3A0(char** string, char* out, char* size, const char* delims, uint32_t* quoted);
+extern "C" __attribute__((weak)) bool Storm_Sub257F0(char** string, int32_t* entry, uint32_t* listHead, void* callback,
+                               void* errorHandler);
+extern "C" __attribute__((weak)) void Storm_Sub24CD0(void* errorHandler);
+
 namespace {
 
 int32_t g_lastError;              // 0x6FC45388  last Storm error, mirrored to SetLastError
 uint32_t g_argListHead;           // 0x6FC459E4  SCMD argument-definition list head
-
-// unmapped internal callees, retail argument order
-void Storm_Sub3B3A0(char** string, char* out, char* size, const char* delims, uint32_t* quoted);
-bool Storm_Sub257F0(char** string, int32_t* entry, uint32_t* listHead, void* callback,
-                    void* errorHandler);
-void Storm_Sub24CD0(void* errorHandler);
 
 uint32_t rd32(const void* p) { uint32_t v; std::memcpy(&v, p, 4); return v; }
 void StormSetLastError(uint32_t e) { g_lastError = (int32_t)e; }
@@ -32,6 +33,8 @@ void StormSetLastError(uint32_t e) { g_lastError = (int32_t)e; }
 const char kDelims[] = " ,;\"\t\n\r\x1a";
 
 }  // namespace
+// the tokenizer 0x3B3A0 (storm_sub_3b3a0.cpp) reports through this seam: Storm+0x45388 := the code (SetLastError is the IAT thunk)
+void Storm_SetLastError(uint32_t e) { g_lastError = (int32_t)e; }
 
 // 1.13c Storm+0x25890: SCmdProcess. A null string pointer is 0x57; a non-zero second argument
 // skips the first token first. 0x257F0 consumes the string and advances the local list head; the
@@ -64,3 +67,6 @@ int32_t Storm_Sub25890(char** string, uint32_t param_2, void* callback, void* er
     if (savedHandler != nullptr && ok == 0) Storm_Sub24CD0(savedHandler);
     return ok;
 }
+
+// Capture-probe accessor: the port globals (Storm+0x45388 and Storm+0x459E4), copied in and out by the probe around the call.
+extern "C" void storm_25890_globals(int32_t** lastError, uint32_t** argListHead) { *lastError = &g_lastError; *argListHead = &g_argListHead; }

@@ -1,3 +1,4 @@
+// SCmdProcess (Storm+0x25890) calls this tokenizer, so the prove build must keep it linked.
 #include <cstdint>
 #include <cstring>
 void Storm_SetLastError(uint32_t); // seam: DAT_6fc45388 + SetLastError
