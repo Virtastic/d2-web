@@ -26,6 +26,8 @@ struct N42G {
     int archListHead; u32 lastError2;
 };
 static N42G G;
+// Seam: sets the archive-entry flag and list-head globals.
+void storm_n42_set_flags(u32 flags, int head) { G.archFlags = flags; G.archHead = head; }
 
 // 1.13c Storm+0x28DA0
 void Storm_28DA0(N42G*, const char* name, void** out, int (*f)(void*, const char*, uint8_t, void**), void* arch) {
@@ -36,7 +38,7 @@ void Storm_28DA0(N42G*, const char* name, void** out, int (*f)(void*, const char
 }
 
 // 1.13c Storm+0x29BE0
-void Storm_29BE0(u32 a, u32* b, u32 c, int* d, int e, int (*f)(u32, u32*, u32, int*, int, int, int)) { f(a, b, c, d, e, 0, 0); }
+int Storm_29BE0(u32 a, u32* b, u32 c, int* d, int e, int (*f)(u32, u32*, u32, int*, int, int, int)) { return f(a, b, c, d, e, 0, 0); }
 
 // 1.13c Storm+0x26190
 u32 Storm_26190(const char* path) {
