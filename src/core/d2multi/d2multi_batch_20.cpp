@@ -10,7 +10,7 @@ int32_t  Ordinal_10003(void);
 uint32_t Ordinal_10265(int32_t);
 void     Ordinal_10024(void*, int32_t);
 uint32_t Ordinal_10023(int32_t);
-int32_t  Ordinal_10132(uint8_t, uint32_t, uint32_t, int32_t);
+int32_t  Ordinal_10132(uint8_t, uint32_t, uint32_t);
 void     Ordinal_10082(int32_t, void*, void*, void*, void*, uint16_t, int32_t);
 void*    Ordinal_10042(int32_t, int32_t);
 void     Ordinal_10043(int32_t, int32_t);
@@ -21,7 +21,7 @@ extern uint8_t* DAT_6fa09ef8;
 extern uint8_t* DAT_6fa09ef4;
 extern int32_t DAT_6fa09efc;
 extern char DAT_6f9e75d7[];
-extern uint32_t* gdwBitMasks_exref;
+extern uint32_t gdwBitMasks_exref[], gdwInvBitMasks_exref[];
 size_t ustrlen(const uint16_t*);
 uint16_t* ustrcpy(uint16_t*, const uint16_t*);
 uint16_t* ustrcat(uint16_t*, const uint16_t*);
@@ -46,12 +46,11 @@ void d2_multi_sub_ed60(uint16_t* dst, int32_t n) {
 }
 
 // 1.13c D2Multi+0xEEA0
-void d2_multi_sub_eea0(uint8_t* p1, char* out, const char* name) {
+extern "C" void d2_multi_sub_eea0(uint8_t* p1, char* out, const char* name) {
     *out = 0; *p1 = 0;
     if (*name == '*') { Ordinal_501(out, name, 0x7fffffff); return; }
-    // ponytail: the two arg-less 571 calls are inferred as first/last '*' (disassembly not consulted)
-    char* a = Ordinal_571(name, '*');
-    const char* b = strrchr(name, '*');
+    char* a = Ordinal_571(name, 0x40);
+    char* b = Ordinal_571(name, '*');
     if (a && b && a < b) { Ordinal_501(out, name, 0x7fffffff); char* s = Ordinal_571(out, 0x2a); *s = 0; return; }
     for (uint8_t* n = DAT_6fa09ef8; n; n = *(uint8_t**)(n + 0x44)) {
         if (__stricmp((char*)n, name)) continue;
@@ -59,7 +58,7 @@ void d2_multi_sub_eea0(uint8_t* p1, char* out, const char* name) {
             if (__stricmp((char*)(q + 4), name)) continue;
             uint32_t m = Ordinal_10023(*(int32_t*)(q + 0x9c));
             if ((gdwBitMasks_exref[6] & m) || (gdwBitMasks_exref[7] & m))
-                Ordinal_501((char*)0x2a, (char*)(intptr_t)Ordinal_10132(q[0x86], (m >> 5 & 1) * 3 + (m >> 7 & 1) * 2 + (m >> 6 & 1), m >> 12 & 1, 0x7fffffff), 0);
+                Ordinal_501((char*)p1, (char*)(intptr_t)Ordinal_10132(q[0x86], (m >> 5 & 1) * 3 + (m >> 7 & 1) * 2 + (m >> 6 & 1), m >> 12 & 1), 0x7fffffff);   // #10132 is a 3-word stdcall; its answer is copied into p1
             break;
         }
         Ordinal_501(out, (char*)n + 0x32, 0x7fffffff);
@@ -67,34 +66,38 @@ void d2_multi_sub_eea0(uint8_t* p1, char* out, const char* name) {
     }
     char* star = Ordinal_571(name, '*');
     if (*name != '*' && star) { size_t k = star - name; memcpy(out, name, k); out[k] = 0; return; }
-    Ordinal_501(out, "", 0x7fffffff);   // retail copies the (empty) fallback text
+    Ordinal_501(out, name, 0x7fffffff);
 }
 
-// 1.13c D2Multi+0xF020
-void d2_multi_sub_f020(const char* name, uint8_t* prev) {
+// 1.13c D2Multi+0xF020: EBX = name, one stack word = text. Finds the list node whose key (the part after '*') equals the name's key and rewrites its text (+0x32);
+// otherwise appends a node (at most 0x400 nodes: the head is dropped first).
+extern "C" void d2_multi_sub_f020(const char* name, const char* text) {
+    uint8_t* prev = nullptr;
     uint8_t* n = DAT_6fa09ef8;
     char* t = Ordinal_571(name, '*');
     const char* key = (t && t[1]) ? t + 1 : name;
     for (; n; prev = n, n = *(uint8_t**)(n + 0x44)) {
         char* s = Ordinal_571((char*)n, 0x2a);
         const char* k2 = (s && s[1]) ? s + 1 : (char*)n;
-        if (strcmp(k2, key) == 0) { strcpy((char*)n + 0x32, ""); return; }  // retail copies the incoming text to +0x32
+        if (strcmp(k2, key) == 0) { strcpy((char*)n + 0x32, text); return; }
     }
-    if (DAT_6fa09efc > 0x3ff) {
-        DAT_6fa09ef8 = *(uint8_t**)(DAT_6fa09ef8 + 0x44);
-        Ordinal_10043(0x928, 0);
+    if (DAT_6fa09efc >= 0x400) {
+        uint8_t* head = DAT_6fa09ef8;
+        DAT_6fa09ef8 = *(uint8_t**)(head + 0x44);
+        Ordinal_10043(0x928, 0);   // retail: ECX = head, EDX = source-file string
         DAT_6fa09efc--;
     }
-    uint8_t* nn = (uint8_t*)Ordinal_10042(0x92c, 0);
+    uint8_t* nn = (uint8_t*)Ordinal_10042(0x92c, 0);   // retail: ECX = 0x48 bytes
     strcpy((char*)nn, name);
-    strcpy((char*)nn + 0x32, (char*)prev);
+    strcpy((char*)nn + 0x32, text);
     *(uint8_t**)(nn + 0x44) = 0;
+    if (prev) *(uint8_t**)(prev + 0x44) = nn; else DAT_6fa09ef8 = nn;
     DAT_6fa09efc++;
 }
 
 // 1.13c D2Multi+0xF170
-void d2_multi_sub_f170(int32_t* p) {
-    uint16_t a[102] = {0}, b[34] = {0}, c[102] = {0}, d[64] = {0}, e[100] = {0};
+extern "C" void d2_multi_sub_f170(int32_t* p) {
+    uint16_t a[102] = {0}, b[34] = {0}, c[102] = {0}, d[64] = {0}, e[100] = {0};   // a, b, c, d are retail's four buffers, e the key scratch
     char* s = (char*)(p + 1);
     char pre[0x20] = {0};
     if (*s == '*') {
@@ -109,19 +112,21 @@ void d2_multi_sub_f170(int32_t* p) {
         ustrncat(a, e, 0x32);
         uwin2Unicode(b, pre, 0x10);
     }
+    uwin2Unicode(c, (const char*)p + 0x97, 0x32);
+    uwin2Unicode(d, (const char*)p + 0x46, 0x20);
     int32_t id = p[0];
     uint16_t v = 0;
     if (id == 0x44324456 || id == 0x44325354 || id == 0x44325850) v = (uint16_t)p[0x22];
-    Ordinal_10082(p[0x27], a, pre, c, d, v, id);
+    Ordinal_10082(p[0x27], a, b, c, d, v, id);
 }
 
 // 1.13c D2Multi+0xF340
-uint32_t d2_multi_sub_f340(const char* in, uint32_t flags, uint8_t* o) {
+extern "C" uint32_t d2_multi_sub_f340(const char* in, uint32_t flags, uint8_t* o) {
     uint8_t res = 7;
     int len = (int)strlen(in);
     *(uint16_t*)(o + 0x8a) = 0;
     bool gen = false;
-    auto unk = [&] { memcpy(o, "NKNU", 4); strcpy((char*)o + 0x36, in + 4); };
+    auto unk = [&] { memcpy(o, "NKNU", 4); strcpy((char*)o + 0x36, (char*)o + 4); };   // retail copies its own record's +4 string (the source pointer is EBP+4)
     auto tail = [&]() -> uint32_t {
         for (int i = 0; i < 0x10; i++) { o[0x66 + i] = i == 1 ? 1 : 0; o[0x76 + i] = 0xff; }
         return res;

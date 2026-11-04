@@ -86,11 +86,11 @@ void d2_multi_sub_ce70(int32_t in_eax) {
 }
 
 // 1.13c D2Multi+0xE730
-int32_t d2_multi_sub_e730(uint8_t* p1) {
+extern "C" int32_t d2_multi_sub_e730(uint8_t* p1) {
     DAT_6fa09f14 = p1;
     Ordinal_10100();
     Ordinal_10176(1);
-    d2_multi_sub_e150(nullptr);
+    d2_multi_sub_e150(p1);   // retail passes the context in EAX
     Ordinal_10144();
     return DAT_6fa0a0dc;
 }

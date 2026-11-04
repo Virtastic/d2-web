@@ -14,7 +14,7 @@ char*    Ordinal_571(const char* s = nullptr, int c = 0);
 extern uint8_t *DAT_6fa09ef4, *DAT_6fa09f08, *DAT_6fa09f14;
 __attribute__((weak)) int32_t DAT_6fa09f04 = 0, DAT_6fa0a0c8 = 0, DAT_6fa0a0d4 = 0;
 extern char DAT_6fa09198[];
-extern uint32_t *gdwBitMasks_exref, *gdwInvBitMasks_exref;
+extern uint32_t gdwBitMasks_exref[], gdwInvBitMasks_exref[];   // D2Common's Fog tables: arrays of 32 dwords (1<<i, ~(1<<i))
 uint16_t* ustrcat(uint16_t*, const uint16_t*);            // Unicode::strcat
 void d2_multi_sub_eb70(uint16_t*);
 void d2_multi_sub_ec80(int32_t, uint16_t*);
@@ -38,7 +38,7 @@ static inline uint32_t rank(uint8_t* n) {
 static inline uint32_t setm(uint32_t u, bool on, int i) { return on ? u | gdwBitMasks_exref[i] : u & gdwInvBitMasks_exref[i]; }
 
 // 1.13c D2Multi+0xF750
-void d2_multi_sub_f750(void) {
+extern "C" void d2_multi_sub_f750(void) {
     if (DAT_6fa09ef4) {
         uint8_t* rest = nxt(DAT_6fa09ef4);
         nxt(DAT_6fa09ef4) = 0;

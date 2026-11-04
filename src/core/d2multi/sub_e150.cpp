@@ -9,7 +9,7 @@
 // be replayed without a bespoke capture block (see the spec's "what a vector cannot cover").
 #include <cstdint>
 
-extern "C" int32_t d2_multi_sub_e150(void* ctx) {
+extern "C" __attribute__((weak)) int32_t d2_multi_sub_e150(void* ctx) {
     (void)ctx;
     return 1;   // retail returns 1 (or the status word 0x6FA0A0DC from sub_E730)
 }
