@@ -49,7 +49,7 @@ extern "C" char* d2_fn_d2lang_122e(uint32_t value, char* dest, int32_t radix)
 }
 
 // 1.13c D2Lang+0x01248 x64toa: 64-bit variant (negation over the full 64 bits).
-extern "C" void d2_fn_d2lang_1248(uint64_t val, char* buf, uint32_t radix, int neg)
+extern "C" void d2lang_1248_port(uint64_t val, char* buf, uint32_t radix, int neg)
 {
 	if (neg)
 	{
@@ -62,18 +62,28 @@ extern "C" void d2_fn_d2lang_1248(uint64_t val, char* buf, uint32_t radix, int n
 // 1.13c D2Lang+0x012E6 _ui64toa
 extern "C" char* d2_fn_d2lang_12e6(uint64_t val, char* dest, int32_t radix)
 {
-	d2_fn_d2lang_1248(val, dest, static_cast<uint32_t>(radix), 0);
+	d2lang_1248_port(val, dest, static_cast<uint32_t>(radix), 0);
 	return dest;
 }
 
 // 1.13c D2Lang+0x01301 _isalpha (retail mask 0x103 = upper|lower|alpha); C-locale table.
-extern "C" int d2_fn_d2lang_1301(int c) { return isalpha(c); }
+static int d2lang_ctype_mask(int c)   // retail C-locale _pctype word for c in -1..255 (0 outside)
+{
+	if (c < 0 || c > 127) return 0;
+	int m = 0;
+	if (c >= 'A' && c <= 'Z') m |= 0x01;
+	if (c >= 'a' && c <= 'z') m |= 0x02;
+	if (c >= '0' && c <= '9') m |= 0x04;
+	if (c == ' ' || (c >= 9 && c <= 13)) m |= 0x08;
+	return m;
+}
+extern "C" int d2lang_1301_port(int c) { return d2lang_ctype_mask(c) & 0x103; }
 
 // 1.13c D2Lang+0x01340 _isspace (mask 0x08)
-extern "C" int d2_fn_d2lang_1340(int c) { return isspace(c); }
+extern "C" int d2lang_1340_port(int c) { return d2lang_ctype_mask(c) & 0x08; }
 
 // 1.13c D2Lang+0x0137A _isalnum (mask 0x107)
-extern "C" int d2_fn_d2lang_137a(int c) { return isalnum(c); }
+extern "C" int d2lang_137a_port(int c) { return d2lang_ctype_mask(c) & 0x107; }
 
 // 1.13c D2Lang+0x013FB __initterm: call each non-null function pointer in [first, last).
 extern "C" void d2_fn_d2lang_13fb(void (**first)(), void (**last)())

@@ -54,8 +54,10 @@ extern "C" void d2lang_9590_suffixes(const uint8_t* tbl, const uint32_t* cache, 
     if (!tbl) exit(-1);
     for (int k = 0; k < 4; k++) {
         const uint16_t* w = (const uint16_t*)(uintptr_t)d2lang_9050_lookup(tbl, 0x14d0 + k, cache);
-        int n = 0;                                      // narrowed copy is capped at 4 chars
-        while (n < 4 && w[n]) n++;
-        out[k] = n < 2 ? (int16_t)(int8_t)(n ? (char)w[0] : 0) : def[k];
+        char nb[5]; int c = 0;                          // retail narrows each wide char to a byte (at most 4, stops at a 0 wide char), NUL-terminates, then strlens
+        while (c < 4 && w[c]) { nb[c] = (char)w[c]; c++; }
+        nb[c] = 0;
+        int n = 0; while (nb[n]) n++;
+        out[k] = n < 2 ? (int16_t)(int8_t)nb[0] : def[k];
     }
 }
