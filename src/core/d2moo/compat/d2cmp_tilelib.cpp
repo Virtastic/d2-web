@@ -139,9 +139,11 @@ extern "C" uint32_t D2CMP_14EC0_TableIndex(int a, int b) {
 // Node: +4 id, +8..+18 five key ints, +1C hash, +2C next (void*). Key: +4 flags, +8 kind, +C idA, +14 idB, +18..+28 five ints.
 extern "C" const uint8_t* D2CMP_17020_CacheFind(const uint8_t* pTable, const uint8_t* pKey, uint32_t nBucket, uint32_t nHash) {
     auto I = [](const uint8_t* p, int o) { int v; memcpy(&v, p + o, 4); return v; };
-    const uint8_t* n; memcpy(&n, pTable + 0x8000 + (size_t)nBucket * sizeof n, sizeof n);
+    // Retail's bucket slots and next links are 32-bit addresses (the build caps linear memory at 4 GiB).
+    auto P = [&I](const uint8_t* p, int o) { return (const uint8_t*)(uintptr_t)(uint32_t)I(p, o); };
+    const uint8_t* n = P(pTable, 0x8000 + (int)nBucket * 4);
     const int kind = I(pKey, 8);
-    for (; n; memcpy(&n, n + 0x2c, sizeof n)) {
+    for (; n; n = P(n, 0x2c)) {
         bool ok = true;
         for (int k = 0; k < 5; k++) ok = ok && I(pKey, 0x18 + 4 * k) == I(n, 8 + 4 * k);
         if (kind == 3 || kind == 4) ok = ok && I(pKey, 0xc) == I(n, 4);
