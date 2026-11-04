@@ -9,7 +9,6 @@
 // 0xE0F40 (ecx cy, edx unit, eax room; cx, game, 1).
 #include <cstdint>
 #include <cstring>
-#include <emscripten.h>
 
 struct D2Game31E20Env {
     void     (*fatal)(uint32_t line);
@@ -40,7 +39,7 @@ static uint32_t roll(uint32_t seed, int32_t range)
 }
 
 // 1.13c D2Game+0x31E20
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_31e20(uint32_t game, uint32_t classId, int32_t sizeX, int32_t sizeY,
+extern "C" uint32_t d2g_31e20(uint32_t game, uint32_t classId, int32_t sizeX, int32_t sizeY,
                                                            uint32_t room, const D2Game31E20Env* env)
 {
     int32_t box[4] = { 0, 0, 0, 0 };
