@@ -19,6 +19,10 @@ static uint32_t g_be0, g_be4;             // +0x10BE0 +0x10BE4
 static uint8_t  g_bf8[1];                 // +0x10BF8 back-end info block
 static uint8_t  g_pal78[1];               // +0x11278 palette block
 
+// capture state accessors (the B580 probe pins and reads the globals the capture pins and dumps): hinst, wndproc, mode, arg4, 0x14778, 0x10BE4
+extern "C" void d2gfx_n124_state_get(uint32_t* o) { o[0] = g_hinst; o[1] = g_wndproc; o[2] = g_mode; o[3] = g_arg4; o[4] = g_94778; o[5] = g_be4; }
+extern "C" void d2gfx_n124_state_set(const uint32_t* i) { g_hinst = i[0]; g_wndproc = i[1]; g_mode = i[2]; g_arg4 = i[3]; g_94778 = i[4]; g_be4 = i[5]; }
+
 struct D2GfxN124Env {
     void     (*error)(uint32_t id, const char* fmt);           // 0x7836(0x783C(id)) report
     void     (*exit_)(int32_t code);                           // 0x150B

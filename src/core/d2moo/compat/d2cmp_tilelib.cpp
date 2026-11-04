@@ -13,6 +13,7 @@
 #include <D2Common.h>
 #include <D2CMP.h>
 #include <string>
+#include <string.h>
 #include <vector>
 #include "../../../assets/mpqvfs.h"
 
@@ -136,7 +137,7 @@ extern "C" uint32_t D2CMP_14EC0_TableIndex(int a, int b) {
 // 1.13c D2CMP+0x17020 (verified against decompile)
 // Cache bucket lookup. Retail gets bucket index + key hash from 0x16E80 (register args); the caller supplies them.
 // Node: +4 id, +8..+18 five key ints, +1C hash, +2C next (void*). Key: +4 flags, +8 kind, +C idA, +14 idB, +18..+28 five ints.
-const uint8_t* D2CMP_17020_CacheFind(const uint8_t* pTable, const uint8_t* pKey, uint32_t nBucket, uint32_t nHash) {
+extern "C" const uint8_t* D2CMP_17020_CacheFind(const uint8_t* pTable, const uint8_t* pKey, uint32_t nBucket, uint32_t nHash) {
     auto I = [](const uint8_t* p, int o) { int v; memcpy(&v, p + o, 4); return v; };
     const uint8_t* n; memcpy(&n, pTable + 0x8000 + (size_t)nBucket * sizeof n, sizeof n);
     const int kind = I(pKey, 8);
@@ -184,11 +185,18 @@ static uint32_t slot32(const void* p) {
     if (v > 0xFFFFFFFFu) { fprintf(stderr, "D2CMP: sprite cache address %p does not fit a 32-bit slot\n", p); abort(); }
     return (uint32_t)v;
 }
-void D2CMP_SpriteCacheInit(D2SpriteCache* p, uint32_t param1, uint32_t eax, uint32_t param2) {
+// capture seam: the two Fog allocations and the lock init (retail 0x8D84, 0x8D7E, InitializeCriticalSection) as callbacks
+struct D2SpriteCacheEnv {
+    void* (*allocPool)(uint32_t pool, uint32_t size, const char* file, uint32_t line);
+    void* (*alloc)(uint32_t size, const char* file, uint32_t line);
+    void (*initLock)(void* lock);
+};
+extern "C" void D2CMP_SpriteCacheInitEx(D2SpriteCache* p, uint32_t param1, uint32_t eax, uint32_t param2, const D2SpriteCacheEnv* env) {
     p->s0 = param1; p->s1 = eax; p->s2 = p->s3 = 0; p->s11 = param2;
-    // retail: Fog #10045 FOG_AllocPool(pool = ECX = param_1, size = EDX = 0x23000, file, 0x905, 0), zeroed
-    D2SpriteNode* nodes = (D2SpriteNode*)FOG_AllocPool((void*)(uintptr_t)param1, 0x23000, kSpriteCacheFile, 0x905, 0);
+    // retail: Fog #10045 FOG_AllocPool(pool = ECX = param_1, size = EDX = 0x23000, file, 0x905, 0), then zeroes 0x8C00 dwords
+    D2SpriteNode* nodes = (D2SpriteNode*)env->allocPool(param1, 0x23000, kSpriteCacheFile, 0x905);
     p->pNodes = slot32(nodes);
+    memset(nodes, 0, 0x23000);
     for (uint32_t i = 0; i < 0x1400; i++) {
         nodes[i].next = i < 0x13ff ? slot32(&nodes[i + 1]) : 0;
         nodes[i].prev = i > 0 ? slot32(&nodes[i - 1]) : 0;
@@ -196,8 +204,15 @@ void D2CMP_SpriteCacheInit(D2SpriteCache* p, uint32_t param1, uint32_t eax, uint
     p->pHead = slot32(&nodes[0]); p->pTail = slot32(&nodes[0x13ff]);
     p->s5_8[0] = p->s5_8[1] = p->s5_8[2] = p->s5_8[3] = 0;
     p->s13_14[0] = p->s13_14[1] = 0;
-    // retail: Fog #10042 FOG_Alloc(ECX = 0x18, file, 0x92d, 0), stored at [12]; then InitializeCriticalSection (not reproduced)
-    if (!p->pLock) p->pLock = slot32(FOG_Alloc(0x18, kSpriteCacheFile, 0x92d, 0));
+    // retail: Fog #10042 FOG_Alloc(ECX = 0x18, file, 0x92d, 0), stored at [12]; then InitializeCriticalSection(lock)
+    if (!p->pLock) { void* l = env->alloc(0x18, kSpriteCacheFile, 0x92d); p->pLock = slot32(l); env->initLock(l); }
+}
+static void* defAllocPool(uint32_t pool, uint32_t size, const char* f, uint32_t line) { return FOG_AllocPool((void*)(uintptr_t)pool, size, f, line, 0); }
+static void* defAlloc(uint32_t size, const char* f, uint32_t line) { return FOG_Alloc(size, f, line, 0); }
+static void defInitLock(void*) {}   // InitializeCriticalSection is not reproduced
+void D2CMP_SpriteCacheInit(D2SpriteCache* p, uint32_t param1, uint32_t eax, uint32_t param2) {
+    static const D2SpriteCacheEnv env{defAllocPool, defAlloc, defInitLock};
+    D2CMP_SpriteCacheInitEx(p, param1, eax, param2, &env);
 }
 
 // 1.13c D2CMP+0x08710 -- statically linked CRT __convertcp(fromCP, toCP, src, &len, dst, dstLen).
