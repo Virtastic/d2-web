@@ -46,13 +46,20 @@ static uintptr_t findQuestState(uintptr_t game, uint32_t type, const D2GameBatch
     return 0;
 }
 
+// 0x9BEB0 takes the unit in EAX; 0x9C160 takes that result in EAX, EBX = 0 and the callback on the stack
+// (env->call args are eax, ecx, edx, ebx, esi, stack word 0, stack word 1); ESI is the caller's residue (E6B90) or self (E6850/E6980).
+static void walkParty(uintptr_t unit, uint32_t cbRva, uintptr_t esi, const D2GameBatchE6850Env* env)
+{
+    uintptr_t ax = C(0x9BEB0, unit, 0, 0, 0, 0, 0, 0);
+    if ((int16_t)ax != -1) C(0x9C160, ax, 0, 0, 0, esi, A(cbRva), 0);
+}
+
 // E6850/E6980 share a body; E6B90 is the same without the Ordinal_10174 test.
 static uint32_t timerIf(uintptr_t self, uintptr_t unit, uint32_t sub, uint32_t cbRva, const D2GameBatchE6850Env* env)
 {
     uintptr_t pl = O(10920, unit, 0, 0, 0, 0);
     uintptr_t v = O(10174, rd32(pl, 0x10 + rd8(self, 0x6d) * 4), sub, 0xd, 0, 0);
-    if (v && unit && rd32(unit, 0x80) && rd32(unit, 0) == 0 && (int16_t)C(0x9BEB0, 0, 0, 0, 0, 0, 0, 0) != -1)
-        C(0x9C160, A(cbRva), 0, 0, 0, 0, 0, 0);
+    if (v && unit && rd32(unit, 0x80) && rd32(unit, 0) == 0) walkParty(unit, cbRva, self, env);
     return 0;
 }
 // 1.13c D2Game+0xE6850
@@ -65,8 +72,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_E6980(uintptr_t self, uint
 // 1.13c D2Game+0xE6B90   (unit arrives in EAX)
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_E6B90(uintptr_t unit, const D2GameBatchE6850Env* env)
 {
-    if (unit && rd32(unit, 0x80) && rd32(unit, 0) == 0 && (int16_t)C(0x9BEB0, 0, 0, 0, 0, 0, 0, 0) != -1)
-        C(0x9C160, A(0xE3C70), 0, 0, 0, 0, 0, 0);
+    if (unit && rd32(unit, 0x80) && rd32(unit, 0) == 0) walkParty(unit, 0xE3C70, 0, env);
     return 0;
 }
 

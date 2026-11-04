@@ -101,7 +101,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_717e0(void* param1, void* game
     void* b = e->getOwner(n);      if (!b || !e->isValid(b)) return;
     if (msg == 0x12) {
         if (rd8(param1, 0x6c) != 0 && rd32(param1, 0x68) == 2) { wr32(param1, 100, 0xffffffff); wr32(param1, 0x68, 6); wr8(param1, 0x6c, 0); }
-        e->fd4570();
+        e->fd4570(eax);
     } else if (msg == 0x13) {
         if (param4 > 0 && (int32_t)e->getStat(param1, 0xf, 0) >= param4) {
             int32_t cur = (int32_t)e->getStat(param1, 0xe, 0);
@@ -120,19 +120,24 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_717e0(void* param1, void* game
 }
 
 // ---- 0x734E0 (NAMED) -------------------------------------------------------------------------------
-struct D2Game734e0Env { void (*fd4570)(); void (*f72fc0)(int* p2, int* eax); };
-// 1.13c-NAMED D2Game+0x734E0: GUESS fd4570 args hidden. msg 0x17 clears a state-4 sub-record, 0x18 forwards.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_734e0(int32_t* eax, int16_t msg, int32_t* p2, const D2Game734e0Env* e) {
+struct D2Game734e0Env { void (*fd4570)(int* unit); void (*f72fc0)(int* p2, int* eax); };   // 0xD4570: EAX = unit (still live from the entry), no stack words; 0x72FC0: stack (p2, unit)
+// 1.13c D2Game+0x734E0: EAX = unit, CX = msg, stack p2 (ret 4). msg 0x17 clears a state-4 sub-record, 0x18 forwards.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_734E0(int32_t* eax, int16_t msg, int32_t* p2, const D2Game734e0Env* e) {
     if (msg == 0x17) {
         if ((uint8_t)eax[0x1b] != 0 && eax[0x1a] == 4) { eax[0x19] = -1; eax[0x1a] = 6; *(uint8_t*)(eax + 0x1b) = 0; }
-        e->fd4570();
+        e->fd4570(eax);
     } else if (msg == 0x18) e->f72fc0(p2, eax);
 }
 
 // ---- 0x758D0 / 0x75900 -----------------------------------------------------------------------------
-struct D2Game75680Env { void (*f75680)(int* p, void* eax); };
-// 1.13c D2Game+0x758D0: tail-forward (param_1, EAX).
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_758d0(int* param1, void* eax, const D2Game75680Env* e) { e->f75680(param1, eax); }
+struct D2Game75680Env { void (*f75680)(int* p, void* eax, uint32_t one, const uint32_t* rec); };
+// 1.13c D2Game+0x758D0: EAX, ECX and one stack word (ret 4). Builds a 0x20-byte local whose dwords 1 and 2 are EAX and ECX
+// (dword 0 and the rest are stack residue) and calls 0x75680(param1, EAX, 1, &local), which pops the four words.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_758D0(int* param1, void* eax, void* ecx, const D2Game75680Env* e) {
+    uint32_t local[8] = {};
+    local[1] = (uint32_t)(uintptr_t)eax; local[2] = (uint32_t)(uintptr_t)ecx;
+    e->f75680(param1, eax, 1, local);
+}
 
 
 // ---- 0x75A40 (NAMED, last) / 0x75C60 ---------------------------------------------------------------
