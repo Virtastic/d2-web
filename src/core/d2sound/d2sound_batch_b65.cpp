@@ -42,15 +42,17 @@ void D2sound_b65_8FD0(const int32_t* p)
 }
 
 // 1.13c D2sound+0x7CD0  (EAX register input becomes explicit leading param)
-static uint32_t g_b65_c8, g_b65_h580;
-static void (*g_b65_ord260)(uint32_t);
-static uint32_t (*g_b65_fn7740)(int, uint32_t);
-static uint32_t g_b65_arg658c;
-void D2sound_b65_7CD0(uint32_t eax_in)
+// Retail 32-bit words: the three globals (0x6F9C65C8 / 0x6F9C6580) are reached through pointers, the two callees are seams.
+struct D2soundB65_7CD0Env {
+    uint32_t* store65c8; uint32_t* result6580; uint32_t arg658c;
+    void (*ord260)(uint32_t);
+    uint32_t (*fn7740)(uint32_t flags, uint32_t arg);
+};
+void D2sound_b65_7CD0(uint32_t eax_in, const D2soundB65_7CD0Env* e)
 {
-    g_b65_c8 = eax_in;
-    g_b65_ord260(g_b65_arg658c);
-    g_b65_h580 = g_b65_fn7740(1, g_b65_c8);
+    *e->store65c8 = eax_in;
+    e->ord260(e->arg658c);
+    *e->result6580 = e->fn7740(1, *e->store65c8);
 }
 
 // 1.13c D2sound+0x8DB0  (__fastcall: param_1 in ECX)

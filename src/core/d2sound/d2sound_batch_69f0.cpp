@@ -30,7 +30,11 @@ void D2sound_69F0(void* obj, void (*stop6980)(void*)) {
 // Returns 1 and fills +0x04 size, +0x08 half size, +0x30 = -1, +0x34 = flags; 0 on failure.
 // env: dsound = DAT_6F9C658C, hwMix = DAT_6F9C6584, has3d = DAT_6F9C6594, ds3d = DAT_6F9C6598,
 // guidA/guidB = the IIDs at 0x6F9C01C4 / 0x6F9C01B4, guidP1/guidP2 = 0x6F9C01E8 / 0x6F9C0208.
-struct D2sound7090Env { void* dsound; uint32_t hwMix, has3d, ds3d; const void *guidA, *guidB, *guidP1, *guidP2; };
+struct D2sound7090Env { uint32_t dsound, hwMix, has3d, ds3d, guidA, guidB, guidP1, guidP2; };   // retail 32-bit words (COM objects and GUID addresses are guest dwords)
+typedef int32_t (*Com1)(uint32_t, uint32_t, uint32_t, uint32_t);
+typedef int32_t (*Com3)(uint32_t, uint32_t, uint32_t);
+static inline uint32_t gslot(uint32_t itf, uint32_t off) { return rd32((const void*)(uintptr_t)rd32((const void*)(uintptr_t)itf, 0), off); }
+static void comRelease32(uint32_t itf) { ((void (*)(uint32_t))(uintptr_t)gslot(itf, 8))(itf); }
 uint32_t D2sound_7090(void* obj, uint32_t flags, const D2sound7090Env* e) {
     uint16_t ch = ((flags & 1) != 0) + 1;
     uint8_t wfx[18] = {};                                   // WAVEFORMATEX, 16-bit PCM @ 22050 Hz
@@ -45,43 +49,46 @@ uint32_t D2sound_7090(void* obj, uint32_t flags, const D2sound7090Env* e) {
     uint32_t dsFlags = (e->hwMix ? 0x8000u : 0u) + 0xA0u;
     uint32_t ctl = flags & 2;
     dsFlags |= ctl ? 0x14u : 0x40u;
-    uint32_t desc[5] = { 0x14, dsFlags, bytes, 0, 0 };      // DSBUFFERDESC
-    void* wp = wfx; std::memcpy(&desc[4], &wp, sizeof wp);  // lpwfxFormat (host pointer width: seam only)
-    void* dsb = nullptr;
-    void** dvt = *(void***)e->dsound;
-    if ((int32_t)((int32_t (*)(void*, void*, void**, void*))dvt[0xC / 4])(e->dsound, desc, &dsb, nullptr) < 0) return 0;
-    std::memcpy((uint8_t*)obj, &dsb, sizeof dsb);
+    uint32_t desc[5] = { 0x14, dsFlags, bytes, 0, (uint32_t)(uintptr_t)wfx };      // DSBUFFERDESC
+    const uint32_t o = (uint32_t)(uintptr_t)obj;
+    // CreateSoundBuffer(this, &desc, &obj->+0, 0): the buffer pointer is written by the callee straight into the stream record.
+    if ((int32_t)((Com1)(uintptr_t)gslot(e->dsound, 0xC))(e->dsound, (uint32_t)(uintptr_t)desc, o, 0) < 0) return 0;
     auto ok = [&] { wr32(obj, 4, bytes); wr32(obj, 0xD * 4, flags); wr32(obj, 8, bytes >> 1); wr32(obj, 0xC * 4, 0xFFFFFFFF); return 1u; };
     if (!ctl) return ok();
-    void** bvt = *(void***)dsb;
-    void* itf3 = nullptr;
-    if ((int32_t)((int32_t (*)(void*, const void*, void**))bvt[0])(dsb, e->guidA, &itf3) >= 0) {
-        std::memcpy((uint8_t*)obj + 0xC, &itf3, sizeof itf3);
+    const uint32_t dsb = rd32(obj, 0);
+    if ((int32_t)((Com3)(uintptr_t)gslot(dsb, 0))(dsb, e->guidA, o + 0xC) >= 0) {
         if (!e->has3d) return ok();
-        void* ps = nullptr;
-        void** ivt = *(void***)itf3;
-        if ((int32_t)((int32_t (*)(void*, const void*, void**))ivt[0])(itf3, e->guidB, &ps) >= 0) {
-            std::memcpy((uint8_t*)obj + 0x10, &ps, sizeof ps);
+        const uint32_t itf3 = rd32(obj, 0xC);
+        if ((int32_t)((Com3)(uintptr_t)gslot(itf3, 0))(itf3, e->guidB, o + 0x10) >= 0) {
             uint32_t support = 0;
-            void** pvt = *(void***)ps;
-            int32_t r = ((int32_t (*)(void*, const void*, uint32_t, uint32_t*))pvt[0x14 / 4])(ps, e->ds3d == 1 ? e->guidP1 : e->guidP2, 1, &support);
+            const uint32_t ps = rd32(obj, 0x10);
+            int32_t r = ((int32_t (*)(uint32_t, uint32_t, uint32_t, uint32_t))(uintptr_t)gslot(ps, 0x14))(ps, e->ds3d == 1 ? e->guidP1 : e->guidP2, 1, (uint32_t)(uintptr_t)&support);
             if (r >= 0 && (support & 3) == 3) return ok();
-            comRelease(ps);
+            comRelease32(rd32(obj, 0x10));
         }
     }
-    comRelease(dsb);
+    comRelease32(rd32(obj, 0));
     return 0;
 }
 
 // 1.13c D2sound+0x7AA0
 // Create the manual-reset event and the worker thread; fatal (message 0xBC) if the thread already exists.
 // The thread body (0x7800) is not ported, so it arrives as `proc`.
-static HANDLE g_evt65d0, g_thr65d4;
+struct D2sound7AA0Env { uint32_t* evt; uint32_t* thr; uint32_t (*createEvent)(void); uint32_t (*createThread)(void); void (*fatal)(uint32_t); };   // 0x6F9C65D0 / 0x6F9C65D4
+void D2sound_7AA0_core(const D2sound7AA0Env* e) {
+    if (*e->thr) e->fatal(0xBC);
+    *e->evt = e->createEvent();
+    *e->thr = e->createThread();
+}
+static uint32_t g_evt65d0, g_thr65d4;
+static LPTHREAD_START_ROUTINE g_proc7AA0;
 void D2sound_7AA0(LPTHREAD_START_ROUTINE proc) {
-    if (g_thr65d4) fatal69(0xBC);
-    g_evt65d0 = CreateEventA(nullptr, 1, 0, nullptr);
-    DWORD id;
-    g_thr65d4 = CreateThread(nullptr, 0, proc, nullptr, 0, &id);
+    g_proc7AA0 = proc;
+    D2sound7AA0Env e = { &g_evt65d0, &g_thr65d4,
+        [] { return (uint32_t)(uintptr_t)CreateEventA(nullptr, 1, 0, nullptr); },
+        [] { DWORD id; return (uint32_t)(uintptr_t)CreateThread(nullptr, 0, g_proc7AA0, nullptr, 0, &id); },
+        fatal69 };
+    D2sound_7AA0_core(&e);
 }
 
 // 1.13c D2sound+0x7BC0

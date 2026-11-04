@@ -82,9 +82,9 @@ uint32_t D2Sound_67C0(void* obj) {
 void D2Sound_68D0(void* obj, uint32_t a, uint32_t b, uint32_t c) {
     if (!obj || !rd32(obj, 0)) d2sound_fatal(0x302);
     if (rd32(obj, 0x34) & 2) {
-        void* iface = rdptr(obj, 0xC);
-        void** vt = *(void***)iface;
-        ((void (*)(void*, uint32_t, uint32_t, uint32_t, uint32_t))vt[0x4C / 4])(iface, a, b, c, 0);
+        const uint32_t iface = rd32(obj, 0xC);
+        const uint32_t vt = rd32((const void*)(uintptr_t)iface, 0);
+        ((void (*)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t))(uintptr_t)rd32((const void*)(uintptr_t)vt, 0x4C))(iface, a, b, c, 0);
     }
 }
 
@@ -222,17 +222,18 @@ void D2Sound_7650(void* obj, const D2SoundEnv* env) {
         wr32(obj, 0x40, 0);
         wr32(obj, 0x44, 0);
     }
-    void* iface = rdptr(obj, 0);
-    void** vt = *(void***)iface;
-    ((void (*)(void*, uint32_t))vt[0x34 / 4])(iface, 0);
-    void* aux = rdptr(obj, 0x0C);
+    // COM objects are retail 32-bit pointers: their words are guest dwords (vtable at +0, slot n at vtable + 4n).
+    const uint32_t iface = rd32(obj, 0);
+    const uint32_t vt = rd32((const void*)(uintptr_t)iface, 0);
+    ((void (*)(uint32_t, uint32_t))(uintptr_t)rd32((const void*)(uintptr_t)vt, 0x34))(iface, 0);
+    const uint32_t aux = rd32(obj, 0x0C);
     if (aux) {
-        void** avt = *(void***)aux;
-        ((void (*)(void*, float, uint32_t))avt[0x40 / 4])(aux, 100.0f, 0);
-        ((void (*)(void*, float, uint32_t))avt[0x44 / 4])(aux, 2.0f, 0);
+        const uint32_t avt = rd32((const void*)(uintptr_t)aux, 0);
+        ((void (*)(uint32_t, float, uint32_t))(uintptr_t)rd32((const void*)(uintptr_t)avt, 0x40))(aux, 100.0f, 0);
+        ((void (*)(uint32_t, float, uint32_t))(uintptr_t)rd32((const void*)(uintptr_t)rd32((const void*)(uintptr_t)aux, 0), 0x44))(aux, 2.0f, 0);
     }
     if (!(rd8(obj, 0x34) & 2))
-        ((void (*)(void*))vt[0x40 / 4])(iface);
+        ((void (*)(uint32_t, uint32_t))(uintptr_t)rd32((const void*)(uintptr_t)vt, 0x40))(iface, 0);
     else
         env->stopStream(obj, 0, 0, 0);
     env->setPan(obj, 0.0f);
@@ -620,16 +621,20 @@ uint32_t D2Sound_7C60(int32_t enable, int32_t loop, const D2SoundEnvB* e) {
 // 1.13c D2sound+0x07580
 // Bind a WAVE image to the stream: parse the header, and if the payload is longer than +0x44 store
 // (len, fmt) at +0x18/+0x14, refill, mark +0x28, and set the +0x30 cursor. Fatal on any failure.
-uint32_t D2Sound_7580(void* s, int32_t* wav, uint32_t size, const D2SoundEnvB* e) {
-    if (!s || !rd32(s, 0) || !wav || !size) d2sound_fatal(599);
+// `sd`/`wavd` are retail 32-bit pointers (guest dwords).
+extern "C" int32_t* D2sound_8980(int32_t* riff, uint32_t* size, uint16_t* wfx);
+uint32_t D2Sound_72D0(uint32_t sd, uint32_t pos, uint32_t lockOff, uint32_t bytes);
+uint32_t D2Sound_7580(uint32_t sd, uint32_t wavd, uint32_t size) {
+    void* s = (void*)(uintptr_t)sd;
+    if (!s || !rd32(s, 0) || !wavd || !size) d2sound_fatal(599);
     EnterCriticalSection(&g_lock);
     uint16_t fmt[10];
     uint32_t len = size;
-    int32_t* data = D2Sound_8980(wav, &len, fmt, e->base);
+    int32_t* data = D2sound_8980((int32_t*)(uintptr_t)wavd, &len, fmt);
     if (rd32(s, 0x44) >= len) d2sound_fatal(0x25F);
     wr32(s, 0x18, len);
     wr32(s, 0x14, (uint32_t)(uintptr_t)data);
-    e->fill(nullptr, 0, rdptr(s, 4));
+    D2Sound_72D0(sd, 0, 0, rd32(s, 4));
     wr32(s, 0x28, 1);
     wr32(s, 0x30, (!rd32(s, 0x40) && rd32(s, 0x18) < rd32(s, 4)) ? rd32(s, 0x18) : 0xFFFFFFFFu);
     LeaveCriticalSection(&g_lock);
@@ -651,7 +656,7 @@ void D2Sound_8200(const uint8_t* name, const D2SoundEnvB* e, uint32_t (*after6F3
             if (!s || !rd32(s, 0)) d2sound_fatal(0x2A5);
             if (rd32(s, 0x1C) == 0) {
                 D2Sound_7650(s, e->base);
-                D2Sound_7580(s, (int32_t*)rdptr(ent, 0x50), rd32(ent, 0x54), e);
+                D2Sound_7580((uint32_t)(uintptr_t)s, rd32(ent, 0x50), rd32(ent, 0x54));
                 e->base->setVolume(s, 0xFF);
                 after6F30(s);
                 break;
@@ -664,38 +669,42 @@ void D2Sound_8200(const uint8_t* name, const D2SoundEnvB* e, uint32_t (*after6F3
 // 1.13c D2sound+0x072D0
 // Stream refill. Retail takes the stream in EBX and (pos, lockOffset, bytes) on the stack. Locks
 // `bytes` of the buffer object (+0x00, method +0x2C), copies from data(+0x14) at `pos` wrapping at
-// +0x18 back to +0x44, zero-pads a non-looping tail up to the +0x30 limit, unlocks (+0x4C).
-uint32_t D2Sound_72D0(void* s, uint32_t pos, uint32_t lockOff, uint32_t bytes) {
+// +0x18 back to +0x44, zero-pads a non-looping tail up to the +0x30 limit (compared against
+// lockOffset + bytes copied, retail keeps that running sum in the lockOffset slot), unlocks (+0x4C).
+// `s` is the retail 32-bit stream record: its words are guest dwords, never host pointers.
+uint32_t D2Sound_72D0(uint32_t sd, uint32_t pos, uint32_t lockOff, uint32_t bytes) {
+    void* s = (void*)(uintptr_t)sd;
     if (!s || !rd32(s, 0) || !rd32(s, 0x14) || !bytes) d2sound_fatal(0xDD);
     EnterCriticalSection(&g_lock);
-    void* iface = rdptr(s, 0);
-    void** vt = *(void***)iface;
-    uint8_t* dst = nullptr;
-    uint32_t got = bytes;
-    if (((int32_t (*)(void*, uint32_t, uint32_t, void*, void*, uint32_t, uint32_t, uint32_t))vt[0x2C / 4])(
-            iface, lockOff, bytes, &dst, &got, 0, 0, 0) < 0) {
+    const uint32_t iface = rd32(s, 0);
+    const uint32_t vt = rd32((const void*)(uintptr_t)iface, 0);
+    uint32_t p1 = 0, len1 = bytes;
+    typedef int32_t (*LockFn)(uint32_t, uint32_t, uint32_t, uint32_t*, uint32_t*, uint32_t, uint32_t, uint32_t);
+    typedef int32_t (*UnlockFn)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+    if (((LockFn)(uintptr_t)rd32((const void*)(uintptr_t)vt, 0x2C))(iface, lockOff, bytes, &p1, &len1, 0, 0, 0) < 0) {
         LeaveCriticalSection(&g_lock);
         return 0;
     }
-    uint8_t* d = dst;
-    uint32_t n = bytes, written = 0;
+    uint8_t* d = (uint8_t*)(uintptr_t)p1;
+    uint32_t n = bytes;
     for (;;) {
         uint32_t end = rd32(s, 0x18);
-        if (end <= pos) { uint32_t b = rd32(s, 0x44); pos = (pos - b) % (end - b) + b; }
-        uint32_t c = (int32_t)n < (int32_t)(end - pos) ? n : end - pos;
-        std::memcpy(d, (const uint8_t*)rdptr(s, 0x14) + pos, c);
-        d += c; wr32(s, 0x24, rd32(s, 0x24) + c); n -= c; written += c; pos += c;
+        if (pos >= end) { uint32_t b = rd32(s, 0x44); pos = (pos - b) % (end - b) + b; }
+        uint32_t room = end - pos;
+        uint32_t c = (int32_t)n < (int32_t)room ? n : room;
+        std::memcpy(d, (const uint8_t*)(uintptr_t)rd32(s, 0x14) + pos, c);
+        d += c; wr32(s, 0x24, rd32(s, 0x24) + c); n -= c; lockOff += c; pos += c;
         if (rd32(s, 0x40) == 0) break;
         if (n == 0) goto done;
     }
     if (n) {
         uint32_t lim = rd32(s, 0x30);
-        if (lim != 0xFFFFFFFFu) { if (lim <= written) goto done; n = lim - written; }
-        std::memset(d, 0, n);
+        if (lim != 0xFFFFFFFFu) { if (lockOff >= lim) goto done; n = lim - lockOff; }
+        if (n) std::memset(d, 0, n);
     }
 done:
-    ((int32_t (*)(void*, void*, uint32_t, void*, uint32_t))vt[0x4C / 4])(iface, dst, got, nullptr, 0);
-    if (rd32(s, 0x40) == 0 && rd32(s, 0x18) <= rd32(s, 0x24)) wr32(s, 0x2C, 1);
+    ((UnlockFn)(uintptr_t)rd32((const void*)(uintptr_t)vt, 0x4C))(iface, p1, len1, 0, 0);
+    if (rd32(s, 0x40) == 0 && rd32(s, 0x24) >= rd32(s, 0x18)) wr32(s, 0x2C, 1);
     LeaveCriticalSection(&g_lock);
     return 1;
 }
