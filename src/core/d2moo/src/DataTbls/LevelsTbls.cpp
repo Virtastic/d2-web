@@ -992,8 +992,17 @@ D2LvlSubTxt* __fastcall DATATBLS_GetLvlSubTxtRecord(int nSubType)
 	return &sgptDataTables->pLvlSubTxt[sgptDataTables->pLvlSubTypeStartIds[nSubType]];
 }
 
-//D2Common.0x6FD62780
-void __fastcall DATATBLS_AllocGlobalTileLibraryHash()
+//D2Common.0x6FD62780 (the body; the entry below calls it without a seam)
+// The three outside calls of the allocator (pool alloc, FOG_IsExpansion, the tile library slot loader), so a capture probe can answer them
+// the way the recorded retail hooks did. A null member is the real one.
+struct D2TileLibraryHashSeam
+{
+	void* (*alloc)(size_t nSize);
+	int (*isExpansion)();
+	void (*loadSlot)(D2TileLibraryHashStrc** ppSlots, const char* szFile);
+};
+
+void DATATBLS_AllocGlobalTileLibraryHashSeam(const D2TileLibraryHashSeam* pSeam)
 {
 	static char szTest[] = "0";
 
@@ -1002,9 +1011,11 @@ void __fastcall DATATBLS_AllocGlobalTileLibraryHash()
 
 	D2_ASSERT(sgptDataTables->pLvlTypesTxt);
 
-	sgptDataTables->ppTileLibraryHash = (D2TileLibraryHashStrc**)D2_CALLOC_POOL(nullptr, sizeof(D2TileLibraryHashStrc*[1024]) * sgptDataTables->nLvlTypesTxtRecordCount);
-	
+	const size_t nSize = sizeof(D2TileLibraryHashStrc*[1024]) * sgptDataTables->nLvlTypesTxtRecordCount;
+	sgptDataTables->ppTileLibraryHash = (D2TileLibraryHashStrc**)(pSeam && pSeam->alloc ? pSeam->alloc(nSize) : D2_CALLOC_POOL(nullptr, nSize));
+
 	ppTileLibraryHash = sgptDataTables->ppTileLibraryHash;
+	const int bExpansion = pSeam && pSeam->isExpansion ? pSeam->isExpansion() : FOG_IsExpansion();
 	for (int i = 0; i < sgptDataTables->nLvlTypesTxtRecordCount; ++i)
 	{
 		for (int j = 0; j < 32; ++j)
@@ -1023,14 +1034,27 @@ void __fastcall DATATBLS_AllocGlobalTileLibraryHash()
 				break;
 			}
 
-			if (FOG_IsExpansion() || !sgptDataTables->pLvlTypesTxt[i].dwExpansion)
+			if (bExpansion || !sgptDataTables->pLvlTypesTxt[i].dwExpansion)
 			{
-				D2CMP_10087_LoadTileLibrarySlot(ppTileLibraryHash, sgptDataTables->pLvlTypesTxt[i].szFile[j]);
+				if (pSeam && pSeam->loadSlot)
+				{
+					pSeam->loadSlot(ppTileLibraryHash, sgptDataTables->pLvlTypesTxt[i].szFile[j]);
+				}
+				else
+				{
+					D2CMP_10087_LoadTileLibrarySlot(ppTileLibraryHash, sgptDataTables->pLvlTypesTxt[i].szFile[j]);
+				}
 			}
 		}
 
 		ppTileLibraryHash += 1024;
 	}
+}
+
+//D2Common.0x6FD62780
+void __fastcall DATATBLS_AllocGlobalTileLibraryHash()
+{
+	DATATBLS_AllocGlobalTileLibraryHashSeam(nullptr);
 }
 
 //D2Common.0x6FD628A0

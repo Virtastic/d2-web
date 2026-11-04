@@ -7,7 +7,9 @@
 namespace d2net_n97 {
 
 struct Host {
-  int (*get_cp_info)(uint32_t cp, uint8_t lead[12]);  // GetCPInfo: 1 ok, lead = LeadByte pairs
+  int (*get_cp_info)(uint32_t cp, uint8_t cpinfo[20]);  // GetCPInfo: 1 ok; cpinfo = MaxCharSize(4), DefaultChar(2), LeadByte(12), 2 pad
+  void (*reset_sbcs)();                               // 0x3376
+  void (*build_casemap)();                            // 0x339F: the ctype/case tables from the new codepage
   uint32_t (*get_acp)();                              // GetACP
   uint32_t (*get_oemcp)();                            // GetOEMCP
   void (*lock)(int);
@@ -20,6 +22,9 @@ struct State {
   uint8_t mbctype[257];     // _mbctype
   uint32_t mbcodepage, mbulinfo[6], mbcsflag;
   uint8_t sbcs_ext[256];
+  uint32_t lang;            // 0xB454 language id of the codepage
+  uint8_t tbl[0xf8];        // 0xA5C0: flag bytes (+0..3) and five 0x30-byte codepage entries from +8 (cp, 3 info dwords, four 8-byte lead-range groups)
+  uint32_t sbcs_fallback;   // 0xB0D0: nonzero = an unknown codepage falls back to SBCS instead of failing
 };
 
 // 1.13c D2NET+0x03347
@@ -39,16 +44,51 @@ int getSystemCP(const Host& h, int cp) {
   return cp;
 }
 
-// 1.13c D2NET+0x0353A: fill _mbctype lead (0x04) and trail (0x08) flags from GetCPInfo lead ranges
+// 1.13c D2NET+0x03347 (eax = codepage): the language id of the four East Asian codepages, else 0
+uint32_t cpLangId(uint32_t cp) {
+  switch (cp) { case 932: return 0x411; case 936: return 0x804; case 949: return 0x412; case 950: return 0x404; default: return 0; }
+}
+
+// 1.13c D2NET+0x0353A: the CRT codepage table builder (cdecl cp, 0 ok / -1 unknown codepage with no fallback).
+// A codepage in the five-entry static table (0xA5C8 + 0x30 * i) takes its ranges from the table; any other asks GetCPInfo.
 int buildMbctable(const Host& h, State& s, uint32_t cp) {
-  uint8_t lead[12] = {};
-  if (!h.get_cp_info(cp, lead)) return 0;
+  auto sbcs = [&]() { h.reset_sbcs(); h.build_casemap(); return 0; };
+  if (cp == 0) return sbcs();
+  uint32_t i = 0;
+  for (; i < 5; ++i) { uint32_t v; std::memcpy(&v, s.tbl + 8 + 0x30 * i, 4); if (v == cp) break; }
+  if (i < 5) {
+    std::memset(s.mbctype, 0, sizeof s.mbctype);
+    const uint8_t* e = s.tbl + 8 + 0x30 * i;
+    for (uint32_t g = 0; g < 4; ++g) {
+      const uint8_t* p = e + 0x10 + 8 * g;
+      for (uint8_t lo = *p; lo; lo = *p) {
+        uint8_t hi = p[1];
+        if (!hi) break;
+        if (lo <= hi) for (uint32_t c = lo; c <= hi; ++c) s.mbctype[1 + c] |= s.tbl[g];
+        p += 2;
+      }
+    }
+    s.mbcodepage = cp; s.mbcsflag = 1;
+    s.lang = cpLangId(cp);
+    std::memcpy(s.mbulinfo, e + 4, 12);
+    h.build_casemap();
+    return 0;
+  }
+  uint8_t ci[20] = {};
+  if (h.get_cp_info(cp, ci) != 1) return s.sbcs_fallback ? sbcs() : -1;
   std::memset(s.mbctype, 0, sizeof s.mbctype);
-  for (int i = 0; i < 12 && lead[i] && lead[i + 1]; i += 2)
-    for (int c = lead[i]; c <= lead[i + 1]; ++c) s.mbctype[c + 1] |= 4;
-  for (int c = 1; c < 255; ++c) if (!(s.mbctype[c + 1] & 4)) s.mbctype[c + 1] |= 8 * (c > 0x3f);
-  s.mbcodepage = cp; s.mbcsflag = 1;
-  return 1;
+  s.mbcodepage = cp; s.lang = 0;
+  uint32_t maxc; std::memcpy(&maxc, ci, 4);
+  if (maxc > 1) {
+    for (const uint8_t* p = ci + 7; p[-1] && p[0]; p += 2)
+      for (uint32_t c = p[-1]; c <= p[0]; ++c) s.mbctype[1 + c] |= 4;
+    for (uint32_t c = 1; c < 255; ++c) s.mbctype[1 + c] |= 8;
+    s.lang = cpLangId(cp);
+    s.mbcsflag = 1;
+  } else s.mbcsflag = 0;
+  std::memset(s.mbulinfo, 0, 12);
+  h.build_casemap();
+  return 0;
 }
 
 // 1.13c D2NET+0x036CE: __setmbcp, 0 on success, -1 on a codepage with no table
