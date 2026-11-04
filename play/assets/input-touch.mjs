@@ -563,6 +563,12 @@ export function installTouchInput({ documentObject = globalThis.document, window
     return belt ? { key: `belt:${belt}`, shop: false, belt: true } : null;
   }
   function heldItem() { return windowObject.__d2Shell?.cursorItem || 0; }
+  // A dead player in the game (PLRMODE_DEAD = 17, the mode death-screen.mjs's respawnAllowed reads; the
+  // shell's own Escape handler is what checks it). The death animation (0) is not yet a respawn.
+  function deadAwaitingRespawn() {
+    const shell = windowObject.__d2Shell;
+    return Boolean(shell && shell.screen === 'game' && !shell.clearScreen && shell.snapshot?.mode === 17);
+  }
   function hover(x, y, pointerId) {
     send('pointermove', x, y, { button: 0, buttons: 0, pointerType: 'touch', pointerId, shiftKey: restDown() });
   }
@@ -654,6 +660,10 @@ export function installTouchInput({ documentObject = globalThis.document, window
     if (e.target !== canvas) return;
     e.stopPropagation();
     if (e.cancelable) e.preventDefault();
+    // The death prompt reads "PRESS ESC TO CONTINUE" (retail's youdiedinst). A phone has no Escape, so a
+    // touch on the dead player's screen is that Escape: the same keydown the shell answers with a respawn.
+    // It is sent once, at the press; the finger is held as a dead hold, which sends nothing when it lifts.
+    if (deadAwaitingRespawn()) { holds.set(e.pointerId, { role: 'dead' }); tapKey('Escape', 'Escape'); return; }
     const [x, y] = toCanvas(canvas, e.clientX, e.clientY);
     // A finger the aim rules claim is a click; otherwise a finger in the console gap is a rest.
     if (!snapAim(x, y) && restGround(x, y)) { holds.set(e.pointerId, { role: 'rest' }); return; }
