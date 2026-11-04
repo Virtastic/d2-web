@@ -322,7 +322,10 @@ export function installTouchInput({ documentObject = globalThis.document, window
   // hits something is delivered raw, and ground that has nothing near it still walks exactly there.
   // Panels, the HUD band and the belt are excluded: their own aim rules (above) decide there.
   const WORLD_SPOKES = 8;
-  function worldAim(x, y) {
+  // The right click (the second finger) is how a player attacks, and it is the hardest to land on a moving
+  // monster: it searches wider (RIGHT_REACH_CSS), on more rings and spokes, nearest ring first.
+  const RIGHT_REACH_CSS = 30, RIGHT_RINGS = 5, RIGHT_SPOKES = 16;
+  function worldAim(x, y, wide) {
     const shell = windowObject.__d2Shell;
     if (!shell || shell.screen !== 'game' || shell.clearScreen || typeof shell.touchPickAt !== 'function') return null;
     if (shell.skillSelectOpen || shell.characterVisible || shell.skillsVisible) return null;
@@ -332,10 +335,12 @@ export function installTouchInput({ documentObject = globalThis.document, window
     if (y >= bandTop || inPanel(x, y)) return null;
     let hit;
     try { if (shell.touchPickAt(x, y)) return null; } catch { return null; }
-    const reach = fingerReach(16);
-    for (const r of [reach / 2, reach]) {
-      for (let i = 0; i < WORLD_SPOKES; i += 1) {
-        const a = (i / WORLD_SPOKES) * 2 * Math.PI, px = x + r * Math.cos(a), py = y + r * Math.sin(a);
+    const reach = wide ? fingerReach(16) * RIGHT_REACH_CSS / FINGER_REACH_CSS : fingerReach(16);
+    const rings = wide ? Array.from({ length: RIGHT_RINGS }, (_, k) => reach * (k + 1) / RIGHT_RINGS) : [reach / 2, reach];
+    const spokes = wide ? RIGHT_SPOKES : WORLD_SPOKES;
+    for (const r of rings) {
+      for (let i = 0; i < spokes; i += 1) {
+        const a = (i / spokes) * 2 * Math.PI, px = x + r * Math.cos(a), py = y + r * Math.sin(a);
         if (py >= bandTop || inPanel(px, py)) continue;
         try { hit = shell.touchPickAt(px, py); } catch { hit = false; }
         if (hit) return [px, py];
@@ -679,7 +684,7 @@ export function installTouchInput({ documentObject = globalThis.document, window
     if (aiming?.[1].right) { holds.set(e.pointerId, { role: 'swallowed' }); return; }
     if (aiming) {
       // The second finger: the right button goes down where the aiming finger is pointing.
-      const [ax, ay] = aim(aiming[1].x, aiming[1].y);
+      const [ax, ay] = snapAim(aiming[1].x, aiming[1].y) || worldAim(aiming[1].x, aiming[1].y, true) || [aiming[1].x, aiming[1].y];
       const shiftKey = restDown();
       // A mouse has one pointer: the left button comes up before the right goes down, or the held
       // left keeps walking the hero through the whole right click.
@@ -730,7 +735,7 @@ export function installTouchInput({ documentObject = globalThis.document, window
       h.x = x; h.y = y;
       const held = [...holds.entries()].find(([, o]) => o.role === 'second');
       if (!held) return;
-      const [ax, ay] = moveAim(x, y);
+      const [ax, ay] = snapAim(x, y) || worldAim(x, y, true) || [x, y];
       held[1].ax = ax; held[1].ay = ay;
       send('pointermove', ax, ay, { button: 2, pointerType: 'touch', pointerId: held[0], shiftKey: restDown() });
       return;

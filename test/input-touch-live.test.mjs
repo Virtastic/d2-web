@@ -1094,3 +1094,17 @@ test('on a wider canvas a gold coin is found by the shell probe in canvas px (th
   w.down(1, 697, 410); w.up(1, 697, 410);
   assert.deepEqual(w.sent.at(-1), left('pointerup', 705, 410));
 });
+
+test('the right click of two fingers snaps to a monster farther off than a tap does', () => {
+  // A monster occupies 400..420 x 300..320; the aiming finger lands 24 px left of it: out of a tap's reach.
+  const touchPickAt = (x, y) => x >= 400 && x < 420 && y >= 300 && y < 320;
+  const w = world({ screen: 'game', touchPickAt });
+  w.down(1, 376, 310);
+  w.down(2, 600, 500);
+  const press = w.sent.find((e) => e.type === 'pointerdown' && e.button === 2);
+  assert.ok(press.x >= 400 && press.x < 420 && press.y >= 300 && press.y < 320, `snapped to ${press.x},${press.y}`);
+  const far = world({ screen: 'game', touchPickAt });
+  far.down(1, 200, 200);
+  far.down(2, 600, 500);
+  assert.deepEqual(far.sent.find((e) => e.type === 'pointerdown' && e.button === 2), right('pointerdown', 200, 200));
+});
