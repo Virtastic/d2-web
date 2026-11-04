@@ -36,12 +36,16 @@ uint8_t d2launch_sub_128D0(int32_t (*regread)(const char*, const char*, int32_t,
 }
 
 // 1.13c D2LAUNCH+0x122C0
-void d2launch_sub_122C0(const void* (*gettext)(void), size_t (*ulen)(const void*),
-                        void (*update)(void), int32_t flag) {
-  const void* a = gettext();
-  const void* b = gettext();
-  if (a && b) { ulen(a); ulen(b); }
-  if (flag) update();
+void d2launch_sub_122C0(const void* (*gettext)(uint32_t), size_t (*ulen)(const void*),
+                        void (*update)(uint32_t, uint32_t), uint32_t g254fc, uint32_t g2529c, uint32_t g25504) {
+  const void* a = gettext(g254fc);
+  const void* b = gettext(g2529c);
+  uint32_t ok = 0;
+  if (a && b) {
+    int32_t la = (int32_t)ulen(a), lb = (int32_t)ulen(b);
+    if (la >= 1 && la <= 0x32 && lb >= 1 && lb <= 0xD) ok = 1;
+  }
+  if (g25504) update(g25504, ok);
 }
 
 // 1.13c D2LAUNCH+0x121B0  (ESI = ctl; param_1 = set/clear)

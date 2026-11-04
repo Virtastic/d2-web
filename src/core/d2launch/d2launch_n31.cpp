@@ -142,25 +142,46 @@ int FUN_6fa4f030(SaveSeams& q, uint8_t* buf /*0x2000*/) {
   q.seek0(); int r = q.write(0, buf, 0); q.close(); return r;
 }
 
-// 1.13c D2Launch+0xF190
-int FUN_6fa4f190(uint8_t* out, const char* name, const uint8_t* classDefault, const std::function<int(uint8_t*, int)>& readSave,
-                 std::function<void(int)> fatal, uint8_t esiHi, uint16_t ebx) {
-  if (!*name) { fatal(0xf9); return 0; }
-  static uint8_t b[0x2000]; int n = readSave(b, 0x2000);
-  if (n < 0) return 0;
-  uint32_t mg, ver; memcpy(&mg, b, 4); memcpy(&ver, b + 4, 4);
-  if (n <= 7 || mg != 0xaa55aa55u) return 0;
-  const uint8_t *p7, *p10; uint8_t cls;
-  if (ver < 0x5c) { if (n < 0x82 || ver < 0x47 || ver > 0x5b) return 0; p7 = b + 0x26; p10 = p7 + 0x10; cls = b[0x22]; }
-  else { if (n < 0x14f || ver < 0x5c || ver > 0x60) return 0; p7 = b + 0x88; p10 = p7 + 0x10; cls = b[0x28]; }
-  out[0] = (uint8_t)(ebx & 0xff); out[1] = (uint8_t)(ebx >> 8);
-  uint8_t* d = out + 2;
-  if (*p7 == 0) { memcpy(d, classDefault, 11); d += 11; }
-  else { memcpy(d, p7, 11); d += 11; }
-  *d = cls + 1; memcpy(d + 1, p10, 11); d[12] = esiHi;
-  d[13] = 0; d[14] = 0; d[15] = 0; d[16] = 0;
-  d[17] = d[18] = d[19] = 0xff; d[20] = 0;
-  return 1;
+// 1.13c D2Launch+0xF190  (fastcall: out = ECX, name = EDX; the value packed at out+0x1a is the header's flags dword, the byte at out+0x19 the header's trailing byte). Seams: dir fills the save path (Fog 10115), open/read/close the CRT file calls,
+// fatal the empty-name path; classDefault is the 11 bytes at 6fa64d9c.
+struct F190Seams {
+  void (*dir)(char* buf);
+  void* (*open)(const char* path);
+  size_t (*read)(void* h, uint8_t* buf, size_t n);
+  void (*close)(void* h);
+  void (*fatal)(int);
+};
+// Fog 10086 (0x18090): a value stored as two bytes, each with bit 7 set
+static void fogPack(uint8_t* p, uint32_t v) { p[0] = (uint8_t)v | 0x80; p[1] = (uint8_t)(v >> 7) | 0x80; }
+int FUN_6fa4f190(uint8_t* out, const char* name, const uint8_t* classDefault, const F190Seams& S) {
+  if (!*name) { S.fatal(0xf9); return 0; }
+  char dir[1024]; S.dir(dir);
+  char path[500]; snprintf(path, sizeof path, "%s%s.d2s", dir, name);
+  void* h = S.open(path);
+  if (!h) return 0;
+  uint8_t b[0x2000];   // a stack local in retail too: the read callee sees a stack pointer
+  size_t n = S.read(h, b, 0x2000);
+  int ret = 0;
+  uint32_t mg = 0, ver = 0;
+  if (n > 7) { memcpy(&mg, b, 4); memcpy(&ver, b + 4, 4); }
+  if (n > 7 && mg == 0xaa55aa55u) {
+    const uint8_t *p7 = nullptr, *p10 = nullptr; uint8_t cls = 0, tail = 0; uint32_t flags = 0;
+    if (ver < 0x5c) { if (!(n < 0x82 || ver < 0x47 || ver > 0x5b)) { p7 = b + 0x26; p10 = p7 + 0x10; cls = b[0x22]; tail = b[0x24]; memcpy(&flags, b + 0x18, 4); } }
+    else { if (!(n < 0x14f || ver > 0x60)) { p7 = b + 0x88; p10 = b + 0x98; cls = b[0x28]; tail = b[0x2b]; memcpy(&flags, b + 0x24, 4); } }
+    if (p7) {
+      fogPack(out, 0xd);
+      uint8_t* d = out + 2;
+      if (*p7 == 0) { memcpy(d, classDefault, 11); d += 11; }
+      else { memcpy(d, p7, 11); d += 11; }
+      d[0] = cls + 1; memcpy(d + 1, p10, 11); d[12] = tail;
+      fogPack(d + 13, flags);
+      fogPack(d + 15, 0);
+      d[17] = d[18] = d[19] = 0xff; d[20] = 0;
+      ret = 1;
+    }
+  }
+  S.close(h);
+  return ret;
 }
 
 // 1.13c D2Launch+0xF5B0  (out = in_EAX; cls = param_1; name = param_2; flagsLo = unaff_BX)
