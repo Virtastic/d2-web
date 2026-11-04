@@ -160,6 +160,7 @@ uint8_t* __stdcall D2CMP_MixPalette(uint8_t nTrans, int nColor) {
     return &sentinel[nTrans][nColor];
 }
 int32_t __fastcall CLIENTS_GetClassId(D2ClientStrc* pClient) { return pClient ? pClient->nClassId : 0; }
+int32_t __fastcall CLIENTS_GetClientId(D2ClientStrc* pClient) { return pClient ? (int32_t)pClient->dwClientId : 0; }
 int32_t __fastcall CLIENTS_GetFlags(D2ClientStrc* pClient) {
     if (!pClient) return 0;
     uint32_t flags = 0;

@@ -6,6 +6,7 @@
 #include <cstring>
 #include <Windows.h>
 
+void* g_45824;                // 0x6FC45824 (shared symbol)
 namespace {
 int32_t g_lastError;          // 0x6FC45388
 CRITICAL_SECTION g_lock;      // 0x6FC45A24
@@ -18,7 +19,6 @@ int32_t g_45830;              // 0x6FC45830
 intptr_t g_45a6c;             // 0x6FC45A6C  archive list head
 volatile int32_t g_41a98;        // 0x6FC41A98
 void* g_4584c;               // 0x6FC4584C
-void* g_45824;                // 0x6FC45824
 int32_t g_45844;              // 0x6FC45844
 void* g_45390;              // 0x6FC45390
 uint8_t g_45a3c[12], g_45a64[12]; // 0x6FC45A3C / 0x6FC45A64 lists, count at +8

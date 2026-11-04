@@ -17,9 +17,14 @@ void* Storm_Alloc(uint32_t n, const char* file, int32_t line, uint32_t flags);  
 void  Storm_Sub4D60(void* p);                                            // 0x04D60
 extern uint8_t* g_list_458BC;          // 0x6FC458BC (list head, address taken)
 extern CRITICAL_SECTION g_cs_458C8;    // 0x6FC458C8
+}  // namespace storm_z9
+namespace storm_b36d40 {
 extern uint32_t g_trans_a;             // 0x6FC45364
 extern int32_t  g_trans_b;             // 0x6FC45368
 extern uint32_t g_trans_c;             // 0x6FC45360 (32-bit ptr to row-offset table)
+}
+namespace storm_z9 {
+using storm_b36d40::g_trans_a; using storm_b36d40::g_trans_b; using storm_b36d40::g_trans_c;
 extern int32_t  g_lastError;           // 0x6FC45388
 extern int32_t  g_shX, g_shY;          // 0x6FC415E8, 0x6FC415F0
 extern int32_t  g_e0, g_e4, g_ec, g_f4;// 0x6FC415E0, E4, EC, F4
