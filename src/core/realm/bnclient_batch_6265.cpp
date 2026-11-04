@@ -258,14 +258,15 @@ EMSCRIPTEN_KEEPALIVE void* bn_memmove(void* dst, const void* src, size_t size) {
 
 // ---------------------------------------------------------------------------------------------------
 // 1.13c BNClient+0x072CA (322 B, caller 0x3DF8 report_failure): the MSVC 2003 security-failure reporter.
-// A non-null installed handler (+0x1E6D8) is called with no arguments and the call returns to the exit;
+// A non-null installed handler (+0x1E6D8) is called with the two stack words (code, [ebp+0xC]) and the call returns to the exit;
 // otherwise the module path goes into a 0x104-byte buffer ("<program name unknown>" on failure), is
 // shortened to a 60-byte window with a "..." tail when strlen + 0xB > 0x3C, and the box text is the
 // title + "\n\n" + "Program: " + name + "\n\n" + the long detail text (param 1 selects the buffer-overrun
 // pair, anything else the unknown-failure pair), shown with type 0x12010. Both paths __exit(3); the
 // following `swi 3` is unreachable.
 struct BnReportGsFailureEnv {
-    void     (*security_handler)(void);                       // +0x1E6D8 DAT_6ff3e6d8
+    void     (*security_handler)(int32_t code, uint32_t arg2); // +0x1E6D8 DAT_6ff3e6d8, called (code, [ebp+0xC])
+    uint32_t arg2;                                            // the second stack word ([ebp+0xC]) the handler is handed
     uint32_t (*get_module_file_name)(uint32_t mod, char* name, uint32_t size);  // GetModuleFileNameA
     int32_t  (*message_box_a)(const char* text, const char* caption, uint32_t type);  // 0x7415
     void     (*exit_)(uint32_t code);                         // 0x157A __exit
@@ -275,7 +276,7 @@ struct BnReportGsFailureEnv {
 extern "C"
 EMSCRIPTEN_KEEPALIVE void bn_report_gsfailure(int32_t code, const BnReportGsFailureEnv* env) {
     if (env->security_handler != nullptr) {
-        env->security_handler();
+        env->security_handler(code, env->arg2);
     } else {
         const char* const title = code == 1 ? "Buffer overrun detected!"
                                             : "Unknown security failure detected!";

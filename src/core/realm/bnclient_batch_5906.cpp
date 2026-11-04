@@ -20,10 +20,18 @@ static uint32_t g_bn_nlg_eax, g_bn_nlg_param, g_bn_nlg_ebp;
 // +0x3D63C for the notifier. EAX/EBP cannot ride a C signature, so they are the seam after the retail
 // stack argument. Same body as D2Gfx 0x39B6 (src/core/d2gfx/d2gfx_batch_b45.cpp).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_5906(uint32_t param, uint32_t eax, uint32_t ebp) {
+EMSCRIPTEN_KEEPALIVE void bn_nlg_notify(uint32_t param, uint32_t eax, uint32_t ebp) {
     g_bn_nlg_param = param;
     g_bn_nlg_eax = eax;
     g_bn_nlg_ebp = ebp;
+}
+
+// Capture-probe state accessor: the three notifier globals in retail order (+0x3D634, +0x3D638, +0x3D63C).
+extern "C"
+EMSCRIPTEN_KEEPALIVE void d2_bnclient_5906_state(uint32_t* out) {
+    out[0] = g_bn_nlg_eax;
+    out[1] = g_bn_nlg_param;
+    out[2] = g_bn_nlg_ebp;
 }
 
 // 1.13c BNClient+0x06255 (16 B, caller 0x6265 ___crtInitCritSecAndSpinCount when kernel32 has no

@@ -98,14 +98,23 @@ extern "C" int32_t bnclient_queue_binary(BnEnv* env, BnGlobals* g, uint32_t type
     return 1;
 }
 
-// 1.13c BNCLIENT+0x0F240: set phase 1, start the gateway-ping thread (FUN_6ff2f0a0) on {buf, arg} and wait
-// until it finishes or the found flag (6ff3f660) is set, polling every 10 ms.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_bnclient_f240(BnEnv* env, BnGlobals* g, char* buf, uint32_t arg) {
+// 1.13c BNCLIENT+0x0F240 (stdcall, EAX = out string buffer, [esp+4] = arg): set phase 1, Sleep(10), clear the buffer, store {buf, arg} in
+// DAT_6ff3f500/04, start the gateway-ping thread (FUN_6ff2f0a0) on that pair and poll until it finishes (Wait(0) == 0) or the found flag
+// (DAT_6ff3f660) is set, sleeping 10 ms per poll. The globals ride a 4-dword block {phase 0x1F1F8, buf 0x1F500, arg 0x1F504, found 0x1F660}.
+struct BnGatewayStartState { uint32_t phase; uint32_t buf; uint32_t arg; uint32_t found; };
+struct BnGatewayStartEnv {
+    void (*sleep_ms)(uint32_t ms);
+    uint32_t (*create_thread)(const BnGatewayStartState* params);   // CreateThread(0, 0, 0x2F0A0, &DAT_1F500, 0, &tid)
+    uint32_t (*wait)(uint32_t handle, uint32_t ms);                 // WaitForSingleObject
+};
+extern "C" EMSCRIPTEN_KEEPALIVE void bn_gateway_start(const BnGatewayStartEnv* env, BnGatewayStartState* g, char* buf, uint32_t arg) {
     g->phase = 1;
     env->sleep_ms(10);
     buf[0] = 0;
-    void* thread = (void*)env->call(0xF0A0, buf, (void*)(uintptr_t)arg, nullptr, nullptr);  // CreateThread
-    while (g->found == 0 && env->call(0xFFFF0001, thread, nullptr, nullptr, nullptr) != 0)  // Wait(0) != signalled
+    g->arg = arg;
+    g->buf = (uint32_t)(uintptr_t)buf;
+    uint32_t thread = env->create_thread(g);
+    while (g->found == 0 && env->wait(thread, 0) != 0)
         env->sleep_ms(10);
 }
 

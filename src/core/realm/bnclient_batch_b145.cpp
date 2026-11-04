@@ -34,17 +34,66 @@ extern "C" uint32_t d2_bnclient_11960(void (*build)(), void (*send)()) { build()
 // Tick + lowercased 0x100 string hash + seed hash, rotate buffer DAT+0x3EC58 (0x40), send 0x58. Returns 0.
 extern "C" uint32_t d2_bnclient_11b00(void (*gather)(), void (*hash)(), void (*send)()) { gather(); hash(); send(); return 0; }
 
-// 1.13c BNClient+0x11CB0
-// Clears DAT+0x3EB50, lowercases/hashes three strings, copies 0x20 from DAT+0x3ECF8, sends 0x55. Returns 0.
-extern "C" uint32_t d2_bnclient_11cb0(uint32_t* flag, void (*work)(), void (*send)()) { *flag = 0; work(); send(); return 0; }
+// The three login frame builders below (0x11CB0, 0x11DC0, 0x11E60) are straight-line: every callee is a seam. Addresses are 32-bit words
+// (a stack/blob address, or 0xB2000000|rva for a module global: the seam records them, nothing dereferences a module word here).
+struct BnPacketEnv {
+    uint32_t (*scopy)(uint32_t dst, uint32_t src, uint32_t max);                    // 0x804E  Storm #501 SStrCopy, answers a string pointer
+    void (*zero)(uint32_t dst, uint32_t n);                                          // 0x806C  #494
+    void (*lower)(uint32_t s);                                                       // 0x8078  #510
+    void (*mcopy)(uint32_t dst, uint32_t src, uint32_t n);                           // 0x807E  #491
+    void (*hash_a)(uint32_t eax, uint32_t ecx, uint32_t ebx, uint32_t s0, uint32_t s1);   // 0xAED0 (eax/ecx/ebx + 2 stack words)
+    void (*hash_b)(uint32_t eax, uint32_t ecx, uint32_t edx, uint32_t s0);            // 0xAE10 (eax/ecx/edx + 1 stack word)
+    void (*send)(uint32_t ecx, uint32_t edi, uint32_t id);                           // 0xEB00 (ecx = payload, edi = block, id on the stack)
+};
+static inline uint32_t bn_a(const void* p) { return (uint32_t)(uintptr_t)p; }
+#define BN_MOD(rva) (0xB2000000u | (rva))
 
-// 1.13c BNClient+0x11DC0
-// Two lowercased strings hashed, then send 0x52. Returns 1.
-extern "C" uint32_t d2_bnclient_11dc0(void (*work)(), void (*send)()) { work(); send(); return 1; }
+// 1.13c BNClient+0x11CB0 (stdcall, ret 8: two string pointers; ESI = a third string)
+// Clears DAT+0x1EB50, zeroes 0xBC bytes at DAT+0x1EC98, copies ESI / a0 / a1 into three 0x100 buffers (lowercased), runs 0xAED0 over (b1, b3) and 0xAE10 over b1/b2,
+// copies 0x20 bytes from DAT+0x1ECF8, copies ESI once more and sends frame 0x55 with ECX = that copy + 0x21. Returns 0.
+extern "C" uint32_t d2_bnclient_11cb0(uint32_t a0, uint32_t a1, uint32_t esi, uint32_t* flag, const BnPacketEnv* e) {
+    char b1[0x100], b3[0x100], b2[0x100], m[0x20], b4[0x140];
+    *flag = 0;
+    e->zero(BN_MOD(0x1EC98), 0xBC);
+    e->scopy(bn_a(b1), esi, 0x100); e->lower(bn_a(b1));
+    e->scopy(bn_a(b2), a0, 0x100);  e->lower(bn_a(b2));
+    e->scopy(bn_a(b3), a1, 0x100);  e->lower(bn_a(b3));
+    e->hash_a(BN_MOD(0x1EC58), BN_MOD(0x1F8E4), BN_MOD(0x1EC78), bn_a(b1), bn_a(b3));
+    e->hash_b(bn_a(b1), BN_MOD(0x1EC98), BN_MOD(0x1F8E4), bn_a(b2));
+    e->mcopy(bn_a(m), BN_MOD(0x1ECF8), 0x20);
+    uint32_t r = e->scopy(bn_a(b4), esi, 0x100);
+    e->send(r + 0x21, bn_a(m), 0x55);
+    return 0;
+}
 
-// 1.13c BNClient+0x11E60
-// As 11CB0 (flag clear, strings, copy 0x20) but send 0x53. Returns 1.
-extern "C" uint32_t d2_bnclient_11e60(uint32_t* flag, void (*work)(), void (*send)()) { *flag = 0; work(); send(); return 1; }
+// 1.13c BNClient+0x11DC0 (stdcall, ret 4: one string pointer; ESI = a second string)
+// Two lowercased 0x100 copies (ESI, a0), 0xAED0 over them, a third copy of ESI (limit 0x7FFFFFFF) and frame 0x52 with ECX = that copy + 0x41. Returns 1.
+extern "C" uint32_t d2_bnclient_11dc0(uint32_t a0, uint32_t esi, const BnPacketEnv* e) {
+    char b1[0x100], b2[0x100], b3[0x20], b4[0x20], b5[0x100], b6[0x10];
+    e->scopy(bn_a(b1), esi, 0x100); e->lower(bn_a(b1));
+    e->scopy(bn_a(b2), a0, 0x100);  e->lower(bn_a(b2));
+    e->hash_a(bn_a(b3), BN_MOD(0x1F8E4), bn_a(b4), bn_a(b1), bn_a(b2));
+    uint32_t r = e->scopy(bn_a(b5), esi, 0x7FFFFFFF);
+    e->send(r + 0x41, bn_a(b6), 0x52);
+    return 1;
+}
+
+// 1.13c BNClient+0x11E60 (stdcall, ret 4: one string pointer; ESI = a second string)
+// Clears DAT+0x1EB50, copies ESI into DAT+0x1EB58, zeroes 0xBC bytes at DAT+0x1EC98, two lowercased copies (ESI, a0), 0xAE10, copies 0x20 bytes from DAT+0x1ECF8,
+// copies ESI once more and sends frame 0x53 with ECX = that copy + 0x21. Returns 1.
+extern "C" uint32_t d2_bnclient_11e60(uint32_t a0, uint32_t esi, uint32_t* flag, const BnPacketEnv* e) {
+    char b1[0x100], b2[0x100], m[0x20], b4[0x140];
+    *flag = 0;
+    e->scopy(BN_MOD(0x1EB58), esi, 0x100);
+    e->zero(BN_MOD(0x1EC98), 0xBC);
+    e->scopy(bn_a(b1), esi, 0x100); e->lower(bn_a(b1));
+    e->scopy(bn_a(b2), a0, 0x100);  e->lower(bn_a(b2));
+    e->hash_b(bn_a(b1), BN_MOD(0x1EC98), BN_MOD(0x1F8E4), bn_a(b2));
+    e->mcopy(bn_a(m), BN_MOD(0x1ECF8), 0x20);
+    uint32_t r = e->scopy(bn_a(b4), esi, 0x100);
+    e->send(r + 0x21, bn_a(m), 0x53);
+    return 1;
+}
 
 // 1.13c BNClient+0x11F80
 // r = FUN_b3a0(DAT+0x3F8E4, arg); zero DAT+0x3ECB8 (0x20); if r: copy 0x14 and 0x40 buffers, zero 0x40, send 0x56, return 1; else 0.
