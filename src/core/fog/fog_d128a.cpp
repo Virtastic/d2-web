@@ -30,8 +30,8 @@ uint32_t* FUN_6ff6b190(int32_t size, uint8_t* mgr);                           //
 void FUN_6ff6ad20(const char* fmt, ...);                                      // Fog+0x1AD20
 void Ordinal_501(char* dst, const char* src, uint32_t cap);                   // Storm SStrCopy
 extern const char DAT_6ff768ec[];
-extern uint32_t g_fog_819a0, g_fog_818f8;                                      // fog_sub_19530.cpp
 }
+namespace fogb144pub { extern uint32_t g_stop, g_818f8; }                    // 0x6FF819A0, 0x6FF818F8 (fog_batch_b144.cpp)
 int fog_sub_1abb0(uint32_t, const uint32_t*);                                 // Fog+0x1ABB0
 
 // Storm #506 / #503, weak so a real Storm shim wins.
@@ -82,7 +82,7 @@ namespace
 // p3 == 1, and push a timestamped message node on the log list.
 extern "C" EMSCRIPTEN_KEEPALIVE void FUN_6ff68770(const char* ch, int p2, int p3, const char* fmt, va_list ap)
 {
-	if (g_fog_819a0 != 0 || g_fog_818f8 == 0) return;
+	if (fogb144pub::g_stop != 0 || fogb144pub::g_818f8 == 0) return;
 	char buf[0x1000];   // retail local is 4092 bytes with vsnprintf(.., 0x1000): the 4 extra are slack here
 	vsnprintf(buf, sizeof buf, fmt, ap);
 	if (p3 == 1) Ordinal_503(buf, "\n", 0x1000);

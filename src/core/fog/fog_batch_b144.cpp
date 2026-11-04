@@ -56,11 +56,16 @@ static void fogb144_die(const FogB144Api* a, int line) {
 
 // Log manager state, retail addresses in the comments.
 static uint8_t  g_names[20][16];     // 0x6FF816F8
-static SYSTEMTIME g_startup;         // 0x6FF81838
-static uint32_t g_banner[20];        // 0x6FF81850, startup banner pending
-static uint32_t g_last_use[20];      // 0x6FF818A8
-static FILE*    g_files[20];         // 0x6FF81900
-static uint32_t g_opened[20];        // 0x6FF81950
+namespace fogb144pub {   // shared with fog_sub_19530.cpp and the FN probes
+SYSTEMTIME g_startup;                // 0x6FF81838
+uint32_t g_banner[20];               // 0x6FF81850, startup banner pending
+uint32_t g_last_use[20];             // 0x6FF818A8
+FILE*    g_files[20];                // 0x6FF81900
+uint32_t g_opened[20];               // 0x6FF81950
+static uint32_t realTick() { return GetTickCount(); }
+uint32_t (*g_tick)(void) = realTick; // GetTickCount, a seam for the FN probe
+int (*g_fclose)(FILE*) = fclose;     // Fog+0x2C0B (CRT fclose), a seam for the FN probe
+}
 static uint32_t g_cleanup_tick;      // 0x6FFA6ED8
 static CRITICAL_SECTION g_cs_a6e8c;  // 0x6FFA6E8C
 static CRITICAL_SECTION g_cs_a6ea4;  // 0x6FFA6EA4
@@ -171,10 +176,10 @@ void fog_sub_18150(const char* path, const uint32_t* now) {
 // Close idle log files: any open slot whose open time is >15000 ms or last-use >5000 ms old.
 extern "C"
 void fog_sub_18200(void) {
-    const DWORD now = GetTickCount();
+    const uint32_t now = g_tick();
     for (int i = 0; i < 20; i++) {
         if (g_files[i] && (now - g_opened[i] > 15000 || now - g_last_use[i] > 5000)) {
-            fclose(g_files[i]);
+            g_fclose(g_files[i]);
             g_files[i] = nullptr;
         }
     }

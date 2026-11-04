@@ -4,25 +4,19 @@
 // module-internal and Win32 callees as seams on an Api struct.
 #include <cstdint>
 #include <cstdlib>
+#include "fog_asyncstate.h"
 
 typedef uint32_t u32;
 typedef uint64_t u64;
 typedef uint8_t u8;
 
-// Shared fatal path: capture ip, WSOCK32 ordinal 116, log at level 6, abort, _exit(-1).
-struct FogN41Fatal {
-    u32 (*capture_ip)(void);                                                         // Fog+0xFC20
-    void (*ordinal116)(void);
-    void (*fatal)(int level, const char* file, int line, const char* fmt, ...);      // Fog+0x10F30
-    void (*abort)(void);                                                             // Fog+0x184A0
-    void (*exit_process)(int code);                                                  // _exit
-};
-static void fog_n41_die(const FogN41Fatal* f, int line) {
+static u32 fog_n41_die(const FogN41Fatal* f, int line) {   // returns the captured ip (retail keeps it in ESI)
     const u32 ip = f->capture_ip();
     f->ordinal116();
     f->fatal(6, "", line, "Unrecoverable internal error %08x", ip);
     f->abort();
     f->exit_process(-1);
+    return ip;
 }
 
 // --- __unlock_fhandle tail stubs ----------------------------------------------------------------
@@ -37,24 +31,7 @@ void fog_sub_7731(const FogUnlockApi* a, int fh) { a->unlockFhandle(fh); }
 // 1.13c Fog+0x78E2
 void fog_sub_78e2(const FogUnlockApi* a, int fh) { a->unlockFhandle(fh); }
 
-// --- AsyncData event table: 256 entries of 12 bytes (HANDLE, 1, pad) at DAT_6ff9af70 -----------
-struct FogAsyncState {
-    u8* table;        // DAT_6ff9af70
-    u32 count;        // DAT_6ff9af6c
-    u32 initialized;  // DAT_6ff9af68
-    int dataBase;     // DAT_6ff9af60
-    u8* pending;      // DAT_6ff9af64 (list head)
-};
-struct FogAsyncApi {
-    void* (*alloc)(void* ctx);                                                       // Fog+0x1B560
-    void (*free_)(void* p);                                                          // Fog+0x1B0C0
-    void (*closeHandle)(u32 h);
-    u32 (*createEvent)(void);                                                        // CreateEventA(0,1,0,0)
-    void (*setLimit)(u32 v);                                                         // Ordinal_284 / 285 / 282 seam
-    void (*setHandleLimit)(u32 handle, int v);                                       // Ordinal_282
-    FogN41Fatal die;
-    void (*logAlloc)(int level, const char* file, int line, const char* fmt);        // Fog+0x10F30
-};
+// --- AsyncData event table: state and seams in fog_asyncstate.h -----------------------------------
 static u32 fa_ld(const u8* p) { return *(const u32*)p; }
 static void fa_st(u8* p, u32 v) { *(u32*)p = v; }
 
@@ -72,7 +49,8 @@ void fog_sub_1d7f0(const FogAsyncApi* a, FogAsyncState* s) {
             u8* e = s->table + i * 12;
             if (fa_ld(e)) { a->closeHandle(fa_ld(e)); fa_st(e, 0); }
         }
-        a->free_(s->table);
+        void* slot = s->table;
+        a->freeBlock(&slot, kFogAsyncFile, 0xae);
         s->table = nullptr;
         s->count = 0;
     }
@@ -105,13 +83,14 @@ void fog_sub_1db40(const FogAsyncApi* a, FogAsyncState* s, u8* obj, int v) {
 
 // Fog 0x1DF00 (1.13c)
 void fog_sub_1df00(const FogAsyncApi* a, FogAsyncState* s, int enable) {
-    if (s->initialized) { fog_n41_die(&a->die, 0x7b); return; }
+    // retail: _exit does not return; were it to, the init runs on with ESI (the enable flag) now holding the captured ip
+    if (s->initialized) enable = (int)fog_n41_die(&a->die, 0x7b);
     a->setLimit(0x40000);   // Ordinal_284
-    a->setLimit(0x4000);    // Ordinal_285
+    a->setLimit285(0x4000); // Ordinal_285
     if (!enable) return;
-    u8* t = (u8*)a->alloc(nullptr);
+    u8* t = (u8*)a->allocSized(0x3000, nullptr, kFogAsyncFile, 0x88);   // room for the 0x400-slot ceiling of +0x1D870
     if (!t) {
-        a->logAlloc(2, "..\\Source\\Fog\\Src\\AsyncData.cpp", 0x88, "");
+        a->logAlloc(2, kFogAsyncFile, 0x88, "");
         s->table = nullptr;
         fog_n41_die(&a->die, 0x89);
         return;

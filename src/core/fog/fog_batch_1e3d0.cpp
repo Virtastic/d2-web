@@ -15,61 +15,13 @@
 #include <cstdint>
 #include <cstring>
 
-#include <Windows.h>   // CRITICAL_SECTION, Enter/Leave/InitializeCriticalSection (host no-ops)
+#include <Windows.h>   // CRITICAL_SECTION, InitializeCriticalSection (host no-op)
+
+#include "fog_qssocket.h"
 
 namespace {
 
 constexpr const char* kQssocketFile = "..\\Source\\Fog\\Src\\D2QSSocket.cpp";
-
-struct FogQSSocket {
-    uint32_t thread;       // +0x000 CreateThread result
-    uint32_t threadId;     // +0x004
-    char name[0x104];      // +0x008
-    uint32_t value;        // +0x10C
-    void* connection;      // +0x110
-    void* event;           // +0x114 CreateEventA result
-    uint32_t at118;        // +0x118 = 2
-    uint32_t at11c;        // +0x11C = 0
-    uint32_t at120;        // +0x120
-    uint32_t at124;        // +0x124 = 0
-    char tag[0x40];        // +0x128
-    uint8_t at168[8];      // +0x168
-    uint8_t protocol[4];   // +0x170
-    uint8_t critical[24];  // +0x174 CRITICAL_SECTION
-    uint32_t at18c;        // +0x18C = 0
-    uint32_t at190;        // +0x190 = 0
-};
-static_assert(sizeof(void*) != 4 || offsetof(FogQSSocket, threadId) == 0x004, "threadId");
-static_assert(sizeof(void*) != 4 || offsetof(FogQSSocket, name) == 0x008, "name");
-static_assert(sizeof(void*) != 4 || offsetof(FogQSSocket, value) == 0x10C, "value");
-static_assert(sizeof(void*) != 4 || offsetof(FogQSSocket, connection) == 0x110, "connection");
-static_assert(sizeof(void*) != 4 || offsetof(FogQSSocket, event) == 0x114, "event");
-static_assert(sizeof(void*) != 4 || offsetof(FogQSSocket, at118) == 0x118, "at118");
-static_assert(sizeof(void*) != 4 || offsetof(FogQSSocket, tag) == 0x128, "tag");
-static_assert(sizeof(void*) != 4 || offsetof(FogQSSocket, protocol) == 0x170, "protocol");
-static_assert(sizeof(void*) != 4 || offsetof(FogQSSocket, critical) == 0x174, "critical");
-static_assert(sizeof(void*) != 4 || offsetof(FogQSSocket, at18c) == 0x18C, "at18c");
-static_assert(sizeof(void*) != 4 || sizeof(FogQSSocket) == 0x194, "FogQSSocket");
-
-struct FogQSSocketApi {
-    void* (*alloc)(uint32_t size, uint32_t zero, const char* file, uint32_t line);   // +0x1B560
-    void (*free_block)(void** slot, const char* file, uint32_t line);                // +0x1B0C0
-    void (*teardown)(void* socket);                                                  // +0x1E5C0
-    void (*flush)(void* protocol);                                                   // +0x67B60
-    void (*close_conn)(void* connection);                                            // +0x67020
-    uint16_t (*send_conn)(void* connection, int32_t param, uint16_t length);         // +0x66EB0
-    void (*validate_cs)(void* cs, uint32_t line);                                    // +0x11690
-    uint32_t (*capture_ip)(void);                                                    // +0xFC20
-    void (*stack_dump)(void);                                                        // +0xCD8E
-    void (*fatal)(int level, const char* file, uint32_t line, const char* format, ...); // +0x10F30
-    void (*abort)(void);                                                             // +0x684A0
-    void (*exit_process)(int code);                                                  // +0x1BA9
-    void* (*thread_proc)(void* param);                                               // +0x6EC90
-    void* (*create_event)(void);                                                     // CreateEventA
-    void* (*create_thread)(void* (*proc)(void*), void* param, uint32_t* id);         // CreateThread
-    uint32_t (*wait_object)(void* handle, uint32_t ms);                              // WaitForSingleObject
-    void (*sleep_ms)(uint32_t ms);                                                   // Sleep
-};
 
 // Storm #501 SStrCopy: copy at most max-1 bytes, always terminate.
 void sstr_copy(char* dest, const char* src, uint32_t max) {
@@ -128,23 +80,26 @@ FogQSSocket* fog_sub_1E3D0(const FogQSSocketApi* api, const char* name, int32_t 
 }
 
 // 1.13c Fog+0x1E940 (ordinal 10069): terminate a socket object.
-// Tear the protocol layer down, flush +0x170, close and clear the connection at +0x110 when it is
-// live (its +0x24 flag is set), then release the block (D2QSSocket.cpp:0x27C).
+// Tear the protocol layer down (ESI = socket), flush +0x170 (ESI), close and clear the connection at +0x110
+// when it is live (its +0x24 flag is set; ECX = connection), then release the block through a stack slot
+// holding the socket (ECX = &slot, EAX = 0, D2QSSocket.cpp:0x27C).
 extern "C"
 void fog_sub_1E940(const FogQSSocketApi* api, FogQSSocket* socket) {
     if (socket == nullptr) return;
     api->teardown(socket);
     api->flush(socket->protocol);
-    void* conn = socket->connection;
-    if (conn != nullptr && *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(conn) + 0x24) != 0) {
+    uint8_t* conn = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(socket->connection));
+    uint32_t live = 0;
+    if (conn != nullptr) std::memcpy(&live, conn + 0x24, 4);
+    if (conn != nullptr && live != 0) {
         api->close_conn(conn);
-        socket->connection = nullptr;
+        socket->connection = 0;
     }
     void* slot = socket;
     api->free_block(&slot, kQssocketFile, 0x27C);
 }
 
-// 1.13c Fog+0x1E9A0 (ordinal 10075): the protocol-layer half of the teardown.
+// 1.13c Fog+0x1E9A0 (ordinal 10075): the protocol-layer half of the teardown (ESI = socket).
 extern "C"
 void fog_sub_1E9A0(const FogQSSocketApi* api, FogQSSocket* socket) {
     if (socket != nullptr) api->teardown(socket);
@@ -152,36 +107,38 @@ void fog_sub_1E9A0(const FogQSSocketApi* api, FogQSSocket* socket) {
 
 // 1.13c Fog+0x1E800 (ordinal 10071)
 // Send: a NULL object, a missing connection or a NULL connection head reads false. Otherwise
-// validate and enter the connection's critical section at +0xC, send arg2/arg3 when both are
-// non-zero, leave, and report whether the returned count equals arg3.
+// validate (ECX = cs, EDX = 0x1DF) and enter the connection's critical section at +0xC, send
+// (ECX = connection reread from +0x110, EDX = param, push length) when param and the low 16 bits of
+// length are both non-zero, leave the section at the reread connection +0xC, and report whether the
+// low 16 bits of the sent count equal length.
 extern "C"
 bool fog_sub_1E800(const FogQSSocketApi* api, FogQSSocket* socket, int32_t param, uint16_t length) {
     if (socket == nullptr) return false;
-    uint8_t* conn = static_cast<uint8_t*>(socket->connection);
-    if (conn == nullptr || *reinterpret_cast<uint32_t*>(conn) == 0) return false;
+    uint8_t* conn = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(socket->connection));
+    uint32_t head = 0;
+    if (conn != nullptr) std::memcpy(&head, conn, 4);
+    if (conn == nullptr || head == 0) return false;
 
     api->validate_cs(conn + 0xC, 0x1DF);
-    EnterCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(conn + 0xC));
+    api->enter_cs(conn + 0xC);
     uint16_t sent = 0;
     if (param != 0 && length != 0) {
-        sent = api->send_conn(socket->connection, param, length);
+        sent = api->send_conn(reinterpret_cast<void*>(static_cast<uintptr_t>(socket->connection)), param, length);
     }
-    LeaveCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(
-        static_cast<uint8_t*>(socket->connection) + 0xC));
+    api->leave_cs(reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(socket->connection)) + 0xC);
     return length == sent;
 }
 
 // 1.13c Fog+0x1ECD0 (ordinal 10074): start the object's thread if it has none.
-// Clear +0x124, create the event at +0x114, create the thread on the +0x6EC90 routine with the
-// object as parameter and its id at +0x04, store the handle at +0x00 and return it (NULL when the
-// object is null or already has a thread).
+// Clear +0x124, CreateEventA(0, 0, 0, 0) into +0x114, CreateThread(0, 0, +0x1EC90, object, 0, &object+0x04)
+// into +0x00 and return the handle (NULL when the object is null or already has a thread).
 extern "C"
-void* fog_sub_1ECD0(const FogQSSocketApi* api, FogQSSocket* socket) {
-    if (socket == nullptr || socket->thread != 0) return nullptr;
+uint32_t fog_sub_1ECD0(const FogQSSocketApi* api, FogQSSocket* socket) {
+    if (socket == nullptr || socket->thread != 0) return 0;
     socket->at124 = 0;
-    socket->event = api->create_event();
-    void* thread = api->create_thread(api->thread_proc, socket, &socket->threadId);
-    socket->thread = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(thread));
+    socket->event = api->create_event(0, 0, 0, 0);
+    const uint32_t thread = api->create_thread(0, 0, api->thread_proc, socket, 0, &socket->threadId);
+    socket->thread = thread;
     return thread;
 }
 
@@ -192,9 +149,9 @@ extern "C"
 void fog_sub_1ED20(const FogQSSocketApi* api, FogQSSocket* socket) {
     if (socket == nullptr || socket->thread != 0) return;
     socket->at124 = 0;
-    socket->event = api->create_event();
-    void* thread = api->create_thread(api->thread_proc, socket, &socket->threadId);
-    socket->thread = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(thread));
+    socket->event = api->create_event(0, 0, 0, 0);
+    const uint32_t thread = api->create_thread(0, 0, api->thread_proc, socket, 0, &socket->threadId);
+    socket->thread = thread;
     uint32_t state = api->wait_object(thread, 0);
     while (state != 0) {
         api->sleep_ms(10);

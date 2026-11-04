@@ -1,4 +1,4 @@
-// Fog event-slot pool acquire (1D870) and hacklist unlist (DE00); retail structs 32-bit, guest addresses index flat `mem`.
+// Fog hacklist unlist (DE00; the event-slot acquire 1D870 is fog_1d870.cpp); retail structs 32-bit, guest addresses index flat `mem`.
 #include <cstdint>
 
 struct FogB14Env {
@@ -16,23 +16,7 @@ struct FogB14Env {
 extern "C" uint32_t DAT_6ffa6ed4;  // hacklist log gate, shared with the other hacklist logs
 static inline uint32_t& W(FogB14Env* e, uint32_t a) { return *reinterpret_cast<uint32_t*>(e->mem + a); }
 
-// 1.13c Fog+0x1D870 -- slot = {HANDLE, int busy, int}; table 0x6FF9AF70, count 0x6FF9AF6C, enabled 0x6FF9AF68.
-extern "C" uint32_t fog_sub_1D870(FogB14Env* e) {  // 1.13c Fog+0x1D870
-    if (!W(e, 0x6FF9AF68)) return 0;
-    uint32_t tbl = W(e, 0x6FF9AF70), n = W(e, 0x6FF9AF6C);
-    for (uint32_t i = 0, p = tbl; i < n; i++, p += 12)
-        if (W(e, p + 4)) { W(e, p + 4) = 0; return p; }
-    for (uint32_t i = 0, p = tbl; i < n; i++, p += 12)
-        if (e->waitZero(W(e, p)) == 0) { e->f1D740(); W(e, p + 4) = 0; return p; }
-    if (n < 0x400) {
-        uint32_t p = tbl + n * 12;
-        W(e, 0x6FF9AF6C) = n + 1;
-        W(e, p) = e->createEvent();
-        W(e, p + 4) = 0;
-        return p;
-    }
-    return 0;
-}
+// 1.13c Fog+0x1D870: src/core/fog/fog_1d870.cpp (it hands the slot request to +0x1D740 in EAX).
 
 // 1.13c Fog+0xDE00 -- remove every node with key==k from bucket k%W(+0x8b0); node {key,.,.,next@+0xC}.
 extern "C" void fog_sub_DE00(FogB14Env* e, uint32_t self, uint32_t k) {  // 1.13c Fog+0xDE00

@@ -8,7 +8,7 @@ struct fog_batch55a_Env {
     uint32_t* (*lookup)(int a, uint32_t b, void** cs);
     void (*leaveCs)(void* cs);
     uint32_t (*ord15)(uint16_t v);                 // Fog ordinal 15
-    int (*sub_1E880)(uint32_t a, uint32_t b);
+    int (*sub_1E880)(uint32_t a, uint32_t b);      // unused (1E910 moved to fog_1e910.cpp)
     void (*sha1Transform)(uint32_t* state);        // Fog+0x13520, buffer at state+5 words (ctx+0x1c)
     const uint8_t* sha1Pad;                        // 64-byte padding table at Fog+0x7FFA0
     const int32_t* bitIndexTable;                  // 256 entries at Fog+0x77B50
@@ -81,14 +81,7 @@ int fog_sub_13B70(uint32_t v) {
     return -1;
 }
 
-// 1.13c Fog+0x1E910
-int fog_sub_1E910(const uint8_t* obj, uint32_t a, uint16_t b) {
-    if (obj) {
-        const int* p; memcpy(&p, obj + 0x110, sizeof p);
-        if (p && *p) return g_fog_batch55a_env.sub_1E880(a, b);
-    }
-    return -1;
-}
+// 1.13c Fog+0x1E910: src/core/fog/fog_1e910.cpp (it hands the connection to +0x1E880 in EAX).
 
 // Seams for Fog+0x1E880 (socket send under the object's critical section at +0xC).
 struct fog_sub_1E880_Env {
