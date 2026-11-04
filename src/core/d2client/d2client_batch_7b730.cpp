@@ -105,7 +105,7 @@ uint32_t d2_client_7bad0(uint32_t node, const int32_t* pt, int32_t mode_cc414, i
     return 1;
 }
 
-// 1.13c D2Client+0x7BEB0 (133 B): list {head; u16 count} -- free every node (6 string frees + node free),
+// retired, see d2client_7beb0.cpp: D2Client 0x7BEB0 (133 B): list {head; u16 count} -- free every node (6 string frees + node free),
 // head = 0; the freed count must equal the u16 count (else fatal 0x6c9); then count = 0.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_7beb0(uint32_t* list, void (*free_)(uint32_t id, uint32_t), void (*fatal)(uint32_t code)) {

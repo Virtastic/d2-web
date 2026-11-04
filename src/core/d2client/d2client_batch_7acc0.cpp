@@ -104,13 +104,13 @@ extern "C" void d2_client_7b240(const Msg* list_hdr_unused, void** head, uint32_
     d2_win_set_font(0);
 }
 
-// 1.13c D2Client+0x7B330
+// retired, see d2client_7b330.cpp: D2Client 0x7B330
 extern "C" void d2_client_7b330(void* const slots[6]) {
     for (int i = 0; i < 6; i++) if (slots[i]) d2_fog_free(slots[i], 0x6af);
     d2_fog_free((void*)slots, 0x6b2);
 }
 
-// 1.13c D2Client+0x7B3D0
+// retired, see d2client_7b3d0.cpp: D2Client 0x7B3D0
 struct Node2 { void* a; Node2* next; };
 extern "C" void d2_client_7b3d0(Node2* n) {
     while (n) { n = n->next; d2_fog_free(nullptr, 0x60b); d2_fog_free(nullptr, 0x60c); }

@@ -31,11 +31,11 @@ static void freeBlock(Services& s, uint8_t* blk, int32_t line){
 }
 void sub_68BE0(Services& s, uint8_t* blk){ freeBlock(s,blk,0xe61); }
 void sub_68C30(Services& s, uint8_t* blk){ freeBlock(s,blk,0xe50); }
-// 1.13c D2Client+0x68CB0 (eax = unit, dl = value): fill 20 words' low bytes
+// retired, see d2client_68cb0.cpp: D2Client 0x68CB0 (eax = unit, dl = value): fill 20 words' low bytes
 void sub_68CB0(Services& s, void* unit, uint8_t v){
  uint8_t* a=(uint8_t*)clientData(s,unit); for(int i=0;i<0x14;i++) a[i*2]=v;
 }
-// 1.13c D2Client+0x68E30 (eax = unit): drop list nodes whose type is neither 0 nor 0x11
+// retired, see d2client_68e30.cpp: D2Client 0x68E30 (eax = unit): drop list nodes whose type is neither 0 nor 0x11
 void sub_68E30(Services& s, void* unit){
  uint8_t* d=(uint8_t*)clientData(s,unit);
  uint8_t* prev=nullptr; uint8_t* n=(uint8_t*)(uintptr_t)rd<uint64_t>(d,0x28);

@@ -81,7 +81,7 @@ static void clamp_scroll(uint8_t* b) {
     if (vis + top <= sel) wr<int32_t>(b, 0x180730, top + 1);
 }
 
-// 1.13c D2Client+0x68440 -- select next row
+// retired, see d2client_68440.cpp: D2Client 0x68440 -- select next row
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_68440(uint8_t* b, const D2ClientListEnv* env) {
     uint32_t n = rd<uint16_t>(b, 0x180748);
     if (rd<int32_t>(b, 0x18074a) == 0) {
@@ -97,7 +97,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_68440(uint8_t* b, const D2Clie
     return 1;
 }
 
-// 1.13c D2Client+0x684E0 -- select previous row
+// retired, see d2client_684e0.cpp: D2Client 0x684E0 -- select previous row
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_684e0(uint8_t* b, const D2ClientListEnv* env) {
     if (rd<int32_t>(b, 0x18074a) == 0) wr<int32_t>(b, 0x180738, rd<int32_t>(b, 0x180730));
     if (rd<int32_t>(b, 0x180738) > 0) {
@@ -165,7 +165,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_client_68670(uint8_t* b, const uint8_
     return 0;
 }
 
-// 1.13c D2Client+0x68810 -- walk 0x200 hash buckets at +0xc; entry: next@0, flags@4, size@8
+// retired, see d2client_68810.cpp: D2Client 0x68810 -- walk 0x200 hash buckets at +0xc; entry: next@0, flags@4, size@8
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_68810(const uint8_t* tbl, int32_t* mem_total_6fbcc044,
                                                     const D2ClientListEnv* env, uintptr_t (*next)(uintptr_t)) {
     (void)tbl; (void)mem_total_6fbcc044; (void)env; (void)next;
