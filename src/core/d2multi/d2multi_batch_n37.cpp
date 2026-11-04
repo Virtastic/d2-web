@@ -138,7 +138,7 @@ extern "C" void d2_multi_sub_8e70(uint8_t* s) {
     if ((f & 4) && !(f & 8)) {
         if (n37_Ordinal_10227() != 0 || s[0x1ea] < 5) v = 1;
     }
-    DAT_6fa09f38 = n37_Ordinal_10154((int)s[0x1ea], v, s + 0x39d, s + 0x3ad);
+    DAT_6fa09f38 = n37_Ordinal_10154((int)s[0x1ea], v, (uint32_t)(uintptr_t)(s + 0x39d), (uint32_t)(uintptr_t)(s + 0x3ad));
     if (DAT_6fa09f38) {
         n37_Ordinal_10140(DAT_6fa09f38, 0x42);
         n37_Ordinal_10179(DAT_6fa09f38, 0x23b);
@@ -283,7 +283,7 @@ extern "C" void d2_multi_sub_9d60(void) {
     if (DAT_6fa09f88) {
         char buf[512]; buf[0] = 0;
         int32_t n = 0;
-        for (char* s = DAT_6fa0a0f0; s && n < 0x200; s = *(char**)(s + 0x204)) {
+        for (char* s = DAT_6fa0a0f0; s && n < 0x200; s = (char*)(uintptr_t)*(uint32_t*)(s + 0x204)) {   // retail's next is a 32-bit word at +0x204
             strncat(buf, s, 0x200 - n);
             n = (int32_t)strlen(buf);
         }
