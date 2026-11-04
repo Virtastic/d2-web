@@ -54,7 +54,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_4c370(const B46Env* e, int32_t* u, uint16_t w) {
 EMSCRIPTEN_KEEPALIVE void d2c_4dc30(const B46Env* e, const int32_t* u) {
     if (!u || u[0] != 1) return;
     uint32_t t = (uint32_t)u[4];
-    if (t < 0x10 && t != 0 && t != 0xc) { e->f55fb0(); e->o10770(u[0xb]); e->f2a6c0(); }
+    if (t < 0x10 && t != 0 && t != 0xc) { e->f55fb0(u, 0); e->o10770(u[0xb]); e->f2a6c0(u, 1); }
 }
 // 1.13c D2Client+0x4EE40  (ESI = unit, param = struct with mode at +4)
 EMSCRIPTEN_KEEPALIVE int32_t d2c_4ee40(const B46Env* e, int32_t* u, const int32_t* p) {

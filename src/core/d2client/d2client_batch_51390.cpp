@@ -65,10 +65,10 @@ I sub_51D10(I* px,I* py,S51D10& g,I (*fn2c5c0)(),void (*fn1860)(),void (*fn10f0)
  return 1;
 }
 // 1.13c D2Client+0x51E30
-void sub_51E30(P esi,I (*f568e0)(P,I,I,I),void (*f1860)(),I& c2f4,I& c2f8){
+void sub_51E30(P esi,I (*f568e0)(P,I,I,I),void (*f1860)(P),I& c2f4,I& c2f8){
  if(!esi){c2f4=0;c2f8=1;return;}
  I r=f568e0(esi,0,0,0); c2f8=0;
- if(r){f1860();c2f8=1;return;}
+ if(r){f1860(esi);c2f8=1;return;}
  c2f4=0;
 }
 // message builder shared shape: 23 zeroed words, dispatch via D2Client+0xB30F0

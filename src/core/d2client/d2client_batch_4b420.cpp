@@ -69,10 +69,10 @@ void sub_4BEC0(Seams& s, Unit* u) {
  uint32_t buf[0x17] = {};
  s.s630f0(buf); s.s630f0(buf);
 }
-// 1.13c D2Client+0x4BFA0   (ecx = enable, eax = {idx, nonzero})
-uint32_t sub_4BFA0(Seams& s, int32_t enable, const uint32_t* e, const uint32_t* bitMasks) {
- if (!enable || !e || !e[1] || (int32_t)e[0] >= 0x10) return 0;
- uint8_t* r = (uint8_t*)s.s1260();
+// 1.13c D2Client+0x4BFA0   (ecx = pointer to a record whose dword 1 selects the lookup, eax = {idx, nonzero})
+uint32_t sub_4BFA0(Seams& s, const uint32_t* en, const uint32_t* e, const uint32_t* bitMasks) {
+ if (!en || !e || !e[1] || (int32_t)e[0] >= 0x10) return 0;
+ uint8_t* r = (uint8_t*)s.s1260i((int32_t)en[1]);
  return r ? (bitMasks[e[0] & 7] & r[0x104 + ((int32_t)e[0] >> 3)]) : 0;
 }
 // 1.13c D2Client+0x4C3C0   (param_2 = packet: u8 type, u32 id @1, u16 @5)

@@ -135,3 +135,7 @@ extern "C" void d2c_560b0(void (*f55b20)(uint32_t,void*,void*,uint32_t,uint32_t,
                           void* unit,uint32_t a7,char16_t* dst,const char16_t* tail){
  d2client_batch_43710::Calls c{}; c.fb05b20=f55b20; c.ord10003s=str; d2client_batch_43710::sub_560B0(c,unit,a7,dst,tail);
 }
+// Probe entry for 0x56700 (and its twin 0x56740): the one seam is Ordinal_10569 (thunk 0xC5EC), which fills the two out words.
+extern "C" uint32_t d2c_56700(void (*f10569)(void*,int32_t*,int32_t*),uint8_t* obj){
+ d2client_batch_43710::Calls c{}; c.ord10569=f10569; return d2client_batch_43710::sub_56700(c,obj);
+}

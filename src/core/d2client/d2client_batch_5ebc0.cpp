@@ -1,35 +1,11 @@
 // Implementation batch (alpha lane): D2Client+0x5EBC0..0x5F6B0. Decompile-derived; not yet vectored.
 // Imported-DLL ordinals / unrecovered helpers are the Svc virtuals. "REG?" = register argument the decompile
 // shows only as in_EAX/unaff_*: a GUESS, so rows using it stay NAMED.
+#include "d2client_batch_5ebc0.h"
 #include <cstdint>
 #include <cstddef>
 #include <cstdio>
 namespace d2client_batch_5ebc0 {
-struct G {
- uint8_t* cc24c{}; int32_t cc250{};          // sound-record array (0x8e bytes each) and count
- int32_t cc268{}, cc26c{}, cc270{}, cc274{}, cc278{}, cc27c{};
- uint8_t pal[11]{};                          // DAT_6fbcc210..21a
- int32_t cc1b0{};                            // 1 => shifted draw
- uint16_t* cc1b4{};                          // 3x u16 output cursor
- void* cc1b8{}; int32_t cc1bc{};             // 0x2800-byte block list, running entry count
- int32_t* cc1c4{}; void* cc1c0{};            // header, node chain head
- int32_t cc1c8[4]{};                         // 4 handles
- int32_t cc3bc{};                            // *DAT_6fbcc3bc value
- uint8_t c9860{};
-};
-struct Svc {
- virtual ~Svc()=default;
- virtual void f5da80()=0; virtual void f5db30(int32_t idx,char* out80)=0; virtual void f5dae0()=0; virtual void f5cd10()=0;
- virtual int32_t f5ea90(int32_t a,int32_t b,int32_t c,int32_t d)=0; virtual int32_t fabd810(int32_t h,int32_t* out)=0;
- virtual int32_t o10102()=0; virtual int32_t o10105()=0; virtual void o10103()=0; virtual int32_t o10016()=0;
- virtual int32_t o10091()=0; virtual int32_t o10095()=0; virtual int32_t o10092()=0;
- virtual void fatal302()=0;                    // Ordinal_10265(0x302) + Ordinal_10024 + _exit(-1)
- virtual int32_t o10190(int r,int g,int b)=0;  // color index
- virtual void o10065(int32_t h)=0; virtual void free(int32_t tag,void* p)=0;
- virtual void o10010(int32_t x0,int32_t y0,int32_t x1,int32_t y1,int32_t col,int32_t a)=0;
- virtual void* alloc(int32_t tag,int32_t n)=0; // Ordinal_10042
- virtual void o10112()=0; virtual void o10111(int32_t n,void* buf,int32_t z)=0;
-};
 static uint8_t* rec(G& g,int32_t i){ return (g.cc24c&&i>=0&&i<g.cc250)?g.cc24c+i*0x8e:nullptr; }
 template<class T> static T& at(uint8_t* p,int off){ return *reinterpret_cast<T*>(p+off); } // unaligned in retail too
 
@@ -76,15 +52,17 @@ void sub_5F090(Svc& s,G& g){
 void sub_5F180(Svc& s,G& g){
  for(int i=0;i<4;i++){ int32_t h=g.cc1c8[i]; if(h){ s.o10065(h); s.free(0x7a,nullptr); } g.cc1c8[i]=0; }
 }
-// 1.13c D2Client+0x5F1C0  (ecx = REG? x origin, eax = REG? y origin, stack = colour). 12 line segments from table 6fb82de8.
-void sub_5F1C0(Svc& s,G& g,int32_t x,int32_t y,int32_t col,const int32_t tab[24]){
+// 1.13c D2Client+0x5F1C0  (ecx = x origin, eax = y origin, stack = colour). 12 line segments of a closed 13-point outline: segment i draws
+// point i to point i+1 of the table at 6fb82de8 (consecutive (x,y) word pairs, doubled), shifted (-1,+5) when cc1b0 == 1.
+void sub_5F1C0(Svc& s,G& g,int32_t x,int32_t y,int32_t col){
+ static const int32_t tab[26]={0,-1,2,-2,4,-1,2,0,4,1,2,2,0,1,-2,2,-4,1,-2,0,-4,-1,-2,-2,0,-1};
  if(g.cc1b0==1){ x-=1; y+=5; }
- for(int i=0;i<12;i++) s.o10010(x+tab[i*4+0]*2,y+tab[i*4+1]*2,x+tab[i*4+2]*2,y+tab[i*4+3]*2,col,0xff);
+ for(int i=0;i<12;i++) s.o10010(x+tab[i*2+0]*2,y+tab[i*2+1]*2,x+tab[i*2+2]*2,y+tab[i*2+3]*2,col,0xff);
 }
-// 1.13c D2Client+0x5F240  (pushes a zeroed 0x1c-byte node on the chain at cc1c0; link at word 6)
-struct Node { void* w[7]; };
-void sub_5F240(Svc& s,G& g){
- Node* n=(Node*)s.alloc(0x5ed,0); for(auto& p:n->w) p=nullptr; n->w[6]=g.cc1c0; g.cc1c0=n;
+// 1.13c D2Client+0x5F240  (stack = value stored at word 0; pushes a 0x1c-byte node on the chain at cc1c0; link at word 6)
+struct Node { uint32_t w[7]; };   // retail's 32-bit words (0x1c bytes); the chain link is the node's low 32 bits as in retail
+void sub_5F240(Svc& s,G& g,uint32_t p1){
+ Node* n=(Node*)s.alloc(0x1c,0x5ed,0); for(auto& p:n->w) p=0; n->w[0]=p1; n->w[6]=(uint32_t)(uintptr_t)g.cc1c0; g.cc1c0=n;
 }
 // 1.13c D2Client+0x5F290  (edi = REG? destination array; param_1 selects which clear)
 void sub_5F290(Svc& s,G& g,int32_t p1,int32_t* edi){
@@ -168,7 +146,7 @@ void sub_5F6B0(Svc& s,G& g){
  int32_t n=g.cc1bc; uint32_t slot=(uint32_t)n&0x1ff; int32_t blk=n>>9; g.cc1bc=n+1;
  uint32_t* prev=nullptr; uint32_t* b=(uint32_t*)g.cc1b8; int32_t k=0;
  while(b&&k<blk){ prev=b; b=(uint32_t*)(uintptr_t)b[0xa00]; k++; } // ponytail: 32-bit link word as in retail; wasm64 port widens
- if(!b){ b=(uint32_t*)s.alloc(0x35d,0); for(int i=0;i<0xa01;i++) b[i]=0; if(prev) prev[0xa00]=(uint32_t)(uintptr_t)b; else g.cc1b8=b; }
+ if(!b){ b=(uint32_t*)s.alloc(0x2804,0x35d,0); for(int i=0;i<0xa01;i++) b[i]=0; if(prev) prev[0xa00]=(uint32_t)(uintptr_t)b; else g.cc1b8=b; }
  uint32_t* e=b+slot*5; e[0]=e[1]=e[2]=e[3]=e[4]=0;
 }
 } // namespace d2client_batch_5ebc0
