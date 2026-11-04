@@ -105,8 +105,9 @@ int32_t D2Game_3BED0(void* pGame, void* missile, const D2GameBatch3Env* e = &g_b
     p[MS_MISSILE] = (uint16_t)b3_rd16(rec, 0x24);
     p[MS_SKILL] = (uint32_t)e->ord10240(missile);
     p[MS_LEVEL] = (uint32_t)e->ord11029(missile);
-    p[MS_X] = r1 + (x - (uint32_t)r);
-    p[MS_Y] = r2 + (y - (uint32_t)r);
+    p[MS_ORIGIN] = (uint32_t)(uintptr_t)missile;
+    p[7] = r1 + (x - (uint32_t)r);
+    p[8] = r2 + (y - (uint32_t)r);
     e->createMissile(pGame, p);
     return 1;
 }

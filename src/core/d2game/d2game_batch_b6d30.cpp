@@ -15,7 +15,7 @@ struct D2GameBatchB6D30Env {
     uint32_t sgptDataTables;                                  // *(sgptDataTables_exref)
     uint32_t (*s1100)(uint32_t unit);                         // 0x1100
     uint32_t (*s1130)(uint32_t unit);                         // 0x1130
-    uint32_t (*sB08F0)(uint32_t a, uint32_t b);               // 0xB08F0
+    uint32_t (*sB08F0)(uint32_t unit2, uint32_t x, uint32_t y);  // 0xB08F0 (EAX = unit2)
     void     (*fatal)(uint32_t code);                         // Ordinal_10265 + 10024 + _exit(-1); no return
     uint32_t (*sB6C90)(uint32_t arg);                         // 0xB6C90
     uint32_t (*ord11027)(uint32_t unit);
@@ -73,7 +73,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE bool d2_fn_d2game_B6D30(uint32_t unit, uint32_t 
     if (!rec) e->fatal(0x11e);
     if (e->r8(unit + 0x18) != e->r8(rec + 0x18)) return false;
     uint32_t y = e->s1130(unit), x = e->s1100(unit);
-    return e->sB08F0(x, y) < 0x3fc;
+    return e->sB08F0(rec, x, y) < 0x3fc;
 }
 
 // 1.13c D2Game+0xB75D0  returns the picked index. local_40[i-2] is weight i; weights 0/1 (local_40[-2],[-1])

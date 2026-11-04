@@ -74,16 +74,16 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_game_41eb0(void* game, void* unit, c
     return d2_game_40860(game, unit, e);
 }
 
-// Shared 0x21-request body of 0x41110 / 0x41850 (23 dwords; +0 type 0x21, +4 key, +0x10 target+0x18, +0x14/+0x18 and
-// +0x1C/+0x20 the unit x,y twice, +0x28 Ordinal_10240, +0x30 Ordinal_11029).
-static void send21(const D2GameBatch3fEnv* e, void* game, uint32_t key, void* unit, void* tgt)
+// Shared 0x21-request body of 0x41110 / 0x41850 (23 dwords; +0 type 0x21, +4 key, +0x10 the unit's own monstats row word +0x18, +0x14/+0x18 and
+// +0x1C/+0x20 the unit x,y twice, +0x2C Ordinal_10240, +0x30 Ordinal_11029). keyTgt: 0x41850 keys on the target, 0x41110 asks 0xE0A20 after the position reads.
+static void send21(const D2GameBatch3fEnv* e, void* game, void* keyTgt, void* unit, void* rec)
 {
     uint32_t x = e->unitX(unit), y = e->unitY(unit);
     uint32_t b[23] = {};
-    b[0] = 0x21; b[1] = key;
-    b[4] = (uint32_t)(int32_t)(int16_t)rd16(tgt, 0x18);
+    b[0] = 0x21; b[1] = keyTgt ? (uint32_t)(uintptr_t)keyTgt : e->gameKey(game);
+    b[4] = (uint32_t)(int32_t)(int16_t)rd16(rec, 0x18);
     b[5] = x; b[6] = y; b[7] = x; b[8] = y;
-    b[10] = e->o10240get(unit);
+    b[11] = e->o10240get(unit);
     b[12] = e->o11029(unit);
     e->sendRequest(game, b);
 }
@@ -95,7 +95,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_game_41110(void* game, void* unit, c
     if (!rec || (int16_t)rd16(rec, 0x18) < 0 || !hasTargetFlag(unit)) return 2;
     void* tgt = e->getTarget(game, rd32(unit, 0x98));
     if (!tgt) return 2;
-    if (e->o10203(rdptr(unit, 0x2C))) send21(e, game, e->gameKey(game), unit, tgt);
+    if (e->o10203(rdptr(unit, 0x2C))) send21(e, game, nullptr, unit, rec);
     return e->tail(game);
 }
 
@@ -107,7 +107,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_game_41850(void* game, void* unit, c
     if (!tgt) return 2;
     void* rec = monsRow(e, unit);
     if (!rec || (int16_t)rd16(rec, 0x18) < 0 || !rdptr(unit, 0x2C)) return 2;
-    if (e->o10203(rdptr(unit, 0x2C))) send21(e, game, (uint32_t)(uintptr_t)game, unit, tgt);  // key is param_1 as shown
+    if (e->o10203(rdptr(unit, 0x2C))) send21(e, game, tgt, unit, rec);
     return e->tail(game);
 }
 

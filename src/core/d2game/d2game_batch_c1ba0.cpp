@@ -51,7 +51,7 @@ static uint32_t dispatchCb(const D2GameBatchC1BA0Env* e, void* self, uint32_t fa
     uint8_t* o = (uint8_t*)e->mem(e->sub33F30(rd32(self, 0x10)));
     if (!o) return 0;
     if (e->isBadCodePtr(rd32(self, 0xf0))) e->fatal(fatalCode);
-    return e->callCb(rd32(o, 0xf0), self);
+    return e->callCb(rd32(o, 0xf0), o);   // retail ECX = the node
 }
 
 // 1.13c D2Game+0xC1BA0  (EAX = unit-ish; +4 -> +0xC0 feeds #10518; +0x18 is the shuffle state)

@@ -25,7 +25,8 @@ template <class E> void Think(E& e, uint32_t game, uint32_t unit, uint32_t tp, u
     const int32_t d = (int32_t)e.rd32(tp + 0x14);
     const uint32_t S = unit + 0x20, b = e.rd8(game + 0x6D);
     auto W = [&](uint32_t o) { return (int32_t)e.rd16s(row + o + b * 2); };
-    auto step = [&]() { const uint64_t v = (uint64_t)e.rd32(S) * 0x6AC690C5u + e.rd32(S + 4); e.wr32(S + 4, (uint32_t)(v >> 32)); e.wr32(S, (uint32_t)v); return (int32_t)((uint32_t)v % 100); };
+    uint32_t lastq = 0;   // retail's DIV leaves the quotient (new seed low / 100) in EAX; 0xF1B10 is entered with only AL loaded
+    auto step = [&]() { const uint64_t v = (uint64_t)e.rd32(S) * 0x6AC690C5u + e.rd32(S + 4); e.wr32(S + 4, (uint32_t)(v >> 32)); e.wr32(S, (uint32_t)v); lastq = (uint32_t)v / 100; return (int32_t)((uint32_t)v % 100); };
     auto lib = [&]() { return (int32_t)e.h(0x1180, 100, S); };
     auto idle = [&]() { e.h(0xF22C0, game, 0, 0, 0, unit, 0xA); };
     auto f2220 = [&](uint32_t a) { e.h(0xF2220, a, 0, 0, 0, 0, game, T); };
@@ -87,6 +88,6 @@ template <class E> void Think(E& e, uint32_t game, uint32_t unit, uint32_t tp, u
     if (d < 6 && step() < W(0x7A)) { f2220(8); return; }
     if (step() < W(0x74)) { e.wr32(C + 0x14, 0); idle(); return; }
     if (step() < 0x46) e.h(0xF2540, 0, game, unit, 0, 0, T, 2, 0, 0, 1, 7);
-    else e.h(0xF1B10, 0xC, 0, 0, 0, 0, game, unit);
+    else e.h(0xF1B10, (lastq & ~0xFFu) | 0xC, 0, 0, 0, 0, game, unit);
 }
 }

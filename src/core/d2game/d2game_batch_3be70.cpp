@@ -214,9 +214,9 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_3cdd0(void* game, int32_t* u, const D2Game
     uint32_t req[23] = {};
     req[0] = 1; req[1] = (uint32_t)(uintptr_t)client;
     req[5] = e->unitX(u); req[6] = e->unitY(u);
-    e->unitClass(u);   // #10240 is called (retail 0x3CE5x) and its result overwritten by #11029
-    req[10] = e->unitLevel(u);
-    req[2] = (uint32_t)(int32_t)i16(row, 0x24);
+    req[11] = e->unitClass(u);   // #10240 skill id (retail stores it at req+0x2C, level at +0x30, the row word at +0x10)
+    req[12] = e->unitLevel(u);
+    req[4] = (uint32_t)(int32_t)i16(row, 0x24);
     e->createMissile(game, req);
     return 0;
 }

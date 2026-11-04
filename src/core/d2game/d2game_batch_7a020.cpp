@@ -44,14 +44,14 @@ void D2GAME_7A4C0(const H& h, int* client, u32 p1, u8 p2, u8 b11) {
     enqueue(h, client, m);
 }
 
-// 1.13c D2Game+0x7B510   GUESS: eax (game, +0x20 = 64-bit seed), esi (table base), unit
-struct B510H { int (*o10331)(); int (*o10826)(int); int (*f1780)(void*); };
+// 1.13c D2Game+0x7B510   EAX = game (+0x20 = seed), stack arg = table base (slot idx*4+0xF0 -> record)
+struct B510H { int (*o10331)(int); int (*o10826)(int); int (*f1780)(int, void*); };
 int D2GAME_7B510(const B510H& h, int game, int* esi) {
-    int idx = h.o10826(h.o10331());
+    int idx = h.o10826(h.o10331(game));
     int* e = (int*)(intptr_t)esi[0xf0/4 + idx];
     if (e[0x2d4/4] < 0) {
         if (idx < 0x28) { e[0x2d4/4] = 0; return 0; }
-        e[0x2d4/4] = h.f1780((void*)(intptr_t)(game + 0x20));
+        e[0x2d4/4] = h.f1780(3, (void*)(intptr_t)(game + 0x20));
     }
     return e[0x2d4/4];
 }

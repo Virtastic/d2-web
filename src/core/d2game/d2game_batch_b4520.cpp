@@ -317,13 +317,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B6840(void* game, void* unit, i
 extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B6A60(void* game, void* unit, i32 skillId, u32 p4, const D2GameBatchB4520Env* env)
 { return b6840(game, unit, skillId, p4, env); }
 
-// 1.13c D2Game+0xB6C90  (ESI = unit)
-extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B6C90(void* unit, const D2GameBatchB4520Env* env)
+// 1.13c D2Game+0xB6C90  (ESI = unit, EDI = the first argument of #10306)
+extern "C" EMSCRIPTEN_KEEPALIVE u32 d2_fn_d2game_B6C90(void* unit, u32 edi, const D2GameBatchB4520Env* env)
 {
     if (!unit) return 0;
-    i32 k = ORD(10601, U((uintptr_t)unit), 0, 0, 0);
+    i32 k = ORD(10601, U((uintptr_t)unit), 0x6fd1b434u, 0x131, 0);
     if (k == 0x3b || k == 0x38) return 1;
-    if (k == 0x33) return ORD(10306, U((uintptr_t)unit), 0, 0, 0) > 3;
-    if (k == 0x1b) return ORD(10306, U((uintptr_t)unit), 0, 0, 0) > 7;
+    if (k == 0x33) return (i32)ORD(10306, edi, U((uintptr_t)unit), 1, 0) > 3;
+    if (k == 0x1b) return (i32)ORD(10306, edi, U((uintptr_t)unit), 1, 0) > 7;
     return 0;
 }
