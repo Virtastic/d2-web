@@ -9,7 +9,7 @@
 static uint32_t rd(const uint8_t* p) { uint32_t v; std::memcpy(&v, p, 4); return v; }
 
 // 1.13c D2Win+0xF610
-uint32_t D2Win_F610(const uint8_t* ctl, int32_t delta, uint32_t mask0, uint32_t mask2,
+extern "C" uint32_t D2Win_F610(const uint8_t* ctl, int32_t delta, uint32_t mask0, uint32_t mask2,
                     uint32_t* dat14a8, void (*cb)(uint8_t* ev), void (*fatal)(uint32_t code)) {
     if (rd(ctl) != 6) { fatal(0xE2); std::exit(-1); }
     uint32_t f = rd(ctl + 8), b = ctl[0x40];
