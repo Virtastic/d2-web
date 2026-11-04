@@ -105,7 +105,7 @@ void d2_multi_sub_7b5f(uint32_t* p) {
 // 1.13c D2Multi+0x8C80 (FUN_6f9d8c80, ret 8): EAX = text, edited in place (each line NUL-ended, restored after); stack: p1, flag.
 // Each line is one D2Win #10022 call (thunk 0x7C5C) with ECX = p1 and EDX = the line start; with flag set the call repeats with
 // EDX = the module constant 0x6F9E75D7 (not text). The empty text is one call with EDX = 0x6F9E75D7.
-void d2_multi_sub_8c80_r(int32_t p1, int32_t flag, char* s) {
+extern "C" void d2_multi_sub_8c80_r(int32_t p1, int32_t flag, char* s) {
     if (strlen(s) == 0) { n37_Ordinal_10022(p1, (int32_t)0x6F9E75D7); return; }
     while (*s) {
         char* e = s; while (*e && *e != '\n') e++;
@@ -123,7 +123,7 @@ void d2_multi_sub_8c80(int32_t p1, int32_t flag) { char empty[1] = { 0 }; d2_mul
 
 // 1.13c D2Multi+0x8D80 (FUN_6f9d8d80, ret): EAX = sel picks the string id (0-6: 0xFAB, 0xFAA, 0xFA9, 0xFA8, 0xFA7, 0x2771, 0x2772;
 // default 0x1507); ESI = destination. D2Lang #10003 (ECX = id) answers the string; Unicode::strcpy (ECX = dst, EDX = src).
-void d2_multi_sub_8d80_r(int32_t sel, void* dst) {
+extern "C" void d2_multi_sub_8d80_r(int32_t sel, void* dst) {
     static const uint32_t ids[7] = { 0xFAB, 0xFAA, 0xFA9, 0xFA8, 0xFA7, 0x2771, 0x2772 };
     const uint32_t id = (sel >= 0 && sel <= 6) ? ids[sel] : 0x1507u;
     d2_multi_unicode_strcpy(dst, (const void*)(uintptr_t)n37_Ordinal_10003(id));
@@ -132,7 +132,7 @@ void d2_multi_sub_8d80_r(int32_t sel, void* dst) {
 void d2_multi_sub_8d80(void) { static uint16_t buf[64]; d2_multi_sub_8d80_r(0, buf); }
 
 // 1.13c D2Multi+0x8E70
-void d2_multi_sub_8e70(uint8_t* s) {
+extern "C" void d2_multi_sub_8e70(uint8_t* s) {
     int32_t v = 5;
     uint16_t f = *(uint16_t*)(s + 0x3c7);
     if ((f & 4) && !(f & 8)) {
@@ -158,7 +158,7 @@ bool d2_multi_sub_9000(const char* key, const char* val, uint8_t* out, uint32_t*
 
 // 1.13c D2Multi+0x90D0: releases each handle that is set, in decompile order: D2Win #10126 (thunk 0x7D40) with ECX = the handle,
 // then the slot is cleared. Slot pairs as decompiled (54 blocks).
-void d2_multi_sub_90d0(void) {
+extern "C" void d2_multi_sub_90d0(void) {
     if (DAT_6fa09f48 != 0) { n37_Ordinal_10126(DAT_6fa09f48); DAT_6fa09f48 = 0; }
     if (DAT_6fa09f4c != 0) { n37_Ordinal_10126(DAT_6fa09f4c); DAT_6fa09f4c = 0; }
     if (DAT_6fa09f40 != 0) { n37_Ordinal_10126(DAT_6fa09f40); DAT_6fa09f40 = 0; }
@@ -217,7 +217,7 @@ void d2_multi_sub_90d0(void) {
 
 // 1.13c D2Multi+0x9550: each UI path DATA\GLOBAL\... is formatted into a stack buffer and D2Win #10111 (thunk 0x7DAC, ECX = the path)
 // returns the handle stored in its slot (53 slots, decompile order); then D2Win #10101 (thunk 0x7D6A) with the last two slots.
-void d2_multi_sub_9550(void) {
+extern "C" void d2_multi_sub_9550(void) {
     { char p[] = "DATA\\GLOBAL\\UI\\FrontEnd\\PopUpLargest2"; DAT_6fa09f48 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
     { char p[] = "DATA\\GLOBAL\\UI\\FrontEnd\\MediumButtonBlank2"; DAT_6fa09f4c = (int32_t)n37_Ordinal_10111((intptr_t)p); }
     { char p[] = "DATA\\GLOBAL\\UI\\BIGMENU\\bnet"; DAT_6fa09f40 = (int32_t)n37_Ordinal_10111((intptr_t)p); }
