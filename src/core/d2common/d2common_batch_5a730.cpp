@@ -157,7 +157,7 @@ static void b5a730_zeroGrid(D2DrlgGridStrc* g)
     g->pCellsFlags = nullptr;
     g->pCellsRowOffsets = nullptr;
 }
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_833f0(D2LvlSubTxt* record)
+void D2Common_833F0_LvlSubTeardown(D2LvlSubTxt* record)
 {
     if (!record->pDrlgFile) return;
     for (int i = 0; i < record->pDrlgFile->nWallLayers; ++i) {

@@ -29,15 +29,18 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_4E480_FindSkillNode(uint32_t unit, int32_
  return best;
 }
 // 1.13c D2Common+0x32CA0: write owner identity and SOURCEUNIT stats.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_32ca0(uint32_t unit, int32_t type, int32_t id,
- void (*toggle)(uint32_t,int32_t,int32_t), uint32_t (*find)(uint32_t,int32_t),
+// countGate: sgptDataTables+0xC4 > 0x62. Retail runs the bit block (toggle) and UNITROOM_RefreshUnit (refresh) only then,
+// and only when the unit has a stat list ex; both happen before the overlay-list lookup.
+void D2Common_32CA0_StoreOwnerInfo(uint32_t unit, int32_t type, int32_t id, bool countGate,
+ void (*toggle)(uint32_t,int32_t,int32_t), void (*refresh)(uint32_t), uint32_t (*find)(uint32_t,int32_t),
  uint32_t (*alloc)(uint32_t,int32_t,int32_t,int32_t,int32_t), void (*post)(uint32_t,uint32_t,int32_t),
  void (*set)(uint32_t,int32_t,int32_t)) {
  if (!unit) return;
  w(unit,0x94)=static_cast<uint32_t>(type); w(unit,0x98)=static_cast<uint32_t>(id);
  if (w(unit,0x5C)) {
-  if (toggle) toggle(unit,0x62,1);
-  uint32_t list=find ? find(unit,0x62) : 0;
+  if (countGate) { if (toggle) toggle(unit,0x62,1); if (refresh) refresh(unit); }
+  // retail walks the overlay lists only when the list ex is extended (flags bit 31); otherwise it allocates directly
+  uint32_t list=(find && static_cast<int32_t>(w(w(unit,0x5C),0x10))<0) ? find(unit,0x62) : 0;
   if (!list && alloc) { list=alloc(w(unit,8),0,0,s(unit,0),s(unit,4)); if (!list) return;
    w(list,0x14)=0x62; if (post) post(unit,list,1); }
   if (set) { set(list,0x161,type); set(list,0x162,id); }
@@ -64,7 +67,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2common_port_2f100(uint32_t unit, uint32_t target
  return mode!=old;
 }
 // 1.13c D2Common+0x4F870: stat gate for category 1,2,4,5,12.
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_4f870(uint32_t unit, int32_t category, int32_t ratio,
+int32_t D2Common_4F870_StatGate(uint32_t unit, int32_t category, int32_t ratio,
  uint32_t tableCount, uint32_t tableRow, uint32_t (*hasStat)(uint32_t,int32_t),
  uint32_t (*hasTableStat)(uint32_t), int32_t (*applyRatio)(int32_t,int32_t)) {
  // retail: EAX = stat value from the getter (0x38B70 / 0x38A80), ESI = base; the result is
