@@ -11,9 +11,12 @@ struct D2Seam {
     // hookblk: log n dwords at p (a stack block handed to the callee just called), 9 per record
     void (*bl)(void* ctx, uint32_t rva, uint32_t p, uint32_t n) = nullptr;
     void blk(uint32_t rva, const void* p, uint32_t n) const { if (bl) bl(ctx, rva, (uint32_t)(uintptr_t)p, n); }
-    // REGS `J`: EDI at the hooked call, one record straight after the call's own (call it after call())
+    // REGS `J`: EDI handed to the callee just called, logged as its own record straight after the call's
     void (*ej)(void* ctx, uint32_t rva, uint32_t edi) = nullptr;
     void edi(uint32_t rva, uint32_t v) const { if (ej) ej(ctx, rva, v); }
+    // a retail code pointer the function was handed (fastcall: ECX, EDX, one stack word, ret 4): the probe runs its stand-in
+    uint32_t (*cbk)(void* ctx, uint32_t fn, uint32_t c, uint32_t d, uint32_t s0) = nullptr;
+    uint32_t callback(uint32_t fn, uint32_t c, uint32_t d, uint32_t s0) const { return cbk ? cbk(ctx, fn, c, d, s0) : 0; }
     uint32_t call(uint32_t rva, uint32_t a = 0, uint32_t c = 0, uint32_t d = 0, uint32_t b = 0, uint32_t s = 0,
                   uint32_t s0 = 0, uint32_t s1 = 0, uint32_t s2 = 0, uint32_t s3 = 0, uint32_t s4 = 0, uint32_t s5 = 0, uint32_t s6 = 0, uint32_t s7 = 0) const {
         return fn(ctx, rva, a, c, d, b, s, s0, s1, s2, s3, s4, s5, s6, s7);
