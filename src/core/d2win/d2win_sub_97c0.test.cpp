@@ -13,8 +13,8 @@ int main() {
     assert(calls == 1 && gbox == &box && p3 == 4 && p4 == 0 && p5 == 0);
     assert(got[0] == 'A' && got[1] == 0xE9 && got[2] == 'z' && got[3] == 0);
     char big[0x500]; memset(big, 'x', sizeof big - 1); big[sizeof big - 1] = 0;
-    d2win_sub_97C0(&box, big, add, nullptr);               // capped at 0x400 units
-    assert(got[0x3FF] == 'x');
+    d2win_sub_97C0(&box, big, add, nullptr);               // capped at 0x3FF characters plus the terminator
+    assert(got[0x3FE] == 'x' && got[0x3FF] == 0);
     D2WinW2Env e{fat, 0, 0, 0};
     try { d2win_sub_97C0(nullptr, "a", add, &e); assert(0); } catch (int) {}
     assert(fcode == 0x109 && calls == 2);

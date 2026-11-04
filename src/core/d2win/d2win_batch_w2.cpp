@@ -83,7 +83,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_97C0(void* box, const char* s,
         const D2WinW2Env* env) {
     if (!box) w2_fatal(env, 0x109);
     uint16_t buf[0x400] = {};                       // Unicode::win2Unicode(buf, s, 0x400)
-    for (int i = 0; i < 0x400 && s[i]; ++i) buf[i] = (uint8_t)s[i];
+    for (int i = 0; i < 0x3FF && s[i]; ++i) buf[i] = (uint8_t)s[i];   // the cap leaves room for the terminator: at most 0x3FF characters
     addText(box, buf, 4, 0, 0);
 }
 
