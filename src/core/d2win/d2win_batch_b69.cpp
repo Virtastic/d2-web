@@ -3,6 +3,7 @@
 // Skipped: CRT/chkstk (0x1B3C 0x35E0), 0x17260 (alloca'd 20 KB screenshot frame, unresolved layout).
 // Hidden register inputs are explicit leading params. Callees are seams; retail globals are externs.
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <strings.h>
 #include <initializer_list>
@@ -27,7 +28,7 @@ __attribute__((weak)) void* Ordinal_10208(void*, void*);
 __attribute__((weak)) int32_t Ordinal_10210(void*);
 __attribute__((weak)) void Ordinal_10207(void*, uint32_t, void*, int32_t, uint32_t);
 __attribute__((weak)) void Ordinal_10209(void*);
-__attribute__((weak)) int wsprintfA(char*, const char*, ...);
+#define wsprintfA sprintf   // the Win32 wsprintfA formats like sprintf for the %s/%d uses here (the link stub in compat_link_weak.cpp writes nothing)
 void _exit(int);
 extern const uint32_t* gdwBitMasks_exref;
 __attribute__((weak)) extern const uint32_t* d2win_ea30_masks;

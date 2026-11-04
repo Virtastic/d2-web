@@ -181,19 +181,24 @@ int32_t d2win_b66_99F0(int32_t* w, const uint16_t* text, int32_t limit, int32_t 
     return 1;
 }
 
-// 1.13c D2Win+0x12B40 -- slot idx (EAX hidden): reset and re-create its entry in d2win_font_tab.
+// 1.13c D2Win+0x12B40 -- slot idx (EAX hidden, also EBX): reset and re-create its entry in the font table (5 dwords per entry).
+// Seams on the Env: 0x12280 (builds the .tbl path, EBX = idx, EDI = buffer, cap on the stack), Ordinal_10043 (release, (0xB3, 0), EDX = the
+// module's file-name string), 0x7C60 (Storm file load, EAX = path, two zero stack words, returns the loaded block).
 struct D2WinFontEnt { void* s[5]; };
+struct D2Win12B40Env {
+    D2WinFontEnt* slot;                                        // &table[idx]: 0x6F901514 + idx * 0x14
+    void (*sub12280)(int32_t cap, int32_t idx, char* dst);
+    void (*release)(int32_t tag, int32_t zero);
+    void* (*load7c60)(const char* path);
+};
 extern "C" {
-extern D2WinFontEnt d2win_font_tab[32];
-void d2win_sub_12280(int32_t cap, int32_t fontIdx, char* dst);
-void* d2win_7c60(const char* name, uint32_t* size);
 EMSCRIPTEN_KEEPALIVE
-void d2win_12B40(int32_t idx) {
-    char path[260];
-    d2win_sub_12280(0x4f, idx, path);   // retail leaves EBX/EDI from the caller; only the size check matters
-    D2WinFontEnt& s = d2win_font_tab[idx];
-    if (s.s[0]) Ordinal_10043(0xb3, 0);
-    void* v = d2win_7c60(nullptr, nullptr);
+void d2win_12B40(int32_t idx, const D2Win12B40Env* e) {
+    char path[0x50];
+    e->sub12280(0x4f, idx, path);   // retail leaves EBX/EDI from the caller; only the size check matters
+    D2WinFontEnt& s = *e->slot;
+    if (s.s[0]) e->release(0xb3, 0);
+    void* v = e->load7c60(path);
     s.s[0] = v; s.s[1] = v; s.s[2] = (uint8_t*)v + 0xc;
 }
 }

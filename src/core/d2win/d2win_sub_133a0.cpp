@@ -5,6 +5,7 @@
 // 1 (tiled, cache palette) and 2 (plain) as pushed; the closing restore sets the font to the entry font when the
 // loop left it changed (the entry value sits at [esp+0x28]).
 #include <cstdint>
+#include <emscripten.h>
 struct D2Win133A0Env {
   const uint16_t* text;        // 0x6F9A9E58
   int32_t* curFont;            // 0x6F8FFD34, live: SetUnicodeTextFont writes it
@@ -25,7 +26,7 @@ struct D2Win133A0Env {
   void (*setFont)(int32_t);                                     // 0x12FE0
 };
 // 1.13c D2Win+0x133A0
-void d2win_sub_133a0(D2Win133A0Env& e) {
+extern "C" EMSCRIPTEN_KEEPALIVE void d2win_sub_133a0(D2Win133A0Env& e) {
   if (!e.text[0]) return;
   const int32_t entryFont = *e.curFont;
   int32_t f = entryFont, w, h, dx, dy, y0;

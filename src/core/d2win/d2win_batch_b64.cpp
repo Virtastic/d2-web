@@ -31,7 +31,7 @@ struct D2WinB64Env {
     int32_t (*strncmp16)(const uint16_t*, const uint16_t*, int32_t);
     uint8_t* (*curGlyph)(void);                            // *DAT_6f901508
     int32_t (*glyphSheetW)(void* cell);                    // Ordinal_10000
-    void (*drawGlyph)(int32_t* ctx, int32_t x, int32_t y, uint8_t* g, int32_t n, uint32_t m); // Ordinal_10074
+    void (*drawGlyph)(const uint32_t* rec, int32_t x, int32_t y, int32_t a3, int32_t a4, uint32_t m); // Ordinal_10074
     uint8_t (*fontHeight)(void);                           // *(tbl[curFont*0x14]+10)
     uint32_t colorSwitchA, colorSwitchB;                   // DAT_6f9aa670 / DAT_6f9aa66c marker values
     uint32_t extraWord, glyphWord;                         // DAT_6f901628 / *DAT_6f9014f0
@@ -143,15 +143,20 @@ uint32_t* d2win_sub_E3C0(const uint8_t* cols, const char* tx) {
     return w;
 }
 
-// 1.13c D2Win+0x11C30 -- __fastcall (ecx=text, edx=x, then y, startCol, mode)
-uint32_t d2win_sub_11C30(const uint16_t* text, int32_t x, uint32_t y, int32_t startCol, int32_t mode) {
-    uint32_t ret = (uint32_t)mode;
-    if (mode < 0) return ret;
+// 1.13c D2Win+0x11C30 -- __fastcall (ecx = text, edx = x), stack y, a2 (never read), a3, a4, ret 0x10.
+// a3 < 0 returns a3 at once. The 0x7828 draw takes the 0x48-byte record (the same one the cell-data call
+// 0x7744 and the colour-code draw 0x77CE take), x, y, then a3 and a4 (the visible span) or, when a3 + a4
+// is past the cell width, 0 and the width. The return value in EAX is whatever the last loop step left
+// (a glyph pointer or an arithmetic residue), so it is not a contract; the last glyph pointer is returned here.
+uint32_t d2win_sub_11C30(const uint16_t* text, int32_t x, uint32_t y, int32_t a2, int32_t a3, int32_t a4) {
+    (void)a2;
+    uint32_t ret = (uint32_t)a3;
+    if (a3 < 0) return ret;
     uint32_t gm = E.getMode();
     int32_t n = E.strlen16(text);
     ret = 0;
     uint32_t rec[18] = {0};
-    int32_t lineX = x;
+    const int32_t lineX = x;
     for (int32_t i = 0; i < n;) {
         int32_t next = i + 1;
         if (text[i] < 0x100 && text[i] == 0xff) {
@@ -180,17 +185,25 @@ uint32_t d2win_sub_11C30(const uint16_t* text, int32_t x, uint32_t y, int32_t st
                 rec[0] = *(uint16_t*)(g + 8);
                 rec[13] = E.glyphWord;
                 int32_t w = E.glyphSheetW(E.cellData(rec));
-                if ((int32_t)((intptr_t)g + startCol) <= w) {
-                    E.drawGlyph(&lineX, x, (int32_t)y, g, startCol, 5);
-                    ret = (uint32_t)(uintptr_t)g; x += g[3]; i = next; continue;
-                }
-                E.drawGlyph(&lineX, x, (int32_t)y, nullptr, w, 5);
+                if ((int32_t)((uint32_t)a3 + (uint32_t)a4) <= w) E.drawGlyph(rec, x, (int32_t)y, a3, a4, 5);
+                else E.drawGlyph(rec, x, (int32_t)y, 0, w, 5);
             }
             ret = (uint32_t)(uintptr_t)g; x += g[3];
         }
         i = next;
     }
     return ret;
+}
+
+// FN probe seam (src/core/fn/d2win_11c30.cpp): the callees and globals 0x11C30 reaches.
+extern "C" void d2win_b64_set_11c30_seams(uint32_t (*getMode)(void), int32_t (*strlen16)(const uint16_t*), int32_t (*strncmp16)(const uint16_t*, const uint16_t*, int32_t),
+                                          uint8_t* (*curGlyph)(void), void* (*cellData)(uint32_t*), int32_t (*glyphSheetW)(void*),
+                                          void (*drawGlyph)(const uint32_t*, int32_t, int32_t, int32_t, int32_t, uint32_t),
+                                          void (*drawCell)(uint32_t*, int32_t, int32_t, uint32_t, uint32_t, uint32_t), uint8_t (*fontHeight)(void),
+                                          uint32_t colorA, uint32_t colorB, uint32_t extraWord, uint32_t glyphWord) {
+    E.getMode = getMode; E.strlen16 = strlen16; E.strncmp16 = strncmp16; E.curGlyph = curGlyph; E.cellData = cellData; E.glyphSheetW = glyphSheetW;
+    E.drawGlyph = drawGlyph; E.drawCell = drawCell; E.fontHeight = fontHeight; E.colorSwitchA = colorA; E.colorSwitchB = colorB;
+    E.extraWord = extraWord; E.glyphWord = glyphWord;
 }
 
 // 1.13c D2Win+0x0E240
