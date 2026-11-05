@@ -377,18 +377,6 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d40f0(uint32_t ediUnit, uint32_t ebxArg,
     env->sub8DFD0(ebxArg);
 }
 
-// 1.13c D2Game+0xd4550
-// Guard for 0xD40F0: EAX = unit, and only when bit 0 of unit+0xC4 is set is 0xD40F0 called. EDI and
-// EBX are register-only pass-throughs to 0xD40F0.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d4550(uint32_t eaxUnit, uint32_t ediUnit, uint32_t ebxArg,
-                                             const D2GameBatchD40F0Env* env)
-{
-    if (eaxUnit == 0) return;
-    if ((rd32((void*)(uintptr_t)eaxUnit, 0xC4) & 1u) == 0) return;
-    d2_fn_d2game_d40f0(ediUnit, ebxArg, env);
-}
-
 // Probe entry for 0x38470 (src/core/fn/d2game_38470.cpp): the env carries only the item-code lookup;
 // every other seam is null, so only the early-return paths (unknown code, nItemCount 0) are callable.
 extern "C" void d2game_38470_probe(uint32_t player, uint32_t game, const uint32_t* item,
