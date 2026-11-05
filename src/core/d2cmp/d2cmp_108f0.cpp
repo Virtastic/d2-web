@@ -9,7 +9,7 @@
 
 // Seams: Fog #10042 alloc(line,zero; size in ECX, file in EDX), #10043 free, #10265+#10024 fatal.
 extern "C" __attribute__((weak)) void* d2cmp_fog_alloc(uint32_t size, const char* file, uint32_t line, uint32_t zero);
-extern "C" __attribute__((weak)) void d2cmp_fog_free(void* p, const char* file, uint32_t line, uint32_t zero);
+extern "C" __attribute__((weak)) void d2cmp_fog_free_file(void* p, const char* file, uint32_t line, uint32_t zero);
 extern "C" __attribute__((weak)) void d2cmp_fog_fatal(uint32_t msg);   // 10265(msg) + 10024, then _exit(-1)
 // sub_FD70: (eax=node[0xc], stack: pixels=node[0x20], stride=node[0x10], rows=node[8], &data, &size).
 extern "C" __attribute__((weak)) void d2cmp_fd70(uint32_t eax, uint32_t pixels, uint32_t stride,
@@ -35,7 +35,7 @@ uint32_t d2cmp_108f0(uint8_t* ctx, uint8_t* out) {
         uint32_t h[8] = { rd(nd, 8), rd(nd, 0xc), rd(nd, 0x10), rd(nd, 0x18), rd(nd, 0x1c), 0, 0, size };
         memcpy(b, h, 32);
         memcpy(b + 0x20, data, size);
-        d2cmp_fog_free(data, d2cmp_src_6fe2fe88, 0x8d, 0);
+        d2cmp_fog_free_file(data, d2cmp_src_6fe2fe88, 0x8d, 0);
         uint32_t m = rd(ctx, 0x28);
         uint32_t k = m < 2 ? 1 : ((i / per) << 6) / m;
         uint32_t bit = m ? (uint32_t)__builtin_ctz(m) + 1 : 0;
