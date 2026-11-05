@@ -7,13 +7,13 @@ void     Ordinal_10024(void*, int32_t);
 void     Ordinal_10167(void);
 extern uint8_t *DAT_6fa09f14, *DAT_6fa0917c;
 extern int32_t DAT_6fa09cc0, DAT_6fa09dcc;
-extern uint8_t DAT_6f9ebf57[];
+extern uint8_t DAT_6f9ebf20[];
 extern char DAT_6f9e75d7[];
 void d2_multi_sub_11f80(void);
 }
 
 // 1.13c D2MULTI+0x13F20
-void d2_multi_sub_13f20(void) {
+extern "C" void d2_multi_sub_13f20(void) {
     uint16_t w = *(uint16_t*)(DAT_6fa09f14 + 0x1eb);
     uint32_t a = 0, b = 0;
     if (w & 4) a = b = 4;
@@ -25,7 +25,7 @@ void d2_multi_sub_13f20(void) {
     if (p) {
         int32_t n = *p, cnt = 0;
         uint8_t* s = (uint8_t*)(p + 1);
-        uint8_t* rec = DAT_6f9ebf57;
+        uint8_t* rec = DAT_6f9ebf20 + 0x37;
         DAT_6fa09dcc = n;
         while (cnt < n) {  // do-while in retail; n>0 guard matches its entry test
             *(uint16_t*)(rec - 4) = 1;

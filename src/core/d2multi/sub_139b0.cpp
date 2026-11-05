@@ -6,12 +6,12 @@ uint32_t Ordinal_10265(int32_t);
 void     Ordinal_10024(void*, int32_t);
 extern uint8_t *DAT_6fa09f14, *DAT_6fa0917c;
 extern char DAT_6f9e75d7[];
-bool d2_multi_sub_134d0(void);
-void d2_multi_sub_121b0(void);
+int32_t d2_multi_sub_134d0(const uint8_t*, uint16_t);
+const char* d2_multi_sub_121b0(const char*);
 }
 
 // 1.13c D2MULTI+0x139B0
-int32_t d2_multi_sub_139b0(uint8_t* ebx) {
+extern "C" int32_t d2_multi_sub_139b0(uint8_t* ebx) {
     uint16_t w = *(uint16_t*)(DAT_6fa09f14 + 0x1eb);
     uint32_t a = 0, b = 0;
     if (w & 4) a = b = 4;
@@ -32,9 +32,10 @@ int32_t d2_multi_sub_139b0(uint8_t* ebx) {
     char* s2 = s + 1;           // second string
     while (*s2) s2++;
     char* s3 = s2 + 1;          // third string
-    if (d2_multi_sub_134d0()) return 0;
+    if (d2_multi_sub_134d0((const uint8_t*)s3, w)) return 0;
     d = (char*)ebx + 0x11;
-    do *d++ = *s3; while (*s3++);
-    d2_multi_sub_121b0();
+    const char* c3 = s3;
+    do *d++ = *c3; while (*c3++);
+    d2_multi_sub_121b0(s3);
     return n;
 }
