@@ -35,21 +35,6 @@ namespace
 	inline uint8_t RdU8(const uint8_t* b, int o) { return *(b + o); }
 	inline uint32_t& W(uint8_t* b, int o) { return *reinterpret_cast<uint32_t*>(b + o); }
 
-	// 0x10B0/0x1100: one LCG step, then the limited roll (the same arithmetic as batch 0x10B0).
-	uint32_t RollLimited(uint32_t* pSeed, uint32_t nMax)
-	{
-		if (static_cast<int32_t>(nMax) < 1)
-			return 0;
-
-		const uint64_t lSeed = static_cast<uint64_t>(pSeed[0]) * 0x6AC690C5ull + pSeed[1];
-		pSeed[0] = static_cast<uint32_t>(lSeed);
-		pSeed[1] = static_cast<uint32_t>(lSeed >> 32);
-
-		if ((nMax & (nMax - 1)) != 0)
-			return static_cast<uint32_t>(lSeed) % nMax;
-
-		return (nMax - 1) & static_cast<uint32_t>(lSeed);
-	}
 }
 
 // Env seams for callees that are still UNMAPPED rows, in retail argument order.
@@ -57,15 +42,6 @@ extern "C"
 {
 	void* (*g_d2lang_fn_10003)(int32_t);                                    // D2Lang ordinal 10003
 	void* (*g_d2common_fn_10045)(const char*, int32_t, int32_t);            // Fog ordinal 10045
-}
-
-// Retail globals this batch reads; zero is the only value available until the rows that fill them
-// are mapped.
-extern "C"
-{
-	int32_t g_d2common_dat_6fdf0b7c = 0;    // 0x5A7D0 lookup count
-	int16_t* g_d2common_dat_6fdf0b6c = nullptr; // 0x5A7D0 lookup table
-	uint8_t g_d2common_dat_6fdf1484[8] = {};    // 0x5A7D0 fallback string
 }
 
 // 1.13c D2Common+0x18DF0 (#10840): bound check of a 0x34-byte record. Retail fatals 0x147 on a
@@ -105,30 +81,6 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_391a0(uint32_t pStatList, int32_t nS
 
 	return STATLIST_GetTotalStat_6FDB63E0(reinterpret_cast<D2StatListStrc*>(P(pStatList)), nStatId,
 	                                      &sgptDataTables->pItemStatCostTxt[nStatId]);
-}
-
-// 1.13c D2Common+0x5A7D0 (#10852): roll once over the unit's seed-limited table (count at
-// 0x6FDF0B7C, int16 entries at 0x6FDF0B6C); a non-zero entry is resolved through D2Lang ordinal
-// 10003, and anything else falls back to the static default string at 0x6FDF1484.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void* d2_fn_d2common_5a7d0(uint32_t pUnit)
-{
-	uint8_t* p = P(pUnit);
-	if (!p)
-		return g_d2common_dat_6fdf1484;
-
-	if (g_d2common_dat_6fdf0b7c > 0)
-	{
-		const uint32_t nRoll = RollLimited(reinterpret_cast<uint32_t*>(p + 0x20),
-		                                   static_cast<uint32_t>(g_d2common_dat_6fdf0b7c));
-		if (g_d2common_dat_6fdf0b6c && g_d2common_dat_6fdf0b6c[nRoll] != 0 && g_d2lang_fn_10003)
-		{
-			if (void* pString = g_d2lang_fn_10003(g_d2common_dat_6fdf0b6c[nRoll]))
-				return pString;
-		}
-	}
-
-	return g_d2common_dat_6fdf1484;
 }
 
 // 1.13c D2Common+0x1FF40 (#10854): report the first usable item among the two hand slots of an

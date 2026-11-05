@@ -757,119 +757,35 @@ void __stdcall DATATBLS_ResetGlobalDefaultUnicodeString()
 }
 
 //D2Common.0x6FD68A10 (#10651)
+// 0x5A850 in 1.13c: the body is the seam in src/core/d2common/d2common_5a850.cpp (the D2Lang lookup injected)
+const Unicode* DATATBLS_RollRandomUniqueTitleStringSeam(D2UnitStrc* pUnit, const Unicode* (*pfnLookup)(short));
 const Unicode* __fastcall DATATBLS_RollRandomUniqueTitleString(D2UnitStrc* pUnit)
 {
-	int nRand = 0;
-
-	if (pUnit && sgptDataTables->nUniqueTitleTxtRecordCount > 0)
-	{
-		if ((sgptDataTables->nUniqueTitleTxtRecordCount - 1) & sgptDataTables->nUniqueTitleTxtRecordCount)
-		{
-			nRand = (unsigned int)SEED_RollRandomNumber(&pUnit->pSeed) % sgptDataTables->nUniqueTitleTxtRecordCount;
-		}
-		else
-		{
-			nRand = SEED_RollRandomNumber(&pUnit->pSeed) & (sgptDataTables->nUniqueTitleTxtRecordCount - 1);
-		}
-
-		if (sgptDataTables->pUniqueTitleTxt[nRand].wStringId)
-		{
-			const Unicode* pString = D2LANG_GetStringFromTblIndex(sgptDataTables->pUniqueTitleTxt[nRand].wStringId);
-			if (pString)
-			{
-				return pString;
-			}
-		}
-	}
-
-	return &sgptDataTables->wszDefault;
+	return DATATBLS_RollRandomUniqueTitleStringSeam(pUnit, D2LANG_GetStringFromTblIndex);
 }
 
 //D2Common.0x6FD68A80 (#10652)
+// 0x5A810 in 1.13c: the body is the seam in src/core/d2common/d2common_5a810.cpp (the D2Lang lookup injected)
+const Unicode* DATATBLS_RollRandomUniquePrefixStringSeam(D2UnitStrc* pUnit, const Unicode* (*pfnLookup)(short));
 const Unicode* __fastcall DATATBLS_RollRandomUniquePrefixString(D2UnitStrc* pUnit)
 {
-	int nRand = 0;
-
-	if (pUnit && sgptDataTables->nUniquePrefixTxtRecordCount > 0)
-	{
-		if ((sgptDataTables->nUniquePrefixTxtRecordCount - 1) & sgptDataTables->nUniquePrefixTxtRecordCount)
-		{
-			nRand = (unsigned int)SEED_RollRandomNumber(&pUnit->pSeed) % sgptDataTables->nUniquePrefixTxtRecordCount;
-		}
-		else
-		{
-			nRand = SEED_RollRandomNumber(&pUnit->pSeed) & (sgptDataTables->nUniquePrefixTxtRecordCount - 1);
-		}
-
-		if (sgptDataTables->pUniquePrefixTxt[nRand].wStringId)
-		{
-			const Unicode* pString = D2LANG_GetStringFromTblIndex(sgptDataTables->pUniquePrefixTxt[nRand].wStringId);
-			if (pString)
-			{
-				return pString;
-			}
-		}
-	}
-
-	return &sgptDataTables->wszDefault;
+	return DATATBLS_RollRandomUniquePrefixStringSeam(pUnit, D2LANG_GetStringFromTblIndex);
 }
 
 //D2Common.0x6FD68AF0 (#10653)
+// 0x5A7D0 in 1.13c: the body is the seam in src/core/d2common/d2common_5a7d0.cpp (the D2Lang lookup injected)
+const Unicode* DATATBLS_RollRandomUniqueSuffixStringSeam(D2UnitStrc* pUnit, const Unicode* (*pfnLookup)(short));
 const Unicode* __fastcall DATATBLS_RollRandomUniqueSuffixString(D2UnitStrc* pUnit)
 {
-	int nRand = 0;
-
-	if (pUnit && sgptDataTables->nUniqueSuffixTxtRecordCount > 0)
-	{
-		if ((sgptDataTables->nUniqueSuffixTxtRecordCount - 1) & sgptDataTables->nUniqueSuffixTxtRecordCount)
-		{
-			nRand = (unsigned int)SEED_RollRandomNumber(&pUnit->pSeed) % sgptDataTables->nUniqueSuffixTxtRecordCount;
-		}
-		else
-		{
-			nRand = SEED_RollRandomNumber(&pUnit->pSeed) & (sgptDataTables->nUniqueSuffixTxtRecordCount - 1);
-		}
-
-		if (sgptDataTables->pUniqueSuffixTxt[nRand].wStringId)
-		{
-			const Unicode* pString = D2LANG_GetStringFromTblIndex(sgptDataTables->pUniqueSuffixTxt[nRand].wStringId);
-			if (pString)
-			{
-				return pString;
-			}
-		}
-	}
-
-	return &sgptDataTables->wszDefault;
+	return DATATBLS_RollRandomUniqueSuffixStringSeam(pUnit, D2LANG_GetStringFromTblIndex);
 }
 
 //D2Common.0x6FD68B60 (#10654)
+// 0x5A790 in 1.13c: the body is the seam in src/core/d2common/d2common_5a790.cpp (the D2Lang lookup injected)
+const Unicode* DATATBLS_RollRandomUniqueAppellationStringSeam(D2UnitStrc* pUnit, const Unicode* (*pfnLookup)(short));
 const Unicode* __fastcall DATATBLS_RollRandomUniqueAppellationString(D2UnitStrc* pUnit)
 {
-	int nRand = 0;
-
-	if (pUnit && sgptDataTables->nUniqueAppellationTxtRecordCount > 0)
-	{
-		if ((sgptDataTables->nUniqueAppellationTxtRecordCount - 1) & sgptDataTables->nUniqueAppellationTxtRecordCount)
-		{
-			nRand = (unsigned int)SEED_RollRandomNumber(&pUnit->pSeed) % sgptDataTables->nUniqueAppellationTxtRecordCount;
-		}
-		else
-		{
-			nRand = SEED_RollRandomNumber(&pUnit->pSeed) & (sgptDataTables->nUniqueAppellationTxtRecordCount - 1);
-		}
-
-		if (sgptDataTables->pUniqueAppellationTxt[nRand].wStringId)
-		{
-			const Unicode* pString = D2LANG_GetStringFromTblIndex(sgptDataTables->pUniqueAppellationTxt[nRand].wStringId);
-			if (pString)
-			{
-				return pString;
-			}
-		}
-	}
-
-	return &sgptDataTables->wszDefault;
+	return DATATBLS_RollRandomUniqueAppellationStringSeam(pUnit, D2LANG_GetStringFromTblIndex);
 }
 
 //D2Common.0x6FD68BD0

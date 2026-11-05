@@ -138,19 +138,6 @@ uint32_t D2Common_20700_EquippedHandCandidate(uint32_t pInv, uint32_t* pOutUnit,
     return 0;
 }
 
-// 1.13c D2Common+0x5A850 (#10103)
-// Unit-to-string via a static short table: when the table count (a D2Common global) is positive, 0x1100
-// rolls on the unit's seed (+0x20) and the roll indexes a ushort table; a non-zero entry is resolved
-// through D2Lang#10003 (import thunk 0x92E8) and returned. A null unit, an empty table, a zero entry or a
-// null string gives the static empty string (0x6FDF1484). The table entry and the D2Lang result are
-// register-only in retail, so they are passed in resolved.
-uint32_t D2Common_5A850_GetRolledString(uint32_t pUnit, uint32_t nTableCount, uint32_t nRolledTableEntry, uint32_t pResolvedString, uint32_t pEmptyString)
-{
-    if (!pUnit) return pEmptyString;
-    if (nTableCount == 0 || nRolledTableEntry == 0 || pResolvedString == 0) return pEmptyString;
-    return pResolvedString;
-}
-
 // 1.13c D2Common+0x2A170 (#10104)
 // Unit gate over two ItemStatCost rows (70 = 0x46 and 125 = 0x7D, stride 0x144, table at sgptDataTables
 // +0xBCC, count +0xBD4; each query is guarded by the row count and a non-null row): with the unit's stat

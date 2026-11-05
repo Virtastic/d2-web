@@ -52,14 +52,6 @@ extern "C" void d2_batch_d2common_18db0(int32_t nId)
 	(void)DATATBLS_GetArmTypeTxtRecord(nId);
 }
 
-// 1.13c D2Common+0x5A790: rolls the unit's unique-appellation string. A null unit, an empty table
-// or a rolled record with a zero string id all yield the shared default unicode string, which is
-// exactly the 1.10f body of DATATBLS_RollRandomUniqueAppellationString.
-const Unicode* d2_fn_d2common_5a790(D2UnitStrc* pUnit)
-{
-	return DATATBLS_RollRandomUniqueAppellationString(pUnit);
-}
-
 extern "C" void D2Common_44D90_Engine(uint32_t pUnit, uint8_t* pnIntensity, uint8_t* pnRed,
                                      uint8_t* pnGreen, uint8_t* pnBlue);
 

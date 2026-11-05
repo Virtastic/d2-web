@@ -345,29 +345,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_30AC0_FindSkillNode(uint32_t pUnit, int32
 	return 0;
 }
 
-// 1.13c D2Common+0x5A810 (#10249): string from a unit's seed roll.
-// A null unit gives the static empty string. With a positive global roll-table count, 0x51100 rolls on
-// the unit's seed (+0x20); a non-zero ushort entry at that index is translated through D2Lang 10003 and
-// returned when non-null. Otherwise the static empty string (retail 0x6FDF1484) is returned; our image
-// has no such object, so the empty case is a null pointer. The table globals and both callees are env
-// seams.
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_5a810(uint32_t pUnit,
-	int32_t (*pfnRoll51100)(uint32_t),
-	int32_t (*pfnTableEntry)(uint32_t),
-	uint32_t (*pfnLang10003)(uint32_t))
-{
-	uint8_t* u = P(pUnit);
-	if (!u || !pfnRoll51100 || !pfnTableEntry)
-		return 0;
-
-	const int32_t nRoll = pfnRoll51100(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(u + 0x20)));
-	const int32_t nStringId = pfnTableEntry(static_cast<uint32_t>(nRoll));
-	if (nStringId == 0)
-		return 0;
-	return pfnLang10003 ? pfnLang10003(static_cast<uint32_t>(nStringId)) : 0;
-}
-
 // 1.13c D2Common+0x2F6A0 (#10265): take and reset a type-0 unit's +0x14 data block fields.
 // Dword +0x84 and +0x8C are read out, then +0x74 is cleared, +0x7C and +0x90 become -1 and +0x94 is
 // cleared. A non-type-0 (or null) unit writes 0 and -1. A type-0 unit with a null data block is fatal in

@@ -2,6 +2,7 @@
 // Prior art used: D2MOO DataTbls, MonsterTbls, ItemsTbls and TokenTbls unload routines.
 #include <emscripten.h>
 #include "D2DataTbls.h"
+#include "d2common_tblfree.h"
 
 // 1.13c D2Common+0x18F90: release the token/table blocks held by five slots, each guarded by its own
 // non-null test and cleared afterwards.
@@ -47,34 +48,16 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_53bd0()
 	}
 }
 
-// 1.13c D2Common+0x53EB0: clear the 512-dword retail table at 0x6FDF0080..0x6FDF087C to -1.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_53eb0()
+// Engine entry of 0x53EB0: the body is d2common_53eb0.cpp; the engine passes the Fog frees.
+extern "C" void d2_batch_d2common_53eb0()
 {
-	if (sgptDataTables->pHirelingTxt != 0)
-	{
-		DATATBLS_UnloadBin(sgptDataTables->pHirelingTxt);               // DataTbls.cpp
-	}
-	sgptDataTables->nHirelingTxtRecordCount = 0;
-	for (int& id : sgptDataTables->nHirelingStartRecordIds) id = -1;
+	DATATBLS_UnloadHirelingTxtSeam(DATATBLS_EngineTblFreeSeam());
 }
 
-// 1.13c D2Common+0x53AD0: release one table allocation, then clear ten dword slots.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_53ad0()
+// Engine entry of 0x53AD0: the body is d2common_53ad0.cpp; the engine passes the Fog frees.
+extern "C" void d2_batch_d2common_53ad0()
 {
-	if (sgptDataTables->pMonPresetTxt != 0)
-	{
-		DATATBLS_UnloadBin(sgptDataTables->pMonPresetTxt);               // DataTbls.cpp
-	}
-	sgptDataTables->pMonPresetTxtActSections[0] = 0;
-	sgptDataTables->nMonPresetTxtActRecordCounts[0] = 0;
-	sgptDataTables->pMonPresetTxtActSections[1] = 0;
-	sgptDataTables->nMonPresetTxtActRecordCounts[1] = 0;
-	sgptDataTables->pMonPresetTxtActSections[2] = 0;
-	sgptDataTables->nMonPresetTxtActRecordCounts[2] = 0;
-	sgptDataTables->pMonPresetTxtActSections[3] = 0;
-	sgptDataTables->nMonPresetTxtActRecordCounts[3] = 0;
-	sgptDataTables->pMonPresetTxtActSections[4] = 0;
-	sgptDataTables->nMonPresetTxtActRecordCounts[4] = 0;
+	DATATBLS_UnloadMonPresetTxtSeam(DATATBLS_EngineTblFreeSeam());
 }
 
 // 1.13c D2Common+0x534B0: release the linker at 0x6FDF0890, then clear the base/count pair. Retail does
@@ -111,35 +94,16 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_539e0()
 	}
 }
 
-// 1.13c D2Common+0x53F10: release the linker at 0x6FDF09B0 and the guarded slot at 0x6FDF09AC.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_53f10()
+// Engine entry of 0x53F10: the body is d2common_53f10.cpp; the engine passes the Fog frees.
+extern "C" void d2_batch_d2common_53f10()
 {
-	if (sgptDataTables->pSuperUniquesLinker != 0)
-	{
-		FOG_FreeLinker(sgptDataTables->pSuperUniquesLinker);
-	}
-	if (sgptDataTables->pSuperUniquesTxt != 0)
-	{
-		DATATBLS_UnloadBin(sgptDataTables->pSuperUniquesTxt);               // DataTbls.cpp
-		sgptDataTables->pSuperUniquesTxt = 0;
-	}
-	sgptDataTables->nSuperUniquesTxtRecordCount = 0;
+	DATATBLS_UnloadSuperUniquesTxtSeam(DATATBLS_EngineTblFreeSeam());
 }
 
-// 1.13c D2Common+0x53F70: release the linker at 0x6FDF0B24 and the guarded slot at 0x6FDF0B28.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_53f70()
+// Engine entry of 0x53F70: the body is d2common_53f70.cpp; the engine passes the Fog frees.
+extern "C" void d2_batch_d2common_53f70()
 {
-	if (sgptDataTables->pMonUModLinker != 0)
-	{
-		FOG_FreeLinker(sgptDataTables->pMonUModLinker);
-		sgptDataTables->pMonUModLinker = 0;
-	}
-	if (sgptDataTables->pMonUModTxt != 0)
-	{
-		DATATBLS_UnloadBin(sgptDataTables->pMonUModTxt);               // DataTbls.cpp
-		sgptDataTables->pMonUModTxt = 0;
-	}
-	sgptDataTables->nMonUModTxtRecordCount = 0;
+	DATATBLS_UnloadMonUModTxtSeam(DATATBLS_EngineTblFreeSeam());
 }
 
 // 1.13c D2Common+0x54200: teardown of the level/monster table group. It runs six of the routines
@@ -156,10 +120,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_54200()
 	{
 		DATATBLS_UnloadBin(sgptDataTables->pNpcTxt);               // DataTbls.cpp
 	}
-	d2_fn_d2common_53eb0();
-	d2_fn_d2common_53ad0();
-	d2_fn_d2common_53f10();
-	d2_fn_d2common_53f70();
+	d2_batch_d2common_53eb0();
+	d2_batch_d2common_53ad0();
+	d2_batch_d2common_53f10();
+	d2_batch_d2common_53f70();
 	if (sgptDataTables->pMonStatsTxt != 0)
 	{
 		DATATBLS_UnloadBin(sgptDataTables->pMonStatsTxt);               // DataTbls.cpp
