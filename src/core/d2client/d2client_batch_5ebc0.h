@@ -16,10 +16,11 @@ struct G {
 };
 struct Svc {
  virtual ~Svc()=default;
- virtual void f5da80()=0; virtual void f5db30(int32_t idx,char* out80)=0; virtual void f5dae0()=0; virtual void f5cd10()=0;
+ virtual void f5da80(uint8_t* rec)=0; virtual void f5db30(int32_t idx,char* out80)=0; virtual void f5dae0()=0; virtual void f5cd10()=0;
  virtual int32_t f5ea90(int32_t a,int32_t b,int32_t c,int32_t d)=0; virtual int32_t fabd810(int32_t h,int32_t* out)=0;
  virtual int32_t o10102()=0; virtual int32_t o10105()=0; virtual void o10103()=0; virtual int32_t o10016()=0;
- virtual int32_t o10091()=0; virtual int32_t o10095()=0; virtual int32_t o10092()=0;
+ virtual int32_t o10091()=0; virtual int32_t o10095()=0; virtual int32_t o10092(int32_t h)=0;
+ virtual void f5ebc0(int32_t idx,int32_t eax,int32_t p1)=0; // sub_5EBC0 as 5ED90's callee seam
  virtual void fatal302()=0;                    // Ordinal_10265(0x302) + Ordinal_10024 + _exit(-1)
  virtual int32_t o10190(int r,int g,int b)=0;  // color index
  virtual void o10065(int32_t h)=0; virtual void free(int32_t tag,void* p)=0;

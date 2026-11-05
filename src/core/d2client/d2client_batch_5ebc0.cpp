@@ -14,7 +14,7 @@ void sub_5EBC0(Svc& s,G& g,int32_t idx,int32_t eax,int32_t p1){
  int32_t saved=g.cc268; uint8_t* r=rec(g,idx); if(!r) r=nullptr; // retail derefs null+off; caller guarantees non-null
  if(at<uint8_t>(r,0x81)!=0) return;
  int32_t st=at<int32_t>(r,0x86); if(st==2) return;
- if(st==1){ if(eax==0) return; s.f5da80(); return; }
+ if(st==1){ if(eax==0) return; s.f5da80(r); return; }
  if(st!=0) return;
  char name[80]; s.f5db30(idx,name);
  if(s.o10102()==0){ at<uint8_t>(r,0x81)=1; return; }
@@ -35,10 +35,10 @@ void sub_5ED90(Svc& s,G& g,int32_t now){
  for(int32_t off=0x8e; off<0x65ae7; off+=0x8e,i++){
   uint8_t* r=g.cc24c+off; bool again=false;
   if(at<int32_t>(r,0x86)==0&&(at<int32_t>(r,0x8a)!=0||at<uint8_t>(r,0x4c)!=0)){
-   if(now==0||(g.cc274<0xf&&(uint32_t)(now-g.cc270)>0xf9)){ sub_5EBC0(s,g,i,1,0 /*REG?*/); }
+   if(now==0||((uint32_t)g.cc274<0xf&&(uint32_t)(now-g.cc270)>0xf9)){ s.f5ebc0(i,now==0,1); }
    again=true;
   } else again=true;
-  if(again&&at<int32_t>(r,0x86)==1&&s.o10092()!=0) s.f5da80();
+  if(again&&at<int32_t>(r,0x86)==1&&s.o10092(at<int32_t>(r,0x82))!=0) s.f5da80(r);
  }
  g.cc26c=now;
 }
@@ -50,7 +50,7 @@ void sub_5F090(Svc& s,G& g){
 }
 // 1.13c D2Client+0x5F180
 void sub_5F180(Svc& s,G& g){
- for(int i=0;i<4;i++){ int32_t h=g.cc1c8[i]; if(h){ s.o10065(h); s.free(0x7a,nullptr); } g.cc1c8[i]=0; }
+ for(int i=0;i<4;i++){ int32_t h=g.cc1c8[i]; if(h){ s.o10065(h); s.free(0x7a,(void*)(uintptr_t)(uint32_t)h); } g.cc1c8[i]=0; }
 }
 // 1.13c D2Client+0x5F1C0  (ecx = x origin, eax = y origin, stack = colour). 12 line segments of a closed 13-point outline: segment i draws
 // point i to point i+1 of the table at 6fb82de8 (consecutive (x,y) word pairs, doubled), shifted (-1,+5) when cc1b0 == 1.
@@ -73,7 +73,7 @@ void sub_5F290(Svc& s,G& g,int32_t p1,int32_t* edi){
 // 1.13c D2Client+0x5F300  (frees the 0x2800-byte block chain; next ptr at +0x2800)
 void sub_5F300(Svc& s,G& g){
  if(!g.cc1c4) return;
- for(uint8_t* b=(uint8_t*)g.cc1b8; b; ){ uint8_t* n=*(uint8_t**)(b+0x2800); s.free(0x51e,nullptr); b=n; }
+ for(uint8_t* b=(uint8_t*)g.cc1b8; b; ){ uint8_t* n=*(uint8_t**)(b+0x2800); s.free(0x51e,b); b=n; }
  g.cc1b8=nullptr; g.cc1bc=0; g.cc1c4[2]=g.cc1c4[3]=g.cc1c4[4]=g.cc1c4[5]=0;
 }
 // 1.13c D2Client+0x5F360  (ecx = tree node: [0]=leaf flag,[1],[2] payload,[3]=child,[4]=sibling)
@@ -143,10 +143,12 @@ int32_t sub_5F3E0(MapSvc& s,G& g,const char* subdir,const char* name){
 }
 // 1.13c D2Client+0x5F6B0  (appends 20-byte entry slot; blocks of 0x2800 bytes = 512 entries, next ptr word 0xa00)
 void sub_5F6B0(Svc& s,G& g){
- int32_t n=g.cc1bc; uint32_t slot=(uint32_t)n&0x1ff; int32_t blk=n>>9; g.cc1bc=n+1;
- uint32_t* prev=nullptr; uint32_t* b=(uint32_t*)g.cc1b8; int32_t k=0;
- while(b&&k<blk){ prev=b; b=(uint32_t*)(uintptr_t)b[0xa00]; k++; } // ponytail: 32-bit link word as in retail; wasm64 port widens
- if(!b){ b=(uint32_t*)s.alloc(0x2804,0x35d,0); for(int i=0;i<0xa01;i++) b[i]=0; if(prev) prev[0xa00]=(uint32_t)(uintptr_t)b; else g.cc1b8=b; }
- uint32_t* e=b+slot*5; e[0]=e[1]=e[2]=e[3]=e[4]=0;
+    const int32_t n=g.cc1bc; int32_t blk=(int32_t)((uint32_t)n+(((uint32_t)(n>>31))&0x1ffu))>>9;
+    int32_t slot=(int32_t)((uint32_t)n&0x800001ffu); if(slot<0) slot=(int32_t)((((uint32_t)slot-1u)|0xfffffe00u)+1u);
+    g.cc1bc=n+1;
+    uint32_t* prev=nullptr; uint32_t* b=(uint32_t*)g.cc1b8; int32_t k=0;
+    while(b&&k<blk){ prev=b; b=(uint32_t*)(uintptr_t)b[0xa00]; k++; } // ponytail: 32-bit link word as in retail; wasm64 port widens
+    if(!b){ b=(uint32_t*)s.alloc(0x2804,0x35d,0); for(int i=0;i<0xa01;i++) b[i]=0; if(prev) prev[0xa00]=(uint32_t)(uintptr_t)b; else g.cc1b8=b; }
+    uint32_t* e=b+slot*5; e[0]=e[1]=e[2]=e[3]=e[4]=0;
 }
 } // namespace d2client_batch_5ebc0
