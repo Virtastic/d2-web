@@ -1,4 +1,4 @@
-// 1.13c D2Common implementation batch (rows 0x343E0, 0x18280, 0x50150, 0x260F0, 0x37A20, 0x21420).
+// 1.13c D2Common implementation batch (rows 0x343E0, 0x18280, 0x260F0, 0x37A20, 0x21420).
 // Bodies follow the cached 1.13c decompiles (build-wasm/ghidra-d2common/decomp/0x<RVA>.c).
 // Callees whose bodies are not recovered are env-seam function pointers after the retail arguments;
 // a null seam contributes 0 and the body never faults on it. Static tables embedded in the retail
@@ -76,44 +76,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_ChatNodeNew_18280(uint32_t pPool, const c
 	p[0x11 + nCopy] = 0;
 	p[0x08] = static_cast<uint8_t>(pfnRand());
 	return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(p));
-}
-
-// 1.13c D2Common+0x50150 (#10444): monster-unit predicate.
-// Unit type must be 1 and unit+0x10 must be 0xC, or 0 with nAllowZero set. Callee 0x33C20 is tested
-// against the pointer at datas+0x150 and must return 0. Callee 0x1470 (hidden ECX is the data tables,
-// its retail first operand is dropped) must return non-zero. The class id (+0x04) below the data
-// tables' MonStats count (+0xA80) gives the row at +0xA78, whose short +0x32 is tested. An out-of-range
-// class id reaches a decompiler artefact (a short read at absolute 0x32); it yields 0 here.
-extern "C"
-// 1.13c D2Common+0x50150
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_50150(uint32_t pUnit, int32_t nAllowZero,
-	int32_t (*pfn33C20)(uint32_t),
-	uint32_t (*pfn1470)(uint32_t, int32_t))
-{
-	uint8_t* u = P(pUnit);
-	if (!u || W(u, 0) != 1)
-		return 0;
-
-	const uint32_t nData = W(u, 0x10);
-	if (!(nData == 0xC || (nAllowZero != 0 && nData == 0)))
-		return 0;
-
-	uint8_t* t = T();
-	if (pfn33C20 && pfn33C20(R(t, 0x150)) != 0)
-		return 0;
-
-	const int32_t nIndex = static_cast<int32_t>(W(u, 0x04));
-	const uint32_t nHiddenEcx = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(sgptDataTables));
-	if (!pfn1470 || pfn1470(nHiddenEcx, 7) == 0)
-		return 0;
-
-	const int32_t nCount = static_cast<int32_t>(R(t, 0xA80));
-	if (nIndex < 0 || nIndex >= nCount)
-		return 0;
-	const uint32_t pRows = R(t, 0xA78);
-	if (!pRows)
-		return 0;
-	return *reinterpret_cast<const int16_t*>(P(pRows) + nIndex * 0x1A8 + 0x32) != 0 ? 1 : 0;
 }
 
 // 1.13c D2Common+0x260F0 D2SetStatWithNoTest (#10463): item-unit value capped at 0x1FF.

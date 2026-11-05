@@ -3,6 +3,7 @@
 #include <emscripten.h>
 #include "D2DataTbls.h"
 #include "d2common_tblfree.h"
+#include "d2common_montblfree.h"
 
 // 1.13c D2Common+0x18F90: release the token/table blocks held by five slots, each guarded by its own
 // non-null test and cleared afterwards.
@@ -35,19 +36,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_batch_d2common_18f90()
 	sgptDataTables->pArmTypeTxt = 0;
 }
 
-// 1.13c D2Common+0x53BD0: release the monster-table allocation behind 0x6FDF0B10 and clear the pair.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_53bd0()
-{
-	if (sgptDataTables->pMonTypeTxt != 0)
-	{
-		DATATBLS_UnloadBin(sgptDataTables->pMonTypeTxt);               // DataTbls.cpp
-		FOG_FreeLinker(sgptDataTables->pMonTypeLinker);
-		D2_FREE_POOL(nullptr, sgptDataTables->pMonTypeNest);
-		sgptDataTables->pMonTypeTxt = 0;
-		sgptDataTables->pMonTypeLinker = 0;
-	}
-}
-
 // Engine entry of 0x53EB0: the body is d2common_53eb0.cpp; the engine passes the Fog frees.
 extern "C" void d2_batch_d2common_53eb0()
 {
@@ -76,22 +64,6 @@ static void d2common_534b0_engine()
 	D2Common_534B0_Release(&t, d2common_534b0_free, d2common_534b0_linker_free);
 	sgptDataTables->pTreasureClassEx = 0;
 	sgptDataTables->nTreasureClassEx = 0;
-}
-
-// 1.13c D2Common+0x539E0: clear two table pairs.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_539e0()
-{
-	if (sgptDataTables->pMonSeqTxt != 0)
-	{
-		DATATBLS_UnloadBin(sgptDataTables->pMonSeqTxt);               // DataTbls.cpp
-		FOG_FreeLinker(sgptDataTables->pMonSeqLinker);
-		sgptDataTables->nMonSeqTxtRecordCount = 0;
-	}
-	if (sgptDataTables->pMonSeqTable != 0)
-	{
-		D2_FREE_POOL(nullptr, sgptDataTables->pMonSeqTable);
-		sgptDataTables->nMonSeqTableRecordCount = 0;
-	}
 }
 
 // Engine entry of 0x53F10: the body is d2common_53f10.cpp; the engine passes the Fog frees.
@@ -147,7 +119,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_54200()
 		FOG_FreeLinker(sgptDataTables->pMonSoundsLinker);
 		sgptDataTables->nMonSoundsTxtRecordCount = 0;
 	}
-	d2_fn_d2common_539e0();
+	DATATBLS_UnloadMonSeqTxtSeam(DATATBLS_EngineMonTblFreeSeam());
 	d2common_534b0_engine();
 	if (sgptDataTables->pMonLvlTxt != 0)
 	{

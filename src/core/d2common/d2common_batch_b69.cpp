@@ -27,21 +27,6 @@ __attribute__((weak)) extern const char g_d2common_fmt_dda728[]; // DAT_6fdda728
 __attribute__((weak)) void sub_7C0E0(void*);
 }
 
-// 1.13c D2Common+0x68780
-int sub_68780(int32_t* p1, int p2, int p3, int p4, int32_t* out) {
-    int n = p1[0x2c / 4];
-    int32_t* arr = static_cast<int32_t*>(gp(p1, 8));
-    for (int i = 0; i < n; i++) {
-        int r;
-        if (static_cast<uint32_t>(arr[i]) != static_cast<uint32_t>(reinterpret_cast<uintptr_t>(p1)) ? (r = sub_681A0(p2, p3, p4)) != 0 : false) {
-            *out = arr[i];
-            return r;
-        }
-    }
-    *out = 0;
-    return 0;
-}
-
 // D2Common 0x69360 (thiscall; hidden input: edi = `edi`, explicit leading param)
 void sub_69360(void* thisp, void* edi, char* p1, uint32_t p2, void* p3) {
     int32_t* ent = static_cast<int32_t*>(gp(edi, 0x4c));

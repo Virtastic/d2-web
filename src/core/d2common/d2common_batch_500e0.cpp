@@ -1,4 +1,4 @@
-// 1.13c D2Common implementation batch 6: 0x500E0, 0x32820, 0x20700, 0x5A850, 0x2A170, 0x1FD40, 0x3D160, 0x3B000.
+// 1.13c D2Common implementation batch 6: 0x32820, 0x20700, 0x5A850, 0x2A170, 0x1FD40, 0x3D160, 0x3B000.
 // The functions whose retail operands are passed in registers the decompiler drops (inv.fastcall ECX/EDX,
 // the 0x51470 / 0x38A80 / 0x1100 hidden operands) take those operands resolved, in the style of sub_33c20.cpp.
 #include <cstddef>
@@ -32,19 +32,6 @@ uint8_t* GridCell(uint8_t* grid, int n)
     uint32_t cells = W(grid, 0x0C);
     return cells ? P(W(P(cells), n * 4)) : nullptr;
 }
-}
-
-// 1.13c D2Common+0x500E0 (#10096)
-// Unit predicate: a type-1 (player) unit whose animation mode (+0x10) is 0xC, that the 0x33C20 table-bit
-// test misses (that call gets sgptDataTables+0x150 and takes its owner in a register) and that answers
-// non-zero for ids 7 and 0xC through 0x51470. 0x51470's unit operand is register-only too, so both stat
-// results and the 0x33C20 result are passed in resolved.
-uint32_t D2Common_500E0_PlayerModeCWithSkillFlags(uint32_t pUnit, uint32_t nTableTest, uint32_t nFlag7, uint32_t nFlagC)
-{
-    uint8_t* u = P(pUnit);
-    if (!u || W(u, 0) != 1 || W(u, 0x10) != 0xC) return 0;
-    if (nTableTest != 0 || nFlag7 == 0 || nFlagC == 0) return 0;
-    return 1;
 }
 
 // 1.13c D2Common+0x32820 (#10099)

@@ -1,4 +1,4 @@
-// 1.13c D2Common Stage A batch: rows 0x2A480, 0x344F0, 0x460B0, 0x1D710, 0x30880, 0x71610, 0x50EA0.
+// 1.13c D2Common Stage A batch: rows 0x2A480, 0x344F0, 0x460B0, 0x1D710, 0x30880, 0x71610.
 // Translated from the pinned 1.13c decompiles. Fatal paths that end in _exit(-1) are modelled as
 // returns, as in the rest of src/core/d2common. A row whose body is carried by still-UNMAPPED
 // callees is a Stage A stub whose comment names what is unproven.
@@ -133,18 +133,3 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t D2Common_71610_QuestRow(int32_t nQuest)
 		static_cast<uint32_t>(nQuest) * 0x70u;
 }
 
-extern "C" uint32_t D2Common_4E480_FindSkillNode(uint32_t, int32_t);
-extern "C" int32_t d2_fn_d2common_4fcb0(D2UnitStrc*, D2SkillStrc*);
-// +0x50EA0 (#11008): clamped skill level. param_1 is the unit (0 -> 0); the skill id arrives in ESI
-// (unmodelled, passed as nSkill). Node = 0x4E480(unit, skill); none -> 0. Level = node+0x28, plus
-// 0x4FCB0 when node+0x34 is -1; floored at 0, then capped at *DAT_6fdf0b50 (passed as pCap).
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_50ea0(D2UnitStrc* pUnit, int32_t nSkill, const int32_t* pCap) { // 1.13c D2Common+0x50EA0
-	if (!pUnit) return 0;
-	const uint32_t node = D2Common_4E480_FindSkillNode(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pUnit)), nSkill);
-	if (!node) return 0;
-	int32_t v = *reinterpret_cast<int32_t*>(static_cast<uintptr_t>(node) + 0x28);
-	if (*reinterpret_cast<int32_t*>(static_cast<uintptr_t>(node) + 0x34) == -1)
-		v += d2_fn_d2common_4fcb0(pUnit, reinterpret_cast<D2SkillStrc*>(node));
-	if (v < 0) v = 0;
-	return v < *pCap ? v : *pCap;
-}

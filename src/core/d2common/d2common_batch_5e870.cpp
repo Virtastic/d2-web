@@ -10,7 +10,7 @@ W void Ordinal_10046(const char* file, int32_t line, int32_t z);
 __attribute__((weak)) W void Ordinal_10043(int32_t a, int32_t b);
 W void Ordinal_10212(uint32_t p);
 W void d2_batch_d2common_18f90();
-W void d2_fn_d2common_53bd0();
+extern "C" void d2_batch_d2common_53bd0();
 W void d2_fn_d2common_54200();
 W void d2_fn_d2common_5de00();
 W void d2_fn_d2common_6c7e0();
@@ -111,7 +111,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_5e870() {
     V(DAT_6fdefbf0) = 0;
   }
   d2_fn_d2common_71180();
-  d2_fn_d2common_53bd0();
+  d2_batch_d2common_53bd0();
   d2_batch_d2common_18f90();
   leak(DAT_6fdf0b50);
   if (V(DAT_6fdf0b4c)) {
