@@ -122,43 +122,4 @@ extern "C" void d2_fn_d2common_4bb30(uint32_t pRoom, int32_t nX, int32_t nY, uin
 		reinterpret_cast<D2ActiveRoomStrc*>(static_cast<uintptr_t>(pRoom)), &pBoundingBox, nMask);
 }
 
-namespace
-{
-	// Grid record and layer prefix, as in d2common_batch_321e0.cpp (0x4C940): the cell array sits at +0x20.
-	struct D2Grid2D88Hdr
-	{
-		int32_t nField0;   // 0x00
-		int32_t nField1;   // 0x04
-		int32_t nField2;   // 0x08
-		int32_t nPad[5];   // 0x0C
-		void* pCells;      // 0x20
-	};
-	static_assert(offsetof(D2Grid2D88Hdr, pCells) == 0x20, "grid header pointer at retail offset 0x20");
-
-	// Clears nMask in the 0x1330 grid cell (nX, nY): layer = record +0x20, index = (nY - layer[+4]) *
-	// layer[+8] - layer[+0] + nX. A missing record or layer leaves the grid alone, as retail does.
-	void ClearGridCell1330(void* (*pfnGrid1330)(void), int32_t nX, int32_t nY, uint16_t nMask)
-	{
-		if (!pfnGrid1330)
-			return;
-		auto* pRecord = static_cast<D2Grid2D88Hdr*>(pfnGrid1330());
-		auto* pLayer = pRecord ? static_cast<D2Grid2D88Hdr*>(pRecord->pCells) : nullptr;
-		if (!pLayer || !pLayer->pCells)
-			return;
-		const int32_t nIndex = (nY - pLayer->nField1) * pLayer->nField2 - pLayer->nField0 + nX;
-		auto* pCell = reinterpret_cast<uint16_t*>(static_cast<uint8_t*>(pLayer->pCells) +
-			static_cast<intptr_t>(nIndex) * 2);
-		*pCell &= static_cast<uint16_t>(~nMask);
-	}
-}
-
-// 1.13c D2Common+0x4BB70: clear nMask on the single subtile (nX, nY) of the 0x1330 grid. Retail takes the
-// mask in CX and x in EDX, y on the stack; the first argument is not read.
-extern "C" void d2_fn_d2common_4bb70(uint32_t nUnused, int32_t nX, int32_t nY, uint16_t nMask,
-	void* (*pfnGrid1330)(void))
-{
-	(void)nUnused;
-	ClearGridCell1330(pfnGrid1330, nX, nY, nMask);
-}
-
 // D2Common+0x4BBB0 (the plus-shaped reset) now lives in d2common_4bbb0.cpp on the retail signature.

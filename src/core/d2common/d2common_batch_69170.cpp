@@ -10,23 +10,6 @@ inline int32_t& iw(uintptr_t a, int o) { return *reinterpret_cast<int32_t*>(p(a)
 }
 
 extern "C" {
-// 1.13c D2Common+0x69170: take the next 0x30-byte slot from (obj+0x54) pool, push it on the list whose
-// head slot is headSlot (4-byte pointer cell, may be 0), run worker 0x68DF0; returns the slot.
-EMSCRIPTEN_KEEPALIVE uintptr_t d2_fn_d2common_69170(uintptr_t headSlot, uintptr_t eax_obj, int32_t a1, int32_t a2,
-	uint32_t a3, int32_t a4, void (*w68df0)(int32_t, int32_t, uint32_t, int32_t)) {
-	uintptr_t pool = w(eax_obj, 0x54);
-	uintptr_t slot = (uintptr_t)(iw(pool, 0xc) * 0x30) + w(pool, 0x1c);
-	if (headSlot == 0) {
-		w(slot, 0x20) = 0;
-	} else {
-		w(slot, 0x20) = w(headSlot, 0);
-		w(headSlot, 0) = (uint32_t)slot;
-	}
-	iw(pool, 0xc) += 1;
-	w68df0(a2, a1, a3, a4);
-	return slot;
-}
-
 // 1.13c D2Common+0x69360: (edi = level/room ctx). Find the list node at edi+0x4c whose (+0x10)->[0]
 // equals table[a2>>20&0x3f] from 0x69950; if type byte (a2>>8) is 0/4 or 0x69090 accepts, link a1 onto the
 // node's +0xc list and (when (+0x10)+0x24 set) add a flagged entry via 0x68F00. Fatal ids 0x2b1/0x2cb.

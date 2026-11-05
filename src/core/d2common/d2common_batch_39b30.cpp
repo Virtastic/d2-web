@@ -124,21 +124,6 @@ int32_t D2Common_1FF40_GetHandAmmoItem(D2InventoryStrc* pInventory, D2UnitStrc**
 	return 1;
 }
 
-// 1.13c D2Common+0x4E3F0 (#10856): allocate and zero the 24-byte skill record through Fog ordinal
-// 10045 (Skills.cpp:0x380), then store the first dword.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_4e3f0(uint32_t nValue)
-{
-	uint8_t* p = g_d2common_fn_10045
-		? reinterpret_cast<uint8_t*>(g_d2common_fn_10045("Skills.cpp", 0x380, 0))
-		: nullptr;
-	if (!p)
-		return;
-
-	std::memset(p, 0, 24);
-	W(p, 0) = nValue;
-}
-
 // 1.13c D2Common+0x30590 (#10859): refresh the item data's grid class from 0x30460's record S = [[unit+0xA8]+8]:
 // the int16 behind the pointer S[0] becomes itemdata+0x84, and S's dword +0x34 becomes itemdata+0x8C. A unit
 // with type != 0 is a no-op; no item data is retail's fatal 0x1424, a null record fatal 0x638.

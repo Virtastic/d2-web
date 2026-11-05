@@ -46,19 +46,6 @@ namespace
 	}
 }
 
-// 1.13c D2Common+0x67BD0 (#10309) allocates the 16-byte waypoint record used by the default map
-// state: zeroed, first word 0x102, then bit 0 set through the waypoint bit table (word 1, mask 1).
-// Retail stores the table as (word index, mask) pairs at the pair-0 globals; 0x67C90's spec pins
-// the mapping to word 1 + n/16 and mask 1 << n%16, so pair 0 is {1, 1}.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void* d2_fn_d2common_67bd0(void)
-{
-	uint8_t* pRecord = (uint8_t*)D2_CALLOC(0x10);
-	*(uint16_t*)pRecord = 0x102;
-	*(uint16_t*)(pRecord + 1 * 2) |= 1;
-	return pRecord;
-}
-
 // 1.13c D2Common+0x3BD60 (#10310) reads a pointer out of the object at +0x10/+0x64 and returns its
 // +0x30 dword. A null inner pointer is a fatal report in retail (message 0x2CD); we return 0.
 extern "C"

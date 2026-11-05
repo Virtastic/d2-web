@@ -20,19 +20,6 @@ uint32_t D2Common_33C20_BitmaskHit(bool hasOwner, bool hasRec, int32_t recFlag, 
 
 namespace
 {
-	// The compat clock (src/core/d2moo/compat/Server.h QueryPerformanceCounter) is the zero counter.
-	struct PerfCounter
-	{
-		uint32_t nLow;
-		int32_t nHigh;
-	};
-
-	inline void ReadPerfCounter(PerfCounter* pCounter)
-	{
-		pCounter->nLow = 0;
-		pCounter->nHigh = 0;
-	}
-
 	// MonStats2 flag bit of the monster row nMonsterId, bit nBit of its dwFlags/nFlags (+0x04);
 	// the 1.13c body at 0x1470 is implemented in d2common_batch_10b0.cpp.
 	inline uint32_t MonStats2FlagBit(int32_t nMonsterId, int32_t nBit)
@@ -50,18 +37,6 @@ namespace
 		if (!pStatList || (int32_t)pStatList->dwFlags >= 0 || !pStatList->StatFlags) return 0;
 		return pStatList->StatFlags[nBit >> 5] & gdwBitMasks[nBit & 31];
 	}
-
-	// Retail's timing slots at DAT_6fde9ec8, 0x1E uint32 per slot. Sixty-four slots cover the
-	// caller-supplied indices the shipped callers use; out of range is ignored.
-	struct PerfSlot
-	{
-		uint32_t nLow;
-		int32_t nHigh;
-		uint32_t nCount;
-		uint32_t nPad[0x1E - 3];
-	};
-	static_assert(sizeof(PerfSlot) == 0x1E * 4, "perf slot stride");
-	PerfSlot gPerfSlots[64];
 }
 
 // 1.13c D2Common+0x52660 (#10008) skills.txt row's passive state, stat-list bits, then add skill
@@ -211,26 +186,6 @@ void D2Common_1D7C0_ResetPath(int32_t* pUnit32, int32_t nFrameCount, int32_t nFr
 	(void)pfnSegment;
 	(void)pfnTail;
 	return;
-}
-
-// 1.13c D2Common+0x4A370 (#10021) performance accumulator: per-slot low/high clock delta and
-// call count. this = slot index, param_1 = previous low, param_2 = previous high.
-void D2Common_4A370_PerfAccumulate(int32_t nSlot, uint32_t nPreviousLow, int32_t nPreviousHigh)
-{
-	if (nSlot < 0 || nSlot >= 64) return;
-
-	PerfCounter counter;
-	ReadPerfCounter(&counter);
-
-	PerfSlot& slot = gPerfSlots[nSlot];
-	const uint32_t nDelta = counter.nLow - nPreviousLow;
-	const uint32_t nOldLow = slot.nLow;
-
-	slot.nLow = nOldLow + nDelta;
-	slot.nHigh = slot.nHigh + (counter.nHigh - nPreviousHigh)
-		- (counter.nLow < nPreviousLow ? 1 : 0)
-		+ (nOldLow + nDelta < nOldLow ? 1 : 0);
-	++slot.nCount;
 }
 
 // 1.13c D2Common+0x229D0 (#10026) items.txt nQuantityWarning (+0x136) of item units. Any other

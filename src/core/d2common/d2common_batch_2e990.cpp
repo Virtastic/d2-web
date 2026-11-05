@@ -10,22 +10,6 @@
 #include "Drlg/D2DrlgDrlg.h"
 #include "Units/Units.h"
 
-namespace
-{
-	// Retail 0x6FDE9EC8: 23 profiling records of 0x78 bytes. The reset zeroes the first three
-	// dwords (low/high clock delta, count) of each record.
-	struct PerfSlot
-	{
-		uint32_t nLow;
-		int32_t nHigh;
-		uint32_t nCount;
-		uint32_t nRest[(0x78 - 3 * 4) / 4];
-	};
-	static_assert(sizeof(PerfSlot) == 0x78, "profiling slot stride");
-	static_assert(sizeof(PerfSlot) * 23 == 0xAC8, "23 profiling slots");
-	PerfSlot gPerfResetSlots[23];
-}
-
 // 1.13c D2Common+0x2E990 (#10169): stores arg2 at +0x7C of arg1, the D2ActiveRoomStrc::pRoomNext
 // link (field identified by offset; the only caller is the export thunk). Null arg1 takes the
 // module's fatal path (0x150B), which never returns, so nothing is stored. Retail stores a
@@ -37,19 +21,6 @@ EMSCRIPTEN_KEEPALIVE void D2Common_2E990_SetRoomNext(D2ActiveRoomStrc* pRoom, D2
 		return;
 	}
 	pRoom->pRoomNext = pNext;
-}
-
-// 1.13c D2Common+0x4A450 (#10173): profiling reset. The retail body first calls 0x4A3D0, which
-// logs and dumps the table; that function is still UNMAPPED, so the dump is the one seam left.
-// It then zeroes the clock delta and count of all 23 records starting at 0x6FDE9EC8.
-EMSCRIPTEN_KEEPALIVE void D2Common_4A450_ProfileReset()
-{
-	for (PerfSlot& slot : gPerfResetSlots)
-	{
-		slot.nLow = 0;
-		slot.nHigh = 0;
-		slot.nCount = 0;
-	}
 }
 
 // 1.13c D2Common+0x2E960 (#10181): returns the +0x7C dword of arg1, the D2ActiveRoomStrc::pRoomNext
