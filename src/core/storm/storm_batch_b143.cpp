@@ -110,13 +110,13 @@ struct StormSfileHooks {
   void *cbA, *cbB;
 };
 extern "C" StormSfileHooks Storm_SfileHooks = {};
-static void* g_sfileList;  // DAT_6fc43118
+extern "C" void* Storm_SfileList = nullptr;  // list at module +0x53118 (the FN probe pins it)
 extern "C" uint32_t Storm_Sub28110(uint32_t p1, uint32_t p2, uint32_t p3) {
   StormSfileHooks& h = Storm_SfileHooks;
   if (h.lock) h.lock();
-  if (!g_sfileList && h.alloc) g_sfileList = h.alloc(0x3134, "..\\3rdParty\\STORM\\SOURCE\\SFILE.CPP", 0x3b5, 0);
+  if (!Storm_SfileList && h.alloc) Storm_SfileList = h.alloc(0x3134, "..\\3rdParty\\STORM\\SOURCE\\SFILE.CPP", 0x3b5, 0);
   uint32_t rec[5] = {p2, 0, p1, 0, p3};
-  if (h.insert) h.insert(h.cbA, h.cbB, g_sfileList, rec);
+  if (h.insert) h.insert(h.cbA, h.cbB, Storm_SfileList, rec);
   if (h.unlock) h.unlock();
   return 1;
 }

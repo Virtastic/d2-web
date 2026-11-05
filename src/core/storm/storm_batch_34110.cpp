@@ -509,6 +509,12 @@ extern "C" uint32_t Storm_Sub341D0Real(uint32_t p1, uint32_t p2, uint32_t p3, ui
     *displayRoot = g_displayRoot;
     return r;
 }
+// 0x345D0 with its clone seam supplied by the caller
+extern "C" uint32_t Storm_Sub345D0Real(uint32_t x, uint32_t (*f36680)(uint32_t, uint32_t)) {
+    StormBatch34110Env env{};
+    env.f_36680 = f36680;
+    return Storm_Sub345D0(x, &env);
+}
 // which: 0 = 0x34550, 1 = 0x34570, 2 = 0x34590, 3 = 0x345B0
 extern "C" uint32_t Storm_Sub345xxReal(int which, uint32_t key, uint32_t p2, uint32_t h, uint32_t (*f34460)(uint32_t, uint32_t, uint32_t, uint32_t)) {
     StormBatch34110Env env{};

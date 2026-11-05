@@ -187,6 +187,24 @@ void storm_bnvec_add_word(StormBnVec* v, uint32_t carry, const StormBnVec* src) 
     storm_bnvec_setsize(v, v->base + i);
 }
 
+// 1.13c Storm+0x2D020: v = a + b, word by word with the carry, while either operand has words past its base.
+void storm_bnvec_add(StormBnVec* v, const StormBnVec* a, const StormBnVec* b) {
+    uint32_t carry = 0, i = 0;
+    while (carry != 0 || a->base + i < a->size || b->base + i < b->size) {
+        uint32_t x = storm_bnvec_get(a, a->base + i);
+        uint32_t y = storm_bnvec_get(b, b->base + i);
+        uint32_t s = x + y;
+        uint32_t c = s < x;
+        uint32_t t = s + carry;
+        c += t < s;
+        storm_bnvec_touch(v, v->base + i);
+        v->data[v->base + i] = t;
+        carry = c;
+        i++;
+    }
+    storm_bnvec_setsize(v, v->base + i);
+}
+
 // 1.13c Storm+0x3BF0: dst.data[0..n) = src[0..n), dst.cap = n, dst.size = n.
 void storm_bnvec_copy(StormBnVec* dst, const uint32_t* src, uint32_t n) {
     dst->cap = n;

@@ -351,8 +351,9 @@ uint32_t Storm_Sub25C70(uint32_t hinst, int32_t reason, int32_t reserved) {
 
 // 1.13c Storm+0x26930: refill one streaming DirectSound buffer for request `req` (the audio worker's
 // per-chunk copy). Retail's lock pointer lives at req+0x20; here a local, low 32 bits mirrored there.
-// `esi` is retail's unnamed caller-supplied register argument added to the new write position.
+// The new write position adds the locked byte count (retail reloads it from the lock's out slot); `esi` is unused.
 void Storm_Sub26930(uint8_t* req, uint32_t esi) {
+    (void)esi;
     EnterCriticalSection(&g_45988);
     uint8_t* ds = N(U(req, 0x28));
     uint8_t* rec = N(U(req, 0x30));
@@ -366,7 +367,7 @@ void Storm_Sub26930(uint8_t* req, uint32_t esi) {
         memcpy(locked, N(g_43128), n);
         if (n < got) memset(locked + n, *(uint8_t*)(rec + 0x48), got - n);
         W("IDirectSoundBuffer::Unlock", ds, locked, got, 0, 0);  // vtable +0x4c
-        U(rec, 0x30) = (U(req, 0x10) - U(rec, 0x20)) + esi;
+        U(rec, 0x30) = (U(req, 0x10) - U(rec, 0x20)) + got;
         if (U(rec, 0x24) < U(rec, 0x30)) U(rec, 0x1c) = U(rec, 0x30) - U(rec, 0x24);
         if (U(rec, 0x18) == 1) {
             uint32_t v = U(rec, 0x24) < 0x10001 ? U(rec, 0x24) : 0x10000;
@@ -612,6 +613,8 @@ uint32_t Storm_Sub2FAB0(void) {
     if (g_415f8 != 0xffffffffu) { DeleteCriticalSection(&g_42fe0); g_415f8 = 0xffffffffu; }
     return 1;
 }
+// Shutdown state, in order: handler head, chain head, flag, lock counter (the 0x2fab0 probe copies the pinned words in and out).
+extern "C" void Storm_Sub2FAB0Pins(uint32_t** p) { p[0] = &g_45960; p[1] = &g_4537c; p[2] = &g_45380; p[3] = &g_415f8; }
 
 // 1.13c Storm+0x34300: window procedure; 241D0 may handle the message, else DefWindowProcA.
 intptr_t Storm_Sub34300(void* hwnd, uint32_t msg, uint32_t wp, intptr_t lp) {
@@ -621,3 +624,6 @@ intptr_t Storm_Sub34300(void* hwnd, uint32_t msg, uint32_t wp, intptr_t lp) {
     if (ok != 0 && handled != 0) return res;
     return W("DefWindowProcA", hwnd, msg, wp, lp);
 }
+
+// FN probe seam (src/core/fn/storm_26930.cpp): pins the two module words and installs the Win32 / DirectSound back end.
+extern "C" void Storm_26930_FnSetup(uint32_t bytes, uint32_t src, intptr_t (*w)(const char*, const intptr_t*, int)) { g_43114 = bytes; g_43128 = src; g_win32 = w; }

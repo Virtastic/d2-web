@@ -22,6 +22,7 @@ inline uint32_t tagRva(const char* s) {
         { "AV_TSHashObjectChunk_URGN_VH", 0x51B88 },
         { "AUUSEREVENT", 0x51D8C }, { "AUCONNREC", 0x51DC0 }, { "AUPROVIDERINFO", 0x51DD8 },
         { "AUFILEREC", 0x51CC0 }, { "AUEVENTREC", 0x51CA8 },
+        { "AUSTREAM", 0x515B8 }, { "SBLT.CPP", 0x469D8 },
     };
     for (const auto& e : t) {
         const char* p = strstr(s, e.k);

@@ -4,13 +4,28 @@
 #include <cstring>
 
 extern "C" {
-char* sub_2AFD0(const char* s);                        // Storm+0x2AFD0 (strlen-like)
-void sub_2B080(char* dst, const char* src, int n);     // Storm+0x2B080
-void sub_2AE00(char* dst, const char* src, int n);     // Storm+0x2AE00
 int sub_6868(const short* s);                          // Storm+0x6868 (wide length)
 extern const char s_AUVIDEOREC[] = "AUVIDEOREC";   // Storm .rdata @0x6FC41D24
-extern const char DAT_36b84[];                         // Storm .rdata @0x6FC36B84
-extern const char DAT_36b80[];                         // Storm .rdata @0x6FC36B80
+}
+// Storm .rdata: 0x6FC36B80 ")", 0x6FC36B84 " (", 0x6FC36B88 "?@" (read from the 1.13c image).
+static const char DAT_36b84[] = " (";
+static const char DAT_36b80[] = ")";
+static const char kSeps[] = "?@";
+// 1.13c Storm+0x3AFD0 / 0x3B080 / 0x3AE00 for non-null arguments (the null-argument error branch is not reachable from sub_2F330).
+static char* sub_2AFD0(const char* s) { return (char*)(uintptr_t)strlen(s); }
+static uint32_t b69_copy(char* dst, const char* src, uint32_t cap) {
+  if (!cap) return 0;
+  uint32_t n = 0;
+  while (n + 1 < cap && src[n]) { dst[n] = src[n]; ++n; }
+  dst[n] = 0;
+  return n;
+}
+static void sub_2B080(char* dst, const char* src, int n) { b69_copy(dst, src, (uint32_t)n); }
+static void sub_2AE00(char* dst, const char* src, int cap) {
+  if (!cap) return;
+  if ((uint32_t)cap != 0x7fffffffu) dst[(uint32_t)cap - 1] = 0;
+  uint32_t n = (uint32_t)strlen(dst);
+  b69_copy(dst + n, src, (uint32_t)cap - n);
 }
 
 extern "C" int32_t Storm_Sub1B960(void* p, const char* tag, int32_t line);   // storm_alloc_1b960.cpp
@@ -81,9 +96,9 @@ void sub_1D1D0(const uint32_t* in, uint8_t* param_1, uint16_t* param_2, uint16_t
 int sub_2F330(char* param_1, char* esi, int ebx) {
   char* len = sub_2AFD0(param_1);
   if ((uintptr_t)len > 5 && param_1[0] == '.' && param_1[3] == 'U') {
-    if (strpbrk(param_1 + 4, "?@")) {
+    if (strpbrk(param_1 + 4, kSeps)) {
       sub_2B080(esi, param_1 + 4, ebx);
-      char* q = strpbrk(esi, "?@");
+      char* q = strpbrk(esi, kSeps);
       if (q) {
         *q = 0;
         while (--q, esi <= q && *q == '_') *q = 0;

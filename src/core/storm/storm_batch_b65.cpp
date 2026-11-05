@@ -216,12 +216,14 @@ uint32_t sub_29F60(const AttrEnv& e, void* self, uint8_t* entries, uint32_t coun
 }
 
 // 1.13c Storm+0x26ED0
-// Hidden EAX = file record (errctx at +8). readAt = sub_26D70 with pos -1.
-bool sub_26ED0(bool (*readAt)(int32_t* pos, void* buf, uint32_t n, uint32_t* ctx), uint8_t* rec, void* buf, uint32_t n, uint32_t* out) {
+// Hidden EAX = file record (errctx at +8, handle at +0x10C). readAt = sub_26D70 (the caller's hidden position register rides in it) over a local position word that starts at -1;
+// the byte count goes to the caller's output slot (zeroed first, so a failed read leaves 0), which is written back to the optional output and compared with the requested count.
+bool sub_26ED0(bool (*readAt)(int32_t* pos, void* buf, uint32_t n, uint32_t* ctx, uint32_t* got), uint8_t* rec, void* buf, uint32_t n, uint32_t* out) {
     int32_t pos = -1;
-    readAt(&pos, buf, n, (uint32_t*)(rec + 8));
-    if (out) *out = 0;
-    return n == 0;
+    uint32_t got = 0;
+    readAt(&pos, buf, n, (uint32_t*)(rec + 8), &got);
+    if (out) *out = got;
+    return got == n;
 }
 }
 
