@@ -112,25 +112,3 @@ void* d2win_sub_7C60(uint32_t* param_2, uint32_t check, const D2WinB67Env* env) 
     if (param_2) *param_2 = u;
     return r;
 }
-
-// 1.13c D2Win+0x164d0 -- ESI = esi, caller return address = retaddr; links a 0x48-byte node at list tail.
-extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t* d2win_sub_164D0(uint32_t esi, uint32_t retaddr, uint32_t fn63e0, uint32_t lab6310,
-                          const uint32_t* bitMasks, uint32_t** head, const D2WinB67Env* env) {
-    uint32_t* n = (uint32_t*)Ordinal_10042(0x1c, 0);
-    for (int i = 0; i < 0x12; i++) n[i] = 0;
-    n[0] = 8;
-    n[2] = bitMasks[0] | bitMasks[2];
-    n[0x10] = esi;
-    n[0x11] = env->getTickCount();
-    n[0xd] = retaddr;
-    n[8] = fn63e0;
-    n[0xf] = 0;
-    n[0xc] = lab6310;
-    if (*head) {
-        uint32_t* t = *head;
-        while (t[0xf]) t = (uint32_t*)(uintptr_t)t[0xf];   // +0x3c = next
-        t[0xf] = (uint32_t)(uintptr_t)n;
-    } else *head = n;
-    return n;
-}
