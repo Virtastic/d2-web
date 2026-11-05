@@ -53,7 +53,7 @@ void d2_client_8cb90(void (*send_43e0)(const uint8_t*)) {
     send_43e0(b);
 }
 
-// 1.13c D2Client+0x8CC50 (88 B) fastcall(param_1)
+// old form of D2Client 8CC50 (now d2client_8cc50.cpp) (88 B) fastcall(param_1)
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_8cc50(uint32_t p, uint32_t unit_bbfc, uint32_t* g_90ec0, uint32_t (*ord10331)(uint32_t),
                      uint32_t (*ord10826)(uint32_t), int8_t (*ord10459)(uint32_t)) {

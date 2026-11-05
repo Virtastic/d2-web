@@ -6,7 +6,7 @@ struct G { int32_t cc3dc{},c97ec{},c9828{}; };
 int32_t sub_51470(Svc& s,G& g,const int32_t* unit,int32_t p1,int32_t p2,int32_t p4,int32_t* flag){
  (void)p1; if(!unit||*unit!=5) return 0;
  if(s.f557e0(p2)&&s.f557e0(p4)&&s.o10143(p1)&&g.cc3dc){
-  if(g.c97ec<g.c9828){ g.c9828=g.c97ec+500; return 1; }
+  if((uint32_t)g.c97ec<(uint32_t)g.c9828){ g.c9828=g.c97ec+500; return 1; }
   if(*flag==0){ g.c9828=g.c97ec+500; *flag=1; }
  }
  return 0;

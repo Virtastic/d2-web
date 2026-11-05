@@ -144,7 +144,7 @@ int32_t d2_client_8c760(uint32_t unit, uint32_t* out, uint32_t flag_9854,
     return ord10244() ? r : 0;
 }
 
-// 1.13c D2Client+0x8C8B0 (361 B): draw the 12 text rows (stride 0xe table at 0x6FB8139C), splitting at '\n'.
+// old form of D2Client 8C8B0 (now d2client_8c8b0.cpp) (361 B): draw the 12 text rows (stride 0xe table at 0x6FB8139C), splitting at '\n'.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_8c8b0(const int32_t* tab_139c, int32_t x_b9a0, int32_t y_b9a4,
                      void (*ord10184)(void), const uint16_t* (*ord10003)(void), void (*ord10028)(void),

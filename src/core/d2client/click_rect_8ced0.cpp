@@ -3,7 +3,7 @@
 #include <emscripten.h>
 #include "client_host.h"
 
-// 1.13c D2Client+0x8CED0 (132 B, implicit ESI = event struct p; callers 0x9FF46/0x6A037A): mouse-event hit test.
+// old form of D2Client 8CED0 (now d2client_8ced0.cpp) (132 B, implicit ESI = event struct p; callers 0x9FF46/0x6A037A): mouse-event hit test.
 // p+0xC u16 x, p+0xE u16 y; p+0x18/0x1C = handled/pass flags; host(511) = Storm#511 (eax = p) consumes the event.
 // Hit box: x in [W-dx-0x12E, W-dx-0x10E], y in [dy-0x60+H, dy-0x40+H] with W=0x6FB8BC48, H=0x6FB8BC4C,
 // dx=0x6FBCB9A0, dy=0x6FBCB9A4. On hit sets flag 0x6FBCBEDC=1 (*hit) and consumes again; returns 1, else 0.

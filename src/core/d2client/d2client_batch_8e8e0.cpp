@@ -130,7 +130,7 @@ void sub_8F660(Env& e) {
     if (e.cb834) e.sub_cb864 = 4;
 }
 
-// 1.13c D2Client+0x8F880 (param_1 = stack arg, edi = cursor Y, esi = struct whose +0x18 is set)
+// old form of D2Client 8F880 (now d2client_8f880.cpp) (param_1 = stack arg, edi = cursor Y, esi = struct whose +0x18 is set)
 void sub_8F880(Env& e, int32_t p1, int32_t edi, uint32_t esi) {
     if (e.ord(10031) != 2) return;
     if (e.fn(0x26320) != 0 || p1 > e.scrH_8bc4c - 0x30) return;
@@ -142,7 +142,7 @@ void sub_8F880(Env& e, int32_t p1, int32_t edi, uint32_t esi) {
     e.ord(511);
 }
 
-// 1.13c D2Client+0x8F9E0 (tooltip name line; out = tooltip buffer, unaff_EBP = trailing text)
+// old form of D2Client 8F9E0 (now d2client_8f9e0.cpp) (tooltip name line; out = tooltip buffer, unaff_EBP = trailing text)
 void sub_8F9E0(Env& e, W* out, const W* tail, const W* sep) {
     W a[512] = {};
     e.txt(0); e.txt(1); e.txt(2);
@@ -163,7 +163,7 @@ void sub_8F9E0(Env& e, W* out, const W* tail, const W* sep) {
     wcat(dst, tail);
 }
 
-// 1.13c D2Client+0x8FB80 (item damage/defense line; param_1 = item, out = ESI buffer)
+// old form of D2Client 8FB80 (now d2client_8fb80.cpp) (item damage/defense line; param_1 = item, out = ESI buffer)
 void sub_8FB80(Env& e, uint32_t item, W* out, uint32_t ebx) {
     if (!item) return;
     uint32_t base = e.ord(11160, item);
@@ -192,7 +192,7 @@ void sub_8FB80(Env& e, uint32_t item, W* out, uint32_t ebx) {
     wcat(out, e.txt(1));
 }
 
-// 1.13c D2Client+0x8FDC0 (defense/resist percent line into param_1)
+// old form of D2Client 8FDC0 (now d2client_8fdc0.cpp) (defense/resist percent line into param_1)
 void sub_8FDC0(Env& e, W* out, uint32_t ctx) {
     int32_t v = (int32_t)e.ord(10973);
     uint32_t pl = e.player_cbbfc;
@@ -271,7 +271,7 @@ void sub_8FF20(Env& e, uint32_t item, W* out, W* out2, const W* sp) {
     }
 }
 
-// 1.13c D2Client+0x90770 (item quantity/durability line; out = ESI buffer)
+// old form of D2Client 90770 (now d2client_90770.cpp) (item quantity/durability line; out = ESI buffer)
 void sub_90770(Env& e, uint32_t item, W* out) {
     W num[16] = {};
     const W* sp = e.txt(0);
