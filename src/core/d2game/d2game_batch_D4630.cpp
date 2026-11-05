@@ -498,13 +498,3 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_9DCD0(void* param1, uint32_t eax, uint32_
     }
 }
 
-// Owner accessor: #10920's record +0x34 must be non-null (fatal 0xDB); the answer is that record's
-// +0x04.
-// 1.13c D2Game+0xB23D0
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_B23D0(const D2GameBatchD4630Env* env)
-{
-    const uint32_t owner = env->ordinal10920();
-    if (rd32(owner, 0x34) == 0) d2game_fatal(0xDB);
-    return rd32(rd32(owner, 0x34), 4);
-}

@@ -129,7 +129,7 @@ static uintptr_t lookup(E env, uintptr_t pd, uintptr_t esi, uintptr_t edi)
     return edi != esi ? findNode(env, pd, unitId(esi)) : 0;
 }
 
-// 1.13c D2Game+0xF0060  (esi=unit, edi=other; Ordinal_10920 arg is a register not shown: edi)
+// esi = unit, edi = other; the proved rule is d2game_f0060.h
 X uintptr_t d2_fn_d2game_F0060(uintptr_t esi, uintptr_t edi, E env)
 {
     return lookup(env, O(10920, edi, 0, 0, 0, 0), esi, edi);
@@ -147,7 +147,7 @@ X void d2_fn_d2game_F0130(uintptr_t eax, uintptr_t edi, E env)
     }
 }
 
-// 1.13c D2Game+0xF0220  (esi, edi, stk=new state)
+// esi, edi, stack = new state; the proved rule is d2game_f0060.h (SetState)
 X void d2_fn_d2game_F0220(uintptr_t esi, uintptr_t edi, uint32_t stk, E env)
 {
     uintptr_t pd = O(10920, edi, 0, 0, 0, 0);

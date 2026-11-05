@@ -87,43 +87,7 @@ int D2GAME_A1210(intptr_t* param1, int param2)
     return 1;
 }
 
-// 1.13c D2Game+0xA4D10  (ecx=unit, edx=rec, stack ai record)
-// MISMATCH vs spec: the decompile tests the rec flag word at +0xC8 (param_2[0x32] as int*), not +0x128 as the spec
-// says; and the owner id at +0x98 (param_2[0x26]). Port follows the decompile. The spec's +0x1C/+0x8/+0x18 AI fields
-// and the monstat row at ai+0x1C (+0x62 / +0x56 / +0x5C, byte +0x6D difficulty) match.
-void D2GAME_A4D10(int unit, u8* rec, u8* ai)
-{
-    if (rec && ((at<uint32_t>(rec, 0xc8) >> 10) & 1)) {
-        if (FUN_6fd003a0(unit, at<int>(rec, 0x98))) {
-            if (FUN_6fcffa90() == 0) {
-                int slot = at<int>(ai, 0x18);
-                int unitB = at<int>(ai, 0x08);
-                u8* row = ptr(at<int>(ai, 0x1c));
-                uint32_t idx = (uint32_t)at<u8>((void*)(intptr_t)unit, 0x6d) * 2;
-                u8* state = ptr(at<int>(ai, 0));
-                if (at<int>(state, 0x1c) == 0) {
-                    int16_t sv = at<int16_t>(row, 0x62 + idx);
-                    uint32_t r = (uint32_t)FUN_6fc21180(rec + 0x20);
-                    at<int>(state, 0x1c) = at<int>((void*)(intptr_t)unit, 0xa8) + (int)((r + (uint32_t)(int)sv) * 0x19);
-                }
-                if (at<int>(state, 0x1c) < at<int>((void*)(intptr_t)unit, 0xa8)) {
-                    FUN_6fcfeee0(unit, rec, nullptr, 1);
-                    return;
-                }
-                if (slot) {
-                    uint32_t r = (uint32_t)FUN_6fc21180(rec + 0x20);
-                    if ((int)r < (int)at<int16_t>(row, 0x56 + idx)) {
-                        FUN_6fd12220(unit, unitB);
-                        return;
-                    }
-                }
-                FUN_6fd122c0((int)at<int16_t>(row, 0x5c + idx));
-                return;
-            }
-        }
-    }
-    FUN_6fcfeee0(unit, rec, nullptr, 1);
-}
+// The A4D10 cooldown step: d2game_a4d10.cpp is its own file.
 
 // 1.13c D2Game+0xA5350  (ecx=caster unit, edx=rec (the player-type unit), stack ai record)
 // Spec deltas: none. The decompile's two arms of the power-of-two test are the same LCG step, so one step is taken

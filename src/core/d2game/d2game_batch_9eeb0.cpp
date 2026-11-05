@@ -111,32 +111,6 @@ uint32_t D2GAME_A34E0_Create(const uint8_t* unit, uint32_t s1, uint32_t s2, int 
     return o;
 }
 
-// 1.13c D2Game+0xA35D0 : null-check game then forward game+0x80
-bool D2GAME_A35D0_Forward(const uint8_t* game, int p1, void (*fn)(uint32_t, int))
-{
-    if (!game) return false; // retail: fatal assert line 0xa2a
-    fn(rd<uint32_t>(game, 0x80), p1);
-    return true;
-}
-
-// 1.13c D2Game+0xA3A20 : true if another row (stride 0x3c) shares the short at +0x1e and hook(p1,idx) is set
-bool D2GAME_A3A20_SharesGroup(uint32_t p1, int idx, const uint8_t* rows, int count, bool (*chk)(uint32_t, int))
-{
-    if (idx < 0 || idx >= count) return false;
-    int16_t g = rd<int16_t>(rows + (size_t)idx * 0x3c, 0x1e);
-    if (!g) return false;
-    bool r = false;
-    for (int i = 0; i < count; ++i)
-        if (i != idx && rd<int16_t>(rows + (size_t)i * 0x3c, 0x1e) == g && chk(p1, i)) r = true;
-    return r;
-}
-
-// 1.13c D2Game+0xA3AE0 : level/3 + stat/2, min 1; stat = hook(unit) if unit else 1
-int D2GAME_A3AE0_Calc(int level, bool hasUnit, int (*stat)())
-{
-    int v = hasUnit ? stat() : 1;
-    v = level / 3 + v / 2;
-    return v < 2 ? 1 : v;
-}
+// The A35D0, A3A20 and A3AE0 rules: d2game_a35d0.cpp, d2game_a3a20.cpp and d2game_a3ae0.cpp are their own files.
 
 } // namespace d2game_batch_9eeb0

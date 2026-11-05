@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <emscripten.h>
+#include "d2game_a3d60.cpp"
 
 typedef uintptr_t A;  // a retail record address
 static inline uint32_t rd32(A p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
@@ -341,22 +342,19 @@ uint32_t d2_fn_d2game_70CF0(A param1, A param2, A eax, A ebx, A esi, A iStack20,
     return 1;
 }
 
-// ECX param_1 = skill id, EDX param_2 = unit. in_EAX = flag. 0xA3D60 table: 0x23C-byte rows at +0xB98.
-// 1.13c D2Game+0xA3D60
+// ECX param1 = skill id, EDX param2 = unit, EAX = flag: the rule is d2game_a3d60.cpp (ga3d60::Allowed); this adapter runs it on the env.
+struct A3D60Env {
+    const D2GameBatch6E400Env* e;
+    static uint32_t rd32(A p) { return ::rd32(p, 0); }
+    static int32_t rd16s(A p) { return (int16_t)::rd16(p, 0); }
+    static uint32_t rd8(A p) { return ::rd8(p, 0); }
+    uint32_t h(uint32_t, uint32_t = 0, uint32_t = 0, uint32_t = 0, uint32_t = 0) { return (uint32_t)e->fB6600(); }
+};
 extern "C" EMSCRIPTEN_KEEPALIVE
 bool d2_fn_d2game_A3D60(int32_t param1, A param2, A eax, const D2GameBatch6E400Env* e)
 {
-    A dt = e->dataTables;
-    if (param1 < 0 || (int32_t)rd32(dt, 0xBA0) <= param1) return false;
-    A row = (A)param1 * 0x23C + rdA(dt, 0xB98);
-    if (!row) return false;
-    if ((int16_t)rd16(row, 0xBC) == 0) return true;
-    uint32_t id = param2 ? rd32(param2, 4) : 0xFFFFFFFFu;
-    if ((int32_t)(int16_t)rd16(row, 0xBC) == (int32_t)(id & 0xFFFF)) return false;
-    int32_t c = (int8_t)rd8(row, 0xBE);
-    if (c > -1 && c < (int32_t)rd32(dt, 0xBF0) && eax != 0)
-        return (int32_t)e->fB6600() != c;               // REG? unit
-    return true;
+    A3D60Env env{ e };
+    return ga3d60::Allowed(env, e->dataTables, param1, param2, (uint32_t)eax) != 0;
 }
 
 // 1.13c D2Game+0xA3E10

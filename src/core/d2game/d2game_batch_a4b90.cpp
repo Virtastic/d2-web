@@ -81,25 +81,7 @@ void D2GAME_A4B90(void* game, void* unit, int** ctx)
     at<int>(*ctx, 0x18) = 1;  // REG? iStack_4 is the ctx pointer
 }
 
-// 1.13c D2Game+0xA4E40  (caller 0xA8430; REG? esi=unit, edi=ctx**)
-void D2GAME_A4E40(int* unit, int** ctx)
-{
-    Ordinal_10302();
-    void* g = Ordinal_10630();
-    if (!g) assertFail(0x1702);
-    Ordinal_10243(g, 0x11e);
-    if (!unit) assertFail(0xa2a);
-    int t = unit[0];
-    void* d = pat(unit, 0x2c);
-    void* owner = pat(unit, 0x80);
-    if (t != 2 && (t < 4 || t > 5) && d) Ordinal_10750(d);
-    if (t != 2 && (t < 4 || t > 5) && d) Ordinal_10867(d);
-    FUN_6fd12380(unit);
-    at<int>(*ctx, 0x14) += 1;
-    at<int>(*ctx, 0x1c) = at<int>(owner, 0xa8) + 100;
-    at<uint32_t>(*ctx, 0x18) |= 2;
-    at<uint32_t>(*ctx, 0x18) &= 0xfffffffe;
-}
+// The A4E40 skill start: d2game_a4e40.cpp is its own file.
 
 // 1.13c D2Game+0xA4F40  (ecx=game, edx=unit)
 void D2GAME_A4F40(void* game, void* unit)

@@ -81,14 +81,6 @@ extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_C1FF0(void* self, const D2GameBatchC1BA0Env* e)
 { return dispatchCb(e, self, 0x34e); }
 
-// 1.13c D2Game+0xC2120  (EAX = unit-ish; returns byte at node10.data+4)
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_C2120(void* in, const D2GameBatchC1BA0Env* e)
-{
-    uint8_t* n = findNode(e, e->mem(rd32(in, 4)), 10);
-    return n ? rd8(e->mem(rd32(n, 0x18)), 4) : 0;
-}
-
 // 1.13c D2Game+0xC21E0  (ECX = self)
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_C21E0(void* self, const D2GameBatchC1BA0Env* e)
@@ -105,7 +97,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C2380(void* in, int32_t add, const D2Game
     if (n) { uint8_t* d = (uint8_t*)e->mem(rd32(n, 0x18)); wr32(d, 0x24, rd32(d, 0x24) + (uint32_t)add); }
 }
 
-// 1.13c D2Game+0xC2460  (EAX = game)
+// EAX = game; the proved rule is d2game_c2460.h
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_C2460(void* game, const D2GameBatchC1BA0Env* e)
 {

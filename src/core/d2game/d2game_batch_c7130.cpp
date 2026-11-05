@@ -268,15 +268,6 @@ void d2_fn_d2game_ca490(const int32_t* unit, const int32_t* table, const D2GameB
     if (e->ord10830() == 0) w32(rec, 0x2d0, r32(rec, 0x2d0) - 1);
 }
 
-// 1.13c D2Game+0xCB370
-extern "C" EMSCRIPTEN_KEEPALIVE
-uint8_t d2_fn_d2game_cb370(void* ecx, void* eax, const D2GameBatchC7130Env* e)
-{
-    uint8_t a = e->ord10459(e->ord10826(e->ord10331(ecx)));
-    uint8_t b = e->ord10459(e->ord10826(e->ord10331(eax)));
-    return (uint8_t)(((a == b) - 1u) & 2);
-}
-
 // 1.13c D2Game+0xCBC70
 extern "C" EMSCRIPTEN_KEEPALIVE
 int32_t d2_fn_d2game_cbc70(const void* p1, int32_t p2, const D2GameBatchC7130Env* e)

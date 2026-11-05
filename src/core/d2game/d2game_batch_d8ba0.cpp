@@ -148,23 +148,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2game_da8c0(void* edi, void* ebx, void* un
     if (add + s > 0) d8_wr32(ebx, 0xc, d8_rds32(ebx, 0xc) + add + s);
 }
 
-// 1.13c D2Game+0xDA930 -- unaff_EDI = amount; #10973 (read) and #10887 (restore) take register args.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2game_da930(int32_t edi, void* unit) {
-    if (edi < 1) return 0;
-    int32_t r = E.stat(unit, 0, 0) - edi;  // GUESS: stat id/layer register-passed
-    if (r < 0 || r < 0x100) r = 0;
-    E.statSet(unit, 0, 0);
-    return r != 0 ? (uint32_t)edi : 0;
-}
-
-// 1.13c D2Game+0xDA970 -- as DA930 without the explicit r<0 test (equivalent).
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2game_da970(int32_t edi, void* unit) {
-    if (edi < 1) return 0;
-    int32_t r = E.stat(unit, 0, 0) - edi;
-    if (r < 0x100) r = 0;
-    E.statSet(unit, 0, 0);
-    return r != 0 ? (uint32_t)edi : 0;
-}
+// The mana and life spend helpers are d2game_da930.h.
 
 // 1.13c D2Game+0xDAC10 -- in_EAX = ctx (+4 skill row, +8 attacker, +0xc defender).
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2game_dac10(const void* ctx) {
