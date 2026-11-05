@@ -1,4 +1,4 @@
-// 1.13c Storm+0x38F10 -- max value over list nodes whose key (either slot) matches `key` with a zero flag and nonzero flag2.
+// Earlier draft (native node layout; the port is storm_38f10.cpp) -- max value over list nodes whose key (either slot) matches `key` with a zero flag and nonzero flag2.
 #include <cstdint>
 struct S38F10Node {
     S38F10Node* next;  // +4 (retail: 32-bit link; +0 unused here)

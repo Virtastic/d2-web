@@ -76,7 +76,7 @@ static void freeStream(void* s) {
   LeaveCriticalSection(Storm_StreamLockCS());
 }
 
-// 1.13c Storm+0x38130
+// Earlier draft of the stream release (the port is storm_38130.cpp)
 void Storm_Sub38130(uint8_t* obj) {
   uint32_t* slot = (uint32_t*)(obj + 0x18);
   for (int i = 0; i < 2; i++, slot += 3) {

@@ -475,7 +475,7 @@ extern "C" void Storm_N33_2D6F0(const char* s, BigVec* v) {
     }
 }
 
-// 1.13c Storm+0x35CD0
+// Earlier draft of the SEVT command removal (native table); the port is storm_batch_19040.cpp.
 // Removes the (k3, k4) records from the (k1, k2) table; 1 if anything was removed.
 extern "C" uint32_t Storm_N33_35CD0(uint32_t k1, uint32_t k2, uint32_t k3, uint32_t k4) {
     uint32_t ret = 0;

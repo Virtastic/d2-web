@@ -229,7 +229,7 @@ uint32_t Storm_Sub36CD0(uint32_t* rec) {
     return 1;
 }
 
-// 1.13c Storm+0x36E00 (ordinal 440): (re)build the power-of-two tile row-offset table.
+// Earlier draft (ordinal 440; the port is storm_36e00.cpp): (re)build the power-of-two tile row-offset table.
 uint32_t Storm_Sub36E00(int32_t totalW, int32_t totalH, int32_t tileW, int32_t tileH) {
     if (g_trans_c != 0) { Storm_Free((void*)(uintptr_t)g_trans_c, kTrans, 0x508); g_trans_c = 0; }
     int32_t p = 1; g_shX = 0;

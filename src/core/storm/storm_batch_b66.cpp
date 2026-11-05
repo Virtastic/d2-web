@@ -92,7 +92,7 @@ uint32_t Storm_sub_28E80(File* f, uint32_t off, uint8_t* dst, uint32_t len) {
     return mid + tail + head;
 }
 
-// 1.13c Storm+0x361C0  frees the global hash-bucket table; g_buckets = 0x6FC45370, count 0x6FC45374
+// Earlier draft (native Node layout, superseded by storm_361c0.cpp): the global hash-bucket table; g_buckets = 0x6FC45370, count 0x6FC45374
 namespace { struct Node { void* a; void* b; void* c; Node* items; Node* next; }; }
 Node** g_stormBuckets; uint32_t g_stormBucketCount, g_stormBucketUsed, g_stormBucketsInit;
 static CRITICAL_SECTION g_sevtLock;                    // 0x6FC458C8 (SEVT table lock; shim no-op)
