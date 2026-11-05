@@ -28,7 +28,7 @@ extern "C" void d2_port_d2common_55400(HD2ARCHIVE archive)
 }
 
 // 1.13c D2Common+0x60920
-extern "C" void d2_fn_d2common_60920(HD2ARCHIVE archive)
+extern "C" void d2_port_d2common_60920(HD2ARCHIVE archive)
 {
     D2BinFieldStrc fields[] = {
         {"Amazon", TXTFIELD_DWORD, 0, 0, nullptr},
@@ -47,7 +47,7 @@ extern "C" void d2_fn_d2common_60920(HD2ARCHIVE archive)
 }
 
 // 1.13c D2Common+0x616D0
-extern "C" void d2_fn_d2common_616d0(HD2ARCHIVE archive)
+extern "C" void d2_port_d2common_616d0(HD2ARCHIVE archive)
 {
     // compcode always loads; remaining code/name linkers require bCompileTxt.
     DATATBLS_LoadSomeTxts(archive);

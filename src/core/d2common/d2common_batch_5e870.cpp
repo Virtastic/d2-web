@@ -12,7 +12,7 @@ W void Ordinal_10212(uint32_t p);
 W void d2_batch_d2common_18f90();
 extern "C" void d2_batch_d2common_53bd0();
 W void d2_fn_d2common_54200();
-W void d2_fn_d2common_5de00();
+W void d2_port_d2common_5de00();
 W void d2_fn_d2common_6c7e0();
 W void d2_fn_d2common_71180();
 W void d2_fn_d2common_716b0();
@@ -74,7 +74,7 @@ static void leak(char* g) { if (V(g)) Ordinal_10046(DT, V(DAT_6fde9e20) == 0 ? 0
 // 1.13c D2Common+0x5E870
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_5e870() {
 
-  d2_fn_d2common_5de00();
+  d2_port_d2common_5de00();
   leak(DAT_6fdf0a9c);
   DATATBLS_UnloadMissilesTxt();
   Ordinal_10212(V(DAT_6fdf0a90));

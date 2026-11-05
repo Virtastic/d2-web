@@ -135,7 +135,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_54200()
 // 1.13c D2Common+0x5DE00: teardown of the 0x6FDEFE.. / 0x6FDEFF.. block. One guarded slot, then,
 // when bCompileTxt is set, fifteen guarded bins each followed by its linker.
 // All linkers are released whether or not their corresponding bin is non-null.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_5de00()
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_port_d2common_5de00()
 {
 	if (sgptDataTables->pCompCodeTxt != 0)
 	{

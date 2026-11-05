@@ -1,4 +1,4 @@
-// 1.13c D2Common implementation batch: +0x4AD20, +0x24800, +0x30340, +0x31200, +0x54A00,
+// 1.13c D2Common implementation batch: +0x4AD20, +0x24800, +0x30340, +0x31200,
 // +0x45BE0, +0x2CC60, +0x4FB30, +0x26930, +0x303E0, +0x21DD0, +0x38710. Bodies follow the
 // cached 1.13c decompile; where a vendored D2MOO function is the same body it is called rather
 // than copied. Retail's fatal paths (Fog message + _exit(-1)) are modelled as returns.
@@ -64,17 +64,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t D2Common_31200_CanSwitchAI(uint32_t nMonsterId) { 
 	return UNITS_CanSwitchAI(static_cast<int>(nMonsterId)) ? 1u : 0u;
 }
 
-// +0x54A00: per-level monster stat block. The difficulty is clamped to 0..2 and the level to the
-// monlvl record count - 1; the monlvl row is then read with the game-type offset of 3 and, for each
-// set flag bit, HP/AC/EXP/TH/A1/A2/S1/elemental min and max are either scaled by the monlvl ratio
-// or copied raw when the monster's NORATIO flag is set. Writes the 14-int D2MonStatsInitStrc.
-// The vendored DATATBLS_CalculateMonsterStatsByLevel has this exact structure and output layout.
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2common_54a00(uint32_t nMonsterId, uint32_t nGameType, uint32_t nDifficulty, uint32_t nLevel, uint32_t nFlags, uint32_t pOutStats) {   // 1.13c D2Common+0x54A00
-	if (!pOutStats)
-		return 0;
-	return DATATBLS_CalculateMonsterStatsByLevel(static_cast<int>(nMonsterId), static_cast<int>(nGameType), static_cast<int>(nDifficulty), static_cast<int>(nLevel), static_cast<short>(nFlags), reinterpret_cast<D2MonStatsInitStrc*>(pOutStats)) ? 1u : 0u;
-}
+// +0x54A00 moved to d2common_54a00.cpp (signed monstats reads, FN probe).
 
 // +0x45BE0: affix applicability test. The affix byte block has two type-class gates (bytes 1 and 0
 // with item type selectors 0x2D and 0x32) that accept anything whose items.txt type is outside the

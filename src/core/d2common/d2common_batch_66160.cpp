@@ -13,7 +13,7 @@ W void d2_fn_d2common_74400(HD2ARCHIVE a);
 W void d2_fn_d2common_72c50(void* a);
 W void d2_fn_d2common_69650(void* a);
 W void d2_fn_d2common_69190(void* a);
-void d2_fn_d2common_60920(HD2ARCHIVE a);
+void d2_port_d2common_60920(HD2ARCHIVE a);
 W void d2_fn_d2common_5d570(void* a);
 W void d2_fn_d2common_6c3a0(void* a);
 W void d2_fn_d2common_6fba0(void* a, int32_t b, int32_t c);
@@ -27,12 +27,12 @@ W char DAT_6fde9e20[4];
 W char DAT_6fdf0070[4];
 W char DAT_6fdf0074[4];
 W char DAT_6fdf0b4c[8];
-void d2_fn_d2common_616d0(HD2ARCHIVE archive);
+void d2_port_d2common_616d0(HD2ARCHIVE archive);
 
 // 1.13c D2Common+0x66160
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_66160(HD2ARCHIVE h, int32_t p2, int32_t p3) {
  void* const a = (void*)h;
- d2_fn_d2common_616d0(h);
+ d2_port_d2common_616d0(h);
  DATATBLS_LoadItemTypesTxt(h);
  d2_fn_d2common_56a10(a);
  d2_port_d2common_55400(h);
@@ -63,7 +63,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_66160(HD2ARCHIVE h, int32_t p2, int32_t
  d2_fn_d2common_69190(a);
  DATATBLS_LoadCompositTxt(h);
  DATATBLS_LoadArmTypeTxt(h);
- d2_fn_d2common_60920(h);
+ d2_port_d2common_60920(h);
  *(uint64_t*)DAT_6fdf0b4c = (uint64_t)(intptr_t)DATATBLS_LoadAnimDataD2(h);
  d2_fn_d2common_5d570(a);
  DATATBLS_LoadLevelsTxt(h);
