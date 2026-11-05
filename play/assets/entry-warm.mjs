@@ -12,7 +12,7 @@ import { loadPlayerAnimation, drawnPlayerState } from './unit-renderer.mjs';
 import { createPlayerCompositeResolver } from './player-composite.mjs';
 import { decodeCof } from './unit-formats.mjs';
 
-const BASE = Object.freeze({ 0: 'LIT', 1: 'LIT', 2: 'LIT', 3: 'LIT', 4: 'LIT', 8: 'LIT', 9: 'LIT' });   // unit-renderer.mjs START_BASE
+const BASE = Object.freeze({ 0: 'LIT', 1: 'LIT', 2: 'LIT', 3: 'LIT', 4: 'LIT', 7: 'LIT', 8: 'LIT', 9: 'LIT' });   // unit-renderer.mjs START_BASE
 const COMPONENT = ['HD', 'TR', 'LG', 'RA', 'LA', 'RH', 'LH', 'SH', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8'];
 const OBJECT_MODE = ['NU', 'OP', 'ON', 'S1', 'S2', 'S3', 'S4', 'S5'];   // object-renderer.mjs MODE
 

@@ -132,6 +132,7 @@
 #include "../d2client/weather_sim.h"
 #include "../d2client/inv_sockets_95140.h"
 #include "hellforge_diagnostic.h"
+#include "../d2common/d2common_33110.h"
 #include "../../../tools/vectorfmt/vectorfmt.h"
 
 static_assert(offsetof(D2Act4Quest3Strc, nHellforgeObjectMode) == 0x00);
@@ -598,6 +599,25 @@ static bool g_clientCastClockActive;
 static uint32_t g_clientCastFramePrecise;
 static uint32_t g_clientCastMode;
 static uint16_t g_clientCastAnimSpeed;
+// The client's own neutral-mode clock: retail's client unit plays NU at its mode-table speed and wraps,
+// while the in-process server unit's clock does not move in that mode. Drawing only, like the cast clock.
+static bool g_clientNeutralClockActive;
+static uint32_t g_clientNeutralFramePrecise;
+static uint16_t g_clientNeutralAnimSpeed;
+// The client's shapeshift entry. When the Werewolf/Werebear state arrives, the client's state-on callback for it
+// plays the form's S1 (the transformation) on the client unit, then neutral from frame 0, and turns that unit
+// to direction 0. The server unit stays in its own cast/neutral modes. Drawing only.
+static bool g_clientMorphActive;
+static bool g_clientMorphStatePrev;
+static uint32_t g_clientMorphFramePrecise;
+static uint32_t g_clientMorphFrameCount;
+static uint16_t g_clientMorphAnimSpeed;
+// The client unit's own facing where it differs from the server unit's: a path record that only carries
+// direction, target and step, turned by the same Common setter and per-frame stepper as the server path.
+// Held until the server path takes a new target direction of its own.
+static bool g_clientFacingActive;
+static uint8_t g_clientFacingServerTarget;
+static D2DynamicPathStrc g_clientFacing;
 static D2SessionCoords g_sessionCoords;
 static std::vector<D2SessionUnitCoord> g_sessionUnitCoords;
 static std::vector<D2SessionUnitFacing> g_sessionUnitFacings;
@@ -2152,6 +2172,9 @@ static void detachTargetFixture() {
     g_sessionJoinRooms.clear();
     free(g_targetClient); g_targetClient = nullptr; g_targetRoom = nullptr; g_targetPlayer = nullptr; g_targetMonster = nullptr;
     g_clientCastClockActive = false; g_clientCastFramePrecise = 0; g_clientCastAnimSpeed = 0;
+    g_clientNeutralClockActive = false; g_clientNeutralFramePrecise = 0; g_clientNeutralAnimSpeed = 0;
+    g_clientMorphActive = false; g_clientMorphStatePrev = false; g_clientMorphFramePrecise = 0; g_clientMorphFrameCount = 0;
+    g_clientMorphAnimSpeed = 0; g_clientFacingActive = false; g_clientFacingServerTarget = 0; g_clientFacing = {};
 }
 
 // GAME_CreateGame minus the server (game slots, clients, tasks, critical sections): the fields the
@@ -7332,6 +7355,97 @@ static void advanceClientCastClock() {
     }
 }
 
+// Neutral mode: #11090's start frame for player mode 1 is 0 and the client's advance policy for it wraps
+// (frame + speed, minus the sequence length once it reaches it). The tick that enters the mode draws frame 0.
+static void syncClientNeutralClock() {
+    if (!g_targetPlayer || g_targetPlayer->dwAnimMode != PLRMODE_NEUTRAL) { g_clientNeutralClockActive = false; return; }
+    if (g_clientNeutralClockActive) return;
+    g_clientNeutralClockActive = true;
+    g_clientNeutralFramePrecise = 0;
+    // The client unit's rate is computed with the unit's stats in place (other-anim-rate 100). The server unit
+    // entered neutral when it was allocated, before its stats were set, so its own rate is the clamped 15%.
+    // Recompute it for the client and leave the server unit's value as it was.
+    const int16_t serverSpeed = g_targetPlayer->wAnimSpeed;
+    UNITS_UpdateAnimRateAndVelocity(g_targetPlayer, __FILE__, __LINE__);
+    g_clientNeutralAnimSpeed = (uint16_t)g_targetPlayer->wAnimSpeed;
+    g_targetPlayer->wAnimSpeed = serverSpeed;
+}
+
+static void advanceClientNeutralClock() {
+    const bool wasActive = g_clientNeutralClockActive;
+    syncClientNeutralClock();
+    if (!wasActive || !g_clientNeutralClockActive) return;
+    const uint32_t frameCount = g_targetPlayer->dwFrameCountPrecise;
+    if (!frameCount) return;
+    uint32_t next = g_clientNeutralFramePrecise + g_clientNeutralAnimSpeed;
+    while (next >= frameCount) next -= frameCount;
+    g_clientNeutralFramePrecise = next;
+}
+
+// The player's rate and length for a mode it is not in: the mode-rate update run on the unit with the mode
+// swapped in, and every field it writes put back.
+static void clientModeRate(int32_t mode, uint16_t* speed, uint32_t* frameCount) {
+    D2UnitStrc* u = g_targetPlayer;
+    const uint32_t savedMode = u->dwAnimMode, savedSeq = u->dwSeqSpeed, savedCount = u->dwFrameCountPrecise;
+    const int16_t savedSpeed = u->wAnimSpeed;
+    const D2AnimDataRecordStrc* const savedAnim = u->pAnimData;
+    u->dwAnimMode = (uint32_t)mode;
+    // The client's rate update gets no shape-shift weapon-speed base (#11043 -> 0): retail draws the morph at the
+    // anim data speed x attack rate (256 x 120% wolf, 256 x 100% bear) where the server unit uses the weapon base.
+    static const D2Common33110Env kClientEnv = [] { D2Common33110Env e = UNITS_AnimRateEnv(); e.meleeSpeed = [](D2UnitStrc*) -> int { return 0; }; return e; }();
+    D2Common_33110_UpdateAnimRate(u, kClientEnv);
+    *speed = (uint16_t)u->wAnimSpeed;
+    *frameCount = u->pAnimData ? u->pAnimData->dwFrames << 8 : 0;
+    u->dwAnimMode = savedMode; u->dwSeqSpeed = savedSeq; u->dwFrameCountPrecise = savedCount;
+    u->wAnimSpeed = savedSpeed; u->pAnimData = savedAnim;
+}
+
+// Turn the client unit toward `dir` from wherever it faces now (the server facing when no client facing is held).
+static void clientFaceToward(uint8_t dir) {
+    const D2DynamicPathStrc* path = g_targetPlayer ? g_targetPlayer->pDynamicPath : nullptr;
+    if (!path) return;
+    if (!g_clientFacingActive) {
+        g_clientFacing = {};
+        g_clientFacing.nDirection = path->nDirection;
+        g_clientFacing.nNewDirection = path->nDirection;
+        g_clientFacingActive = true;
+    }
+    g_clientFacingServerTarget = path->nNewDirection;
+    D2COMMON_10160_PathUpdateDirection(&g_clientFacing, dir);
+}
+
+// Per client frame, after the cast and neutral clocks: the shapeshift entry and the client facing step.
+static void advanceClientForm() {
+    if (!g_targetPlayer) return;
+    const bool formState = STATES_CheckState(g_targetPlayer, STATE_WOLF) || STATES_CheckState(g_targetPlayer, STATE_BEAR);
+    const bool entered = formState && !g_clientMorphStatePrev;
+    g_clientMorphStatePrev = formState;
+    if (!formState) g_clientMorphActive = false;
+    if (entered) {
+        // The state-on callback: S1 from frame 0 (advanced below on this same frame), and a turn to direction 0.
+        clientModeRate(PLRMODE_SPECIAL1, &g_clientMorphAnimSpeed, &g_clientMorphFrameCount);
+        g_clientMorphActive = g_clientMorphFrameCount != 0;
+        g_clientMorphFramePrecise = 0;
+        clientFaceToward(0);
+    }
+    if (g_clientMorphActive) {
+        // S1 ends when its clock reaches the last frame; the unit then stands in neutral from frame 0.
+        const uint32_t next = g_clientMorphFramePrecise + g_clientMorphAnimSpeed;
+        if (next + 256 >= g_clientMorphFrameCount) {
+            g_clientMorphActive = false;
+            g_clientNeutralClockActive = false;
+            syncClientNeutralClock();
+        } else {
+            g_clientMorphFramePrecise = next;
+        }
+    }
+    if (g_clientFacingActive) {
+        const D2DynamicPathStrc* path = g_targetPlayer->pDynamicPath;
+        if (!path || path->nNewDirection != g_clientFacingServerTarget) g_clientFacingActive = false;
+        else D2COMMON_10193_PATH_AdjustDirection(&g_clientFacing);
+    }
+}
+
 // The commands the approach-walk resume below re-issues (defined further down).
 EMSCRIPTEN_KEEPALIVE int d2_session_command_primary_attack(uint32_t targetUnitId);
 EMSCRIPTEN_KEEPALIVE int d2_session_command_right_skill(uint32_t targetUnitId);
@@ -7577,6 +7691,8 @@ EMSCRIPTEN_KEEPALIVE int d2_session_tick(int frames) {
         // `D2Common_10226`) just set, which is what makes a hero who turns around draw a different DCC
         // direction. It is a no-op when the two already agree.
         advanceClientCastClock();
+        advanceClientNeutralClock();
+        advanceClientForm();
         // PLRMODE_SEQUENCE: sub_6FCBD120 (Inferno, 1.13c D2Game+0xE2480) reads the SERVER clock as the
         // sequence position; retail's headless D2Game never advances it, so the client-side step must not touch it.
         const int32_t seqServerClock = g_targetPlayer->nSeqCurrentFramePrecise;
@@ -8208,6 +8324,24 @@ static int sessionCommandRightSkillAt(int32_t x, int32_t y, bool held) {
     d2_client_note_move_cmd(0);
 //    d2_client_note_local_action(2);   // 2A750 on the ground: mode 2 (WL), 23C00's first footfall
     updateSessionSnapshot();
+    return 1;
+}
+// The client's own coordinate cast (D2Client+0x1BF20) turns the client unit toward the point the player clicked,
+// which the replay carries apart from the 0x0C packet's target; call after the matching right-skill command.
+// x,y are screen pixels: 1BF20 first runs 1.13c D2Client+0x3F5F0 on them (EBX = &x, EDI = &y; perspective off):
+// x += [0x119960] - [0x11C418], y += [0x11995C], the view origin (hero pixel - half the 640x480 screen, y + 0x10),
+// then D2Common #10474 (+0x4D8E0) maps the pixel to a subtile: X = (2y + x) >> 5, Y = (2y - x) >> 5. A22B0's
+// #10434 then faces the unit toward that subtile's centre.
+EMSCRIPTEN_KEEPALIVE int d2_session_client_cast_at(int32_t x, int32_t y) {
+    const D2DynamicPathStrc* path = g_targetPlayer ? g_targetPlayer->pDynamicPath : nullptr;
+    if (!path) return 0;
+    const int32_t px = static_cast<int32_t>(path->tGameCoords.dwPrecisionX), py = static_cast<int32_t>(path->tGameCoords.dwPrecisionY);
+    const int32_t sx = x + ((px - py) >> 12) - 640 / 2;
+    const int32_t sy = y + ((px + py) >> 13) - 480 / 2 + 0x10;
+    const int32_t tx = (2 * sy + sx) >> 5, ty = (2 * sy - sx) >> 5;
+    clientFaceToward(static_cast<uint8_t>(PATH_ComputeDirectionFromPreciseCoords_6FDAC760(
+        path->tGameCoords.dwPrecisionX, path->tGameCoords.dwPrecisionY,
+        PATH_ToFP16Center(static_cast<uint16_t>(tx)), PATH_ToFP16Center(static_cast<uint16_t>(ty)))));
     return 1;
 }
 EMSCRIPTEN_KEEPALIVE int d2_session_command_right_skill_at(int32_t x, int32_t y) {
@@ -9391,15 +9525,18 @@ EMSCRIPTEN_KEEPALIVE const D2SessionMotion* d2_session_motion() {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pDynamicPath) return &g_sessionMotion;
     const D2DynamicPathStrc* path = g_targetPlayer->pDynamicPath;
     syncClientCastClock();
+    syncClientNeutralClock();
     g_sessionMotion.gameFrame = g_game->dwGameFrame; g_sessionMotion.mode = g_targetPlayer->dwAnimMode;
     g_sessionMotion.x = path->tGameCoords.wPosX; g_sessionMotion.y = path->tGameCoords.wPosY;
     g_sessionMotion.targetX = g_sessionMovePending ? g_sessionTargetX : g_sessionMotion.x;
     g_sessionMotion.targetY = g_sessionMovePending ? g_sessionTargetY : g_sessionMotion.y;
     g_sessionMotion.pathPoints = path->dwPathPoints; g_sessionMotion.currentPoint = path->dwCurrentPointIdx;
-    g_sessionMotion.framePrecise = g_clientCastClockActive ? g_clientCastFramePrecise : g_targetPlayer->nSeqCurrentFramePrecise;
+    g_sessionMotion.framePrecise = g_clientCastClockActive ? g_clientCastFramePrecise
+        : g_clientNeutralClockActive ? g_clientNeutralFramePrecise : g_targetPlayer->nSeqCurrentFramePrecise;
     g_sessionMotion.frameCountPrecise = g_targetPlayer->dwFrameCountPrecise;
-    g_sessionMotion.animSpeed = g_clientCastClockActive ? g_clientCastAnimSpeed : g_targetPlayer->wAnimSpeed;
-    g_sessionMotion.direction = path->nDirection;
+    g_sessionMotion.animSpeed = g_clientCastClockActive ? g_clientCastAnimSpeed
+        : g_clientNeutralClockActive ? g_clientNeutralAnimSpeed : g_targetPlayer->wAnimSpeed;
+    g_sessionMotion.direction = g_clientFacingActive ? g_clientFacing.nDirection : path->nDirection;
     g_sessionMotion.moving = g_sessionMovePending;
     if (g_targetPlayer->dwAnimMode == PLRMODE_SEQUENCE) {
         g_sessionMotion.seqMode = static_cast<uint8_t>(g_targetPlayer->dwSeqMode);
@@ -9599,7 +9736,17 @@ EMSCRIPTEN_KEEPALIVE const D2SessionMonsterAnimation* d2_session_player_form_act
     a.id = g_targetPlayer->dwUnitId; a.classId = (uint32_t)classId; a.code = mon->dwCode; a.mode = (uint32_t)mode;
     a.framePrecise = g_targetPlayer->nSeqCurrentFramePrecise; a.frameCountPrecise = g_targetPlayer->dwFrameCountPrecise;
     a.animSpeed = g_targetPlayer->wAnimSpeed;
-    a.direction = g_targetPlayer->pDynamicPath ? g_targetPlayer->pDynamicPath->nDirection : 0;
+    if (g_clientMorphActive) {
+        // The client unit is in the form's S1 (player S1 converts to the monster's S1), on its own clock.
+        int mt = UNIT_PLAYER, mc = (int)g_targetPlayer->dwClassId, mm = PLRMODE_SPECIAL1;
+        D2COMMON_11013_ConvertMode(g_targetPlayer, &mt, &mc, &mm, __FILE__, __LINE__);
+        a.mode = (uint32_t)mm;
+        a.framePrecise = g_clientMorphFramePrecise; a.frameCountPrecise = g_clientMorphFrameCount; a.animSpeed = g_clientMorphAnimSpeed;
+    } else if (g_clientNeutralClockActive) {
+        a.framePrecise = g_clientNeutralFramePrecise; a.animSpeed = g_clientNeutralAnimSpeed;
+    }
+    a.direction = g_clientFacingActive ? g_clientFacing.nDirection
+        : g_targetPlayer->pDynamicPath ? g_targetPlayer->pDynamicPath->nDirection : 0;
     a.baseWeaponClass = mon2 ? static_cast<uint32_t>(mon2->nBaseW) : 0;
     a.animationFlags = (mon2 && (mon2->dwModeFlags & MONSTATS2MODEFLAG_DD) ? 0x02 : 0);
     for (uint32_t c = 0; c < 16; ++c) a.componentCodes[c] = (uint32_t)D2Common_11070(classId, c, 0);

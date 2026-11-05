@@ -34,28 +34,6 @@ struct D2C9f750Env {
     void    (*dialog_cb_9fd70)(void);                  // 0x9FD70
 };
 
-// 1.13c D2Client+0x9F750
-// g[0]=bb214 state, g[1]=bb21c, g[2]=bb218, g[3]=bb228; handles = bcbc0c/bcbc10.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9f750(int32_t* g, void** h0, void** h1, uint8_t* slotBase, int32_t slotCount, const D2C9f750Env* env) {
-    g[0] = 0; g[1] = 0; g[2] = 0; g[3] = 0;
-    *h0 = env->alloc_6f6c0();
-    *h1 = env->alloc_6f6c0();
-    sl_clear({slotBase, slotCount});
-}
-
-// 1.13c D2Client+0x9F7B0
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9f7b0(int32_t x, int32_t y, uint8_t* slotBase, int32_t slotCount, const D2C9f750Env* env) {
-    D2C9f750Slots s{slotBase, slotCount};
-    sl_clear(s);
-    for (int i = 0; i < slotCount; ++i) {
-        if (sl_i32(s, i, 0) <= x && x <= sl_i32(s, i, 4) && sl_i32(s, i, 8) <= y && y <= sl_i32(s, i, 0xC)) {
-            env->fn_88a70(0, 0, 0, 0);
-            s.base[i * 0x28 + 0x15] = 1;
-            s.base[i * 0x28 + 0x14] = 1;
-        }
-    }
-}
-
 // 1.13c D2Client+0x9F830
 // st = bb214 state, unitSel = bbfc? (DAT_6fbcbbfc, unit; id at +0xC), dlgOut = bb224, flag210 = bb210,
 // v21c/v220 = bb21c/bb220. Returns 1 when it opened the dialog.
@@ -93,13 +71,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9f9e0(int32_t* st, void* unitSel6
     if (*dlg) { env->free_dialog(); *dlg = nullptr; }
     env->reset_72790(0xe, 1, 0);
     *bcc2fc = 0;
-}
-
-// 1.13c D2Client+0x9FA90
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9fa90(int32_t* st, void** h0, void** h1, void (*close9f9e0)(void), const D2C9f750Env* env) {
-    if (*st != 0) close9f9e0();
-    void** hs[2] = {h0, h1};
-    for (void** h : hs) if (*h) { env->free_handle(*h); env->free_10043(0x7a, 0); *h = nullptr; }
 }
 
 // 1.13c D2Client+0x9FE50

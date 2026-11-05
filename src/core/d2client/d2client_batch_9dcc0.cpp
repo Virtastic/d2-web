@@ -77,10 +77,6 @@ static void sendFlag(const D2c9dEnv* e, const void* unit, uint32_t a, uint32_t b
 }
 // 1.13c D2Client+0x9DE90
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9de90(const D2c9dEnv* e, const void* unit, uint32_t a, uint32_t bx) { sendFlag(e, unit, a, bx, 3, 4); }
-// 1.13c D2Client+0x9DF30
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9df30(const D2c9dEnv* e, const void* unit, uint32_t a, uint32_t bx) { sendFlag(e, unit, a, bx, 2, 2); }
-// 1.13c D2Client+0x9DFD0
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9dfd0(const D2c9dEnv* e, const void* unit, uint32_t a, uint32_t bx) { sendFlag(e, unit, a, bx, 1, 1); }
 
 // 1.13c D2Client+0x9E520
 extern "C" EMSCRIPTEN_KEEPALIVE intptr_t d2_client_9e520(const D2c9dEnv* e, const uint8_t* unit, uint32_t a, uint32_t esi) {
@@ -209,25 +205,3 @@ extern "C" EMSCRIPTEN_KEEPALIVE bool d2_client_9e690(const D2c9eEnv* e, const ui
     return !fail;
 }
 
-// ---- 9EDD0: palette-ish 4-byte colour state ----
-struct D2c9eColor { uint8_t c0, c1, c2, c3; };  // DAT_6fbbb234/5/6/7
-struct D2c9eColEnv {
-    void*    root;                                  // DAT_6fbcbbfc
-    uint32_t arg;                                   // DAT_6fbcc3b8
-    void     (*ord10189)(uint32_t arg, uint8_t* a, uint8_t* b, uint8_t* c);
-    uint8_t  (*ord10731)(uint32_t arg);
-    uint32_t (*ord10331)(void* root);
-    void     (*ord10636)(uint32_t v, uint8_t* a, uint8_t* b, uint8_t* c, uint8_t* d);
-};
-// 1.13c D2Client+0x9EDD0
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9edd0(const D2c9eColEnv* e, D2c9eColor* c) {
-    e->ord10189(e->arg, &c->c0, &c->c1, &c->c3);
-    c->c2 = e->ord10731(e->arg);
-    if (!e->root) return;
-    uint32_t v = e->ord10331(e->root);
-    if (!v) return;
-    uint8_t t[4];
-    e->ord10636(v, t + 3, t, t + 2, t + 1);
-    uint8_t lo = (uint8_t)v, b1 = (uint8_t)(v >> 8), b2 = (uint8_t)(v >> 16);
-    if (lo || b2 || b1) { c->c2 = (uint8_t)(v >> 24); c->c0 = b1; c->c1 = b2; c->c3 = lo; }
-}

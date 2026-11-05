@@ -15,7 +15,7 @@ const PLAYER_CLASS = Object.freeze([
   { token: 'BA', name: 'Barbarian' }, { token: 'DZ', name: 'Druid' },
   { token: 'AI', name: 'Assassin' },
 ]);
-const START_BASE = Object.freeze({ 0: 'LIT', 1: 'LIT', 2: 'LIT', 3: 'LIT', 4: 'LIT', 8: 'LIT', 9: 'LIT' });
+const START_BASE = Object.freeze({ 0: 'LIT', 1: 'LIT', 2: 'LIT', 3: 'LIT', 4: 'LIT', 7: 'LIT', 8: 'LIT', 9: 'LIT' });
 const MODE = Object.freeze(['DT', 'NU', 'WL', 'RN', 'GH', 'TN', 'TW', 'A1', 'A2', 'BL', 'SC', 'TH', 'KK', 'S1', 'S2', 'S3', 'S4', 'DD']);
 const PALETTE = ['ACT1', 'ACT2', 'ACT3', 'ACT4', 'ACT5'];
 const PLAYER_DECODE_CACHE_ENTRIES = 128;
@@ -42,9 +42,9 @@ export function playerDrawnEvidence(layers, source, directions, components, fram
   return layers.map((layer) => {
     const componentId = layer.componentId ?? COMPONENT.indexOf(layer.component), dcc = components.get(componentId);
     return { ...layer, componentId, source: source[componentId] || null,
-      direction: directions.get(componentId), directions: dcc?.directions,
-      frame: Math.min(frame, (dcc?.framesPerDirection ?? 1) - 1),
-      framesPerDirection: dcc?.framesPerDirection };
+      direction: directions.get(componentId) ?? layer.blankDirection, directions: dcc?.directions ?? (layer.blank ? 16 : undefined),
+      frame: Math.min(frame, (dcc?.framesPerDirection ?? layer.blankFrames ?? 1) - 1),
+      framesPerDirection: dcc?.framesPerDirection ?? layer.blankFrames };
   });
 }
 
@@ -187,7 +187,10 @@ export function loadPlayerAnimation(read, playerClass, mode, { headOnly = false,
     const component = COMPONENT[layer.component], base = composition?.components?.[layer.component] || START_BASE[layer.component];
     if (!component || !base) continue;
     const path = `data\\global\\CHARS\\${player.token}\\${component}\\${player.token}${component}${base}${token}${layer.weaponClass.toUpperCase()}.DCC`;
-    const bytes = read(path);
+    // The default shield layer has no DCC in the archives, yet the retail draw list still carries its record: a
+    // blank layer keeps the identity and draws no pixels.
+    let bytes; try { bytes = read(path); } catch (error) { if (composition?.source?.[layer.component] || layer.component !== 7) throw error; bytes = null; }
+    if (!bytes) { drawn.push({ component, componentId: layer.component, variant: base.toLowerCase(), source: null, path: path.toLowerCase(), blank: true, blankFrames: cof.framesPerDirection, blankDirection: direction64 == null ? 0 : dccDirection(direction64, 16) }); continue; }
     // D2CMP's direction lookup is keyed by this DCC's header count. Most player
     // layers have 16 directions, but a small set of Paladin RH axe layers have 8.
     const layerDirection = direction64 == null ? null : dccDirection(direction64, bytes[2]);

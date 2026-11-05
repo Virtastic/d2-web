@@ -1743,9 +1743,9 @@ __forceinline void __fastcall UNITS_UpdateRunWalkAnimRateAndVelocity(D2UnitStrc*
 // functions. 1.13c deltas: no trace on a null unit, bad type or null path; cast, block, get-hit, attack and the stat-rate
 // "other" path divide the rate product unsigned (a negative product saturates to 0x7FFF); the holy-shield test guards the
 // raw unit type and the states.txt count inline; pAnimData is read as SetAnimData left it.
-void __stdcall UNITS_UpdateAnimRateAndVelocity(D2UnitStrc* pUnit, const char* szFile, int nLine)
+// The callee table of UNITS_UpdateAnimRateAndVelocity; the client rate update copies it with its own seams.
+const D2Common33110Env& UNITS_AnimRateEnv()
 {
-	(void)szFile; (void)nLine;
 	static const D2Common33110Env kEnv = {
 		[](D2UnitStrc* u, int* t, int* c, int* m) { D2COMMON_11013_ConvertMode(u, t, c, m, __FILE__, __LINE__); },
 		[](D2UnitStrc* u, int t, int c, int m) { UNITS_SetAnimData(u, t, c, m); },
@@ -1770,7 +1770,13 @@ void __stdcall UNITS_UpdateAnimRateAndVelocity(D2UnitStrc* pUnit, const char* sz
 		[](D2UnitStrc* u) -> int { return D2Common_11043(u); },
 		[](int t, int m, int c) -> int { return UNITS_AnimModeAllowsAnimSpeed(t, m, c); },
 	};
-	D2Common_33110_UpdateAnimRate(pUnit, kEnv);
+	return kEnv;
+}
+
+void __stdcall UNITS_UpdateAnimRateAndVelocity(D2UnitStrc* pUnit, const char* szFile, int nLine)
+{
+	(void)szFile; (void)nLine;
+	D2Common_33110_UpdateAnimRate(pUnit, UNITS_AnimRateEnv());
 }
 
 // 1.13c D2Common+0x30B40

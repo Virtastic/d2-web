@@ -31,3 +31,4 @@ struct D2Common33110Env {
 };
 
 void D2Common_33110_UpdateAnimRate(D2UnitStrc* pUnit, const D2Common33110Env& x);
+const D2Common33110Env& UNITS_AnimRateEnv();   // the retail callee table (Units.cpp)
