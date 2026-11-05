@@ -71,7 +71,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_a7d50(uintptr_t unit, const D2ClientBatchA7D
     }
 }
 
-// 1.13c D2Client+0xA82B0: walk the list, releasing each node's two resources, then clear the head.
+// older port of D2Client+0xA82B0: walk the list, releasing each node's two resources, then clear the head.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_a82b0(const D2ClientBatchA7D50Env* env) {
     uintptr_t n = g_listHead;
@@ -84,7 +84,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_a82b0(const D2ClientBatchA7D50Env* env) {
     g_listHead = 0;
 }
 
-// 1.13c D2Client+0xA8310: eax=row, ecx=col; copy one line-cache cell per the current step mode.
+// older port of D2Client+0xA8310: eax=row, ecx=col; copy one line-cache cell per the current step mode.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_a8310(int32_t row, int32_t col) {
     int32_t d = row * 0x40 + col, a, b, i;
@@ -116,7 +116,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_a8310(int32_t row, int32_t col) {
     }
 }
 
-// 1.13c D2Client+0xA8470: eax=obj, edx=x, stack=y; pick step mode from the delta to obj+0x10/+0x14.
+// older port of D2Client+0xA8470: eax=obj, edx=x, stack=y; pick step mode from the delta to obj+0x10/+0x14.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_a8470(uintptr_t obj, int32_t x, int32_t y) {
     int32_t dx = rd32(obj, 0x10) - x, dy = rd32(obj, 0x14) - y;
@@ -129,7 +129,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_a8470(uintptr_t obj, int32_t x, int32_t y) {
     g_mode = 3; g_frac = (dx << 8) / dy;
 }
 
-// 1.13c D2Client+0xA8560: fill cells rows [r0..r1] x cols [c0..c1] with {0, colour}.
+// older port of D2Client+0xA8560: fill cells rows [r0..r1] x cols [c0..c1] with {0, colour}.
 // eax=r1, ecx=r0, edx=colour, stack=c0, edi=c1.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_a8560(int32_t r1, int32_t r0, uint32_t colour, int32_t c0, int32_t c1) {
@@ -141,7 +141,7 @@ EMSCRIPTEN_KEEPALIVE void d2_client_a8560(int32_t r1, int32_t r0, uint32_t colou
         }
 }
 
-// 1.13c D2Client+0xA85F0: eax=obj; null or type-2 obj is fatal.
+// older port of D2Client+0xA85F0: eax=obj; null or type-2 obj is fatal.
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_client_a85f0(uintptr_t obj, const D2ClientBatchA7D50Env* env) {
     if (obj == 0) { env->fatal(0x18d); return; }

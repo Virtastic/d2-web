@@ -12,7 +12,7 @@ static inline uint32_t rd32(uint32_t a) { return *(const uint32_t*)(uintptr_t)a;
 static inline void wr32(uint32_t a, uint32_t v) { *(uint32_t*)(uintptr_t)a = v; }
 static inline int16_t rd16(uint32_t a) { return *(const int16_t*)(uintptr_t)a; }
 
-// 1.13c D2Client+0x77DA0 (56 B): clear every state==1 slot of the table at 0x6FBC3D38.
+// old form of D2Client 77DA0 (now d2client_77da0.cpp) (56 B): clear every state==1 slot of the table at 0x6FBC3D38.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_77da0(uint32_t unit_bbfc, int32_t* tab_3d38, int (*ord11120)(uint32_t)) {
     if (!unit_bbfc) return;

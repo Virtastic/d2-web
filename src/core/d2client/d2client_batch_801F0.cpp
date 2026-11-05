@@ -74,7 +74,7 @@ P sub_81C30(Ops2& o,P a,P ebx){
  }
  return r;
 }
-// 1.13c D2Client+0x81CB0
+// old form of D2Client 81CB0 (now d2client_81cb0.cpp)
 U sub_81CB0(Ops2& o,P g6fbcbbfc){
  if(o.o10195()) return 1;
  return (g6fbcbbfc&&o.o10494(g6fbcbbfc,0x36))?1:0;
@@ -88,7 +88,7 @@ void sub_81CE0(Ops2& o,P in,const void* lab81a90){
   P h=o.o11013(0,2,0xc,b,a); o.o10785(h,0x36); o.o10911(h,lab81a90);
  } else o.o10785(r,0x36);
 }
-// 1.13c D2Client+0x81D30 (EAX = mode, ESI = unit)
+// old form of D2Client 81D30 (now d2client_81d30.cpp) (EAX = mode, ESI = unit)
 void sub_81D30(Ops2& o,I mode,P unit,I p2){
  if(mode==2){ o.o11090();
   if(unit){ U f=rd(unit,0xc4); wr(unit,0xc4,p2?(f|2):(f&~2u)); } }

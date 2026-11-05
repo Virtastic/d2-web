@@ -22,7 +22,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_6dca0(i32 p1, i32* p4, u32* p5, i32* p6, i32* p7, 
     *p4 = ord10020(*p5, p8);
 }
 
-// 1.13c D2Client+0x72080  (esi = unit)
+// old form of D2Client 72080 (now d2client_72080.cpp)  (esi = unit)
 EMSCRIPTEN_KEEPALIVE i32 d2c_72080(i32 unit, i32 (*ord10787)(), i32 g_bbfc, i32 g_97f8, i32 g_985c) {
     i32 r = ord10787();
     if (r == 0) {

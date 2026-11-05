@@ -81,7 +81,7 @@ void d2_client_74ED0(uint32_t this_ecx, int32_t eax, uint32_t p1, int32_t g_bcb9
     o10150();
 }
 
-// 1.13c D2Client+0x74F90 (54 B): walk the list at global 6fbcbfd8 via next@+0xcd, string 0x108 each; then clear head.
+// old form of D2Client 74F90 (now d2client_74f90.cpp) (54 B): walk the list at global 6fbcbfd8 via next@+0xcd, string 0x108 each; then clear head.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_74F90(uint32_t* head_bcbfd8, void (*o10043)(int, int)) {
     uint32_t n = *head_bcbfd8;

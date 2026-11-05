@@ -322,7 +322,7 @@ void sub_7DC00(uint8_t* unit) {
     if ((uint8_t)e.fn2b4f0(t)) { t[0xff] = 0; e.fn2ca40((int32_t)arg, unit, t); }
 }
 
-// 1.13c D2Client+0x7DE00
+// old form of D2Client 7DE00 (now d2client_7de00.cpp)
 void sub_7DE00() {
     if (!g.v3ae8) return;
     uint32_t tag = rd32(g.v3ae8, 0x80);

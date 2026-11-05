@@ -9,7 +9,7 @@ static inline uint32_t R32(uintptr_t p) { return *(const uint32_t*)p; }
 static inline void W32(uintptr_t p, uint32_t v) { *(uint32_t*)p = v; }
 typedef void (*FatalFn)(uint32_t msg);
 
-// 1.13c D2Client+0xA8950 (219 B): ECX unused, param_2 = light record. tbl = DAT_6fbb0de8 (int32,
+// older port of D2Client+0xA8950 (219 B): ECX unused, param_2 = light record. tbl = DAT_6fbb0de8 (int32,
 // row stride 0x41), ox/oy = DAT_6fbb4df0/4, flags = DAT_6fbb5208 (stride 8 bytes, 0x30x0x30 grid).
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_a8950(uintptr_t rec, int32_t* tbl, int32_t ox, int32_t oy, const uint8_t* flags) {
@@ -32,7 +32,7 @@ void d2_client_a8950(uintptr_t rec, int32_t* tbl, int32_t ox, int32_t oy, const 
     }
 }
 
-// 1.13c D2Client+0xA8A40 (283 B): EAX = x, ECX = y (pixels), then a,r,g,b. cells = DAT_6fbb520c
+// older port of D2Client+0xA8A40 (283 B): EAX = x, ECX = y (pixels), then a,r,g,b. cells = DAT_6fbb520c
 // (stride 8: light, r, g, b), curve = DAT_6fbb4e00 (int32[256]), tint = DAT_6fb8e830.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_a8a40(int32_t x, int32_t y, int32_t a, uint8_t r, uint8_t g, uint8_t b,

@@ -39,7 +39,7 @@ void d2_client_717b0(int32_t b9a4, void (*ord10184)(void), void (*ord10003)(void
     ord10028(); ord10150(x, 0, 0); ord10184();
 }
 
-// 1.13c D2Client+0x72040
+// old form of D2Client 72040 (now d2client_72040.cpp)
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_72040(uint32_t p1, uint32_t p2, uint32_t (*ord10871)(uint32_t, uint32_t),
                      uint32_t (*ord10680)(uint32_t, int, int), void (*ord10069)(uint32_t, uint32_t, uint32_t)) {
