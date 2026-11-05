@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstddef>
 #define W __attribute__((weak))
+char* Storm_Sub3BB00_z14(char*, char, int);
 extern "C" {
 // D2Win
 W uint8_t d2win_g_cptab[512], d2win_g_cpbits[4], d2win_g_mbctype[0x101], d2win_g_mbf[3 * 4];
@@ -37,7 +38,12 @@ W uint16_t* ustrcat(uint16_t* d, const uint16_t* s) { ustrcpy(d + ustrlen(d), s)
 W uint16_t* ustrncat(uint16_t* d, const uint16_t* s, int32_t n) { uint16_t* e = d + ustrlen(d); while (n-- > 0 && *s) *e++ = *s++; *e = 0; return d; }
 W void utoUnicode(uint16_t* d, const char* s, int32_t n) { while (n-- > 0 && *s) *d++ = (uint8_t)*s++; *d = 0; }
 W void uwin2Unicode(uint16_t* d, const char* s, int32_t n) { while (n-- > 0 && *s) *d++ = (uint8_t)*s++; *d = 0; }
-W char* Ordinal_571(const char* s, int32_t c) { if (!s) return 0; for (;; s++) { if (*s == (char)c) return (char*)s; if (!*s) return 0; } }
+W char* Ordinal_571(const char* s, int32_t c) { return ::Storm_Sub3BB00_z14((char*)s, (char)c, 0); }
+W void Ordinal_10097(void) {}
+W int32_t Ordinal_10098(const void*) { return 0; }
+W intptr_t Ordinal_10020(intptr_t) { return 0; }
+W void d2_multi_exit(int32_t) {}
+W uint8_t DAT_6f9ea2a0[0x100];
 W int32_t Storm_Ordinal_506(const void* s) { const char* p = (const char*)s; int32_t n = 0; while (p && p[n]) n++; return n; }
 W uint8_t DAT_6ff76690[0x100], DAT_6ff768ec[0x100];
 // Fog/Storm ordinal imports no merged row defines yet (link fix); signatures match the importers.
