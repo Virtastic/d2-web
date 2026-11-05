@@ -52,31 +52,45 @@ void sub_7C0E0(void* unit) {
 // 1.13c D2Common+0x28D70 = ITEMS_SerializeItem(pItem=ecx, pBuffer=edx, bServer=p3, bSaveItemInv=p4,
 // bGamble=p5); all five are retail arguments. The entry-stack slot the decompile calls unaff_retaddr is p5.
 // The register reads sub_222B0 takes the unit in EAX; sub_25C10 takes the buffer in EBX (see the spec).
-void sub_28D70(void* p1, uint32_t p2, int p3, int p4, int p5) {
+// The six callees are a seam (D2Common_28D70With) so the FN probe can log retail's call records; sub_28D70 binds them.
+struct D2Common28D70Env {
+    uint8_t (*flag222B0)(void* unit);                                 // 0x222B0: EAX unit
+    void (*write10128)(uint32_t buf, uint32_t value, uint32_t bits); // Fog 10128 (thunk 0x92C4), stdcall 3
+    void (*full27180)(void* unit, uint32_t buf, int server, int gamble); // 0x27180, stdcall 4
+    void (*compact25C10)(void* unit, uint32_t buf, int server);     // 0x25C10: EBX buffer, stack (unit, server)
+    void (*child10131)(uint32_t buf);                                // Fog 10131 (thunk 0x92B8), stdcall 1
+    void (*close10127)(uint32_t buf);                                // Fog 10127 (thunk 0x92D0), stdcall 1
+};
+extern "C" void D2Common_28D70With(void* p1, uint32_t p2, int p3, int p4, int p5, const D2Common28D70Env* e) {
     uint32_t a = 0;
     if (p1 && I(p1, 0) == 4 && PT(p1, 0x14)) a = U(PT(p1, 0x14), 0x18);
     uint32_t b = (a & 0xfff7ffff) | 0x800000;
-    if (sub_222B0(p1)) b = (a & 0xfff7ffff) | 0xa00000;
+    if (e->flag222B0(p1)) b = (a & 0xfff7ffff) | 0xa00000;
     if (p5) b = (b & 0xffbfffff) | 0x2000000;
     if (p3 == 0) { if (!(b & 0x10)) b &= 0xfffff7ff; }
-    else q_d2common_batch_b63_Ordinal_10128(p2, 0x4d4a, 0x10);
-    q_d2common_batch_b63_Ordinal_10128(p2, b, 0x20);
-    if (!(b & 0x200000)) sub_27180(p1, p2, p3, p5); else sub_25C10(p1, p2, p3);
+    else e->write10128(p2, 0x4d4a, 0x10);
+    e->write10128(p2, b, 0x20);
+    if (!(b & 0x200000)) e->full27180(p1, p2, p3, p5); else e->compact25C10(p1, p2, p3);
     // Inventory walk: only for a non-gamble save with bSaveItemInv set.
     if (p5 == 0 && p4 != 0) {
         void* q = PT(p1, 0x60);
         if (q && I(q, 0) == 0x1020304 && (q = PT(q, 0xc))) {
             for (;;) {
                 int t = I(q, 0);
-                Ordinal_10131(p2);
-                sub_28D70((t != 4) ? nullptr : q, p2, p3, p4, 0);
+                e->child10131(p2);
+                D2Common_28D70With((t != 4) ? nullptr : q, p2, p3, p4, 0, e);
                 if (I(q, 0) != 4) break;
                 int s = I(q, 0x14);
                 if (s == 0 || s == -0x5c || !(q = PT((P)(intptr_t)s, 100))) break;
             }
         }
     }
-    Ordinal_10127(p2);
+    e->close10127(p2);
+}
+static void w10128(uint32_t b, uint32_t v, uint32_t n) { q_d2common_batch_b63_Ordinal_10128(b, v, n); }
+void sub_28D70(void* p1, uint32_t p2, int p3, int p4, int p5) {
+    static const D2Common28D70Env env = { sub_222B0, w10128, sub_27180, sub_25C10, Ordinal_10131, Ordinal_10127 };
+    D2Common_28D70With(p1, p2, p3, p4, p5, &env);
 }
 
 // 0x44950 on blobs: add an orth node (room, dir) to owner's list head unless present.

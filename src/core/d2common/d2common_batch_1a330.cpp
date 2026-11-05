@@ -54,63 +54,68 @@ uint32_t D2Common_1A330_MonsterChainPair(const void* pUnit, uint32_t* pOutChain,
 // stat total of record 0x49 (+0x5B20, only if the stat list +0x5C exists and count >= 0x49), or
 // (b) 0x24F00 holds and the quantity-record 0x47 total (+0x5898, count >= 0x47) is below
 // 0x260F0(item), or (c) 0x24FF0 succeeds with its out value 0. Flagged items add
-// 0x28E80(item, nArg4, pArg5, nArg3, 3) and call pfn(pUnit). Callees are env-supplied (separate rows).
+// 0x28E80(EAX unit; item, nArg4, pArg5, nArg3, 3) and call pfn as fastcall (ECX nArg1, EDX item; unit), ret 0x18.
+// The stat calls take EBX = the item's stat list (+0x5C) and EDI = the stat id << 16 (0x48 / 0x46). The record addresses
+// are 32-bit sums, so a base of -0x5B20 reads as "no record". Callees are env-supplied (separate rows).
 struct D2Common2A210Env {
-    uint8_t* (*getTable)();                                // 0x1E1B0(&DAT_6fded378)
-    int32_t  (*statTotal)(const uint8_t* pRecord);         // 0x38A80
-    int32_t  (*isUsable)(uint8_t* pItem);                  // 0x27090
-    int32_t  (*hasDurability)(uint8_t* pItem);             // 0x26D40
-    int32_t  (*baseDurability)(uint8_t* pItem);            // 0x38FF0
-    int32_t  (*isQuantityItem)(uint8_t* pItem);            // 0x24F00
-    int32_t  (*maxQuantity)(uint8_t* pItem);               // 0x260F0
-    int32_t  (*checkStatus)(uint8_t* pItem, int32_t* pOut);// 0x24FF0
-    int32_t  (*cost)(uint8_t* pItem, int32_t a4, uint32_t* a5, int32_t a3, int32_t mode); // 0x28E80
+    uint32_t (*getTable)();                                // 0x1E1B0(EAX 0; &DAT_6fded378)
+    int32_t  (*statTotal)(uint32_t statList, uint32_t statId, uint32_t rec);   // 0x38A80(EBX list, EDI id; rec)
+    int32_t  (*isUsable)(uint32_t item);                   // 0x27090
+    int32_t  (*hasDurability)(uint32_t item);              // 0x26D40
+    int32_t  (*baseDurability)(uint32_t item);             // 0x38FF0
+    int32_t  (*isQuantityItem)(uint32_t item);             // 0x24F00 (ESI item)
+    int32_t  (*maxQuantity)(uint32_t item);                // 0x260F0
+    int32_t  (*checkStatus)(uint32_t item, int32_t* pOut); // 0x24FF0
+    int32_t  (*cost)(uint32_t unit, uint32_t item, int32_t a4, uint32_t a5, int32_t a3, int32_t mode); // 0x28E80 (EAX unit)
 };
-extern "C" int32_t D2Common_2A210_InventoryRepairCount(const D2Common2A210Env* e, void* pUnit, int32_t nArg3,
-    int32_t nArg4, uint32_t* pArg5, void (*pfn)(void*))
+static uint32_t rd2A210(uint32_t a) { return *reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(a)); }
+extern "C" int32_t D2Common_2A210_InventoryRepairCount(const D2Common2A210Env* e, uint32_t nArg1, uint32_t pUnit, int32_t nArg3,
+    int32_t nArg4, uint32_t pArg5, void (*pfn)(uint32_t nArg1, uint32_t pItem, uint32_t pUnit))
 {
-    if (pUnit == nullptr)
+    if (pUnit == 0)
         return 0;
-    const int32_t* pInv = *reinterpret_cast<const int32_t* const*>(static_cast<uint8_t*>(pUnit) + 0x60);
-    if (pInv == nullptr)
+    const uint32_t pInv = rd2A210(pUnit + 0x60);
+    if (pInv == 0)
         return 0;
-    const uint8_t* t = reinterpret_cast<const uint8_t*>(sgptDataTables);
-    const int32_t nCount = *reinterpret_cast<const int32_t*>(t + 0xBD4);
-    const uint8_t* pBase = reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(*reinterpret_cast<const uint32_t*>(t + 0xBCC)));
+    const uint32_t t = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(sgptDataTables));
     int32_t nSum = 0;
-    for (int32_t nSlot = 0; nSlot < 0x34; nSlot += 4)
+    for (uint32_t nSlot = 0; nSlot < 0x34; nSlot += 4)
     {
-        if (pInv[0] != 0x1020304)
+        if (rd2A210(pInv) != 0x1020304)
             continue;
-        const uint8_t* pTbl = e->getTable();
+        const uint32_t pTbl = e->getTable();
         if (!pTbl)
             continue;
-        uint8_t* pItem = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(
-            *reinterpret_cast<const uint32_t*>(*reinterpret_cast<const uint8_t* const*>(pTbl + 0xC) + nSlot)));
+        const uint32_t pItem = rd2A210(rd2A210(pTbl + 0xC) + nSlot);
         if (!pItem)
             continue;
-        const bool bStats = *reinterpret_cast<const uint32_t*>(pItem + 0x5C) != 0;
         bool bFlag = false;
         if (e->isUsable(pItem) && e->hasDurability(pItem))
         {
             const int32_t nBase = e->baseDurability(pItem);
-            const int32_t nCur = (bStats && nCount >= 0x49 && pBase + 0x5B20) ? e->statTotal(pBase + 0x5B20) : 0;
+            const uint32_t pList = rd2A210(pItem + 0x5C);
+            int32_t nCur = 0;
+            if (pList && static_cast<int32_t>(rd2A210(t + 0xBD4)) > 0x48 && rd2A210(t + 0xBCC) + 0x5B20 != 0)
+                nCur = e->statTotal(pList, 0x480000, rd2A210(t + 0xBCC) + 0x5B20);
             if (nBase != 0 && nCur != nBase)
                 bFlag = true;
         }
         if (e->isQuantityItem(pItem))
         {
             const int32_t nMax = e->maxQuantity(pItem);
-            const int32_t nCur = (bStats && nCount >= 0x47 && pBase + 0x5898) ? e->statTotal(pBase + 0x5898) : 0;
+            const uint32_t pList = rd2A210(pItem + 0x5C);
+            int32_t nCur = 0;
+            if (pList && static_cast<int32_t>(rd2A210(t + 0xBD4)) > 0x46 && rd2A210(t + 0xBCC) + 0x5898 != 0)
+                nCur = e->statTotal(pList, 0x460000, rd2A210(t + 0xBCC) + 0x5898);
             if (nCur < nMax)
                 bFlag = true;
         }
         int32_t nOut = 0;
         if ((e->checkStatus(pItem, &nOut) != 0 && nOut == 0) || bFlag)
         {
-            nSum += e->cost(pItem, nArg4, pArg5, nArg3, 3);
+            nSum += e->cost(pUnit, pItem, nArg4, pArg5, nArg3, 3);
             if (pfn)
-                pfn(pUnit);
+                pfn(nArg1, pItem, pUnit);
         }
     }
     return nSum;

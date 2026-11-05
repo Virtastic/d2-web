@@ -1,5 +1,5 @@
 // 1.13c D2Common Stage A implementation batch (RE-DONE alpha lane): rows 0x82030, 0x4FA30, 0x32330,
-// 0x23400, 0x34450, 0x3AC50, 0x21DA0.
+// 0x23400, 0x34450, 0x21DA0.
 // Bodies follow the cached 1.13c decompiles (build-wasm/ghidra-d2common/decomp/0x<RVA>.c). Callees that
 // still own an UNMAPPED row are env-seam function pointers (null seam contributes the function's neutral
 // value). Retail's fatal paths (Fog error + _exit) are modelled as returns, as in the other batch files.
@@ -171,23 +171,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_34450_ToggleStatListState(D2UnitSt
 		*pWord &= gdwInvBitMasks[nStateId & 0x1F];
 
 	UNITROOM_RefreshUnit(pUnit);
-}
-
-// 1.13c D2Common+0x3ac50 (#11040): clear bit 8 of the unit's stat-list dwFlags (+0x10). If the list is
-// still extended (bit 31), allocate a 0x80-byte block (0x37F40) and hand it to 0x3A650. A null unit or
-// stat list, or a non-extended list, does nothing; a failed allocation is ignored.
-extern "C" EMSCRIPTEN_KEEPALIVE void D2Common_3AC50_ClearStatListFlag(D2UnitStrc* pUnit) {  // 1.13c D2Common+0x3AC50 (#11040)
-	if (pUnit == nullptr || pUnit->pStatListEx == nullptr)
-		return;
-
-	D2StatListExStrc* pStatList = pUnit->pStatListEx;
-	pStatList->dwFlags &= 0xFFFFFEFFu;
-
-	if (static_cast<int32_t>(pStatList->dwFlags) >= 0 || g_d2common_fn_37F40 == nullptr)
-		return;
-	const uint32_t pBlock = g_d2common_fn_37F40(0x80);
-	if (pBlock != 0)
-		D2Common_3A650_DropListEntries(pBlock);
 }
 
 // 1.13c D2Common+0x21DA0 (#11041): class-skill id at nPosition in the unit's class skill list, i.e.

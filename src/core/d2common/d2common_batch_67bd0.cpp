@@ -121,63 +121,7 @@ EMSCRIPTEN_KEEPALIVE void* D2Common_12330_FindNearestUnit(D2UnitStrc* pUnit, int
 	return pBest;
 }
 
-// 1.13c D2Common+0x2E3E0 (#10316) seeds the 0x48C-byte DRLG level record: zeroed, the parent seed
-// at +0x00 and its LCG state at +0x04, the caller's parameters, and the per-difficulty seed draws
-// (difficulty 1 draws two distinct 0..6 values into +0x94/+0x484 and re-stores the LCG state;
-// difficulty 2 draws once into the state and keeps bit 0 at +0x474).
-// partial: the 0x2D4E0/0x7B8D0 initialize calls, the per-difficulty generators (0x17930..0x17AE0),
-// the optional level allocation through 0x2D9B0/0x2D9B0 and the +0x478 parent write (a register
-// argument the decompiler loses) are not translated.
-extern "C"
-EMSCRIPTEN_KEEPALIVE void* d2_fn_d2common_2e3e0(const uint8_t* pDrlg, uint8_t nDifficulty,
-	uint32_t nParam3, uint32_t nParam4, uint8_t nParam5, uint32_t nParam6, uint32_t nParam7)
-{
-	uint8_t* pLevel = (uint8_t*)D2_CALLOC(0x48C);
-
-	const uint32_t nSeed = pDrlg ? *(const uint32_t*)(pDrlg + 0x5C) : 0;
-	const uint64_t nState = (uint64_t)nSeed * 0x6AC690C5ull + 0x29Aull;
-
-	*(uint32_t*)(pLevel + 0x8C) = nParam3;
-	*(uint32_t*)(pLevel + 0x9C) = nParam4;
-	*(uint8_t*)(pLevel + 0x450) = nParam5;
-	*(uint32_t*)(pLevel + 0x454) = nParam6;
-	*(uint32_t*)(pLevel + 0x458) = nSeed;
-	*(uint32_t*)(pLevel + 0x464) = nDifficulty;
-	// retail writes the 0x29A dword at +4 before the state word (the state word below overwrites it)
-	*(uint32_t*)(pLevel + 0x004) = 0x29A;
-	*(uint64_t*)(pLevel + 0x000) = nState;
-	*(char*)(pLevel + 0x480) = (char)nDifficulty;
-	*(uint32_t*)(pLevel + 0x46C) = (uint32_t)(uintptr_t)pDrlg;
-	*(uint32_t*)(pLevel + 0x470) = (uint32_t)nState;
-	*(uint32_t*)(pLevel + 0x488) = nParam7;
-
-	if (nDifficulty == 1)
-	{
-		uint64_t nDraw;
-		int32_t nFirst;
-		int32_t nSecond;
-
-		do
-		{
-			nDraw = (nState & 0xFFFFFFFFull) * 0x6AC690C5ull + (nState >> 32);
-			nFirst = (int32_t)((nDraw & 0xFFFFFFFFull) % 7);
-			nDraw = (nDraw & 0xFFFFFFFFull) * 0x6AC690C5ull + (nDraw >> 32);
-			nSecond = (int32_t)((nDraw & 0xFFFFFFFFull) % 7);
-		} while (nFirst == nSecond);
-
-		*(uint32_t*)(pLevel + 0x94) = nFirst + 0x42;
-		*(uint64_t*)(pLevel + 0x000) = nDraw;
-		*(uint32_t*)(pLevel + 0x484) = nSecond + 0x42;
-	}
-	else if (nDifficulty == 2)
-	{
-		const uint64_t nDraw = (nState & 0xFFFFFFFFull) * 0x6AC690C5ull + (nState >> 32);
-		*(uint64_t*)(pLevel + 0x000) = nDraw;
-		*(uint32_t*)(pLevel + 0x474) = (uint32_t)nDraw & 1;
-	}
-
-	return pLevel;
-}
+// 1.13c D2Common+0x2E3E0 (#10316) moved to d2common_2e3e0.cpp (the whole body, with callee seams).
 
 // 1.13c D2Common+0x22F50 (#10321) items.txt wMissileType (+0xFA) of an item unit; any other unit
 // type answers 0xFFFFFFFF. A missing items row is fatal in retail; we answer 0xFFFFFFFF.

@@ -22,8 +22,10 @@ inline uint32_t R32(const void* p, uint32_t off)
 inline const void* P(uint32_t addr) { return reinterpret_cast<const void*>(static_cast<uintptr_t>(addr)); }
 }
 
-// 1.13c D2Common+0x41230: cdecl, one argument (the level).
-extern "C" void D2Common_41230(void* level)
+// 1.13c D2Common+0x41230: stdcall (ret 4), one argument (the level). The stamp is 0x42A70 (ECX level, EDX x,
+// stack y, tile, -1, 0); D2Common_41230With takes it as a seam so a probe can log retail's call records.
+typedef void (*D2Common41230Stamp)(void* ctx, int32_t x0, int32_t y0, int32_t idx, int32_t flag, int32_t extra);
+extern "C" void D2Common_41230With(void* level, D2Common41230Stamp stamp)
 {
     const void* out = P(R32(level, 0x14));                          // level+0x14: pOutdoors
     const int32_t lastX = static_cast<int32_t>(R32(out, 0x5C)) - 2;  // width - 2
@@ -36,10 +38,12 @@ extern "C" void D2Common_41230(void* level)
     while (x != 0 || y != lastY) {
         const int32_t k = static_cast<int32_t>(cells[rows[y] + x]) - (0x371 + snow);
         if (k < 0 || k > 7) return;   // outside the step table: retail reads past it; no capture reaches this
-        D2Common_42A70(level, x, y, k + snow + 0x37D, -1, 0);
+        stamp(level, x, y, k + snow + 0x37D, -1, 0);
         x += kStepDx[k] * 2;
         y += kStepDy[k] * 2;
     }
-    D2Common_42A70(level, lastX, 0, snow + 0x38A, -1, 0);
-    D2Common_42A70(level, 0, lastY, snow + 0x389, -1, 0);
+    stamp(level, lastX, 0, snow + 0x38A, -1, 0);
+    stamp(level, 0, lastY, snow + 0x389, -1, 0);
 }
+
+extern "C" void D2Common_41230(void* level) { D2Common_41230With(level, D2Common_42A70); }

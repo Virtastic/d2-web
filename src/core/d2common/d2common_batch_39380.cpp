@@ -122,12 +122,13 @@ extern "C" uint32_t d2common_1fb50_lookup(int32_t a,int32_t b,const D2Common1FB5
 }
 
 
-struct D2Common21D70Env { int32_t (*place)(uint32_t,uint32_t,int32_t,int32_t,int32_t,int32_t,int32_t); };
-// 1.13c D2Common+0x21D70: place an item in belt slot 0..15.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_21d70(uint32_t inventory,uint32_t item,
- int32_t slot,const D2Common21D70Env* e) {
- if (!inventory || !item || i32(p(item),0)!=4 || slot<0 || slot>=16 || !e || !e->place) return 0;
- return e->place(inventory,item,slot,0,1,0,0);
+// 0x218A0 as retail calls it: EAX inventory, EDI item, stack (page, 0, 1, 0), ret 0x10.
+struct D2Common21D70Env { int32_t (*place)(uint32_t inventory,uint32_t item,int32_t page,int32_t x,int32_t y,int32_t flag); };
+// 1.13c D2Common+0x21D70: EAX inventory, ECX belt page, EDX item; page 0..15 of an item goes to 0x218A0.
+extern "C" int32_t D2Common_21D70_PlaceInPage(uint32_t inventory,uint32_t item,
+ int32_t page,const D2Common21D70Env* e) {
+ if (!inventory || !item || i32(p(item),0)!=4 || page<0 || page>=16) return 0;
+ return e->place(inventory,item,page,0,1,0);
 }
 
 // 1.13c D2Common+0x38160: lower-bound insertion index, -1 for an existing key.

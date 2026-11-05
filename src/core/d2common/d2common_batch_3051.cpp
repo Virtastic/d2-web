@@ -104,10 +104,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_2a600(D2UnitStrc* item,
     return ITEMS_DecodeItemBitstreamComplete(item, buffer, checkHeader, gamble, socketedItems, version);
 }
 
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_2c0c0(D2UnitStrc* item,
-    D2BitBufferStrc* buffer, int32_t checkHeader, uint32_t version) { // 1.13c D2Common+0x2C0C0
-    return ITEMS_DecodeItemBitstreamCompact(item, buffer, checkHeader, version);
-}
 
 
 
