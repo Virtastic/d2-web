@@ -205,7 +205,7 @@ int32_t sub_54280(Svc& s,int32_t* in,int32_t key,std::u16string& out){
  out+=buf; return 1;
 }
 
-// 1.13c D2Client+0x546E0  (eax = base value, param_1 = unit, param_2 = id, edi = skill record)
+// old form of D2Client 546E0 (now d2client_546e0.cpp)  (eax = base value, param_1 = unit, param_2 = id, edi = skill record)
 int32_t sub_546E0(Svc& s,const uint8_t* rec,int32_t base,void* unit,int32_t unitType,int32_t id,
                   const uint8_t* (*lookup)(int32_t idx,int32_t* ok),int32_t* okOut){
  // lookup(): sgptDataTables +0xbcc table (0x144 stride, count +0xbd4); ok=0 => retail returns 0.
@@ -246,7 +246,7 @@ void sub_54880(Svc& s,G& g,int32_t unitArg,std::u16string& out,const G::Row* tbl
  }
 }
 
-// 1.13c D2Client+0x54AC0  (param_1 = unit, param_2 = stat arg, param_3 = skill idx, param_4 = expected, param_5 = skill rec, param_6 = out flag)
+// old form of D2Client 54AC0 (now d2client_54ac0.cpp)  (param_1 = unit, param_2 = stat arg, param_3 = skill idx, param_4 = expected, param_5 = skill rec, param_6 = out flag)
 int32_t sub_54AC0(Svc& s,void* unit,int32_t statArg,int32_t idx,int32_t expect,const uint8_t* rec5,uint32_t* flag,
                   int32_t count,const uint8_t* (*row)(int32_t),
                   int32_t (*calc)(Svc&,void*,int32_t)){

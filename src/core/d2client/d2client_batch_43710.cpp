@@ -54,7 +54,7 @@ void sub_4C7C0(Calls&c,const I*unit,U a1,I a2,I a3,const uint8_t*dt_a78,I dt_a80
  }
 }
 // tooltip line builder (rva 0x55B20) is transcribed in d2client_n86.cpp:sub_55B20.
-// 1.13c D2Client+0x55F10  (EAX = unit/handle; EBX = item context passed to 10871 and 55B20; stack: a1, a2 passed through to 55B20; ret 8)
+// old form of D2Client 55F10 (now d2client_55f10.cpp)  (EAX = unit/handle; EBX = item context passed to 10871 and 55B20; stack: a1, a2 passed through to 55B20; ret 8)
 void sub_55F10(Calls&c,P eax,P ebx,P a1,U a2,const uint8_t*dt_c18,I dt_c1c){
  if(c.ord10106(eax)!=5) return; I q=c.ord10620(eax);
  if(q<0||q>=dt_c1c) return; const uint8_t*rec=dt_c18+q*0x1b8; if(!rec) return;
@@ -62,7 +62,7 @@ void sub_55F10(Calls&c,P eax,P ebx,P a1,U a2,const uint8_t*dt_c18,I dt_c1c){
  for(I i=0;i<6;++i){ P it=c.ord10871(ebx,c.tbl_82e50[i]);
   if(it&&(I)w==c.ord10680(it,0x47,0)){ c.fb05b20(0,ebx,a1,a2,0,c.tbl_82e50[i],0,1); return; } }
 }
-// 1.13c D2Client+0x55FB0  (EAX = esi ctx; EDI = type-4 unit; stack: a1, a2 (ret 8); 55B20 gets (EDI, a1, a2, 0, tbl, 0, 1) with ECX = 0)
+// old form of D2Client 55FB0 (now d2client_55fb0.cpp)  (EAX = esi ctx; EDI = type-4 unit; stack: a1, a2 (ret 8); 55B20 gets (EDI, a1, a2, 0, tbl, 0, 1) with ECX = 0)
 void sub_55FB0(Calls&c,P esi,const I*edi,P a1,U a2,const U*tbl85d20){
  if(!edi||edi[0]!=4||c.ord10106((P)edi)!=5) return; const uint8_t*p=(const uint8_t*)c.ord10218((P)edi); if(!p) return;
  if(p[0x87]==1){

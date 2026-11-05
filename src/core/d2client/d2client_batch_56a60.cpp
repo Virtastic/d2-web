@@ -5,7 +5,7 @@
 #include <cstdint>
 namespace d2client_batch_56a60 {
 
-// 1.13c D2Client+0x56A60
+// old form of D2Client 56A60 (now d2client_56a60.cpp)
 // (fastcall ECX=unit, EDX=idx; stack a4 passed to 11086; ret 4)
 I sub_56A60(Svc& s,Unit* u,I idx,U a4){
  if(!s.row(idx)) return 0;
@@ -24,7 +24,7 @@ I sub_56B20(Svc& s,Unit* u,I idx,U a4){
  if(!(s.o10397(o)&2)) v=r->f138; else { s.o10137(o,0); v=r->f13c; }
  s.o10542(u,s.o10786(u,v,idx,a4)); return 1;
 }
-// 1.13c D2Client+0x56BB0
+// old form of D2Client 56BB0 (now d2client_56bb0.cpp)
 I sub_56BB0(Svc& s,Unit* u){
  if(u) u->flags&=0xfffffff1u;
  I x=s.unitX(u), y=s.unitY(u);
@@ -42,7 +42,7 @@ void sub_56DA0(Svc& s,const uint8_t* p1,Unit* esi,I* w){
  }
  s.o10542r(esi,8); w[0x12]=0x500;
 }
-// 1.13c D2Client+0x56E10  (EAX = row idx, EBX = obj (+4 ent index, +0x2c handle), stack: a1 (passed to 10786), p2; ret 8)
+// old form of D2Client 56E10 (now d2client_56e10.cpp)  (EAX = row idx, EBX = obj (+4 ent index, +0x2c handle), stack: a1 (passed to 10786), p2; ret 8)
 I sub_56E10(Svc& s,const void* a1,I p2,I idx,const I* obj){
  Row* r=s.row(idx); if(!r||!obj) return 0;
  const uint8_t* e=(const uint8_t*)s.ent(obj[1]); if(!e) return 0;
@@ -53,7 +53,7 @@ I sub_56E10(Svc& s,const void* a1,I p2,I idx,const I* obj){
  s.o10441((void*)obj,(I)(((U)e[0x178]<<8)/(U)n)); s.o10558((void*)obj,n); s.o10970((void*)obj,n);
  return 1;
 }
-// 1.13c D2Client+0x56EE0  (fastcall ECX=unit, EDX=idx; stack a4 passed to 10786; ret 4)
+// old form of D2Client 56EE0 (now d2client_56ee0.cpp)  (fastcall ECX=unit, EDX=idx; stack a4 passed to 10786; ret 4)
 I sub_56EE0(Svc& s,Unit* u,I idx,U a4){
  Row* r=s.row(idx); if(!r) return 0;
  I o=s.o10511(u); if(!o) return 0;
