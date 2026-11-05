@@ -1,4 +1,4 @@
-// Link seams for the z14 number/strans batch (callees not yet ported); never reached by the probes.
+// Link seams for the z14 number/strans batch (callees not yet ported). The numeric ones below are reached by the string-to-double probes.
 #include <cstdint>
 uint32_t z14_vtbl36848;
 // Last-error global and the strchr/strrchr pair for the z14 string helpers (their only definition; the probes reset and read it).
@@ -7,17 +7,22 @@ void z14_SetLastError(uint32_t) {}
 char* z14_Sub3B280(char*, char) { return nullptr; }
 char* z14_Sub3B2D0(char*, char) { return nullptr; }
 extern const uint32_t z14_tab35458[2] = {0, 0};
-extern const double z14_d37af8 = 0, z14_d37b10 = 0, z14_d37b08 = 0;
-extern const double z14_tab42918[2] = {0, 0};
+// The string-to-double helpers' constants: 0.0, 0.0 and 2^32 (the unsigned-to-double correction), and the fraction-digit table
+// (21 places x 10 digits). Retail fills that table at start-up from an integer power whose negative exponents divide to 0, so every
+// entry is 0.0.
+extern const double z14_d37af8 = 0, z14_d37b10 = 0, z14_d37b08 = 4294967296.0;
+extern const double z14_tab42918[210] = {};
+// Storm+0x1000: integer power (ECX base, EDX exponent): 32-bit wrapping product; a negative exponent gives 1 / product by integer
+// division, loaded with fild.
 long double z14_Pow(int base, int e) {
-  long double r = 1, b = (long double)base;
-  bool neg = e < 0;
-  unsigned n = neg ? (unsigned)(-(long long)e) : (unsigned)e;
-  while (n) { if (n & 1) r *= b; b *= b; n >>= 1; }
-  return neg ? 1 / r : r;
+  uint32_t n = e < 0 ? 0u - (uint32_t)e : (uint32_t)e, r = 1, b = (uint32_t)base;
+  while (true) { if (n & 1) r *= b; n >>= 1; if (!n) break; b *= b; }
+  if (e >= 0) return (long double)(int32_t)r;
+  return (int32_t)r == 0 ? 0 : (long double)(1 / (int32_t)r);
 }
 int64_t z14_Sub2C908() { return 0; }
-uint32_t z14_Atoi(char*) { return 0; }
+uint32_t Storm_Sub3AD50_z14(const char* s);
+uint32_t z14_Atoi(char* s) { return Storm_Sub3AD50_z14(s); }  // Storm+0x3AD50
 void z14_Strupr(char*) {}
 void z14_Strlwr(char*) {}
 void z14_Sub01120(uint32_t*) {}
