@@ -140,35 +140,6 @@ struct D2C9f750Env2 {
     int   (*ord_10680)(void*, int, int);
 };
 
-// 1.13c D2Client+0xA0660
-// EBX = unit; *state is the quest/state word. Retail only acts while *state == 0.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_a0660(int32_t* state, void* unit, const D2C9f750Env2* e) {
-    if (*state != 0) return;
-    auto pick = [&](int slot) -> void* {
-        void* it = e->item_slot(unit, slot);
-        if (it && (e->ord_11006(it) == 0 || e->ord_11088(it) == 0x26)) it = nullptr;
-        return it;
-    };
-    void* a = pick(4);
-    void* b = pick(5);
-    if (e->ord_10744(a, 0x2d) && e->ord_10744(b, 0x2d)) {
-        void* u = e->ord_10708(-1);
-        if (e->ord_10631(u) == 0) { *state = 5; e->ord_11031(u, 5); e->ord_10708(-1); e->ord_11103(); return; }
-        e->ord_11031(u, 0);
-        e->ord_11103();
-    }
-}
-
-// 1.13c D2Client+0xA0750
-// Register inputs in retail order: ECX=param_1, EDX=param_2, EAX=in_EAX, EBX, ESI, EDI.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_a0750(void* p1, int32_t p2, int32_t eax, int32_t ebx, int32_t esi, int32_t edi, const D2C9f750Env2* e) {
-    int32_t wh[2] = {0, 0};
-    e->size_10561(p1, wh);
-    if (p2 + edi < esi && wh[0] + esi < p2 - edi) return 0;
-    if (ebx <= eax + edi) return 1;
-    return (eax - edi <= wh[1] + ebx) ? 1 : 0;
-}
-
 // 1.13c D2Client+0xA07C0
 // EBX -> a, EDI -> b: (a,b) = (b, -a), then halved together until a^2+b^2 <= 3.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_a07c0(int32_t* a, int32_t* b) {
@@ -183,36 +154,4 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_a0800(int32_t* a, int32_t* b) {
     int32_t x = *a, s = *b * *b + x * x;
     if (s < 4) { *a = x * 4; *b = *b * 4; x = *a; s = *b * *b + x * x; }
     if (s < 0x10) { *a = x * 2; *b = *b << 1; }
-}
-
-// 1.13c D2Client+0xA0880
-// EDI = unit or null. Ordinal_11013(0,4,0,unit?[0]:6,unit?[3]:-1).
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_a0880(const uint32_t* unit, const D2C9f750Env2* e) {
-    int a = unit ? (int)unit[0] : 6, b = unit ? (int)unit[3] : -1;
-    void* p = e->ord_11013(0, 4, 0, a, b);
-    if (p) { e->ord_10807(); e->ord_10188(p, 0x44, 1, 0); e->ord_10819(); }
-}
-
-// 1.13c D2Client+0xA08E0
-// tables = sgptDataTables (native); handlers = ea48 array of callbacks (count ec50); unit = stack word.
-// Skill list: int16 array at *(tables+0x184), count int16 at tables+0x188; skills.txt rows stride 0x3c at
-// *(tables+0xBC), count int32 at +0xC4, row +0x34 int16 = handler index.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_a08e0(void* thisp, uint32_t param1, const uint8_t* tables, uint32_t unit,
-                                                     void (* const* handlers)(uint32_t), int32_t handlerCount, const D2C9f750Env2* e) {
-    if (!e->ord_10276(param1, thisp)) return;
-    auto rd16 = [](const uint8_t* p) { int16_t v; std::memcpy(&v, p, 2); return (int)v; };
-    auto rd32 = [](const uint8_t* p) { int32_t v; std::memcpy(&v, p, 4); return (int)v; };
-    auto rdp = [](const uint8_t* p) { const uint8_t* v; std::memcpy(&v, p, sizeof v); return v; };
-    for (int i = 0; i < rd16(tables + 0x188); ++i) {
-        int sk = rd16(rdp(tables + 0x184) + i * 2);
-        void* has = e->ord_10494(unit, sk);
-        if (!has || sk < 0 || sk >= rd32(tables + 0xC4)) continue;
-        const uint8_t* row = rdp(tables + 0xBC) + sk * 0x3c;
-        int idx = rd16(row + 0x34);
-        if (idx < 0 || idx >= handlerCount || !handlers[idx]) continue;
-        uint32_t arg = 1;
-        void* sd = e->ord_10871(unit, sk);
-        if (sd) { e->ord_10680(sd, 0x15e, 0); arg = (uint32_t)e->ord_10680(sd, 0x15f, 0); }
-        handlers[idx](arg);
-    }
 }

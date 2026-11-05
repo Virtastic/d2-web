@@ -29,7 +29,7 @@ static uint8_t* tblRec(const D2cA0State* s, size_t cntOff, size_t baseOff, int32
     return rd<uint8_t*>(s->dt, baseOff) + (size_t)i * stride;
 }
 
-// 1.13c D2Client+0xA0A30
+// Legacy shim for d2_client_a0e70 (the retail port of 0xA0A30 is d2client_a0a30.cpp).
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_a0a30(const D2cA0Env* e, uint8_t* u) {
     if (!u) return 0;
     if (rd<int32_t>(u, 0) != 0) return 1;
@@ -80,57 +80,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_a0c40(const D2cA0Env* e, const D2
     e->ord(10418, 0, 0, 0);
 }
 
-// 1.13c D2Client+0xA0DB0
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_a0db0(const D2cA0State* s, uint32_t* alt, uint32_t* self,
-                                                     void (*b30f0)(uint32_t*)) {
-    for (int i = 0; i < 64; i++) {
-        if (!alt) {
-            self[7] = s->tabHi[i]; self[8] = s->tabLo[i];
-            if (self[4] == 0xb0) self[0] ^= 0x4000;
-            b30f0(self);
-            continue;
-        }
-        uint8_t* rng = rd<uint8_t*>(self, 4);
-        uint64_t v = (uint64_t)rd<uint32_t>(rng, 0x20) * 0x6ac690c5u + rd<uint32_t>(rng, 0x24);
-        wr<uint64_t>(rng, 0x20, v);
-        uint32_t* t = ((uint32_t)v % 6 == 0) ? alt : self;
-        t[7] = s->tabHi[i]; t[8] = s->tabLo[i];
-        b30f0(t);
-    }
-}
-
 // 1.13c D2Client+0xA0E70
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_a0e70(const D2cA0Env* e, uint8_t* u, uint32_t a) {
     if (!d2_client_a0a30(e, u)) return 0;
     return e->ord(10641, a, 0, 0) != 0;
-}
-
-// 1.13c D2Client+0xA0EA0
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_a0ea0(const D2cA0Env* e, uint8_t* u, uint32_t a) {
-    if (!e->ord(10889, a, 0, 0)) {
-        uint32_t v = e->ord(10641, a, 0, 0);
-        if (v && e->ord(10744, v, 0x26, 0)) return 0;
-    } else if (!d2_client_a0a30(e, u)) return 0;
-    return 1;
-}
-
-// 1.13c D2Client+0xA0EE0
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_a0ee0(const D2cA0Env* e, const D2cA0State* s, const int32_t* u, uint32_t p) {
-    int32_t k;
-    if (!u) k = -1;
-    else {
-        k = u[3];
-        if (u[0] == 1) {
-            uint8_t* n = s->list;
-            while (n && rd<int32_t>(n, 8) != k) n = nextNode(n);
-            if (!n) return 0;
-            k = rd<int32_t>(n, 0xc);
-            if (k == -1) return 0;
-        }
-    }
-    uint8_t* a = (uint8_t*)e->fn(0x9d630, (void*)(uintptr_t)p, (void*)(intptr_t)(p ? (int32_t)rd<int32_t>((void*)(uintptr_t)p, 0xc) : -1), nullptr);
-    uint8_t* b = (uint8_t*)e->fn(0x9d630, nullptr, (void*)(intptr_t)k, nullptr);
-    return a && b && rd<int16_t>(a, 0x22) == rd<int16_t>(b, 0x22) && rd<int16_t>(a, 0x22) != -1;
 }
 
 // 1.13c D2Client+0xA0F60

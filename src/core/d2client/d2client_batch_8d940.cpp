@@ -5,18 +5,8 @@
 #include <cstring>
 #include <initializer_list>
 #include <cstdio>
+#include "d2client_8d940_env.h"
 namespace d2client_batch_8d940 {
-typedef uint16_t wc;
-struct Env {
- virtual ~Env()=default;
- virtual const wc* str(int32_t slot)=0;                 // Ordinal_10003: localized string / colour code, call order per function
- virtual void fmt(char* out,int32_t n,int32_t v)=0;     // Ordinal_578 (_snprintf with DAT_6fb834c4 / 6fb835a0 "%d")
- virtual int32_t q(int32_t what,int32_t a,int32_t b)=0; // generic D2Common/D2Client query (what = ordinal)
- virtual int32_t g(int32_t what)=0;                     // D2Client global read (what = RVA of the global)
- virtual void gset(int32_t what,int32_t v)=0;
- virtual void draw(int32_t a,int32_t b,int32_t c,int32_t d,int32_t e,int32_t f)=0; // Ordinal_10041/10150/10184
- virtual bool personalize(wc* out,const wc* in,int32_t n)=0; // Unicode::Personalize(.., lang)
-};
 static void ucpy(wc* d,const wc* s){ while((*d++=*s++)); }
 static void ucat(wc* d,const wc* s){ while(*d) ++d; ucpy(d,s); }
 static void w2u(wc* d,const char* s,int32_t n){ while(n-- >0 && *s) *d++=(uint8_t)*s++; *d=0; }
@@ -34,8 +24,6 @@ static int32_t rd16(const void* p,unsigned o){ uint16_t v; std::memcpy(&v,(const
 // label 0xd8c when D2Common#10744(unit,0x33), else 0x5516 when #10744(unit,0xf), else nothing is written.
 // lo/hi start at data[0xfe]/data[0xff]; for 0x33 the player's (DAT_6fbcbbfc) #10630(player,0x75) skill, if present and
 // #10494(player,0x65), adds #10567(player,0x75,t,1)>>8 and #10297(player,0x75,t,1)>>8 with t = #10306(player,skill,1).
-struct Imp8d940 { int32_t(*o10630)(int32_t,int32_t); int32_t(*o10306)(int32_t,int32_t,int32_t);
- int32_t(*o10567)(int32_t,int32_t,int32_t,int32_t); int32_t(*o10297)(int32_t,int32_t,int32_t,int32_t); };
 void tooltipRequirement(Env& e,const Imp8d940& f,int32_t player,int32_t unit,const uint8_t* data,wc* out){
  const wc* c0=e.str(0xf9b); const wc* c1=e.str(0xf9e);
  int32_t lo=data[0xfe], hi=data[0xff], label;

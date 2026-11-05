@@ -59,7 +59,8 @@ void nameLine_63940(U which,I x,I y,const Imp63940&f){
   for(I slot=1;slot>=0;slot--){
    if((int16_t)f.keyOf(k,U(slot))==-1) continue;
    char16_t buf[30]; std::memset(buf,0,sizeof buf);
-   D2Lang_Unicode_sprintf(0x1e,buf,f.getString(0x1052),(uintptr_t)f.keyName(k,U(slot)));
+   const uintptr_t kn=(uintptr_t)f.keyName(k,U(slot));   // retail order: key name (0x391E0) first, then the format string
+   D2Lang_Unicode_sprintf(0x1e,buf,f.getString(0x1052),kn);
    u16cat(line,buf);
   }
  }
