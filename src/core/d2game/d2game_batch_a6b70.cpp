@@ -2,11 +2,11 @@
 // Ghidra decompiles (build-wasm/ghidra-d2game/decomp/0x<RVA>.c). Base 0x6FC20000.
 //
 // Skill-use handlers (0xA6B70..0xA9610, 0xAAC30), the mercenary/item-use helpers (0xACDA0..0xAD0F0) and the
-// two small list walkers (0xAC9E0, 0xACF10). Every callee (D2Common ordinal or unmapped D2Game sub) is a seam
+// small list walker 0xAC9E0. Every callee (D2Common ordinal or unmapped D2Game sub) is a seam
 // on D2GameBatchA6B70Env: one generic signature, arguments in retail order (ECX, EDX, stack...), unused tail
 // zero. Game pointers are 32-bit handles resolved through env->p(); field reads use the retail offsets.
 // Register-only values Ghidra shows as unaff_* / in_EAX are explicit parameters.
-// ponytail: the stack-built "fn95e10" request records (0xA7290 / 0xA8270 / 0xA8350) are recovered only
+// ponytail: the stack-built "fn95e10" request record of 0xA7290 is recovered only
 // partially by the decompiler; they are modelled as 8 dwords with the known fields, see each function.
 #include <cstdint>
 #include <cstring>
@@ -180,26 +180,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_A7290(uint32_t game, uint32_t 
     C(E->sd12540, game, unit, t, 2, 0, 0, 1);
 }
 
-static void rangeTail(const Env* E, uint32_t game, uint32_t unit, uint32_t cmd)
-{
-    int32_t v = R(cmd, 0x14);
-    if (C(E->sd1bc0, game, A(&v)) && v < 0x19) {
-        C(E->o11103, unit, 0);
-        if (unit) C(E->s21320);
-        uint32_t q[8] = {0, unit, 0, 0, 0, 0, 0, (uint32_t)v};   // ponytail: stack request layout unrecovered
-        C(E->s95e10, game, A(q));
-        return;
-    }
-    C(E->sd122c0, 0x32);
-}
-
-// The two bodies are byte-identical in 1.13c (distinct skill ids in the dispatch table).
-// 1.13c D2Game+0xA8270
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_A8270(uint32_t game, uint32_t unit, uint32_t cmd, const Env* E)
-{ rangeTail(E, game, unit, cmd); }
-// 1.13c D2Game+0xA8350
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_A8350(uint32_t game, uint32_t unit, uint32_t cmd, const Env* E)
-{ rangeTail(E, game, unit, cmd); }
+// 0xA8270 and 0xA8350 (byte-identical) are one file: d2game_a8270.h.
 
 // Skill-use dispatcher on the result of 0xC8E80 (target classification); each case either hands off to a
 // bound skill (cmd+7 row shorts at 0x170..0x17e), queues a move, or fails with an error code (0xD122C0).
@@ -389,40 +370,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_ACDA0(uint32_t unit, uint3
     return 1;
 }
 
-// For each entry of the +0x60 list whose unit carries stat-state 4 (#10202(unit,4,0x78)): clear it
-// (#10977), then queue the 8-byte 0x3F update packet (0xAA3E0) with the unit id. param_1 is the player.
-// 1.13c D2Game+0xACF10
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_ACF10(uint32_t player, const Env* E)
-{
-    if (R(player, 0x60) == 0) return;
-    for (int32_t it = C(E->o10460, R(player, 0x60)); it; it = C(E->o10464, it)) {
-        uint32_t u = C(E->o11147, it);
-        if (C(E->o10202, u, 4, 0x78) == 0) continue;
-        C(E->o10977, u, 4, 0);
-        if (R(player, 0) == 0) C(E->o10920, player);
-        uint8_t pkt[8] = {0x3f, 0xff, 0, 0, 0, 0, 0xff, 0xff};
-        if (u) memcpy(pkt + 2, (const uint8_t*)E->p(u) + 0xc, 4);
-        C(E->saa3e0, A(pkt), 8);
-    }
-}
-
-// Clear stat-state 4 on item EDI-owner param_3, and when #11000 answers a slot >= 0 queue the 0x3F packet
-// (slot byte, item id). Always answers 1. param_2 is the player.
-// 1.13c D2Game+0xACFD0
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_ACFD0(uint32_t ecx, uint32_t player, uint32_t item, const Env* E)
-{
-    (void)ecx;
-    C(E->o10977, item, 4);
-    int32_t slot = C(E->o11000, item);
-    if (slot > -1) {
-        if (player && R(player, 0) == 0) C(E->o10920, player);
-        uint8_t pkt[8] = {0x3f, (uint8_t)slot, 0, 0, 0, 0, 0, 0};
-        if (item) memcpy(pkt + 2, (const uint8_t*)E->p(item) + 0xc, 4);
-        memcpy(pkt + 6, &item, 2);
-        C(E->saa3e0, A(pkt), 8);
-    }
-    return 1;
-}
+// 0xACF10 and 0xACFD0 are one file each: d2game_acf10.h, d2game_acfd0.h.
 
 // Item-use dispatcher: EDI = player unit, ESI = use packet (type 4, +4 item id, +0xc, +0). Resolves the
 // item's handler index (#10744 / #11028+#11065 / #10695+0x94), then runs the pre handler

@@ -9,41 +9,7 @@
 template <class T> static T rd(const uint8_t* b, uint32_t o) { T v; memcpy(&v, b + o, sizeof v); return v; }
 template <class T> static void wr(uint8_t* b, uint32_t o, T v) { memcpy(b + o, &v, sizeof v); }
 
-// 1.13c D2Game+0x9CA00 (in_ECX/param_1 unused)
-int D2GAME_9CA00(const uint8_t* a, uint8_t* b, int (*getRoom)(const uint8_t*), int (*isFlagged)(uint8_t*),
-                 int (*getVal)())
-{
-    if (b && rd<int>(b, 0) == 1 && a != b && getRoom(a) == getRoom(b) && isFlagged(b) == 0) {
-        int v = getVal();
-        if (v < rd<int>(b, 4)) { wr<uint32_t>(b, 0, (uint32_t)(uintptr_t)b); wr<int>(b, 4, v); }
-    }
-    return 0;
-}
-
-// 1.13c D2Game+0x9CA60 (in_EAX=a, EDI=u; 0xfa = skill id, 0xa80 = table count read via cnt)
-int D2GAME_9CA60(const uint8_t* a, uint8_t* u, int cnt, int (*ord10064)(int))
-{
-    bool ok;
-    if (a && rd<int>(a, 0) == 1 && rd<int>(a, 20) && (rd<uint8_t>((const uint8_t*)(uintptr_t)rd<uint32_t>(a, 20), 0x16) & 8)) ok = true;
-    else ok = ord10064(0) != 0;
-    int s = a ? rd<int>(a, 4) : -1;
-    if (((a && s >= 0 && s < cnt && s == 0xfa) || ok) && rd<uint32_t>(u, 20) < 0x14) {
-        uint8_t* p = (uint8_t*)(uintptr_t)rd<uint32_t>(u, 8);
-        if (p && rd<int>(p, 0) == 0) {
-            uint8_t* q = (uint8_t*)(uintptr_t)rd<uint32_t>(u, 0);
-            if (!(rd<uint8_t>(q, 8) & 0x10)) { wr<uint8_t>(q, 8, rd<uint8_t>(q, 8) | 0x10); return 1; } // FUN_fffd0/122c0 side effects bound by caller
-        }
-    }
-    return 0;
-}
-
-// 1.13c D2Game+0x9CCF0
-int D2GAME_9CCF0(const uint8_t* unit, const uint8_t* p, uint32_t mask12, uint32_t (*ord11009)(uint32_t),
-                 void (*fn)(const uint8_t*))
-{
-    if ((mask12 & rd<uint8_t>((const uint8_t*)(uintptr_t)rd<uint32_t>(unit, 0x1c), 0xc)) && (ord11009(rd<uint32_t>(p, 0x2c)) & 0x800)) fn(p);
-    return 0;
-}
+// 0x9CA00, 0x9CA60 and 0x9CCF0 are one file each: d2game_9ca00.h, d2game_9ca60.h, d2game_9ccf0.h.
 
 // 1.13c D2Game+0x9CD90
 bool D2GAME_9CD90(int p1, int (*o10494)(), void (*f122c0)(int), int (*f9ccf0)(), int (*f9cb30)(int))

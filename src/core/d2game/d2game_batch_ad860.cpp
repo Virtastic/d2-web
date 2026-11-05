@@ -62,17 +62,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_AD860(void* self, void* un
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_AD910(void* self, void* unit, uint32_t p2, uint32_t p3, uint32_t p4, const D2GameBatchAD860Env* env)
 { (void)p3; return useSkillItem(self, unit, p2, p4, 0x08, 0x8d, env); }
 
-// 1.13c D2Game+0xADAC0
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_ADAC0(uint32_t p1, void* p2, uint32_t p3, uint32_t p4, const D2GameBatchAD860Env* env)
-{
-    (void)p3;
-    if (((const char*)p2)[0x6c] != 0 && rd32(p2, 0x68) == 0 && env->subE03A0(p1, rd32(p2, 100)) != 0) return 0;
-    if (O(10202, p4, 0x10, 0x94, "..\\Source\\D2Game\\SKILLS\\SkillItem.cpp", 0) == 0 && env->subC9E0() != 0) {
-        env->subF6BC0();
-        return 1;
-    }
-    return 0;
-}
+// 0xADAC0 is its own file: d2game_adac0.h.
 
 // 1.13c D2Game+0xADCE0   ebx / retaddr are Ghidra's unaff_EBX and unaff_retaddr (stack word, a record ptr).
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_ADCE0(void* p1, uint32_t p2, uint32_t p3, uint32_t p4,
