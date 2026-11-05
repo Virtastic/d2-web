@@ -1,5 +1,5 @@
 // 1.13c D2Common+0x19190: objtype/objmode token tables (name strings at module 0x94FD4 and 0x94FCC, alloc line 0x94). EAX = archive handle; void.
-// Publishes total/pool/pool/second into the module dwords 0x1213B4 / 0x1213B8 / 0x1213BC / 0x1213C0.
+// Publishes total/pool/pool/second into the module dwords 0xA13B4 / 0xA13B8 / 0xA13BC / 0xA13C0.
 #include <emscripten.h>
 #include "d2common_tokpair.h"
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_seam_d2common_19190(uint32_t arch, const D2CommonTokPairEnv* E, uint32_t* out4) {

@@ -4,12 +4,14 @@
 #include <cstddef>
 #include <cstdint>
 #include "D2Items.h"
+#include "D2Inventory.h"
 #include "Units/Units.h"
 #include "DataTbls/SequenceTbls.h"
 
 // 1.13c 0x24430 (src/core/d2common/d2common_24430.cpp): the retail item-type check the 1FD40 port calls.
 uint32_t D2Common_24430_CheckItemTypeId(const D2UnitStrc* pItem, int nItemType);
 
+extern D2InventoryGridInfoStrc gBodyLocInventoryGridInfo;
 namespace {
 inline uint8_t* P(uint32_t a) { return (uint8_t*)(uintptr_t)a; }
 inline uint32_t& W(uint8_t* b, int o) { return *(uint32_t*)(b + o); }
@@ -26,6 +28,11 @@ uint8_t* BodyLocGrid(uint32_t pInv)
     uint8_t* inv = P(pInv);
     if (!inv || W(inv, 0x18) < 1) return nullptr;
     return P(W(inv, 0x14));
+}
+// 0x20320 / 0x20700 call 0x1E1B0 with the body-location size record (0x9D378): a grid whose size differs from it is no grid.
+uint8_t* BodyLocGridChecked(uint32_t pInv)
+{
+    return (uint8_t*)INVENTORY_GetGrid((D2InventoryStrc*)(uintptr_t)pInv, INVGRID_BODYLOC, &gBodyLocInventoryGridInfo);
 }
 uint8_t* GridCell(uint8_t* grid, int n)
 {
@@ -84,7 +91,7 @@ bool Pass23EF0(uint8_t* c)
 uint8_t* Current320(uint8_t* inv)
 {
     if (!inv || W(inv, 0) != 0x01020304u || W(inv, 0x1C) == 0xFFFFFFFFu) return nullptr;
-    uint8_t* grid = BodyLocGrid((uint32_t)(uintptr_t)inv);
+    uint8_t* grid = BodyLocGridChecked((uint32_t)(uintptr_t)inv);
     if (!grid) return nullptr;
     uint8_t* c5 = GridCell(grid, 5);
     if (c5 && ITEMS_CheckItemTypeId((D2UnitStrc*)c5, 0x2D) && W(c5, 0x0C) == W(inv, 0x1C)) return c5;
@@ -102,7 +109,7 @@ uint32_t D2Common_20700_EquippedHandCandidate(uint32_t pInv, uint32_t* pOutUnit,
     *pOutIsHeld = 0;
     uint8_t* cur = Current320(inv);
     if (W(inv, 0) == 0x01020304u) {
-        uint8_t* grid = BodyLocGrid(pInv);
+        uint8_t* grid = BodyLocGridChecked(pInv);
         uint8_t* c4 = grid ? GridCell(grid, 4) : nullptr;
         if (Pass23EF0(c4) && ITEMS_CheckItemTypeId((D2UnitStrc*)c4, 0x2D)) {
             *pOutUnit = (uint32_t)(uintptr_t)c4;
@@ -112,7 +119,7 @@ uint32_t D2Common_20700_EquippedHandCandidate(uint32_t pInv, uint32_t* pOutUnit,
             return 1;
         }
     }
-    uint8_t* grid = W(inv, 0) == 0x01020304u ? BodyLocGrid(pInv) : nullptr;
+    uint8_t* grid = W(inv, 0) == 0x01020304u ? BodyLocGridChecked(pInv) : nullptr;
     uint8_t* c5 = grid ? GridCell(grid, 5) : nullptr;
     if (Pass23EF0(c5) && ITEMS_CheckItemTypeId((D2UnitStrc*)c5, 0x2D)) {
         *pOutUnit = (uint32_t)(uintptr_t)c5;
