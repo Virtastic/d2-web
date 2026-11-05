@@ -37,7 +37,7 @@ template <class E> void Choose(E& e, uint32_t unit, uint32_t game, uint32_t cls,
             v = (uint64_t)e.rd32(S) * 0x6AC690C5u + e.rd32(S + 4);
             e.wr32(S + 4, (uint32_t)(v >> 32)); e.wr32(S, (uint32_t)v);
             if ((uint32_t)v % 100 < 0x32) {
-                if (e.h(0xF2870, (((uint32_t)v / 100) & ~0xFFu) | 4, a2, 0, 0, 0, game, unit)) return;
+                if (e.h(0xF2870, (((uint32_t)v / 100) & ~0xFFu) | 4, 0, 0, 0, 0, game, unit)) return;
                 if (unit)
                     for (uint32_t n = e.rd32(unit + 0xDC); n;) { const uint32_t nx = e.rd32(n + 0x24); if (e.rd8(n) == 2) e.h(0x8E6F0, n); n = nx; }
                 if (e.h(0xF2D80, a3, 0, 0, 0, 0, game, unit, 4, 1)) return;

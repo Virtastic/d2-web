@@ -255,11 +255,25 @@ static void d2game_DE8F0_113c(void* pAttacker, void* pGame, void* pDefender, int
     }
 }
 
-// 1.13c D2Game+0xB24D0 (r[0]=pGame EAX, r[1]=pUnit)
+// 1.13c D2Game+0xB24D0 FUNCTION-mode probe: r[0]=pGame EAX, r[1]=pUnit (stack), r[2]=arena blob 0xA2E6 hands back,
+// r[3]=player data blob 0xA4C0 hands back, r[5]=hook log. Both seams log through HookEnv as the capture's hook recorder
+// does (0xA2E6: ECX pool, EDX size, file, line, 0; 0xA4C0: the unit).
+#include "../fn/hookenv.h"
+static HookEnv* g_b24d0H; static uint32_t g_b24d0Ar, g_b24d0Pd;
 extern "C"
 EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_b24d0(uint32_t* r)
 {
-    d2game_B24D0_113c((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1], batchEnv(r));
+    static uint32_t none[2] = {0, 0};
+    HookEnv he((uint32_t*)(uintptr_t)r[5], none); g_b24d0H = &he;
+    g_b24d0Ar = r[2]; g_b24d0Pd = r[3];
+    D2GameBatchB74Env env{};
+    env.ord10045 = [](void* pool, uint32_t size, uint32_t line) -> void* {
+        g_b24d0H->h(0xA2E6, 0, (uint32_t)(uintptr_t)pool, size, 0, 0, 0xB20FB568u, line, 0);
+        return (void*)(uintptr_t)g_b24d0Ar; };
+    env.ord10920 = [](void* unit) -> void* {
+        g_b24d0H->h(0xA4C0, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)unit);
+        return (void*)(uintptr_t)g_b24d0Pd; };
+    d2game_B24D0_113c((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1], env);
     r[4] = 0;
 }
 

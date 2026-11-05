@@ -210,7 +210,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_f0390(void* game, void* player, const D2GameBa
     void* node = rdptr(playerData, 0x38);
     while (node != nullptr) {
         void* next = rdptr(node, 0x10);
-        env->freePool(nullptr, node, 0x4E);                // Ordinal_10046, pool in a register
+        env->freePool(rdptr(game, 0x1C), node, 0x4E);         // Ordinal_10046, pool = game+0x1C in ECX (was passed null)
         node = next;
     }
     wr32(playerData, 0x38, 0);
@@ -429,4 +429,35 @@ void D2G15_56740_probe(void* game, void* unit, uint32_t* lg, const uint32_t* sc)
     e.getRoom = [](void* u) -> void* { return (void*)(uintptr_t)q15H->h(0xA478, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); };
     e.getLevelIdFromRoom = [](void* r) -> uint32_t { return q15H->h(0xA556, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)r); };
     d2_game_56740(game, unit, &e);
+}
+
+// ---- FUNCTION-mode probes for 0xB2480 and 0xF0390: the seams log
+// through HookEnv as the capture's hook recorder does and hand back the blobs the descriptor pins.
+static HookEnv* g15H; static uint32_t g15Pd;
+static void* g15GetPd(void* u) { g15H->h(0xA4C0, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u); return (void*)(uintptr_t)g15Pd; }
+static void g15Free(void* pool, void* p, uint32_t line) {
+    g15H->h(0xA2EC, 0, (uint32_t)(uintptr_t)pool, (uint32_t)(uintptr_t)p, 0, 0, 0xB20FB568u, line, 0); }
+// 0xB2480: r[0] player (EAX), r[1] game (stack), r[2] player data blob, r[3] hook log
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_b2480(uint32_t* r)
+{
+    static uint32_t none[2] = {0, 0};
+    HookEnv he((uint32_t*)(uintptr_t)r[3], none); g15H = &he; g15Pd = r[2];
+    D2GameBatch15Env e{}; e.getPlayerData = g15GetPd; e.freePool = g15Free;
+    d2_game_b2480(rdptr((void*)(uintptr_t)r[1], 0x1C), (void*)(uintptr_t)r[0], &e);
+    r[4] = 0;
+}
+// 0xF0390: r[0] player (EAX), r[1] game (ECX), r[2] player data blob, r[3] hook log. 0xDFC10 takes the player on the stack, the game in EDI and the 0xF0040 callback in EBX.
+static void g15Iter(void* game, void* player) {
+    g15H->ed((uint32_t)(uintptr_t)game);
+    g15H->h(0xDFC10, 0, 0, 0, 0xB20F0040u, 0, (uint32_t)(uintptr_t)player);
+    g15H->edi(0xDFC10, (uint32_t)(uintptr_t)game); }
+static void g15Free4E(void* pool, void* p, uint32_t line) {
+    g15H->h(0xA2EC, 0, (uint32_t)(uintptr_t)pool, (uint32_t)(uintptr_t)p, 0, 0, 0xB20FB9A4u, line, 0); }
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_f0390(uint32_t* r)
+{
+    static uint32_t none[2] = {0, 0};
+    HookEnv he((uint32_t*)(uintptr_t)r[3], none); g15H = &he; g15Pd = r[2];
+    D2GameBatch15Env e{}; e.getPlayerData = g15GetPd; e.freePool = g15Free4E; e.iterateLivingPlayers = g15Iter;
+    d2_game_f0390((void*)(uintptr_t)r[1], (void*)(uintptr_t)r[0], &e);
+    r[4] = 0;
 }

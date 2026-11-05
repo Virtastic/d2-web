@@ -27,7 +27,7 @@ template <class E> void PantherJavelin(E& e, uint32_t game, uint32_t unit, uint3
     }
     uint32_t blk[2] = { 0, 0x7FFFFFFFu };
     const uint32_t in[2] = { 0, 0x7FFFFFFFu };
-    e.h(0xB17B0, 1, e.stk(blk), game, 0, 0, unit, 0x6FCBCA00u);
+    e.h(0xB17B0, 1, e.stk(blk), game, 0, 0, unit, 0xB209CA00u);
     e.blk(0xB17B0, in, 2, 0x3);   // retail logs the block at hook entry, before the hook's out-words land
     if (blk[0] && w(0x62) < (int32_t)blk[1]) { e.h(0xF2540, 0, game, unit, 0, 0, blk[0], 2, 0, 0, 1, 7); return; }
     idle();

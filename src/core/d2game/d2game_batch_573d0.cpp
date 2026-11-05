@@ -413,3 +413,17 @@ void D2G573_questcb_probe(int which, const uint8_t* q, uint8_t* u, uint32_t* lg,
     q573E.cbLab80ec0 = (void*)(uintptr_t)0xB2060EC0u; q573E.cbLab81ec0 = (void*)(uintptr_t)0xB2061EC0u; q573E.cbLab821b0 = (void*)(uintptr_t)0xB20621B0u;
     if (which == 0) d2game_64150(q, u); else if (which == 1) d2game_64fe0(q, u); else d2game_65200(q, u);
 }
+
+// ---- FUNCTION-mode probe for 0x64940 (src/core/fn/d2game_64940.cpp): 0xA4A2 (#11090), 0xDFCC0 and 0xCBE70 are recorders; the debug word is the pinned global.
+extern "C" void d2game_64940(void* param1, uint8_t* q);
+static uint8_t* q64940;
+void D2G573_64940_probe(void* param1, uint8_t* q, int32_t dbg, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); q573H = &h; q573E = D2G573Env{};
+    q573E.debugOn = dbg;
+    q573E.setMode = [](void* u, int32_t m) { q573H->h(0xA4A2, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)u, (uint32_t)m); };
+    q573E.fnDFCC0 = [](void*, int32_t b) { q573H->h(0xDFCC0, 0, 0, 0, 0, 0, (uint32_t)b); };
+    q573E.fnCBE70 = [](void*, const char*) { char text[8] = {}; q573H->h(0xCBE70, 0, 0, (uint32_t)(uintptr_t)text, 0, 0, rd32(q64940, 4), 4); };
+    q64940 = q;
+    d2game_64940(param1, q);
+}

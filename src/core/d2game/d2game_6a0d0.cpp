@@ -14,7 +14,7 @@ struct D2Game6A0D0Env {
     const uint8_t* (*ordinal10092)();
     void           (*sub8AAE0)();
 };
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_6a0d0(const uint8_t* client, const D2Game6A0D0Env* env) { // 1.13c D2Game+0x6A0D0
+extern "C" void D2Game_6A0D0(const uint8_t* client, const D2Game6A0D0Env* env) { // 1.13c D2Game+0x6A0D0
     uint8_t p[17] = {};  // one buffer, as in the decompile frame
     uint32_t id = 0xFFFFFFFFu; uint8_t f = 0;
     if (client) { id = rd32(client, 0xC); f = (rd32(client, 0xC4) >> 1) & 1; }
@@ -28,10 +28,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_6a0d0(const uint8_t* client, c
         const uint8_t* q = env->ordinal10092();
         uint8_t v = q ? *q : 0;
         uint32_t o = rd32((const void*)(uintptr_t)rd32(client, 0x14), 0xC);
-        if (o) {   // ponytail: decompile frame for the 17-byte send is lossy (buffer at stack0xffffffe4, bytes 12..16 unnamed); zero-filled here
+        if (o) {   // the 17-byte frame: 4D 02, owner id, (o - 1), the #10092 byte, zero to the end (every byte retail writes)
             o -= 1;
-            p[0] = (uint8_t)(o >> 16); p[1] = (uint8_t)(o >> 24); p[2] = v;
-            p[3] = p[4] = p[5] = p[6] = p[7] = p[8] = 0;
+            uint32_t cid = rd32(client, 0xC);
+            memset(p, 0, sizeof p);
+            p[0] = 0x4D; p[1] = 2; memcpy(p + 2, &cid, 4); memcpy(p + 6, &o, 4); p[10] = v;
             env->send8A3E0(p, 17);
         }
     }
