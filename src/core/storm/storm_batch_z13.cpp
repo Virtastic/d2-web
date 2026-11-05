@@ -268,7 +268,7 @@ u32 Storm_Z13_379D0(const StormZ13Seam& s, u32* a, u32** out) {
     *out = r;
     return 1;
 }
-// 1.13c Storm+0x37A60: build a mask record. eax8 = in_EAX (must be 8), flags = ECX, rc = ESI (i32[4] or null).
+// 1.13c Storm+0x37A60: build a mask record. eax8 = in_EAX (the record format; only 8 is built), flags = ECX, rc = ESI (i32[4] or null).
 u32 Storm_Z13_37A60(const StormZ13Seam& s, u32 flags, i32 eax8, i32* rc, i32 p1, u32 p2, u32 p3, i32 p4, u32** p5) {
     if (eax8 != 8) return 0;
     char c4 = (flags & 0x1000000) ? (char)flags : 0;
@@ -286,17 +286,20 @@ u32 Storm_Z13_37A60(const StormZ13Seam& s, u32 flags, i32 eax8, i32* rc, i32 p1,
     *p5 = r;
     return 1;
 }
-static u32 z13_37A60Wrap(const StormZ13Seam& s, i32 p1, u32 p2, u32 p3, i32 rcmode, i32* rc, u32 flags, u32** out, i32 p4) {
+// 0x37A60 as the two wrappers below call it; a probe replaces it to record the call (null = the port above).
+u32 (*g_storm_z13_37a60_hook)(const StormZ13Seam& s, u32 flags, i32 eaxArg, i32* rc, i32 p1, u32 p2, u32 p3, i32 mode, u32** out) = nullptr;
+// 37B90/37C10 share one body: clear *out, refuse a zero p1/p2/p3/out (0x57), then 0x37A60 with EAX = p4, ECX = flags (p6),
+// ESI = rc (p5) and stack (p1, p2, p3, mode, out); its EAX is the result.
+static u32 z13_37A60Wrap(const StormZ13Seam& s, i32 p1, u32 p2, u32 p3, u32 p4, i32* rc, u32 flags, u32** out, i32 mode) {
     if (out) *out = 0;
     if (!p1 || !p2 || !p3 || !out) { z13err(s); return 0; }
-    return Storm_Z13_37A60(s, flags, 8, rc, p1, p2, p3, p4, out);
+    if (g_storm_z13_37a60_hook) return g_storm_z13_37a60_hook(s, flags, (i32)p4, rc, p1, p2, p3, mode, out);
+    return Storm_Z13_37A60(s, flags, (i32)p4, rc, p1, p2, p3, mode, out);
 }
-// 1.13c Storm+0x37B90 (ordinal 446)
-u32 Storm_Z13_37B90(const StormZ13Seam& s, i32 p1, u32 p2, u32 p3, u32, i32* rc, u32 flags, u32** out) { return z13_37A60Wrap(s, p1, p2, p3, 0, rc, flags, out, 1); }
-// 1.13c Storm+0x37C10 (ordinal 445)
-// Decompile: p5 is never read; 37A60 is called as __thiscall(this=p6 -> flags, p1, p2, p3, 0, p7=out) with ESI not set here,
-// so rc is passed as null (GUESSED: the ESI seam is not visible from this function).
-u32 Storm_Z13_37C10(const StormZ13Seam& s, i32 p1, u32 p2, u32 p3, u32, i32* rc, u32 flags, u32** out) { (void)rc; return z13_37A60Wrap(s, p1, p2, p3, 0, nullptr, flags, out, 0); }
+// 1.13c Storm+0x37B90 (ordinal 446): mode 1.
+u32 Storm_Z13_37B90(const StormZ13Seam& s, i32 p1, u32 p2, u32 p3, u32 p4, i32* rc, u32 flags, u32** out) { return z13_37A60Wrap(s, p1, p2, p3, p4, rc, flags, out, 1); }
+// 1.13c Storm+0x37C10 (ordinal 445): mode 0; otherwise identical to 37B90 (ESI = p5 is loaded the same way).
+u32 Storm_Z13_37C10(const StormZ13Seam& s, i32 p1, u32 p2, u32 p3, u32 p4, i32* rc, u32 flags, u32** out) { return z13_37A60Wrap(s, p1, p2, p3, p4, rc, flags, out, 0); }
 // 1.13c Storm+0x37C90 (ordinal 444): inclusive rect (p5) -> exclusive, then 37B90.
 void Storm_Z13_37C90(const StormZ13Seam& s, i32 p1, u32 p2, u32 p3, u32 p4, const i32* r5, u32 flags, u32** out) {
     i32 rc[4]; i32* pr = nullptr;

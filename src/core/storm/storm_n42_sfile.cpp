@@ -108,6 +108,8 @@ extern "C" void storm_n42_26c40_install(void) {
     g_26c40Host.free_ = probe26c40Free;
     G.h = &g_26c40Host;
 }
+// The last-error word (Storm+0x55388) for the capture probes that pin it.
+extern "C" u32* storm_n42_lastErr_global(void) { return &G.lastErr; }
 
 // Capture-probe install for 0x26190: lock/unlock/setErr are the no-op pins, strlen and the bounded copy/append are
 // plain C (the length check in Storm_26190 keeps both inside the 0x104 buffer, so truncation never happens). Exposes G.dir (Storm+0x43000) and G.lastErr (Storm+0x45388).

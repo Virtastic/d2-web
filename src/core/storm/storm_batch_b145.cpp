@@ -51,10 +51,13 @@ extern "C" void Storm_Sub35170(uint32_t ecx) {
 extern "C" void Storm_Sub38220(int32_t* p, uint32_t eax) {
   if (Storm_Hook_2A330) Storm_Hook_2A330(nullptr, (void*)(uintptr_t)eax, nullptr, 0xa0, 0, p);
   int32_t blk = p[0];
-  if (blk == 0) { g_lastError = 0x57; return; }  // SetLastError(0x57) not modelled
+  if (blk == 0) { g_lastError = 0x57; if (SetLastError) SetLastError(0x57); return; }
   p[1] = blk + 0x4c;
   p[2] = *(int32_t*)(uintptr_t)(blk + 0x48) - 4 + *(int32_t*)(uintptr_t)(blk + 0x44);  // 32-bit guest addr truncated
 }
+
+// The module's last-error word, for the capture probes that pin it.
+extern "C" uint32_t* Storm_B145_LastErr(void) { return &g_lastError; }
 
 // 1.13c Storm+0x38b00: x86 instruction encoder. p = out buffer, o = operand record (32-bit fields)
 extern "C" uint8_t* Storm_Sub38B00(uint8_t* out, uint8_t* o) {
