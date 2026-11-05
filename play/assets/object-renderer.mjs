@@ -179,6 +179,17 @@ export function createObjectRenderer(read, documentObject = globalThis.document,
     catch { return null; }
     finally { lastEvidence = keepEvidence; globalThis.__d2DrawList = keepList; measuring = false; }
   },
+  // PERF (entry): every frame of the object's current animation composed and rastered before its first draw (the load screen,
+  // entry-warm.mjs), through measure(): the same decode, cache keys and canvases a draw builds, into the scratch canvas, with
+  // the evidence and the draw list left as they were. Returns the frames prepared.
+  prepare(object, act) {
+    if (!renderer.measure(object, act)) return 0;
+    const animation = animations.get(`${object.token}:${MODE[object.mode] || 'NU'}:${object.direction}:${object.componentMask}`);
+    const n = animation?.cof.framesPerDirection ?? 0;
+    for (let f = 0; f < n; f++) renderer.measure({ ...object, framePrecise: f << 8 }, act);
+    return n;
+  },
+  get rasters(){return rasterCache.size;},
   get lastEvidence(){return lastEvidence&&{...lastEvidence};}, get decoded(){return animations.size;}, get failures(){return failures.size;} };
   return renderer;
 }

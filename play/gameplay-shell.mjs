@@ -19,6 +19,7 @@ import { createPlayerRenderer, playerClassInfo } from './assets/unit-renderer.mj
 import { applyRealmPlayerFrame, selectPlayerRenderSource, sendRealmGroundWalk, sendRealmRightSkillAt, sendRealmRightSkillOnMonster, realmDirectionalAim, realmClientProjectilePredictor, realmFireballMonsterPredictor, visibleRealmPlayers } from './assets/realm-player-state.mjs';
 import { createRealmPlayerReassignFade } from './assets/realm-player-reassign-fade.mjs';
 import { createMonsterRenderer, parseMonsterAnimations, realmMonsterAnimationActor } from './assets/monster-renderer.mjs';
+import { warmEntryFiles } from './assets/entry-warm.mjs';
 import { createObjectRenderer, parseObjectPresentations } from './assets/object-renderer.mjs';
 import { drawObjectHoverLabel, objectNameFor, STR_LOCKED_CHEST, objectPortalLabel, objectRetailName, objectRetailNameOffset } from './assets/object-hover-label.mjs';
 import { areaEntranceLabel, warpAtPoint } from './assets/area-hover-label.mjs';
@@ -1375,8 +1376,27 @@ async function bootstrapSession() {
     if (TERRAIN_ENABLED) loadSessionTerrain(fixture.act0);
     // The player build decodes the level's DT1 libraries here, one task each with its bytes fetched first,
     // instead of inside the first frame (library() is keyed by path and pure: the frame finds the same entry).
-    if (TERRAIN_ENABLED && terrain?.preload && terrainFiles && !navigator.webdriver) {
+    if (TERRAIN_ENABLED && terrain?.preload && terrainFiles && (!navigator.webdriver || window.__d2EntryWarm)) {
       for (const path of new Set(terrainFiles.filter(Boolean))) { await soundFetched([path]); terrain?.preload(path); await entryYield(); }
+    }
+    // The player build fetches the files the first frames draw the hero, the NPCs and the objects from
+    // (entry-warm.mjs) before the session goes live; cold they were the first frames' synchronous misses.
+    // __d2EntryWarm runs it under the test runner for the entry-window instrument only.
+    if (!navigator.webdriver || window.__d2EntryWarm) {
+      try {
+        window.__d2EntryWarmed = await warmEntryFiles({ read: createMpqAssetReader(Module), fetched: (path) => soundFetched([path]),
+          hero: selectedPlayerSource().renderState, objects: snapshot.objects || [],
+          monsters: (snapshot.entities || []).filter((e) => e.type === 1 && e.animation).map((e) => e.animation) });
+      } catch (error) { window.__d2EntryWarmed = String(error); }
+      // Then decode them, and compose and raster every frame of each unit's current animation: drawn cold, each new frame
+      // built its image the first time it came up (the entry window's objects 224 ms vs 47 steady). Caches only (prepare()).
+      let prepared = 0;
+      try {
+        for (const e of snapshot.entities || []) if (e.type === 1 && e.animation) prepared += monsterRenderer?.prepare?.(e.animation, snapshot.act) ?? 0;
+        await entryYield();
+        for (const o of snapshot.objects || []) prepared += objectRenderer?.prepare?.(o, snapshot.act) ?? 0;
+      } catch (error) { prepared = String(error); }
+      window.__d2EntryPrepared = prepared;
     }
     // A picked character is not applied to anything: createFromSave above already made it, sections
     // and all, in the act and at the map seed its own header names.

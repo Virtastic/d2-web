@@ -30,3 +30,17 @@ test('URL params are never read, by a player or the test runner', () => {
   }
   assert.equal(run('?enhanced=1', true).fill, false);   // the test runner always gets the 800x600 parity view
 });
+test('as=player: the test runner gets the player page with its URL options; a player never does', () => {
+  const run2 = (search, webdriver) => {
+    class Navigator {} const nav = new Navigator(); Object.defineProperty(nav, 'webdriver', { get() { return webdriver; }, configurable: true });
+    Object.setPrototypeOf(nav, Navigator.prototype); Object.defineProperty(Navigator.prototype, 'webdriver', { get() { return webdriver; }, configurable: true });
+    delete nav.webdriver;
+    const g = { URLSearchParams, Navigator, navigator: nav, location: { search }, document: undefined };
+    g.globalThis = g; vm.runInNewContext(src, g);
+    return { e: g.__d2Entry, wd: nav.webdriver };
+  };
+  const r = run2('?play=1&as=player', true);
+  assert.equal(r.wd, false); assert.equal(r.e.fill, true); assert.equal(r.e.test, false); assert.equal(r.e.search, '?play=1&as=player'); assert.equal(r.e.asPlayer, true);
+  const p = run2('?play=1&as=player', false);
+  assert.equal(p.wd, false); assert.equal(p.e.search, ''); assert.equal(p.e.asPlayer, undefined);
+});

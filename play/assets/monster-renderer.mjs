@@ -247,7 +247,40 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
     if (warmQueue.length) warmSchedule();
   };
   const warmSchedule = () => { if (!warmScheduled) { warmScheduled = true; requestIdleCallback(warmRun, { timeout: 500 }); } };
+  // The composed plane's canvas, keyed by the plane's identity and the palette: one per plane for the session.
+  const rasterOf = (composed, act0, pal, highlight) => {
+    let composedId = composedIds.get(composed);
+    if (!composedId) composedIds.set(composed, composedId = nextComposedId++);
+    const key = `${composedId}:${act0}${highlight ? ':hl' : ''}`;
+    if (highlight && !highlights.has(act0)) highlights.set(act0, highlightMap(read(`data\\global\\palette\\${PALETTE[act0]}\\pal.dat`)));
+    const hmap = highlight ? highlights.get(act0) : null;
+    let canvas = rasters.get(key);
+    if (!canvas) {
+      canvas = documentObject.createElement('canvas'); canvas.width = composed.width; canvas.height = composed.height;
+      if (canvas.width && canvas.height) canvas.getContext('2d').putImageData(
+        new ImageData(indexedToRgba(hmap ? composed.indexed.map((v) => hmap[v]) : composed.indexed, composed.opaque, pal), canvas.width, canvas.height), 0, 0);
+      rasters.set(key, canvas);
+    }
+    return { key, canvas };
+  };
   return {
+    // PERF (entry): decode the actor's current animation and compose + raster every frame of it, before its first draw (the load
+    // screen, entry-warm.mjs). The same loader, cache keys and canvases draw() builds on first use; nothing is drawn or recorded,
+    // no clock advances, and a load that fails is left for draw() to fail the same way. Returns the frames prepared.
+    prepare(actor, act) {
+      const attackClass = actor.mode === 4 || actor.mode === 5 || actor.mode === 14 ? actor.baseWeaponClass ?? '' : '';
+      const baseKey = `${actor.code}:${actor.mode}:${actor.seqMode ?? ''}:${actor.direction}:${actor.components.join(',')}:${attackClass}`;
+      if (failures.has(baseKey)) return 0;
+      let animation = animations.get(baseKey);
+      if (!animation) { try { animation = loadMonsterAnimation(animationRead, actor); } catch { return 0; } animations.set(baseKey, animation); }
+      const [act0, pal] = palette(act), key = animation.componentDirectionKey ?? monsterComponentDirectionKey(animation.componentDirections);
+      let n = 0;
+      for (let frame = 0; frame < animation.cof.framesPerDirection; frame++) {
+        let composed; try { composed = composeCofFrame(animation.cof, animation.cofDirection, frame, animation.components, animation.componentDirections, key); } catch { break; }
+        rasterOf(composed, act0, pal, false); n++;
+      }
+      return n;
+    },
     warm(actor) {
       if (typeof requestIdleCallback !== 'function' || (globalThis.navigator?.webdriver && globalThis.__d2Perf !== true)) return;
       const key = actor.direction + ':' + actor.mode + ':' + actor.seqMode;
@@ -286,18 +319,7 @@ export function createMonsterRenderer(read, documentObject = globalThis.document
       const componentDirectionKey = animation.componentDirectionKey ?? monsterComponentDirectionKey(animation.componentDirections);
       try { composed = composeCofFrame(animation.cof, animation.cofDirection, frame, animation.components, animation.componentDirections, componentDirectionKey); }
       catch (e) { failures.add(baseKey); console.warn(`monster ${actor.code} mode ${actor.mode} dir ${actor.direction} frame ${frame}: ${e.message}`); return null; }   // a COF/DCC frame-count mismatch must not stop the frame loop
-      let composedId = composedIds.get(composed);
-      if (!composedId) composedIds.set(composed, composedId = nextComposedId++);
-      const [act0, pal] = palette(act), key = `${composedId}:${act0}${highlight ? ':hl' : ''}`;
-      if (highlight && !highlights.has(act0)) highlights.set(act0, highlightMap(read(`data\\global\\palette\\${PALETTE[act0]}\\pal.dat`)));
-      const hmap = highlight ? highlights.get(act0) : null;
-      let canvas = rasters.get(key);
-      if (!canvas) {
-        canvas = documentObject.createElement('canvas'); canvas.width = composed.width; canvas.height = composed.height;
-        if (canvas.width && canvas.height) canvas.getContext('2d').putImageData(
-          new ImageData(indexedToRgba(hmap ? composed.indexed.map((v) => hmap[v]) : composed.indexed, composed.opaque, pal), canvas.width, canvas.height), 0, 0);
-        rasters.set(key, canvas);
-      }
+      const [act0, pal] = palette(act), { key, canvas } = rasterOf(composed, act0, pal, highlight);
       // D2Client sets the unit's no-shadow bit (0x20) for a dead monster; retail's records: 41 DT/DD instances, 0 shadows.
       if (animation.token !== 'DT' && animation.token !== 'DD') shadows?.draw(ctx, Math.round(x), Math.round(y),
         { cof: animation.cof, components: animation.components, direction: animation.cofDirection, dccDirection: animation.componentDirections, frame },
