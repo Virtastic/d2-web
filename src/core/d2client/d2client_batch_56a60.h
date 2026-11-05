@@ -31,5 +31,11 @@ struct Svc {
  virtual I o10630()=0; virtual I o10980(I)=0; virtual void f6c0(I ediArg)=0;
 };
 void sub_56DA0(Svc& s,const uint8_t* p1,Unit* esi,I* w);
+I sub_56B20(Svc& s,Unit* u,I idx,U a4);
+// sgptDataTables+0xb98 row idx (stride 0x23c, bound +0xba0): retail tests idx<0, idx>=count, then the row address against 0 (32-bit words).
+inline Row* rowAt(const uint8_t* dt,I idx){
+ U n,b; __builtin_memcpy(&n,dt+0xba0,4); __builtin_memcpy(&b,dt+0xb98,4);
+ if(idx<0||idx>=(I)n) return nullptr; U a=b+(U)idx*0x23cu; return a?(Row*)(uintptr_t)a:nullptr;
+}
 I sub_57000(Svc& s,Unit* u);
 }

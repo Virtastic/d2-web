@@ -23,8 +23,8 @@ struct Svc {
  virtual ~Svc()=default;
  virtual void release(void* p,int32_t line)=0;       // FUN_6fabbf86 (ecx = pointer, line)
  virtual void ord10614(uint32_t* seed,uint32_t id)=0; // Ordinal_10614 (ecx = &unit+0x20, edx = (u16)edx + unit.id)
- virtual int32_t f558e0(Unit*)=0;                    // FUN_6fb558e0 (arg unrecovered; reads state)
- virtual const uint8_t* f1260()=0;                   // FUN_6fab1260 -> record (byte +0x11c checked via recType)
+ virtual int32_t f558e0(Unit*)=0;                    // FUN_6fb558e0 (D2Client+0xA58E0, eax = unit) (arg unrecovered; reads state)
+ virtual const uint8_t* f1260(int32_t id)=0;         // FUN_6fab1260 (eax = unit id) -> record (byte +0x11c checked)
  virtual int32_t recType(const uint8_t*)=0;          // *(char*)(rec+0x11c)
  [[noreturn]] virtual void fatal(int32_t line)=0;    // Ordinal_10265/10024 + _exit(-1)
  virtual int32_t monPalType(int32_t monId)=0;        // sgptDataTables monstats(+0xa78,0x1a8)->+0x18 -> table(+0xa90,0x134)+0x11c; -1 if any bound/null check fails
@@ -52,34 +52,40 @@ void sub_537D0(Svc& s,G& g){
 // 1.13c D2Client+0x537A0 (callee of 53C30, already read): list lookup by id
 extern "C" Pal* D2Client_537A0_find(Pal* head,int32_t id){ for(Pal* p=head;p;p=p->next) if(p->id==id) return p; return nullptr; }
 static Pal* find(G& g,int32_t id){ return D2Client_537A0_find(g.head608,id); }
-// Slot table access at DAT_6fbc7804 + 4 + id*8 (retail stores a 4-byte pointer there; host keeps a Pal* in the same slot).
-static Pal* tabGet(const G& g,int32_t id){ Pal* p; std::memcpy(&p,g.tab7804+4+(size_t)id*8,sizeof p); return p; }
-static void tabPut(G& g,int32_t id,Pal* p){ std::memcpy(g.tab7804+4+(size_t)id*8,&p,sizeof p); }
+// Slot table access at DAT_6fbc7804 + 4 + id*8: a 4-byte pointer word, as retail stores it.
+static Pal* tabGet(const G& g,int32_t id){ uint32_t w; std::memcpy(&w,g.tab7804+4+(uint32_t)id*8u,4); return (Pal*)(uintptr_t)w; }
+static void tabPut(G& g,int32_t id,Pal* p){ uint32_t w=(uint32_t)(uintptr_t)p; std::memcpy(g.tab7804+4+(uint32_t)id*8u,&w,4); }
 
-// 1.13c D2Client+0x539E0  (eax = unit as u32 words [seed lo at word 8, hi at word 9, id at word 1]; edx = u16)
-int32_t sub_539E0(Svc& s,uint32_t* unit,uint32_t edx){
+template<class F> static int32_t run539E0(uint32_t* unit,uint32_t edx,F ord10614){
  if(!unit) return 9;
  uint32_t* st=unit+8;
- s.ord10614(st,(uint16_t)edx+unit[1]);
+ ord10614(st,(uint32_t)(uint16_t)edx+unit[1]);
  uint64_t v=(uint64_t)st[0]*0x6ac690c5u+st[1];
  st[0]=(uint32_t)v; st[1]=(uint32_t)(v>>32);
  return (int32_t)((uint32_t)v%0x1e)+9;
 }
+// 1.13c D2Client+0x539E0  (eax = unit as u32 words [seed lo at word 8, hi at word 9, id at word 1]; edx = u16)
+int32_t sub_539E0(Svc& s,uint32_t* unit,uint32_t edx){
+ return run539E0(unit,edx,[&](uint32_t* st,uint32_t id){ s.ord10614(st,id); });
+}
 
+// Address arithmetic is 32-bit as in retail: the bank pointer is slot word + 4 + k*0x100 (+0x800 for the alternate bank).
+template<class K,class R,class X> static uint32_t run53A30(const uint8_t* tab,int32_t c2d4,int32_t c380,uint32_t c7808,const int32_t* u,K f558e0,R f1260,X fatal){
+ if(!u||u[0]!=1) return 0;
+ uint32_t p; std::memcpy(&p,tab+4+(uint32_t)u[1]*8u,4); if(!p) return 0;
+ int32_t k=f558e0(u);
+ if((uint32_t)k<=7){
+  if(k<2){ if((uint32_t)u[1]<0x16b||(uint32_t)u[1]>0x16c) return 0; return (uint32_t)k*0x100u+4u+p; }
+ } else if(c2d4){
+  int32_t j=k-8; if(j>=0&&j<0x1e) return c7808+(uint32_t)j*0x100u; fatal(0x160);
+ }
+ if(c380){ const uint8_t* r=f1260(u[1]); if(r&&r[0x11c]==2) return (uint32_t)k*0x100u+0x804u+p; }
+ return (uint32_t)k*0x100u+4u+p;
+}
 // 1.13c D2Client+0x53A30  (eax = unit)
 uint8_t* sub_53A30(Svc& s,G& g,Unit* u){
- if(!u||u->type!=1) return nullptr;
- Pal* p=tabGet(g,u->id); if(!p) return nullptr;
- int32_t k=s.f558e0(u);
- bool alt=false;
- if(k==0||k==1){ if((uint32_t)u->id<0x16b||(uint32_t)u->id>0x16c) return nullptr; }
- else {
-  if(!(k>=2&&k<=7)){
-   if(g.c2d4){ int32_t j=k-8; if(j>=0&&j<0x1e) return g.c7808+j*0x100; s.fatal(0x160); }
-  }
-  if(g.c380){ const uint8_t* r=s.f1260(); if(r&&s.recType(r)==2) alt=true; }
- }
- return p->bank+(alt?0x800:0)+k*0x100;
+ return (uint8_t*)(uintptr_t)run53A30(g.tab7804,g.c2d4,g.c380,(uint32_t)(uintptr_t)g.c7808,(const int32_t*)u,
+  [&](const int32_t* x){ return s.f558e0((Unit*)x); },[&](int32_t id){ return s.f1260(id); },[&](int32_t l){ s.fatal(l); });
 }
 
 // 1.13c D2Client+0x53B20  (eax = monster id, param_2 = Pal*)
@@ -91,11 +97,17 @@ static void shift53B20(Pal* d,const uint8_t* remap){
   uint8_t c=remap[d->bank[row*256+i]]; if(c) dst[row*256+i]=c;
  }
 }
-extern "C" void D2Client_53B20(int32_t monId,Pal* d,const uint8_t* remap,const uint8_t* monStats,int32_t monCount,const uint8_t* palTypes,int32_t palCount){
- if(monId<0||monId>=monCount||!monStats||!palTypes) return;
- int16_t t=(int16_t)(monStats[monId*0x1a8+0x18]|(monStats[monId*0x1a8+0x19]<<8));
- if(t<0||t>=palCount||palTypes[t*0x134+0x11c]!=2) return;
+// The palette-type row address is tested against 0 (not the table base), as retail does.
+static void run53B20(int32_t monId,Pal* d,const uint8_t* remap,const uint8_t* monStats,int32_t monCount,const uint8_t* palTypes,int32_t palCount){
+ if(monId<0||monId>=monCount) return;
+ int16_t t; std::memcpy(&t,monStats+(uint32_t)monId*0x1a8u+0x18,2);
+ if(t<0||t>=palCount) return;
+ const uint8_t* row=(const uint8_t*)(uintptr_t)(uint32_t)((uint32_t)(uintptr_t)palTypes+(uint32_t)t*0x134u);
+ if(!row||row[0x11c]!=2) return;
  shift53B20(d,remap);
+}
+extern "C" void D2Client_53B20(int32_t monId,Pal* d,const uint8_t* remap,const uint8_t* monStats,int32_t monCount,const uint8_t* palTypes,int32_t palCount){
+ run53B20(monId,d,remap,monStats,monCount,palTypes,palCount);
 }
 void sub_53B20(Svc& s,G& g,int32_t monId,Pal* d){
  if(monId<0||s.monPalType(monId)!=2) return;
@@ -250,4 +262,15 @@ int32_t sub_54AC0(Svc& s,void* unit,int32_t statArg,int32_t idx,int32_t expect,c
  }
  return 1;
 }
+}
+// Probe entries: the slot table, remap table and sgptDataTables are retail 32-bit words.
+extern "C" int32_t d2c_539e0(void (*f10614)(uint32_t*,uint32_t),uint32_t* unit,uint32_t edx){
+ return d2client_batch_537d0::run539E0(unit,edx,f10614);
+}
+extern "C" uint32_t d2c_53a30(const uint8_t* tab,int32_t c2d4,int32_t c380,uint32_t c7808,const int32_t* u,int32_t (*f558e0)(const int32_t*),const uint8_t* (*f1260)(int32_t),void (*fatal)(int32_t)){
+ return d2client_batch_537d0::run53A30(tab,c2d4,c380,c7808,u,f558e0,f1260,fatal);
+}
+extern "C" void d2c_53b20(int32_t monId,uint8_t* d,const uint8_t* remap,const uint8_t* dt){
+ auto w=[&](uint32_t o){ uint32_t v; std::memcpy(&v,dt+o,4); return v; };
+ d2client_batch_537d0::run53B20(monId,(d2client_batch_537d0::Pal*)d,remap,(const uint8_t*)(uintptr_t)w(0xa78),(int32_t)w(0xa80),(const uint8_t*)(uintptr_t)w(0xa90),(int32_t)w(0xa98));
 }

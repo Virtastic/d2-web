@@ -146,10 +146,17 @@ void sub_53550(Svc& s,G& g,Unit* a){
 void sub_536F0(Svc& s,G& g){
  for(Unit* u=s.o10717(g.cc3b8);u;u=u->next7c) if(s.o10826(u)==8) sub_53550(s,g,u);
 }
+template<class A,class B> static void run53720(int32_t& c960c,int32_t& cc2e0,int32_t& a212c,int32_t& cc2e4,int32_t& a2130,A f2f10,B f36f0){
+ if(c960c) f2f10();
+ if(cc2e0==0&&a212c!=-1&&(a212c=(int32_t)((uint32_t)a212c+1u),a212c>0x1d)){ cc2e0=1; f36f0(); }
+ if(cc2e4&&a2130!=-1&&(a2130=(int32_t)((uint32_t)a2130+1u),a2130>0x1d)){ cc2e4=0; a2130=-1; }
+}
 // 1.13c D2Client+0x53720
 void sub_53720(Svc& s,G& g){
- if(g.c960c) sub_52F10(s,g);
- if(g.cc2e0==0&&g.a212c!=-1&&(++g.a212c,g.a212c>0x1d)){ g.cc2e0=1; sub_536F0(s,g); }
- if(g.cc2e4&&g.a2130!=-1&&(++g.a2130,g.a2130>0x1d)){ g.cc2e4=0; g.a2130=-1; }
+ run53720(g.c960c,g.cc2e0,g.a212c,g.cc2e4,g.a2130,[&]{ sub_52F10(s,g); },[&]{ sub_536F0(s,g); });
 }
+}
+// Probe entry for 0x53720: the five globals (0x11960C, 0x11C2E0, 0xF212C, 0x11C2E4, 0xF2130) by address, the two callees as seams.
+extern "C" void d2c_53720(int32_t* c960c,int32_t* cc2e0,int32_t* a212c,int32_t* cc2e4,int32_t* a2130,void (*f2f10)(),void (*f36f0)()){
+ d2client_batch_52860::run53720(*c960c,*cc2e0,*a212c,*cc2e4,*a2130,f2f10,f36f0);
 }

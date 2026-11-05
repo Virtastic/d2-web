@@ -88,7 +88,8 @@ void sub_560B0(Calls&c,P unit,U a7,W*dst,const W*param_3){
  if(buf[len-1]==10) buf[len-1]=0;   // reads the original tail (buf[len-1]); k<len-1 so it was not the zeroed cell
  wcat(dst,buf+k+1); wcat(dst,b); wcat(dst,a);
 }
-static void trimNl(W*s){ size_t n=wlen(s); if(n&&s[n-1]==10){ s[n-1]=0; } }
+// retail tests s[len-1] with no length check: an empty string reads (and may clear) the word before it
+static void trimNl(W*s){ intptr_t n=(intptr_t)wlen(s); if(s[n-1]==10){ s[n-1]=0; } }
 // 1.13c D2Client+0x56210  (ECX, EAX = passed to 10996; EDX = out; stack: unit, arg2 (unused), tail string; ret 0xc)
 void sub_56210(Calls&c,U ecx,U eax,W*out,P unit,U arg2,const W*tail){
  (void)arg2;
@@ -138,4 +139,21 @@ extern "C" void d2c_560b0(void (*f55b20)(uint32_t,void*,void*,uint32_t,uint32_t,
 // Probe entry for 0x56700 (and its twin 0x56740): the one seam is Ordinal_10569 (thunk 0xC5EC), which fills the two out words.
 extern "C" uint32_t d2c_56700(void (*f10569)(void*,int32_t*,int32_t*),uint8_t* obj){
  d2client_batch_43710::Calls c{}; c.ord10569=f10569; return d2client_batch_43710::sub_56700(c,obj);
+}
+extern "C" uint32_t d2c_56740(void (*f10569)(void*,int32_t*,int32_t*),uint8_t* obj){
+ d2client_batch_43710::Calls c{}; c.ord10569=f10569; return d2client_batch_43710::sub_56740(c,obj);
+}
+// Probe entries for 0x56210/0x56280: the seams are 55B20, the D1EC string lookup and the ordinals 10996/10872/11111/11108.
+struct D2c56Seams {
+ void (*f55b20)(uint32_t,void*,void*,uint32_t,uint32_t,uint32_t,uint32_t,uint32_t); const char16_t* (*str)(int32_t);
+ void (*o10996)(int32_t,int32_t,void*,uint32_t,uint32_t,int32_t); void* (*o10872)(void*,int32_t,int32_t); void (*o11111)(void*,void*); void (*o11108)(void*);
+};
+static d2client_batch_43710::Calls d2c56calls(const D2c56Seams& k){
+ d2client_batch_43710::Calls c{}; c.fb05b20=k.f55b20; c.ord10003s=k.str; c.ord10996=k.o10996; c.ord10872=k.o10872; c.ord11111=k.o11111; c.ord11108=k.o11108; return c;
+}
+extern "C" void d2c_56210(const D2c56Seams* k,uint32_t ecx,uint32_t eax,char16_t* out,void* unit,uint32_t arg2,const char16_t* tail){
+ auto c=d2c56calls(*k); d2client_batch_43710::sub_56210(c,ecx,eax,out,unit,arg2,tail);
+}
+extern "C" void d2c_56280(const D2c56Seams* k,void* ebx,uint32_t ecx,uint32_t eax,char16_t* out,uint32_t arg2,const char16_t* tail){
+ auto c=d2c56calls(*k); d2client_batch_43710::sub_56280(c,ebx,ecx,eax,out,arg2,tail);
 }
