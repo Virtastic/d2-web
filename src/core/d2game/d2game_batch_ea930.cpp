@@ -174,7 +174,7 @@ X void d2_fn_d2game_F02F0(uintptr_t ecx, uintptr_t eax, E env)
     wr32(pd, 0x38, (uint32_t)n);
 }
 
-// 1.13c D2Game+0xF03E0  (param_1=game, param_2 passed to Ordinal_10920)
+// sketch only: the retail-layout port is d2game_f03e0.cpp
 X void d2_fn_d2game_F03E0(uintptr_t game, uint32_t param2, E env)
 {
     uintptr_t pd = O(10920, param2, 0, 0, 0, 0);

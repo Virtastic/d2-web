@@ -53,13 +53,13 @@ static void* findNode(const D2GameF05B0Env* e, void* self, void* other)
     return nullptr;
 }
 
-// 1.13c D2Game+0xF05B0
+// sketch only: the retail-layout port is d2game_f05b0.cpp
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_F05B0(void* self, void* other, const D2GameF05B0Env* e)
 {
     if (findNode(e, self, other)) { uint32_t a[4] = {}; e->fn_DFC10(a); }
 }
 
-// 1.13c D2Game+0xF0640
+// sketch only: the retail-layout port is d2game_f0640.cpp
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_F0640(void* self, int set, uint32_t mask, void* other, const D2GameF05B0Env* e)
 {
     void* n = findNode(e, self, other);
@@ -70,7 +70,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_F0640(void* self, int set, uin
     }
 }
 
-// 1.13c D2Game+0xF0720
+// sketch only: the retail-layout port is d2game_f0720.cpp
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_F0720(uint32_t v, uint8_t kind, const D2GameF05B0Env* e)
 {
     uint32_t grp = (kind == 1 || kind == 2) ? 1 : kind == 3 ? 3 : kind == 4 ? 4 :
@@ -83,7 +83,7 @@ static uint32_t playerField9c(void* u, const D2GameF05B0Env* e)
     return (u && rd32(u, 0) == 0) ? rd32(e->ord10920(u), 0x9c) : 0;
 }
 
-// 1.13c D2Game+0xF0870
+// sketch only: the retail-layout port is d2game_f0870.cpp
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_F0870(void* a, void* b, const D2GameF05B0Env* e)
 {
     e->fn_102F0(a);
@@ -102,7 +102,7 @@ static void callIfPlaced(void* u, const D2GameF05B0Env* e)
     if (u && rd32(u, 0x80) != 0 && rd32(u, 0) == 0) e->fn_9BEB0(u);
 }
 
-// 1.13c D2Game+0xF0900
+// sketch only: the retail-layout port is d2game_f0900.cpp
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_F0900(void* a, void* b, const D2GameF05B0Env* e)
 {
     e->fn_102F0(a);
@@ -118,7 +118,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_F0900(void* a, void* b, const 
     e->fn_10130();
 }
 
-// 1.13c D2Game+0xF09E0 (EBX = unit, param = other)
+// sketch only: the retail-layout port is d2game_f09e0.cpp
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_F09E0(void* other, void* unit, const D2GameF05B0Env* e)
 {
     if (unitId(unit) == unitId(other)) return;
@@ -128,7 +128,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_F09E0(void* other, void* unit,
     e->fn_10220();
 }
 
-// 1.13c D2Game+0xF0C60 (EAX = unitB)
+// sketch only: the retail-layout port is d2game_f0c60.cpp
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_F0C60(void* a, int p2, uint32_t unused, uint32_t p4, void* unitB, void* other, const D2GameF05B0Env* e)
 {
     (void)unused;
