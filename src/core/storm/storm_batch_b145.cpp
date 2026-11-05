@@ -32,7 +32,7 @@ void (*Storm_Hook_1FAB0)() = nullptr;                  // FUN_6fc1fab0
 int (*Storm_Hook_CrtStartup)(uint32_t, int, int) = nullptr; // __DllMainCRTStartup@12
 static uint32_t g_listHead[4];         // DAT_6fc42fc0 (pointers to nodes whose first dword is arg of 24BA0)
 
-// 1.13c Storm+0x35170: shutdown; drain 4 handle lists under their bucket locks, then delete the locks.
+// also Storm 0x35170 (vectored port: storm_logshutdown_35170.cpp): shutdown; drain 4 handle lists under their bucket locks, then delete the locks.
 extern "C" void Storm_Sub35170(uint32_t ecx) {
   if (Storm_Hook_249E0) Storm_Hook_249E0(ecx);
   for (int i = 0; i < 4; i++) {

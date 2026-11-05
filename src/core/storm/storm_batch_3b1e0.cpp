@@ -62,7 +62,7 @@ extern "C" void Storm_Sub30580(uint32_t handle, StormState3b1e0& s, const StormC
     c.regionClear(n); c.regionRelease(0x458f0,n);
     if (n) c.leave(regionLock);
 }
-// 1.13c Storm+0x34BA0
+// also Storm 0x34BA0 (older port; src/core/storm/storm_34ba0.cpp)
 extern "C" void Storm_Sub34BA0(uint32_t id, StormState3b1e0& s, const StormCalls3b1e0& c) {
     if (!id) return;
     uint32_t bucket = id & 3;
@@ -96,7 +96,7 @@ extern "C" StormLog3b1e0* Storm_Sub347B0(uint32_t id, uint32_t* bucket, uint32_t
     *bucket = ~0u;
     return nullptr;
 }
-// 1.13c Storm+0x34AE0
+// also Storm 0x34AE0 (older port; src/core/storm/storm_34ae0.cpp)
 extern "C" uint32_t Storm_Sub34AE0(const char* name, uint32_t /*unused*/, uint32_t* out,
                                     StormState3b1e0& s, const StormCalls3b1e0& c) {
     // Retail dereferences name before validating it; preserve that precondition.
@@ -113,7 +113,7 @@ extern "C" uint32_t Storm_Sub34AE0(const char* name, uint32_t /*unused*/, uint32
     n->file = file; n->field18 = 1; n->field14 = 0;
     c.leave(logLock(bucket)); return 1;
 }
-// 1.13c Storm+0x349E0
+// also Storm 0x349E0 (older ports: storm_349e0.cpp, this batch; the retail-word port is storm_logflush_349e0.cpp)
 extern "C" void Storm_Sub349E0(uint32_t scratch, StormState3b1e0& s, const StormCalls3b1e0&) {
     for (int i = 0; i < 4; ++i) g_stormLogs[i] = s.logs[i]; // caller-owned state mirrors the module's
     Storm_FlushLogs_349E0(scratch);
