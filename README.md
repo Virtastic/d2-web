@@ -19,7 +19,7 @@
 [![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-buy%20us%20a%20coffee-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/virtastic)
 [![YouTube](https://img.shields.io/badge/YouTube-Virtastic-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/@Virtastic-Apps)
 [![Reddit](https://img.shields.io/badge/Reddit-r%2Fvirtastic-FF4500?logo=reddit&logoColor=white)](https://www.reddit.com/r/virtastic)
-![License: MIT](https://img.shields.io/badge/license-MIT-blue)
+![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0-blue)
 ![Platform: Chrome desktop](https://img.shields.io/badge/browser-Chrome%20%2F%20Chromium-brightgreen)
 
 An unofficial reimplementation of the Diablo II: Lord of Destruction **1.13c** engine, compiled to
@@ -527,4 +527,4 @@ Blizzard Entertainment, Inc. in the U.S. and/or other countries. All game conten
 owners; you must own the game to use this project. The engine was written by studying the retail
 1.13c program (it was not written clean-room), and it ships no Blizzard files or data.
 
-The d2-web source code is released under the [MIT License](LICENSE).
+The d2-web source code is released under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-or-later).

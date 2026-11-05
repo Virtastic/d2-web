@@ -1,3 +1,6 @@
+d2-web is licensed under the GNU Affero General Public License v3.0 or later (see LICENSE).
+The third-party components below keep their own licences, all compatible with AGPL-3.0.
+
 d2-web -- third-party notices
 
 src/core/d2moo/        D2MOO, MIT License, (c) The Phrozen Keep community. See src/core/d2moo/LICENSE.
