@@ -596,6 +596,7 @@ static D2SessionMotion g_sessionMotion;
 // clock here; do not overwrite the server unit's event clock to make its sprite move.
 static bool g_clientCastClockActive;
 static uint32_t g_clientCastFramePrecise;
+static uint32_t g_clientCastMode;
 static uint16_t g_clientCastAnimSpeed;
 static D2SessionCoords g_sessionCoords;
 static std::vector<D2SessionUnitCoord> g_sessionUnitCoords;
@@ -7296,16 +7297,23 @@ EMSCRIPTEN_KEEPALIVE const char* d2_session_hp_watch() { return g_hpWatch.c_str(
 // gate each client frame. The server-side unit in this in-process session instead carries the game
 // epoch that #6FCBCE70 writes for cast event timing. Mirror the client's cast clock for drawing and
 // leave that authoritative server clock (and action-frame processing) alone.
+// Retail client clock for the player's timed action modes (attack 1/2, throw, kick, cast). Each
+// mode-set tick the client hero reads 0x200 (attack), 0x100 (throw, kick) or 0x100 (cast: seed 0
+// plus the same tick's step), then +wAnimSpeed per tick (build-wasm session capture p71-swing, `FR C`).
+static bool clientClockMode(uint32_t m) {
+    return m == PLRMODE_CAST || m == PLRMODE_ATTACK1 || m == PLRMODE_ATTACK2 || m == PLRMODE_THROW || m == PLRMODE_KICK;
+}
 static void syncClientCastClock() {
-    if (!g_targetPlayer || g_targetPlayer->dwAnimMode != PLRMODE_CAST) {
+    if (!g_targetPlayer || !clientClockMode(g_targetPlayer->dwAnimMode)) {
         g_clientCastClockActive = false;
         return;
     }
-    if (g_clientCastClockActive) return;
+    if (g_clientCastClockActive && g_clientCastMode == g_targetPlayer->dwAnimMode) return;
     g_clientCastClockActive = true;
-    // Native #11090's setup helper asks #6FD82220 for the player's start frame. For player mode 10,
-    // that helper's mode-table entry selects its zero-return path, so the client clock starts at 0.
-    g_clientCastFramePrecise = 0;
+    g_clientCastMode = g_targetPlayer->dwAnimMode;
+    // Native #11090's setup helper asks #6FD82220 for the player's start frame: 0 for cast, throw and
+    // kick, one frame (0x100) for the two attack modes.
+    g_clientCastFramePrecise = (g_clientCastMode == PLRMODE_ATTACK1 || g_clientCastMode == PLRMODE_ATTACK2) ? 0x100 : 0;
     g_clientCastAnimSpeed = g_targetPlayer->wAnimSpeed;
 }
 

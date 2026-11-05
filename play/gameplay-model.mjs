@@ -101,6 +101,8 @@ export function normalizeSnapshot(value) {
       mana: Math.max(0, finite(player.mana)), manaMax: Math.max(0, finite(player.manaMax)),
       ...(player.weaponClassId == null ? {} : { weaponClassId: Math.trunc(finite(player.weaponClassId, -1)) }),
       ...(typeof player.weaponClass === 'string' ? { weaponClass: player.weaponClass } : {}),
+      // the engine's Disguise-state form record (d2_session_player_form_actor): the draw selects on it
+      ...(player.form && typeof player.form === 'object' ? { form: player.form } : {}),
     },
     entities: entities.slice(0, 2048).map((e) => ({
       id: Math.trunc(finite(e?.id)), type: Math.trunc(finite(e?.type)), classId: Math.trunc(finite(e?.classId)),
