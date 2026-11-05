@@ -20,35 +20,17 @@
 #include <cstring>
 #include <Windows.h>
 
-struct StormBatch19040Env {
-    // ---- unmapped internal callees, retail argument order --------------------------------------
-    uint32_t  (*f_18f00)(void);                                  // 0x18F00 surface update pump
-    void      (*f_18f90)(void);                                  // 0x18F90 default palette reset
-    uint32_t  (*f_18fe0)(void* hwnd);                            // 0x18FE0 window-state test (EAX)
-    void      (*f_1050)(void* p);                                // 0x1050 free with "delete" tag
-    void      (*f_35fc0)(void* group);                           // 0x35FC0 free a bucket-group (EDI)
-    void      (*f_365e0)(void* dst, void* src);                  // 0x365E0 clone a group (src in EBX)
-    uint32_t* (*f_35c70)(uint32_t a, uint32_t b);                // 0x35C70 table lookup (ESI/EDX)
-    uint32_t  (*f_1520)(void* node);                             // 0x1520 remove AUBREAKCMD node
-    void      (*f_4d60)(void* node);                             // 0x4D60 list unlink
-    int32_t   (*f_1b960)(void* p, const char* file, int32_t line); // 0x1B960 SMemFree
-    uint32_t* (*f_1bdd0)(int32_t a, uint32_t b, int32_t c, uint32_t d, uint32_t e, uint32_t f);
-    uint32_t* (*f_1c390)(uint32_t flags, uint32_t size);         // 0x1C390 pool allocate
-    uint32_t  (*f_2f590)(uint32_t code, const char* msg, int32_t line, uint8_t* buf, int32_t a,
-                         int32_t b);                             // 0x2F590 fatal error
-    uint32_t  (*f_1ad80)(void);                                  // 0x1AD80 heap id
-    void      (*f_1a600)(void);                                  // 0x1A600 heap swap check
-    void      (*exit_process)(uint32_t code);                    // kernel32
-    // ---- gdi32 / user32 imports ---------------------------------------------------------------
-    int32_t   (*set_palette_entries)(void* pal, uint32_t start, uint32_t count, void* entries);
-    void*     (*get_dc)(void* hwnd);
-    void*     (*select_palette)(void* hdc, void* pal, int32_t background);
-    int32_t   (*realize_palette)(void* hdc);
-    int32_t   (*release_dc)(void* hwnd, void* hdc);
-    int32_t   (*is_window_visible)(void* hwnd);
-    int32_t   (*is_iconic)(void* hwnd);
-    int32_t   (*invalidate_rect)(void* hwnd, void* rect, int32_t erase);
-};
+#include "storm_batch_19040.h"
+
+// SEVT command table (0x36290 et al.): shared with the FN probes through storm_batch_19040.h.
+uint32_t g_evtTable;              // 0x6FC45370  hash buckets of group records
+uint32_t g_evtSize;               // 0x6FC45374  bucket count (power of two)
+uint32_t g_evtCount;              // 0x6FC45378  group-record count
+CRITICAL_SECTION g_evtLock;       // 0x6FC458C8
+int32_t  g_evtDirty;              // 0x6FC42F58  table changed since the last walk
+uint32_t g_breakAnchor;           // 0x6FC458BC  list anchor handed to 0x1520
+int32_t  g_evtDepth;              // 0x6FC4536C  dispatch recursion depth
+uint32_t g_breakList;             // 0x6FC458C4  AUBREAKCMD list head
 
 namespace {
 
@@ -74,14 +56,6 @@ int32_t  g_heapDirty[0x100];      // 0x6FC44D60  per-id: list has freeable nodes
 void     StormSeamVirtualFree(void*, uint32_t, uint32_t) {} // 0x6FC3323C, node is released by the host
 
 // SEVT command table (0x36290 et al.).
-uint32_t g_evtTable;              // 0x6FC45370  hash buckets of group records
-uint32_t g_evtSize;               // 0x6FC45374  bucket count (power of two)
-uint32_t g_evtCount;              // 0x6FC45378  group-record count
-CRITICAL_SECTION g_evtLock;       // 0x6FC458C8
-uint32_t g_breakList;             // 0x6FC458C4  AUBREAKCMD list head
-int32_t  g_evtDepth;              // 0x6FC4536C  dispatch recursion depth
-int32_t  g_evtDirty;              // 0x6FC42F58  table changed since the last walk
-uint32_t g_breakAnchor;           // 0x6FC458BC  list anchor handed to 0x1520
 
 // Retail record layouts (4-byte fields, as in 0x36290).
 struct EvtNode   { uint32_t key, seq, handler, next; };        // 0x10
@@ -359,6 +333,12 @@ uint32_t* Storm_Sub1C580Env(uint32_t param_1, const char* param_2, int32_t param
     return puVar3;
 }
 
+// SEVT allocations go through the 0x1C580 seam when the caller supplies one (the FN probes log the call), else the pool allocator.
+static uint32_t* evtAlloc(uint32_t size, const char* file, int32_t line, uint32_t flags, const StormBatch19040Env* env) {
+    if (env->f_1c580) return env->f_1c580(size, file, line, flags);
+    return Storm_Sub1C580Env(size, file, line, flags, env);
+}
+
 // 1.13c Storm+0x35CD0: remove every bucket node of command param_3 (optionally only those whose
 // handler is param_4) from the group record's bucket array, freeing each node with 0x1050.
 extern "C" void Storm_Sub1050(void* p);   // 0x1050 SMemFree(p, "delete", -1)
@@ -467,7 +447,8 @@ lab_5e00:
         LeaveCriticalSection(&g_evtLock);
         if (pcVar5 != nullptr) {
             local_8 = 1;
-            pcVar5(param_4);
+            if (env->call_handler) env->call_handler((uint32_t)(uintptr_t)pcVar5, param_4);
+            else pcVar5(param_4);
         }
         if (puVar4 != nullptr) goto lab_5e00;
     }
@@ -585,7 +566,7 @@ uint32_t Storm_Sub36290(uint32_t param_1, uint32_t param_2, uint32_t param_3, ui
                     newSize = uVar8;
                 } while (uVar8 < target || uVar8 - target == 0);
             }
-            uint32_t* puVar5 = Storm_Sub1C580Env(newSize * 4, kSevt, 0x143, 8, env);
+            uint32_t* puVar5 = evtAlloc(newSize * 4, kSevt, 0x143, 8, env);
             uVar4 = newSize;
             table = puVar5;
             if (g_evtTable != 0) {
@@ -610,11 +591,11 @@ uint32_t Storm_Sub36290(uint32_t param_1, uint32_t param_2, uint32_t param_3, ui
         g_evtSize = uVar4;
         g_evtTable = val(table);
         uint32_t idx = (param_1 ^ param_2) & (g_evtSize - 1);
-        puVar3 = (EvtRecord*)Storm_Sub1C580Env(0x14, kSevt, 0x15d, 8, env);
+        puVar3 = (EvtRecord*)evtAlloc(0x14, kSevt, 0x15d, 8, env);
         std::memset(puVar3, 0, 0x14);
         puVar3->k1 = param_1;
         puVar3->k2 = param_2;
-        EvtGroup* puVar5g = (EvtGroup*)Storm_Sub1C580Env(0x10, kSevt, 0x160, 8, env);
+        EvtGroup* puVar5g = (EvtGroup*)evtAlloc(0x10, kSevt, 0x160, 8, env);
         std::memset(puVar5g, 0, 0x10);
         puVar3->group = val(puVar5g);
         table = ptr<uint32_t>(g_evtTable);
@@ -635,8 +616,8 @@ uint32_t Storm_Sub36290(uint32_t param_1, uint32_t param_2, uint32_t param_3, ui
                 newSize = uVar8;
             } while (uVar8 < target || uVar8 - target == 0);
         }
-        uint32_t* puVar5 = Storm_Sub1C580Env(newSize * 4, kSevt, 0x16e, 8, env);
-        uint32_t* puVar6 = Storm_Sub1C580Env(newSize * 4, kSevt, 0x16f, 8, env);
+        uint32_t* puVar5 = evtAlloc(newSize * 4, kSevt, 0x16e, 8, env);
+        uint32_t* puVar6 = evtAlloc(newSize * 4, kSevt, 0x16f, 8, env);
         for (uint32_t i = 0; i < newSize; i++) puVar6[i] = val(&puVar5[i]);
         if (puVar3g->buckets != 0 && puVar3g->size != 0) {
             for (uint32_t i = 0; i < puVar3g->size; i++) {
@@ -658,7 +639,7 @@ uint32_t Storm_Sub36290(uint32_t param_1, uint32_t param_2, uint32_t param_3, ui
     }
 
     uint32_t uVar8 = (puVar3g->size - 1) & param_3;
-    uint32_t* puVar5 = Storm_Sub1C580Env(0x10, kSevt, 0x18d, 8, env);
+    uint32_t* puVar5 = evtAlloc(0x10, kSevt, 0x18d, 8, env);
     puVar5[0] = param_3;
     uint32_t uVar4 = puVar3->seq;
     puVar3->seq = uVar4 + 1;
@@ -685,7 +666,7 @@ uint32_t Storm_Sub36680(uint32_t param_1, uint32_t param_2, const StormBatch1904
             puVar3 = ptr<uint32_t>(puVar3[4]);
         }
         if (puVar3 != nullptr) {
-            uint32_t* puVar1 = Storm_Sub1C580Env(0x10, "..\\3rdParty\\STORM\\SOURCE\\SEVT.CPP",
+            uint32_t* puVar1 = evtAlloc(0x10, "..\\3rdParty\\STORM\\SOURCE\\SEVT.CPP",
                                               0x11c, 0, env);
             env->f_365e0(puVar1, (void*)(uintptr_t)puVar3[3]);
             uVar2 = 1;
