@@ -21,7 +21,7 @@ export function selectPlayerRenderSource(snapshot, motion, realmSessionOpen, rea
         direction: live?.direction ?? realmPlayer.initialDirection ?? 0, framePrecise: live?.framePrecise,
         frameCountPrecise: live?.frameCountPrecise, animSpeed: live?.animSpeed, seqMode: live?.seqMode, seqFrame: live?.seqFrame,
         tick: snapshot?.tick ?? 0, act: realmAct ?? snapshot?.act ?? 0,
-        weaponClass: 'hth', items: [] },
+        weaponClass: 'hth', items: [], form: realmPlayer.form ?? null },
     };
   }
   if (realmSessionOpen) return { source: 'none', x: 0, y: 0, classId: null, renderState: null };

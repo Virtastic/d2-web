@@ -1,3 +1,4 @@
+import { parseMonsterAnimations } from './monster-renderer.mjs';
 import { parseRealmMissiles } from './realm-missiles.mjs';
 import { parseRealmMissileSoundEvents } from './realm-missile-sounds.mjs';
 // The realm CLIENT half: it drives our protocol (BNCS/MCP/D2GS) over a byte-pipe transport.
@@ -515,7 +516,7 @@ export function bindEngineProtocol(Module, scratch = 65536) {
         const count = call('d2_realm_client_player_count', 'number', [], []);
         for (let index = 0; index < count; index++) {
           const other = readPlayerPointer(call('d2_realm_client_player_at', 'bigint', ['number'], [index]));
-          if (other?.guid === player.guid) { player.motion = protocol.d2gsClientPlayerMotionAt(index); break; }
+          if (other?.guid === player.guid) { player.motion = protocol.d2gsClientPlayerMotionAt(index); player.form = protocol.d2gsClientPlayerFormAt(index); break; }
         }
       }
       return player;
@@ -538,8 +539,14 @@ export function bindEngineProtocol(Module, scratch = 65536) {
     d2gsClientPlayerAt: (index) => {
       const ptr = call('d2_realm_client_player_at', 'bigint', ['number'], [index]);
       const player = readPlayerPointer(ptr);
-      if (player?.active) player.motion = protocol.d2gsClientPlayerMotionAt(index);
+      if (player?.active) { player.motion = protocol.d2gsClientPlayerMotionAt(index); player.form = protocol.d2gsClientPlayerFormAt(index); }
       return player;
+    },
+    // The monster a Disguise state (Werewolf, Werebear) turns this roster player into, as the engine's animation record; null otherwise.
+    d2gsClientPlayerFormAt: (index) => {
+      Module.HEAPU8.fill(0, Number(P), Number(P) + 96);
+      if (!call('d2_realm_client_player_form_at', 'number', ['number', 'bigint'], [index, BigInt(P)])) return null;
+      return parseMonsterAnimations(Module.HEAPU8.slice(Number(P), Number(P) + 96), 1)[0];
     },
     d2gsClientPlayerMotionAt: (index) => {
       const ptr = call('d2_realm_client_player_motion_at', 'bigint', ['number'], [index]);
@@ -561,6 +568,7 @@ export function bindEngineProtocol(Module, scratch = 65536) {
         const player = readPlayerPointer(ptr);
         if (player?.active) {
           player.motion = protocol.d2gsClientPlayerMotionAt(index);
+          player.form = protocol.d2gsClientPlayerFormAt(index);
           players.push(player);
         }
       }

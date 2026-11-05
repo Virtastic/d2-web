@@ -3817,7 +3817,8 @@ function drawRealmFrame() {
         weaponClass: 'hth', items: [] };
       let drawn = null, error = '';
       try {
-        if (playerRenderer) drawn = playerRenderer.draw(c, x, y, renderState);
+        if (player.form && monsterRenderer) drawn = monsterRenderer.draw(c, x, y, player.form, renderState.act);
+        else if (playerRenderer) drawn = playerRenderer.draw(c, x, y, renderState);
         else {
           c.fillStyle = '#d9b85c'; c.beginPath(); c.arc(x, y, 7, 0, Math.PI * 2); c.fill();
           drawn = { playerClass: player.classId, token: 'TN', engineDirection: renderState.direction };

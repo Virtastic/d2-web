@@ -2520,6 +2520,38 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_used_skill_at(int index) {
     return skill ? SKILLS_GetSkillIdFromSkill(skill, __FILE__, __LINE__) : -1;
 }
 
+// A roster player in a Disguise state (Werewolf, Werebear) is drawn as the monster ConvertMode names, not
+// as its class token. Fills the 96-byte monster animation record (the layout parseMonsterAnimations reads)
+// and returns 1, or returns 0 when the unit is not converted to a monster.
+struct RealmPlayerFormRecord {
+    uint32_t id, classId, code, mode, framePrecise, frameCountPrecise, componentCodes[16];
+    uint16_t animSpeed; uint8_t direction, flags; uint32_t baseWeaponClass;
+};
+static_assert(sizeof(RealmPlayerFormRecord) == 96, "monster animation record");
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_form_at(int index, RealmPlayerFormRecord* out) {
+    if (!out || index < 0 || static_cast<size_t>(index) >= g_players.size()) return 0;
+    const D2UnitStrc* unit = g_players[static_cast<size_t>(index)].motionUnit;
+    if (!unit || !unit->pDynamicPath) return 0;
+    int unitType = static_cast<int>(unit->dwUnitType), classId = static_cast<int>(unit->dwClassId);
+    int mode = UNITS_GetAnimOrSeqMode(const_cast<D2UnitStrc*>(unit));
+    D2COMMON_11013_ConvertMode(const_cast<D2UnitStrc*>(unit), &unitType, &classId, &mode, __FILE__, __LINE__);
+    if (unitType != UNIT_MONSTER) return 0;
+    const D2MonStatsTxt* mon = DATATBLS_GetMonStatsTxtRecord(classId);
+    const D2MonStats2Txt* mon2 = UNITS_GetMonStats2TxtRecordFromMonsterId(classId);
+    if (!mon) return 0;
+    memset(out, 0, sizeof *out);
+    out->id = unit->dwUnitId; out->classId = static_cast<uint32_t>(classId); out->code = mon->dwCode;
+    out->mode = static_cast<uint32_t>(mode);
+    out->framePrecise = static_cast<uint32_t>(unit->nSeqCurrentFramePrecise);
+    out->frameCountPrecise = static_cast<uint32_t>(unit->dwFrameCountPrecise);
+    out->animSpeed = static_cast<uint16_t>(unit->wAnimSpeed);
+    out->direction = static_cast<uint8_t>(PATH_GetDirection(unit->pDynamicPath));
+    out->baseWeaponClass = mon2 ? static_cast<uint32_t>(mon2->nBaseW) : 0;
+    out->flags = (mon2 && (mon2->dwModeFlags & MONSTATS2MODEFLAG_DD)) ? 0x02 : 0;
+    for (uint32_t c = 0; c < 16; ++c) out->componentCodes[c] = static_cast<uint32_t>(D2Common_11070(classId, c, 0));
+    return 1;
+}
+
 EMSCRIPTEN_KEEPALIVE int d2_realm_client_player_count() { return static_cast<int>(g_players.size()); }
 EMSCRIPTEN_KEEPALIVE const D2RealmClientPlayerState* d2_realm_client_player_at(int index) {
     return index >= 0 && static_cast<size_t>(index) < g_players.size() ? &g_players[index].view : nullptr;
