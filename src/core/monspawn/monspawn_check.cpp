@@ -1741,7 +1741,9 @@ static void updateSessionWorld() {
                 memcpy(&object.token, txt->szToken, 3); object.mode = clientObjectClock(unit).shown;
                 if (unit->pStaticPath) { object.x = unit->pStaticPath->tGameCoords.nX; object.y = unit->pStaticPath->tGameCoords.nY; }
                 { const ClientObjectClock& c = clientObjectClock(unit); object.framePrecise = c.clock; object.frameCountPrecise = c.count; object.animSpeed = c.speed; } object.direction = txt->nOrientation;
-                object.selectable = unit->dwAnimMode < 8 ? txt->nSelectable[unit->dwAnimMode] : 0;
+                // The client's own mode (the shown one) picks the Selectable column, as retail's hover does: a portal
+                // the server leaves in OP is ON on the client once its opening cels run out.
+                object.selectable = object.mode < 8 ? txt->nSelectable[object.mode] : 0;
                 object.inClientRoom = (clientHeldCount(room) > 0 || inStartLattice(roomEx));
                 object.locked = txt->nLockable && (unit->pObjectData->InteractType & 0x80);
                 if (txt->nSubClass & (OBJSUBCLASS_TOWNPORTAL | OBJSUBCLASS_PORTAL)) object.portalLevel = unit->pObjectData->InteractType;
@@ -5015,7 +5017,7 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_npc_packet(uint32_t npcId) {
 // retail answers with "no operation".
 static bool objectClickIsSelectable(D2UnitStrc* object) {
     if (!object || !object->pObjectData || !object->pObjectData->pObjectTxt) return false;
-    const uint32_t mode = object->dwAnimMode;
+    const uint32_t mode = clientObjectClock(object).shown;   // the client unit's mode, not the server's (Cairn portal: server OP, client ON)
     return mode < 8 && object->pObjectData->pObjectTxt->nSelectable[mode] != 0;
 }
 
