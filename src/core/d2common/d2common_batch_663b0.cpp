@@ -344,7 +344,7 @@ uint32_t D2Common_1EEE0_InventoryHasPotion(uint32_t pInventory, uint32_t pItem)
 // comparator at LAB_6fd8d040, copies the entries back into the nodes in list order, and frees
 // the scratch array.
 // Comparator at 0x3D040: 1 when the first u16 id is greater, -1 when smaller, 0 when equal.
-extern "C" void d2_fn_d2common_3cf30(uint32_t records, uint32_t count, int32_t (*compare)(uintptr_t, uintptr_t));
+extern "C" void d2c_3cf30_legacy(uint32_t records, uint32_t count, int32_t (*compare)(uintptr_t, uintptr_t));
 static int32_t TextCompare_3D040(uintptr_t a, uintptr_t b)
 {
 	const uint16_t x = *reinterpret_cast<const uint16_t*>(a), y = *reinterpret_cast<const uint16_t*>(b);
@@ -370,7 +370,7 @@ void D2Common_3D2B0_SortTextList(uint32_t pList)
 		*reinterpret_cast<uint16_t*>(out) = *reinterpret_cast<uint16_t*>(P(n));
 		W(out, 4) = W(P(n), 4);
 	}
-	d2_fn_d2common_3cf30(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(scratch)), count, TextCompare_3D040);
+	d2c_3cf30_legacy(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(scratch)), count, TextCompare_3D040);
 	out = scratch;
 	uint32_t n = W(list, 8);
 	for (uint32_t i = 0; i < count; ++i, out += 12)

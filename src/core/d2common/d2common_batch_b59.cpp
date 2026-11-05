@@ -42,7 +42,7 @@ struct D2Common3CDF0Env
 // room holding the chosen cell, writing the chosen coordinate back through arg4/arg5.
 // The record's coordinates arrive through the 0x1A130 seam's two outputs.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t* d2_fn_d2common_3cdf0(uint32_t pUnit, int32_t nArg2, int32_t nArg3,
+EMSCRIPTEN_KEEPALIVE int32_t* d2c_3cdf0_legacy(uint32_t pUnit, int32_t nArg2, int32_t nArg3,
                                                    int32_t* pOutX, int32_t* pOutY, int32_t nArg6,
                                                    const D2Common3CDF0Env* pEnv)
 {

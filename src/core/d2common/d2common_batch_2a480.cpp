@@ -62,11 +62,6 @@ extern "C" void D2Common_2A480_ItemSocketCount(uint32_t pUnit, uint32_t nMax) { 
 	}
 }
 
-// +0x344F0 (#10993): forwards the state mask at data-tables +0xDC (fStateMasks[4]) and the unit to 0x34080.
-extern "C" void D2Common_34080_ApplyStateMask(const uint32_t* mask, D2UnitStrc* unit);
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_344f0(uint32_t pArg) { // 1.13c D2Common+0x344f0
-	D2Common_34080_ApplyStateMask(sgptDataTables->fStateMasks[4], reinterpret_cast<D2UnitStrc*>(static_cast<uintptr_t>(pArg)));
-}
 
 // +0x460B0 (#10996): per-mode emit loop. Stub: every side effect is a still-UNMAPPED callee -- 0x22640
 // and 0x221C0 (item format) pick the element, 0x45AA0 emits, 0x458C0 selects the slot, 0x1800/0x1830

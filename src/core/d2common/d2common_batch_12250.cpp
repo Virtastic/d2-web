@@ -93,7 +93,7 @@ extern "C" uint32_t D2Common_3B3A0_ValidateUnitIds(uint32_t room) {
  return 1;
 }
 // 1.13c D2Common+0x3CF30: stable insertion sort of 12-byte records; retail calls compare(ecx=earlier record, edx=moving record) and shifts while it is positive.
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2common_3cf30(uint32_t records, uint32_t count,
+EMSCRIPTEN_KEEPALIVE void d2c_3cf30_legacy(uint32_t records, uint32_t count,
  int32_t (*compare)(uintptr_t,uintptr_t)) {
  if (!records || !compare) return;
  uint8_t saved[12];
