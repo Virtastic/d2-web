@@ -132,6 +132,9 @@ void d2cmp_c9a0(int32_t flag, const D2CMPBatch116d0Env* env) {
     env->regLoadValue("Diablo II", "CompressedData", 1, &g_d2cmp_32cc8);
     if (flag == 0) g_d2cmp_32cc8 = 0;
 }
+// FUNCTION-mode accessors for the 0x6FE32CC8 global (the probe pins it before the call and reads it back).
+extern "C" uint32_t d2cmp_c9a0_get(void) { return g_d2cmp_32cc8; }
+extern "C" void d2cmp_c9a0_set(uint32_t v) { g_d2cmp_32cc8 = v; }
 
 // 1.13c D2CMP+0x15360 (export #10022, 42 bytes): return the dword at obj+0x14; null is fatal 0x79.
 // 1.13c D2CMP+0x15360
@@ -267,6 +270,9 @@ uint32_t d2cmp_c280(void) {
     LeaveCriticalSection(g_d2cmp_cs_6fe77270);
     return value;
 }
+// FUNCTION-mode pin for 0xC280: a live lock at 0x6FE77270 and the value at 0x6FE77248.
+static CRITICAL_SECTION g_d2cmp_c280_lock;
+extern "C" void d2cmp_c280_pin(uint32_t value) { g_d2cmp_cs_6fe77270 = &g_d2cmp_c280_lock; g_d2cmp_value_6fe77248 = value; }
 
 // 1.13c D2CMP+0x15270 (export #10036, 42 bytes): return the dword at obj+0x1C; null is fatal 0x7E.
 // 1.13c D2CMP+0x15270
