@@ -230,19 +230,7 @@ void PARTY_LeaveParty_113c(void* unit, const Batch5Env* env)
     if (env->countPartyNodes(partyId) < 2) env->destroyParty(partyId);
 }
 
-// 1.13c D2Game+0x9D550
-// Release the units registered for the unit in EAX: import #10383 returns the list (count in the
-// register pair), then import #10144 is applied to each entry, in order. Called from client
-// removal (0x4B7F0). partial: the list's element type is not recovered; the loop and order are.
-void CLIENTS_ReleaseClientUnits_113c(uint32_t unitEax, const Batch5Env* env)
-{
-    if (unitEax == 0) fatal(0x14E);
-    void* list = nullptr;
-    const uint32_t count = env->unitResetLightMapList((void*)(uintptr_t)unitEax, &list);
-    for (uint32_t i = 0; i < count; ++i) {
-        env->setUnitAliveCollision(((void**)list)[i]);
-    }
-}
+// The unit-list release: d2game_9d550.cpp is its own file.
 
 // superseded by d2game_53e50.cpp: 1.13c D2Game+0x53E50
 // D2GAME_SAVE_AttachSaveFile: free the client's pending save header (0x49630), build the player

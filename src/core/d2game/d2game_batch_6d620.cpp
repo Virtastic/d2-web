@@ -178,25 +178,7 @@ extern "C" int d2game_98680(int* a, int unit)
     return 1;
 }
 
-// 1.13c D2Game+0x987D0
-extern "C" int d2game_987d0(int game)
-{
-    int lo, hi;
-    if (!d2game_572c0(game)) {
-        lo = d2ord_10973(); if (lo < 1) lo = 1;
-        hi = d2ord_10973(); if (hi < 2) hi = 2;
-    } else if (d2ord_10051() == 2) { lo = d2ord_10973(); hi = d2ord_10973(); }
-    else { lo = d2ord_10973(); hi = d2ord_10973(); }
-    lo *= 0x100; hi *= 0x100;
-    if (lo < 1) lo = 0x100;
-    if (hi <= lo) hi = lo + 0x100;
-    unsigned r = hi - lo;
-    if ((int)r < 1) return lo;
-    uint64_t* seed = (uint64_t*)(game + 0x20);
-    uint64_t s = (uint64_t)(uint32_t)*seed * 0x6ac690c5ull + (uint32_t)(*seed >> 32);
-    *seed = s;
-    return (r & (r - 1)) ? (int)((uint32_t)s % r) + lo : (int)((r - 1) & (uint32_t)s) + lo;
-}
+// The damage-range roll: d2game_987d0.cpp is its own file.
 
 // 1.13c D2Game+0x988B0 moved to src/core/d2game/d2game_988b0.cpp
 

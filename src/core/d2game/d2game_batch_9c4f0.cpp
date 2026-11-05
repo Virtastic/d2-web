@@ -11,29 +11,9 @@ template <class T> static void wr(uint8_t* b, uint32_t o, T v) { memcpy(b + o, &
 
 // 0x9CA00, 0x9CA60 and 0x9CCF0 are one file each: d2game_9ca00.h, d2game_9ca60.h, d2game_9ccf0.h.
 
-// 1.13c D2Game+0x9CD90
-bool D2GAME_9CD90(int p1, int (*o10494)(), void (*f122c0)(int), int (*f9ccf0)(), int (*f9cb30)(int))
-{
-    if (o10494() == 0) { if (f9ccf0() == 0) return f9cb30(p1) != 0; }
-    else f122c0(3);
-    return true;
-}
+// The idle/trigger gate: d2game_9cd90.cpp is its own file.
 
-// 1.13c D2Game+0x9CFE0 (callee results precomputed by the caller in order; same short-circuits)
-int D2GAME_9CFE0(const uint8_t* a, int (*f9ca60)(), int (*f9cde0)(), uint32_t (*c215d0)(int), uint32_t (*c21560)(int),
-                 int (*inUnit)(), uint8_t (*tableByte)(int), bool (*ce90)(), void (*act)())
-{
-    if (rd<int>(a, 8) == 0) return 0;
-    if (f9ca60() || f9cde0()) return 1;
-    if (c215d0(1) && c21560(2)) {
-        if (inUnit()) {
-            uint8_t b = tableByte(0x2f);
-            if (b && (uint32_t)b < rd<uint32_t>(a, 20) && !ce90()) { act(); return 1; }
-        }
-        return 0;
-    }
-    return 0;
-}
+// The monster skill guard: d2game_9cfe0.cpp is its own file.
 
 // 1.13c D2Game+0x9DDA0 (game ptr in_EAX; unit list at +0x74, next at +0xe8)
 void D2GAME_9DDA0(const uint8_t* game, int (*o10596)(const uint8_t*), void (*f6b100)(const uint8_t*), bool* fatal)

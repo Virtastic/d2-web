@@ -206,23 +206,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_54420_old(void* self, uint32_t param1
     return 0xd;
 }
 
-// Flag-4 records whose target is a type-1 unit with a non-negative +0x04 index: when the index is in
-// range the record's +0x02 short is reloaded, and a final 0x4E index whose ordinal 10494 probe answers 0
-// sets bit 3 of the record's +0x04 byte.
-// 1.13c D2Game+0x771D0
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_771D0(uint32_t ebx, void* esi, const D2GameBatch54420Env* env)
-{
-    if ((rd8(ebx, 4) & 4) == 0 || esi == nullptr || rd32(esi, 0) != 1) return;
-    int32_t i2 = (int32_t)rd32(esi, 4);
-    if (i2 < 0) return;
-    if (i2 < (int32_t)rd32(env->dataTables, 0xa80)) {
-        const uint32_t rec = (uint32_t)i2 * 0x1a8 + rd32(env->dataTables, 0xa78);
-        if (rec != 0) i2 = (int32_t)rd16(rec, 2);
-    }
-    if (i2 < 0 || i2 >= (int32_t)rd32(env->dataTables, 0xa80)) return;
-    if (i2 == 0x4e && env->ordinal10494() == 0) wr8(ebx, 4, (uint8_t)(rd8(ebx, 4) | 8));
-}
+// The monster-kind flag check: moved to d2game_771d0.h.
 
 // Store param_1 into the +0x54 dword of a type-1 unit's +0x14 record.
 // 1.13c D2Game+0xaf710
@@ -276,16 +260,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_DB910(uint32_t param1, uint32_t param
     return 0;
 }
 
-// Call 0xDEA00(param_1, self, EAX) when self and EAX are non-null and EAX's +0xC4 bit 26 is clear.
-// 1.13c D2Game+0x777F0
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_777F0(void* self, uint32_t param1, void* eaxIn,
-                                             const D2GameBatch54420Env* env)
-{
-    if (self != nullptr && eaxIn != nullptr && ((rd32(eaxIn, 0xc4) >> 0x1a) & 1) == 0) {
-        env->subDEA00(param1, self, eaxIn);
-    }
-}
+// The guarded unit hand-off: moved to d2game_777f0.h.
 
 // Type-1 unit with a +0x14 record whose +0x28 record has a non-null +0x28: the 0xE03A0 probe must
 // succeed, the unit's +0x04 index must select a data-table record whose signed +0xA8 short is positive

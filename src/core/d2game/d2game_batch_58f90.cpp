@@ -38,23 +38,23 @@ static uint32_t questHandler(int quest, void* p1, void* p2) {
     return 0;
 }
 
-// 1.13c D2Game+0x58F90
+// old form of D2Game 58F90 (now d2game_58f90.cpp)
 uint32_t d2game_58F90(void* p1, void* p2) { return questHandler(0x27, p1, p2); }
 
-// 1.13c D2Game+0x59180
+// old form of D2Game 59180 (now d2game_59180.cpp)
 void d2game_59180(int32_t* p1) {
     uint8_t buf[6] = { 0x5d, 0x21, 0x20, 0, 0, 0 };  // 0x20215d, then word 0
     if (p1 && *p1 == 0) E.ordinal10920(p1);
     E.subA3E0(buf, 6);
 }
 
-// 1.13c D2Game+0x591D0
+// old form of D2Game 591D0 (now d2game_591d0.cpp)
 uint32_t d2game_591D0(void* p1, void* p2) { return questHandler(0x25, p1, p2); }
 
-// 1.13c D2Game+0x593F0
+// old form of D2Game 593F0 (now d2game_593f0.cpp)
 uint32_t d2game_593F0(void* p1, void* p2) { return questHandler(0x24, p1, p2); }
 
-// 1.13c D2Game+0x59620
+// old form of D2Game 59620 (now d2game_59620.cpp)
 uint32_t d2game_59620(void* p1, void* p2) { return questHandler(0x23, p1, p2); }
 
 static void* findNode(void* game, uint32_t type) {

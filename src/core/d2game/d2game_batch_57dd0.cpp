@@ -202,7 +202,7 @@ void d2game_58be0(void* p1, void* reg) {
     if (n) { void* s = rdptr(n, 0x18); wr32(s, 0x88, rd32(s, 0x88) + 1); }
 }
 
-// 1.13c D2Game+0x590C0
+// old form of D2Game 590C0 (now d2game_590c0.cpp)
 uint32_t d2game_590c0(void* unit, void* p2) {
     uint32_t h = statHandle(g.ord10920(p2), unit);
     if ((g.ord10174(h, 0x26, 0) || g.ord10174(h, 0x26, 0xf)) || g.ord10174(h, 0x26, 0xd) || g.ord10174(h, 0x26, 0xe))

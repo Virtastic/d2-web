@@ -73,23 +73,7 @@ int D2Game_993A0(Env98& e, uint32_t p1, int* p2, int p3) {
   return 1;
 }
 
-// 1.13c D2Game+0x9B570 ; game = unaff_EBX
-int D2Game_9B570(Env98& e, char* unit, char* game) {
-  if (unit) {
-    uint32_t f = at<uint32_t>(unit, 200);
-    if ((f >> 0x16 & 1) || (f >> 0x17 & 1)) return 1;
-  }
-  void* n = e.ord10170(at<uint32_t>(unit, 0x60));
-  while (n) {
-    uint32_t id = e.ord10727(n);
-    if (!game) e.fatal(0x2d3);
-    char* u = (char*)at<uintptr_t>(game, 0x1720 + (id & 0x7f) * sizeof(uintptr_t));
-    while (u && at<uint32_t>(u, 0xc) != id) u = (char*)at<uintptr_t>(u, 0xe4);
-    n = e.ord10691(n);
-    if (u) return 1;
-  }
-  return 0;
-}
+// The unit-list ownership test: d2game_9b570.cpp is its own file.
 
 // 1.13c D2Game+0x9BC70 ; in_EAX = amount, unaff_EDI = out1
 void D2Game_9BC70(Env98& e, void* unit, int* out2, int amount, int* out1) {

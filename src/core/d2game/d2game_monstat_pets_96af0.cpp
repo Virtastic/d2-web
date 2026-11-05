@@ -102,20 +102,7 @@ uint32_t D2Game_9C9A0_UnitStateFlagGuard(const Env& e, uint32_t thisType, int32_
     return e.ord11085();
 }
 
-// 1.13c D2Game+0x9D160 (EBX = unit, ESI = record of five-plus dwords, param_1 stack): dispatch on the kind at *FUN_D0F0(unit); the
-// result pointer is stored at record+8 (kinds 1, 2, 4, 5). Kind 0 returns false; kind 3 and any other kind return true.
-bool D2Game_9D160_ObjectCreateByKind(const Env& e, void* unit, uint32_t* esi, int32_t param1)
-{
-    int32_t* kind = (int32_t*)e.fn0F0(unit);
-    switch (*kind) {
-    case 0: return false;
-    case 1: { void* r = e.fn13220(unit, (uint32_t*)(uintptr_t)esi[0], param1, esi + 5); esi[2] = (uint32_t)(uintptr_t)r; return r == nullptr; }
-    case 2: { void* r = e.fn1C90(unit, (uint32_t*)(uintptr_t)esi[0], esi + 5); esi[2] = (uint32_t)(uintptr_t)r; return false; }
-    case 4: { void* r = e.fn13150(esi + 5, (uint32_t*)(uintptr_t)esi[0], param1, unit); esi[2] = (uint32_t)(uintptr_t)r; return r == nullptr; }
-    case 5: { void* r = e.fn13150(esi + 5, (uint32_t*)(uintptr_t)esi[0], param1, unit); esi[2] = (uint32_t)(uintptr_t)r; return false; }
-    default: return true;
-    }
-}
+// The create-by-kind dispatch: d2game_9d160.cpp is its own file.
 
 // 1.13c D2Game+0x9ED20 (ECX = unit, EAX = amount): a unit of type 0 with no flag 0x72 gives up `amount` of its stat 8, if it has that much.
 uint32_t D2Game_9ED20_UnitStatDrainByAmount(const Env& e, int32_t* unit, int32_t amount)

@@ -225,13 +225,7 @@ extern "C" void D2GAME_78FA0(int* eax, int param_1)
     FUN_6fc57f80((void*)(intptr_t)eax[3], eax);
 }
 
-// 1.13c D2Game+0x79A60  (fastcall)
-extern "C" void D2GAME_79A60(int game, int* unit)
-{
-    FUN_6fcbc620(game);
-    FUN_6fcb8250(game);
-    FUN_6fcaea80(game, unit, 0xb, *(int*)(game + 0xa8) + 0x1e, 0, 0, 0);
-}
+// The unit hand-over step: moved to d2game_79a60.h.
 
 // 1.13c D2Game+0x79AA0  (fastcall)
 extern "C" void D2GAME_79AA0(int game, int* unit)

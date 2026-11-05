@@ -33,16 +33,11 @@ static i32 stateCb(i32 p1, i32* p2, i32 st, void* cb)
     if (b && p2 && p2[0x20] && *p2 == 0 && (int16_t)r_9BEB0() != -1) r_9C160(cb);
     return 0;
 }
-// 1.13c D2Game+0x5AB00
+// old form of D2Game 5AB00 (now d2game_5ab00.cpp)
 i32 D2GAME_5AB00(i32 p1, i32* p2) { return stateCb(p1, p2, 0x28, (void*)r_58C90); }
-// 1.13c D2Game+0x5AF50
+// old form of D2Game 5AF50 (now d2game_5af50.cpp)
 i32 D2GAME_5AF50(i32 p1, i32* p2) { return stateCb(p1, p2, 0x26, (void*)r_57830); }
-// 1.13c D2Game+0x5B120
-i32 D2GAME_5B120(i32 p1, i32* p2) { return stateCb(p1, p2, 0x25, (void*)r_580A0); }
-// 1.13c D2Game+0x5B180
-i32 D2GAME_5B180(i32 p1, i32* p2) { return stateCb(p1, p2, 0x24, (void*)r_582E0); }
-// 1.13c D2Game+0x5B490
-i32 D2GAME_5B490(i32 p1, i32* p2) { return stateCb(p1, p2, 0x23, (void*)r_58640); }
+// The quest-callback arms for the three Act V quests: moved to d2game_5b120.h, d2game_5b180.h and d2game_5b490.h.
 
 // 1.13c D2Game+0x5B030 (p2 = in_EAX, REG? unit)
 bool D2GAME_5B030(i32 p1, i32* in_EAX /* EAX = unit (5B8C0 passes its EDX) */)
@@ -80,16 +75,7 @@ L1:
 
 // 1.13c D2Game+0x5C2A0: moved to d2game_5c2a0.cpp (env seam for the FN probe).
 
-// 1.13c D2Game+0x5CC30
-void D2GAME_5CC30(i32 unit)
-{
-    i32* q = findAI((i32*)(intptr_t)unit, 0x21); // list lives at unit+0x10f4
-    if (!q) return;
-    i32 st = q[6];
-    *(u8*)(intptr_t)(st + 0xad) = 1;
-    *(i32*)(intptr_t)(st + 0x84) = 2;
-    r_5C690(q, st);
-}
+// The quest-node arm: moved to d2game_5cc30.h.
 
 // 1.13c D2Game+0x5CC70
 void D2GAME_5CC70(i32 b)

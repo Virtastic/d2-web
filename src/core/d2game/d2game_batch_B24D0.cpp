@@ -178,21 +178,7 @@ static void d2game_8AF10_113c(void* pRecord, void* pClient, const D2GameBatchB74
     env.sendPacket(pClient, packet, 6);
 }
 
-// 1.13c D2Game+0x7A540
-// REMOVEOBJECT (0x0A). ECX=unit record, stack argument 1 = client, ret 4. Nothing is sent for a
-// type-3 record; otherwise {0x0A, type byte, GUID dword} -- 6 bytes, type from +0x00 (byte) and
-// GUID from +0x0C.
-static void d2game_7A540_113c(void* pRecord, void* pClient, const D2GameBatchB74Env& env)
-{
-    const uint8_t nType = rd8(pRecord, 0x0);
-    if (nType == 3) return;
-    uint8_t packet[6];
-    packet[0] = 0x0A;
-    packet[1] = nType;
-    const uint32_t nGuid = rd32(pRecord, 0xC);
-    std::memcpy(packet + 2, &nGuid, 4);
-    env.sendPacket(pClient, packet, 6);
-}
+// The object-removal notice: moved to d2game_7a540.h.
 
 // 1.13c D2Game+0xDC030
 // SUNITDMG_ComputeExperienceGain. EAX=nDefenderExperience, EBX=pAttacker, EDI=nAttackerLevel,
@@ -309,14 +295,6 @@ EMSCRIPTEN_KEEPALIVE void d2game_8af10_send(void* record, void* client, void (*s
     D2GameBatchB74Env env{};
     env.sendPacket = send;
     d2game_8AF10_113c(record, client, env);
-}
-
-// 1.13c D2Game+0x7A540 (r[0]=record ECX, r[1]=client)
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_7a540(uint32_t* r)
-{
-    d2game_7A540_113c((void*)(uintptr_t)r[0], (void*)(uintptr_t)r[1], batchEnv(r));
-    r[4] = 0;
 }
 
 // 1.13c D2Game+0xDC030 (r[0]=pGame, r[1]=pAttacker EBX, r[2]=nAttackerLevel EDI,

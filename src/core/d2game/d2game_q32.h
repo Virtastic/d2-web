@@ -34,7 +34,8 @@ inline uint32_t questRec(const Call& X, uint32_t game, uint32_t unitOrClient) {
 inline int32_t qGet(const Call& X, uint32_t rec, uint32_t a, uint32_t b) { return (int32_t)X(kO10174, 0, 0, 0, 0, 0, rec, a, b); }
 inline void qSet(const Call& X, uint32_t rec, uint32_t a, uint32_t b) { X(kO10003, 0, 0, 0, 0, 0, rec, a, b); }
 // The 0x62700 family (quests 6, 4, 3, 2, 1): ECX = game, EDX = client, ret 4. Fires D2Game+0x354F0 (AL = quest, ECX = client, stack game).
-inline uint32_t questStartFlags(const Call& X, uint32_t game, uint32_t client, uint32_t q) {
+// `al` is the quest number handed to 0x354F0 when it differs from the record's quest index (the act 5 handlers pass the index minus 4).
+inline uint32_t questStartFlags(const Call& X, uint32_t game, uint32_t client, uint32_t q, uint32_t al) {
     uint32_t sk = questRec(X, game, client);
     int32_t last = qGet(X, sk, q, 0);
     bool fire = false, chk = true;
@@ -47,7 +48,8 @@ inline uint32_t questStartFlags(const Call& X, uint32_t game, uint32_t client, u
         if (last != 0) fire = true;
         else { last = qGet(X, sk, q, 0xe); if (last != 0) fire = true; }
     }
-    if (fire) X(0x354F0, ((uint32_t)last & ~0xffu) | q, client, 0, 0, 0, game);   // mov al, q keeps the last result's upper bytes
+    if (fire) X(0x354F0, ((uint32_t)last & ~0xffu) | (al & 0xffu), client, 0, 0, 0, game);   // mov al, q keeps the last result's upper bytes
     return 0;
 }
+inline uint32_t questStartFlags(const Call& X, uint32_t game, uint32_t client, uint32_t q) { return questStartFlags(X, game, client, q, q); }
 }  // namespace q32

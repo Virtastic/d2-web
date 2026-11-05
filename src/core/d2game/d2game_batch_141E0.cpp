@@ -326,51 +326,7 @@ EMSCRIPTEN_KEEPALIVE void d2game_8ba10_send(uint32_t ecxByte, uint32_t edxDword,
     d2_fn_d2game_8BA10(ecxByte, edxDword, client, arg, &env);
 }
 
-// Pet-list node removal. Unlink the node whose +4 equals ECX from the list at *arg1 (+0x14 next),
-// run the 0xDFC10 iterator over the single-element context { this }, then for the game's unit at
-// +0x1320+(id&0x7F)*4 with +0xC == id either clear bit 31 of +0xC4 (arg2 zero) or call 0x977E0,
-// free the node through Fog 10046 on pool game+0x1C (line 0x25C), and decrement the list count at
-// +4; a negative count asserts 0x260, a null game asserts 0x2D3. ECX is the node id owner, EAX the
-// game.
-// 1.13c D2Game+0x97920
-extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_97920(uint32_t self, void* game, void* list,
-                                                        int32_t flag, const D2GameBatch141E0Env* env)
-{
-    uint32_t node = rd32(list, 0);
-    uint32_t prev = 0;
-    while (node != 0) {
-        if (rd32(node, 4) == self) break;
-        prev = node;
-        node = rd32(node, 0x14);
-    }
-    if (node == 0) return;
-
-    if (prev != 0) wr32(prev, 0x14, rd32(node, 0x14));
-    else           wr32(list, 0, rd32(node, 0x14));
-
-    uint32_t ctx[7] = { self, 0, 0, 0, 0, 0, 0 };
-    env->subDFC10(ctx);
-
-    const uint32_t guid = rd32(node, 4);
-    if (game == nullptr) d2game_fatal(0x2D3);
-
-    const uint32_t first = rd32(game, 0x1320 + (guid & 0x7F) * 4);
-    for (uint32_t ent = first; ent != 0; ent = rd32(ent, 0xE4)) {
-        if (rd32(ent, 0xC) == guid) {
-            if (flag == 0) wr32(ent, 0xC4, rd32(ent, 0xC4) & 0x7FFFFFFFu);
-            else           env->sub977E0(game, guid);
-            break;
-        }
-    }
-
-    env->fog10046((void*)(uintptr_t)rd32(game, 0x1C), (void*)(uintptr_t)node,
-                  "..\\Source\\D2Game\\PLAYER\\PlayerPets.cpp", 0x25C, 0);
-
-    uint32_t count = rd32(list, 4) - 1;
-    wr32(list, 4, count);
-    if ((int32_t)count < 0) d2game_fatal(0x260);
-}
+// The pet-list node removal lives in d2game_97920.cpp.
 
 // Monster summon batch. ESI is the summoner, EAX the count, EBX the game, and four stack arguments
 // feed 0xEDDB0(monsterId, arg2, summoner, game, arg3, arg4). Each spawned unit that comes back type 1
