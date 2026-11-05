@@ -12,12 +12,12 @@ struct FogBigFreeEnv {
 
 extern "C" void fog_sub_1aa80(uint8_t* pool, void* user, const FogBigFreeEnv* e) {
     void** hdr = reinterpret_cast<void**>(static_cast<uint8_t*>(user) - 4);  // retail: (int)hdr % 0x3ff
-    void** buckets = reinterpret_cast<void**>(pool + 0x7ac);
+    void** buckets = reinterpret_cast<void**>(pool + 0x7ac);   // retail idiv: the bucket index is the signed remainder
     e->lock(pool + 4);
     void** prev = nullptr;
-    for (void** n = static_cast<void**>(buckets[reinterpret_cast<uintptr_t>(hdr) % 0x3ff]); n; prev = n, n = static_cast<void**>(*n)) {
+    for (void** n = static_cast<void**>(buckets[(int32_t)reinterpret_cast<uintptr_t>(hdr) % 0x3ff]); n; prev = n, n = static_cast<void**>(*n)) {
         if (n == hdr) {
-            if (prev) *prev = *n; else buckets[reinterpret_cast<uintptr_t>(hdr) % 0x3ff] = static_cast<void**>(*n);
+            if (prev) *prev = *n; else buckets[(int32_t)reinterpret_cast<uintptr_t>(hdr) % 0x3ff] = static_cast<void**>(*n);
             break;
         }
     }

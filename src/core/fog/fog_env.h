@@ -24,5 +24,9 @@ inline uint32_t fe_call(const FogEnv* e, uint32_t rva, uint32_t a = 0, uint32_t 
                         uint32_t s0 = 0, uint32_t s1 = 0, uint32_t s2 = 0, uint32_t s3 = 0, uint32_t s4 = 0, uint32_t s5 = 0) {
     return e->hook(e->ctx, rva, a, c, d, b, s, s0, s1, s2, s3, s4, s5);
 }
+// A varargs callee reached with more stack words than fe_call carries (a log writer handed a seven- or eight-word format): fe_wide(total, w6, w7)
+// right before the fe_call states the word count and words 6 and 7; the recorder reads and clears them. 0 = not stated.
+inline uint32_t fe_nw = 0, fe_x6 = 0, fe_x7 = 0;
+inline void fe_wide(uint32_t total, uint32_t w6 = 0, uint32_t w7 = 0) { fe_nw = total; fe_x6 = w6; fe_x7 = w7; }
 inline void fe_enter(const FogEnv* e, uint32_t cs) { if (e->enter) e->enter(e->ctx, cs); }
 inline void fe_leave(const FogEnv* e, uint32_t cs) { if (e->leave) e->leave(e->ctx, cs); }

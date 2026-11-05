@@ -17,6 +17,11 @@ struct HookEnv {
             for (uint32_t j = 0; j < 9; j++) { uint32_t v = o + j < n ? rd32(p + 4 * (o + j)) : 0; e[1 + j] = isStk(v) ? 0xB3000000u : v; }
         }
     }
+    // REGS `Z`: the %s string behind a stack-pointer argument word i of a log-writer call: two records (0x10000000|i<<20|rva, 36 string bytes each, zero past the NUL)
+    void zstr(uint32_t rva, uint32_t i, const char* s) {
+        uint8_t buf[72] = {}; for (uint32_t q = 0; q < 71 && s[q]; ++q) buf[q] = (uint8_t)s[q];
+        for (uint32_t o = 0; o < 2; ++o) { if (L[0] >= kLogMax) abort(); uint32_t* e = L + 1 + L[0]++ * 10; e[0] = 0x10000000u | (i << 20) | rva; memcpy(e + 1, buf + 36 * o, 36); }
+    }
     // REGS `J`: EDI at hook entry as an argument, one record (rva|0x20000000, edi, 0...) straight after the call's own record; a stack pointer is 0xB3000000.
     void j(uint32_t rva, uint32_t edi) {
         if (L[0] >= kLogMax) abort();

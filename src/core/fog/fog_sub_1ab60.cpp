@@ -5,7 +5,7 @@ static inline uint32_t& W(uint8_t* b, uint32_t o) { return *reinterpret_cast<uin
 static inline uint8_t* P(uint32_t v) { return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(v)); }
 extern "C" void fog_sub_1ab60(uint8_t* n, uint8_t* l) {
     uint32_t nx = W(n, 0xC);
-    if (nx == 0 || W(l, 0x1C) > W(P(nx), 8)) return;
+    if (nx == 0 || (int32_t)W(P(nx), 8) < (int32_t)W(l, 0x1C)) return;   // retail: jl, signed
     W(P(nx), 0x10) = W(n, 0x10);
     if (W(n, 0x10) == 0) W(l, 0x2C) = W(n, 0xC); else W(P(W(n, 0x10)), 0xC) = W(n, 0xC);
     W(n, 0x10) = W(l, 0x28);

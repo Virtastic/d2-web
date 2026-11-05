@@ -19,10 +19,14 @@ static const char g_fogLogDir[] = "";
 static char g_fogLogName[20][16];
 static FILE* g_fogLogFile[20];
 
-// 1.13c Fog+0x180D0: close the open log slot whose name matches, clear its FILE*.
-extern "C" void fog_sub_180d0(const char* name) {  // 1.13c Fog+0x180D0
+// 1.13c Fog+0x180D0: close the open log slot whose name matches, clear its FILE*. The table and the closer are parameters so the
+// capture probe can run it over the pinned retail table (names = 20 x 16 bytes at Fog+0x316F8, files = 20 FILE* at Fog+0x31900).
+extern "C" void fog_log_close_named(const char (*names)[16], FILE** files, const char* name, int (*closer)(FILE*)) {
     for (int i = 0; i < 20; i++)
-        if (g_fogLogFile[i] && !strcmp(g_fogLogName[i], name)) { fog_fclose(g_fogLogFile[i]); g_fogLogFile[i] = nullptr; return; }
+        if (files[i] && !strcmp(names[i], name)) { closer(files[i]); files[i] = nullptr; return; }
+}
+extern "C" void fog_sub_180d0(const char* name) {  // 1.13c Fog+0x180D0
+    fog_log_close_named(g_fogLogName, g_fogLogFile, name, fog_fclose);
 }
 
 extern "C" long fog_sub_18580(const char* name) {

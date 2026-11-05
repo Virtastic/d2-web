@@ -165,7 +165,7 @@ void fog_sub_18150(const char* path, const uint32_t* now) {
     st.wYear = (WORD)(yy < 0x5b ? yy + 2000 : yy + 1900);
     st.wMonth = (WORD)mm;
     st.wDay = (WORD)dd;
-    uint32_t ft[2];
+    uint32_t ft[2] = {0, 0};   // retail zeroes the FILETIME before the call; a rejected date leaves it 0
     g_w32->systime_to_filetime(&st, ft);
     if (ft[1] <= now[1] && now[1] - ft[1] > 0x4b6)
         g_w32->delete_file(path);
@@ -449,3 +449,6 @@ void fog_sub_19160(const FogB144Api* api, const uint8_t* rec, const uint8_t* dat
         len -= n;
     }
 }
+
+// Capture-probe seam: the host Win32 table (FILETIME / DeleteFileA) and the log manager state of Fog+0x18BB0.
+extern "C" void fog_b144_set_w32(const FogWin32* w) { g_w32 = w; }
