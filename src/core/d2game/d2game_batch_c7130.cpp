@@ -255,7 +255,7 @@ uint32_t d2_fn_d2game_c9a80(int32_t* p, const D2GameBatchC7130Env* e)
     return 0;
 }
 
-// 1.13c D2Game+0xCA490
+// old CA490 (superseded by d2game_ca490.cpp g_ca490)
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_fn_d2game_ca490(const int32_t* unit, const int32_t* table, const D2GameBatchC7130Env* e)
 {

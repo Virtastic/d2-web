@@ -137,7 +137,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C5D10(void* q, void* thisp, vo
 }
 
 // 0xC5E90 (EAX=q, ECX=this, stack=ctx)
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C5E90(void* q, void* thisp, void* ctx, const D2GameBatchC5190Env* env) {  // 1.13c D2Game+0xC5E90
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C5E90(void* q, void* thisp, void* ctx, const D2GameBatchC5190Env* env) {  // old C5E90 (superseded by d2game_c5e90.cpp g_c5e90)
     if (rd32(q, 0xC0) != 0) {
         wr8(rdptr(ctx, 0x18), 2, 0);
         env->ordinal10895(rd32(q, 0xC0));

@@ -180,7 +180,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_C31C0(void* game, void* unit, const D
     return 1;
 }
 
-// 1.13c D2Game+0xC3260  (EAX = game; EDX out of 0xC1A00 is the node data)
+// old C3260 (superseded by d2game_c3260.cpp g_c3260)
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_C3260(void* game, const D2GameBatchC1BA0Env* e)
 {

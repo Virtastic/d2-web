@@ -427,3 +427,15 @@ void D2G573_64940_probe(void* param1, uint8_t* q, int32_t dbg, uint32_t* lg, con
     q64940 = q;
     d2game_64940(param1, q);
 }
+
+// ---- FUNCTION-mode probe for 0x66320 (src/core/fn/d2game_66320.cpp): 0x660D0 is a recorder; retail pushes (game, ctx[2], ctx[5], ctx[6]).
+static int32_t* q573_ctx;
+static void q573_660d0(void* game, void* a) {
+    q573H->h(0x660D0, 0, 0, 0, 0, 0, (uint32_t)(uintptr_t)game, (uint32_t)(uintptr_t)a, (uint32_t)q573_ctx[5], (uint32_t)q573_ctx[6]);
+}
+void D2G573_66320_probe(int32_t* ctx, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); q573H = &h; q573E = D2G573Env{}; q573_ctx = ctx;
+    q573E.fn660D0 = q573_660d0;
+    d2game_66320(ctx);
+}

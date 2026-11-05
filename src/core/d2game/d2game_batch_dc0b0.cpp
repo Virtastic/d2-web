@@ -146,16 +146,3 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_DC530(int32_t eaxAdd, int3
     if (v <= 0x100000) return (uint32_t)((int32_t)((uint32_t)v * sc) / 128);
     return (uint32_t)((v / 128) * (int32_t)sc);
 }
-
-// 1.13c D2Game+0xDCE00 : eax = unit (edi), esi = table index, ebx = pass-through, stack a1 = out record, ret 4.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DCE00(uint32_t eaxUnit, int32_t esiIdx, uint32_t ebxV, uint32_t a1, const Env_DC* e) {
-    if (esiIdx < 0) return;
-    uint32_t dt = R<uint32_t>(e, R<uint32_t>(e, e->tableDataTables));
-    if (esiIdx >= R<int32_t>(e, dt + 0xba0)) return;
-    if (R<uint32_t>(e, dt + 0xb98) + (uint32_t)esiIdx * 0x23c == 0) return;
-    uint32_t mn = e->o10567(eaxUnit, esiIdx, ebxV, 0);
-    uint32_t mx = e->o10297(eaxUnit, esiIdx, ebxV, 0);
-    uint32_t r = d2_fn_d2game_DC530(0, (int32_t)mx, eaxUnit, 0, 0, (int32_t)mn, 0, 0x80, e);
-    W<uint32_t>(e, a1 + 8, r);
-    e->sub9F210((uint32_t)esiIdx, a1, ebxV);
-}

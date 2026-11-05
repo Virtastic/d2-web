@@ -172,27 +172,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2game_dac10(const void* ctx) {
     return 100;
 }
 
-// 1.13c D2Game+0xDAD00 -- param_1 = ctx (+0xc unit, +0x18 stat rec), in_EAX = amount, unaff_EBX = skill row.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2game_dad00(const void* ctx, int32_t amount, const void* row) {
-    void* unit = (void*)d8_ptr(ctx, 0xc);
-    uint8_t* rec = (uint8_t*)d8_ptr(ctx, 0x18);
-    if (d8_rds32(row, 0x10) != -1) {
-        int32_t v = E.stat(unit, d8_rds32(row, 0x10), 0);
-        if (v > 0x27 || v > 0) {
-            int32_t t = E.sub214D0(100, amount);
-            d8_wr32(rec, 0x48, d8_rds32(rec, 0x48) + t);
-            amount -= t;
-        }
-        int32_t w = E.stat(unit, d8_rds32(row, 0x14), 0) * 0x100;
-        if (w > 0) {
-            if (amount <= w) w = amount;
-            d8_wr32(rec, 0x48, d8_rds32(rec, 0x48) + w);
-            amount -= w;
-        }
-    }
-    return amount;
-}
-
 // 1.13c D2Game+0xDAD70 -- in_EAX = skill-row index holder (int[2]: kind, id), param_1 = unit, param_2 = accumulator.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2game_dad70(const int32_t* eax, void* unit, void* acc) {
     if (!eax || eax[0] != 1) return;
@@ -206,17 +185,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2game_dad70(const int32_t* eax, void* unit
     for (int32_t k = 0; k < n; k++)
         if (E.sub21620(d8_rd16(buf, k * 8)))
             d8_wr32(acc, 0xc, d8_rds32(acc, 0xc) + d8_rds32(buf, k * 8 + 4));
-}
-
-// 1.13c D2Game+0xDAE70 -- param_1 = delta, unaff_EDI = fallback return.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2game_dae70(int32_t delta, int32_t edi, void* unit) {
-    if (delta < 1) return 0;
-    int32_t mx = E.statMax(unit);
-    int32_t cur = E.stat(unit, 0, 0);
-    int32_t t = delta + cur;
-    if (mx <= t) t = mx;
-    E.statSet(unit, 0, 0);
-    return t != mx ? edi : mx - cur;
 }
 
 // 1.13c D2Game+0xDB1F0 -- param_2 = int* value, unaff_EBX = int* accumulator, unaff_EDI = unit; #10910/#10064 etc register args GUESSED.

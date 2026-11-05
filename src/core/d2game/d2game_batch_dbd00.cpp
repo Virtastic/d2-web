@@ -135,18 +135,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DC940(uint32_t thisp, uint32_t
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DCAB0(uint32_t thisp, uint32_t p1, uint32_t unit, int32_t p3, int32_t p4, const D2GameBatchDBD00Env* e)
 { dbd00Aura(thisp, p1, unit, p3, p4, 2, e); }
 
-// 1.13c D2Game+0xDCD80  ESI/EDI are register args. GUESS: Ordinal_10973 args not shown (none passed).
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_DCD80(uint32_t param1, uint32_t param2, uint32_t esi, uint32_t edi, const D2GameBatchDBD00Env* e)
-{
-    (void)param1;
-    uint32_t stk = 0;
-    int32_t a = e->ordinal10973();
-    if (a * 0x100 < 8) return param2 & (((int32_t)param2 < 0) - 1);
-    int32_t b = e->ordinal10973();
-    if (param2 != 0xffffffffu) { stk = (uint32_t)e->ordinal10973(); esi += stk; }
-    return e->subDBED0(stk, a * 0x100, edi, b << 8, esi);
-}
-
 // 1.13c D2Game+0xDEBA0  EAX = unit A, EBX = unit B (rng seed at B+0x20/+0x24). Weighted pick over
 // weightTable; the LCG is seed = lo*0x6AC690C5 + hi, written back as a 64-bit pair, low 32 bits used.
 // GUESS: the first block's sub572C0 arg and sub32EE0's (none) args; return of the early-out paths follows

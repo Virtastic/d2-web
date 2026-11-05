@@ -102,3 +102,15 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_B11A0(uint32_t arg1, uint32
     }
     return 0;
 }
+
+// ---- FUNCTION-mode probe for 0x6FFA0 (src/core/fn/d2game_6ffa0.cpp): D2Common #10920 (0xA4C0) is a HookEnv recorder.
+#include "../fn/hookenv.h"
+static HookEnv* t1019H;
+static uint32_t t1019_10920(uint32_t c) { return (*t1019H).h(0xA4C0, 0, 0, 0, 0, 0, c); }
+void D2G1019j_6FFA0_probe(uint32_t ctx, uint32_t* lg, const uint32_t* sc)
+{
+    HookEnv h(lg, sc); t1019H = &h;
+    D2GameBatch1019jEnv env{};
+    env.ordinal10920 = t1019_10920;
+    d2_fn_d2game_6FFA0(ctx, &env);
+}

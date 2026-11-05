@@ -11,23 +11,6 @@ typedef D2GameBatchDF620Env Env_DF;
 template <class T> static inline T R(const Env_DF* e, uint32_t a) { T v; memcpy(&v, e->at(a), sizeof(T)); return v; }
 template <class T> static inline void W(const Env_DF* e, uint32_t a, T v) { memcpy(e->at(a), &v, sizeof(T)); }
 
-// 1.13c D2Game+0xDF620 : esi = unit, stack arg1 = game table base, ret 4. Returns the 10950 result or 0.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_DF620(uint32_t esiUnit, uint32_t tbl, const Env_DF* e) {
-    uint32_t edi = R<uint32_t>(e, esiUnit + 0x2c);
-    uint32_t ebx = e->o10950(edi);
-    uint32_t x = e->o10826(e->o10331(esiUnit));
-    if (x) {
-        uint32_t idx = e->o10459(x) & 0xff;
-        uint32_t p = e->o10717(R<uint32_t>(e, tbl + 0xbc + idx * 4));
-        while (p) {
-            if (p == ebx) return ebx;
-            p = R<uint32_t>(e, p + 0x7c);
-        }
-    }
-    e->o10451(edi);
-    return 0;
-}
-
 // 1.13c D2Game+0xE0210 : eax = unitA, esi = unitB, ecx = row index. Returns 1/0.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_E0210(uint32_t eaxA, uint32_t esiB, int32_t ecxIdx, const Env_DF* e) {
     if (!esiB || !eaxA) return 0;

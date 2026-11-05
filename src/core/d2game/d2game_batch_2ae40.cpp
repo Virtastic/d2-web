@@ -174,8 +174,8 @@ int32_t GAME_DisconnectClientByName(const char* szClientName, uint32_t nEventTyp
     {
         // partial: 0x49FE0 and 0x2D090 take game/client in EAX/ESI at the retail call sites.
         void* pClient = pEnv->getClientFromClientId(pGame, nClientId);
-        (void)nEventType; // 1.13c has no event argument: 0x2D090 passes the fixed event 1 to 0x4B7F0
-        pEnv->disconnectClient(pGame, pClient, 1);
+        // 1.13c D2Game+0x2DEC0 pushes its own second stack argument as the event of 0x2D090 (the FN vector proves it)
+        pEnv->disconnectClient(pGame, pClient, nEventType);
         pEnv->leaveGamesCriticalSection(pGame);
     }
     return 1;

@@ -357,7 +357,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_97a20(uint32_t ebxGame, uint32_t ecxP
     d2game_fatal(0x330);
 }
 
-// 1.13c D2Game+0xD40F0
+// old probe-shaped D40F0 (superseded by d2game_d40f0.cpp g_d40f0)
 // Delayed-unit update: EDI = unit, EBX = the argument forwarded to 0x8E030 / 0x8DFD0. Skipped when
 // the unit is null, bit 4 of unit+0xC4 is set, or unit+0x10 is not 3. 0x4AD10(0) runs first; bit
 // 0xC of unit+0xC4 then routes to 0x8E030, otherwise to 0x8DFD0.

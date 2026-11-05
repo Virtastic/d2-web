@@ -141,24 +141,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DE0C0(uint32_t att, uint32_t g
     (void)tgtType;
 }
 
-// 1.13c D2Game+0xDE870 : esi = unit, ebx = pass-through (value reg), stack a1; ret 4.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DE870(uint32_t esiUnit, uint32_t ebxV, uint32_t a1, const Env_DE* e) {
-    if (!esiUnit) return;
-    uint32_t t = R<uint32_t>(e, esiUnit);
-    if (t != 0 && t != 1) return;
-    uint32_t edi = e->o10587(esiUnit, 0xc, 0);
-    if (t == 0) { e->subDE6D0(esiUnit, ebxV, a1, edi, ebxV); return; }
-    uint32_t ai = R<uint32_t>(e, esiUnit + 0x14);
-    if (!ai) return;
-    uint32_t b = R<uint32_t>(e, ai + 0x28);
-    if (!b) return;
-    uint32_t ecx = R<uint32_t>(e, b + 0x28);
-    if (!ecx) return;
-    uint32_t p = e->sub3A0(R<uint32_t>(e, b + 0x30), R<uint32_t>(e, b + 0x2c), ecx);
-    if (!p || R<uint32_t>(e, p) != 0) return;
-    e->subDDCB0(ebxV, a1, p, esiUnit, edi);
-}
-
 // 1.13c D2Game+0xDEA00 : stack (game, unit, item), ret 0xc.
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_DEA00(uint32_t game, uint32_t unit, uint32_t item, const Env_DE* e) {
     if (!unit || !item) return;

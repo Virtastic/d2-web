@@ -172,7 +172,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_70B70(void* self, uint32_t par
 
 // 0xD22C0: true when the EDI context is set, its #10858 record has a positive +0x18 and a +0x14 byte
 // of 2, a size-0x30 #11034 block exists, and 0xD1A30 on ESI also comes back non-zero.
-extern "C" EMSCRIPTEN_KEEPALIVE bool d2_fn_d2game_D22C0(void* edi, void* esi, const D2GameBatchED540Env* env) {  // 1.13c D2Game+0xD22C0
+extern "C" EMSCRIPTEN_KEEPALIVE bool d2_fn_d2game_D22C0(void* edi, void* esi, const D2GameBatchED540Env* env) {  // old D22C0 (superseded by d2game_d22c0.cpp g_d22c0)
     if (edi == nullptr) return false;
     void* iVar1 = env->ordinal10858_v();
     if (iVar1 != nullptr && (int16_t)rd16(iVar1, 0x18) > 0) {
@@ -194,41 +194,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_D2310(void* esi, void* edi, ui
         const int32_t iVar2 = env->ordinal10787_v();
         if (iVar2 != 2 && iVar2 != 7) env->subA2100(esi, ebx, piVar1, (uint32_t)(uintptr_t)piVar3);
     }
-}
-
-// 0xDA9E0: scale EAX by the #10989 value of param_1 (an integer percentage), saturating to the
-// 0x7FFFFFFF ceiling when the product would overflow; a #10989(0) outside (0,0x20) leaves EAX alone.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_DA9E0(uint32_t param_1, int32_t eax, const D2GameBatchED540Env* env) {  // 1.13c D2Game+0xDA9E0
-    if (eax > 0) {
-        const int32_t iVar1 = env->ordinal10989(param_1);
-        const int32_t iVar2 = env->ordinal10989(0);
-        if (iVar2 > 0 && iVar2 < 0x20) {
-            const uint32_t bVar3 = (uint8_t)iVar2;
-            const int32_t shift = (int32_t)(((int8_t)(iVar1 >> (bVar3 & 0x1F)) + (int32_t)bVar3) & 0x1F);
-            if ((int32_t)(0x7FFFFFFF >> shift) < eax) return (int32_t)((uint32_t)eax >> (bVar3 & 0x1F)) * iVar1;
-            eax = (iVar1 * eax) >> (bVar3 & 0x1F);
-        }
-    }
-    return eax;
-}
-
-// 0xDAA40: look the unsigned delta between EAX and param_1 up in one of the two 11-entry delta tables
-// (param_1 above EAX uses 0x6FD1A01C, below uses 0x6FD1A048) and return param_2 when the entry is
-// 0x100, else re-enter 0x14D0 at 0x100; the out-of-range path calls 0x14D0 on param_1 directly.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_DAA40(uint32_t param_1, int32_t param_2, int32_t eax, const D2GameBatchED540Env* env) {  // 1.13c D2Game+0xDAA40
-    int32_t iVar1;
-    if (eax < (int32_t)param_1) {
-        if (eax > 0x18 && (int32_t)param_1 > 0) return env->sub14D0(param_1, param_2);
-        iVar1 = (int32_t)param_1 - eax;
-        if (iVar1 > 10) iVar1 = 10;
-        iVar1 = env->table1A048[iVar1];
-    } else {
-        iVar1 = eax - (int32_t)param_1;
-        if (iVar1 > 10) iVar1 = 10;
-        iVar1 = env->table1A01C[iVar1];
-    }
-    if (iVar1 == 0x100) return param_2;
-    return env->sub14D0(0x100, param_2);
 }
 
 // 0xDB6B0: for an EAX context record whose +0 is 1, walk +0x14 -> +0x28 -> +0x28/+0x2C through
