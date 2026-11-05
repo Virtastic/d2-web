@@ -27,7 +27,7 @@ const char16_t* find(const char16_t* text, const char16_t* needle) {
 }
 }
 
-// 1.13c D2Client+0x8E600
+// old form of D2Client 8E600 (now d2client_8e600.cpp)
 void sub_8E600(char16_t* text, std::uint32_t token, const char16_t* replacement) {
     char16_t assembled[400]{};
     const auto count = length(text);

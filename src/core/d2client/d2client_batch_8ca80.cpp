@@ -208,7 +208,7 @@ void d2_client_8d600(uint32_t param_1, uint32_t item, uint32_t unit_bbfc, void* 
     ustrcat(out, (const void*)(uintptr_t)b);
 }
 
-// 1.13c D2Client+0x8D880 (183 B)
+// old form of D2Client 8D880 (now d2client_8d880.cpp) (183 B)
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_8d880(uint32_t unit, void* out, void* tmp_u /*>=40 B*/, uint32_t (*ord10003)(void),
                      int (*ord10973)(uint32_t, int, int), int (*ord10463)(uint32_t),

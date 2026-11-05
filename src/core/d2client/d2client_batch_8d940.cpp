@@ -108,13 +108,13 @@ void tooltipStat46(Env& e,int32_t unit,const uint8_t* rec,wc* out){
  }
 }
 
-// 1.13c D2Client+0x8DFB0
+// old form of D2Client 8DFB0 (now d2client_8dfb0.cpp)
 int32_t personalizedName(Env& e,wc* out){
  if(!e.q(10202,0,0)) return 0;
  wc tmp[32]; w2u(tmp,(const char*)(intptr_t)e.q(10083,0,0),32);
  e.personalize(out,tmp,0x200); return 1;
 }
-// 1.13c D2Client+0x8E080
+// old form of D2Client 8E080 (now d2client_8e080.cpp)
 int32_t personalizedNameInPlace(Env& e,wc* out){
  if(!e.q(10202,0,0)) return 0;
  int32_t cls=e.q(10106,0,0); if(cls>=5 && cls<=9) return 0;
