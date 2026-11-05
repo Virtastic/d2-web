@@ -28,15 +28,14 @@ inline uint32_t rd32(uintptr_t b, uint32_t o) { return *reinterpret_cast<uint32_
 [[noreturn]] void fatal(int line) { Ordinal_10024("", Ordinal_10265(line), line); __builtin_trap(); }
 }
 
-// 1.13c D2Game+0xF4260. eax = hi, edi = lo, ecx = unit.
+// D2Game+0xF4260 (eax = hi, edi = lo, ecx = unit): the body is d2game_f4260_impl (d2game_f4260.cpp).
+extern "C" uint32_t d2game_f4260_impl(uint32_t hi, uint32_t lo, uint32_t unit,
+                                      uint32_t (*record)(uint32_t id), void (*fatal)(int32_t line));
+static uint32_t f4260_record(uint32_t id) { return Ordinal_10688(id); }
+static void f4260_fatal(int32_t line) { fatal(line); }
 extern "C" uint32_t D2GAME_F4260_ScaledRoll(uint32_t hi, uint32_t lo, uintptr_t unit)
 {
-    if (lo > hi) fatal(0x14);
-    uint32_t r = FUN_6fc211d0(unit + 0x20, hi - lo + 0x100) + lo;
-    uint32_t id = unit ? rd32(unit, 4) : 0xFFFFFFFFu;
-    uint32_t pct = *reinterpret_cast<uint8_t*>(Ordinal_10688(id) + 0x19C);
-    if (pct == 0) fatal(0x1B);
-    return static_cast<uint32_t>((static_cast<uint64_t>(pct * r) * 0x51EB851Full) >> 37);
+    return d2game_f4260_impl(hi, lo, (uint32_t)unit, f4260_record, f4260_fatal);
 }
 
 // 1.13c D2Game+0xF42D0

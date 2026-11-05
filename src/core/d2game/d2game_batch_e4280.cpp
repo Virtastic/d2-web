@@ -216,7 +216,7 @@ i32 D2GAME_EFB80(i32 msg, i32 unit, i32 p1, i32 p2, i32 p5)
     return r_EF940(p1, p2, a, b, 0, 0x154, p5);
 }
 
-// 1.13c D2Game+0xF3CB0 (eax = unit; null returns 1)
+// D2Game F3CB0 stand-in (eax = unit; superseded by d2game_f3cb0.cpp, which carries the 1.13c body)
 i32 D2GAME_F3CB0(i32 unit)
 {
     if (unit == 0) return 1;

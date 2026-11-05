@@ -13,19 +13,19 @@ struct D2Game36C50Env {
     char     (*levelAct)(uint32_t level);                 // #10459
     void     (*setMode)(uint32_t unit, uint32_t mode);    // #11090 (UNITS_ChangeAnimMode)
     void     (*sub_E9EA0)(uint32_t node);                 // eax = node
-    void     (*sub_68F00)(uint32_t node);                 // eax = ebx = node
-    void     (*sub_5EE30)(uint32_t node);                 // eax = ebx = node
-    void     (*sub_5E840)(uint32_t node);                 // eax = ebx = node
+    void     (*sub_68F00)(uint32_t node, uint32_t unit);  // eax = ebx = node, edi = unit
+    void     (*sub_5EE30)(uint32_t node, uint32_t unit);  // eax = ebx = node, edi = unit
+    void     (*sub_5E840)(uint32_t node, uint32_t unit);  // eax = ebx = node, edi = unit
     void     (*sub_C8CD0)(uint32_t unit, uint32_t node);  // eax = unit, stack = node
     void     (*sub_67730)(uint32_t game, uint32_t unit);  // stack
     void     (*sub_EDDB0)(uint32_t unit, uint32_t game);  // ecx = 1, eax = 0x12d, edx = unit, stack = game, -1, 0
     void     (*sub_BBC00)(uint32_t unit, uint32_t game);  // ebx = unit, edi = game
     void     (*sub_68E20)(uint32_t node, uint32_t unit);  // stack
-    void     (*sub_E9960)(uint32_t node);                 // stack
+    void     (*sub_E9960)(uint32_t node, uint32_t unit);  // stack = node, edi = unit
     void     (*sub_BB6A0)(uint32_t node, uint32_t unit);  // stack = node, esi = unit
     void     (*sub_5E420)(uint32_t node, uint32_t unit);  // stack
-    void     (*sub_5E790)();
-    void     (*sub_5E940)(uint32_t unit, uint32_t game);  // eax = unit, ecx = game
+    void     (*sub_5E790)(uint32_t unit, uint32_t game);  // edi = unit, esi = game
+    void     (*sub_5E940)(uint32_t unit, uint32_t game);  // eax = unit, ecx = game (tail jump; esi is the caller's again)
     void     (*sub_5DEF0)(uint32_t game);                 // eax = game
     void     (*sub_68D20)(uint32_t node, uint32_t unit);  // esi = node, stack = unit (ret 4; checked against the 0x68D20 body, which reads [esi+0x18])
 };
@@ -55,11 +55,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_36C50(uint32_t unit, uint32_t 
     case 0xbd: {
         const uint32_t level = e->roomLevel(room);
         if (e->levelAct(level) == 0) {
-            if ((n = findQuest(game, 4))) e->sub_68F00(n);
+            if ((n = findQuest(game, 4))) e->sub_68F00(n, unit);
         } else if (level == 0x6d || (int32_t)level > 0x70) {
-            if ((n = findQuest(game, 0x21))) e->sub_5E840(n);
+            if ((n = findQuest(game, 0x21))) e->sub_5E840(n, unit);
         } else {
-            if ((n = findQuest(game, 0x20))) e->sub_5EE30(n);
+            if ((n = findQuest(game, 0x20))) e->sub_5EE30(n, unit);
         }
         return;
     }
@@ -82,7 +82,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_36C50(uint32_t unit, uint32_t 
         if ((n = findQuest(game, 4))) e->sub_68E20(n, unit);
         return;
     case 0x155:
-        if ((n = findQuest(game, 0x14))) e->sub_E9960(n);
+        if ((n = findQuest(game, 0x14))) e->sub_E9960(n, unit);
         return;
     case 0x173:
         if ((n = findQuest(game, 5))) e->sub_68D20(n, unit);
@@ -90,7 +90,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_36C50(uint32_t unit, uint32_t 
     case 0x178:
         if ((n = findQuest(game, 0x18))) e->sub_BB6A0(n, unit);
         return;
-    case 0x1cb: e->sub_5E790(); return;
+    case 0x1cb: e->sub_5E790(unit, game); return;
     case 0x1cc: e->sub_5E940(unit, game); return;
     case 0x1cd: e->sub_5DEF0(game); return;
     case 0x1da: case 0x1db: case 0x1dc:

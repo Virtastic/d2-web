@@ -12,7 +12,7 @@ namespace d2game_f4260 {
 struct FrameInfo { void* pExceptionObject; FrameInfo* pNext; };
 static FrameInfo* g_curException = nullptr;
 
-// 1.13c D2Game+0xF4260 -- percent-scaled stat helper that aborts on bad input (fatal-error path).
+// Not the D2Game+0xF4260 body (that is d2game_f4260.cpp) -- percent-scaled stat helper that aborts on bad input (fatal-error path).
 // Original takes EAX/EDI implicitly (unaff_EDI = base, in_EAX = limit); here explicit.
 // Table lookup (Ordinal_10688 -> +0x19c byte) is a D2Common call, passed as pct by the caller.
 uint32_t F4260_scale(uint32_t limit, uint32_t base, uint32_t statValue, uint8_t pct) {

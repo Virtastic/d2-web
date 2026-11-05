@@ -78,17 +78,19 @@ void sub_F3000(Env& e,P target,P unit,P game,I wv) {
     e.walk(game,unit,target,2,0,0,1,wv);
 }
 // 1.13c D2Game+0xF3220
-P sub_F3220(Env& e,P unit,P a,P game,P b) {
-    P r=e.f1c90(unit,a,b);
+// ECX = unit, EDX = a, EAX = x0, stack (game, b) (ret 8). B1C90 gets EAX = game and (unit, a, b, x0); the
+// 1560 class test takes EAX = unit+4, EDX = 2, and F1B10 gets AL = 5 over that test's nonzero result.
+P sub_F3220(Env& e,P unit,P a,P game,P b,I x0) {
+    P r=e.f1c90(game,unit,a,b,x0);
     if (r) return r;
     if (unit && s(unit,0)==1 && e.ptr(unit,0x14)) {
         I m=s(e.ptr(unit,0x14),0x54);
-        if ((m==3||m==0x13) && e.f1560(2)) { e.f1b10(game,unit); return nullptr; }
+        if (m==3||m==0x13) { U t=e.f1560(s(unit,4),2); if (t) { e.f1b10((t&~0xFFu)|5,game,unit); return nullptr; } }
     }
     I d=e.r10123(unit);
     I y=yOf(e,unit),x=xOf(e,unit);
     I q=e.r10331(unit,x,y,d,0x40);
-    if (e.r10851(q) && e.f1560(2)) { e.f1b10(game,unit); return nullptr; }
+    if (e.r10851(q)) { U t=e.f1560(s(unit,4),2); if (t) { e.f1b10((t&~0xFFu)|5,game,unit); return nullptr; } }
     I m=s(b,0);
     if (m>0x22) e.idle(game,unit,0x19);
     else if (m<0x19) e.idle(game,unit,10);
@@ -96,13 +98,18 @@ P sub_F3220(Env& e,P unit,P a,P game,P b) {
     return nullptr;
 }
 // 1.13c D2Game+0xF41C0
-void sub_F41C0(Env& e,P unit,P ebx) {
-    if (unit && s(unit,0)==0) { e.f102f0(unit); e.f10640(unit,ebx); return; }
-    e.fatal(0x24);
+// EDI = unit, EBX = passed on, EAX = passed on in EAX/ESI; returns F0640's result (flag 1).
+I sub_F41C0(Env& e,P unit,P ebx,I eax) {
+    if (!unit || s(unit,0)!=0) { e.fatal(0x24); return 0; }
+    e.f102f0(unit,eax,eax,ebx);
+    return e.f10640(unit,8,eax,ebx,1);
 }
 // 1.13c D2Game+0xF4210
-I sub_F4210(Env& e,P unit,P ebx) {
-    if (unit && s(unit,0)==0) { e.f102f0(unit); e.f10640(unit,ebx); return 1; }
-    e.fatal(0x15); return 0;
+// As F41C0 with flag 0; returns 1.
+I sub_F4210(Env& e,P unit,P ebx,I eax) {
+    if (!unit || s(unit,0)!=0) { e.fatal(0x15); return 0; }
+    e.f102f0(unit,eax,eax,ebx);
+    e.f10640(unit,8,eax,ebx,0);
+    return 1;
 }
 }

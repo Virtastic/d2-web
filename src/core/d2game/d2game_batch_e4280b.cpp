@@ -638,7 +638,7 @@ void D2GAME_F1FF0(P self, u32 param_1, P in_EAX, u32 uStack_4)
     r_75E10(uStack_4, AD(local_20));
 }
 
-// 1.13c D2Game+0xF21E0 (param_1..param_3 as the decompile names them; in_EAX = the record).
+// D2Game F21E0 stand-in (param_1..param_3 as the decompile names them); superseded by d2game_f21e0.cpp.
 void D2GAME_F21E0(u32 param_1, u32 param_2, u32 param_3, P in_EAX)
 {
     i32 local_20[3] = {0, 0, 0};

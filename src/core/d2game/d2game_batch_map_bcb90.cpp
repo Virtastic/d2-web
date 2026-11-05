@@ -238,7 +238,7 @@ u32 D2GAME_EFB80(P thisMsg, P in_EAX, P param_1, u32 param_2, u16 param_5)
     return (u32)r_EF940(param_1, param_2, a, b, 0, 0x154, param_5);
 }
 
-// 1.13c D2Game+0xF3CB0 (in_EAX = unit; the Ordinal_10630/11103 arguments are not recovered)
+// D2Game F3CB0 stand-in (in_EAX = unit; superseded by d2game_f3cb0.cpp, which carries the 1.13c body)
 u8 D2GAME_F3CB0(P in_EAX)
 {
     if (in_EAX == 0) return 1;

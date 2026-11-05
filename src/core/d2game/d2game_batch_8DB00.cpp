@@ -180,11 +180,11 @@ EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2game_486d0(uint32_t ecxId, uint32_t eaxUnit
 }
 
 // 1.13c D2Game+0xF3360
-// EAX = unit, stack arg = client. Packet 0x13 (9 bytes): unit id, a zero byte, and a 0..0x80
+// EAX = unit, stack arg = client. Packet 0x13 (9 bytes): unit id, the unit byte at +0xB0, and a 0..0x80
 // ratio of the layer-6 stat over the unit's #10913 value, decremented when above 1 and flagged
 // with 0x80 for a type-1 unit whose player-data flag at +0x17 is set.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_f3360(uint32_t eaxUnit, uint32_t client,
+EMSCRIPTEN_KEEPALIVE void d2game_f3360_impl(uint32_t eaxUnit, uint32_t client,
                                              const D2GameBatch8DB00Env* env)
 {
     const void* unit = (void*)(uintptr_t)eaxUnit;
@@ -208,6 +208,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_f3360(uint32_t eaxUnit, uint32_t client,
     pkt[1] = 0x01;
     wr32(pkt, 2, rd32(unit, 0x0C));
     pkt[6] = 0x13;
+    pkt[7] = rd8(unit, 0xB0);
     pkt[8] = ratio;
     env->sendPacket(client, pkt, 9);
 }
@@ -217,7 +218,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_f3360(uint32_t eaxUnit, uint32_t client,
 // block at +0x14 whose +0x5C bit 0 is set: unit id, word +0x14, word +0x1C, byte +0x1E, and
 // (byte+0x16 >> 2) & 1 as a word.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_f3410(uint32_t ebxUnit, uint32_t client,
+EMSCRIPTEN_KEEPALIVE void d2game_f3410_impl(uint32_t ebxUnit, uint32_t client,
                                              const D2GameBatch8DB00Env* env)
 {
     if (ebxUnit == 0) return;
