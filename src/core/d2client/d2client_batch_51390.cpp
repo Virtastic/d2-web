@@ -44,7 +44,7 @@ P sub_51500(P unit,Calls& c,const Probe& t,U start,const uint8_t* st,U mask10,U 
  }
  return nullptr;
 }
-// 1.13c D2Client+0x51D10  (ECX=px out, EAX=py out; fn10f0 takes px and EBX=py)
+// old form of D2Client 51D10 (now d2client_51d10.cpp)  (ECX=px out, EAX=py out; fn10f0 takes px and EBX=py)
 struct S51D10 { I mode,c414,b848,bc4c,b828,b824,c2fc,x0,y0,x1,y1,c2f8,a68,c2f4,c64c,c9638; U* c3c4; };
 I sub_51D10(I* px,I* py,S51D10& g,I (*fn2c5c0)(),void (*fn1860)(),void (*fn10f0)(I*,I*),U* d3afa,
             P (*fn55b40)(I,I),P (*ord10331)(P,P),void (*ord10742)(P)){
@@ -73,9 +73,9 @@ void sub_51E30(P esi,I (*f568e0)(P,I,I,I),void (*f1860)(P),I& c2f4,I& c2f8){
 }
 // message builder shared shape: 23 zeroed words, dispatch via D2Client+0xB30F0
 static P send(Calls& c,U w0,U w1,U w2,U w3,U w4,U w5){U m[23]={};m[0]=w0;m[1]=w1;m[2]=w2;m[3]=w3;m[4]=w4;m[5]=w5;return c.node630f0(m);}
-// 1.13c D2Client+0x52230  (word idx = byte offset from frame base / 4: [0x10]=0x133,[0x30]=1)
+// old form of D2Client 52230 (now d2client_52230.cpp)  (word idx = byte offset from frame base / 4: [0x10]=0x133,[0x30]=1)
 void sub_52230(U p2,Calls& c){U m[23]={};m[1]=p2;m[2]=p2;m[4]=0x133;m[12]=1;c.node630f0(m);}
-// 1.13c D2Client+0x52270  (ESI = id; disassembly: each message is 23 zeroed words with [1]=[2]=ESI, [4]=type, [12]=1;
+// old form of D2Client 52270 (now d2client_52270.cpp)  (ESI = id; disassembly: each message is 23 zeroed words with [1]=[2]=ESI, [4]=type, [12]=1;
 // types 0x12b (result p goes to Ordinal_10637/10019 with 0x4b), 0x166, 0x132)
 void sub_52270(U esi,Calls& c){
  U m[23]={}; m[1]=esi; m[2]=esi; m[4]=0x12b; m[12]=1;
@@ -84,7 +84,7 @@ void sub_52270(U esi,Calls& c){
  std::memset(m,0,sizeof m); m[1]=esi; m[12]=1; m[2]=esi; m[4]=0x166; c.node630f0(m);
  std::memset(m,0,sizeof m); m[1]=esi; m[2]=esi; m[12]=1; m[4]=0x132; c.node630f0(m);
 }
-// 1.13c D2Client+0x52320 (ESI = unit/client handle; three messages 0x11c, 0x128, 0x125)
+// old form of D2Client 52320 (now d2client_52320.cpp) (ESI = unit/client handle; three messages 0x11c, 0x128, 0x125)
 void sub_52320(U esi,Calls& c){U m[23]={}; m[1]=esi; m[2]=esi; m[4]=0x11c; m[12]=1;
  P p=c.node630f0(m); if(p)c.o10637(p,0x32);
  std::memset(m,0,sizeof m); m[1]=esi; m[2]=esi; m[4]=0x128; m[12]=1; c.node630f0(m);
@@ -111,7 +111,7 @@ void sub_52570(P client,Calls& c){
  U y=uy(p,c),x=ux(p,c);
  c.fn5ff10(U(uintptr_t(client)),0x271,x,y,0,1);
 }
-// 1.13c D2Client+0x52620 / 526E0 / 527A0: unit event message (ids 0x16b / 0x161 / 0x15b)
+// old form of D2Client 52620 / 526E0 / 527A0 (now their own files): unit event message (ids 0x16b / 0x161 / 0x15b)
 static void unitMsg(P unit,U client,U id,Calls& c){
  U y=uy(unit,c),x=ux(unit,c);
  if(!client)return;

@@ -142,7 +142,7 @@ void sub_53550(Svc& s,G& g,Unit* a){
   if(ok>=3) break;
  }
 }
-// 1.13c D2Client+0x536F0
+// old form of D2Client 536F0 (now d2client_536f0.cpp), kept for 53720 below
 void sub_536F0(Svc& s,G& g){
  for(Unit* u=s.o10717(g.cc3b8);u;u=u->next7c) if(s.o10826(u)==8) sub_53550(s,g,u);
 }
