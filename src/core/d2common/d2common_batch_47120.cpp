@@ -1,58 +1,45 @@
-// D2Common 1.13c batch. Unwired retail callees are weak so the file links.
+// D2Common 1.13c 0x47120 (#10803, stdcall unit, skill, level, charges; ret 0x10): give an item (or the first item in the unit's
+// inventory chain that takes it) the charged-skill stat 0xCC. Retail addresses are 32-bit words; the callees and sgptDataTables
+// come in through the env (retail registers named on each seam).
 #include <cstdint>
-#include <emscripten.h>
+#include <cstring>
+#include "d2common_47120.h"
 
-extern "C" {
-#define W __attribute__((weak))
-W intptr_t sub_37F40(int32_t);                                            // 0x37F40
-W int32_t sub_38B00(intptr_t);                                            // 0x38B00
-W void sub_3A1D0(intptr_t, int32_t, uint32_t, uint32_t, intptr_t);        // 0x3A1D0
-W uint8_t* sgptDataTables;
-
-static inline uint32_t rd(intptr_t p, int off) { return *(const uint32_t*)(p + off); }
+static uint32_t rd(uint32_t a) { uint32_t v; memcpy(&v, (const void*)(uintptr_t)a, 4); return v; }
 
 // 1.13c D2Common+0x47120
-EMSCRIPTEN_KEEPALIVE int32_t sub_47120(intptr_t p1, int32_t p2, uint32_t p3, uint32_t p4) {
- uint8_t* t = sgptDataTables;
- if (!p1 || rd(p1, 0) != 4) return 0;
- uint32_t shift = rd((intptr_t)t, 0xc6c), mask = rd((intptr_t)t, 0xc70);
- uint32_t a = rd(p1, 0x5c);
- if (a && (int32_t)rd((intptr_t)a, 0x10) < 0) {
-  intptr_t n = sub_37F40(0x40);
+int32_t D2Common_47120_AddChargedSkill(uint32_t unit, int32_t skill, uint32_t level, int32_t charges, const D2Common47120Env* e) {
+ if (!unit || rd(unit) != 4) return 0;
+ uint32_t t = e->dt();
+ const uint32_t layer = ((uint32_t)skill << (rd(t + 0xc6c) & 0x1f)) + (rd(t + 0xc70) & level);
+ const uint32_t par = rd(unit + 0x5c);
+ if (par && (int32_t)rd(par + 0x10) < 0) {
+  uint32_t n = e->find(par, 0x40);                      // 0x37F40: EAX = parent, ECX = 0x40
   while (n) {
-   t = sgptDataTables;
-   if (0xcc < (int32_t)rd((intptr_t)t, 0xbd4) && rd((intptr_t)t, 0xbcc) + 0x10230 != 0) {
-    int32_t v = sub_38B00((intptr_t)(rd((intptr_t)t, 0xbcc) + 0x10230));
-    t = sgptDataTables;
+   if ((int32_t)rd(t + 0xbd4) > 0xcc && rd(t + 0xbcc) + 0x10230 != 0) {
+    const int32_t v = e->value(n, (0xccu << 16) + (layer & 0xffff), rd(t + 0xbcc) + 0x10230);   // 0x38B00: EBX list, EDI key, stack rec
     if (v) {
-     int32_t hi = v >> 8;
-     if (hi < 1 || hi >= 0x100) return 0;
-     uint32_t lo = p4 & (((int32_t)p4 < 1) - 1u);
-     if (hi <= (int32_t)lo) lo = hi;
-     sub_3A1D0(n, 0xcc, hi * 0x100 + (lo & 0xff), (p2 << (shift & 0x1f)) + (mask & p3), p1);
+     const int32_t hi = v >> 8;
+     if (hi < 1 || hi > 0xff) return 0;
+     int32_t lo = charges & -(int32_t)(charges >= 1);
+     if (lo >= hi) lo = hi;
+     e->set(n, 0xcc, (uint32_t)(hi << 8) + ((uint32_t)lo & 0xff), layer, unit);   // 0x3A1D0 stdcall, 5 words
      return 1;
     }
+    t = e->dt();
    }
-   n = (intptr_t)rd(n, 0x2c);
-   for (;;) {
-    if (!n) goto next;
-    if (*(const uint8_t*)(n + 0x10) & 0x40) break;
-    n = (intptr_t)rd(n, 0x2c);
-   }
+   n = rd(n + 0x2c);
+   while (n && !(rd(n + 0x10) & 0x40)) n = rd(n + 0x2c);
   }
  }
-next:
- intptr_t c = (intptr_t)rd(p1, 0x60);
- if (c && rd(c, 0) == 0x1020304) {
-  intptr_t q = (intptr_t)rd(c, 0xc);
-  while (q) {
-   if (sub_47120(rd(q, 0) == 4 ? q : 0, p2, p3, p4)) return 1;
-   if (rd(q, 0) != 4) return 0;
-   int32_t x = (int32_t)rd(q, 0x14);
-   if (x == 0 || x == -0x5c) return 0;
-   q = (intptr_t)rd((intptr_t)x, 100);
-  }
+ const uint32_t inv = rd(unit + 0x60);
+ if (!inv || rd(inv) != 0x1020304) return 0;
+ for (uint32_t q = rd(inv + 0xc); q;) {
+  if (D2Common_47120_AddChargedSkill(rd(q) == 4 ? q : 0, skill, level, charges, e)) return 1;
+  if (rd(q) != 4) return 0;
+  const uint32_t id = rd(q + 0x14);
+  if (!id || id + 0x5c == 0) return 0;
+  q = rd(id + 0x64);
  }
  return 0;
-}
 }
