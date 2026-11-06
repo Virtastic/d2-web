@@ -41,8 +41,11 @@ extern "C" int32_t fog_sub_1EB50(const FogEnv1EB50* e, uint8_t* arr, const uint8
     uint32_t total, n = len;
     if (*(int32_t*)(arr + 0x118) == 4 && *(int32_t*)(arr + 0x11C) == 2) {
         if (!data || !len || len >= 0x2060) { e->fatal(e->capture_ip(), 0x5D); return -1; }
-        buf[0] = arr[0x120]; uint16_t t = (uint16_t)(len + 3); memcpy(buf + 1, &t, 2);
-        memcpy(buf + 3, data, len); total = n + 3;
+        // retail copies len-1 bytes of data to frame+3 first, then writes the 4-byte header {type, data[0], u16 len+3} over frame+0..3;
+        // frame[len+2] (the last byte sent) is never written (stack residue)
+        memcpy(buf + 3, data, len - 1);
+        uint16_t t = (uint16_t)(len + 3);
+        buf[0] = arr[0x120]; buf[1] = data[0]; memcpy(buf + 2, &t, 2); total = n + 3;
     } else {
         uint16_t t = (uint16_t)(len + 2);
         if (t >= 0x2064) { e->fatal(e->capture_ip(), 0x71); return -1; }

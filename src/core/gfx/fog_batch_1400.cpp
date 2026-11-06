@@ -342,10 +342,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_fog_1750(uint32_t* r) {
     fog_array_free_items(reinterpret_cast<FogArray*>(static_cast<uintptr_t>(r[0])));
 }
 
-// 1.13c Fog+0x17D0
-EMSCRIPTEN_KEEPALIVE void d2_fn_fog_17d0(uint32_t* r) {
-    fog_array_resize(reinterpret_cast<FogArray*>(static_cast<uintptr_t>(r[0])), r[1]);
-}
+// 1.13c Fog+0x17D0 is ported in src/core/fog/fog_17d0.cpp.
 
 // 1.13c Fog+0x184D
 EMSCRIPTEN_KEEPALIVE uint32_t d2_eng_fog_184d(const FogCrtLocale* l, uint32_t c) { return fog_tolower_mt(l, c); }

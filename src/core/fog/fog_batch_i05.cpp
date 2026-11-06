@@ -58,6 +58,6 @@ extern "C" void* fog_sub_16dd0(uintptr_t host, uint32_t port) {  // 1.13c FOG+0x
 }
 extern "C" uint32_t fog_safesock_connect_1ec90(uint8_t* p) {  // 1.13c FOG+0x1EC90
 	void* s = fog_sub_16dd0((uintptr_t)(p + 8), *(uint32_t*)(p + 0x10c));
-	*(void**)(p + 0x110) = s;
+	*(uint32_t*)(p + 0x110) = (uint32_t)(uintptr_t)s;   // the retail field is a 32-bit handle
 	return 1;
 }
